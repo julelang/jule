@@ -34,15 +34,15 @@ It aims to be advanced, readable and a good choice for systems programming.
     <tr>
         <td>Windows</td>
         <td>Not Yet</td>
-    <tr>
+    </tr>
     <tr>
         <td>Linux</td>
         <td>Not Yet</td>
-    <tr>
+    </tr>
     <tr>
         <td>MacOS</td>
         <td>Not yet</td>
-    <tr>
+    </tr>
 </table>
 
 <h2 id="contributing">Contributing</h2>
