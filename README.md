@@ -10,10 +10,40 @@
 ## Table of Contents
 <div class="toc">
   <ul>
+    <li><a href="#overview">Overview</a></li>
+    <li><a href="#os_support">OS Support</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#license">License</a></li>
   </ul>
 </div>
+
+<h2 id="overview">Overview</h2>
+
+The X programming language is compiled, static typed, fast, modern and simple.<br>
+Before the X source code is compiled, it is translated to C++ code and compiled from C++.<br>
+Transpiling to C++ only instead of compiling is also an option.<br>
+It aims to be advanced, readable and a good choice for systems programming.
+
+<h2 id="os_support">OS Support</h2>
+
+<table>
+    <tr>
+        <td>Operating System</td>
+        <td>State</td>
+    </tr>
+    <tr>
+        <td>Windows</td>
+        <td>Not Yet</td>
+    <tr>
+    <tr>
+        <td>Linux</td>
+        <td>Not Yet</td>
+    <tr>
+    <tr>
+        <td>MacOS</td>
+        <td>Not yet</td>
+    <tr>
+</table>
 
 <h2 id="contributing">Contributing</h2>
 
