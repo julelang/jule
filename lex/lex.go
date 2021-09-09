@@ -110,6 +110,10 @@ func (l *Lex) Token() Token {
 		tk.Value = "}"
 		tk.Type = Brace
 		l.Position++
+	case isKeyword(ln, "int8"):
+		tk.Value = "int8"
+		tk.Type = Type
+		l.Position += 5
 	case isKeyword(ln, "int16"):
 		tk.Value = "int16"
 		tk.Type = Type
