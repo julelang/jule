@@ -21,8 +21,31 @@ func help(cmd string) {
 		println("This module can only be used as single!")
 		return
 	}
-	println(`help        Show help.
-version     Show version.`)
+	helpContent := [][]string{
+		{"help", "Show help."},
+		{"version", "Show version."},
+		{"init", "Initialize new project here."},
+	}
+	maxlen := len(helpContent[0][0])
+	for _, part := range helpContent {
+		length := len(part[0])
+		if length > maxlen {
+			maxlen = length
+		}
+	}
+	var sb strings.Builder
+	const space = 5 // Space of between command name and description.
+	for _, part := range helpContent {
+		sb.WriteString(part[0])
+		mlchc := (maxlen - len(part[0])) + space
+		for mlchc > 0 {
+			sb.WriteByte(' ')
+			mlchc--
+		}
+		sb.WriteString(part[1])
+		sb.WriteByte('\n')
+	}
+	println(sb.String()[:sb.Len()-1])
 }
 
 func version(cmd string) {
@@ -33,12 +56,28 @@ func version(cmd string) {
 	println("The X Programming Language\n" + x.Version)
 }
 
+func initProject(cmd string) {
+	if cmd != "" {
+		println("This module can only be used as single!")
+		return
+	}
+	err := os.WriteFile(x.SettingsFile, []byte(`out_dir ./
+out_name x.cpp`), 0606)
+	if err != nil {
+		println(err.Error())
+		return
+	}
+	println("Initialized project.")
+}
+
 func processCommand(namespace, cmd string) bool {
 	switch namespace {
 	case "help":
 		help(cmd)
 	case "version":
 		version(cmd)
+	case "init":
+		initProject(cmd)
 	default:
 		return false
 	}
@@ -66,6 +105,26 @@ func init() {
 	}
 }
 
+func loadXSet() {
+	// File check.
+	info, err := os.Stat(x.SettingsFile)
+	if err != nil || info.IsDir() {
+		println(`X settings file ("` + x.SettingsFile + `") is not found!`)
+		os.Exit(0)
+	}
+	x.XSettings = x.NewXSet()
+	bytes, err := os.ReadFile(x.SettingsFile)
+	if err != nil {
+		println(err.Error())
+		os.Exit(0)
+	}
+	err = x.XSettings.Parse(bytes)
+	if err != nil {
+		println(err.Error())
+		os.Exit(0)
+	}
+}
+
 func printErrors(errors []string) {
 	defer os.Exit(0)
 	for _, message := range errors {
@@ -81,6 +140,7 @@ func main() {
 		println(err.Error())
 		return
 	}
+	loadXSet()
 	routines = new(sync.WaitGroup)
 	info := new(parser.ParseFileInfo)
 	info.File = f
