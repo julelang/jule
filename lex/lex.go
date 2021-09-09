@@ -113,7 +113,7 @@ func (l *Lex) Token() Token {
 	case isKeyword(ln, "int8"):
 		tk.Value = "int8"
 		tk.Type = Type
-		l.Position += 5
+		l.Position += 4
 	case isKeyword(ln, "int16"):
 		tk.Value = "int16"
 		tk.Type = Type
@@ -124,6 +124,10 @@ func (l *Lex) Token() Token {
 		l.Position += 5
 	case isKeyword(ln, "int64"):
 		tk.Value = "int64"
+		tk.Type = Type
+		l.Position += 5
+	case isKeyword(ln, "uint8"):
+		tk.Value = "uint8"
 		tk.Type = Type
 		l.Position += 5
 	default:
