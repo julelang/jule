@@ -17,8 +17,9 @@ type XSet struct {
 func NewXSet() *XSet {
 	xs := new(XSet)
 	xs.Fields = make(map[string]string)
-	xs.Fields["out_dir"] = ""
 	xs.Fields["out_name"] = ""
+	xs.Fields["cxx_out_dir"] = ""
+	xs.Fields["cxx_out_name"] = ""
 	return xs
 }
 

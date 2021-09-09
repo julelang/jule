@@ -61,8 +61,9 @@ func initProject(cmd string) {
 		println("This module can only be used as single!")
 		return
 	}
-	err := os.WriteFile(x.SettingsFile, []byte(`out_dir ./
-out_name x.cpp`), 0606)
+	err := os.WriteFile(x.SettingsFile, []byte(`out_name main
+cxx_out_dir ./
+cxx_out_name x.cpp`), 0606)
 	if err != nil {
 		println(err.Error())
 		return
@@ -156,7 +157,7 @@ func main() {
 	}
 	os.WriteFile(
 		filepath.Join(
-			x.XSettings.Fields["out_dir"],
-			x.XSettings.Fields["out_name"]),
+			x.XSettings.Fields["cxx_out_dir"],
+			x.XSettings.Fields["cxx_out_name"]),
 		[]byte(info.X_CXX), 0606)
 }

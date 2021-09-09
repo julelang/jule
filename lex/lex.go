@@ -10,8 +10,7 @@ import (
 	"github.com/the-xlang/x/pkg/x"
 )
 
-// error thrown exception.
-func (l *Lex) error(err string) {
+func (l *Lex) pushError(err string) {
 	l.Errors = append(l.Errors,
 		fmt.Sprintf("%s %d:%d %s", l.File.Path, l.Line, l.Column, x.Errors[err]))
 }
@@ -148,7 +147,7 @@ func (l *Lex) Token() Token {
 			tk.Type = Name
 			break
 		}
-		l.error("invalid_token")
+		l.pushError("invalid_token")
 		l.Column++
 		l.Position++
 		return tk
