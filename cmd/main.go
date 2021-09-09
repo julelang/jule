@@ -5,10 +5,13 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
+	"github.com/the-xlang/x/parser"
 	"github.com/the-xlang/x/pkg/io"
 	"github.com/the-xlang/x/pkg/x"
 )
@@ -63,10 +66,30 @@ func init() {
 	}
 }
 
+func printErrors(errors []string) {
+	defer os.Exit(0)
+	for _, message := range errors {
+		fmt.Println(message)
+	}
+}
+
+var routines *sync.WaitGroup
+
 func main() {
-	_, err := io.GetX(os.Args[0])
+	f, err := io.GetX(os.Args[0])
 	if err != nil {
 		println(err.Error())
 		return
 	}
+	routines = new(sync.WaitGroup)
+	info := new(parser.ParseFileInfo)
+	info.File = f
+	info.Routines = routines
+	routines.Add(1)
+	go parser.ParseFile(info)
+	routines.Wait()
+	if info.Errors != nil {
+		printErrors(info.Errors)
+	}
+	os.WriteFile("x.cxx", []byte(info.X_CXX), 0606)
 }
