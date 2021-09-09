@@ -1,6 +1,7 @@
 package x
 
 import (
+	"errors"
 	"fmt"
 	"runtime"
 	"strings"
@@ -21,14 +22,26 @@ func NewXSet() *XSet {
 	return xs
 }
 
-// Parse is parse x.set file content to fields.
-func (xs *XSet) Parse(content []byte) error {
-	var lines []string
+func splitLines(content string) []string {
 	if runtime.GOOS == "windows" {
-		lines = strings.SplitN(string(content), "\n", -1)
-	} else {
-		lines = strings.SplitN(string(content), "\n\r", -1)
+		return strings.SplitN(string(content), "\n", -1)
 	}
+	return strings.SplitN(string(content), "\n\r", -1)
+}
+
+func (xs *XSet) checkUnset() []error {
+	var errs []error
+	for key := range xs.Fields {
+		if xs.Fields[key] == "" {
+			errs = append(errs, errors.New("\""+key+"\" is not defined!"))
+		}
+	}
+	return errs
+}
+
+// Parse is parse x.set file content to fields.
+func (xs *XSet) Parse(content []byte) []error {
+	lines := splitLines(string(content))
 	for index, line := range lines {
 		line = strings.TrimFunc(line, unicode.IsSpace)
 		if line == "" {
@@ -36,20 +49,20 @@ func (xs *XSet) Parse(content []byte) error {
 		}
 		parts := strings.SplitN(line, " ", -1)
 		if len(parts) < 2 {
-			return fmt.Errorf("invalid syntax at line %d", index+1)
+			return []error{fmt.Errorf("invalid syntax at line %d", index+1)}
 		}
 		key, value := parts[0], parts[1]
 		_, ok := xs.Fields[key]
 		if !ok {
-			return fmt.Errorf("invalid field at line %d", index+1)
+			return []error{fmt.Errorf("invalid field at line %d", index+1)}
 		}
 		switch key {
 		case "out_name":
 			if len(parts) > 2 {
-				return fmt.Errorf("invalid value at line %d", index+1)
+				return []error{fmt.Errorf("invalid value at line %d", index+1)}
 			}
 		}
-		xs.Fields[value] = value
+		xs.Fields[key] = value
 	}
-	return nil
+	return xs.checkUnset()
 }

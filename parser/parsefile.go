@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/the-xlang/x/lex"
@@ -25,7 +24,8 @@ func ParseFile(info *ParseFileInfo) {
 		info.Errors = lexer.Errors
 		return
 	}
-	for _, token := range tokens {
-		fmt.Print("'"+token.Value+"'", " ")
-	}
+	parser := NewParser(tokens, info)
+	parser.Parse()
+	code := parser.String()
+	info.X_CXX += code
 }

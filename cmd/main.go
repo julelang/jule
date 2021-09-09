@@ -118,9 +118,12 @@ func loadXSet() {
 		println(err.Error())
 		os.Exit(0)
 	}
-	err = x.XSettings.Parse(bytes)
-	if err != nil {
-		println(err.Error())
+	errors := x.XSettings.Parse(bytes)
+	if errors != nil {
+		println("X settings has errors;")
+		for _, err := range errors {
+			println(err.Error())
+		}
 		os.Exit(0)
 	}
 }
@@ -151,5 +154,9 @@ func main() {
 	if info.Errors != nil {
 		printErrors(info.Errors)
 	}
-	os.WriteFile("x.cxx", []byte(info.X_CXX), 0606)
+	os.WriteFile(
+		filepath.Join(
+			x.XSettings.Fields["out_dir"],
+			x.XSettings.Fields["out_name"]),
+		[]byte(info.X_CXX), 0606)
 }
