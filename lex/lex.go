@@ -130,6 +130,10 @@ func (l *Lex) Token() Token {
 		tk.Value = "uint8"
 		tk.Type = Type
 		l.Position += 5
+	case isKeyword(ln, "uint16"):
+		tk.Value = "uint16"
+		tk.Type = Type
+		l.Position += 6
 	default:
 		if chk := l.lexName(ln); chk != "" {
 			tk.Value = chk
