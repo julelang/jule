@@ -138,6 +138,10 @@ func (l *Lex) Token() Token {
 		tk.Value = "uint32"
 		tk.Type = Type
 		l.Position += 6
+	case isKeyword(ln, "uint64"):
+		tk.Value = "uint64"
+		tk.Type = Type
+		l.Position += 6
 	default:
 		if chk := l.lexName(ln); chk != "" {
 			tk.Value = chk
