@@ -63,7 +63,7 @@ func initProject(cmd string) {
 	}
 	err := os.WriteFile(x.SettingsFile, []byte(`out_name main
 cxx_out_dir ./
-cxx_out_name x.cpp`), 0606)
+cxx_out_name x.cxx`), 0606)
 	if err != nil {
 		println(err.Error())
 		return

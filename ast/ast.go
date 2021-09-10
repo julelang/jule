@@ -28,7 +28,7 @@ func (ast *AST) PushError(err string) {
 	message := x.Errors[err]
 	token := ast.Tokens[ast.Position]
 	ast.Errors = append(ast.Errors, fmt.Sprintf(
-		"%s %s: %d", token.File.Path, message, token.Line))
+		"%s:%d %s", token.File.Path, token.Line, message))
 }
 
 // Ended reports position is at end of tokens or not.
@@ -59,10 +59,16 @@ func (ast *AST) BuildFunction() {
 	function.ReturnType.Type = x.Void
 	// Skip function parentheses.
 	//! Fix here at after.
-	ast.Position += 3
+	ast.Position++
+	parameters := ast.getRange("(", ")")
+	if parameters == nil {
+		return
+	} else if len(parameters) > 0 {
+		ast.PushError("parameters_not_supported")
+	}
 	if ast.Ended() {
 		ast.Position--
-		ast.PushError("function_body")
+		ast.PushError("function_body_not_exist")
 		ast.Position = -1 // Stop parsing.
 		return
 	}
@@ -73,7 +79,7 @@ func (ast *AST) BuildFunction() {
 		ast.Position++
 		if ast.Ended() {
 			ast.Position--
-			ast.PushError("function_body")
+			ast.PushError("function_body_not_exist")
 			ast.Position = -1 // Stop parsing.
 			return
 		}
@@ -88,7 +94,12 @@ func (ast *AST) BuildFunction() {
 		}
 		// Skip function braces.
 		//! Fix here at after.
-		ast.Position += 2
+		block := ast.getRange("{", "}")
+		if block == nil {
+			ast.PushError("function_body_not_exist")
+			ast.Position = -1
+			return
+		}
 	default:
 		ast.PushError("invalid_syntax")
 		ast.Position = -1 // Stop parsing.
@@ -123,4 +134,32 @@ func (ast *AST) processName() {
 			ast.PushError("invalid_syntax")
 		}
 	}
+}
+
+func (ast *AST) getRange(open, close string) []lex.Token {
+	token := ast.Tokens[ast.Position]
+	if token.Type == lex.Brace && token.Value == open {
+		ast.Position++
+		braceCount := 1
+		start := ast.Position
+		for ; braceCount > 0 && !ast.Ended(); ast.Position++ {
+			token := ast.Tokens[ast.Position]
+			if token.Type != lex.Brace {
+				continue
+			}
+			if token.Value == open {
+				braceCount++
+			} else if token.Value == close {
+				braceCount--
+			}
+		}
+		if braceCount > 0 {
+			ast.Position--
+			ast.PushError("brace_not_closed")
+			ast.Position = -1
+			return nil
+		}
+		return ast.Tokens[start+1 : ast.Position]
+	}
+	return nil
 }
