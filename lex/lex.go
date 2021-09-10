@@ -64,7 +64,7 @@ func (l *Lex) resume() string {
 		if unicode.IsSpace(r) {
 			l.Column++
 			l.Position++
-			if r == '\n' || r == '\r' {
+			if r == '\n' {
 				l.Line++
 				l.Column = 1
 			}

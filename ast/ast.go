@@ -88,7 +88,7 @@ func (ast *AST) BuildFunction() {
 		}
 		// Skip function braces.
 		//! Fix here at after.
-		ast.Position += 3
+		ast.Position += 2
 	default:
 		ast.PushError("invalid_syntax")
 		ast.Position = -1 // Stop parsing.
