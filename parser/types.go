@@ -2,29 +2,7 @@ package parser
 
 import "github.com/the-xlang/x/pkg/x"
 
-func typeFromName(name string) uint {
-	switch name {
-	case "int8":
-		return x.Int8
-	case "int16":
-		return x.Int16
-	case "int32":
-		return x.Int32
-	case "int64":
-		return x.Int64
-	case "uint8":
-		return x.UInt8
-	case "uint16":
-		return x.UInt16
-	case "uint32":
-		return x.UInt32
-	case "uint64":
-		return x.UInt64
-	}
-	return 0 // Unreachable code.
-}
-
-func cxxTypeNameFromType(typeCode uint) string {
+func cxxTypeNameFromType(typeCode uint8) string {
 	switch typeCode {
 	case x.Void:
 		return "void"

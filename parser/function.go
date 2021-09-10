@@ -11,7 +11,7 @@ type Function struct {
 	FILE       *io.FILE
 	Line       int
 	Name       string
-	ReturnType uint
+	ReturnType uint8
 }
 
 func (f Function) String() string {
