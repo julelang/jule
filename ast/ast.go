@@ -210,7 +210,8 @@ func (ast *AST) BuildReturnStatement(tokens []lex.Token) StatementAST {
 
 // BuildExpression builds AST model of expression.
 func (ast *AST) BuildExpression(tokens []lex.Token) (e ExpressionAST) {
-	return ast.processExpression(tokens)
+	_, e = ast.processExpression(tokens)
+	return
 }
 
 func (ast *AST) processSingleValuePart(token lex.Token) (result ValueAST) {
@@ -242,7 +243,6 @@ func (ast *AST) processSingleValuePart(token lex.Token) (result ValueAST) {
 }
 
 func (ast *AST) processValuePart(tokens []lex.Token) (result ValueAST) {
-	//var result *oop.Val
 	if len(tokens) == 1 {
 		result = ast.processSingleValuePart(tokens[0])
 		if result.Type != NA {
@@ -250,11 +250,54 @@ func (ast *AST) processValuePart(tokens []lex.Token) (result ValueAST) {
 		}
 	}
 	switch token := tokens[len(tokens)-1]; token.Type {
+	case lex.Brace:
+		switch token.Value {
+		case ")":
+			return ast.processParenthesesValuePart(tokens)
+		}
 	default:
 		ast.PushErrorToken(tokens[0], "invalid_syntax")
 	}
 end:
 	return
+}
+
+func (ast *AST) processParenthesesValuePart(tokens []lex.Token) ValueAST {
+	var valueTokens []lex.Token
+	j := len(tokens) - 1
+	braceCount := 0
+	for ; j >= 0; j-- {
+		token := tokens[j]
+		if token.Type != lex.Brace {
+			continue
+		}
+		switch token.Value {
+		case ")":
+			braceCount++
+		case "(":
+			braceCount--
+		}
+		if braceCount > 0 {
+			continue
+		}
+		valueTokens = tokens[:j]
+		break
+	}
+	if len(valueTokens) == 0 && braceCount == 0 {
+		tk := tokens[0]
+		tokens = tokens[1 : len(tokens)-1]
+		if len(tokens) == 0 {
+			ast.PushErrorToken(tk, "invalid_syntax")
+		}
+		value, _ := ast.processExpression(tokens)
+		return value
+	}
+	val := ast.processValuePart(valueTokens)
+	switch val.Type {
+	default:
+		ast.PushErrorToken(tokens[len(valueTokens)], "invalid_syntax")
+	}
+	return ValueAST{} // Unreachable return.
 }
 
 type arithmeticProcess struct {
@@ -303,19 +346,17 @@ func (p arithmeticProcess) solve() (value ValueAST) {
 	return
 }
 
-func (ast *AST) processExpression(tokens []lex.Token) ExpressionAST {
+func (ast *AST) processExpression(tokens []lex.Token) (ValueAST, ExpressionAST) {
 	processes := ast.getExpressionProcesses(tokens)
-	if len(processes) == 1 {
-		value := ast.processValuePart(processes[0])
-		return ExpressionAST{
-			Content: []ExpressionNode{{
-				Content: value,
-				Type:    ExpressionNodeValue,
-			}},
-			Type: value.Type,
-		}
+	if processes == nil {
+		return ValueAST{}, ExpressionAST{}
 	}
 	result := buildExpressionByProcesses(processes)
+	if len(processes) == 1 {
+		value := ast.processValuePart(processes[0])
+		result.Type = value.Type
+		return value, result
+	}
 	var process arithmeticProcess
 	var value ValueAST
 	process.ast = ast
@@ -374,7 +415,7 @@ func (ast *AST) processExpression(tokens []lex.Token) ExpressionAST {
 		j = ast.nextOperator(processes)
 	}
 	result.Type = value.Type
-	return result
+	return value, result
 }
 
 func buildExpressionByProcesses(processes [][]lex.Token) ExpressionAST {
@@ -453,6 +494,7 @@ func (ast *AST) getExpressionProcesses(tokens []lex.Token) [][]lex.Token {
 	var processes [][]lex.Token
 	var part []lex.Token
 	operator := false
+	value := false
 	braceCount := 0
 	pushedError := false
 	for index, token := range tokens {
@@ -466,6 +508,7 @@ func (ast *AST) getExpressionProcesses(tokens []lex.Token) [][]lex.Token {
 				ast.PushErrorToken(token, "operator_overflow")
 			}
 			operator = false
+			value = true
 			if braceCount > 0 {
 				part = append(part, token)
 				continue
@@ -493,9 +536,14 @@ func (ast *AST) getExpressionProcesses(tokens []lex.Token) [][]lex.Token {
 		ast.checkExpressionToken(token)
 		part = append(part, token)
 		operator = requireOperatorForProcess(token, index, len(tokens))
+		value = false
 	}
-	if len(part) != 0 {
+	if len(part) > 0 {
 		processes = append(processes, part)
+	}
+	if value {
+		ast.PushErrorToken(processes[len(processes)-1][0], "operator_overflow")
+		pushedError = true
 	}
 	if pushedError {
 		return nil
