@@ -23,12 +23,16 @@ func New(tokens []lex.Token) *AST {
 	return ast
 }
 
-// PushError is appends new error by parser fields.
-func (ast *AST) PushError(err string) {
+// PushErrorToken appends error by specified token.
+func (ast *AST) PushErrorToken(token lex.Token, err string) {
 	message := x.Errors[err]
-	token := ast.Tokens[ast.Position]
 	ast.Errors = append(ast.Errors, fmt.Sprintf(
 		"%s:%d %s", token.File.Path, token.Line, message))
+}
+
+// PushError appends error by current token.
+func (ast *AST) PushError(err string) {
+	ast.PushErrorToken(ast.Tokens[ast.Position], err)
 }
 
 // Ended reports position is at end of tokens or not.
@@ -85,26 +89,18 @@ func (ast *AST) BuildFunction() {
 		}
 		token = ast.Tokens[ast.Position]
 	}
-	switch token.Type {
-	case lex.Brace:
-		if token.Value != "{" {
-			ast.PushError("invalid_syntax")
-			ast.Position = -1 // Stop parsing.
-			return
-		}
-		// Skip function braces.
-		//! Fix here at after.
-		block := ast.getRange("{", "}")
-		if block == nil {
-			ast.PushError("function_body_not_exist")
-			ast.Position = -1
-			return
-		}
-	default:
+	if token.Type != lex.Brace || token.Value != "{" {
 		ast.PushError("invalid_syntax")
 		ast.Position = -1 // Stop parsing.
 		return
 	}
+	blockTokens := ast.getRange("{", "}")
+	if blockTokens == nil {
+		ast.PushError("function_body_not_exist")
+		ast.Position = -1
+		return
+	}
+	function.Block = ast.BuildBlock(blockTokens)
 	ast.Tree = append(ast.Tree, Object{
 		Token: function.Token,
 		Type:  Statement,
@@ -114,6 +110,73 @@ func (ast *AST) BuildFunction() {
 			Value: function,
 		},
 	})
+}
+
+// IsStatement reports token is
+// statement finish point or not.
+func IsStatement(before, current lex.Token) bool {
+	return current.Type == lex.SemiColon || before.Line < current.Line
+}
+
+// BuildBlock builds AST model of statements of code block.
+func (ast *AST) BuildBlock(tokens []lex.Token) (b BlockAST) {
+	braceCount := 0
+	oldStatementPoint := 0
+	for index, token := range tokens {
+		if token.Type == lex.Brace {
+			if token.Value == "{" {
+				braceCount++
+			} else {
+				braceCount--
+			}
+		}
+		if braceCount > 0 {
+			continue
+		}
+		if index < len(tokens)-1 {
+			if index == 0 && !IsStatement(token, token) {
+				continue
+			} else if index > 0 && !IsStatement(tokens[index-1], token) {
+				continue
+			}
+		}
+		if token.Type != lex.SemiColon {
+			index++
+		}
+		if index-oldStatementPoint == 0 {
+			continue
+		}
+		b.Content = append(b.Content,
+			ast.BuildStatement(tokens[oldStatementPoint:index]))
+		oldStatementPoint = index + 1
+	}
+	return
+}
+
+// BuildStatement builds AST model of statement.
+func (ast *AST) BuildStatement(tokens []lex.Token) (s StatementAST) {
+	firstToken := tokens[0]
+	switch firstToken.Type {
+	case lex.Return:
+		return ast.BuildReturnStatement(tokens)
+	default:
+		ast.PushErrorToken(firstToken, "invalid_syntax")
+	}
+	return
+}
+
+// BuildReturnStatement builds AST model of return statement.
+func (ast *AST) BuildReturnStatement(tokens []lex.Token) StatementAST {
+	var returnModel ReturnAST
+	returnModel.Token = tokens[0]
+	if len(tokens) > 1 {
+		ast.PushErrorToken(tokens[1], "not_support_expression")
+	}
+	return StatementAST{
+		Token: returnModel.Token,
+		Type:  StatementReturn,
+		Value: returnModel,
+	}
 }
 
 func (ast *AST) processName() {
@@ -159,7 +222,7 @@ func (ast *AST) getRange(open, close string) []lex.Token {
 			ast.Position = -1
 			return nil
 		}
-		return ast.Tokens[start+1 : ast.Position]
+		return ast.Tokens[start : ast.Position-1]
 	}
 	return nil
 }

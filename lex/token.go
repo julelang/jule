@@ -13,8 +13,10 @@ type Token struct {
 
 // Token types.
 const (
-	NA    = 0
-	Type  = 1
-	Name  = 2
-	Brace = 3
+	NA        = 0
+	Type      = 1
+	Name      = 2
+	Brace     = 3
+	Return    = 4
+	SemiColon = 5
 )

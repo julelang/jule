@@ -30,7 +30,7 @@ type RangeAST struct {
 
 // BlockAST is code block.
 type BlockAST struct {
-	Content []Object
+	Content []StatementAST
 }
 
 // TypeAST is data type identifier.
@@ -45,4 +45,18 @@ type FunctionAST struct {
 	Name       string
 	ReturnType TypeAST
 	Block      BlockAST
+}
+
+// ExpressionAST is AST model of expression.
+type ExpressionAST struct {
+}
+
+// ReturnAST is return statement AST model.
+type ReturnAST struct {
+	Token      lex.Token
+	Expression ExpressionAST
+}
+
+func (rast ReturnAST) String() string {
+	return rast.Token.Value
 }

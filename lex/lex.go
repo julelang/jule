@@ -93,6 +93,10 @@ func (l *Lex) Token() Token {
 	//* Tokenize
 
 	switch {
+	case ln[0] == ';':
+		tk.Value = ";"
+		tk.Type = SemiColon
+		l.Position++
 	case ln[0] == '(':
 		tk.Value = "("
 		tk.Type = Brace
@@ -140,6 +144,10 @@ func (l *Lex) Token() Token {
 	case isKeyword(ln, "uint64"):
 		tk.Value = "uint64"
 		tk.Type = Type
+		l.Position += 6
+	case isKeyword(ln, "return"):
+		tk.Value = "return"
+		tk.Type = Return
 		l.Position += 6
 	default:
 		if chk := l.lexName(ln); chk != "" {

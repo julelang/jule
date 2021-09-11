@@ -79,17 +79,30 @@ func (cp *CxxParser) ParseStatement(s ast.StatementAST) {
 }
 
 // ParseFunction parse X function to C++ code.
-func (cp *CxxParser) ParseFunction(f ast.FunctionAST) {
-	if function := cp.functionByBName(f.Name); function != nil {
-		cp.PushErrorToken(f.Token, "exist_name")
+func (cp *CxxParser) ParseFunction(fnAst ast.FunctionAST) {
+	if function := cp.functionByBName(fnAst.Name); function != nil {
+		cp.PushErrorToken(fnAst.Token, "exist_name")
 		return
 	}
-	function := new(Function)
-	function.Name = f.Name
-	function.Line = f.Token.Line
-	function.FILE = f.Token.File
-	function.ReturnType = f.ReturnType.Type
-	cp.Functions = append(cp.Functions, function)
+	fn := new(Function)
+	fn.Token = fnAst.Token
+	fn.Name = fnAst.Name
+	fn.ReturnType = fnAst.ReturnType.Type
+	fn.Block = fnAst.Block
+	cp.checkFunctionReturn(fn)
+	cp.Functions = append(cp.Functions, fn)
+}
+
+func (cp *CxxParser) checkFunctionReturn(fn *Function) {
+	if fn.ReturnType == x.Void {
+		return
+	}
+	for _, s := range fn.Block.Content {
+		if s.Type == ast.StatementReturn {
+			return
+		}
+	}
+	cp.PushErrorToken(fn.Token, "missing_return")
 }
 
 func (cp *CxxParser) functionByBName(name string) *Function {

@@ -20,6 +20,7 @@ const (
 const (
 	StatementNA       uint8 = 0
 	StatementFunction uint8 = 1
+	StatementReturn   uint8 = 2
 )
 
 // AST Range types.
