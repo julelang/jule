@@ -2,6 +2,9 @@ package ast
 
 import (
 	"fmt"
+	"math/big"
+	"strconv"
+	"strings"
 
 	"github.com/the-xlang/x/lex"
 	"github.com/the-xlang/x/pkg/x"
@@ -170,12 +173,132 @@ func (ast *AST) BuildReturnStatement(tokens []lex.Token) StatementAST {
 	var returnModel ReturnAST
 	returnModel.Token = tokens[0]
 	if len(tokens) > 1 {
-		ast.PushErrorToken(tokens[1], "not_support_expression")
+		returnModel.Expression = ast.BuildExpression(tokens[1:])
 	}
 	return StatementAST{
 		Token: returnModel.Token,
 		Type:  StatementReturn,
 		Value: returnModel,
+	}
+}
+
+// BuildExpression builds AST model of expression.
+func (ast *AST) BuildExpression(tokens []lex.Token) (e ExpressionAST) {
+	processes := ast.getExpressionProcesses(tokens)
+	if len(processes) == 1 {
+		value := ast.processExpression(tokens)
+		e.Content = append(e.Content, ExpressionNode{
+			Content: value,
+			Type:    ExpressionNodeValue,
+		})
+		e.Type = value.Type
+		return
+	}
+	return
+}
+
+// IsString reports vaule is string representation or not.
+func IsString(value string) bool {
+	return value[0] == '"'
+}
+
+// IsBoolean reports vaule is boolean representation or not.
+func IsBoolean(value string) bool {
+	return value == "true" || value == "false"
+}
+
+func (ast *AST) processSingleValuePart(token lex.Token) (result ValueAST) {
+	result.Type = NA
+	result.Token = token
+	switch token.Type {
+	case lex.Value:
+		if IsString(token.Value) {
+			result.Data = token.Value[1 : len(token.Value)-1]
+			result.Type = x.String
+		} else if IsBoolean(token.Value) {
+			result.Data = token.Value
+			result.Type = x.Boolean
+		}
+		// Numeric.
+		if strings.Contains(token.Value, ".") ||
+			strings.ContainsAny(token.Value, "eE") {
+			result.Type = x.Float64
+		} else {
+			result.Type = x.Int32
+			ok := CheckBitInt(token.Value, 32)
+			if !ok {
+				result.Type = x.Int64
+			}
+		}
+		result.Data = token.Value
+	}
+	return
+}
+
+func (ast *AST) processExpression(tokens []lex.Token) (result ValueAST) {
+	if len(tokens) == 1 {
+		result = ast.processSingleValuePart(tokens[0])
+		if result.Type != NA {
+			goto end
+		}
+	}
+	ast.PushErrorToken(tokens[0], "invalid_syntax")
+end:
+	return
+}
+
+func (ast *AST) getExpressionProcesses(tokens []lex.Token) [][]lex.Token {
+	var processes [][]lex.Token
+	var part []lex.Token
+	braceCount := 0
+	pushedError := false
+	for index, token := range tokens {
+		switch token.Type {
+		case lex.Brace:
+			switch token.Value {
+			case "(", "[", "{":
+				braceCount++
+			default:
+				braceCount--
+			}
+		}
+		if index > 0 {
+			lt := tokens[index-1]
+			if (lt.Type == lex.Name || lt.Type == lex.Value) &&
+				(token.Type == lex.Name || token.Type == lex.Value) {
+				ast.PushErrorToken(token, "invalid_syntax")
+				pushedError = true
+			}
+		}
+		ast.checkExpressionToken(token)
+		part = append(part, token)
+	}
+	if len(part) != 0 {
+		processes = append(processes, part)
+	}
+	if pushedError {
+		return nil
+	}
+	return processes
+}
+
+// CheckBitInt reports integer is compatible this bit-size or not.
+func CheckBitInt(value string, bit int) bool {
+	_, err := strconv.ParseInt(value, 10, bit)
+	return err == nil
+}
+
+func (ast *AST) checkExpressionToken(token lex.Token) {
+	if token.Value[0] >= '0' && token.Value[0] <= '9' {
+		var result bool
+		if strings.IndexByte(token.Value, '.') != -1 {
+			_, result = new(big.Float).SetString(token.Value)
+		} else {
+			result = CheckBitInt(token.Value, 64)
+		}
+		if !result {
+			ast.PushErrorToken(token, "invalid_numeric_range")
+		}
 	}
 }
 

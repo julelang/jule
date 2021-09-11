@@ -29,3 +29,22 @@ const (
 	RangeBrace       uint8 = 1
 	RangeParentheses uint8 = 2
 )
+
+// AST Expression types.
+const (
+	ExpressionNA      uint8 = 0
+	ExpressionNumeric uint8 = 1
+)
+
+// AST Expression node types.
+const (
+	ExpressionNodeNA       uint8 = 0
+	ExpressionNodeValue    uint8 = 1
+	ExpressionNodeOperator uint8 = 2
+)
+
+// AST Value types.
+const (
+	ValueNA      uint8 = 0
+	ValueNumeric uint8 = 1
+)

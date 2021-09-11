@@ -1,6 +1,11 @@
 package ast
 
-import "github.com/the-xlang/x/lex"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/the-xlang/x/lex"
+)
 
 // Object is an element of AST.
 type Object struct {
@@ -49,6 +54,43 @@ type FunctionAST struct {
 
 // ExpressionAST is AST model of expression.
 type ExpressionAST struct {
+	Content []ExpressionNode
+	Type    uint8
+}
+
+func (e ExpressionAST) String() string {
+	var sb strings.Builder
+	for _, node := range e.Content {
+		sb.WriteString(node.String())
+	}
+	return sb.String()
+}
+
+// ExpressionNode is value model.
+type ExpressionNode struct {
+	Content interface{}
+	Type    uint8
+}
+
+func (n ExpressionNode) String() string {
+	return fmt.Sprint(n.Content)
+}
+
+// ValueAST is AST model of constant value.
+type ValueAST struct {
+	Token lex.Token
+	Data  string
+	Type  uint8
+}
+
+func (v ValueAST) String() string {
+	return v.Data
+}
+
+// OperatorAST is AST model of operator.
+type OperatorAST struct {
+	Token lex.Token
+	Value string
 }
 
 // ReturnAST is return statement AST model.
@@ -58,5 +100,8 @@ type ReturnAST struct {
 }
 
 func (rast ReturnAST) String() string {
+	if rast.Expression.Type != NA {
+		return rast.Token.Value + " " + rast.Expression.String()
+	}
 	return rast.Token.Value
 }

@@ -12,4 +12,6 @@ var Errors = map[string]string{
 	`parameters_not_supported`: `functions is not support parameters, yet`,
 	`not_support_expression`:   `expressions is not supports yet`,
 	`missing_return`:           `missing return at end of function`,
+	`invalid_numeric_range`:    `arithmetic value overflow`,
+	`incompatible_value`:       `incompatible value with type`,
 }
