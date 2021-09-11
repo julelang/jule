@@ -54,7 +54,14 @@ To contribute, please read the contribution guidelines from <a href="https://git
 To discussions and questions, please use <a href="https://github.com/the-xlang/x/discussions">discussions</a>.
 <br><br>
 All contributions to X, no matter how small or large, are welcome. <br>
-From a simple typo correction to a contribution to the code, all contributions are welcome and appreciated.
+From a simple typo correction to a contribution to the code, all contributions are welcome and appreciated. <br>
+Before you start contributing, you should familiarize yourself with the following repository structure; <br>
+
++ ``ast/`` abstract syntax tree builder.
++ ``cmd/`` main and compile files.
++ ``lex/`` lexer.
++ ``parser/`` interpreter.
++ ``pkg/`` utility packages.
 
 <h2 id="license">License</h2>
 
