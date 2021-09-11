@@ -17,6 +17,89 @@ const (
 	Float64 uint8 = 12
 )
 
+// TypeGreaterThan reports type one is greater than type two or not.
+func TypeGreaterThan(t1, t2 uint8) bool {
+	switch t1 {
+	case Int16:
+		return t2 == Int8
+	case Int32:
+		return t2 == Int8 ||
+			t2 == Int16
+	case Int64:
+		return t2 == Int8 ||
+			t2 == Int16 ||
+			t2 == Int32
+	case UInt16:
+		return t2 == UInt8
+	case UInt32:
+		return t2 == UInt8 ||
+			t2 == UInt16
+	case UInt64:
+		return t2 == UInt8 ||
+			t2 == UInt16 ||
+			t2 == UInt32
+	}
+	return false
+}
+
+// TypeAreCompatible reports type one and type two is compatible or not.
+func TypesAreCompatible(t1, t2 uint8) bool {
+	switch t1 {
+	case Int8:
+		return t2 == Int8 ||
+			t2 == Int16 ||
+			t2 == Int32 ||
+			t2 == Int64
+	case Int16:
+		return t2 == Int16 ||
+			t2 == Int32 ||
+			t2 == Int64
+	case Int32:
+		return t2 == Int32 ||
+			t2 == Int64
+	case Int64:
+		return t2 == Int64
+	case UInt8:
+		return t2 == UInt8 ||
+			t2 == UInt16 ||
+			t2 == UInt32 ||
+			t2 == UInt64
+	case UInt16:
+		return t2 == UInt16 ||
+			t2 == UInt32 ||
+			t2 == UInt64
+	case UInt32:
+		return t2 == UInt32 ||
+			t2 == UInt64
+	case UInt64:
+		return t2 == UInt64
+	}
+	return false
+}
+
+// IsNumericType reports type is numeric or not.
+func IsNumericType(t uint8) bool {
+	return IsSignedNumericType(t) || IsUnsignedNumericType(t)
+}
+
+// IsSignedNumericType reports type is signed numeric or not.
+func IsSignedNumericType(t uint8) bool {
+	return t == Int8 ||
+		t == Int16 ||
+		t == Int32 ||
+		t == Int64 ||
+		t == Float32 ||
+		t == Float64
+}
+
+// IsUnsignedNumericType reports type is unsigned numeric or not.
+func IsUnsignedNumericType(t uint8) bool {
+	return t == UInt8 ||
+		t == UInt16 ||
+		t == UInt32 ||
+		t == UInt64
+}
+
 // TypeFromName returns type name of specified type code.
 func TypeFromName(name string) uint8 {
 	switch name {

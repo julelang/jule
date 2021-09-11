@@ -121,6 +121,32 @@ func IsStatement(before, current lex.Token) bool {
 	return current.Type == lex.SemiColon || before.Line < current.Line
 }
 
+// IsString reports vaule is string representation or not.
+func IsString(value string) bool {
+	return value[0] == '"'
+}
+
+// IsBoolean reports vaule is boolean representation or not.
+func IsBoolean(value string) bool {
+	return value == "true" || value == "false"
+}
+
+// CheckBitInt reports integer is compatible this bit-size or not.
+func CheckBitInt(value string, bit int) bool {
+	_, err := strconv.ParseInt(value, 10, bit)
+	return err == nil
+}
+
+// IsSigleOperator is returns true
+// if operator is unary or smilar to unary,
+// returns false if not.
+func IsSingleOperator(operator string) bool {
+	return operator == "-" ||
+		operator == "!" ||
+		operator == "*" ||
+		operator == "&"
+}
+
 // BuildBlock builds AST model of statements of code block.
 func (ast *AST) BuildBlock(tokens []lex.Token) (b BlockAST) {
 	braceCount := 0
@@ -184,27 +210,7 @@ func (ast *AST) BuildReturnStatement(tokens []lex.Token) StatementAST {
 
 // BuildExpression builds AST model of expression.
 func (ast *AST) BuildExpression(tokens []lex.Token) (e ExpressionAST) {
-	processes := ast.getExpressionProcesses(tokens)
-	if len(processes) == 1 {
-		value := ast.processExpression(tokens)
-		e.Content = append(e.Content, ExpressionNode{
-			Content: value,
-			Type:    ExpressionNodeValue,
-		})
-		e.Type = value.Type
-		return
-	}
-	return
-}
-
-// IsString reports vaule is string representation or not.
-func IsString(value string) bool {
-	return value[0] == '"'
-}
-
-// IsBoolean reports vaule is boolean representation or not.
-func IsBoolean(value string) bool {
-	return value == "true" || value == "false"
+	return ast.processExpression(tokens)
 }
 
 func (ast *AST) processSingleValuePart(token lex.Token) (result ValueAST) {
@@ -213,10 +219,10 @@ func (ast *AST) processSingleValuePart(token lex.Token) (result ValueAST) {
 	switch token.Type {
 	case lex.Value:
 		if IsString(token.Value) {
-			result.Data = token.Value[1 : len(token.Value)-1]
+			result.Value = token.Value[1 : len(token.Value)-1]
 			result.Type = x.String
 		} else if IsBoolean(token.Value) {
-			result.Data = token.Value
+			result.Value = token.Value
 			result.Type = x.Boolean
 		}
 		// Numeric.
@@ -230,30 +236,244 @@ func (ast *AST) processSingleValuePart(token lex.Token) (result ValueAST) {
 				result.Type = x.Int64
 			}
 		}
-		result.Data = token.Value
+		result.Value = token.Value
 	}
 	return
 }
 
-func (ast *AST) processExpression(tokens []lex.Token) (result ValueAST) {
+func (ast *AST) processValuePart(tokens []lex.Token) (result ValueAST) {
+	//var result *oop.Val
 	if len(tokens) == 1 {
 		result = ast.processSingleValuePart(tokens[0])
 		if result.Type != NA {
 			goto end
 		}
 	}
-	ast.PushErrorToken(tokens[0], "invalid_syntax")
+	switch token := tokens[len(tokens)-1]; token.Type {
+	default:
+		ast.PushErrorToken(tokens[0], "invalid_syntax")
+	}
 end:
 	return
+}
+
+type arithmeticProcess struct {
+	ast      *AST
+	left     []lex.Token
+	leftVal  ValueAST
+	right    []lex.Token
+	rightVal ValueAST
+	operator lex.Token
+}
+
+func (p arithmeticProcess) solveString() (value ValueAST) {
+	// Not both string?
+	if p.leftVal.Type != p.rightVal.Type {
+		p.ast.PushErrorToken(p.operator, "invalid_data_types")
+		return
+	}
+	value.Type = x.String
+	switch p.operator.Value {
+	case "+":
+		value.Value = p.leftVal.String() + p.rightVal.String()
+	default:
+		p.ast.PushErrorToken(p.operator, "operator_notfor_strings")
+	}
+	return
+}
+
+func (p arithmeticProcess) solve() (value ValueAST) {
+	switch {
+	case p.leftVal.Type == x.Boolean || p.rightVal.Type == x.Boolean:
+		p.ast.PushErrorToken(p.operator, "operator_notfor_booleans")
+		return
+	case p.leftVal.Type == x.String || p.rightVal.Type == x.String:
+		return p.solveString()
+	}
+	if x.IsSignedNumericType(p.leftVal.Type) !=
+		x.IsSignedNumericType(p.rightVal.Type) {
+		p.ast.PushErrorToken(p.operator, "operator_notfor_uint_and_int")
+		return
+	}
+	// Numeric.
+	value.Type = p.leftVal.Type
+	if x.TypeGreaterThan(p.rightVal.Type, value.Type) {
+		value.Type = p.rightVal.Type
+	}
+	return
+}
+
+func (ast *AST) processExpression(tokens []lex.Token) ExpressionAST {
+	processes := ast.getExpressionProcesses(tokens)
+	if len(processes) == 1 {
+		value := ast.processValuePart(processes[0])
+		return ExpressionAST{
+			Content: []ExpressionNode{{
+				Content: value,
+				Type:    ExpressionNodeValue,
+			}},
+			Type: value.Type,
+		}
+	}
+	result := buildExpressionByProcesses(processes)
+	var process arithmeticProcess
+	var value ValueAST
+	process.ast = ast
+	j := ast.nextOperator(processes)
+	for j != -1 {
+		if j == 0 {
+			process.leftVal = value
+			process.operator = processes[j][0]
+			process.right = processes[j+1]
+			process.rightVal = ast.processValuePart(process.right)
+			value = process.solve()
+			processes = processes[2:]
+			j = ast.nextOperator(processes)
+			continue
+		} else if j == len(processes)-1 {
+			process.operator = processes[j][0]
+			process.left = processes[j-1]
+			process.leftVal = ast.processValuePart(process.left)
+			process.rightVal = value
+			value = process.solve()
+			processes = processes[:j-1]
+			j = ast.nextOperator(processes)
+			continue
+		} else if prev := processes[j-1]; prev[0].Type == lex.Operator &&
+			len(prev) == 1 {
+			process.leftVal = value
+			process.operator = processes[j][0]
+			process.right = processes[j+1]
+			process.rightVal = ast.processValuePart(process.right)
+			value = process.solve()
+			processes = append(processes[:j], processes[j+2:]...)
+			j = ast.nextOperator(processes)
+			continue
+		}
+		process.left = processes[j-1]
+		process.leftVal = ast.processValuePart(process.left)
+		process.operator = processes[j][0]
+		process.right = processes[j+1]
+		process.rightVal = ast.processValuePart(process.right)
+		solvedValue := process.solve()
+		if value.Type != NA {
+			process.operator.Value = "+"
+			process.right = processes[j+1]
+			process.leftVal = value
+			process.rightVal = solvedValue
+			value = process.solve()
+		} else {
+			value = solvedValue
+		}
+		// Remove computed processes.
+		processes = append(processes[:j-1], processes[j+2:]...)
+		if len(processes) == 1 {
+			break
+		}
+		// Find next operator.
+		j = ast.nextOperator(processes)
+	}
+	result.Type = value.Type
+	return result
+}
+
+func buildExpressionByProcesses(processes [][]lex.Token) ExpressionAST {
+	var result ExpressionAST
+	for _, part := range processes {
+		for _, token := range part {
+			switch token.Type {
+			case lex.Operator:
+				result.Content = append(result.Content, ExpressionNode{
+					Content: OperatorAST{
+						Token: token,
+						Value: token.Value,
+					},
+					Type: ExpressionNodeOperator,
+				})
+			case lex.Value:
+				result.Content = append(result.Content, ExpressionNode{
+					Content: ValueAST{
+						Token: token,
+						Value: token.Value,
+					},
+					Type: ExpressionNodeValue,
+				})
+			case lex.Brace:
+				result.Content = append(result.Content, ExpressionNode{
+					Content: BraceAST{
+						Token: token,
+						Value: token.Value,
+					},
+					Type: ExpressionNodeBrace,
+				})
+			}
+		}
+	}
+	return result
+}
+
+// nextOperator find index of priority operator and returns index of operator
+// if found, returns -1 if not.
+func (ast *AST) nextOperator(tokens [][]lex.Token) int {
+	high, mid, low := -1, -1, -1
+	for index, part := range tokens {
+		if len(part) != 1 {
+			continue
+		} else if part[0].Type != lex.Operator {
+			continue
+		}
+		switch part[0].Value {
+		case "<<", ">>":
+			return index
+		case "&", "&^", "%":
+			if high == -1 {
+				high = index
+			}
+		case "*", "/", "\\", "|":
+			if mid == -1 {
+				mid = index
+			}
+		case "+", "-":
+			if low == -1 {
+				low = index
+			}
+		default:
+			ast.PushErrorToken(part[0], "invalid_operator")
+		}
+	}
+	if high != -1 {
+		return high
+	} else if mid != -1 {
+		return mid
+	}
+	return low
 }
 
 func (ast *AST) getExpressionProcesses(tokens []lex.Token) [][]lex.Token {
 	var processes [][]lex.Token
 	var part []lex.Token
+	operator := false
 	braceCount := 0
 	pushedError := false
 	for index, token := range tokens {
 		switch token.Type {
+		case lex.Operator:
+			if !operator {
+				if IsSingleOperator(token.Value) {
+					part = append(part, token)
+					continue
+				}
+				ast.PushErrorToken(token, "operator_overflow")
+			}
+			operator = false
+			if braceCount > 0 {
+				part = append(part, token)
+				continue
+			}
+			processes = append(processes, part)
+			processes = append(processes, []lex.Token{token})
+			part = []lex.Token{}
+			continue
 		case lex.Brace:
 			switch token.Value {
 			case "(", "[", "{":
@@ -272,6 +492,7 @@ func (ast *AST) getExpressionProcesses(tokens []lex.Token) [][]lex.Token {
 		}
 		ast.checkExpressionToken(token)
 		part = append(part, token)
+		operator = requireOperatorForProcess(token, index, len(tokens))
 	}
 	if len(part) != 0 {
 		processes = append(processes, part)
@@ -282,10 +503,16 @@ func (ast *AST) getExpressionProcesses(tokens []lex.Token) [][]lex.Token {
 	return processes
 }
 
-// CheckBitInt reports integer is compatible this bit-size or not.
-func CheckBitInt(value string, bit int) bool {
-	_, err := strconv.ParseInt(value, 10, bit)
-	return err == nil
+func requireOperatorForProcess(token lex.Token, index, tokensLen int) bool {
+	switch token.Type {
+	case lex.Brace:
+		if token.Value == "[" ||
+			token.Value == "(" ||
+			token.Value == "{" {
+			return false
+		}
+	}
+	return index < tokensLen-1
 }
 
 func (ast *AST) checkExpressionToken(token lex.Token) {

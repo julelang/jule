@@ -79,12 +79,22 @@ func (n ExpressionNode) String() string {
 // ValueAST is AST model of constant value.
 type ValueAST struct {
 	Token lex.Token
-	Data  string
+	Value string
 	Type  uint8
 }
 
 func (v ValueAST) String() string {
-	return v.Data
+	return v.Value
+}
+
+// BraceAST is AST model of brace.
+type BraceAST struct {
+	Token lex.Token
+	Value string
+}
+
+func (b BraceAST) String() string {
+	return b.Value
 }
 
 // OperatorAST is AST model of operator.
@@ -93,15 +103,19 @@ type OperatorAST struct {
 	Value string
 }
 
+func (o OperatorAST) String() string {
+	return o.Value
+}
+
 // ReturnAST is return statement AST model.
 type ReturnAST struct {
 	Token      lex.Token
 	Expression ExpressionAST
 }
 
-func (rast ReturnAST) String() string {
-	if rast.Expression.Type != NA {
-		return rast.Token.Value + " " + rast.Expression.String()
+func (r ReturnAST) String() string {
+	if r.Expression.Type != NA {
+		return r.Token.Value + " " + r.Expression.String()
 	}
-	return rast.Token.Value
+	return r.Token.Value
 }

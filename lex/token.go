@@ -20,4 +20,5 @@ const (
 	Return    uint8 = 4
 	SemiColon uint8 = 5
 	Value     uint8 = 6
+	Operator  uint8 = 7
 )
