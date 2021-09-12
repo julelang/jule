@@ -10,9 +10,11 @@ import (
 	"github.com/the-xlang/x/pkg/xbits"
 )
 
-// CxxParser.
+// CxxParser is C++ parser of X code.
 type CxxParser struct {
-	Functions []*Function
+	Functions       []*Function
+	GlobalVariables []*Variable
+	BlockVariables  []*Variable
 
 	Tokens []lex.Token
 	PFI    *ParseFileInfo
@@ -30,7 +32,7 @@ func NewParser(tokens []lex.Token, PFI *ParseFileInfo) *CxxParser {
 func (cp *CxxParser) PushErrorToken(token lex.Token, err string) {
 	message := x.Errors[err]
 	cp.PFI.Errors = append(cp.PFI.Errors, fmt.Sprintf(
-		"%s:%d %s", token.File.Path, token.Line, message))
+		"%s:%d:%d %s", token.File.Path, token.Line, token.Column, message))
 }
 
 // PushError appends new error.
@@ -81,7 +83,7 @@ func (cp *CxxParser) ParseStatement(s ast.StatementAST) {
 
 // ParseFunction parse X function to C++ code.
 func (cp *CxxParser) ParseFunction(fnAst ast.FunctionAST) {
-	if function := cp.functionByName(fnAst.Name); function != nil {
+	if token := cp.existName(fnAst.Name); token.Type != ast.NA {
 		cp.PushErrorToken(fnAst.Token, "exist_name")
 		return
 	}
@@ -91,8 +93,19 @@ func (cp *CxxParser) ParseFunction(fnAst ast.FunctionAST) {
 	fn.ReturnType = fnAst.ReturnType.Type
 	fn.Block = fnAst.Block
 	fn.Params = fnAst.Params
-	cp.checkFunctionReturn(fn)
 	cp.Functions = append(cp.Functions, fn)
+}
+
+func variablesFromParameters(params []ast.ParameterAST) []*Variable {
+	var vars []*Variable
+	for _, param := range params {
+		variable := new(Variable)
+		variable.Name = param.Name
+		variable.Token = param.Token
+		variable.Type = param.Type.Type
+		vars = append(vars, variable)
+	}
+	return vars
 }
 
 func (cp *CxxParser) checkFunctionReturn(fn *Function) {
@@ -123,9 +136,35 @@ func (cp *CxxParser) functionByName(name string) *Function {
 	return nil
 }
 
+func (cp *CxxParser) variableByName(name string) *Variable {
+	for _, variable := range cp.BlockVariables {
+		if variable.Name == name {
+			return variable
+		}
+	}
+	for _, variable := range cp.GlobalVariables {
+		if variable.Name == name {
+			return variable
+		}
+	}
+	return nil
+}
+
+func (cp *CxxParser) existName(name string) lex.Token {
+	fn := cp.functionByName(name)
+	if fn != nil {
+		return fn.Token
+	}
+	return lex.Token{}
+}
+
 func (cp *CxxParser) finalCheck() {
 	if cp.functionByName(x.EntryPoint) == nil {
 		cp.PushError("no_entry_point")
+	}
+	for _, fn := range cp.Functions {
+		cp.BlockVariables = variablesFromParameters(fn.Params)
+		cp.checkFunctionReturn(fn)
 	}
 }
 
@@ -288,6 +327,8 @@ func (p arithmeticProcess) solve() (value ast.ValueAST) {
 	return
 }
 
+const functionName = 0x0000A
+
 func (cp *CxxParser) processSingleValuePart(token lex.Token) (result ast.ValueAST) {
 	result.Type = ast.NA
 	result.Token = token
@@ -314,11 +355,15 @@ func (cp *CxxParser) processSingleValuePart(token lex.Token) (result ast.ValueAS
 			result.Value = token.Value
 		}
 	case lex.Name:
-		if cp.functionByName(token.Value) == nil {
+		if cp.functionByName(token.Value) != nil {
+			result.Value = token.Value
+			result.Type = functionName
+		} else if variable := cp.variableByName(token.Value); variable != nil {
+			result.Value = token.Value
+			result.Type = variable.Type
+		} else {
 			cp.PushErrorToken(token, "name_not_defined")
 		}
-		result.Type = ast.ValueName
-		result.Value = token.Value
 	default:
 		cp.PushErrorToken(token, "invalid_syntax")
 	}
@@ -376,8 +421,8 @@ func (cp *CxxParser) processParenthesesValuePart(tokens []lex.Token) ast.ValueAS
 	}
 	value := cp.processValuePart(valueTokens)
 	switch value.Type {
-	case ast.ValueName:
-		fn := cp.functionByName(valueTokens[0].Value)
+	case functionName:
+		fn := cp.functionByName(value.Value)
 		cp.parseFunctionCallStatement(fn, tokens[len(valueTokens):])
 		value.Type = fn.ReturnType
 	default:
