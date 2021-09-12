@@ -21,4 +21,5 @@ const (
 	SemiColon uint8 = 5
 	Value     uint8 = 6
 	Operator  uint8 = 7
+	Comma     uint8 = 8
 )

@@ -121,7 +121,7 @@ func TypeFromName(name string) uint8 {
 		return UInt32
 	case "uint64":
 		return UInt64
-	case "string":
+	case "str":
 		return String
 	case "bool":
 		return Boolean
@@ -131,4 +131,34 @@ func TypeFromName(name string) uint8 {
 		return Float64
 	}
 	return 0 // Unreachable code.
+}
+
+func CxxTypeNameFromType(typeCode uint8) string {
+	switch typeCode {
+	case Void:
+		return "void"
+	case Int8:
+		return "signed char"
+	case Int16:
+		return "short"
+	case Int32:
+		return "int"
+	case Int64:
+		return "long"
+	case UInt8:
+		return "unsigned char"
+	case UInt16:
+		return "unsigned short"
+	case UInt32:
+		return "unsigned int"
+	case UInt64:
+		return "unsigned long"
+	case Boolean:
+		return "bool"
+	case Float32:
+		return "float"
+	case Float64:
+		return "double"
+	}
+	return "" // Unreachable code.
 }

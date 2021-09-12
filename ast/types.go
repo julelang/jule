@@ -17,8 +17,9 @@ const (
 
 // AST Statement types.
 const (
-	StatementFunction uint8 = 1
-	StatementReturn   uint8 = 2
+	StatementFunction     uint8 = 1
+	StatementReturn       uint8 = 2
+	StatementFunctionCall uint8 = 3
 )
 
 // AST Range types.
@@ -37,4 +38,5 @@ const (
 // AST Value types.
 const (
 	ValueNumeric uint8 = 1
+	ValueName    uint8 = 2
 )

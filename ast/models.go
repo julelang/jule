@@ -1,10 +1,10 @@
 package ast
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/the-xlang/x/lex"
+	"github.com/the-xlang/x/pkg/x"
 )
 
 // Object is an element of AST.
@@ -48,32 +48,46 @@ type TypeAST struct {
 type FunctionAST struct {
 	Token      lex.Token
 	Name       string
+	Params     []ParameterAST
 	ReturnType TypeAST
 	Block      BlockAST
 }
 
+// ParameterAST is function parameter AST model.
+type ParameterAST struct {
+	Token lex.Token
+	Name  string
+	Type  TypeAST
+}
+
+func (p ParameterAST) String() string {
+	return x.CxxTypeNameFromType(p.Type.Type) + " " + p.Name
+}
+
+// FunctionAST is function declaration AST model.
+type FunctionCallAST struct {
+	Token lex.Token
+	Name  string
+	Args  []lex.Token
+}
+
+func (fc FunctionCallAST) String() string {
+	var sb strings.Builder
+	sb.WriteString(fc.Name)
+	sb.WriteByte('(')
+	sb.WriteString(tokensToString(fc.Args))
+	sb.WriteByte(')')
+	return sb.String()
+}
+
 // ExpressionAST is AST model of expression.
 type ExpressionAST struct {
-	Content []ExpressionNode
-	Type    uint8
+	Tokens    []lex.Token
+	Processes [][]lex.Token
 }
 
 func (e ExpressionAST) String() string {
-	var sb strings.Builder
-	for _, node := range e.Content {
-		sb.WriteString(node.String() + " ")
-	}
-	return sb.String()[:sb.Len()-1]
-}
-
-// ExpressionNode is value model.
-type ExpressionNode struct {
-	Content interface{}
-	Type    uint8
-}
-
-func (n ExpressionNode) String() string {
-	return fmt.Sprint(n.Content)
+	return tokensToString(e.Tokens)
 }
 
 // ValueAST is AST model of constant value.
@@ -114,8 +128,17 @@ type ReturnAST struct {
 }
 
 func (r ReturnAST) String() string {
-	if r.Expression.Type != NA {
-		return r.Token.Value + " " + r.Expression.String()
+	return r.Token.Value + " " + r.Expression.String()
+}
+
+func tokensToString(tokens []lex.Token) string {
+	var sb strings.Builder
+	for _, token := range tokens {
+		sb.WriteString(token.Value)
+		if token.Type != lex.Brace &&
+			token.Type != lex.Name {
+			sb.WriteByte(' ')
+		}
 	}
-	return r.Token.Value
+	return sb.String()
 }

@@ -2,7 +2,6 @@ package parser
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/the-xlang/x/ast"
 	"github.com/the-xlang/x/lex"
@@ -24,24 +23,32 @@ type Function struct {
 	Token      lex.Token
 	Name       string
 	ReturnType uint8
+	Params     []ast.ParameterAST
 	Block      ast.BlockAST
 }
 
 func (f Function) String() string {
-	var sb strings.Builder
-	sb.WriteString(cxxTypeNameFromType(f.ReturnType))
-	sb.WriteByte(' ')
-	sb.WriteString(f.Name)
-	sb.WriteString("()")
-	sb.WriteString(" {")
-	sb.WriteString(getFunctionStandardCode(f.Name))
-	for _, s := range f.Block.Content {
-		sb.WriteByte('\n')
-		sb.WriteString("  " + fmt.Sprint(s.Value))
-		sb.WriteByte(';')
+	code := ""
+	code += x.CxxTypeNameFromType(f.ReturnType)
+	code += " "
+	code += f.Name
+	code += "("
+	if len(f.Params) > 0 {
+		for _, p := range f.Params {
+			code += p.String()
+			code += ","
+		}
+		code = code[:len(code)-1]
 	}
-	sb.WriteString("\n}")
-	return sb.String()
+	code += ") {"
+	code += getFunctionStandardCode(f.Name)
+	for _, s := range f.Block.Content {
+		code += "\n"
+		code += "  " + fmt.Sprint(s.Value)
+		code += ";"
+	}
+	code += "\n}"
+	return code
 }
 
 func getFunctionStandardCode(name string) string {

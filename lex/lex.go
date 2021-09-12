@@ -152,6 +152,10 @@ func (l *Lex) Token() Token {
 		tk.Value = "/"
 		tk.Type = Operator
 		l.Position++
+	case ln[0] == ',':
+		tk.Value = ","
+		tk.Type = Comma
+		l.Position++
 	case isKeyword(ln, "int8"):
 		tk.Value = "int8"
 		tk.Type = Type
