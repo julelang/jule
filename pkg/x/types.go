@@ -73,6 +73,8 @@ func TypesAreCompatible(t1, t2 uint8) bool {
 			t2 == UInt64
 	case UInt64:
 		return t2 == UInt64
+	case Boolean:
+		return t2 == Boolean
 	}
 	return false
 }

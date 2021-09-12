@@ -22,6 +22,12 @@ func cxxTypeNameFromType(typeCode uint8) string {
 		return "unsigned int"
 	case x.UInt64:
 		return "unsigned long"
+	case x.Boolean:
+		return "bool"
+	case x.Float32:
+		return "float"
+	case x.Float64:
+		return "double"
 	}
 	return "" // Unreachable code.
 }

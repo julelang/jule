@@ -188,6 +188,18 @@ func (l *Lex) Token() Token {
 		tk.Value = "return"
 		tk.Type = Return
 		l.Position += 6
+	case isKeyword(ln, "bool"):
+		tk.Value = "bool"
+		tk.Type = Type
+		l.Position += 4
+	case isKeyword(ln, "true"):
+		tk.Value = "true"
+		tk.Type = Value
+		l.Position += 4
+	case isKeyword(ln, "false"):
+		tk.Value = "false"
+		tk.Type = Value
+		l.Position += 5
 	default:
 		lex := l.lexName(ln)
 		if lex != "" {

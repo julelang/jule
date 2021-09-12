@@ -225,19 +225,19 @@ func (ast *AST) processSingleValuePart(token lex.Token) (result ValueAST) {
 		} else if IsBoolean(token.Value) {
 			result.Value = token.Value
 			result.Type = x.Boolean
-		}
-		// Numeric.
-		if strings.Contains(token.Value, ".") ||
-			strings.ContainsAny(token.Value, "eE") {
-			result.Type = x.Float64
-		} else {
-			result.Type = x.Int32
-			ok := CheckBitInt(token.Value, 32)
-			if !ok {
-				result.Type = x.Int64
+		} else { // Numeric.
+			if strings.Contains(token.Value, ".") ||
+				strings.ContainsAny(token.Value, "eE") {
+				result.Type = x.Float64
+			} else {
+				result.Type = x.Int32
+				ok := CheckBitInt(token.Value, 32)
+				if !ok {
+					result.Type = x.Int64
+				}
 			}
+			result.Value = token.Value
 		}
-		result.Value = token.Value
 	}
 	return
 }
