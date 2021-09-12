@@ -5,7 +5,7 @@ import (
 	"github.com/the-xlang/x/pkg/x"
 )
 
-var builtinFunctions = []*Function{
+var builtinFunctions = []*function{
 	{
 		Name:       "out",
 		ReturnType: x.Void,

@@ -50,6 +50,8 @@ func (ast *AST) Build() {
 	for ast.Position != -1 && !ast.Ended() {
 		firstToken := ast.Tokens[ast.Position]
 		switch firstToken.Type {
+		case lex.Brace:
+			ast.BuildBrace()
 		case lex.Fun:
 			ast.BuildFunction()
 		default:
@@ -59,19 +61,59 @@ func (ast *AST) Build() {
 	}
 }
 
+// BuildBrace builds AST model by brace statement.
+func (ast *AST) BuildBrace() {
+	token := ast.Tokens[ast.Position]
+	switch token.Value {
+	case "[":
+		ast.BuildTag()
+	default:
+		ast.PushErrorToken(token, "invalid_syntax")
+	}
+}
+
+// BuildTag builds AST model of tag.
+func (ast *AST) BuildTag() {
+	var tag TagAST
+	ast.Position++
+	if ast.Ended() {
+		ast.PushErrorToken(ast.Tokens[ast.Position-1], "invalid_syntax")
+		return
+	}
+	ast.Position++
+	if ast.Ended() {
+		ast.PushErrorToken(ast.Tokens[ast.Position-1], "invalid_syntax")
+		return
+	}
+	tag.Token = ast.Tokens[ast.Position]
+	if tag.Token.Type != lex.Brace || tag.Token.Value != "]" {
+		ast.PushErrorToken(tag.Token, "invalid_syntax")
+		ast.Position = -1
+		return
+	}
+	tag.Token = ast.Tokens[ast.Position-1]
+	tag.Value = tag.Token.Value
+	ast.Tree = append(ast.Tree, Object{
+		Token: tag.Token,
+		Type:  Tag,
+		Value: tag,
+	})
+	ast.Position++
+}
+
 // BuildFunction builds AST model of function.
 func (ast *AST) BuildFunction() {
 	ast.Position++ // Skip function keyword.
-	var fn FunctionAST
-	fn.Token = ast.Tokens[ast.Position]
-	fn.Name = fn.Token.Value
-	fn.ReturnType.Type = x.Void
+	var funAST FunctionAST
+	funAST.Token = ast.Tokens[ast.Position]
+	funAST.Name = funAST.Token.Value
+	funAST.ReturnType.Type = x.Void
 	ast.Position++
 	tokens := ast.getRange("(", ")")
 	if tokens == nil {
 		return
 	} else if len(tokens) > 0 {
-		ast.BuildParameters(&fn, tokens)
+		ast.BuildParameters(&funAST, tokens)
 	}
 	if ast.Ended() {
 		ast.Position--
@@ -81,7 +123,7 @@ func (ast *AST) BuildFunction() {
 	}
 	token := ast.Tokens[ast.Position]
 	if token.Type == lex.Type {
-		fn.ReturnType = ast.BuildType(token)
+		funAST.ReturnType = ast.BuildType(token)
 		ast.Position++
 		if ast.Ended() {
 			ast.Position--
@@ -102,14 +144,14 @@ func (ast *AST) BuildFunction() {
 		ast.Position = -1
 		return
 	}
-	fn.Block = ast.BuildBlock(blockTokens)
+	funAST.Block = ast.BuildBlock(blockTokens)
 	ast.Tree = append(ast.Tree, Object{
-		Token: fn.Token,
+		Token: funAST.Token,
 		Type:  Statement,
 		Value: StatementAST{
-			Token: fn.Token,
+			Token: funAST.Token,
 			Type:  StatementFunction,
-			Value: fn,
+			Value: funAST,
 		},
 	})
 }

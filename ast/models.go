@@ -142,3 +142,13 @@ func tokensToString(tokens []lex.Token) string {
 	}
 	return sb.String()
 }
+
+// TagAST is tag statement AST model.
+type TagAST struct {
+	Token lex.Token
+	Value string
+}
+
+func (t TagAST) String() string {
+	return t.Value
+}

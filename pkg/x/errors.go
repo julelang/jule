@@ -25,4 +25,5 @@ var Errors = map[string]string{
 	`argument_overflow`:            `argument overflow`,
 	`argument_missing`:             `missing argument(s)`,
 	`invalid_type`:                 `invalid data type`,
+	`invalid_tag`:                  `invalid tag for type`,
 }

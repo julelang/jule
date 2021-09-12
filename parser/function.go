@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/the-xlang/x/ast"
 	"github.com/the-xlang/x/lex"
@@ -15,44 +16,68 @@ const entryPointStandard = `
 
 `
 
-// Function is function define representation.
-type Function struct {
+type function struct {
 	Token      lex.Token
 	Name       string
 	ReturnType uint8
 	Params     []ast.ParameterAST
+	Tags       []ast.TagAST
 	Block      ast.BlockAST
 }
 
-func (f Function) String() string {
-	code := ""
-	code += x.CxxTypeNameFromType(f.ReturnType)
-	code += " "
-	code += f.Name
-	code += "("
-	if len(f.Params) > 0 {
-		any := false
-		for _, p := range f.Params {
-			code += p.String()
-			code += ","
-			if !any {
-				any = p.Type.Type == x.Any
-			}
-		}
-		code = code[:len(code)-1]
-		if any {
-			code = "template <typename any>\n" + code
+func (f function) String() string {
+	var cxx string
+	cxx += tagsToString(f.Tags)
+	cxx += x.CxxTypeNameFromType(f.ReturnType)
+	cxx += " "
+	cxx += f.Name
+	cxx += "("
+	cxx += paramsToCxx(f.Params)
+	cxx += ") {"
+	cxx += getFunctionStandardCode(f.Name)
+	cxx += blockToCxx(f.Block)
+	cxx += "\n}"
+	return cxx
+}
+
+func tagsToString(tags []ast.TagAST) string {
+	var cxx strings.Builder
+	for _, tag := range tags {
+		cxx.WriteString(tag.String())
+		cxx.WriteByte(' ')
+	}
+	return cxx.String()
+}
+
+func paramsToCxx(params []ast.ParameterAST) string {
+	if len(params) == 0 {
+		return ""
+	}
+	var cxx string
+	any := false
+	for _, p := range params {
+		cxx += p.String()
+		cxx += ","
+		if !any {
+			any = p.Type.Type == x.Any
 		}
 	}
-	code += ") {"
-	code += getFunctionStandardCode(f.Name)
-	for _, s := range f.Block.Content {
-		code += "\n"
-		code += "  " + fmt.Sprint(s.Value)
-		code += ";"
+	cxx = cxx[:len(cxx)-1]
+	if any {
+		cxx = "template <typename any>\n" + cxx
 	}
-	code += "\n}"
-	return code
+	return cxx
+}
+
+func blockToCxx(block ast.BlockAST) string {
+	var cxx strings.Builder
+	for _, s := range block.Content {
+		cxx.WriteByte('\n')
+		cxx.WriteString("  ")
+		cxx.WriteString(fmt.Sprint(s.Value))
+		cxx.WriteByte(';')
+	}
+	return cxx.String()
 }
 
 func getFunctionStandardCode(name string) string {

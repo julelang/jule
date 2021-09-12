@@ -4,8 +4,7 @@ import (
 	"github.com/the-xlang/x/lex"
 )
 
-// Variable is variable define representation.
-type Variable struct {
+type variable struct {
 	Name  string
 	Token lex.Token
 	Type  uint8

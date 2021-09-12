@@ -136,6 +136,14 @@ func (l *Lex) Token() Token {
 		tk.Value = "}"
 		tk.Type = Brace
 		l.Position++
+	case ln[0] == '[':
+		tk.Value = "["
+		tk.Type = Brace
+		l.Position++
+	case ln[0] == ']':
+		tk.Value = "]"
+		tk.Type = Brace
+		l.Position++
 	case ln[0] == '+':
 		tk.Value = "+"
 		tk.Type = Operator
@@ -160,6 +168,10 @@ func (l *Lex) Token() Token {
 		tk.Value = "fun"
 		tk.Type = Fun
 		l.Position += 3
+	case isKeyword(ln, "inline"):
+		tk.Value = "inline"
+		tk.Type = Inline
+		l.Position += 6
 	case isKeyword(ln, "any"):
 		tk.Value = "any"
 		tk.Type = Type

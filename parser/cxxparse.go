@@ -12,12 +12,13 @@ import (
 
 // CxxParser is C++ parser of X code.
 type CxxParser struct {
-	Functions       []*Function
-	GlobalVariables []*Variable
-	BlockVariables  []*Variable
+	tags []ast.TagAST
 
-	Tokens []lex.Token
-	PFI    *ParseFileInfo
+	Functions       []*function
+	GlobalVariables []*variable
+	BlockVariables  []*variable
+	Tokens          []lex.Token
+	PFI             *ParseFileInfo
 }
 
 // NewParser returns new instance of CxxParser.
@@ -62,6 +63,8 @@ func (cp *CxxParser) Parse() {
 	}
 	for _, model := range astModel.Tree {
 		switch model.Type {
+		case ast.Tag:
+			cp.PushTag(model.Value.(ast.TagAST))
 		case ast.Statement:
 			cp.ParseStatement(model.Value.(ast.StatementAST))
 		default:
@@ -69,6 +72,16 @@ func (cp *CxxParser) Parse() {
 		}
 	}
 	cp.finalCheck()
+}
+
+// PushTag processes and appends to tag list.
+func (cp *CxxParser) PushTag(t ast.TagAST) {
+	switch t.Token.Type {
+	case lex.Inline:
+	default:
+		cp.PushErrorToken(t.Token, "invalid_syntax")
+	}
+	cp.tags = append(cp.tags, t)
 }
 
 // ParseStatement parse X statement to C++ code.
@@ -87,19 +100,32 @@ func (cp *CxxParser) ParseFunction(funAst ast.FunctionAST) {
 		cp.PushErrorToken(funAst.Token, "exist_name")
 		return
 	}
-	fun := new(Function)
+	fun := new(function)
 	fun.Token = funAst.Token
 	fun.Name = funAst.Name
 	fun.ReturnType = funAst.ReturnType.Type
 	fun.Block = funAst.Block
 	fun.Params = funAst.Params
+	fun.Tags = cp.tags
+	cp.tags = nil
+	cp.checkFunctionTags(fun.Tags)
 	cp.Functions = append(cp.Functions, fun)
 }
 
-func variablesFromParameters(params []ast.ParameterAST) []*Variable {
-	var vars []*Variable
+func (cp *CxxParser) checkFunctionTags(tags []ast.TagAST) {
+	for _, tag := range tags {
+		switch tag.Token.Type {
+		case lex.Inline:
+		default:
+			cp.PushErrorToken(tag.Token, "invalid_tag")
+		}
+	}
+}
+
+func variablesFromParameters(params []ast.ParameterAST) []*variable {
+	var vars []*variable
 	for _, param := range params {
-		variable := new(Variable)
+		variable := new(variable)
 		variable.Name = param.Name
 		variable.Token = param.Token
 		variable.Type = param.Type.Type
@@ -108,7 +134,7 @@ func variablesFromParameters(params []ast.ParameterAST) []*Variable {
 	return vars
 }
 
-func (cp *CxxParser) checkFunctionReturn(fun *Function) {
+func (cp *CxxParser) checkFunctionReturn(fun *function) {
 	if fun.ReturnType == x.Void {
 		return
 	}
@@ -127,7 +153,7 @@ func (cp *CxxParser) checkFunctionReturn(fun *Function) {
 	}
 }
 
-func (cp *CxxParser) functionByName(name string) *Function {
+func (cp *CxxParser) functionByName(name string) *function {
 	for _, fun := range builtinFunctions {
 		if fun.Name == name {
 			return fun
@@ -141,7 +167,7 @@ func (cp *CxxParser) functionByName(name string) *Function {
 	return nil
 }
 
-func (cp *CxxParser) variableByName(name string) *Variable {
+func (cp *CxxParser) variableByName(name string) *variable {
 	for _, variable := range cp.BlockVariables {
 		if variable.Name == name {
 			return variable
@@ -438,7 +464,7 @@ func (cp *CxxParser) processParenthesesValuePart(tokens []lex.Token) ast.ValueAS
 	return value
 }
 
-func (cp *CxxParser) parseFunctionCallStatement(fun *Function, tokens []lex.Token) {
+func (cp *CxxParser) parseFunctionCallStatement(fun *function, tokens []lex.Token) {
 	errToken := tokens[0]
 	tokens = cp.getRangeTokens("(", ")", tokens)
 	if tokens == nil {
@@ -449,7 +475,7 @@ func (cp *CxxParser) parseFunctionCallStatement(fun *Function, tokens []lex.Toke
 	}
 }
 
-func (cp *CxxParser) parseArgs(fun *Function, tokens []lex.Token) int {
+func (cp *CxxParser) parseArgs(fun *function, tokens []lex.Token) int {
 	last := 0
 	braceCount := 0
 	count := 0
@@ -480,7 +506,7 @@ func (cp *CxxParser) parseArgs(fun *Function, tokens []lex.Token) int {
 	return count
 }
 
-func (cp *CxxParser) parseArg(fun *Function, count int, tokens []lex.Token, err lex.Token) {
+func (cp *CxxParser) parseArg(fun *function, count int, tokens []lex.Token, err lex.Token) {
 	if len(tokens) == 0 {
 		cp.PushErrorToken(err, "invalid_syntax")
 		return
