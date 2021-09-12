@@ -141,6 +141,8 @@ func appendStandards(code *string) {
 #include <iostream>
 #include <locale.h>
 
+template <typename any>
+
 ` + *code
 }
 

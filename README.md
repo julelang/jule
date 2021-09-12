@@ -36,6 +36,8 @@ fun main() int32 {
 #include <iostream>
 #include <locale.h>
 
+template <typename any>
+
 int main() {
   // Entry point standard codes.
   setlocale(0x0, "");
