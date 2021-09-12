@@ -25,8 +25,8 @@ Transpiling to C++ only instead of compiling is also an option.<br>
 It aims to be advanced, readable and a good choice for systems programming.
 
 <strong>Example X code;</strong>
-```rs
-main() int32 {
+```kt
+fun main() int32 {
   return 0;
 }
 ```

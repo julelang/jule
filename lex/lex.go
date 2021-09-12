@@ -156,6 +156,10 @@ func (l *Lex) Token() Token {
 		tk.Value = ","
 		tk.Type = Comma
 		l.Position++
+	case isKeyword(ln, "fun"):
+		tk.Value = "fun"
+		tk.Type = Fun
+		l.Position += 3
 	case isKeyword(ln, "int8"):
 		tk.Value = "int8"
 		tk.Type = Type
