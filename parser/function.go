@@ -6,7 +6,14 @@ import (
 
 	"github.com/the-xlang/x/ast"
 	"github.com/the-xlang/x/lex"
+	"github.com/the-xlang/x/pkg/x"
 )
+
+const entryPointStandard = `
+  // Entry point standard codes.
+  _setmode(0x1, 0x40000);
+
+`
 
 // Function is function define representation.
 type Function struct {
@@ -23,11 +30,20 @@ func (f Function) String() string {
 	sb.WriteString(f.Name)
 	sb.WriteString("()")
 	sb.WriteString(" {")
+	sb.WriteString(getFunctionStandardCode(f.Name))
 	for _, s := range f.Block.Content {
 		sb.WriteByte('\n')
-		sb.WriteString("\t" + fmt.Sprint(s.Value))
+		sb.WriteString("  " + fmt.Sprint(s.Value))
 		sb.WriteByte(';')
 	}
 	sb.WriteString("\n}")
 	return sb.String()
+}
+
+func getFunctionStandardCode(name string) string {
+	switch name {
+	case x.EntryPoint:
+		return entryPointStandard
+	}
+	return ""
 }
