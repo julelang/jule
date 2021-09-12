@@ -2,7 +2,6 @@ package lex
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -30,7 +29,18 @@ func (l *Lex) Tokenize() []Token {
 
 // isKeyword returns true if part is keyword, false if not.
 func isKeyword(ln, kw string) bool {
-	return regexp.MustCompile("^" + kw + `(\s+|$|[[:punct:]])`).MatchString(ln)
+	if !strings.HasPrefix(ln, kw) {
+		return false
+	}
+	ln = ln[len(kw):]
+	if ln == "" {
+		return true
+	} else if unicode.IsSpace(rune(ln[0])) {
+		return true
+	} else if unicode.IsPunct(rune(ln[0])) {
+		return true
+	}
+	return false
 }
 
 // lexName returns name if next token is name,
