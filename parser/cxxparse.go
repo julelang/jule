@@ -128,6 +128,11 @@ func (cp *CxxParser) checkFunctionReturn(fun *Function) {
 }
 
 func (cp *CxxParser) functionByName(name string) *Function {
+	for _, fun := range builtinFunctions {
+		if fun.Name == name {
+			return fun
+		}
+	}
 	for _, fun := range cp.Functions {
 		if fun.Name == name {
 			return fun

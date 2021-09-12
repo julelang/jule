@@ -9,8 +9,9 @@ import (
 )
 
 const entryPointStandard = `
-  // Entry point standard codes.
+#pragma region X_ENTRY_POINT_STANDARD_CODES
   setlocale(0x0, "");
+#pragma endregion
 
 `
 
@@ -30,11 +31,18 @@ func (f Function) String() string {
 	code += f.Name
 	code += "("
 	if len(f.Params) > 0 {
+		any := false
 		for _, p := range f.Params {
 			code += p.String()
 			code += ","
+			if !any {
+				any = p.Type.Type == x.Any
+			}
 		}
 		code = code[:len(code)-1]
+		if any {
+			code = "template <typename any>\n" + code
+		}
 	}
 	code += ") {"
 	code += getFunctionStandardCode(f.Name)
