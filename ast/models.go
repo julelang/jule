@@ -67,18 +67,14 @@ func (p ParameterAST) String() string {
 
 // FunctionAST is function declaration AST model.
 type FunctionCallAST struct {
-	Token lex.Token
-	Name  string
-	Args  []lex.Token
+	Token      lex.Token
+	Name       string
+	Expression ExpressionAST
+	Args       []lex.Token
 }
 
 func (fc FunctionCallAST) String() string {
-	var sb strings.Builder
-	sb.WriteString(fc.Name)
-	sb.WriteByte('(')
-	sb.WriteString(tokensToString(fc.Args))
-	sb.WriteByte(')')
-	return sb.String()
+	return fc.Expression.String()
 }
 
 // ExpressionAST is AST model of expression.
@@ -88,7 +84,19 @@ type ExpressionAST struct {
 }
 
 func (e ExpressionAST) String() string {
-	return tokensToString(e.Tokens)
+	var sb strings.Builder
+	for _, process := range e.Processes {
+		if len(process) == 1 && process[0].Type == lex.Operator {
+			sb.WriteByte(' ')
+			sb.WriteString(process[0].Value)
+			sb.WriteByte(' ')
+			continue
+		}
+		for _, token := range process {
+			sb.WriteString(token.Value)
+		}
+	}
+	return sb.String()
 }
 
 // ValueAST is AST model of constant value.
@@ -130,15 +138,6 @@ type ReturnAST struct {
 
 func (r ReturnAST) String() string {
 	return r.Token.Value + " " + r.Expression.String()
-}
-
-func tokensToString(tokens []lex.Token) string {
-	var sb strings.Builder
-	for _, token := range tokens {
-		sb.WriteString(token.Value)
-		sb.WriteByte(' ')
-	}
-	return sb.String()
 }
 
 // AttributeAST is attribtue AST model.
