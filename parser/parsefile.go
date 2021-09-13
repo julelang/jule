@@ -26,6 +26,5 @@ func ParseFile(info *ParseFileInfo) {
 	}
 	parser := NewParser(tokens, info)
 	parser.Parse()
-	code := parser.String()
-	info.X_CXX += code
+	info.X_CXX += parser.Cxx()
 }

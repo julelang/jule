@@ -26,4 +26,9 @@ var Errors = map[string]string{
 	`argument_missing`:             `missing argument(s)`,
 	`invalid_type`:                 `invalid data type`,
 	`invalid_tag`:                  `invalid tag for type`,
+	`entrypoint_have_return`:       `entry point is cannot have return type`,
+	`entrypoint_have_parameters`:   `entry point is cannot have parameter(s)`,
+	`require_return_value`:         `return statements of non-void functions should have return value`,
+	`void_function_return_value`:   `void functions is cannot returns any value`,
+	`missing_semicolon`:            `missing statement terminator at end of statement`,
 }

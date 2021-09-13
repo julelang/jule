@@ -40,6 +40,7 @@ type BlockAST struct {
 
 // TypeAST is data type identifier.
 type TypeAST struct {
+	Token lex.Token
 	Type  uint8
 	Value string
 }

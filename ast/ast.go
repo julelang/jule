@@ -222,8 +222,9 @@ func (ast *AST) BuildType(token lex.Token) (t TypeAST) {
 		ast.PushErrorToken(token, "invalid_type")
 		return
 	}
-	t.Type = x.TypeFromName(token.Value)
-	t.Value = token.Value
+	t.Token = token
+	t.Type = x.TypeFromName(t.Token.Value)
+	t.Value = t.Token.Value
 	return t
 }
 
@@ -261,6 +262,9 @@ func (ast *AST) BuildBlock(tokens []lex.Token) (b BlockAST) {
 			break
 		}
 		oldStatementPoint = index + 1
+	}
+	if oldStatementPoint < len(tokens) {
+		ast.PushErrorToken(tokens[len(tokens)-1], "missing_semicolon")
 	}
 	return
 }
