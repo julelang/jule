@@ -8,7 +8,7 @@ const (
 	Range      uint8 = 3
 	Block      uint8 = 4
 	Type       uint8 = 5
-	Tag        uint8 = 6
+	Attribute  uint8 = 6
 )
 
 // AST Identifier types.
