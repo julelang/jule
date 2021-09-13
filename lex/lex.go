@@ -120,6 +120,10 @@ func (l *Lex) Token() Token {
 		tk.Value = ";"
 		tk.Type = SemiColon
 		l.Position++
+	case ln[0] == ',':
+		tk.Value = ","
+		tk.Type = Comma
+		l.Position++
 	case ln[0] == '(':
 		tk.Value = "("
 		tk.Type = Brace
@@ -160,9 +164,9 @@ func (l *Lex) Token() Token {
 		tk.Value = "/"
 		tk.Type = Operator
 		l.Position++
-	case ln[0] == ',':
-		tk.Value = ","
-		tk.Type = Comma
+	case ln[0] == '%':
+		tk.Value = "%"
+		tk.Type = Operator
 		l.Position++
 	case isKeyword(ln, "fun"):
 		tk.Value = "fun"
@@ -176,6 +180,10 @@ func (l *Lex) Token() Token {
 		tk.Value = "any"
 		tk.Type = Type
 		l.Position += 3
+	case isKeyword(ln, "bool"):
+		tk.Value = "bool"
+		tk.Type = Type
+		l.Position += 4
 	case isKeyword(ln, "int8"):
 		tk.Value = "int8"
 		tk.Type = Type
@@ -208,6 +216,14 @@ func (l *Lex) Token() Token {
 		tk.Value = "uint64"
 		tk.Type = Type
 		l.Position += 6
+	case isKeyword(ln, "float32"):
+		tk.Value = "float32"
+		tk.Type = Type
+		l.Position += 7
+	case isKeyword(ln, "float64"):
+		tk.Value = "float64"
+		tk.Type = Type
+		l.Position += 7
 	case isKeyword(ln, "return"):
 		tk.Value = "return"
 		tk.Type = Return

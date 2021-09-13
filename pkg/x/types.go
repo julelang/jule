@@ -62,30 +62,46 @@ func TypesAreCompatible(t1, t2 uint8, ignoreany bool) bool {
 		return t2 == Int8 ||
 			t2 == Int16 ||
 			t2 == Int32 ||
-			t2 == Int64
+			t2 == Int64 ||
+			t2 == Float32 ||
+			t2 == Float64
 	case Int16:
 		return t2 == Int16 ||
 			t2 == Int32 ||
-			t2 == Int64
+			t2 == Int64 ||
+			t2 == Float32 ||
+			t2 == Float64
 	case Int32:
 		return t2 == Int32 ||
-			t2 == Int64
+			t2 == Int64 ||
+			t2 == Float32 ||
+			t2 == Float64
 	case Int64:
-		return t2 == Int64
+		return t2 == Int64 ||
+			t2 == Float32 ||
+			t2 == Float64
 	case UInt8:
 		return t2 == UInt8 ||
 			t2 == UInt16 ||
 			t2 == UInt32 ||
-			t2 == UInt64
+			t2 == UInt64 ||
+			t2 == Float32 ||
+			t2 == Float64
 	case UInt16:
 		return t2 == UInt16 ||
 			t2 == UInt32 ||
-			t2 == UInt64
+			t2 == UInt64 ||
+			t2 == Float32 ||
+			t2 == Float64
 	case UInt32:
 		return t2 == UInt32 ||
-			t2 == UInt64
+			t2 == UInt64 ||
+			t2 == Float32 ||
+			t2 == Float64
 	case UInt64:
-		return t2 == UInt64
+		return t2 == UInt64 ||
+			t2 == Float32 ||
+			t2 == Float64
 	case Bool:
 		return t2 == Bool
 	case Str:
@@ -102,6 +118,11 @@ func TypesAreCompatible(t1, t2 uint8, ignoreany bool) bool {
 // IsNumericType reports type is numeric or not.
 func IsNumericType(t uint8) bool {
 	return IsSignedNumericType(t) || IsUnsignedNumericType(t)
+}
+
+// IsFloatType reports type is float or not.
+func IsFloatType(t uint8) bool {
+	return t == Float32 || t == Float64
 }
 
 // IsSignedNumericType reports type is signed numeric or not.
@@ -152,7 +173,7 @@ func TypeFromName(name string) uint8 {
 	case "any":
 		return Any
 	}
-	return 0 // Unreachable code.
+	return 0
 }
 
 func CxxTypeNameFromType(typeCode uint8) string {

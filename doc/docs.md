@@ -132,35 +132,35 @@ fun main() {
   </tr>
   <tr>
     <td>int8</td>
-    <td>int8, int16, int32, int64</td>
+    <td>int8, int16, int32, int64, float32, float64</td>
   </tr>
   <tr>
     <td>int16</td>
-    <td>int16, int32, int64</td>
+    <td>int16, int32, int64, float32, float64</td>
   </tr>
   <tr>
     <td>int32</td>
-    <td>int32, int64</td>
+    <td>int32, int64, float32, float64</td>
   </tr>
   <tr>
     <td>int64</td>
-    <td>int64</td>
+    <td>int64, float32, float64</td>
   </tr>
   <tr>
     <td>uint8</td>
-    <td>uint8, uint16, uint32, uint64</td>
+    <td>uint8, uint16, uint32, uint64, float32, float64</td>
   </tr>
   <tr>
     <td>uint16</td>
-    <td>uin16, uint32, uint64</td>
+    <td>uin16, uint32, uint64, float32, float64</td>
   </tr>
   <tr>
     <td>uint32</td>
-    <td>uint32, uint64</td>
+    <td>uint32, uint64, float32, float64</td>
   </tr>
   <tr>
     <td>uint64</td>
-    <td>uint64</td>
+    <td>uint64, float32, float64</td>
   </tr>
   <tr>
     <td>float32</td>
