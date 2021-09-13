@@ -26,8 +26,8 @@ It aims to be advanced, readable and a good choice for systems programming.
 
 <strong>Example X code;</strong>
 ```kt
-fun main() int32 {
-  return 0;
+fun main() {
+  // ...
 }
 ```
 
