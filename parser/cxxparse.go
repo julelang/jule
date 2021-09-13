@@ -50,7 +50,6 @@ func (cp CxxParser) String() string {
 func (cp *CxxParser) Cxx() string {
 	var sb strings.Builder
 	for _, fun := range cp.Functions {
-		cp.checkFunction(fun)
 		sb.WriteString(fun.String())
 		sb.WriteString("\n\n")
 	}
@@ -209,6 +208,8 @@ func (cp *CxxParser) finalCheck() {
 	}
 	for _, fun := range cp.Functions {
 		cp.BlockVariables = variablesFromParameters(fun.Params)
+		cp.checkFunction(fun)
+		cp.checkBlock(fun.Block)
 		cp.checkFunctionReturn(fun)
 	}
 }
@@ -670,6 +671,27 @@ func (cp *CxxParser) checkFunction(fun *function) {
 			cp.PushErrorToken(fun.ReturnType.Token, "entrypoint_have_return")
 		}
 	}
+}
+
+func (cp *CxxParser) checkBlock(b ast.BlockAST) {
+	for _, model := range b.Content {
+		switch model.Type {
+		case ast.StatementFunctionCall:
+			cp.checkFunctionCallStatement(model.Value.(ast.FunctionCallAST))
+		case ast.StatementReturn:
+		default:
+			cp.PushErrorToken(model.Token, "invalid_syntax")
+		}
+	}
+}
+
+func (cp *CxxParser) checkFunctionCallStatement(cs ast.FunctionCallAST) {
+	fun := cp.functionByName(cs.Name)
+	if fun == nil {
+		cp.PushErrorToken(cs.Token, "name_not_defined")
+		return
+	}
+	cp.parseFunctionCallStatement(fun, cs.Expression.Tokens[1:])
 }
 
 func isConstantNumeric(v string) bool {
