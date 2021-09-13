@@ -67,6 +67,7 @@ Before you start contributing, you should familiarize yourself with the followin
 
 + ``ast/`` abstract syntax tree builder.
 + ``cmd/`` main and compile files.
++ ``doc`` documentations.
 + ``lex/`` lexer.
 + ``parser/`` interpreter.
 + ``pkg/`` utility packages.
