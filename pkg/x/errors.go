@@ -36,4 +36,5 @@ var Errors = map[string]string{
 	`bitshift_must_unsigned`:     `bit shifting value is must be unsigned`,
 	`invalid_data_unary`:         `invalid data type for unary operator`,
 	`invalid_data_plus`:          `invalid data type for plus operator`,
+	`invalid_data_tilde`:         `invalid data type for tilde operator`,
 }

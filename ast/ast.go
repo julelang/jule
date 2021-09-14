@@ -233,7 +233,8 @@ func (ast *AST) BuildType(token lex.Token) (t TypeAST) {
 // returns false if not.
 func IsSingleOperator(operator string) bool {
 	return operator == "-" ||
-		operator == "+"
+		operator == "+" ||
+		operator == "~"
 }
 
 // BuildBlock builds AST model of statements of code block.
