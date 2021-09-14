@@ -37,4 +37,5 @@ var Errors = map[string]string{
 	`invalid_data_unary`:         `invalid data type for unary operator`,
 	`invalid_data_plus`:          `invalid data type for plus operator`,
 	`invalid_data_tilde`:         `invalid data type for tilde operator`,
+	`invalid_data_logical_not`:   `invalid data type for logical not operator`,
 }
