@@ -264,8 +264,8 @@ func (cp *CxxParser) computeProcesses(processes [][]lex.Token) ast.ValueAST {
 		solvedValue := process.solve()
 		if value.Type != ast.NA {
 			process.operator.Value = "+"
-			process.right = processes[j+1]
 			process.leftVal = value
+			process.right = processes[j+1]
 			process.rightVal = solvedValue
 			value = process.solve()
 		} else {
@@ -419,6 +419,12 @@ func (p arithmeticProcess) solveSigned() (value ast.ValueAST) {
 		if x.TypeGreaterThan(p.rightVal.Type, value.Type) {
 			value.Type = p.rightVal.Type
 		}
+	case ">>", "<<":
+		value.Type = p.leftVal.Type
+		if !x.IsUnsignedNumericType(p.rightVal.Type) &&
+			!checkIntBit(p.rightVal, xbits.BitsizeOfType(x.UInt64)) {
+			p.cp.PushErrorToken(p.rightVal.Token, "bitshift_must_unsigned")
+		}
 	default:
 		p.cp.PushErrorToken(p.operator, "operator_notfor_int")
 	}
@@ -450,11 +456,7 @@ func (p arithmeticProcess) solveUnsigned() (value ast.ValueAST) {
 
 func (p arithmeticProcess) solve() (value ast.ValueAST) {
 	switch p.operator.Value {
-	case "+":
-	case "-":
-	case "*":
-	case "/":
-	case "%":
+	case "+", "-", "*", "/", "%", ">>", "<<":
 	default:
 		p.cp.PushErrorToken(p.operator, "invalid_operator")
 	}
@@ -695,6 +697,9 @@ func (cp *CxxParser) checkFunctionCallStatement(cs ast.FunctionCallAST) {
 }
 
 func isConstantNumeric(v string) bool {
+	if v == "" {
+		return false
+	}
 	return v[0] >= '0' && v[0] <= '9'
 }
 

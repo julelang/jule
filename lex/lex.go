@@ -168,6 +168,14 @@ func (l *Lex) Token() Token {
 		tk.Value = "%"
 		tk.Type = Operator
 		l.Position++
+	case strings.HasPrefix(ln, "<<"):
+		tk.Value = "<<"
+		tk.Type = Operator
+		l.Position += 2
+	case strings.HasPrefix(ln, ">>"):
+		tk.Value = ">>"
+		tk.Type = Operator
+		l.Position += 2
 	case isKeyword(ln, "fun"):
 		tk.Value = "fun"
 		tk.Type = Fun
