@@ -418,7 +418,7 @@ func (p arithmeticProcess) solveSigned() (value ast.ValueAST) {
 	switch p.operator.Value {
 	case "!=", "==", "<", ">", ">=", "<=":
 		value.Type = x.Bool
-	case "+", "-", "*", "/", "%", "&":
+	case "+", "-", "*", "/", "%", "&", "|":
 		value.Type = p.leftVal.Type
 		if x.TypeGreaterThan(p.rightVal.Type, value.Type) {
 			value.Type = p.rightVal.Type
@@ -447,7 +447,7 @@ func (p arithmeticProcess) solveUnsigned() (value ast.ValueAST) {
 	switch p.operator.Value {
 	case "!=", "==", "<", ">", ">=", "<=":
 		value.Type = x.Bool
-	case "+", "-", "*", "/", "%", "&":
+	case "+", "-", "*", "/", "%", "&", "|":
 		value.Type = p.leftVal.Type
 		if x.TypeGreaterThan(p.rightVal.Type, value.Type) {
 			value.Type = p.rightVal.Type
@@ -460,7 +460,7 @@ func (p arithmeticProcess) solveUnsigned() (value ast.ValueAST) {
 
 func (p arithmeticProcess) solve() (value ast.ValueAST) {
 	switch p.operator.Value {
-	case "+", "-", "*", "/", "%", ">>", "<<", "&":
+	case "+", "-", "*", "/", "%", ">>", "<<", "&", "|":
 	default:
 		p.cp.PushErrorToken(p.operator, "invalid_operator")
 	}

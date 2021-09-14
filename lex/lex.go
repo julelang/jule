@@ -176,6 +176,10 @@ func (l *Lex) Token() Token {
 		tk.Value = "&"
 		tk.Type = Operator
 		l.Position++
+	case ln[0] == '|':
+		tk.Value = "|"
+		tk.Type = Operator
+		l.Position++
 	case strings.HasPrefix(ln, "<<"):
 		tk.Value = "<<"
 		tk.Type = Operator
