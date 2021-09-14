@@ -230,7 +230,14 @@ func (cp *CxxParser) computeProcesses(processes [][]lex.Token) ast.ValueAST {
 	var value ast.ValueAST
 	process.cp = cp
 	j := cp.nextOperator(processes)
+	boolean := false
 	for j != -1 {
+		if !boolean {
+			boolean = value.Type == x.Bool
+		}
+		if boolean {
+			value.Type = x.Bool
+		}
 		if j == 0 {
 			process.leftVal = value
 			process.operator = processes[j][0]
@@ -377,7 +384,7 @@ func (p arithmeticProcess) solveBool() (value ast.ValueAST) {
 		return
 	}
 	switch p.operator.Value {
-	case "&&", "||", "!=", "==":
+	case "!=", "==":
 		value.Type = x.Bool
 	default:
 		p.cp.PushErrorToken(p.operator, "operator_notfor_bool")
@@ -460,7 +467,9 @@ func (p arithmeticProcess) solveUnsigned() (value ast.ValueAST) {
 
 func (p arithmeticProcess) solve() (value ast.ValueAST) {
 	switch p.operator.Value {
-	case "+", "-", "*", "/", "%", ">>", "<<", "&", "|", "^":
+	case "+", "-", "*", "/", "%", ">>",
+		"<<", "&", "|", "^", "==", "!=",
+		">=", "<=", ">", "<":
 	default:
 		p.cp.PushErrorToken(p.operator, "invalid_operator")
 	}
