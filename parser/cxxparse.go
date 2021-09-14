@@ -541,6 +541,11 @@ func (cp *CxxParser) processSingleOperatorPart(tokens []lex.Token) ast.ValueAST 
 		if !x.IsNumericType(result.Type) {
 			cp.PushErrorToken(token, "invalid_data_unary")
 		}
+	case "+":
+		result = cp.processValuePart(tokens)
+		if !x.IsNumericType(result.Type) {
+			cp.PushErrorToken(token, "invalid_data_plus")
+		}
 	default:
 		cp.PushErrorToken(token, "invalid_syntax")
 	}

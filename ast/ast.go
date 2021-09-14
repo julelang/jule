@@ -232,7 +232,8 @@ func (ast *AST) BuildType(token lex.Token) (t TypeAST) {
 // if operator is unary or smilar to unary,
 // returns false if not.
 func IsSingleOperator(operator string) bool {
-	return operator == "-"
+	return operator == "-" ||
+		operator == "+"
 }
 
 // BuildBlock builds AST model of statements of code block.

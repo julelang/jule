@@ -35,4 +35,5 @@ var Errors = map[string]string{
 	`missing_semicolon`:          `missing statement terminator at end of statement`,
 	`bitshift_must_unsigned`:     `bit shifting value is must be unsigned`,
 	`invalid_data_unary`:         `invalid data type for unary operator`,
+	`invalid_data_plus`:          `invalid data type for plus operator`,
 }
