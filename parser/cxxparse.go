@@ -122,12 +122,12 @@ func (cp *CxxParser) ParseFunction(funAst ast.FunctionAST) {
 	cp.Functions = append(cp.Functions, fun)
 }
 
-func (cp *CxxParser) checkFunctionAttributes(tags []ast.AttributeAST) {
-	for _, tag := range tags {
-		switch tag.Token.Type {
+func (cp *CxxParser) checkFunctionAttributes(attributes []ast.AttributeAST) {
+	for _, attribute := range attributes {
+		switch attribute.Token.Type {
 		case lex.Inline:
 		default:
-			cp.PushErrorToken(tag.Token, "invalid_tag")
+			cp.PushErrorToken(attribute.Token, "invalid_attribute")
 		}
 	}
 }
