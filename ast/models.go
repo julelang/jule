@@ -40,14 +40,28 @@ type BlockAST struct {
 }
 
 func (b BlockAST) String() string {
+	return parseBlock(b, 1)
+}
+
+func parseBlock(b BlockAST, indent int) string {
+	// Space count per indent.
+	const indentSpace = 2
 	var cxx strings.Builder
 	for _, s := range b.Content {
 		cxx.WriteByte('\n')
-		cxx.WriteString("  ")
+		cxx.WriteString(fullString(' ', indent*indentSpace))
 		cxx.WriteString(fmt.Sprint(s.Value))
-		cxx.WriteByte(';')
 	}
 	return cxx.String()
+}
+
+func fullString(b byte, count int) string {
+	var sb strings.Builder
+	for count > 0 {
+		count--
+		sb.WriteByte(b)
+	}
+	return sb.String()
 }
 
 // TypeAST is data type identifier.
@@ -95,7 +109,7 @@ func (fc FunctionCallAST) String() string {
 		}
 		cxx = cxx[:len(cxx)-1]
 	}
-	cxx += ")"
+	cxx += ");"
 	return cxx
 }
 
@@ -181,4 +195,12 @@ type AttributeAST struct {
 
 func (a AttributeAST) String() string {
 	return a.Value
+}
+
+// VariableAST is variable declaration AST model.
+type VariableAST struct {
+	Token lex.Token
+	Name  string
+	Type  TypeAST
+	Value ExpressionAST
 }

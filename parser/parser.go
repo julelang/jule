@@ -54,10 +54,21 @@ func (p Parser) String() string {
 // Cxx is returns full C++ code of parsed objects.
 func (p *Parser) Cxx() string {
 	var sb strings.Builder
+	sb.WriteString("#pragma region X_GLOBAL_VARIABLES")
+	sb.WriteByte('\n')
+	for _, va := range p.GlobalVariables {
+		sb.WriteString(va.String())
+		sb.WriteByte('\n')
+	}
+	sb.WriteString("#pragma endregion X_GLOBAL_VARIABLES")
+	sb.WriteString("\n\n")
+	sb.WriteString("#pragma region X_FUNCTIONS")
+	sb.WriteByte('\n')
 	for _, fun := range p.Functions {
 		sb.WriteString(fun.String())
 		sb.WriteString("\n\n")
 	}
+	sb.WriteString("#pragma endregion X_FUNCTIONS")
 	return sb.String()
 }
 
