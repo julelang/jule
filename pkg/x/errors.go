@@ -34,4 +34,5 @@ var Errors = map[string]string{
 	`void_function_return_value`: `void functions is cannot returns any value`,
 	`missing_semicolon`:          `missing statement terminator at end of statement`,
 	`bitshift_must_unsigned`:     `bit shifting value is must be unsigned`,
+	`invalid_data_unary`:         `invalid data type for unary operator`,
 }

@@ -36,6 +36,11 @@ func (cp *CxxParser) PushErrorToken(token lex.Token, err string) {
 		"%s:%d:%d %s", token.File.Path, token.Line, token.Column, message))
 }
 
+// AppendErrors appends specified errors.
+func (cp *CxxParser) AppendErrors(errors ...string) {
+	cp.PFI.Errors = append(cp.PFI.Errors, errors...)
+}
+
 // PushError appends new error.
 func (cp *CxxParser) PushError(err string) {
 	cp.PFI.Errors = append(cp.PFI.Errors, x.Errors[err])
@@ -151,11 +156,10 @@ func (cp *CxxParser) checkFunctionReturn(fun *function) {
 			} else {
 				if fun.ReturnType.Type == x.Void {
 					cp.PushErrorToken(retAST.Token, "void_function_return_value")
-				} else {
-					value := cp.computeExpression(retAST.Expression)
-					if !x.TypesAreCompatible(value.Type, fun.ReturnType.Type, true) {
-						cp.PushErrorToken(retAST.Token, "incompatible_type")
-					}
+				}
+				value := cp.computeExpression(retAST.Expression)
+				if !x.TypesAreCompatible(value.Type, fun.ReturnType.Type, true) {
+					cp.PushErrorToken(retAST.Token, "incompatible_type")
 				}
 			}
 			miss = false
@@ -520,8 +524,33 @@ func (cp *CxxParser) processSingleValuePart(token lex.Token) (result ast.ValueAS
 	return
 }
 
+func (cp *CxxParser) processSingleOperatorPart(tokens []lex.Token) ast.ValueAST {
+	var result ast.ValueAST
+	token := tokens[0]
+	//? Length is 1 caouse all lengths of operators is 1,
+	//? change "1" with length of token's valaue
+	//? if all operators length is not 1.
+	tokens = tokens[1:]
+	if len(tokens) == 0 {
+		cp.PushErrorToken(token, "invalid_syntax")
+		return result
+	}
+	switch token.Value {
+	case "-":
+		result = cp.processValuePart(tokens)
+		if !x.IsNumericType(result.Type) {
+			cp.PushErrorToken(token, "invalid_data_unary")
+		}
+	default:
+		cp.PushErrorToken(token, "invalid_syntax")
+	}
+	return result
+}
+
 func (cp *CxxParser) processValuePart(tokens []lex.Token) (result ast.ValueAST) {
-	if len(tokens) == 1 {
+	if tokens[0].Type == lex.Operator {
+		return cp.processSingleOperatorPart(tokens)
+	} else if len(tokens) == 1 {
 		result = cp.processSingleValuePart(tokens[0])
 		if result.Type != ast.NA {
 			goto end
@@ -587,57 +616,34 @@ func (cp *CxxParser) parseFunctionCallStatement(fun *function, tokens []lex.Toke
 	if tokens == nil {
 		tokens = make([]lex.Token, 0)
 	}
-	if cp.parseArgs(fun, tokens) < len(fun.Params) {
+	ast := new(ast.AST)
+	args := ast.BuildArgs(tokens)
+	if len(ast.Errors) > 0 {
+		cp.AppendErrors(ast.Errors...)
+	}
+	cp.parseArgs(fun, args, errToken)
+}
+
+func (cp *CxxParser) parseArgs(fun *function, args []ast.ArgAST, errToken lex.Token) {
+	if len(args) < len(fun.Params) {
 		cp.PushErrorToken(errToken, "argument_missing")
 	}
+	for index, arg := range args {
+		cp.parseArg(fun, index, arg)
+	}
 }
 
-func (cp *CxxParser) parseArgs(fun *function, tokens []lex.Token) int {
-	last := 0
-	braceCount := 0
-	count := 0
-	for index, token := range tokens {
-		if token.Type == lex.Brace {
-			switch token.Value {
-			case "{", "[", "(":
-				braceCount++
-			default:
-				braceCount--
-			}
-		}
-		if braceCount > 0 || token.Type != lex.Comma {
-			continue
-		}
-		count++
-		cp.parseArg(fun, count, tokens[last:index], token)
-		last = index + 1
-	}
-	if last < len(tokens) {
-		count++
-		if last == 0 {
-			cp.parseArg(fun, count, tokens[last:], tokens[last])
-		} else {
-			cp.parseArg(fun, count, tokens[last:], tokens[last-1])
-		}
-	}
-	return count
-}
-
-func (cp *CxxParser) parseArg(fun *function, count int, tokens []lex.Token, err lex.Token) {
-	if len(tokens) == 0 {
-		cp.PushErrorToken(err, "invalid_syntax")
+func (cp *CxxParser) parseArg(fun *function, index int, arg ast.ArgAST) {
+	if index >= len(fun.Params) {
+		cp.PushErrorToken(arg.Token, "argument_overflow")
 		return
 	}
-	if count > len(fun.Params) {
-		cp.PushErrorToken(err, "argument_overflow")
-		return
-	}
-	value := cp.computeTokens(tokens)
-	param := fun.Params[count-1]
+	value := cp.computeExpression(arg.Expression)
+	param := fun.Params[index]
 	if !x.TypesAreCompatible(value.Type, param.Type.Type, false) {
 		value.Type = param.Type.Type
 		if !checkIntBit(value, xbits.BitsizeOfType(param.Type.Type)) {
-			cp.PushErrorToken(err, "incompatible_type")
+			cp.PushErrorToken(arg.Token, "incompatible_type")
 		}
 	}
 }
@@ -693,7 +699,7 @@ func (cp *CxxParser) checkFunctionCallStatement(cs ast.FunctionCallAST) {
 		cp.PushErrorToken(cs.Token, "name_not_defined")
 		return
 	}
-	cp.parseFunctionCallStatement(fun, cs.Expression.Tokens[1:])
+	cp.parseArgs(fun, cs.Args, cs.Token)
 }
 
 func isConstantNumeric(v string) bool {

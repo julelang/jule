@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/the-xlang/x/ast"
@@ -36,7 +35,7 @@ func (f function) String() string {
 	cxx += paramsToCxx(f.Params)
 	cxx += ") {"
 	cxx += getFunctionStandardCode(f.Name)
-	cxx += blockToCxx(f.Block)
+	cxx += f.Block.String()
 	cxx += "\n}"
 	return cxx
 }
@@ -75,17 +74,6 @@ func paramsToCxx(params []ast.ParameterAST) string {
 		cxx = "template <typename any>\n" + cxx
 	}
 	return cxx
-}
-
-func blockToCxx(block ast.BlockAST) string {
-	var cxx strings.Builder
-	for _, s := range block.Content {
-		cxx.WriteByte('\n')
-		cxx.WriteString("  ")
-		cxx.WriteString(fmt.Sprint(s.Value))
-		cxx.WriteByte(';')
-	}
-	return cxx.String()
 }
 
 func getFunctionStandardCode(name string) string {

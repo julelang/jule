@@ -1,6 +1,7 @@
 package ast
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/the-xlang/x/lex"
@@ -38,6 +39,17 @@ type BlockAST struct {
 	Content []StatementAST
 }
 
+func (b BlockAST) String() string {
+	var cxx strings.Builder
+	for _, s := range b.Content {
+		cxx.WriteByte('\n')
+		cxx.WriteString("  ")
+		cxx.WriteString(fmt.Sprint(s.Value))
+		cxx.WriteByte(';')
+	}
+	return cxx.String()
+}
+
 // TypeAST is data type identifier.
 type TypeAST struct {
 	Token lex.Token
@@ -70,11 +82,33 @@ type FunctionCallAST struct {
 	Token      lex.Token
 	Name       string
 	Expression ExpressionAST
-	Args       []lex.Token
+	Args       []ArgAST
 }
 
 func (fc FunctionCallAST) String() string {
-	return fc.Expression.String()
+	var cxx string
+	cxx += fc.Name
+	cxx += "("
+	if len(fc.Args) > 0 {
+		for _, arg := range fc.Args {
+			cxx += arg.String()
+			cxx += ","
+		}
+		cxx = cxx[:len(cxx)-1]
+	}
+	cxx += ")"
+	return cxx
+}
+
+// ArgAST is AST model of argument.
+type ArgAST struct {
+	Token      lex.Token
+	Tokens     []lex.Token
+	Expression ExpressionAST
+}
+
+func (a ArgAST) String() string {
+	return a.Expression.String()
 }
 
 // ExpressionAST is AST model of expression.

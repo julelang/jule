@@ -232,10 +232,7 @@ func (ast *AST) BuildType(token lex.Token) (t TypeAST) {
 // if operator is unary or smilar to unary,
 // returns false if not.
 func IsSingleOperator(operator string) bool {
-	return operator == "-" ||
-		operator == "!" ||
-		operator == "*" ||
-		operator == "&"
+	return operator == "-"
 }
 
 // BuildBlock builds AST model of statements of code block.
@@ -306,20 +303,63 @@ func (ast *AST) BuildFunctionCallStatement(tokens []lex.Token) StatementAST {
 	fnCall.Token = tokens[0]
 	fnCall.Name = fnCall.Token.Value
 	tokens = tokens[1:]
-	fnCall.Args = ast.getRangeTokens("(", ")", tokens)
-	if fnCall.Args == nil {
+	args := ast.getRangeTokens("(", ")", tokens)
+	if args == nil {
 		ast.Position = -1
 		return StatementAST{}
-	} else if len(fnCall.Args) != len(tokens)-2 {
+	} else if len(args) != len(tokens)-2 {
 		ast.PushErrorToken(tokens[len(tokens)-2], "invalid_syntax")
 		ast.Position = -1
 		return StatementAST{}
 	}
+	fnCall.Args = ast.BuildArgs(args)
 	return StatementAST{
 		Token: fnCall.Token,
 		Value: fnCall,
 		Type:  StatementFunctionCall,
 	}
+}
+
+// BuildArgs builds AST model of arguments.
+func (ast *AST) BuildArgs(tokens []lex.Token) []ArgAST {
+	var args []ArgAST
+	last := 0
+	braceCount := 0
+	for index, token := range tokens {
+		if token.Type == lex.Brace {
+			switch token.Value {
+			case "{", "[", "(":
+				braceCount++
+			default:
+				braceCount--
+			}
+		}
+		if braceCount > 0 || token.Type != lex.Comma {
+			continue
+		}
+		ast.pushArg(&args, tokens[last:index], token)
+		last = index + 1
+	}
+	if last < len(tokens) {
+		if last == 0 {
+			ast.pushArg(&args, tokens[last:], tokens[last])
+		} else {
+			ast.pushArg(&args, tokens[last:], tokens[last-1])
+		}
+	}
+	return args
+}
+
+func (ast *AST) pushArg(args *[]ArgAST, tokens []lex.Token, err lex.Token) {
+	if len(tokens) == 0 {
+		ast.PushErrorToken(err, "invalid_syntax")
+		return
+	}
+	var arg ArgAST
+	arg.Token = tokens[0]
+	arg.Tokens = tokens
+	arg.Expression = ast.BuildExpression(arg.Tokens)
+	*args = append(*args, arg)
 }
 
 // BuildReturnStatement builds AST model of return statement.
@@ -350,16 +390,19 @@ func (ast *AST) getExpressionProcesses(tokens []lex.Token) [][]lex.Token {
 	value := false
 	braceCount := 0
 	pushedError := false
+	singleOperatored := false
 	for index, token := range tokens {
 		switch token.Type {
 		case lex.Operator:
 			if !operator {
-				if IsSingleOperator(token.Value) {
+				if IsSingleOperator(token.Value) && !singleOperatored {
 					part = append(part, token)
+					singleOperatored = true
 					continue
 				}
 				ast.PushErrorToken(token, "operator_overflow")
 			}
+			singleOperatored = false
 			operator = false
 			value = true
 			if braceCount > 0 {
@@ -373,6 +416,7 @@ func (ast *AST) getExpressionProcesses(tokens []lex.Token) [][]lex.Token {
 		case lex.Brace:
 			switch token.Value {
 			case "(", "[", "{":
+				singleOperatored = false
 				braceCount++
 			default:
 				braceCount--

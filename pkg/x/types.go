@@ -117,7 +117,9 @@ func TypesAreCompatible(t1, t2 uint8, ignoreany bool) bool {
 
 // IsNumericType reports type is numeric or not.
 func IsNumericType(t uint8) bool {
-	return IsSignedNumericType(t) || IsUnsignedNumericType(t)
+	return IsSignedNumericType(t) ||
+		IsUnsignedNumericType(t) ||
+		IsFloatType(t)
 }
 
 // IsFloatType reports type is float or not.
