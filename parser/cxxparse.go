@@ -298,7 +298,9 @@ func (cp *CxxParser) computeTokens(tokens []lex.Token) ast.ValueAST {
 }
 
 func (cp *CxxParser) computeExpression(ex ast.ExpressionAST) ast.ValueAST {
-	return cp.computeProcesses(ex.Processes)
+	processes := make([][]lex.Token, len(ex.Processes))
+	copy(processes, ex.Processes)
+	return cp.computeProcesses(processes)
 }
 
 // nextOperator find index of priority operator and returns index of operator
@@ -465,11 +467,24 @@ func (p arithmeticProcess) solveUnsigned() (value ast.ValueAST) {
 	return
 }
 
+func (p arithmeticProcess) solveLogical() (value ast.ValueAST) {
+	value.Type = x.Bool
+	if p.leftVal.Type != x.Bool {
+		p.cp.PushErrorToken(p.leftVal.Token, "logical_not_bool")
+	}
+	if p.rightVal.Type != x.Bool {
+		p.cp.PushErrorToken(p.rightVal.Token, "logical_not_bool")
+	}
+	return
+}
+
 func (p arithmeticProcess) solve() (value ast.ValueAST) {
 	switch p.operator.Value {
 	case "+", "-", "*", "/", "%", ">>",
 		"<<", "&", "|", "^", "==", "!=",
 		">=", "<=", ">", "<":
+	case "&&", "||":
+		return p.solveLogical()
 	default:
 		p.cp.PushErrorToken(p.operator, "invalid_operator")
 	}
