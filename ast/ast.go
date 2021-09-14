@@ -299,7 +299,6 @@ func (ast *AST) BuildNameStatement(tokens []lex.Token) (s StatementAST) {
 
 func (ast *AST) BuildFunctionCallStatement(tokens []lex.Token) StatementAST {
 	var fnCall FunctionCallAST
-	fnCall.Expression = ast.BuildExpression(tokens)
 	fnCall.Token = tokens[0]
 	fnCall.Name = fnCall.Token.Value
 	tokens = tokens[1:]

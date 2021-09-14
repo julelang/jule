@@ -79,10 +79,9 @@ func (p ParameterAST) String() string {
 
 // FunctionAST is function declaration AST model.
 type FunctionCallAST struct {
-	Token      lex.Token
-	Name       string
-	Expression ExpressionAST
-	Args       []ArgAST
+	Token lex.Token
+	Name  string
+	Args  []ArgAST
 }
 
 func (fc FunctionCallAST) String() string {
