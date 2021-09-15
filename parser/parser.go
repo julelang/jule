@@ -97,8 +97,8 @@ func (p *Parser) Parse() {
 
 // PushAttribute processes and appends to attribute list.
 func (p *Parser) PushAttribute(t ast.AttributeAST) {
-	switch t.Token.Type {
-	case lex.Inline:
+	switch t.Token.Value {
+	case "inline":
 	default:
 		p.PushErrorToken(t.Token, "invalid_syntax")
 	}
@@ -135,8 +135,8 @@ func (p *Parser) ParseFunction(funAst ast.FunctionAST) {
 
 func (p *Parser) checkFunctionAttributes(attributes []ast.AttributeAST) {
 	for _, attribute := range attributes {
-		switch attribute.Token.Type {
-		case lex.Inline:
+		switch attribute.Token.Value {
+		case "inline":
 		default:
 			p.PushErrorToken(attribute.Token, "invalid_attribute")
 		}

@@ -23,5 +23,4 @@ const (
 	Operator  uint8 = 7
 	Comma     uint8 = 8
 	Fun       uint8 = 9
-	Inline    uint8 = 10
 )

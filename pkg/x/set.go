@@ -27,7 +27,7 @@ func splitLines(content string) []string {
 	if runtime.GOOS == "windows" {
 		return strings.SplitN(string(content), "\n", -1)
 	}
-	return strings.SplitN(string(content), "\n\r", -1)
+	return strings.SplitN(string(content), "\n", -1)
 }
 
 func (xs *XSet) checkUnset() []error {
