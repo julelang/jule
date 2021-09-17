@@ -14,11 +14,12 @@ import (
 type Parser struct {
 	attributes []ast.AttributeAST
 
-	Functions       []*function
-	GlobalVariables []*variable
-	BlockVariables  []*variable
-	Tokens          []lex.Token
-	PFI             *ParseFileInfo
+	Functions              []*function
+	GlobalVariables        []ast.VariableAST
+	WaitingGlobalVariables []ast.VariableAST
+	BlockVariables         []ast.VariableAST
+	Tokens                 []lex.Token
+	PFI                    *ParseFileInfo
 }
 
 // NewParser returns new instance of Parser.
@@ -110,6 +111,8 @@ func (p *Parser) ParseStatement(s ast.StatementAST) {
 	switch s.Type {
 	case ast.StatementFunction:
 		p.ParseFunction(s.Value.(ast.FunctionAST))
+	case ast.StatementVariable:
+		p.ParseGlobalVariable(s.Value.(ast.VariableAST))
 	default:
 		p.PushErrorToken(s.Token, "invalid_syntax")
 	}
@@ -117,7 +120,7 @@ func (p *Parser) ParseStatement(s ast.StatementAST) {
 
 // ParseFunction parse X function.
 func (p *Parser) ParseFunction(funAst ast.FunctionAST) {
-	if token := p.existName(funAst.Name); token.Type != ast.NA {
+	if p.existName(funAst.Name).Type != ast.NA {
 		p.PushErrorToken(funAst.Token, "exist_name")
 		return
 	}
@@ -133,6 +136,35 @@ func (p *Parser) ParseFunction(funAst ast.FunctionAST) {
 	p.Functions = append(p.Functions, fun)
 }
 
+// ParseVariable parse X global variable.
+func (p *Parser) ParseGlobalVariable(varAST ast.VariableAST) {
+	if p.existName(varAST.Name).Type != ast.NA {
+		p.PushErrorToken(varAST.Token, "exist_name")
+		return
+	}
+	p.WaitingGlobalVariables = append(p.WaitingGlobalVariables, varAST)
+}
+
+// ParseWaitingGlobalVariables parse X global variables for waiting parsing.
+func (p *Parser) ParseWaitingGlobalVariables() {
+	for _, varAST := range p.WaitingGlobalVariables {
+		p.GlobalVariables = append(p.GlobalVariables, p.ParseVariable(varAST))
+	}
+}
+
+// ParseVariable parse X variable.
+func (p *Parser) ParseVariable(varAST ast.VariableAST) ast.VariableAST {
+	if varAST.Type.Code != x.Void {
+		value := p.computeExpression(varAST.Value)
+		if varAST.Type.Code != value.Type {
+			if !x.TypesAreCompatible(varAST.Type.Code, value.Type, true) {
+				p.PushErrorToken(varAST.Token, "incompatible_datatype")
+			}
+		}
+	}
+	return varAST
+}
+
 func (p *Parser) checkFunctionAttributes(attributes []ast.AttributeAST) {
 	for _, attribute := range attributes {
 		switch attribute.Token.Value {
@@ -143,13 +175,13 @@ func (p *Parser) checkFunctionAttributes(attributes []ast.AttributeAST) {
 	}
 }
 
-func variablesFromParameters(params []ast.ParameterAST) []*variable {
-	var vars []*variable
+func variablesFromParameters(params []ast.ParameterAST) []ast.VariableAST {
+	var vars []ast.VariableAST
 	for _, param := range params {
-		variable := new(variable)
+		var variable ast.VariableAST
 		variable.Name = param.Name
 		variable.Token = param.Token
-		variable.Type = param.Type.Type
+		variable.Type = param.Type
 		vars = append(vars, variable)
 	}
 	return vars
@@ -161,22 +193,22 @@ func (p *Parser) checkFunctionReturn(fun *function) {
 		if s.Type == ast.StatementReturn {
 			retAST := s.Value.(ast.ReturnAST)
 			if len(retAST.Expression.Tokens) == 0 {
-				if fun.ReturnType.Type != x.Void {
+				if fun.ReturnType.Code != x.Void {
 					p.PushErrorToken(retAST.Token, "require_return_value")
 				}
 			} else {
-				if fun.ReturnType.Type == x.Void {
+				if fun.ReturnType.Code == x.Void {
 					p.PushErrorToken(retAST.Token, "void_function_return_value")
 				}
 				value := p.computeExpression(retAST.Expression)
-				if !x.TypesAreCompatible(value.Type, fun.ReturnType.Type, true) {
+				if !x.TypesAreCompatible(value.Type, fun.ReturnType.Code, true) {
 					p.PushErrorToken(retAST.Token, "incompatible_type")
 				}
 			}
 			miss = false
 		}
 	}
-	if miss && fun.ReturnType.Type != x.Void {
+	if miss && fun.ReturnType.Code != x.Void {
 		p.PushErrorToken(fun.Token, "missing_return")
 	}
 }
@@ -195,15 +227,15 @@ func (p *Parser) functionByName(name string) *function {
 	return nil
 }
 
-func (p *Parser) variableByName(name string) *variable {
+func (p *Parser) variableByName(name string) *ast.VariableAST {
 	for _, variable := range p.BlockVariables {
 		if variable.Name == name {
-			return variable
+			return &variable
 		}
 	}
 	for _, variable := range p.GlobalVariables {
 		if variable.Name == name {
-			return variable
+			return &variable
 		}
 	}
 	return nil
@@ -214,6 +246,15 @@ func (p *Parser) existName(name string) lex.Token {
 	if fun != nil {
 		return fun.Token
 	}
+	variable := p.variableByName(name)
+	if variable != nil {
+		return variable.Token
+	}
+	for _, varAST := range p.WaitingGlobalVariables {
+		if varAST.Name == name {
+			return varAST.Token
+		}
+	}
 	return lex.Token{}
 }
 
@@ -221,6 +262,12 @@ func (p *Parser) finalCheck() {
 	if p.functionByName(x.EntryPoint) == nil {
 		p.PushError("no_entry_point")
 	}
+	p.ParseWaitingGlobalVariables()
+	p.WaitingGlobalVariables = nil
+	p.checkFunctions()
+}
+
+func (p *Parser) checkFunctions() {
 	for _, fun := range p.Functions {
 		p.BlockVariables = variablesFromParameters(fun.Params)
 		p.checkFunction(fun)
@@ -367,7 +414,7 @@ type arithmeticProcess struct {
 func (ap arithmeticProcess) solveString() (value ast.ValueAST) {
 	// Not both string?
 	if ap.leftVal.Type != ap.rightVal.Type {
-		ap.cp.PushErrorToken(ap.operator, "invalid_datatype")
+		ap.cp.PushErrorToken(ap.operator, "incompatible_datatype")
 		return
 	}
 	switch ap.operator.Value {
@@ -549,7 +596,7 @@ func (p *Parser) processSingleValuePart(token lex.Token) (result ast.ValueAST) {
 			result.Type = functionName
 		} else if variable := p.variableByName(token.Value); variable != nil {
 			result.Value = token.Value
-			result.Type = variable.Type
+			result.Type = variable.Type.Code
 		} else {
 			p.PushErrorToken(token, "name_not_defined")
 		}
@@ -653,7 +700,7 @@ func (p *Parser) processParenthesesValuePart(tokens []lex.Token) ast.ValueAST {
 	case functionName:
 		fun := p.functionByName(value.Value)
 		p.parseFunctionCallStatement(fun, tokens[len(valueTokens):])
-		value.Type = fun.ReturnType.Type
+		value.Type = fun.ReturnType.Code
 	default:
 		p.PushErrorToken(tokens[len(valueTokens)], "invalid_syntax")
 	}
@@ -690,9 +737,9 @@ func (p *Parser) parseArg(fun *function, index int, arg ast.ArgAST) {
 	}
 	value := p.computeExpression(arg.Expression)
 	param := fun.Params[index]
-	if !x.TypesAreCompatible(value.Type, param.Type.Type, false) {
-		value.Type = param.Type.Type
-		if !checkIntBit(value, xbits.BitsizeOfType(param.Type.Type)) {
+	if !x.TypesAreCompatible(value.Type, param.Type.Code, false) {
+		value.Type = param.Type.Code
+		if !checkIntBit(value, xbits.BitsizeOfType(param.Type.Code)) {
 			p.PushErrorToken(arg.Token, "incompatible_type")
 		}
 	}
@@ -725,7 +772,7 @@ func (p *Parser) checkFunction(fun *function) {
 		if len(fun.Params) > 0 {
 			p.PushErrorToken(fun.Token, "entrypoint_have_parameters")
 		}
-		if fun.ReturnType.Type != x.Void {
+		if fun.ReturnType.Code != x.Void {
 			p.PushErrorToken(fun.ReturnType.Token, "entrypoint_have_return")
 		}
 	}
@@ -736,6 +783,8 @@ func (p *Parser) checkBlock(b ast.BlockAST) {
 		switch model.Type {
 		case ast.StatementFunctionCall:
 			p.checkFunctionCallStatement(model.Value.(ast.FunctionCallAST))
+		case ast.StatementVariable:
+			p.checkVariableStatement(model.Value.(ast.VariableAST))
 		case ast.StatementReturn:
 		default:
 			p.PushErrorToken(model.Token, "invalid_syntax")
@@ -750,6 +799,16 @@ func (p *Parser) checkFunctionCallStatement(cs ast.FunctionCallAST) {
 		return
 	}
 	p.parseArgs(fun, cs.Args, cs.Token)
+}
+
+func (p *Parser) checkVariableStatement(varAST ast.VariableAST) {
+	for _, variable := range p.BlockVariables {
+		if varAST.Name == variable.Name {
+			p.PushErrorToken(varAST.Token, "exist_name")
+			break
+		}
+	}
+	p.BlockVariables = append(p.BlockVariables, p.ParseVariable(varAST))
 }
 
 func isConstantNumeric(v string) bool {

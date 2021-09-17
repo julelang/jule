@@ -212,3 +212,21 @@ func CxxTypeNameFromType(typeCode uint8) string {
 	}
 	return "" // Unreachable code.
 }
+
+// DefaultValueOfType returns default value of specified type.
+//
+// Special case is:
+//  DefaultValueOfType(t) = "." if t is invalid
+//  DefaultValueOfType(t) = "." if t is not have default value
+func DefaultValueOfType(t uint8) string {
+	if IsNumericType(t) {
+		return "0"
+	}
+	switch t {
+	case Bool:
+		return "false"
+	case Str:
+		return `""`
+	}
+	return "."
+}

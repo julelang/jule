@@ -23,4 +23,5 @@ const (
 	Operator  uint8 = 7
 	Comma     uint8 = 8
 	Fun       uint8 = 9
+	Var       uint8 = 10
 )

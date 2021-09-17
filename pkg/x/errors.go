@@ -14,7 +14,7 @@ var Errors = map[string]string{
 	`incompatible_type`:          `incompatible value type`,
 	`operator_overflow`:          `operator overflow`,
 	`invalid_operator`:           `invalid operator`,
-	`invalid_datatype`:           `data type are not compatible`,
+	`incompatible_datatype`:      `data type are not compatible`,
 	`operator_notfor_string`:     `this operator is not defined for string type`,
 	`operator_notfor_bool`:       `this operator is not defined for boolean type`,
 	`operator_notfor_any`:        `this operator is not defined for any type`,
@@ -39,4 +39,5 @@ var Errors = map[string]string{
 	`invalid_data_tilde`:         `invalid data type for tilde operator`,
 	`invalid_data_logical_not`:   `invalid data type for logical not operator`,
 	`logical_not_bool`:           `logical expression is have only boolean type values`,
+	`missing_autotype_value`:     `auto type declarations should have a initializer`,
 }

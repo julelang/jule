@@ -67,7 +67,7 @@ func fullString(b byte, count int) string {
 // TypeAST is data type identifier.
 type TypeAST struct {
 	Token lex.Token
-	Type  uint8
+	Code  uint8
 	Value string
 }
 
@@ -88,7 +88,7 @@ type ParameterAST struct {
 }
 
 func (p ParameterAST) String() string {
-	return x.CxxTypeNameFromType(p.Type.Type) + " " + p.Name
+	return x.CxxTypeNameFromType(p.Type.Code) + " " + p.Name
 }
 
 // FunctionAST is function declaration AST model.
@@ -203,4 +203,19 @@ type VariableAST struct {
 	Name  string
 	Type  TypeAST
 	Value ExpressionAST
+}
+
+func (v VariableAST) String() string {
+	var sb strings.Builder
+	if v.Type.Code == x.Void {
+		sb.WriteString("auto")
+	} else {
+		sb.WriteString(x.CxxTypeNameFromType(v.Type.Code))
+	}
+	sb.WriteByte(' ')
+	sb.WriteString(v.Name)
+	sb.WriteString(" = ")
+	sb.WriteString(v.Value.String())
+	sb.WriteByte(';')
+	return sb.String()
 }

@@ -54,6 +54,8 @@ func (ast *AST) Build() {
 			ast.BuildBrace()
 		case lex.Fun:
 			ast.BuildFunction()
+		case lex.Var, lex.Type:
+			ast.BuildGlobalVariable()
 		default:
 			ast.PushError("invalid_syntax")
 			ast.Position++
@@ -88,7 +90,7 @@ func (ast *AST) BuildAttribute() {
 	attribute.Token = ast.Tokens[ast.Position]
 	if attribute.Token.Type != lex.Brace || attribute.Token.Value != "]" {
 		ast.PushErrorToken(attribute.Token, "invalid_syntax")
-		ast.Position = -1
+		ast.Position = -1 // Stop modelling.
 		return
 	}
 	attribute.Token = ast.Tokens[ast.Position-1]
@@ -106,9 +108,18 @@ func (ast *AST) BuildFunction() {
 	ast.Position++ // Skip function keyword.
 	var funAST FunctionAST
 	funAST.Token = ast.Tokens[ast.Position]
+	if funAST.Token.Type != lex.Name {
+		ast.PushErrorToken(funAST.Token, "invalid_syntax")
+	}
 	funAST.Name = funAST.Token.Value
-	funAST.ReturnType.Type = x.Void
+	funAST.ReturnType.Code = x.Void
 	ast.Position++
+	if ast.Ended() {
+		ast.Position--
+		ast.PushError("function_body_not_exist")
+		ast.Position = -1 // Stop modelling.
+		return
+	}
 	tokens := ast.getRange("(", ")")
 	if tokens == nil {
 		return
@@ -118,7 +129,7 @@ func (ast *AST) BuildFunction() {
 	if ast.Ended() {
 		ast.Position--
 		ast.PushError("function_body_not_exist")
-		ast.Position = -1 // Stop parsing.
+		ast.Position = -1 // Stop modelling.
 		return
 	}
 	token := ast.Tokens[ast.Position]
@@ -128,20 +139,20 @@ func (ast *AST) BuildFunction() {
 		if ast.Ended() {
 			ast.Position--
 			ast.PushError("function_body_not_exist")
-			ast.Position = -1 // Stop parsing.
+			ast.Position = -1 // Stop modelling.
 			return
 		}
 		token = ast.Tokens[ast.Position]
 	}
 	if token.Type != lex.Brace || token.Value != "{" {
 		ast.PushError("invalid_syntax")
-		ast.Position = -1 // Stop parsing.
+		ast.Position = -1 // Stop modelling.
 		return
 	}
 	blockTokens := ast.getRange("{", "}")
 	if blockTokens == nil {
 		ast.PushError("function_body_not_exist")
-		ast.Position = -1
+		ast.Position = -1 // Stop modelling.
 		return
 	}
 	funAST.Block = ast.BuildBlock(blockTokens)
@@ -153,6 +164,20 @@ func (ast *AST) BuildFunction() {
 			Type:  StatementFunction,
 			Value: funAST,
 		},
+	})
+}
+
+// BuildGlobalVariable builds AST model of global variable.
+func (ast *AST) BuildGlobalVariable() {
+	statementTokens := ast.skipStatement()
+	if statementTokens == nil {
+		return
+	}
+	statement := ast.BuildVariableStatement(statementTokens)
+	ast.Tree = append(ast.Tree, Object{
+		Token: statement.Token,
+		Type:  Statement,
+		Value: statement,
 	})
 }
 
@@ -223,7 +248,7 @@ func (ast *AST) BuildType(token lex.Token) (t TypeAST) {
 		return
 	}
 	t.Token = token
-	t.Type = x.TypeFromName(t.Token.Value)
+	t.Code = x.TypeFromName(t.Token.Value)
 	t.Value = t.Token.Value
 	return t
 }
@@ -275,6 +300,8 @@ func (ast *AST) BuildStatement(tokens []lex.Token) (s StatementAST) {
 	switch firstToken.Type {
 	case lex.Name:
 		return ast.BuildNameStatement(tokens)
+	case lex.Var:
+		return ast.BuildVariableStatement(tokens)
 	case lex.Return:
 		return ast.BuildReturnStatement(tokens)
 	default:
@@ -300,6 +327,7 @@ func (ast *AST) BuildNameStatement(tokens []lex.Token) (s StatementAST) {
 	return
 }
 
+// BuildFunctionCallStatement builds AST model of function call statement.
 func (ast *AST) BuildFunctionCallStatement(tokens []lex.Token) StatementAST {
 	var fnCall FunctionCallAST
 	fnCall.Token = tokens[0]
@@ -307,11 +335,11 @@ func (ast *AST) BuildFunctionCallStatement(tokens []lex.Token) StatementAST {
 	tokens = tokens[1:]
 	args := ast.getRangeTokens("(", ")", tokens)
 	if args == nil {
-		ast.Position = -1
+		ast.Position = -1 // Stop modelling.
 		return StatementAST{}
 	} else if len(args) != len(tokens)-2 {
 		ast.PushErrorToken(tokens[len(tokens)-2], "invalid_syntax")
-		ast.Position = -1
+		ast.Position = -1 // Stop modelling.
 		return StatementAST{}
 	}
 	fnCall.Args = ast.BuildArgs(args)
@@ -362,6 +390,62 @@ func (ast *AST) pushArg(args *[]ArgAST, tokens []lex.Token, err lex.Token) {
 	arg.Tokens = tokens
 	arg.Expression = ast.BuildExpression(arg.Tokens)
 	*args = append(*args, arg)
+}
+
+// BuildVariableStatement builds AST model of variable declaration statement.
+func (ast *AST) BuildVariableStatement(tokens []lex.Token) (s StatementAST) {
+	position := 1 // Here is "1" because first keyword is variable declaration.
+	var varAST VariableAST
+	varAST.Token = tokens[position]
+	if varAST.Token.Type != lex.Name {
+		ast.PushErrorToken(varAST.Token, "invalid_syntax")
+	}
+	varAST.Name = varAST.Token.Value
+	varAST.Type = TypeAST{Code: x.Void}
+	position++
+	if position >= len(tokens) {
+		ast.PushErrorToken(tokens[position-1], "invalid_syntax")
+		return
+	}
+	token := tokens[position]
+	if token.Type == lex.Type {
+		varAST.Type = ast.BuildType(token)
+		position++
+		if position >= len(tokens) {
+			ast.PushErrorToken(token, "invalid_syntax")
+			return
+		}
+		token = tokens[position]
+	}
+	switch token.Type {
+	case lex.SemiColon:
+		if varAST.Type.Code == x.Void {
+			ast.PushErrorToken(token, "missing_autotype_value")
+			goto end
+		} else {
+			var valueToken lex.Token
+			valueToken.Type = lex.Value
+			valueToken.Value = x.DefaultValueOfType(varAST.Type.Code)
+			valueTokens := []lex.Token{valueToken}
+			varAST.Value = ExpressionAST{
+				Tokens:    valueTokens,
+				Processes: [][]lex.Token{valueTokens},
+			}
+		}
+		goto end
+	case lex.Operator:
+		if token.Value != "=" {
+			ast.PushErrorToken(token, "invalid_syntax")
+			goto end
+		}
+	}
+	varAST.Value = ast.BuildExpression(tokens[position+1:])
+end:
+	return StatementAST{
+		Token: varAST.Token,
+		Type:  StatementVariable,
+		Value: varAST,
+	}
 }
 
 // BuildReturnStatement builds AST model of return statement.
@@ -519,10 +603,25 @@ func (ast *AST) getRange(open, close string) []lex.Token {
 		if braceCount > 0 {
 			ast.Position--
 			ast.PushError("brace_not_closed")
-			ast.Position = -1
+			ast.Position = -1 // Stop modelling.
 			return nil
 		}
 		return ast.Tokens[start : ast.Position-1]
 	}
+	return nil
+}
+
+func (ast *AST) skipStatement() []lex.Token {
+	start := ast.Position
+	for ; !ast.Ended(); ast.Position++ {
+		token := ast.Tokens[ast.Position]
+		if token.Type == lex.SemiColon {
+			ast.Position++
+			return ast.Tokens[start : ast.Position-1]
+		}
+	}
+	ast.Position--
+	ast.PushError("missing_semicolon")
+	ast.Position = -1 // Stop modelling.
 	return nil
 }

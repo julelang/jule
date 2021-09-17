@@ -228,9 +228,17 @@ func (l *Lex) Token() Token {
 		tk.Value = ">"
 		tk.Type = Operator
 		l.Position++
+	case ln[0] == '=':
+		tk.Value = "="
+		tk.Type = Operator
+		l.Position++
 	case isKeyword(ln, "fun"):
 		tk.Value = "fun"
 		tk.Type = Fun
+		l.Position += 3
+	case isKeyword(ln, "var"):
+		tk.Value = "var"
+		tk.Type = Var
 		l.Position += 3
 	case isKeyword(ln, "any"):
 		tk.Value = "any"

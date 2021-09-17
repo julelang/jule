@@ -28,7 +28,7 @@ func (f function) String() string {
 	f.readyCxx()
 	var cxx string
 	cxx += attributesToString(f.Attributes)
-	cxx += x.CxxTypeNameFromType(f.ReturnType.Type)
+	cxx += x.CxxTypeNameFromType(f.ReturnType.Code)
 	cxx += " "
 	cxx += f.Name
 	cxx += "("
@@ -43,7 +43,7 @@ func (f function) String() string {
 func (f *function) readyCxx() {
 	switch f.Name {
 	case x.EntryPoint:
-		f.ReturnType.Type = x.Int32
+		f.ReturnType.Code = x.Int32
 	}
 }
 
@@ -66,7 +66,7 @@ func paramsToCxx(params []ast.ParameterAST) string {
 		cxx += p.String()
 		cxx += ","
 		if !any {
-			any = p.Type.Type == x.Any
+			any = p.Type.Code == x.Any
 		}
 	}
 	cxx = cxx[:len(cxx)-1]
