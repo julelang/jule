@@ -10,6 +10,7 @@ Welcome to the X programming language documentations.
 * [Types](#types)
   * [Primitive Types](#primitive_types)
   * [Type Compability](#type_compability)
+* [Variables](#variables)
 * [Functions](#functions)
 * [Appendices](#appendices)
   * [Keywords](#keywords)
@@ -175,6 +176,25 @@ fun main() {
     <td>bool</td>
   </tr>
 </table>
+
+<h2 id="variables">Variables</h2>
+
+``var`` keyword is used for variable declaration.
+
+Variable declaration with auto type detection;
+```go
+var a = true;
+```
+
+Variable declaration with manuel type;
+```go
+var a bool = true;
+```
+If you give a type, you not must initialize variable. <br>
+```go
+var a bool;
+```
+If you not initialize variable, initialize with default value.
 
 <h2 id="functions">Functions</h2>
 
