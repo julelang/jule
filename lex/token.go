@@ -13,15 +13,16 @@ type Token struct {
 
 // Token types.
 const (
-	NA        uint8 = 0
-	Type      uint8 = 1
-	Name      uint8 = 2
-	Brace     uint8 = 3
-	Return    uint8 = 4
-	SemiColon uint8 = 5
-	Value     uint8 = 6
-	Operator  uint8 = 7
-	Comma     uint8 = 8
-	Fun       uint8 = 9
-	Var       uint8 = 10
+	NA          uint8 = 0
+	Type        uint8 = 1
+	Name        uint8 = 2
+	Brace       uint8 = 3
+	Return      uint8 = 4
+	SemiColon   uint8 = 5
+	Value       uint8 = 6
+	Operator    uint8 = 7
+	Comma       uint8 = 8
+	Fun         uint8 = 9
+	Var         uint8 = 10
+	LineComment uint8 = 11
 )
