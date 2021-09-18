@@ -5,6 +5,7 @@ Welcome to the X programming language documentations.
 ## Table of Contents
 
 * [Introduction](#introduction)
+* [Comments](#comments)
 * [Basics](#basics)
   * [Entry Point](#entry_point)
 * [Types](#types)
@@ -28,6 +29,18 @@ The fact that X is simple does not diminish its power. X is a pretty powerful la
 
 The fact that it evolves directly to C++ and compiles from C++ means an environment familiar to C/C++ developers.
 X is also a good choice for the simpler way to write C++. At the developer's request, X can be translated or compiled into C++. This choice is the developer's.
+
+<h2 id="comments">Comments</h2>
+
+```cxx
+// Single line comment example.
+```
+
+```cxx
+/* Multiline comment
+   example.
+*/
+```
 
 <h2 id="basics">Basics</h2>
 
