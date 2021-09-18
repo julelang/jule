@@ -723,7 +723,7 @@ func (p *Parser) parseFunctionCallStatement(fun *function, tokens []lex.Token) {
 
 func (p *Parser) parseArgs(fun *function, args []ast.ArgAST, errToken lex.Token) {
 	if len(args) < len(fun.Params) {
-		p.PushErrorToken(errToken, "argument_missing")
+		p.PushErrorToken(errToken, "missing_argument")
 	}
 	for index, arg := range args {
 		p.parseArg(fun, index, arg)

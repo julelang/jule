@@ -22,10 +22,10 @@ var Errors = map[string]string{
 	`operator_notfor_int`:        `this operator is not defined for integer type(s)`,
 	`operator_notfor_uint`:       `this operator is not defined for unsigned integer type(s)`,
 	`name_not_defined`:           `name is not defined`,
-	`type_missing`:               `data type missing`,
+	`missing_type`:               `data type missing`,
 	`parameter_exist`:            `parameter is already exist in this name`,
 	`argument_overflow`:          `argument overflow`,
-	`argument_missing`:           `missing argument(s)`,
+	`missing_argument`:           `missing argument(s)`,
 	`invalid_type`:               `invalid data type`,
 	`invalid_attribute`:          `invalid attribute for type`,
 	`entrypoint_have_return`:     `entry point is cannot have return type`,
@@ -40,4 +40,5 @@ var Errors = map[string]string{
 	`invalid_data_logical_not`:   `invalid data type for logical not operator`,
 	`logical_not_bool`:           `logical expression is have only boolean type values`,
 	`missing_autotype_value`:     `auto type declarations should have a initializer`,
+	`missing_value`:              `value is not given`,
 }

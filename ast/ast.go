@@ -219,7 +219,7 @@ func (ast *AST) pushParameter(fn *FunctionAST, tokens []lex.Token, err lex.Token
 		ast.PushErrorToken(nameToken, "invalid_syntax")
 	}
 	if len(tokens) < 2 {
-		ast.PushErrorToken(nameToken, "type_missing")
+		ast.PushErrorToken(nameToken, "missing_type")
 		return
 	}
 	for _, param := range fn.Params {
@@ -421,26 +421,28 @@ func (ast *AST) BuildVariableStatement(tokens []lex.Token) (s StatementAST) {
 	case lex.SemiColon:
 		if varAST.Type.Code == x.Void {
 			ast.PushErrorToken(token, "missing_autotype_value")
-			goto end
-		} else {
-			var valueToken lex.Token
-			valueToken.Type = lex.Value
-			valueToken.Value = x.DefaultValueOfType(varAST.Type.Code)
-			valueTokens := []lex.Token{valueToken}
-			varAST.Value = ExpressionAST{
-				Tokens:    valueTokens,
-				Processes: [][]lex.Token{valueTokens},
-			}
+			break
 		}
-		goto end
+		var valueToken lex.Token
+		valueToken.Type = lex.Value
+		valueToken.Value = x.DefaultValueOfType(varAST.Type.Code)
+		valueTokens := []lex.Token{valueToken}
+		varAST.Value = ExpressionAST{
+			Tokens:    valueTokens,
+			Processes: [][]lex.Token{valueTokens},
+		}
 	case lex.Operator:
 		if token.Value != "=" {
 			ast.PushErrorToken(token, "invalid_syntax")
-			goto end
+			break
 		}
+		valueTokens := tokens[position+1:]
+		if len(valueTokens) == 0 {
+			ast.PushErrorToken(token, "missing_value")
+			break
+		}
+		varAST.Value = ast.BuildExpression(valueTokens)
 	}
-	varAST.Value = ast.BuildExpression(tokens[position+1:])
-end:
 	return StatementAST{
 		Token: varAST.Token,
 		Type:  StatementVariable,
