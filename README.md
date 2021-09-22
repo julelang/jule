@@ -11,6 +11,7 @@
 <div class="toc">
   <ul>
     <li><a href="#overview">Overview</a></li>
+    <li><a href="#why_x">Why X?</a></li>
     <li><a href="#os_support">OS Support</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#license">License</a></li>
@@ -31,8 +32,29 @@ fun main() {
 }
 ```
 
+<h2 id="why_x">Why X?</h2>
+
+<h3>Simplicity</h3>
+
+X is a simple language that anyone can understand. <br>
+It is clear, simple and useful for beginners or experts.
+
+<h3>Efficient</h3>
+
+The translation of X to C++ code happens very quickly and efficiently. <br>
+In addition, the generated C++ result is human readable, understandable and efficient code.
+
+<h3>Learning</h3>
+
+X is pretty easy to learn. <br>
+It's not a compelling option for those new to programming either.
+
+On the other hand, X is also a way to learn algorithms and see the C++ equivalent in an easier way since it is translated into human readable C++ code.
+In this way, X can also be used as an easy interface for learning C++.
 
 <h2 id="os_support">OS Support</h2>
+
+> Compiler is not supports any operating system but transpiler is planned usable for Windows, Darwin and Linux.
 
 <table>
     <tr>
@@ -65,13 +87,13 @@ All contributions to X, no matter how small or large, are welcome. <br>
 From a simple typo correction to a contribution to the code, all contributions are welcome and appreciated. <br>
 Before you start contributing, you should familiarize yourself with the following repository structure; <br>
 
-+ ``ast/`` abstract syntax tree builder.
-+ ``cmd/`` main and compile files.
-+ ``doc`` documentations.
-+ ``lex/`` lexer.
-+ ``parser/`` interpreter.
-+ ``pkg/`` utility packages.
-+ ``xlib/`` standard libraries.
++ [``ast/``](https://github.com/the-xlang/x/blob/main/ast) abstract syntax tree builder.
++ [``cmd/``](https://github.com/the-xlang/x/blob/main/cmd) main and compile files.
++ [``doc``](https://github.com/the-xlang/x/blob/main/docs) documentations.
++ [``lex/``](https://github.com/the-xlang/x/blob/main/lex) lexer.
++ [``parser/``](https://github.com/the-xlang/x/blob/main/parser) x-cxx parser.
++ [``pkg/``](https://github.com/the-xlang/x/blob/main/pkg) utility packages.
++ [``xlib/``](https://github.com/the-xlang/x/blob/main/xlib) standard libraries.
 
 <h2 id="license">License</h2>
 
