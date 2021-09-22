@@ -28,7 +28,7 @@ func (f function) String() string {
 	f.readyCxx()
 	var cxx string
 	cxx += attributesToString(f.Attributes)
-	cxx += x.CxxTypeNameFromType(f.ReturnType.Code)
+	cxx += f.ReturnType.String()
 	cxx += " "
 	cxx += f.Name
 	cxx += "("

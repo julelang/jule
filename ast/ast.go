@@ -133,8 +133,9 @@ func (ast *AST) BuildFunction() {
 		return
 	}
 	token := ast.Tokens[ast.Position]
-	if token.Type == lex.Type {
-		funAST.ReturnType = ast.BuildType(token)
+	t, ok := ast.BuildType(ast.Tokens, &ast.Position, false)
+	if ok {
+		funAST.ReturnType = t
 		ast.Position++
 		if ast.Ended() {
 			ast.Position--
@@ -228,11 +229,18 @@ func (ast *AST) pushParameter(fn *FunctionAST, tokens []lex.Token, err lex.Token
 			break
 		}
 	}
+	index := new(int)
+	*index = 1
+	t, _ := ast.BuildType(tokens, index, true)
 	fn.Params = append(fn.Params, ParameterAST{
 		Token: nameToken,
 		Name:  nameToken.Value,
-		Type:  ast.BuildType(tokens[1]),
+		Type:  t,
 	})
+	if *index != len(tokens)-1 {
+		ast.PushErrorToken(tokens[*index], "invalid_syntax")
+	}
+	index = nil
 }
 
 // IsStatement reports token is
@@ -242,15 +250,33 @@ func IsStatement(token lex.Token) bool {
 }
 
 // BuildType builds AST model of type.
-func (ast *AST) BuildType(token lex.Token) (t TypeAST) {
-	if token.Type != lex.Type {
-		ast.PushErrorToken(token, "invalid_type")
-		return
+func (ast *AST) BuildType(tokens []lex.Token, index *int, err bool) (t TypeAST, _ bool) {
+	first := *index
+	for ; *index < len(tokens); *index++ {
+		token := tokens[*index]
+		switch token.Type {
+		case lex.Type:
+			t.Token = token
+			t.Code = x.TypeFromName(t.Token.Value)
+			t.Value += t.Token.Value
+			return t, true
+		case lex.Operator:
+			if token.Value == "*" {
+				t.Value += token.Value
+				break
+			}
+			fallthrough
+		default:
+			if err {
+				ast.PushErrorToken(token, "invalid_syntax")
+			}
+			return t, false
+		}
 	}
-	t.Token = token
-	t.Code = x.TypeFromName(t.Token.Value)
-	t.Value = t.Token.Value
-	return t
+	if err {
+		ast.PushErrorToken(tokens[first], "invalid_type")
+	}
+	return t, false
 }
 
 // IsSigleOperator is returns true
@@ -260,7 +286,9 @@ func IsSingleOperator(operator string) bool {
 	return operator == "-" ||
 		operator == "+" ||
 		operator == "~" ||
-		operator == "!"
+		operator == "!" ||
+		operator == "*" ||
+		operator == "&"
 }
 
 // BuildBlock builds AST model of statements of code block.
@@ -408,8 +436,9 @@ func (ast *AST) BuildVariableStatement(tokens []lex.Token) (s StatementAST) {
 		return
 	}
 	token := tokens[position]
-	if token.Type == lex.Type {
-		varAST.Type = ast.BuildType(token)
+	t, ok := ast.BuildType(tokens, &position, false)
+	if ok {
+		varAST.Type = t
 		position++
 		if position >= len(tokens) {
 			ast.PushErrorToken(token, "invalid_syntax")

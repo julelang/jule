@@ -71,6 +71,18 @@ type TypeAST struct {
 	Value string
 }
 
+func (t TypeAST) String() string {
+	var sb strings.Builder
+	for _, run := range t.Value {
+		if run == '*' {
+			sb.WriteRune(run)
+			continue
+		}
+		break
+	}
+	return x.CxxTypeNameFromType(t.Code) + sb.String()
+}
+
 // FunctionAST is function declaration AST model.
 type FunctionAST struct {
 	Token      lex.Token
@@ -88,7 +100,7 @@ type ParameterAST struct {
 }
 
 func (p ParameterAST) String() string {
-	return x.CxxTypeNameFromType(p.Type.Code) + " " + p.Name
+	return p.Type.String() + " " + p.Name
 }
 
 // FunctionAST is function declaration AST model.
@@ -150,7 +162,7 @@ func (e ExpressionAST) String() string {
 type ValueAST struct {
 	Token lex.Token
 	Value string
-	Type  uint8
+	Type  TypeAST
 }
 
 func (v ValueAST) String() string {
@@ -184,7 +196,7 @@ type ReturnAST struct {
 }
 
 func (r ReturnAST) String() string {
-	return r.Token.Value + " " + r.Expression.String()
+	return r.Token.Value + " " + r.Expression.String() + ";"
 }
 
 // AttributeAST is attribtue AST model.
@@ -207,15 +219,18 @@ type VariableAST struct {
 
 func (v VariableAST) String() string {
 	var sb strings.Builder
-	if v.Type.Code == x.Void {
-		sb.WriteString("auto")
-	} else {
-		sb.WriteString(x.CxxTypeNameFromType(v.Type.Code))
-	}
+	sb.WriteString(v.StringType())
 	sb.WriteByte(' ')
 	sb.WriteString(v.Name)
 	sb.WriteString(" = ")
 	sb.WriteString(v.Value.String())
 	sb.WriteByte(';')
 	return sb.String()
+}
+
+func (v VariableAST) StringType() string {
+	if v.Type.Code == x.Void {
+		return "auto"
+	}
+	return v.Type.String()
 }
