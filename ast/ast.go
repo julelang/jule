@@ -162,7 +162,6 @@ func (ast *AST) BuildFunction() {
 		Type:  Statement,
 		Value: StatementAST{
 			Token: funAST.Token,
-			Type:  StatementFunction,
 			Value: funAST,
 		},
 	})
@@ -374,7 +373,6 @@ func (ast *AST) BuildFunctionCallStatement(tokens []lex.Token) StatementAST {
 	return StatementAST{
 		Token: fnCall.Token,
 		Value: fnCall,
-		Type:  StatementFunctionCall,
 	}
 }
 
@@ -474,7 +472,6 @@ func (ast *AST) BuildVariableStatement(tokens []lex.Token) (s StatementAST) {
 	}
 	return StatementAST{
 		Token: varAST.Token,
-		Type:  StatementVariable,
 		Value: varAST,
 	}
 }
@@ -488,7 +485,6 @@ func (ast *AST) BuildReturnStatement(tokens []lex.Token) StatementAST {
 	}
 	return StatementAST{
 		Token: returnModel.Token,
-		Type:  StatementReturn,
 		Value: returnModel,
 	}
 }

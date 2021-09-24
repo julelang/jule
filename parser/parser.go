@@ -108,11 +108,11 @@ func (p *Parser) PushAttribute(t ast.AttributeAST) {
 
 // ParseStatement parse X statement.
 func (p *Parser) ParseStatement(s ast.StatementAST) {
-	switch s.Type {
-	case ast.StatementFunction:
-		p.ParseFunction(s.Value.(ast.FunctionAST))
-	case ast.StatementVariable:
-		p.ParseGlobalVariable(s.Value.(ast.VariableAST))
+	switch t := s.Value.(type) {
+	case ast.FunctionAST:
+		p.ParseFunction(t)
+	case ast.VariableAST:
+		p.ParseGlobalVariable(t)
 	default:
 		p.PushErrorToken(s.Token, "invalid_syntax")
 	}
@@ -196,24 +196,24 @@ func variablesFromParameters(params []ast.ParameterAST) []ast.VariableAST {
 func (p *Parser) checkFunctionReturn(fun *function) {
 	miss := true
 	for _, s := range fun.Block.Content {
-		if s.Type == ast.StatementReturn {
-			retAST := s.Value.(ast.ReturnAST)
-			if len(retAST.Expression.Tokens) == 0 {
+		switch t := s.Value.(type) {
+		case ast.ReturnAST:
+			if len(t.Expression.Tokens) == 0 {
 				if fun.ReturnType.Code != x.Void {
-					p.PushErrorToken(retAST.Token, "require_return_value")
+					p.PushErrorToken(t.Token, "require_return_value")
 				}
 			} else {
 				if fun.ReturnType.Code == x.Void {
-					p.PushErrorToken(retAST.Token, "void_function_return_value")
+					p.PushErrorToken(t.Token, "void_function_return_value")
 				}
-				value := p.computeExpression(retAST.Expression)
+				value := p.computeExpression(t.Expression)
 				if typeIsSingle(value.Type) && typeIsSingle(fun.ReturnType) {
 					if !x.TypesAreCompatible(value.Type.Code, fun.ReturnType.Code, true) {
-						p.PushErrorToken(retAST.Token, "incompatible_type")
+						p.PushErrorToken(t.Token, "incompatible_type")
 					}
 				} else if fun.ReturnType.Code != x.Any {
 					if value.Type.Value != fun.ReturnType.Value {
-						p.PushErrorToken(retAST.Token, "incompatible_type")
+						p.PushErrorToken(t.Token, "incompatible_type")
 					}
 				}
 			}
@@ -860,15 +860,14 @@ func (p *Parser) checkFunction(fun *function) {
 
 func (p *Parser) checkBlock(b ast.BlockAST) {
 	for index, model := range b.Content {
-		switch model.Type {
-		case ast.StatementFunctionCall:
-			p.checkFunctionCallStatement(model.Value.(ast.FunctionCallAST))
-		case ast.StatementVariable:
-			varAST := model.Value.(ast.VariableAST)
-			p.checkVariableStatement(&varAST)
-			model.Value = varAST
+		switch t := model.Value.(type) {
+		case ast.FunctionCallAST:
+			p.checkFunctionCallStatement(t)
+		case ast.VariableAST:
+			p.checkVariableStatement(&t)
+			model.Value = t
 			b.Content[index] = model
-		case ast.StatementReturn:
+		case ast.ReturnAST:
 		default:
 			p.PushErrorToken(model.Token, "invalid_syntax")
 		}

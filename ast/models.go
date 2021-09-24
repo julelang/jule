@@ -24,7 +24,6 @@ type IdentifierAST struct {
 // StatementAST is statement.
 type StatementAST struct {
 	Token lex.Token
-	Type  uint8
 	Value interface{}
 }
 
