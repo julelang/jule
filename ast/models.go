@@ -139,9 +139,18 @@ func (a ArgAST) String() string {
 type ExpressionAST struct {
 	Tokens    []lex.Token
 	Processes [][]lex.Token
+	Model     ExpressionModel
+}
+
+// ExpressionModel for special expression model to Cxx string.
+type ExpressionModel interface {
+	String() string
 }
 
 func (e ExpressionAST) String() string {
+	if e.Model != nil {
+		return e.Model.String()
+	}
 	var sb strings.Builder
 	for _, process := range e.Processes {
 		if len(process) == 1 && process[0].Type == lex.Operator {
