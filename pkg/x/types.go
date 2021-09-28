@@ -186,27 +186,27 @@ func CxxTypeNameFromType(typeCode uint8) string {
 	case Void:
 		return "void"
 	case Int8:
-		return "signed char"
+		return "int8"
 	case Int16:
-		return "short"
+		return "int16"
 	case Int32:
-		return "int"
+		return "int32"
 	case Int64:
-		return "long long int"
+		return "int64"
 	case UInt8:
-		return "unsigned char"
+		return "uint8"
 	case UInt16:
-		return "unsigned short"
+		return "uint16"
 	case UInt32:
-		return "unsigned int"
+		return "uint32"
 	case UInt64:
-		return "unsigned long long int"
+		return "uint64"
 	case Bool:
 		return "bool"
 	case Float32:
-		return "float"
+		return "float32"
 	case Float64:
-		return "double"
+		return "float64"
 	case Any:
 		return "any"
 	}

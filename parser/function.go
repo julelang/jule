@@ -15,6 +15,13 @@ const entryPointStandard = `
 
 `
 
+const entryPointStandardEnd = `
+
+
+#pragma region X_ENTRY_POINT_END_STANDARD_CODES
+  return EXIT_SUCCESS;
+#pragma endregion X_ENTRY_POINT_END_STANDARD_CODES`
+
 type function struct {
 	Token      lex.Token
 	Name       string
@@ -28,16 +35,31 @@ func (f function) String() string {
 	f.readyCxx()
 	var cxx string
 	cxx += attributesToString(f.Attributes)
-	cxx += f.ReturnType.String()
+	cxx += f.typeString()
 	cxx += " "
-	cxx += f.Name
+	cxx += f.nameString()
 	cxx += "("
 	cxx += paramsToCxx(f.Params)
 	cxx += ") {"
 	cxx += getFunctionStandardCode(f.Name)
 	cxx += f.Block.String()
+	cxx += getFunctionStandardEndCode(f.Name)
 	cxx += "\n}"
 	return cxx
+}
+
+func (f *function) typeString() string {
+	if f.Name == "_"+x.EntryPoint {
+		return "int"
+	}
+	return f.ReturnType.String()
+}
+
+func (f *function) nameString() string {
+	if f.Name == "_"+x.EntryPoint {
+		return x.EntryPoint
+	}
+	return f.Name
 }
 
 func (f *function) readyCxx() {
@@ -78,8 +100,16 @@ func paramsToCxx(params []ast.ParameterAST) string {
 
 func getFunctionStandardCode(name string) string {
 	switch name {
-	case x.EntryPoint:
+	case "_" + x.EntryPoint:
 		return entryPointStandard
+	}
+	return ""
+}
+
+func getFunctionStandardEndCode(name string) string {
+	switch name {
+	case "_" + x.EntryPoint:
+		return entryPointStandardEnd
 	}
 	return ""
 }
