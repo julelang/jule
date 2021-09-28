@@ -153,13 +153,13 @@ func appendStandards(code *string) {
 
 #pragma region X_BUILTIN_FUNCTIONS
 template <typename any>
-inline void out(any v) {
+inline void _out(any v) {
   std::wcout << v;
 }
 
 template <typename any>
-inline void outln(any v) {
-  out(v);
+inline void _outln(any v) {
+  _out(v);
   std::wcout << std::endl;
 }
 #pragma endregion X_BUILTIN_FUNCTIONS

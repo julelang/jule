@@ -363,5 +363,8 @@ func (l *Lex) Token() Token {
 		return token
 	}
 	l.Column += len(token.Value)
+	if token.Type == Name {
+		token.Value = "_" + token.Value
+	}
 	return token
 }

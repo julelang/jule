@@ -230,7 +230,7 @@ func (p *Parser) checkFunctionReturn(fun *function) {
 
 func (p *Parser) functionByName(name string) *function {
 	for _, fun := range builtinFunctions {
-		if fun.Name == name {
+		if fun.Name == name[1:] {
 			return fun
 		}
 	}
@@ -274,7 +274,7 @@ func (p *Parser) existName(name string) lex.Token {
 }
 
 func (p *Parser) finalCheck() {
-	if p.functionByName(x.EntryPoint) == nil {
+	if p.functionByName("_"+x.EntryPoint) == nil {
 		p.PushError("no_entry_point")
 	}
 	p.ParseWaitingGlobalVariables()

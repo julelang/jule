@@ -236,6 +236,7 @@ func (v VariableAST) String() string {
 	return sb.String()
 }
 
+// StringType parses type to cxx.
 func (v VariableAST) StringType() string {
 	if v.Type.Code == x.Void {
 		return "auto"
