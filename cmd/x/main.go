@@ -151,6 +151,19 @@ func appendStandards(code *string) {
 #include <locale.h>
 #pragma endregion X_STANDARD_IMPORTS
 
+#pragma region X_BUILTIN_TYPES
+#define int8 signed char
+#define int16 short
+#define int32 int
+#define int64 long long int
+#define uint8 unsigned char
+#define uint16 unsigned short
+#define uint32 unsigned int
+#define uint64 unsigned long long int
+#define float32 float
+#define float64 double
+#pragma endregion X_BUILTIN_TYPES
+
 #pragma region X_BUILTIN_FUNCTIONS
 template <typename any>
 inline void _out(any v) {
