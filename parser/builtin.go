@@ -7,7 +7,7 @@ import (
 
 var builtinFunctions = []*function{
 	{
-		Name: "out",
+		Name: "_out",
 		ReturnType: ast.TypeAST{
 			Code: x.Void,
 		},
@@ -20,7 +20,7 @@ var builtinFunctions = []*function{
 		}},
 	},
 	{
-		Name: "outln",
+		Name: "_outln",
 		ReturnType: ast.TypeAST{
 			Code: x.Void,
 		},

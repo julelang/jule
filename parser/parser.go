@@ -230,7 +230,7 @@ func (p *Parser) checkFunctionReturn(fun *function) {
 
 func (p *Parser) functionByName(name string) *function {
 	for _, fun := range builtinFunctions {
-		if fun.Name == name[1:] {
+		if fun.Name == name {
 			return fun
 		}
 	}
