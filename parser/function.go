@@ -11,7 +11,7 @@ import (
 const entryPointStandard = `
 #pragma region X_ENTRY_POINT_STANDARD_CODES
   setlocale(0x0, "");
-#pragma endregion
+#pragma endregion X_ENTRY_POINT_STANDARD_CODES
 
 `
 
