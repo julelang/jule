@@ -2,6 +2,7 @@ package lex
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -104,7 +105,7 @@ func (l *Lex) lexLineComment() {
 		if l.File.Content[l.Position] == '\n' {
 			l.Position++
 			l.NewLine()
-			break
+			return
 		}
 	}
 }
@@ -125,6 +126,62 @@ func (l *Lex) lexBlockComment() {
 		}
 	}
 	l.pushError("missing_block_comment")
+}
+
+var escapeSequenceRegexp = regexp.MustCompile(`^(\\\\|\\r|\\t|\\b|\\v|\\n|\\'|\\f|\\a|\\")`)
+
+func (l *Lex) getEscapeSequence(content string) string {
+	seq := escapeSequenceRegexp.FindString(content)
+	if seq != "" {
+		l.Position += len(seq)
+		return seq
+	}
+	l.Position++
+	l.pushError("invalid_escape_sequence")
+	return seq
+}
+
+func (l *Lex) getRune(content string) string {
+	first := content[0]
+	if first == '\\' {
+		return l.getEscapeSequence(content)
+	}
+	l.Position++
+	return string(first)
+}
+
+func (l *Lex) lexRune(token *Token, content string) {
+	var sb strings.Builder
+	sb.WriteByte('\'')
+	l.Column++
+	content = content[1:]
+	count := 0
+	for index := 0; index < len(content); index++ {
+		if content[index] == '\n' {
+			l.pushError("missing_rune_end")
+			l.Position++
+			l.NewLine()
+			return
+		}
+		run := l.getRune(content[index:])
+		sb.WriteString(run)
+		length := len(run)
+		l.Column += length
+		if run == "'" {
+			l.Position++
+			break
+		}
+		if length > 1 {
+			index += length - 1
+		}
+		count++
+	}
+	token.Value = sb.String()
+	if count == 0 {
+		l.pushError("rune_empty")
+	} else if count > 1 {
+		l.pushError("rune_overflow")
+	}
 }
 
 // NewLine sets ready lexer to a new line lexing.
@@ -182,6 +239,10 @@ func (l *Lex) Token() Token {
 		token.Value = "]"
 		token.Type = Brace
 		l.Position++
+	case content[0] == '\'':
+		l.lexRune(&token, content)
+		token.Type = Value
+		return token
 	case strings.HasPrefix(content, "//"):
 		l.lexLineComment()
 		return token
@@ -334,6 +395,10 @@ func (l *Lex) Token() Token {
 		l.Position += 6
 	case isKeyword(content, "bool"):
 		token.Value = "bool"
+		token.Type = Type
+		l.Position += 4
+	case isKeyword(content, "rune"):
+		token.Value = "rune"
 		token.Type = Type
 		l.Position += 4
 	case isKeyword(content, "true"):

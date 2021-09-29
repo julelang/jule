@@ -581,6 +581,22 @@ func (ap arithmeticProcess) solveLogical() (v ast.ValueAST) {
 	return
 }
 
+func (ap arithmeticProcess) solveRune() (v ast.ValueAST) {
+	if !x.TypesAreCompatible(ap.leftVal.Type.Code, ap.rightVal.Type.Code, true) {
+		ap.cp.PushErrorToken(ap.operator, "incompatible_type")
+		return
+	}
+	switch ap.operator.Value {
+	case "!=", "==", ">", "<", ">=", "<=":
+		v.Type.Code = x.Bool
+	case "+", "-", "*", "/", "^", "&", "%", "|":
+		v.Type.Code = x.Rune
+	default:
+		ap.cp.PushErrorToken(ap.operator, "operator_notfor_bool")
+	}
+	return
+}
+
 func (ap arithmeticProcess) solve() (v ast.ValueAST) {
 	switch ap.operator.Value {
 	case "+", "-", "*", "/", "%", ">>",
@@ -594,6 +610,8 @@ func (ap arithmeticProcess) solve() (v ast.ValueAST) {
 	switch {
 	case typeIsPointer(ap.leftVal.Type) || typeIsPointer(ap.rightVal.Type):
 		return ap.solvePointer()
+	case ap.leftVal.Type.Code == x.Rune || ap.rightVal.Type.Code == x.Rune:
+		return ap.solveRune()
 	case ap.leftVal.Type.Code == x.Any || ap.rightVal.Type.Code == x.Any:
 		return ap.solveAny()
 	case ap.leftVal.Type.Code == x.Bool || ap.rightVal.Type.Code == x.Bool:
@@ -622,14 +640,22 @@ func (p *Parser) processSingleValuePart(token lex.Token, builder *expressionMode
 	case lex.Value:
 		if IsString(token.Value) {
 			// result.Value = token.Value[1 : len(token.Value)-1]
-			v.Value = "L" + token.Value
+			v.Value = token.Value
 			v.Type.Code = x.Str
 			v.Type.Value = "str"
+			builder.appendNode(strExpNode{token: token})
+			ok = true
+		} else if IsRune(token.Value) {
+			v.Value = token.Value
+			v.Type.Code = x.Rune
+			v.Type.Value = "rune"
+			builder.appendNode(runeExpNode{token: token})
 			ok = true
 		} else if IsBoolean(token.Value) {
 			v.Value = token.Value
 			v.Type.Code = x.Bool
 			v.Type.Value = "bool"
+			builder.appendNode(tokenExpNode{token: token})
 			ok = true
 		} else { // Numeric.
 			if strings.Contains(token.Value, ".") ||
@@ -646,16 +672,19 @@ func (p *Parser) processSingleValuePart(token lex.Token, builder *expressionMode
 				}
 			}
 			v.Value = token.Value
+			builder.appendNode(tokenExpNode{token: token})
 			ok = true
 		}
 	case lex.Name:
 		if variable := p.variableByName(token.Value); variable != nil {
 			v.Value = token.Value
 			v.Type = variable.Type
+			builder.appendNode(tokenExpNode{token: token})
 			ok = true
 		} else if p.functionByName(token.Value) != nil {
 			v.Value = token.Value
 			v.Type.Code = functionName
+			builder.appendNode(tokenExpNode{token: token})
 			ok = true
 		} else {
 			p.PushErrorToken(token, "name_not_defined")
@@ -663,7 +692,6 @@ func (p *Parser) processSingleValuePart(token lex.Token, builder *expressionMode
 	default:
 		p.PushErrorToken(token, "invalid_syntax")
 	}
-	builder.appendNode(tokenExpNode{token: token})
 	return
 }
 

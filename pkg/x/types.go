@@ -16,6 +16,7 @@ const (
 	Float32 uint8 = 11
 	Float64 uint8 = 12
 	Any     uint8 = 13
+	Rune    uint8 = 14
 )
 
 // TypeGreaterThan reports type one is greater than type two or not.
@@ -111,6 +112,16 @@ func TypesAreCompatible(t1, t2 uint8, ignoreany bool) bool {
 			t2 == Float64
 	case Float64:
 		return t2 == Float64
+	case Rune:
+		return t2 == Rune ||
+			t2 == Int8 ||
+			t2 == Int16 ||
+			t2 == Int32 ||
+			t2 == Int64 ||
+			t2 == UInt8 ||
+			t2 == UInt16 ||
+			t2 == UInt32 ||
+			t2 == UInt64
 	}
 	return false
 }
@@ -177,6 +188,8 @@ func TypeFromName(name string) uint8 {
 		return Float64
 	case "any":
 		return Any
+	case "rune":
+		return Rune
 	}
 	return 0
 }
@@ -209,6 +222,10 @@ func CxxTypeNameFromType(typeCode uint8) string {
 		return "float64"
 	case Any:
 		return "any"
+	case Str:
+		return "str"
+	case Rune:
+		return "rune"
 	}
 	return "" // Unreachable code.
 }

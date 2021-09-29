@@ -45,4 +45,8 @@ var Errors = map[string]string{
 	`missing_autotype_value`:     `auto type declarations should have a initializer`,
 	`missing_value`:              `value is not given`,
 	`missing_block_comment`:      `missing block comment close`,
+	`missing_rune_end`:           `rune is not finished`,
+	`rune_empty`:                 `rune is cannot empty`,
+	`rune_overflow`:              `rune is should be single`,
+	`invalid_escape_sequence`:    `invalid escape sequence`,
 }

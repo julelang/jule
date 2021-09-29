@@ -1,11 +1,16 @@
 package parser
 
-// IsString reports vaule is string representation or not.
+// IsString reports value is string representation or not.
 func IsString(value string) bool {
 	return value[0] == '"'
 }
 
-// IsBoolean reports vaule is boolean representation or not.
+// IsRune reports value is rune representation of not.
+func IsRune(value string) bool {
+	return value[0] == '\''
+}
+
+// IsBoolean reports value is boolean representation or not.
 func IsBoolean(value string) bool {
 	return value == "true" || value == "false"
 }

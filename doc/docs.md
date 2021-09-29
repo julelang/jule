@@ -129,6 +129,11 @@ fun main() {
     <td>1bytes</td>
     <td>true of false</td>
   </tr>
+  <tr>
+    <td>rune</td>
+    <td>-</td>
+    <td>Single UTF-8 character.</td>
+  </tr>
 </table>
 
 <h3 id="type_compability">Type Compability</h3>
@@ -187,6 +192,10 @@ fun main() {
   <tr>
     <td>bool</td>
     <td>bool</td>
+  </tr>
+  <tr>
+    <td>rune</td>
+    <td>rune</td>
   </tr>
 </table>
 

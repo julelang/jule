@@ -162,6 +162,8 @@ func appendStandards(code *string) {
 #define uint64 unsigned long long int
 #define float32 float
 #define float64 double
+#define str std::wstring
+#define rune wchar_t
 #pragma endregion X_BUILTIN_TYPES
 
 #pragma region X_BUILTIN_FUNCTIONS
