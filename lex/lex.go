@@ -128,7 +128,7 @@ func (l *Lex) lexBlockComment() {
 	l.pushError("missing_block_comment")
 }
 
-var escapeSequenceRegexp = regexp.MustCompile(`^(\\\\|\\r|\\t|\\b|\\v|\\n|\\'|\\f|\\a|\\")`)
+var escapeSequenceRegexp = regexp.MustCompile(`^\\([\\'"abfnrtv]|U.{8}|u.{4}|x..|[0-7]{1,3})`)
 
 func (l *Lex) getEscapeSequence(content string) string {
 	seq := escapeSequenceRegexp.FindString(content)
