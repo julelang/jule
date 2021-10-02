@@ -3,8 +3,11 @@
     <img width="300" src="https://raw.githubusercontent.com/the-xlang/resources/main/x.svg?sanitize=true">
 </p>
 <h1>The X Programming Language</h1>
-<strong>Simple, safe and compiled programming language.</strong>
+<strong>Simple, safe and compiled programming language.
 
+[Website](https://the-xlang.github.io/website/)
+
+</strong>
 </div>
 
 ## Table of Contents
@@ -80,7 +83,7 @@ In this way, X can also be used as an easy interface for learning C++.
 Thanks for you want contributing to X!
 <br><br>
 The X project use issues for only bug reports and proposals. <br>
-To contribute, please read the contribution guidelines from <a href="https://github.com/the-xlang/x/blob/main/CONTRIBUTING.md">here</a>. <br>
+To contribute, please read the contribution guidelines from <a href="https://the-xlang.github.io/website/pages/contributing.html">here</a>. <br>
 To discussions and questions, please use <a href="https://github.com/the-xlang/x/discussions">discussions</a>.
 <br><br>
 All contributions to X, no matter how small or large, are welcome. <br>
@@ -98,4 +101,4 @@ Before you start contributing, you should familiarize yourself with the followin
 <h2 id="license">License</h2>
 
 X and standard library is distributed under the terms of the MIT license. <br>
-[See license details.](https://github.com/the-xlang/x/blob/main/LICENSE)
+[See license details.](https://the-xlang.github.io/website/pages/license.html)
