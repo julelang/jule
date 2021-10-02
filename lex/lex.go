@@ -150,7 +150,7 @@ func (l *Lex) getRune(content string) string {
 	return string(first)
 }
 
-func (l *Lex) lexRune(token *Token, content string) {
+func (l *Lex) lexRune(content string) string {
 	var sb strings.Builder
 	sb.WriteByte('\'')
 	l.Column++
@@ -161,7 +161,7 @@ func (l *Lex) lexRune(token *Token, content string) {
 			l.pushError("missing_rune_end")
 			l.Position++
 			l.NewLine()
-			return
+			return ""
 		}
 		run := l.getRune(content[index:])
 		sb.WriteString(run)
@@ -176,12 +176,39 @@ func (l *Lex) lexRune(token *Token, content string) {
 		}
 		count++
 	}
-	token.Value = sb.String()
 	if count == 0 {
 		l.pushError("rune_empty")
 	} else if count > 1 {
 		l.pushError("rune_overflow")
 	}
+	return sb.String()
+}
+
+func (l *Lex) lexString(content string) string {
+	var sb strings.Builder
+	sb.WriteByte('"')
+	l.Column++
+	content = content[1:]
+	for index := 0; index < len(content); index++ {
+		if content[index] == '\n' {
+			l.pushError("missing_string_end")
+			l.Position++
+			l.NewLine()
+			return ""
+		}
+		run := l.getRune(content[index:])
+		sb.WriteString(run)
+		length := len(run)
+		l.Column += length
+		if run == `"` {
+			l.Position++
+			break
+		}
+		if length > 1 {
+			index += length - 1
+		}
+	}
+	return sb.String()
 }
 
 // NewLine sets ready lexer to a new line lexing.
@@ -240,7 +267,11 @@ func (l *Lex) Token() Token {
 		token.Type = Brace
 		l.Position++
 	case content[0] == '\'':
-		l.lexRune(&token, content)
+		token.Value = l.lexRune(content)
+		token.Type = Value
+		return token
+	case content[0] == '"':
+		token.Value = l.lexString(content)
 		token.Type = Value
 		return token
 	case strings.HasPrefix(content, "//"):
@@ -401,6 +432,10 @@ func (l *Lex) Token() Token {
 		token.Value = "rune"
 		token.Type = Type
 		l.Position += 4
+	case isKeyword(content, "str"):
+		token.Value = "str"
+		token.Type = Type
+		l.Position += 3
 	case isKeyword(content, "true"):
 		token.Value = "true"
 		token.Type = Value

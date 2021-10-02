@@ -46,6 +46,7 @@ var Errors = map[string]string{
 	`missing_value`:              `value is not given`,
 	`missing_block_comment`:      `missing block comment close`,
 	`missing_rune_end`:           `rune is not finished`,
+	`missing_string_end`:         `string is not finished`,
 	`rune_empty`:                 `rune is cannot empty`,
 	`rune_overflow`:              `rune is should be single`,
 	`invalid_escape_sequence`:    `invalid escape sequence`,
