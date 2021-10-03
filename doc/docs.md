@@ -131,8 +131,13 @@ fun main() {
   </tr>
   <tr>
     <td>rune</td>
+    <td>4bytes</td>
+    <td>Single UTF-16 character.</td>
+  </tr>
+  <tr>
+    <td>str</td>
     <td>-</td>
-    <td>Single UTF-8 character.</td>
+    <td>UTF-16 character array.</td>
   </tr>
 </table>
 
@@ -196,6 +201,10 @@ fun main() {
   <tr>
     <td>rune</td>
     <td>rune</td>
+  </tr>
+  <tr>
+    <td>str</td>
+    <td>str</td>
   </tr>
 </table>
 
