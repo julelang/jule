@@ -152,18 +152,18 @@ func appendStandards(code *string) {
 #pragma endregion X_STANDARD_IMPORTS
 
 #pragma region X_BUILTIN_TYPES
-#define int8 signed char
-#define int16 short
-#define int32 int
-#define int64 long long int
-#define uint8 unsigned char
-#define uint16 unsigned short
-#define uint32 unsigned int
-#define uint64 unsigned long long int
-#define float32 float
-#define float64 double
-#define str std::wstring
-#define rune wchar_t
+typedef signed char int8;
+typedef short int16;
+typedef int int32;
+typedef long long int int64;
+typedef unsigned char uint8;
+typedef unsigned short uint16;
+typedef unsigned int uint32;
+typedef unsigned long long int uint64;
+typedef float float32;
+typedef double float64;
+typedef std::wstring str;
+typedef wchar_t rune;
 #pragma endregion X_BUILTIN_TYPES
 
 #pragma region X_BUILTIN_FUNCTIONS
