@@ -52,7 +52,7 @@ func (ast *AST) Build() {
 		switch firstToken.Type {
 		case lex.Brace:
 			ast.BuildBrace()
-		case lex.Fun:
+		case lex.Sub:
 			ast.BuildFunction()
 		case lex.Var, lex.Type:
 			ast.BuildGlobalVariable()

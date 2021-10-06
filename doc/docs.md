@@ -12,7 +12,7 @@ Welcome to the X programming language documentations.
   * [Primitive Types](#primitive_types)
   * [Type Compability](#type_compability)
 * [Variables](#variables)
-* [Functions](#functions)
+* [Functions](#function)
 * [Appendices](#appendices)
   * [Keywords](#keywords)
   * [Operators](#operators)
@@ -54,7 +54,7 @@ Entry point is should be void and not have any parameter.
 Example;
 
 ```kt
-fun main() {
+sub main() {
   // ...
 }
 ```
@@ -230,10 +230,10 @@ If you not initialize variable, initialize with default value.
 <h2 id="functions">Functions</h2>
 
 Functions are very useful for adding functionality to your code, functions are very common in X code.
-Functions are declared with the ``fun`` keyword.
+Functions are declared with the ``sub`` keyword.
 
 ```kt
-fun myFunction() {
+sub myFunction() {
   // ...
 }
 
@@ -245,7 +245,7 @@ Functions can also be defined to have parameters, which are special variables th
 When a function has parameters, you can provide it with concrete values for those parameters.
 
 ```kt
-fun printInt(x int32) {
+sub printInt(x int32) {
   outln(x)
 }
 
@@ -256,7 +256,7 @@ fun printInt(x int32) {
 Functions can also return a value.
 
 ```kt
-fun divide(a int32, b int32) float64 {
+sub divide(a int32, b int32) float64 {
   return a / b
 }
 
