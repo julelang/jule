@@ -158,7 +158,7 @@ func (p *Parser) ParseVariable(varAST ast.VariableAST) ast.VariableAST {
 	varAST.Value.Model = model
 	if varAST.Type.Code != x.Void {
 		if typeIsSingle(varAST.Type) && typeIsSingle(value.Type) {
-			if !x.TypesAreCompatible(varAST.Type.Code, value.Type.Code, true) {
+			if !x.TypesAreCompatible(value.Type.Code, varAST.Type.Code, true) {
 				p.PushErrorToken(varAST.Token, "incompatible_datatype")
 			}
 		} else {

@@ -66,19 +66,6 @@ func (l *Lex) lexName(ln string) string {
 	return sb.String()
 }
 
-// lexNumeric returns numeric if next token is numeric,
-// returns empty string if not.
-func (l *Lex) lexNumeric(ln string) string {
-	for index, run := range ln {
-		if '0' <= run && '9' >= run {
-			l.Position++
-			continue
-		}
-		return ln[:index]
-	}
-	return ""
-}
-
 // resume to lex from position.
 func (l *Lex) resume() string {
 	var ln string
@@ -126,6 +113,16 @@ func (l *Lex) lexBlockComment() {
 		}
 	}
 	l.pushError("missing_block_comment")
+}
+
+var numericRegexp = *regexp.MustCompile(`^((0x[[:xdigit:]]+)|(\d+((\.\d+)?(e|E)(\-|\+|)\d+)?|(\.\d+)))`)
+
+// lexNumeric returns numeric if next token is numeric,
+// returns empty string if not.
+func (l *Lex) lexNumeric(content string) string {
+	value := numericRegexp.FindString(content)
+	l.Position += len(value)
+	return value
 }
 
 var escapeSequenceRegexp = regexp.MustCompile(`^\\([\\'"abfnrtv]|U.{8}|u.{4}|x..|[0-7]{1,3})`)
