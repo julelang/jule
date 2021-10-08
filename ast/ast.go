@@ -351,8 +351,8 @@ func (ast *AST) BuildStatement(tokens []lex.Token) (s StatementAST) {
 		return ast.BuildVariableStatement(tokens)
 	case lex.Return:
 		return ast.BuildReturnStatement(tokens)
-	case lex.Brace:
-		if firstToken.Value == "(" {
+	case lex.Operator:
+		if firstToken.Value == "<" {
 			return ast.BuildReturnStatement(tokens)
 		}
 		fallthrough
@@ -505,9 +505,7 @@ func (ast *AST) BuildVariableStatement(tokens []lex.Token) (s StatementAST) {
 func (ast *AST) BuildReturnStatement(tokens []lex.Token) StatementAST {
 	var returnModel ReturnAST
 	returnModel.Token = tokens[0]
-	if tokens[0].Type == lex.Brace {
-		returnModel.Expression = ast.BuildExpression(tokens)
-	} else if len(tokens) > 1 {
+	if len(tokens) > 1 {
 		returnModel.Expression = ast.BuildExpression(tokens[1:])
 	}
 	return StatementAST{

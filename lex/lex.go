@@ -413,10 +413,10 @@ func (l *Lex) Token() Token {
 		token.Value = "float64"
 		token.Type = Type
 		l.Position += 7
-	case isKeyword(content, "return"):
-		token.Value = "return"
+	case isKeyword(content, "ret"):
+		token.Value = "ret"
 		token.Type = Return
-		l.Position += 6
+		l.Position += 3
 	case isKeyword(content, "bool"):
 		token.Value = "bool"
 		token.Type = Type

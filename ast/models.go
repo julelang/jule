@@ -204,10 +204,10 @@ type ReturnAST struct {
 }
 
 func (r ReturnAST) String() string {
-	if r.Token.Type == lex.Brace {
+	if r.Token.Type == lex.Operator {
 		return "return " + r.Expression.String() + ";"
 	}
-	return r.Token.Value + " " + r.Expression.String() + ";"
+	return "return " + r.Expression.String() + ";"
 }
 
 // AttributeAST is attribtue AST model.
