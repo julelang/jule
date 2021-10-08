@@ -22,6 +22,5 @@ const (
 	Value     uint8 = 6
 	Operator  uint8 = 7
 	Comma     uint8 = 8
-	Sub       uint8 = 9
 	Var       uint8 = 10
 )

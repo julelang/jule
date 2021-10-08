@@ -52,8 +52,8 @@ func (ast *AST) Build() {
 		switch firstToken.Type {
 		case lex.Brace:
 			ast.BuildBrace()
-		case lex.Sub:
-			ast.BuildFunction()
+		case lex.Name:
+			ast.BuildName()
 		case lex.Var, lex.Type:
 			ast.BuildGlobalVariable()
 		default:
@@ -63,7 +63,28 @@ func (ast *AST) Build() {
 	}
 }
 
-// BuildBrace builds AST model by brace statement.
+// BuildName builds AST model of global name statement.
+func (ast *AST) BuildName() {
+	ast.Position++
+	if ast.Ended() {
+		ast.PushErrorToken(ast.Tokens[ast.Position-1], "invalid_syntax")
+		return
+	}
+	token := ast.Tokens[ast.Position]
+	ast.Position--
+	switch token.Type {
+	case lex.Brace:
+		switch token.Value {
+		case "(":
+			ast.BuildFunction()
+			return
+		}
+	}
+	ast.Position++
+	ast.PushErrorToken(token, "invalid_syntax")
+}
+
+// BuildBrace builds AST model by global brace statement.
 func (ast *AST) BuildBrace() {
 	token := ast.Tokens[ast.Position]
 	switch token.Value {
@@ -105,7 +126,6 @@ func (ast *AST) BuildAttribute() {
 
 // BuildFunction builds AST model of function.
 func (ast *AST) BuildFunction() {
-	ast.Position++ // Skip function keyword.
 	var funAST FunctionAST
 	funAST.Token = ast.Tokens[ast.Position]
 	if funAST.Token.Type != lex.Name {

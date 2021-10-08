@@ -361,10 +361,6 @@ func (l *Lex) Token() Token {
 		token.Value = "="
 		token.Type = Operator
 		l.Position++
-	case isKeyword(content, "sub"):
-		token.Value = "sub"
-		token.Type = Sub
-		l.Position += 3
 	case isKeyword(content, "var"):
 		token.Value = "var"
 		token.Type = Var
