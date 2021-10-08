@@ -204,6 +204,9 @@ type ReturnAST struct {
 }
 
 func (r ReturnAST) String() string {
+	if r.Token.Type == lex.Brace {
+		return "return " + r.Expression.String() + ";"
+	}
 	return r.Token.Value + " " + r.Expression.String() + ";"
 }
 
