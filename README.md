@@ -5,7 +5,8 @@
 <h1>The X Programming Language</h1>
 <strong>Simple, safe and compiled programming language.
 
-[Website](https://the-xlang.github.io/website/)
+[Website](https://the-xlang.github.io/website/) |
+[Documentations](https://the-xlang.github.io/website/pages/docs.html)
 
 </strong>
 </div>
