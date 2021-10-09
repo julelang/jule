@@ -328,7 +328,7 @@ func (ast *AST) BuildBlock(tokens []lex.Token) (b BlockAST) {
 		if index-oldStatementPoint == 0 {
 			continue
 		}
-		b.Content = append(b.Content,
+		b.Statements = append(b.Statements,
 			ast.BuildStatement(tokens[oldStatementPoint:index]))
 		if ast.Position == -1 {
 			break
@@ -343,6 +343,10 @@ func (ast *AST) BuildBlock(tokens []lex.Token) (b BlockAST) {
 
 // BuildStatement builds AST model of statement.
 func (ast *AST) BuildStatement(tokens []lex.Token) (s StatementAST) {
+	s, ok := ast.BuildVariableSetStatement(tokens)
+	if ok {
+		return s
+	}
 	firstToken := tokens[0]
 	switch firstToken.Type {
 	case lex.Name:
@@ -358,6 +362,47 @@ func (ast *AST) BuildStatement(tokens []lex.Token) (s StatementAST) {
 		fallthrough
 	default:
 		ast.PushErrorToken(firstToken, "invalid_syntax")
+	}
+	return
+}
+
+// BuildVariableSetStatement builds AST model of variable set statement.
+func (ast *AST) BuildVariableSetStatement(tokens []lex.Token) (s StatementAST, _ bool) {
+	switch tokens[0].Type {
+	case lex.Name, lex.Brace, lex.Operator:
+	default:
+		return
+	}
+	braceCount := 0
+	for index, token := range tokens {
+		switch token.Type {
+		case lex.Brace:
+			switch token.Value {
+			case "{", "[", "(":
+				braceCount++
+			default:
+				braceCount--
+			}
+		}
+		if braceCount != 0 {
+			continue
+		}
+		switch token.Value {
+		case "=":
+			if index == len(tokens)-1 {
+				ast.PushErrorToken(token, "missing_value")
+				return s, true /* true for not give another errors */
+			}
+			s = StatementAST{
+				Token: token,
+				Value: VariableSetAST{
+					Setter:           token,
+					SelectExpression: ast.BuildExpression(tokens[:index]),
+					ValueExpression:  ast.BuildExpression(tokens[index+1:]),
+				},
+			}
+			return s, true
+		}
 	}
 	return
 }

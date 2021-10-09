@@ -33,19 +33,20 @@ type function struct {
 
 func (f function) String() string {
 	f.readyCxx()
-	var cxx string
-	cxx += attributesToString(f.Attributes)
-	cxx += f.typeString()
-	cxx += " "
-	cxx += f.nameString()
-	cxx += "("
-	cxx += paramsToCxx(f.Params)
-	cxx += ") {"
-	cxx += getFunctionStandardCode(f.Name)
-	cxx += f.Block.String()
-	cxx += getFunctionStandardEndCode(f.Name)
-	cxx += "\n}"
-	return cxx
+	var cxx strings.Builder
+	cxx.WriteString("template <typename any>\n")
+	cxx.WriteString(attributesToString(f.Attributes))
+	cxx.WriteString(f.typeString())
+	cxx.WriteByte(' ')
+	cxx.WriteString(f.nameString())
+	cxx.WriteByte('(')
+	cxx.WriteString(paramsToCxx(f.Params))
+	cxx.WriteString(") {")
+	cxx.WriteString(getFunctionStandardCode(f.Name))
+	cxx.WriteString(f.Block.String())
+	cxx.WriteString(getFunctionStandardEndCode(f.Name))
+	cxx.WriteString("\n}")
+	return cxx.String()
 }
 
 func (f *function) typeString() string {
@@ -82,20 +83,12 @@ func paramsToCxx(params []ast.ParameterAST) string {
 	if len(params) == 0 {
 		return ""
 	}
-	var cxx string
-	any := false
+	var cxx strings.Builder
 	for _, p := range params {
-		cxx += p.String()
-		cxx += ","
-		if !any {
-			any = p.Type.Code == x.Any
-		}
+		cxx.WriteString(p.String())
+		cxx.WriteByte(',')
 	}
-	cxx = cxx[:len(cxx)-1]
-	if any {
-		cxx = "template <typename any>\n" + cxx
-	}
-	return cxx
+	return cxx.String()[:cxx.Len()-1]
 }
 
 func getFunctionStandardCode(name string) string {

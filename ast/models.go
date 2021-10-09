@@ -35,7 +35,7 @@ type RangeAST struct {
 
 // BlockAST is code block.
 type BlockAST struct {
-	Content []StatementAST
+	Statements []StatementAST
 }
 
 func (b BlockAST) String() string {
@@ -46,7 +46,7 @@ func parseBlock(b BlockAST, indent int) string {
 	// Space count per indent.
 	const indentSpace = 2
 	var cxx strings.Builder
-	for _, s := range b.Content {
+	for _, s := range b.Statements {
 		cxx.WriteByte('\n')
 		cxx.WriteString(fullString(' ', indent*indentSpace))
 		cxx.WriteString(fmt.Sprint(s.Value))
@@ -245,4 +245,15 @@ func (v VariableAST) StringType() string {
 		return "auto"
 	}
 	return v.Type.String()
+}
+
+// VariableSetAST is variable set AST model.
+type VariableSetAST struct {
+	Setter           lex.Token
+	SelectExpression ExpressionAST
+	ValueExpression  ExpressionAST
+}
+
+func (vs VariableSetAST) String() string {
+	return vs.SelectExpression.String() + " = " + vs.ValueExpression.String() + ";"
 }

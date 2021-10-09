@@ -158,7 +158,7 @@ func (p *Parser) ParseVariable(varAST ast.VariableAST) ast.VariableAST {
 	varAST.Value.Model = model
 	if varAST.Type.Code != x.Void {
 		if typeIsSingle(varAST.Type) && typeIsSingle(value.Type) {
-			if !x.TypesAreCompatible(value.Type.Code, varAST.Type.Code, true) {
+			if !x.TypesAreCompatible(value.Type.Code, varAST.Type.Code, false) {
 				p.PushErrorToken(varAST.Token, "incompatible_datatype")
 			}
 		} else {
@@ -196,7 +196,7 @@ func variablesFromParameters(params []ast.ParameterAST) []ast.VariableAST {
 
 func (p *Parser) checkFunctionReturn(fun *function) {
 	miss := true
-	for index, s := range fun.Block.Content {
+	for index, s := range fun.Block.Statements {
 		switch t := s.Value.(type) {
 		case ast.ReturnAST:
 			if len(t.Expression.Tokens) == 0 {
@@ -209,7 +209,7 @@ func (p *Parser) checkFunctionReturn(fun *function) {
 				}
 				value, model := p.computeExpression(t.Expression)
 				t.Expression.Model = model
-				fun.Block.Content[index].Value = t
+				fun.Block.Statements[index].Value = t
 				if typeIsSingle(value.Type) && typeIsSingle(fun.ReturnType) {
 					if !x.TypesAreCompatible(value.Type.Code, fun.ReturnType.Code, true) {
 						p.PushErrorToken(t.Token, "incompatible_type")
@@ -921,14 +921,16 @@ func (p *Parser) checkFunction(fun *function) {
 }
 
 func (p *Parser) checkBlock(b ast.BlockAST) {
-	for index, model := range b.Content {
+	for index, model := range b.Statements {
 		switch t := model.Value.(type) {
 		case ast.FunctionCallAST:
 			p.checkFunctionCallStatement(t)
 		case ast.VariableAST:
 			p.checkVariableStatement(&t)
 			model.Value = t
-			b.Content[index] = model
+			b.Statements[index] = model
+		case ast.VariableSetAST:
+			p.checkVariableSetStatement(t)
 		case ast.ReturnAST:
 		default:
 			p.PushErrorToken(model.Token, "invalid_syntax")
@@ -954,6 +956,23 @@ func (p *Parser) checkVariableStatement(varAST *ast.VariableAST) {
 	}
 	*varAST = p.ParseVariable(*varAST)
 	p.BlockVariables = append(p.BlockVariables, *varAST)
+}
+
+func (p *Parser) checkVariableSetStatement(vsAST ast.VariableSetAST) {
+	selected, _ := p.computeProcesses(vsAST.SelectExpression.Processes)
+	value, _ := p.computeProcesses(vsAST.ValueExpression.Processes)
+	if typeIsSingle(selected.Type) && typeIsSingle(value.Type) {
+		if !x.TypesAreCompatible(value.Type.Code, selected.Type.Code, false) {
+			value.Type = selected.Type
+			if !checkIntBit(value, xbits.BitsizeOfType(selected.Type.Code)) {
+				p.PushErrorToken(vsAST.Setter, "incompatible_type")
+			}
+		}
+	} else if selected.Type.Code != x.Any {
+		if selected.Type.Value != value.Type.Value {
+			p.PushErrorToken(vsAST.Setter, "incompatible_type")
+		}
+	}
 }
 
 func isConstantNumeric(v string) bool {

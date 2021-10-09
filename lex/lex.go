@@ -115,7 +115,7 @@ func (l *Lex) lexBlockComment() {
 	l.pushError("missing_block_comment")
 }
 
-var numericRegexp = *regexp.MustCompile(`^((0x[[:xdigit:]]+)|(\d+((\.\d+)?(e|E)(\-|\+|)\d+)?|(\.\d+)))`)
+var numericRegexp = *regexp.MustCompile(`^((0x[[:xdigit:]]+)|(\d+((\.\d+)?((e|E)(\-|\+|)\d+)?|(\.\d+))))`)
 
 // lexNumeric returns numeric if next token is numeric,
 // returns empty string if not.
