@@ -54,7 +54,7 @@ func (ast *AST) Build() {
 			ast.BuildBrace()
 		case lex.Name:
 			ast.BuildName()
-		case lex.Var, lex.Type:
+		case lex.Var, lex.Const:
 			ast.BuildGlobalVariable()
 		default:
 			ast.PushError("invalid_syntax")
@@ -351,7 +351,7 @@ func (ast *AST) BuildStatement(tokens []lex.Token) (s StatementAST) {
 	switch firstToken.Type {
 	case lex.Name:
 		return ast.BuildNameStatement(tokens)
-	case lex.Var:
+	case lex.Var, lex.Const:
 		return ast.BuildVariableStatement(tokens)
 	case lex.Return:
 		return ast.BuildReturnStatement(tokens)
@@ -490,17 +490,19 @@ func (ast *AST) pushArg(args *[]ArgAST, tokens []lex.Token, err lex.Token) {
 
 // BuildVariableStatement builds AST model of variable declaration statement.
 func (ast *AST) BuildVariableStatement(tokens []lex.Token) (s StatementAST) {
-	position := 1 // Here is "1" because first keyword is variable declaration.
 	var varAST VariableAST
-	varAST.Token = tokens[position]
-	if varAST.Token.Type != lex.Name {
-		ast.PushErrorToken(varAST.Token, "invalid_syntax")
+	position := 0
+	varAST.DefineToken = tokens[position]
+	position++
+	varAST.NameToken = tokens[position]
+	if varAST.NameToken.Type != lex.Name {
+		ast.PushErrorToken(varAST.NameToken, "invalid_syntax")
 	}
-	varAST.Name = varAST.Token.Value
+	varAST.Name = varAST.NameToken.Value
 	varAST.Type = TypeAST{Code: x.Void}
 	position++
 	if position >= len(tokens) {
-		ast.PushErrorToken(tokens[position-1], "invalid_syntax")
+		ast.PushErrorToken(tokens[position-1], "missing_autotype_value")
 		return
 	}
 	token := tokens[position]
@@ -509,39 +511,38 @@ func (ast *AST) BuildVariableStatement(tokens []lex.Token) (s StatementAST) {
 		varAST.Type = t
 		position++
 		if position >= len(tokens) {
-			ast.PushErrorToken(token, "invalid_syntax")
-			return
+			if varAST.Type.Code == x.Void {
+				ast.PushErrorToken(token, "missing_autotype_value")
+				return
+			}
+			var valueToken lex.Token
+			valueToken.Type = lex.Value
+			valueToken.Value = x.DefaultValueOfType(varAST.Type.Code)
+			valueTokens := []lex.Token{valueToken}
+			varAST.Value = ExpressionAST{
+				Tokens:    valueTokens,
+				Processes: [][]lex.Token{valueTokens},
+			}
+			goto ret
 		}
 		token = tokens[position]
 	}
-	switch token.Type {
-	case lex.SemiColon:
-		if varAST.Type.Code == x.Void {
-			ast.PushErrorToken(token, "missing_autotype_value")
-			break
-		}
-		var valueToken lex.Token
-		valueToken.Type = lex.Value
-		valueToken.Value = x.DefaultValueOfType(varAST.Type.Code)
-		valueTokens := []lex.Token{valueToken}
-		varAST.Value = ExpressionAST{
-			Tokens:    valueTokens,
-			Processes: [][]lex.Token{valueTokens},
-		}
-	case lex.Operator:
+	if token.Type == lex.Operator {
 		if token.Value != "=" {
 			ast.PushErrorToken(token, "invalid_syntax")
-			break
+			return
 		}
 		valueTokens := tokens[position+1:]
 		if len(valueTokens) == 0 {
 			ast.PushErrorToken(token, "missing_value")
-			break
+			return
 		}
 		varAST.Value = ast.BuildExpression(valueTokens)
+		varAST.SetterToken = token
 	}
+ret:
 	return StatementAST{
-		Token: varAST.Token,
+		Token: varAST.NameToken,
 		Value: varAST,
 	}
 }

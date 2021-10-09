@@ -222,14 +222,19 @@ func (a AttributeAST) String() string {
 
 // VariableAST is variable declaration AST model.
 type VariableAST struct {
-	Token lex.Token
-	Name  string
-	Type  TypeAST
-	Value ExpressionAST
+	DefineToken lex.Token
+	NameToken   lex.Token
+	SetterToken lex.Token
+	Name        string
+	Type        TypeAST
+	Value       ExpressionAST
 }
 
 func (v VariableAST) String() string {
 	var sb strings.Builder
+	if v.DefineToken.Value == "const" {
+		sb.WriteString("const ")
+	}
 	sb.WriteString(v.StringType())
 	sb.WriteByte(' ')
 	sb.WriteString(v.Name)

@@ -365,6 +365,10 @@ func (l *Lex) Token() Token {
 		token.Value = "var"
 		token.Type = Var
 		l.Position += 3
+	case isKeyword(content, "const"):
+		token.Value = "const"
+		token.Type = Const
+		l.Position += 5
 	case isKeyword(content, "any"):
 		token.Value = "any"
 		token.Type = Type
