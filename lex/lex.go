@@ -139,12 +139,12 @@ func (l *Lex) getEscapeSequence(content string) string {
 }
 
 func (l *Lex) getRune(content string) string {
-	first := content[0]
-	if first == '\\' {
+	if content[0] == '\\' {
 		return l.getEscapeSequence(content)
 	}
+	run, _ := utf8.DecodeRuneInString(content)
 	l.Position++
-	return string(first)
+	return string(run)
 }
 
 func (l *Lex) lexRune(content string) string {
@@ -186,8 +186,8 @@ func (l *Lex) lexString(content string) string {
 	sb.WriteByte('"')
 	l.Column++
 	content = content[1:]
-	for index := 0; index < len(content); index++ {
-		if content[index] == '\n' {
+	for index, run := range content {
+		if run == '\n' {
 			l.pushError("missing_string_end")
 			l.Position++
 			l.NewLine()
@@ -369,14 +369,6 @@ func (l *Lex) Token() Token {
 		token.Value = "const"
 		token.Type = Const
 		l.Position += 5
-	case isKeyword(content, "any"):
-		token.Value = "any"
-		token.Type = Type
-		l.Position += 3
-	case isKeyword(content, "bool"):
-		token.Value = "bool"
-		token.Type = Type
-		l.Position += 4
 	case isKeyword(content, "int8"):
 		token.Value = "int8"
 		token.Type = Type

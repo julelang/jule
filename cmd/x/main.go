@@ -152,14 +152,14 @@ func appendStandards(code *string) {
 #pragma endregion X_STANDARD_IMPORTS
 
 #pragma region X_BUILTIN_TYPES
-typedef signed char int8;
-typedef short int16;
-typedef int int32;
-typedef long long int int64;
-typedef unsigned char uint8;
-typedef unsigned short uint16;
-typedef unsigned int uint32;
-typedef unsigned long long int uint64;
+typedef int8_t int8;
+typedef int16_t int16;
+typedef int32_t int32;
+typedef int64_t int64;
+typedef uint8_t uint8;
+typedef uint16_t uint16;
+typedef uint32_t uint32;
+typedef uint64_t uint64;
 typedef float float32;
 typedef double float64;
 typedef std::wstring str;
@@ -167,19 +167,33 @@ typedef wchar_t rune;
 #pragma endregion X_BUILTIN_TYPES
 
 #pragma region X_BUILTIN_FUNCTIONS
-template <typename any>
-inline void _out(any v) {
+template<typename any> inline void _out(any v) {
   std::wcout << v;
 }
 
-template <typename any>
-inline void _outln(any v) {
+template<typename any> inline void _outln(any v) {
   _out(v);
   std::wcout << std::endl;
 }
 #pragma endregion X_BUILTIN_FUNCTIONS
 
-` + *code
+#pragma region TRANSPILED_X_CODE
+` + *code + `
+#pragma endregion TRANSPILED_X_CODE
+
+#pragma region X_ENTRY_POINT
+int main() {
+#pragma region X_ENTRY_POINT_STANDARD_CODES
+  setlocale(0x0, "");
+#pragma endregion X_ENTRY_POINT_STANDARD_CODES
+
+  _main();
+
+#pragma region X_ENTRY_POINT_END_STANDARD_CODES
+  return EXIT_SUCCESS;
+#pragma endregion X_ENTRY_POINT_END_STANDARD_CODES
+}
+#pragma endregion X_ENTRY_POINT`
 }
 
 var routines *sync.WaitGroup
