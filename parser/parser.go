@@ -158,21 +158,25 @@ func (p *Parser) ParseWaitingGlobalVariables() {
 	}
 }
 
+func (p *Parser) checkType(real, check ast.TypeAST, ignoreAny bool, errToken lex.Token) {
+	if typeIsSingle(real) && typeIsSingle(check) {
+		if !x.TypesAreCompatible(check.Code, real.Code, false) {
+			p.PushErrorToken(errToken, "incompatible_datatype")
+		}
+	} else {
+		if real.Value != check.Value {
+			p.PushErrorToken(errToken, "incompatible_datatype")
+		}
+	}
+}
+
 // ParseVariable parse X variable.
 func (p *Parser) ParseVariable(varAST ast.VariableAST) ast.VariableAST {
 	value, model := p.computeExpression(varAST.Value)
 	varAST.Value.Model = model
 	if varAST.Type.Code != x.Void {
 		if varAST.SetterToken.Type != lex.NA { // Pass default value.
-			if typeIsSingle(varAST.Type) && typeIsSingle(value.ast.Type) {
-				if !x.TypesAreCompatible(value.ast.Type.Code, varAST.Type.Code, false) {
-					p.PushErrorToken(varAST.NameToken, "incompatible_datatype")
-				}
-			} else {
-				if varAST.Type.Value != value.ast.Type.Value {
-					p.PushErrorToken(varAST.NameToken, "incompatible_datatype")
-				}
-			}
+			p.checkType(varAST.Type, value.ast.Type, false, varAST.NameToken)
 		}
 	} else {
 		varAST.Type = value.ast.Type
@@ -227,15 +231,7 @@ func (p *Parser) checkFunctionReturn(fun *function) {
 				value, model := p.computeExpression(t.Expression)
 				t.Expression.Model = model
 				fun.Block.Statements[index].Value = t
-				if typeIsSingle(value.ast.Type) && typeIsSingle(fun.ReturnType) {
-					if !x.TypesAreCompatible(value.ast.Type.Code, fun.ReturnType.Code, true) {
-						p.PushErrorToken(t.Token, "incompatible_type")
-					}
-				} else if fun.ReturnType.Code != x.Any {
-					if value.ast.Type.Value != fun.ReturnType.Value {
-						p.PushErrorToken(t.Token, "incompatible_type")
-					}
-				}
+				p.checkType(fun.ReturnType, value.ast.Type, true, t.Token)
 			}
 			miss = false
 		}
@@ -897,18 +893,7 @@ func (p *Parser) parseArg(fun *function, index int, arg *ast.ArgAST) {
 	value, model := p.computeExpression(arg.Expression)
 	arg.Expression.Model = model
 	param := fun.Params[index]
-	if typeIsSingle(value.ast.Type) && typeIsSingle(param.Type) {
-		if !x.TypesAreCompatible(value.ast.Type.Code, param.Type.Code, false) {
-			value.ast.Type = param.Type
-			if !checkIntBit(value.ast, xbits.BitsizeOfType(param.Type.Code)) {
-				p.PushErrorToken(arg.Token, "incompatible_type")
-			}
-		}
-	} else if param.Type.Code != x.Any {
-		if value.ast.Type.Value != param.Type.Value {
-			p.PushErrorToken(arg.Token, "incompatible_type")
-		}
-	}
+	p.checkType(param.Type, value.ast.Type, false, arg.Token)
 }
 
 func (p *Parser) getRangeTokens(open, close string, tokens []lex.Token) []lex.Token {
@@ -994,18 +979,7 @@ func (p *Parser) checkVariableSetStatement(vsAST ast.VariableSetAST) {
 		return
 	}
 	value, _ := p.computeProcesses(vsAST.ValueExpression.Processes)
-	if typeIsSingle(selected.ast.Type) && typeIsSingle(value.ast.Type) {
-		if !x.TypesAreCompatible(value.ast.Type.Code, selected.ast.Type.Code, false) {
-			value.ast.Type = selected.ast.Type
-			if !checkIntBit(value.ast, xbits.BitsizeOfType(selected.ast.Type.Code)) {
-				p.PushErrorToken(vsAST.Setter, "incompatible_type")
-			}
-		}
-	} else if selected.ast.Type.Code != x.Any {
-		if selected.ast.Type.Value != value.ast.Type.Value {
-			p.PushErrorToken(vsAST.Setter, "incompatible_type")
-		}
-	}
+	p.checkType(selected.ast.Type, value.ast.Type, false, vsAST.Setter)
 }
 
 func isConstantNumeric(v string) bool {
