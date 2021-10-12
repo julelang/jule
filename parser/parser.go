@@ -174,19 +174,29 @@ func (p *Parser) ParseWaitingGlobalVariables() {
 	}
 }
 
-func (p *Parser) readyType(t ast.DataTypeAST) ast.DataTypeAST {
-	if t.Code == x.Void {
-		if t.Token.Value == "" {
-			return t
+func (p *Parser) readyType(dt ast.DataTypeAST) (ast.DataTypeAST, bool) {
+	if dt.Code == x.Void {
+		if dt.Token.Value == "" {
+			return dt, true
 		}
-		return p.readyType(p.typeByName(t.Token.Value).Type)
+		t := p.typeByName(dt.Token.Value)
+		if t == nil {
+			return dt, false
+		}
+		return p.readyType(t.Type)
 	}
-	return t
+	return dt, true
 }
 
 func (p *Parser) checkType(real, check ast.DataTypeAST, ignoreAny bool, errToken lex.Token) {
-	real = p.readyType(real)
-	check = p.readyType(check)
+	real, ok := p.readyType(real)
+	if !ok {
+		return
+	}
+	check, ok = p.readyType(check)
+	if !ok {
+		return
+	}
 	if typeIsSingle(real) && typeIsSingle(check) {
 		if !x.TypesAreCompatible(check.Code, real.Code, false) {
 			p.PushErrorToken(errToken, "incompatible_datatype")
@@ -209,11 +219,14 @@ func (p *Parser) ParseVariable(varAST ast.VariableAST) ast.VariableAST {
 		} else {
 			var valueToken lex.Token
 			valueToken.Type = lex.Value
-			valueToken.Value = x.DefaultValueOfType(p.readyType(varAST.Type).Code)
-			valueTokens := []lex.Token{valueToken}
-			varAST.Value = ast.ExpressionAST{
-				Tokens:    valueTokens,
-				Processes: [][]lex.Token{valueTokens},
+			dt, ok := p.readyType(varAST.Type)
+			if ok {
+				valueToken.Value = x.DefaultValueOfType(dt.Code)
+				valueTokens := []lex.Token{valueToken}
+				varAST.Value = ast.ExpressionAST{
+					Tokens:    valueTokens,
+					Processes: [][]lex.Token{valueTokens},
+				}
 			}
 		}
 	} else {
@@ -341,9 +354,19 @@ func (p *Parser) finalCheck() {
 	if p.functionByName("_"+x.EntryPoint) == nil {
 		p.PushError("no_entry_point")
 	}
+	p.checkTypes()
 	p.ParseWaitingGlobalVariables()
 	p.WaitingGlobalVariables = nil
 	p.checkFunctions()
+}
+
+func (p *Parser) checkTypes() {
+	for _, t := range p.Types {
+		_, ok := p.readyType(t.Type)
+		if !ok {
+			p.PushErrorToken(t.Token, "invalid_type_source")
+		}
+	}
 }
 
 func (p *Parser) checkFunctions() {
