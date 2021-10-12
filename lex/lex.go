@@ -371,43 +371,43 @@ func (l *Lex) Token() Token {
 		l.Position += 5
 	case isKeyword(content, "int8"):
 		token.Value = "int8"
-		token.Type = Type
+		token.Type = DataType
 		l.Position += 4
 	case isKeyword(content, "int16"):
 		token.Value = "int16"
-		token.Type = Type
+		token.Type = DataType
 		l.Position += 5
 	case isKeyword(content, "int32"):
 		token.Value = "int32"
-		token.Type = Type
+		token.Type = DataType
 		l.Position += 5
 	case isKeyword(content, "int64"):
 		token.Value = "int64"
-		token.Type = Type
+		token.Type = DataType
 		l.Position += 5
 	case isKeyword(content, "uint8"):
 		token.Value = "uint8"
-		token.Type = Type
+		token.Type = DataType
 		l.Position += 5
 	case isKeyword(content, "uint16"):
 		token.Value = "uint16"
-		token.Type = Type
+		token.Type = DataType
 		l.Position += 6
 	case isKeyword(content, "uint32"):
 		token.Value = "uint32"
-		token.Type = Type
+		token.Type = DataType
 		l.Position += 6
 	case isKeyword(content, "uint64"):
 		token.Value = "uint64"
-		token.Type = Type
+		token.Type = DataType
 		l.Position += 6
 	case isKeyword(content, "float32"):
 		token.Value = "float32"
-		token.Type = Type
+		token.Type = DataType
 		l.Position += 7
 	case isKeyword(content, "float64"):
 		token.Value = "float64"
-		token.Type = Type
+		token.Type = DataType
 		l.Position += 7
 	case isKeyword(content, "ret"):
 		token.Value = "ret"
@@ -415,15 +415,15 @@ func (l *Lex) Token() Token {
 		l.Position += 3
 	case isKeyword(content, "bool"):
 		token.Value = "bool"
-		token.Type = Type
+		token.Type = DataType
 		l.Position += 4
 	case isKeyword(content, "rune"):
 		token.Value = "rune"
-		token.Type = Type
+		token.Type = DataType
 		l.Position += 4
 	case isKeyword(content, "str"):
 		token.Value = "str"
-		token.Type = Type
+		token.Type = DataType
 		l.Position += 3
 	case isKeyword(content, "true"):
 		token.Value = "true"
@@ -433,6 +433,10 @@ func (l *Lex) Token() Token {
 		token.Value = "false"
 		token.Type = Value
 		l.Position += 5
+	case isKeyword(content, "type"):
+		token.Value = "type"
+		token.Type = Type
+		l.Position += 4
 	default:
 		lex := l.lexName(content)
 		if lex != "" {

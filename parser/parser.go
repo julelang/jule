@@ -16,6 +16,7 @@ type Parser struct {
 
 	Functions              []*function
 	GlobalVariables        []ast.VariableAST
+	Types                  []ast.TypeAST
 	WaitingGlobalVariables []ast.VariableAST
 	BlockVariables         []ast.VariableAST
 	Tokens                 []lex.Token
@@ -54,29 +55,33 @@ func (p Parser) String() string {
 
 // Cxx is returns full C++ code of parsed objects.
 func (p *Parser) Cxx() string {
-	var sb strings.Builder
-	sb.WriteString("#pragma region PROTOTYPES\n")
-	for _, fun := range p.Functions {
-		sb.WriteString(fun.Prototype())
-		sb.WriteByte('\n')
+	var cxx strings.Builder
+	cxx.WriteString("#pragma region TYPES\n")
+	for _, t := range p.Types {
+		cxx.WriteString(t.String())
+		cxx.WriteByte('\n')
 	}
-	sb.WriteString("#pragma endregion PROTOTYPES")
-	sb.WriteString("\n\n")
-	sb.WriteString("#pragma region GLOBAL_VARIABLES\n")
+	cxx.WriteString("#pragma endregion TYPES\n\n")
+	cxx.WriteString("#pragma region PROTOTYPES\n")
+	for _, fun := range p.Functions {
+		cxx.WriteString(fun.Prototype())
+		cxx.WriteByte('\n')
+	}
+	cxx.WriteString("#pragma endregion PROTOTYPES\n\n")
+	cxx.WriteString("#pragma region GLOBAL_VARIABLES\n")
 	for _, va := range p.GlobalVariables {
-		sb.WriteString(va.String())
-		sb.WriteByte('\n')
+		cxx.WriteString(va.String())
+		cxx.WriteByte('\n')
 	}
-	sb.WriteString("#pragma endregion GLOBAL_VARIABLES")
-	sb.WriteString("\n\n")
-	sb.WriteString("#pragma region FUNCTIONS")
-	sb.WriteString("\n\n")
+	cxx.WriteString("#pragma endregion GLOBAL_VARIABLES\n\n")
+	cxx.WriteString("#pragma region FUNCTIONS")
+	cxx.WriteString("\n\n")
 	for _, fun := range p.Functions {
-		sb.WriteString(fun.String())
-		sb.WriteString("\n\n")
+		cxx.WriteString(fun.String())
+		cxx.WriteString("\n\n")
 	}
-	sb.WriteString("#pragma endregion FUNCTIONS")
-	return sb.String()
+	cxx.WriteString("#pragma endregion FUNCTIONS")
+	return cxx.String()
 }
 
 // Parse is parse X code.
@@ -90,16 +95,27 @@ func (p *Parser) Parse() {
 		return
 	}
 	for _, model := range astModel.Tree {
-		switch model.Type {
-		case ast.Attribute:
-			p.PushAttribute(model.Value.(ast.AttributeAST))
-		case ast.Statement:
-			p.ParseStatement(model.Value.(ast.StatementAST))
+		switch t := model.Value.(type) {
+		case ast.AttributeAST:
+			p.PushAttribute(t)
+		case ast.StatementAST:
+			p.ParseStatement(t)
+		case ast.TypeAST:
+			p.ParseType(t)
 		default:
 			p.PushErrorToken(model.Token, "invalid_syntax")
 		}
 	}
 	p.finalCheck()
+}
+
+// ParseType parse X statement.
+func (p *Parser) ParseType(t ast.TypeAST) {
+	if p.existName(t.Name).Type != lex.NA {
+		p.PushErrorToken(t.Token, "exist_name")
+		return
+	}
+	p.Types = append(p.Types, t)
 }
 
 // PushAttribute processes and appends to attribute list.
@@ -126,7 +142,7 @@ func (p *Parser) ParseStatement(s ast.StatementAST) {
 
 // ParseFunction parse X function.
 func (p *Parser) ParseFunction(funAst ast.FunctionAST) {
-	if p.existName(funAst.Name).Type != ast.NA {
+	if p.existName(funAst.Name).Type != lex.NA {
 		p.PushErrorToken(funAst.Token, "exist_name")
 		return
 	}
@@ -144,7 +160,7 @@ func (p *Parser) ParseFunction(funAst ast.FunctionAST) {
 
 // ParseVariable parse X global variable.
 func (p *Parser) ParseGlobalVariable(varAST ast.VariableAST) {
-	if p.existName(varAST.Name).Type != ast.NA {
+	if p.existName(varAST.Name).Type != lex.NA {
 		p.PushErrorToken(varAST.NameToken, "exist_name")
 		return
 	}
@@ -158,7 +174,19 @@ func (p *Parser) ParseWaitingGlobalVariables() {
 	}
 }
 
-func (p *Parser) checkType(real, check ast.TypeAST, ignoreAny bool, errToken lex.Token) {
+func (p *Parser) readyType(t ast.DataTypeAST) ast.DataTypeAST {
+	if t.Code == x.Void {
+		if t.Token.Value == "" {
+			return t
+		}
+		return p.readyType(p.typeByName(t.Token.Value).Type)
+	}
+	return t
+}
+
+func (p *Parser) checkType(real, check ast.DataTypeAST, ignoreAny bool, errToken lex.Token) {
+	real = p.readyType(real)
+	check = p.readyType(check)
 	if typeIsSingle(real) && typeIsSingle(check) {
 		if !x.TypesAreCompatible(check.Code, real.Code, false) {
 			p.PushErrorToken(errToken, "incompatible_datatype")
@@ -174,9 +202,19 @@ func (p *Parser) checkType(real, check ast.TypeAST, ignoreAny bool, errToken lex
 func (p *Parser) ParseVariable(varAST ast.VariableAST) ast.VariableAST {
 	value, model := p.computeExpression(varAST.Value)
 	varAST.Value.Model = model
-	if varAST.Type.Code != x.Void {
+	if varAST.Type.Code != x.Void ||
+		(varAST.Type.Code == x.Void && varAST.Type.Token.Value != "") {
 		if varAST.SetterToken.Type != lex.NA { // Pass default value.
 			p.checkType(varAST.Type, value.ast.Type, false, varAST.NameToken)
+		} else {
+			var valueToken lex.Token
+			valueToken.Type = lex.Value
+			valueToken.Value = x.DefaultValueOfType(p.readyType(varAST.Type).Code)
+			valueTokens := []lex.Token{valueToken}
+			varAST.Value = ast.ExpressionAST{
+				Tokens:    valueTokens,
+				Processes: [][]lex.Token{valueTokens},
+			}
 		}
 	} else {
 		varAST.Type = value.ast.Type
@@ -241,6 +279,15 @@ func (p *Parser) checkFunctionReturn(fun *function) {
 	}
 }
 
+func (p *Parser) typeByName(name string) *ast.TypeAST {
+	for _, t := range p.Types {
+		if t.Name == name {
+			return &t
+		}
+	}
+	return nil
+}
+
 func (p *Parser) functionByName(name string) *function {
 	for _, fun := range builtinFunctions {
 		if fun.Name == name {
@@ -270,6 +317,10 @@ func (p *Parser) variableByName(name string) *ast.VariableAST {
 }
 
 func (p *Parser) existName(name string) lex.Token {
+	t := p.typeByName(name)
+	if t != nil {
+		return t.Token
+	}
 	fun := p.functionByName(name)
 	if fun != nil {
 		return fun.Token
@@ -377,7 +428,7 @@ func (p *Parser) computeProcesses(processes [][]lex.Token) (v value, e expressio
 		process.rightVal = p.processValuePart(process.right, builder).ast
 		{
 			solvedValue := process.solve()
-			if v.ast.Type.Code != ast.NA {
+			if v.ast.Type.Code != x.Void {
 				process.operator.Value = "+"
 				process.leftVal = v.ast
 				process.right = processes[j+1]
@@ -652,7 +703,7 @@ func (ap arithmeticProcess) solve() (v ast.ValueAST) {
 const functionName = 0x0000A
 
 func (p *Parser) processSingleValuePart(token lex.Token, builder *expressionModelBuilder) (v value, ok bool) {
-	v.ast.Type.Code = ast.NA
+	v.ast.Type.Code = x.Void
 	v.ast.Token = token
 	switch token.Type {
 	case lex.Value:
@@ -715,14 +766,14 @@ func (p *Parser) processSingleValuePart(token lex.Token, builder *expressionMode
 	return
 }
 
-func typeIsPointer(t ast.TypeAST) bool {
+func typeIsPointer(t ast.DataTypeAST) bool {
 	if t.Value == "" {
 		return false
 	}
 	return t.Value[0] == '*'
 }
 
-func typeIsSingle(t ast.TypeAST) bool {
+func typeIsSingle(t ast.DataTypeAST) bool {
 	return !typeIsPointer(t)
 }
 
@@ -957,6 +1008,12 @@ func (p *Parser) checkFunctionCallStatement(cs ast.FunctionCallAST) {
 }
 
 func (p *Parser) checkVariableStatement(varAST *ast.VariableAST) {
+	for _, t := range p.Types {
+		if varAST.Name == t.Name {
+			p.PushErrorToken(varAST.NameToken, "exist_name")
+			break
+		}
+	}
 	for _, variable := range p.BlockVariables {
 		if varAST.Name == variable.Name {
 			p.PushErrorToken(varAST.NameToken, "exist_name")

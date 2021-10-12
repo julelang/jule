@@ -12,7 +12,6 @@ import (
 type Object struct {
 	Token lex.Token
 	Value interface{}
-	Type  uint8
 }
 
 // IdentifierAST is identifier.
@@ -63,23 +62,37 @@ func fullString(b byte, count int) string {
 	return sb.String()
 }
 
-// TypeAST is data type identifier.
-type TypeAST struct {
+// DataTypeAST is data type identifier.
+type DataTypeAST struct {
 	Token lex.Token
 	Code  uint8
 	Value string
 }
 
-func (t TypeAST) String() string {
-	var sb strings.Builder
-	for _, run := range t.Value {
+func (dt DataTypeAST) String() string {
+	var cxx strings.Builder
+	for _, run := range dt.Value {
 		if run == '*' {
-			sb.WriteRune(run)
+			cxx.WriteRune(run)
 			continue
 		}
 		break
 	}
-	return x.CxxTypeNameFromType(t.Code) + sb.String()
+	if dt.Token.Type == lex.Name {
+		return dt.Token.Value + cxx.String()
+	}
+	return x.CxxTypeNameFromType(dt.Code) + cxx.String()
+}
+
+// TypeAST is type declaration.
+type TypeAST struct {
+	Token lex.Token
+	Name  string
+	Type  DataTypeAST
+}
+
+func (t TypeAST) String() string {
+	return "typedef " + t.Type.String() + " " + t.Name + ";"
 }
 
 // FunctionAST is function declaration AST model.
@@ -87,7 +100,7 @@ type FunctionAST struct {
 	Token      lex.Token
 	Name       string
 	Params     []ParameterAST
-	ReturnType TypeAST
+	ReturnType DataTypeAST
 	Block      BlockAST
 }
 
@@ -95,7 +108,7 @@ type FunctionAST struct {
 type ParameterAST struct {
 	Token lex.Token
 	Name  string
-	Type  TypeAST
+	Type  DataTypeAST
 }
 
 func (p ParameterAST) String() string {
@@ -170,7 +183,7 @@ func (e ExpressionAST) String() string {
 type ValueAST struct {
 	Token lex.Token
 	Value string
-	Type  TypeAST
+	Type  DataTypeAST
 }
 
 func (v ValueAST) String() string {
@@ -226,7 +239,7 @@ type VariableAST struct {
 	NameToken   lex.Token
 	SetterToken lex.Token
 	Name        string
-	Type        TypeAST
+	Type        DataTypeAST
 	Value       ExpressionAST
 }
 
@@ -246,7 +259,7 @@ func (v VariableAST) String() string {
 
 // StringType parses type to cxx.
 func (v VariableAST) StringType() string {
-	if v.Type.Code == x.Void {
+	if v.Type.Code == x.Void && v.Type.Token.Value == "" {
 		return "auto"
 	}
 	return v.Type.String()

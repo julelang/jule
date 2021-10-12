@@ -8,12 +8,12 @@ import (
 var builtinFunctions = []*function{
 	{
 		Name: "_out",
-		ReturnType: ast.TypeAST{
+		ReturnType: ast.DataTypeAST{
 			Code: x.Void,
 		},
 		Params: []ast.ParameterAST{{
 			Name: "v",
-			Type: ast.TypeAST{
+			Type: ast.DataTypeAST{
 				Value: "any",
 				Code:  x.Any,
 			},
@@ -21,12 +21,12 @@ var builtinFunctions = []*function{
 	},
 	{
 		Name: "_outln",
-		ReturnType: ast.TypeAST{
+		ReturnType: ast.DataTypeAST{
 			Code: x.Void,
 		},
 		Params: []ast.ParameterAST{{
 			Name: "v",
-			Type: ast.TypeAST{
+			Type: ast.DataTypeAST{
 				Value: "any",
 				Code:  x.Any,
 			},

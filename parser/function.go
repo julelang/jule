@@ -10,7 +10,7 @@ import (
 type function struct {
 	Token      lex.Token
 	Name       string
-	ReturnType ast.TypeAST
+	ReturnType ast.DataTypeAST
 	Params     []ast.ParameterAST
 	Attributes []ast.AttributeAST
 	Block      ast.BlockAST

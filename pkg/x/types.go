@@ -114,11 +114,8 @@ func TypesAreCompatible(t1, t2 uint8, ignoreany bool) bool {
 		return t2 == Float64
 	case Rune:
 		return t2 == Rune ||
-			t2 == Int8 ||
-			t2 == Int16 ||
 			t2 == Int32 ||
 			t2 == Int64 ||
-			t2 == UInt8 ||
 			t2 == UInt16 ||
 			t2 == UInt32 ||
 			t2 == UInt64

@@ -14,7 +14,7 @@ type Token struct {
 // Token types.
 const (
 	NA        uint8 = 0
-	Type      uint8 = 1
+	DataType  uint8 = 1
 	Name      uint8 = 2
 	Brace     uint8 = 3
 	Return    uint8 = 4
@@ -24,4 +24,5 @@ const (
 	Comma     uint8 = 8
 	Var       uint8 = 9
 	Const     uint8 = 10
+	Type      uint8 = 11
 )

@@ -56,11 +56,41 @@ func (ast *AST) Build() {
 			ast.BuildName()
 		case lex.Var, lex.Const:
 			ast.BuildGlobalVariable()
+		case lex.Type:
+			ast.BuildType()
 		default:
 			ast.PushError("invalid_syntax")
 			ast.Position++
 		}
 	}
+}
+
+// BuildType builds AST model of type defination statement.
+func (ast *AST) BuildType() {
+	position := 1 // Initialize value is 1 for skip keyword.
+	tokens := ast.skipStatement()
+	if position >= len(tokens) {
+		ast.PushErrorToken(tokens[position-1], "invalid_syntax")
+		return
+	}
+	token := tokens[position]
+	if token.Type != lex.Name {
+		ast.PushErrorToken(token, "invalid_syntax")
+	}
+	position++
+	if position >= len(tokens) {
+		ast.PushErrorToken(tokens[position-1], "invalid_syntax")
+		return
+	}
+	destinationType, _ := ast.BuildDataType(tokens[position:], new(int), true)
+	ast.Tree = append(ast.Tree, Object{
+		Token: tokens[1],
+		Value: TypeAST{
+			Token: tokens[1],
+			Name:  tokens[1].Value,
+			Type:  destinationType,
+		},
+	})
 }
 
 // BuildName builds AST model of global name statement.
@@ -118,7 +148,6 @@ func (ast *AST) BuildAttribute() {
 	attribute.Value = attribute.Token.Value
 	ast.Tree = append(ast.Tree, Object{
 		Token: attribute.Token,
-		Type:  Attribute,
 		Value: attribute,
 	})
 	ast.Position++
@@ -153,7 +182,7 @@ func (ast *AST) BuildFunction() {
 		return
 	}
 	token := ast.Tokens[ast.Position]
-	t, ok := ast.BuildType(ast.Tokens, &ast.Position, false)
+	t, ok := ast.BuildDataType(ast.Tokens, &ast.Position, false)
 	if ok {
 		funAST.ReturnType = t
 		ast.Position++
@@ -179,7 +208,6 @@ func (ast *AST) BuildFunction() {
 	funAST.Block = ast.BuildBlock(blockTokens)
 	ast.Tree = append(ast.Tree, Object{
 		Token: funAST.Token,
-		Type:  Statement,
 		Value: StatementAST{
 			Token: funAST.Token,
 			Value: funAST,
@@ -196,7 +224,6 @@ func (ast *AST) BuildGlobalVariable() {
 	statement := ast.BuildVariableStatement(statementTokens)
 	ast.Tree = append(ast.Tree, Object{
 		Token: statement.Token,
-		Type:  Statement,
 		Value: statement,
 	})
 }
@@ -248,18 +275,16 @@ func (ast *AST) pushParameter(fn *FunctionAST, tokens []lex.Token, err lex.Token
 			break
 		}
 	}
-	index := new(int)
-	*index = 1
-	t, _ := ast.BuildType(tokens, index, true)
+	index := 1
+	t, _ := ast.BuildDataType(tokens, &index, true)
 	fn.Params = append(fn.Params, ParameterAST{
 		Token: nameToken,
 		Name:  nameToken.Value,
 		Type:  t,
 	})
-	if *index != len(tokens)-1 {
-		ast.PushErrorToken(tokens[*index], "invalid_syntax")
+	if index != len(tokens)-1 {
+		ast.PushErrorToken(tokens[index], "invalid_syntax")
 	}
-	index = nil
 }
 
 // IsStatement reports token is
@@ -268,15 +293,20 @@ func IsStatement(token lex.Token) bool {
 	return token.Type == lex.SemiColon
 }
 
-// BuildType builds AST model of type.
-func (ast *AST) BuildType(tokens []lex.Token, index *int, err bool) (t TypeAST, _ bool) {
+// BuildDataType builds AST model of data type.
+func (ast *AST) BuildDataType(tokens []lex.Token, index *int, err bool) (t DataTypeAST, _ bool) {
 	first := *index
 	for ; *index < len(tokens); *index++ {
 		token := tokens[*index]
 		switch token.Type {
-		case lex.Type:
+		case lex.DataType:
 			t.Token = token
 			t.Code = x.TypeFromName(t.Token.Value)
+			t.Value += t.Token.Value
+			return t, true
+		case lex.Name:
+			t.Token = token
+			t.Code = x.Void
 			t.Value += t.Token.Value
 			return t, true
 		case lex.Operator:
@@ -499,29 +529,21 @@ func (ast *AST) BuildVariableStatement(tokens []lex.Token) (s StatementAST) {
 		ast.PushErrorToken(varAST.NameToken, "invalid_syntax")
 	}
 	varAST.Name = varAST.NameToken.Value
-	varAST.Type = TypeAST{Code: x.Void}
+	varAST.Type = DataTypeAST{Code: x.Void}
 	position++
 	if position >= len(tokens) {
 		ast.PushErrorToken(tokens[position-1], "missing_autotype_value")
 		return
 	}
 	token := tokens[position]
-	t, ok := ast.BuildType(tokens, &position, false)
+	t, ok := ast.BuildDataType(tokens, &position, false)
 	if ok {
 		varAST.Type = t
 		position++
 		if position >= len(tokens) {
-			if varAST.Type.Code == x.Void {
+			if varAST.Type.Code == x.Void && varAST.Type.Token.Type != lex.Name {
 				ast.PushErrorToken(token, "missing_autotype_value")
 				return
-			}
-			var valueToken lex.Token
-			valueToken.Type = lex.Value
-			valueToken.Value = x.DefaultValueOfType(varAST.Type.Code)
-			valueTokens := []lex.Token{valueToken}
-			varAST.Value = ExpressionAST{
-				Tokens:    valueTokens,
-				Processes: [][]lex.Token{valueTokens},
 			}
 			goto ret
 		}
