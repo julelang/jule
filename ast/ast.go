@@ -306,7 +306,7 @@ func (ast *AST) BuildDataType(tokens []lex.Token, index *int, err bool) (t DataT
 			return t, true
 		case lex.Name:
 			t.Token = token
-			t.Code = x.Void
+			t.Code = x.Name
 			t.Value += t.Token.Value
 			return t, true
 		case lex.Operator:
@@ -541,7 +541,7 @@ func (ast *AST) BuildVariableStatement(tokens []lex.Token) (s StatementAST) {
 		varAST.Type = t
 		position++
 		if position >= len(tokens) {
-			if varAST.Type.Code == x.Void && varAST.Type.Token.Type != lex.Name {
+			if varAST.Type.Code == x.Void {
 				ast.PushErrorToken(token, "missing_autotype_value")
 				return
 			}

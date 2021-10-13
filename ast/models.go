@@ -78,7 +78,7 @@ func (dt DataTypeAST) String() string {
 		}
 		break
 	}
-	if dt.Token.Type == lex.Name {
+	if dt.Code == x.Name {
 		return dt.Token.Value + cxx.String()
 	}
 	return x.CxxTypeNameFromType(dt.Code) + cxx.String()
@@ -259,7 +259,7 @@ func (v VariableAST) String() string {
 
 // StringType parses type to cxx.
 func (v VariableAST) StringType() string {
-	if v.Type.Code == x.Void && v.Type.Token.Value == "" {
+	if v.Type.Code == x.Void {
 		return "auto"
 	}
 	return v.Type.String()

@@ -175,10 +175,7 @@ func (p *Parser) ParseWaitingGlobalVariables() {
 }
 
 func (p *Parser) readyType(dt ast.DataTypeAST) (ast.DataTypeAST, bool) {
-	if dt.Code == x.Void {
-		if dt.Token.Value == "" {
-			return dt, true
-		}
+	if dt.Code == x.Name {
 		t := p.typeByName(dt.Token.Value)
 		if t == nil {
 			return dt, false
@@ -212,8 +209,7 @@ func (p *Parser) checkType(real, check ast.DataTypeAST, ignoreAny bool, errToken
 func (p *Parser) ParseVariable(varAST ast.VariableAST) ast.VariableAST {
 	value, model := p.computeExpression(varAST.Value)
 	varAST.Value.Model = model
-	if varAST.Type.Code != x.Void ||
-		(varAST.Type.Code == x.Void && varAST.Type.Token.Value != "") {
+	if varAST.Type.Code != x.Void {
 		if varAST.SetterToken.Type != lex.NA { // Pass default value.
 			p.checkType(varAST.Type, value.ast.Type, false, varAST.NameToken)
 		} else {

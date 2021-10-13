@@ -17,6 +17,7 @@ const (
 	Float64 uint8 = 12
 	Any     uint8 = 13
 	Rune    uint8 = 14
+	Name    uint8 = 15
 )
 
 // TypeGreaterThan reports type one is greater than type two or not.
