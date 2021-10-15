@@ -165,7 +165,13 @@ typedef float float32;
 typedef double float64;
 typedef std::wstring str;
 typedef wchar_t rune;
+
+#define function std::function
 #pragma endregion X_BUILTIN_TYPES
+
+#pragma region X_BUILTIN_VALUES
+#define null NULL
+#pragma endregion X_BUILTIN_VALUES
 
 #pragma region X_BUILTIN_FUNCTIONS
 template<typename any> inline void _out(any v) {

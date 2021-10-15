@@ -433,6 +433,10 @@ func (l *Lex) Token() Token {
 		token.Value = "false"
 		token.Type = Value
 		l.Position += 5
+	case isKeyword(content, "null"):
+		token.Value = "null"
+		token.Type = Value
+		l.Position += 4
 	case isKeyword(content, "type"):
 		token.Value = "type"
 		token.Type = Type

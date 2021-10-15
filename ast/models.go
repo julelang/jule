@@ -89,7 +89,7 @@ func (dt DataTypeAST) String() string {
 }
 
 func (dt DataTypeAST) FunctionString() string {
-	cxx := "std::function<"
+	cxx := "function<"
 	fun := dt.Tag.(FunctionAST)
 	cxx += fun.ReturnType.String()
 	cxx += "("

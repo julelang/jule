@@ -175,46 +175,6 @@ func (p *Parser) ParseWaitingGlobalVariables() {
 	}
 }
 
-func (p *Parser) readyType(dt ast.DataTypeAST) (ast.DataTypeAST, bool) {
-	switch dt.Code {
-	case x.Name:
-		t := p.typeByName(dt.Token.Value)
-		if t == nil {
-			return dt, false
-		}
-		t.Type.Value = dt.Value[:len(dt.Value)-len(dt.Token.Value)] + t.Type.Value
-		return p.readyType(t.Type)
-	case x.Function:
-		funAST := dt.Tag.(ast.FunctionAST)
-		for index, param := range funAST.Params {
-			funAST.Params[index].Type, _ = p.readyType(param.Type)
-		}
-		funAST.ReturnType, _ = p.readyType(funAST.ReturnType)
-		dt.Value = dt.Tag.(ast.FunctionAST).DataTypeString()
-	}
-	return dt, true
-}
-
-func (p *Parser) checkType(real, check ast.DataTypeAST, ignoreAny bool, errToken lex.Token) {
-	real, ok := p.readyType(real)
-	if !ok {
-		return
-	}
-	check, ok = p.readyType(check)
-	if !ok {
-		return
-	}
-	if typeIsSingle(real) && typeIsSingle(check) {
-		if !x.TypesAreCompatible(check.Code, real.Code, false) {
-			p.PushErrorToken(errToken, "incompatible_datatype")
-		}
-	} else {
-		if real.Value != check.Value {
-			p.PushErrorToken(errToken, "incompatible_datatype")
-		}
-	}
-}
-
 // ParseVariable parse X variable.
 func (p *Parser) ParseVariable(varAST ast.VariableAST) ast.VariableAST {
 	value, model := p.computeExpression(varAST.Value)
@@ -227,7 +187,7 @@ func (p *Parser) ParseVariable(varAST ast.VariableAST) ast.VariableAST {
 			valueToken.Type = lex.Value
 			dt, ok := p.readyType(varAST.Type)
 			if ok {
-				valueToken.Value = x.DefaultValueOfType(dt.Code)
+				valueToken.Value = defaultValueOfType(dt)
 				valueTokens := []lex.Token{valueToken}
 				varAST.Value = ast.ExpressionAST{
 					Tokens:    valueTokens,
@@ -237,6 +197,9 @@ func (p *Parser) ParseVariable(varAST ast.VariableAST) ast.VariableAST {
 		}
 	} else {
 		varAST.Type = value.ast.Type
+		if varAST.Type.Code == x.Null {
+			p.PushErrorToken(varAST.SetterToken, "null_used_with_autotype")
+		}
 	}
 	if varAST.DefineToken.Value == "const" {
 		if varAST.SetterToken.Type == lex.NA {
@@ -582,7 +545,7 @@ func (ap arithmeticProcess) solveAny() (v ast.ValueAST) {
 }
 
 func (ap arithmeticProcess) solveBool() (v ast.ValueAST) {
-	if !x.TypesAreCompatible(ap.leftVal.Type.Code, ap.rightVal.Type.Code, true) {
+	if !typesAreCompatible(ap.leftVal.Type, ap.rightVal.Type, true) {
 		ap.cp.PushErrorToken(ap.operator, "incompatible_type")
 		return
 	}
@@ -596,7 +559,7 @@ func (ap arithmeticProcess) solveBool() (v ast.ValueAST) {
 }
 
 func (ap arithmeticProcess) solveFloat() (v ast.ValueAST) {
-	if !x.TypesAreCompatible(ap.leftVal.Type.Code, ap.rightVal.Type.Code, true) {
+	if !typesAreCompatible(ap.leftVal.Type, ap.rightVal.Type, true) {
 		if !isConstantNumeric(ap.leftVal.Value) &&
 			!isConstantNumeric(ap.rightVal.Value) {
 			ap.cp.PushErrorToken(ap.operator, "incompatible_type")
@@ -618,7 +581,7 @@ func (ap arithmeticProcess) solveFloat() (v ast.ValueAST) {
 }
 
 func (ap arithmeticProcess) solveSigned() (v ast.ValueAST) {
-	if !x.TypesAreCompatible(ap.leftVal.Type.Code, ap.rightVal.Type.Code, true) {
+	if !typesAreCompatible(ap.leftVal.Type, ap.rightVal.Type, true) {
 		if !isConstantNumeric(ap.leftVal.Value) &&
 			!isConstantNumeric(ap.rightVal.Value) {
 			ap.cp.PushErrorToken(ap.operator, "incompatible_type")
@@ -646,7 +609,7 @@ func (ap arithmeticProcess) solveSigned() (v ast.ValueAST) {
 }
 
 func (ap arithmeticProcess) solveUnsigned() (v ast.ValueAST) {
-	if !x.TypesAreCompatible(ap.leftVal.Type.Code, ap.rightVal.Type.Code, true) {
+	if !typesAreCompatible(ap.leftVal.Type, ap.rightVal.Type, true) {
 		if !isConstantNumeric(ap.leftVal.Value) &&
 			!isConstantNumeric(ap.rightVal.Value) {
 			ap.cp.PushErrorToken(ap.operator, "incompatible_type")
@@ -680,7 +643,7 @@ func (ap arithmeticProcess) solveLogical() (v ast.ValueAST) {
 }
 
 func (ap arithmeticProcess) solveRune() (v ast.ValueAST) {
-	if !x.TypesAreCompatible(ap.leftVal.Type.Code, ap.rightVal.Type.Code, true) {
+	if !typesAreCompatible(ap.leftVal.Type, ap.rightVal.Type, true) {
 		ap.cp.PushErrorToken(ap.operator, "incompatible_type")
 		return
 	}
@@ -690,7 +653,21 @@ func (ap arithmeticProcess) solveRune() (v ast.ValueAST) {
 	case "+", "-", "*", "/", "^", "&", "%", "|":
 		v.Type.Code = x.Rune
 	default:
-		ap.cp.PushErrorToken(ap.operator, "operator_notfor_bool")
+		ap.cp.PushErrorToken(ap.operator, "operator_notfor_rune")
+	}
+	return
+}
+
+func (ap arithmeticProcess) solveNull() (v ast.ValueAST) {
+	if !typesAreCompatible(ap.leftVal.Type, ap.rightVal.Type, false) {
+		ap.cp.PushErrorToken(ap.operator, "incompatible_type")
+		return
+	}
+	switch ap.operator.Value {
+	case "!=", "==":
+		v.Type.Code = x.Bool
+	default:
+		ap.cp.PushErrorToken(ap.operator, "operator_notfor_null")
 	}
 	return
 }
@@ -708,6 +685,8 @@ func (ap arithmeticProcess) solve() (v ast.ValueAST) {
 	switch {
 	case typeIsPointer(ap.leftVal.Type) || typeIsPointer(ap.rightVal.Type):
 		return ap.solvePointer()
+	case ap.leftVal.Type.Code == x.Null || ap.rightVal.Type.Code == x.Null:
+		return ap.solveNull()
 	case ap.leftVal.Type.Code == x.Rune || ap.rightVal.Type.Code == x.Rune:
 		return ap.solveRune()
 	case ap.leftVal.Type.Code == x.Any || ap.rightVal.Type.Code == x.Any:
@@ -752,6 +731,11 @@ func (p *Parser) processSingleValuePart(token lex.Token, builder *expressionMode
 			v.ast.Type.Value = "bool"
 			builder.appendNode(tokenExpNode{token: token})
 			ok = true
+		} else if IsNull(token.Value) {
+			v.ast.Value = token.Value
+			v.ast.Type.Code = x.Null
+			builder.appendNode(tokenExpNode{token: token})
+			ok = true
 		} else { // Numeric.
 			if strings.Contains(token.Value, ".") ||
 				strings.ContainsAny(token.Value, "eE") {
@@ -791,17 +775,6 @@ func (p *Parser) processSingleValuePart(token lex.Token, builder *expressionMode
 		p.PushErrorToken(token, "invalid_syntax")
 	}
 	return
-}
-
-func typeIsPointer(t ast.DataTypeAST) bool {
-	if t.Value == "" {
-		return false
-	}
-	return t.Value[0] == '*'
-}
-
-func typeIsSingle(dt ast.DataTypeAST) bool {
-	return !typeIsPointer(dt) && dt.Code != x.Function
 }
 
 func (p *Parser) processSingleOperatorPart(tokens []lex.Token, builder *expressionModelBuilder) value {
@@ -1082,21 +1055,4 @@ func (p *Parser) checkVariableSetStatement(vsAST ast.VariableSetAST) {
 	}
 	value, _ := p.computeProcesses(vsAST.ValueExpression.Processes)
 	p.checkType(selected.ast.Type, value.ast.Type, false, vsAST.Setter)
-}
-
-func isConstantNumeric(v string) bool {
-	if v == "" {
-		return false
-	}
-	return v[0] >= '0' && v[0] <= '9'
-}
-
-func checkIntBit(v ast.ValueAST, bit int) bool {
-	if bit == 0 {
-		return false
-	}
-	if x.IsSignedNumericType(v.Type.Code) {
-		return xbits.CheckBitInt(v.Value, bit)
-	}
-	return xbits.CheckBitUInt(v.Value, bit)
 }
