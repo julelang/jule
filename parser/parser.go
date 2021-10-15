@@ -147,14 +147,15 @@ func (p *Parser) ParseFunction(funAst ast.FunctionAST) {
 		return
 	}
 	fun := new(function)
-	fun.Token = funAst.Token
-	fun.Name = funAst.Name
-	fun.ReturnType = funAst.ReturnType
-	fun.Block = funAst.Block
-	fun.Params = funAst.Params
-	fun.Attributes = p.attributes
+	fun.ast = funAst
+	fun.token = funAst.Token
+	fun.name = funAst.Name
+	fun.returnType = funAst.ReturnType
+	fun.block = funAst.Block
+	fun.params = funAst.Params
+	fun.attributes = p.attributes
 	p.attributes = nil
-	p.checkFunctionAttributes(fun.Attributes)
+	p.checkFunctionAttributes(fun.attributes)
 	p.Functions = append(p.Functions, fun)
 }
 
@@ -175,12 +176,21 @@ func (p *Parser) ParseWaitingGlobalVariables() {
 }
 
 func (p *Parser) readyType(dt ast.DataTypeAST) (ast.DataTypeAST, bool) {
-	if dt.Code == x.Name {
+	switch dt.Code {
+	case x.Name:
 		t := p.typeByName(dt.Token.Value)
 		if t == nil {
 			return dt, false
 		}
+		t.Type.Value = dt.Value[:len(dt.Value)-len(dt.Token.Value)] + t.Type.Value
 		return p.readyType(t.Type)
+	case x.Function:
+		funAST := dt.Tag.(ast.FunctionAST)
+		for index, param := range funAST.Params {
+			funAST.Params[index].Type, _ = p.readyType(param.Type)
+		}
+		funAST.ReturnType, _ = p.readyType(funAST.ReturnType)
+		dt.Value = dt.Tag.(ast.FunctionAST).DataTypeString()
 	}
 	return dt, true
 }
@@ -264,27 +274,27 @@ func variablesFromParameters(params []ast.ParameterAST) []ast.VariableAST {
 
 func (p *Parser) checkFunctionReturn(fun *function) {
 	miss := true
-	for index, s := range fun.Block.Statements {
+	for index, s := range fun.block.Statements {
 		switch t := s.Value.(type) {
 		case ast.ReturnAST:
 			if len(t.Expression.Tokens) == 0 {
-				if fun.ReturnType.Code != x.Void {
+				if fun.returnType.Code != x.Void {
 					p.PushErrorToken(t.Token, "require_return_value")
 				}
 			} else {
-				if fun.ReturnType.Code == x.Void {
+				if fun.returnType.Code == x.Void {
 					p.PushErrorToken(t.Token, "void_function_return_value")
 				}
 				value, model := p.computeExpression(t.Expression)
 				t.Expression.Model = model
-				fun.Block.Statements[index].Value = t
-				p.checkType(fun.ReturnType, value.ast.Type, true, t.Token)
+				fun.block.Statements[index].Value = t
+				p.checkType(fun.returnType, value.ast.Type, true, t.Token)
 			}
 			miss = false
 		}
 	}
-	if miss && fun.ReturnType.Code != x.Void {
-		p.PushErrorToken(fun.Token, "missing_return")
+	if miss && fun.returnType.Code != x.Void {
+		p.PushErrorToken(fun.token, "missing_return")
 	}
 }
 
@@ -299,12 +309,12 @@ func (p *Parser) typeByName(name string) *ast.TypeAST {
 
 func (p *Parser) functionByName(name string) *function {
 	for _, fun := range builtinFunctions {
-		if fun.Name == name {
+		if fun.name == name {
 			return fun
 		}
 	}
 	for _, fun := range p.Functions {
-		if fun.Name == name {
+		if fun.name == name {
 			return fun
 		}
 	}
@@ -332,7 +342,7 @@ func (p *Parser) existName(name string) lex.Token {
 	}
 	fun := p.functionByName(name)
 	if fun != nil {
-		return fun.Token
+		return fun.token
 	}
 	variable := p.variableByName(name)
 	if variable != nil {
@@ -367,9 +377,9 @@ func (p *Parser) checkTypes() {
 
 func (p *Parser) checkFunctions() {
 	for _, fun := range p.Functions {
-		p.BlockVariables = variablesFromParameters(fun.Params)
+		p.BlockVariables = variablesFromParameters(fun.params)
 		p.checkFunction(fun)
-		p.checkBlock(fun.Block)
+		p.checkBlock(fun.block)
 		p.checkFunctionReturn(fun)
 	}
 }
@@ -719,15 +729,12 @@ func (ap arithmeticProcess) solve() (v ast.ValueAST) {
 	return
 }
 
-const functionName = 0x0000A
-
 func (p *Parser) processSingleValuePart(token lex.Token, builder *expressionModelBuilder) (v value, ok bool) {
 	v.ast.Type.Code = x.Void
 	v.ast.Token = token
 	switch token.Type {
 	case lex.Value:
 		if IsString(token.Value) {
-			// result.Value = token.Value[1 : len(token.Value)-1]
 			v.ast.Value = token.Value
 			v.ast.Type.Code = x.Str
 			v.ast.Type.Value = "str"
@@ -770,10 +777,11 @@ func (p *Parser) processSingleValuePart(token lex.Token, builder *expressionMode
 			v.constant = variable.DefineToken.Value == "const"
 			builder.appendNode(tokenExpNode{token: token})
 			ok = true
-		} else if p.functionByName(token.Value) != nil {
+		} else if fun := p.functionByName(token.Value); fun != nil {
 			v.ast.Value = token.Value
-			v.ast.Type.Code = functionName
-			v.ast.Type.Value = "function"
+			v.ast.Type.Code = x.Function
+			v.ast.Type.Value = fun.ast.DataTypeString()
+			v.ast.Type.Tag = fun.ast
 			builder.appendNode(tokenExpNode{token: token})
 			ok = true
 		} else {
@@ -792,8 +800,8 @@ func typeIsPointer(t ast.DataTypeAST) bool {
 	return t.Value[0] == '*'
 }
 
-func typeIsSingle(t ast.DataTypeAST) bool {
-	return !typeIsPointer(t)
+func typeIsSingle(dt ast.DataTypeAST) bool {
+	return !typeIsPointer(dt) && dt.Code != x.Function
 }
 
 func (p *Parser) processSingleOperatorPart(tokens []lex.Token, builder *expressionModelBuilder) value {
@@ -844,9 +852,20 @@ func (p *Parser) processSingleOperatorPart(tokens []lex.Token, builder *expressi
 		}
 		v.ast.Type.Value = v.ast.Type.Value[1:]
 	case "&":
+		nodeLen := len(builder.current.nodes)
 		v = p.processValuePart(tokens, builder)
 		if v.ast.Token.Type != lex.Name {
 			p.PushErrorToken(token, "invalid_data_amper")
+		}
+		if v.ast.Type.Code == x.Function {
+			if p.functionByName(v.ast.Token.Value) != nil {
+				builder.current.nodes = append(
+					builder.current.nodes[:nodeLen-1], /* -1 for remove amper operator */
+					functionPointerExp{
+						valueDataType: v.ast.Type,
+						nodes:         builder.current.nodes[nodeLen:],
+					})
+			}
 		}
 		v.ast.Type.Value = "*" + v.ast.Type.Value
 	default:
@@ -919,8 +938,8 @@ func (p *Parser) processParenthesesValuePart(tokens []lex.Token, builder *expres
 	builder.appendNode(tokenExpNode{token: lex.Token{Value: "("}})
 	defer builder.appendNode(tokenExpNode{token: lex.Token{Value: ")"}})
 	switch v.ast.Type.Code {
-	case functionName:
-		fun := p.functionByName(v.ast.Value)
+	case x.Function:
+		fun := v.ast.Type.Tag.(ast.FunctionAST)
 		p.parseFunctionCallStatement(fun, tokens[len(valueTokens):], builder)
 		v.ast.Type = fun.ReturnType
 	default:
@@ -929,7 +948,7 @@ func (p *Parser) processParenthesesValuePart(tokens []lex.Token, builder *expres
 	return
 }
 
-func (p *Parser) parseFunctionCallStatement(fun *function, tokens []lex.Token, builder *expressionModelBuilder) {
+func (p *Parser) parseFunctionCallStatement(fun ast.FunctionAST, tokens []lex.Token, builder *expressionModelBuilder) {
 	errToken := tokens[0]
 	tokens = p.getRangeTokens("(", ")", tokens)
 	if tokens == nil {
@@ -943,7 +962,7 @@ func (p *Parser) parseFunctionCallStatement(fun *function, tokens []lex.Token, b
 	p.parseArgs(fun, args, errToken, builder)
 }
 
-func (p *Parser) parseArgs(fun *function, args []ast.ArgAST, errToken lex.Token, builder *expressionModelBuilder) {
+func (p *Parser) parseArgs(fun ast.FunctionAST, args []ast.ArgAST, errToken lex.Token, builder *expressionModelBuilder) {
 	if len(args) < len(fun.Params) {
 		p.PushErrorToken(errToken, "missing_argument")
 	}
@@ -955,7 +974,7 @@ func (p *Parser) parseArgs(fun *function, args []ast.ArgAST, errToken lex.Token,
 	}
 }
 
-func (p *Parser) parseArg(fun *function, index int, arg *ast.ArgAST) {
+func (p *Parser) parseArg(fun ast.FunctionAST, index int, arg *ast.ArgAST) {
 	if index >= len(fun.Params) {
 		p.PushErrorToken(arg.Token, "argument_overflow")
 		return
@@ -988,13 +1007,13 @@ func (p *Parser) getRangeTokens(open, close string, tokens []lex.Token) []lex.To
 }
 
 func (p *Parser) checkFunction(fun *function) {
-	switch fun.Name {
+	switch fun.name {
 	case x.EntryPoint:
-		if len(fun.Params) > 0 {
-			p.PushErrorToken(fun.Token, "entrypoint_have_parameters")
+		if len(fun.params) > 0 {
+			p.PushErrorToken(fun.token, "entrypoint_have_parameters")
 		}
-		if fun.ReturnType.Code != x.Void {
-			p.PushErrorToken(fun.ReturnType.Token, "entrypoint_have_return")
+		if fun.returnType.Code != x.Void {
+			p.PushErrorToken(fun.returnType.Token, "entrypoint_have_return")
 		}
 	}
 }
@@ -1002,6 +1021,8 @@ func (p *Parser) checkFunction(fun *function) {
 func (p *Parser) checkBlock(b ast.BlockAST) {
 	for index, model := range b.Statements {
 		switch t := model.Value.(type) {
+		case ast.BlockExpressionAST:
+			_, _ = p.computeExpression(t.Expression)
 		case ast.FunctionCallAST:
 			p.checkFunctionCallStatement(t)
 		case ast.VariableAST:
@@ -1018,12 +1039,15 @@ func (p *Parser) checkBlock(b ast.BlockAST) {
 }
 
 func (p *Parser) checkFunctionCallStatement(cs ast.FunctionCallAST) {
-	fun := p.functionByName(cs.Name)
-	if fun == nil {
-		p.PushErrorToken(cs.Token, "name_not_defined")
+	value, ok := p.processSingleValuePart(cs.Token, new(expressionModelBuilder))
+	if !ok {
 		return
 	}
-	p.parseArgs(fun, cs.Args, cs.Token, nil)
+	if value.ast.Type.Code != x.Function {
+		p.PushErrorToken(cs.Token, "not_function_call")
+		return
+	}
+	p.parseArgs(value.ast.Type.Tag.(ast.FunctionAST), cs.Args, cs.Token, nil)
 }
 
 func (p *Parser) checkVariableStatement(varAST *ast.VariableAST) {
@@ -1049,10 +1073,12 @@ func (p *Parser) checkVariableSetStatement(vsAST ast.VariableSetAST) {
 		p.PushErrorToken(vsAST.Setter, "const_value_update")
 		return
 	}
-	switch selected.ast.Type.Value {
-	case "function":
-		p.PushErrorToken(vsAST.Setter, "type_not_support_value_update")
-		return
+	switch selected.ast.Type.Tag.(type) {
+	case ast.FunctionAST:
+		if p.functionByName(selected.ast.Token.Value) != nil {
+			p.PushErrorToken(vsAST.Setter, "type_not_support_value_update")
+			return
+		}
 	}
 	value, _ := p.computeProcesses(vsAST.ValueExpression.Processes)
 	p.checkType(selected.ast.Type, value.ast.Type, false, vsAST.Setter)

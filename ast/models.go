@@ -67,6 +67,7 @@ type DataTypeAST struct {
 	Token lex.Token
 	Code  uint8
 	Value string
+	Tag   interface{}
 }
 
 func (dt DataTypeAST) String() string {
@@ -78,10 +79,28 @@ func (dt DataTypeAST) String() string {
 		}
 		break
 	}
-	if dt.Code == x.Name {
+	switch dt.Code {
+	case x.Name:
 		return dt.Token.Value + cxx.String()
+	case x.Function:
+		return dt.FunctionString() + cxx.String()
 	}
 	return x.CxxTypeNameFromType(dt.Code) + cxx.String()
+}
+
+func (dt DataTypeAST) FunctionString() string {
+	cxx := "std::function<"
+	fun := dt.Tag.(FunctionAST)
+	cxx += fun.ReturnType.String()
+	cxx += "("
+	if len(fun.Params) > 0 {
+		for _, param := range fun.Params {
+			cxx += param.Type.String() + ", "
+		}
+		cxx = cxx[:len(cxx)-2]
+	}
+	cxx += ")>"
+	return cxx
 }
 
 // TypeAST is type declaration.
@@ -112,7 +131,10 @@ type ParameterAST struct {
 }
 
 func (p ParameterAST) String() string {
-	return p.Type.String() + " " + p.Name
+	if p.Name != "" {
+		return p.Type.String() + " " + p.Name
+	}
+	return p.Type.String()
 }
 
 // FunctionAST is function declaration AST model.
@@ -135,6 +157,22 @@ func (fc FunctionCallAST) String() string {
 	}
 	cxx += ");"
 	return cxx
+}
+
+// DataTypeString returns data type string of function.
+func (fc FunctionAST) DataTypeString() string {
+	dt := "("
+	if len(fc.Params) > 0 {
+		for _, param := range fc.Params {
+			dt += param.Type.Value + ", "
+		}
+		dt = dt[:len(dt)-2]
+	}
+	dt += ")"
+	if fc.ReturnType.Code != x.Void {
+		dt += fc.ReturnType.Value
+	}
+	return dt
 }
 
 // ArgAST is AST model of argument.
@@ -177,6 +215,15 @@ func (e ExpressionAST) String() string {
 		}
 	}
 	return sb.String()
+}
+
+// BlockExpressionAST is AST model of expression statement in block.
+type BlockExpressionAST struct {
+	Expression ExpressionAST
+}
+
+func (be BlockExpressionAST) String() string {
+	return be.Expression.String() + ";"
 }
 
 // ValueAST is AST model of constant value.

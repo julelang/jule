@@ -261,30 +261,42 @@ func (ast *AST) pushParameter(fn *FunctionAST, tokens []lex.Token, err lex.Token
 		ast.PushErrorToken(err, "invalid_syntax")
 		return
 	}
-	nameToken := tokens[0]
-	if nameToken.Type != lex.Name {
-		ast.PushErrorToken(nameToken, "invalid_syntax")
+	paramAST := ParameterAST{
+		Token: tokens[0],
 	}
-	if len(tokens) < 2 {
-		ast.PushErrorToken(nameToken, "missing_type")
-		return
-	}
-	for _, param := range fn.Params {
-		if param.Name == nameToken.Value {
-			ast.PushErrorToken(nameToken, "parameter_exist")
-			break
+	index := 0
+	if t, ok := ast.BuildDataType(tokens, &index, true); ok {
+		if index+1 == len(tokens) {
+			paramAST.Type = t
+			goto end
 		}
 	}
-	index := 1
-	t, _ := ast.BuildDataType(tokens, &index, true)
-	fn.Params = append(fn.Params, ParameterAST{
-		Token: nameToken,
-		Name:  nameToken.Value,
-		Type:  t,
-	})
-	if index != len(tokens)-1 {
-		ast.PushErrorToken(tokens[index], "invalid_syntax")
+	{
+		if len(tokens) < 2 {
+			ast.PushErrorToken(paramAST.Token, "missing_type")
+			return
+		}
+		nameToken := tokens[0]
+		if nameToken.Type != lex.Name {
+			ast.PushErrorToken(nameToken, "invalid_syntax")
+		}
+		if !x.IsIgnoreName(nameToken.Value) {
+			for _, param := range fn.Params {
+				if param.Name == nameToken.Value {
+					ast.PushErrorToken(nameToken, "parameter_exist")
+					break
+				}
+			}
+			paramAST.Name = nameToken.Value
+		}
+		index := 1
+		paramAST.Type, _ = ast.BuildDataType(tokens, &index, true)
+		if index+1 < len(tokens) {
+			ast.PushErrorToken(tokens[index+1], "invalid_syntax")
+		}
 	}
+end:
+	fn.Params = append(fn.Params, paramAST)
 }
 
 // IsStatement reports token is
@@ -315,6 +327,20 @@ func (ast *AST) BuildDataType(tokens []lex.Token, index *int, err bool) (t DataT
 				break
 			}
 			fallthrough
+		case lex.Brace:
+			if token.Value != "(" {
+				if err {
+					ast.PushErrorToken(token, "invalid_syntax")
+				}
+				return t, false
+			}
+			t.Token = token
+			t.Code = x.Function
+			value, funAST := ast.buildFunctionDataType(tokens, index)
+			funAST.ReturnType, _ = ast.BuildDataType(tokens, index, false)
+			t.Value += value
+			t.Tag = funAST
+			return t, true
 		default:
 			if err {
 				ast.PushErrorToken(token, "invalid_syntax")
@@ -326,6 +352,34 @@ func (ast *AST) BuildDataType(tokens []lex.Token, index *int, err bool) (t DataT
 		ast.PushErrorToken(tokens[first], "invalid_type")
 	}
 	return t, false
+}
+
+func (ast *AST) buildFunctionDataType(tokens []lex.Token, index *int) (string, FunctionAST) {
+	var funAST FunctionAST
+	var typeValue strings.Builder
+	typeValue.WriteByte('(')
+	brace := 1
+	firstIndex := *index
+	for *index++; *index < len(tokens); *index++ {
+		token := tokens[*index]
+		typeValue.WriteString(token.Value)
+		switch token.Type {
+		case lex.Brace:
+			switch token.Value {
+			case "{", "[", "(":
+				brace++
+			default:
+				brace--
+			}
+		}
+		if brace == 0 {
+			ast.BuildParameters(&funAST, tokens[firstIndex+1:*index])
+			*index++
+			return typeValue.String(), funAST
+		}
+	}
+	ast.PushErrorToken(tokens[firstIndex], "invalid_type")
+	return "", funAST
 }
 
 // IsSigleOperator is returns true
@@ -385,14 +439,16 @@ func (ast *AST) BuildStatement(tokens []lex.Token) (s StatementAST) {
 		return ast.BuildVariableStatement(tokens)
 	case lex.Return:
 		return ast.BuildReturnStatement(tokens)
+	case lex.Brace:
+		if firstToken.Value == "(" {
+			return ast.BuildExpressionStatement(tokens)
+		}
 	case lex.Operator:
 		if firstToken.Value == "<" {
 			return ast.BuildReturnStatement(tokens)
 		}
-		fallthrough
-	default:
-		ast.PushErrorToken(firstToken, "invalid_syntax")
 	}
+	ast.PushErrorToken(firstToken, "invalid_syntax")
 	return
 }
 
@@ -473,6 +529,16 @@ func (ast *AST) BuildFunctionCallStatement(tokens []lex.Token) StatementAST {
 	return StatementAST{
 		Token: fnCall.Token,
 		Value: fnCall,
+	}
+}
+
+// BuildExpressionStatement builds AST model of expression.
+func (ast *AST) BuildExpressionStatement(tokens []lex.Token) StatementAST {
+	return StatementAST{
+		Token: tokens[0],
+		Value: BlockExpressionAST{
+			Expression: ast.BuildExpression(tokens),
+		},
 	}
 }
 

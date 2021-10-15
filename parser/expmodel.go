@@ -3,6 +3,7 @@ package parser
 import (
 	"strings"
 
+	"github.com/the-xlang/x/ast"
 	"github.com/the-xlang/x/lex"
 )
 
@@ -93,4 +94,17 @@ type strExpNode struct {
 
 func (str strExpNode) String() string {
 	return "L" + str.token.Value
+}
+
+type functionPointerExp struct {
+	valueDataType ast.DataTypeAST
+	nodes         []expressionNode
+}
+
+func (fbe functionPointerExp) String() string {
+	var cxxNodes strings.Builder
+	for _, node := range fbe.nodes {
+		cxxNodes.WriteString(node.String())
+	}
+	return "new " + fbe.valueDataType.String() + "(" + cxxNodes.String() + ")"
 }

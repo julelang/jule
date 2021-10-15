@@ -20,6 +20,7 @@ var Errors = map[string]string{
 	`operator_notfor_uint`:          `this operator is not defined for unsigned integer type(s)`,
 	`operator_notfor_pointer`:       `this operator is not defined for pointer type`,
 	`name_not_defined`:              `name is not defined`,
+	`not_function_call`:             `value is not function`,
 	`parameter_exist`:               `parameter is already exist in this name`,
 	`argument_overflow`:             `argument overflow`,
 	`entrypoint_have_return`:        `entry point is cannot have return type`,

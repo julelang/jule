@@ -14,3 +14,8 @@ var (
 	ExecutablePath string
 	XSettings      *XSet
 )
+
+// IsIgnoreName reports name is ignore or not.
+func IsIgnoreName(name string) bool {
+	return name == "__"
+}

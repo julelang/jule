@@ -2,22 +2,23 @@ package x
 
 // Data type (built-in) constants.
 const (
-	Void    uint8 = 0
-	Int8    uint8 = 1
-	Int16   uint8 = 2
-	Int32   uint8 = 3
-	Int64   uint8 = 4
-	UInt8   uint8 = 5
-	UInt16  uint8 = 6
-	UInt32  uint8 = 7
-	UInt64  uint8 = 8
-	Bool    uint8 = 9
-	Str     uint8 = 10
-	Float32 uint8 = 11
-	Float64 uint8 = 12
-	Any     uint8 = 13
-	Rune    uint8 = 14
-	Name    uint8 = 15
+	Void     uint8 = 0
+	Int8     uint8 = 1
+	Int16    uint8 = 2
+	Int32    uint8 = 3
+	Int64    uint8 = 4
+	UInt8    uint8 = 5
+	UInt16   uint8 = 6
+	UInt32   uint8 = 7
+	UInt64   uint8 = 8
+	Bool     uint8 = 9
+	Str      uint8 = 10
+	Float32  uint8 = 11
+	Float64  uint8 = 12
+	Any      uint8 = 13
+	Rune     uint8 = 14
+	Name     uint8 = 15
+	Function uint8 = 16
 )
 
 // TypeGreaterThan reports type one is greater than type two or not.

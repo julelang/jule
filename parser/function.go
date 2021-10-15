@@ -8,12 +8,13 @@ import (
 )
 
 type function struct {
-	Token      lex.Token
-	Name       string
-	ReturnType ast.DataTypeAST
-	Params     []ast.ParameterAST
-	Attributes []ast.AttributeAST
-	Block      ast.BlockAST
+	ast        ast.FunctionAST
+	token      lex.Token
+	name       string
+	returnType ast.DataTypeAST
+	params     []ast.ParameterAST
+	attributes []ast.AttributeAST
+	block      ast.BlockAST
 }
 
 func (f function) String() string {
@@ -21,7 +22,7 @@ func (f function) String() string {
 	prototype := f.Prototype()
 	cxx.WriteString(prototype[:len(prototype)-1])
 	cxx.WriteString(" {")
-	cxx.WriteString(f.Block.String())
+	cxx.WriteString(f.block.String())
 	cxx.WriteString("\n}")
 	return cxx.String()
 }
@@ -29,12 +30,12 @@ func (f function) String() string {
 // Prototype returns prototype cxx code of function.
 func (f function) Prototype() string {
 	var cxx strings.Builder
-	cxx.WriteString(attributesToString(f.Attributes))
-	cxx.WriteString(f.ReturnType.String())
+	cxx.WriteString(attributesToString(f.attributes))
+	cxx.WriteString(f.returnType.String())
 	cxx.WriteByte(' ')
-	cxx.WriteString(f.Name)
+	cxx.WriteString(f.name)
 	cxx.WriteByte('(')
-	cxx.WriteString(paramsToCxx(f.Params))
+	cxx.WriteString(paramsToCxx(f.params))
 	cxx.WriteString(");")
 	return cxx.String()
 }
