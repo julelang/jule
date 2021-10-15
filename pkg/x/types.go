@@ -53,9 +53,9 @@ func TypeGreaterThan(t1, t2 uint8) bool {
 
 // TypeAreCompatible reports type one and type two is compatible or not.
 func TypesAreCompatible(t1, t2 uint8, ignoreany bool) bool {
-	/*if !ignoreany && t2 == Any {
+	if !ignoreany && t2 == Any {
 		return true
-	}*/
+	}
 	switch t1 {
 	case Any:
 		if ignoreany {

@@ -4,17 +4,11 @@ import (
 	"strings"
 
 	"github.com/the-xlang/x/ast"
-	"github.com/the-xlang/x/lex"
 )
 
 type function struct {
 	ast        ast.FunctionAST
-	token      lex.Token
-	name       string
-	returnType ast.DataTypeAST
-	params     []ast.ParameterAST
 	attributes []ast.AttributeAST
-	block      ast.BlockAST
 }
 
 func (f function) String() string {
@@ -22,7 +16,7 @@ func (f function) String() string {
 	prototype := f.Prototype()
 	cxx.WriteString(prototype[:len(prototype)-1])
 	cxx.WriteString(" {")
-	cxx.WriteString(f.block.String())
+	cxx.WriteString(f.ast.Block.String())
 	cxx.WriteString("\n}")
 	return cxx.String()
 }
@@ -31,11 +25,11 @@ func (f function) String() string {
 func (f function) Prototype() string {
 	var cxx strings.Builder
 	cxx.WriteString(attributesToString(f.attributes))
-	cxx.WriteString(f.returnType.String())
+	cxx.WriteString(f.ast.ReturnType.String())
 	cxx.WriteByte(' ')
-	cxx.WriteString(f.name)
+	cxx.WriteString(f.ast.Name)
 	cxx.WriteByte('(')
-	cxx.WriteString(paramsToCxx(f.params))
+	cxx.WriteString(paramsToCxx(f.ast.Params))
 	cxx.WriteString(");")
 	return cxx.String()
 }

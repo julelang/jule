@@ -148,11 +148,6 @@ func (p *Parser) ParseFunction(funAst ast.FunctionAST) {
 	}
 	fun := new(function)
 	fun.ast = funAst
-	fun.token = funAst.Token
-	fun.name = funAst.Name
-	fun.returnType = funAst.ReturnType
-	fun.block = funAst.Block
-	fun.params = funAst.Params
 	fun.attributes = p.attributes
 	p.attributes = nil
 	p.checkFunctionAttributes(fun.attributes)
@@ -237,27 +232,27 @@ func variablesFromParameters(params []ast.ParameterAST) []ast.VariableAST {
 
 func (p *Parser) checkFunctionReturn(fun *function) {
 	miss := true
-	for index, s := range fun.block.Statements {
+	for index, s := range fun.ast.Block.Statements {
 		switch t := s.Value.(type) {
 		case ast.ReturnAST:
 			if len(t.Expression.Tokens) == 0 {
-				if fun.returnType.Code != x.Void {
+				if fun.ast.ReturnType.Code != x.Void {
 					p.PushErrorToken(t.Token, "require_return_value")
 				}
 			} else {
-				if fun.returnType.Code == x.Void {
+				if fun.ast.ReturnType.Code == x.Void {
 					p.PushErrorToken(t.Token, "void_function_return_value")
 				}
 				value, model := p.computeExpression(t.Expression)
 				t.Expression.Model = model
-				fun.block.Statements[index].Value = t
-				p.checkType(fun.returnType, value.ast.Type, true, t.Token)
+				fun.ast.Block.Statements[index].Value = t
+				p.checkType(fun.ast.ReturnType, value.ast.Type, true, t.Token)
 			}
 			miss = false
 		}
 	}
-	if miss && fun.returnType.Code != x.Void {
-		p.PushErrorToken(fun.token, "missing_return")
+	if miss && fun.ast.ReturnType.Code != x.Void {
+		p.PushErrorToken(fun.ast.Token, "missing_return")
 	}
 }
 
@@ -272,12 +267,12 @@ func (p *Parser) typeByName(name string) *ast.TypeAST {
 
 func (p *Parser) functionByName(name string) *function {
 	for _, fun := range builtinFunctions {
-		if fun.name == name {
+		if fun.ast.Name == name {
 			return fun
 		}
 	}
 	for _, fun := range p.Functions {
-		if fun.name == name {
+		if fun.ast.Name == name {
 			return fun
 		}
 	}
@@ -305,7 +300,7 @@ func (p *Parser) existName(name string) lex.Token {
 	}
 	fun := p.functionByName(name)
 	if fun != nil {
-		return fun.token
+		return fun.ast.Token
 	}
 	variable := p.variableByName(name)
 	if variable != nil {
@@ -340,9 +335,9 @@ func (p *Parser) checkTypes() {
 
 func (p *Parser) checkFunctions() {
 	for _, fun := range p.Functions {
-		p.BlockVariables = variablesFromParameters(fun.params)
+		p.BlockVariables = variablesFromParameters(fun.ast.Params)
 		p.checkFunction(fun)
-		p.checkBlock(fun.block)
+		p.checkBlock(fun.ast.Block)
 		p.checkFunctionReturn(fun)
 	}
 }
@@ -980,13 +975,13 @@ func (p *Parser) getRangeTokens(open, close string, tokens []lex.Token) []lex.To
 }
 
 func (p *Parser) checkFunction(fun *function) {
-	switch fun.name {
+	switch fun.ast.Name {
 	case x.EntryPoint:
-		if len(fun.params) > 0 {
-			p.PushErrorToken(fun.token, "entrypoint_have_parameters")
+		if len(fun.ast.Params) > 0 {
+			p.PushErrorToken(fun.ast.Token, "entrypoint_have_parameters")
 		}
-		if fun.returnType.Code != x.Void {
-			p.PushErrorToken(fun.returnType.Token, "entrypoint_have_return")
+		if fun.ast.ReturnType.Code != x.Void {
+			p.PushErrorToken(fun.ast.ReturnType.Token, "entrypoint_have_return")
 		}
 	}
 }
