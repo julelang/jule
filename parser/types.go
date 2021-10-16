@@ -24,8 +24,12 @@ func defaultValueOfType(t ast.DataTypeAST) string {
 	return x.DefaultValueOfType(t.Code)
 }
 
+func typeIsNullCompatible(t ast.DataTypeAST) bool {
+	return t.Code == x.Function || typeIsPointer(t)
+}
+
 func typesAreCompatible(t1, t2 ast.DataTypeAST, ignoreany bool) bool {
-	if (typeIsPointer(t1) || typeIsPointer(t2)) &&
+	if (typeIsNullCompatible(t1) || typeIsNullCompatible(t2)) &&
 		(t1.Code == x.Null || t2.Code == x.Null) {
 		return true
 	}
