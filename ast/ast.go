@@ -106,7 +106,7 @@ func (ast *AST) BuildName() {
 	case lex.Brace:
 		switch token.Value {
 		case "(":
-			ast.BuildFunction()
+			_ = ast.BuildFunction(false)
 			return
 		}
 	}
@@ -154,21 +154,24 @@ func (ast *AST) BuildAttribute() {
 }
 
 // BuildFunction builds AST model of function.
-func (ast *AST) BuildFunction() {
-	var funAST FunctionAST
+func (ast *AST) BuildFunction(anonymous bool) (funAST FunctionAST) {
 	funAST.Token = ast.Tokens[ast.Position]
-	if funAST.Token.Type != lex.Name {
-		ast.PushErrorToken(funAST.Token, "invalid_syntax")
+	if anonymous {
+		funAST.Name = "anonymous"
+	} else {
+		if funAST.Token.Type != lex.Name {
+			ast.PushErrorToken(funAST.Token, "invalid_syntax")
+		}
+		funAST.Name = funAST.Token.Value
+		ast.Position++
+		if ast.Ended() {
+			ast.Position--
+			ast.PushError("function_body_not_exist")
+			ast.Position = -1 // Stop modelling.
+			return
+		}
 	}
-	funAST.Name = funAST.Token.Value
 	funAST.ReturnType.Code = x.Void
-	ast.Position++
-	if ast.Ended() {
-		ast.Position--
-		ast.PushError("function_body_not_exist")
-		ast.Position = -1 // Stop modelling.
-		return
-	}
 	tokens := ast.getRange("(", ")")
 	if tokens == nil {
 		return
@@ -213,6 +216,7 @@ func (ast *AST) BuildFunction() {
 			Value: funAST,
 		},
 	})
+	return
 }
 
 // BuildGlobalVariable builds AST model of global variable.
@@ -374,7 +378,6 @@ func (ast *AST) buildFunctionDataType(tokens []lex.Token, index *int) (string, F
 		}
 		if brace == 0 {
 			ast.BuildParameters(&funAST, tokens[firstIndex+1:*index])
-			*index++
 			return typeValue.String(), funAST
 		}
 	}
@@ -400,16 +403,16 @@ func (ast *AST) BuildBlock(tokens []lex.Token) (b BlockAST) {
 	oldStatementPoint := 0
 	for index, token := range tokens {
 		if token.Type == lex.Brace {
-			if token.Value == "{" {
+			switch token.Value {
+			case "{":
 				braceCount++
-			} else {
+			case "}":
 				braceCount--
 			}
 		}
-		if braceCount > 0 || !IsStatement(token) {
-			continue
-		}
-		if index-oldStatementPoint == 0 {
+		if braceCount > 0 ||
+			!IsStatement(token) ||
+			index-oldStatementPoint == 0 {
 			continue
 		}
 		b.Statements = append(b.Statements,
@@ -672,7 +675,9 @@ func (ast *AST) getExpressionProcesses(tokens []lex.Token) [][]lex.Token {
 					singleOperatored = true
 					continue
 				}
-				ast.PushErrorToken(token, "operator_overflow")
+				if braceCount == 0 {
+					ast.PushErrorToken(token, "operator_overflow")
+				}
 			}
 			singleOperatored = false
 			operator = false
@@ -694,7 +699,7 @@ func (ast *AST) getExpressionProcesses(tokens []lex.Token) [][]lex.Token {
 				braceCount--
 			}
 		}
-		if index > 0 {
+		if index > 0 && braceCount == 0 {
 			lt := tokens[index-1]
 			if (lt.Type == lex.Name || lt.Type == lex.Value) &&
 				(token.Type == lex.Name || token.Type == lex.Value) {

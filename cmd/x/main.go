@@ -174,11 +174,13 @@ typedef wchar_t rune;
 #pragma endregion X_BUILTIN_VALUES
 
 #pragma region X_BUILTIN_FUNCTIONS
-template<typename any> inline void _out(any v) {
+template<typename any>
+inline void _out(any v) {
   std::wcout << v;
 }
 
-template<typename any> inline void _outln(any v) {
+template<typename any>
+inline void _outln(any v) {
   _out(v);
   std::wcout << std::endl;
 }

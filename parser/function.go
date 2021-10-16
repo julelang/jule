@@ -15,9 +15,7 @@ func (f function) String() string {
 	var cxx strings.Builder
 	prototype := f.Prototype()
 	cxx.WriteString(prototype[:len(prototype)-1])
-	cxx.WriteString(" {")
 	cxx.WriteString(f.ast.Block.String())
-	cxx.WriteString("\n}")
 	return cxx.String()
 }
 
@@ -28,9 +26,8 @@ func (f function) Prototype() string {
 	cxx.WriteString(f.ast.ReturnType.String())
 	cxx.WriteByte(' ')
 	cxx.WriteString(f.ast.Name)
-	cxx.WriteByte('(')
 	cxx.WriteString(paramsToCxx(f.ast.Params))
-	cxx.WriteString(");")
+	cxx.WriteByte(';')
 	return cxx.String()
 }
 
@@ -45,12 +42,13 @@ func attributesToString(attributes []ast.AttributeAST) string {
 
 func paramsToCxx(params []ast.ParameterAST) string {
 	if len(params) == 0 {
-		return ""
+		return "()"
 	}
 	var cxx strings.Builder
+	cxx.WriteByte('(')
 	for _, p := range params {
 		cxx.WriteString(p.String())
 		cxx.WriteString(", ")
 	}
-	return cxx.String()[:cxx.Len()-2]
+	return cxx.String()[:cxx.Len()-2] + ")"
 }

@@ -56,7 +56,8 @@ var Errors = map[string]string{
 	`missing_return`:                `missing return at end of function`,
 	`missing_string_end`:            `string is not finished`,
 	`missing_const_value`:           `constants must have value specification`,
-	`null_used_with_autotype`:       `null is cannot use with auto-type definations`,
+	`null_for_autotype`:             `null is cannot use with auto-type definations`,
+	`void_for_autotype`:             `void data is cannot use for auto-type definations`,
 	`rune_empty`:                    `rune is cannot empty`,
 	`rune_overflow`:                 `rune is should be single`,
 }

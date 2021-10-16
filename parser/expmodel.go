@@ -101,10 +101,24 @@ type functionPointerExp struct {
 	nodes         []expressionNode
 }
 
-func (fbe functionPointerExp) String() string {
+func (fb functionPointerExp) String() string {
 	var cxxNodes strings.Builder
-	for _, node := range fbe.nodes {
+	for _, node := range fb.nodes {
 		cxxNodes.WriteString(node.String())
 	}
-	return "new " + fbe.valueDataType.String() + "(" + cxxNodes.String() + ")"
+	return "new " + fb.valueDataType.String() + "(" + cxxNodes.String() + ")"
+}
+
+type anonymousFunctionExp struct {
+	ast ast.FunctionAST
+}
+
+func (af anonymousFunctionExp) String() string {
+	var cxx strings.Builder
+	cxx.WriteString("[&]")
+	cxx.WriteString(paramsToCxx(af.ast.Params))
+	ast.Indent++
+	cxx.WriteString(ast.ParseBlock(af.ast.Block, ast.Indent))
+	ast.Indent--
+	return cxx.String()
 }

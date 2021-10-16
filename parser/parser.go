@@ -182,7 +182,7 @@ func (p *Parser) ParseVariable(varAST ast.VariableAST) ast.VariableAST {
 			valueToken.Type = lex.Value
 			dt, ok := p.readyType(varAST.Type)
 			if ok {
-				valueToken.Value = defaultValueOfType(dt)
+				valueToken.Value = p.defaultValueOfType(dt)
 				valueTokens := []lex.Token{valueToken}
 				varAST.Value = ast.ExpressionAST{
 					Tokens:    valueTokens,
@@ -192,9 +192,7 @@ func (p *Parser) ParseVariable(varAST ast.VariableAST) ast.VariableAST {
 		}
 	} else {
 		varAST.Type = value.ast.Type
-		if varAST.Type.Code == x.Null {
-			p.PushErrorToken(varAST.SetterToken, "null_used_with_autotype")
-		}
+		p.checkValidityForAutoType(varAST.Type, varAST.SetterToken)
 	}
 	if varAST.DefineToken.Value == "const" {
 		if varAST.SetterToken.Type == lex.NA {
@@ -230,29 +228,29 @@ func variablesFromParameters(params []ast.ParameterAST) []ast.VariableAST {
 	return vars
 }
 
-func (p *Parser) checkFunctionReturn(fun *function) {
-	miss := true
-	for index, s := range fun.ast.Block.Statements {
+func (p *Parser) checkFunctionReturn(fun ast.FunctionAST) {
+	missed := true
+	for index, s := range fun.Block.Statements {
 		switch t := s.Value.(type) {
 		case ast.ReturnAST:
 			if len(t.Expression.Tokens) == 0 {
-				if fun.ast.ReturnType.Code != x.Void {
+				if fun.ReturnType.Code != x.Void {
 					p.PushErrorToken(t.Token, "require_return_value")
 				}
 			} else {
-				if fun.ast.ReturnType.Code == x.Void {
+				if fun.ReturnType.Code == x.Void {
 					p.PushErrorToken(t.Token, "void_function_return_value")
 				}
 				value, model := p.computeExpression(t.Expression)
 				t.Expression.Model = model
-				fun.ast.Block.Statements[index].Value = t
-				p.checkType(fun.ast.ReturnType, value.ast.Type, true, t.Token)
+				fun.Block.Statements[index].Value = t
+				p.checkType(fun.ReturnType, value.ast.Type, true, t.Token)
 			}
-			miss = false
+			missed = false
 		}
 	}
-	if miss && fun.ast.ReturnType.Code != x.Void {
-		p.PushErrorToken(fun.ast.Token, "missing_return")
+	if missed && fun.ReturnType.Code != x.Void {
+		p.PushErrorToken(fun.Token, "missing_return")
 	}
 }
 
@@ -336,9 +334,8 @@ func (p *Parser) checkTypes() {
 func (p *Parser) checkFunctions() {
 	for _, fun := range p.Functions {
 		p.BlockVariables = variablesFromParameters(fun.ast.Params)
-		p.checkFunction(fun)
-		p.checkBlock(fun.ast.Block)
-		p.checkFunctionReturn(fun)
+		p.checkFunctionSpecialCases(fun.ast)
+		p.checkFunction(fun.ast)
 	}
 }
 
@@ -759,7 +756,6 @@ func (p *Parser) processSingleValuePart(token lex.Token, builder *expressionMode
 		} else if fun := p.functionByName(token.Value); fun != nil {
 			v.ast.Value = token.Value
 			v.ast.Type.Code = x.Function
-			v.ast.Type.Value = fun.ast.DataTypeString()
 			v.ast.Type.Tag = fun.ast
 			builder.appendNode(tokenExpNode{token: token})
 			ok = true
@@ -858,6 +854,8 @@ func (p *Parser) processValuePart(tokens []lex.Token, builder *expressionModelBu
 		switch token.Value {
 		case ")":
 			return p.processParenthesesValuePart(tokens, builder)
+		case "}":
+			return p.processBraceValuePart(tokens, builder)
 		}
 	default:
 		p.PushErrorToken(tokens[0], "invalid_syntax")
@@ -891,6 +889,7 @@ func (p *Parser) processParenthesesValuePart(tokens []lex.Token, builder *expres
 		// Write parentheses.
 		builder.appendNode(tokenExpNode{token: lex.Token{Value: "("}})
 		defer builder.appendNode(tokenExpNode{token: lex.Token{Value: ")"}})
+
 		tk := tokens[0]
 		tokens = tokens[1 : len(tokens)-1]
 		if len(tokens) == 0 {
@@ -902,9 +901,11 @@ func (p *Parser) processParenthesesValuePart(tokens []lex.Token, builder *expres
 		return
 	}
 	v = p.processValuePart(valueTokens, builder)
+
 	// Write parentheses.
 	builder.appendNode(tokenExpNode{token: lex.Token{Value: "("}})
 	defer builder.appendNode(tokenExpNode{token: lex.Token{Value: ")"}})
+
 	switch v.ast.Type.Code {
 	case x.Function:
 		fun := v.ast.Type.Tag.(ast.FunctionAST)
@@ -912,6 +913,58 @@ func (p *Parser) processParenthesesValuePart(tokens []lex.Token, builder *expres
 		v.ast.Type = fun.ReturnType
 	default:
 		p.PushErrorToken(tokens[len(valueTokens)], "invalid_syntax")
+	}
+	return
+}
+
+func (p *Parser) processBraceValuePart(tokens []lex.Token, builder *expressionModelBuilder) (v value) {
+	var valueTokens []lex.Token
+	j := len(tokens) - 1
+	braceCount := 0
+	for ; j >= 0; j-- {
+		token := tokens[j]
+		if token.Type != lex.Brace {
+			continue
+		}
+		switch token.Value {
+		case "}":
+			braceCount++
+		case "{":
+			braceCount--
+		}
+		if braceCount > 0 {
+			continue
+		}
+		valueTokens = tokens[:j]
+		break
+	}
+	valTokensLen := len(valueTokens)
+	if valTokensLen == 0 && braceCount == 0 {
+		p.PushErrorToken(tokens[j], "invalid_syntax")
+		return
+	}
+	switch valueTokens[0].Type {
+	case lex.Brace:
+		switch valueTokens[0].Value {
+		case "(":
+			astBuilder := ast.New(tokens)
+			funAST := astBuilder.BuildFunction(true)
+			if len(astBuilder.Errors) > 0 {
+				p.AppendErrors(astBuilder.Errors...)
+				return
+			}
+			p.checkFunction(funAST)
+			v.ast.Type.Tag = funAST
+			v.ast.Type.Code = x.Function
+			builder.appendNode(anonymousFunctionExp{
+				ast: funAST,
+			})
+			return
+		default:
+			p.PushErrorToken(valueTokens[0], "invalid_syntax")
+		}
+	default:
+		p.PushErrorToken(valueTokens[0], "invalid_syntax")
 	}
 	return
 }
@@ -974,14 +1027,14 @@ func (p *Parser) getRangeTokens(open, close string, tokens []lex.Token) []lex.To
 	return nil
 }
 
-func (p *Parser) checkFunction(fun *function) {
-	switch fun.ast.Name {
+func (p *Parser) checkFunctionSpecialCases(fun ast.FunctionAST) {
+	switch fun.Name {
 	case x.EntryPoint:
-		if len(fun.ast.Params) > 0 {
-			p.PushErrorToken(fun.ast.Token, "entrypoint_have_parameters")
+		if len(fun.Params) > 0 {
+			p.PushErrorToken(fun.Token, "entrypoint_have_parameters")
 		}
-		if fun.ast.ReturnType.Code != x.Void {
-			p.PushErrorToken(fun.ast.ReturnType.Token, "entrypoint_have_return")
+		if fun.ReturnType.Code != x.Void {
+			p.PushErrorToken(fun.ReturnType.Token, "entrypoint_have_return")
 		}
 	}
 }
@@ -1016,6 +1069,11 @@ func (p *Parser) checkFunctionCallStatement(cs ast.FunctionCallAST) {
 		return
 	}
 	p.parseArgs(value.ast.Type.Tag.(ast.FunctionAST), cs.Args, cs.Token, nil)
+}
+
+func (p *Parser) checkFunction(fun ast.FunctionAST) {
+	p.checkBlock(fun.Block)
+	p.checkFunctionReturn(fun)
 }
 
 func (p *Parser) checkVariableStatement(varAST *ast.VariableAST) {

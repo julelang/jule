@@ -26,6 +26,10 @@ type StatementAST struct {
 	Value interface{}
 }
 
+func (s StatementAST) String() string {
+	return fmt.Sprint(s.Value)
+}
+
 // RangeAST represents block range or etc.
 type RangeAST struct {
 	Type    uint8
@@ -37,19 +41,29 @@ type BlockAST struct {
 	Statements []StatementAST
 }
 
+// Indent total of blocks.
+var Indent = 1
+
 func (b BlockAST) String() string {
-	return parseBlock(b, 1)
+	Indent = 1
+	return ParseBlock(b, Indent)
 }
 
-func parseBlock(b BlockAST, indent int) string {
+// IndentSpace of blocks.
+const IndentSpace = 2
+
+// ParseBlock to cxx.
+func ParseBlock(b BlockAST, indent int) string {
 	// Space count per indent.
-	const indentSpace = 2
 	var cxx strings.Builder
+	cxx.WriteByte('{')
 	for _, s := range b.Statements {
 		cxx.WriteByte('\n')
-		cxx.WriteString(fullString(' ', indent*indentSpace))
-		cxx.WriteString(fmt.Sprint(s.Value))
+		cxx.WriteString(fullString(' ', indent*IndentSpace))
+		cxx.WriteString(s.String())
 	}
+	cxx.WriteByte('\n')
+	cxx.WriteString(fullString(' ', (indent-1)*IndentSpace) + "}")
 	return cxx.String()
 }
 

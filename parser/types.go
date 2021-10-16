@@ -17,7 +17,16 @@ func typeIsSingle(dt ast.DataTypeAST) bool {
 	return !typeIsPointer(dt) && dt.Code != x.Function
 }
 
-func defaultValueOfType(t ast.DataTypeAST) string {
+func (p *Parser) checkValidityForAutoType(t ast.DataTypeAST, err lex.Token) {
+	switch t.Code {
+	case x.Null:
+		p.PushErrorToken(err, "null_for_autotype")
+	case x.Void:
+		p.PushErrorToken(err, "void_for_autotype")
+	}
+}
+
+func (p *Parser) defaultValueOfType(t ast.DataTypeAST) string {
 	if typeIsPointer(t) {
 		return "null"
 	}
