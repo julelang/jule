@@ -151,28 +151,6 @@ func (p ParameterAST) String() string {
 	return p.Type.String()
 }
 
-// FunctionAST is function declaration AST model.
-type FunctionCallAST struct {
-	Token lex.Token
-	Name  string
-	Args  []ArgAST
-}
-
-func (fc FunctionCallAST) String() string {
-	var cxx string
-	cxx += fc.Name
-	cxx += "("
-	if len(fc.Args) > 0 {
-		for _, arg := range fc.Args {
-			cxx += arg.String()
-			cxx += ","
-		}
-		cxx = cxx[:len(cxx)-1]
-	}
-	cxx += ");"
-	return cxx
-}
-
 // DataTypeString returns data type string of function.
 func (fc FunctionAST) DataTypeString() string {
 	dt := "("

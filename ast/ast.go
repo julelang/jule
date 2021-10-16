@@ -515,24 +515,7 @@ func (ast *AST) BuildNameStatement(tokens []lex.Token) (s StatementAST) {
 
 // BuildFunctionCallStatement builds AST model of function call statement.
 func (ast *AST) BuildFunctionCallStatement(tokens []lex.Token) StatementAST {
-	var fnCall FunctionCallAST
-	fnCall.Token = tokens[0]
-	fnCall.Name = fnCall.Token.Value
-	tokens = tokens[1:]
-	args := ast.getRangeTokens("(", ")", tokens)
-	if args == nil {
-		ast.Position = -1 // Stop modelling.
-		return StatementAST{}
-	} else if len(args) != len(tokens)-2 {
-		ast.PushErrorToken(tokens[len(tokens)-2], "invalid_syntax")
-		ast.Position = -1 // Stop modelling.
-		return StatementAST{}
-	}
-	fnCall.Args = ast.BuildArgs(args)
-	return StatementAST{
-		Token: fnCall.Token,
-		Value: fnCall,
-	}
+	return ast.BuildExpressionStatement(tokens)
 }
 
 // BuildExpressionStatement builds AST model of expression.
@@ -751,27 +734,6 @@ func (ast *AST) checkExpressionToken(token lex.Token) {
 			ast.PushErrorToken(token, "invalid_numeric_range")
 		}
 	}
-}
-
-func (ast *AST) getRangeTokens(open, close string, tokens []lex.Token) []lex.Token {
-	braceCount := 0
-	start := 1
-	for index, token := range tokens {
-		if token.Type != lex.Brace {
-			continue
-		}
-		if token.Value == open {
-			braceCount++
-		} else if token.Value == close {
-			braceCount--
-		}
-		if braceCount > 0 {
-			continue
-		}
-		return tokens[start:index]
-	}
-	ast.PushErrorToken(tokens[0], "brace_not_closed")
-	return nil
 }
 
 func (ast *AST) getRange(open, close string) []lex.Token {

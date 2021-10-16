@@ -511,7 +511,7 @@ func (ap arithmeticProcess) solvePointer() (v ast.ValueAST) {
 
 func (ap arithmeticProcess) solveString() (v ast.ValueAST) {
 	// Not both string?
-	if ap.leftVal.Type != ap.rightVal.Type {
+	if ap.leftVal.Type.Code != ap.rightVal.Type.Code {
 		ap.cp.PushErrorToken(ap.operator, "incompatible_datatype")
 		return
 	}
@@ -953,7 +953,7 @@ func (p *Parser) processBraceValuePart(tokens []lex.Token, builder *expressionMo
 				p.AppendErrors(astBuilder.Errors...)
 				return
 			}
-			p.checkFunction(funAST)
+			p.checkAnonymousFunction(funAST)
 			v.ast.Type.Tag = funAST
 			v.ast.Type.Code = x.Function
 			builder.appendNode(anonymousFunctionExp{
@@ -967,6 +967,16 @@ func (p *Parser) processBraceValuePart(tokens []lex.Token, builder *expressionMo
 		p.PushErrorToken(valueTokens[0], "invalid_syntax")
 	}
 	return
+}
+
+func (p *Parser) checkAnonymousFunction(fun ast.FunctionAST) {
+	globalVariables := p.GlobalVariables
+	blockVariables := p.BlockVariables
+	p.GlobalVariables = append(blockVariables, p.GlobalVariables...)
+	p.BlockVariables = variablesFromParameters(fun.Params)
+	p.checkFunction(fun)
+	p.GlobalVariables = globalVariables
+	p.BlockVariables = blockVariables
 }
 
 func (p *Parser) parseFunctionCallStatement(fun ast.FunctionAST, tokens []lex.Token, builder *expressionModelBuilder) {
@@ -1043,9 +1053,9 @@ func (p *Parser) checkBlock(b ast.BlockAST) {
 	for index, model := range b.Statements {
 		switch t := model.Value.(type) {
 		case ast.BlockExpressionAST:
-			_, _ = p.computeExpression(t.Expression)
-		case ast.FunctionCallAST:
-			p.checkFunctionCallStatement(t)
+			_, t.Expression.Model = p.computeExpression(t.Expression)
+			model.Value = t
+			b.Statements[index] = model
 		case ast.VariableAST:
 			p.checkVariableStatement(&t)
 			model.Value = t
@@ -1057,18 +1067,6 @@ func (p *Parser) checkBlock(b ast.BlockAST) {
 			p.PushErrorToken(model.Token, "invalid_syntax")
 		}
 	}
-}
-
-func (p *Parser) checkFunctionCallStatement(cs ast.FunctionCallAST) {
-	value, ok := p.processSingleValuePart(cs.Token, new(expressionModelBuilder))
-	if !ok {
-		return
-	}
-	if value.ast.Type.Code != x.Function {
-		p.PushErrorToken(cs.Token, "not_function_call")
-		return
-	}
-	p.parseArgs(value.ast.Type.Tag.(ast.FunctionAST), cs.Args, cs.Token, nil)
 }
 
 func (p *Parser) checkFunction(fun ast.FunctionAST) {
