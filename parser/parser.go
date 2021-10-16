@@ -1029,7 +1029,7 @@ func (p *Parser) getRangeTokens(open, close string, tokens []lex.Token) []lex.To
 
 func (p *Parser) checkFunctionSpecialCases(fun ast.FunctionAST) {
 	switch fun.Name {
-	case x.EntryPoint:
+	case "_" + x.EntryPoint:
 		if len(fun.Params) > 0 {
 			p.PushErrorToken(fun.Token, "entrypoint_have_parameters")
 		}
