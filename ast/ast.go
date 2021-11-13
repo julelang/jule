@@ -332,19 +332,33 @@ func (ast *AST) BuildDataType(tokens []lex.Token, index *int, err bool) (t DataT
 			}
 			fallthrough
 		case lex.Brace:
-			if token.Value != "(" {
-				if err {
+			switch token.Value {
+			case "(":
+				t.Token = token
+				t.Code = x.Function
+				value, funAST := ast.buildFunctionDataType(tokens, index)
+				funAST.ReturnType, _ = ast.BuildDataType(tokens, index, false)
+				t.Value += value
+				t.Tag = funAST
+				return t, true
+			case "[":
+				*index++
+				if *index > len(tokens) {
 					ast.PushErrorToken(token, "invalid_syntax")
+					return t, false
 				}
-				return t, false
+				token = tokens[*index]
+				if token.Type != lex.Brace || token.Value != "]" {
+					ast.PushErrorToken(token, "invalid_syntax")
+					return t, false
+				}
+				t.Value += "[]"
+				continue
 			}
-			t.Token = token
-			t.Code = x.Function
-			value, funAST := ast.buildFunctionDataType(tokens, index)
-			funAST.ReturnType, _ = ast.BuildDataType(tokens, index, false)
-			t.Value += value
-			t.Tag = funAST
-			return t, true
+			/*if err {
+				ast.PushErrorToken(token, "invalid_syntax")
+			}*/
+			return t, false
 		default:
 			if err {
 				ast.PushErrorToken(token, "invalid_syntax")

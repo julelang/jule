@@ -122,3 +122,22 @@ func (af anonymousFunctionExp) String() string {
 	ast.Indent--
 	return cxx.String()
 }
+
+type arrayExp struct {
+	dataType    ast.DataTypeAST
+	expressions []expressionModel
+}
+
+func (a arrayExp) String() string {
+	if len(a.expressions) == 0 {
+		return "({})"
+	}
+	var cxx strings.Builder
+	cxx.WriteString(a.dataType.String())
+	cxx.WriteString("({")
+	for _, exp := range a.expressions {
+		cxx.WriteString(exp.String())
+		cxx.WriteString(", ")
+	}
+	return cxx.String()[:cxx.Len()-2] + "})"
+}

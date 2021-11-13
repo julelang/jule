@@ -86,6 +86,13 @@ type DataTypeAST struct {
 
 func (dt DataTypeAST) String() string {
 	var cxx strings.Builder
+	if dt.Value != "" && dt.Value[0] == '[' {
+		cxx.WriteString("array<")
+		dt.Value = dt.Value[2:]
+		cxx.WriteString(dt.String())
+		cxx.WriteByte('>')
+		return cxx.String()
+	}
 	for _, run := range dt.Value {
 		if run == '*' {
 			cxx.WriteRune(run)

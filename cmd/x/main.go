@@ -149,6 +149,7 @@ func appendStandards(code *string) {
 #pragma region X_STANDARD_IMPORTS
 #include <iostream>
 #include <functional>
+#include <vector>
 #include <locale.h>
 #pragma endregion X_STANDARD_IMPORTS
 
@@ -170,8 +171,95 @@ typedef wchar_t rune;
 #pragma endregion X_BUILTIN_TYPES
 
 #pragma region X_BUILTIN_VALUES
-#define null NULL
+#define null nullptr
 #pragma endregion X_BUILTIN_VALUES
+
+#pragma region X_RUNTIME_FUNCTIONS
+inline void throw_exception(const str message) {
+  std::wcout << message << std::endl;
+  exit(1);
+}
+#pragma endregion X_RUNTIME_FUNCTIONS
+
+#pragma region X_STRUCTURES
+template<typename T>
+struct array {
+public:
+#pragma region FIELDS
+  std::vector<T> vector;
+#pragma endregion FIELDS
+
+#pragma region CONSTRUCTORS
+  array() {
+    this->vector = {};
+  }
+
+  array(std::nullptr_t ) : array() {}
+
+  array(const std::vector<T>& vector) {
+    this->vector = vector;
+  }
+#pragma endregion CONSTRUCTORS
+
+#pragma region DESTRUCTOR
+  ~array() {
+    this->vector.clear();
+  }
+#pragma endregion DESTRUCTOR
+
+#pragma region OPERATOR_OVERFLOWS
+  bool operator==(const array& array) {
+    const uint32 vector_length = this->vector.size();
+    const uint32 array_vector_length = array.vector.size();
+    if (vector_length != array_vector_length) {
+      return false;
+    }
+    for (int index = 0; index < vector_length; ++index) {
+      if (this->vector[index] != array.vector[index]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool operator==(std::nullptr_t) {
+    return this->vector.empty();
+  }
+
+  bool operator!=(const array& array) {
+    return !(*this == array);
+  }
+
+  bool operator!=(std::nullptr_t) {
+    return !this->vector.empty();
+  }
+
+  T& operator[](const int index) {
+    const uint32 length = this->vector.size();
+    if (index < 0) {
+      throw_exception(L"stackoverflow exception:\n index is less than zero");
+    } else if (index >= length) {
+      throw_exception(L"stackoverflow exception:\nindex overflow " +
+        std::to_wstring(index) + L":" + std::to_wstring(length));
+    }
+    return this->vector[index];
+  }
+
+  friend std::wostream& operator<<(std::wostream &os, const array<T>& array) {
+    os << L"[";
+    const uint32 size = array.vector.size();
+    for (int index = 0; index < size;) {
+      os << array.vector[index++];
+      if (index < size) {
+        os << L", ";
+      }
+    }
+    os << L"]";
+    return os;
+  }
+#pragma endregion OPERATOR_OVERFLOWS
+};
+#pragma endregion X_STRUCTURES
 
 #pragma region X_BUILTIN_FUNCTIONS
 template<typename any>

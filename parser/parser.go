@@ -650,6 +650,20 @@ func (ap arithmeticProcess) solveRune() (v ast.ValueAST) {
 	return
 }
 
+func (ap arithmeticProcess) solveArray() (v ast.ValueAST) {
+	if !typesAreCompatible(ap.leftVal.Type, ap.rightVal.Type, true) {
+		ap.cp.PushErrorToken(ap.operator, "incompatible_type")
+		return
+	}
+	switch ap.operator.Value {
+	case "!=", "==":
+		v.Type.Code = x.Bool
+	default:
+		ap.cp.PushErrorToken(ap.operator, "operator_notfor_array")
+	}
+	return
+}
+
 func (ap arithmeticProcess) solveNull() (v ast.ValueAST) {
 	if !typesAreCompatible(ap.leftVal.Type, ap.rightVal.Type, false) {
 		ap.cp.PushErrorToken(ap.operator, "incompatible_type")
@@ -675,6 +689,8 @@ func (ap arithmeticProcess) solve() (v ast.ValueAST) {
 		ap.cp.PushErrorToken(ap.operator, "invalid_operator")
 	}
 	switch {
+	case typeIsArray(ap.leftVal.Type) || typeIsArray(ap.rightVal.Type):
+		return ap.solveArray()
 	case typeIsPointer(ap.leftVal.Type) || typeIsPointer(ap.rightVal.Type):
 		return ap.solvePointer()
 	case ap.leftVal.Type.Code == x.Null || ap.rightVal.Type.Code == x.Null:
@@ -856,6 +872,8 @@ func (p *Parser) processValuePart(tokens []lex.Token, builder *expressionModelBu
 			return p.processParenthesesValuePart(tokens, builder)
 		case "}":
 			return p.processBraceValuePart(tokens, builder)
+		case "]":
+			return p.processBracketValuePart(tokens, builder)
 		}
 	default:
 		p.PushErrorToken(tokens[0], "invalid_syntax")
@@ -874,9 +892,9 @@ func (p *Parser) processParenthesesValuePart(tokens []lex.Token, builder *expres
 			continue
 		}
 		switch token.Value {
-		case ")":
+		case ")", "}", "]":
 			braceCount++
-		case "(":
+		case "(", "{", "[":
 			braceCount--
 		}
 		if braceCount > 0 {
@@ -927,9 +945,9 @@ func (p *Parser) processBraceValuePart(tokens []lex.Token, builder *expressionMo
 			continue
 		}
 		switch token.Value {
-		case "}":
+		case "}", "]", ")":
 			braceCount++
-		case "{":
+		case "{", "(", "[":
 			braceCount--
 		}
 		if braceCount > 0 {
@@ -939,13 +957,32 @@ func (p *Parser) processBraceValuePart(tokens []lex.Token, builder *expressionMo
 		break
 	}
 	valTokensLen := len(valueTokens)
-	if valTokensLen == 0 && braceCount == 0 {
-		p.PushErrorToken(tokens[j], "invalid_syntax")
+	if valTokensLen == 0 || braceCount > 0 {
+		p.PushErrorToken(tokens[0], "invalid_syntax")
 		return
 	}
 	switch valueTokens[0].Type {
 	case lex.Brace:
 		switch valueTokens[0].Value {
+		case "[":
+			ast := ast.New(nil)
+			dt, ok := ast.BuildDataType(valueTokens, new(int), true)
+			if !ok {
+				p.AppendErrors(ast.Errors...)
+				return
+			}
+			valueTokens = tokens[len(valueTokens):]
+			var model expressionNode
+			v, model = p.buildArray(p.buildEnumerableParts(valueTokens), valueTokens[0])
+			if v.ast.Type.Code == x.Void {
+				v.ast.Type.Code = dt.Code
+				v.ast.Type.Value += typeNameOfTypeValue(dt.Value)
+			}
+			p.checkType(dt, v.ast.Type, true, valueTokens[0])
+			arrExp := model.(arrayExp)
+			arrExp.dataType = v.ast.Type
+			builder.appendNode(arrExp)
+			return
 		case "(":
 			astBuilder := ast.New(tokens)
 			funAST := astBuilder.BuildFunction(true)
@@ -967,6 +1004,122 @@ func (p *Parser) processBraceValuePart(tokens []lex.Token, builder *expressionMo
 		p.PushErrorToken(valueTokens[0], "invalid_syntax")
 	}
 	return
+}
+
+func (p *Parser) processBracketValuePart(tokens []lex.Token, builder *expressionModelBuilder) (v value) {
+	var valueTokens []lex.Token
+	j := len(tokens) - 1
+	braceCount := 0
+	for ; j >= 0; j-- {
+		token := tokens[j]
+		if token.Type != lex.Brace {
+			continue
+		}
+		switch token.Value {
+		case "}", "]", ")":
+			braceCount++
+		case "{", "(", "[":
+			braceCount--
+		}
+		if braceCount > 0 {
+			continue
+		}
+		valueTokens = tokens[:j]
+		break
+	}
+	valTokensLen := len(valueTokens)
+	if valTokensLen == 0 || braceCount > 0 {
+		p.PushErrorToken(tokens[0], "invalid_syntax")
+		return
+	}
+	var model expressionNode
+	v, model = p.computeTokens(valueTokens)
+	builder.appendNode(model)
+	tokens = tokens[len(valueTokens)+1 : len(tokens)-1] // Removed array syntax "["..."]"
+	builder.appendNode(tokenExpNode{token: lex.Token{Value: "["}})
+	selectv, model := p.computeTokens(tokens)
+	builder.appendNode(model)
+	builder.appendNode(tokenExpNode{token: lex.Token{Value: "]"}})
+	return p.processEnumerableSelect(v, selectv, tokens[0])
+}
+
+func (p *Parser) processEnumerableSelect(enumv, selectv value, err lex.Token) (v value) {
+	switch {
+	case typeIsArray(enumv.ast.Type):
+		return p.processArraySelect(enumv, selectv, err)
+	default:
+		p.PushErrorToken(err, "not_enumerable")
+	}
+	return
+}
+
+func (p *Parser) processArraySelect(arrv, selectv value, err lex.Token) value {
+	arrv.ast.Type.Value = arrv.ast.Type.Value[2:] // Remove array syntax "[]"
+	if !typeIsSingle(selectv.ast.Type) || !x.IsIntegerType(selectv.ast.Type.Code) {
+		p.PushErrorToken(err, "notint_array_select")
+	}
+	return arrv
+}
+
+type enumPart struct {
+	tokens []lex.Token
+}
+
+func (p *Parser) buildEnumerableParts(tokens []lex.Token) []enumPart {
+	braceCount := 0
+	lastComma := -1
+	tokens = tokens[1 : len(tokens)-1]
+	var parts []enumPart
+	for index, token := range tokens {
+		if token.Type == lex.Brace {
+			switch token.Value {
+			case "{", "[", "(":
+				braceCount++
+			default:
+				braceCount--
+			}
+		}
+		if braceCount > 1 {
+			continue
+		}
+		if token.Type == lex.Comma {
+			if index-lastComma-1 == 0 {
+				p.PushErrorToken(token, "missing_expression")
+				lastComma = index
+				continue
+			}
+			parts = append(parts, enumPart{
+				tokens: tokens[lastComma+1 : index],
+			})
+			lastComma = index
+		}
+	}
+	if lastComma == -1 || lastComma+1 < len(tokens) {
+		parts = append(parts, enumPart{
+			tokens: tokens[lastComma+1:],
+		})
+	}
+	return parts
+}
+
+func (p *Parser) buildArray(parts []enumPart, err lex.Token) (value, expressionNode) {
+	var v value
+	var model arrayExp
+	if len(parts) == 0 {
+		v.ast.Type.Code = x.Any
+		return v, model
+	}
+	partValue, expModel := p.computeTokens(parts[0].tokens)
+	model.expressions = append(model.expressions, expModel)
+	v.ast.Type = partValue.ast.Type
+	for _, part := range parts[1:] {
+		partValue, expModel = p.computeTokens(part.tokens)
+		model.expressions = append(model.expressions, expModel)
+		p.checkType(v.ast.Type, partValue.ast.Type, false, part.tokens[0])
+	}
+	v.ast.Type.Value = "[]" + v.ast.Type.Value
+	model.dataType = v.ast.Type
+	return v, model
 }
 
 func (p *Parser) checkAnonymousFunction(fun ast.FunctionAST) {

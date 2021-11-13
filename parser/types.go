@@ -1,6 +1,9 @@
 package parser
 
 import (
+	"strings"
+	"unicode"
+
 	"github.com/the-xlang/x/ast"
 	"github.com/the-xlang/x/lex"
 	"github.com/the-xlang/x/pkg/x"
@@ -13,8 +16,17 @@ func typeIsPointer(t ast.DataTypeAST) bool {
 	return t.Value[0] == '*'
 }
 
+func typeIsArray(t ast.DataTypeAST) bool {
+	if t.Value == "" {
+		return false
+	}
+	return t.Value[0] == '['
+}
+
 func typeIsSingle(dt ast.DataTypeAST) bool {
-	return !typeIsPointer(dt) && dt.Code != x.Function
+	return !typeIsPointer(dt) &&
+		!typeIsArray(dt) &&
+		dt.Code != x.Function
 }
 
 func (p *Parser) checkValidityForAutoType(t ast.DataTypeAST, err lex.Token) {
@@ -27,7 +39,7 @@ func (p *Parser) checkValidityForAutoType(t ast.DataTypeAST, err lex.Token) {
 }
 
 func (p *Parser) defaultValueOfType(t ast.DataTypeAST) string {
-	if typeIsPointer(t) {
+	if typeIsPointer(t) || typeIsArray(t) {
 		return "null"
 	}
 	return x.DefaultValueOfType(t.Code)
@@ -37,10 +49,22 @@ func typeIsNullCompatible(t ast.DataTypeAST) bool {
 	return t.Code == x.Function || typeIsPointer(t)
 }
 
-func typesAreCompatible(t1, t2 ast.DataTypeAST, ignoreany bool) bool {
-	if (typeIsNullCompatible(t1) || typeIsNullCompatible(t2)) &&
-		(t1.Code == x.Null || t2.Code == x.Null) {
+func checkArrayCompatiblity(arrT, t ast.DataTypeAST) bool {
+	if t.Code == x.Null {
 		return true
+	}
+	return arrT.Value == t.Value
+}
+
+func typesAreCompatible(t1, t2 ast.DataTypeAST, ignoreany bool) bool {
+	switch {
+	case typeIsArray(t1) || typeIsArray(t2):
+		if typeIsArray(t2) {
+			t1, t2 = t2, t1
+		}
+		return checkArrayCompatiblity(t1, t2)
+	case typeIsNullCompatible(t1) || typeIsNullCompatible(t2):
+		return t1.Code == x.Null || t2.Code == x.Null
 	}
 	return x.TypesAreCompatible(t1.Code, t2.Code, ignoreany)
 }
@@ -65,6 +89,10 @@ func (p *Parser) readyType(dt ast.DataTypeAST) (ast.DataTypeAST, bool) {
 	return dt, true
 }
 
+func typeNameOfTypeValue(value string) string {
+	return value[strings.IndexFunc(value, unicode.IsLetter):]
+}
+
 func (p *Parser) checkType(real, check ast.DataTypeAST, ignoreAny bool, errToken lex.Token) {
 	real, ok := p.readyType(real)
 	if !ok {
@@ -74,12 +102,16 @@ func (p *Parser) checkType(real, check ast.DataTypeAST, ignoreAny bool, errToken
 	if !ok {
 		return
 	}
+	if !ignoreAny || real.Code == x.Any {
+		return
+	}
 	if typeIsSingle(real) && typeIsSingle(check) {
-		if !x.TypesAreCompatible(check.Code, real.Code, false) {
+		if !x.TypesAreCompatible(check.Code, real.Code, ignoreAny) {
 			p.PushErrorToken(errToken, "incompatible_datatype")
 		}
 	} else {
-		if typeIsPointer(real) && check.Code == x.Null {
+		if (typeIsPointer(real) || typeIsArray(real)) &&
+			check.Code == x.Null {
 			return
 		}
 		if real.Value != check.Value {
