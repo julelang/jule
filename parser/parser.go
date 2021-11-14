@@ -973,15 +973,8 @@ func (p *Parser) processBraceValuePart(tokens []lex.Token, builder *expressionMo
 			}
 			valueTokens = tokens[len(valueTokens):]
 			var model expressionNode
-			v, model = p.buildArray(p.buildEnumerableParts(valueTokens), valueTokens[0])
-			if v.ast.Type.Code == x.Void {
-				v.ast.Type.Code = dt.Code
-				v.ast.Type.Value += typeNameOfTypeValue(dt.Value)
-			}
-			p.checkType(dt, v.ast.Type, true, valueTokens[0])
-			arrExp := model.(arrayExp)
-			arrExp.dataType = v.ast.Type
-			builder.appendNode(arrExp)
+			v, model = p.buildArray(p.buildEnumerableParts(valueTokens), dt, valueTokens[0])
+			builder.appendNode(model)
 			return
 		case "(":
 			astBuilder := ast.New(tokens)
@@ -1054,7 +1047,7 @@ func (p *Parser) processEnumerableSelect(enumv, selectv value, err lex.Token) (v
 }
 
 func (p *Parser) processArraySelect(arrv, selectv value, err lex.Token) value {
-	arrv.ast.Type.Value = arrv.ast.Type.Value[2:] // Remove array syntax "[]"
+	arrv.ast.Type = typeOfArrayElements(arrv.ast.Type)
 	if !typeIsSingle(selectv.ast.Type) || !x.IsIntegerType(selectv.ast.Type.Code) {
 		p.PushErrorToken(err, "notint_array_select")
 	}
@@ -1065,10 +1058,11 @@ type enumPart struct {
 	tokens []lex.Token
 }
 
+//! IMPORTANT: Tokens is should be store enumerable parentheses.
 func (p *Parser) buildEnumerableParts(tokens []lex.Token) []enumPart {
+	tokens = tokens[1 : len(tokens)-1]
 	braceCount := 0
 	lastComma := -1
-	tokens = tokens[1 : len(tokens)-1]
 	var parts []enumPart
 	for index, token := range tokens {
 		if token.Type == lex.Brace {
@@ -1079,7 +1073,7 @@ func (p *Parser) buildEnumerableParts(tokens []lex.Token) []enumPart {
 				braceCount--
 			}
 		}
-		if braceCount > 1 {
+		if braceCount > 0 {
 			continue
 		}
 		if token.Type == lex.Comma {
@@ -1102,23 +1096,21 @@ func (p *Parser) buildEnumerableParts(tokens []lex.Token) []enumPart {
 	return parts
 }
 
-func (p *Parser) buildArray(parts []enumPart, err lex.Token) (value, expressionNode) {
+func (p *Parser) buildArray(parts []enumPart, dt ast.DataTypeAST, err lex.Token) (value, expressionNode) {
 	var v value
 	var model arrayExp
 	if len(parts) == 0 {
 		v.ast.Type.Code = x.Any
 		return v, model
 	}
-	partValue, expModel := p.computeTokens(parts[0].tokens)
-	model.expressions = append(model.expressions, expModel)
-	v.ast.Type = partValue.ast.Type
-	for _, part := range parts[1:] {
-		partValue, expModel = p.computeTokens(part.tokens)
+	v.ast.Type = dt
+	model.dataType = dt
+	elementType := typeOfArrayElements(dt)
+	for _, part := range parts {
+		partValue, expModel := p.computeTokens(part.tokens)
 		model.expressions = append(model.expressions, expModel)
-		p.checkType(v.ast.Type, partValue.ast.Type, false, part.tokens[0])
+		p.checkType(elementType, partValue.ast.Type, false, part.tokens[0])
 	}
-	v.ast.Type.Value = "[]" + v.ast.Type.Value
-	model.dataType = v.ast.Type
 	return v, model
 }
 

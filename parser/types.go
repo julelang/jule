@@ -1,13 +1,15 @@
 package parser
 
 import (
-	"strings"
-	"unicode"
-
 	"github.com/the-xlang/x/ast"
 	"github.com/the-xlang/x/lex"
 	"github.com/the-xlang/x/pkg/x"
 )
+
+func typeOfArrayElements(t ast.DataTypeAST) ast.DataTypeAST {
+	t.Value = t.Value[2:] // Remove array syntax "[]"
+	return t
+}
 
 func typeIsPointer(t ast.DataTypeAST) bool {
 	if t.Value == "" {
@@ -87,10 +89,6 @@ func (p *Parser) readyType(dt ast.DataTypeAST) (ast.DataTypeAST, bool) {
 		dt.Value = dt.Tag.(ast.FunctionAST).DataTypeString()
 	}
 	return dt, true
-}
-
-func typeNameOfTypeValue(value string) string {
-	return value[strings.IndexFunc(value, unicode.IsLetter):]
 }
 
 func (p *Parser) checkType(real, check ast.DataTypeAST, ignoreAny bool, errToken lex.Token) {
