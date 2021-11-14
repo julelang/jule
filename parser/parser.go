@@ -1214,7 +1214,9 @@ func (p *Parser) checkBlock(b ast.BlockAST) {
 			model.Value = t
 			b.Statements[index] = model
 		case ast.VariableSetAST:
-			p.checkVariableSetStatement(t)
+			p.checkVariableSetStatement(&t)
+			model.Value = t
+			b.Statements[index] = model
 		case ast.ReturnAST:
 		default:
 			p.PushErrorToken(model.Token, "invalid_syntax")
@@ -1244,7 +1246,7 @@ func (p *Parser) checkVariableStatement(varAST *ast.VariableAST) {
 	p.BlockVariables = append(p.BlockVariables, *varAST)
 }
 
-func (p *Parser) checkVariableSetStatement(vsAST ast.VariableSetAST) {
+func (p *Parser) checkVariableSetStatement(vsAST *ast.VariableSetAST) {
 	selected, _ := p.computeProcesses(vsAST.SelectExpression.Processes)
 	if selected.constant {
 		p.PushErrorToken(vsAST.Setter, "const_value_update")
@@ -1257,6 +1259,7 @@ func (p *Parser) checkVariableSetStatement(vsAST ast.VariableSetAST) {
 			return
 		}
 	}
-	value, _ := p.computeProcesses(vsAST.ValueExpression.Processes)
+	value, model := p.computeProcesses(vsAST.ValueExpression.Processes)
+	vsAST.ValueExpression = model.ExpressionAST()
 	p.checkType(selected.ast.Type, value.ast.Type, false, vsAST.Setter)
 }

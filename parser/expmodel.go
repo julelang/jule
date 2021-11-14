@@ -72,6 +72,10 @@ func (model expressionModel) String() string {
 	return sb.String()
 }
 
+func (model expressionModel) ExpressionAST() ast.ExpressionAST {
+	return ast.ExpressionAST{Model: model}
+}
+
 type tokenExpNode struct {
 	token lex.Token
 }
