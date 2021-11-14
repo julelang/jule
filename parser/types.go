@@ -100,7 +100,7 @@ func (p *Parser) checkType(real, check ast.DataTypeAST, ignoreAny bool, errToken
 	if !ok {
 		return
 	}
-	if !ignoreAny || real.Code == x.Any {
+	if !ignoreAny && real.Code == x.Any {
 		return
 	}
 	if typeIsSingle(real) && typeIsSingle(check) {

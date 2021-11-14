@@ -21,6 +21,8 @@ type Parser struct {
 	BlockVariables         []ast.VariableAST
 	Tokens                 []lex.Token
 	PFI                    *ParseFileInfo
+
+	arrayElementType *ast.DataTypeAST
 }
 
 // NewParser returns new instance of Parser.
@@ -958,7 +960,12 @@ func (p *Parser) processBraceValuePart(tokens []lex.Token, builder *expressionMo
 	}
 	valTokensLen := len(valueTokens)
 	if valTokensLen == 0 || braceCount > 0 {
-		p.PushErrorToken(tokens[0], "invalid_syntax")
+		if p.arrayElementType == nil {
+			p.PushErrorToken(tokens[0], "invalid_syntax")
+		}
+		var model expressionNode
+		v, model = p.buildArray(p.buildEnumerableParts(tokens), *p.arrayElementType, tokens[0])
+		builder.appendNode(model)
 		return
 	}
 	switch valueTokens[0].Type {
@@ -974,6 +981,7 @@ func (p *Parser) processBraceValuePart(tokens []lex.Token, builder *expressionMo
 			valueTokens = tokens[len(valueTokens):]
 			var model expressionNode
 			v, model = p.buildArray(p.buildEnumerableParts(valueTokens), dt, valueTokens[0])
+			p.arrayElementType = nil
 			builder.appendNode(model)
 			return
 		case "(":
@@ -1107,9 +1115,12 @@ func (p *Parser) buildArray(parts []enumPart, dt ast.DataTypeAST, err lex.Token)
 	model.dataType = dt
 	elementType := typeOfArrayElements(dt)
 	for _, part := range parts {
+		elemType := p.arrayElementType
+		p.arrayElementType = &elementType
 		partValue, expModel := p.computeTokens(part.tokens)
 		model.expressions = append(model.expressions, expModel)
 		p.checkType(elementType, partValue.ast.Type, false, part.tokens[0])
+		p.arrayElementType = elemType
 	}
 	return v, model
 }
