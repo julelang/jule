@@ -21,8 +21,6 @@ type Parser struct {
 	BlockVariables         []ast.VariableAST
 	Tokens                 []lex.Token
 	PFI                    *ParseFileInfo
-
-	arrayElementType *ast.DataTypeAST
 }
 
 // NewParser returns new instance of Parser.
@@ -351,6 +349,13 @@ func (p *Parser) computeProcesses(processes [][]lex.Token) (v value, e expressio
 		return
 	}
 	builder := newExpBuilder()
+	/*for _, process := range processes {
+		for _, token := range process {
+			fmt.Print(token.Value, " ")
+		}
+		println()
+	}
+	os.Exit(0)*/
 	if len(processes) == 1 {
 		builder.setIndex(0)
 		v = p.processValuePart(processes[0], builder)
@@ -831,15 +836,22 @@ func (p *Parser) processSingleOperatorPart(tokens []lex.Token, builder *expressi
 		v = p.processValuePart(tokens, builder)
 		if !typeIsPointer(v.ast.Type) {
 			p.PushErrorToken(token, "invalid_data_star")
+		} else {
+			v.ast.Type.Value = v.ast.Type.Value[1:]
 		}
-		v.ast.Type.Value = v.ast.Type.Value[1:]
 	case "&":
 		nodeLen := len(builder.current.nodes)
 		v = p.processValuePart(tokens, builder)
-		if v.ast.Token.Type != lex.Name {
+		if !canGetPointer(v) {
 			p.PushErrorToken(token, "invalid_data_amper")
 		}
-		if v.ast.Type.Code == x.Function {
+		if typeIsArray(v.ast.Type) {
+			builder.current.nodes = append(
+				builder.current.nodes[:nodeLen-1], /* -1 for remove amper operator */
+				arrayPointerExp{
+					nodes: builder.current.nodes[nodeLen:],
+				})
+		} else if v.ast.Type.Code == x.Function {
 			if p.functionByName(v.ast.Token.Value) != nil {
 				builder.current.nodes = append(
 					builder.current.nodes[:nodeLen-1], /* -1 for remove amper operator */
@@ -855,6 +867,11 @@ func (p *Parser) processSingleOperatorPart(tokens []lex.Token, builder *expressi
 	}
 	v.ast.Token = token
 	return v
+}
+
+func canGetPointer(v value) bool {
+	return v.ast.Token.Type == lex.Name ||
+		typeIsArray(v.ast.Type)
 }
 
 func (p *Parser) processValuePart(tokens []lex.Token, builder *expressionModelBuilder) (v value) {
@@ -960,12 +977,7 @@ func (p *Parser) processBraceValuePart(tokens []lex.Token, builder *expressionMo
 	}
 	valTokensLen := len(valueTokens)
 	if valTokensLen == 0 || braceCount > 0 {
-		if p.arrayElementType == nil {
-			p.PushErrorToken(tokens[0], "invalid_syntax")
-		}
-		var model expressionNode
-		v, model = p.buildArray(p.buildEnumerableParts(tokens), *p.arrayElementType, tokens[0])
-		builder.appendNode(model)
+		p.PushErrorToken(tokens[0], "invalid_syntax")
 		return
 	}
 	switch valueTokens[0].Type {
@@ -981,7 +993,6 @@ func (p *Parser) processBraceValuePart(tokens []lex.Token, builder *expressionMo
 			valueTokens = tokens[len(valueTokens):]
 			var model expressionNode
 			v, model = p.buildArray(p.buildEnumerableParts(valueTokens), dt, valueTokens[0])
-			p.arrayElementType = nil
 			builder.appendNode(model)
 			return
 		case "(":
@@ -1096,7 +1107,7 @@ func (p *Parser) buildEnumerableParts(tokens []lex.Token) []enumPart {
 			lastComma = index
 		}
 	}
-	if lastComma == -1 || lastComma+1 < len(tokens) {
+	if lastComma+1 < len(tokens) {
 		parts = append(parts, enumPart{
 			tokens: tokens[lastComma+1:],
 		})
@@ -1106,21 +1117,13 @@ func (p *Parser) buildEnumerableParts(tokens []lex.Token) []enumPart {
 
 func (p *Parser) buildArray(parts []enumPart, dt ast.DataTypeAST, err lex.Token) (value, expressionNode) {
 	var v value
-	var model arrayExp
-	if len(parts) == 0 {
-		v.ast.Type.Code = x.Any
-		return v, model
-	}
 	v.ast.Type = dt
-	model.dataType = dt
+	model := arrayExp{dataType: dt}
 	elementType := typeOfArrayElements(dt)
 	for _, part := range parts {
-		elemType := p.arrayElementType
-		p.arrayElementType = &elementType
 		partValue, expModel := p.computeTokens(part.tokens)
 		model.expressions = append(model.expressions, expModel)
 		p.checkType(elementType, partValue.ast.Type, false, part.tokens[0])
-		p.arrayElementType = elemType
 	}
 	return v, model
 }

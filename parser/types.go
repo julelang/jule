@@ -7,7 +7,8 @@ import (
 )
 
 func typeOfArrayElements(t ast.DataTypeAST) ast.DataTypeAST {
-	t.Value = t.Value[2:] // Remove array syntax "[]"
+	// Remove array syntax "[]"
+	t.Value = t.Value[2:]
 	return t
 }
 

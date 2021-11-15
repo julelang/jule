@@ -663,7 +663,13 @@ func (ast *AST) getExpressionProcesses(tokens []lex.Token) [][]lex.Token {
 	braceCount := 0
 	pushedError := false
 	singleOperatored := false
-	for index, token := range tokens {
+	for index := 0; index < len(tokens); index++ {
+		oldIndex := index
+		if _, ok := ast.BuildDataType(tokens, &index, false); ok {
+			part = append(part, tokens[oldIndex:index+1]...)
+			continue
+		}
+		token := tokens[index]
 		switch token.Type {
 		case lex.Operator:
 			if !operator {
@@ -727,8 +733,7 @@ func requireOperatorForProcess(token lex.Token, index, tokensLen int) bool {
 	case lex.Comma:
 		return false
 	case lex.Brace:
-		if token.Value == "[" ||
-			token.Value == "(" ||
+		if token.Value == "(" ||
 			token.Value == "{" {
 			return false
 		}

@@ -113,6 +113,18 @@ func (fb functionPointerExp) String() string {
 	return "new " + fb.valueDataType.String() + "(" + cxxNodes.String() + ")"
 }
 
+type arrayPointerExp struct {
+	nodes []expressionNode
+}
+
+func (ap arrayPointerExp) String() string {
+	var cxxNodes strings.Builder
+	for _, node := range ap.nodes {
+		cxxNodes.WriteString(node.String())
+	}
+	return "new " + cxxNodes.String()
+}
+
 type anonymousFunctionExp struct {
 	ast ast.FunctionAST
 }
@@ -133,12 +145,12 @@ type arrayExp struct {
 }
 
 func (a arrayExp) String() string {
-	if len(a.expressions) == 0 {
-		return "({})"
-	}
 	var cxx strings.Builder
 	cxx.WriteString(a.dataType.String())
 	cxx.WriteString("({")
+	if len(a.expressions) == 0 {
+		return cxx.String() + "})"
+	}
 	for _, exp := range a.expressions {
 		cxx.WriteString(exp.String())
 		cxx.WriteString(", ")

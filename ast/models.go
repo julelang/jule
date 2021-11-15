@@ -86,19 +86,23 @@ type DataTypeAST struct {
 
 func (dt DataTypeAST) String() string {
 	var cxx strings.Builder
-	if dt.Value != "" && dt.Value[0] == '[' {
-		cxx.WriteString("array<")
-		dt.Value = dt.Value[2:]
-		cxx.WriteString(dt.String())
-		cxx.WriteByte('>')
-		return cxx.String()
-	}
-	for _, run := range dt.Value {
+	for index, run := range dt.Value {
 		if run == '*' {
 			cxx.WriteRune(run)
 			continue
 		}
+		dt.Value = dt.Value[index:]
 		break
+	}
+	if dt.Value != "" && dt.Value[0] == '[' {
+		pointers := cxx.String()
+		cxx.Reset()
+		cxx.WriteString("array<")
+		dt.Value = dt.Value[2:]
+		cxx.WriteString(dt.String())
+		cxx.WriteByte('>')
+		cxx.WriteString(pointers)
+		return cxx.String()
 	}
 	switch dt.Code {
 	case x.Name:
