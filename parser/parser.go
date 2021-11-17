@@ -349,13 +349,6 @@ func (p *Parser) computeProcesses(processes [][]lex.Token) (v value, e expressio
 		return
 	}
 	builder := newExpBuilder()
-	/*for _, process := range processes {
-		for _, token := range process {
-			fmt.Print(token.Value, " ")
-		}
-		println()
-	}
-	os.Exit(0)*/
 	if len(processes) == 1 {
 		builder.setIndex(0)
 		v = p.processValuePart(processes[0], builder)
@@ -1059,9 +1052,10 @@ func (p *Parser) processEnumerableSelect(enumv, selectv value, err lex.Token) (v
 	switch {
 	case typeIsArray(enumv.ast.Type):
 		return p.processArraySelect(enumv, selectv, err)
-	default:
-		p.PushErrorToken(err, "not_enumerable")
+	case typeIsSingle(enumv.ast.Type):
+		return p.processStringSelect(enumv, selectv, err)
 	}
+	p.PushErrorToken(err, "not_enumerable")
 	return
 }
 
@@ -1071,6 +1065,14 @@ func (p *Parser) processArraySelect(arrv, selectv value, err lex.Token) value {
 		p.PushErrorToken(err, "notint_array_select")
 	}
 	return arrv
+}
+
+func (p *Parser) processStringSelect(strv, selectv value, err lex.Token) value {
+	strv.ast.Type.Code = x.Rune
+	if !typeIsSingle(selectv.ast.Type) || !x.IsIntegerType(selectv.ast.Type.Code) {
+		p.PushErrorToken(err, "notint_string_select")
+	}
+	return strv
 }
 
 type enumPart struct {

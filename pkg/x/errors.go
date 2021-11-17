@@ -64,4 +64,5 @@ var Errors = map[string]string{
 	`rune_overflow`:                 `rune is should be single`,
 	`not_enumerable`:                `value is not enumerable`,
 	`notint_array_select`:           `array indexes is should be integer`,
+	`notint_string_select`:          `string indexes is should be integer`,
 }

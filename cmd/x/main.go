@@ -153,6 +153,13 @@ func appendStandards(code *string) {
 #include <locale.h>
 #pragma endregion X_STANDARD_IMPORTS
 
+#pragma region X_RUNTIME_FUNCTIONS
+inline void throw_exception(const std::wstring message) {
+  std::wcout << message << std::endl;
+  exit(1);
+}
+#pragma endregion X_RUNTIME_FUNCTIONS
+
 #pragma region X_BUILTIN_TYPES
 typedef int8_t int8;
 typedef int16_t int16;
@@ -164,26 +171,67 @@ typedef uint32_t uint32;
 typedef uint64_t uint64;
 typedef float float32;
 typedef double float64;
-typedef std::wstring str;
 typedef wchar_t rune;
 
 #define function std::function
+
+class str {
+public:
+#pragma region FIELDS
+  std::wstring string;
+#pragma endregion FIELDS
+
+#pragma region CONSTRUCTORS
+  str(const std::wstring& string) {
+    this->string = string;
+  }
+
+  str(const rune* string) {
+    this->string = string;
+  }
+#pragma endregion CONSTRUCTORS
+
+#pragma region DESTRUCTOR
+  ~str() {
+    this->string.clear();
+  }
+#pragma endregion DESTRUCTOR
+
+#pragma region OPERATOR_OVERFLOWS
+  bool operator==(const str& string) {
+    return this->string == string.string;
+  }
+
+  bool operator!=(const str& string) {
+    return !(this->string == string.string);
+  }
+
+  rune& operator[](const int index) {
+    const uint32 length = this->string.length();
+    if (index < 0) {
+      throw_exception(L"stackoverflow exception:\n index is less than zero");
+    } else if (index >= length) {
+      throw_exception(L"stackoverflow exception:\nindex overflow " +
+        std::to_wstring(index) + L":" + std::to_wstring(length));
+    }
+    return this->string[index];
+  }
+
+  friend std::wostream& operator<<(std::wostream &os, const str& string) {
+    os << string.string;
+    return os;
+  }
+#pragma endregion OPERATOR_OVERFLOWS
+};
 #pragma endregion X_BUILTIN_TYPES
 
 #pragma region X_BUILTIN_VALUES
 #define null nullptr
 #pragma endregion X_BUILTIN_VALUES
 
-#pragma region X_RUNTIME_FUNCTIONS
-inline void throw_exception(const str message) {
-  std::wcout << message << std::endl;
-  exit(1);
-}
-#pragma endregion X_RUNTIME_FUNCTIONS
-
 #pragma region X_STRUCTURES
 template<typename T>
-struct array {
+class array {
 public:
 #pragma region FIELDS
   std::vector<T> vector;
