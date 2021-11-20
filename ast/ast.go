@@ -304,70 +304,82 @@ end:
 func IsStatement(token lex.Token) bool { return token.Type == lex.SemiColon }
 
 // BuildDataType builds AST model of data type.
-func (ast *AST) BuildDataType(tokens []lex.Token, index *int, err bool) (t DataTypeAST, _ bool) {
+func (ast *AST) BuildDataType(tokens []lex.Token, index *int, err bool) (dt DataTypeAST, _ bool) {
 	first := *index
 	for ; *index < len(tokens); *index++ {
 		token := tokens[*index]
 		switch token.Type {
 		case lex.DataType:
-			t.Token = token
-			t.Code = x.TypeFromName(t.Token.Value)
-			t.Value += t.Token.Value
-			return t, true
+			buildDataType(token, &dt)
+			return dt, true
 		case lex.Name:
-			t.Token = token
-			t.Code = x.Name
-			t.Value += t.Token.Value
-			return t, true
+			buildNameType(token, &dt)
+			return dt, true
 		case lex.Operator:
 			if token.Value == "*" {
-				t.Value += token.Value
+				dt.Value += token.Value
 				break
 			}
 			fallthrough
 		case lex.Brace:
 			switch token.Value {
 			case "(":
-				t.Token = token
-				t.Code = x.Function
-				value, funAST := ast.buildFunctionDataType(tokens, index)
-				funAST.ReturnType, _ = ast.BuildDataType(tokens, index, false)
-				t.Value += value
-				t.Tag = funAST
-				return t, true
+				ast.buildFunctionType(token, tokens, index, &dt)
+				return dt, true
 			case "[":
 				*index++
 				if *index > len(tokens) {
 					if err {
 						ast.PushErrorToken(token, "invalid_syntax")
 					}
-					return t, false
+					return dt, false
 				}
 				token = tokens[*index]
 				if token.Type != lex.Brace || token.Value != "]" {
 					if err {
 						ast.PushErrorToken(token, "invalid_syntax")
 					}
-					return t, false
+					return dt, false
 				}
-				t.Value += "[]"
+				dt.Value += "[]"
 				continue
 			}
 			/*if err {
 				ast.PushErrorToken(token, "invalid_syntax")
 			}*/
-			return t, false
+			return dt, false
 		default:
 			if err {
 				ast.PushErrorToken(token, "invalid_syntax")
 			}
-			return t, false
+			return dt, false
 		}
 	}
 	if err {
 		ast.PushErrorToken(tokens[first], "invalid_type")
 	}
-	return t, false
+	return dt, false
+}
+
+func buildDataType(token lex.Token, dt *DataTypeAST) {
+	dt.Token = token
+	dt.Code = x.TypeFromName(dt.Token.Value)
+	dt.Value += dt.Token.Value
+}
+
+func buildNameType(token lex.Token, dt *DataTypeAST) {
+	dt.Token = token
+	dt.Code = x.Name
+	dt.Value += dt.Token.Value
+}
+
+func (ast *AST) buildFunctionType(token lex.Token, tokens []lex.Token, index *int, dt *DataTypeAST) {
+	dt.Token = token
+	dt.Code = x.Function
+	value, funAST := ast.buildFunctionDataType(tokens, index)
+	funAST.ReturnType, _ = ast.BuildDataType(tokens, index, false)
+	dt.Value += value
+	dt.Tag = funAST
 }
 
 func (ast *AST) buildFunctionDataType(tokens []lex.Token, index *int) (string, FunctionAST) {

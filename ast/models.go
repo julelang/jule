@@ -267,7 +267,8 @@ type ReturnAST struct {
 }
 
 func (r ReturnAST) String() string {
-	if r.Token.Type == lex.Operator {
+	switch r.Token.Type {
+	case lex.Operator:
 		return "return " + r.Expression.String() + ";"
 	}
 	return "return " + r.Expression.String() + ";"
