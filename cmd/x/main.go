@@ -148,6 +148,7 @@ func appendStandards(code *string) {
 
 #pragma region X_STANDARD_IMPORTS
 #include <iostream>
+#include <string>
 #include <functional>
 #include <vector>
 #include <locale.h>
