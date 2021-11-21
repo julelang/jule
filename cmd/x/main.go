@@ -64,7 +64,7 @@ func initProject(cmd string) {
 	}
 	err := os.WriteFile(x.SettingsFile, []byte(`out_name main
 cxx_out_dir ./
-cxx_out_name x.cxx`), 0606)
+cxx_out_name x.cxx`), 0x025E)
 	if err != nil {
 		println(err.Error())
 		return
@@ -89,6 +89,7 @@ func processCommand(namespace, cmd string) bool {
 func init() {
 	x.ExecutablePath = filepath.Dir(os.Args[0])
 	// Not started with arguments.
+	// Here is "2" but "os.Args" always have one element for store working directory.
 	if len(os.Args) < 2 {
 		os.Exit(0)
 	}
@@ -366,5 +367,5 @@ func main() {
 		filepath.Join(
 			x.XSettings.Fields["cxx_out_dir"],
 			x.XSettings.Fields["cxx_out_name"]),
-		[]byte(info.X_CXX), 0606)
+		[]byte(info.X_CXX), 0x025E)
 }
