@@ -62,12 +62,12 @@ func initProject(cmd string) {
 		println("This module can only be used as single!")
 		return
 	}
-	err := os.WriteFile(x.SettingsFile, []byte(`out_name main
+	err := io.WriteFileTruncate(x.SettingsFile, []byte(`out_name main
 cxx_out_dir ./
-cxx_out_name x.cxx`), 0x025E)
+cxx_out_name x.cxx`))
 	if err != nil {
 		println(err.Error())
-		return
+		os.Exit(1)
 	}
 	println("Initialized project.")
 }
@@ -343,6 +343,17 @@ int main() {
 #pragma endregion X_ENTRY_POINT`
 }
 
+func writeCxxOutput(info *parser.ParseFileInfo) {
+	path := filepath.Join(
+		x.XSettings.Fields["cxx_out_dir"],
+		x.XSettings.Fields["cxx_out_name"])
+	err := io.WriteFileTruncate(path, []byte(info.X_CXX))
+	if err != nil {
+		println(err.Error())
+		os.Exit(1)
+	}
+}
+
 var routines *sync.WaitGroup
 
 func main() {
@@ -363,9 +374,5 @@ func main() {
 		printErrors(info.Errors)
 	}
 	appendStandards(&info.X_CXX)
-	os.WriteFile(
-		filepath.Join(
-			x.XSettings.Fields["cxx_out_dir"],
-			x.XSettings.Fields["cxx_out_name"]),
-		[]byte(info.X_CXX), 0x025E)
+	writeCxxOutput(info)
 }
