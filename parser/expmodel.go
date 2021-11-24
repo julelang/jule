@@ -151,3 +151,16 @@ func (a arrayExp) String() string {
 	}
 	return cxx.String()[:cxx.Len()-2] + "})"
 }
+
+type argsExp struct {
+	args []ast.ArgAST
+}
+
+func (a argsExp) String() string {
+	var cxx strings.Builder
+	for _, arg := range a.args {
+		cxx.WriteString(arg.String())
+		cxx.WriteByte(',')
+	}
+	return cxx.String()[:cxx.Len()-1]
+}

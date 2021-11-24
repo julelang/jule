@@ -1256,6 +1256,9 @@ func (p *Parser) parseFunctionCallStatement(fun ast.FunctionAST, tokens []lex.To
 		p.AppendErrors(ast.Errors...)
 	}
 	p.parseArgs(fun, args, errToken, builder)
+	if builder != nil {
+		builder.appendNode(argsExp{args})
+	}
 }
 
 func (p *Parser) parseArgs(fun ast.FunctionAST, args []ast.ArgAST, errToken lex.Token, builder *expressionModelBuilder) {
@@ -1264,9 +1267,7 @@ func (p *Parser) parseArgs(fun ast.FunctionAST, args []ast.ArgAST, errToken lex.
 	}
 	for index, arg := range args {
 		p.parseArg(fun, index, &arg)
-		if builder != nil {
-			builder.appendNode(arg.Expression)
-		}
+		args[index] = arg
 	}
 }
 
