@@ -7,14 +7,10 @@ import (
 )
 
 // IsString reports value is string or not.
-func IsString(value string) bool {
-	return value[0] == '"'
-}
+func IsString(value string) bool { return value[0] == '"' }
 
 // IsRune reports value is rune of not.
-func IsRune(value string) bool {
-	return value[0] == '\''
-}
+func IsRune(value string) bool { return value[0] == '\'' }
 
 // IsBoolean reports value is boolean or not.
 func IsBoolean(value string) bool {
@@ -22,9 +18,7 @@ func IsBoolean(value string) bool {
 }
 
 // IsNull reports value is null or not.
-func IsNull(value string) bool {
-	return value == "null"
-}
+func IsNull(value string) bool { return value == "null" }
 
 func isConstantNumeric(v string) bool {
 	if v == "" {

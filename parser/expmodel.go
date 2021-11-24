@@ -80,25 +80,19 @@ type tokenExpNode struct {
 	token lex.Token
 }
 
-func (node tokenExpNode) String() string {
-	return node.token.Value
-}
+func (node tokenExpNode) String() string { return node.token.Value }
 
 type runeExpNode struct {
 	token lex.Token
 }
 
-func (run runeExpNode) String() string {
-	return "L" + run.token.Value
-}
+func (run runeExpNode) String() string { return "L" + run.token.Value }
 
 type strExpNode struct {
 	token lex.Token
 }
 
-func (str strExpNode) String() string {
-	return "L" + str.token.Value
-}
+func (str strExpNode) String() string { return "L" + str.token.Value }
 
 type functionPointerExp struct {
 	valueDataType ast.DataTypeAST

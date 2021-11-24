@@ -3,7 +3,6 @@ package x
 import (
 	"errors"
 	"fmt"
-	"runtime"
 	"strings"
 	"unicode"
 )
@@ -24,9 +23,6 @@ func NewXSet() *XSet {
 }
 
 func splitLines(content string) []string {
-	if runtime.GOOS == "windows" {
-		return strings.SplitN(string(content), "\n", -1)
-	}
 	return strings.SplitN(string(content), "\n", -1)
 }
 

@@ -48,32 +48,50 @@ func (p *Parser) PushError(err string) {
 	p.PFI.Errors = append(p.PFI.Errors, x.Errors[err])
 }
 
-// String is returns full C++ code of parsed objects.
+// String returns full C++ code of parsed objects.
 func (p Parser) String() string {
 	return p.Cxx()
 }
 
-// Cxx is returns full C++ code of parsed objects.
-func (p *Parser) Cxx() string {
+// CxxTypes returns C++ code developer-defined types.
+func (p *Parser) CxxTypes() string {
 	var cxx strings.Builder
 	cxx.WriteString("#pragma region TYPES\n")
 	for _, t := range p.Types {
 		cxx.WriteString(t.String())
 		cxx.WriteByte('\n')
 	}
-	cxx.WriteString("#pragma endregion TYPES\n\n")
+	cxx.WriteString("#pragma endregion TYPES")
+	return cxx.String()
+}
+
+// CxxPrototypes returns C++ code of prototypes of C++ code.
+func (p *Parser) CxxPrototypes() string {
+	var cxx strings.Builder
 	cxx.WriteString("#pragma region PROTOTYPES\n")
 	for _, fun := range p.Functions {
 		cxx.WriteString(fun.Prototype())
 		cxx.WriteByte('\n')
 	}
-	cxx.WriteString("#pragma endregion PROTOTYPES\n\n")
+	cxx.WriteString("#pragma endregion PROTOTYPES")
+	return cxx.String()
+}
+
+// CxxGlobalVariables returns C++ code of global variables.
+func (p *Parser) CxxGlobalVariables() string {
+	var cxx strings.Builder
 	cxx.WriteString("#pragma region GLOBAL_VARIABLES\n")
 	for _, va := range p.GlobalVariables {
 		cxx.WriteString(va.String())
 		cxx.WriteByte('\n')
 	}
-	cxx.WriteString("#pragma endregion GLOBAL_VARIABLES\n\n")
+	cxx.WriteString("#pragma endregion GLOBAL_VARIABLES")
+	return cxx.String()
+}
+
+// CxxFunctions returns C++ code of functions.
+func (p *Parser) CxxFunctions() string {
+	var cxx strings.Builder
 	cxx.WriteString("#pragma region FUNCTIONS")
 	cxx.WriteString("\n\n")
 	for _, fun := range p.Functions {
@@ -81,6 +99,17 @@ func (p *Parser) Cxx() string {
 		cxx.WriteString("\n\n")
 	}
 	cxx.WriteString("#pragma endregion FUNCTIONS")
+	return cxx.String()
+}
+
+// Cxx returns full C++ code of parsed objects.
+func (p *Parser) Cxx() string {
+	var cxx strings.Builder
+	cxx.WriteString(p.CxxTypes() + "\n\n")
+	cxx.WriteString(p.CxxPrototypes() + "\n\n")
+	cxx.WriteString(p.CxxGlobalVariables() + "\n\n")
+	cxx.WriteString(p.CxxGlobalVariables() + "\n\n")
+	cxx.WriteString(p.CxxFunctions())
 	return cxx.String()
 }
 
@@ -370,7 +399,7 @@ func (p *Parser) computeProcesses(processes [][]lex.Token) (v value, e expressio
 			process.leftVal = v.ast
 			process.operator = processes[j][0]
 			builder.setIndex(j + 1)
-			builder.appendNode(tokenExpNode{token: process.operator})
+			builder.appendNode(tokenExpNode{process.operator})
 			process.right = processes[j+1]
 			builder.setIndex(j + 1)
 			process.rightVal = p.processValuePart(process.right, builder).ast
@@ -384,7 +413,7 @@ func (p *Parser) computeProcesses(processes [][]lex.Token) (v value, e expressio
 			process.leftVal = p.processValuePart(process.left, builder).ast
 			process.rightVal = v.ast
 			builder.setIndex(j)
-			builder.appendNode(tokenExpNode{token: process.operator})
+			builder.appendNode(tokenExpNode{process.operator})
 			v.ast = process.solve()
 			processes = processes[:j-1]
 			goto end
@@ -393,7 +422,7 @@ func (p *Parser) computeProcesses(processes [][]lex.Token) (v value, e expressio
 			process.leftVal = v.ast
 			process.operator = processes[j][0]
 			builder.setIndex(j)
-			builder.appendNode(tokenExpNode{token: process.operator})
+			builder.appendNode(tokenExpNode{process.operator})
 			process.right = processes[j+1]
 			builder.setIndex(j + 1)
 			process.rightVal = p.processValuePart(process.right, builder).ast
@@ -406,7 +435,7 @@ func (p *Parser) computeProcesses(processes [][]lex.Token) (v value, e expressio
 		process.leftVal = p.processValuePart(process.left, builder).ast
 		process.operator = processes[j][0]
 		builder.setIndex(j)
-		builder.appendNode(tokenExpNode{token: process.operator})
+		builder.appendNode(tokenExpNode{process.operator})
 		process.right = processes[j+1]
 		builder.setIndex(j + 1)
 		process.rightVal = p.processValuePart(process.right, builder).ast
@@ -716,155 +745,236 @@ func (ap arithmeticProcess) solve() (v ast.ValueAST) {
 	return
 }
 
+type singleValueProcessor struct {
+	token   lex.Token
+	builder *expressionModelBuilder
+	parser  *Parser
+}
+
+func (p *singleValueProcessor) string() value {
+	var v value
+	v.ast.Value = p.token.Value
+	v.ast.Type.Code = x.Str
+	v.ast.Type.Value = "str"
+	p.builder.appendNode(strExpNode{p.token})
+	return v
+}
+
+func (p *singleValueProcessor) rune() value {
+	var v value
+	v.ast.Value = p.token.Value
+	v.ast.Type.Code = x.Rune
+	v.ast.Type.Value = "rune"
+	p.builder.appendNode(runeExpNode{p.token})
+	return v
+}
+
+func (p *singleValueProcessor) boolean() value {
+	var v value
+	v.ast.Value = p.token.Value
+	v.ast.Type.Code = x.Bool
+	v.ast.Type.Value = "bool"
+	p.builder.appendNode(tokenExpNode{p.token})
+	return v
+}
+
+func (p *singleValueProcessor) null() value {
+	var v value
+	v.ast.Value = p.token.Value
+	v.ast.Type.Code = x.Null
+	p.builder.appendNode(tokenExpNode{p.token})
+	return v
+}
+
+func (p *singleValueProcessor) numeric() value {
+	var v value
+	if strings.Contains(p.token.Value, ".") ||
+		strings.ContainsAny(p.token.Value, "eE") {
+		v.ast.Type.Code = x.Float64
+		v.ast.Type.Value = "float64"
+	} else {
+		v.ast.Type.Code = x.Int32
+		v.ast.Type.Value = "int32"
+		ok := xbits.CheckBitInt(p.token.Value, 32)
+		if !ok {
+			v.ast.Type.Code = x.Int64
+			v.ast.Type.Value = "int64"
+		}
+	}
+	v.ast.Value = p.token.Value
+	p.builder.appendNode(tokenExpNode{p.token})
+	return v
+}
+
+func (p *singleValueProcessor) name() (v value, ok bool) {
+	if variable := p.parser.variableByName(p.token.Value); variable != nil {
+		v.ast.Value = p.token.Value
+		v.ast.Type = variable.Type
+		v.constant = variable.DefineToken.Value == "const"
+		p.builder.appendNode(tokenExpNode{p.token})
+		ok = true
+	} else if fun := p.parser.functionByName(p.token.Value); fun != nil {
+		v.ast.Value = p.token.Value
+		v.ast.Type.Code = x.Function
+		v.ast.Type.Tag = fun.ast
+		p.builder.appendNode(tokenExpNode{p.token})
+		ok = true
+	} else {
+		p.parser.PushErrorToken(p.token, "name_not_defined")
+	}
+	return
+}
+
 func (p *Parser) processSingleValuePart(token lex.Token, builder *expressionModelBuilder) (v value, ok bool) {
+	processor := singleValueProcessor{
+		token:   token,
+		builder: builder,
+		parser:  p,
+	}
 	v.ast.Type.Code = x.Void
 	v.ast.Token = token
 	switch token.Type {
 	case lex.Value:
-		if IsString(token.Value) {
-			v.ast.Value = token.Value
-			v.ast.Type.Code = x.Str
-			v.ast.Type.Value = "str"
-			builder.appendNode(strExpNode{token: token})
-			ok = true
-		} else if IsRune(token.Value) {
-			v.ast.Value = token.Value
-			v.ast.Type.Code = x.Rune
-			v.ast.Type.Value = "rune"
-			builder.appendNode(runeExpNode{token: token})
-			ok = true
-		} else if IsBoolean(token.Value) {
-			v.ast.Value = token.Value
-			v.ast.Type.Code = x.Bool
-			v.ast.Type.Value = "bool"
-			builder.appendNode(tokenExpNode{token: token})
-			ok = true
-		} else if IsNull(token.Value) {
-			v.ast.Value = token.Value
-			v.ast.Type.Code = x.Null
-			builder.appendNode(tokenExpNode{token: token})
-			ok = true
-		} else { // Numeric.
-			if strings.Contains(token.Value, ".") ||
-				strings.ContainsAny(token.Value, "eE") {
-				v.ast.Type.Code = x.Float64
-				v.ast.Type.Value = "float64"
-			} else {
-				v.ast.Type.Code = x.Int32
-				v.ast.Type.Value = "int32"
-				ok := xbits.CheckBitInt(token.Value, 32)
-				if !ok {
-					v.ast.Type.Code = x.Int64
-					v.ast.Type.Value = "int64"
-				}
-			}
-			v.ast.Value = token.Value
-			builder.appendNode(tokenExpNode{token: token})
-			ok = true
+		ok = true
+		switch {
+		case IsString(token.Value):
+			v = processor.string()
+		case IsRune(token.Value):
+			v = processor.rune()
+		case IsBoolean(token.Value):
+			v = processor.boolean()
+		case IsNull(token.Value):
+			v = processor.null()
+		default:
+			v = processor.numeric()
 		}
 	case lex.Name:
-		if variable := p.variableByName(token.Value); variable != nil {
-			v.ast.Value = token.Value
-			v.ast.Type = variable.Type
-			v.constant = variable.DefineToken.Value == "const"
-			builder.appendNode(tokenExpNode{token: token})
-			ok = true
-		} else if fun := p.functionByName(token.Value); fun != nil {
-			v.ast.Value = token.Value
-			v.ast.Type.Code = x.Function
-			v.ast.Type.Tag = fun.ast
-			builder.appendNode(tokenExpNode{token: token})
-			ok = true
-		} else {
-			p.PushErrorToken(token, "name_not_defined")
-		}
+		v, ok = processor.name()
 	default:
 		p.PushErrorToken(token, "invalid_syntax")
 	}
 	return
 }
 
+type singleOperatorProcessor struct {
+	token   lex.Token
+	tokens  []lex.Token
+	builder *expressionModelBuilder
+	parser  *Parser
+}
+
+func (p *singleOperatorProcessor) unary() value {
+	v := p.parser.processValuePart(p.tokens, p.builder)
+	if !typeIsSingle(v.ast.Type) {
+		p.parser.PushErrorToken(p.token, "invalid_data_unary")
+	} else if !x.IsNumericType(v.ast.Type.Code) {
+		p.parser.PushErrorToken(p.token, "invalid_data_unary")
+	}
+	return v
+}
+
+func (p *singleOperatorProcessor) plus() value {
+	v := p.parser.processValuePart(p.tokens, p.builder)
+	if !typeIsSingle(v.ast.Type) {
+		p.parser.PushErrorToken(p.token, "invalid_data_plus")
+	} else if !x.IsNumericType(v.ast.Type.Code) {
+		p.parser.PushErrorToken(p.token, "invalid_data_plus")
+	}
+	return v
+}
+
+func (p *singleOperatorProcessor) tilde() value {
+	v := p.parser.processValuePart(p.tokens, p.builder)
+	if !typeIsSingle(v.ast.Type) {
+		p.parser.PushErrorToken(p.token, "invalid_data_tilde")
+	} else if !x.IsIntegerType(v.ast.Type.Code) {
+		p.parser.PushErrorToken(p.token, "invalid_data_tilde")
+	}
+	return v
+}
+
+func (p *singleOperatorProcessor) logicalNot() value {
+	v := p.parser.processValuePart(p.tokens, p.builder)
+	if !typeIsSingle(v.ast.Type) {
+		p.parser.PushErrorToken(p.token, "invalid_data_logical_not")
+	} else if v.ast.Type.Code != x.Bool {
+		p.parser.PushErrorToken(p.token, "invalid_data_logical_not")
+	}
+	return v
+}
+
+func (p *singleOperatorProcessor) star() value {
+	v := p.parser.processValuePart(p.tokens, p.builder)
+	if !typeIsPointer(v.ast.Type) {
+		p.parser.PushErrorToken(p.token, "invalid_data_star")
+	} else {
+		v.ast.Type.Value = v.ast.Type.Value[1:]
+	}
+	return v
+}
+
+func (p *singleOperatorProcessor) amper() value {
+	nodeLen := len(p.builder.current.nodes)
+	v := p.parser.processValuePart(p.tokens, p.builder)
+	if !canGetPointer(v) {
+		p.parser.PushErrorToken(p.token, "invalid_data_amper")
+	}
+	if typeIsArray(v.ast.Type) {
+		p.builder.current.nodes = append(
+			p.builder.current.nodes[:nodeLen-1], /* -1 for remove amper operator */
+			arrayPointerExp{p.builder.current.nodes[nodeLen:]})
+	} else if v.ast.Type.Code == x.Function {
+		if p.parser.functionByName(v.ast.Token.Value) != nil {
+			p.builder.current.nodes = append(
+				p.builder.current.nodes[:nodeLen-1], /* -1 for remove amper operator */
+				functionPointerExp{
+					valueDataType: v.ast.Type,
+					nodes:         p.builder.current.nodes[nodeLen:],
+				})
+		}
+	}
+	v.ast.Type.Value = "*" + v.ast.Type.Value
+	return v
+}
+
 func (p *Parser) processSingleOperatorPart(tokens []lex.Token, builder *expressionModelBuilder) value {
 	var v value
-	token := tokens[0]
-	builder.appendNode(tokenExpNode{token: token})
-	//? Length is 1 caouse all lengths of operators is 1,
-	//? change "1" with length of token's valaue
-	//? if all operators length is not 1.
-	tokens = tokens[1:]
-	if len(tokens) == 0 {
-		p.PushErrorToken(token, "invalid_syntax")
+	processor := singleOperatorProcessor{
+		token: tokens[0],
+		//? Length is 1 cause all length of operator tokens is 1.
+		//? Change "1" with length of token's value
+		//? if all operators length is not 1.
+		tokens:  tokens[1:],
+		builder: builder,
+		parser:  p,
+	}
+	builder.appendNode(tokenExpNode{processor.token})
+	if processor.tokens == nil {
+		p.PushErrorToken(processor.token, "invalid_syntax")
 		return v
 	}
-	switch token.Value {
+	switch processor.token.Value {
 	case "-":
-		v = p.processValuePart(tokens, builder)
-		if !typeIsSingle(v.ast.Type) {
-			p.PushErrorToken(token, "invalid_data_unary")
-		} else if !x.IsNumericType(v.ast.Type.Code) {
-			p.PushErrorToken(token, "invalid_data_unary")
-		}
+		v = processor.unary()
 	case "+":
-		v = p.processValuePart(tokens, builder)
-		if !typeIsSingle(v.ast.Type) {
-			p.PushErrorToken(token, "invalid_data_unary")
-		} else if !x.IsNumericType(v.ast.Type.Code) {
-			p.PushErrorToken(token, "invalid_data_plus")
-		}
+		v = processor.plus()
 	case "~":
-		v = p.processValuePart(tokens, builder)
-		if !typeIsSingle(v.ast.Type) {
-			p.PushErrorToken(token, "invalid_data_unary")
-		} else if !x.IsIntegerType(v.ast.Type.Code) {
-			p.PushErrorToken(token, "invalid_data_tilde")
-		}
+		v = processor.tilde()
 	case "!":
-		v = p.processValuePart(tokens, builder)
-		if !typeIsSingle(v.ast.Type) {
-			p.PushErrorToken(token, "invalid_data_unary")
-		} else if v.ast.Type.Code != x.Bool {
-			p.PushErrorToken(token, "invalid_data_logical_not")
-		}
+		v = processor.logicalNot()
 	case "*":
-		v = p.processValuePart(tokens, builder)
-		if !typeIsPointer(v.ast.Type) {
-			p.PushErrorToken(token, "invalid_data_star")
-		} else {
-			v.ast.Type.Value = v.ast.Type.Value[1:]
-		}
+		v = processor.star()
 	case "&":
-		nodeLen := len(builder.current.nodes)
-		v = p.processValuePart(tokens, builder)
-		if !canGetPointer(v) {
-			p.PushErrorToken(token, "invalid_data_amper")
-		}
-		if typeIsArray(v.ast.Type) {
-			builder.current.nodes = append(
-				builder.current.nodes[:nodeLen-1], /* -1 for remove amper operator */
-				arrayPointerExp{
-					nodes: builder.current.nodes[nodeLen:],
-				})
-		} else if v.ast.Type.Code == x.Function {
-			if p.functionByName(v.ast.Token.Value) != nil {
-				builder.current.nodes = append(
-					builder.current.nodes[:nodeLen-1], /* -1 for remove amper operator */
-					functionPointerExp{
-						valueDataType: v.ast.Type,
-						nodes:         builder.current.nodes[nodeLen:],
-					})
-			}
-		}
-		v.ast.Type.Value = "*" + v.ast.Type.Value
+		v = processor.amper()
 	default:
-		p.PushErrorToken(token, "invalid_syntax")
+		p.PushErrorToken(processor.token, "invalid_syntax")
 	}
-	v.ast.Token = token
+	v.ast.Token = processor.token
 	return v
 }
 
 func canGetPointer(v value) bool {
-	return v.ast.Token.Type == lex.Name ||
-		typeIsArray(v.ast.Type)
+	return v.ast.Token.Type == lex.Name || typeIsArray(v.ast.Type)
 }
 
 func (p *Parser) processValuePart(tokens []lex.Token, builder *expressionModelBuilder) (v value) {
@@ -917,8 +1027,8 @@ func (p *Parser) processParenthesesValuePart(tokens []lex.Token, builder *expres
 	}
 	if len(valueTokens) == 0 && braceCount == 0 {
 		// Write parentheses.
-		builder.appendNode(tokenExpNode{token: lex.Token{Value: "("}})
-		defer builder.appendNode(tokenExpNode{token: lex.Token{Value: ")"}})
+		builder.appendNode(tokenExpNode{lex.Token{Value: "("}})
+		defer builder.appendNode(tokenExpNode{lex.Token{Value: ")"}})
 
 		tk := tokens[0]
 		tokens = tokens[1 : len(tokens)-1]
@@ -933,8 +1043,8 @@ func (p *Parser) processParenthesesValuePart(tokens []lex.Token, builder *expres
 	v = p.processValuePart(valueTokens, builder)
 
 	// Write parentheses.
-	builder.appendNode(tokenExpNode{token: lex.Token{Value: "("}})
-	defer builder.appendNode(tokenExpNode{token: lex.Token{Value: ")"}})
+	builder.appendNode(tokenExpNode{lex.Token{Value: "("}})
+	defer builder.appendNode(tokenExpNode{lex.Token{Value: ")"}})
 
 	switch v.ast.Type.Code {
 	case x.Function:
@@ -998,9 +1108,7 @@ func (p *Parser) processBraceValuePart(tokens []lex.Token, builder *expressionMo
 			p.checkAnonymousFunction(funAST)
 			v.ast.Type.Tag = funAST
 			v.ast.Type.Code = x.Function
-			builder.appendNode(anonymousFunctionExp{
-				ast: funAST,
-			})
+			builder.appendNode(anonymousFunctionExp{funAST})
 			return
 		default:
 			p.PushErrorToken(valueTokens[0], "invalid_syntax")
@@ -1041,10 +1149,10 @@ func (p *Parser) processBracketValuePart(tokens []lex.Token, builder *expression
 	v, model = p.computeTokens(valueTokens)
 	builder.appendNode(model)
 	tokens = tokens[len(valueTokens)+1 : len(tokens)-1] // Removed array syntax "["..."]"
-	builder.appendNode(tokenExpNode{token: lex.Token{Value: "["}})
+	builder.appendNode(tokenExpNode{lex.Token{Value: "["}})
 	selectv, model := p.computeTokens(tokens)
 	builder.appendNode(model)
-	builder.appendNode(tokenExpNode{token: lex.Token{Value: "]"}})
+	builder.appendNode(tokenExpNode{lex.Token{Value: "]"}})
 	return p.processEnumerableSelect(v, selectv, tokens[0])
 }
 
@@ -1103,16 +1211,12 @@ func (p *Parser) buildEnumerableParts(tokens []lex.Token) []enumPart {
 				lastComma = index
 				continue
 			}
-			parts = append(parts, enumPart{
-				tokens: tokens[lastComma+1 : index],
-			})
+			parts = append(parts, enumPart{tokens[lastComma+1 : index]})
 			lastComma = index
 		}
 	}
 	if lastComma+1 < len(tokens) {
-		parts = append(parts, enumPart{
-			tokens: tokens[lastComma+1:],
-		})
+		parts = append(parts, enumPart{tokens[lastComma+1:]})
 	}
 	return parts
 }
