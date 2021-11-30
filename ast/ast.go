@@ -50,7 +50,7 @@ func (ast *AST) Build() {
 			ast.BuildBrace()
 		case lex.Name:
 			ast.BuildName()
-		case lex.Var, lex.Const:
+		case lex.Const:
 			ast.BuildGlobalVariable()
 		case lex.Type:
 			ast.BuildType()
@@ -99,6 +99,8 @@ func (ast *AST) BuildName() {
 	token := ast.Tokens[ast.Position]
 	ast.Position--
 	switch token.Type {
+	case lex.Colon:
+		ast.BuildGlobalVariable()
 	case lex.Brace:
 		switch token.Value {
 		case "(":
@@ -462,7 +464,7 @@ func (ast *AST) BuildStatement(tokens []lex.Token) (s StatementAST) {
 	switch firstToken.Type {
 	case lex.Name:
 		return ast.BuildNameStatement(tokens)
-	case lex.Var, lex.Const:
+	case lex.Const:
 		return ast.BuildVariableStatement(tokens)
 	case lex.Return:
 		return ast.BuildReturnStatement(tokens)
@@ -483,6 +485,9 @@ func (ast *AST) BuildStatement(tokens []lex.Token) (s StatementAST) {
 func (ast *AST) BuildVariableSetStatement(tokens []lex.Token) (s StatementAST, _ bool) {
 	switch tokens[0].Type {
 	case lex.Name, lex.Brace, lex.Operator:
+		if len(tokens) > 1 && tokens[1].Type == lex.Colon {
+			return
+		}
 	default:
 		return
 	}
@@ -527,6 +532,8 @@ func (ast *AST) BuildNameStatement(tokens []lex.Token) (s StatementAST) {
 		return
 	}
 	switch tokens[1].Type {
+	case lex.Colon:
+		return ast.BuildVariableStatement(tokens)
 	case lex.Brace:
 		switch tokens[1].Value {
 		case "(":
@@ -598,15 +605,27 @@ func (ast *AST) pushArg(args *[]ArgAST, tokens []lex.Token, err lex.Token) {
 func (ast *AST) BuildVariableStatement(tokens []lex.Token) (s StatementAST) {
 	var varAST VariableAST
 	position := 0
-	varAST.DefineToken = tokens[position]
-	position++
+	if tokens[position].Type != lex.Name {
+		varAST.DefineToken = tokens[position]
+		position++
+	}
 	varAST.NameToken = tokens[position]
 	if varAST.NameToken.Type != lex.Name {
 		ast.PushErrorToken(varAST.NameToken, "invalid_syntax")
 	}
 	varAST.Name = varAST.NameToken.Value
 	varAST.Type = DataTypeAST{Code: x.Void}
+	// Skip type definer operator(':')
 	position++
+	if varAST.DefineToken.File != nil {
+		if tokens[position].Type != lex.Colon {
+			ast.PushErrorToken(tokens[position], "invalid_syntax")
+			return
+		}
+		position++
+	} else {
+		position++
+	}
 	if position >= len(tokens) {
 		ast.PushErrorToken(tokens[position-1], "missing_autotype_value")
 		return

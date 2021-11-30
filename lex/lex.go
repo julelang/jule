@@ -231,6 +231,10 @@ func (l *Lex) Token() Token {
 	//* Tokenize
 
 	switch {
+	case content[0] == ':':
+		token.Value = ":"
+		token.Type = Colon
+		l.Position++
 	case content[0] == ';':
 		token.Value = ";"
 		token.Type = SemiColon
@@ -361,10 +365,6 @@ func (l *Lex) Token() Token {
 		token.Value = "="
 		token.Type = Operator
 		l.Position++
-	case isKeyword(content, "var"):
-		token.Value = "var"
-		token.Type = Var
-		l.Position += 3
 	case isKeyword(content, "const"):
 		token.Value = "const"
 		token.Type = Const

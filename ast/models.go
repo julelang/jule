@@ -14,12 +14,6 @@ type Object struct {
 	Value interface{}
 }
 
-// IdentifierAST is identifier.
-type IdentifierAST struct {
-	Type  uint8
-	Value string
-}
-
 // StatementAST is statement.
 type StatementAST struct {
 	Token lex.Token

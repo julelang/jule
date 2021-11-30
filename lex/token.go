@@ -22,7 +22,7 @@ const (
 	Value     uint8 = 6
 	Operator  uint8 = 7
 	Comma     uint8 = 8
-	Var       uint8 = 9
-	Const     uint8 = 10
-	Type      uint8 = 11
+	Const     uint8 = 9
+	Type      uint8 = 10
+	Colon     uint8 = 11
 )
