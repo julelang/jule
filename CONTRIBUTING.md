@@ -1,6 +1,6 @@
 # Contributing
-+ [Code of Conduct](https://github.com/the-xlang/x/blob/main/CODE_OF_CONDUCT.md)
-+ [License](https://github.com/the-xlang/x/blob/main/LICENSE)
++ [Code of Conduct](https://the-xlang.github.io/website/pages/code_of_conduct.html)
++ [License](https://the-xlang.github.io/website/pages/license.html)
 
 ## Rules
 + It is important that the code is written and properly formatted.
