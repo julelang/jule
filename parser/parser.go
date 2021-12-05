@@ -1376,7 +1376,7 @@ func (p *Parser) checkVariableSetStatement(vsAST *ast.VariableSetAST) {
 	vsAST.ValueExpression = model.ExpressionAST()
 	if vsAST.Setter.Kind != "=" {
 		vsAST.Setter.Kind = vsAST.Setter.Kind[:len(vsAST.Setter.Kind)-1]
-		_ = arithmeticProcess{
+		value.ast = arithmeticProcess{
 			p:        p,
 			left:     vsAST.SelectExpression.Tokens,
 			leftVal:  selected.ast,
