@@ -385,7 +385,7 @@ func (p *Parser) computeProcesses(processes [][]lex.Token) (v value, e expressio
 		return
 	}
 	var process arithmeticProcess
-	process.cp = p
+	process.p = p
 	j := p.nextOperator(processes)
 	boolean := false
 	for j != -1 {
@@ -516,7 +516,7 @@ func (p *Parser) nextOperator(tokens [][]lex.Token) int {
 }
 
 type arithmeticProcess struct {
-	cp       *Parser
+	p        *Parser
 	left     []lex.Token
 	leftVal  ast.ValueAST
 	right    []lex.Token
@@ -526,14 +526,14 @@ type arithmeticProcess struct {
 
 func (ap arithmeticProcess) solvePointer() (v ast.ValueAST) {
 	if ap.leftVal.Type.Value != ap.rightVal.Type.Value {
-		ap.cp.PushErrorToken(ap.operator, "incompatible_type")
+		ap.p.PushErrorToken(ap.operator, "incompatible_type")
 		return
 	}
 	switch ap.operator.Kind {
 	case "!=", "==":
 		v.Type.Code = x.Bool
 	default:
-		ap.cp.PushErrorToken(ap.operator, "operator_notfor_pointer")
+		ap.p.PushErrorToken(ap.operator, "operator_notfor_pointer")
 	}
 	return
 }
@@ -541,7 +541,7 @@ func (ap arithmeticProcess) solvePointer() (v ast.ValueAST) {
 func (ap arithmeticProcess) solveString() (v ast.ValueAST) {
 	// Not both string?
 	if ap.leftVal.Type.Code != ap.rightVal.Type.Code {
-		ap.cp.PushErrorToken(ap.operator, "incompatible_datatype")
+		ap.p.PushErrorToken(ap.operator, "incompatible_datatype")
 		return
 	}
 	switch ap.operator.Kind {
@@ -550,7 +550,7 @@ func (ap arithmeticProcess) solveString() (v ast.ValueAST) {
 	case "==", "!=":
 		v.Type.Code = x.Bool
 	default:
-		ap.cp.PushErrorToken(ap.operator, "operator_notfor_strings")
+		ap.p.PushErrorToken(ap.operator, "operator_notfor_strings")
 	}
 	return
 }
@@ -560,21 +560,21 @@ func (ap arithmeticProcess) solveAny() (v ast.ValueAST) {
 	case "!=", "==":
 		v.Type.Code = x.Bool
 	default:
-		ap.cp.PushErrorToken(ap.operator, "operator_notfor_any")
+		ap.p.PushErrorToken(ap.operator, "operator_notfor_any")
 	}
 	return
 }
 
 func (ap arithmeticProcess) solveBool() (v ast.ValueAST) {
 	if !typesAreCompatible(ap.leftVal.Type, ap.rightVal.Type, true) {
-		ap.cp.PushErrorToken(ap.operator, "incompatible_type")
+		ap.p.PushErrorToken(ap.operator, "incompatible_type")
 		return
 	}
 	switch ap.operator.Kind {
 	case "!=", "==":
 		v.Type.Code = x.Bool
 	default:
-		ap.cp.PushErrorToken(ap.operator, "operator_notfor_bool")
+		ap.p.PushErrorToken(ap.operator, "operator_notfor_bool")
 	}
 	return
 }
@@ -583,7 +583,7 @@ func (ap arithmeticProcess) solveFloat() (v ast.ValueAST) {
 	if !typesAreCompatible(ap.leftVal.Type, ap.rightVal.Type, true) {
 		if !isConstantNumeric(ap.leftVal.Value) &&
 			!isConstantNumeric(ap.rightVal.Value) {
-			ap.cp.PushErrorToken(ap.operator, "incompatible_type")
+			ap.p.PushErrorToken(ap.operator, "incompatible_type")
 			return
 		}
 	}
@@ -596,7 +596,7 @@ func (ap arithmeticProcess) solveFloat() (v ast.ValueAST) {
 			v.Type.Code = x.Float64
 		}
 	default:
-		ap.cp.PushErrorToken(ap.operator, "operator_notfor_float")
+		ap.p.PushErrorToken(ap.operator, "operator_notfor_float")
 	}
 	return
 }
@@ -605,7 +605,7 @@ func (ap arithmeticProcess) solveSigned() (v ast.ValueAST) {
 	if !typesAreCompatible(ap.leftVal.Type, ap.rightVal.Type, true) {
 		if !isConstantNumeric(ap.leftVal.Value) &&
 			!isConstantNumeric(ap.rightVal.Value) {
-			ap.cp.PushErrorToken(ap.operator, "incompatible_type")
+			ap.p.PushErrorToken(ap.operator, "incompatible_type")
 			return
 		}
 	}
@@ -621,10 +621,10 @@ func (ap arithmeticProcess) solveSigned() (v ast.ValueAST) {
 		v.Type = ap.leftVal.Type
 		if !x.IsUnsignedNumericType(ap.rightVal.Type.Code) &&
 			!checkIntBit(ap.rightVal, xbits.BitsizeOfType(x.UInt64)) {
-			ap.cp.PushErrorToken(ap.rightVal.Token, "bitshift_must_unsigned")
+			ap.p.PushErrorToken(ap.rightVal.Token, "bitshift_must_unsigned")
 		}
 	default:
-		ap.cp.PushErrorToken(ap.operator, "operator_notfor_int")
+		ap.p.PushErrorToken(ap.operator, "operator_notfor_int")
 	}
 	return
 }
@@ -633,7 +633,7 @@ func (ap arithmeticProcess) solveUnsigned() (v ast.ValueAST) {
 	if !typesAreCompatible(ap.leftVal.Type, ap.rightVal.Type, true) {
 		if !isConstantNumeric(ap.leftVal.Value) &&
 			!isConstantNumeric(ap.rightVal.Value) {
-			ap.cp.PushErrorToken(ap.operator, "incompatible_type")
+			ap.p.PushErrorToken(ap.operator, "incompatible_type")
 			return
 		}
 		return
@@ -647,7 +647,7 @@ func (ap arithmeticProcess) solveUnsigned() (v ast.ValueAST) {
 			v.Type = ap.rightVal.Type
 		}
 	default:
-		ap.cp.PushErrorToken(ap.operator, "operator_notfor_uint")
+		ap.p.PushErrorToken(ap.operator, "operator_notfor_uint")
 	}
 	return
 }
@@ -655,17 +655,17 @@ func (ap arithmeticProcess) solveUnsigned() (v ast.ValueAST) {
 func (ap arithmeticProcess) solveLogical() (v ast.ValueAST) {
 	v.Type.Code = x.Bool
 	if ap.leftVal.Type.Code != x.Bool {
-		ap.cp.PushErrorToken(ap.leftVal.Token, "logical_not_bool")
+		ap.p.PushErrorToken(ap.leftVal.Token, "logical_not_bool")
 	}
 	if ap.rightVal.Type.Code != x.Bool {
-		ap.cp.PushErrorToken(ap.rightVal.Token, "logical_not_bool")
+		ap.p.PushErrorToken(ap.rightVal.Token, "logical_not_bool")
 	}
 	return
 }
 
 func (ap arithmeticProcess) solveRune() (v ast.ValueAST) {
 	if !typesAreCompatible(ap.leftVal.Type, ap.rightVal.Type, true) {
-		ap.cp.PushErrorToken(ap.operator, "incompatible_type")
+		ap.p.PushErrorToken(ap.operator, "incompatible_type")
 		return
 	}
 	switch ap.operator.Kind {
@@ -674,35 +674,35 @@ func (ap arithmeticProcess) solveRune() (v ast.ValueAST) {
 	case "+", "-", "*", "/", "^", "&", "%", "|":
 		v.Type.Code = x.Rune
 	default:
-		ap.cp.PushErrorToken(ap.operator, "operator_notfor_rune")
+		ap.p.PushErrorToken(ap.operator, "operator_notfor_rune")
 	}
 	return
 }
 
 func (ap arithmeticProcess) solveArray() (v ast.ValueAST) {
 	if !typesAreCompatible(ap.leftVal.Type, ap.rightVal.Type, true) {
-		ap.cp.PushErrorToken(ap.operator, "incompatible_type")
+		ap.p.PushErrorToken(ap.operator, "incompatible_type")
 		return
 	}
 	switch ap.operator.Kind {
 	case "!=", "==":
 		v.Type.Code = x.Bool
 	default:
-		ap.cp.PushErrorToken(ap.operator, "operator_notfor_array")
+		ap.p.PushErrorToken(ap.operator, "operator_notfor_array")
 	}
 	return
 }
 
 func (ap arithmeticProcess) solveNull() (v ast.ValueAST) {
 	if !typesAreCompatible(ap.leftVal.Type, ap.rightVal.Type, false) {
-		ap.cp.PushErrorToken(ap.operator, "incompatible_type")
+		ap.p.PushErrorToken(ap.operator, "incompatible_type")
 		return
 	}
 	switch ap.operator.Kind {
 	case "!=", "==":
 		v.Type.Code = x.Bool
 	default:
-		ap.cp.PushErrorToken(ap.operator, "operator_notfor_null")
+		ap.p.PushErrorToken(ap.operator, "operator_notfor_null")
 	}
 	return
 }
@@ -715,7 +715,7 @@ func (ap arithmeticProcess) solve() (v ast.ValueAST) {
 	case "&&", "||":
 		return ap.solveLogical()
 	default:
-		ap.cp.PushErrorToken(ap.operator, "invalid_operator")
+		ap.p.PushErrorToken(ap.operator, "invalid_operator")
 	}
 	switch {
 	case typeIsArray(ap.leftVal.Type) || typeIsArray(ap.rightVal.Type):
@@ -1374,5 +1374,17 @@ func (p *Parser) checkVariableSetStatement(vsAST *ast.VariableSetAST) {
 	}
 	value, model := p.computeProcesses(vsAST.ValueExpression.Processes)
 	vsAST.ValueExpression = model.ExpressionAST()
+	if vsAST.Setter.Kind != "=" {
+		vsAST.Setter.Kind = vsAST.Setter.Kind[:len(vsAST.Setter.Kind)-1]
+		_ = arithmeticProcess{
+			p:        p,
+			left:     vsAST.SelectExpression.Tokens,
+			leftVal:  selected.ast,
+			right:    vsAST.ValueExpression.Tokens,
+			rightVal: value.ast,
+			operator: vsAST.Setter,
+		}.solve()
+		vsAST.Setter.Kind += "="
+	}
 	p.checkType(selected.ast.Type, value.ast.Type, false, vsAST.Setter)
 }

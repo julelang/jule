@@ -505,8 +505,7 @@ func (ast *AST) BuildVariableSetStatement(tokens []lex.Token) (s StatementAST, _
 		if braceCount != 0 {
 			continue
 		}
-		switch token.Kind {
-		case "=":
+		if strings.HasSuffix(token.Kind, "=") {
 			if index == len(tokens)-1 {
 				ast.PushErrorToken(token, "missing_value")
 				return s, true /* true for not give another errors */

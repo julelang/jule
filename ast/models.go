@@ -316,5 +316,6 @@ type VariableSetAST struct {
 }
 
 func (vs VariableSetAST) String() string {
-	return vs.SelectExpression.String() + " = " + vs.ValueExpression.String() + ";"
+	return vs.SelectExpression.String() + " " + vs.Setter.Kind +
+		" " + vs.ValueExpression.String() + ";"
 }
