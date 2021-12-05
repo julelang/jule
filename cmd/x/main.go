@@ -38,11 +38,7 @@ func help(cmd string) {
 	const space = 5 // Space of between command name and description.
 	for _, part := range helpContent {
 		sb.WriteString(part[0])
-		mlchc := (maxlen - len(part[0])) + space
-		for mlchc > 0 {
-			sb.WriteByte(' ')
-			mlchc--
-		}
+		sb.WriteString(strings.Repeat(" ", (maxlen-len(part[0]))+space))
 		sb.WriteString(part[1])
 		sb.WriteByte('\n')
 	}
