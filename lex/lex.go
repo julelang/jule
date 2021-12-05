@@ -277,6 +277,7 @@ func (l *Lex) Token() Token {
 		l.lexPunct(content, "]", Brace, &token),
 		l.lexPunct(content, "+=", Operator, &token),
 		l.lexPunct(content, "-=", Operator, &token),
+		l.lexPunct(content, "*=", Operator, &token),
 		l.lexPunct(content, "==", Operator, &token),
 		l.lexPunct(content, "!=", Operator, &token),
 		l.lexPunct(content, ">=", Operator, &token),
