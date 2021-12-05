@@ -550,7 +550,7 @@ func (ap arithmeticProcess) solveString() (v ast.ValueAST) {
 	case "==", "!=":
 		v.Type.Code = x.Bool
 	default:
-		ap.p.PushErrorToken(ap.operator, "operator_notfor_strings")
+		ap.p.PushErrorToken(ap.operator, "operator_notfor_string")
 	}
 	return
 }
