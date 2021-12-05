@@ -205,7 +205,7 @@ void _main();
 
 void _main(){
   int32 _a = 5;
-  _a <<= 10;
+  _a &= 10;
   _outln(_a);
 }
 
