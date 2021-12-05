@@ -208,6 +208,14 @@ public:
     return !(this->string == string.string);
   }
 
+  str operator+(const str& string) {
+    return str(this->string + string.string);
+  }
+
+  void operator+=(const str& string) {
+    this->string += string.string;
+  }
+
   rune& operator[](const int index) {
     const uint32 length = this->string.length();
     if (index < 0) {
