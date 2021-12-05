@@ -214,6 +214,26 @@ func (l *Lex) NewLine() {
 	l.Column = 1
 }
 
+func (l *Lex) lexPunct(content, kind string, id uint8, token *Token) bool {
+	if !strings.HasPrefix(content, kind) {
+		return false
+	}
+	token.Kind = kind
+	token.Id = id
+	l.Position += len([]rune(kind))
+	return true
+}
+
+func (l *Lex) lexKeyword(content, kind string, id uint8, token *Token) bool {
+	if !isKeyword(content, kind) {
+		return false
+	}
+	token.Kind = kind
+	token.Id = id
+	l.Position += len([]rune(kind))
+	return true
+}
+
 // Token generates next token from resume at position.
 func (l *Lex) Token() Token {
 	token := Token{
@@ -231,42 +251,6 @@ func (l *Lex) Token() Token {
 	//* Tokenize
 
 	switch {
-	case content[0] == ':':
-		token.Kind = ":"
-		token.Id = Colon
-		l.Position++
-	case content[0] == ';':
-		token.Kind = ";"
-		token.Id = SemiColon
-		l.Position++
-	case content[0] == ',':
-		token.Kind = ","
-		token.Id = Comma
-		l.Position++
-	case content[0] == '(':
-		token.Kind = "("
-		token.Id = Brace
-		l.Position++
-	case content[0] == ')':
-		token.Kind = ")"
-		token.Id = Brace
-		l.Position++
-	case content[0] == '{':
-		token.Kind = "{"
-		token.Id = Brace
-		l.Position++
-	case content[0] == '}':
-		token.Kind = "}"
-		token.Id = Brace
-		l.Position++
-	case content[0] == '[':
-		token.Kind = "["
-		token.Id = Brace
-		l.Position++
-	case content[0] == ']':
-		token.Kind = "]"
-		token.Id = Brace
-		l.Position++
 	case content[0] == '\'':
 		token.Kind = l.lexRune(content)
 		token.Id = Value
@@ -281,170 +265,60 @@ func (l *Lex) Token() Token {
 	case strings.HasPrefix(content, "/*"):
 		l.lexBlockComment()
 		return token
-	case strings.HasPrefix(content, "<<"):
-		token.Kind = "<<"
-		token.Id = Operator
-		l.Position += 2
-	case strings.HasPrefix(content, ">>"):
-		token.Kind = ">>"
-		token.Id = Operator
-		l.Position += 2
-	case strings.HasPrefix(content, "=="):
-		token.Kind = "=="
-		token.Id = Operator
-		l.Position += 2
-	case strings.HasPrefix(content, "!="):
-		token.Kind = "!="
-		token.Id = Operator
-		l.Position += 2
-	case strings.HasPrefix(content, ">="):
-		token.Kind = ">="
-		token.Id = Operator
-		l.Position += 2
-	case strings.HasPrefix(content, "<="):
-		token.Kind = "<="
-		token.Id = Operator
-		l.Position += 2
-	case strings.HasPrefix(content, "&&"):
-		token.Kind = "&&"
-		token.Id = Operator
-		l.Position += 2
-	case strings.HasPrefix(content, "||"):
-		token.Kind = "||"
-		token.Id = Operator
-		l.Position += 2
-	case content[0] == '+':
-		token.Kind = "+"
-		token.Id = Operator
-		l.Position++
-	case content[0] == '-':
-		token.Kind = "-"
-		token.Id = Operator
-		l.Position++
-	case content[0] == '*':
-		token.Kind = "*"
-		token.Id = Operator
-		l.Position++
-	case content[0] == '/':
-		token.Kind = "/"
-		token.Id = Operator
-		l.Position++
-	case content[0] == '%':
-		token.Kind = "%"
-		token.Id = Operator
-		l.Position++
-	case content[0] == '~':
-		token.Kind = "~"
-		token.Id = Operator
-		l.Position++
-	case content[0] == '&':
-		token.Kind = "&"
-		token.Id = Operator
-		l.Position++
-	case content[0] == '|':
-		token.Kind = "|"
-		token.Id = Operator
-		l.Position++
-	case content[0] == '^':
-		token.Kind = "^"
-		token.Id = Operator
-		l.Position++
-	case content[0] == '!':
-		token.Kind = "!"
-		token.Id = Operator
-		l.Position++
-	case content[0] == '<':
-		token.Kind = "<"
-		token.Id = Operator
-		l.Position++
-	case content[0] == '>':
-		token.Kind = ">"
-		token.Id = Operator
-		l.Position++
-	case content[0] == '=':
-		token.Kind = "="
-		token.Id = Operator
-		l.Position++
-	case isKeyword(content, "const"):
-		token.Kind = "const"
-		token.Id = Const
-		l.Position += 5
-	case isKeyword(content, "int8"):
-		token.Kind = "int8"
-		token.Id = DataType
-		l.Position += 4
-	case isKeyword(content, "int16"):
-		token.Kind = "int16"
-		token.Id = DataType
-		l.Position += 5
-	case isKeyword(content, "int32"):
-		token.Kind = "int32"
-		token.Id = DataType
-		l.Position += 5
-	case isKeyword(content, "int64"):
-		token.Kind = "int64"
-		token.Id = DataType
-		l.Position += 5
-	case isKeyword(content, "uint8"):
-		token.Kind = "uint8"
-		token.Id = DataType
-		l.Position += 5
-	case isKeyword(content, "uint16"):
-		token.Kind = "uint16"
-		token.Id = DataType
-		l.Position += 6
-	case isKeyword(content, "uint32"):
-		token.Kind = "uint32"
-		token.Id = DataType
-		l.Position += 6
-	case isKeyword(content, "uint64"):
-		token.Kind = "uint64"
-		token.Id = DataType
-		l.Position += 6
-	case isKeyword(content, "float32"):
-		token.Kind = "float32"
-		token.Id = DataType
-		l.Position += 7
-	case isKeyword(content, "float64"):
-		token.Kind = "float64"
-		token.Id = DataType
-		l.Position += 7
-	case isKeyword(content, "ret"):
-		token.Kind = "ret"
-		token.Id = Return
-		l.Position += 3
-	case isKeyword(content, "bool"):
-		token.Kind = "bool"
-		token.Id = DataType
-		l.Position += 4
-	case isKeyword(content, "rune"):
-		token.Kind = "rune"
-		token.Id = DataType
-		l.Position += 4
-	case isKeyword(content, "str"):
-		token.Kind = "str"
-		token.Id = DataType
-		l.Position += 3
-	case isKeyword(content, "true"):
-		token.Kind = "true"
-		token.Id = Value
-		l.Position += 4
-	case isKeyword(content, "false"):
-		token.Kind = "false"
-		token.Id = Value
-		l.Position += 5
-	case isKeyword(content, "null"):
-		token.Kind = "null"
-		token.Id = Value
-		l.Position += 4
-	case isKeyword(content, "type"):
-		token.Kind = "type"
-		token.Id = Type
-		l.Position += 4
+	case
+		l.lexPunct(content, ":", Colon, &token),
+		l.lexPunct(content, ";", SemiColon, &token),
+		l.lexPunct(content, ",", Comma, &token),
+		l.lexPunct(content, "(", Brace, &token),
+		l.lexPunct(content, ")", Brace, &token),
+		l.lexPunct(content, "{", Brace, &token),
+		l.lexPunct(content, "}", Brace, &token),
+		l.lexPunct(content, "[", Brace, &token),
+		l.lexPunct(content, "]", Brace, &token),
+		l.lexPunct(content, "<<", Operator, &token),
+		l.lexPunct(content, ">>", Operator, &token),
+		l.lexPunct(content, "==", Operator, &token),
+		l.lexPunct(content, "!=", Operator, &token),
+		l.lexPunct(content, ">=", Operator, &token),
+		l.lexPunct(content, "<=", Operator, &token),
+		l.lexPunct(content, "&&", Operator, &token),
+		l.lexPunct(content, "||", Operator, &token),
+		l.lexPunct(content, "+", Operator, &token),
+		l.lexPunct(content, "-", Operator, &token),
+		l.lexPunct(content, "*", Operator, &token),
+		l.lexPunct(content, "/", Operator, &token),
+		l.lexPunct(content, "%", Operator, &token),
+		l.lexPunct(content, "~", Operator, &token),
+		l.lexPunct(content, "&", Operator, &token),
+		l.lexPunct(content, "|", Operator, &token),
+		l.lexPunct(content, "^", Operator, &token),
+		l.lexPunct(content, "!", Operator, &token),
+		l.lexPunct(content, "<", Operator, &token),
+		l.lexPunct(content, ">", Operator, &token),
+		l.lexPunct(content, "=", Operator, &token),
+		l.lexKeyword(content, "int8", DataType, &token),
+		l.lexKeyword(content, "int16", DataType, &token),
+		l.lexKeyword(content, "int32", DataType, &token),
+		l.lexKeyword(content, "int64", DataType, &token),
+		l.lexKeyword(content, "uint8", DataType, &token),
+		l.lexKeyword(content, "uint16", DataType, &token),
+		l.lexKeyword(content, "uint32", DataType, &token),
+		l.lexKeyword(content, "uint64", DataType, &token),
+		l.lexKeyword(content, "float32", DataType, &token),
+		l.lexKeyword(content, "float64", DataType, &token),
+		l.lexKeyword(content, "bool", DataType, &token),
+		l.lexKeyword(content, "rune", DataType, &token),
+		l.lexKeyword(content, "str", DataType, &token),
+		l.lexKeyword(content, "true", Value, &token),
+		l.lexKeyword(content, "false", Value, &token),
+		l.lexKeyword(content, "null", Value, &token),
+		l.lexKeyword(content, "const", Const, &token),
+		l.lexKeyword(content, "ret", Return, &token),
+		l.lexKeyword(content, "type", Type, &token):
 	default:
 		lex := l.lexName(content)
 		if lex != "" {
-			token.Kind = lex
+			token.Kind = "_" + lex
 			token.Id = Name
 			break
 		}
@@ -460,8 +334,5 @@ func (l *Lex) Token() Token {
 		return token
 	}
 	l.Column += len(token.Kind)
-	if token.Id == Name {
-		token.Kind = "_" + token.Kind
-	}
 	return token
 }
