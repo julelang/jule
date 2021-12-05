@@ -30,7 +30,7 @@ func New(tokens []lex.Token) *AST {
 func (ast *AST) PushErrorToken(token lex.Token, err string) {
 	message := x.Errors[err]
 	ast.Errors = append(ast.Errors, fmt.Sprintf(
-		"%s:%d:%d %s", token.File.Path, token.Line, token.Column, message))
+		"%s:%d:%d %s", token.File.Path, token.Row, token.Column, message))
 }
 
 // PushError appends error by current token.
@@ -45,7 +45,7 @@ func (ast *AST) Ended() bool { return ast.Position >= len(ast.Tokens) }
 func (ast *AST) Build() {
 	for ast.Position != -1 && !ast.Ended() {
 		firstToken := ast.Tokens[ast.Position]
-		switch firstToken.Type {
+		switch firstToken.Id {
 		case lex.Brace:
 			ast.BuildBrace()
 		case lex.Name:
@@ -70,7 +70,7 @@ func (ast *AST) BuildType() {
 		return
 	}
 	token := tokens[position]
-	if token.Type != lex.Name {
+	if token.Id != lex.Name {
 		ast.PushErrorToken(token, "invalid_syntax")
 	}
 	position++
@@ -83,7 +83,7 @@ func (ast *AST) BuildType() {
 		Token: tokens[1],
 		Value: TypeAST{
 			Token: tokens[1],
-			Name:  tokens[1].Value,
+			Name:  tokens[1].Kind,
 			Type:  destinationType,
 		},
 	})
@@ -98,11 +98,11 @@ func (ast *AST) BuildName() {
 	}
 	token := ast.Tokens[ast.Position]
 	ast.Position--
-	switch token.Type {
+	switch token.Id {
 	case lex.Colon:
 		ast.BuildGlobalVariable()
 	case lex.Brace:
-		switch token.Value {
+		switch token.Kind {
 		case "(":
 			funAST := ast.BuildFunction(false)
 			ast.Tree = append(ast.Tree, Object{
@@ -122,7 +122,7 @@ func (ast *AST) BuildName() {
 // BuildBrace builds AST model by global brace statement.
 func (ast *AST) BuildBrace() {
 	token := ast.Tokens[ast.Position]
-	switch token.Value {
+	switch token.Kind {
 	case "[":
 		ast.BuildAttribute()
 	default:
@@ -144,13 +144,13 @@ func (ast *AST) BuildAttribute() {
 		return
 	}
 	attribute.Token = ast.Tokens[ast.Position]
-	if attribute.Token.Type != lex.Brace || attribute.Token.Value != "]" {
+	if attribute.Token.Id != lex.Brace || attribute.Token.Kind != "]" {
 		ast.PushErrorToken(attribute.Token, "invalid_syntax")
 		ast.Position = -1 // Stop modelling.
 		return
 	}
 	attribute.Token = ast.Tokens[ast.Position-1]
-	attribute.Value = attribute.Token.Value
+	attribute.Value = attribute.Token.Kind
 	ast.Tree = append(ast.Tree, Object{
 		Token: attribute.Token,
 		Value: attribute,
@@ -164,10 +164,10 @@ func (ast *AST) BuildFunction(anonymous bool) (funAST FunctionAST) {
 	if anonymous {
 		funAST.Name = "anonymous"
 	} else {
-		if funAST.Token.Type != lex.Name {
+		if funAST.Token.Id != lex.Name {
 			ast.PushErrorToken(funAST.Token, "invalid_syntax")
 		}
-		funAST.Name = funAST.Token.Value
+		funAST.Name = funAST.Token.Kind
 		ast.Position++
 		if ast.Ended() {
 			ast.Position--
@@ -202,7 +202,7 @@ func (ast *AST) BuildFunction(anonymous bool) (funAST FunctionAST) {
 		}
 		token = ast.Tokens[ast.Position]
 	}
-	if token.Type != lex.Brace || token.Value != "{" {
+	if token.Id != lex.Brace || token.Kind != "{" {
 		ast.PushError("invalid_syntax")
 		ast.Position = -1 // Stop modelling.
 		return
@@ -235,15 +235,15 @@ func (ast *AST) BuildParameters(fn *FunctionAST, tokens []lex.Token) {
 	last := 0
 	braceCount := 0
 	for index, token := range tokens {
-		if token.Type == lex.Brace {
-			switch token.Value {
+		if token.Id == lex.Brace {
+			switch token.Kind {
 			case "{", "[", "(":
 				braceCount++
 			default:
 				braceCount--
 			}
 		}
-		if braceCount > 0 || token.Type != lex.Comma {
+		if braceCount > 0 || token.Id != lex.Comma {
 			continue
 		}
 		ast.pushParameter(fn, tokens[last:index], token)
@@ -279,17 +279,17 @@ func (ast *AST) pushParameter(fn *FunctionAST, tokens []lex.Token, err lex.Token
 			return
 		}
 		nameToken := tokens[0]
-		if nameToken.Type != lex.Name {
+		if nameToken.Id != lex.Name {
 			ast.PushErrorToken(nameToken, "invalid_syntax")
 		}
-		if !x.IsIgnoreName(nameToken.Value) {
+		if !x.IsIgnoreName(nameToken.Kind) {
 			for _, param := range fn.Params {
-				if param.Name == nameToken.Value {
+				if param.Name == nameToken.Kind {
 					ast.PushErrorToken(nameToken, "parameter_exist")
 					break
 				}
 			}
-			paramAST.Name = nameToken.Value
+			paramAST.Name = nameToken.Kind
 		}
 		index := 1
 		paramAST.Type, _ = ast.BuildDataType(tokens, &index, true)
@@ -303,14 +303,14 @@ end:
 
 // IsStatement reports token is
 // statement finish point or not.
-func IsStatement(token lex.Token) bool { return token.Type == lex.SemiColon }
+func IsStatement(token lex.Token) bool { return token.Id == lex.SemiColon }
 
 // BuildDataType builds AST model of data type.
 func (ast *AST) BuildDataType(tokens []lex.Token, index *int, err bool) (dt DataTypeAST, _ bool) {
 	first := *index
 	for ; *index < len(tokens); *index++ {
 		token := tokens[*index]
-		switch token.Type {
+		switch token.Id {
 		case lex.DataType:
 			buildDataType(token, &dt)
 			return dt, true
@@ -318,13 +318,13 @@ func (ast *AST) BuildDataType(tokens []lex.Token, index *int, err bool) (dt Data
 			buildNameType(token, &dt)
 			return dt, true
 		case lex.Operator:
-			if token.Value == "*" {
-				dt.Value += token.Value
+			if token.Kind == "*" {
+				dt.Value += token.Kind
 				break
 			}
 			fallthrough
 		case lex.Brace:
-			switch token.Value {
+			switch token.Kind {
 			case "(":
 				ast.buildFunctionType(token, tokens, index, &dt)
 				return dt, true
@@ -337,7 +337,7 @@ func (ast *AST) BuildDataType(tokens []lex.Token, index *int, err bool) (dt Data
 					return dt, false
 				}
 				token = tokens[*index]
-				if token.Type != lex.Brace || token.Value != "]" {
+				if token.Id != lex.Brace || token.Kind != "]" {
 					if err {
 						ast.PushErrorToken(token, "invalid_syntax")
 					}
@@ -365,14 +365,14 @@ func (ast *AST) BuildDataType(tokens []lex.Token, index *int, err bool) (dt Data
 
 func buildDataType(token lex.Token, dt *DataTypeAST) {
 	dt.Token = token
-	dt.Code = x.TypeFromName(dt.Token.Value)
-	dt.Value += dt.Token.Value
+	dt.Code = x.TypeFromName(dt.Token.Kind)
+	dt.Value += dt.Token.Kind
 }
 
 func buildNameType(token lex.Token, dt *DataTypeAST) {
 	dt.Token = token
 	dt.Code = x.Name
-	dt.Value += dt.Token.Value
+	dt.Value += dt.Token.Kind
 }
 
 func (ast *AST) buildFunctionType(token lex.Token, tokens []lex.Token, index *int, dt *DataTypeAST) {
@@ -392,10 +392,10 @@ func (ast *AST) buildFunctionDataType(tokens []lex.Token, index *int) (string, F
 	firstIndex := *index
 	for *index++; *index < len(tokens); *index++ {
 		token := tokens[*index]
-		typeValue.WriteString(token.Value)
-		switch token.Type {
+		typeValue.WriteString(token.Kind)
+		switch token.Id {
 		case lex.Brace:
-			switch token.Value {
+			switch token.Kind {
 			case "{", "[", "(":
 				brace++
 			default:
@@ -428,8 +428,8 @@ func (ast *AST) BuildBlock(tokens []lex.Token) (b BlockAST) {
 	braceCount := 0
 	oldStatementPoint := 0
 	for index, token := range tokens {
-		if token.Type == lex.Brace {
-			switch token.Value {
+		if token.Id == lex.Brace {
+			switch token.Kind {
 			case "{":
 				braceCount++
 			case "}":
@@ -461,7 +461,7 @@ func (ast *AST) BuildStatement(tokens []lex.Token) (s StatementAST) {
 		return s
 	}
 	firstToken := tokens[0]
-	switch firstToken.Type {
+	switch firstToken.Id {
 	case lex.Name:
 		return ast.BuildNameStatement(tokens)
 	case lex.Const:
@@ -469,11 +469,11 @@ func (ast *AST) BuildStatement(tokens []lex.Token) (s StatementAST) {
 	case lex.Return:
 		return ast.BuildReturnStatement(tokens)
 	case lex.Brace:
-		if firstToken.Value == "(" {
+		if firstToken.Kind == "(" {
 			return ast.BuildExpressionStatement(tokens)
 		}
 	case lex.Operator:
-		if firstToken.Value == "<" {
+		if firstToken.Kind == "<" {
 			return ast.BuildReturnStatement(tokens)
 		}
 	}
@@ -483,9 +483,9 @@ func (ast *AST) BuildStatement(tokens []lex.Token) (s StatementAST) {
 
 // BuildVariableSetStatement builds AST model of variable set statement.
 func (ast *AST) BuildVariableSetStatement(tokens []lex.Token) (s StatementAST, _ bool) {
-	switch tokens[0].Type {
+	switch tokens[0].Id {
 	case lex.Name, lex.Brace, lex.Operator:
-		if len(tokens) > 1 && tokens[1].Type == lex.Colon {
+		if len(tokens) > 1 && tokens[1].Id == lex.Colon {
 			return
 		}
 	default:
@@ -493,9 +493,9 @@ func (ast *AST) BuildVariableSetStatement(tokens []lex.Token) (s StatementAST, _
 	}
 	braceCount := 0
 	for index, token := range tokens {
-		switch token.Type {
+		switch token.Id {
 		case lex.Brace:
-			switch token.Value {
+			switch token.Kind {
 			case "{", "[", "(":
 				braceCount++
 			default:
@@ -505,7 +505,7 @@ func (ast *AST) BuildVariableSetStatement(tokens []lex.Token) (s StatementAST, _
 		if braceCount != 0 {
 			continue
 		}
-		switch token.Value {
+		switch token.Kind {
 		case "=":
 			if index == len(tokens)-1 {
 				ast.PushErrorToken(token, "missing_value")
@@ -531,11 +531,11 @@ func (ast *AST) BuildNameStatement(tokens []lex.Token) (s StatementAST) {
 		ast.PushErrorToken(tokens[0], "invalid_syntax")
 		return
 	}
-	switch tokens[1].Type {
+	switch tokens[1].Id {
 	case lex.Colon:
 		return ast.BuildVariableStatement(tokens)
 	case lex.Brace:
-		switch tokens[1].Value {
+		switch tokens[1].Kind {
 		case "(":
 			return ast.BuildFunctionCallStatement(tokens)
 		}
@@ -565,15 +565,15 @@ func (ast *AST) BuildArgs(tokens []lex.Token) []ArgAST {
 	last := 0
 	braceCount := 0
 	for index, token := range tokens {
-		if token.Type == lex.Brace {
-			switch token.Value {
+		if token.Id == lex.Brace {
+			switch token.Kind {
 			case "{", "[", "(":
 				braceCount++
 			default:
 				braceCount--
 			}
 		}
-		if braceCount > 0 || token.Type != lex.Comma {
+		if braceCount > 0 || token.Id != lex.Comma {
 			continue
 		}
 		ast.pushArg(&args, tokens[last:index], token)
@@ -605,20 +605,20 @@ func (ast *AST) pushArg(args *[]ArgAST, tokens []lex.Token, err lex.Token) {
 func (ast *AST) BuildVariableStatement(tokens []lex.Token) (s StatementAST) {
 	var varAST VariableAST
 	position := 0
-	if tokens[position].Type != lex.Name {
+	if tokens[position].Id != lex.Name {
 		varAST.DefineToken = tokens[position]
 		position++
 	}
 	varAST.NameToken = tokens[position]
-	if varAST.NameToken.Type != lex.Name {
+	if varAST.NameToken.Id != lex.Name {
 		ast.PushErrorToken(varAST.NameToken, "invalid_syntax")
 	}
-	varAST.Name = varAST.NameToken.Value
+	varAST.Name = varAST.NameToken.Kind
 	varAST.Type = DataTypeAST{Code: x.Void}
 	// Skip type definer operator(':')
 	position++
 	if varAST.DefineToken.File != nil {
-		if tokens[position].Type != lex.Colon {
+		if tokens[position].Id != lex.Colon {
 			ast.PushErrorToken(tokens[position], "invalid_syntax")
 			return
 		}
@@ -644,8 +644,8 @@ func (ast *AST) BuildVariableStatement(tokens []lex.Token) (s StatementAST) {
 		}
 		token = tokens[position]
 	}
-	if token.Type == lex.Operator {
-		if token.Value != "=" {
+	if token.Id == lex.Operator {
+		if token.Kind != "=" {
 			ast.PushErrorToken(token, "invalid_syntax")
 			return
 		}
@@ -694,10 +694,10 @@ func (ast *AST) getExpressionProcesses(tokens []lex.Token) [][]lex.Token {
 	singleOperatored := false
 	for index := 0; index < len(tokens); index++ {
 		token := tokens[index]
-		switch token.Type {
+		switch token.Id {
 		case lex.Operator:
 			if !operator {
-				if IsSingleOperator(token.Value) && !singleOperatored {
+				if IsSingleOperator(token.Kind) && !singleOperatored {
 					part = append(part, token)
 					singleOperatored = true
 					continue
@@ -718,9 +718,9 @@ func (ast *AST) getExpressionProcesses(tokens []lex.Token) [][]lex.Token {
 			part = []lex.Token{}
 			continue
 		case lex.Brace:
-			switch token.Value {
+			switch token.Kind {
 			case "(", "[", "{":
-				if token.Value == "[" {
+				if token.Kind == "[" {
 					oldIndex := index
 					if _, ok := ast.BuildDataType(tokens, &index, false); ok {
 						part = append(part, tokens[oldIndex:index+1]...)
@@ -736,8 +736,8 @@ func (ast *AST) getExpressionProcesses(tokens []lex.Token) [][]lex.Token {
 		}
 		if index > 0 && braceCount == 0 {
 			lt := tokens[index-1]
-			if (lt.Type == lex.Name || lt.Type == lex.Value) &&
-				(token.Type == lex.Name || token.Type == lex.Value) {
+			if (lt.Id == lex.Name || lt.Id == lex.Value) &&
+				(token.Id == lex.Name || token.Id == lex.Value) {
 				ast.PushErrorToken(token, "invalid_syntax")
 				pushedError = true
 			}
@@ -761,12 +761,12 @@ func (ast *AST) getExpressionProcesses(tokens []lex.Token) [][]lex.Token {
 }
 
 func requireOperatorForProcess(token lex.Token, index, tokensLen int) bool {
-	switch token.Type {
+	switch token.Id {
 	case lex.Comma:
 		return false
 	case lex.Brace:
-		if token.Value == "(" ||
-			token.Value == "{" {
+		if token.Kind == "(" ||
+			token.Kind == "{" {
 			return false
 		}
 	}
@@ -774,12 +774,12 @@ func requireOperatorForProcess(token lex.Token, index, tokensLen int) bool {
 }
 
 func (ast *AST) checkExpressionToken(token lex.Token) {
-	if token.Value[0] >= '0' && token.Value[0] <= '9' {
+	if token.Kind[0] >= '0' && token.Kind[0] <= '9' {
 		var result bool
-		if strings.IndexByte(token.Value, '.') != -1 {
-			_, result = new(big.Float).SetString(token.Value)
+		if strings.IndexByte(token.Kind, '.') != -1 {
+			_, result = new(big.Float).SetString(token.Kind)
 		} else {
-			result = xbits.CheckBitInt(token.Value, 64)
+			result = xbits.CheckBitInt(token.Kind, 64)
 		}
 		if !result {
 			ast.PushErrorToken(token, "invalid_numeric_range")
@@ -789,18 +789,18 @@ func (ast *AST) checkExpressionToken(token lex.Token) {
 
 func (ast *AST) getRange(open, close string) []lex.Token {
 	token := ast.Tokens[ast.Position]
-	if token.Type == lex.Brace && token.Value == open {
+	if token.Id == lex.Brace && token.Kind == open {
 		ast.Position++
 		braceCount := 1
 		start := ast.Position
 		for ; braceCount > 0 && !ast.Ended(); ast.Position++ {
 			token := ast.Tokens[ast.Position]
-			if token.Type != lex.Brace {
+			if token.Id != lex.Brace {
 				continue
 			}
-			if token.Value == open {
+			if token.Kind == open {
 				braceCount++
-			} else if token.Value == close {
+			} else if token.Kind == close {
 				braceCount--
 			}
 		}
@@ -819,7 +819,7 @@ func (ast *AST) skipStatement() []lex.Token {
 	start := ast.Position
 	for ; !ast.Ended(); ast.Position++ {
 		token := ast.Tokens[ast.Position]
-		if token.Type == lex.SemiColon {
+		if token.Id == lex.SemiColon {
 			ast.Position++
 			return ast.Tokens[start : ast.Position-1]
 		}

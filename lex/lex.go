@@ -21,7 +21,7 @@ func (l *Lex) Tokenize() []Token {
 	l.Errors = nil
 	for l.Position < len(l.File.Content) {
 		token := l.Token()
-		if token.Type != NA {
+		if token.Id != NA {
 			tokens = append(tokens, token)
 		}
 	}
@@ -34,11 +34,11 @@ func isKeyword(ln, kw string) bool {
 		return false
 	}
 	ln = ln[len(kw):]
-	if ln == "" {
-		return true
-	} else if unicode.IsSpace(rune(ln[0])) {
-		return true
-	} else if unicode.IsPunct(rune(ln[0])) {
+	switch {
+	case
+		ln == "",
+		unicode.IsSpace(rune(ln[0])),
+		unicode.IsPunct(rune(ln[0])):
 		return true
 	}
 	return false
@@ -218,7 +218,7 @@ func (l *Lex) NewLine() {
 func (l *Lex) Token() Token {
 	token := Token{
 		File: l.File,
-		Type: NA,
+		Id:   NA,
 	}
 	content := l.resume()
 	if content == "" {
@@ -226,54 +226,54 @@ func (l *Lex) Token() Token {
 	}
 	// Set token values.
 	token.Column = l.Column
-	token.Line = l.Line
+	token.Row = l.Line
 
 	//* Tokenize
 
 	switch {
 	case content[0] == ':':
-		token.Value = ":"
-		token.Type = Colon
+		token.Kind = ":"
+		token.Id = Colon
 		l.Position++
 	case content[0] == ';':
-		token.Value = ";"
-		token.Type = SemiColon
+		token.Kind = ";"
+		token.Id = SemiColon
 		l.Position++
 	case content[0] == ',':
-		token.Value = ","
-		token.Type = Comma
+		token.Kind = ","
+		token.Id = Comma
 		l.Position++
 	case content[0] == '(':
-		token.Value = "("
-		token.Type = Brace
+		token.Kind = "("
+		token.Id = Brace
 		l.Position++
 	case content[0] == ')':
-		token.Value = ")"
-		token.Type = Brace
+		token.Kind = ")"
+		token.Id = Brace
 		l.Position++
 	case content[0] == '{':
-		token.Value = "{"
-		token.Type = Brace
+		token.Kind = "{"
+		token.Id = Brace
 		l.Position++
 	case content[0] == '}':
-		token.Value = "}"
-		token.Type = Brace
+		token.Kind = "}"
+		token.Id = Brace
 		l.Position++
 	case content[0] == '[':
-		token.Value = "["
-		token.Type = Brace
+		token.Kind = "["
+		token.Id = Brace
 		l.Position++
 	case content[0] == ']':
-		token.Value = "]"
-		token.Type = Brace
+		token.Kind = "]"
+		token.Id = Brace
 		l.Position++
 	case content[0] == '\'':
-		token.Value = l.lexRune(content)
-		token.Type = Value
+		token.Kind = l.lexRune(content)
+		token.Id = Value
 		return token
 	case content[0] == '"':
-		token.Value = l.lexString(content)
-		token.Type = Value
+		token.Kind = l.lexString(content)
+		token.Id = Value
 		return token
 	case strings.HasPrefix(content, "//"):
 		l.lexLineComment()
@@ -282,176 +282,176 @@ func (l *Lex) Token() Token {
 		l.lexBlockComment()
 		return token
 	case strings.HasPrefix(content, "<<"):
-		token.Value = "<<"
-		token.Type = Operator
+		token.Kind = "<<"
+		token.Id = Operator
 		l.Position += 2
 	case strings.HasPrefix(content, ">>"):
-		token.Value = ">>"
-		token.Type = Operator
+		token.Kind = ">>"
+		token.Id = Operator
 		l.Position += 2
 	case strings.HasPrefix(content, "=="):
-		token.Value = "=="
-		token.Type = Operator
+		token.Kind = "=="
+		token.Id = Operator
 		l.Position += 2
 	case strings.HasPrefix(content, "!="):
-		token.Value = "!="
-		token.Type = Operator
+		token.Kind = "!="
+		token.Id = Operator
 		l.Position += 2
 	case strings.HasPrefix(content, ">="):
-		token.Value = ">="
-		token.Type = Operator
+		token.Kind = ">="
+		token.Id = Operator
 		l.Position += 2
 	case strings.HasPrefix(content, "<="):
-		token.Value = "<="
-		token.Type = Operator
+		token.Kind = "<="
+		token.Id = Operator
 		l.Position += 2
 	case strings.HasPrefix(content, "&&"):
-		token.Value = "&&"
-		token.Type = Operator
+		token.Kind = "&&"
+		token.Id = Operator
 		l.Position += 2
 	case strings.HasPrefix(content, "||"):
-		token.Value = "||"
-		token.Type = Operator
+		token.Kind = "||"
+		token.Id = Operator
 		l.Position += 2
 	case content[0] == '+':
-		token.Value = "+"
-		token.Type = Operator
+		token.Kind = "+"
+		token.Id = Operator
 		l.Position++
 	case content[0] == '-':
-		token.Value = "-"
-		token.Type = Operator
+		token.Kind = "-"
+		token.Id = Operator
 		l.Position++
 	case content[0] == '*':
-		token.Value = "*"
-		token.Type = Operator
+		token.Kind = "*"
+		token.Id = Operator
 		l.Position++
 	case content[0] == '/':
-		token.Value = "/"
-		token.Type = Operator
+		token.Kind = "/"
+		token.Id = Operator
 		l.Position++
 	case content[0] == '%':
-		token.Value = "%"
-		token.Type = Operator
+		token.Kind = "%"
+		token.Id = Operator
 		l.Position++
 	case content[0] == '~':
-		token.Value = "~"
-		token.Type = Operator
+		token.Kind = "~"
+		token.Id = Operator
 		l.Position++
 	case content[0] == '&':
-		token.Value = "&"
-		token.Type = Operator
+		token.Kind = "&"
+		token.Id = Operator
 		l.Position++
 	case content[0] == '|':
-		token.Value = "|"
-		token.Type = Operator
+		token.Kind = "|"
+		token.Id = Operator
 		l.Position++
 	case content[0] == '^':
-		token.Value = "^"
-		token.Type = Operator
+		token.Kind = "^"
+		token.Id = Operator
 		l.Position++
 	case content[0] == '!':
-		token.Value = "!"
-		token.Type = Operator
+		token.Kind = "!"
+		token.Id = Operator
 		l.Position++
 	case content[0] == '<':
-		token.Value = "<"
-		token.Type = Operator
+		token.Kind = "<"
+		token.Id = Operator
 		l.Position++
 	case content[0] == '>':
-		token.Value = ">"
-		token.Type = Operator
+		token.Kind = ">"
+		token.Id = Operator
 		l.Position++
 	case content[0] == '=':
-		token.Value = "="
-		token.Type = Operator
+		token.Kind = "="
+		token.Id = Operator
 		l.Position++
 	case isKeyword(content, "const"):
-		token.Value = "const"
-		token.Type = Const
+		token.Kind = "const"
+		token.Id = Const
 		l.Position += 5
 	case isKeyword(content, "int8"):
-		token.Value = "int8"
-		token.Type = DataType
+		token.Kind = "int8"
+		token.Id = DataType
 		l.Position += 4
 	case isKeyword(content, "int16"):
-		token.Value = "int16"
-		token.Type = DataType
+		token.Kind = "int16"
+		token.Id = DataType
 		l.Position += 5
 	case isKeyword(content, "int32"):
-		token.Value = "int32"
-		token.Type = DataType
+		token.Kind = "int32"
+		token.Id = DataType
 		l.Position += 5
 	case isKeyword(content, "int64"):
-		token.Value = "int64"
-		token.Type = DataType
+		token.Kind = "int64"
+		token.Id = DataType
 		l.Position += 5
 	case isKeyword(content, "uint8"):
-		token.Value = "uint8"
-		token.Type = DataType
+		token.Kind = "uint8"
+		token.Id = DataType
 		l.Position += 5
 	case isKeyword(content, "uint16"):
-		token.Value = "uint16"
-		token.Type = DataType
+		token.Kind = "uint16"
+		token.Id = DataType
 		l.Position += 6
 	case isKeyword(content, "uint32"):
-		token.Value = "uint32"
-		token.Type = DataType
+		token.Kind = "uint32"
+		token.Id = DataType
 		l.Position += 6
 	case isKeyword(content, "uint64"):
-		token.Value = "uint64"
-		token.Type = DataType
+		token.Kind = "uint64"
+		token.Id = DataType
 		l.Position += 6
 	case isKeyword(content, "float32"):
-		token.Value = "float32"
-		token.Type = DataType
+		token.Kind = "float32"
+		token.Id = DataType
 		l.Position += 7
 	case isKeyword(content, "float64"):
-		token.Value = "float64"
-		token.Type = DataType
+		token.Kind = "float64"
+		token.Id = DataType
 		l.Position += 7
 	case isKeyword(content, "ret"):
-		token.Value = "ret"
-		token.Type = Return
+		token.Kind = "ret"
+		token.Id = Return
 		l.Position += 3
 	case isKeyword(content, "bool"):
-		token.Value = "bool"
-		token.Type = DataType
+		token.Kind = "bool"
+		token.Id = DataType
 		l.Position += 4
 	case isKeyword(content, "rune"):
-		token.Value = "rune"
-		token.Type = DataType
+		token.Kind = "rune"
+		token.Id = DataType
 		l.Position += 4
 	case isKeyword(content, "str"):
-		token.Value = "str"
-		token.Type = DataType
+		token.Kind = "str"
+		token.Id = DataType
 		l.Position += 3
 	case isKeyword(content, "true"):
-		token.Value = "true"
-		token.Type = Value
+		token.Kind = "true"
+		token.Id = Value
 		l.Position += 4
 	case isKeyword(content, "false"):
-		token.Value = "false"
-		token.Type = Value
+		token.Kind = "false"
+		token.Id = Value
 		l.Position += 5
 	case isKeyword(content, "null"):
-		token.Value = "null"
-		token.Type = Value
+		token.Kind = "null"
+		token.Id = Value
 		l.Position += 4
 	case isKeyword(content, "type"):
-		token.Value = "type"
-		token.Type = Type
+		token.Kind = "type"
+		token.Id = Type
 		l.Position += 4
 	default:
 		lex := l.lexName(content)
 		if lex != "" {
-			token.Value = lex
-			token.Type = Name
+			token.Kind = lex
+			token.Id = Name
 			break
 		}
 		lex = l.lexNumeric(content)
 		if lex != "" {
-			token.Value = lex
-			token.Type = Value
+			token.Kind = lex
+			token.Id = Value
 			break
 		}
 		l.pushError("invalid_token")
@@ -459,9 +459,9 @@ func (l *Lex) Token() Token {
 		l.Position++
 		return token
 	}
-	l.Column += len(token.Value)
-	if token.Type == Name {
-		token.Value = "_" + token.Value
+	l.Column += len(token.Kind)
+	if token.Id == Name {
+		token.Kind = "_" + token.Kind
 	}
 	return token
 }

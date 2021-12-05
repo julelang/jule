@@ -35,7 +35,7 @@ func NewParser(tokens []lex.Token, PFI *ParseFileInfo) *Parser {
 func (p *Parser) PushErrorToken(token lex.Token, err string) {
 	message := x.Errors[err]
 	p.PFI.Errors = append(p.PFI.Errors, fmt.Sprintf(
-		"%s:%d:%d %s", token.File.Path, token.Line, token.Column, message))
+		"%s:%d:%d %s", token.File.Path, token.Row, token.Column, message))
 }
 
 // AppendErrors appends specified errors.
@@ -140,7 +140,7 @@ func (p *Parser) Parse() {
 
 // ParseType parse X statement.
 func (p *Parser) ParseType(t ast.TypeAST) {
-	if p.existName(t.Name).Type != lex.NA {
+	if p.existName(t.Name).Id != lex.NA {
 		p.PushErrorToken(t.Token, "exist_name")
 		return
 	}
@@ -149,7 +149,7 @@ func (p *Parser) ParseType(t ast.TypeAST) {
 
 // PushAttribute processes and appends to attribute list.
 func (p *Parser) PushAttribute(t ast.AttributeAST) {
-	switch t.Token.Value {
+	switch t.Token.Kind {
 	case "inline":
 	default:
 		p.PushErrorToken(t.Token, "invalid_syntax")
@@ -171,7 +171,7 @@ func (p *Parser) ParseStatement(s ast.StatementAST) {
 
 // ParseFunction parse X function.
 func (p *Parser) ParseFunction(funAst ast.FunctionAST) {
-	if p.existName(funAst.Name).Type != lex.NA {
+	if p.existName(funAst.Name).Id != lex.NA {
 		p.PushErrorToken(funAst.Token, "exist_name")
 		return
 	}
@@ -185,7 +185,7 @@ func (p *Parser) ParseFunction(funAst ast.FunctionAST) {
 
 // ParseVariable parse X global variable.
 func (p *Parser) ParseGlobalVariable(varAST ast.VariableAST) {
-	if p.existName(varAST.Name).Type != lex.NA {
+	if p.existName(varAST.Name).Id != lex.NA {
 		p.PushErrorToken(varAST.NameToken, "exist_name")
 		return
 	}
@@ -204,14 +204,14 @@ func (p *Parser) ParseVariable(varAST ast.VariableAST) ast.VariableAST {
 	value, model := p.computeExpression(varAST.Value)
 	varAST.Value.Model = model
 	if varAST.Type.Code != x.Void {
-		if varAST.SetterToken.Type != lex.NA { // Pass default value.
+		if varAST.SetterToken.Id != lex.NA { // Pass default value.
 			p.checkType(varAST.Type, value.ast.Type, false, varAST.NameToken)
 		} else {
 			var valueToken lex.Token
-			valueToken.Type = lex.Value
+			valueToken.Id = lex.Value
 			dt, ok := p.readyType(varAST.Type)
 			if ok {
-				valueToken.Value = p.defaultValueOfType(dt)
+				valueToken.Kind = p.defaultValueOfType(dt)
 				valueTokens := []lex.Token{valueToken}
 				varAST.Value = ast.ExpressionAST{
 					Tokens:    valueTokens,
@@ -223,8 +223,8 @@ func (p *Parser) ParseVariable(varAST ast.VariableAST) ast.VariableAST {
 		varAST.Type = value.ast.Type
 		p.checkValidityForAutoType(varAST.Type, varAST.SetterToken)
 	}
-	if varAST.DefineToken.Value == "const" {
-		if varAST.SetterToken.Type == lex.NA {
+	if varAST.DefineToken.Kind == "const" {
+		if varAST.SetterToken.Id == lex.NA {
 			p.PushErrorToken(varAST.NameToken, "missing_const_value")
 			return varAST
 		} else if !typeIsSingle(varAST.Type) {
@@ -237,7 +237,7 @@ func (p *Parser) ParseVariable(varAST ast.VariableAST) ast.VariableAST {
 
 func (p *Parser) checkFunctionAttributes(attributes []ast.AttributeAST) {
 	for _, attribute := range attributes {
-		switch attribute.Token.Value {
+		switch attribute.Token.Kind {
 		case "inline":
 		default:
 			p.PushErrorToken(attribute.Token, "invalid_attribute")
@@ -417,7 +417,7 @@ func (p *Parser) computeProcesses(processes [][]lex.Token) (v value, e expressio
 			v.ast = process.solve()
 			processes = processes[:j-1]
 			goto end
-		} else if prev := processes[j-1]; prev[0].Type == lex.Operator &&
+		} else if prev := processes[j-1]; prev[0].Id == lex.Operator &&
 			len(prev) == 1 {
 			process.leftVal = v.ast
 			process.operator = processes[j][0]
@@ -442,7 +442,7 @@ func (p *Parser) computeProcesses(processes [][]lex.Token) (v value, e expressio
 		{
 			solvedValue := process.solve()
 			if v.ast.Type.Code != x.Void {
-				process.operator.Value = "+"
+				process.operator.Kind = "+"
 				process.leftVal = v.ast
 				process.right = processes[j+1]
 				process.rightVal = solvedValue
@@ -485,10 +485,10 @@ func (p *Parser) nextOperator(tokens [][]lex.Token) int {
 	for index, part := range tokens {
 		if len(part) != 1 {
 			continue
-		} else if part[0].Type != lex.Operator {
+		} else if part[0].Id != lex.Operator {
 			continue
 		}
-		switch part[0].Value {
+		switch part[0].Kind {
 		case "*", "/", "%", "<<", ">>", "&":
 			precedence5 = index
 		case "+", "-", "|", "^":
@@ -529,7 +529,7 @@ func (ap arithmeticProcess) solvePointer() (v ast.ValueAST) {
 		ap.cp.PushErrorToken(ap.operator, "incompatible_type")
 		return
 	}
-	switch ap.operator.Value {
+	switch ap.operator.Kind {
 	case "!=", "==":
 		v.Type.Code = x.Bool
 	default:
@@ -544,7 +544,7 @@ func (ap arithmeticProcess) solveString() (v ast.ValueAST) {
 		ap.cp.PushErrorToken(ap.operator, "incompatible_datatype")
 		return
 	}
-	switch ap.operator.Value {
+	switch ap.operator.Kind {
 	case "+":
 		v.Type.Code = x.Str
 	case "==", "!=":
@@ -556,7 +556,7 @@ func (ap arithmeticProcess) solveString() (v ast.ValueAST) {
 }
 
 func (ap arithmeticProcess) solveAny() (v ast.ValueAST) {
-	switch ap.operator.Value {
+	switch ap.operator.Kind {
 	case "!=", "==":
 		v.Type.Code = x.Bool
 	default:
@@ -570,7 +570,7 @@ func (ap arithmeticProcess) solveBool() (v ast.ValueAST) {
 		ap.cp.PushErrorToken(ap.operator, "incompatible_type")
 		return
 	}
-	switch ap.operator.Value {
+	switch ap.operator.Kind {
 	case "!=", "==":
 		v.Type.Code = x.Bool
 	default:
@@ -587,7 +587,7 @@ func (ap arithmeticProcess) solveFloat() (v ast.ValueAST) {
 			return
 		}
 	}
-	switch ap.operator.Value {
+	switch ap.operator.Kind {
 	case "!=", "==", "<", ">", ">=", "<=":
 		v.Type.Code = x.Bool
 	case "+", "-", "*", "/":
@@ -609,7 +609,7 @@ func (ap arithmeticProcess) solveSigned() (v ast.ValueAST) {
 			return
 		}
 	}
-	switch ap.operator.Value {
+	switch ap.operator.Kind {
 	case "!=", "==", "<", ">", ">=", "<=":
 		v.Type.Code = x.Bool
 	case "+", "-", "*", "/", "%", "&", "|", "^":
@@ -638,7 +638,7 @@ func (ap arithmeticProcess) solveUnsigned() (v ast.ValueAST) {
 		}
 		return
 	}
-	switch ap.operator.Value {
+	switch ap.operator.Kind {
 	case "!=", "==", "<", ">", ">=", "<=":
 		v.Type.Code = x.Bool
 	case "+", "-", "*", "/", "%", "&", "|", "^":
@@ -668,7 +668,7 @@ func (ap arithmeticProcess) solveRune() (v ast.ValueAST) {
 		ap.cp.PushErrorToken(ap.operator, "incompatible_type")
 		return
 	}
-	switch ap.operator.Value {
+	switch ap.operator.Kind {
 	case "!=", "==", ">", "<", ">=", "<=":
 		v.Type.Code = x.Bool
 	case "+", "-", "*", "/", "^", "&", "%", "|":
@@ -684,7 +684,7 @@ func (ap arithmeticProcess) solveArray() (v ast.ValueAST) {
 		ap.cp.PushErrorToken(ap.operator, "incompatible_type")
 		return
 	}
-	switch ap.operator.Value {
+	switch ap.operator.Kind {
 	case "!=", "==":
 		v.Type.Code = x.Bool
 	default:
@@ -698,7 +698,7 @@ func (ap arithmeticProcess) solveNull() (v ast.ValueAST) {
 		ap.cp.PushErrorToken(ap.operator, "incompatible_type")
 		return
 	}
-	switch ap.operator.Value {
+	switch ap.operator.Kind {
 	case "!=", "==":
 		v.Type.Code = x.Bool
 	default:
@@ -708,7 +708,7 @@ func (ap arithmeticProcess) solveNull() (v ast.ValueAST) {
 }
 
 func (ap arithmeticProcess) solve() (v ast.ValueAST) {
-	switch ap.operator.Value {
+	switch ap.operator.Kind {
 	case "+", "-", "*", "/", "%", ">>",
 		"<<", "&", "|", "^", "==", "!=",
 		">=", "<=", ">", "<":
@@ -753,7 +753,7 @@ type singleValueProcessor struct {
 
 func (p *singleValueProcessor) string() value {
 	var v value
-	v.ast.Value = p.token.Value
+	v.ast.Value = p.token.Kind
 	v.ast.Type.Code = x.Str
 	v.ast.Type.Value = "str"
 	p.builder.appendNode(strExpNode{p.token})
@@ -762,7 +762,7 @@ func (p *singleValueProcessor) string() value {
 
 func (p *singleValueProcessor) rune() value {
 	var v value
-	v.ast.Value = p.token.Value
+	v.ast.Value = p.token.Kind
 	v.ast.Type.Code = x.Rune
 	v.ast.Type.Value = "rune"
 	p.builder.appendNode(runeExpNode{p.token})
@@ -771,7 +771,7 @@ func (p *singleValueProcessor) rune() value {
 
 func (p *singleValueProcessor) boolean() value {
 	var v value
-	v.ast.Value = p.token.Value
+	v.ast.Value = p.token.Kind
 	v.ast.Type.Code = x.Bool
 	v.ast.Type.Value = "bool"
 	p.builder.appendNode(tokenExpNode{p.token})
@@ -780,7 +780,7 @@ func (p *singleValueProcessor) boolean() value {
 
 func (p *singleValueProcessor) null() value {
 	var v value
-	v.ast.Value = p.token.Value
+	v.ast.Value = p.token.Kind
 	v.ast.Type.Code = x.Null
 	p.builder.appendNode(tokenExpNode{p.token})
 	return v
@@ -788,33 +788,33 @@ func (p *singleValueProcessor) null() value {
 
 func (p *singleValueProcessor) numeric() value {
 	var v value
-	if strings.Contains(p.token.Value, ".") ||
-		strings.ContainsAny(p.token.Value, "eE") {
+	if strings.Contains(p.token.Kind, ".") ||
+		strings.ContainsAny(p.token.Kind, "eE") {
 		v.ast.Type.Code = x.Float64
 		v.ast.Type.Value = "float64"
 	} else {
 		v.ast.Type.Code = x.Int32
 		v.ast.Type.Value = "int32"
-		ok := xbits.CheckBitInt(p.token.Value, 32)
+		ok := xbits.CheckBitInt(p.token.Kind, 32)
 		if !ok {
 			v.ast.Type.Code = x.Int64
 			v.ast.Type.Value = "int64"
 		}
 	}
-	v.ast.Value = p.token.Value
+	v.ast.Value = p.token.Kind
 	p.builder.appendNode(tokenExpNode{p.token})
 	return v
 }
 
 func (p *singleValueProcessor) name() (v value, ok bool) {
-	if variable := p.parser.variableByName(p.token.Value); variable != nil {
-		v.ast.Value = p.token.Value
+	if variable := p.parser.variableByName(p.token.Kind); variable != nil {
+		v.ast.Value = p.token.Kind
 		v.ast.Type = variable.Type
-		v.constant = variable.DefineToken.Value == "const"
+		v.constant = variable.DefineToken.Kind == "const"
 		p.builder.appendNode(tokenExpNode{p.token})
 		ok = true
-	} else if fun := p.parser.functionByName(p.token.Value); fun != nil {
-		v.ast.Value = p.token.Value
+	} else if fun := p.parser.functionByName(p.token.Kind); fun != nil {
+		v.ast.Value = p.token.Kind
 		v.ast.Type.Code = x.Function
 		v.ast.Type.Tag = fun.ast
 		p.builder.appendNode(tokenExpNode{p.token})
@@ -833,17 +833,17 @@ func (p *Parser) processSingleValuePart(token lex.Token, builder *expressionMode
 	}
 	v.ast.Type.Code = x.Void
 	v.ast.Token = token
-	switch token.Type {
+	switch token.Id {
 	case lex.Value:
 		ok = true
 		switch {
-		case IsString(token.Value):
+		case IsString(token.Kind):
 			v = processor.string()
-		case IsRune(token.Value):
+		case IsRune(token.Kind):
 			v = processor.rune()
-		case IsBoolean(token.Value):
+		case IsBoolean(token.Kind):
 			v = processor.boolean()
-		case IsNull(token.Value):
+		case IsNull(token.Kind):
 			v = processor.null()
 		default:
 			v = processor.numeric()
@@ -924,7 +924,7 @@ func (p *singleOperatorProcessor) amper() value {
 			p.builder.current.nodes[:nodeLen-1], /* -1 for remove amper operator */
 			arrayPointerExp{p.builder.current.nodes[nodeLen:]})
 	} else if v.ast.Type.Code == x.Function {
-		if p.parser.functionByName(v.ast.Token.Value) != nil {
+		if p.parser.functionByName(v.ast.Token.Kind) != nil {
 			p.builder.current.nodes = append(
 				p.builder.current.nodes[:nodeLen-1], /* -1 for remove amper operator */
 				functionPointerExp{
@@ -953,7 +953,7 @@ func (p *Parser) processSingleOperatorPart(tokens []lex.Token, builder *expressi
 		p.PushErrorToken(processor.token, "invalid_syntax")
 		return v
 	}
-	switch processor.token.Value {
+	switch processor.token.Kind {
 	case "-":
 		v = processor.unary()
 	case "+":
@@ -974,11 +974,11 @@ func (p *Parser) processSingleOperatorPart(tokens []lex.Token, builder *expressi
 }
 
 func canGetPointer(v value) bool {
-	return v.ast.Token.Type == lex.Name || typeIsArray(v.ast.Type)
+	return v.ast.Token.Id == lex.Name || typeIsArray(v.ast.Type)
 }
 
 func (p *Parser) processValuePart(tokens []lex.Token, builder *expressionModelBuilder) (v value) {
-	if tokens[0].Type == lex.Operator {
+	if tokens[0].Id == lex.Operator {
 		return p.processSingleOperatorPart(tokens, builder)
 	} else if len(tokens) == 1 {
 		value, ok := p.processSingleValuePart(tokens[0], builder)
@@ -987,9 +987,9 @@ func (p *Parser) processValuePart(tokens []lex.Token, builder *expressionModelBu
 			goto end
 		}
 	}
-	switch token := tokens[len(tokens)-1]; token.Type {
+	switch token := tokens[len(tokens)-1]; token.Id {
 	case lex.Brace:
-		switch token.Value {
+		switch token.Kind {
 		case ")":
 			return p.processParenthesesValuePart(tokens, builder)
 		case "}":
@@ -1010,10 +1010,10 @@ func (p *Parser) processParenthesesValuePart(tokens []lex.Token, builder *expres
 	braceCount := 0
 	for ; j >= 0; j-- {
 		token := tokens[j]
-		if token.Type != lex.Brace {
+		if token.Id != lex.Brace {
 			continue
 		}
-		switch token.Value {
+		switch token.Kind {
 		case ")", "}", "]":
 			braceCount++
 		case "(", "{", "[":
@@ -1027,8 +1027,8 @@ func (p *Parser) processParenthesesValuePart(tokens []lex.Token, builder *expres
 	}
 	if len(valueTokens) == 0 && braceCount == 0 {
 		// Write parentheses.
-		builder.appendNode(tokenExpNode{lex.Token{Value: "("}})
-		defer builder.appendNode(tokenExpNode{lex.Token{Value: ")"}})
+		builder.appendNode(tokenExpNode{lex.Token{Kind: "("}})
+		defer builder.appendNode(tokenExpNode{lex.Token{Kind: ")"}})
 
 		tk := tokens[0]
 		tokens = tokens[1 : len(tokens)-1]
@@ -1043,8 +1043,8 @@ func (p *Parser) processParenthesesValuePart(tokens []lex.Token, builder *expres
 	v = p.processValuePart(valueTokens, builder)
 
 	// Write parentheses.
-	builder.appendNode(tokenExpNode{lex.Token{Value: "("}})
-	defer builder.appendNode(tokenExpNode{lex.Token{Value: ")"}})
+	builder.appendNode(tokenExpNode{lex.Token{Kind: "("}})
+	defer builder.appendNode(tokenExpNode{lex.Token{Kind: ")"}})
 
 	switch v.ast.Type.Code {
 	case x.Function:
@@ -1063,10 +1063,10 @@ func (p *Parser) processBraceValuePart(tokens []lex.Token, builder *expressionMo
 	braceCount := 0
 	for ; j >= 0; j-- {
 		token := tokens[j]
-		if token.Type != lex.Brace {
+		if token.Id != lex.Brace {
 			continue
 		}
-		switch token.Value {
+		switch token.Kind {
 		case "}", "]", ")":
 			braceCount++
 		case "{", "(", "[":
@@ -1083,9 +1083,9 @@ func (p *Parser) processBraceValuePart(tokens []lex.Token, builder *expressionMo
 		p.PushErrorToken(tokens[0], "invalid_syntax")
 		return
 	}
-	switch valueTokens[0].Type {
+	switch valueTokens[0].Id {
 	case lex.Brace:
-		switch valueTokens[0].Value {
+		switch valueTokens[0].Kind {
 		case "[":
 			ast := ast.New(nil)
 			dt, ok := ast.BuildDataType(valueTokens, new(int), true)
@@ -1125,10 +1125,10 @@ func (p *Parser) processBracketValuePart(tokens []lex.Token, builder *expression
 	braceCount := 0
 	for ; j >= 0; j-- {
 		token := tokens[j]
-		if token.Type != lex.Brace {
+		if token.Id != lex.Brace {
 			continue
 		}
-		switch token.Value {
+		switch token.Kind {
 		case "}", "]", ")":
 			braceCount++
 		case "{", "(", "[":
@@ -1149,10 +1149,10 @@ func (p *Parser) processBracketValuePart(tokens []lex.Token, builder *expression
 	v, model = p.computeTokens(valueTokens)
 	builder.appendNode(model)
 	tokens = tokens[len(valueTokens)+1 : len(tokens)-1] // Removed array syntax "["..."]"
-	builder.appendNode(tokenExpNode{lex.Token{Value: "["}})
+	builder.appendNode(tokenExpNode{lex.Token{Kind: "["}})
 	selectv, model := p.computeTokens(tokens)
 	builder.appendNode(model)
-	builder.appendNode(tokenExpNode{lex.Token{Value: "]"}})
+	builder.appendNode(tokenExpNode{lex.Token{Kind: "]"}})
 	return p.processEnumerableSelect(v, selectv, tokens[0])
 }
 
@@ -1194,8 +1194,8 @@ func (p *Parser) buildEnumerableParts(tokens []lex.Token) []enumPart {
 	lastComma := -1
 	var parts []enumPart
 	for index, token := range tokens {
-		if token.Type == lex.Brace {
-			switch token.Value {
+		if token.Id == lex.Brace {
+			switch token.Kind {
 			case "{", "[", "(":
 				braceCount++
 			default:
@@ -1205,7 +1205,7 @@ func (p *Parser) buildEnumerableParts(tokens []lex.Token) []enumPart {
 		if braceCount > 0 {
 			continue
 		}
-		if token.Type == lex.Comma {
+		if token.Id == lex.Comma {
 			if index-lastComma-1 == 0 {
 				p.PushErrorToken(token, "missing_expression")
 				lastComma = index
@@ -1286,12 +1286,12 @@ func (p *Parser) getRangeTokens(open, close string, tokens []lex.Token) []lex.To
 	braceCount := 0
 	start := 1
 	for index, token := range tokens {
-		if token.Type != lex.Brace {
+		if token.Id != lex.Brace {
 			continue
 		}
-		if token.Value == open {
+		if token.Kind == open {
 			braceCount++
-		} else if token.Value == close {
+		} else if token.Kind == close {
 			braceCount--
 		}
 		if braceCount > 0 {
@@ -1367,7 +1367,7 @@ func (p *Parser) checkVariableSetStatement(vsAST *ast.VariableSetAST) {
 	}
 	switch selected.ast.Type.Tag.(type) {
 	case ast.FunctionAST:
-		if p.functionByName(selected.ast.Token.Value) != nil {
+		if p.functionByName(selected.ast.Token.Kind) != nil {
 			p.PushErrorToken(vsAST.Setter, "type_not_support_value_update")
 			return
 		}

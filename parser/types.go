@@ -75,11 +75,11 @@ func typesAreCompatible(t1, t2 ast.DataTypeAST, ignoreany bool) bool {
 func (p *Parser) readyType(dt ast.DataTypeAST) (ast.DataTypeAST, bool) {
 	switch dt.Code {
 	case x.Name:
-		t := p.typeByName(dt.Token.Value)
+		t := p.typeByName(dt.Token.Kind)
 		if t == nil {
 			return dt, false
 		}
-		t.Type.Value = dt.Value[:len(dt.Value)-len(dt.Token.Value)] + t.Type.Value
+		t.Type.Value = dt.Value[:len(dt.Value)-len(dt.Token.Kind)] + t.Type.Value
 		return p.readyType(t.Type)
 	case x.Function:
 		funAST := dt.Tag.(ast.FunctionAST)

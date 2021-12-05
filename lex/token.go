@@ -5,10 +5,10 @@ import "github.com/the-xlang/x/pkg/io"
 // Token is lexer token.
 type Token struct {
 	File   *io.FILE
-	Line   int
+	Row    int
 	Column int
-	Value  string
-	Type   uint8
+	Kind   string
+	Id     uint8
 }
 
 // Token types.

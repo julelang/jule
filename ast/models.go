@@ -100,7 +100,7 @@ func (dt DataTypeAST) String() string {
 	}
 	switch dt.Code {
 	case x.Name:
-		return dt.Token.Value + cxx.String()
+		return dt.Token.Kind + cxx.String()
 	case x.Function:
 		return dt.FunctionString() + cxx.String()
 	}
@@ -201,14 +201,14 @@ func (e ExpressionAST) String() string {
 	}
 	var sb strings.Builder
 	for _, process := range e.Processes {
-		if len(process) == 1 && process[0].Type == lex.Operator {
+		if len(process) == 1 && process[0].Id == lex.Operator {
 			sb.WriteByte(' ')
-			sb.WriteString(process[0].Value)
+			sb.WriteString(process[0].Kind)
 			sb.WriteByte(' ')
 			continue
 		}
 		for _, token := range process {
-			sb.WriteString(token.Value)
+			sb.WriteString(token.Kind)
 		}
 	}
 	return sb.String()
@@ -237,21 +237,19 @@ func (v ValueAST) String() string {
 // BraceAST is AST model of brace.
 type BraceAST struct {
 	Token lex.Token
-	Value string
 }
 
 func (b BraceAST) String() string {
-	return b.Value
+	return b.Token.Kind
 }
 
 // OperatorAST is AST model of operator.
 type OperatorAST struct {
 	Token lex.Token
-	Value string
 }
 
 func (o OperatorAST) String() string {
-	return o.Value
+	return o.Token.Kind
 }
 
 // ReturnAST is return statement AST model.
@@ -261,7 +259,7 @@ type ReturnAST struct {
 }
 
 func (r ReturnAST) String() string {
-	switch r.Token.Type {
+	switch r.Token.Id {
 	case lex.Operator:
 		return "return " + r.Expression.String() + ";"
 	}
@@ -290,7 +288,7 @@ type VariableAST struct {
 
 func (v VariableAST) String() string {
 	var sb strings.Builder
-	if v.DefineToken.Value == "const" {
+	if v.DefineToken.Kind == "const" {
 		sb.WriteString("const ")
 	}
 	sb.WriteString(v.StringType())
