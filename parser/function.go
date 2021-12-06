@@ -42,7 +42,7 @@ func attributesToString(attributes []ast.AttributeAST) string {
 
 func paramsToCxx(params []ast.ParameterAST) string {
 	if len(params) == 0 {
-		return "()"
+		return "(void)"
 	}
 	var cxx strings.Builder
 	cxx.WriteByte('(')
