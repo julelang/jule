@@ -17,8 +17,8 @@ func IsBoolean(value string) bool {
 	return value == "true" || value == "false"
 }
 
-// IsNull reports value is null or not.
-func IsNull(value string) bool { return value == "null" }
+// IsNil reports value is nil or not.
+func IsNil(value string) bool { return value == "nil" }
 
 func isConstantNumeric(v string) bool {
 	if v == "" {

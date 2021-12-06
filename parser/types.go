@@ -34,8 +34,8 @@ func typeIsSingle(dt ast.DataTypeAST) bool {
 
 func (p *Parser) checkValidityForAutoType(t ast.DataTypeAST, err lex.Token) {
 	switch t.Code {
-	case x.Null:
-		p.PushErrorToken(err, "null_for_autotype")
+	case x.Nil:
+		p.PushErrorToken(err, "nil_for_autotype")
 	case x.Void:
 		p.PushErrorToken(err, "void_for_autotype")
 	}
@@ -43,17 +43,17 @@ func (p *Parser) checkValidityForAutoType(t ast.DataTypeAST, err lex.Token) {
 
 func (p *Parser) defaultValueOfType(t ast.DataTypeAST) string {
 	if typeIsPointer(t) || typeIsArray(t) {
-		return "null"
+		return "nil"
 	}
 	return x.DefaultValueOfType(t.Code)
 }
 
-func typeIsNullCompatible(t ast.DataTypeAST) bool {
+func typeIsNilCompatible(t ast.DataTypeAST) bool {
 	return t.Code == x.Function || typeIsPointer(t)
 }
 
 func checkArrayCompatiblity(arrT, t ast.DataTypeAST) bool {
-	if t.Code == x.Null {
+	if t.Code == x.Nil {
 		return true
 	}
 	return arrT.Value == t.Value
@@ -66,8 +66,8 @@ func typesAreCompatible(t1, t2 ast.DataTypeAST, ignoreany bool) bool {
 			t1, t2 = t2, t1
 		}
 		return checkArrayCompatiblity(t1, t2)
-	case typeIsNullCompatible(t1) || typeIsNullCompatible(t2):
-		return t1.Code == x.Null || t2.Code == x.Null
+	case typeIsNilCompatible(t1) || typeIsNilCompatible(t2):
+		return t1.Code == x.Nil || t2.Code == x.Nil
 	}
 	return x.TypesAreCompatible(t1.Code, t2.Code, ignoreany)
 }
@@ -110,7 +110,7 @@ func (p *Parser) checkType(real, check ast.DataTypeAST, ignoreAny bool, errToken
 		}
 	} else {
 		if (typeIsPointer(real) || typeIsArray(real)) &&
-			check.Code == x.Null {
+			check.Code == x.Nil {
 			return
 		}
 		if real.Value != check.Value {

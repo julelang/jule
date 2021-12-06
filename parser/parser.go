@@ -693,7 +693,7 @@ func (ap arithmeticProcess) solveArray() (v ast.ValueAST) {
 	return
 }
 
-func (ap arithmeticProcess) solveNull() (v ast.ValueAST) {
+func (ap arithmeticProcess) solveNil() (v ast.ValueAST) {
 	if !typesAreCompatible(ap.leftVal.Type, ap.rightVal.Type, false) {
 		ap.p.PushErrorToken(ap.operator, "incompatible_type")
 		return
@@ -702,7 +702,7 @@ func (ap arithmeticProcess) solveNull() (v ast.ValueAST) {
 	case "!=", "==":
 		v.Type.Code = x.Bool
 	default:
-		ap.p.PushErrorToken(ap.operator, "operator_notfor_null")
+		ap.p.PushErrorToken(ap.operator, "operator_notfor_nil")
 	}
 	return
 }
@@ -722,8 +722,8 @@ func (ap arithmeticProcess) solve() (v ast.ValueAST) {
 		return ap.solveArray()
 	case typeIsPointer(ap.leftVal.Type) || typeIsPointer(ap.rightVal.Type):
 		return ap.solvePointer()
-	case ap.leftVal.Type.Code == x.Null || ap.rightVal.Type.Code == x.Null:
-		return ap.solveNull()
+	case ap.leftVal.Type.Code == x.Nil || ap.rightVal.Type.Code == x.Nil:
+		return ap.solveNil()
 	case ap.leftVal.Type.Code == x.Rune || ap.rightVal.Type.Code == x.Rune:
 		return ap.solveRune()
 	case ap.leftVal.Type.Code == x.Any || ap.rightVal.Type.Code == x.Any:
@@ -778,10 +778,10 @@ func (p *singleValueProcessor) boolean() value {
 	return v
 }
 
-func (p *singleValueProcessor) null() value {
+func (p *singleValueProcessor) nil() value {
 	var v value
 	v.ast.Value = p.token.Kind
-	v.ast.Type.Code = x.Null
+	v.ast.Type.Code = x.Nil
 	p.builder.appendNode(tokenExpNode{p.token})
 	return v
 }
@@ -843,8 +843,8 @@ func (p *Parser) processSingleValuePart(token lex.Token, builder *expressionMode
 			v = processor.rune()
 		case IsBoolean(token.Kind):
 			v = processor.boolean()
-		case IsNull(token.Kind):
-			v = processor.null()
+		case IsNil(token.Kind):
+			v = processor.nil()
 		default:
 			v = processor.numeric()
 		}

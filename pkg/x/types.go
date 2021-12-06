@@ -19,7 +19,7 @@ const (
 	Rune     uint8 = 14
 	Name     uint8 = 15
 	Function uint8 = 16
-	Null     uint8 = 17
+	Nil      uint8 = 17
 )
 
 // TypeGreaterThan reports type one is greater than type two or not.
@@ -122,8 +122,8 @@ func TypesAreCompatible(t1, t2 uint8, ignoreany bool) bool {
 			t2 == UInt16 ||
 			t2 == UInt32 ||
 			t2 == UInt64
-	case Null:
-		return t2 == Null
+	case Nil:
+		return t2 == Nil
 	}
 	return false
 }
@@ -240,8 +240,8 @@ func CxxTypeNameFromType(typeCode uint8) string {
 // DefaultValueOfType returns default value of specified type.
 //
 // Special case is:
-//  DefaultValueOfType(t) = "null" if t is invalid
-//  DefaultValueOfType(t) = "null" if t is not have default value
+//  DefaultValueOfType(t) = "nil" if t is invalid
+//  DefaultValueOfType(t) = "nil" if t is not have default value
 func DefaultValueOfType(code uint8) string {
 	if IsNumericType(code) {
 		return "0"
@@ -254,5 +254,5 @@ func DefaultValueOfType(code uint8) string {
 	case Rune:
 		return `'\0'`
 	}
-	return "null"
+	return "nil"
 }

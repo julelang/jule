@@ -232,7 +232,7 @@ public:
 #pragma endregion X_BUILTIN_TYPES
 
 #pragma region X_BUILTIN_VALUES
-#define null nullptr
+#define nil nullptr
 #pragma endregion X_BUILTIN_VALUES
 
 #pragma region X_STRUCTURES
