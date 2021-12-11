@@ -73,6 +73,9 @@ func typesAreCompatible(t1, t2 ast.DataTypeAST, ignoreany bool) bool {
 }
 
 func (p *Parser) readyType(dt ast.DataTypeAST) (ast.DataTypeAST, bool) {
+	if dt.Value == "" {
+		return dt, true
+	}
 	switch dt.Code {
 	case x.Name:
 		t := p.typeByName(dt.Token.Kind)

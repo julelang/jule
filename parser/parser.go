@@ -811,12 +811,14 @@ func (p *singleValueProcessor) name() (v value, ok bool) {
 		v.ast.Value = p.token.Kind
 		v.ast.Type = variable.Type
 		v.constant = variable.DefineToken.Kind == "const"
+		v.ast.Token = variable.NameToken
 		p.builder.appendNode(tokenExpNode{p.token})
 		ok = true
 	} else if fun := p.parser.functionByName(p.token.Kind); fun != nil {
 		v.ast.Value = p.token.Kind
 		v.ast.Type.Code = x.Function
 		v.ast.Type.Tag = fun.ast
+		v.ast.Token = fun.ast.Token
 		p.builder.appendNode(tokenExpNode{p.token})
 		ok = true
 	} else {
