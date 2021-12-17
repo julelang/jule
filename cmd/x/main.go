@@ -241,23 +241,31 @@ class array {
 public:
 #pragma region FIELDS
   std::vector<T> vector;
+  bool heap;
 #pragma endregion FIELDS
 
 #pragma region CONSTRUCTORS
   array() {
     this->vector = {};
+    this->heap = false;
   }
 
   array(std::nullptr_t ) : array() {}
 
-  array(const std::vector<T>& vector) {
+  array(const std::vector<T>& vector, bool heap) {
     this->vector = vector;
+    this->heap = heap;
   }
+
+  array(const std::vector<T>& vector) : array(vector, false) {}
 #pragma endregion CONSTRUCTORS
 
 #pragma region DESTRUCTOR
   ~array() {
     this->vector.clear();
+    if (this->heap) {
+      delete this;
+    }
   }
 #pragma endregion DESTRUCTOR
 

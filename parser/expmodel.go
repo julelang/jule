@@ -116,7 +116,7 @@ func (ap arrayPointerExp) String() string {
 	for _, node := range ap.nodes {
 		cxxNodes.WriteString(node.String())
 	}
-	return "new " + cxxNodes.String()
+	return "new " + cxxNodes.String()[:cxxNodes.Len()-1] + ", true)"
 }
 
 type anonymousFunctionExp struct {
