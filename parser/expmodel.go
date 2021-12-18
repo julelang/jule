@@ -94,19 +94,6 @@ type strExpNode struct {
 
 func (str strExpNode) String() string { return "L" + str.token.Kind }
 
-type functionPointerExp struct {
-	valueDataType ast.DataTypeAST
-	nodes         []expressionNode
-}
-
-func (fb functionPointerExp) String() string {
-	var cxxNodes strings.Builder
-	for _, node := range fb.nodes {
-		cxxNodes.WriteString(node.String())
-	}
-	return "new " + fb.valueDataType.String() + "(" + cxxNodes.String() + ")"
-}
-
 type arrayPointerExp struct {
 	nodes []expressionNode
 }

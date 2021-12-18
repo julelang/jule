@@ -925,15 +925,6 @@ func (p *singleOperatorProcessor) amper() value {
 		p.builder.current.nodes = append(
 			p.builder.current.nodes[:nodeLen-1], /* -1 for remove amper operator */
 			arrayPointerExp{p.builder.current.nodes[nodeLen:]})
-	} else if v.ast.Type.Code == x.Function {
-		if p.parser.functionByName(v.ast.Token.Kind) != nil {
-			p.builder.current.nodes = append(
-				p.builder.current.nodes[:nodeLen-1], /* -1 for remove amper operator */
-				functionPointerExp{
-					valueDataType: v.ast.Type,
-					nodes:         p.builder.current.nodes[nodeLen:],
-				})
-		}
 	}
 	v.ast.Type.Value = "*" + v.ast.Type.Value
 	return v
@@ -976,7 +967,11 @@ func (p *Parser) processSingleOperatorPart(tokens []lex.Token, builder *expressi
 }
 
 func canGetPointer(v value) bool {
-	return v.ast.Token.Id == lex.Name || typeIsArray(v.ast.Type)
+	if v.ast.Type.Code == x.Function {
+		return false
+	}
+	return v.ast.Token.Id == lex.Name ||
+		typeIsArray(v.ast.Type)
 }
 
 func (p *Parser) processValuePart(tokens []lex.Token, builder *expressionModelBuilder) (v value) {
