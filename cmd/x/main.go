@@ -15,6 +15,7 @@ import (
 	"github.com/the-xlang/x/parser"
 	"github.com/the-xlang/x/pkg/io"
 	"github.com/the-xlang/x/pkg/x"
+	"github.com/the-xlang/x/pkg/x/xset"
 )
 
 func help(cmd string) {
@@ -58,9 +59,11 @@ func initProject(cmd string) {
 		println("This module can only be used as single!")
 		return
 	}
-	err := io.WriteFileTruncate(x.SettingsFile, []byte(`out_name main
-cxx_out_dir ./
-cxx_out_name x.cxx`))
+	err := io.WriteFileTruncate(x.SettingsFile, []byte(`{
+  "cxx_out_dir": "./dist/",
+  "cxx_out_name": "x.cxx",
+  "out_name": "main"
+}`))
 	if err != nil {
 		println(err.Error())
 		os.Exit(1)
@@ -109,26 +112,23 @@ func loadXSet() {
 	info, err := os.Stat(x.SettingsFile)
 	if err != nil || info.IsDir() {
 		println(`X settings file ("` + x.SettingsFile + `") is not found!`)
-		os.Exit(0)
+		os.Exit(1)
 	}
-	x.XSettings = x.NewXSet()
 	bytes, err := os.ReadFile(x.SettingsFile)
 	if err != nil {
 		println(err.Error())
-		os.Exit(0)
+		os.Exit(1)
 	}
-	errors := x.XSettings.Parse(bytes)
-	if errors != nil {
+	x.XSettings, err = xset.Load(bytes)
+	if err != nil {
 		println("X settings has errors;")
-		for _, err := range errors {
-			println(err.Error())
-		}
-		os.Exit(0)
+		println(err.Error())
+		os.Exit(1)
 	}
 }
 
 func printErrors(errors []string) {
-	defer os.Exit(0)
+	defer os.Exit(1)
 	for _, message := range errors {
 		fmt.Println(message)
 	}
@@ -356,10 +356,13 @@ int main() {
 }
 
 func writeCxxOutput(info *parser.ParseFileInfo) {
-	path := filepath.Join(
-		x.XSettings.Fields["cxx_out_dir"],
-		x.XSettings.Fields["cxx_out_name"])
-	err := io.WriteFileTruncate(path, []byte(info.X_CXX))
+	path := filepath.Join(x.XSettings.CxxOutDir, x.XSettings.CxxOutName)
+	err := os.MkdirAll(x.XSettings.CxxOutDir, 0511)
+	if err != nil {
+		println(err.Error())
+		os.Exit(1)
+	}
+	err = io.WriteFileTruncate(path, []byte(info.X_CXX))
 	if err != nil {
 		println(err.Error())
 		os.Exit(1)

@@ -1,5 +1,7 @@
 package x
 
+import "github.com/the-xlang/x/pkg/x/xset"
+
 // X constants.
 const (
 	Version      = `@developer_beta 0.0.1`
@@ -12,7 +14,7 @@ const (
 // Environment Variables.
 var (
 	ExecutablePath string
-	XSettings      *XSet
+	XSettings      *xset.XSet
 )
 
 // IsIgnoreName reports name is ignore or not.
