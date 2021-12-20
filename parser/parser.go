@@ -108,7 +108,6 @@ func (p *Parser) Cxx() string {
 	cxx.WriteString(p.CxxTypes() + "\n\n")
 	cxx.WriteString(p.CxxPrototypes() + "\n\n")
 	cxx.WriteString(p.CxxGlobalVariables() + "\n\n")
-	cxx.WriteString(p.CxxGlobalVariables() + "\n\n")
 	cxx.WriteString(p.CxxFunctions())
 	return cxx.String()
 }

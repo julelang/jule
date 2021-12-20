@@ -15,6 +15,7 @@ func (f function) String() string {
 	var cxx strings.Builder
 	prototype := f.Prototype()
 	cxx.WriteString(prototype[:len(prototype)-1])
+	cxx.WriteByte(' ')
 	cxx.WriteString(f.ast.Block.String())
 	return cxx.String()
 }
