@@ -147,13 +147,19 @@ func (p *Parser) ParseType(t ast.TypeAST) {
 }
 
 // PushAttribute processes and appends to attribute list.
-func (p *Parser) PushAttribute(t ast.AttributeAST) {
-	switch t.Token.Kind {
-	case "inline":
+func (p *Parser) PushAttribute(attribute ast.AttributeAST) {
+	switch attribute.Tag.Kind {
+	case "_inline":
 	default:
-		p.PushErrorToken(t.Token, "invalid_syntax")
+		p.PushErrorToken(attribute.Tag, "undefined_tag")
 	}
-	p.attributes = append(p.attributes, t)
+	for _, attr := range p.attributes {
+		if attr.Tag.Kind == attribute.Tag.Kind {
+			p.PushErrorToken(attribute.Tag, "attribute_repeat")
+			return
+		}
+	}
+	p.attributes = append(p.attributes, attribute)
 }
 
 // ParseStatement parse X statement.
@@ -236,8 +242,8 @@ func (p *Parser) ParseVariable(varAST ast.VariableAST) ast.VariableAST {
 
 func (p *Parser) checkFunctionAttributes(attributes []ast.AttributeAST) {
 	for _, attribute := range attributes {
-		switch attribute.Token.Kind {
-		case "inline":
+		switch attribute.Tag.Kind {
+		case "_inline":
 		default:
 			p.PushErrorToken(attribute.Token, "invalid_attribute")
 		}
@@ -362,7 +368,7 @@ func (p *Parser) checkTypes() {
 func (p *Parser) checkFunctions() {
 	for _, fun := range p.Functions {
 		p.BlockVariables = variablesFromParameters(fun.ast.Params)
-		p.checkFunctionSpecialCases(fun.ast)
+		p.checkFunctionSpecialCases(fun)
 		p.checkFunction(fun.ast)
 	}
 }
@@ -1299,14 +1305,17 @@ func (p *Parser) getRangeTokens(open, close string, tokens []lex.Token) []lex.To
 	return nil
 }
 
-func (p *Parser) checkFunctionSpecialCases(fun ast.FunctionAST) {
-	switch fun.Name {
+func (p *Parser) checkFunctionSpecialCases(fun *function) {
+	switch fun.ast.Name {
 	case "_" + x.EntryPoint:
-		if len(fun.Params) > 0 {
-			p.PushErrorToken(fun.Token, "entrypoint_have_parameters")
+		if len(fun.ast.Params) > 0 {
+			p.PushErrorToken(fun.ast.Token, "entrypoint_have_parameters")
 		}
-		if fun.ReturnType.Code != x.Void {
-			p.PushErrorToken(fun.ReturnType.Token, "entrypoint_have_return")
+		if fun.ast.ReturnType.Code != x.Void {
+			p.PushErrorToken(fun.ast.ReturnType.Token, "entrypoint_have_return")
+		}
+		if fun.attributes != nil {
+			p.PushErrorToken(fun.ast.Token, "entrypoint_have_attributes")
 		}
 	}
 }

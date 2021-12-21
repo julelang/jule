@@ -269,11 +269,11 @@ func (r ReturnAST) String() string {
 // AttributeAST is attribtue AST model.
 type AttributeAST struct {
 	Token lex.Token
-	Value string
+	Tag   lex.Token
 }
 
 func (a AttributeAST) String() string {
-	return a.Value
+	return a.Tag.Kind[1:] // Remove name underscore at start
 }
 
 // VariableAST is variable declaration AST model.

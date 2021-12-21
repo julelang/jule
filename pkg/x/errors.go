@@ -28,6 +28,7 @@ var Errors = map[string]string{
 	`argument_overflow`:             `argument overflow`,
 	`entrypoint_have_return`:        `entry point is cannot have return type`,
 	`entrypoint_have_parameters`:    `entry point is cannot have parameter(s)`,
+	`entrypoint_have_attributes`:    `entry point is cannot have attribute(s)`,
 	`require_return_value`:          `return statements of non-void functions should have return value`,
 	`void_function_return_value`:    `void functions is cannot returns any value`,
 	`bitshift_must_unsigned`:        `bit shifting value is must be unsigned`,
@@ -65,4 +66,6 @@ var Errors = map[string]string{
 	`not_enumerable`:                `value is not enumerable`,
 	`notint_array_select`:           `array indexes is should be integer`,
 	`notint_string_select`:          `string indexes is should be integer`,
+	`undefined_tag`:                 `undefined attribute`,
+	`attribute_repeat`:              `this attribute is already given`,
 }

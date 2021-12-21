@@ -46,8 +46,8 @@ func (ast *AST) Build() {
 	for ast.Position != -1 && !ast.Ended() {
 		firstToken := ast.Tokens[ast.Position]
 		switch firstToken.Id {
-		case lex.Brace:
-			ast.BuildBrace()
+		case lex.At:
+			ast.BuildAttribute()
 		case lex.Name:
 			ast.BuildName()
 		case lex.Const:
@@ -119,38 +119,21 @@ func (ast *AST) BuildName() {
 	ast.PushErrorToken(token, "invalid_syntax")
 }
 
-// BuildBrace builds AST model by global brace statement.
-func (ast *AST) BuildBrace() {
-	token := ast.Tokens[ast.Position]
-	switch token.Kind {
-	case "[":
-		ast.BuildAttribute()
-	default:
-		ast.PushErrorToken(token, "invalid_syntax")
-	}
-}
-
 // BuildAttribute builds AST model of attribute.
 func (ast *AST) BuildAttribute() {
 	var attribute AttributeAST
-	ast.Position++
+	ast.Position++ // Skip tag token
 	if ast.Ended() {
 		ast.PushErrorToken(ast.Tokens[ast.Position-1], "invalid_syntax")
 		return
 	}
-	ast.Position++
-	if ast.Ended() {
-		ast.PushErrorToken(ast.Tokens[ast.Position-1], "invalid_syntax")
-		return
-	}
-	attribute.Token = ast.Tokens[ast.Position]
-	if attribute.Token.Id != lex.Brace || attribute.Token.Kind != "]" {
-		ast.PushErrorToken(attribute.Token, "invalid_syntax")
+	attribute.Tag = ast.Tokens[ast.Position]
+	if attribute.Tag.Id != lex.Name {
+		ast.PushErrorToken(attribute.Tag, "invalid_syntax")
 		ast.Position = -1 // Stop modelling.
 		return
 	}
 	attribute.Token = ast.Tokens[ast.Position-1]
-	attribute.Value = attribute.Token.Kind
 	ast.Tree = append(ast.Tree, Object{
 		Token: attribute.Token,
 		Value: attribute,

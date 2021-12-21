@@ -25,4 +25,5 @@ const (
 	Const     uint8 = 9
 	Type      uint8 = 10
 	Colon     uint8 = 11
+	At        uint8 = 12
 )
