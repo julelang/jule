@@ -122,18 +122,19 @@ func (ast *AST) BuildName() {
 // BuildAttribute builds AST model of attribute.
 func (ast *AST) BuildAttribute() {
 	var attribute AttributeAST
-	ast.Position++ // Skip tag token
+	attribute.Token = ast.Tokens[ast.Position]
+	ast.Position++
 	if ast.Ended() {
 		ast.PushErrorToken(ast.Tokens[ast.Position-1], "invalid_syntax")
 		return
 	}
 	attribute.Tag = ast.Tokens[ast.Position]
-	if attribute.Tag.Id != lex.Name {
+	if attribute.Tag.Id != lex.Name ||
+		attribute.Token.Column+1 != attribute.Tag.Column {
 		ast.PushErrorToken(attribute.Tag, "invalid_syntax")
 		ast.Position = -1 // Stop modelling.
 		return
 	}
-	attribute.Token = ast.Tokens[ast.Position-1]
 	ast.Tree = append(ast.Tree, Object{
 		Token: attribute.Token,
 		Value: attribute,
