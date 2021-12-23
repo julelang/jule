@@ -250,38 +250,50 @@ func (ast *AST) pushParameter(fn *FunctionAST, tokens []lex.Token, err lex.Token
 	paramAST := ParameterAST{
 		Token: tokens[0],
 	}
-	index := 0
-	if t, ok := ast.BuildDataType(tokens, &index, true); ok {
-		if index+1 == len(tokens) {
-			paramAST.Type = t
+	for index, token := range tokens {
+		switch token.Id {
+		case lex.Const:
+			if paramAST.Const {
+				ast.PushErrorToken(token, "already_constant")
+				continue
+			}
+			paramAST.Const = true
+		case lex.Name:
+			tokens = tokens[index:]
+			if len(tokens) < 2 {
+				ast.PushErrorToken(paramAST.Token, "missing_type")
+				return
+			}
+			if !x.IsIgnoreName(token.Kind) {
+				for _, param := range fn.Params {
+					if param.Name == token.Kind {
+						ast.PushErrorToken(token, "parameter_exist")
+						break
+					}
+				}
+				paramAST.Name = token.Kind
+			}
+			index := 1
+			paramAST.Type, _ = ast.BuildDataType(tokens, &index, true)
+			if index+1 < len(tokens) {
+				ast.PushErrorToken(tokens[index+1], "invalid_syntax")
+			}
+			goto end
+		default:
+			if t, ok := ast.BuildDataType(tokens, &index, true); ok {
+				if index+1 == len(tokens) {
+					paramAST.Type = t
+					goto end
+				}
+			}
+			ast.PushErrorToken(token, "invalid_syntax")
 			goto end
 		}
 	}
-	{
-		if len(tokens) < 2 {
-			ast.PushErrorToken(paramAST.Token, "missing_type")
-			return
-		}
-		nameToken := tokens[0]
-		if nameToken.Id != lex.Name {
-			ast.PushErrorToken(nameToken, "invalid_syntax")
-		}
-		if !x.IsIgnoreName(nameToken.Kind) {
-			for _, param := range fn.Params {
-				if param.Name == nameToken.Kind {
-					ast.PushErrorToken(nameToken, "parameter_exist")
-					break
-				}
-			}
-			paramAST.Name = nameToken.Kind
-		}
-		index := 1
-		paramAST.Type, _ = ast.BuildDataType(tokens, &index, true)
-		if index+1 < len(tokens) {
-			ast.PushErrorToken(tokens[index+1], "invalid_syntax")
-		}
-	}
 end:
+	if paramAST.Type.Code == x.Void {
+		ast.PushErrorToken(paramAST.Token, "invalid_syntax")
+	}
 	fn.Params = append(fn.Params, paramAST)
 }
 

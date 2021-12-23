@@ -146,14 +146,20 @@ type FunctionAST struct {
 type ParameterAST struct {
 	Token lex.Token
 	Name  string
+	Const bool
 	Type  DataTypeAST
 }
 
 func (p ParameterAST) String() string {
-	if p.Name != "" {
-		return p.Type.String() + " " + p.Name
+	var cxx strings.Builder
+	if p.Const {
+		cxx.WriteString("const ")
 	}
-	return p.Type.String()
+	cxx.WriteString(p.Type.String())
+	if p.Name != "" {
+		return cxx.String() + " " + p.Name
+	}
+	return cxx.String()
 }
 
 // DataTypeString returns data type string of function.
@@ -288,7 +294,8 @@ type VariableAST struct {
 
 func (v VariableAST) String() string {
 	var sb strings.Builder
-	if v.DefineToken.Kind == "const" {
+	switch v.DefineToken.Id {
+	case lex.Const:
 		sb.WriteString("const ")
 	}
 	sb.WriteString(v.StringType())

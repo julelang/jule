@@ -231,10 +231,8 @@ func (p *Parser) ParseVariable(varAST ast.VariableAST) ast.VariableAST {
 	if varAST.DefineToken.Kind == "const" {
 		if varAST.SetterToken.Id == lex.NA {
 			p.PushErrorToken(varAST.NameToken, "missing_const_value")
-			return varAST
-		} else if !typeIsSingle(varAST.Type) {
+		} else if !checkValidityConstantDataType(varAST.Type) {
 			p.PushErrorToken(varAST.NameToken, "invalid_const_data_type")
-			return varAST
 		}
 	}
 	return varAST
@@ -257,6 +255,9 @@ func variablesFromParameters(params []ast.ParameterAST) []ast.VariableAST {
 		variable.Name = param.Name
 		variable.NameToken = param.Token
 		variable.Type = param.Type
+		if param.Const {
+			variable.DefineToken.Id = lex.Const
+		}
 		vars = append(vars, variable)
 	}
 	return vars
@@ -815,7 +816,7 @@ func (p *singleValueProcessor) name() (v value, ok bool) {
 	if variable := p.parser.variableByName(p.token.Kind); variable != nil {
 		v.ast.Value = p.token.Kind
 		v.ast.Type = variable.Type
-		v.constant = variable.DefineToken.Kind == "const"
+		v.constant = variable.DefineToken.Id == lex.Const
 		v.ast.Token = variable.NameToken
 		p.builder.appendNode(tokenExpNode{p.token})
 		ok = true
@@ -1342,9 +1343,21 @@ func (p *Parser) checkBlock(b ast.BlockAST) {
 	}
 }
 
+func (p *Parser) checkParameters(params []ast.ParameterAST) {
+	for _, param := range params {
+		if !param.Const {
+			continue
+		}
+		if !checkValidityConstantDataType(param.Type) {
+			p.PushErrorToken(param.Type.Token, "invalid_const_data_type")
+		}
+	}
+}
+
 func (p *Parser) checkFunction(fun ast.FunctionAST) {
 	p.checkBlock(fun.Block)
 	p.checkFunctionReturn(fun)
+	p.checkParameters(fun.Params)
 }
 
 func (p *Parser) checkVariableStatement(varAST *ast.VariableAST) {

@@ -32,6 +32,10 @@ func typeIsSingle(dt ast.DataTypeAST) bool {
 		dt.Code != x.Function
 }
 
+func checkValidityConstantDataType(dt ast.DataTypeAST) bool {
+	return typeIsSingle(dt)
+}
+
 func (p *Parser) checkValidityForAutoType(t ast.DataTypeAST, err lex.Token) {
 	switch t.Code {
 	case x.Nil:

@@ -68,4 +68,5 @@ var Errors = map[string]string{
 	`notint_string_select`:          `string indexes is should be integer`,
 	`undefined_tag`:                 `undefined attribute`,
 	`attribute_repeat`:              `this attribute is already given`,
+	`already_constant`:              `this define is already constant`,
 }
