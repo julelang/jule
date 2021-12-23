@@ -824,6 +824,7 @@ func (p *singleValueProcessor) name() (v value, ok bool) {
 		v.ast.Value = p.token.Kind
 		v.ast.Type.Code = x.Function
 		v.ast.Type.Tag = fun.ast
+		v.ast.Type.Value = fun.ast.DataTypeString()
 		v.ast.Token = fun.ast.Token
 		p.builder.appendNode(tokenExpNode{p.token})
 		ok = true
@@ -1111,6 +1112,7 @@ func (p *Parser) processBraceValuePart(tokens []lex.Token, builder *expressionMo
 			p.checkAnonymousFunction(funAST)
 			v.ast.Type.Tag = funAST
 			v.ast.Type.Code = x.Function
+			v.ast.Type.Value = funAST.DataTypeString()
 			builder.appendNode(anonymousFunctionExp{funAST})
 			return
 		default:
