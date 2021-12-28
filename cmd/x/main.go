@@ -345,7 +345,7 @@ int main() {
 #pragma region X_ENTRY_POINT_STANDARD_CODES
   setlocale(0x0, "");
 #pragma endregion X_ENTRY_POINT_STANDARD_CODES
-
+  ${init_point}
   _main();
 
 #pragma region X_ENTRY_POINT_END_STANDARD_CODES
@@ -353,6 +353,17 @@ int main() {
 #pragma endregion X_ENTRY_POINT_END_STANDARD_CODES
 }
 #pragma endregion X_ENTRY_POINT`
+}
+
+func makeFinally(info *parser.ParseFileInfo) {
+	initPointString := ""
+	for _, fun := range info.Parser.Functions {
+		if fun.Ast.Name == "_"+x.InitPoint {
+			initPointString = "_" + x.InitPoint + "();"
+			break
+		}
+	}
+	info.X_CXX = strings.Replace(info.X_CXX, "${init_point}", initPointString, -1)
 }
 
 func writeCxxOutput(info *parser.ParseFileInfo) {
@@ -389,5 +400,6 @@ func main() {
 		printErrors(info.Errors)
 	}
 	appendStandards(&info.X_CXX)
+	makeFinally(info)
 	writeCxxOutput(info)
 }

@@ -7,8 +7,8 @@ import (
 )
 
 type function struct {
-	ast        ast.FunctionAST
-	attributes []ast.AttributeAST
+	Ast        ast.FunctionAST
+	Attributes []ast.AttributeAST
 }
 
 func (f function) String() string {
@@ -16,18 +16,18 @@ func (f function) String() string {
 	prototype := f.Prototype()
 	cxx.WriteString(prototype[:len(prototype)-1])
 	cxx.WriteByte(' ')
-	cxx.WriteString(f.ast.Block.String())
+	cxx.WriteString(f.Ast.Block.String())
 	return cxx.String()
 }
 
 // Prototype returns prototype cxx code of function.
 func (f function) Prototype() string {
 	var cxx strings.Builder
-	cxx.WriteString(attributesToString(f.attributes))
-	cxx.WriteString(f.ast.ReturnType.String())
+	cxx.WriteString(attributesToString(f.Attributes))
+	cxx.WriteString(f.Ast.ReturnType.String())
 	cxx.WriteByte(' ')
-	cxx.WriteString(f.ast.Name)
-	cxx.WriteString(paramsToCxx(f.ast.Params))
+	cxx.WriteString(f.Ast.Name)
+	cxx.WriteString(paramsToCxx(f.Ast.Params))
 	cxx.WriteByte(';')
 	return cxx.String()
 }

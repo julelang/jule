@@ -181,10 +181,10 @@ func (p *Parser) ParseFunction(funAst ast.FunctionAST) {
 		return
 	}
 	fun := new(function)
-	fun.ast = funAst
-	fun.attributes = p.attributes
+	fun.Ast = funAst
+	fun.Attributes = p.attributes
 	p.attributes = nil
-	p.checkFunctionAttributes(fun.attributes)
+	p.checkFunctionAttributes(fun.Attributes)
 	p.Functions = append(p.Functions, fun)
 }
 
@@ -298,14 +298,21 @@ func (p *Parser) typeByName(name string) *ast.TypeAST {
 	return nil
 }
 
-func (p *Parser) functionByName(name string) *function {
+// FunctionByName returns function by specified name.
+//
+// Special case:
+//  FunctionByName(name) -> nil: if function is not exist.
+func (p *Parser) FunctionByName(name string) *function {
+	if name == "_"+x.InitPoint { // Eliminate InitPoint function.
+		return nil
+	}
 	for _, fun := range builtinFunctions {
-		if fun.ast.Name == name {
+		if fun.Ast.Name == name {
 			return fun
 		}
 	}
 	for _, fun := range p.Functions {
-		if fun.ast.Name == name {
+		if fun.Ast.Name == name {
 			return fun
 		}
 	}
@@ -331,9 +338,9 @@ func (p *Parser) existName(name string) lex.Token {
 	if t != nil {
 		return t.Token
 	}
-	fun := p.functionByName(name)
+	fun := p.FunctionByName(name)
 	if fun != nil {
-		return fun.ast.Token
+		return fun.Ast.Token
 	}
 	variable := p.variableByName(name)
 	if variable != nil {
@@ -348,7 +355,7 @@ func (p *Parser) existName(name string) lex.Token {
 }
 
 func (p *Parser) finalCheck() {
-	if p.functionByName("_"+x.EntryPoint) == nil {
+	if p.FunctionByName("_"+x.EntryPoint) == nil {
 		p.PushError("no_entry_point")
 	}
 	p.checkTypes()
@@ -368,9 +375,9 @@ func (p *Parser) checkTypes() {
 
 func (p *Parser) checkFunctions() {
 	for _, fun := range p.Functions {
-		p.BlockVariables = variablesFromParameters(fun.ast.Params)
+		p.BlockVariables = variablesFromParameters(fun.Ast.Params)
 		p.checkFunctionSpecialCases(fun)
-		p.checkFunction(fun.ast)
+		p.checkFunction(fun.Ast)
 	}
 }
 
@@ -820,12 +827,12 @@ func (p *singleValueProcessor) name() (v value, ok bool) {
 		v.ast.Token = variable.NameToken
 		p.builder.appendNode(tokenExpNode{p.token})
 		ok = true
-	} else if fun := p.parser.functionByName(p.token.Kind); fun != nil {
+	} else if fun := p.parser.FunctionByName(p.token.Kind); fun != nil {
 		v.ast.Value = p.token.Kind
 		v.ast.Type.Code = x.Function
-		v.ast.Type.Tag = fun.ast
-		v.ast.Type.Value = fun.ast.DataTypeString()
-		v.ast.Token = fun.ast.Token
+		v.ast.Type.Tag = fun.Ast
+		v.ast.Type.Value = fun.Ast.DataTypeString()
+		v.ast.Token = fun.Ast.Token
 		p.builder.appendNode(tokenExpNode{p.token})
 		ok = true
 	} else {
@@ -1309,17 +1316,35 @@ func (p *Parser) getRangeTokens(open, close string, tokens []lex.Token) []lex.To
 }
 
 func (p *Parser) checkFunctionSpecialCases(fun *function) {
-	switch fun.ast.Name {
+	switch fun.Ast.Name {
 	case "_" + x.EntryPoint:
-		if len(fun.ast.Params) > 0 {
-			p.PushErrorToken(fun.ast.Token, "entrypoint_have_parameters")
-		}
-		if fun.ast.ReturnType.Code != x.Void {
-			p.PushErrorToken(fun.ast.ReturnType.Token, "entrypoint_have_return")
-		}
-		if fun.attributes != nil {
-			p.PushErrorToken(fun.ast.Token, "entrypoint_have_attributes")
-		}
+		p.checkEntryPointSpecialCases(fun)
+	case "_" + x.InitPoint:
+		p.checkInitPointSpecialCases(fun)
+	}
+}
+
+func (p *Parser) checkEntryPointSpecialCases(fun *function) {
+	if len(fun.Ast.Params) > 0 {
+		p.PushErrorToken(fun.Ast.Token, "entrypoint_have_parameters")
+	}
+	if fun.Ast.ReturnType.Code != x.Void {
+		p.PushErrorToken(fun.Ast.ReturnType.Token, "entrypoint_have_return")
+	}
+	if fun.Attributes != nil {
+		p.PushErrorToken(fun.Ast.Token, "entrypoint_have_attributes")
+	}
+}
+
+func (p *Parser) checkInitPointSpecialCases(fun *function) {
+	if len(fun.Ast.Params) > 0 {
+		p.PushErrorToken(fun.Ast.Token, "initpoint_have_parameters")
+	}
+	if fun.Ast.ReturnType.Code != x.Void {
+		p.PushErrorToken(fun.Ast.ReturnType.Token, "initpoint_have_return")
+	}
+	if fun.Attributes != nil {
+		p.PushErrorToken(fun.Ast.Token, "initpoint_have_attributes")
 	}
 }
 
@@ -1387,7 +1412,7 @@ func (p *Parser) checkVariableSetStatement(vsAST *ast.VariableSetAST) {
 	}
 	switch selected.ast.Type.Tag.(type) {
 	case ast.FunctionAST:
-		if p.functionByName(selected.ast.Token.Kind) != nil {
+		if p.FunctionByName(selected.ast.Token.Kind) != nil {
 			p.PushErrorToken(vsAST.Setter, "type_not_support_value_update")
 			return
 		}

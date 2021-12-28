@@ -9,6 +9,7 @@ const (
 	SettingsFile = "x.set"
 
 	EntryPoint = "main"
+	InitPoint  = "init"
 )
 
 // Environment Variables.
