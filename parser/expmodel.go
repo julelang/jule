@@ -80,19 +80,25 @@ type tokenExpNode struct {
 	token lex.Token
 }
 
-func (node tokenExpNode) String() string { return node.token.Kind }
+func (node tokenExpNode) String() string {
+	return node.token.Kind
+}
 
 type runeExpNode struct {
 	token lex.Token
 }
 
-func (run runeExpNode) String() string { return "L" + run.token.Kind }
+func (run runeExpNode) String() string {
+	return "L" + run.token.Kind
+}
 
 type strExpNode struct {
 	token lex.Token
 }
 
-func (str strExpNode) String() string { return "L" + str.token.Kind }
+func (str strExpNode) String() string {
+	return "L" + str.token.Kind
+}
 
 type arrayPointerExp struct {
 	nodes []expressionNode
@@ -144,6 +150,9 @@ type argsExp struct {
 }
 
 func (a argsExp) String() string {
+	if a.args == nil {
+		return ""
+	}
 	var cxx strings.Builder
 	for _, arg := range a.args {
 		cxx.WriteString(arg.String())
