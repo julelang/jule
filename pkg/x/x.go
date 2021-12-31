@@ -9,13 +9,12 @@ const (
 	SettingsFile = "x.set"
 
 	EntryPoint = "main"
-	InitPoint  = "init"
 )
 
 // Environment Variables.
 var (
 	ExecutablePath string
-	XSettings      *xset.XSet
+	XSet           *xset.XSet
 )
 
 // IsIgnoreName reports name is ignore or not.

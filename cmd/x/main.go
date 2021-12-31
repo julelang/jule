@@ -119,7 +119,7 @@ func loadXSet() {
 		println(err.Error())
 		os.Exit(1)
 	}
-	x.XSettings, err = xset.Load(bytes)
+	x.XSet, err = xset.Load(bytes)
 	if err != nil {
 		println("X settings has errors;")
 		println(err.Error())
@@ -345,7 +345,6 @@ int main() {
 #pragma region X_ENTRY_POINT_STANDARD_CODES
   setlocale(0x0, "");
 #pragma endregion X_ENTRY_POINT_STANDARD_CODES
-  ${init_point}
   _main();
 
 #pragma region X_ENTRY_POINT_END_STANDARD_CODES
@@ -355,20 +354,9 @@ int main() {
 #pragma endregion X_ENTRY_POINT`
 }
 
-func makeFinally(info *parser.ParseFileInfo) {
-	initPointString := ""
-	for _, fun := range info.Parser.Functions {
-		if fun.Ast.Name == "_"+x.InitPoint {
-			initPointString = "_" + x.InitPoint + "();"
-			break
-		}
-	}
-	info.X_CXX = strings.Replace(info.X_CXX, "${init_point}", initPointString, -1)
-}
-
 func writeCxxOutput(info *parser.ParseFileInfo) {
-	path := filepath.Join(x.XSettings.CxxOutDir, x.XSettings.CxxOutName)
-	err := os.MkdirAll(x.XSettings.CxxOutDir, 0511)
+	path := filepath.Join(x.XSet.CxxOutDir, x.XSet.CxxOutName)
+	err := os.MkdirAll(x.XSet.CxxOutDir, 0511)
 	if err != nil {
 		println(err.Error())
 		os.Exit(1)
@@ -400,6 +388,5 @@ func main() {
 		printErrors(info.Errors)
 	}
 	appendStandards(&info.X_CXX)
-	makeFinally(info)
 	writeCxxOutput(info)
 }

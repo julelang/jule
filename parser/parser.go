@@ -310,9 +310,6 @@ func (p *Parser) typeByName(name string) *ast.TypeAST {
 // Special case:
 //  FunctionByName(name) -> nil: if function is not exist.
 func (p *Parser) FunctionByName(name string) *function {
-	if name == "_"+x.InitPoint { // Eliminate InitPoint function.
-		return nil
-	}
 	for _, fun := range builtinFunctions {
 		if fun.Ast.Name == name {
 			return fun
@@ -1326,8 +1323,6 @@ func (p *Parser) checkFunctionSpecialCases(fun *function) {
 	switch fun.Ast.Name {
 	case "_" + x.EntryPoint:
 		p.checkEntryPointSpecialCases(fun)
-	case "_" + x.InitPoint:
-		p.checkInitPointSpecialCases(fun)
 	}
 }
 
@@ -1340,18 +1335,6 @@ func (p *Parser) checkEntryPointSpecialCases(fun *function) {
 	}
 	if fun.Attributes != nil {
 		p.PushErrorToken(fun.Ast.Token, "entrypoint_have_attributes")
-	}
-}
-
-func (p *Parser) checkInitPointSpecialCases(fun *function) {
-	if len(fun.Ast.Params) > 0 {
-		p.PushErrorToken(fun.Ast.Token, "initpoint_have_parameters")
-	}
-	if fun.Ast.ReturnType.Code != x.Void {
-		p.PushErrorToken(fun.Ast.ReturnType.Token, "initpoint_have_return")
-	}
-	if fun.Attributes != nil {
-		p.PushErrorToken(fun.Ast.Token, "initpoint_have_attributes")
 	}
 }
 

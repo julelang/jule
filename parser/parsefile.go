@@ -12,7 +12,6 @@ type ParseFileInfo struct {
 	Errors   []string
 	File     *io.FILE
 	Routines *sync.WaitGroup
-	Parser   *Parser // Used parser.
 }
 
 // ParseFile parses file content.
@@ -25,7 +24,7 @@ func ParseFile(info *ParseFileInfo) {
 		info.Errors = lexer.Errors
 		return
 	}
-	info.Parser = NewParser(tokens, info)
-	info.Parser.Parse()
-	info.X_CXX += info.Parser.Cxx()
+	parser := NewParser(tokens, info)
+	parser.Parse()
+	info.X_CXX += parser.Cxx()
 }
