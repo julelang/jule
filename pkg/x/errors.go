@@ -72,4 +72,5 @@ var Errors = map[string]string{
 	`undefined_tag`:                 `undefined attribute`,
 	`attribute_repeat`:              `this attribute is already given`,
 	`already_constant`:              `this define is already constant`,
+	`ignore_name_identifier`:        `ignore operator cannot use as identifier`,
 }

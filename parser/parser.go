@@ -142,6 +142,9 @@ func (p *Parser) ParseType(t ast.TypeAST) {
 	if p.existName(t.Name).Id != lex.NA {
 		p.PushErrorToken(t.Token, "exist_name")
 		return
+	} else if x.IsIgnoreName(t.Name) {
+		p.PushErrorToken(t.Token, "ignore_name_identifier")
+		return
 	}
 	p.Types = append(p.Types, t)
 }
@@ -175,13 +178,14 @@ func (p *Parser) ParseStatement(s ast.StatementAST) {
 }
 
 // ParseFunction parse X function.
-func (p *Parser) ParseFunction(funAst ast.FunctionAST) {
-	if p.existName(funAst.Name).Id != lex.NA {
-		p.PushErrorToken(funAst.Token, "exist_name")
-		return
+func (p *Parser) ParseFunction(funAST ast.FunctionAST) {
+	if p.existName(funAST.Name).Id != lex.NA {
+		p.PushErrorToken(funAST.Token, "exist_name")
+	} else if x.IsIgnoreName(funAST.Name) {
+		p.PushErrorToken(funAST.Token, "ignore_name_identifier")
 	}
 	fun := new(function)
-	fun.Ast = funAst
+	fun.Ast = funAST
 	fun.Attributes = p.attributes
 	p.attributes = nil
 	p.checkFunctionAttributes(fun.Attributes)
@@ -206,6 +210,9 @@ func (p *Parser) ParseWaitingGlobalVariables() {
 
 // ParseVariable parse X variable.
 func (p *Parser) ParseVariable(varAST ast.VariableAST) ast.VariableAST {
+	if x.IsIgnoreName(varAST.Name) {
+		p.PushErrorToken(varAST.NameToken, "ignore_name_identifier")
+	}
 	value, model := p.computeExpression(varAST.Value)
 	varAST.Value.Model = model
 	if varAST.Type.Code != x.Void {
