@@ -53,21 +53,12 @@ func ParseBlock(b BlockAST, indent int) string {
 	cxx.WriteByte('{')
 	for _, s := range b.Statements {
 		cxx.WriteByte('\n')
-		cxx.WriteString(fullString(' ', indent*IndentSpace))
+		cxx.WriteString(strings.Repeat(" ", indent*IndentSpace))
 		cxx.WriteString(s.String())
 	}
 	cxx.WriteByte('\n')
-	cxx.WriteString(fullString(' ', (indent-1)*IndentSpace) + "}")
+	cxx.WriteString(strings.Repeat(" ", (indent-1)*IndentSpace) + "}")
 	return cxx.String()
-}
-
-func fullString(b byte, count int) string {
-	var sb strings.Builder
-	for count > 0 {
-		count--
-		sb.WriteByte(b)
-	}
-	return sb.String()
 }
 
 // DataTypeAST is data type identifier.
