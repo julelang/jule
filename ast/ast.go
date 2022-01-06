@@ -318,7 +318,10 @@ func (ast *AST) BuildDataType(tokens []lex.Token, index *int, err bool) (dt Data
 				dt.Value += token.Kind
 				break
 			}
-			fallthrough
+			if err {
+				ast.PushErrorToken(token, "invalid_syntax")
+			}
+			return dt, false
 		case lex.Brace:
 			switch token.Kind {
 			case "(":
@@ -477,20 +480,10 @@ func (ast *AST) BuildStatement(tokens []lex.Token) (s StatementAST) {
 	return
 }
 
-// BuildVariableSetStatement builds AST model of variable set statement.
-func (ast *AST) BuildVariableSetStatement(tokens []lex.Token) (s StatementAST, _ bool) {
-	switch tokens[0].Id {
-	case lex.Name, lex.Brace, lex.Operator:
-		if len(tokens) > 1 && tokens[1].Id == lex.Colon {
-			return
-		}
-	default:
-		return
-	}
+func checkVariableSetStatementTokens(tokens []lex.Token) bool {
 	braceCount := 0
-	for index, token := range tokens {
-		switch token.Id {
-		case lex.Brace:
+	for _, token := range tokens {
+		if token.Id == lex.Brace {
 			switch token.Kind {
 			case "{", "[", "(":
 				braceCount++
@@ -498,26 +491,176 @@ func (ast *AST) BuildVariableSetStatement(tokens []lex.Token) (s StatementAST, _
 				braceCount--
 			}
 		}
-		if braceCount != 0 {
+		if braceCount > 0 {
 			continue
 		}
-		if strings.HasSuffix(token.Kind, "=") {
-			if index == len(tokens)-1 {
-				ast.PushErrorToken(token, "missing_value")
-				return s, true /* true for not give another errors */
-			}
-			s = StatementAST{
-				Token: token,
-				Value: VariableSetAST{
-					Setter:           token,
-					SelectExpression: ast.BuildExpression(tokens[:index]),
-					ValueExpression:  ast.BuildExpression(tokens[index+1:]),
-				},
-			}
-			return s, true
+		if token.Id == lex.Operator &&
+			token.Kind[len(token.Kind)-1] == '=' {
+			return true
 		}
 	}
+	return false
+}
+
+type varsetInfo struct {
+	selectorTokens   []lex.Token
+	expressionTokens []lex.Token
+	setter           lex.Token
+	ok               bool
+	justDeclare      bool
+}
+
+func (ast *AST) variableSetInfo(tokens []lex.Token) (info varsetInfo) {
+	info.ok = true
+	braceCount := 0
+	for index, token := range tokens {
+		if token.Id == lex.Brace {
+			switch token.Kind {
+			case "(", "[", "{":
+				braceCount++
+			default:
+				braceCount--
+			}
+		}
+		if braceCount > 0 {
+			continue
+		}
+		if token.Id == lex.Operator &&
+			token.Kind[len(token.Kind)-1] == '=' {
+			info.selectorTokens = tokens[:index]
+			if info.selectorTokens == nil {
+				ast.PushErrorToken(token, "invalid_syntax")
+				info.ok = false
+			}
+			info.setter = token
+			if index+1 >= len(tokens) {
+				ast.PushErrorToken(token, "missing_value")
+				info.ok = false
+			} else {
+				info.expressionTokens = tokens[index+1:]
+			}
+			return
+		}
+	}
+	info.justDeclare = true
+	info.selectorTokens = tokens
 	return
+}
+
+func (ast *AST) pushVarsetSelector(selectors *[]VarsetSelector, last, current int, info varsetInfo) {
+	var selector VarsetSelector
+	selector.Expression.Tokens = info.selectorTokens[last:current]
+	if last-current == 0 {
+		ast.PushErrorToken(info.selectorTokens[current-1], "missing_value")
+		return
+	}
+	// Variable is new?
+	if selector.Expression.Tokens[0].Id == lex.Name &&
+		current-last > 1 &&
+		selector.Expression.Tokens[1].Id == lex.Colon {
+		selector.NewVariable = true
+		selector.Variable.NameToken = selector.Expression.Tokens[0]
+		selector.Variable.Name = selector.Variable.NameToken.Kind
+		selector.Variable.SetterToken = info.setter
+		// Has specific data-type?
+		if current-last > 2 {
+			selector.Variable.Type, _ = ast.BuildDataType(
+				selector.Expression.Tokens[2:], new(int), false)
+		}
+	} else {
+		if selector.Expression.Tokens[0].Id == lex.Name {
+			selector.Variable.NameToken = selector.Expression.Tokens[0]
+			selector.Variable.Name = selector.Variable.NameToken.Kind
+		}
+		selector.Expression = ast.BuildExpression(selector.Expression.Tokens)
+	}
+	*selectors = append(*selectors, selector)
+}
+
+func (ast *AST) varsetSelectors(info varsetInfo) []VarsetSelector {
+	var selectors []VarsetSelector
+	braceCount := 0
+	lastIndex := 0
+	for index, token := range info.selectorTokens {
+		if token.Id == lex.Brace {
+			switch token.Kind {
+			case "(", "[", "{":
+				braceCount++
+			default:
+				braceCount--
+			}
+		}
+		if braceCount > 0 {
+			continue
+		} else if token.Id != lex.Comma {
+			continue
+		}
+		ast.pushVarsetSelector(&selectors, lastIndex, index, info)
+		lastIndex = index + 1
+	}
+	if lastIndex < len(info.selectorTokens) {
+		ast.pushVarsetSelector(&selectors, lastIndex,
+			len(info.selectorTokens), info)
+	}
+	return selectors
+}
+
+func (ast *AST) pushVarsetExpression(exps *[]ExpressionAST, last, current int, info varsetInfo) {
+	tokens := info.expressionTokens[last:current]
+	if tokens == nil {
+		ast.PushErrorToken(info.expressionTokens[current-1], "missing_value")
+		return
+	}
+	*exps = append(*exps, ast.BuildExpression(tokens))
+}
+
+func (ast *AST) varsetExpressions(info varsetInfo) []ExpressionAST {
+	var expressions []ExpressionAST
+	braceCount := 0
+	lastIndex := 0
+	for index, token := range info.expressionTokens {
+		if token.Id == lex.Brace {
+			switch token.Kind {
+			case "(", "[", "{":
+				braceCount++
+			default:
+				braceCount--
+			}
+		}
+		if braceCount > 0 {
+			continue
+		} else if token.Id != lex.Comma {
+			continue
+		}
+		ast.pushVarsetExpression(&expressions, lastIndex, index, info)
+		lastIndex = index + 1
+	}
+	if lastIndex < len(info.expressionTokens) {
+		ast.pushVarsetExpression(&expressions, lastIndex,
+			len(info.expressionTokens), info)
+	}
+	return expressions
+}
+
+// BuildVariableSetStatement builds AST model of variable set statement.
+func (ast *AST) BuildVariableSetStatement(tokens []lex.Token) (s StatementAST, _ bool) {
+	if !checkVariableSetStatementTokens(tokens) {
+		return
+	}
+	info := ast.variableSetInfo(tokens)
+	if !info.ok {
+		return
+	}
+	var varAST VariableSetAST
+	varAST.Setter = info.setter
+	varAST.JustDeclare = info.justDeclare
+	varAST.SelectExpressions = ast.varsetSelectors(info)
+	if !info.justDeclare {
+		varAST.ValueExpressions = ast.varsetExpressions(info)
+	}
+	s.Token = tokens[0]
+	s.Value = varAST
+	return s, true
 }
 
 // BuildReturnStatement builds AST model of return statement.
@@ -527,8 +670,6 @@ func (ast *AST) BuildNameStatement(tokens []lex.Token) (s StatementAST) {
 		return
 	}
 	switch tokens[1].Id {
-	case lex.Colon:
-		return ast.BuildVariableStatement(tokens)
 	case lex.Brace:
 		switch tokens[1].Kind {
 		case "(":
@@ -621,36 +762,30 @@ func (ast *AST) BuildVariableStatement(tokens []lex.Token) (s StatementAST) {
 	} else {
 		position++
 	}
-	if position >= len(tokens) {
-		ast.PushErrorToken(tokens[position-1], "missing_autotype_value")
-		return
-	}
-	token := tokens[position]
-	t, ok := ast.BuildDataType(tokens, &position, false)
-	if ok {
-		varAST.Type = t
-		position++
-		if position >= len(tokens) {
-			if varAST.Type.Code == x.Void {
-				ast.PushErrorToken(token, "missing_autotype_value")
+	if position < len(tokens) {
+		token := tokens[position]
+		t, ok := ast.BuildDataType(tokens, &position, false)
+		if ok {
+			varAST.Type = t
+			position++
+			if position >= len(tokens) {
+				goto ret
+			}
+			token = tokens[position]
+		}
+		if token.Id == lex.Operator {
+			if token.Kind != "=" {
+				ast.PushErrorToken(token, "invalid_syntax")
 				return
 			}
-			goto ret
+			valueTokens := tokens[position+1:]
+			if len(valueTokens) == 0 {
+				ast.PushErrorToken(token, "missing_value")
+				return
+			}
+			varAST.Value = ast.BuildExpression(valueTokens)
+			varAST.SetterToken = token
 		}
-		token = tokens[position]
-	}
-	if token.Id == lex.Operator {
-		if token.Kind != "=" {
-			ast.PushErrorToken(token, "invalid_syntax")
-			return
-		}
-		valueTokens := tokens[position+1:]
-		if len(valueTokens) == 0 {
-			ast.PushErrorToken(token, "missing_value")
-			return
-		}
-		varAST.Value = ast.BuildExpression(valueTokens)
-		varAST.SetterToken = token
 	}
 ret:
 	return StatementAST{

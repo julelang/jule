@@ -281,6 +281,7 @@ type VariableAST struct {
 	Name        string
 	Type        DataTypeAST
 	Value       ExpressionAST
+	Tag         interface{}
 }
 
 func (v VariableAST) String() string {
@@ -292,8 +293,10 @@ func (v VariableAST) String() string {
 	sb.WriteString(v.StringType())
 	sb.WriteByte(' ')
 	sb.WriteString(v.Name)
-	sb.WriteString(" = ")
-	sb.WriteString(v.Value.String())
+	if v.Value.Processes != nil {
+		sb.WriteString(" = ")
+		sb.WriteString(v.Value.String())
+	}
 	sb.WriteByte(';')
 	return sb.String()
 }
@@ -306,14 +309,50 @@ func (v VariableAST) StringType() string {
 	return v.Type.String()
 }
 
+// VarsetSelector is selector for variable set operation.
+type VarsetSelector struct {
+	NewVariable bool
+	Variable    VariableAST
+	Expression  ExpressionAST
+	Ignore      bool
+}
+
+func (vs VarsetSelector) String() string {
+	if vs.NewVariable {
+		return vs.Expression.Tokens[0].Kind // Return variable name.
+	}
+	return vs.Expression.String()
+}
+
 // VariableSetAST is variable set AST model.
 type VariableSetAST struct {
-	Setter           lex.Token
-	SelectExpression ExpressionAST
-	ValueExpression  ExpressionAST
+	Setter            lex.Token
+	SelectExpressions []VarsetSelector
+	ValueExpressions  []ExpressionAST
+	JustDeclare       bool
 }
 
 func (vs VariableSetAST) String() string {
-	return vs.SelectExpression.String() + " " + vs.Setter.Kind +
-		" " + vs.ValueExpression.String() + ";"
+	var cxx strings.Builder
+	for _, selector := range vs.SelectExpressions {
+		if selector.Ignore || !selector.NewVariable {
+			continue
+		}
+		cxx.WriteString(selector.Variable.String() + " ")
+	}
+	if vs.JustDeclare {
+		return cxx.String()[:cxx.Len()-1] /* Remove unnecesarry whitespace. */
+	}
+	for index, selector := range vs.SelectExpressions {
+		if selector.Ignore {
+			continue
+		}
+		expression := vs.ValueExpressions[index]
+		cxx.WriteString(selector.String())
+		cxx.WriteString(vs.Setter.Kind)
+		cxx.WriteString(expression.String())
+		cxx.WriteString(", ")
+	}
+	// Remove unnecessary comma and add terminator.
+	return cxx.String()[:cxx.Len()-2] + ";"
 }

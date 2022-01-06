@@ -213,11 +213,18 @@ func (p *Parser) ParseVariable(varAST ast.VariableAST) ast.VariableAST {
 	if x.IsIgnoreName(varAST.Name) {
 		p.PushErrorToken(varAST.NameToken, "ignore_name_identifier")
 	}
-	value, model := p.computeExpression(varAST.Value)
-	varAST.Value.Model = model
+	var val value
+	switch t := varAST.Tag.(type) {
+	case value:
+		val = t
+	default:
+		if varAST.SetterToken.Id != lex.NA {
+			val, varAST.Value.Model = p.computeExpression(varAST.Value)
+		}
+	}
 	if varAST.Type.Code != x.Void {
 		if varAST.SetterToken.Id != lex.NA { // Pass default value.
-			p.checkType(varAST.Type, value.ast.Type, false, varAST.NameToken)
+			p.checkType(varAST.Type, val.ast.Type, false, varAST.NameToken)
 		} else {
 			var valueToken lex.Token
 			valueToken.Id = lex.Value
@@ -232,8 +239,12 @@ func (p *Parser) ParseVariable(varAST ast.VariableAST) ast.VariableAST {
 			}
 		}
 	} else {
-		varAST.Type = value.ast.Type
-		p.checkValidityForAutoType(varAST.Type, varAST.SetterToken)
+		if varAST.SetterToken.Id == lex.NA {
+			p.PushErrorToken(varAST.NameToken, "missing_autotype_value")
+		} else {
+			varAST.Type = val.ast.Type
+			p.checkValidityForAutoType(varAST.Type, varAST.SetterToken)
+		}
 	}
 	if varAST.DefineToken.Kind == "const" {
 		if varAST.SetterToken.Id == lex.NA {
@@ -381,7 +392,7 @@ func (p *Parser) checkFunctions() {
 	for _, fun := range p.Functions {
 		p.BlockVariables = variablesFromParameters(fun.Ast.Params)
 		p.checkFunctionSpecialCases(fun)
-		p.checkFunction(fun.Ast)
+		p.checkFunction(&fun.Ast)
 	}
 }
 
@@ -1120,7 +1131,7 @@ func (p *Parser) processBraceValuePart(tokens []lex.Token, builder *expressionMo
 				p.AppendErrors(astBuilder.Errors...)
 				return
 			}
-			p.checkAnonymousFunction(funAST)
+			p.checkAnonymousFunction(&funAST)
 			v.ast.Type.Tag = funAST
 			v.ast.Type.Code = x.Function
 			v.ast.Type.Value = funAST.DataTypeString()
@@ -1250,7 +1261,7 @@ func (p *Parser) buildArray(parts []enumPart, dt ast.DataTypeAST, err lex.Token)
 	return v, model
 }
 
-func (p *Parser) checkAnonymousFunction(fun ast.FunctionAST) {
+func (p *Parser) checkAnonymousFunction(fun *ast.FunctionAST) {
 	globalVariables := p.GlobalVariables
 	blockVariables := p.BlockVariables
 	p.GlobalVariables = append(blockVariables, p.GlobalVariables...)
@@ -1338,21 +1349,19 @@ func (p *Parser) checkEntryPointSpecialCases(fun *function) {
 	}
 }
 
-func (p *Parser) checkBlock(b ast.BlockAST) {
-	for index, model := range b.Statements {
+func (p *Parser) checkBlock(b *ast.BlockAST) {
+	for index := 0; index < len(b.Statements); index++ {
+		model := &b.Statements[index]
 		switch t := model.Value.(type) {
 		case ast.BlockExpressionAST:
 			_, t.Expression.Model = p.computeExpression(t.Expression)
 			model.Value = t
-			b.Statements[index] = model
 		case ast.VariableAST:
-			p.checkVariableStatement(&t)
+			p.checkVariableStatement(&t, false)
 			model.Value = t
-			b.Statements[index] = model
 		case ast.VariableSetAST:
 			p.checkVariableSetStatement(&t)
 			model.Value = t
-			b.Statements[index] = model
 		case ast.ReturnAST:
 		default:
 			p.PushErrorToken(model.Token, "invalid_syntax")
@@ -1371,13 +1380,13 @@ func (p *Parser) checkParameters(params []ast.ParameterAST) {
 	}
 }
 
-func (p *Parser) checkFunction(fun ast.FunctionAST) {
-	p.checkBlock(fun.Block)
-	p.checkFunctionReturn(fun)
+func (p *Parser) checkFunction(fun *ast.FunctionAST) {
+	p.checkBlock(&fun.Block)
+	p.checkFunctionReturn(*fun)
 	p.checkParameters(fun.Params)
 }
 
-func (p *Parser) checkVariableStatement(varAST *ast.VariableAST) {
+func (p *Parser) checkVariableStatement(varAST *ast.VariableAST, noParse bool) {
 	for _, t := range p.Types {
 		if varAST.Name == t.Name {
 			p.PushErrorToken(varAST.NameToken, "exist_name")
@@ -1390,36 +1399,102 @@ func (p *Parser) checkVariableStatement(varAST *ast.VariableAST) {
 			break
 		}
 	}
-	*varAST = p.ParseVariable(*varAST)
+	if !noParse {
+		*varAST = p.ParseVariable(*varAST)
+	}
 	p.BlockVariables = append(p.BlockVariables, *varAST)
 }
 
-func (p *Parser) checkVariableSetStatement(vsAST *ast.VariableSetAST) {
-	selected, _ := p.computeProcesses(vsAST.SelectExpression.Processes)
+func (p *Parser) checkVarsetOperation(selected value, err lex.Token) bool {
 	if selected.constant {
-		p.PushErrorToken(vsAST.Setter, "const_value_update")
-		return
+		p.PushErrorToken(err, "const_value_update")
+		return false
 	}
 	switch selected.ast.Type.Tag.(type) {
 	case ast.FunctionAST:
 		if p.FunctionByName(selected.ast.Token.Kind) != nil {
-			p.PushErrorToken(vsAST.Setter, "type_not_support_value_update")
-			return
+			p.PushErrorToken(err, "type_not_support_value_update")
+			return false
 		}
 	}
-	value, model := p.computeProcesses(vsAST.ValueExpression.Processes)
-	vsAST.ValueExpression = model.ExpressionAST()
+	return true
+}
+
+func (p *Parser) checkOneVarset(vsAST *ast.VariableSetAST) {
+	selected, _ := p.computeExpression(vsAST.SelectExpressions[0].Expression)
+	if !p.checkVarsetOperation(selected, vsAST.Setter) {
+		return
+	}
+	value, model := p.computeExpression(vsAST.ValueExpressions[0])
+	vsAST.ValueExpressions[0] = model.ExpressionAST()
 	if vsAST.Setter.Kind != "=" {
 		vsAST.Setter.Kind = vsAST.Setter.Kind[:len(vsAST.Setter.Kind)-1]
 		value.ast = arithmeticProcess{
 			p:        p,
-			left:     vsAST.SelectExpression.Tokens,
+			left:     vsAST.SelectExpressions[0].Expression.Tokens,
 			leftVal:  selected.ast,
-			right:    vsAST.ValueExpression.Tokens,
+			right:    vsAST.ValueExpressions[0].Tokens,
 			rightVal: value.ast,
 			operator: vsAST.Setter,
 		}.solve()
 		vsAST.Setter.Kind += "="
 	}
 	p.checkType(selected.ast.Type, value.ast.Type, false, vsAST.Setter)
+}
+
+func (p *Parser) checkVariableSetStatement(vsAST *ast.VariableSetAST) {
+	if !vsAST.JustDeclare &&
+		len(vsAST.SelectExpressions) != len(vsAST.ValueExpressions) {
+		p.PushErrorToken(vsAST.Setter, "missing_value")
+		return
+	} else if len(vsAST.SelectExpressions) == 1 {
+		if !vsAST.SelectExpressions[0].NewVariable {
+			p.checkOneVarset(vsAST)
+			return
+		}
+	}
+	if !vsAST.JustDeclare && vsAST.Setter.Kind != "=" {
+		p.PushErrorToken(vsAST.Setter, "invalid_syntax")
+		return
+	}
+	// PARSE EXPRESSIONS
+	var values []struct {
+		value value
+		model expressionModel
+	}
+	for index, expression := range vsAST.ValueExpressions {
+		val, model := p.computeExpression(expression)
+		vsAST.ValueExpressions[index].Model = model
+		values = append(values, struct {
+			value value
+			model expressionModel
+		}{val, model})
+	}
+	// PARSE SELECTIONS
+	if vsAST.JustDeclare {
+		for index, selector := range vsAST.SelectExpressions {
+			p.checkVariableStatement(&selector.Variable, false)
+			vsAST.SelectExpressions[index] = selector
+		}
+		return
+	}
+	for selectIndex := 0; selectIndex < len(vsAST.SelectExpressions); selectIndex++ {
+		selector := &vsAST.SelectExpressions[selectIndex]
+		val := values[selectIndex]
+		selector.Ignore = x.IsIgnoreName(selector.Variable.Name)
+		if !selector.NewVariable {
+			if selector.Ignore {
+				continue
+			}
+			selected, _ := p.computeExpression(selector.Expression)
+			if !p.checkVarsetOperation(selected, vsAST.Setter) {
+				return
+			}
+			p.checkType(selected.ast.Type, val.value.ast.Type, false, vsAST.Setter)
+			continue
+		}
+		selector.Variable.Tag = val.value
+		p.checkVariableStatement(&selector.Variable, false)
+
+	}
 }
