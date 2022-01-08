@@ -3,18 +3,18 @@ package x
 // Data type (built-in) constants.
 const (
 	Void     uint8 = 0
-	Int8     uint8 = 1
-	Int16    uint8 = 2
-	Int32    uint8 = 3
-	Int64    uint8 = 4
-	UInt8    uint8 = 5
-	UInt16   uint8 = 6
-	UInt32   uint8 = 7
-	UInt64   uint8 = 8
+	I8       uint8 = 1
+	I16      uint8 = 2
+	I32      uint8 = 3
+	I64      uint8 = 4
+	U8       uint8 = 5
+	U16      uint8 = 6
+	U32      uint8 = 7
+	U64      uint8 = 8
 	Bool     uint8 = 9
 	Str      uint8 = 10
-	Float32  uint8 = 11
-	Float64  uint8 = 12
+	F32      uint8 = 11
+	F64      uint8 = 12
 	Any      uint8 = 13
 	Rune     uint8 = 14
 	Name     uint8 = 15
@@ -25,27 +25,27 @@ const (
 // TypeGreaterThan reports type one is greater than type two or not.
 func TypeGreaterThan(t1, t2 uint8) bool {
 	switch t1 {
-	case Int16:
-		return t2 == Int8
-	case Int32:
-		return t2 == Int8 ||
-			t2 == Int16
-	case Int64:
-		return t2 == Int8 ||
-			t2 == Int16 ||
-			t2 == Int32
-	case UInt16:
-		return t2 == UInt8
-	case UInt32:
-		return t2 == UInt8 ||
-			t2 == UInt16
-	case UInt64:
-		return t2 == UInt8 ||
-			t2 == UInt16 ||
-			t2 == UInt32
-	case Float32:
-		return t2 != Any && t2 != Float64
-	case Float64:
+	case I16:
+		return t2 == I8
+	case I32:
+		return t2 == I8 ||
+			t2 == I16
+	case I64:
+		return t2 == I8 ||
+			t2 == I16 ||
+			t2 == I32
+	case U16:
+		return t2 == U8
+	case U32:
+		return t2 == U8 ||
+			t2 == U16
+	case U64:
+		return t2 == U8 ||
+			t2 == U16 ||
+			t2 == U32
+	case F32:
+		return t2 != Any && t2 != F64
+	case F64:
 		return t2 != Any
 	}
 	return false
@@ -62,66 +62,66 @@ func TypesAreCompatible(t1, t2 uint8, ignoreany bool) bool {
 			return false
 		}
 		return true
-	case Int8:
-		return t2 == Int8 ||
-			t2 == Int16 ||
-			t2 == Int32 ||
-			t2 == Int64 ||
-			t2 == Float32 ||
-			t2 == Float64
-	case Int16:
-		return t2 == Int16 ||
-			t2 == Int32 ||
-			t2 == Int64 ||
-			t2 == Float32 ||
-			t2 == Float64
-	case Int32:
-		return t2 == Int32 ||
-			t2 == Int64 ||
-			t2 == Float32 ||
-			t2 == Float64
-	case Int64:
-		return t2 == Int64 ||
-			t2 == Float32 ||
-			t2 == Float64
-	case UInt8:
-		return t2 == UInt8 ||
-			t2 == UInt16 ||
-			t2 == UInt32 ||
-			t2 == UInt64 ||
-			t2 == Float32 ||
-			t2 == Float64
-	case UInt16:
-		return t2 == UInt16 ||
-			t2 == UInt32 ||
-			t2 == UInt64 ||
-			t2 == Float32 ||
-			t2 == Float64
-	case UInt32:
-		return t2 == UInt32 ||
-			t2 == UInt64 ||
-			t2 == Float32 ||
-			t2 == Float64
-	case UInt64:
-		return t2 == UInt64 ||
-			t2 == Float32 ||
-			t2 == Float64
+	case I8:
+		return t2 == I8 ||
+			t2 == I16 ||
+			t2 == I32 ||
+			t2 == I64 ||
+			t2 == F32 ||
+			t2 == F64
+	case I16:
+		return t2 == I16 ||
+			t2 == I32 ||
+			t2 == I64 ||
+			t2 == F32 ||
+			t2 == F64
+	case I32:
+		return t2 == I32 ||
+			t2 == I64 ||
+			t2 == F32 ||
+			t2 == F64
+	case I64:
+		return t2 == I64 ||
+			t2 == F32 ||
+			t2 == F64
+	case U8:
+		return t2 == U8 ||
+			t2 == U16 ||
+			t2 == U32 ||
+			t2 == U64 ||
+			t2 == F32 ||
+			t2 == F64
+	case U16:
+		return t2 == U16 ||
+			t2 == U32 ||
+			t2 == U64 ||
+			t2 == F32 ||
+			t2 == F64
+	case U32:
+		return t2 == U32 ||
+			t2 == U64 ||
+			t2 == F32 ||
+			t2 == F64
+	case U64:
+		return t2 == U64 ||
+			t2 == F32 ||
+			t2 == F64
 	case Bool:
 		return t2 == Bool
 	case Str:
 		return t2 == Str
-	case Float32:
-		return t2 == Float32 ||
-			t2 == Float64
-	case Float64:
-		return t2 == Float64
+	case F32:
+		return t2 == F32 ||
+			t2 == F64
+	case F64:
+		return t2 == F64
 	case Rune:
 		return t2 == Rune ||
-			t2 == Int32 ||
-			t2 == Int64 ||
-			t2 == UInt16 ||
-			t2 == UInt32 ||
-			t2 == UInt64
+			t2 == I32 ||
+			t2 == I64 ||
+			t2 == U16 ||
+			t2 == U32 ||
+			t2 == U64
 	case Nil:
 		return t2 == Nil
 	}
@@ -140,59 +140,59 @@ func IsNumericType(t uint8) bool {
 
 // IsFloatType reports type is float or not.
 func IsFloatType(t uint8) bool {
-	return t == Float32 || t == Float64
+	return t == F32 || t == F64
 }
 
 // IsSignedNumericType reports type is signed numeric or not.
 func IsSignedNumericType(t uint8) bool {
 	return IsSignedIntegerType(t) ||
-		t == Float32 ||
-		t == Float64
+		t == F32 ||
+		t == F64
 }
 
 // IsSignedIntegerType reports type is signed integer or not.
 func IsSignedIntegerType(t uint8) bool {
-	return t == Int8 ||
-		t == Int16 ||
-		t == Int32 ||
-		t == Int64
+	return t == I8 ||
+		t == I16 ||
+		t == I32 ||
+		t == I64
 }
 
 // IsUnsignedNumericType reports type is unsigned numeric or not.
 func IsUnsignedNumericType(t uint8) bool {
-	return t == UInt8 ||
-		t == UInt16 ||
-		t == UInt32 ||
-		t == UInt64
+	return t == U8 ||
+		t == U16 ||
+		t == U32 ||
+		t == U64
 }
 
 // TypeFromName returns type name of specified type code.
 func TypeFromName(name string) uint8 {
 	switch name {
-	case "int8":
-		return Int8
-	case "int16":
-		return Int16
-	case "int32":
-		return Int32
-	case "int64":
-		return Int64
-	case "uint8":
-		return UInt8
-	case "uint16":
-		return UInt16
-	case "uint32":
-		return UInt32
-	case "uint64":
-		return UInt64
+	case "i8":
+		return I8
+	case "i16":
+		return I16
+	case "i32":
+		return I32
+	case "i64":
+		return I64
+	case "u8":
+		return U8
+	case "u16":
+		return U16
+	case "u32":
+		return U32
+	case "u64":
+		return U64
 	case "str":
 		return Str
 	case "bool":
 		return Bool
-	case "float32":
-		return Float32
-	case "float64":
-		return Float64
+	case "f32":
+		return F32
+	case "f64":
+		return F64
 	case "any":
 		return Any
 	case "rune":
@@ -205,28 +205,28 @@ func CxxTypeNameFromType(typeCode uint8) string {
 	switch typeCode {
 	case Void:
 		return "void"
-	case Int8:
-		return "int8"
-	case Int16:
-		return "int16"
-	case Int32:
-		return "int32"
-	case Int64:
-		return "int64"
-	case UInt8:
-		return "uint8"
-	case UInt16:
-		return "uint16"
-	case UInt32:
-		return "uint32"
-	case UInt64:
-		return "uint64"
+	case I8:
+		return "i8"
+	case I16:
+		return "i16"
+	case I32:
+		return "i32"
+	case I64:
+		return "i64"
+	case U8:
+		return "u8"
+	case U16:
+		return "u16"
+	case U32:
+		return "u32"
+	case U64:
+		return "u64"
 	case Bool:
 		return "bool"
-	case Float32:
-		return "float32"
-	case Float64:
-		return "float64"
+	case F32:
+		return "f32"
+	case F64:
+		return "f64"
 	case Any:
 		return "any"
 	case Str:

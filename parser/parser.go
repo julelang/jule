@@ -619,9 +619,9 @@ func (ap arithmeticProcess) solveFloat() (v ast.ValueAST) {
 	case "!=", "==", "<", ">", ">=", "<=":
 		v.Type.Code = x.Bool
 	case "+", "-", "*", "/":
-		v.Type.Code = x.Float32
-		if ap.leftVal.Type.Code == x.Float64 || ap.rightVal.Type.Code == x.Float64 {
-			v.Type.Code = x.Float64
+		v.Type.Code = x.F32
+		if ap.leftVal.Type.Code == x.F64 || ap.rightVal.Type.Code == x.F64 {
+			v.Type.Code = x.F64
 		}
 	default:
 		ap.p.PushErrorToken(ap.operator, "operator_notfor_float")
@@ -648,7 +648,7 @@ func (ap arithmeticProcess) solveSigned() (v ast.ValueAST) {
 	case ">>", "<<":
 		v.Type = ap.leftVal.Type
 		if !x.IsUnsignedNumericType(ap.rightVal.Type.Code) &&
-			!checkIntBit(ap.rightVal, xbits.BitsizeOfType(x.UInt64)) {
+			!checkIntBit(ap.rightVal, xbits.BitsizeOfType(x.U64)) {
 			ap.p.PushErrorToken(ap.rightVal.Token, "bitshift_must_unsigned")
 		}
 	default:
@@ -818,14 +818,14 @@ func (p *singleValueProcessor) numeric() value {
 	var v value
 	if strings.Contains(p.token.Kind, ".") ||
 		strings.ContainsAny(p.token.Kind, "eE") {
-		v.ast.Type.Code = x.Float64
+		v.ast.Type.Code = x.F64
 		v.ast.Type.Value = "float64"
 	} else {
-		v.ast.Type.Code = x.Int32
+		v.ast.Type.Code = x.I32
 		v.ast.Type.Value = "int32"
 		ok := xbits.CheckBitInt(p.token.Kind, 32)
 		if !ok {
-			v.ast.Type.Code = x.Int64
+			v.ast.Type.Code = x.I64
 			v.ast.Type.Value = "int64"
 		}
 	}

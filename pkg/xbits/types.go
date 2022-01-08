@@ -6,13 +6,13 @@ import "github.com/the-xlang/x/pkg/x"
 // data type of specified type code.
 func BitsizeOfType(t uint8) int {
 	switch t {
-	case x.Int8, x.UInt8:
+	case x.I8, x.U8:
 		return 8
-	case x.Int16, x.UInt16:
+	case x.I16, x.U16:
 		return 16
-	case x.Int32, x.UInt32:
+	case x.I32, x.U32:
 		return 32
-	case x.Int64, x.UInt64:
+	case x.I64, x.U64:
 		return 64
 	}
 	return 0
