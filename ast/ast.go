@@ -34,10 +34,14 @@ func (ast *AST) PushErrorToken(token lex.Token, err string) {
 }
 
 // PushError appends error by current token.
-func (ast *AST) PushError(err string) { ast.PushErrorToken(ast.Tokens[ast.Position], err) }
+func (ast *AST) PushError(err string) {
+	ast.PushErrorToken(ast.Tokens[ast.Position], err)
+}
 
 // Ended reports position is at end of tokens or not.
-func (ast *AST) Ended() bool { return ast.Position >= len(ast.Tokens) }
+func (ast *AST) Ended() bool {
+	return ast.Position >= len(ast.Tokens)
+}
 
 // Build builds AST tree.
 //
@@ -297,10 +301,6 @@ end:
 	fn.Params = append(fn.Params, paramAST)
 }
 
-// IsStatement reports token is
-// statement finish point or not.
-func IsStatement(token lex.Token) bool { return token.Id == lex.SemiColon }
-
 // BuildDataType builds AST model of data type.
 func (ast *AST) BuildDataType(tokens []lex.Token, index *int, err bool) (dt DataTypeAST, _ bool) {
 	first := *index
@@ -422,33 +422,74 @@ func IsSingleOperator(operator string) bool {
 		operator == "&"
 }
 
-// BuildBlock builds AST model of statements of code block.
-func (ast *AST) BuildBlock(tokens []lex.Token) (b BlockAST) {
+// IsStatement reports token is
+// statement finish point or not.
+func IsStatement(current, prev lex.Token) (yes bool, withSemicolon bool) {
+	yes = current.Id == lex.SemiColon || prev.Row < current.Row
+	if yes {
+		withSemicolon = current.Id == lex.SemiColon
+	}
+	return
+}
+
+func (ast *AST) pushStatementToBlock(b *BlockAST, tokens []lex.Token) {
+	if tokens[len(tokens)-1].Id == lex.SemiColon {
+		if len(tokens) == 1 {
+			return
+		}
+		tokens = tokens[:len(tokens)-1]
+	}
+	b.Statements = append(b.Statements, ast.BuildStatement(tokens))
+}
+
+func nextStatementPos(tokens []lex.Token, start int) int {
 	braceCount := 0
-	oldStatementPoint := 0
-	for index, token := range tokens {
+	index := start
+	for ; index < len(tokens); index++ {
+		token := tokens[index]
 		if token.Id == lex.Brace {
 			switch token.Kind {
-			case "{":
+			case "{", "[", "(":
 				braceCount++
-			case "}":
+				continue
+			default:
 				braceCount--
+				continue
 			}
 		}
-		if braceCount > 0 ||
-			!IsStatement(token) ||
-			index-oldStatementPoint == 0 {
+		if braceCount > 0 {
 			continue
 		}
-		b.Statements = append(b.Statements,
-			ast.BuildStatement(tokens[oldStatementPoint:index]))
+		var isStatement, withSemicolon bool
+		if index > start {
+			isStatement, withSemicolon = IsStatement(token, tokens[index-1])
+		} else {
+			isStatement, withSemicolon = IsStatement(token, token)
+		}
+		if !isStatement {
+			continue
+		}
+		if withSemicolon {
+			index++
+		}
+		return index
+	}
+	return index
+}
+
+// BuildBlock builds AST model of statements of code block.
+func (ast *AST) BuildBlock(tokens []lex.Token) (b BlockAST) {
+	var index, start int
+	for {
 		if ast.Position == -1 {
+			return
+		}
+		index = nextStatementPos(tokens, index)
+		ast.pushStatementToBlock(&b, tokens[start:index])
+		if index >= len(tokens) {
 			break
 		}
-		oldStatementPoint = index + 1
-	}
-	if oldStatementPoint < len(tokens) {
-		ast.PushErrorToken(tokens[len(tokens)-1], "missing_semicolon")
+		start = index
 	}
 	return
 }
@@ -947,15 +988,6 @@ func (ast *AST) getRange(open, close string) []lex.Token {
 
 func (ast *AST) skipStatement() []lex.Token {
 	start := ast.Position
-	for ; !ast.Ended(); ast.Position++ {
-		token := ast.Tokens[ast.Position]
-		if token.Id == lex.SemiColon {
-			ast.Position++
-			return ast.Tokens[start : ast.Position-1]
-		}
-	}
-	ast.Position--
-	ast.PushError("missing_semicolon")
-	ast.Position = -1 // Stop modelling.
-	return nil
+	ast.Position = nextStatementPos(ast.Tokens, start)
+	return ast.Tokens[start:ast.Position]
 }

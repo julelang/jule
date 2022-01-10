@@ -53,7 +53,6 @@ var Errors = map[string]string{
 	`missing_value`:                 `value is not given`,
 	`missing_argument`:              `missing argument(s)`,
 	`missing_block_comment`:         `missing block comment close`,
-	`missing_semicolon`:             `missing statement terminator at end of statement`,
 	`missing_rune_end`:              `rune is not finished`,
 	`missing_return`:                `missing return at end of function`,
 	`missing_string_end`:            `string is not finished`,
