@@ -297,7 +297,7 @@ public:
   }
 
   T& operator[](const int index) {
-    const uint32 length = this->vector.size();
+    const u32 length = this->vector.size();
     if (index < 0) {
       throw_exception(L"stackoverflow exception:\n index is less than zero");
     } else if (index >= length) {
@@ -309,7 +309,7 @@ public:
 
   friend std::wostream& operator<<(std::wostream &os, const array<T>& array) {
     os << L"[";
-    const uint32 size = array.vector.size();
+    const u32 size = array.vector.size();
     for (int index = 0; index < size;) {
       os << array.vector[index++];
       if (index < size) {
