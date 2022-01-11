@@ -271,8 +271,8 @@ public:
 
 #pragma region OPERATOR_OVERFLOWS
   bool operator==(const array& array) {
-    const uint32 vector_length = this->vector.size();
-    const uint32 array_vector_length = array.vector.size();
+    const u32 vector_length = this->vector.size();
+    const u32 array_vector_length = array.vector.size();
     if (vector_length != array_vector_length) {
       return false;
     }
