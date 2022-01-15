@@ -412,8 +412,7 @@ func (p *Parser) computeProcesses(processes [][]lex.Token) (v value, e expressio
 		e = builder.build()
 		return
 	}
-	var process arithmeticProcess
-	process.p = p
+	process := arithmeticProcess{p: p}
 	j := p.nextOperator(processes)
 	boolean := false
 	for j != -1 {

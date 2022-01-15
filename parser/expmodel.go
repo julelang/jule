@@ -24,29 +24,29 @@ func newExpBuilder() *expressionModelBuilder {
 	return builder
 }
 
-func (builder *expressionModelBuilder) setIndex(index int) {
-	if builder.index != -1 {
-		builder.appendBuildNode(expressionBuildNode{
-			index: builder.index,
-			node:  builder.current,
+func (b *expressionModelBuilder) setIndex(index int) {
+	if b.index != -1 {
+		b.appendBuildNode(expressionBuildNode{
+			index: b.index,
+			node:  b.current,
 		})
 	}
-	builder.index = index
-	builder.current = expressionModel{}
+	b.index = index
+	b.current = expressionModel{}
 }
 
-func (builder *expressionModelBuilder) appendBuildNode(node expressionBuildNode) {
-	builder.nodes = append(builder.nodes, node)
+func (b *expressionModelBuilder) appendBuildNode(node expressionBuildNode) {
+	b.nodes = append(b.nodes, node)
 }
 
-func (builder *expressionModelBuilder) appendNode(node expressionNode) {
-	builder.current.nodes = append(builder.current.nodes, node)
+func (b *expressionModelBuilder) appendNode(node expressionNode) {
+	b.current.nodes = append(b.current.nodes, node)
 }
 
-func (builder *expressionModelBuilder) build() (e expressionModel) {
-	builder.setIndex(-1)
-	for index := range builder.nodes {
-		for _, buildNode := range builder.nodes {
+func (b *expressionModelBuilder) build() (e expressionModel) {
+	b.setIndex(-1)
+	for index := range b.nodes {
+		for _, buildNode := range b.nodes {
 			if buildNode.index != index {
 				continue
 			}
@@ -97,7 +97,7 @@ type strExpNode struct {
 }
 
 func (str strExpNode) String() string {
-	return "L" + str.token.Kind
+	return "str(L" + str.token.Kind + ")"
 }
 
 type arrayPointerExp struct {
