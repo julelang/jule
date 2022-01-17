@@ -99,6 +99,24 @@ func (p *Parser) readyType(dt ast.DataTypeAST) (ast.DataTypeAST, bool) {
 	return dt, true
 }
 
+func (p *Parser) checkMultiType(real, check ast.DataTypeAST, ignoreAny bool, errToken lex.Token) {
+	if real.MultiTyped != check.MultiTyped {
+		p.PushErrorToken(errToken, "incompatible_datatype")
+		return
+	}
+	realTypes := real.Tag.([]ast.DataTypeAST)
+	checkTypes := real.Tag.([]ast.DataTypeAST)
+	if len(realTypes) != len(checkTypes) {
+		p.PushErrorToken(errToken, "incompatible_datatype")
+		return
+	}
+	for index := 0; index < len(realTypes); index++ {
+		realType := realTypes[index]
+		checkType := checkTypes[index]
+		p.checkType(realType, checkType, ignoreAny, errToken)
+	}
+}
+
 func (p *Parser) checkType(real, check ast.DataTypeAST, ignoreAny bool, errToken lex.Token) {
 	real, ok := p.readyType(real)
 	if !ok {
@@ -111,17 +129,21 @@ func (p *Parser) checkType(real, check ast.DataTypeAST, ignoreAny bool, errToken
 	if !ignoreAny && real.Code == x.Any {
 		return
 	}
+	if real.MultiTyped || check.MultiTyped {
+		p.checkMultiType(real, check, ignoreAny, errToken)
+		return
+	}
 	if typeIsSingle(real) && typeIsSingle(check) {
 		if !x.TypesAreCompatible(check.Code, real.Code, ignoreAny) {
 			p.PushErrorToken(errToken, "incompatible_datatype")
 		}
-	} else {
-		if (typeIsPointer(real) || typeIsArray(real)) &&
-			check.Code == x.Nil {
-			return
-		}
-		if real.Value != check.Value {
-			p.PushErrorToken(errToken, "incompatible_datatype")
-		}
+		return
+	}
+	if (typeIsPointer(real) || typeIsArray(real)) &&
+		check.Code == x.Nil {
+		return
+	}
+	if real.Value != check.Value {
+		p.PushErrorToken(errToken, "incompatible_datatype")
 	}
 }

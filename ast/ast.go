@@ -178,7 +178,7 @@ func (ast *AST) BuildFunction(anonymous bool) (funAST FunctionAST) {
 		return
 	}
 	token := ast.Tokens[ast.Position]
-	t, ok := ast.BuildDataType(ast.Tokens, &ast.Position, false)
+	t, ok := ast.BuildFunctionReturnDataType(ast.Tokens, &ast.Position)
 	if ok {
 		funAST.ReturnType = t
 		ast.Position++
@@ -325,7 +325,7 @@ func (ast *AST) BuildDataType(tokens []lex.Token, index *int, err bool) (dt Data
 		case lex.Brace:
 			switch token.Kind {
 			case "(":
-				ast.buildFunctionType(token, tokens, index, &dt)
+				ast.buildFunctionDataType(token, tokens, index, &dt)
 				return dt, true
 			case "[":
 				*index++
@@ -374,16 +374,16 @@ func buildNameType(token lex.Token, dt *DataTypeAST) {
 	dt.Value += dt.Token.Kind
 }
 
-func (ast *AST) buildFunctionType(token lex.Token, tokens []lex.Token, index *int, dt *DataTypeAST) {
+func (ast *AST) buildFunctionDataType(token lex.Token, tokens []lex.Token, index *int, dt *DataTypeAST) {
 	dt.Token = token
 	dt.Code = x.Function
-	value, funAST := ast.buildFunctionDataType(tokens, index)
-	funAST.ReturnType, _ = ast.BuildDataType(tokens, index, false)
+	value, funAST := ast.buildFunctionDataTypeHead(tokens, index)
+	funAST.ReturnType, _ = ast.BuildFunctionReturnDataType(tokens, index)
 	dt.Value += value
 	dt.Tag = funAST
 }
 
-func (ast *AST) buildFunctionDataType(tokens []lex.Token, index *int) (string, FunctionAST) {
+func (ast *AST) buildFunctionDataTypeHead(tokens []lex.Token, index *int) (string, FunctionAST) {
 	var funAST FunctionAST
 	var typeValue strings.Builder
 	typeValue.WriteByte('(')
@@ -410,6 +410,69 @@ func (ast *AST) buildFunctionDataType(tokens []lex.Token, index *int) (string, F
 	return "", funAST
 }
 
+func (ast *AST) pushTypeToTypes(types *[]DataTypeAST, tokens []lex.Token, errToken lex.Token) {
+	if len(tokens) == 0 {
+		ast.PushErrorToken(errToken, "missing_value")
+		return
+	}
+	currentDt, _ := ast.BuildDataType(tokens, new(int), false)
+	*types = append(*types, currentDt)
+}
+
+func (ast *AST) BuildFunctionReturnDataType(tokens []lex.Token, index *int) (dt DataTypeAST, ok bool) {
+	if *index >= len(tokens) {
+		goto end
+	}
+	if tokens[*index].Id == lex.Brace &&
+		tokens[*index].Kind == "[" {
+		*index++
+		if *index >= len(tokens) {
+			*index--
+			goto end
+		}
+		if tokens[*index].Id == lex.Brace &&
+			tokens[*index].Kind == "]" {
+			*index--
+			goto end
+		}
+		var types []DataTypeAST
+		braceCount := 1
+		last := *index
+		for ; *index < len(tokens); *index++ {
+			token := tokens[*index]
+			if token.Id == lex.Brace {
+				switch token.Kind {
+				case "(", "[", "{":
+					braceCount++
+				default:
+					braceCount--
+				}
+			}
+			if braceCount == 0 {
+				ast.pushTypeToTypes(&types, tokens[last:*index], tokens[last-1])
+				break
+			} else if braceCount > 1 {
+				continue
+			}
+			if token.Id != lex.Comma {
+				continue
+			}
+			ast.pushTypeToTypes(&types, tokens[last:*index], tokens[*index-1])
+			last = *index + 1
+		}
+		if len(types) > 1 {
+			dt.MultiTyped = true
+			dt.Tag = types
+		} else {
+			dt = types[0]
+		}
+		ok = true
+		return
+	}
+end:
+	return ast.BuildDataType(tokens, index, false)
+}
+
 // IsSigleOperator is returns true
 // if operator is unary or smilar to unary,
 // returns false if not.
@@ -433,6 +496,9 @@ func IsStatement(current, prev lex.Token) (yes bool, withSemicolon bool) {
 }
 
 func (ast *AST) pushStatementToBlock(b *BlockAST, tokens []lex.Token) {
+	if len(tokens) == 0 {
+		return
+	}
 	if tokens[len(tokens)-1].Id == lex.SemiColon {
 		if len(tokens) == 1 {
 			return

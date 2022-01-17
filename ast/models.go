@@ -63,10 +63,11 @@ func ParseBlock(b BlockAST, indent int) string {
 
 // DataTypeAST is data type identifier.
 type DataTypeAST struct {
-	Token lex.Token
-	Code  uint8
-	Value string
-	Tag   interface{}
+	Token      lex.Token
+	Code       uint8
+	Value      string
+	MultiTyped bool
+	Tag        interface{}
 }
 
 func (dt DataTypeAST) String() string {
@@ -78,6 +79,9 @@ func (dt DataTypeAST) String() string {
 		}
 		dt.Value = dt.Value[index:]
 		break
+	}
+	if dt.MultiTyped {
+		return dt.MultiTypeString() + cxx.String()
 	}
 	if dt.Value != "" && dt.Value[0] == '[' {
 		pointers := cxx.String()
@@ -111,6 +115,17 @@ func (dt DataTypeAST) FunctionString() string {
 	}
 	cxx += ")>"
 	return cxx
+}
+
+func (dt DataTypeAST) MultiTypeString() string {
+	types := dt.Tag.([]DataTypeAST)
+	var cxx strings.Builder
+	cxx.WriteString("std::tuple<")
+	for _, t := range types {
+		cxx.WriteString(t.String())
+		cxx.WriteByte(',')
+	}
+	return cxx.String()[:cxx.Len()-1] + ">"
 }
 
 // TypeAST is type declaration.

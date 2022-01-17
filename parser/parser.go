@@ -281,32 +281,6 @@ func variablesFromParameters(params []ast.ParameterAST) []ast.VariableAST {
 	return vars
 }
 
-func (p *Parser) checkFunctionReturn(fun ast.FunctionAST) {
-	missed := true
-	for index, s := range fun.Block.Statements {
-		switch t := s.Value.(type) {
-		case ast.ReturnAST:
-			if len(t.Expression.Tokens) == 0 {
-				if fun.ReturnType.Code != x.Void {
-					p.PushErrorToken(t.Token, "require_return_value")
-				}
-			} else {
-				if fun.ReturnType.Code == x.Void {
-					p.PushErrorToken(t.Token, "void_function_return_value")
-				}
-				value, model := p.computeExpression(t.Expression)
-				t.Expression.Model = model
-				fun.Block.Statements[index].Value = t
-				p.checkType(fun.ReturnType, value.ast.Type, true, t.Token)
-			}
-			missed = false
-		}
-	}
-	if missed && fun.ReturnType.Code != x.Void {
-		p.PushErrorToken(fun.Token, "missing_return")
-	}
-}
-
 func (p *Parser) typeByName(name string) *ast.TypeAST {
 	for _, t := range p.Types {
 		if t.Name == name {
@@ -1376,6 +1350,32 @@ func (p *Parser) checkParameters(params []ast.ParameterAST) {
 		if !checkValidityConstantDataType(param.Type) {
 			p.PushErrorToken(param.Type.Token, "invalid_const_data_type")
 		}
+	}
+}
+
+func (p *Parser) checkFunctionReturn(fun ast.FunctionAST) {
+	missed := true
+	for index, s := range fun.Block.Statements {
+		switch t := s.Value.(type) {
+		case ast.ReturnAST:
+			if len(t.Expression.Tokens) == 0 {
+				if fun.ReturnType.Code != x.Void {
+					p.PushErrorToken(t.Token, "require_return_value")
+				}
+			} else {
+				if fun.ReturnType.Code == x.Void {
+					p.PushErrorToken(t.Token, "void_function_return_value")
+				}
+				value, model := p.computeExpression(t.Expression)
+				t.Expression.Model = model
+				fun.Block.Statements[index].Value = t
+				p.checkType(fun.ReturnType, value.ast.Type, true, t.Token)
+			}
+			missed = false
+		}
+	}
+	if missed && fun.ReturnType.Code != x.Void {
+		p.PushErrorToken(fun.Token, "missing_return")
 	}
 }
 
