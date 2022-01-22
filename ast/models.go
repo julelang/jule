@@ -358,16 +358,30 @@ func (vs VariableSetAST) String() string {
 	if vs.JustDeclare {
 		return cxx.String()[:cxx.Len()-1] /* Remove unnecesarry whitespace. */
 	}
+	if len(vs.SelectExpressions) == 1 { // One select.
+		cxx.WriteString(vs.SelectExpressions[0].String())
+		cxx.WriteString(vs.Setter.Kind)
+		cxx.WriteString(vs.ValueExpressions[0].String())
+		cxx.WriteByte(';')
+		return cxx.String()
+	}
+	// More select.
+	cxx.WriteString("std::tie(")
+	var expCxx strings.Builder
+	expCxx.WriteString("std::make_tuple(")
 	for index, selector := range vs.SelectExpressions {
 		if selector.Ignore {
 			continue
 		}
-		expression := vs.ValueExpressions[index]
 		cxx.WriteString(selector.String())
-		cxx.WriteString(vs.Setter.Kind)
-		cxx.WriteString(expression.String())
-		cxx.WriteString(", ")
+		cxx.WriteByte(',')
+		expCxx.WriteString(vs.ValueExpressions[index].String())
+		expCxx.WriteByte(',')
 	}
-	// Remove unnecessary comma and add terminator.
-	return cxx.String()[:cxx.Len()-2] + ";"
+	str := cxx.String()[:cxx.Len()-1] + ")"
+	cxx.Reset()
+	cxx.WriteString(str)
+	cxx.WriteString(vs.Setter.Kind)
+	cxx.WriteString(expCxx.String()[:expCxx.Len()-1] + ")")
+	return cxx.String() + ";"
 }
