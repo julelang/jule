@@ -160,3 +160,17 @@ func (a argsExp) String() string {
 	}
 	return cxx.String()[:cxx.Len()-1]
 }
+
+type multiReturnExpModel struct {
+	models []expressionModel
+}
+
+func (mre multiReturnExpModel) String() string {
+	var cxx strings.Builder
+	cxx.WriteString("std::make_tuple(")
+	for _, model := range mre.models {
+		cxx.WriteString(model.String())
+		cxx.WriteByte(',')
+	}
+	return cxx.String()[:cxx.Len()-1] + ")"
+}

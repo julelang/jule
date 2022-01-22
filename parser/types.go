@@ -6,6 +6,10 @@ import (
 	"github.com/the-xlang/x/pkg/x"
 )
 
+func typeIsVoidReturn(t ast.DataTypeAST) bool {
+	return t.Code == x.Void && !t.MultiTyped
+}
+
 func typeOfArrayElements(t ast.DataTypeAST) ast.DataTypeAST {
 	// Remove array syntax "[]"
 	t.Value = t.Value[2:]

@@ -1353,24 +1353,101 @@ func (p *Parser) checkParameters(params []ast.ParameterAST) {
 	}
 }
 
-func (p *Parser) checkFunctionReturn(fun ast.FunctionAST) {
+type returnChecker struct {
+	p        *Parser
+	retAST   *ast.ReturnAST
+	fun      ast.FunctionAST
+	expModel multiReturnExpModel
+	values   []value
+}
+
+func (rc *returnChecker) pushValue(last, current int, errTk lex.Token) {
+	if current-last == 0 {
+		rc.p.PushErrorToken(errTk, "missing_value")
+		return
+	}
+	tokens := rc.retAST.Expression.Tokens[last:current]
+	value, model := rc.p.computeTokens(tokens)
+	rc.expModel.models = append(rc.expModel.models, model)
+	rc.values = append(rc.values, value)
+}
+
+func (rc *returnChecker) checkValues() {
+	braceCount := 0
+	last := 0
+	for index, token := range rc.retAST.Expression.Tokens {
+		if token.Id == lex.Brace {
+			switch token.Kind {
+			case "(", "{", "[":
+			default:
+				braceCount--
+			}
+		}
+		if braceCount > 0 || token.Id != lex.Comma {
+			continue
+		}
+		rc.pushValue(last, index, token)
+		last = index + 1
+	}
+	length := len(rc.retAST.Expression.Tokens)
+	if last < length {
+		if last == 0 {
+			rc.pushValue(0, length, rc.retAST.Token)
+		} else {
+			rc.pushValue(last, length, rc.retAST.Expression.Tokens[last-1])
+		}
+	}
+	if !typeIsVoidReturn(rc.fun.ReturnType) {
+		rc.checkValueTypes()
+	}
+}
+
+func (rc *returnChecker) checkValueTypes() {
+	valLength := len(rc.values)
+	if !rc.fun.ReturnType.MultiTyped {
+		rc.retAST.Expression.Model = rc.expModel.models[0]
+		if valLength > 1 {
+			rc.p.PushErrorToken(rc.retAST.Token, "overflow_return")
+		}
+		rc.p.checkType(rc.fun.ReturnType, rc.values[0].ast.Type, true, rc.retAST.Token)
+		return
+	}
+	// Multi return
+	rc.retAST.Expression.Model = rc.expModel
+	types := rc.fun.ReturnType.Tag.([]ast.DataTypeAST)
+	if valLength == 1 {
+		rc.p.PushErrorToken(rc.retAST.Token, "missing_multi_return")
+	} else if valLength > len(types) {
+		rc.p.PushErrorToken(rc.retAST.Token, "overflow_return")
+	}
+	for index, t := range types {
+		if index >= valLength {
+			break
+		}
+		rc.p.checkType(t, rc.values[index].ast.Type, true, rc.retAST.Token)
+	}
+}
+
+func (rc *returnChecker) check() {
+	if !typeIsVoidReturn(rc.fun.ReturnType) &&
+		len(rc.retAST.Expression.Tokens) == 0 {
+		rc.p.PushErrorToken(rc.retAST.Token, "require_return_value")
+		return
+	}
+	if typeIsVoidReturn(rc.fun.ReturnType) {
+		rc.p.PushErrorToken(rc.retAST.Token, "void_function_return_value")
+	}
+	rc.checkValues()
+}
+
+func (p *Parser) checkReturns(fun ast.FunctionAST) {
 	missed := true
 	for index, s := range fun.Block.Statements {
 		switch t := s.Value.(type) {
 		case ast.ReturnAST:
-			if len(t.Expression.Tokens) == 0 {
-				if fun.ReturnType.Code != x.Void {
-					p.PushErrorToken(t.Token, "require_return_value")
-				}
-			} else {
-				if fun.ReturnType.Code == x.Void {
-					p.PushErrorToken(t.Token, "void_function_return_value")
-				}
-				value, model := p.computeExpression(t.Expression)
-				t.Expression.Model = model
-				fun.Block.Statements[index].Value = t
-				p.checkType(fun.ReturnType, value.ast.Type, true, t.Token)
-			}
+			rc := returnChecker{p: p, retAST: &t, fun: fun}
+			rc.check()
+			fun.Block.Statements[index].Value = t
 			missed = false
 		}
 	}
@@ -1381,7 +1458,7 @@ func (p *Parser) checkFunctionReturn(fun ast.FunctionAST) {
 
 func (p *Parser) checkFunction(fun *ast.FunctionAST) {
 	p.checkBlock(&fun.Block)
-	p.checkFunctionReturn(*fun)
+	p.checkReturns(*fun)
 	p.checkParameters(fun.Params)
 }
 

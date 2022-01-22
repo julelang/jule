@@ -58,6 +58,7 @@ var Errors = map[string]string{
 	`missing_string_end`:            `string is not finished`,
 	`missing_const_value`:           `constants must have value specification`,
 	`missing_expression`:            `missing expression`,
+	`missing_multi_return`:          `missing return values for multi return`,
 	`nil_for_autotype`:              `nil is cannot use with auto-type definations`,
 	`void_for_autotype`:             `void data is cannot use for auto-type definations`,
 	`rune_empty`:                    `rune is cannot empty`,
@@ -69,4 +70,5 @@ var Errors = map[string]string{
 	`attribute_repeat`:              `this attribute is already given`,
 	`already_constant`:              `this define is already constant`,
 	`ignore_name_identifier`:        `ignore operator cannot use as identifier`,
+	`overflow_return`:               `overflow return expressions`,
 }
