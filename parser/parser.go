@@ -213,18 +213,20 @@ func (p *Parser) ParseVariable(varAST ast.VariableAST) ast.VariableAST {
 	if x.IsIgnoreName(varAST.Name) {
 		p.PushErrorToken(varAST.NameToken, "ignore_name_identifier")
 	}
-	var val value
+	var dt ast.DataTypeAST
 	switch t := varAST.Tag.(type) {
-	case value:
-		val = t
+	case ast.DataTypeAST:
+		dt = t
 	default:
 		if varAST.SetterToken.Id != lex.NA {
+			var val value
 			val, varAST.Value.Model = p.computeExpression(varAST.Value)
+			dt = val.ast.Type
 		}
 	}
 	if varAST.Type.Code != x.Void {
 		if varAST.SetterToken.Id != lex.NA { // Pass default value.
-			p.checkType(varAST.Type, val.ast.Type, false, varAST.NameToken)
+			p.checkType(varAST.Type, dt, false, varAST.NameToken)
 		} else {
 			var valueToken lex.Token
 			valueToken.Id = lex.Value
@@ -242,7 +244,7 @@ func (p *Parser) ParseVariable(varAST ast.VariableAST) ast.VariableAST {
 		if varAST.SetterToken.Id == lex.NA {
 			p.PushErrorToken(varAST.NameToken, "missing_autotype_value")
 		} else {
-			varAST.Type = val.ast.Type
+			varAST.Type = dt
 			p.checkValidityForAutoType(varAST.Type, varAST.SetterToken)
 		}
 	}
@@ -1518,45 +1520,33 @@ func (p *Parser) checkOneVarset(vsAST *ast.VariableSetAST) {
 	p.checkType(selected.ast.Type, value.ast.Type, false, vsAST.Setter)
 }
 
-func (p *Parser) checkVariableSetStatement(vsAST *ast.VariableSetAST) {
-	if !vsAST.JustDeclare &&
-		len(vsAST.SelectExpressions) != len(vsAST.ValueExpressions) {
-		p.PushErrorToken(vsAST.Setter, "missing_value")
-		return
-	} else if len(vsAST.SelectExpressions) == 1 {
-		if !vsAST.SelectExpressions[0].NewVariable {
-			p.checkOneVarset(vsAST)
-			return
-		}
+type varsetValue struct {
+	value value
+	model expressionModel
+}
+
+func (p *Parser) parseVarsetSelections(vsAST *ast.VariableSetAST) {
+	for index, selector := range vsAST.SelectExpressions {
+		p.checkVariableStatement(&selector.Variable, false)
+		vsAST.SelectExpressions[index] = selector
 	}
-	if !vsAST.JustDeclare && vsAST.Setter.Kind != "=" {
-		p.PushErrorToken(vsAST.Setter, "invalid_syntax")
-		return
-	}
-	// PARSE EXPRESSIONS
-	var values []struct {
-		value value
-		model expressionModel
-	}
+}
+
+func (p *Parser) getVarsetValues(vsAST *ast.VariableSetAST) []varsetValue {
+	values := make([]varsetValue, len(vsAST.ValueExpressions))
 	for index, expression := range vsAST.ValueExpressions {
 		val, model := p.computeExpression(expression)
 		vsAST.ValueExpressions[index].Model = model
-		values = append(values, struct {
-			value value
-			model expressionModel
-		}{val, model})
+		values[index] = varsetValue{val, model}
 	}
-	// PARSE SELECTIONS
-	if vsAST.JustDeclare {
-		for index, selector := range vsAST.SelectExpressions {
-			p.checkVariableStatement(&selector.Variable, false)
-			vsAST.SelectExpressions[index] = selector
-		}
-		return
-	}
-	for selectIndex := 0; selectIndex < len(vsAST.SelectExpressions); selectIndex++ {
-		selector := &vsAST.SelectExpressions[selectIndex]
-		val := values[selectIndex]
+	return values
+}
+
+func (p *Parser) processMultiVarset(vsAST *ast.VariableSetAST) {
+	values := p.getVarsetValues(vsAST)
+	for index := range vsAST.SelectExpressions {
+		selector := &vsAST.SelectExpressions[index]
+		val := values[index]
 		selector.Ignore = x.IsIgnoreName(selector.Variable.Name)
 		if !selector.NewVariable {
 			if selector.Ignore {
@@ -1569,8 +1559,65 @@ func (p *Parser) checkVariableSetStatement(vsAST *ast.VariableSetAST) {
 			p.checkType(selected.ast.Type, val.value.ast.Type, false, vsAST.Setter)
 			continue
 		}
-		selector.Variable.Tag = val.value
+		selector.Variable.Tag = val.value.ast.Type
 		p.checkVariableStatement(&selector.Variable, false)
-
 	}
+}
+
+func (p *Parser) processFuncMultiVarset(vsAST *ast.VariableSetAST, funcVal value) {
+	types := funcVal.ast.Type.Tag.([]ast.DataTypeAST)
+	if len(types) != len(vsAST.SelectExpressions) {
+		p.PushErrorToken(vsAST.Setter, "missing_multiassign_identifiers")
+		return
+	}
+	for index := range vsAST.SelectExpressions {
+		selector := &vsAST.SelectExpressions[index]
+		selector.Ignore = x.IsIgnoreName(selector.Variable.Name)
+		dt := types[index]
+		if !selector.NewVariable {
+			if selector.Ignore {
+				continue
+			}
+			selected, _ := p.computeExpression(selector.Expression)
+			if !p.checkVarsetOperation(selected, vsAST.Setter) {
+				return
+			}
+			p.checkType(selected.ast.Type, dt, false, vsAST.Setter)
+			continue
+		}
+		selector.Variable.Tag = dt
+		p.checkVariableStatement(&selector.Variable, false)
+	}
+}
+
+func (p *Parser) checkVariableSetStatement(vsAST *ast.VariableSetAST) {
+	selectLength := len(vsAST.SelectExpressions)
+	valueLength := len(vsAST.ValueExpressions)
+	if vsAST.JustDeclare {
+		p.parseVarsetSelections(vsAST)
+		return
+	} else if selectLength == 1 && !vsAST.SelectExpressions[0].NewVariable {
+		p.checkOneVarset(vsAST)
+		return
+	} else if vsAST.Setter.Kind != "=" {
+		p.PushErrorToken(vsAST.Setter, "invalid_syntax")
+		return
+	}
+	if valueLength == 1 {
+		firstVal, _ := p.computeExpression(vsAST.ValueExpressions[0])
+		if firstVal.ast.Type.MultiTyped {
+			vsAST.MultipleReturn = true
+			p.processFuncMultiVarset(vsAST, firstVal)
+			return
+		}
+	}
+	switch {
+	case selectLength > valueLength:
+		p.PushErrorToken(vsAST.Setter, "overflow_multiassign_identifiers")
+		return
+	case selectLength < valueLength:
+		p.PushErrorToken(vsAST.Setter, "missing_multiassign_identifiers")
+		return
+	}
+	p.processMultiVarset(vsAST)
 }

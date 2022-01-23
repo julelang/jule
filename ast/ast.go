@@ -777,6 +777,8 @@ func (ast *AST) BuildNameStatement(tokens []lex.Token) (s StatementAST) {
 		return
 	}
 	switch tokens[1].Id {
+	case lex.Colon:
+		return ast.BuildVariableStatement(tokens)
 	case lex.Brace:
 		switch tokens[1].Kind {
 		case "(":

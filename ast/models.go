@@ -334,7 +334,7 @@ type VarsetSelector struct {
 
 func (vs VarsetSelector) String() string {
 	if vs.NewVariable {
-		return vs.Expression.Tokens[0].Kind // Return variable name.
+		return vs.Expression.Tokens[0].Kind // Returns variable name.
 	}
 	return vs.Expression.String()
 }
@@ -345,27 +345,18 @@ type VariableSetAST struct {
 	SelectExpressions []VarsetSelector
 	ValueExpressions  []ExpressionAST
 	JustDeclare       bool
+	MultipleReturn    bool
 }
 
-func (vs VariableSetAST) String() string {
-	var cxx strings.Builder
-	for _, selector := range vs.SelectExpressions {
-		if selector.Ignore || !selector.NewVariable {
-			continue
-		}
-		cxx.WriteString(selector.Variable.String() + " ")
-	}
-	if vs.JustDeclare {
-		return cxx.String()[:cxx.Len()-1] /* Remove unnecesarry whitespace. */
-	}
-	if len(vs.SelectExpressions) == 1 { // One select.
-		cxx.WriteString(vs.SelectExpressions[0].String())
-		cxx.WriteString(vs.Setter.Kind)
-		cxx.WriteString(vs.ValueExpressions[0].String())
-		cxx.WriteByte(';')
-		return cxx.String()
-	}
-	// More select.
+func (vs VariableSetAST) cxxSingleSet(cxx *strings.Builder) string {
+	cxx.WriteString(vs.SelectExpressions[0].String())
+	cxx.WriteString(vs.Setter.Kind)
+	cxx.WriteString(vs.ValueExpressions[0].String())
+	cxx.WriteByte(';')
+	return cxx.String()
+}
+
+func (vs VariableSetAST) cxxMultipleSet(cxx *strings.Builder) string {
 	cxx.WriteString("std::tie(")
 	var expCxx strings.Builder
 	expCxx.WriteString("std::make_tuple(")
@@ -383,5 +374,49 @@ func (vs VariableSetAST) String() string {
 	cxx.WriteString(str)
 	cxx.WriteString(vs.Setter.Kind)
 	cxx.WriteString(expCxx.String()[:expCxx.Len()-1] + ")")
-	return cxx.String() + ";"
+	cxx.WriteByte(';')
+	return cxx.String()
+}
+
+func (vs VariableSetAST) cxxMultipleReturn(cxx *strings.Builder) string {
+	cxx.WriteString("std::tie(")
+	for _, selector := range vs.SelectExpressions {
+		if selector.Ignore {
+			cxx.WriteString("std::ignore,")
+			continue
+		}
+		cxx.WriteString(selector.String())
+		cxx.WriteByte(',')
+	}
+	str := cxx.String()[:cxx.Len()-1]
+	cxx.Reset()
+	cxx.WriteString(str)
+	cxx.WriteByte(')')
+	cxx.WriteString(vs.Setter.Kind)
+	cxx.WriteString(vs.ValueExpressions[0].String())
+	cxx.WriteByte(';')
+	return cxx.String()
+}
+
+func (vs VariableSetAST) cxxNewDefines(cxx *strings.Builder) {
+	for _, selector := range vs.SelectExpressions {
+		if selector.Ignore || !selector.NewVariable {
+			continue
+		}
+		cxx.WriteString(selector.Variable.String() + " ")
+	}
+}
+
+func (vs VariableSetAST) String() string {
+	var cxx strings.Builder
+	vs.cxxNewDefines(&cxx)
+	if vs.JustDeclare {
+		return cxx.String()[:cxx.Len()-1] /* Remove unnecesarry whitespace. */
+	}
+	if vs.MultipleReturn {
+		return vs.cxxMultipleReturn(&cxx)
+	} else if len(vs.SelectExpressions) == 1 {
+		return vs.cxxSingleSet(&cxx)
+	}
+	return vs.cxxMultipleSet(&cxx)
 }
