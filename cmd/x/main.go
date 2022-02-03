@@ -180,37 +180,19 @@ public:
 #pragma endregion FIELDS
 
 #pragma region CONSTRUCTORS
-  str(const std::wstring& string) {
-    this->string = string;
-  }
-
-  str(const rune* string) {
-    this->string = string;
-  }
+  str(const std::wstring& string) { this->string = string; }
+  str(const rune* string)         { this->string = string; }
 #pragma endregion CONSTRUCTORS
 
 #pragma region DESTRUCTOR
-  ~str() {
-    this->string.clear();
-  }
+  ~str() { this->string.clear(); }
 #pragma endregion DESTRUCTOR
 
 #pragma region OPERATOR_OVERFLOWS
-  bool operator==(const str& string) {
-    return this->string == string.string;
-  }
-
-  bool operator!=(const str& string) {
-    return !(this->string == string.string);
-  }
-
-  str operator+(const str& string) {
-    return str(this->string + string.string);
-  }
-
-  void operator+=(const str& string) {
-    this->string += string.string;
-  }
+  bool operator==(const str& string) { return this->string == string.string; }
+  bool operator!=(const str& string) { return !(this->string == string.string); }
+  str operator+(const str& string)   { return str(this->string + string.string); }
+  void operator+=(const str& string) { this->string += string.string; }
 
   rune& operator[](const int index) {
     const u32 length = this->string.length();
@@ -223,10 +205,8 @@ public:
     return this->string[index];
   }
 
-  friend std::wostream& operator<<(std::wostream &os, const str& string) {
-    os << string.string;
-    return os;
-  }
+  friend std::wostream& operator<<(std::wostream &os, const str& string)
+  { os << string.string; return os; }
 #pragma endregion OPERATOR_OVERFLOWS
 };
 #pragma endregion X_BUILTIN_TYPES
@@ -246,26 +226,25 @@ public:
 
 #pragma region CONSTRUCTORS
   array() {
-    this->vector = {};
+    this->vector = { };
     this->heap = false;
   }
-
-  array(std::nullptr_t ) : array() {}
 
   array(const std::vector<T>& vector, bool heap) {
     this->vector = vector;
     this->heap = heap;
   }
 
-  array(const std::vector<T>& vector) : array(vector, false) {}
+  array(std::nullptr_t ) : array() { }
+  array(const std::vector<T>& vector) : array(vector, false) { }
+  array(const array<T>& arr, bool heap): array(std::vector<T>(arr.vector), heap) { }
+  array(const array<T>& arr): array(arr, false) { }
 #pragma endregion CONSTRUCTORS
 
 #pragma region DESTRUCTOR
   ~array() {
     this->vector.clear();
-    if (this->heap) {
-      delete this;
-    }
+    if (this->heap) { delete this; }
   }
 #pragma endregion DESTRUCTOR
 
@@ -273,34 +252,20 @@ public:
   bool operator==(const array& array) {
     const u32 vector_length = this->vector.size();
     const u32 array_vector_length = array.vector.size();
-    if (vector_length != array_vector_length) {
-      return false;
-    }
-    for (int index = 0; index < vector_length; ++index) {
-      if (this->vector[index] != array.vector[index]) {
-        return false;
-      }
-    }
+    if (vector_length != array_vector_length) { return false; }
+    for (int index = 0; index < vector_length; ++index)
+    { if (this->vector[index] != array.vector[index]) { return false; } }
     return true;
   }
 
-  bool operator==(std::nullptr_t) {
-    return this->vector.empty();
-  }
-
-  bool operator!=(const array& array) {
-    return !(*this == array);
-  }
-
-  bool operator!=(std::nullptr_t) {
-    return !this->vector.empty();
-  }
+  bool operator==(std::nullptr_t)     { return this->vector.empty(); }
+  bool operator!=(const array& array) { return !(*this == array); }
+  bool operator!=(std::nullptr_t)     { return !this->vector.empty(); }
 
   T& operator[](const int index) {
     const u32 length = this->vector.size();
-    if (index < 0) {
-      throw_exception(L"stackoverflow exception:\n index is less than zero");
-    } else if (index >= length) {
+         if (index < 0) { throw_exception(L"stackoverflow exception:\n index is less than zero"); }
+    else if (index >= length) {
       throw_exception(L"stackoverflow exception:\nindex overflow " +
         std::to_wstring(index) + L":" + std::to_wstring(length));
     }
@@ -312,9 +277,7 @@ public:
     const u32 size = array.vector.size();
     for (int index = 0; index < size;) {
       os << array.vector[index++];
-      if (index < size) {
-        os << L", ";
-      }
+      if (index < size) { os << L", "; }
     }
     os << L"]";
     return os;
@@ -325,9 +288,7 @@ public:
 
 #pragma region X_BUILTIN_FUNCTIONS
 template<typename any>
-inline void _out(any v) {
-  std::wcout << v;
-}
+inline void _out(any v) { std::wcout << v; }
 
 template<typename any>
 inline void _outln(any v) {

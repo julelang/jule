@@ -928,7 +928,8 @@ func (p *singleOperatorProcessor) amper() value {
 	if typeIsArray(v.ast.Type) {
 		p.builder.current.nodes = append(
 			p.builder.current.nodes[:nodeLen-1], /* -1 for remove amper operator */
-			arrayPointerExp{p.builder.current.nodes[nodeLen:]})
+			arrayPointerExp{p.builder.current.nodes[nodeLen:], v.ast.Token.Id == lex.Name, v})
+		v.ast.Type.Heap = true
 	}
 	v.ast.Type.Value = "*" + v.ast.Type.Value
 	return v
@@ -1372,6 +1373,9 @@ func (rc *returnChecker) pushValue(last, current int, errTk lex.Token) {
 	value, model := rc.p.computeTokens(tokens)
 	rc.expModel.models = append(rc.expModel.models, model)
 	rc.values = append(rc.values, value)
+	if typeIsPointer(value.ast.Type) && !value.ast.Type.Heap {
+		rc.p.PushErrorToken(errTk, "returns_dangling_ptr")
+	}
 }
 
 func (rc *returnChecker) checkValues() {

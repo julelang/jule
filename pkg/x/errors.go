@@ -73,4 +73,5 @@ var Errors = map[string]string{
 	`ignore_name_identifier`:           `ignore operator cannot use as identifier`,
 	`overflow_multiassign_identifiers`: `overflow multi assignment identifers`,
 	`overflow_return`:                  `overflow return expressions`,
+	`returns_dangling_ptr`:             `function returns dangling pointer (you may want change with heap allocated pointer)`,
 }

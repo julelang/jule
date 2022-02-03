@@ -102,14 +102,24 @@ func (str strExpNode) String() string {
 
 type arrayPointerExp struct {
 	nodes []expressionNode
+	named bool
+	value value
 }
 
 func (ap arrayPointerExp) String() string {
-	var cxxNodes strings.Builder
-	for _, node := range ap.nodes {
-		cxxNodes.WriteString(node.String())
+	var cxx strings.Builder
+	if ap.named {
+		cxx.WriteString("new ")
+		cxx.WriteString(ap.value.ast.Type.String())
+		cxx.WriteString("(")
+		cxx.WriteString(ap.value.ast.Token.Kind)
+		cxx.WriteString(", true)")
+		return cxx.String()
 	}
-	return "new " + cxxNodes.String()[:cxxNodes.Len()-1] + ", true)"
+	for _, node := range ap.nodes {
+		cxx.WriteString(node.String())
+	}
+	return "new " + cxx.String()[:cxx.Len()-1] + ", true)"
 }
 
 type anonymousFunctionExp struct {
