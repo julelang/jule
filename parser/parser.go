@@ -1453,12 +1453,12 @@ func (rc *returnChecker) checkValueTypes() {
 }
 
 func (rc *returnChecker) check() {
-	if !typeIsVoidReturn(rc.fun.ReturnType) &&
-		len(rc.retAST.Expression.Tokens) == 0 {
+	exprTokensLen := len(rc.retAST.Expression.Tokens)
+	if exprTokensLen == 0 && !typeIsVoidReturn(rc.fun.ReturnType) {
 		rc.p.PushErrorToken(rc.retAST.Token, "require_return_value")
 		return
 	}
-	if typeIsVoidReturn(rc.fun.ReturnType) {
+	if exprTokensLen > 0 && typeIsVoidReturn(rc.fun.ReturnType) {
 		rc.p.PushErrorToken(rc.retAST.Token, "void_function_return_value")
 	}
 	rc.checkValues()
@@ -1475,7 +1475,7 @@ func (p *Parser) checkReturns(fun ast.FunctionAST) {
 			missed = false
 		}
 	}
-	if missed && fun.ReturnType.Code != x.Void {
+	if missed && !typeIsVoidReturn(fun.ReturnType) {
 		p.PushErrorToken(fun.Token, "missing_return")
 	}
 }
