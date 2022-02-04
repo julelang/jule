@@ -915,7 +915,6 @@ func (p *singleOperatorProcessor) star() value {
 		p.parser.PushErrorToken(p.token, "invalid_data_star")
 	} else {
 		v.ast.Type.Value = v.ast.Type.Value[1:]
-		v.ast.Type.Heap = false
 	}
 	return v
 }
@@ -925,7 +924,6 @@ func (p *singleOperatorProcessor) amper() value {
 	if !canGetPointer(v) {
 		p.parser.PushErrorToken(p.token, "invalid_data_amper")
 	}
-	v.ast.Type.Heap = false
 	v.ast.Type.Value = "*" + v.ast.Type.Value
 	return v
 }
@@ -982,16 +980,17 @@ func (p *Parser) computeNewHeapAllocation(tokens []lex.Token, builder *expressio
 	tokens = tokens[1:]
 	astb := new(ast.AST)
 	index := new(int)
-	*index = 0
 	dt, ok := astb.BuildDataType(tokens, index, true)
+	builder.appendNode(newHeapAllocationExpModel{dt})
+	dt.Value = "*" + dt.Value
+	v.ast.Type = dt
 	if !ok {
 		p.PushErrorToken(tokens[0], "fail_build_heap_allocation_type")
 		return
 	}
-	builder.appendNode(newHeapAllocationExpModel{dt})
-	dt.Heap = true
-	dt.Value = "*" + dt.Value
-	v.ast.Type = dt
+	if *index < len(tokens)-1 {
+		p.PushErrorToken(tokens[*index+1], "invalid_syntax")
+	}
 	return
 }
 
@@ -1269,7 +1268,7 @@ func (p *Parser) checkAnonymousFunction(fun *ast.FunctionAST) {
 
 func (p *Parser) parseFunctionCallStatement(fun ast.FunctionAST, tokens []lex.Token, builder *expressionModelBuilder) {
 	errToken := tokens[0]
-	tokens = p.getRangeTokens("(", ")", tokens)
+	tokens, _ = p.getRangeTokens("(", ")", tokens)
 	if tokens == nil {
 		tokens = make([]lex.Token, 0)
 	}
@@ -1305,9 +1304,16 @@ func (p *Parser) parseArg(fun ast.FunctionAST, index int, arg *ast.ArgAST) {
 	p.checkType(param.Type, value.ast.Type, false, arg.Token)
 }
 
-func (p *Parser) getRangeTokens(open, close string, tokens []lex.Token) []lex.Token {
+// Returns between of brackets.
+//
+// Special case is:
+//  getRangeTokens(open, close, tokens) = nil, false if first token is not brace.
+func (p *Parser) getRangeTokens(open, close string, tokens []lex.Token) (_ []lex.Token, ok bool) {
 	braceCount := 0
 	start := 1
+	if tokens[0].Id != lex.Brace {
+		return nil, false
+	}
 	for index, token := range tokens {
 		if token.Id != lex.Brace {
 			continue
@@ -1320,10 +1326,10 @@ func (p *Parser) getRangeTokens(open, close string, tokens []lex.Token) []lex.To
 		if braceCount > 0 {
 			continue
 		}
-		return tokens[start:index]
+		return tokens[start:index], true
 	}
 	p.PushErrorToken(tokens[0], "brace_not_closed")
-	return nil
+	return nil, false
 }
 
 func (p *Parser) checkFunctionSpecialCases(fun *function) {
@@ -1396,9 +1402,6 @@ func (rc *returnChecker) pushValue(last, current int, errTk lex.Token) {
 	value, model := rc.p.computeTokens(tokens)
 	rc.expModel.models = append(rc.expModel.models, model)
 	rc.values = append(rc.values, value)
-	if typeIsPointer(value.ast.Type) && !value.ast.Type.Heap {
-		rc.p.PushErrorToken(errTk, "returns_dangling_ptr")
-	}
 }
 
 func (rc *returnChecker) checkValues() {
@@ -1629,9 +1632,6 @@ func (p *Parser) checkVarsetStatement(vsAST *ast.VariableSetAST) {
 func (p *Parser) checkFreeStatement(freeAST *ast.FreeAST) {
 	val, model := p.computeExpression(freeAST.Expression)
 	freeAST.Expression.Model = model
-	if !val.ast.Type.Heap {
-		p.PushErrorToken(freeAST.Token, "free_nonheap_allocation")
-	}
 	if !typeIsPointer(val.ast.Type) {
 		p.PushErrorToken(freeAST.Token, "free_nonpointer")
 	}

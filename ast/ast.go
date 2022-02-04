@@ -939,10 +939,15 @@ func (ast *AST) getExpressionProcesses(tokens []lex.Token) [][]lex.Token {
 	braceCount := 0
 	pushedError := false
 	singleOperatored := false
+	newKeyword := false
 	for index := 0; index < len(tokens); index++ {
 		token := tokens[index]
 		switch token.Id {
 		case lex.Operator:
+			if newKeyword {
+				part = append(part, token)
+				continue
+			}
 			if !operator {
 				if IsSingleOperator(token.Kind) && !singleOperatored {
 					part = append(part, token)
@@ -979,6 +984,12 @@ func (ast *AST) getExpressionProcesses(tokens []lex.Token) [][]lex.Token {
 				braceCount++
 			default:
 				braceCount--
+			}
+		case lex.New:
+			newKeyword = true
+		case lex.Name:
+			if braceCount == 0 {
+				newKeyword = false
 			}
 		}
 		if index > 0 && braceCount == 0 {

@@ -67,7 +67,6 @@ type DataTypeAST struct {
 	Code       uint8
 	Value      string
 	MultiTyped bool
-	Heap       bool
 	Tag        interface{}
 }
 
