@@ -12,7 +12,7 @@ type Lex struct {
 }
 
 // New Lex instance.
-func New(f *io.FILE) *Lex {
+func NewLex(f *io.FILE) *Lex {
 	l := new(Lex)
 	l.File = f
 	l.Line = 1

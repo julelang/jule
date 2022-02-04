@@ -18,7 +18,7 @@ type ParseFileInfo struct {
 func ParseFile(info *ParseFileInfo) {
 	defer info.Routines.Done()
 	info.X_CXX = ""
-	lexer := lex.New(info.File)
+	lexer := lex.NewLex(info.File)
 	tokens := lexer.Tokenize()
 	if lexer.Errors != nil {
 		info.Errors = lexer.Errors

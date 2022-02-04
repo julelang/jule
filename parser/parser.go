@@ -384,7 +384,7 @@ func (p *Parser) computeProcesses(processes [][]lex.Token) (v value, e expressio
 	builder := newExpBuilder()
 	if len(processes) == 1 {
 		builder.setIndex(0)
-		v = p.processValuePart(processes[0], builder)
+		v = p.processValPart(processes[0], builder)
 		e = builder.build()
 		return
 	}
@@ -405,7 +405,7 @@ func (p *Parser) computeProcesses(processes [][]lex.Token) (v value, e expressio
 			builder.appendNode(tokenExpNode{process.operator})
 			process.right = processes[j+1]
 			builder.setIndex(j + 1)
-			process.rightVal = p.processValuePart(process.right, builder).ast
+			process.rightVal = p.processValPart(process.right, builder).ast
 			v.ast = process.solve()
 			processes = processes[2:]
 			goto end
@@ -413,7 +413,7 @@ func (p *Parser) computeProcesses(processes [][]lex.Token) (v value, e expressio
 			process.operator = processes[j][0]
 			process.left = processes[j-1]
 			builder.setIndex(j - 1)
-			process.leftVal = p.processValuePart(process.left, builder).ast
+			process.leftVal = p.processValPart(process.left, builder).ast
 			process.rightVal = v.ast
 			builder.setIndex(j)
 			builder.appendNode(tokenExpNode{process.operator})
@@ -428,20 +428,20 @@ func (p *Parser) computeProcesses(processes [][]lex.Token) (v value, e expressio
 			builder.appendNode(tokenExpNode{process.operator})
 			process.right = processes[j+1]
 			builder.setIndex(j + 1)
-			process.rightVal = p.processValuePart(process.right, builder).ast
+			process.rightVal = p.processValPart(process.right, builder).ast
 			v.ast = process.solve()
 			processes = append(processes[:j], processes[j+2:]...)
 			goto end
 		}
 		process.left = processes[j-1]
 		builder.setIndex(j - 1)
-		process.leftVal = p.processValuePart(process.left, builder).ast
+		process.leftVal = p.processValPart(process.left, builder).ast
 		process.operator = processes[j][0]
 		builder.setIndex(j)
 		builder.appendNode(tokenExpNode{process.operator})
 		process.right = processes[j+1]
 		builder.setIndex(j + 1)
-		process.rightVal = p.processValuePart(process.right, builder).ast
+		process.rightVal = p.processValPart(process.right, builder).ast
 		{
 			solvedValue := process.solve()
 			if v.ast.Type.Code != x.Void {
@@ -831,7 +831,7 @@ func (p *singleValueProcessor) name() (v value, ok bool) {
 	return
 }
 
-func (p *Parser) processSingleValuePart(token lex.Token, builder *expressionModelBuilder) (v value, ok bool) {
+func (p *Parser) processSingleValPart(token lex.Token, builder *expressionModelBuilder) (v value, ok bool) {
 	processor := singleValueProcessor{
 		token:   token,
 		builder: builder,
@@ -870,7 +870,7 @@ type singleOperatorProcessor struct {
 }
 
 func (p *singleOperatorProcessor) unary() value {
-	v := p.parser.processValuePart(p.tokens, p.builder)
+	v := p.parser.processValPart(p.tokens, p.builder)
 	if !typeIsSingle(v.ast.Type) {
 		p.parser.PushErrorToken(p.token, "invalid_data_unary")
 	} else if !x.IsNumericType(v.ast.Type.Code) {
@@ -880,7 +880,7 @@ func (p *singleOperatorProcessor) unary() value {
 }
 
 func (p *singleOperatorProcessor) plus() value {
-	v := p.parser.processValuePart(p.tokens, p.builder)
+	v := p.parser.processValPart(p.tokens, p.builder)
 	if !typeIsSingle(v.ast.Type) {
 		p.parser.PushErrorToken(p.token, "invalid_data_plus")
 	} else if !x.IsNumericType(v.ast.Type.Code) {
@@ -890,7 +890,7 @@ func (p *singleOperatorProcessor) plus() value {
 }
 
 func (p *singleOperatorProcessor) tilde() value {
-	v := p.parser.processValuePart(p.tokens, p.builder)
+	v := p.parser.processValPart(p.tokens, p.builder)
 	if !typeIsSingle(v.ast.Type) {
 		p.parser.PushErrorToken(p.token, "invalid_data_tilde")
 	} else if !x.IsIntegerType(v.ast.Type.Code) {
@@ -900,7 +900,7 @@ func (p *singleOperatorProcessor) tilde() value {
 }
 
 func (p *singleOperatorProcessor) logicalNot() value {
-	v := p.parser.processValuePart(p.tokens, p.builder)
+	v := p.parser.processValPart(p.tokens, p.builder)
 	if !typeIsSingle(v.ast.Type) {
 		p.parser.PushErrorToken(p.token, "invalid_data_logical_not")
 	} else if v.ast.Type.Code != x.Bool {
@@ -910,7 +910,7 @@ func (p *singleOperatorProcessor) logicalNot() value {
 }
 
 func (p *singleOperatorProcessor) star() value {
-	v := p.parser.processValuePart(p.tokens, p.builder)
+	v := p.parser.processValPart(p.tokens, p.builder)
 	if !typeIsPointer(v.ast.Type) {
 		p.parser.PushErrorToken(p.token, "invalid_data_star")
 	} else {
@@ -920,16 +920,9 @@ func (p *singleOperatorProcessor) star() value {
 }
 
 func (p *singleOperatorProcessor) amper() value {
-	nodeLen := len(p.builder.current.nodes)
-	v := p.parser.processValuePart(p.tokens, p.builder)
+	v := p.parser.processValPart(p.tokens, p.builder)
 	if !canGetPointer(v) {
 		p.parser.PushErrorToken(p.token, "invalid_data_amper")
-	}
-	if typeIsArray(v.ast.Type) {
-		p.builder.current.nodes = append(
-			p.builder.current.nodes[:nodeLen-1], /* -1 for remove amper operator */
-			arrayPointerExp{p.builder.current.nodes[nodeLen:], v.ast.Token.Id == lex.Name, v})
-		v.ast.Type.Heap = true
 	}
 	v.ast.Type.Value = "*" + v.ast.Type.Value
 	return v
@@ -975,38 +968,63 @@ func canGetPointer(v value) bool {
 	if v.ast.Type.Code == x.Function {
 		return false
 	}
-	return v.ast.Token.Id == lex.Name ||
-		typeIsArray(v.ast.Type)
+	return v.ast.Token.Id == lex.Name
 }
 
-func (p *Parser) processValuePart(tokens []lex.Token, builder *expressionModelBuilder) (v value) {
-	if tokens[0].Id == lex.Operator {
-		return p.processSingleOperatorPart(tokens, builder)
-	} else if len(tokens) == 1 {
-		value, ok := p.processSingleValuePart(tokens[0], builder)
+func (p *Parser) computeNewHeapAllocation(tokens []lex.Token, builder *expressionModelBuilder) (v value) {
+	if len(tokens) == 1 {
+		p.PushErrorToken(tokens[0], "invalid_syntax_keyword_new")
+		return
+	}
+	v.ast.Token = tokens[0]
+	tokens = tokens[1:]
+	astb := new(ast.AST)
+	index := new(int)
+	*index = 0
+	dt, ok := astb.BuildDataType(tokens, index, true)
+	if !ok {
+		p.PushErrorToken(tokens[0], "fail_build_heap_allocation_type")
+		return
+	}
+	builder.appendNode(newHeapAllocationExpModel{dt})
+	dt.Heap = true
+	dt.Value = "*" + dt.Value
+	v.ast.Type = dt
+	return
+}
+
+func (p *Parser) processValPart(tokens []lex.Token, builder *expressionModelBuilder) (v value) {
+	if len(tokens) == 1 {
+		value, ok := p.processSingleValPart(tokens[0], builder)
 		if ok {
 			v = value
-			goto end
+			return
 		}
+	}
+	firstTok := tokens[0]
+	switch firstTok.Id {
+	case lex.Operator:
+		return p.processSingleOperatorPart(tokens, builder)
+	case lex.New:
+		return p.computeNewHeapAllocation(tokens, builder)
 	}
 	switch token := tokens[len(tokens)-1]; token.Id {
 	case lex.Brace:
 		switch token.Kind {
 		case ")":
-			return p.processParenthesesValuePart(tokens, builder)
+			return p.processParenthesesValPart(tokens, builder)
 		case "}":
-			return p.processBraceValuePart(tokens, builder)
+			return p.processBraceValPart(tokens, builder)
 		case "]":
-			return p.processBracketValuePart(tokens, builder)
+			return p.processBracketValPart(tokens, builder)
 		}
 	default:
 		p.PushErrorToken(tokens[0], "invalid_syntax")
 	}
-end:
 	return
 }
 
-func (p *Parser) processParenthesesValuePart(tokens []lex.Token, builder *expressionModelBuilder) (v value) {
+func (p *Parser) processParenthesesValPart(tokens []lex.Token, builder *expressionModelBuilder) (v value) {
 	var valueTokens []lex.Token
 	j := len(tokens) - 1
 	braceCount := 0
@@ -1042,7 +1060,7 @@ func (p *Parser) processParenthesesValuePart(tokens []lex.Token, builder *expres
 		builder.appendNode(model)
 		return
 	}
-	v = p.processValuePart(valueTokens, builder)
+	v = p.processValPart(valueTokens, builder)
 
 	// Write parentheses.
 	builder.appendNode(tokenExpNode{lex.Token{Kind: "("}})
@@ -1059,7 +1077,7 @@ func (p *Parser) processParenthesesValuePart(tokens []lex.Token, builder *expres
 	return
 }
 
-func (p *Parser) processBraceValuePart(tokens []lex.Token, builder *expressionModelBuilder) (v value) {
+func (p *Parser) processBraceValPart(tokens []lex.Token, builder *expressionModelBuilder) (v value) {
 	var valueTokens []lex.Token
 	j := len(tokens) - 1
 	braceCount := 0
@@ -1122,7 +1140,7 @@ func (p *Parser) processBraceValuePart(tokens []lex.Token, builder *expressionMo
 	return
 }
 
-func (p *Parser) processBracketValuePart(tokens []lex.Token, builder *expressionModelBuilder) (v value) {
+func (p *Parser) processBracketValPart(tokens []lex.Token, builder *expressionModelBuilder) (v value) {
 	var valueTokens []lex.Token
 	j := len(tokens) - 1
 	braceCount := 0

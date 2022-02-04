@@ -154,7 +154,7 @@ func appendStandards(code *string) {
 #pragma region X_RUNTIME_FUNCTIONS
 inline void throw_exception(const std::wstring message) {
   std::wcout << message << std::endl;
-  exit(1);
+  std::exit(1);
 }
 #pragma endregion X_RUNTIME_FUNCTIONS
 

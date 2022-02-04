@@ -44,7 +44,7 @@ var Errors = map[string]string{
 	`invalid_data_tilde`:               `invalid data type for tilde operator`,
 	`invalid_data_logical_not`:         `invalid data type for logical not operator`,
 	`invalid_data_star`:                `invalid data type for star operator`,
-	`invalid_data_amper`:               `invalid data type for amper operator`,
+	`invalid_data_amper`:               `invalid data type for amper operator (maybe you want use heap allocation)`,
 	`invalid_escape_sequence`:          `invalid escape sequence`,
 	`invalid_const_data_type`:          `invalid data type for constant`,
 	`invalid_type_source`:              `invalid data type source for type alias`,
@@ -73,5 +73,7 @@ var Errors = map[string]string{
 	`ignore_name_identifier`:           `ignore operator cannot use as identifier`,
 	`overflow_multiassign_identifiers`: `overflow multi assignment identifers`,
 	`overflow_return`:                  `overflow return expressions`,
-	`returns_dangling_ptr`:             `function returns dangling pointer (you may want change with heap allocated pointer)`,
+	`returns_dangling_ptr`:             `function returns dangling pointer (you may want change with heap-allocated pointer)`,
+	`invalid_syntax_keyword_new`:       `invalid syntax for new heap-allocation`,
+	`fail_build_heap_allocation_type`:  `new heap-allocation with invalid data-type`,
 }

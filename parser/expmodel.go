@@ -100,28 +100,6 @@ func (str strExpNode) String() string {
 	return "str(L" + str.token.Kind + ")"
 }
 
-type arrayPointerExp struct {
-	nodes []expressionNode
-	named bool
-	value value
-}
-
-func (ap arrayPointerExp) String() string {
-	var cxx strings.Builder
-	if ap.named {
-		cxx.WriteString("new ")
-		cxx.WriteString(ap.value.ast.Type.String())
-		cxx.WriteString("(")
-		cxx.WriteString(ap.value.ast.Token.Kind)
-		cxx.WriteString(", true)")
-		return cxx.String()
-	}
-	for _, node := range ap.nodes {
-		cxx.WriteString(node.String())
-	}
-	return "new " + cxx.String()[:cxx.Len()-1] + ", true)"
-}
-
 type anonymousFunctionExp struct {
 	ast ast.FunctionAST
 }
@@ -183,4 +161,12 @@ func (mre multiReturnExpModel) String() string {
 		cxx.WriteByte(',')
 	}
 	return cxx.String()[:cxx.Len()-1] + ")"
+}
+
+type newHeapAllocationExpModel struct {
+	typeAST ast.DataTypeAST
+}
+
+func (nha newHeapAllocationExpModel) String() string {
+	return "new(std::nothrow) " + nha.typeAST.String()
 }
