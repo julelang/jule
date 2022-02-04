@@ -27,4 +27,5 @@ const (
 	Colon     uint8 = 11
 	At        uint8 = 12
 	New       uint8 = 13
+	Free      uint8 = 14
 )

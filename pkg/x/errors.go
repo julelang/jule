@@ -76,4 +76,6 @@ var Errors = map[string]string{
 	`returns_dangling_ptr`:             `function returns dangling pointer (you may want change with heap-allocated pointer)`,
 	`invalid_syntax_keyword_new`:       `invalid syntax for new heap-allocation`,
 	`fail_build_heap_allocation_type`:  `new heap-allocation with invalid data-type`,
+	`free_nonheap_allocation`:          `cannot be freed non heap-allocated allocations`,
+	`free_nonpointer`:                  `only pointers are can be freed`,
 }

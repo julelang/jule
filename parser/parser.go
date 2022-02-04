@@ -915,6 +915,7 @@ func (p *singleOperatorProcessor) star() value {
 		p.parser.PushErrorToken(p.token, "invalid_data_star")
 	} else {
 		v.ast.Type.Value = v.ast.Type.Value[1:]
+		v.ast.Type.Heap = false
 	}
 	return v
 }
@@ -924,6 +925,7 @@ func (p *singleOperatorProcessor) amper() value {
 	if !canGetPointer(v) {
 		p.parser.PushErrorToken(p.token, "invalid_data_amper")
 	}
+	v.ast.Type.Heap = false
 	v.ast.Type.Value = "*" + v.ast.Type.Value
 	return v
 }
@@ -1356,6 +1358,9 @@ func (p *Parser) checkBlock(b *ast.BlockAST) {
 		case ast.VariableSetAST:
 			p.checkVarsetStatement(&t)
 			model.Value = t
+		case ast.FreeAST:
+			p.checkFreeStatement(&t)
+			model.Value = t
 		case ast.ReturnAST:
 		default:
 			p.PushErrorToken(model.Token, "invalid_syntax")
@@ -1619,4 +1624,15 @@ func (p *Parser) checkVarsetStatement(vsAST *ast.VariableSetAST) {
 		return
 	}
 	p.processMultiVarset(vsAST, p.getVarsetTypes(vsAST))
+}
+
+func (p *Parser) checkFreeStatement(freeAST *ast.FreeAST) {
+	val, model := p.computeExpression(freeAST.Expression)
+	freeAST.Expression.Model = model
+	if !val.ast.Type.Heap {
+		p.PushErrorToken(freeAST.Token, "free_nonheap_allocation")
+	}
+	if !typeIsPointer(val.ast.Type) {
+		p.PushErrorToken(freeAST.Token, "free_nonpointer")
+	}
 }

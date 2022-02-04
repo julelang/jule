@@ -574,6 +574,8 @@ func (ast *AST) BuildStatement(tokens []lex.Token) (s StatementAST) {
 		return ast.BuildVariableStatement(tokens)
 	case lex.Return:
 		return ast.BuildReturnStatement(tokens)
+	case lex.Free:
+		return ast.BuildFreeStatement(tokens)
 	case lex.Brace:
 		if firstToken.Kind == "(" {
 			return ast.BuildExpressionStatement(tokens)
@@ -897,10 +899,7 @@ func (ast *AST) BuildVariableStatement(tokens []lex.Token) (s StatementAST) {
 		}
 	}
 ret:
-	return StatementAST{
-		Token: varAST.NameToken,
-		Value: varAST,
-	}
+	return StatementAST{Token: varAST.NameToken, Value: varAST}
 }
 
 // BuildReturnStatement builds AST model of return statement.
@@ -910,10 +909,19 @@ func (ast *AST) BuildReturnStatement(tokens []lex.Token) StatementAST {
 	if len(tokens) > 1 {
 		returnModel.Expression = ast.BuildExpression(tokens[1:])
 	}
-	return StatementAST{
-		Token: returnModel.Token,
-		Value: returnModel,
+	return StatementAST{Token: returnModel.Token, Value: returnModel}
+}
+
+func (ast *AST) BuildFreeStatement(tokens []lex.Token) StatementAST {
+	var freeAST FreeAST
+	freeAST.Token = tokens[0]
+	tokens = tokens[1:]
+	if len(tokens) == 0 {
+		ast.PushErrorToken(freeAST.Token, "missing_expression")
+	} else {
+		freeAST.Expression = ast.BuildExpression(tokens)
 	}
+	return StatementAST{freeAST.Token, freeAST}
 }
 
 // BuildExpression builds AST model of expression.
