@@ -152,7 +152,7 @@ func appendStandards(code *string) {
 #pragma endregion X_STANDARD_IMPORTS
 
 #pragma region X_RUNTIME_FUNCTIONS
-inline void throw_exception(const std::wstring message) {
+inline void panic(const std::wstring message) {
   std::wcout << message << std::endl;
   std::exit(1);
 }
@@ -197,9 +197,9 @@ public:
   rune& operator[](const int index) {
     const u32 length = this->string.length();
     if (index < 0) {
-      throw_exception(L"stackoverflow exception:\n index is less than zero");
+      panic(L"stackoverflow exception:\n index is less than zero");
     } else if (index >= length) {
-      throw_exception(L"stackoverflow exception:\nindex overflow " +
+      panic(L"stackoverflow exception:\nindex overflow " +
         std::to_wstring(index) + L":" + std::to_wstring(length));
     }
     return this->string[index];
@@ -264,9 +264,9 @@ public:
 
   T& operator[](const int index) {
     const u32 length = this->vector.size();
-         if (index < 0) { throw_exception(L"stackoverflow exception:\n index is less than zero"); }
+         if (index < 0) { panic(L"stackoverflow exception:\n index is less than zero"); }
     else if (index >= length) {
-      throw_exception(L"stackoverflow exception:\nindex overflow " +
+      panic(L"stackoverflow exception:\nindex overflow " +
         std::to_wstring(index) + L":" + std::to_wstring(length));
     }
     return this->vector[index];
