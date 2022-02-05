@@ -116,13 +116,13 @@ func (p *Parser) Cxx() string {
 //
 //! This function is main point of parsing.
 func (p *Parser) Parse() {
-	astModel := ast.NewBuilder(p.Tokens)
-	astModel.Build()
-	if astModel.Errors != nil {
-		p.PFI.Errors = append(p.PFI.Errors, astModel.Errors...)
+	builder := ast.NewBuilder(p.Tokens)
+	builder.Build()
+	if len(builder.Errors) > 0 {
+		p.PFI.Errors = append(p.PFI.Errors, builder.Errors...)
 		return
 	}
-	for _, model := range astModel.Tree {
+	for _, model := range builder.Tree {
 		switch t := model.Value.(type) {
 		case ast.AttributeAST:
 			p.PushAttribute(t)

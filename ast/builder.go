@@ -100,6 +100,7 @@ func (b *Builder) Name() {
 	switch token.Id {
 	case lex.Colon:
 		b.GlobalVariable()
+		return
 	case lex.Brace:
 		switch token.Kind {
 		case "(":
