@@ -186,28 +186,28 @@ func (fc FunctionAST) DataTypeString() string {
 
 // ArgAST is AST model of argument.
 type ArgAST struct {
-	Token      lex.Token
-	Tokens     []lex.Token
-	Expression ExpressionAST
+	Token  lex.Token
+	Tokens []lex.Token
+	Expr   ExprAST
 }
 
 func (a ArgAST) String() string {
-	return a.Expression.String()
+	return a.Expr.String()
 }
 
-// ExpressionAST is AST model of expression.
-type ExpressionAST struct {
+// ExprAST is AST model of expression.
+type ExprAST struct {
 	Tokens    []lex.Token
 	Processes [][]lex.Token
-	Model     ExpressionModel
+	Model     IExprModel
 }
 
-// ExpressionModel for special expression model to Cxx string.
-type ExpressionModel interface {
+// IExprModel for special expression model to Cxx string.
+type IExprModel interface {
 	String() string
 }
 
-func (e ExpressionAST) String() string {
+func (e ExprAST) String() string {
 	if e.Model != nil {
 		return e.Model.String()
 	}
@@ -226,13 +226,13 @@ func (e ExpressionAST) String() string {
 	return sb.String()
 }
 
-// BlockExpressionAST is AST model of expression statement in block.
-type BlockExpressionAST struct {
-	Expression ExpressionAST
+// BlockExprAST is AST model of expression statement in block.
+type BlockExprAST struct {
+	Expr ExprAST
 }
 
-func (be BlockExpressionAST) String() string {
-	return be.Expression.String() + ";"
+func (be BlockExprAST) String() string {
+	return be.Expr.String() + ";"
 }
 
 // ValueAST is AST model of constant value.
@@ -266,16 +266,16 @@ func (o OperatorAST) String() string {
 
 // ReturnAST is return statement AST model.
 type ReturnAST struct {
-	Token      lex.Token
-	Expression ExpressionAST
+	Token lex.Token
+	Expr  ExprAST
 }
 
 func (r ReturnAST) String() string {
 	switch r.Token.Id {
 	case lex.Operator:
-		return "return " + r.Expression.String() + ";"
+		return "return " + r.Expr.String() + ";"
 	}
-	return "return " + r.Expression.String() + ";"
+	return "return " + r.Expr.String() + ";"
 }
 
 // AttributeAST is attribtue AST model.
@@ -295,7 +295,7 @@ type VariableAST struct {
 	SetterToken lex.Token
 	Name        string
 	Type        DataTypeAST
-	Value       ExpressionAST
+	Value       ExprAST
 	Tag         interface{}
 }
 
@@ -328,30 +328,30 @@ func (v VariableAST) StringType() string {
 type VarsetSelector struct {
 	NewVariable bool
 	Variable    VariableAST
-	Expression  ExpressionAST
+	Expr        ExprAST
 	Ignore      bool
 }
 
 func (vs VarsetSelector) String() string {
 	if vs.NewVariable {
-		return vs.Expression.Tokens[0].Kind // Returns variable name.
+		return vs.Expr.Tokens[0].Kind // Returns variable name.
 	}
-	return vs.Expression.String()
+	return vs.Expr.String()
 }
 
 // VariableSetAST is variable set AST model.
 type VariableSetAST struct {
-	Setter            lex.Token
-	SelectExpressions []VarsetSelector
-	ValueExpressions  []ExpressionAST
-	JustDeclare       bool
-	MultipleReturn    bool
+	Setter         lex.Token
+	SelectExprs    []VarsetSelector
+	ValueExprs     []ExprAST
+	JustDeclare    bool
+	MultipleReturn bool
 }
 
 func (vs VariableSetAST) cxxSingleSet(cxx *strings.Builder) string {
-	cxx.WriteString(vs.SelectExpressions[0].String())
+	cxx.WriteString(vs.SelectExprs[0].String())
 	cxx.WriteString(vs.Setter.Kind)
-	cxx.WriteString(vs.ValueExpressions[0].String())
+	cxx.WriteString(vs.ValueExprs[0].String())
 	cxx.WriteByte(';')
 	return cxx.String()
 }
@@ -360,13 +360,13 @@ func (vs VariableSetAST) cxxMultipleSet(cxx *strings.Builder) string {
 	cxx.WriteString("std::tie(")
 	var expCxx strings.Builder
 	expCxx.WriteString("std::make_tuple(")
-	for index, selector := range vs.SelectExpressions {
+	for index, selector := range vs.SelectExprs {
 		if selector.Ignore {
 			continue
 		}
 		cxx.WriteString(selector.String())
 		cxx.WriteByte(',')
-		expCxx.WriteString(vs.ValueExpressions[index].String())
+		expCxx.WriteString(vs.ValueExprs[index].String())
 		expCxx.WriteByte(',')
 	}
 	str := cxx.String()[:cxx.Len()-1] + ")"
@@ -380,7 +380,7 @@ func (vs VariableSetAST) cxxMultipleSet(cxx *strings.Builder) string {
 
 func (vs VariableSetAST) cxxMultipleReturn(cxx *strings.Builder) string {
 	cxx.WriteString("std::tie(")
-	for _, selector := range vs.SelectExpressions {
+	for _, selector := range vs.SelectExprs {
 		if selector.Ignore {
 			cxx.WriteString("std::ignore,")
 			continue
@@ -393,13 +393,13 @@ func (vs VariableSetAST) cxxMultipleReturn(cxx *strings.Builder) string {
 	cxx.WriteString(str)
 	cxx.WriteByte(')')
 	cxx.WriteString(vs.Setter.Kind)
-	cxx.WriteString(vs.ValueExpressions[0].String())
+	cxx.WriteString(vs.ValueExprs[0].String())
 	cxx.WriteByte(';')
 	return cxx.String()
 }
 
 func (vs VariableSetAST) cxxNewDefines(cxx *strings.Builder) {
-	for _, selector := range vs.SelectExpressions {
+	for _, selector := range vs.SelectExprs {
 		if selector.Ignore || !selector.NewVariable {
 			continue
 		}
@@ -415,17 +415,17 @@ func (vs VariableSetAST) String() string {
 	}
 	if vs.MultipleReturn {
 		return vs.cxxMultipleReturn(&cxx)
-	} else if len(vs.SelectExpressions) == 1 {
+	} else if len(vs.SelectExprs) == 1 {
 		return vs.cxxSingleSet(&cxx)
 	}
 	return vs.cxxMultipleSet(&cxx)
 }
 
 type FreeAST struct {
-	Token      lex.Token
-	Expression ExpressionAST
+	Token lex.Token
+	Expr  ExprAST
 }
 
 func (f FreeAST) String() string {
-	return "delete " + f.Expression.String() + ";"
+	return "delete " + f.Expr.String() + ";"
 }

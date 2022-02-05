@@ -75,14 +75,9 @@ func isKeyword(ln, kw string) bool {
 		return false
 	}
 	ln = ln[len(kw):]
-	switch {
-	case
-		ln == "",
-		unicode.IsSpace(rune(ln[0])),
-		unicode.IsPunct(rune(ln[0])):
-		return true
-	}
-	return false
+	return ln == "" ||
+		unicode.IsSpace(rune(ln[0])) ||
+		unicode.IsPunct(rune(ln[0]))
 }
 
 // lexName returns name if next token is name,
@@ -156,20 +151,20 @@ func (l *Lex) lexBlockComment() {
 	l.pushError("missing_block_comment")
 }
 
-var numericRegexp = *regexp.MustCompile(`^((0x[[:xdigit:]]+)|(\d+((\.\d+)?((e|E)(\-|\+|)\d+)?|(\.\d+))))`)
+var numRegexp = *regexp.MustCompile(`^((0x[[:xdigit:]]+)|(\d+((\.\d+)?((e|E)(\-|\+|)\d+)?|(\.\d+))))`)
 
 // lexNumeric returns numeric if next token is numeric,
 // returns empty string if not.
 func (l *Lex) lexNumeric(content string) string {
-	value := numericRegexp.FindString(content)
+	value := numRegexp.FindString(content)
 	l.Position += len(value)
 	return value
 }
 
-var escapeSequenceRegexp = regexp.MustCompile(`^\\([\\'"abfnrtv]|U.{8}|u.{4}|x..|[0-7]{1,3})`)
+var escSeqRegexp = regexp.MustCompile(`^\\([\\'"abfnrtv]|U.{8}|u.{4}|x..|[0-7]{1,3})`)
 
 func (l *Lex) getEscapeSequence(content string) string {
-	seq := escapeSequenceRegexp.FindString(content)
+	seq := escSeqRegexp.FindString(content)
 	if seq != "" {
 		l.Position += len(seq)
 		return seq

@@ -66,7 +66,7 @@ func initProject(cmd string) {
 }`))
 	if err != nil {
 		println(err.Error())
-		os.Exit(1)
+		os.Exit(0)
 	}
 	println("Initialized project.")
 }
@@ -112,23 +112,23 @@ func loadXSet() {
 	info, err := os.Stat(x.SettingsFile)
 	if err != nil || info.IsDir() {
 		println(`X settings file ("` + x.SettingsFile + `") is not found!`)
-		os.Exit(1)
+		os.Exit(0)
 	}
 	bytes, err := os.ReadFile(x.SettingsFile)
 	if err != nil {
 		println(err.Error())
-		os.Exit(1)
+		os.Exit(0)
 	}
 	x.XSet, err = xset.Load(bytes)
 	if err != nil {
 		println("X settings has errors;")
 		println(err.Error())
-		os.Exit(1)
+		os.Exit(0)
 	}
 }
 
 func printErrors(errors []string) {
-	defer os.Exit(1)
+	defer os.Exit(0)
 	for _, message := range errors {
 		fmt.Println(message)
 	}
@@ -320,12 +320,12 @@ func writeCxxOutput(info *parser.ParseFileInfo) {
 	err := os.MkdirAll(x.XSet.CxxOutDir, 0511)
 	if err != nil {
 		println(err.Error())
-		os.Exit(1)
+		os.Exit(0)
 	}
 	err = io.WriteFileTruncate(path, []byte(info.X_CXX))
 	if err != nil {
 		println(err.Error())
-		os.Exit(1)
+		os.Exit(0)
 	}
 }
 

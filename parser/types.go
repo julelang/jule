@@ -143,8 +143,7 @@ func (p *Parser) checkType(real, check ast.DataTypeAST, ignoreAny bool, errToken
 		}
 		return
 	}
-	if (typeIsPointer(real) || typeIsArray(real)) &&
-		check.Code == x.Nil {
+	if (typeIsPointer(real) || typeIsArray(real)) && check.Code == x.Nil {
 		return
 	}
 	if real.Value != check.Value {
