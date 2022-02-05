@@ -7,12 +7,41 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/the-xlang/x/pkg/io"
 	"github.com/the-xlang/x/pkg/x"
 )
+
+// Lex is lexer of Fract.
+type Lex struct {
+	File     *io.FILE
+	Position int
+	Column   int
+	Line     int
+	Errors   []string
+
+	parentheses []Token
+	brackets    []Token
+	braces      []Token
+}
+
+// New Lex instance.
+func NewLex(f *io.FILE) *Lex {
+	l := new(Lex)
+	l.File = f
+	l.Line = 1
+	l.Column = 1
+	l.Position = 0
+	return l
+}
 
 func (l *Lex) pushError(err string) {
 	l.Errors = append(l.Errors,
 		fmt.Sprintf("%s %d:%d %s", l.File.Path, l.Line, l.Column, x.Errors[err]))
+}
+
+func (l *Lex) pushErrorToken(tok Token, err string) {
+	l.Errors = append(l.Errors,
+		fmt.Sprintf("%s %d:%d %s", l.File.Path, tok.Row, tok.Column, x.Errors[err]))
 }
 
 // Tokenize all source content.
@@ -25,7 +54,20 @@ func (l *Lex) Tokenize() []Token {
 			tokens = append(tokens, token)
 		}
 	}
+	l.checkParentheses()
 	return tokens
+}
+
+func (l *Lex) checkParentheses() {
+	for _, token := range l.parentheses {
+		l.pushErrorToken(token, "wait_close_parentheses")
+	}
+	for _, token := range l.braces {
+		l.pushErrorToken(token, "wait_close_brace")
+	}
+	for _, token := range l.brackets {
+		l.pushErrorToken(token, "wait_close_bracket")
+	}
 }
 
 // isKeyword returns true if part is keyword, false if not.
@@ -265,17 +307,35 @@ func (l *Lex) Token() Token {
 	case strings.HasPrefix(content, "/*"):
 		l.lexBlockComment()
 		return token
+	case l.lexPunct(content, "(", Brace, &token):
+		l.parentheses = append(l.parentheses, token)
+	case l.lexPunct(content, ")", Brace, &token):
+		if len(l.parentheses) == 0 {
+			l.pushErrorToken(token, "extra_closed_parentheses")
+			break
+		}
+		l.parentheses = l.parentheses[:len(l.parentheses)-1]
+	case l.lexPunct(content, "{", Brace, &token):
+		l.braces = append(l.braces, token)
+	case l.lexPunct(content, "}", Brace, &token):
+		if len(l.braces) == 0 {
+			l.pushErrorToken(token, "extra_closed_braces")
+			break
+		}
+		l.braces = l.braces[:len(l.braces)-1]
+	case l.lexPunct(content, "[", Brace, &token):
+		l.brackets = append(l.brackets, token)
+	case l.lexPunct(content, "]", Brace, &token):
+		if len(l.brackets) == 0 {
+			l.pushErrorToken(token, "extra_closed_brackets")
+			break
+		}
+		l.brackets = l.brackets[:len(l.brackets)-1]
 	case
 		l.lexPunct(content, ":", Colon, &token),
 		l.lexPunct(content, ";", SemiColon, &token),
 		l.lexPunct(content, ",", Comma, &token),
 		l.lexPunct(content, "@", At, &token),
-		l.lexPunct(content, "(", Brace, &token),
-		l.lexPunct(content, ")", Brace, &token),
-		l.lexPunct(content, "{", Brace, &token),
-		l.lexPunct(content, "}", Brace, &token),
-		l.lexPunct(content, "[", Brace, &token),
-		l.lexPunct(content, "]", Brace, &token),
 		l.lexPunct(content, "+=", Operator, &token),
 		l.lexPunct(content, "-=", Operator, &token),
 		l.lexPunct(content, "*=", Operator, &token),
