@@ -106,7 +106,7 @@ func (af anonymousFunctionExpr) String() string {
 	cxx.WriteString("[&]")
 	cxx.WriteString(paramsToCxx(af.ast.Params))
 	ast.Indent++
-	cxx.WriteString(ast.ParseBlock(af.ast.Block, ast.Indent))
+	cxx.WriteString(ast.ParseBlock(af.ast.Block, int(ast.Indent)))
 	ast.Indent--
 	return cxx.String()
 }

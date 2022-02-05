@@ -2,6 +2,7 @@ package parser
 
 import (
 	"strings"
+	"sync/atomic"
 
 	"github.com/the-xlang/x/ast"
 )
@@ -16,6 +17,7 @@ func (f function) String() string {
 	prototype := f.Prototype()
 	cxx.WriteString(prototype[:len(prototype)-1])
 	cxx.WriteByte(' ')
+	atomic.SwapInt32(&ast.Indent, 0)
 	cxx.WriteString(f.Ast.Block.String())
 	return cxx.String()
 }

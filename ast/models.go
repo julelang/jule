@@ -3,6 +3,7 @@ package ast
 import (
 	"fmt"
 	"strings"
+	"sync/atomic"
 
 	"github.com/the-xlang/x/lex"
 	"github.com/the-xlang/x/pkg/x"
@@ -36,11 +37,11 @@ type BlockAST struct {
 }
 
 // Indent total of blocks.
-var Indent = 1
+var Indent int32 = 0
 
 func (b BlockAST) String() string {
-	Indent = 1
-	return ParseBlock(b, Indent)
+	atomic.SwapInt32(&Indent, Indent+1)
+	return ParseBlock(b, int(Indent))
 }
 
 // IndentSpace of blocks.
@@ -428,4 +429,16 @@ type FreeAST struct {
 
 func (f FreeAST) String() string {
 	return "delete " + f.Expr.String() + ";"
+}
+
+type IterAST struct {
+	Token lex.Token
+	Block BlockAST
+}
+
+func (i IterAST) String() string {
+	var cxx strings.Builder
+	cxx.WriteString("while (true) ")
+	cxx.WriteString(i.Block.String())
+	return cxx.String()
 }

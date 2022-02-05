@@ -1317,7 +1317,6 @@ func (p *Parser) getRange(open, close string, tokens []lex.Token) (_ []lex.Token
 		}
 		return tokens[start:index], true
 	}
-	p.PushErrorToken(tokens[0], "brace_not_closed")
 	return nil, false
 }
 
@@ -1355,6 +1354,9 @@ func (p *Parser) checkBlock(b *ast.BlockAST) {
 			model.Value = t
 		case ast.FreeAST:
 			p.checkFreeStatement(&t)
+			model.Value = t
+		case ast.IterAST:
+			p.checkIterExpression(&t)
 			model.Value = t
 		case ast.ReturnAST:
 		default:
@@ -1625,4 +1627,8 @@ func (p *Parser) checkFreeStatement(freeAST *ast.FreeAST) {
 	if !typeIsPointer(val.ast.Type) {
 		p.PushErrorToken(freeAST.Token, "free_nonpointer")
 	}
+}
+
+func (p *Parser) checkIterExpression(iterAST *ast.IterAST) {
+	p.checkBlock(&iterAST.Block)
 }

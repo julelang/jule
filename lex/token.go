@@ -28,4 +28,5 @@ const (
 	At        uint8 = 12
 	New       uint8 = 13
 	Free      uint8 = 14
+	Iter      uint8 = 15
 )

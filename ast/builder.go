@@ -155,7 +155,7 @@ func (b *Builder) Function(anonymous bool) (funAST FunctionAST) {
 		}
 	}
 	funAST.ReturnType.Code = x.Void
-	tokens := b.getRange("(", ")")
+	tokens := getRange(&b.Position, "(", ")", b.Tokens)
 	if tokens == nil {
 		return
 	} else if len(tokens) > 0 {
@@ -185,7 +185,7 @@ func (b *Builder) Function(anonymous bool) (funAST FunctionAST) {
 		b.Position = -1 // Stop modelling.
 		return
 	}
-	blockTokens := b.getRange("{", "}")
+	blockTokens := getRange(&b.Position, "{", "}", b.Tokens)
 	if blockTokens == nil {
 		b.PushError("function_body_not_exist")
 		b.Position = -1 // Stop modelling.
@@ -492,7 +492,7 @@ func (b *Builder) pushStatementToBlock(block *BlockAST, tokens []lex.Token) {
 		}
 		tokens = tokens[:len(tokens)-1]
 	}
-	statement := b.BuildStatement(tokens)
+	statement := b.Statement(tokens)
 	block.Statements = append(block.Statements, statement)
 }
 
@@ -548,8 +548,8 @@ func (b *Builder) Block(tokens []lex.Token) (block BlockAST) {
 	return
 }
 
-// BuildStatement builds AST model of statement.
-func (b *Builder) BuildStatement(tokens []lex.Token) (s StatementAST) {
+// Statement builds AST model of statement.
+func (b *Builder) Statement(tokens []lex.Token) (s StatementAST) {
 	s, ok := b.VariableSetStatement(tokens)
 	if ok {
 		return s
@@ -564,6 +564,8 @@ func (b *Builder) BuildStatement(tokens []lex.Token) (s StatementAST) {
 		return b.ReturnStatement(tokens)
 	case lex.Free:
 		return b.FreeStatement(tokens)
+	case lex.Iter:
+		return b.IterStatement(tokens)
 	case lex.Brace:
 		if firstToken.Kind == "(" {
 			return b.ExprStatement(tokens)
@@ -906,6 +908,27 @@ func (b *Builder) FreeStatement(tokens []lex.Token) StatementAST {
 	return StatementAST{freeAST.Token, freeAST}
 }
 
+func (b *Builder) IterStatement(tokens []lex.Token) (s StatementAST) {
+	var iter IterAST
+	iter.Token = tokens[0]
+	tokens = tokens[1:]
+	if len(tokens) == 0 {
+		b.PushErrorToken(iter.Token, "iter_body_not_exist")
+		return
+	}
+	index := new(int)
+	blockTokens := getRange(index, "{", "}", tokens)
+	if blockTokens == nil {
+		b.PushErrorToken(tokens[0], "invalid_syntax")
+		return
+	}
+	if *index < len(tokens) {
+		b.PushErrorToken(tokens[*index], "invalid_syntax")
+	}
+	iter.Block = b.Block(blockTokens)
+	return StatementAST{iter.Token, iter}
+}
+
 // Expr builds AST model of expression.
 func (b *Builder) Expr(tokens []lex.Token) (e ExprAST) {
 	e.Processes = b.getExprProcesses(tokens)
@@ -1027,14 +1050,14 @@ func (b *Builder) checkExprToken(token lex.Token) {
 	}
 }
 
-func (b *Builder) getRange(open, close string) []lex.Token {
-	token := b.Tokens[b.Position]
+func getRange(index *int, open, close string, tokens []lex.Token) []lex.Token {
+	token := tokens[*index]
 	if token.Id == lex.Brace && token.Kind == open {
-		b.Position++
+		*index++
 		braceCount := 1
-		start := b.Position
-		for ; braceCount > 0 && !b.Ended(); b.Position++ {
-			token := b.Tokens[b.Position]
+		start := *index
+		for ; braceCount > 0 && *index < len(tokens); *index++ {
+			token := tokens[*index]
 			if token.Id != lex.Brace {
 				continue
 			}
@@ -1044,13 +1067,7 @@ func (b *Builder) getRange(open, close string) []lex.Token {
 				braceCount--
 			}
 		}
-		if braceCount > 0 {
-			b.Position--
-			b.PushError("brace_not_closed")
-			b.Position = -1 // Stop modelling.
-			return nil
-		}
-		return b.Tokens[start : b.Position-1]
+		return tokens[start : *index-1]
 	}
 	return nil
 }
