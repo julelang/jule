@@ -16,5 +16,5 @@ if exist .\x.exe (
   echo Compile is successful!
 ) else (
   echo -----------------------------------------------------------------------
-  echo An unexpected error occurred while compiling Fract. Check errors above.
+  echo An unexpected error occurred while compiling X. Check errors above.
 )
