@@ -19,9 +19,7 @@ type Lex struct {
 	Line     int
 	Errors   []string
 
-	parentheses []Token
-	brackets    []Token
-	braces      []Token
+	braces []Token
 }
 
 // New Lex instance.
@@ -59,14 +57,15 @@ func (l *Lex) Tokenize() []Token {
 }
 
 func (l *Lex) checkParentheses() {
-	for _, token := range l.parentheses {
-		l.pushErrorToken(token, "wait_close_parentheses")
-	}
 	for _, token := range l.braces {
-		l.pushErrorToken(token, "wait_close_brace")
-	}
-	for _, token := range l.brackets {
-		l.pushErrorToken(token, "wait_close_bracket")
+		switch token.Kind {
+		case "(":
+			l.pushErrorToken(token, "wait_close_parentheses")
+		case "{":
+			l.pushErrorToken(token, "wait_close_brace")
+		case "[":
+			l.pushErrorToken(token, "wait_close_bracket")
+		}
 	}
 }
 
@@ -308,29 +307,38 @@ func (l *Lex) Token() Token {
 		l.lexBlockComment()
 		return token
 	case l.lexPunct(content, "(", Brace, &token):
-		l.parentheses = append(l.parentheses, token)
+		l.braces = append(l.braces, token)
 	case l.lexPunct(content, ")", Brace, &token):
-		if len(l.parentheses) == 0 {
+		length := len(l.braces)
+		if length == 0 {
 			l.pushErrorToken(token, "extra_closed_parentheses")
 			break
+		} else if l.braces[length-1].Kind != "(" {
+			l.pushWrongOrderCloseErrorr(token)
 		}
-		l.parentheses = l.parentheses[:len(l.parentheses)-1]
+		l.removeBrace(length-1, token.Kind)
 	case l.lexPunct(content, "{", Brace, &token):
 		l.braces = append(l.braces, token)
 	case l.lexPunct(content, "}", Brace, &token):
-		if len(l.braces) == 0 {
+		length := len(l.braces)
+		if length == 0 {
 			l.pushErrorToken(token, "extra_closed_braces")
 			break
+		} else if l.braces[length-1].Kind != "{" {
+			l.pushWrongOrderCloseErrorr(token)
 		}
-		l.braces = l.braces[:len(l.braces)-1]
+		l.removeBrace(length-1, token.Kind)
 	case l.lexPunct(content, "[", Brace, &token):
-		l.brackets = append(l.brackets, token)
+		l.braces = append(l.braces, token)
 	case l.lexPunct(content, "]", Brace, &token):
-		if len(l.brackets) == 0 {
+		length := len(l.braces)
+		if length == 0 {
 			l.pushErrorToken(token, "extra_closed_brackets")
 			break
+		} else if l.braces[length-1].Kind != "[" {
+			l.pushWrongOrderCloseErrorr(token)
 		}
-		l.brackets = l.brackets[:len(l.brackets)-1]
+		l.removeBrace(length-1, token.Kind)
 	case
 		l.lexPunct(content, ":", Colon, &token),
 		l.lexPunct(content, ";", SemiColon, &token),
@@ -408,4 +416,37 @@ func (l *Lex) Token() Token {
 	}
 	l.Column += len(token.Kind)
 	return token
+}
+
+func (l *Lex) removeBrace(index int, kind string) {
+	var close string
+	switch kind {
+	case ")":
+		close = "("
+	case "}":
+		close = "{"
+	case "]":
+		close = "["
+	}
+	for ; index >= 0; index-- {
+		token := l.braces[index]
+		if token.Kind != close {
+			continue
+		}
+		l.braces = append(l.braces[:index], l.braces[index+1:]...)
+		break
+	}
+}
+
+func (l *Lex) pushWrongOrderCloseErrorr(token Token) {
+	var message string
+	switch l.braces[len(l.braces)-1].Kind {
+	case "(":
+		message = "expected_parentheses_close"
+	case "{":
+		message = "expected_brace_close"
+	case "[":
+		message = "expected_bracket_close"
+	}
+	l.pushErrorToken(token, message)
 }
