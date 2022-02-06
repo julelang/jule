@@ -442,3 +442,9 @@ func (i IterAST) String() string {
 	cxx.WriteString(i.Block.String())
 	return cxx.String()
 }
+
+type BreakAST struct {
+	Token lex.Token
+}
+
+func (b BreakAST) String() string { return "break;" }

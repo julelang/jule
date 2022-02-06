@@ -29,4 +29,5 @@ const (
 	New       uint8 = 13
 	Free      uint8 = 14
 	Iter      uint8 = 15
+	Break     uint8 = 16
 )

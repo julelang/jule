@@ -85,4 +85,5 @@ var Errors = map[string]string{
 	`invalid_syntax_keyword_new`:       `invalid syntax for new heap-allocation`,
 	`fail_build_heap_allocation_type`:  `new heap-allocation with invalid data-type`,
 	`free_nonpointer`:                  `only pointers are can be freed`,
+	`break_at_outiter`:                 `break keyword is cannot used at out of iter block`,
 }

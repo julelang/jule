@@ -13,6 +13,7 @@ import (
 // Parser is parser of X code.
 type Parser struct {
 	attributes []ast.AttributeAST
+	loopCount  int
 
 	Functions              []*function
 	GlobalVariables        []ast.VariableAST
@@ -1358,6 +1359,8 @@ func (p *Parser) checkBlock(b *ast.BlockAST) {
 		case ast.IterAST:
 			p.checkIterExpression(&t)
 			model.Value = t
+		case ast.BreakAST:
+			p.checkBreakStatement(&t)
 		case ast.ReturnAST:
 		default:
 			p.PushErrorToken(model.Token, "invalid_syntax")
@@ -1630,5 +1633,13 @@ func (p *Parser) checkFreeStatement(freeAST *ast.FreeAST) {
 }
 
 func (p *Parser) checkIterExpression(iterAST *ast.IterAST) {
+	p.loopCount++
 	p.checkBlock(&iterAST.Block)
+	p.loopCount--
+}
+
+func (p *Parser) checkBreakStatement(breakAST *ast.BreakAST) {
+	if p.loopCount == 0 {
+		p.PushErrorToken(breakAST.Token, "break_at_outiter")
+	}
 }

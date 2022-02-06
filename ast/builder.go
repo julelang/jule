@@ -567,6 +567,8 @@ func (b *Builder) Statement(tokens []lex.Token) (s StatementAST) {
 		return b.FreeStatement(tokens)
 	case lex.Iter:
 		return b.IterStatement(tokens)
+	case lex.Break:
+		return b.BreakStatement(tokens)
 	case lex.Brace:
 		if firstToken.Kind == "(" {
 			return b.ExprStatement(tokens)
@@ -928,6 +930,15 @@ func (b *Builder) IterStatement(tokens []lex.Token) (s StatementAST) {
 	}
 	iter.Block = b.Block(blockTokens)
 	return StatementAST{iter.Token, iter}
+}
+
+func (b *Builder) BreakStatement(tokens []lex.Token) StatementAST {
+	var breakAST BreakAST
+	breakAST.Token = tokens[0]
+	if len(tokens) > 1 {
+		b.PushErrorToken(tokens[1], "invalid_syntax")
+	}
+	return StatementAST{breakAST.Token, breakAST}
 }
 
 // Expr builds AST model of expression.
