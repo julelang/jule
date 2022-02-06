@@ -1634,9 +1634,16 @@ func (p *Parser) checkFreeStatement(freeAST *ast.FreeAST) {
 	}
 }
 
-func (p *Parser) checkIterExpression(iterAST *ast.IterAST) {
+func (p *Parser) checkIterExpression(iter *ast.IterAST) {
 	p.loopCount++
-	p.checkBlock(&iterAST.Block)
+	if iter.While {
+		val, model := p.computeExpr(iter.Profile.Expr)
+		iter.Profile.Expr.Model = model
+		if val.ast.Type.Code != x.Bool || !typeIsSingle(val.ast.Type) {
+			p.PushErrorToken(iter.Token, "iter_while_notbool_expr")
+		}
+	}
+	p.checkBlock(&iter.Block)
 	p.loopCount--
 }
 

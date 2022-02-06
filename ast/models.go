@@ -41,6 +41,7 @@ var Indent int32 = 0
 
 func (b BlockAST) String() string {
 	atomic.SwapInt32(&Indent, Indent+1)
+	defer func() { atomic.SwapInt32(&Indent, Indent-1) }()
 	return ParseBlock(b, int(Indent))
 }
 
@@ -431,14 +432,30 @@ func (f FreeAST) String() string {
 	return "delete " + f.Expr.String() + ";"
 }
 
+type WhileProfile struct {
+	Expr ExprAST
+}
+
+func (wp WhileProfile) String() string {
+	return wp.Expr.String()
+}
+
 type IterAST struct {
-	Token lex.Token
-	Block BlockAST
+	Token   lex.Token
+	Block   BlockAST
+	While   bool
+	Profile WhileProfile
 }
 
 func (i IterAST) String() string {
 	var cxx strings.Builder
-	cxx.WriteString("while (true) ")
+	cxx.WriteString("while (")
+	if i.While {
+		cxx.WriteString(i.Profile.String())
+	} else {
+		cxx.WriteString("true")
+	}
+	cxx.WriteString(") ")
 	cxx.WriteString(i.Block.String())
 	return cxx.String()
 }
@@ -447,10 +464,14 @@ type BreakAST struct {
 	Token lex.Token
 }
 
-func (b BreakAST) String() string { return "break;" }
+func (b BreakAST) String() string {
+	return "break;"
+}
 
 type ContinueAST struct {
 	Token lex.Token
 }
 
-func (c ContinueAST) String() string { return "continue;" }
+func (c ContinueAST) String() string {
+	return "continue;"
+}

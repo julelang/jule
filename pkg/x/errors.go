@@ -87,4 +87,5 @@ var Errors = map[string]string{
 	`free_nonpointer`:                  `only pointers are can be freed`,
 	`break_at_outiter`:                 `break keyword is cannot used at out of iter block`,
 	`continue_at_outiter`:              `continue keyword is cannot used at out of iter block`,
+	`iter_while_notbool_expr`:          `while iterations must be have boolean expressions`,
 }

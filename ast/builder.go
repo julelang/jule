@@ -913,6 +913,27 @@ func (b *Builder) FreeStatement(tokens []lex.Token) StatementAST {
 	return StatementAST{freeAST.Token, freeAST}
 }
 
+func iterExprTokens(tokens []lex.Token) (expr []lex.Token) {
+	braceCount := 0
+	for index, token := range tokens {
+		if token.Id == lex.Brace {
+			switch token.Kind {
+			case "{":
+				if braceCount > 0 {
+					braceCount++
+					break
+				}
+				return tokens[:index]
+			case "(", "[":
+				braceCount++
+			default:
+				braceCount--
+			}
+		}
+	}
+	return nil
+}
+
 func (b *Builder) IterStatement(tokens []lex.Token) (s StatementAST) {
 	var iter IterAST
 	iter.Token = tokens[0]
@@ -920,6 +941,12 @@ func (b *Builder) IterStatement(tokens []lex.Token) (s StatementAST) {
 	if len(tokens) == 0 {
 		b.PushErrorToken(iter.Token, "iter_body_not_exist")
 		return
+	}
+	exprTokens := iterExprTokens(tokens)
+	if len(exprTokens) > 0 {
+		iter.While = true
+		iter.Profile.Expr = b.Expr(exprTokens)
+		tokens = tokens[len(exprTokens):] // Skip expr tokens
 	}
 	index := new(int)
 	blockTokens := getRange(index, "{", "}", tokens)
