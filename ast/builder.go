@@ -569,6 +569,8 @@ func (b *Builder) Statement(tokens []lex.Token) (s StatementAST) {
 		return b.IterStatement(tokens)
 	case lex.Break:
 		return b.BreakStatement(tokens)
+	case lex.Continue:
+		return b.ContinueStatement(tokens)
 	case lex.Brace:
 		if firstToken.Kind == "(" {
 			return b.ExprStatement(tokens)
@@ -939,6 +941,15 @@ func (b *Builder) BreakStatement(tokens []lex.Token) StatementAST {
 		b.PushErrorToken(tokens[1], "invalid_syntax")
 	}
 	return StatementAST{breakAST.Token, breakAST}
+}
+
+func (b *Builder) ContinueStatement(tokens []lex.Token) StatementAST {
+	var continueAST ContinueAST
+	continueAST.Token = tokens[0]
+	if len(tokens) > 1 {
+		b.PushErrorToken(tokens[1], "invalid_syntax")
+	}
+	return StatementAST{continueAST.Token, continueAST}
 }
 
 // Expr builds AST model of expression.

@@ -1361,6 +1361,8 @@ func (p *Parser) checkBlock(b *ast.BlockAST) {
 			model.Value = t
 		case ast.BreakAST:
 			p.checkBreakStatement(&t)
+		case ast.ContinueAST:
+			p.checkContinueStatement(&t)
 		case ast.ReturnAST:
 		default:
 			p.PushErrorToken(model.Token, "invalid_syntax")
@@ -1641,5 +1643,11 @@ func (p *Parser) checkIterExpression(iterAST *ast.IterAST) {
 func (p *Parser) checkBreakStatement(breakAST *ast.BreakAST) {
 	if p.loopCount == 0 {
 		p.PushErrorToken(breakAST.Token, "break_at_outiter")
+	}
+}
+
+func (p *Parser) checkContinueStatement(continueAST *ast.ContinueAST) {
+	if p.loopCount == 0 {
+		p.PushErrorToken(continueAST.Token, "continue_at_outiter")
 	}
 }

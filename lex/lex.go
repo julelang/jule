@@ -392,7 +392,8 @@ func (l *Lex) Token() Token {
 		l.lexKeyword(content, "new", New, &token),
 		l.lexKeyword(content, "free", Free, &token),
 		l.lexKeyword(content, "iter", Iter, &token),
-		l.lexKeyword(content, "break", Break, &token):
+		l.lexKeyword(content, "break", Break, &token),
+		l.lexKeyword(content, "continue", Continue, &token):
 	default:
 		lex := l.lexName(content)
 		if lex != "" {

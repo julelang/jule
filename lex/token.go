@@ -30,4 +30,5 @@ const (
 	Free      uint8 = 14
 	Iter      uint8 = 15
 	Break     uint8 = 16
+	Continue  uint8 = 17
 )

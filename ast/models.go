@@ -448,3 +448,9 @@ type BreakAST struct {
 }
 
 func (b BreakAST) String() string { return "break;" }
+
+type ContinueAST struct {
+	Token lex.Token
+}
+
+func (c ContinueAST) String() string { return "continue;" }
