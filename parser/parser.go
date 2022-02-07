@@ -1115,7 +1115,7 @@ func (p *Parser) computeBraceRange(tokens []lex.Token, builder *exprModelBuilder
 			return
 		case "(":
 			astBuilder := ast.NewBuilder(tokens)
-			funAST := astBuilder.Function(true)
+			funAST := astBuilder.Function(astBuilder.Tokens, true)
 			if len(astBuilder.Errors) > 0 {
 				p.AppendErrors(astBuilder.Errors...)
 				return
