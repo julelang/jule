@@ -339,10 +339,10 @@ func nameType(token lex.Token, dt *DataTypeAST) {
 func (b *Builder) functionDataType(token lex.Token, tokens []lex.Token, index *int, dt *DataTypeAST) {
 	dt.Token = token
 	dt.Code = x.Function
-	value, funAST := b.FunctionDataTypeHead(tokens, index)
-	funAST.ReturnType, _ = b.FunctionReturnDataType(tokens, index)
+	value, fun := b.FunctionDataTypeHead(tokens, index)
+	fun.ReturnType, _ = b.FunctionReturnDataType(tokens, index)
 	dt.Value += value
-	dt.Tag = funAST
+	dt.Tag = fun
 }
 
 func (b *Builder) FunctionDataTypeHead(tokens []lex.Token, index *int) (string, FunctionAST) {
@@ -365,6 +365,7 @@ func (b *Builder) FunctionDataTypeHead(tokens []lex.Token, index *int) (string, 
 		}
 		if brace == 0 {
 			b.Parameters(&funAST, tokens[firstIndex+1:*index])
+			*index++
 			return typeValue.String(), funAST
 		}
 	}
@@ -383,17 +384,16 @@ func (b *Builder) pushTypeToTypes(types *[]DataTypeAST, tokens []lex.Token, errT
 
 func (b *Builder) FunctionReturnDataType(tokens []lex.Token, index *int) (dt DataTypeAST, ok bool) {
 	if *index >= len(tokens) {
-		goto end
+		return
 	}
-	if tokens[*index].Id == lex.Brace &&
-		tokens[*index].Kind == "[" {
+	token := tokens[*index]
+	if token.Id == lex.Brace && token.Kind == "[" { // Multityped?
 		*index++
 		if *index >= len(tokens) {
 			*index--
 			goto end
 		}
-		if tokens[*index].Id == lex.Brace &&
-			tokens[*index].Kind == "]" {
+		if token.Id == lex.Brace && token.Kind == "]" {
 			*index--
 			goto end
 		}
@@ -486,7 +486,7 @@ func nextStatementPos(tokens []lex.Token, start int) int {
 				continue
 			}
 		}
-		if braceCount > 0 {
+		if braceCount != 0 {
 			continue
 		}
 		var isStatement, withSemicolon bool
@@ -529,8 +529,8 @@ func (b *Builder) Statement(tokens []lex.Token) (s StatementAST) {
 	if ok {
 		return s
 	}
-	firstToken := tokens[0]
-	switch firstToken.Id {
+	token := tokens[0]
+	switch token.Id {
 	case lex.Name:
 		return b.NameStatement(tokens)
 	case lex.Const:
@@ -546,15 +546,15 @@ func (b *Builder) Statement(tokens []lex.Token) (s StatementAST) {
 	case lex.Continue:
 		return b.ContinueStatement(tokens)
 	case lex.Brace:
-		if firstToken.Kind == "(" {
+		if token.Kind == "(" {
 			return b.ExprStatement(tokens)
 		}
 	case lex.Operator:
-		if firstToken.Kind == "<" {
+		if token.Kind == "<" {
 			return b.ReturnStatement(tokens)
 		}
 	}
-	b.PushError(firstToken, "invalid_syntax")
+	b.PushError(token, "invalid_syntax")
 	return
 }
 
@@ -1003,7 +1003,8 @@ func (b *Builder) getExprProcesses(tokens []lex.Token) [][]lex.Token {
 			case "(", "[", "{":
 				if token.Kind == "[" {
 					oldIndex := index
-					if _, ok := b.DataType(tokens, &index, false); ok {
+					_, ok := b.DataType(tokens, &index, false)
+					if ok {
 						part = append(part, tokens[oldIndex:index+1]...)
 						continue
 					}

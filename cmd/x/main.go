@@ -171,8 +171,6 @@ typedef float f32;
 typedef double f64;
 typedef wchar_t rune;
 
-#define function std::function
-
 class str {
 public:
 #pragma region FIELDS

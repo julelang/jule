@@ -470,7 +470,7 @@ func (p *Parser) computeProcesses(processes [][]lex.Token) (v value, e exprModel
 }
 
 func (p *Parser) computeTokens(tokens []lex.Token) (value, exprModel) {
-	return p.computeProcesses(new(ast.Builder).Expr(tokens).Processes)
+	return p.computeExpr(new(ast.Builder).Expr(tokens))
 }
 
 func (p *Parser) computeExpr(ex ast.ExprAST) (value, exprModel) {
@@ -996,8 +996,8 @@ func (p *Parser) computeValPart(tokens []lex.Token, builder *exprModelBuilder) (
 			return
 		}
 	}
-	firstTok := tokens[0]
-	switch firstTok.Id {
+	token := tokens[0]
+	switch token.Id {
 	case lex.Operator:
 		return p.computeOperatorPart(tokens, builder)
 	case lex.New:
@@ -1407,6 +1407,7 @@ func (rc *returnChecker) checkValues() {
 		if token.Id == lex.Brace {
 			switch token.Kind {
 			case "(", "{", "[":
+				braceCount++
 			default:
 				braceCount--
 			}

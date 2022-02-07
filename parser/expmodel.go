@@ -103,11 +103,10 @@ type anonymousFunctionExpr struct {
 
 func (af anonymousFunctionExpr) String() string {
 	var cxx strings.Builder
-	cxx.WriteString("[&]")
+	cxx.WriteString("[=]")
 	cxx.WriteString(paramsToCxx(af.ast.Params))
-	ast.Indent++
-	cxx.WriteString(ast.ParseBlock(af.ast.Block, int(ast.Indent)))
-	ast.Indent--
+	cxx.WriteString(" mutable ")
+	cxx.WriteString(af.ast.Block.String())
 	return cxx.String()
 }
 
