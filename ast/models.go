@@ -228,12 +228,12 @@ func (e ExprAST) String() string {
 	return sb.String()
 }
 
-// BlockExprAST is AST model of expression statement in block.
-type BlockExprAST struct {
+// ExprStatementAST is AST model of expression statement in block.
+type ExprStatementAST struct {
 	Expr ExprAST
 }
 
-func (be BlockExprAST) String() string {
+func (be ExprStatementAST) String() string {
 	return be.Expr.String() + ";"
 }
 

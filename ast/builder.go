@@ -475,6 +475,7 @@ func nextStatementPos(tokens []lex.Token, start int) int {
 	braceCount := 0
 	index := start
 	for ; index < len(tokens); index++ {
+		var isStatement, withSemicolon bool
 		token := tokens[index]
 		if token.Id == lex.Brace {
 			switch token.Kind {
@@ -483,13 +484,21 @@ func nextStatementPos(tokens []lex.Token, start int) int {
 				continue
 			default:
 				braceCount--
+				if braceCount == 0 {
+					if index+1 < len(tokens) {
+						isStatement, withSemicolon = IsStatement(tokens[index+1], token)
+						if isStatement {
+							index++
+							goto ret
+						}
+					}
+				}
 				continue
 			}
 		}
 		if braceCount != 0 {
 			continue
 		}
-		var isStatement, withSemicolon bool
 		if index > start {
 			isStatement, withSemicolon = IsStatement(token, tokens[index-1])
 		} else {
@@ -498,6 +507,7 @@ func nextStatementPos(tokens []lex.Token, start int) int {
 		if !isStatement {
 			continue
 		}
+	ret:
 		if withSemicolon {
 			index++
 		}
@@ -765,7 +775,7 @@ func (b *Builder) FunctionCallStatement(tokens []lex.Token) StatementAST {
 
 // ExprStatement builds AST model of expression.
 func (b *Builder) ExprStatement(tokens []lex.Token) StatementAST {
-	block := BlockExprAST{b.Expr(tokens)}
+	block := ExprStatementAST{b.Expr(tokens)}
 	return StatementAST{tokens[0], block}
 }
 

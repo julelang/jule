@@ -1344,7 +1344,7 @@ func (p *Parser) checkBlock(b *ast.BlockAST) {
 	for index := 0; index < len(b.Statements); index++ {
 		model := &b.Statements[index]
 		switch t := model.Value.(type) {
-		case ast.BlockExprAST:
+		case ast.ExprStatementAST:
 			_, t.Expr.Model = p.computeExpr(t.Expr)
 			model.Value = t
 		case ast.VariableAST:
