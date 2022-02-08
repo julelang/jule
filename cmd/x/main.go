@@ -219,7 +219,6 @@ class array {
 public:
 #pragma region FIELDS
   std::vector<T> vector;
-  bool heap;
 #pragma endregion FIELDS
 
 #pragma region CONSTRUCTORS
@@ -228,22 +227,13 @@ public:
     this->heap = false;
   }
 
-  array(const std::vector<T>& vector, bool heap) {
-    this->vector = vector;
-    this->heap = heap;
-  }
-
+  array(const std::vector<T>& vector) { this->vector = vector; }
   array(std::nullptr_t ) : array() { }
-  array(const std::vector<T>& vector) : array(vector, false) { }
-  array(const array<T>& arr, bool heap): array(std::vector<T>(arr.vector), heap) { }
-  array(const array<T>& arr): array(arr, false) { }
+  array(const array<T>& arr): array(std::vector<T>(arr.vector)) { }
 #pragma endregion CONSTRUCTORS
 
 #pragma region DESTRUCTOR
-  ~array() {
-    this->vector.clear();
-    if (this->heap) { delete this; }
-  }
+  ~array() { this->vector.clear(); }
 #pragma endregion DESTRUCTOR
 
 #pragma region OPERATOR_OVERFLOWS

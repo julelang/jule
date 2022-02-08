@@ -105,7 +105,9 @@ func (af anonymousFunctionExpr) String() string {
 	var cxx strings.Builder
 	cxx.WriteString("[=]")
 	cxx.WriteString(paramsToCxx(af.ast.Params))
-	cxx.WriteString(" mutable ")
+	cxx.WriteString(" mutable -> ")
+	cxx.WriteString(af.ast.ReturnType.String())
+	cxx.WriteByte(' ')
 	cxx.WriteString(af.ast.Block.String())
 	return cxx.String()
 }
