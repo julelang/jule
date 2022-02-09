@@ -56,7 +56,7 @@ var Errors = map[string]string{
 	`invalid_data_amper`:               `invalid data type for amper operator (maybe you want use heap allocation)`,
 	`invalid_escape_sequence`:          `invalid escape sequence`,
 	`invalid_const_data_type`:          `invalid data type for constant`,
-	`invalid_type_source`:              `invalid data type source for type alias`,
+	`invalid_type_source`:              `invalid data type source`,
 	`missing_autotype_value`:           `auto-type declarations should have a initializer`,
 	`missing_type`:                     `data type missing`,
 	`missing_value`:                    `value is not given`,
@@ -87,5 +87,7 @@ var Errors = map[string]string{
 	`free_nonpointer`:                  `only pointers are can be freed`,
 	`break_at_outiter`:                 `break keyword is cannot used at out of iter block`,
 	`continue_at_outiter`:              `continue keyword is cannot used at out of iter block`,
-	`iter_while_notbool_expr`:          `while iterations must be have boolean expressions`,
+	`iter_while_notbool_expr`:          `while iterations must be have boolean expression`,
+	`iter_foreach_nonenumerable_expr`:  `foreach iterations must be have enumerable expression`,
+	`much_foreach_vars`:                `foreach variables can be maximum two`,
 }

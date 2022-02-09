@@ -152,9 +152,24 @@ func appendStandards(code *string) {
 #pragma endregion X_STANDARD_IMPORTS
 
 #pragma region X_RUNTIME_FUNCTIONS
-inline void panic(const std::wstring message) {
+static inline void panic(const std::wstring message) {
   std::wcout << message << std::endl;
   std::exit(1);
+}
+
+template <typename ET, typename IT, typename ETET>
+static inline void foreach(ET enumerable,
+	                         std::function<void(IT index, ETET element)> block) {
+  IT index = 0;
+  for (auto element : enumerable)
+  { block(index++, element); }
+}
+
+template <typename ET, typename IT>
+static inline void foreach(ET enumerable, std::function<void(IT index)> block) {
+  IT index = 0;
+  for (auto element : enumerable)
+  { block(index++); }
 }
 #pragma endregion X_RUNTIME_FUNCTIONS
 
@@ -185,6 +200,15 @@ public:
 #pragma region DESTRUCTOR
   ~str() { this->string.clear(); }
 #pragma endregion DESTRUCTOR
+
+#pragma region FOREACH_SUPPORT
+  typedef rune       *iterator;
+  typedef const rune *const_iterator;
+  iterator begin()             { return &this->string[0]; }
+  const_iterator begin() const { return &this->string[0]; }
+  iterator end()               { return &this->string[this->string.size()]; }
+  const_iterator end() const   { return &this->string[this->string.size()]; }
+#pragma endregion FOREACH_SUPPORT
 
 #pragma region OPERATOR_OVERFLOWS
   bool operator==(const str& string) { return this->string == string.string; }
@@ -222,19 +246,24 @@ public:
 #pragma endregion FIELDS
 
 #pragma region CONSTRUCTORS
-  array() {
-    this->vector = { };
-    this->heap = false;
-  }
-
-  array(const std::vector<T>& vector) { this->vector = vector; }
-  array(std::nullptr_t ) : array() { }
+  array()                                                       { this->vector = { }; }
+  array(const std::vector<T>& vector)                           { this->vector = vector; }
+  array(std::nullptr_t ) : array()                              { }
   array(const array<T>& arr): array(std::vector<T>(arr.vector)) { }
 #pragma endregion CONSTRUCTORS
 
 #pragma region DESTRUCTOR
   ~array() { this->vector.clear(); }
 #pragma endregion DESTRUCTOR
+
+#pragma region FOREACH_SUPPORT
+  typedef T       *iterator;
+  typedef const T *const_iterator;
+  iterator begin()             { return &this->vector[0]; }
+  const_iterator begin() const { return &this->vector[0]; }
+  iterator end()               { return &this->vector[this->vector.size()]; }
+  const_iterator end() const   { return &this->vector[this->vector.size()]; }
+#pragma endregion FOREACH_SUPPORT
 
 #pragma region OPERATOR_OVERFLOWS
   bool operator==(const array& array) {

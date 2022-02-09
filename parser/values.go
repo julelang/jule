@@ -20,6 +20,21 @@ func IsBoolean(value string) bool {
 // IsNil reports value is nil or not.
 func IsNil(value string) bool { return value == "nil" }
 
+func isWhileIterVal(val value) bool {
+	return val.ast.Type.Code == x.Bool && typeIsSingle(val.ast.Type)
+}
+
+func isForeachIterVal(val value) bool {
+	switch {
+	case typeIsArray(val.ast.Type):
+		return true
+	case !typeIsSingle(val.ast.Type):
+		return false
+	}
+	code := val.ast.Type.Code
+	return code == x.Str
+}
+
 func isConstantNumeric(v string) bool {
 	if v == "" {
 		return false

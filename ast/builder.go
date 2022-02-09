@@ -918,6 +918,131 @@ func iterExprTokens(tokens []lex.Token) (expr []lex.Token) {
 	return nil
 }
 
+func (b *Builder) getWhileIterProfile(tokens []lex.Token) WhileProfile {
+	return WhileProfile{b.Expr(tokens)}
+}
+
+func (b *Builder) pushVarsTokensPart(vars *[][]lex.Token, part []lex.Token, errTok lex.Token) {
+	if len(part) == 0 {
+		b.PushError(errTok, "missing_value")
+	}
+	*vars = append(*vars, part)
+}
+
+func (b *Builder) getForeachVarsTokens(tokens []lex.Token) [][]lex.Token {
+	var vars [][]lex.Token
+	braceCount := 0
+	last := 0
+	for index, token := range tokens {
+		if token.Id == lex.Brace {
+			switch token.Kind {
+			case "(", "[", "{":
+				braceCount++
+			default:
+				braceCount--
+			}
+		}
+		if braceCount > 0 {
+			continue
+		}
+		if token.Id == lex.Comma {
+			part := tokens[last:index]
+			b.pushVarsTokensPart(&vars, part, token)
+			last = index + 1
+		}
+	}
+	if last < len(tokens) {
+		part := tokens[last:]
+		b.pushVarsTokensPart(&vars, part, tokens[last])
+	}
+	return vars
+}
+
+func (b *Builder) getForeachIterVars(varsTokens [][]lex.Token) []VariableAST {
+	var vars []VariableAST
+	for _, tokens := range varsTokens {
+		var vast VariableAST
+		vast.NameToken = tokens[0]
+		if vast.NameToken.Id != lex.Name {
+			b.PushError(vast.NameToken, "invalid_syntax")
+			vars = append(vars, vast)
+			continue
+		}
+		vast.Name = vast.NameToken.Kind
+		if len(tokens) == 1 {
+			vars = append(vars, vast)
+			continue
+		}
+		if colon := tokens[1]; colon.Id != lex.Colon {
+			b.PushError(colon, "invalid_syntax")
+			vars = append(vars, vast)
+			continue
+		}
+		vast.New = true
+		index := new(int)
+		*index = 2
+		if *index >= len(tokens) {
+			vars = append(vars, vast)
+			continue
+		}
+		vast.Type, _ = b.DataType(tokens, index, true)
+		if *index < len(tokens)-1 {
+			b.PushError(tokens[*index], "invalid_syntax")
+		}
+		vars = append(vars, vast)
+	}
+	return vars
+}
+
+func (b *Builder) getForeachIterProfile(varTokens, exprTokens []lex.Token, inTok lex.Token) ForeachProfile {
+	var profile ForeachProfile
+	profile.InToken = inTok
+	profile.Expr = b.Expr(exprTokens)
+	if len(varTokens) == 0 {
+		profile.KeyA.Name = "__"
+		profile.KeyB.Name = "__"
+	} else {
+		varsTokens := b.getForeachVarsTokens(varTokens)
+		if len(varsTokens) == 0 {
+			return profile
+		}
+		if len(varsTokens) > 2 {
+			b.PushError(inTok, "much_foreach_vars")
+		}
+		vars := b.getForeachIterVars(varsTokens)
+		profile.KeyA = vars[0]
+		if len(vars) > 1 {
+			profile.KeyB = vars[1]
+		} else {
+			profile.KeyB.Name = "__"
+		}
+	}
+	return profile
+}
+
+func (b *Builder) getIterProfile(tokens []lex.Token) IterProfile {
+	braceCount := 0
+	for index, token := range tokens {
+		if token.Id == lex.Brace {
+			switch token.Kind {
+			case "(", "[", "{":
+				braceCount++
+			default:
+				braceCount--
+			}
+		}
+		if braceCount != 0 {
+			continue
+		}
+		if token.Id == lex.In {
+			varTokens := tokens[:index]
+			exprTokens := tokens[index+1:]
+			return b.getForeachIterProfile(varTokens, exprTokens, token)
+		}
+	}
+	return b.getWhileIterProfile(tokens)
+}
+
 func (b *Builder) IterStatement(tokens []lex.Token) (s StatementAST) {
 	var iter IterAST
 	iter.Token = tokens[0]
@@ -928,11 +1053,10 @@ func (b *Builder) IterStatement(tokens []lex.Token) (s StatementAST) {
 	}
 	exprTokens := iterExprTokens(tokens)
 	if len(exprTokens) > 0 {
-		iter.While = true
-		iter.Profile.Expr = b.Expr(exprTokens)
-		tokens = tokens[len(exprTokens):] // Skip expr tokens
+		iter.Profile = b.getIterProfile(exprTokens)
 	}
 	index := new(int)
+	*index = len(exprTokens)
 	blockTokens := getRange(index, "{", "}", tokens)
 	if blockTokens == nil {
 		b.PushError(tokens[0], "invalid_syntax")

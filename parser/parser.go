@@ -240,6 +240,8 @@ func (p *Parser) Variable(varAST ast.VariableAST) ast.VariableAST {
 					Tokens:    valueTokens,
 					Processes: processes,
 				}
+			} else {
+				p.PushErrorToken(varAST.Type.Token, "invalid_type_source")
 			}
 		}
 	} else {
@@ -326,7 +328,7 @@ func (p *Parser) variableByName(name string) *ast.VariableAST {
 	return nil
 }
 
-func (p *Parser) existName(name string) lex.Token {
+func (p *Parser) existNamef(name string, exceptGlobals bool) lex.Token {
 	t := p.typeByName(name)
 	if t != nil {
 		return t.Token
@@ -335,16 +337,28 @@ func (p *Parser) existName(name string) lex.Token {
 	if fun != nil {
 		return fun.Ast.Token
 	}
-	variable := p.variableByName(name)
-	if variable != nil {
-		return variable.NameToken
+	for _, variable := range p.BlockVariables {
+		if variable.Name == name {
+			return variable.NameToken
+		}
 	}
-	for _, varAST := range p.waitingGlobalVariables {
-		if varAST.Name == name {
-			return varAST.NameToken
+	if !exceptGlobals {
+		for _, variable := range p.GlobalVariables {
+			if variable.Name == name {
+				return variable.NameToken
+			}
+		}
+		for _, varAST := range p.waitingGlobalVariables {
+			if varAST.Name == name {
+				return varAST.NameToken
+			}
 		}
 	}
 	return lex.Token{}
+}
+
+func (p *Parser) existName(name string) lex.Token {
+	return p.existNamef(name, false)
 }
 
 func (p *Parser) check() {
@@ -1492,17 +1506,8 @@ func (p *Parser) checkFunction(fun *ast.FunctionAST) {
 }
 
 func (p *Parser) checkVariableStatement(varAST *ast.VariableAST, noParse bool) {
-	for _, t := range p.Types {
-		if varAST.Name == t.Name {
-			p.PushErrorToken(varAST.NameToken, "exist_name")
-			break
-		}
-	}
-	for _, variable := range p.BlockVariables {
-		if varAST.Name == variable.Name {
-			p.PushErrorToken(varAST.NameToken, "exist_name")
-			break
-		}
+	if p.existNamef(varAST.Name, true).Id != lex.NA {
+		p.PushErrorToken(varAST.NameToken, "exist_name")
 	}
 	if !noParse {
 		*varAST = p.Variable(*varAST)
@@ -1635,16 +1640,133 @@ func (p *Parser) checkFreeStatement(freeAST *ast.FreeAST) {
 	}
 }
 
-func (p *Parser) checkIterExpression(iter *ast.IterAST) {
-	p.loopCount++
-	if iter.While {
-		val, model := p.computeExpr(iter.Profile.Expr)
-		iter.Profile.Expr.Model = model
-		if val.ast.Type.Code != x.Bool || !typeIsSingle(val.ast.Type) {
-			p.PushErrorToken(iter.Token, "iter_while_notbool_expr")
-		}
+func (p *Parser) checkWhileProfile(iter *ast.IterAST) {
+	profile := iter.Profile.(ast.WhileProfile)
+	val, model := p.computeExpr(profile.Expr)
+	profile.Expr.Model = model
+	iter.Profile = profile
+	if !isWhileIterVal(val) {
+		p.PushErrorToken(iter.Token, "iter_while_notbool_expr")
 	}
 	p.checkBlock(&iter.Block)
+}
+
+type foreachTypeChecker struct {
+	p       *Parser
+	profile *ast.ForeachProfile
+	value   value
+}
+
+func (frc *foreachTypeChecker) array() {
+	if !x.IsIgnoreName(frc.profile.KeyA.Name) {
+		keyA := &frc.profile.KeyA
+		if keyA.Type.Code == x.Void {
+			keyA.Type.Code = x.I32
+			keyA.Type.Value = x.CxxTypeNameFromType(keyA.Type.Code)
+		} else {
+			var ok bool
+			keyA.Type, ok = frc.p.readyType(keyA.Type)
+			if !ok {
+				frc.p.PushErrorToken(keyA.Type.Token, "invalid_type_source")
+			} else {
+				if !typeIsSingle(keyA.Type) || !x.IsNumericType(keyA.Type.Code) {
+					frc.p.PushErrorToken(keyA.NameToken, "incompatible_datatype")
+				}
+			}
+		}
+	}
+	if !x.IsIgnoreName(frc.profile.KeyB.Name) {
+		elementType := frc.profile.ExprType
+		elementType.Value = elementType.Value[2:]
+		keyB := &frc.profile.KeyB
+		if keyB.Type.Code == x.Void {
+			keyB.Type = elementType
+		} else {
+			frc.p.checkType(elementType, frc.profile.KeyB.Type, true, frc.profile.InToken)
+		}
+	}
+}
+
+func (frc *foreachTypeChecker) string() {
+	if !x.IsIgnoreName(frc.profile.KeyA.Name) {
+		keyA := &frc.profile.KeyA
+		if keyA.Type.Code == x.Void {
+			keyA.Type.Code = x.I32
+			keyA.Type.Value = x.CxxTypeNameFromType(keyA.Type.Code)
+		} else {
+			var ok bool
+			keyA.Type, ok = frc.p.readyType(keyA.Type)
+			if !ok {
+				frc.p.PushErrorToken(keyA.Type.Token, "invalid_type_source")
+			} else {
+				if !typeIsSingle(keyA.Type) || !x.IsNumericType(keyA.Type.Code) {
+					frc.p.PushErrorToken(keyA.NameToken, "incompatible_datatype")
+				}
+			}
+		}
+	}
+	if !x.IsIgnoreName(frc.profile.KeyB.Name) {
+		runeType := ast.DataTypeAST{
+			Code:  x.Rune,
+			Value: x.CxxTypeNameFromType(x.Rune),
+		}
+		keyB := &frc.profile.KeyB
+		if keyB.Type.Code == x.Void {
+			keyB.Type = runeType
+		} else {
+			frc.p.checkType(runeType, frc.profile.KeyB.Type, true, frc.profile.InToken)
+		}
+	}
+}
+
+func (ftc *foreachTypeChecker) check() {
+	switch {
+	case typeIsArray(ftc.value.ast.Type):
+		ftc.array()
+	case ftc.value.ast.Type.Code == x.Str:
+		ftc.string()
+	}
+}
+
+func (p *Parser) checkForeachProfile(iter *ast.IterAST) {
+	profile := iter.Profile.(ast.ForeachProfile)
+	val, model := p.computeExpr(profile.Expr)
+	profile.Expr.Model = model
+	profile.ExprType = val.ast.Type
+	if !isForeachIterVal(val) {
+		p.PushErrorToken(iter.Token, "iter_foreach_nonenumerable_expr")
+	} else {
+		checker := foreachTypeChecker{p, &profile, val}
+		checker.check()
+	}
+	iter.Profile = profile
+	blockVariables := p.BlockVariables
+	if profile.KeyA.New {
+		if x.IsIgnoreName(profile.KeyA.Name) {
+			p.PushErrorToken(profile.KeyA.NameToken, "ignore_name_identifier")
+		}
+		p.checkVariableStatement(&profile.KeyA, true)
+	}
+	if profile.KeyB.New {
+		if x.IsIgnoreName(profile.KeyB.Name) {
+			p.PushErrorToken(profile.KeyB.NameToken, "ignore_name_identifier")
+		}
+		p.checkVariableStatement(&profile.KeyB, true)
+	}
+	p.checkBlock(&iter.Block)
+	p.BlockVariables = blockVariables
+}
+
+func (p *Parser) checkIterExpression(iter *ast.IterAST) {
+	p.loopCount++
+	if iter.Profile != nil {
+		switch iter.Profile.(type) {
+		case ast.WhileProfile:
+			p.checkWhileProfile(iter)
+		case ast.ForeachProfile:
+			p.checkForeachProfile(iter)
+		}
+	}
 	p.loopCount--
 }
 
@@ -1657,5 +1779,94 @@ func (p *Parser) checkBreakStatement(breakAST *ast.BreakAST) {
 func (p *Parser) checkContinueStatement(continueAST *ast.ContinueAST) {
 	if p.loopCount == 0 {
 		p.PushErrorToken(continueAST.Token, "continue_at_outiter")
+	}
+}
+
+func (p *Parser) checkValidityForAutoType(t ast.DataTypeAST, err lex.Token) {
+	switch t.Code {
+	case x.Nil:
+		p.PushErrorToken(err, "nil_for_autotype")
+	case x.Void:
+		p.PushErrorToken(err, "void_for_autotype")
+	}
+}
+
+func (p *Parser) defaultValueOfType(t ast.DataTypeAST) string {
+	if typeIsPointer(t) || typeIsArray(t) {
+		return "nil"
+	}
+	return x.DefaultValueOfType(t.Code)
+}
+
+func (p *Parser) readyType(dt ast.DataTypeAST) (_ ast.DataTypeAST, ok bool) {
+	if dt.Value == "" {
+		return dt, true
+	}
+	switch dt.Code {
+	case x.Name:
+		t := p.typeByName(dt.Token.Kind)
+		if t == nil {
+			return dt, false
+		}
+		t.Type.Value = dt.Value[:len(dt.Value)-len(dt.Token.Kind)] + t.Type.Value
+		return p.readyType(t.Type)
+	case x.Function:
+		funAST := dt.Tag.(ast.FunctionAST)
+		for index, param := range funAST.Params {
+			funAST.Params[index].Type, _ = p.readyType(param.Type)
+		}
+		funAST.ReturnType, _ = p.readyType(funAST.ReturnType)
+		dt.Value = dt.Tag.(ast.FunctionAST).DataTypeString()
+	}
+	return dt, true
+}
+
+func (p *Parser) checkMultiType(real, check ast.DataTypeAST, ignoreAny bool, errToken lex.Token) {
+	if real.MultiTyped != check.MultiTyped {
+		p.PushErrorToken(errToken, "incompatible_datatype")
+		return
+	}
+	realTypes := real.Tag.([]ast.DataTypeAST)
+	checkTypes := real.Tag.([]ast.DataTypeAST)
+	if len(realTypes) != len(checkTypes) {
+		p.PushErrorToken(errToken, "incompatible_datatype")
+		return
+	}
+	for index := 0; index < len(realTypes); index++ {
+		realType := realTypes[index]
+		checkType := checkTypes[index]
+		p.checkType(realType, checkType, ignoreAny, errToken)
+	}
+}
+
+func (p *Parser) checkType(real, check ast.DataTypeAST, ignoreAny bool, errToken lex.Token) {
+	real, ok := p.readyType(real)
+	if !ok {
+		p.PushErrorToken(errToken, "incompatible_datatype")
+		return
+	}
+	check, ok = p.readyType(check)
+	if !ok {
+		p.PushErrorToken(errToken, "incompatible_datatype")
+		return
+	}
+	if !ignoreAny && real.Code == x.Any {
+		return
+	}
+	if real.MultiTyped || check.MultiTyped {
+		p.checkMultiType(real, check, ignoreAny, errToken)
+		return
+	}
+	if typeIsSingle(real) && typeIsSingle(check) {
+		if !x.TypesAreCompatible(check.Code, real.Code, ignoreAny) {
+			p.PushErrorToken(errToken, "incompatible_datatype")
+		}
+		return
+	}
+	if (typeIsPointer(real) || typeIsArray(real)) && check.Code == x.Nil {
+		return
+	}
+	if real.Value != check.Value {
+		p.PushErrorToken(errToken, "incompatible_datatype")
 	}
 }

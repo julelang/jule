@@ -298,6 +298,7 @@ type VariableAST struct {
 	Name        string
 	Type        DataTypeAST
 	Value       ExprAST
+	New         bool
 	Tag         interface{}
 }
 
@@ -307,7 +308,7 @@ func (v VariableAST) String() string {
 	case lex.Const:
 		sb.WriteString("const ")
 	}
-	sb.WriteString(v.StringType())
+	sb.WriteString(v.Type.String())
 	sb.WriteByte(' ')
 	sb.WriteString(v.Name)
 	if v.Value.Processes != nil {
@@ -316,14 +317,6 @@ func (v VariableAST) String() string {
 	}
 	sb.WriteByte(';')
 	return sb.String()
-}
-
-// StringType parses type to cxx.
-func (v VariableAST) StringType() string {
-	if v.Type.Code == x.Void {
-		return "auto"
-	}
-	return v.Type.String()
 }
 
 // VarsetSelector is selector for variable set operation.
@@ -432,32 +425,88 @@ func (f FreeAST) String() string {
 	return "delete " + f.Expr.String() + ";"
 }
 
+// IterProfile interface for iteration profiles.
+type IterProfile interface {
+	String(iter IterAST) string
+}
+
+// WhileProfile is while iteration profile.
 type WhileProfile struct {
 	Expr ExprAST
 }
 
-func (wp WhileProfile) String() string {
-	return wp.Expr.String()
+func (wp WhileProfile) String(iter IterAST) string {
+	var cxx strings.Builder
+	cxx.WriteString("while (")
+	cxx.WriteString(wp.Expr.String())
+	cxx.WriteByte(')')
+	cxx.WriteString(iter.Block.String())
+	return cxx.String()
 }
 
+// ForeachProfile is foreach iteration profile.
+type ForeachProfile struct {
+	KeyA     VariableAST
+	KeyB     VariableAST
+	InToken  lex.Token
+	Expr     ExprAST
+	ExprType DataTypeAST
+}
+
+func (fp ForeachProfile) String(iter IterAST) string {
+	if !x.IsIgnoreName(fp.KeyA.Name) {
+		return fp.ForeachString(iter)
+	}
+	return fp.IterationSring(iter)
+}
+
+func (fp ForeachProfile) ForeachString(iter IterAST) string {
+	var cxx strings.Builder
+	cxx.WriteString("foreach<")
+	cxx.WriteString(fp.ExprType.String())
+	cxx.WriteString("," + fp.KeyA.Type.String())
+	if !x.IsIgnoreName(fp.KeyB.Name) {
+		cxx.WriteString("," + fp.KeyB.Type.String())
+	}
+	cxx.WriteString(">(")
+	cxx.WriteString(fp.Expr.String())
+	cxx.WriteString(", [](")
+	cxx.WriteString(fp.KeyA.Type.String())
+	cxx.WriteString(" " + fp.KeyA.Name)
+	if !x.IsIgnoreName(fp.KeyB.Name) {
+		cxx.WriteString(",")
+		cxx.WriteString(fp.KeyB.Type.String())
+		cxx.WriteString(" " + fp.KeyB.Name)
+	}
+	cxx.WriteString(") -> void ")
+	cxx.WriteString(iter.Block.String())
+	cxx.WriteString(");")
+	return cxx.String()
+}
+
+func (fp ForeachProfile) IterationSring(iter IterAST) string {
+	var cxx strings.Builder
+	cxx.WriteString("for (auto ")
+	cxx.WriteString(fp.KeyB.Name)
+	cxx.WriteString(" : ")
+	cxx.WriteString(fp.Expr.String())
+	cxx.WriteString(") ")
+	cxx.WriteString(iter.Block.String())
+	return cxx.String()
+}
+
+// IterAST is the AST model of iterations.
 type IterAST struct {
 	Token   lex.Token
 	Block   BlockAST
-	While   bool
-	Profile WhileProfile
+	Profile IterProfile
 }
 
-func (i IterAST) String() string {
-	var cxx strings.Builder
-	cxx.WriteString("while (")
-	if i.While {
-		cxx.WriteString(i.Profile.String())
-	} else {
-		cxx.WriteString("true")
+func (iter IterAST) String() string {
+	if iter.Profile == nil {
+		return "while (true) " + iter.Block.String()
 	}
-	cxx.WriteString(") ")
-	cxx.WriteString(i.Block.String())
-	return cxx.String()
+	return iter.Profile.String(iter)
 }
 
 type BreakAST struct {
