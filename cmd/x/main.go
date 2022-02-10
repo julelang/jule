@@ -304,14 +304,8 @@ public:
 #pragma endregion X_STRUCTURES
 
 #pragma region X_BUILTIN_FUNCTIONS
-template<typename any>
-inline void _out(any v) { std::wcout << v; }
-
-template<typename any>
-inline void _outln(any v) {
-  _out(v);
-  std::wcout << std::endl;
-}
+#define _out(v) std::wcout << v
+#define _outln(v) _out(v); std::wcout << std::endl
 #pragma endregion X_BUILTIN_FUNCTIONS
 
 #pragma region TRANSPILED_X_CODE

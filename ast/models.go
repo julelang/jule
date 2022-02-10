@@ -470,7 +470,7 @@ func (fp ForeachProfile) ForeachString(iter IterAST) string {
 	}
 	cxx.WriteString(">(")
 	cxx.WriteString(fp.Expr.String())
-	cxx.WriteString(", [](")
+	cxx.WriteString(", [&](")
 	cxx.WriteString(fp.KeyA.Type.String())
 	cxx.WriteString(" " + fp.KeyA.Name)
 	if !x.IsIgnoreName(fp.KeyB.Name) {
