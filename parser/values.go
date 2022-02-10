@@ -51,3 +51,10 @@ func checkIntBit(v ast.ValueAST, bit int) bool {
 	}
 	return xbits.CheckBitUInt(v.Value, bit)
 }
+
+func checkFloatBit(v ast.ValueAST, bit int) bool {
+	if bit == 0 {
+		return false
+	}
+	return xbits.CheckBitFloat(v.Value, bit)
+}

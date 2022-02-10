@@ -214,20 +214,18 @@ func (p *Parser) Variable(varAST ast.VariableAST) ast.VariableAST {
 	if x.IsIgnoreName(varAST.Name) {
 		p.PushErrorToken(varAST.NameToken, "ignore_name_identifier")
 	}
-	var dt ast.DataTypeAST
+	var val value
 	switch t := varAST.Tag.(type) {
-	case ast.DataTypeAST:
-		dt = t
+	case value:
+		val = t
 	default:
 		if varAST.SetterToken.Id != lex.NA {
-			var val value
 			val, varAST.Value.Model = p.computeExpr(varAST.Value)
-			dt = val.ast.Type
 		}
 	}
 	if varAST.Type.Code != x.Void {
 		if varAST.SetterToken.Id != lex.NA { // Pass default value.
-			p.checkType(varAST.Type, dt, false, varAST.NameToken)
+			p.checkAssignType(varAST.Type, val, false, varAST.NameToken)
 		} else {
 			var valueToken lex.Token
 			valueToken.Id = lex.Value
@@ -248,7 +246,7 @@ func (p *Parser) Variable(varAST ast.VariableAST) ast.VariableAST {
 		if varAST.SetterToken.Id == lex.NA {
 			p.PushErrorToken(varAST.NameToken, "missing_autotype_value")
 		} else {
-			varAST.Type = dt
+			varAST.Type = val.ast.Type
 			p.checkValidityForAutoType(varAST.Type, varAST.SetterToken)
 		}
 	}
@@ -888,6 +886,9 @@ func (p *operatorProcessor) unary() value {
 	} else if !x.IsNumericType(v.ast.Type.Code) {
 		p.parser.PushErrorToken(p.token, "invalid_data_unary")
 	}
+	if isConstantNumeric(v.ast.Value) {
+		v.ast.Value = "-" + v.ast.Value
+	}
 	return v
 }
 
@@ -1004,9 +1005,9 @@ func (p *Parser) computeHeapAlloc(tokens []lex.Token, builder *exprModelBuilder)
 
 func (p *Parser) computeValPart(tokens []lex.Token, builder *exprModelBuilder) (v value) {
 	if len(tokens) == 1 {
-		value, ok := p.computeVal(tokens[0], builder)
+		val, ok := p.computeVal(tokens[0], builder)
 		if ok {
-			v = value
+			v = val
 			return
 		}
 	}
@@ -1255,7 +1256,7 @@ func (p *Parser) buildArray(parts [][]lex.Token, dt ast.DataTypeAST, err lex.Tok
 	for _, part := range parts {
 		partValue, expModel := p.computeTokens(part)
 		model.expr = append(model.expr, expModel)
-		p.checkType(elementType, partValue.ast.Type, false, part[0])
+		p.checkAssignType(elementType, partValue, false, part[0])
 	}
 	return v, model
 }
@@ -1305,7 +1306,7 @@ func (p *Parser) parseArg(fun ast.FunctionAST, index int, arg *ast.ArgAST) {
 	value, model := p.computeExpr(arg.Expr)
 	arg.Expr.Model = model
 	param := fun.Params[index]
-	p.checkType(param.Type, value.ast.Type, false, arg.Token)
+	p.checkAssignType(param.Type, value, false, arg.Token)
 }
 
 // Returns between of brackets.
@@ -1452,7 +1453,7 @@ func (rc *returnChecker) checkValueTypes() {
 		if valLength > 1 {
 			rc.p.PushErrorToken(rc.retAST.Token, "overflow_return")
 		}
-		rc.p.checkType(rc.fun.ReturnType, rc.values[0].ast.Type, true, rc.retAST.Token)
+		rc.p.checkAssignType(rc.fun.ReturnType, rc.values[0], true, rc.retAST.Token)
 		return
 	}
 	// Multi return
@@ -1467,7 +1468,7 @@ func (rc *returnChecker) checkValueTypes() {
 		if index >= valLength {
 			break
 		}
-		rc.p.checkType(t, rc.values[index].ast.Type, true, rc.retAST.Token)
+		rc.p.checkAssignType(t, rc.values[index], true, rc.retAST.Token)
 	}
 }
 
@@ -1550,7 +1551,7 @@ func (p *Parser) checkOneVarset(vsAST *ast.VariableSetAST) {
 		value.ast = solver.Solve()
 		vsAST.Setter.Kind += "="
 	}
-	p.checkType(selected.ast.Type, value.ast.Type, false, vsAST.Setter)
+	p.checkAssignType(selected.ast.Type, value, false, vsAST.Setter)
 }
 
 func (p *Parser) parseVarsetSelections(vsAST *ast.VariableSetAST) {
@@ -1560,12 +1561,12 @@ func (p *Parser) parseVarsetSelections(vsAST *ast.VariableSetAST) {
 	}
 }
 
-func (p *Parser) getVarsetTypes(vsAST *ast.VariableSetAST) []ast.DataTypeAST {
-	values := make([]ast.DataTypeAST, len(vsAST.ValueExprs))
+func (p *Parser) getVarsetVals(vsAST *ast.VariableSetAST) []value {
+	values := make([]value, len(vsAST.ValueExprs))
 	for index, expr := range vsAST.ValueExprs {
 		val, model := p.computeExpr(expr)
 		vsAST.ValueExprs[index].Model = model
-		values[index] = val.ast.Type
+		values[index] = val
 	}
 	return values
 }
@@ -1576,14 +1577,23 @@ func (p *Parser) processFuncMultiVarset(vsAST *ast.VariableSetAST, funcVal value
 		p.PushErrorToken(vsAST.Setter, "missing_multiassign_identifiers")
 		return
 	}
-	p.processMultiVarset(vsAST, types)
+	values := make([]value, len(types))
+	for index, t := range types {
+		values[index] = value{
+			ast: ast.ValueAST{
+				Token: t.Token,
+				Type:  t,
+			},
+		}
+	}
+	p.processMultiVarset(vsAST, values)
 }
 
-func (p *Parser) processMultiVarset(vsAST *ast.VariableSetAST, types []ast.DataTypeAST) {
+func (p *Parser) processMultiVarset(vsAST *ast.VariableSetAST, vals []value) {
 	for index := range vsAST.SelectExprs {
 		selector := &vsAST.SelectExprs[index]
 		selector.Ignore = x.IsIgnoreName(selector.Variable.Name)
-		dt := types[index]
+		val := vals[index]
 		if !selector.NewVariable {
 			if selector.Ignore {
 				continue
@@ -1592,10 +1602,10 @@ func (p *Parser) processMultiVarset(vsAST *ast.VariableSetAST, types []ast.DataT
 			if !p.checkVarsetOperation(selected, vsAST.Setter) {
 				return
 			}
-			p.checkType(selected.ast.Type, dt, false, vsAST.Setter)
+			p.checkAssignType(selected.ast.Type, val, false, vsAST.Setter)
 			continue
 		}
-		selector.Variable.Tag = dt
+		selector.Variable.Tag = val
 		p.checkVariableStatement(&selector.Variable, false)
 	}
 }
@@ -1629,7 +1639,7 @@ func (p *Parser) checkVarsetStatement(vsAST *ast.VariableSetAST) {
 		p.PushErrorToken(vsAST.Setter, "missing_multiassign_identifiers")
 		return
 	}
-	p.processMultiVarset(vsAST, p.getVarsetTypes(vsAST))
+	p.processMultiVarset(vsAST, p.getVarsetVals(vsAST))
 }
 
 func (p *Parser) checkFreeStatement(freeAST *ast.FreeAST) {
@@ -1839,6 +1849,32 @@ func (p *Parser) checkMultiType(real, check ast.DataTypeAST, ignoreAny bool, err
 	}
 }
 
+func (p *Parser) checkAssignType(t ast.DataTypeAST, val value, ignoreAny bool, errToken lex.Token) {
+	if typeIsSingle(t) && isConstantNumeric(val.ast.Value) {
+		switch {
+		case x.IsSignedIntegerType(t.Code):
+			if xbits.CheckBitInt(val.ast.Value, xbits.BitsizeOfType(t.Code)) {
+				return
+			}
+			p.PushErrorToken(errToken, "incompatible_datatype")
+			return
+		case x.IsFloatType(t.Code):
+			if checkFloatBit(val.ast, xbits.BitsizeOfType(t.Code)) {
+				return
+			}
+			p.PushErrorToken(errToken, "incompatible_datatype")
+			return
+		case x.IsUnsignedNumericType(t.Code):
+			if xbits.CheckBitUInt(val.ast.Value, xbits.BitsizeOfType(t.Code)) {
+				return
+			}
+			p.PushErrorToken(errToken, "incompatible_datatype")
+			return
+		}
+	}
+	p.checkType(t, val.ast.Type, ignoreAny, errToken)
+}
+
 func (p *Parser) checkType(real, check ast.DataTypeAST, ignoreAny bool, errToken lex.Token) {
 	real, ok := p.readyType(real)
 	if !ok {
@@ -1858,7 +1894,7 @@ func (p *Parser) checkType(real, check ast.DataTypeAST, ignoreAny bool, errToken
 		return
 	}
 	if typeIsSingle(real) && typeIsSingle(check) {
-		if !x.TypesAreCompatible(check.Code, real.Code, ignoreAny) {
+		if !typesAreCompatible(real, check, ignoreAny) {
 			p.PushErrorToken(errToken, "incompatible_datatype")
 		}
 		return
