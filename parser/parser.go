@@ -1661,7 +1661,7 @@ func (frc *foreachTypeChecker) array() {
 	if !x.IsIgnoreName(frc.profile.KeyA.Name) {
 		keyA := &frc.profile.KeyA
 		if keyA.Type.Code == x.Void {
-			keyA.Type.Code = x.I32
+			keyA.Type.Code = x.Size
 			keyA.Type.Value = x.CxxTypeNameFromType(keyA.Type.Code)
 		} else {
 			var ok bool
@@ -1691,7 +1691,7 @@ func (frc *foreachTypeChecker) string() {
 	if !x.IsIgnoreName(frc.profile.KeyA.Name) {
 		keyA := &frc.profile.KeyA
 		if keyA.Type.Code == x.Void {
-			keyA.Type.Code = x.I32
+			keyA.Type.Code = x.Size
 			keyA.Type.Value = x.CxxTypeNameFromType(keyA.Type.Code)
 		} else {
 			var ok bool

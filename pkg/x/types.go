@@ -20,6 +20,7 @@ const (
 	Name     uint8 = 15
 	Function uint8 = 16
 	Nil      uint8 = 17
+	Size     uint8 = 18
 )
 
 // TypeGreaterThan reports type one is greater than type two or not.
@@ -47,6 +48,8 @@ func TypeGreaterThan(t1, t2 uint8) bool {
 		return t2 != Any && t2 != F64
 	case F64:
 		return t2 != Any
+	case Size:
+		return true
 	}
 	return false
 }
@@ -163,7 +166,8 @@ func IsUnsignedNumericType(t uint8) bool {
 	return t == U8 ||
 		t == U16 ||
 		t == U32 ||
-		t == U64
+		t == U64 ||
+		t == Size
 }
 
 // TypeFromName returns type name of specified type code.
@@ -197,6 +201,8 @@ func TypeFromName(name string) uint8 {
 		return Any
 	case "rune":
 		return Rune
+	case "size":
+		return Size
 	}
 	return 0
 }
@@ -233,6 +239,8 @@ func CxxTypeNameFromType(typeCode uint8) string {
 		return "str"
 	case Rune:
 		return "rune"
+	case Size:
+		return "size"
 	}
 	return "" // Unreachable code.
 }
