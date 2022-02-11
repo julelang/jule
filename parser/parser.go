@@ -1380,7 +1380,8 @@ func (p *Parser) checkBlock(b *ast.BlockAST) {
 		case ast.ContinueAST:
 			p.checkContinueStatement(&t)
 		case ast.IfAST:
-			p.checkIfExpr(&t)
+			p.checkIfExpr(&t, &index, b.Statements)
+			model.Value = t
 		case ast.ReturnAST:
 		default:
 			p.PushErrorToken(model.Token, "invalid_syntax")
@@ -1783,13 +1784,34 @@ func (p *Parser) checkIterExpr(iter *ast.IterAST) {
 	p.loopCount--
 }
 
-func (p *Parser) checkIfExpr(ifast *ast.IfAST) {
+func (p *Parser) checkIfExpr(ifast *ast.IfAST, index *int, statements []ast.StatementAST) {
 	val, model := p.computeExpr(ifast.Expr)
 	ifast.Expr.Model = model
+	statement := statements[*index]
 	if !isConditionExpr(val) {
 		p.PushErrorToken(ifast.Token, "if_notbool_expr")
 	}
 	p.checkBlock(&ifast.Block)
+	if statement.WithTerminator {
+		return
+	}
+	*index++
+	if *index >= len(statements) {
+		*index--
+		return
+	}
+	statement = statements[*index]
+	switch t := statement.Value.(type) {
+	case ast.ElseAST:
+		p.checkElseBlock(&t)
+		statement.Value = t
+	default:
+		*index--
+	}
+}
+
+func (p *Parser) checkElseBlock(elseast *ast.ElseAST) {
+	p.checkBlock(&elseast.Block)
 }
 
 func (p *Parser) checkBreakStatement(breakAST *ast.BreakAST) {

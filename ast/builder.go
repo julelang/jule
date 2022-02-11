@@ -95,7 +95,7 @@ func (b *Builder) Name(tokens []lex.Token) {
 		switch token.Kind {
 		case "(":
 			funAST := b.Function(tokens, false)
-			statement := StatementAST{funAST.Token, funAST}
+			statement := StatementAST{funAST.Token, funAST, false}
 			b.Tree = append(b.Tree, Object{funAST.Token, statement})
 			return
 		}
@@ -447,35 +447,37 @@ func IsSingleOperator(operator string) bool {
 		operator == "&"
 }
 
-func (b *Builder) pushStatementToBlock(block *BlockAST, tokens []lex.Token) {
-	if len(tokens) == 0 {
+func (b *Builder) pushStatementToBlock(bs blockStatement) {
+	if len(bs.tokens) == 0 {
 		return
 	}
-	if tokens[len(tokens)-1].Id == lex.SemiColon {
-		if len(tokens) == 1 {
+	lastToken := bs.tokens[len(bs.tokens)-1]
+	if lastToken.Id == lex.SemiColon {
+		if len(bs.tokens) == 1 {
 			return
 		}
-		tokens = tokens[:len(tokens)-1]
+		bs.tokens = bs.tokens[:len(bs.tokens)-1]
 	}
-	statement := b.Statement(block, tokens)
-	block.Statements = append(block.Statements, statement)
+	statement := b.Statement(bs)
+	statement.WithTerminator = bs.withTerminator
+	bs.block.Statements = append(bs.block.Statements, statement)
 }
 
 // IsStatement reports token is
 // statement finish point or not.
-func IsStatement(current, prev lex.Token) (yes bool, withSemicolon bool) {
-	yes = current.Id == lex.SemiColon || prev.Row < current.Row
-	if yes {
-		withSemicolon = current.Id == lex.SemiColon
+func IsStatement(current, prev lex.Token) (ok bool, withTerminator bool) {
+	ok = current.Id == lex.SemiColon || prev.Row < current.Row
+	if ok {
+		withTerminator = current.Id == lex.SemiColon
 	}
 	return
 }
 
-func nextStatementPos(tokens []lex.Token, start int) int {
+func nextStatementPos(tokens []lex.Token, start int) (int, bool) {
 	braceCount := 0
 	index := start
 	for ; index < len(tokens); index++ {
-		var isStatement, withSemicolon bool
+		var isStatement, withTerminator bool
 		token := tokens[index]
 		if token.Id == lex.Brace {
 			switch token.Kind {
@@ -486,7 +488,7 @@ func nextStatementPos(tokens []lex.Token, start int) int {
 				braceCount--
 				if braceCount == 0 {
 					if index+1 < len(tokens) {
-						isStatement, withSemicolon = IsStatement(tokens[index+1], token)
+						isStatement, withTerminator = IsStatement(tokens[index+1], token)
 						if isStatement {
 							index++
 							goto ret
@@ -500,71 +502,80 @@ func nextStatementPos(tokens []lex.Token, start int) int {
 			continue
 		}
 		if index > start {
-			isStatement, withSemicolon = IsStatement(token, tokens[index-1])
+			isStatement, withTerminator = IsStatement(token, tokens[index-1])
 		} else {
-			isStatement, withSemicolon = IsStatement(token, token)
+			isStatement, withTerminator = IsStatement(token, token)
 		}
 		if !isStatement {
 			continue
 		}
 	ret:
-		if withSemicolon {
+		if withTerminator {
 			index++
 		}
-		return index
+		return index, withTerminator
 	}
-	return index
+	return index, false
+}
+
+type blockStatement struct {
+	block          *BlockAST
+	blockTokens    *[]lex.Token
+	tokens         []lex.Token
+	withTerminator bool
 }
 
 // Block builds AST model of statements of code block.
 func (b *Builder) Block(tokens []lex.Token) (block BlockAST) {
-	var index, start int
 	for {
 		if b.Position == -1 {
 			return
 		}
-		index = nextStatementPos(tokens, index)
-		statementTokens := tokens[start:index]
-		b.pushStatementToBlock(&block, statementTokens)
+		index, withTerminator := nextStatementPos(tokens, 0)
+		statementTokens := tokens[:index]
+		statement := blockStatement{&block, &tokens, statementTokens, withTerminator}
+		b.pushStatementToBlock(statement)
 		if index >= len(tokens) {
 			break
 		}
-		start = index
+		tokens = tokens[index:]
 	}
 	return
 }
 
 // Statement builds AST model of statement.
-func (b *Builder) Statement(block *BlockAST, tokens []lex.Token) (s StatementAST) {
-	s, ok := b.VariableSetStatement(tokens)
+func (b *Builder) Statement(bs blockStatement) (s StatementAST) {
+	s, ok := b.VariableSetStatement(bs.tokens)
 	if ok {
 		return s
 	}
-	token := tokens[0]
+	token := bs.tokens[0]
 	switch token.Id {
 	case lex.Name:
-		return b.NameStatement(tokens)
+		return b.NameStatement(bs.tokens)
 	case lex.Const:
-		return b.VariableStatement(tokens)
+		return b.VariableStatement(bs.tokens)
 	case lex.Return:
-		return b.ReturnStatement(tokens)
+		return b.ReturnStatement(bs.tokens)
 	case lex.Free:
-		return b.FreeStatement(tokens)
+		return b.FreeStatement(bs.tokens)
 	case lex.Iter:
-		return b.IterExpr(tokens)
+		return b.IterExpr(bs.tokens)
 	case lex.Break:
-		return b.BreakStatement(tokens)
+		return b.BreakStatement(bs.tokens)
 	case lex.Continue:
-		return b.ContinueStatement(tokens)
+		return b.ContinueStatement(bs.tokens)
 	case lex.If:
-		return b.IfExpr(tokens)
+		return b.IfExpr(bs)
+	case lex.Else:
+		return b.ElseBlock(bs.tokens)
 	case lex.Brace:
 		if token.Kind == "(" {
-			return b.ExprStatement(tokens)
+			return b.ExprStatement(bs.tokens)
 		}
 	case lex.Operator:
 		if token.Kind == "<" {
-			return b.ReturnStatement(tokens)
+			return b.ReturnStatement(bs.tokens)
 		}
 	}
 	b.PushError(token, "invalid_syntax")
@@ -779,7 +790,7 @@ func (b *Builder) FunctionCallStatement(tokens []lex.Token) StatementAST {
 // ExprStatement builds AST model of expression.
 func (b *Builder) ExprStatement(tokens []lex.Token) StatementAST {
 	block := ExprStatementAST{b.Expr(tokens)}
-	return StatementAST{tokens[0], block}
+	return StatementAST{tokens[0], block, false}
 }
 
 // Args builds AST model of arguments.
@@ -875,7 +886,7 @@ func (b *Builder) VariableStatement(tokens []lex.Token) (s StatementAST) {
 		}
 	}
 ret:
-	return StatementAST{varAST.NameToken, varAST}
+	return StatementAST{varAST.NameToken, varAST, false}
 }
 
 // ReturnStatement builds AST model of return statement.
@@ -885,7 +896,7 @@ func (b *Builder) ReturnStatement(tokens []lex.Token) StatementAST {
 	if len(tokens) > 1 {
 		returnModel.Expr = b.Expr(tokens[1:])
 	}
-	return StatementAST{returnModel.Token, returnModel}
+	return StatementAST{returnModel.Token, returnModel, false}
 }
 
 func (b *Builder) FreeStatement(tokens []lex.Token) StatementAST {
@@ -897,7 +908,7 @@ func (b *Builder) FreeStatement(tokens []lex.Token) StatementAST {
 	} else {
 		freeAST.Expr = b.Expr(tokens)
 	}
-	return StatementAST{freeAST.Token, freeAST}
+	return StatementAST{freeAST.Token, freeAST, false}
 }
 
 func blockExprTokens(tokens []lex.Token) (expr []lex.Token) {
@@ -1069,30 +1080,55 @@ func (b *Builder) IterExpr(tokens []lex.Token) (s StatementAST) {
 		b.PushError(tokens[*index], "invalid_syntax")
 	}
 	iter.Block = b.Block(blockTokens)
-	return StatementAST{iter.Token, iter}
+	return StatementAST{iter.Token, iter, false}
 }
 
-func (b *Builder) IfExpr(tokens []lex.Token) (s StatementAST) {
+func (b *Builder) IfExpr(bs blockStatement) (s StatementAST) {
 	var ifast IfAST
-	ifast.Token = tokens[0]
-	tokens = tokens[1:]
-	exprTokens := blockExprTokens(tokens)
+	ifast.Token = bs.tokens[0]
+	bs.tokens = bs.tokens[1:]
+	exprTokens := blockExprTokens(bs.tokens)
 	if len(exprTokens) == 0 {
 		b.PushError(ifast.Token, "missing_expression")
 	}
 	index := new(int)
 	*index = len(exprTokens)
-	blockTokens := getRange(index, "{", "}", tokens)
+	blockTokens := getRange(index, "{", "}", bs.tokens)
 	if blockTokens == nil {
 		b.PushError(ifast.Token, "body_not_exist")
+		return
+	}
+	if *index < len(bs.tokens) {
+		if bs.tokens[*index].Id == lex.Else {
+			*bs.blockTokens = append(bs.tokens[*index:], *bs.blockTokens...)
+		} else {
+			b.PushError(bs.tokens[*index], "invalid_syntax")
+		}
+	}
+	ifast.Expr = b.Expr(exprTokens)
+	ifast.Block = b.Block(blockTokens)
+	return StatementAST{ifast.Token, ifast, false}
+}
+
+func (b *Builder) ElseBlock(tokens []lex.Token) (s StatementAST) {
+	var elseast ElseAST
+	elseast.Token = tokens[0]
+	tokens = tokens[1:]
+	index := new(int)
+	blockTokens := getRange(index, "{", "}", tokens)
+	if blockTokens == nil {
+		if *index < len(tokens) {
+			b.PushError(elseast.Token, "else_have_expr")
+		} else {
+			b.PushError(elseast.Token, "body_not_exist")
+		}
 		return
 	}
 	if *index < len(tokens) {
 		b.PushError(tokens[*index], "invalid_syntax")
 	}
-	ifast.Expr = b.Expr(exprTokens)
-	ifast.Block = b.Block(blockTokens)
-	return StatementAST{ifast.Token, ifast}
+	elseast.Block = b.Block(blockTokens)
+	return StatementAST{elseast.Token, elseast, false}
 }
 
 func (b *Builder) BreakStatement(tokens []lex.Token) StatementAST {
@@ -1101,7 +1137,7 @@ func (b *Builder) BreakStatement(tokens []lex.Token) StatementAST {
 	if len(tokens) > 1 {
 		b.PushError(tokens[1], "invalid_syntax")
 	}
-	return StatementAST{breakAST.Token, breakAST}
+	return StatementAST{breakAST.Token, breakAST, false}
 }
 
 func (b *Builder) ContinueStatement(tokens []lex.Token) StatementAST {
@@ -1110,7 +1146,7 @@ func (b *Builder) ContinueStatement(tokens []lex.Token) StatementAST {
 	if len(tokens) > 1 {
 		b.PushError(tokens[1], "invalid_syntax")
 	}
-	return StatementAST{continueAST.Token, continueAST}
+	return StatementAST{continueAST.Token, continueAST, false}
 }
 
 // Expr builds AST model of expression.
@@ -1236,6 +1272,9 @@ func (b *Builder) checkExprToken(token lex.Token) {
 }
 
 func getRange(index *int, open, close string, tokens []lex.Token) []lex.Token {
+	if *index >= len(tokens) {
+		return nil
+	}
 	token := tokens[*index]
 	if token.Id == lex.Brace && token.Kind == open {
 		*index++
@@ -1259,7 +1298,7 @@ func getRange(index *int, open, close string, tokens []lex.Token) []lex.Token {
 
 func (b *Builder) skipStatement() []lex.Token {
 	start := b.Position
-	b.Position = nextStatementPos(b.Tokens, start)
+	b.Position, _ = nextStatementPos(b.Tokens, start)
 	tokens := b.Tokens[start:b.Position]
 	if tokens[len(tokens)-1].Id == lex.SemiColon {
 		if len(tokens) == 1 {

@@ -17,8 +17,9 @@ type Object struct {
 
 // StatementAST is statement.
 type StatementAST struct {
-	Token lex.Token
-	Value interface{}
+	Token          lex.Token
+	Value          interface{}
+	WithTerminator bool
 }
 
 func (s StatementAST) String() string {
@@ -540,5 +541,18 @@ func (ifast IfAST) String() string {
 	cxx.WriteString(ifast.Expr.String())
 	cxx.WriteString(") ")
 	cxx.WriteString(ifast.Block.String())
+	return cxx.String()
+}
+
+// ElseAST is the AST model of else blocks.
+type ElseAST struct {
+	Token lex.Token
+	Block BlockAST
+}
+
+func (elseast ElseAST) String() string {
+	var cxx strings.Builder
+	cxx.WriteString("else ")
+	cxx.WriteString(elseast.Block.String())
 	return cxx.String()
 }

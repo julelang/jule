@@ -90,4 +90,5 @@ var Errors = map[string]string{
 	`iter_foreach_nonenumerable_expr`:  `foreach iterations must be have enumerable expression`,
 	`much_foreach_vars`:                `foreach variables can be maximum two`,
 	`if_notbool_expr`:                  `if conditions must be have boolean expression`,
+	`else_have_expr`:                   `else's cannot have any expression`,
 }

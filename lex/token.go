@@ -33,4 +33,5 @@ const (
 	Continue  uint8 = 17
 	In        uint8 = 18
 	If        uint8 = 19
+	Else      uint8 = 20
 )
