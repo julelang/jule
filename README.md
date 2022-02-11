@@ -101,5 +101,5 @@ Before you start contributing, you should familiarize yourself with the followin
 
 <h2 id="license">License</h2>
 
-X and standard library is distributed under the terms of the MIT license. <br>
+X and standard library is distributed under the terms of the BSD 3-Clause license. <br>
 [See license details.](https://the-xlang.github.io/website/pages/license.html)
