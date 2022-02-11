@@ -1792,6 +1792,7 @@ func (p *Parser) checkIfExpr(ifast *ast.IfAST, index *int, statements []ast.Stat
 		p.PushErrorToken(ifast.Token, "if_notbool_expr")
 	}
 	p.checkBlock(&ifast.Block)
+node:
 	if statement.WithTerminator {
 		return
 	}
@@ -1802,6 +1803,14 @@ func (p *Parser) checkIfExpr(ifast *ast.IfAST, index *int, statements []ast.Stat
 	}
 	statement = statements[*index]
 	switch t := statement.Value.(type) {
+	case ast.ElseIfAST:
+		val, model := p.computeExpr(t.Expr)
+		t.Expr.Model = model
+		if !isConditionExpr(val) {
+			p.PushErrorToken(t.Token, "if_notbool_expr")
+		}
+		p.checkBlock(&t.Block)
+		goto node
 	case ast.ElseAST:
 		p.checkElseBlock(&t)
 		statement.Value = t

@@ -41,17 +41,17 @@ func (ast *Builder) Ended() bool {
 // Build builds AST tree.
 func (b *Builder) Build() {
 	for b.Position != -1 && !b.Ended() {
-		statement := b.skipStatement()
-		token := statement[0]
+		tokens := b.skipStatement()
+		token := tokens[0]
 		switch token.Id {
 		case lex.At:
-			b.Attribute(statement)
+			b.Attribute(tokens)
 		case lex.Name:
-			b.Name(statement)
+			b.Name(tokens)
 		case lex.Const:
-			b.GlobalVariable(statement)
+			b.GlobalVariable(tokens)
 		case lex.Type:
-			b.Type(statement)
+			b.Type(tokens)
 		default:
 			b.PushError(token, "invalid_syntax")
 		}
@@ -447,7 +447,7 @@ func IsSingleOperator(operator string) bool {
 		operator == "&"
 }
 
-func (b *Builder) pushStatementToBlock(bs blockStatement) {
+func (b *Builder) pushStatementToBlock(bs *blockStatement) {
 	if len(bs.tokens) == 0 {
 		return
 	}
@@ -467,9 +467,7 @@ func (b *Builder) pushStatementToBlock(bs blockStatement) {
 // statement finish point or not.
 func IsStatement(current, prev lex.Token) (ok bool, withTerminator bool) {
 	ok = current.Id == lex.SemiColon || prev.Row < current.Row
-	if ok {
-		withTerminator = current.Id == lex.SemiColon
-	}
+	withTerminator = current.Id == lex.SemiColon
 	return
 }
 
@@ -522,6 +520,7 @@ type blockStatement struct {
 	block          *BlockAST
 	blockTokens    *[]lex.Token
 	tokens         []lex.Token
+	nextTokens     []lex.Token
 	withTerminator bool
 }
 
@@ -533,8 +532,19 @@ func (b *Builder) Block(tokens []lex.Token) (block BlockAST) {
 		}
 		index, withTerminator := nextStatementPos(tokens, 0)
 		statementTokens := tokens[:index]
-		statement := blockStatement{&block, &tokens, statementTokens, withTerminator}
-		b.pushStatementToBlock(statement)
+		bs := new(blockStatement)
+		bs.block = &block
+		bs.blockTokens = &tokens
+		bs.tokens = statementTokens
+		bs.withTerminator = withTerminator
+		b.pushStatementToBlock(bs)
+	next:
+		if len(bs.nextTokens) > 0 {
+			bs.tokens = bs.nextTokens
+			bs.nextTokens = nil
+			b.pushStatementToBlock(bs)
+			goto next
+		}
 		if index >= len(tokens) {
 			break
 		}
@@ -544,7 +554,7 @@ func (b *Builder) Block(tokens []lex.Token) (block BlockAST) {
 }
 
 // Statement builds AST model of statement.
-func (b *Builder) Statement(bs blockStatement) (s StatementAST) {
+func (b *Builder) Statement(bs *blockStatement) (s StatementAST) {
 	s, ok := b.VariableSetStatement(bs.tokens)
 	if ok {
 		return s
@@ -568,7 +578,7 @@ func (b *Builder) Statement(bs blockStatement) (s StatementAST) {
 	case lex.If:
 		return b.IfExpr(bs)
 	case lex.Else:
-		return b.ElseBlock(bs.tokens)
+		return b.ElseBlock(bs)
 	case lex.Brace:
 		if token.Kind == "(" {
 			return b.ExprStatement(bs.tokens)
@@ -1083,7 +1093,7 @@ func (b *Builder) IterExpr(tokens []lex.Token) (s StatementAST) {
 	return StatementAST{iter.Token, iter, false}
 }
 
-func (b *Builder) IfExpr(bs blockStatement) (s StatementAST) {
+func (b *Builder) IfExpr(bs *blockStatement) (s StatementAST) {
 	var ifast IfAST
 	ifast.Token = bs.tokens[0]
 	bs.tokens = bs.tokens[1:]
@@ -1100,7 +1110,7 @@ func (b *Builder) IfExpr(bs blockStatement) (s StatementAST) {
 	}
 	if *index < len(bs.tokens) {
 		if bs.tokens[*index].Id == lex.Else {
-			*bs.blockTokens = append(bs.tokens[*index:], *bs.blockTokens...)
+			bs.nextTokens = bs.tokens[*index:]
 		} else {
 			b.PushError(bs.tokens[*index], "invalid_syntax")
 		}
@@ -1110,22 +1120,52 @@ func (b *Builder) IfExpr(bs blockStatement) (s StatementAST) {
 	return StatementAST{ifast.Token, ifast, false}
 }
 
-func (b *Builder) ElseBlock(tokens []lex.Token) (s StatementAST) {
-	var elseast ElseAST
-	elseast.Token = tokens[0]
-	tokens = tokens[1:]
+func (b *Builder) ElseIfExpr(bs *blockStatement) (s StatementAST) {
+	var elif ElseIfAST
+	elif.Token = bs.tokens[1]
+	bs.tokens = bs.tokens[2:]
+	exprTokens := blockExprTokens(bs.tokens)
+	if len(exprTokens) == 0 {
+		b.PushError(elif.Token, "missing_expression")
+	}
 	index := new(int)
-	blockTokens := getRange(index, "{", "}", tokens)
+	*index = len(exprTokens)
+	blockTokens := getRange(index, "{", "}", bs.tokens)
 	if blockTokens == nil {
-		if *index < len(tokens) {
+		b.PushError(elif.Token, "body_not_exist")
+		return
+	}
+	if *index < len(bs.tokens) {
+		if bs.tokens[*index].Id == lex.Else {
+			bs.nextTokens = bs.tokens[*index:]
+		} else {
+			b.PushError(bs.tokens[*index], "invalid_syntax")
+		}
+	}
+	elif.Expr = b.Expr(exprTokens)
+	elif.Block = b.Block(blockTokens)
+	return StatementAST{elif.Token, elif, false}
+}
+
+func (b *Builder) ElseBlock(bs *blockStatement) (s StatementAST) {
+	if len(bs.tokens) > 1 && bs.tokens[1].Id == lex.If {
+		return b.ElseIfExpr(bs)
+	}
+	var elseast ElseAST
+	elseast.Token = bs.tokens[0]
+	bs.tokens = bs.tokens[1:]
+	index := new(int)
+	blockTokens := getRange(index, "{", "}", bs.tokens)
+	if blockTokens == nil {
+		if *index < len(bs.tokens) {
 			b.PushError(elseast.Token, "else_have_expr")
 		} else {
 			b.PushError(elseast.Token, "body_not_exist")
 		}
 		return
 	}
-	if *index < len(tokens) {
-		b.PushError(tokens[*index], "invalid_syntax")
+	if *index < len(bs.tokens) {
+		b.PushError(bs.tokens[*index], "invalid_syntax")
 	}
 	elseast.Block = b.Block(blockTokens)
 	return StatementAST{elseast.Token, elseast, false}

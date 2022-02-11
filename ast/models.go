@@ -544,6 +544,22 @@ func (ifast IfAST) String() string {
 	return cxx.String()
 }
 
+// ElseIfAST is the AST model of else if expression.
+type ElseIfAST struct {
+	Token lex.Token
+	Expr  ExprAST
+	Block BlockAST
+}
+
+func (elif ElseIfAST) String() string {
+	var cxx strings.Builder
+	cxx.WriteString("else if (")
+	cxx.WriteString(elif.Expr.String())
+	cxx.WriteString(") ")
+	cxx.WriteString(elif.Block.String())
+	return cxx.String()
+}
+
 // ElseAST is the AST model of else blocks.
 type ElseAST struct {
 	Token lex.Token
