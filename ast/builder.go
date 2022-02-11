@@ -556,6 +556,8 @@ func (b *Builder) Statement(block *BlockAST, tokens []lex.Token) (s StatementAST
 		return b.BreakStatement(tokens)
 	case lex.Continue:
 		return b.ContinueStatement(tokens)
+	case lex.If:
+		return b.IfExpr(tokens)
 	case lex.Brace:
 		if token.Kind == "(" {
 			return b.ExprStatement(tokens)
@@ -1068,6 +1070,29 @@ func (b *Builder) IterExpr(tokens []lex.Token) (s StatementAST) {
 	}
 	iter.Block = b.Block(blockTokens)
 	return StatementAST{iter.Token, iter}
+}
+
+func (b *Builder) IfExpr(tokens []lex.Token) (s StatementAST) {
+	var ifast IfAST
+	ifast.Token = tokens[0]
+	tokens = tokens[1:]
+	exprTokens := blockExprTokens(tokens)
+	if len(exprTokens) == 0 {
+		b.PushError(ifast.Token, "missing_expression")
+	}
+	index := new(int)
+	*index = len(exprTokens)
+	blockTokens := getRange(index, "{", "}", tokens)
+	if blockTokens == nil {
+		b.PushError(ifast.Token, "body_not_exist")
+		return
+	}
+	if *index < len(tokens) {
+		b.PushError(tokens[*index], "invalid_syntax")
+	}
+	ifast.Expr = b.Expr(exprTokens)
+	ifast.Block = b.Block(blockTokens)
+	return StatementAST{ifast.Token, ifast}
 }
 
 func (b *Builder) BreakStatement(tokens []lex.Token) StatementAST {

@@ -509,6 +509,7 @@ func (iter IterAST) String() string {
 	return iter.Profile.String(iter)
 }
 
+// BreakAST is the AST model of break statement.
 type BreakAST struct {
 	Token lex.Token
 }
@@ -517,10 +518,27 @@ func (b BreakAST) String() string {
 	return "break;"
 }
 
+// ContinueAST is the AST model of break statement.
 type ContinueAST struct {
 	Token lex.Token
 }
 
 func (c ContinueAST) String() string {
 	return "continue;"
+}
+
+// IfAST is the AST model of if expression.
+type IfAST struct {
+	Token lex.Token
+	Expr  ExprAST
+	Block BlockAST
+}
+
+func (ifast IfAST) String() string {
+	var cxx strings.Builder
+	cxx.WriteString("if (")
+	cxx.WriteString(ifast.Expr.String())
+	cxx.WriteString(") ")
+	cxx.WriteString(ifast.Block.String())
+	return cxx.String()
 }

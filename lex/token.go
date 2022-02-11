@@ -32,4 +32,5 @@ const (
 	Break     uint8 = 16
 	Continue  uint8 = 17
 	In        uint8 = 18
+	If        uint8 = 19
 )
