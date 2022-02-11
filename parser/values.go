@@ -20,11 +20,11 @@ func IsBoolean(value string) bool {
 // IsNil reports value is nil or not.
 func IsNil(value string) bool { return value == "nil" }
 
-func isWhileIterVal(val value) bool {
+func isConditionExpr(val value) bool {
 	return val.ast.Type.Code == x.Bool && typeIsSingle(val.ast.Type)
 }
 
-func isForeachIterVal(val value) bool {
+func isForeachIterExpr(val value) bool {
 	switch {
 	case typeIsArray(val.ast.Type):
 		return true

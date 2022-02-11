@@ -141,7 +141,7 @@ func (b *Builder) Function(tokens []lex.Token, anonymous bool) (funAST FunctionA
 		b.Parameters(&funAST, paramTokens)
 	}
 	if index >= len(tokens) {
-		b.PushError(funAST.Token, "function_body_not_exist")
+		b.PushError(funAST.Token, "body_not_exist")
 		return
 	}
 	token := tokens[index]
@@ -150,7 +150,7 @@ func (b *Builder) Function(tokens []lex.Token, anonymous bool) (funAST FunctionA
 		funAST.ReturnType = t
 		index++
 		if index >= len(tokens) {
-			b.PushError(funAST.Token, "function_body_not_exist")
+			b.PushError(funAST.Token, "body_not_exist")
 			return
 		}
 		token = tokens[index]
@@ -161,7 +161,7 @@ func (b *Builder) Function(tokens []lex.Token, anonymous bool) (funAST FunctionA
 	}
 	blockTokens := getRange(&index, "{", "}", tokens)
 	if blockTokens == nil {
-		b.PushError(funAST.Token, "function_body_not_exist")
+		b.PushError(funAST.Token, "body_not_exist")
 		return
 	}
 	if index < len(tokens) {
@@ -447,16 +447,6 @@ func IsSingleOperator(operator string) bool {
 		operator == "&"
 }
 
-// IsStatement reports token is
-// statement finish point or not.
-func IsStatement(current, prev lex.Token) (yes bool, withSemicolon bool) {
-	yes = current.Id == lex.SemiColon || prev.Row < current.Row
-	if yes {
-		withSemicolon = current.Id == lex.SemiColon
-	}
-	return
-}
-
 func (b *Builder) pushStatementToBlock(block *BlockAST, tokens []lex.Token) {
 	if len(tokens) == 0 {
 		return
@@ -467,8 +457,18 @@ func (b *Builder) pushStatementToBlock(block *BlockAST, tokens []lex.Token) {
 		}
 		tokens = tokens[:len(tokens)-1]
 	}
-	statement := b.Statement(tokens)
+	statement := b.Statement(block, tokens)
 	block.Statements = append(block.Statements, statement)
+}
+
+// IsStatement reports token is
+// statement finish point or not.
+func IsStatement(current, prev lex.Token) (yes bool, withSemicolon bool) {
+	yes = current.Id == lex.SemiColon || prev.Row < current.Row
+	if yes {
+		withSemicolon = current.Id == lex.SemiColon
+	}
+	return
 }
 
 func nextStatementPos(tokens []lex.Token, start int) int {
@@ -524,7 +524,8 @@ func (b *Builder) Block(tokens []lex.Token) (block BlockAST) {
 			return
 		}
 		index = nextStatementPos(tokens, index)
-		b.pushStatementToBlock(&block, tokens[start:index])
+		statementTokens := tokens[start:index]
+		b.pushStatementToBlock(&block, statementTokens)
 		if index >= len(tokens) {
 			break
 		}
@@ -534,7 +535,7 @@ func (b *Builder) Block(tokens []lex.Token) (block BlockAST) {
 }
 
 // Statement builds AST model of statement.
-func (b *Builder) Statement(tokens []lex.Token) (s StatementAST) {
+func (b *Builder) Statement(block *BlockAST, tokens []lex.Token) (s StatementAST) {
 	s, ok := b.VariableSetStatement(tokens)
 	if ok {
 		return s
@@ -550,7 +551,7 @@ func (b *Builder) Statement(tokens []lex.Token) (s StatementAST) {
 	case lex.Free:
 		return b.FreeStatement(tokens)
 	case lex.Iter:
-		return b.IterStatement(tokens)
+		return b.IterExpr(tokens)
 	case lex.Break:
 		return b.BreakStatement(tokens)
 	case lex.Continue:
@@ -897,7 +898,7 @@ func (b *Builder) FreeStatement(tokens []lex.Token) StatementAST {
 	return StatementAST{freeAST.Token, freeAST}
 }
 
-func iterExprTokens(tokens []lex.Token) (expr []lex.Token) {
+func blockExprTokens(tokens []lex.Token) (expr []lex.Token) {
 	braceCount := 0
 	for index, token := range tokens {
 		if token.Id == lex.Brace {
@@ -1043,15 +1044,15 @@ func (b *Builder) getIterProfile(tokens []lex.Token) IterProfile {
 	return b.getWhileIterProfile(tokens)
 }
 
-func (b *Builder) IterStatement(tokens []lex.Token) (s StatementAST) {
+func (b *Builder) IterExpr(tokens []lex.Token) (s StatementAST) {
 	var iter IterAST
 	iter.Token = tokens[0]
 	tokens = tokens[1:]
 	if len(tokens) == 0 {
-		b.PushError(iter.Token, "iter_body_not_exist")
+		b.PushError(iter.Token, "body_not_exist")
 		return
 	}
-	exprTokens := iterExprTokens(tokens)
+	exprTokens := blockExprTokens(tokens)
 	if len(exprTokens) > 0 {
 		iter.Profile = b.getIterProfile(exprTokens)
 	}
@@ -1059,7 +1060,7 @@ func (b *Builder) IterStatement(tokens []lex.Token) (s StatementAST) {
 	*index = len(exprTokens)
 	blockTokens := getRange(index, "{", "}", tokens)
 	if blockTokens == nil {
-		b.PushError(tokens[0], "invalid_syntax")
+		b.PushError(iter.Token, "body_not_exist")
 		return
 	}
 	if *index < len(tokens) {
@@ -1234,5 +1235,12 @@ func getRange(index *int, open, close string, tokens []lex.Token) []lex.Token {
 func (b *Builder) skipStatement() []lex.Token {
 	start := b.Position
 	b.Position = nextStatementPos(b.Tokens, start)
-	return b.Tokens[start:b.Position]
+	tokens := b.Tokens[start:b.Position]
+	if tokens[len(tokens)-1].Id == lex.SemiColon {
+		if len(tokens) == 1 {
+			return b.skipStatement()
+		}
+		tokens = tokens[:len(tokens)-1]
+	}
+	return tokens
 }

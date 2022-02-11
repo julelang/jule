@@ -205,7 +205,8 @@ func (p *Parser) GlobalVariable(varAST ast.VariableAST) {
 // WaitingGlobalVariables parse X global variables for waiting parsing.
 func (p *Parser) WaitingGlobalVariables() {
 	for _, varAST := range p.waitingGlobalVariables {
-		p.GlobalVariables = append(p.GlobalVariables, p.Variable(varAST))
+		variable := p.Variable(varAST)
+		p.GlobalVariables = append(p.GlobalVariables, variable)
 	}
 }
 
@@ -1372,7 +1373,7 @@ func (p *Parser) checkBlock(b *ast.BlockAST) {
 			p.checkFreeStatement(&t)
 			model.Value = t
 		case ast.IterAST:
-			p.checkIterExpression(&t)
+			p.checkIterExpr(&t)
 			model.Value = t
 		case ast.BreakAST:
 			p.checkBreakStatement(&t)
@@ -1655,7 +1656,7 @@ func (p *Parser) checkWhileProfile(iter *ast.IterAST) {
 	val, model := p.computeExpr(profile.Expr)
 	profile.Expr.Model = model
 	iter.Profile = profile
-	if !isWhileIterVal(val) {
+	if !isConditionExpr(val) {
 		p.PushErrorToken(iter.Token, "iter_while_notbool_expr")
 	}
 	p.checkBlock(&iter.Block)
@@ -1743,7 +1744,7 @@ func (p *Parser) checkForeachProfile(iter *ast.IterAST) {
 	val, model := p.computeExpr(profile.Expr)
 	profile.Expr.Model = model
 	profile.ExprType = val.ast.Type
-	if !isForeachIterVal(val) {
+	if !isForeachIterExpr(val) {
 		p.PushErrorToken(iter.Token, "iter_foreach_nonenumerable_expr")
 	} else {
 		checker := foreachTypeChecker{p, &profile, val}
@@ -1767,7 +1768,7 @@ func (p *Parser) checkForeachProfile(iter *ast.IterAST) {
 	p.BlockVariables = blockVariables
 }
 
-func (p *Parser) checkIterExpression(iter *ast.IterAST) {
+func (p *Parser) checkIterExpr(iter *ast.IterAST) {
 	p.loopCount++
 	if iter.Profile != nil {
 		switch iter.Profile.(type) {
