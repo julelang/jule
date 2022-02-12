@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 	"unicode"
 	"unicode/utf8"
 
@@ -13,6 +14,8 @@ import (
 
 // Lex is lexer of Fract.
 type Lex struct {
+	wg sync.WaitGroup
+
 	File     *io.FILE
 	Position int
 	Column   int
@@ -52,11 +55,14 @@ func (l *Lex) Tokenize() []Token {
 			tokens = append(tokens, token)
 		}
 	}
-	l.checkParentheses()
+	l.wg.Add(1)
+	go l.checkParenthesesAsync()
+	l.wg.Wait()
 	return tokens
 }
 
-func (l *Lex) checkParentheses() {
+func (l *Lex) checkParenthesesAsync() {
+	defer func() { l.wg.Done() }()
 	for _, token := range l.braces {
 		switch token.Kind {
 		case "(":
@@ -309,7 +315,8 @@ func (l *Lex) Token() Token {
 			l.pushErrorToken(token, "extra_closed_parentheses")
 			break
 		} else if l.braces[length-1].Kind != "(" {
-			l.pushWrongOrderCloseErrorr(token)
+			l.wg.Add(1)
+			go l.pushWrongOrderCloseErrorrAsync(token)
 		}
 		l.removeBrace(length-1, token.Kind)
 	case l.lexPunct(content, "{", Brace, &token):
@@ -320,7 +327,8 @@ func (l *Lex) Token() Token {
 			l.pushErrorToken(token, "extra_closed_braces")
 			break
 		} else if l.braces[length-1].Kind != "{" {
-			l.pushWrongOrderCloseErrorr(token)
+			l.wg.Add(1)
+			go l.pushWrongOrderCloseErrorrAsync(token)
 		}
 		l.removeBrace(length-1, token.Kind)
 	case l.lexPunct(content, "[", Brace, &token):
@@ -331,7 +339,8 @@ func (l *Lex) Token() Token {
 			l.pushErrorToken(token, "extra_closed_brackets")
 			break
 		} else if l.braces[length-1].Kind != "[" {
-			l.pushWrongOrderCloseErrorr(token)
+			l.wg.Add(1)
+			go l.pushWrongOrderCloseErrorrAsync(token)
 		}
 		l.removeBrace(length-1, token.Kind)
 	case
@@ -440,7 +449,8 @@ func (l *Lex) removeBrace(index int, kind string) {
 	}
 }
 
-func (l *Lex) pushWrongOrderCloseErrorr(token Token) {
+func (l *Lex) pushWrongOrderCloseErrorrAsync(token Token) {
+	defer func() { l.wg.Done() }()
 	var message string
 	switch l.braces[len(l.braces)-1].Kind {
 	case "(":

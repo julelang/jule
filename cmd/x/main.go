@@ -355,7 +355,7 @@ func main() {
 	info.File = f
 	info.Routines = routines
 	routines.Add(1)
-	go parser.ParseFile(info)
+	go parser.ParseFileAsync(info)
 	routines.Wait()
 	if info.Errors != nil {
 		printErrors(info.Errors)

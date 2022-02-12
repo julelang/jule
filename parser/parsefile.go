@@ -14,8 +14,8 @@ type ParseFileInfo struct {
 	Routines *sync.WaitGroup
 }
 
-// ParseFile parses file content.
-func ParseFile(info *ParseFileInfo) {
+// ParseFileAsync parses file content.
+func ParseFileAsync(info *ParseFileInfo) {
 	defer info.Routines.Done()
 	info.X_CXX = ""
 	lexer := lex.NewLex(info.File)
