@@ -411,6 +411,7 @@ func (p *Parser) checkFunctionSpecialCasesAsync(fun *function) {
 type value struct {
 	ast      ast.ValueAST
 	constant bool
+	lvalue   bool
 }
 
 func (p *Parser) computeProcesses(processes [][]lex.Token) (v value, e exprModel) {
@@ -621,6 +622,7 @@ func (p *valueProcessor) name() (v value, ok bool) {
 		v.ast.Type = variable.Type
 		v.constant = variable.DefineToken.Id == lex.Const
 		v.ast.Token = variable.NameToken
+		v.lvalue = true
 		p.builder.appendNode(tokenExprNode{p.token})
 		ok = true
 	} else if fun := p.parser.FunctionByName(p.token.Kind); fun != nil {
@@ -946,6 +948,7 @@ func (p *operatorProcessor) logicalNot() value {
 
 func (p *operatorProcessor) star() value {
 	v := p.parser.computeValPart(p.tokens, p.builder)
+	v.lvalue = true
 	if !typeIsPointer(v.ast.Type) {
 		p.parser.PushErrorToken(p.token, "invalid_data_star")
 	} else {
@@ -956,6 +959,7 @@ func (p *operatorProcessor) star() value {
 
 func (p *operatorProcessor) amper() value {
 	v := p.parser.computeValPart(p.tokens, p.builder)
+	v.lvalue = true
 	if !canGetPointer(v) {
 		p.parser.PushErrorToken(p.token, "invalid_data_amper")
 	}
@@ -1007,6 +1011,7 @@ func (p *Parser) computeHeapAlloc(tokens []lex.Token, builder *exprModelBuilder)
 		p.PushErrorToken(tokens[0], "invalid_syntax_keyword_new")
 		return
 	}
+	v.lvalue = true
 	v.ast.Token = tokens[0]
 	tokens = tokens[1:]
 	astb := new(ast.Builder)
@@ -1103,6 +1108,7 @@ func (p *Parser) computeParenthesesRange(tokens []lex.Token, builder *exprModelB
 		fun := v.ast.Type.Tag.(ast.FunctionAST)
 		p.parseFunctionCall(fun, tokens[len(valueTokens):], builder)
 		v.ast.Type = fun.ReturnType
+		v.lvalue = typeIsLvalue(v.ast.Type)
 	default:
 		p.PushErrorToken(tokens[len(valueTokens)], "invalid_syntax")
 	}
@@ -1221,6 +1227,7 @@ func (p *Parser) computeEnumerableSelect(enumv, selectv value, err lex.Token) (v
 }
 
 func (p *Parser) computeArraySelect(arrv, selectv value, err lex.Token) value {
+	arrv.lvalue = true
 	arrv.ast.Type = typeOfArrayElements(arrv.ast.Type)
 	if !typeIsSingle(selectv.ast.Type) || !x.IsIntegerType(selectv.ast.Type.Code) {
 		p.PushErrorToken(err, "notint_array_select")
@@ -1229,6 +1236,7 @@ func (p *Parser) computeArraySelect(arrv, selectv value, err lex.Token) value {
 }
 
 func (p *Parser) computeStringSelect(strv, selectv value, err lex.Token) value {
+	strv.lvalue = true
 	strv.ast.Type.Code = x.Rune
 	if !typeIsSingle(selectv.ast.Type) || !x.IsIntegerType(selectv.ast.Type.Code) {
 		p.PushErrorToken(err, "notint_string_select")
@@ -1543,18 +1551,23 @@ func (p *Parser) checkVariableStatement(varAST *ast.VariableAST, noParse bool) {
 }
 
 func (p *Parser) checkVarsetOperation(selected value, err lex.Token) bool {
+	state := true
+	if !selected.lvalue {
+		p.PushErrorToken(err, "nonlvalue_update")
+		state = false
+	}
 	if selected.constant {
 		p.PushErrorToken(err, "const_value_update")
-		return false
+		state = false
 	}
 	switch selected.ast.Type.Tag.(type) {
 	case ast.FunctionAST:
 		if p.FunctionByName(selected.ast.Token.Kind) != nil {
 			p.PushErrorToken(err, "type_not_support_value_update")
-			return false
+			state = false
 		}
 	}
-	return true
+	return state
 }
 
 func (p *Parser) checkOneVarset(vsAST *ast.VariableSetAST) {

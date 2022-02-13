@@ -50,6 +50,10 @@ func checkArrayCompatiblity(arrT, t ast.DataTypeAST) bool {
 	return arrT.Value == t.Value
 }
 
+func typeIsLvalue(t ast.DataTypeAST) bool {
+	return typeIsPointer(t) || typeIsArray(t)
+}
+
 func typesAreCompatible(t1, t2 ast.DataTypeAST, ignoreany bool) bool {
 	switch {
 	case typeIsArray(t1) || typeIsArray(t2):

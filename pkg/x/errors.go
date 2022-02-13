@@ -42,6 +42,7 @@ var Errors = map[string]string{
 	`bitshift_must_unsigned`:           `bit shifting value is must be unsigned`,
 	`logical_not_bool`:                 `logical expression is have only boolean type values`,
 	`const_value_update`:               `value is cannot update of constants`,
+	`nonlvalue_update`:                 `lvalue required as left operand of assignment`,
 	`type_not_support_value_update`:    `type is not support value update`,
 	`invalid_type`:                     `invalid data type`,
 	`invalid_attribute`:                `invalid attribute for type`,
