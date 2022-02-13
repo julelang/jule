@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"sync"
 
 	"github.com/the-xlang/x/lex"
 	"github.com/the-xlang/x/pkg/x"
@@ -12,6 +13,8 @@ import (
 
 // Builder is builds AST tree.
 type Builder struct {
+	wg sync.WaitGroup
+
 	Tree     []Object
 	Errors   []string
 	Tokens   []lex.Token
@@ -56,6 +59,7 @@ func (b *Builder) Build() {
 			b.PushError(token, "invalid_syntax")
 		}
 	}
+	b.wg.Wait()
 }
 
 // Type builds AST model of type defination statement.
@@ -206,6 +210,17 @@ func (b *Builder) Parameters(fn *FunctionAST, tokens []lex.Token) {
 			b.pushParameter(fn, tokens[last:], tokens[last-1])
 		}
 	}
+	b.wg.Add(1)
+	go b.checkParamsAsync(fn)
+}
+
+func (b *Builder) checkParamsAsync(fn *FunctionAST) {
+	defer func() { b.wg.Done() }()
+	for _, param := range fn.Params {
+		if param.Type.Token.Id == lex.NA {
+			b.PushError(param.Token, "missing_type")
+		}
+	}
 }
 
 func (b *Builder) pushParameter(fn *FunctionAST, tokens []lex.Token, err lex.Token) {
@@ -226,10 +241,6 @@ func (b *Builder) pushParameter(fn *FunctionAST, tokens []lex.Token, err lex.Tok
 			paramAST.Const = true
 		case lex.Name:
 			tokens = tokens[index:]
-			if len(tokens) < 2 {
-				b.PushError(paramAST.Token, "missing_type")
-				return
-			}
 			if !x.IsIgnoreName(token.Kind) {
 				for _, param := range fn.Params {
 					if param.Name == token.Kind {
@@ -239,10 +250,21 @@ func (b *Builder) pushParameter(fn *FunctionAST, tokens []lex.Token, err lex.Tok
 				}
 				paramAST.Name = token.Kind
 			}
-			index := 1
-			paramAST.Type, _ = b.DataType(tokens, &index, true)
-			if index+1 < len(tokens) {
-				b.PushError(tokens[index+1], "invalid_syntax")
+			if len(tokens) > 1 {
+				index := 1
+				paramAST.Type, _ = b.DataType(tokens, &index, true)
+				index++
+				if index < len(tokens) {
+					b.PushError(tokens[index], "invalid_syntax")
+				}
+				index = len(fn.Params) - 1
+				for ; index >= 0; index-- {
+					param := &fn.Params[index]
+					if param.Type.Token.Id != lex.NA {
+						break
+					}
+					param.Type = paramAST.Type
+				}
 			}
 			goto end
 		default:
@@ -257,9 +279,6 @@ func (b *Builder) pushParameter(fn *FunctionAST, tokens []lex.Token, err lex.Tok
 		}
 	}
 end:
-	if paramAST.Type.Code == x.Void {
-		b.PushError(paramAST.Token, "invalid_syntax")
-	}
 	fn.Params = append(fn.Params, paramAST)
 }
 
