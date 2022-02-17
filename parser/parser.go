@@ -1549,11 +1549,13 @@ func (rc *returnChecker) checkValues() {
 		}
 	}
 	if !typeIsVoidReturn(rc.fun.ReturnType) {
-		rc.checkValueTypes()
+		rc.p.wg.Add(1)
+		go rc.checkValueTypesAsync()
 	}
 }
 
-func (rc *returnChecker) checkValueTypes() {
+func (rc *returnChecker) checkValueTypesAsync() {
+	defer func() { rc.p.wg.Done() }()
 	valLength := len(rc.values)
 	if !rc.fun.ReturnType.MultiTyped {
 		rc.retAST.Expr.Model = rc.expModel.models[0]
@@ -1593,8 +1595,7 @@ func (rc *returnChecker) check() {
 	rc.checkValues()
 }
 
-func (p *Parser) checkReturnsAsync(fun *ast.FunctionAST) {
-	defer func() { p.wg.Done() }()
+func (p *Parser) checkReturns(fun *ast.FunctionAST) {
 	missed := true
 	for index, s := range fun.Block.Statements {
 		switch t := s.Value.(type) {
@@ -1612,8 +1613,7 @@ func (p *Parser) checkReturnsAsync(fun *ast.FunctionAST) {
 
 func (p *Parser) checkFunction(fun *ast.FunctionAST) {
 	p.checkBlock(&fun.Block)
-	p.wg.Add(1)
-	go p.checkReturnsAsync(fun)
+	p.checkReturns(fun)
 	p.wg.Add(1)
 	go p.checkParametersAsync(fun.Params)
 }
