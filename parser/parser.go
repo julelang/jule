@@ -116,8 +116,6 @@ func (p *Parser) Cxx() string {
 }
 
 // Parse is parse X code.
-//
-//! This function is main point of parsing.
 func (p *Parser) Parse() {
 	builder := ast.NewBuilder(p.Tokens)
 	builder.Build()
@@ -268,15 +266,22 @@ func (p *Parser) checkFunctionAttributes(attributes []ast.AttributeAST) {
 	}
 }
 
-func variablesFromParameters(params []ast.ParameterAST) []ast.VariableAST {
+func (p *Parser) variablesFromParameters(params []ast.ParameterAST) []ast.VariableAST {
 	var vars []ast.VariableAST
-	for _, param := range params {
+	length := len(params)
+	for index, param := range params {
 		var variable ast.VariableAST
 		variable.Name = param.Name
 		variable.NameToken = param.Token
 		variable.Type = param.Type
 		if param.Const {
 			variable.DefineToken.Id = lex.Const
+		}
+		if param.Variadic {
+			if length-index > 1 {
+				p.PushErrorToken(param.Token, "variadic_parameter_notlast")
+			}
+			variable.Type.Value = "[]" + variable.Type.Value
 		}
 		vars = append(vars, variable)
 	}
@@ -393,7 +398,7 @@ func (p *Parser) WaitingGlobalVariablesAsync() {
 func (p *Parser) checkFunctionsAsync() {
 	defer func() { p.wg.Done() }()
 	for _, fun := range p.Functions {
-		p.BlockVariables = variablesFromParameters(fun.Ast.Params)
+		p.BlockVariables = p.variablesFromParameters(fun.Ast.Params)
 		p.wg.Add(1)
 		go p.checkFunctionSpecialCasesAsync(fun)
 		p.checkFunction(&fun.Ast)
@@ -412,6 +417,7 @@ type value struct {
 	ast      ast.ValueAST
 	constant bool
 	lvalue   bool
+	variadic bool
 }
 
 func (p *Parser) computeProcesses(processes [][]lex.Token) (v value, e exprModel) {
@@ -557,7 +563,7 @@ func (p *Parser) nextOperator(tokens [][]lex.Token) int {
 
 type valueProcessor struct {
 	token   lex.Token
-	builder *exprModelBuilder
+	builder *exprBuilder
 	parser  *Parser
 }
 
@@ -869,7 +875,7 @@ func (s solver) Solve() (v ast.ValueAST) {
 	return
 }
 
-func (p *Parser) computeVal(token lex.Token, builder *exprModelBuilder) (v value, ok bool) {
+func (p *Parser) computeVal(token lex.Token, builder *exprBuilder) (v value, ok bool) {
 	processor := valueProcessor{token, builder, p}
 	v.ast.Type.Code = x.Void
 	v.ast.Token = token
@@ -899,7 +905,7 @@ func (p *Parser) computeVal(token lex.Token, builder *exprModelBuilder) (v value
 type operatorProcessor struct {
 	token   lex.Token
 	tokens  []lex.Token
-	builder *exprModelBuilder
+	builder *exprBuilder
 	parser  *Parser
 }
 
@@ -967,7 +973,7 @@ func (p *operatorProcessor) amper() value {
 	return v
 }
 
-func (p *Parser) computeOperatorPart(tokens []lex.Token, builder *exprModelBuilder) value {
+func (p *Parser) computeOperatorPart(tokens []lex.Token, builder *exprBuilder) value {
 	var v value
 	//? Length is 1 cause all length of operator tokens is 1.
 	//? Change "1" with length of token's value
@@ -1006,7 +1012,7 @@ func canGetPointer(v value) bool {
 	return v.ast.Token.Id == lex.Name
 }
 
-func (p *Parser) computeHeapAlloc(tokens []lex.Token, builder *exprModelBuilder) (v value) {
+func (p *Parser) computeHeapAlloc(tokens []lex.Token, builder *exprBuilder) (v value) {
 	if len(tokens) == 1 {
 		p.PushErrorToken(tokens[0], "invalid_syntax_keyword_new")
 		return
@@ -1030,7 +1036,7 @@ func (p *Parser) computeHeapAlloc(tokens []lex.Token, builder *exprModelBuilder)
 	return
 }
 
-func (p *Parser) computeValPart(tokens []lex.Token, builder *exprModelBuilder) (v value) {
+func (p *Parser) computeValPart(tokens []lex.Token, builder *exprBuilder) (v value) {
 	if len(tokens) == 1 {
 		val, ok := p.computeVal(tokens[0], builder)
 		if ok {
@@ -1045,7 +1051,10 @@ func (p *Parser) computeValPart(tokens []lex.Token, builder *exprModelBuilder) (
 	case lex.New:
 		return p.computeHeapAlloc(tokens, builder)
 	}
-	switch token := tokens[len(tokens)-1]; token.Id {
+	token = tokens[len(tokens)-1]
+	switch token.Id {
+	case lex.Operator:
+		return p.computeOperatorPartRight(tokens, builder)
 	case lex.Brace:
 		switch token.Kind {
 		case ")":
@@ -1061,7 +1070,30 @@ func (p *Parser) computeValPart(tokens []lex.Token, builder *exprModelBuilder) (
 	return
 }
 
-func (p *Parser) computeParenthesesRange(tokens []lex.Token, builder *exprModelBuilder) (v value) {
+func (p *Parser) computeOperatorPartRight(tokens []lex.Token, b *exprBuilder) (v value) {
+	token := tokens[len(tokens)-1]
+	switch token.Kind {
+	case "...":
+		tokens = tokens[:len(tokens)-1]
+		return p.computeVariadicExprPart(tokens, b, token)
+	default:
+		p.PushErrorToken(token, "invalid_syntax")
+	}
+	return
+}
+
+func (p *Parser) computeVariadicExprPart(tokens []lex.Token, b *exprBuilder, errTok lex.Token) (v value) {
+	v = p.computeValPart(tokens, b)
+	if !typeIsVariadicable(v.ast.Type) {
+		p.PushErrorToken(errTok, "variadic_with_nonvariadicable")
+		return
+	}
+	v.ast.Type.Value = v.ast.Type.Value[2:] // Remove array type.
+	v.variadic = true
+	return
+}
+
+func (p *Parser) computeParenthesesRange(tokens []lex.Token, b *exprBuilder) (v value) {
 	var valueTokens []lex.Token
 	j := len(tokens) - 1
 	braceCount := 0
@@ -1084,8 +1116,8 @@ func (p *Parser) computeParenthesesRange(tokens []lex.Token, builder *exprModelB
 	}
 	if len(valueTokens) == 0 && braceCount == 0 {
 		// Write parentheses.
-		builder.appendNode(tokenExprNode{lex.Token{Kind: "("}})
-		defer builder.appendNode(tokenExprNode{lex.Token{Kind: ")"}})
+		b.appendNode(tokenExprNode{lex.Token{Kind: "("}})
+		defer b.appendNode(tokenExprNode{lex.Token{Kind: ")"}})
 
 		tk := tokens[0]
 		tokens = tokens[1 : len(tokens)-1]
@@ -1094,19 +1126,19 @@ func (p *Parser) computeParenthesesRange(tokens []lex.Token, builder *exprModelB
 		}
 		value, model := p.computeTokens(tokens)
 		v = value
-		builder.appendNode(model)
+		b.appendNode(model)
 		return
 	}
-	v = p.computeValPart(valueTokens, builder)
+	v = p.computeValPart(valueTokens, b)
 
 	// Write parentheses.
-	builder.appendNode(tokenExprNode{lex.Token{Kind: "("}})
-	defer builder.appendNode(tokenExprNode{lex.Token{Kind: ")"}})
+	b.appendNode(tokenExprNode{lex.Token{Kind: "("}})
+	defer b.appendNode(tokenExprNode{lex.Token{Kind: ")"}})
 
 	switch v.ast.Type.Code {
 	case x.Function:
 		fun := v.ast.Type.Tag.(ast.FunctionAST)
-		p.parseFunctionCall(fun, tokens[len(valueTokens):], builder)
+		p.parseFunctionCall(fun, tokens[len(valueTokens):], b)
 		v.ast.Type = fun.ReturnType
 		v.lvalue = typeIsLvalue(v.ast.Type)
 	default:
@@ -1115,7 +1147,7 @@ func (p *Parser) computeParenthesesRange(tokens []lex.Token, builder *exprModelB
 	return
 }
 
-func (p *Parser) computeBraceRange(tokens []lex.Token, builder *exprModelBuilder) (v value) {
+func (p *Parser) computeBraceRange(tokens []lex.Token, b *exprBuilder) (v value) {
 	var valueTokens []lex.Token
 	j := len(tokens) - 1
 	braceCount := 0
@@ -1152,9 +1184,9 @@ func (p *Parser) computeBraceRange(tokens []lex.Token, builder *exprModelBuilder
 				return
 			}
 			valueTokens = tokens[len(valueTokens):]
-			var model exprNode
+			var model IExprNode
 			v, model = p.buildArray(p.buildEnumerableParts(valueTokens), dt, valueTokens[0])
-			builder.appendNode(model)
+			b.appendNode(model)
 			return
 		case "(":
 			astBuilder := ast.NewBuilder(tokens)
@@ -1167,7 +1199,7 @@ func (p *Parser) computeBraceRange(tokens []lex.Token, builder *exprModelBuilder
 			v.ast.Type.Tag = funAST
 			v.ast.Type.Code = x.Function
 			v.ast.Type.Value = funAST.DataTypeString()
-			builder.appendNode(anonymousFunctionExpr{funAST})
+			b.appendNode(anonymousFunctionExpr{funAST})
 			return
 		default:
 			p.PushErrorToken(valueTokens[0], "invalid_syntax")
@@ -1178,7 +1210,7 @@ func (p *Parser) computeBraceRange(tokens []lex.Token, builder *exprModelBuilder
 	return
 }
 
-func (p *Parser) computeBracketRange(tokens []lex.Token, builder *exprModelBuilder) (v value) {
+func (p *Parser) computeBracketRange(tokens []lex.Token, b *exprBuilder) (v value) {
 	var valueTokens []lex.Token
 	j := len(tokens) - 1
 	braceCount := 0
@@ -1204,14 +1236,14 @@ func (p *Parser) computeBracketRange(tokens []lex.Token, builder *exprModelBuild
 		p.PushErrorToken(tokens[0], "invalid_syntax")
 		return
 	}
-	var model exprNode
+	var model IExprNode
 	v, model = p.computeTokens(valueTokens)
-	builder.appendNode(model)
+	b.appendNode(model)
 	tokens = tokens[len(valueTokens)+1 : len(tokens)-1] // Removed array syntax "["..."]"
-	builder.appendNode(tokenExprNode{lex.Token{Kind: "["}})
+	b.appendNode(tokenExprNode{lex.Token{Kind: "["}})
 	selectv, model := p.computeTokens(tokens)
-	builder.appendNode(model)
-	builder.appendNode(tokenExprNode{lex.Token{Kind: "]"}})
+	b.appendNode(model)
+	b.appendNode(tokenExprNode{lex.Token{Kind: "]"}})
 	return p.computeEnumerableSelect(v, selectv, tokens[0])
 }
 
@@ -1278,7 +1310,7 @@ func (p *Parser) buildEnumerableParts(tokens []lex.Token) [][]lex.Token {
 	return parts
 }
 
-func (p *Parser) buildArray(parts [][]lex.Token, dt ast.DataTypeAST, err lex.Token) (value, exprNode) {
+func (p *Parser) buildArray(parts [][]lex.Token, dt ast.DataTypeAST, err lex.Token) (value, IExprNode) {
 	var v value
 	v.ast.Type = dt
 	model := arrayExpr{dataType: dt}
@@ -1296,13 +1328,13 @@ func (p *Parser) checkAnonymousFunction(fun *ast.FunctionAST) {
 	globalVariables := p.GlobalVariables
 	blockVariables := p.BlockVariables
 	p.GlobalVariables = append(blockVariables, p.GlobalVariables...)
-	p.BlockVariables = variablesFromParameters(fun.Params)
+	p.BlockVariables = p.variablesFromParameters(fun.Params)
 	p.checkFunction(fun)
 	p.GlobalVariables = globalVariables
 	p.BlockVariables = blockVariables
 }
 
-func (p *Parser) parseFunctionCall(fun ast.FunctionAST, tokens []lex.Token, builder *exprModelBuilder) {
+func (p *Parser) parseFunctionCall(fun ast.FunctionAST, tokens []lex.Token, builder *exprBuilder) {
 	errToken := tokens[0]
 	tokens, _ = p.getRange("(", ")", tokens)
 	if tokens == nil {
@@ -1313,32 +1345,78 @@ func (p *Parser) parseFunctionCall(fun ast.FunctionAST, tokens []lex.Token, buil
 	if len(ast.Errors) > 0 {
 		p.AppendErrors(ast.Errors...)
 	}
-	p.parseArgs(fun, args, errToken, builder)
+	p.parseArgs(fun.Params, &args, errToken, builder)
 	if builder != nil {
 		builder.appendNode(argsExpr{args})
 	}
 }
 
-func (p *Parser) parseArgs(fun ast.FunctionAST, args []ast.ArgAST, errToken lex.Token, builder *exprModelBuilder) {
-	if len(args) < len(fun.Params) {
-		p.PushErrorToken(errToken, "missing_argument")
+func (p *Parser) parseArgs(params []ast.ParameterAST, args *[]ast.ArgAST, errTok lex.Token, b *exprBuilder) {
+	parsedArgs := make([]ast.ArgAST, 0)
+	if len(params) > 0 && params[len(params)-1].Variadic {
+		if len(*args) == 0 && len(params) == 1 {
+			return
+		} else if len(*args) < len(params)-1 {
+			p.PushErrorToken(errTok, "missing_argument")
+			goto argParse
+		} else if len(*args) <= len(params)-1 {
+			goto argParse
+		}
+		variadicArgs := (*args)[len(params)-1:]
+		variadicParam := params[len(params)-1]
+		*args = (*args)[:len(params)-1]
+		params = params[:len(params)-1]
+		defer func() {
+			model := arrayExpr{variadicParam.Type, nil}
+			model.dataType.Value = "[]" + model.dataType.Value // For array.
+			variadiced := false
+			for _, arg := range variadicArgs {
+				p.parseArg(variadicParam, &arg, &variadiced)
+				model.expr = append(model.expr, arg.Expr.Model.(exprModel))
+			}
+			if variadiced && len(variadicArgs) > 1 {
+				p.PushErrorToken(errTok, "more_args_with_varidiced")
+			}
+			arg := ast.ArgAST{Expr: ast.ExprAST{Model: model}}
+			parsedArgs = append(parsedArgs, arg)
+			*args = parsedArgs
+		}()
 	}
-	for index, arg := range args {
-		p.parseArg(fun, index, &arg)
-		args[index] = arg
-	}
-}
-
-func (p *Parser) parseArg(fun ast.FunctionAST, index int, arg *ast.ArgAST) {
-	if index >= len(fun.Params) {
-		p.PushErrorToken(arg.Token, "argument_overflow")
+	if len(*args) == 0 && len(params) == 0 {
+		return
+	} else if len(*args) < len(params) {
+		p.PushErrorToken(errTok, "missing_argument")
+	} else if len(*args) > len(params) {
+		p.PushErrorToken(errTok, "argument_overflow")
 		return
 	}
+argParse:
+	for index, arg := range *args {
+		p.parseArg(params[index], &arg, nil)
+		parsedArgs = append(parsedArgs, arg)
+	}
+	*args = parsedArgs
+}
+
+func (p *Parser) parseArg(param ast.ParameterAST, arg *ast.ArgAST, variadiced *bool) {
 	value, model := p.computeExpr(arg.Expr)
 	arg.Expr.Model = model
-	param := fun.Params[index]
+	if variadiced != nil && !*variadiced {
+		*variadiced = value.variadic
+	}
 	p.wg.Add(1)
-	go p.checkAssignTypeAsync(param.Type, value, false, arg.Token)
+	go p.checkArgTypeAsync(param, value, false, arg.Token)
+}
+
+func (p *Parser) checkArgTypeAsync(param ast.ParameterAST, val value, ignoreAny bool, errTok lex.Token) {
+	defer func() { p.wg.Done() }()
+	if param.Variadic {
+		p.wg.Add(1)
+		go p.checkAssignTypeAsync(param.Type, val, false, errTok)
+		return
+	}
+	p.wg.Add(1)
+	go p.checkAssignTypeAsync(param.Type, val, false, errTok)
 }
 
 // Returns between of brackets.

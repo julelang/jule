@@ -239,6 +239,16 @@ func (b *Builder) pushParameter(fn *FunctionAST, tokens []lex.Token, err lex.Tok
 				continue
 			}
 			paramAST.Const = true
+		case lex.Operator:
+			if token.Kind != "..." {
+				b.PushError(token, "invalid_syntax")
+				continue
+			}
+			if paramAST.Variadic {
+				b.PushError(token, "already_variadic")
+				continue
+			}
+			paramAST.Variadic = true
 		case lex.Name:
 			tokens = tokens[index:]
 			if !x.IsIgnoreName(token.Kind) {
@@ -859,8 +869,7 @@ func (b *Builder) pushArg(args *[]ArgAST, tokens []lex.Token, err lex.Token) {
 	}
 	var arg ArgAST
 	arg.Token = tokens[0]
-	arg.Tokens = tokens
-	arg.Expr = b.Expr(arg.Tokens)
+	arg.Expr = b.Expr(tokens)
 	*args = append(*args, arg)
 }
 
@@ -1215,6 +1224,21 @@ func (b *Builder) Expr(tokens []lex.Token) (e ExprAST) {
 	return
 }
 
+func (b *Builder) isOverflowOperator(kind string) bool {
+	return kind == "+" ||
+		kind == "-" ||
+		kind == "*" ||
+		kind == "/" ||
+		kind == "%" ||
+		kind == "&" ||
+		kind == "|" ||
+		kind == "^" ||
+		kind == "<" ||
+		kind == ">" ||
+		kind == "~" ||
+		kind == "!"
+}
+
 func (b *Builder) getExprProcesses(tokens []lex.Token) [][]lex.Token {
 	var processes [][]lex.Token
 	var part []lex.Token
@@ -1228,7 +1252,7 @@ func (b *Builder) getExprProcesses(tokens []lex.Token) [][]lex.Token {
 		token := tokens[index]
 		switch token.Id {
 		case lex.Operator:
-			if newKeyword {
+			if newKeyword || !b.isOverflowOperator(token.Kind) {
 				part = append(part, token)
 				continue
 			}

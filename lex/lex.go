@@ -348,6 +348,7 @@ func (l *Lex) Token() Token {
 		l.lexPunct(content, ";", SemiColon, &token),
 		l.lexPunct(content, ",", Comma, &token),
 		l.lexPunct(content, "@", At, &token),
+		l.lexPunct(content, "...", Operator, &token),
 		l.lexPunct(content, "+=", Operator, &token),
 		l.lexPunct(content, "-=", Operator, &token),
 		l.lexPunct(content, "*=", Operator, &token),

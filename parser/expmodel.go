@@ -7,24 +7,28 @@ import (
 	"github.com/the-xlang/x/lex"
 )
 
+type IExprNode interface {
+	String() string
+}
+
 type exprBuildNode struct {
 	index int
 	node  exprModel
 }
 
-type exprModelBuilder struct {
+type exprBuilder struct {
 	index   int
 	current exprModel
 	nodes   []exprBuildNode
 }
 
-func newExprBuilder() *exprModelBuilder {
-	builder := new(exprModelBuilder)
+func newExprBuilder() *exprBuilder {
+	builder := new(exprBuilder)
 	builder.index = -1
 	return builder
 }
 
-func (b *exprModelBuilder) setIndex(index int) {
+func (b *exprBuilder) setIndex(index int) {
 	if b.index != -1 {
 		b.appendBuildNode(exprBuildNode{b.index, b.current})
 	}
@@ -32,15 +36,15 @@ func (b *exprModelBuilder) setIndex(index int) {
 	b.current = exprModel{}
 }
 
-func (b *exprModelBuilder) appendBuildNode(node exprBuildNode) {
+func (b *exprBuilder) appendBuildNode(node exprBuildNode) {
 	b.nodes = append(b.nodes, node)
 }
 
-func (b *exprModelBuilder) appendNode(node exprNode) {
+func (b *exprBuilder) appendNode(node IExprNode) {
 	b.current.nodes = append(b.current.nodes, node)
 }
 
-func (b *exprModelBuilder) build() (e exprModel) {
+func (b *exprBuilder) build() (e exprModel) {
 	b.setIndex(-1)
 	for index := range b.nodes {
 		for _, buildNode := range b.nodes {
@@ -53,12 +57,8 @@ func (b *exprModelBuilder) build() (e exprModel) {
 	return
 }
 
-type exprNode interface {
-	String() string
-}
-
 type exprModel struct {
-	nodes []exprNode
+	nodes []IExprNode
 }
 
 func (model exprModel) String() string {

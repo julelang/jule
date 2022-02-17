@@ -14,11 +14,21 @@ type function struct {
 
 func (f function) String() string {
 	var cxx strings.Builder
-	prototype := f.Prototype()
-	cxx.WriteString(prototype[:len(prototype)-1])
+	cxx.WriteString(f.Head())
 	cxx.WriteByte(' ')
 	atomic.SwapInt32(&ast.Indent, 0)
 	cxx.WriteString(f.Ast.Block.String())
+	return cxx.String()
+}
+
+// Head returns declaration head of function.
+func (f function) Head() string {
+	var cxx strings.Builder
+	cxx.WriteString(attributesToString(f.Attributes))
+	cxx.WriteString(f.Ast.ReturnType.String())
+	cxx.WriteByte(' ')
+	cxx.WriteString(f.Ast.Name)
+	cxx.WriteString(paramsToCxx(f.Ast.Params))
 	return cxx.String()
 }
 
@@ -29,9 +39,23 @@ func (f function) Prototype() string {
 	cxx.WriteString(f.Ast.ReturnType.String())
 	cxx.WriteByte(' ')
 	cxx.WriteString(f.Ast.Name)
-	cxx.WriteString(paramsToCxx(f.Ast.Params))
+	cxx.WriteString(f.PrototypeParams())
 	cxx.WriteByte(';')
 	return cxx.String()
+}
+
+// PrototypeParams returns prototype cxx code of function parameters.
+func (f function) PrototypeParams() string {
+	if len(f.Ast.Params) == 0 {
+		return "(void)"
+	}
+	var cxx strings.Builder
+	cxx.WriteByte('(')
+	for _, p := range f.Ast.Params {
+		cxx.WriteString(p.Prototype())
+		cxx.WriteString(", ")
+	}
+	return cxx.String()[:cxx.Len()-2] + ")"
 }
 
 func attributesToString(attributes []ast.AttributeAST) string {

@@ -153,20 +153,40 @@ type FunctionAST struct {
 
 // ParameterAST is function parameter AST model.
 type ParameterAST struct {
-	Token lex.Token
-	Name  string
-	Const bool
-	Type  DataTypeAST
+	Token    lex.Token
+	Name     string
+	Const    bool
+	Variadic bool
+	Type     DataTypeAST
 }
 
 func (p ParameterAST) String() string {
 	var cxx strings.Builder
+	cxx.WriteString(p.Prototype())
+	if p.Name != "" {
+		cxx.WriteByte(' ')
+		cxx.WriteString(p.Name)
+	}
+	if p.Variadic {
+		cxx.WriteString(" =array<")
+		cxx.WriteString(p.Type.String())
+		cxx.WriteString(">()")
+	}
+	return cxx.String()
+}
+
+// Prototype returns prototype cxx of parameter.
+func (p ParameterAST) Prototype() string {
+	var cxx strings.Builder
 	if p.Const {
 		cxx.WriteString("const ")
 	}
-	cxx.WriteString(p.Type.String())
-	if p.Name != "" {
-		return cxx.String() + " " + p.Name
+	if p.Variadic {
+		cxx.WriteString("array<")
+		cxx.WriteString(p.Type.String())
+		cxx.WriteByte('>')
+	} else {
+		cxx.WriteString(p.Type.String())
 	}
 	return cxx.String()
 }
@@ -189,9 +209,8 @@ func (fc FunctionAST) DataTypeString() string {
 
 // ArgAST is AST model of argument.
 type ArgAST struct {
-	Token  lex.Token
-	Tokens []lex.Token
-	Expr   ExprAST
+	Token lex.Token
+	Expr  ExprAST
 }
 
 func (a ArgAST) String() string {

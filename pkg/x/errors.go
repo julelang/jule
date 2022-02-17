@@ -79,6 +79,7 @@ var Errors = map[string]string{
 	`undefined_tag`:                    `undefined attribute`,
 	`attribute_repeat`:                 `this attribute is already given`,
 	`already_constant`:                 `this define is already constant`,
+	`already_variadic`:                 `this define is already variadic`,
 	`ignore_name_identifier`:           `ignore operator cannot use as identifier`,
 	`overflow_multiassign_identifiers`: `overflow multi assignment identifers`,
 	`overflow_return`:                  `overflow return expressions`,
@@ -92,4 +93,7 @@ var Errors = map[string]string{
 	`much_foreach_vars`:                `foreach variables can be maximum two`,
 	`if_notbool_expr`:                  `if conditions must be have boolean expression`,
 	`else_have_expr`:                   `else's cannot have any expression`,
+	`variadic_parameter_notlast`:       `variadic parameter can only be last parameter`,
+	`variadic_with_nonvariadicable`:    `type is not variadicable`,
+	`more_args_with_varidiced`:         `variadic argument can't use with more arg`,
 }

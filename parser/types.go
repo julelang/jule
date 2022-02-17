@@ -66,3 +66,7 @@ func typesAreCompatible(t1, t2 ast.DataTypeAST, ignoreany bool) bool {
 	}
 	return x.TypesAreCompatible(t1.Code, t2.Code, ignoreany)
 }
+
+func typeIsVariadicable(t ast.DataTypeAST) bool {
+	return typeIsArray(t)
+}
