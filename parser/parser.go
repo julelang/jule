@@ -1549,13 +1549,11 @@ func (rc *returnChecker) checkValues() {
 		}
 	}
 	if !typeIsVoidReturn(rc.fun.ReturnType) {
-		rc.p.wg.Add(1)
-		go rc.checkValueTypesAsync()
+		rc.checkValueTypes()
 	}
 }
 
-func (rc *returnChecker) checkValueTypesAsync() {
-	defer func() { rc.p.wg.Done() }()
+func (rc *returnChecker) checkValueTypes() {
 	valLength := len(rc.values)
 	if !rc.fun.ReturnType.MultiTyped {
 		rc.retAST.Expr.Model = rc.expModel.models[0]

@@ -293,10 +293,6 @@ type ReturnAST struct {
 }
 
 func (r ReturnAST) String() string {
-	switch r.Token.Id {
-	case lex.Operator:
-		return "return " + r.Expr.String() + ";"
-	}
 	return "return " + r.Expr.String() + ";"
 }
 
