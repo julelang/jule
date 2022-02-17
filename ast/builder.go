@@ -608,17 +608,12 @@ func (b *Builder) Statement(bs *blockStatement) (s StatementAST) {
 		return b.IfExpr(bs)
 	case lex.Else:
 		return b.ElseBlock(bs)
-	case lex.Brace:
-		if token.Kind == "(" {
-			return b.ExprStatement(bs.tokens)
-		}
 	case lex.Operator:
 		if token.Kind == "<" {
 			return b.ReturnStatement(bs.tokens)
 		}
 	}
-	b.PushError(token, "invalid_syntax")
-	return
+	return b.ExprStatement(bs.tokens)
 }
 
 func checkVariableSetStatementTokens(tokens []lex.Token) bool {
