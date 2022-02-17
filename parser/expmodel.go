@@ -73,12 +73,12 @@ func (model exprModel) ExprAST() ast.ExprAST {
 	return ast.ExprAST{Model: model}
 }
 
-type tokenExprNode struct {
-	token lex.Token
+type exprNode struct {
+	value string
 }
 
-func (node tokenExprNode) String() string {
-	return node.token.Kind
+func (node exprNode) String() string {
+	return node.value
 }
 
 type runeExprNode struct {
