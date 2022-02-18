@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -64,7 +65,7 @@ func initProject(cmd string) {
   "cxx_out_name": "x.cxx",
   "out_name": "main"
 }`)
-	err := os.WriteFile(x.SettingsFile, content, 0666)
+	err := ioutil.WriteFile(x.SettingsFile, content, 0666)
 	if err != nil {
 		println(err.Error())
 		os.Exit(0)
@@ -336,7 +337,7 @@ func writeCxxOutput(info *parser.ParseFileInfo) {
 		os.Exit(0)
 	}
 	content := []byte(info.X_CXX)
-	err = os.WriteFile(path, content, 0666)
+	err = ioutil.WriteFile(path, content, 0666)
 	if err != nil {
 		println(err.Error())
 		os.Exit(0)
