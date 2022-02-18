@@ -59,11 +59,12 @@ func initProject(cmd string) {
 		println("This module can only be used as single!")
 		return
 	}
-	err := io.WriteFileTruncate(x.SettingsFile, []byte(`{
+	content := []byte(`{
   "cxx_out_dir": "./dist/",
   "cxx_out_name": "x.cxx",
   "out_name": "main"
-}`))
+}`)
+	err := os.WriteFile(x.SettingsFile, content, 0666)
 	if err != nil {
 		println(err.Error())
 		os.Exit(0)
@@ -334,7 +335,8 @@ func writeCxxOutput(info *parser.ParseFileInfo) {
 		println(err.Error())
 		os.Exit(0)
 	}
-	err = io.WriteFileTruncate(path, []byte(info.X_CXX))
+	content := []byte(info.X_CXX)
+	err = os.WriteFile(path, content, 0666)
 	if err != nil {
 		println(err.Error())
 		os.Exit(0)
