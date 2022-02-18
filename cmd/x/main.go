@@ -329,7 +329,7 @@ int main() {
 
 func writeCxxOutput(info *parser.ParseFileInfo) {
 	path := filepath.Join(x.XSet.CxxOutDir, x.XSet.CxxOutName)
-	err := os.MkdirAll(x.XSet.CxxOutDir, 0511)
+	err := os.MkdirAll(x.XSet.CxxOutDir, 0777)
 	if err != nil {
 		println(err.Error())
 		os.Exit(0)

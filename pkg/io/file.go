@@ -14,5 +14,5 @@ func WriteFileTruncate(path string, content []byte) error {
 	if _, err := os.Open(path); err == nil {
 		os.Remove(path)
 	}
-	return os.WriteFile(path, content, 0x025E)
+	return os.WriteFile(path, content, 0666)
 }
