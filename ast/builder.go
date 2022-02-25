@@ -51,7 +51,7 @@ func (b *Builder) Build() {
 			b.Attribute(tokens)
 		case lex.Name:
 			b.Name(tokens)
-		case lex.Const:
+		case lex.Const, lex.Volatile:
 			b.GlobalVariable(tokens)
 		case lex.Type:
 			b.Type(tokens)
@@ -239,6 +239,12 @@ func (b *Builder) pushParameter(fn *FunctionAST, tokens []lex.Token, err lex.Tok
 				continue
 			}
 			paramAST.Const = true
+		case lex.Volatile:
+			if paramAST.Volatile {
+				b.PushError(token, "already_volatile")
+				continue
+			}
+			paramAST.Volatile = true
 		case lex.Operator:
 			if token.Kind != "..." {
 				b.PushError(token, "invalid_syntax")
@@ -872,9 +878,31 @@ func (b *Builder) pushArg(args *[]ArgAST, tokens []lex.Token, err lex.Token) {
 func (b *Builder) VariableStatement(tokens []lex.Token) (s StatementAST) {
 	var varAST VariableAST
 	position := 0
-	if tokens[position].Id != lex.Name {
-		varAST.DefineToken = tokens[position]
-		position++
+	varAST.DefineToken = tokens[position]
+	for ; position < len(tokens); position++ {
+		token := tokens[position]
+		if token.Id == lex.Name {
+			break
+		}
+		switch token.Id {
+		case lex.Const:
+			if varAST.Const {
+				b.PushError(token, "invalid_constant")
+				break
+			}
+			varAST.Const = true
+		case lex.Volatile:
+			if varAST.Volatile {
+				b.PushError(token, "invalid_volatile")
+				break
+			}
+			varAST.Volatile = true
+		default:
+			b.PushError(token, "invalid_syntax")
+		}
+	}
+	if position >= len(tokens) {
+		return
 	}
 	varAST.NameToken = tokens[position]
 	if varAST.NameToken.Id != lex.Name {

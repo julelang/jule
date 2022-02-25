@@ -407,7 +407,8 @@ func (l *Lex) Token() Token {
 		l.lexKeyword(content, "continue", Continue, &token),
 		l.lexKeyword(content, "in", In, &token),
 		l.lexKeyword(content, "if", If, &token),
-		l.lexKeyword(content, "else", Else, &token):
+		l.lexKeyword(content, "else", Else, &token),
+		l.lexKeyword(content, "volatile", Volatile, &token):
 	default:
 		lex := l.lexName(content)
 		if lex != "" {

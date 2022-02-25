@@ -80,6 +80,7 @@ var Errors = map[string]string{
 	`attribute_repeat`:                 `this attribute is already given`,
 	`already_constant`:                 `this define is already constant`,
 	`already_variadic`:                 `this define is already variadic`,
+	`already_volatile`:                 `this define is already volatile`,
 	`ignore_name_identifier`:           `ignore operator cannot use as identifier`,
 	`overflow_multiassign_identifiers`: `overflow multi assignment identifers`,
 	`overflow_return`:                  `overflow return expressions`,

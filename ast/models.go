@@ -156,6 +156,7 @@ type ParameterAST struct {
 	Token    lex.Token
 	Name     string
 	Const    bool
+	Volatile bool
 	Variadic bool
 	Type     DataTypeAST
 }
@@ -178,6 +179,9 @@ func (p ParameterAST) String() string {
 // Prototype returns prototype cxx of parameter.
 func (p ParameterAST) Prototype() string {
 	var cxx strings.Builder
+	if p.Volatile {
+		cxx.WriteString("volatile ")
+	}
 	if p.Const {
 		cxx.WriteString("const ")
 	}
@@ -314,14 +318,18 @@ type VariableAST struct {
 	Name        string
 	Type        DataTypeAST
 	Value       ExprAST
+	Const       bool
+	Volatile    bool
 	New         bool
 	Tag         interface{}
 }
 
 func (v VariableAST) String() string {
 	var sb strings.Builder
-	switch v.DefineToken.Id {
-	case lex.Const:
+	if v.Volatile {
+		sb.WriteString("volatile ")
+	}
+	if v.Const {
 		sb.WriteString("const ")
 	}
 	sb.WriteString(v.Type.String())
