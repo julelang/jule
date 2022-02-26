@@ -15,7 +15,7 @@ func typeOfArrayElements(t ast.DataTypeAST) ast.DataTypeAST {
 	return t
 }
 
-func typeIsPointer(t ast.DataTypeAST) bool {
+func typeIsPtr(t ast.DataTypeAST) bool {
 	if t.Value == "" {
 		return false
 	}
@@ -30,13 +30,13 @@ func typeIsArray(t ast.DataTypeAST) bool {
 }
 
 func typeIsSingle(dt ast.DataTypeAST) bool {
-	return !typeIsPointer(dt) &&
+	return !typeIsPtr(dt) &&
 		!typeIsArray(dt) &&
 		dt.Code != x.Function
 }
 
 func typeIsNilCompatible(t ast.DataTypeAST) bool {
-	return t.Code == x.Function || typeIsPointer(t)
+	return t.Code == x.Function || typeIsPtr(t)
 }
 
 func checkArrayCompatiblity(arrT, t ast.DataTypeAST) bool {
@@ -47,7 +47,7 @@ func checkArrayCompatiblity(arrT, t ast.DataTypeAST) bool {
 }
 
 func typeIsLvalue(t ast.DataTypeAST) bool {
-	return typeIsPointer(t) || typeIsArray(t)
+	return typeIsPtr(t) || typeIsArray(t)
 }
 
 func typesAreCompatible(t1, t2 ast.DataTypeAST, ignoreany bool) bool {
@@ -68,5 +68,5 @@ func typeIsVariadicable(t ast.DataTypeAST) bool {
 }
 
 func typeIsMut(t ast.DataTypeAST) bool {
-	return typeIsPointer(t)
+	return typeIsPtr(t)
 }

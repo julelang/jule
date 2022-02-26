@@ -97,4 +97,6 @@ var Errors = map[string]string{
 	`variadic_with_nonvariadicable`:         `type is not variadicable`,
 	`more_args_with_varidiced`:              `variadic argument can't use with more arg`,
 	`constant_pushed_nonconstant_parameter`: `constant mutable value can't pass to non-constant parameter`,
+	`casting_missing_expr`:                  `expression missing of casting`,
+	`type_notsupports_casting`:              `data-type not supports casting`,
 }
