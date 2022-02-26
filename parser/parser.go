@@ -58,6 +58,9 @@ func (p Parser) String() string {
 
 // CxxTypes returns C++ code developer-defined types.
 func (p *Parser) CxxTypes() string {
+	if len(p.Types) == 0 {
+		return ""
+	}
 	var cxx strings.Builder
 	cxx.WriteString("#pragma region TYPES\n")
 	for _, t := range p.Types {
@@ -70,6 +73,9 @@ func (p *Parser) CxxTypes() string {
 
 // CxxPrototypes returns C++ code of prototypes of C++ code.
 func (p *Parser) CxxPrototypes() string {
+	if len(p.Functions) == 0 {
+		return ""
+	}
 	var cxx strings.Builder
 	cxx.WriteString("#pragma region PROTOTYPES\n")
 	for _, fun := range p.Functions {
@@ -82,6 +88,9 @@ func (p *Parser) CxxPrototypes() string {
 
 // CxxGlobalVariables returns C++ code of global variables.
 func (p *Parser) CxxGlobalVariables() string {
+	if len(p.GlobalVariables) == 0 {
+		return ""
+	}
 	var cxx strings.Builder
 	cxx.WriteString("#pragma region GLOBAL_VARIABLES\n")
 	for _, va := range p.GlobalVariables {
