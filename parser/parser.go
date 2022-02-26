@@ -1416,7 +1416,7 @@ func (p *Parser) parseArg(param ast.ParameterAST, arg *ast.ArgAST, variadiced *b
 
 func (p *Parser) checkArgTypeAsync(param ast.ParameterAST, val value, ignoreAny bool, errTok lex.Token) {
 	defer func() { p.wg.Done() }()
-	if typeIsMut(param.Type) && val.constant != param.Const {
+	if typeIsMut(param.Type) && val.constant && !param.Const {
 		p.PushErrorToken(errTok, "constant_pushed_nonconstant_parameter")
 	}
 	if param.Variadic {
