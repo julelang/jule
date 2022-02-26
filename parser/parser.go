@@ -258,8 +258,6 @@ func (p *Parser) Variable(varAST ast.VariableAST) ast.VariableAST {
 	if varAST.Const {
 		if varAST.SetterToken.Id == lex.NA {
 			p.PushErrorToken(varAST.NameToken, "missing_const_value")
-		} else if !checkValidityConstantDataType(varAST.Type) {
-			p.PushErrorToken(varAST.NameToken, "invalid_const_data_type")
 		}
 	}
 	return varAST
@@ -1418,6 +1416,9 @@ func (p *Parser) parseArg(param ast.ParameterAST, arg *ast.ArgAST, variadiced *b
 
 func (p *Parser) checkArgTypeAsync(param ast.ParameterAST, val value, ignoreAny bool, errTok lex.Token) {
 	defer func() { p.wg.Done() }()
+	if typeIsMut(param.Type) && val.constant != param.Const {
+		p.PushErrorToken(errTok, "constant_pushed_nonconstant_parameter")
+	}
 	if param.Variadic {
 		p.wg.Add(1)
 		go p.checkAssignTypeAsync(param.Type, val, false, errTok)
@@ -1495,18 +1496,6 @@ func (p *Parser) checkBlock(b *ast.BlockAST) {
 		case ast.ReturnAST:
 		default:
 			p.PushErrorToken(model.Token, "invalid_syntax")
-		}
-	}
-}
-
-func (p *Parser) checkParametersAsync(params []ast.ParameterAST) {
-	defer func() { p.wg.Done() }()
-	for _, param := range params {
-		if !param.Const {
-			continue
-		}
-		if !checkValidityConstantDataType(param.Type) {
-			p.PushErrorToken(param.Type.Token, "invalid_const_data_type")
 		}
 	}
 }
@@ -1620,8 +1609,6 @@ func (p *Parser) checkReturns(fun *ast.FunctionAST) {
 func (p *Parser) checkFunction(fun *ast.FunctionAST) {
 	p.checkBlock(&fun.Block)
 	p.checkReturns(fun)
-	p.wg.Add(1)
-	go p.checkParametersAsync(fun.Params)
 }
 
 func (p *Parser) checkVariableStatement(varAST *ast.VariableAST, noParse bool) {

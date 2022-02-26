@@ -35,10 +35,6 @@ func typeIsSingle(dt ast.DataTypeAST) bool {
 		dt.Code != x.Function
 }
 
-func checkValidityConstantDataType(dt ast.DataTypeAST) bool {
-	return typeIsSingle(dt)
-}
-
 func typeIsNilCompatible(t ast.DataTypeAST) bool {
 	return t.Code == x.Function || typeIsPointer(t)
 }
@@ -69,4 +65,8 @@ func typesAreCompatible(t1, t2 ast.DataTypeAST, ignoreany bool) bool {
 
 func typeIsVariadicable(t ast.DataTypeAST) bool {
 	return typeIsArray(t)
+}
+
+func typeIsMut(t ast.DataTypeAST) bool {
+	return typeIsPointer(t)
 }
