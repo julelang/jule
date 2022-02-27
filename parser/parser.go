@@ -604,6 +604,8 @@ func (p *valueProcessor) nil() value {
 
 func (p *valueProcessor) numeric() value {
 	var v value
+	v.ast.Value = p.token.Kind
+	p.builder.appendNode(exprNode{p.token.Kind})
 	if strings.Contains(p.token.Kind, ".") ||
 		strings.ContainsAny(p.token.Kind, "eE") {
 		v.ast.Type.Code = x.F64
@@ -617,8 +619,6 @@ func (p *valueProcessor) numeric() value {
 			v.ast.Type.Value = "i64"
 		}
 	}
-	v.ast.Value = p.token.Kind
-	p.builder.appendNode(exprNode{p.token.Kind})
 	return v
 }
 
@@ -1124,9 +1124,6 @@ func (p *Parser) computeTryCast(tokens []lex.Token, builder *exprBuilder) (v val
 }
 
 func (p *Parser) computeCast(v value, t ast.DataTypeAST, errToken lex.Token) value {
-	v.ast.Type = t
-	v.constant = false
-	v.volatile = false
 	switch {
 	case typeIsPtr(t):
 		p.checkCastPtr(v.ast.Type, errToken)
@@ -1135,6 +1132,9 @@ func (p *Parser) computeCast(v value, t ast.DataTypeAST, errToken lex.Token) val
 	default:
 		p.PushErrorToken(errToken, "type_notsupports_casting")
 	}
+	v.ast.Type = t
+	v.constant = false
+	v.volatile = false
 	return v
 }
 
@@ -1143,28 +1143,37 @@ func (p *Parser) checkCastSingle(vt ast.DataTypeAST, t uint8, errToken lex.Token
 	case x.IsIntegerType(t):
 		p.checkCastInteger(vt, errToken)
 	case x.IsNumericType(t):
-		p.checkCastNumeric(vt.Code, errToken)
+		p.checkCastNumeric(vt, errToken)
 	default:
 		p.PushErrorToken(errToken, "type_notsupports_casting")
 	}
 }
 
 func (p *Parser) checkCastInteger(vt ast.DataTypeAST, errToken lex.Token) {
-	if !typeIsPtr(vt) && !x.IsNumericType(vt.Code) {
-		p.PushErrorToken(errToken, "type_notsupports_casting")
+	if typeIsPtr(vt) {
+		return
 	}
+	if typeIsSingle(vt) && x.IsNumericType(vt.Code) {
+		return
+	}
+	p.PushErrorToken(errToken, "type_notsupports_casting")
 }
 
-func (p *Parser) checkCastNumeric(vt uint8, errToken lex.Token) {
-	if !x.IsNumericType(vt) {
-		p.PushErrorToken(errToken, "type_notsupports_casting")
+func (p *Parser) checkCastNumeric(vt ast.DataTypeAST, errToken lex.Token) {
+	if typeIsSingle(vt) && x.IsNumericType(vt.Code) {
+		return
 	}
+	p.PushErrorToken(errToken, "type_notsupports_casting")
 }
 
 func (p *Parser) checkCastPtr(vt ast.DataTypeAST, errToken lex.Token) {
-	if !typeIsPtr(vt) && !x.IsIntegerType(vt.Code) {
-		p.PushErrorToken(errToken, "type_notsupports_casting")
+	if typeIsPtr(vt) {
+		return
 	}
+	if typeIsSingle(vt) && x.IsIntegerType(vt.Code) {
+		return
+	}
+	p.PushErrorToken(errToken, "type_notsupports_casting")
 }
 
 func (p *Parser) computeOperatorPartRight(tokens []lex.Token, b *exprBuilder) (v value) {
