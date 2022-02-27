@@ -1128,15 +1128,43 @@ func (p *Parser) computeCast(v value, t ast.DataTypeAST, errToken lex.Token) val
 	v.constant = false
 	v.volatile = false
 	switch {
-	case typeIsPtr(t) && p.checkCastPtr(v.ast.Type, t, errToken):
+	case typeIsPtr(t):
+		p.checkCastPtr(v.ast.Type, errToken)
+	case typeIsSingle(t):
+		p.checkCastSingle(v.ast.Type, t.Code, errToken)
 	default:
 		p.PushErrorToken(errToken, "type_notsupports_casting")
 	}
 	return v
 }
 
-func (p *Parser) checkCastPtr(vt, dt ast.DataTypeAST, errToken lex.Token) bool {
-	return typeIsPtr(vt) || x.IsIntegerType(dt.Code)
+func (p *Parser) checkCastSingle(vt ast.DataTypeAST, t uint8, errToken lex.Token) {
+	switch {
+	case x.IsIntegerType(t):
+		p.checkCastInteger(vt, errToken)
+	case x.IsNumericType(t):
+		p.checkCastNumeric(vt.Code, errToken)
+	default:
+		p.PushErrorToken(errToken, "type_notsupports_casting")
+	}
+}
+
+func (p *Parser) checkCastInteger(vt ast.DataTypeAST, errToken lex.Token) {
+	if !typeIsPtr(vt) && !x.IsNumericType(vt.Code) {
+		p.PushErrorToken(errToken, "type_notsupports_casting")
+	}
+}
+
+func (p *Parser) checkCastNumeric(vt uint8, errToken lex.Token) {
+	if !x.IsNumericType(vt) {
+		p.PushErrorToken(errToken, "type_notsupports_casting")
+	}
+}
+
+func (p *Parser) checkCastPtr(vt ast.DataTypeAST, errToken lex.Token) {
+	if !typeIsPtr(vt) && !x.IsIntegerType(vt.Code) {
+		p.PushErrorToken(errToken, "type_notsupports_casting")
+	}
 }
 
 func (p *Parser) computeOperatorPartRight(tokens []lex.Token, b *exprBuilder) (v value) {
