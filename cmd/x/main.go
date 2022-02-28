@@ -194,73 +194,83 @@ typedef wchar_t  rune;
 
 class str {
 public:
-// region FIELDS
-  std::wstring _buffer;
-// endregion FIELDS
+  // region FIELDS
+  rune *_buffer{nil};
+  size _length{0};
+  // endregion FIELDS
 
-// region CONSTRUCTORS
-  str(void)                     { this->_buffer = {L""}; }
-  str(const std::wstring &_Str) { this->_buffer = _Str; }
-// endregion CONSTRUCTORS
+  // region CONSTRUCTOR
+  str(void) {
+    this->_buffer = {new(std::nothrow) rune};
+    if (!this->_buffer) { panic(L"string memory allocation is failed"); }
+  }
 
-// region DESTRUCTOR
-  ~str(void) { this->_buffer.clear(); }
-// endregion DESTRUCTOR
+  str(const rune *_Str) {
+    this->_buffer = wcsdup(_Str);
+    this->_length = wcslen(this->_buffer);
+  }
+  // endregion CONSTRUCTORS
 
-// region FOREACH_SUPPORT
+  // region DESTRUCTOR
+  ~str(void) {
+    delete this->_buffer;
+    this->_buffer = nil;
+  }
+  // endregion DESTRUCTOR
+
+  // region FOREACH_SUPPORT
   typedef rune       *iterator;
   typedef const rune *const_iterator;
   iterator begin(void)             { return &this->_buffer[0]; }
   const_iterator begin(void) const { return &this->_buffer[0]; }
-  iterator end(void)               { return &this->_buffer[this->_buffer.size()]; }
-  const_iterator end(void) const   { return &this->_buffer[this->_buffer.size()]; }
-// endregion FOREACH_SUPPORT
+  iterator end(void)               { return &this->_buffer[this->_length]; }
+  const_iterator end(void) const   { return &this->_buffer[this->_length]; }
+  // endregion FOREACH_SUPPORT
 
-// region OPERATOR_OVERFLOWS
-  bool operator==(const str &_Str) { return this->_buffer == _Str._buffer; }
-  bool operator!=(const str &_Str) { return !(this->_buffer == _Str._buffer); }
-  str operator+(const str &_Str)   { return str(this->_buffer + _Str._buffer); }
-  void operator+=(const str &_Str) { this->_buffer += _Str._buffer; }
+  // region OPERATOR_OVERFLOWS
+  bool operator==(const str &_Str) { return wcscmp(this->_buffer, _Str._buffer) == 0; }
+  bool operator!=(const str &_Str) { return wcscmp(this->_buffer, _Str._buffer) != 0; }
+  str operator+(const str &_Str)   { return str(wcscat(this->_buffer, _Str._buffer)); }
+  void operator+=(const str &_Str) { this->_buffer = wcscat(this->_buffer, _Str._buffer); }
 
   rune& operator[](const int _Index) {
-    const size _length = this->_buffer.length();
     if (_Index < 0) {
       panic(L"stackoverflow exception:\n index is less than zero");
-    } else if (_Index >= _length) {
+    } else if (_Index >= this->_length) {
       panic(L"stackoverflow exception:\nindex overflow " +
-        std::to_wstring(_Index) + L":" + std::to_wstring(_length));
+      std::to_wstring(_Index) + L":" + std::to_wstring(this->_length));
     }
     return this->_buffer[_Index];
   }
 
   friend std::wostream& operator<<(std::wostream &_Stream, const str &_Str)
-  { _Stream << _Str._buffer; return _Stream; }
+  { return _Stream << _Str._buffer; }
 // endregion OPERATOR_OVERFLOWS
 };
 // endregion X_BUILTIN_TYPES
 
 // region X_STRUCTURES
-template<typename T>
+template<typename _Item_t>
 class array {
 public:
 // region FIELDS
-  std::vector<T> _buffer;
+  std::vector<_Item_t> _buffer;
 // endregion FIELDS
 
 // region CONSTRUCTORS
-  array<T>(void)                                         { this->_buffer = { }; }
-  array<T>(const std::vector<T>& _Src)                   { this->_buffer = _Src; }
-  array<T>(std::nullptr_t): array<T>()                   { }
-  array<T>(const array<T>& _Src): array<T>(_Src._buffer) { }
+  array<_Item_t>(void)                                                     { this->_buffer = { }; }
+  array<_Item_t>(const std::vector<_Item_t>& _Src)                         { this->_buffer = _Src; }
+  array<_Item_t>(std::nullptr_t): array<_Item_t>()                         { }
+  array<_Item_t>(const array<_Item_t>& _Src): array<_Item_t>(_Src._buffer) { }
 // endregion CONSTRUCTORS
 
 // region DESTRUCTOR
-  ~array<T>(void) { this->_buffer.clear(); }
+  ~array<_Item_t>(void) { this->_buffer.clear(); }
 // endregion DESTRUCTOR
 
 // region FOREACH_SUPPORT
-  typedef T       *iterator;
-  typedef const T *const_iterator;
+  typedef _Item_t       *iterator;
+  typedef const _Item_t *const_iterator;
   iterator begin(void)             { return &this->_buffer[0]; }
   const_iterator begin(void) const { return &this->_buffer[0]; }
   iterator end(void)               { return &this->_buffer[this->_buffer.size()]; }
@@ -268,7 +278,7 @@ public:
 // endregion FOREACH_SUPPORT
 
 // region OPERATOR_OVERFLOWS
-  bool operator==(const array<T> &_Src) {
+  bool operator==(const array<_Item_t> &_Src) {
     const size _length = this->_buffer.size();
     const size _Src_length = _Src._buffer.size();
     if (_length != _Src_length) { return false; }
@@ -277,11 +287,11 @@ public:
     return true;
   }
 
-  bool operator==(std::nullptr_t)       { return this->_buffer.empty(); }
-  bool operator!=(const array<T> &_Src) { return !(*this == _Src); }
-  bool operator!=(std::nullptr_t)       { return !this->_buffer.empty(); }
+  bool operator==(std::nullptr_t)             { return this->_buffer.empty(); }
+  bool operator!=(const array<_Item_t> &_Src) { return !(*this == _Src); }
+  bool operator!=(std::nullptr_t)             { return !this->_buffer.empty(); }
 
-  T& operator[](const int _Index) {
+  _Item_t& operator[](const int _Index) {
     const size _length = this->_buffer.size();
          if (_Index < 0) { panic(L"stackoverflow exception:\n index is less than zero"); }
     else if (_Index >= _length) {
@@ -292,7 +302,7 @@ public:
   }
 
   friend std::wostream& operator<<(std::wostream &_Stream,
-		                               const array<T> &_Src) {
+                                   const array<_Item_t> &_Src) {
     _Stream << L"[";
     const size _length = _Src._buffer.size();
     for (size _index = 0; _index < _length;) {
