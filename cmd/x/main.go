@@ -157,7 +157,8 @@ func appendStandards(code *string) {
 #define nil nullptr
 // endregion X_BUILTIN_VALUES
 
-// region X_RUNTIME_FUNCTIONS
+// region X_CXX_API
+#define XALLOC(_Alloc) new(std::nothrow) _Alloc
 #define panic(_Msg) std::wcout << _Msg << std::endl; std::exit(EXIT_FAILURE)
 
 template <typename _Enum_t, typename _Index_t, typename _Item_t>
@@ -173,7 +174,7 @@ static inline void foreach(const _Enum_t _Enum,
   _Index_t _index{0};
   for (auto _: _Enum) { _Body(_index++); }
 }
-// endregion X_RUNTIME_FUNCTIONS
+// endregion X_CXX_API
 
 // region X_BUILTIN_TYPES
 typedef size_t   size;
@@ -198,7 +199,7 @@ public:
 
   // region CONSTRUCTOR
   str(void) {
-    this->_buffer = {new(std::nothrow) rune};
+    this->_buffer = {XALLOC(rune)};
     if (!this->_buffer) { panic(L"string memory allocation is failed"); }
   }
 
