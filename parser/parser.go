@@ -62,12 +62,12 @@ func (p *Parser) CxxTypes() string {
 		return ""
 	}
 	var cxx strings.Builder
-	cxx.WriteString("#pragma region TYPES\n")
+	cxx.WriteString("// region TYPES\n")
 	for _, t := range p.Types {
 		cxx.WriteString(t.String())
 		cxx.WriteByte('\n')
 	}
-	cxx.WriteString("#pragma endregion TYPES")
+	cxx.WriteString("// endregion TYPES")
 	return cxx.String()
 }
 
@@ -77,12 +77,12 @@ func (p *Parser) CxxPrototypes() string {
 		return ""
 	}
 	var cxx strings.Builder
-	cxx.WriteString("#pragma region PROTOTYPES\n")
+	cxx.WriteString("// region PROTOTYPES\n")
 	for _, fun := range p.Functions {
 		cxx.WriteString(fun.Prototype())
 		cxx.WriteByte('\n')
 	}
-	cxx.WriteString("#pragma endregion PROTOTYPES")
+	cxx.WriteString("// endregion PROTOTYPES")
 	return cxx.String()
 }
 
@@ -92,25 +92,25 @@ func (p *Parser) CxxGlobalVariables() string {
 		return ""
 	}
 	var cxx strings.Builder
-	cxx.WriteString("#pragma region GLOBAL_VARIABLES\n")
+	cxx.WriteString("// region GLOBAL_VARIABLES\n")
 	for _, va := range p.GlobalVariables {
 		cxx.WriteString(va.String())
 		cxx.WriteByte('\n')
 	}
-	cxx.WriteString("#pragma endregion GLOBAL_VARIABLES")
+	cxx.WriteString("// endregion GLOBAL_VARIABLES")
 	return cxx.String()
 }
 
 // CxxFunctions returns C++ code of functions.
 func (p *Parser) CxxFunctions() string {
 	var cxx strings.Builder
-	cxx.WriteString("#pragma region FUNCTIONS")
+	cxx.WriteString("// region FUNCTIONS")
 	cxx.WriteString("\n\n")
 	for _, fun := range p.Functions {
 		cxx.WriteString(fun.String())
 		cxx.WriteString("\n\n")
 	}
-	cxx.WriteString("#pragma endregion FUNCTIONS")
+	cxx.WriteString("// endregion FUNCTIONS")
 	return cxx.String()
 }
 

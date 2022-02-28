@@ -145,41 +145,40 @@ func appendStandards(code *string) {
 // X compiler version: ` + x.Version + `
 // Date:               ` + timeString + `
 
-#pragma region X_STANDARD_IMPORTS
+// region X_STANDARD_IMPORTS
 #include <iostream>
 #include <string>
 #include <functional>
 #include <vector>
 #include <locale.h>
-#pragma endregion X_STANDARD_IMPORTS
+// endregion X_STANDARD_IMPORTS
 
-#pragma region X_BUILTIN_VALUES
+// region X_BUILTIN_VALUES
 #define nil nullptr
-#pragma endregion X_BUILTIN_VALUES
+// endregion X_BUILTIN_VALUES
 
-#pragma region X_RUNTIME_FUNCTIONS
-static inline void panic(const std::wstring message) {
-  std::wcout << message << std::endl;
-  std::exit(1);
+// region X_RUNTIME_FUNCTIONS
+static inline void panic(const std::wstring _Msg) {
+  std::wcout << _Msg << std::endl;
+  std::exit(EXIT_FAILURE);
 }
 
-template <typename ET, typename IT, typename ETET>
-static inline void foreach(ET enumerable,
-	                         std::function<void(IT index, ETET element)> block) {
-  IT index = 0;
-  for (auto element : enumerable)
-  { block(index++, element); }
+template <typename _Enum_t, typename _Index_t, typename _Item_t>
+static inline void foreach(const _Enum_t _Enum,
+                           const std::function<void(_Index_t, _Item_t)> _Body) {
+  _Index_t _index{0};
+  for (auto _item: _Enum) { _Body(_index++, _item); }
 }
 
-template <typename ET, typename IT>
-static inline void foreach(ET enumerable, std::function<void(IT index)> block) {
-  IT index = 0;
-  for (auto element : enumerable)
-  { block(index++); }
+template <typename _Enum_t, typename _Index_t>
+static inline void foreach(const _Enum_t _Enum,
+                           const std::function<void(_Index_t)> _Body) {
+  _Index_t _index{0};
+  for (auto _: _Enum) { _Body(_index++); }
 }
-#pragma endregion X_RUNTIME_FUNCTIONS
+// endregion X_RUNTIME_FUNCTIONS
 
-#pragma region X_BUILTIN_TYPES
+// region X_BUILTIN_TYPES
 typedef size_t   size;
 typedef int8_t   i8;
 typedef int16_t  i16;
@@ -195,139 +194,139 @@ typedef wchar_t  rune;
 
 class str {
 public:
-#pragma region FIELDS
-  std::wstring string;
-#pragma endregion FIELDS
+// region FIELDS
+  std::wstring _buffer;
+// endregion FIELDS
 
-#pragma region CONSTRUCTORS
-  str(void)                       { this->string = {L""}; }
-  str(const std::wstring& string) { this->string = string; }
-  str(const rune* string)         { this->string = string; }
-#pragma endregion CONSTRUCTORS
+// region CONSTRUCTORS
+  str(void)                     { this->_buffer = {L""}; }
+  str(const std::wstring &_Str) { this->_buffer = _Str; }
+// endregion CONSTRUCTORS
 
-#pragma region DESTRUCTOR
-  ~str(void) { this->string.clear(); }
-#pragma endregion DESTRUCTOR
+// region DESTRUCTOR
+  ~str(void) { this->_buffer.clear(); }
+// endregion DESTRUCTOR
 
-#pragma region FOREACH_SUPPORT
+// region FOREACH_SUPPORT
   typedef rune       *iterator;
   typedef const rune *const_iterator;
-  iterator begin(void)             { return &this->string[0]; }
-  const_iterator begin(void) const { return &this->string[0]; }
-  iterator end(void)               { return &this->string[this->string.size()]; }
-  const_iterator end(void) const   { return &this->string[this->string.size()]; }
-#pragma endregion FOREACH_SUPPORT
+  iterator begin(void)             { return &this->_buffer[0]; }
+  const_iterator begin(void) const { return &this->_buffer[0]; }
+  iterator end(void)               { return &this->_buffer[this->_buffer.size()]; }
+  const_iterator end(void) const   { return &this->_buffer[this->_buffer.size()]; }
+// endregion FOREACH_SUPPORT
 
-#pragma region OPERATOR_OVERFLOWS
-  bool operator==(const str& string) { return this->string == string.string; }
-  bool operator!=(const str& string) { return !(this->string == string.string); }
-  str operator+(const str& string)   { return str(this->string + string.string); }
-  void operator+=(const str& string) { this->string += string.string; }
+// region OPERATOR_OVERFLOWS
+  bool operator==(const str &_Str) { return this->_buffer == _Str._buffer; }
+  bool operator!=(const str &_Str) { return !(this->_buffer == _Str._buffer); }
+  str operator+(const str &_Str)   { return str(this->_buffer + _Str._buffer); }
+  void operator+=(const str &_Str) { this->_buffer += _Str._buffer; }
 
-  rune& operator[](const int index) {
-    const u32 length = this->string.length();
-    if (index < 0) {
+  rune& operator[](const int _Index) {
+    const size _length = this->_buffer.length();
+    if (_Index < 0) {
       panic(L"stackoverflow exception:\n index is less than zero");
-    } else if (index >= length) {
+    } else if (_Index >= _length) {
       panic(L"stackoverflow exception:\nindex overflow " +
-        std::to_wstring(index) + L":" + std::to_wstring(length));
+        std::to_wstring(_Index) + L":" + std::to_wstring(_length));
     }
-    return this->string[index];
+    return this->_buffer[_Index];
   }
 
-  friend std::wostream& operator<<(std::wostream &os, const str& string)
-  { os << string.string; return os; }
-#pragma endregion OPERATOR_OVERFLOWS
+  friend std::wostream& operator<<(std::wostream &_Stream, const str &_Str)
+  { _Stream << _Str._buffer; return _Stream; }
+// endregion OPERATOR_OVERFLOWS
 };
-#pragma endregion X_BUILTIN_TYPES
+// endregion X_BUILTIN_TYPES
 
-#pragma region X_STRUCTURES
+// region X_STRUCTURES
 template<typename T>
 class array {
 public:
-#pragma region FIELDS
-  std::vector<T> vector;
-#pragma endregion FIELDS
+// region FIELDS
+  std::vector<T> _buffer;
+// endregion FIELDS
 
-#pragma region CONSTRUCTORS
-  array(void)                                                   { this->vector = { }; }
-  array(const std::vector<T>& vector)                           { this->vector = vector; }
-  array(std::nullptr_t ) : array()                              { }
-  array(const array<T>& arr): array(std::vector<T>(arr.vector)) { }
-#pragma endregion CONSTRUCTORS
+// region CONSTRUCTORS
+  array<T>(void)                                         { this->_buffer = { }; }
+  array<T>(const std::vector<T>& _Src)                   { this->_buffer = _Src; }
+  array<T>(std::nullptr_t): array<T>()                   { }
+  array<T>(const array<T>& _Src): array<T>(_Src._buffer) { }
+// endregion CONSTRUCTORS
 
-#pragma region DESTRUCTOR
-  ~array(void) { this->vector.clear(); }
-#pragma endregion DESTRUCTOR
+// region DESTRUCTOR
+  ~array<T>(void) { this->_buffer.clear(); }
+// endregion DESTRUCTOR
 
-#pragma region FOREACH_SUPPORT
+// region FOREACH_SUPPORT
   typedef T       *iterator;
   typedef const T *const_iterator;
-  iterator begin(void)             { return &this->vector[0]; }
-  const_iterator begin(void) const { return &this->vector[0]; }
-  iterator end(void)               { return &this->vector[this->vector.size()]; }
-  const_iterator end(void) const   { return &this->vector[this->vector.size()]; }
-#pragma endregion FOREACH_SUPPORT
+  iterator begin(void)             { return &this->_buffer[0]; }
+  const_iterator begin(void) const { return &this->_buffer[0]; }
+  iterator end(void)               { return &this->_buffer[this->_buffer.size()]; }
+  const_iterator end(void) const   { return &this->_buffer[this->_buffer.size()]; }
+// endregion FOREACH_SUPPORT
 
-#pragma region OPERATOR_OVERFLOWS
-  bool operator==(const array& array) {
-    const u32 vector_length = this->vector.size();
-    const u32 array_vector_length = array.vector.size();
-    if (vector_length != array_vector_length) { return false; }
-    for (int index = 0; index < vector_length; ++index)
-    { if (this->vector[index] != array.vector[index]) { return false; } }
+// region OPERATOR_OVERFLOWS
+  bool operator==(const array<T> &_Src) {
+    const size _length = this->_buffer.size();
+    const size _Src_length = _Src._buffer.size();
+    if (_length != _Src_length) { return false; }
+    for (size _index = 0; _index < _length; ++_index)
+    { if (this->_buffer[_index] != _Src._buffer[_index]) { return false; } }
     return true;
   }
 
-  bool operator==(std::nullptr_t)     { return this->vector.empty(); }
-  bool operator!=(const array& array) { return !(*this == array); }
-  bool operator!=(std::nullptr_t)     { return !this->vector.empty(); }
+  bool operator==(std::nullptr_t)       { return this->_buffer.empty(); }
+  bool operator!=(const array<T> &_Src) { return !(*this == _Src); }
+  bool operator!=(std::nullptr_t)       { return !this->_buffer.empty(); }
 
-  T& operator[](const int index) {
-    const u32 length = this->vector.size();
-         if (index < 0) { panic(L"stackoverflow exception:\n index is less than zero"); }
-    else if (index >= length) {
+  T& operator[](const int _Index) {
+    const size _length = this->_buffer.size();
+         if (_Index < 0) { panic(L"stackoverflow exception:\n index is less than zero"); }
+    else if (_Index >= _length) {
       panic(L"stackoverflow exception:\nindex overflow " +
-        std::to_wstring(index) + L":" + std::to_wstring(length));
+        std::to_wstring(_Index) + L":" + std::to_wstring(_length));
     }
-    return this->vector[index];
+    return this->_buffer[_Index];
   }
 
-  friend std::wostream& operator<<(std::wostream &os, const array<T>& array) {
-    os << L"[";
-    const u32 size = array.vector.size();
-    for (int index = 0; index < size;) {
-      os << array.vector[index++];
-      if (index < size) { os << L", "; }
+  friend std::wostream& operator<<(std::wostream &_Stream,
+		                               const array<T> &_Src) {
+    _Stream << L"[";
+    const size _length = _Src._buffer.size();
+    for (size _index = 0; _index < _length;) {
+      _Stream << _Src._buffer[_index++];
+      if (_index < _length) { _Stream << L", "; }
     }
-    os << L"]";
-    return os;
+    _Stream << L"]";
+    return _Stream;
   }
-#pragma endregion OPERATOR_OVERFLOWS
+// endregion OPERATOR_OVERFLOWS
 };
-#pragma endregion X_STRUCTURES
+// endregion X_STRUCTURES
 
-#pragma region X_BUILTIN_FUNCTIONS
-#define _out(v) std::wcout << v
-#define _outln(v) _out(v); std::wcout << std::endl
-#pragma endregion X_BUILTIN_FUNCTIONS
+// region X_BUILTIN_FUNCTIONS
+#define _out(_Obj) std::wcout << _Obj
+#define _outln(_Obj) _out(_Obj); std::wcout << std::endl
+// endregion X_BUILTIN_FUNCTIONS
 
-#pragma region TRANSPILED_X_CODE
+// region TRANSPILED_X_CODE
 ` + *code + `
-#pragma endregion TRANSPILED_X_CODE
+// endregion TRANSPILED_X_CODE
 
-#pragma region X_ENTRY_POINT
+// region X_ENTRY_POINT
 int main() {
-#pragma region X_ENTRY_POINT_STANDARD_CODES
-  setlocale(0x0, "");
-#pragma endregion X_ENTRY_POINT_STANDARD_CODES
+// region X_ENTRY_POINT_STANDARD_CODES
+  std::setlocale(LC_ALL, "");
+// endregion X_ENTRY_POINT_STANDARD_CODES
   _main();
 
-#pragma region X_ENTRY_POINT_END_STANDARD_CODES
+// region X_ENTRY_POINT_END_STANDARD_CODES
   return EXIT_SUCCESS;
-#pragma endregion X_ENTRY_POINT_END_STANDARD_CODES
+// endregion X_ENTRY_POINT_END_STANDARD_CODES
 }
-#pragma endregion X_ENTRY_POINT`
+// endregion X_ENTRY_POINT`
 }
 
 func writeCxxOutput(info *parser.ParseFileInfo) {
