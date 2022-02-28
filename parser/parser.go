@@ -230,7 +230,14 @@ func (p *Parser) Variable(varAST ast.VariableAST) ast.VariableAST {
 	if varAST.Type.Code != x.Void {
 		if varAST.SetterToken.Id != lex.NA { // Pass default value.
 			p.wg.Add(1)
-			go p.checkAssignTypeAsync(varAST.Type, val, false, varAST.NameToken)
+			go assignChecker{
+				p,
+				varAST.Const,
+				varAST.Type,
+				val,
+				false,
+				varAST.NameToken,
+			}.checkAssignTypeAsync()
 		} else {
 			var valueToken lex.Token
 			valueToken.Id = lex.Value
@@ -251,6 +258,7 @@ func (p *Parser) Variable(varAST ast.VariableAST) ast.VariableAST {
 		} else {
 			varAST.Type = val.ast.Type
 			p.checkValidityForAutoType(varAST.Type, varAST.SetterToken)
+			p.checkAssignConst(varAST.Const, varAST.Type, val, varAST.SetterToken)
 		}
 	}
 	if varAST.Const {
@@ -1425,7 +1433,14 @@ func (p *Parser) buildArray(parts [][]lex.Token, dt ast.DataTypeAST, err lex.Tok
 		partValue, expModel := p.computeTokens(part)
 		model.expr = append(model.expr, expModel)
 		p.wg.Add(1)
-		go p.checkAssignTypeAsync(elementType, partValue, false, part[0])
+		go assignChecker{
+			p,
+			false,
+			elementType,
+			partValue,
+			false,
+			part[0],
+		}.checkAssignTypeAsync()
 	}
 	return v, model
 }
@@ -1516,16 +1531,15 @@ func (p *Parser) parseArg(param ast.ParameterAST, arg *ast.ArgAST, variadiced *b
 
 func (p *Parser) checkArgTypeAsync(param ast.ParameterAST, val value, ignoreAny bool, errTok lex.Token) {
 	defer func() { p.wg.Done() }()
-	if typeIsMut(param.Type) && val.constant && !param.Const {
-		p.PushErrorToken(errTok, "constant_pushed_nonconstant_parameter")
-	}
-	if param.Variadic {
-		p.wg.Add(1)
-		go p.checkAssignTypeAsync(param.Type, val, false, errTok)
-		return
-	}
 	p.wg.Add(1)
-	go p.checkAssignTypeAsync(param.Type, val, false, errTok)
+	go assignChecker{
+		p,
+		param.Const,
+		param.Type,
+		val,
+		false,
+		errTok,
+	}.checkAssignTypeAsync()
 }
 
 // Returns between of brackets.
@@ -1658,7 +1672,14 @@ func (rc *returnChecker) checkValueTypes() {
 			rc.p.PushErrorToken(rc.retAST.Token, "overflow_return")
 		}
 		rc.p.wg.Add(1)
-		go rc.p.checkAssignTypeAsync(rc.fun.ReturnType, rc.values[0], true, rc.retAST.Token)
+		go assignChecker{
+			rc.p,
+			false,
+			rc.fun.ReturnType,
+			rc.values[0],
+			true,
+			rc.retAST.Token,
+		}.checkAssignTypeAsync()
 		return
 	}
 	// Multi return
@@ -1674,7 +1695,14 @@ func (rc *returnChecker) checkValueTypes() {
 			break
 		}
 		rc.p.wg.Add(1)
-		go rc.p.checkAssignTypeAsync(t, rc.values[index], true, rc.retAST.Token)
+		go assignChecker{
+			rc.p,
+			false,
+			t,
+			rc.values[index],
+			true,
+			rc.retAST.Token,
+		}.checkAssignTypeAsync()
 	}
 }
 
@@ -1746,7 +1774,7 @@ func (p *Parser) checkOneVarset(vsAST *ast.VariableSetAST) {
 	if !p.checkVarsetOperation(selected, vsAST.Setter) {
 		return
 	}
-	value, model := p.computeExpr(vsAST.ValueExprs[0])
+	val, model := p.computeExpr(vsAST.ValueExprs[0])
 	vsAST.ValueExprs[0] = model.ExprAST()
 	if vsAST.Setter.Kind != "=" {
 		vsAST.Setter.Kind = vsAST.Setter.Kind[:len(vsAST.Setter.Kind)-1]
@@ -1755,14 +1783,21 @@ func (p *Parser) checkOneVarset(vsAST *ast.VariableSetAST) {
 			left:     vsAST.SelectExprs[0].Expr.Tokens,
 			leftVal:  selected.ast,
 			right:    vsAST.ValueExprs[0].Tokens,
-			rightVal: value.ast,
+			rightVal: val.ast,
 			operator: vsAST.Setter,
 		}
-		value.ast = solver.Solve()
+		val.ast = solver.Solve()
 		vsAST.Setter.Kind += "="
 	}
 	p.wg.Add(1)
-	go p.checkAssignTypeAsync(selected.ast.Type, value, false, vsAST.Setter)
+	go assignChecker{
+		p,
+		selected.constant,
+		selected.ast.Type,
+		val,
+		false,
+		vsAST.Setter,
+	}.checkAssignTypeAsync()
 }
 
 func (p *Parser) parseVarsetSelections(vsAST *ast.VariableSetAST) {
@@ -1814,7 +1849,14 @@ func (p *Parser) processMultiVarset(vsAST *ast.VariableSetAST, vals []value) {
 				return
 			}
 			p.wg.Add(1)
-			go p.checkAssignTypeAsync(selected.ast.Type, val, false, vsAST.Setter)
+			go assignChecker{
+				p,
+				selected.constant,
+				selected.ast.Type,
+				val,
+				false,
+				vsAST.Setter,
+			}.checkAssignTypeAsync()
 			continue
 		}
 		selector.Variable.Tag = val
@@ -2102,32 +2144,48 @@ func (p *Parser) checkMultiTypeAsync(real, check ast.DataTypeAST, ignoreAny bool
 	}
 }
 
-func (p *Parser) checkAssignTypeAsync(t ast.DataTypeAST, val value, ignoreAny bool, errToken lex.Token) {
-	defer func() { p.wg.Done() }()
-	if typeIsSingle(t) && isConstantNumeric(val.ast.Value) {
+func (p *Parser) checkAssignConst(constant bool, t ast.DataTypeAST, val value, errToken lex.Token) {
+	if typeIsMut(t) && val.constant && !constant {
+		p.PushErrorToken(errToken, "constant_assignto_nonconstant")
+	}
+}
+
+type assignChecker struct {
+	p         *Parser
+	constant  bool
+	t         ast.DataTypeAST
+	val       value
+	ignoreAny bool
+	errToken  lex.Token
+}
+
+func (ac assignChecker) checkAssignTypeAsync() {
+	defer func() { ac.p.wg.Done() }()
+	ac.p.checkAssignConst(ac.constant, ac.t, ac.val, ac.errToken)
+	if typeIsSingle(ac.t) && isConstantNumeric(ac.val.ast.Value) {
 		switch {
-		case x.IsSignedIntegerType(t.Code):
-			if xbits.CheckBitInt(val.ast.Value, xbits.BitsizeOfType(t.Code)) {
+		case x.IsSignedIntegerType(ac.t.Code):
+			if xbits.CheckBitInt(ac.val.ast.Value, xbits.BitsizeOfType(ac.t.Code)) {
 				return
 			}
-			p.PushErrorToken(errToken, "incompatible_datatype")
+			ac.p.PushErrorToken(ac.errToken, "incompatible_datatype")
 			return
-		case x.IsFloatType(t.Code):
-			if checkFloatBit(val.ast, xbits.BitsizeOfType(t.Code)) {
+		case x.IsFloatType(ac.t.Code):
+			if checkFloatBit(ac.val.ast, xbits.BitsizeOfType(ac.t.Code)) {
 				return
 			}
-			p.PushErrorToken(errToken, "incompatible_datatype")
+			ac.p.PushErrorToken(ac.errToken, "incompatible_datatype")
 			return
-		case x.IsUnsignedNumericType(t.Code):
-			if xbits.CheckBitUInt(val.ast.Value, xbits.BitsizeOfType(t.Code)) {
+		case x.IsUnsignedNumericType(ac.t.Code):
+			if xbits.CheckBitUInt(ac.val.ast.Value, xbits.BitsizeOfType(ac.t.Code)) {
 				return
 			}
-			p.PushErrorToken(errToken, "incompatible_datatype")
+			ac.p.PushErrorToken(ac.errToken, "incompatible_datatype")
 			return
 		}
 	}
-	p.wg.Add(1)
-	go p.checkTypeAsync(t, val.ast.Type, ignoreAny, errToken)
+	ac.p.wg.Add(1)
+	go ac.p.checkTypeAsync(ac.t, ac.val.ast.Type, ac.ignoreAny, ac.errToken)
 }
 
 func (p *Parser) checkTypeAsync(real, check ast.DataTypeAST, ignoreAny bool, errToken lex.Token) {
