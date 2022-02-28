@@ -158,10 +158,7 @@ func appendStandards(code *string) {
 // endregion X_BUILTIN_VALUES
 
 // region X_RUNTIME_FUNCTIONS
-static inline void panic(const std::wstring _Msg) {
-  std::wcout << _Msg << std::endl;
-  std::exit(EXIT_FAILURE);
-}
+#define panic(_Msg) std::wcout << _Msg << std::endl; std::exit(EXIT_FAILURE)
 
 template <typename _Enum_t, typename _Index_t, typename _Item_t>
 static inline void foreach(const _Enum_t _Enum,
