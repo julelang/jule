@@ -166,5 +166,9 @@ type newHeapAllocationExprModel struct {
 }
 
 func (nha newHeapAllocationExprModel) String() string {
-	return "new(std::nothrow) " + nha.typeAST.String()
+	var cxx strings.Builder
+	cxx.WriteString("XALLOC(")
+	cxx.WriteString(nha.typeAST.String())
+	cxx.WriteByte(')')
+	return cxx.String()
 }

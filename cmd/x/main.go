@@ -153,13 +153,14 @@ func appendStandards(code *string) {
 #include <locale.h>
 // endregion X_STANDARD_IMPORTS
 
+// region X_CXX_API
 // region X_BUILTIN_VALUES
 #define nil nullptr
 // endregion X_BUILTIN_VALUES
 
-// region X_CXX_API
+// region X_MISC
 #define XALLOC(_Alloc) new(std::nothrow) _Alloc
-#define panic(_Msg) std::wcout << _Msg << std::endl; std::exit(EXIT_FAILURE)
+#define XPANIC(_Msg) std::wcout << _Msg << std::endl; std::exit(EXIT_FAILURE)
 
 template <typename _Enum_t, typename _Index_t, typename _Item_t>
 static inline void foreach(const _Enum_t _Enum,
@@ -174,7 +175,7 @@ static inline void foreach(const _Enum_t _Enum,
   _Index_t _index{0};
   for (auto _: _Enum) { _Body(_index++); }
 }
-// endregion X_CXX_API
+// endregion X_MISC
 
 // region X_BUILTIN_TYPES
 typedef size_t   size;
@@ -200,7 +201,7 @@ public:
   // region CONSTRUCTOR
   str(void) {
     this->_buffer = {XALLOC(rune)};
-    if (!this->_buffer) { panic(L"string memory allocation is failed"); }
+    if (!this->_buffer) { XPANIC(L"string memory allocation is failed"); }
   }
 
   str(const rune *_Str) {
@@ -233,9 +234,9 @@ public:
 
   rune& operator[](const int _Index) {
     if (_Index < 0) {
-      panic(L"stackoverflow exception:\n index is less than zero");
+      XPANIC(L"stackoverflow exception:\n index is less than zero");
     } else if (_Index >= this->_length) {
-      panic(L"stackoverflow exception:\nindex overflow " +
+      XPANIC(L"stackoverflow exception:\nindex overflow " +
       std::to_wstring(_Index) + L":" + std::to_wstring(this->_length));
     }
     return this->_buffer[_Index];
@@ -291,9 +292,9 @@ public:
 
   _Item_t& operator[](const int _Index) {
     const size _length = this->_buffer.size();
-         if (_Index < 0) { panic(L"stackoverflow exception:\n index is less than zero"); }
+         if (_Index < 0) { XPANIC(L"stackoverflow exception:\n index is less than zero"); }
     else if (_Index >= _length) {
-      panic(L"stackoverflow exception:\nindex overflow " +
+      XPANIC(L"stackoverflow exception:\nindex overflow " +
         std::to_wstring(_Index) + L":" + std::to_wstring(_length));
     }
     return this->_buffer[_Index];
@@ -318,6 +319,7 @@ public:
 #define _out(_Obj) std::wcout << _Obj
 #define _outln(_Obj) _out(_Obj); std::wcout << std::endl
 // endregion X_BUILTIN_FUNCTIONS
+// endregion X_CXX_API
 
 // region TRANSPILED_X_CODE
 ` + *code + `
