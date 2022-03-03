@@ -664,11 +664,25 @@ type solver struct {
 }
 
 func (s solver) pointer() (v ast.ValueAST) {
-	if s.leftVal.Type.Value != s.rightVal.Type.Value {
+	switch {
+	case s.leftVal.Type.Value == s.rightVal.Type.Value:
+	case typeIsSingle(s.leftVal.Type) && x.IsIntegerType(s.leftVal.Type.Code):
+	case typeIsSingle(s.rightVal.Type) && x.IsIntegerType(s.rightVal.Type.Code):
+	default:
 		s.p.PushErrorToken(s.operator, "incompatible_type")
 		return
 	}
 	switch s.operator.Kind {
+	case "+", "-":
+		if typeIsPtr(s.leftVal.Type) && typeIsPtr(s.rightVal.Type) {
+			s.p.PushErrorToken(s.operator, "incompatible_type")
+			return
+		}
+		if typeIsPtr(s.leftVal.Type) {
+			v.Type = s.leftVal.Type
+		} else {
+			v.Type = s.rightVal.Type
+		}
 	case "!=", "==":
 		v.Type.Code = x.Bool
 	default:
