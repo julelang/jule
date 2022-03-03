@@ -643,8 +643,7 @@ func checkVariableSetStatementTokens(tokens []lex.Token) bool {
 		if braceCount > 0 {
 			continue
 		}
-		if token.Id == lex.Operator &&
-			token.Kind[len(token.Kind)-1] == '=' {
+		if token.Id == lex.Operator && token.Kind[len(token.Kind)-1] == '=' {
 			return true
 		}
 	}
@@ -1254,7 +1253,7 @@ func (b *Builder) Expr(tokens []lex.Token) (e ExprAST) {
 	return
 }
 
-func (b *Builder) isOverflowOperator(kind string) bool {
+func isOverflowOperator(kind string) bool {
 	return kind == "+" ||
 		kind == "-" ||
 		kind == "*" ||
@@ -1267,6 +1266,10 @@ func (b *Builder) isOverflowOperator(kind string) bool {
 		kind == ">" ||
 		kind == "~" ||
 		kind == "!"
+}
+
+func isExprOperator(kind string) bool {
+	return kind == "..."
 }
 
 func (b *Builder) getExprProcesses(tokens []lex.Token) [][]lex.Token {
@@ -1282,7 +1285,7 @@ func (b *Builder) getExprProcesses(tokens []lex.Token) [][]lex.Token {
 		token := tokens[index]
 		switch token.Id {
 		case lex.Operator:
-			if newKeyword || !b.isOverflowOperator(token.Kind) {
+			if newKeyword || isExprOperator(token.Kind) {
 				part = append(part, token)
 				continue
 			}
@@ -1292,7 +1295,7 @@ func (b *Builder) getExprProcesses(tokens []lex.Token) [][]lex.Token {
 					singleOperatored = true
 					continue
 				}
-				if braceCount == 0 {
+				if braceCount == 0 && isOverflowOperator(token.Kind) {
 					b.PushError(token, "operator_overflow")
 				}
 			}
