@@ -237,19 +237,19 @@ func (e ExprAST) String() string {
 	if e.Model != nil {
 		return e.Model.String()
 	}
-	var sb strings.Builder
+	var expr strings.Builder
 	for _, process := range e.Processes {
 		if len(process) == 1 && process[0].Id == lex.Operator {
-			sb.WriteByte(' ')
-			sb.WriteString(process[0].Kind)
-			sb.WriteByte(' ')
+			expr.WriteByte(' ')
+			expr.WriteString(process[0].Kind)
+			expr.WriteByte(' ')
 			continue
 		}
 		for _, token := range process {
-			sb.WriteString(token.Kind)
+			expr.WriteString(token.Kind)
 		}
 	}
-	return sb.String()
+	return expr.String()
 }
 
 // ExprStatementAST is AST model of expression statement in block.
@@ -343,31 +343,31 @@ func (v VariableAST) String() string {
 	return sb.String()
 }
 
-// VarsetSelector is selector for variable set operation.
-type VarsetSelector struct {
+// AssignSelector is selector for assignment operation.
+type AssignSelector struct {
 	NewVariable bool
 	Variable    VariableAST
 	Expr        ExprAST
 	Ignore      bool
 }
 
-func (vs VarsetSelector) String() string {
+func (vs AssignSelector) String() string {
 	if vs.NewVariable {
 		return vs.Expr.Tokens[0].Kind // Returns variable name.
 	}
 	return vs.Expr.String()
 }
 
-// VariableSetAST is variable set AST model.
-type VariableSetAST struct {
+// AssignAST is assignment AST model.
+type AssignAST struct {
 	Setter         lex.Token
-	SelectExprs    []VarsetSelector
+	SelectExprs    []AssignSelector
 	ValueExprs     []ExprAST
 	JustDeclare    bool
 	MultipleReturn bool
 }
 
-func (vs VariableSetAST) cxxSingleSet(cxx *strings.Builder) string {
+func (vs AssignAST) cxxSingleAssign(cxx *strings.Builder) string {
 	cxx.WriteString(vs.SelectExprs[0].String())
 	cxx.WriteString(vs.Setter.Kind)
 	cxx.WriteString(vs.ValueExprs[0].String())
@@ -375,7 +375,7 @@ func (vs VariableSetAST) cxxSingleSet(cxx *strings.Builder) string {
 	return cxx.String()
 }
 
-func (vs VariableSetAST) cxxMultipleSet(cxx *strings.Builder) string {
+func (vs AssignAST) cxxMultipleAssign(cxx *strings.Builder) string {
 	cxx.WriteString("std::tie(")
 	var expCxx strings.Builder
 	expCxx.WriteString("std::make_tuple(")
@@ -397,7 +397,7 @@ func (vs VariableSetAST) cxxMultipleSet(cxx *strings.Builder) string {
 	return cxx.String()
 }
 
-func (vs VariableSetAST) cxxMultipleReturn(cxx *strings.Builder) string {
+func (vs AssignAST) cxxMultipleReturn(cxx *strings.Builder) string {
 	cxx.WriteString("std::tie(")
 	for _, selector := range vs.SelectExprs {
 		if selector.Ignore {
@@ -417,7 +417,7 @@ func (vs VariableSetAST) cxxMultipleReturn(cxx *strings.Builder) string {
 	return cxx.String()
 }
 
-func (vs VariableSetAST) cxxNewDefines(cxx *strings.Builder) {
+func (vs AssignAST) cxxNewDefines(cxx *strings.Builder) {
 	for _, selector := range vs.SelectExprs {
 		if selector.Ignore || !selector.NewVariable {
 			continue
@@ -426,7 +426,7 @@ func (vs VariableSetAST) cxxNewDefines(cxx *strings.Builder) {
 	}
 }
 
-func (vs VariableSetAST) String() string {
+func (vs AssignAST) String() string {
 	var cxx strings.Builder
 	vs.cxxNewDefines(&cxx)
 	if vs.JustDeclare {
@@ -435,9 +435,9 @@ func (vs VariableSetAST) String() string {
 	if vs.MultipleReturn {
 		return vs.cxxMultipleReturn(&cxx)
 	} else if len(vs.SelectExprs) == 1 {
-		return vs.cxxSingleSet(&cxx)
+		return vs.cxxSingleAssign(&cxx)
 	}
-	return vs.cxxMultipleSet(&cxx)
+	return vs.cxxMultipleAssign(&cxx)
 }
 
 type FreeAST struct {
@@ -463,7 +463,7 @@ func (wp WhileProfile) String(iter IterAST) string {
 	var cxx strings.Builder
 	cxx.WriteString("while (")
 	cxx.WriteString(wp.Expr.String())
-	cxx.WriteByte(')')
+	cxx.WriteString(") ")
 	cxx.WriteString(iter.Block.String())
 	return cxx.String()
 }

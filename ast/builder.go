@@ -590,7 +590,7 @@ func (b *Builder) Block(tokens []lex.Token) (block BlockAST) {
 
 // Statement builds AST model of statement.
 func (b *Builder) Statement(bs *blockStatement) (s StatementAST) {
-	s, ok := b.VariableSetStatement(bs.tokens)
+	s, ok := b.AssignStatement(bs.tokens)
 	if ok {
 		return s
 	}
@@ -622,35 +622,7 @@ func (b *Builder) Statement(bs *blockStatement) (s StatementAST) {
 	return b.ExprStatement(bs.tokens)
 }
 
-func isVariableStatementToken(token lex.Token) bool {
-	return token.Id == lex.Const || token.Id == lex.Volatile
-}
-
-func checkVariableSetStatementTokens(tokens []lex.Token) bool {
-	if isVariableStatementToken(tokens[0]) {
-		return false
-	}
-	braceCount := 0
-	for _, token := range tokens {
-		if token.Id == lex.Brace {
-			switch token.Kind {
-			case "{", "[", "(":
-				braceCount++
-			default:
-				braceCount--
-			}
-		}
-		if braceCount > 0 {
-			continue
-		}
-		if token.Id == lex.Operator && token.Kind[len(token.Kind)-1] == '=' {
-			return true
-		}
-	}
-	return false
-}
-
-type varsetInfo struct {
+type assignInfo struct {
 	selectorTokens []lex.Token
 	exprTokens     []lex.Token
 	setter         lex.Token
@@ -658,7 +630,7 @@ type varsetInfo struct {
 	justDeclare    bool
 }
 
-func (b *Builder) variableSetInfo(tokens []lex.Token) (info varsetInfo) {
+func (b *Builder) assignInfo(tokens []lex.Token) (info assignInfo) {
 	info.ok = true
 	braceCount := 0
 	for index, token := range tokens {
@@ -695,8 +667,8 @@ func (b *Builder) variableSetInfo(tokens []lex.Token) (info varsetInfo) {
 	return
 }
 
-func (b *Builder) pushVarsetSelector(selectors *[]VarsetSelector, last, current int, info varsetInfo) {
-	var selector VarsetSelector
+func (b *Builder) pushAssignSelector(selectors *[]AssignSelector, last, current int, info assignInfo) {
+	var selector AssignSelector
 	selector.Expr.Tokens = info.selectorTokens[last:current]
 	if last-current == 0 {
 		b.PushError(info.selectorTokens[current-1], "missing_value")
@@ -725,8 +697,8 @@ func (b *Builder) pushVarsetSelector(selectors *[]VarsetSelector, last, current 
 	*selectors = append(*selectors, selector)
 }
 
-func (b *Builder) varsetSelectors(info varsetInfo) []VarsetSelector {
-	var selectors []VarsetSelector
+func (b *Builder) assignSelectors(info assignInfo) []AssignSelector {
+	var selectors []AssignSelector
 	braceCount := 0
 	lastIndex := 0
 	for index, token := range info.selectorTokens {
@@ -743,16 +715,16 @@ func (b *Builder) varsetSelectors(info varsetInfo) []VarsetSelector {
 		} else if token.Id != lex.Comma {
 			continue
 		}
-		b.pushVarsetSelector(&selectors, lastIndex, index, info)
+		b.pushAssignSelector(&selectors, lastIndex, index, info)
 		lastIndex = index + 1
 	}
 	if lastIndex < len(info.selectorTokens) {
-		b.pushVarsetSelector(&selectors, lastIndex, len(info.selectorTokens), info)
+		b.pushAssignSelector(&selectors, lastIndex, len(info.selectorTokens), info)
 	}
 	return selectors
 }
 
-func (b *Builder) pushVarsetExpr(exps *[]ExprAST, last, current int, info varsetInfo) {
+func (b *Builder) pushAssignExpr(exps *[]ExprAST, last, current int, info assignInfo) {
 	tokens := info.exprTokens[last:current]
 	if tokens == nil {
 		b.PushError(info.exprTokens[current-1], "missing_value")
@@ -761,7 +733,7 @@ func (b *Builder) pushVarsetExpr(exps *[]ExprAST, last, current int, info varset
 	*exps = append(*exps, b.Expr(tokens))
 }
 
-func (b *Builder) varsetExprs(info varsetInfo) []ExprAST {
+func (b *Builder) assignExprs(info assignInfo) []ExprAST {
 	var exprs []ExprAST
 	braceCount := 0
 	lastIndex := 0
@@ -779,30 +751,75 @@ func (b *Builder) varsetExprs(info varsetInfo) []ExprAST {
 		} else if token.Id != lex.Comma {
 			continue
 		}
-		b.pushVarsetExpr(&exprs, lastIndex, index, info)
+		b.pushAssignExpr(&exprs, lastIndex, index, info)
 		lastIndex = index + 1
 	}
 	if lastIndex < len(info.exprTokens) {
-		b.pushVarsetExpr(&exprs, lastIndex, len(info.exprTokens), info)
+		b.pushAssignExpr(&exprs, lastIndex, len(info.exprTokens), info)
 	}
 	return exprs
 }
 
-// VariableSetStatement builds AST model of variable set statement.
-func (b *Builder) VariableSetStatement(tokens []lex.Token) (s StatementAST, _ bool) {
-	if !checkVariableSetStatementTokens(tokens) {
+func isAssignToken(token lex.Token) bool {
+	return token.Id == lex.Name ||
+		token.Id == lex.Brace ||
+		token.Id == lex.Operator
+}
+
+func isAssignOperator(kind string) bool {
+	return kind == "=" ||
+		kind == "+=" ||
+		kind == "-=" ||
+		kind == "/=" ||
+		kind == "*=" ||
+		kind == "%=" ||
+		kind == ">>=" ||
+		kind == "<<=" ||
+		kind == "|=" ||
+		kind == "&=" ||
+		kind == "^="
+}
+
+func checkAssignTokens(tokens []lex.Token) bool {
+	if !isAssignToken(tokens[0]) {
+		return false
+	}
+	braceCount := 0
+	for _, token := range tokens {
+		if token.Id == lex.Brace {
+			switch token.Kind {
+			case "{", "[", "(":
+				braceCount++
+			default:
+				braceCount--
+			}
+		}
+		if braceCount > 0 {
+			continue
+		}
+		if token.Id == lex.Operator &&
+			isAssignOperator(token.Kind) {
+			return true
+		}
+	}
+	return false
+}
+
+// AssignStatement builds AST model of assignment statement.
+func (b *Builder) AssignStatement(tokens []lex.Token) (s StatementAST, _ bool) {
+	if !checkAssignTokens(tokens) {
 		return
 	}
-	info := b.variableSetInfo(tokens)
+	info := b.assignInfo(tokens)
 	if !info.ok {
 		return
 	}
-	var varAST VariableSetAST
+	var varAST AssignAST
 	varAST.Setter = info.setter
 	varAST.JustDeclare = info.justDeclare
-	varAST.SelectExprs = b.varsetSelectors(info)
+	varAST.SelectExprs = b.assignSelectors(info)
 	if !info.justDeclare {
-		varAST.ValueExprs = b.varsetExprs(info)
+		varAST.ValueExprs = b.assignExprs(info)
 	}
 	s.Token = tokens[0]
 	s.Value = varAST

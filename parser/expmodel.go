@@ -62,11 +62,11 @@ type exprModel struct {
 }
 
 func (model exprModel) String() string {
-	var sb strings.Builder
+	var expr strings.Builder
 	for _, node := range model.nodes {
-		sb.WriteString(node.String())
+		expr.WriteString(node.String())
 	}
-	return sb.String()
+	return expr.String()
 }
 
 func (model exprModel) ExprAST() ast.ExprAST {

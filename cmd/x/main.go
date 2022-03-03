@@ -191,61 +191,25 @@ typedef float    f32;
 typedef double   f64;
 typedef wchar_t  rune;
 
-class str {
+class str: public std::basic_string<rune> {
 public:
-  // region FIELDS
-  rune *_buffer{nil};
-  size _length{0};
-  // endregion FIELDS
+// region CONSTRUCTOR
+  str(void): str(L"")   { }
+  str(const rune* _Str) { this->assign(_Str); }
+// endregion CONSTRUCTOR
 
-  // region CONSTRUCTOR
-  str(void) {
-    this->_buffer = {XALLOC(rune)};
-    if (!this->_buffer) { XPANIC(L"string memory allocation is failed"); }
-  }
-
-  str(const rune *_Str) {
-    this->_buffer = wcsdup(_Str);
-    this->_length = wcslen(this->_buffer);
-  }
-  // endregion CONSTRUCTORS
-
-  // region DESTRUCTOR
-  ~str(void) {
-    delete this->_buffer;
-    this->_buffer = nil;
-  }
-  // endregion DESTRUCTOR
-
-  // region FOREACH_SUPPORT
-  typedef rune       *iterator;
-  typedef const rune *const_iterator;
-  iterator begin(void)             { return &this->_buffer[0]; }
-  const_iterator begin(void) const { return &this->_buffer[0]; }
-  iterator end(void)               { return &this->_buffer[this->_length]; }
-  const_iterator end(void) const   { return &this->_buffer[this->_length]; }
-  // endregion FOREACH_SUPPORT
-
-  // region OPERATOR_OVERFLOWS
-  bool operator==(const str &_Str) { return wcscmp(this->_buffer, _Str._buffer) == 0; }
-  bool operator!=(const str &_Str) { return wcscmp(this->_buffer, _Str._buffer) != 0; }
-  str operator+(const str &_Str)   { return str(wcscat(this->_buffer, _Str._buffer)); }
-  void operator+=(const str &_Str) { this->_buffer = wcscat(this->_buffer, _Str._buffer); }
-
-  rune& operator[](const int _Index) {
+// region OPERATOR_OVERFLOWS
+  rune& operator[](const int _Index) noexcept {
     if (_Index < 0) {
       XPANIC(L"stackoverflow exception:\n index is less than zero");
-    } else if (_Index >= this->_length) {
+    } else if (_Index >= this->length()) {
       XPANIC(L"stackoverflow exception:\nindex overflow " +
-      std::to_wstring(_Index) + L":" + std::to_wstring(this->_length));
+      std::to_wstring(_Index) + L":" + std::to_wstring(this->length()));
     }
-    return this->_buffer[_Index];
+    return this->at(_Index);
   }
-
-  friend std::wostream& operator<<(std::wostream &_Stream, const str &_Str)
-  { return _Stream << _Str._buffer; }
 // endregion OPERATOR_OVERFLOWS
-};
+  };
 // endregion X_BUILTIN_TYPES
 
 // region X_STRUCTURES
@@ -316,8 +280,14 @@ public:
 // endregion X_STRUCTURES
 
 // region X_BUILTIN_FUNCTIONS
-#define _out(_Obj) std::wcout << _Obj
-#define _outln(_Obj) _out(_Obj); std::wcout << std::endl
+template <typename _Obj_t>
+static inline void _out(_Obj_t _Obj) { std::wcout << _Obj; }
+
+template <typename _Obj_t>
+static inline void _outln(_Obj_t _Obj) {
+  _out<_Obj_t>(_Obj);
+  std::wcout << std::endl;
+}
 // endregion X_BUILTIN_FUNCTIONS
 // endregion X_CXX_API
 

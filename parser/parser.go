@@ -104,8 +104,7 @@ func (p *Parser) CxxGlobalVariables() string {
 // CxxFunctions returns C++ code of functions.
 func (p *Parser) CxxFunctions() string {
 	var cxx strings.Builder
-	cxx.WriteString("// region FUNCTIONS")
-	cxx.WriteString("\n\n")
+	cxx.WriteString("// region FUNCTIONS\n")
 	for _, fun := range p.Functions {
 		cxx.WriteString(fun.String())
 		cxx.WriteString("\n\n")
@@ -439,7 +438,7 @@ func (p *Parser) computeProcesses(processes [][]lex.Token) (v value, e exprModel
 		e = builder.build()
 		return
 	}
-	process := solver{p: p}
+	process := solver{p: p, builder: builder}
 	j := p.nextOperator(processes)
 	boolean := false
 	for j != -1 {
@@ -661,6 +660,7 @@ type solver struct {
 	right    []lex.Token
 	rightVal ast.ValueAST
 	operator lex.Token
+	builder  *exprBuilder
 }
 
 func (s solver) pointer() (v ast.ValueAST) {
@@ -876,8 +876,8 @@ func (s solver) nil() (v ast.ValueAST) {
 func (s solver) Solve() (v ast.ValueAST) {
 	switch s.operator.Kind {
 	case "+", "-", "*", "/", "%", ">>",
-		"<<", "&", "|", "^", "==", "!=",
-		">=", "<=", ">", "<":
+		"<<", "&", "|", "^", "==", "!=", ">", "<", ">=", "<=":
+		break
 	case "&&", "||":
 		return s.logical()
 	default:
@@ -980,11 +980,11 @@ func (p *operatorProcessor) tilde() value {
 
 func (p *operatorProcessor) logicalNot() value {
 	v := p.parser.computeValPart(p.tokens, p.builder)
-	if !typeIsSingle(v.ast.Type) {
-		p.parser.PushErrorToken(p.token, "invalid_data_logical_not")
-	} else if v.ast.Type.Code != x.Bool {
+	if !isBoolExpr(v) {
 		p.parser.PushErrorToken(p.token, "invalid_data_logical_not")
 	}
+	v.ast.Type.Value = "bool"
+	v.ast.Type.Code = x.Bool
 	return v
 }
 
@@ -1618,8 +1618,8 @@ func (p *Parser) checkBlock(b *ast.BlockAST) {
 		case ast.VariableAST:
 			p.checkVariableStatement(&t, false)
 			model.Value = t
-		case ast.VariableSetAST:
-			p.checkVarsetStatement(&t)
+		case ast.AssignAST:
+			p.checkAssignment(&t)
 			model.Value = t
 		case ast.FreeAST:
 			p.checkFreeStatement(&t)
@@ -1776,7 +1776,7 @@ func (p *Parser) checkVariableStatement(varAST *ast.VariableAST, noParse bool) {
 	p.BlockVariables = append(p.BlockVariables, *varAST)
 }
 
-func (p *Parser) checkVarsetOperation(selected value, err lex.Token) bool {
+func (p *Parser) checkAssignOpr(selected value, err lex.Token) bool {
 	state := true
 	if !selected.lvalue {
 		p.PushErrorToken(err, "assign_nonlvalue")
@@ -1796,9 +1796,9 @@ func (p *Parser) checkVarsetOperation(selected value, err lex.Token) bool {
 	return state
 }
 
-func (p *Parser) checkOneVarset(vsAST *ast.VariableSetAST) {
+func (p *Parser) checkSingleAssign(vsAST *ast.AssignAST) {
 	selected, _ := p.computeExpr(vsAST.SelectExprs[0].Expr)
-	if !p.checkVarsetOperation(selected, vsAST.Setter) {
+	if !p.checkAssignOpr(selected, vsAST.Setter) {
 		return
 	}
 	val, model := p.computeExpr(vsAST.ValueExprs[0])
@@ -1827,14 +1827,14 @@ func (p *Parser) checkOneVarset(vsAST *ast.VariableSetAST) {
 	}.checkAssignTypeAsync()
 }
 
-func (p *Parser) parseVarsetSelections(vsAST *ast.VariableSetAST) {
+func (p *Parser) parseAssignSelections(vsAST *ast.AssignAST) {
 	for index, selector := range vsAST.SelectExprs {
 		p.checkVariableStatement(&selector.Variable, false)
 		vsAST.SelectExprs[index] = selector
 	}
 }
 
-func (p *Parser) getVarsetVals(vsAST *ast.VariableSetAST) []value {
+func (p *Parser) assignVals(vsAST *ast.AssignAST) []value {
 	values := make([]value, len(vsAST.ValueExprs))
 	for index, expr := range vsAST.ValueExprs {
 		val, model := p.computeExpr(expr)
@@ -1844,7 +1844,7 @@ func (p *Parser) getVarsetVals(vsAST *ast.VariableSetAST) []value {
 	return values
 }
 
-func (p *Parser) processFuncMultiVarset(vsAST *ast.VariableSetAST, funcVal value) {
+func (p *Parser) processFuncMultiAssign(vsAST *ast.AssignAST, funcVal value) {
 	types := funcVal.ast.Type.Tag.([]ast.DataTypeAST)
 	if len(types) != len(vsAST.SelectExprs) {
 		p.PushErrorToken(vsAST.Setter, "missing_multiassign_identifiers")
@@ -1859,10 +1859,10 @@ func (p *Parser) processFuncMultiVarset(vsAST *ast.VariableSetAST, funcVal value
 			},
 		}
 	}
-	p.processMultiVarset(vsAST, values)
+	p.processMultiAssign(vsAST, values)
 }
 
-func (p *Parser) processMultiVarset(vsAST *ast.VariableSetAST, vals []value) {
+func (p *Parser) processMultiAssign(vsAST *ast.AssignAST, vals []value) {
 	for index := range vsAST.SelectExprs {
 		selector := &vsAST.SelectExprs[index]
 		selector.Ignore = x.IsIgnoreName(selector.Variable.Name)
@@ -1872,7 +1872,7 @@ func (p *Parser) processMultiVarset(vsAST *ast.VariableSetAST, vals []value) {
 				continue
 			}
 			selected, _ := p.computeExpr(selector.Expr)
-			if !p.checkVarsetOperation(selected, vsAST.Setter) {
+			if !p.checkAssignOpr(selected, vsAST.Setter) {
 				return
 			}
 			p.wg.Add(1)
@@ -1891,14 +1891,14 @@ func (p *Parser) processMultiVarset(vsAST *ast.VariableSetAST, vals []value) {
 	}
 }
 
-func (p *Parser) checkVarsetStatement(vsAST *ast.VariableSetAST) {
+func (p *Parser) checkAssignment(vsAST *ast.AssignAST) {
 	selectLength := len(vsAST.SelectExprs)
 	valueLength := len(vsAST.ValueExprs)
 	if vsAST.JustDeclare {
-		p.parseVarsetSelections(vsAST)
+		p.parseAssignSelections(vsAST)
 		return
 	} else if selectLength == 1 && !vsAST.SelectExprs[0].NewVariable {
-		p.checkOneVarset(vsAST)
+		p.checkSingleAssign(vsAST)
 		return
 	} else if vsAST.Setter.Kind != "=" {
 		p.PushErrorToken(vsAST.Setter, "invalid_syntax")
@@ -1908,7 +1908,7 @@ func (p *Parser) checkVarsetStatement(vsAST *ast.VariableSetAST) {
 		firstVal, _ := p.computeExpr(vsAST.ValueExprs[0])
 		if firstVal.ast.Type.MultiTyped {
 			vsAST.MultipleReturn = true
-			p.processFuncMultiVarset(vsAST, firstVal)
+			p.processFuncMultiAssign(vsAST, firstVal)
 			return
 		}
 	}
@@ -1920,7 +1920,7 @@ func (p *Parser) checkVarsetStatement(vsAST *ast.VariableSetAST) {
 		p.PushErrorToken(vsAST.Setter, "missing_multiassign_identifiers")
 		return
 	}
-	p.processMultiVarset(vsAST, p.getVarsetVals(vsAST))
+	p.processMultiAssign(vsAST, p.assignVals(vsAST))
 }
 
 func (p *Parser) checkFreeStatement(freeAST *ast.FreeAST) {
@@ -1936,7 +1936,7 @@ func (p *Parser) checkWhileProfile(iter *ast.IterAST) {
 	val, model := p.computeExpr(profile.Expr)
 	profile.Expr.Model = model
 	iter.Profile = profile
-	if !isConditionExpr(val) {
+	if !isBoolExpr(val) {
 		p.PushErrorToken(iter.Token, "iter_while_notbool_expr")
 	}
 	p.checkBlock(&iter.Block)
@@ -2063,7 +2063,7 @@ func (p *Parser) checkIfExpr(ifast *ast.IfAST, index *int, statements []ast.Stat
 	val, model := p.computeExpr(ifast.Expr)
 	ifast.Expr.Model = model
 	statement := statements[*index]
-	if !isConditionExpr(val) {
+	if !isBoolExpr(val) {
 		p.PushErrorToken(ifast.Token, "if_notbool_expr")
 	}
 	p.checkBlock(&ifast.Block)
@@ -2081,7 +2081,7 @@ node:
 	case ast.ElseIfAST:
 		val, model := p.computeExpr(t.Expr)
 		t.Expr.Model = model
-		if !isConditionExpr(val) {
+		if !isBoolExpr(val) {
 			p.PushErrorToken(t.Token, "if_notbool_expr")
 		}
 		p.checkBlock(&t.Block)
