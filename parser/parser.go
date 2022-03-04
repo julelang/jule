@@ -1802,45 +1802,50 @@ func (p *Parser) checkVarStatement(varAST *ast.VariableAST, noParse bool) {
 	p.BlockVars = append(p.BlockVars, *varAST)
 }
 
-func (p *Parser) checkAssignment(selected value, err lex.Token) bool {
+func (p *Parser) checkAssignment(selected value, errtok lex.Token) bool {
 	state := true
 	if !selected.lvalue {
-		p.pusherrtok(err, "assign_nonlvalue")
+		p.pusherrtok(errtok, "assign_nonlvalue")
 		state = false
 	}
 	if selected.constant {
-		p.pusherrtok(err, "assign_const")
+		p.pusherrtok(errtok, "assign_const")
 		state = false
 	}
 	switch selected.ast.Type.Tag.(type) {
 	case ast.FuncAST:
 		if p.FuncById(selected.ast.Token.Kind) != nil {
-			p.pusherrtok(err, "assign_type_not_support_value")
+			p.pusherrtok(errtok, "assign_type_not_support_value")
 			state = false
 		}
 	}
 	return state
 }
 
-func (p *Parser) checkSingleAssign(vsAST *ast.AssignAST) {
-	selected, _ := p.evalExpr(vsAST.SelectExprs[0].Expr)
-	if !p.checkAssignment(selected, vsAST.Setter) {
+func (p *Parser) checkSingleAssign(assign *ast.AssignAST) {
+	sexpr := &assign.SelectExprs[0].Expr
+	if len(sexpr.Tokens) == 1 && x.IsIgnoreName(sexpr.Tokens[0].Kind) {
 		return
 	}
-	val, model := p.evalExpr(vsAST.ValueExprs[0])
-	vsAST.ValueExprs[0] = model.ExprAST()
-	if vsAST.Setter.Kind != "=" {
-		vsAST.Setter.Kind = vsAST.Setter.Kind[:len(vsAST.Setter.Kind)-1]
+	selected, _ := p.evalExpr(*sexpr)
+	if !p.checkAssignment(selected, assign.Setter) {
+		return
+	}
+	vexpr := &assign.ValueExprs[0]
+	val, model := p.evalExpr(*vexpr)
+	*vexpr = model.ExprAST()
+	if assign.Setter.Kind != "=" {
+		assign.Setter.Kind = assign.Setter.Kind[:len(assign.Setter.Kind)-1]
 		solver := solver{
 			p:        p,
-			left:     vsAST.SelectExprs[0].Expr.Tokens,
+			left:     sexpr.Tokens,
 			leftVal:  selected.ast,
-			right:    vsAST.ValueExprs[0].Tokens,
+			right:    vexpr.Tokens,
 			rightVal: val.ast,
-			operator: vsAST.Setter,
+			operator: assign.Setter,
 		}
 		val.ast = solver.Solve()
-		vsAST.Setter.Kind += "="
+		assign.Setter.Kind += "="
 	}
 	p.wg.Add(1)
 	go assignChecker{
@@ -1849,13 +1854,13 @@ func (p *Parser) checkSingleAssign(vsAST *ast.AssignAST) {
 		selected.ast.Type,
 		val,
 		false,
-		vsAST.Setter,
+		assign.Setter,
 	}.checkAssignTypeAsync()
 }
 
 func (p *Parser) parseAssignSelections(vsAST *ast.AssignAST) {
 	for index, selector := range vsAST.SelectExprs {
-		p.checkVarStatement(&selector.Variable, false)
+		p.checkVarStatement(&selector.Var, false)
 		vsAST.SelectExprs[index] = selector
 	}
 }
@@ -1888,17 +1893,17 @@ func (p *Parser) processFuncMultiAssign(vsAST *ast.AssignAST, funcVal value) {
 	p.processMultiAssign(vsAST, values)
 }
 
-func (p *Parser) processMultiAssign(vsAST *ast.AssignAST, vals []value) {
-	for index := range vsAST.SelectExprs {
-		selector := &vsAST.SelectExprs[index]
-		selector.Ignore = x.IsIgnoreName(selector.Variable.Id)
+func (p *Parser) processMultiAssign(assign *ast.AssignAST, vals []value) {
+	for index := range assign.SelectExprs {
+		selector := &assign.SelectExprs[index]
+		selector.Ignore = x.IsIgnoreName(selector.Var.Id)
 		val := vals[index]
 		if !selector.NewVariable {
 			if selector.Ignore {
 				continue
 			}
 			selected, _ := p.evalExpr(selector.Expr)
-			if !p.checkAssignment(selected, vsAST.Setter) {
+			if !p.checkAssignment(selected, assign.Setter) {
 				return
 			}
 			p.wg.Add(1)
@@ -1908,12 +1913,12 @@ func (p *Parser) processMultiAssign(vsAST *ast.AssignAST, vals []value) {
 				selected.ast.Type,
 				val,
 				false,
-				vsAST.Setter,
+				assign.Setter,
 			}.checkAssignTypeAsync()
 			continue
 		}
-		selector.Variable.Tag = val
-		p.checkVarStatement(&selector.Variable, false)
+		selector.Var.Tag = val
+		p.checkVarStatement(&selector.Var, false)
 	}
 }
 

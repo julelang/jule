@@ -370,7 +370,7 @@ func (v VariableAST) String() string {
 // AssignSelector is selector for assignment operation.
 type AssignSelector struct {
 	NewVariable bool
-	Variable    VariableAST
+	Var         VariableAST
 	Expr        ExprAST
 	Ignore      bool
 }
@@ -394,8 +394,11 @@ type AssignAST struct {
 
 func (vs AssignAST) cxxSingleAssign() string {
 	var cxx strings.Builder
-	cxx.WriteString(vs.SelectExprs[0].String())
-	cxx.WriteString(vs.Setter.Kind)
+	expr := vs.SelectExprs[0]
+	if len(expr.Expr.Tokens) != 1 || !x.IsIgnoreName(expr.Expr.Tokens[0].Kind) {
+		cxx.WriteString(vs.SelectExprs[0].String())
+		cxx.WriteString(vs.Setter.Kind)
+	}
 	cxx.WriteString(vs.ValueExprs[0].String())
 	return cxx.String()
 }
@@ -448,7 +451,7 @@ func (vs AssignAST) cxxNewDefines() string {
 		if selector.Ignore || !selector.NewVariable {
 			continue
 		}
-		cxx.WriteString(selector.Variable.String() + " ")
+		cxx.WriteString(selector.Var.String() + " ")
 	}
 	return cxx.String()
 }

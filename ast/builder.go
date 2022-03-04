@@ -677,17 +677,17 @@ func (b *Builder) pushAssignSelector(selectors *[]AssignSelector, last, current 
 			b.pusherr(selector.Expr.Tokens[0], "notallow_declares")
 		}
 		selector.NewVariable = true
-		selector.Variable.IdToken = selector.Expr.Tokens[0]
-		selector.Variable.Id = selector.Variable.IdToken.Kind
-		selector.Variable.SetterToken = info.setter
+		selector.Var.IdToken = selector.Expr.Tokens[0]
+		selector.Var.Id = selector.Var.IdToken.Kind
+		selector.Var.SetterToken = info.setter
 		// Has specific data-type?
 		if current-last > 2 {
-			selector.Variable.Type, _ = b.DataType(selector.Expr.Tokens[2:], new(int), false)
+			selector.Var.Type, _ = b.DataType(selector.Expr.Tokens[2:], new(int), false)
 		}
 	} else {
 		if selector.Expr.Tokens[0].Id == lex.Id {
-			selector.Variable.IdToken = selector.Expr.Tokens[0]
-			selector.Variable.Id = selector.Variable.IdToken.Kind
+			selector.Var.IdToken = selector.Expr.Tokens[0]
+			selector.Var.Id = selector.Var.IdToken.Kind
 		}
 		selector.Expr = b.Expr(selector.Expr.Tokens)
 	}
