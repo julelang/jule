@@ -172,7 +172,7 @@ var escSeqRegexp = regexp.MustCompile(`^\\([\\'"abfnrtv]|U.{8}|u.{4}|x..|[0-7]{1
 func (l *Lex) escseq(content string) string {
 	seq := escSeqRegexp.FindString(content)
 	if seq != "" {
-		l.Position += len(seq)
+		l.Position += len([]rune(seq))
 		return seq
 	}
 	l.Position++
@@ -228,14 +228,15 @@ func (l *Lex) str(content string) string {
 	sb.WriteByte('"')
 	l.Column++
 	content = content[1:]
-	for index, run := range content {
-		if run == '\n' {
+	for i := 0; i < len(content); i++ {
+		ch := content[i]
+		if ch == '\n' {
 			l.pusherr("missing_string_end")
 			l.Position++
 			l.Newln()
 			return ""
 		}
-		run := l.getrune(content[index:])
+		run := l.getrune(content[i:])
 		sb.WriteString(run)
 		length := len(run)
 		l.Column += length
@@ -244,7 +245,7 @@ func (l *Lex) str(content string) string {
 			break
 		}
 		if length > 1 {
-			index += length - 1
+			i += length - 1
 		}
 	}
 	return sb.String()
