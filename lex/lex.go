@@ -391,6 +391,7 @@ func (l *Lex) Token() Token {
 		l.lexKeyword(content, "f32", DataType, &token),
 		l.lexKeyword(content, "f64", DataType, &token),
 		l.lexKeyword(content, "size", DataType, &token),
+		l.lexKeyword(content, "ssize", DataType, &token),
 		l.lexKeyword(content, "bool", DataType, &token),
 		l.lexKeyword(content, "rune", DataType, &token),
 		l.lexKeyword(content, "str", DataType, &token),

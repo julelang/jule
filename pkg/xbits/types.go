@@ -18,7 +18,7 @@ func BitsizeOfType(t uint8) int {
 		return 32
 	case x.I64, x.U64, x.F64:
 		return 64
-	case x.Size:
+	case x.Size, x.SSize:
 		return strconv.IntSize
 	}
 	return 0

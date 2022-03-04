@@ -178,15 +178,16 @@ static inline void foreach(const _Enum_t _Enum,
 // endregion X_MISC
 
 // region X_BUILTIN_TYPES
-typedef size_t   size;
 typedef int8_t   i8;
 typedef int16_t  i16;
 typedef int32_t  i32;
 typedef int64_t  i64;
+typedef ssize_t  ssize;
 typedef uint8_t  u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
+typedef size_t   size;
 typedef float    f32;
 typedef double   f64;
 typedef wchar_t  rune;
@@ -199,7 +200,7 @@ public:
 // endregion CONSTRUCTOR
 
 // region OPERATOR_OVERFLOWS
-  rune& operator[](const int _Index) noexcept {
+  rune& operator[](const ssize _Index) noexcept {
     if (_Index < 0) {
       XPANIC(L"stackoverflow exception:\n index is less than zero");
     } else if (_Index >= this->length()) {
@@ -254,7 +255,7 @@ public:
   bool operator!=(const array<_Item_t> &_Src) { return !(*this == _Src); }
   bool operator!=(std::nullptr_t)             { return !this->_buffer.empty(); }
 
-  _Item_t& operator[](const int _Index) {
+  _Item_t& operator[](const ssize _Index) {
     const size _length = this->_buffer.size();
          if (_Index < 0) { XPANIC(L"stackoverflow exception:\n index is less than zero"); }
     else if (_Index >= _length) {
