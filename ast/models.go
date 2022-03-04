@@ -99,25 +99,32 @@ func (dt DataTypeAST) String() string {
 	switch dt.Code {
 	case x.Name:
 		return dt.Token.Kind + cxx.String()
-	case x.Function:
+	case x.Func:
 		return dt.FunctionString() + cxx.String()
+	default:
+		return x.CxxTypeNameFromType(dt.Code) + cxx.String()
 	}
-	return x.CxxTypeNameFromType(dt.Code) + cxx.String()
 }
 
 func (dt DataTypeAST) FunctionString() string {
-	cxx := "std::function<"
-	fun := dt.Tag.(FunctionAST)
-	cxx += fun.ReturnType.String()
-	cxx += "("
+	var cxx strings.Builder
+	cxx.WriteString("std::function<")
+	fun := dt.Tag.(FuncAST)
+	cxx.WriteString(fun.ReturnType.String())
+	cxx.WriteByte('(')
 	if len(fun.Params) > 0 {
 		for _, param := range fun.Params {
-			cxx += param.Type.String() + ", "
+			cxx.WriteString(param.Type.String())
+			cxx.WriteString(", ")
 		}
-		cxx = cxx[:len(cxx)-2]
+		cxxStr := cxx.String()[:cxx.Len()-1]
+		cxx.Reset()
+		cxx.WriteString(cxxStr)
+	} else {
+		cxx.WriteString("void")
 	}
-	cxx += ")>"
-	return cxx
+	cxx.WriteString(")>")
+	return cxx.String()
 }
 
 func (dt DataTypeAST) MultiTypeString() string {
@@ -134,18 +141,24 @@ func (dt DataTypeAST) MultiTypeString() string {
 // TypeAST is type declaration.
 type TypeAST struct {
 	Token lex.Token
-	Name  string
+	Id    string
 	Type  DataTypeAST
 }
 
 func (t TypeAST) String() string {
-	return "typedef " + t.Type.String() + " " + t.Name + ";"
+	var cxx strings.Builder
+	cxx.WriteString("typedef ")
+	cxx.WriteString(t.Type.String())
+	cxx.WriteByte(' ')
+	cxx.WriteString(t.Id)
+	cxx.WriteByte(';')
+	return cxx.String()
 }
 
-// FunctionAST is function declaration AST model.
-type FunctionAST struct {
+// FuncAST is function declaration AST model.
+type FuncAST struct {
 	Token      lex.Token
-	Name       string
+	Id         string
 	Params     []ParameterAST
 	ReturnType DataTypeAST
 	Block      BlockAST
@@ -154,7 +167,7 @@ type FunctionAST struct {
 // ParameterAST is function parameter AST model.
 type ParameterAST struct {
 	Token    lex.Token
-	Name     string
+	Id       string
 	Const    bool
 	Volatile bool
 	Variadic bool
@@ -164,9 +177,9 @@ type ParameterAST struct {
 func (p ParameterAST) String() string {
 	var cxx strings.Builder
 	cxx.WriteString(p.Prototype())
-	if p.Name != "" {
+	if p.Id != "" {
 		cxx.WriteByte(' ')
-		cxx.WriteString(p.Name)
+		cxx.WriteString(p.Id)
 	}
 	if p.Variadic {
 		cxx.WriteString(" =array<")
@@ -196,19 +209,23 @@ func (p ParameterAST) Prototype() string {
 }
 
 // DataTypeString returns data type string of function.
-func (fc FunctionAST) DataTypeString() string {
-	dt := "("
+func (fc FuncAST) DataTypeString() string {
+	var cxx strings.Builder
+	cxx.WriteByte('(')
 	if len(fc.Params) > 0 {
 		for _, param := range fc.Params {
-			dt += param.Type.Value + ", "
+			cxx.WriteString(param.Type.String())
+			cxx.WriteString(", ")
 		}
-		dt = dt[:len(dt)-2]
+		cxxStr := cxx.String()[:cxx.Len()-2]
+		cxx.Reset()
+		cxx.WriteString(cxxStr)
 	}
-	dt += ")"
+	cxx.WriteByte(')')
 	if fc.ReturnType.Code != x.Void {
-		dt += fc.ReturnType.Value
+		cxx.WriteString(fc.ReturnType.String())
 	}
-	return dt
+	return cxx.String()
 }
 
 // ArgAST is AST model of argument.
@@ -258,7 +275,10 @@ type ExprStatementAST struct {
 }
 
 func (be ExprStatementAST) String() string {
-	return be.Expr.String() + ";"
+	var cxx strings.Builder
+	cxx.WriteString(be.Expr.String())
+	cxx.WriteByte(';')
+	return cxx.String()
 }
 
 // ValueAST is AST model of constant value.
@@ -297,7 +317,11 @@ type ReturnAST struct {
 }
 
 func (r ReturnAST) String() string {
-	return "return " + r.Expr.String() + ";"
+	var cxx strings.Builder
+	cxx.WriteString("return ")
+	cxx.WriteString(r.Expr.String())
+	cxx.WriteByte(';')
+	return cxx.String()
 }
 
 // AttributeAST is attribtue AST model.
@@ -312,10 +336,10 @@ func (a AttributeAST) String() string {
 
 // VariableAST is variable declaration AST model.
 type VariableAST struct {
-	DefineToken lex.Token
-	NameToken   lex.Token
+	DefToken    lex.Token
+	IdToken     lex.Token
 	SetterToken lex.Token
-	Name        string
+	Id          string
 	Type        DataTypeAST
 	Value       ExprAST
 	Const       bool
@@ -334,7 +358,7 @@ func (v VariableAST) String() string {
 	}
 	sb.WriteString(v.Type.String())
 	sb.WriteByte(' ')
-	sb.WriteString(v.Name)
+	sb.WriteString(v.Id)
 	if v.Value.Processes != nil {
 		sb.WriteString(" = ")
 		sb.WriteString(v.Value.String())
@@ -455,7 +479,11 @@ type FreeAST struct {
 }
 
 func (f FreeAST) String() string {
-	return "delete " + f.Expr.String() + ";"
+	var cxx strings.Builder
+	cxx.WriteString("delete ")
+	cxx.WriteString(f.Expr.String())
+	cxx.WriteByte(';')
+	return cxx.String()
 }
 
 // IterProfile interface for iteration profiles.
@@ -487,7 +515,7 @@ type ForeachProfile struct {
 }
 
 func (fp ForeachProfile) String(iter IterAST) string {
-	if !x.IsIgnoreName(fp.KeyA.Name) {
+	if !x.IsIgnoreName(fp.KeyA.Id) {
 		return fp.ForeachString(iter)
 	}
 	return fp.IterationSring(iter)
@@ -498,18 +526,18 @@ func (fp ForeachProfile) ForeachString(iter IterAST) string {
 	cxx.WriteString("foreach<")
 	cxx.WriteString(fp.ExprType.String())
 	cxx.WriteString("," + fp.KeyA.Type.String())
-	if !x.IsIgnoreName(fp.KeyB.Name) {
+	if !x.IsIgnoreName(fp.KeyB.Id) {
 		cxx.WriteString("," + fp.KeyB.Type.String())
 	}
 	cxx.WriteString(">(")
 	cxx.WriteString(fp.Expr.String())
 	cxx.WriteString(", [&](")
 	cxx.WriteString(fp.KeyA.Type.String())
-	cxx.WriteString(" " + fp.KeyA.Name)
-	if !x.IsIgnoreName(fp.KeyB.Name) {
+	cxx.WriteString(" " + fp.KeyA.Id)
+	if !x.IsIgnoreName(fp.KeyB.Id) {
 		cxx.WriteString(",")
 		cxx.WriteString(fp.KeyB.Type.String())
-		cxx.WriteString(" " + fp.KeyB.Name)
+		cxx.WriteString(" " + fp.KeyB.Id)
 	}
 	cxx.WriteString(") -> void ")
 	cxx.WriteString(iter.Block.String())
@@ -520,7 +548,7 @@ func (fp ForeachProfile) ForeachString(iter IterAST) string {
 func (fp ForeachProfile) IterationSring(iter IterAST) string {
 	var cxx strings.Builder
 	cxx.WriteString("for (auto ")
-	cxx.WriteString(fp.KeyB.Name)
+	cxx.WriteString(fp.KeyB.Id)
 	cxx.WriteString(" : ")
 	cxx.WriteString(fp.Expr.String())
 	cxx.WriteString(") ")
@@ -537,7 +565,10 @@ type IterAST struct {
 
 func (iter IterAST) String() string {
 	if iter.Profile == nil {
-		return "while (true) " + iter.Block.String()
+		var cxx strings.Builder
+		cxx.WriteString("while (true) ")
+		cxx.WriteString(iter.Block.String())
+		return cxx.String()
 	}
 	return iter.Profile.String(iter)
 }

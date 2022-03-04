@@ -5,7 +5,7 @@ import (
 	"github.com/the-xlang/x/pkg/x"
 )
 
-func typeIsVoidReturn(t ast.DataTypeAST) bool {
+func typeIsVoidRet(t ast.DataTypeAST) bool {
 	return t.Code == x.Void && !t.MultiTyped
 }
 
@@ -32,11 +32,11 @@ func typeIsArray(t ast.DataTypeAST) bool {
 func typeIsSingle(dt ast.DataTypeAST) bool {
 	return !typeIsPtr(dt) &&
 		!typeIsArray(dt) &&
-		dt.Code != x.Function
+		dt.Code != x.Func
 }
 
 func typeIsNilCompatible(t ast.DataTypeAST) bool {
-	return t.Code == x.Function || typeIsPtr(t)
+	return t.Code == x.Func || typeIsPtr(t)
 }
 
 func checkArrayCompatiblity(arrT, t ast.DataTypeAST) bool {

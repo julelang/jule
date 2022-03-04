@@ -4,7 +4,7 @@ import "github.com/the-xlang/x/pkg/io"
 
 // Token is lexer token.
 type Token struct {
-	File   *io.FILE
+	File   *io.File
 	Row    int
 	Column int
 	Kind   string
@@ -15,9 +15,9 @@ type Token struct {
 const (
 	NA        uint8 = 0
 	DataType  uint8 = 1
-	Name      uint8 = 2
+	Id        uint8 = 2
 	Brace     uint8 = 3
-	Return    uint8 = 4
+	Ret       uint8 = 4
 	SemiColon uint8 = 5
 	Value     uint8 = 6
 	Operator  uint8 = 7

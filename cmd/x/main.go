@@ -129,14 +129,14 @@ func loadXSet() {
 	}
 }
 
-func printErrors(errors []string) {
+func printerr(errors []string) {
 	defer os.Exit(0)
-	for _, message := range errors {
-		fmt.Println(message)
+	for _, msg := range errors {
+		fmt.Println(msg)
 	}
 }
 
-func appendStandards(code *string) {
+func appendStandard(code *string) {
 	year, month, day := time.Now().Date()
 	hour, min, _ := time.Now().Clock()
 	timeString := fmt.Sprintf("%d/%d/%d %d.%d (DD/MM/YYYY) (HH.MM)",
@@ -150,7 +150,7 @@ func appendStandards(code *string) {
 #include <string>
 #include <functional>
 #include <vector>
-#include <locale.h>
+#include <locale>
 // endregion X_STANDARD_IMPORTS
 
 // region X_CXX_API
@@ -328,7 +328,7 @@ func writeCxxOutput(info *parser.ParseFileInfo) {
 var routines *sync.WaitGroup
 
 func main() {
-	f, err := io.GetX(os.Args[0])
+	f, err := io.Openfx(os.Args[0])
 	if err != nil {
 		println(err.Error())
 		return
@@ -342,8 +342,8 @@ func main() {
 	go parser.ParseFileAsync(info)
 	routines.Wait()
 	if info.Errors != nil {
-		printErrors(info.Errors)
+		printerr(info.Errors)
 	}
-	appendStandards(&info.X_CXX)
+	appendStandard(&info.X_CXX)
 	writeCxxOutput(info)
 }

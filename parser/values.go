@@ -6,19 +6,13 @@ import (
 	"github.com/the-xlang/x/pkg/xbits"
 )
 
-// IsString reports value is string or not.
-func IsString(value string) bool { return value[0] == '"' }
+func isstr(value string) bool  { return value[0] == '"' }
+func isrune(value string) bool { return value[0] == '\'' }
+func isnil(value string) bool  { return value == "nil" }
 
-// IsRune reports value is rune of not.
-func IsRune(value string) bool { return value[0] == '\'' }
-
-// IsBoolean reports value is boolean or not.
-func IsBoolean(value string) bool {
+func isbool(value string) bool {
 	return value == "true" || value == "false"
 }
-
-// IsNil reports value is nil or not.
-func IsNil(value string) bool { return value == "nil" }
 
 func isBoolExpr(val value) bool {
 	switch {
@@ -41,7 +35,7 @@ func isForeachIterExpr(val value) bool {
 	return code == x.Str
 }
 
-func isConstantNumeric(v string) bool {
+func isConstNum(v string) bool {
 	if v == "" {
 		return false
 	}

@@ -10,7 +10,7 @@ import (
 type ParseFileInfo struct {
 	X_CXX    string
 	Errors   []string
-	File     *io.FILE
+	File     *io.File
 	Routines *sync.WaitGroup
 }
 

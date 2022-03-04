@@ -1,7 +1,7 @@
 package io
 
-// FILE instance of fs.
-type FILE struct {
+// File instance of fs.
+type File struct {
 	Path    string
 	Content []rune
 }

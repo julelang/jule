@@ -5,15 +5,15 @@ import (
 	"github.com/the-xlang/x/pkg/x"
 )
 
-var builtinFunctions = []*function{
+var builtinFuncs = []*function{
 	{
-		Ast: ast.FunctionAST{
-			Name: "_out",
+		Ast: ast.FuncAST{
+			Id: "_out",
 			ReturnType: ast.DataTypeAST{
 				Code: x.Void,
 			},
 			Params: []ast.ParameterAST{{
-				Name: "v",
+				Id: "v",
 				Type: ast.DataTypeAST{
 					Value: "any",
 					Code:  x.Any,
@@ -22,13 +22,13 @@ var builtinFunctions = []*function{
 		},
 	},
 	{
-		Ast: ast.FunctionAST{
-			Name: "_outln",
+		Ast: ast.FuncAST{
+			Id: "_outln",
 			ReturnType: ast.DataTypeAST{
 				Code: x.Void,
 			},
 			Params: []ast.ParameterAST{{
-				Name: "v",
+				Id: "v",
 				Type: ast.DataTypeAST{
 					Value: "any",
 					Code:  x.Any,

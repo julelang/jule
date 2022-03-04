@@ -81,27 +81,27 @@ func (node exprNode) String() string {
 	return node.value
 }
 
-type runeExprNode struct {
+type runeExpr struct {
 	token lex.Token
 }
 
-func (run runeExprNode) String() string {
+func (run runeExpr) String() string {
 	return "L" + run.token.Kind
 }
 
-type strExprNode struct {
+type strExpr struct {
 	token lex.Token
 }
 
-func (str strExprNode) String() string {
+func (str strExpr) String() string {
 	return "str(L" + str.token.Kind + ")"
 }
 
-type anonymousFunctionExpr struct {
-	ast ast.FunctionAST
+type anonFunc struct {
+	ast ast.FuncAST
 }
 
-func (af anonymousFunctionExpr) String() string {
+func (af anonFunc) String() string {
 	var cxx strings.Builder
 	cxx.WriteString("[=]")
 	cxx.WriteString(paramsToCxx(af.ast.Params))
@@ -147,11 +147,11 @@ func (a argsExpr) String() string {
 	return cxx.String()[:cxx.Len()-1]
 }
 
-type multiReturnExprModel struct {
+type multiRetExpr struct {
 	models []exprModel
 }
 
-func (mre multiReturnExprModel) String() string {
+func (mre multiRetExpr) String() string {
 	var cxx strings.Builder
 	cxx.WriteString("std::make_tuple(")
 	for _, model := range mre.models {
@@ -161,11 +161,11 @@ func (mre multiReturnExprModel) String() string {
 	return cxx.String()[:cxx.Len()-1] + ")"
 }
 
-type newHeapAllocationExprModel struct {
+type newHeapAllocExpr struct {
 	typeAST ast.DataTypeAST
 }
 
-func (nha newHeapAllocationExprModel) String() string {
+func (nha newHeapAllocExpr) String() string {
 	var cxx strings.Builder
 	cxx.WriteString("XALLOC(")
 	cxx.WriteString(nha.typeAST.String())
@@ -173,11 +173,11 @@ func (nha newHeapAllocationExprModel) String() string {
 	return cxx.String()
 }
 
-type assignExprModel struct {
+type assignExpr struct {
 	assign ast.AssignAST
 }
 
-func (a assignExprModel) String() string {
+func (a assignExpr) String() string {
 	var cxx strings.Builder
 	cxx.WriteByte('(')
 	cxx.WriteString(a.assign.String())

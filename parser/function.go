@@ -8,7 +8,7 @@ import (
 )
 
 type function struct {
-	Ast        ast.FunctionAST
+	Ast        ast.FuncAST
 	Attributes []ast.AttributeAST
 }
 
@@ -27,7 +27,7 @@ func (f function) Head() string {
 	cxx.WriteString(attributesToString(f.Attributes))
 	cxx.WriteString(f.Ast.ReturnType.String())
 	cxx.WriteByte(' ')
-	cxx.WriteString(f.Ast.Name)
+	cxx.WriteString(f.Ast.Id)
 	cxx.WriteString(paramsToCxx(f.Ast.Params))
 	return cxx.String()
 }
@@ -38,7 +38,7 @@ func (f function) Prototype() string {
 	cxx.WriteString(attributesToString(f.Attributes))
 	cxx.WriteString(f.Ast.ReturnType.String())
 	cxx.WriteByte(' ')
-	cxx.WriteString(f.Ast.Name)
+	cxx.WriteString(f.Ast.Id)
 	cxx.WriteString(f.PrototypeParams())
 	cxx.WriteByte(';')
 	return cxx.String()

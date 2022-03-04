@@ -6,9 +6,9 @@ import (
 	"github.com/the-xlang/x/pkg/x"
 )
 
-// BitsizeOfType returns bit-size of
+// BitsizeType returns bit-size of
 // data type of specified type code.
-func BitsizeOfType(t uint8) int {
+func BitsizeType(t uint8) int {
 	switch t {
 	case x.I8, x.U8:
 		return 8
