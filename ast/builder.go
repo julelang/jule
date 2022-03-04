@@ -590,7 +590,7 @@ func (b *Builder) Block(tokens []lex.Token) (block BlockAST) {
 
 // Statement builds AST model of statement.
 func (b *Builder) Statement(bs *blockStatement) (s StatementAST) {
-	s, ok := b.AssignStatement(bs.tokens)
+	s, ok := b.AssignStatement(bs.tokens, false)
 	if ok {
 		return s
 	}
@@ -628,6 +628,7 @@ type assignInfo struct {
 	setter         lex.Token
 	ok             bool
 	justDeclare    bool
+	isExpr         bool
 }
 
 func (b *Builder) assignInfo(tokens []lex.Token) (info assignInfo) {
@@ -678,14 +679,16 @@ func (b *Builder) pushAssignSelector(selectors *[]AssignSelector, last, current 
 	if selector.Expr.Tokens[0].Id == lex.Name &&
 		current-last > 1 &&
 		selector.Expr.Tokens[1].Id == lex.Colon {
+		if info.isExpr {
+			b.PushError(selector.Expr.Tokens[0], "notallow_declares")
+		}
 		selector.NewVariable = true
 		selector.Variable.NameToken = selector.Expr.Tokens[0]
 		selector.Variable.Name = selector.Variable.NameToken.Kind
 		selector.Variable.SetterToken = info.setter
 		// Has specific data-type?
 		if current-last > 2 {
-			selector.Variable.Type, _ = b.DataType(
-				selector.Expr.Tokens[2:], new(int), false)
+			selector.Variable.Type, _ = b.DataType(selector.Expr.Tokens[2:], new(int), false)
 		}
 	} else {
 		if selector.Expr.Tokens[0].Id == lex.Name {
@@ -806,7 +809,18 @@ func checkAssignTokens(tokens []lex.Token) bool {
 }
 
 // AssignStatement builds AST model of assignment statement.
-func (b *Builder) AssignStatement(tokens []lex.Token) (s StatementAST, _ bool) {
+func (b *Builder) AssignStatement(tokens []lex.Token, isExpr bool) (s StatementAST, _ bool) {
+	assign, ok := b.AssignExpr(tokens, isExpr)
+	if !ok {
+		return
+	}
+	s.Token = tokens[0]
+	s.Value = assign
+	return s, true
+}
+
+// AssignExpr builds AST model of assignment expression.
+func (b *Builder) AssignExpr(tokens []lex.Token, isExpr bool) (assign AssignAST, ok bool) {
 	if !checkAssignTokens(tokens) {
 		return
 	}
@@ -814,16 +828,19 @@ func (b *Builder) AssignStatement(tokens []lex.Token) (s StatementAST, _ bool) {
 	if !info.ok {
 		return
 	}
-	var varAST AssignAST
-	varAST.Setter = info.setter
-	varAST.JustDeclare = info.justDeclare
-	varAST.SelectExprs = b.assignSelectors(info)
-	if !info.justDeclare {
-		varAST.ValueExprs = b.assignExprs(info)
+	ok = true
+	info.isExpr = isExpr
+	assign.IsExpr = isExpr
+	assign.Setter = info.setter
+	assign.JustDeclare = info.justDeclare
+	assign.SelectExprs = b.assignSelectors(info)
+	if isExpr && len(assign.SelectExprs) > 1 {
+		b.PushError(assign.Setter, "notallow_multiple_assign")
 	}
-	s.Token = tokens[0]
-	s.Value = varAST
-	return s, true
+	if !info.justDeclare {
+		assign.ValueExprs = b.assignExprs(info)
+	}
+	return
 }
 
 // BuildReturnStatement builds AST model of return statement.
@@ -1302,7 +1319,9 @@ func (b *Builder) getExprProcesses(tokens []lex.Token) [][]lex.Token {
 		token := tokens[index]
 		switch token.Id {
 		case lex.Operator:
-			if newKeyword || isExprOperator(token.Kind) {
+			if newKeyword ||
+				isExprOperator(token.Kind) ||
+				isAssignOperator(token.Kind) {
 				part = append(part, token)
 				continue
 			}

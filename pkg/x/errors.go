@@ -99,4 +99,6 @@ var Errors = map[string]string{
 	`constant_assignto_nonconstant`:    `constant mutable value can't assign to non-constant`,
 	`casting_missing_expr`:             `expression missing of casting`,
 	`type_notsupports_casting`:         `data-type not supports casting`,
+	`notallow_declares`:                `declare not allowed`,
+	`notallow_multiple_assign`:         `multiple assignments not allowed`,
 }

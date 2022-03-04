@@ -172,3 +172,15 @@ func (nha newHeapAllocationExprModel) String() string {
 	cxx.WriteByte(')')
 	return cxx.String()
 }
+
+type assignExprModel struct {
+	assign ast.AssignAST
+}
+
+func (a assignExprModel) String() string {
+	var cxx strings.Builder
+	cxx.WriteByte('(')
+	cxx.WriteString(a.assign.String())
+	cxx.WriteByte(')')
+	return cxx.String()
+}

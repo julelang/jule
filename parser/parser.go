@@ -223,7 +223,7 @@ func (p *Parser) Variable(varAST ast.VariableAST) ast.VariableAST {
 		val = t
 	default:
 		if varAST.SetterToken.Id != lex.NA {
-			val, varAST.Value.Model = p.computeExpr(varAST.Value)
+			val, varAST.Value.Model = p.evalExpr(varAST.Value)
 		}
 	}
 	if varAST.Type.Code != x.Void {
@@ -427,14 +427,14 @@ type value struct {
 	variadic bool
 }
 
-func (p *Parser) computeProcesses(processes [][]lex.Token) (v value, e exprModel) {
+func (p *Parser) evalProcesses(processes [][]lex.Token) (v value, e exprModel) {
 	if processes == nil {
 		return
 	}
 	builder := newExprBuilder()
 	if len(processes) == 1 {
 		builder.setIndex(0)
-		v = p.computeValPart(processes[0], builder)
+		v = p.evalExprPart(processes[0], builder)
 		e = builder.build()
 		return
 	}
@@ -455,7 +455,7 @@ func (p *Parser) computeProcesses(processes [][]lex.Token) (v value, e exprModel
 			builder.appendNode(exprNode{process.operator.Kind})
 			process.right = processes[j+1]
 			builder.setIndex(j + 1)
-			process.rightVal = p.computeValPart(process.right, builder).ast
+			process.rightVal = p.evalExprPart(process.right, builder).ast
 			v.ast = process.Solve()
 			processes = processes[2:]
 			goto end
@@ -463,7 +463,7 @@ func (p *Parser) computeProcesses(processes [][]lex.Token) (v value, e exprModel
 			process.operator = processes[j][0]
 			process.left = processes[j-1]
 			builder.setIndex(j - 1)
-			process.leftVal = p.computeValPart(process.left, builder).ast
+			process.leftVal = p.evalExprPart(process.left, builder).ast
 			process.rightVal = v.ast
 			builder.setIndex(j)
 			builder.appendNode(exprNode{process.operator.Kind})
@@ -478,20 +478,20 @@ func (p *Parser) computeProcesses(processes [][]lex.Token) (v value, e exprModel
 			builder.appendNode(exprNode{process.operator.Kind})
 			process.right = processes[j+1]
 			builder.setIndex(j + 1)
-			process.rightVal = p.computeValPart(process.right, builder).ast
+			process.rightVal = p.evalExprPart(process.right, builder).ast
 			v.ast = process.Solve()
 			processes = append(processes[:j], processes[j+2:]...)
 			goto end
 		}
 		process.left = processes[j-1]
 		builder.setIndex(j - 1)
-		process.leftVal = p.computeValPart(process.left, builder).ast
+		process.leftVal = p.evalExprPart(process.left, builder).ast
 		process.operator = processes[j][0]
 		builder.setIndex(j)
 		builder.appendNode(exprNode{process.operator.Kind})
 		process.right = processes[j+1]
 		builder.setIndex(j + 1)
-		process.rightVal = p.computeValPart(process.right, builder).ast
+		process.rightVal = p.evalExprPart(process.right, builder).ast
 		{
 			solvedValue := process.Solve()
 			if v.ast.Type.Code != x.Void {
@@ -504,7 +504,7 @@ func (p *Parser) computeProcesses(processes [][]lex.Token) (v value, e exprModel
 				v.ast = solvedValue
 			}
 		}
-		// Remove computed processes.
+		// Remove evald processes.
 		processes = append(processes[:j-1], processes[j+2:]...)
 		if len(processes) == 1 {
 			break
@@ -517,14 +517,14 @@ func (p *Parser) computeProcesses(processes [][]lex.Token) (v value, e exprModel
 	return
 }
 
-func (p *Parser) computeTokens(tokens []lex.Token) (value, exprModel) {
-	return p.computeExpr(new(ast.Builder).Expr(tokens))
+func (p *Parser) evalTokens(tokens []lex.Token) (value, exprModel) {
+	return p.evalExpr(new(ast.Builder).Expr(tokens))
 }
 
-func (p *Parser) computeExpr(ex ast.ExprAST) (value, exprModel) {
+func (p *Parser) evalExpr(ex ast.ExprAST) (value, exprModel) {
 	processes := make([][]lex.Token, len(ex.Processes))
 	copy(processes, ex.Processes)
-	return p.computeProcesses(processes)
+	return p.evalProcesses(processes)
 }
 
 // nextOperator find index of priority operator and returns index of operator
@@ -556,16 +556,18 @@ func (p *Parser) nextOperator(tokens [][]lex.Token) int {
 			p.PushErrorToken(part[0], "invalid_operator")
 		}
 	}
-	if precedence5 != -1 {
+	switch {
+	case precedence5 != -1:
 		return precedence5
-	} else if precedence4 != -1 {
+	case precedence4 != -1:
 		return precedence4
-	} else if precedence3 != -1 {
+	case precedence3 != -1:
 		return precedence3
-	} else if precedence2 != -1 {
+	case precedence2 != -1:
 		return precedence2
+	default:
+		return precedence1
 	}
-	return precedence1
 }
 
 type valueProcessor struct {
@@ -911,7 +913,7 @@ func (s solver) Solve() (v ast.ValueAST) {
 	return
 }
 
-func (p *Parser) computeVal(token lex.Token, builder *exprBuilder) (v value, ok bool) {
+func (p *Parser) evalSingleExpr(token lex.Token, builder *exprBuilder) (v value, ok bool) {
 	processor := valueProcessor{token, builder, p}
 	v.ast.Type.Code = x.Void
 	v.ast.Token = token
@@ -946,7 +948,7 @@ type operatorProcessor struct {
 }
 
 func (p *operatorProcessor) unary() value {
-	v := p.parser.computeValPart(p.tokens, p.builder)
+	v := p.parser.evalExprPart(p.tokens, p.builder)
 	if !typeIsSingle(v.ast.Type) {
 		p.parser.PushErrorToken(p.token, "invalid_data_unary")
 	} else if !x.IsNumericType(v.ast.Type.Code) {
@@ -959,7 +961,7 @@ func (p *operatorProcessor) unary() value {
 }
 
 func (p *operatorProcessor) plus() value {
-	v := p.parser.computeValPart(p.tokens, p.builder)
+	v := p.parser.evalExprPart(p.tokens, p.builder)
 	if !typeIsSingle(v.ast.Type) {
 		p.parser.PushErrorToken(p.token, "invalid_data_plus")
 	} else if !x.IsNumericType(v.ast.Type.Code) {
@@ -969,7 +971,7 @@ func (p *operatorProcessor) plus() value {
 }
 
 func (p *operatorProcessor) tilde() value {
-	v := p.parser.computeValPart(p.tokens, p.builder)
+	v := p.parser.evalExprPart(p.tokens, p.builder)
 	if !typeIsSingle(v.ast.Type) {
 		p.parser.PushErrorToken(p.token, "invalid_data_tilde")
 	} else if !x.IsIntegerType(v.ast.Type.Code) {
@@ -979,7 +981,7 @@ func (p *operatorProcessor) tilde() value {
 }
 
 func (p *operatorProcessor) logicalNot() value {
-	v := p.parser.computeValPart(p.tokens, p.builder)
+	v := p.parser.evalExprPart(p.tokens, p.builder)
 	if !isBoolExpr(v) {
 		p.parser.PushErrorToken(p.token, "invalid_data_logical_not")
 	}
@@ -989,7 +991,7 @@ func (p *operatorProcessor) logicalNot() value {
 }
 
 func (p *operatorProcessor) star() value {
-	v := p.parser.computeValPart(p.tokens, p.builder)
+	v := p.parser.evalExprPart(p.tokens, p.builder)
 	v.lvalue = true
 	if !typeIsPtr(v.ast.Type) {
 		p.parser.PushErrorToken(p.token, "invalid_data_star")
@@ -1000,7 +1002,7 @@ func (p *operatorProcessor) star() value {
 }
 
 func (p *operatorProcessor) amper() value {
-	v := p.parser.computeValPart(p.tokens, p.builder)
+	v := p.parser.evalExprPart(p.tokens, p.builder)
 	v.lvalue = true
 	if !canGetPointer(v) {
 		p.parser.PushErrorToken(p.token, "invalid_data_amper")
@@ -1009,7 +1011,7 @@ func (p *operatorProcessor) amper() value {
 	return v
 }
 
-func (p *Parser) computeOperatorPart(tokens []lex.Token, builder *exprBuilder) value {
+func (p *Parser) evalOperatorExprPart(tokens []lex.Token, builder *exprBuilder) value {
 	var v value
 	//? Length is 1 cause all length of operator tokens is 1.
 	//? Change "1" with length of token's value
@@ -1048,7 +1050,7 @@ func canGetPointer(v value) bool {
 	return v.ast.Token.Id == lex.Name
 }
 
-func (p *Parser) computeHeapAlloc(tokens []lex.Token, builder *exprBuilder) (v value) {
+func (p *Parser) evalHeapAllocExpr(tokens []lex.Token, builder *exprBuilder) (v value) {
 	if len(tokens) == 1 {
 		p.PushErrorToken(tokens[0], "invalid_syntax_keyword_new")
 		return
@@ -1072,9 +1074,9 @@ func (p *Parser) computeHeapAlloc(tokens []lex.Token, builder *exprBuilder) (v v
 	return
 }
 
-func (p *Parser) computeValPart(tokens []lex.Token, builder *exprBuilder) (v value) {
+func (p *Parser) evalExprPart(tokens []lex.Token, builder *exprBuilder) (v value) {
 	if len(tokens) == 1 {
-		val, ok := p.computeVal(tokens[0], builder)
+		val, ok := p.evalSingleExpr(tokens[0], builder)
 		if ok {
 			v = val
 			return
@@ -1083,13 +1085,18 @@ func (p *Parser) computeValPart(tokens []lex.Token, builder *exprBuilder) (v val
 	token := tokens[0]
 	switch token.Id {
 	case lex.Operator:
-		return p.computeOperatorPart(tokens, builder)
+		return p.evalOperatorExprPart(tokens, builder)
 	case lex.New:
-		return p.computeHeapAlloc(tokens, builder)
+		return p.evalHeapAllocExpr(tokens, builder)
 	case lex.Brace:
 		switch token.Kind {
 		case "(":
-			val, ok := p.computeTryCast(tokens, builder)
+			val, ok := p.evalTryCastExpr(tokens, builder)
+			if ok {
+				v = val
+				return
+			}
+			val, ok = p.evalTryAssignExpr(tokens, builder)
 			if ok {
 				v = val
 				return
@@ -1099,15 +1106,15 @@ func (p *Parser) computeValPart(tokens []lex.Token, builder *exprBuilder) (v val
 	token = tokens[len(tokens)-1]
 	switch token.Id {
 	case lex.Operator:
-		return p.computeOperatorPartRight(tokens, builder)
+		return p.evalOperatorExprPartRight(tokens, builder)
 	case lex.Brace:
 		switch token.Kind {
 		case ")":
-			return p.computeParenthesesRange(tokens, builder)
+			return p.evalParenthesesRangeExpr(tokens, builder)
 		case "}":
-			return p.computeBraceRange(tokens, builder)
+			return p.evalBraceRangeExpr(tokens, builder)
 		case "]":
-			return p.computeBracketRange(tokens, builder)
+			return p.evalBracketRangeExpr(tokens, builder)
 		}
 	default:
 		p.PushErrorToken(tokens[0], "invalid_syntax")
@@ -1115,7 +1122,7 @@ func (p *Parser) computeValPart(tokens []lex.Token, builder *exprBuilder) (v val
 	return
 }
 
-func (p *Parser) computeTryCast(tokens []lex.Token, builder *exprBuilder) (v value, _ bool) {
+func (p *Parser) evalTryCastExpr(tokens []lex.Token, builder *exprBuilder) (v value, _ bool) {
 	braceCount := 0
 	errToken := tokens[0]
 	for index, token := range tokens {
@@ -1131,9 +1138,9 @@ func (p *Parser) computeTryCast(tokens []lex.Token, builder *exprBuilder) (v val
 		if braceCount > 0 {
 			continue
 		}
-		typeTokens := tokens[1:index]
-		astb := ast.NewBuilder(typeTokens)
+		astb := ast.NewBuilder(nil)
 		dtindex := 0
+		typeTokens := tokens[1:index]
 		dt, ok := astb.DataType(typeTokens, &dtindex, false)
 		if !ok {
 			return
@@ -1151,14 +1158,32 @@ func (p *Parser) computeTryCast(tokens []lex.Token, builder *exprBuilder) (v val
 		}
 		exprTokens := tokens[index+1:]
 		builder.appendNode(exprNode{"(" + dt.String() + ")"})
-		val := p.computeValPart(exprTokens, builder)
-		val = p.computeCast(val, dt, errToken)
+		val := p.evalExprPart(exprTokens, builder)
+		val = p.evalCast(val, dt, errToken)
 		return val, true
 	}
 	return
 }
 
-func (p *Parser) computeCast(v value, t ast.DataTypeAST, errToken lex.Token) value {
+func (p *Parser) evalTryAssignExpr(tokens []lex.Token, b *exprBuilder) (v value, ok bool) {
+	astb := ast.NewBuilder(nil)
+	tokens = tokens[1 : len(tokens)-1] // Remove first-last parentheses
+	assign, ok := astb.AssignExpr(tokens, true)
+	if !ok {
+		return
+	}
+	ok = true
+	if len(astb.Errors) > 0 {
+		p.AppendErrors(astb.Errors...)
+		return
+	}
+	p.checkAssignment(&assign)
+	b.appendNode(assignExprModel{assign})
+	v, _ = p.evalExpr(assign.SelectExprs[0].Expr)
+	return
+}
+
+func (p *Parser) evalCast(v value, t ast.DataTypeAST, errToken lex.Token) value {
 	switch {
 	case typeIsPtr(t):
 		p.checkCastPtr(v.ast.Type, errToken)
@@ -1211,20 +1236,20 @@ func (p *Parser) checkCastPtr(vt ast.DataTypeAST, errToken lex.Token) {
 	p.PushErrorToken(errToken, "type_notsupports_casting")
 }
 
-func (p *Parser) computeOperatorPartRight(tokens []lex.Token, b *exprBuilder) (v value) {
+func (p *Parser) evalOperatorExprPartRight(tokens []lex.Token, b *exprBuilder) (v value) {
 	token := tokens[len(tokens)-1]
 	switch token.Kind {
 	case "...":
 		tokens = tokens[:len(tokens)-1]
-		return p.computeVariadicExprPart(tokens, b, token)
+		return p.evalVariadicExprPart(tokens, b, token)
 	default:
 		p.PushErrorToken(token, "invalid_syntax")
 	}
 	return
 }
 
-func (p *Parser) computeVariadicExprPart(tokens []lex.Token, b *exprBuilder, errTok lex.Token) (v value) {
-	v = p.computeValPart(tokens, b)
+func (p *Parser) evalVariadicExprPart(tokens []lex.Token, b *exprBuilder, errTok lex.Token) (v value) {
+	v = p.evalExprPart(tokens, b)
 	if !typeIsVariadicable(v.ast.Type) {
 		p.PushErrorToken(errTok, "variadic_with_nonvariadicable")
 		return
@@ -1234,7 +1259,7 @@ func (p *Parser) computeVariadicExprPart(tokens []lex.Token, b *exprBuilder, err
 	return
 }
 
-func (p *Parser) computeParenthesesRange(tokens []lex.Token, b *exprBuilder) (v value) {
+func (p *Parser) evalParenthesesRangeExpr(tokens []lex.Token, b *exprBuilder) (v value) {
 	var valueTokens []lex.Token
 	j := len(tokens) - 1
 	braceCount := 0
@@ -1265,12 +1290,12 @@ func (p *Parser) computeParenthesesRange(tokens []lex.Token, b *exprBuilder) (v 
 		if len(tokens) == 0 {
 			p.PushErrorToken(tk, "invalid_syntax")
 		}
-		value, model := p.computeTokens(tokens)
+		value, model := p.evalTokens(tokens)
 		v = value
 		b.appendNode(model)
 		return
 	}
-	v = p.computeValPart(valueTokens, b)
+	v = p.evalExprPart(valueTokens, b)
 
 	// Write parentheses.
 	b.appendNode(exprNode{"("})
@@ -1288,7 +1313,7 @@ func (p *Parser) computeParenthesesRange(tokens []lex.Token, b *exprBuilder) (v 
 	return
 }
 
-func (p *Parser) computeBraceRange(tokens []lex.Token, b *exprBuilder) (v value) {
+func (p *Parser) evalBraceRangeExpr(tokens []lex.Token, b *exprBuilder) (v value) {
 	var valueTokens []lex.Token
 	j := len(tokens) - 1
 	braceCount := 0
@@ -1351,7 +1376,7 @@ func (p *Parser) computeBraceRange(tokens []lex.Token, b *exprBuilder) (v value)
 	return
 }
 
-func (p *Parser) computeBracketRange(tokens []lex.Token, b *exprBuilder) (v value) {
+func (p *Parser) evalBracketRangeExpr(tokens []lex.Token, b *exprBuilder) (v value) {
 	var valueTokens []lex.Token
 	j := len(tokens) - 1
 	braceCount := 0
@@ -1378,28 +1403,28 @@ func (p *Parser) computeBracketRange(tokens []lex.Token, b *exprBuilder) (v valu
 		return
 	}
 	var model IExprNode
-	v, model = p.computeTokens(valueTokens)
+	v, model = p.evalTokens(valueTokens)
 	b.appendNode(model)
 	tokens = tokens[len(valueTokens)+1 : len(tokens)-1] // Removed array syntax "["..."]"
 	b.appendNode(exprNode{"["})
-	selectv, model := p.computeTokens(tokens)
+	selectv, model := p.evalTokens(tokens)
 	b.appendNode(model)
 	b.appendNode(exprNode{"]"})
-	return p.computeEnumerableSelect(v, selectv, tokens[0])
+	return p.evalEnumerableSelect(v, selectv, tokens[0])
 }
 
-func (p *Parser) computeEnumerableSelect(enumv, selectv value, err lex.Token) (v value) {
+func (p *Parser) evalEnumerableSelect(enumv, selectv value, err lex.Token) (v value) {
 	switch {
 	case typeIsArray(enumv.ast.Type):
-		return p.computeArraySelect(enumv, selectv, err)
+		return p.evalArraySelect(enumv, selectv, err)
 	case typeIsSingle(enumv.ast.Type):
-		return p.computeStringSelect(enumv, selectv, err)
+		return p.evalStringSelect(enumv, selectv, err)
 	}
 	p.PushErrorToken(err, "not_enumerable")
 	return
 }
 
-func (p *Parser) computeArraySelect(arrv, selectv value, err lex.Token) value {
+func (p *Parser) evalArraySelect(arrv, selectv value, err lex.Token) value {
 	arrv.lvalue = true
 	arrv.ast.Type = typeOfArrayElements(arrv.ast.Type)
 	if !typeIsSingle(selectv.ast.Type) || !x.IsIntegerType(selectv.ast.Type.Code) {
@@ -1408,7 +1433,7 @@ func (p *Parser) computeArraySelect(arrv, selectv value, err lex.Token) value {
 	return arrv
 }
 
-func (p *Parser) computeStringSelect(strv, selectv value, err lex.Token) value {
+func (p *Parser) evalStringSelect(strv, selectv value, err lex.Token) value {
 	strv.lvalue = true
 	strv.ast.Type.Code = x.Rune
 	if !typeIsSingle(selectv.ast.Type) || !x.IsIntegerType(selectv.ast.Type.Code) {
@@ -1457,7 +1482,7 @@ func (p *Parser) buildArray(parts [][]lex.Token, dt ast.DataTypeAST, err lex.Tok
 	model := arrayExpr{dataType: dt}
 	elementType := typeOfArrayElements(dt)
 	for _, part := range parts {
-		partValue, expModel := p.computeTokens(part)
+		partValue, expModel := p.evalTokens(part)
 		model.expr = append(model.expr, expModel)
 		p.wg.Add(1)
 		go assignChecker{
@@ -1547,7 +1572,7 @@ argParse:
 }
 
 func (p *Parser) parseArg(param ast.ParameterAST, arg *ast.ArgAST, variadiced *bool) {
-	value, model := p.computeExpr(arg.Expr)
+	value, model := p.evalExpr(arg.Expr)
 	arg.Expr.Model = model
 	if variadiced != nil && !*variadiced {
 		*variadiced = value.variadic
@@ -1613,7 +1638,7 @@ func (p *Parser) checkBlock(b *ast.BlockAST) {
 		model := &b.Statements[index]
 		switch t := model.Value.(type) {
 		case ast.ExprStatementAST:
-			_, t.Expr.Model = p.computeExpr(t.Expr)
+			_, t.Expr.Model = p.evalExpr(t.Expr)
 			model.Value = t
 		case ast.VariableAST:
 			p.checkVariableStatement(&t, false)
@@ -1655,7 +1680,7 @@ func (rc *returnChecker) pushValue(last, current int, errTk lex.Token) {
 		return
 	}
 	tokens := rc.retAST.Expr.Tokens[last:current]
-	value, model := rc.p.computeTokens(tokens)
+	value, model := rc.p.evalTokens(tokens)
 	rc.expModel.models = append(rc.expModel.models, model)
 	rc.values = append(rc.values, value)
 }
@@ -1797,11 +1822,11 @@ func (p *Parser) checkAssignOpr(selected value, err lex.Token) bool {
 }
 
 func (p *Parser) checkSingleAssign(vsAST *ast.AssignAST) {
-	selected, _ := p.computeExpr(vsAST.SelectExprs[0].Expr)
+	selected, _ := p.evalExpr(vsAST.SelectExprs[0].Expr)
 	if !p.checkAssignOpr(selected, vsAST.Setter) {
 		return
 	}
-	val, model := p.computeExpr(vsAST.ValueExprs[0])
+	val, model := p.evalExpr(vsAST.ValueExprs[0])
 	vsAST.ValueExprs[0] = model.ExprAST()
 	if vsAST.Setter.Kind != "=" {
 		vsAST.Setter.Kind = vsAST.Setter.Kind[:len(vsAST.Setter.Kind)-1]
@@ -1837,7 +1862,7 @@ func (p *Parser) parseAssignSelections(vsAST *ast.AssignAST) {
 func (p *Parser) assignVals(vsAST *ast.AssignAST) []value {
 	values := make([]value, len(vsAST.ValueExprs))
 	for index, expr := range vsAST.ValueExprs {
-		val, model := p.computeExpr(expr)
+		val, model := p.evalExpr(expr)
 		vsAST.ValueExprs[index].Model = model
 		values[index] = val
 	}
@@ -1871,7 +1896,7 @@ func (p *Parser) processMultiAssign(vsAST *ast.AssignAST, vals []value) {
 			if selector.Ignore {
 				continue
 			}
-			selected, _ := p.computeExpr(selector.Expr)
+			selected, _ := p.evalExpr(selector.Expr)
 			if !p.checkAssignOpr(selected, vsAST.Setter) {
 				return
 			}
@@ -1891,40 +1916,40 @@ func (p *Parser) processMultiAssign(vsAST *ast.AssignAST, vals []value) {
 	}
 }
 
-func (p *Parser) checkAssignment(vsAST *ast.AssignAST) {
-	selectLength := len(vsAST.SelectExprs)
-	valueLength := len(vsAST.ValueExprs)
-	if vsAST.JustDeclare {
-		p.parseAssignSelections(vsAST)
+func (p *Parser) checkAssignment(assign *ast.AssignAST) {
+	selectLength := len(assign.SelectExprs)
+	valueLength := len(assign.ValueExprs)
+	if assign.JustDeclare {
+		p.parseAssignSelections(assign)
 		return
-	} else if selectLength == 1 && !vsAST.SelectExprs[0].NewVariable {
-		p.checkSingleAssign(vsAST)
+	} else if selectLength == 1 && !assign.SelectExprs[0].NewVariable {
+		p.checkSingleAssign(assign)
 		return
-	} else if vsAST.Setter.Kind != "=" {
-		p.PushErrorToken(vsAST.Setter, "invalid_syntax")
+	} else if assign.Setter.Kind != "=" {
+		p.PushErrorToken(assign.Setter, "invalid_syntax")
 		return
 	}
 	if valueLength == 1 {
-		firstVal, _ := p.computeExpr(vsAST.ValueExprs[0])
+		firstVal, _ := p.evalExpr(assign.ValueExprs[0])
 		if firstVal.ast.Type.MultiTyped {
-			vsAST.MultipleReturn = true
-			p.processFuncMultiAssign(vsAST, firstVal)
+			assign.MultipleReturn = true
+			p.processFuncMultiAssign(assign, firstVal)
 			return
 		}
 	}
 	switch {
 	case selectLength > valueLength:
-		p.PushErrorToken(vsAST.Setter, "overflow_multiassign_identifiers")
+		p.PushErrorToken(assign.Setter, "overflow_multiassign_identifiers")
 		return
 	case selectLength < valueLength:
-		p.PushErrorToken(vsAST.Setter, "missing_multiassign_identifiers")
+		p.PushErrorToken(assign.Setter, "missing_multiassign_identifiers")
 		return
 	}
-	p.processMultiAssign(vsAST, p.assignVals(vsAST))
+	p.processMultiAssign(assign, p.assignVals(assign))
 }
 
 func (p *Parser) checkFreeStatement(freeAST *ast.FreeAST) {
-	val, model := p.computeExpr(freeAST.Expr)
+	val, model := p.evalExpr(freeAST.Expr)
 	freeAST.Expr.Model = model
 	if !typeIsPtr(val.ast.Type) {
 		p.PushErrorToken(freeAST.Token, "free_nonpointer")
@@ -1933,7 +1958,7 @@ func (p *Parser) checkFreeStatement(freeAST *ast.FreeAST) {
 
 func (p *Parser) checkWhileProfile(iter *ast.IterAST) {
 	profile := iter.Profile.(ast.WhileProfile)
-	val, model := p.computeExpr(profile.Expr)
+	val, model := p.evalExpr(profile.Expr)
 	profile.Expr.Model = model
 	iter.Profile = profile
 	if !isBoolExpr(val) {
@@ -2019,7 +2044,7 @@ func (ftc *foreachTypeChecker) check() {
 
 func (p *Parser) checkForeachProfile(iter *ast.IterAST) {
 	profile := iter.Profile.(ast.ForeachProfile)
-	val, model := p.computeExpr(profile.Expr)
+	val, model := p.evalExpr(profile.Expr)
 	profile.Expr.Model = model
 	profile.ExprType = val.ast.Type
 	if !isForeachIterExpr(val) {
@@ -2060,7 +2085,7 @@ func (p *Parser) checkIterExpr(iter *ast.IterAST) {
 }
 
 func (p *Parser) checkIfExpr(ifast *ast.IfAST, index *int, statements []ast.StatementAST) {
-	val, model := p.computeExpr(ifast.Expr)
+	val, model := p.evalExpr(ifast.Expr)
 	ifast.Expr.Model = model
 	statement := statements[*index]
 	if !isBoolExpr(val) {
@@ -2079,7 +2104,7 @@ node:
 	statement = statements[*index]
 	switch t := statement.Value.(type) {
 	case ast.ElseIfAST:
-		val, model := p.computeExpr(t.Expr)
+		val, model := p.evalExpr(t.Expr)
 		t.Expr.Model = model
 		if !isBoolExpr(val) {
 			p.PushErrorToken(t.Token, "if_notbool_expr")

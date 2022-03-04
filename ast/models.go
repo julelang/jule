@@ -363,19 +363,21 @@ type AssignAST struct {
 	Setter         lex.Token
 	SelectExprs    []AssignSelector
 	ValueExprs     []ExprAST
+	IsExpr         bool
 	JustDeclare    bool
 	MultipleReturn bool
 }
 
-func (vs AssignAST) cxxSingleAssign(cxx *strings.Builder) string {
+func (vs AssignAST) cxxSingleAssign() string {
+	var cxx strings.Builder
 	cxx.WriteString(vs.SelectExprs[0].String())
 	cxx.WriteString(vs.Setter.Kind)
 	cxx.WriteString(vs.ValueExprs[0].String())
-	cxx.WriteByte(';')
 	return cxx.String()
 }
 
-func (vs AssignAST) cxxMultipleAssign(cxx *strings.Builder) string {
+func (vs AssignAST) cxxMultipleAssign() string {
+	var cxx strings.Builder
 	cxx.WriteString("std::tie(")
 	var expCxx strings.Builder
 	expCxx.WriteString("std::make_tuple(")
@@ -393,11 +395,11 @@ func (vs AssignAST) cxxMultipleAssign(cxx *strings.Builder) string {
 	cxx.WriteString(str)
 	cxx.WriteString(vs.Setter.Kind)
 	cxx.WriteString(expCxx.String()[:expCxx.Len()-1] + ")")
-	cxx.WriteByte(';')
 	return cxx.String()
 }
 
-func (vs AssignAST) cxxMultipleReturn(cxx *strings.Builder) string {
+func (vs AssignAST) cxxMultipleReturn() string {
+	var cxx strings.Builder
 	cxx.WriteString("std::tie(")
 	for _, selector := range vs.SelectExprs {
 		if selector.Ignore {
@@ -413,31 +415,38 @@ func (vs AssignAST) cxxMultipleReturn(cxx *strings.Builder) string {
 	cxx.WriteByte(')')
 	cxx.WriteString(vs.Setter.Kind)
 	cxx.WriteString(vs.ValueExprs[0].String())
-	cxx.WriteByte(';')
 	return cxx.String()
 }
 
-func (vs AssignAST) cxxNewDefines(cxx *strings.Builder) {
+func (vs AssignAST) cxxNewDefines() string {
+	var cxx strings.Builder
 	for _, selector := range vs.SelectExprs {
 		if selector.Ignore || !selector.NewVariable {
 			continue
 		}
 		cxx.WriteString(selector.Variable.String() + " ")
 	}
+	return cxx.String()
 }
 
 func (vs AssignAST) String() string {
 	var cxx strings.Builder
-	vs.cxxNewDefines(&cxx)
+	cxx.WriteString(vs.cxxNewDefines())
 	if vs.JustDeclare {
 		return cxx.String()[:cxx.Len()-1] /* Remove unnecesarry whitespace. */
 	}
-	if vs.MultipleReturn {
-		return vs.cxxMultipleReturn(&cxx)
-	} else if len(vs.SelectExprs) == 1 {
-		return vs.cxxSingleAssign(&cxx)
+	switch {
+	case vs.MultipleReturn:
+		cxx.WriteString(vs.cxxMultipleReturn())
+	case len(vs.SelectExprs) == 1:
+		cxx.WriteString(vs.cxxSingleAssign())
+	default:
+		cxx.WriteString(vs.cxxMultipleAssign())
 	}
-	return vs.cxxMultipleAssign(&cxx)
+	if !vs.IsExpr {
+		cxx.WriteByte(';')
+	}
+	return cxx.String()
 }
 
 type FreeAST struct {
