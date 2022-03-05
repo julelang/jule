@@ -1197,6 +1197,8 @@ func (p *Parser) evalCast(v value, t ast.DataTypeAST, errtok lex.Token) value {
 	switch {
 	case typeIsPtr(t):
 		p.checkCastPtr(v.ast.Type, errtok)
+	case typeIsArray(t):
+		p.checkCastArray(t, v.ast.Type, errtok)
 	case typeIsSingle(t):
 		p.checkCastSingle(v.ast.Type, t.Code, errtok)
 	default:
@@ -1209,6 +1211,11 @@ func (p *Parser) evalCast(v value, t ast.DataTypeAST, errtok lex.Token) value {
 }
 
 func (p *Parser) checkCastSingle(vt ast.DataTypeAST, t uint8, errtok lex.Token) {
+	switch t {
+	case x.Str:
+		p.checkCastStr(vt, errtok)
+		return
+	}
 	switch {
 	case x.IsIntegerType(t):
 		p.checkCastInteger(vt, errtok)
@@ -1219,14 +1226,25 @@ func (p *Parser) checkCastSingle(vt ast.DataTypeAST, t uint8, errtok lex.Token) 
 	}
 }
 
-func (p *Parser) checkCastInteger(vt ast.DataTypeAST, errTok lex.Token) {
+func (p *Parser) checkCastStr(vt ast.DataTypeAST, errtok lex.Token) {
+	if !typeIsArray(vt) {
+		p.pusherrtok(errtok, "type_notsupports_casting")
+		return
+	}
+	vt.Value = vt.Value[2:] // Remove array brackets
+	if !typeIsSingle(vt) || (vt.Code != x.Rune && vt.Code != x.U8) {
+		p.pusherrtok(errtok, "type_notsupports_casting")
+	}
+}
+
+func (p *Parser) checkCastInteger(vt ast.DataTypeAST, errtok lex.Token) {
 	if typeIsPtr(vt) {
 		return
 	}
 	if typeIsSingle(vt) && x.IsNumericType(vt.Code) {
 		return
 	}
-	p.pusherrtok(errTok, "type_notsupports_casting")
+	p.pusherrtok(errtok, "type_notsupports_casting")
 }
 
 func (p *Parser) checkCastNumeric(vt ast.DataTypeAST, errtok lex.Token) {
@@ -1244,6 +1262,17 @@ func (p *Parser) checkCastPtr(vt ast.DataTypeAST, errtok lex.Token) {
 		return
 	}
 	p.pusherrtok(errtok, "type_notsupports_casting")
+}
+
+func (p *Parser) checkCastArray(t, vt ast.DataTypeAST, errtok lex.Token) {
+	if !typeIsSingle(vt) || vt.Code != x.Str {
+		p.pusherrtok(errtok, "type_notsupports_casting")
+		return
+	}
+	t.Value = t.Value[2:] // Remove array brackets
+	if !typeIsSingle(t) || (t.Code != x.Rune && t.Code != x.U8) {
+		p.pusherrtok(errtok, "type_notsupports_casting")
+	}
 }
 
 func (p *Parser) evalOperatorExprPartRight(tokens []lex.Token, b *exprBuilder) (v value) {

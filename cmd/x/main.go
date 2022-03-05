@@ -150,7 +150,9 @@ func appendStandard(code *string) {
 #include <string>
 #include <functional>
 #include <vector>
+#include <codecvt>
 #include <locale>
+#include <type_traits>
 // endregion X_STANDARD_IMPORTS
 
 // region X_CXX_API
@@ -195,8 +197,9 @@ typedef wchar_t  rune;
 class str: public std::basic_string<rune> {
 public:
 // region CONSTRUCTOR
-  str(void): str(L"")   { }
-  str(const rune* _Str) { this->assign(_Str); }
+  str(void): str(L"")                                        { }
+  str(const rune* _Str)                                      { this->assign(_Str); }
+  str(const std::basic_string<rune> _Src): str(_Src.c_str()) { }
 // endregion CONSTRUCTOR
 
 // region OPERATOR_OVERFLOWS
@@ -210,7 +213,7 @@ public:
     return this->at(_Index);
   }
 // endregion OPERATOR_OVERFLOWS
-  };
+};
 // endregion X_BUILTIN_TYPES
 
 // region X_STRUCTURES
@@ -222,27 +225,49 @@ public:
 // endregion FIELDS
 
 // region CONSTRUCTORS
-  array<_Item_t>(void)                                                     { this->_buffer = { }; }
-  array<_Item_t>(const std::vector<_Item_t>& _Src)                         { this->_buffer = _Src; }
-  array<_Item_t>(std::nullptr_t): array<_Item_t>()                         { }
-  array<_Item_t>(const array<_Item_t>& _Src): array<_Item_t>(_Src._buffer) { }
+  array<_Item_t>(void) noexcept                                                     { this->_buffer = { }; }
+  array<_Item_t>(const std::vector<_Item_t>& _Src) noexcept                         { this->_buffer = _Src; }
+  array<_Item_t>(std::nullptr_t) noexcept: array<_Item_t>()                         { }
+  array<_Item_t>(const array<_Item_t>& _Src) noexcept: array<_Item_t>(_Src._buffer) { }
+
+  array<_Item_t>(const str _Str) {
+    if (std::is_same<_Item_t, rune>::value) {
+      this->_buffer = std::vector<_Item_t>(_Str.begin(), _Str.end());
+      return;
+    }
+    if (std::is_same<_Item_t, u8>::value) {
+      std::wstring_convert<std::codecvt_utf8_utf16<rune>> _conv;
+      std::string _bytes = _conv.to_bytes(_Str);
+      this->_buffer = std::vector<_Item_t>(_bytes.begin(), _bytes.end());
+      return;
+    }
+  }
 // endregion CONSTRUCTORS
 
 // region DESTRUCTOR
-  ~array<_Item_t>(void) { this->_buffer.clear(); }
+  ~array<_Item_t>(void) noexcept { this->_buffer.clear(); }
 // endregion DESTRUCTOR
 
 // region FOREACH_SUPPORT
   typedef _Item_t       *iterator;
   typedef const _Item_t *const_iterator;
-  iterator begin(void)             { return &this->_buffer[0]; }
-  const_iterator begin(void) const { return &this->_buffer[0]; }
-  iterator end(void)               { return &this->_buffer[this->_buffer.size()]; }
-  const_iterator end(void) const   { return &this->_buffer[this->_buffer.size()]; }
+  iterator begin(void) noexcept             { return &this->_buffer[0]; }
+  const_iterator begin(void) const noexcept { return &this->_buffer[0]; }
+  iterator end(void) noexcept               { return &this->_buffer[this->_buffer.size()]; }
+  const_iterator end(void) const noexcept   { return &this->_buffer[this->_buffer.size()]; }
 // endregion FOREACH_SUPPORT
 
 // region OPERATOR_OVERFLOWS
-  bool operator==(const array<_Item_t> &_Src) {
+  operator str() const noexcept {
+    if (std::is_same<_Item_t, rune>::value) { return str(std::basic_string<rune>(this->begin(), this->end())); }
+    if (std::is_same<_Item_t, u8>::value) {
+      std::wstring_convert<std::codecvt_utf8_utf16<rune>> _conv;
+      const std::string _bytes(this->begin(), this->end());
+      return str(_conv.from_bytes(_bytes));
+    }
+  }
+
+  bool operator==(const array<_Item_t> &_Src) const noexcept {
     const size _length = this->_buffer.size();
     const size _Src_length = _Src._buffer.size();
     if (_length != _Src_length) { return false; }
@@ -251,11 +276,11 @@ public:
     return true;
   }
 
-  bool operator==(std::nullptr_t)             { return this->_buffer.empty(); }
-  bool operator!=(const array<_Item_t> &_Src) { return !(*this == _Src); }
-  bool operator!=(std::nullptr_t)             { return !this->_buffer.empty(); }
+  bool operator==(std::nullptr_t) const noexcept             { return this->_buffer.empty(); }
+  bool operator!=(const array<_Item_t> &_Src) const noexcept { return !(*this == _Src); }
+  bool operator!=(std::nullptr_t) const noexcept             { return !this->_buffer.empty(); }
 
-  _Item_t& operator[](const ssize _Index) {
+  _Item_t& operator[](const ssize _Index) noexcept {
     const size _length = this->_buffer.size();
          if (_Index < 0) { XPANIC(L"stackoverflow exception:\n index is less than zero"); }
     else if (_Index >= _length) {
