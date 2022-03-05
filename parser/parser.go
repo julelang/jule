@@ -570,6 +570,12 @@ func (p *Parser) nextOperator(tokens [][]lex.Token) int {
 	}
 }
 
+func toRawStrLiteral(literal string) string {
+	literal = literal[1 : len(literal)-1] // Remove bounds
+	literal = `"(` + literal + `)"`
+	return literal
+}
+
 type valueEvaluator struct {
 	token   lex.Token
 	builder *exprBuilder
@@ -581,7 +587,11 @@ func (p *valueEvaluator) str() value {
 	v.ast.Value = p.token.Kind
 	v.ast.Type.Code = x.Str
 	v.ast.Type.Value = "str"
-	p.builder.appendNode(strExpr{p.token})
+	if israwstr(p.token.Kind) {
+		p.builder.appendNode(rawStrExpr{toRawStrLiteral(p.token.Kind)})
+	} else {
+		p.builder.appendNode(strExpr{p.token.Kind})
+	}
 	return v
 }
 
@@ -590,7 +600,7 @@ func (p *valueEvaluator) rune() value {
 	v.ast.Value = p.token.Kind
 	v.ast.Type.Code = x.Rune
 	v.ast.Type.Value = "rune"
-	p.builder.appendNode(runeExpr{p.token})
+	p.builder.appendNode(runeExpr{p.token.Kind})
 	return v
 }
 

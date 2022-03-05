@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/the-xlang/x/ast"
-	"github.com/the-xlang/x/lex"
 )
 
 type IExprNode interface {
@@ -82,19 +81,38 @@ func (node exprNode) String() string {
 }
 
 type runeExpr struct {
-	token lex.Token
+	literal string
 }
 
 func (run runeExpr) String() string {
-	return "L" + run.token.Kind
+	var cxx strings.Builder
+	cxx.WriteByte('L')
+	cxx.WriteString(run.literal)
+	return cxx.String()
 }
 
 type strExpr struct {
-	token lex.Token
+	literal string
 }
 
 func (str strExpr) String() string {
-	return "str(L" + str.token.Kind + ")"
+	var cxx strings.Builder
+	cxx.WriteString("str(L")
+	cxx.WriteString(str.literal)
+	cxx.WriteByte(')')
+	return cxx.String()
+}
+
+type rawStrExpr struct {
+	literal string
+}
+
+func (rawstr rawStrExpr) String() string {
+	var cxx strings.Builder
+	cxx.WriteString("str(LR")
+	cxx.WriteString(rawstr.literal)
+	cxx.WriteByte(')')
+	return cxx.String()
 }
 
 type anonFunc struct {

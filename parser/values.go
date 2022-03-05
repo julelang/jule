@@ -6,9 +6,10 @@ import (
 	"github.com/the-xlang/x/pkg/xbits"
 )
 
-func isstr(value string) bool  { return value[0] == '"' }
-func isrune(value string) bool { return value[0] == '\'' }
-func isnil(value string) bool  { return value == "nil" }
+func isstr(value string) bool    { return value[0] == '"' || israwstr(value) }
+func israwstr(value string) bool { return value[0] == '`' }
+func isrune(value string) bool   { return value[0] == '\'' }
+func isnil(value string) bool    { return value == "nil" }
 
 func isbool(value string) bool {
 	return value == "true" || value == "false"

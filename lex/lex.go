@@ -180,8 +180,8 @@ func (l *Lex) escseq(content string) string {
 	return seq
 }
 
-func (l *Lex) getrune(content string) string {
-	if content[0] == '\\' {
+func (l *Lex) getrune(content string, raw bool) string {
+	if !raw && content[0] == '\\' {
 		return l.escseq(content)
 	}
 	run, _ := utf8.DecodeRuneInString(content)
@@ -202,7 +202,7 @@ func (l *Lex) rune(content string) string {
 			l.Newln()
 			return ""
 		}
-		run := l.getrune(content[index:])
+		run := l.getrune(content[index:], false)
 		sb.WriteString(run)
 		length := len(run)
 		l.Column += length
@@ -225,22 +225,27 @@ func (l *Lex) rune(content string) string {
 
 func (l *Lex) str(content string) string {
 	var sb strings.Builder
-	sb.WriteByte('"')
+	mark := content[0]
+	raw := mark == '`'
+	sb.WriteByte(mark)
 	l.Column++
 	content = content[1:]
 	for i := 0; i < len(content); i++ {
 		ch := content[i]
 		if ch == '\n' {
-			l.pusherr("missing_string_end")
-			l.Position++
+			if !raw {
+				l.pusherr("missing_string_end")
+				l.Position++
+				l.Newln()
+				return ""
+			}
 			l.Newln()
-			return ""
 		}
-		run := l.getrune(content[i:])
+		run := l.getrune(content[i:], raw)
 		sb.WriteString(run)
 		length := len(run)
 		l.Column += length
-		if run == `"` {
+		if ch == mark {
 			l.Position++
 			break
 		}
@@ -279,158 +284,158 @@ func (l *Lex) kw(content, kind string, id uint8, token *Token) bool {
 
 // Tok generates next token from resume at position.
 func (l *Lex) Tok() Token {
-	token := Token{
+	tok := Token{
 		File: l.File,
 		Id:   NA,
 	}
 	content := l.resume()
 	if content == "" {
-		return token
+		return tok
 	}
 	// Set token values.
-	token.Column = l.Column
-	token.Row = l.Line
+	tok.Column = l.Column
+	tok.Row = l.Line
 
 	//* Tokenize
 
 	switch {
 	case content[0] == '\'':
-		token.Kind = l.rune(content)
-		token.Id = Value
-		return token
-	case content[0] == '"':
-		token.Kind = l.str(content)
-		token.Id = Value
-		return token
+		tok.Kind = l.rune(content)
+		tok.Id = Value
+		return tok
+	case content[0] == '"', content[0] == '`':
+		tok.Kind = l.str(content)
+		tok.Id = Value
+		return tok
 	case strings.HasPrefix(content, "//"):
 		l.lncomment()
-		return token
+		return tok
 	case strings.HasPrefix(content, "/*"):
 		l.rangecomment()
-		return token
-	case l.punct(content, "(", Brace, &token):
-		l.braces = append(l.braces, token)
-	case l.punct(content, ")", Brace, &token):
+		return tok
+	case l.punct(content, "(", Brace, &tok):
+		l.braces = append(l.braces, tok)
+	case l.punct(content, ")", Brace, &tok):
 		length := len(l.braces)
 		if length == 0 {
-			l.pusherrtok(token, "extra_closed_parentheses")
+			l.pusherrtok(tok, "extra_closed_parentheses")
 			break
 		} else if l.braces[length-1].Kind != "(" {
 			l.wg.Add(1)
-			go l.pushWrongOrderCloseErrAsync(token)
+			go l.pushWrongOrderCloseErrAsync(tok)
 		}
-		l.rmrange(length-1, token.Kind)
-	case l.punct(content, "{", Brace, &token):
-		l.braces = append(l.braces, token)
-	case l.punct(content, "}", Brace, &token):
+		l.rmrange(length-1, tok.Kind)
+	case l.punct(content, "{", Brace, &tok):
+		l.braces = append(l.braces, tok)
+	case l.punct(content, "}", Brace, &tok):
 		length := len(l.braces)
 		if length == 0 {
-			l.pusherrtok(token, "extra_closed_braces")
+			l.pusherrtok(tok, "extra_closed_braces")
 			break
 		} else if l.braces[length-1].Kind != "{" {
 			l.wg.Add(1)
-			go l.pushWrongOrderCloseErrAsync(token)
+			go l.pushWrongOrderCloseErrAsync(tok)
 		}
-		l.rmrange(length-1, token.Kind)
-	case l.punct(content, "[", Brace, &token):
-		l.braces = append(l.braces, token)
-	case l.punct(content, "]", Brace, &token):
+		l.rmrange(length-1, tok.Kind)
+	case l.punct(content, "[", Brace, &tok):
+		l.braces = append(l.braces, tok)
+	case l.punct(content, "]", Brace, &tok):
 		length := len(l.braces)
 		if length == 0 {
-			l.pusherrtok(token, "extra_closed_brackets")
+			l.pusherrtok(tok, "extra_closed_brackets")
 			break
 		} else if l.braces[length-1].Kind != "[" {
 			l.wg.Add(1)
-			go l.pushWrongOrderCloseErrAsync(token)
+			go l.pushWrongOrderCloseErrAsync(tok)
 		}
-		l.rmrange(length-1, token.Kind)
+		l.rmrange(length-1, tok.Kind)
 	case
-		l.punct(content, ":", Colon, &token),
-		l.punct(content, ";", SemiColon, &token),
-		l.punct(content, ",", Comma, &token),
-		l.punct(content, "@", At, &token),
-		l.punct(content, "...", Operator, &token),
-		l.punct(content, "+=", Operator, &token),
-		l.punct(content, "-=", Operator, &token),
-		l.punct(content, "*=", Operator, &token),
-		l.punct(content, "/=", Operator, &token),
-		l.punct(content, "%=", Operator, &token),
-		l.punct(content, "<<=", Operator, &token),
-		l.punct(content, ">>=", Operator, &token),
-		l.punct(content, "^=", Operator, &token),
-		l.punct(content, "&=", Operator, &token),
-		l.punct(content, "|=", Operator, &token),
-		l.punct(content, "==", Operator, &token),
-		l.punct(content, "!=", Operator, &token),
-		l.punct(content, ">=", Operator, &token),
-		l.punct(content, "<=", Operator, &token),
-		l.punct(content, "&&", Operator, &token),
-		l.punct(content, "||", Operator, &token),
-		l.punct(content, "<<", Operator, &token),
-		l.punct(content, ">>", Operator, &token),
-		l.punct(content, "+", Operator, &token),
-		l.punct(content, "-", Operator, &token),
-		l.punct(content, "*", Operator, &token),
-		l.punct(content, "/", Operator, &token),
-		l.punct(content, "%", Operator, &token),
-		l.punct(content, "~", Operator, &token),
-		l.punct(content, "&", Operator, &token),
-		l.punct(content, "|", Operator, &token),
-		l.punct(content, "^", Operator, &token),
-		l.punct(content, "!", Operator, &token),
-		l.punct(content, "<", Operator, &token),
-		l.punct(content, ">", Operator, &token),
-		l.punct(content, "=", Operator, &token),
-		l.kw(content, "i8", DataType, &token),
-		l.kw(content, "i16", DataType, &token),
-		l.kw(content, "i32", DataType, &token),
-		l.kw(content, "i64", DataType, &token),
-		l.kw(content, "u8", DataType, &token),
-		l.kw(content, "u16", DataType, &token),
-		l.kw(content, "u32", DataType, &token),
-		l.kw(content, "u64", DataType, &token),
-		l.kw(content, "f32", DataType, &token),
-		l.kw(content, "f64", DataType, &token),
-		l.kw(content, "size", DataType, &token),
-		l.kw(content, "ssize", DataType, &token),
-		l.kw(content, "bool", DataType, &token),
-		l.kw(content, "rune", DataType, &token),
-		l.kw(content, "str", DataType, &token),
-		l.kw(content, "true", Value, &token),
-		l.kw(content, "false", Value, &token),
-		l.kw(content, "nil", Value, &token),
-		l.kw(content, "const", Const, &token),
-		l.kw(content, "ret", Ret, &token),
-		l.kw(content, "type", Type, &token),
-		l.kw(content, "new", New, &token),
-		l.kw(content, "free", Free, &token),
-		l.kw(content, "iter", Iter, &token),
-		l.kw(content, "break", Break, &token),
-		l.kw(content, "continue", Continue, &token),
-		l.kw(content, "in", In, &token),
-		l.kw(content, "if", If, &token),
-		l.kw(content, "else", Else, &token),
-		l.kw(content, "volatile", Volatile, &token):
+		l.punct(content, ":", Colon, &tok),
+		l.punct(content, ";", SemiColon, &tok),
+		l.punct(content, ",", Comma, &tok),
+		l.punct(content, "@", At, &tok),
+		l.punct(content, "...", Operator, &tok),
+		l.punct(content, "+=", Operator, &tok),
+		l.punct(content, "-=", Operator, &tok),
+		l.punct(content, "*=", Operator, &tok),
+		l.punct(content, "/=", Operator, &tok),
+		l.punct(content, "%=", Operator, &tok),
+		l.punct(content, "<<=", Operator, &tok),
+		l.punct(content, ">>=", Operator, &tok),
+		l.punct(content, "^=", Operator, &tok),
+		l.punct(content, "&=", Operator, &tok),
+		l.punct(content, "|=", Operator, &tok),
+		l.punct(content, "==", Operator, &tok),
+		l.punct(content, "!=", Operator, &tok),
+		l.punct(content, ">=", Operator, &tok),
+		l.punct(content, "<=", Operator, &tok),
+		l.punct(content, "&&", Operator, &tok),
+		l.punct(content, "||", Operator, &tok),
+		l.punct(content, "<<", Operator, &tok),
+		l.punct(content, ">>", Operator, &tok),
+		l.punct(content, "+", Operator, &tok),
+		l.punct(content, "-", Operator, &tok),
+		l.punct(content, "*", Operator, &tok),
+		l.punct(content, "/", Operator, &tok),
+		l.punct(content, "%", Operator, &tok),
+		l.punct(content, "~", Operator, &tok),
+		l.punct(content, "&", Operator, &tok),
+		l.punct(content, "|", Operator, &tok),
+		l.punct(content, "^", Operator, &tok),
+		l.punct(content, "!", Operator, &tok),
+		l.punct(content, "<", Operator, &tok),
+		l.punct(content, ">", Operator, &tok),
+		l.punct(content, "=", Operator, &tok),
+		l.kw(content, "i8", DataType, &tok),
+		l.kw(content, "i16", DataType, &tok),
+		l.kw(content, "i32", DataType, &tok),
+		l.kw(content, "i64", DataType, &tok),
+		l.kw(content, "u8", DataType, &tok),
+		l.kw(content, "u16", DataType, &tok),
+		l.kw(content, "u32", DataType, &tok),
+		l.kw(content, "u64", DataType, &tok),
+		l.kw(content, "f32", DataType, &tok),
+		l.kw(content, "f64", DataType, &tok),
+		l.kw(content, "size", DataType, &tok),
+		l.kw(content, "ssize", DataType, &tok),
+		l.kw(content, "bool", DataType, &tok),
+		l.kw(content, "rune", DataType, &tok),
+		l.kw(content, "str", DataType, &tok),
+		l.kw(content, "true", Value, &tok),
+		l.kw(content, "false", Value, &tok),
+		l.kw(content, "nil", Value, &tok),
+		l.kw(content, "const", Const, &tok),
+		l.kw(content, "ret", Ret, &tok),
+		l.kw(content, "type", Type, &tok),
+		l.kw(content, "new", New, &tok),
+		l.kw(content, "free", Free, &tok),
+		l.kw(content, "iter", Iter, &tok),
+		l.kw(content, "break", Break, &tok),
+		l.kw(content, "continue", Continue, &tok),
+		l.kw(content, "in", In, &tok),
+		l.kw(content, "if", If, &tok),
+		l.kw(content, "else", Else, &tok),
+		l.kw(content, "volatile", Volatile, &tok):
 	default:
 		lex := l.id(content)
 		if lex != "" {
-			token.Kind = "_" + lex
-			token.Id = Id
+			tok.Kind = "_" + lex
+			tok.Id = Id
 			break
 		}
 		lex = l.num(content)
 		if lex != "" {
-			token.Kind = lex
-			token.Id = Value
+			tok.Kind = lex
+			tok.Id = Value
 			break
 		}
 		l.pusherr("invalid_token")
 		l.Column++
 		l.Position++
-		return token
+		return tok
 	}
-	l.Column += len(token.Kind)
-	return token
+	l.Column += len(tok.Kind)
+	return tok
 }
 
 func (l *Lex) rmrange(index int, kind string) {
