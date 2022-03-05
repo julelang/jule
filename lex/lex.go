@@ -396,6 +396,8 @@ func (l *Lex) Tok() Token {
 		l.kw(content, "u64", DataType, &tok),
 		l.kw(content, "f32", DataType, &tok),
 		l.kw(content, "f64", DataType, &tok),
+		l.kw(content, "byte", DataType, &tok),
+		l.kw(content, "sbyte", DataType, &tok),
 		l.kw(content, "size", DataType, &tok),
 		l.kw(content, "ssize", DataType, &tok),
 		l.kw(content, "bool", DataType, &tok),

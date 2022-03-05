@@ -4,10 +4,12 @@ package x
 const (
 	Void  uint8 = 0
 	I8    uint8 = 1
+	SByte uint8 = I8
 	I16   uint8 = 2
 	I32   uint8 = 3
 	I64   uint8 = 4
 	U8    uint8 = 5
+	Byte  uint8 = U8
 	U16   uint8 = 6
 	U32   uint8 = 7
 	U64   uint8 = 8
@@ -192,7 +194,7 @@ func IsUnsignedNumericType(t uint8) bool {
 // TypeFromName returns type name of specified type code.
 func TypeFromName(name string) uint8 {
 	switch name {
-	case "i8":
+	case "i8", "sbyte":
 		return I8
 	case "i16":
 		return I16
@@ -200,7 +202,7 @@ func TypeFromName(name string) uint8 {
 		return I32
 	case "i64":
 		return I64
-	case "u8":
+	case "u8", "byte":
 		return U8
 	case "u16":
 		return U16
