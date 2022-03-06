@@ -35,4 +35,5 @@ const (
 	If        uint8 = 19
 	Else      uint8 = 20
 	Volatile  uint8 = 21
+	Comment   uint8 = 22
 )

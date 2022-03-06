@@ -638,3 +638,16 @@ func (elseast ElseAST) String() string {
 	cxx.WriteString(elseast.Block.String())
 	return cxx.String()
 }
+
+// CommentAST is the AST model of just comment lines.
+type CommentAST struct {
+	Token   lex.Token
+	Content string
+}
+
+func (c CommentAST) String() string {
+	var cxx strings.Builder
+	cxx.WriteString("// ")
+	cxx.WriteString(c.Content)
+	return cxx.String()
+}

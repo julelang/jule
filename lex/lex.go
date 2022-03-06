@@ -14,7 +14,8 @@ import (
 
 // Lex is lexer of Fract.
 type Lex struct {
-	wg sync.WaitGroup
+	wg               sync.WaitGroup
+	firstTokenOfLine bool
 
 	File     *io.File
 	Position int
@@ -49,6 +50,7 @@ func (l *Lex) pusherrtok(tok Token, err string) {
 func (l *Lex) Tokenize() []Token {
 	var tokens []Token
 	l.Errors = nil
+	l.Newln()
 	for l.Position < len(l.File.Content) {
 		token := l.Tok()
 		if token.Id != NA {
@@ -128,10 +130,15 @@ func (l *Lex) resume() string {
 	return ln
 }
 
-func (l *Lex) lncomment() {
+func (l *Lex) lncomment(token *Token) {
+	start := l.Position
 	l.Position += 2
 	for ; l.Position < len(l.File.Content); l.Position++ {
 		if l.File.Content[l.Position] == '\n' {
+			if l.firstTokenOfLine {
+				token.Id = Comment
+				token.Kind = string(l.File.Content[start:l.Position])
+			}
 			l.Position++
 			l.Newln()
 			return
@@ -258,6 +265,7 @@ func (l *Lex) str(content string) string {
 
 // Newln sets ready lexer to a new line lexing.
 func (l *Lex) Newln() {
+	l.firstTokenOfLine = true
 	l.Line++
 	l.Column = 1
 }
@@ -284,6 +292,7 @@ func (l *Lex) kw(content, kind string, id uint8, token *Token) bool {
 
 // Tok generates next token from resume at position.
 func (l *Lex) Tok() Token {
+	defer func() { l.firstTokenOfLine = false }()
 	tok := Token{
 		File: l.File,
 		Id:   NA,
@@ -308,7 +317,7 @@ func (l *Lex) Tok() Token {
 		tok.Id = Value
 		return tok
 	case strings.HasPrefix(content, "//"):
-		l.lncomment()
+		l.lncomment(&tok)
 		return tok
 	case strings.HasPrefix(content, "/*"):
 		l.rangecomment()

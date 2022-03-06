@@ -139,6 +139,7 @@ func (p *Parser) Parse() {
 			p.Statement(t)
 		case ast.TypeAST:
 			p.Type(t)
+		case ast.CommentAST:
 		default:
 			p.pusherrtok(model.Token, "invalid_syntax")
 		}

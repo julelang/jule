@@ -55,6 +55,8 @@ func (b *Builder) Build() {
 			b.GlobalVar(tokens)
 		case lex.Type:
 			b.Type(tokens)
+		case lex.Comment:
+			b.Comment(tokens)
 		default:
 			b.pusherr(token, "invalid_syntax")
 		}
@@ -82,6 +84,12 @@ func (b *Builder) Type(tokens []lex.Token) {
 	token = tokens[1]
 	typeAST := TypeAST{token, token.Kind, destType}
 	b.Tree = append(b.Tree, Object{token, typeAST})
+}
+
+func (b *Builder) Comment(tokens []lex.Token) {
+	token := tokens[0]
+	commentAST := CommentAST{token, token.Kind[2:]}
+	b.Tree = append(b.Tree, Object{token, commentAST})
 }
 
 // Id builds AST model of global name statement.
@@ -488,6 +496,9 @@ func (b *Builder) pushStatementToBlock(bs *blockStatement) {
 		bs.tokens = bs.tokens[:len(bs.tokens)-1]
 	}
 	statement := b.Statement(bs)
+	if statement.Value == nil {
+		return
+	}
 	statement.WithTerminator = bs.withTerminator
 	bs.block.Statements = append(bs.block.Statements, statement)
 }
@@ -612,6 +623,8 @@ func (b *Builder) Statement(bs *blockStatement) (s StatementAST) {
 		if token.Kind == "<" {
 			return b.RetStatement(bs.tokens)
 		}
+	case lex.Comment:
+		return
 	}
 	return b.ExprStatement(bs.tokens)
 }
