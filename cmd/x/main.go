@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/the-xlang/x/documenter"
 	"github.com/the-xlang/x/parser"
 	"github.com/the-xlang/x/pkg/io"
 	"github.com/the-xlang/x/pkg/x"
@@ -73,6 +74,26 @@ func initProject(cmd string) {
 	println("Initialized project.")
 }
 
+func doc(cmd string) {
+	filePath := strings.TrimSpace(cmd)
+	info := compile(filePath, true)
+	if info == nil {
+		return
+	}
+	if info.Errors != nil {
+		printerr(info.Errors)
+		fmt.Println("Documentation couldn't generated because X source code has an errors.")
+		return
+	}
+	docjson, err := documenter.Documentize(info.Parser)
+	if err != nil {
+		fmt.Println("Error:", err.Error())
+		return
+	}
+	path := filepath.Join(x.XSet.CxxOutDir, filePath+".xdoc")
+	writeOutput(path, docjson)
+}
+
 func processCommand(namespace, cmd string) bool {
 	switch namespace {
 	case "help":
@@ -81,6 +102,8 @@ func processCommand(namespace, cmd string) bool {
 		version(cmd)
 	case "init":
 		initProject(cmd)
+	case "doc":
+		doc(cmd)
 	default:
 		return false
 	}
@@ -104,6 +127,7 @@ func init() {
 	if index == -1 {
 		index = len(arg)
 	}
+	loadXSet()
 	if processCommand(arg[:index], arg[index:]) {
 		os.Exit(0)
 	}
@@ -335,40 +359,44 @@ int main() {
 // endregion X_ENTRY_POINT`
 }
 
-func writeCxxOutput(info *parser.ParseFileInfo) {
-	path := filepath.Join(x.XSet.CxxOutDir, x.XSet.CxxOutName)
+func writeOutput(path, content string) {
 	err := os.MkdirAll(x.XSet.CxxOutDir, 0777)
 	if err != nil {
 		println(err.Error())
 		os.Exit(0)
 	}
-	content := []byte(info.X_CXX)
-	err = ioutil.WriteFile(path, content, 0666)
+	bytes := []byte(content)
+	err = ioutil.WriteFile(path, bytes, 0666)
 	if err != nil {
 		println(err.Error())
 		os.Exit(0)
 	}
 }
 
-var routines *sync.WaitGroup
-
-func main() {
-	f, err := io.Openfx(os.Args[0])
+func compile(path string, justDefs bool) *parser.ParseFileInfo {
+	f, err := io.Openfx(path)
 	if err != nil {
 		println(err.Error())
-		return
+		return nil
 	}
-	loadXSet()
-	routines = new(sync.WaitGroup)
+	routines := new(sync.WaitGroup)
 	info := new(parser.ParseFileInfo)
 	info.File = f
 	info.Routines = routines
 	routines.Add(1)
-	go parser.ParseFileAsync(info)
+	go info.ParseAsync(justDefs)
 	routines.Wait()
 	if info.Errors != nil {
 		printerr(info.Errors)
 	}
-	appendStandard(&info.X_CXX)
-	writeCxxOutput(info)
+	return info
+}
+
+func main() {
+	filePath := os.Args[0]
+	info := compile(filePath, false)
+	cxx := info.Parser.Cxx()
+	appendStandard(&cxx)
+	path := filepath.Join(x.XSet.CxxOutDir, x.XSet.CxxOutName)
+	writeOutput(path, cxx)
 }

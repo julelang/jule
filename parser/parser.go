@@ -16,6 +16,7 @@ type Parser struct {
 	attributes []ast.AttributeAST
 	iterCount  int
 	wg         sync.WaitGroup
+	justDefs   bool
 
 	Funcs             []*function
 	GlobalVars        []ast.VariableAST
@@ -124,13 +125,14 @@ func (p *Parser) Cxx() string {
 }
 
 // Parse is parse X code.
-func (p *Parser) Parse() {
+func (p *Parser) Parse(justDefs bool) {
 	builder := ast.NewBuilder(p.Tokens)
 	builder.Build()
 	if len(builder.Errors) > 0 {
 		p.PFI.Errors = append(p.PFI.Errors, builder.Errors...)
 		return
 	}
+	p.justDefs = justDefs
 	for _, model := range builder.Tree {
 		switch t := model.Value.(type) {
 		case ast.AttributeAST:
@@ -154,7 +156,7 @@ func (p *Parser) Type(t ast.TypeAST) {
 	if p.existName(t.Id).Id != lex.NA {
 		p.pusherrtok(t.Token, "exist_id")
 		return
-	} else if x.IsIgnoreName(t.Id) {
+	} else if x.IsIgnoreId(t.Id) {
 		p.pusherrtok(t.Token, "ignore_id")
 		return
 	}
@@ -193,7 +195,7 @@ func (p *Parser) Statement(s ast.StatementAST) {
 func (p *Parser) Func(fast ast.FuncAST) {
 	if p.existName(fast.Id).Id != lex.NA {
 		p.pusherrtok(fast.Token, "exist_id")
-	} else if x.IsIgnoreName(fast.Id) {
+	} else if x.IsIgnoreId(fast.Id) {
 		p.pusherrtok(fast.Token, "ignore_id")
 	}
 	fun := new(function)
@@ -215,7 +217,7 @@ func (p *Parser) GlobalVar(vast ast.VariableAST) {
 
 // Var parse X variable.
 func (p *Parser) Var(vast ast.VariableAST) ast.VariableAST {
-	if x.IsIgnoreName(vast.Id) {
+	if x.IsIgnoreId(vast.Id) {
 		p.pusherrtok(vast.IdToken, "ignore_id")
 	}
 	var val value
@@ -376,15 +378,19 @@ func (p *Parser) existName(name string) lex.Token {
 
 func (p *Parser) checkAsync() {
 	defer func() { p.wg.Done() }()
-	if p.FuncById("_"+x.EntryPoint) == nil {
-		p.pusherr("no_entry_point")
+	if !p.justDefs {
+		if p.FuncById("_"+x.EntryPoint) == nil {
+			p.pusherr("no_entry_point")
+		}
 	}
 	p.wg.Add(1)
 	go p.checkTypesAsync()
 	p.WaitingGlobalVars()
 	p.waitingGlobalVars = nil
-	p.wg.Add(1)
-	go p.checkFuncsAsync()
+	if !p.justDefs {
+		p.wg.Add(1)
+		go p.checkFuncsAsync()
+	}
 }
 
 func (p *Parser) checkTypesAsync() {
@@ -1345,7 +1351,7 @@ func (p *Parser) evalParenthesesRangeExpr(tokens []lex.Token, b *exprBuilder) (v
 	case x.Func:
 		fun := v.ast.Type.Tag.(ast.FuncAST)
 		p.parseFuncCall(fun, tokens[len(valueTokens):], b)
-		v.ast.Type = fun.ReturnType
+		v.ast.Type = fun.RetType
 		v.lvalue = typeIsLvalue(v.ast.Type)
 	default:
 		p.pusherrtok(tokens[len(valueTokens)], "invalid_syntax")
@@ -1666,8 +1672,8 @@ func (p *Parser) checkEntryPointSpecialCases(fun *function) {
 	if len(fun.Ast.Params) > 0 {
 		p.pusherrtok(fun.Ast.Token, "entrypoint_have_parameters")
 	}
-	if fun.Ast.ReturnType.Code != x.Void {
-		p.pusherrtok(fun.Ast.ReturnType.Token, "entrypoint_have_return")
+	if fun.Ast.RetType.Code != x.Void {
+		p.pusherrtok(fun.Ast.RetType.Token, "entrypoint_have_return")
 	}
 	if fun.Attributes != nil {
 		p.pusherrtok(fun.Ast.Token, "entrypoint_have_attributes")
@@ -1752,14 +1758,14 @@ func (rc *retChecker) checkepxrs() {
 			rc.pushval(last, length, rc.retAST.Expr.Tokens[last-1])
 		}
 	}
-	if !typeIsVoidRet(rc.fun.ReturnType) {
+	if !typeIsVoidRet(rc.fun.RetType) {
 		rc.checkExprTypes()
 	}
 }
 
 func (rc *retChecker) checkExprTypes() {
 	valLength := len(rc.values)
-	if !rc.fun.ReturnType.MultiTyped {
+	if !rc.fun.RetType.MultiTyped {
 		rc.retAST.Expr.Model = rc.expModel.models[0]
 		if valLength > 1 {
 			rc.p.pusherrtok(rc.retAST.Token, "overflow_return")
@@ -1768,7 +1774,7 @@ func (rc *retChecker) checkExprTypes() {
 		go assignChecker{
 			rc.p,
 			false,
-			rc.fun.ReturnType,
+			rc.fun.RetType,
 			rc.values[0],
 			true,
 			rc.retAST.Token,
@@ -1777,7 +1783,7 @@ func (rc *retChecker) checkExprTypes() {
 	}
 	// Multi return
 	rc.retAST.Expr.Model = rc.expModel
-	types := rc.fun.ReturnType.Tag.([]ast.DataTypeAST)
+	types := rc.fun.RetType.Tag.([]ast.DataTypeAST)
 	if valLength == 1 {
 		rc.p.pusherrtok(rc.retAST.Token, "missing_multi_return")
 	} else if valLength > len(types) {
@@ -1801,11 +1807,11 @@ func (rc *retChecker) checkExprTypes() {
 
 func (rc *retChecker) check() {
 	exprTokensLen := len(rc.retAST.Expr.Tokens)
-	if exprTokensLen == 0 && !typeIsVoidRet(rc.fun.ReturnType) {
+	if exprTokensLen == 0 && !typeIsVoidRet(rc.fun.RetType) {
 		rc.p.pusherrtok(rc.retAST.Token, "require_return_value")
 		return
 	}
-	if exprTokensLen > 0 && typeIsVoidRet(rc.fun.ReturnType) {
+	if exprTokensLen > 0 && typeIsVoidRet(rc.fun.RetType) {
 		rc.p.pusherrtok(rc.retAST.Token, "void_function_return_value")
 	}
 	rc.checkepxrs()
@@ -1822,7 +1828,7 @@ func (p *Parser) checkRets(fun *ast.FuncAST) {
 			missed = false
 		}
 	}
-	if missed && !typeIsVoidRet(fun.ReturnType) {
+	if missed && !typeIsVoidRet(fun.RetType) {
 		p.pusherrtok(fun.Token, "missing_return")
 	}
 }
@@ -1864,7 +1870,7 @@ func (p *Parser) checkAssignment(selected value, errtok lex.Token) bool {
 
 func (p *Parser) checkSingleAssign(assign *ast.AssignAST) {
 	sexpr := &assign.SelectExprs[0].Expr
-	if len(sexpr.Tokens) == 1 && x.IsIgnoreName(sexpr.Tokens[0].Kind) {
+	if len(sexpr.Tokens) == 1 && x.IsIgnoreId(sexpr.Tokens[0].Kind) {
 		return
 	}
 	selected, _ := p.evalExpr(*sexpr)
@@ -1936,7 +1942,7 @@ func (p *Parser) processFuncMultiAssign(vsAST *ast.AssignAST, funcVal value) {
 func (p *Parser) processMultiAssign(assign *ast.AssignAST, vals []value) {
 	for index := range assign.SelectExprs {
 		selector := &assign.SelectExprs[index]
-		selector.Ignore = x.IsIgnoreName(selector.Var.Id)
+		selector.Ignore = x.IsIgnoreId(selector.Var.Id)
 		val := vals[index]
 		if !selector.NewVariable {
 			if selector.Ignore {
@@ -2020,7 +2026,7 @@ type foreachTypeChecker struct {
 }
 
 func (frc *foreachTypeChecker) array() {
-	if !x.IsIgnoreName(frc.profile.KeyA.Id) {
+	if !x.IsIgnoreId(frc.profile.KeyA.Id) {
 		keyA := &frc.profile.KeyA
 		if keyA.Type.Code == x.Void {
 			keyA.Type.Code = x.Size
@@ -2035,7 +2041,7 @@ func (frc *foreachTypeChecker) array() {
 			}
 		}
 	}
-	if !x.IsIgnoreName(frc.profile.KeyB.Id) {
+	if !x.IsIgnoreId(frc.profile.KeyB.Id) {
 		elementType := frc.profile.ExprType
 		elementType.Value = elementType.Value[2:]
 		keyB := &frc.profile.KeyB
@@ -2049,7 +2055,7 @@ func (frc *foreachTypeChecker) array() {
 }
 
 func (frc *foreachTypeChecker) str() {
-	if !x.IsIgnoreName(frc.profile.KeyA.Id) {
+	if !x.IsIgnoreId(frc.profile.KeyA.Id) {
 		keyA := &frc.profile.KeyA
 		if keyA.Type.Code == x.Void {
 			keyA.Type.Code = x.Size
@@ -2064,7 +2070,7 @@ func (frc *foreachTypeChecker) str() {
 			}
 		}
 	}
-	if !x.IsIgnoreName(frc.profile.KeyB.Id) {
+	if !x.IsIgnoreId(frc.profile.KeyB.Id) {
 		runeType := ast.DataTypeAST{
 			Code:  x.Rune,
 			Value: x.CxxTypeNameFromType(x.Rune),
@@ -2102,13 +2108,13 @@ func (p *Parser) checkForeachProfile(iter *ast.IterAST) {
 	iter.Profile = profile
 	blockVariables := p.BlockVars
 	if profile.KeyA.New {
-		if x.IsIgnoreName(profile.KeyA.Id) {
+		if x.IsIgnoreId(profile.KeyA.Id) {
 			p.pusherrtok(profile.KeyA.IdToken, "ignore_id")
 		}
 		p.checkVarStatement(&profile.KeyA, true)
 	}
 	if profile.KeyB.New {
-		if x.IsIgnoreName(profile.KeyB.Id) {
+		if x.IsIgnoreId(profile.KeyB.Id) {
 			p.pusherrtok(profile.KeyB.IdToken, "ignore_id")
 		}
 		p.checkVarStatement(&profile.KeyB, true)
@@ -2217,7 +2223,7 @@ func (p *Parser) readyType(dt ast.DataTypeAST, err bool) (_ ast.DataTypeAST, ok 
 		for index, param := range funAST.Params {
 			funAST.Params[index].Type, _ = p.readyType(param.Type, err)
 		}
-		funAST.ReturnType, _ = p.readyType(funAST.ReturnType, err)
+		funAST.RetType, _ = p.readyType(funAST.RetType, err)
 		dt.Value = dt.Tag.(ast.FuncAST).DataTypeString()
 	}
 	return dt, true

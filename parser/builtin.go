@@ -9,7 +9,7 @@ var builtinFuncs = []*function{
 	{
 		Ast: ast.FuncAST{
 			Id: "_out",
-			ReturnType: ast.DataTypeAST{
+			RetType: ast.DataTypeAST{
 				Code: x.Void,
 			},
 			Params: []ast.ParameterAST{{
@@ -24,7 +24,7 @@ var builtinFuncs = []*function{
 	{
 		Ast: ast.FuncAST{
 			Id: "_outln",
-			ReturnType: ast.DataTypeAST{
+			RetType: ast.DataTypeAST{
 				Code: x.Void,
 			},
 			Params: []ast.ParameterAST{{

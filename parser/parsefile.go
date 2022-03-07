@@ -8,23 +8,21 @@ import (
 )
 
 type ParseFileInfo struct {
-	X_CXX    string
+	Parser   *Parser
 	Errors   []string
 	File     *io.File
 	Routines *sync.WaitGroup
 }
 
 // ParseFileAsync parses file content.
-func ParseFileAsync(info *ParseFileInfo) {
+func (info *ParseFileInfo) ParseAsync(justDefs bool) {
 	defer info.Routines.Done()
-	info.X_CXX = ""
 	lexer := lex.NewLex(info.File)
 	tokens := lexer.Tokenize()
 	if lexer.Errors != nil {
 		info.Errors = lexer.Errors
 		return
 	}
-	parser := NewParser(tokens, info)
-	parser.Parse()
-	info.X_CXX += parser.Cxx()
+	info.Parser = NewParser(tokens, info)
+	info.Parser.Parse(justDefs)
 }

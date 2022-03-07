@@ -124,7 +124,7 @@ func (af anonFunc) String() string {
 	cxx.WriteString("[=]")
 	cxx.WriteString(paramsToCxx(af.ast.Params))
 	cxx.WriteString(" mutable -> ")
-	cxx.WriteString(af.ast.ReturnType.String())
+	cxx.WriteString(af.ast.RetType.String())
 	cxx.WriteByte(' ')
 	cxx.WriteString(af.ast.Block.String())
 	return cxx.String()

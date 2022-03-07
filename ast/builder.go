@@ -147,7 +147,7 @@ func (b *Builder) Func(tokens []lex.Token, anonymous bool) (funAST FuncAST) {
 		funAST.Id = funAST.Token.Kind
 		index++
 	}
-	funAST.ReturnType.Code = x.Void
+	funAST.RetType.Code = x.Void
 	paramTokens := getRange(&index, "(", ")", tokens)
 	if len(paramTokens) > 0 {
 		b.Params(&funAST, paramTokens)
@@ -159,7 +159,7 @@ func (b *Builder) Func(tokens []lex.Token, anonymous bool) (funAST FuncAST) {
 	token := tokens[index]
 	t, ok := b.FuncRetDataType(tokens, &index)
 	if ok {
-		funAST.ReturnType = t
+		funAST.RetType = t
 		index++
 		if index >= len(tokens) {
 			b.pusherr(funAST.Token, "body_not_exist")
@@ -265,7 +265,7 @@ func (b *Builder) pushParam(fn *FuncAST, tokens []lex.Token, err lex.Token) {
 			paramAST.Variadic = true
 		case lex.Id:
 			tokens = tokens[index:]
-			if !x.IsIgnoreName(token.Kind) {
+			if !x.IsIgnoreId(token.Kind) {
 				for _, param := range fn.Params {
 					if param.Id == token.Kind {
 						b.pusherr(token, "parameter_exist")
@@ -340,7 +340,7 @@ func (b *Builder) DataType(tokens []lex.Token, index *int, err bool) (dt DataTyp
 				dt.Token = token
 				dt.Code = x.Func
 				value, fun := b.FuncDataTypeHead(tokens, index)
-				fun.ReturnType, _ = b.FuncRetDataType(tokens, index)
+				fun.RetType, _ = b.FuncRetDataType(tokens, index)
 				dtv.WriteString(value)
 				dt.Tag = fun
 				ok = true
@@ -425,6 +425,7 @@ func (b *Builder) FuncRetDataType(tokens []lex.Token, i *int) (dt DataTypeAST, o
 	}
 	token := tokens[*i]
 	if token.Id == lex.Brace && token.Kind == "[" { // Multityped?
+		dt.Value += token.Kind
 		*i++
 		if *i >= len(tokens) {
 			*i--
@@ -439,6 +440,7 @@ func (b *Builder) FuncRetDataType(tokens []lex.Token, i *int) (dt DataTypeAST, o
 		last := *i
 		for ; *i < len(tokens); *i++ {
 			token := tokens[*i]
+			dt.Value += token.Kind
 			if token.Id == lex.Brace {
 				switch token.Kind {
 				case "(", "[", "{":

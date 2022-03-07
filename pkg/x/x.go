@@ -17,7 +17,23 @@ var (
 	XSet           *xset.XSet
 )
 
-// IsIgnoreName reports name is ignore or not.
-func IsIgnoreName(name string) bool {
+// IsIgnoreId reports identifier is ignore or not.
+func IsIgnoreId(name string) bool {
 	return name == "__"
+}
+
+// Returns specified identifer as X identifer.
+func AsId(name string) string {
+	return "_" + name
+}
+
+// Returns normalized identifer of specified X identifer.
+//
+// Special case is:
+//  NormalizeId(name) -> "" if name is empty
+func NormalizeId(name string) string {
+	if name == "" {
+		return ""
+	}
+	return name[1:]
 }

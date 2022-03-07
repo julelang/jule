@@ -110,7 +110,7 @@ func (dt DataTypeAST) FunctionString() string {
 	var cxx strings.Builder
 	cxx.WriteString("std::function<")
 	fun := dt.Tag.(FuncAST)
-	cxx.WriteString(fun.ReturnType.String())
+	cxx.WriteString(fun.RetType.String())
 	cxx.WriteByte('(')
 	if len(fun.Params) > 0 {
 		for _, param := range fun.Params {
@@ -157,11 +157,11 @@ func (t TypeAST) String() string {
 
 // FuncAST is function declaration AST model.
 type FuncAST struct {
-	Token      lex.Token
-	Id         string
-	Params     []ParameterAST
-	ReturnType DataTypeAST
-	Block      BlockAST
+	Token   lex.Token
+	Id      string
+	Params  []ParameterAST
+	RetType DataTypeAST
+	Block   BlockAST
 }
 
 // ParameterAST is function parameter AST model.
@@ -222,8 +222,8 @@ func (fc FuncAST) DataTypeString() string {
 		cxx.WriteString(cxxStr)
 	}
 	cxx.WriteByte(')')
-	if fc.ReturnType.Code != x.Void {
-		cxx.WriteString(fc.ReturnType.String())
+	if fc.RetType.Code != x.Void {
+		cxx.WriteString(fc.RetType.String())
 	}
 	return cxx.String()
 }
@@ -395,7 +395,7 @@ type AssignAST struct {
 func (vs AssignAST) cxxSingleAssign() string {
 	var cxx strings.Builder
 	expr := vs.SelectExprs[0]
-	if len(expr.Expr.Tokens) != 1 || !x.IsIgnoreName(expr.Expr.Tokens[0].Kind) {
+	if len(expr.Expr.Tokens) != 1 || !x.IsIgnoreId(expr.Expr.Tokens[0].Kind) {
 		cxx.WriteString(vs.SelectExprs[0].String())
 		cxx.WriteString(vs.Setter.Kind)
 	}
@@ -518,7 +518,7 @@ type ForeachProfile struct {
 }
 
 func (fp ForeachProfile) String(iter IterAST) string {
-	if !x.IsIgnoreName(fp.KeyA.Id) {
+	if !x.IsIgnoreId(fp.KeyA.Id) {
 		return fp.ForeachString(iter)
 	}
 	return fp.IterationSring(iter)
@@ -529,7 +529,7 @@ func (fp ForeachProfile) ForeachString(iter IterAST) string {
 	cxx.WriteString("foreach<")
 	cxx.WriteString(fp.ExprType.String())
 	cxx.WriteString("," + fp.KeyA.Type.String())
-	if !x.IsIgnoreName(fp.KeyB.Id) {
+	if !x.IsIgnoreId(fp.KeyB.Id) {
 		cxx.WriteString("," + fp.KeyB.Type.String())
 	}
 	cxx.WriteString(">(")
@@ -537,7 +537,7 @@ func (fp ForeachProfile) ForeachString(iter IterAST) string {
 	cxx.WriteString(", [&](")
 	cxx.WriteString(fp.KeyA.Type.String())
 	cxx.WriteString(" " + fp.KeyA.Id)
-	if !x.IsIgnoreName(fp.KeyB.Id) {
+	if !x.IsIgnoreId(fp.KeyB.Id) {
 		cxx.WriteString(",")
 		cxx.WriteString(fp.KeyB.Type.String())
 		cxx.WriteString(" " + fp.KeyB.Id)

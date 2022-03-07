@@ -25,7 +25,7 @@ func (f function) String() string {
 func (f function) Head() string {
 	var cxx strings.Builder
 	cxx.WriteString(attributesToString(f.Attributes))
-	cxx.WriteString(f.Ast.ReturnType.String())
+	cxx.WriteString(f.Ast.RetType.String())
 	cxx.WriteByte(' ')
 	cxx.WriteString(f.Ast.Id)
 	cxx.WriteString(paramsToCxx(f.Ast.Params))
@@ -36,7 +36,7 @@ func (f function) Head() string {
 func (f function) Prototype() string {
 	var cxx strings.Builder
 	cxx.WriteString(attributesToString(f.Attributes))
-	cxx.WriteString(f.Ast.ReturnType.String())
+	cxx.WriteString(f.Ast.RetType.String())
 	cxx.WriteByte(' ')
 	cxx.WriteString(f.Ast.Id)
 	cxx.WriteString(f.PrototypeParams())
