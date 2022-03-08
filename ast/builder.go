@@ -8,6 +8,7 @@ import (
 
 	"github.com/the-xlang/x/lex"
 	"github.com/the-xlang/x/pkg/x"
+	"github.com/the-xlang/x/pkg/xapi"
 	"github.com/the-xlang/x/pkg/xbits"
 )
 
@@ -265,7 +266,7 @@ func (b *Builder) pushParam(fn *FuncAST, tokens []lex.Token, err lex.Token) {
 			paramAST.Variadic = true
 		case lex.Id:
 			tokens = tokens[index:]
-			if !x.IsIgnoreId(token.Kind) {
+			if !xapi.IsIgnoreId(token.Kind) {
 				for _, param := range fn.Params {
 					if param.Id == token.Kind {
 						b.pusherr(token, "parameter_exist")
@@ -1123,8 +1124,8 @@ func (b *Builder) getForeachIterProfile(varTokens, exprTokens []lex.Token, inTok
 	profile.InToken = inTok
 	profile.Expr = b.Expr(exprTokens)
 	if len(varTokens) == 0 {
-		profile.KeyA.Id = "_"
-		profile.KeyB.Id = "_"
+		profile.KeyA.Id = xapi.Ignore
+		profile.KeyB.Id = xapi.Ignore
 	} else {
 		varsTokens := b.getForeachVarsTokens(varTokens)
 		if len(varsTokens) == 0 {
@@ -1138,7 +1139,7 @@ func (b *Builder) getForeachIterProfile(varTokens, exprTokens []lex.Token, inTok
 		if len(vars) > 1 {
 			profile.KeyB = vars[1]
 		} else {
-			profile.KeyB.Id = "_"
+			profile.KeyB.Id = xapi.Ignore
 		}
 	}
 	return profile

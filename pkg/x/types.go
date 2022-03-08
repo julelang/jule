@@ -4,12 +4,10 @@ package x
 const (
 	Void  uint8 = 0
 	I8    uint8 = 1
-	SByte uint8 = I8
 	I16   uint8 = 2
 	I32   uint8 = 3
 	I64   uint8 = 4
 	U8    uint8 = 5
-	Byte  uint8 = U8
 	U16   uint8 = 6
 	U32   uint8 = 7
 	U64   uint8 = 8

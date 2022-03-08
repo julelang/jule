@@ -7,6 +7,7 @@ import (
 
 	"github.com/the-xlang/x/lex"
 	"github.com/the-xlang/x/pkg/x"
+	"github.com/the-xlang/x/pkg/xapi"
 )
 
 // Object is an element of AST.
@@ -98,7 +99,7 @@ func (dt DataTypeAST) String() string {
 	}
 	switch dt.Code {
 	case x.Name:
-		return x.AsId(dt.Token.Kind) + cxx.String()
+		return xapi.AsId(dt.Token.Kind) + cxx.String()
 	case x.Func:
 		return dt.FunctionString() + cxx.String()
 	default:
@@ -150,7 +151,7 @@ func (t TypeAST) String() string {
 	cxx.WriteString("typedef ")
 	cxx.WriteString(t.Type.String())
 	cxx.WriteByte(' ')
-	cxx.WriteString(x.AsId(t.Id))
+	cxx.WriteString(xapi.AsId(t.Id))
 	cxx.WriteByte(';')
 	return cxx.String()
 }
@@ -199,7 +200,7 @@ func (p ParameterAST) String() string {
 	cxx.WriteString(p.Prototype())
 	if p.Id != "" {
 		cxx.WriteByte(' ')
-		cxx.WriteString(x.AsId(p.Id))
+		cxx.WriteString(xapi.AsId(p.Id))
 	}
 	if p.Variadic {
 		cxx.WriteString(" =array<")
@@ -259,7 +260,7 @@ func (e ExprAST) String() string {
 		for _, token := range process {
 			switch token.Id {
 			case lex.Id:
-				expr.WriteString(x.AsId(token.Kind))
+				expr.WriteString(xapi.AsId(token.Kind))
 			default:
 				expr.WriteString(token.Kind)
 			}
@@ -339,7 +340,7 @@ func (v VariableAST) String() string {
 	}
 	sb.WriteString(v.Type.String())
 	sb.WriteByte(' ')
-	sb.WriteString(x.AsId(v.Id))
+	sb.WriteString(xapi.AsId(v.Id))
 	if v.Value.Processes != nil {
 		sb.WriteString(" = ")
 		sb.WriteString(v.Value.String())
@@ -358,7 +359,8 @@ type AssignSelector struct {
 
 func (vs AssignSelector) String() string {
 	if vs.NewVariable {
-		return x.AsId(vs.Expr.Tokens[0].Kind) // Returns variable name.
+		// Returns variable name.
+		return xapi.AsId(vs.Expr.Tokens[0].Kind)
 	}
 	return vs.Expr.String()
 }
@@ -376,7 +378,8 @@ type AssignAST struct {
 func (vs AssignAST) cxxSingleAssign() string {
 	var cxx strings.Builder
 	expr := vs.SelectExprs[0]
-	if len(expr.Expr.Tokens) != 1 || !x.IsIgnoreId(expr.Expr.Tokens[0].Kind) {
+	if len(expr.Expr.Tokens) != 1 ||
+		!xapi.IsIgnoreId(expr.Expr.Tokens[0].Kind) {
 		cxx.WriteString(vs.SelectExprs[0].String())
 		cxx.WriteString(vs.Setter.Kind)
 	}
@@ -499,7 +502,7 @@ type ForeachProfile struct {
 }
 
 func (fp ForeachProfile) String(iter IterAST) string {
-	if !x.IsIgnoreId(fp.KeyA.Id) {
+	if !xapi.IsIgnoreId(fp.KeyA.Id) {
 		return fp.ForeachString(iter)
 	}
 	return fp.IterationSring(iter)
@@ -511,7 +514,7 @@ func (fp ForeachProfile) ForeachString(iter IterAST) string {
 	cxx.WriteString(fp.ExprType.String())
 	cxx.WriteByte(',')
 	cxx.WriteString(fp.KeyA.Type.String())
-	if !x.IsIgnoreId(fp.KeyB.Id) {
+	if !xapi.IsIgnoreId(fp.KeyB.Id) {
 		cxx.WriteByte(',')
 		cxx.WriteString(fp.KeyB.Type.String())
 	}
@@ -520,12 +523,12 @@ func (fp ForeachProfile) ForeachString(iter IterAST) string {
 	cxx.WriteString(", [&](")
 	cxx.WriteString(fp.KeyA.Type.String())
 	cxx.WriteByte(' ')
-	cxx.WriteString(x.AsId(fp.KeyA.Id))
-	if !x.IsIgnoreId(fp.KeyB.Id) {
+	cxx.WriteString(xapi.AsId(fp.KeyA.Id))
+	if !xapi.IsIgnoreId(fp.KeyB.Id) {
 		cxx.WriteByte(',')
 		cxx.WriteString(fp.KeyB.Type.String())
 		cxx.WriteByte(' ')
-		cxx.WriteString(x.AsId(fp.KeyB.Id))
+		cxx.WriteString(xapi.AsId(fp.KeyB.Id))
 	}
 	cxx.WriteString(") -> void ")
 	cxx.WriteString(iter.Block.String())
@@ -536,7 +539,7 @@ func (fp ForeachProfile) ForeachString(iter IterAST) string {
 func (fp ForeachProfile) IterationSring(iter IterAST) string {
 	var cxx strings.Builder
 	cxx.WriteString("for (auto ")
-	cxx.WriteString(x.AsId(fp.KeyB.Id))
+	cxx.WriteString(xapi.AsId(fp.KeyB.Id))
 	cxx.WriteString(" : ")
 	cxx.WriteString(fp.Expr.String())
 	cxx.WriteString(") ")

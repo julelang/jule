@@ -8,6 +8,7 @@ import (
 	"github.com/the-xlang/x/ast"
 	"github.com/the-xlang/x/lex"
 	"github.com/the-xlang/x/pkg/x"
+	"github.com/the-xlang/x/pkg/xapi"
 	"github.com/the-xlang/x/pkg/xbits"
 )
 
@@ -156,7 +157,7 @@ func (p *Parser) Type(t ast.TypeAST) {
 	if p.existName(t.Id).Id != lex.NA {
 		p.pusherrtok(t.Token, "exist_id")
 		return
-	} else if x.IsIgnoreId(t.Id) {
+	} else if xapi.IsIgnoreId(t.Id) {
 		p.pusherrtok(t.Token, "ignore_id")
 		return
 	}
@@ -195,7 +196,7 @@ func (p *Parser) Statement(s ast.StatementAST) {
 func (p *Parser) Func(fast ast.FuncAST) {
 	if p.existName(fast.Id).Id != lex.NA {
 		p.pusherrtok(fast.Token, "exist_id")
-	} else if x.IsIgnoreId(fast.Id) {
+	} else if xapi.IsIgnoreId(fast.Id) {
 		p.pusherrtok(fast.Token, "ignore_id")
 	}
 	fun := new(function)
@@ -217,7 +218,7 @@ func (p *Parser) GlobalVar(vast ast.VariableAST) {
 
 // Var parse X variable.
 func (p *Parser) Var(vast ast.VariableAST) ast.VariableAST {
-	if x.IsIgnoreId(vast.Id) {
+	if xapi.IsIgnoreId(vast.Id) {
 		p.pusherrtok(vast.IdToken, "ignore_id")
 	}
 	var val value
@@ -580,6 +581,7 @@ func (p *Parser) nextOperator(tokens [][]lex.Token) int {
 func toRawStrLiteral(literal string) string {
 	literal = literal[1 : len(literal)-1] // Remove bounds
 	literal = `"(` + literal + `)"`
+	literal = xapi.ToRawStr(literal)
 	return literal
 }
 
@@ -595,9 +597,9 @@ func (p *valueEvaluator) str() value {
 	v.ast.Type.Code = x.Str
 	v.ast.Type.Value = "str"
 	if israwstr(p.token.Kind) {
-		p.builder.appendNode(rawStrExpr{toRawStrLiteral(p.token.Kind)})
+		p.builder.appendNode(exprNode{toRawStrLiteral(p.token.Kind)})
 	} else {
-		p.builder.appendNode(strExpr{p.token.Kind})
+		p.builder.appendNode(exprNode{xapi.ToStr(p.token.Kind)})
 	}
 	return v
 }
@@ -607,7 +609,7 @@ func (p *valueEvaluator) rune() value {
 	v.ast.Value = p.token.Kind
 	v.ast.Type.Code = x.Rune
 	v.ast.Type.Value = "rune"
-	p.builder.appendNode(runeExpr{p.token.Kind})
+	p.builder.appendNode(exprNode{xapi.ToRune(p.token.Kind)})
 	return v
 }
 
@@ -656,7 +658,7 @@ func (p *valueEvaluator) id() (v value, ok bool) {
 		v.volatile = variable.Volatile
 		v.ast.Token = variable.IdToken
 		v.lvalue = true
-		p.builder.appendNode(exprNode{x.AsId(p.token.Kind)})
+		p.builder.appendNode(exprNode{xapi.AsId(p.token.Kind)})
 		ok = true
 	} else if fun := p.parser.FuncById(p.token.Kind); fun != nil {
 		v.ast.Value = p.token.Kind
@@ -664,7 +666,7 @@ func (p *valueEvaluator) id() (v value, ok bool) {
 		v.ast.Type.Tag = fun.Ast
 		v.ast.Type.Value = fun.Ast.DataTypeString()
 		v.ast.Token = fun.Ast.Token
-		p.builder.appendNode(exprNode{x.AsId(p.token.Kind)})
+		p.builder.appendNode(exprNode{xapi.AsId(p.token.Kind)})
 		ok = true
 	} else {
 		p.parser.pusherrtok(p.token, "id_noexist")
@@ -1870,7 +1872,7 @@ func (p *Parser) checkAssignment(selected value, errtok lex.Token) bool {
 
 func (p *Parser) checkSingleAssign(assign *ast.AssignAST) {
 	sexpr := &assign.SelectExprs[0].Expr
-	if len(sexpr.Tokens) == 1 && x.IsIgnoreId(sexpr.Tokens[0].Kind) {
+	if len(sexpr.Tokens) == 1 && xapi.IsIgnoreId(sexpr.Tokens[0].Kind) {
 		return
 	}
 	selected, _ := p.evalExpr(*sexpr)
@@ -1942,7 +1944,7 @@ func (p *Parser) processFuncMultiAssign(vsAST *ast.AssignAST, funcVal value) {
 func (p *Parser) processMultiAssign(assign *ast.AssignAST, vals []value) {
 	for index := range assign.SelectExprs {
 		selector := &assign.SelectExprs[index]
-		selector.Ignore = x.IsIgnoreId(selector.Var.Id)
+		selector.Ignore = xapi.IsIgnoreId(selector.Var.Id)
 		val := vals[index]
 		if !selector.NewVariable {
 			if selector.Ignore {
@@ -2026,7 +2028,7 @@ type foreachTypeChecker struct {
 }
 
 func (frc *foreachTypeChecker) array() {
-	if !x.IsIgnoreId(frc.profile.KeyA.Id) {
+	if !xapi.IsIgnoreId(frc.profile.KeyA.Id) {
 		keyA := &frc.profile.KeyA
 		if keyA.Type.Code == x.Void {
 			keyA.Type.Code = x.Size
@@ -2041,7 +2043,7 @@ func (frc *foreachTypeChecker) array() {
 			}
 		}
 	}
-	if !x.IsIgnoreId(frc.profile.KeyB.Id) {
+	if !xapi.IsIgnoreId(frc.profile.KeyB.Id) {
 		elementType := frc.profile.ExprType
 		elementType.Value = elementType.Value[2:]
 		keyB := &frc.profile.KeyB
@@ -2055,7 +2057,7 @@ func (frc *foreachTypeChecker) array() {
 }
 
 func (frc *foreachTypeChecker) str() {
-	if !x.IsIgnoreId(frc.profile.KeyA.Id) {
+	if !xapi.IsIgnoreId(frc.profile.KeyA.Id) {
 		keyA := &frc.profile.KeyA
 		if keyA.Type.Code == x.Void {
 			keyA.Type.Code = x.Size
@@ -2070,7 +2072,7 @@ func (frc *foreachTypeChecker) str() {
 			}
 		}
 	}
-	if !x.IsIgnoreId(frc.profile.KeyB.Id) {
+	if !xapi.IsIgnoreId(frc.profile.KeyB.Id) {
 		runeType := ast.DataTypeAST{
 			Code:  x.Rune,
 			Value: x.CxxTypeNameFromType(x.Rune),
@@ -2108,13 +2110,13 @@ func (p *Parser) checkForeachProfile(iter *ast.IterAST) {
 	iter.Profile = profile
 	blockVariables := p.BlockVars
 	if profile.KeyA.New {
-		if x.IsIgnoreId(profile.KeyA.Id) {
+		if xapi.IsIgnoreId(profile.KeyA.Id) {
 			p.pusherrtok(profile.KeyA.IdToken, "ignore_id")
 		}
 		p.checkVarStatement(&profile.KeyA, true)
 	}
 	if profile.KeyB.New {
-		if x.IsIgnoreId(profile.KeyB.Id) {
+		if xapi.IsIgnoreId(profile.KeyB.Id) {
 			p.pusherrtok(profile.KeyB.IdToken, "ignore_id")
 		}
 		p.checkVarStatement(&profile.KeyB, true)

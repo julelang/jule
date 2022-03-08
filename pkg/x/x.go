@@ -16,13 +16,3 @@ var (
 	ExecutablePath string
 	XSet           *xset.XSet
 )
-
-// IsIgnoreId reports identifier is ignore or not.
-func IsIgnoreId(name string) bool {
-	return name == "_"
-}
-
-// Returns specified identifer as X identifer.
-func AsId(name string) string {
-	return "_" + name
-}

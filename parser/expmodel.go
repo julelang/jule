@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/the-xlang/x/ast"
+	"github.com/the-xlang/x/pkg/xapi"
 )
 
 type IExprNode interface {
@@ -80,41 +81,6 @@ func (node exprNode) String() string {
 	return node.value
 }
 
-type runeExpr struct {
-	literal string
-}
-
-func (run runeExpr) String() string {
-	var cxx strings.Builder
-	cxx.WriteByte('L')
-	cxx.WriteString(run.literal)
-	return cxx.String()
-}
-
-type strExpr struct {
-	literal string
-}
-
-func (str strExpr) String() string {
-	var cxx strings.Builder
-	cxx.WriteString("str(L")
-	cxx.WriteString(str.literal)
-	cxx.WriteByte(')')
-	return cxx.String()
-}
-
-type rawStrExpr struct {
-	literal string
-}
-
-func (rawstr rawStrExpr) String() string {
-	var cxx strings.Builder
-	cxx.WriteString("str(LR")
-	cxx.WriteString(rawstr.literal)
-	cxx.WriteByte(')')
-	return cxx.String()
-}
-
 type anonFunc struct {
 	ast ast.FuncAST
 }
@@ -184,11 +150,7 @@ type newHeapAllocExpr struct {
 }
 
 func (nha newHeapAllocExpr) String() string {
-	var cxx strings.Builder
-	cxx.WriteString("XALLOC(")
-	cxx.WriteString(nha.typeAST.String())
-	cxx.WriteByte(')')
-	return cxx.String()
+	return xapi.ToXAlloc(nha.typeAST.String())
 }
 
 type assignExpr struct {
