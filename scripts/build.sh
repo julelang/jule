@@ -9,7 +9,7 @@ else
   MAIN_FILE="../cmd/x/main.go"
 fi
 
-go build -o x.out -v $MAIN_FILE
+go build -o xxc.out -v $MAIN_FILE
 
 if [ $? -eq 0 ]; then
   echo "Compile is successful!"

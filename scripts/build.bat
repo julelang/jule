@@ -4,15 +4,15 @@
 
 @echo off
 
-if exist .\x.exe ( del /f x.exe )
+if exist .\xxc.exe ( del /f xxc.exe )
 
 if exist cmd\x\main.go (
-  go build -o x.exe -v cmd\x\main.go
+  go build -o xxc.exe -v cmd\x\main.go
 ) else (
-  go build -o x.exe -v ..\cmd\x\main.go
+  go build -o xxc.exe -v ..\cmd\x\main.go
 )
 
-if exist .\x.exe (
+if exist .\xxc.exe (
   echo Compile is successful!
 ) else (
   echo -----------------------------------------------------------------------

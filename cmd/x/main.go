@@ -29,6 +29,7 @@ func help(cmd string) {
 		{"help", "Show help."},
 		{"version", "Show version."},
 		{"init", "Initialize new project here."},
+		{"doc", "Documentize X source code."},
 	}
 	maxlen := len(helpContent[0][0])
 	for _, part := range helpContent {
