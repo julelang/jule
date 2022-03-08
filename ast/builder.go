@@ -1,7 +1,6 @@
 package ast
 
 import (
-	"fmt"
 	"math/big"
 	"strings"
 	"sync"
@@ -10,6 +9,7 @@ import (
 	"github.com/the-xlang/x/pkg/x"
 	"github.com/the-xlang/x/pkg/xapi"
 	"github.com/the-xlang/x/pkg/xbits"
+	"github.com/the-xlang/x/pkg/xlog"
 )
 
 // Builder is builds AST tree.
@@ -17,7 +17,7 @@ type Builder struct {
 	wg sync.WaitGroup
 
 	Tree     []Obj
-	Errors   []string
+	Errors   []xlog.CompilerLog
 	Tokens   []lex.Token
 	Position int
 }
@@ -33,8 +33,13 @@ func NewBuilder(tokens []lex.Token) *Builder {
 // pusherr appends error by specified token.
 func (b *Builder) pusherr(token lex.Token, err string) {
 	message := x.Errors[err]
-	b.Errors = append(b.Errors, fmt.Sprintf(
-		"%s:%d:%d %s", token.File.Path, token.Row, token.Column, message))
+	b.Errors = append(b.Errors, xlog.CompilerLog{
+		Type:    xlog.Error,
+		Row:     token.Row,
+		Column:  token.Column,
+		Path:    token.File.Path,
+		Message: message,
+	})
 }
 
 // Ended reports position is at end of tokens or not.

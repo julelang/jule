@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"fmt"
 	"strings"
 	"sync"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/the-xlang/x/pkg/x"
 	"github.com/the-xlang/x/pkg/xapi"
 	"github.com/the-xlang/x/pkg/xbits"
+	"github.com/the-xlang/x/pkg/xlog"
 )
 
 // Parser is parser of X code.
@@ -38,19 +38,26 @@ func NewParser(tokens []lex.Token, PFI *ParseFileInfo) *Parser {
 
 // pusherrtok appends new error by token.
 func (p *Parser) pusherrtok(token lex.Token, err string) {
-	message := x.Errors[err]
-	p.PFI.Errors = append(p.PFI.Errors, fmt.Sprintf(
-		"%s:%d:%d %s", token.File.Path, token.Row, token.Column, message))
+	p.PFI.Errors = append(p.PFI.Errors, xlog.CompilerLog{
+		Type:    xlog.Error,
+		Row:     token.Row,
+		Column:  token.Column,
+		Path:    token.File.Path,
+		Message: x.Errors[err],
+	})
 }
 
 // pusherrs appends specified errors.
-func (p *Parser) pusherrs(errs ...string) {
+func (p *Parser) pusherrs(errs ...xlog.CompilerLog) {
 	p.PFI.Errors = append(p.PFI.Errors, errs...)
 }
 
 // pusherr appends new error.
 func (p *Parser) pusherr(err string) {
-	p.PFI.Errors = append(p.PFI.Errors, x.Errors[err])
+	p.PFI.Errors = append(p.PFI.Errors, xlog.CompilerLog{
+		Type:    xlog.Flat,
+		Message: x.Errors[err],
+	})
 }
 
 // String returns full C++ code of parsed objects.

@@ -1,7 +1,6 @@
 package lex
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
 	"sync"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/the-xlang/x/pkg/io"
 	"github.com/the-xlang/x/pkg/x"
+	"github.com/the-xlang/x/pkg/xlog"
 )
 
 // Lex is lexer of Fract.
@@ -20,8 +20,8 @@ type Lex struct {
 	File     *io.File
 	Position int
 	Column   int
-	Line     int
-	Errors   []string
+	Row      int
+	Errors   []xlog.CompilerLog
 
 	braces []Token
 }
@@ -30,20 +30,30 @@ type Lex struct {
 func NewLex(f *io.File) *Lex {
 	l := new(Lex)
 	l.File = f
-	l.Line = 1
+	l.Row = 1
 	l.Column = 1
 	l.Position = 0
 	return l
 }
 
 func (l *Lex) pusherr(err string) {
-	l.Errors = append(l.Errors,
-		fmt.Sprintf("%s %d:%d %s", l.File.Path, l.Line, l.Column, x.Errors[err]))
+	l.Errors = append(l.Errors, xlog.CompilerLog{
+		Type:    xlog.Error,
+		Row:     l.Row,
+		Column:  l.Column,
+		Path:    l.File.Path,
+		Message: x.Errors[err],
+	})
 }
 
 func (l *Lex) pusherrtok(tok Token, err string) {
-	l.Errors = append(l.Errors,
-		fmt.Sprintf("%s %d:%d %s", l.File.Path, tok.Row, tok.Column, x.Errors[err]))
+	l.Errors = append(l.Errors, xlog.CompilerLog{
+		Type:    xlog.Error,
+		Row:     tok.Row,
+		Column:  tok.Column,
+		Path:    l.File.Path,
+		Message: x.Errors[err],
+	})
 }
 
 // Tokenize all source content.
@@ -266,7 +276,7 @@ func (l *Lex) str(content string) string {
 // Newln sets ready lexer to a new line lexing.
 func (l *Lex) Newln() {
 	l.firstTokenOfLine = true
-	l.Line++
+	l.Row++
 	l.Column = 1
 }
 
@@ -303,7 +313,7 @@ func (l *Lex) Tok() Token {
 	}
 	// Set token values.
 	tok.Column = l.Column
-	tok.Row = l.Line
+	tok.Row = l.Row
 
 	//* Tokenize
 

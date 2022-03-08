@@ -5,11 +5,12 @@ import (
 
 	"github.com/the-xlang/x/lex"
 	"github.com/the-xlang/x/pkg/io"
+	"github.com/the-xlang/x/pkg/xlog"
 )
 
 type ParseFileInfo struct {
 	Parser   *Parser
-	Errors   []string
+	Errors   []xlog.CompilerLog
 	File     *io.File
 	Routines *sync.WaitGroup
 }

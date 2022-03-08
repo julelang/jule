@@ -18,6 +18,7 @@ import (
 	"github.com/the-xlang/x/pkg/io"
 	"github.com/the-xlang/x/pkg/x"
 	"github.com/the-xlang/x/pkg/x/xset"
+	"github.com/the-xlang/x/pkg/xlog"
 )
 
 func help(cmd string) {
@@ -65,7 +66,8 @@ func initProject(cmd string) {
 	content := []byte(`{
   "cxx_out_dir": "./dist/",
   "cxx_out_name": "x.cxx",
-  "out_name": "main"
+  "out_name": "main",
+  "styled_logs": true,
 }`)
 	err := ioutil.WriteFile(x.SettingsFile, content, 0666)
 	if err != nil {
@@ -85,7 +87,7 @@ func doc(cmd string) {
 			continue
 		}
 		if info.Errors != nil {
-			printerr(info.Errors)
+			printlogs(info.Errors)
 			fmt.Println(path+":",
 				"documentation couldn't generated because X source code has an errors")
 			continue
@@ -159,10 +161,24 @@ func loadXSet() {
 	}
 }
 
-func printerr(errors []string) {
-	for _, msg := range errors {
-		fmt.Println(msg)
+func printlogs(logs []xlog.CompilerLog) {
+	var str strings.Builder
+	for _, log := range logs {
+		switch log.Type {
+		case xlog.Flat:
+			str.WriteString(log.Message)
+		case xlog.Error:
+			str.WriteString(log.Path)
+			str.WriteByte(':')
+			str.WriteString(fmt.Sprint(log.Row))
+			str.WriteByte(':')
+			str.WriteString(fmt.Sprint(log.Column))
+			str.WriteByte(' ')
+			str.WriteString(log.Message)
+		}
+		str.WriteByte('\n')
 	}
+	print(str.String())
 }
 
 func appendStandard(code *string) {
@@ -398,7 +414,7 @@ func main() {
 	filePath := os.Args[0]
 	info := compile(filePath, false)
 	if info.Errors != nil {
-		printerr(info.Errors)
+		printlogs(info.Errors)
 		os.Exit(0)
 	}
 	cxx := info.Parser.Cxx()
