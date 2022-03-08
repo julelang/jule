@@ -75,23 +75,28 @@ func initProject(cmd string) {
 }
 
 func doc(cmd string) {
-	filePath := strings.TrimSpace(cmd)
-	info := compile(filePath, true)
-	if info == nil {
-		return
+	cmd = strings.TrimSpace(cmd)
+	paths := strings.SplitAfterN(cmd, " ", -1)
+	for _, path := range paths {
+		path = strings.TrimSpace(path)
+		info := compile(path, true)
+		if info == nil {
+			continue
+		}
+		if info.Errors != nil {
+			printerr(info.Errors)
+			fmt.Println(path+":",
+				"documentation couldn't generated because X source code has an errors")
+			continue
+		}
+		docjson, err := documenter.Documentize(info.Parser)
+		if err != nil {
+			fmt.Println("Error:", err.Error())
+			continue
+		}
+		path = filepath.Join(x.XSet.CxxOutDir, path+".xdoc")
+		writeOutput(path, docjson)
 	}
-	if info.Errors != nil {
-		printerr(info.Errors)
-		fmt.Println("Documentation couldn't generated because X source code has an errors.")
-		return
-	}
-	docjson, err := documenter.Documentize(info.Parser)
-	if err != nil {
-		fmt.Println("Error:", err.Error())
-		return
-	}
-	path := filepath.Join(x.XSet.CxxOutDir, filePath+".xdoc")
-	writeOutput(path, docjson)
 }
 
 func processCommand(namespace, cmd string) bool {
@@ -154,7 +159,6 @@ func loadXSet() {
 }
 
 func printerr(errors []string) {
-	defer os.Exit(0)
 	for _, msg := range errors {
 		fmt.Println(msg)
 	}
@@ -386,15 +390,16 @@ func compile(path string, justDefs bool) *parser.ParseFileInfo {
 	routines.Add(1)
 	go info.ParseAsync(justDefs)
 	routines.Wait()
-	if info.Errors != nil {
-		printerr(info.Errors)
-	}
 	return info
 }
 
 func main() {
 	filePath := os.Args[0]
 	info := compile(filePath, false)
+	if info.Errors != nil {
+		printerr(info.Errors)
+		os.Exit(0)
+	}
 	cxx := info.Parser.Cxx()
 	appendStandard(&cxx)
 	path := filepath.Join(x.XSet.CxxOutDir, x.XSet.CxxOutName)
