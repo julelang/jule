@@ -98,7 +98,7 @@ func (dt DataTypeAST) String() string {
 	}
 	switch dt.Code {
 	case x.Name:
-		return dt.Token.Kind + cxx.String()
+		return x.AsId(dt.Token.Kind) + cxx.String()
 	case x.Func:
 		return dt.FunctionString() + cxx.String()
 	default:
@@ -150,7 +150,7 @@ func (t TypeAST) String() string {
 	cxx.WriteString("typedef ")
 	cxx.WriteString(t.Type.String())
 	cxx.WriteByte(' ')
-	cxx.WriteString(t.Id)
+	cxx.WriteString(x.AsId(t.Id))
 	cxx.WriteByte(';')
 	return cxx.String()
 }
@@ -162,6 +162,26 @@ type FuncAST struct {
 	Params  []ParameterAST
 	RetType DataTypeAST
 	Block   BlockAST
+}
+
+// DataTypeString returns data type string of function.
+func (fc FuncAST) DataTypeString() string {
+	var cxx strings.Builder
+	cxx.WriteByte('(')
+	if len(fc.Params) > 0 {
+		for _, param := range fc.Params {
+			cxx.WriteString(param.Type.String())
+			cxx.WriteString(", ")
+		}
+		cxxStr := cxx.String()[:cxx.Len()-2]
+		cxx.Reset()
+		cxx.WriteString(cxxStr)
+	}
+	cxx.WriteByte(')')
+	if fc.RetType.Code != x.Void {
+		cxx.WriteString(fc.RetType.String())
+	}
+	return cxx.String()
 }
 
 // ParameterAST is function parameter AST model.
@@ -179,7 +199,7 @@ func (p ParameterAST) String() string {
 	cxx.WriteString(p.Prototype())
 	if p.Id != "" {
 		cxx.WriteByte(' ')
-		cxx.WriteString(p.Id)
+		cxx.WriteString(x.AsId(p.Id))
 	}
 	if p.Variadic {
 		cxx.WriteString(" =array<")
@@ -204,26 +224,6 @@ func (p ParameterAST) Prototype() string {
 		cxx.WriteByte('>')
 	} else {
 		cxx.WriteString(p.Type.String())
-	}
-	return cxx.String()
-}
-
-// DataTypeString returns data type string of function.
-func (fc FuncAST) DataTypeString() string {
-	var cxx strings.Builder
-	cxx.WriteByte('(')
-	if len(fc.Params) > 0 {
-		for _, param := range fc.Params {
-			cxx.WriteString(param.Type.String())
-			cxx.WriteString(", ")
-		}
-		cxxStr := cxx.String()[:cxx.Len()-2]
-		cxx.Reset()
-		cxx.WriteString(cxxStr)
-	}
-	cxx.WriteByte(')')
-	if fc.RetType.Code != x.Void {
-		cxx.WriteString(fc.RetType.String())
 	}
 	return cxx.String()
 }
@@ -256,14 +256,13 @@ func (e ExprAST) String() string {
 	}
 	var expr strings.Builder
 	for _, process := range e.Processes {
-		if len(process) == 1 && process[0].Id == lex.Operator {
-			expr.WriteByte(' ')
-			expr.WriteString(process[0].Kind)
-			expr.WriteByte(' ')
-			continue
-		}
 		for _, token := range process {
-			expr.WriteString(token.Kind)
+			switch token.Id {
+			case lex.Id:
+				expr.WriteString(x.AsId(token.Kind))
+			default:
+				expr.WriteString(token.Kind)
+			}
 		}
 	}
 	return expr.String()
@@ -292,24 +291,6 @@ func (v ValueAST) String() string {
 	return v.Value
 }
 
-// BraceAST is AST model of brace.
-type BraceAST struct {
-	Token lex.Token
-}
-
-func (b BraceAST) String() string {
-	return b.Token.Kind
-}
-
-// OperatorAST is AST model of operator.
-type OperatorAST struct {
-	Token lex.Token
-}
-
-func (o OperatorAST) String() string {
-	return o.Token.Kind
-}
-
 // ReturnAST is return statement AST model.
 type ReturnAST struct {
 	Token lex.Token
@@ -331,7 +312,7 @@ type AttributeAST struct {
 }
 
 func (a AttributeAST) String() string {
-	return a.Tag.Kind[1:] // Remove name underscore at start
+	return a.Tag.Kind
 }
 
 // VariableAST is variable declaration AST model.
@@ -358,7 +339,7 @@ func (v VariableAST) String() string {
 	}
 	sb.WriteString(v.Type.String())
 	sb.WriteByte(' ')
-	sb.WriteString(v.Id)
+	sb.WriteString(x.AsId(v.Id))
 	if v.Value.Processes != nil {
 		sb.WriteString(" = ")
 		sb.WriteString(v.Value.String())
@@ -377,7 +358,7 @@ type AssignSelector struct {
 
 func (vs AssignSelector) String() string {
 	if vs.NewVariable {
-		return vs.Expr.Tokens[0].Kind // Returns variable name.
+		return x.AsId(vs.Expr.Tokens[0].Kind) // Returns variable name.
 	}
 	return vs.Expr.String()
 }
@@ -528,19 +509,23 @@ func (fp ForeachProfile) ForeachString(iter IterAST) string {
 	var cxx strings.Builder
 	cxx.WriteString("foreach<")
 	cxx.WriteString(fp.ExprType.String())
-	cxx.WriteString("," + fp.KeyA.Type.String())
+	cxx.WriteByte(',')
+	cxx.WriteString(fp.KeyA.Type.String())
 	if !x.IsIgnoreId(fp.KeyB.Id) {
-		cxx.WriteString("," + fp.KeyB.Type.String())
+		cxx.WriteByte(',')
+		cxx.WriteString(fp.KeyB.Type.String())
 	}
 	cxx.WriteString(">(")
 	cxx.WriteString(fp.Expr.String())
 	cxx.WriteString(", [&](")
 	cxx.WriteString(fp.KeyA.Type.String())
-	cxx.WriteString(" " + fp.KeyA.Id)
+	cxx.WriteByte(' ')
+	cxx.WriteString(x.AsId(fp.KeyA.Id))
 	if !x.IsIgnoreId(fp.KeyB.Id) {
-		cxx.WriteString(",")
+		cxx.WriteByte(',')
 		cxx.WriteString(fp.KeyB.Type.String())
-		cxx.WriteString(" " + fp.KeyB.Id)
+		cxx.WriteByte(' ')
+		cxx.WriteString(x.AsId(fp.KeyB.Id))
 	}
 	cxx.WriteString(") -> void ")
 	cxx.WriteString(iter.Block.String())
@@ -551,7 +536,7 @@ func (fp ForeachProfile) ForeachString(iter IterAST) string {
 func (fp ForeachProfile) IterationSring(iter IterAST) string {
 	var cxx strings.Builder
 	cxx.WriteString("for (auto ")
-	cxx.WriteString(fp.KeyB.Id)
+	cxx.WriteString(x.AsId(fp.KeyB.Id))
 	cxx.WriteString(" : ")
 	cxx.WriteString(fp.Expr.String())
 	cxx.WriteString(") ")

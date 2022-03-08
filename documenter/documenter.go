@@ -5,7 +5,6 @@ import (
 
 	"github.com/the-xlang/x/ast"
 	"github.com/the-xlang/x/parser"
-	"github.com/the-xlang/x/pkg/x"
 )
 
 type xtype struct {
@@ -42,7 +41,7 @@ type document struct {
 func types(p *parser.Parser) []xtype {
 	types := make([]xtype, len(p.Types))
 	for i, t := range p.Types {
-		types[i] = xtype{x.NormalizeId(t.Id), t.Type.Value}
+		types[i] = xtype{t.Id, t.Type.Value}
 	}
 	return types
 }
@@ -50,7 +49,7 @@ func types(p *parser.Parser) []xtype {
 func globals(p *parser.Parser) []variable {
 	globals := make([]variable, len(p.GlobalVars))
 	for i, v := range p.GlobalVars {
-		globals[i] = variable{x.NormalizeId(v.Id), v.Type.Value, v.Const, v.Volatile}
+		globals[i] = variable{v.Id, v.Type.Value, v.Const, v.Volatile}
 	}
 	return globals
 }
@@ -58,7 +57,7 @@ func globals(p *parser.Parser) []variable {
 func params(parameters []ast.ParameterAST) []parameter {
 	params := make([]parameter, len(parameters))
 	for i, p := range parameters {
-		params[i] = parameter{x.NormalizeId(p.Id), p.Type.Value, p.Const, p.Volatile}
+		params[i] = parameter{p.Id, p.Type.Value, p.Const, p.Volatile}
 	}
 	return params
 }
@@ -67,7 +66,7 @@ func funcs(p *parser.Parser) []function {
 	funcs := make([]function, len(p.Funcs))
 	for i, f := range p.Funcs {
 		fun := function{}
-		fun.Id = x.NormalizeId(f.Ast.Id)
+		fun.Id = f.Ast.Id
 		fun.Ret = f.Ast.RetType.Value
 		fun.Params = params(f.Ast.Params)
 		funcs[i] = fun

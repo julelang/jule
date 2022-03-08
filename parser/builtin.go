@@ -8,7 +8,7 @@ import (
 var builtinFuncs = []*function{
 	{
 		Ast: ast.FuncAST{
-			Id: "_out",
+			Id: "out",
 			RetType: ast.DataTypeAST{
 				Code: x.Void,
 			},
@@ -23,7 +23,7 @@ var builtinFuncs = []*function{
 	},
 	{
 		Ast: ast.FuncAST{
-			Id: "_outln",
+			Id: "outln",
 			RetType: ast.DataTypeAST{
 				Code: x.Void,
 			},

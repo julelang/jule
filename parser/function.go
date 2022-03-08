@@ -5,6 +5,7 @@ import (
 	"sync/atomic"
 
 	"github.com/the-xlang/x/ast"
+	"github.com/the-xlang/x/pkg/x"
 )
 
 type function struct {
@@ -27,7 +28,7 @@ func (f function) Head() string {
 	cxx.WriteString(attributesToString(f.Attributes))
 	cxx.WriteString(f.Ast.RetType.String())
 	cxx.WriteByte(' ')
-	cxx.WriteString(f.Ast.Id)
+	cxx.WriteString(x.AsId(f.Ast.Id))
 	cxx.WriteString(paramsToCxx(f.Ast.Params))
 	return cxx.String()
 }
@@ -38,7 +39,7 @@ func (f function) Prototype() string {
 	cxx.WriteString(attributesToString(f.Attributes))
 	cxx.WriteString(f.Ast.RetType.String())
 	cxx.WriteByte(' ')
-	cxx.WriteString(f.Ast.Id)
+	cxx.WriteString(x.AsId(f.Ast.Id))
 	cxx.WriteString(f.PrototypeParams())
 	cxx.WriteByte(';')
 	return cxx.String()

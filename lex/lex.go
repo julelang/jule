@@ -430,7 +430,7 @@ func (l *Lex) Tok() Token {
 	default:
 		lex := l.id(content)
 		if lex != "" {
-			tok.Kind = x.AsId(lex)
+			tok.Kind = lex
 			tok.Id = Id
 			break
 		}

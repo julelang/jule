@@ -1123,8 +1123,8 @@ func (b *Builder) getForeachIterProfile(varTokens, exprTokens []lex.Token, inTok
 	profile.InToken = inTok
 	profile.Expr = b.Expr(exprTokens)
 	if len(varTokens) == 0 {
-		profile.KeyA.Id = "__"
-		profile.KeyB.Id = "__"
+		profile.KeyA.Id = "_"
+		profile.KeyB.Id = "_"
 	} else {
 		varsTokens := b.getForeachVarsTokens(varTokens)
 		if len(varsTokens) == 0 {
@@ -1138,7 +1138,7 @@ func (b *Builder) getForeachIterProfile(varTokens, exprTokens []lex.Token, inTok
 		if len(vars) > 1 {
 			profile.KeyB = vars[1]
 		} else {
-			profile.KeyB.Id = "__"
+			profile.KeyB.Id = "_"
 		}
 	}
 	return profile

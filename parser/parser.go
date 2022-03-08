@@ -166,7 +166,7 @@ func (p *Parser) Type(t ast.TypeAST) {
 // PushAttribute processes and appends to attribute list.
 func (p *Parser) PushAttribute(attribute ast.AttributeAST) {
 	switch attribute.Tag.Kind {
-	case "_inline":
+	case "inline":
 	default:
 		p.pusherrtok(attribute.Tag, "undefined_tag")
 	}
@@ -274,7 +274,7 @@ func (p *Parser) Var(vast ast.VariableAST) ast.VariableAST {
 func (p *Parser) checkFuncAttributes(attributes []ast.AttributeAST) {
 	for _, attribute := range attributes {
 		switch attribute.Tag.Kind {
-		case "_inline":
+		case "inline":
 		default:
 			p.pusherrtok(attribute.Token, "invalid_attribute")
 		}
@@ -379,7 +379,7 @@ func (p *Parser) existName(name string) lex.Token {
 func (p *Parser) checkAsync() {
 	defer func() { p.wg.Done() }()
 	if !p.justDefs {
-		if p.FuncById("_"+x.EntryPoint) == nil {
+		if p.FuncById(x.EntryPoint) == nil {
 			p.pusherr("no_entry_point")
 		}
 	}
@@ -421,7 +421,7 @@ func (p *Parser) checkFuncsAsync() {
 func (p *Parser) checkFuncSpecialCasesAsync(fun *function) {
 	defer func() { p.wg.Done() }()
 	switch fun.Ast.Id {
-	case "_" + x.EntryPoint:
+	case x.EntryPoint:
 		p.checkEntryPointSpecialCases(fun)
 	}
 }
@@ -656,7 +656,7 @@ func (p *valueEvaluator) id() (v value, ok bool) {
 		v.volatile = variable.Volatile
 		v.ast.Token = variable.IdToken
 		v.lvalue = true
-		p.builder.appendNode(exprNode{p.token.Kind})
+		p.builder.appendNode(exprNode{x.AsId(p.token.Kind)})
 		ok = true
 	} else if fun := p.parser.FuncById(p.token.Kind); fun != nil {
 		v.ast.Value = p.token.Kind
@@ -664,7 +664,7 @@ func (p *valueEvaluator) id() (v value, ok bool) {
 		v.ast.Type.Tag = fun.Ast
 		v.ast.Type.Value = fun.Ast.DataTypeString()
 		v.ast.Token = fun.Ast.Token
-		p.builder.appendNode(exprNode{p.token.Kind})
+		p.builder.appendNode(exprNode{x.AsId(p.token.Kind)})
 		ok = true
 	} else {
 		p.parser.pusherrtok(p.token, "id_noexist")
@@ -931,7 +931,7 @@ func (s solver) Solve() (v ast.ValueAST) {
 }
 
 func (p *Parser) evalSingleExpr(token lex.Token, builder *exprBuilder) (v value, ok bool) {
-	processor := valueEvaluator{token, builder, p}
+	eval := valueEvaluator{token, builder, p}
 	v.ast.Type.Code = x.Void
 	v.ast.Token = token
 	switch token.Id {
@@ -939,18 +939,18 @@ func (p *Parser) evalSingleExpr(token lex.Token, builder *exprBuilder) (v value,
 		ok = true
 		switch {
 		case isstr(token.Kind):
-			v = processor.str()
+			v = eval.str()
 		case isrune(token.Kind):
-			v = processor.rune()
+			v = eval.rune()
 		case isbool(token.Kind):
-			v = processor.bool()
+			v = eval.bool()
 		case isnil(token.Kind):
-			v = processor.nil()
+			v = eval.nil()
 		default:
-			v = processor.num()
+			v = eval.num()
 		}
 	case lex.Id:
-		v, ok = processor.id()
+		v, ok = eval.id()
 	default:
 		p.pusherrtok(token, "invalid_syntax")
 	}
