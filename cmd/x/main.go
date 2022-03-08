@@ -189,8 +189,16 @@ func appendStandard(code *string) {
 // endregion X_BUILTIN_VALUES
 
 // region X_MISC
+class exception: public std::exception {
+private:
+  std::basic_string<char> _buffer;
+public:
+  exception(const char *_Str)      { this->_buffer = _Str; }
+  const char *what() const throw() { return this->_buffer.c_str(); }
+};
+
 #define XALLOC(_Alloc) new(std::nothrow) _Alloc
-#define XPANIC(_Msg) std::wcout << _Msg << std::endl; std::exit(EXIT_FAILURE)
+#define XTHROW(_Msg) throw exception(_Msg)
 
 template <typename _Enum_t, typename _Index_t, typename _Item_t>
 static inline void foreach(const _Enum_t _Enum,
@@ -231,13 +239,9 @@ public:
 // endregion CONSTRUCTOR
 
 // region OPERATOR_OVERFLOWS
-  rune& operator[](const ssize _Index) noexcept {
-    if (_Index < 0) {
-      XPANIC(L"stackoverflow exception:\n index is less than zero");
-    } else if (_Index >= this->length()) {
-      XPANIC(L"stackoverflow exception:\nindex overflow " +
-      std::to_wstring(_Index) + L":" + std::to_wstring(this->length()));
-    }
+  rune& operator[](const size_t _Index) {
+    if (_Index < 0 || _Index >= this->length())
+    { XTHROW("stackoverflow exception: index is out of range"); }
     return this->at(_Index);
   }
 // endregion OPERATOR_OVERFLOWS
@@ -308,13 +312,9 @@ public:
   bool operator!=(const array<_Item_t> &_Src) const noexcept { return !(*this == _Src); }
   bool operator!=(std::nullptr_t) const noexcept             { return !this->_buffer.empty(); }
 
-  _Item_t& operator[](const ssize _Index) noexcept {
-    const size _length = this->_buffer.size();
-         if (_Index < 0) { XPANIC(L"stackoverflow exception:\n index is less than zero"); }
-    else if (_Index >= _length) {
-      XPANIC(L"stackoverflow exception:\nindex overflow " +
-        std::to_wstring(_Index) + L":" + std::to_wstring(_length));
-    }
+  _Item_t& operator[](const size _Index) {
+    if (_Index < 0 || _Index >= this->_buffer.size())
+    { XTHROW("stackoverflow exception: index is out of range"); }
     return this->_buffer[_Index];
   }
 
