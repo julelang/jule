@@ -9,8 +9,8 @@ import (
 )
 
 type function struct {
-	Ast        ast.FuncAST
-	Attributes []ast.AttributeAST
+	Ast        ast.Func
+	Attributes []ast.Attribute
 }
 
 func (f function) String() string {
@@ -59,7 +59,7 @@ func (f function) PrototypeParams() string {
 	return cxx.String()[:cxx.Len()-2] + ")"
 }
 
-func attributesToString(attributes []ast.AttributeAST) string {
+func attributesToString(attributes []ast.Attribute) string {
 	var cxx strings.Builder
 	for _, attribute := range attributes {
 		cxx.WriteString(attribute.String())
@@ -68,7 +68,7 @@ func attributesToString(attributes []ast.AttributeAST) string {
 	return cxx.String()
 }
 
-func paramsToCxx(params []ast.ParameterAST) string {
+func paramsToCxx(params []ast.Parameter) string {
 	if len(params) == 0 {
 		return "(void)"
 	}

@@ -7,14 +7,14 @@ import (
 
 var builtinFuncs = []*function{
 	{
-		Ast: ast.FuncAST{
+		Ast: ast.Func{
 			Id: "out",
-			RetType: ast.DataTypeAST{
+			RetType: ast.DataType{
 				Code: x.Void,
 			},
-			Params: []ast.ParameterAST{{
+			Params: []ast.Parameter{{
 				Id: "v",
-				Type: ast.DataTypeAST{
+				Type: ast.DataType{
 					Value: "any",
 					Code:  x.Any,
 				},
@@ -22,14 +22,14 @@ var builtinFuncs = []*function{
 		},
 	},
 	{
-		Ast: ast.FuncAST{
+		Ast: ast.Func{
 			Id: "outln",
-			RetType: ast.DataTypeAST{
+			RetType: ast.DataType{
 				Code: x.Void,
 			},
-			Params: []ast.ParameterAST{{
+			Params: []ast.Parameter{{
 				Id: "v",
-				Type: ast.DataTypeAST{
+				Type: ast.DataType{
 					Value: "any",
 					Code:  x.Any,
 				},

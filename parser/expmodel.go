@@ -69,8 +69,8 @@ func (model exprModel) String() string {
 	return expr.String()
 }
 
-func (model exprModel) ExprAST() ast.ExprAST {
-	return ast.ExprAST{Model: model}
+func (model exprModel) ExprAST() ast.Expr {
+	return ast.Expr{Model: model}
 }
 
 type exprNode struct {
@@ -82,7 +82,7 @@ func (node exprNode) String() string {
 }
 
 type anonFunc struct {
-	ast ast.FuncAST
+	ast ast.Func
 }
 
 func (af anonFunc) String() string {
@@ -97,7 +97,7 @@ func (af anonFunc) String() string {
 }
 
 type arrayExpr struct {
-	dataType ast.DataTypeAST
+	dataType ast.DataType
 	expr     []exprModel
 }
 
@@ -116,7 +116,7 @@ func (a arrayExpr) String() string {
 }
 
 type argsExpr struct {
-	args []ast.ArgAST
+	args []ast.Arg
 }
 
 func (a argsExpr) String() string {
@@ -146,7 +146,7 @@ func (mre multiRetExpr) String() string {
 }
 
 type newHeapAllocExpr struct {
-	typeAST ast.DataTypeAST
+	typeAST ast.DataType
 }
 
 func (nha newHeapAllocExpr) String() string {
@@ -154,7 +154,7 @@ func (nha newHeapAllocExpr) String() string {
 }
 
 type assignExpr struct {
-	assign ast.AssignAST
+	assign ast.Assign
 }
 
 func (a assignExpr) String() string {

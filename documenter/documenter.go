@@ -54,7 +54,7 @@ func globals(p *parser.Parser) []variable {
 	return globals
 }
 
-func params(parameters []ast.ParameterAST) []parameter {
+func params(parameters []ast.Parameter) []parameter {
 	params := make([]parameter, len(parameters))
 	for i, p := range parameters {
 		params[i] = parameter{p.Id, p.Type.Value, p.Const, p.Volatile}

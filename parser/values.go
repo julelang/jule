@@ -43,19 +43,19 @@ func isConstNum(v string) bool {
 	return v[0] >= '0' && v[0] <= '9'
 }
 
-func checkIntBit(v ast.ValueAST, bit int) bool {
+func checkIntBit(v ast.Value, bit int) bool {
 	if bit == 0 {
 		return false
 	}
 	if x.IsSignedNumericType(v.Type.Code) {
-		return xbits.CheckBitInt(v.Value, bit)
+		return xbits.CheckBitInt(v.Data, bit)
 	}
-	return xbits.CheckBitUInt(v.Value, bit)
+	return xbits.CheckBitUInt(v.Data, bit)
 }
 
-func checkFloatBit(v ast.ValueAST, bit int) bool {
+func checkFloatBit(v ast.Value, bit int) bool {
 	if bit == 0 {
 		return false
 	}
-	return xbits.CheckBitFloat(v.Value, bit)
+	return xbits.CheckBitFloat(v.Data, bit)
 }

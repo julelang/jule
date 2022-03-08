@@ -10,32 +10,26 @@ import (
 	"github.com/the-xlang/x/pkg/xapi"
 )
 
-// Object is an element of AST.
-type Object struct {
+// Obj is an element of AST.
+type Obj struct {
 	Token lex.Token
 	Value interface{}
 }
 
-// StatementAST is statement.
-type StatementAST struct {
+// Statement is statement.
+type Statement struct {
 	Token          lex.Token
 	Value          interface{}
 	WithTerminator bool
 }
 
-func (s StatementAST) String() string {
+func (s Statement) String() string {
 	return fmt.Sprint(s.Value)
-}
-
-// RangeAST represents block range or etc.
-type RangeAST struct {
-	Type    uint8
-	Content []Object
 }
 
 // BlockAST is code block.
 type BlockAST struct {
-	Statements []StatementAST
+	Statements []Statement
 }
 
 // Indent total of blocks.
@@ -65,8 +59,8 @@ func ParseBlock(b BlockAST, indent int) string {
 	return cxx.String()
 }
 
-// DataTypeAST is data type identifier.
-type DataTypeAST struct {
+// DataType is data type identifier.
+type DataType struct {
 	Token      lex.Token
 	Code       uint8
 	Value      string
@@ -74,7 +68,7 @@ type DataTypeAST struct {
 	Tag        interface{}
 }
 
-func (dt DataTypeAST) String() string {
+func (dt DataType) String() string {
 	var cxx strings.Builder
 	for index, run := range dt.Value {
 		if run == '*' {
@@ -107,10 +101,10 @@ func (dt DataTypeAST) String() string {
 	}
 }
 
-func (dt DataTypeAST) FunctionString() string {
+func (dt DataType) FunctionString() string {
 	var cxx strings.Builder
 	cxx.WriteString("std::function<")
-	fun := dt.Tag.(FuncAST)
+	fun := dt.Tag.(Func)
 	cxx.WriteString(fun.RetType.String())
 	cxx.WriteByte('(')
 	if len(fun.Params) > 0 {
@@ -128,8 +122,8 @@ func (dt DataTypeAST) FunctionString() string {
 	return cxx.String()
 }
 
-func (dt DataTypeAST) MultiTypeString() string {
-	types := dt.Tag.([]DataTypeAST)
+func (dt DataType) MultiTypeString() string {
+	types := dt.Tag.([]DataType)
 	var cxx strings.Builder
 	cxx.WriteString("std::tuple<")
 	for _, t := range types {
@@ -139,14 +133,14 @@ func (dt DataTypeAST) MultiTypeString() string {
 	return cxx.String()[:cxx.Len()-1] + ">"
 }
 
-// TypeAST is type declaration.
-type TypeAST struct {
+// Type is type declaration.
+type Type struct {
 	Token lex.Token
 	Id    string
-	Type  DataTypeAST
+	Type  DataType
 }
 
-func (t TypeAST) String() string {
+func (t Type) String() string {
 	var cxx strings.Builder
 	cxx.WriteString("typedef ")
 	cxx.WriteString(t.Type.String())
@@ -156,17 +150,17 @@ func (t TypeAST) String() string {
 	return cxx.String()
 }
 
-// FuncAST is function declaration AST model.
-type FuncAST struct {
+// Func is function declaration AST model.
+type Func struct {
 	Token   lex.Token
 	Id      string
-	Params  []ParameterAST
-	RetType DataTypeAST
+	Params  []Parameter
+	RetType DataType
 	Block   BlockAST
 }
 
 // DataTypeString returns data type string of function.
-func (fc FuncAST) DataTypeString() string {
+func (fc Func) DataTypeString() string {
 	var cxx strings.Builder
 	cxx.WriteByte('(')
 	if len(fc.Params) > 0 {
@@ -185,17 +179,17 @@ func (fc FuncAST) DataTypeString() string {
 	return cxx.String()
 }
 
-// ParameterAST is function parameter AST model.
-type ParameterAST struct {
+// Parameter is function parameter AST model.
+type Parameter struct {
 	Token    lex.Token
 	Id       string
 	Const    bool
 	Volatile bool
 	Variadic bool
-	Type     DataTypeAST
+	Type     DataType
 }
 
-func (p ParameterAST) String() string {
+func (p Parameter) String() string {
 	var cxx strings.Builder
 	cxx.WriteString(p.Prototype())
 	if p.Id != "" {
@@ -211,7 +205,7 @@ func (p ParameterAST) String() string {
 }
 
 // Prototype returns prototype cxx of parameter.
-func (p ParameterAST) Prototype() string {
+func (p Parameter) Prototype() string {
 	var cxx strings.Builder
 	if p.Volatile {
 		cxx.WriteString("volatile ")
@@ -229,18 +223,18 @@ func (p ParameterAST) Prototype() string {
 	return cxx.String()
 }
 
-// ArgAST is AST model of argument.
-type ArgAST struct {
+// Arg is AST model of argument.
+type Arg struct {
 	Token lex.Token
-	Expr  ExprAST
+	Expr  Expr
 }
 
-func (a ArgAST) String() string {
+func (a Arg) String() string {
 	return a.Expr.String()
 }
 
-// ExprAST is AST model of expression.
-type ExprAST struct {
+// Expr is AST model of expression.
+type Expr struct {
 	Tokens    []lex.Token
 	Processes [][]lex.Token
 	Model     IExprModel
@@ -251,7 +245,7 @@ type IExprModel interface {
 	String() string
 }
 
-func (e ExprAST) String() string {
+func (e Expr) String() string {
 	if e.Model != nil {
 		return e.Model.String()
 	}
@@ -269,36 +263,36 @@ func (e ExprAST) String() string {
 	return expr.String()
 }
 
-// ExprStatementAST is AST model of expression statement in block.
-type ExprStatementAST struct {
-	Expr ExprAST
+// ExprStatement is AST model of expression statement in block.
+type ExprStatement struct {
+	Expr Expr
 }
 
-func (be ExprStatementAST) String() string {
+func (be ExprStatement) String() string {
 	var cxx strings.Builder
 	cxx.WriteString(be.Expr.String())
 	cxx.WriteByte(';')
 	return cxx.String()
 }
 
-// ValueAST is AST model of constant value.
-type ValueAST struct {
+// Value is AST model of constant value.
+type Value struct {
 	Token lex.Token
-	Value string
-	Type  DataTypeAST
+	Data  string
+	Type  DataType
 }
 
-func (v ValueAST) String() string {
-	return v.Value
+func (v Value) String() string {
+	return v.Data
 }
 
-// ReturnAST is return statement AST model.
-type ReturnAST struct {
+// Ret is return statement AST model.
+type Ret struct {
 	Token lex.Token
-	Expr  ExprAST
+	Expr  Expr
 }
 
-func (r ReturnAST) String() string {
+func (r Ret) String() string {
 	var cxx strings.Builder
 	cxx.WriteString("return ")
 	cxx.WriteString(r.Expr.String())
@@ -306,31 +300,31 @@ func (r ReturnAST) String() string {
 	return cxx.String()
 }
 
-// AttributeAST is attribtue AST model.
-type AttributeAST struct {
+// Attribute is attribtue AST model.
+type Attribute struct {
 	Token lex.Token
 	Tag   lex.Token
 }
 
-func (a AttributeAST) String() string {
+func (a Attribute) String() string {
 	return a.Tag.Kind
 }
 
-// VariableAST is variable declaration AST model.
-type VariableAST struct {
+// Var is variable declaration AST model.
+type Var struct {
 	DefToken    lex.Token
 	IdToken     lex.Token
 	SetterToken lex.Token
 	Id          string
-	Type        DataTypeAST
-	Value       ExprAST
+	Type        DataType
+	Value       Expr
 	Const       bool
 	Volatile    bool
 	New         bool
 	Tag         interface{}
 }
 
-func (v VariableAST) String() string {
+func (v Var) String() string {
 	var sb strings.Builder
 	if v.Volatile {
 		sb.WriteString("volatile ")
@@ -352,8 +346,8 @@ func (v VariableAST) String() string {
 // AssignSelector is selector for assignment operation.
 type AssignSelector struct {
 	NewVariable bool
-	Var         VariableAST
-	Expr        ExprAST
+	Var         Var
+	Expr        Expr
 	Ignore      bool
 }
 
@@ -365,17 +359,17 @@ func (vs AssignSelector) String() string {
 	return vs.Expr.String()
 }
 
-// AssignAST is assignment AST model.
-type AssignAST struct {
+// Assign is assignment AST model.
+type Assign struct {
 	Setter         lex.Token
 	SelectExprs    []AssignSelector
-	ValueExprs     []ExprAST
+	ValueExprs     []Expr
 	IsExpr         bool
 	JustDeclare    bool
 	MultipleReturn bool
 }
 
-func (vs AssignAST) cxxSingleAssign() string {
+func (vs Assign) cxxSingleAssign() string {
 	var cxx strings.Builder
 	expr := vs.SelectExprs[0]
 	if len(expr.Expr.Tokens) != 1 ||
@@ -387,7 +381,7 @@ func (vs AssignAST) cxxSingleAssign() string {
 	return cxx.String()
 }
 
-func (vs AssignAST) cxxMultipleAssign() string {
+func (vs Assign) cxxMultipleAssign() string {
 	var cxx strings.Builder
 	cxx.WriteString("std::tie(")
 	var expCxx strings.Builder
@@ -409,7 +403,7 @@ func (vs AssignAST) cxxMultipleAssign() string {
 	return cxx.String()
 }
 
-func (vs AssignAST) cxxMultipleReturn() string {
+func (vs Assign) cxxMultipleReturn() string {
 	var cxx strings.Builder
 	cxx.WriteString("std::tie(")
 	for _, selector := range vs.SelectExprs {
@@ -429,7 +423,7 @@ func (vs AssignAST) cxxMultipleReturn() string {
 	return cxx.String()
 }
 
-func (vs AssignAST) cxxNewDefines() string {
+func (vs Assign) cxxNewDefines() string {
 	var cxx strings.Builder
 	for _, selector := range vs.SelectExprs {
 		if selector.Ignore || !selector.NewVariable {
@@ -440,7 +434,7 @@ func (vs AssignAST) cxxNewDefines() string {
 	return cxx.String()
 }
 
-func (vs AssignAST) String() string {
+func (vs Assign) String() string {
 	var cxx strings.Builder
 	cxx.WriteString(vs.cxxNewDefines())
 	if vs.JustDeclare {
@@ -460,12 +454,12 @@ func (vs AssignAST) String() string {
 	return cxx.String()
 }
 
-type FreeAST struct {
+type Free struct {
 	Token lex.Token
-	Expr  ExprAST
+	Expr  Expr
 }
 
-func (f FreeAST) String() string {
+func (f Free) String() string {
 	var cxx strings.Builder
 	cxx.WriteString("delete ")
 	cxx.WriteString(f.Expr.String())
@@ -475,15 +469,15 @@ func (f FreeAST) String() string {
 
 // IterProfile interface for iteration profiles.
 type IterProfile interface {
-	String(iter IterAST) string
+	String(iter Iter) string
 }
 
 // WhileProfile is while iteration profile.
 type WhileProfile struct {
-	Expr ExprAST
+	Expr Expr
 }
 
-func (wp WhileProfile) String(iter IterAST) string {
+func (wp WhileProfile) String(iter Iter) string {
 	var cxx strings.Builder
 	cxx.WriteString("while (")
 	cxx.WriteString(wp.Expr.String())
@@ -494,21 +488,21 @@ func (wp WhileProfile) String(iter IterAST) string {
 
 // ForeachProfile is foreach iteration profile.
 type ForeachProfile struct {
-	KeyA     VariableAST
-	KeyB     VariableAST
+	KeyA     Var
+	KeyB     Var
 	InToken  lex.Token
-	Expr     ExprAST
-	ExprType DataTypeAST
+	Expr     Expr
+	ExprType DataType
 }
 
-func (fp ForeachProfile) String(iter IterAST) string {
+func (fp ForeachProfile) String(iter Iter) string {
 	if !xapi.IsIgnoreId(fp.KeyA.Id) {
 		return fp.ForeachString(iter)
 	}
 	return fp.IterationSring(iter)
 }
 
-func (fp ForeachProfile) ForeachString(iter IterAST) string {
+func (fp ForeachProfile) ForeachString(iter Iter) string {
 	var cxx strings.Builder
 	cxx.WriteString("foreach<")
 	cxx.WriteString(fp.ExprType.String())
@@ -536,7 +530,7 @@ func (fp ForeachProfile) ForeachString(iter IterAST) string {
 	return cxx.String()
 }
 
-func (fp ForeachProfile) IterationSring(iter IterAST) string {
+func (fp ForeachProfile) IterationSring(iter Iter) string {
 	var cxx strings.Builder
 	cxx.WriteString("for (auto ")
 	cxx.WriteString(xapi.AsId(fp.KeyB.Id))
@@ -547,14 +541,14 @@ func (fp ForeachProfile) IterationSring(iter IterAST) string {
 	return cxx.String()
 }
 
-// IterAST is the AST model of iterations.
-type IterAST struct {
+// Iter is the AST model of iterations.
+type Iter struct {
 	Token   lex.Token
 	Block   BlockAST
 	Profile IterProfile
 }
 
-func (iter IterAST) String() string {
+func (iter Iter) String() string {
 	if iter.Profile == nil {
 		var cxx strings.Builder
 		cxx.WriteString("while (true) ")
@@ -564,32 +558,32 @@ func (iter IterAST) String() string {
 	return iter.Profile.String(iter)
 }
 
-// BreakAST is the AST model of break statement.
-type BreakAST struct {
+// Break is the AST model of break statement.
+type Break struct {
 	Token lex.Token
 }
 
-func (b BreakAST) String() string {
+func (b Break) String() string {
 	return "break;"
 }
 
-// ContinueAST is the AST model of break statement.
-type ContinueAST struct {
+// Continue is the AST model of break statement.
+type Continue struct {
 	Token lex.Token
 }
 
-func (c ContinueAST) String() string {
+func (c Continue) String() string {
 	return "continue;"
 }
 
-// IfAST is the AST model of if expression.
-type IfAST struct {
+// If is the AST model of if expression.
+type If struct {
 	Token lex.Token
-	Expr  ExprAST
+	Expr  Expr
 	Block BlockAST
 }
 
-func (ifast IfAST) String() string {
+func (ifast If) String() string {
 	var cxx strings.Builder
 	cxx.WriteString("if (")
 	cxx.WriteString(ifast.Expr.String())
@@ -598,14 +592,14 @@ func (ifast IfAST) String() string {
 	return cxx.String()
 }
 
-// ElseIfAST is the AST model of else if expression.
-type ElseIfAST struct {
+// ElseIf is the AST model of else if expression.
+type ElseIf struct {
 	Token lex.Token
-	Expr  ExprAST
+	Expr  Expr
 	Block BlockAST
 }
 
-func (elif ElseIfAST) String() string {
+func (elif ElseIf) String() string {
 	var cxx strings.Builder
 	cxx.WriteString("else if (")
 	cxx.WriteString(elif.Expr.String())
@@ -614,26 +608,26 @@ func (elif ElseIfAST) String() string {
 	return cxx.String()
 }
 
-// ElseAST is the AST model of else blocks.
-type ElseAST struct {
+// Else is the AST model of else blocks.
+type Else struct {
 	Token lex.Token
 	Block BlockAST
 }
 
-func (elseast ElseAST) String() string {
+func (elseast Else) String() string {
 	var cxx strings.Builder
 	cxx.WriteString("else ")
 	cxx.WriteString(elseast.Block.String())
 	return cxx.String()
 }
 
-// CommentAST is the AST model of just comment lines.
-type CommentAST struct {
+// Comment is the AST model of just comment lines.
+type Comment struct {
 	Token   lex.Token
 	Content string
 }
 
-func (c CommentAST) String() string {
+func (c Comment) String() string {
 	var cxx strings.Builder
 	cxx.WriteString("// ")
 	cxx.WriteString(c.Content)
