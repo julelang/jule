@@ -58,8 +58,6 @@ In this way, X can also be used as an easy interface for learning C++.
 
 <h2 id="os_support">OS Support</h2>
 
-> Compiler is not supports any operating system but transpiler is planned usable for Windows, Darwin and Linux.
-
 <table>
     <tr>
         <td>Operating System</td>
@@ -67,15 +65,15 @@ In this way, X can also be used as an easy interface for learning C++.
     </tr>
     <tr>
         <td>Windows</td>
-        <td>Not Yet</td>
+        <td>Supports transpiler, not supports compiler yet</td>
     </tr>
     <tr>
         <td>Linux</td>
-        <td>Not Yet</td>
+        <td>Supports transpiler, not supports compiler yet</td>
     </tr>
     <tr>
         <td>MacOS</td>
-        <td>Not yet</td>
+        <td>Supports transpiler, not supports compiler yet</td>
     </tr>
 </table>
 
