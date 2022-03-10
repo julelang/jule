@@ -101,4 +101,5 @@ var Errors = map[string]string{
 	`type_notsupports_casting`:         `data-type not supports casting`,
 	`notallow_declares`:                `declare not allowed`,
 	`notallow_multiple_assign`:         `multiple assignments not allowed`,
+	`attribute_not_supports`:           `attribute is not supports by define`,
 }

@@ -88,7 +88,11 @@ func (b *Builder) Type(tokens []lex.Token) {
 	}
 	destType, _ := b.DataType(tokens[position:], new(int), true)
 	token = tokens[1]
-	typeAST := Type{token, token.Kind, destType}
+	typeAST := Type{
+		Token: token,
+		Id:    token.Kind,
+		Type:  destType,
+	}
 	b.Tree = append(b.Tree, Obj{token, typeAST})
 }
 

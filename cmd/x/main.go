@@ -66,8 +66,7 @@ func initProject(cmd string) {
 	content := []byte(`{
   "cxx_out_dir": "./dist/",
   "cxx_out_name": "x.cxx",
-  "out_name": "main",
-  "styled_logs": true,
+  "out_name": "main"
 }`)
 	err := ioutil.WriteFile(x.SettingsFile, content, 0666)
 	if err != nil {
@@ -86,8 +85,7 @@ func doc(cmd string) {
 		if info == nil {
 			continue
 		}
-		if info.Errors != nil {
-			printlogs(info.Errors)
+		if printlogs(info.Logs) {
 			fmt.Println(path+":",
 				"documentation couldn't generated because X source code has an errors")
 			continue
@@ -161,13 +159,32 @@ func loadXSet() {
 	}
 }
 
-func printlogs(logs []xlog.CompilerLog) {
+// printlogs prints logs and returns true
+// if logs has error, false if not.
+func printlogs(logs []xlog.CompilerLog) bool {
 	var str strings.Builder
+	err := false
 	for _, log := range logs {
 		switch log.Type {
-		case xlog.Flat:
+		case xlog.FlatError:
+			err = true
+			str.WriteString("ERROR: ")
+			str.WriteString(log.Message)
+		case xlog.FlatWarning:
+			str.WriteString("WARNING: ")
 			str.WriteString(log.Message)
 		case xlog.Error:
+			err = true
+			str.WriteString("ERROR: ")
+			str.WriteString(log.Path)
+			str.WriteByte(':')
+			str.WriteString(fmt.Sprint(log.Row))
+			str.WriteByte(':')
+			str.WriteString(fmt.Sprint(log.Column))
+			str.WriteByte(' ')
+			str.WriteString(log.Message)
+		case xlog.Warning:
+			str.WriteString("WARNING: ")
 			str.WriteString(log.Path)
 			str.WriteByte(':')
 			str.WriteString(fmt.Sprint(log.Row))
@@ -179,6 +196,7 @@ func printlogs(logs []xlog.CompilerLog) {
 		str.WriteByte('\n')
 	}
 	print(str.String())
+	return err
 }
 
 func appendStandard(code *string) {
@@ -413,8 +431,7 @@ func compile(path string, justDefs bool) *parser.ParseFileInfo {
 func main() {
 	filePath := os.Args[0]
 	info := compile(filePath, false)
-	if info.Errors != nil {
-		printlogs(info.Errors)
+	if printlogs(info.Logs) {
 		os.Exit(0)
 	}
 	cxx := info.Parser.Cxx()

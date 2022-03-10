@@ -135,9 +135,10 @@ func (dt DataType) MultiTypeString() string {
 
 // Type is type declaration.
 type Type struct {
-	Token lex.Token
-	Id    string
-	Type  DataType
+	Token       lex.Token
+	Id          string
+	Type        DataType
+	Description string
 }
 
 func (t Type) String() string {
@@ -322,25 +323,26 @@ type Var struct {
 	Volatile    bool
 	New         bool
 	Tag         interface{}
+	Description string
 }
 
 func (v Var) String() string {
-	var sb strings.Builder
+	var cxx strings.Builder
 	if v.Volatile {
-		sb.WriteString("volatile ")
+		cxx.WriteString("volatile ")
 	}
 	if v.Const {
-		sb.WriteString("const ")
+		cxx.WriteString("const ")
 	}
-	sb.WriteString(v.Type.String())
-	sb.WriteByte(' ')
-	sb.WriteString(xapi.AsId(v.Id))
+	cxx.WriteString(v.Type.String())
+	cxx.WriteByte(' ')
+	cxx.WriteString(xapi.AsId(v.Id))
 	if v.Value.Processes != nil {
-		sb.WriteString(" = ")
-		sb.WriteString(v.Value.String())
+		cxx.WriteString(" = ")
+		cxx.WriteString(v.Value.String())
 	}
-	sb.WriteByte(';')
-	return sb.String()
+	cxx.WriteByte(';')
+	return cxx.String()
 }
 
 // AssignSelector is selector for assignment operation.

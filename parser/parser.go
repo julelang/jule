@@ -15,6 +15,7 @@ import (
 // Parser is parser of X code.
 type Parser struct {
 	attributes []ast.Attribute
+	docText    strings.Builder
 	iterCount  int
 	wg         sync.WaitGroup
 	justDefs   bool
@@ -37,26 +38,45 @@ func NewParser(tokens []lex.Token, PFI *ParseFileInfo) *Parser {
 }
 
 // pusherrtok appends new error by token.
-func (p *Parser) pusherrtok(token lex.Token, err string) {
-	p.PFI.Errors = append(p.PFI.Errors, xlog.CompilerLog{
+func (p *Parser) pusherrtok(token lex.Token, key string) {
+	p.PFI.Logs = append(p.PFI.Logs, xlog.CompilerLog{
 		Type:    xlog.Error,
 		Row:     token.Row,
 		Column:  token.Column,
 		Path:    token.File.Path,
-		Message: x.Errors[err],
+		Message: x.Errors[key],
+	})
+}
+
+// pushwarntok appends new warning by token.
+func (p *Parser) pushwarntok(token lex.Token, key string) {
+	p.PFI.Logs = append(p.PFI.Logs, xlog.CompilerLog{
+		Type:    xlog.Warning,
+		Row:     token.Row,
+		Column:  token.Column,
+		Path:    token.File.Path,
+		Message: x.Warns[key],
 	})
 }
 
 // pusherrs appends specified errors.
 func (p *Parser) pusherrs(errs ...xlog.CompilerLog) {
-	p.PFI.Errors = append(p.PFI.Errors, errs...)
+	p.PFI.Logs = append(p.PFI.Logs, errs...)
 }
 
 // pusherr appends new error.
-func (p *Parser) pusherr(err string) {
-	p.PFI.Errors = append(p.PFI.Errors, xlog.CompilerLog{
-		Type:    xlog.Flat,
-		Message: x.Errors[err],
+func (p *Parser) pusherr(key string) {
+	p.PFI.Logs = append(p.PFI.Logs, xlog.CompilerLog{
+		Type:    xlog.FlatError,
+		Message: x.Errors[key],
+	})
+}
+
+// pusherr appends new warning.
+func (p *Parser) pushwarn(key string) {
+	p.PFI.Logs = append(p.PFI.Logs, xlog.CompilerLog{
+		Type:    xlog.FlatWarning,
+		Message: x.Warns[key],
 	})
 }
 
@@ -125,9 +145,12 @@ func (p *Parser) CxxFuncs() string {
 // Cxx returns full C++ code of parsed objects.
 func (p *Parser) Cxx() string {
 	var cxx strings.Builder
-	cxx.WriteString(p.CxxTypes() + "\n\n")
-	cxx.WriteString(p.CxxPrototypes() + "\n\n")
-	cxx.WriteString(p.CxxGlobalVars() + "\n\n")
+	cxx.WriteString(p.CxxTypes())
+	cxx.WriteString("\n\n")
+	cxx.WriteString(p.CxxPrototypes())
+	cxx.WriteString("\n\n")
+	cxx.WriteString(p.CxxGlobalVars())
+	cxx.WriteString("\n\n")
 	cxx.WriteString(p.CxxFuncs())
 	return cxx.String()
 }
@@ -137,12 +160,12 @@ func (p *Parser) Parse(justDefs bool) {
 	builder := ast.NewBuilder(p.Tokens)
 	builder.Build()
 	if len(builder.Errors) > 0 {
-		p.PFI.Errors = append(p.PFI.Errors, builder.Errors...)
+		p.PFI.Logs = append(p.PFI.Logs, builder.Errors...)
 		return
 	}
 	p.justDefs = justDefs
-	for _, model := range builder.Tree {
-		switch t := model.Value.(type) {
+	for _, obj := range builder.Tree {
+		switch t := obj.Value.(type) {
 		case ast.Attribute:
 			p.PushAttribute(t)
 		case ast.Statement:
@@ -150,13 +173,43 @@ func (p *Parser) Parse(justDefs bool) {
 		case ast.Type:
 			p.Type(t)
 		case ast.Comment:
+			p.Comment(t)
 		default:
-			p.pusherrtok(model.Token, "invalid_syntax")
+			p.pusherrtok(obj.Token, "invalid_syntax")
 		}
+		p.checkDoc(obj)
+		p.checkAttribute(obj)
+	}
+	if p.docText.Len() > 0 {
+		p.pushwarn("exist_undefined_doc")
 	}
 	p.wg.Add(1)
 	go p.checkAsync()
 	p.wg.Wait()
+}
+
+func (p *Parser) checkDoc(obj ast.Obj) {
+	if p.docText.Len() == 0 {
+		return
+	}
+	switch obj.Value.(type) {
+	case ast.Comment, ast.Attribute:
+		return
+	}
+	p.pushwarntok(obj.Token, "doc_ignored")
+	p.docText.Reset()
+}
+
+func (p *Parser) checkAttribute(obj ast.Obj) {
+	if p.attributes == nil {
+		return
+	}
+	switch obj.Value.(type) {
+	case ast.Attribute, ast.Comment:
+		return
+	}
+	p.pusherrtok(obj.Token, "attribute_not_supports")
+	p.attributes = nil
 }
 
 // Type parses X type define statement.
@@ -168,7 +221,27 @@ func (p *Parser) Type(t ast.Type) {
 		p.pusherrtok(t.Token, "ignore_id")
 		return
 	}
+	t.Description = p.docText.String()
+	p.docText.Reset()
 	p.Types = append(p.Types, t)
+}
+
+// Comment parses X documentation comments line.
+func (p *Parser) Comment(c ast.Comment) {
+	c.Content = strings.TrimSpace(c.Content)
+	if p.docText.Len() == 0 {
+		if strings.HasPrefix(c.Content, "doc:") {
+			c.Content = c.Content[4:]
+			if c.Content == "" {
+				c.Content = " "
+			}
+			goto write
+		}
+		return
+	}
+	p.docText.WriteByte('\n')
+write:
+	p.docText.WriteString(c.Content)
 }
 
 // PushAttribute processes and appends to attribute list.
@@ -208,9 +281,11 @@ func (p *Parser) Func(fast ast.Func) {
 	}
 	fun := new(function)
 	fun.Ast = fast
-	fun.Attributes = p.attributes
+	fun.attributes = p.attributes
+	fun.Description = p.docText.String()
 	p.attributes = nil
-	p.checkFuncAttributes(fun.Attributes)
+	p.docText.Reset()
+	p.checkFuncAttributes(fun.attributes)
 	p.Funcs = append(p.Funcs, fun)
 }
 
@@ -220,6 +295,8 @@ func (p *Parser) GlobalVar(vast ast.Var) {
 		p.pusherrtok(vast.IdToken, "exist_id")
 		return
 	}
+	vast.Description = p.docText.String()
+	p.docText.Reset()
 	p.waitingGlobalVars = append(p.waitingGlobalVars, vast)
 }
 
@@ -1684,7 +1761,7 @@ func (p *Parser) checkEntryPointSpecialCases(fun *function) {
 	if fun.Ast.RetType.Code != x.Void {
 		p.pusherrtok(fun.Ast.RetType.Token, "entrypoint_have_return")
 	}
-	if fun.Attributes != nil {
+	if fun.attributes != nil {
 		p.pusherrtok(fun.Ast.Token, "entrypoint_have_attributes")
 	}
 }

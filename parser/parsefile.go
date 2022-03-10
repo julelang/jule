@@ -10,7 +10,7 @@ import (
 
 type ParseFileInfo struct {
 	Parser   *Parser
-	Errors   []xlog.CompilerLog
+	Logs     []xlog.CompilerLog
 	File     *io.File
 	Routines *sync.WaitGroup
 }
@@ -20,8 +20,8 @@ func (info *ParseFileInfo) ParseAsync(justDefs bool) {
 	defer info.Routines.Done()
 	lexer := lex.NewLex(info.File)
 	tokens := lexer.Tokenize()
-	if lexer.Errors != nil {
-		info.Errors = lexer.Errors
+	if lexer.Logs != nil {
+		info.Logs = lexer.Logs
 		return
 	}
 	info.Parser = NewParser(tokens, info)

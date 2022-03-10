@@ -8,21 +8,24 @@ import (
 )
 
 type xtype struct {
-	Id    string `json:"id"`
-	Alias string `json:"alias"`
+	Id          string `json:"id"`
+	Alias       string `json:"alias"`
+	Description string `json:"description"`
 }
 
-type variable struct {
-	Id       string `json:"id"`
-	Type     string `json:"type"`
-	Constant bool   `json:"constant"`
-	Volatile bool   `json:"volatile"`
+type global struct {
+	Id          string `json:"id"`
+	Type        string `json:"type"`
+	Constant    bool   `json:"constant"`
+	Volatile    bool   `json:"volatile"`
+	Description string `json:"description"`
 }
 
 type function struct {
-	Id     string      `json:"id"`
-	Ret    string      `json:"ret"`
-	Params []parameter `json:"parameters"`
+	Id          string      `json:"id"`
+	Ret         string      `json:"ret"`
+	Params      []parameter `json:"parameters"`
+	Description string      `json:"description"`
 }
 
 type parameter struct {
@@ -34,22 +37,32 @@ type parameter struct {
 
 type document struct {
 	Types   []xtype    `json:"types"`
-	Globals []variable `json:"globals"`
+	Globals []global   `json:"globals"`
 	Funcs   []function `json:"functions"`
 }
 
 func types(p *parser.Parser) []xtype {
 	types := make([]xtype, len(p.Types))
 	for i, t := range p.Types {
-		types[i] = xtype{t.Id, t.Type.Value}
+		types[i] = xtype{
+			Id:          t.Id,
+			Alias:       t.Type.Value,
+			Description: descriptize(t.Description),
+		}
 	}
 	return types
 }
 
-func globals(p *parser.Parser) []variable {
-	globals := make([]variable, len(p.GlobalVars))
+func globals(p *parser.Parser) []global {
+	globals := make([]global, len(p.GlobalVars))
 	for i, v := range p.GlobalVars {
-		globals[i] = variable{v.Id, v.Type.Value, v.Const, v.Volatile}
+		globals[i] = global{
+			Id:          v.Id,
+			Type:        v.Type.Value,
+			Constant:    v.Const,
+			Volatile:    v.Volatile,
+			Description: descriptize(v.Description),
+		}
 	}
 	return globals
 }
@@ -57,7 +70,12 @@ func globals(p *parser.Parser) []variable {
 func params(parameters []ast.Parameter) []parameter {
 	params := make([]parameter, len(parameters))
 	for i, p := range parameters {
-		params[i] = parameter{p.Id, p.Type.Value, p.Const, p.Volatile}
+		params[i] = parameter{
+			Id:       p.Id,
+			Type:     p.Type.Value,
+			Constant: p.Const,
+			Volatile: p.Volatile,
+		}
 	}
 	return params
 }
@@ -65,10 +83,12 @@ func params(parameters []ast.Parameter) []parameter {
 func funcs(p *parser.Parser) []function {
 	funcs := make([]function, len(p.Funcs))
 	for i, f := range p.Funcs {
-		fun := function{}
-		fun.Id = f.Ast.Id
-		fun.Ret = f.Ast.RetType.Value
-		fun.Params = params(f.Ast.Params)
+		fun := function{
+			Id:          f.Ast.Id,
+			Ret:         f.Ast.RetType.Value,
+			Params:      params(f.Ast.Params),
+			Description: descriptize(f.Description),
+		}
 		funcs[i] = fun
 	}
 	return funcs

@@ -9,8 +9,9 @@ import (
 )
 
 type function struct {
-	Ast        ast.Func
-	Attributes []ast.Attribute
+	Ast         ast.Func
+	attributes  []ast.Attribute
+	Description string
 }
 
 func (f function) String() string {
@@ -25,7 +26,7 @@ func (f function) String() string {
 // Head returns declaration head of function.
 func (f function) Head() string {
 	var cxx strings.Builder
-	cxx.WriteString(attributesToString(f.Attributes))
+	cxx.WriteString(attributesToString(f.attributes))
 	cxx.WriteString(f.Ast.RetType.String())
 	cxx.WriteByte(' ')
 	cxx.WriteString(xapi.AsId(f.Ast.Id))
@@ -36,7 +37,7 @@ func (f function) Head() string {
 // Prototype returns prototype cxx code of function.
 func (f function) Prototype() string {
 	var cxx strings.Builder
-	cxx.WriteString(attributesToString(f.Attributes))
+	cxx.WriteString(attributesToString(f.attributes))
 	cxx.WriteString(f.Ast.RetType.String())
 	cxx.WriteByte(' ')
 	cxx.WriteString(xapi.AsId(f.Ast.Id))

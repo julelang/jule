@@ -21,7 +21,8 @@ type Lex struct {
 	Position int
 	Column   int
 	Row      int
-	Errors   []xlog.CompilerLog
+	// Logs are only errors
+	Logs []xlog.CompilerLog
 
 	braces []Token
 }
@@ -30,14 +31,13 @@ type Lex struct {
 func NewLex(f *io.File) *Lex {
 	l := new(Lex)
 	l.File = f
-	l.Row = 1
-	l.Column = 1
 	l.Position = 0
+	l.Newln()
 	return l
 }
 
 func (l *Lex) pusherr(err string) {
-	l.Errors = append(l.Errors, xlog.CompilerLog{
+	l.Logs = append(l.Logs, xlog.CompilerLog{
 		Type:    xlog.Error,
 		Row:     l.Row,
 		Column:  l.Column,
@@ -47,7 +47,7 @@ func (l *Lex) pusherr(err string) {
 }
 
 func (l *Lex) pusherrtok(tok Token, err string) {
-	l.Errors = append(l.Errors, xlog.CompilerLog{
+	l.Logs = append(l.Logs, xlog.CompilerLog{
 		Type:    xlog.Error,
 		Row:     tok.Row,
 		Column:  tok.Column,
@@ -59,7 +59,7 @@ func (l *Lex) pusherrtok(tok Token, err string) {
 // Tokenize all source content.
 func (l *Lex) Tokenize() []Token {
 	var tokens []Token
-	l.Errors = nil
+	l.Logs = nil
 	l.Newln()
 	for l.Position < len(l.File.Content) {
 		token := l.Tok()
@@ -127,10 +127,11 @@ func (l *Lex) resume() string {
 	// Skip spaces.
 	for i, r := range runes {
 		if unicode.IsSpace(r) {
-			l.Column++
 			l.Position++
 			if r == '\n' {
 				l.Newln()
+			} else {
+				l.Column++
 			}
 			continue
 		}
@@ -149,10 +150,12 @@ func (l *Lex) lncomment(token *Token) {
 				token.Id = Comment
 				token.Kind = string(l.File.Content[start:l.Position])
 			}
-			l.Position++
-			l.Newln()
 			return
 		}
+	}
+	if l.firstTokenOfLine {
+		token.Id = Comment
+		token.Kind = string(l.File.Content[start:])
 	}
 }
 
@@ -250,13 +253,12 @@ func (l *Lex) str(content string) string {
 	for i := 0; i < len(content); i++ {
 		ch := content[i]
 		if ch == '\n' {
+			defer l.Newln()
 			if !raw {
 				l.pusherr("missing_string_end")
 				l.Position++
-				l.Newln()
 				return ""
 			}
-			l.Newln()
 		}
 		run := l.getrune(content[i:], raw)
 		sb.WriteString(run)
@@ -328,7 +330,7 @@ func (l *Lex) Tok() Token {
 		return tok
 	case strings.HasPrefix(content, "//"):
 		l.lncomment(&tok)
-		return tok
+		goto ret
 	case strings.HasPrefix(content, "/*"):
 		l.rangecomment()
 		return tok
@@ -456,6 +458,7 @@ func (l *Lex) Tok() Token {
 		return tok
 	}
 	l.Column += len(tok.Kind)
+ret:
 	return tok
 }
 
