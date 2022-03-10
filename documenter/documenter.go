@@ -26,6 +26,7 @@ type function struct {
 	Ret         string      `json:"ret"`
 	Params      []parameter `json:"parameters"`
 	Description string      `json:"description"`
+	Attributes  []string    `json:"attributes"`
 }
 
 type parameter struct {
@@ -80,6 +81,14 @@ func params(parameters []ast.Parameter) []parameter {
 	return params
 }
 
+func attributes(attributes []ast.Attribute) []string {
+	attrs := make([]string, len(attributes))
+	for index, attribute := range attributes {
+		attrs[index] = attribute.String()
+	}
+	return attrs
+}
+
 func funcs(p *parser.Parser) []function {
 	funcs := make([]function, len(p.Funcs))
 	for i, f := range p.Funcs {
@@ -88,6 +97,7 @@ func funcs(p *parser.Parser) []function {
 			Ret:         f.Ast.RetType.Value,
 			Params:      params(f.Ast.Params),
 			Description: descriptize(f.Description),
+			Attributes:  attributes(f.Attributes),
 		}
 		funcs[i] = fun
 	}

@@ -281,11 +281,11 @@ func (p *Parser) Func(fast ast.Func) {
 	}
 	fun := new(function)
 	fun.Ast = fast
-	fun.attributes = p.attributes
+	fun.Attributes = p.attributes
 	fun.Description = p.docText.String()
 	p.attributes = nil
 	p.docText.Reset()
-	p.checkFuncAttributes(fun.attributes)
+	p.checkFuncAttributes(fun.Attributes)
 	p.Funcs = append(p.Funcs, fun)
 }
 
@@ -1761,7 +1761,7 @@ func (p *Parser) checkEntryPointSpecialCases(fun *function) {
 	if fun.Ast.RetType.Code != x.Void {
 		p.pusherrtok(fun.Ast.RetType.Token, "entrypoint_have_return")
 	}
-	if fun.attributes != nil {
+	if fun.Attributes != nil {
 		p.pusherrtok(fun.Ast.Token, "entrypoint_have_attributes")
 	}
 }
