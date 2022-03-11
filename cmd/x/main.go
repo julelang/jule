@@ -246,7 +246,8 @@ template <typename _Enum_t, typename _Index_t>
 static inline void foreach(const _Enum_t _Enum,
                            const std::function<void(_Index_t)> _Body) {
   _Index_t _index{0};
-  for (auto _: _Enum) { _Body(_index++); }
+  for (auto begin = _Enum.begin(), end = _Enum.end(); begin < end; ++begin)
+  { _Body(_index++); }
 }
 // endregion X_MISC
 
@@ -272,14 +273,6 @@ public:
   str(const rune* _Str)                                      { this->assign(_Str); }
   str(const std::basic_string<rune> _Src): str(_Src.c_str()) { }
 // endregion CONSTRUCTOR
-
-// region OPERATOR_OVERFLOWS
-  rune& operator[](const size_t _Index) {
-    if (_Index < 0 || _Index >= this->length())
-    { XTHROW("stackoverflow exception: index is out of range"); }
-    return this->at(_Index);
-  }
-// endregion OPERATOR_OVERFLOWS
 };
 // endregion X_BUILTIN_TYPES
 
@@ -294,7 +287,7 @@ public:
 // region CONSTRUCTORS
   array<_Item_t>(void) noexcept                                                     { this->_buffer = { }; }
   array<_Item_t>(const std::vector<_Item_t>& _Src) noexcept                         { this->_buffer = _Src; }
-  array<_Item_t>(std::nullptr_t) noexcept: array<_Item_t>()                         { }
+  array<_Item_t>(const std::nullptr_t) noexcept: array<_Item_t>()                   { }
   array<_Item_t>(const array<_Item_t>& _Src) noexcept: array<_Item_t>(_Src._buffer) { }
 
   array<_Item_t>(const str _Str) {
@@ -325,7 +318,7 @@ public:
 // endregion FOREACH_SUPPORT
 
 // region OPERATOR_OVERFLOWS
-  operator str() const noexcept {
+  operator str(void) const noexcept {
     if (std::is_same<_Item_t, rune>::value) { return str(std::basic_string<rune>(this->begin(), this->end())); }
     if (std::is_same<_Item_t, u8>::value) {
       std::wstring_convert<std::codecvt_utf8_utf16<rune>> _conv;
@@ -343,15 +336,10 @@ public:
     return true;
   }
 
-  bool operator==(std::nullptr_t) const noexcept             { return this->_buffer.empty(); }
+  bool operator==(const std::nullptr_t) const noexcept       { return this->_buffer.empty(); }
   bool operator!=(const array<_Item_t> &_Src) const noexcept { return !(*this == _Src); }
-  bool operator!=(std::nullptr_t) const noexcept             { return !this->_buffer.empty(); }
-
-  _Item_t& operator[](const size _Index) {
-    if (_Index < 0 || _Index >= this->_buffer.size())
-    { XTHROW("stackoverflow exception: index is out of range"); }
-    return this->_buffer[_Index];
-  }
+  bool operator!=(const std::nullptr_t) const noexcept       { return !this->_buffer.empty(); }
+  _Item_t& operator[](const size _Index)                     { return this->_buffer[_Index]; }
 
   friend std::wostream& operator<<(std::wostream &_Stream,
                                    const array<_Item_t> &_Src) {
