@@ -94,9 +94,9 @@ Before you start contributing, you should familiarize yourself with the followin
 + [``doc``](https://github.com/the-xlang/x/blob/main/docs) documentations
 + [``documenter``](https://github.com/the-xlang/x/blob/main/documenter) documenter
 + [``lex/``](https://github.com/the-xlang/x/blob/main/lex) lexer
++ [``lib/``](https://github.com/the-xlang/x/blob/main/lib) standard library
 + [``parser/``](https://github.com/the-xlang/x/blob/main/parser) x-cxx parser
 + [``pkg/``](https://github.com/the-xlang/x/blob/main/pkg) utility packages
-+ [``xlib/``](https://github.com/the-xlang/x/blob/main/xlib) standard libraries
 
 <h2 id="license">License</h2>
 

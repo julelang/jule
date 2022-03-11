@@ -95,7 +95,7 @@ func doc(cmd string) {
 			fmt.Println("Error:", err.Error())
 			continue
 		}
-		path = filepath.Join(x.XSet.CxxOutDir, path+".xdoc")
+		path = filepath.Join(x.XSet.CxxOutDir, path+x.DocExtension)
 		writeOutput(path, docjson)
 	}
 }
@@ -118,6 +118,7 @@ func processCommand(namespace, cmd string) bool {
 
 func init() {
 	x.ExecutablePath = filepath.Dir(os.Args[0])
+
 	// Not started with arguments.
 	// Here is "2" but "os.Args" always have one element for store working directory.
 	if len(os.Args) < 2 {
@@ -400,14 +401,25 @@ func writeOutput(path, content string) {
 	}
 }
 
-func compile(path string, justDefs bool) *parser.ParseFileInfo {
+func compile(path string, justDefs bool) *parser.ParseInfo {
+	info := new(parser.ParseInfo)
+
+	// Check standard library.
+	inf, err := os.Stat(filepath.Join(x.ExecutablePath, x.Stdlib))
+	if err != nil || !inf.IsDir() {
+		info.Logs = append(info.Logs, xlog.CompilerLog{
+			Type:    xlog.FlatError,
+			Message: "standard library directory not found",
+		})
+		return info
+	}
+
 	f, err := io.Openfx(path)
 	if err != nil {
 		println(err.Error())
 		return nil
 	}
 	routines := new(sync.WaitGroup)
-	info := new(parser.ParseFileInfo)
 	info.File = f
 	info.Routines = routines
 	routines.Add(1)

@@ -20,26 +20,25 @@ type Parser struct {
 	wg         sync.WaitGroup
 	justDefs   bool
 
-	Funcs             []*function
-	GlobalVars        []ast.Var
-	Types             []ast.Type
-	waitingGlobalVars []ast.Var
-	BlockVars         []ast.Var
-	Tokens            []lex.Token
-	PFI               *ParseFileInfo
+	Defs           *defmap
+	waitingGlobals []ast.Var
+	BlockVars      []ast.Var
+	Tokens         []lex.Token
+	Pfi            *ParseInfo
 }
 
 // NewParser returns new instance of Parser.
-func NewParser(tokens []lex.Token, PFI *ParseFileInfo) *Parser {
+func NewParser(tokens []lex.Token, Pfi *ParseInfo) *Parser {
 	parser := new(Parser)
 	parser.Tokens = tokens
-	parser.PFI = PFI
+	parser.Pfi = Pfi
+	parser.Defs = new(defmap)
 	return parser
 }
 
 // pusherrtok appends new error by token.
 func (p *Parser) pusherrtok(token lex.Token, key string) {
-	p.PFI.Logs = append(p.PFI.Logs, xlog.CompilerLog{
+	p.Pfi.Logs = append(p.Pfi.Logs, xlog.CompilerLog{
 		Type:    xlog.Error,
 		Row:     token.Row,
 		Column:  token.Column,
@@ -50,7 +49,7 @@ func (p *Parser) pusherrtok(token lex.Token, key string) {
 
 // pushwarntok appends new warning by token.
 func (p *Parser) pushwarntok(token lex.Token, key string) {
-	p.PFI.Logs = append(p.PFI.Logs, xlog.CompilerLog{
+	p.Pfi.Logs = append(p.Pfi.Logs, xlog.CompilerLog{
 		Type:    xlog.Warning,
 		Row:     token.Row,
 		Column:  token.Column,
@@ -61,12 +60,12 @@ func (p *Parser) pushwarntok(token lex.Token, key string) {
 
 // pusherrs appends specified errors.
 func (p *Parser) pusherrs(errs ...xlog.CompilerLog) {
-	p.PFI.Logs = append(p.PFI.Logs, errs...)
+	p.Pfi.Logs = append(p.Pfi.Logs, errs...)
 }
 
 // pusherr appends new error.
 func (p *Parser) pusherr(key string) {
-	p.PFI.Logs = append(p.PFI.Logs, xlog.CompilerLog{
+	p.Pfi.Logs = append(p.Pfi.Logs, xlog.CompilerLog{
 		Type:    xlog.FlatError,
 		Message: x.Errors[key],
 	})
@@ -74,7 +73,7 @@ func (p *Parser) pusherr(key string) {
 
 // pusherr appends new warning.
 func (p *Parser) pushwarn(key string) {
-	p.PFI.Logs = append(p.PFI.Logs, xlog.CompilerLog{
+	p.Pfi.Logs = append(p.Pfi.Logs, xlog.CompilerLog{
 		Type:    xlog.FlatWarning,
 		Message: x.Warns[key],
 	})
@@ -87,12 +86,12 @@ func (p Parser) String() string {
 
 // CxxTypes returns C++ code developer-defined types.
 func (p *Parser) CxxTypes() string {
-	if len(p.Types) == 0 {
+	if len(p.Defs.Types) == 0 {
 		return ""
 	}
 	var cxx strings.Builder
 	cxx.WriteString("// region TYPES\n")
-	for _, t := range p.Types {
+	for _, t := range p.Defs.Types {
 		cxx.WriteString(t.String())
 		cxx.WriteByte('\n')
 	}
@@ -102,12 +101,12 @@ func (p *Parser) CxxTypes() string {
 
 // CxxPrototypes returns C++ code of prototypes of C++ code.
 func (p *Parser) CxxPrototypes() string {
-	if len(p.Funcs) == 0 {
+	if len(p.Defs.Funcs) == 0 {
 		return ""
 	}
 	var cxx strings.Builder
 	cxx.WriteString("// region PROTOTYPES\n")
-	for _, fun := range p.Funcs {
+	for _, fun := range p.Defs.Funcs {
 		cxx.WriteString(fun.Prototype())
 		cxx.WriteByte('\n')
 	}
@@ -115,18 +114,18 @@ func (p *Parser) CxxPrototypes() string {
 	return cxx.String()
 }
 
-// CxxGlobalVars returns C++ code of global variables.
-func (p *Parser) CxxGlobalVars() string {
-	if len(p.GlobalVars) == 0 {
+// CxxGlobals returns C++ code of global variables.
+func (p *Parser) CxxGlobals() string {
+	if len(p.Defs.Globals) == 0 {
 		return ""
 	}
 	var cxx strings.Builder
-	cxx.WriteString("// region GLOBAL_VARIABLES\n")
-	for _, va := range p.GlobalVars {
+	cxx.WriteString("// region GLOBALS\n")
+	for _, va := range p.Defs.Globals {
 		cxx.WriteString(va.String())
 		cxx.WriteByte('\n')
 	}
-	cxx.WriteString("// endregion GLOBAL_VARIABLES")
+	cxx.WriteString("// endregion GLOBALS")
 	return cxx.String()
 }
 
@@ -134,7 +133,7 @@ func (p *Parser) CxxGlobalVars() string {
 func (p *Parser) CxxFuncs() string {
 	var cxx strings.Builder
 	cxx.WriteString("// region FUNCTIONS\n")
-	for _, fun := range p.Funcs {
+	for _, fun := range p.Defs.Funcs {
 		cxx.WriteString(fun.String())
 		cxx.WriteString("\n\n")
 	}
@@ -149,7 +148,7 @@ func (p *Parser) Cxx() string {
 	cxx.WriteString("\n\n")
 	cxx.WriteString(p.CxxPrototypes())
 	cxx.WriteString("\n\n")
-	cxx.WriteString(p.CxxGlobalVars())
+	cxx.WriteString(p.CxxGlobals())
 	cxx.WriteString("\n\n")
 	cxx.WriteString(p.CxxFuncs())
 	return cxx.String()
@@ -160,7 +159,7 @@ func (p *Parser) Parse(justDefs bool) {
 	builder := ast.NewBuilder(p.Tokens)
 	builder.Build()
 	if len(builder.Errors) > 0 {
-		p.PFI.Logs = append(p.PFI.Logs, builder.Errors...)
+		p.Pfi.Logs = append(p.Pfi.Logs, builder.Errors...)
 		return
 	}
 	p.justDefs = justDefs
@@ -214,7 +213,7 @@ func (p *Parser) checkAttribute(obj ast.Obj) {
 
 // Type parses X type define statement.
 func (p *Parser) Type(t ast.Type) {
-	if p.existName(t.Id).Id != lex.NA {
+	if p.existid(t.Id).Id != lex.NA {
 		p.pusherrtok(t.Token, "exist_id")
 		return
 	} else if xapi.IsIgnoreId(t.Id) {
@@ -223,7 +222,7 @@ func (p *Parser) Type(t ast.Type) {
 	}
 	t.Description = p.docText.String()
 	p.docText.Reset()
-	p.Types = append(p.Types, t)
+	p.Defs.Types = append(p.Defs.Types, t)
 }
 
 // Comment parses X documentation comments line.
@@ -266,7 +265,7 @@ func (p *Parser) Statement(s ast.Statement) {
 	case ast.Func:
 		p.Func(t)
 	case ast.Var:
-		p.GlobalVar(t)
+		p.Global(t)
 	default:
 		p.pusherrtok(s.Token, "invalid_syntax")
 	}
@@ -274,30 +273,30 @@ func (p *Parser) Statement(s ast.Statement) {
 
 // Func parse X function.
 func (p *Parser) Func(fast ast.Func) {
-	if p.existName(fast.Id).Id != lex.NA {
+	if p.existid(fast.Id).Id != lex.NA {
 		p.pusherrtok(fast.Token, "exist_id")
 	} else if xapi.IsIgnoreId(fast.Id) {
 		p.pusherrtok(fast.Token, "ignore_id")
 	}
-	fun := new(function)
-	fun.Ast = fast
-	fun.Attributes = p.attributes
-	fun.Description = p.docText.String()
+	f := new(function)
+	f.Ast = fast
+	f.Attributes = p.attributes
+	f.Description = p.docText.String()
 	p.attributes = nil
 	p.docText.Reset()
-	p.checkFuncAttributes(fun.Attributes)
-	p.Funcs = append(p.Funcs, fun)
+	p.checkFuncAttributes(f.Attributes)
+	p.Defs.Funcs = append(p.Defs.Funcs, f)
 }
 
 // ParseVariable parse X global variable.
-func (p *Parser) GlobalVar(vast ast.Var) {
-	if p.existName(vast.Id).Id != lex.NA {
+func (p *Parser) Global(vast ast.Var) {
+	if p.existid(vast.Id).Id != lex.NA {
 		p.pusherrtok(vast.IdToken, "exist_id")
 		return
 	}
 	vast.Description = p.docText.String()
 	p.docText.Reset()
-	p.waitingGlobalVars = append(p.waitingGlobalVars, vast)
+	p.waitingGlobals = append(p.waitingGlobals, vast)
 }
 
 // Var parse X variable.
@@ -387,77 +386,57 @@ func (p *Parser) varsFromParams(params []ast.Parameter) []ast.Var {
 	return vars
 }
 
-func (p *Parser) typeById(id string) *ast.Type {
-	for _, t := range p.Types {
-		if t.Id == id {
-			return &t
-		}
-	}
-	return nil
-}
-
 // FuncById returns function by specified name.
 //
 // Special case:
 //  FuncById(name) -> nil: if function is not exist.
 func (p *Parser) FuncById(id string) *function {
-	for _, fun := range builtinFuncs {
-		if fun.Ast.Id == id {
-			return fun
+	for _, f := range builtinFuncs {
+		if f.Ast.Id == id {
+			return f
 		}
 	}
-	for _, fun := range p.Funcs {
-		if fun.Ast.Id == id {
-			return fun
-		}
-	}
-	return nil
+	return p.Defs.FuncById(id)
 }
 
 func (p *Parser) varById(id string) *ast.Var {
-	for _, variable := range p.BlockVars {
-		if variable.Id == id {
-			return &variable
+	for _, v := range p.BlockVars {
+		if v.Id == id {
+			return &v
 		}
 	}
-	for _, variable := range p.GlobalVars {
-		if variable.Id == id {
-			return &variable
-		}
-	}
-	return nil
+	return p.Defs.globalById(id)
 }
 
 func (p *Parser) existIdf(id string, exceptGlobals bool) lex.Token {
-	t := p.typeById(id)
+	t := p.Defs.typeById(id)
 	if t != nil {
 		return t.Token
 	}
-	fun := p.FuncById(id)
-	if fun != nil {
-		return fun.Ast.Token
+	f := p.FuncById(id)
+	if f != nil {
+		return f.Ast.Token
 	}
-	for _, variable := range p.BlockVars {
-		if variable.Id == id {
-			return variable.IdToken
+	for _, v := range p.BlockVars {
+		if v.Id == id {
+			return v.IdToken
 		}
 	}
 	if !exceptGlobals {
-		for _, variable := range p.GlobalVars {
-			if variable.Id == id {
-				return variable.IdToken
-			}
+		v := p.Defs.globalById(id)
+		if v != nil {
+			return v.IdToken
 		}
-		for _, varAST := range p.waitingGlobalVars {
-			if varAST.Id == id {
-				return varAST.IdToken
+		for _, v := range p.waitingGlobals {
+			if v.Id == id {
+				return v.IdToken
 			}
 		}
 	}
 	return lex.Token{}
 }
 
-func (p *Parser) existName(name string) lex.Token {
+func (p *Parser) existid(name string) lex.Token {
 	return p.existIdf(name, false)
 }
 
@@ -470,8 +449,8 @@ func (p *Parser) checkAsync() {
 	}
 	p.wg.Add(1)
 	go p.checkTypesAsync()
-	p.WaitingGlobalVars()
-	p.waitingGlobalVars = nil
+	p.WaitingGlobals()
+	p.waitingGlobals = nil
 	if !p.justDefs {
 		p.wg.Add(1)
 		go p.checkFuncsAsync()
@@ -480,22 +459,22 @@ func (p *Parser) checkAsync() {
 
 func (p *Parser) checkTypesAsync() {
 	defer func() { p.wg.Done() }()
-	for _, t := range p.Types {
+	for _, t := range p.Defs.Types {
 		_, _ = p.readyType(t.Type, true)
 	}
 }
 
-// WaitingGlobalVars parse X global variables for waiting parsing.
-func (p *Parser) WaitingGlobalVars() {
-	for _, varAST := range p.waitingGlobalVars {
+// WaitingGlobals parse X global variables for waiting parsing.
+func (p *Parser) WaitingGlobals() {
+	for _, varAST := range p.waitingGlobals {
 		variable := p.Var(varAST)
-		p.GlobalVars = append(p.GlobalVars, variable)
+		p.Defs.Globals = append(p.Defs.Globals, variable)
 	}
 }
 
 func (p *Parser) checkFuncsAsync() {
 	defer func() { p.wg.Done() }()
-	for _, fun := range p.Funcs {
+	for _, fun := range p.Defs.Funcs {
 		p.BlockVars = p.varsFromParams(fun.Ast.Params)
 		p.wg.Add(1)
 		go p.checkFuncSpecialCasesAsync(fun)
@@ -1631,12 +1610,12 @@ func (p *Parser) buildArray(parts [][]lex.Token, t ast.DataType, errtok lex.Toke
 }
 
 func (p *Parser) checkAnonFunc(f *ast.Func) {
-	globalVariables := p.GlobalVars
+	globals := p.Defs.Globals
 	blockVariables := p.BlockVars
-	p.GlobalVars = append(blockVariables, p.GlobalVars...)
+	p.Defs.Globals = append(blockVariables, p.Defs.Globals...)
 	p.BlockVars = p.varsFromParams(f.Params)
 	p.checkFunc(f)
-	p.GlobalVars = globalVariables
+	p.Defs.Globals = globals
 	p.BlockVars = blockVariables
 }
 
@@ -2295,7 +2274,7 @@ func (p *Parser) readyType(dt ast.DataType, err bool) (_ ast.DataType, ok bool) 
 	}
 	switch dt.Code {
 	case x.Name:
-		t := p.typeById(dt.Token.Kind)
+		t := p.Defs.typeById(dt.Token.Kind)
 		if t == nil {
 			if err {
 				p.pusherrtok(dt.Token, "invalid_type_source")

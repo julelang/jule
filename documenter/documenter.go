@@ -43,8 +43,8 @@ type document struct {
 }
 
 func types(p *parser.Parser) []xtype {
-	types := make([]xtype, len(p.Types))
-	for i, t := range p.Types {
+	types := make([]xtype, len(p.Defs.Types))
+	for i, t := range p.Defs.Types {
 		types[i] = xtype{
 			Id:          t.Id,
 			Alias:       t.Type.Value,
@@ -55,8 +55,8 @@ func types(p *parser.Parser) []xtype {
 }
 
 func globals(p *parser.Parser) []global {
-	globals := make([]global, len(p.GlobalVars))
-	for i, v := range p.GlobalVars {
+	globals := make([]global, len(p.Defs.Globals))
+	for i, v := range p.Defs.Globals {
 		globals[i] = global{
 			Id:          v.Id,
 			Type:        v.Type.Value,
@@ -90,8 +90,8 @@ func attributes(attributes []ast.Attribute) []string {
 }
 
 func funcs(p *parser.Parser) []function {
-	funcs := make([]function, len(p.Funcs))
-	for i, f := range p.Funcs {
+	funcs := make([]function, len(p.Defs.Funcs))
+	for i, f := range p.Defs.Funcs {
 		fun := function{
 			Id:          f.Ast.Id,
 			Ret:         f.Ast.RetType.Value,

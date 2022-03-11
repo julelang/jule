@@ -8,7 +8,7 @@ import (
 	"github.com/the-xlang/x/pkg/xlog"
 )
 
-type ParseFileInfo struct {
+type ParseInfo struct {
 	Parser   *Parser
 	Logs     []xlog.CompilerLog
 	File     *io.File
@@ -16,7 +16,7 @@ type ParseFileInfo struct {
 }
 
 // ParseFileAsync parses file content.
-func (info *ParseFileInfo) ParseAsync(justDefs bool) {
+func (info *ParseInfo) ParseAsync(justDefs bool) {
 	defer info.Routines.Done()
 	lexer := lex.NewLex(info.File)
 	tokens := lexer.Tokenize()
