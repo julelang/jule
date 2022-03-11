@@ -94,7 +94,7 @@ func doc(cmd string) {
 			fmt.Println("Error:", err.Error())
 			continue
 		}
-		path = filepath.Join(x.XSet.CxxOutDir, path+x.DocExtension)
+		path = filepath.Join(x.XSet.CxxOutDir, path+x.DocExt)
 		writeOutput(path, docjson)
 	}
 }
@@ -116,8 +116,13 @@ func processCommand(namespace, cmd string) bool {
 }
 
 func init() {
-	x.ExecutablePath = filepath.Dir(os.Args[0])
-	x.StdlibPath = filepath.Join(x.ExecutablePath, x.StdlibName)
+	execp, err := filepath.Abs(filepath.Dir(os.Args[0]))
+	if err != nil {
+		println(err.Error())
+		os.Exit(0)
+	}
+	x.ExecPath = execp
+	x.StdlibPath = filepath.Join(x.ExecPath, x.StdlibName)
 
 	// Not started with arguments.
 	// Here is "2" but "os.Args" always have one element for store working directory.
