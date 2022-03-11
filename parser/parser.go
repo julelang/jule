@@ -31,13 +31,15 @@ type Parser struct {
 	Defs           *defmap
 	waitingGlobals []ast.Var
 	BlockVars      []ast.Var
-	Pfi            *ParseInfo
+	Errors         []xlog.CompilerLog
+	Warnings       []xlog.CompilerLog
+	File           *xio.File
 }
 
 // NewParser returns new instance of Parser.
-func NewParser(Pfi *ParseInfo) *Parser {
+func NewParser(f *xio.File) *Parser {
 	parser := new(Parser)
-	parser.Pfi = Pfi
+	parser.File = f
 	parser.dontUseLocal = false
 	parser.Defs = new(defmap)
 	return parser
@@ -50,7 +52,7 @@ func (p *Parser) pusherrtok(tok lex.Token, key string) {
 
 // pusherrtok appends new error message by token.
 func (p *Parser) pusherrmsgtok(tok lex.Token, msg string) {
-	p.Pfi.Logs = append(p.Pfi.Logs, xlog.CompilerLog{
+	p.Errors = append(p.Errors, xlog.CompilerLog{
 		Type:    xlog.Error,
 		Row:     tok.Row,
 		Column:  tok.Column,
@@ -61,7 +63,7 @@ func (p *Parser) pusherrmsgtok(tok lex.Token, msg string) {
 
 // pushwarntok appends new warning by token.
 func (p *Parser) pushwarntok(tok lex.Token, key string) {
-	p.Pfi.Logs = append(p.Pfi.Logs, xlog.CompilerLog{
+	p.Warnings = append(p.Warnings, xlog.CompilerLog{
 		Type:    xlog.Warning,
 		Row:     tok.Row,
 		Column:  tok.Column,
@@ -72,7 +74,7 @@ func (p *Parser) pushwarntok(tok lex.Token, key string) {
 
 // pusherrs appends specified errors.
 func (p *Parser) pusherrs(errs ...xlog.CompilerLog) {
-	p.Pfi.Logs = append(p.Pfi.Logs, errs...)
+	p.Errors = append(p.Errors, errs...)
 }
 
 // pusherr appends new error.
@@ -82,7 +84,7 @@ func (p *Parser) pusherr(key string) {
 
 // pusherrmsh appends new flat error message
 func (p *Parser) pusherrmsg(msg string) {
-	p.Pfi.Logs = append(p.Pfi.Logs, xlog.CompilerLog{
+	p.Errors = append(p.Errors, xlog.CompilerLog{
 		Type:    xlog.FlatError,
 		Message: msg,
 	})
@@ -90,7 +92,7 @@ func (p *Parser) pusherrmsg(msg string) {
 
 // pusherr appends new warning.
 func (p *Parser) pushwarn(key string) {
-	p.Pfi.Logs = append(p.Pfi.Logs, xlog.CompilerLog{
+	p.Warnings = append(p.Warnings, xlog.CompilerLog{
 		Type:    xlog.FlatWarning,
 		Message: x.Warns[key],
 	})
@@ -173,7 +175,7 @@ func (p *Parser) getTree(tokens []lex.Token) []ast.Obj {
 	builder := ast.NewBuilder(tokens)
 	builder.Build()
 	if len(builder.Errors) > 0 {
-		p.Pfi.Logs = append(p.Pfi.Logs, builder.Errors...)
+		p.pusherrs(builder.Errors...)
 		return nil
 	}
 	return builder.Tree
@@ -213,11 +215,10 @@ func (p *Parser) compileUse(use *ast.Use) {
 			p.pusherrmsg(err.Error())
 			continue
 		}
-		pinfo := &ParseInfo{File: file}
-		src := NewParser(pinfo)
+		src := NewParser(file)
 		src.dontUseLocal = true
 		src.Parse(false, false)
-		if pinfo.Logs != nil {
+		if src.Errors != nil {
 			p.pusherrtok(use.Token, "use_has_errors")
 			continue
 		}
@@ -322,13 +323,13 @@ func (p *Parser) checkParse() {
 }
 
 func (p *Parser) useLocalPakcage() {
-	dir := filepath.Dir(p.Pfi.File.Path)
+	dir := filepath.Dir(p.File.Path)
 	infos, err := ioutil.ReadDir(dir)
 	if err != nil {
 		p.pusherrmsg(err.Error())
 		return
 	}
-	_, mainName := filepath.Split(p.Pfi.File.Path)
+	_, mainName := filepath.Split(p.File.Path)
 	for _, info := range infos {
 		name := info.Name()
 		// Skip directories.
@@ -342,11 +343,10 @@ func (p *Parser) useLocalPakcage() {
 			p.pusherrmsg(err.Error())
 			continue
 		}
-		pfi := &ParseInfo{File: file}
-		src := NewParser(pfi)
+		src := NewParser(file)
 		src.dontUseLocal = true
 		src.Parse(false, false)
-		p.Pfi.Logs = append(p.Pfi.Logs, src.Pfi.Logs...)
+		p.pusherrs(src.Errors...)
 		p.Defs.Types = append(p.Defs.Types, src.Defs.Types...)
 		p.Defs.Globals = append(p.Defs.Globals, src.Defs.Globals...)
 		p.Defs.Funcs = append(p.Defs.Funcs, src.Defs.Funcs...)
@@ -355,7 +355,7 @@ func (p *Parser) useLocalPakcage() {
 
 // Parse is parse X code.
 func (p *Parser) Parse(main, justDefs bool) {
-	lexer := lex.NewLex(p.Pfi.File)
+	lexer := lex.NewLex(p.File)
 	tokens := lexer.Lex()
 	if lexer.Logs != nil {
 		p.pusherrs(lexer.Logs...)

@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/the-xlang/x/documenter"
@@ -81,16 +80,16 @@ func doc(cmd string) {
 	paths := strings.SplitAfterN(cmd, " ", -1)
 	for _, path := range paths {
 		path = strings.TrimSpace(path)
-		info := compile(path, false, true)
-		if info == nil {
+		p := compile(path, false, true)
+		if p == nil {
 			continue
 		}
-		if printlogs(info.Logs) {
+		if printlogs(p) {
 			fmt.Println(path+":",
 				"documentation couldn't generated because X source code has an errors")
 			continue
 		}
-		docjson, err := documenter.Documentize(info.Parser)
+		docjson, err := documenter.Documentize(p)
 		if err != nil {
 			fmt.Println("Error:", err.Error())
 			continue
@@ -163,27 +162,12 @@ func loadXSet() {
 
 // printlogs prints logs and returns true
 // if logs has error, false if not.
-func printlogs(logs []xlog.CompilerLog) bool {
+func printlogs(p *parser.Parser) bool {
 	var str strings.Builder
-	err := false
-	for _, log := range logs {
+	for _, log := range p.Warnings {
 		switch log.Type {
-		case xlog.FlatError:
-			err = true
-			str.WriteString("ERROR: ")
-			str.WriteString(log.Message)
 		case xlog.FlatWarning:
 			str.WriteString("WARNING: ")
-			str.WriteString(log.Message)
-		case xlog.Error:
-			err = true
-			str.WriteString("ERROR: ")
-			str.WriteString(log.Path)
-			str.WriteByte(':')
-			str.WriteString(fmt.Sprint(log.Row))
-			str.WriteByte(':')
-			str.WriteString(fmt.Sprint(log.Column))
-			str.WriteByte(' ')
 			str.WriteString(log.Message)
 		case xlog.Warning:
 			str.WriteString("WARNING: ")
@@ -197,8 +181,25 @@ func printlogs(logs []xlog.CompilerLog) bool {
 		}
 		str.WriteByte('\n')
 	}
+	for _, log := range p.Errors {
+		switch log.Type {
+		case xlog.FlatError:
+			str.WriteString("ERROR: ")
+			str.WriteString(log.Message)
+		case xlog.Error:
+			str.WriteString("ERROR: ")
+			str.WriteString(log.Path)
+			str.WriteByte(':')
+			str.WriteString(fmt.Sprint(log.Row))
+			str.WriteByte(':')
+			str.WriteString(fmt.Sprint(log.Column))
+			str.WriteByte(' ')
+			str.WriteString(log.Message)
+		}
+		str.WriteByte('\n')
+	}
 	print(str.String())
-	return err
+	return len(p.Errors) > 0
 }
 
 func appendStandard(code *string) {
@@ -402,17 +403,16 @@ func writeOutput(path, content string) {
 	}
 }
 
-func compile(path string, main, justDefs bool) *parser.ParseInfo {
-	info := new(parser.ParseInfo)
-
+func compile(path string, main, justDefs bool) *parser.Parser {
+	p := parser.NewParser(nil)
 	// Check standard library.
 	inf, err := os.Stat(x.StdlibPath)
 	if err != nil || !inf.IsDir() {
-		info.Logs = append(info.Logs, xlog.CompilerLog{
+		p.Errors = append(p.Errors, xlog.CompilerLog{
 			Type:    xlog.FlatError,
 			Message: "standard library directory not found",
 		})
-		return info
+		return p
 	}
 
 	f, err := xio.Openfx(path)
@@ -420,22 +420,21 @@ func compile(path string, main, justDefs bool) *parser.ParseInfo {
 		println(err.Error())
 		return nil
 	}
-	routines := new(sync.WaitGroup)
-	info.File = f
-	info.Routines = routines
-	routines.Add(1)
-	go info.ParseAsync(main, justDefs)
-	routines.Wait()
-	return info
+	p.File = f
+	p.Parse(true, false)
+	return p
 }
 
 func main() {
 	filePath := os.Args[0]
-	info := compile(filePath, true, false)
-	if printlogs(info.Logs) {
+	p := compile(filePath, true, false)
+	if p == nil {
+		return
+	}
+	if printlogs(p) {
 		os.Exit(0)
 	}
-	cxx := info.Parser.Cxx()
+	cxx := p.Cxx()
 	appendStandard(&cxx)
 	path := filepath.Join(x.XSet.CxxOutDir, x.XSet.CxxOutName)
 	writeOutput(path, cxx)
