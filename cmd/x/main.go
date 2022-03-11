@@ -15,9 +15,9 @@ import (
 
 	"github.com/the-xlang/x/documenter"
 	"github.com/the-xlang/x/parser"
-	"github.com/the-xlang/x/pkg/io"
 	"github.com/the-xlang/x/pkg/x"
 	"github.com/the-xlang/x/pkg/x/xset"
+	"github.com/the-xlang/x/pkg/xio"
 	"github.com/the-xlang/x/pkg/xlog"
 )
 
@@ -81,7 +81,7 @@ func doc(cmd string) {
 	paths := strings.SplitAfterN(cmd, " ", -1)
 	for _, path := range paths {
 		path = strings.TrimSpace(path)
-		info := compile(path, true)
+		info := compile(path, false, true)
 		if info == nil {
 			continue
 		}
@@ -118,6 +118,7 @@ func processCommand(namespace, cmd string) bool {
 
 func init() {
 	x.ExecutablePath = filepath.Dir(os.Args[0])
+	x.StdlibPath = filepath.Join(x.ExecutablePath, x.StdlibName)
 
 	// Not started with arguments.
 	// Here is "2" but "os.Args" always have one element for store working directory.
@@ -401,11 +402,11 @@ func writeOutput(path, content string) {
 	}
 }
 
-func compile(path string, justDefs bool) *parser.ParseInfo {
+func compile(path string, main, justDefs bool) *parser.ParseInfo {
 	info := new(parser.ParseInfo)
 
 	// Check standard library.
-	inf, err := os.Stat(filepath.Join(x.ExecutablePath, x.Stdlib))
+	inf, err := os.Stat(x.StdlibPath)
 	if err != nil || !inf.IsDir() {
 		info.Logs = append(info.Logs, xlog.CompilerLog{
 			Type:    xlog.FlatError,
@@ -414,7 +415,7 @@ func compile(path string, justDefs bool) *parser.ParseInfo {
 		return info
 	}
 
-	f, err := io.Openfx(path)
+	f, err := xio.Openfx(path)
 	if err != nil {
 		println(err.Error())
 		return nil
@@ -423,14 +424,14 @@ func compile(path string, justDefs bool) *parser.ParseInfo {
 	info.File = f
 	info.Routines = routines
 	routines.Add(1)
-	go info.ParseAsync(justDefs)
+	go info.ParseAsync(main, justDefs)
 	routines.Wait()
 	return info
 }
 
 func main() {
 	filePath := os.Args[0]
-	info := compile(filePath, false)
+	info := compile(filePath, true, false)
 	if printlogs(info.Logs) {
 		os.Exit(0)
 	}

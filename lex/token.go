@@ -1,10 +1,10 @@
 package lex
 
-import "github.com/the-xlang/x/pkg/io"
+import "github.com/the-xlang/x/pkg/xio"
 
 // Token is lexer token.
 type Token struct {
-	File   *io.File
+	File   *xio.File
 	Row    int
 	Column int
 	Kind   string
@@ -36,4 +36,6 @@ const (
 	Else      uint8 = 20
 	Volatile  uint8 = 21
 	Comment   uint8 = 22
+	Use       uint8 = 23
+	Dot       uint8 = 24
 )

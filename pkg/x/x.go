@@ -8,13 +8,14 @@ const (
 	SourceExtension = `.xx`
 	DocExtension    = ".xdoc"
 	SettingsFile    = "x.set"
-	Stdlib          = "lib"
+	StdlibName      = "lib"
 
 	EntryPoint = "main"
 )
 
 // Environment Variables.
 var (
+	StdlibPath     string
 	ExecutablePath string
 	XSet           *xset.XSet
 )

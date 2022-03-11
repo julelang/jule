@@ -1,6 +1,10 @@
 package parser
 
 import (
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -9,51 +13,59 @@ import (
 	"github.com/the-xlang/x/pkg/x"
 	"github.com/the-xlang/x/pkg/xapi"
 	"github.com/the-xlang/x/pkg/xbits"
+	"github.com/the-xlang/x/pkg/xio"
 	"github.com/the-xlang/x/pkg/xlog"
 )
 
 // Parser is parser of X code.
 type Parser struct {
-	attributes []ast.Attribute
-	docText    strings.Builder
-	iterCount  int
-	wg         sync.WaitGroup
-	justDefs   bool
+	attributes   []ast.Attribute
+	docText      strings.Builder
+	iterCount    int
+	wg           sync.WaitGroup
+	justDefs     bool
+	main         bool
+	dontUseLocal bool
+	usePaths     []string
 
 	Defs           *defmap
 	waitingGlobals []ast.Var
 	BlockVars      []ast.Var
-	Tokens         []lex.Token
 	Pfi            *ParseInfo
 }
 
 // NewParser returns new instance of Parser.
-func NewParser(tokens []lex.Token, Pfi *ParseInfo) *Parser {
+func NewParser(Pfi *ParseInfo) *Parser {
 	parser := new(Parser)
-	parser.Tokens = tokens
 	parser.Pfi = Pfi
+	parser.dontUseLocal = false
 	parser.Defs = new(defmap)
 	return parser
 }
 
 // pusherrtok appends new error by token.
-func (p *Parser) pusherrtok(token lex.Token, key string) {
+func (p *Parser) pusherrtok(tok lex.Token, key string) {
+	p.pusherrmsgtok(tok, x.Errors[key])
+}
+
+// pusherrtok appends new error message by token.
+func (p *Parser) pusherrmsgtok(tok lex.Token, msg string) {
 	p.Pfi.Logs = append(p.Pfi.Logs, xlog.CompilerLog{
 		Type:    xlog.Error,
-		Row:     token.Row,
-		Column:  token.Column,
-		Path:    token.File.Path,
-		Message: x.Errors[key],
+		Row:     tok.Row,
+		Column:  tok.Column,
+		Path:    tok.File.Path,
+		Message: msg,
 	})
 }
 
 // pushwarntok appends new warning by token.
-func (p *Parser) pushwarntok(token lex.Token, key string) {
+func (p *Parser) pushwarntok(tok lex.Token, key string) {
 	p.Pfi.Logs = append(p.Pfi.Logs, xlog.CompilerLog{
 		Type:    xlog.Warning,
-		Row:     token.Row,
-		Column:  token.Column,
-		Path:    token.File.Path,
+		Row:     tok.Row,
+		Column:  tok.Column,
+		Path:    tok.File.Path,
 		Message: x.Warns[key],
 	})
 }
@@ -65,9 +77,14 @@ func (p *Parser) pusherrs(errs ...xlog.CompilerLog) {
 
 // pusherr appends new error.
 func (p *Parser) pusherr(key string) {
+	p.pusherrmsg(x.Errors[key])
+}
+
+// pusherrmsh appends new flat error message
+func (p *Parser) pusherrmsg(msg string) {
 	p.Pfi.Logs = append(p.Pfi.Logs, xlog.CompilerLog{
 		Type:    xlog.FlatError,
-		Message: x.Errors[key],
+		Message: msg,
 	})
 }
 
@@ -80,9 +97,7 @@ func (p *Parser) pushwarn(key string) {
 }
 
 // String returns full C++ code of parsed objects.
-func (p Parser) String() string {
-	return p.Cxx()
-}
+func (p Parser) String() string { return p.Cxx() }
 
 // CxxTypes returns C++ code developer-defined types.
 func (p *Parser) CxxTypes() string {
@@ -106,8 +121,8 @@ func (p *Parser) CxxPrototypes() string {
 	}
 	var cxx strings.Builder
 	cxx.WriteString("// region PROTOTYPES\n")
-	for _, fun := range p.Defs.Funcs {
-		cxx.WriteString(fun.Prototype())
+	for _, f := range p.Defs.Funcs {
+		cxx.WriteString(f.Prototype())
 		cxx.WriteByte('\n')
 	}
 	cxx.WriteString("// endregion PROTOTYPES")
@@ -154,16 +169,126 @@ func (p *Parser) Cxx() string {
 	return cxx.String()
 }
 
-// Parse is parse X code.
-func (p *Parser) Parse(justDefs bool) {
-	builder := ast.NewBuilder(p.Tokens)
+func (p *Parser) getTree(tokens []lex.Token) []ast.Obj {
+	builder := ast.NewBuilder(tokens)
 	builder.Build()
 	if len(builder.Errors) > 0 {
 		p.Pfi.Logs = append(p.Pfi.Logs, builder.Errors...)
+		return nil
+	}
+	return builder.Tree
+}
+
+func (p *Parser) checkUsePath(use *ast.Use) bool {
+	info, err := os.Stat(use.Path)
+	// Exists directory?
+	if err != nil || !info.IsDir() {
+		p.pusherrtok(use.Token, "use_not_found")
+		return false
+	}
+	// Already uses?
+	for _, path := range p.usePaths {
+		if use.Path == path {
+			p.pusherrtok(use.Token, "already_uses")
+			return false
+		}
+	}
+	return true
+}
+
+func (p *Parser) compileUse(use *ast.Use) {
+	infos, err := ioutil.ReadDir(use.Path)
+	if err != nil {
+		p.pusherrmsg(err.Error())
 		return
 	}
-	p.justDefs = justDefs
-	for _, obj := range builder.Tree {
+	for _, info := range infos {
+		name := info.Name()
+		// Skip directories.
+		if info.IsDir() || !strings.HasSuffix(name, x.SourceExtension) {
+			continue
+		}
+		file, err := xio.Openfx(filepath.Join(use.Path, name))
+		if err != nil {
+			p.pusherrmsg(err.Error())
+			continue
+		}
+		pinfo := &ParseInfo{File: file}
+		src := NewParser(pinfo)
+		src.dontUseLocal = true
+		src.Parse(false, false)
+		if pinfo.Logs != nil {
+			p.pusherrtok(use.Token, "use_has_errors")
+			continue
+		}
+		p.pushUseDefs(src.Defs)
+	}
+}
+
+func (p *Parser) pushUseTypes(dm *defmap) {
+	for _, t := range dm.Types {
+		def := p.typeById(t.Id)
+		if def != nil {
+			p.pusherrmsgtok(def.Token,
+				fmt.Sprintf(`"%s" identifier is already defined in this source`, t.Id))
+		} else {
+			p.Defs.Types = append(p.Defs.Types, t)
+		}
+	}
+}
+
+func (p *Parser) pushUseGlobals(dm *defmap) {
+	for _, g := range dm.Globals {
+		def := p.Defs.globalById(g.Id)
+		if def != nil {
+			p.pusherrmsgtok(def.IdToken,
+				fmt.Sprintf(`"%s" identifier is already defined in this source`, g.Id))
+		} else {
+			p.Defs.Globals = append(p.Defs.Globals, g)
+		}
+	}
+}
+
+func (p *Parser) pushUseFuncs(dm *defmap) {
+	for _, f := range dm.Funcs {
+		def := p.Defs.funcById(f.Ast.Id)
+		if def != nil {
+			p.pusherrmsgtok(def.Ast.Token,
+				fmt.Sprintf(`"%s" identifier is already defined in this source`, f.Ast.Id))
+		} else {
+			p.Defs.Funcs = append(p.Defs.Funcs, f)
+		}
+	}
+}
+
+func (p *Parser) pushUseDefs(dm *defmap) {
+	p.pushUseTypes(dm)
+	p.pushUseGlobals(dm)
+	p.pushUseFuncs(dm)
+}
+
+func (p *Parser) use(useAST *ast.Use) {
+	if !p.checkUsePath(useAST) {
+		return
+	}
+	p.compileUse(useAST)
+	p.usePaths = append(p.usePaths, useAST.Path)
+}
+
+func (p *Parser) parseUses(tree *[]ast.Obj) {
+	for i, obj := range *tree {
+		switch t := obj.Value.(type) {
+		case ast.Use:
+			p.use(&t)
+		default:
+			*tree = (*tree)[i:]
+			return
+		}
+	}
+}
+
+func (p *Parser) parseContent(tree []ast.Obj) {
+	for _, obj := range tree {
 		switch t := obj.Value.(type) {
 		case ast.Attribute:
 			p.PushAttribute(t)
@@ -173,17 +298,80 @@ func (p *Parser) Parse(justDefs bool) {
 			p.Type(t)
 		case ast.Comment:
 			p.Comment(t)
+		case ast.Use:
+			p.pusherrtok(obj.Token, "use_at_content")
 		default:
 			p.pusherrtok(obj.Token, "invalid_syntax")
 		}
 		p.checkDoc(obj)
 		p.checkAttribute(obj)
 	}
+}
+
+func (p *Parser) parseTree(tree []ast.Obj) {
+	p.parseUses(&tree)
+	p.parseContent(tree)
+}
+
+func (p *Parser) checkParse() {
 	if p.docText.Len() > 0 {
 		p.pushwarn("exist_undefined_doc")
 	}
 	p.wg.Add(1)
 	go p.checkAsync()
+}
+
+func (p *Parser) useLocalPakcage() {
+	dir := filepath.Dir(p.Pfi.File.Path)
+	infos, err := ioutil.ReadDir(dir)
+	if err != nil {
+		p.pusherrmsg(err.Error())
+		return
+	}
+	_, mainName := filepath.Split(p.Pfi.File.Path)
+	for _, info := range infos {
+		name := info.Name()
+		// Skip directories.
+		if info.IsDir() ||
+			!strings.HasSuffix(name, x.SourceExtension) ||
+			name == mainName {
+			continue
+		}
+		file, err := xio.Openfx(filepath.Join(dir, name))
+		if err != nil {
+			p.pusherrmsg(err.Error())
+			continue
+		}
+		pfi := &ParseInfo{File: file}
+		src := NewParser(pfi)
+		src.dontUseLocal = true
+		src.Parse(false, false)
+		p.Pfi.Logs = append(p.Pfi.Logs, src.Pfi.Logs...)
+		p.Defs.Types = append(p.Defs.Types, src.Defs.Types...)
+		p.Defs.Globals = append(p.Defs.Globals, src.Defs.Globals...)
+		p.Defs.Funcs = append(p.Defs.Funcs, src.Defs.Funcs...)
+	}
+}
+
+// Parse is parse X code.
+func (p *Parser) Parse(main, justDefs bool) {
+	lexer := lex.NewLex(p.Pfi.File)
+	tokens := lexer.Lex()
+	if lexer.Logs != nil {
+		p.pusherrs(lexer.Logs...)
+		return
+	}
+	tree := p.getTree(tokens)
+	if tree == nil {
+		return
+	}
+	p.main = main
+	p.justDefs = justDefs
+	if !p.dontUseLocal {
+		p.useLocalPakcage()
+	}
+	p.parseTree(tree)
+	p.checkParse()
 	p.wg.Wait()
 }
 
@@ -396,7 +584,7 @@ func (p *Parser) FuncById(id string) *function {
 			return f
 		}
 	}
-	return p.Defs.FuncById(id)
+	return p.Defs.funcById(id)
 }
 
 func (p *Parser) varById(id string) *ast.Var {
@@ -408,8 +596,12 @@ func (p *Parser) varById(id string) *ast.Var {
 	return p.Defs.globalById(id)
 }
 
+func (p *Parser) typeById(id string) *ast.Type {
+	return p.Defs.typeById(id)
+}
+
 func (p *Parser) existIdf(id string, exceptGlobals bool) lex.Token {
-	t := p.Defs.typeById(id)
+	t := p.typeById(id)
 	if t != nil {
 		return t.Token
 	}
@@ -442,7 +634,7 @@ func (p *Parser) existid(id string) lex.Token {
 
 func (p *Parser) checkAsync() {
 	defer func() { p.wg.Done() }()
-	if !p.justDefs {
+	if p.main && !p.justDefs {
 		if p.FuncById(x.EntryPoint) == nil {
 			p.pusherr("no_entry_point")
 		}
@@ -2274,7 +2466,7 @@ func (p *Parser) readyType(dt ast.DataType, err bool) (_ ast.DataType, ok bool) 
 	}
 	switch dt.Code {
 	case x.Id:
-		t := p.Defs.typeById(dt.Token.Kind)
+		t := p.typeById(dt.Token.Kind)
 		if t == nil {
 			if err {
 				p.pusherrtok(dt.Token, "invalid_type_source")

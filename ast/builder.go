@@ -2,6 +2,7 @@ package ast
 
 import (
 	"math/big"
+	"os"
 	"strings"
 	"sync"
 
@@ -53,6 +54,8 @@ func (b *Builder) Build() {
 		tokens := b.skipStatement()
 		token := tokens[0]
 		switch token.Id {
+		case lex.Use:
+			b.Use(tokens)
 		case lex.At:
 			b.Attribute(tokens)
 		case lex.Id:
@@ -123,6 +126,38 @@ func (b *Builder) Id(tokens []lex.Token) {
 		}
 	}
 	b.pusherr(token, "invalid_syntax")
+}
+
+// Use builds AST model of use statement.
+func (b *Builder) Use(tokens []lex.Token) {
+	var use Use
+	use.Token = tokens[0]
+	if len(tokens) < 2 {
+		b.pusherr(use.Token, "missing_use_path")
+		return
+	}
+	use.Path = b.usePath(tokens[1:])
+	b.Tree = append(b.Tree, Obj{use.Token, use})
+}
+
+func (b *Builder) usePath(tokens []lex.Token) string {
+	var path strings.Builder
+	path.WriteString(x.StdlibPath)
+	path.WriteRune(os.PathSeparator)
+	for i, tok := range tokens {
+		if i%2 != 0 {
+			if tok.Id != lex.Dot {
+				b.pusherr(tok, "invalid_syntax")
+			}
+			path.WriteRune(os.PathSeparator)
+			continue
+		}
+		if tok.Id != lex.Id {
+			b.pusherr(tok, "invalid_syntax")
+		}
+		path.WriteString(tok.Kind)
+	}
+	return path.String()
 }
 
 // Attribute builds AST model of attribute.

@@ -68,6 +68,7 @@ var Errors = map[string]string{
 	`missing_expression`:               `missing expression`,
 	`missing_multi_return`:             `missing return values for multi return`,
 	`missing_multiassign_identifiers`:  `missing identifier(s) for multiple assignment`,
+	`missing_use_path`:                 `missing path of use statement`,
 	`nil_for_autotype`:                 `nil is cannot use with auto-type definations`,
 	`void_for_autotype`:                `void data is cannot use for auto-type definations`,
 	`rune_empty`:                       `rune is cannot empty`,
@@ -80,6 +81,7 @@ var Errors = map[string]string{
 	`already_constant`:                 `this define is already constant`,
 	`already_variadic`:                 `this define is already variadic`,
 	`already_volatile`:                 `this define is already volatile`,
+	`already_uses`:                     `this path is already uses`,
 	`ignore_id`:                        `ignore operator cannot use as identifier`,
 	`overflow_multiassign_identifiers`: `overflow multi assignment identifers`,
 	`overflow_return`:                  `overflow return expressions`,
@@ -102,4 +104,7 @@ var Errors = map[string]string{
 	`notallow_declares`:                `declare not allowed`,
 	`notallow_multiple_assign`:         `multiple assignments not allowed`,
 	`attribute_not_supports`:           `attribute is not supports by define`,
+	`use_at_content`:                   `use statement must be start of source code`,
+	`use_not_found`:                    `use directory path not found/access`,
+	`use_has_errors`:                   `use package has errors`,
 }

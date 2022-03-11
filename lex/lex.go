@@ -7,8 +7,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/the-xlang/x/pkg/io"
 	"github.com/the-xlang/x/pkg/x"
+	"github.com/the-xlang/x/pkg/xio"
 	"github.com/the-xlang/x/pkg/xlog"
 )
 
@@ -17,7 +17,7 @@ type Lex struct {
 	wg               sync.WaitGroup
 	firstTokenOfLine bool
 
-	File     *io.File
+	File     *xio.File
 	Position int
 	Column   int
 	Row      int
@@ -28,7 +28,7 @@ type Lex struct {
 }
 
 // New Lex instance.
-func NewLex(f *io.File) *Lex {
+func NewLex(f *xio.File) *Lex {
 	l := new(Lex)
 	l.File = f
 	l.Position = 0
@@ -57,8 +57,8 @@ func (l *Lex) pusherrtok(tok Token, err string) {
 	})
 }
 
-// Tokenize all source content.
-func (l *Lex) Tokenize() []Token {
+// Lex all source content.
+func (l *Lex) Lex() []Token {
 	var tokens []Token
 	l.Logs = nil
 	l.Newln()
@@ -377,6 +377,7 @@ func (l *Lex) Tok() Token {
 		l.punct(content, ",", Comma, &tok),
 		l.punct(content, "@", At, &tok),
 		l.punct(content, "...", Operator, &tok),
+		l.punct(content, ".", Dot, &tok),
 		l.punct(content, "+=", Operator, &tok),
 		l.punct(content, "-=", Operator, &tok),
 		l.punct(content, "*=", Operator, &tok),
@@ -439,7 +440,8 @@ func (l *Lex) Tok() Token {
 		l.kw(content, "in", In, &tok),
 		l.kw(content, "if", If, &tok),
 		l.kw(content, "else", Else, &tok),
-		l.kw(content, "volatile", Volatile, &tok):
+		l.kw(content, "volatile", Volatile, &tok),
+		l.kw(content, "use", Use, &tok):
 	default:
 		lex := l.id(content)
 		if lex != "" {

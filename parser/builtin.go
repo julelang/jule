@@ -13,7 +13,8 @@ var builtinFuncs = []*function{
 				Code: x.Void,
 			},
 			Params: []ast.Parameter{{
-				Id: "v",
+				Id:    "v",
+				Const: true,
 				Type: ast.DataType{
 					Value: "any",
 					Code:  x.Any,
@@ -28,7 +29,8 @@ var builtinFuncs = []*function{
 				Code: x.Void,
 			},
 			Params: []ast.Parameter{{
-				Id: "v",
+				Id:    "v",
+				Const: true,
 				Type: ast.DataType{
 					Value: "any",
 					Code:  x.Any,

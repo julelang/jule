@@ -635,3 +635,9 @@ func (c Comment) String() string {
 	cxx.WriteString(c.Content)
 	return cxx.String()
 }
+
+// Use is the AST model of use statement.
+type Use struct {
+	Token lex.Token
+	Path  string
+}
