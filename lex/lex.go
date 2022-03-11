@@ -32,6 +32,7 @@ func NewLex(f *io.File) *Lex {
 	l := new(Lex)
 	l.File = f
 	l.Position = 0
+	l.Row = -1 // For true row
 	l.Newln()
 	return l
 }
