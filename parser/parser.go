@@ -386,10 +386,10 @@ func (p *Parser) varsFromParams(params []ast.Parameter) []ast.Var {
 	return vars
 }
 
-// FuncById returns function by specified name.
+// FuncById returns function by specified id.
 //
 // Special case:
-//  FuncById(name) -> nil: if function is not exist.
+//  FuncById(id) -> nil: if function is not exist.
 func (p *Parser) FuncById(id string) *function {
 	for _, f := range builtinFuncs {
 		if f.Ast.Id == id {
@@ -436,8 +436,8 @@ func (p *Parser) existIdf(id string, exceptGlobals bool) lex.Token {
 	return lex.Token{}
 }
 
-func (p *Parser) existid(name string) lex.Token {
-	return p.existIdf(name, false)
+func (p *Parser) existid(id string) lex.Token {
+	return p.existIdf(id, false)
 }
 
 func (p *Parser) checkAsync() {
@@ -2095,7 +2095,7 @@ func (frc *foreachTypeChecker) array() {
 		keyA := &frc.profile.KeyA
 		if keyA.Type.Code == x.Void {
 			keyA.Type.Code = x.Size
-			keyA.Type.Value = x.CxxTypeNameFromType(keyA.Type.Code)
+			keyA.Type.Value = x.CxxTypeIdFromType(keyA.Type.Code)
 		} else {
 			var ok bool
 			keyA.Type, ok = frc.p.readyType(keyA.Type, true)
@@ -2124,7 +2124,7 @@ func (frc *foreachTypeChecker) str() {
 		keyA := &frc.profile.KeyA
 		if keyA.Type.Code == x.Void {
 			keyA.Type.Code = x.Size
-			keyA.Type.Value = x.CxxTypeNameFromType(keyA.Type.Code)
+			keyA.Type.Value = x.CxxTypeIdFromType(keyA.Type.Code)
 		} else {
 			var ok bool
 			keyA.Type, ok = frc.p.readyType(keyA.Type, true)
@@ -2138,7 +2138,7 @@ func (frc *foreachTypeChecker) str() {
 	if !xapi.IsIgnoreId(frc.profile.KeyB.Id) {
 		runeType := ast.DataType{
 			Code:  x.Rune,
-			Value: x.CxxTypeNameFromType(x.Rune),
+			Value: x.CxxTypeIdFromType(x.Rune),
 		}
 		keyB := &frc.profile.KeyB
 		if keyB.Type.Code == x.Void {
@@ -2273,7 +2273,7 @@ func (p *Parser) readyType(dt ast.DataType, err bool) (_ ast.DataType, ok bool) 
 		return dt, true
 	}
 	switch dt.Code {
-	case x.Name:
+	case x.Id:
 		t := p.Defs.typeById(dt.Token.Kind)
 		if t == nil {
 			if err {

@@ -4,11 +4,11 @@ package xapi
 const Ignore = "_"
 
 // IsIgnoreId reports identifier is ignore or not.
-func IsIgnoreId(name string) bool {
-	return name == Ignore
+func IsIgnoreId(id string) bool {
+	return id == Ignore
 }
 
 // Returns specified identifer as X identifer.
-func AsId(name string) string {
-	return Ignore + name
+func AsId(id string) string {
+	return Ignore + id
 }

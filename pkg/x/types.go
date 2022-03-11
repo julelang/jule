@@ -17,7 +17,7 @@ const (
 	F64   uint8 = 12
 	Any   uint8 = 13
 	Rune  uint8 = 14
-	Name  uint8 = 15
+	Id    uint8 = 15
 	Func  uint8 = 16
 	Nil   uint8 = 17
 	Size  uint8 = 18
@@ -189,9 +189,9 @@ func IsUnsignedNumericType(t uint8) bool {
 		t == Size
 }
 
-// TypeFromName returns type name of specified type code.
-func TypeFromName(name string) uint8 {
-	switch name {
+// TypeFromId returns type id of specified type code.
+func TypeFromId(id string) uint8 {
+	switch id {
 	case "i8", "sbyte":
 		return I8
 	case "i16":
@@ -228,7 +228,7 @@ func TypeFromName(name string) uint8 {
 	return 0
 }
 
-func CxxTypeNameFromType(typeCode uint8) string {
+func CxxTypeIdFromType(typeCode uint8) string {
 	switch typeCode {
 	case Void:
 		return "void"

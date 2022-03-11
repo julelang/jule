@@ -102,7 +102,7 @@ func (b *Builder) Comment(tokens []lex.Token) {
 	b.Tree = append(b.Tree, Obj{token, commentAST})
 }
 
-// Id builds AST model of global name statement.
+// Id builds AST model of global id statement.
 func (b *Builder) Id(tokens []lex.Token) {
 	if len(tokens) == 1 {
 		b.pusherr(tokens[0], "invalid_syntax")
@@ -325,13 +325,13 @@ func (b *Builder) DataType(tokens []lex.Token, index *int, err bool) (dt DataTyp
 		switch token.Id {
 		case lex.DataType:
 			dt.Token = token
-			dt.Code = x.TypeFromName(dt.Token.Kind)
+			dt.Code = x.TypeFromId(dt.Token.Kind)
 			dtv.WriteString(dt.Token.Kind)
 			ok = true
 			goto ret
 		case lex.Id:
 			dt.Token = token
-			dt.Code = x.Name
+			dt.Code = x.Id
 			dtv.WriteString(dt.Token.Kind)
 			ok = true
 			goto ret
@@ -614,7 +614,7 @@ func (b *Builder) Statement(bs *blockStatement) (s Statement) {
 	token := bs.tokens[0]
 	switch token.Id {
 	case lex.Id:
-		return b.NameStatement(bs.tokens)
+		return b.IdStatement(bs.tokens)
 	case lex.Const, lex.Volatile:
 		return b.VarStatement(bs.tokens)
 	case lex.Ret:
@@ -863,7 +863,7 @@ func (b *Builder) AssignExpr(tokens []lex.Token, isExpr bool) (assign Assign, ok
 }
 
 // BuildReturnStatement builds AST model of return statement.
-func (b *Builder) NameStatement(tokens []lex.Token) (s Statement) {
+func (b *Builder) IdStatement(tokens []lex.Token) (s Statement) {
 	if len(tokens) == 1 {
 		b.pusherr(tokens[0], "invalid_syntax")
 		return

@@ -19,10 +19,10 @@ func (dm *defmap) typeById(id string) *ast.Type {
 	return nil
 }
 
-// FuncById returns function by specified name.
+// FuncById returns function by specified id.
 //
 // Special case:
-//  FuncById(name) -> nil: if function is not exist.
+//  FuncById(id) -> nil: if function is not exist.
 func (dm *defmap) FuncById(id string) *function {
 	for _, f := range dm.Funcs {
 		if f.Ast.Id == id {

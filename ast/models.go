@@ -92,12 +92,12 @@ func (dt DataType) String() string {
 		return cxx.String()
 	}
 	switch dt.Code {
-	case x.Name:
+	case x.Id:
 		return xapi.AsId(dt.Token.Kind) + cxx.String()
 	case x.Func:
 		return dt.FunctionString() + cxx.String()
 	default:
-		return x.CxxTypeNameFromType(dt.Code) + cxx.String()
+		return x.CxxTypeIdFromType(dt.Code) + cxx.String()
 	}
 }
 
@@ -355,7 +355,7 @@ type AssignSelector struct {
 
 func (vs AssignSelector) String() string {
 	if vs.NewVariable {
-		// Returns variable name.
+		// Returns variable identifier.
 		return xapi.AsId(vs.Expr.Tokens[0].Kind)
 	}
 	return vs.Expr.String()
