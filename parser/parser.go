@@ -26,14 +26,14 @@ var used []*use
 
 // Parser is parser of X code.
 type Parser struct {
-	attributes   []ast.Attribute
-	docText      strings.Builder
-	iterCount    int
-	wg           sync.WaitGroup
-	justDefs     bool
-	main         bool
-	dontUseLocal bool
-	uses         []*use
+	attributes []ast.Attribute
+	docText    strings.Builder
+	iterCount  int
+	wg         sync.WaitGroup
+	justDefs   bool
+	main       bool
+	isLocalPkg bool
+	uses       []*use
 
 	Defs           *defmap
 	waitingGlobals []ast.Var
@@ -47,7 +47,7 @@ type Parser struct {
 func NewParser(f *xio.File) *Parser {
 	parser := new(Parser)
 	parser.File = f
-	parser.dontUseLocal = false
+	parser.isLocalPkg = false
 	parser.Defs = new(defmap)
 	return parser
 }
@@ -377,7 +377,7 @@ func (p *Parser) useLocalPakcage() {
 			continue
 		}
 		src := NewParser(f)
-		src.dontUseLocal = true
+		src.isLocalPkg = true
 		src.Parse(false, false)
 		p.pusherrs(src.Errors...)
 		p.Defs.Types = append(p.Defs.Types, src.Defs.Types...)
@@ -400,7 +400,7 @@ func (p *Parser) Parse(main, justDefs bool) {
 	}
 	p.main = main
 	p.justDefs = justDefs
-	if !p.dontUseLocal {
+	if !p.isLocalPkg {
 		p.useLocalPakcage()
 	}
 	p.parseTree(tree)
@@ -721,11 +721,11 @@ func (p *Parser) WaitingGlobals() {
 
 func (p *Parser) checkFuncsAsync() {
 	defer func() { p.wg.Done() }()
-	for _, fun := range p.Defs.Funcs {
-		p.BlockVars = p.varsFromParams(fun.Ast.Params)
+	for _, f := range p.Defs.Funcs {
+		p.BlockVars = p.varsFromParams(f.Ast.Params)
 		p.wg.Add(1)
-		go p.checkFuncSpecialCasesAsync(fun)
-		p.checkFunc(&fun.Ast)
+		go p.checkFuncSpecialCasesAsync(f)
+		p.checkFunc(&f.Ast)
 	}
 }
 
