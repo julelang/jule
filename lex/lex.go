@@ -441,7 +441,8 @@ func (l *Lex) Tok() Token {
 		l.kw(content, "if", If, &tok),
 		l.kw(content, "else", Else, &tok),
 		l.kw(content, "volatile", Volatile, &tok),
-		l.kw(content, "use", Use, &tok):
+		l.kw(content, "use", Use, &tok),
+		l.kw(content, "pub", Pub, &tok):
 	default:
 		lex := l.id(content)
 		if lex != "" {

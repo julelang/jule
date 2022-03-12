@@ -15,7 +15,8 @@ import (
 
 // Builder is builds AST tree.
 type Builder struct {
-	wg sync.WaitGroup
+	wg  sync.WaitGroup
+	pub bool
 
 	Tree     []Obj
 	Errors   []xlog.CompilerLog
@@ -48,27 +49,43 @@ func (ast *Builder) Ended() bool {
 	return ast.Position >= len(ast.Tokens)
 }
 
+func (b *Builder) buildNode(tokens []lex.Token) {
+	token := tokens[0]
+	switch token.Id {
+	case lex.Use:
+		b.Use(tokens)
+	case lex.At:
+		b.Attribute(tokens)
+	case lex.Id:
+		b.Id(tokens)
+	case lex.Const, lex.Volatile:
+		b.GlobalVar(tokens)
+	case lex.Type:
+		b.Type(tokens)
+	case lex.Comment:
+		b.Comment(tokens)
+	default:
+		b.pusherr(token, "invalid_syntax")
+		return
+	}
+	if b.pub {
+		b.pusherr(token, "def_not_support_pub")
+	}
+}
+
 // Build builds AST tree.
 func (b *Builder) Build() {
 	for b.Position != -1 && !b.Ended() {
 		tokens := b.skipStatement()
-		token := tokens[0]
-		switch token.Id {
-		case lex.Use:
-			b.Use(tokens)
-		case lex.At:
-			b.Attribute(tokens)
-		case lex.Id:
-			b.Id(tokens)
-		case lex.Const, lex.Volatile:
-			b.GlobalVar(tokens)
-		case lex.Type:
-			b.Type(tokens)
-		case lex.Comment:
-			b.Comment(tokens)
-		default:
-			b.pusherr(token, "invalid_syntax")
+		b.pub = tokens[0].Id == lex.Pub
+		if b.pub {
+			if len(tokens) == 1 {
+				b.pusherr(tokens[0], "invalid_syntax")
+				continue
+			}
+			tokens = tokens[1:]
 		}
+		b.buildNode(tokens)
 	}
 	b.wg.Wait()
 }
@@ -92,10 +109,12 @@ func (b *Builder) Type(tokens []lex.Token) {
 	destType, _ := b.DataType(tokens[position:], new(int), true)
 	token = tokens[1]
 	typeAST := Type{
+		Pub:   b.pub,
 		Token: token,
 		Id:    token.Kind,
 		Type:  destType,
 	}
+	b.pub = false
 	b.Tree = append(b.Tree, Obj{token, typeAST})
 }
 
@@ -180,34 +199,36 @@ func (b *Builder) Attribute(tokens []lex.Token) {
 }
 
 // Func builds AST model of function.
-func (b *Builder) Func(tokens []lex.Token, anonymous bool) (funAST Func) {
-	funAST.Token = tokens[0]
+func (b *Builder) Func(tokens []lex.Token, anonymous bool) (f Func) {
+	f.Token = tokens[0]
 	index := 0
+	f.Pub = b.pub
+	b.pub = false
 	if anonymous {
-		funAST.Id = "anonymous"
+		f.Id = "anonymous"
 	} else {
-		if funAST.Token.Id != lex.Id {
-			b.pusherr(funAST.Token, "invalid_syntax")
+		if f.Token.Id != lex.Id {
+			b.pusherr(f.Token, "invalid_syntax")
 		}
-		funAST.Id = funAST.Token.Kind
+		f.Id = f.Token.Kind
 		index++
 	}
-	funAST.RetType.Code = x.Void
+	f.RetType.Code = x.Void
 	paramTokens := getRange(&index, "(", ")", tokens)
 	if len(paramTokens) > 0 {
-		b.Params(&funAST, paramTokens)
+		b.Params(&f, paramTokens)
 	}
 	if index >= len(tokens) {
-		b.pusherr(funAST.Token, "body_not_exist")
+		b.pusherr(f.Token, "body_not_exist")
 		return
 	}
 	token := tokens[index]
 	t, ok := b.FuncRetDataType(tokens, &index)
 	if ok {
-		funAST.RetType = t
+		f.RetType = t
 		index++
 		if index >= len(tokens) {
-			b.pusherr(funAST.Token, "body_not_exist")
+			b.pusherr(f.Token, "body_not_exist")
 			return
 		}
 		token = tokens[index]
@@ -218,13 +239,13 @@ func (b *Builder) Func(tokens []lex.Token, anonymous bool) (funAST Func) {
 	}
 	blockTokens := getRange(&index, "{", "}", tokens)
 	if blockTokens == nil {
-		b.pusherr(funAST.Token, "body_not_exist")
+		b.pusherr(f.Token, "body_not_exist")
 		return
 	}
 	if index < len(tokens) {
 		b.pusherr(tokens[index], "invalid_syntax")
 	}
-	funAST.Block = b.Block(blockTokens)
+	f.Block = b.Block(blockTokens)
 	return
 }
 
@@ -971,6 +992,8 @@ func (b *Builder) pushArg(args *[]Arg, tokens []lex.Token, err lex.Token) {
 // VarStatement builds AST model of variable declaration statement.
 func (b *Builder) VarStatement(tokens []lex.Token) (s Statement) {
 	var varAST Var
+	varAST.Pub = b.pub
+	b.pub = false
 	position := 0
 	varAST.DefToken = tokens[position]
 	for ; position < len(tokens); position++ {

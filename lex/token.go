@@ -38,4 +38,5 @@ const (
 	Comment   uint8 = 22
 	Use       uint8 = 23
 	Dot       uint8 = 24
+	Pub       uint8 = 25
 )

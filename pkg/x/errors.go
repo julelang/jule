@@ -107,4 +107,5 @@ var Errors = map[string]string{
 	`use_at_content`:                   `use statement must be start of source code`,
 	`use_not_found`:                    `use directory path not found/access`,
 	`use_has_errors`:                   `use package has errors`,
+	`def_not_support_pub`:              `define is not supports pub modifier`,
 }

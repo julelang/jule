@@ -135,6 +135,7 @@ func (dt DataType) MultiTypeString() string {
 
 // Type is type declaration.
 type Type struct {
+	Pub         bool
 	Token       lex.Token
 	Id          string
 	Type        DataType
@@ -153,6 +154,7 @@ func (t Type) String() string {
 
 // Func is function declaration AST model.
 type Func struct {
+	Pub     bool
 	Token   lex.Token
 	Id      string
 	Params  []Parameter
@@ -313,6 +315,7 @@ func (a Attribute) String() string {
 
 // Var is variable declaration AST model.
 type Var struct {
+	Pub         bool
 	DefToken    lex.Token
 	IdToken     lex.Token
 	SetterToken lex.Token

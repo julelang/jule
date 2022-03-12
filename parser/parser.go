@@ -251,7 +251,7 @@ func (p *Parser) pushUseTypes(use *use, dm *defmap) {
 		if def != nil {
 			p.pusherrmsgtok(def.Token,
 				fmt.Sprintf(`"%s" identifier is already defined in this source`, t.Id))
-		} else {
+		} else if t.Pub {
 			use.defs.Types = append(use.defs.Types, t)
 		}
 	}
@@ -263,7 +263,7 @@ func (p *Parser) pushUseGlobals(use *use, dm *defmap) {
 		if def != nil {
 			p.pusherrmsgtok(def.IdToken,
 				fmt.Sprintf(`"%s" identifier is already defined in this source`, g.Id))
-		} else {
+		} else if g.Pub {
 			use.defs.Globals = append(use.defs.Globals, g)
 		}
 	}
@@ -275,7 +275,7 @@ func (p *Parser) pushUseFuncs(use *use, dm *defmap) {
 		if def != nil {
 			p.pusherrmsgtok(def.Ast.Token,
 				fmt.Sprintf(`"%s" identifier is already defined in this source`, f.Ast.Id))
-		} else {
+		} else if f.Ast.Pub {
 			use.defs.Funcs = append(use.defs.Funcs, f)
 		}
 	}
