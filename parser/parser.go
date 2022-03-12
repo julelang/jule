@@ -237,6 +237,8 @@ func (p *Parser) compileUse(useAST *ast.Use) *use {
 		src := NewParser(f)
 		src.Parse(false, false)
 		if src.Errors != nil {
+			p.Warnings = append(p.Warnings, src.Warnings...)
+			p.pusherrs(src.Errors...)
 			p.pusherrtok(useAST.Token, "use_has_errors")
 			continue
 		}
@@ -593,7 +595,7 @@ func (p *Parser) varsFromParams(params []ast.Parameter) []ast.Var {
 		var vast ast.Var
 		vast.Id = param.Id
 		vast.IdToken = param.Token
-		vast.Type = param.Type
+		vast.Type, _ = p.readyType(param.Type, false)
 		vast.Const = param.Const
 		vast.Volatile = param.Volatile
 		if param.Variadic {
@@ -2084,12 +2086,12 @@ func (rc *retChecker) checkExprTypes() {
 		}
 		rc.p.wg.Add(1)
 		go assignChecker{
-			rc.p,
-			false,
-			rc.fun.RetType,
-			rc.values[0],
-			true,
-			rc.retAST.Token,
+			p:         rc.p,
+			constant:  false,
+			t:         rc.fun.RetType,
+			v:         rc.values[0],
+			ignoreAny: false,
+			errtok:    rc.retAST.Token,
 		}.checkAssignTypeAsync()
 		return
 	}
@@ -2107,12 +2109,12 @@ func (rc *retChecker) checkExprTypes() {
 		}
 		rc.p.wg.Add(1)
 		go assignChecker{
-			rc.p,
-			false,
-			t,
-			rc.values[index],
-			true,
-			rc.retAST.Token,
+			p:         rc.p,
+			constant:  false,
+			t:         t,
+			v:         rc.values[index],
+			ignoreAny: false,
+			errtok:    rc.retAST.Token,
 		}.checkAssignTypeAsync()
 	}
 }
@@ -2580,6 +2582,11 @@ type assignChecker struct {
 
 func (ac assignChecker) checkAssignTypeAsync() {
 	defer func() { ac.p.wg.Done() }()
+	t, ok := ac.p.readyType(ac.t, true)
+	if !ok {
+		return
+	}
+	ac.t = t
 	ac.p.checkAssignConst(ac.constant, ac.t, ac.v, ac.errtok)
 	if typeIsSingle(ac.t) && isConstNum(ac.v.ast.Data) {
 		switch {
