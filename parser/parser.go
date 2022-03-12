@@ -501,6 +501,10 @@ func (p *Parser) Func(fast ast.Func) {
 	} else if xapi.IsIgnoreId(fast.Id) {
 		p.pusherrtok(fast.Token, "ignore_id")
 	}
+	fast.RetType, _ = p.readyType(fast.RetType, false)
+	for i, param := range fast.Params {
+		fast.Params[i].Type, _ = p.readyType(param.Type, false)
+	}
 	f := new(function)
 	f.Ast = fast
 	f.Attributes = p.attributes
@@ -595,7 +599,7 @@ func (p *Parser) varsFromParams(params []ast.Parameter) []ast.Var {
 		var vast ast.Var
 		vast.Id = param.Id
 		vast.IdToken = param.Token
-		vast.Type, _ = p.readyType(param.Type, false)
+		vast.Type = param.Type
 		vast.Const = param.Const
 		vast.Volatile = param.Volatile
 		if param.Variadic {
@@ -2524,6 +2528,18 @@ func (p *Parser) readyType(dt ast.DataType, err bool) (_ ast.DataType, ok bool) 
 	if dt.Value == "" {
 		return dt, true
 	}
+	if dt.MultiTyped {
+		types := dt.Tag.([]ast.DataType)
+		for i, t := range types {
+			t, okr := p.readyType(t, err)
+			types[i] = t
+			if ok {
+				ok = okr
+			}
+		}
+		dt.Tag = types
+		return dt, ok
+	}
 	switch dt.Code {
 	case x.Id:
 		t := p.typeById(dt.Token.Kind)
@@ -2536,11 +2552,11 @@ func (p *Parser) readyType(dt ast.DataType, err bool) (_ ast.DataType, ok bool) 
 		t.Type.Value = dt.Value[:len(dt.Value)-len(dt.Token.Kind)] + t.Type.Value
 		return p.readyType(t.Type, err)
 	case x.Func:
-		funAST := dt.Tag.(ast.Func)
-		for index, param := range funAST.Params {
-			funAST.Params[index].Type, _ = p.readyType(param.Type, err)
+		f := dt.Tag.(ast.Func)
+		for i, param := range f.Params {
+			f.Params[i].Type, _ = p.readyType(param.Type, err)
 		}
-		funAST.RetType, _ = p.readyType(funAST.RetType, err)
+		f.RetType, _ = p.readyType(f.RetType, err)
 		dt.Value = dt.Tag.(ast.Func).DataTypeString()
 	}
 	return dt, true
