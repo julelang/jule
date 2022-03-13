@@ -1,7 +1,6 @@
 package ast
 
 import (
-	"math/big"
 	"os"
 	"strings"
 	"sync"
@@ -147,7 +146,7 @@ func (b *Builder) Id(tokens []lex.Token) {
 	b.pusherr(token, "invalid_syntax")
 }
 
-// Use builds AST model of use statement.
+// Use builds AST model of use declaration.
 func (b *Builder) Use(tokens []lex.Token) {
 	var use Use
 	use.Token = tokens[0]
@@ -1490,9 +1489,12 @@ func (b *Builder) checkExprTok(token lex.Token) {
 	if token.Kind[0] >= '0' && token.Kind[0] <= '9' {
 		var result bool
 		if strings.IndexByte(token.Kind, '.') != -1 {
-			_, result = new(big.Float).SetString(token.Kind)
+			result = xbits.CheckBitFloat(token.Kind, 64)
 		} else {
 			result = xbits.CheckBitInt(token.Kind, 64)
+			if !result {
+				result = xbits.CheckBitUInt(token.Kind, 64)
+			}
 		}
 		if !result {
 			b.pusherr(token, "invalid_numeric_range")

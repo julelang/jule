@@ -639,7 +639,7 @@ func (c Comment) String() string {
 	return cxx.String()
 }
 
-// Use is the AST model of use statement.
+// Use is the AST model of use declaration.
 type Use struct {
 	Token lex.Token
 	Path  string

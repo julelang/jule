@@ -20,6 +20,7 @@ func BitsizeType(t uint8) int {
 		return 64
 	case x.Size, x.SSize:
 		return strconv.IntSize
+	default:
+		return 0
 	}
-	return 0
 }

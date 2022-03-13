@@ -250,7 +250,6 @@ func (p *Parser) compileUse(useAST *ast.Use) *use {
 		psub.Parsef(false, false)
 		if psub.Errors != nil {
 			p.pusherrtok(useAST.Token, "use_has_errors")
-			return nil
 		}
 		use := new(use)
 		use.defs = new(defmap)
@@ -339,22 +338,26 @@ func (p *Parser) parseUses(tree *[]ast.Obj) {
 	*tree = nil
 }
 
-func (p *Parser) parseContent(tree []ast.Obj) {
+func (p *Parser) parseSrcTreeObj(obj ast.Obj) {
+	switch t := obj.Value.(type) {
+	case ast.Attribute:
+		p.PushAttribute(t)
+	case ast.Statement:
+		p.Statement(t)
+	case ast.Type:
+		p.Type(t)
+	case ast.Comment:
+		p.Comment(t)
+	case ast.Use:
+		p.pusherrtok(obj.Token, "use_at_content")
+	default:
+		p.pusherrtok(obj.Token, "invalid_syntax")
+	}
+}
+
+func (p *Parser) parseSrcTree(tree []ast.Obj) {
 	for _, obj := range tree {
-		switch t := obj.Value.(type) {
-		case ast.Attribute:
-			p.PushAttribute(t)
-		case ast.Statement:
-			p.Statement(t)
-		case ast.Type:
-			p.Type(t)
-		case ast.Comment:
-			p.Comment(t)
-		case ast.Use:
-			p.pusherrtok(obj.Token, "use_at_content")
-		default:
-			p.pusherrtok(obj.Token, "invalid_syntax")
-		}
+		p.parseSrcTreeObj(obj)
 		p.checkDoc(obj)
 		p.checkAttribute(obj)
 	}
@@ -362,7 +365,7 @@ func (p *Parser) parseContent(tree []ast.Obj) {
 
 func (p *Parser) parseTree(tree []ast.Obj) {
 	p.parseUses(&tree)
-	p.parseContent(tree)
+	p.parseSrcTree(tree)
 }
 
 func (p *Parser) checkParse() {
@@ -1827,7 +1830,8 @@ func (p *Parser) evalEnumerableSelect(enumv, selectv value, errtok lex.Token) (v
 func (p *Parser) evalArraySelect(arrv, selectv value, errtok lex.Token) value {
 	arrv.lvalue = true
 	arrv.ast.Type = typeOfArrayElements(arrv.ast.Type)
-	if !typeIsSingle(selectv.ast.Type) || !x.IsIntegerType(selectv.ast.Type.Code) {
+	if !typeIsSingle(selectv.ast.Type) ||
+		!x.IsIntegerType(selectv.ast.Type.Code) {
 		p.pusherrtok(errtok, "notint_array_select")
 	}
 	return arrv
@@ -1836,7 +1840,8 @@ func (p *Parser) evalArraySelect(arrv, selectv value, errtok lex.Token) value {
 func (p *Parser) evalStrSelect(strv, selectv value, errtok lex.Token) value {
 	strv.lvalue = true
 	strv.ast.Type.Code = x.Rune
-	if !typeIsSingle(selectv.ast.Type) || !x.IsIntegerType(selectv.ast.Type.Code) {
+	if !typeIsSingle(selectv.ast.Type) ||
+		!x.IsIntegerType(selectv.ast.Type.Code) {
 		p.pusherrtok(errtok, "notint_string_select")
 	}
 	return strv

@@ -104,8 +104,8 @@ var Errors = map[string]string{
 	`notallow_declares`:                `declare not allowed`,
 	`notallow_multiple_assign`:         `multiple assignments not allowed`,
 	`attribute_not_supports`:           `attribute is not supports by define`,
-	`use_at_content`:                   `use statement must be start of source code`,
-	`use_not_found`:                    `use directory path not found/access`,
-	`use_has_errors`:                   `use package has errors`,
+	`use_at_content`:                   `use declaration must be start of source code`,
+	`use_not_found`:                    `used directory path not found/access`,
+	`use_has_errors`:                   `used package has errors`,
 	`def_not_support_pub`:              `define is not supports pub modifier`,
 }
