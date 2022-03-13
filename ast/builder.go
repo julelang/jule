@@ -1488,7 +1488,8 @@ func requireOperatorForProcess(token lex.Token, index, tokensLen int) bool {
 func (b *Builder) checkExprTok(token lex.Token) {
 	if token.Kind[0] >= '0' && token.Kind[0] <= '9' {
 		var result bool
-		if strings.IndexByte(token.Kind, '.') != -1 {
+		if strings.Contains(token.Kind, ".") ||
+			strings.ContainsAny(token.Kind, "eE") {
 			result = xbits.CheckBitFloat(token.Kind, 64)
 		} else {
 			result = xbits.CheckBitInt(token.Kind, 64)
