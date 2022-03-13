@@ -568,7 +568,7 @@ func (b *Builder) pushStatementToBlock(bs *blockStatement) {
 		return
 	}
 	statement.WithTerminator = bs.withTerminator
-	bs.block.Statements = append(bs.block.Statements, statement)
+	bs.block.Tree = append(bs.block.Tree, statement)
 }
 
 // IsStatement reports token is

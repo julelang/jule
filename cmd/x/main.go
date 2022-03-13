@@ -426,7 +426,7 @@ func compile(path string, main, justDefs bool) *parser.Parser {
 		return nil
 	}
 	p.File = f
-	p.Parse(true, false)
+	p.Parsef(true, false)
 	return p
 }
 

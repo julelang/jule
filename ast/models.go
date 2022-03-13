@@ -29,7 +29,7 @@ func (s Statement) String() string {
 
 // BlockAST is code block.
 type BlockAST struct {
-	Statements []Statement
+	Tree []Statement
 }
 
 // Indent total of blocks.
@@ -49,7 +49,7 @@ func ParseBlock(b BlockAST, indent int) string {
 	// Space count per indent.
 	var cxx strings.Builder
 	cxx.WriteByte('{')
-	for _, s := range b.Statements {
+	for _, s := range b.Tree {
 		cxx.WriteByte('\n')
 		cxx.WriteString(strings.Repeat(" ", indent*IndentSpace))
 		cxx.WriteString(s.String())

@@ -52,6 +52,13 @@ func NewParser(f *xio.File) *Parser {
 	return parser
 }
 
+// Parses object tree and returns parser.
+func Parset(tree []ast.Obj, main, justDefs bool) *Parser {
+	p := NewParser(nil)
+	p.Parset(tree, main, justDefs)
+	return p
+}
+
 // pusherrtok appends new error by token.
 func (p *Parser) pusherrtok(tok lex.Token, key string) {
 	p.pusherrmsgtok(tok, x.Errors[key])
@@ -166,8 +173,14 @@ func (p *Parser) CxxGlobals() string {
 func (p *Parser) CxxFuncs() string {
 	var cxx strings.Builder
 	cxx.WriteString("// region FUNCTIONS\n")
-	for _, fun := range p.Defs.Funcs {
-		cxx.WriteString(fun.String())
+	for _, use := range used {
+		for _, f := range use.defs.Funcs {
+			cxx.WriteString(f.String())
+			cxx.WriteString("\n\n")
+		}
+	}
+	for _, f := range p.Defs.Funcs {
+		cxx.WriteString(f.String())
 		cxx.WriteString("\n\n")
 	}
 	cxx.WriteString("// endregion FUNCTIONS")
@@ -187,14 +200,16 @@ func (p *Parser) Cxx() string {
 	return cxx.String()
 }
 
-func (p *Parser) getTree(tokens []lex.Token) []ast.Obj {
-	builder := ast.NewBuilder(tokens)
-	builder.Build()
-	if len(builder.Errors) > 0 {
-		p.pusherrs(builder.Errors...)
+func getTree(tokens []lex.Token, errs *[]xlog.CompilerLog) []ast.Obj {
+	b := ast.NewBuilder(tokens)
+	b.Build()
+	if len(b.Errors) > 0 {
+		if errs != nil {
+			*errs = append(*errs, b.Errors...)
+		}
 		return nil
 	}
-	return builder.Tree
+	return b.Tree
 }
 
 func (p *Parser) checkUsePath(use *ast.Use) bool {
@@ -223,6 +238,8 @@ func (p *Parser) compileUse(useAST *ast.Use) *use {
 	use := new(use)
 	use.defs = new(defmap)
 	use.path = useAST.Path
+	tree := make([]ast.Obj, 0)
+	errored := false
 	for _, info := range infos {
 		name := info.Name()
 		// Skip directories.
@@ -234,16 +251,32 @@ func (p *Parser) compileUse(useAST *ast.Use) *use {
 			p.pusherrmsg(err.Error())
 			continue
 		}
-		src := NewParser(f)
-		src.Parse(false, false)
-		if src.Errors != nil {
-			p.Warnings = append(p.Warnings, src.Warnings...)
-			p.pusherrs(src.Errors...)
-			p.pusherrtok(useAST.Token, "use_has_errors")
+		lexer := lex.NewLex(f)
+		tokens := lexer.Lex()
+		if lexer.Logs != nil {
+			p.pusherrs(lexer.Logs...)
+			errored = true
 			continue
 		}
-		p.pushUseDefs(use, src.Defs)
+		subtree := getTree(tokens, nil)
+		if subtree == nil {
+			errored = true
+			continue
+		}
+		tree = append(tree, subtree...)
 	}
+	if errored {
+		p.pusherrtok(useAST.Token, "use_has_errors")
+		return nil
+	}
+	src := Parset(tree, false, false)
+	if src.Errors != nil {
+		p.pusherrtok(useAST.Token, "use_has_errors")
+		return nil
+	}
+	p.pusherrs(src.Errors...)
+	p.Warnings = append(p.Warnings, src.Warnings...)
+	p.pushUseDefs(use, src.Defs)
 	return use
 }
 
@@ -357,7 +390,12 @@ func (p *Parser) checkParse() {
 	go p.checkAsync()
 }
 
+// Special case is;
+//  p.useLocalPackage() -> nothing if p.File is nil
 func (p *Parser) useLocalPakcage() {
+	if p.File == nil {
+		return
+	}
 	dir := filepath.Dir(p.File.Path)
 	infos, err := ioutil.ReadDir(dir)
 	if err != nil {
@@ -380,26 +418,17 @@ func (p *Parser) useLocalPakcage() {
 		}
 		src := NewParser(f)
 		src.isLocalPkg = true
-		src.Parse(false, false)
+		src.Parsef(false, false)
 		p.pusherrs(src.Errors...)
+		p.Warnings = append(p.Warnings, src.Warnings...)
 		p.Defs.Types = append(p.Defs.Types, src.Defs.Types...)
 		p.Defs.Globals = append(p.Defs.Globals, src.Defs.Globals...)
 		p.Defs.Funcs = append(p.Defs.Funcs, src.Defs.Funcs...)
 	}
 }
 
-// Parse is parse X code.
-func (p *Parser) Parse(main, justDefs bool) {
-	lexer := lex.NewLex(p.File)
-	tokens := lexer.Lex()
-	if lexer.Logs != nil {
-		p.pusherrs(lexer.Logs...)
-		return
-	}
-	tree := p.getTree(tokens)
-	if tree == nil {
-		return
-	}
+// Parses X code from object tree.
+func (p *Parser) Parset(tree []ast.Obj, main, justDefs bool) {
 	p.main = main
 	p.justDefs = justDefs
 	if !p.isLocalPkg {
@@ -408,6 +437,26 @@ func (p *Parser) Parse(main, justDefs bool) {
 	p.parseTree(tree)
 	p.checkParse()
 	p.wg.Wait()
+}
+
+// Parses X code from tokens.
+func (p *Parser) Parse(tokens []lex.Token, main, justDefs bool) {
+	tree := getTree(tokens, &p.Errors)
+	if tree == nil {
+		return
+	}
+	p.Parset(tree, main, justDefs)
+}
+
+// Parses X code from file.
+func (p *Parser) Parsef(main, justDefs bool) {
+	lexer := lex.NewLex(p.File)
+	tokens := lexer.Lex()
+	if lexer.Logs != nil {
+		p.pusherrs(lexer.Logs...)
+		return
+	}
+	p.Parse(tokens, main, justDefs)
 }
 
 func (p *Parser) checkDoc(obj ast.Obj) {
@@ -1999,8 +2048,8 @@ func (p *Parser) checkEntryPointSpecialCases(fun *function) {
 }
 
 func (p *Parser) checkBlock(b *ast.BlockAST) {
-	for index := 0; index < len(b.Statements); index++ {
-		model := &b.Statements[index]
+	for i := 0; i < len(b.Tree); i++ {
+		model := &b.Tree[i]
 		switch t := model.Value.(type) {
 		case ast.ExprStatement:
 			_, t.Expr.Model = p.evalExpr(t.Expr)
@@ -2022,7 +2071,7 @@ func (p *Parser) checkBlock(b *ast.BlockAST) {
 		case ast.Continue:
 			p.checkContinueStatement(&t)
 		case ast.If:
-			p.checkIfExpr(&t, &index, b.Statements)
+			p.checkIfExpr(&t, &i, b.Tree)
 			model.Value = t
 		case ast.Ret:
 		default:
@@ -2137,12 +2186,12 @@ func (rc *retChecker) check() {
 
 func (p *Parser) checkRets(fun *ast.Func) {
 	missed := true
-	for index, s := range fun.Block.Statements {
+	for index, s := range fun.Block.Tree {
 		switch t := s.Value.(type) {
 		case ast.Ret:
 			rc := retChecker{p: p, retAST: &t, fun: fun}
 			rc.check()
-			fun.Block.Statements[index].Value = t
+			fun.Block.Tree[index].Value = t
 			missed = false
 		}
 	}
@@ -2152,9 +2201,9 @@ func (p *Parser) checkRets(fun *ast.Func) {
 }
 
 func (p *Parser) checkFunc(f *ast.Func) {
-	if f.Token.File != p.File { // Skip already checked functions
-		return
-	}
+	/*if f.Token.File != p.File { // Skip already checked functions
+	return
+	}*/
 	p.checkBlock(&f.Block)
 	p.checkRets(f)
 }
