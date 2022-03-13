@@ -5,7 +5,13 @@ import (
 
 	"github.com/the-xlang/x/ast"
 	"github.com/the-xlang/x/parser"
+	"github.com/the-xlang/x/pkg/x"
 )
+
+type use struct {
+	Path         string `json:"path"`
+	StandardPath bool   `json:"standard_path"`
+}
 
 type xtype struct {
 	Id          string `json:"id"`
@@ -37,9 +43,23 @@ type parameter struct {
 }
 
 type document struct {
+	Uses    []use      `json:"uses"`
 	Types   []xtype    `json:"types"`
 	Globals []global   `json:"globals"`
 	Funcs   []function `json:"functions"`
+}
+
+func uses(p *parser.Parser) []use {
+	uses := make([]use, len(p.Uses))
+	for i, u := range p.Uses {
+		path := u.Path
+		path = path[len(x.StdlibPath)+1:]
+		uses[i] = use{
+			Path:         path,
+			StandardPath: true,
+		}
+	}
+	return uses
 }
 
 func types(p *parser.Parser) []xtype {
@@ -106,7 +126,7 @@ func funcs(p *parser.Parser) []function {
 
 // Documentize Parser defines with JSON format.
 func Documentize(p *parser.Parser) (string, error) {
-	doc := document{types(p), globals(p), funcs(p)}
+	doc := document{uses(p), types(p), globals(p), funcs(p)}
 	bytes, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
 		return "", err

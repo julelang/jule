@@ -18,7 +18,7 @@ import (
 )
 
 type use struct {
-	path string
+	Path string
 	defs *defmap
 }
 
@@ -33,8 +33,8 @@ type Parser struct {
 	justDefs   bool
 	main       bool
 	isLocalPkg bool
-	uses       []*use
 
+	Uses           []*use
 	Defs           *defmap
 	waitingGlobals []ast.Var
 	BlockVars      []ast.Var
@@ -220,8 +220,8 @@ func (p *Parser) checkUsePath(use *ast.Use) bool {
 		return false
 	}
 	// Already uses?
-	for _, puse := range p.uses {
-		if use.Path == puse.path {
+	for _, puse := range p.Uses {
+		if use.Path == puse.Path {
 			p.pusherrtok(use.Token, "already_uses")
 			return false
 		}
@@ -254,7 +254,7 @@ func (p *Parser) compileUse(useAST *ast.Use) *use {
 		}
 		use := new(use)
 		use.defs = new(defmap)
-		use.path = useAST.Path
+		use.Path = useAST.Path
 		p.pusherrs(psub.Errors...)
 		p.Warnings = append(p.Warnings, psub.Warnings...)
 		p.pushUseDefs(use, psub.Defs)
@@ -315,7 +315,7 @@ func (p *Parser) use(useAST *ast.Use) {
 	}
 	exist := false
 	for _, guse := range used {
-		if guse.path == use.path {
+		if guse.Path == use.Path {
 			exist = true
 			break
 		}
@@ -323,7 +323,7 @@ func (p *Parser) use(useAST *ast.Use) {
 	if !exist {
 		used = append(used, use)
 	}
-	p.uses = append(p.uses, use)
+	p.Uses = append(p.Uses, use)
 }
 
 func (p *Parser) parseUses(tree *[]ast.Obj) {
@@ -658,7 +658,7 @@ func (p *Parser) FuncById(id string) *function {
 			return f
 		}
 	}
-	for _, use := range p.uses {
+	for _, use := range p.Uses {
 		f := use.defs.funcById(id)
 		if f != nil && f.Ast.Pub {
 			return f
@@ -677,7 +677,7 @@ func (p *Parser) varById(id string) *ast.Var {
 }
 
 func (p *Parser) globalById(id string) *ast.Var {
-	for _, use := range p.uses {
+	for _, use := range p.Uses {
 		g := use.defs.globalById(id)
 		if g != nil && g.Pub {
 			return g
@@ -687,7 +687,7 @@ func (p *Parser) globalById(id string) *ast.Var {
 }
 
 func (p *Parser) typeById(id string) *ast.Type {
-	for _, use := range p.uses {
+	for _, use := range p.Uses {
 		t := use.defs.typeById(id)
 		if t != nil && t.Pub {
 			return t
