@@ -8,55 +8,46 @@ import (
 	"github.com/the-xlang/x/pkg/xapi"
 )
 
-type IExprNode interface {
+type iExpr interface {
 	String() string
 }
 
 type exprBuildNode struct {
 	index int
-	nodes []IExprNode
+	nodes []iExpr
 }
 
-type exprBuilder struct {
+type exprModel struct {
 	index int
 	nodes []exprBuildNode
 }
 
-func newExprBuilder(processes [][]lex.Token) *exprBuilder {
-	b := new(exprBuilder)
-	b.index = 0
+func newExprModel(processes [][]lex.Token) *exprModel {
+	m := new(exprModel)
+	m.index = 0
 	for i := range processes {
-		b.nodes = append(b.nodes, exprBuildNode{index: i})
+		m.nodes = append(m.nodes, exprBuildNode{index: i})
 	}
-	return b
+	return m
 }
 
-func (b *exprBuilder) appendNodeToSubNodes(node IExprNode) {
-	nodes := &b.nodes[b.index].nodes
+func (m *exprModel) appendNodeToSubNodes(node iExpr) {
+	nodes := &m.nodes[m.index].nodes
 	*nodes = append(*nodes, node)
 }
 
-func (b *exprBuilder) build() (e exprModel) {
-	for _, node := range b.nodes {
-		e.nodes = append(e.nodes, node.nodes...)
-	}
-	return
-}
-
-type exprModel struct {
-	nodes []IExprNode
-}
-
-func (model exprModel) String() string {
+func (m exprModel) String() string {
 	var expr strings.Builder
-	for _, node := range model.nodes {
-		expr.WriteString(node.String())
+	for _, node := range m.nodes {
+		for _, node := range node.nodes {
+			expr.WriteString(node.String())
+		}
 	}
 	return expr.String()
 }
 
-func (model exprModel) ExprAST() ast.Expr {
-	return ast.Expr{Model: model}
+func (m *exprModel) Expr() ast.Expr {
+	return ast.Expr{Model: m}
 }
 
 type exprNode struct {
@@ -84,7 +75,7 @@ func (af anonFunc) String() string {
 
 type arrayExpr struct {
 	dataType ast.DataType
-	expr     []exprModel
+	expr     []iExpr
 }
 
 func (a arrayExpr) String() string {
@@ -118,7 +109,7 @@ func (a argsExpr) String() string {
 }
 
 type multiRetExpr struct {
-	models []exprModel
+	models []iExpr
 }
 
 func (mre multiRetExpr) String() string {
