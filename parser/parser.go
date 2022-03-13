@@ -789,121 +789,110 @@ type value struct {
 	variadic bool
 }
 
+func eliminateProcesses(processes *[][]lex.Token, i, to int) {
+	for i < to {
+		(*processes)[i] = nil
+		i++
+	}
+}
+
 func (p *Parser) evalProcesses(processes [][]lex.Token) (v value, e exprModel) {
 	if processes == nil {
 		return
 	}
-	b := newExprBuilder()
+	b := newExprBuilder(processes)
 	if len(processes) == 1 {
-		b.setIndex(0)
 		v = p.evalExprPart(processes[0], b)
 		e = b.build()
 		return
 	}
 	process := solver{p: p, builder: b}
-	j := p.nextOperator(processes)
 	boolean := false
-	for j != -1 {
+	for i := p.nextOperator(processes); i != -1 && !noData(processes); i = p.nextOperator(processes) {
 		if !boolean {
 			boolean = v.ast.Type.Code == x.Bool
 		}
 		if boolean {
 			v.ast.Type.Code = x.Bool
 		}
-		if j == 0 {
+		b.index = i
+		process.operator = processes[b.index][0]
+		b.appendNodeToSubNodes(exprNode{process.operator.Kind})
+		if processes[i-1] == nil {
 			process.leftVal = v.ast
-			process.operator = processes[j][0]
-			b.setIndex(j + 1)
-			b.appendNode(exprNode{process.operator.Kind})
-			process.right = processes[j+1]
-			b.setIndex(j + 1)
+			b.index = i + 1
+			process.right = processes[b.index]
 			process.rightVal = p.evalExprPart(process.right, b).ast
 			v.ast = process.Solve()
-			processes = processes[2:]
-			goto end
-		} else if j == len(processes)-1 {
-			process.operator = processes[j][0]
-			process.left = processes[j-1]
-			b.setIndex(j - 1)
+			eliminateProcesses(&processes, i, i+2)
+			continue
+		} else if processes[i+1] == nil {
+			b.index = i - 1
+			process.left = processes[b.index]
 			process.leftVal = p.evalExprPart(process.left, b).ast
 			process.rightVal = v.ast
-			b.setIndex(j)
-			b.appendNode(exprNode{process.operator.Kind})
 			v.ast = process.Solve()
-			processes = processes[:j-1]
-			goto end
-		} else if prev := processes[j-1]; prev[0].Id == lex.Operator &&
-			len(prev) == 1 {
+			eliminateProcesses(&processes, i-1, i+1)
+			continue
+		} else if isOperator(processes[i-1]) {
 			process.leftVal = v.ast
-			process.operator = processes[j][0]
-			b.setIndex(j)
-			b.appendNode(exprNode{process.operator.Kind})
-			process.right = processes[j+1]
-			b.setIndex(j + 1)
+			b.index = i + 1
+			process.right = processes[b.index]
 			process.rightVal = p.evalExprPart(process.right, b).ast
 			v.ast = process.Solve()
-			processes = append(processes[:j], processes[j+2:]...)
-			goto end
+			eliminateProcesses(&processes, i, i+1)
+			continue
 		}
-		process.left = processes[j-1]
-		b.setIndex(j - 1)
+		b.index = i - 1
+		process.left = processes[b.index]
 		process.leftVal = p.evalExprPart(process.left, b).ast
-		process.operator = processes[j][0]
-		b.setIndex(j)
-		b.appendNode(exprNode{process.operator.Kind})
-		process.right = processes[j+1]
-		b.setIndex(j + 1)
+		b.index = i + 1
+		process.right = processes[b.index]
 		process.rightVal = p.evalExprPart(process.right, b).ast
-		{
-			solvedv := process.Solve()
-			if v.ast.Type.Code != x.Void {
-				process.operator.Kind = "+"
-				process.leftVal = v.ast
-				process.right = processes[j+1]
-				process.rightVal = solvedv
-				v.ast = process.Solve()
-			} else {
-				v.ast = solvedv
-			}
+		solvedv := process.Solve()
+		if v.ast.Type.Code != x.Void {
+			process.operator.Kind = "+"
+			process.leftVal = v.ast
+			process.right = processes[i+1]
+			process.rightVal = solvedv
+			solvedv = process.Solve()
 		}
-		// Remove evald processes.
-		processes = append(processes[:j-1], processes[j+2:]...)
-		if len(processes) == 1 {
-			break
-		}
-	end:
-		// Find next operator.
-		j = p.nextOperator(processes)
+		v.ast = solvedv
+		eliminateProcesses(&processes, i-1, i+2)
 	}
 	e = b.build()
 	return
 }
 
-func (p *Parser) evalTokens(tokens []lex.Token) (value, exprModel) {
-	return p.evalExpr(new(ast.Builder).Expr(tokens))
+func noData(processes [][]lex.Token) bool {
+	for _, p := range processes {
+		if !isOperator(p) && p != nil {
+			return false
+		}
+	}
+	return true
 }
 
-func (p *Parser) evalExpr(ex ast.Expr) (value, exprModel) {
-	processes := make([][]lex.Token, len(ex.Processes))
-	copy(processes, ex.Processes)
-	return p.evalProcesses(processes)
+func isOperator(process []lex.Token) bool {
+	return len(process) == 1 && process[0].Id == lex.Operator
 }
 
 // nextOperator find index of priority operator and returns index of operator
 // if found, returns -1 if not.
-func (p *Parser) nextOperator(tokens [][]lex.Token) int {
+func (p *Parser) nextOperator(processes [][]lex.Token) int {
 	precedence5 := -1
 	precedence4 := -1
 	precedence3 := -1
 	precedence2 := -1
 	precedence1 := -1
-	for i, part := range tokens {
-		if len(part) != 1 {
-			continue
-		} else if part[0].Id != lex.Operator {
+	for i, process := range processes {
+		if !isOperator(process) {
 			continue
 		}
-		switch part[0].Kind {
+		if processes[i-1] == nil && processes[i+1] == nil {
+			continue
+		}
+		switch process[0].Kind {
 		case "*", "/", "%", "<<", ">>", "&":
 			precedence5 = i
 		case "+", "-", "|", "^":
@@ -915,7 +904,7 @@ func (p *Parser) nextOperator(tokens [][]lex.Token) int {
 		case "||":
 			precedence1 = i
 		default:
-			p.pusherrtok(part[0], "invalid_operator")
+			p.pusherrtok(process[0], "invalid_operator")
 		}
 	}
 	switch {
@@ -930,6 +919,16 @@ func (p *Parser) nextOperator(tokens [][]lex.Token) int {
 	default:
 		return precedence1
 	}
+}
+
+func (p *Parser) evalTokens(tokens []lex.Token) (value, exprModel) {
+	return p.evalExpr(new(ast.Builder).Expr(tokens))
+}
+
+func (p *Parser) evalExpr(ex ast.Expr) (value, exprModel) {
+	processes := make([][]lex.Token, len(ex.Processes))
+	copy(processes, ex.Processes)
+	return p.evalProcesses(processes)
 }
 
 func toRawStrLiteral(literal string) string {
@@ -951,9 +950,9 @@ func (p *valueEvaluator) str() value {
 	v.ast.Type.Code = x.Str
 	v.ast.Type.Value = "str"
 	if israwstr(p.token.Kind) {
-		p.builder.appendNode(exprNode{toRawStrLiteral(p.token.Kind)})
+		p.builder.appendNodeToSubNodes(exprNode{toRawStrLiteral(p.token.Kind)})
 	} else {
-		p.builder.appendNode(exprNode{xapi.ToStr(p.token.Kind)})
+		p.builder.appendNodeToSubNodes(exprNode{xapi.ToStr(p.token.Kind)})
 	}
 	return v
 }
@@ -963,7 +962,7 @@ func (p *valueEvaluator) rune() value {
 	v.ast.Data = p.token.Kind
 	v.ast.Type.Code = x.Rune
 	v.ast.Type.Value = "rune"
-	p.builder.appendNode(exprNode{xapi.ToRune(p.token.Kind)})
+	p.builder.appendNodeToSubNodes(exprNode{xapi.ToRune(p.token.Kind)})
 	return v
 }
 
@@ -972,7 +971,7 @@ func (p *valueEvaluator) bool() value {
 	v.ast.Data = p.token.Kind
 	v.ast.Type.Code = x.Bool
 	v.ast.Type.Value = "bool"
-	p.builder.appendNode(exprNode{p.token.Kind})
+	p.builder.appendNodeToSubNodes(exprNode{p.token.Kind})
 	return v
 }
 
@@ -980,14 +979,14 @@ func (p *valueEvaluator) nil() value {
 	var v value
 	v.ast.Data = p.token.Kind
 	v.ast.Type.Code = x.Nil
-	p.builder.appendNode(exprNode{p.token.Kind})
+	p.builder.appendNodeToSubNodes(exprNode{p.token.Kind})
 	return v
 }
 
 func (p *valueEvaluator) num() value {
 	var v value
 	v.ast.Data = p.token.Kind
-	p.builder.appendNode(exprNode{p.token.Kind})
+	p.builder.appendNodeToSubNodes(exprNode{p.token.Kind})
 	if strings.Contains(p.token.Kind, ".") ||
 		strings.ContainsAny(p.token.Kind, "eE") {
 		v.ast.Type.Code = x.F64
@@ -1012,7 +1011,7 @@ func (p *valueEvaluator) id() (v value, ok bool) {
 		v.volatile = variable.Volatile
 		v.ast.Token = variable.IdToken
 		v.lvalue = true
-		p.builder.appendNode(exprNode{xapi.AsId(p.token.Kind)})
+		p.builder.appendNodeToSubNodes(exprNode{xapi.AsId(p.token.Kind)})
 		ok = true
 	} else if fun := p.parser.FuncById(p.token.Kind); fun != nil {
 		v.ast.Data = p.token.Kind
@@ -1020,7 +1019,7 @@ func (p *valueEvaluator) id() (v value, ok bool) {
 		v.ast.Type.Tag = fun.Ast
 		v.ast.Type.Value = fun.Ast.DataTypeString()
 		v.ast.Token = fun.Ast.Token
-		p.builder.appendNode(exprNode{xapi.AsId(p.token.Kind)})
+		p.builder.appendNodeToSubNodes(exprNode{xapi.AsId(p.token.Kind)})
 		ok = true
 	} else {
 		p.parser.pusherrtok(p.token, "id_noexist")
@@ -1391,7 +1390,7 @@ func (p *Parser) evalOperatorExprPart(tokens []lex.Token, b *exprBuilder) value 
 	//? if all operators length is not 1.
 	exprTokens := tokens[1:]
 	processor := operatorProcessor{tokens[0], exprTokens, b, p}
-	b.appendNode(exprNode{processor.token.Kind})
+	b.appendNodeToSubNodes(exprNode{processor.token.Kind})
 	if processor.tokens == nil {
 		p.pusherrtok(processor.token, "invalid_syntax")
 		return v
@@ -1434,7 +1433,7 @@ func (p *Parser) evalHeapAllocExpr(tokens []lex.Token, b *exprBuilder) (v value)
 	astb := new(ast.Builder)
 	index := new(int)
 	dt, ok := astb.DataType(tokens, index, true)
-	b.appendNode(newHeapAllocExpr{dt})
+	b.appendNodeToSubNodes(newHeapAllocExpr{dt})
 	dt.Value = "*" + dt.Value
 	v.ast.Type = dt
 	if !ok {
@@ -1530,7 +1529,7 @@ func (p *Parser) evalTryCastExpr(tokens []lex.Token, b *exprBuilder) (v value, _
 			return
 		}
 		exprTokens := tokens[index+1:]
-		b.appendNode(exprNode{"(" + dt.String() + ")"})
+		b.appendNodeToSubNodes(exprNode{"(" + dt.String() + ")"})
 		val := p.evalExprPart(exprTokens, b)
 		val = p.evalCast(val, dt, errToken)
 		return val, true
@@ -1551,7 +1550,7 @@ func (p *Parser) evalTryAssignExpr(tokens []lex.Token, b *exprBuilder) (v value,
 		return
 	}
 	p.checkAssign(&assign)
-	b.appendNode(assignExpr{assign})
+	b.appendNodeToSubNodes(assignExpr{assign})
 	v, _ = p.evalExpr(assign.SelectExprs[0].Expr)
 	return
 }
@@ -1684,8 +1683,8 @@ func (p *Parser) evalParenthesesRangeExpr(tokens []lex.Token, b *exprBuilder) (v
 	}
 	if len(valueTokens) == 0 && braceCount == 0 {
 		// Write parentheses.
-		b.appendNode(exprNode{"("})
-		defer b.appendNode(exprNode{")"})
+		b.appendNodeToSubNodes(exprNode{"("})
+		defer b.appendNodeToSubNodes(exprNode{")"})
 
 		tk := tokens[0]
 		tokens = tokens[1 : len(tokens)-1]
@@ -1694,14 +1693,14 @@ func (p *Parser) evalParenthesesRangeExpr(tokens []lex.Token, b *exprBuilder) (v
 		}
 		value, model := p.evalTokens(tokens)
 		v = value
-		b.appendNode(model)
+		b.appendNodeToSubNodes(model)
 		return
 	}
 	v = p.evalExprPart(valueTokens, b)
 
 	// Write parentheses.
-	b.appendNode(exprNode{"("})
-	defer b.appendNode(exprNode{")"})
+	b.appendNodeToSubNodes(exprNode{"("})
+	defer b.appendNodeToSubNodes(exprNode{")"})
 
 	switch v.ast.Type.Code {
 	case x.Func:
@@ -1755,7 +1754,7 @@ func (p *Parser) evalBraceRangeExpr(tokens []lex.Token, b *exprBuilder) (v value
 			var model IExprNode
 			v, model = p.buildArray(p.buildEnumerableParts(exprTokens),
 				dt, exprTokens[0])
-			b.appendNode(model)
+			b.appendNodeToSubNodes(model)
 			return
 		case "(":
 			astBuilder := ast.NewBuilder(tokens)
@@ -1768,7 +1767,7 @@ func (p *Parser) evalBraceRangeExpr(tokens []lex.Token, b *exprBuilder) (v value
 			v.ast.Type.Tag = funAST
 			v.ast.Type.Code = x.Func
 			v.ast.Type.Value = funAST.DataTypeString()
-			b.appendNode(anonFunc{funAST})
+			b.appendNodeToSubNodes(anonFunc{funAST})
 			return
 		default:
 			p.pusherrtok(exprTokens[0], "invalid_syntax")
@@ -1807,12 +1806,12 @@ func (p *Parser) evalBracketRangeExpr(tokens []lex.Token, b *exprBuilder) (v val
 	}
 	var model IExprNode
 	v, model = p.evalTokens(exprTokens)
-	b.appendNode(model)
+	b.appendNodeToSubNodes(model)
 	tokens = tokens[len(exprTokens)+1 : len(tokens)-1] // Removed array syntax "["..."]"
-	b.appendNode(exprNode{"["})
+	b.appendNodeToSubNodes(exprNode{"["})
 	selectv, model := p.evalTokens(tokens)
-	b.appendNode(model)
-	b.appendNode(exprNode{"]"})
+	b.appendNodeToSubNodes(model)
+	b.appendNodeToSubNodes(exprNode{"]"})
 	return p.evalEnumerableSelect(v, selectv, tokens[0])
 }
 
@@ -1925,7 +1924,7 @@ func (p *Parser) parseFuncCall(f ast.Func, tokens []lex.Token, b *exprBuilder) {
 	}
 	p.parseArgs(f.Params, &args, errToken, b)
 	if b != nil {
-		b.appendNode(argsExpr{args})
+		b.appendNodeToSubNodes(argsExpr{args})
 	}
 }
 

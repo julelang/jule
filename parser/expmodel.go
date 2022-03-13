@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/the-xlang/x/ast"
+	"github.com/the-xlang/x/lex"
 	"github.com/the-xlang/x/pkg/xapi"
 )
 
@@ -13,46 +14,31 @@ type IExprNode interface {
 
 type exprBuildNode struct {
 	index int
-	node  exprModel
+	nodes []IExprNode
 }
 
 type exprBuilder struct {
-	index   int
-	current exprModel
-	nodes   []exprBuildNode
+	index int
+	nodes []exprBuildNode
 }
 
-func newExprBuilder() *exprBuilder {
-	builder := new(exprBuilder)
-	builder.index = -1
-	return builder
-}
-
-func (b *exprBuilder) setIndex(index int) {
-	if b.index != -1 {
-		b.appendBuildNode(exprBuildNode{b.index, b.current})
+func newExprBuilder(processes [][]lex.Token) *exprBuilder {
+	b := new(exprBuilder)
+	b.index = 0
+	for i := range processes {
+		b.nodes = append(b.nodes, exprBuildNode{index: i})
 	}
-	b.index = index
-	b.current = exprModel{}
+	return b
 }
 
-func (b *exprBuilder) appendBuildNode(node exprBuildNode) {
-	b.nodes = append(b.nodes, node)
-}
-
-func (b *exprBuilder) appendNode(node IExprNode) {
-	b.current.nodes = append(b.current.nodes, node)
+func (b *exprBuilder) appendNodeToSubNodes(node IExprNode) {
+	nodes := &b.nodes[b.index].nodes
+	*nodes = append(*nodes, node)
 }
 
 func (b *exprBuilder) build() (e exprModel) {
-	b.setIndex(-1)
-	for index := range b.nodes {
-		for _, buildNode := range b.nodes {
-			if buildNode.index != index {
-				continue
-			}
-			e.nodes = append(e.nodes, buildNode.node)
-		}
+	for _, node := range b.nodes {
+		e.nodes = append(e.nodes, node.nodes...)
 	}
 	return
 }
