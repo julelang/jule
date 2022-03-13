@@ -235,11 +235,6 @@ func (p *Parser) compileUse(useAST *ast.Use) *use {
 		p.pusherrmsg(err.Error())
 		return nil
 	}
-	use := new(use)
-	use.defs = new(defmap)
-	use.path = useAST.Path
-	tree := make([]ast.Obj, 0)
-	errored := false
 	for _, info := range infos {
 		name := info.Name()
 		// Skip directories.
@@ -251,33 +246,21 @@ func (p *Parser) compileUse(useAST *ast.Use) *use {
 			p.pusherrmsg(err.Error())
 			continue
 		}
-		lexer := lex.NewLex(f)
-		tokens := lexer.Lex()
-		if lexer.Logs != nil {
-			p.pusherrs(lexer.Logs...)
-			errored = true
-			continue
+		psub := NewParser(f)
+		psub.Parsef(false, false)
+		if psub.Errors != nil {
+			p.pusherrtok(useAST.Token, "use_has_errors")
+			return nil
 		}
-		subtree := getTree(tokens, nil)
-		if subtree == nil {
-			errored = true
-			continue
-		}
-		tree = append(tree, subtree...)
+		use := new(use)
+		use.defs = new(defmap)
+		use.path = useAST.Path
+		p.pusherrs(psub.Errors...)
+		p.Warnings = append(p.Warnings, psub.Warnings...)
+		p.pushUseDefs(use, psub.Defs)
+		return use
 	}
-	if errored {
-		p.pusherrtok(useAST.Token, "use_has_errors")
-		return nil
-	}
-	src := Parset(tree, false, false)
-	if src.Errors != nil {
-		p.pusherrtok(useAST.Token, "use_has_errors")
-		return nil
-	}
-	p.pusherrs(src.Errors...)
-	p.Warnings = append(p.Warnings, src.Warnings...)
-	p.pushUseDefs(use, src.Defs)
-	return use
+	return nil
 }
 
 func (p *Parser) pushUseTypes(use *use, dm *defmap) {
@@ -286,7 +269,7 @@ func (p *Parser) pushUseTypes(use *use, dm *defmap) {
 		if def != nil {
 			p.pusherrmsgtok(def.Token,
 				fmt.Sprintf(`"%s" identifier is already defined in this source`, t.Id))
-		} else if t.Pub {
+		} else {
 			use.defs.Types = append(use.defs.Types, t)
 		}
 	}
@@ -298,7 +281,7 @@ func (p *Parser) pushUseGlobals(use *use, dm *defmap) {
 		if def != nil {
 			p.pusherrmsgtok(def.IdToken,
 				fmt.Sprintf(`"%s" identifier is already defined in this source`, g.Id))
-		} else if g.Pub {
+		} else {
 			use.defs.Globals = append(use.defs.Globals, g)
 		}
 	}
@@ -310,7 +293,7 @@ func (p *Parser) pushUseFuncs(use *use, dm *defmap) {
 		if def != nil {
 			p.pusherrmsgtok(def.Ast.Token,
 				fmt.Sprintf(`"%s" identifier is already defined in this source`, f.Ast.Id))
-		} else if f.Ast.Pub {
+		} else {
 			use.defs.Funcs = append(use.defs.Funcs, f)
 		}
 	}
@@ -392,7 +375,7 @@ func (p *Parser) checkParse() {
 
 // Special case is;
 //  p.useLocalPackage() -> nothing if p.File is nil
-func (p *Parser) useLocalPakcage() {
+func (p *Parser) useLocalPakcage(tree *[]ast.Obj) {
 	if p.File == nil {
 		return
 	}
@@ -416,14 +399,17 @@ func (p *Parser) useLocalPakcage() {
 			p.pusherrmsg(err.Error())
 			continue
 		}
-		src := NewParser(f)
-		src.isLocalPkg = true
-		src.Parsef(false, false)
-		p.pusherrs(src.Errors...)
-		p.Warnings = append(p.Warnings, src.Warnings...)
-		p.Defs.Types = append(p.Defs.Types, src.Defs.Types...)
-		p.Defs.Globals = append(p.Defs.Globals, src.Defs.Globals...)
-		p.Defs.Funcs = append(p.Defs.Funcs, src.Defs.Funcs...)
+		lexer := lex.NewLex(f)
+		tokens := lexer.Lex()
+		if lexer.Logs != nil {
+			p.pusherrs(lexer.Logs...)
+			continue
+		}
+		subtree := getTree(tokens, &p.Errors)
+		if subtree == nil {
+			continue
+		}
+		*tree = append(*tree, subtree...)
 	}
 }
 
@@ -432,7 +418,7 @@ func (p *Parser) Parset(tree []ast.Obj, main, justDefs bool) {
 	p.main = main
 	p.justDefs = justDefs
 	if !p.isLocalPkg {
-		p.useLocalPakcage()
+		p.useLocalPakcage(&tree)
 	}
 	p.parseTree(tree)
 	p.checkParse()
@@ -674,7 +660,7 @@ func (p *Parser) FuncById(id string) *function {
 	}
 	for _, use := range p.uses {
 		f := use.defs.funcById(id)
-		if f != nil {
+		if f != nil && f.Ast.Pub {
 			return f
 		}
 	}
@@ -693,7 +679,7 @@ func (p *Parser) varById(id string) *ast.Var {
 func (p *Parser) globalById(id string) *ast.Var {
 	for _, use := range p.uses {
 		g := use.defs.globalById(id)
-		if g != nil {
+		if g != nil && g.Pub {
 			return g
 		}
 	}
@@ -703,7 +689,7 @@ func (p *Parser) globalById(id string) *ast.Var {
 func (p *Parser) typeById(id string) *ast.Type {
 	for _, use := range p.uses {
 		t := use.defs.typeById(id)
-		if t != nil {
+		if t != nil && t.Pub {
 			return t
 		}
 	}
