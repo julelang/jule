@@ -115,24 +115,6 @@ func (p *Parser) pushwarn(key string) {
 // String returns full C++ code of parsed objects.
 func (p Parser) String() string { return p.Cxx() }
 
-// CxxTypes returns C++ code developer-defined types.
-func (p *Parser) CxxTypes() string {
-	var cxx strings.Builder
-	cxx.WriteString("// region TYPES\n")
-	for _, use := range used {
-		for _, t := range use.defs.Types {
-			cxx.WriteString(t.String())
-			cxx.WriteByte('\n')
-		}
-	}
-	for _, t := range p.Defs.Types {
-		cxx.WriteString(t.String())
-		cxx.WriteByte('\n')
-	}
-	cxx.WriteString("// endregion TYPES")
-	return cxx.String()
-}
-
 // CxxPrototypes returns C++ code of prototypes of C++ code.
 func (p *Parser) CxxPrototypes() string {
 	var cxx strings.Builder
@@ -190,8 +172,6 @@ func (p *Parser) CxxFuncs() string {
 // Cxx returns full C++ code of parsed objects.
 func (p *Parser) Cxx() string {
 	var cxx strings.Builder
-	cxx.WriteString(p.CxxTypes())
-	cxx.WriteString("\n\n")
 	cxx.WriteString(p.CxxPrototypes())
 	cxx.WriteString("\n\n")
 	cxx.WriteString(p.CxxGlobals())
@@ -547,9 +527,9 @@ func (p *Parser) Func(fast ast.Func) {
 	} else if xapi.IsIgnoreId(fast.Id) {
 		p.pusherrtok(fast.Token, "ignore_id")
 	}
-	fast.RetType, _ = p.readyType(fast.RetType, false)
+	fast.RetType, _ = p.readyType(fast.RetType, true)
 	for i, param := range fast.Params {
-		fast.Params[i].Type, _ = p.readyType(param.Type, false)
+		fast.Params[i].Type, _ = p.readyType(param.Type, true)
 	}
 	f := new(function)
 	f.Ast = fast
@@ -1524,7 +1504,7 @@ func (p *Parser) evalTryCastExpr(tokens []lex.Token, m *exprModel) (v value, _ b
 		if !ok {
 			return
 		}
-		_, ok = p.readyType(dt, false)
+		dt, ok = p.readyType(dt, false)
 		if !ok {
 			return
 		}
@@ -2644,11 +2624,6 @@ type assignChecker struct {
 
 func (ac assignChecker) checkAssignTypeAsync() {
 	defer func() { ac.p.wg.Done() }()
-	t, ok := ac.p.readyType(ac.t, true)
-	if !ok {
-		return
-	}
-	ac.t = t
 	ac.p.checkAssignConst(ac.constant, ac.t, ac.v, ac.errtok)
 	if typeIsSingle(ac.t) && isConstNum(ac.v.ast.Data) {
 		switch {
@@ -2678,14 +2653,6 @@ func (ac assignChecker) checkAssignTypeAsync() {
 
 func (p *Parser) checkTypeAsync(real, check ast.DataType, ignoreAny bool, errToken lex.Token) {
 	defer func() { p.wg.Done() }()
-	real, ok := p.readyType(real, true)
-	if !ok {
-		return
-	}
-	check, ok = p.readyType(check, true)
-	if !ok {
-		return
-	}
 	if !ignoreAny && real.Code == x.Any {
 		return
 	}
