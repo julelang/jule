@@ -308,6 +308,13 @@ func (p *Parser) use(useAST *ast.Use) {
 	if !p.checkUsePath(useAST) {
 		return
 	}
+	// Already parsed?
+	for _, use := range used {
+		if useAST.Path == use.Path {
+			p.Uses = append(p.Uses, use)
+			return
+		}
+	}
 	use := p.compileUse(useAST)
 	if use == nil {
 		return
