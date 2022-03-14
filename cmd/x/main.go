@@ -15,9 +15,9 @@ import (
 	"github.com/the-xlang/x/documenter"
 	"github.com/the-xlang/x/parser"
 	"github.com/the-xlang/x/pkg/x"
-	"github.com/the-xlang/x/pkg/x/xset"
 	"github.com/the-xlang/x/pkg/xio"
 	"github.com/the-xlang/x/pkg/xlog"
+	"github.com/the-xlang/x/pkg/xset"
 )
 
 func help(cmd string) {
