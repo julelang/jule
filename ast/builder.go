@@ -62,7 +62,7 @@ func (b *Builder) buildNode(tokens []lex.Token) {
 	case lex.Type:
 		b.Type(tokens)
 	case lex.Comment:
-		b.Comment(tokens)
+		b.Comment(tokens[0])
 	default:
 		b.pusherr(token, "invalid_syntax")
 		return
@@ -117,10 +117,13 @@ func (b *Builder) Type(tokens []lex.Token) {
 	b.Tree = append(b.Tree, Obj{token, typeAST})
 }
 
-func (b *Builder) Comment(tokens []lex.Token) {
-	token := tokens[0]
-	commentAST := Comment{token, token.Kind[2:]}
-	b.Tree = append(b.Tree, Obj{token, commentAST})
+func (b *Builder) Comment(tok lex.Token) {
+	tok.Kind = strings.TrimSpace(tok.Kind[2:])
+	if strings.HasPrefix(tok.Kind, "cxx:") {
+		b.Tree = append(b.Tree, Obj{tok, CxxEmbed{tok.Kind[4:]}})
+	} else {
+		b.Tree = append(b.Tree, Obj{tok, Comment{tok.Kind}})
+	}
 }
 
 // Id builds AST model of global id statement.
@@ -691,7 +694,7 @@ func (b *Builder) Statement(bs *blockStatement) (s Statement) {
 			return b.RetStatement(bs.tokens)
 		}
 	case lex.Comment:
-		return
+		return b.CommentStatement(bs.tokens[0])
 	}
 	return b.ExprStatement(bs.tokens)
 }
@@ -1064,6 +1067,17 @@ func (b *Builder) VarStatement(tokens []lex.Token) (s Statement) {
 	}
 ret:
 	return Statement{varAST.IdToken, varAST, false}
+}
+
+func (b *Builder) CommentStatement(tok lex.Token) (s Statement) {
+	s.Token = tok
+	tok.Kind = strings.TrimSpace(tok.Kind[2:])
+	if strings.HasPrefix(tok.Kind, "cxx:") {
+		s.Value = CxxEmbed{tok.Kind[4:]}
+	} else {
+		s.Value = Comment{tok.Kind}
+	}
+	return
 }
 
 // RetStatement builds AST model of return statement.

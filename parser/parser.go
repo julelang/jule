@@ -34,6 +34,7 @@ type Parser struct {
 	main       bool
 	isLocalPkg bool
 
+	Embeds         strings.Builder
 	Uses           []*use
 	Defs           *defmap
 	waitingGlobals []ast.Var
@@ -115,6 +116,15 @@ func (p *Parser) pushwarn(key string) {
 // String returns full C++ code of parsed objects.
 func (p Parser) String() string { return p.Cxx() }
 
+// CxxEmbeds return C++ code of cxx embeds.
+func (p *Parser) CxxEmbeds() string {
+	var cxx strings.Builder
+	cxx.WriteString("// region EMBEDS\n")
+	cxx.WriteString(p.Embeds.String())
+	cxx.WriteString("// endregion EMBEDS")
+	return cxx.String()
+}
+
 // CxxPrototypes returns C++ code of prototypes of C++ code.
 func (p *Parser) CxxPrototypes() string {
 	var cxx strings.Builder
@@ -172,6 +182,8 @@ func (p *Parser) CxxFuncs() string {
 // Cxx returns full C++ code of parsed objects.
 func (p *Parser) Cxx() string {
 	var cxx strings.Builder
+	cxx.WriteString(p.CxxEmbeds())
+	cxx.WriteString("\n\n")
 	cxx.WriteString(p.CxxPrototypes())
 	cxx.WriteString("\n\n")
 	cxx.WriteString(p.CxxGlobals())
@@ -333,6 +345,9 @@ func (p *Parser) parseSrcTreeObj(obj ast.Obj) {
 		p.Statement(t)
 	case ast.Type:
 		p.Type(t)
+	case ast.CxxEmbed:
+		p.Embeds.WriteString(t.String())
+		p.Embeds.WriteByte('\n')
 	case ast.Comment:
 		p.Comment(t)
 	case ast.Use:
@@ -2024,9 +2039,9 @@ func (p *Parser) checkEntryPointSpecialCases(fun *function) {
 	}
 }
 
-func (p *Parser) checkBlock(m *ast.BlockAST) {
-	for i := 0; i < len(m.Tree); i++ {
-		model := &m.Tree[i]
+func (p *Parser) checkBlock(b *ast.BlockAST) {
+	for i := 0; i < len(b.Tree); i++ {
+		model := &b.Tree[i]
 		switch t := model.Value.(type) {
 		case ast.ExprStatement:
 			_, t.Expr.Model = p.evalExpr(t.Expr)
@@ -2048,8 +2063,10 @@ func (p *Parser) checkBlock(m *ast.BlockAST) {
 		case ast.Continue:
 			p.checkContinueStatement(&t)
 		case ast.If:
-			p.checkIfExpr(&t, &i, m.Tree)
+			p.checkIfExpr(&t, &i, b.Tree)
 			model.Value = t
+		case ast.CxxEmbed:
+		case ast.Comment:
 		case ast.Ret:
 		default:
 			p.pusherrtok(model.Token, "invalid_syntax")

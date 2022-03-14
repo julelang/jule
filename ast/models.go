@@ -628,7 +628,6 @@ func (elseast Else) String() string {
 
 // Comment is the AST model of just comment lines.
 type Comment struct {
-	Token   lex.Token
 	Content string
 }
 
@@ -643,4 +642,13 @@ func (c Comment) String() string {
 type Use struct {
 	Token lex.Token
 	Path  string
+}
+
+// CxxEmbed is the AST model of cxx code embed.
+type CxxEmbed struct {
+	Content string
+}
+
+func (ce CxxEmbed) String() string {
+	return ce.Content
 }
