@@ -412,6 +412,7 @@ func (p *Parser) useLocalPakcage(tree *[]ast.Obj) {
 		if subtree == nil {
 			continue
 		}
+		p.parseUses(&subtree)
 		*tree = append(*tree, subtree...)
 	}
 }
