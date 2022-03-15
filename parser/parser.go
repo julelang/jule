@@ -582,7 +582,7 @@ func (p *Parser) Var(vast ast.Var) ast.Var {
 		}
 	}
 	if vast.Type.Code != x.Void {
-		if vast.SetterToken.Id != lex.NA { // Pass default value.
+		if vast.SetterToken.Id != lex.NA {
 			p.wg.Add(1)
 			go assignChecker{
 				p,
@@ -592,11 +592,11 @@ func (p *Parser) Var(vast ast.Var) ast.Var {
 				false,
 				vast.IdToken,
 			}.checkAssignTypeAsync()
-		} else {
-			var valueToken lex.Token
-			valueToken.Id = lex.Value
+		} else { // Pass default value.
 			dt, ok := p.readyType(vast.Type, true)
 			if ok {
+				var valueToken lex.Token
+				valueToken.Id = lex.Value
 				valueToken.Kind = p.defaultValueOfType(dt)
 				valueTokens := []lex.Token{valueToken}
 				processes := [][]lex.Token{valueTokens}
@@ -604,6 +604,7 @@ func (p *Parser) Var(vast ast.Var) ast.Var {
 					Tokens:    valueTokens,
 					Processes: processes,
 				}
+				_, vast.Value.Model = p.evalExpr(vast.Value)
 			}
 		}
 	} else {
@@ -2195,9 +2196,6 @@ func (p *Parser) checkRets(fun *ast.Func) {
 }
 
 func (p *Parser) checkFunc(f *ast.Func) {
-	/*if f.Token.File != p.File { // Skip already checked functions
-	return
-	}*/
 	p.checkBlock(&f.Block)
 	p.checkRets(f)
 }
