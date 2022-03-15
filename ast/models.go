@@ -329,8 +329,9 @@ func (v Var) String() string {
 	cxx.WriteByte(' ')
 	cxx.WriteString(xapi.AsId(v.Id))
 	if v.Value.Processes != nil {
-		cxx.WriteString(" = ")
+		cxx.WriteByte('{')
 		cxx.WriteString(v.Value.String())
+		cxx.WriteByte('}')
 	}
 	cxx.WriteByte(';')
 	return cxx.String()
@@ -338,14 +339,13 @@ func (v Var) String() string {
 
 // AssignSelector is selector for assignment operation.
 type AssignSelector struct {
-	NewVariable bool
-	Var         Var
-	Expr        Expr
-	Ignore      bool
+	Var    Var
+	Expr   Expr
+	Ignore bool
 }
 
 func (vs AssignSelector) String() string {
-	if vs.NewVariable {
+	if vs.Var.New {
 		// Returns variable identifier.
 		return xapi.AsId(vs.Expr.Tokens[0].Kind)
 	}
@@ -354,20 +354,25 @@ func (vs AssignSelector) String() string {
 
 // Assign is assignment AST model.
 type Assign struct {
-	Setter         lex.Token
-	SelectExprs    []AssignSelector
-	ValueExprs     []Expr
-	IsExpr         bool
-	JustDeclare    bool
+	Setter      lex.Token
+	SelectExprs []AssignSelector
+	ValueExprs  []Expr
+	IsExpr      bool
+
 	MultipleReturn bool
 }
 
 func (vs Assign) cxxSingleAssign() string {
-	var cxx strings.Builder
 	expr := vs.SelectExprs[0]
+	if expr.Var.New {
+		expr.Var.Value = vs.ValueExprs[0]
+		s := expr.Var.String()
+		return s[:len(s)-1] // Remove statement terminator
+	}
+	var cxx strings.Builder
 	if len(expr.Expr.Tokens) != 1 ||
 		!xapi.IsIgnoreId(expr.Expr.Tokens[0].Kind) {
-		cxx.WriteString(vs.SelectExprs[0].String())
+		cxx.WriteString(expr.String())
 		cxx.WriteString(vs.Setter.Kind)
 	}
 	cxx.WriteString(vs.ValueExprs[0].String())
@@ -376,6 +381,7 @@ func (vs Assign) cxxSingleAssign() string {
 
 func (vs Assign) cxxMultipleAssign() string {
 	var cxx strings.Builder
+	cxx.WriteString(vs.cxxNewDefines())
 	cxx.WriteString("std::tie(")
 	var expCxx strings.Builder
 	expCxx.WriteString("std::make_tuple(")
@@ -398,6 +404,7 @@ func (vs Assign) cxxMultipleAssign() string {
 
 func (vs Assign) cxxMultipleReturn() string {
 	var cxx strings.Builder
+	cxx.WriteString(vs.cxxNewDefines())
 	cxx.WriteString("std::tie(")
 	for _, selector := range vs.SelectExprs {
 		if selector.Ignore {
@@ -419,7 +426,7 @@ func (vs Assign) cxxMultipleReturn() string {
 func (vs Assign) cxxNewDefines() string {
 	var cxx strings.Builder
 	for _, selector := range vs.SelectExprs {
-		if selector.Ignore || !selector.NewVariable {
+		if selector.Ignore || !selector.Var.New {
 			continue
 		}
 		cxx.WriteString(selector.Var.String() + " ")
@@ -429,10 +436,6 @@ func (vs Assign) cxxNewDefines() string {
 
 func (vs Assign) String() string {
 	var cxx strings.Builder
-	cxx.WriteString(vs.cxxNewDefines())
-	if vs.JustDeclare {
-		return cxx.String()[:cxx.Len()-1] /* Remove unnecesarry whitespace. */
-	}
 	switch {
 	case vs.MultipleReturn:
 		cxx.WriteString(vs.cxxMultipleReturn())

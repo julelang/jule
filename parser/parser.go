@@ -2272,13 +2272,6 @@ func (p *Parser) checkSingleAssign(assign *ast.Assign) {
 	}.checkAssignTypeAsync()
 }
 
-func (p *Parser) parseAssignSelections(vsAST *ast.Assign) {
-	for index, selector := range vsAST.SelectExprs {
-		p.checkVarStatement(&selector.Var, false)
-		vsAST.SelectExprs[index] = selector
-	}
-}
-
 func (p *Parser) assignExprs(vsAST *ast.Assign) []value {
 	values := make([]value, len(vsAST.ValueExprs))
 	for index, expr := range vsAST.ValueExprs {
@@ -2312,7 +2305,7 @@ func (p *Parser) processMultiAssign(assign *ast.Assign, vals []value) {
 		selector := &assign.SelectExprs[index]
 		selector.Ignore = xapi.IsIgnoreId(selector.Var.Id)
 		val := vals[index]
-		if !selector.NewVariable {
+		if !selector.Var.New {
 			if selector.Ignore {
 				continue
 			}
@@ -2339,10 +2332,7 @@ func (p *Parser) processMultiAssign(assign *ast.Assign, vals []value) {
 func (p *Parser) checkAssign(assign *ast.Assign) {
 	selectLength := len(assign.SelectExprs)
 	valueLength := len(assign.ValueExprs)
-	if assign.JustDeclare {
-		p.parseAssignSelections(assign)
-		return
-	} else if selectLength == 1 && !assign.SelectExprs[0].NewVariable {
+	if selectLength == 1 && !assign.SelectExprs[0].Var.New {
 		p.checkSingleAssign(assign)
 		return
 	} else if assign.Setter.Kind != "=" {

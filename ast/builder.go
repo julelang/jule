@@ -767,7 +767,6 @@ type assignInfo struct {
 	exprTokens     []lex.Token
 	setter         lex.Token
 	ok             bool
-	justDeclare    bool
 	isExpr         bool
 }
 
@@ -803,8 +802,6 @@ func (b *Builder) assignInfo(tokens []lex.Token) (info assignInfo) {
 			return
 		}
 	}
-	info.justDeclare = true
-	info.selectorTokens = tokens
 	return
 }
 
@@ -822,7 +819,7 @@ func (b *Builder) pushAssignSelector(selectors *[]AssignSelector, last, current 
 		if info.isExpr {
 			b.pusherr(selector.Expr.Tokens[0], "notallow_declares")
 		}
-		selector.NewVariable = true
+		selector.Var.New = true
 		selector.Var.IdToken = selector.Expr.Tokens[0]
 		selector.Var.Id = selector.Var.IdToken.Kind
 		selector.Var.SetterToken = info.setter
@@ -972,14 +969,11 @@ func (b *Builder) AssignExpr(tokens []lex.Token, isExpr bool) (assign Assign, ok
 	info.isExpr = isExpr
 	assign.IsExpr = isExpr
 	assign.Setter = info.setter
-	assign.JustDeclare = info.justDeclare
 	assign.SelectExprs = b.assignSelectors(info)
 	if isExpr && len(assign.SelectExprs) > 1 {
 		b.pusherr(assign.Setter, "notallow_multiple_assign")
 	}
-	if !info.justDeclare {
-		assign.ValueExprs = b.assignExprs(info)
-	}
+	assign.ValueExprs = b.assignExprs(info)
 	return
 }
 
