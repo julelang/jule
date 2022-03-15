@@ -63,6 +63,8 @@ func (b *Builder) buildNode(tokens []lex.Token) {
 		b.Type(tokens)
 	case lex.Comment:
 		b.Comment(tokens[0])
+	case lex.Preprocessor:
+		b.Preprocessor(tokens)
 	default:
 		b.pusherr(token, "invalid_syntax")
 		return
@@ -117,6 +119,7 @@ func (b *Builder) Type(tokens []lex.Token) {
 	b.Tree = append(b.Tree, Obj{token, typeAST})
 }
 
+// Comment builds AST model of comment.
 func (b *Builder) Comment(tok lex.Token) {
 	tok.Kind = strings.TrimSpace(tok.Kind[2:])
 	if strings.HasPrefix(tok.Kind, "cxx:") {
@@ -124,6 +127,66 @@ func (b *Builder) Comment(tok lex.Token) {
 	} else {
 		b.Tree = append(b.Tree, Obj{tok, Comment{tok.Kind}})
 	}
+}
+
+// Preprocessor builds AST model of preprocessor directives.
+func (b *Builder) Preprocessor(toks []lex.Token) {
+	if len(toks) == 1 {
+		b.pusherr(toks[0], "invalid_syntax")
+		return
+	}
+	var pp Preprocessor
+	toks = toks[1:] // Remove directive mark
+	tok := toks[0]
+	if tok.Id != lex.Id {
+		b.pusherr(pp.Token, "invalid_syntax")
+		return
+	}
+	ok := false
+	switch tok.Kind {
+	case "pragma":
+		ok = b.Pragma(&pp, toks)
+	default:
+		b.pusherr(tok, "invalid_preprocessor")
+		return
+	}
+	if ok {
+		b.Tree = append(b.Tree, Obj{pp.Token, pp})
+	}
+}
+
+// Pragma builds AST model of preprocessor pragma directive.
+// Returns true if success, returns false if not.
+func (b *Builder) Pragma(pp *Preprocessor, toks []lex.Token) bool {
+	if len(toks) == 1 {
+		b.pusherr(toks[0], "missing_pragma_directive")
+		return false
+	}
+	toks = toks[1:] // Remove pragma identifier
+	tok := toks[0]
+	if tok.Id != lex.Id {
+		b.pusherr(tok, "invalid_syntax")
+		return false
+	}
+	var d Directive
+	ok := false
+	switch tok.Kind {
+	case "enofi":
+		ok = b.pragmaEnofi(&d, toks)
+	default:
+		b.pusherr(tok, "invalid_pragma_directive")
+	}
+	pp.Command = d
+	return ok
+}
+
+func (b *Builder) pragmaEnofi(d *Directive, toks []lex.Token) bool {
+	if len(toks) > 1 {
+		b.pusherr(toks[1], "invalid_syntax")
+		return false
+	}
+	d.Command = EnofiDirective{}
+	return true
 }
 
 // Id builds AST model of global id statement.

@@ -15,6 +15,7 @@ import (
 	"github.com/the-xlang/x/pkg/xbits"
 	"github.com/the-xlang/x/pkg/xio"
 	"github.com/the-xlang/x/pkg/xlog"
+	"github.com/the-xlang/x/preprocessor"
 )
 
 type use struct {
@@ -352,6 +353,7 @@ func (p *Parser) parseSrcTreeObj(obj ast.Obj) {
 		p.Comment(t)
 	case ast.Use:
 		p.pusherrtok(obj.Token, "use_at_content")
+	case ast.Preprocessor:
 	default:
 		p.pusherrtok(obj.Token, "invalid_syntax")
 	}
@@ -414,6 +416,7 @@ func (p *Parser) useLocalPakcage(tree *[]ast.Obj) {
 		if subtree == nil {
 			continue
 		}
+		preprocessor.TrimEnofi(&subtree)
 		p.parseUses(&subtree)
 		*tree = append(*tree, subtree...)
 	}

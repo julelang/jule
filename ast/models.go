@@ -23,14 +23,10 @@ type Statement struct {
 	WithTerminator bool
 }
 
-func (s Statement) String() string {
-	return fmt.Sprint(s.Value)
-}
+func (s Statement) String() string { return fmt.Sprint(s.Value) }
 
 // BlockAST is code block.
-type BlockAST struct {
-	Tree []Statement
-}
+type BlockAST struct{ Tree []Statement }
 
 // Indent total of blocks.
 var Indent int32 = 0
@@ -232,9 +228,7 @@ type Arg struct {
 	Expr  Expr
 }
 
-func (a Arg) String() string {
-	return a.Expr.String()
-}
+func (a Arg) String() string { return a.Expr.String() }
 
 // Expr is AST model of expression.
 type Expr struct {
@@ -267,9 +261,7 @@ func (e Expr) String() string {
 }
 
 // ExprStatement is AST model of expression statement in block.
-type ExprStatement struct {
-	Expr Expr
-}
+type ExprStatement struct{ Expr Expr }
 
 func (be ExprStatement) String() string {
 	var cxx strings.Builder
@@ -285,9 +277,7 @@ type Value struct {
 	Type  DataType
 }
 
-func (v Value) String() string {
-	return v.Data
-}
+func (v Value) String() string { return v.Data }
 
 // Ret is return statement AST model.
 type Ret struct {
@@ -309,9 +299,7 @@ type Attribute struct {
 	Tag   lex.Token
 }
 
-func (a Attribute) String() string {
-	return a.Tag.Kind
-}
+func (a Attribute) String() string { return a.Tag.Kind }
 
 // Var is variable declaration AST model.
 type Var struct {
@@ -478,9 +466,7 @@ type IterProfile interface {
 }
 
 // WhileProfile is while iteration profile.
-type WhileProfile struct {
-	Expr Expr
-}
+type WhileProfile struct{ Expr Expr }
 
 func (wp WhileProfile) String(iter Iter) string {
 	var cxx strings.Builder
@@ -564,22 +550,14 @@ func (iter Iter) String() string {
 }
 
 // Break is the AST model of break statement.
-type Break struct {
-	Token lex.Token
-}
+type Break struct{ Token lex.Token }
 
-func (b Break) String() string {
-	return "break;"
-}
+func (b Break) String() string { return "break;" }
 
 // Continue is the AST model of break statement.
-type Continue struct {
-	Token lex.Token
-}
+type Continue struct{ Token lex.Token }
 
-func (c Continue) String() string {
-	return "continue;"
-}
+func (c Continue) String() string { return "continue;" }
 
 // If is the AST model of if expression.
 type If struct {
@@ -627,9 +605,7 @@ func (elseast Else) String() string {
 }
 
 // Comment is the AST model of just comment lines.
-type Comment struct {
-	Content string
-}
+type Comment struct{ Content string }
 
 func (c Comment) String() string {
 	var cxx strings.Builder
@@ -645,10 +621,24 @@ type Use struct {
 }
 
 // CxxEmbed is the AST model of cxx code embed.
-type CxxEmbed struct {
-	Content string
+type CxxEmbed struct{ Content string }
+
+func (ce CxxEmbed) String() string { return ce.Content }
+
+// Preprocessor is the AST model of preprocessor directives.
+type Preprocessor struct {
+	Token   lex.Token
+	Command interface{}
 }
 
-func (ce CxxEmbed) String() string {
-	return ce.Content
-}
+func (pp Preprocessor) String() string { return fmt.Sprint(pp.Command) }
+
+// Directive is the AST model of directives.
+type Directive struct{ Command interface{} }
+
+func (d Directive) String() string { return fmt.Sprint(d.Command) }
+
+// EnofiDirective is the AST model of enofi directive.
+type EnofiDirective struct{}
+
+func (EnofiDirective) String() string { return "" }

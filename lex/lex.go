@@ -372,6 +372,7 @@ func (l *Lex) Tok() Token {
 		}
 		l.rmrange(length-1, tok.Kind)
 	case
+		l.firstTokenOfLine && l.punct(content, "#", Preprocessor, &tok),
 		l.punct(content, ":", Colon, &tok),
 		l.punct(content, ";", SemiColon, &tok),
 		l.punct(content, ",", Comma, &tok),
