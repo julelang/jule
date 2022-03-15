@@ -383,7 +383,7 @@ static inline void _outln(_Obj_t _Obj) {
 // region X_ENTRY_POINT
 int main() {
 // region X_ENTRY_POINT_STANDARD_CODES
-  std::setlocale(LC_ALL, "");
+  std::locale::global(std::locale());
 // endregion X_ENTRY_POINT_STANDARD_CODES
   _main();
 

@@ -429,6 +429,9 @@ func (p *Parser) Parset(tree []ast.Obj, main, justDefs bool) {
 	if !p.isLocalPkg {
 		p.useLocalPakcage(&tree)
 	}
+	if !main {
+		preprocessor.TrimEnofi(&tree)
+	}
 	p.parseTree(tree)
 	p.checkParse()
 	p.wg.Wait()
