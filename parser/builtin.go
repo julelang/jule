@@ -50,3 +50,14 @@ var strDefs = &defmap{
 		},
 	},
 }
+
+var arrDefs = &defmap{
+	Globals: []ast.Var{
+		{
+			Id:    "len",
+			Const: true,
+			Type:  ast.DataType{Code: x.Size, Value: "size"},
+			Tag:   "_buffer.size()",
+		},
+	},
+}

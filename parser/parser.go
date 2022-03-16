@@ -1525,6 +1525,26 @@ func (p *Parser) evalStrSubId(val value, idTok lex.Token, m *exprModel) (v value
 	return v
 }
 
+func (p *Parser) evalArraySubId(val value, idTok lex.Token, m *exprModel) (v value) {
+	i, t := arrDefs.defById(idTok.Kind)
+	if i == -1 {
+		p.pusherrtok(idTok, "object_have_not_id")
+		return
+	}
+	v = val
+	m.appendSubNode(exprNode{"."})
+	switch t {
+	case 'g':
+		g := &arrDefs.Globals[i]
+		m.appendSubNode(exprNode{g.Tag.(string)})
+		v.ast.Type = g.Type
+		v.lvalue = true
+		v.constant = g.Const
+	default:
+	}
+	return v
+}
+
 func (p *Parser) evalIdExprPart(toks []lex.Token, m *exprModel) (v value) {
 	i := len(toks) - 1
 	tok := toks[i]
@@ -1541,14 +1561,12 @@ func (p *Parser) evalIdExprPart(toks []lex.Token, m *exprModel) (v value) {
 	valTok := toks[i]
 	toks = toks[:i]
 	val := p.evalExprPart(toks, m)
-	if !typeIsSingle(val.ast.Type) {
-		goto err
-	}
-	switch val.ast.Type.Code {
-	case x.Str:
+	switch {
+	case typeIsSingle(val.ast.Type) && val.ast.Type.Code == x.Str:
 		return p.evalStrSubId(val, idTok, m)
+	case typeIsArray(val.ast.Type):
+		return p.evalArraySubId(val, idTok, m)
 	}
-err:
 	p.pusherrtok(valTok, "object_not_support_sub_fields")
 	return
 }
