@@ -39,3 +39,14 @@ var builtinFuncs = []*function{
 		},
 	},
 }
+
+var strDefs = &defmap{
+	Globals: []ast.Var{
+		{
+			Id:    "len",
+			Const: true,
+			Type:  ast.DataType{Code: x.Size, Value: "size"},
+			Tag:   "length()",
+		},
+	},
+}

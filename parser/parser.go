@@ -827,7 +827,7 @@ func (p *Parser) evalProcesses(processes [][]lex.Token) (v value, e iExpr) {
 		}
 		m.index = i
 		process.operator = processes[m.index][0]
-		m.appendNodeToSubNodes(exprNode{process.operator.Kind})
+		m.appendSubNode(exprNode{process.operator.Kind})
 		if processes[i-1] == nil {
 			process.leftVal = v.ast
 			m.index = i + 1
@@ -959,9 +959,9 @@ func (p *valueEvaluator) str() value {
 	v.ast.Type.Code = x.Str
 	v.ast.Type.Value = "str"
 	if israwstr(p.token.Kind) {
-		p.model.appendNodeToSubNodes(exprNode{toRawStrLiteral(p.token.Kind)})
+		p.model.appendSubNode(exprNode{toRawStrLiteral(p.token.Kind)})
 	} else {
-		p.model.appendNodeToSubNodes(exprNode{xapi.ToStr(p.token.Kind)})
+		p.model.appendSubNode(exprNode{xapi.ToStr(p.token.Kind)})
 	}
 	return v
 }
@@ -971,7 +971,7 @@ func (p *valueEvaluator) rune() value {
 	v.ast.Data = p.token.Kind
 	v.ast.Type.Code = x.Rune
 	v.ast.Type.Value = "rune"
-	p.model.appendNodeToSubNodes(exprNode{xapi.ToRune(p.token.Kind)})
+	p.model.appendSubNode(exprNode{xapi.ToRune(p.token.Kind)})
 	return v
 }
 
@@ -980,7 +980,7 @@ func (p *valueEvaluator) bool() value {
 	v.ast.Data = p.token.Kind
 	v.ast.Type.Code = x.Bool
 	v.ast.Type.Value = "bool"
-	p.model.appendNodeToSubNodes(exprNode{p.token.Kind})
+	p.model.appendSubNode(exprNode{p.token.Kind})
 	return v
 }
 
@@ -988,14 +988,14 @@ func (p *valueEvaluator) nil() value {
 	var v value
 	v.ast.Data = p.token.Kind
 	v.ast.Type.Code = x.Nil
-	p.model.appendNodeToSubNodes(exprNode{p.token.Kind})
+	p.model.appendSubNode(exprNode{p.token.Kind})
 	return v
 }
 
 func (p *valueEvaluator) num() value {
 	var v value
 	v.ast.Data = p.token.Kind
-	p.model.appendNodeToSubNodes(exprNode{p.token.Kind})
+	p.model.appendSubNode(exprNode{p.token.Kind})
 	if strings.Contains(p.token.Kind, ".") ||
 		strings.ContainsAny(p.token.Kind, "eE") {
 		v.ast.Type.Code = x.F64
@@ -1020,7 +1020,7 @@ func (p *valueEvaluator) id() (v value, ok bool) {
 		v.volatile = variable.Volatile
 		v.ast.Token = variable.IdToken
 		v.lvalue = true
-		p.model.appendNodeToSubNodes(exprNode{xapi.AsId(p.token.Kind)})
+		p.model.appendSubNode(exprNode{xapi.AsId(p.token.Kind)})
 		ok = true
 	} else if fun := p.parser.FuncById(p.token.Kind); fun != nil {
 		v.ast.Data = p.token.Kind
@@ -1028,7 +1028,7 @@ func (p *valueEvaluator) id() (v value, ok bool) {
 		v.ast.Type.Tag = fun.Ast
 		v.ast.Type.Value = fun.Ast.DataTypeString()
 		v.ast.Token = fun.Ast.Token
-		p.model.appendNodeToSubNodes(exprNode{xapi.AsId(p.token.Kind)})
+		p.model.appendSubNode(exprNode{xapi.AsId(p.token.Kind)})
 		ok = true
 	} else {
 		p.parser.pusherrtok(p.token, "id_noexist")
@@ -1399,7 +1399,7 @@ func (p *Parser) evalOperatorExprPart(tokens []lex.Token, m *exprModel) value {
 	//? if all operators length is not 1.
 	exprTokens := tokens[1:]
 	processor := operatorProcessor{tokens[0], exprTokens, m, p}
-	m.appendNodeToSubNodes(exprNode{processor.token.Kind})
+	m.appendSubNode(exprNode{processor.token.Kind})
 	if processor.tokens == nil {
 		p.pusherrtok(processor.token, "invalid_syntax")
 		return v
@@ -1442,7 +1442,7 @@ func (p *Parser) evalHeapAllocExpr(tokens []lex.Token, m *exprModel) (v value) {
 	astb := new(ast.Builder)
 	index := new(int)
 	dt, ok := astb.DataType(tokens, index, true)
-	m.appendNodeToSubNodes(newHeapAllocExpr{dt})
+	m.appendSubNode(newHeapAllocExpr{dt})
 	dt.Value = "*" + dt.Value
 	v.ast.Type = dt
 	if !ok {
@@ -1486,6 +1486,8 @@ func (p *Parser) evalExprPart(tokens []lex.Token, m *exprModel) (v value) {
 	}
 	token = tokens[len(tokens)-1]
 	switch token.Id {
+	case lex.Id:
+		return p.evalIdExprPart(tokens, m)
 	case lex.Operator:
 		return p.evalOperatorExprPartRight(tokens, m)
 	case lex.Brace:
@@ -1500,6 +1502,54 @@ func (p *Parser) evalExprPart(tokens []lex.Token, m *exprModel) (v value) {
 	default:
 		p.pusherrtok(tokens[0], "invalid_syntax")
 	}
+	return
+}
+
+func (p *Parser) evalStrSubId(val value, idTok lex.Token, m *exprModel) (v value) {
+	i, t := strDefs.defById(idTok.Kind)
+	if i == -1 {
+		p.pusherrtok(idTok, "object_have_not_id")
+		return
+	}
+	v = val
+	m.appendSubNode(exprNode{"."})
+	switch t {
+	case 'g':
+		g := &strDefs.Globals[i]
+		m.appendSubNode(exprNode{g.Tag.(string)})
+		v.ast.Type = g.Type
+		v.lvalue = true
+		v.constant = g.Const
+	default:
+	}
+	return v
+}
+
+func (p *Parser) evalIdExprPart(toks []lex.Token, m *exprModel) (v value) {
+	i := len(toks) - 1
+	tok := toks[i]
+	if i <= 0 {
+		v, _ = p.evalSingleExpr(tok, m)
+		return
+	}
+	i--
+	if i == 0 || toks[i].Id != lex.Dot {
+		p.pusherrtok(toks[i], "invalid_syntax")
+		return
+	}
+	idTok := toks[i+1]
+	valTok := toks[i]
+	toks = toks[:i]
+	val := p.evalExprPart(toks, m)
+	if !typeIsSingle(val.ast.Type) {
+		goto err
+	}
+	switch val.ast.Type.Code {
+	case x.Str:
+		return p.evalStrSubId(val, idTok, m)
+	}
+err:
+	p.pusherrtok(valTok, "object_not_support_sub_fields")
 	return
 }
 
@@ -1538,7 +1588,7 @@ func (p *Parser) evalTryCastExpr(tokens []lex.Token, m *exprModel) (v value, _ b
 			return
 		}
 		exprTokens := tokens[index+1:]
-		m.appendNodeToSubNodes(exprNode{"(" + dt.String() + ")"})
+		m.appendSubNode(exprNode{"(" + dt.String() + ")"})
 		val := p.evalExprPart(exprTokens, m)
 		val = p.evalCast(val, dt, errToken)
 		return val, true
@@ -1559,7 +1609,7 @@ func (p *Parser) evalTryAssignExpr(tokens []lex.Token, m *exprModel) (v value, o
 		return
 	}
 	p.checkAssign(&assign)
-	m.appendNodeToSubNodes(assignExpr{assign})
+	m.appendSubNode(assignExpr{assign})
 	v, _ = p.evalExpr(assign.SelectExprs[0].Expr)
 	return
 }
@@ -1571,6 +1621,7 @@ func (p *Parser) evalCast(v value, t ast.DataType, errtok lex.Token) value {
 	case typeIsArray(t):
 		p.checkCastArray(t, v.ast.Type, errtok)
 	case typeIsSingle(t):
+		v.lvalue = false
 		p.checkCastSingle(v.ast.Type, t.Code, errtok)
 	default:
 		p.pusherrtok(errtok, "type_notsupports_casting")
@@ -1692,8 +1743,8 @@ func (p *Parser) evalParenthesesRangeExpr(tokens []lex.Token, m *exprModel) (v v
 	}
 	if len(valueTokens) == 0 && braceCount == 0 {
 		// Write parentheses.
-		m.appendNodeToSubNodes(exprNode{"("})
-		defer m.appendNodeToSubNodes(exprNode{")"})
+		m.appendSubNode(exprNode{"("})
+		defer m.appendSubNode(exprNode{")"})
 
 		tk := tokens[0]
 		tokens = tokens[1 : len(tokens)-1]
@@ -1702,14 +1753,14 @@ func (p *Parser) evalParenthesesRangeExpr(tokens []lex.Token, m *exprModel) (v v
 		}
 		value, model := p.evalTokens(tokens)
 		v = value
-		m.appendNodeToSubNodes(model)
+		m.appendSubNode(model)
 		return
 	}
 	v = p.evalExprPart(valueTokens, m)
 
 	// Write parentheses.
-	m.appendNodeToSubNodes(exprNode{"("})
-	defer m.appendNodeToSubNodes(exprNode{")"})
+	m.appendSubNode(exprNode{"("})
+	defer m.appendSubNode(exprNode{")"})
 
 	switch v.ast.Type.Code {
 	case x.Func:
@@ -1763,7 +1814,7 @@ func (p *Parser) evalBraceRangeExpr(tokens []lex.Token, m *exprModel) (v value) 
 			var model iExpr
 			v, model = p.buildArray(p.buildEnumerableParts(exprTokens),
 				dt, exprTokens[0])
-			m.appendNodeToSubNodes(model)
+			m.appendSubNode(model)
 			return
 		case "(":
 			astBuilder := ast.NewBuilder(tokens)
@@ -1776,7 +1827,7 @@ func (p *Parser) evalBraceRangeExpr(tokens []lex.Token, m *exprModel) (v value) 
 			v.ast.Type.Tag = funAST
 			v.ast.Type.Code = x.Func
 			v.ast.Type.Value = funAST.DataTypeString()
-			m.appendNodeToSubNodes(anonFunc{funAST})
+			m.appendSubNode(anonFunc{funAST})
 			return
 		default:
 			p.pusherrtok(exprTokens[0], "invalid_syntax")
@@ -1815,12 +1866,12 @@ func (p *Parser) evalBracketRangeExpr(tokens []lex.Token, m *exprModel) (v value
 	}
 	var model iExpr
 	v, model = p.evalTokens(exprTokens)
-	m.appendNodeToSubNodes(model)
+	m.appendSubNode(model)
 	tokens = tokens[len(exprTokens)+1 : len(tokens)-1] // Removed array syntax "["..."]"
-	m.appendNodeToSubNodes(exprNode{"["})
+	m.appendSubNode(exprNode{"["})
 	selectv, model := p.evalTokens(tokens)
-	m.appendNodeToSubNodes(model)
-	m.appendNodeToSubNodes(exprNode{"]"})
+	m.appendSubNode(model)
+	m.appendSubNode(exprNode{"]"})
 	return p.evalEnumerableSelect(v, selectv, tokens[0])
 }
 
@@ -1933,7 +1984,7 @@ func (p *Parser) parseFuncCall(f ast.Func, tokens []lex.Token, m *exprModel) {
 	}
 	p.parseArgs(f.Params, &args, errToken, m)
 	if m != nil {
-		m.appendNodeToSubNodes(argsExpr{args})
+		m.appendSubNode(argsExpr{args})
 	}
 }
 

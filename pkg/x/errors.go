@@ -111,4 +111,6 @@ var Errors = map[string]string{
 	`use_not_found`:                    `used directory path not found/access`,
 	`use_has_errors`:                   `used package has errors`,
 	`def_not_support_pub`:              `define is not supports pub modifier`,
+	`object_not_support_sub_fields`:    `object is not supports sub fields`,
+	`object_have_not_id`:               `object is not have sub field in this identifier`,
 }

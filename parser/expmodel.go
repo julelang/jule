@@ -31,7 +31,7 @@ func newExprModel(processes [][]lex.Token) *exprModel {
 	return m
 }
 
-func (m *exprModel) appendNodeToSubNodes(node iExpr) {
+func (m *exprModel) appendSubNode(node iExpr) {
 	nodes := &m.nodes[m.index].nodes
 	*nodes = append(*nodes, node)
 }
