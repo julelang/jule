@@ -17,10 +17,10 @@ type Lex struct {
 	wg               sync.WaitGroup
 	firstTokenOfLine bool
 
-	File     *xio.File
-	Position int
-	Column   int
-	Row      int
+	File   *xio.File
+	Pos    int
+	Column int
+	Row    int
 	// Logs are only errors
 	Logs []xlog.CompilerLog
 
@@ -31,7 +31,7 @@ type Lex struct {
 func NewLex(f *xio.File) *Lex {
 	l := new(Lex)
 	l.File = f
-	l.Position = 0
+	l.Pos = 0
 	l.Row = -1 // For true row
 	l.Newln()
 	return l
@@ -59,31 +59,31 @@ func (l *Lex) pusherrtok(tok Token, err string) {
 
 // Lex all source content.
 func (l *Lex) Lex() []Token {
-	var tokens []Token
+	var toks []Token
 	l.Logs = nil
 	l.Newln()
-	for l.Position < len(l.File.Content) {
-		token := l.Tok()
-		if token.Id != NA {
-			tokens = append(tokens, token)
+	for l.Pos < len(l.File.Content) {
+		tok := l.Tok()
+		if tok.Id != NA {
+			toks = append(toks, tok)
 		}
 	}
 	l.wg.Add(1)
 	go l.checkRangesAsync()
 	l.wg.Wait()
-	return tokens
+	return toks
 }
 
 func (l *Lex) checkRangesAsync() {
 	defer func() { l.wg.Done() }()
-	for _, token := range l.braces {
-		switch token.Kind {
+	for _, tok := range l.braces {
+		switch tok.Kind {
 		case "(":
-			l.pusherrtok(token, "wait_close_parentheses")
+			l.pusherrtok(tok, "wait_close_parentheses")
 		case "{":
-			l.pusherrtok(token, "wait_close_brace")
+			l.pusherrtok(tok, "wait_close_brace")
 		case "[":
-			l.pusherrtok(token, "wait_close_bracket")
+			l.pusherrtok(tok, "wait_close_bracket")
 		}
 	}
 }
@@ -116,7 +116,7 @@ func (l *Lex) id(ln string) string {
 			break
 		}
 		sb.WriteRune(run)
-		l.Position++
+		l.Pos++
 	}
 	return sb.String()
 }
@@ -124,11 +124,11 @@ func (l *Lex) id(ln string) string {
 // resume to lex from position.
 func (l *Lex) resume() string {
 	var ln string
-	runes := l.File.Content[l.Position:]
+	runes := l.File.Content[l.Pos:]
 	// Skip spaces.
 	for i, r := range runes {
 		if unicode.IsSpace(r) {
-			l.Position++
+			l.Pos++
 			if r == '\n' {
 				l.Newln()
 			} else {
@@ -142,36 +142,36 @@ func (l *Lex) resume() string {
 	return ln
 }
 
-func (l *Lex) lncomment(token *Token) {
-	start := l.Position
-	l.Position += 2
-	for ; l.Position < len(l.File.Content); l.Position++ {
-		if l.File.Content[l.Position] == '\n' {
+func (l *Lex) lncomment(tok *Token) {
+	start := l.Pos
+	l.Pos += 2
+	for ; l.Pos < len(l.File.Content); l.Pos++ {
+		if l.File.Content[l.Pos] == '\n' {
 			if l.firstTokenOfLine {
-				token.Id = Comment
-				token.Kind = string(l.File.Content[start:l.Position])
+				tok.Id = Comment
+				tok.Kind = string(l.File.Content[start:l.Pos])
 			}
 			return
 		}
 	}
 	if l.firstTokenOfLine {
-		token.Id = Comment
-		token.Kind = string(l.File.Content[start:])
+		tok.Id = Comment
+		tok.Kind = string(l.File.Content[start:])
 	}
 }
 
 func (l *Lex) rangecomment() {
-	l.Position += 2
-	for ; l.Position < len(l.File.Content); l.Position++ {
-		run := l.File.Content[l.Position]
+	l.Pos += 2
+	for ; l.Pos < len(l.File.Content); l.Pos++ {
+		run := l.File.Content[l.Pos]
 		if run == '\n' {
 			l.Newln()
 			continue
 		}
 		l.Column += len(string(run))
-		if strings.HasPrefix(string(l.File.Content[l.Position:]), "*/") {
+		if strings.HasPrefix(string(l.File.Content[l.Pos:]), "*/") {
 			l.Column += 2
-			l.Position += 2
+			l.Pos += 2
 			return
 		}
 	}
@@ -184,7 +184,7 @@ var numRegexp = *regexp.MustCompile(`^((0x[[:xdigit:]]+)|(\d+((\.\d+)?((e|E)(\-|
 // returns empty string if not.
 func (l *Lex) num(content string) string {
 	value := numRegexp.FindString(content)
-	l.Position += len(value)
+	l.Pos += len(value)
 	return value
 }
 
@@ -193,10 +193,10 @@ var escSeqRegexp = regexp.MustCompile(`^\\([\\'"abfnrtv]|U.{8}|u.{4}|x..|[0-7]{1
 func (l *Lex) escseq(content string) string {
 	seq := escSeqRegexp.FindString(content)
 	if seq != "" {
-		l.Position += len([]rune(seq))
+		l.Pos += len([]rune(seq))
 		return seq
 	}
-	l.Position++
+	l.Pos++
 	l.pusherr("invalid_escape_sequence")
 	return seq
 }
@@ -206,7 +206,7 @@ func (l *Lex) getrune(content string, raw bool) string {
 		return l.escseq(content)
 	}
 	run, _ := utf8.DecodeRuneInString(content)
-	l.Position++
+	l.Pos++
 	return string(run)
 }
 
@@ -219,7 +219,7 @@ func (l *Lex) rune(content string) string {
 	for index := 0; index < len(content); index++ {
 		if content[index] == '\n' {
 			l.pusherr("missing_rune_end")
-			l.Position++
+			l.Pos++
 			l.Newln()
 			return ""
 		}
@@ -228,7 +228,7 @@ func (l *Lex) rune(content string) string {
 		length := len(run)
 		l.Column += length
 		if run == "'" {
-			l.Position++
+			l.Pos++
 			break
 		}
 		if length > 1 {
@@ -257,7 +257,7 @@ func (l *Lex) str(content string) string {
 			defer l.Newln()
 			if !raw {
 				l.pusherr("missing_string_end")
-				l.Position++
+				l.Pos++
 				return ""
 			}
 		}
@@ -266,7 +266,7 @@ func (l *Lex) str(content string) string {
 		length := len(run)
 		l.Column += length
 		if ch == mark {
-			l.Position++
+			l.Pos++
 			break
 		}
 		if length > 1 {
@@ -283,23 +283,23 @@ func (l *Lex) Newln() {
 	l.Column = 1
 }
 
-func (l *Lex) punct(content, kind string, id uint8, token *Token) bool {
+func (l *Lex) punct(content, kind string, id uint8, tok *Token) bool {
 	if !strings.HasPrefix(content, kind) {
 		return false
 	}
-	token.Kind = kind
-	token.Id = id
-	l.Position += len([]rune(kind))
+	tok.Kind = kind
+	tok.Id = id
+	l.Pos += len([]rune(kind))
 	return true
 }
 
-func (l *Lex) kw(content, kind string, id uint8, token *Token) bool {
+func (l *Lex) kw(content, kind string, id uint8, tok *Token) bool {
 	if !iskw(content, kind) {
 		return false
 	}
-	token.Kind = kind
-	token.Id = id
-	l.Position += len([]rune(kind))
+	tok.Kind = kind
+	tok.Id = id
+	l.Pos += len([]rune(kind))
 	return true
 }
 
@@ -459,7 +459,7 @@ func (l *Lex) Tok() Token {
 		}
 		l.pusherr("invalid_token")
 		l.Column++
-		l.Position++
+		l.Pos++
 		return tok
 	}
 	l.Column += len(tok.Kind)
@@ -478,8 +478,8 @@ func (l *Lex) rmrange(index int, kind string) {
 		close = "["
 	}
 	for ; index >= 0; index-- {
-		token := l.braces[index]
-		if token.Kind != close {
+		tok := l.braces[index]
+		if tok.Kind != close {
 			continue
 		}
 		l.braces = append(l.braces[:index], l.braces[index+1:]...)
@@ -487,7 +487,7 @@ func (l *Lex) rmrange(index int, kind string) {
 	}
 }
 
-func (l *Lex) pushWrongOrderCloseErrAsync(token Token) {
+func (l *Lex) pushWrongOrderCloseErrAsync(tok Token) {
 	defer func() { l.wg.Done() }()
 	var message string
 	switch l.braces[len(l.braces)-1].Kind {
@@ -498,5 +498,5 @@ func (l *Lex) pushWrongOrderCloseErrAsync(token Token) {
 	case "[":
 		message = "expected_bracket_close"
 	}
-	l.pusherrtok(token, message)
+	l.pusherrtok(tok, message)
 }

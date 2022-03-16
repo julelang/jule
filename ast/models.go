@@ -248,12 +248,12 @@ func (e Expr) String() string {
 	}
 	var expr strings.Builder
 	for _, process := range e.Processes {
-		for _, token := range process {
-			switch token.Id {
+		for _, tok := range process {
+			switch tok.Id {
 			case lex.Id:
-				expr.WriteString(xapi.AsId(token.Kind))
+				expr.WriteString(xapi.AsId(tok.Kind))
 			default:
-				expr.WriteString(token.Kind)
+				expr.WriteString(tok.Kind)
 			}
 		}
 	}
@@ -354,11 +354,10 @@ func (vs AssignSelector) String() string {
 
 // Assign is assignment AST model.
 type Assign struct {
-	Setter      lex.Token
-	SelectExprs []AssignSelector
-	ValueExprs  []Expr
-	IsExpr      bool
-
+	Setter         lex.Token
+	SelectExprs    []AssignSelector
+	ValueExprs     []Expr
+	IsExpr         bool
 	MultipleReturn bool
 }
 

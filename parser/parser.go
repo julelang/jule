@@ -114,9 +114,6 @@ func (p *Parser) pushwarn(key string) {
 	})
 }
 
-// String returns full C++ code of parsed objects.
-func (p Parser) String() string { return p.Cxx() }
-
 // CxxEmbeds return C++ code of cxx embeds.
 func (p *Parser) CxxEmbeds() string {
 	var cxx strings.Builder
@@ -193,8 +190,8 @@ func (p *Parser) Cxx() string {
 	return cxx.String()
 }
 
-func getTree(tokens []lex.Token, errs *[]xlog.CompilerLog) []ast.Obj {
-	b := ast.NewBuilder(tokens)
+func getTree(toks []lex.Token, errs *[]xlog.CompilerLog) []ast.Obj {
+	b := ast.NewBuilder(toks)
 	b.Build()
 	if len(b.Errors) > 0 {
 		if errs != nil {
@@ -407,12 +404,12 @@ func (p *Parser) useLocalPakcage(tree *[]ast.Obj) {
 			continue
 		}
 		lexer := lex.NewLex(f)
-		tokens := lexer.Lex()
+		toks := lexer.Lex()
 		if lexer.Logs != nil {
 			p.pusherrs(lexer.Logs...)
 			continue
 		}
-		subtree := getTree(tokens, &p.Errors)
+		subtree := getTree(toks, &p.Errors)
 		if subtree == nil {
 			continue
 		}
@@ -438,8 +435,8 @@ func (p *Parser) Parset(tree []ast.Obj, main, justDefs bool) {
 }
 
 // Parses X code from tokens.
-func (p *Parser) Parse(tokens []lex.Token, main, justDefs bool) {
-	tree := getTree(tokens, &p.Errors)
+func (p *Parser) Parse(toks []lex.Token, main, justDefs bool) {
+	tree := getTree(toks, &p.Errors)
 	if tree == nil {
 		return
 	}
@@ -449,12 +446,12 @@ func (p *Parser) Parse(tokens []lex.Token, main, justDefs bool) {
 // Parses X code from file.
 func (p *Parser) Parsef(main, justDefs bool) {
 	lexer := lex.NewLex(p.File)
-	tokens := lexer.Lex()
+	toks := lexer.Lex()
 	if lexer.Logs != nil {
 		p.pusherrs(lexer.Logs...)
 		return
 	}
-	p.Parse(tokens, main, justDefs)
+	p.Parse(toks, main, justDefs)
 }
 
 func (p *Parser) checkDoc(obj ast.Obj) {
@@ -604,12 +601,9 @@ func (p *Parser) Var(vast ast.Var) ast.Var {
 				var valueToken lex.Token
 				valueToken.Id = lex.Value
 				valueToken.Kind = p.defaultValueOfType(dt)
-				valueTokens := []lex.Token{valueToken}
-				processes := [][]lex.Token{valueTokens}
-				vast.Value = ast.Expr{
-					Tokens:    valueTokens,
-					Processes: processes,
-				}
+				valueToks := []lex.Token{valueToken}
+				processes := [][]lex.Token{valueToks}
+				vast.Value = ast.Expr{Tokens: valueToks, Processes: processes}
 				_, vast.Value.Model = p.evalExpr(vast.Value)
 			}
 		}
@@ -930,8 +924,8 @@ func (p *Parser) nextOperator(processes [][]lex.Token) int {
 	}
 }
 
-func (p *Parser) evalTokens(tokens []lex.Token) (value, iExpr) {
-	return p.evalExpr(new(ast.Builder).Expr(tokens))
+func (p *Parser) evalToks(toks []lex.Token) (value, iExpr) {
+	return p.evalExpr(new(ast.Builder).Expr(toks))
 }
 
 func (p *Parser) evalExpr(ex ast.Expr) (value, iExpr) {
@@ -948,62 +942,62 @@ func toRawStrLiteral(literal string) string {
 }
 
 type valueEvaluator struct {
-	token  lex.Token
+	tok    lex.Token
 	model  *exprModel
 	parser *Parser
 }
 
 func (p *valueEvaluator) str() value {
 	var v value
-	v.ast.Data = p.token.Kind
+	v.ast.Data = p.tok.Kind
 	v.ast.Type.Code = x.Str
 	v.ast.Type.Value = "str"
-	if israwstr(p.token.Kind) {
-		p.model.appendSubNode(exprNode{toRawStrLiteral(p.token.Kind)})
+	if israwstr(p.tok.Kind) {
+		p.model.appendSubNode(exprNode{toRawStrLiteral(p.tok.Kind)})
 	} else {
-		p.model.appendSubNode(exprNode{xapi.ToStr(p.token.Kind)})
+		p.model.appendSubNode(exprNode{xapi.ToStr(p.tok.Kind)})
 	}
 	return v
 }
 
 func (p *valueEvaluator) rune() value {
 	var v value
-	v.ast.Data = p.token.Kind
+	v.ast.Data = p.tok.Kind
 	v.ast.Type.Code = x.Rune
 	v.ast.Type.Value = "rune"
-	p.model.appendSubNode(exprNode{xapi.ToRune(p.token.Kind)})
+	p.model.appendSubNode(exprNode{xapi.ToRune(p.tok.Kind)})
 	return v
 }
 
 func (p *valueEvaluator) bool() value {
 	var v value
-	v.ast.Data = p.token.Kind
+	v.ast.Data = p.tok.Kind
 	v.ast.Type.Code = x.Bool
 	v.ast.Type.Value = "bool"
-	p.model.appendSubNode(exprNode{p.token.Kind})
+	p.model.appendSubNode(exprNode{p.tok.Kind})
 	return v
 }
 
 func (p *valueEvaluator) nil() value {
 	var v value
-	v.ast.Data = p.token.Kind
+	v.ast.Data = p.tok.Kind
 	v.ast.Type.Code = x.Nil
-	p.model.appendSubNode(exprNode{p.token.Kind})
+	p.model.appendSubNode(exprNode{p.tok.Kind})
 	return v
 }
 
 func (p *valueEvaluator) num() value {
 	var v value
-	v.ast.Data = p.token.Kind
-	p.model.appendSubNode(exprNode{p.token.Kind})
-	if strings.Contains(p.token.Kind, ".") ||
-		strings.ContainsAny(p.token.Kind, "eE") {
+	v.ast.Data = p.tok.Kind
+	p.model.appendSubNode(exprNode{p.tok.Kind})
+	if strings.Contains(p.tok.Kind, ".") ||
+		strings.ContainsAny(p.tok.Kind, "eE") {
 		v.ast.Type.Code = x.F64
 		v.ast.Type.Value = "f64"
 	} else {
 		v.ast.Type.Code = x.I32
 		v.ast.Type.Value = "i32"
-		ok := xbits.CheckBitInt(p.token.Kind, 32)
+		ok := xbits.CheckBitInt(p.tok.Kind, 32)
 		if !ok {
 			v.ast.Type.Code = x.I64
 			v.ast.Type.Value = "i64"
@@ -1013,25 +1007,25 @@ func (p *valueEvaluator) num() value {
 }
 
 func (p *valueEvaluator) id() (v value, ok bool) {
-	if variable := p.parser.varById(p.token.Kind); variable != nil {
-		v.ast.Data = p.token.Kind
+	if variable := p.parser.varById(p.tok.Kind); variable != nil {
+		v.ast.Data = p.tok.Kind
 		v.ast.Type = variable.Type
 		v.constant = variable.Const
 		v.volatile = variable.Volatile
 		v.ast.Token = variable.IdToken
 		v.lvalue = true
-		p.model.appendSubNode(exprNode{xapi.AsId(p.token.Kind)})
+		p.model.appendSubNode(exprNode{xapi.AsId(p.tok.Kind)})
 		ok = true
-	} else if fun := p.parser.FuncById(p.token.Kind); fun != nil {
-		v.ast.Data = p.token.Kind
+	} else if fun := p.parser.FuncById(p.tok.Kind); fun != nil {
+		v.ast.Data = p.tok.Kind
 		v.ast.Type.Code = x.Func
 		v.ast.Type.Tag = fun.Ast
 		v.ast.Type.Value = fun.Ast.DataTypeString()
 		v.ast.Token = fun.Ast.Token
-		p.model.appendSubNode(exprNode{xapi.AsId(p.token.Kind)})
+		p.model.appendSubNode(exprNode{xapi.AsId(p.tok.Kind)})
 		ok = true
 	} else {
-		p.parser.pusherrtok(p.token, "id_noexist")
+		p.parser.pusherrtok(p.tok, "id_noexist")
 	}
 	return
 }
@@ -1294,21 +1288,21 @@ func (s solver) Solve() (v ast.Value) {
 	return
 }
 
-func (p *Parser) evalSingleExpr(token lex.Token, m *exprModel) (v value, ok bool) {
-	eval := valueEvaluator{token, m, p}
+func (p *Parser) evalSingleExpr(tok lex.Token, m *exprModel) (v value, ok bool) {
+	eval := valueEvaluator{tok, m, p}
 	v.ast.Type.Code = x.Void
-	v.ast.Token = token
-	switch token.Id {
+	v.ast.Token = tok
+	switch tok.Id {
 	case lex.Value:
 		ok = true
 		switch {
-		case isstr(token.Kind):
+		case isstr(tok.Kind):
 			v = eval.str()
-		case isrune(token.Kind):
+		case isrune(tok.Kind):
 			v = eval.rune()
-		case isbool(token.Kind):
+		case isbool(tok.Kind):
 			v = eval.bool()
-		case isnil(token.Kind):
+		case isnil(tok.Kind):
 			v = eval.nil()
 		default:
 			v = eval.num()
@@ -1316,24 +1310,24 @@ func (p *Parser) evalSingleExpr(token lex.Token, m *exprModel) (v value, ok bool
 	case lex.Id:
 		v, ok = eval.id()
 	default:
-		p.pusherrtok(token, "invalid_syntax")
+		p.pusherrtok(tok, "invalid_syntax")
 	}
 	return
 }
 
 type operatorProcessor struct {
-	token  lex.Token
-	tokens []lex.Token
+	tok    lex.Token
+	toks   []lex.Token
 	model  *exprModel
 	parser *Parser
 }
 
 func (p *operatorProcessor) unary() value {
-	v := p.parser.evalExprPart(p.tokens, p.model)
+	v := p.parser.evalExprPart(p.toks, p.model)
 	if !typeIsSingle(v.ast.Type) {
-		p.parser.pusherrtok(p.token, "invalid_data_unary")
+		p.parser.pusherrtok(p.tok, "invalid_data_unary")
 	} else if !x.IsNumericType(v.ast.Type.Code) {
-		p.parser.pusherrtok(p.token, "invalid_data_unary")
+		p.parser.pusherrtok(p.tok, "invalid_data_unary")
 	}
 	if isConstNum(v.ast.Data) {
 		v.ast.Data = "-" + v.ast.Data
@@ -1342,29 +1336,29 @@ func (p *operatorProcessor) unary() value {
 }
 
 func (p *operatorProcessor) plus() value {
-	v := p.parser.evalExprPart(p.tokens, p.model)
+	v := p.parser.evalExprPart(p.toks, p.model)
 	if !typeIsSingle(v.ast.Type) {
-		p.parser.pusherrtok(p.token, "invalid_data_plus")
+		p.parser.pusherrtok(p.tok, "invalid_data_plus")
 	} else if !x.IsNumericType(v.ast.Type.Code) {
-		p.parser.pusherrtok(p.token, "invalid_data_plus")
+		p.parser.pusherrtok(p.tok, "invalid_data_plus")
 	}
 	return v
 }
 
 func (p *operatorProcessor) tilde() value {
-	v := p.parser.evalExprPart(p.tokens, p.model)
+	v := p.parser.evalExprPart(p.toks, p.model)
 	if !typeIsSingle(v.ast.Type) {
-		p.parser.pusherrtok(p.token, "invalid_data_tilde")
+		p.parser.pusherrtok(p.tok, "invalid_data_tilde")
 	} else if !x.IsIntegerType(v.ast.Type.Code) {
-		p.parser.pusherrtok(p.token, "invalid_data_tilde")
+		p.parser.pusherrtok(p.tok, "invalid_data_tilde")
 	}
 	return v
 }
 
 func (p *operatorProcessor) logicalNot() value {
-	v := p.parser.evalExprPart(p.tokens, p.model)
+	v := p.parser.evalExprPart(p.toks, p.model)
 	if !isBoolExpr(v) {
-		p.parser.pusherrtok(p.token, "invalid_data_logical_not")
+		p.parser.pusherrtok(p.tok, "invalid_data_logical_not")
 	}
 	v.ast.Type.Value = "bool"
 	v.ast.Type.Code = x.Bool
@@ -1372,10 +1366,10 @@ func (p *operatorProcessor) logicalNot() value {
 }
 
 func (p *operatorProcessor) star() value {
-	v := p.parser.evalExprPart(p.tokens, p.model)
+	v := p.parser.evalExprPart(p.toks, p.model)
 	v.lvalue = true
 	if !typeIsPtr(v.ast.Type) {
-		p.parser.pusherrtok(p.token, "invalid_data_star")
+		p.parser.pusherrtok(p.tok, "invalid_data_star")
 	} else {
 		v.ast.Type.Value = v.ast.Type.Value[1:]
 	}
@@ -1383,28 +1377,28 @@ func (p *operatorProcessor) star() value {
 }
 
 func (p *operatorProcessor) amper() value {
-	v := p.parser.evalExprPart(p.tokens, p.model)
+	v := p.parser.evalExprPart(p.toks, p.model)
 	v.lvalue = true
 	if !canGetPointer(v) {
-		p.parser.pusherrtok(p.token, "invalid_data_amper")
+		p.parser.pusherrtok(p.tok, "invalid_data_amper")
 	}
 	v.ast.Type.Value = "*" + v.ast.Type.Value
 	return v
 }
 
-func (p *Parser) evalOperatorExprPart(tokens []lex.Token, m *exprModel) value {
+func (p *Parser) evalOperatorExprPart(toks []lex.Token, m *exprModel) value {
 	var v value
 	//? Length is 1 cause all length of operator tokens is 1.
 	//? Change "1" with length of token's value
 	//? if all operators length is not 1.
-	exprTokens := tokens[1:]
-	processor := operatorProcessor{tokens[0], exprTokens, m, p}
-	m.appendSubNode(exprNode{processor.token.Kind})
-	if processor.tokens == nil {
-		p.pusherrtok(processor.token, "invalid_syntax")
+	exprToks := toks[1:]
+	processor := operatorProcessor{toks[0], exprToks, m, p}
+	m.appendSubNode(exprNode{processor.tok.Kind})
+	if processor.toks == nil {
+		p.pusherrtok(processor.tok, "invalid_syntax")
 		return v
 	}
-	switch processor.token.Kind {
+	switch processor.tok.Kind {
 	case "-":
 		v = processor.unary()
 	case "+":
@@ -1418,9 +1412,9 @@ func (p *Parser) evalOperatorExprPart(tokens []lex.Token, m *exprModel) value {
 	case "&":
 		v = processor.amper()
 	default:
-		p.pusherrtok(processor.token, "invalid_syntax")
+		p.pusherrtok(processor.tok, "invalid_syntax")
 	}
-	v.ast.Token = processor.token
+	v.ast.Token = processor.tok
 	return v
 }
 
@@ -1431,76 +1425,76 @@ func canGetPointer(v value) bool {
 	return v.ast.Token.Id == lex.Id
 }
 
-func (p *Parser) evalHeapAllocExpr(tokens []lex.Token, m *exprModel) (v value) {
-	if len(tokens) == 1 {
-		p.pusherrtok(tokens[0], "invalid_syntax_keyword_new")
+func (p *Parser) evalHeapAllocExpr(toks []lex.Token, m *exprModel) (v value) {
+	if len(toks) == 1 {
+		p.pusherrtok(toks[0], "invalid_syntax_keyword_new")
 		return
 	}
 	v.lvalue = true
-	v.ast.Token = tokens[0]
-	tokens = tokens[1:]
-	astb := new(ast.Builder)
-	index := new(int)
-	dt, ok := astb.DataType(tokens, index, true)
+	v.ast.Token = toks[0]
+	toks = toks[1:]
+	b := new(ast.Builder)
+	i := new(int)
+	dt, ok := b.DataType(toks, i, true)
 	m.appendSubNode(newHeapAllocExpr{dt})
 	dt.Value = "*" + dt.Value
 	v.ast.Type = dt
 	if !ok {
-		p.pusherrtok(tokens[0], "fail_build_heap_allocation_type")
+		p.pusherrtok(toks[0], "fail_build_heap_allocation_type")
 		return
 	}
-	if *index < len(tokens)-1 {
-		p.pusherrtok(tokens[*index+1], "invalid_syntax")
+	if *i < len(toks)-1 {
+		p.pusherrtok(toks[*i+1], "invalid_syntax")
 	}
 	return
 }
 
-func (p *Parser) evalExprPart(tokens []lex.Token, m *exprModel) (v value) {
-	if len(tokens) == 1 {
-		val, ok := p.evalSingleExpr(tokens[0], m)
+func (p *Parser) evalExprPart(toks []lex.Token, m *exprModel) (v value) {
+	if len(toks) == 1 {
+		val, ok := p.evalSingleExpr(toks[0], m)
 		if ok {
 			v = val
 			return
 		}
 	}
-	token := tokens[0]
-	switch token.Id {
+	tok := toks[0]
+	switch tok.Id {
 	case lex.Operator:
-		return p.evalOperatorExprPart(tokens, m)
+		return p.evalOperatorExprPart(toks, m)
 	case lex.New:
-		return p.evalHeapAllocExpr(tokens, m)
+		return p.evalHeapAllocExpr(toks, m)
 	case lex.Brace:
-		switch token.Kind {
+		switch tok.Kind {
 		case "(":
-			val, ok := p.evalTryCastExpr(tokens, m)
+			val, ok := p.evalTryCastExpr(toks, m)
 			if ok {
 				v = val
 				return
 			}
-			val, ok = p.evalTryAssignExpr(tokens, m)
+			val, ok = p.evalTryAssignExpr(toks, m)
 			if ok {
 				v = val
 				return
 			}
 		}
 	}
-	token = tokens[len(tokens)-1]
-	switch token.Id {
+	tok = toks[len(toks)-1]
+	switch tok.Id {
 	case lex.Id:
-		return p.evalIdExprPart(tokens, m)
+		return p.evalIdExprPart(toks, m)
 	case lex.Operator:
-		return p.evalOperatorExprPartRight(tokens, m)
+		return p.evalOperatorExprPartRight(toks, m)
 	case lex.Brace:
-		switch token.Kind {
+		switch tok.Kind {
 		case ")":
-			return p.evalParenthesesRangeExpr(tokens, m)
+			return p.evalParenthesesRangeExpr(toks, m)
 		case "}":
-			return p.evalBraceRangeExpr(tokens, m)
+			return p.evalBraceRangeExpr(toks, m)
 		case "]":
-			return p.evalBracketRangeExpr(tokens, m)
+			return p.evalBracketRangeExpr(toks, m)
 		}
 	default:
-		p.pusherrtok(tokens[0], "invalid_syntax")
+		p.pusherrtok(toks[0], "invalid_syntax")
 	}
 	return
 }
@@ -1571,12 +1565,12 @@ func (p *Parser) evalIdExprPart(toks []lex.Token, m *exprModel) (v value) {
 	return
 }
 
-func (p *Parser) evalTryCastExpr(tokens []lex.Token, m *exprModel) (v value, _ bool) {
+func (p *Parser) evalTryCastExpr(toks []lex.Token, m *exprModel) (v value, _ bool) {
 	braceCount := 0
-	errToken := tokens[0]
-	for index, token := range tokens {
-		if token.Id == lex.Brace {
-			switch token.Kind {
+	errTok := toks[0]
+	for i, tok := range toks {
+		if tok.Id == lex.Brace {
+			switch tok.Kind {
 			case "(", "[", "{":
 				braceCount++
 				continue
@@ -1589,8 +1583,8 @@ func (p *Parser) evalTryCastExpr(tokens []lex.Token, m *exprModel) (v value, _ b
 		}
 		astb := ast.NewBuilder(nil)
 		dtindex := 0
-		typeTokens := tokens[1:index]
-		dt, ok := astb.DataType(typeTokens, &dtindex, false)
+		typeToks := toks[1:i]
+		dt, ok := astb.DataType(typeToks, &dtindex, false)
 		if !ok {
 			return
 		}
@@ -1598,32 +1592,32 @@ func (p *Parser) evalTryCastExpr(tokens []lex.Token, m *exprModel) (v value, _ b
 		if !ok {
 			return
 		}
-		if dtindex+1 < len(typeTokens) {
+		if dtindex+1 < len(typeToks) {
 			return
 		}
-		if index+1 >= len(tokens) {
-			p.pusherrtok(token, "casting_missing_expr")
+		if i+1 >= len(toks) {
+			p.pusherrtok(tok, "casting_missing_expr")
 			return
 		}
-		exprTokens := tokens[index+1:]
+		exprToks := toks[i+1:]
 		m.appendSubNode(exprNode{"(" + dt.String() + ")"})
-		val := p.evalExprPart(exprTokens, m)
-		val = p.evalCast(val, dt, errToken)
+		val := p.evalExprPart(exprToks, m)
+		val = p.evalCast(val, dt, errTok)
 		return val, true
 	}
 	return
 }
 
-func (p *Parser) evalTryAssignExpr(tokens []lex.Token, m *exprModel) (v value, ok bool) {
-	astb := ast.NewBuilder(nil)
-	tokens = tokens[1 : len(tokens)-1] // Remove first-last parentheses
-	assign, ok := astb.AssignExpr(tokens, true)
+func (p *Parser) evalTryAssignExpr(toks []lex.Token, m *exprModel) (v value, ok bool) {
+	b := ast.NewBuilder(nil)
+	toks = toks[1 : len(toks)-1] // Remove first-last parentheses
+	assign, ok := b.AssignExpr(toks, true)
 	if !ok {
 		return
 	}
 	ok = true
-	if len(astb.Errors) > 0 {
-		p.pusherrs(astb.Errors...)
+	if len(b.Errors) > 0 {
+		p.pusherrs(b.Errors...)
 		return
 	}
 	p.checkAssign(&assign)
@@ -1715,20 +1709,20 @@ func (p *Parser) checkCastArray(t, vt ast.DataType, errtok lex.Token) {
 	}
 }
 
-func (p *Parser) evalOperatorExprPartRight(tokens []lex.Token, m *exprModel) (v value) {
-	token := tokens[len(tokens)-1]
-	switch token.Kind {
+func (p *Parser) evalOperatorExprPartRight(toks []lex.Token, m *exprModel) (v value) {
+	tok := toks[len(toks)-1]
+	switch tok.Kind {
 	case "...":
-		tokens = tokens[:len(tokens)-1]
-		return p.evalVariadicExprPart(tokens, m, token)
+		toks = toks[:len(toks)-1]
+		return p.evalVariadicExprPart(toks, m, tok)
 	default:
-		p.pusherrtok(token, "invalid_syntax")
+		p.pusherrtok(tok, "invalid_syntax")
 	}
 	return
 }
 
-func (p *Parser) evalVariadicExprPart(tokens []lex.Token, m *exprModel, errtok lex.Token) (v value) {
-	v = p.evalExprPart(tokens, m)
+func (p *Parser) evalVariadicExprPart(toks []lex.Token, m *exprModel, errtok lex.Token) (v value) {
+	v = p.evalExprPart(toks, m)
 	if !typeIsVariadicable(v.ast.Type) {
 		p.pusherrtok(errtok, "variadic_with_nonvariadicable")
 		return
@@ -1738,16 +1732,15 @@ func (p *Parser) evalVariadicExprPart(tokens []lex.Token, m *exprModel, errtok l
 	return
 }
 
-func (p *Parser) evalParenthesesRangeExpr(tokens []lex.Token, m *exprModel) (v value) {
-	var valueTokens []lex.Token
-	j := len(tokens) - 1
+func (p *Parser) evalParenthesesRangeExpr(toks []lex.Token, m *exprModel) (v value) {
+	var valueToks []lex.Token
 	braceCount := 0
-	for ; j >= 0; j-- {
-		token := tokens[j]
-		if token.Id != lex.Brace {
+	for i := len(toks) - 1; i >= 0; i-- {
+		tok := toks[i]
+		if tok.Id != lex.Brace {
 			continue
 		}
-		switch token.Kind {
+		switch tok.Kind {
 		case ")", "}", "]":
 			braceCount++
 		case "(", "{", "[":
@@ -1756,25 +1749,25 @@ func (p *Parser) evalParenthesesRangeExpr(tokens []lex.Token, m *exprModel) (v v
 		if braceCount > 0 {
 			continue
 		}
-		valueTokens = tokens[:j]
+		valueToks = toks[:i]
 		break
 	}
-	if len(valueTokens) == 0 && braceCount == 0 {
+	if len(valueToks) == 0 && braceCount == 0 {
 		// Write parentheses.
 		m.appendSubNode(exprNode{"("})
 		defer m.appendSubNode(exprNode{")"})
 
-		tk := tokens[0]
-		tokens = tokens[1 : len(tokens)-1]
-		if len(tokens) == 0 {
+		tk := toks[0]
+		toks = toks[1 : len(toks)-1]
+		if len(toks) == 0 {
 			p.pusherrtok(tk, "invalid_syntax")
 		}
-		value, model := p.evalTokens(tokens)
-		v = value
+		val, model := p.evalToks(toks)
+		v = val
 		m.appendSubNode(model)
 		return
 	}
-	v = p.evalExprPart(valueTokens, m)
+	v = p.evalExprPart(valueToks, m)
 
 	// Write parentheses.
 	m.appendSubNode(exprNode{"("})
@@ -1783,25 +1776,24 @@ func (p *Parser) evalParenthesesRangeExpr(tokens []lex.Token, m *exprModel) (v v
 	switch v.ast.Type.Code {
 	case x.Func:
 		fun := v.ast.Type.Tag.(ast.Func)
-		p.parseFuncCall(fun, tokens[len(valueTokens):], m)
+		p.parseFuncCall(fun, toks[len(valueToks):], m)
 		v.ast.Type = fun.RetType
 		v.lvalue = typeIsLvalue(v.ast.Type)
 	default:
-		p.pusherrtok(tokens[len(valueTokens)], "invalid_syntax")
+		p.pusherrtok(toks[len(valueToks)], "invalid_syntax")
 	}
 	return
 }
 
-func (p *Parser) evalBraceRangeExpr(tokens []lex.Token, m *exprModel) (v value) {
-	var exprTokens []lex.Token
-	j := len(tokens) - 1
+func (p *Parser) evalBraceRangeExpr(toks []lex.Token, m *exprModel) (v value) {
+	var exprToks []lex.Token
 	braceCount := 0
-	for ; j >= 0; j-- {
-		token := tokens[j]
-		if token.Id != lex.Brace {
+	for i := len(toks) - 1; i >= 0; i-- {
+		tok := toks[i]
+		if tok.Id != lex.Brace {
 			continue
 		}
-		switch token.Kind {
+		switch tok.Kind {
 		case "}", "]", ")":
 			braceCount++
 		case "{", "(", "[":
@@ -1810,62 +1802,61 @@ func (p *Parser) evalBraceRangeExpr(tokens []lex.Token, m *exprModel) (v value) 
 		if braceCount > 0 {
 			continue
 		}
-		exprTokens = tokens[:j]
+		exprToks = toks[:i]
 		break
 	}
-	valTokensLen := len(exprTokens)
-	if valTokensLen == 0 || braceCount > 0 {
-		p.pusherrtok(tokens[0], "invalid_syntax")
+	valToksLen := len(exprToks)
+	if valToksLen == 0 || braceCount > 0 {
+		p.pusherrtok(toks[0], "invalid_syntax")
 		return
 	}
-	switch exprTokens[0].Id {
+	switch exprToks[0].Id {
 	case lex.Brace:
-		switch exprTokens[0].Kind {
+		switch exprToks[0].Kind {
 		case "[":
 			ast := ast.NewBuilder(nil)
-			dt, ok := ast.DataType(exprTokens, new(int), true)
+			dt, ok := ast.DataType(exprToks, new(int), true)
 			if !ok {
 				p.pusherrs(ast.Errors...)
 				return
 			}
-			exprTokens = tokens[len(exprTokens):]
+			exprToks = toks[len(exprToks):]
 			var model iExpr
-			v, model = p.buildArray(p.buildEnumerableParts(exprTokens),
-				dt, exprTokens[0])
+			v, model = p.buildArray(p.buildEnumerableParts(exprToks),
+				dt, exprToks[0])
 			m.appendSubNode(model)
 			return
 		case "(":
-			astBuilder := ast.NewBuilder(tokens)
-			funAST := astBuilder.Func(astBuilder.Tokens, true)
-			if len(astBuilder.Errors) > 0 {
-				p.pusherrs(astBuilder.Errors...)
+			b := ast.NewBuilder(toks)
+			f := b.Func(b.Tokens, true)
+			if len(b.Errors) > 0 {
+				p.pusherrs(b.Errors...)
 				return
 			}
-			p.checkAnonFunc(&funAST)
-			v.ast.Type.Tag = funAST
+			p.checkAnonFunc(&f)
+			v.ast.Type.Tag = f
 			v.ast.Type.Code = x.Func
-			v.ast.Type.Value = funAST.DataTypeString()
-			m.appendSubNode(anonFunc{funAST})
+			v.ast.Type.Value = f.DataTypeString()
+			m.appendSubNode(anonFunc{f})
 			return
 		default:
-			p.pusherrtok(exprTokens[0], "invalid_syntax")
+			p.pusherrtok(exprToks[0], "invalid_syntax")
 		}
 	default:
-		p.pusherrtok(exprTokens[0], "invalid_syntax")
+		p.pusherrtok(exprToks[0], "invalid_syntax")
 	}
 	return
 }
 
-func (p *Parser) evalBracketRangeExpr(tokens []lex.Token, m *exprModel) (v value) {
-	var exprTokens []lex.Token
-	j := len(tokens) - 1
+func (p *Parser) evalBracketRangeExpr(toks []lex.Token, m *exprModel) (v value) {
+	var exprToks []lex.Token
 	braceCount := 0
-	for ; j >= 0; j-- {
-		token := tokens[j]
-		if token.Id != lex.Brace {
+	for i := len(toks) - 1; i >= 0; i-- {
+		tok := toks[i]
+		if tok.Id != lex.Brace {
 			continue
 		}
-		switch token.Kind {
+		switch tok.Kind {
 		case "}", "]", ")":
 			braceCount++
 		case "{", "(", "[":
@@ -1874,23 +1865,23 @@ func (p *Parser) evalBracketRangeExpr(tokens []lex.Token, m *exprModel) (v value
 		if braceCount > 0 {
 			continue
 		}
-		exprTokens = tokens[:j]
+		exprToks = toks[:i]
 		break
 	}
-	valTokensLen := len(exprTokens)
-	if valTokensLen == 0 || braceCount > 0 {
-		p.pusherrtok(tokens[0], "invalid_syntax")
+	valToksLen := len(exprToks)
+	if valToksLen == 0 || braceCount > 0 {
+		p.pusherrtok(toks[0], "invalid_syntax")
 		return
 	}
 	var model iExpr
-	v, model = p.evalTokens(exprTokens)
+	v, model = p.evalToks(exprToks)
 	m.appendSubNode(model)
-	tokens = tokens[len(exprTokens)+1 : len(tokens)-1] // Removed array syntax "["..."]"
+	toks = toks[len(exprToks)+1 : len(toks)-1] // Removed array syntax "["..."]"
 	m.appendSubNode(exprNode{"["})
-	selectv, model := p.evalTokens(tokens)
+	selectv, model := p.evalToks(toks)
 	m.appendSubNode(model)
 	m.appendSubNode(exprNode{"]"})
-	return p.evalEnumerableSelect(v, selectv, tokens[0])
+	return p.evalEnumerableSelect(v, selectv, toks[0])
 }
 
 func (p *Parser) evalEnumerableSelect(enumv, selectv value, errtok lex.Token) (v value) {
@@ -1925,14 +1916,14 @@ func (p *Parser) evalStrSelect(strv, selectv value, errtok lex.Token) value {
 }
 
 //! IMPORTANT: Tokens is should be store enumerable parentheses.
-func (p *Parser) buildEnumerableParts(tokens []lex.Token) [][]lex.Token {
-	tokens = tokens[1 : len(tokens)-1]
+func (p *Parser) buildEnumerableParts(toks []lex.Token) [][]lex.Token {
+	toks = toks[1 : len(toks)-1]
 	braceCount := 0
 	lastComma := -1
 	var parts [][]lex.Token
-	for index, token := range tokens {
-		if token.Id == lex.Brace {
-			switch token.Kind {
+	for i, tok := range toks {
+		if tok.Id == lex.Brace {
+			switch tok.Kind {
 			case "{", "[", "(":
 				braceCount++
 			default:
@@ -1942,18 +1933,18 @@ func (p *Parser) buildEnumerableParts(tokens []lex.Token) [][]lex.Token {
 		if braceCount > 0 {
 			continue
 		}
-		if token.Id == lex.Comma {
-			if index-lastComma-1 == 0 {
-				p.pusherrtok(token, "missing_expression")
-				lastComma = index
+		if tok.Id == lex.Comma {
+			if i-lastComma-1 == 0 {
+				p.pusherrtok(tok, "missing_expression")
+				lastComma = i
 				continue
 			}
-			parts = append(parts, tokens[lastComma+1:index])
-			lastComma = index
+			parts = append(parts, toks[lastComma+1:i])
+			lastComma = i
 		}
 	}
-	if lastComma+1 < len(tokens) {
-		parts = append(parts, tokens[lastComma+1:])
+	if lastComma+1 < len(toks) {
+		parts = append(parts, toks[lastComma+1:])
 	}
 	return parts
 }
@@ -1962,16 +1953,16 @@ func (p *Parser) buildArray(parts [][]lex.Token, t ast.DataType, errtok lex.Toke
 	var v value
 	v.ast.Type = t
 	model := arrayExpr{dataType: t}
-	elementType := typeOfArrayElements(t)
+	elemType := typeOfArrayElements(t)
 	for _, part := range parts {
-		partValue, expModel := p.evalTokens(part)
+		partVal, expModel := p.evalToks(part)
 		model.expr = append(model.expr, expModel)
 		p.wg.Add(1)
 		go assignChecker{
 			p,
 			false,
-			elementType,
-			partValue,
+			elemType,
+			partVal,
 			false,
 			part[0],
 		}.checkAssignTypeAsync()
@@ -1989,18 +1980,18 @@ func (p *Parser) checkAnonFunc(f *ast.Func) {
 	p.BlockVars = blockVariables
 }
 
-func (p *Parser) parseFuncCall(f ast.Func, tokens []lex.Token, m *exprModel) {
-	errToken := tokens[0]
-	tokens, _ = p.getRange("(", ")", tokens)
-	if tokens == nil {
-		tokens = make([]lex.Token, 0)
+func (p *Parser) parseFuncCall(f ast.Func, toks []lex.Token, m *exprModel) {
+	errTok := toks[0]
+	toks, _ = p.getRange("(", ")", toks)
+	if toks == nil {
+		toks = make([]lex.Token, 0)
 	}
-	ast := new(ast.Builder)
-	args := ast.Args(tokens)
-	if len(ast.Errors) > 0 {
-		p.pusherrs(ast.Errors...)
+	b := new(ast.Builder)
+	args := b.Args(toks)
+	if len(b.Errors) > 0 {
+		p.pusherrs(b.Errors...)
 	}
-	p.parseArgs(f.Params, &args, errToken, m)
+	p.parseArgs(f.Params, &args, errTok, m)
 	if m != nil {
 		m.appendSubNode(argsExpr{args})
 	}
@@ -2080,25 +2071,25 @@ func (p *Parser) checkArgTypeAsync(param ast.Parameter, val value, ignoreAny boo
 //
 // Special case is:
 //  getRange(open, close, tokens) = nil, false if first token is not brace.
-func (p *Parser) getRange(open, close string, tokens []lex.Token) (_ []lex.Token, ok bool) {
+func (p *Parser) getRange(open, close string, toks []lex.Token) (_ []lex.Token, ok bool) {
 	braceCount := 0
 	start := 1
-	if tokens[0].Id != lex.Brace {
+	if toks[0].Id != lex.Brace {
 		return nil, false
 	}
-	for index, token := range tokens {
-		if token.Id != lex.Brace {
+	for i, tok := range toks {
+		if tok.Id != lex.Brace {
 			continue
 		}
-		if token.Kind == open {
+		if tok.Kind == open {
 			braceCount++
-		} else if token.Kind == close {
+		} else if tok.Kind == close {
 			braceCount--
 		}
 		if braceCount > 0 {
 			continue
 		}
-		return tokens[start:index], true
+		return toks[start:i], true
 	}
 	return nil, false
 }
@@ -2163,29 +2154,29 @@ func (rc *retChecker) pushval(last, current int, errTk lex.Token) {
 		rc.p.pusherrtok(errTk, "missing_value")
 		return
 	}
-	tokens := rc.retAST.Expr.Tokens[last:current]
-	value, model := rc.p.evalTokens(tokens)
+	toks := rc.retAST.Expr.Tokens[last:current]
+	val, model := rc.p.evalToks(toks)
 	rc.expModel.models = append(rc.expModel.models, model)
-	rc.values = append(rc.values, value)
+	rc.values = append(rc.values, val)
 }
 
 func (rc *retChecker) checkepxrs() {
 	braceCount := 0
 	last := 0
-	for index, token := range rc.retAST.Expr.Tokens {
-		if token.Id == lex.Brace {
-			switch token.Kind {
+	for i, tok := range rc.retAST.Expr.Tokens {
+		if tok.Id == lex.Brace {
+			switch tok.Kind {
 			case "(", "{", "[":
 				braceCount++
 			default:
 				braceCount--
 			}
 		}
-		if braceCount > 0 || token.Id != lex.Comma {
+		if braceCount > 0 || tok.Id != lex.Comma {
 			continue
 		}
-		rc.pushval(last, index, token)
-		last = index + 1
+		rc.pushval(last, i, tok)
+		last = i + 1
 	}
 	length := len(rc.retAST.Expr.Tokens)
 	if last < length {
@@ -2243,12 +2234,12 @@ func (rc *retChecker) checkExprTypes() {
 }
 
 func (rc *retChecker) check() {
-	exprTokensLen := len(rc.retAST.Expr.Tokens)
-	if exprTokensLen == 0 && !typeIsVoidRet(rc.fun.RetType) {
+	exprToksLen := len(rc.retAST.Expr.Tokens)
+	if exprToksLen == 0 && !typeIsVoidRet(rc.fun.RetType) {
 		rc.p.pusherrtok(rc.retAST.Token, "require_return_value")
 		return
 	}
-	if exprTokensLen > 0 && typeIsVoidRet(rc.fun.RetType) {
+	if exprToksLen > 0 && typeIsVoidRet(rc.fun.RetType) {
 		rc.p.pusherrtok(rc.retAST.Token, "void_function_return_value")
 	}
 	rc.checkepxrs()
