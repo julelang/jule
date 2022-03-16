@@ -203,9 +203,9 @@ func (b *Builder) Id(toks []lex.Token) {
 	case lex.Brace:
 		switch tok.Kind {
 		case "(":
-			funAST := b.Func(toks, false)
-			statement := Statement{funAST.Token, funAST, false}
-			b.Tree = append(b.Tree, Obj{funAST.Token, statement})
+			f := b.Func(toks, false)
+			s := Statement{f.Token, f, false}
+			b.Tree = append(b.Tree, Obj{f.Token, s})
 			return
 		}
 	}
@@ -984,9 +984,19 @@ func (b *Builder) IdStatement(toks []lex.Token) (s Statement) {
 	switch toks[1].Id {
 	case lex.Colon:
 		return b.VarStatement(toks)
+	case lex.Brace:
+		switch toks[1].Kind {
+		case "(":
+			return b.FuncCallStatement(toks)
+		}
 	}
 	b.pusherr(toks[0], "invalid_syntax")
 	return
+}
+
+// FuncCallStatement builds AST model of function call statement.
+func (b *Builder) FuncCallStatement(tokens []lex.Token) Statement {
+	return b.ExprStatement(tokens)
 }
 
 // ExprStatement builds AST model of expression.
