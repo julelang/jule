@@ -14,6 +14,7 @@
 ## Table of Contents
 <div class="toc">
   <ul>
+    <li><a href="#what_is_xxc">What is XXC?</li>
     <li><a href="#overview">Overview</a></li>
     <li><a href="#why_x">Why X?</a></li>
     <li><a href="#os_support">OS Support</a></li>
@@ -21,6 +22,10 @@
     <li><a href="#license">License</a></li>
   </ul>
 </div>
+
+<h2 id="what_is_xxc">What is XXC?</h2>
+XXC is the name of the reference compiler for the X programming language. <br>
+It is the original compiler of the X programming language.
 
 <h2 id="overview">Overview</h2>
 
