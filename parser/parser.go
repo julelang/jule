@@ -8,14 +8,14 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/the-xlang/x/ast"
-	"github.com/the-xlang/x/lex"
-	"github.com/the-xlang/x/pkg/x"
-	"github.com/the-xlang/x/pkg/xapi"
-	"github.com/the-xlang/x/pkg/xbits"
-	"github.com/the-xlang/x/pkg/xio"
-	"github.com/the-xlang/x/pkg/xlog"
-	"github.com/the-xlang/x/preprocessor"
+	"github.com/the-xlang/xxc/ast"
+	"github.com/the-xlang/xxc/lex"
+	"github.com/the-xlang/xxc/pkg/x"
+	"github.com/the-xlang/xxc/pkg/xapi"
+	"github.com/the-xlang/xxc/pkg/xbits"
+	"github.com/the-xlang/xxc/pkg/xio"
+	"github.com/the-xlang/xxc/pkg/xlog"
+	"github.com/the-xlang/xxc/preprocessor"
 )
 
 type use struct {

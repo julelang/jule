@@ -3,9 +3,9 @@ package documenter
 import (
 	"encoding/json"
 
-	"github.com/the-xlang/x/ast"
-	"github.com/the-xlang/x/parser"
-	"github.com/the-xlang/x/pkg/x"
+	"github.com/the-xlang/xxc/ast"
+	"github.com/the-xlang/xxc/parser"
+	"github.com/the-xlang/xxc/pkg/x"
 )
 
 type use struct {

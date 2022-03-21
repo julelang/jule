@@ -1,8 +1,8 @@
 package parser
 
 import (
-	"github.com/the-xlang/x/ast"
-	"github.com/the-xlang/x/pkg/x"
+	"github.com/the-xlang/xxc/ast"
+	"github.com/the-xlang/xxc/pkg/x"
 )
 
 func typeIsVoidRet(t ast.DataType) bool {

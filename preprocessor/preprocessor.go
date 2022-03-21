@@ -1,6 +1,6 @@
 package preprocessor
 
-import "github.com/the-xlang/x/ast"
+import "github.com/the-xlang/xxc/ast"
 
 // TrimEnofi trims tree by enofi pragma directive.
 func TrimEnofi(tree *[]ast.Obj) {

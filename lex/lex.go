@@ -7,9 +7,9 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/the-xlang/x/pkg/x"
-	"github.com/the-xlang/x/pkg/xio"
-	"github.com/the-xlang/x/pkg/xlog"
+	"github.com/the-xlang/xxc/pkg/x"
+	"github.com/the-xlang/xxc/pkg/xio"
+	"github.com/the-xlang/xxc/pkg/xlog"
 )
 
 // Lex is lexer of Fract.

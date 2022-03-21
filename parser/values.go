@@ -1,9 +1,9 @@
 package parser
 
 import (
-	"github.com/the-xlang/x/ast"
-	"github.com/the-xlang/x/pkg/x"
-	"github.com/the-xlang/x/pkg/xbits"
+	"github.com/the-xlang/xxc/ast"
+	"github.com/the-xlang/xxc/pkg/x"
+	"github.com/the-xlang/xxc/pkg/xbits"
 )
 
 func isstr(value string) bool    { return value[0] == '"' || israwstr(value) }

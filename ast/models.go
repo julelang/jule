@@ -5,9 +5,9 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/the-xlang/x/lex"
-	"github.com/the-xlang/x/pkg/x"
-	"github.com/the-xlang/x/pkg/xapi"
+	"github.com/the-xlang/xxc/lex"
+	"github.com/the-xlang/xxc/pkg/x"
+	"github.com/the-xlang/xxc/pkg/xapi"
 )
 
 // Obj is an element of AST.

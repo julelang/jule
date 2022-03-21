@@ -1,6 +1,6 @@
 package lex
 
-import "github.com/the-xlang/x/pkg/xio"
+import "github.com/the-xlang/xxc/pkg/xio"
 
 // Tok is lexer token.
 type Tok struct {

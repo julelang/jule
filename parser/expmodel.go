@@ -3,9 +3,9 @@ package parser
 import (
 	"strings"
 
-	"github.com/the-xlang/x/ast"
-	"github.com/the-xlang/x/lex"
-	"github.com/the-xlang/x/pkg/xapi"
+	"github.com/the-xlang/xxc/ast"
+	"github.com/the-xlang/xxc/lex"
+	"github.com/the-xlang/xxc/pkg/xapi"
 )
 
 type iExpr interface {

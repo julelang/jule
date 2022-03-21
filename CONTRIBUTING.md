@@ -9,7 +9,7 @@
 + Commit messages should be understandable and expressive.
 
 ## Get Fork
-[Fork X](https://github.com/the-xlang/xxc/fork)
+[Fork XXC](https://github.com/the-xlang/xxc/fork)
 
 Once you have your fork, you can work directly. But to make things easier, you can open a branch in your own name.
 After making the changes in the fork you want to work with, you can throw a pull request.
@@ -29,6 +29,6 @@ There are some points to be considered for an understandable PR;
 + Changes should be noted in the PR statement, reviewers should understand the purpose of PR.
 + If there are, possible errors and conflicts that may occur in the case of combining the PR should be mentioned.
 
-# 
+#
 
 Thanks.

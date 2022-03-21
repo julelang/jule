@@ -4,8 +4,8 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/the-xlang/x/ast"
-	"github.com/the-xlang/x/pkg/xapi"
+	"github.com/the-xlang/xxc/ast"
+	"github.com/the-xlang/xxc/pkg/xapi"
 )
 
 type function struct {

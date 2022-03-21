@@ -1,6 +1,6 @@
 package x
 
-import "github.com/the-xlang/x/pkg/xset"
+import "github.com/the-xlang/xxc/pkg/xset"
 
 // X constants.
 const (

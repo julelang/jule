@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/the-xlang/x/pkg/x"
+	"github.com/the-xlang/xxc/pkg/x"
 )
 
 // Openfx returns X source file.

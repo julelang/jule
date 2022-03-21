@@ -5,11 +5,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/the-xlang/x/lex"
-	"github.com/the-xlang/x/pkg/x"
-	"github.com/the-xlang/x/pkg/xapi"
-	"github.com/the-xlang/x/pkg/xbits"
-	"github.com/the-xlang/x/pkg/xlog"
+	"github.com/the-xlang/xxc/lex"
+	"github.com/the-xlang/xxc/pkg/x"
+	"github.com/the-xlang/xxc/pkg/xapi"
+	"github.com/the-xlang/xxc/pkg/xbits"
+	"github.com/the-xlang/xxc/pkg/xlog"
 )
 
 // Builder is builds AST tree.

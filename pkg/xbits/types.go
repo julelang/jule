@@ -3,7 +3,7 @@ package xbits
 import (
 	"strconv"
 
-	"github.com/the-xlang/x/pkg/x"
+	"github.com/the-xlang/xxc/pkg/x"
 )
 
 // BitsizeType returns bit-size of

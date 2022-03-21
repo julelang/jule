@@ -6,10 +6,10 @@
 
 if exist .\xxc.exe ( del /f xxc.exe )
 
-if exist cmd\x\main.go (
-  go build -o xxc.exe -v cmd\x\main.go
+if exist cmd\xxc\main.go (
+  go build -o xxc.exe -v cmd\xxc\main.go
 ) else (
-  go build -o xxc.exe -v ..\cmd\x\main.go
+  go build -o xxc.exe -v ..\cmd\xxc\main.go
 )
 
 if exist .\xxc.exe (
