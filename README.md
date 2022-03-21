@@ -83,20 +83,20 @@ Thanks for you want contributing to X!
 <br><br>
 The X project use issues for only bug reports and proposals. <br>
 To contribute, please read the contribution guidelines from <a href="https://the-xlang.github.io/website/pages/contributing.html">here</a>. <br>
-To discussions and questions, please use <a href="https://github.com/the-xlang/x/discussions">discussions</a>.
+To discussions and questions, please use <a href="https://github.com/the-xlang/xxc/discussions">discussions</a>.
 <br><br>
 All contributions to X, no matter how small or large, are welcome. <br>
 From a simple typo correction to a contribution to the code, all contributions are welcome and appreciated. <br>
 Before you start contributing, you should familiarize yourself with the following repository structure; <br>
 
-+ [``ast/``](https://github.com/the-xlang/x/blob/main/ast) abstract syntax tree builder
-+ [``cmd/``](https://github.com/the-xlang/x/blob/main/cmd) main and compile files
-+ [``doc``](https://github.com/the-xlang/x/blob/main/docs) documentations
-+ [``documenter``](https://github.com/the-xlang/x/blob/main/documenter) documenter
-+ [``lex/``](https://github.com/the-xlang/x/blob/main/lex) lexer
-+ [``lib/``](https://github.com/the-xlang/x/blob/main/lib) standard library
-+ [``parser/``](https://github.com/the-xlang/x/blob/main/parser) x-cxx parser
-+ [``pkg/``](https://github.com/the-xlang/x/blob/main/pkg) utility packages
++ [``ast/``](https://github.com/the-xlang/xxc/blob/main/ast) abstract syntax tree builder
++ [``cmd/``](https://github.com/the-xlang/xxc/blob/main/cmd) main and compile files
++ [``doc``](https://github.com/the-xlang/xxc/blob/main/docs) documentations
++ [``documenter``](https://github.com/the-xlang/xxc/blob/main/documenter) documenter
++ [``lex/``](https://github.com/the-xlang/xxc/blob/main/lex) lexer
++ [``lib/``](https://github.com/the-xlang/xxc/blob/main/lib) standard library
++ [``parser/``](https://github.com/the-xlang/xxc/blob/main/parser) x-cxx parser
++ [``pkg/``](https://github.com/the-xlang/xxc/blob/main/pkg) utility packages
 
 <h2 id="license">License</h2>
 
