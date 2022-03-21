@@ -6,44 +6,44 @@ import (
 )
 
 func typeIsVoidRet(t ast.DataType) bool {
-	return t.Code == x.Void && !t.MultiTyped
+	return t.Id == x.Void && !t.MultiTyped
 }
 
 func typeOfArrayElements(t ast.DataType) ast.DataType {
 	// Remove array syntax "[]"
-	t.Value = t.Value[2:]
+	t.Val = t.Val[2:]
 	return t
 }
 
 func typeIsPtr(t ast.DataType) bool {
-	if t.Value == "" {
+	if t.Val == "" {
 		return false
 	}
-	return t.Value[0] == '*'
+	return t.Val[0] == '*'
 }
 
 func typeIsArray(t ast.DataType) bool {
-	if t.Value == "" {
+	if t.Val == "" {
 		return false
 	}
-	return t.Value[0] == '['
+	return t.Val[0] == '['
 }
 
 func typeIsSingle(dt ast.DataType) bool {
 	return !typeIsPtr(dt) &&
 		!typeIsArray(dt) &&
-		dt.Code != x.Func
+		dt.Id != x.Func
 }
 
 func typeIsNilCompatible(t ast.DataType) bool {
-	return t.Code == x.Func || typeIsPtr(t)
+	return t.Id == x.Func || typeIsPtr(t)
 }
 
 func checkArrayCompatiblity(arrT, t ast.DataType) bool {
-	if t.Code == x.Nil {
+	if t.Id == x.Nil {
 		return true
 	}
-	return arrT.Value == t.Value
+	return arrT.Val == t.Val
 }
 
 func typeIsLvalue(t ast.DataType) bool {
@@ -58,9 +58,9 @@ func typesAreCompatible(t1, t2 ast.DataType, ignoreany bool) bool {
 		}
 		return checkArrayCompatiblity(t1, t2)
 	case typeIsNilCompatible(t1) || typeIsNilCompatible(t2):
-		return t1.Code == x.Nil || t2.Code == x.Nil
+		return t1.Id == x.Nil || t2.Id == x.Nil
 	}
-	return x.TypesAreCompatible(t1.Code, t2.Code, ignoreany)
+	return x.TypesAreCompatible(t1.Id, t2.Id, ignoreany)
 }
 
 func typeIsVariadicable(t ast.DataType) bool {

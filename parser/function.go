@@ -9,9 +9,9 @@ import (
 )
 
 type function struct {
-	Ast         ast.Func
-	Attributes  []ast.Attribute
-	Description string
+	Ast        ast.Func
+	Attributes []ast.Attribute
+	Desc       string
 }
 
 func (f function) String() string {
@@ -62,8 +62,8 @@ func (f function) PrototypeParams() string {
 
 func attributesToString(attributes []ast.Attribute) string {
 	var cxx strings.Builder
-	for _, attribute := range attributes {
-		cxx.WriteString(attribute.String())
+	for _, attr := range attributes {
+		cxx.WriteString(attr.String())
 		cxx.WriteByte(' ')
 	}
 	return cxx.String()

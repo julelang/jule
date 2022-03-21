@@ -22,7 +22,7 @@ type exprModel struct {
 	nodes []exprBuildNode
 }
 
-func newExprModel(processes [][]lex.Token) *exprModel {
+func newExprModel(processes [][]lex.Tok) *exprModel {
 	m := new(exprModel)
 	m.index = 0
 	for i := range processes {

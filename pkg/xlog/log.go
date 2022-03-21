@@ -2,17 +2,17 @@ package xlog
 
 // Log types.
 const (
-	FlatError   uint8 = 0
-	FlatWarning uint8 = 1
-	Error       uint8 = 2
-	Warning     uint8 = 3
+	FlatErr  uint8 = 0
+	FlatWarn uint8 = 1
+	Err      uint8 = 2
+	Warn     uint8 = 3
 )
 
 // CompilerLog is a compiler log.
 type CompilerLog struct {
-	Type    uint8
-	Row     int
-	Column  int
-	Path    string
-	Message string
+	Type   uint8
+	Row    int
+	Column int
+	Path   string
+	Msg    string
 }

@@ -14,8 +14,8 @@ import (
 
 // Lex is lexer of Fract.
 type Lex struct {
-	wg               sync.WaitGroup
-	firstTokenOfLine bool
+	wg             sync.WaitGroup
+	firstTokOfLine bool
 
 	File   *xio.File
 	Pos    int
@@ -24,7 +24,7 @@ type Lex struct {
 	// Logs are only errors
 	Logs []xlog.CompilerLog
 
-	braces []Token
+	braces []Tok
 }
 
 // New Lex instance.
@@ -39,30 +39,30 @@ func NewLex(f *xio.File) *Lex {
 
 func (l *Lex) pusherr(err string) {
 	l.Logs = append(l.Logs, xlog.CompilerLog{
-		Type:    xlog.Error,
-		Row:     l.Row,
-		Column:  l.Column,
-		Path:    l.File.Path,
-		Message: x.Errors[err],
+		Type:   xlog.Err,
+		Row:    l.Row,
+		Column: l.Column,
+		Path:   l.File.Path,
+		Msg:    x.Errs[err],
 	})
 }
 
-func (l *Lex) pusherrtok(tok Token, err string) {
+func (l *Lex) pusherrtok(tok Tok, err string) {
 	l.Logs = append(l.Logs, xlog.CompilerLog{
-		Type:    xlog.Error,
-		Row:     tok.Row,
-		Column:  tok.Column,
-		Path:    l.File.Path,
-		Message: x.Errors[err],
+		Type:   xlog.Err,
+		Row:    tok.Row,
+		Column: tok.Column,
+		Path:   l.File.Path,
+		Msg:    x.Errs[err],
 	})
 }
 
 // Lex all source content.
-func (l *Lex) Lex() []Token {
-	var toks []Token
+func (l *Lex) Lex() []Tok {
+	var toks []Tok
 	l.Logs = nil
 	l.Newln()
-	for l.Pos < len(l.File.Content) {
+	for l.Pos < len(l.File.Text) {
 		tok := l.Tok()
 		if tok.Id != NA {
 			toks = append(toks, tok)
@@ -109,13 +109,13 @@ func (l *Lex) id(ln string) string {
 		}
 	}
 	var sb strings.Builder
-	for _, run := range ln {
-		if run != '_' &&
-			('0' > run || '9' < run) &&
-			!unicode.IsLetter(run) {
+	for _, r := range ln {
+		if r != '_' &&
+			('0' > r || '9' < r) &&
+			!unicode.IsLetter(r) {
 			break
 		}
-		sb.WriteRune(run)
+		sb.WriteRune(r)
 		l.Pos++
 	}
 	return sb.String()
@@ -124,7 +124,7 @@ func (l *Lex) id(ln string) string {
 // resume to lex from position.
 func (l *Lex) resume() string {
 	var ln string
-	runes := l.File.Content[l.Pos:]
+	runes := l.File.Text[l.Pos:]
 	// Skip spaces.
 	for i, r := range runes {
 		if unicode.IsSpace(r) {
@@ -142,34 +142,34 @@ func (l *Lex) resume() string {
 	return ln
 }
 
-func (l *Lex) lncomment(tok *Token) {
+func (l *Lex) lncomment(tok *Tok) {
 	start := l.Pos
 	l.Pos += 2
-	for ; l.Pos < len(l.File.Content); l.Pos++ {
-		if l.File.Content[l.Pos] == '\n' {
-			if l.firstTokenOfLine {
+	for ; l.Pos < len(l.File.Text); l.Pos++ {
+		if l.File.Text[l.Pos] == '\n' {
+			if l.firstTokOfLine {
 				tok.Id = Comment
-				tok.Kind = string(l.File.Content[start:l.Pos])
+				tok.Kind = string(l.File.Text[start:l.Pos])
 			}
 			return
 		}
 	}
-	if l.firstTokenOfLine {
+	if l.firstTokOfLine {
 		tok.Id = Comment
-		tok.Kind = string(l.File.Content[start:])
+		tok.Kind = string(l.File.Text[start:])
 	}
 }
 
 func (l *Lex) rangecomment() {
 	l.Pos += 2
-	for ; l.Pos < len(l.File.Content); l.Pos++ {
-		run := l.File.Content[l.Pos]
+	for ; l.Pos < len(l.File.Text); l.Pos++ {
+		run := l.File.Text[l.Pos]
 		if run == '\n' {
 			l.Newln()
 			continue
 		}
 		l.Column += len(string(run))
-		if strings.HasPrefix(string(l.File.Content[l.Pos:]), "*/") {
+		if strings.HasPrefix(string(l.File.Text[l.Pos:]), "*/") {
 			l.Column += 2
 			l.Pos += 2
 			return
@@ -182,16 +182,16 @@ var numRegexp = *regexp.MustCompile(`^((0x[[:xdigit:]]+)|(\d+((\.\d+)?((e|E)(\-|
 
 // num returns numeric if next token is numeric,
 // returns empty string if not.
-func (l *Lex) num(content string) string {
-	value := numRegexp.FindString(content)
-	l.Pos += len(value)
-	return value
+func (l *Lex) num(txt string) string {
+	val := numRegexp.FindString(txt)
+	l.Pos += len(val)
+	return val
 }
 
 var escSeqRegexp = regexp.MustCompile(`^\\([\\'"abfnrtv]|U.{8}|u.{4}|x..|[0-7]{1,3})`)
 
-func (l *Lex) escseq(content string) string {
-	seq := escSeqRegexp.FindString(content)
+func (l *Lex) escseq(txt string) string {
+	seq := escSeqRegexp.FindString(txt)
 	if seq != "" {
 		l.Pos += len([]rune(seq))
 		return seq
@@ -201,29 +201,29 @@ func (l *Lex) escseq(content string) string {
 	return seq
 }
 
-func (l *Lex) getrune(content string, raw bool) string {
-	if !raw && content[0] == '\\' {
-		return l.escseq(content)
+func (l *Lex) getrune(txt string, raw bool) string {
+	if !raw && txt[0] == '\\' {
+		return l.escseq(txt)
 	}
-	run, _ := utf8.DecodeRuneInString(content)
+	run, _ := utf8.DecodeRuneInString(txt)
 	l.Pos++
 	return string(run)
 }
 
-func (l *Lex) rune(content string) string {
+func (l *Lex) rune(txt string) string {
 	var sb strings.Builder
 	sb.WriteByte('\'')
 	l.Column++
-	content = content[1:]
+	txt = txt[1:]
 	count := 0
-	for index := 0; index < len(content); index++ {
-		if content[index] == '\n' {
+	for i := 0; i < len(txt); i++ {
+		if txt[i] == '\n' {
 			l.pusherr("missing_rune_end")
 			l.Pos++
 			l.Newln()
 			return ""
 		}
-		run := l.getrune(content[index:], false)
+		run := l.getrune(txt[i:], false)
 		sb.WriteString(run)
 		length := len(run)
 		l.Column += length
@@ -232,7 +232,7 @@ func (l *Lex) rune(content string) string {
 			break
 		}
 		if length > 1 {
-			index += length - 1
+			i += length - 1
 		}
 		count++
 	}
@@ -244,15 +244,15 @@ func (l *Lex) rune(content string) string {
 	return sb.String()
 }
 
-func (l *Lex) str(content string) string {
+func (l *Lex) str(txt string) string {
 	var sb strings.Builder
-	mark := content[0]
+	mark := txt[0]
 	raw := mark == '`'
 	sb.WriteByte(mark)
 	l.Column++
-	content = content[1:]
-	for i := 0; i < len(content); i++ {
-		ch := content[i]
+	txt = txt[1:]
+	for i := 0; i < len(txt); i++ {
+		ch := txt[i]
 		if ch == '\n' {
 			defer l.Newln()
 			if !raw {
@@ -261,7 +261,7 @@ func (l *Lex) str(content string) string {
 				return ""
 			}
 		}
-		run := l.getrune(content[i:], raw)
+		run := l.getrune(txt[i:], raw)
 		sb.WriteString(run)
 		length := len(run)
 		l.Column += length
@@ -278,13 +278,13 @@ func (l *Lex) str(content string) string {
 
 // Newln sets ready lexer to a new line lexing.
 func (l *Lex) Newln() {
-	l.firstTokenOfLine = true
+	l.firstTokOfLine = true
 	l.Row++
 	l.Column = 1
 }
 
-func (l *Lex) punct(content, kind string, id uint8, tok *Token) bool {
-	if !strings.HasPrefix(content, kind) {
+func (l *Lex) punct(txt, kind string, id uint8, tok *Tok) bool {
+	if !strings.HasPrefix(txt, kind) {
 		return false
 	}
 	tok.Kind = kind
@@ -293,8 +293,8 @@ func (l *Lex) punct(content, kind string, id uint8, tok *Token) bool {
 	return true
 }
 
-func (l *Lex) kw(content, kind string, id uint8, tok *Token) bool {
-	if !iskw(content, kind) {
+func (l *Lex) kw(txt, kind string, id uint8, tok *Tok) bool {
+	if !iskw(txt, kind) {
 		return false
 	}
 	tok.Kind = kind
@@ -304,154 +304,153 @@ func (l *Lex) kw(content, kind string, id uint8, tok *Token) bool {
 }
 
 // Tok generates next token from resume at position.
-func (l *Lex) Tok() Token {
-	defer func() { l.firstTokenOfLine = false }()
-	tok := Token{
-		File: l.File,
-		Id:   NA,
-	}
-	content := l.resume()
-	if content == "" {
+func (l *Lex) Tok() Tok {
+	defer func() { l.firstTokOfLine = false }()
+
+	tok := Tok{File: l.File, Id: NA}
+
+	txt := l.resume()
+	if txt == "" {
 		return tok
 	}
+
 	// Set token values.
 	tok.Column = l.Column
 	tok.Row = l.Row
 
 	//* Tokenize
-
 	switch {
-	case content[0] == '\'':
-		tok.Kind = l.rune(content)
+	case txt[0] == '\'':
+		tok.Kind = l.rune(txt)
 		tok.Id = Value
 		return tok
-	case content[0] == '"', content[0] == '`':
-		tok.Kind = l.str(content)
+	case txt[0] == '"', txt[0] == '`':
+		tok.Kind = l.str(txt)
 		tok.Id = Value
 		return tok
-	case strings.HasPrefix(content, "//"):
+	case strings.HasPrefix(txt, "//"):
 		l.lncomment(&tok)
 		goto ret
-	case strings.HasPrefix(content, "/*"):
+	case strings.HasPrefix(txt, "/*"):
 		l.rangecomment()
 		return tok
-	case l.punct(content, "(", Brace, &tok):
+	case l.punct(txt, "(", Brace, &tok):
 		l.braces = append(l.braces, tok)
-	case l.punct(content, ")", Brace, &tok):
-		length := len(l.braces)
-		if length == 0 {
+	case l.punct(txt, ")", Brace, &tok):
+		len := len(l.braces)
+		if len == 0 {
 			l.pusherrtok(tok, "extra_closed_parentheses")
 			break
-		} else if l.braces[length-1].Kind != "(" {
+		} else if l.braces[len-1].Kind != "(" {
 			l.wg.Add(1)
 			go l.pushWrongOrderCloseErrAsync(tok)
 		}
-		l.rmrange(length-1, tok.Kind)
-	case l.punct(content, "{", Brace, &tok):
+		l.rmrange(len-1, tok.Kind)
+	case l.punct(txt, "{", Brace, &tok):
 		l.braces = append(l.braces, tok)
-	case l.punct(content, "}", Brace, &tok):
-		length := len(l.braces)
-		if length == 0 {
+	case l.punct(txt, "}", Brace, &tok):
+		len := len(l.braces)
+		if len == 0 {
 			l.pusherrtok(tok, "extra_closed_braces")
 			break
-		} else if l.braces[length-1].Kind != "{" {
+		} else if l.braces[len-1].Kind != "{" {
 			l.wg.Add(1)
 			go l.pushWrongOrderCloseErrAsync(tok)
 		}
-		l.rmrange(length-1, tok.Kind)
-	case l.punct(content, "[", Brace, &tok):
+		l.rmrange(len-1, tok.Kind)
+	case l.punct(txt, "[", Brace, &tok):
 		l.braces = append(l.braces, tok)
-	case l.punct(content, "]", Brace, &tok):
-		length := len(l.braces)
-		if length == 0 {
+	case l.punct(txt, "]", Brace, &tok):
+		len := len(l.braces)
+		if len == 0 {
 			l.pusherrtok(tok, "extra_closed_brackets")
 			break
-		} else if l.braces[length-1].Kind != "[" {
+		} else if l.braces[len-1].Kind != "[" {
 			l.wg.Add(1)
 			go l.pushWrongOrderCloseErrAsync(tok)
 		}
-		l.rmrange(length-1, tok.Kind)
+		l.rmrange(len-1, tok.Kind)
 	case
-		l.firstTokenOfLine && l.punct(content, "#", Preprocessor, &tok),
-		l.punct(content, ":", Colon, &tok),
-		l.punct(content, ";", SemiColon, &tok),
-		l.punct(content, ",", Comma, &tok),
-		l.punct(content, "@", At, &tok),
-		l.punct(content, "...", Operator, &tok),
-		l.punct(content, ".", Dot, &tok),
-		l.punct(content, "+=", Operator, &tok),
-		l.punct(content, "-=", Operator, &tok),
-		l.punct(content, "*=", Operator, &tok),
-		l.punct(content, "/=", Operator, &tok),
-		l.punct(content, "%=", Operator, &tok),
-		l.punct(content, "<<=", Operator, &tok),
-		l.punct(content, ">>=", Operator, &tok),
-		l.punct(content, "^=", Operator, &tok),
-		l.punct(content, "&=", Operator, &tok),
-		l.punct(content, "|=", Operator, &tok),
-		l.punct(content, "==", Operator, &tok),
-		l.punct(content, "!=", Operator, &tok),
-		l.punct(content, ">=", Operator, &tok),
-		l.punct(content, "<=", Operator, &tok),
-		l.punct(content, "&&", Operator, &tok),
-		l.punct(content, "||", Operator, &tok),
-		l.punct(content, "<<", Operator, &tok),
-		l.punct(content, ">>", Operator, &tok),
-		l.punct(content, "+", Operator, &tok),
-		l.punct(content, "-", Operator, &tok),
-		l.punct(content, "*", Operator, &tok),
-		l.punct(content, "/", Operator, &tok),
-		l.punct(content, "%", Operator, &tok),
-		l.punct(content, "~", Operator, &tok),
-		l.punct(content, "&", Operator, &tok),
-		l.punct(content, "|", Operator, &tok),
-		l.punct(content, "^", Operator, &tok),
-		l.punct(content, "!", Operator, &tok),
-		l.punct(content, "<", Operator, &tok),
-		l.punct(content, ">", Operator, &tok),
-		l.punct(content, "=", Operator, &tok),
-		l.kw(content, "i8", DataType, &tok),
-		l.kw(content, "i16", DataType, &tok),
-		l.kw(content, "i32", DataType, &tok),
-		l.kw(content, "i64", DataType, &tok),
-		l.kw(content, "u8", DataType, &tok),
-		l.kw(content, "u16", DataType, &tok),
-		l.kw(content, "u32", DataType, &tok),
-		l.kw(content, "u64", DataType, &tok),
-		l.kw(content, "f32", DataType, &tok),
-		l.kw(content, "f64", DataType, &tok),
-		l.kw(content, "byte", DataType, &tok),
-		l.kw(content, "sbyte", DataType, &tok),
-		l.kw(content, "size", DataType, &tok),
-		l.kw(content, "ssize", DataType, &tok),
-		l.kw(content, "bool", DataType, &tok),
-		l.kw(content, "rune", DataType, &tok),
-		l.kw(content, "str", DataType, &tok),
-		l.kw(content, "true", Value, &tok),
-		l.kw(content, "false", Value, &tok),
-		l.kw(content, "nil", Value, &tok),
-		l.kw(content, "const", Const, &tok),
-		l.kw(content, "ret", Ret, &tok),
-		l.kw(content, "type", Type, &tok),
-		l.kw(content, "new", New, &tok),
-		l.kw(content, "free", Free, &tok),
-		l.kw(content, "iter", Iter, &tok),
-		l.kw(content, "break", Break, &tok),
-		l.kw(content, "continue", Continue, &tok),
-		l.kw(content, "in", In, &tok),
-		l.kw(content, "if", If, &tok),
-		l.kw(content, "else", Else, &tok),
-		l.kw(content, "volatile", Volatile, &tok),
-		l.kw(content, "use", Use, &tok),
-		l.kw(content, "pub", Pub, &tok):
+		l.firstTokOfLine && l.punct(txt, "#", Preprocessor, &tok),
+		l.punct(txt, ":", Colon, &tok),
+		l.punct(txt, ";", SemiColon, &tok),
+		l.punct(txt, ",", Comma, &tok),
+		l.punct(txt, "@", At, &tok),
+		l.punct(txt, "...", Operator, &tok),
+		l.punct(txt, ".", Dot, &tok),
+		l.punct(txt, "+=", Operator, &tok),
+		l.punct(txt, "-=", Operator, &tok),
+		l.punct(txt, "*=", Operator, &tok),
+		l.punct(txt, "/=", Operator, &tok),
+		l.punct(txt, "%=", Operator, &tok),
+		l.punct(txt, "<<=", Operator, &tok),
+		l.punct(txt, ">>=", Operator, &tok),
+		l.punct(txt, "^=", Operator, &tok),
+		l.punct(txt, "&=", Operator, &tok),
+		l.punct(txt, "|=", Operator, &tok),
+		l.punct(txt, "==", Operator, &tok),
+		l.punct(txt, "!=", Operator, &tok),
+		l.punct(txt, ">=", Operator, &tok),
+		l.punct(txt, "<=", Operator, &tok),
+		l.punct(txt, "&&", Operator, &tok),
+		l.punct(txt, "||", Operator, &tok),
+		l.punct(txt, "<<", Operator, &tok),
+		l.punct(txt, ">>", Operator, &tok),
+		l.punct(txt, "+", Operator, &tok),
+		l.punct(txt, "-", Operator, &tok),
+		l.punct(txt, "*", Operator, &tok),
+		l.punct(txt, "/", Operator, &tok),
+		l.punct(txt, "%", Operator, &tok),
+		l.punct(txt, "~", Operator, &tok),
+		l.punct(txt, "&", Operator, &tok),
+		l.punct(txt, "|", Operator, &tok),
+		l.punct(txt, "^", Operator, &tok),
+		l.punct(txt, "!", Operator, &tok),
+		l.punct(txt, "<", Operator, &tok),
+		l.punct(txt, ">", Operator, &tok),
+		l.punct(txt, "=", Operator, &tok),
+		l.kw(txt, "i8", DataType, &tok),
+		l.kw(txt, "i16", DataType, &tok),
+		l.kw(txt, "i32", DataType, &tok),
+		l.kw(txt, "i64", DataType, &tok),
+		l.kw(txt, "u8", DataType, &tok),
+		l.kw(txt, "u16", DataType, &tok),
+		l.kw(txt, "u32", DataType, &tok),
+		l.kw(txt, "u64", DataType, &tok),
+		l.kw(txt, "f32", DataType, &tok),
+		l.kw(txt, "f64", DataType, &tok),
+		l.kw(txt, "byte", DataType, &tok),
+		l.kw(txt, "sbyte", DataType, &tok),
+		l.kw(txt, "size", DataType, &tok),
+		l.kw(txt, "ssize", DataType, &tok),
+		l.kw(txt, "bool", DataType, &tok),
+		l.kw(txt, "rune", DataType, &tok),
+		l.kw(txt, "str", DataType, &tok),
+		l.kw(txt, "true", Value, &tok),
+		l.kw(txt, "false", Value, &tok),
+		l.kw(txt, "nil", Value, &tok),
+		l.kw(txt, "const", Const, &tok),
+		l.kw(txt, "ret", Ret, &tok),
+		l.kw(txt, "type", Type, &tok),
+		l.kw(txt, "new", New, &tok),
+		l.kw(txt, "free", Free, &tok),
+		l.kw(txt, "iter", Iter, &tok),
+		l.kw(txt, "break", Break, &tok),
+		l.kw(txt, "continue", Continue, &tok),
+		l.kw(txt, "in", In, &tok),
+		l.kw(txt, "if", If, &tok),
+		l.kw(txt, "else", Else, &tok),
+		l.kw(txt, "volatile", Volatile, &tok),
+		l.kw(txt, "use", Use, &tok),
+		l.kw(txt, "pub", Pub, &tok):
 	default:
-		lex := l.id(content)
+		lex := l.id(txt)
 		if lex != "" {
 			tok.Kind = lex
 			tok.Id = Id
 			break
 		}
-		lex = l.num(content)
+		lex = l.num(txt)
 		if lex != "" {
 			tok.Kind = lex
 			tok.Id = Value
@@ -467,7 +466,7 @@ ret:
 	return tok
 }
 
-func (l *Lex) rmrange(index int, kind string) {
+func (l *Lex) rmrange(i int, kind string) {
 	var close string
 	switch kind {
 	case ")":
@@ -477,26 +476,26 @@ func (l *Lex) rmrange(index int, kind string) {
 	case "]":
 		close = "["
 	}
-	for ; index >= 0; index-- {
-		tok := l.braces[index]
+	for ; i >= 0; i-- {
+		tok := l.braces[i]
 		if tok.Kind != close {
 			continue
 		}
-		l.braces = append(l.braces[:index], l.braces[index+1:]...)
+		l.braces = append(l.braces[:i], l.braces[i+1:]...)
 		break
 	}
 }
 
-func (l *Lex) pushWrongOrderCloseErrAsync(tok Token) {
+func (l *Lex) pushWrongOrderCloseErrAsync(tok Tok) {
 	defer func() { l.wg.Done() }()
-	var message string
+	var msg string
 	switch l.braces[len(l.braces)-1].Kind {
 	case "(":
-		message = "expected_parentheses_close"
+		msg = "expected_parentheses_close"
 	case "{":
-		message = "expected_brace_close"
+		msg = "expected_brace_close"
 	case "[":
-		message = "expected_bracket_close"
+		msg = "expected_bracket_close"
 	}
-	l.pusherrtok(tok, message)
+	l.pusherrtok(tok, msg)
 }

@@ -2,8 +2,8 @@ package lex
 
 import "github.com/the-xlang/x/pkg/xio"
 
-// Token is lexer token.
-type Token struct {
+// Tok is lexer token.
+type Tok struct {
 	File   *xio.File
 	Row    int
 	Column int

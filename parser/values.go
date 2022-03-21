@@ -19,7 +19,7 @@ func isBoolExpr(val value) bool {
 	switch {
 	case typeIsNilCompatible(val.ast.Type):
 		return true
-	case val.ast.Type.Code == x.Bool && typeIsSingle(val.ast.Type):
+	case val.ast.Type.Id == x.Bool && typeIsSingle(val.ast.Type):
 		return true
 	}
 	return false
@@ -32,7 +32,7 @@ func isForeachIterExpr(val value) bool {
 	case !typeIsSingle(val.ast.Type):
 		return false
 	}
-	code := val.ast.Type.Code
+	code := val.ast.Type.Id
 	return code == x.Str
 }
 
@@ -47,7 +47,7 @@ func checkIntBit(v ast.Value, bit int) bool {
 	if bit == 0 {
 		return false
 	}
-	if x.IsSignedNumericType(v.Type.Code) {
+	if x.IsSignedNumericType(v.Type.Id) {
 		return xbits.CheckBitInt(v.Data, bit)
 	}
 	return xbits.CheckBitUInt(v.Data, bit)

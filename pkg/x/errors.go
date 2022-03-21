@@ -1,7 +1,7 @@
 package x
 
 // Error messages.
-var Errors = map[string]string{
+var Errs = map[string]string{
 	`file_not_x`:                       `this is not x source file: `,
 	`invalid_token`:                    `undefined code content`,
 	`invalid_syntax`:                   `invalid syntax`,
@@ -64,7 +64,7 @@ var Errors = map[string]string{
 	`missing_argument`:                 `missing argument(s)`,
 	`missing_block_comment`:            `missing block comment close`,
 	`missing_rune_end`:                 `rune is not finished`,
-	`missing_return`:                   `missing return at end of function`,
+	`missing_ret`:                      `missing return at end of function`,
 	`missing_string_end`:               `string is not finished`,
 	`missing_const_value`:              `constants must have value specification`,
 	`missing_expression`:               `missing expression`,

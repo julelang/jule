@@ -10,14 +10,14 @@ var builtinFuncs = []*function{
 		Ast: ast.Func{
 			Id: "out",
 			RetType: ast.DataType{
-				Code: x.Void,
+				Id: x.Void,
 			},
 			Params: []ast.Parameter{{
 				Id:    "v",
 				Const: true,
 				Type: ast.DataType{
-					Value: "any",
-					Code:  x.Any,
+					Val: "any",
+					Id:  x.Any,
 				},
 			}},
 		},
@@ -26,14 +26,14 @@ var builtinFuncs = []*function{
 		Ast: ast.Func{
 			Id: "outln",
 			RetType: ast.DataType{
-				Code: x.Void,
+				Id: x.Void,
 			},
 			Params: []ast.Parameter{{
 				Id:    "v",
 				Const: true,
 				Type: ast.DataType{
-					Value: "any",
-					Code:  x.Any,
+					Val: "any",
+					Id:  x.Any,
 				},
 			}},
 		},
@@ -45,7 +45,7 @@ var strDefs = &defmap{
 		{
 			Id:    "len",
 			Const: true,
-			Type:  ast.DataType{Code: x.Size, Value: "size"},
+			Type:  ast.DataType{Id: x.Size, Val: "size"},
 			Tag:   "length()",
 		},
 	},
@@ -56,7 +56,7 @@ var arrDefs = &defmap{
 		{
 			Id:    "len",
 			Const: true,
-			Type:  ast.DataType{Code: x.Size, Value: "size"},
+			Type:  ast.DataType{Id: x.Size, Val: "size"},
 			Tag:   "_buffer.size()",
 		},
 	},

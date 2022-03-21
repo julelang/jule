@@ -11,13 +11,13 @@ type XSet struct {
 }
 
 // Load loads XSet from json string.
-func Load(jsonbytes []byte) (*XSet, error) {
+func Load(bytes []byte) (*XSet, error) {
 	set := XSet{
 		CxxOutDir:  "./dist",
 		CxxOutName: "x.cxx",
 		OutName:    "main",
 	}
-	err := json.Unmarshal(jsonbytes, &set)
+	err := json.Unmarshal(bytes, &set)
 	if err != nil {
 		return nil, err
 	}

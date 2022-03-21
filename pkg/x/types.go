@@ -268,12 +268,12 @@ func CxxTypeIdFromType(typeCode uint8) string {
 	return "" // Unreachable code.
 }
 
-// DefaultValueOfType returns default value of specified type.
+// DefaultValOfType returns default value of specified type.
 //
 // Special case is:
-//  DefaultValueOfType(t) = "nil" if t is invalid
-//  DefaultValueOfType(t) = "nil" if t is not have default value
-func DefaultValueOfType(code uint8) string {
+//  DefaultValOfType(t) = "nil" if t is invalid
+//  DefaultValOfType(t) = "nil" if t is not have default value
+func DefaultValOfType(code uint8) string {
 	if IsNumericType(code) {
 		return "0"
 	}

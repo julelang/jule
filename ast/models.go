@@ -12,18 +12,18 @@ import (
 
 // Obj is an element of AST.
 type Obj struct {
-	Token lex.Token
+	Tok   lex.Tok
 	Value interface{}
 }
 
 // Statement is statement.
 type Statement struct {
-	Token          lex.Token
-	Value          interface{}
+	Tok            lex.Tok
+	Val            interface{}
 	WithTerminator bool
 }
 
-func (s Statement) String() string { return fmt.Sprint(s.Value) }
+func (s Statement) String() string { return fmt.Sprint(s.Val) }
 
 // BlockAST is code block.
 type BlockAST struct{ Tree []Statement }
@@ -57,43 +57,43 @@ func ParseBlock(b BlockAST, indent int) string {
 
 // DataType is data type identifier.
 type DataType struct {
-	Token      lex.Token
-	Code       uint8
-	Value      string
+	Tok        lex.Tok
+	Id         uint8
+	Val        string
 	MultiTyped bool
 	Tag        interface{}
 }
 
 func (dt DataType) String() string {
 	var cxx strings.Builder
-	for index, run := range dt.Value {
+	for i, run := range dt.Val {
 		if run == '*' {
 			cxx.WriteRune(run)
 			continue
 		}
-		dt.Value = dt.Value[index:]
+		dt.Val = dt.Val[i:]
 		break
 	}
 	if dt.MultiTyped {
 		return dt.MultiTypeString() + cxx.String()
 	}
-	if dt.Value != "" && dt.Value[0] == '[' {
+	if dt.Val != "" && dt.Val[0] == '[' {
 		pointers := cxx.String()
 		cxx.Reset()
 		cxx.WriteString("array<")
-		dt.Value = dt.Value[2:]
+		dt.Val = dt.Val[2:]
 		cxx.WriteString(dt.String())
 		cxx.WriteByte('>')
 		cxx.WriteString(pointers)
 		return cxx.String()
 	}
-	switch dt.Code {
+	switch dt.Id {
 	case x.Id:
-		return xapi.AsId(dt.Token.Kind) + cxx.String()
+		return xapi.AsId(dt.Tok.Kind) + cxx.String()
 	case x.Func:
 		return dt.FunctionString() + cxx.String()
 	default:
-		return x.CxxTypeIdFromType(dt.Code) + cxx.String()
+		return x.CxxTypeIdFromType(dt.Id) + cxx.String()
 	}
 }
 
@@ -131,11 +131,11 @@ func (dt DataType) MultiTypeString() string {
 
 // Type is type declaration.
 type Type struct {
-	Pub         bool
-	Token       lex.Token
-	Id          string
-	Type        DataType
-	Description string
+	Pub  bool
+	Tok  lex.Tok
+	Id   string
+	Type DataType
+	Desc string
 }
 
 func (t Type) String() string {
@@ -151,7 +151,7 @@ func (t Type) String() string {
 // Func is function declaration AST model.
 type Func struct {
 	Pub     bool
-	Token   lex.Token
+	Tok     lex.Tok
 	Id      string
 	Params  []Parameter
 	RetType DataType
@@ -172,7 +172,7 @@ func (fc Func) DataTypeString() string {
 		cxx.WriteString(cxxStr)
 	}
 	cxx.WriteByte(')')
-	if fc.RetType.Code != x.Void {
+	if fc.RetType.Id != x.Void {
 		cxx.WriteString(fc.RetType.String())
 	}
 	return cxx.String()
@@ -180,7 +180,7 @@ func (fc Func) DataTypeString() string {
 
 // Parameter is function parameter AST model.
 type Parameter struct {
-	Token    lex.Token
+	Tok      lex.Tok
 	Id       string
 	Const    bool
 	Volatile bool
@@ -224,23 +224,21 @@ func (p Parameter) Prototype() string {
 
 // Arg is AST model of argument.
 type Arg struct {
-	Token lex.Token
-	Expr  Expr
+	Tok  lex.Tok
+	Expr Expr
 }
 
 func (a Arg) String() string { return a.Expr.String() }
 
 // Expr is AST model of expression.
 type Expr struct {
-	Tokens    []lex.Token
-	Processes [][]lex.Token
+	Toks      []lex.Tok
+	Processes [][]lex.Tok
 	Model     IExprModel
 }
 
 // IExprModel for special expression model to Cxx string.
-type IExprModel interface {
-	String() string
-}
+type IExprModel interface{ String() string }
 
 func (e Expr) String() string {
 	if e.Model != nil {
@@ -272,17 +270,17 @@ func (be ExprStatement) String() string {
 
 // Value is AST model of constant value.
 type Value struct {
-	Token lex.Token
-	Data  string
-	Type  DataType
+	Tok  lex.Tok
+	Data string
+	Type DataType
 }
 
 func (v Value) String() string { return v.Data }
 
 // Ret is return statement AST model.
 type Ret struct {
-	Token lex.Token
-	Expr  Expr
+	Tok  lex.Tok
+	Expr Expr
 }
 
 func (r Ret) String() string {
@@ -295,26 +293,26 @@ func (r Ret) String() string {
 
 // Attribute is attribtue AST model.
 type Attribute struct {
-	Token lex.Token
-	Tag   lex.Token
+	Tok lex.Tok
+	Tag lex.Tok
 }
 
 func (a Attribute) String() string { return a.Tag.Kind }
 
 // Var is variable declaration AST model.
 type Var struct {
-	Pub         bool
-	DefToken    lex.Token
-	IdToken     lex.Token
-	SetterToken lex.Token
-	Id          string
-	Type        DataType
-	Value       Expr
-	Const       bool
-	Volatile    bool
-	New         bool
-	Tag         interface{}
-	Description string
+	Pub       bool
+	DefTok    lex.Tok
+	IdTok     lex.Tok
+	SetterTok lex.Tok
+	Id        string
+	Type      DataType
+	Val       Expr
+	Const     bool
+	Volatile  bool
+	New       bool
+	Tag       interface{}
+	Desc      string
 }
 
 func (v Var) String() string {
@@ -328,9 +326,9 @@ func (v Var) String() string {
 	cxx.WriteString(v.Type.String())
 	cxx.WriteByte(' ')
 	cxx.WriteString(xapi.AsId(v.Id))
-	if v.Value.Processes != nil {
+	if v.Val.Processes != nil {
 		cxx.WriteByte('{')
-		cxx.WriteString(v.Value.String())
+		cxx.WriteString(v.Val.String())
 		cxx.WriteByte('}')
 	}
 	cxx.WriteByte(';')
@@ -347,30 +345,30 @@ type AssignSelector struct {
 func (vs AssignSelector) String() string {
 	if vs.Var.New {
 		// Returns variable identifier.
-		return xapi.AsId(vs.Expr.Tokens[0].Kind)
+		return xapi.AsId(vs.Expr.Toks[0].Kind)
 	}
 	return vs.Expr.String()
 }
 
 // Assign is assignment AST model.
 type Assign struct {
-	Setter         lex.Token
-	SelectExprs    []AssignSelector
-	ValueExprs     []Expr
-	IsExpr         bool
-	MultipleReturn bool
+	Setter      lex.Tok
+	SelectExprs []AssignSelector
+	ValueExprs  []Expr
+	IsExpr      bool
+	MultipleRet bool
 }
 
 func (vs Assign) cxxSingleAssign() string {
 	expr := vs.SelectExprs[0]
 	if expr.Var.New {
-		expr.Var.Value = vs.ValueExprs[0]
+		expr.Var.Val = vs.ValueExprs[0]
 		s := expr.Var.String()
 		return s[:len(s)-1] // Remove statement terminator
 	}
 	var cxx strings.Builder
-	if len(expr.Expr.Tokens) != 1 ||
-		!xapi.IsIgnoreId(expr.Expr.Tokens[0].Kind) {
+	if len(expr.Expr.Toks) != 1 ||
+		!xapi.IsIgnoreId(expr.Expr.Toks[0].Kind) {
 		cxx.WriteString(expr.String())
 		cxx.WriteString(vs.Setter.Kind)
 	}
@@ -384,13 +382,13 @@ func (vs Assign) cxxMultipleAssign() string {
 	cxx.WriteString("std::tie(")
 	var expCxx strings.Builder
 	expCxx.WriteString("std::make_tuple(")
-	for index, selector := range vs.SelectExprs {
+	for i, selector := range vs.SelectExprs {
 		if selector.Ignore {
 			continue
 		}
 		cxx.WriteString(selector.String())
 		cxx.WriteByte(',')
-		expCxx.WriteString(vs.ValueExprs[index].String())
+		expCxx.WriteString(vs.ValueExprs[i].String())
 		expCxx.WriteByte(',')
 	}
 	str := cxx.String()[:cxx.Len()-1] + ")"
@@ -436,7 +434,7 @@ func (vs Assign) cxxNewDefines() string {
 func (vs Assign) String() string {
 	var cxx strings.Builder
 	switch {
-	case vs.MultipleReturn:
+	case vs.MultipleRet:
 		cxx.WriteString(vs.cxxMultipleReturn())
 	case len(vs.SelectExprs) == 1:
 		cxx.WriteString(vs.cxxSingleAssign())
@@ -450,8 +448,8 @@ func (vs Assign) String() string {
 }
 
 type Free struct {
-	Token lex.Token
-	Expr  Expr
+	Tok  lex.Tok
+	Expr Expr
 }
 
 func (f Free) String() string {
@@ -483,7 +481,7 @@ func (wp WhileProfile) String(iter Iter) string {
 type ForeachProfile struct {
 	KeyA     Var
 	KeyB     Var
-	InToken  lex.Token
+	InTok    lex.Tok
 	Expr     Expr
 	ExprType DataType
 }
@@ -536,7 +534,7 @@ func (fp ForeachProfile) IterationSring(iter Iter) string {
 
 // Iter is the AST model of iterations.
 type Iter struct {
-	Token   lex.Token
+	Tok     lex.Tok
 	Block   BlockAST
 	Profile IterProfile
 }
@@ -552,18 +550,18 @@ func (iter Iter) String() string {
 }
 
 // Break is the AST model of break statement.
-type Break struct{ Token lex.Token }
+type Break struct{ Tok lex.Tok }
 
 func (b Break) String() string { return "break;" }
 
 // Continue is the AST model of break statement.
-type Continue struct{ Token lex.Token }
+type Continue struct{ Tok lex.Tok }
 
 func (c Continue) String() string { return "continue;" }
 
 // If is the AST model of if expression.
 type If struct {
-	Token lex.Token
+	Tok   lex.Tok
 	Expr  Expr
 	Block BlockAST
 }
@@ -579,7 +577,7 @@ func (ifast If) String() string {
 
 // ElseIf is the AST model of else if expression.
 type ElseIf struct {
-	Token lex.Token
+	Tok   lex.Tok
 	Expr  Expr
 	Block BlockAST
 }
@@ -595,7 +593,7 @@ func (elif ElseIf) String() string {
 
 // Else is the AST model of else blocks.
 type Else struct {
-	Token lex.Token
+	Tok   lex.Tok
 	Block BlockAST
 }
 
@@ -618,8 +616,8 @@ func (c Comment) String() string {
 
 // Use is the AST model of use declaration.
 type Use struct {
-	Token lex.Token
-	Path  string
+	Tok  lex.Tok
+	Path string
 }
 
 // CxxEmbed is the AST model of cxx code embed.
@@ -629,7 +627,7 @@ func (ce CxxEmbed) String() string { return ce.Content }
 
 // Preprocessor is the AST model of preprocessor directives.
 type Preprocessor struct {
-	Token   lex.Token
+	Tok     lex.Tok
 	Command interface{}
 }
 

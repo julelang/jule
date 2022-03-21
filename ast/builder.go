@@ -17,38 +17,36 @@ type Builder struct {
 	wg  sync.WaitGroup
 	pub bool
 
-	Tree   []Obj
-	Errors []xlog.CompilerLog
-	Tokens []lex.Token
-	Pos    int
+	Tree []Obj
+	Errs []xlog.CompilerLog
+	Toks []lex.Tok
+	Pos  int
 }
 
 // NewBuilder instance.
-func NewBuilder(toks []lex.Token) *Builder {
-	ast := new(Builder)
-	ast.Tokens = toks
-	ast.Pos = 0
-	return ast
+func NewBuilder(toks []lex.Tok) *Builder {
+	b := new(Builder)
+	b.Toks = toks
+	b.Pos = 0
+	return b
 }
 
 // pusherr appends error by specified token.
-func (b *Builder) pusherr(tok lex.Token, err string) {
-	message := x.Errors[err]
-	b.Errors = append(b.Errors, xlog.CompilerLog{
-		Type:    xlog.Error,
-		Row:     tok.Row,
-		Column:  tok.Column,
-		Path:    tok.File.Path,
-		Message: message,
+func (b *Builder) pusherr(tok lex.Tok, key string) {
+	msg := x.Errs[key]
+	b.Errs = append(b.Errs, xlog.CompilerLog{
+		Type:   xlog.Err,
+		Row:    tok.Row,
+		Column: tok.Column,
+		Path:   tok.File.Path,
+		Msg:    msg,
 	})
 }
 
 // Ended reports position is at end of tokens or not.
-func (ast *Builder) Ended() bool {
-	return ast.Pos >= len(ast.Tokens)
-}
+func (ast *Builder) Ended() bool { return ast.Pos >= len(ast.Toks) }
 
-func (b *Builder) buildNode(toks []lex.Token) {
+func (b *Builder) buildNode(toks []lex.Tok) {
 	tok := toks[0]
 	switch tok.Id {
 	case lex.Use:
@@ -92,35 +90,35 @@ func (b *Builder) Build() {
 }
 
 // Type builds AST model of type defination statement.
-func (b *Builder) Type(toks []lex.Token) {
-	pos := 1 // Initialize value is 1 for skip keyword.
-	if pos >= len(toks) {
-		b.pusherr(toks[pos-1], "invalid_syntax")
+func (b *Builder) Type(toks []lex.Tok) {
+	i := 1 // Initialize value is 1 for skip keyword.
+	if i >= len(toks) {
+		b.pusherr(toks[i-1], "invalid_syntax")
 		return
 	}
-	tok := toks[pos]
+	tok := toks[i]
 	if tok.Id != lex.Id {
 		b.pusherr(tok, "invalid_syntax")
 	}
-	pos++
-	if pos >= len(toks) {
-		b.pusherr(toks[pos-1], "invalid_syntax")
+	i++
+	if i >= len(toks) {
+		b.pusherr(toks[i-1], "invalid_syntax")
 		return
 	}
-	destType, _ := b.DataType(toks[pos:], new(int), true)
+	destType, _ := b.DataType(toks[i:], new(int), true)
 	tok = toks[1]
-	typeAST := Type{
-		Pub:   b.pub,
-		Token: tok,
-		Id:    tok.Kind,
-		Type:  destType,
+	t := Type{
+		Pub:  b.pub,
+		Tok:  tok,
+		Id:   tok.Kind,
+		Type: destType,
 	}
 	b.pub = false
-	b.Tree = append(b.Tree, Obj{tok, typeAST})
+	b.Tree = append(b.Tree, Obj{tok, t})
 }
 
 // Comment builds AST model of comment.
-func (b *Builder) Comment(tok lex.Token) {
+func (b *Builder) Comment(tok lex.Tok) {
 	tok.Kind = strings.TrimSpace(tok.Kind[2:])
 	if strings.HasPrefix(tok.Kind, "cxx:") {
 		b.Tree = append(b.Tree, Obj{tok, CxxEmbed{tok.Kind[4:]}})
@@ -130,7 +128,7 @@ func (b *Builder) Comment(tok lex.Token) {
 }
 
 // Preprocessor builds AST model of preprocessor directives.
-func (b *Builder) Preprocessor(toks []lex.Token) {
+func (b *Builder) Preprocessor(toks []lex.Tok) {
 	if len(toks) == 1 {
 		b.pusherr(toks[0], "invalid_syntax")
 		return
@@ -139,7 +137,7 @@ func (b *Builder) Preprocessor(toks []lex.Token) {
 	toks = toks[1:] // Remove directive mark
 	tok := toks[0]
 	if tok.Id != lex.Id {
-		b.pusherr(pp.Token, "invalid_syntax")
+		b.pusherr(pp.Tok, "invalid_syntax")
 		return
 	}
 	ok := false
@@ -151,13 +149,13 @@ func (b *Builder) Preprocessor(toks []lex.Token) {
 		return
 	}
 	if ok {
-		b.Tree = append(b.Tree, Obj{pp.Token, pp})
+		b.Tree = append(b.Tree, Obj{pp.Tok, pp})
 	}
 }
 
 // Pragma builds AST model of preprocessor pragma directive.
 // Returns true if success, returns false if not.
-func (b *Builder) Pragma(pp *Preprocessor, toks []lex.Token) bool {
+func (b *Builder) Pragma(pp *Preprocessor, toks []lex.Tok) bool {
 	if len(toks) == 1 {
 		b.pusherr(toks[0], "missing_pragma_directive")
 		return false
@@ -180,7 +178,7 @@ func (b *Builder) Pragma(pp *Preprocessor, toks []lex.Token) bool {
 	return ok
 }
 
-func (b *Builder) pragmaEnofi(d *Directive, toks []lex.Token) bool {
+func (b *Builder) pragmaEnofi(d *Directive, toks []lex.Tok) bool {
 	if len(toks) > 1 {
 		b.pusherr(toks[1], "invalid_syntax")
 		return false
@@ -190,7 +188,7 @@ func (b *Builder) pragmaEnofi(d *Directive, toks []lex.Token) bool {
 }
 
 // Id builds AST model of global id statement.
-func (b *Builder) Id(toks []lex.Token) {
+func (b *Builder) Id(toks []lex.Tok) {
 	if len(toks) == 1 {
 		b.pusherr(toks[0], "invalid_syntax")
 		return
@@ -204,8 +202,8 @@ func (b *Builder) Id(toks []lex.Token) {
 		switch tok.Kind {
 		case "(":
 			f := b.Func(toks, false)
-			s := Statement{f.Token, f, false}
-			b.Tree = append(b.Tree, Obj{f.Token, s})
+			s := Statement{f.Tok, f, false}
+			b.Tree = append(b.Tree, Obj{f.Tok, s})
 			return
 		}
 	}
@@ -213,18 +211,18 @@ func (b *Builder) Id(toks []lex.Token) {
 }
 
 // Use builds AST model of use declaration.
-func (b *Builder) Use(toks []lex.Token) {
+func (b *Builder) Use(toks []lex.Tok) {
 	var use Use
-	use.Token = toks[0]
+	use.Tok = toks[0]
 	if len(toks) < 2 {
-		b.pusherr(use.Token, "missing_use_path")
+		b.pusherr(use.Tok, "missing_use_path")
 		return
 	}
 	use.Path = b.usePath(toks[1:])
-	b.Tree = append(b.Tree, Obj{use.Token, use})
+	b.Tree = append(b.Tree, Obj{use.Tok, use})
 }
 
-func (b *Builder) usePath(toks []lex.Token) string {
+func (b *Builder) usePath(toks []lex.Tok) string {
 	var path strings.Builder
 	path.WriteString(x.StdlibPath)
 	path.WriteRune(os.PathSeparator)
@@ -245,46 +243,46 @@ func (b *Builder) usePath(toks []lex.Token) string {
 }
 
 // Attribute builds AST model of attribute.
-func (b *Builder) Attribute(toks []lex.Token) {
-	var attribute Attribute
+func (b *Builder) Attribute(toks []lex.Tok) {
+	var a Attribute
 	i := 0
-	attribute.Token = toks[i]
+	a.Tok = toks[i]
 	i++
 	if b.Ended() {
 		b.pusherr(toks[i-1], "invalid_syntax")
 		return
 	}
-	attribute.Tag = toks[i]
-	if attribute.Tag.Id != lex.Id ||
-		attribute.Token.Column+1 != attribute.Tag.Column {
-		b.pusherr(attribute.Tag, "invalid_syntax")
+	a.Tag = toks[i]
+	if a.Tag.Id != lex.Id ||
+		a.Tok.Column+1 != a.Tag.Column {
+		b.pusherr(a.Tag, "invalid_syntax")
 		return
 	}
-	b.Tree = append(b.Tree, Obj{attribute.Token, attribute})
+	b.Tree = append(b.Tree, Obj{a.Tok, a})
 }
 
 // Func builds AST model of function.
-func (b *Builder) Func(toks []lex.Token, anonymous bool) (f Func) {
-	f.Token = toks[0]
+func (b *Builder) Func(toks []lex.Tok, anonymous bool) (f Func) {
+	f.Tok = toks[0]
 	i := 0
 	f.Pub = b.pub
 	b.pub = false
 	if anonymous {
 		f.Id = "anonymous"
 	} else {
-		if f.Token.Id != lex.Id {
-			b.pusherr(f.Token, "invalid_syntax")
+		if f.Tok.Id != lex.Id {
+			b.pusherr(f.Tok, "invalid_syntax")
 		}
-		f.Id = f.Token.Kind
+		f.Id = f.Tok.Kind
 		i++
 	}
-	f.RetType.Code = x.Void
+	f.RetType.Id = x.Void
 	paramToks := getRange(&i, "(", ")", toks)
 	if len(paramToks) > 0 {
 		b.Params(&f, paramToks)
 	}
 	if i >= len(toks) {
-		b.pusherr(f.Token, "body_not_exist")
+		b.pusherr(f.Tok, "body_not_exist")
 		return
 	}
 	tok := toks[i]
@@ -293,7 +291,7 @@ func (b *Builder) Func(toks []lex.Token, anonymous bool) (f Func) {
 		f.RetType = t
 		i++
 		if i >= len(toks) {
-			b.pusherr(f.Token, "body_not_exist")
+			b.pusherr(f.Tok, "body_not_exist")
 			return
 		}
 		tok = toks[i]
@@ -304,7 +302,7 @@ func (b *Builder) Func(toks []lex.Token, anonymous bool) (f Func) {
 	}
 	blockToks := getRange(&i, "{", "}", toks)
 	if blockToks == nil {
-		b.pusherr(f.Token, "body_not_exist")
+		b.pusherr(f.Tok, "body_not_exist")
 		return
 	}
 	if i < len(toks) {
@@ -315,16 +313,16 @@ func (b *Builder) Func(toks []lex.Token, anonymous bool) (f Func) {
 }
 
 // GlobalVar builds AST model of global variable.
-func (b *Builder) GlobalVar(toks []lex.Token) {
+func (b *Builder) GlobalVar(toks []lex.Tok) {
 	if toks == nil {
 		return
 	}
-	statement := b.VarStatement(toks)
-	b.Tree = append(b.Tree, Obj{statement.Token, statement})
+	s := b.VarStatement(toks)
+	b.Tree = append(b.Tree, Obj{s.Tok, s})
 }
 
 // Params builds AST model of function parameters.
-func (b *Builder) Params(fn *Func, toks []lex.Token) {
+func (b *Builder) Params(fn *Func, toks []lex.Tok) {
 	last := 0
 	braceCount := 0
 	for i, tok := range toks {
@@ -356,18 +354,18 @@ func (b *Builder) Params(fn *Func, toks []lex.Token) {
 func (b *Builder) checkParamsAsync(f *Func) {
 	defer func() { b.wg.Done() }()
 	for _, p := range f.Params {
-		if p.Type.Token.Id == lex.NA {
-			b.pusherr(p.Token, "missing_type")
+		if p.Type.Tok.Id == lex.NA {
+			b.pusherr(p.Tok, "missing_type")
 		}
 	}
 }
 
-func (b *Builder) pushParam(f *Func, toks []lex.Token, errtok lex.Token) {
+func (b *Builder) pushParam(f *Func, toks []lex.Tok, errtok lex.Tok) {
 	if len(toks) == 0 {
 		b.pusherr(errtok, "invalid_syntax")
 		return
 	}
-	past := Parameter{Token: toks[0]}
+	past := Parameter{Tok: toks[0]}
 	for i, tok := range toks {
 		switch tok.Id {
 		case lex.Const:
@@ -413,7 +411,7 @@ func (b *Builder) pushParam(f *Func, toks []lex.Token, errtok lex.Token) {
 				i = len(f.Params) - 1
 				for ; i >= 0; i-- {
 					param := &f.Params[i]
-					if param.Type.Token.Id != lex.NA {
+					if param.Type.Tok.Id != lex.NA {
 						break
 					}
 					param.Type = past.Type
@@ -436,22 +434,22 @@ end:
 }
 
 // DataType builds AST model of data type.
-func (b *Builder) DataType(toks []lex.Token, i *int, err bool) (dt DataType, ok bool) {
+func (b *Builder) DataType(toks []lex.Tok, i *int, err bool) (dt DataType, ok bool) {
 	first := *i
 	var dtv strings.Builder
 	for ; *i < len(toks); *i++ {
 		tok := toks[*i]
 		switch tok.Id {
 		case lex.DataType:
-			dt.Token = tok
-			dt.Code = x.TypeFromId(dt.Token.Kind)
-			dtv.WriteString(dt.Token.Kind)
+			dt.Tok = tok
+			dt.Id = x.TypeFromId(dt.Tok.Kind)
+			dtv.WriteString(dt.Tok.Kind)
 			ok = true
 			goto ret
 		case lex.Id:
-			dt.Token = tok
-			dt.Code = x.Id
-			dtv.WriteString(dt.Token.Kind)
+			dt.Tok = tok
+			dt.Id = x.Id
+			dtv.WriteString(dt.Tok.Kind)
 			ok = true
 			goto ret
 		case lex.Operator:
@@ -466,8 +464,8 @@ func (b *Builder) DataType(toks []lex.Token, i *int, err bool) (dt DataType, ok 
 		case lex.Brace:
 			switch tok.Kind {
 			case "(":
-				dt.Token = tok
-				dt.Code = x.Func
+				dt.Tok = tok
+				dt.Id = x.Func
 				value, f := b.FuncDataTypeHead(toks, i)
 				f.RetType, _ = b.FuncRetDataType(toks, i)
 				dtv.WriteString(value)
@@ -493,7 +491,7 @@ func (b *Builder) DataType(toks []lex.Token, i *int, err bool) (dt DataType, ok 
 				continue
 			}
 			/*if err {
-				ast.PushErrorToken(token, "invalid_syntax")
+				ast.pusherrtok(tok, "invalid_syntax")
 			}*/
 			return
 		default:
@@ -507,11 +505,11 @@ func (b *Builder) DataType(toks []lex.Token, i *int, err bool) (dt DataType, ok 
 		b.pusherr(toks[first], "invalid_type")
 	}
 ret:
-	dt.Value = dtv.String()
+	dt.Val = dtv.String()
 	return
 }
 
-func (b *Builder) FuncDataTypeHead(toks []lex.Token, i *int) (string, Func) {
+func (b *Builder) FuncDataTypeHead(toks []lex.Tok, i *int) (string, Func) {
 	var f Func
 	var typeVal strings.Builder
 	typeVal.WriteByte('(')
@@ -539,7 +537,7 @@ func (b *Builder) FuncDataTypeHead(toks []lex.Token, i *int) (string, Func) {
 	return "", f
 }
 
-func (b *Builder) pushTypeToTypes(types *[]DataType, toks []lex.Token, errTok lex.Token) {
+func (b *Builder) pushTypeToTypes(types *[]DataType, toks []lex.Tok, errTok lex.Tok) {
 	if len(toks) == 0 {
 		b.pusherr(errTok, "missing_value")
 		return
@@ -548,13 +546,13 @@ func (b *Builder) pushTypeToTypes(types *[]DataType, toks []lex.Token, errTok le
 	*types = append(*types, currentDt)
 }
 
-func (b *Builder) FuncRetDataType(toks []lex.Token, i *int) (dt DataType, ok bool) {
+func (b *Builder) FuncRetDataType(toks []lex.Tok, i *int) (dt DataType, ok bool) {
 	if *i >= len(toks) {
 		return
 	}
 	tok := toks[*i]
 	if tok.Id == lex.Brace && tok.Kind == "[" { // Multityped?
-		dt.Value += tok.Kind
+		dt.Val += tok.Kind
 		*i++
 		if *i >= len(toks) {
 			*i--
@@ -569,7 +567,7 @@ func (b *Builder) FuncRetDataType(toks []lex.Token, i *int) (dt DataType, ok boo
 		last := *i
 		for ; *i < len(toks); *i++ {
 			tok := toks[*i]
-			dt.Value += tok.Kind
+			dt.Val += tok.Kind
 			if tok.Id == lex.Brace {
 				switch tok.Kind {
 				case "(", "[", "{":
@@ -627,7 +625,7 @@ func (b *Builder) pushStatementToBlock(bs *blockStatement) {
 		bs.toks = bs.toks[:len(bs.toks)-1]
 	}
 	s := b.Statement(bs)
-	if s.Value == nil {
+	if s.Val == nil {
 		return
 	}
 	s.WithTerminator = bs.withTerminator
@@ -636,13 +634,13 @@ func (b *Builder) pushStatementToBlock(bs *blockStatement) {
 
 // IsStatement reports token is
 // statement finish point or not.
-func IsStatement(current, prev lex.Token) (ok bool, withTerminator bool) {
+func IsStatement(current, prev lex.Tok) (ok bool, withTerminator bool) {
 	ok = current.Id == lex.SemiColon || prev.Row < current.Row
 	withTerminator = current.Id == lex.SemiColon
 	return
 }
 
-func nextStatementPos(toks []lex.Token, start int) (int, bool) {
+func nextStatementPos(toks []lex.Tok, start int) (int, bool) {
 	braceCount := 0
 	i := start
 	for ; i < len(toks); i++ {
@@ -689,14 +687,14 @@ func nextStatementPos(toks []lex.Token, start int) (int, bool) {
 
 type blockStatement struct {
 	block          *BlockAST
-	blockToks      *[]lex.Token
-	toks           []lex.Token
-	nextToks       []lex.Token
+	blockToks      *[]lex.Tok
+	toks           []lex.Tok
+	nextToks       []lex.Tok
 	withTerminator bool
 }
 
 // Block builds AST model of statements of code block.
-func (b *Builder) Block(toks []lex.Token) (block BlockAST) {
+func (b *Builder) Block(toks []lex.Tok) (block BlockAST) {
 	for {
 		if b.Pos == -1 {
 			return
@@ -761,14 +759,14 @@ func (b *Builder) Statement(bs *blockStatement) (s Statement) {
 }
 
 type assignInfo struct {
-	selectorToks []lex.Token
-	exprToks     []lex.Token
-	setter       lex.Token
+	selectorToks []lex.Tok
+	exprToks     []lex.Tok
+	setter       lex.Tok
 	ok           bool
 	isExpr       bool
 }
 
-func (b *Builder) assignInfo(toks []lex.Token) (info assignInfo) {
+func (b *Builder) assignInfo(toks []lex.Tok) (info assignInfo) {
 	info.ok = true
 	braceCount := 0
 	for i, tok := range toks {
@@ -805,32 +803,32 @@ func (b *Builder) assignInfo(toks []lex.Token) (info assignInfo) {
 
 func (b *Builder) pushAssignSelector(selectors *[]AssignSelector, last, current int, info assignInfo) {
 	var selector AssignSelector
-	selector.Expr.Tokens = info.selectorToks[last:current]
+	selector.Expr.Toks = info.selectorToks[last:current]
 	if last-current == 0 {
 		b.pusherr(info.selectorToks[current-1], "missing_value")
 		return
 	}
 	// Variable is new?
-	if selector.Expr.Tokens[0].Id == lex.Id &&
+	if selector.Expr.Toks[0].Id == lex.Id &&
 		current-last > 1 &&
-		selector.Expr.Tokens[1].Id == lex.Colon {
+		selector.Expr.Toks[1].Id == lex.Colon {
 		if info.isExpr {
-			b.pusherr(selector.Expr.Tokens[0], "notallow_declares")
+			b.pusherr(selector.Expr.Toks[0], "notallow_declares")
 		}
 		selector.Var.New = true
-		selector.Var.IdToken = selector.Expr.Tokens[0]
-		selector.Var.Id = selector.Var.IdToken.Kind
-		selector.Var.SetterToken = info.setter
+		selector.Var.IdTok = selector.Expr.Toks[0]
+		selector.Var.Id = selector.Var.IdTok.Kind
+		selector.Var.SetterTok = info.setter
 		// Has specific data-type?
 		if current-last > 2 {
-			selector.Var.Type, _ = b.DataType(selector.Expr.Tokens[2:], new(int), false)
+			selector.Var.Type, _ = b.DataType(selector.Expr.Toks[2:], new(int), false)
 		}
 	} else {
-		if selector.Expr.Tokens[0].Id == lex.Id {
-			selector.Var.IdToken = selector.Expr.Tokens[0]
-			selector.Var.Id = selector.Var.IdToken.Kind
+		if selector.Expr.Toks[0].Id == lex.Id {
+			selector.Var.IdTok = selector.Expr.Toks[0]
+			selector.Var.Id = selector.Var.IdTok.Kind
 		}
-		selector.Expr = b.Expr(selector.Expr.Tokens)
+		selector.Expr = b.Expr(selector.Expr.Toks)
 	}
 	*selectors = append(*selectors, selector)
 }
@@ -918,7 +916,7 @@ func isAssignOperator(kind string) bool {
 		kind == "^="
 }
 
-func checkAssignToks(toks []lex.Token) bool {
+func checkAssignToks(toks []lex.Tok) bool {
 	if !isAssignTok(toks[0].Id) {
 		return false
 	}
@@ -944,18 +942,18 @@ func checkAssignToks(toks []lex.Token) bool {
 }
 
 // AssignStatement builds AST model of assignment statement.
-func (b *Builder) AssignStatement(toks []lex.Token, isExpr bool) (s Statement, _ bool) {
+func (b *Builder) AssignStatement(toks []lex.Tok, isExpr bool) (s Statement, _ bool) {
 	assign, ok := b.AssignExpr(toks, isExpr)
 	if !ok {
 		return
 	}
-	s.Token = toks[0]
-	s.Value = assign
+	s.Tok = toks[0]
+	s.Val = assign
 	return s, true
 }
 
 // AssignExpr builds AST model of assignment expression.
-func (b *Builder) AssignExpr(toks []lex.Token, isExpr bool) (assign Assign, ok bool) {
+func (b *Builder) AssignExpr(toks []lex.Tok, isExpr bool) (assign Assign, ok bool) {
 	if !checkAssignToks(toks) {
 		return
 	}
@@ -976,7 +974,7 @@ func (b *Builder) AssignExpr(toks []lex.Token, isExpr bool) (assign Assign, ok b
 }
 
 // BuildReturnStatement builds AST model of return statement.
-func (b *Builder) IdStatement(toks []lex.Token) (s Statement) {
+func (b *Builder) IdStatement(toks []lex.Tok) (s Statement) {
 	if len(toks) == 1 {
 		b.pusherr(toks[0], "invalid_syntax")
 		return
@@ -995,18 +993,18 @@ func (b *Builder) IdStatement(toks []lex.Token) (s Statement) {
 }
 
 // FuncCallStatement builds AST model of function call statement.
-func (b *Builder) FuncCallStatement(tokens []lex.Token) Statement {
-	return b.ExprStatement(tokens)
+func (b *Builder) FuncCallStatement(toks []lex.Tok) Statement {
+	return b.ExprStatement(toks)
 }
 
 // ExprStatement builds AST model of expression.
-func (b *Builder) ExprStatement(toks []lex.Token) Statement {
+func (b *Builder) ExprStatement(toks []lex.Tok) Statement {
 	block := ExprStatement{b.Expr(toks)}
 	return Statement{toks[0], block, false}
 }
 
 // Args builds AST model of arguments.
-func (b *Builder) Args(toks []lex.Token) []Arg {
+func (b *Builder) Args(toks []lex.Tok) []Arg {
 	var args []Arg
 	last := 0
 	braceCount := 0
@@ -1035,24 +1033,24 @@ func (b *Builder) Args(toks []lex.Token) []Arg {
 	return args
 }
 
-func (b *Builder) pushArg(args *[]Arg, toks []lex.Token, err lex.Token) {
+func (b *Builder) pushArg(args *[]Arg, toks []lex.Tok, err lex.Tok) {
 	if len(toks) == 0 {
 		b.pusherr(err, "invalid_syntax")
 		return
 	}
 	var arg Arg
-	arg.Token = toks[0]
+	arg.Tok = toks[0]
 	arg.Expr = b.Expr(toks)
 	*args = append(*args, arg)
 }
 
 // VarStatement builds AST model of variable declaration statement.
-func (b *Builder) VarStatement(toks []lex.Token) (s Statement) {
+func (b *Builder) VarStatement(toks []lex.Tok) (s Statement) {
 	var vast Var
 	vast.Pub = b.pub
 	b.pub = false
 	i := 0
-	vast.DefToken = toks[i]
+	vast.DefTok = toks[i]
 	for ; i < len(toks); i++ {
 		tok := toks[i]
 		if tok.Id == lex.Id {
@@ -1078,15 +1076,15 @@ func (b *Builder) VarStatement(toks []lex.Token) (s Statement) {
 	if i >= len(toks) {
 		return
 	}
-	vast.IdToken = toks[i]
-	if vast.IdToken.Id != lex.Id {
-		b.pusherr(vast.IdToken, "invalid_syntax")
+	vast.IdTok = toks[i]
+	if vast.IdTok.Id != lex.Id {
+		b.pusherr(vast.IdTok, "invalid_syntax")
 	}
-	vast.Id = vast.IdToken.Kind
-	vast.Type = DataType{Code: x.Void}
+	vast.Id = vast.IdTok.Kind
+	vast.Type = DataType{Id: x.Void}
 	// Skip type definer operator(':')
 	i++
-	if vast.DefToken.File != nil {
+	if vast.DefTok.File != nil {
 		if toks[i].Id != lex.Colon {
 			b.pusherr(toks[i], "invalid_syntax")
 			return
@@ -1116,48 +1114,48 @@ func (b *Builder) VarStatement(toks []lex.Token) (s Statement) {
 				b.pusherr(tok, "missing_value")
 				return
 			}
-			vast.Value = b.Expr(valueToks)
-			vast.SetterToken = tok
+			vast.Val = b.Expr(valueToks)
+			vast.SetterTok = tok
 		}
 	}
 ret:
-	return Statement{vast.IdToken, vast, false}
+	return Statement{vast.IdTok, vast, false}
 }
 
-func (b *Builder) CommentStatement(tok lex.Token) (s Statement) {
-	s.Token = tok
+func (b *Builder) CommentStatement(tok lex.Tok) (s Statement) {
+	s.Tok = tok
 	tok.Kind = strings.TrimSpace(tok.Kind[2:])
 	if strings.HasPrefix(tok.Kind, "cxx:") {
-		s.Value = CxxEmbed{tok.Kind[4:]}
+		s.Val = CxxEmbed{tok.Kind[4:]}
 	} else {
-		s.Value = Comment{tok.Kind}
+		s.Val = Comment{tok.Kind}
 	}
 	return
 }
 
 // RetStatement builds AST model of return statement.
-func (b *Builder) RetStatement(toks []lex.Token) Statement {
+func (b *Builder) RetStatement(toks []lex.Tok) Statement {
 	var returnModel Ret
-	returnModel.Token = toks[0]
+	returnModel.Tok = toks[0]
 	if len(toks) > 1 {
 		returnModel.Expr = b.Expr(toks[1:])
 	}
-	return Statement{returnModel.Token, returnModel, false}
+	return Statement{returnModel.Tok, returnModel, false}
 }
 
-func (b *Builder) FreeStatement(toks []lex.Token) Statement {
+func (b *Builder) FreeStatement(toks []lex.Tok) Statement {
 	var free Free
-	free.Token = toks[0]
+	free.Tok = toks[0]
 	toks = toks[1:]
 	if len(toks) == 0 {
-		b.pusherr(free.Token, "missing_expression")
+		b.pusherr(free.Tok, "missing_expression")
 	} else {
 		free.Expr = b.Expr(toks)
 	}
-	return Statement{free.Token, free, false}
+	return Statement{free.Tok, free, false}
 }
 
-func blockExprToks(toks []lex.Token) (expr []lex.Token) {
+func blockExprToks(toks []lex.Tok) (expr []lex.Tok) {
 	braceCount := 0
 	for i, tok := range toks {
 		if tok.Id == lex.Brace {
@@ -1178,19 +1176,19 @@ func blockExprToks(toks []lex.Token) (expr []lex.Token) {
 	return nil
 }
 
-func (b *Builder) getWhileIterProfile(toks []lex.Token) WhileProfile {
+func (b *Builder) getWhileIterProfile(toks []lex.Tok) WhileProfile {
 	return WhileProfile{b.Expr(toks)}
 }
 
-func (b *Builder) pushVarsToksPart(vars *[][]lex.Token, toks []lex.Token, errTok lex.Token) {
+func (b *Builder) pushVarsToksPart(vars *[][]lex.Tok, toks []lex.Tok, errTok lex.Tok) {
 	if len(toks) == 0 {
 		b.pusherr(errTok, "missing_value")
 	}
 	*vars = append(*vars, toks)
 }
 
-func (b *Builder) getForeachVarsToks(toks []lex.Token) [][]lex.Token {
-	var vars [][]lex.Token
+func (b *Builder) getForeachVarsToks(toks []lex.Tok) [][]lex.Tok {
+	var vars [][]lex.Tok
 	braceCount := 0
 	last := 0
 	for i, tok := range toks {
@@ -1218,17 +1216,17 @@ func (b *Builder) getForeachVarsToks(toks []lex.Token) [][]lex.Token {
 	return vars
 }
 
-func (b *Builder) getForeachIterVars(varsToks [][]lex.Token) []Var {
+func (b *Builder) getForeachIterVars(varsToks [][]lex.Tok) []Var {
 	var vars []Var
 	for _, toks := range varsToks {
 		var vast Var
-		vast.IdToken = toks[0]
-		if vast.IdToken.Id != lex.Id {
-			b.pusherr(vast.IdToken, "invalid_syntax")
+		vast.IdTok = toks[0]
+		if vast.IdTok.Id != lex.Id {
+			b.pusherr(vast.IdTok, "invalid_syntax")
 			vars = append(vars, vast)
 			continue
 		}
-		vast.Id = vast.IdToken.Kind
+		vast.Id = vast.IdTok.Kind
 		if len(toks) == 1 {
 			vars = append(vars, vast)
 			continue
@@ -1254,9 +1252,9 @@ func (b *Builder) getForeachIterVars(varsToks [][]lex.Token) []Var {
 	return vars
 }
 
-func (b *Builder) getForeachIterProfile(varToks, exprToks []lex.Token, inTok lex.Token) ForeachProfile {
+func (b *Builder) getForeachIterProfile(varToks, exprToks []lex.Tok, inTok lex.Tok) ForeachProfile {
 	var profile ForeachProfile
-	profile.InToken = inTok
+	profile.InTok = inTok
 	profile.Expr = b.Expr(exprToks)
 	if len(varToks) == 0 {
 		profile.KeyA.Id = xapi.Ignore
@@ -1280,7 +1278,7 @@ func (b *Builder) getForeachIterProfile(varToks, exprToks []lex.Token, inTok lex
 	return profile
 }
 
-func (b *Builder) getIterProfile(toks []lex.Token) IterProfile {
+func (b *Builder) getIterProfile(toks []lex.Tok) IterProfile {
 	braceCount := 0
 	for i, tok := range toks {
 		if tok.Id == lex.Brace {
@@ -1303,45 +1301,45 @@ func (b *Builder) getIterProfile(toks []lex.Token) IterProfile {
 	return b.getWhileIterProfile(toks)
 }
 
-func (b *Builder) IterExpr(toks []lex.Token) (s Statement) {
+func (b *Builder) IterExpr(toks []lex.Tok) (s Statement) {
 	var iter Iter
-	iter.Token = toks[0]
+	iter.Tok = toks[0]
 	toks = toks[1:]
 	if len(toks) == 0 {
-		b.pusherr(iter.Token, "body_not_exist")
+		b.pusherr(iter.Tok, "body_not_exist")
 		return
 	}
 	exprToks := blockExprToks(toks)
 	if len(exprToks) > 0 {
 		iter.Profile = b.getIterProfile(exprToks)
 	}
-	index := new(int)
-	*index = len(exprToks)
-	blockToks := getRange(index, "{", "}", toks)
+	i := new(int)
+	*i = len(exprToks)
+	blockToks := getRange(i, "{", "}", toks)
 	if blockToks == nil {
-		b.pusherr(iter.Token, "body_not_exist")
+		b.pusherr(iter.Tok, "body_not_exist")
 		return
 	}
-	if *index < len(toks) {
-		b.pusherr(toks[*index], "invalid_syntax")
+	if *i < len(toks) {
+		b.pusherr(toks[*i], "invalid_syntax")
 	}
 	iter.Block = b.Block(blockToks)
-	return Statement{iter.Token, iter, false}
+	return Statement{iter.Tok, iter, false}
 }
 
 func (b *Builder) IfExpr(bs *blockStatement) (s Statement) {
 	var ifast If
-	ifast.Token = bs.toks[0]
+	ifast.Tok = bs.toks[0]
 	bs.toks = bs.toks[1:]
 	exprToks := blockExprToks(bs.toks)
 	if len(exprToks) == 0 {
-		b.pusherr(ifast.Token, "missing_expression")
+		b.pusherr(ifast.Tok, "missing_expression")
 	}
 	i := new(int)
 	*i = len(exprToks)
 	blockToks := getRange(i, "{", "}", bs.toks)
 	if blockToks == nil {
-		b.pusherr(ifast.Token, "body_not_exist")
+		b.pusherr(ifast.Tok, "body_not_exist")
 		return
 	}
 	if *i < len(bs.toks) {
@@ -1353,22 +1351,22 @@ func (b *Builder) IfExpr(bs *blockStatement) (s Statement) {
 	}
 	ifast.Expr = b.Expr(exprToks)
 	ifast.Block = b.Block(blockToks)
-	return Statement{ifast.Token, ifast, false}
+	return Statement{ifast.Tok, ifast, false}
 }
 
 func (b *Builder) ElseIfExpr(bs *blockStatement) (s Statement) {
 	var elif ElseIf
-	elif.Token = bs.toks[1]
+	elif.Tok = bs.toks[1]
 	bs.toks = bs.toks[2:]
 	exprToks := blockExprToks(bs.toks)
 	if len(exprToks) == 0 {
-		b.pusherr(elif.Token, "missing_expression")
+		b.pusherr(elif.Tok, "missing_expression")
 	}
 	i := new(int)
 	*i = len(exprToks)
 	blockToks := getRange(i, "{", "}", bs.toks)
 	if blockToks == nil {
-		b.pusherr(elif.Token, "body_not_exist")
+		b.pusherr(elif.Tok, "body_not_exist")
 		return
 	}
 	if *i < len(bs.toks) {
@@ -1380,7 +1378,7 @@ func (b *Builder) ElseIfExpr(bs *blockStatement) (s Statement) {
 	}
 	elif.Expr = b.Expr(exprToks)
 	elif.Block = b.Block(blockToks)
-	return Statement{elif.Token, elif, false}
+	return Statement{elif.Tok, elif, false}
 }
 
 func (b *Builder) ElseBlock(bs *blockStatement) (s Statement) {
@@ -1388,15 +1386,15 @@ func (b *Builder) ElseBlock(bs *blockStatement) (s Statement) {
 		return b.ElseIfExpr(bs)
 	}
 	var elseast Else
-	elseast.Token = bs.toks[0]
+	elseast.Tok = bs.toks[0]
 	bs.toks = bs.toks[1:]
 	i := new(int)
 	blockToks := getRange(i, "{", "}", bs.toks)
 	if blockToks == nil {
 		if *i < len(bs.toks) {
-			b.pusherr(elseast.Token, "else_have_expr")
+			b.pusherr(elseast.Tok, "else_have_expr")
 		} else {
-			b.pusherr(elseast.Token, "body_not_exist")
+			b.pusherr(elseast.Tok, "body_not_exist")
 		}
 		return
 	}
@@ -1404,31 +1402,31 @@ func (b *Builder) ElseBlock(bs *blockStatement) (s Statement) {
 		b.pusherr(bs.toks[*i], "invalid_syntax")
 	}
 	elseast.Block = b.Block(blockToks)
-	return Statement{elseast.Token, elseast, false}
+	return Statement{elseast.Tok, elseast, false}
 }
 
-func (b *Builder) BreakStatement(toks []lex.Token) Statement {
+func (b *Builder) BreakStatement(toks []lex.Tok) Statement {
 	var breakAST Break
-	breakAST.Token = toks[0]
+	breakAST.Tok = toks[0]
 	if len(toks) > 1 {
 		b.pusherr(toks[1], "invalid_syntax")
 	}
-	return Statement{breakAST.Token, breakAST, false}
+	return Statement{breakAST.Tok, breakAST, false}
 }
 
-func (b *Builder) ContinueStatement(toks []lex.Token) Statement {
+func (b *Builder) ContinueStatement(toks []lex.Tok) Statement {
 	var continueAST Continue
-	continueAST.Token = toks[0]
+	continueAST.Tok = toks[0]
 	if len(toks) > 1 {
 		b.pusherr(toks[1], "invalid_syntax")
 	}
-	return Statement{continueAST.Token, continueAST, false}
+	return Statement{continueAST.Tok, continueAST, false}
 }
 
 // Expr builds AST model of expression.
-func (b *Builder) Expr(toks []lex.Token) (e Expr) {
+func (b *Builder) Expr(toks []lex.Tok) (e Expr) {
 	e.Processes = b.getExprProcesses(toks)
-	e.Tokens = toks
+	e.Toks = toks
 	return
 }
 
@@ -1449,9 +1447,9 @@ func isOverflowOperator(kind string) bool {
 
 func isExprOperator(kind string) bool { return kind == "..." }
 
-func (b *Builder) getExprProcesses(toks []lex.Token) [][]lex.Token {
-	var processes [][]lex.Token
-	var part []lex.Token
+func (b *Builder) getExprProcesses(toks []lex.Tok) [][]lex.Tok {
+	var processes [][]lex.Tok
+	var part []lex.Tok
 	operator := false
 	value := false
 	braceCount := 0
@@ -1486,8 +1484,8 @@ func (b *Builder) getExprProcesses(toks []lex.Token) [][]lex.Token {
 				continue
 			}
 			processes = append(processes, part)
-			processes = append(processes, []lex.Token{tok})
-			part = []lex.Token{}
+			processes = append(processes, []lex.Tok{tok})
+			part = []lex.Tok{}
 			continue
 		case lex.Brace:
 			switch tok.Kind {
@@ -1539,7 +1537,7 @@ func (b *Builder) getExprProcesses(toks []lex.Token) [][]lex.Token {
 	return processes
 }
 
-func requireOperatorForProcess(tok lex.Token, index, len int) bool {
+func requireOperatorForProcess(tok lex.Tok, index, len int) bool {
 	switch tok.Id {
 	case lex.Comma:
 		return false
@@ -1552,7 +1550,7 @@ func requireOperatorForProcess(tok lex.Token, index, len int) bool {
 	return index < len-1
 }
 
-func (b *Builder) checkExprTok(tok lex.Token) {
+func (b *Builder) checkExprTok(tok lex.Tok) {
 	if tok.Kind[0] >= '0' && tok.Kind[0] <= '9' {
 		var result bool
 		if strings.Contains(tok.Kind, ".") ||
@@ -1570,7 +1568,7 @@ func (b *Builder) checkExprTok(tok lex.Token) {
 	}
 }
 
-func getRange(i *int, open, close string, toks []lex.Token) []lex.Token {
+func getRange(i *int, open, close string, toks []lex.Tok) []lex.Tok {
 	if *i >= len(toks) {
 		return nil
 	}
@@ -1595,10 +1593,10 @@ func getRange(i *int, open, close string, toks []lex.Token) []lex.Token {
 	return nil
 }
 
-func (b *Builder) skipStatement() []lex.Token {
+func (b *Builder) skipStatement() []lex.Tok {
 	start := b.Pos
-	b.Pos, _ = nextStatementPos(b.Tokens, start)
-	toks := b.Tokens[start:b.Pos]
+	b.Pos, _ = nextStatementPos(b.Toks, start)
+	toks := b.Toks[start:b.Pos]
 	if toks[len(toks)-1].Id == lex.SemiColon {
 		if len(toks) == 1 {
 			return b.skipStatement()
