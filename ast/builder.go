@@ -32,14 +32,13 @@ func NewBuilder(toks []lex.Tok) *Builder {
 }
 
 // pusherr appends error by specified token.
-func (b *Builder) pusherr(tok lex.Tok, key string) {
-	msg := x.Errs[key]
+func (b *Builder) pusherr(tok lex.Tok, key string, args ...interface{}) {
 	b.Errs = append(b.Errs, xlog.CompilerLog{
 		Type:   xlog.Err,
 		Row:    tok.Row,
 		Column: tok.Column,
 		Path:   tok.File.Path,
-		Msg:    msg,
+		Msg:    x.GetErr(key, args...),
 	})
 }
 
@@ -395,7 +394,7 @@ func (b *Builder) pushParam(f *Func, toks []lex.Tok, errtok lex.Tok) {
 			if !xapi.IsIgnoreId(tok.Kind) {
 				for _, param := range f.Params {
 					if param.Id == tok.Kind {
-						b.pusherr(tok, "parameter_exist")
+						b.pusherr(tok, "parameter_exist", tok.Kind)
 						break
 					}
 				}
@@ -539,7 +538,7 @@ func (b *Builder) FuncDataTypeHead(toks []lex.Tok, i *int) (string, Func) {
 
 func (b *Builder) pushTypeToTypes(types *[]DataType, toks []lex.Tok, errTok lex.Tok) {
 	if len(toks) == 0 {
-		b.pusherr(errTok, "missing_value")
+		b.pusherr(errTok, "missing_expr")
 		return
 	}
 	currentDt, _ := b.DataType(toks, new(int), false)
@@ -790,7 +789,7 @@ func (b *Builder) assignInfo(toks []lex.Tok) (info assignInfo) {
 			}
 			info.setter = tok
 			if i+1 >= len(toks) {
-				b.pusherr(tok, "missing_value")
+				b.pusherr(tok, "missing_expr")
 				info.ok = false
 			} else {
 				info.exprToks = toks[i+1:]
@@ -805,7 +804,7 @@ func (b *Builder) pushAssignSelector(selectors *[]AssignSelector, last, current 
 	var selector AssignSelector
 	selector.Expr.Toks = info.selectorToks[last:current]
 	if last-current == 0 {
-		b.pusherr(info.selectorToks[current-1], "missing_value")
+		b.pusherr(info.selectorToks[current-1], "missing_expr")
 		return
 	}
 	// Variable is new?
@@ -863,7 +862,7 @@ func (b *Builder) assignSelectors(info assignInfo) []AssignSelector {
 func (b *Builder) pushAssignExpr(exps *[]Expr, last, current int, info assignInfo) {
 	toks := info.exprToks[last:current]
 	if toks == nil {
-		b.pusherr(info.exprToks[current-1], "missing_value")
+		b.pusherr(info.exprToks[current-1], "missing_expr")
 		return
 	}
 	*exps = append(*exps, b.Expr(toks))
@@ -1111,7 +1110,7 @@ func (b *Builder) VarStatement(toks []lex.Tok) (s Statement) {
 			}
 			valueToks := toks[i+1:]
 			if len(valueToks) == 0 {
-				b.pusherr(tok, "missing_value")
+				b.pusherr(tok, "missing_expr")
 				return
 			}
 			vast.Val = b.Expr(valueToks)
@@ -1148,7 +1147,7 @@ func (b *Builder) FreeStatement(toks []lex.Tok) Statement {
 	free.Tok = toks[0]
 	toks = toks[1:]
 	if len(toks) == 0 {
-		b.pusherr(free.Tok, "missing_expression")
+		b.pusherr(free.Tok, "missing_expr")
 	} else {
 		free.Expr = b.Expr(toks)
 	}
@@ -1182,7 +1181,7 @@ func (b *Builder) getWhileIterProfile(toks []lex.Tok) WhileProfile {
 
 func (b *Builder) pushVarsToksPart(vars *[][]lex.Tok, toks []lex.Tok, errTok lex.Tok) {
 	if len(toks) == 0 {
-		b.pusherr(errTok, "missing_value")
+		b.pusherr(errTok, "missing_expr")
 	}
 	*vars = append(*vars, toks)
 }
@@ -1333,7 +1332,7 @@ func (b *Builder) IfExpr(bs *blockStatement) (s Statement) {
 	bs.toks = bs.toks[1:]
 	exprToks := blockExprToks(bs.toks)
 	if len(exprToks) == 0 {
-		b.pusherr(ifast.Tok, "missing_expression")
+		b.pusherr(ifast.Tok, "missing_expr")
 	}
 	i := new(int)
 	*i = len(exprToks)
@@ -1360,7 +1359,7 @@ func (b *Builder) ElseIfExpr(bs *blockStatement) (s Statement) {
 	bs.toks = bs.toks[2:]
 	exprToks := blockExprToks(bs.toks)
 	if len(exprToks) == 0 {
-		b.pusherr(elif.Tok, "missing_expression")
+		b.pusherr(elif.Tok, "missing_expr")
 	}
 	i := new(int)
 	*i = len(exprToks)

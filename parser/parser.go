@@ -62,7 +62,9 @@ func Parset(tree []ast.Obj, main, justDefs bool) *Parser {
 }
 
 // pusherrtok appends new error by token.
-func (p *Parser) pusherrtok(tok lex.Tok, key string) { p.pusherrmsgtok(tok, x.Errs[key]) }
+func (p *Parser) pusherrtok(tok lex.Tok, key string, args ...interface{}) {
+	p.pusherrmsgtok(tok, x.GetErr(key, args...))
+}
 
 // pusherrtok appends new error message by token.
 func (p *Parser) pusherrmsgtok(tok lex.Tok, msg string) {
@@ -76,13 +78,13 @@ func (p *Parser) pusherrmsgtok(tok lex.Tok, msg string) {
 }
 
 // pushwarntok appends new warning by token.
-func (p *Parser) pushwarntok(tok lex.Tok, key string) {
+func (p *Parser) pushwarntok(tok lex.Tok, key string, args ...interface{}) {
 	p.Warns = append(p.Warns, xlog.CompilerLog{
 		Type:   xlog.Warn,
 		Row:    tok.Row,
 		Column: tok.Column,
 		Path:   tok.File.Path,
-		Msg:    x.Warns[key],
+		Msg:    x.GetWarn(key, args...),
 	})
 }
 
@@ -90,7 +92,9 @@ func (p *Parser) pushwarntok(tok lex.Tok, key string) {
 func (p *Parser) pusherrs(errs ...xlog.CompilerLog) { p.Errs = append(p.Errs, errs...) }
 
 // pusherr appends new error.
-func (p *Parser) pusherr(key string) { p.pusherrmsg(x.Errs[key]) }
+func (p *Parser) pusherr(key string, args ...interface{}) {
+	p.pusherrmsg(x.GetErr(key, args...))
+}
 
 // pusherrmsh appends new flat error message
 func (p *Parser) pusherrmsg(msg string) {
@@ -101,10 +105,10 @@ func (p *Parser) pusherrmsg(msg string) {
 }
 
 // pusherr appends new warning.
-func (p *Parser) pushwarn(key string) {
+func (p *Parser) pushwarn(key string, args ...interface{}) {
 	p.Warns = append(p.Warns, xlog.CompilerLog{
 		Type: xlog.FlatWarn,
-		Msg:  x.Warns[key],
+		Msg:  x.GetWarn(key, args...),
 	})
 }
 
@@ -200,7 +204,7 @@ func (p *Parser) checkUsePath(use *ast.Use) bool {
 	info, err := os.Stat(use.Path)
 	// Exists directory?
 	if err != nil || !info.IsDir() {
-		p.pusherrtok(use.Tok, "use_not_found")
+		p.pusherrtok(use.Tok, "use_not_found", use.Path)
 		return false
 	}
 	// Already uses?
@@ -475,7 +479,7 @@ func (p *Parser) checkAttribute(obj ast.Obj) {
 // Type parses X type define statement.
 func (p *Parser) Type(t ast.Type) {
 	if p.existid(t.Id).Id != lex.NA {
-		p.pusherrtok(t.Tok, "exist_id")
+		p.pusherrtok(t.Tok, "exist_id", t.Id)
 		return
 	} else if xapi.IsIgnoreId(t.Id) {
 		p.pusherrtok(t.Tok, "ignore_id")
@@ -535,7 +539,7 @@ func (p *Parser) Statement(s ast.Statement) {
 // Func parse X function.
 func (p *Parser) Func(fast ast.Func) {
 	if p.existid(fast.Id).Id != lex.NA {
-		p.pusherrtok(fast.Tok, "exist_id")
+		p.pusherrtok(fast.Tok, "exist_id", fast.Id)
 	} else if xapi.IsIgnoreId(fast.Id) {
 		p.pusherrtok(fast.Tok, "ignore_id")
 	}
@@ -556,7 +560,7 @@ func (p *Parser) Func(fast ast.Func) {
 // ParseVariable parse X global variable.
 func (p *Parser) Global(vast ast.Var) {
 	if p.existid(vast.Id).Id != lex.NA {
-		p.pusherrtok(vast.IdTok, "exist_id")
+		p.pusherrtok(vast.IdTok, "exist_id", vast.Id)
 		return
 	}
 	vast.Desc = p.docText.String()
@@ -1001,25 +1005,26 @@ func (p *valueEvaluator) num() value {
 }
 
 func (p *valueEvaluator) id() (v value, ok bool) {
-	if variable := p.parser.varById(p.tok.Kind); variable != nil {
-		v.ast.Data = p.tok.Kind
+	id := p.tok.Kind
+	if variable := p.parser.varById(id); variable != nil {
+		v.ast.Data = id
 		v.ast.Type = variable.Type
 		v.constant = variable.Const
 		v.volatile = variable.Volatile
 		v.ast.Tok = variable.IdTok
 		v.lvalue = true
-		p.model.appendSubNode(exprNode{xapi.AsId(p.tok.Kind)})
+		p.model.appendSubNode(exprNode{xapi.AsId(id)})
 		ok = true
-	} else if fun := p.parser.FuncById(p.tok.Kind); fun != nil {
-		v.ast.Data = p.tok.Kind
+	} else if fun := p.parser.FuncById(id); fun != nil {
+		v.ast.Data = id
 		v.ast.Type.Id = x.Func
 		v.ast.Type.Tag = fun.Ast
 		v.ast.Type.Val = fun.Ast.DataTypeString()
 		v.ast.Tok = fun.Ast.Tok
-		p.model.appendSubNode(exprNode{xapi.AsId(p.tok.Kind)})
+		p.model.appendSubNode(exprNode{xapi.AsId(id)})
 		ok = true
 	} else {
-		p.parser.pusherrtok(p.tok, "id_noexist")
+		p.parser.pusherrtok(p.tok, "id_noexist", id)
 	}
 	return
 }
@@ -1053,13 +1058,15 @@ func (s solver) ptr() (v ast.Value) {
 		}
 	}
 	if !ok {
-		s.p.pusherrtok(s.operator, "incompatible_type")
+		s.p.pusherrtok(s.operator, "incompatible_datatype",
+			s.rightVal.Type.Val, s.leftVal.Type.Val)
 		return
 	}
 	switch s.operator.Kind {
 	case "+", "-":
 		if typeIsPtr(s.leftVal.Type) && typeIsPtr(s.rightVal.Type) {
-			s.p.pusherrtok(s.operator, "incompatible_type")
+			s.p.pusherrtok(s.operator, "incompatible_datatype",
+				s.rightVal.Type.Val, s.leftVal.Type.Val)
 			return
 		}
 		if typeIsPtr(s.leftVal.Type) {
@@ -1078,7 +1085,8 @@ func (s solver) ptr() (v ast.Value) {
 func (s solver) str() (v ast.Value) {
 	// Not both string?
 	if s.leftVal.Type.Id != s.rightVal.Type.Id {
-		s.p.pusherrtok(s.operator, "incompatible_datatype")
+		s.p.pusherrtok(s.operator, "incompatible_datatype",
+			s.leftVal.Type.Val, s.rightVal.Type.Val)
 		return
 	}
 	switch s.operator.Kind {
@@ -1104,7 +1112,8 @@ func (s solver) any() (v ast.Value) {
 
 func (s solver) bool() (v ast.Value) {
 	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
-		s.p.pusherrtok(s.operator, "incompatible_type")
+		s.p.pusherrtok(s.operator, "incompatible_datatype",
+			s.rightVal.Type.Val, s.leftVal.Type.Val)
 		return
 	}
 	switch s.operator.Kind {
@@ -1120,7 +1129,8 @@ func (s solver) float() (v ast.Value) {
 	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
 		if !isConstNum(s.leftVal.Data) &&
 			!isConstNum(s.rightVal.Data) {
-			s.p.pusherrtok(s.operator, "incompatible_type")
+			s.p.pusherrtok(s.operator, "incompatible_datatype",
+				s.rightVal.Type.Val, s.leftVal.Type.Val)
 			return
 		}
 	}
@@ -1142,7 +1152,8 @@ func (s solver) signed() (v ast.Value) {
 	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
 		if !isConstNum(s.leftVal.Data) &&
 			!isConstNum(s.rightVal.Data) {
-			s.p.pusherrtok(s.operator, "incompatible_type")
+			s.p.pusherrtok(s.operator, "incompatible_datatype",
+				s.rightVal.Type.Val, s.leftVal.Type.Val)
 			return
 		}
 	}
@@ -1170,7 +1181,8 @@ func (s solver) unsigned() (v ast.Value) {
 	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
 		if !isConstNum(s.leftVal.Data) &&
 			!isConstNum(s.rightVal.Data) {
-			s.p.pusherrtok(s.operator, "incompatible_type")
+			s.p.pusherrtok(s.operator, "incompatible_datatype",
+				s.rightVal.Type.Val, s.leftVal.Type.Val)
 			return
 		}
 		return
@@ -1202,7 +1214,8 @@ func (s solver) logical() (v ast.Value) {
 
 func (s solver) rune() (v ast.Value) {
 	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
-		s.p.pusherrtok(s.operator, "incompatible_type")
+		s.p.pusherrtok(s.operator, "incompatible_datatype",
+			s.rightVal.Type.Val, s.leftVal.Type.Val)
 		return
 	}
 	switch s.operator.Kind {
@@ -1218,7 +1231,8 @@ func (s solver) rune() (v ast.Value) {
 
 func (s solver) array() (v ast.Value) {
 	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
-		s.p.pusherrtok(s.operator, "incompatible_type")
+		s.p.pusherrtok(s.operator, "incompatible_datatype",
+			s.rightVal.Type.Val, s.leftVal.Type.Val)
 		return
 	}
 	switch s.operator.Kind {
@@ -1232,7 +1246,8 @@ func (s solver) array() (v ast.Value) {
 
 func (s solver) nil() (v ast.Value) {
 	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, false) {
-		s.p.pusherrtok(s.operator, "incompatible_type")
+		s.p.pusherrtok(s.operator, "incompatible_datatype",
+			s.rightVal.Type.Val, s.leftVal.Type.Val)
 		return
 	}
 	switch s.operator.Kind {
@@ -1434,7 +1449,7 @@ func (p *Parser) evalHeapAllocExpr(toks []lex.Tok, m *exprModel) (v value) {
 	dt.Val = "*" + dt.Val
 	v.ast.Type = dt
 	if !ok {
-		p.pusherrtok(toks[0], "fail_build_heap_allocation_type")
+		p.pusherrtok(toks[0], "fail_build_heap_allocation_type", dt.Val)
 		return
 	}
 	if *i < len(toks)-1 {
@@ -1496,7 +1511,7 @@ func (p *Parser) evalExprPart(toks []lex.Tok, m *exprModel) (v value) {
 func (p *Parser) evalStrSubId(val value, idTok lex.Tok, m *exprModel) (v value) {
 	i, t := strDefs.defById(idTok.Kind)
 	if i == -1 {
-		p.pusherrtok(idTok, "object_have_not_id")
+		p.pusherrtok(idTok, "obj_have_not_id", val.ast.Type.Val)
 		return
 	}
 	v = val
@@ -1516,7 +1531,7 @@ func (p *Parser) evalStrSubId(val value, idTok lex.Tok, m *exprModel) (v value) 
 func (p *Parser) evalArraySubId(val value, idTok lex.Tok, m *exprModel) (v value) {
 	i, t := arrDefs.defById(idTok.Kind)
 	if i == -1 {
-		p.pusherrtok(idTok, "object_have_not_id")
+		p.pusherrtok(idTok, "obj_have_not_id", val.ast.Type.Val)
 		return
 	}
 	v = val
@@ -1555,7 +1570,7 @@ func (p *Parser) evalIdExprPart(toks []lex.Tok, m *exprModel) (v value) {
 	case typeIsArray(val.ast.Type):
 		return p.evalArraySubId(val, idTok, m)
 	}
-	p.pusherrtok(valTok, "object_not_support_sub_fields")
+	p.pusherrtok(valTok, "obj_not_support_sub_fields", val.ast.Type.Val)
 	return
 }
 
@@ -1628,9 +1643,9 @@ func (p *Parser) evalCast(v value, t ast.DataType, errtok lex.Tok) value {
 		p.checkCastArray(t, v.ast.Type, errtok)
 	case typeIsSingle(t):
 		v.lvalue = false
-		p.checkCastSingle(v.ast.Type, t.Id, errtok)
+		p.checkCastSingle(t, v.ast.Type, errtok)
 	default:
-		p.pusherrtok(errtok, "type_notsupports_casting")
+		p.pusherrtok(errtok, "type_notsupports_casting", t.Val)
 	}
 	v.ast.Type = t
 	v.constant = false
@@ -1638,48 +1653,48 @@ func (p *Parser) evalCast(v value, t ast.DataType, errtok lex.Tok) value {
 	return v
 }
 
-func (p *Parser) checkCastSingle(vt ast.DataType, t uint8, errtok lex.Tok) {
-	switch t {
+func (p *Parser) checkCastSingle(t, vt ast.DataType, errtok lex.Tok) {
+	switch t.Id {
 	case x.Str:
 		p.checkCastStr(vt, errtok)
 		return
 	}
 	switch {
-	case x.IsIntegerType(t):
-		p.checkCastInteger(vt, errtok)
-	case x.IsNumericType(t):
-		p.checkCastNumeric(vt, errtok)
+	case x.IsIntegerType(t.Id):
+		p.checkCastInteger(t, vt, errtok)
+	case x.IsNumericType(t.Id):
+		p.checkCastNumeric(t, vt, errtok)
 	default:
-		p.pusherrtok(errtok, "type_notsupports_casting")
+		p.pusherrtok(errtok, "type_notsupports_casting", t.Val)
 	}
 }
 
 func (p *Parser) checkCastStr(vt ast.DataType, errtok lex.Tok) {
 	if !typeIsArray(vt) {
-		p.pusherrtok(errtok, "type_notsupports_casting")
+		p.pusherrtok(errtok, "type_notsupports_casting", vt.Val)
 		return
 	}
 	vt.Val = vt.Val[2:] // Remove array brackets
 	if !typeIsSingle(vt) || (vt.Id != x.Rune && vt.Id != x.U8) {
-		p.pusherrtok(errtok, "type_notsupports_casting")
+		p.pusherrtok(errtok, "type_notsupports_casting", vt.Val)
 	}
 }
 
-func (p *Parser) checkCastInteger(vt ast.DataType, errtok lex.Tok) {
+func (p *Parser) checkCastInteger(t, vt ast.DataType, errtok lex.Tok) {
 	if typeIsPtr(vt) {
 		return
 	}
 	if typeIsSingle(vt) && x.IsNumericType(vt.Id) {
 		return
 	}
-	p.pusherrtok(errtok, "type_notsupports_casting")
+	p.pusherrtok(errtok, "type_notsupports_casting_to", vt.Val, t.Val)
 }
 
-func (p *Parser) checkCastNumeric(vt ast.DataType, errtok lex.Tok) {
+func (p *Parser) checkCastNumeric(t, vt ast.DataType, errtok lex.Tok) {
 	if typeIsSingle(vt) && x.IsNumericType(vt.Id) {
 		return
 	}
-	p.pusherrtok(errtok, "type_notsupports_casting")
+	p.pusherrtok(errtok, "type_notsupports_casting_to", vt.Val, t.Val)
 }
 
 func (p *Parser) checkCastPtr(vt ast.DataType, errtok lex.Tok) {
@@ -1689,17 +1704,17 @@ func (p *Parser) checkCastPtr(vt ast.DataType, errtok lex.Tok) {
 	if typeIsSingle(vt) && x.IsIntegerType(vt.Id) {
 		return
 	}
-	p.pusherrtok(errtok, "type_notsupports_casting")
+	p.pusherrtok(errtok, "type_notsupports_casting", vt.Val)
 }
 
 func (p *Parser) checkCastArray(t, vt ast.DataType, errtok lex.Tok) {
 	if !typeIsSingle(vt) || vt.Id != x.Str {
-		p.pusherrtok(errtok, "type_notsupports_casting")
+		p.pusherrtok(errtok, "type_notsupports_casting", vt.Val)
 		return
 	}
 	t.Val = t.Val[2:] // Remove array brackets
 	if !typeIsSingle(t) || (t.Id != x.Rune && t.Id != x.U8) {
-		p.pusherrtok(errtok, "type_notsupports_casting")
+		p.pusherrtok(errtok, "type_notsupports_casting", vt.Val)
 	}
 }
 
@@ -1718,7 +1733,7 @@ func (p *Parser) evalOperatorExprPartRight(toks []lex.Tok, m *exprModel) (v valu
 func (p *Parser) evalVariadicExprPart(toks []lex.Tok, m *exprModel, errtok lex.Tok) (v value) {
 	v = p.evalExprPart(toks, m)
 	if !typeIsVariadicable(v.ast.Type) {
-		p.pusherrtok(errtok, "variadic_with_nonvariadicable")
+		p.pusherrtok(errtok, "variadic_with_nonvariadicable", v.ast.Type.Val)
 		return
 	}
 	v.ast.Type.Val = v.ast.Type.Val[2:] // Remove array type.
@@ -1929,7 +1944,7 @@ func (p *Parser) buildEnumerableParts(toks []lex.Tok) [][]lex.Tok {
 		}
 		if tok.Id == lex.Comma {
 			if i-lastComma-1 == 0 {
-				p.pusherrtok(tok, "missing_expression")
+				p.pusherrtok(tok, "missing_expr")
 				lastComma = i
 				continue
 			}
@@ -2145,7 +2160,7 @@ type retChecker struct {
 
 func (rc *retChecker) pushval(last, current int, errTk lex.Tok) {
 	if current-last == 0 {
-		rc.p.pusherrtok(errTk, "missing_value")
+		rc.p.pusherrtok(errTk, "missing_expr")
 		return
 	}
 	toks := rc.retAST.Expr.Toks[last:current]
@@ -2260,14 +2275,14 @@ func (p *Parser) checkFunc(f *ast.Func) {
 	p.checkRets(f)
 }
 
-func (p *Parser) checkVarStatement(varAST *ast.Var, noParse bool) {
-	if p.existIdf(varAST.Id, true).Id != lex.NA {
-		p.pusherrtok(varAST.IdTok, "exist_id")
+func (p *Parser) checkVarStatement(vast *ast.Var, noParse bool) {
+	if p.existIdf(vast.Id, true).Id != lex.NA {
+		p.pusherrtok(vast.IdTok, "exist_id", vast.Id)
 	}
 	if !noParse {
-		*varAST = p.Var(*varAST)
+		*vast = p.Var(*vast)
 	}
-	p.BlockVars = append(p.BlockVars, *varAST)
+	p.BlockVars = append(p.BlockVars, *vast)
 }
 
 func (p *Parser) checkAssignment(selected value, errtok lex.Tok) bool {
@@ -2448,7 +2463,8 @@ func (frc *foreachTypeChecker) array() {
 			keyA.Type, ok = frc.p.readyType(keyA.Type, true)
 			if ok {
 				if !typeIsSingle(keyA.Type) || !x.IsNumericType(keyA.Type.Id) {
-					frc.p.pusherrtok(keyA.IdTok, "incompatible_datatype")
+					frc.p.pusherrtok(keyA.IdTok, "incompatible_datatype",
+						keyA.Type.Val, x.NumericTypeStr)
 				}
 			}
 		}
@@ -2480,7 +2496,8 @@ func (frc *foreachTypeChecker) keyA() {
 	keyA.Type, ok = frc.p.readyType(keyA.Type, true)
 	if ok {
 		if !typeIsSingle(keyA.Type) || !x.IsNumericType(keyA.Type.Id) {
-			frc.p.pusherrtok(keyA.IdTok, "incompatible_datatype")
+			frc.p.pusherrtok(keyA.IdTok, "incompatible_datatype",
+				keyA.Type.Val, x.NumericTypeStr)
 		}
 	}
 }
@@ -2666,13 +2683,13 @@ func (p *Parser) readyType(dt ast.DataType, err bool) (_ ast.DataType, ok bool) 
 func (p *Parser) checkMultiTypeAsync(real, check ast.DataType, ignoreAny bool, errTok lex.Tok) {
 	defer func() { p.wg.Done() }()
 	if real.MultiTyped != check.MultiTyped {
-		p.pusherrtok(errTok, "incompatible_datatype")
+		p.pusherrtok(errTok, "incompatible_datatype", real.Val, check.Val)
 		return
 	}
 	realTypes := real.Tag.([]ast.DataType)
 	checkTypes := real.Tag.([]ast.DataType)
 	if len(realTypes) != len(checkTypes) {
-		p.pusherrtok(errTok, "incompatible_datatype")
+		p.pusherrtok(errTok, "incompatible_datatype", real.Val, check.Val)
 		return
 	}
 	for i := 0; i < len(realTypes); i++ {
@@ -2706,19 +2723,19 @@ func (ac assignChecker) checkAssignTypeAsync() {
 			if xbits.CheckBitInt(ac.v.ast.Data, xbits.BitsizeType(ac.t.Id)) {
 				return
 			}
-			ac.p.pusherrtok(ac.errtok, "incompatible_datatype")
+			ac.p.pusherrtok(ac.errtok, "incompatible_datatype", ac.t, ac.v.ast.Type)
 			return
 		case x.IsFloatType(ac.t.Id):
 			if checkFloatBit(ac.v.ast, xbits.BitsizeType(ac.t.Id)) {
 				return
 			}
-			ac.p.pusherrtok(ac.errtok, "incompatible_datatype")
+			ac.p.pusherrtok(ac.errtok, "incompatible_datatype", ac.t, ac.v.ast.Type)
 			return
 		case x.IsUnsignedNumericType(ac.t.Id):
 			if xbits.CheckBitUInt(ac.v.ast.Data, xbits.BitsizeType(ac.t.Id)) {
 				return
 			}
-			ac.p.pusherrtok(ac.errtok, "incompatible_datatype")
+			ac.p.pusherrtok(ac.errtok, "incompatible_datatype", ac.t, ac.v.ast.Type)
 			return
 		}
 	}
@@ -2738,7 +2755,7 @@ func (p *Parser) checkTypeAsync(real, check ast.DataType, ignoreAny bool, errTok
 	}
 	if typeIsSingle(real) && typeIsSingle(check) {
 		if !typesAreCompatible(real, check, ignoreAny) {
-			p.pusherrtok(errTok, "incompatible_datatype")
+			p.pusherrtok(errTok, "incompatible_datatype", real.Val, check.Val)
 		}
 		return
 	}
@@ -2746,6 +2763,6 @@ func (p *Parser) checkTypeAsync(real, check ast.DataType, ignoreAny bool, errTok
 		return
 	}
 	if real.Val != check.Val {
-		p.pusherrtok(errTok, "incompatible_datatype")
+		p.pusherrtok(errTok, "incompatible_datatype", real.Val, check.Val)
 	}
 }

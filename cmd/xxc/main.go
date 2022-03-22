@@ -77,7 +77,7 @@ func initProject(cmd string) {
 
 func doc(cmd string) {
 	cmd = strings.TrimSpace(cmd)
-	paths := strings.SplitAfterN(cmd, " ", -1)
+	paths := strings.SplitN(cmd, " ", -1)
 	for _, path := range paths {
 		path = strings.TrimSpace(path)
 		p := compile(path, false, true)
@@ -85,13 +85,12 @@ func doc(cmd string) {
 			continue
 		}
 		if printlogs(p) {
-			fmt.Println(path+":",
-				"documentation couldn't generated because X source code has an errors")
+			fmt.Println(x.GetErr("doc_couldnt_generated", path))
 			continue
 		}
 		docjson, err := documenter.Documentize(p)
 		if err != nil {
-			fmt.Println("Error:", err.Error())
+			fmt.Println(x.GetErr("error", err.Error()))
 			continue
 		}
 		path = filepath.Join(x.XSet.CxxOutDir, path+x.DocExt)

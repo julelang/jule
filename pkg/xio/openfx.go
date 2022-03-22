@@ -11,7 +11,7 @@ import (
 // Openfx returns X source file.
 func Openfx(path string) (*File, error) {
 	if filepath.Ext(path) != x.SrcExt {
-		return nil, errors.New(x.Errs[`file_not_x`] + path)
+		return nil, errors.New(x.GetErr("file_not_x", path))
 	}
 	bytes, err := os.ReadFile(path)
 	if err != nil {

@@ -24,6 +24,10 @@ const (
 	SSize uint8 = 19
 )
 
+const (
+	NumericTypeStr = "<numeric>"
+)
+
 // TypeGreaterThan reports type one is greater than type two or not.
 func TypeGreaterThan(t1, t2 uint8) bool {
 	switch t1 {
