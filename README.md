@@ -102,7 +102,7 @@ Later, XXC is planned to be developed with the X programming language.
 
 ### Building with Go Compiler
 ```
-go build -o xxc.exe -v cmd/xxc/main.go
+go build -o xxc -v cmd/xxc/main.go
 ```
 Run the above command in your terminal, in the XXC project directory.
 
