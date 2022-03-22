@@ -1,6 +1,6 @@
 <div align="center">
 <p>
-    <img width="300" src="https://raw.githubusercontent.com/the-xlang/resources/main/x.svg?sanitize=true">
+    <img width="250" src="https://raw.githubusercontent.com/the-xlang/resources/main/x.svg?sanitize=true">
 </p>
 <h1>The X Programming Language</h1>
 <strong>Simple, efficent and compiled system programming language.
@@ -18,6 +18,7 @@
     <li><a href="#overview">Overview</a></li>
     <li><a href="#why-x">Why X?</a></li>
     <li><a href="#os-support">OS Support</a></li>
+    <li><a href="#project-build-state">Project Build State</a></li>
     <li><a href="#documentations">Documentations</a></li>
     <li><a href="#building-project">Building Project</a></li>
     <li><a href="#contributing">Contributing</a></li>
@@ -83,6 +84,39 @@ In this way, X can also be used as an easy interface for learning C++.
     <tr>
         <td>MacOS</td>
         <td>Supports transpiler, not supports compiler yet</td>
+    </tr>
+</table>
+
+<h2 id="project-build-state">Project Build State</h2>
+
+<table>
+    <tr>
+        <td><strong>Operating System</strong></td>
+        <td><strong>State</strong></td>
+    </tr>
+    <tr>
+        <td>Windows</td>
+        <td>
+            <a href="https://github.com/the-xlang/xxc/actions/workflows/windows.yml">
+                <img src="https://github.com/the-xlang/xxc/actions/workflows/windows.yml/badge.svg")>
+            </a>
+        </td>
+    </tr>
+    <tr>
+        <td>Ubuntu</td>
+        <td>
+            <a href="https://github.com/the-xlang/xxc/actions/workflows/ubuntu.yml">
+                <img src="https://github.com/the-xlang/xxc/actions/workflows/ubuntu.yml/badge.svg")>
+            </a>
+        </td>
+    </tr>
+    <tr>
+        <td>MacOS</td>
+        <td>
+            <a href="https://github.com/the-xlang/xxc/actions/workflows/macos.yml">
+                <img src="https://github.com/the-xlang/xxc/actions/workflows/macos.yml/badge.svg")>
+            </a>
+        </td>
     </tr>
 </table>
 
