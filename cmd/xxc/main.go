@@ -68,7 +68,7 @@ func initProject(cmd string) {
   "cxx_out_dir": "./dist/",
   "cxx_out_name": "x.cxx",
   "out_name": "main",
-  "language": "default"
+  "language": ""
 }`)
 	err := ioutil.WriteFile(x.SettingsFile, txt, 0666)
 	if err != nil {

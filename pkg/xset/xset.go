@@ -17,7 +17,7 @@ func Load(bytes []byte) (*XSet, error) {
 		CxxOutDir:  "./dist",
 		CxxOutName: "x.cxx",
 		OutName:    "main",
-		Language:   "default",
+		Language:   "",
 	}
 	err := json.Unmarshal(bytes, &set)
 	if err != nil {
