@@ -5,7 +5,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -65,7 +67,8 @@ func initProject(cmd string) {
 	txt := []byte(`{
   "cxx_out_dir": "./dist/",
   "cxx_out_name": "x.cxx",
-  "out_name": "main"
+  "out_name": "main",
+  "language": "default"
 }`)
 	err := ioutil.WriteFile(x.SettingsFile, txt, 0666)
 	if err != nil {
@@ -121,7 +124,8 @@ func init() {
 		os.Exit(0)
 	}
 	x.ExecPath = execp
-	x.StdlibPath = filepath.Join(x.ExecPath, x.StdlibName)
+	x.StdlibPath = filepath.Join(x.ExecPath, x.Stdlib)
+	x.LangsPath = filepath.Join(x.ExecPath, x.Langs)
 
 	// Not started with arguments.
 	// Here is "2" but "os.Args" always have one element for store working directory.
@@ -144,6 +148,76 @@ func init() {
 	}
 }
 
+func loadLangWarns(path string, infos []fs.FileInfo) {
+	i := -1
+	for j, f := range infos {
+		if f.IsDir() || f.Name() != "warns.json" {
+			continue
+		}
+		i = j
+		path = filepath.Join(path, f.Name())
+		break
+	}
+	if i == -1 {
+		return
+	}
+	bytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		println("Language's warnings couldn't loaded (uses default);")
+		println(err.Error())
+		return
+	}
+	err = json.Unmarshal(bytes, &x.Warns)
+	if err != nil {
+		println("Language's warnings couldn't loaded (uses default);")
+		println(err.Error())
+		return
+	}
+}
+
+func loadLangErrs(path string, infos []fs.FileInfo) {
+	i := -1
+	for j, f := range infos {
+		if f.IsDir() || f.Name() != "errs.json" {
+			continue
+		}
+		i = j
+		path = filepath.Join(path, f.Name())
+		break
+	}
+	if i == -1 {
+		return
+	}
+	bytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		println("Language's errors couldn't loaded (uses default);")
+		println(err.Error())
+		return
+	}
+	err = json.Unmarshal(bytes, &x.Errs)
+	if err != nil {
+		println("Language's errors couldn't loaded (uses default);")
+		println(err.Error())
+		return
+	}
+}
+
+func loadLang() {
+	lang := strings.TrimSpace(x.XSet.Language)
+	if lang == "" || lang == "default" {
+		return
+	}
+	path := filepath.Join(x.LangsPath, lang)
+	infos, err := ioutil.ReadDir(path)
+	if err != nil {
+		println("Language couldn't loaded (uses default);")
+		println(err.Error())
+		return
+	}
+	loadLangWarns(path, infos)
+	loadLangErrs(path, infos)
+}
+
 func loadXSet() {
 	// File check.
 	info, err := os.Stat(x.SettingsFile)
@@ -162,6 +236,7 @@ func loadXSet() {
 		println(err.Error())
 		os.Exit(0)
 	}
+	loadLang()
 }
 
 // printlogs prints logs and returns true
