@@ -1077,7 +1077,7 @@ func (s solver) ptr() (v ast.Value) {
 	case "!=", "==":
 		v.Type.Id = x.Bool
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_pointer")
+		s.p.pusherrtok(s.operator, "operator_notfor_xtype", "pointer")
 	}
 	return
 }
@@ -1095,7 +1095,7 @@ func (s solver) str() (v ast.Value) {
 	case "==", "!=":
 		v.Type.Id = x.Bool
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_string")
+		s.p.pusherrtok(s.operator, "operator_notfor_xtype", "string")
 	}
 	return
 }
@@ -1105,7 +1105,7 @@ func (s solver) any() (v ast.Value) {
 	case "!=", "==":
 		v.Type.Id = x.Bool
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_any")
+		s.p.pusherrtok(s.operator, "operator_notfor_xtype", "any")
 	}
 	return
 }
@@ -1120,7 +1120,7 @@ func (s solver) bool() (v ast.Value) {
 	case "!=", "==":
 		v.Type.Id = x.Bool
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_bool")
+		s.p.pusherrtok(s.operator, "operator_notfor_xtype", "bool")
 	}
 	return
 }
@@ -1224,7 +1224,7 @@ func (s solver) rune() (v ast.Value) {
 	case "+", "-", "*", "/", "^", "&", "%", "|":
 		v.Type.Id = x.Rune
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_rune")
+		s.p.pusherrtok(s.operator, "operator_notfor_xtype", "rune")
 	}
 	return
 }
@@ -1239,7 +1239,7 @@ func (s solver) array() (v ast.Value) {
 	case "!=", "==":
 		v.Type.Id = x.Bool
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_array")
+		s.p.pusherrtok(s.operator, "operator_notfor_xtype", "array")
 	}
 	return
 }
@@ -1254,7 +1254,7 @@ func (s solver) nil() (v ast.Value) {
 	case "!=", "==":
 		v.Type.Id = x.Bool
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_nil")
+		s.p.pusherrtok(s.operator, "operator_notfor_xtype", "nil")
 	}
 	return
 }
@@ -1324,19 +1324,19 @@ func (p *Parser) evalSingleExpr(tok lex.Tok, m *exprModel) (v value, ok bool) {
 	return
 }
 
-type operatorProcessor struct {
+type unaryProcessor struct {
 	tok    lex.Tok
 	toks   []lex.Tok
 	model  *exprModel
 	parser *Parser
 }
 
-func (p *operatorProcessor) unary() value {
+func (p *unaryProcessor) minus() value {
 	v := p.parser.evalExprPart(p.toks, p.model)
 	if !typeIsSingle(v.ast.Type) {
-		p.parser.pusherrtok(p.tok, "invalid_type_unary_minus")
+		p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", '-')
 	} else if !x.IsNumericType(v.ast.Type.Id) {
-		p.parser.pusherrtok(p.tok, "invalid_type_unary_minus")
+		p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", '-')
 	}
 	if isConstNum(v.ast.Data) {
 		v.ast.Data = "-" + v.ast.Data
@@ -1344,48 +1344,48 @@ func (p *operatorProcessor) unary() value {
 	return v
 }
 
-func (p *operatorProcessor) plus() value {
+func (p *unaryProcessor) plus() value {
 	v := p.parser.evalExprPart(p.toks, p.model)
 	if !typeIsSingle(v.ast.Type) {
-		p.parser.pusherrtok(p.tok, "invalid_type_unary_plus")
+		p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", '+')
 	} else if !x.IsNumericType(v.ast.Type.Id) {
-		p.parser.pusherrtok(p.tok, "invalid_type_unary_plus")
+		p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", '+')
 	}
 	return v
 }
 
-func (p *operatorProcessor) tilde() value {
+func (p *unaryProcessor) tilde() value {
 	v := p.parser.evalExprPart(p.toks, p.model)
 	if !typeIsSingle(v.ast.Type) {
-		p.parser.pusherrtok(p.tok, "invalid_type_unary_tilde")
+		p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", '~')
 	} else if !x.IsIntegerType(v.ast.Type.Id) {
-		p.parser.pusherrtok(p.tok, "invalid_type_unary_tilde")
+		p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", '~')
 	}
 	return v
 }
 
-func (p *operatorProcessor) logicalNot() value {
+func (p *unaryProcessor) logicalNot() value {
 	v := p.parser.evalExprPart(p.toks, p.model)
 	if !isBoolExpr(v) {
-		p.parser.pusherrtok(p.tok, "invalid_type_unary_logical_not")
+		p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", '!')
 	}
 	v.ast.Type.Val = "bool"
 	v.ast.Type.Id = x.Bool
 	return v
 }
 
-func (p *operatorProcessor) star() value {
+func (p *unaryProcessor) star() value {
 	v := p.parser.evalExprPart(p.toks, p.model)
 	v.lvalue = true
 	if !typeIsPtr(v.ast.Type) {
-		p.parser.pusherrtok(p.tok, "invalid_type_unary_star")
+		p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", '*')
 	} else {
 		v.ast.Type.Val = v.ast.Type.Val[1:]
 	}
 	return v
 }
 
-func (p *operatorProcessor) amper() value {
+func (p *unaryProcessor) amper() value {
 	v := p.parser.evalExprPart(p.toks, p.model)
 	v.lvalue = true
 	if !canGetPointer(v) {
@@ -1401,7 +1401,7 @@ func (p *Parser) evalOperatorExprPart(toks []lex.Tok, m *exprModel) value {
 	//? Change "1" with length of token's value
 	//? if all operators length is not 1.
 	exprToks := toks[1:]
-	processor := operatorProcessor{toks[0], exprToks, m, p}
+	processor := unaryProcessor{toks[0], exprToks, m, p}
 	m.appendSubNode(exprNode{processor.tok.Kind})
 	if processor.toks == nil {
 		p.pusherrtok(processor.tok, "invalid_syntax")
@@ -1409,7 +1409,7 @@ func (p *Parser) evalOperatorExprPart(toks []lex.Tok, m *exprModel) value {
 	}
 	switch processor.tok.Kind {
 	case "-":
-		v = processor.unary()
+		v = processor.minus()
 	case "+":
 		v = processor.plus()
 	case "~":

@@ -37,13 +37,13 @@ func NewLex(f *xio.File) *Lex {
 	return l
 }
 
-func (l *Lex) pusherr(err string) {
+func (l *Lex) pusherr(key string, args ...interface{}) {
 	l.Logs = append(l.Logs, xlog.CompilerLog{
 		Type:   xlog.Err,
 		Row:    l.Row,
 		Column: l.Column,
 		Path:   l.File.Path,
-		Msg:    x.Errs[err],
+		Msg:    x.GetErr(key, args...),
 	})
 }
 
@@ -456,8 +456,9 @@ func (l *Lex) Tok() Tok {
 			tok.Id = Value
 			break
 		}
-		l.pusherr("invalid_token")
-		l.Column++
+		r, sz := utf8.DecodeRuneInString(txt)
+		l.pusherr("invalid_token", r)
+		l.Column += sz
 		l.Pos++
 		return tok
 	}
