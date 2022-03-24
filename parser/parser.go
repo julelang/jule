@@ -594,7 +594,8 @@ func (p *Parser) Var(vast ast.Var) ast.Var {
 				vast.IdTok,
 			}.checkAssignTypeAsync()
 		} else { // Pass default value.
-			dt, ok := p.readyType(vast.Type, true)
+			vast.Type, _ = p.readyType(vast.Type, true)
+			/*dt, ok := p.readyType(vast.Type, true)
 			if ok {
 				var valTok lex.Tok
 				valTok.Id = lex.Value
@@ -603,7 +604,7 @@ func (p *Parser) Var(vast ast.Var) ast.Var {
 				processes := [][]lex.Tok{valToks}
 				vast.Val = ast.Expr{Toks: valToks, Processes: processes}
 				_, vast.Val.Model = p.evalExpr(vast.Val)
-			}
+			}*/
 		}
 	} else {
 		if vast.SetterTok.Id == lex.NA {
@@ -759,9 +760,9 @@ func (p *Parser) checkTypesAsync() {
 
 // WaitingGlobals parse X global variables for waiting parsing.
 func (p *Parser) WaitingGlobals() {
-	for _, varAST := range p.waitingGlobals {
-		variable := p.Var(varAST)
-		p.Defs.Globals = append(p.Defs.Globals, variable)
+	for _, vast := range p.waitingGlobals {
+		v := p.Var(vast)
+		p.Defs.Globals = append(p.Defs.Globals, v)
 	}
 }
 

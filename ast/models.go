@@ -326,11 +326,11 @@ func (v Var) String() string {
 	cxx.WriteString(v.Type.String())
 	cxx.WriteByte(' ')
 	cxx.WriteString(xapi.AsId(v.Id))
+	cxx.WriteByte('{')
 	if v.Val.Processes != nil {
-		cxx.WriteByte('{')
 		cxx.WriteString(v.Val.String())
-		cxx.WriteByte('}')
 	}
+	cxx.WriteByte('}')
 	cxx.WriteByte(';')
 	return cxx.String()
 }
