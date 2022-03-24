@@ -142,7 +142,6 @@ func init() {
 	if i == -1 {
 		i = len(arg)
 	}
-	loadXSet()
 	if processCommand(arg[:i], arg[i:]) {
 		os.Exit(0)
 	}
@@ -483,6 +482,7 @@ func writeOutput(path, content string) {
 }
 
 func compile(path string, main, justDefs bool) *parser.Parser {
+	loadXSet()
 	p := parser.New(nil)
 	// Check standard library.
 	inf, err := os.Stat(x.StdlibPath)
