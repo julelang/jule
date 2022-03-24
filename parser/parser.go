@@ -513,7 +513,7 @@ func (p *Parser) PushAttribute(attribute ast.Attribute) {
 	switch attribute.Tag.Kind {
 	case "inline":
 	default:
-		p.pusherrtok(attribute.Tag, "undefined_tag")
+		p.pusherrtok(attribute.Tag, "undefined_attribute")
 	}
 	for _, attr := range p.attributes {
 		if attr.Tag.Kind == attribute.Tag.Kind {
@@ -1334,9 +1334,9 @@ type operatorProcessor struct {
 func (p *operatorProcessor) unary() value {
 	v := p.parser.evalExprPart(p.toks, p.model)
 	if !typeIsSingle(v.ast.Type) {
-		p.parser.pusherrtok(p.tok, "invalid_data_unary")
+		p.parser.pusherrtok(p.tok, "invalid_type_unary_minus")
 	} else if !x.IsNumericType(v.ast.Type.Id) {
-		p.parser.pusherrtok(p.tok, "invalid_data_unary")
+		p.parser.pusherrtok(p.tok, "invalid_type_unary_minus")
 	}
 	if isConstNum(v.ast.Data) {
 		v.ast.Data = "-" + v.ast.Data
@@ -1347,9 +1347,9 @@ func (p *operatorProcessor) unary() value {
 func (p *operatorProcessor) plus() value {
 	v := p.parser.evalExprPart(p.toks, p.model)
 	if !typeIsSingle(v.ast.Type) {
-		p.parser.pusherrtok(p.tok, "invalid_data_plus")
+		p.parser.pusherrtok(p.tok, "invalid_type_unary_plus")
 	} else if !x.IsNumericType(v.ast.Type.Id) {
-		p.parser.pusherrtok(p.tok, "invalid_data_plus")
+		p.parser.pusherrtok(p.tok, "invalid_type_unary_plus")
 	}
 	return v
 }
@@ -1357,9 +1357,9 @@ func (p *operatorProcessor) plus() value {
 func (p *operatorProcessor) tilde() value {
 	v := p.parser.evalExprPart(p.toks, p.model)
 	if !typeIsSingle(v.ast.Type) {
-		p.parser.pusherrtok(p.tok, "invalid_data_tilde")
+		p.parser.pusherrtok(p.tok, "invalid_type_unary_tilde")
 	} else if !x.IsIntegerType(v.ast.Type.Id) {
-		p.parser.pusherrtok(p.tok, "invalid_data_tilde")
+		p.parser.pusherrtok(p.tok, "invalid_type_unary_tilde")
 	}
 	return v
 }
@@ -1367,7 +1367,7 @@ func (p *operatorProcessor) tilde() value {
 func (p *operatorProcessor) logicalNot() value {
 	v := p.parser.evalExprPart(p.toks, p.model)
 	if !isBoolExpr(v) {
-		p.parser.pusherrtok(p.tok, "invalid_data_logical_not")
+		p.parser.pusherrtok(p.tok, "invalid_type_unary_logical_not")
 	}
 	v.ast.Type.Val = "bool"
 	v.ast.Type.Id = x.Bool
@@ -1378,7 +1378,7 @@ func (p *operatorProcessor) star() value {
 	v := p.parser.evalExprPart(p.toks, p.model)
 	v.lvalue = true
 	if !typeIsPtr(v.ast.Type) {
-		p.parser.pusherrtok(p.tok, "invalid_data_star")
+		p.parser.pusherrtok(p.tok, "invalid_type_unary_star")
 	} else {
 		v.ast.Type.Val = v.ast.Type.Val[1:]
 	}
@@ -1389,7 +1389,7 @@ func (p *operatorProcessor) amper() value {
 	v := p.parser.evalExprPart(p.toks, p.model)
 	v.lvalue = true
 	if !canGetPointer(v) {
-		p.parser.pusherrtok(p.tok, "invalid_data_amper")
+		p.parser.pusherrtok(p.tok, "invalid_type_unary_amper")
 	}
 	v.ast.Type.Val = "*" + v.ast.Type.Val
 	return v
