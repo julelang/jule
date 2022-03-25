@@ -78,10 +78,14 @@ func (b *Builder) Build() {
 		b.pub = toks[0].Id == lex.Pub
 		if b.pub {
 			if len(toks) == 1 {
-				b.pusherr(toks[0], "invalid_syntax")
-				continue
+				if b.Ended() {
+					b.pusherr(toks[0], "invalid_syntax")
+					continue
+				}
+				toks = b.skipStatement()
+			} else {
+				toks = toks[1:]
 			}
-			toks = toks[1:]
 		}
 		b.buildNode(toks)
 	}
@@ -276,13 +280,17 @@ func (b *Builder) Func(toks []lex.Tok, anonymous bool) (f Func) {
 		i++
 	}
 	f.RetType.Id = x.Void
-	paramToks := getRange(&i, "(", ")", toks)
+	paramToks := b.getrange(&i, "(", ")", &toks)
 	if len(paramToks) > 0 {
 		b.Params(&f, paramToks)
 	}
 	if i >= len(toks) {
-		b.pusherr(f.Tok, "body_not_exist")
-		return
+		if b.Ended() {
+			b.pusherr(f.Tok, "body_not_exist")
+			return
+		}
+		i = 0
+		toks = b.skipStatement()
 	}
 	tok := toks[i]
 	t, ok := b.FuncRetDataType(toks, &i)
@@ -290,8 +298,12 @@ func (b *Builder) Func(toks []lex.Tok, anonymous bool) (f Func) {
 		f.RetType = t
 		i++
 		if i >= len(toks) {
-			b.pusherr(f.Tok, "body_not_exist")
-			return
+			if b.Ended() {
+				b.pusherr(f.Tok, "body_not_exist")
+				return
+			}
+			i = 0
+			toks = b.skipStatement()
 		}
 		tok = toks[i]
 	}
@@ -299,7 +311,7 @@ func (b *Builder) Func(toks []lex.Tok, anonymous bool) (f Func) {
 		b.pusherr(tok, "invalid_syntax")
 		return
 	}
-	blockToks := getRange(&i, "{", "}", toks)
+	blockToks := b.getrange(&i, "{", "}", &toks)
 	if blockToks == nil {
 		b.pusherr(f.Tok, "body_not_exist")
 		return
@@ -1314,7 +1326,7 @@ func (b *Builder) IterExpr(toks []lex.Tok) (s Statement) {
 	}
 	i := new(int)
 	*i = len(exprToks)
-	blockToks := getRange(i, "{", "}", toks)
+	blockToks := b.getrange(i, "{", "}", &toks)
 	if blockToks == nil {
 		b.pusherr(iter.Tok, "body_not_exist")
 		return
@@ -1336,7 +1348,7 @@ func (b *Builder) IfExpr(bs *blockStatement) (s Statement) {
 	}
 	i := new(int)
 	*i = len(exprToks)
-	blockToks := getRange(i, "{", "}", bs.toks)
+	blockToks := b.getrange(i, "{", "}", &bs.toks)
 	if blockToks == nil {
 		b.pusherr(ifast.Tok, "body_not_exist")
 		return
@@ -1363,7 +1375,7 @@ func (b *Builder) ElseIfExpr(bs *blockStatement) (s Statement) {
 	}
 	i := new(int)
 	*i = len(exprToks)
-	blockToks := getRange(i, "{", "}", bs.toks)
+	blockToks := b.getrange(i, "{", "}", &bs.toks)
 	if blockToks == nil {
 		b.pusherr(elif.Tok, "body_not_exist")
 		return
@@ -1388,7 +1400,7 @@ func (b *Builder) ElseBlock(bs *blockStatement) (s Statement) {
 	elseast.Tok = bs.toks[0]
 	bs.toks = bs.toks[1:]
 	i := new(int)
-	blockToks := getRange(i, "{", "}", bs.toks)
+	blockToks := b.getrange(i, "{", "}", &bs.toks)
 	if blockToks == nil {
 		if *i < len(bs.toks) {
 			b.pusherr(elseast.Tok, "else_have_expr")
@@ -1567,7 +1579,21 @@ func (b *Builder) checkExprTok(tok lex.Tok) {
 	}
 }
 
-func getRange(i *int, open, close string, toks []lex.Tok) []lex.Tok {
+func (b *Builder) getrange(i *int, open, close string, toks *[]lex.Tok) []lex.Tok {
+	rang := getrange(i, open, close, *toks)
+	if rang != nil {
+		return rang
+	}
+	if b.Ended() {
+		return nil
+	}
+	*i = 0
+	*toks = b.skipStatement()
+	rang = getrange(i, open, close, *toks)
+	return rang
+}
+
+func getrange(i *int, open, close string, toks []lex.Tok) []lex.Tok {
 	if *i >= len(toks) {
 		return nil
 	}
