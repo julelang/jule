@@ -422,7 +422,6 @@ func (l *Lex) Tok() Tok {
 		l.kw(txt, "byte", DataType, &tok),
 		l.kw(txt, "sbyte", DataType, &tok),
 		l.kw(txt, "size", DataType, &tok),
-		l.kw(txt, "ssize", DataType, &tok),
 		l.kw(txt, "bool", DataType, &tok),
 		l.kw(txt, "rune", DataType, &tok),
 		l.kw(txt, "str", DataType, &tok),

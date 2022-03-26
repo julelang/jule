@@ -445,22 +445,22 @@ end:
 }
 
 // DataType builds AST model of data type.
-func (b *Builder) DataType(toks []lex.Tok, i *int, err bool) (dt DataType, ok bool) {
+func (b *Builder) DataType(toks []lex.Tok, i *int, err bool) (t DataType, ok bool) {
 	first := *i
 	var dtv strings.Builder
 	for ; *i < len(toks); *i++ {
 		tok := toks[*i]
 		switch tok.Id {
 		case lex.DataType:
-			dt.Tok = tok
-			dt.Id = x.TypeFromId(dt.Tok.Kind)
-			dtv.WriteString(dt.Tok.Kind)
+			t.Tok = tok
+			t.Id = x.TypeFromId(t.Tok.Kind)
+			dtv.WriteString(t.Tok.Kind)
 			ok = true
 			goto ret
 		case lex.Id:
-			dt.Tok = tok
-			dt.Id = x.Id
-			dtv.WriteString(dt.Tok.Kind)
+			t.Tok = tok
+			t.Id = x.Id
+			dtv.WriteString(t.Tok.Kind)
 			ok = true
 			goto ret
 		case lex.Operator:
@@ -475,12 +475,12 @@ func (b *Builder) DataType(toks []lex.Tok, i *int, err bool) (dt DataType, ok bo
 		case lex.Brace:
 			switch tok.Kind {
 			case "(":
-				dt.Tok = tok
-				dt.Id = x.Func
-				value, f := b.FuncDataTypeHead(toks, i)
+				t.Tok = tok
+				t.Id = x.Func
+				val, f := b.FuncDataTypeHead(toks, i)
 				f.RetType, _ = b.FuncRetDataType(toks, i)
-				dtv.WriteString(value)
-				dt.Tag = f
+				dtv.WriteString(val)
+				t.Tag = f
 				ok = true
 				goto ret
 			case "[":
@@ -492,14 +492,22 @@ func (b *Builder) DataType(toks []lex.Tok, i *int, err bool) (dt DataType, ok bo
 					return
 				}
 				tok = toks[*i]
-				if tok.Id != lex.Brace || tok.Kind != "]" {
+				if tok.Id == lex.Brace && tok.Kind == "]" {
+					dtv.WriteString("[]")
+					continue
+				}
+				*i-- // Start from bracket
+				dt, val := b.MapDataType(toks, i, err)
+				if val == "" {
 					if err {
 						b.pusherr(tok, "invalid_syntax")
 					}
 					return
 				}
-				dtv.WriteString("[]")
-				continue
+				t = dt
+				dtv.WriteString(val)
+				ok = true
+				goto ret
 			}
 			/*if err {
 				ast.pusherrtok(tok, "invalid_syntax")
@@ -516,10 +524,73 @@ func (b *Builder) DataType(toks []lex.Tok, i *int, err bool) (dt DataType, ok bo
 		b.pusherr(toks[first], "invalid_type")
 	}
 ret:
-	dt.Val = dtv.String()
+	t.Val = dtv.String()
 	return
 }
 
+// MapDataType builds map data-type.
+func (b *Builder) MapDataType(toks []lex.Tok, i *int, err bool) (t DataType, _ string) {
+	t.Id = x.Map
+	t.Tok = toks[0]
+	braceCount := 0
+	colon := -1
+	start := *i
+	var mapToks []lex.Tok
+	for ; *i < len(toks); *i++ {
+		tok := toks[*i]
+		if tok.Id == lex.Brace {
+			switch tok.Kind {
+			case "(", "[", "{":
+				braceCount++
+			default:
+				braceCount--
+			}
+		}
+		if braceCount == 0 {
+			if start+1 > *i {
+				return
+			}
+			mapToks = toks[start+1 : *i]
+			break
+		} else if braceCount != 1 {
+			continue
+		}
+		if colon == -1 && tok.Id == lex.Colon {
+			colon = *i - start - 1
+		}
+	}
+	if mapToks == nil || colon == -1 {
+		return
+	}
+	colonTok := toks[colon]
+	if colon == 0 || colon+1 >= len(mapToks) {
+		b.pusherr(colonTok, "missing_expr")
+		return t, " " // Space for ignore "invalid_syntax" error
+	}
+	keyTypeToks := mapToks[:colon]
+	valTypeToks := mapToks[colon+1:]
+	types := make([]DataType, 2)
+	j := 0
+	types[0], _ = b.DataType(keyTypeToks, &j, err)
+	if j < len(keyTypeToks) && err {
+		b.pusherr(keyTypeToks[j], "invalid_syntax")
+	}
+	j = 0
+	types[1], _ = b.DataType(valTypeToks, &j, err)
+	if j < len(valTypeToks) && err {
+		b.pusherr(valTypeToks[j], "invalid_syntax")
+	}
+	t.Tag = types
+	var val strings.Builder
+	val.WriteByte('[')
+	val.WriteString(types[0].Val)
+	val.WriteByte(':')
+	val.WriteString(types[1].Val)
+	val.WriteByte(']')
+	return t, val.String()
+}
+
+// FuncDataTypeHead builds head part of function data-type.
 func (b *Builder) FuncDataTypeHead(toks []lex.Tok, i *int) (string, Func) {
 	var f Func
 	var typeVal strings.Builder
@@ -557,13 +628,15 @@ func (b *Builder) pushTypeToTypes(types *[]DataType, toks []lex.Tok, errTok lex.
 	*types = append(*types, currentDt)
 }
 
-func (b *Builder) FuncRetDataType(toks []lex.Tok, i *int) (dt DataType, ok bool) {
+// FuncRetDataType builds ret data-type of funtion.
+func (b *Builder) FuncRetDataType(toks []lex.Tok, i *int) (t DataType, ok bool) {
 	if *i >= len(toks) {
 		return
 	}
 	tok := toks[*i]
+	start := *i
 	if tok.Id == lex.Brace && tok.Kind == "[" { // Multityped?
-		dt.Val += tok.Kind
+		t.Val += tok.Kind
 		*i++
 		if *i >= len(toks) {
 			*i--
@@ -578,7 +651,7 @@ func (b *Builder) FuncRetDataType(toks []lex.Tok, i *int) (dt DataType, ok bool)
 		last := *i
 		for ; *i < len(toks); *i++ {
 			tok := toks[*i]
-			dt.Val += tok.Kind
+			t.Val += tok.Kind
 			if tok.Id == lex.Brace {
 				switch tok.Kind {
 				case "(", "[", "{":
@@ -588,22 +661,31 @@ func (b *Builder) FuncRetDataType(toks []lex.Tok, i *int) (dt DataType, ok bool)
 				}
 			}
 			if braceCount == 0 {
+				if tok.Id == lex.Colon {
+					*i = start
+					goto end
+				}
 				b.pushTypeToTypes(&types, toks[last:*i], toks[last-1])
 				break
 			} else if braceCount > 1 {
 				continue
 			}
-			if tok.Id != lex.Comma {
+			switch tok.Id {
+			case lex.Comma:
+			case lex.Colon:
+				*i = start
+				goto end
+			default:
 				continue
 			}
 			b.pushTypeToTypes(&types, toks[last:*i], toks[*i-1])
 			last = *i + 1
 		}
 		if len(types) > 1 {
-			dt.MultiTyped = true
-			dt.Tag = types
+			t.MultiTyped = true
+			t.Tag = types
 		} else {
-			dt = types[0]
+			t = types[0]
 		}
 		ok = true
 		return

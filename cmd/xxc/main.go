@@ -294,6 +294,7 @@ func appendStandard(code *string) {
 #include <string>
 #include <functional>
 #include <vector>
+#include <map>
 #include <codecvt>
 #include <locale>
 #include <type_traits>
@@ -304,55 +305,27 @@ func appendStandard(code *string) {
 #define nil nullptr
 // endregion X_BUILTIN_VALUES
 
-// region X_MISC
-class exception: public std::exception {
-private:
-  std::basic_string<char> _buffer;
-public:
-  exception(const char *_Str)      { this->_buffer = _Str; }
-  const char *what() const throw() { return this->_buffer.c_str(); }
-};
-
-#define XALLOC(_Alloc) new(std::nothrow) _Alloc
-#define XTHROW(_Msg) throw exception(_Msg)
-
-template <typename _Enum_t, typename _Index_t, typename _Item_t>
-static inline void foreach(const _Enum_t _Enum,
-                           const std::function<void(_Index_t, _Item_t)> _Body) {
-  _Index_t _index{0};
-  for (auto _item: _Enum) { _Body(_index++, _item); }
-}
-
-template <typename _Enum_t, typename _Index_t>
-static inline void foreach(const _Enum_t _Enum,
-                           const std::function<void(_Index_t)> _Body) {
-  _Index_t _index{0};
-  for (auto begin = _Enum.begin(), end = _Enum.end(); begin < end; ++begin)
-  { _Body(_index++); }
-}
-// endregion X_MISC
-
 // region X_BUILTIN_TYPES
-typedef int8_t   i8;
-typedef int16_t  i16;
-typedef int32_t  i32;
-typedef int64_t  i64;
-typedef ssize_t  ssize;
-typedef uint8_t  u8;
-typedef uint16_t u16;
-typedef uint32_t u32;
-typedef uint64_t u64;
-typedef size_t   size;
-typedef float    f32;
-typedef double   f64;
-typedef wchar_t  rune;
+typedef int8_t        i8;
+typedef int16_t       i16;
+typedef int32_t       i32;
+typedef int64_t       i64;
+typedef uint8_t       u8;
+typedef uint16_t      u16;
+typedef uint32_t      u32;
+typedef uint64_t      u64;
+typedef std::size_t   size;
+typedef float         f32;
+typedef double        f64;
+typedef wchar_t       rune;
+#define func          std::function
 
 class str: public std::basic_string<rune> {
 public:
 // region CONSTRUCTOR
-  str(void): str(L"")                                        { }
+  str(void): str(L"")                                        {}
   str(const rune* _Str)                                      { this->assign(_Str); }
-  str(const std::basic_string<rune> _Src): str(_Src.c_str()) { }
+  str(const std::basic_string<rune> _Src): str(_Src.c_str()) {}
 // endregion CONSTRUCTOR
 };
 // endregion X_BUILTIN_TYPES
@@ -368,8 +341,8 @@ public:
 // region CONSTRUCTORS
   array<_Item_t>(void) noexcept                                                     { this->_buffer = { }; }
   array<_Item_t>(const std::vector<_Item_t>& _Src) noexcept                         { this->_buffer = _Src; }
-  array<_Item_t>(const std::nullptr_t) noexcept: array<_Item_t>()                   { }
-  array<_Item_t>(const array<_Item_t>& _Src) noexcept: array<_Item_t>(_Src._buffer) { }
+  array<_Item_t>(const std::nullptr_t) noexcept: array<_Item_t>()                   {}
+  array<_Item_t>(const array<_Item_t>& _Src) noexcept: array<_Item_t>(_Src._buffer) {}
 
   array<_Item_t>(const str _Str) {
     if (std::is_same<_Item_t, rune>::value) {
@@ -378,7 +351,7 @@ public:
     }
     if (std::is_same<_Item_t, u8>::value) {
       std::wstring_convert<std::codecvt_utf8_utf16<rune>> _conv;
-      std::string _bytes = _conv.to_bytes(_Str);
+      const std::string _bytes = _conv.to_bytes(_Str);
       this->_buffer = std::vector<_Item_t>(_bytes.begin(), _bytes.end());
       return;
     }
@@ -402,9 +375,8 @@ public:
   operator str(void) const noexcept {
     if (std::is_same<_Item_t, rune>::value) { return str(std::basic_string<rune>(this->begin(), this->end())); }
     if (std::is_same<_Item_t, u8>::value) {
-      std::wstring_convert<std::codecvt_utf8_utf16<rune>> _conv;
       const std::string _bytes(this->begin(), this->end());
-      return str(_conv.from_bytes(_bytes));
+      return str(std::wstring(_bytes.begin(), _bytes.end()));
     }
   }
 
@@ -424,18 +396,88 @@ public:
 
   friend std::wostream& operator<<(std::wostream &_Stream,
                                    const array<_Item_t> &_Src) {
-    _Stream << L"[";
+    _Stream << L'[';
     const size _length = _Src._buffer.size();
     for (size _index = 0; _index < _length;) {
       _Stream << _Src._buffer[_index++];
       if (_index < _length) { _Stream << L", "; }
     }
-    _Stream << L"]";
+    _Stream << L']';
     return _Stream;
   }
 // endregion OPERATOR_OVERFLOWS
 };
+
+template<typename _Key_t, typename _Value_t>
+class map: public std::map<_Key_t, _Value_t> {
+public:
+// region CONSTRUCTORS
+  map<_Key_t, _Value_t>(void)                 {}
+  map<_Key_t, _Value_t>(const std::nullptr_t) {}
+  map<_Key_t, _Value_t>(const std::initializer_list<std::pair<_Key_t, _Value_t>> _Src)
+  { for (const auto _data: _Src) { this->insert(_data); } }
+// endregion CONSTRUCTORS
+
+// region OPERATOR_OVERFLOW
+  bool operator==(const std::nullptr_t) const noexcept { return this->empty(); }
+  bool operator!=(const std::nullptr_t) const noexcept { return !this->empty(); }
+
+  friend std::wostream& operator<<(std::wostream &_Stream,
+                          const map<_Key_t, _Value_t> &_Src) {
+    _Stream << L'{';
+    size _length = _Src.size();
+    for (const auto _pair: _Src) {
+      _Stream << _pair.first;
+      _Stream << L':';
+      _Stream << _pair.second;
+      if (--_length > 0) { _Stream << L", "; }
+    }
+    _Stream << L'}';
+    return _Stream;
+  }
+// endreion OPERATOR_OVERFLOW
+};
 // endregion X_STRUCTURES
+
+// region X_MISC
+class exception: public std::exception {
+private:
+  std::basic_string<char> _buffer;
+public:
+  exception(const char *_Str)      { this->_buffer = _Str; }
+  const char *what() const throw() { return this->_buffer.c_str(); }
+};
+
+#define XALLOC(_Alloc) new(std::nothrow) _Alloc
+#define XTHROW(_Msg) throw exception(_Msg)
+
+template <typename _Enum_t, typename _Index_t, typename _Item_t>
+static inline void foreach(const _Enum_t _Enum,
+                           const func<void(_Index_t, _Item_t)> _Body) {
+  _Index_t _index{0};
+  for (auto _item: _Enum) { _Body(_index++, _item); }
+}
+
+template <typename _Enum_t, typename _Index_t>
+static inline void foreach(const _Enum_t _Enum,
+                           const func<void(_Index_t)> _Body) {
+  _Index_t _index{0};
+  for (auto begin = _Enum.begin(), end = _Enum.end(); begin < end; ++begin)
+  { _Body(_index++); }
+}
+
+template <typename _Key_t, typename _Value_t>
+static inline void foreach(const map<_Key_t, _Value_t> _Map,
+                           const func<void(_Key_t)> _Body) {
+  for (const auto _pair: _Map) { _Body(_pair.first); }
+}
+
+template <typename _Key_t, typename _Value_t>
+static inline void foreach(const map<_Key_t, _Value_t> _Map,
+                           const func<void(_Key_t, _Value_t)> _Body) {
+  for (const auto _pair: _Map) { _Body(_pair.first, _pair.second); }
+}
+// endregion X_MISC
 
 // region X_BUILTIN_FUNCTIONS
 template <typename _Obj_t>
@@ -456,7 +498,9 @@ static inline void _outln(_Obj_t _Obj) {
 // region X_ENTRY_POINT
 int main() {
 // region X_ENTRY_POINT_STANDARD_CODES
-  std::locale::global(std::locale());
+  std::setlocale(LC_ALL, "");
+  std::wcin.imbue(std::locale::global(std::locale()));
+  std::wcout.imbue(std::locale::global(std::locale()));
 // endregion X_ENTRY_POINT_STANDARD_CODES
   _main();
 

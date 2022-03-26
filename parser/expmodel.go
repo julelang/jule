@@ -92,6 +92,28 @@ func (a arrayExpr) String() string {
 	return cxx.String()[:cxx.Len()-2] + "})"
 }
 
+type mapExpr struct {
+	dataType ast.DataType
+	keyExprs []iExpr
+	valExprs []iExpr
+}
+
+func (m mapExpr) String() string {
+	var cxx strings.Builder
+	cxx.WriteString(m.dataType.String())
+	cxx.WriteByte('{')
+	for i, k := range m.keyExprs {
+		v := m.valExprs[i]
+		cxx.WriteByte('{')
+		cxx.WriteString(k.String())
+		cxx.WriteByte(',')
+		cxx.WriteString(v.String())
+		cxx.WriteString("},")
+	}
+	cxx.WriteByte('}')
+	return cxx.String()
+}
+
 type argsExpr struct {
 	args []ast.Arg
 }

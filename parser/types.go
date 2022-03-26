@@ -1,13 +1,13 @@
 package parser
 
 import (
+	"strings"
+
 	"github.com/the-xlang/xxc/ast"
 	"github.com/the-xlang/xxc/pkg/x"
 )
 
-func typeIsVoidRet(t ast.DataType) bool {
-	return t.Id == x.Void && !t.MultiTyped
-}
+func typeIsVoidRet(t ast.DataType) bool { return t.Id == x.Void && !t.MultiTyped }
 
 func typeOfArrayElements(t ast.DataType) ast.DataType {
 	// Remove array syntax "[]"
@@ -26,17 +26,25 @@ func typeIsArray(t ast.DataType) bool {
 	if t.Val == "" {
 		return false
 	}
-	return t.Val[0] == '['
+	return strings.HasPrefix(t.Val, "[]")
 }
 
-func typeIsSingle(dt ast.DataType) bool {
-	return !typeIsPtr(dt) &&
-		!typeIsArray(dt) &&
-		dt.Id != x.Func
+func typeIsMap(t ast.DataType) bool {
+	if t.Val == "" {
+		return false
+	}
+	return t.Id == x.Map && t.Val[0] == '[' && !strings.HasPrefix(t.Val, "[]")
+}
+
+func typeIsSingle(t ast.DataType) bool {
+	return !typeIsPtr(t) &&
+		!typeIsArray(t) &&
+		!typeIsMap(t) &&
+		t.Id != x.Func
 }
 
 func typeIsNilCompatible(t ast.DataType) bool {
-	return t.Id == x.Func || typeIsPtr(t)
+	return t.Id == x.Func || typeIsPtr(t) || typeIsArray(t) || typeIsMap(t)
 }
 
 func checkArrayCompatiblity(arrT, t ast.DataType) bool {
@@ -46,8 +54,21 @@ func checkArrayCompatiblity(arrT, t ast.DataType) bool {
 	return arrT.Val == t.Val
 }
 
+func checkMapCompability(mapT, t ast.DataType) bool {
+	if t.Id == x.Nil {
+		return true
+	}
+	/*t1types := t1.Tag.([]ast.DataType)
+	t2types := t2.Tag.([]ast.DataType)
+	if !typesAreCompatible(t1types[0], t2types[0], ignoreany) {
+		return false
+	}
+	return typesAreCompatible(t1types[1], t2types[1], ignoreany)*/
+	return mapT.Val == t.Val
+}
+
 func typeIsLvalue(t ast.DataType) bool {
-	return typeIsPtr(t) || typeIsArray(t)
+	return typeIsPtr(t) || typeIsArray(t) || typeIsMap(t)
 }
 
 func typesAreCompatible(t1, t2 ast.DataType, ignoreany bool) bool {
@@ -57,16 +78,16 @@ func typesAreCompatible(t1, t2 ast.DataType, ignoreany bool) bool {
 			t1, t2 = t2, t1
 		}
 		return checkArrayCompatiblity(t1, t2)
+	case typeIsMap(t1) || typeIsMap(t2):
+		if typeIsMap(t2) {
+			t1, t2 = t2, t1
+		}
+		return checkMapCompability(t1, t2)
 	case typeIsNilCompatible(t1) || typeIsNilCompatible(t2):
 		return t1.Id == x.Nil || t2.Id == x.Nil
 	}
 	return x.TypesAreCompatible(t1.Id, t2.Id, ignoreany)
 }
 
-func typeIsVariadicable(t ast.DataType) bool {
-	return typeIsArray(t)
-}
-
-func typeIsMut(t ast.DataType) bool {
-	return typeIsPtr(t)
-}
+func typeIsVariadicable(t ast.DataType) bool { return typeIsArray(t) }
+func typeIsMut(t ast.DataType) bool          { return typeIsPtr(t) }
