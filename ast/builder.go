@@ -642,6 +642,7 @@ func (b *Builder) FuncRetDataType(toks []lex.Tok, i *int) (t DataType, ok bool) 
 			*i--
 			goto end
 		}
+		tok = toks[*i]
 		if tok.Id == lex.Brace && tok.Kind == "]" {
 			*i--
 			goto end

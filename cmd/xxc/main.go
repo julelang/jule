@@ -335,14 +335,16 @@ template<typename _Item_t>
 class array {
 public:
 // region FIELDS
-  std::vector<_Item_t> _buffer;
+  std::vector<_Item_t> _buffer{};
 // endregion FIELDS
 
 // region CONSTRUCTORS
-  array<_Item_t>(void) noexcept                                                     { this->_buffer = { }; }
-  array<_Item_t>(const std::vector<_Item_t>& _Src) noexcept                         { this->_buffer = _Src; }
-  array<_Item_t>(const std::nullptr_t) noexcept: array<_Item_t>()                   {}
-  array<_Item_t>(const array<_Item_t>& _Src) noexcept: array<_Item_t>(_Src._buffer) {}
+  array<_Item_t>(void) noexcept                       {}
+  array<_Item_t>(const std::nullptr_t) noexcept       {}
+  array<_Item_t>(const array<_Item_t>& _Src) noexcept { this->_buffer = _Src._buffer; }
+
+  array<_Item_t>(const std::initializer_list<_Item_t> &_Src) noexcept
+  { this->_buffer = std::vector<_Item_t>(_Src.begin(), _Src.end()); }
 
   array<_Item_t>(const str _Str) {
     if (std::is_same<_Item_t, rune>::value) {
