@@ -74,6 +74,12 @@ var mapDefs = &defmap{
 	Funcs: []*function{
 		{Ast: ast.Func{Id: "keys"}},
 		{Ast: ast.Func{Id: "values"}},
+		{Ast: ast.Func{
+			Id:      "has",
+			Params:  []ast.Parameter{{Id: "key", Const: true}},
+			RetType: ast.DataType{Id: x.Bool, Val: "bool"},
+		},
+		},
 	},
 }
 
@@ -83,10 +89,15 @@ func readyMapDefs(mapt ast.DataType) {
 	types := mapt.Tag.([]ast.DataType)
 	keyt := types[0]
 	valt := types[1]
+
 	keysFunc := mapDefs.funcById("keys")
 	keysFunc.Ast.RetType = keyt
 	keysFunc.Ast.RetType.Val = "[]" + keysFunc.Ast.RetType.Val
+
 	valuesFunc := mapDefs.funcById("values")
 	valuesFunc.Ast.RetType = valt
 	valuesFunc.Ast.RetType.Val = "[]" + valuesFunc.Ast.RetType.Val
+
+	hasFunc := mapDefs.funcById("has")
+	hasFunc.Ast.Params[0].Type = keyt
 }
