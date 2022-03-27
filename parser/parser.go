@@ -1813,8 +1813,8 @@ func (p *Parser) evalParenthesesRangeExpr(toks []lex.Tok, m *exprModel) (v value
 	m.appendSubNode(exprNode{"("})
 	defer m.appendSubNode(exprNode{")"})
 
-	switch v.ast.Type.Id {
-	case x.Func:
+	switch {
+	case typeIsFunc(v.ast.Type):
 		fun := v.ast.Type.Tag.(ast.Func)
 		p.parseFuncCall(fun, toks[len(valueToks):], m)
 		v.ast.Type = fun.RetType
