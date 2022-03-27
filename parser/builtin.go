@@ -61,3 +61,32 @@ var arrDefs = &defmap{
 		},
 	},
 }
+
+var mapDefs = &defmap{
+	Globals: []ast.Var{
+		{
+			Id:    "len",
+			Const: true,
+			Type:  ast.DataType{Id: x.Size, Val: "size"},
+			Tag:   "size()",
+		},
+	},
+	Funcs: []*function{
+		{Ast: ast.Func{Id: "keys"}},
+		{Ast: ast.Func{Id: "values"}},
+	},
+}
+
+// Use this at before use mapDefs if necessary.
+// Because some definitions is responsive for map data-types.
+func readyMapDefs(mapt ast.DataType) {
+	types := mapt.Tag.([]ast.DataType)
+	keyt := types[0]
+	valt := types[1]
+	keysFunc := mapDefs.funcById("keys")
+	keysFunc.Ast.RetType = keyt
+	keysFunc.Ast.RetType.Val = "[]" + keysFunc.Ast.RetType.Val
+	valuesFunc := mapDefs.funcById("values")
+	valuesFunc.Ast.RetType = valt
+	valuesFunc.Ast.RetType.Val = "[]" + valuesFunc.Ast.RetType.Val
+}

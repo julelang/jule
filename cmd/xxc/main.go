@@ -418,6 +418,22 @@ public:
   { for (const auto _data: _Src) { this->insert(_data); } }
 // endregion CONSTRUCTORS
 
+// region METHODS
+  array<_Key_t> keys(void) const noexcept {
+    array<_Key_t> _keys{};
+    for (const auto _pair: *this)
+    { _keys._buffer.push_back(_pair.first); }
+    return _keys;
+  }
+
+  array<_Value_t> values(void) const noexcept {
+    array<_Value_t> _values{};
+    for (const auto _pair: *this)
+    { _values._buffer.push_back(_pair.second); }
+    return _values;
+  }
+// endregion METHODS
+
 // region OPERATOR_OVERFLOW
   bool operator==(const std::nullptr_t) const noexcept { return this->empty(); }
   bool operator!=(const std::nullptr_t) const noexcept { return !this->empty(); }

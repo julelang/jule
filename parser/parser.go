@@ -1525,9 +1525,8 @@ func (p *Parser) evalStrSubId(val value, idTok lex.Tok, m *exprModel) (v value) 
 		v.ast.Type = g.Type
 		v.lvalue = true
 		v.constant = g.Const
-	default:
 	}
-	return v
+	return
 }
 
 func (p *Parser) evalArraySubId(val value, idTok lex.Tok, m *exprModel) (v value) {
@@ -1545,9 +1544,37 @@ func (p *Parser) evalArraySubId(val value, idTok lex.Tok, m *exprModel) (v value
 		v.ast.Type = g.Type
 		v.lvalue = true
 		v.constant = g.Const
-	default:
 	}
-	return v
+	return
+}
+
+func (p *Parser) evalMapSubId(val value, idTok lex.Tok, m *exprModel) (v value) {
+	readyMapDefs(val.ast.Type)
+	i, t := mapDefs.defById(idTok.Kind)
+	if i == -1 {
+		p.pusherrtok(idTok, "obj_have_not_id", val.ast.Type.Val)
+		return
+	}
+	v = val
+	v.lvalue = false
+	v.ast.Data = idTok.Kind
+	m.appendSubNode(exprNode{"."})
+	switch t {
+	case 'g':
+		g := &mapDefs.Globals[i]
+		m.appendSubNode(exprNode{g.Tag.(string)})
+		v.ast.Type = g.Type
+		v.lvalue = true
+		v.constant = g.Const
+	case 'f':
+		f := mapDefs.Funcs[i]
+		v.ast.Type.Id = x.Func
+		v.ast.Type.Tag = f.Ast
+		v.ast.Type.Val = f.Ast.DataTypeString()
+		v.ast.Tok = f.Ast.Tok
+		m.appendSubNode(exprNode{f.Ast.Id})
+	}
+	return
 }
 
 func (p *Parser) evalIdExprPart(toks []lex.Tok, m *exprModel) (v value) {
@@ -1571,6 +1598,8 @@ func (p *Parser) evalIdExprPart(toks []lex.Tok, m *exprModel) (v value) {
 		return p.evalStrSubId(val, idTok, m)
 	case typeIsArray(val.ast.Type):
 		return p.evalArraySubId(val, idTok, m)
+	case typeIsMap(val.ast.Type):
+		return p.evalMapSubId(val, idTok, m)
 	}
 	p.pusherrtok(valTok, "obj_not_support_sub_fields", val.ast.Type.Val)
 	return

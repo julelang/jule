@@ -70,10 +70,16 @@ func (dm *defmap) globalById(id string) *ast.Var {
 //
 // Types;
 // 'g' -> global
+// 'f' -> function
 func (dm *defmap) defById(id string) (int, byte) {
-	i := dm.findGlobalById(id)
+	var i int
+	i = dm.findGlobalById(id)
 	if i != -1 {
 		return i, 'g'
+	}
+	i = dm.findFuncById(id)
+	if i != -1 {
+		return i, 'f'
 	}
 	return -1, ' '
 }
