@@ -825,7 +825,10 @@ func (b *Builder) Statement(bs *blockStatement) (s Statement) {
 	tok := bs.toks[0]
 	switch tok.Id {
 	case lex.Id:
-		return b.IdStatement(bs.toks)
+		s, ok := b.IdStatement(bs.toks)
+		if ok {
+			return s
+		}
 	case lex.Const, lex.Volatile:
 		return b.VarStatement(bs.toks)
 	case lex.Ret:
@@ -1068,27 +1071,13 @@ func (b *Builder) AssignExpr(toks []lex.Tok, isExpr bool) (assign Assign, ok boo
 }
 
 // BuildReturnStatement builds AST model of return statement.
-func (b *Builder) IdStatement(toks []lex.Tok) (s Statement) {
-	if len(toks) == 1 {
-		b.pusherr(toks[0], "invalid_syntax")
-		return
-	}
-	switch toks[1].Id {
+func (b *Builder) IdStatement(toks []lex.Tok) (s Statement, _ bool) {
+	tok := toks[1]
+	switch tok.Id {
 	case lex.Colon:
-		return b.VarStatement(toks)
-	case lex.Brace:
-		switch toks[1].Kind {
-		case "(":
-			return b.FuncCallStatement(toks)
-		}
+		return b.VarStatement(toks), true
 	}
-	b.pusherr(toks[0], "invalid_syntax")
 	return
-}
-
-// FuncCallStatement builds AST model of function call statement.
-func (b *Builder) FuncCallStatement(toks []lex.Tok) Statement {
-	return b.ExprStatement(toks)
 }
 
 // ExprStatement builds AST model of expression.
