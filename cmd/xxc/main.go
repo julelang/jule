@@ -436,6 +436,7 @@ public:
   }
 
   bool has(const _Key_t _Key) const noexcept { return this->find(_Key) != this->end(); }
+  bool del(const _Key_t _Key) const noexcept { return this->erase(_Key) != this->end(); }
 // endregion METHODS
 
 // region OPERATOR_OVERFLOW

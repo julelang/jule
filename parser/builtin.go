@@ -72,14 +72,14 @@ var mapDefs = &defmap{
 		},
 	},
 	Funcs: []*function{
+		{Ast: ast.Func{Id: "clear"}},
 		{Ast: ast.Func{Id: "keys"}},
 		{Ast: ast.Func{Id: "values"}},
 		{Ast: ast.Func{
 			Id:      "has",
 			Params:  []ast.Parameter{{Id: "key", Const: true}},
 			RetType: ast.DataType{Id: x.Bool, Val: "bool"},
-		},
-		},
+		}},
 	},
 }
 
