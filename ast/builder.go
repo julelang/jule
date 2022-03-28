@@ -887,7 +887,7 @@ func (b *Builder) assignInfo(toks []lex.Tok) (info assignInfo) {
 			}
 			info.setter = tok
 			if i+1 >= len(toks) {
-				b.pusherr(tok, "missing_expr")
+				// b.pusherr(tok, "missing_expr")
 				info.ok = false
 			} else {
 				info.exprToks = toks[i+1:]
