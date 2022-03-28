@@ -323,9 +323,9 @@ typedef wchar_t       rune;
 class str: public std::basic_string<rune> {
 public:
 // region CONSTRUCTOR
-  str(void): str(L"")                                        {}
-  str(const rune* _Str)                                      { this->assign(_Str); }
+  str(void) noexcept                                         {}
   str(const std::basic_string<rune> _Src): str(_Src.c_str()) {}
+  str(const rune* _Str) noexcept                             { this->assign(_Str); }
 // endregion CONSTRUCTOR
 };
 // endregion X_BUILTIN_TYPES
@@ -346,7 +346,7 @@ public:
   array<_Item_t>(const std::initializer_list<_Item_t> &_Src) noexcept
   { this->_buffer = std::vector<_Item_t>(_Src.begin(), _Src.end()); }
 
-  array<_Item_t>(const str _Str) {
+  array<_Item_t>(const str _Str) noexcept {
     if (std::is_same<_Item_t, rune>::value) {
       this->_buffer = std::vector<_Item_t>(_Str.begin(), _Str.end());
       return;
@@ -414,8 +414,8 @@ template<typename _Key_t, typename _Value_t>
 class map: public std::map<_Key_t, _Value_t> {
 public:
 // region CONSTRUCTORS
-  map<_Key_t, _Value_t>(void)                 {}
-  map<_Key_t, _Value_t>(const std::nullptr_t) {}
+  map<_Key_t, _Value_t>(void) noexcept                 {}
+  map<_Key_t, _Value_t>(const std::nullptr_t) noexcept {}
   map<_Key_t, _Value_t>(const std::initializer_list<std::pair<_Key_t, _Value_t>> _Src)
   { for (const auto _data: _Src) { this->insert(_data); } }
 // endregion CONSTRUCTORS
@@ -500,11 +500,13 @@ static inline void foreach(const map<_Key_t, _Value_t> _Map,
 }
 
 template<typename _Function_t, typename _Tuple_t, size_t ... _I_t>
-auto tuple_as_args(_Function_t _Function, _Tuple_t _Tuple, std::index_sequence<_I_t ...>)
+inline auto tuple_as_args(_Function_t _Function,
+                   _Tuple_t _Tuple,
+                   std::index_sequence<_I_t ...>)
 { return _Function(std::get<_I_t>(_Tuple) ...); }
 
 template<typename _Function_t, typename _Tuple_t>
-auto tuple_as_args(_Function_t _Function, _Tuple_t _Tuple) {
+inline auto tuple_as_args(_Function_t _Function, _Tuple_t _Tuple) {
   static constexpr auto _size = std::tuple_size<_Tuple_t>::value;
   return tuple_as_args(_Function, _Tuple, std::make_index_sequence<_size>{});
 }
@@ -512,10 +514,10 @@ auto tuple_as_args(_Function_t _Function, _Tuple_t _Tuple) {
 
 // region X_BUILTIN_FUNCTIONS
 template <typename _Obj_t>
-static inline void _out(_Obj_t _Obj) { std::wcout << _Obj; }
+static inline void _out(_Obj_t _Obj) noexcept { std::wcout << _Obj; }
 
 template <typename _Obj_t>
-static inline void _outln(_Obj_t _Obj) {
+static inline void _outln(_Obj_t _Obj) noexcept {
   _out<_Obj_t>(_Obj);
   std::wcout << std::endl;
 }
