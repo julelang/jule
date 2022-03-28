@@ -498,6 +498,16 @@ static inline void foreach(const map<_Key_t, _Value_t> _Map,
                            const func<void(_Key_t, _Value_t)> _Body) {
   for (const auto _pair: _Map) { _Body(_pair.first, _pair.second); }
 }
+
+template<typename _Function_t, typename _Tuple_t, size_t ... _I_t>
+auto tuple_as_args(_Function_t _Function, _Tuple_t _Tuple, std::index_sequence<_I_t ...>)
+{ return _Function(std::get<_I_t>(_Tuple) ...); }
+
+template<typename _Function_t, typename _Tuple_t>
+auto tuple_as_args(_Function_t _Function, _Tuple_t _Tuple) {
+  static constexpr auto _size = std::tuple_size<_Tuple_t>::value;
+  return tuple_as_args(_Function, _Tuple, std::make_index_sequence<_size>{});
+}
 // endregion X_MISC
 
 // region X_BUILTIN_FUNCTIONS

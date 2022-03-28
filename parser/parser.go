@@ -1815,9 +1815,9 @@ func (p *Parser) evalParenthesesRangeExpr(toks []lex.Tok, m *exprModel) (v value
 
 	switch {
 	case typeIsFunc(v.ast.Type):
-		fun := v.ast.Type.Tag.(ast.Func)
-		p.parseFuncCall(fun, toks[len(valueToks):], m)
-		v.ast.Type = fun.RetType
+		f := v.ast.Type.Tag.(ast.Func)
+		p.parseFuncCall(f, toks[len(valueToks):], m)
+		v.ast.Type = f.RetType
 		v.lvalue = typeIsLvalue(v.ast.Type)
 	default:
 		p.pusherrtok(toks[len(valueToks)], "invalid_syntax")
@@ -2117,12 +2117,17 @@ func (p *Parser) parseFuncCall(f ast.Func, toks []lex.Tok, m *exprModel) {
 func (p *Parser) parseArgs(params []ast.Parameter, args *[]ast.Arg, errTok lex.Tok, m *exprModel) {
 	parsedArgs := make([]ast.Arg, 0)
 	if len(params) > 0 && params[len(params)-1].Variadic {
+		// No arg(s) and only variadic parameter
 		if len(*args) == 0 && len(params) == 1 {
 			return
-		} else if len(*args) < len(params)-1 {
+		}
+		// Arg missing for normal parameters
+		if len(*args) < len(params)-1 {
 			p.pusherrtok(errTok, "missing_argument")
 			goto argParse
-		} else if len(*args) <= len(params)-1 {
+		}
+		// Arg passed for normal parameters, but not for variadic parameter
+		if len(*args) <= len(params)-1 {
 			goto argParse
 		}
 		variadicArgs := (*args)[len(params)-1:]
@@ -2148,6 +2153,10 @@ func (p *Parser) parseArgs(params []ast.Parameter, args *[]ast.Arg, errTok lex.T
 	if len(*args) == 0 && len(params) == 0 {
 		return
 	} else if len(*args) < len(params) {
+		if len(*args) == 1 {
+			p.tryFuncMultiRetAsArgs(params, args, errTok, m)
+			return
+		}
 		p.pusherrtok(errTok, "missing_argument")
 	} else if len(*args) > len(params) {
 		p.pusherrtok(errTok, "argument_overflow")
@@ -2159,6 +2168,35 @@ argParse:
 		parsedArgs = append(parsedArgs, arg)
 	}
 	*args = parsedArgs
+}
+
+func (p *Parser) tryFuncMultiRetAsArgs(params []ast.Parameter, args *[]ast.Arg, errTok lex.Tok, m *exprModel) {
+	arg := (*args)[0]
+	val, model := p.evalExpr(arg.Expr)
+	arg.Expr.Model = model
+	if !val.ast.Type.MultiTyped {
+		p.pusherrtok(errTok, "missing_argument")
+		return
+	}
+	types := val.ast.Type.Tag.([]ast.DataType)
+	if len(types) < len(params) {
+		p.pusherrtok(errTok, "missing_argument")
+		return
+	} else if len(types) > len(params) {
+		p.pusherrtok(errTok, "argument_overflow")
+		return
+	}
+	fname := m.nodes[m.index].nodes[0]
+	m.nodes[m.index].nodes[0] = exprNode{"tuple_as_args"}
+	*args = make([]ast.Arg, 2)
+	(*args)[0] = ast.Arg{Expr: ast.Expr{Model: fname}}
+	(*args)[1] = arg
+	for i, param := range params {
+		rt := types[i]
+		p.wg.Add(1)
+		val := value{ast: ast.Value{Type: rt}}
+		go p.checkArgTypeAsync(param, val, false, arg.Tok)
+	}
 }
 
 func (p *Parser) parseArg(param ast.Parameter, arg *ast.Arg, variadiced *bool) {

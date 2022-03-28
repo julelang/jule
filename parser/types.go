@@ -37,7 +37,7 @@ func typeIsMap(t ast.DataType) bool {
 }
 
 func typeIsFunc(t ast.DataType) bool {
-	if t.Val == "" {
+	if t.Id != x.Func || t.Val == "" {
 		return false
 	}
 	return t.Val[0] == '('

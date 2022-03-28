@@ -120,7 +120,7 @@ func (dt DataType) FunctionString() string {
 	if len(fun.Params) > 0 {
 		for _, param := range fun.Params {
 			cxx.WriteString(param.Type.String())
-			cxx.WriteString(", ")
+			cxx.WriteByte(',')
 		}
 		cxxStr := cxx.String()[:cxx.Len()-1]
 		cxx.Reset()
