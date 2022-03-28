@@ -1027,7 +1027,9 @@ func checkAssignToks(toks []lex.Tok) bool {
 				braceCount--
 			}
 		}
-		if braceCount > 0 {
+		if braceCount < 0 {
+			return false
+		} else if braceCount > 0 {
 			continue
 		}
 		if tok.Id == lex.Operator &&
