@@ -2368,7 +2368,8 @@ func (rc *retChecker) checkExprTypes() {
 	rc.retAST.Expr.Model = rc.expModel
 	types := rc.fun.RetType.Tag.([]ast.DataType)
 	if valLength == 1 {
-		rc.p.pusherrtok(rc.retAST.Tok, "missing_multi_return")
+		rc.checkMultiRetAsMutliRet()
+		return
 	} else if valLength > len(types) {
 		rc.p.pusherrtok(rc.retAST.Tok, "overflow_return")
 	}
@@ -2382,6 +2383,38 @@ func (rc *retChecker) checkExprTypes() {
 			constant:  false,
 			t:         t,
 			v:         rc.values[i],
+			ignoreAny: false,
+			errtok:    rc.retAST.Tok,
+		}.checkAssignTypeAsync()
+	}
+}
+
+func (rc *retChecker) checkMultiRetAsMutliRet() {
+	val := rc.values[0]
+	if !val.ast.Type.MultiTyped {
+		rc.p.pusherrtok(rc.retAST.Tok, "missing_multi_return")
+		return
+	}
+	valTypes := val.ast.Type.Tag.([]ast.DataType)
+	retTypes := rc.fun.RetType.Tag.([]ast.DataType)
+	if len(valTypes) < len(retTypes) {
+		rc.p.pusherrtok(rc.retAST.Tok, "missing_multi_return")
+		return
+	} else if len(valTypes) < len(retTypes) {
+		rc.p.pusherrtok(rc.retAST.Tok, "overflow_return")
+		return
+	}
+	// Set model for just signle return
+	rc.retAST.Expr.Model = rc.expModel.models[0]
+	for i, rt := range retTypes {
+		vt := valTypes[i]
+		val := value{ast: ast.Value{Type: vt}}
+		rc.p.wg.Add(1)
+		go assignChecker{
+			p:         rc.p,
+			constant:  false,
+			t:         rt,
+			v:         val,
 			ignoreAny: false,
 			errtok:    rc.retAST.Tok,
 		}.checkAssignTypeAsync()
