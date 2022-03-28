@@ -58,13 +58,16 @@ func (node exprNode) String() string {
 	return node.value
 }
 
-type anonFunc struct {
-	ast ast.Func
+type anonFuncExpr struct {
+	ast     ast.Func
+	capture byte
 }
 
-func (af anonFunc) String() string {
+func (af anonFuncExpr) String() string {
 	var cxx strings.Builder
-	cxx.WriteString("[=]")
+	cxx.WriteByte('[')
+	cxx.WriteByte(af.capture)
+	cxx.WriteByte(']')
 	cxx.WriteString(paramsToCxx(af.ast.Params))
 	cxx.WriteString(" mutable -> ")
 	cxx.WriteString(af.ast.RetType.String())

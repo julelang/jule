@@ -501,8 +501,8 @@ static inline void foreach(const map<_Key_t, _Value_t> _Map,
 
 template<typename _Function_t, typename _Tuple_t, size_t ... _I_t>
 inline auto tuple_as_args(_Function_t _Function,
-                   _Tuple_t _Tuple,
-                   std::index_sequence<_I_t ...>)
+                          _Tuple_t _Tuple,
+                          std::index_sequence<_I_t ...>)
 { return _Function(std::get<_I_t>(_Tuple) ...); }
 
 template<typename _Function_t, typename _Tuple_t>

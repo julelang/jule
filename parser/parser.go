@@ -1389,11 +1389,29 @@ func (p *unaryProcessor) star() value {
 
 func (p *unaryProcessor) amper() value {
 	v := p.parser.evalExprPart(p.toks, p.model)
-	v.lvalue = true
-	if !canGetPointer(v) {
-		p.parser.pusherrtok(p.tok, "invalid_type_unary_amper")
+	switch {
+	case typeIsFunc(v.ast.Type):
+		mainNode := &p.model.nodes[p.model.index]
+		mainNode.nodes = mainNode.nodes[1:] // Remove unary operator from model
+		node := &p.model.nodes[p.model.index].nodes[0]
+		switch t := (*node).(type) {
+		case anonFuncExpr:
+			if t.capture == xapi.LambdaByReference {
+				p.parser.pusherrmsgtok(p.tok, "invalid_type_unary_amper")
+				break
+			}
+			t.capture = xapi.LambdaByReference
+			*node = t
+		default:
+			p.parser.pusherrtok(p.tok, "invalid_type_unary_amper")
+		}
+	default:
+		v.lvalue = true
+		if !canGetPointer(v) {
+			p.parser.pusherrtok(p.tok, "invalid_type_unary_amper")
+		}
+		v.ast.Type.Val = "*" + v.ast.Type.Val
 	}
-	v.ast.Type.Val = "*" + v.ast.Type.Val
 	return v
 }
 
@@ -1881,7 +1899,7 @@ func (p *Parser) evalBraceRangeExpr(toks []lex.Tok, m *exprModel) (v value) {
 			v.ast.Type.Tag = f
 			v.ast.Type.Id = x.Func
 			v.ast.Type.Val = f.DataTypeString()
-			m.appendSubNode(anonFunc{f})
+			m.appendSubNode(anonFuncExpr{f, xapi.LambdaByCopy})
 			return
 		default:
 			p.pusherrtok(exprToks[0], "invalid_syntax")
