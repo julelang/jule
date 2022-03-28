@@ -118,11 +118,12 @@ func processCommand(namespace, cmd string) bool {
 }
 
 func init() {
-	execp, err := filepath.Abs(filepath.Dir(os.Args[0]))
+	execp, err := os.Executable()
 	if err != nil {
 		println(err.Error())
 		os.Exit(0)
 	}
+	execp = filepath.Dir(execp)
 	x.ExecPath = execp
 	x.StdlibPath = filepath.Join(x.ExecPath, x.Stdlib)
 	x.LangsPath = filepath.Join(x.ExecPath, x.Langs)
