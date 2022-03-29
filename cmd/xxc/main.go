@@ -470,8 +470,10 @@ public:
   const char *what() const throw() { return this->_buffer.c_str(); }
 };
 
-#define XALLOC(_Alloc) new(std::nothrow) _Alloc
 #define XTHROW(_Msg) throw exception(_Msg)
+
+template<typename _Alloc_t>
+static inline _Alloc_t *xalloc() { return new(std::nothrow) _Alloc_t; }
 
 template <typename _Enum_t, typename _Index_t, typename _Item_t>
 static inline void foreach(const _Enum_t _Enum,

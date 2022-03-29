@@ -5,8 +5,8 @@ import "strings"
 // Returns type as X heap-allocation expression for cxx.
 func ToXAlloc(t string) string {
 	var cxx strings.Builder
-	cxx.WriteString("XALLOC(")
+	cxx.WriteString("xalloc<")
 	cxx.WriteString(t)
-	cxx.WriteByte(')')
+	cxx.WriteString(">()")
 	return cxx.String()
 }
