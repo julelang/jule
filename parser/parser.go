@@ -1535,7 +1535,7 @@ func (p *Parser) evalStrSubId(val value, idTok lex.Tok, m *exprModel) (v value) 
 		return
 	}
 	v = val
-	m.appendSubNode(exprNode{"."})
+	m.appendSubNode(exprNode{subIdAccessorOfType(val.ast.Type)})
 	switch t {
 	case 'g':
 		g := &strDefs.Globals[i]
@@ -1554,7 +1554,7 @@ func (p *Parser) evalArraySubId(val value, idTok lex.Tok, m *exprModel) (v value
 		return
 	}
 	v = val
-	m.appendSubNode(exprNode{"."})
+	m.appendSubNode(exprNode{subIdAccessorOfType(val.ast.Type)})
 	switch t {
 	case 'g':
 		g := &arrDefs.Globals[i]
@@ -1576,7 +1576,7 @@ func (p *Parser) evalMapSubId(val value, idTok lex.Tok, m *exprModel) (v value) 
 	v = val
 	v.lvalue = false
 	v.ast.Data = idTok.Kind
-	m.appendSubNode(exprNode{"."})
+	m.appendSubNode(exprNode{subIdAccessorOfType(val.ast.Type)})
 	switch t {
 	case 'g':
 		g := &mapDefs.Globals[i]
@@ -1611,12 +1611,17 @@ func (p *Parser) evalIdExprPart(toks []lex.Tok, m *exprModel) (v value) {
 	valTok := toks[i]
 	toks = toks[:i]
 	val := p.evalExprPart(toks, m)
+	checkType := val.ast.Type
+	if typeIsPtr(checkType) {
+		// Remove pointer mark
+		checkType.Val = checkType.Val[1:]
+	}
 	switch {
-	case typeIsSingle(val.ast.Type) && val.ast.Type.Id == x.Str:
+	case typeIsSingle(checkType) && checkType.Id == x.Str:
 		return p.evalStrSubId(val, idTok, m)
-	case typeIsArray(val.ast.Type):
+	case typeIsArray(checkType):
 		return p.evalArraySubId(val, idTok, m)
-	case typeIsMap(val.ast.Type):
+	case typeIsMap(checkType):
 		return p.evalMapSubId(val, idTok, m)
 	}
 	p.pusherrtok(valTok, "obj_not_support_sub_fields", val.ast.Type.Val)

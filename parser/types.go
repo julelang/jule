@@ -50,6 +50,13 @@ func typeIsSingle(t ast.DataType) bool {
 		!typeIsFunc(t)
 }
 
+func subIdAccessorOfType(t ast.DataType) string {
+	if typeIsPtr(t) {
+		return "->"
+	}
+	return "."
+}
+
 func typeIsNilCompatible(t ast.DataType) bool {
 	return t.Id == x.Func || typeIsPtr(t) || typeIsArray(t) || typeIsMap(t)
 }
