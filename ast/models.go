@@ -46,6 +46,9 @@ func ParseBlock(b BlockAST, indent int) string {
 	var cxx strings.Builder
 	cxx.WriteByte('{')
 	for _, s := range b.Tree {
+		if s.Val == nil {
+			continue
+		}
 		cxx.WriteByte('\n')
 		cxx.WriteString(strings.Repeat(" ", indent*IndentSpace))
 		cxx.WriteString(s.String())

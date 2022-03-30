@@ -40,6 +40,7 @@ type Parser struct {
 	Defs           *defmap
 	waitingGlobals []ast.Var
 	BlockVars      []ast.Var
+	BlockTypes     []ast.Type
 	Errs           []xlog.CompilerLog
 	Warns          []xlog.CompilerLog
 	File           *xio.File
@@ -476,13 +477,20 @@ func (p *Parser) checkAttribute(obj ast.Obj) {
 	p.attributes = nil
 }
 
-// Type parses X type define statement.
-func (p *Parser) Type(t ast.Type) {
+func (p *Parser) checkTypeAST(t ast.Type) bool {
 	if p.existid(t.Id).Id != lex.NA {
 		p.pusherrtok(t.Tok, "exist_id", t.Id)
-		return
+		return false
 	} else if xapi.IsIgnoreId(t.Id) {
 		p.pusherrtok(t.Tok, "ignore_id")
+		return false
+	}
+	return true
+}
+
+// Type parses X type define statement.
+func (p *Parser) Type(t ast.Type) {
+	if !p.checkTypeAST(t) {
 		return
 	}
 	t.Desc = p.docText.String()
@@ -583,6 +591,7 @@ func (p *Parser) Var(vast ast.Var) ast.Var {
 		}
 	}
 	if vast.Type.Id != x.Void {
+		vast.Type, _ = p.readyType(vast.Type, true)
 		if vast.SetterTok.Id != lex.NA {
 			p.wg.Add(1)
 			go assignChecker{
@@ -593,18 +602,6 @@ func (p *Parser) Var(vast ast.Var) ast.Var {
 				false,
 				vast.IdTok,
 			}.checkAssignTypeAsync()
-		} else { // Pass default value.
-			vast.Type, _ = p.readyType(vast.Type, true)
-			/*dt, ok := p.readyType(vast.Type, true)
-			if ok {
-				var valTok lex.Tok
-				valTok.Id = lex.Value
-				valTok.Kind = p.defaultValueOfType(dt)
-				valToks := []lex.Tok{valTok}
-				processes := [][]lex.Tok{valToks}
-				vast.Val = ast.Expr{Toks: valToks, Processes: processes}
-				_, vast.Val.Model = p.evalExpr(vast.Val)
-			}*/
 		}
 	} else {
 		if vast.SetterTok.Id == lex.NA {
@@ -693,6 +690,11 @@ func (p *Parser) globalById(id string) *ast.Var {
 }
 
 func (p *Parser) typeById(id string) *ast.Type {
+	for _, t := range p.BlockTypes {
+		if t.Id == id {
+			return &t
+		}
+	}
 	for _, use := range p.Uses {
 		t := use.defs.typeById(id)
 		if t != nil && t.Pub {
@@ -730,9 +732,7 @@ func (p *Parser) existIdf(id string, exceptGlobals bool) lex.Tok {
 	return lex.Tok{}
 }
 
-func (p *Parser) existid(id string) lex.Tok {
-	return p.existIdf(id, false)
-}
+func (p *Parser) existid(id string) lex.Tok { return p.existIdf(id, false) }
 
 func (p *Parser) checkAsync() {
 	defer func() { p.wg.Done() }()
@@ -753,8 +753,8 @@ func (p *Parser) checkAsync() {
 
 func (p *Parser) checkTypesAsync() {
 	defer func() { p.wg.Done() }()
-	for _, t := range p.Defs.Types {
-		_, _ = p.readyType(t.Type, true)
+	for i, t := range p.Defs.Types {
+		p.Defs.Types[i].Type, _ = p.readyType(t.Type, true)
 	}
 }
 
@@ -769,6 +769,7 @@ func (p *Parser) WaitingGlobals() {
 func (p *Parser) checkFuncsAsync() {
 	defer func() { p.wg.Done() }()
 	for _, f := range p.Defs.Funcs {
+		p.BlockTypes = nil
 		p.BlockVars = p.varsFromParams(f.Ast.Params)
 		p.wg.Add(1)
 		go p.checkFuncSpecialCasesAsync(f)
@@ -2310,6 +2311,12 @@ func (p *Parser) checkBlock(b *ast.BlockAST) {
 		case ast.If:
 			p.checkIfExpr(&t, &i, b.Tree)
 			model.Val = t
+		case ast.Type:
+			if p.checkTypeAST(t) {
+				t.Type, _ = p.readyType(t.Type, true)
+			}
+			p.BlockTypes = append(p.BlockTypes, t)
+			model.Val = nil
 		case ast.CxxEmbed:
 		case ast.Comment:
 		case ast.Ret:

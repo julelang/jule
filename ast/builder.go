@@ -57,7 +57,10 @@ func (b *Builder) buildNode(toks []lex.Tok) {
 	case lex.Const, lex.Volatile:
 		b.GlobalVar(toks)
 	case lex.Type:
-		b.Type(toks)
+		t := b.Type(toks)
+		t.Pub = b.pub
+		b.pub = false
+		b.Tree = append(b.Tree, Obj{t.Tok, t})
 	case lex.Comment:
 		b.Comment(toks[0])
 	case lex.Preprocessor:
@@ -93,7 +96,7 @@ func (b *Builder) Build() {
 }
 
 // Type builds AST model of type defination statement.
-func (b *Builder) Type(toks []lex.Tok) {
+func (b *Builder) Type(toks []lex.Tok) (t Type) {
 	i := 1 // Initialize value is 1 for skip keyword.
 	if i >= len(toks) {
 		b.pusherr(toks[i-1], "invalid_syntax")
@@ -110,14 +113,11 @@ func (b *Builder) Type(toks []lex.Tok) {
 	}
 	destType, _ := b.DataType(toks[i:], new(int), true)
 	tok = toks[1]
-	t := Type{
-		Pub:  b.pub,
+	return Type{
 		Tok:  tok,
 		Id:   tok.Kind,
 		Type: destType,
 	}
-	b.pub = false
-	b.Tree = append(b.Tree, Obj{tok, t})
 }
 
 // Comment builds AST model of comment.
@@ -845,6 +845,11 @@ func (b *Builder) Statement(bs *blockStatement) (s Statement) {
 		return b.IfExpr(bs)
 	case lex.Else:
 		return b.ElseBlock(bs)
+	case lex.Type:
+		t := b.Type(bs.toks)
+		s.Tok = t.Tok
+		s.Val = t
+		return
 	case lex.Operator:
 		if tok.Kind == "<" {
 			return b.RetStatement(bs.toks)
