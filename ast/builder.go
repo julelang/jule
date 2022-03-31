@@ -743,17 +743,21 @@ func nextStatementPos(toks []lex.Tok, start int) (int, bool) {
 		if tok.Id == lex.Brace {
 			switch tok.Kind {
 			case "{", "[", "(":
+				if braceCount == 0 && i > start {
+					isStatement, withTerminator = IsStatement(tok, toks[i-1])
+					if isStatement {
+						goto ret
+					}
+				}
 				braceCount++
 				continue
 			default:
 				braceCount--
-				if braceCount == 0 {
-					if i+1 < len(toks) {
-						isStatement, withTerminator = IsStatement(toks[i+1], tok)
-						if isStatement {
-							i++
-							goto ret
-						}
+				if braceCount == 0 && i+1 < len(toks) {
+					isStatement, withTerminator = IsStatement(toks[i+1], tok)
+					if isStatement {
+						i++
+						goto ret
 					}
 				}
 				continue
@@ -780,7 +784,9 @@ func nextStatementPos(toks []lex.Tok, start int) (int, bool) {
 }
 
 type blockStatement struct {
+	pos            int
 	block          *BlockAST
+	srcToks        *[]lex.Tok
 	blockToks      *[]lex.Tok
 	toks           []lex.Tok
 	nextToks       []lex.Tok
@@ -796,8 +802,10 @@ func (b *Builder) Block(toks []lex.Tok) (block BlockAST) {
 		i, withTerminator := nextStatementPos(toks, 0)
 		statementToks := toks[:i]
 		bs := new(blockStatement)
+		bs.pos = i
 		bs.block = &block
 		bs.blockToks = &toks
+		bs.srcToks = &toks
 		bs.toks = statementToks
 		bs.withTerminator = withTerminator
 		b.pushStatementToBlock(bs)
@@ -808,10 +816,10 @@ func (b *Builder) Block(toks []lex.Tok) (block BlockAST) {
 			b.pushStatementToBlock(bs)
 			goto next
 		}
-		if i >= len(toks) {
+		if bs.pos >= len(toks) {
 			break
 		}
-		toks = toks[i:]
+		toks = toks[bs.pos:]
 	}
 	return
 }
@@ -1437,11 +1445,19 @@ func (b *Builder) IfExpr(bs *blockStatement) (s Statement) {
 	ifast.Tok = bs.toks[0]
 	bs.toks = bs.toks[1:]
 	exprToks := blockExprToks(bs.toks)
-	if len(exprToks) == 0 {
-		b.pusherr(ifast.Tok, "missing_expr")
-	}
 	i := new(int)
-	*i = len(exprToks)
+	if len(exprToks) == 0 {
+		if len(bs.toks) == 0 || bs.pos >= len(*bs.srcToks) {
+			b.pusherr(ifast.Tok, "missing_expr")
+			return
+		}
+		exprToks = bs.toks
+		*bs.srcToks = (*bs.srcToks)[bs.pos:]
+		bs.pos, bs.withTerminator = nextStatementPos(*bs.srcToks, 0)
+		bs.toks = (*bs.srcToks)[:bs.pos]
+	} else {
+		*i = len(exprToks)
+	}
 	blockToks := b.getrange(i, "{", "}", &bs.toks)
 	if blockToks == nil {
 		b.pusherr(ifast.Tok, "body_not_exist")
@@ -1464,11 +1480,19 @@ func (b *Builder) ElseIfExpr(bs *blockStatement) (s Statement) {
 	elif.Tok = bs.toks[1]
 	bs.toks = bs.toks[2:]
 	exprToks := blockExprToks(bs.toks)
-	if len(exprToks) == 0 {
-		b.pusherr(elif.Tok, "missing_expr")
-	}
 	i := new(int)
-	*i = len(exprToks)
+	if len(exprToks) == 0 {
+		if len(bs.toks) == 0 || bs.pos >= len(*bs.srcToks) {
+			b.pusherr(elif.Tok, "missing_expr")
+			return
+		}
+		exprToks = bs.toks
+		*bs.srcToks = (*bs.srcToks)[bs.pos:]
+		bs.pos, bs.withTerminator = nextStatementPos(*bs.srcToks, 0)
+		bs.toks = (*bs.srcToks)[:bs.pos]
+	} else {
+		*i = len(exprToks)
+	}
 	blockToks := b.getrange(i, "{", "}", &bs.toks)
 	if blockToks == nil {
 		b.pusherr(elif.Tok, "body_not_exist")
