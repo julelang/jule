@@ -2317,6 +2317,9 @@ func (p *Parser) checkBlock(b *ast.BlockAST) {
 			}
 			p.BlockTypes = append(p.BlockTypes, t)
 			model.Val = nil
+		case ast.BlockAST:
+			p.checkBlock(&t)
+			model.Val = t
 		case ast.CxxEmbed:
 		case ast.Comment:
 		case ast.Ret:

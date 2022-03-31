@@ -856,8 +856,23 @@ func (b *Builder) Statement(bs *blockStatement) (s Statement) {
 		}
 	case lex.Comment:
 		return b.CommentStatement(bs.toks[0])
+	case lex.Brace:
+		if tok.Kind == "{" {
+			return b.blockStatement(bs.toks)
+		}
 	}
 	return b.ExprStatement(bs.toks)
+}
+
+func (b *Builder) blockStatement(toks []lex.Tok) Statement {
+	i := new(int)
+	tok := toks[0]
+	toks = getrange(i, "{", "}", toks)
+	if *i < len(toks) {
+		b.pusherr(toks[*i], "invalid_syntax")
+	}
+	block := b.Block(toks)
+	return Statement{Tok: tok, Val: block}
 }
 
 type assignInfo struct {
