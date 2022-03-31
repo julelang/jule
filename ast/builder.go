@@ -795,19 +795,14 @@ type blockStatement struct {
 
 // Block builds AST model of statements of code block.
 func (b *Builder) Block(toks []lex.Tok) (block BlockAST) {
+	bs := new(blockStatement)
+	bs.block = &block
+	bs.srcToks = &toks
 	for {
-		if b.Pos == -1 {
-			return
-		}
-		i, withTerminator := nextStatementPos(toks, 0)
-		statementToks := toks[:i]
-		bs := new(blockStatement)
-		bs.pos = i
-		bs.block = &block
+		bs.pos, bs.withTerminator = nextStatementPos(toks, 0)
+		statementToks := toks[:bs.pos]
 		bs.blockToks = &toks
-		bs.srcToks = &toks
 		bs.toks = statementToks
-		bs.withTerminator = withTerminator
 		b.pushStatementToBlock(bs)
 	next:
 		if len(bs.nextToks) > 0 {
