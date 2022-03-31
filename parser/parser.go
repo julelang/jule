@@ -2318,8 +2318,12 @@ func (p *Parser) checkBlock(b *ast.BlockAST) {
 			p.BlockTypes = append(p.BlockTypes, t)
 			model.Val = nil
 		case ast.BlockAST:
+			blockVars := p.BlockVars
+			blockTypes := p.BlockTypes
 			p.checkBlock(&t)
 			model.Val = t
+			p.BlockVars = blockVars
+			p.BlockTypes = blockTypes
 		case ast.CxxEmbed:
 		case ast.Comment:
 		case ast.Ret:
