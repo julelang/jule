@@ -201,7 +201,7 @@ func (l *Lex) escseq(txt string) string {
 	return seq
 }
 
-func (l *Lex) getrune(txt string, raw bool) string {
+func (l *Lex) getchar(txt string, raw bool) string {
 	if !raw && txt[0] == '\\' {
 		return l.escseq(txt)
 	}
@@ -210,7 +210,7 @@ func (l *Lex) getrune(txt string, raw bool) string {
 	return string(run)
 }
 
-func (l *Lex) rune(txt string) string {
+func (l *Lex) char(txt string) string {
 	var sb strings.Builder
 	sb.WriteByte('\'')
 	l.Column++
@@ -218,12 +218,12 @@ func (l *Lex) rune(txt string) string {
 	count := 0
 	for i := 0; i < len(txt); i++ {
 		if txt[i] == '\n' {
-			l.pusherr("missing_rune_end")
+			l.pusherr("missing_char_end")
 			l.Pos++
 			l.Newln()
 			return ""
 		}
-		run := l.getrune(txt[i:], false)
+		run := l.getchar(txt[i:], false)
 		sb.WriteString(run)
 		length := len(run)
 		l.Column += length
@@ -237,9 +237,9 @@ func (l *Lex) rune(txt string) string {
 		count++
 	}
 	if count == 0 {
-		l.pusherr("rune_empty")
+		l.pusherr("char_empty")
 	} else if count > 1 {
-		l.pusherr("rune_overflow")
+		l.pusherr("char_overflow")
 	}
 	return sb.String()
 }
@@ -261,7 +261,7 @@ func (l *Lex) str(txt string) string {
 				return ""
 			}
 		}
-		run := l.getrune(txt[i:], raw)
+		run := l.getchar(txt[i:], raw)
 		sb.WriteString(run)
 		length := len(run)
 		l.Column += length
@@ -321,7 +321,7 @@ func (l *Lex) Tok() Tok {
 	//* Tokenize
 	switch {
 	case txt[0] == '\'':
-		tok.Kind = l.rune(txt)
+		tok.Kind = l.char(txt)
 		tok.Id = Value
 		return tok
 	case txt[0] == '"', txt[0] == '`':
@@ -423,7 +423,7 @@ func (l *Lex) Tok() Tok {
 		l.kw(txt, "sbyte", DataType, &tok),
 		l.kw(txt, "size", DataType, &tok),
 		l.kw(txt, "bool", DataType, &tok),
-		l.kw(txt, "rune", DataType, &tok),
+		l.kw(txt, "char", DataType, &tok),
 		l.kw(txt, "str", DataType, &tok),
 		l.kw(txt, "true", Value, &tok),
 		l.kw(txt, "false", Value, &tok),

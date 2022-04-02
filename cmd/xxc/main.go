@@ -318,17 +318,8 @@ typedef uint64_t      u64;
 typedef std::size_t   size;
 typedef float         f32;
 typedef double        f64;
-typedef wchar_t       rune;
+typedef std::string   str;
 #define func          std::function
-
-class str: public std::basic_string<rune> {
-public:
-// region CONSTRUCTOR
-  str(void) noexcept                                         {}
-  str(const std::basic_string<rune> _Src): str(_Src.c_str()) {}
-  str(const rune* _Str) noexcept                             { this->assign(_Str); }
-// endregion CONSTRUCTOR
-};
 // endregion X_BUILTIN_TYPES
 
 // region X_STRUCTURES
@@ -347,18 +338,8 @@ public:
   array<_Item_t>(const std::initializer_list<_Item_t> &_Src) noexcept
   { this->_buffer = std::vector<_Item_t>(_Src.begin(), _Src.end()); }
 
-  array<_Item_t>(const str _Str) noexcept {
-    if (std::is_same<_Item_t, rune>::value) {
-      this->_buffer = std::vector<_Item_t>(_Str.begin(), _Str.end());
-      return;
-    }
-    if (std::is_same<_Item_t, u8>::value) {
-      std::wstring_convert<std::codecvt_utf8_utf16<rune>> _conv;
-      const std::string _bytes = _conv.to_bytes(_Str);
-      this->_buffer = std::vector<_Item_t>(_bytes.begin(), _bytes.end());
-      return;
-    }
-  }
+  array<_Item_t>(const str _Str) noexcept
+  { this->_buffer = std::vector<_Item_t>(_Str.begin(), _Str.end()); }
 // endregion CONSTRUCTORS
 
 // region DESTRUCTOR
@@ -375,13 +356,7 @@ public:
 // endregion FOREACH_SUPPORT
 
 // region OPERATOR_OVERFLOWS
-  operator str(void) const noexcept {
-    if (std::is_same<_Item_t, rune>::value) { return str(std::basic_string<rune>(this->begin(), this->end())); }
-    if (std::is_same<_Item_t, u8>::value) {
-      const std::string _bytes(this->begin(), this->end());
-      return str(std::wstring(_bytes.begin(), _bytes.end()));
-    }
-  }
+  operator str(void) const noexcept { return str{this->begin(), this->end()}; }
 
   bool operator==(const array<_Item_t> &_Src) const noexcept {
     const size _length = this->_buffer.size();
@@ -462,6 +437,8 @@ public:
 // endregion X_STRUCTURES
 
 // region X_MISC
+#define XTHROW(_Msg) throw exception(_Msg)
+
 class exception: public std::exception {
 private:
   std::basic_string<char> _buffer;
@@ -470,7 +447,10 @@ public:
   const char *what() const throw() { return this->_buffer.c_str(); }
 };
 
-#define XTHROW(_Msg) throw exception(_Msg)
+static inline std::wostream& operator<<(std::wostream &_Stream,
+                                        const str &_Src) {
+  return _Stream << std::wstring(_Src.begin(), _Src.end());
+}
 
 template<typename _Alloc_t>
 static inline _Alloc_t *xalloc() { return new(std::nothrow) _Alloc_t; }
@@ -503,13 +483,13 @@ static inline void foreach(const map<_Key_t, _Value_t> _Map,
 }
 
 template<typename _Function_t, typename _Tuple_t, size_t ... _I_t>
-inline auto tuple_as_args(_Function_t _Function,
-                          _Tuple_t _Tuple,
-                          std::index_sequence<_I_t ...>)
+inline auto tuple_as_args(const _Function_t _Function,
+                          const _Tuple_t _Tuple,
+                          const std::index_sequence<_I_t ...>)
 { return _Function(std::get<_I_t>(_Tuple) ...); }
 
 template<typename _Function_t, typename _Tuple_t>
-inline auto tuple_as_args(_Function_t _Function, _Tuple_t _Tuple) {
+inline auto tuple_as_args(const _Function_t _Function, const _Tuple_t _Tuple) {
   static constexpr auto _size = std::tuple_size<_Tuple_t>::value;
   return tuple_as_args(_Function, _Tuple, std::make_index_sequence<_size>{});
 }
@@ -517,10 +497,10 @@ inline auto tuple_as_args(_Function_t _Function, _Tuple_t _Tuple) {
 
 // region X_BUILTIN_FUNCTIONS
 template <typename _Obj_t>
-static inline void _out(_Obj_t _Obj) noexcept { std::wcout << _Obj; }
+static inline void _out(const _Obj_t _Obj) noexcept { std::wcout << _Obj; }
 
 template <typename _Obj_t>
-static inline void _outln(_Obj_t _Obj) noexcept {
+static inline void _outln(const _Obj_t _Obj) noexcept {
   _out<_Obj_t>(_Obj);
   std::wcout << std::endl;
 }
@@ -533,16 +513,8 @@ static inline void _outln(_Obj_t _Obj) noexcept {
 
 // region X_ENTRY_POINT
 int main() {
-// region X_ENTRY_POINT_STANDARD_CODES
-  std::setlocale(LC_ALL, "");
-  std::wcin.imbue(std::locale::global(std::locale()));
-  std::wcout.imbue(std::locale::global(std::locale()));
-// endregion X_ENTRY_POINT_STANDARD_CODES
   _main();
-
-// region X_ENTRY_POINT_END_STANDARD_CODES
   return EXIT_SUCCESS;
-// endregion X_ENTRY_POINT_END_STANDARD_CODES
 }
 // endregion X_ENTRY_POINT`
 }

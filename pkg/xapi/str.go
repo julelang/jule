@@ -3,14 +3,12 @@ package xapi
 import "strings"
 
 // Raw-String literal.
-const RawStrMark = "LR"
-const StrMark = "L"
+const RawStrMark = "R"
 
 // ToStr returns specified literal as X string literal for cxx.
 func ToStr(literal string) string {
 	var cxx strings.Builder
 	cxx.WriteString("str(")
-	cxx.WriteString(StrMark)
 	cxx.WriteString(literal)
 	cxx.WriteByte(')')
 	return cxx.String()
@@ -29,7 +27,6 @@ func ToRawStr(literal string) string {
 // ToRune returns specified literal as X rune literal for cxx.
 func ToRune(literal string) string {
 	var cxx strings.Builder
-	cxx.WriteString(StrMark)
 	cxx.WriteString(literal)
 	return cxx.String()
 }

@@ -960,12 +960,12 @@ func (p *valueEvaluator) str() value {
 	return v
 }
 
-func (p *valueEvaluator) rune() value {
+func (p *valueEvaluator) char() value {
 	var v value
 	v.ast.Data = p.tok.Kind
-	v.ast.Type.Id = x.Rune
-	v.ast.Type.Val = "rune"
-	p.model.appendSubNode(exprNode{xapi.ToRune(p.tok.Kind)})
+	v.ast.Type.Id = x.Char
+	v.ast.Type.Val = "char"
+	p.model.appendSubNode(exprNode{p.tok.Kind})
 	return v
 }
 
@@ -1215,7 +1215,7 @@ func (s solver) logical() (v ast.Value) {
 	return
 }
 
-func (s solver) rune() (v ast.Value) {
+func (s solver) char() (v ast.Value) {
 	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.Type.Val, s.leftVal.Type.Val)
@@ -1225,9 +1225,9 @@ func (s solver) rune() (v ast.Value) {
 	case "!=", "==", ">", "<", ">=", "<=":
 		v.Type.Id = x.Bool
 	case "+", "-", "*", "/", "^", "&", "%", "|":
-		v.Type.Id = x.Rune
+		v.Type.Id = x.Char
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_xtype", "rune")
+		s.p.pusherrtok(s.operator, "operator_notfor_xtype", "char")
 	}
 	return
 }
@@ -1279,8 +1279,8 @@ func (s solver) Solve() (v ast.Value) {
 		return s.ptr()
 	case s.leftVal.Type.Id == x.Nil || s.rightVal.Type.Id == x.Nil:
 		return s.nil()
-	case s.leftVal.Type.Id == x.Rune || s.rightVal.Type.Id == x.Rune:
-		return s.rune()
+	case s.leftVal.Type.Id == x.Char || s.rightVal.Type.Id == x.Char:
+		return s.char()
 	case s.leftVal.Type.Id == x.Any || s.rightVal.Type.Id == x.Any:
 		return s.any()
 	case s.leftVal.Type.Id == x.Bool || s.rightVal.Type.Id == x.Bool:
@@ -1310,8 +1310,8 @@ func (p *Parser) evalSingleExpr(tok lex.Tok, m *exprModel) (v value, ok bool) {
 		switch {
 		case isstr(tok.Kind):
 			v = eval.str()
-		case isrune(tok.Kind):
-			v = eval.rune()
+		case ischar(tok.Kind):
+			v = eval.char()
 		case isbool(tok.Kind):
 			v = eval.bool()
 		case isnil(tok.Kind):
@@ -1730,7 +1730,7 @@ func (p *Parser) checkCastStr(vt ast.DataType, errtok lex.Tok) {
 		return
 	}
 	vt.Val = vt.Val[2:] // Remove array brackets
-	if !typeIsSingle(vt) || (vt.Id != x.Rune && vt.Id != x.U8) {
+	if !typeIsSingle(vt) || (vt.Id != x.Char && vt.Id != x.U8) {
 		p.pusherrtok(errtok, "type_notsupports_casting", vt.Val)
 	}
 }
@@ -1768,7 +1768,7 @@ func (p *Parser) checkCastArray(t, vt ast.DataType, errtok lex.Tok) {
 		return
 	}
 	t.Val = t.Val[2:] // Remove array brackets
-	if !typeIsSingle(t) || (t.Id != x.Rune && t.Id != x.U8) {
+	if !typeIsSingle(t) || (t.Id != x.Char && t.Id != x.U8) {
 		p.pusherrtok(errtok, "type_notsupports_casting", vt.Val)
 	}
 }
@@ -1988,7 +1988,7 @@ func (p *Parser) evalMapSelect(mapv, selectv value, errtok lex.Tok) value {
 
 func (p *Parser) evalStrSelect(strv, selectv value, errtok lex.Tok) value {
 	strv.lvalue = true
-	strv.ast.Type.Id = x.Rune
+	strv.ast.Type.Id = x.Char
 	if !typeIsSingle(selectv.ast.Type) ||
 		!x.IsIntegerType(selectv.ast.Type.Id) {
 		p.pusherrtok(errtok, "notint_string_select")
@@ -2742,17 +2742,17 @@ func (fc *foreachChecker) str() {
 	if xapi.IsIgnoreId(fc.profile.KeyB.Id) {
 		return
 	}
-	runeType := ast.DataType{
-		Id:  x.Rune,
-		Val: x.CxxTypeIdFromType(x.Rune),
+	charType := ast.DataType{
+		Id:  x.Char,
+		Val: x.CxxTypeIdFromType(x.Char),
 	}
 	keyB := &fc.profile.KeyB
 	if keyB.Type.Id == x.Void {
-		keyB.Type = runeType
+		keyB.Type = charType
 		return
 	}
 	fc.p.wg.Add(1)
-	go fc.p.checkTypeAsync(runeType, keyB.Type, true, fc.profile.InTok)
+	go fc.p.checkTypeAsync(charType, keyB.Type, true, fc.profile.InTok)
 }
 
 func (fc *foreachChecker) check() {
