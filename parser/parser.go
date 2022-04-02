@@ -39,8 +39,8 @@ type Parser struct {
 	Uses           []*use
 	Defs           *defmap
 	waitingGlobals []ast.Var
-	BlockVars      []ast.Var
-	BlockTypes     []ast.Type
+	BlockVars      []*ast.Var
+	BlockTypes     []*ast.Type
 	Errs           []xlog.CompilerLog
 	Warns          []xlog.CompilerLog
 	File           *xio.File
@@ -122,19 +122,29 @@ func (p *Parser) CxxEmbeds() string {
 	return cxx.String()
 }
 
+// outableFunc returns true if function is available for
+// cxx output, returns false if not.
+func outableFunc(f *function) bool {
+	return f.Ast.Id == x.EntryPoint || f.used
+}
+
 // CxxPrototypes returns C++ code of prototypes of C++ code.
 func (p *Parser) CxxPrototypes() string {
 	var cxx strings.Builder
 	cxx.WriteString("// region PROTOTYPES\n")
 	for _, use := range used {
 		for _, f := range use.defs.Funcs {
-			cxx.WriteString(f.Prototype())
-			cxx.WriteByte('\n')
+			if outableFunc(f) {
+				cxx.WriteString(f.Prototype())
+				cxx.WriteByte('\n')
+			}
 		}
 	}
 	for _, f := range p.Defs.Funcs {
-		cxx.WriteString(f.Prototype())
-		cxx.WriteByte('\n')
+		if outableFunc(f) {
+			cxx.WriteString(f.Prototype())
+			cxx.WriteByte('\n')
+		}
 	}
 	cxx.WriteString("// endregion PROTOTYPES")
 	return cxx.String()
@@ -146,13 +156,17 @@ func (p *Parser) CxxGlobals() string {
 	cxx.WriteString("// region GLOBALS\n")
 	for _, use := range used {
 		for _, v := range use.defs.Globals {
-			cxx.WriteString(v.String())
-			cxx.WriteByte('\n')
+			if v.Used {
+				cxx.WriteString(v.String())
+				cxx.WriteByte('\n')
+			}
 		}
 	}
 	for _, v := range p.Defs.Globals {
-		cxx.WriteString(v.String())
-		cxx.WriteByte('\n')
+		if v.Used {
+			cxx.WriteString(v.String())
+			cxx.WriteByte('\n')
+		}
 	}
 	cxx.WriteString("// endregion GLOBALS")
 	return cxx.String()
@@ -164,13 +178,17 @@ func (p *Parser) CxxFuncs() string {
 	cxx.WriteString("// region FUNCTIONS\n")
 	for _, use := range used {
 		for _, f := range use.defs.Funcs {
-			cxx.WriteString(f.String())
-			cxx.WriteString("\n\n")
+			if outableFunc(f) {
+				cxx.WriteString(f.String())
+				cxx.WriteString("\n\n")
+			}
 		}
 	}
 	for _, f := range p.Defs.Funcs {
-		cxx.WriteString(f.String())
-		cxx.WriteString("\n\n")
+		if outableFunc(f) {
+			cxx.WriteString(f.String())
+			cxx.WriteString("\n\n")
+		}
 	}
 	cxx.WriteString("// endregion FUNCTIONS")
 	return cxx.String()
@@ -495,7 +513,7 @@ func (p *Parser) Type(t ast.Type) {
 	}
 	t.Desc = p.docText.String()
 	p.docText.Reset()
-	p.Defs.Types = append(p.Defs.Types, t)
+	p.Defs.Types = append(p.Defs.Types, &t)
 }
 
 // Comment parses X documentation comments line.
@@ -577,47 +595,47 @@ func (p *Parser) Global(vast ast.Var) {
 }
 
 // Var parse X variable.
-func (p *Parser) Var(vast ast.Var) ast.Var {
-	if xapi.IsIgnoreId(vast.Id) {
-		p.pusherrtok(vast.IdTok, "ignore_id")
+func (p *Parser) Var(v ast.Var) *ast.Var {
+	if xapi.IsIgnoreId(v.Id) {
+		p.pusherrtok(v.IdTok, "ignore_id")
 	}
 	var val value
-	switch t := vast.Tag.(type) {
+	switch t := v.Tag.(type) {
 	case value:
 		val = t
 	default:
-		if vast.SetterTok.Id != lex.NA {
-			val, vast.Val.Model = p.evalExpr(vast.Val)
+		if v.SetterTok.Id != lex.NA {
+			val, v.Val.Model = p.evalExpr(v.Val)
 		}
 	}
-	if vast.Type.Id != x.Void {
-		vast.Type, _ = p.readyType(vast.Type, true)
-		if vast.SetterTok.Id != lex.NA {
+	if v.Type.Id != x.Void {
+		v.Type, _ = p.readyType(v.Type, true)
+		if v.SetterTok.Id != lex.NA {
 			p.wg.Add(1)
 			go assignChecker{
 				p,
-				vast.Const,
-				vast.Type,
+				v.Const,
+				v.Type,
 				val,
 				false,
-				vast.IdTok,
+				v.IdTok,
 			}.checkAssignTypeAsync()
 		}
 	} else {
-		if vast.SetterTok.Id == lex.NA {
-			p.pusherrtok(vast.IdTok, "missing_autotype_value")
+		if v.SetterTok.Id == lex.NA {
+			p.pusherrtok(v.IdTok, "missing_autotype_value")
 		} else {
-			vast.Type = val.ast.Type
-			p.checkValidityForAutoType(vast.Type, vast.SetterTok)
-			p.checkAssignConst(vast.Const, vast.Type, val, vast.SetterTok)
+			v.Type = val.ast.Type
+			p.checkValidityForAutoType(v.Type, v.SetterTok)
+			p.checkAssignConst(v.Const, v.Type, val, v.SetterTok)
 		}
 	}
-	if vast.Const {
-		if vast.SetterTok.Id == lex.NA {
-			p.pusherrtok(vast.IdTok, "missing_const_value")
+	if v.Const {
+		if v.SetterTok.Id == lex.NA {
+			p.pusherrtok(v.IdTok, "missing_const_value")
 		}
 	}
-	return vast
+	return &v
 }
 
 func (p *Parser) checkFuncAttributes(attributes []ast.Attribute) {
@@ -630,23 +648,23 @@ func (p *Parser) checkFuncAttributes(attributes []ast.Attribute) {
 	}
 }
 
-func (p *Parser) varsFromParams(params []ast.Parameter) []ast.Var {
-	var vars []ast.Var
+func (p *Parser) varsFromParams(params []ast.Parameter) []*ast.Var {
 	length := len(params)
+	vars := make([]*ast.Var, length)
 	for i, param := range params {
-		var vast ast.Var
-		vast.Id = param.Id
-		vast.IdTok = param.Tok
-		vast.Type = param.Type
-		vast.Const = param.Const
-		vast.Volatile = param.Volatile
+		v := new(ast.Var)
+		v.Id = param.Id
+		v.IdTok = param.Tok
+		v.Type = param.Type
+		v.Const = param.Const
+		v.Volatile = param.Volatile
 		if param.Variadic {
 			if length-i > 1 {
 				p.pusherrtok(param.Tok, "variadic_parameter_notlast")
 			}
-			vast.Type.Val = "[]" + vast.Type.Val
+			v.Type.Val = "[]" + v.Type.Val
 		}
-		vars = append(vars, vast)
+		vars = append(vars, v)
 	}
 	return vars
 }
@@ -672,8 +690,8 @@ func (p *Parser) FuncById(id string) *function {
 
 func (p *Parser) varById(id string) *ast.Var {
 	for _, v := range p.BlockVars {
-		if v.Id == id {
-			return &v
+		if v != nil && v.Id == id {
+			return v
 		}
 	}
 	return p.globalById(id)
@@ -691,8 +709,8 @@ func (p *Parser) globalById(id string) *ast.Var {
 
 func (p *Parser) typeById(id string) *ast.Type {
 	for _, t := range p.BlockTypes {
-		if t.Id == id {
-			return &t
+		if t != nil && t.Id == id {
+			return t
 		}
 	}
 	for _, use := range p.Uses {
@@ -714,7 +732,7 @@ func (p *Parser) existIdf(id string, exceptGlobals bool) lex.Tok {
 		return f.Ast.Tok
 	}
 	for _, v := range p.BlockVars {
-		if v.Id == id {
+		if v != nil && v.Id == id {
 			return v.IdTok
 		}
 	}
@@ -1010,6 +1028,7 @@ func (p *valueEvaluator) num() value {
 func (p *valueEvaluator) id() (v value, ok bool) {
 	id := p.tok.Kind
 	if variable := p.parser.varById(id); variable != nil {
+		variable.Used = true
 		v.ast.Data = id
 		v.ast.Type = variable.Type
 		v.constant = variable.Const
@@ -1018,12 +1037,13 @@ func (p *valueEvaluator) id() (v value, ok bool) {
 		v.lvalue = true
 		p.model.appendSubNode(exprNode{xapi.AsId(id)})
 		ok = true
-	} else if fun := p.parser.FuncById(id); fun != nil {
+	} else if f := p.parser.FuncById(id); f != nil {
+		f.used = true
 		v.ast.Data = id
 		v.ast.Type.Id = x.Func
-		v.ast.Type.Tag = fun.Ast
-		v.ast.Type.Val = fun.Ast.DataTypeString()
-		v.ast.Tok = fun.Ast.Tok
+		v.ast.Type.Tag = f.Ast
+		v.ast.Type.Val = f.Ast.DataTypeString()
+		v.ast.Tok = f.Ast.Tok
 		p.model.appendSubNode(exprNode{xapi.AsId(id)})
 		ok = true
 	} else {
@@ -1539,7 +1559,7 @@ func (p *Parser) evalStrSubId(val value, idTok lex.Tok, m *exprModel) (v value) 
 	m.appendSubNode(exprNode{subIdAccessorOfType(val.ast.Type)})
 	switch t {
 	case 'g':
-		g := &strDefs.Globals[i]
+		g := strDefs.Globals[i]
 		m.appendSubNode(exprNode{g.Tag.(string)})
 		v.ast.Type = g.Type
 		v.lvalue = true
@@ -1558,7 +1578,7 @@ func (p *Parser) evalArraySubId(val value, idTok lex.Tok, m *exprModel) (v value
 	m.appendSubNode(exprNode{subIdAccessorOfType(val.ast.Type)})
 	switch t {
 	case 'g':
-		g := &arrDefs.Globals[i]
+		g := arrDefs.Globals[i]
 		m.appendSubNode(exprNode{g.Tag.(string)})
 		v.ast.Type = g.Type
 		v.lvalue = true
@@ -1580,7 +1600,7 @@ func (p *Parser) evalMapSubId(val value, idTok lex.Tok, m *exprModel) (v value) 
 	m.appendSubNode(exprNode{subIdAccessorOfType(val.ast.Type)})
 	switch t {
 	case 'g':
-		g := &mapDefs.Globals[i]
+		g := mapDefs.Globals[i]
 		m.appendSubNode(exprNode{g.Tag.(string)})
 		v.ast.Type = g.Type
 		v.lvalue = true
@@ -2285,12 +2305,29 @@ func (p *Parser) checkEntryPointSpecialCases(fun *function) {
 	}
 }
 
-func (p *Parser) checkNewBlock(b *ast.Block) {
-	blockVars := p.BlockVars
+func (p *Parser) checkNewBlockCustom(b *ast.Block, oldBlockVars []*ast.Var) {
 	blockTypes := p.BlockTypes
 	p.checkBlock(b)
-	p.BlockVars = blockVars
+
+	vars := p.BlockVars[len(oldBlockVars):]
+	types := p.BlockTypes[len(blockTypes):]
+	for _, v := range vars {
+		if !v.Used {
+			p.pusherrtok(v.IdTok, "declared_but_not_used", v.Id)
+		}
+	}
+	for _, t := range types {
+		if !t.Used {
+			p.pusherrtok(t.Tok, "declared_but_not_used", t.Id)
+		}
+	}
+
+	p.BlockVars = oldBlockVars
 	p.BlockTypes = blockTypes
+}
+
+func (p *Parser) checkNewBlock(b *ast.Block) {
+	p.checkNewBlockCustom(b, p.BlockVars)
 }
 
 func (p *Parser) checkBlock(b *ast.Block) {
@@ -2323,7 +2360,7 @@ func (p *Parser) checkBlock(b *ast.Block) {
 			if p.checkTypeAST(t) {
 				t.Type, _ = p.readyType(t.Type, true)
 			}
-			p.BlockTypes = append(p.BlockTypes, t)
+			p.BlockTypes = append(p.BlockTypes, &t)
 			model.Val = nil
 		case ast.Block:
 			p.checkNewBlock(&t)
@@ -2495,14 +2532,14 @@ func (p *Parser) checkFunc(f *ast.Func) {
 	p.checkRets(f)
 }
 
-func (p *Parser) checkVarStatement(vast *ast.Var, noParse bool) {
-	if p.existIdf(vast.Id, true).Id != lex.NA {
-		p.pusherrtok(vast.IdTok, "exist_id", vast.Id)
+func (p *Parser) checkVarStatement(v *ast.Var, noParse bool) {
+	if p.existIdf(v.Id, true).Id != lex.NA {
+		p.pusherrtok(v.IdTok, "exist_id", v.Id)
 	}
 	if !noParse {
-		*vast = p.Var(*vast)
+		*v = *p.Var(*v)
 	}
-	p.BlockVars = append(p.BlockVars, *vast)
+	p.BlockVars = append(p.BlockVars, v)
 }
 
 func (p *Parser) checkAssignment(selected value, errtok lex.Tok) bool {
@@ -2526,6 +2563,9 @@ func (p *Parser) checkAssignment(selected value, errtok lex.Tok) bool {
 }
 
 func (p *Parser) checkSingleAssign(assign *ast.Assign) {
+	vexpr := &assign.ValueExprs[0]
+	val, model := p.evalExpr(*vexpr)
+	*vexpr = model.(*exprModel).Expr()
 	sexpr := &assign.SelectExprs[0].Expr
 	if len(sexpr.Toks) == 1 && xapi.IsIgnoreId(sexpr.Toks[0].Kind) {
 		return
@@ -2534,9 +2574,6 @@ func (p *Parser) checkSingleAssign(assign *ast.Assign) {
 	if !p.checkAssignment(selected, assign.Setter) {
 		return
 	}
-	vexpr := &assign.ValueExprs[0]
-	val, model := p.evalExpr(*vexpr)
-	*vexpr = model.(*exprModel).Expr()
 	if assign.Setter.Kind != "=" {
 		assign.Setter.Kind = assign.Setter.Kind[:len(assign.Setter.Kind)-1]
 		solver := solver{
@@ -2795,8 +2832,7 @@ func (p *Parser) checkForeachProfile(iter *ast.Iter) {
 		}
 		p.checkVarStatement(&profile.KeyB, true)
 	}
-	p.checkNewBlock(&iter.Block)
-	p.BlockVars = blockVars
+	p.checkNewBlockCustom(&iter.Block, blockVars)
 }
 
 func (p *Parser) checkIterExpr(iter *ast.Iter) {
@@ -2902,8 +2938,10 @@ func (p *Parser) readyType(dt ast.DataType, err bool) (_ ast.DataType, ok bool) 
 			}
 			return dt, false
 		}
-		t.Type.Val = dt.Val[:len(dt.Val)-len(dt.Tok.Kind)] + t.Type.Val
-		return p.readyType(t.Type, err)
+		t.Used = true
+		dt = t.Type
+		dt.Val = dt.Val[:len(dt.Val)-len(dt.Tok.Kind)] + t.Type.Val
+		return p.readyType(dt, err)
 	case x.Func:
 		f := dt.Tag.(ast.Func)
 		for i, param := range f.Params {

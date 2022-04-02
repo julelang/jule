@@ -4,8 +4,8 @@ import "github.com/the-xlang/xxc/ast"
 
 type defmap struct {
 	Funcs   []*function
-	Globals []ast.Var
-	Types   []ast.Type
+	Globals []*ast.Var
+	Types   []*ast.Type
 }
 
 func (dm *defmap) findTypeById(id string) int {
@@ -22,7 +22,7 @@ func (dm *defmap) typeById(id string) *ast.Type {
 	if i == -1 {
 		return nil
 	}
-	return &dm.Types[i]
+	return dm.Types[i]
 }
 
 func (dm *defmap) findFuncById(id string) int {
@@ -60,7 +60,7 @@ func (dm *defmap) globalById(id string) *ast.Var {
 	if i == -1 {
 		return nil
 	}
-	return &dm.Globals[i]
+	return dm.Globals[i]
 }
 
 // defById returns index of definition with type if exist.

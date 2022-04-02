@@ -8,10 +8,8 @@ import (
 var builtinFuncs = []*function{
 	{
 		Ast: ast.Func{
-			Id: "out",
-			RetType: ast.DataType{
-				Id: x.Void,
-			},
+			Id:      "out",
+			RetType: ast.DataType{Id: x.Void},
 			Params: []ast.Parameter{{
 				Id:    "v",
 				Const: true,
@@ -24,10 +22,8 @@ var builtinFuncs = []*function{
 	},
 	{
 		Ast: ast.Func{
-			Id: "outln",
-			RetType: ast.DataType{
-				Id: x.Void,
-			},
+			Id:      "outln",
+			RetType: ast.DataType{Id: x.Void},
 			Params: []ast.Parameter{{
 				Id:    "v",
 				Const: true,
@@ -41,7 +37,7 @@ var builtinFuncs = []*function{
 }
 
 var strDefs = &defmap{
-	Globals: []ast.Var{
+	Globals: []*ast.Var{
 		{
 			Id:    "len",
 			Const: true,
@@ -52,7 +48,7 @@ var strDefs = &defmap{
 }
 
 var arrDefs = &defmap{
-	Globals: []ast.Var{
+	Globals: []*ast.Var{
 		{
 			Id:    "len",
 			Const: true,
@@ -63,7 +59,7 @@ var arrDefs = &defmap{
 }
 
 var mapDefs = &defmap{
-	Globals: []ast.Var{
+	Globals: []*ast.Var{
 		{
 			Id:    "len",
 			Const: true,

@@ -12,6 +12,7 @@ type function struct {
 	Ast        ast.Func
 	Attributes []ast.Attribute
 	Desc       string
+	used       bool
 }
 
 func (f function) String() string {

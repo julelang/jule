@@ -153,6 +153,7 @@ type Type struct {
 	Id   string
 	Type DataType
 	Desc string
+	Used bool
 }
 
 func (t Type) String() string {
@@ -330,6 +331,7 @@ type Var struct {
 	New       bool
 	Tag       interface{}
 	Desc      string
+	Used      bool
 }
 
 func (v Var) String() string {
