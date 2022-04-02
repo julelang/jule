@@ -2285,7 +2285,15 @@ func (p *Parser) checkEntryPointSpecialCases(fun *function) {
 	}
 }
 
-func (p *Parser) checkBlock(b *ast.BlockAST) {
+func (p *Parser) checkNewBlock(b *ast.Block) {
+	blockVars := p.BlockVars
+	blockTypes := p.BlockTypes
+	p.checkBlock(b)
+	p.BlockVars = blockVars
+	p.BlockTypes = blockTypes
+}
+
+func (p *Parser) checkBlock(b *ast.Block) {
 	for i := 0; i < len(b.Tree); i++ {
 		model := &b.Tree[i]
 		switch t := model.Val.(type) {
@@ -2317,13 +2325,9 @@ func (p *Parser) checkBlock(b *ast.BlockAST) {
 			}
 			p.BlockTypes = append(p.BlockTypes, t)
 			model.Val = nil
-		case ast.BlockAST:
-			blockVars := p.BlockVars
-			blockTypes := p.BlockTypes
-			p.checkBlock(&t)
+		case ast.Block:
+			p.checkNewBlock(&t)
 			model.Val = t
-			p.BlockVars = blockVars
-			p.BlockTypes = blockTypes
 		case ast.CxxEmbed:
 		case ast.Comment:
 		case ast.Ret:
@@ -2487,7 +2491,7 @@ func (p *Parser) checkRets(fun *ast.Func) {
 }
 
 func (p *Parser) checkFunc(f *ast.Func) {
-	p.checkBlock(&f.Block)
+	p.checkNewBlock(&f.Block)
 	p.checkRets(f)
 }
 
@@ -2659,7 +2663,7 @@ func (p *Parser) checkWhileProfile(iter *ast.Iter) {
 	if !isBoolExpr(val) {
 		p.pusherrtok(iter.Tok, "iter_while_notbool_expr")
 	}
-	p.checkBlock(&iter.Block)
+	p.checkNewBlock(&iter.Block)
 }
 
 type foreachChecker struct {
@@ -2778,7 +2782,7 @@ func (p *Parser) checkForeachProfile(iter *ast.Iter) {
 		fc.check()
 	}
 	iter.Profile = profile
-	blockVariables := p.BlockVars
+	blockVars := p.BlockVars
 	if profile.KeyA.New {
 		if xapi.IsIgnoreId(profile.KeyA.Id) {
 			p.pusherrtok(profile.KeyA.IdTok, "ignore_id")
@@ -2791,8 +2795,8 @@ func (p *Parser) checkForeachProfile(iter *ast.Iter) {
 		}
 		p.checkVarStatement(&profile.KeyB, true)
 	}
-	p.checkBlock(&iter.Block)
-	p.BlockVars = blockVariables
+	p.checkNewBlock(&iter.Block)
+	p.BlockVars = blockVars
 }
 
 func (p *Parser) checkIterExpr(iter *ast.Iter) {
@@ -2815,7 +2819,7 @@ func (p *Parser) checkIfExpr(ifast *ast.If, i *int, statements []ast.Statement) 
 	if !isBoolExpr(val) {
 		p.pusherrtok(ifast.Tok, "if_notbool_expr")
 	}
-	p.checkBlock(&ifast.Block)
+	p.checkNewBlock(&ifast.Block)
 node:
 	if statement.WithTerminator {
 		return
@@ -2833,7 +2837,7 @@ node:
 		if !isBoolExpr(val) {
 			p.pusherrtok(t.Tok, "if_notbool_expr")
 		}
-		p.checkBlock(&t.Block)
+		p.checkNewBlock(&t.Block)
 		goto node
 	case ast.Else:
 		p.checkElseBlock(&t)
@@ -2843,9 +2847,7 @@ node:
 	}
 }
 
-func (p *Parser) checkElseBlock(elseast *ast.Else) {
-	p.checkBlock(&elseast.Block)
-}
+func (p *Parser) checkElseBlock(elseast *ast.Else) { p.checkNewBlock(&elseast.Block) }
 
 func (p *Parser) checkBreakStatement(breakAST *ast.Break) {
 	if p.iterCount == 0 {

@@ -25,13 +25,13 @@ type Statement struct {
 
 func (s Statement) String() string { return fmt.Sprint(s.Val) }
 
-// BlockAST is code block.
-type BlockAST struct{ Tree []Statement }
+// Block is code block.
+type Block struct{ Tree []Statement }
 
 // Indent total of blocks.
 var Indent int32 = 0
 
-func (b BlockAST) String() string {
+func (b Block) String() string {
 	atomic.SwapInt32(&Indent, Indent+1)
 	defer func() { atomic.SwapInt32(&Indent, Indent-1) }()
 	return ParseBlock(b, int(Indent))
@@ -41,7 +41,7 @@ func (b BlockAST) String() string {
 const IndentSpace = 2
 
 // ParseBlock to cxx.
-func ParseBlock(b BlockAST, indent int) string {
+func ParseBlock(b Block, indent int) string {
 	// Space count per indent.
 	var cxx strings.Builder
 	cxx.WriteByte('{')
@@ -172,7 +172,7 @@ type Func struct {
 	Id      string
 	Params  []Parameter
 	RetType DataType
-	Block   BlockAST
+	Block   Block
 }
 
 // DataTypeString returns data type string of function.
@@ -588,7 +588,7 @@ func (fp ForeachProfile) IterationString(iter Iter) string {
 // Iter is the AST model of iterations.
 type Iter struct {
 	Tok     lex.Tok
-	Block   BlockAST
+	Block   Block
 	Profile IterProfile
 }
 
@@ -616,7 +616,7 @@ func (c Continue) String() string { return "continue;" }
 type If struct {
 	Tok   lex.Tok
 	Expr  Expr
-	Block BlockAST
+	Block Block
 }
 
 func (ifast If) String() string {
@@ -632,7 +632,7 @@ func (ifast If) String() string {
 type ElseIf struct {
 	Tok   lex.Tok
 	Expr  Expr
-	Block BlockAST
+	Block Block
 }
 
 func (elif ElseIf) String() string {
@@ -647,7 +647,7 @@ func (elif ElseIf) String() string {
 // Else is the AST model of else blocks.
 type Else struct {
 	Tok   lex.Tok
-	Block BlockAST
+	Block Block
 }
 
 func (elseast Else) String() string {

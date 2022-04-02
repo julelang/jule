@@ -785,7 +785,7 @@ func nextStatementPos(toks []lex.Tok, start int) (int, bool) {
 
 type blockStatement struct {
 	pos            int
-	block          *BlockAST
+	block          *Block
 	srcToks        *[]lex.Tok
 	blockToks      *[]lex.Tok
 	toks           []lex.Tok
@@ -794,7 +794,7 @@ type blockStatement struct {
 }
 
 // Block builds AST model of statements of code block.
-func (b *Builder) Block(toks []lex.Tok) (block BlockAST) {
+func (b *Builder) Block(toks []lex.Tok) (block Block) {
 	bs := new(blockStatement)
 	bs.block = &block
 	bs.srcToks = &toks
