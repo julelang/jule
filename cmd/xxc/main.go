@@ -296,9 +296,6 @@ func appendStandard(code *string) {
 #include <functional>
 #include <vector>
 #include <map>
-#include <codecvt>
-#include <locale>
-#include <type_traits>
 // endregion X_STANDARD_IMPORTS
 
 // region X_CXX_API
@@ -326,11 +323,8 @@ typedef std::string   str;
 template<typename _Item_t>
 class array {
 public:
-// region FIELDS
   std::vector<_Item_t> _buffer{};
-// endregion FIELDS
 
-// region CONSTRUCTORS
   array<_Item_t>(void) noexcept                       {}
   array<_Item_t>(const std::nullptr_t) noexcept       {}
   array<_Item_t>(const array<_Item_t>& _Src) noexcept { this->_buffer = _Src._buffer; }
@@ -340,22 +334,16 @@ public:
 
   array<_Item_t>(const str _Str) noexcept
   { this->_buffer = std::vector<_Item_t>(_Str.begin(), _Str.end()); }
-// endregion CONSTRUCTORS
 
-// region DESTRUCTOR
   ~array<_Item_t>(void) noexcept { this->_buffer.clear(); }
-// endregion DESTRUCTOR
 
-// region FOREACH_SUPPORT
   typedef _Item_t       *iterator;
   typedef const _Item_t *const_iterator;
   iterator begin(void) noexcept             { return &this->_buffer[0]; }
   const_iterator begin(void) const noexcept { return &this->_buffer[0]; }
   iterator end(void) noexcept               { return &this->_buffer[this->_buffer.size()]; }
   const_iterator end(void) const noexcept   { return &this->_buffer[this->_buffer.size()]; }
-// endregion FOREACH_SUPPORT
 
-// region OPERATOR_OVERFLOWS
   operator str(void) const noexcept { return str{this->begin(), this->end()}; }
 
   bool operator==(const array<_Item_t> &_Src) const noexcept {
@@ -383,20 +371,16 @@ public:
     _Stream << L']';
     return _Stream;
   }
-// endregion OPERATOR_OVERFLOWS
 };
 
 template<typename _Key_t, typename _Value_t>
 class map: public std::map<_Key_t, _Value_t> {
 public:
-// region CONSTRUCTORS
   map<_Key_t, _Value_t>(void) noexcept                 {}
   map<_Key_t, _Value_t>(const std::nullptr_t) noexcept {}
   map<_Key_t, _Value_t>(const std::initializer_list<std::pair<_Key_t, _Value_t>> _Src)
   { for (const auto _data: _Src) { this->insert(_data); } }
-// endregion CONSTRUCTORS
 
-// region METHODS
   array<_Key_t> keys(void) const noexcept {
     array<_Key_t> _keys{};
     for (const auto _pair: *this)
@@ -413,9 +397,7 @@ public:
 
   bool has(const _Key_t _Key) const noexcept { return this->find(_Key) != this->end(); }
   bool del(const _Key_t _Key) const noexcept { return this->erase(_Key) != this->end(); }
-// endregion METHODS
 
-// region OPERATOR_OVERFLOW
   bool operator==(const std::nullptr_t) const noexcept { return this->empty(); }
   bool operator!=(const std::nullptr_t) const noexcept { return !this->empty(); }
 
@@ -432,7 +414,6 @@ public:
     _Stream << L'}';
     return _Stream;
   }
-// endreion OPERATOR_OVERFLOW
 };
 // endregion X_STRUCTURES
 
