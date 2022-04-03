@@ -361,12 +361,15 @@ type AssignSelector struct {
 	Ignore bool
 }
 
-func (vs AssignSelector) String() string {
-	if vs.Var.New {
+func (as AssignSelector) String() string {
+	switch {
+	case as.Var.New:
 		// Returns variable identifier.
-		return xapi.AsId(vs.Expr.Toks[0].Kind)
+		return xapi.AsId(as.Expr.Toks[0].Kind)
+	case as.Ignore:
+		return xapi.CxxIgnore
 	}
-	return vs.Expr.String()
+	return as.Expr.String()
 }
 
 // Assign is assignment AST model.
@@ -378,10 +381,10 @@ type Assign struct {
 	MultipleRet bool
 }
 
-func (vs Assign) cxxSingleAssign() string {
-	expr := vs.SelectExprs[0]
+func (a *Assign) cxxSingleAssign() string {
+	expr := a.SelectExprs[0]
 	if expr.Var.New {
-		expr.Var.Val = vs.ValueExprs[0]
+		expr.Var.Val = a.ValueExprs[0]
 		s := expr.Var.String()
 		return s[:len(s)-1] // Remove statement terminator
 	}
@@ -389,42 +392,56 @@ func (vs Assign) cxxSingleAssign() string {
 	if len(expr.Expr.Toks) != 1 ||
 		!xapi.IsIgnoreId(expr.Expr.Toks[0].Kind) {
 		cxx.WriteString(expr.String())
-		cxx.WriteString(vs.Setter.Kind)
+		cxx.WriteString(a.Setter.Kind)
 	}
-	cxx.WriteString(vs.ValueExprs[0].String())
+	cxx.WriteString(a.ValueExprs[0].String())
 	return cxx.String()
 }
 
-func (vs Assign) cxxMultipleAssign() string {
+func (a *Assign) hasSelector() bool {
+	for _, s := range a.SelectExprs {
+		if !s.Ignore {
+			return true
+		}
+	}
+	return false
+}
+
+func (a *Assign) cxxMultipleAssign() string {
 	var cxx strings.Builder
-	cxx.WriteString(vs.cxxNewDefines())
+	if !a.hasSelector() {
+		for _, expr := range a.ValueExprs {
+			cxx.WriteString(expr.String())
+			cxx.WriteByte(';')
+		}
+		return cxx.String()[:cxx.Len()-1] // Remove last semicolon
+	}
+	cxx.WriteString(a.cxxNewDefines())
 	cxx.WriteString("std::tie(")
 	var expCxx strings.Builder
 	expCxx.WriteString("std::make_tuple(")
-	for i, selector := range vs.SelectExprs {
-		if selector.Ignore {
-			continue
-		}
+	for i, selector := range a.SelectExprs {
 		cxx.WriteString(selector.String())
 		cxx.WriteByte(',')
-		expCxx.WriteString(vs.ValueExprs[i].String())
+		expCxx.WriteString(a.ValueExprs[i].String())
 		expCxx.WriteByte(',')
 	}
 	str := cxx.String()[:cxx.Len()-1] + ")"
 	cxx.Reset()
 	cxx.WriteString(str)
-	cxx.WriteString(vs.Setter.Kind)
+	cxx.WriteString(a.Setter.Kind)
 	cxx.WriteString(expCxx.String()[:expCxx.Len()-1] + ")")
 	return cxx.String()
 }
 
-func (vs Assign) cxxMultipleReturn() string {
+func (a *Assign) cxxMultipleReturn() string {
 	var cxx strings.Builder
-	cxx.WriteString(vs.cxxNewDefines())
+	cxx.WriteString(a.cxxNewDefines())
 	cxx.WriteString("std::tie(")
-	for _, selector := range vs.SelectExprs {
+	for _, selector := range a.SelectExprs {
 		if selector.Ignore {
-			cxx.WriteString("std::ignore,")
+			cxx.WriteString(xapi.CxxIgnore)
+			cxx.WriteByte(',')
 			continue
 		}
 		cxx.WriteString(selector.String())
@@ -434,14 +451,14 @@ func (vs Assign) cxxMultipleReturn() string {
 	cxx.Reset()
 	cxx.WriteString(str)
 	cxx.WriteByte(')')
-	cxx.WriteString(vs.Setter.Kind)
-	cxx.WriteString(vs.ValueExprs[0].String())
+	cxx.WriteString(a.Setter.Kind)
+	cxx.WriteString(a.ValueExprs[0].String())
 	return cxx.String()
 }
 
-func (vs Assign) cxxNewDefines() string {
+func (a *Assign) cxxNewDefines() string {
 	var cxx strings.Builder
-	for _, selector := range vs.SelectExprs {
+	for _, selector := range a.SelectExprs {
 		if selector.Ignore || !selector.Var.New {
 			continue
 		}
@@ -450,17 +467,17 @@ func (vs Assign) cxxNewDefines() string {
 	return cxx.String()
 }
 
-func (vs Assign) String() string {
+func (a Assign) String() string {
 	var cxx strings.Builder
 	switch {
-	case vs.MultipleRet:
-		cxx.WriteString(vs.cxxMultipleReturn())
-	case len(vs.SelectExprs) == 1:
-		cxx.WriteString(vs.cxxSingleAssign())
+	case a.MultipleRet:
+		cxx.WriteString(a.cxxMultipleReturn())
+	case len(a.SelectExprs) == 1:
+		cxx.WriteString(a.cxxSingleAssign())
 	default:
-		cxx.WriteString(vs.cxxMultipleAssign())
+		cxx.WriteString(a.cxxMultipleAssign())
 	}
-	if !vs.IsExpr {
+	if !a.IsExpr {
 		cxx.WriteByte(';')
 	}
 	return cxx.String()
