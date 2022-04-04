@@ -7,4 +7,4 @@ const Ignore = "_"
 func IsIgnoreId(id string) bool { return id == Ignore }
 
 // Returns specified identifer as X identifer.
-func AsId(id string) string { return Ignore + id }
+func AsId(id string) string { return "XID(" + id + ")" }

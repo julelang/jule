@@ -474,10 +474,10 @@ inline auto tuple_as_args(const _Function_t _Function, const _Tuple_t _Tuple) {
 }
 
 struct defer {
-  typedef std::function<void(void)> _Function_t;
+  typedef func<void(void)> _Function_t;
   template<class Callable>
   defer(Callable &&_function): _function(std::forward<Callable>(_function)) {}
-  defer(defer &&_other): _function(std::move(_other._function))             { _other._function = nullptr; }
+  defer(defer &&_Src): _function(std::move(_Src._function))                 { _Src._function = nullptr; }
   ~defer() noexcept                                                         { if (this->_function) { this->_function(); } }
   defer(const defer &)          = delete;
   void operator=(const defer &) = delete;
@@ -488,15 +488,16 @@ struct defer {
 #define _CONCAT(_A, _B) _A ## _B
 #define CONCAT(_A, _B) _CONCAT(_A, _B)
 #define DEFER(_Expr) defer CONCAT(XXDEFER_, __LINE__){[&](void) mutable -> void { _Expr; }}
+#define XID(_Identifier) CONCAT(_, _Identifier)
 // endregion X_MISC
 
 // region X_BUILTIN_FUNCTIONS
 template <typename _Obj_t>
-static inline void _out(const _Obj_t _Obj) noexcept { std::wcout << _Obj; }
+static inline void XID(out)(const _Obj_t _Obj) noexcept { std::wcout << _Obj; }
 
 template <typename _Obj_t>
-static inline void _outln(const _Obj_t _Obj) noexcept {
-  _out<_Obj_t>(_Obj);
+static inline void XID(outln)(const _Obj_t _Obj) noexcept {
+  XID(out)<_Obj_t>(_Obj);
   std::wcout << std::endl;
 }
 // endregion X_BUILTIN_FUNCTIONS
