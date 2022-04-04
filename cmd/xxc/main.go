@@ -418,8 +418,6 @@ public:
 // endregion X_STRUCTURES
 
 // region X_MISC
-#define XTHROW(_Msg) throw exception(_Msg)
-
 class exception: public std::exception {
 private:
   std::basic_string<char> _buffer;
@@ -474,6 +472,22 @@ inline auto tuple_as_args(const _Function_t _Function, const _Tuple_t _Tuple) {
   static constexpr auto _size = std::tuple_size<_Tuple_t>::value;
   return tuple_as_args(_Function, _Tuple, std::make_index_sequence<_size>{});
 }
+
+struct defer {
+  typedef std::function<void(void)> _Function_t;
+  template<class Callable>
+  defer(Callable &&_function): _function(std::forward<Callable>(_function)) {}
+  defer(defer &&_other): _function(std::move(_other._function))             { _other._function = nullptr; }
+  ~defer() noexcept                                                         { if (this->_function) { this->_function(); } }
+  defer(const defer &)          = delete;
+  void operator=(const defer &) = delete;
+  _Function_t _function;
+};
+
+#define XTHROW(_Msg) throw exception(_Msg)
+#define _CONCAT(_A, _B) _A ## _B
+#define CONCAT(_A, _B) _CONCAT(_A, _B)
+#define DEFER(_Expr) defer CONCAT(XXDEFER_, __LINE__){[&](void) mutable -> void { _Expr; }}
 // endregion X_MISC
 
 // region X_BUILTIN_FUNCTIONS

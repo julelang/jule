@@ -714,3 +714,11 @@ func (d Directive) String() string { return fmt.Sprint(d.Command) }
 type EnofiDirective struct{}
 
 func (EnofiDirective) String() string { return "" }
+
+// Defer is the AST model of deferred calls.
+type Defer struct {
+	Tok  lex.Tok
+	Expr Expr
+}
+
+func (d Defer) String() string { return xapi.ToDefer(d.Expr.String()) }

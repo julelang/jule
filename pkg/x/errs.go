@@ -108,6 +108,7 @@ var Errs = map[string]string{
 	`obj_have_not_id`:                  `object is not have sub field in this identifier: %s`,
 	`doc_couldnt_generated`:            `%s: documentation couldn't generated because X source code has an errors`,
 	`declared_but_not_used`:            `%s declared but not used`,
+	`defer_expr_not_func_call`:         `defer must have function call expression`,
 	`error`:                            `error: %s`,
 }
 

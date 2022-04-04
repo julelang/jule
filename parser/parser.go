@@ -1860,7 +1860,7 @@ func (p *Parser) evalParenthesesRangeExpr(toks []lex.Tok, m *exprModel) (v value
 	switch {
 	case typeIsFunc(v.ast.Type):
 		f := v.ast.Type.Tag.(ast.Func)
-		p.parseFuncCall(f, toks[len(valueToks):], m)
+		p.parseFuncCallToks(f, toks[len(valueToks):], m)
 		v.ast.Type = f.RetType
 		v.lvalue = typeIsLvalue(v.ast.Type)
 	default:
@@ -2141,8 +2141,7 @@ func (p *Parser) checkAnonFunc(f *ast.Func) {
 	p.BlockVars = blockVariables
 }
 
-func (p *Parser) parseFuncCall(f ast.Func, toks []lex.Tok, m *exprModel) {
-	errTok := toks[0]
+func (p *Parser) getArgs(toks []lex.Tok) []ast.Arg {
 	toks, _ = p.getRange("(", ")", toks)
 	if toks == nil {
 		toks = make([]lex.Tok, 0)
@@ -2151,11 +2150,23 @@ func (p *Parser) parseFuncCall(f ast.Func, toks []lex.Tok, m *exprModel) {
 	args := b.Args(toks)
 	if len(b.Errs) > 0 {
 		p.pusherrs(b.Errs...)
+		args = nil
+	}
+	return args
+}
+
+func (p *Parser) parseFuncCall(f ast.Func, args []ast.Arg, m *exprModel, errTok lex.Tok) {
+	if args == nil {
+		return
 	}
 	p.parseArgs(f.Params, &args, errTok, m)
 	if m != nil {
 		m.appendSubNode(argsExpr{args})
 	}
+}
+
+func (p *Parser) parseFuncCallToks(f ast.Func, argsToks []lex.Tok, m *exprModel) {
+	p.parseFuncCall(f, p.getArgs(argsToks), m, argsToks[0])
 }
 
 func (p *Parser) parseArgs(params []ast.Parameter, args *[]ast.Arg, errTok lex.Tok, m *exprModel) {
@@ -2230,11 +2241,13 @@ func (p *Parser) tryFuncMultiRetAsArgs(params []ast.Parameter, args *[]ast.Arg, 
 		p.pusherrtok(errTok, "argument_overflow")
 		return
 	}
-	fname := m.nodes[m.index].nodes[0]
-	m.nodes[m.index].nodes[0] = exprNode{"tuple_as_args"}
-	*args = make([]ast.Arg, 2)
-	(*args)[0] = ast.Arg{Expr: ast.Expr{Model: fname}}
-	(*args)[1] = arg
+	if m != nil {
+		fname := m.nodes[m.index].nodes[0]
+		m.nodes[m.index].nodes[0] = exprNode{"tuple_as_args"}
+		*args = make([]ast.Arg, 2)
+		(*args)[0] = ast.Arg{Expr: ast.Expr{Model: fname}}
+		(*args)[1] = arg
+	}
 	for i, param := range params {
 		rt := types[i]
 		p.wg.Add(1)
@@ -2326,9 +2339,7 @@ func (p *Parser) checkNewBlockCustom(b *ast.Block, oldBlockVars []*ast.Var) {
 	p.BlockTypes = blockTypes
 }
 
-func (p *Parser) checkNewBlock(b *ast.Block) {
-	p.checkNewBlockCustom(b, p.BlockVars)
-}
+func (p *Parser) checkNewBlock(b *ast.Block) { p.checkNewBlockCustom(b, p.BlockVars) }
 
 func (p *Parser) checkBlock(b *ast.Block) {
 	for i := 0; i < len(b.Tree); i++ {
@@ -2364,6 +2375,9 @@ func (p *Parser) checkBlock(b *ast.Block) {
 			model.Val = nil
 		case ast.Block:
 			p.checkNewBlock(&t)
+			model.Val = t
+		case ast.Defer:
+			p.checkDeferStatement(&t)
 			model.Val = t
 		case ast.CxxEmbed:
 		case ast.Comment:
@@ -2540,6 +2554,44 @@ func (p *Parser) checkVarStatement(v *ast.Var, noParse bool) {
 		*v = *p.Var(*v)
 	}
 	p.BlockVars = append(p.BlockVars, v)
+}
+
+func (p *Parser) checkDeferStatement(d *ast.Defer) {
+	tokens := d.Expr.Toks
+	if t := tokens[len(tokens)-1]; t.Id != lex.Brace && t.Kind != ")" {
+		p.pusherrtok(d.Tok, "defer_expr_not_func_call")
+		return
+	}
+	var exprToks []lex.Tok
+	braceCount := 0
+	for i := len(tokens) - 1; i >= 0; i-- {
+		tok := tokens[i]
+		if tok.Id == lex.Brace {
+			switch tok.Kind {
+			case ")":
+				braceCount++
+			case "(":
+				braceCount--
+			}
+			if braceCount == 0 {
+				exprToks = tokens[:i]
+				break
+			}
+		}
+	}
+	if len(exprToks) == 0 {
+		p.pusherrtok(d.Tok, "defer_expr_not_func_call")
+		return
+	}
+	m := new(exprModel)
+	m.nodes = make([]exprBuildNode, 1)
+	if !typeIsFunc(p.evalExprPart(exprToks, m).ast.Type) {
+		p.pusherrtok(d.Tok, "defer_expr_not_func_call")
+		return
+	}
+	m.nodes[0].nodes = nil
+	_ = p.evalExprPart(tokens, m)
+	d.Expr.Model = m
 }
 
 func (p *Parser) checkAssignment(selected value, errtok lex.Tok) bool {

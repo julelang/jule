@@ -859,6 +859,8 @@ func (b *Builder) Statement(bs *blockStatement) (s Statement) {
 		}
 	case lex.Comment:
 		return b.CommentStatement(bs.toks[0])
+	case lex.Defer:
+		return b.DeferStatement(bs.toks)
 	case lex.Brace:
 		if tok.Kind == "{" {
 			return b.blockStatement(bs.toks)
@@ -1230,6 +1232,7 @@ ret:
 	return Statement{vast.IdTok, vast, false}
 }
 
+// CommentStatement builds AST model of comment statement.
 func (b *Builder) CommentStatement(tok lex.Tok) (s Statement) {
 	s.Tok = tok
 	tok.Kind = strings.TrimSpace(tok.Kind[2:])
@@ -1238,6 +1241,21 @@ func (b *Builder) CommentStatement(tok lex.Tok) (s Statement) {
 	} else {
 		s.Val = Comment{tok.Kind}
 	}
+	return
+}
+
+// DeferStatement builds AST model of deferred call statement.
+func (b *Builder) DeferStatement(toks []lex.Tok) (s Statement) {
+	var d Defer
+	d.Tok = toks[0]
+	toks = toks[1:]
+	if len(toks) == 0 {
+		b.pusherr(d.Tok, "missing_expr")
+		return
+	}
+	d.Expr = b.Expr(toks)
+	s.Tok = d.Tok
+	s.Val = d
 	return
 }
 
@@ -1251,6 +1269,7 @@ func (b *Builder) RetStatement(toks []lex.Tok) Statement {
 	return Statement{returnModel.Tok, returnModel, false}
 }
 
+// FreeStatement builds AST model of free statement.
 func (b *Builder) FreeStatement(toks []lex.Tok) Statement {
 	var free Free
 	free.Tok = toks[0]

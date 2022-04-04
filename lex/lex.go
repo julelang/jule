@@ -441,7 +441,8 @@ func (l *Lex) Tok() Tok {
 		l.kw(txt, "else", Else, &tok),
 		l.kw(txt, "volatile", Volatile, &tok),
 		l.kw(txt, "use", Use, &tok),
-		l.kw(txt, "pub", Pub, &tok):
+		l.kw(txt, "pub", Pub, &tok),
+		l.kw(txt, "defer", Defer, &tok):
 	default:
 		lex := l.id(txt)
 		if lex != "" {
