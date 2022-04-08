@@ -64,6 +64,7 @@ var Errs = map[string]string{
 	`missing_multiassign_identifiers`:  `missing identifier(s) for multiple assignment`,
 	`missing_use_path`:                 `missing path of use statement`,
 	`missing_pragma_directive`:         `missing pragma directive`,
+	`missing_goto_label`:               `missing label identifier for goto statement`,
 	`nil_for_autotype`:                 `nil is cannot use with auto-type definations`,
 	`void_for_autotype`:                `void data is cannot use for auto-type definations`,
 	`char_empty`:                       `char is cannot empty`,
@@ -109,6 +110,9 @@ var Errs = map[string]string{
 	`doc_couldnt_generated`:            `%s: documentation couldn't generated because X source code has an errors`,
 	`declared_but_not_used`:            `%s declared but not used`,
 	`defer_expr_not_func_call`:         `defer must have function call expression`,
+	`label_exist`:                      `label is already exist in this identifier: %s`,
+	`label_not_exist`:                  `not exist any label in this identifier: %s`,
+	`goto_jumps_declarations`:          `goto %s jumps over declaration(s)`,
 	`error`:                            `error: %s`,
 }
 

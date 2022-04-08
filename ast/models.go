@@ -25,8 +25,17 @@ type Statement struct {
 
 func (s Statement) String() string { return fmt.Sprint(s.Val) }
 
+type Labels []*Label
+type Gotos []*Goto
+
 // Block is code block.
-type Block struct{ Tree []Statement }
+type Block struct {
+	Parent   *Block
+	SubIndex int // Anonymous block sub count
+	Tree     []Statement
+	Gotos    *Gotos
+	Labels   *Labels
+}
 
 // Indent total of blocks.
 var Indent int32 = 0
@@ -722,3 +731,30 @@ type Defer struct {
 }
 
 func (d Defer) String() string { return xapi.ToDefer(d.Expr.String()) }
+
+// Label is the AST model of labels.
+type Label struct {
+	Tok   lex.Tok
+	Label string
+	Index int
+	Used  bool
+	Block *Block
+}
+
+func (l Label) String() string { return l.Label + ":;" }
+
+// Goto is the AST model of goto statements.
+type Goto struct {
+	Tok   lex.Tok
+	Label string
+	Index int
+	Block *Block
+}
+
+func (gt Goto) String() string {
+	var cxx strings.Builder
+	cxx.WriteString("goto ")
+	cxx.WriteString(gt.Label)
+	cxx.WriteByte(';')
+	return cxx.String()
+}

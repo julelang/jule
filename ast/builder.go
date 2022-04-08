@@ -848,6 +848,12 @@ func (b *Builder) Statement(bs *blockStatement) (s Statement) {
 		return b.IfExpr(bs)
 	case lex.Else:
 		return b.ElseBlock(bs)
+	case lex.Comment:
+		return b.CommentStatement(bs.toks[0])
+	case lex.Defer:
+		return b.DeferStatement(bs.toks)
+	case lex.Goto:
+		return b.GotoStatement(bs.toks)
 	case lex.Type:
 		t := b.Type(bs.toks)
 		s.Tok = t.Tok
@@ -857,10 +863,6 @@ func (b *Builder) Statement(bs *blockStatement) (s Statement) {
 		if tok.Kind == "<" {
 			return b.RetStatement(bs.toks)
 		}
-	case lex.Comment:
-		return b.CommentStatement(bs.toks[0])
-	case lex.Defer:
-		return b.DeferStatement(bs.toks)
 	case lex.Brace:
 		if tok.Kind == "{" {
 			return b.blockStatement(bs.toks)
@@ -1102,9 +1104,20 @@ func (b *Builder) IdStatement(toks []lex.Tok) (s Statement, _ bool) {
 	tok := toks[1]
 	switch tok.Id {
 	case lex.Colon:
+		if len(toks) == 2 { // Label?
+			return b.LabelStatement(toks[0]), true
+		}
 		return b.VarStatement(toks), true
 	}
 	return
+}
+
+// LabelStatement builds AST model of label.
+func (b *Builder) LabelStatement(tok lex.Tok) Statement {
+	var l Label
+	l.Tok = tok
+	l.Label = tok.Kind
+	return Statement{Tok: tok, Val: l}
 }
 
 // ExprStatement builds AST model of expression.
@@ -1256,6 +1269,26 @@ func (b *Builder) DeferStatement(toks []lex.Tok) (s Statement) {
 	d.Expr = b.Expr(toks)
 	s.Tok = d.Tok
 	s.Val = d
+	return
+}
+
+func (b *Builder) GotoStatement(toks []lex.Tok) (s Statement) {
+	s.Tok = toks[0]
+	if len(toks) == 1 {
+		b.pusherr(s.Tok, "missing_goto_label")
+		return
+	} else if len(toks) > 2 {
+		b.pusherr(toks[2], "invalid_syntax")
+	}
+	idTok := toks[1]
+	if idTok.Id != lex.Id {
+		b.pusherr(idTok, "invalid_syntax")
+		return
+	}
+	var gt Goto
+	gt.Tok = s.Tok
+	gt.Label = idTok.Kind
+	s.Val = gt
 	return
 }
 

@@ -41,4 +41,5 @@ const (
 	Pub          uint8 = 25
 	Preprocessor uint8 = 26
 	Defer        uint8 = 27
+	Goto         uint8 = 28
 )

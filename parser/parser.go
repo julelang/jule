@@ -34,6 +34,8 @@ type Parser struct {
 	justDefs   bool
 	main       bool
 	isLocalPkg bool
+	rootBlock  *ast.Block
+	nodeBlock  *ast.Block
 
 	Embeds         strings.Builder
 	Uses           []*use
@@ -2319,6 +2321,23 @@ func (p *Parser) checkEntryPointSpecialCases(fun *function) {
 }
 
 func (p *Parser) checkNewBlockCustom(b *ast.Block, oldBlockVars []*ast.Var) {
+	b.Gotos = new(ast.Gotos)
+	b.Labels = new(ast.Labels)
+	if p.rootBlock == nil {
+		p.rootBlock = b
+		p.nodeBlock = b
+		defer func() {
+			p.checkLabelNGoto()
+			p.rootBlock = nil
+			p.nodeBlock = nil
+		}()
+	} else {
+		b.Parent = p.nodeBlock
+		b.SubIndex = p.nodeBlock.SubIndex + 1
+		oldNode := p.nodeBlock
+		p.nodeBlock = b
+		defer func() { p.nodeBlock = oldNode }()
+	}
 	blockTypes := p.BlockTypes
 	p.checkBlock(b)
 
@@ -2379,6 +2398,14 @@ func (p *Parser) checkBlock(b *ast.Block) {
 		case ast.Defer:
 			p.checkDeferStatement(&t)
 			model.Val = t
+		case ast.Label:
+			t.Index = i
+			t.Block = b
+			*p.rootBlock.Labels = append(*p.rootBlock.Labels, &t)
+		case ast.Goto:
+			t.Index = i
+			t.Block = b
+			*p.rootBlock.Gotos = append(*p.rootBlock.Gotos, &t)
 		case ast.CxxEmbed:
 		case ast.Comment:
 		case ast.Ret:
@@ -2386,6 +2413,156 @@ func (p *Parser) checkBlock(b *ast.Block) {
 			p.pusherrtok(model.Tok, "invalid_syntax")
 		}
 	}
+}
+
+func (p *Parser) findLabel(id string) *ast.Label {
+	for _, label := range *p.rootBlock.Labels {
+		if label.Label == id {
+			return label
+		}
+	}
+	return nil
+}
+
+func (p *Parser) checkLabels() {
+	labels := p.rootBlock.Labels
+	for _, label := range *labels {
+		for _, checkLabel := range *labels {
+			if label.Index == checkLabel.Index {
+				break
+			} else if label.Label == checkLabel.Label {
+				p.pusherrtok(label.Tok, "label_exist", label.Label)
+			}
+		}
+		if !label.Used {
+			p.pusherrtok(label.Tok, "declared_but_not_used", label.Label+":")
+		}
+	}
+}
+
+func statementIsDef(s *ast.Statement) bool {
+	switch t := s.Val.(type) {
+	case ast.Var:
+		return true
+	case ast.Assign:
+		for _, selector := range t.SelectExprs {
+			if selector.Var.New {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (p *Parser) checkSameScopeGoto(gt *ast.Goto, label *ast.Label) {
+	if label.Index < gt.Index { // Label at above.
+		return
+	}
+	for i := label.Index; i > gt.Index; i-- {
+		s := &label.Block.Tree[i]
+		if statementIsDef(s) {
+			p.pusherrtok(gt.Tok, "goto_jumps_declarations", gt.Label)
+			break
+		}
+	}
+}
+
+func (p *Parser) checkLabelParents(gt *ast.Goto, label *ast.Label) bool {
+	block := label.Block
+parent_scopes:
+	if block.Parent != nil && block.Parent != gt.Block {
+		block = block.Parent
+		for i := 0; i < len(block.Tree); i++ {
+			s := &block.Tree[i]
+			switch {
+			case s.Tok.Row >= label.Tok.Row:
+				return true
+			case statementIsDef(s):
+				p.pusherrtok(gt.Tok, "goto_jumps_declarations", gt.Label)
+				return false
+			}
+		}
+		goto parent_scopes
+	}
+	return true
+}
+
+func (p *Parser) checkDiffScopeGoto(gt *ast.Goto, label *ast.Label) {
+	switch {
+	case label.Block.SubIndex > 0 && gt.Block.SubIndex == 0:
+		if !p.checkLabelParents(gt, label) {
+			return
+		}
+	case label.Block.SubIndex < gt.Block.SubIndex: // Label at parent blocks.
+		return
+	}
+	block := label.Block
+	for i := label.Index - 1; i >= 0; i-- {
+		s := &block.Tree[i]
+		switch s.Val.(type) {
+		case ast.Block:
+			if s.Tok.Row <= gt.Tok.Row {
+				return
+			}
+		}
+		if statementIsDef(s) {
+			p.pusherrtok(gt.Tok, "goto_jumps_declarations", gt.Label)
+			break
+		}
+	}
+	// Parent Scopes
+parent_scopes:
+	if block.Parent != nil && block.Parent != gt.Block {
+		block = block.Parent
+		for i := 0; i < len(block.Tree); i++ {
+			s := &block.Tree[i]
+			switch {
+			case s.Tok.Row >= label.Tok.Row:
+				return
+			case statementIsDef(s):
+				p.pusherrtok(gt.Tok, "goto_jumps_declarations", gt.Label)
+				return
+			}
+		}
+		goto parent_scopes
+	} else { // goto Scope
+		for i := gt.Index; i < len(gt.Block.Tree); i++ {
+			s := &gt.Block.Tree[i]
+			switch {
+			case s.Tok.Row >= label.Tok.Row:
+				return
+			case statementIsDef(s):
+				p.pusherrtok(gt.Tok, "goto_jumps_declarations", gt.Label)
+				return
+			}
+		}
+	}
+}
+
+func (p *Parser) checkGoto(gt *ast.Goto, label *ast.Label) {
+	switch {
+	case gt.Block == label.Block:
+		p.checkSameScopeGoto(gt, label)
+	case label.Block.SubIndex > 0:
+		p.checkDiffScopeGoto(gt, label)
+	}
+}
+
+func (p *Parser) checkGotos() {
+	for _, gt := range *p.rootBlock.Gotos {
+		label := p.findLabel(gt.Label)
+		if label == nil {
+			p.pusherrtok(gt.Tok, "label_not_exist", gt.Label)
+			continue
+		}
+		label.Used = true
+		p.checkGoto(gt, label)
+	}
+}
+
+func (p *Parser) checkLabelNGoto() {
+	p.checkGotos()
+	p.checkLabels()
 }
 
 type retChecker struct {
