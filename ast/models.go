@@ -190,8 +190,11 @@ func (fc Func) DataTypeString() string {
 	var cxx strings.Builder
 	cxx.WriteByte('(')
 	if len(fc.Params) > 0 {
-		for _, param := range fc.Params {
-			cxx.WriteString(param.Type.String())
+		for _, p := range fc.Params {
+			if p.Variadic {
+				cxx.WriteString("...")
+			}
+			cxx.WriteString(p.Type.String())
 			cxx.WriteString(", ")
 		}
 		cxxStr := cxx.String()[:cxx.Len()-2]

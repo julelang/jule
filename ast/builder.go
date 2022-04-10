@@ -280,6 +280,7 @@ func (b *Builder) Func(toks []lex.Tok, anonymous bool) (f Func) {
 		i++
 	}
 	f.RetType.Id = x.Void
+	f.RetType.Val = x.VoidTypeStr
 	paramToks := b.getrange(&i, "(", ")", &toks)
 	if len(paramToks) > 0 {
 		b.Params(&f, paramToks)

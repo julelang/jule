@@ -27,6 +27,7 @@ const (
 const (
 	NumericTypeStr = "<numeric>"
 	NilTypeStr     = "<nil>"
+	VoidTypeStr    = "<void>"
 )
 
 // TypeGreaterThan reports type one is greater than type two or not.
