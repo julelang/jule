@@ -8,9 +8,7 @@ import (
 	"github.com/the-xlang/xxc/pkg/xapi"
 )
 
-type iExpr interface {
-	String() string
-}
+type iExpr interface{ String() string }
 
 type exprBuildNode struct {
 	index int
@@ -46,17 +44,11 @@ func (m exprModel) String() string {
 	return expr.String()
 }
 
-func (m *exprModel) Expr() ast.Expr {
-	return ast.Expr{Model: m}
-}
+func (m *exprModel) Expr() ast.Expr { return ast.Expr{Model: m} }
 
-type exprNode struct {
-	value string
-}
+type exprNode struct{ value string }
 
-func (node exprNode) String() string {
-	return node.value
-}
+func (node exprNode) String() string { return node.value }
 
 type anonFuncExpr struct {
 	ast     ast.Func
@@ -118,12 +110,10 @@ func (m mapExpr) String() string {
 	return cxx.String()
 }
 
-type argsExpr struct {
-	args []ast.Arg
-}
+type argsExpr struct{ args []ast.Arg }
 
 func (a argsExpr) String() string {
-	if a.args == nil {
+	if len(a.args) == 0 {
 		return ""
 	}
 	var cxx strings.Builder
@@ -134,9 +124,7 @@ func (a argsExpr) String() string {
 	return cxx.String()[:cxx.Len()-1]
 }
 
-type multiRetExpr struct {
-	models []iExpr
-}
+type multiRetExpr struct{ models []iExpr }
 
 func (mre multiRetExpr) String() string {
 	var cxx strings.Builder
@@ -148,17 +136,11 @@ func (mre multiRetExpr) String() string {
 	return cxx.String()[:cxx.Len()-1] + ")"
 }
 
-type newHeapAllocExpr struct {
-	typeAST ast.DataType
-}
+type newHeapAllocExpr struct{ typeAST ast.DataType }
 
-func (nha newHeapAllocExpr) String() string {
-	return xapi.ToXAlloc(nha.typeAST.String())
-}
+func (nha newHeapAllocExpr) String() string { return xapi.ToXAlloc(nha.typeAST.String()) }
 
-type assignExpr struct {
-	assign ast.Assign
-}
+type assignExpr struct{ assign ast.Assign }
 
 func (a assignExpr) String() string {
 	var cxx strings.Builder

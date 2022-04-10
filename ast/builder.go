@@ -1127,8 +1127,8 @@ func (b *Builder) ExprStatement(toks []lex.Tok) Statement {
 }
 
 // Args builds AST model of arguments.
-func (b *Builder) Args(toks []lex.Tok) []Arg {
-	var args []Arg
+func (b *Builder) Args(toks []lex.Tok) *Args {
+	args := new(Args)
 	last := 0
 	braceCount := 0
 	for i, tok := range toks {
@@ -1143,28 +1143,38 @@ func (b *Builder) Args(toks []lex.Tok) []Arg {
 		if braceCount > 0 || tok.Id != lex.Comma {
 			continue
 		}
-		b.pushArg(&args, toks[last:i], tok)
+		b.pushArg(args, toks[last:i], tok)
 		last = i + 1
 	}
 	if last < len(toks) {
 		if last == 0 {
-			b.pushArg(&args, toks[last:], toks[last])
+			b.pushArg(args, toks[last:], toks[last])
 		} else {
-			b.pushArg(&args, toks[last:], toks[last-1])
+			b.pushArg(args, toks[last:], toks[last-1])
 		}
 	}
 	return args
 }
 
-func (b *Builder) pushArg(args *[]Arg, toks []lex.Tok, err lex.Tok) {
+func (b *Builder) pushArg(args *Args, toks []lex.Tok, err lex.Tok) {
 	if len(toks) == 0 {
 		b.pusherr(err, "invalid_syntax")
 		return
 	}
 	var arg Arg
 	arg.Tok = toks[0]
+	if arg.Tok.Id == lex.Id {
+		if len(toks) > 1 {
+			tok := toks[1]
+			if tok.Id == lex.Operator && tok.Kind == "=" {
+				args.Targetted = true
+				arg.TargetId = arg.Tok.Kind
+				toks = toks[2:]
+			}
+		}
+	}
 	arg.Expr = b.Expr(toks)
-	*args = append(*args, arg)
+	args.Src = append(args.Src, arg)
 }
 
 // VarStatement builds AST model of variable declaration statement.

@@ -131,7 +131,7 @@ func (dt DataType) FunctionString() string {
 	cxx.WriteByte('(')
 	if len(fun.Params) > 0 {
 		for _, param := range fun.Params {
-			cxx.WriteString(param.Type.String())
+			cxx.WriteString(param.Prototype())
 			cxx.WriteByte(',')
 		}
 		cxxStr := cxx.String()[:cxx.Len()-1]
@@ -222,11 +222,6 @@ func (p Parameter) String() string {
 		cxx.WriteByte(' ')
 		cxx.WriteString(xapi.AsId(p.Id))
 	}
-	if p.Variadic {
-		cxx.WriteString(" =array<")
-		cxx.WriteString(p.Type.String())
-		cxx.WriteString(">()")
-	}
 	return cxx.String()
 }
 
@@ -251,8 +246,15 @@ func (p Parameter) Prototype() string {
 
 // Arg is AST model of argument.
 type Arg struct {
-	Tok  lex.Tok
-	Expr Expr
+	Tok      lex.Tok
+	TargetId string
+	Expr     Expr
+}
+
+// Argument base.
+type Args struct {
+	Src       []Arg
+	Targetted bool
 }
 
 func (a Arg) String() string { return a.Expr.String() }

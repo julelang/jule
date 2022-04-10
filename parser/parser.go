@@ -2143,7 +2143,7 @@ func (p *Parser) checkAnonFunc(f *ast.Func) {
 	p.BlockVars = blockVariables
 }
 
-func (p *Parser) getArgs(toks []lex.Tok) []ast.Arg {
+func (p *Parser) getArgs(toks []lex.Tok) *ast.Args {
 	toks, _ = p.getRange("(", ")", toks)
 	if toks == nil {
 		toks = make([]lex.Tok, 0)
@@ -2157,13 +2157,13 @@ func (p *Parser) getArgs(toks []lex.Tok) []ast.Arg {
 	return args
 }
 
-func (p *Parser) parseFuncCall(f ast.Func, args []ast.Arg, m *exprModel, errTok lex.Tok) {
+func (p *Parser) parseFuncCall(f ast.Func, args *ast.Args, m *exprModel, errTok lex.Tok) {
 	if args == nil {
 		return
 	}
-	p.parseArgs(f.Params, &args, errTok, m)
+	p.parseArgs(f.Params, args, errTok, m)
 	if m != nil {
-		m.appendSubNode(argsExpr{args})
+		m.appendSubNode(argsExpr{args.Src})
 	}
 }
 
@@ -2171,64 +2171,213 @@ func (p *Parser) parseFuncCallToks(f ast.Func, argsToks []lex.Tok, m *exprModel)
 	p.parseFuncCall(f, p.getArgs(argsToks), m, argsToks[0])
 }
 
-func (p *Parser) parseArgs(params []ast.Parameter, args *[]ast.Arg, errTok lex.Tok, m *exprModel) {
+func (p *Parser) parseArgs(params []ast.Parameter, args *ast.Args, errTok lex.Tok, m *exprModel) {
+	if args.Targetted {
+		tap := targettedArgParser{
+			p:      p,
+			params: params,
+			args:   args,
+			errTok: errTok,
+		}
+		tap.parse()
+	} else {
+		p.parsePureArgs(params, args, errTok, m)
+	}
+}
+
+//             [identifier]
+type paramMap map[string]*paramMapPair
+type paramMapPair struct {
+	param *ast.Parameter
+	arg   *ast.Arg
+}
+
+func getParamMap(params []ast.Parameter) *paramMap {
+	pmap := new(paramMap)
+	*pmap = make(paramMap, len(params))
+	for i := range params {
+		p := &params[i]
+		(*pmap)[p.Id] = &paramMapPair{p, nil}
+	}
+	return pmap
+}
+
+type targettedArgParser struct {
+	p      *Parser
+	pmap   *paramMap
+	params []ast.Parameter
+	args   *ast.Args
+	i      int
+	arg    ast.Arg
+	errTok lex.Tok
+}
+
+func (tap *targettedArgParser) buildArgs() {
+	tap.args.Src = make([]ast.Arg, 0)
+	for _, p := range tap.params {
+		pair := (*tap.pmap)[p.Id]
+		if pair.arg != nil {
+			tap.args.Src = append(tap.args.Src, *pair.arg)
+		} else if pair.param.Variadic {
+			model := arrayExpr{pair.param.Type, nil}
+			model.dataType.Val = "[]" + model.dataType.Val // For array.
+			arg := ast.Arg{Expr: ast.Expr{Model: model}}
+			tap.args.Src = append(tap.args.Src, arg)
+		}
+	}
+}
+
+func (tap *targettedArgParser) pushVariadicArgs(pair *paramMapPair) {
+	model := arrayExpr{pair.param.Type, nil}
+	model.dataType.Val = "[]" + model.dataType.Val // For array.
+	variadiced := false
+	tap.p.parseArg(*pair.param, pair.arg, &variadiced)
+	model.expr = append(model.expr, pair.arg.Expr.Model.(iExpr))
+	once := false
+	for tap.i++; tap.i < len(tap.args.Src); tap.i++ {
+		arg := tap.args.Src[tap.i]
+		if arg.TargetId != "" {
+			tap.i--
+			break
+		}
+		once = true
+		tap.p.parseArg(*pair.param, &arg, &variadiced)
+		model.expr = append(model.expr, arg.Expr.Model.(iExpr))
+	}
+	if !once {
+		return
+	}
+	// Variadic argument have one more variadiced expressions.
+	if variadiced {
+		tap.p.pusherrtok(tap.errTok, "more_args_with_variadiced")
+	}
+	pair.arg.Expr.Model = model
+}
+
+func (tap *targettedArgParser) pushArg() {
+	defer func() { tap.i++ }()
+	if tap.arg.TargetId == "" {
+		tap.p.pusherrtok(tap.arg.Tok, "argument_must_target_to_parameter")
+		return
+	}
+	pair, ok := (*tap.pmap)[tap.arg.TargetId]
+	if !ok {
+		tap.p.pusherrtok(tap.arg.Tok, "function_not_has_parameter", tap.arg.TargetId)
+		return
+	} else if pair.arg != nil {
+		tap.p.pusherrtok(tap.arg.Tok, "parameter_already_has_argument", tap.arg.TargetId)
+		return
+	}
+	arg := tap.arg
+	pair.arg = &arg
+	if pair.param.Variadic {
+		tap.pushVariadicArgs(pair)
+	} else {
+		tap.p.parseArg(*pair.param, pair.arg, nil)
+	}
+}
+
+func (tap *targettedArgParser) checkPasses() {
+	for _, pair := range *tap.pmap {
+		if pair.arg == nil && !pair.param.Variadic {
+			tap.p.pusherrtok(tap.errTok, "missing_argument_for", pair.param.Id)
+		}
+	}
+}
+
+func (tap *targettedArgParser) parse() {
+	tap.pmap = getParamMap(tap.params)
+	// Check non targetteds
+	argCount := 0
+	for tap.i, tap.arg = range tap.args.Src {
+		if tap.arg.TargetId != "" { // Targetted?
+			break
+		}
+		if argCount >= len(tap.params) {
+			tap.p.pusherrtok(tap.errTok, "argument_overflow")
+			return
+		}
+		argCount++
+		param := tap.params[tap.i]
+		arg := tap.arg
+		(*tap.pmap)[param.Id].arg = &arg
+		tap.p.parseArg(param, &arg, nil)
+	}
+	for tap.i < len(tap.args.Src) {
+		tap.arg = tap.args.Src[tap.i]
+		tap.pushArg()
+	}
+	tap.checkPasses()
+	tap.buildArgs()
+}
+
+func (p *Parser) parsePureArgs(params []ast.Parameter, args *ast.Args, errTok lex.Tok, m *exprModel) {
 	parsedArgs := make([]ast.Arg, 0)
 	if len(params) > 0 && params[len(params)-1].Variadic {
+		variadicParam := params[len(params)-1]
+		model := arrayExpr{variadicParam.Type, nil}
+		model.dataType.Val = "[]" + model.dataType.Val // For array.
 		// No arg(s) and only variadic parameter
-		if len(*args) == 0 && len(params) == 1 {
+		if len(args.Src) == 0 && len(params) == 1 {
+			arg := ast.Arg{Expr: ast.Expr{Model: model}}
+			parsedArgs = append(parsedArgs, arg)
+			args.Src = parsedArgs
 			return
 		}
 		// Arg missing for normal parameters
-		if len(*args) < len(params)-1 {
+		if len(args.Src) < len(params)-1 {
 			p.pusherrtok(errTok, "missing_argument")
 			goto argParse
 		}
 		// Arg passed for normal parameters, but not for variadic parameter
-		if len(*args) <= len(params)-1 {
+		if len(args.Src) <= len(params)-1 {
+			defer func() {
+				arg := ast.Arg{Expr: ast.Expr{Model: model}}
+				parsedArgs = append(parsedArgs, arg)
+				args.Src = parsedArgs
+			}()
 			goto argParse
 		}
-		variadicArgs := (*args)[len(params)-1:]
-		variadicParam := params[len(params)-1]
-		*args = (*args)[:len(params)-1]
+		variadicArgs := args.Src[len(params)-1:]
+		args.Src = args.Src[:len(params)-1]
 		params = params[:len(params)-1]
 		defer func() {
-			model := arrayExpr{variadicParam.Type, nil}
-			model.dataType.Val = "[]" + model.dataType.Val // For array.
 			variadiced := false
 			for _, arg := range variadicArgs {
 				p.parseArg(variadicParam, &arg, &variadiced)
 				model.expr = append(model.expr, arg.Expr.Model.(iExpr))
 			}
+			// Variadic argument have one more variadiced expressions.
 			if variadiced && len(variadicArgs) > 1 {
-				p.pusherrtok(errTok, "more_args_with_varidiced")
+				p.pusherrtok(errTok, "more_args_with_variadiced")
 			}
 			arg := ast.Arg{Expr: ast.Expr{Model: model}}
 			parsedArgs = append(parsedArgs, arg)
-			*args = parsedArgs
+			args.Src = parsedArgs
 		}()
 	}
-	if len(*args) == 0 && len(params) == 0 {
+	if len(args.Src) == 0 && len(params) == 0 {
 		return
-	} else if len(*args) < len(params) {
-		if len(*args) == 1 {
+	} else if len(args.Src) < len(params) {
+		if len(args.Src) == 1 {
 			p.tryFuncMultiRetAsArgs(params, args, errTok, m)
 			return
 		}
 		p.pusherrtok(errTok, "missing_argument")
-	} else if len(*args) > len(params) {
+	} else if len(args.Src) > len(params) {
 		p.pusherrtok(errTok, "argument_overflow")
 		return
 	}
 argParse:
-	for i, arg := range *args {
+	for i, arg := range args.Src {
 		p.parseArg(params[i], &arg, nil)
 		parsedArgs = append(parsedArgs, arg)
 	}
-	*args = parsedArgs
+	args.Src = parsedArgs
 }
 
-func (p *Parser) tryFuncMultiRetAsArgs(params []ast.Parameter, args *[]ast.Arg, errTok lex.Tok, m *exprModel) {
-	arg := (*args)[0]
+func (p *Parser) tryFuncMultiRetAsArgs(params []ast.Parameter, args *ast.Args, errTok lex.Tok, m *exprModel) {
+	arg := args.Src[0]
 	val, model := p.evalExpr(arg.Expr)
 	arg.Expr.Model = model
 	if !val.ast.Type.MultiTyped {
@@ -2246,9 +2395,9 @@ func (p *Parser) tryFuncMultiRetAsArgs(params []ast.Parameter, args *[]ast.Arg, 
 	if m != nil {
 		fname := m.nodes[m.index].nodes[0]
 		m.nodes[m.index].nodes[0] = exprNode{"tuple_as_args"}
-		*args = make([]ast.Arg, 2)
-		(*args)[0] = ast.Arg{Expr: ast.Expr{Model: fname}}
-		(*args)[1] = arg
+		args.Src = make([]ast.Arg, 2)
+		args.Src[0] = ast.Arg{Expr: ast.Expr{Model: fname}}
+		args.Src[1] = arg
 	}
 	for i, param := range params {
 		rt := types[i]
