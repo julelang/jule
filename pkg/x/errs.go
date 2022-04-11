@@ -117,6 +117,7 @@ var Errs = map[string]string{
 	`function_not_has_parameter`:        `function is not has parameter in this identifier: %s`,
 	`parameter_already_has_argument`:    `%s parameter already has argument`,
 	`argument_must_target_to_parameter`: `argument must target to parameter`,
+	`invalid_value_for_key`:             `"%s" is invalid value for the "%s" key`,
 	`error`:                             `error: %s`,
 }
 

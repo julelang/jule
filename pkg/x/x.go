@@ -19,5 +19,5 @@ var (
 	LangsPath  string
 	StdlibPath string
 	ExecPath   string
-	XSet       *xset.XSet
+	Set        *xset.XSet
 )

@@ -10,7 +10,9 @@ import (
 	"io/fs"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 
@@ -21,6 +23,8 @@ import (
 	"github.com/the-xlang/xxc/pkg/xlog"
 	"github.com/the-xlang/xxc/pkg/xset"
 )
+
+var compilerExecutable string
 
 func help(cmd string) {
 	if cmd != "" {
@@ -68,7 +72,9 @@ func initProject(cmd string) {
   "cxx_out_dir": "./dist/",
   "cxx_out_name": "x.cxx",
   "out_name": "main",
-  "language": ""
+  "language": "",
+  "mode": "transpile",
+  "post_commands": []
 }`)
 	err := ioutil.WriteFile(x.SettingsFile, txt, 0666)
 	if err != nil {
@@ -96,7 +102,7 @@ func doc(cmd string) {
 			fmt.Println(x.GetErr("error", err.Error()))
 			continue
 		}
-		path = filepath.Join(x.XSet.CxxOutDir, path+x.DocExt)
+		path = filepath.Join(x.Set.CxxOutDir, path+x.DocExt)
 		writeOutput(path, docjson)
 	}
 }
@@ -203,7 +209,7 @@ func loadLangErrs(path string, infos []fs.FileInfo) {
 }
 
 func loadLang() {
-	lang := strings.TrimSpace(x.XSet.Language)
+	lang := strings.TrimSpace(x.Set.Language)
 	if lang == "" || lang == "default" {
 		return
 	}
@@ -218,6 +224,20 @@ func loadLang() {
 	loadLangErrs(path, infos)
 }
 
+func checkMode() {
+	lower := strings.ToLower(x.Set.Mode)
+	if lower != xset.ModeTranspile &&
+		lower != xset.ModeCompile {
+		key, _ := reflect.TypeOf(x.Set).Elem().FieldByName("Mode")
+		tag := string(key.Tag)
+		// 6 for skip "json:
+		tag = tag[6 : len(tag)-1]
+		println(x.GetErr("invalid_value_for_key", x.Set.Mode, tag))
+		os.Exit(0)
+	}
+	x.Set.Mode = lower
+}
+
 func loadXSet() {
 	// File check.
 	info, err := os.Stat(x.SettingsFile)
@@ -230,13 +250,14 @@ func loadXSet() {
 		println(err.Error())
 		os.Exit(0)
 	}
-	x.XSet, err = xset.Load(bytes)
+	x.Set, err = xset.Load(bytes)
 	if err != nil {
 		println("X settings has errors;")
 		println(err.Error())
 		os.Exit(0)
 	}
 	loadLang()
+	checkMode()
 }
 
 // printlogs prints logs and returns true
@@ -516,7 +537,7 @@ int main() {
 }
 
 func writeOutput(path, content string) {
-	err := os.MkdirAll(x.XSet.CxxOutDir, 0777)
+	err := os.MkdirAll(x.Set.CxxOutDir, 0777)
 	if err != nil {
 		println(err.Error())
 		os.Exit(0)
@@ -552,6 +573,27 @@ func compile(path string, main, justDefs bool) *parser.Parser {
 	return p
 }
 
+func executePostCommands() {
+	for _, cmd := range x.Set.PostCommands {
+		fmt.Println(">", cmd)
+		parts := strings.SplitN(cmd, " ", -1)
+		err := exec.Command(parts[0], parts[1:]...).Run()
+		if err != nil {
+			println(err.Error())
+		}
+	}
+}
+
+func doSpell(path, cxx string) {
+	defer executePostCommands()
+	writeOutput(path, cxx)
+	switch x.Set.Mode {
+	case xset.ModeCompile:
+		defer os.Remove(path)
+		println("compilation is not supported yet")
+	}
+}
+
 func main() {
 	fpath := os.Args[0]
 	p := compile(fpath, true, false)
@@ -563,6 +605,6 @@ func main() {
 	}
 	cxx := p.Cxx()
 	appendStandard(&cxx)
-	path := filepath.Join(x.XSet.CxxOutDir, x.XSet.CxxOutName)
-	writeOutput(path, cxx)
+	path := filepath.Join(x.Set.CxxOutDir, x.Set.CxxOutName)
+	doSpell(path, cxx)
 }
