@@ -311,12 +311,20 @@ func appendStandard(code *string) {
 // X compiler version: ` + x.Version + `
 // Date:               ` + timeStr + `
 
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#define _WINDOWS
+#endif
+
 // region X_STANDARD_IMPORTS
 #include <iostream>
 #include <string>
+#include <string.h>
 #include <functional>
 #include <vector>
 #include <map>
+#ifdef _WINDOWS
+#include <windows.h>
+#endif
 // endregion X_STANDARD_IMPORTS
 
 // region X_CXX_API
@@ -336,9 +344,7 @@ typedef uint64_t      u64;
 typedef std::size_t   size;
 typedef float         f32;
 typedef double        f64;
-typedef std::string   str;
 #define func          std::function
-// endregion X_BUILTIN_TYPES
 
 // region X_STRUCTURES
 template<typename _Item_t>
@@ -353,9 +359,6 @@ public:
   array<_Item_t>(const std::initializer_list<_Item_t> &_Src) noexcept
   { this->_buffer = std::vector<_Item_t>(_Src.begin(), _Src.end()); }
 
-  array<_Item_t>(const str _Str) noexcept
-  { this->_buffer = std::vector<_Item_t>(_Str.begin(), _Str.end()); }
-
   ~array<_Item_t>(void) noexcept { this->_buffer.clear(); }
 
   typedef _Item_t       *iterator;
@@ -364,8 +367,6 @@ public:
   const_iterator begin(void) const noexcept { return &this->_buffer[0]; }
   iterator end(void) noexcept               { return &this->_buffer[this->_buffer.size()]; }
   const_iterator end(void) const noexcept   { return &this->_buffer[this->_buffer.size()]; }
-
-  operator str(void) const noexcept { return str{this->begin(), this->end()}; }
 
   bool operator==(const array<_Item_t> &_Src) const noexcept {
     const size _length = this->_buffer.size();
@@ -381,15 +382,15 @@ public:
   bool operator!=(const std::nullptr_t) const noexcept       { return !this->_buffer.empty(); }
   _Item_t& operator[](const size _Index)                     { return this->_buffer[_Index]; }
 
-  friend std::wostream& operator<<(std::wostream &_Stream,
-                                   const array<_Item_t> &_Src) {
-    _Stream << L'[';
+  friend std::ostream& operator<<(std::ostream &_Stream,
+                                  const array<_Item_t> &_Src) {
+    _Stream << '[';
     const size _length = _Src._buffer.size();
     for (size _index = 0; _index < _length;) {
       _Stream << _Src._buffer[_index++];
-      if (_index < _length) { _Stream << L", "; }
+      if (_index < _length) { _Stream << u8", "; }
     }
-    _Stream << L']';
+    _Stream << ']';
     return _Stream;
   }
 };
@@ -422,21 +423,194 @@ public:
   bool operator==(const std::nullptr_t) const noexcept { return this->empty(); }
   bool operator!=(const std::nullptr_t) const noexcept { return !this->empty(); }
 
-  friend std::wostream& operator<<(std::wostream &_Stream,
-                          const map<_Key_t, _Value_t> &_Src) {
-    _Stream << L'{';
+  friend std::ostream& operator<<(std::ostream &_Stream,
+                                  const map<_Key_t, _Value_t> &_Src) {
+    _Stream << '{';
     size _length = _Src.size();
     for (const auto _pair: _Src) {
       _Stream << _pair.first;
-      _Stream << L':';
+      _Stream << ':';
       _Stream << _pair.second;
-      if (--_length > 0) { _Stream << L", "; }
+      if (--_length > 0) { _Stream << u8", "; }
     }
-    _Stream << L'}';
+    _Stream << '}';
     return _Stream;
   }
 };
 // endregion X_STRUCTURES
+
+// region UTF8_ENCODING
+const u8 xx   {0xF1};
+const u8 as   {0xF0};
+const u8 s1   {0x02};
+const u8 s2   {0x13};
+const u8 s3   {0x03};
+const u8 s4   {0x23};
+const u8 s5   {0x34};
+const u8 s6   {0x04};
+const u8 s7   {0x44};
+const u8 locb {0b10000000};
+const u8 hicb {0b10111111};
+const u8 maskx{0b00111111};
+const u8 mask2{0b00011111};
+const u8 mask3{0b00001111};
+const u8 mask4{0b00000111};
+
+u8 first[256] {
+  as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, as,
+  as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, as,
+  as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, as,
+  as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, as,
+  as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, as,
+  as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, as,
+  as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, as,
+  as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, as,
+  xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx,
+  xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx,
+  xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx,
+  xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx,
+  xx, xx, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1,
+  s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1,
+  s2, s3, s3, s3, s3, s3, s3, s3, s3, s3, s3, s3, s3, s4, s3, s3,
+  s5, s6, s6, s6, s7, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx,
+};
+
+struct acceptRange {
+public:
+  u8 lo;
+  u8 hi;
+};
+
+acceptRange acceptRanges[16] {
+  {locb, hicb},
+  {0xA0, hicb},
+  {locb, 0x9F},
+  {0x90, hicb},
+  {locb, 0x8F},
+};
+
+const size runelen(const char *_Src) noexcept {
+  const size n{strlen(_Src)};
+  if (n < 1) { return 0; }
+  const u8 s0{(u8)(*_Src)};
+  const u8 x{first[s0]};
+  if (x >= as) { return 1; }
+  const i32 sz{x&7};
+  const acceptRange accept{acceptRanges[x>>4]};
+  if (n < sz) { return 1; }
+  const u8 s1{(u8)(*(_Src+1))};
+  if (s1 < accept.lo || accept.hi < s1) { return 1; }
+  if (sz <= 2) { return 2; }
+  const u8 s2{(u8)(*(_Src+2))};
+  if (s2 < locb || hicb < s2) { return 1; }
+  if (sz <= 3) { return 3; }
+  const u8 s3{(u8)(*(_Src+3))};
+  if (s3 < locb || hicb < s3) { return 1; }
+  return 4;
+}
+// endregion UTF8_ENCODING
+
+struct rune {
+public:
+  std::vector<u8> _bytes{};
+
+  rune(void) noexcept {}
+
+  rune(const char *_Src) noexcept
+  { for (; *_Src; ++_Src) { this->_bytes.push_back((u8)(*_Src)); }; }
+
+  rune(const u8 _Src) noexcept { this->_bytes.push_back(_Src); }
+
+  bool operator==(const rune &_Rune) const noexcept { 
+    if (this->_bytes.size() != _Rune._bytes.size()) { return false; }
+    for (size _index{0}; _index < this->_bytes.size(); ++_index)
+    { if (this->_bytes[_index] != _Rune._bytes[_index]) { return false; } }
+    return true;
+  }
+
+  bool operator!=(const rune &_Rune) const noexcept { return !(*this == _Rune); }
+
+  friend std::ostream& operator<<(std::ostream &_Stream,
+                                  const rune &_Src) {
+    return (_Stream << std::string(_Src._bytes.begin(), _Src._bytes.end()));
+  }
+};
+
+class str {
+public:
+  std::vector<rune> _buffer{};
+
+  str(void) noexcept {}
+
+  str(const char *_Src) noexcept {
+    while (*_Src) {
+      size _len{runelen(_Src)};
+      rune _rune{};
+      while (_len-- > 0) { _rune._bytes.push_back((u8)(*_Src++)); }
+      this->_buffer.push_back(_rune);
+    }
+  }
+
+  str(const str &_Src) noexcept
+  { this->_buffer = _Src._buffer; }
+  
+  str(const array<rune> _Src) noexcept
+  { this->_buffer = _Src._buffer; }
+
+  str(const array<u8> _Src) noexcept: str(std::string(_Src.begin(), _Src.end()).c_str())  {}
+
+  typedef rune       *iterator;
+  typedef const rune *const_iterator;
+  iterator begin(void) noexcept             { return &this->_buffer[0]; }
+  const_iterator begin(void) const noexcept { return &this->_buffer[0]; }
+  iterator end(void) noexcept               { return &this->_buffer[this->_buffer.size()]; }
+  const_iterator end(void) const noexcept   { return &this->_buffer[this->_buffer.size()]; }
+
+  operator array<rune>(void) const noexcept {
+    array<rune> _array{};
+    _array._buffer = std::vector<rune>{this->begin(), this->end()};
+    return _array;
+  }
+
+  operator array<u8>(void) const noexcept {
+    array<u8> _array{};
+    for (const rune &_rune: *this) {
+      for (const u8 &_byte: _rune._bytes)
+      { _array._buffer.push_back(_byte); }
+    }
+    return _array;
+  }
+
+  rune &operator[](size _Index) { return this->_buffer[_Index]; }
+
+  bool operator==(const str &_Str) const noexcept { 
+    if (this->_buffer.size() != _Str._buffer.size()) { return false; }
+    for (size _index{0}; _index < this->_buffer.size(); ++_index)
+    { if (this->_buffer[_index] != _Str._buffer[_index]) { return false; } }
+    return true;
+  }
+
+  void operator+=(const str _Str) noexcept {
+    for (const rune _rune: _Str)
+    { this->_buffer.push_back(_rune); }
+  }
+
+  str operator+(const str _Str) const noexcept {
+    str _str{};
+    _str._buffer = this->_buffer;
+    for (const rune _rune: _Str)
+    { _str._buffer.push_back(_rune); }
+    return _str;
+  }
+
+  bool operator!=(const str &_Str) const noexcept { return !(*this == _Str); }
+
+  friend std::ostream& operator<<(std::ostream &_Stream, const str &_Src) {
+    for (const rune &_rune: _Src._buffer) { _Stream << _rune; }
+    return _Stream;
+  }
+};
+// endregion X_BUILTIN_TYPES
 
 // region X_MISC
 class exception: public std::exception {
@@ -446,11 +620,6 @@ public:
   exception(const char *_Str)      { this->_buffer = _Str; }
   const char *what() const throw() { return this->_buffer.c_str(); }
 };
-
-static inline std::wostream& operator<<(std::wostream &_Stream,
-                                        const str &_Src) {
-  return _Stream << std::wstring(_Src.begin(), _Src.end());
-}
 
 template<typename _Alloc_t>
 static inline _Alloc_t *xalloc() { return new(std::nothrow) _Alloc_t; }
@@ -513,13 +682,19 @@ struct defer {
 // endregion X_MISC
 
 // region X_BUILTIN_FUNCTIONS
+std::ostream& operator<<(std::ostream &_Stream, const i8 &_Src)
+{ return _Stream << (i32)(_Src); }
+
+std::ostream& operator<<(std::ostream &_Stream, const u8 &_Src)
+{ return _Stream << (i32)(_Src); }
+
 template <typename _Obj_t>
-static inline void XID(out)(const _Obj_t _Obj) noexcept { std::wcout << _Obj; }
+static inline void XID(out)(const _Obj_t _Obj) noexcept { std::cout << _Obj; }
 
 template <typename _Obj_t>
 static inline void XID(outln)(const _Obj_t _Obj) noexcept {
   XID(out)<_Obj_t>(_Obj);
-  std::wcout << std::endl;
+  std::cout << std::endl;
 }
 // endregion X_BUILTIN_FUNCTIONS
 // endregion X_CXX_API
@@ -530,6 +705,9 @@ static inline void XID(outln)(const _Obj_t _Obj) noexcept {
 
 // region X_ENTRY_POINT
 int main() {
+#ifdef _WINDOWS
+  SetConsoleOutputCP(65001);
+#endif
   _main();
   return EXIT_SUCCESS;
 }

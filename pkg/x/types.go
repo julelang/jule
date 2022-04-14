@@ -16,7 +16,7 @@ const (
 	F32  uint8 = 11
 	F64  uint8 = 12
 	Any  uint8 = 13
-	Char uint8 = 14
+	Rune uint8 = 14
 	Id   uint8 = 15
 	Func uint8 = 16
 	Nil  uint8 = 17
@@ -133,8 +133,8 @@ func TypesAreCompatible(t1, t2 uint8, ignoreany bool) bool {
 			t2 == F64
 	case F64:
 		return t2 == F64
-	case Char:
-		return t2 == Char ||
+	case Rune:
+		return t2 == Rune ||
 			t2 == I32 ||
 			t2 == I64 ||
 			t2 == U16 ||
@@ -215,8 +215,8 @@ func TypeFromId(id string) uint8 {
 		return F64
 	case "any":
 		return Any
-	case "char":
-		return Char
+	case "rune":
+		return Rune
 	case "size":
 		return Size
 	}
@@ -253,8 +253,8 @@ func CxxTypeIdFromType(typeCode uint8) string {
 		return "any"
 	case Str:
 		return "str"
-	case Char:
-		return "char"
+	case Rune:
+		return "rune"
 	case Size:
 		return "size"
 	}
@@ -275,7 +275,7 @@ func DefaultValOfType(code uint8) string {
 		return "false"
 	case Str:
 		return `""`
-	case Char:
+	case Rune:
 		return `'\0'`
 	}
 	return "nil"

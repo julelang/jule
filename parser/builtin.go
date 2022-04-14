@@ -42,7 +42,7 @@ var strDefs = &defmap{
 			Id:    "len",
 			Const: true,
 			Type:  ast.DataType{Id: x.Size, Val: "size"},
-			Tag:   "length()",
+			Tag:   "_buffer.size()",
 		},
 	},
 }
