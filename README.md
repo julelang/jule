@@ -6,7 +6,8 @@
 <strong>Simple, efficent and compiled system programming language.
 
 [Website](https://the-xlang.github.io/website/) |
-[Documentations](https://the-xlang.github.io/website/pages/docs.html)
+[Documentations](https://the-xlang.github.io/website/pages/docs.html) |
+[Contributing](https://the-xlang.github.io/website/pages/contributing.html)
 
 </strong>
 </div>
@@ -142,9 +143,9 @@ Run the above command in your terminal, in the XXC project directory.
 
 <h2 id="contributing">Contributing</h2>
 
-Thanks for you want contributing to X!
+Thanks for you want contributing to XXC!
 <br><br>
-The X project use issues for only bug reports and proposals. <br>
+The XXC project use issues for only bug reports and proposals. <br>
 To contribute, please read the contribution guidelines from <a href="https://the-xlang.github.io/website/pages/contributing.html">here</a>. <br>
 To discussions and questions, please use <a href="https://github.com/the-xlang/xxc/discussions">discussions</a>.
 
