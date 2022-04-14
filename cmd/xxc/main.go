@@ -322,6 +322,9 @@ func appendStandard(code *string) {
 #include <functional>
 #include <vector>
 #include <map>
+#ifdef _WINDOWS
+#include <windows.h>
+#endif
 // endregion X_STANDARD_IMPORTS
 
 // region X_CXX_API
@@ -379,15 +382,15 @@ public:
   bool operator!=(const std::nullptr_t) const noexcept       { return !this->_buffer.empty(); }
   _Item_t& operator[](const size _Index)                     { return this->_buffer[_Index]; }
 
-  friend std::wostream& operator<<(std::wostream &_Stream,
+  friend std::ostream& operator<<(std::ostream &_Stream,
                                   const array<_Item_t> &_Src) {
-    _Stream << L'[';
+    _Stream << '[';
     const size _length = _Src._buffer.size();
     for (size _index = 0; _index < _length;) {
       _Stream << _Src._buffer[_index++];
-      if (_index < _length) { _Stream << L", "; }
+      if (_index < _length) { _Stream << u8", "; }
     }
-    _Stream << L']';
+    _Stream << ']';
     return _Stream;
   }
 };
@@ -420,17 +423,17 @@ public:
   bool operator==(const std::nullptr_t) const noexcept { return this->empty(); }
   bool operator!=(const std::nullptr_t) const noexcept { return !this->empty(); }
 
-  friend std::wostream& operator<<(std::wostream &_Stream,
+  friend std::ostream& operator<<(std::ostream &_Stream,
                                   const map<_Key_t, _Value_t> &_Src) {
-    _Stream << L'{';
+    _Stream << '{';
     size _length = _Src.size();
     for (const auto _pair: _Src) {
       _Stream << _pair.first;
-      _Stream << L':';
+      _Stream << ':';
       _Stream << _pair.second;
-      if (--_length > 0) { _Stream << L", "; }
+      if (--_length > 0) { _Stream << u8", "; }
     }
-    _Stream << L'}';
+    _Stream << '}';
     return _Stream;
   }
 };
@@ -527,9 +530,9 @@ public:
 
   bool operator!=(const rune &_Rune) const noexcept { return !(*this == _Rune); }
 
-  friend std::wostream& operator<<(std::wostream &_Stream,
-                                   const rune &_Src) {
-    return (_Stream << std::wstring(_Src._bytes.begin(), _Src._bytes.end()));
+  friend std::ostream& operator<<(std::ostream &_Stream,
+                                  const rune &_Src) {
+    return (_Stream << std::string(_Src._bytes.begin(), _Src._bytes.end()));
   }
 };
 
@@ -602,7 +605,7 @@ public:
 
   bool operator!=(const str &_Str) const noexcept { return !(*this == _Str); }
 
-  friend std::wostream& operator<<(std::wostream &_Stream, const str &_Src) {
+  friend std::ostream& operator<<(std::ostream &_Stream, const str &_Src) {
     for (const rune &_rune: _Src._buffer) { _Stream << _rune; }
     return _Stream;
   }
@@ -679,19 +682,19 @@ struct defer {
 // endregion X_MISC
 
 // region X_BUILTIN_FUNCTIONS
-std::wostream& operator<<(std::wostream &_Stream, const i8 &_Src)
+std::ostream& operator<<(std::ostream &_Stream, const i8 &_Src)
 { return _Stream << (i32)(_Src); }
 
-std::wostream& operator<<(std::wostream &_Stream, const u8 &_Src)
+std::ostream& operator<<(std::ostream &_Stream, const u8 &_Src)
 { return _Stream << (i32)(_Src); }
 
 template <typename _Obj_t>
-static inline void XID(out)(const _Obj_t _Obj) noexcept { std::wcout << _Obj; }
+static inline void XID(out)(const _Obj_t _Obj) noexcept { std::cout << _Obj; }
 
 template <typename _Obj_t>
 static inline void XID(outln)(const _Obj_t _Obj) noexcept {
   XID(out)<_Obj_t>(_Obj);
-  std::wcout << std::endl;
+  std::cout << std::endl;
 }
 // endregion X_BUILTIN_FUNCTIONS
 // endregion X_CXX_API
