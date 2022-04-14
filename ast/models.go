@@ -35,6 +35,7 @@ type Block struct {
 	Tree     []Statement
 	Gotos    *Gotos
 	Labels   *Labels
+	Func     *Func
 }
 
 // Indent total of blocks.

@@ -1087,6 +1087,8 @@ func (p *valueEvaluator) id() (v value, ok bool) {
 		p.model.appendSubNode(exprNode{xapi.AsId(id)})
 		ok = true
 	} else {
+		v.ast.Type.Id = x.Void
+		v.ast.Type.Val = x.VoidTypeStr
 		p.parser.pusherrtok(p.tok, "id_noexist", id)
 	}
 	return
@@ -2575,6 +2577,7 @@ func (p *Parser) checkNewBlockCustom(b *ast.Block, oldBlockVars []*ast.Var) {
 	} else {
 		b.Parent = p.nodeBlock
 		b.SubIndex = p.nodeBlock.SubIndex + 1
+		b.Func = p.nodeBlock.Func
 		oldNode := p.nodeBlock
 		p.nodeBlock = b
 		defer func() { p.nodeBlock = oldNode }()
@@ -2643,13 +2646,16 @@ func (p *Parser) checkBlock(b *ast.Block) {
 			t.Index = i
 			t.Block = b
 			*p.rootBlock.Labels = append(*p.rootBlock.Labels, &t)
+		case ast.Ret:
+			rc := retChecker{p: p, retAST: &t, fun: b.Func}
+			rc.check()
+			model.Val = t
 		case ast.Goto:
 			t.Index = i
 			t.Block = b
 			*p.rootBlock.Gotos = append(*p.rootBlock.Gotos, &t)
 		case ast.CxxEmbed:
 		case ast.Comment:
-		case ast.Ret:
 		default:
 			p.pusherrtok(model.Tok, "invalid_syntax")
 		}
@@ -2944,22 +2950,19 @@ func (rc *retChecker) check() {
 }
 
 func (p *Parser) checkRets(fun *ast.Func) {
-	missed := true
-	for i, s := range fun.Block.Tree {
-		switch t := s.Val.(type) {
+	for _, s := range fun.Block.Tree {
+		switch s.Val.(type) {
 		case ast.Ret:
-			rc := retChecker{p: p, retAST: &t, fun: fun}
-			rc.check()
-			fun.Block.Tree[i].Val = t
-			missed = false
+			return
 		}
 	}
-	if missed && !typeIsVoidRet(fun.RetType) {
+	if !typeIsVoidRet(fun.RetType) {
 		p.pusherrtok(fun.Tok, "missing_ret")
 	}
 }
 
 func (p *Parser) checkFunc(f *ast.Func) {
+	f.Block.Func = f
 	p.checkNewBlock(&f.Block)
 	p.checkRets(f)
 }
