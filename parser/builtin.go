@@ -10,7 +10,7 @@ var builtinFuncs = []*function{
 		Ast: ast.Func{
 			Id:      "out",
 			RetType: ast.DataType{Id: x.Void},
-			Params: []ast.Parameter{{
+			Params: []ast.Param{{
 				Id:    "v",
 				Const: true,
 				Type: ast.DataType{
@@ -24,7 +24,7 @@ var builtinFuncs = []*function{
 		Ast: ast.Func{
 			Id:      "outln",
 			RetType: ast.DataType{Id: x.Void},
-			Params: []ast.Parameter{{
+			Params: []ast.Param{{
 				Id:    "v",
 				Const: true,
 				Type: ast.DataType{
@@ -73,7 +73,7 @@ var mapDefs = &defmap{
 		{Ast: ast.Func{Id: "values"}},
 		{Ast: ast.Func{
 			Id:      "has",
-			Params:  []ast.Parameter{{Id: "key", Const: true}},
+			Params:  []ast.Param{{Id: "key", Const: true}},
 			RetType: ast.DataType{Id: x.Bool, Val: "bool"},
 		}},
 	},

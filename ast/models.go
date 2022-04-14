@@ -180,7 +180,7 @@ type Func struct {
 	Pub     bool
 	Tok     lex.Tok
 	Id      string
-	Params  []Parameter
+	Params  []Param
 	RetType DataType
 	Block   Block
 }
@@ -208,17 +208,18 @@ func (fc Func) DataTypeString() string {
 	return cxx.String()
 }
 
-// Parameter is function parameter AST model.
-type Parameter struct {
+// Param is function parameter AST model.
+type Param struct {
 	Tok      lex.Tok
 	Id       string
 	Const    bool
 	Volatile bool
 	Variadic bool
 	Type     DataType
+	Default  Expr
 }
 
-func (p Parameter) String() string {
+func (p Param) String() string {
 	var cxx strings.Builder
 	cxx.WriteString(p.Prototype())
 	if p.Id != "" {
@@ -229,7 +230,7 @@ func (p Parameter) String() string {
 }
 
 // Prototype returns prototype cxx of parameter.
-func (p Parameter) Prototype() string {
+func (p Param) Prototype() string {
 	var cxx strings.Builder
 	if p.Volatile {
 		cxx.WriteString("volatile ")

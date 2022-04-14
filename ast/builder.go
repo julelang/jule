@@ -271,7 +271,7 @@ func (b *Builder) Func(toks []lex.Tok, anonymous bool) (f Func) {
 	f.Pub = b.pub
 	b.pub = false
 	if anonymous {
-		f.Id = "anonymous"
+		f.Id = x.Anonymous
 	} else {
 		if f.Tok.Id != lex.Id {
 			b.pusherr(f.Tok, "invalid_syntax")
@@ -377,31 +377,31 @@ func (b *Builder) pushParam(f *Func, toks []lex.Tok, errtok lex.Tok) {
 		b.pusherr(errtok, "invalid_syntax")
 		return
 	}
-	past := Parameter{Tok: toks[0]}
+	p := Param{Tok: toks[0]}
 	for i, tok := range toks {
 		switch tok.Id {
 		case lex.Const:
-			if past.Const {
+			if p.Const {
 				b.pusherr(tok, "already_constant")
 				continue
 			}
-			past.Const = true
+			p.Const = true
 		case lex.Volatile:
-			if past.Volatile {
+			if p.Volatile {
 				b.pusherr(tok, "already_volatile")
 				continue
 			}
-			past.Volatile = true
+			p.Volatile = true
 		case lex.Operator:
 			if tok.Kind != "..." {
 				b.pusherr(tok, "invalid_syntax")
 				continue
 			}
-			if past.Variadic {
+			if p.Variadic {
 				b.pusherr(tok, "already_variadic")
 				continue
 			}
-			past.Variadic = true
+			p.Variadic = true
 		case lex.Id:
 			toks = toks[i:]
 			if !xapi.IsIgnoreId(tok.Kind) {
@@ -411,11 +411,40 @@ func (b *Builder) pushParam(f *Func, toks []lex.Tok, errtok lex.Tok) {
 						break
 					}
 				}
-				past.Id = tok.Kind
+				p.Id = tok.Kind
+			} else {
+				p.Id = x.Anonymous
 			}
-			if len(toks) > 1 {
-				i := 1
-				past.Type, _ = b.DataType(toks, &i, true)
+			if len(toks) == 1 {
+				goto end
+			}
+			toks = toks[1:]
+			if tok := toks[0]; tok.Id == lex.Brace && tok.Kind == "{" {
+				braceCount := 0
+				for i, tok := range toks {
+					if tok.Id == lex.Brace {
+						switch tok.Kind {
+						case "{", "(", "[":
+							braceCount++
+							continue
+						default:
+							braceCount--
+						}
+					}
+					if braceCount > 0 {
+						continue
+					}
+					exprToks := toks[1:i]
+					toks = toks[i+1:]
+					if len(exprToks) > 0 {
+						p.Default = b.Expr(exprToks)
+					}
+					break
+				}
+			}
+			if len(toks) > 0 {
+				i := 0
+				p.Type, _ = b.DataType(toks, &i, true)
 				i++
 				if i < len(toks) {
 					b.pusherr(toks[i], "invalid_syntax")
@@ -426,14 +455,14 @@ func (b *Builder) pushParam(f *Func, toks []lex.Tok, errtok lex.Tok) {
 					if param.Type.Tok.Id != lex.NA {
 						break
 					}
-					param.Type = past.Type
+					param.Type = p.Type
 				}
 			}
 			goto end
 		default:
 			if t, ok := b.DataType(toks, &i, true); ok {
 				if i+1 == len(toks) {
-					past.Type = t
+					p.Type = t
 					goto end
 				}
 			}
@@ -442,7 +471,7 @@ func (b *Builder) pushParam(f *Func, toks []lex.Tok, errtok lex.Tok) {
 		}
 	}
 end:
-	f.Params = append(f.Params, past)
+	f.Params = append(f.Params, p)
 }
 
 // DataType builds AST model of data type.

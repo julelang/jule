@@ -12,6 +12,8 @@ const (
 	Langs        = "langs"
 
 	EntryPoint = "main"
+
+	Anonymous = "<anonymous>"
 )
 
 // Environment Variables.

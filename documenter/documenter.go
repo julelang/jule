@@ -88,7 +88,7 @@ func globals(p *parser.Parser) []global {
 	return globals
 }
 
-func params(parameters []ast.Parameter) []parameter {
+func params(parameters []ast.Param) []parameter {
 	params := make([]parameter, len(parameters))
 	for i, p := range parameters {
 		params[i] = parameter{

@@ -70,7 +70,7 @@ func attributesToString(attributes []ast.Attribute) string {
 	return cxx.String()
 }
 
-func paramsToCxx(params []ast.Parameter) string {
+func paramsToCxx(params []ast.Param) string {
 	if len(params) == 0 {
 		return "(void)"
 	}
