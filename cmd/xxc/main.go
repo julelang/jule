@@ -440,21 +440,21 @@ public:
 // endregion X_STRUCTURES
 
 // region UTF8_ENCODING
-const u8 xx   {0xF1};
-const u8 as   {0xF0};
-const u8 s1   {0x02};
-const u8 s2   {0x13};
-const u8 s3   {0x03};
-const u8 s4   {0x23};
-const u8 s5   {0x34};
-const u8 s6   {0x04};
-const u8 s7   {0x44};
-const u8 locb {0b10000000};
-const u8 hicb {0b10111111};
-const u8 maskx{0b00111111};
-const u8 mask2{0b00011111};
-const u8 mask3{0b00001111};
-const u8 mask4{0b00000111};
+constexpr u8 xx   {0xF1};
+constexpr u8 as   {0xF0};
+constexpr u8 s1   {0x02};
+constexpr u8 s2   {0x13};
+constexpr u8 s3   {0x03};
+constexpr u8 s4   {0x23};
+constexpr u8 s5   {0x34};
+constexpr u8 s6   {0x04};
+constexpr u8 s7   {0x44};
+constexpr u8 locb {0b10000000};
+constexpr u8 hicb {0b10111111};
+constexpr u8 maskx{0b00111111};
+constexpr u8 mask2{0b00011111};
+constexpr u8 mask3{0b00001111};
+constexpr u8 mask4{0b00000111};
 
 u8 first[256] {
   as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, as,
@@ -674,6 +674,12 @@ struct defer {
   _Function_t _function;
 };
 
+std::ostream& operator<<(std::ostream &_Stream, const i8 &_Src)
+{ return _Stream << (i32)(_Src); }
+
+std::ostream& operator<<(std::ostream &_Stream, const u8 &_Src)
+{ return _Stream << (i32)(_Src); }
+
 #define XTHROW(_Msg) throw exception(_Msg)
 #define _CONCAT(_A, _B) _A ## _B
 #define CONCAT(_A, _B) _CONCAT(_A, _B)
@@ -682,12 +688,6 @@ struct defer {
 // endregion X_MISC
 
 // region X_BUILTIN_FUNCTIONS
-std::ostream& operator<<(std::ostream &_Stream, const i8 &_Src)
-{ return _Stream << (i32)(_Src); }
-
-std::ostream& operator<<(std::ostream &_Stream, const u8 &_Src)
-{ return _Stream << (i32)(_Src); }
-
 template <typename _Obj_t>
 static inline void XID(out)(const _Obj_t _Obj) noexcept { std::cout << _Obj; }
 
