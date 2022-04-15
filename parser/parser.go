@@ -2180,7 +2180,10 @@ func (p *Parser) checkAnonFunc(f *ast.Func) {
 	blockVariables := p.BlockVars
 	p.Defs.Globals = append(blockVariables, p.Defs.Globals...)
 	p.BlockVars = p.varsFromParams(f.Params)
+	rootBlock := p.rootBlock
+	p.rootBlock = nil
 	p.checkFunc(f)
+	p.rootBlock = rootBlock
 	p.Defs.Globals = globals
 	p.BlockVars = blockVariables
 }
