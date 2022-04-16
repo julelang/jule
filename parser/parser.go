@@ -2394,7 +2394,9 @@ func (p *Parser) parseArgs(f *ast.Func, args *ast.Args, m *exprModel, errTok lex
 	}
 }
 
-func paramHasDefaultArg(param *ast.Param) bool { return param.Default.Toks != nil }
+func paramHasDefaultArg(param *ast.Param) bool {
+	return param.Default.Toks != nil || param.Default.Model != nil
+}
 
 //             [identifier]
 type paramMap map[string]*paramMapPair
