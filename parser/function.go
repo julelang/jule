@@ -2,7 +2,6 @@ package parser
 
 import (
 	"strings"
-	"sync/atomic"
 
 	"github.com/the-xlang/xxc/ast"
 	"github.com/the-xlang/xxc/pkg/xapi"
@@ -19,7 +18,6 @@ func (f function) String() string {
 	var cxx strings.Builder
 	cxx.WriteString(f.Head())
 	cxx.WriteByte(' ')
-	atomic.SwapInt32(&ast.Indent, 0)
 	cxx.WriteString(f.Ast.Block.String())
 	return cxx.String()
 }

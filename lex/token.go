@@ -42,4 +42,5 @@ const (
 	Preprocessor uint8 = 26
 	Defer        uint8 = 27
 	Goto         uint8 = 28
+	DoubleColon  uint8 = 29
 )

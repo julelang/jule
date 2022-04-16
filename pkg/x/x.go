@@ -14,6 +14,8 @@ const (
 	EntryPoint = "main"
 
 	Anonymous = "<anonymous>"
+
+	DocPrefix = "doc:"
 )
 
 // Environment Variables.

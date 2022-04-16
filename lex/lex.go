@@ -372,6 +372,7 @@ func (l *Lex) Tok() Tok {
 		l.rmrange(len-1, tok.Kind)
 	case
 		l.firstTokOfLine && l.punct(txt, "#", Preprocessor, &tok),
+		l.punct(txt, "::", DoubleColon, &tok),
 		l.punct(txt, ":", Colon, &tok),
 		l.punct(txt, ";", SemiColon, &tok),
 		l.punct(txt, ",", Comma, &tok),

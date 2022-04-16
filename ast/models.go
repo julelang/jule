@@ -38,20 +38,30 @@ type Block struct {
 	Func     *Func
 }
 
-// Indent total of blocks.
-var Indent int32 = 0
-
-func (b Block) String() string {
-	atomic.SwapInt32(&Indent, Indent+1)
-	defer func() { atomic.SwapInt32(&Indent, Indent-1) }()
-	return ParseBlock(b, int(Indent))
-}
-
 // IndentSpace of blocks.
 const IndentSpace = 2
 
+// Indent is indention count.
+// This should be manuplate atomic.
+var Indent uint32 = 0
+
+// IndentString returns indent space of current block.
+func IndentString() string { return strings.Repeat(" ", int(Indent)*IndentSpace) }
+
+// AddIndent adds new indent to IndentString.
+func AddIndent() { atomic.AddUint32(&Indent, 1) }
+
+// DoneIndent removes last indent from IndentString.
+func DoneIndent() { atomic.SwapUint32(&Indent, Indent-1) }
+
+func (b Block) String() string {
+	AddIndent()
+	defer func() { DoneIndent() }()
+	return ParseBlock(b)
+}
+
 // ParseBlock to cxx.
-func ParseBlock(b Block, indent int) string {
+func ParseBlock(b Block) string {
 	// Space count per indent.
 	var cxx strings.Builder
 	cxx.WriteByte('{')
@@ -60,11 +70,12 @@ func ParseBlock(b Block, indent int) string {
 			continue
 		}
 		cxx.WriteByte('\n')
-		cxx.WriteString(strings.Repeat(" ", indent*IndentSpace))
+		cxx.WriteString(IndentString())
 		cxx.WriteString(s.String())
 	}
 	cxx.WriteByte('\n')
-	cxx.WriteString(strings.Repeat(" ", (indent-1)*IndentSpace) + "}")
+	cxx.WriteString(strings.Repeat(" ", int(Indent-1)*IndentSpace))
+	cxx.WriteByte('}')
 	return cxx.String()
 }
 
@@ -764,4 +775,11 @@ func (gt Goto) String() string {
 	cxx.WriteString(gt.Label)
 	cxx.WriteByte(';')
 	return cxx.String()
+}
+
+// Namespace is the AST model of namespace statements.
+type Namespace struct {
+	Tok  lex.Tok
+	Ids  []string
+	Tree []Obj
 }

@@ -1,17 +1,40 @@
 package parser
 
-import "github.com/the-xlang/xxc/ast"
+import (
+	"github.com/the-xlang/xxc/ast"
+)
 
 type defmap struct {
-	Funcs   []*function
-	Globals []*ast.Var
-	Types   []*ast.Type
+	Namespaces []*namespace
+	Types      []*ast.Type
+	Funcs      []*function
+	Globals    []*ast.Var
+	justPub    bool
+}
+
+func (dm *defmap) findNsById(id string) int {
+	for i, t := range dm.Namespaces {
+		if t != nil && t.Id == id {
+			return i
+		}
+	}
+	return -1
+}
+
+func (dm *defmap) nsById(id string) *namespace {
+	i := dm.findNsById(id)
+	if i == -1 {
+		return nil
+	}
+	return dm.Namespaces[i]
 }
 
 func (dm *defmap) findTypeById(id string) int {
 	for i, t := range dm.Types {
-		if t.Id == id {
-			return i
+		if t != nil && t.Id == id {
+			if !dm.justPub || t.Pub {
+				return i
+			}
 		}
 	}
 	return -1
@@ -27,8 +50,10 @@ func (dm *defmap) typeById(id string) *ast.Type {
 
 func (dm *defmap) findFuncById(id string) int {
 	for i, f := range dm.Funcs {
-		if f.Ast.Id == id {
-			return i
+		if f != nil && f.Ast.Id == id {
+			if !dm.justPub || f.Ast.Pub {
+				return i
+			}
 		}
 	}
 	return -1
@@ -48,8 +73,10 @@ func (dm *defmap) funcById(id string) *function {
 
 func (dm *defmap) findGlobalById(id string) int {
 	for i, v := range dm.Globals {
-		if v.Id == id {
-			return i
+		if v != nil && v.Id == id {
+			if !dm.justPub || v.Pub {
+				return i
+			}
 		}
 	}
 	return -1

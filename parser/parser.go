@@ -25,6 +25,11 @@ type use struct {
 
 var used []*use
 
+type globalWaitPair struct {
+	vast ast.Var
+	defs *defmap
+}
+
 // Parser is parser of X code.
 type Parser struct {
 	attributes []ast.Attribute
@@ -40,7 +45,7 @@ type Parser struct {
 	Embeds         strings.Builder
 	Uses           []*use
 	Defs           *defmap
-	waitingGlobals []ast.Var
+	waitingGlobals []globalWaitPair
 	BlockVars      []*ast.Var
 	BlockTypes     []*ast.Type
 	Errs           []xlog.CompilerLog
@@ -118,9 +123,7 @@ func (p *Parser) pushwarn(key string, args ...interface{}) {
 // CxxEmbeds return C++ code of cxx embeds.
 func (p *Parser) CxxEmbeds() string {
 	var cxx strings.Builder
-	cxx.WriteString("// region EMBEDS\n")
 	cxx.WriteString(p.Embeds.String())
-	cxx.WriteString("// endregion EMBEDS")
 	return cxx.String()
 }
 
@@ -130,10 +133,25 @@ func outableFunc(f *function) bool {
 	return f.Ast.Id == x.EntryPoint || f.used
 }
 
+// CxxNamespaces returns C++ code of namespaces.
+func (p *Parser) CxxNamespaces() string {
+	var cxx strings.Builder
+	for _, use := range used {
+		for _, ns := range use.defs.Namespaces {
+			cxx.WriteString(ns.String())
+			cxx.WriteString("\n\n")
+		}
+	}
+	for _, ns := range p.Defs.Namespaces {
+		cxx.WriteString(ns.String())
+		cxx.WriteString("\n\n")
+	}
+	return cxx.String()
+}
+
 // CxxPrototypes returns C++ code of prototypes of C++ code.
 func (p *Parser) CxxPrototypes() string {
 	var cxx strings.Builder
-	cxx.WriteString("// region PROTOTYPES\n")
 	for _, use := range used {
 		for _, f := range use.defs.Funcs {
 			if outableFunc(f) {
@@ -148,14 +166,12 @@ func (p *Parser) CxxPrototypes() string {
 			cxx.WriteByte('\n')
 		}
 	}
-	cxx.WriteString("// endregion PROTOTYPES")
 	return cxx.String()
 }
 
 // CxxGlobals returns C++ code of global variables.
 func (p *Parser) CxxGlobals() string {
 	var cxx strings.Builder
-	cxx.WriteString("// region GLOBALS\n")
 	for _, use := range used {
 		for _, v := range use.defs.Globals {
 			if v.Used {
@@ -170,14 +186,12 @@ func (p *Parser) CxxGlobals() string {
 			cxx.WriteByte('\n')
 		}
 	}
-	cxx.WriteString("// endregion GLOBALS")
 	return cxx.String()
 }
 
 // CxxFuncs returns C++ code of functions.
 func (p *Parser) CxxFuncs() string {
 	var cxx strings.Builder
-	cxx.WriteString("// region FUNCTIONS\n")
 	for _, use := range used {
 		for _, f := range use.defs.Funcs {
 			if outableFunc(f) {
@@ -192,7 +206,6 @@ func (p *Parser) CxxFuncs() string {
 			cxx.WriteString("\n\n")
 		}
 	}
-	cxx.WriteString("// endregion FUNCTIONS")
 	return cxx.String()
 }
 
@@ -201,6 +214,7 @@ func (p *Parser) Cxx() string {
 	var cxx strings.Builder
 	cxx.WriteString(p.CxxEmbeds())
 	cxx.WriteString("\n\n")
+	cxx.WriteString(p.CxxNamespaces())
 	cxx.WriteString(p.CxxPrototypes())
 	cxx.WriteString("\n\n")
 	cxx.WriteString(p.CxxGlobals())
@@ -271,6 +285,56 @@ func (p *Parser) compileUse(useAST *ast.Use) *use {
 	return nil
 }
 
+func (p *Parser) checkNsNses(src, sub *namespace) {
+	for _, ns := range sub.Defs.Namespaces {
+		srcNs := src.Defs.nsById(ns.Id)
+		p.checkNsDefs(sub, srcNs)
+	}
+}
+
+func (p *Parser) checkNsTypes(src, sub *namespace) {
+	for _, t := range sub.Defs.Types {
+		if src.Defs.typeById(t.Id) != nil {
+			p.pusherrtok(t.Tok, "exist_id", t.Id)
+		}
+	}
+}
+
+func (p *Parser) checkNsGlobals(src, sub *namespace) {
+	for _, g := range sub.Defs.Globals {
+		if g.Pub && src.Defs.typeById(g.Id) != nil {
+			p.pusherrtok(g.IdTok, "exist_id", g.Id)
+		}
+	}
+}
+
+func (p *Parser) checkNsFuncs(src, sub *namespace) {
+	for _, f := range sub.Defs.Funcs {
+		if f.Ast.Pub && src.Defs.typeById(f.Ast.Id) != nil {
+			p.pusherrtok(f.Ast.Tok, "exist_id", f.Ast.Id)
+		}
+	}
+}
+
+func (p *Parser) checkNsDefs(src, sub *namespace) {
+	p.checkNsNses(src, sub)
+	p.checkNsTypes(src, sub)
+	p.checkNsGlobals(src, sub)
+	p.checkNsFuncs(src, sub)
+}
+
+func (p *Parser) pushUseNamespaces(use *use, dm *defmap) {
+	for _, ns := range dm.Namespaces {
+		ns.Defs.justPub = true
+		def := p.nsById(ns.Id)
+		if def == nil {
+			use.defs.Namespaces = append(use.defs.Namespaces, ns)
+			continue
+		}
+		p.checkNsDefs(def, ns)
+	}
+}
+
 func (p *Parser) pushUseTypes(use *use, dm *defmap) {
 	for _, t := range dm.Types {
 		def := p.typeById(t.Id)
@@ -308,6 +372,7 @@ func (p *Parser) pushUseFuncs(use *use, dm *defmap) {
 }
 
 func (p *Parser) pushUseDefs(use *use, dm *defmap) {
+	p.pushUseNamespaces(use, dm)
 	p.pushUseTypes(use, dm)
 	p.pushUseGlobals(use, dm)
 	p.pushUseFuncs(use, dm)
@@ -335,6 +400,7 @@ func (p *Parser) use(useAST *ast.Use) {
 			break
 		}
 	}
+	use.defs.justPub = true
 	if !exist {
 		used = append(used, use)
 	}
@@ -367,6 +433,8 @@ func (p *Parser) parseSrcTreeObj(obj ast.Obj) {
 		p.Embeds.WriteByte('\n')
 	case ast.Comment:
 		p.Comment(t)
+	case ast.Namespace:
+		p.Namespace(t)
 	case ast.Use:
 		p.pusherrtok(obj.Tok, "use_at_content")
 	case ast.Preprocessor:
@@ -518,11 +586,37 @@ func (p *Parser) Type(t ast.Type) {
 	p.Defs.Types = append(p.Defs.Types, &t)
 }
 
+// Push namespace to defmap and returns leaf namespace.
+func (p *Parser) pushNs(ns *ast.Namespace) *namespace {
+	var src *namespace
+	prev := p.Defs
+	for _, id := range ns.Ids {
+		src = p.nsById(id)
+		if src == nil {
+			src = new(namespace)
+			src.Id = id
+			src.Defs = new(defmap)
+			prev.Namespaces = append(prev.Namespaces, src)
+		}
+		prev = src.Defs
+	}
+	return src
+}
+
+// Namespace parses namespace statement.
+func (p *Parser) Namespace(ns ast.Namespace) {
+	src := p.pushNs(&ns)
+	pdefs := p.Defs
+	p.Defs = src.Defs
+	p.parseSrcTree(ns.Tree)
+	p.Defs = pdefs
+}
+
 // Comment parses X documentation comments line.
 func (p *Parser) Comment(c ast.Comment) {
 	c.Content = strings.TrimSpace(c.Content)
 	if p.docText.Len() == 0 {
-		if strings.HasPrefix(c.Content, "doc:") {
+		if strings.HasPrefix(c.Content, x.DocPrefix) {
 			c.Content = c.Content[4:]
 			if c.Content == "" {
 				c.Content = " "
@@ -626,7 +720,7 @@ func (p *Parser) Global(vast ast.Var) {
 	}
 	vast.Desc = p.docText.String()
 	p.docText.Reset()
-	p.waitingGlobals = append(p.waitingGlobals, vast)
+	p.waitingGlobals = append(p.waitingGlobals, globalWaitPair{vast, p.Defs})
 }
 
 // Var parse X variable.
@@ -716,7 +810,7 @@ func (p *Parser) FuncById(id string) *function {
 	}
 	for _, use := range p.Uses {
 		f := use.defs.funcById(id)
-		if f != nil && f.Ast.Pub {
+		if f != nil {
 			return f
 		}
 	}
@@ -735,11 +829,21 @@ func (p *Parser) varById(id string) *ast.Var {
 func (p *Parser) globalById(id string) *ast.Var {
 	for _, use := range p.Uses {
 		g := use.defs.globalById(id)
-		if g != nil && g.Pub {
+		if g != nil {
 			return g
 		}
 	}
 	return p.Defs.globalById(id)
+}
+
+func (p *Parser) nsById(id string) *namespace {
+	for _, use := range p.Uses {
+		ns := use.defs.nsById(id)
+		if ns != nil {
+			return ns
+		}
+	}
+	return p.Defs.nsById(id)
 }
 
 func (p *Parser) typeById(id string) *ast.Type {
@@ -750,7 +854,7 @@ func (p *Parser) typeById(id string) *ast.Type {
 	}
 	for _, use := range p.Uses {
 		t := use.defs.typeById(id)
-		if t != nil && t.Pub {
+		if t != nil {
 			return t
 		}
 	}
@@ -776,9 +880,9 @@ func (p *Parser) existIdf(id string, exceptGlobals bool) lex.Tok {
 		if v != nil {
 			return v.IdTok
 		}
-		for _, v := range p.waitingGlobals {
-			if v.Id == id {
-				return v.IdTok
+		for _, wg := range p.waitingGlobals {
+			if wg.defs == p.Defs && wg.vast.Id == id {
+				return wg.vast.IdTok
 			}
 		}
 	}
@@ -813,9 +917,9 @@ func (p *Parser) checkTypesAsync() {
 
 // WaitingGlobals parse X global variables for waiting parsing.
 func (p *Parser) WaitingGlobals() {
-	for _, vast := range p.waitingGlobals {
-		v := p.Var(vast)
-		p.Defs.Globals = append(p.Defs.Globals, v)
+	for _, wg := range p.waitingGlobals {
+		v := p.Var(wg.vast)
+		wg.defs.Globals = append(wg.defs.Globals, v)
 	}
 }
 
@@ -1660,19 +1764,48 @@ func (p *Parser) evalMapSubId(val value, idTok lex.Tok, m *exprModel) (v value) 
 	return
 }
 
-func (p *Parser) evalIdExprPart(toks []lex.Tok, m *exprModel) (v value) {
-	i := len(toks) - 1
-	tok := toks[i]
-	if i <= 0 {
-		v, _ = p.evalSingleExpr(tok, m)
-		return
+type nsFind interface{ nsById(string) *namespace }
+
+func (p *Parser) evalNsSubId(toks []lex.Tok, m *exprModel) (v value) {
+	var prev nsFind = p
+	for i, tok := range toks {
+		if (i+1)%2 != 0 {
+			if tok.Id != lex.Id {
+				p.pusherrtok(tok, "invalid_syntax")
+				continue
+			}
+			src := prev.nsById(tok.Kind)
+			if src == nil {
+				if i > 0 {
+					toks = toks[i:]
+					goto eval
+				}
+				p.pusherrtok(tok, "namespace_not_exist", tok.Kind)
+				return
+			}
+			prev = src.Defs
+			m.appendSubNode(exprNode{xapi.AsId(src.Id)})
+			continue
+		}
+		switch tok.Id {
+		case lex.DoubleColon:
+			m.appendSubNode(exprNode{"::"})
+			continue
+		default:
+			goto eval
+		}
 	}
+eval:
+	pdefs := p.Defs
+	p.Defs = prev.(*defmap)
+	defer func() { p.Defs = pdefs }()
+	return p.evalExprPart(toks, m)
+}
+
+func (p *Parser) evalExprSubId(toks []lex.Tok, m *exprModel) (v value) {
+	i := len(toks)
+	idTok := toks[i]
 	i--
-	if i == 0 || toks[i].Id != lex.Dot {
-		p.pusherrtok(toks[i], "invalid_syntax")
-		return
-	}
-	idTok := toks[i+1]
 	valTok := toks[i]
 	toks = toks[:i]
 	val := p.evalExprPart(toks, m)
@@ -1691,6 +1824,30 @@ func (p *Parser) evalIdExprPart(toks []lex.Tok, m *exprModel) (v value) {
 	}
 	p.pusherrtok(valTok, "obj_not_support_sub_fields", val.ast.Type.Val)
 	return
+}
+
+func (p *Parser) evalIdExprPart(toks []lex.Tok, m *exprModel) (v value) {
+	i := len(toks) - 1
+	tok := toks[i]
+	if i <= 0 {
+		v, _ = p.evalSingleExpr(tok, m)
+		return
+	}
+	i--
+	if i == 0 {
+		p.pusherrtok(toks[i], "invalid_syntax")
+		return
+	}
+	tok = toks[i]
+	switch tok.Id {
+	case lex.Dot:
+		return p.evalExprSubId(toks, m)
+	case lex.DoubleColon:
+		return p.evalNsSubId(toks, m)
+	default:
+		p.pusherrtok(toks[i], "invalid_syntax")
+		return
+	}
 }
 
 func (p *Parser) evalTryCastExpr(toks []lex.Tok, m *exprModel) (v value, _ bool) {

@@ -125,9 +125,9 @@ func (b *Builder) Comment(tok lex.Tok) {
 	tok.Kind = strings.TrimSpace(tok.Kind[2:])
 	if strings.HasPrefix(tok.Kind, "cxx:") {
 		b.Tree = append(b.Tree, Obj{tok, CxxEmbed{tok.Kind[4:]}})
-	} else {
-		b.Tree = append(b.Tree, Obj{tok, Comment{tok.Kind}})
+		return
 	}
+	b.Tree = append(b.Tree, Obj{tok, Comment{tok.Kind}})
 }
 
 // Preprocessor builds AST model of preprocessor directives.
@@ -201,9 +201,15 @@ func (b *Builder) Id(toks []lex.Tok) {
 	case lex.Colon:
 		b.GlobalVar(toks)
 		return
+	case lex.DoubleColon:
+		b.Namespace(toks)
+		return
 	case lex.Brace:
 		switch tok.Kind {
-		case "(":
+		case "{": // Namespace.
+			b.Namespace(toks)
+			return
+		case "(": // Function.
 			f := b.Func(toks, false)
 			s := Statement{f.Tok, f, false}
 			b.Tree = append(b.Tree, Obj{f.Tok, s})
@@ -211,6 +217,57 @@ func (b *Builder) Id(toks []lex.Tok) {
 		}
 	}
 	b.pusherr(tok, "invalid_syntax")
+}
+
+func (b *Builder) nsIds(toks []lex.Tok, i *int) []string {
+	var ids []string
+	for ; *i < len(toks); *i++ {
+		tok := toks[*i]
+		if (*i+1)%2 != 0 {
+			if tok.Id != lex.Id {
+				b.pusherr(tok, "invalid_syntax")
+				continue
+			}
+			ids = append(ids, tok.Kind)
+			continue
+		}
+		switch tok.Id {
+		case lex.DoubleColon:
+			continue
+		default:
+			goto ret
+		}
+	}
+ret:
+	return ids
+}
+
+// Namespace builds AST model of namespace statement.
+func (b *Builder) Namespace(toks []lex.Tok) {
+	var ns Namespace
+	ns.Tok = toks[0]
+	i := new(int)
+	ns.Ids = b.nsIds(toks, i)
+	treeToks := b.getrange(i, "{", "}", &toks)
+	if treeToks == nil {
+		b.pusherr(ns.Tok, "body_not_exist")
+		return
+	}
+	if *i < len(toks) {
+		b.pusherr(toks[*i], "invalid_syntax")
+	}
+	tree := b.Tree
+	b.Tree = nil
+	btoks := b.Toks
+	pos := b.Pos
+	b.Toks = treeToks
+	b.Pos = 0
+	b.Build()
+	b.Toks = btoks
+	b.Pos = pos
+	ns.Tree = b.Tree
+	b.Tree = tree
+	b.Tree = append(b.Tree, Obj{ns.Tok, ns})
 }
 
 // Use builds AST model of use declaration.
