@@ -1304,6 +1304,10 @@ func (b *Builder) VarStatement(toks []lex.Tok) (s Statement) {
 	vast.Type = DataType{Id: x.Void}
 	// Skip type definer operator(':')
 	i++
+	if i >= len(toks) {
+		b.pusherr(toks[i-1], "invalid_syntax")
+		return
+	}
 	if vast.DefTok.File != nil {
 		if toks[i].Id != lex.Colon {
 			b.pusherr(toks[i], "invalid_syntax")
