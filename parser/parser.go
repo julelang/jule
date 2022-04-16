@@ -154,7 +154,7 @@ func (p *Parser) CxxPrototypes() string {
 	var cxx strings.Builder
 	for _, use := range used {
 		for _, f := range use.defs.Funcs {
-			if outableFunc(f) {
+			if !f.Ast.Pub || outableFunc(f) {
 				cxx.WriteString(f.Prototype())
 				cxx.WriteByte('\n')
 			}
@@ -174,7 +174,7 @@ func (p *Parser) CxxGlobals() string {
 	var cxx strings.Builder
 	for _, use := range used {
 		for _, v := range use.defs.Globals {
-			if v.Used {
+			if !v.Pub || v.Used {
 				cxx.WriteString(v.String())
 				cxx.WriteByte('\n')
 			}
@@ -194,7 +194,7 @@ func (p *Parser) CxxFuncs() string {
 	var cxx strings.Builder
 	for _, use := range used {
 		for _, f := range use.defs.Funcs {
-			if outableFunc(f) {
+			if !f.Ast.Pub || outableFunc(f) {
 				cxx.WriteString(f.String())
 				cxx.WriteString("\n\n")
 			}

@@ -706,7 +706,9 @@ static inline void XID(outln)(const _Obj_t _Obj) noexcept {
 // region X_ENTRY_POINT
 int main() {
   std::setlocale(LC_ALL, "");
+#ifdef _WINDOWS
   std::wcin.imbue(std::locale::global(std::locale()));
+#endif
   _main();
   return EXIT_SUCCESS;
 }
