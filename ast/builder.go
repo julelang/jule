@@ -434,7 +434,7 @@ func (b *Builder) pushParam(f *Func, toks []lex.Tok, errtok lex.Tok) {
 		b.pusherr(errtok, "invalid_syntax")
 		return
 	}
-	p := Param{Tok: toks[0]}
+	var p Param
 	for i, tok := range toks {
 		switch tok.Id {
 		case lex.Const:
@@ -461,6 +461,7 @@ func (b *Builder) pushParam(f *Func, toks []lex.Tok, errtok lex.Tok) {
 			p.Variadic = true
 		case lex.Id:
 			toks = toks[i:]
+			p.Tok = tok
 			if !xapi.IsIgnoreId(tok.Kind) {
 				for _, param := range f.Params {
 					if param.Id == tok.Kind {

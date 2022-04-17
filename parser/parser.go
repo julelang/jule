@@ -3027,7 +3027,7 @@ func (rc *retChecker) checkepxrs() {
 
 func (rc *retChecker) checkExprTypes() {
 	valLength := len(rc.values)
-	if !rc.fun.RetType.MultiTyped {
+	if !rc.fun.RetType.MultiTyped { // Single return
 		rc.retAST.Expr.Model = rc.expModel.models[0]
 		if valLength > 1 {
 			rc.p.pusherrtok(rc.retAST.Tok, "overflow_return")
@@ -3632,20 +3632,14 @@ func (ac assignChecker) checkAssignTypeAsync() {
 			if xbits.CheckBitInt(ac.v.ast.Data, xbits.BitsizeType(ac.t.Id)) {
 				return
 			}
-			ac.p.pusherrtok(ac.errtok, "incompatible_datatype", ac.t, ac.v.ast.Type)
-			return
 		case x.IsFloatType(ac.t.Id):
 			if checkFloatBit(ac.v.ast, xbits.BitsizeType(ac.t.Id)) {
 				return
 			}
-			ac.p.pusherrtok(ac.errtok, "incompatible_datatype", ac.t, ac.v.ast.Type)
-			return
 		case x.IsUnsignedNumericType(ac.t.Id):
 			if xbits.CheckBitUInt(ac.v.ast.Data, xbits.BitsizeType(ac.t.Id)) {
 				return
 			}
-			ac.p.pusherrtok(ac.errtok, "incompatible_datatype", ac.t, ac.v.ast.Type)
-			return
 		}
 	}
 	ac.p.wg.Add(1)
@@ -3671,7 +3665,7 @@ func (p *Parser) checkTypeAsync(real, check ast.DataType, ignoreAny bool, errTok
 	if typeIsNilCompatible(real) && check.Id == x.Nil {
 		return
 	}
-	if real.Id == x.Voidptr && typeIsPtr(check) {
+	if real.Id == x.Voidptr && !typeIsPtr(check) {
 		return
 	}
 	if real.Val != check.Val {
