@@ -19,7 +19,7 @@ func typeIsPtr(t ast.DataType) bool {
 	if t.Val == "" {
 		return false
 	}
-	return t.Val[0] == '*'
+	return t.Id == x.Voidptr || t.Val[0] == '*'
 }
 
 func typeIsArray(t ast.DataType) bool {

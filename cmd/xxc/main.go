@@ -344,6 +344,7 @@ typedef uint64_t      u64;
 typedef std::size_t   size;
 typedef float         f32;
 typedef double        f64;
+typedef void          *voidptr;
 #define func          std::function
 
 // region X_STRUCTURES

@@ -426,6 +426,7 @@ func (l *Lex) Tok() Tok {
 		l.kw(txt, "bool", DataType, &tok),
 		l.kw(txt, "rune", DataType, &tok),
 		l.kw(txt, "str", DataType, &tok),
+		l.kw(txt, "voidptr", DataType, &tok),
 		l.kw(txt, "true", Value, &tok),
 		l.kw(txt, "false", Value, &tok),
 		l.kw(txt, "nil", Value, &tok),

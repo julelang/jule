@@ -2,26 +2,27 @@ package x
 
 // Data type (built-in) constants.
 const (
-	Void uint8 = 0
-	I8   uint8 = 1
-	I16  uint8 = 2
-	I32  uint8 = 3
-	I64  uint8 = 4
-	U8   uint8 = 5
-	U16  uint8 = 6
-	U32  uint8 = 7
-	U64  uint8 = 8
-	Bool uint8 = 9
-	Str  uint8 = 10
-	F32  uint8 = 11
-	F64  uint8 = 12
-	Any  uint8 = 13
-	Rune uint8 = 14
-	Id   uint8 = 15
-	Func uint8 = 16
-	Nil  uint8 = 17
-	Size uint8 = 18
-	Map  uint8 = 19
+	Void    uint8 = 0
+	I8      uint8 = 1
+	I16     uint8 = 2
+	I32     uint8 = 3
+	I64     uint8 = 4
+	U8      uint8 = 5
+	U16     uint8 = 6
+	U32     uint8 = 7
+	U64     uint8 = 8
+	Bool    uint8 = 9
+	Str     uint8 = 10
+	F32     uint8 = 11
+	F64     uint8 = 12
+	Any     uint8 = 13
+	Rune    uint8 = 14
+	Id      uint8 = 15
+	Func    uint8 = 16
+	Nil     uint8 = 17
+	Size    uint8 = 18
+	Map     uint8 = 19
+	Voidptr uint8 = 20
 )
 
 const (
@@ -219,6 +220,8 @@ func TypeFromId(id string) uint8 {
 		return Rune
 	case "size":
 		return Size
+	case "voidptr":
+		return Voidptr
 	}
 	return 0
 }
@@ -257,6 +260,8 @@ func CxxTypeIdFromType(typeCode uint8) string {
 		return "rune"
 	case Size:
 		return "size"
+	case Voidptr:
+		return "voidptr"
 	}
 	return "" // Unreachable code.
 }
