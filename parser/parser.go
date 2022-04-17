@@ -1191,8 +1191,6 @@ func (p *valueEvaluator) id() (v value, ok bool) {
 		p.model.appendSubNode(exprNode{xapi.AsId(id)})
 		ok = true
 	} else {
-		v.ast.Type.Id = x.Void
-		v.ast.Type.Val = x.VoidTypeStr
 		p.parser.pusherrtok(p.tok, "id_noexist", id)
 	}
 	return
@@ -1648,6 +1646,11 @@ func (p *Parser) evalHeapAllocExpr(toks []lex.Tok, m *exprModel) (v value) {
 }
 
 func (p *Parser) evalExprPart(toks []lex.Tok, m *exprModel) (v value) {
+	defer func() {
+		if v.ast.Type.Id == x.Void {
+			v.ast.Type.Val = x.VoidTypeStr
+		}
+	}()
 	if len(toks) == 1 {
 		val, ok := p.evalSingleExpr(toks[0], m)
 		if ok {
@@ -1865,6 +1868,8 @@ func (p *Parser) evalTryCastExpr(toks []lex.Tok, m *exprModel) (v value, _ bool)
 		}
 		if braceCount > 0 {
 			continue
+		} else if i+1 == len(toks) {
+			return
 		}
 		astb := ast.NewBuilder(nil)
 		dtindex := 0
@@ -1878,10 +1883,6 @@ func (p *Parser) evalTryCastExpr(toks []lex.Tok, m *exprModel) (v value, _ bool)
 			return
 		}
 		if dtindex+1 < len(typeToks) {
-			return
-		}
-		if i+1 >= len(toks) {
-			p.pusherrtok(tok, "casting_missing_expr")
 			return
 		}
 		exprToks := toks[i+1:]
@@ -1957,7 +1958,7 @@ func (p *Parser) checkCastStr(vt ast.DataType, errtok lex.Tok) {
 }
 
 func (p *Parser) checkCastInteger(t, vt ast.DataType, errtok lex.Tok) {
-	if typeIsPtr(vt) {
+	if typeIsPtr(vt) && (t.Id == x.I64 || t.Id == x.U64) {
 		return
 	}
 	if typeIsSingle(vt) && x.IsNumericType(vt.Id) {

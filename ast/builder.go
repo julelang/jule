@@ -1128,7 +1128,7 @@ func isAssignOperator(kind string) bool {
 }
 
 func checkAssignToks(toks []lex.Tok) bool {
-	if !isAssignTok(toks[0].Id) {
+	if len(toks) == 0 || !isAssignTok(toks[0].Id) {
 		return false
 	}
 	braceCount := 0
