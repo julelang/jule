@@ -15,7 +15,7 @@ type namespace struct {
 func (ns *namespace) cxxFuncPrototypes() string {
 	var cxx strings.Builder
 	for _, f := range ns.Defs.Funcs {
-		if !f.Ast.Pub || outableFunc(f) {
+		if f.used {
 			cxx.WriteString(ast.IndentString())
 			cxx.WriteString(f.Prototype())
 			cxx.WriteByte('\n')
@@ -27,7 +27,7 @@ func (ns *namespace) cxxFuncPrototypes() string {
 func (ns *namespace) cxxGlobals() string {
 	var cxx strings.Builder
 	for _, g := range ns.Defs.Globals {
-		if !g.Pub || g.Used {
+		if g.Used {
 			cxx.WriteByte('\n')
 			cxx.WriteString(ast.IndentString())
 			cxx.WriteString(g.String())
@@ -39,7 +39,7 @@ func (ns *namespace) cxxGlobals() string {
 func (ns *namespace) cxxFuncs() string {
 	var cxx strings.Builder
 	for _, f := range ns.Defs.Funcs {
-		if !f.Ast.Pub || outableFunc(f) {
+		if f.used {
 			cxx.WriteByte('\n')
 			cxx.WriteString(ast.IndentString())
 			cxx.WriteString(f.String())

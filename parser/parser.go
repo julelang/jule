@@ -127,12 +127,6 @@ func (p *Parser) CxxEmbeds() string {
 	return cxx.String()
 }
 
-// outableFunc returns true if function is available for
-// cxx output, returns false if not.
-func outableFunc(f *function) bool {
-	return f.Ast.Id == x.EntryPoint || f.used
-}
-
 // CxxNamespaces returns C++ code of namespaces.
 func (p *Parser) CxxNamespaces() string {
 	var cxx strings.Builder
@@ -154,14 +148,14 @@ func (p *Parser) CxxPrototypes() string {
 	var cxx strings.Builder
 	for _, use := range used {
 		for _, f := range use.defs.Funcs {
-			if !f.Ast.Pub || outableFunc(f) {
+			if f.used {
 				cxx.WriteString(f.Prototype())
 				cxx.WriteByte('\n')
 			}
 		}
 	}
 	for _, f := range p.Defs.Funcs {
-		if outableFunc(f) {
+		if f.used {
 			cxx.WriteString(f.Prototype())
 			cxx.WriteByte('\n')
 		}
@@ -174,7 +168,7 @@ func (p *Parser) CxxGlobals() string {
 	var cxx strings.Builder
 	for _, use := range used {
 		for _, v := range use.defs.Globals {
-			if !v.Pub || v.Used {
+			if v.Used {
 				cxx.WriteString(v.String())
 				cxx.WriteByte('\n')
 			}
@@ -194,14 +188,14 @@ func (p *Parser) CxxFuncs() string {
 	var cxx strings.Builder
 	for _, use := range used {
 		for _, f := range use.defs.Funcs {
-			if !f.Ast.Pub || outableFunc(f) {
+			if f.used {
 				cxx.WriteString(f.String())
 				cxx.WriteString("\n\n")
 			}
 		}
 	}
 	for _, f := range p.Defs.Funcs {
-		if outableFunc(f) {
+		if f.used {
 			cxx.WriteString(f.String())
 			cxx.WriteString("\n\n")
 		}
@@ -894,8 +888,10 @@ func (p *Parser) existid(id string) lex.Tok { return p.existIdf(id, false) }
 func (p *Parser) checkAsync() {
 	defer func() { p.wg.Done() }()
 	if p.main && !p.justDefs {
-		if p.FuncById(x.EntryPoint) == nil {
+		if f := p.FuncById(x.EntryPoint); f == nil {
 			p.pusherr("no_entry_point")
+		} else {
+			f.used = true
 		}
 	}
 	p.wg.Add(1)
@@ -925,12 +921,20 @@ func (p *Parser) WaitingGlobals() {
 
 func (p *Parser) checkFuncsAsync() {
 	defer func() { p.wg.Done() }()
-	for _, f := range p.Defs.Funcs {
+	check := func(f *function) {
 		p.BlockTypes = nil
 		p.BlockVars = p.varsFromParams(f.Ast.Params)
 		p.wg.Add(1)
 		go p.checkFuncSpecialCasesAsync(f)
 		p.checkFunc(&f.Ast)
+	}
+	for _, ns := range p.Defs.Namespaces {
+		for _, f := range ns.Defs.Funcs {
+			check(f)
+		}
+	}
+	for _, f := range p.Defs.Funcs {
+		check(f)
 	}
 }
 
@@ -1652,11 +1656,8 @@ func (p *Parser) evalExprPart(toks []lex.Tok, m *exprModel) (v value) {
 		}
 	}()
 	if len(toks) == 1 {
-		val, ok := p.evalSingleExpr(toks[0], m)
-		if ok {
-			v = val
-			return
-		}
+		v, _ = p.evalSingleExpr(toks[0], m)
+		return
 	}
 	tok := toks[0]
 	switch tok.Id {
