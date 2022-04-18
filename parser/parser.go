@@ -1132,17 +1132,33 @@ func (p *valueEvaluator) str() value {
 	return v
 }
 
-func toRuneLiteral(kind string) string {
-	kind = "\"" + kind[1:len(kind)-1] + "\""
-	return xapi.ToRune(kind)
+func toRuneLiteral(kind string) (string, bool) {
+	kind = kind[1 : len(kind)-1]
+	isByte := false
+	switch {
+	case len(kind) == 1 && kind[0] >= 0 && kind[0] <= 255:
+		isByte = true
+	case kind[0] == '\\' && kind[1] == 'x':
+		isByte = true
+	case kind[0] == '\\' && kind[1] >= '0' && kind[1] <= '7':
+		isByte = true
+	}
+	kind = "\"" + kind + "\""
+	return xapi.ToRune(kind), isByte
 }
 
 func (p *valueEvaluator) rune() value {
 	var v value
 	v.ast.Data = p.tok.Kind
-	v.ast.Type.Id = x.Rune
-	v.ast.Type.Val = "rune"
-	p.model.appendSubNode(exprNode{toRuneLiteral(p.tok.Kind)})
+	literal, isByte := toRuneLiteral(p.tok.Kind)
+	if isByte {
+		v.ast.Type.Id = x.U8
+		v.ast.Type.Val = "u8"
+	} else {
+		v.ast.Type.Id = x.Rune
+		v.ast.Type.Val = "rune"
+	}
+	p.model.appendSubNode(exprNode{literal})
 	return v
 }
 
