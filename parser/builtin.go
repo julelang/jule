@@ -88,14 +88,14 @@ func readyMapDefs(mapt ast.DataType) {
 	keyt := types[0]
 	valt := types[1]
 
-	keysFunc := mapDefs.funcById("keys")
+	keysFunc, _, _ := mapDefs.funcById("keys", nil)
 	keysFunc.Ast.RetType = keyt
 	keysFunc.Ast.RetType.Val = "[]" + keysFunc.Ast.RetType.Val
 
-	valuesFunc := mapDefs.funcById("values")
+	valuesFunc, _, _ := mapDefs.funcById("values", nil)
 	valuesFunc.Ast.RetType = valt
 	valuesFunc.Ast.RetType.Val = "[]" + valuesFunc.Ast.RetType.Val
 
-	hasFunc := mapDefs.funcById("has")
+	hasFunc, _, _ := mapDefs.funcById("has", nil)
 	hasFunc.Ast.Params[0].Type = keyt
 }

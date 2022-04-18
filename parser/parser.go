@@ -26,7 +26,7 @@ type use struct {
 var used []*use
 
 type globalWaitPair struct {
-	vast ast.Var
+	vast *ast.Var
 	defs *defmap
 }
 
@@ -208,11 +208,11 @@ func (p *Parser) Cxx() string {
 	var cxx strings.Builder
 	cxx.WriteString(p.CxxEmbeds())
 	cxx.WriteString("\n\n")
-	cxx.WriteString(p.CxxNamespaces())
 	cxx.WriteString(p.CxxPrototypes())
 	cxx.WriteString("\n\n")
 	cxx.WriteString(p.CxxGlobals())
 	cxx.WriteString("\n\n")
+	cxx.WriteString(p.CxxNamespaces())
 	cxx.WriteString(p.CxxFuncs())
 	return cxx.String()
 }
@@ -281,31 +281,37 @@ func (p *Parser) compileUse(useAST *ast.Use) *use {
 
 func (p *Parser) checkNsNses(src, sub *namespace) {
 	for _, ns := range sub.Defs.Namespaces {
-		srcNs := src.Defs.nsById(ns.Id)
+		srcNs := src.Defs.nsById(ns.Id, false)
 		p.checkNsDefs(sub, srcNs)
 	}
 }
 
 func (p *Parser) checkNsTypes(src, sub *namespace) {
 	for _, t := range sub.Defs.Types {
-		if src.Defs.typeById(t.Id) != nil {
-			p.pusherrtok(t.Tok, "exist_id", t.Id)
+		for _, st := range src.Defs.Globals {
+			if t.Id == st.Id {
+				p.pusherrtok(t.Tok, "exist_id", t.Id)
+			}
 		}
 	}
 }
 
 func (p *Parser) checkNsGlobals(src, sub *namespace) {
 	for _, g := range sub.Defs.Globals {
-		if g.Pub && src.Defs.typeById(g.Id) != nil {
-			p.pusherrtok(g.IdTok, "exist_id", g.Id)
+		for _, sg := range src.Defs.Globals {
+			if g.Id == sg.Id {
+				p.pusherrtok(g.IdTok, "exist_id", g.Id)
+			}
 		}
 	}
 }
 
 func (p *Parser) checkNsFuncs(src, sub *namespace) {
 	for _, f := range sub.Defs.Funcs {
-		if f.Ast.Pub && src.Defs.typeById(f.Ast.Id) != nil {
-			p.pusherrtok(f.Ast.Tok, "exist_id", f.Ast.Id)
+		for _, sf := range src.Defs.Funcs {
+			if f.Ast.Id == sf.Ast.Id {
+				p.pusherrtok(f.Ast.Tok, "exist_id", f.Ast.Id)
+			}
 		}
 	}
 }
@@ -317,59 +323,59 @@ func (p *Parser) checkNsDefs(src, sub *namespace) {
 	p.checkNsFuncs(src, sub)
 }
 
-func (p *Parser) pushUseNamespaces(use *use, dm *defmap) {
+func (p *Parser) pushUseNamespaces(use, dm *defmap) {
 	for _, ns := range dm.Namespaces {
 		ns.Defs.justPub = true
-		def := p.nsById(ns.Id)
+		def := p.nsById(ns.Id, false)
 		if def == nil {
-			use.defs.Namespaces = append(use.defs.Namespaces, ns)
+			use.Namespaces = append(use.Namespaces, ns)
 			continue
 		}
 		p.checkNsDefs(def, ns)
 	}
 }
 
-func (p *Parser) pushUseTypes(use *use, dm *defmap) {
+func (p *Parser) pushUseTypes(use, dm *defmap) {
 	for _, t := range dm.Types {
-		def := p.typeById(t.Id)
+		def, _, _ := p.typeById(t.Id)
 		if def != nil {
 			p.pusherrmsgtok(def.Tok,
 				fmt.Sprintf(`"%s" identifier is already defined in this source`, t.Id))
 		} else {
-			use.defs.Types = append(use.defs.Types, t)
+			use.Types = append(use.Types, t)
 		}
 	}
 }
 
-func (p *Parser) pushUseGlobals(use *use, dm *defmap) {
+func (p *Parser) pushUseGlobals(use, dm *defmap) {
 	for _, g := range dm.Globals {
-		def := p.Defs.globalById(g.Id)
+		def, _, _ := p.Defs.globalById(g.Id, nil)
 		if def != nil {
 			p.pusherrmsgtok(def.IdTok,
 				fmt.Sprintf(`"%s" identifier is already defined in this source`, g.Id))
 		} else {
-			use.defs.Globals = append(use.defs.Globals, g)
+			use.Globals = append(use.Globals, g)
 		}
 	}
 }
 
-func (p *Parser) pushUseFuncs(use *use, dm *defmap) {
+func (p *Parser) pushUseFuncs(use, dm *defmap) {
 	for _, f := range dm.Funcs {
-		def := p.Defs.funcById(f.Ast.Id)
+		def, _, _ := p.Defs.funcById(f.Ast.Id, nil)
 		if def != nil {
 			p.pusherrmsgtok(def.Ast.Tok,
 				fmt.Sprintf(`"%s" identifier is already defined in this source`, f.Ast.Id))
 		} else {
-			use.defs.Funcs = append(use.defs.Funcs, f)
+			use.Funcs = append(use.Funcs, f)
 		}
 	}
 }
 
 func (p *Parser) pushUseDefs(use *use, dm *defmap) {
-	p.pushUseNamespaces(use, dm)
-	p.pushUseTypes(use, dm)
-	p.pushUseGlobals(use, dm)
-	p.pushUseFuncs(use, dm)
+	p.pushUseNamespaces(use.defs, dm)
+	p.pushUseTypes(use.defs, dm)
+	p.pushUseGlobals(use.defs, dm)
+	p.pushUseFuncs(use.defs, dm)
 }
 
 func (p *Parser) use(useAST *ast.Use) {
@@ -560,7 +566,7 @@ func (p *Parser) checkAttribute(obj ast.Obj) {
 }
 
 func (p *Parser) checkTypeAST(t ast.Type) bool {
-	if p.existid(t.Id).Id != lex.NA {
+	if tok, _, canshadow := p.existid(t.Id); tok.Id != lex.NA && !canshadow {
 		p.pusherrtok(t.Tok, "exist_id", t.Id)
 		return false
 	} else if xapi.IsIgnoreId(t.Id) {
@@ -585,11 +591,12 @@ func (p *Parser) pushNs(ns *ast.Namespace) *namespace {
 	var src *namespace
 	prev := p.Defs
 	for _, id := range ns.Ids {
-		src = p.nsById(id)
+		src = p.nsById(id, false)
 		if src == nil {
 			src = new(namespace)
 			src.Id = id
 			src.Defs = new(defmap)
+			src.Defs.parent = prev
 			prev.Namespaces = append(prev.Namespaces, src)
 		}
 		prev = src.Defs
@@ -600,6 +607,9 @@ func (p *Parser) pushNs(ns *ast.Namespace) *namespace {
 // Namespace parses namespace statement.
 func (p *Parser) Namespace(ns ast.Namespace) {
 	src := p.pushNs(&ns)
+	justPub := src.Defs.justPub
+	src.Defs.justPub = false
+	defer func() { src.Defs.justPub = justPub }()
 	pdefs := p.Defs
 	p.Defs = src.Defs
 	p.parseSrcTree(ns.Tree)
@@ -689,7 +699,7 @@ func (p *Parser) params(params *[]ast.Param) {
 
 // Func parse X function.
 func (p *Parser) Func(fast ast.Func) {
-	if p.existid(fast.Id).Id != lex.NA {
+	if tok, _, canshadow := p.existid(fast.Id); tok.Id != lex.NA && !canshadow {
 		p.pusherrtok(fast.Tok, "exist_id", fast.Id)
 	} else if xapi.IsIgnoreId(fast.Id) {
 		p.pusherrtok(fast.Tok, "ignore_id")
@@ -708,13 +718,16 @@ func (p *Parser) Func(fast ast.Func) {
 
 // ParseVariable parse X global variable.
 func (p *Parser) Global(vast ast.Var) {
-	if p.existid(vast.Id).Id != lex.NA {
+	if tok, m, _ := p.existid(vast.Id); tok.Id != lex.NA && m == p.Defs {
 		p.pusherrtok(vast.IdTok, "exist_id", vast.Id)
 		return
 	}
 	vast.Desc = p.docText.String()
 	p.docText.Reset()
-	p.waitingGlobals = append(p.waitingGlobals, globalWaitPair{vast, p.Defs})
+	v := new(ast.Var)
+	*v = vast
+	p.waitingGlobals = append(p.waitingGlobals, globalWaitPair{v, p.Defs})
+	p.Defs.Globals = append(p.Defs.Globals, v)
 }
 
 // Var parse X variable.
@@ -796,99 +809,93 @@ func (p *Parser) varsFromParams(params []ast.Param) []*ast.Var {
 //
 // Special case:
 //  FuncById(id) -> nil: if function is not exist.
-func (p *Parser) FuncById(id string) *function {
+func (p *Parser) FuncById(id string) (*function, *defmap, bool) {
 	for _, f := range builtinFuncs {
 		if f.Ast.Id == id {
-			return f
+			return f, nil, false
 		}
 	}
 	for _, use := range p.Uses {
-		f := use.defs.funcById(id)
+		f, m, _ := use.defs.funcById(id, p.File)
 		if f != nil {
-			return f
+			return f, m, false
 		}
 	}
-	return p.Defs.funcById(id)
+	return p.Defs.funcById(id, p.File)
 }
 
-func (p *Parser) varById(id string) *ast.Var {
+func (p *Parser) varById(id string) (*ast.Var, *defmap) {
 	for _, v := range p.BlockVars {
 		if v != nil && v.Id == id {
-			return v
+			return v, nil
 		}
 	}
 	return p.globalById(id)
 }
 
-func (p *Parser) globalById(id string) *ast.Var {
+func (p *Parser) globalById(id string) (*ast.Var, *defmap) {
 	for _, use := range p.Uses {
-		g := use.defs.globalById(id)
+		g, m, _ := use.defs.globalById(id, p.File)
 		if g != nil {
-			return g
+			return g, m
 		}
 	}
-	return p.Defs.globalById(id)
+	g, m, _ := p.Defs.globalById(id, p.File)
+	return g, m
 }
 
-func (p *Parser) nsById(id string) *namespace {
+func (p *Parser) nsById(id string, parent bool) *namespace {
 	for _, use := range p.Uses {
-		ns := use.defs.nsById(id)
+		ns := use.defs.nsById(id, parent)
 		if ns != nil {
 			return ns
 		}
 	}
-	return p.Defs.nsById(id)
+	return p.Defs.nsById(id, parent)
 }
 
-func (p *Parser) typeById(id string) *ast.Type {
+func (p *Parser) typeById(id string) (*ast.Type, *defmap, bool) {
 	for _, t := range p.BlockTypes {
 		if t != nil && t.Id == id {
-			return t
+			return t, nil, false
 		}
 	}
 	for _, use := range p.Uses {
-		t := use.defs.typeById(id)
+		t, m, _ := use.defs.typeById(id, p.File)
 		if t != nil {
-			return t
+			return t, m, false
 		}
 	}
-	return p.Defs.typeById(id)
+	return p.Defs.typeById(id, p.File)
 }
 
-func (p *Parser) existIdf(id string, exceptGlobals bool) lex.Tok {
-	t := p.typeById(id)
+func (p *Parser) existid(id string) (tok lex.Tok, m *defmap, canshadow bool) {
+	var t *ast.Type
+	t, m, canshadow = p.typeById(id)
 	if t != nil {
-		return t.Tok
+		return t.Tok, m, canshadow
 	}
-	f := p.FuncById(id)
+	var f *function
+	f, m, canshadow = p.FuncById(id)
 	if f != nil {
-		return f.Ast.Tok
+		return f.Ast.Tok, m, canshadow
 	}
 	for _, v := range p.BlockVars {
 		if v != nil && v.Id == id {
-			return v.IdTok
+			return v.IdTok, m, false
 		}
 	}
-	if !exceptGlobals {
-		v := p.globalById(id)
-		if v != nil {
-			return v.IdTok
-		}
-		for _, wg := range p.waitingGlobals {
-			if wg.defs == p.Defs && wg.vast.Id == id {
-				return wg.vast.IdTok
-			}
-		}
+	v, m := p.globalById(id)
+	if v != nil {
+		return v.IdTok, m, true
 	}
-	return lex.Tok{}
+	return
 }
-
-func (p *Parser) existid(id string) lex.Tok { return p.existIdf(id, false) }
 
 func (p *Parser) checkAsync() {
 	defer func() { p.wg.Done() }()
 	if p.main && !p.justDefs {
-		if f := p.FuncById(x.EntryPoint); f == nil {
+		if f, _, _ := p.FuncById(x.EntryPoint); f == nil {
 			p.pusherr("no_entry_point")
 		} else {
 			f.used = true
@@ -911,12 +918,14 @@ func (p *Parser) checkTypesAsync() {
 	}
 }
 
-// WaitingGlobals parse X global variables for waiting parsing.
+// WaitingGlobals parses X global variables for waiting to parsing.
 func (p *Parser) WaitingGlobals() {
+	pdefs := p.Defs
 	for _, wg := range p.waitingGlobals {
-		v := p.Var(wg.vast)
-		wg.defs.Globals = append(wg.defs.Globals, v)
+		p.Defs = wg.defs
+		*wg.vast = *p.Var(*wg.vast)
 	}
+	p.Defs = pdefs
 }
 
 func (p *Parser) checkFuncsAsync() {
@@ -929,9 +938,11 @@ func (p *Parser) checkFuncsAsync() {
 		p.checkFunc(&f.Ast)
 	}
 	for _, ns := range p.Defs.Namespaces {
+		p.Defs = ns.Defs
 		for _, f := range ns.Defs.Funcs {
 			check(f)
 		}
+		p.Defs = p.Defs.parent
 	}
 	for _, f := range p.Defs.Funcs {
 		check(f)
@@ -1103,9 +1114,9 @@ func toRawStrLiteral(literal string) string {
 }
 
 type valueEvaluator struct {
-	tok    lex.Tok
-	model  *exprModel
-	parser *Parser
+	tok   lex.Tok
+	model *exprModel
+	p     *Parser
 }
 
 func (p *valueEvaluator) str() value {
@@ -1173,9 +1184,13 @@ func (p *valueEvaluator) num() value {
 	return v
 }
 
+func (p *Parser) isGlobal(m *defmap) bool {
+	return p.Defs != m && m != nil && m.parent == nil
+}
+
 func (p *valueEvaluator) id() (v value, ok bool) {
 	id := p.tok.Kind
-	if variable := p.parser.varById(id); variable != nil {
+	if variable, m := p.p.varById(id); variable != nil {
 		variable.Used = true
 		v.ast.Data = id
 		v.ast.Type = variable.Type
@@ -1183,19 +1198,25 @@ func (p *valueEvaluator) id() (v value, ok bool) {
 		v.volatile = variable.Volatile
 		v.ast.Tok = variable.IdTok
 		v.lvalue = true
+		if p.p.isGlobal(m) {
+			p.model.appendSubNode(exprNode{"global::"})
+		}
 		p.model.appendSubNode(exprNode{xapi.AsId(id)})
 		ok = true
-	} else if f := p.parser.FuncById(id); f != nil {
+	} else if f, m, _ := p.p.FuncById(id); f != nil {
 		f.used = true
 		v.ast.Data = id
 		v.ast.Type.Id = x.Func
 		v.ast.Type.Tag = f.Ast
 		v.ast.Type.Val = f.Ast.DataTypeString()
 		v.ast.Tok = f.Ast.Tok
+		if p.p.isGlobal(m) {
+			p.model.appendSubNode(exprNode{"global::"})
+		}
 		p.model.appendSubNode(exprNode{xapi.AsId(id)})
 		ok = true
 	} else {
-		p.parser.pusherrtok(p.tok, "id_noexist", id)
+		p.p.pusherrtok(p.tok, "id_noexist", id)
 	}
 	return
 }
@@ -1702,7 +1723,7 @@ func (p *Parser) evalExprPart(toks []lex.Tok, m *exprModel) (v value) {
 }
 
 func (p *Parser) evalStrSubId(val value, idTok lex.Tok, m *exprModel) (v value) {
-	i, t := strDefs.defById(idTok.Kind)
+	i, _, t := strDefs.defById(idTok.Kind, nil)
 	if i == -1 {
 		p.pusherrtok(idTok, "obj_have_not_id", val.ast.Type.Val)
 		return
@@ -1721,7 +1742,7 @@ func (p *Parser) evalStrSubId(val value, idTok lex.Tok, m *exprModel) (v value) 
 }
 
 func (p *Parser) evalArraySubId(val value, idTok lex.Tok, m *exprModel) (v value) {
-	i, t := arrDefs.defById(idTok.Kind)
+	i, _, t := arrDefs.defById(idTok.Kind, nil)
 	if i == -1 {
 		p.pusherrtok(idTok, "obj_have_not_id", val.ast.Type.Val)
 		return
@@ -1741,7 +1762,7 @@ func (p *Parser) evalArraySubId(val value, idTok lex.Tok, m *exprModel) (v value
 
 func (p *Parser) evalMapSubId(val value, idTok lex.Tok, m *exprModel) (v value) {
 	readyMapDefs(val.ast.Type)
-	i, t := mapDefs.defById(idTok.Kind)
+	i, _, t := mapDefs.defById(idTok.Kind, nil)
 	if i == -1 {
 		p.pusherrtok(idTok, "obj_have_not_id", val.ast.Type.Val)
 		return
@@ -1768,7 +1789,7 @@ func (p *Parser) evalMapSubId(val value, idTok lex.Tok, m *exprModel) (v value) 
 	return
 }
 
-type nsFind interface{ nsById(string) *namespace }
+type nsFind interface{ nsById(string, bool) *namespace }
 
 func (p *Parser) evalNsSubId(toks []lex.Tok, m *exprModel) (v value) {
 	var prev nsFind = p
@@ -1778,7 +1799,7 @@ func (p *Parser) evalNsSubId(toks []lex.Tok, m *exprModel) (v value) {
 				p.pusherrtok(tok, "invalid_syntax")
 				continue
 			}
-			src := prev.nsById(tok.Kind)
+			src := prev.nsById(tok.Kind, false)
 			if src == nil {
 				if i > 0 {
 					toks = toks[i:]
@@ -1794,7 +1815,6 @@ func (p *Parser) evalNsSubId(toks []lex.Tok, m *exprModel) (v value) {
 		switch tok.Id {
 		case lex.DoubleColon:
 			m.appendSubNode(exprNode{"::"})
-			continue
 		default:
 			goto eval
 		}
@@ -1802,12 +1822,17 @@ func (p *Parser) evalNsSubId(toks []lex.Tok, m *exprModel) (v value) {
 eval:
 	pdefs := p.Defs
 	p.Defs = prev.(*defmap)
-	defer func() { p.Defs = pdefs }()
+	parent := p.Defs.parent
+	p.Defs.parent = nil
+	defer func() {
+		p.Defs.parent = parent
+		p.Defs = pdefs
+	}()
 	return p.evalExprPart(toks, m)
 }
 
 func (p *Parser) evalExprSubId(toks []lex.Tok, m *exprModel) (v value) {
-	i := len(toks)
+	i := len(toks) - 1
 	idTok := toks[i]
 	i--
 	valTok := toks[i]
@@ -3132,7 +3157,7 @@ func (p *Parser) checkFunc(f *ast.Func) {
 }
 
 func (p *Parser) checkVarStatement(v *ast.Var, noParse bool) {
-	if p.existIdf(v.Id, true).Id != lex.NA {
+	if tok, _, canshadow := p.existid(v.Id); tok.Id != lex.NA && !canshadow {
 		p.pusherrtok(v.IdTok, "exist_id", v.Id)
 	}
 	if !noParse {
@@ -3191,7 +3216,7 @@ func (p *Parser) checkAssignment(selected value, errtok lex.Tok) bool {
 	}
 	switch selected.ast.Type.Tag.(type) {
 	case ast.Func:
-		if p.FuncById(selected.ast.Tok.Kind) != nil {
+		if f, _, _ := p.FuncById(selected.ast.Tok.Kind); f != nil {
 			p.pusherrtok(errtok, "assign_type_not_support_value")
 			state = false
 		}
@@ -3253,12 +3278,7 @@ func (p *Parser) processFuncMultiAssign(vsAST *ast.Assign, funcVal value) {
 	}
 	vals := make([]value, len(types))
 	for i, t := range types {
-		vals[i] = value{
-			ast: ast.Value{
-				Tok:  t.Tok,
-				Type: t,
-			},
-		}
+		vals[i] = value{ast: ast.Value{Tok: t.Tok, Type: t}}
 	}
 	p.processMultiAssign(vsAST, vals)
 }
@@ -3568,7 +3588,7 @@ func (p *Parser) readyType(dt ast.DataType, err bool) (_ ast.DataType, ok bool) 
 	}
 	switch dt.Id {
 	case x.Id:
-		t := p.typeById(dt.Tok.Kind)
+		t, _, _ := p.typeById(dt.Tok.Kind)
 		if t == nil {
 			if err {
 				p.pusherrtok(dt.Tok, "invalid_type_source")

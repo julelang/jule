@@ -2,6 +2,8 @@ package parser
 
 import (
 	"github.com/the-xlang/xxc/ast"
+	"github.com/the-xlang/xxc/pkg/x"
+	"github.com/the-xlang/xxc/pkg/xio"
 )
 
 type defmap struct {
@@ -9,85 +11,101 @@ type defmap struct {
 	Types      []*ast.Type
 	Funcs      []*function
 	Globals    []*ast.Var
+	parent     *defmap
 	justPub    bool
 }
 
-func (dm *defmap) findNsById(id string) int {
+func (dm *defmap) findNsById(id string, parent bool) (int, *defmap) {
 	for i, t := range dm.Namespaces {
 		if t != nil && t.Id == id {
-			return i
+			return i, dm
 		}
 	}
-	return -1
+	if parent && dm.parent != nil {
+		return dm.parent.findNsById(id, parent)
+	}
+	return -1, nil
 }
 
-func (dm *defmap) nsById(id string) *namespace {
-	i := dm.findNsById(id)
+func (dm *defmap) nsById(id string, parent bool) *namespace {
+	i, m := dm.findNsById(id, parent)
 	if i == -1 {
 		return nil
 	}
-	return dm.Namespaces[i]
+	return m.Namespaces[i]
 }
 
-func (dm *defmap) findTypeById(id string) int {
+func (dm *defmap) findTypeById(id string, f *xio.File) (int, *defmap, bool) {
 	for i, t := range dm.Types {
 		if t != nil && t.Id == id {
-			if !dm.justPub || t.Pub {
-				return i
+			if !dm.justPub || f == t.Tok.File || t.Pub {
+				return i, dm, false
 			}
 		}
 	}
-	return -1
+	if dm.parent != nil {
+		i, m, _ := dm.parent.findTypeById(id, f)
+		return i, m, true
+	}
+	return -1, nil, false
 }
 
-func (dm *defmap) typeById(id string) *ast.Type {
-	i := dm.findTypeById(id)
+func (dm *defmap) typeById(id string, f *xio.File) (*ast.Type, *defmap, bool) {
+	i, m, canshadow := dm.findTypeById(id, f)
 	if i == -1 {
-		return nil
+		return nil, nil, false
 	}
-	return dm.Types[i]
+	return m.Types[i], m, canshadow
 }
 
-func (dm *defmap) findFuncById(id string) int {
-	for i, f := range dm.Funcs {
-		if f != nil && f.Ast.Id == id {
-			if !dm.justPub || f.Ast.Pub {
-				return i
+func (dm *defmap) findFuncById(id string, f *xio.File) (int, *defmap, bool) {
+	for i, fn := range dm.Funcs {
+		if fn != nil && fn.Ast.Id == id {
+			if !dm.justPub || f == fn.Ast.Tok.File || fn.Ast.Pub {
+				return i, dm, false
 			}
 		}
 	}
-	return -1
+	if dm.parent != nil {
+		i, m, _ := dm.parent.findFuncById(id, f)
+		return i, m, true
+	}
+	return -1, nil, false
 }
 
 // funcById returns function by specified id.
 //
 // Special case:
 //  funcById(id) -> nil: if function is not exist.
-func (dm *defmap) funcById(id string) *function {
-	i := dm.findFuncById(id)
+func (dm *defmap) funcById(id string, f *xio.File) (*function, *defmap, bool) {
+	i, m, canshadow := dm.findFuncById(id, f)
 	if i == -1 {
-		return nil
+		return nil, nil, false
 	}
-	return dm.Funcs[i]
+	return m.Funcs[i], m, canshadow
 }
 
-func (dm *defmap) findGlobalById(id string) int {
+func (dm *defmap) findGlobalById(id string, f *xio.File) (int, *defmap, bool) {
 	for i, v := range dm.Globals {
-		if v != nil && v.Id == id {
-			if !dm.justPub || v.Pub {
-				return i
+		if v != nil && v.Type.Id != x.Void && v.Id == id {
+			if !dm.justPub || f == v.IdTok.File || v.Pub {
+				return i, dm, false
 			}
 		}
 	}
-	return -1
+	if dm.parent != nil {
+		i, m, _ := dm.parent.findGlobalById(id, f)
+		return i, m, true
+	}
+	return -1, nil, false
 }
 
-func (dm *defmap) globalById(id string) *ast.Var {
-	i := dm.findGlobalById(id)
+func (dm *defmap) globalById(id string, f *xio.File) (*ast.Var, *defmap, bool) {
+	i, m, canshadow := dm.findGlobalById(id, f)
 	if i == -1 {
-		return nil
+		return nil, nil, false
 	}
-	return dm.Globals[i]
+	return m.Globals[i], m, canshadow
 }
 
 // defById returns index of definition with type if exist.
@@ -98,15 +116,16 @@ func (dm *defmap) globalById(id string) *ast.Var {
 // Types;
 // 'g' -> global
 // 'f' -> function
-func (dm *defmap) defById(id string) (int, byte) {
+func (dm *defmap) defById(id string, f *xio.File) (int, *defmap, byte) {
 	var i int
-	i = dm.findGlobalById(id)
+	var m *defmap
+	i, m, _ = dm.findGlobalById(id, f)
 	if i != -1 {
-		return i, 'g'
+		return i, m, 'g'
 	}
-	i = dm.findFuncById(id)
+	i, m, _ = dm.findFuncById(id, f)
 	if i != -1 {
-		return i, 'f'
+		return i, m, 'f'
 	}
-	return -1, ' '
+	return -1, m, ' '
 }

@@ -9,6 +9,8 @@ import (
 func CheckBitInt(val string, bit int) bool {
 	var err error
 	switch {
+	case len(val) == 1:
+		return true
 	case strings.HasPrefix(val, "0x"):
 		_, err = strconv.ParseInt(val[2:], 16, bit)
 	case strings.HasPrefix(val, "0b"):
@@ -26,6 +28,8 @@ func CheckBitInt(val string, bit int) bool {
 func CheckBitUInt(val string, bit int) bool {
 	var err error
 	switch {
+	case len(val) == 1:
+		return true
 	case strings.HasPrefix(val, "0x"):
 		_, err = strconv.ParseUint(val[2:], 16, bit)
 	case strings.HasPrefix(val, "0b"):
