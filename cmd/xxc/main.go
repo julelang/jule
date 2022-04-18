@@ -418,8 +418,8 @@ public:
     return _values;
   }
 
-  bool has(const _Key_t _Key) const noexcept { return this->find(_Key) != this->end(); }
-  bool del(const _Key_t _Key) const noexcept { return this->erase(_Key) != this->end(); }
+  inline bool has(const _Key_t _Key) const noexcept { return this->find(_Key) != this->end(); }
+  inline void del(const _Key_t _Key) noexcept { this->erase(_Key); }
 
   bool operator==(const std::nullptr_t) const noexcept { return this->empty(); }
   bool operator!=(const std::nullptr_t) const noexcept { return !this->empty(); }

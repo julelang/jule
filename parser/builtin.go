@@ -78,6 +78,10 @@ var mapDefs = &defmap{
 			Params:  []ast.Param{{Id: "key", Const: true}},
 			RetType: ast.DataType{Id: x.Bool, Val: "bool"},
 		}},
+		{Ast: ast.Func{
+			Id:     "del",
+			Params: []ast.Param{{Id: "key", Const: true}},
+		}},
 	},
 }
 
@@ -98,4 +102,7 @@ func readyMapDefs(mapt ast.DataType) {
 
 	hasFunc, _, _ := mapDefs.funcById("has", nil)
 	hasFunc.Ast.Params[0].Type = keyt
+
+	delFunc, _, _ := mapDefs.funcById("del", nil)
+	delFunc.Ast.Params[0].Type = keyt
 }
