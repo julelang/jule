@@ -1,10 +1,8 @@
 package lex
 
-import "github.com/the-xlang/xxc/pkg/xio"
-
 // Tok is lexer token.
 type Tok struct {
-	File   *xio.File
+	File   *File
 	Row    int
 	Column int
 	Kind   string

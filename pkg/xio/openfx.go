@@ -19,6 +19,6 @@ func Openfx(path string) (*File, error) {
 	}
 	f := new(File)
 	f.Path = path
-	f.Text = []rune(string(bytes))
+	f.Data = []rune(string(bytes))
 	return f, nil
 }

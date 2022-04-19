@@ -12,12 +12,14 @@ import (
 	"github.com/the-xlang/xxc/pkg/xlog"
 )
 
+type File = xio.File
+
 // Lex is lexer of Fract.
 type Lex struct {
 	wg             sync.WaitGroup
 	firstTokOfLine bool
 
-	File   *xio.File
+	File   *File
 	Pos    int
 	Column int
 	Row    int
@@ -28,7 +30,7 @@ type Lex struct {
 }
 
 // New Lex instance.
-func NewLex(f *xio.File) *Lex {
+func NewLex(f *File) *Lex {
 	l := new(Lex)
 	l.File = f
 	l.Pos = 0
@@ -37,7 +39,7 @@ func NewLex(f *xio.File) *Lex {
 	return l
 }
 
-func (l *Lex) pusherr(key string, args ...interface{}) {
+func (l *Lex) pusherr(key string, args ...any) {
 	l.Logs = append(l.Logs, xlog.CompilerLog{
 		Type:   xlog.Err,
 		Row:    l.Row,
@@ -62,7 +64,7 @@ func (l *Lex) Lex() []Tok {
 	var toks []Tok
 	l.Logs = nil
 	l.Newln()
-	for l.Pos < len(l.File.Text) {
+	for l.Pos < len(l.File.Data) {
 		tok := l.Tok()
 		if tok.Id != NA {
 			toks = append(toks, tok)
@@ -124,7 +126,7 @@ func (l *Lex) id(ln string) string {
 // resume to lex from position.
 func (l *Lex) resume() string {
 	var ln string
-	runes := l.File.Text[l.Pos:]
+	runes := l.File.Data[l.Pos:]
 	// Skip spaces.
 	for i, r := range runes {
 		if unicode.IsSpace(r) {
@@ -145,31 +147,31 @@ func (l *Lex) resume() string {
 func (l *Lex) lncomment(tok *Tok) {
 	start := l.Pos
 	l.Pos += 2
-	for ; l.Pos < len(l.File.Text); l.Pos++ {
-		if l.File.Text[l.Pos] == '\n' {
+	for ; l.Pos < len(l.File.Data); l.Pos++ {
+		if l.File.Data[l.Pos] == '\n' {
 			if l.firstTokOfLine {
 				tok.Id = Comment
-				tok.Kind = string(l.File.Text[start:l.Pos])
+				tok.Kind = string(l.File.Data[start:l.Pos])
 			}
 			return
 		}
 	}
 	if l.firstTokOfLine {
 		tok.Id = Comment
-		tok.Kind = string(l.File.Text[start:])
+		tok.Kind = string(l.File.Data[start:])
 	}
 }
 
 func (l *Lex) rangecomment() {
 	l.Pos += 2
-	for ; l.Pos < len(l.File.Text); l.Pos++ {
-		run := l.File.Text[l.Pos]
+	for ; l.Pos < len(l.File.Data); l.Pos++ {
+		run := l.File.Data[l.Pos]
 		if run == '\n' {
 			l.Newln()
 			continue
 		}
 		l.Column += len(string(run))
-		if strings.HasPrefix(string(l.File.Text[l.Pos:]), "*/") {
+		if strings.HasPrefix(string(l.File.Data[l.Pos:]), "*/") {
 			l.Column += 2
 			l.Pos += 2
 			return

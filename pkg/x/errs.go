@@ -122,4 +122,4 @@ var Errs = map[string]string{
 }
 
 // GetErr returns error.
-func GetErr(key string, args ...interface{}) string { return fmt.Sprintf(Errs[key], args...) }
+func GetErr(key string, args ...any) string { return fmt.Sprintf(Errs[key], args...) }

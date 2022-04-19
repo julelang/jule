@@ -24,7 +24,9 @@ import (
 	"github.com/the-xlang/xxc/pkg/xset"
 )
 
-var compilerExecutable string
+type Parser = parser.Parser
+
+var compilerExe string
 
 func help(cmd string) {
 	if cmd != "" {
@@ -68,15 +70,12 @@ func initProject(cmd string) {
 		println("This module can only be used as single!")
 		return
 	}
-	txt := []byte(`{
-  "cxx_out_dir": "./dist/",
-  "cxx_out_name": "x.cxx",
-  "out_name": "main",
-  "language": "",
-  "mode": "transpile",
-  "post_commands": []
-}`)
-	err := ioutil.WriteFile(x.SettingsFile, txt, 0666)
+	bytes, err := json.MarshalIndent(*xset.Default, "", "  ")
+	if err != nil {
+		println(err)
+		os.Exit(0)
+	}
+	err = ioutil.WriteFile(x.SettingsFile, bytes, 0666)
 	if err != nil {
 		println(err.Error())
 		os.Exit(0)
@@ -262,7 +261,7 @@ func loadXSet() {
 
 // printlogs prints logs and returns true
 // if logs has error, false if not.
-func printlogs(p *parser.Parser) bool {
+func printlogs(p *Parser) bool {
 	var str strings.Builder
 	for _, log := range p.Warns {
 		switch log.Type {
@@ -730,7 +729,7 @@ func writeOutput(path, content string) {
 	}
 }
 
-func compile(path string, main, justDefs bool) *parser.Parser {
+func compile(path string, main, justDefs bool) *Parser {
 	loadXSet()
 	p := parser.New(nil)
 	// Check standard library.
@@ -753,7 +752,7 @@ func compile(path string, main, justDefs bool) *parser.Parser {
 	return p
 }
 
-func executePostCommands() {
+func execPostCommands() {
 	for _, cmd := range x.Set.PostCommands {
 		fmt.Println(">", cmd)
 		parts := strings.SplitN(cmd, " ", -1)
@@ -765,7 +764,7 @@ func executePostCommands() {
 }
 
 func doSpell(path, cxx string) {
-	defer executePostCommands()
+	defer execPostCommands()
 	writeOutput(path, cxx)
 	switch x.Set.Mode {
 	case xset.ModeCompile:

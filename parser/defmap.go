@@ -1,16 +1,14 @@
 package parser
 
 import (
-	"github.com/the-xlang/xxc/ast"
 	"github.com/the-xlang/xxc/pkg/x"
-	"github.com/the-xlang/xxc/pkg/xio"
 )
 
 type defmap struct {
 	Namespaces []*namespace
-	Types      []*ast.Type
+	Types      []*Type
 	Funcs      []*function
-	Globals    []*ast.Var
+	Globals    []*Var
 	parent     *defmap
 	justPub    bool
 }
@@ -35,7 +33,7 @@ func (dm *defmap) nsById(id string, parent bool) *namespace {
 	return m.Namespaces[i]
 }
 
-func (dm *defmap) findTypeById(id string, f *xio.File) (int, *defmap, bool) {
+func (dm *defmap) findTypeById(id string, f *File) (int, *defmap, bool) {
 	for i, t := range dm.Types {
 		if t != nil && t.Id == id {
 			if !dm.justPub || f == t.Tok.File || t.Pub {
@@ -50,7 +48,7 @@ func (dm *defmap) findTypeById(id string, f *xio.File) (int, *defmap, bool) {
 	return -1, nil, false
 }
 
-func (dm *defmap) typeById(id string, f *xio.File) (*ast.Type, *defmap, bool) {
+func (dm *defmap) typeById(id string, f *File) (*Type, *defmap, bool) {
 	i, m, canshadow := dm.findTypeById(id, f)
 	if i == -1 {
 		return nil, nil, false
@@ -58,7 +56,7 @@ func (dm *defmap) typeById(id string, f *xio.File) (*ast.Type, *defmap, bool) {
 	return m.Types[i], m, canshadow
 }
 
-func (dm *defmap) findFuncById(id string, f *xio.File) (int, *defmap, bool) {
+func (dm *defmap) findFuncById(id string, f *File) (int, *defmap, bool) {
 	for i, fn := range dm.Funcs {
 		if fn != nil && fn.Ast.Id == id {
 			if !dm.justPub || f == fn.Ast.Tok.File || fn.Ast.Pub {
@@ -77,7 +75,7 @@ func (dm *defmap) findFuncById(id string, f *xio.File) (int, *defmap, bool) {
 //
 // Special case:
 //  funcById(id) -> nil: if function is not exist.
-func (dm *defmap) funcById(id string, f *xio.File) (*function, *defmap, bool) {
+func (dm *defmap) funcById(id string, f *File) (*function, *defmap, bool) {
 	i, m, canshadow := dm.findFuncById(id, f)
 	if i == -1 {
 		return nil, nil, false
@@ -85,7 +83,7 @@ func (dm *defmap) funcById(id string, f *xio.File) (*function, *defmap, bool) {
 	return m.Funcs[i], m, canshadow
 }
 
-func (dm *defmap) findGlobalById(id string, f *xio.File) (int, *defmap, bool) {
+func (dm *defmap) findGlobalById(id string, f *File) (int, *defmap, bool) {
 	for i, v := range dm.Globals {
 		if v != nil && v.Type.Id != x.Void && v.Id == id {
 			if !dm.justPub || f == v.IdTok.File || v.Pub {
@@ -100,7 +98,7 @@ func (dm *defmap) findGlobalById(id string, f *xio.File) (int, *defmap, bool) {
 	return -1, nil, false
 }
 
-func (dm *defmap) globalById(id string, f *xio.File) (*ast.Var, *defmap, bool) {
+func (dm *defmap) globalById(id string, f *File) (*Var, *defmap, bool) {
 	i, m, canshadow := dm.findGlobalById(id, f)
 	if i == -1 {
 		return nil, nil, false
@@ -116,7 +114,7 @@ func (dm *defmap) globalById(id string, f *xio.File) (*ast.Var, *defmap, bool) {
 // Types;
 // 'g' -> global
 // 'f' -> function
-func (dm *defmap) defById(id string, f *xio.File) (int, *defmap, byte) {
+func (dm *defmap) defById(id string, f *File) (int, *defmap, byte) {
 	var i int
 	var m *defmap
 	i, m, _ = dm.findGlobalById(id, f)

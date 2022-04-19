@@ -9,4 +9,4 @@ var Warns = map[string]string{
 }
 
 // GetWarn returns warning.
-func GetWarn(key string, args ...interface{}) string { return fmt.Sprintf(Warns[key], args...) }
+func GetWarn(key string, args ...any) string { return fmt.Sprintf(Warns[key], args...) }

@@ -12,14 +12,14 @@ import (
 
 // Obj is an element of AST.
 type Obj struct {
-	Tok   lex.Tok
-	Value interface{}
+	Tok   Tok
+	Value any
 }
 
 // Statement is statement.
 type Statement struct {
-	Tok            lex.Tok
-	Val            interface{}
+	Tok            Tok
+	Val            any
 	WithTerminator bool
 }
 
@@ -81,11 +81,11 @@ func ParseBlock(b Block) string {
 
 // DataType is data type identifier.
 type DataType struct {
-	Tok        lex.Tok
+	Tok        Tok
 	Id         uint8
 	Val        string
 	MultiTyped bool
-	Tag        interface{}
+	Tag        any
 }
 
 func (dt DataType) String() string {
@@ -170,7 +170,7 @@ func (dt DataType) MultiTypeString() string {
 // Type is type declaration.
 type Type struct {
 	Pub  bool
-	Tok  lex.Tok
+	Tok  Tok
 	Id   string
 	Type DataType
 	Desc string
@@ -190,7 +190,7 @@ func (t Type) String() string {
 // Func is function declaration AST model.
 type Func struct {
 	Pub     bool
-	Tok     lex.Tok
+	Tok     Tok
 	Id      string
 	Params  []Param
 	RetType DataType
@@ -222,7 +222,7 @@ func (fc Func) DataTypeString() string {
 
 // Param is function parameter AST model.
 type Param struct {
-	Tok      lex.Tok
+	Tok      Tok
 	Id       string
 	Const    bool
 	Volatile bool
@@ -262,7 +262,7 @@ func (p Param) Prototype() string {
 
 // Arg is AST model of argument.
 type Arg struct {
-	Tok      lex.Tok
+	Tok      Tok
 	TargetId string
 	Expr     Expr
 }
@@ -277,8 +277,8 @@ func (a Arg) String() string { return a.Expr.String() }
 
 // Expr is AST model of expression.
 type Expr struct {
-	Toks      []lex.Tok
-	Processes [][]lex.Tok
+	Toks      []Tok
+	Processes [][]Tok
 	Model     IExprModel
 }
 
@@ -315,7 +315,7 @@ func (be ExprStatement) String() string {
 
 // Value is AST model of constant value.
 type Value struct {
-	Tok  lex.Tok
+	Tok  Tok
 	Data string
 	Type DataType
 }
@@ -324,7 +324,7 @@ func (v Value) String() string { return v.Data }
 
 // Ret is return statement AST model.
 type Ret struct {
-	Tok  lex.Tok
+	Tok  Tok
 	Expr Expr
 }
 
@@ -338,8 +338,8 @@ func (r Ret) String() string {
 
 // Attribute is attribtue AST model.
 type Attribute struct {
-	Tok lex.Tok
-	Tag lex.Tok
+	Tok Tok
+	Tag Tok
 }
 
 func (a Attribute) String() string { return a.Tag.Kind }
@@ -347,16 +347,16 @@ func (a Attribute) String() string { return a.Tag.Kind }
 // Var is variable declaration AST model.
 type Var struct {
 	Pub       bool
-	DefTok    lex.Tok
-	IdTok     lex.Tok
-	SetterTok lex.Tok
+	DefTok    Tok
+	IdTok     Tok
+	SetterTok Tok
 	Id        string
 	Type      DataType
 	Val       Expr
 	Const     bool
 	Volatile  bool
 	New       bool
-	Tag       interface{}
+	Tag       any
 	Desc      string
 	Used      bool
 }
@@ -401,7 +401,7 @@ func (as AssignSelector) String() string {
 
 // Assign is assignment AST model.
 type Assign struct {
-	Setter      lex.Tok
+	Setter      Tok
 	SelectExprs []AssignSelector
 	ValueExprs  []Expr
 	IsExpr      bool
@@ -511,7 +511,7 @@ func (a Assign) String() string {
 }
 
 type Free struct {
-	Tok  lex.Tok
+	Tok  Tok
 	Expr Expr
 }
 
@@ -544,7 +544,7 @@ func (wp WhileProfile) String(iter Iter) string {
 type ForeachProfile struct {
 	KeyA     Var
 	KeyB     Var
-	InTok    lex.Tok
+	InTok    Tok
 	Expr     Expr
 	ExprType DataType
 }
@@ -633,7 +633,7 @@ func (fp ForeachProfile) IterationString(iter Iter) string {
 
 // Iter is the AST model of iterations.
 type Iter struct {
-	Tok     lex.Tok
+	Tok     Tok
 	Block   Block
 	Profile IterProfile
 }
@@ -649,18 +649,18 @@ func (iter Iter) String() string {
 }
 
 // Break is the AST model of break statement.
-type Break struct{ Tok lex.Tok }
+type Break struct{ Tok Tok }
 
 func (b Break) String() string { return "break;" }
 
 // Continue is the AST model of break statement.
-type Continue struct{ Tok lex.Tok }
+type Continue struct{ Tok Tok }
 
 func (c Continue) String() string { return "continue;" }
 
 // If is the AST model of if expression.
 type If struct {
-	Tok   lex.Tok
+	Tok   Tok
 	Expr  Expr
 	Block Block
 }
@@ -676,7 +676,7 @@ func (ifast If) String() string {
 
 // ElseIf is the AST model of else if expression.
 type ElseIf struct {
-	Tok   lex.Tok
+	Tok   Tok
 	Expr  Expr
 	Block Block
 }
@@ -692,7 +692,7 @@ func (elif ElseIf) String() string {
 
 // Else is the AST model of else blocks.
 type Else struct {
-	Tok   lex.Tok
+	Tok   Tok
 	Block Block
 }
 
@@ -715,7 +715,7 @@ func (c Comment) String() string {
 
 // Use is the AST model of use declaration.
 type Use struct {
-	Tok  lex.Tok
+	Tok  Tok
 	Path string
 }
 
@@ -726,14 +726,14 @@ func (ce CxxEmbed) String() string { return ce.Content }
 
 // Preprocessor is the AST model of preprocessor directives.
 type Preprocessor struct {
-	Tok     lex.Tok
-	Command interface{}
+	Tok     Tok
+	Command any
 }
 
 func (pp Preprocessor) String() string { return fmt.Sprint(pp.Command) }
 
 // Directive is the AST model of directives.
-type Directive struct{ Command interface{} }
+type Directive struct{ Command any }
 
 func (d Directive) String() string { return fmt.Sprint(d.Command) }
 
@@ -744,7 +744,7 @@ func (EnofiDirective) String() string { return "" }
 
 // Defer is the AST model of deferred calls.
 type Defer struct {
-	Tok  lex.Tok
+	Tok  Tok
 	Expr Expr
 }
 
@@ -752,7 +752,7 @@ func (d Defer) String() string { return xapi.ToDefer(d.Expr.String()) }
 
 // Label is the AST model of labels.
 type Label struct {
-	Tok   lex.Tok
+	Tok   Tok
 	Label string
 	Index int
 	Used  bool
@@ -763,7 +763,7 @@ func (l Label) String() string { return l.Label + ":;" }
 
 // Goto is the AST model of goto statements.
 type Goto struct {
-	Tok   lex.Tok
+	Tok   Tok
 	Label string
 	Index int
 	Block *Block
@@ -779,7 +779,7 @@ func (gt Goto) String() string {
 
 // Namespace is the AST model of namespace statements.
 type Namespace struct {
-	Tok  lex.Tok
+	Tok  Tok
 	Ids  []string
 	Tree []Obj
 }

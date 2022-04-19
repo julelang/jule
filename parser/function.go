@@ -8,7 +8,7 @@ import (
 )
 
 type function struct {
-	Ast        ast.Func
+	Ast        Func
 	Attributes []ast.Attribute
 	Desc       string
 	used       bool
@@ -68,7 +68,7 @@ func attributesToString(attributes []ast.Attribute) string {
 	return cxx.String()
 }
 
-func paramsToCxx(params []ast.Param) string {
+func paramsToCxx(params []Param) string {
 	if len(params) == 0 {
 		return "(void)"
 	}

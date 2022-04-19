@@ -16,16 +16,19 @@ type XSet struct {
 	PostCommands []string `json:"post_commands"`
 }
 
+// Default XSet instance.
+var Default = &XSet{
+	CxxOutDir:    "./dist",
+	CxxOutName:   "x.cxx",
+	OutName:      "main",
+	Language:     "",
+	Mode:         "transpile",
+	PostCommands: make([]string, 0),
+}
+
 // Load loads XSet from json string.
 func Load(bytes []byte) (*XSet, error) {
-	set := XSet{
-		CxxOutDir:    "./dist",
-		CxxOutName:   "x.cxx",
-		OutName:      "main",
-		Language:     "",
-		Mode:         "transpile",
-		PostCommands: nil,
-	}
+	set := *Default
 	err := json.Unmarshal(bytes, &set)
 	if err != nil {
 		return nil, err

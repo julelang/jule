@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/the-xlang/xxc/ast"
-	"github.com/the-xlang/xxc/lex"
 	"github.com/the-xlang/xxc/pkg/xapi"
 )
 
@@ -20,7 +19,7 @@ type exprModel struct {
 	nodes []exprBuildNode
 }
 
-func newExprModel(processes [][]lex.Tok) *exprModel {
+func newExprModel(processes []Toks) *exprModel {
 	m := new(exprModel)
 	m.index = 0
 	for i := range processes {
@@ -44,14 +43,14 @@ func (m exprModel) String() string {
 	return expr.String()
 }
 
-func (m *exprModel) Expr() ast.Expr { return ast.Expr{Model: m} }
+func (m *exprModel) Expr() Expr { return Expr{Model: m} }
 
 type exprNode struct{ value string }
 
 func (node exprNode) String() string { return node.value }
 
 type anonFuncExpr struct {
-	ast     ast.Func
+	ast     Func
 	capture byte
 }
 
@@ -69,7 +68,7 @@ func (af anonFuncExpr) String() string {
 }
 
 type arrayExpr struct {
-	dataType ast.DataType
+	dataType DataType
 	expr     []iExpr
 }
 
@@ -89,7 +88,7 @@ func (a arrayExpr) String() string {
 }
 
 type mapExpr struct {
-	dataType ast.DataType
+	dataType DataType
 	keyExprs []iExpr
 	valExprs []iExpr
 }
@@ -136,7 +135,7 @@ func (mre multiRetExpr) String() string {
 	return cxx.String()[:cxx.Len()-1] + ")"
 }
 
-type newHeapAllocExpr struct{ typeAST ast.DataType }
+type newHeapAllocExpr struct{ typeAST DataType }
 
 func (nha newHeapAllocExpr) String() string { return xapi.ToXAlloc(nha.typeAST.String()) }
 
