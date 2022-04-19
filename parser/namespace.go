@@ -9,7 +9,7 @@ import (
 
 type namespace struct {
 	Id   string
-	Defs *defmap
+	Defs *Defmap
 }
 
 func (ns *namespace) cxxFuncPrototypes() string {

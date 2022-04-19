@@ -31,14 +31,14 @@ type Toks = ast.Toks
 
 type use struct {
 	Path string
-	defs *defmap
+	defs *Defmap
 }
 
 var used []*use
 
 type globalWaitPair struct {
 	vast *Var
-	defs *defmap
+	defs *Defmap
 }
 
 // Parser is parser of X code.
@@ -55,7 +55,7 @@ type Parser struct {
 
 	Embeds         strings.Builder
 	Uses           []*use
-	Defs           *defmap
+	Defs           *Defmap
 	waitingGlobals []globalWaitPair
 	BlockVars      []*Var
 	BlockTypes     []*Type
@@ -69,7 +69,7 @@ func New(f *File) *Parser {
 	p := new(Parser)
 	p.File = f
 	p.isLocalPkg = false
-	p.Defs = new(defmap)
+	p.Defs = new(Defmap)
 	return p
 }
 
@@ -280,7 +280,7 @@ func (p *Parser) compileUse(useAST *ast.Use) *use {
 			p.pusherrtok(useAST.Tok, "use_has_errors")
 		}
 		use := new(use)
-		use.defs = new(defmap)
+		use.defs = new(Defmap)
 		use.Path = useAST.Path
 		p.pusherrs(psub.Errs...)
 		p.Warns = append(p.Warns, psub.Warns...)
@@ -334,7 +334,7 @@ func (p *Parser) checkNsDefs(src, sub *namespace) {
 	p.checkNsFuncs(src, sub)
 }
 
-func (p *Parser) pushUseNamespaces(use, dm *defmap) {
+func (p *Parser) pushUseNamespaces(use, dm *Defmap) {
 	for _, ns := range dm.Namespaces {
 		ns.Defs.justPub = true
 		def := p.nsById(ns.Id, false)
@@ -346,7 +346,7 @@ func (p *Parser) pushUseNamespaces(use, dm *defmap) {
 	}
 }
 
-func (p *Parser) pushUseTypes(use, dm *defmap) {
+func (p *Parser) pushUseTypes(use, dm *Defmap) {
 	for _, t := range dm.Types {
 		def, _, _ := p.typeById(t.Id)
 		if def != nil {
@@ -358,7 +358,7 @@ func (p *Parser) pushUseTypes(use, dm *defmap) {
 	}
 }
 
-func (p *Parser) pushUseGlobals(use, dm *defmap) {
+func (p *Parser) pushUseGlobals(use, dm *Defmap) {
 	for _, g := range dm.Globals {
 		def, _, _ := p.Defs.globalById(g.Id, nil)
 		if def != nil {
@@ -370,7 +370,7 @@ func (p *Parser) pushUseGlobals(use, dm *defmap) {
 	}
 }
 
-func (p *Parser) pushUseFuncs(use, dm *defmap) {
+func (p *Parser) pushUseFuncs(use, dm *Defmap) {
 	for _, f := range dm.Funcs {
 		def, _, _ := p.Defs.funcById(f.Ast.Id, nil)
 		if def != nil {
@@ -382,7 +382,7 @@ func (p *Parser) pushUseFuncs(use, dm *defmap) {
 	}
 }
 
-func (p *Parser) pushUseDefs(use *use, dm *defmap) {
+func (p *Parser) pushUseDefs(use *use, dm *Defmap) {
 	p.pushUseNamespaces(use.defs, dm)
 	p.pushUseTypes(use.defs, dm)
 	p.pushUseGlobals(use.defs, dm)
@@ -606,7 +606,7 @@ func (p *Parser) pushNs(ns *ast.Namespace) *namespace {
 		if src == nil {
 			src = new(namespace)
 			src.Id = id
-			src.Defs = new(defmap)
+			src.Defs = new(Defmap)
 			src.Defs.parent = prev
 			prev.Namespaces = append(prev.Namespaces, src)
 		}
@@ -820,7 +820,7 @@ func (p *Parser) varsFromParams(params []Param) []*Var {
 //
 // Special case:
 //  FuncById(id) -> nil: if function is not exist.
-func (p *Parser) FuncById(id string) (*function, *defmap, bool) {
+func (p *Parser) FuncById(id string) (*function, *Defmap, bool) {
 	for _, f := range builtinFuncs {
 		if f.Ast.Id == id {
 			return f, nil, false
@@ -835,7 +835,7 @@ func (p *Parser) FuncById(id string) (*function, *defmap, bool) {
 	return p.Defs.funcById(id, p.File)
 }
 
-func (p *Parser) varById(id string) (*Var, *defmap) {
+func (p *Parser) varById(id string) (*Var, *Defmap) {
 	for _, v := range p.BlockVars {
 		if v != nil && v.Id == id {
 			return v, nil
@@ -844,7 +844,7 @@ func (p *Parser) varById(id string) (*Var, *defmap) {
 	return p.globalById(id)
 }
 
-func (p *Parser) globalById(id string) (*Var, *defmap) {
+func (p *Parser) globalById(id string) (*Var, *Defmap) {
 	for _, use := range p.Uses {
 		g, m, _ := use.defs.globalById(id, p.File)
 		if g != nil {
@@ -865,7 +865,7 @@ func (p *Parser) nsById(id string, parent bool) *namespace {
 	return p.Defs.nsById(id, parent)
 }
 
-func (p *Parser) typeById(id string) (*Type, *defmap, bool) {
+func (p *Parser) typeById(id string) (*Type, *Defmap, bool) {
 	for _, t := range p.BlockTypes {
 		if t != nil && t.Id == id {
 			return t, nil, false
@@ -880,7 +880,7 @@ func (p *Parser) typeById(id string) (*Type, *defmap, bool) {
 	return p.Defs.typeById(id, p.File)
 }
 
-func (p *Parser) existid(id string) (tok Tok, m *defmap, canshadow bool) {
+func (p *Parser) existid(id string) (tok Tok, m *Defmap, canshadow bool) {
 	var t *Type
 	t, m, canshadow = p.typeById(id)
 	if t != nil {
@@ -1211,7 +1211,7 @@ func (p *valueEvaluator) num() value {
 	return v
 }
 
-func (p *Parser) isGlobal(m *defmap) bool {
+func (p *Parser) isGlobal(m *Defmap) bool {
 	return p.Defs != m && m != nil && m.parent == nil
 }
 
@@ -1848,7 +1848,7 @@ func (p *Parser) evalNsSubId(toks Toks, m *exprModel) (v value) {
 	}
 eval:
 	pdefs := p.Defs
-	p.Defs = prev.(*defmap)
+	p.Defs = prev.(*Defmap)
 	parent := p.Defs.parent
 	p.Defs.parent = nil
 	defer func() {

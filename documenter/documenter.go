@@ -8,6 +8,8 @@ import (
 	"github.com/the-xlang/xxc/pkg/x"
 )
 
+type Defmap = parser.Defmap
+
 type use struct {
 	Path         string `json:"path"`
 	StandardPath bool   `json:"standard_path"`
@@ -42,11 +44,20 @@ type parameter struct {
 	Volatile bool   `json:"volatile"`
 }
 
+type namespace struct {
+	Id         string      `json:"id"`
+	Types      []xtype     `json:"types"`
+	Globals    []global    `json:"globals"`
+	Funcs      []function  `json:"functions"`
+	Namespaces []namespace `json:"namespaces"`
+}
+
 type document struct {
-	Uses    []use      `json:"uses"`
-	Types   []xtype    `json:"types"`
-	Globals []global   `json:"globals"`
-	Funcs   []function `json:"functions"`
+	Uses       []use       `json:"uses"`
+	Types      []xtype     `json:"types"`
+	Globals    []global    `json:"globals"`
+	Funcs      []function  `json:"functions"`
+	Namespaces []namespace `json:"namespaces"`
 }
 
 func uses(p *parser.Parser) []use {
@@ -62,9 +73,9 @@ func uses(p *parser.Parser) []use {
 	return uses
 }
 
-func types(p *parser.Parser) []xtype {
-	types := make([]xtype, len(p.Defs.Types))
-	for i, t := range p.Defs.Types {
+func types(dm *Defmap) []xtype {
+	types := make([]xtype, len(dm.Types))
+	for i, t := range dm.Types {
 		types[i] = xtype{
 			Id:    t.Id,
 			Alias: t.Type.Val,
@@ -74,9 +85,9 @@ func types(p *parser.Parser) []xtype {
 	return types
 }
 
-func globals(p *parser.Parser) []global {
-	globals := make([]global, len(p.Defs.Globals))
-	for i, v := range p.Defs.Globals {
+func globals(dm *Defmap) []global {
+	globals := make([]global, len(dm.Globals))
+	for i, v := range dm.Globals {
 		globals[i] = global{
 			Id:       v.Id,
 			Type:     v.Type.Val,
@@ -109,9 +120,9 @@ func attributes(attributes []ast.Attribute) []string {
 	return attrs
 }
 
-func funcs(p *parser.Parser) []function {
-	funcs := make([]function, len(p.Defs.Funcs))
-	for i, f := range p.Defs.Funcs {
+func funcs(dm *Defmap) []function {
+	funcs := make([]function, len(dm.Funcs))
+	for i, f := range dm.Funcs {
 		fun := function{
 			Id:         f.Ast.Id,
 			Ret:        f.Ast.RetType.Val,
@@ -124,9 +135,34 @@ func funcs(p *parser.Parser) []function {
 	return funcs
 }
 
+func makeNamespace(dm *Defmap) namespace {
+	var ns namespace
+	ns.Types = types(dm)
+	ns.Globals = globals(dm)
+	ns.Funcs = funcs(dm)
+	ns.Namespaces = namespaces(dm)
+	return ns
+}
+
+func namespaces(dm *Defmap) []namespace {
+	namespaces := make([]namespace, len(dm.Namespaces))
+	for i, ns := range dm.Namespaces {
+		nspace := makeNamespace(ns.Defs)
+		nspace.Id = ns.Id
+		namespaces[i] = nspace
+	}
+	return namespaces
+}
+
 // Documentize Parser defines with JSON format.
 func Documentize(p *parser.Parser) (string, error) {
-	doc := document{uses(p), types(p), globals(p), funcs(p)}
+	doc := document{
+		uses(p),
+		types(p.Defs),
+		globals(p.Defs),
+		funcs(p.Defs),
+		namespaces(p.Defs),
+	}
 	bytes, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
 		return "", err

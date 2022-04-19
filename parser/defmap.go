@@ -4,16 +4,17 @@ import (
 	"github.com/the-xlang/xxc/pkg/x"
 )
 
-type defmap struct {
+// Defmap is definition map.
+type Defmap struct {
 	Namespaces []*namespace
 	Types      []*Type
 	Funcs      []*function
 	Globals    []*Var
-	parent     *defmap
+	parent     *Defmap
 	justPub    bool
 }
 
-func (dm *defmap) findNsById(id string, parent bool) (int, *defmap) {
+func (dm *Defmap) findNsById(id string, parent bool) (int, *Defmap) {
 	for i, t := range dm.Namespaces {
 		if t != nil && t.Id == id {
 			return i, dm
@@ -25,7 +26,7 @@ func (dm *defmap) findNsById(id string, parent bool) (int, *defmap) {
 	return -1, nil
 }
 
-func (dm *defmap) nsById(id string, parent bool) *namespace {
+func (dm *Defmap) nsById(id string, parent bool) *namespace {
 	i, m := dm.findNsById(id, parent)
 	if i == -1 {
 		return nil
@@ -33,7 +34,7 @@ func (dm *defmap) nsById(id string, parent bool) *namespace {
 	return m.Namespaces[i]
 }
 
-func (dm *defmap) findTypeById(id string, f *File) (int, *defmap, bool) {
+func (dm *Defmap) findTypeById(id string, f *File) (int, *Defmap, bool) {
 	for i, t := range dm.Types {
 		if t != nil && t.Id == id {
 			if !dm.justPub || f == t.Tok.File || t.Pub {
@@ -48,7 +49,7 @@ func (dm *defmap) findTypeById(id string, f *File) (int, *defmap, bool) {
 	return -1, nil, false
 }
 
-func (dm *defmap) typeById(id string, f *File) (*Type, *defmap, bool) {
+func (dm *Defmap) typeById(id string, f *File) (*Type, *Defmap, bool) {
 	i, m, canshadow := dm.findTypeById(id, f)
 	if i == -1 {
 		return nil, nil, false
@@ -56,7 +57,7 @@ func (dm *defmap) typeById(id string, f *File) (*Type, *defmap, bool) {
 	return m.Types[i], m, canshadow
 }
 
-func (dm *defmap) findFuncById(id string, f *File) (int, *defmap, bool) {
+func (dm *Defmap) findFuncById(id string, f *File) (int, *Defmap, bool) {
 	for i, fn := range dm.Funcs {
 		if fn != nil && fn.Ast.Id == id {
 			if !dm.justPub || f == fn.Ast.Tok.File || fn.Ast.Pub {
@@ -75,7 +76,7 @@ func (dm *defmap) findFuncById(id string, f *File) (int, *defmap, bool) {
 //
 // Special case:
 //  funcById(id) -> nil: if function is not exist.
-func (dm *defmap) funcById(id string, f *File) (*function, *defmap, bool) {
+func (dm *Defmap) funcById(id string, f *File) (*function, *Defmap, bool) {
 	i, m, canshadow := dm.findFuncById(id, f)
 	if i == -1 {
 		return nil, nil, false
@@ -83,7 +84,7 @@ func (dm *defmap) funcById(id string, f *File) (*function, *defmap, bool) {
 	return m.Funcs[i], m, canshadow
 }
 
-func (dm *defmap) findGlobalById(id string, f *File) (int, *defmap, bool) {
+func (dm *Defmap) findGlobalById(id string, f *File) (int, *Defmap, bool) {
 	for i, v := range dm.Globals {
 		if v != nil && v.Type.Id != x.Void && v.Id == id {
 			if !dm.justPub || f == v.IdTok.File || v.Pub {
@@ -98,7 +99,7 @@ func (dm *defmap) findGlobalById(id string, f *File) (int, *defmap, bool) {
 	return -1, nil, false
 }
 
-func (dm *defmap) globalById(id string, f *File) (*Var, *defmap, bool) {
+func (dm *Defmap) globalById(id string, f *File) (*Var, *Defmap, bool) {
 	i, m, canshadow := dm.findGlobalById(id, f)
 	if i == -1 {
 		return nil, nil, false
@@ -114,9 +115,9 @@ func (dm *defmap) globalById(id string, f *File) (*Var, *defmap, bool) {
 // Types;
 // 'g' -> global
 // 'f' -> function
-func (dm *defmap) defById(id string, f *File) (int, *defmap, byte) {
+func (dm *Defmap) defById(id string, f *File) (int, *Defmap, byte) {
 	var i int
-	var m *defmap
+	var m *Defmap
 	i, m, _ = dm.findGlobalById(id, f)
 	if i != -1 {
 		return i, m, 'g'

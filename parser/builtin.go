@@ -31,7 +31,7 @@ var builtinFuncs = []*function{
 	},
 }
 
-var strDefs = &defmap{
+var strDefs = &Defmap{
 	Globals: []*Var{
 		{
 			Id:    "len",
@@ -42,7 +42,7 @@ var strDefs = &defmap{
 	},
 }
 
-var arrDefs = &defmap{
+var arrDefs = &Defmap{
 	Globals: []*Var{
 		{
 			Id:    "len",
@@ -53,7 +53,7 @@ var arrDefs = &defmap{
 	},
 }
 
-var mapDefs = &defmap{
+var mapDefs = &Defmap{
 	Globals: []*Var{
 		{
 			Id:    "len",
