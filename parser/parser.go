@@ -983,10 +983,44 @@ func eliminateProcesses(processes *[]Toks, i, to int) {
 	}
 }
 
-func (p *Parser) evalProcesses(processes []Toks) (v value, e iExpr) {
-	if processes == nil {
-		return
+func (p *Parser) evalLogicProcesses(processes []Toks) (v value, e iExpr) {
+	m := new(exprModel)
+	e = m
+	v.ast.Type.Id = x.Bool
+	v.ast.Type.Val = "bool"
+	last := 0
+	evalProcesses := func(tok Tok, i int) {
+		exprProcesses := processes[last:i]
+		val, e := p.evalNonLogicProcesses(exprProcesses)
+		node := exprBuildNode{i - 1, []iExpr{e}}
+		m.nodes = append(m.nodes, node)
+		if !isBoolExpr(val) {
+			p.pusherrtok(tok, "invalid_type")
+		}
 	}
+	for i, process := range processes {
+		if !isOperator(process) {
+			continue
+		}
+		tok := process[0]
+		switch {
+		case tok.Id != lex.Operator:
+			continue
+		case tok.Kind != "&&" && tok.Kind != "||":
+			continue
+		}
+		evalProcesses(tok, i)
+		node := exprBuildNode{i, []iExpr{exprNode{tok.Kind}}}
+		m.nodes = append(m.nodes, node)
+		last = i + 1
+	}
+	if last < len(processes) {
+		evalProcesses(processes[last-1][0], len(processes))
+	}
+	return
+}
+
+func (p *Parser) evalNonLogicProcesses(processes []Toks) (v value, e iExpr) {
 	m := newExprModel(processes)
 	e = m
 	if len(processes) == 1 {
@@ -1050,6 +1084,17 @@ func (p *Parser) evalProcesses(processes []Toks) (v value, e iExpr) {
 	return
 }
 
+func (p *Parser) evalProcesses(processes []Toks) (v value, e iExpr) {
+	switch {
+	case processes == nil:
+		return
+	case isLogicEval(processes):
+		return p.evalLogicProcesses(processes)
+	default:
+		return p.evalNonLogicProcesses(processes)
+	}
+}
+
 func noData(processes []Toks) bool {
 	for _, p := range processes {
 		if !isOperator(p) && p != nil {
@@ -1085,10 +1130,6 @@ func (p *Parser) nextOperator(processes []Toks) int {
 			precedence4 = i
 		case "==", "!=", "<", "<=", ">", ">=":
 			precedence3 = i
-		case "&&":
-			precedence2 = i
-		case "||":
-			precedence1 = i
 		default:
 			p.pusherrtok(process[0], "invalid_operator")
 		}
@@ -1105,6 +1146,19 @@ func (p *Parser) nextOperator(processes []Toks) int {
 	default:
 		return precedence1
 	}
+}
+
+func isLogicEval(processes []Toks) bool {
+	for _, process := range processes {
+		if !isOperator(process) {
+			continue
+		}
+		switch process[0].Kind {
+		case "&&", "||":
+			return true
+		}
+	}
+	return false
 }
 
 func (p *Parser) evalToks(toks Toks) (value, iExpr) {
