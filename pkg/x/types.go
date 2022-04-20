@@ -135,7 +135,8 @@ func TypesAreCompatible(t1, t2 uint8, ignoreany bool) bool {
 	case F64:
 		return t2 == F64
 	case Rune:
-		return t2 == Rune
+		return t2 == Rune ||
+			t2 == U8
 	case Nil:
 		return t2 == Nil
 	}

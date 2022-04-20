@@ -992,7 +992,7 @@ func (p *Parser) evalLogicProcesses(processes []Toks) (v value, e iExpr) {
 	evalProcesses := func(tok Tok, i int) {
 		exprProcesses := processes[last:i]
 		val, e := p.evalNonLogicProcesses(exprProcesses)
-		node := exprBuildNode{i - 1, []iExpr{e}}
+		node := exprBuildNode{[]iExpr{e}}
 		m.nodes = append(m.nodes, node)
 		if !isBoolExpr(val) {
 			p.pusherrtok(tok, "invalid_type")
@@ -1010,7 +1010,7 @@ func (p *Parser) evalLogicProcesses(processes []Toks) (v value, e iExpr) {
 			continue
 		}
 		evalProcesses(tok, i)
-		node := exprBuildNode{i, []iExpr{exprNode{tok.Kind}}}
+		node := exprBuildNode{[]iExpr{exprNode{tok.Kind}}}
 		m.nodes = append(m.nodes, node)
 		last = i + 1
 	}

@@ -9,10 +9,7 @@ import (
 
 type iExpr interface{ String() string }
 
-type exprBuildNode struct {
-	index int
-	nodes []iExpr
-}
+type exprBuildNode struct{ nodes []iExpr }
 
 type exprModel struct {
 	index int
@@ -22,9 +19,7 @@ type exprModel struct {
 func newExprModel(processes []Toks) *exprModel {
 	m := new(exprModel)
 	m.index = 0
-	for i := range processes {
-		m.nodes = append(m.nodes, exprBuildNode{index: i})
-	}
+	m.nodes = make([]exprBuildNode, len(processes))
 	return m
 }
 
