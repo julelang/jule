@@ -181,12 +181,13 @@ func (l *Lex) rangecomment() {
 	l.pusherr("missing_block_comment")
 }
 
-var numRegexp = *regexp.MustCompile(`^((0x[[:xdigit:]]+)|0b([0-1]{1,})|0([0-7]{1,})|(\d+((\.\d+)?((e|E)(\-|\+|)\d+)?|(\.\d+))))`)
+// NumRegexp is regular expression pattern for numericals.
+var NumRegexp = *regexp.MustCompile(`^((0x[[:xdigit:]]+)|0b([0-1]{1,})|0([0-7]{1,})|(\d+((\.\d+)?((e|E)(\-|\+|)\d+)?|(\.\d+))))`)
 
 // num returns numeric if next token is numeric,
 // returns empty string if not.
 func (l *Lex) num(txt string) string {
-	val := numRegexp.FindString(txt)
+	val := NumRegexp.FindString(txt)
 	l.Pos += len(val)
 	return val
 }

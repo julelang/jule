@@ -91,7 +91,7 @@ func (p *Parser) pusherrmsgtok(tok Tok, msg string) {
 		Type:   xlog.Err,
 		Row:    tok.Row,
 		Column: tok.Column,
-		Path:   tok.File.Path,
+		Path:   p.File.Path,
 		Msg:    msg,
 	})
 }
@@ -102,7 +102,7 @@ func (p *Parser) pushwarntok(tok Tok, key string, args ...any) {
 		Type:   xlog.Warn,
 		Row:    tok.Row,
 		Column: tok.Column,
-		Path:   tok.File.Path,
+		Path:   p.File.Path,
 		Msg:    x.GetWarn(key, args...),
 	})
 }
@@ -1313,6 +1313,7 @@ type solver struct {
 }
 
 func (s solver) ptr() (v ast.Value) {
+	v.Tok = s.operator
 	ok := false
 	switch {
 	case s.leftVal.Type.Val == s.rightVal.Type.Val:
@@ -1349,6 +1350,7 @@ func (s solver) ptr() (v ast.Value) {
 		}
 	case "!=", "==":
 		v.Type.Id = x.Bool
+		v.Type.Val = "bool"
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "pointer")
 	}
@@ -1356,6 +1358,7 @@ func (s solver) ptr() (v ast.Value) {
 }
 
 func (s solver) str() (v ast.Value) {
+	v.Tok = s.operator
 	// Not both string?
 	if s.leftVal.Type.Id != s.rightVal.Type.Id {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
@@ -1376,9 +1379,11 @@ func (s solver) str() (v ast.Value) {
 }
 
 func (s solver) any() (v ast.Value) {
+	v.Tok = s.operator
 	switch s.operator.Kind {
 	case "!=", "==":
 		v.Type.Id = x.Bool
+		v.Type.Val = "bool"
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "any")
 	}
@@ -1386,6 +1391,7 @@ func (s solver) any() (v ast.Value) {
 }
 
 func (s solver) bool() (v ast.Value) {
+	v.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.Type.Val, s.leftVal.Type.Val)
@@ -1394,6 +1400,7 @@ func (s solver) bool() (v ast.Value) {
 	switch s.operator.Kind {
 	case "!=", "==":
 		v.Type.Id = x.Bool
+		v.Type.Val = "bool"
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "bool")
 	}
@@ -1401,6 +1408,7 @@ func (s solver) bool() (v ast.Value) {
 }
 
 func (s solver) float() (v ast.Value) {
+	v.Tok = s.operator
 	if !x.IsNumericType(s.leftVal.Type.Id) || !x.IsNumericType(s.rightVal.Type.Id) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.Type.Val, s.leftVal.Type.Val)
@@ -1409,6 +1417,7 @@ func (s solver) float() (v ast.Value) {
 	switch s.operator.Kind {
 	case "!=", "==", "<", ">", ">=", "<=":
 		v.Type.Id = x.Bool
+		v.Type.Val = "bool"
 	case "+", "-", "*", "/":
 		v.Type.Id = x.F32
 		if s.leftVal.Type.Id == x.F64 || s.rightVal.Type.Id == x.F64 {
@@ -1421,6 +1430,7 @@ func (s solver) float() (v ast.Value) {
 }
 
 func (s solver) signed() (v ast.Value) {
+	v.Tok = s.operator
 	if !x.IsNumericType(s.leftVal.Type.Id) || !x.IsNumericType(s.rightVal.Type.Id) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.Type.Val, s.leftVal.Type.Val)
@@ -1429,6 +1439,7 @@ func (s solver) signed() (v ast.Value) {
 	switch s.operator.Kind {
 	case "!=", "==", "<", ">", ">=", "<=":
 		v.Type.Id = x.Bool
+		v.Type.Val = "bool"
 	case "+", "-", "*", "/", "%", "&", "|", "^":
 		v.Type = s.leftVal.Type
 		if x.TypeGreaterThan(s.rightVal.Type.Id, v.Type.Id) {
@@ -1447,6 +1458,7 @@ func (s solver) signed() (v ast.Value) {
 }
 
 func (s solver) unsigned() (v ast.Value) {
+	v.Tok = s.operator
 	if !x.IsNumericType(s.leftVal.Type.Id) || !x.IsNumericType(s.rightVal.Type.Id) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.Type.Val, s.leftVal.Type.Val)
@@ -1455,11 +1467,14 @@ func (s solver) unsigned() (v ast.Value) {
 	switch s.operator.Kind {
 	case "!=", "==", "<", ">", ">=", "<=":
 		v.Type.Id = x.Bool
+		v.Type.Val = "bool"
 	case "+", "-", "*", "/", "%", "&", "|", "^":
 		v.Type = s.leftVal.Type
 		if x.TypeGreaterThan(s.rightVal.Type.Id, v.Type.Id) {
 			v.Type = s.rightVal.Type
 		}
+	case ">>", "<<":
+		v.Type = s.leftVal.Type
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_uint", s.operator.Kind)
 	}
@@ -1467,7 +1482,9 @@ func (s solver) unsigned() (v ast.Value) {
 }
 
 func (s solver) logical() (v ast.Value) {
+	v.Tok = s.operator
 	v.Type.Id = x.Bool
+	v.Type.Val = "bool"
 	if s.leftVal.Type.Id != x.Bool {
 		s.p.pusherrtok(s.leftVal.Tok, "logical_not_bool")
 	}
@@ -1478,6 +1495,7 @@ func (s solver) logical() (v ast.Value) {
 }
 
 func (s solver) rune() (v ast.Value) {
+	v.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.Type.Val, s.leftVal.Type.Val)
@@ -1486,6 +1504,7 @@ func (s solver) rune() (v ast.Value) {
 	switch s.operator.Kind {
 	case "!=", "==":
 		v.Type.Id = x.Bool
+		v.Type.Val = "bool"
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "rune")
 	}
@@ -1493,6 +1512,7 @@ func (s solver) rune() (v ast.Value) {
 }
 
 func (s solver) array() (v ast.Value) {
+	v.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.Type.Val, s.leftVal.Type.Val)
@@ -1501,6 +1521,7 @@ func (s solver) array() (v ast.Value) {
 	switch s.operator.Kind {
 	case "!=", "==":
 		v.Type.Id = x.Bool
+		v.Type.Val = "bool"
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "array")
 	}
@@ -1508,6 +1529,7 @@ func (s solver) array() (v ast.Value) {
 }
 
 func (s solver) nil() (v ast.Value) {
+	v.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, false) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.Type.Val, s.leftVal.Type.Val)
@@ -1516,6 +1538,7 @@ func (s solver) nil() (v ast.Value) {
 	switch s.operator.Kind {
 	case "!=", "==":
 		v.Type.Id = x.Bool
+		v.Type.Val = "bool"
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "nil")
 	}
@@ -1523,6 +1546,11 @@ func (s solver) nil() (v ast.Value) {
 }
 
 func (s solver) Solve() (v ast.Value) {
+	defer func() {
+		if v.Type.Id == x.Void {
+			v.Type.Val = x.VoidTypeStr
+		}
+	}()
 	switch s.operator.Kind {
 	case "+", "-", "*", "/", "%", ">>",
 		"<<", "&", "|", "^", "==", "!=", ">", "<", ">=", "<=":
@@ -1550,12 +1578,12 @@ func (s solver) Solve() (v ast.Value) {
 	case x.IsFloatType(s.leftVal.Type.Id) ||
 		x.IsFloatType(s.rightVal.Type.Id):
 		return s.float()
-	case x.IsSignedNumericType(s.leftVal.Type.Id) ||
-		x.IsSignedNumericType(s.rightVal.Type.Id):
-		return s.signed()
 	case x.IsUnsignedNumericType(s.leftVal.Type.Id) ||
 		x.IsUnsignedNumericType(s.rightVal.Type.Id):
 		return s.unsigned()
+	case x.IsSignedNumericType(s.leftVal.Type.Id) ||
+		x.IsSignedNumericType(s.rightVal.Type.Id):
+		return s.signed()
 	}
 	return
 }

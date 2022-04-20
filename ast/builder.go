@@ -1832,10 +1832,10 @@ func requireOperatorForProcess(tok Tok, index, len int) bool {
 }
 
 func (b *Builder) checkExprTok(tok Tok) {
-	if tok.Kind[0] >= '0' && tok.Kind[0] <= '9' {
+	if lex.NumRegexp.MatchString(tok.Kind) {
 		var result bool
 		if strings.Contains(tok.Kind, ".") ||
-			strings.ContainsAny(tok.Kind, "eE") {
+			(!strings.HasPrefix(tok.Kind, "0x") && strings.ContainsAny(tok.Kind, "eE")) {
 			result = xbits.CheckBitFloat(tok.Kind, 64)
 		} else {
 			result = xbits.CheckBitInt(tok.Kind, 64)
