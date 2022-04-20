@@ -1296,7 +1296,7 @@ func (s solver) ptr() (v ast.Value) {
 	case "!=", "==":
 		v.Type.Id = x.Bool
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_xtype", "pointer")
+		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "pointer")
 	}
 	return
 }
@@ -1316,7 +1316,7 @@ func (s solver) str() (v ast.Value) {
 		v.Type.Id = x.Bool
 		v.Type.Val = "bool"
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_xtype", "str")
+		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "str")
 	}
 	return
 }
@@ -1326,7 +1326,7 @@ func (s solver) any() (v ast.Value) {
 	case "!=", "==":
 		v.Type.Id = x.Bool
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_xtype", "any")
+		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "any")
 	}
 	return
 }
@@ -1341,19 +1341,16 @@ func (s solver) bool() (v ast.Value) {
 	case "!=", "==":
 		v.Type.Id = x.Bool
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_xtype", "bool")
+		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "bool")
 	}
 	return
 }
 
 func (s solver) float() (v ast.Value) {
-	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
-		if !isConstNum(s.leftVal.Data) &&
-			!isConstNum(s.rightVal.Data) {
-			s.p.pusherrtok(s.operator, "incompatible_datatype",
-				s.rightVal.Type.Val, s.leftVal.Type.Val)
-			return
-		}
+	if !x.IsNumericType(s.leftVal.Type.Id) || !x.IsNumericType(s.rightVal.Type.Id) {
+		s.p.pusherrtok(s.operator, "incompatible_datatype",
+			s.rightVal.Type.Val, s.leftVal.Type.Val)
+		return
 	}
 	switch s.operator.Kind {
 	case "!=", "==", "<", ">", ">=", "<=":
@@ -1364,19 +1361,16 @@ func (s solver) float() (v ast.Value) {
 			v.Type.Id = x.F64
 		}
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_float")
+		s.p.pusherrtok(s.operator, "operator_notfor_float", s.operator.Kind)
 	}
 	return
 }
 
 func (s solver) signed() (v ast.Value) {
-	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
-		if !isConstNum(s.leftVal.Data) &&
-			!isConstNum(s.rightVal.Data) {
-			s.p.pusherrtok(s.operator, "incompatible_datatype",
-				s.rightVal.Type.Val, s.leftVal.Type.Val)
-			return
-		}
+	if !x.IsNumericType(s.leftVal.Type.Id) || !x.IsNumericType(s.rightVal.Type.Id) {
+		s.p.pusherrtok(s.operator, "incompatible_datatype",
+			s.rightVal.Type.Val, s.leftVal.Type.Val)
+		return
 	}
 	switch s.operator.Kind {
 	case "!=", "==", "<", ">", ">=", "<=":
@@ -1393,19 +1387,15 @@ func (s solver) signed() (v ast.Value) {
 			s.p.pusherrtok(s.rightVal.Tok, "bitshift_must_unsigned")
 		}
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_int")
+		s.p.pusherrtok(s.operator, "operator_notfor_int", s.operator.Kind)
 	}
 	return
 }
 
 func (s solver) unsigned() (v ast.Value) {
-	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
-		if !isConstNum(s.leftVal.Data) &&
-			!isConstNum(s.rightVal.Data) {
-			s.p.pusherrtok(s.operator, "incompatible_datatype",
-				s.rightVal.Type.Val, s.leftVal.Type.Val)
-			return
-		}
+	if !x.IsNumericType(s.leftVal.Type.Id) || !x.IsNumericType(s.rightVal.Type.Id) {
+		s.p.pusherrtok(s.operator, "incompatible_datatype",
+			s.rightVal.Type.Val, s.leftVal.Type.Val)
 		return
 	}
 	switch s.operator.Kind {
@@ -1417,7 +1407,7 @@ func (s solver) unsigned() (v ast.Value) {
 			v.Type = s.rightVal.Type
 		}
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_uint")
+		s.p.pusherrtok(s.operator, "operator_notfor_uint", s.operator.Kind)
 	}
 	return
 }
@@ -1440,12 +1430,10 @@ func (s solver) rune() (v ast.Value) {
 		return
 	}
 	switch s.operator.Kind {
-	case "!=", "==", ">", "<", ">=", "<=":
+	case "!=", "==":
 		v.Type.Id = x.Bool
-	case "+", "-", "*", "/", "^", "&", "%", "|":
-		v.Type.Id = x.Rune
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_xtype", "rune")
+		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "rune")
 	}
 	return
 }
@@ -1460,7 +1448,7 @@ func (s solver) array() (v ast.Value) {
 	case "!=", "==":
 		v.Type.Id = x.Bool
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_xtype", "array")
+		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "array")
 	}
 	return
 }
@@ -1475,7 +1463,7 @@ func (s solver) nil() (v ast.Value) {
 	case "!=", "==":
 		v.Type.Id = x.Bool
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_xtype", "nil")
+		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "nil")
 	}
 	return
 }
