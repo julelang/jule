@@ -50,6 +50,7 @@ var Errs = map[string]string{
 	`invalid_type_source`:               `invalid data-type source`,
 	`invalid_preprocessor`:              `invalid preprocessor directive`,
 	`invalid_pragma_directive`:          `invalid pragma directive`,
+	`invalid_type_for_const`:            `%s is invalid data-type for constant`,
 	`missing_autotype_value`:            `auto-type declarations should have a initializer`,
 	`missing_type`:                      `data-type missing`,
 	`missing_expr`:                      `expression missing`,

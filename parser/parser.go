@@ -676,6 +676,9 @@ func (p *Parser) Statement(s ast.Statement) {
 
 func (p *Parser) param(param *Param) {
 	param.Type, _ = p.readyType(param.Type, true)
+	if !typeIsAllowForConst(param.Type) {
+		p.pusherrtok(param.Tok, "invalid_type_for_const", param.Type.Val)
+	}
 	if paramHasDefaultArg(param) {
 		dt := param.Type
 		if param.Variadic {
@@ -779,6 +782,9 @@ func (p *Parser) Var(v Var) *Var {
 		}
 	}
 	if v.Const {
+		if !typeIsAllowForConst(v.Type) {
+			p.pusherrtok(v.IdTok, "invalid_type_for_const", v.Type.Val)
+		}
 		if v.SetterTok.Id == lex.NA {
 			p.pusherrtok(v.IdTok, "missing_const_value")
 		}

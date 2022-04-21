@@ -21,6 +21,8 @@ func typeIsPtr(t DataType) bool {
 	return t.Id == x.Voidptr || t.Val[0] == '*'
 }
 
+func typeIsAllowForConst(t DataType) bool { return typeIsSingle(t) }
+
 func typeIsArray(t DataType) bool {
 	if t.Val == "" {
 		return false
