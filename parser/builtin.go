@@ -55,19 +55,23 @@ var arrDefs = &Defmap{
 		{Ast: Func{Id: "clear"}},
 		{Ast: Func{
 			Id:     "find",
-			Params: []Param{{Id: "value", Const: true}},
+			Params: []Param{{Id: "value"}},
 		}},
 		{Ast: Func{
 			Id:     "find_last",
-			Params: []Param{{Id: "value", Const: true}},
+			Params: []Param{{Id: "value"}},
 		}},
 		{Ast: Func{
 			Id:     "erase",
-			Params: []Param{{Id: "value", Const: true}},
+			Params: []Param{{Id: "value"}},
 		}},
 		{Ast: Func{
 			Id:     "erase_all",
-			Params: []Param{{Id: "value", Const: true}},
+			Params: []Param{{Id: "value"}},
+		}},
+		{Ast: Func{
+			Id:     "append",
+			Params: []Param{{Id: "items", Variadic: true}},
 		}},
 	},
 }
@@ -90,6 +94,9 @@ func readyArrDefs(arrt DataType) {
 
 	eraseAllFunc, _, _ := arrDefs.funcById("erase_all", nil)
 	eraseAllFunc.Ast.Params[0].Type = elemType
+
+	appendFunc, _, _ := arrDefs.funcById("append", nil)
+	appendFunc.Ast.Params[0].Type = elemType
 }
 
 var mapDefs = &Defmap{

@@ -404,6 +404,10 @@ public:
     { if (_Item == *_it) { this->_buffer.erase(_it); } }
   }
 
+  void append(const array<_Item_t> &_Items) noexcept {
+    for (const _Item_t _item: _Items) { this->_buffer.push_back(_item); }
+  }
+
   bool operator==(const array<_Item_t> &_Src) const noexcept {
     const size _length = this->_buffer.size();
     const size _Src_length = _Src._buffer.size();
