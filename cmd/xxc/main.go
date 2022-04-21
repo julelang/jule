@@ -368,6 +368,8 @@ public:
   iterator end(void) noexcept               { return &this->_buffer[this->_buffer.size()]; }
   const_iterator end(void) const noexcept   { return &this->_buffer[this->_buffer.size()]; }
 
+  void clear(void) noexcept { this->_buffer.clear(); }
+
   bool operator==(const array<_Item_t> &_Src) const noexcept {
     const size _length = this->_buffer.size();
     const size _Src_length = _Src._buffer.size();

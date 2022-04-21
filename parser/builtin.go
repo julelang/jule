@@ -51,6 +51,9 @@ var arrDefs = &Defmap{
 			Tag:   "_buffer.size()",
 		},
 	},
+	Funcs: []*function{
+		{Ast: Func{Id: "clear"}},
+	},
 }
 
 var mapDefs = &Defmap{
