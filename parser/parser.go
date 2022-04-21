@@ -285,6 +285,7 @@ func (p *Parser) compileUse(useAST *ast.Use) *use {
 		use.Path = useAST.Path
 		p.pusherrs(psub.Errs...)
 		p.Warns = append(p.Warns, psub.Warns...)
+		p.Embeds.WriteString(psub.Embeds.String())
 		p.pushUseDefs(use, psub.Defs)
 		return use
 	}
