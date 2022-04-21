@@ -1305,7 +1305,8 @@ func (b *Builder) VarStatement(toks Toks) (s Statement) {
 		b.pusherr(vast.IdTok, "invalid_syntax")
 	}
 	vast.Id = vast.IdTok.Kind
-	vast.Type = DataType{Id: x.Void}
+	vast.Type.Id = x.Void
+	vast.Type.Val = x.VoidTypeStr
 	// Skip type definer operator(':')
 	i++
 	if i >= len(toks) {
@@ -1344,6 +1345,8 @@ func (b *Builder) VarStatement(toks Toks) (s Statement) {
 			}
 			vast.Val = b.Expr(valueToks)
 			vast.SetterTok = tok
+		} else {
+			b.pusherr(tok, "invalid_syntax")
 		}
 	}
 ret:
