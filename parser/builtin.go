@@ -61,6 +61,14 @@ var arrDefs = &Defmap{
 			Id:     "find_last",
 			Params: []Param{{Id: "value", Const: true}},
 		}},
+		{Ast: Func{
+			Id:     "erase",
+			Params: []Param{{Id: "value", Const: true}},
+		}},
+		{Ast: Func{
+			Id:     "erase_all",
+			Params: []Param{{Id: "value", Const: true}},
+		}},
 	},
 }
 
@@ -76,6 +84,12 @@ func readyArrDefs(arrt DataType) {
 	findLastFunc.Ast.Params[0].Type = elemType
 	findLastFunc.Ast.RetType = elemType
 	findLastFunc.Ast.RetType.Val = "*" + findLastFunc.Ast.RetType.Val
+
+	eraseFunc, _, _ := arrDefs.funcById("erase", nil)
+	eraseFunc.Ast.Params[0].Type = elemType
+
+	eraseAllFunc, _, _ := arrDefs.funcById("erase_all", nil)
+	eraseAllFunc.Ast.Params[0].Type = elemType
 }
 
 var mapDefs = &Defmap{

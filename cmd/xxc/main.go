@@ -368,7 +368,7 @@ public:
   iterator end(void) noexcept               { return &this->_buffer[this->_buffer.size()]; }
   const_iterator end(void) const noexcept   { return &this->_buffer[this->_buffer.size()]; }
 
-  void clear(void) noexcept { this->_buffer.clear(); }
+  inline void clear(void) noexcept { this->_buffer.clear(); }
 
   _Item_t *find(const _Item_t &_Item) noexcept {
     iterator _it{this->begin()};
@@ -384,6 +384,24 @@ public:
     for (; _it >= _begin; --_it)
     { if (_Item == *_it) { return _it; } }
     return nil;
+  }
+
+  void erase(const _Item_t &_Item) noexcept {
+    auto _it{this->_buffer.begin()};
+    auto _end{this->_buffer.end()};
+    for (; _it < _end; ++_it) {
+      if (_Item == *_it) {
+        this->_buffer.erase(_it);
+        return;
+      }
+    }
+  }
+
+  void erase_all(const _Item_t &_Item) noexcept {
+    auto _it{this->_buffer.begin()};
+    auto _end{this->_buffer.end()};
+    for (; _it < _end; ++_it)
+    { if (_Item == *_it) { this->_buffer.erase(_it); } }
   }
 
   bool operator==(const array<_Item_t> &_Src) const noexcept {
