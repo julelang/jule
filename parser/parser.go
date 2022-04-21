@@ -1820,7 +1820,7 @@ func (p *Parser) evalExprPart(toks Toks, m *exprModel) (v value) {
 }
 
 func (p *Parser) evalStrSubId(val value, idTok Tok, m *exprModel) (v value) {
-	i, _, t := strDefs.defById(idTok.Kind, nil)
+	i, dm, t := strDefs.defById(idTok.Kind, nil)
 	if i == -1 {
 		p.pusherrtok(idTok, "obj_have_not_id", val.ast.Type.Val)
 		return
@@ -1829,7 +1829,7 @@ func (p *Parser) evalStrSubId(val value, idTok Tok, m *exprModel) (v value) {
 	m.appendSubNode(exprNode{subIdAccessorOfType(val.ast.Type)})
 	switch t {
 	case 'g':
-		g := strDefs.Globals[i]
+		g := dm.Globals[i]
 		m.appendSubNode(exprNode{g.Tag.(string)})
 		v.ast.Type = g.Type
 		v.lvalue = true
@@ -1839,7 +1839,8 @@ func (p *Parser) evalStrSubId(val value, idTok Tok, m *exprModel) (v value) {
 }
 
 func (p *Parser) evalArraySubId(val value, idTok Tok, m *exprModel) (v value) {
-	i, _, t := arrDefs.defById(idTok.Kind, nil)
+	readyArrDefs(val.ast.Type)
+	i, dm, t := arrDefs.defById(idTok.Kind, nil)
 	if i == -1 {
 		p.pusherrtok(idTok, "obj_have_not_id", val.ast.Type.Val)
 		return
@@ -1848,13 +1849,13 @@ func (p *Parser) evalArraySubId(val value, idTok Tok, m *exprModel) (v value) {
 	m.appendSubNode(exprNode{subIdAccessorOfType(val.ast.Type)})
 	switch t {
 	case 'g':
-		g := arrDefs.Globals[i]
+		g := dm.Globals[i]
 		m.appendSubNode(exprNode{g.Tag.(string)})
 		v.ast.Type = g.Type
 		v.lvalue = true
 		v.constant = g.Const
 	case 'f':
-		f := mapDefs.Funcs[i]
+		f := dm.Funcs[i]
 		v.ast.Type.Id = x.Func
 		v.ast.Type.Tag = f.Ast
 		v.ast.Type.Val = f.Ast.DataTypeString()
@@ -1866,7 +1867,7 @@ func (p *Parser) evalArraySubId(val value, idTok Tok, m *exprModel) (v value) {
 
 func (p *Parser) evalMapSubId(val value, idTok Tok, m *exprModel) (v value) {
 	readyMapDefs(val.ast.Type)
-	i, _, t := mapDefs.defById(idTok.Kind, nil)
+	i, dm, t := mapDefs.defById(idTok.Kind, nil)
 	if i == -1 {
 		p.pusherrtok(idTok, "obj_have_not_id", val.ast.Type.Val)
 		return
@@ -1877,13 +1878,13 @@ func (p *Parser) evalMapSubId(val value, idTok Tok, m *exprModel) (v value) {
 	m.appendSubNode(exprNode{subIdAccessorOfType(val.ast.Type)})
 	switch t {
 	case 'g':
-		g := mapDefs.Globals[i]
+		g := dm.Globals[i]
 		m.appendSubNode(exprNode{g.Tag.(string)})
 		v.ast.Type = g.Type
 		v.lvalue = true
 		v.constant = g.Const
 	case 'f':
-		f := mapDefs.Funcs[i]
+		f := dm.Funcs[i]
 		v.ast.Type.Id = x.Func
 		v.ast.Type.Tag = f.Ast
 		v.ast.Type.Val = f.Ast.DataTypeString()

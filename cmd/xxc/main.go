@@ -370,6 +370,22 @@ public:
 
   void clear(void) noexcept { this->_buffer.clear(); }
 
+  _Item_t *find(const _Item_t &_Item) noexcept {
+    iterator _it{this->begin()};
+    iterator _end{this->end()};
+    for (; _it < _end; ++_it)
+    { if (_Item == *_it) { return _it; } }
+    return nil;
+  }
+
+  _Item_t *find_last(const _Item_t &_Item) noexcept {
+    iterator _it{this->end()};
+    iterator _begin{this->begin()};
+    for (; _it >= _begin; --_it)
+    { if (_Item == *_it) { return _it; } }
+    return nil;
+  }
+
   bool operator==(const array<_Item_t> &_Src) const noexcept {
     const size _length = this->_buffer.size();
     const size _Src_length = _Src._buffer.size();

@@ -53,7 +53,29 @@ var arrDefs = &Defmap{
 	},
 	Funcs: []*function{
 		{Ast: Func{Id: "clear"}},
+		{Ast: Func{
+			Id:     "find",
+			Params: []Param{{Id: "value", Const: true}},
+		}},
+		{Ast: Func{
+			Id:     "find_last",
+			Params: []Param{{Id: "value", Const: true}},
+		}},
 	},
+}
+
+func readyArrDefs(arrt DataType) {
+	elemType := typeOfArrayElements(arrt)
+
+	findFunc, _, _ := arrDefs.funcById("find", nil)
+	findFunc.Ast.Params[0].Type = elemType
+	findFunc.Ast.RetType = elemType
+	findFunc.Ast.RetType.Val = "*" + findFunc.Ast.RetType.Val
+
+	findLastFunc, _, _ := arrDefs.funcById("find_last", nil)
+	findLastFunc.Ast.Params[0].Type = elemType
+	findLastFunc.Ast.RetType = elemType
+	findLastFunc.Ast.RetType.Val = "*" + findLastFunc.Ast.RetType.Val
 }
 
 var mapDefs = &Defmap{
