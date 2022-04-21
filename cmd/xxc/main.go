@@ -408,6 +408,13 @@ public:
     for (const _Item_t _item: _Items) { this->_buffer.push_back(_item); }
   }
 
+  bool insert(const size &_Start, const array<_Item_t> &_Items) noexcept {
+    auto _it{this->_buffer.begin()+_Start};
+    if (_it >= this->_buffer.end()) { return false; }
+    this->_buffer.insert(_it, _Items.begin(), _Items.end());
+    return true;
+  }
+
   bool operator==(const array<_Item_t> &_Src) const noexcept {
     const size _length = this->_buffer.size();
     const size _Src_length = _Src._buffer.size();
