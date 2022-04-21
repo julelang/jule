@@ -46,7 +46,6 @@ var Errs = map[string]string{
 	`invalid_numeric_range`:             `arithmetic value overflow`,
 	"invalid_operator":                  "invalid operator",
 	"invalid_type_unary_operator":       "invalid data-type for unary %s operator",
-	"invalid_type_unary_amper":          "invalid data-type for unary & operator (maybe you want use heap allocation)",
 	`invalid_escape_sequence`:           `invalid escape sequence`,
 	`invalid_type_source`:               `invalid data-type source`,
 	`invalid_preprocessor`:              `invalid preprocessor directive`,

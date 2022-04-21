@@ -71,13 +71,13 @@ var arrDefs = &Defmap{
 		}},
 		{Ast: Func{
 			Id:     "append",
-			Params: []Param{{Id: "items", Variadic: true}},
+			Params: []Param{{Id: "values", Variadic: true}},
 		}},
 		{Ast: Func{
 			Id: "insert",
 			Params: []Param{
 				{Id: "start", Type: DataType{Id: x.Size, Val: "size"}},
-				{Id: "items", Variadic: true},
+				{Id: "values", Variadic: true},
 			},
 			RetType: DataType{Id: x.Bool, Val: "bool"},
 		}},
@@ -85,7 +85,7 @@ var arrDefs = &Defmap{
 }
 
 func readyArrDefs(arrt DataType) {
-	elemType := typeOfArrayElements(arrt)
+	elemType := typeOfArrayItems(arrt)
 
 	findFunc, _, _ := arrDefs.funcById("find", nil)
 	findFunc.Ast.Params[0].Type = elemType

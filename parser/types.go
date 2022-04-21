@@ -8,7 +8,7 @@ import (
 
 func typeIsVoidRet(t DataType) bool { return t.Id == x.Void && !t.MultiTyped }
 
-func typeOfArrayElements(t DataType) DataType {
+func typeOfArrayItems(t DataType) DataType {
 	// Remove array syntax "[]"
 	t.Val = t.Val[2:]
 	return t

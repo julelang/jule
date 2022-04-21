@@ -28,6 +28,7 @@ type DataType = ast.DataType
 type Expr = ast.Expr
 type Tok = ast.Tok
 type Toks = ast.Toks
+type Attribute = ast.Attribute
 
 type use struct {
 	Path string
@@ -43,7 +44,7 @@ type globalWaitPair struct {
 
 // Parser is parser of X code.
 type Parser struct {
-	attributes []ast.Attribute
+	attributes []Attribute
 	docText    strings.Builder
 	iterCount  int
 	wg         sync.WaitGroup
@@ -433,7 +434,7 @@ func (p *Parser) parseUses(tree *[]ast.Obj) {
 
 func (p *Parser) parseSrcTreeObj(obj ast.Obj) {
 	switch t := obj.Value.(type) {
-	case ast.Attribute:
+	case Attribute:
 		p.PushAttribute(t)
 	case ast.Statement:
 		p.Statement(t)
@@ -557,7 +558,7 @@ func (p *Parser) checkDoc(obj ast.Obj) {
 		return
 	}
 	switch obj.Value.(type) {
-	case ast.Comment, ast.Attribute:
+	case ast.Comment, Attribute:
 		return
 	}
 	p.pushwarntok(obj.Tok, "doc_ignored")
@@ -569,7 +570,7 @@ func (p *Parser) checkAttribute(obj ast.Obj) {
 		return
 	}
 	switch obj.Value.(type) {
-	case ast.Attribute, ast.Comment:
+	case Attribute, ast.Comment:
 		return
 	}
 	p.pusherrtok(obj.Tok, "attribute_not_supports")
@@ -646,7 +647,7 @@ write:
 }
 
 // PushAttribute processes and appends to attribute list.
-func (p *Parser) PushAttribute(attribute ast.Attribute) {
+func (p *Parser) PushAttribute(attribute Attribute) {
 	switch attribute.Tag.Kind {
 	case "inline":
 	default:
@@ -785,7 +786,7 @@ func (p *Parser) Var(v Var) *Var {
 	return &v
 }
 
-func (p *Parser) checkFuncAttributes(attributes []ast.Attribute) {
+func (p *Parser) checkFuncAttributes(attributes []Attribute) {
 	for _, attribute := range attributes {
 		switch attribute.Tag.Kind {
 		case "inline":
@@ -1686,18 +1687,18 @@ func (p *unaryProcessor) amper() value {
 		switch t := (*node).(type) {
 		case anonFuncExpr:
 			if t.capture == xapi.LambdaByReference {
-				p.parser.pusherrmsgtok(p.tok, "invalid_type_unary_amper")
+				p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", "&")
 				break
 			}
 			t.capture = xapi.LambdaByReference
 			*node = t
 		default:
-			p.parser.pusherrtok(p.tok, "invalid_type_unary_amper")
+			p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", "&")
 		}
 	default:
 		v.lvalue = true
-		if !canGetPointer(v) {
-			p.parser.pusherrtok(p.tok, "invalid_type_unary_amper")
+		if !canGetPtr(v) {
+			p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", "&")
 		}
 		v.ast.Type.Val = "*" + v.ast.Type.Val
 	}
@@ -1736,7 +1737,7 @@ func (p *Parser) evalOperatorExprPart(toks Toks, m *exprModel) value {
 	return v
 }
 
-func canGetPointer(v value) bool {
+func canGetPtr(v value) bool {
 	if v.ast.Type.Id == x.Func {
 		return false
 	}
@@ -2320,7 +2321,7 @@ func (p *Parser) evalEnumerableSelect(enumv, selectv value, errtok Tok) (v value
 
 func (p *Parser) evalArraySelect(arrv, selectv value, errtok Tok) value {
 	arrv.lvalue = true
-	arrv.ast.Type = typeOfArrayElements(arrv.ast.Type)
+	arrv.ast.Type = typeOfArrayItems(arrv.ast.Type)
 	if !typeIsSingle(selectv.ast.Type) ||
 		!x.IsIntegerType(selectv.ast.Type.Id) {
 		p.pusherrtok(errtok, "notint_array_select")
@@ -2387,7 +2388,7 @@ func (p *Parser) buildArray(parts []Toks, t DataType, errtok Tok) (value, iExpr)
 	var v value
 	v.ast.Type = t
 	model := arrayExpr{dataType: t}
-	elemType := typeOfArrayElements(t)
+	elemType := typeOfArrayItems(t)
 	for _, part := range parts {
 		partVal, expModel := p.evalToks(part)
 		model.expr = append(model.expr, expModel)

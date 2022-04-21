@@ -3,13 +3,12 @@ package parser
 import (
 	"strings"
 
-	"github.com/the-xlang/xxc/ast"
 	"github.com/the-xlang/xxc/pkg/xapi"
 )
 
 type function struct {
 	Ast        Func
-	Attributes []ast.Attribute
+	Attributes []Attribute
 	Desc       string
 	used       bool
 }
@@ -59,7 +58,7 @@ func (f function) PrototypeParams() string {
 	return cxx.String()[:cxx.Len()-2] + ")"
 }
 
-func attributesToString(attributes []ast.Attribute) string {
+func attributesToString(attributes []Attribute) string {
 	var cxx strings.Builder
 	for _, attr := range attributes {
 		cxx.WriteString(attr.String())
