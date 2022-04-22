@@ -1209,7 +1209,7 @@ func toRuneLiteral(kind string) (string, bool) {
 	kind = kind[1 : len(kind)-1]
 	isByte := false
 	switch {
-	case len(kind) == 1 && kind[0] >= 0 && kind[0] <= 255:
+	case len(kind) == 1 && kind[0] <= 255:
 		isByte = true
 	case kind[0] == '\\' && kind[1] == 'x':
 		isByte = true
@@ -2745,7 +2745,7 @@ func (pap *pureArgParser) checkPasses() {
 
 func (pap *pureArgParser) pushArg() {
 	defer func() { pap.i++ }()
-	pair, _ := (*pap.pmap)[pap.paramId]
+	pair := (*pap.pmap)[pap.paramId]
 	arg := pap.arg
 	pair.arg = &arg
 	if pair.param.Variadic {
@@ -3679,13 +3679,6 @@ func (p *Parser) checkValidityForAutoType(t DataType, errtok Tok) {
 	case x.Void:
 		p.pusherrtok(errtok, "void_for_autotype")
 	}
-}
-
-func (p *Parser) defaultValueOfType(t DataType) string {
-	if typeIsPtr(t) || typeIsArray(t) {
-		return "nil"
-	}
-	return x.DefaultValOfType(t.Id)
 }
 
 func (p *Parser) readyType(dt DataType, err bool) (_ DataType, ok bool) {
