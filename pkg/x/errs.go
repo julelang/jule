@@ -1,8 +1,6 @@
 package x
 
-import (
-	"fmt"
-)
+import "fmt"
 
 // Error messages.
 var Errs = map[string]string{
@@ -70,8 +68,6 @@ var Errs = map[string]string{
 	`rune_empty`:                        `rune is cannot empty`,
 	`rune_overflow`:                     `rune is should be single`,
 	`not_enumerable`:                    `value is not enumerable`,
-	`notint_array_select`:               `array indexes is should be integer`,
-	`notint_string_select`:              `string indexes is should be integer`,
 	`undefined_attribute`:               `undefined attribute`,
 	`attribute_repeat`:                  `this attribute is already given`,
 	`already_constant`:                  `this define is already constant`,

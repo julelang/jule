@@ -2329,10 +2329,13 @@ func (p *Parser) evalEnumerableSelect(enumv, selectv value, errtok Tok) (v value
 func (p *Parser) evalArraySelect(arrv, selectv value, errtok Tok) value {
 	arrv.lvalue = true
 	arrv.ast.Type = typeOfArrayItems(arrv.ast.Type)
-	if !typeIsSingle(selectv.ast.Type) ||
-		!x.IsIntegerType(selectv.ast.Type.Id) {
-		p.pusherrtok(errtok, "notint_array_select")
-	}
+	p.wg.Add(1)
+	go assignChecker{
+		p:      p,
+		t:      DataType{Id: x.Size, Val: "size"},
+		v:      selectv,
+		errtok: errtok,
+	}.checkAssignTypeAsync()
 	return arrv
 }
 
@@ -2350,10 +2353,12 @@ func (p *Parser) evalMapSelect(mapv, selectv value, errtok Tok) value {
 func (p *Parser) evalStrSelect(strv, selectv value, errtok Tok) value {
 	strv.lvalue = true
 	strv.ast.Type.Id = x.Rune
-	if !typeIsSingle(selectv.ast.Type) ||
-		!x.IsIntegerType(selectv.ast.Type.Id) {
-		p.pusherrtok(errtok, "notint_string_select")
-	}
+	go assignChecker{
+		p:      p,
+		t:      DataType{Id: x.Size, Val: "size"},
+		v:      selectv,
+		errtok: errtok,
+	}.checkAssignTypeAsync()
 	return strv
 }
 
