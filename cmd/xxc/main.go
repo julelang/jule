@@ -486,7 +486,7 @@ public:
   std::string _buffer{};
 
   str(void) noexcept                   {}
-  str(const char *_Src) noexcept       { this->_buffer = _Src; }
+  str(const char *_Src) noexcept       { this->_buffer = _Src ? _Src : ""; }
 	str(const std::string _Src) noexcept { this->_buffer = _Src; }
   str(const str &_Src) noexcept        { this->_buffer = _Src._buffer; }
   
