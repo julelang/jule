@@ -410,6 +410,8 @@ public:
     return true;
   }
 
+  inline bool empty(void) const noexcept { return this->_buffer.empty(); }
+
   bool operator==(const array<_Item_t> &_Src) const noexcept {
     const size _length = this->_buffer.size();
     const size _Src_length = _Src._buffer.size();

@@ -60,6 +60,10 @@ var arrDefs = &Defmap{
 	Funcs: []*function{
 		{Ast: Func{Id: "clear"}},
 		{Ast: Func{
+			Id:      "empty",
+			RetType: DataType{Id: x.Bool, Val: "bool"},
+		}},
+		{Ast: Func{
 			Id:     "find",
 			Params: []Param{{Id: "value"}},
 		}},
