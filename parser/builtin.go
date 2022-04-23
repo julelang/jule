@@ -134,6 +134,10 @@ var mapDefs = &Defmap{
 		{Ast: Func{Id: "keys"}},
 		{Ast: Func{Id: "values"}},
 		{Ast: Func{
+			Id:      "empty",
+			RetType: DataType{Id: x.Bool, Val: "bool"},
+		}},
+		{Ast: Func{
 			Id:      "has",
 			Params:  []Param{{Id: "key", Const: true}},
 			RetType: DataType{Id: x.Bool, Val: "bool"},
