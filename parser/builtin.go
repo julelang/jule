@@ -40,6 +40,12 @@ var strDefs = &Defmap{
 			Tag:   "_buffer.size()",
 		},
 	},
+	Funcs: []*function{
+		{Ast: Func{
+			Id:      "empty",
+			RetType: DataType{Id: x.Bool, Val: "bool"},
+		}},
+	},
 }
 
 var arrDefs = &Defmap{

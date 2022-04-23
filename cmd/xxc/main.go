@@ -487,7 +487,7 @@ public:
 
   str(void) noexcept                   {}
   str(const char *_Src) noexcept       { this->_buffer = _Src ? _Src : ""; }
-	str(const std::string _Src) noexcept { this->_buffer = _Src; }
+  str(const std::string _Src) noexcept { this->_buffer = _Src; }
   str(const str &_Src) noexcept        { this->_buffer = _Src._buffer; }
   
   str(const array<char> &_Src) noexcept
@@ -502,6 +502,8 @@ public:
   const_iterator begin(void) const noexcept { return &this->_buffer[0]; }
   iterator end(void) noexcept               { return &this->_buffer[this->_buffer.size()]; }
   const_iterator end(void) const noexcept   { return &this->_buffer[this->_buffer.size()]; }
+
+  inline bool empty(void) const noexcept { return this->_buffer.empty(); }
 
   operator array<char>(void) const noexcept {
     array<char> _array{};

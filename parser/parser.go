@@ -1827,6 +1827,13 @@ func (p *Parser) evalStrSubId(val value, idTok Tok, m *exprModel) (v value) {
 		v.ast.Type = g.Type
 		v.lvalue = true
 		v.constant = g.Const
+	case 'f':
+		f := dm.Funcs[i]
+		v.ast.Type.Id = x.Func
+		v.ast.Type.Tag = f.Ast
+		v.ast.Type.Val = f.Ast.DataTypeString()
+		v.ast.Tok = f.Ast.Tok
+		m.appendSubNode(exprNode{f.Ast.Id})
 	}
 	return
 }
