@@ -428,7 +428,7 @@ func (l *Lex) Tok() Tok {
 		l.kw(txt, "sbyte", DataType, &tok),
 		l.kw(txt, "size", DataType, &tok),
 		l.kw(txt, "bool", DataType, &tok),
-		l.kw(txt, "rune", DataType, &tok),
+		l.kw(txt, "char", DataType, &tok),
 		l.kw(txt, "str", DataType, &tok),
 		l.kw(txt, "voidptr", DataType, &tok),
 		l.kw(txt, "true", Value, &tok),

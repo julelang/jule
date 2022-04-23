@@ -1205,7 +1205,7 @@ func (p *valueEvaluator) str() value {
 	return v
 }
 
-func toRuneLiteral(kind string) (string, bool) {
+func toCharLiteral(kind string) (string, bool) {
 	kind = kind[1 : len(kind)-1]
 	isByte := false
 	switch {
@@ -1216,21 +1216,16 @@ func toRuneLiteral(kind string) (string, bool) {
 	case kind[0] == '\\' && kind[1] >= '0' && kind[1] <= '7':
 		isByte = true
 	}
-	kind = "\"" + kind + "\""
-	return xapi.ToRune(kind), isByte
+	kind = "'" + kind + "'"
+	return xapi.ToChar(kind), isByte
 }
 
-func (p *valueEvaluator) rune() value {
+func (p *valueEvaluator) char() value {
 	var v value
 	v.ast.Data = p.tok.Kind
-	literal, isByte := toRuneLiteral(p.tok.Kind)
-	if isByte {
-		v.ast.Type.Id = x.U8
-		v.ast.Type.Val = "u8"
-	} else {
-		v.ast.Type.Id = x.Rune
-		v.ast.Type.Val = "rune"
-	}
+	literal, _ := toCharLiteral(p.tok.Kind)
+	v.ast.Type.Id = x.Char
+	v.ast.Type.Val = "char"
 	p.model.appendSubNode(exprNode{literal})
 	return v
 }
@@ -1492,7 +1487,7 @@ func (s solver) logical() (v ast.Value) {
 	return
 }
 
-func (s solver) rune() (v ast.Value) {
+func (s solver) char() (v ast.Value) {
 	v.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
@@ -1504,7 +1499,7 @@ func (s solver) rune() (v ast.Value) {
 		v.Type.Id = x.Bool
 		v.Type.Val = "bool"
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "rune")
+		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "char")
 	}
 	return
 }
@@ -1565,8 +1560,8 @@ func (s solver) Solve() (v ast.Value) {
 		return s.ptr()
 	case s.leftVal.Type.Id == x.Nil || s.rightVal.Type.Id == x.Nil:
 		return s.nil()
-	case s.leftVal.Type.Id == x.Rune || s.rightVal.Type.Id == x.Rune:
-		return s.rune()
+	case s.leftVal.Type.Id == x.Char || s.rightVal.Type.Id == x.Char:
+		return s.char()
 	case s.leftVal.Type.Id == x.Any || s.rightVal.Type.Id == x.Any:
 		return s.any()
 	case s.leftVal.Type.Id == x.Bool || s.rightVal.Type.Id == x.Bool:
@@ -1597,7 +1592,7 @@ func (p *Parser) evalSingleExpr(tok Tok, m *exprModel) (v value, ok bool) {
 		case isstr(tok.Kind):
 			v = eval.str()
 		case isRune(tok.Kind):
-			v = eval.rune()
+			v = eval.char()
 		case isbool(tok.Kind):
 			v = eval.bool()
 		case isnil(tok.Kind):
@@ -2081,7 +2076,7 @@ func (p *Parser) checkCastStr(vt DataType, errtok Tok) {
 		return
 	}
 	vt.Val = vt.Val[2:] // Remove array brackets
-	if !typeIsSingle(vt) || (vt.Id != x.Rune && vt.Id != x.U8) {
+	if !typeIsSingle(vt) || (vt.Id != x.Char && vt.Id != x.U8) {
 		p.pusherrtok(errtok, "type_notsupports_casting", vt.Val)
 	}
 }
@@ -2119,7 +2114,7 @@ func (p *Parser) checkCastArray(t, vt DataType, errtok Tok) {
 		return
 	}
 	t.Val = t.Val[2:] // Remove array brackets
-	if !typeIsSingle(t) || (t.Id != x.Rune && t.Id != x.U8) {
+	if !typeIsSingle(t) || (t.Id != x.Char && t.Id != x.U8) {
 		p.pusherrtok(errtok, "type_notsupports_casting", vt.Val)
 	}
 }
@@ -2342,7 +2337,7 @@ func (p *Parser) evalMapSelect(mapv, selectv value, errtok Tok) value {
 
 func (p *Parser) evalStrSelect(strv, selectv value, errtok Tok) value {
 	strv.lvalue = true
-	strv.ast.Type.Id = x.Rune
+	strv.ast.Type.Id = x.Char
 	go assignChecker{
 		p:      p,
 		t:      DataType{Id: x.Size, Val: "size"},
@@ -3549,8 +3544,8 @@ func (fc *foreachChecker) str() {
 		return
 	}
 	runeType := DataType{
-		Id:  x.Rune,
-		Val: x.CxxTypeIdFromType(x.Rune),
+		Id:  x.Char,
+		Val: x.CxxTypeIdFromType(x.Char),
 	}
 	keyB := &fc.profile.KeyB
 	if keyB.Type.Id == x.Void {

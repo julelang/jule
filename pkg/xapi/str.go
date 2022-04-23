@@ -3,7 +3,7 @@ package xapi
 import "strings"
 
 // String literal prefix.
-const StrMark = "u8"
+const StrMark = ""
 
 // Raw-String literal.
 const RawStrMark = StrMark + "R"
@@ -28,8 +28,8 @@ func ToRawStr(literal string) string {
 	return cxx.String()
 }
 
-// ToRune returns specified literal as X rune literal for cxx.
-func ToRune(literal string) string {
+// ToChar returns specified literal as X rune literal for cxx.
+func ToChar(literal string) string {
 	var cxx strings.Builder
 	cxx.WriteString(StrMark)
 	cxx.WriteString(literal)

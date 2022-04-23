@@ -319,9 +319,6 @@ func appendStandard(code *string) {
 #include <functional>
 #include <vector>
 #include <map>
-#ifdef _WINDOWS
-#include <windows.h>
-#endif
 // endregion X_STANDARD_IMPORTS
 
 // region X_CXX_API
@@ -484,176 +481,49 @@ public:
 };
 // endregion X_STRUCTURES
 
-// region UTF8_ENCODING
-constexpr u8 xx   {0xF1};
-constexpr u8 as   {0xF0};
-constexpr u8 s1   {0x02};
-constexpr u8 s2   {0x13};
-constexpr u8 s3   {0x03};
-constexpr u8 s4   {0x23};
-constexpr u8 s5   {0x34};
-constexpr u8 s6   {0x04};
-constexpr u8 s7   {0x44};
-constexpr u8 locb {0b10000000};
-constexpr u8 hicb {0b10111111};
-constexpr u8 maskx{0b00111111};
-constexpr u8 mask2{0b00011111};
-constexpr u8 mask3{0b00001111};
-constexpr u8 mask4{0b00000111};
-
-u8 first[256] {
-  as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, as,
-  as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, as,
-  as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, as,
-  as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, as,
-  as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, as,
-  as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, as,
-  as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, as,
-  as, as, as, as, as, as, as, as, as, as, as, as, as, as, as, as,
-  xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx,
-  xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx,
-  xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx,
-  xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx,
-  xx, xx, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1,
-  s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1, s1,
-  s2, s3, s3, s3, s3, s3, s3, s3, s3, s3, s3, s3, s3, s4, s3, s3,
-  s5, s6, s6, s6, s7, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx, xx,
-};
-
-struct acceptRange {
-public:
-  u8 lo;
-  u8 hi;
-};
-
-acceptRange acceptRanges[16] {
-  {locb, hicb},
-  {0xA0, hicb},
-  {locb, 0x9F},
-  {0x90, hicb},
-  {locb, 0x8F},
-};
-
-const size runelen(const char *_Src) noexcept {
-  const size n{strlen(_Src)};
-  if (n < 1) { return 0; }
-  const u8 s0{(u8)(*_Src)};
-  const u8 x{first[s0]};
-  if (x >= as) { return 1; }
-  const i32 sz{x&7};
-  const acceptRange accept{acceptRanges[x>>4]};
-  if (n < sz) { return 1; }
-  const u8 s1{(u8)(*(_Src+1))};
-  if (s1 < accept.lo || accept.hi < s1) { return 1; }
-  if (sz <= 2) { return 2; }
-  const u8 s2{(u8)(*(_Src+2))};
-  if (s2 < locb || hicb < s2) { return 1; }
-  if (sz <= 3) { return 3; }
-  const u8 s3{(u8)(*(_Src+3))};
-  if (s3 < locb || hicb < s3) { return 1; }
-  return 4;
-}
-// endregion UTF8_ENCODING
-
-struct rune {
-public:
-  std::vector<u8> _bytes{};
-
-  rune(void) noexcept {}
-
-  rune(const char *_Src) noexcept
-  { for (; *_Src; ++_Src) { this->_bytes.push_back((u8)(*_Src)); }; }
-
-  rune(const u8 _Src) noexcept { this->_bytes.push_back(_Src); }
-
-  bool operator==(const rune &_Rune) const noexcept { 
-    if (this->_bytes.size() != _Rune._bytes.size()) { return false; }
-    for (size _index{0}; _index < this->_bytes.size(); ++_index)
-    { if (this->_bytes[_index] != _Rune._bytes[_index]) { return false; } }
-    return true;
-  }
-
-  bool operator!=(const rune &_Rune) const noexcept { return !(*this == _Rune); }
-
-  friend std::ostream& operator<<(std::ostream &_Stream,
-                                  const rune &_Src) {
-    return (_Stream << std::string(_Src._bytes.begin(), _Src._bytes.end()));
-  }
-};
-
 class str {
 public:
-  std::vector<rune> _buffer{};
+  std::string _buffer{};
 
-  str(void) noexcept {}
-
-  str(const char *_Src) noexcept {
-    while (*_Src) {
-      size _len{runelen(_Src)};
-      rune _rune{};
-      while (_len-- > 0) { _rune._bytes.push_back((u8)(*_Src++)); }
-      this->_buffer.push_back(_rune);
-    }
-  }
-
-  str(const str &_Src) noexcept
-  { this->_buffer = _Src._buffer; }
+  str(void) noexcept                   {}
+  str(const char *_Src) noexcept       { this->_buffer = _Src; }
+	str(const std::string _Src) noexcept { this->_buffer = _Src; }
+  str(const str &_Src) noexcept        { this->_buffer = _Src._buffer; }
   
-  str(const array<rune> _Src) noexcept
-  { this->_buffer = _Src._buffer; }
+  str(const array<char> &_Src) noexcept
+  { this->_buffer = std::string{_Src.begin(), _Src.end()}; }
 
-  str(const array<u8> _Src) noexcept: str(std::string(_Src.begin(), _Src.end()).c_str())  {}
+  str(const array<u8> &_Src) noexcept
+  { this->_buffer = std::string{_Src.begin(), _Src.end()}; }
 
-  typedef rune       *iterator;
-  typedef const rune *const_iterator;
+  typedef char       *iterator;
+  typedef const char *const_iterator;
   iterator begin(void) noexcept             { return &this->_buffer[0]; }
   const_iterator begin(void) const noexcept { return &this->_buffer[0]; }
   iterator end(void) noexcept               { return &this->_buffer[this->_buffer.size()]; }
   const_iterator end(void) const noexcept   { return &this->_buffer[this->_buffer.size()]; }
 
-  operator array<rune>(void) const noexcept {
-    array<rune> _array{};
-    _array._buffer = std::vector<rune>{this->begin(), this->end()};
+  operator array<char>(void) const noexcept {
+    array<char> _array{};
+    _array._buffer = std::vector<char>{this->begin(), this->end()};
     return _array;
   }
 
   operator array<u8>(void) const noexcept {
     array<u8> _array{};
-    for (const rune &_rune: *this) {
-      for (const u8 &_byte: _rune._bytes)
-      { _array._buffer.push_back(_byte); }
-    }
+    _array._buffer = std::vector<u8>{this->begin(), this->end()};
     return _array;
   }
 
-  rune &operator[](size _Index) { return this->_buffer[_Index]; }
+  char &operator[](size _Index) { return this->_buffer[_Index]; }
 
-  bool operator==(const str &_Str) const noexcept { 
-    if (this->_buffer.size() != _Str._buffer.size()) { return false; }
-    for (size _index{0}; _index < this->_buffer.size(); ++_index)
-    { if (this->_buffer[_index] != _Str._buffer[_index]) { return false; } }
-    return true;
-  }
+  void operator+=(const str _Str) noexcept        { this->_buffer += _Str._buffer; }
+  str operator+(const str _Str) const noexcept    { return str{this->_buffer + _Str._buffer}; }
+  bool operator==(const str &_Str) const noexcept { return this->_buffer == _Str._buffer; }
+  bool operator!=(const str &_Str) const noexcept { return this->_buffer != _Str._buffer; }
 
-  void operator+=(const str _Str) noexcept {
-    for (const rune _rune: _Str)
-    { this->_buffer.push_back(_rune); }
-  }
-
-  str operator+(const str _Str) const noexcept {
-    str _str{};
-    _str._buffer = this->_buffer;
-    for (const rune _rune: _Str)
-    { _str._buffer.push_back(_rune); }
-    return _str;
-  }
-
-  bool operator!=(const str &_Str) const noexcept { return !(*this == _Str); }
-
-  friend std::ostream& operator<<(std::ostream &_Stream, const str &_Src) {
-    for (const rune &_rune: _Src._buffer) { _Stream << _rune; }
-    return _Stream;
-  }
+  friend std::ostream& operator<<(std::ostream &_Stream, const str &_Src)
+  { return _Stream << _Src._buffer; }
 };
 // endregion X_BUILTIN_TYPES
 
@@ -750,10 +620,6 @@ static inline void XID(outln)(const _Obj_t _Obj) noexcept {
 
 // region X_ENTRY_POINT
 int main() {
-  std::setlocale(LC_ALL, "");
-#ifdef _WINDOWS
-  std::wcin.imbue(std::locale::global(std::locale()));
-#endif
   _main();
   return EXIT_SUCCESS;
 }
