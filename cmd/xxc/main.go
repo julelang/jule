@@ -26,8 +26,6 @@ import (
 
 type Parser = parser.Parser
 
-var compilerExe string
-
 func help(cmd string) {
 	if cmd != "" {
 		println("This module can only be used as single!")

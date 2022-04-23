@@ -1273,13 +1273,9 @@ func (p *valueEvaluator) num() value {
 	return v
 }
 
-func (p *Parser) isGlobal(m *Defmap) bool {
-	return p.Defs != m && m != nil && m.parent == nil
-}
-
 func (p *valueEvaluator) id() (v value, ok bool) {
 	id := p.tok.Kind
-	if variable, m := p.p.varById(id); variable != nil {
+	if variable, _ := p.p.varById(id); variable != nil {
 		variable.Used = true
 		v.ast.Data = id
 		v.ast.Type = variable.Type
@@ -1287,21 +1283,15 @@ func (p *valueEvaluator) id() (v value, ok bool) {
 		v.volatile = variable.Volatile
 		v.ast.Tok = variable.IdTok
 		v.lvalue = true
-		if p.p.isGlobal(m) {
-			p.model.appendSubNode(exprNode{"global::"})
-		}
 		p.model.appendSubNode(exprNode{xapi.AsId(id)})
 		ok = true
-	} else if f, m, _ := p.p.FuncById(id); f != nil {
+	} else if f, _, _ := p.p.FuncById(id); f != nil {
 		f.used = true
 		v.ast.Data = id
 		v.ast.Type.Id = x.Func
 		v.ast.Type.Tag = f.Ast
 		v.ast.Type.Val = f.Ast.DataTypeString()
 		v.ast.Tok = f.Ast.Tok
-		if p.p.isGlobal(m) {
-			p.model.appendSubNode(exprNode{"global::"})
-		}
 		p.model.appendSubNode(exprNode{xapi.AsId(id)})
 		ok = true
 	} else {
