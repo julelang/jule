@@ -1217,6 +1217,9 @@ func (b *Builder) AssignExpr(toks Toks, isExpr bool) (assign Assign, ok bool) {
 
 // BuildReturnStatement builds AST model of return statement.
 func (b *Builder) IdStatement(toks Toks) (s Statement, _ bool) {
+	if len(toks) == 1 {
+		return
+	}
 	tok := toks[1]
 	switch tok.Id {
 	case lex.Colon:

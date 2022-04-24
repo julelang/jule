@@ -647,15 +647,32 @@ static inline void foreach(const map<_Key_t, _Value_t> _Map,
   for (const auto _pair: _Map) { _Body(_pair.first, _pair.second); }
 }
 
-template<typename _Function_t, typename _Tuple_t, size_t ... _I_t>
-inline auto tuple_as_args(const _Function_t _Function,
-                          const _Tuple_t _Tuple,
-                          const std::index_sequence<_I_t ...>)
-{ return _Function(std::get<_I_t>(_Tuple) ...); }
+template<typename Type, unsigned N, unsigned Last>
+struct tuple_ostream {
+  static void arrow(std::ostream &_Stream, const Type &_Type) {
+    _Stream << std::get<N>(_Type) << u8", ";
+    tuple_ostream<Type, N + 1, Last>::arrow(_Stream, _Type);
+  }
+};
+
+template<typename Type, unsigned N>
+struct tuple_ostream<Type, N, N> {
+  static void arrow(std::ostream &_Stream, const Type &_Type)
+  { _Stream << std::get<N>(_Type); }
+};
+
+template<typename... Types>
+std::ostream& operator<<(std::ostream &_Stream,
+                         const std::tuple<Types...> &_Tuple) {
+  _Stream << u8"(";
+  tuple_ostream<std::tuple<Types...>, 0, sizeof...(Types)-1>::arrow(_Stream, _Tuple);
+  _Stream << u8")";
+  return _Stream;
+}
 
 template<typename _Function_t, typename _Tuple_t>
 inline auto tuple_as_args(const _Function_t _Function, const _Tuple_t _Tuple) {
-  static constexpr auto _size = std::tuple_size<_Tuple_t>::value;
+  static constexpr auto _size{std::tuple_size<_Tuple_t>::value};
   return tuple_as_args(_Function, _Tuple, std::make_index_sequence<_size>{});
 }
 
@@ -670,10 +687,10 @@ struct defer {
   _Function_t _function;
 };
 
-std::ostream& operator<<(std::ostream &_Stream, const i8 &_Src)
+std::ostream &operator<<(std::ostream &_Stream, const i8 &_Src)
 { return _Stream << (i32)(_Src); }
 
-std::ostream& operator<<(std::ostream &_Stream, const u8 &_Src)
+std::ostream &operator<<(std::ostream &_Stream, const u8 &_Src)
 { return _Stream << (i32)(_Src); }
 
 #define XTHROW(_Msg) throw exception(_Msg)
