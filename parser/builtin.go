@@ -75,6 +75,14 @@ var strDefs = &Defmap{
 			Params:  []Param{{Id: "bytes", Type: DataType{Id: x.Str, Val: "str"}}},
 			RetType: DataType{Id: x.Str, Val: "str"},
 		}},
+		{Ast: Func{
+			Id: "split",
+			Params: []Param{
+				{Id: "sub", Type: DataType{Id: x.Str, Val: "str"}},
+				{Id: "n", Type: DataType{Id: x.I64, Val: "i64"}},
+			},
+			RetType: DataType{Id: x.Str, Val: "[]str"},
+		}},
 	},
 }
 

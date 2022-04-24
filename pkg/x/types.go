@@ -74,6 +74,12 @@ func TypesAreCompatible(t1, t2 uint8, ignoreany bool) bool {
 		}
 		return true
 	case I8:
+		return t2 == I8
+	case I16:
+		return t2 == I8 ||
+			t2 == I16 ||
+			t2 == Char
+	case I32:
 		return t2 == I8 ||
 			t2 == I16 ||
 			t2 == I32 ||
@@ -82,23 +88,11 @@ func TypesAreCompatible(t1, t2 uint8, ignoreany bool) bool {
 			t2 == F64 ||
 			t2 == Size ||
 			t2 == Char
-	case I16:
-		return t2 == I16 ||
+	case I64:
+		return t2 == I8 ||
+			t2 == I16 ||
 			t2 == I32 ||
 			t2 == I64 ||
-			t2 == F32 ||
-			t2 == F64 ||
-			t2 == Size ||
-			t2 == Char
-	case I32:
-		return t2 == I32 ||
-			t2 == I64 ||
-			t2 == F32 ||
-			t2 == F64 ||
-			t2 == Size ||
-			t2 == Char
-	case I64:
-		return t2 == I64 ||
 			t2 == F32 ||
 			t2 == F64 ||
 			t2 == Size ||

@@ -523,12 +523,12 @@ public:
 
   inline size find(const str &_Sub) const noexcept {
     size _index{this->_buffer.find(_Sub._buffer)};
-    return _index == -1 ? this->len() : _index;
+    return _index == std::string::npos ? this->len() : _index;
   }
 
   inline size rfind(const str &_Sub) const noexcept {
     size _index{this->_buffer.rfind(_Sub._buffer)};
-    return _index == -1 ? this->len() : _index;
+    return _index == std::string::npos ? this->len() : _index;
   }
 
   str trim(const str &_Bytes) const noexcept {
@@ -558,6 +558,30 @@ public:
       if (!exist) { return this->sub(0, _it-_begin+1); }
     }
     return str{u8""};
+  }
+
+  array<str> split(const str &_Sub, const i64 &_N) const noexcept {
+    array<str> _parts{};
+    if (_N == 0) { return _parts; }
+    const const_iterator _begin{this->begin()};
+    std::string _s{this->_buffer};
+    size _pos{std::string::npos};
+    if (_N < 0) {
+      while ((_pos = _s.find(_Sub._buffer)) != std::string::npos) {
+        _parts._buffer.push_back(_s.substr(0, _pos));
+        _s = _s.substr(_pos+_Sub.len());
+      }
+      if (!_parts.empty()) { _parts._buffer.push_back(str{_s}); }
+    } else {
+      size _n{0};
+      while ((_pos = _s.find(_Sub._buffer)) != std::string::npos) {
+        _parts._buffer.push_back(_s.substr(0, _pos));
+        _s = _s.substr(_pos+_Sub.len());
+        if (++_n >= _N) { break; }
+      }
+      if (!_parts.empty() && _n < _N) { _parts._buffer.push_back(str{_s}); }
+    }
+    return _parts;
   }
 
   operator array<char>(void) const noexcept {
