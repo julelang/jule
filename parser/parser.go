@@ -1307,35 +1307,13 @@ type solver struct {
 
 func (s solver) ptr() (v ast.Value) {
 	v.Tok = s.operator
-	ok := false
-	switch {
-	case s.leftVal.Type.Val == s.rightVal.Type.Val:
-		ok = true
-	case typeIsSingle(s.leftVal.Type):
-		switch {
-		case s.leftVal.Type.Id == x.Nil,
-			x.IsIntegerType(s.leftVal.Type.Id):
-			ok = true
-		}
-	case typeIsSingle(s.rightVal.Type):
-		switch {
-		case s.rightVal.Type.Id == x.Nil,
-			x.IsIntegerType(s.rightVal.Type.Id):
-			ok = true
-		}
-	}
-	if !ok {
+	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.Type.Val, s.leftVal.Type.Val)
 		return
 	}
 	switch s.operator.Kind {
 	case "+", "-":
-		if typeIsPtr(s.leftVal.Type) && typeIsPtr(s.rightVal.Type) {
-			s.p.pusherrtok(s.operator, "incompatible_datatype",
-				s.rightVal.Type.Val, s.leftVal.Type.Val)
-			return
-		}
 		if typeIsPtr(s.leftVal.Type) {
 			v.Type = s.leftVal.Type
 		} else {

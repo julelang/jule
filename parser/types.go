@@ -86,8 +86,23 @@ func typeIsLvalue(t DataType) bool {
 	return typeIsPtr(t) || typeIsArray(t) || typeIsMap(t)
 }
 
+func checkPtrCompability(t1, t2 DataType) bool {
+	if typeIsPtr(t2) {
+		return true
+	}
+	if typeIsSingle(t2) && x.IsIntegerType(t2.Id) {
+		return true
+	}
+	return false
+}
+
 func typesAreCompatible(t1, t2 DataType, ignoreany bool) bool {
 	switch {
+	case typeIsPtr(t1) || typeIsPtr(t2):
+		if typeIsPtr(t2) {
+			t1, t2 = t2, t1
+		}
+		return checkPtrCompability(t1, t2)
 	case typeIsArray(t1) || typeIsArray(t2):
 		if typeIsArray(t2) {
 			t1, t2 = t2, t1
