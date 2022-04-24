@@ -106,7 +106,7 @@ var arrDefs = &Defmap{
 			Params: []Param{{Id: "value"}},
 		}},
 		{Ast: Func{
-			Id:     "find_last",
+			Id:     "rfind",
 			Params: []Param{{Id: "value"}},
 		}},
 		{Ast: Func{
@@ -140,10 +140,10 @@ func readyArrDefs(arrt DataType) {
 	findFunc.Ast.RetType = elemType
 	findFunc.Ast.RetType.Val = "*" + findFunc.Ast.RetType.Val
 
-	findLastFunc, _, _ := arrDefs.funcById("find_last", nil)
-	findLastFunc.Ast.Params[0].Type = elemType
-	findLastFunc.Ast.RetType = elemType
-	findLastFunc.Ast.RetType.Val = "*" + findLastFunc.Ast.RetType.Val
+	rfindFunc, _, _ := arrDefs.funcById("rfind", nil)
+	rfindFunc.Ast.Params[0].Type = elemType
+	rfindFunc.Ast.RetType = elemType
+	rfindFunc.Ast.RetType.Val = "*" + rfindFunc.Ast.RetType.Val
 
 	eraseFunc, _, _ := arrDefs.funcById("erase", nil)
 	eraseFunc.Ast.Params[0].Type = elemType

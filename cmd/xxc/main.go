@@ -374,7 +374,7 @@ public:
     return nil;
   }
 
-  _Item_t *find_last(const _Item_t &_Item) noexcept {
+  _Item_t *rfind(const _Item_t &_Item) noexcept {
     iterator _it{this->end()};
     const iterator _begin{this->begin()};
     for (; _it >= _begin; --_it)
