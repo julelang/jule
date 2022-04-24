@@ -3255,40 +3255,9 @@ func (p *Parser) checkVarStatement(v *Var, noParse bool) {
 }
 
 func (p *Parser) checkDeferStatement(d *ast.Defer) {
-	tokens := d.Expr.Toks
-	if t := tokens[len(tokens)-1]; t.Id != lex.Brace && t.Kind != ")" {
-		p.pusherrtok(d.Tok, "defer_expr_not_func_call")
-		return
-	}
-	var exprToks Toks
-	braceCount := 0
-	for i := len(tokens) - 1; i >= 0; i-- {
-		tok := tokens[i]
-		if tok.Id == lex.Brace {
-			switch tok.Kind {
-			case ")":
-				braceCount++
-			case "(":
-				braceCount--
-			}
-			if braceCount == 0 {
-				exprToks = tokens[:i]
-				break
-			}
-		}
-	}
-	if len(exprToks) == 0 {
-		p.pusherrtok(d.Tok, "defer_expr_not_func_call")
-		return
-	}
 	m := new(exprModel)
 	m.nodes = make([]exprBuildNode, 1)
-	if !typeIsFunc(p.evalExprPart(exprToks, m).ast.Type) {
-		p.pusherrtok(d.Tok, "defer_expr_not_func_call")
-		return
-	}
-	m.nodes[0].nodes = nil
-	_ = p.evalExprPart(tokens, m)
+	_ = p.evalExprPart(d.Expr.Toks, m)
 	d.Expr.Model = m
 }
 

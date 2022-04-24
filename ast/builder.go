@@ -951,15 +951,16 @@ func (b *Builder) Statement(bs *blockStatement) (s Statement) {
 		s.Val = t
 		return
 	case lex.Operator:
-		if tok.Kind == "<" {
-			return b.RetStatement(bs.toks)
-		}
 	case lex.Brace:
 		if tok.Kind == "{" {
 			return b.blockStatement(bs.toks)
 		}
 	}
-	return b.ExprStatement(bs.toks)
+	if isFuncCall(bs.toks) {
+		return b.ExprStatement(bs.toks)
+	}
+	bs.toks = append([]Tok{{Id: lex.Ret, Kind: "ret"}}, bs.toks...)
+	return b.RetStatement(bs.toks)
 }
 
 func (b *Builder) blockStatement(toks Toks) Statement {
@@ -979,6 +980,30 @@ type assignInfo struct {
 	setter       Tok
 	ok           bool
 	isExpr       bool
+}
+
+func isFuncCall(toks Toks) bool {
+	if t := toks[len(toks)-1]; t.Id != lex.Brace && t.Kind != ")" {
+		return false
+	}
+	var exprToks Toks
+	braceCount := 0
+	for i := len(toks) - 1; i >= 0; i-- {
+		tok := toks[i]
+		if tok.Id == lex.Brace {
+			switch tok.Kind {
+			case ")":
+				braceCount++
+			case "(":
+				braceCount--
+			}
+			if braceCount == 0 {
+				exprToks = toks[:i]
+				break
+			}
+		}
+	}
+	return len(exprToks) > 0
 }
 
 func (b *Builder) assignInfo(toks Toks) (info assignInfo) {
@@ -1373,6 +1398,9 @@ func (b *Builder) DeferStatement(toks Toks) (s Statement) {
 	if len(toks) == 0 {
 		b.pusherr(d.Tok, "missing_expr")
 		return
+	}
+	if !isFuncCall(toks) {
+		b.pusherr(d.Tok, "defer_expr_not_func_call")
 	}
 	d.Expr = b.Expr(toks)
 	s.Tok = d.Tok
