@@ -3,7 +3,7 @@ package xapi
 import "strings"
 
 // String literal prefix.
-const StrMark = ""
+const StrMark = "u8"
 
 // Raw-String literal.
 const RawStrMark = StrMark + "R"

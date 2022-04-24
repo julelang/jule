@@ -368,7 +368,7 @@ public:
 
   _Item_t *find(const _Item_t &_Item) noexcept {
     iterator _it{this->begin()};
-    iterator _end{this->end()};
+    const iterator _end{this->end()};
     for (; _it < _end; ++_it)
     { if (_Item == *_it) { return _it; } }
     return nil;
@@ -376,7 +376,7 @@ public:
 
   _Item_t *find_last(const _Item_t &_Item) noexcept {
     iterator _it{this->end()};
-    iterator _begin{this->begin()};
+    const iterator _begin{this->begin()};
     for (; _it >= _begin; --_it)
     { if (_Item == *_it) { return _it; } }
     return nil;
@@ -526,9 +526,38 @@ public:
     return _index == -1 ? this->len() : _index;
   }
 
-  inline size find_last(const str &_Sub) const noexcept {
+  inline size rfind(const str &_Sub) const noexcept {
     size _index{this->_buffer.rfind(_Sub._buffer)};
     return _index == -1 ? this->len() : _index;
+  }
+
+  str trim(const str &_Bytes) const noexcept {
+    const_iterator _it{this->begin()};
+    const const_iterator _end{this->end()};
+    const_iterator _begin{this->begin()};
+    for (; _it < _end; ++_it) {
+      bool exist{false};
+      const_iterator _bytes_it{_Bytes.begin()};
+      const const_iterator _bytes_end{_Bytes.end()};
+      for (; _bytes_it < _bytes_end; ++_bytes_it)
+      { if ((exist = *_it == *_bytes_it)) { break; } }
+      if (!exist) { return this->sub(_it-_begin); }
+    }
+    return str{u8""};
+  }
+
+  str rtrim(const str &_Bytes) const noexcept {
+    const_iterator _it{this->end()-1};
+    const const_iterator _begin{this->begin()};
+    for (; _it >= _begin; --_it) {
+      bool exist{false};
+      const_iterator _bytes_it{_Bytes.begin()};
+      const const_iterator _bytes_end{_Bytes.end()};
+      for (; _bytes_it < _bytes_end; ++_bytes_it)
+      { if ((exist = *_it == *_bytes_it)) { break; } }
+      if (!exist) { return this->sub(0, _it-_begin+1); }
+    }
+    return str{u8""};
   }
 
   operator array<char>(void) const noexcept {

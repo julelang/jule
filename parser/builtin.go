@@ -58,12 +58,22 @@ var strDefs = &Defmap{
 		{Ast: Func{
 			Id:      "find",
 			Params:  []Param{{Id: "sub", Type: DataType{Id: x.Str, Val: "str"}}},
-			RetType: DataType{Id: x.Char, Val: "*char"},
+			RetType: DataType{Id: x.Size, Val: "size"},
 		}},
 		{Ast: Func{
-			Id:      "find_last",
+			Id:      "rfind",
 			Params:  []Param{{Id: "sub", Type: DataType{Id: x.Str, Val: "str"}}},
-			RetType: DataType{Id: x.Char, Val: "*char"},
+			RetType: DataType{Id: x.Size, Val: "size"},
+		}},
+		{Ast: Func{
+			Id:      "trim",
+			Params:  []Param{{Id: "bytes", Type: DataType{Id: x.Str, Val: "str"}}},
+			RetType: DataType{Id: x.Str, Val: "str"},
+		}},
+		{Ast: Func{
+			Id:      "rtrim",
+			Params:  []Param{{Id: "bytes", Type: DataType{Id: x.Str, Val: "str"}}},
+			RetType: DataType{Id: x.Str, Val: "str"},
 		}},
 	},
 }
