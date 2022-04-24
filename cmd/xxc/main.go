@@ -364,6 +364,7 @@ public:
   const_iterator end(void) const noexcept   { return &this->_buffer[this->_buffer.size()]; }
 
   inline void clear(void) noexcept { this->_buffer.clear(); }
+  inline size len(void) const noexcept { return this->_buffer.size(); }
 
   _Item_t *find(const _Item_t &_Item) noexcept {
     iterator _it{this->begin()};
@@ -502,10 +503,17 @@ public:
   typedef const char *const_iterator;
   iterator begin(void) noexcept             { return &this->_buffer[0]; }
   const_iterator begin(void) const noexcept { return &this->_buffer[0]; }
-  iterator end(void) noexcept               { return &this->_buffer[this->_buffer.size()]; }
-  const_iterator end(void) const noexcept   { return &this->_buffer[this->_buffer.size()]; }
+  iterator end(void) noexcept               { return &this->_buffer[this->len()]; }
+  const_iterator end(void) const noexcept   { return &this->_buffer[this->len()]; }
 
+  inline size len(void) const noexcept { return this->_buffer.length(); }
   inline bool empty(void) const noexcept { return this->_buffer.empty(); }
+
+  inline str substr(const size start, const size end) const noexcept
+  { return this->_buffer.substr(start, end); }
+
+  inline bool has_prefix(const str &_Sub) const noexcept
+  { return this->len() >= _Sub.len() && this->substr(0, _Sub.len()) == _Sub._buffer; }
 
   operator array<char>(void) const noexcept {
     array<char> _array{};

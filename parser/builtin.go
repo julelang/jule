@@ -37,12 +37,17 @@ var strDefs = &Defmap{
 			Id:    "len",
 			Const: true,
 			Type:  DataType{Id: x.Size, Val: "size"},
-			Tag:   "_buffer.size()",
+			Tag:   "len()",
 		},
 	},
 	Funcs: []*function{
 		{Ast: Func{
 			Id:      "empty",
+			RetType: DataType{Id: x.Bool, Val: "bool"},
+		}},
+		{Ast: Func{
+			Id:      "has_prefix",
+			Params:  []Param{{Id: "sub", Type: DataType{Id: x.Str, Val: "str"}}},
 			RetType: DataType{Id: x.Bool, Val: "bool"},
 		}},
 	},
@@ -54,7 +59,7 @@ var arrDefs = &Defmap{
 			Id:    "len",
 			Const: true,
 			Type:  DataType{Id: x.Size, Val: "size"},
-			Tag:   "_buffer.size()",
+			Tag:   "len()",
 		},
 	},
 	Funcs: []*function{
