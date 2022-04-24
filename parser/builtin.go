@@ -55,6 +55,16 @@ var strDefs = &Defmap{
 			Params:  []Param{{Id: "sub", Type: DataType{Id: x.Str, Val: "str"}}},
 			RetType: DataType{Id: x.Bool, Val: "bool"},
 		}},
+		{Ast: Func{
+			Id:      "find",
+			Params:  []Param{{Id: "sub", Type: DataType{Id: x.Str, Val: "str"}}},
+			RetType: DataType{Id: x.Char, Val: "*char"},
+		}},
+		{Ast: Func{
+			Id:      "find_last",
+			Params:  []Param{{Id: "sub", Type: DataType{Id: x.Str, Val: "str"}}},
+			RetType: DataType{Id: x.Char, Val: "*char"},
+		}},
 	},
 }
 

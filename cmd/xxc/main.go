@@ -521,6 +521,16 @@ public:
   inline bool has_suffix(const str &_Sub) const noexcept
   { return this->len() >= _Sub.len() && this->sub(this->len()-_Sub.len()) == _Sub; }
 
+  inline size find(const str &_Sub) const noexcept {
+    size _index{this->_buffer.find(_Sub._buffer)};
+    return _index == -1 ? this->len() : _index;
+  }
+
+  inline size find_last(const str &_Sub) const noexcept {
+    size _index{this->_buffer.rfind(_Sub._buffer)};
+    return _index == -1 ? this->len() : _index;
+  }
+
   operator array<char>(void) const noexcept {
     array<char> _array{};
     _array._buffer = std::vector<char>{this->begin(), this->end()};
