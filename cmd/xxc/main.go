@@ -509,11 +509,17 @@ public:
   inline size len(void) const noexcept { return this->_buffer.length(); }
   inline bool empty(void) const noexcept { return this->_buffer.empty(); }
 
-  inline str substr(const size start, const size end) const noexcept
+  inline str sub(const size start, const size end) const noexcept
   { return this->_buffer.substr(start, end); }
 
+  inline str sub(const size start) const noexcept
+  { return this->_buffer.substr(start); }
+
   inline bool has_prefix(const str &_Sub) const noexcept
-  { return this->len() >= _Sub.len() && this->substr(0, _Sub.len()) == _Sub._buffer; }
+  { return this->len() >= _Sub.len() && this->sub(0, _Sub.len()) == _Sub._buffer; }
+
+  inline bool has_suffix(const str &_Sub) const noexcept
+  { return this->len() >= _Sub.len() && this->sub(this->len()-_Sub.len()) == _Sub; }
 
   operator array<char>(void) const noexcept {
     array<char> _array{};

@@ -50,6 +50,11 @@ var strDefs = &Defmap{
 			Params:  []Param{{Id: "sub", Type: DataType{Id: x.Str, Val: "str"}}},
 			RetType: DataType{Id: x.Bool, Val: "bool"},
 		}},
+		{Ast: Func{
+			Id:      "has_suffix",
+			Params:  []Param{{Id: "sub", Type: DataType{Id: x.Str, Val: "str"}}},
+			RetType: DataType{Id: x.Bool, Val: "bool"},
+		}},
 	},
 }
 
