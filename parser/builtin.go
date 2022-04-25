@@ -114,6 +114,23 @@ var u64statics = &Defmap{
 	},
 }
 
+var f32statics = &Defmap{
+	Globals: []*Var{
+		{
+			Id:    "max",
+			Const: true,
+			Type:  DataType{Id: x.F32, Val: "f32"},
+			Tag:   "__FLT_MAX__",
+		},
+		{
+			Id:    "min",
+			Const: true,
+			Type:  DataType{Id: x.F32, Val: "f32"},
+			Tag:   "__FLT_MIN__",
+		},
+	},
+}
+
 var builtinFuncs = []*function{
 	{
 		Ast: Func{
