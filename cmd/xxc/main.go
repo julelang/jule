@@ -521,15 +521,11 @@ public:
   inline bool has_suffix(const str &_Sub) const noexcept
   { return this->len() >= _Sub.len() && this->sub(this->len()-_Sub.len()) == _Sub; }
 
-  inline size find(const str &_Sub) const noexcept {
-    size _index{this->_buffer.find(_Sub._buffer)};
-    return _index == std::string::npos ? this->len() : _index;
-  }
+  inline size find(const str &_Sub) const noexcept
+  { return this->_buffer.find(_Sub._buffer); }
 
-  inline size rfind(const str &_Sub) const noexcept {
-    size _index{this->_buffer.rfind(_Sub._buffer)};
-    return _index == std::string::npos ? this->len() : _index;
-  }
+  inline size rfind(const str &_Sub) const noexcept
+  { return this->_buffer.rfind(_Sub._buffer); }
 
   str trim(const str &_Bytes) const noexcept {
     const_iterator _it{this->begin()};

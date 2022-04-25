@@ -1831,16 +1831,16 @@ func (p *Parser) evalXObjSubId(dm *Defmap, val value, idTok Tok, m *exprModel) (
 	return
 }
 
-func (p *Parser) evalStrSubId(val value, idTok Tok, m *exprModel) (v value) {
+func (p *Parser) evalStrObjSubId(val value, idTok Tok, m *exprModel) (v value) {
 	return p.evalXObjSubId(strDefs, val, idTok, m)
 }
 
-func (p *Parser) evalArraySubId(val value, idTok Tok, m *exprModel) (v value) {
+func (p *Parser) evalArrayObjSubId(val value, idTok Tok, m *exprModel) (v value) {
 	readyArrDefs(val.ast.Type)
 	return p.evalXObjSubId(arrDefs, val, idTok, m)
 }
 
-func (p *Parser) evalMapSubId(val value, idTok Tok, m *exprModel) (v value) {
+func (p *Parser) evalMapObjSubId(val value, idTok Tok, m *exprModel) (v value) {
 	readyMapDefs(val.ast.Type)
 	return p.evalXObjSubId(mapDefs, val, idTok, m)
 }
@@ -1949,6 +1949,10 @@ func (p *Parser) evalF64SubId(idTok Tok, m *exprModel) (v value) {
 	return p.evalXTypeSubId(f64statics, idTok, m)
 }
 
+func (p *Parser) evalStrSubId(idTok Tok, m *exprModel) (v value) {
+	return p.evalXTypeSubId(strStatics, idTok, m)
+}
+
 func (p *Parser) evalTypeSubId(typeTok, idTok Tok, m *exprModel) (v value) {
 	switch typeTok.Kind {
 	case tokens.I8:
@@ -1973,6 +1977,8 @@ func (p *Parser) evalTypeSubId(typeTok, idTok Tok, m *exprModel) (v value) {
 		return p.evalF32SubId(idTok, m)
 	case tokens.F64:
 		return p.evalF64SubId(idTok, m)
+	case tokens.STR:
+		return p.evalStrSubId(idTok, m)
 	}
 	p.pusherrtok(typeTok, "obj_not_support_sub_fields", typeTok.Kind)
 	return
@@ -1995,11 +2001,11 @@ func (p *Parser) evalExprSubId(toks Toks, m *exprModel) (v value) {
 	}
 	switch {
 	case typeIsSingle(checkType) && checkType.Id == xtype.Str:
-		return p.evalStrSubId(val, idTok, m)
+		return p.evalStrObjSubId(val, idTok, m)
 	case typeIsArray(checkType):
-		return p.evalArraySubId(val, idTok, m)
+		return p.evalArrayObjSubId(val, idTok, m)
 	case typeIsMap(checkType):
-		return p.evalMapSubId(val, idTok, m)
+		return p.evalMapObjSubId(val, idTok, m)
 	}
 	p.pusherrtok(valTok, "obj_not_support_sub_fields", val.ast.Type.Val)
 	return

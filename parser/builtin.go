@@ -162,6 +162,17 @@ var f64statics = &Defmap{
 	},
 }
 
+var strStatics = &Defmap{
+	Globals: []*Var{
+		{
+			Id:    "npos",
+			Const: true,
+			Type:  DataType{Id: xtype.Size, Val: tokens.SIZE},
+			Tag:   "std::string::npos",
+		},
+	},
+}
+
 var builtinFuncs = []*function{
 	{
 		Ast: Func{
@@ -237,7 +248,11 @@ var strDefs = &Defmap{
 			Id: "split",
 			Params: []Param{
 				{Id: "sub", Type: DataType{Id: xtype.Str, Val: tokens.STR}},
-				{Id: "n", Type: DataType{Id: xtype.I64, Val: tokens.I64}},
+				{
+					Id:      "n",
+					Type:    DataType{Id: xtype.I64, Val: tokens.I64},
+					Default: Expr{Model: exprNode{"-1"}},
+				},
 			},
 			RetType: DataType{Id: xtype.Str, Val: "[]" + tokens.STR},
 		}},
