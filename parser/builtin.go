@@ -1,8 +1,23 @@
 package parser
 
-import (
-	"github.com/the-xlang/xxc/pkg/x"
-)
+import "github.com/the-xlang/xxc/pkg/x"
+
+var i32statics = &Defmap{
+	Globals: []*Var{
+		{
+			Id:    "max",
+			Const: true,
+			Type:  DataType{Id: x.I32, Val: "i32"},
+			Tag:   "INT32_MAX",
+		},
+		{
+			Id:    "min",
+			Const: true,
+			Type:  DataType{Id: x.I32, Val: "i32"},
+			Tag:   "INT32_MIN",
+		},
+	},
+}
 
 var builtinFuncs = []*function{
 	{
