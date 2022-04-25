@@ -70,6 +70,50 @@ var i64statics = &Defmap{
 	},
 }
 
+var u8statics = &Defmap{
+	Globals: []*Var{
+		{
+			Id:    "max",
+			Const: true,
+			Type:  DataType{Id: x.U8, Val: "u8"},
+			Tag:   "UINT8_MAX",
+		},
+	},
+}
+
+var u16statics = &Defmap{
+	Globals: []*Var{
+		{
+			Id:    "max",
+			Const: true,
+			Type:  DataType{Id: x.U16, Val: "u16"},
+			Tag:   "UINT16_MAX",
+		},
+	},
+}
+
+var u32statics = &Defmap{
+	Globals: []*Var{
+		{
+			Id:    "max",
+			Const: true,
+			Type:  DataType{Id: x.U32, Val: "u32"},
+			Tag:   "UINT32_MAX",
+		},
+	},
+}
+
+var u64statics = &Defmap{
+	Globals: []*Var{
+		{
+			Id:    "max",
+			Const: true,
+			Type:  DataType{Id: x.U64, Val: "u64"},
+			Tag:   "UINT64_MAX",
+		},
+	},
+}
+
 var builtinFuncs = []*function{
 	{
 		Ast: Func{
