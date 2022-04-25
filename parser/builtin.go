@@ -2,6 +2,23 @@ package parser
 
 import "github.com/the-xlang/xxc/pkg/x"
 
+var i16statics = &Defmap{
+	Globals: []*Var{
+		{
+			Id:    "max",
+			Const: true,
+			Type:  DataType{Id: x.I16, Val: "i16"},
+			Tag:   "INT16_MAX",
+		},
+		{
+			Id:    "min",
+			Const: true,
+			Type:  DataType{Id: x.I16, Val: "i16"},
+			Tag:   "INT16_MIN",
+		},
+	},
+}
+
 var i32statics = &Defmap{
 	Globals: []*Var{
 		{
