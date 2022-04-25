@@ -114,6 +114,17 @@ var u64statics = &Defmap{
 	},
 }
 
+var sizeStatics = &Defmap{
+	Globals: []*Var{
+		{
+			Id:    "max",
+			Const: true,
+			Type:  DataType{Id: x.Size, Val: "size"},
+			Tag:   "SIZE_MAX",
+		},
+	},
+}
+
 var f32statics = &Defmap{
 	Globals: []*Var{
 		{
