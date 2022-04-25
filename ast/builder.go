@@ -211,10 +211,10 @@ func (b *Builder) Id(toks Toks) {
 		return
 	case tokens.Brace:
 		switch tok.Kind {
-		case "{": // Namespace.
+		case tokens.LBRACE: // Namespace.
 			b.Namespace(toks)
 			return
-		case "(": // Function.
+		case tokens.LPARENTHESES: // Function.
 			f := b.Func(toks, false)
 			s := Statement{f.Tok, f, false}
 			b.Tree = append(b.Tree, Obj{f.Tok, s})
@@ -253,7 +253,7 @@ func (b *Builder) Namespace(toks Toks) {
 	ns.Tok = toks[0]
 	i := new(int)
 	ns.Ids = b.nsIds(toks, i)
-	treeToks := b.getrange(i, "{", "}", &toks)
+	treeToks := b.getrange(i, tokens.LBRACE, tokens.RBRACE, &toks)
 	if treeToks == nil {
 		b.pusherr(ns.Tok, "body_not_exist")
 		return
@@ -343,7 +343,7 @@ func (b *Builder) Func(toks Toks, anon bool) (f Func) {
 	}
 	f.RetType.Id = xtype.Void
 	f.RetType.Val = xtype.VoidTypeStr
-	paramToks := b.getrange(&i, "(", ")", &toks)
+	paramToks := b.getrange(&i, tokens.LPARENTHESES, tokens.RPARENTHESES, &toks)
 	if len(paramToks) > 0 {
 		b.Params(&f, paramToks)
 	}
@@ -370,11 +370,11 @@ func (b *Builder) Func(toks Toks, anon bool) (f Func) {
 		}
 		tok = toks[i]
 	}
-	if tok.Id != tokens.Brace || tok.Kind != "{" {
+	if tok.Id != tokens.Brace || tok.Kind != tokens.LBRACE {
 		b.pusherr(tok, "invalid_syntax")
 		return
 	}
-	blockToks := b.getrange(&i, "{", "}", &toks)
+	blockToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
 	if blockToks == nil {
 		b.pusherr(f.Tok, "body_not_exist")
 		return
@@ -402,7 +402,7 @@ func (b *Builder) Params(fn *Func, toks Toks) {
 	for i, tok := range toks {
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
-			case "{", "[", "(":
+			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
 				braceCount++
 			default:
 				braceCount--
@@ -482,12 +482,12 @@ func (b *Builder) pushParam(f *Func, toks Toks, errtok Tok) {
 				goto end
 			}
 			toks = toks[1:]
-			if tok := toks[0]; tok.Id == tokens.Brace && tok.Kind == "{" {
+			if tok := toks[0]; tok.Id == tokens.Brace && tok.Kind == tokens.LBRACE {
 				braceCount := 0
 				for i, tok := range toks {
 					if tok.Id == tokens.Brace {
 						switch tok.Kind {
-						case "{", "(", "[":
+						case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
 							braceCount++
 							continue
 						default:
@@ -567,7 +567,7 @@ func (b *Builder) DataType(toks Toks, i *int, err bool) (t DataType, ok bool) {
 			return
 		case tokens.Brace:
 			switch tok.Kind {
-			case "(":
+			case tokens.LPARENTHESES:
 				t.Tok = tok
 				t.Id = xtype.Func
 				val, f := b.FuncDataTypeHead(toks, i)
@@ -576,7 +576,7 @@ func (b *Builder) DataType(toks Toks, i *int, err bool) (t DataType, ok bool) {
 				t.Tag = f
 				ok = true
 				goto ret
-			case "[":
+			case tokens.LBRACKET:
 				*i++
 				if *i > len(toks) {
 					if err {
@@ -585,7 +585,7 @@ func (b *Builder) DataType(toks Toks, i *int, err bool) (t DataType, ok bool) {
 					return
 				}
 				tok = toks[*i]
-				if tok.Id == tokens.Brace && tok.Kind == "]" {
+				if tok.Id == tokens.Brace && tok.Kind == tokens.RBRACKET {
 					dtv.WriteString("[]")
 					continue
 				}
@@ -633,7 +633,7 @@ func (b *Builder) MapDataType(toks Toks, i *int, err bool) (t DataType, _ string
 		tok := toks[*i]
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
-			case "(", "[", "{":
+			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
 				braceCount++
 			default:
 				braceCount--
@@ -696,7 +696,7 @@ func (b *Builder) FuncDataTypeHead(toks Toks, i *int) (string, Func) {
 		switch tok.Id {
 		case tokens.Brace:
 			switch tok.Kind {
-			case "{", "[", "(":
+			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
 				brace++
 			default:
 				brace--
@@ -728,7 +728,7 @@ func (b *Builder) FuncRetDataType(toks Toks, i *int) (t DataType, ok bool) {
 	}
 	tok := toks[*i]
 	start := *i
-	if tok.Id == tokens.Brace && tok.Kind == "[" { // Multityped?
+	if tok.Id == tokens.Brace && tok.Kind == tokens.LBRACKET { // Multityped?
 		t.Val += tok.Kind
 		*i++
 		if *i >= len(toks) {
@@ -736,7 +736,7 @@ func (b *Builder) FuncRetDataType(toks Toks, i *int) (t DataType, ok bool) {
 			goto end
 		}
 		tok = toks[*i]
-		if tok.Id == tokens.Brace && tok.Kind == "]" {
+		if tok.Id == tokens.Brace && tok.Kind == tokens.RBRACKET {
 			*i--
 			goto end
 		}
@@ -748,7 +748,7 @@ func (b *Builder) FuncRetDataType(toks Toks, i *int) (t DataType, ok bool) {
 			t.Val += tok.Kind
 			if tok.Id == tokens.Brace {
 				switch tok.Kind {
-				case "(", "[", "{":
+				case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
 					braceCount++
 				default:
 					braceCount--
@@ -835,7 +835,7 @@ func nextStatementPos(toks Toks, start int) (int, bool) {
 		tok := toks[i]
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
-			case "{", "[", "(":
+			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
 				if braceCount == 0 && i > start {
 					isStatement, withTerminator = IsStatement(tok, toks[i-1])
 					if isStatement {
@@ -954,7 +954,7 @@ func (b *Builder) Statement(bs *blockStatement) (s Statement) {
 		return
 	case tokens.Operator:
 	case tokens.Brace:
-		if tok.Kind == "{" {
+		if tok.Kind == tokens.LBRACE {
 			return b.blockStatement(bs.toks)
 		}
 	}
@@ -968,7 +968,7 @@ func (b *Builder) Statement(bs *blockStatement) (s Statement) {
 func (b *Builder) blockStatement(toks Toks) Statement {
 	i := new(int)
 	tok := toks[0]
-	toks = getrange(i, "{", "}", toks)
+	toks = getrange(i, tokens.LBRACE, tokens.RBRACE, toks)
 	if *i < len(toks) {
 		b.pusherr(toks[*i], "invalid_syntax")
 	}
@@ -985,7 +985,7 @@ type assignInfo struct {
 }
 
 func isFuncCall(toks Toks) bool {
-	if t := toks[len(toks)-1]; t.Id != tokens.Brace && t.Kind != ")" {
+	if t := toks[len(toks)-1]; t.Id != tokens.Brace && t.Kind != tokens.RPARENTHESES {
 		return false
 	}
 	var exprToks Toks
@@ -994,9 +994,9 @@ func isFuncCall(toks Toks) bool {
 		tok := toks[i]
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
-			case ")":
+			case tokens.RPARENTHESES:
 				braceCount++
-			case "(":
+			case tokens.LPARENTHESES:
 				braceCount--
 			}
 			if braceCount == 0 {
@@ -1014,7 +1014,7 @@ func (b *Builder) assignInfo(toks Toks) (info assignInfo) {
 	for i, tok := range toks {
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
-			case "(", "[", "{":
+			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
 				braceCount++
 			default:
 				braceCount--
@@ -1082,7 +1082,7 @@ func (b *Builder) assignSelectors(info assignInfo) []AssignSelector {
 	for i, tok := range info.selectorToks {
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
-			case "(", "[", "{":
+			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
 				braceCount++
 			default:
 				braceCount--
@@ -1118,7 +1118,7 @@ func (b *Builder) assignExprs(info assignInfo) []Expr {
 	for i, tok := range info.exprToks {
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
-			case "(", "[", "{":
+			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
 				braceCount++
 			default:
 				braceCount--
@@ -1166,7 +1166,7 @@ func checkAssignToks(toks Toks) bool {
 	for _, tok := range toks {
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
-			case "{", "[", "(":
+			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
 				braceCount++
 			default:
 				braceCount--
@@ -1255,7 +1255,7 @@ func (b *Builder) Args(toks Toks) *Args {
 	for i, tok := range toks {
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
-			case "{", "[", "(":
+			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
 				braceCount++
 			default:
 				braceCount--
@@ -1461,13 +1461,13 @@ func blockExprToks(toks Toks) (expr Toks) {
 	for i, tok := range toks {
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
-			case "{":
+			case tokens.LBRACE:
 				if braceCount > 0 {
 					braceCount++
 					break
 				}
 				return toks[:i]
-			case "(", "[":
+			case tokens.LBRACKET, tokens.LPARENTHESES:
 				braceCount++
 			default:
 				braceCount--
@@ -1495,7 +1495,7 @@ func (b *Builder) getForeachVarsToks(toks Toks) []Toks {
 	for i, tok := range toks {
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
-			case "(", "[", "{":
+			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
 				braceCount++
 			default:
 				braceCount--
@@ -1584,7 +1584,7 @@ func (b *Builder) getIterProfile(toks Toks) IterProfile {
 	for i, tok := range toks {
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
-			case "(", "[", "{":
+			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
 				braceCount++
 			default:
 				braceCount--
@@ -1616,7 +1616,7 @@ func (b *Builder) IterExpr(toks Toks) (s Statement) {
 	}
 	i := new(int)
 	*i = len(exprToks)
-	blockToks := b.getrange(i, "{", "}", &toks)
+	blockToks := b.getrange(i, tokens.LBRACE, tokens.RBRACE, &toks)
 	if blockToks == nil {
 		b.pusherr(iter.Tok, "body_not_exist")
 		return
@@ -1646,7 +1646,7 @@ func (b *Builder) IfExpr(bs *blockStatement) (s Statement) {
 	} else {
 		*i = len(exprToks)
 	}
-	blockToks := b.getrange(i, "{", "}", &bs.toks)
+	blockToks := b.getrange(i, tokens.LBRACE, tokens.RBRACE, &bs.toks)
 	if blockToks == nil {
 		b.pusherr(ifast.Tok, "body_not_exist")
 		return
@@ -1681,7 +1681,7 @@ func (b *Builder) ElseIfExpr(bs *blockStatement) (s Statement) {
 	} else {
 		*i = len(exprToks)
 	}
-	blockToks := b.getrange(i, "{", "}", &bs.toks)
+	blockToks := b.getrange(i, tokens.LBRACE, tokens.RBRACE, &bs.toks)
 	if blockToks == nil {
 		b.pusherr(elif.Tok, "body_not_exist")
 		return
@@ -1706,7 +1706,7 @@ func (b *Builder) ElseBlock(bs *blockStatement) (s Statement) {
 	elseast.Tok = bs.toks[0]
 	bs.toks = bs.toks[1:]
 	i := new(int)
-	blockToks := b.getrange(i, "{", "}", &bs.toks)
+	blockToks := b.getrange(i, tokens.LBRACE, tokens.RBRACE, &bs.toks)
 	if blockToks == nil {
 		if *i < len(bs.toks) {
 			b.pusherr(elseast.Tok, "else_have_expr")
@@ -1806,8 +1806,8 @@ func (b *Builder) getExprProcesses(toks Toks) []Toks {
 			continue
 		case tokens.Brace:
 			switch tok.Kind {
-			case "(", "[", "{":
-				if tok.Kind == "[" {
+			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
+				if tok.Kind == tokens.LBRACKET {
 					oldIndex := i
 					_, ok := b.DataType(toks, &i, false)
 					if ok {
@@ -1859,8 +1859,8 @@ func requireOperatorForProcess(tok Tok, index, len int) bool {
 	case tokens.Comma:
 		return false
 	case tokens.Brace:
-		if tok.Kind == "(" ||
-			tok.Kind == "{" {
+		if tok.Kind == tokens.LPARENTHESES ||
+			tok.Kind == tokens.LBRACE {
 			return false
 		}
 	}

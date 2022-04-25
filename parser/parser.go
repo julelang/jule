@@ -1341,7 +1341,7 @@ func (s solver) str() (v ast.Value) {
 		return
 	}
 	switch s.operator.Kind {
-	case tokens.STAR:
+	case tokens.PLUS:
 		v.Type.Id = xtype.Str
 		v.Type.Val = tokens.STR
 	case tokens.EQUALS, tokens.NOT_EQUALS:
@@ -1349,7 +1349,7 @@ func (s solver) str() (v ast.Value) {
 		v.Type.Val = tokens.BOOL
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
-		s.operator.Kind, tokens.STR)
+			s.operator.Kind, tokens.STR)
 	}
 	return
 }
@@ -1489,7 +1489,7 @@ func (s solver) char() (v ast.Value) {
 		v.Type.Val = tokens.BOOL
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
-		s.operator.Kind, tokens.CHAR)
+			s.operator.Kind, tokens.CHAR)
 	}
 	return
 }
@@ -1524,7 +1524,7 @@ func (s solver) nil() (v ast.Value) {
 		v.Type.Val = tokens.BOOL
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
-		s.operator.Kind, tokens.NIL)
+			s.operator.Kind, tokens.NIL)
 	}
 	return
 }
@@ -1771,7 +1771,7 @@ func (p *Parser) evalExprPart(toks Toks, m *exprModel) (v value) {
 		return p.evalHeapAllocExpr(toks, m)
 	case tokens.Brace:
 		switch tok.Kind {
-		case "(":
+		case tokens.LPARENTHESES:
 			val, ok := p.evalTryCastExpr(toks, m)
 			if ok {
 				v = val
@@ -1792,11 +1792,11 @@ func (p *Parser) evalExprPart(toks Toks, m *exprModel) (v value) {
 		return p.evalOperatorExprPartRight(toks, m)
 	case tokens.Brace:
 		switch tok.Kind {
-		case ")":
+		case tokens.RPARENTHESES:
 			return p.evalParenthesesRangeExpr(toks, m)
-		case "}":
+		case tokens.RBRACE:
 			return p.evalBraceRangeExpr(toks, m)
-		case "]":
+		case tokens.RBRACKET:
 			return p.evalBracketRangeExpr(toks, m)
 		}
 	default:
@@ -2035,7 +2035,7 @@ func (p *Parser) evalTryCastExpr(toks Toks, m *exprModel) (v value, _ bool) {
 	for i, tok := range toks {
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
-			case "(", "[", "{":
+			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
 				braceCount++
 				continue
 			default:
@@ -2062,7 +2062,7 @@ func (p *Parser) evalTryCastExpr(toks Toks, m *exprModel) (v value, _ bool) {
 			return
 		}
 		exprToks := toks[i+1:]
-		m.appendSubNode(exprNode{"(" + dt.String() + ")"})
+		m.appendSubNode(exprNode{tokens.LPARENTHESES + dt.String() + tokens.RPARENTHESES})
 		val := p.evalExprPart(exprToks, m)
 		val = p.evalCast(val, dt, errTok)
 		return val, true
@@ -2203,9 +2203,9 @@ func (p *Parser) evalParenthesesRangeExpr(toks Toks, m *exprModel) (v value) {
 			continue
 		}
 		switch tok.Kind {
-		case ")", "}", "]":
+		case tokens.RBRACE, tokens.RBRACKET, tokens.RPARENTHESES:
 			braceCount++
-		case "(", "{", "[":
+		default:
 			braceCount--
 		}
 		if braceCount > 0 {
@@ -2216,8 +2216,8 @@ func (p *Parser) evalParenthesesRangeExpr(toks Toks, m *exprModel) (v value) {
 	}
 	if len(valueToks) == 0 && braceCount == 0 {
 		// Write parentheses.
-		m.appendSubNode(exprNode{"("})
-		defer m.appendSubNode(exprNode{")"})
+		m.appendSubNode(exprNode{tokens.LPARENTHESES})
+		defer m.appendSubNode(exprNode{tokens.RPARENTHESES})
 
 		tk := toks[0]
 		toks = toks[1 : len(toks)-1]
@@ -2232,8 +2232,8 @@ func (p *Parser) evalParenthesesRangeExpr(toks Toks, m *exprModel) (v value) {
 	v = p.evalExprPart(valueToks, m)
 
 	// Write parentheses.
-	m.appendSubNode(exprNode{"("})
-	defer m.appendSubNode(exprNode{")"})
+	m.appendSubNode(exprNode{tokens.LPARENTHESES})
+	defer m.appendSubNode(exprNode{tokens.RPARENTHESES})
 
 	switch {
 	case typeIsFunc(v.ast.Type):
@@ -2256,9 +2256,9 @@ func (p *Parser) evalBraceRangeExpr(toks Toks, m *exprModel) (v value) {
 			continue
 		}
 		switch tok.Kind {
-		case "}", "]", ")":
+		case tokens.RBRACE, tokens.RBRACKET, tokens.RPARENTHESES:
 			braceCount++
-		case "{", "(", "[":
+		default:
 			braceCount--
 		}
 		if braceCount > 0 {
@@ -2275,7 +2275,7 @@ func (p *Parser) evalBraceRangeExpr(toks Toks, m *exprModel) (v value) {
 	switch exprToks[0].Id {
 	case tokens.Brace:
 		switch exprToks[0].Kind {
-		case "[":
+		case tokens.LBRACKET:
 			b := ast.NewBuilder(nil)
 			t, ok := b.DataType(exprToks, new(int), true)
 			if !ok {
@@ -2292,7 +2292,7 @@ func (p *Parser) evalBraceRangeExpr(toks Toks, m *exprModel) (v value) {
 			}
 			m.appendSubNode(model)
 			return
-		case "(":
+		case tokens.LPARENTHESES:
 			b := ast.NewBuilder(toks)
 			f := b.Func(b.Toks, true)
 			if len(b.Errs) > 0 {
@@ -2323,9 +2323,9 @@ func (p *Parser) evalBracketRangeExpr(toks Toks, m *exprModel) (v value) {
 			continue
 		}
 		switch tok.Kind {
-		case "}", "]", ")":
+		case tokens.RBRACE, tokens.RBRACKET, tokens.RPARENTHESES:
 			braceCount++
-		case "{", "(", "[":
+		default:
 			braceCount--
 		}
 		if braceCount > 0 {
@@ -2343,10 +2343,10 @@ func (p *Parser) evalBracketRangeExpr(toks Toks, m *exprModel) (v value) {
 	v, model = p.evalToks(exprToks)
 	m.appendSubNode(model)
 	toks = toks[len(exprToks)+1 : len(toks)-1] // Removed array syntax "["..."]"
-	m.appendSubNode(exprNode{"["})
+	m.appendSubNode(exprNode{tokens.LBRACKET})
 	selectv, model := p.evalToks(toks)
 	m.appendSubNode(model)
-	m.appendSubNode(exprNode{"]"})
+	m.appendSubNode(exprNode{tokens.RBRACKET})
 	return p.evalEnumerableSelect(v, selectv, toks[0])
 }
 
@@ -2408,7 +2408,7 @@ func (p *Parser) buildEnumerableParts(toks Toks) []Toks {
 	for i, tok := range toks {
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
-			case "{", "[", "(":
+			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
 				braceCount++
 			default:
 				braceCount--
@@ -2467,7 +2467,7 @@ func (p *Parser) buildMap(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
 		for i, tok := range part {
 			if tok.Id == tokens.Brace {
 				switch tok.Kind {
-				case "(", "[", "{":
+				case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
 					braceCount++
 				default:
 					braceCount--
@@ -2528,7 +2528,7 @@ func (p *Parser) checkAnonFunc(f *Func) {
 }
 
 func (p *Parser) getArgs(toks Toks) *ast.Args {
-	toks, _ = p.getRange("(", ")", toks)
+	toks, _ = p.getRange(tokens.LPARENTHESES, tokens.RPARENTHESES, toks)
 	if toks == nil {
 		toks = make(Toks, 0)
 	}
@@ -3181,7 +3181,7 @@ func (rc *retChecker) checkepxrs() {
 	for i, tok := range rc.retAST.Expr.Toks {
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
-			case "(", "{", "[":
+			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
 				braceCount++
 			default:
 				braceCount--

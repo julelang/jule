@@ -670,6 +670,12 @@ std::ostream& operator<<(std::ostream &_Stream,
   return _Stream;
 }
 
+template<typename _Function_t, typename _Tuple_t, size_t ... _I_t>
+inline auto tuple_as_args(const _Function_t _Function,
+                          const _Tuple_t _Tuple,
+                          const std::index_sequence<_I_t ...>)
+{ return _Function(std::get<_I_t>(_Tuple) ...); }
+
 template<typename _Function_t, typename _Tuple_t>
 inline auto tuple_as_args(const _Function_t _Function, const _Tuple_t _Tuple) {
   static constexpr auto _size{std::tuple_size<_Tuple_t>::value};

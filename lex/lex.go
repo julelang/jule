@@ -81,11 +81,11 @@ func (l *Lex) checkRangesAsync() {
 	defer func() { l.wg.Done() }()
 	for _, tok := range l.braces {
 		switch tok.Kind {
-		case "(":
+		case tokens.LPARENTHESES:
 			l.pusherrtok(tok, "wait_close_parentheses")
-		case "{":
+		case tokens.LBRACE:
 			l.pusherrtok(tok, "wait_close_brace")
-		case "[":
+		case tokens.LBRACKET:
 			l.pusherrtok(tok, "wait_close_bracket")
 		}
 	}
@@ -173,7 +173,7 @@ func (l *Lex) rangecomment() {
 			continue
 		}
 		l.Column += len(string(run))
-		if strings.HasPrefix(string(l.File.Data[l.Pos:]), "*/") {
+		if strings.HasPrefix(string(l.File.Data[l.Pos:]), tokens.RANGE_COMMENT_CLOSE) {
 			l.Column += 2
 			l.Pos += 2
 			return
@@ -333,44 +333,44 @@ func (l *Lex) Tok() Tok {
 		tok.Kind = l.str(txt)
 		tok.Id = tokens.Value
 		return tok
-	case strings.HasPrefix(txt, "//"):
+	case strings.HasPrefix(txt, tokens.LINE_COMMENT):
 		l.lncomment(&tok)
 		goto ret
-	case strings.HasPrefix(txt, "/*"):
+	case strings.HasPrefix(txt, tokens.RANGE_COMMENT_OPEN):
 		l.rangecomment()
 		return tok
-	case l.punct(txt, "(", tokens.Brace, &tok):
+	case l.punct(txt, tokens.LPARENTHESES, tokens.Brace, &tok):
 		l.braces = append(l.braces, tok)
-	case l.punct(txt, ")", tokens.Brace, &tok):
+	case l.punct(txt, tokens.RPARENTHESES, tokens.Brace, &tok):
 		len := len(l.braces)
 		if len == 0 {
 			l.pusherrtok(tok, "extra_closed_parentheses")
 			break
-		} else if l.braces[len-1].Kind != "(" {
+		} else if l.braces[len-1].Kind != tokens.LPARENTHESES {
 			l.wg.Add(1)
 			go l.pushWrongOrderCloseErrAsync(tok)
 		}
 		l.rmrange(len-1, tok.Kind)
-	case l.punct(txt, "{", tokens.Brace, &tok):
+	case l.punct(txt, tokens.LBRACE, tokens.Brace, &tok):
 		l.braces = append(l.braces, tok)
-	case l.punct(txt, "}", tokens.Brace, &tok):
+	case l.punct(txt, tokens.RBRACE, tokens.Brace, &tok):
 		len := len(l.braces)
 		if len == 0 {
 			l.pusherrtok(tok, "extra_closed_braces")
 			break
-		} else if l.braces[len-1].Kind != "{" {
+		} else if l.braces[len-1].Kind != tokens.LBRACE {
 			l.wg.Add(1)
 			go l.pushWrongOrderCloseErrAsync(tok)
 		}
 		l.rmrange(len-1, tok.Kind)
-	case l.punct(txt, "[", tokens.Brace, &tok):
+	case l.punct(txt, tokens.LBRACKET, tokens.Brace, &tok):
 		l.braces = append(l.braces, tok)
-	case l.punct(txt, "]", tokens.Brace, &tok):
+	case l.punct(txt, tokens.RBRACKET, tokens.Brace, &tok):
 		len := len(l.braces)
 		if len == 0 {
 			l.pusherrtok(tok, "extra_closed_brackets")
 			break
-		} else if l.braces[len-1].Kind != "[" {
+		} else if l.braces[len-1].Kind != tokens.LBRACKET {
 			l.wg.Add(1)
 			go l.pushWrongOrderCloseErrAsync(tok)
 		}
@@ -478,12 +478,12 @@ ret:
 func (l *Lex) rmrange(i int, kind string) {
 	var close string
 	switch kind {
-	case ")":
-		close = "("
-	case "}":
-		close = "{"
-	case "]":
-		close = "["
+	case tokens.RPARENTHESES:
+		close = tokens.LPARENTHESES
+	case tokens.RBRACE:
+		close = tokens.LBRACE
+	case tokens.RBRACKET:
+		close = tokens.LBRACKET
 	}
 	for ; i >= 0; i-- {
 		tok := l.braces[i]
@@ -499,11 +499,11 @@ func (l *Lex) pushWrongOrderCloseErrAsync(tok Tok) {
 	defer func() { l.wg.Done() }()
 	var msg string
 	switch l.braces[len(l.braces)-1].Kind {
-	case "(":
+	case tokens.LPARENTHESES:
 		msg = "expected_parentheses_close"
-	case "{":
+	case tokens.LBRACE:
 		msg = "expected_brace_close"
-	case "[":
+	case tokens.LBRACKET:
 		msg = "expected_bracket_close"
 	}
 	l.pusherrtok(tok, msg)

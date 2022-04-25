@@ -31,7 +31,6 @@ func ToRawStr(literal string) string {
 // ToChar returns specified literal as X rune literal for cxx.
 func ToChar(literal string) string {
 	var cxx strings.Builder
-	cxx.WriteString(StrMark)
 	cxx.WriteString(literal)
 	return cxx.String()
 }
