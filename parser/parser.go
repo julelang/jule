@@ -1968,6 +1968,24 @@ func (p *Parser) evalI32SubId(typeTok, idTok Tok, m *exprModel) (v value) {
 	return
 }
 
+func (p *Parser) evalI64SubId(typeTok, idTok Tok, m *exprModel) (v value) {
+	i, dm, t := i64statics.defById(idTok.Kind, nil)
+	if i == -1 {
+		p.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
+		return
+	}
+	v.lvalue = false
+	v.ast.Data = idTok.Kind
+	switch t {
+	case 'g':
+		g := dm.Globals[i]
+		m.appendSubNode(exprNode{g.Tag.(string)})
+		v.ast.Type = g.Type
+		v.constant = g.Const
+	}
+	return
+}
+
 func (p *Parser) evalTypeSubId(typeTok, idTok Tok, m *exprModel) (v value) {
 	switch typeTok.Kind {
 	case "i8":
@@ -1976,6 +1994,8 @@ func (p *Parser) evalTypeSubId(typeTok, idTok Tok, m *exprModel) (v value) {
 		return p.evalI16SubId(typeTok, idTok, m)
 	case "i32":
 		return p.evalI32SubId(typeTok, idTok, m)
+	case "i64":
+		return p.evalI64SubId(typeTok, idTok, m)
 	}
 	p.pusherrtok(typeTok, "obj_not_support_sub_fields", typeTok.Kind)
 	return

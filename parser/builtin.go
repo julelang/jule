@@ -53,6 +53,23 @@ var i32statics = &Defmap{
 	},
 }
 
+var i64statics = &Defmap{
+	Globals: []*Var{
+		{
+			Id:    "max",
+			Const: true,
+			Type:  DataType{Id: x.I64, Val: "i64"},
+			Tag:   "INT64_MAX",
+		},
+		{
+			Id:    "min",
+			Const: true,
+			Type:  DataType{Id: x.I64, Val: "i64"},
+			Tag:   "INT64_MIN",
+		},
+	},
+}
+
 var builtinFuncs = []*function{
 	{
 		Ast: Func{
