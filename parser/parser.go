@@ -10,11 +10,13 @@ import (
 
 	"github.com/the-xlang/xxc/ast"
 	"github.com/the-xlang/xxc/lex"
+	"github.com/the-xlang/xxc/lex/tokens"
 	"github.com/the-xlang/xxc/pkg/x"
 	"github.com/the-xlang/xxc/pkg/xapi"
 	"github.com/the-xlang/xxc/pkg/xbits"
 	"github.com/the-xlang/xxc/pkg/xio"
 	"github.com/the-xlang/xxc/pkg/xlog"
+	"github.com/the-xlang/xxc/pkg/xtype"
 	"github.com/the-xlang/xxc/preprocessor"
 )
 
@@ -579,7 +581,7 @@ func (p *Parser) checkAttribute(obj ast.Obj) {
 }
 
 func (p *Parser) checkTypeAST(t Type) bool {
-	if tok, _, canshadow := p.existid(t.Id); tok.Id != lex.NA && !canshadow {
+	if tok, _, canshadow := p.existid(t.Id); tok.Id != tokens.NA && !canshadow {
 		p.pusherrtok(t.Tok, "exist_id", t.Id)
 		return false
 	} else if xapi.IsIgnoreId(t.Id) {
@@ -715,7 +717,7 @@ func (p *Parser) params(params *[]Param) {
 
 // Func parse X function.
 func (p *Parser) Func(fast Func) {
-	if tok, _, canshadow := p.existid(fast.Id); tok.Id != lex.NA && !canshadow {
+	if tok, _, canshadow := p.existid(fast.Id); tok.Id != tokens.NA && !canshadow {
 		p.pusherrtok(fast.Tok, "exist_id", fast.Id)
 	} else if xapi.IsIgnoreId(fast.Id) {
 		p.pusherrtok(fast.Tok, "ignore_id")
@@ -734,7 +736,7 @@ func (p *Parser) Func(fast Func) {
 
 // ParseVariable parse X global variable.
 func (p *Parser) Global(vast Var) {
-	if tok, m, _ := p.existid(vast.Id); tok.Id != lex.NA && m == p.Defs {
+	if tok, m, _ := p.existid(vast.Id); tok.Id != tokens.NA && m == p.Defs {
 		p.pusherrtok(vast.IdTok, "exist_id", vast.Id)
 		return
 	}
@@ -756,13 +758,13 @@ func (p *Parser) Var(v Var) *Var {
 	case value:
 		val = t
 	default:
-		if v.SetterTok.Id != lex.NA {
+		if v.SetterTok.Id != tokens.NA {
 			val, v.Val.Model = p.evalExpr(v.Val)
 		}
 	}
-	if v.Type.Id != x.Void {
+	if v.Type.Id != xtype.Void {
 		v.Type, _ = p.readyType(v.Type, true)
-		if v.SetterTok.Id != lex.NA {
+		if v.SetterTok.Id != tokens.NA {
 			p.wg.Add(1)
 			go assignChecker{
 				p,
@@ -774,7 +776,7 @@ func (p *Parser) Var(v Var) *Var {
 			}.checkAssignTypeAsync()
 		}
 	} else {
-		if v.SetterTok.Id == lex.NA {
+		if v.SetterTok.Id == tokens.NA {
 			p.pusherrtok(v.IdTok, "missing_autotype_value")
 		} else {
 			v.Type = val.ast.Type
@@ -786,7 +788,7 @@ func (p *Parser) Var(v Var) *Var {
 		if !typeIsAllowForConst(v.Type) {
 			p.pusherrtok(v.IdTok, "invalid_type_for_const", v.Type.Val)
 		}
-		if v.SetterTok.Id == lex.NA {
+		if v.SetterTok.Id == tokens.NA {
 			p.pusherrtok(v.IdTok, "missing_const_value")
 		}
 	}
@@ -994,8 +996,8 @@ func eliminateProcesses(processes *[]Toks, i, to int) {
 func (p *Parser) evalLogicProcesses(processes []Toks) (v value, e iExpr) {
 	m := new(exprModel)
 	e = m
-	v.ast.Type.Id = x.Bool
-	v.ast.Type.Val = "bool"
+	v.ast.Type.Id = xtype.Bool
+	v.ast.Type.Val = tokens.BOOL
 	last := 0
 	evalProcesses := func(tok Tok, i int) {
 		exprProcesses := processes[last:i]
@@ -1012,9 +1014,9 @@ func (p *Parser) evalLogicProcesses(processes []Toks) (v value, e iExpr) {
 		}
 		tok := process[0]
 		switch {
-		case tok.Id != lex.Operator:
+		case tok.Id != tokens.Operator:
 			continue
-		case tok.Kind != "&&" && tok.Kind != "||":
+		case tok.Kind != tokens.AND && tok.Kind != tokens.OR:
 			continue
 		}
 		evalProcesses(tok, i)
@@ -1039,10 +1041,10 @@ func (p *Parser) evalNonLogicProcesses(processes []Toks) (v value, e iExpr) {
 	boolean := false
 	for i := p.nextOperator(processes); i != -1 && !noData(processes); i = p.nextOperator(processes) {
 		if !boolean {
-			boolean = v.ast.Type.Id == x.Bool
+			boolean = v.ast.Type.Id == xtype.Bool
 		}
 		if boolean {
-			v.ast.Type.Id = x.Bool
+			v.ast.Type.Id = xtype.Bool
 		}
 		m.index = i
 		process.operator = processes[m.index][0]
@@ -1079,8 +1081,8 @@ func (p *Parser) evalNonLogicProcesses(processes []Toks) (v value, e iExpr) {
 		process.right = processes[m.index]
 		process.rightVal = p.evalExprPart(process.right, m).ast
 		solvedv := process.Solve()
-		if v.ast.Type.Id != x.Void {
-			process.operator.Kind = "+"
+		if v.ast.Type.Id != xtype.Void {
+			process.operator.Kind = tokens.PLUS
 			process.leftVal = v.ast
 			process.right = processes[i+1]
 			process.rightVal = solvedv
@@ -1113,7 +1115,7 @@ func noData(processes []Toks) bool {
 }
 
 func isOperator(process Toks) bool {
-	return len(process) == 1 && process[0].Id == lex.Operator
+	return len(process) == 1 && process[0].Id == tokens.Operator
 }
 
 // nextOperator find index of priority operator and returns index of operator
@@ -1132,11 +1134,13 @@ func (p *Parser) nextOperator(processes []Toks) int {
 			continue
 		}
 		switch process[0].Kind {
-		case "*", "/", "%", "<<", ">>", "&":
+		case tokens.STAR, tokens.SLASH, tokens.PERCENT,
+			tokens.LSHIFT, tokens.RSHIFT, tokens.AMPER:
 			precedence5 = i
-		case "+", "-", "|", "^":
+		case tokens.PLUS, tokens.MINUS, tokens.VLINE, tokens.CARET:
 			precedence4 = i
-		case "==", "!=", "<", "<=", ">", ">=":
+		case tokens.EQUALS, tokens.NOT_EQUALS, tokens.LESS, tokens.LESS_EQUAL,
+			tokens.GREAT, tokens.GREAT_EQUAL:
 			precedence3 = i
 		default:
 			p.pusherrtok(process[0], "invalid_operator")
@@ -1162,7 +1166,7 @@ func isLogicEval(processes []Toks) bool {
 			continue
 		}
 		switch process[0].Kind {
-		case "&&", "||":
+		case tokens.AND, tokens.OR:
 			return true
 		}
 	}
@@ -1195,8 +1199,8 @@ type valueEvaluator struct {
 func (p *valueEvaluator) str() value {
 	var v value
 	v.ast.Data = p.tok.Kind
-	v.ast.Type.Id = x.Str
-	v.ast.Type.Val = "str"
+	v.ast.Type.Id = xtype.Str
+	v.ast.Type.Val = tokens.STR
 	if israwstr(p.tok.Kind) {
 		p.model.appendSubNode(exprNode{toRawStrLiteral(p.tok.Kind)})
 	} else {
@@ -1224,8 +1228,8 @@ func (p *valueEvaluator) char() value {
 	var v value
 	v.ast.Data = p.tok.Kind
 	literal, _ := toCharLiteral(p.tok.Kind)
-	v.ast.Type.Id = x.Char
-	v.ast.Type.Val = "char"
+	v.ast.Type.Id = xtype.Char
+	v.ast.Type.Val = tokens.CHAR
 	p.model.appendSubNode(exprNode{literal})
 	return v
 }
@@ -1233,8 +1237,8 @@ func (p *valueEvaluator) char() value {
 func (p *valueEvaluator) bool() value {
 	var v value
 	v.ast.Data = p.tok.Kind
-	v.ast.Type.Id = x.Bool
-	v.ast.Type.Val = "bool"
+	v.ast.Type.Id = xtype.Bool
+	v.ast.Type.Val = tokens.BOOL
 	p.model.appendSubNode(exprNode{p.tok.Kind})
 	return v
 }
@@ -1242,8 +1246,8 @@ func (p *valueEvaluator) bool() value {
 func (p *valueEvaluator) nil() value {
 	var v value
 	v.ast.Data = p.tok.Kind
-	v.ast.Type.Id = x.Nil
-	v.ast.Type.Val = x.NilTypeStr
+	v.ast.Type.Id = xtype.Nil
+	v.ast.Type.Val = xtype.NilTypeStr
 	p.model.appendSubNode(exprNode{p.tok.Kind})
 	return v
 }
@@ -1252,17 +1256,17 @@ func (p *valueEvaluator) num() value {
 	var v value
 	v.ast.Data = p.tok.Kind
 	p.model.appendSubNode(exprNode{p.tok.Kind})
-	if strings.Contains(p.tok.Kind, ".") ||
+	if strings.Contains(p.tok.Kind, tokens.DOT) ||
 		strings.ContainsAny(p.tok.Kind, "eE") {
-		v.ast.Type.Id = x.F64
-		v.ast.Type.Val = "f64"
+		v.ast.Type.Id = xtype.F64
+		v.ast.Type.Val = tokens.F64
 	} else {
-		v.ast.Type.Id = x.I32
-		v.ast.Type.Val = "i32"
+		v.ast.Type.Id = xtype.I32
+		v.ast.Type.Val = tokens.I32
 		ok := xbits.CheckBitInt(p.tok.Kind, 32)
 		if !ok {
-			v.ast.Type.Id = x.I64
-			v.ast.Type.Val = "i64"
+			v.ast.Type.Id = xtype.I64
+			v.ast.Type.Val = tokens.I64
 		}
 	}
 	return v
@@ -1283,7 +1287,7 @@ func (p *valueEvaluator) id() (v value, ok bool) {
 	} else if f, _, _ := p.p.FuncById(id); f != nil {
 		f.used = true
 		v.ast.Data = id
-		v.ast.Type.Id = x.Func
+		v.ast.Type.Id = xtype.Func
 		v.ast.Type.Tag = f.Ast
 		v.ast.Type.Val = f.Ast.DataTypeString()
 		v.ast.Tok = f.Ast.Tok
@@ -1313,15 +1317,15 @@ func (s solver) ptr() (v ast.Value) {
 		return
 	}
 	switch s.operator.Kind {
-	case "+", "-":
+	case tokens.PLUS, tokens.MINUS:
 		if typeIsPtr(s.leftVal.Type) {
 			v.Type = s.leftVal.Type
 		} else {
 			v.Type = s.rightVal.Type
 		}
-	case "!=", "==":
-		v.Type.Id = x.Bool
-		v.Type.Val = "bool"
+	case tokens.EQUALS, tokens.NOT_EQUALS:
+		v.Type.Id = xtype.Bool
+		v.Type.Val = tokens.BOOL
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "pointer")
 	}
@@ -1337,14 +1341,15 @@ func (s solver) str() (v ast.Value) {
 		return
 	}
 	switch s.operator.Kind {
-	case "+":
-		v.Type.Id = x.Str
-		v.Type.Val = "str"
-	case "==", "!=":
-		v.Type.Id = x.Bool
-		v.Type.Val = "bool"
+	case tokens.STAR:
+		v.Type.Id = xtype.Str
+		v.Type.Val = tokens.STR
+	case tokens.EQUALS, tokens.NOT_EQUALS:
+		v.Type.Id = xtype.Bool
+		v.Type.Val = tokens.BOOL
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "str")
+		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
+		s.operator.Kind, tokens.STR)
 	}
 	return
 }
@@ -1352,9 +1357,9 @@ func (s solver) str() (v ast.Value) {
 func (s solver) any() (v ast.Value) {
 	v.Tok = s.operator
 	switch s.operator.Kind {
-	case "!=", "==":
-		v.Type.Id = x.Bool
-		v.Type.Val = "bool"
+	case tokens.EQUALS, tokens.NOT_EQUALS:
+		v.Type.Id = xtype.Bool
+		v.Type.Val = tokens.BOOL
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "any")
 	}
@@ -1369,30 +1374,32 @@ func (s solver) bool() (v ast.Value) {
 		return
 	}
 	switch s.operator.Kind {
-	case "!=", "==":
-		v.Type.Id = x.Bool
-		v.Type.Val = "bool"
+	case tokens.EQUALS, tokens.NOT_EQUALS:
+		v.Type.Id = xtype.Bool
+		v.Type.Val = tokens.BOOL
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "bool")
+		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
+			s.operator.Kind, tokens.BOOL)
 	}
 	return
 }
 
 func (s solver) float() (v ast.Value) {
 	v.Tok = s.operator
-	if !x.IsNumericType(s.leftVal.Type.Id) || !x.IsNumericType(s.rightVal.Type.Id) {
+	if !xtype.IsNumericType(s.leftVal.Type.Id) || !xtype.IsNumericType(s.rightVal.Type.Id) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.Type.Val, s.leftVal.Type.Val)
 		return
 	}
 	switch s.operator.Kind {
-	case "!=", "==", "<", ">", ">=", "<=":
-		v.Type.Id = x.Bool
-		v.Type.Val = "bool"
-	case "+", "-", "*", "/":
-		v.Type.Id = x.F32
-		if s.leftVal.Type.Id == x.F64 || s.rightVal.Type.Id == x.F64 {
-			v.Type.Id = x.F64
+	case tokens.EQUALS, tokens.NOT_EQUALS, tokens.LESS, tokens.GREAT,
+		tokens.GREAT_EQUAL, tokens.LESS_EQUAL:
+		v.Type.Id = xtype.Bool
+		v.Type.Val = tokens.BOOL
+	case tokens.PLUS, tokens.MINUS, tokens.STAR, tokens.SLASH:
+		v.Type.Id = xtype.F32
+		if s.leftVal.Type.Id == xtype.F64 || s.rightVal.Type.Id == xtype.F64 {
+			v.Type.Id = xtype.F64
 		}
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_float", s.operator.Kind)
@@ -1402,24 +1409,26 @@ func (s solver) float() (v ast.Value) {
 
 func (s solver) signed() (v ast.Value) {
 	v.Tok = s.operator
-	if !x.IsNumericType(s.leftVal.Type.Id) || !x.IsNumericType(s.rightVal.Type.Id) {
+	if !xtype.IsNumericType(s.leftVal.Type.Id) || !xtype.IsNumericType(s.rightVal.Type.Id) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.Type.Val, s.leftVal.Type.Val)
 		return
 	}
 	switch s.operator.Kind {
-	case "!=", "==", "<", ">", ">=", "<=":
-		v.Type.Id = x.Bool
-		v.Type.Val = "bool"
-	case "+", "-", "*", "/", "%", "&", "|", "^":
+	case tokens.EQUALS, tokens.NOT_EQUALS, tokens.LESS,
+		tokens.GREAT, tokens.GREAT_EQUAL, tokens.LESS_EQUAL:
+		v.Type.Id = xtype.Bool
+		v.Type.Val = tokens.BOOL
+	case tokens.PLUS, tokens.MINUS, tokens.STAR, tokens.SLASH,
+		tokens.PERCENT, tokens.AMPER, tokens.VLINE, tokens.CARET:
 		v.Type = s.leftVal.Type
-		if x.TypeGreaterThan(s.rightVal.Type.Id, v.Type.Id) {
+		if xtype.TypeGreaterThan(s.rightVal.Type.Id, v.Type.Id) {
 			v.Type = s.rightVal.Type
 		}
-	case ">>", "<<":
+	case tokens.RSHIFT, tokens.LSHIFT:
 		v.Type = s.leftVal.Type
-		if !x.IsUnsignedNumericType(s.rightVal.Type.Id) &&
-			!checkIntBit(s.rightVal, xbits.BitsizeType(x.U64)) {
+		if !xtype.IsUnsignedNumericType(s.rightVal.Type.Id) &&
+			!checkIntBit(s.rightVal, xbits.BitsizeType(xtype.U64)) {
 			s.p.pusherrtok(s.rightVal.Tok, "bitshift_must_unsigned")
 		}
 	default:
@@ -1430,21 +1439,23 @@ func (s solver) signed() (v ast.Value) {
 
 func (s solver) unsigned() (v ast.Value) {
 	v.Tok = s.operator
-	if !x.IsNumericType(s.leftVal.Type.Id) || !x.IsNumericType(s.rightVal.Type.Id) {
+	if !xtype.IsNumericType(s.leftVal.Type.Id) || !xtype.IsNumericType(s.rightVal.Type.Id) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.Type.Val, s.leftVal.Type.Val)
 		return
 	}
 	switch s.operator.Kind {
-	case "!=", "==", "<", ">", ">=", "<=":
-		v.Type.Id = x.Bool
-		v.Type.Val = "bool"
-	case "+", "-", "*", "/", "%", "&", "|", "^":
+	case tokens.EQUALS, tokens.NOT_EQUALS, tokens.LESS,
+		tokens.GREAT, tokens.GREAT_EQUAL, tokens.LESS_EQUAL:
+		v.Type.Id = xtype.Bool
+		v.Type.Val = tokens.BOOL
+	case tokens.PLUS, tokens.MINUS, tokens.STAR, tokens.SLASH,
+		tokens.PERCENT, tokens.AMPER, tokens.VLINE, tokens.CARET:
 		v.Type = s.leftVal.Type
-		if x.TypeGreaterThan(s.rightVal.Type.Id, v.Type.Id) {
+		if xtype.TypeGreaterThan(s.rightVal.Type.Id, v.Type.Id) {
 			v.Type = s.rightVal.Type
 		}
-	case ">>", "<<":
+	case tokens.RSHIFT, tokens.LSHIFT:
 		v.Type = s.leftVal.Type
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_uint", s.operator.Kind)
@@ -1454,12 +1465,12 @@ func (s solver) unsigned() (v ast.Value) {
 
 func (s solver) logical() (v ast.Value) {
 	v.Tok = s.operator
-	v.Type.Id = x.Bool
-	v.Type.Val = "bool"
-	if s.leftVal.Type.Id != x.Bool {
+	v.Type.Id = xtype.Bool
+	v.Type.Val = tokens.BOOL
+	if s.leftVal.Type.Id != xtype.Bool {
 		s.p.pusherrtok(s.leftVal.Tok, "logical_not_bool")
 	}
-	if s.rightVal.Type.Id != x.Bool {
+	if s.rightVal.Type.Id != xtype.Bool {
 		s.p.pusherrtok(s.rightVal.Tok, "logical_not_bool")
 	}
 	return
@@ -1473,11 +1484,12 @@ func (s solver) char() (v ast.Value) {
 		return
 	}
 	switch s.operator.Kind {
-	case "!=", "==":
-		v.Type.Id = x.Bool
-		v.Type.Val = "bool"
+	case tokens.EQUALS, tokens.NOT_EQUALS:
+		v.Type.Id = xtype.Bool
+		v.Type.Val = tokens.BOOL
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "char")
+		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
+		s.operator.Kind, tokens.CHAR)
 	}
 	return
 }
@@ -1490,9 +1502,9 @@ func (s solver) array() (v ast.Value) {
 		return
 	}
 	switch s.operator.Kind {
-	case "!=", "==":
-		v.Type.Id = x.Bool
-		v.Type.Val = "bool"
+	case tokens.EQUALS, tokens.NOT_EQUALS:
+		v.Type.Id = xtype.Bool
+		v.Type.Val = tokens.BOOL
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "array")
 	}
@@ -1507,26 +1519,28 @@ func (s solver) nil() (v ast.Value) {
 		return
 	}
 	switch s.operator.Kind {
-	case "!=", "==":
-		v.Type.Id = x.Bool
-		v.Type.Val = "bool"
+	case tokens.NOT_EQUALS, tokens.EQUALS:
+		v.Type.Id = xtype.Bool
+		v.Type.Val = tokens.BOOL
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "nil")
+		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
+		s.operator.Kind, tokens.NIL)
 	}
 	return
 }
 
 func (s solver) Solve() (v ast.Value) {
 	defer func() {
-		if v.Type.Id == x.Void {
-			v.Type.Val = x.VoidTypeStr
+		if v.Type.Id == xtype.Void {
+			v.Type.Val = xtype.VoidTypeStr
 		}
 	}()
 	switch s.operator.Kind {
-	case "+", "-", "*", "/", "%", ">>",
-		"<<", "&", "|", "^", "==", "!=", ">", "<", ">=", "<=":
+	case tokens.PLUS, tokens.MINUS, tokens.STAR, tokens.SLASH, tokens.PERCENT, tokens.RSHIFT,
+		tokens.LSHIFT, tokens.AMPER, tokens.VLINE, tokens.CARET, tokens.EQUALS, tokens.NOT_EQUALS,
+		tokens.GREAT, tokens.LESS, tokens.GREAT_EQUAL, tokens.LESS_EQUAL:
 		break
-	case "&&", "||":
+	case tokens.AND, tokens.OR:
 		return s.logical()
 	default:
 		s.p.pusherrtok(s.operator, "invalid_operator")
@@ -1536,24 +1550,24 @@ func (s solver) Solve() (v ast.Value) {
 		return s.array()
 	case typeIsPtr(s.leftVal.Type) || typeIsPtr(s.rightVal.Type):
 		return s.ptr()
-	case s.leftVal.Type.Id == x.Nil || s.rightVal.Type.Id == x.Nil:
+	case s.leftVal.Type.Id == xtype.Nil || s.rightVal.Type.Id == xtype.Nil:
 		return s.nil()
-	case s.leftVal.Type.Id == x.Char || s.rightVal.Type.Id == x.Char:
+	case s.leftVal.Type.Id == xtype.Char || s.rightVal.Type.Id == xtype.Char:
 		return s.char()
-	case s.leftVal.Type.Id == x.Any || s.rightVal.Type.Id == x.Any:
+	case s.leftVal.Type.Id == xtype.Any || s.rightVal.Type.Id == xtype.Any:
 		return s.any()
-	case s.leftVal.Type.Id == x.Bool || s.rightVal.Type.Id == x.Bool:
+	case s.leftVal.Type.Id == xtype.Bool || s.rightVal.Type.Id == xtype.Bool:
 		return s.bool()
-	case s.leftVal.Type.Id == x.Str || s.rightVal.Type.Id == x.Str:
+	case s.leftVal.Type.Id == xtype.Str || s.rightVal.Type.Id == xtype.Str:
 		return s.str()
-	case x.IsFloatType(s.leftVal.Type.Id) ||
-		x.IsFloatType(s.rightVal.Type.Id):
+	case xtype.IsFloatType(s.leftVal.Type.Id) ||
+		xtype.IsFloatType(s.rightVal.Type.Id):
 		return s.float()
-	case x.IsUnsignedNumericType(s.leftVal.Type.Id) ||
-		x.IsUnsignedNumericType(s.rightVal.Type.Id):
+	case xtype.IsUnsignedNumericType(s.leftVal.Type.Id) ||
+		xtype.IsUnsignedNumericType(s.rightVal.Type.Id):
 		return s.unsigned()
-	case x.IsSignedNumericType(s.leftVal.Type.Id) ||
-		x.IsSignedNumericType(s.rightVal.Type.Id):
+	case xtype.IsSignedNumericType(s.leftVal.Type.Id) ||
+		xtype.IsSignedNumericType(s.rightVal.Type.Id):
 		return s.signed()
 	}
 	return
@@ -1561,10 +1575,11 @@ func (s solver) Solve() (v ast.Value) {
 
 func (p *Parser) evalSingleExpr(tok Tok, m *exprModel) (v value, ok bool) {
 	eval := valueEvaluator{tok, m, p}
-	v.ast.Type.Id = x.Void
+	v.ast.Type.Id = xtype.Void
+	v.ast.Type.Val = xtype.VoidTypeStr
 	v.ast.Tok = tok
 	switch tok.Id {
-	case lex.Value:
+	case tokens.Value:
 		ok = true
 		switch {
 		case isstr(tok.Kind):
@@ -1578,7 +1593,7 @@ func (p *Parser) evalSingleExpr(tok Tok, m *exprModel) (v value, ok bool) {
 		default:
 			v = eval.num()
 		}
-	case lex.Id:
+	case tokens.Id:
 		v, ok = eval.id()
 	default:
 		p.pusherrtok(tok, "invalid_syntax")
@@ -1597,11 +1612,11 @@ func (p *unaryProcessor) minus() value {
 	v := p.parser.evalExprPart(p.toks, p.model)
 	if !typeIsSingle(v.ast.Type) {
 		p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", '-')
-	} else if !x.IsNumericType(v.ast.Type.Id) {
+	} else if !xtype.IsNumericType(v.ast.Type.Id) {
 		p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", '-')
 	}
 	if isConstNum(v.ast.Data) {
-		v.ast.Data = "-" + v.ast.Data
+		v.ast.Data = tokens.MINUS + v.ast.Data
 	}
 	return v
 }
@@ -1610,7 +1625,7 @@ func (p *unaryProcessor) plus() value {
 	v := p.parser.evalExprPart(p.toks, p.model)
 	if !typeIsSingle(v.ast.Type) {
 		p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", '+')
-	} else if !x.IsNumericType(v.ast.Type.Id) {
+	} else if !xtype.IsNumericType(v.ast.Type.Id) {
 		p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", '+')
 	}
 	return v
@@ -1620,7 +1635,7 @@ func (p *unaryProcessor) tilde() value {
 	v := p.parser.evalExprPart(p.toks, p.model)
 	if !typeIsSingle(v.ast.Type) {
 		p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", '~')
-	} else if !x.IsIntegerType(v.ast.Type.Id) {
+	} else if !xtype.IsIntegerType(v.ast.Type.Id) {
 		p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", '~')
 	}
 	return v
@@ -1631,15 +1646,15 @@ func (p *unaryProcessor) logicalNot() value {
 	if !isBoolExpr(v) {
 		p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", '!')
 	}
-	v.ast.Type.Val = "bool"
-	v.ast.Type.Id = x.Bool
+	v.ast.Type.Id = xtype.Bool
+	v.ast.Type.Val = tokens.BOOL
 	return v
 }
 
 func (p *unaryProcessor) star() value {
 	v := p.parser.evalExprPart(p.toks, p.model)
 	v.lvalue = true
-	if v.ast.Type.Id == x.Voidptr || !typeIsPtr(v.ast.Type) {
+	if v.ast.Type.Id == xtype.Voidptr || !typeIsPtr(v.ast.Type) {
 		p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", '*')
 	} else {
 		v.ast.Type.Val = v.ast.Type.Val[1:]
@@ -1657,20 +1672,20 @@ func (p *unaryProcessor) amper() value {
 		switch t := (*node).(type) {
 		case anonFuncExpr:
 			if t.capture == xapi.LambdaByReference {
-				p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", "&")
+				p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", tokens.AMPER)
 				break
 			}
 			t.capture = xapi.LambdaByReference
 			*node = t
 		default:
-			p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", "&")
+			p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", tokens.AMPER)
 		}
 	default:
 		v.lvalue = true
 		if !canGetPtr(v) {
-			p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", "&")
+			p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", tokens.AMPER)
 		}
-		v.ast.Type.Val = "*" + v.ast.Type.Val
+		v.ast.Type.Val = tokens.STAR + v.ast.Type.Val
 	}
 	return v
 }
@@ -1688,17 +1703,17 @@ func (p *Parser) evalOperatorExprPart(toks Toks, m *exprModel) value {
 		return v
 	}
 	switch processor.tok.Kind {
-	case "-":
+	case tokens.MINUS:
 		v = processor.minus()
-	case "+":
+	case tokens.PLUS:
 		v = processor.plus()
-	case "~":
+	case tokens.TILDE:
 		v = processor.tilde()
-	case "!":
+	case tokens.EXCLAMATION:
 		v = processor.logicalNot()
-	case "*":
+	case tokens.STAR:
 		v = processor.star()
-	case "&":
+	case tokens.AMPER:
 		v = processor.amper()
 	default:
 		p.pusherrtok(processor.tok, "invalid_syntax")
@@ -1708,10 +1723,10 @@ func (p *Parser) evalOperatorExprPart(toks Toks, m *exprModel) value {
 }
 
 func canGetPtr(v value) bool {
-	if v.ast.Type.Id == x.Func {
+	if v.ast.Type.Id == xtype.Func {
 		return false
 	}
-	return v.ast.Tok.Id == lex.Id
+	return v.ast.Tok.Id == tokens.Id
 }
 
 func (p *Parser) evalHeapAllocExpr(toks Toks, m *exprModel) (v value) {
@@ -1726,7 +1741,7 @@ func (p *Parser) evalHeapAllocExpr(toks Toks, m *exprModel) (v value) {
 	i := new(int)
 	dt, ok := b.DataType(toks, i, true)
 	m.appendSubNode(newHeapAllocExpr{dt})
-	dt.Val = "*" + dt.Val
+	dt.Val = tokens.STAR + dt.Val
 	v.ast.Type = dt
 	if !ok {
 		p.pusherrtok(toks[0], "fail_build_heap_allocation_type", dt.Val)
@@ -1740,8 +1755,8 @@ func (p *Parser) evalHeapAllocExpr(toks Toks, m *exprModel) (v value) {
 
 func (p *Parser) evalExprPart(toks Toks, m *exprModel) (v value) {
 	defer func() {
-		if v.ast.Type.Id == x.Void {
-			v.ast.Type.Val = x.VoidTypeStr
+		if v.ast.Type.Id == xtype.Void {
+			v.ast.Type.Val = xtype.VoidTypeStr
 		}
 	}()
 	if len(toks) == 1 {
@@ -1750,11 +1765,11 @@ func (p *Parser) evalExprPart(toks Toks, m *exprModel) (v value) {
 	}
 	tok := toks[0]
 	switch tok.Id {
-	case lex.Operator:
+	case tokens.Operator:
 		return p.evalOperatorExprPart(toks, m)
-	case lex.New:
+	case tokens.New:
 		return p.evalHeapAllocExpr(toks, m)
-	case lex.Brace:
+	case tokens.Brace:
 		switch tok.Kind {
 		case "(":
 			val, ok := p.evalTryCastExpr(toks, m)
@@ -1771,11 +1786,11 @@ func (p *Parser) evalExprPart(toks Toks, m *exprModel) (v value) {
 	}
 	tok = toks[len(toks)-1]
 	switch tok.Id {
-	case lex.Id:
+	case tokens.Id:
 		return p.evalIdExprPart(toks, m)
-	case lex.Operator:
+	case tokens.Operator:
 		return p.evalOperatorExprPartRight(toks, m)
-	case lex.Brace:
+	case tokens.Brace:
 		switch tok.Kind {
 		case ")":
 			return p.evalParenthesesRangeExpr(toks, m)
@@ -1790,8 +1805,8 @@ func (p *Parser) evalExprPart(toks Toks, m *exprModel) (v value) {
 	return
 }
 
-func (p *Parser) evalStrSubId(val value, idTok Tok, m *exprModel) (v value) {
-	i, dm, t := strDefs.defById(idTok.Kind, nil)
+func (p *Parser) evalXObjSubId(dm *Defmap, val value, idTok Tok, m *exprModel) (v value) {
+	i, dm, t := dm.defById(idTok.Kind, nil)
 	if i == -1 {
 		p.pusherrtok(idTok, "obj_have_not_id", val.ast.Type.Val)
 		return
@@ -1807,69 +1822,27 @@ func (p *Parser) evalStrSubId(val value, idTok Tok, m *exprModel) (v value) {
 		v.constant = g.Const
 	case 'f':
 		f := dm.Funcs[i]
-		v.ast.Type.Id = x.Func
+		v.ast.Type.Id = xtype.Func
 		v.ast.Type.Tag = f.Ast
 		v.ast.Type.Val = f.Ast.DataTypeString()
 		v.ast.Tok = f.Ast.Tok
 		m.appendSubNode(exprNode{f.Ast.Id})
 	}
 	return
+}
+
+func (p *Parser) evalStrSubId(val value, idTok Tok, m *exprModel) (v value) {
+	return p.evalXObjSubId(strDefs, val, idTok, m)
 }
 
 func (p *Parser) evalArraySubId(val value, idTok Tok, m *exprModel) (v value) {
 	readyArrDefs(val.ast.Type)
-	i, dm, t := arrDefs.defById(idTok.Kind, nil)
-	if i == -1 {
-		p.pusherrtok(idTok, "obj_have_not_id", val.ast.Type.Val)
-		return
-	}
-	v = val
-	m.appendSubNode(exprNode{subIdAccessorOfType(val.ast.Type)})
-	switch t {
-	case 'g':
-		g := dm.Globals[i]
-		m.appendSubNode(exprNode{g.Tag.(string)})
-		v.ast.Type = g.Type
-		v.lvalue = true
-		v.constant = g.Const
-	case 'f':
-		f := dm.Funcs[i]
-		v.ast.Type.Id = x.Func
-		v.ast.Type.Tag = f.Ast
-		v.ast.Type.Val = f.Ast.DataTypeString()
-		v.ast.Tok = f.Ast.Tok
-		m.appendSubNode(exprNode{f.Ast.Id})
-	}
-	return
+	return p.evalXObjSubId(arrDefs, val, idTok, m)
 }
 
 func (p *Parser) evalMapSubId(val value, idTok Tok, m *exprModel) (v value) {
 	readyMapDefs(val.ast.Type)
-	i, dm, t := mapDefs.defById(idTok.Kind, nil)
-	if i == -1 {
-		p.pusherrtok(idTok, "obj_have_not_id", val.ast.Type.Val)
-		return
-	}
-	v = val
-	v.lvalue = false
-	v.ast.Data = idTok.Kind
-	m.appendSubNode(exprNode{subIdAccessorOfType(val.ast.Type)})
-	switch t {
-	case 'g':
-		g := dm.Globals[i]
-		m.appendSubNode(exprNode{g.Tag.(string)})
-		v.ast.Type = g.Type
-		v.lvalue = true
-		v.constant = g.Const
-	case 'f':
-		f := dm.Funcs[i]
-		v.ast.Type.Id = x.Func
-		v.ast.Type.Tag = f.Ast
-		v.ast.Type.Val = f.Ast.DataTypeString()
-		v.ast.Tok = f.Ast.Tok
-		m.appendSubNode(exprNode{f.Ast.Id})
-	}
-	return
+	return p.evalXObjSubId(mapDefs, val, idTok, m)
 }
 
 type nsFind interface{ nsById(string, bool) *namespace }
@@ -1878,7 +1851,7 @@ func (p *Parser) evalNsSubId(toks Toks, m *exprModel) (v value) {
 	var prev nsFind = p
 	for i, tok := range toks {
 		if (i+1)%2 != 0 {
-			if tok.Id != lex.Id {
+			if tok.Id != tokens.Id {
 				p.pusherrtok(tok, "invalid_syntax")
 				continue
 			}
@@ -1896,8 +1869,8 @@ func (p *Parser) evalNsSubId(toks Toks, m *exprModel) (v value) {
 			continue
 		}
 		switch tok.Id {
-		case lex.DoubleColon:
-			m.appendSubNode(exprNode{"::"})
+		case tokens.DoubleColon:
+			m.appendSubNode(exprNode{tokens.DOUBLE_COLON})
 		default:
 			goto eval
 		}
@@ -1914,8 +1887,8 @@ eval:
 	return p.evalExprPart(toks, m)
 }
 
-func (p *Parser) evalI8SubId(typeTok, idTok Tok, m *exprModel) (v value) {
-	i, dm, t := i8statics.defById(idTok.Kind, nil)
+func (p *Parser) evalXTypeSubId(dm *Defmap, idTok Tok, m *exprModel) (v value) {
+	i, dm, t := dm.defById(idTok.Kind, nil)
 	if i == -1 {
 		p.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
 		return
@@ -1932,210 +1905,74 @@ func (p *Parser) evalI8SubId(typeTok, idTok Tok, m *exprModel) (v value) {
 	return
 }
 
-func (p *Parser) evalI16SubId(typeTok, idTok Tok, m *exprModel) (v value) {
-	i, dm, t := i16statics.defById(idTok.Kind, nil)
-	if i == -1 {
-		p.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
-		return
-	}
-	v.lvalue = false
-	v.ast.Data = idTok.Kind
-	switch t {
-	case 'g':
-		g := dm.Globals[i]
-		m.appendSubNode(exprNode{g.Tag.(string)})
-		v.ast.Type = g.Type
-		v.constant = g.Const
-	}
-	return
+func (p *Parser) evalI8SubId(idTok Tok, m *exprModel) (v value) {
+	return p.evalXTypeSubId(i8statics, idTok, m)
 }
 
-func (p *Parser) evalI32SubId(typeTok, idTok Tok, m *exprModel) (v value) {
-	i, dm, t := i32statics.defById(idTok.Kind, nil)
-	if i == -1 {
-		p.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
-		return
-	}
-	v.lvalue = false
-	v.ast.Data = idTok.Kind
-	switch t {
-	case 'g':
-		g := dm.Globals[i]
-		m.appendSubNode(exprNode{g.Tag.(string)})
-		v.ast.Type = g.Type
-		v.constant = g.Const
-	}
-	return
+func (p *Parser) evalI16SubId(idTok Tok, m *exprModel) (v value) {
+	return p.evalXTypeSubId(i16statics, idTok, m)
 }
 
-func (p *Parser) evalI64SubId(typeTok, idTok Tok, m *exprModel) (v value) {
-	i, dm, t := i64statics.defById(idTok.Kind, nil)
-	if i == -1 {
-		p.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
-		return
-	}
-	v.lvalue = false
-	v.ast.Data = idTok.Kind
-	switch t {
-	case 'g':
-		g := dm.Globals[i]
-		m.appendSubNode(exprNode{g.Tag.(string)})
-		v.ast.Type = g.Type
-		v.constant = g.Const
-	}
-	return
+func (p *Parser) evalI32SubId(idTok Tok, m *exprModel) (v value) {
+	return p.evalXTypeSubId(i32statics, idTok, m)
 }
 
-func (p *Parser) evalU8SubId(typeTok, idTok Tok, m *exprModel) (v value) {
-	i, dm, t := u8statics.defById(idTok.Kind, nil)
-	if i == -1 {
-		p.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
-		return
-	}
-	v.lvalue = false
-	v.ast.Data = idTok.Kind
-	switch t {
-	case 'g':
-		g := dm.Globals[i]
-		m.appendSubNode(exprNode{g.Tag.(string)})
-		v.ast.Type = g.Type
-		v.constant = g.Const
-	}
-	return
+func (p *Parser) evalI64SubId(idTok Tok, m *exprModel) (v value) {
+	return p.evalXTypeSubId(i64statics, idTok, m)
 }
 
-func (p *Parser) evalU16SubId(typeTok, idTok Tok, m *exprModel) (v value) {
-	i, dm, t := u16statics.defById(idTok.Kind, nil)
-	if i == -1 {
-		p.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
-		return
-	}
-	v.lvalue = false
-	v.ast.Data = idTok.Kind
-	switch t {
-	case 'g':
-		g := dm.Globals[i]
-		m.appendSubNode(exprNode{g.Tag.(string)})
-		v.ast.Type = g.Type
-		v.constant = g.Const
-	}
-	return
+func (p *Parser) evalU8SubId(idTok Tok, m *exprModel) (v value) {
+	return p.evalXTypeSubId(u8statics, idTok, m)
 }
 
-func (p *Parser) evalU32SubId(typeTok, idTok Tok, m *exprModel) (v value) {
-	i, dm, t := u32statics.defById(idTok.Kind, nil)
-	if i == -1 {
-		p.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
-		return
-	}
-	v.lvalue = false
-	v.ast.Data = idTok.Kind
-	switch t {
-	case 'g':
-		g := dm.Globals[i]
-		m.appendSubNode(exprNode{g.Tag.(string)})
-		v.ast.Type = g.Type
-		v.constant = g.Const
-	}
-	return
+func (p *Parser) evalU16SubId(idTok Tok, m *exprModel) (v value) {
+	return p.evalXTypeSubId(u16statics, idTok, m)
 }
 
-func (p *Parser) evalU64SubId(typeTok, idTok Tok, m *exprModel) (v value) {
-	i, dm, t := u64statics.defById(idTok.Kind, nil)
-	if i == -1 {
-		p.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
-		return
-	}
-	v.lvalue = false
-	v.ast.Data = idTok.Kind
-	switch t {
-	case 'g':
-		g := dm.Globals[i]
-		m.appendSubNode(exprNode{g.Tag.(string)})
-		v.ast.Type = g.Type
-		v.constant = g.Const
-	}
-	return
+func (p *Parser) evalU32SubId(idTok Tok, m *exprModel) (v value) {
+	return p.evalXTypeSubId(u32statics, idTok, m)
 }
 
-func (p *Parser) evalSizeSubId(typeTok, idTok Tok, m *exprModel) (v value) {
-	i, dm, t := sizeStatics.defById(idTok.Kind, nil)
-	if i == -1 {
-		p.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
-		return
-	}
-	v.lvalue = false
-	v.ast.Data = idTok.Kind
-	switch t {
-	case 'g':
-		g := dm.Globals[i]
-		m.appendSubNode(exprNode{g.Tag.(string)})
-		v.ast.Type = g.Type
-		v.constant = g.Const
-	}
-	return
+func (p *Parser) evalU64SubId(idTok Tok, m *exprModel) (v value) {
+	return p.evalXTypeSubId(u64statics, idTok, m)
 }
 
-func (p *Parser) evalF32SubId(typeTok, idTok Tok, m *exprModel) (v value) {
-	i, dm, t := f32statics.defById(idTok.Kind, nil)
-	if i == -1 {
-		p.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
-		return
-	}
-	v.lvalue = false
-	v.ast.Data = idTok.Kind
-	switch t {
-	case 'g':
-		g := dm.Globals[i]
-		m.appendSubNode(exprNode{g.Tag.(string)})
-		v.ast.Type = g.Type
-		v.constant = g.Const
-	}
-	return
+func (p *Parser) evalSizeSubId(idTok Tok, m *exprModel) (v value) {
+	return p.evalXTypeSubId(sizeStatics, idTok, m)
 }
 
-func (p *Parser) evalF64SubId(typeTok, idTok Tok, m *exprModel) (v value) {
-	i, dm, t := f64statics.defById(idTok.Kind, nil)
-	if i == -1 {
-		p.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
-		return
-	}
-	v.lvalue = false
-	v.ast.Data = idTok.Kind
-	switch t {
-	case 'g':
-		g := dm.Globals[i]
-		m.appendSubNode(exprNode{g.Tag.(string)})
-		v.ast.Type = g.Type
-		v.constant = g.Const
-	}
-	return
+func (p *Parser) evalF32SubId(idTok Tok, m *exprModel) (v value) {
+	return p.evalXTypeSubId(f32statics, idTok, m)
+}
+
+func (p *Parser) evalF64SubId(idTok Tok, m *exprModel) (v value) {
+	return p.evalXTypeSubId(f64statics, idTok, m)
 }
 
 func (p *Parser) evalTypeSubId(typeTok, idTok Tok, m *exprModel) (v value) {
 	switch typeTok.Kind {
-	case "i8":
-		return p.evalI8SubId(typeTok, idTok, m)
-	case "i16":
-		return p.evalI16SubId(typeTok, idTok, m)
-	case "i32":
-		return p.evalI32SubId(typeTok, idTok, m)
-	case "i64":
-		return p.evalI64SubId(typeTok, idTok, m)
-	case "u8":
-		return p.evalU8SubId(typeTok, idTok, m)
-	case "u16":
-		return p.evalU16SubId(typeTok, idTok, m)
-	case "u32":
-		return p.evalU32SubId(typeTok, idTok, m)
-	case "u64":
-		return p.evalU64SubId(typeTok, idTok, m)
-	case "size":
-		return p.evalSizeSubId(typeTok, idTok, m)
-	case "f32":
-		return p.evalF32SubId(typeTok, idTok, m)
-	case "f64":
-		return p.evalF64SubId(typeTok, idTok, m)
+	case tokens.I8:
+		return p.evalI8SubId(idTok, m)
+	case tokens.I16:
+		return p.evalI16SubId(idTok, m)
+	case tokens.I32:
+		return p.evalI32SubId(idTok, m)
+	case tokens.I64:
+		return p.evalI64SubId(idTok, m)
+	case tokens.U8:
+		return p.evalU8SubId(idTok, m)
+	case tokens.U16:
+		return p.evalU16SubId(idTok, m)
+	case tokens.U32:
+		return p.evalU32SubId(idTok, m)
+	case tokens.U64:
+		return p.evalU64SubId(idTok, m)
+	case tokens.SIZE:
+		return p.evalSizeSubId(idTok, m)
+	case tokens.F32:
+		return p.evalF32SubId(idTok, m)
+	case tokens.F64:
+		return p.evalF64SubId(idTok, m)
 	}
 	p.pusherrtok(typeTok, "obj_not_support_sub_fields", typeTok.Kind)
 	return
@@ -2147,17 +1984,17 @@ func (p *Parser) evalExprSubId(toks Toks, m *exprModel) (v value) {
 	i--
 	valTok := toks[i]
 	toks = toks[:i]
-	if len(toks) == 1 && toks[0].Id == lex.DataType {
+	if len(toks) == 1 && toks[0].Id == tokens.DataType {
 		return p.evalTypeSubId(toks[0], idTok, m)
 	}
 	val := p.evalExprPart(toks, m)
 	checkType := val.ast.Type
-	if checkType.Id != x.Voidptr && typeIsPtr(checkType) {
+	if checkType.Id != xtype.Voidptr && typeIsPtr(checkType) {
 		// Remove pointer mark
 		checkType.Val = checkType.Val[1:]
 	}
 	switch {
-	case typeIsSingle(checkType) && checkType.Id == x.Str:
+	case typeIsSingle(checkType) && checkType.Id == xtype.Str:
 		return p.evalStrSubId(val, idTok, m)
 	case typeIsArray(checkType):
 		return p.evalArraySubId(val, idTok, m)
@@ -2182,9 +2019,9 @@ func (p *Parser) evalIdExprPart(toks Toks, m *exprModel) (v value) {
 	}
 	tok = toks[i]
 	switch tok.Id {
-	case lex.Dot:
+	case tokens.Dot:
 		return p.evalExprSubId(toks, m)
-	case lex.DoubleColon:
+	case tokens.DoubleColon:
 		return p.evalNsSubId(toks, m)
 	default:
 		p.pusherrtok(toks[i], "invalid_syntax")
@@ -2196,7 +2033,7 @@ func (p *Parser) evalTryCastExpr(toks Toks, m *exprModel) (v value, _ bool) {
 	braceCount := 0
 	errTok := toks[0]
 	for i, tok := range toks {
-		if tok.Id == lex.Brace {
+		if tok.Id == tokens.Brace {
 			switch tok.Kind {
 			case "(", "[", "{":
 				braceCount++
@@ -2271,14 +2108,14 @@ func (p *Parser) evalCast(v value, t DataType, errtok Tok) value {
 
 func (p *Parser) checkCastSingle(t, vt DataType, errtok Tok) {
 	switch t.Id {
-	case x.Str:
+	case xtype.Str:
 		p.checkCastStr(vt, errtok)
 		return
 	}
 	switch {
-	case x.IsIntegerType(t.Id):
+	case xtype.IsIntegerType(t.Id):
 		p.checkCastInteger(t, vt, errtok)
-	case x.IsNumericType(t.Id):
+	case xtype.IsNumericType(t.Id):
 		p.checkCastNumeric(t, vt, errtok)
 	default:
 		p.pusherrtok(errtok, "type_notsupports_casting", t.Val)
@@ -2291,23 +2128,23 @@ func (p *Parser) checkCastStr(vt DataType, errtok Tok) {
 		return
 	}
 	vt.Val = vt.Val[2:] // Remove array brackets
-	if !typeIsSingle(vt) || (vt.Id != x.Char && vt.Id != x.U8) {
+	if !typeIsSingle(vt) || (vt.Id != xtype.Char && vt.Id != xtype.U8) {
 		p.pusherrtok(errtok, "type_notsupports_casting", vt.Val)
 	}
 }
 
 func (p *Parser) checkCastInteger(t, vt DataType, errtok Tok) {
-	if typeIsPtr(vt) && (t.Id == x.I64 || t.Id == x.U64) {
+	if typeIsPtr(vt) && (t.Id == xtype.I64 || xtype.Id == xtype.U64) {
 		return
 	}
-	if typeIsSingle(vt) && x.IsNumericType(vt.Id) {
+	if typeIsSingle(vt) && xtype.IsNumericType(vt.Id) {
 		return
 	}
 	p.pusherrtok(errtok, "type_notsupports_casting_to", vt.Val, t.Val)
 }
 
 func (p *Parser) checkCastNumeric(t, vt DataType, errtok Tok) {
-	if typeIsSingle(vt) && x.IsNumericType(vt.Id) {
+	if typeIsSingle(vt) && xtype.IsNumericType(vt.Id) {
 		return
 	}
 	p.pusherrtok(errtok, "type_notsupports_casting_to", vt.Val, t.Val)
@@ -2317,19 +2154,19 @@ func (p *Parser) checkCastPtr(vt DataType, errtok Tok) {
 	if typeIsPtr(vt) {
 		return
 	}
-	if typeIsSingle(vt) && x.IsIntegerType(vt.Id) {
+	if typeIsSingle(vt) && xtype.IsIntegerType(vt.Id) {
 		return
 	}
 	p.pusherrtok(errtok, "type_notsupports_casting", vt.Val)
 }
 
 func (p *Parser) checkCastArray(t, vt DataType, errtok Tok) {
-	if !typeIsSingle(vt) || vt.Id != x.Str {
+	if !typeIsSingle(vt) || vt.Id != xtype.Str {
 		p.pusherrtok(errtok, "type_notsupports_casting", vt.Val)
 		return
 	}
 	t.Val = t.Val[2:] // Remove array brackets
-	if !typeIsSingle(t) || (t.Id != x.Char && t.Id != x.U8) {
+	if !typeIsSingle(t) || (t.Id != xtype.Char && t.Id != xtype.U8) {
 		p.pusherrtok(errtok, "type_notsupports_casting", vt.Val)
 	}
 }
@@ -2337,7 +2174,7 @@ func (p *Parser) checkCastArray(t, vt DataType, errtok Tok) {
 func (p *Parser) evalOperatorExprPartRight(toks Toks, m *exprModel) (v value) {
 	tok := toks[len(toks)-1]
 	switch tok.Kind {
-	case "...":
+	case tokens.TRIPLE_DOT:
 		toks = toks[:len(toks)-1]
 		return p.evalVariadicExprPart(toks, m, tok)
 	default:
@@ -2362,7 +2199,7 @@ func (p *Parser) evalParenthesesRangeExpr(toks Toks, m *exprModel) (v value) {
 	braceCount := 0
 	for i := len(toks) - 1; i >= 0; i-- {
 		tok := toks[i]
-		if tok.Id != lex.Brace {
+		if tok.Id != tokens.Brace {
 			continue
 		}
 		switch tok.Kind {
@@ -2415,7 +2252,7 @@ func (p *Parser) evalBraceRangeExpr(toks Toks, m *exprModel) (v value) {
 	braceCount := 0
 	for i := len(toks) - 1; i >= 0; i-- {
 		tok := toks[i]
-		if tok.Id != lex.Brace {
+		if tok.Id != tokens.Brace {
 			continue
 		}
 		switch tok.Kind {
@@ -2436,7 +2273,7 @@ func (p *Parser) evalBraceRangeExpr(toks Toks, m *exprModel) (v value) {
 		return
 	}
 	switch exprToks[0].Id {
-	case lex.Brace:
+	case tokens.Brace:
 		switch exprToks[0].Kind {
 		case "[":
 			b := ast.NewBuilder(nil)
@@ -2464,7 +2301,7 @@ func (p *Parser) evalBraceRangeExpr(toks Toks, m *exprModel) (v value) {
 			}
 			p.checkAnonFunc(&f)
 			v.ast.Type.Tag = f
-			v.ast.Type.Id = x.Func
+			v.ast.Type.Id = xtype.Func
 			v.ast.Type.Val = f.DataTypeString()
 			m.appendSubNode(anonFuncExpr{f, xapi.LambdaByCopy})
 			return
@@ -2482,7 +2319,7 @@ func (p *Parser) evalBracketRangeExpr(toks Toks, m *exprModel) (v value) {
 	braceCount := 0
 	for i := len(toks) - 1; i >= 0; i-- {
 		tok := toks[i]
-		if tok.Id != lex.Brace {
+		if tok.Id != tokens.Brace {
 			continue
 		}
 		switch tok.Kind {
@@ -2532,7 +2369,7 @@ func (p *Parser) evalArraySelect(arrv, selectv value, errtok Tok) value {
 	p.wg.Add(1)
 	go assignChecker{
 		p:      p,
-		t:      DataType{Id: x.Size, Val: "size"},
+		t:      DataType{Id: xtype.Size, Val: tokens.SIZE},
 		v:      selectv,
 		errtok: errtok,
 	}.checkAssignTypeAsync()
@@ -2552,10 +2389,10 @@ func (p *Parser) evalMapSelect(mapv, selectv value, errtok Tok) value {
 
 func (p *Parser) evalStrSelect(strv, selectv value, errtok Tok) value {
 	strv.lvalue = true
-	strv.ast.Type.Id = x.Char
+	strv.ast.Type.Id = xtype.Char
 	go assignChecker{
 		p:      p,
-		t:      DataType{Id: x.Size, Val: "size"},
+		t:      DataType{Id: xtype.Size, Val: tokens.SIZE},
 		v:      selectv,
 		errtok: errtok,
 	}.checkAssignTypeAsync()
@@ -2569,7 +2406,7 @@ func (p *Parser) buildEnumerableParts(toks Toks) []Toks {
 	lastComma := -1
 	var parts []Toks
 	for i, tok := range toks {
-		if tok.Id == lex.Brace {
+		if tok.Id == tokens.Brace {
 			switch tok.Kind {
 			case "{", "[", "(":
 				braceCount++
@@ -2580,7 +2417,7 @@ func (p *Parser) buildEnumerableParts(toks Toks) []Toks {
 		if braceCount > 0 {
 			continue
 		}
-		if tok.Id == lex.Comma {
+		if tok.Id == tokens.Comma {
 			if i-lastComma-1 == 0 {
 				p.pusherrtok(tok, "missing_expr")
 				lastComma = i
@@ -2628,7 +2465,7 @@ func (p *Parser) buildMap(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
 		braceCount := 0
 		colon := -1
 		for i, tok := range part {
-			if tok.Id == lex.Brace {
+			if tok.Id == tokens.Brace {
 				switch tok.Kind {
 				case "(", "[", "{":
 					braceCount++
@@ -2639,7 +2476,7 @@ func (p *Parser) buildMap(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
 			if braceCount != 0 {
 				continue
 			}
-			if tok.Id == lex.Colon {
+			if tok.Id == tokens.Colon {
 				colon = i
 				break
 			}
@@ -3038,11 +2875,11 @@ func (p *Parser) checkArgTypeAsync(param Param, val value, ignoreAny bool, errTo
 func (p *Parser) getRange(open, close string, toks Toks) (_ Toks, ok bool) {
 	braceCount := 0
 	start := 1
-	if toks[0].Id != lex.Brace {
+	if toks[0].Id != tokens.Brace {
 		return nil, false
 	}
 	for i, tok := range toks {
-		if tok.Id != lex.Brace {
+		if tok.Id != tokens.Brace {
 			continue
 		}
 		if tok.Kind == open {
@@ -3062,7 +2899,7 @@ func (p *Parser) checkEntryPointSpecialCases(fun *function) {
 	if len(fun.Ast.Params) > 0 {
 		p.pusherrtok(fun.Ast.Tok, "entrypoint_have_parameters")
 	}
-	if fun.Ast.RetType.Id != x.Void {
+	if fun.Ast.RetType.Id != xtype.Void {
 		p.pusherrtok(fun.Ast.RetType.Tok, "entrypoint_have_return")
 	}
 	if fun.Attributes != nil {
@@ -3342,7 +3179,7 @@ func (rc *retChecker) checkepxrs() {
 	braceCount := 0
 	last := 0
 	for i, tok := range rc.retAST.Expr.Toks {
-		if tok.Id == lex.Brace {
+		if tok.Id == tokens.Brace {
 			switch tok.Kind {
 			case "(", "{", "[":
 				braceCount++
@@ -3350,7 +3187,7 @@ func (rc *retChecker) checkepxrs() {
 				braceCount--
 			}
 		}
-		if braceCount > 0 || tok.Id != lex.Comma {
+		if braceCount > 0 || tok.Id != tokens.Comma {
 			continue
 		}
 		rc.pushval(last, i, tok)
@@ -3475,7 +3312,7 @@ func (p *Parser) checkFunc(f *Func) {
 }
 
 func (p *Parser) checkVarStatement(v *Var, noParse bool) {
-	if tok, _, canshadow := p.existid(v.Id); tok.Id != lex.NA && !canshadow {
+	if tok, _, canshadow := p.existid(v.Id); tok.Id != tokens.NA && !canshadow {
 		p.pusherrtok(v.IdTok, "exist_id", v.Id)
 	}
 	if !noParse {
@@ -3523,7 +3360,7 @@ func (p *Parser) checkSingleAssign(assign *ast.Assign) {
 	if !p.checkAssignment(selected, assign.Setter) {
 		return
 	}
-	if assign.Setter.Kind != "=" {
+	if assign.Setter.Kind != tokens.EQUAL {
 		assign.Setter.Kind = assign.Setter.Kind[:len(assign.Setter.Kind)-1]
 		solver := solver{
 			p:        p,
@@ -3534,7 +3371,7 @@ func (p *Parser) checkSingleAssign(assign *ast.Assign) {
 			operator: assign.Setter,
 		}
 		val.ast = solver.Solve()
-		assign.Setter.Kind += "="
+		assign.Setter.Kind += tokens.EQUAL
 	}
 	p.wg.Add(1)
 	go assignChecker{
@@ -3605,7 +3442,7 @@ func (p *Parser) checkAssign(assign *ast.Assign) {
 	if selectLength == 1 && !assign.SelectExprs[0].Var.New {
 		p.checkSingleAssign(assign)
 		return
-	} else if assign.Setter.Kind != "=" {
+	} else if assign.Setter.Kind != tokens.EQUAL {
 		p.pusherrtok(assign.Setter, "invalid_syntax")
 		return
 	}
@@ -3661,7 +3498,7 @@ func (fc *foreachChecker) array() {
 	elementType := fc.profile.ExprType
 	elementType.Val = elementType.Val[2:]
 	keyB := &fc.profile.KeyB
-	if keyB.Type.Id == x.Void {
+	if keyB.Type.Id == xtype.Void {
 		keyB.Type = elementType
 		return
 	}
@@ -3679,17 +3516,17 @@ func (fc *foreachChecker) checkKeyASize() {
 		return
 	}
 	keyA := &fc.profile.KeyA
-	if keyA.Type.Id == x.Void {
-		keyA.Type.Id = x.Size
-		keyA.Type.Val = x.CxxTypeIdFromType(keyA.Type.Id)
+	if keyA.Type.Id == xtype.Void {
+		keyA.Type.Id = xtype.Size
+		keyA.Type.Val = xtype.CxxTypeIdFromType(keyA.Type.Id)
 		return
 	}
 	var ok bool
 	keyA.Type, ok = fc.p.readyType(keyA.Type, true)
 	if ok {
-		if !typeIsSingle(keyA.Type) || !x.IsNumericType(keyA.Type.Id) {
+		if !typeIsSingle(keyA.Type) || !xtype.IsNumericType(keyA.Type.Id) {
 			fc.p.pusherrtok(keyA.IdTok, "incompatible_datatype",
-				keyA.Type.Val, x.NumericTypeStr)
+				keyA.Type.Val, xtype.NumericTypeStr)
 		}
 	}
 }
@@ -3700,7 +3537,7 @@ func (fc *foreachChecker) checkKeyAMapKey() {
 	}
 	keyType := fc.val.ast.Type.Tag.([]DataType)[0]
 	keyA := &fc.profile.KeyA
-	if keyA.Type.Id == x.Void {
+	if keyA.Type.Id == xtype.Void {
 		keyA.Type = keyType
 		return
 	}
@@ -3714,7 +3551,7 @@ func (fc *foreachChecker) checkKeyBMapVal() {
 	}
 	valType := fc.val.ast.Type.Tag.([]DataType)[1]
 	keyB := &fc.profile.KeyB
-	if keyB.Type.Id == x.Void {
+	if keyB.Type.Id == xtype.Void {
 		keyB.Type = valType
 		return
 	}
@@ -3728,11 +3565,11 @@ func (fc *foreachChecker) str() {
 		return
 	}
 	runeType := DataType{
-		Id:  x.Char,
-		Val: x.CxxTypeIdFromType(x.Char),
+		Id:  xtype.Char,
+		Val: xtype.CxxTypeIdFromType(xtype.Char),
 	}
 	keyB := &fc.profile.KeyB
-	if keyB.Type.Id == x.Void {
+	if keyB.Type.Id == xtype.Void {
 		keyB.Type = runeType
 		return
 	}
@@ -3746,7 +3583,7 @@ func (fc *foreachChecker) check() {
 		fc.array()
 	case typeIsMap(fc.val.ast.Type):
 		fc.xmap()
-	case fc.val.ast.Type.Id == x.Str:
+	case fc.val.ast.Type.Id == xtype.Str:
 		fc.str()
 	}
 }
@@ -3843,9 +3680,9 @@ func (p *Parser) checkContinueStatement(continueAST *ast.Continue) {
 
 func (p *Parser) checkValidityForAutoType(t DataType, errtok Tok) {
 	switch t.Id {
-	case x.Nil:
+	case xtype.Nil:
 		p.pusherrtok(errtok, "nil_for_autotype")
-	case x.Void:
+	case xtype.Void:
 		p.pusherrtok(errtok, "void_for_autotype")
 	}
 }
@@ -3867,7 +3704,7 @@ func (p *Parser) readyType(dt DataType, err bool) (_ DataType, ok bool) {
 		return dt, ok
 	}
 	switch dt.Id {
-	case x.Id:
+	case xtype.Id:
 		t, _, _ := p.typeById(dt.Tok.Kind)
 		if t == nil {
 			if err {
@@ -3879,7 +3716,7 @@ func (p *Parser) readyType(dt DataType, err bool) (_ DataType, ok bool) {
 		dt = t.Type
 		dt.Val = dt.Val[:len(dt.Val)-len(dt.Tok.Kind)] + t.Type.Val
 		return p.readyType(dt, err)
-	case x.Func:
+	case xtype.Func:
 		f := dt.Tag.(Func)
 		for i, param := range f.Params {
 			f.Params[i].Type, _ = p.readyType(param.Type, err)
@@ -3929,15 +3766,15 @@ func (ac assignChecker) checkAssignTypeAsync() {
 	ac.p.checkAssignConst(ac.constant, ac.t, ac.v, ac.errtok)
 	if typeIsSingle(ac.t) && isConstNum(ac.v.ast.Data) {
 		switch {
-		case x.IsSignedIntegerType(ac.t.Id):
+		case xtype.IsSignedIntegerType(ac.t.Id):
 			if xbits.CheckBitInt(ac.v.ast.Data, xbits.BitsizeType(ac.t.Id)) {
 				return
 			}
-		case x.IsFloatType(ac.t.Id):
+		case xtype.IsFloatType(ac.t.Id):
 			if checkFloatBit(ac.v.ast, xbits.BitsizeType(ac.t.Id)) {
 				return
 			}
-		case x.IsUnsignedNumericType(ac.t.Id):
+		case xtype.IsUnsignedNumericType(ac.t.Id):
 			if xbits.CheckBitUInt(ac.v.ast.Data, xbits.BitsizeType(ac.t.Id)) {
 				return
 			}
@@ -3949,7 +3786,7 @@ func (ac assignChecker) checkAssignTypeAsync() {
 
 func (p *Parser) checkTypeAsync(real, check DataType, ignoreAny bool, errTok Tok) {
 	defer func() { p.wg.Done() }()
-	if !ignoreAny && real.Id == x.Any {
+	if !ignoreAny && real.Id == xtype.Any {
 		return
 	}
 	if real.MultiTyped || check.MultiTyped {
@@ -3963,10 +3800,10 @@ func (p *Parser) checkTypeAsync(real, check DataType, ignoreAny bool, errTok Tok
 		}
 		return
 	}
-	if typeIsNilCompatible(real) && check.Id == x.Nil {
+	if typeIsNilCompatible(real) && check.Id == xtype.Nil {
 		return
 	}
-	if real.Id == x.Voidptr && !typeIsPtr(check) {
+	if real.Id == xtype.Voidptr && !typeIsPtr(check) {
 		return
 	}
 	if real.Val != check.Val {

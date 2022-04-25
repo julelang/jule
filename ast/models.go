@@ -5,9 +5,9 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/the-xlang/xxc/lex"
-	"github.com/the-xlang/xxc/pkg/x"
+	"github.com/the-xlang/xxc/lex/tokens"
 	"github.com/the-xlang/xxc/pkg/xapi"
+	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
 // Obj is an element of AST.
@@ -112,7 +112,7 @@ func (dt DataType) String() string {
 			cxx.WriteByte('>')
 			cxx.WriteString(pointers)
 			return cxx.String()
-		case dt.Id == x.Map && dt.Val[0] == '[':
+		case dt.Id == xtype.Map && dt.Val[0] == '[':
 			pointers := cxx.String()
 			types := dt.Tag.([]DataType)
 			cxx.Reset()
@@ -126,12 +126,12 @@ func (dt DataType) String() string {
 		}
 	}
 	switch dt.Id {
-	case x.Id:
+	case xtype.Id:
 		return xapi.AsId(dt.Tok.Kind) + cxx.String()
-	case x.Func:
+	case xtype.Func:
 		return dt.FunctionString() + cxx.String()
 	default:
-		return x.CxxTypeIdFromType(dt.Id) + cxx.String()
+		return xtype.CxxTypeIdFromType(dt.Id) + cxx.String()
 	}
 }
 
@@ -214,7 +214,7 @@ func (fc Func) DataTypeString() string {
 		cxx.WriteString(cxxStr)
 	}
 	cxx.WriteByte(')')
-	if fc.RetType.Id != x.Void {
+	if fc.RetType.Id != xtype.Void {
 		cxx.WriteString(fc.RetType.String())
 	}
 	return cxx.String()
@@ -293,7 +293,7 @@ func (e Expr) String() string {
 	for _, process := range e.Processes {
 		for _, tok := range process {
 			switch tok.Id {
-			case lex.Id:
+			case tokens.Id:
 				expr.WriteString(xapi.AsId(tok.Kind))
 			default:
 				expr.WriteString(tok.Kind)
@@ -611,7 +611,7 @@ func (fp *ForeachProfile) MapString(iter Iter) string {
 
 func (fp *ForeachProfile) ForeachString(iter Iter) string {
 	switch {
-	case fp.ExprType.Val == "str",
+	case fp.ExprType.Val == tokens.STR,
 		strings.HasPrefix(fp.ExprType.Val, "[]"):
 		return fp.ClassicString(iter)
 	case fp.ExprType.Val[0] == '[':

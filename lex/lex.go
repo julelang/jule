@@ -7,6 +7,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/the-xlang/xxc/lex/tokens"
 	"github.com/the-xlang/xxc/pkg/x"
 	"github.com/the-xlang/xxc/pkg/xio"
 	"github.com/the-xlang/xxc/pkg/xlog"
@@ -66,7 +67,7 @@ func (l *Lex) Lex() []Tok {
 	l.Newln()
 	for l.Pos < len(l.File.Data) {
 		tok := l.Tok()
-		if tok.Id != NA {
+		if tok.Id != tokens.NA {
 			toks = append(toks, tok)
 		}
 	}
@@ -151,14 +152,14 @@ func (l *Lex) lncomment(tok *Tok) {
 	for ; l.Pos < len(l.File.Data); l.Pos++ {
 		if l.File.Data[l.Pos] == '\n' {
 			if l.firstTokOfLine {
-				tok.Id = Comment
+				tok.Id = tokens.Comment
 				tok.Kind = string(l.File.Data[start:l.Pos])
 			}
 			return
 		}
 	}
 	if l.firstTokOfLine {
-		tok.Id = Comment
+		tok.Id = tokens.Comment
 		tok.Kind = string(l.File.Data[start:])
 	}
 }
@@ -311,7 +312,7 @@ func (l *Lex) kw(txt, kind string, id uint8, tok *Tok) bool {
 func (l *Lex) Tok() Tok {
 	defer func() { l.firstTokOfLine = false }()
 
-	tok := Tok{File: l.File, Id: NA}
+	tok := Tok{File: l.File, Id: tokens.NA}
 
 	txt := l.resume()
 	if txt == "" {
@@ -326,11 +327,11 @@ func (l *Lex) Tok() Tok {
 	switch {
 	case txt[0] == '\'':
 		tok.Kind = l.rune(txt)
-		tok.Id = Value
+		tok.Id = tokens.Value
 		return tok
 	case txt[0] == '"', txt[0] == '`':
 		tok.Kind = l.str(txt)
-		tok.Id = Value
+		tok.Id = tokens.Value
 		return tok
 	case strings.HasPrefix(txt, "//"):
 		l.lncomment(&tok)
@@ -338,9 +339,9 @@ func (l *Lex) Tok() Tok {
 	case strings.HasPrefix(txt, "/*"):
 		l.rangecomment()
 		return tok
-	case l.punct(txt, "(", Brace, &tok):
+	case l.punct(txt, "(", tokens.Brace, &tok):
 		l.braces = append(l.braces, tok)
-	case l.punct(txt, ")", Brace, &tok):
+	case l.punct(txt, ")", tokens.Brace, &tok):
 		len := len(l.braces)
 		if len == 0 {
 			l.pusherrtok(tok, "extra_closed_parentheses")
@@ -350,9 +351,9 @@ func (l *Lex) Tok() Tok {
 			go l.pushWrongOrderCloseErrAsync(tok)
 		}
 		l.rmrange(len-1, tok.Kind)
-	case l.punct(txt, "{", Brace, &tok):
+	case l.punct(txt, "{", tokens.Brace, &tok):
 		l.braces = append(l.braces, tok)
-	case l.punct(txt, "}", Brace, &tok):
+	case l.punct(txt, "}", tokens.Brace, &tok):
 		len := len(l.braces)
 		if len == 0 {
 			l.pusherrtok(tok, "extra_closed_braces")
@@ -362,9 +363,9 @@ func (l *Lex) Tok() Tok {
 			go l.pushWrongOrderCloseErrAsync(tok)
 		}
 		l.rmrange(len-1, tok.Kind)
-	case l.punct(txt, "[", Brace, &tok):
+	case l.punct(txt, "[", tokens.Brace, &tok):
 		l.braces = append(l.braces, tok)
-	case l.punct(txt, "]", Brace, &tok):
+	case l.punct(txt, "]", tokens.Brace, &tok):
 		len := len(l.braces)
 		if len == 0 {
 			l.pusherrtok(tok, "extra_closed_brackets")
@@ -375,92 +376,92 @@ func (l *Lex) Tok() Tok {
 		}
 		l.rmrange(len-1, tok.Kind)
 	case
-		l.firstTokOfLine && l.punct(txt, "#", Preprocessor, &tok),
-		l.punct(txt, "::", DoubleColon, &tok),
-		l.punct(txt, ":", Colon, &tok),
-		l.punct(txt, ";", SemiColon, &tok),
-		l.punct(txt, ",", Comma, &tok),
-		l.punct(txt, "@", At, &tok),
-		l.punct(txt, "...", Operator, &tok),
-		l.punct(txt, ".", Dot, &tok),
-		l.punct(txt, "+=", Operator, &tok),
-		l.punct(txt, "-=", Operator, &tok),
-		l.punct(txt, "*=", Operator, &tok),
-		l.punct(txt, "/=", Operator, &tok),
-		l.punct(txt, "%=", Operator, &tok),
-		l.punct(txt, "<<=", Operator, &tok),
-		l.punct(txt, ">>=", Operator, &tok),
-		l.punct(txt, "^=", Operator, &tok),
-		l.punct(txt, "&=", Operator, &tok),
-		l.punct(txt, "|=", Operator, &tok),
-		l.punct(txt, "==", Operator, &tok),
-		l.punct(txt, "!=", Operator, &tok),
-		l.punct(txt, ">=", Operator, &tok),
-		l.punct(txt, "<=", Operator, &tok),
-		l.punct(txt, "&&", Operator, &tok),
-		l.punct(txt, "||", Operator, &tok),
-		l.punct(txt, "<<", Operator, &tok),
-		l.punct(txt, ">>", Operator, &tok),
-		l.punct(txt, "+", Operator, &tok),
-		l.punct(txt, "-", Operator, &tok),
-		l.punct(txt, "*", Operator, &tok),
-		l.punct(txt, "/", Operator, &tok),
-		l.punct(txt, "%", Operator, &tok),
-		l.punct(txt, "~", Operator, &tok),
-		l.punct(txt, "&", Operator, &tok),
-		l.punct(txt, "|", Operator, &tok),
-		l.punct(txt, "^", Operator, &tok),
-		l.punct(txt, "!", Operator, &tok),
-		l.punct(txt, "<", Operator, &tok),
-		l.punct(txt, ">", Operator, &tok),
-		l.punct(txt, "=", Operator, &tok),
-		l.kw(txt, "i8", DataType, &tok),
-		l.kw(txt, "i16", DataType, &tok),
-		l.kw(txt, "i32", DataType, &tok),
-		l.kw(txt, "i64", DataType, &tok),
-		l.kw(txt, "u8", DataType, &tok),
-		l.kw(txt, "u16", DataType, &tok),
-		l.kw(txt, "u32", DataType, &tok),
-		l.kw(txt, "u64", DataType, &tok),
-		l.kw(txt, "f32", DataType, &tok),
-		l.kw(txt, "f64", DataType, &tok),
-		l.kw(txt, "byte", DataType, &tok),
-		l.kw(txt, "sbyte", DataType, &tok),
-		l.kw(txt, "size", DataType, &tok),
-		l.kw(txt, "bool", DataType, &tok),
-		l.kw(txt, "char", DataType, &tok),
-		l.kw(txt, "str", DataType, &tok),
-		l.kw(txt, "voidptr", DataType, &tok),
-		l.kw(txt, "true", Value, &tok),
-		l.kw(txt, "false", Value, &tok),
-		l.kw(txt, "nil", Value, &tok),
-		l.kw(txt, "const", Const, &tok),
-		l.kw(txt, "ret", Ret, &tok),
-		l.kw(txt, "type", Type, &tok),
-		l.kw(txt, "new", New, &tok),
-		l.kw(txt, "free", Free, &tok),
-		l.kw(txt, "iter", Iter, &tok),
-		l.kw(txt, "break", Break, &tok),
-		l.kw(txt, "continue", Continue, &tok),
-		l.kw(txt, "in", In, &tok),
-		l.kw(txt, "if", If, &tok),
-		l.kw(txt, "else", Else, &tok),
-		l.kw(txt, "volatile", Volatile, &tok),
-		l.kw(txt, "use", Use, &tok),
-		l.kw(txt, "pub", Pub, &tok),
-		l.kw(txt, "defer", Defer, &tok),
-		l.kw(txt, "goto", Goto, &tok):
+		l.firstTokOfLine && l.punct(txt, tokens.SHARP, tokens.Preprocessor, &tok),
+		l.punct(txt, tokens.DOUBLE_COLON, tokens.DoubleColon, &tok),
+		l.punct(txt, tokens.COLON, tokens.Colon, &tok),
+		l.punct(txt, tokens.SEMICOLON, tokens.SemiColon, &tok),
+		l.punct(txt, tokens.COMMA, tokens.Comma, &tok),
+		l.punct(txt, tokens.AT, tokens.At, &tok),
+		l.punct(txt, tokens.TRIPLE_DOT, tokens.Operator, &tok),
+		l.punct(txt, tokens.DOT, tokens.Dot, &tok),
+		l.punct(txt, tokens.PLUS_EQUAL, tokens.Operator, &tok),
+		l.punct(txt, tokens.MINUS_EQUAL, tokens.Operator, &tok),
+		l.punct(txt, tokens.STAR_EQUAL, tokens.Operator, &tok),
+		l.punct(txt, tokens.SLASH_EQUAL, tokens.Operator, &tok),
+		l.punct(txt, tokens.PERCENT_EQUAL, tokens.Operator, &tok),
+		l.punct(txt, tokens.LSHIFT_EQUAL, tokens.Operator, &tok),
+		l.punct(txt, tokens.RSHIFT_EQUAL, tokens.Operator, &tok),
+		l.punct(txt, tokens.CARET_EQUAL, tokens.Operator, &tok),
+		l.punct(txt, tokens.AMPER_EQUAL, tokens.Operator, &tok),
+		l.punct(txt, tokens.VLINE_EQUAL, tokens.Operator, &tok),
+		l.punct(txt, tokens.EQUALS, tokens.Operator, &tok),
+		l.punct(txt, tokens.NOT_EQUALS, tokens.Operator, &tok),
+		l.punct(txt, tokens.GREAT_EQUAL, tokens.Operator, &tok),
+		l.punct(txt, tokens.LESS_EQUAL, tokens.Operator, &tok),
+		l.punct(txt, tokens.AND, tokens.Operator, &tok),
+		l.punct(txt, tokens.OR, tokens.Operator, &tok),
+		l.punct(txt, tokens.LSHIFT, tokens.Operator, &tok),
+		l.punct(txt, tokens.RSHIFT, tokens.Operator, &tok),
+		l.punct(txt, tokens.PLUS, tokens.Operator, &tok),
+		l.punct(txt, tokens.MINUS, tokens.Operator, &tok),
+		l.punct(txt, tokens.STAR, tokens.Operator, &tok),
+		l.punct(txt, tokens.SLASH, tokens.Operator, &tok),
+		l.punct(txt, tokens.PERCENT, tokens.Operator, &tok),
+		l.punct(txt, tokens.TILDE, tokens.Operator, &tok),
+		l.punct(txt, tokens.AMPER, tokens.Operator, &tok),
+		l.punct(txt, tokens.VLINE, tokens.Operator, &tok),
+		l.punct(txt, tokens.CARET, tokens.Operator, &tok),
+		l.punct(txt, tokens.EXCLAMATION, tokens.Operator, &tok),
+		l.punct(txt, tokens.LESS, tokens.Operator, &tok),
+		l.punct(txt, tokens.GREAT, tokens.Operator, &tok),
+		l.punct(txt, tokens.EQUAL, tokens.Operator, &tok),
+		l.kw(txt, tokens.I8, tokens.DataType, &tok),
+		l.kw(txt, tokens.I16, tokens.DataType, &tok),
+		l.kw(txt, tokens.I32, tokens.DataType, &tok),
+		l.kw(txt, tokens.I64, tokens.DataType, &tok),
+		l.kw(txt, tokens.U8, tokens.DataType, &tok),
+		l.kw(txt, tokens.U16, tokens.DataType, &tok),
+		l.kw(txt, tokens.U32, tokens.DataType, &tok),
+		l.kw(txt, tokens.U64, tokens.DataType, &tok),
+		l.kw(txt, tokens.F32, tokens.DataType, &tok),
+		l.kw(txt, tokens.F64, tokens.DataType, &tok),
+		l.kw(txt, tokens.BYTE, tokens.DataType, &tok),
+		l.kw(txt, tokens.SBYTE, tokens.DataType, &tok),
+		l.kw(txt, tokens.SIZE, tokens.DataType, &tok),
+		l.kw(txt, tokens.BOOL, tokens.DataType, &tok),
+		l.kw(txt, tokens.CHAR, tokens.DataType, &tok),
+		l.kw(txt, tokens.STR, tokens.DataType, &tok),
+		l.kw(txt, tokens.VOIDPTR, tokens.DataType, &tok),
+		l.kw(txt, tokens.TRUE, tokens.Value, &tok),
+		l.kw(txt, tokens.FALSE, tokens.Value, &tok),
+		l.kw(txt, tokens.NIL, tokens.Value, &tok),
+		l.kw(txt, tokens.CONST, tokens.Const, &tok),
+		l.kw(txt, tokens.RET, tokens.Ret, &tok),
+		l.kw(txt, tokens.TYPE, tokens.Type, &tok),
+		l.kw(txt, tokens.NEW, tokens.New, &tok),
+		l.kw(txt, tokens.FREE, tokens.Free, &tok),
+		l.kw(txt, tokens.ITER, tokens.Iter, &tok),
+		l.kw(txt, tokens.BREAK, tokens.Break, &tok),
+		l.kw(txt, tokens.CONTINUE, tokens.Continue, &tok),
+		l.kw(txt, tokens.IN, tokens.In, &tok),
+		l.kw(txt, tokens.IF, tokens.If, &tok),
+		l.kw(txt, tokens.ELSE, tokens.Else, &tok),
+		l.kw(txt, tokens.VOLATILE, tokens.Volatile, &tok),
+		l.kw(txt, tokens.USE, tokens.Use, &tok),
+		l.kw(txt, tokens.PUB, tokens.Pub, &tok),
+		l.kw(txt, tokens.DEFER, tokens.Defer, &tok),
+		l.kw(txt, tokens.GOTO, tokens.Goto, &tok):
 	default:
 		lex := l.id(txt)
 		if lex != "" {
 			tok.Kind = lex
-			tok.Id = Id
+			tok.Id = tokens.Id
 			break
 		}
 		lex = l.num(txt)
 		if lex != "" {
 			tok.Kind = lex
-			tok.Id = Value
+			tok.Id = tokens.Value
 			break
 		}
 		r, sz := utf8.DecodeRuneInString(txt)

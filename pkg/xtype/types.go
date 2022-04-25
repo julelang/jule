@@ -1,4 +1,6 @@
-package x
+package xtype
+
+import "github.com/the-xlang/xxc/lex/tokens"
 
 // Data type (built-in) constants.
 const (
@@ -201,37 +203,37 @@ func IsUnsignedNumericType(t uint8) bool {
 // TypeFromId returns type id of specified type code.
 func TypeFromId(id string) uint8 {
 	switch id {
-	case "i8", "sbyte":
+	case tokens.I8, tokens.SBYTE:
 		return I8
-	case "i16":
+	case tokens.I16:
 		return I16
-	case "i32":
+	case tokens.I32:
 		return I32
-	case "i64":
+	case tokens.I64:
 		return I64
-	case "u8", "byte":
+	case tokens.U8, tokens.BYTE:
 		return U8
-	case "u16":
+	case tokens.U16:
 		return U16
-	case "u32":
+	case tokens.U32:
 		return U32
-	case "u64":
+	case tokens.U64:
 		return U64
-	case "str":
+	case tokens.STR:
 		return Str
-	case "bool":
+	case tokens.BOOL:
 		return Bool
-	case "f32":
+	case tokens.F32:
 		return F32
-	case "f64":
+	case tokens.F64:
 		return F64
 	case "any":
 		return Any
-	case "char":
+	case tokens.CHAR:
 		return Char
-	case "size":
+	case tokens.SIZE:
 		return Size
-	case "voidptr":
+	case tokens.VOIDPTR:
 		return Voidptr
 	}
 	return 0
@@ -242,37 +244,37 @@ func CxxTypeIdFromType(typeCode uint8) string {
 	case Void:
 		return "void"
 	case I8:
-		return "i8"
+		return tokens.I8
 	case I16:
-		return "i16"
+		return tokens.I16
 	case I32:
-		return "i32"
+		return tokens.I32
 	case I64:
-		return "i64"
+		return tokens.I64
 	case U8:
-		return "u8"
+		return tokens.U8
 	case U16:
-		return "u16"
+		return tokens.U16
 	case U32:
-		return "u32"
+		return tokens.U32
 	case U64:
-		return "u64"
+		return tokens.U64
 	case Bool:
-		return "bool"
+		return tokens.BOOL
 	case F32:
-		return "f32"
+		return tokens.F32
 	case F64:
-		return "f64"
+		return tokens.F64
 	case Any:
 		return "any"
 	case Str:
-		return "str"
+		return tokens.STR
 	case Char:
-		return "char"
+		return tokens.CHAR
 	case Size:
-		return "size"
+		return tokens.SIZE
 	case Voidptr:
-		return "voidptr"
+		return tokens.VOIDPTR
 	}
 	return "" // Unreachable code.
 }

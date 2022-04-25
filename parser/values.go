@@ -2,21 +2,22 @@ package parser
 
 import (
 	"github.com/the-xlang/xxc/ast"
-	"github.com/the-xlang/xxc/pkg/x"
+	"github.com/the-xlang/xxc/lex/tokens"
 	"github.com/the-xlang/xxc/pkg/xbits"
+	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
 func isstr(value string) bool    { return value[0] == '"' || israwstr(value) }
 func israwstr(value string) bool { return value[0] == '`' }
 func isRune(value string) bool   { return value[0] == '\'' }
-func isnil(value string) bool    { return value == "nil" }
-func isbool(value string) bool   { return value == "true" || value == "false" }
+func isnil(value string) bool    { return value == tokens.NIL }
+func isbool(value string) bool   { return value == tokens.TRUE || value == tokens.FALSE }
 
 func isBoolExpr(val value) bool {
 	switch {
 	case typeIsNilCompatible(val.ast.Type):
 		return true
-	case val.ast.Type.Id == x.Bool && typeIsSingle(val.ast.Type):
+	case val.ast.Type.Id == xtype.Bool && typeIsSingle(val.ast.Type):
 		return true
 	}
 	return false
@@ -31,7 +32,7 @@ func isForeachIterExpr(val value) bool {
 		return false
 	}
 	code := val.ast.Type.Id
-	return code == x.Str
+	return code == xtype.Str
 }
 
 func isConstNum(v string) bool {
@@ -45,7 +46,7 @@ func checkIntBit(v ast.Value, bit int) bool {
 	if bit == 0 {
 		return false
 	}
-	if x.IsSignedNumericType(v.Type.Id) {
+	if xtype.IsSignedNumericType(v.Type.Id) {
 		return xbits.CheckBitInt(v.Data, bit)
 	}
 	return xbits.CheckBitUInt(v.Data, bit)

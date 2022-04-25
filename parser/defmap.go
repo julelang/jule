@@ -1,8 +1,6 @@
 package parser
 
-import (
-	"github.com/the-xlang/xxc/pkg/x"
-)
+import "github.com/the-xlang/xxc/pkg/xtype"
 
 // Defmap is definition map.
 type Defmap struct {
@@ -86,7 +84,7 @@ func (dm *Defmap) funcById(id string, f *File) (*function, *Defmap, bool) {
 
 func (dm *Defmap) findGlobalById(id string, f *File) (int, *Defmap, bool) {
 	for i, v := range dm.Globals {
-		if v != nil && v.Type.Id != x.Void && v.Id == id {
+		if v != nil && v.Type.Id != xtype.Void && v.Id == id {
 			if !dm.justPub || f == v.IdTok.File || v.Pub {
 				return i, dm, false
 			}

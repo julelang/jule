@@ -3,22 +3,22 @@ package xbits
 import (
 	"strconv"
 
-	"github.com/the-xlang/xxc/pkg/x"
+	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
 // BitsizeType returns bit-size of
 // data type of specified type code.
 func BitsizeType(t uint8) int {
 	switch t {
-	case x.I8, x.U8:
+	case xtype.I8, xtype.U8:
 		return 0b1000
-	case x.I16, x.U16:
+	case xtype.I16, xtype.U16:
 		return 0b00010000
-	case x.I32, x.U32, x.F32:
+	case xtype.I32, xtype.U32, xtype.F32:
 		return 0b00100000
-	case x.I64, x.U64, x.F64:
+	case xtype.I64, xtype.U64, xtype.F64:
 		return 0b01000000
-	case x.Size:
+	case xtype.Size:
 		return strconv.IntSize
 	default:
 		return 0
