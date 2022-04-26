@@ -580,6 +580,26 @@ public:
     return _parts;
   }
 
+  str replace(const str &_Sub, const str &_New, const i64 &_N) const noexcept {
+    if (_N == 0) { return *this; }
+    std::string _s{this->_buffer};
+    size start_pos{0};
+    if (_N < 0) {
+      while((start_pos = _s.find(_Sub._buffer, start_pos)) != std::string::npos) {
+        _s.replace(start_pos, _Sub.len(), _New._buffer);
+        start_pos += _New.len();
+      }
+    } else {
+      size _n{0};
+      while((start_pos = _s.find(_Sub._buffer, start_pos)) != std::string::npos) {
+        _s.replace(start_pos, _Sub.len(), _New._buffer);
+        start_pos += _New.len();
+        if (++_n >= _N) { break; }
+      }
+    }
+    return str{_s};
+  }
+
   operator array<char>(void) const noexcept {
     array<char> _array{};
     _array._buffer = std::vector<char>{this->begin(), this->end()};

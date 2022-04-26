@@ -256,6 +256,19 @@ var strDefs = &Defmap{
 			},
 			RetType: DataType{Id: xtype.Str, Val: "[]" + tokens.STR},
 		}},
+		{Ast: Func{
+			Id: "replace",
+			Params: []Param{
+				{Id: "sub", Type: DataType{Id: xtype.Str, Val: tokens.STR}},
+				{Id: "new", Type: DataType{Id: xtype.Str, Val: tokens.STR}},
+				{
+					Id:      "n",
+					Type:    DataType{Id: xtype.I64, Val: tokens.I64},
+					Default: Expr{Model: exprNode{"-1"}},
+				},
+			},
+			RetType: DataType{Id: xtype.Str, Val: tokens.STR},
+		}},
 	},
 }
 
