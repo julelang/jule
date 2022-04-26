@@ -120,14 +120,11 @@ func (b *Builder) Type(toks Toks) (t Type) {
 	}
 	destType, _ := b.DataType(toks[i:], new(int), true)
 	tok = toks[1]
-	t = Type{
-		Pub:  b.pub,
+	return Type{
 		Tok:  tok,
 		Id:   tok.Kind,
 		Type: destType,
 	}
-	b.pub = false
-	return
 }
 
 func (b *Builder) buildEnumItems(toks Toks) []*EnumItem {

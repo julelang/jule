@@ -397,13 +397,13 @@ func (p *Parser) pushUseTypes(use, dm *Defmap) {
 }
 
 func (p *Parser) pushUseEnums(use, dm *Defmap) {
-	for _, t := range dm.Enums {
-		def, _, _ := p.enumById(t.Id)
+	for _, e := range dm.Enums {
+		def, _, _ := p.enumById(e.Id)
 		if def != nil {
 			p.pusherrmsgtok(def.Tok,
-				fmt.Sprintf(`"%s" identifier is already defined in this source`, t.Id))
+				fmt.Sprintf(`"%s" identifier is already defined in this source`, e.Id))
 		} else {
-			use.Enums = append(use.Enums, t)
+			use.Enums = append(use.Enums, e)
 		}
 	}
 }
