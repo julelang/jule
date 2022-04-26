@@ -126,16 +126,16 @@ func (dt DataType) String() string {
 		}
 	}
 	switch dt.Id {
-	case xtype.Id:
+	case xtype.Id, xtype.Enum:
 		return xapi.AsId(dt.Tok.Kind) + cxx.String()
 	case xtype.Func:
-		return dt.FunctionString() + cxx.String()
+		return dt.FuncString() + cxx.String()
 	default:
 		return xtype.CxxTypeIdFromType(dt.Id) + cxx.String()
 	}
 }
 
-func (dt DataType) FunctionString() string {
+func (dt *DataType) FuncString() string {
 	var cxx strings.Builder
 	cxx.WriteString("func<")
 	fun := dt.Tag.(Func)
@@ -156,7 +156,7 @@ func (dt DataType) FunctionString() string {
 	return cxx.String()
 }
 
-func (dt DataType) MultiTypeString() string {
+func (dt *DataType) MultiTypeString() string {
 	types := dt.Tag.([]DataType)
 	var cxx strings.Builder
 	cxx.WriteString("std::tuple<")
@@ -782,4 +782,58 @@ type Namespace struct {
 	Tok  Tok
 	Ids  []string
 	Tree []Obj
+}
+
+// EnumItem is the AST model of enumerator items.
+type EnumItem struct {
+	Tok  Tok
+	Id   string
+	Expr Expr
+}
+
+func (ei EnumItem) String() string {
+	var cxx strings.Builder
+	cxx.WriteString(xapi.AsId(ei.Id))
+	cxx.WriteString(" = ")
+	cxx.WriteString(ei.Expr.String())
+	return cxx.String()
+}
+
+// Enum is the AST model of enumerator statements.
+type Enum struct {
+	Pub   bool
+	Tok   Tok
+	Id    string
+	Type  DataType
+	Items []*EnumItem
+	Used  bool
+	Desc  string
+}
+
+// ItemById returns item by id if exist, nil if not.
+func (e *Enum) ItemById(id string) *EnumItem {
+	for _, item := range e.Items {
+		if item.Id == id {
+			return item
+		}
+	}
+	return nil
+}
+
+func (e Enum) String() string {
+	var cxx strings.Builder
+	cxx.WriteString("enum ")
+	cxx.WriteString(xapi.AsId(e.Id))
+	cxx.WriteByte(':')
+	cxx.WriteString(e.Type.String())
+	cxx.WriteString(" {\n")
+	AddIndent()
+	for _, item := range e.Items {
+		cxx.WriteString(IndentString())
+		cxx.WriteString(item.String())
+		cxx.WriteString(",\n")
+	}
+	DoneIndent()
+	cxx.WriteString("};")
+	return cxx.String()
 }

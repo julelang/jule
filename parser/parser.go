@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -31,6 +32,7 @@ type Expr = ast.Expr
 type Tok = ast.Tok
 type Toks = ast.Toks
 type Attribute = ast.Attribute
+type Enum = ast.Enum
 
 type use struct {
 	Path string
@@ -134,10 +136,30 @@ func (p *Parser) pushwarn(key string, args ...any) {
 	})
 }
 
-// CxxEmbeds return C++ code of cxx embeds.
+// CxxEmbeds returns C++ code of cxx embeds.
 func (p *Parser) CxxEmbeds() string {
 	var cxx strings.Builder
 	cxx.WriteString(p.Embeds.String())
+	return cxx.String()
+}
+
+// CxxEnums returns C++ code of enums.
+func (p *Parser) CxxEnums() string {
+	var cxx strings.Builder
+	for _, use := range used {
+		for _, e := range use.defs.Enums {
+			if e.Used {
+				cxx.WriteString(e.String())
+				cxx.WriteString("\n\n")
+			}
+		}
+	}
+	for _, e := range p.Defs.Enums {
+		if e.Used {
+			cxx.WriteString(e.String())
+			cxx.WriteString("\n\n")
+		}
+	}
 	return cxx.String()
 }
 
@@ -222,6 +244,7 @@ func (p *Parser) Cxx() string {
 	var cxx strings.Builder
 	cxx.WriteString(p.CxxEmbeds())
 	cxx.WriteString("\n\n")
+	cxx.WriteString(p.CxxEnums())
 	cxx.WriteString(p.CxxPrototypes())
 	cxx.WriteString("\n\n")
 	cxx.WriteString(p.CxxGlobals())
@@ -303,9 +326,19 @@ func (p *Parser) checkNsNses(src, sub *namespace) {
 
 func (p *Parser) checkNsTypes(src, sub *namespace) {
 	for _, t := range sub.Defs.Types {
-		for _, st := range src.Defs.Globals {
+		for _, st := range src.Defs.Types {
 			if t.Id == st.Id {
 				p.pusherrtok(t.Tok, "exist_id", t.Id)
+			}
+		}
+	}
+}
+
+func (p *Parser) checkNsEnums(src, sub *namespace) {
+	for _, e := range sub.Defs.Enums {
+		for _, se := range src.Defs.Enums {
+			if e.Id == se.Id {
+				p.pusherrtok(e.Tok, "exist_id", e.Id)
 			}
 		}
 	}
@@ -334,6 +367,7 @@ func (p *Parser) checkNsFuncs(src, sub *namespace) {
 func (p *Parser) checkNsDefs(src, sub *namespace) {
 	p.checkNsNses(src, sub)
 	p.checkNsTypes(src, sub)
+	p.checkNsEnums(src, sub)
 	p.checkNsGlobals(src, sub)
 	p.checkNsFuncs(src, sub)
 }
@@ -358,6 +392,18 @@ func (p *Parser) pushUseTypes(use, dm *Defmap) {
 				fmt.Sprintf(`"%s" identifier is already defined in this source`, t.Id))
 		} else {
 			use.Types = append(use.Types, t)
+		}
+	}
+}
+
+func (p *Parser) pushUseEnums(use, dm *Defmap) {
+	for _, t := range dm.Enums {
+		def, _, _ := p.enumById(t.Id)
+		if def != nil {
+			p.pusherrmsgtok(def.Tok,
+				fmt.Sprintf(`"%s" identifier is already defined in this source`, t.Id))
+		} else {
+			use.Enums = append(use.Enums, t)
 		}
 	}
 }
@@ -389,6 +435,7 @@ func (p *Parser) pushUseFuncs(use, dm *Defmap) {
 func (p *Parser) pushUseDefs(use *use, dm *Defmap) {
 	p.pushUseNamespaces(use.defs, dm)
 	p.pushUseTypes(use.defs, dm)
+	p.pushUseEnums(use.defs, dm)
 	p.pushUseGlobals(use.defs, dm)
 	p.pushUseFuncs(use.defs, dm)
 }
@@ -443,6 +490,8 @@ func (p *Parser) parseSrcTreeObj(obj ast.Obj) {
 		p.Statement(t)
 	case Type:
 		p.Type(t)
+	case Enum:
+		p.Enum(t)
 	case ast.CxxEmbed:
 		p.Embeds.WriteString(t.String())
 		p.Embeds.WriteByte('\n')
@@ -581,7 +630,7 @@ func (p *Parser) checkAttribute(obj ast.Obj) {
 }
 
 func (p *Parser) checkTypeAST(t Type) bool {
-	if tok, _, canshadow := p.existid(t.Id); tok.Id != tokens.NA && !canshadow {
+	if _, tok, _, canshadow := p.defById(t.Id); tok.Id != tokens.NA && !canshadow {
 		p.pusherrtok(t.Tok, "exist_id", t.Id)
 		return false
 	} else if xapi.IsIgnoreId(t.Id) {
@@ -599,6 +648,75 @@ func (p *Parser) Type(t Type) {
 	t.Desc = p.docText.String()
 	p.docText.Reset()
 	p.Defs.Types = append(p.Defs.Types, &t)
+}
+
+// Enum parses X enumerator statement.
+func (p *Parser) Enum(e Enum) {
+	if _, tok, _, _ := p.defById(e.Id); tok.Id != tokens.NA {
+		p.pusherrtok(e.Tok, "exist_id", e.Id)
+		return
+	} else if xapi.IsIgnoreId(e.Id) {
+		p.pusherrtok(e.Tok, "ignore_id")
+		return
+	}
+	e.Desc = p.docText.String()
+	p.docText.Reset()
+	e.Type, _ = p.readyType(e.Type, true)
+	if !typeIsSingle(e.Type) || !xtype.IsIntegerType(e.Type.Id) {
+		p.pusherrtok(e.Type.Tok, "invalid_type_source")
+		return
+	}
+	pdefs := p.Defs
+	uses := p.Uses
+	p.Defs = nil
+	p.Uses = nil
+	p.Defs = new(Defmap)
+	defer func() {
+		p.Defs = nil
+		p.Defs = pdefs
+		p.Uses = uses
+		p.Defs.Enums = append(p.Defs.Enums, &e)
+	}()
+	max := xtype.MaxOfType(e.Type.Id)
+	for i, item := range e.Items {
+		if max == 0 {
+			p.pusherrtok(item.Tok, "enum_overflow_limits")
+		} else {
+			max--
+		}
+		if xapi.IsIgnoreId(item.Id) {
+			p.pusherrtok(item.Tok, "ignore_id")
+		} else {
+			for _, checkItem := range e.Items {
+				if item == checkItem {
+					break
+				}
+				if item.Id == checkItem.Id {
+					p.pusherrtok(item.Tok, "exist_id", item.Id)
+					break
+				}
+			}
+		}
+		if item.Expr.Toks != nil {
+			val, model := p.evalExpr(item.Expr)
+			item.Expr.Model = model
+			p.wg.Add(1)
+			go assignChecker{
+				p:         p,
+				t:         e.Type,
+				v:         val,
+				ignoreAny: true,
+				errtok:    item.Tok,
+			}.checkAssignTypeAsync()
+		} else {
+			item.Expr.Model = exprNode{strconv.Itoa(i)}
+		}
+		itemVar := new(Var)
+		itemVar.Const = true
+		itemVar.Id = item.Id
+		itemVar.Type = e.Type
+		p.Defs.Globals = append(p.Defs.Globals, itemVar)
+	}
 }
 
 // Push namespace to defmap and returns leaf namespace.
@@ -717,7 +835,7 @@ func (p *Parser) params(params *[]Param) {
 
 // Func parse X function.
 func (p *Parser) Func(fast Func) {
-	if tok, _, canshadow := p.existid(fast.Id); tok.Id != tokens.NA && !canshadow {
+	if _, tok, _, canshadow := p.defById(fast.Id); tok.Id != tokens.NA && !canshadow {
 		p.pusherrtok(fast.Tok, "exist_id", fast.Id)
 	} else if xapi.IsIgnoreId(fast.Id) {
 		p.pusherrtok(fast.Tok, "ignore_id")
@@ -727,8 +845,8 @@ func (p *Parser) Func(fast Func) {
 	f := new(function)
 	f.Ast = fast
 	f.Attributes = p.attributes
-	f.Desc = p.docText.String()
 	p.attributes = nil
+	f.Desc = p.docText.String()
 	p.docText.Reset()
 	p.checkFuncAttributes(f.Attributes)
 	p.Defs.Funcs = append(p.Defs.Funcs, f)
@@ -736,7 +854,7 @@ func (p *Parser) Func(fast Func) {
 
 // ParseVariable parse X global variable.
 func (p *Parser) Global(vast Var) {
-	if tok, m, _ := p.existid(vast.Id); tok.Id != tokens.NA && m == p.Defs {
+	if _, tok, m, _ := p.defById(vast.Id); tok.Id != tokens.NA && m == p.Defs {
 		p.pusherrtok(vast.IdTok, "exist_id", vast.Id)
 		return
 	}
@@ -890,25 +1008,40 @@ func (p *Parser) typeById(id string) (*Type, *Defmap, bool) {
 	return p.Defs.typeById(id, p.File)
 }
 
-func (p *Parser) existid(id string) (tok Tok, m *Defmap, canshadow bool) {
+func (p *Parser) enumById(id string) (*Enum, *Defmap, bool) {
+	for _, use := range p.Uses {
+		t, m, _ := use.defs.enumById(id, p.File)
+		if t != nil {
+			return t, m, false
+		}
+	}
+	return p.Defs.enumById(id, p.File)
+}
+
+func (p *Parser) defById(id string) (def interface{}, tok Tok, m *Defmap, canshadow bool) {
 	var t *Type
 	t, m, canshadow = p.typeById(id)
 	if t != nil {
-		return t.Tok, m, canshadow
+		return t, t.Tok, m, canshadow
+	}
+	var e *Enum
+	e, m, canshadow = p.enumById(id)
+	if e != nil {
+		return e, e.Tok, m, canshadow
 	}
 	var f *function
 	f, m, canshadow = p.FuncById(id)
 	if f != nil {
-		return f.Ast.Tok, m, canshadow
+		return f, f.Ast.Tok, m, canshadow
 	}
 	for _, v := range p.BlockVars {
 		if v != nil && v.Id == id {
-			return v.IdTok, m, false
+			return v, v.IdTok, m, false
 		}
 	}
-	v, m := p.globalById(id)
-	if v != nil {
-		return v.IdTok, m, true
+	g, m := p.globalById(id)
+	if g != nil {
+		return g, g.IdTok, m, true
 	}
 	return
 }
@@ -984,6 +1117,7 @@ type value struct {
 	volatile bool
 	lvalue   bool
 	variadic bool
+	isType   bool
 }
 
 func eliminateProcesses(processes *[]Toks, i, to int) {
@@ -1031,6 +1165,11 @@ func (p *Parser) evalLogicProcesses(processes []Toks) (v value, e iExpr) {
 }
 
 func (p *Parser) evalNonLogicProcesses(processes []Toks) (v value, e iExpr) {
+	defer func() {
+		if v.isType {
+			p.pusherrtok(v.ast.Tok, "invalid_syntax")
+		}
+	}()
 	m := newExprModel(processes)
 	e = m
 	if len(processes) == 1 {
@@ -1054,7 +1193,7 @@ func (p *Parser) evalNonLogicProcesses(processes []Toks) (v value, e iExpr) {
 			m.index = i + 1
 			process.right = processes[m.index]
 			process.rightVal = p.evalExprPart(process.right, m).ast
-			v.ast = process.Solve()
+			v.ast = process.solve()
 			eliminateProcesses(&processes, i, i+2)
 			continue
 		} else if processes[i+1] == nil {
@@ -1062,7 +1201,7 @@ func (p *Parser) evalNonLogicProcesses(processes []Toks) (v value, e iExpr) {
 			process.left = processes[m.index]
 			process.leftVal = p.evalExprPart(process.left, m).ast
 			process.rightVal = v.ast
-			v.ast = process.Solve()
+			v.ast = process.solve()
 			eliminateProcesses(&processes, i-1, i+1)
 			continue
 		} else if isOperator(processes[i-1]) {
@@ -1070,7 +1209,7 @@ func (p *Parser) evalNonLogicProcesses(processes []Toks) (v value, e iExpr) {
 			m.index = i + 1
 			process.right = processes[m.index]
 			process.rightVal = p.evalExprPart(process.right, m).ast
-			v.ast = process.Solve()
+			v.ast = process.solve()
 			eliminateProcesses(&processes, i, i+1)
 			continue
 		}
@@ -1080,13 +1219,13 @@ func (p *Parser) evalNonLogicProcesses(processes []Toks) (v value, e iExpr) {
 		m.index = i + 1
 		process.right = processes[m.index]
 		process.rightVal = p.evalExprPart(process.right, m).ast
-		solvedv := process.Solve()
+		solvedv := process.solve()
 		if v.ast.Type.Id != xtype.Void {
 			process.operator.Kind = tokens.PLUS
 			process.leftVal = v.ast
 			process.right = processes[i+1]
 			process.rightVal = solvedv
-			solvedv = process.Solve()
+			solvedv = process.solve()
 		}
 		v.ast = solvedv
 		eliminateProcesses(&processes, i-1, i+2)
@@ -1293,6 +1432,17 @@ func (p *valueEvaluator) id() (v value, ok bool) {
 		v.ast.Tok = f.Ast.Tok
 		p.model.appendSubNode(exprNode{xapi.AsId(id)})
 		ok = true
+	} else if e, _, _ := p.p.enumById(id); e != nil {
+		e.Used = true
+		v.ast.Data = id
+		v.ast.Type.Id = xtype.Enum
+		v.ast.Type.Tag = e
+		v.ast.Type.Val = e.Id
+		v.ast.Tok = e.Tok
+		v.constant = true
+		v.isType = true
+		p.model.appendSubNode(exprNode{xapi.AsId(id)})
+		ok = true
 	} else {
 		p.p.pusherrtok(p.tok, "id_noexist", id)
 	}
@@ -1309,7 +1459,7 @@ type solver struct {
 	model    *exprModel
 }
 
-func (s solver) ptr() (v ast.Value) {
+func (s *solver) ptr() (v ast.Value) {
 	v.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
@@ -1332,7 +1482,17 @@ func (s solver) ptr() (v ast.Value) {
 	return
 }
 
-func (s solver) str() (v ast.Value) {
+func (s *solver) enum() (v ast.Value) {
+	if s.leftVal.Type.Id == xtype.Enum {
+		s.leftVal.Type = s.leftVal.Type.Tag.(*Enum).Type
+	}
+	if s.rightVal.Type.Id == xtype.Enum {
+		s.rightVal.Type = s.rightVal.Type.Tag.(*Enum).Type
+	}
+	return s.solve()
+}
+
+func (s *solver) str() (v ast.Value) {
 	v.Tok = s.operator
 	// Not both string?
 	if s.leftVal.Type.Id != s.rightVal.Type.Id {
@@ -1354,7 +1514,7 @@ func (s solver) str() (v ast.Value) {
 	return
 }
 
-func (s solver) any() (v ast.Value) {
+func (s *solver) any() (v ast.Value) {
 	v.Tok = s.operator
 	switch s.operator.Kind {
 	case tokens.EQUALS, tokens.NOT_EQUALS:
@@ -1366,7 +1526,7 @@ func (s solver) any() (v ast.Value) {
 	return
 }
 
-func (s solver) bool() (v ast.Value) {
+func (s *solver) bool() (v ast.Value) {
 	v.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
@@ -1384,7 +1544,7 @@ func (s solver) bool() (v ast.Value) {
 	return
 }
 
-func (s solver) float() (v ast.Value) {
+func (s *solver) float() (v ast.Value) {
 	v.Tok = s.operator
 	if !xtype.IsNumericType(s.leftVal.Type.Id) || !xtype.IsNumericType(s.rightVal.Type.Id) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
@@ -1407,7 +1567,7 @@ func (s solver) float() (v ast.Value) {
 	return
 }
 
-func (s solver) signed() (v ast.Value) {
+func (s *solver) signed() (v ast.Value) {
 	v.Tok = s.operator
 	if !xtype.IsNumericType(s.leftVal.Type.Id) || !xtype.IsNumericType(s.rightVal.Type.Id) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
@@ -1437,7 +1597,7 @@ func (s solver) signed() (v ast.Value) {
 	return
 }
 
-func (s solver) unsigned() (v ast.Value) {
+func (s *solver) unsigned() (v ast.Value) {
 	v.Tok = s.operator
 	if !xtype.IsNumericType(s.leftVal.Type.Id) || !xtype.IsNumericType(s.rightVal.Type.Id) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
@@ -1463,7 +1623,7 @@ func (s solver) unsigned() (v ast.Value) {
 	return
 }
 
-func (s solver) logical() (v ast.Value) {
+func (s *solver) logical() (v ast.Value) {
 	v.Tok = s.operator
 	v.Type.Id = xtype.Bool
 	v.Type.Val = tokens.BOOL
@@ -1476,7 +1636,7 @@ func (s solver) logical() (v ast.Value) {
 	return
 }
 
-func (s solver) char() (v ast.Value) {
+func (s *solver) char() (v ast.Value) {
 	v.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
@@ -1494,7 +1654,7 @@ func (s solver) char() (v ast.Value) {
 	return
 }
 
-func (s solver) array() (v ast.Value) {
+func (s *solver) array() (v ast.Value) {
 	v.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
@@ -1511,7 +1671,7 @@ func (s solver) array() (v ast.Value) {
 	return
 }
 
-func (s solver) nil() (v ast.Value) {
+func (s *solver) nil() (v ast.Value) {
 	v.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, false) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
@@ -1529,7 +1689,7 @@ func (s solver) nil() (v ast.Value) {
 	return
 }
 
-func (s solver) Solve() (v ast.Value) {
+func (s *solver) solve() (v ast.Value) {
 	defer func() {
 		if v.Type.Id == xtype.Void {
 			v.Type.Val = xtype.VoidTypeStr
@@ -1550,6 +1710,8 @@ func (s solver) Solve() (v ast.Value) {
 		return s.array()
 	case typeIsPtr(s.leftVal.Type) || typeIsPtr(s.rightVal.Type):
 		return s.ptr()
+	case s.leftVal.Type.Id == xtype.Enum || s.rightVal.Type.Id == xtype.Enum:
+		return s.enum()
 	case s.leftVal.Type.Id == xtype.Nil || s.rightVal.Type.Id == xtype.Nil:
 		return s.nil()
 	case s.leftVal.Type.Id == xtype.Char || s.rightVal.Type.Id == xtype.Char:
@@ -1723,10 +1885,12 @@ func (p *Parser) evalOperatorExprPart(toks Toks, m *exprModel) value {
 }
 
 func canGetPtr(v value) bool {
-	if v.ast.Type.Id == xtype.Func {
+	switch v.ast.Type.Id {
+	case xtype.Func, xtype.Enum:
 		return false
+	default:
+		return v.ast.Tok.Id == tokens.Id
 	}
-	return v.ast.Tok.Id == tokens.Id
 }
 
 func (p *Parser) evalHeapAllocExpr(toks Toks, m *exprModel) (v value) {
@@ -1843,6 +2007,21 @@ func (p *Parser) evalArrayObjSubId(val value, idTok Tok, m *exprModel) (v value)
 func (p *Parser) evalMapObjSubId(val value, idTok Tok, m *exprModel) (v value) {
 	readyMapDefs(val.ast.Type)
 	return p.evalXObjSubId(mapDefs, val, idTok, m)
+}
+
+func (p *Parser) evalEnumObjSubId(val value, idTok Tok, m *exprModel) (v value) {
+	enum := val.ast.Type.Tag.(*Enum)
+	v = val
+	v.ast.Type.Tok = enum.Tok
+	v.constant = true
+	v.lvalue = false
+	v.isType = false
+	m.appendSubNode(exprNode{"::"})
+	m.appendSubNode(exprNode{xapi.AsId(idTok.Kind)})
+	if enum.ItemById(idTok.Kind) == nil {
+		p.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
+	}
+	return
 }
 
 type nsFind interface{ nsById(string, bool) *namespace }
@@ -2000,8 +2179,13 @@ func (p *Parser) evalExprSubId(toks Toks, m *exprModel) (v value) {
 		checkType.Val = checkType.Val[1:]
 	}
 	switch {
-	case typeIsSingle(checkType) && checkType.Id == xtype.Str:
-		return p.evalStrObjSubId(val, idTok, m)
+	case typeIsSingle(checkType):
+		switch checkType.Id {
+		case xtype.Str:
+			return p.evalStrObjSubId(val, idTok, m)
+		case xtype.Enum:
+			return p.evalEnumObjSubId(val, idTok, m)
+		}
 	case typeIsArray(checkType):
 		return p.evalArrayObjSubId(val, idTok, m)
 	case typeIsMap(checkType):
@@ -2117,6 +2301,9 @@ func (p *Parser) checkCastSingle(t, vt DataType, errtok Tok) {
 	case xtype.Str:
 		p.checkCastStr(vt, errtok)
 		return
+	case xtype.Enum:
+		p.checkCastEnum(t, vt, errtok)
+		return
 	}
 	switch {
 	case xtype.IsIntegerType(t.Id):
@@ -2137,6 +2324,13 @@ func (p *Parser) checkCastStr(vt DataType, errtok Tok) {
 	if !typeIsSingle(vt) || (vt.Id != xtype.Char && vt.Id != xtype.U8) {
 		p.pusherrtok(errtok, "type_notsupports_casting", vt.Val)
 	}
+}
+
+func (p *Parser) checkCastEnum(t, vt DataType, errtok Tok) {
+	e := t.Tag.(*Enum)
+	t = e.Type
+	t.Val = e.Id
+	p.checkCastNumeric(t, vt, errtok)
 }
 
 func (p *Parser) checkCastInteger(t, vt DataType, errtok Tok) {
@@ -3318,7 +3512,7 @@ func (p *Parser) checkFunc(f *Func) {
 }
 
 func (p *Parser) checkVarStatement(v *Var, noParse bool) {
-	if tok, _, canshadow := p.existid(v.Id); tok.Id != tokens.NA && !canshadow {
+	if _, tok, _, canshadow := p.defById(v.Id); tok.Id != tokens.NA && !canshadow {
 		p.pusherrtok(v.IdTok, "exist_id", v.Id)
 	}
 	if !noParse {
@@ -3376,7 +3570,7 @@ func (p *Parser) checkSingleAssign(assign *ast.Assign) {
 			rightVal: val.ast,
 			operator: assign.Setter,
 		}
-		val.ast = solver.Solve()
+		val.ast = solver.solve()
 		assign.Setter.Kind += tokens.EQUAL
 	}
 	p.wg.Add(1)
@@ -3711,17 +3905,25 @@ func (p *Parser) readyType(dt DataType, err bool) (_ DataType, ok bool) {
 	}
 	switch dt.Id {
 	case xtype.Id:
-		t, _, _ := p.typeById(dt.Tok.Kind)
-		if t == nil {
+		def, _, _, _ := p.defById(dt.Tok.Kind)
+		switch t := def.(type) {
+		case *Type:
+			t.Used = true
+			dt = t.Type
+			dt.Val = dt.Val[:len(dt.Val)-len(dt.Tok.Kind)] + t.Type.Val
+			return p.readyType(dt, err)
+		case *Enum:
+			t.Used = true
+			dt.Id = xtype.Enum
+			dt.Val = t.Id
+			dt.Tag = t
+			return dt, true
+		default:
 			if err {
 				p.pusherrtok(dt.Tok, "invalid_type_source")
 			}
 			return dt, false
 		}
-		t.Used = true
-		dt = t.Type
-		dt.Val = dt.Val[:len(dt.Val)-len(dt.Tok.Kind)] + t.Type.Val
-		return p.readyType(dt, err)
 	case xtype.Func:
 		f := dt.Tag.(Func)
 		for i, param := range f.Params {

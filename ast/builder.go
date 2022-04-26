@@ -66,6 +66,8 @@ func (b *Builder) buildNode(toks Toks) {
 		t.Pub = b.pub
 		b.pub = false
 		b.Tree = append(b.Tree, Obj{t.Tok, t})
+	case tokens.Enum:
+		b.Enum(toks)
 	case tokens.Comment:
 		b.Comment(toks[0])
 	case tokens.Preprocessor:
@@ -118,11 +120,114 @@ func (b *Builder) Type(toks Toks) (t Type) {
 	}
 	destType, _ := b.DataType(toks[i:], new(int), true)
 	tok = toks[1]
-	return Type{
+	t = Type{
+		Pub:  b.pub,
 		Tok:  tok,
 		Id:   tok.Kind,
 		Type: destType,
 	}
+	b.pub = false
+	return
+}
+
+func (b *Builder) buildEnumItems(toks Toks) []*EnumItem {
+	items := make([]*EnumItem, 0)
+	for i := 0; i < len(toks); i++ {
+		tok := toks[i]
+		item := new(EnumItem)
+		item.Tok = tok
+		if item.Tok.Id != tokens.Id {
+			b.pusherr(item.Tok, "invalid_syntax")
+		}
+		item.Id = item.Tok.Kind
+		if i+1 >= len(toks) || toks[i+1].Id == tokens.Comma {
+			if i+1 < len(toks) {
+				i++
+			}
+			items = append(items, item)
+			continue
+		}
+		i++
+		tok = toks[i]
+		if tok.Id != tokens.Operator && tok.Kind != tokens.EQUAL {
+			b.pusherr(toks[0], "invalid_syntax")
+		}
+		i++
+		if i >= len(toks) || toks[i].Id == tokens.Comma {
+			b.pusherr(toks[0], "missing_expr")
+			continue
+		}
+		braceCount := 0
+		exprStart := i
+		for ; i < len(toks); i++ {
+			tok = toks[i]
+			if tok.Id == tokens.Brace {
+				switch tok.Kind {
+				case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
+					braceCount++
+					continue
+				default:
+					braceCount--
+				}
+			}
+			if braceCount > 0 {
+				continue
+			}
+			if tok.Id == tokens.Comma || i+1 >= len(toks) {
+				var exprToks Toks
+				if tok.Id == tokens.Comma {
+					exprToks = toks[exprStart:i]
+				} else {
+					exprToks = toks[exprStart:]
+				}
+				item.Expr = b.Expr(exprToks)
+				items = append(items, item)
+				break
+			}
+		}
+	}
+	return items
+}
+
+// Enum builds AST model of enumerator statement.
+func (b *Builder) Enum(toks Toks) {
+	var enum Enum
+	if len(toks) < 2 || len(toks) < 3 {
+		b.pusherr(toks[0], "invalid_syntax")
+		return
+	}
+	enum.Tok = toks[1]
+	if enum.Tok.Id != tokens.Id {
+		b.pusherr(enum.Tok, "invalid_syntax")
+	}
+	enum.Id = enum.Tok.Kind
+	i := 2
+	if toks[i].Id == tokens.Colon {
+		i++
+		if i >= len(toks) {
+			b.pusherr(toks[i-1], "invalid_syntax")
+			return
+		}
+		enum.Type, _ = b.DataType(toks, &i, true)
+		i++
+		if i >= len(toks) {
+			b.pusherr(enum.Tok, "body_not_exist")
+			return
+		}
+	} else {
+		enum.Type = DataType{Id: xtype.U32, Val: tokens.U32}
+	}
+	itemToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
+	if itemToks == nil {
+		b.pusherr(enum.Tok, "body_not_exist")
+		return
+	} else if i < len(toks) {
+		b.pusherr(toks[i], "invalid_syntax")
+	}
+	enum.Pub = b.pub
+	b.pub = false
+	enum.Items = b.buildEnumItems(itemToks)
+	b.Tree = append(b.Tree, Obj{enum.Tok, enum})
 }
 
 // Comment builds AST model of comment.

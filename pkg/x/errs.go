@@ -114,6 +114,7 @@ var Errs = map[string]string{
 	`invalid_value_for_key`:             `"%s" is invalid value for the "%s" key`,
 	`param_must_have_default_arg`:       `%s paramater is must have a default argument`,
 	`namespace_not_exist`:               `namespace is not exist in this identifier: %s`,
+	`enum_overflow_limits`:              `enum overflow the limit of data-type`,
 	`error`:                             `error: %s`,
 }
 

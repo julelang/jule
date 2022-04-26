@@ -86,6 +86,7 @@ const (
 	PUB                 = "pub"
 	DEFER               = "defer"
 	GOTO                = "goto"
+	ENUM                = "enum"
 )
 
 // Token types.
@@ -120,4 +121,5 @@ const (
 	Defer        uint8 = 27
 	Goto         uint8 = 28
 	DoubleColon  uint8 = 29
+	Enum         uint8 = 30
 )

@@ -25,6 +25,7 @@ const (
 	Size    uint8 = 18
 	Map     uint8 = 19
 	Voidptr uint8 = 20
+	Enum    uint8 = 21
 )
 
 const (
@@ -58,7 +59,7 @@ func TypeGreaterThan(t1, t2 uint8) bool {
 		return t2 != Any && t2 != F64
 	case F64:
 		return t2 != Any
-	case Size:
+	case Size, Enum:
 		return true
 	}
 	return false

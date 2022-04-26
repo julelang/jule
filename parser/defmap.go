@@ -6,6 +6,7 @@ import "github.com/the-xlang/xxc/pkg/xtype"
 type Defmap struct {
 	Namespaces []*namespace
 	Types      []*Type
+	Enums      []*Enum
 	Funcs      []*function
 	Globals    []*Var
 	parent     *Defmap
@@ -53,6 +54,29 @@ func (dm *Defmap) typeById(id string, f *File) (*Type, *Defmap, bool) {
 		return nil, nil, false
 	}
 	return m.Types[i], m, canshadow
+}
+
+func (dm *Defmap) findEnumById(id string, f *File) (int, *Defmap, bool) {
+	for i, t := range dm.Enums {
+		if t != nil && t.Id == id {
+			if !dm.justPub || f == t.Tok.File || t.Pub {
+				return i, dm, false
+			}
+		}
+	}
+	if dm.parent != nil {
+		i, m, _ := dm.parent.findEnumById(id, f)
+		return i, m, true
+	}
+	return -1, nil, false
+}
+
+func (dm *Defmap) enumById(id string, f *File) (*Enum, *Defmap, bool) {
+	i, m, canshadow := dm.findEnumById(id, f)
+	if i == -1 {
+		return nil, nil, false
+	}
+	return m.Enums[i], m, canshadow
 }
 
 func (dm *Defmap) findFuncById(id string, f *File) (int, *Defmap, bool) {
@@ -113,6 +137,7 @@ func (dm *Defmap) globalById(id string, f *File) (*Var, *Defmap, bool) {
 // Types;
 // 'g' -> global
 // 'f' -> function
+// 'e' -> enum
 func (dm *Defmap) defById(id string, f *File) (int, *Defmap, byte) {
 	var i int
 	var m *Defmap
@@ -123,6 +148,10 @@ func (dm *Defmap) defById(id string, f *File) (int, *Defmap, byte) {
 	i, m, _ = dm.findFuncById(id, f)
 	if i != -1 {
 		return i, m, 'f'
+	}
+	i, m, _ = dm.findEnumById(id, f)
+	if i != -1 {
+		return i, m, 'e'
 	}
 	return -1, m, ' '
 }
