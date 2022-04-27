@@ -130,9 +130,14 @@ func (mre multiRetExpr) String() string {
 	return cxx.String()[:cxx.Len()-1] + ")"
 }
 
-type newHeapAllocExpr struct{ typeAST DataType }
+type newHeapAllocExpr struct {
+	typeAST DataType
+	expr    Expr
+}
 
-func (nha newHeapAllocExpr) String() string { return xapi.ToXAlloc(nha.typeAST.String()) }
+func (nha newHeapAllocExpr) String() string {
+	return xapi.ToXAlloc(nha.typeAST.String(), nha.expr.String())
+}
 
 type assignExpr struct{ assign ast.Assign }
 

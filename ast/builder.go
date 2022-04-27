@@ -1060,7 +1060,7 @@ func (b *Builder) Statement(bs *blockStatement) (s Statement) {
 			return b.blockStatement(bs.toks)
 		}
 	}
-	if isFuncCall(bs.toks) {
+	if IsFuncCall(bs.toks) != nil {
 		return b.ExprStatement(bs.toks)
 	}
 	bs.toks = append([]Tok{{Id: tokens.Ret, Kind: tokens.RET}}, bs.toks...)
@@ -1086,11 +1086,12 @@ type assignInfo struct {
 	isExpr       bool
 }
 
-func isFuncCall(toks Toks) bool {
+// IsFuncCall returns function expressions without call expression
+// if tokens are function call, nil if not.
+func IsFuncCall(toks Toks) Toks {
 	if t := toks[len(toks)-1]; t.Id != tokens.Brace && t.Kind != tokens.RPARENTHESES {
-		return false
+		return nil
 	}
-	var exprToks Toks
 	braceCount := 0
 	for i := len(toks) - 1; i >= 0; i-- {
 		tok := toks[i]
@@ -1102,12 +1103,11 @@ func isFuncCall(toks Toks) bool {
 				braceCount--
 			}
 			if braceCount == 0 {
-				exprToks = toks[:i]
-				break
+				return toks[:i]
 			}
 		}
 	}
-	return len(exprToks) > 0
+	return nil
 }
 
 func (b *Builder) assignInfo(toks Toks) (info assignInfo) {
@@ -1506,7 +1506,7 @@ func (b *Builder) DeferStatement(toks Toks) (s Statement) {
 		b.pusherr(d.Tok, "missing_expr")
 		return
 	}
-	if !isFuncCall(toks) {
+	if IsFuncCall(toks) != nil {
 		b.pusherr(d.Tok, "defer_expr_not_func_call")
 	}
 	d.Expr = b.Expr(toks)

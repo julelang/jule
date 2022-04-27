@@ -1925,16 +1925,41 @@ func (p *Parser) evalHeapAllocExpr(toks Toks, m *exprModel) (v value) {
 	toks = toks[1:]
 	b := new(ast.Builder)
 	i := new(int)
-	dt, ok := b.DataType(toks, i, true)
-	m.appendSubNode(newHeapAllocExpr{dt})
+	exprToks := ast.IsFuncCall(toks)
+	var dt DataType
+	var ok bool
+	var alloc newHeapAllocExpr
+	if exprToks == nil {
+		dt, ok = b.DataType(toks, i, true)
+		if *i < len(toks)-1 {
+			p.pusherrtok(toks[*i+1], "invalid_syntax")
+		}
+	} else {
+		dt, ok = b.DataType(exprToks, i, true)
+		if *i < len(exprToks)-1 {
+			p.pusherrtok(exprToks[*i+1], "invalid_syntax")
+		}
+		// Get function call expression tokens without parentheses.
+		exprToks = toks[len(exprToks)+1 : len(toks)-1]
+		if len(exprToks) > 0 {
+			val, model := p.evalToks(exprToks)
+			alloc.expr.Model = model
+			p.wg.Add(1)
+			go assignChecker{
+				p:      p,
+				t:      dt,
+				v:      val,
+				errtok: exprToks[0],
+			}.checkAssignTypeAsync()
+		}
+	}
+	alloc.typeAST = dt
+	m.appendSubNode(alloc)
 	dt.Val = tokens.STAR + dt.Val
 	v.ast.Type = dt
 	if !ok {
 		p.pusherrtok(toks[0], "fail_build_heap_allocation_type", dt.Val)
 		return
-	}
-	if *i < len(toks)-1 {
-		p.pusherrtok(toks[*i+1], "invalid_syntax")
 	}
 	return
 }

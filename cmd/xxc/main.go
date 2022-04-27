@@ -640,7 +640,12 @@ public:
 };
 
 template<typename _Alloc_t>
-static inline _Alloc_t *xalloc() { return new(std::nothrow) _Alloc_t; }
+static inline _Alloc_t *xalloc()
+{ return new(std::nothrow) _Alloc_t; }
+
+template<typename _Alloc_t>
+static inline _Alloc_t *xalloc(_Alloc_t _Init)
+{ return new(std::nothrow) _Alloc_t(_Init); }
 
 template <typename _Enum_t, typename _Index_t, typename _Item_t>
 static inline void foreach(const _Enum_t _Enum,
