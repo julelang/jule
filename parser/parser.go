@@ -964,10 +964,8 @@ func (p *Parser) FuncById(id string) (*function, *Defmap, bool) {
 }
 
 func (p *Parser) varById(id string) (*Var, *Defmap) {
-	for _, v := range p.BlockVars {
-		if v != nil && v.Id == id {
-			return v, nil
-		}
+	if bv := p.blockVarById(id); bv != nil {
+		return bv, p.Defs
 	}
 	return p.globalById(id)
 }
@@ -994,10 +992,8 @@ func (p *Parser) nsById(id string, parent bool) *namespace {
 }
 
 func (p *Parser) typeById(id string) (*Type, *Defmap, bool) {
-	for _, t := range p.BlockTypes {
-		if t != nil && t.Id == id {
-			return t, nil, false
-		}
+	if t := p.blockTypesById(id); t != nil {
+		return t, p.Defs, false
 	}
 	for _, use := range p.Uses {
 		t, m, _ := use.defs.typeById(id, p.File)
@@ -1018,6 +1014,24 @@ func (p *Parser) enumById(id string) (*Enum, *Defmap, bool) {
 	return p.Defs.enumById(id, p.File)
 }
 
+func (p *Parser) blockTypesById(id string) *Type {
+	for _, t := range p.BlockTypes {
+		if t != nil && t.Id == id {
+			return t
+		}
+	}
+	return nil
+}
+
+func (p *Parser) blockVarById(id string) *Var {
+	for _, v := range p.BlockVars {
+		if v != nil && v.Id == id {
+			return v
+		}
+	}
+	return nil
+}
+
 func (p *Parser) defById(id string) (def interface{}, tok Tok, m *Defmap, canshadow bool) {
 	var t *Type
 	t, m, canshadow = p.typeById(id)
@@ -1034,14 +1048,22 @@ func (p *Parser) defById(id string) (def interface{}, tok Tok, m *Defmap, cansha
 	if f != nil {
 		return f, f.Ast.Tok, m, canshadow
 	}
-	for _, v := range p.BlockVars {
-		if v != nil && v.Id == id {
-			return v, v.IdTok, m, false
-		}
+	if bv := p.blockVarById(id); bv != nil {
+		return bv, bv.IdTok, p.Defs, false
 	}
 	g, m := p.globalById(id)
 	if g != nil {
 		return g, g.IdTok, m, true
+	}
+	return
+}
+
+func (p *Parser) blockDefById(id string) (def interface{}, tok Tok) {
+	if bv := p.blockVarById(id); bv != nil {
+		return bv, bv.IdTok
+	}
+	if t := p.blockTypesById(id); t != nil {
+		return t, t.Tok
 	}
 	return
 }
@@ -3512,7 +3534,7 @@ func (p *Parser) checkFunc(f *Func) {
 }
 
 func (p *Parser) checkVarStatement(v *Var, noParse bool) {
-	if _, tok, _, canshadow := p.defById(v.Id); tok.Id != tokens.NA && !canshadow {
+	if _, tok := p.blockDefById(v.Id); tok.Id != tokens.NA {
 		p.pusherrtok(v.IdTok, "exist_id", v.Id)
 	}
 	if !noParse {
