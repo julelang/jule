@@ -527,6 +527,9 @@ public:
   inline size rfind(const str &_Sub) const noexcept
   { return this->_buffer.rfind(_Sub._buffer); }
 
+  inline const char* cstr(void) const noexcept
+  { return this->_buffer.c_str(); }
+
   str trim(const str &_Bytes) const noexcept {
     const_iterator _it{this->begin()};
     const const_iterator _end{this->end()};
