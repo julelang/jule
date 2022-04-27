@@ -7,7 +7,7 @@ import (
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
-func typeIsVoidRet(t DataType) bool { return t.Id == xtype.Void && !t.MultiTyped }
+func typeIsVoid(t DataType) bool { return t.Id == xtype.Void && !t.MultiTyped }
 
 func typeOfArrayItems(t DataType) DataType {
 	// Remove array syntax "[]"

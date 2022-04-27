@@ -3401,7 +3401,7 @@ func (rc *retChecker) checkepxrs() {
 			rc.pushval(last, length, rc.retAST.Expr.Toks[last-1])
 		}
 	}
-	if !typeIsVoidRet(rc.fun.RetType) {
+	if !typeIsVoid(rc.fun.RetType) {
 		rc.checkExprTypes()
 	}
 }
@@ -3483,11 +3483,11 @@ func (rc *retChecker) checkMultiRetAsMutliRet() {
 
 func (rc *retChecker) check() {
 	exprToksLen := len(rc.retAST.Expr.Toks)
-	if exprToksLen == 0 && !typeIsVoidRet(rc.fun.RetType) {
+	if exprToksLen == 0 && !typeIsVoid(rc.fun.RetType) {
 		rc.p.pusherrtok(rc.retAST.Tok, "require_return_value")
 		return
 	}
-	if exprToksLen > 0 && typeIsVoidRet(rc.fun.RetType) {
+	if exprToksLen > 0 && typeIsVoid(rc.fun.RetType) {
 		rc.p.pusherrtok(rc.retAST.Tok, "void_function_return_value")
 	}
 	rc.checkepxrs()
@@ -3500,7 +3500,7 @@ func (p *Parser) checkRets(fun *Func) {
 			return
 		}
 	}
-	if !typeIsVoidRet(fun.RetType) {
+	if !typeIsVoid(fun.RetType) {
 		p.pusherrtok(fun.Tok, "missing_ret")
 	}
 }
@@ -3994,6 +3994,10 @@ func (ac assignChecker) checkAssignTypeAsync() {
 
 func (p *Parser) checkTypeAsync(real, check DataType, ignoreAny bool, errTok Tok) {
 	defer func() { p.wg.Done() }()
+	if typeIsVoid(check) {
+		p.pusherrtok(errTok, "incompatible_datatype", real.Val, check.Val)
+		return
+	}
 	if !ignoreAny && real.Id == xtype.Any {
 		return
 	}
