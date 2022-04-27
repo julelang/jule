@@ -615,6 +615,9 @@ public:
     return _array;
   }
 
+  operator const char*(void) { this->_buffer.c_str(); }
+  operator char*(void)       { this->_buffer.c_str(); }
+
   char &operator[](size _Index) { return this->_buffer[_Index]; }
 
   void operator+=(const str _Str) noexcept        { this->_buffer += _Str._buffer; }
