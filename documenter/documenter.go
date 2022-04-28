@@ -15,6 +15,12 @@ type use struct {
 	StandardPath bool   `json:"standard_path"`
 }
 
+type enum struct {
+	Id    string   `json:"id"`
+	Desc  string   `json:"description"`
+	Items []string `json:"items"`
+}
+
 type xtype struct {
 	Id    string `json:"id"`
 	Alias string `json:"alias"`
@@ -46,6 +52,7 @@ type parameter struct {
 
 type namespace struct {
 	Id         string      `json:"id"`
+	Enums      []enum      `json:"enums"`
 	Types      []xtype     `json:"types"`
 	Globals    []global    `json:"globals"`
 	Funcs      []function  `json:"functions"`
@@ -54,6 +61,7 @@ type namespace struct {
 
 type document struct {
 	Uses       []use       `json:"uses"`
+	Enums      []enum      `json:"enums"`
 	Types      []xtype     `json:"types"`
 	Globals    []global    `json:"globals"`
 	Funcs      []function  `json:"functions"`
@@ -71,6 +79,21 @@ func uses(p *parser.Parser) []use {
 		}
 	}
 	return uses
+}
+
+func enums(dm *Defmap) []enum {
+	enums := make([]enum, len(dm.Enums))
+	for i, e := range dm.Enums {
+		var conv enum
+		conv.Id = e.Id
+		conv.Desc = e.Desc
+		conv.Items = make([]string, len(e.Items))
+		for i, item := range e.Items {
+			conv.Items[i] = item.Id
+		}
+		enums[i] = conv
+	}
+	return enums
 }
 
 func types(dm *Defmap) []xtype {
@@ -137,6 +160,7 @@ func funcs(dm *Defmap) []function {
 
 func makeNamespace(dm *Defmap) namespace {
 	var ns namespace
+	ns.Enums = enums(dm)
 	ns.Types = types(dm)
 	ns.Globals = globals(dm)
 	ns.Funcs = funcs(dm)
@@ -158,6 +182,7 @@ func namespaces(dm *Defmap) []namespace {
 func Documentize(p *parser.Parser) (string, error) {
 	doc := document{
 		uses(p),
+		enums(p.Defs),
 		types(p.Defs),
 		globals(p.Defs),
 		funcs(p.Defs),
