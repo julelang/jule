@@ -139,6 +139,14 @@ All documentation about XXC (naturally X programming language) is on the website
 
 > [Website documentation](https://the-xlang.github.io/website/pages/docs.html?page=getting-started-install-from-source) for install from source.
 
+There are scripts prepared for compiling of XXC. <br>
+These scripts are written to run from the home directory.
+
+`build` scripts used for compile. <br>
+`brun` scripts used for compile and execute if compiling is successful.
+
+[Go to scripts directory](scripts)
+
 XXC aims to have a single main build file. <br>
 XXC is in development with the [Go](https://github.com/golang/go) programming language. <br>
 That is until the X programming language matures. <br>
