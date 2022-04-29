@@ -288,7 +288,7 @@ func (l *Lex) Newln() {
 	l.Column = 1
 }
 
-func (l *Lex) punct(txt, kind string, id uint8, tok *Tok) bool {
+func (l *Lex) isop(txt, kind string, id uint8, tok *Tok) bool {
 	if !strings.HasPrefix(txt, kind) {
 		return false
 	}
@@ -298,7 +298,7 @@ func (l *Lex) punct(txt, kind string, id uint8, tok *Tok) bool {
 	return true
 }
 
-func (l *Lex) kw(txt, kind string, id uint8, tok *Tok) bool {
+func (l *Lex) iskw(txt, kind string, id uint8, tok *Tok) bool {
 	if !iskw(txt, kind) {
 		return false
 	}
@@ -306,6 +306,113 @@ func (l *Lex) kw(txt, kind string, id uint8, tok *Tok) bool {
 	tok.Id = id
 	l.Pos += len([]rune(kind))
 	return true
+}
+
+//               [keyword]id
+var keywords = map[string]uint8{
+	tokens.I8:       tokens.DataType,
+	tokens.I16:      tokens.DataType,
+	tokens.I32:      tokens.DataType,
+	tokens.I64:      tokens.DataType,
+	tokens.U8:       tokens.DataType,
+	tokens.U16:      tokens.DataType,
+	tokens.U32:      tokens.DataType,
+	tokens.U64:      tokens.DataType,
+	tokens.F32:      tokens.DataType,
+	tokens.F64:      tokens.DataType,
+	tokens.BYTE:     tokens.DataType,
+	tokens.SBYTE:    tokens.DataType,
+	tokens.SIZE:     tokens.DataType,
+	tokens.BOOL:     tokens.DataType,
+	tokens.CHAR:     tokens.DataType,
+	tokens.STR:      tokens.DataType,
+	tokens.VOIDPTR:  tokens.DataType,
+	tokens.TRUE:     tokens.Value,
+	tokens.FALSE:    tokens.Value,
+	tokens.NIL:      tokens.Value,
+	tokens.CONST:    tokens.Const,
+	tokens.RET:      tokens.Ret,
+	tokens.TYPE:     tokens.Type,
+	tokens.NEW:      tokens.New,
+	tokens.FREE:     tokens.Free,
+	tokens.ITER:     tokens.Iter,
+	tokens.BREAK:    tokens.Break,
+	tokens.CONTINUE: tokens.Continue,
+	tokens.IN:       tokens.In,
+	tokens.IF:       tokens.If,
+	tokens.ELSE:     tokens.Else,
+	tokens.VOLATILE: tokens.Volatile,
+	tokens.USE:      tokens.Use,
+	tokens.PUB:      tokens.Pub,
+	tokens.DEFER:    tokens.Defer,
+	tokens.GOTO:     tokens.Goto,
+	tokens.ENUM:     tokens.Enum,
+	tokens.STRUCT:   tokens.Struct,
+}
+
+type oppair struct {
+	op string
+	id uint8
+}
+
+//                [  op  ]id
+var basicOps = []oppair{
+	{tokens.DOUBLE_COLON, tokens.DoubleColon},
+	{tokens.COLON, tokens.Colon},
+	{tokens.SEMICOLON, tokens.SemiColon},
+	{tokens.COMMA, tokens.Comma},
+	{tokens.AT, tokens.At},
+	{tokens.TRIPLE_DOT, tokens.Operator},
+	{tokens.DOT, tokens.Dot},
+	{tokens.PLUS_EQUAL, tokens.Operator},
+	{tokens.MINUS_EQUAL, tokens.Operator},
+	{tokens.STAR_EQUAL, tokens.Operator},
+	{tokens.SLASH_EQUAL, tokens.Operator},
+	{tokens.PERCENT_EQUAL, tokens.Operator},
+	{tokens.LSHIFT_EQUAL, tokens.Operator},
+	{tokens.RSHIFT_EQUAL, tokens.Operator},
+	{tokens.CARET_EQUAL, tokens.Operator},
+	{tokens.AMPER_EQUAL, tokens.Operator},
+	{tokens.VLINE_EQUAL, tokens.Operator},
+	{tokens.EQUALS, tokens.Operator},
+	{tokens.NOT_EQUALS, tokens.Operator},
+	{tokens.GREAT_EQUAL, tokens.Operator},
+	{tokens.LESS_EQUAL, tokens.Operator},
+	{tokens.AND, tokens.Operator},
+	{tokens.OR, tokens.Operator},
+	{tokens.LSHIFT, tokens.Operator},
+	{tokens.RSHIFT, tokens.Operator},
+	{tokens.PLUS, tokens.Operator},
+	{tokens.MINUS, tokens.Operator},
+	{tokens.STAR, tokens.Operator},
+	{tokens.SLASH, tokens.Operator},
+	{tokens.PERCENT, tokens.Operator},
+	{tokens.TILDE, tokens.Operator},
+	{tokens.AMPER, tokens.Operator},
+	{tokens.VLINE, tokens.Operator},
+	{tokens.CARET, tokens.Operator},
+	{tokens.EXCLAMATION, tokens.Operator},
+	{tokens.LESS, tokens.Operator},
+	{tokens.GREAT, tokens.Operator},
+	{tokens.EQUAL, tokens.Operator},
+}
+
+func (l *Lex) lexKeywords(txt string, tok *Tok) bool {
+	for key, value := range keywords {
+		if l.iskw(txt, key, value, tok) {
+			return true
+		}
+	}
+	return false
+}
+
+func (l *Lex) lexBasicOps(txt string, tok *Tok) bool {
+	for _, pair := range basicOps {
+		if l.isop(txt, pair.op, pair.id, tok) {
+			return true
+		}
+	}
+	return false
 }
 
 // Tok generates next token from resume at position.
@@ -339,9 +446,9 @@ func (l *Lex) Tok() Tok {
 	case strings.HasPrefix(txt, tokens.RANGE_COMMENT_OPEN):
 		l.rangecomment()
 		return tok
-	case l.punct(txt, tokens.LPARENTHESES, tokens.Brace, &tok):
+	case l.isop(txt, tokens.LPARENTHESES, tokens.Brace, &tok):
 		l.braces = append(l.braces, tok)
-	case l.punct(txt, tokens.RPARENTHESES, tokens.Brace, &tok):
+	case l.isop(txt, tokens.RPARENTHESES, tokens.Brace, &tok):
 		len := len(l.braces)
 		if len == 0 {
 			l.pusherrtok(tok, "extra_closed_parentheses")
@@ -351,9 +458,9 @@ func (l *Lex) Tok() Tok {
 			go l.pushWrongOrderCloseErrAsync(tok)
 		}
 		l.rmrange(len-1, tok.Kind)
-	case l.punct(txt, tokens.LBRACE, tokens.Brace, &tok):
+	case l.isop(txt, tokens.LBRACE, tokens.Brace, &tok):
 		l.braces = append(l.braces, tok)
-	case l.punct(txt, tokens.RBRACE, tokens.Brace, &tok):
+	case l.isop(txt, tokens.RBRACE, tokens.Brace, &tok):
 		len := len(l.braces)
 		if len == 0 {
 			l.pusherrtok(tok, "extra_closed_braces")
@@ -363,9 +470,9 @@ func (l *Lex) Tok() Tok {
 			go l.pushWrongOrderCloseErrAsync(tok)
 		}
 		l.rmrange(len-1, tok.Kind)
-	case l.punct(txt, tokens.LBRACKET, tokens.Brace, &tok):
+	case l.isop(txt, tokens.LBRACKET, tokens.Brace, &tok):
 		l.braces = append(l.braces, tok)
-	case l.punct(txt, tokens.RBRACKET, tokens.Brace, &tok):
+	case l.isop(txt, tokens.RBRACKET, tokens.Brace, &tok):
 		len := len(l.braces)
 		if len == 0 {
 			l.pusherrtok(tok, "extra_closed_brackets")
@@ -376,83 +483,9 @@ func (l *Lex) Tok() Tok {
 		}
 		l.rmrange(len-1, tok.Kind)
 	case
-		l.firstTokOfLine && l.punct(txt, tokens.SHARP, tokens.Preprocessor, &tok),
-		l.punct(txt, tokens.DOUBLE_COLON, tokens.DoubleColon, &tok),
-		l.punct(txt, tokens.COLON, tokens.Colon, &tok),
-		l.punct(txt, tokens.SEMICOLON, tokens.SemiColon, &tok),
-		l.punct(txt, tokens.COMMA, tokens.Comma, &tok),
-		l.punct(txt, tokens.AT, tokens.At, &tok),
-		l.punct(txt, tokens.TRIPLE_DOT, tokens.Operator, &tok),
-		l.punct(txt, tokens.DOT, tokens.Dot, &tok),
-		l.punct(txt, tokens.PLUS_EQUAL, tokens.Operator, &tok),
-		l.punct(txt, tokens.MINUS_EQUAL, tokens.Operator, &tok),
-		l.punct(txt, tokens.STAR_EQUAL, tokens.Operator, &tok),
-		l.punct(txt, tokens.SLASH_EQUAL, tokens.Operator, &tok),
-		l.punct(txt, tokens.PERCENT_EQUAL, tokens.Operator, &tok),
-		l.punct(txt, tokens.LSHIFT_EQUAL, tokens.Operator, &tok),
-		l.punct(txt, tokens.RSHIFT_EQUAL, tokens.Operator, &tok),
-		l.punct(txt, tokens.CARET_EQUAL, tokens.Operator, &tok),
-		l.punct(txt, tokens.AMPER_EQUAL, tokens.Operator, &tok),
-		l.punct(txt, tokens.VLINE_EQUAL, tokens.Operator, &tok),
-		l.punct(txt, tokens.EQUALS, tokens.Operator, &tok),
-		l.punct(txt, tokens.NOT_EQUALS, tokens.Operator, &tok),
-		l.punct(txt, tokens.GREAT_EQUAL, tokens.Operator, &tok),
-		l.punct(txt, tokens.LESS_EQUAL, tokens.Operator, &tok),
-		l.punct(txt, tokens.AND, tokens.Operator, &tok),
-		l.punct(txt, tokens.OR, tokens.Operator, &tok),
-		l.punct(txt, tokens.LSHIFT, tokens.Operator, &tok),
-		l.punct(txt, tokens.RSHIFT, tokens.Operator, &tok),
-		l.punct(txt, tokens.PLUS, tokens.Operator, &tok),
-		l.punct(txt, tokens.MINUS, tokens.Operator, &tok),
-		l.punct(txt, tokens.STAR, tokens.Operator, &tok),
-		l.punct(txt, tokens.SLASH, tokens.Operator, &tok),
-		l.punct(txt, tokens.PERCENT, tokens.Operator, &tok),
-		l.punct(txt, tokens.TILDE, tokens.Operator, &tok),
-		l.punct(txt, tokens.AMPER, tokens.Operator, &tok),
-		l.punct(txt, tokens.VLINE, tokens.Operator, &tok),
-		l.punct(txt, tokens.CARET, tokens.Operator, &tok),
-		l.punct(txt, tokens.EXCLAMATION, tokens.Operator, &tok),
-		l.punct(txt, tokens.LESS, tokens.Operator, &tok),
-		l.punct(txt, tokens.GREAT, tokens.Operator, &tok),
-		l.punct(txt, tokens.EQUAL, tokens.Operator, &tok),
-		l.kw(txt, tokens.I8, tokens.DataType, &tok),
-		l.kw(txt, tokens.I16, tokens.DataType, &tok),
-		l.kw(txt, tokens.I32, tokens.DataType, &tok),
-		l.kw(txt, tokens.I64, tokens.DataType, &tok),
-		l.kw(txt, tokens.U8, tokens.DataType, &tok),
-		l.kw(txt, tokens.U16, tokens.DataType, &tok),
-		l.kw(txt, tokens.U32, tokens.DataType, &tok),
-		l.kw(txt, tokens.U64, tokens.DataType, &tok),
-		l.kw(txt, tokens.F32, tokens.DataType, &tok),
-		l.kw(txt, tokens.F64, tokens.DataType, &tok),
-		l.kw(txt, tokens.BYTE, tokens.DataType, &tok),
-		l.kw(txt, tokens.SBYTE, tokens.DataType, &tok),
-		l.kw(txt, tokens.SIZE, tokens.DataType, &tok),
-		l.kw(txt, tokens.BOOL, tokens.DataType, &tok),
-		l.kw(txt, tokens.CHAR, tokens.DataType, &tok),
-		l.kw(txt, tokens.STR, tokens.DataType, &tok),
-		l.kw(txt, tokens.VOIDPTR, tokens.DataType, &tok),
-		l.kw(txt, tokens.TRUE, tokens.Value, &tok),
-		l.kw(txt, tokens.FALSE, tokens.Value, &tok),
-		l.kw(txt, tokens.NIL, tokens.Value, &tok),
-		l.kw(txt, tokens.CONST, tokens.Const, &tok),
-		l.kw(txt, tokens.RET, tokens.Ret, &tok),
-		l.kw(txt, tokens.TYPE, tokens.Type, &tok),
-		l.kw(txt, tokens.NEW, tokens.New, &tok),
-		l.kw(txt, tokens.FREE, tokens.Free, &tok),
-		l.kw(txt, tokens.ITER, tokens.Iter, &tok),
-		l.kw(txt, tokens.BREAK, tokens.Break, &tok),
-		l.kw(txt, tokens.CONTINUE, tokens.Continue, &tok),
-		l.kw(txt, tokens.IN, tokens.In, &tok),
-		l.kw(txt, tokens.IF, tokens.If, &tok),
-		l.kw(txt, tokens.ELSE, tokens.Else, &tok),
-		l.kw(txt, tokens.VOLATILE, tokens.Volatile, &tok),
-		l.kw(txt, tokens.USE, tokens.Use, &tok),
-		l.kw(txt, tokens.PUB, tokens.Pub, &tok),
-		l.kw(txt, tokens.DEFER, tokens.Defer, &tok),
-		l.kw(txt, tokens.GOTO, tokens.Goto, &tok),
-		l.kw(txt, tokens.ENUM, tokens.Enum, &tok),
-		l.kw(txt, tokens.STRUCT, tokens.Struct, &tok):
+		l.firstTokOfLine && l.isop(txt, tokens.SHARP, tokens.Preprocessor, &tok),
+		l.lexBasicOps(txt, &tok),
+		l.lexKeywords(txt, &tok):
 	default:
 		lex := l.id(txt)
 		if lex != "" {

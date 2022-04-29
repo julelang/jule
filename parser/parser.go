@@ -1498,46 +1498,46 @@ func toCharLiteral(kind string) (string, bool) {
 	return xapi.ToChar(kind), isByte
 }
 
-func (p *valueEvaluator) char() value {
+func (ve *valueEvaluator) char() value {
 	var v value
-	v.ast.Data = p.tok.Kind
-	literal, _ := toCharLiteral(p.tok.Kind)
+	v.ast.Data = ve.tok.Kind
+	literal, _ := toCharLiteral(ve.tok.Kind)
 	v.ast.Type.Id = xtype.Char
 	v.ast.Type.Val = tokens.CHAR
-	p.model.appendSubNode(exprNode{literal})
+	ve.model.appendSubNode(exprNode{literal})
 	return v
 }
 
-func (p *valueEvaluator) bool() value {
+func (ve *valueEvaluator) bool() value {
 	var v value
-	v.ast.Data = p.tok.Kind
+	v.ast.Data = ve.tok.Kind
 	v.ast.Type.Id = xtype.Bool
 	v.ast.Type.Val = tokens.BOOL
-	p.model.appendSubNode(exprNode{p.tok.Kind})
+	ve.model.appendSubNode(exprNode{ve.tok.Kind})
 	return v
 }
 
-func (p *valueEvaluator) nil() value {
+func (ve *valueEvaluator) nil() value {
 	var v value
-	v.ast.Data = p.tok.Kind
+	v.ast.Data = ve.tok.Kind
 	v.ast.Type.Id = xtype.Nil
 	v.ast.Type.Val = xtype.NilTypeStr
-	p.model.appendSubNode(exprNode{p.tok.Kind})
+	ve.model.appendSubNode(exprNode{ve.tok.Kind})
 	return v
 }
 
-func (p *valueEvaluator) num() value {
+func (ve *valueEvaluator) num() value {
 	var v value
-	v.ast.Data = p.tok.Kind
-	p.model.appendSubNode(exprNode{p.tok.Kind})
-	if strings.Contains(p.tok.Kind, tokens.DOT) ||
-		strings.ContainsAny(p.tok.Kind, "eE") {
+	v.ast.Data = ve.tok.Kind
+	ve.model.appendSubNode(exprNode{ve.tok.Kind})
+	if strings.Contains(ve.tok.Kind, tokens.DOT) ||
+		strings.ContainsAny(ve.tok.Kind, "eE") {
 		v.ast.Type.Id = xtype.F64
 		v.ast.Type.Val = tokens.F64
 	} else {
 		v.ast.Type.Id = xtype.I32
 		v.ast.Type.Val = tokens.I32
-		ok := xbits.CheckBitInt(p.tok.Kind, 32)
+		ok := xbits.CheckBitInt(ve.tok.Kind, 32)
 		if !ok {
 			v.ast.Type.Id = xtype.I64
 			v.ast.Type.Val = tokens.I64
@@ -1546,51 +1546,67 @@ func (p *valueEvaluator) num() value {
 	return v
 }
 
-func (p *valueEvaluator) id() (v value, ok bool) {
-	id := p.tok.Kind
-	if variable, _ := p.p.varById(id); variable != nil {
-		variable.Used = true
-		v.ast.Data = id
-		v.ast.Type = variable.Type
-		v.constant = variable.Const
-		v.volatile = variable.Volatile
-		v.ast.Tok = variable.IdTok
-		v.lvalue = true
-		p.model.appendSubNode(exprNode{xapi.AsId(id)})
-		ok = true
-	} else if f, _, _ := p.p.FuncById(id); f != nil {
-		f.used = true
-		v.ast.Data = id
-		v.ast.Type.Id = xtype.Func
-		v.ast.Type.Tag = f.Ast
-		v.ast.Type.Val = f.Ast.DataTypeString()
-		v.ast.Tok = f.Ast.Tok
-		p.model.appendSubNode(exprNode{xapi.AsId(id)})
-		ok = true
-	} else if e, _, _ := p.p.enumById(id); e != nil {
-		e.Used = true
-		v.ast.Data = id
-		v.ast.Type.Id = xtype.Enum
-		v.ast.Type.Tag = e
-		v.ast.Type.Val = e.Id
-		v.ast.Tok = e.Tok
-		v.constant = true
-		v.isType = true
-		p.model.appendSubNode(exprNode{xapi.AsId(id)})
-		ok = true
-	} else if s, _, _ := p.p.structById(id); s != nil {
-		s.Used = true
-		v.ast.Data = id
-		v.ast.Type.Id = xtype.Struct
-		v.ast.Type.Tag = s
-		v.ast.Type.Val = s.Ast.Id
-		v.ast.Type.Tok = s.Ast.Tok
-		v.ast.Tok = s.Ast.Tok
-		v.isType = true
-		p.model.appendSubNode(exprNode{xapi.AsId(id)})
-		ok = true
+func (ve *valueEvaluator) varId(id string, variable *Var) (v value) {
+	variable.Used = true
+	v.ast.Data = id
+	v.ast.Type = variable.Type
+	v.constant = variable.Const
+	v.volatile = variable.Volatile
+	v.ast.Tok = variable.IdTok
+	v.lvalue = true
+	ve.model.appendSubNode(exprNode{xapi.AsId(id)})
+	return
+}
+
+func (ve *valueEvaluator) funcId(id string, f *function) (v value) {
+	f.used = true
+	v.ast.Data = id
+	v.ast.Type.Id = xtype.Func
+	v.ast.Type.Tag = f.Ast
+	v.ast.Type.Val = f.Ast.DataTypeString()
+	v.ast.Tok = f.Ast.Tok
+	ve.model.appendSubNode(exprNode{xapi.AsId(id)})
+	return
+}
+
+func (ve *valueEvaluator) enumId(id string, e *Enum) (v value) {
+	e.Used = true
+	v.ast.Data = id
+	v.ast.Type.Id = xtype.Enum
+	v.ast.Type.Tag = e
+	v.ast.Type.Val = e.Id
+	v.ast.Tok = e.Tok
+	v.constant = true
+	v.isType = true
+	ve.model.appendSubNode(exprNode{xapi.AsId(id)})
+	return
+}
+
+func (ve *valueEvaluator) structId(id string, s *xstruct) (v value) {
+	s.Used = true
+	v.ast.Data = id
+	v.ast.Type.Id = xtype.Struct
+	v.ast.Type.Tag = s
+	v.ast.Type.Val = s.Ast.Id
+	v.ast.Type.Tok = s.Ast.Tok
+	v.ast.Tok = s.Ast.Tok
+	v.isType = true
+	ve.model.appendSubNode(exprNode{xapi.AsId(id)})
+	return
+}
+
+func (ve *valueEvaluator) id() (_ value, ok bool) {
+	id := ve.tok.Kind
+	if variable, _ := ve.p.varById(id); variable != nil {
+		return ve.varId(id, variable), true
+	} else if f, _, _ := ve.p.FuncById(id); f != nil {
+		return ve.funcId(id, f), true
+	} else if e, _, _ := ve.p.enumById(id); e != nil {
+		return ve.enumId(id, e), true
+	} else if s, _, _ := ve.p.structById(id); s != nil {
+		return ve.structId(id, s), true
 	} else {
-		p.p.pusherrtok(p.tok, "id_noexist", id)
+		ve.p.pusherrtok(ve.tok, "id_noexist", id)
 	}
 	return
 }

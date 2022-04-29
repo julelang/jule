@@ -1560,7 +1560,7 @@ func (b *Builder) DeferStatement(toks Toks) (s Statement) {
 		b.pusherr(d.Tok, "missing_expr")
 		return
 	}
-	if IsFuncCall(toks) != nil {
+	if IsFuncCall(toks) == nil {
 		b.pusherr(d.Tok, "defer_expr_not_func_call")
 	}
 	d.Expr = b.Expr(toks)
