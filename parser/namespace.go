@@ -24,6 +24,18 @@ func (ns *namespace) cxxFuncPrototypes() string {
 	return cxx.String()
 }
 
+func (ns *namespace) cxxStructures() string {
+	var cxx strings.Builder
+	for _, s := range ns.Defs.Structs {
+		if s.Used {
+			cxx.WriteByte('\n')
+			cxx.WriteString(ast.IndentString())
+			cxx.WriteString(s.String())
+		}
+	}
+	return cxx.String()
+}
+
 func (ns *namespace) cxxGlobals() string {
 	var cxx strings.Builder
 	for _, g := range ns.Defs.Globals {
@@ -65,6 +77,7 @@ func (ns namespace) String() string {
 	cxx.WriteString(" {\n")
 	ast.AddIndent()
 	cxx.WriteString(ns.cxxFuncPrototypes())
+	cxx.WriteString(ns.cxxStructures())
 	cxx.WriteString(ns.cxxGlobals())
 	cxx.WriteByte('\n')
 	cxx.WriteString(ns.cxxFuncs())

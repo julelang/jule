@@ -35,9 +35,9 @@ func (dm *Defmap) nsById(id string, parent bool) *namespace {
 }
 
 func (dm *Defmap) findStructById(id string, f *File) (int, *Defmap, bool) {
-	for i, t := range dm.Structs {
-		if t != nil && t.Ast.Id == id {
-			if !dm.justPub || f == t.Ast.Tok.File || t.Ast.Pub {
+	for i, s := range dm.Structs {
+		if s != nil && s.Ast.Id == id {
+			if !dm.justPub || f == s.Ast.Tok.File || s.Ast.Pub {
 				return i, dm, false
 			}
 		}

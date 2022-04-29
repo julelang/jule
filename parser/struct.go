@@ -27,6 +27,7 @@ func (s *xstruct) declString() string {
 		cxx.WriteByte('\n')
 	}
 	ast.DoneIndent()
+	cxx.WriteString(ast.IndentString())
 	cxx.WriteString("};")
 	return cxx.String()
 }
@@ -57,6 +58,7 @@ func (s *xstruct) ostream() string {
 	cxx.WriteString(ast.IndentString())
 	cxx.WriteString("return _Stream;\n")
 	ast.DoneIndent()
+	cxx.WriteString(ast.IndentString())
 	cxx.WriteString("}")
 	return cxx.String()
 }
@@ -65,6 +67,7 @@ func (s xstruct) String() string {
 	var cxx strings.Builder
 	cxx.WriteString(s.declString())
 	cxx.WriteString("\n\n")
+	cxx.WriteString(ast.IndentString())
 	cxx.WriteString(s.ostream())
 	return cxx.String()
 }

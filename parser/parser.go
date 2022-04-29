@@ -351,6 +351,18 @@ func (p *Parser) checkNsTypes(src, sub *namespace) {
 		for _, st := range src.Defs.Types {
 			if t.Id == st.Id {
 				p.pusherrtok(t.Tok, "exist_id", t.Id)
+				return
+			}
+		}
+	}
+}
+
+func (p *Parser) checkNsStructs(src, sub *namespace) {
+	for _, s := range sub.Defs.Structs {
+		for _, ss := range src.Defs.Structs {
+			if s.Ast.Id == ss.Ast.Id {
+				p.pusherrtok(s.Ast.Tok, "exist_id", s.Ast.Id)
+				return
 			}
 		}
 	}
@@ -361,6 +373,7 @@ func (p *Parser) checkNsEnums(src, sub *namespace) {
 		for _, se := range src.Defs.Enums {
 			if e.Id == se.Id {
 				p.pusherrtok(e.Tok, "exist_id", e.Id)
+				return
 			}
 		}
 	}
@@ -371,6 +384,7 @@ func (p *Parser) checkNsGlobals(src, sub *namespace) {
 		for _, sg := range src.Defs.Globals {
 			if g.Id == sg.Id {
 				p.pusherrtok(g.IdTok, "exist_id", g.Id)
+				return
 			}
 		}
 	}
@@ -381,6 +395,7 @@ func (p *Parser) checkNsFuncs(src, sub *namespace) {
 		for _, sf := range src.Defs.Funcs {
 			if f.Ast.Id == sf.Ast.Id {
 				p.pusherrtok(f.Ast.Tok, "exist_id", f.Ast.Id)
+				return
 			}
 		}
 	}
@@ -389,6 +404,7 @@ func (p *Parser) checkNsFuncs(src, sub *namespace) {
 func (p *Parser) checkNsDefs(src, sub *namespace) {
 	p.checkNsNses(src, sub)
 	p.checkNsTypes(src, sub)
+	p.checkNsStructs(src, sub)
 	p.checkNsEnums(src, sub)
 	p.checkNsGlobals(src, sub)
 	p.checkNsFuncs(src, sub)
@@ -430,6 +446,19 @@ func (p *Parser) pushUseEnums(use, dm *Defmap) {
 	}
 }
 
+func (p *Parser) pushUseStructs(use, dm *Defmap) {
+	for _, s := range dm.Structs {
+		s.Defs.justPub = true
+		def, _, _ := p.structById(s.Ast.Id)
+		if def != nil {
+			p.pusherrmsgtok(def.Ast.Tok,
+				fmt.Sprintf(`"%s" identifier is already defined in this source`, s.Ast.Id))
+		} else {
+			use.Structs = append(use.Structs, s)
+		}
+	}
+}
+
 func (p *Parser) pushUseGlobals(use, dm *Defmap) {
 	for _, g := range dm.Globals {
 		def, _, _ := p.Defs.globalById(g.Id, nil)
@@ -457,6 +486,7 @@ func (p *Parser) pushUseFuncs(use, dm *Defmap) {
 func (p *Parser) pushUseDefs(use *use, dm *Defmap) {
 	p.pushUseNamespaces(use.defs, dm)
 	p.pushUseTypes(use.defs, dm)
+	p.pushUseStructs(use.defs, dm)
 	p.pushUseEnums(use.defs, dm)
 	p.pushUseGlobals(use.defs, dm)
 	p.pushUseFuncs(use.defs, dm)
@@ -2128,7 +2158,7 @@ func (p *Parser) evalExprPart(toks Toks, m *exprModel) (v value) {
 func (p *Parser) evalXObjSubId(dm *Defmap, val value, idTok Tok, m *exprModel) (v value) {
 	i, dm, t := dm.defById(idTok.Kind, nil)
 	if i == -1 {
-		p.pusherrtok(idTok, "obj_have_not_id", val.ast.Type.Val)
+		p.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
 		return
 	}
 	v = val
@@ -2355,7 +2385,7 @@ func (p *Parser) evalExprSubId(toks Toks, m *exprModel) (v value) {
 		switch {
 		case checkType.Id == xtype.Str:
 			return p.evalStrObjSubId(val, idTok, m)
-		case checkType.Id == xtype.Enum:
+		case valIsEnum(val):
 			return p.evalEnumSubId(val, idTok, m)
 		case valIsStructIns(val):
 			return p.evalStructObjSubId(val, idTok, m)
@@ -2570,6 +2600,10 @@ func (p *Parser) evalVariadicExprPart(toks Toks, m *exprModel, errtok Tok) (v va
 
 func valIsStruct(v value) bool {
 	return v.isType && v.ast.Type.Id == xtype.Struct
+}
+
+func valIsEnum(v value) bool {
+	return v.isType && v.ast.Type.Id == xtype.Enum
 }
 
 func (p *Parser) evalParenthesesRangeExpr(toks Toks, m *exprModel) (v value) {
