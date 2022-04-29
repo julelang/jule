@@ -17,6 +17,7 @@
   <ul>
     <li><a href="#what-is-xxc">What is XXC?</li>
     <li><a href="#overview">Overview</a></li>
+    <li><a href="#key-features">Key Features</a></li>
     <li><a href="#why-x">Why X?</a></li>
     <li><a href="#os-support">OS Support</a></li>
     <li><a href="#project-build-state">Project Build State</a></li>
@@ -46,6 +47,14 @@ main() {
   outln("Hello, GitHub!")
 }
 ```
+
+<h2 id="key-features">Key Features</h2>
+
++ Simple and elegant
++ Efficient and performance
++ Zero cost for C/C++ interoperability
++ Deferred calls
++ Documenter
 
 <h2 id="why-x">Why X?</h2>
 
@@ -137,7 +146,7 @@ Later, XXC is planned to be developed with the X programming language.
 
 ### Building with Go Compiler
 ```
-go build -o xxc -v cmd/xxc/main.go
+go build -v cmd/xxc/main.go
 ```
 Run the above command in your terminal, in the XXC project directory.
 
