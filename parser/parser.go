@@ -33,6 +33,7 @@ type Tok = ast.Tok
 type Toks = ast.Toks
 type Attribute = ast.Attribute
 type Enum = ast.Enum
+type Struct = ast.Struct
 
 type use struct {
 	Path string
@@ -163,6 +164,26 @@ func (p *Parser) CxxEnums() string {
 	return cxx.String()
 }
 
+// CxxEnums returns C++ code of structures.
+func (p *Parser) CxxStruct() string {
+	var cxx strings.Builder
+	for _, use := range used {
+		for _, s := range use.defs.Structs {
+			if s.Used {
+				cxx.WriteString(s.String())
+				cxx.WriteString("\n\n")
+			}
+		}
+	}
+	for _, s := range p.Defs.Structs {
+		if s.Used {
+			cxx.WriteString(s.String())
+			cxx.WriteString("\n\n")
+		}
+	}
+	return cxx.String()
+}
+
 // CxxNamespaces returns C++ code of namespaces.
 func (p *Parser) CxxNamespaces() string {
 	var cxx strings.Builder
@@ -245,6 +266,7 @@ func (p *Parser) Cxx() string {
 	cxx.WriteString(p.CxxEmbeds())
 	cxx.WriteString("\n\n")
 	cxx.WriteString(p.CxxEnums())
+	cxx.WriteString(p.CxxStruct())
 	cxx.WriteString(p.CxxPrototypes())
 	cxx.WriteString("\n\n")
 	cxx.WriteString(p.CxxGlobals())
@@ -492,6 +514,8 @@ func (p *Parser) parseSrcTreeObj(obj ast.Obj) {
 		p.Type(t)
 	case Enum:
 		p.Enum(t)
+	case Struct:
+		p.Struct(t)
 	case ast.CxxEmbed:
 		p.Embeds.WriteString(t.String())
 		p.Embeds.WriteByte('\n')
@@ -652,11 +676,11 @@ func (p *Parser) Type(t Type) {
 
 // Enum parses X enumerator statement.
 func (p *Parser) Enum(e Enum) {
-	if _, tok, _, _ := p.defById(e.Id); tok.Id != tokens.NA {
-		p.pusherrtok(e.Tok, "exist_id", e.Id)
-		return
-	} else if xapi.IsIgnoreId(e.Id) {
+	if xapi.IsIgnoreId(e.Id) {
 		p.pusherrtok(e.Tok, "ignore_id")
+		return
+	} else if _, tok, _, _ := p.defById(e.Id); tok.Id != tokens.NA {
+		p.pusherrtok(e.Tok, "exist_id", e.Id)
 		return
 	}
 	e.Desc = p.docText.String()
@@ -719,7 +743,51 @@ func (p *Parser) Enum(e Enum) {
 	}
 }
 
-// Push namespace to defmap and returns leaf namespace.
+func (p *Parser) processStructFields(s *xstruct) {
+	s.constructor = new(Func)
+	s.constructor.Params = make([]ast.Param, len(s.Ast.Fields))
+	for i, f := range s.Ast.Fields {
+		for _, cf := range s.Ast.Fields {
+			if f == cf {
+				break
+			}
+			if f.Id == cf.Id {
+				p.pusherrtok(f.IdTok, "exist_id", f.Id)
+				break
+			}
+		}
+		param := ast.Param{Id: f.Id}
+		if f.Val.Toks != nil {
+			param.Default = f.Val
+		} else {
+			param.Default.Model = exprNode{defaultValueOfType(f.Type)}
+		}
+		v := p.Var(*f)
+		param.Type = v.Type
+		s.Defs.Globals = append(s.Defs.Globals, v)
+		s.constructor.Params[i] = param
+	}
+}
+
+// Struct parses X structure.
+func (p *Parser) Struct(s Struct) {
+	if xapi.IsIgnoreId(s.Id) {
+		p.pusherrtok(s.Tok, "ignore_id")
+		return
+	} else if _, tok, _, _ := p.defById(s.Id); tok.Id != tokens.NA {
+		p.pusherrtok(s.Tok, "exist_id", s.Id)
+		return
+	}
+	xs := new(xstruct)
+	xs.Desc = p.docText.String()
+	p.docText.Reset()
+	xs.Ast = s
+	xs.Defs = new(Defmap)
+	p.processStructFields(xs)
+	p.Defs.Structs = append(p.Defs.Structs, xs)
+}
+
+// pushNS pushes namespace to defmap and returns leaf namespace.
 func (p *Parser) pushNs(ns *ast.Namespace) *namespace {
 	var src *namespace
 	prev := p.Defs
@@ -1014,6 +1082,16 @@ func (p *Parser) enumById(id string) (*Enum, *Defmap, bool) {
 	return p.Defs.enumById(id, p.File)
 }
 
+func (p *Parser) structById(id string) (*xstruct, *Defmap, bool) {
+	for _, use := range p.Uses {
+		s, m, _ := use.defs.structById(id, p.File)
+		if s != nil {
+			return s, m, false
+		}
+	}
+	return p.Defs.structById(id, p.File)
+}
+
 func (p *Parser) blockTypesById(id string) *Type {
 	for _, t := range p.BlockTypes {
 		if t != nil && t.Id == id {
@@ -1042,6 +1120,11 @@ func (p *Parser) defById(id string) (def interface{}, tok Tok, m *Defmap, cansha
 	e, m, canshadow = p.enumById(id)
 	if e != nil {
 		return e, e.Tok, m, canshadow
+	}
+	var s *xstruct
+	s, m, canshadow = p.structById(id)
+	if s != nil {
+		return s, s.Ast.Tok, m, canshadow
 	}
 	var f *function
 	f, m, canshadow = p.FuncById(id)
@@ -1465,6 +1548,17 @@ func (p *valueEvaluator) id() (v value, ok bool) {
 		v.isType = true
 		p.model.appendSubNode(exprNode{xapi.AsId(id)})
 		ok = true
+	} else if s, _, _ := p.p.structById(id); s != nil {
+		s.Used = true
+		v.ast.Data = id
+		v.ast.Type.Id = xtype.Struct
+		v.ast.Type.Tag = s
+		v.ast.Type.Val = s.Ast.Id
+		v.ast.Type.Tok = s.Ast.Tok
+		v.ast.Tok = s.Ast.Tok
+		v.isType = true
+		p.model.appendSubNode(exprNode{xapi.AsId(id)})
+		ok = true
 	} else {
 		p.p.pusherrtok(p.tok, "id_noexist", id)
 	}
@@ -1865,10 +1959,10 @@ func (p *unaryProcessor) amper() value {
 			p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", tokens.AMPER)
 		}
 	default:
-		v.lvalue = true
 		if !canGetPtr(v) {
 			p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", tokens.AMPER)
 		}
+		v.lvalue = true
 		v.ast.Type.Val = tokens.STAR + v.ast.Type.Val
 	}
 	return v
@@ -1907,6 +2001,9 @@ func (p *Parser) evalOperatorExprPart(toks Toks, m *exprModel) value {
 }
 
 func canGetPtr(v value) bool {
+	if !v.lvalue {
+		return false
+	}
 	switch v.ast.Type.Id {
 	case xtype.Func, xtype.Enum:
 		return false
@@ -1931,30 +2028,42 @@ func (p *Parser) evalHeapAllocExpr(toks Toks, m *exprModel) (v value) {
 	var alloc newHeapAllocExpr
 	if exprToks == nil {
 		dt, ok = b.DataType(toks, i, true)
+		dt, _ = p.readyType(dt, true)
+		alloc.typeAST = dt
+		m.appendSubNode(alloc)
 		if *i < len(toks)-1 {
 			p.pusherrtok(toks[*i+1], "invalid_syntax")
 		}
 	} else {
 		dt, ok = b.DataType(exprToks, i, true)
+		dt, _ = p.readyType(dt, true)
+		alloc.typeAST = dt
 		if *i < len(exprToks)-1 {
 			p.pusherrtok(exprToks[*i+1], "invalid_syntax")
 		}
-		// Get function call expression tokens without parentheses.
-		exprToks = toks[len(exprToks)+1 : len(toks)-1]
-		if len(exprToks) > 0 {
-			val, model := p.evalToks(exprToks)
-			alloc.expr.Model = model
-			p.wg.Add(1)
-			go assignChecker{
-				p:      p,
-				t:      dt,
-				v:      val,
-				errtok: exprToks[0],
-			}.checkAssignTypeAsync()
+		if dt.Id == xtype.Struct {
+			allocExpr := new(exprModel)
+			allocExpr.nodes = make([]exprBuildNode, 1)
+			alloc.expr.Model = allocExpr
+			m.appendSubNode(alloc)
+			dt = p.evalExprPart(toks, allocExpr).ast.Type
+		} else {
+			m.appendSubNode(alloc)
+			// Get function call expression tokens without parentheses.
+			exprToks = toks[len(exprToks)+1 : len(toks)-1]
+			if len(exprToks) > 0 {
+				val, model := p.evalToks(exprToks)
+				alloc.expr.Model = model
+				p.wg.Add(1)
+				go assignChecker{
+					p:      p,
+					t:      dt,
+					v:      val,
+					errtok: exprToks[0],
+				}.checkAssignTypeAsync()
+			}
 		}
 	}
-	alloc.typeAST = dt
-	m.appendSubNode(alloc)
 	dt.Val = tokens.STAR + dt.Val
 	v.ast.Type = dt
 	if !ok {
@@ -2027,7 +2136,11 @@ func (p *Parser) evalXObjSubId(dm *Defmap, val value, idTok Tok, m *exprModel) (
 	switch t {
 	case 'g':
 		g := dm.Globals[i]
-		m.appendSubNode(exprNode{g.Tag.(string)})
+		if g.Tag == nil {
+			m.appendSubNode(exprNode{xapi.AsId(g.Id)})
+		} else {
+			m.appendSubNode(exprNode{g.Tag.(string)})
+		}
 		v.ast.Type = g.Type
 		v.lvalue = true
 		v.constant = g.Const
@@ -2056,7 +2169,7 @@ func (p *Parser) evalMapObjSubId(val value, idTok Tok, m *exprModel) (v value) {
 	return p.evalXObjSubId(mapDefs, val, idTok, m)
 }
 
-func (p *Parser) evalEnumObjSubId(val value, idTok Tok, m *exprModel) (v value) {
+func (p *Parser) evalEnumSubId(val value, idTok Tok, m *exprModel) (v value) {
 	enum := val.ast.Type.Tag.(*Enum)
 	v = val
 	v.ast.Type.Tok = enum.Tok
@@ -2069,6 +2182,14 @@ func (p *Parser) evalEnumObjSubId(val value, idTok Tok, m *exprModel) (v value) 
 		p.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
 	}
 	return
+}
+
+func (p *Parser) evalStructObjSubId(val value, idTok Tok, m *exprModel) value {
+	s := val.ast.Type.Tag.(*xstruct)
+	val.constant = false
+	val.lvalue = false
+	val.isType = false
+	return p.evalXObjSubId(s.Defs, val, idTok, m)
 }
 
 type nsFind interface{ nsById(string, bool) *namespace }
@@ -2210,6 +2331,10 @@ func (p *Parser) evalTypeSubId(typeTok, idTok Tok, m *exprModel) (v value) {
 	return
 }
 
+func valIsStructIns(val value) bool {
+	return !val.isType && val.ast.Type.Id == xtype.Struct
+}
+
 func (p *Parser) evalExprSubId(toks Toks, m *exprModel) (v value) {
 	i := len(toks) - 1
 	idTok := toks[i]
@@ -2227,11 +2352,13 @@ func (p *Parser) evalExprSubId(toks Toks, m *exprModel) (v value) {
 	}
 	switch {
 	case typeIsSingle(checkType):
-		switch checkType.Id {
-		case xtype.Str:
+		switch {
+		case checkType.Id == xtype.Str:
 			return p.evalStrObjSubId(val, idTok, m)
-		case xtype.Enum:
-			return p.evalEnumObjSubId(val, idTok, m)
+		case checkType.Id == xtype.Enum:
+			return p.evalEnumSubId(val, idTok, m)
+		case valIsStructIns(val):
+			return p.evalStructObjSubId(val, idTok, m)
 		}
 	case typeIsArray(checkType):
 		return p.evalArrayObjSubId(val, idTok, m)
@@ -2441,6 +2568,10 @@ func (p *Parser) evalVariadicExprPart(toks Toks, m *exprModel, errtok Tok) (v va
 	return
 }
 
+func valIsStruct(v value) bool {
+	return v.isType && v.ast.Type.Id == xtype.Struct
+}
+
 func (p *Parser) evalParenthesesRangeExpr(toks Toks, m *exprModel) (v value) {
 	var valueToks Toks
 	braceCount := 0
@@ -2478,16 +2609,21 @@ func (p *Parser) evalParenthesesRangeExpr(toks Toks, m *exprModel) (v value) {
 	}
 	v = p.evalExprPart(valueToks, m)
 
-	// Write parentheses.
-	m.appendSubNode(exprNode{tokens.LPARENTHESES})
-	defer m.appendSubNode(exprNode{tokens.RPARENTHESES})
-
 	switch {
 	case typeIsFunc(v.ast.Type):
+		m.appendSubNode(exprNode{tokens.LPARENTHESES})
+		defer m.appendSubNode(exprNode{tokens.RPARENTHESES})
 		f := v.ast.Type.Tag.(Func)
 		p.parseFuncCallToks(f, toks[len(valueToks):], m)
 		v.ast.Type = f.RetType
 		v.lvalue = typeIsLvalue(v.ast.Type)
+	case valIsStruct(v):
+		m.appendSubNode(exprNode{tokens.LBRACE})
+		defer m.appendSubNode(exprNode{tokens.RBRACE})
+		f := *v.ast.Type.Tag.(*xstruct).constructor
+		p.parseFuncCallToks(f, toks[len(valueToks):], m)
+		v.isType = false
+		v.lvalue = false
 	default:
 		p.pusherrtok(toks[len(valueToks)], "invalid_syntax")
 	}
@@ -3963,6 +4099,12 @@ func (p *Parser) readyType(dt DataType, err bool) (_ DataType, ok bool) {
 			t.Used = true
 			dt.Id = xtype.Enum
 			dt.Val = t.Id
+			dt.Tag = t
+			return dt, true
+		case *xstruct:
+			t.Used = true
+			dt.Id = xtype.Struct
+			dt.Val = t.Ast.Id
 			dt.Tag = t
 			return dt, true
 		default:

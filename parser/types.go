@@ -118,6 +118,8 @@ func typesAreCompatible(t1, t2 DataType, ignoreany bool) bool {
 		return t1.Id == xtype.Nil || t2.Id == xtype.Nil
 	case t1.Id == xtype.Enum || t2.Id == xtype.Enum:
 		return t1.Id == t2.Id && t1.Val == t2.Val
+	case t1.Id == xtype.Struct || t2.Id == xtype.Struct:
+		return t1.Id == t2.Id && t1.Val == t2.Val
 	}
 	return xtype.TypesAreCompatible(t1.Id, t2.Id, ignoreany)
 }

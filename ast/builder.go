@@ -68,6 +68,8 @@ func (b *Builder) buildNode(toks Toks) {
 		b.Tree = append(b.Tree, Obj{t.Tok, t})
 	case tokens.Enum:
 		b.Enum(toks)
+	case tokens.Struct:
+		b.Struct(toks)
 	case tokens.Comment:
 		b.Comment(toks[0])
 	case tokens.Preprocessor:
@@ -84,7 +86,7 @@ func (b *Builder) buildNode(toks Toks) {
 // Build builds AST tree.
 func (b *Builder) Build() {
 	for b.Pos != -1 && !b.Ended() {
-		toks := b.skipStatement()
+		toks := b.nextBuilderStatement()
 		b.pub = toks[0].Id == tokens.Pub
 		if b.pub {
 			if len(toks) == 1 {
@@ -92,7 +94,7 @@ func (b *Builder) Build() {
 					b.pusherr(toks[0], "invalid_syntax")
 					continue
 				}
-				toks = b.skipStatement()
+				toks = b.nextBuilderStatement()
 			} else {
 				toks = toks[1:]
 			}
@@ -377,6 +379,54 @@ func (b *Builder) Namespace(toks Toks) {
 	b.Tree = append(b.Tree, Obj{ns.Tok, ns})
 }
 
+func (b *Builder) structFields(toks Toks) []*Var {
+	fields := make([]*Var, 0)
+	i := new(int)
+	for *i < len(toks) {
+		varToks := b.skipStatement(i, &toks)
+		pub := varToks[0].Id == tokens.Pub
+		if pub {
+			if len(varToks) == 1 {
+				b.pusherr(varToks[0], "invalid_syntax")
+				continue
+			}
+			varToks = varToks[1:]
+		}
+		b.Var(varToks)
+		vast := b.Var(varToks)
+		vast.Pub = pub
+		fields = append(fields, &vast)
+	}
+	return fields
+}
+
+// Struct builds AST model of structure.
+func (b *Builder) Struct(toks Toks) {
+	var s Struct
+	s.Pub = b.pub
+	b.pub = false
+	if len(toks) < 3 {
+		b.pusherr(toks[0], "invalid_syntax")
+		return
+	}
+	s.Tok = toks[1]
+	if s.Tok.Id != tokens.Id {
+		b.pusherr(s.Tok, "invalid_syntax")
+	}
+	s.Id = s.Tok.Kind
+	i := 2
+	bodyToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
+	if bodyToks == nil {
+		b.pusherr(s.Tok, "body_not_exist")
+		return
+	}
+	if i < len(toks) {
+		b.pusherr(toks[i], "invalid_syntax")
+	}
+	s.Fields = b.structFields(bodyToks)
+	b.Tree = append(b.Tree, Obj{s.Tok, s})
+}
+
 // Use builds AST model of use declaration.
 func (b *Builder) Use(toks Toks) {
 	var use Use
@@ -455,7 +505,7 @@ func (b *Builder) Func(toks Toks, anon bool) (f Func) {
 			return
 		}
 		i = 0
-		toks = b.skipStatement()
+		toks = b.nextBuilderStatement()
 	}
 	tok := toks[i]
 	t, ok := b.FuncRetDataType(toks, &i)
@@ -468,7 +518,7 @@ func (b *Builder) Func(toks Toks, anon bool) (f Func) {
 				return
 			}
 			i = 0
-			toks = b.skipStatement()
+			toks = b.nextBuilderStatement()
 		}
 		tok = toks[i]
 	}
@@ -1400,9 +1450,8 @@ func (b *Builder) pushArg(args *Args, toks Toks, err Tok) {
 	args.Src = append(args.Src, arg)
 }
 
-// VarStatement builds AST model of variable declaration statement.
-func (b *Builder) VarStatement(toks Toks) (s Statement) {
-	var vast Var
+// Var builds AST model of variable statement.
+func (b *Builder) Var(toks Toks) (vast Var) {
 	vast.Pub = b.pub
 	b.pub = false
 	i := 0
@@ -1461,7 +1510,7 @@ func (b *Builder) VarStatement(toks Toks) (s Statement) {
 			vast.Type = t
 			i++
 			if i >= len(toks) {
-				goto ret
+				return
 			}
 			tok = toks[i]
 		}
@@ -1481,7 +1530,12 @@ func (b *Builder) VarStatement(toks Toks) (s Statement) {
 			b.pusherr(tok, "invalid_syntax")
 		}
 	}
-ret:
+	return
+}
+
+// VarStatement builds AST model of variable declaration statement.
+func (b *Builder) VarStatement(toks Toks) Statement {
+	vast := b.Var(toks)
 	return Statement{vast.IdTok, vast, false}
 }
 
@@ -1996,7 +2050,7 @@ func (b *Builder) getrange(i *int, open, close string, toks *Toks) Toks {
 		return nil
 	}
 	*i = 0
-	*toks = b.skipStatement()
+	*toks = b.nextBuilderStatement()
 	rang = getrange(i, open, close, *toks)
 	return rang
 }
@@ -2026,15 +2080,19 @@ func getrange(i *int, open, close string, toks Toks) Toks {
 	return nil
 }
 
-func (b *Builder) skipStatement() Toks {
-	start := b.Pos
-	b.Pos, _ = nextStatementPos(b.Toks, start)
-	toks := b.Toks[start:b.Pos]
-	if toks[len(toks)-1].Id == tokens.SemiColon {
-		if len(toks) == 1 {
-			return b.skipStatement()
+func (b *Builder) skipStatement(i *int, toks *Toks) Toks {
+	start := *i
+	*i, _ = nextStatementPos(*toks, start)
+	stoks := (*toks)[start:*i]
+	if stoks[len(stoks)-1].Id == tokens.SemiColon {
+		if len(stoks) == 1 {
+			return b.skipStatement(i, toks)
 		}
-		toks = toks[:len(toks)-1]
+		stoks = stoks[:len(stoks)-1]
 	}
-	return toks
+	return stoks
+}
+
+func (b *Builder) nextBuilderStatement() Toks {
+	return b.skipStatement(&b.Pos, &b.Toks)
 }

@@ -126,7 +126,7 @@ func (dt DataType) String() string {
 		}
 	}
 	switch dt.Id {
-	case xtype.Id, xtype.Enum:
+	case xtype.Id, xtype.Enum, xtype.Struct:
 		return xapi.AsId(dt.Tok.Kind) + cxx.String()
 	case xtype.Func:
 		return dt.FuncString() + cxx.String()
@@ -377,6 +377,22 @@ func (v Var) String() string {
 		cxx.WriteString(v.Val.String())
 	}
 	cxx.WriteByte('}')
+	cxx.WriteByte(';')
+	return cxx.String()
+}
+
+// FieldString returns variable as cxx struct field.
+func (v *Var) FieldString() string {
+	var cxx strings.Builder
+	if v.Volatile {
+		cxx.WriteString("volatile ")
+	}
+	if v.Const {
+		cxx.WriteString("const ")
+	}
+	cxx.WriteString(v.Type.String())
+	cxx.WriteByte(' ')
+	cxx.WriteString(xapi.AsId(v.Id))
 	cxx.WriteByte(';')
 	return cxx.String()
 }
@@ -836,4 +852,12 @@ func (e Enum) String() string {
 	DoneIndent()
 	cxx.WriteString("};")
 	return cxx.String()
+}
+
+// Struct is the AST model of structures.
+type Struct struct {
+	Tok    Tok
+	Id     string
+	Pub    bool
+	Fields []*Var
 }

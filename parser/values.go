@@ -58,3 +58,10 @@ func checkFloatBit(v ast.Value, bit int) bool {
 	}
 	return xbits.CheckBitFloat(v.Data, bit)
 }
+
+func defaultValueOfType(t DataType) string {
+	if typeIsNilCompatible(t) {
+		return "nil"
+	}
+	return xtype.DefaultValOfType(t.Id)
+}

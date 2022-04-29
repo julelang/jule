@@ -26,6 +26,7 @@ const (
 	Map     uint8 = 19
 	Voidptr uint8 = 20
 	Enum    uint8 = 21
+	Struct  uint8 = 22
 )
 
 const (

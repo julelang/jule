@@ -5,8 +5,9 @@ import "github.com/the-xlang/xxc/pkg/xtype"
 // Defmap is definition map.
 type Defmap struct {
 	Namespaces []*namespace
-	Types      []*Type
 	Enums      []*Enum
+	Structs    []*xstruct
+	Types      []*Type
 	Funcs      []*function
 	Globals    []*Var
 	parent     *Defmap
@@ -33,27 +34,27 @@ func (dm *Defmap) nsById(id string, parent bool) *namespace {
 	return m.Namespaces[i]
 }
 
-func (dm *Defmap) findTypeById(id string, f *File) (int, *Defmap, bool) {
-	for i, t := range dm.Types {
-		if t != nil && t.Id == id {
-			if !dm.justPub || f == t.Tok.File || t.Pub {
+func (dm *Defmap) findStructById(id string, f *File) (int, *Defmap, bool) {
+	for i, t := range dm.Structs {
+		if t != nil && t.Ast.Id == id {
+			if !dm.justPub || f == t.Ast.Tok.File || t.Ast.Pub {
 				return i, dm, false
 			}
 		}
 	}
 	if dm.parent != nil {
-		i, m, _ := dm.parent.findTypeById(id, f)
+		i, m, _ := dm.parent.findStructById(id, f)
 		return i, m, true
 	}
 	return -1, nil, false
 }
 
-func (dm *Defmap) typeById(id string, f *File) (*Type, *Defmap, bool) {
-	i, m, canshadow := dm.findTypeById(id, f)
+func (dm *Defmap) structById(id string, f *File) (*xstruct, *Defmap, bool) {
+	i, m, canshadow := dm.findStructById(id, f)
 	if i == -1 {
 		return nil, nil, false
 	}
-	return m.Types[i], m, canshadow
+	return m.Structs[i], m, canshadow
 }
 
 func (dm *Defmap) findEnumById(id string, f *File) (int, *Defmap, bool) {
@@ -77,6 +78,29 @@ func (dm *Defmap) enumById(id string, f *File) (*Enum, *Defmap, bool) {
 		return nil, nil, false
 	}
 	return m.Enums[i], m, canshadow
+}
+
+func (dm *Defmap) findTypeById(id string, f *File) (int, *Defmap, bool) {
+	for i, t := range dm.Types {
+		if t != nil && t.Id == id {
+			if !dm.justPub || f == t.Tok.File || t.Pub {
+				return i, dm, false
+			}
+		}
+	}
+	if dm.parent != nil {
+		i, m, _ := dm.parent.findTypeById(id, f)
+		return i, m, true
+	}
+	return -1, nil, false
+}
+
+func (dm *Defmap) typeById(id string, f *File) (*Type, *Defmap, bool) {
+	i, m, canshadow := dm.findTypeById(id, f)
+	if i == -1 {
+		return nil, nil, false
+	}
+	return m.Types[i], m, canshadow
 }
 
 func (dm *Defmap) findFuncById(id string, f *File) (int, *Defmap, bool) {
@@ -138,6 +162,7 @@ func (dm *Defmap) globalById(id string, f *File) (*Var, *Defmap, bool) {
 // 'g' -> global
 // 'f' -> function
 // 'e' -> enum
+// 's' -> struct
 func (dm *Defmap) defById(id string, f *File) (int, *Defmap, byte) {
 	var i int
 	var m *Defmap
@@ -152,6 +177,10 @@ func (dm *Defmap) defById(id string, f *File) (int, *Defmap, byte) {
 	i, m, _ = dm.findEnumById(id, f)
 	if i != -1 {
 		return i, m, 'e'
+	}
+	i, m, _ = dm.findStructById(id, f)
+	if i != -1 {
+		return i, m, 's'
 	}
 	return -1, m, ' '
 }

@@ -451,7 +451,8 @@ func (l *Lex) Tok() Tok {
 		l.kw(txt, tokens.PUB, tokens.Pub, &tok),
 		l.kw(txt, tokens.DEFER, tokens.Defer, &tok),
 		l.kw(txt, tokens.GOTO, tokens.Goto, &tok),
-		l.kw(txt, tokens.ENUM, tokens.Enum, &tok):
+		l.kw(txt, tokens.ENUM, tokens.Enum, &tok),
+		l.kw(txt, tokens.STRUCT, tokens.Struct, &tok):
 	default:
 		lex := l.id(txt)
 		if lex != "" {
