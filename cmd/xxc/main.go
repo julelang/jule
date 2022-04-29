@@ -615,8 +615,11 @@ public:
     return _array;
   }
 
-  operator const char*(void) { return this->_buffer.c_str(); }
-  operator char*(void)       { return (char*)(this->_buffer.c_str()); }
+  operator const char*(void) const noexcept
+  { return this->_buffer.c_str(); }
+  
+  operator char*(void) const noexcept
+  { return (char*)(this->_buffer.c_str()); }
 
   char &operator[](size _Index) { return this->_buffer[_Index]; }
 
