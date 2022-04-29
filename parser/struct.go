@@ -46,7 +46,7 @@ func (s *xstruct) ostream() string {
 		cxx.WriteString(ast.IndentString())
 		cxx.WriteString(`_Stream << "`)
 		cxx.WriteString(field.Id)
-		cxx.WriteString(`: " << _Src.`)
+		cxx.WriteString(`:" << _Src.`)
 		cxx.WriteString(xapi.AsId(field.Id))
 		if i+1 < len(s.Ast.Fields) {
 			cxx.WriteString(" << \", \"")

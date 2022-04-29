@@ -60,7 +60,7 @@ func subIdAccessorOfType(t DataType) string {
 }
 
 func typeIsNilCompatible(t DataType) bool {
-	return t.Id == xtype.Func || typeIsPtr(t) || typeIsArray(t) || typeIsMap(t)
+	return typeIsFunc(t) || typeIsPtr(t) || typeIsArray(t) || typeIsMap(t)
 }
 
 func checkArrayCompatiblity(arrT, t DataType) bool {

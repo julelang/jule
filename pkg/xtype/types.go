@@ -287,7 +287,7 @@ func CxxTypeIdFromType(typeCode uint8) string {
 //  DefaultValOfType(t) = "nil" if t is invalid
 //  DefaultValOfType(t) = "nil" if t is not have default value
 func DefaultValOfType(code uint8) string {
-	if IsNumericType(code) {
+	if IsNumericType(code) || code == Enum {
 		return "0"
 	}
 	switch code {
