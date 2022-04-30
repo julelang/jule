@@ -16,6 +16,7 @@ var CxxDefault = `#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) ||
 // region X_STANDARD_IMPORTS
 #include <iostream>
 #include <string>
+#include <sstream>
 #include <string.h>
 #include <functional>
 #include <vector>
@@ -429,6 +430,13 @@ std::ostream &operator<<(std::ostream &_Stream, const i8 &_Src)
 
 std::ostream &operator<<(std::ostream &_Stream, const u8 &_Src)
 { return _Stream << (i32)(_Src); }
+
+template <typename _Obj_t>
+str tostr(const _Obj_t &_Obj) noexcept {
+  std::stringstream _stream;
+  _stream << _Obj;
+  return str{_stream.str()};
+}
 
 #define XTHROW(_Msg) throw exception(_Msg)
 #define _CONCAT(_A, _B) _A ## _B

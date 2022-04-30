@@ -173,6 +173,12 @@ var strStatics = &Defmap{
 	},
 }
 
+var strDefaultFunc = Func{
+	Id:      "str",
+	Params:  []Param{{Id: "obj", Type: DataType{Id: xtype.Any, Val: "any"}}},
+	RetType: DataType{Id: xtype.Str, Val: tokens.STR},
+}
+
 var builtinFuncs = []*function{
 	{
 		Ast: Func{

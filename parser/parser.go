@@ -2622,6 +2622,15 @@ func valIsEnum(v value) bool {
 	return v.isType && v.ast.Type.Id == xtype.Enum
 }
 
+func (p *Parser) getDataTypeFunc(tok Tok, m *exprModel) (v value) {
+	switch tok.Kind {
+	case tokens.STR:
+		m.appendSubNode(exprNode{"tostr"})
+		v.ast.Type = DataType{Id: xtype.Func, Val: "()", Tag: strDefaultFunc}
+	}
+	return
+}
+
 func (p *Parser) evalParenthesesRangeExpr(toks Toks, m *exprModel) (v value) {
 	var valueToks Toks
 	braceCount := 0
@@ -2657,8 +2666,11 @@ func (p *Parser) evalParenthesesRangeExpr(toks Toks, m *exprModel) (v value) {
 		m.appendSubNode(model)
 		return
 	}
-	v = p.evalExprPart(valueToks, m)
-
+	if tok := valueToks[0]; tok.Id == tokens.DataType {
+		v = p.getDataTypeFunc(tok, m)
+	} else {
+		v = p.evalExprPart(valueToks, m)
+	}
 	switch {
 	case typeIsFunc(v.ast.Type):
 		m.appendSubNode(exprNode{tokens.LPARENTHESES})
