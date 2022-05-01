@@ -443,7 +443,7 @@ str tostr(const _Obj_t &_Obj) noexcept {
 #define _CONCAT(_A, _B) _A ## _B
 #define CONCAT(_A, _B) _CONCAT(_A, _B)
 #define DEFER(_Expr) defer CONCAT(XXDEFER_, __LINE__){[&](void) mutable -> void { _Expr; }}
-#define CO(_Expr) std::thread{[&](void) mutable -> void { _Expr; }}
+#define CO(_Expr) std::thread{[&](void) mutable -> void { _Expr; }}.detach()
 #define XID(_Identifier) CONCAT(_, _Identifier)
 // endregion X_MISC
 
