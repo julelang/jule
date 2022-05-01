@@ -88,6 +88,7 @@ const (
 	GOTO                = "goto"
 	ENUM                = "enum"
 	STRUCT              = "struct"
+	CO                  = "co"
 )
 
 // Token types.
@@ -124,4 +125,5 @@ const (
 	DoubleColon  uint8 = 29
 	Enum         uint8 = 30
 	Struct       uint8 = 31
+	Co           uint8 = 32
 )

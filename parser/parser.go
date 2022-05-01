@@ -3431,6 +3431,9 @@ func (p *Parser) checkBlock(b *ast.Block) {
 		case ast.Defer:
 			p.checkDeferStatement(&t)
 			model.Val = t
+		case ast.ConcurrentCall:
+			p.checkConcurrentCallStatement(&t)
+			model.Val = t
 		case ast.Label:
 			t.Index = i
 			t.Block = b
@@ -3771,6 +3774,13 @@ func (p *Parser) checkDeferStatement(d *ast.Defer) {
 	m.nodes = make([]exprBuildNode, 1)
 	_ = p.evalExprPart(d.Expr.Toks, m)
 	d.Expr.Model = m
+}
+
+func (p *Parser) checkConcurrentCallStatement(cc *ast.ConcurrentCall) {
+	m := new(exprModel)
+	m.nodes = make([]exprBuildNode, 1)
+	_ = p.evalExprPart(cc.Expr.Toks, m)
+	cc.Expr.Model = m
 }
 
 func (p *Parser) checkAssignment(selected value, errtok Tok) bool {

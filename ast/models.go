@@ -764,7 +764,7 @@ type Defer struct {
 	Expr Expr
 }
 
-func (d Defer) String() string { return xapi.ToDefer(d.Expr.String()) }
+func (d Defer) String() string { return xapi.ToDeferredCall(d.Expr.String()) }
 
 // Label is the AST model of labels.
 type Label struct {
@@ -860,4 +860,14 @@ type Struct struct {
 	Id     string
 	Pub    bool
 	Fields []*Var
+}
+
+// ConcurrentCall is the AST model of concurrent calls.
+type ConcurrentCall struct {
+	Tok  Tok
+	Expr Expr
+}
+
+func (cc ConcurrentCall) String() string {
+	return xapi.ToConcurrentCall(cc.Expr.String())
 }

@@ -348,6 +348,7 @@ var keywords = map[string]uint8{
 	tokens.GOTO:     tokens.Goto,
 	tokens.ENUM:     tokens.Enum,
 	tokens.STRUCT:   tokens.Struct,
+	tokens.CO:       tokens.Co,
 }
 
 type oppair struct {

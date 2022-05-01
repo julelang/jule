@@ -1097,6 +1097,8 @@ func (b *Builder) Statement(bs *blockStatement) (s Statement) {
 		return b.CommentStatement(bs.toks[0])
 	case tokens.Defer:
 		return b.DeferStatement(bs.toks)
+	case tokens.Co:
+		return b.ConcurrentCallStatement(bs.toks)
 	case tokens.Goto:
 		return b.GotoStatement(bs.toks)
 	case tokens.Type:
@@ -1561,11 +1563,28 @@ func (b *Builder) DeferStatement(toks Toks) (s Statement) {
 		return
 	}
 	if IsFuncCall(toks) == nil {
-		b.pusherr(d.Tok, "defer_expr_not_func_call")
+		b.pusherr(d.Tok, "expr_not_func_call")
 	}
 	d.Expr = b.Expr(toks)
 	s.Tok = d.Tok
 	s.Val = d
+	return
+}
+
+func (b *Builder) ConcurrentCallStatement(toks Toks) (s Statement) {
+	var cc ConcurrentCall
+	cc.Tok = toks[0]
+	toks = toks[1:]
+	if len(toks) == 0 {
+		b.pusherr(cc.Tok, "missing_expr")
+		return
+	}
+	if IsFuncCall(toks) == nil {
+		b.pusherr(cc.Tok, "expr_not_func_call")
+	}
+	cc.Expr = b.Expr(toks)
+	s.Tok = cc.Tok
+	s.Val = cc
 	return
 }
 

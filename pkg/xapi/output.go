@@ -21,6 +21,7 @@ var CxxDefault = `#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) ||
 #include <functional>
 #include <vector>
 #include <map>
+#include <thread>
 // endregion X_STANDARD_IMPORTS
 
 // region X_CXX_API
@@ -431,7 +432,7 @@ std::ostream &operator<<(std::ostream &_Stream, const i8 &_Src)
 std::ostream &operator<<(std::ostream &_Stream, const u8 &_Src)
 { return _Stream << (i32)(_Src); }
 
-template <typename _Obj_t>
+template<typename _Obj_t>
 str tostr(const _Obj_t &_Obj) noexcept {
   std::stringstream _stream;
   _stream << _Obj;
@@ -442,14 +443,15 @@ str tostr(const _Obj_t &_Obj) noexcept {
 #define _CONCAT(_A, _B) _A ## _B
 #define CONCAT(_A, _B) _CONCAT(_A, _B)
 #define DEFER(_Expr) defer CONCAT(XXDEFER_, __LINE__){[&](void) mutable -> void { _Expr; }}
+#define CO(_Expr) std::thread{[&](void) mutable -> void { _Expr; }}
 #define XID(_Identifier) CONCAT(_, _Identifier)
 // endregion X_MISC
 
 // region X_BUILTIN_FUNCTIONS
-template <typename _Obj_t>
+template<typename _Obj_t>
 static inline void XID(out)(const _Obj_t _Obj) noexcept { std::cout << _Obj; }
 
-template <typename _Obj_t>
+template<typename _Obj_t>
 static inline void XID(outln)(const _Obj_t _Obj) noexcept {
   XID(out)<_Obj_t>(_Obj);
   std::cout << std::endl;
