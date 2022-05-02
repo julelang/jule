@@ -1047,10 +1047,8 @@ func (p *Parser) varsFromParams(params []Param) []*Var {
 // Special case:
 //  FuncById(id) -> nil: if function is not exist.
 func (p *Parser) FuncById(id string) (*function, *Defmap, bool) {
-	for _, f := range builtinFuncs {
-		if f.Ast.Id == id {
-			return f, nil, false
-		}
+	if f, _, _ := builtin.funcById(id, nil); f != nil {
+		return f, nil, false
 	}
 	for _, use := range p.Uses {
 		f, m, _ := use.defs.funcById(id, p.File)
@@ -1113,6 +1111,9 @@ func (p *Parser) enumById(id string) (*Enum, *Defmap, bool) {
 }
 
 func (p *Parser) structById(id string) (*xstruct, *Defmap, bool) {
+	if s, _, _ := builtin.structById(id, nil); s != nil {
+		return s, nil, false
+	}
 	for _, use := range p.Uses {
 		s, m, _ := use.defs.structById(id, p.File)
 		if s != nil {

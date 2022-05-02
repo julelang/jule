@@ -457,4 +457,14 @@ static inline void XID(outln)(const _Obj_t _Obj) noexcept {
   std::cout << std::endl;
 }
 // endregion X_BUILTIN_FUNCTIONS
+
+// region X_BUILTIN_STRUCTURES
+struct XID(error) {
+public:
+  str XID(message);
+};
+  
+std::ostream &operator<<(std::ostream &_Stream, const XID(error) &_Error)
+{ return _Stream << _Error.XID(message); }
+// endregion X_BUILTIN_STRUCTURES
 // endregion X_CXX_API`

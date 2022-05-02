@@ -2,6 +2,7 @@ package parser
 
 import (
 	"github.com/the-xlang/xxc/lex/tokens"
+	"github.com/the-xlang/xxc/pkg/xapi"
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
@@ -179,29 +180,57 @@ var strDefaultFunc = Func{
 	RetType: DataType{Id: xtype.Str, Val: tokens.STR},
 }
 
-var builtinFuncs = []*function{
-	{
-		Ast: Func{
-			Id:      "out",
-			RetType: DataType{Id: xtype.Void, Val: xtype.VoidTypeStr},
-			Params: []Param{{
-				Id:      "v",
-				Const:   true,
-				Type:    DataType{Val: "any", Id: xtype.Any},
-				Default: Expr{Model: exprNode{`""`}},
-			}},
+var errorStruct = &xstruct{
+	Ast: Struct{
+		Id: "error",
+	},
+	Defs: &Defmap{
+		Globals: []*Var{
+			{
+				Id:   "message",
+				Type: DataType{Id: xtype.Str, Val: tokens.STR},
+			},
 		},
 	},
-	{
-		Ast: Func{
-			Id:      "outln",
-			RetType: DataType{Id: xtype.Void, Val: xtype.VoidTypeStr},
-			Params: []Param{{
-				Id:      "v",
-				Const:   true,
-				Type:    DataType{Val: "any", Id: xtype.Any},
-				Default: Expr{Model: exprNode{`""`}},
-			}},
+	constructor: &Func{
+		Params: []Param{
+			{
+				Id:      "message",
+				Type:    DataType{Id: xtype.Str, Val: tokens.STR},
+				Default: Expr{Model: exprNode{xapi.ToStr(`"error: undefined error"`)}},
+			},
+		},
+	},
+}
+
+var builtin = &Defmap{
+	Structs: []*xstruct{
+		errorStruct,
+	},
+	Funcs: []*function{
+		{
+			Ast: Func{
+				Id:      "out",
+				RetType: DataType{Id: xtype.Void, Val: xtype.VoidTypeStr},
+				Params: []Param{{
+					Id:      "v",
+					Const:   true,
+					Type:    DataType{Val: "any", Id: xtype.Any},
+					Default: Expr{Model: exprNode{`""`}},
+				}},
+			},
+		},
+		{
+			Ast: Func{
+				Id:      "outln",
+				RetType: DataType{Id: xtype.Void, Val: xtype.VoidTypeStr},
+				Params: []Param{{
+					Id:      "v",
+					Const:   true,
+					Type:    DataType{Val: "any", Id: xtype.Any},
+					Default: Expr{Model: exprNode{`""`}},
+				}},
+			},
 		},
 	},
 }
