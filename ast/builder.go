@@ -579,9 +579,17 @@ func (b *Builder) Params(fn *Func, toks Toks) {
 
 func (b *Builder) checkParamsAsync(f *Func) {
 	defer func() { b.wg.Done() }()
-	for _, p := range f.Params {
+	for i, p := range f.Params {
 		if p.Type.Tok.Id == tokens.NA {
-			b.pusherr(p.Tok, "missing_type")
+			if p.Tok.Id == tokens.NA {
+				b.pusherr(p.Tok, "missing_type")
+			} else {
+				p.Type.Tok = p.Tok
+				p.Type.Id = xtype.Id
+				p.Type.Val = p.Type.Tok.Kind
+				f.Params[i] = p
+				p.Tok = lex.Tok{}
+			}
 		}
 	}
 }
