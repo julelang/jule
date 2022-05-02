@@ -9,6 +9,7 @@ import (
 
 type namespace struct {
 	Id   string
+	Tok  Tok
 	Defs *Defmap
 }
 
@@ -73,7 +74,7 @@ func (ns *namespace) cxxNamespaces() string {
 func (ns namespace) String() string {
 	var cxx strings.Builder
 	cxx.WriteString("namespace ")
-	cxx.WriteString(xapi.AsId(ns.Id))
+	cxx.WriteString(xapi.OutId(ns.Id, ns.Tok.File))
 	cxx.WriteString(" {\n")
 	ast.AddIndent()
 	cxx.WriteString(ns.cxxFuncPrototypes())

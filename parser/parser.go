@@ -339,86 +339,13 @@ func (p *Parser) compileUse(useAST *ast.Use) *use {
 	return nil
 }
 
-func (p *Parser) checkNsNses(src, sub *namespace) {
-	for _, ns := range sub.Defs.Namespaces {
-		srcNs := src.Defs.nsById(ns.Id, false)
-		p.checkNsDefs(sub, srcNs)
-	}
-}
-
-func (p *Parser) checkNsTypes(src, sub *namespace) {
-	for _, t := range sub.Defs.Types {
-		for _, st := range src.Defs.Types {
-			if t.Id == st.Id {
-				p.pusherrtok(t.Tok, "exist_id", t.Id)
-				return
-			}
-		}
-	}
-}
-
-func (p *Parser) checkNsStructs(src, sub *namespace) {
-	for _, s := range sub.Defs.Structs {
-		for _, ss := range src.Defs.Structs {
-			if s.Ast.Id == ss.Ast.Id {
-				p.pusherrtok(s.Ast.Tok, "exist_id", s.Ast.Id)
-				return
-			}
-		}
-	}
-}
-
-func (p *Parser) checkNsEnums(src, sub *namespace) {
-	for _, e := range sub.Defs.Enums {
-		for _, se := range src.Defs.Enums {
-			if e.Id == se.Id {
-				p.pusherrtok(e.Tok, "exist_id", e.Id)
-				return
-			}
-		}
-	}
-}
-
-func (p *Parser) checkNsGlobals(src, sub *namespace) {
-	for _, g := range sub.Defs.Globals {
-		for _, sg := range src.Defs.Globals {
-			if g.Id == sg.Id {
-				p.pusherrtok(g.IdTok, "exist_id", g.Id)
-				return
-			}
-		}
-	}
-}
-
-func (p *Parser) checkNsFuncs(src, sub *namespace) {
-	for _, f := range sub.Defs.Funcs {
-		for _, sf := range src.Defs.Funcs {
-			if f.Ast.Id == sf.Ast.Id {
-				p.pusherrtok(f.Ast.Tok, "exist_id", f.Ast.Id)
-				return
-			}
-		}
-	}
-}
-
-func (p *Parser) checkNsDefs(src, sub *namespace) {
-	p.checkNsNses(src, sub)
-	p.checkNsTypes(src, sub)
-	p.checkNsStructs(src, sub)
-	p.checkNsEnums(src, sub)
-	p.checkNsGlobals(src, sub)
-	p.checkNsFuncs(src, sub)
-}
-
 func (p *Parser) pushUseNamespaces(use, dm *Defmap) {
 	for _, ns := range dm.Namespaces {
-		ns.Defs.justPub = true
 		def := p.nsById(ns.Id, false)
 		if def == nil {
 			use.Namespaces = append(use.Namespaces, ns)
 			continue
 		}
-		p.checkNsDefs(def, ns)
 	}
 }
 
@@ -448,7 +375,6 @@ func (p *Parser) pushUseEnums(use, dm *Defmap) {
 
 func (p *Parser) pushUseStructs(use, dm *Defmap) {
 	for _, s := range dm.Structs {
-		s.Defs.justPub = true
 		def, _, _ := p.structById(s.Ast.Id)
 		if def != nil {
 			p.pusherrmsgtok(def.Ast.Tok,
@@ -514,7 +440,6 @@ func (p *Parser) use(useAST *ast.Use) {
 			break
 		}
 	}
-	use.defs.justPub = true
 	if !exist {
 		used = append(used, use)
 	}
@@ -826,6 +751,7 @@ func (p *Parser) pushNs(ns *ast.Namespace) *namespace {
 		if src == nil {
 			src = new(namespace)
 			src.Id = id
+			src.Tok = ns.Tok
 			src.Defs = new(Defmap)
 			src.Defs.parent = prev
 			prev.Namespaces = append(prev.Namespaces, src)
@@ -838,9 +764,6 @@ func (p *Parser) pushNs(ns *ast.Namespace) *namespace {
 // Namespace parses namespace statement.
 func (p *Parser) Namespace(ns ast.Namespace) {
 	src := p.pushNs(&ns)
-	justPub := src.Defs.justPub
-	src.Defs.justPub = false
-	defer func() { src.Defs.justPub = justPub }()
 	pdefs := p.Defs
 	p.Defs = src.Defs
 	p.parseSrcTree(ns.Tree)
@@ -1221,11 +1144,25 @@ func (p *Parser) WaitingGlobals() {
 func (p *Parser) checkFuncsAsync() {
 	defer func() { p.wg.Done() }()
 	check := func(f *function) {
+		if f.checked {
+			return
+		}
+		f.checked = true
 		p.BlockTypes = nil
 		p.BlockVars = p.varsFromParams(f.Ast.Params)
 		p.wg.Add(1)
 		go p.checkFuncSpecialCasesAsync(f)
 		p.checkFunc(&f.Ast)
+	}
+	for _, use := range p.Uses {
+		for _, ns := range use.defs.Namespaces {
+			pdefs := p.Defs
+			p.Defs = ns.Defs
+			for _, f := range ns.Defs.Funcs {
+				check(f)
+			}
+			p.Defs = pdefs
+		}
 	}
 	for _, ns := range p.Defs.Namespaces {
 		p.Defs = ns.Defs
@@ -1555,7 +1492,7 @@ func (ve *valueEvaluator) varId(id string, variable *Var) (v value) {
 	v.volatile = variable.Volatile
 	v.ast.Tok = variable.IdTok
 	v.lvalue = true
-	ve.model.appendSubNode(exprNode{xapi.AsId(id)})
+	ve.model.appendSubNode(exprNode{xapi.OutId(id, variable.DefTok.File)})
 	return
 }
 
@@ -1566,7 +1503,7 @@ func (ve *valueEvaluator) funcId(id string, f *function) (v value) {
 	v.ast.Type.Tag = f.Ast
 	v.ast.Type.Val = f.Ast.DataTypeString()
 	v.ast.Tok = f.Ast.Tok
-	ve.model.appendSubNode(exprNode{xapi.AsId(id)})
+	ve.model.appendSubNode(exprNode{f.outId()})
 	return
 }
 
@@ -1579,7 +1516,7 @@ func (ve *valueEvaluator) enumId(id string, e *Enum) (v value) {
 	v.ast.Tok = e.Tok
 	v.constant = true
 	v.isType = true
-	ve.model.appendSubNode(exprNode{xapi.AsId(id)})
+	ve.model.appendSubNode(exprNode{xapi.OutId(id, e.Tok.File)})
 	return
 }
 
@@ -1592,7 +1529,7 @@ func (ve *valueEvaluator) structId(id string, s *xstruct) (v value) {
 	v.ast.Type.Tok = s.Ast.Tok
 	v.ast.Tok = s.Ast.Tok
 	v.isType = true
-	ve.model.appendSubNode(exprNode{xapi.AsId(id)})
+	ve.model.appendSubNode(exprNode{xapi.OutId(id, s.Ast.Tok.File)})
 	return
 }
 
@@ -2184,7 +2121,7 @@ func (p *Parser) evalXObjSubId(dm *Defmap, val value, idTok Tok, m *exprModel) (
 	case 'g':
 		g := dm.Globals[i]
 		if g.Tag == nil {
-			m.appendSubNode(exprNode{xapi.AsId(g.Id)})
+			m.appendSubNode(exprNode{xapi.OutId(g.Id, g.DefTok.File)})
 		} else {
 			m.appendSubNode(exprNode{g.Tag.(string)})
 		}
@@ -2224,7 +2161,7 @@ func (p *Parser) evalEnumSubId(val value, idTok Tok, m *exprModel) (v value) {
 	v.lvalue = false
 	v.isType = false
 	m.appendSubNode(exprNode{"::"})
-	m.appendSubNode(exprNode{xapi.AsId(idTok.Kind)})
+	m.appendSubNode(exprNode{xapi.OutId(idTok.Kind, enum.Tok.File)})
 	if enum.ItemById(idTok.Kind) == nil {
 		p.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
 	}
@@ -2259,7 +2196,7 @@ func (p *Parser) evalNsSubId(toks Toks, m *exprModel) (v value) {
 				return
 			}
 			prev = src.Defs
-			m.appendSubNode(exprNode{xapi.AsId(src.Id)})
+			m.appendSubNode(exprNode{xapi.OutId(src.Id, src.Tok.File)})
 			continue
 		}
 		switch tok.Id {

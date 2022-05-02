@@ -3,6 +3,7 @@ package parser
 import (
 	"strings"
 
+	"github.com/the-xlang/xxc/pkg/x"
 	"github.com/the-xlang/xxc/pkg/xapi"
 )
 
@@ -11,6 +12,14 @@ type function struct {
 	Attributes []Attribute
 	Desc       string
 	used       bool
+	checked    bool
+}
+
+func (f *function) outId() string {
+	if f.Ast.Id == x.EntryPoint {
+		return xapi.AsId(f.Ast.Id)
+	}
+	return xapi.OutId(f.Ast.Id, f.Ast.Tok.File)
 }
 
 func (f function) String() string {
@@ -22,30 +31,30 @@ func (f function) String() string {
 }
 
 // Head returns declaration head of function.
-func (f function) Head() string {
+func (f *function) Head() string {
 	var cxx strings.Builder
 	cxx.WriteString(attributesToString(f.Attributes))
 	cxx.WriteString(f.Ast.RetType.String())
 	cxx.WriteByte(' ')
-	cxx.WriteString(xapi.AsId(f.Ast.Id))
+	cxx.WriteString(f.outId())
 	cxx.WriteString(paramsToCxx(f.Ast.Params))
 	return cxx.String()
 }
 
 // Prototype returns prototype cxx code of function.
-func (f function) Prototype() string {
+func (f *function) Prototype() string {
 	var cxx strings.Builder
 	cxx.WriteString(attributesToString(f.Attributes))
 	cxx.WriteString(f.Ast.RetType.String())
 	cxx.WriteByte(' ')
-	cxx.WriteString(xapi.AsId(f.Ast.Id))
+	cxx.WriteString(f.outId())
 	cxx.WriteString(f.PrototypeParams())
 	cxx.WriteByte(';')
 	return cxx.String()
 }
 
 // PrototypeParams returns prototype cxx code of function parameters.
-func (f function) PrototypeParams() string {
+func (f *function) PrototypeParams() string {
 	if len(f.Ast.Params) == 0 {
 		return "(void)"
 	}

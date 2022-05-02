@@ -18,7 +18,7 @@ type xstruct struct {
 func (s *xstruct) declString() string {
 	var cxx strings.Builder
 	cxx.WriteString("struct ")
-	cxx.WriteString(xapi.AsId(s.Ast.Id))
+	cxx.WriteString(xapi.OutId(s.Ast.Id, s.Ast.Tok.File))
 	cxx.WriteString(" {\n")
 	ast.AddIndent()
 	for _, g := range s.Defs.Globals {
@@ -35,7 +35,7 @@ func (s *xstruct) declString() string {
 func (s *xstruct) ostream() string {
 	var cxx strings.Builder
 	cxx.WriteString("std::ostream &operator<<(std::ostream &_Stream, const ")
-	cxx.WriteString(xapi.AsId(s.Ast.Id))
+	cxx.WriteString(xapi.OutId(s.Ast.Id, s.Ast.Tok.File))
 	cxx.WriteString(" &_Src) {\n")
 	ast.AddIndent()
 	cxx.WriteString(ast.IndentString())
@@ -47,7 +47,7 @@ func (s *xstruct) ostream() string {
 		cxx.WriteString(`_Stream << "`)
 		cxx.WriteString(field.Id)
 		cxx.WriteString(`:" << _Src.`)
-		cxx.WriteString(xapi.AsId(field.Id))
+		cxx.WriteString(xapi.OutId(field.Id, s.Ast.Tok.File))
 		if i+1 < len(s.Ast.Fields) {
 			cxx.WriteString(" << \", \"")
 		}

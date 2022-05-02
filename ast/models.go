@@ -127,7 +127,7 @@ func (dt DataType) String() string {
 	}
 	switch dt.Id {
 	case xtype.Id, xtype.Enum, xtype.Struct:
-		return xapi.AsId(dt.Tok.Kind) + cxx.String()
+		return xapi.OutId(dt.Tok.Kind, dt.Tok.File) + cxx.String()
 	case xtype.Func:
 		return dt.FuncString() + cxx.String()
 	default:
@@ -182,7 +182,7 @@ func (t Type) String() string {
 	cxx.WriteString("typedef ")
 	cxx.WriteString(t.Type.String())
 	cxx.WriteByte(' ')
-	cxx.WriteString(xapi.AsId(t.Id))
+	cxx.WriteString(xapi.OutId(t.Id, t.Tok.File))
 	cxx.WriteByte(';')
 	return cxx.String()
 }
@@ -236,7 +236,7 @@ func (p Param) String() string {
 	cxx.WriteString(p.Prototype())
 	if p.Id != "" {
 		cxx.WriteByte(' ')
-		cxx.WriteString(xapi.AsId(p.Id))
+		cxx.WriteString(xapi.OutId(p.Id, p.Tok.File))
 	}
 	return cxx.String()
 }
@@ -294,7 +294,7 @@ func (e Expr) String() string {
 		for _, tok := range process {
 			switch tok.Id {
 			case tokens.Id:
-				expr.WriteString(xapi.AsId(tok.Kind))
+				expr.WriteString(xapi.OutId(tok.Kind, tok.File))
 			default:
 				expr.WriteString(tok.Kind)
 			}
@@ -371,7 +371,7 @@ func (v Var) String() string {
 	}
 	cxx.WriteString(v.Type.String())
 	cxx.WriteByte(' ')
-	cxx.WriteString(xapi.AsId(v.Id))
+	cxx.WriteString(xapi.OutId(v.Id, v.DefTok.File))
 	cxx.WriteByte('{')
 	if v.Val.Processes != nil {
 		cxx.WriteString(v.Val.String())
@@ -392,7 +392,7 @@ func (v *Var) FieldString() string {
 	}
 	cxx.WriteString(v.Type.String())
 	cxx.WriteByte(' ')
-	cxx.WriteString(xapi.AsId(v.Id))
+	cxx.WriteString(xapi.OutId(v.Id, v.DefTok.File))
 	cxx.WriteByte(';')
 	return cxx.String()
 }
@@ -408,7 +408,8 @@ func (as AssignSelector) String() string {
 	switch {
 	case as.Var.New:
 		// Returns variable identifier.
-		return xapi.AsId(as.Expr.Toks[0].Kind)
+		tok := as.Expr.Toks[0]
+		return xapi.OutId(tok.Kind, tok.File)
 	case as.Ignore:
 		return xapi.CxxIgnore
 	}
@@ -587,12 +588,12 @@ func (fp *ForeachProfile) ClassicString(iter Iter) string {
 	cxx.WriteString(", [&](")
 	cxx.WriteString(fp.KeyA.Type.String())
 	cxx.WriteByte(' ')
-	cxx.WriteString(xapi.AsId(fp.KeyA.Id))
+	cxx.WriteString(xapi.OutId(fp.KeyA.Id, fp.KeyA.IdTok.File))
 	if !xapi.IsIgnoreId(fp.KeyB.Id) {
 		cxx.WriteByte(',')
 		cxx.WriteString(fp.KeyB.Type.String())
 		cxx.WriteByte(' ')
-		cxx.WriteString(xapi.AsId(fp.KeyB.Id))
+		cxx.WriteString(xapi.OutId(fp.KeyB.Id, fp.KeyB.IdTok.File))
 	}
 	cxx.WriteString(") -> void ")
 	cxx.WriteString(iter.Block.String())
@@ -612,12 +613,12 @@ func (fp *ForeachProfile) MapString(iter Iter) string {
 	cxx.WriteString(", [&](")
 	cxx.WriteString(fp.KeyA.Type.String())
 	cxx.WriteByte(' ')
-	cxx.WriteString(xapi.AsId(fp.KeyA.Id))
+	cxx.WriteString(xapi.OutId(fp.KeyA.Id, fp.KeyA.IdTok.File))
 	if !xapi.IsIgnoreId(fp.KeyB.Id) {
 		cxx.WriteByte(',')
 		cxx.WriteString(fp.KeyB.Type.String())
 		cxx.WriteByte(' ')
-		cxx.WriteString(xapi.AsId(fp.KeyB.Id))
+		cxx.WriteString(xapi.OutId(fp.KeyB.Id, fp.KeyB.IdTok.File))
 	}
 	cxx.WriteString(") -> void ")
 	cxx.WriteString(iter.Block.String())
@@ -639,7 +640,7 @@ func (fp *ForeachProfile) ForeachString(iter Iter) string {
 func (fp ForeachProfile) IterationString(iter Iter) string {
 	var cxx strings.Builder
 	cxx.WriteString("for (auto ")
-	cxx.WriteString(xapi.AsId(fp.KeyB.Id))
+	cxx.WriteString(xapi.OutId(fp.KeyB.Id, fp.KeyB.IdTok.File))
 	cxx.WriteString(" : ")
 	cxx.WriteString(fp.Expr.String())
 	cxx.WriteString(") ")
@@ -809,7 +810,7 @@ type EnumItem struct {
 
 func (ei EnumItem) String() string {
 	var cxx strings.Builder
-	cxx.WriteString(xapi.AsId(ei.Id))
+	cxx.WriteString(xapi.OutId(ei.Id, ei.Tok.File))
 	cxx.WriteString(" = ")
 	cxx.WriteString(ei.Expr.String())
 	return cxx.String()
@@ -839,7 +840,7 @@ func (e *Enum) ItemById(id string) *EnumItem {
 func (e Enum) String() string {
 	var cxx strings.Builder
 	cxx.WriteString("enum ")
-	cxx.WriteString(xapi.AsId(e.Id))
+	cxx.WriteString(xapi.OutId(e.Id, e.Tok.File))
 	cxx.WriteByte(':')
 	cxx.WriteString(e.Type.String())
 	cxx.WriteString(" {\n")
