@@ -205,7 +205,7 @@ func IsUnsignedNumericType(t uint8) bool {
 // TypeFromId returns type id of specified type code.
 func TypeFromId(id string) uint8 {
 	switch id {
-	case tokens.I8, tokens.SBYTE:
+	case tokens.I8:
 		return I8
 	case tokens.I16:
 		return I16
@@ -213,7 +213,7 @@ func TypeFromId(id string) uint8 {
 		return I32
 	case tokens.I64:
 		return I64
-	case tokens.U8, tokens.BYTE:
+	case tokens.U8:
 		return U8
 	case tokens.U16:
 		return U16

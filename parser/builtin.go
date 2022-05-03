@@ -204,6 +204,16 @@ var errorStruct = &xstruct{
 }
 
 var builtin = &Defmap{
+	Types: []*Type{
+		{
+			Id:   "byte",
+			Type: DataType{Id: xtype.U8, Val: tokens.U8},
+		},
+		{
+			Id:   "sbyte",
+			Type: DataType{Id: xtype.I8, Val: tokens.I8},
+		},
+	},
 	Structs: []*xstruct{
 		errorStruct,
 	},

@@ -1011,6 +1011,9 @@ func (p *Parser) nsById(id string, parent bool) *namespace {
 }
 
 func (p *Parser) typeById(id string) (*Type, *Defmap, bool) {
+	if t, _, _ := builtin.typeById(id, nil); t != nil {
+		return t, nil, false
+	}
 	if t := p.blockTypesById(id); t != nil {
 		return t, p.Defs, false
 	}
