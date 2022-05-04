@@ -337,14 +337,6 @@ public:
 // endregion X_BUILTIN_TYPES
 
 // region X_MISC
-class exception: public std::exception {
-private:
-  std::basic_string<char> _buffer;
-public:
-  exception(const char *_Str)      { this->_buffer = _Str; }
-  const char *what() const throw() { return this->_buffer.c_str(); }
-};
-
 template<typename _Alloc_t>
 static inline _Alloc_t *xalloc()
 { return new(std::nothrow) _Alloc_t; }
@@ -447,17 +439,6 @@ str tostr(const _Obj_t &_Obj) noexcept {
 #define XID(_Identifier) CONCAT(_, _Identifier)
 // endregion X_MISC
 
-// region X_BUILTIN_FUNCTIONS
-template<typename _Obj_t>
-static inline void XID(out)(const _Obj_t _Obj) noexcept { std::cout << _Obj; }
-
-template<typename _Obj_t>
-static inline void XID(outln)(const _Obj_t _Obj) noexcept {
-  XID(out)<_Obj_t>(_Obj);
-  std::cout << std::endl;
-}
-// endregion X_BUILTIN_FUNCTIONS
-
 // region X_BUILTIN_STRUCTURES
 struct XID(error) {
 public:
@@ -467,4 +448,21 @@ public:
 std::ostream &operator<<(std::ostream &_Stream, const XID(error) &_Error)
 { return _Stream << _Error.XID(message); }
 // endregion X_BUILTIN_STRUCTURES
+
+// region X_BUILTIN_FUNCTIONS
+template<typename _Obj_t>
+static inline void XID(out)(const _Obj_t _Obj) noexcept { std::cout << _Obj; }
+
+template<typename _Obj_t>
+static inline void XID(outln)(const _Obj_t _Obj) noexcept {
+  XID(out)<_Obj_t>(_Obj);
+  std::cout << std::endl;
+}
+
+void XID(panic)(const struct XID(error) &_Error) noexcept {
+  std::cout << "panic: ";
+  XID(outln)(_Error);
+  std::exit(EXIT_FAILURE);
+}
+// endregion X_BUILTIN_FUNCTIONS
 // endregion X_CXX_API`

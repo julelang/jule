@@ -14,6 +14,7 @@ func ToDeferredCall(expr string) string {
 	return cxx.String()
 }
 
+// ToConcurrentCall returns cxx of concurrent function call expression string.
 func ToConcurrentCall(expr string) string {
 	var cxx strings.Builder
 	cxx.WriteString("CO(")

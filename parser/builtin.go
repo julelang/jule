@@ -203,6 +203,8 @@ var errorStruct = &xstruct{
 	},
 }
 
+var errorType = DataType{Id: xtype.Struct, Val: "error", Tag: errorStruct}
+
 var builtin = &Defmap{
 	Types: []*Type{
 		{
@@ -239,6 +241,17 @@ var builtin = &Defmap{
 					Const:   true,
 					Type:    DataType{Val: "any", Id: xtype.Any},
 					Default: Expr{Model: exprNode{`""`}},
+				}},
+			},
+		},
+		{
+			Ast: Func{
+				Id:      "panic",
+				RetType: DataType{Id: xtype.Void, Val: xtype.VoidTypeStr},
+				Params: []Param{{
+					Id:    "err",
+					Const: true,
+					Type:  errorType,
 				}},
 			},
 		},
