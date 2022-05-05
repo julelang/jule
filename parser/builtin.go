@@ -227,7 +227,7 @@ var builtin = &Defmap{
 				Params: []Param{{
 					Id:      "v",
 					Const:   true,
-					Type:    DataType{Val: "any", Id: xtype.Any},
+					Type:    DataType{Id: xtype.Any, Val: "any"},
 					Default: Expr{Model: exprNode{`""`}},
 				}},
 			},
@@ -239,7 +239,7 @@ var builtin = &Defmap{
 				Params: []Param{{
 					Id:      "v",
 					Const:   true,
-					Type:    DataType{Val: "any", Id: xtype.Any},
+					Type:    DataType{Id: xtype.Any, Val: "any"},
 					Default: Expr{Model: exprNode{`""`}},
 				}},
 			},

@@ -1111,6 +1111,8 @@ func (b *Builder) Statement(bs *blockStatement) (s Statement) {
 		return b.GotoStatement(bs.toks)
 	case tokens.Try:
 		return b.TryBlock(bs)
+	case tokens.Catch:
+		return b.CatchBlock(bs)
 	case tokens.Type:
 		t := b.Type(bs.toks)
 		s.Tok = t.Tok
@@ -1702,38 +1704,37 @@ func (b *Builder) getForeachVarsToks(toks Toks) []Toks {
 	return vars
 }
 
+func (b *Builder) getVarProfile(toks Toks) (vast Var) {
+	vast.IdTok = toks[0]
+	if vast.IdTok.Id != tokens.Id {
+		b.pusherr(vast.IdTok, "invalid_syntax")
+		return
+	}
+	vast.Id = vast.IdTok.Kind
+	if len(toks) == 1 {
+		return
+	}
+	if colon := toks[1]; colon.Id != tokens.Colon {
+		b.pusherr(colon, "invalid_syntax")
+		return
+	}
+	vast.New = true
+	i := new(int)
+	*i = 2
+	if *i >= len(toks) {
+		return
+	}
+	vast.Type, _ = b.DataType(toks, i, true)
+	if *i < len(toks)-1 {
+		b.pusherr(toks[*i], "invalid_syntax")
+	}
+	return
+}
+
 func (b *Builder) getForeachIterVars(varsToks []Toks) []Var {
 	var vars []Var
 	for _, toks := range varsToks {
-		var vast Var
-		vast.IdTok = toks[0]
-		if vast.IdTok.Id != tokens.Id {
-			b.pusherr(vast.IdTok, "invalid_syntax")
-			vars = append(vars, vast)
-			continue
-		}
-		vast.Id = vast.IdTok.Kind
-		if len(toks) == 1 {
-			vars = append(vars, vast)
-			continue
-		}
-		if colon := toks[1]; colon.Id != tokens.Colon {
-			b.pusherr(colon, "invalid_syntax")
-			vars = append(vars, vast)
-			continue
-		}
-		vast.New = true
-		i := new(int)
-		*i = 2
-		if *i >= len(toks) {
-			vars = append(vars, vast)
-			continue
-		}
-		vast.Type, _ = b.DataType(toks, i, true)
-		if *i < len(toks)-1 {
-			b.pusherr(toks[*i], "invalid_syntax")
-		}
-		vars = append(vars, vast)
+		vars = append(vars, b.getVarProfile(toks))
 	}
 	return vars
 }
@@ -1825,10 +1826,41 @@ func (b *Builder) TryBlock(bs *blockStatement) (s Statement) {
 		return
 	}
 	if *i < len(bs.toks) {
-		b.pusherr(bs.toks[*i], "invalid_syntax")
+		if bs.toks[*i].Id == tokens.Catch {
+			bs.nextToks = bs.toks[*i:]
+		} else {
+			b.pusherr(bs.toks[*i], "invalid_syntax")
+		}
 	}
 	try.Block = b.Block(blockToks)
 	return Statement{try.Tok, try, false}
+}
+
+// CatchBlock build catch block.
+func (b *Builder) CatchBlock(bs *blockStatement) (s Statement) {
+	var catch Catch
+	catch.Tok = bs.toks[0]
+	bs.toks = bs.toks[1:]
+	varToks := blockExprToks(bs.toks)
+	i := new(int)
+	*i = len(varToks)
+	blockToks := b.getrange(i, tokens.LBRACE, tokens.RBRACE, &bs.toks)
+	if blockToks == nil {
+		b.pusherr(catch.Tok, "body_not_exist")
+		return
+	}
+	if *i < len(bs.toks) {
+		if bs.toks[*i].Id == tokens.Catch {
+			bs.nextToks = bs.toks[*i:]
+		} else {
+			b.pusherr(bs.toks[*i], "invalid_syntax")
+		}
+	}
+	if len(varToks) > 0 {
+		catch.Var = b.getVarProfile(varToks)
+	}
+	catch.Block = b.Block(blockToks)
+	return Statement{catch.Tok, catch, false}
 }
 
 // IfExpr builds AST model of if expression.

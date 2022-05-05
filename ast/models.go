@@ -127,7 +127,7 @@ func (dt DataType) String() string {
 	}
 	switch dt.Id {
 	case xtype.Id, xtype.Enum, xtype.Struct:
-		return xapi.OutId(dt.Tok.Kind, dt.Tok.File) + cxx.String()
+		return xapi.OutId(dt.Val, dt.Tok.File) + cxx.String()
 	case xtype.Func:
 		return dt.FuncString() + cxx.String()
 	default:
@@ -877,12 +877,40 @@ func (cc ConcurrentCall) String() string {
 type Try struct {
 	Tok   Tok
 	Block Block
+	Catch Catch
 }
 
 func (t Try) String() string {
 	var cxx strings.Builder
 	cxx.WriteString("try ")
 	cxx.WriteString(t.Block.String())
-	cxx.WriteString(" catch(...) {}")
+	if t.Catch.Tok.Id == tokens.NA {
+		cxx.WriteString(" catch(...) {}")
+	} else {
+		cxx.WriteByte(' ')
+		cxx.WriteString(t.Catch.String())
+	}
+	return cxx.String()
+}
+
+// Catch is the AST model of catch blocks.
+type Catch struct {
+	Tok   Tok
+	Var   Var
+	Block Block
+}
+
+func (c Catch) String() string {
+	var cxx strings.Builder
+	cxx.WriteString("catch (")
+	if c.Var.Id == "" {
+		cxx.WriteString("...")
+	} else {
+		cxx.WriteString(c.Var.Type.String())
+		cxx.WriteByte(' ')
+		cxx.WriteString(xapi.OutId(c.Var.Id, c.Tok.File))
+	}
+	cxx.WriteString(") ")
+	cxx.WriteString(c.Block.String())
 	return cxx.String()
 }

@@ -468,6 +468,8 @@ void x_terminate_handler(void) noexcept {
   try { std::rethrow_exception(std::current_exception()); }
   catch (const XID(error) _error)
   { std::cout << "panic: " << _error.XID(message) << std::endl; }
+  catch (...)
+  { std::cout << "panic: <undefined panics>" << std::endl; }
   std::abort();
 }
 // endregion BOTTOM_MIST

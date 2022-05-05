@@ -1495,7 +1495,12 @@ func (ve *valueEvaluator) varId(id string, variable *Var) (v value) {
 	v.volatile = variable.Volatile
 	v.ast.Tok = variable.IdTok
 	v.lvalue = true
-	ve.model.appendSubNode(exprNode{xapi.OutId(id, variable.DefTok.File)})
+	// If built-in.
+	if variable.IdTok.Id == tokens.NA {
+		ve.model.appendSubNode(exprNode{xapi.OutId(id, nil)})
+	} else {
+		ve.model.appendSubNode(exprNode{xapi.OutId(id, variable.IdTok.File)})
+	}
 	return
 }
 
@@ -1519,7 +1524,12 @@ func (ve *valueEvaluator) enumId(id string, e *Enum) (v value) {
 	v.ast.Tok = e.Tok
 	v.constant = true
 	v.isType = true
-	ve.model.appendSubNode(exprNode{xapi.OutId(id, e.Tok.File)})
+	// If built-in.
+	if e.Tok.Id == tokens.NA {
+		ve.model.appendSubNode(exprNode{xapi.OutId(id, nil)})
+	} else {
+		ve.model.appendSubNode(exprNode{xapi.OutId(id, e.Tok.File)})
+	}
 	return
 }
 
@@ -1532,7 +1542,12 @@ func (ve *valueEvaluator) structId(id string, s *xstruct) (v value) {
 	v.ast.Type.Tok = s.Ast.Tok
 	v.ast.Tok = s.Ast.Tok
 	v.isType = true
-	ve.model.appendSubNode(exprNode{xapi.OutId(id, s.Ast.Tok.File)})
+	// If built-in.
+	if s.Ast.Tok.Id == tokens.NA {
+		ve.model.appendSubNode(exprNode{xapi.OutId(id, nil)})
+	} else {
+		ve.model.appendSubNode(exprNode{xapi.OutId(id, s.Ast.Tok.File)})
+	}
 	return
 }
 
@@ -3361,7 +3376,7 @@ func (p *Parser) checkBlock(b *ast.Block) {
 			p.checkIfExpr(&t, &i, b.Tree)
 			model.Val = t
 		case ast.Try:
-			p.checkTry(&t)
+			p.checkTry(&t, &i, b.Tree)
 			model.Val = t
 		case Type:
 			if p.checkTypeAST(t) {
@@ -4028,8 +4043,55 @@ func (p *Parser) checkIterExpr(iter *ast.Iter) {
 	p.iterCount--
 }
 
-func (p *Parser) checkTry(try *ast.Try) {
+func (p *Parser) checkTry(try *ast.Try, i *int, statements []ast.Statement) {
 	p.checkNewBlock(&try.Block)
+	statement := statements[*i]
+	if statement.WithTerminator {
+		return
+	}
+	*i++
+	if *i >= len(statements) {
+		*i--
+		return
+	}
+	statement = statements[*i]
+	switch t := statement.Val.(type) {
+	case ast.Catch:
+		p.checkCatch(try, &t)
+		try.Catch = t
+		// Set statatement.Val to nil because *Try has catch instance and
+		// parses catches cxx itself String method. If statement.Val is not nil,
+		// parses each catch block two times.
+		statements[*i].Val = nil
+	default:
+		*i--
+	}
+}
+
+func (p *Parser) checkCatch(try *ast.Try, catch *ast.Catch) {
+	if catch.Var.Id == "" {
+		p.checkNewBlock(&catch.Block)
+		return
+	}
+	_, defTok := p.blockDefById(catch.Var.Id)
+	if defTok.Id != tokens.NA {
+		p.pusherrtok(catch.Var.IdTok, "exist_id", catch.Var.Id)
+	}
+	if catch.Var.Type.Tok.Id != tokens.NA {
+		catch.Var.Type, _ = p.readyType(catch.Var.Type, true)
+		if catch.Var.Type.Val != errorType.Val {
+			p.pusherrtok(catch.Var.Type.Tok, "invalid_type_source")
+		}
+	} else {
+		catch.Var.Type = errorType
+	}
+	if xapi.IsIgnoreId(catch.Var.Id) {
+		p.checkNewBlock(&catch.Block)
+		return
+	}
+	blockVars := p.BlockVars
+	p.BlockVars = append(p.BlockVars, &catch.Var)
+	p.checkNewBlockCustom(&catch.Block, blockVars)
 }
 
 func (p *Parser) checkIfExpr(ifast *ast.If, i *int, statements []ast.Statement) {
@@ -4123,6 +4185,10 @@ func (p *Parser) readyType(dt DataType, err bool) (_ DataType, ok bool) {
 			return dt, true
 		case *xstruct:
 			t.Used = true
+			// If type is built-in.
+			if t.Ast.Tok.Id == tokens.NA {
+				dt.Tok = t.Ast.Tok
+			}
 			dt.Id = xtype.Struct
 			dt.Val = t.Ast.Id
 			dt.Tag = t
