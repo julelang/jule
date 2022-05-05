@@ -371,7 +371,7 @@ func (v Var) String() string {
 	}
 	cxx.WriteString(v.Type.String())
 	cxx.WriteByte(' ')
-	cxx.WriteString(xapi.OutId(v.Id, v.DefTok.File))
+	cxx.WriteString(xapi.OutId(v.Id, v.IdTok.File))
 	cxx.WriteByte('{')
 	if v.Val.Processes != nil {
 		cxx.WriteString(v.Val.String())
@@ -392,7 +392,7 @@ func (v *Var) FieldString() string {
 	}
 	cxx.WriteString(v.Type.String())
 	cxx.WriteByte(' ')
-	cxx.WriteString(xapi.OutId(v.Id, v.DefTok.File))
+	cxx.WriteString(xapi.OutId(v.Id, v.IdTok.File))
 	cxx.WriteByte(';')
 	return cxx.String()
 }

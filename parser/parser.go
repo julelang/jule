@@ -4185,13 +4185,13 @@ func (p *Parser) readyType(dt DataType, err bool) (_ DataType, ok bool) {
 			return dt, true
 		case *xstruct:
 			t.Used = true
+			dt.Id = xtype.Struct
+			dt.Val = dt.Val[:len(dt.Val)-len(dt.Tok.Kind)] + t.Ast.Id
+			dt.Tag = t
 			// If type is built-in.
 			if t.Ast.Tok.Id == tokens.NA {
 				dt.Tok = t.Ast.Tok
 			}
-			dt.Id = xtype.Struct
-			dt.Val = t.Ast.Id
-			dt.Tag = t
 			return dt, true
 		default:
 			if err {
