@@ -3360,6 +3360,9 @@ func (p *Parser) checkBlock(b *ast.Block) {
 		case ast.If:
 			p.checkIfExpr(&t, &i, b.Tree)
 			model.Val = t
+		case ast.Try:
+			p.checkTry(&t)
+			model.Val = t
 		case Type:
 			if p.checkTypeAST(t) {
 				t.Type, _ = p.readyType(t.Type, true)
@@ -4023,6 +4026,10 @@ func (p *Parser) checkIterExpr(iter *ast.Iter) {
 		}
 	}
 	p.iterCount--
+}
+
+func (p *Parser) checkTry(try *ast.Try) {
+	p.checkNewBlock(&try.Block)
 }
 
 func (p *Parser) checkIfExpr(ifast *ast.If, i *int, statements []ast.Statement) {

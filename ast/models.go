@@ -872,3 +872,17 @@ type ConcurrentCall struct {
 func (cc ConcurrentCall) String() string {
 	return xapi.ToConcurrentCall(cc.Expr.String())
 }
+
+// Try is the AST model of try blocks.
+type Try struct {
+	Tok   Tok
+	Block Block
+}
+
+func (t Try) String() string {
+	var cxx strings.Builder
+	cxx.WriteString("try ")
+	cxx.WriteString(t.Block.String())
+	cxx.WriteString(" catch(...) {}")
+	return cxx.String()
+}

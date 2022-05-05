@@ -1109,6 +1109,8 @@ func (b *Builder) Statement(bs *blockStatement) (s Statement) {
 		return b.ConcurrentCallStatement(bs.toks)
 	case tokens.Goto:
 		return b.GotoStatement(bs.toks)
+	case tokens.Try:
+		return b.TryBlock(bs)
 	case tokens.Type:
 		t := b.Type(bs.toks)
 		s.Tok = t.Tok
@@ -1811,6 +1813,25 @@ func (b *Builder) IterExpr(toks Toks) (s Statement) {
 	return Statement{iter.Tok, iter, false}
 }
 
+// TryBlock build try block.
+func (b *Builder) TryBlock(bs *blockStatement) (s Statement) {
+	var try Try
+	try.Tok = bs.toks[0]
+	bs.toks = bs.toks[1:]
+	i := new(int)
+	blockToks := b.getrange(i, tokens.LBRACE, tokens.RBRACE, &bs.toks)
+	if blockToks == nil {
+		b.pusherr(try.Tok, "body_not_exist")
+		return
+	}
+	if *i < len(bs.toks) {
+		b.pusherr(bs.toks[*i], "invalid_syntax")
+	}
+	try.Block = b.Block(blockToks)
+	return Statement{try.Tok, try, false}
+}
+
+// IfExpr builds AST model of if expression.
 func (b *Builder) IfExpr(bs *blockStatement) (s Statement) {
 	var ifast If
 	ifast.Tok = bs.toks[0]
@@ -1846,6 +1867,7 @@ func (b *Builder) IfExpr(bs *blockStatement) (s Statement) {
 	return Statement{ifast.Tok, ifast, false}
 }
 
+// ElseIfEpxr builds AST model of else if expression.
 func (b *Builder) ElseIfExpr(bs *blockStatement) (s Statement) {
 	var elif ElseIf
 	elif.Tok = bs.toks[1]
@@ -1881,6 +1903,7 @@ func (b *Builder) ElseIfExpr(bs *blockStatement) (s Statement) {
 	return Statement{elif.Tok, elif, false}
 }
 
+// ElseBlock builds AST model of else block.
 func (b *Builder) ElseBlock(bs *blockStatement) (s Statement) {
 	if len(bs.toks) > 1 && bs.toks[1].Id == tokens.If {
 		return b.ElseIfExpr(bs)
@@ -1905,6 +1928,7 @@ func (b *Builder) ElseBlock(bs *blockStatement) (s Statement) {
 	return Statement{elseast.Tok, elseast, false}
 }
 
+// BreakStatement builds AST model of break statement.
 func (b *Builder) BreakStatement(toks Toks) Statement {
 	var breakAST Break
 	breakAST.Tok = toks[0]
@@ -1914,6 +1938,7 @@ func (b *Builder) BreakStatement(toks Toks) Statement {
 	return Statement{breakAST.Tok, breakAST, false}
 }
 
+// ContinueStatement builds AST model of continue statement.
 func (b *Builder) ContinueStatement(toks Toks) Statement {
 	var continueAST Continue
 	continueAST.Tok = toks[0]

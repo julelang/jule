@@ -3,6 +3,7 @@ package xapi
 // CxxMain is the entry point output of X-CXX code.
 var CxxMain = `// region X_ENTRY_POINT
 int main() {
+  std::set_terminate(&x_terminate_handler);
   _main();
   return EXIT_SUCCESS;
 }
@@ -459,10 +460,15 @@ static inline void XID(outln)(const _Obj_t _Obj) noexcept {
   std::cout << std::endl;
 }
 
-void XID(panic)(const struct XID(error) &_Error) noexcept {
-  std::cout << "panic: ";
-  XID(outln)(_Error);
-  std::exit(EXIT_FAILURE);
+static inline void XID(panic)(const struct XID(error) &_Error) { throw _Error; }
+// endregion X_BUILTIN_FUNCTIONS,
+
+// region BOTTOM_MISC
+void x_terminate_handler(void) noexcept {
+  try { std::rethrow_exception(std::current_exception()); }
+  catch (const XID(error) _error)
+  { std::cout << "panic: " << _error.XID(message) << std::endl; }
+  std::abort();
 }
-// endregion X_BUILTIN_FUNCTIONS
+// endregion BOTTOM_MIST
 // endregion X_CXX_API`

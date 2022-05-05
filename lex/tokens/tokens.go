@@ -87,6 +87,8 @@ const (
 	ENUM                = "enum"
 	STRUCT              = "struct"
 	CO                  = "co"
+	TRY                 = "try"
+	CATCH               = "catch"
 )
 
 // Token types.
@@ -124,4 +126,6 @@ const (
 	Enum         uint8 = 30
 	Struct       uint8 = 31
 	Co           uint8 = 32
+	Try          uint8 = 33
+	Catch        uint8 = 34
 )
