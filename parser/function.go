@@ -17,7 +17,7 @@ type function struct {
 
 func (f *function) outId() string {
 	if f.Ast.Id == x.EntryPoint {
-		return xapi.AsId(f.Ast.Id)
+		return xapi.OutId(f.Ast.Id, nil)
 	}
 	return xapi.OutId(f.Ast.Id, f.Ast.Tok.File)
 }

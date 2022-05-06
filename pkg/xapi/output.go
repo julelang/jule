@@ -437,7 +437,6 @@ str tostr(const _Obj_t &_Obj) noexcept {
 #define CONCAT(_A, _B) _CONCAT(_A, _B)
 #define DEFER(_Expr) defer CONCAT(XXDEFER_, __LINE__){[&](void) mutable -> void { _Expr; }}
 #define CO(_Expr) std::thread{[&](void) mutable -> void { _Expr; }}.detach()
-#define XID(_Identifier) CONCAT(_, _Identifier)
 // endregion X_MISC
 
 // region X_BUILTIN_STRUCTURES
@@ -470,7 +469,7 @@ void x_terminate_handler(void) noexcept {
   { std::cout << "panic: " << _error.XID(message) << std::endl; }
   catch (...)
   { std::cout << "panic: <undefined panics>" << std::endl; }
-  std::abort();
+  std::exit(EXIT_FAILURE);
 }
 // endregion BOTTOM_MIST
 // endregion X_CXX_API`
