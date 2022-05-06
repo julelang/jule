@@ -13,6 +13,9 @@ const Ignore = "_"
 // IsIgnoreId reports identifier is ignore or not.
 func IsIgnoreId(id string) bool { return id == Ignore }
 
+// Returns specified identifer as X identifer.
+func AsId(id string) string { return "XID(" + id + ")" }
+
 // OutId returns cxx output identifier form of given identifier.
 func OutId(id string, f *xio.File) string {
 	var out strings.Builder
@@ -23,5 +26,5 @@ func OutId(id string, f *xio.File) string {
 		out.WriteByte('_')
 	}
 	out.WriteString(id)
-	return out.String()
+	return AsId(out.String())
 }

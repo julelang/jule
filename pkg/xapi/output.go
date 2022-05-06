@@ -2,9 +2,9 @@ package xapi
 
 // CxxMain is the entry point output of X-CXX code.
 var CxxMain = `// region X_ENTRY_POINT
-int main() {
+int main(void) {
   std::set_terminate(&x_terminate_handler);
-  _main();
+  XID(main());
   return EXIT_SUCCESS;
 }
 // endregion X_ENTRY_POINT`
@@ -432,9 +432,9 @@ str tostr(const _Obj_t &_Obj) noexcept {
   return str{_stream.str()};
 }
 
-#define XTHROW(_Msg) throw exception(_Msg)
 #define _CONCAT(_A, _B) _A ## _B
 #define CONCAT(_A, _B) _CONCAT(_A, _B)
+#define XID(_Identifier) CONCAT(_, _Identifier)
 #define DEFER(_Expr) defer CONCAT(XXDEFER_, __LINE__){[&](void) mutable -> void { _Expr; }}
 #define CO(_Expr) std::thread{[&](void) mutable -> void { _Expr; }}.detach()
 // endregion X_MISC

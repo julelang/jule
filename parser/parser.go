@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -3397,9 +3398,32 @@ func (p *Parser) checkBlock(b *ast.Block) {
 			t.Block = b
 			*p.rootBlock.Gotos = append(*p.rootBlock.Gotos, &t)
 		case ast.CxxEmbed:
+			p.cxxEmbedStatement(&t)
+			model.Val = t
 		case ast.Comment:
 		default:
 			p.pusherrtok(model.Tok, "invalid_syntax")
+		}
+	}
+}
+
+func (p *Parser) cxxEmbedStatement(cxx *ast.CxxEmbed) {
+	rexpr := regexp.MustCompile(`@[\p{L}|_]([\p{L}0-9_]+)?([[:punct:]]|\s|$)`)
+	matches := rexpr.FindAllStringIndex(cxx.Content, -1)
+	for _, match := range matches {
+		start := match[0]
+		// -1 because pattern takes space or punct, so seperator.
+		end := match[1] - 1
+		id := cxx.Content[start+1 : end]
+		def, tok := p.blockDefById(id)
+		if def != nil {
+			switch t := def.(type) {
+			case *Var:
+				t.Used = true
+			case *Type:
+				t.Used = true
+			}
+			cxx.Content = cxx.Content[:start] + xapi.OutId(id, tok.File) + cxx.Content[end:]
 		}
 	}
 }
