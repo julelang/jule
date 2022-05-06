@@ -433,16 +433,7 @@ func (p *Parser) use(useAST *ast.Use) {
 	if use == nil {
 		return
 	}
-	exist := false
-	for _, guse := range used {
-		if guse.Path == use.Path {
-			exist = true
-			break
-		}
-	}
-	if !exist {
-		used = append(used, use)
-	}
+	used = append(used, use)
 	p.Uses = append(p.Uses, use)
 }
 
