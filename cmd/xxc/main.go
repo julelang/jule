@@ -285,7 +285,6 @@ func printlogs(p *Parser) bool {
 			str.WriteString("ERROR: ")
 			str.WriteString(log.Msg)
 		case xlog.Err:
-			str.WriteString("ERROR: ")
 			str.WriteString(log.Path)
 			str.WriteByte(':')
 			str.WriteString(fmt.Sprint(log.Row))

@@ -2448,9 +2448,9 @@ func (p *Parser) evalTryAssignExpr(toks Toks, m *exprModel) (v value, ok bool) {
 		p.pusherrs(b.Errs...)
 		return
 	}
+	v, _ = p.evalExpr(assign.SelectExprs[0].Expr)
 	p.checkAssign(&assign)
 	m.appendSubNode(assignExpr{assign})
-	v, _ = p.evalExpr(assign.SelectExprs[0].Expr)
 	return
 }
 
@@ -3770,7 +3770,8 @@ func (p *Parser) checkSingleAssign(assign *ast.Assign) {
 	if len(sexpr.Toks) == 1 && xapi.IsIgnoreId(sexpr.Toks[0].Kind) {
 		return
 	}
-	selected, _ := p.evalExpr(*sexpr)
+	selected, model := p.evalExpr(*sexpr)
+	*sexpr = model.(*exprModel).Expr()
 	if !p.checkAssignment(selected, assign.Setter) {
 		return
 	}
@@ -3830,7 +3831,8 @@ func (p *Parser) processMultiAssign(assign *ast.Assign, vals []value) {
 			if selector.Ignore {
 				continue
 			}
-			selected, _ := p.evalExpr(selector.Expr)
+			selected, model := p.evalExpr(selector.Expr)
+			selector.Expr.Model = model
 			if !p.checkAssignment(selected, assign.Setter) {
 				return
 			}
@@ -4174,8 +4176,9 @@ func (p *Parser) readyType(dt DataType, err bool) (_ DataType, ok bool) {
 		switch t := def.(type) {
 		case *Type:
 			t.Used = true
+			val := dt.Val[:len(dt.Val)-len(dt.Tok.Kind)] + t.Type.Val
 			dt = t.Type
-			dt.Val = dt.Val[:len(dt.Val)-len(dt.Tok.Kind)] + t.Type.Val
+			dt.Val = val
 			return p.readyType(dt, err)
 		case *Enum:
 			t.Used = true
