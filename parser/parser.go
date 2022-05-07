@@ -2294,8 +2294,12 @@ func (p *Parser) evalU64SubId(idTok Tok, m *exprModel) (v value) {
 	return p.evalXTypeSubId(u64statics, idTok, m)
 }
 
-func (p *Parser) evalSizeSubId(idTok Tok, m *exprModel) (v value) {
-	return p.evalXTypeSubId(sizeStatics, idTok, m)
+func (p *Parser) evalUIntSubId(idTok Tok, m *exprModel) (v value) {
+	return p.evalXTypeSubId(uintStatics, idTok, m)
+}
+
+func (p *Parser) evalIntSubId(idTok Tok, m *exprModel) (v value) {
+	return p.evalXTypeSubId(intStatics, idTok, m)
 }
 
 func (p *Parser) evalF32SubId(idTok Tok, m *exprModel) (v value) {
@@ -2329,7 +2333,9 @@ func (p *Parser) evalTypeSubId(typeTok, idTok Tok, m *exprModel) (v value) {
 	case tokens.U64:
 		return p.evalU64SubId(idTok, m)
 	case tokens.UINT:
-		return p.evalSizeSubId(idTok, m)
+		return p.evalUIntSubId(idTok, m)
+	case tokens.INT:
+		return p.evalIntSubId(idTok, m)
 	case tokens.F32:
 		return p.evalF32SubId(idTok, m)
 	case tokens.F64:

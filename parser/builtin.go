@@ -118,13 +118,30 @@ var u64statics = &Defmap{
 	},
 }
 
-var sizeStatics = &Defmap{
+var uintStatics = &Defmap{
 	Globals: []*Var{
 		{
 			Id:    "max",
 			Const: true,
 			Type:  DataType{Id: xtype.UInt, Val: tokens.UINT},
 			Tag:   "SIZE_MAX",
+		},
+	},
+}
+
+var intStatics = &Defmap{
+	Globals: []*Var{
+		{
+			Id:    "max",
+			Const: true,
+			Type:  DataType{Id: xtype.Int, Val: tokens.INT},
+			Tag:   "",
+		},
+		{
+			Id:    "min",
+			Const: true,
+			Type:  DataType{Id: xtype.Int, Val: tokens.INT},
+			Tag:   "",
 		},
 	},
 }
@@ -455,4 +472,23 @@ func readyMapDefs(mapt DataType) {
 
 	delFunc, _, _ := mapDefs.funcById("del", nil)
 	delFunc.Ast.Params[0].Type = keyt
+}
+
+func init() {
+	intMax := intStatics.Globals[0]
+	intMin := intStatics.Globals[1]
+	switch xtype.BitSize {
+	case 8:
+		intMax.Tag = i8statics.Globals[0].Tag
+		intMin.Tag = i8statics.Globals[1].Tag
+	case 16:
+		intMax.Tag = i16statics.Globals[0].Tag
+		intMin.Tag = i16statics.Globals[1].Tag
+	case 32:
+		intMax.Tag = i32statics.Globals[0].Tag
+		intMin.Tag = i32statics.Globals[1].Tag
+	case 64:
+		intMax.Tag = i64statics.Globals[0].Tag
+		intMin.Tag = i64statics.Globals[1].Tag
+	}
 }

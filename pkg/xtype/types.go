@@ -106,8 +106,7 @@ func TypesAreCompatible(t1, t2 uint8, ignoreany bool) bool {
 	// Check.
 	switch t1 {
 	case I8:
-		return t2 == I8 ||
-			t2 == Char
+		return t2 == I8
 	case I16:
 		return t2 == I8 ||
 			t2 == I16
