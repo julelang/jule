@@ -3423,12 +3423,12 @@ func (p *Parser) checkBlock(b *ast.Block) {
 }
 
 func (p *Parser) cxxEmbedStatement(cxx *ast.CxxEmbed) {
-	rexpr := regexp.MustCompile(`@[\p{L}|_]([\p{L}0-9_]+)?([[:punct:]]|\s|$)`)
-	matches := rexpr.FindAllStringIndex(cxx.Content, -1)
-	for _, match := range matches {
+	rexpr := regexp.MustCompile(`@[\p{L}|_]([\p{L}0-9_]+)?`)
+	match := rexpr.FindStringIndex(cxx.Content)
+	for match != nil {
 		start := match[0]
-		// -1 because pattern takes space or punct, so seperator.
-		end := match[1] - 1
+		end := match[1]
+		// +1 for skip "@" mark.
 		id := cxx.Content[start+1 : end]
 		def, tok := p.blockDefById(id)
 		if def != nil {
@@ -3440,6 +3440,7 @@ func (p *Parser) cxxEmbedStatement(cxx *ast.CxxEmbed) {
 			}
 			cxx.Content = cxx.Content[:start] + xapi.OutId(id, tok.File) + cxx.Content[end:]
 		}
+		match = rexpr.FindStringIndex(cxx.Content)
 	}
 }
 
