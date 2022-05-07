@@ -443,6 +443,7 @@ func (p *Parser) parseUses(tree *[]ast.Obj) {
 		switch t := obj.Value.(type) {
 		case ast.Use:
 			p.use(&t)
+		case ast.Comment: // Ignore beginning comments.
 		default:
 			*tree = (*tree)[i:]
 			return
