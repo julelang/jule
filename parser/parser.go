@@ -848,13 +848,26 @@ func (p *Parser) params(params *[]Param) {
 
 // Func parse X function.
 func (p *Parser) Func(fast Func) {
-	if _, tok, _, canshadow := p.defById(fast.Id); tok.Id != tokens.NA && !canshadow {
+	/*if _, tok, _, canshadow := p.defById(fast.Id); tok.Id != tokens.NA && !canshadow {
 		p.pusherrtok(fast.Tok, "exist_id", fast.Id)
 	} else if xapi.IsIgnoreId(fast.Id) {
 		p.pusherrtok(fast.Tok, "ignore_id")
 	}
 	fast.RetType, _ = p.readyType(fast.RetType, true)
 	p.params(&fast.Params)
+	f := new(function)
+	f.Ast = fast
+	f.Attributes = p.attributes
+	p.attributes = nil
+	f.Desc = p.docText.String()
+	p.docText.Reset()
+	p.checkFuncAttributes(f.Attributes)
+	p.Defs.Funcs = append(p.Defs.Funcs, f)*/
+	if _, tok, _, canshadow := p.defById(fast.Id); tok.Id != tokens.NA && !canshadow {
+		p.pusherrtok(fast.Tok, "exist_id", fast.Id)
+	} else if xapi.IsIgnoreId(fast.Id) {
+		p.pusherrtok(fast.Tok, "ignore_id")
+	}
 	f := new(function)
 	f.Ast = fast
 	f.Attributes = p.attributes
@@ -1142,6 +1155,7 @@ func (p *Parser) checkFuncsAsync() {
 		if f.checked {
 			return
 		}
+		p.params(&f.Ast.Params)
 		f.checked = true
 		p.BlockTypes = nil
 		p.BlockVars = p.varsFromParams(f.Ast.Params)
