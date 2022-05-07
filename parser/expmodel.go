@@ -77,9 +77,9 @@ func (a arrayExpr) String() string {
 	}
 	for _, exp := range a.expr {
 		cxx.WriteString(exp.String())
-		cxx.WriteString(", ")
+		cxx.WriteByte(',')
 	}
-	return cxx.String()[:cxx.Len()-2] + "})"
+	return cxx.String()[:cxx.Len()-1] + "})"
 }
 
 type mapExpr struct {

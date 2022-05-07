@@ -1483,10 +1483,11 @@ func (ve *valueEvaluator) num() value {
 		v.ast.Type.Id = xtype.F64
 		v.ast.Type.Val = tokens.F64
 	} else {
-		v.ast.Type.Id = xtype.I32
-		v.ast.Type.Val = tokens.I32
-		ok := xbits.CheckBitInt(ve.tok.Kind, 32)
-		if !ok {
+		v.ast.Type.Id = xtype.Int
+		v.ast.Type.Val = tokens.INT
+		bit := xbits.BitsizeType(xtype.Int)
+		ok := xbits.CheckBitInt(ve.tok.Kind, bit)
+		if !ok && bit < xbits.MaxInt {
 			v.ast.Type.Id = xtype.I64
 			v.ast.Type.Val = tokens.I64
 		}
@@ -2327,7 +2328,7 @@ func (p *Parser) evalTypeSubId(typeTok, idTok Tok, m *exprModel) (v value) {
 		return p.evalU32SubId(idTok, m)
 	case tokens.U64:
 		return p.evalU64SubId(idTok, m)
-	case tokens.SIZE:
+	case tokens.UINT:
 		return p.evalSizeSubId(idTok, m)
 	case tokens.F32:
 		return p.evalF32SubId(idTok, m)
@@ -2473,6 +2474,7 @@ func (p *Parser) evalCast(v value, t DataType, errtok Tok) value {
 	default:
 		p.pusherrtok(errtok, "type_notsupports_casting", t.Val)
 	}
+	v.ast.Data = ""
 	v.ast.Type = t
 	v.constant = false
 	v.volatile = false
@@ -2777,7 +2779,7 @@ func (p *Parser) evalArraySelect(arrv, selectv value, errtok Tok) value {
 	p.wg.Add(1)
 	go assignChecker{
 		p:      p,
-		t:      DataType{Id: xtype.Size, Val: tokens.SIZE},
+		t:      DataType{Id: xtype.UInt, Val: tokens.UINT},
 		v:      selectv,
 		errtok: errtok,
 	}.checkAssignTypeAsync()
@@ -2800,7 +2802,7 @@ func (p *Parser) evalStrSelect(strv, selectv value, errtok Tok) value {
 	strv.ast.Type.Id = xtype.Char
 	go assignChecker{
 		p:      p,
-		t:      DataType{Id: xtype.Size, Val: tokens.SIZE},
+		t:      DataType{Id: xtype.UInt, Val: tokens.UINT},
 		v:      selectv,
 		errtok: errtok,
 	}.checkAssignTypeAsync()
@@ -3964,7 +3966,7 @@ func (fc *foreachChecker) checkKeyASize() {
 	}
 	keyA := &fc.profile.KeyA
 	if keyA.Type.Id == xtype.Void {
-		keyA.Type.Id = xtype.Size
+		keyA.Type.Id = xtype.UInt
 		keyA.Type.Val = xtype.CxxTypeIdFromType(keyA.Type.Id)
 		return
 	}

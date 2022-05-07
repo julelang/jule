@@ -28,3 +28,6 @@ func OutId(id string, f *xio.File) string {
 	out.WriteString(id)
 	return AsId(out.String())
 }
+
+// AsTypeId returns given identifier as output type identifier.
+func AsTypeId(id string) string { return id + "_xt" }

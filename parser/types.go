@@ -7,7 +7,10 @@ import (
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
-func typeIsVoid(t DataType) bool { return t.Id == xtype.Void && !t.MultiTyped }
+func typeIsVoid(t DataType) bool          { return t.Id == xtype.Void && !t.MultiTyped }
+func typeIsVariadicable(t DataType) bool  { return typeIsArray(t) }
+func typeIsMut(t DataType) bool           { return typeIsPtr(t) }
+func typeIsAllowForConst(t DataType) bool { return typeIsSingle(t) }
 
 func typeOfArrayItems(t DataType) DataType {
 	// Remove array syntax "[]"
@@ -21,8 +24,6 @@ func typeIsPtr(t DataType) bool {
 	}
 	return t.Id == xtype.Voidptr || t.Val[0] == '*'
 }
-
-func typeIsAllowForConst(t DataType) bool { return typeIsSingle(t) }
 
 func typeIsArray(t DataType) bool {
 	if t.Val == "" {
@@ -123,6 +124,3 @@ func typesAreCompatible(t1, t2 DataType, ignoreany bool) bool {
 	}
 	return xtype.TypesAreCompatible(t1.Id, t2.Id, ignoreany)
 }
-
-func typeIsVariadicable(t DataType) bool { return typeIsArray(t) }
-func typeIsMut(t DataType) bool          { return typeIsPtr(t) }

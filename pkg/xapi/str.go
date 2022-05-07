@@ -11,7 +11,7 @@ const RawStrMark = StrMark + "R"
 // ToStr returns specified literal as X string literal for cxx.
 func ToStr(literal string) string {
 	var cxx strings.Builder
-	cxx.WriteString("str{")
+	cxx.WriteString("str_xt{")
 	cxx.WriteString(StrMark)
 	cxx.WriteString(literal)
 	cxx.WriteByte('}')
@@ -21,7 +21,7 @@ func ToStr(literal string) string {
 // ToRawStr returns specified literal as X raw-string literal for cxx.
 func ToRawStr(literal string) string {
 	var cxx strings.Builder
-	cxx.WriteString("str{")
+	cxx.WriteString("str_xt{")
 	cxx.WriteString(RawStrMark)
 	cxx.WriteString(literal)
 	cxx.WriteByte('}')

@@ -1,6 +1,11 @@
 package xtype
 
-import "github.com/the-xlang/xxc/lex/tokens"
+import (
+	"strconv"
+
+	"github.com/the-xlang/xxc/lex/tokens"
+	"github.com/the-xlang/xxc/pkg/xapi"
+)
 
 // Data type (built-in) constants.
 const (
@@ -22,12 +27,24 @@ const (
 	Id      uint8 = 15
 	Func    uint8 = 16
 	Nil     uint8 = 17
-	Size    uint8 = 18
-	Map     uint8 = 19
-	Voidptr uint8 = 20
-	Enum    uint8 = 21
-	Struct  uint8 = 22
+	UInt    uint8 = 18
+	Int     uint8 = 19
+	Map     uint8 = 20
+	Voidptr uint8 = 21
+	Enum    uint8 = 22
+	Struct  uint8 = 23
 )
+
+// IntCode is integer type code of current platform architecture.
+// Is equavalent to "int", but specific bit-sized integer type code.
+var IntCode uint8
+
+// UIntCode is integer type code of current platform architecture.
+// Is equavalent to "uint", but specific bit-sized integer type code.
+var UIntCode uint8
+
+// BitSize is bit size of architecture.
+var BitSize int
 
 const (
 	NumericTypeStr = "<numeric>"
@@ -60,7 +77,7 @@ func TypeGreaterThan(t1, t2 uint8) bool {
 		return t2 != Any && t2 != F64
 	case F64:
 		return t2 != Any
-	case Size, Enum:
+	case Enum:
 		return true
 	}
 	return false
@@ -68,68 +85,62 @@ func TypeGreaterThan(t1, t2 uint8) bool {
 
 // TypeAreCompatible reports type one and type two is compatible or not.
 func TypesAreCompatible(t1, t2 uint8, ignoreany bool) bool {
-	if !ignoreany && t2 == Any {
+	if !ignoreany && t1 == Any {
 		return true
 	}
+
+	// If types is "int" or "uint", set to bit-specific type code.
 	switch t1 {
-	case Any:
-		if ignoreany {
-			return false
-		}
-		return true
+	case Int:
+		t1 = IntCode
+	case UInt:
+		t2 = UIntCode
+	}
+	switch t2 {
+	case Int:
+		t1 = IntCode
+	case UInt:
+		t2 = UIntCode
+	}
+
+	// Check.
+	switch t1 {
 	case I8:
-		return t2 == I8
+		return t2 == I8 ||
+			t2 == Char
 	case I16:
 		return t2 == I8 ||
-			t2 == I16 ||
-			t2 == Char
+			t2 == I16
 	case I32:
 		return t2 == I8 ||
 			t2 == I16 ||
 			t2 == I32 ||
-			t2 == I64 ||
-			t2 == F32 ||
-			t2 == F64 ||
-			t2 == Size ||
 			t2 == Char
 	case I64:
 		return t2 == I8 ||
 			t2 == I16 ||
 			t2 == I32 ||
 			t2 == I64 ||
-			t2 == F32 ||
-			t2 == F64 ||
-			t2 == Size ||
-			t2 == Char
+			t2 == Char ||
+			t2 == Int
 	case U8:
+		return t2 == U8 ||
+			t2 == Char
+	case U16:
+		return t2 == U8 ||
+			t2 == U16 ||
+			t2 == Char
+	case U32:
+		return t2 == U8 ||
+			t2 == U16 ||
+			t2 == U32 ||
+			t2 == Char
+	case U64:
 		return t2 == U8 ||
 			t2 == U16 ||
 			t2 == U32 ||
 			t2 == U64 ||
-			t2 == F32 ||
-			t2 == F64 ||
-			t2 == Size ||
-			t2 == Char
-	case U16:
-		return t2 == U16 ||
-			t2 == U32 ||
-			t2 == U64 ||
-			t2 == F32 ||
-			t2 == F64 ||
-			t2 == Size ||
-			t2 == Char
-	case U32:
-		return t2 == U32 ||
-			t2 == U64 ||
-			t2 == F32 ||
-			t2 == F64 ||
-			t2 == Size ||
-			t2 == Char
-	case U64, Size:
-		return t2 == U64 ||
-			t2 == F32 ||
-			t2 == F64 ||
-			t2 == Size ||
+			t2 == UInt ||
 			t2 == Char
 	case Bool:
 		return t2 == Bool
@@ -190,7 +201,8 @@ func IsSignedIntegerType(t uint8) bool {
 	return t == I8 ||
 		t == I16 ||
 		t == I32 ||
-		t == I64
+		t == I64 ||
+		t == Int
 }
 
 // IsUnsignedNumericType reports type is unsigned numeric or not.
@@ -199,7 +211,7 @@ func IsUnsignedNumericType(t uint8) bool {
 		t == U16 ||
 		t == U32 ||
 		t == U64 ||
-		t == Size
+		t == UInt
 }
 
 // TypeFromId returns type id of specified type code.
@@ -233,8 +245,10 @@ func TypeFromId(id string) uint8 {
 		return Any
 	case tokens.CHAR:
 		return Char
-	case tokens.SIZE:
-		return Size
+	case tokens.UINT:
+		return UInt
+	case tokens.INT:
+		return Int
 	case tokens.VOIDPTR:
 		return Voidptr
 	}
@@ -246,39 +260,41 @@ func CxxTypeIdFromType(typeCode uint8) string {
 	case Void:
 		return "void"
 	case I8:
-		return tokens.I8
+		return xapi.AsTypeId(tokens.I8)
 	case I16:
-		return tokens.I16
+		return xapi.AsTypeId(tokens.I16)
 	case I32:
-		return tokens.I32
+		return xapi.AsTypeId(tokens.I32)
 	case I64:
-		return tokens.I64
+		return xapi.AsTypeId(tokens.I64)
 	case U8:
-		return tokens.U8
+		return xapi.AsTypeId(tokens.U8)
 	case U16:
-		return tokens.U16
+		return xapi.AsTypeId(tokens.U16)
 	case U32:
-		return tokens.U32
+		return xapi.AsTypeId(tokens.U32)
 	case U64:
-		return tokens.U64
+		return xapi.AsTypeId(tokens.U64)
 	case Bool:
-		return tokens.BOOL
+		return xapi.AsTypeId(tokens.BOOL)
 	case F32:
-		return tokens.F32
+		return xapi.AsTypeId(tokens.F32)
 	case F64:
-		return tokens.F64
+		return xapi.AsTypeId(tokens.F64)
 	case Any:
-		return "any"
+		return xapi.AsTypeId("any")
 	case Str:
-		return tokens.STR
+		return xapi.AsTypeId(tokens.STR)
 	case Char:
-		return tokens.CHAR
-	case Size:
-		return tokens.SIZE
+		return xapi.AsTypeId(tokens.CHAR)
+	case UInt:
+		return xapi.AsTypeId(tokens.UINT)
+	case Int:
+		return xapi.AsTypeId(tokens.INT)
 	case Voidptr:
-		return tokens.VOIDPTR
+		return xapi.AsTypeId(tokens.VOIDPTR)
 	}
-	return "" // Unreachable code.
+	return ""
 }
 
 // DefaultValOfType returns default value of specified type.
@@ -299,4 +315,22 @@ func DefaultValOfType(code uint8) string {
 		return `'\0'`
 	}
 	return "nil"
+}
+
+func init() {
+	BitSize = strconv.IntSize
+	switch BitSize {
+	case 8:
+		IntCode = I8
+		UIntCode = U8
+	case 16:
+		IntCode = I16
+		UIntCode = U16
+	case 32:
+		IntCode = I32
+		UIntCode = U32
+	case 64:
+		IntCode = I64
+		UIntCode = U64
+	}
 }

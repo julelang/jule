@@ -62,9 +62,9 @@ func (f *function) PrototypeParams() string {
 	cxx.WriteByte('(')
 	for _, p := range f.Ast.Params {
 		cxx.WriteString(p.Prototype())
-		cxx.WriteString(", ")
+		cxx.WriteByte(',')
 	}
-	return cxx.String()[:cxx.Len()-2] + ")"
+	return cxx.String()[:cxx.Len()-1] + ")"
 }
 
 func attributesToString(attributes []Attribute) string {

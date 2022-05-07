@@ -5,6 +5,9 @@ import (
 	"strings"
 )
 
+// MaxInt is the maximum bitsize of integer types.
+const MaxInt = 64
+
 type bitChecker = func(val string, base, bit int) error
 
 // CheckBitInt reports integer is compatible this bit-size or not.

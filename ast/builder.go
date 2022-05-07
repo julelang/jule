@@ -2114,9 +2114,9 @@ func (b *Builder) checkExprTok(tok Tok) {
 			(!strings.HasPrefix(tok.Kind, "0x") && strings.ContainsAny(tok.Kind, "eE")) {
 			result = xbits.CheckBitFloat(tok.Kind, 64)
 		} else {
-			result = xbits.CheckBitInt(tok.Kind, 64)
+			result = xbits.CheckBitInt(tok.Kind, xbits.MaxInt)
 			if !result {
-				result = xbits.CheckBitUInt(tok.Kind, 64)
+				result = xbits.CheckBitUInt(tok.Kind, xbits.MaxInt)
 			}
 		}
 		if !result {

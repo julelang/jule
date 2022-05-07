@@ -123,7 +123,7 @@ var sizeStatics = &Defmap{
 		{
 			Id:    "max",
 			Const: true,
-			Type:  DataType{Id: xtype.Size, Val: tokens.SIZE},
+			Type:  DataType{Id: xtype.UInt, Val: tokens.UINT},
 			Tag:   "SIZE_MAX",
 		},
 	},
@@ -168,7 +168,7 @@ var strStatics = &Defmap{
 		{
 			Id:    "npos",
 			Const: true,
-			Type:  DataType{Id: xtype.Size, Val: tokens.SIZE},
+			Type:  DataType{Id: xtype.UInt, Val: tokens.UINT},
 			Tag:   "std::string::npos",
 		},
 	},
@@ -214,6 +214,10 @@ var builtin = &Defmap{
 		{
 			Id:   "sbyte",
 			Type: DataType{Id: xtype.I8, Val: tokens.I8},
+		},
+		{
+			Id:   "size",
+			Type: DataType{Id: xtype.UInt, Val: tokens.UINT},
 		},
 	},
 	Structs: []*xstruct{
@@ -263,7 +267,7 @@ var strDefs = &Defmap{
 		{
 			Id:    "len",
 			Const: true,
-			Type:  DataType{Id: xtype.Size, Val: tokens.SIZE},
+			Type:  DataType{Id: xtype.UInt, Val: tokens.UINT},
 			Tag:   "len()",
 		},
 	},
@@ -285,12 +289,12 @@ var strDefs = &Defmap{
 		{Ast: Func{
 			Id:      "find",
 			Params:  []Param{{Id: "sub", Type: DataType{Id: xtype.Str, Val: tokens.STR}}},
-			RetType: DataType{Id: xtype.Size, Val: tokens.SIZE},
+			RetType: DataType{Id: xtype.UInt, Val: tokens.UINT},
 		}},
 		{Ast: Func{
 			Id:      "rfind",
 			Params:  []Param{{Id: "sub", Type: DataType{Id: xtype.Str, Val: tokens.STR}}},
-			RetType: DataType{Id: xtype.Size, Val: tokens.SIZE},
+			RetType: DataType{Id: xtype.UInt, Val: tokens.UINT},
 		}},
 		{Ast: Func{
 			Id:      "trim",
@@ -335,7 +339,7 @@ var arrDefs = &Defmap{
 		{
 			Id:    "len",
 			Const: true,
-			Type:  DataType{Id: xtype.Size, Val: tokens.SIZE},
+			Type:  DataType{Id: xtype.UInt, Val: tokens.UINT},
 			Tag:   "len()",
 		},
 	},
@@ -368,7 +372,7 @@ var arrDefs = &Defmap{
 		{Ast: Func{
 			Id: "insert",
 			Params: []Param{
-				{Id: "start", Type: DataType{Id: xtype.Size, Val: tokens.SIZE}},
+				{Id: "start", Type: DataType{Id: xtype.UInt, Val: tokens.UINT}},
 				{Id: "values", Variadic: true},
 			},
 			RetType: DataType{Id: xtype.Bool, Val: tokens.BOOL},
@@ -407,7 +411,7 @@ var mapDefs = &Defmap{
 		{
 			Id:    "len",
 			Const: true,
-			Type:  DataType{Id: xtype.Size, Val: tokens.SIZE},
+			Type:  DataType{Id: xtype.UInt, Val: tokens.UINT},
 			Tag:   "size()",
 		},
 	},

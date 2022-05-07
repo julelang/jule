@@ -31,19 +31,23 @@ var CxxDefault = `#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) ||
 // endregion X_BUILTIN_VALUES
 
 // region X_BUILTIN_TYPES
-typedef int8_t        i8;
-typedef int16_t       i16;
-typedef int32_t       i32;
-typedef int64_t       i64;
-typedef uint8_t       u8;
-typedef uint16_t      u16;
-typedef uint32_t      u32;
-typedef uint64_t      u64;
-typedef std::size_t   size;
-typedef float         f32;
-typedef double        f64;
-typedef void          *voidptr;
-#define func          std::function
+typedef std::size_t                       uint_xt;
+typedef std::make_signed<uint_xt>::type   int_xt;
+typedef int8_t                            i8_xt;
+typedef int16_t                           i16_xt;
+typedef int32_t                           i32_xt;
+typedef int64_t                           i64_xt;
+typedef uint8_t                           u8_xt;
+typedef uint16_t                          u16_xt;
+typedef uint32_t                          u32_xt;
+typedef uint64_t                          u64_xt;
+typedef float                             f32_xt;
+typedef double                            f64_xt;
+typedef unsigned char                     char_xt;
+typedef bool                              bool_xt;
+typedef void                              *voidptr_xt;
+
+#define func std::function
 
 // region X_STRUCTURES
 template<typename _Item_t>
@@ -67,8 +71,8 @@ public:
   iterator end(void) noexcept               { return &this->_buffer[this->_buffer.size()]; }
   const_iterator end(void) const noexcept   { return &this->_buffer[this->_buffer.size()]; }
 
-  inline void clear(void) noexcept { this->_buffer.clear(); }
-  inline size len(void) const noexcept { return this->_buffer.size(); }
+  inline void clear(void) noexcept        { this->_buffer.clear(); }
+  inline uint_xt len(void) const noexcept { return this->_buffer.size(); }
 
   _Item_t *find(const _Item_t &_Item) noexcept {
     iterator _it{this->begin()};
@@ -108,7 +112,7 @@ public:
     for (const _Item_t _item: _Items) { this->_buffer.push_back(_item); }
   }
 
-  bool insert(const size &_Start, const array<_Item_t> &_Items) noexcept {
+  bool insert(const uint_xt &_Start, const array<_Item_t> &_Items) noexcept {
     auto _it{this->_buffer.begin()+_Start};
     if (_it >= this->_buffer.end()) { return false; }
     this->_buffer.insert(_it, _Items.begin(), _Items.end());
@@ -118,10 +122,10 @@ public:
   inline bool empty(void) const noexcept { return this->_buffer.empty(); }
 
   bool operator==(const array<_Item_t> &_Src) const noexcept {
-    const size _length = this->_buffer.size();
-    const size _Src_length = _Src._buffer.size();
+    const uint_xt _length{this->_buffer.size()};
+    const uint_xt _Src_length{_Src._buffer.size()};
     if (_length != _Src_length) { return false; }
-    for (size _index = 0; _index < _length; ++_index)
+    for (uint_xt _index{0}; _index < _length; ++_index)
     { if (this->_buffer[_index] != _Src._buffer[_index]) { return false; } }
     return true;
   }
@@ -129,13 +133,13 @@ public:
   bool operator==(const std::nullptr_t) const noexcept       { return this->_buffer.empty(); }
   bool operator!=(const array<_Item_t> &_Src) const noexcept { return !(*this == _Src); }
   bool operator!=(const std::nullptr_t) const noexcept       { return !this->_buffer.empty(); }
-  _Item_t& operator[](const size _Index)                     { return this->_buffer[_Index]; }
+  _Item_t& operator[](const uint_xt _Index)                  { return this->_buffer[_Index]; }
 
   friend std::ostream& operator<<(std::ostream &_Stream,
                                   const array<_Item_t> &_Src) {
     _Stream << '[';
-    const size _length = _Src._buffer.size();
-    for (size _index = 0; _index < _length;) {
+    const uint_xt _length{_Src._buffer.size()};
+    for (uint_xt _index{0}; _index < _length;) {
       _Stream << _Src._buffer[_index++];
       if (_index < _length) { _Stream << u8", "; }
     }
@@ -175,7 +179,7 @@ public:
   friend std::ostream& operator<<(std::ostream &_Stream,
                                   const map<_Key_t, _Value_t> &_Src) {
     _Stream << '{';
-    size _length = _Src.size();
+    uint_xt _length{_Src.size()};
     for (const auto _pair: _Src) {
       _Stream << _pair.first;
       _Stream << ':';
@@ -188,53 +192,53 @@ public:
 };
 // endregion X_STRUCTURES
 
-class str {
+class str_xt {
 public:
   std::string _buffer{};
 
-  str(void) noexcept                   {}
-  str(const char *_Src) noexcept       { this->_buffer = _Src ? _Src : ""; }
-  str(const std::string _Src) noexcept { this->_buffer = _Src; }
-  str(const str &_Src) noexcept        { this->_buffer = _Src._buffer; }
+  str_xt(void) noexcept                   {}
+  str_xt(const char *_Src) noexcept       { this->_buffer = _Src ? _Src : ""; }
+  str_xt(const std::string _Src) noexcept { this->_buffer = _Src; }
+  str_xt(const str_xt &_Src) noexcept     { this->_buffer = _Src._buffer; }
   
-  str(const array<char> &_Src) noexcept
+  str_xt(const array<char> &_Src) noexcept
   { this->_buffer = std::string{_Src.begin(), _Src.end()}; }
 
-  str(const array<u8> &_Src) noexcept
+  str_xt(const array<u8_xt> &_Src) noexcept
   { this->_buffer = std::string{_Src.begin(), _Src.end()}; }
 
-  typedef char       *iterator;
-  typedef const char *const_iterator;
-  iterator begin(void) noexcept             { return &this->_buffer[0]; }
-  const_iterator begin(void) const noexcept { return &this->_buffer[0]; }
-  iterator end(void) noexcept               { return &this->_buffer[this->len()]; }
-  const_iterator end(void) const noexcept   { return &this->_buffer[this->len()]; }
+  typedef char_xt       *iterator;
+  typedef const char_xt *const_iterator;
+  iterator begin(void) noexcept             { return (iterator)(&this->_buffer[0]); }
+  const_iterator begin(void) const noexcept { return (const_iterator)(&this->_buffer[0]); }
+  iterator end(void) noexcept               { return (iterator)(&this->_buffer[this->len()]); }
+  const_iterator end(void) const noexcept   { return (const_iterator)(&this->_buffer[this->len()]); }
 
-  inline size len(void) const noexcept { return this->_buffer.length(); }
-  inline bool empty(void) const noexcept { return this->_buffer.empty(); }
+  inline uint_xt len(void) const noexcept { return this->_buffer.length(); }
+  inline bool empty(void) const noexcept  { return this->_buffer.empty(); }
 
-  inline str sub(const size start, const size end) const noexcept
+  inline str_xt sub(const uint_xt start, const uint_xt end) const noexcept
   { return this->_buffer.substr(start, end); }
 
-  inline str sub(const size start) const noexcept
+  inline str_xt sub(const uint_xt start) const noexcept
   { return this->_buffer.substr(start); }
 
-  inline bool has_prefix(const str &_Sub) const noexcept
+  inline bool has_prefix(const str_xt &_Sub) const noexcept
   { return this->len() >= _Sub.len() && this->sub(0, _Sub.len()) == _Sub._buffer; }
 
-  inline bool has_suffix(const str &_Sub) const noexcept
+  inline bool has_suffix(const str_xt &_Sub) const noexcept
   { return this->len() >= _Sub.len() && this->sub(this->len()-_Sub.len()) == _Sub; }
 
-  inline size find(const str &_Sub) const noexcept
+  inline uint_xt find(const str_xt &_Sub) const noexcept
   { return this->_buffer.find(_Sub._buffer); }
 
-  inline size rfind(const str &_Sub) const noexcept
+  inline uint_xt rfind(const str_xt &_Sub) const noexcept
   { return this->_buffer.rfind(_Sub._buffer); }
 
   inline const char* cstr(void) const noexcept
   { return this->_buffer.c_str(); }
 
-  str trim(const str &_Bytes) const noexcept {
+  str_xt trim(const str_xt &_Bytes) const noexcept {
     const_iterator _it{this->begin()};
     const const_iterator _end{this->end()};
     const_iterator _begin{this->begin()};
@@ -246,10 +250,10 @@ public:
       { if ((exist = *_it == *_bytes_it)) { break; } }
       if (!exist) { return this->sub(_it-_begin); }
     }
-    return str{u8""};
+    return str_xt{u8""};
   }
 
-  str rtrim(const str &_Bytes) const noexcept {
+  str_xt rtrim(const str_xt &_Bytes) const noexcept {
     const_iterator _it{this->end()-1};
     const const_iterator _begin{this->begin()};
     for (; _it >= _begin; --_it) {
@@ -260,51 +264,53 @@ public:
       { if ((exist = *_it == *_bytes_it)) { break; } }
       if (!exist) { return this->sub(0, _it-_begin+1); }
     }
-    return str{u8""};
+    return str_xt{u8""};
   }
 
-  array<str> split(const str &_Sub, const i64 &_N) const noexcept {
-    array<str> _parts{};
+  array<str_xt> split(const str_xt &_Sub, const i64_xt &_N) const noexcept {
+    array<str_xt> _parts{};
     if (_N == 0) { return _parts; }
     const const_iterator _begin{this->begin()};
     std::string _s{this->_buffer};
-    size _pos{std::string::npos};
+    uint_xt _pos{std::string::npos};
     if (_N < 0) {
       while ((_pos = _s.find(_Sub._buffer)) != std::string::npos) {
         _parts._buffer.push_back(_s.substr(0, _pos));
         _s = _s.substr(_pos+_Sub.len());
       }
-      if (!_parts.empty()) { _parts._buffer.push_back(str{_s}); }
+      if (!_parts.empty()) { _parts._buffer.push_back(str_xt{_s}); }
     } else {
-      size _n{0};
+      uint_xt _n{0};
       while ((_pos = _s.find(_Sub._buffer)) != std::string::npos) {
         _parts._buffer.push_back(_s.substr(0, _pos));
         _s = _s.substr(_pos+_Sub.len());
         if (++_n >= _N) { break; }
       }
-      if (!_parts.empty() && _n < _N) { _parts._buffer.push_back(str{_s}); }
+      if (!_parts.empty() && _n < _N) { _parts._buffer.push_back(str_xt{_s}); }
     }
     return _parts;
   }
 
-  str replace(const str &_Sub, const str &_New, const i64 &_N) const noexcept {
+  str_xt replace(const str_xt &_Sub,
+                 const str_xt &_New,
+                 const i64_xt &_N) const noexcept {
     if (_N == 0) { return *this; }
     std::string _s{this->_buffer};
-    size start_pos{0};
+    uint_xt start_pos{0};
     if (_N < 0) {
       while((start_pos = _s.find(_Sub._buffer, start_pos)) != std::string::npos) {
         _s.replace(start_pos, _Sub.len(), _New._buffer);
         start_pos += _New.len();
       }
     } else {
-      size _n{0};
+      uint_xt _n{0};
       while((start_pos = _s.find(_Sub._buffer, start_pos)) != std::string::npos) {
         _s.replace(start_pos, _Sub.len(), _New._buffer);
         start_pos += _New.len();
         if (++_n >= _N) { break; }
       }
     }
-    return str{_s};
+    return str_xt{_s};
   }
 
   operator array<char>(void) const noexcept {
@@ -313,9 +319,9 @@ public:
     return _array;
   }
 
-  operator array<u8>(void) const noexcept {
-    array<u8> _array{};
-    _array._buffer = std::vector<u8>{this->begin(), this->end()};
+  operator array<u8_xt>(void) const noexcept {
+    array<u8_xt> _array{};
+    _array._buffer = std::vector<u8_xt>{this->begin(), this->end()};
     return _array;
   }
 
@@ -325,14 +331,14 @@ public:
   operator char*(void) const noexcept
   { return (char*)(this->_buffer.c_str()); }
 
-  char &operator[](size _Index) { return this->_buffer[_Index]; }
+  char &operator[](uint_xt _Index) { return this->_buffer[_Index]; }
 
-  void operator+=(const str _Str) noexcept        { this->_buffer += _Str._buffer; }
-  str operator+(const str _Str) const noexcept    { return str{this->_buffer + _Str._buffer}; }
-  bool operator==(const str &_Str) const noexcept { return this->_buffer == _Str._buffer; }
-  bool operator!=(const str &_Str) const noexcept { return this->_buffer != _Str._buffer; }
+  void operator+=(const str_xt _Str) noexcept        { this->_buffer += _Str._buffer; }
+  str_xt operator+(const str_xt _Str) const noexcept { return str_xt{this->_buffer + _Str._buffer}; }
+  bool operator==(const str_xt &_Str) const noexcept { return this->_buffer == _Str._buffer; }
+  bool operator!=(const str_xt &_Str) const noexcept { return this->_buffer != _Str._buffer; }
 
-  friend std::ostream& operator<<(std::ostream &_Stream, const str &_Src)
+  friend std::ostream& operator<<(std::ostream &_Stream, const str_xt &_Src)
   { return _Stream << _Src._buffer; }
 };
 // endregion X_BUILTIN_TYPES
@@ -419,17 +425,17 @@ struct defer {
   _Function_t _function;
 };
 
-std::ostream &operator<<(std::ostream &_Stream, const i8 &_Src)
-{ return _Stream << (i32)(_Src); }
+std::ostream &operator<<(std::ostream &_Stream, const i8_xt &_Src)
+{ return _Stream << (i32_xt)(_Src); }
 
-std::ostream &operator<<(std::ostream &_Stream, const u8 &_Src)
-{ return _Stream << (i32)(_Src); }
+std::ostream &operator<<(std::ostream &_Stream, const u8_xt &_Src)
+{ return _Stream << (i32_xt)(_Src); }
 
 template<typename _Obj_t>
-str tostr(const _Obj_t &_Obj) noexcept {
+str_xt tostr(const _Obj_t &_Obj) noexcept {
   std::stringstream _stream;
   _stream << _Obj;
-  return str{_stream.str()};
+  return str_xt{_stream.str()};
 }
 
 #define _CONCAT(_A, _B) _A ## _B
@@ -442,7 +448,7 @@ str tostr(const _Obj_t &_Obj) noexcept {
 // region X_BUILTIN_STRUCTURES
 struct XID(error) {
 public:
-  str XID(message);
+  str_xt XID(message);
 };
   
 std::ostream &operator<<(std::ostream &_Stream, const XID(error) &_Error)
