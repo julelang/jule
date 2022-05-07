@@ -62,6 +62,8 @@ const (
 	F64                 = "f64"
 	UINT                = "uint"
 	INT                 = "int"
+	UINTPTR             = "uintptr"
+	INTPTR              = "intptr"
 	BOOL                = "bool"
 	CHAR                = "char"
 	STR                 = "str"

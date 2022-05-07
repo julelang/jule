@@ -46,6 +46,8 @@ typedef double                            f64_xt;
 typedef unsigned char                     char_xt;
 typedef bool                              bool_xt;
 typedef void                              *voidptr_xt;
+typedef intptr_t                          intptr_xt;
+typedef uintptr_t                         uintptr_xt;
 
 #define func std::function
 

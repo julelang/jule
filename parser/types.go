@@ -18,11 +18,15 @@ func typeOfArrayItems(t DataType) DataType {
 	return t
 }
 
+func typeIsSinglePtr(t DataType) bool {
+	return t.Id == xtype.Voidptr || t.Id == xtype.UIntptr || t.Id == xtype.Intptr
+}
+
 func typeIsPtr(t DataType) bool {
 	if t.Val == "" {
 		return false
 	}
-	return t.Id == xtype.Voidptr || t.Val[0] == '*'
+	return t.Val[0] == '*' || typeIsSinglePtr(t)
 }
 
 func typeIsArray(t DataType) bool {

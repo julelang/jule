@@ -322,6 +322,8 @@ var keywords = map[string]uint8{
 	tokens.F64:      tokens.DataType,
 	tokens.UINT:     tokens.DataType,
 	tokens.INT:      tokens.DataType,
+	tokens.UINTPTR:  tokens.DataType,
+	tokens.INTPTR:   tokens.DataType,
 	tokens.BOOL:     tokens.DataType,
 	tokens.CHAR:     tokens.DataType,
 	tokens.STR:      tokens.DataType,

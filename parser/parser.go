@@ -1942,7 +1942,7 @@ func (p *unaryProcessor) logicalNot() value {
 func (p *unaryProcessor) star() value {
 	v := p.parser.evalExprPart(p.toks, p.model)
 	v.lvalue = true
-	if v.ast.Type.Id == xtype.Voidptr || !typeIsPtr(v.ast.Type) {
+	if typeIsSinglePtr(v.ast.Type) || !typeIsPtr(v.ast.Type) {
 		p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", '*')
 	} else {
 		v.ast.Type.Val = v.ast.Type.Val[1:]
@@ -2362,7 +2362,7 @@ func (p *Parser) evalExprSubId(toks Toks, m *exprModel) (v value) {
 	}
 	val := p.evalExprPart(toks, m)
 	checkType := val.ast.Type
-	if checkType.Id != xtype.Voidptr && typeIsPtr(checkType) {
+	if !typeIsSinglePtr(checkType) && typeIsPtr(checkType) {
 		// Remove pointer mark
 		checkType.Val = checkType.Val[1:]
 	}
@@ -4332,7 +4332,7 @@ func (p *Parser) checkTypeAsync(real, check DataType, ignoreAny bool, errTok Tok
 	if typeIsNilCompatible(real) && check.Id == xtype.Nil {
 		return
 	}
-	if real.Id == xtype.Voidptr && !typeIsPtr(check) {
+	if typeIsSinglePtr(real) && !typeIsPtr(check) {
 		return
 	}
 	if real.Val != check.Val {

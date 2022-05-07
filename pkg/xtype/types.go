@@ -31,8 +31,10 @@ const (
 	Int     uint8 = 19
 	Map     uint8 = 20
 	Voidptr uint8 = 21
-	Enum    uint8 = 22
-	Struct  uint8 = 23
+	Intptr  uint8 = 22
+	UIntptr uint8 = 23
+	Enum    uint8 = 24
+	Struct  uint8 = 25
 )
 
 // IntCode is integer type code of current platform architecture.
@@ -250,6 +252,10 @@ func TypeFromId(id string) uint8 {
 		return Int
 	case tokens.VOIDPTR:
 		return Voidptr
+	case tokens.INTPTR:
+		return Intptr
+	case tokens.UINTPTR:
+		return UIntptr
 	}
 	return 0
 }
@@ -292,6 +298,10 @@ func CxxTypeIdFromType(typeCode uint8) string {
 		return xapi.AsTypeId(tokens.INT)
 	case Voidptr:
 		return xapi.AsTypeId(tokens.VOIDPTR)
+	case Intptr:
+		return xapi.AsTypeId(tokens.INTPTR)
+	case UIntptr:
+		return xapi.AsTypeId(tokens.UINTPTR)
 	}
 	return ""
 }
