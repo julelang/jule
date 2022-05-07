@@ -1592,17 +1592,24 @@ func (s *solver) ptr() (v ast.Value) {
 			s.rightVal.Type.Val, s.leftVal.Type.Val)
 		return
 	}
+	if !typeIsPtr(s.leftVal.Type) {
+		s.leftVal, s.rightVal = s.rightVal, s.leftVal
+	}
 	switch s.operator.Kind {
 	case tokens.PLUS, tokens.MINUS:
-		if typeIsPtr(s.leftVal.Type) {
-			v.Type = s.leftVal.Type
-		} else {
-			v.Type = s.rightVal.Type
-		}
+		v.Type = s.leftVal.Type
 	case tokens.EQUALS, tokens.NOT_EQUALS:
 		v.Type.Id = xtype.Bool
 		v.Type.Val = tokens.BOOL
 	default:
+		if typeIsSinglePtr(s.leftVal.Type) {
+			switch s.leftVal.Type.Id {
+			case xtype.Intptr:
+				return s.signed()
+			case xtype.UIntptr:
+				return s.unsigned()
+			}
+		}
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "pointer")
 	}
 	return

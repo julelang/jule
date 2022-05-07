@@ -56,6 +56,20 @@ const (
 
 // TypeGreaterThan reports type one is greater than type two or not.
 func TypeGreaterThan(t1, t2 uint8) bool {
+	// If types is "int" or "uint", set to bit-specific type code.
+	switch t1 {
+	case Int, Intptr:
+		t1 = IntCode
+	case UInt, UIntptr:
+		t2 = UIntCode
+	}
+	switch t2 {
+	case Int:
+		t1 = IntCode
+	case UInt:
+		t2 = UIntCode
+	}
+
 	switch t1 {
 	case I16:
 		return t2 == I8
@@ -93,9 +107,9 @@ func TypesAreCompatible(t1, t2 uint8, ignoreany bool) bool {
 
 	// If types is "int" or "uint", set to bit-specific type code.
 	switch t1 {
-	case Int:
+	case Int, Intptr:
 		t1 = IntCode
-	case UInt:
+	case UInt, UIntptr:
 		t2 = UIntCode
 	}
 	switch t2 {
@@ -123,7 +137,8 @@ func TypesAreCompatible(t1, t2 uint8, ignoreany bool) bool {
 			t2 == I32 ||
 			t2 == I64 ||
 			t2 == Char ||
-			t2 == Int
+			t2 == Int ||
+			t2 == Intptr
 	case U8:
 		return t2 == U8 ||
 			t2 == Char
@@ -142,6 +157,7 @@ func TypesAreCompatible(t1, t2 uint8, ignoreany bool) bool {
 			t2 == U32 ||
 			t2 == U64 ||
 			t2 == UInt ||
+			t2 == UIntptr ||
 			t2 == Char
 	case Bool:
 		return t2 == Bool
@@ -203,7 +219,8 @@ func IsSignedIntegerType(t uint8) bool {
 		t == I16 ||
 		t == I32 ||
 		t == I64 ||
-		t == Int
+		t == Int ||
+		t == Intptr
 }
 
 // IsUnsignedNumericType reports type is unsigned numeric or not.
@@ -212,7 +229,8 @@ func IsUnsignedNumericType(t uint8) bool {
 		t == U16 ||
 		t == U32 ||
 		t == U64 ||
-		t == UInt
+		t == UInt ||
+		t == UIntptr
 }
 
 // TypeFromId returns type id of specified type code.
