@@ -352,6 +352,7 @@ var keywords = map[string]uint8{
 	tokens.CO:       tokens.Co,
 	tokens.TRY:      tokens.Try,
 	tokens.CATCH:    tokens.Catch,
+	tokens.SIZEOF:   tokens.Sizeof,
 }
 
 type oppair struct {

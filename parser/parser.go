@@ -2604,8 +2604,29 @@ func (p *Parser) getDataTypeFunc(tok Tok, m *exprModel) (v value) {
 	switch tok.Kind {
 	case tokens.STR:
 		m.appendSubNode(exprNode{"tostr"})
+		// Val: "()" for accept DataType as function.
 		v.ast.Type = DataType{Id: xtype.Func, Val: "()", Tag: strDefaultFunc}
 	}
+	return
+}
+
+func (p *Parser) callSizeof(toks Toks, m *exprModel) (v value) {
+	m.appendSubNode(exprNode{"sizeof"})
+	// Write parentheses.
+	m.appendSubNode(exprNode{tokens.LPARENTHESES})
+	defer m.appendSubNode(exprNode{tokens.RPARENTHESES})
+	v.ast.Type = DataType{Id: xtype.UInt, Val: tokens.UINT}
+	b := ast.NewBuilder(nil)
+	i := new(int)
+	t, ok := b.DataType(toks, i, true)
+	if !ok {
+		p.pusherrs(b.Errs...)
+		return
+	} else if *i+1 < len(toks) {
+		p.pusherrtok(toks[*i+1], "invalid_syntax")
+	}
+	t, _ = p.readyType(t, true)
+	m.appendSubNode(t)
 	return
 }
 
@@ -2644,9 +2665,16 @@ func (p *Parser) evalParenthesesRangeExpr(toks Toks, m *exprModel) (v value) {
 		m.appendSubNode(model)
 		return
 	}
-	if tok := valueToks[0]; tok.Id == tokens.DataType {
+	switch tok := valueToks[0]; tok.Id {
+	case tokens.DataType:
 		v = p.getDataTypeFunc(tok, m)
-	} else {
+	case tokens.Sizeof:
+		// len(valueToks)+1 because skip for "("
+		// len(toks)-1 because skip for ")"
+		// so it's gets range between of (...)
+		toks = toks[len(valueToks)+1 : len(toks)-1]
+		return p.callSizeof(toks, m)
+	default:
 		v = p.evalExprPart(valueToks, m)
 	}
 	switch {
@@ -2700,10 +2728,13 @@ func (p *Parser) evalBraceRangeExpr(toks Toks, m *exprModel) (v value) {
 		switch exprToks[0].Kind {
 		case tokens.LBRACKET:
 			b := ast.NewBuilder(nil)
-			t, ok := b.DataType(exprToks, new(int), true)
+			i := new(int)
+			t, ok := b.DataType(exprToks, i, true)
 			if !ok {
 				p.pusherrs(b.Errs...)
 				return
+			} else if *i+1 < len(exprToks) {
+				p.pusherrtok(toks[*i+1], "invalid_syntax")
 			}
 			exprToks = toks[len(exprToks):]
 			var model iExpr
