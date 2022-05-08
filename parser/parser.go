@@ -1949,7 +1949,7 @@ func (p *unaryProcessor) logicalNot() value {
 func (p *unaryProcessor) star() value {
 	v := p.parser.evalExprPart(p.toks, p.model)
 	v.lvalue = true
-	if typeIsSinglePtr(v.ast.Type) || !typeIsPtr(v.ast.Type) {
+	if !typeIsExplicitPtr(v.ast.Type) {
 		p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", '*')
 	} else {
 		v.ast.Type.Val = v.ast.Type.Val[1:]
@@ -2369,7 +2369,7 @@ func (p *Parser) evalExprSubId(toks Toks, m *exprModel) (v value) {
 	}
 	val := p.evalExprPart(toks, m)
 	checkType := val.ast.Type
-	if !typeIsSinglePtr(checkType) && typeIsPtr(checkType) {
+	if typeIsExplicitPtr(checkType) {
 		// Remove pointer mark
 		checkType.Val = checkType.Val[1:]
 	}
@@ -2781,6 +2781,8 @@ func (p *Parser) evalEnumerableSelect(enumv, selectv value, errtok Tok) (v value
 		return p.evalMapSelect(enumv, selectv, errtok)
 	case typeIsSingle(enumv.ast.Type):
 		return p.evalStrSelect(enumv, selectv, errtok)
+	case typeIsExplicitPtr(enumv.ast.Type):
+		return p.evalPtrSelect(enumv, selectv, errtok)
 	}
 	p.pusherrtok(errtok, "not_enumerable")
 	return
@@ -2813,6 +2815,7 @@ func (p *Parser) evalMapSelect(mapv, selectv value, errtok Tok) value {
 func (p *Parser) evalStrSelect(strv, selectv value, errtok Tok) value {
 	strv.lvalue = true
 	strv.ast.Type.Id = xtype.Char
+	p.wg.Add(1)
 	go assignChecker{
 		p:      p,
 		t:      DataType{Id: xtype.UInt, Val: tokens.UINT},
@@ -2820,6 +2823,20 @@ func (p *Parser) evalStrSelect(strv, selectv value, errtok Tok) value {
 		errtok: errtok,
 	}.checkAssignTypeAsync()
 	return strv
+}
+
+func (p *Parser) evalPtrSelect(ptrv, selectv value, errtok Tok) value {
+	ptrv.lvalue = true
+	// Remove pointer mark.
+	ptrv.ast.Type.Val = ptrv.ast.Type.Val[1:]
+	p.wg.Add(1)
+	go assignChecker{
+		p:      p,
+		t:      DataType{Id: xtype.UInt, Val: tokens.UINT},
+		v:      selectv,
+		errtok: errtok,
+	}.checkAssignTypeAsync()
+	return ptrv
 }
 
 //! IMPORTANT: Tokens is should be store enumerable parentheses.

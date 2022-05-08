@@ -61,12 +61,12 @@ func TypeGreaterThan(t1, t2 uint8) bool {
 	case Int, Intptr:
 		t1 = IntCode
 	case UInt, UIntptr:
-		t2 = UIntCode
+		t1 = UIntCode
 	}
 	switch t2 {
-	case Int:
-		t1 = IntCode
-	case UInt:
+	case Int, Intptr:
+		t2 = IntCode
+	case UInt, UIntptr:
 		t2 = UIntCode
 	}
 
@@ -110,12 +110,12 @@ func TypesAreCompatible(t1, t2 uint8, ignoreany bool) bool {
 	case Int, Intptr:
 		t1 = IntCode
 	case UInt, UIntptr:
-		t2 = UIntCode
+		t1 = UIntCode
 	}
 	switch t2 {
-	case Int:
-		t1 = IntCode
-	case UInt:
+	case Int, Intptr:
+		t2 = IntCode
+	case UInt, UIntptr:
 		t2 = UIntCode
 	}
 

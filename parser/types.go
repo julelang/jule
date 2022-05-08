@@ -22,11 +22,15 @@ func typeIsSinglePtr(t DataType) bool {
 	return t.Id == xtype.Voidptr || t.Id == xtype.UIntptr || t.Id == xtype.Intptr
 }
 
-func typeIsPtr(t DataType) bool {
+func typeIsExplicitPtr(t DataType) bool {
 	if t.Val == "" {
 		return false
 	}
-	return t.Val[0] == '*' || typeIsSinglePtr(t)
+	return t.Val[0] == '*'
+}
+
+func typeIsPtr(t DataType) bool {
+	return typeIsExplicitPtr(t) || typeIsSinglePtr(t)
 }
 
 func typeIsArray(t DataType) bool {
@@ -50,6 +54,7 @@ func typeIsFunc(t DataType) bool {
 	return t.Val[0] == '('
 }
 
+// Includes single ptr types.
 func typeIsSingle(t DataType) bool {
 	return !typeIsPtr(t) &&
 		!typeIsArray(t) &&
