@@ -145,6 +145,32 @@ func (p *Parser) CxxEmbeds() string {
 	return cxx.String()
 }
 
+// CxxTypes returns C++ code of types.
+func (p *Parser) CxxTypes() string {
+	var cxx strings.Builder
+	for _, t := range Builtin.Types {
+		if t.Used && t.Tok.Id != tokens.NA {
+			cxx.WriteString(t.String())
+			cxx.WriteString("\n\n")
+		}
+	}
+	for _, use := range used {
+		for _, t := range use.defs.Types {
+			if t.Used {
+				cxx.WriteString(t.String())
+				cxx.WriteString("\n\n")
+			}
+		}
+	}
+	for _, t := range p.Defs.Types {
+		if t.Used {
+			cxx.WriteString(t.String())
+			cxx.WriteString("\n\n")
+		}
+	}
+	return cxx.String()
+}
+
 // CxxEnums returns C++ code of enums.
 func (p *Parser) CxxEnums() string {
 	var cxx strings.Builder
@@ -300,6 +326,7 @@ func (p *Parser) Cxx() string {
 	var cxx strings.Builder
 	cxx.WriteString(p.CxxEmbeds())
 	cxx.WriteString("\n\n")
+	cxx.WriteString(p.CxxTypes())
 	cxx.WriteString(p.CxxEnums())
 	cxx.WriteString(p.CxxStruct())
 	cxx.WriteString(p.CxxPrototypes())
@@ -3487,7 +3514,6 @@ func (p *Parser) checkBlock(b *ast.Block) {
 				t.Type, _ = p.readyType(t.Type, true)
 			}
 			p.BlockTypes = append(p.BlockTypes, &t)
-			model.Val = nil
 		case ast.Block:
 			p.checkNewBlock(&t)
 			model.Val = t
@@ -4283,6 +4309,8 @@ func (p *Parser) checkValidityForAutoType(t DataType, errtok Tok) {
 }
 
 func (p *Parser) readyType(dt DataType, err bool) (ret DataType, ok bool) {
+	originalId := dt.OriginalId
+	defer func() { ret.OriginalId = originalId }()
 	if dt.Val == "" {
 		return dt, true
 	}
@@ -4306,6 +4334,7 @@ func (p *Parser) readyType(dt DataType, err bool) (ret DataType, ok bool) {
 			t.Used = true
 			val := dt.Val[:len(dt.Val)-len(dt.Tok.Kind)] + t.Type.Val
 			dt = t.Type
+			dt.OriginalId = originalId
 			dt.Val = val
 			return p.readyType(dt, err)
 		case *Enum:

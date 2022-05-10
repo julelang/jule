@@ -713,6 +713,7 @@ func (b *Builder) DataType(toks Toks, i *int, err bool) (t DataType, ok bool) {
 		case tokens.Id:
 			t.Tok = tok
 			t.Id = xtype.Id
+			t.OriginalId = t.Tok.Kind
 			dtv.WriteString(t.Tok.Kind)
 			ok = true
 			goto ret

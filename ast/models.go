@@ -83,6 +83,7 @@ func ParseBlock(b Block) string {
 type DataType struct {
 	Tok        Tok
 	Id         uint8
+	OriginalId string
 	Val        string
 	MultiTyped bool
 	Tag        any
@@ -97,6 +98,9 @@ func (dt DataType) String() string {
 		}
 		dt.Val = dt.Val[i:]
 		break
+	}
+	if dt.OriginalId != "" {
+		dt.Val = dt.OriginalId
 	}
 	if dt.MultiTyped {
 		return dt.MultiTypeString() + cxx.String()
@@ -124,6 +128,9 @@ func (dt DataType) String() string {
 			cxx.WriteString(pointers)
 			return cxx.String()
 		}
+	}
+	if dt.OriginalId != "" {
+		return xapi.OutId(dt.Val, dt.Tok.File) + cxx.String()
 	}
 	switch dt.Id {
 	case xtype.Id, xtype.Enum, xtype.Struct:
