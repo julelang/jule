@@ -12,5 +12,7 @@ Name of package directories is must conform to naming conventions of the languag
 
 ### Local Package Files
 
-Local package files is actually built-in defines. This files is not imports. <br>
-This built-in defines, can use in everywhere and not necessary any import operation for use.
+Local package files is actually built-in defines. <br>
+This files is can't imports in source code because before compilation, compiler imports these package automatically. <br>
+So, not necessary. Actually, is not possible because ``use`` statement sees subpackages. <br>
+For this reason, this built-in defines, can use in everywhere and not necessary any import operation for use.
