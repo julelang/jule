@@ -86,9 +86,13 @@ type DataType struct {
 	Val        string
 	MultiTyped bool
 	Tag        any
+	First      interface{}
 }
 
 func (dt DataType) String() string {
+	if dt.First != nil {
+		return dt.First.(DataType).String()
+	}
 	var cxx strings.Builder
 	for i, run := range dt.Val {
 		if run == '*' {

@@ -699,6 +699,7 @@ end:
 
 // DataType builds AST model of data type.
 func (b *Builder) DataType(toks Toks, i *int, err bool) (t DataType, ok bool) {
+	defer func() { t.First = t }()
 	first := *i
 	var dtv strings.Builder
 	for ; *i < len(toks); *i++ {
