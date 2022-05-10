@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"sync/atomic"
+	"unicode"
 
 	"github.com/the-xlang/xxc/lex/tokens"
 	"github.com/the-xlang/xxc/pkg/xapi"
@@ -89,6 +90,20 @@ type DataType struct {
 	Tag        any
 }
 
+func (dt *DataType) getValWithOriginalId() string {
+	if dt.OriginalId == "" {
+		return dt.Val
+	}
+	runes := []rune(dt.Val)
+	for i := len(runes) - 1; i >= 0; i-- {
+		r := runes[i]
+		if r != '_' && unicode.IsPunct(r) {
+			return string(runes[:i+1]) + dt.OriginalId
+		}
+	}
+	return dt.OriginalId
+}
+
 func (dt DataType) String() string {
 	var cxx strings.Builder
 	for i, run := range dt.Val {
@@ -99,15 +114,13 @@ func (dt DataType) String() string {
 		dt.Val = dt.Val[i:]
 		break
 	}
-	if dt.OriginalId != "" {
-		dt.Val = dt.OriginalId
-	}
 	if dt.MultiTyped {
 		return dt.MultiTypeString() + cxx.String()
 	}
 	if dt.Val != "" {
 		switch {
 		case strings.HasPrefix(dt.Val, "[]"):
+			dt.Val = dt.getValWithOriginalId()
 			pointers := cxx.String()
 			cxx.Reset()
 			cxx.WriteString("array<")
@@ -129,14 +142,16 @@ func (dt DataType) String() string {
 			return cxx.String()
 		}
 	}
+	if dt.Id == xtype.Func {
+		return dt.FuncString() + cxx.String()
+	}
 	if dt.OriginalId != "" {
-		return xapi.OutId(dt.Val, dt.Tok.File) + cxx.String()
+		dt.Val = dt.getValWithOriginalId()
+		dt.Id = xtype.Id
 	}
 	switch dt.Id {
 	case xtype.Id, xtype.Enum, xtype.Struct:
-		return xapi.OutId(dt.Tok.Kind, dt.Tok.File) + cxx.String()
-	case xtype.Func:
-		return dt.FuncString() + cxx.String()
+		return xapi.OutId(dt.Val, dt.Tok.File) + cxx.String()
 	default:
 		return xtype.CxxTypeIdFromType(dt.Id) + cxx.String()
 	}
