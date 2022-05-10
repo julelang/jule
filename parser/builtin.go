@@ -222,24 +222,8 @@ var errorStruct = &xstruct{
 
 var errorType = DataType{Id: xtype.Struct, Val: "error", Tag: errorStruct}
 
-var builtin = &Defmap{
-	Types: []*Type{
-		{
-			Id:   "byte",
-			Type: DataType{Id: xtype.U8, Val: tokens.U8},
-		},
-		{
-			Id:   "sbyte",
-			Type: DataType{Id: xtype.I8, Val: tokens.I8},
-		},
-		{
-			Id:   "size",
-			Type: DataType{Id: xtype.UInt, Val: tokens.UINT},
-		},
-	},
-	Structs: []*xstruct{
-		errorStruct,
-	},
+// Builtin definitions.
+var Builtin = &Defmap{
 	Funcs: []*function{
 		{
 			Ast: Func{
@@ -262,17 +246,6 @@ var builtin = &Defmap{
 					Const:   true,
 					Type:    DataType{Id: xtype.Any, Val: "any"},
 					Default: Expr{Model: exprNode{`""`}},
-				}},
-			},
-		},
-		{
-			Ast: Func{
-				Id:      "panic",
-				RetType: DataType{Id: xtype.Void, Val: xtype.VoidTypeStr},
-				Params: []Param{{
-					Id:    "err",
-					Const: true,
-					Type:  errorType,
 				}},
 			},
 		},

@@ -208,9 +208,7 @@ func IsFloatType(t uint8) bool {
 
 // IsSignedNumericType reports type is signed numeric or not.
 func IsSignedNumericType(t uint8) bool {
-	return IsSignedIntegerType(t) ||
-		t == F32 ||
-		t == F64
+	return IsSignedIntegerType(t) || IsFloatType(t)
 }
 
 // IsSignedIntegerType reports type is signed integer or not.

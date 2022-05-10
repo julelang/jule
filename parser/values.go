@@ -9,7 +9,7 @@ import (
 
 func isstr(value string) bool    { return value[0] == '"' || israwstr(value) }
 func israwstr(value string) bool { return value[0] == '`' }
-func isRune(value string) bool   { return value[0] == '\'' }
+func ischar(value string) bool   { return value[0] == '\'' }
 func isnil(value string) bool    { return value == tokens.NIL }
 func isbool(value string) bool   { return value == tokens.TRUE || value == tokens.FALSE }
 
@@ -39,7 +39,11 @@ func isConstNum(v string) bool {
 	if v == "" {
 		return false
 	}
-	return v[0] >= '0' && v[0] <= '9'
+	return v[0] == '-' || (v[0] >= '0' && v[0] <= '9')
+}
+
+func isConstExpr(v string) bool {
+	return isConstNum(v) || isstr(v) || ischar(v) || isnil(v) || isbool(v)
 }
 
 func checkIntBit(v ast.Value, bit int) bool {

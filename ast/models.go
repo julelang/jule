@@ -86,13 +86,9 @@ type DataType struct {
 	Val        string
 	MultiTyped bool
 	Tag        any
-	First      interface{}
 }
 
 func (dt DataType) String() string {
-	if dt.First != nil {
-		return dt.First.(DataType).String()
-	}
 	var cxx strings.Builder
 	for i, run := range dt.Val {
 		if run == '*' {
@@ -131,7 +127,7 @@ func (dt DataType) String() string {
 	}
 	switch dt.Id {
 	case xtype.Id, xtype.Enum, xtype.Struct:
-		return xapi.OutId(dt.Val, dt.Tok.File) + cxx.String()
+		return xapi.OutId(dt.Tok.Kind, dt.Tok.File) + cxx.String()
 	case xtype.Func:
 		return dt.FuncString() + cxx.String()
 	default:

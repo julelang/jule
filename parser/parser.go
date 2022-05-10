@@ -145,29 +145,15 @@ func (p *Parser) CxxEmbeds() string {
 	return cxx.String()
 }
 
-// CxxTypes returns C++ code of types.
-func (p *Parser) CxxTypes() string {
-	var cxx strings.Builder
-	for _, use := range used {
-		for _, t := range use.defs.Types {
-			if t.Used {
-				cxx.WriteString(t.String())
-				cxx.WriteString("\n\n")
-			}
-		}
-	}
-	for _, t := range p.Defs.Types {
-		if t.Used {
-			cxx.WriteString(t.String())
-			cxx.WriteString("\n\n")
-		}
-	}
-	return cxx.String()
-}
-
 // CxxEnums returns C++ code of enums.
 func (p *Parser) CxxEnums() string {
 	var cxx strings.Builder
+	for _, e := range Builtin.Enums {
+		if e.Used && e.Tok.Id != tokens.NA {
+			cxx.WriteString(e.String())
+			cxx.WriteString("\n\n")
+		}
+	}
 	for _, use := range used {
 		for _, e := range use.defs.Enums {
 			if e.Used {
@@ -188,6 +174,12 @@ func (p *Parser) CxxEnums() string {
 // CxxEnums returns C++ code of structures.
 func (p *Parser) CxxStruct() string {
 	var cxx strings.Builder
+	for _, s := range Builtin.Structs {
+		if s.Used && s.Ast.Tok.Id != tokens.NA {
+			cxx.WriteString(s.String())
+			cxx.WriteString("\n\n")
+		}
+	}
 	for _, use := range used {
 		for _, s := range use.defs.Structs {
 			if s.Used {
@@ -208,6 +200,10 @@ func (p *Parser) CxxStruct() string {
 // CxxNamespaces returns C++ code of namespaces.
 func (p *Parser) CxxNamespaces() string {
 	var cxx strings.Builder
+	for _, ns := range Builtin.Namespaces {
+		cxx.WriteString(ns.String())
+		cxx.WriteString("\n\n")
+	}
 	for _, use := range used {
 		for _, ns := range use.defs.Namespaces {
 			cxx.WriteString(ns.String())
@@ -224,6 +220,12 @@ func (p *Parser) CxxNamespaces() string {
 // CxxPrototypes returns C++ code of prototypes of C++ code.
 func (p *Parser) CxxPrototypes() string {
 	var cxx strings.Builder
+	for _, f := range Builtin.Funcs {
+		if f.used && f.Ast.Tok.Id != tokens.NA {
+			cxx.WriteString(f.Prototype())
+			cxx.WriteByte('\n')
+		}
+	}
 	for _, use := range used {
 		for _, f := range use.defs.Funcs {
 			if f.used {
@@ -244,17 +246,23 @@ func (p *Parser) CxxPrototypes() string {
 // CxxGlobals returns C++ code of global variables.
 func (p *Parser) CxxGlobals() string {
 	var cxx strings.Builder
+	for _, g := range Builtin.Globals {
+		if g.Used && g.IdTok.Id != tokens.NA {
+			cxx.WriteString(g.String())
+			cxx.WriteByte('\n')
+		}
+	}
 	for _, use := range used {
-		for _, v := range use.defs.Globals {
-			if v.Used {
-				cxx.WriteString(v.String())
+		for _, g := range use.defs.Globals {
+			if g.Used {
+				cxx.WriteString(g.String())
 				cxx.WriteByte('\n')
 			}
 		}
 	}
-	for _, v := range p.Defs.Globals {
-		if v.Used {
-			cxx.WriteString(v.String())
+	for _, g := range p.Defs.Globals {
+		if g.Used {
+			cxx.WriteString(g.String())
 			cxx.WriteByte('\n')
 		}
 	}
@@ -264,6 +272,12 @@ func (p *Parser) CxxGlobals() string {
 // CxxFuncs returns C++ code of functions.
 func (p *Parser) CxxFuncs() string {
 	var cxx strings.Builder
+	for _, f := range Builtin.Funcs {
+		if f.used && f.Ast.Tok.Id != tokens.NA {
+			cxx.WriteString(f.String())
+			cxx.WriteString("\n\n")
+		}
+	}
 	for _, use := range used {
 		for _, f := range use.defs.Funcs {
 			if f.used {
@@ -286,8 +300,6 @@ func (p *Parser) Cxx() string {
 	var cxx strings.Builder
 	cxx.WriteString(p.CxxEmbeds())
 	cxx.WriteString("\n\n")
-	cxx.WriteString(p.CxxTypes())
-	cxx.WriteByte('\n')
 	cxx.WriteString(p.CxxEnums())
 	cxx.WriteString(p.CxxStruct())
 	cxx.WriteString(p.CxxPrototypes())
@@ -998,7 +1010,7 @@ func (p *Parser) varsFromParams(params []Param) []*Var {
 // Special case:
 //  FuncById(id) -> nil: if function is not exist.
 func (p *Parser) FuncById(id string) (*function, *Defmap, bool) {
-	if f, _, _ := builtin.funcById(id, nil); f != nil {
+	if f, _, _ := Builtin.funcById(id, nil); f != nil {
 		return f, nil, false
 	}
 	for _, use := range p.Uses {
@@ -1039,7 +1051,7 @@ func (p *Parser) nsById(id string, parent bool) *namespace {
 }
 
 func (p *Parser) typeById(id string) (*Type, *Defmap, bool) {
-	if t, _, _ := builtin.typeById(id, nil); t != nil {
+	if t, _, _ := Builtin.typeById(id, nil); t != nil {
 		return t, nil, false
 	}
 	if t := p.blockTypesById(id); t != nil {
@@ -1065,7 +1077,7 @@ func (p *Parser) enumById(id string) (*Enum, *Defmap, bool) {
 }
 
 func (p *Parser) structById(id string) (*xstruct, *Defmap, bool) {
-	if s, _, _ := builtin.structById(id, nil); s != nil {
+	if s, _, _ := Builtin.structById(id, nil); s != nil {
 		return s, nil, false
 	}
 	for _, use := range p.Uses {
@@ -1901,7 +1913,7 @@ func (p *Parser) evalSingleExpr(tok Tok, m *exprModel) (v value, ok bool) {
 		switch {
 		case isstr(tok.Kind):
 			v = eval.str()
-		case isRune(tok.Kind):
+		case ischar(tok.Kind):
 			v = eval.char()
 		case isbool(tok.Kind):
 			v = eval.bool()
@@ -3475,6 +3487,7 @@ func (p *Parser) checkBlock(b *ast.Block) {
 				t.Type, _ = p.readyType(t.Type, true)
 			}
 			p.BlockTypes = append(p.BlockTypes, &t)
+			model.Val = nil
 		case ast.Block:
 			p.checkNewBlock(&t)
 			model.Val = t
@@ -3890,7 +3903,7 @@ func (p *Parser) checkSingleAssign(assign *ast.Assign) {
 	if !p.checkAssignment(selected, assign.Setter) {
 		return
 	}
-	if assign.Setter.Kind != tokens.EQUAL {
+	if assign.Setter.Kind != tokens.EQUAL && !isConstExpr(val.ast.Data) {
 		assign.Setter.Kind = assign.Setter.Kind[:len(assign.Setter.Kind)-1]
 		solver := solver{
 			p:        p,
@@ -4270,8 +4283,6 @@ func (p *Parser) checkValidityForAutoType(t DataType, errtok Tok) {
 }
 
 func (p *Parser) readyType(dt DataType, err bool) (ret DataType, ok bool) {
-	first := dt.First
-	defer func() { ret.First = first }()
 	if dt.Val == "" {
 		return dt, true
 	}
@@ -4401,16 +4412,10 @@ func (p *Parser) checkTypeAsync(real, check DataType, ignoreAny bool, errTok Tok
 		go p.checkMultiTypeAsync(real, check, ignoreAny, errTok)
 		return
 	}
-	if typeIsSingle(real) && typeIsSingle(check) {
-		if !typesAreCompatible(real, check, ignoreAny) {
-			p.pusherrtok(errTok, "incompatible_datatype", real.Val, check.Val)
-		}
-		return
-	}
-	if typeIsNilCompatible(real) && check.Id == xtype.Nil {
-		return
-	}
-	if typeIsSinglePtr(real) && !typeIsPtr(check) {
+	switch {
+	case typesAreCompatible(real, check, ignoreAny),
+		typeIsNilCompatible(real) && check.Id == xtype.Nil,
+		typeIsSinglePtr(real) && !typeIsPtr(check):
 		return
 	}
 	if real.Val != check.Val {
