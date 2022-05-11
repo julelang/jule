@@ -2971,7 +2971,7 @@ func (p *Parser) parseFuncCallToks(f Func, argsToks Toks, m *exprModel) {
 }
 
 func (p *Parser) parseArgs(f *Func, args *ast.Args, m *exprModel, errTok Tok) {
-	if args.Targetted {
+	if args.Targeted {
 		tap := targettedArgParser{
 			p:      p,
 			f:      f,

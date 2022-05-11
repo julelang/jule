@@ -292,8 +292,8 @@ type Arg struct {
 
 // Argument base.
 type Args struct {
-	Src       []Arg
-	Targetted bool
+	Src      []Arg
+	Targeted bool
 }
 
 func (a Arg) String() string { return a.Expr.String() }

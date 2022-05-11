@@ -4,15 +4,16 @@ import (
 	"math"
 )
 
-// MaxOfType returns maximum value of numeric type.
+// MaxOfType returns maximum value of integer type.
 //
 // Special case is;
-//  MaxOfType(id) -> returns 0 if type id is not numeric.
+//  MaxOfType(id) -> returns 0 if type id is not integer type.
 //  MaxOfType(id) -> returns 0 if type id is not supported.
 func MaxOfType(id uint8) uint64 {
-	if !IsNumericType(id) {
+	if !IsIntegerType(id) {
 		return 0
 	}
+	id = GetRealCode(id)
 	switch id {
 	case I8:
 		return math.MaxInt8
@@ -30,10 +31,6 @@ func MaxOfType(id uint8) uint64 {
 		return math.MaxUint32
 	case U64:
 		return math.MaxUint64
-	case UInt:
-		return MaxOfType(UIntCode)
-	case Int:
-		return MaxOfType(IntCode)
 	}
 	return 0
 }

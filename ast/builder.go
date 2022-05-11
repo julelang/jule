@@ -910,70 +910,74 @@ func (b *Builder) pushTypeToTypes(types *[]DataType, toks Toks, errTok Tok) {
 	*types = append(*types, currentDt)
 }
 
+func (b *Builder) funcMultiTypeRet(toks Toks, i *int) (t DataType, ok bool) {
+	start := *i
+	tok := toks[*i]
+	t.Val += tok.Kind
+	*i++
+	if *i >= len(toks) {
+		*i--
+		return b.DataType(toks, i, false)
+	}
+	tok = toks[*i]
+	if tok.Id == tokens.Brace && tok.Kind == tokens.RBRACKET {
+		*i--
+		return b.DataType(toks, i, false)
+	}
+	var types []DataType
+	braceCount := 1
+	last := *i
+	for ; *i < len(toks); *i++ {
+		tok := toks[*i]
+		t.Val += tok.Kind
+		if tok.Id == tokens.Brace {
+			switch tok.Kind {
+			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
+				braceCount++
+			default:
+				braceCount--
+			}
+		}
+		if braceCount == 0 {
+			if tok.Id == tokens.Colon {
+				*i = start
+				return b.DataType(toks, i, false)
+			}
+			b.pushTypeToTypes(&types, toks[last:*i], toks[last-1])
+			break
+		} else if braceCount > 1 {
+			continue
+		}
+		switch tok.Id {
+		case tokens.Comma:
+		case tokens.Colon:
+			*i = start
+			return b.DataType(toks, i, false)
+		default:
+			continue
+		}
+		b.pushTypeToTypes(&types, toks[last:*i], toks[*i-1])
+		last = *i + 1
+	}
+	if len(types) > 1 {
+		t.MultiTyped = true
+		t.Tag = types
+	} else {
+		t = types[0]
+	}
+	ok = true
+	return
+}
+
 // FuncRetDataType builds ret data-type of funtion.
 func (b *Builder) FuncRetDataType(toks Toks, i *int) (t DataType, ok bool) {
 	if *i >= len(toks) {
 		return
 	}
 	tok := toks[*i]
-	start := *i
 	if tok.Id == tokens.Brace && tok.Kind == tokens.LBRACKET { // Multityped?
-		t.Val += tok.Kind
-		*i++
-		if *i >= len(toks) {
-			*i--
-			goto end
-		}
-		tok = toks[*i]
-		if tok.Id == tokens.Brace && tok.Kind == tokens.RBRACKET {
-			*i--
-			goto end
-		}
-		var types []DataType
-		braceCount := 1
-		last := *i
-		for ; *i < len(toks); *i++ {
-			tok := toks[*i]
-			t.Val += tok.Kind
-			if tok.Id == tokens.Brace {
-				switch tok.Kind {
-				case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
-					braceCount++
-				default:
-					braceCount--
-				}
-			}
-			if braceCount == 0 {
-				if tok.Id == tokens.Colon {
-					*i = start
-					goto end
-				}
-				b.pushTypeToTypes(&types, toks[last:*i], toks[last-1])
-				break
-			} else if braceCount > 1 {
-				continue
-			}
-			switch tok.Id {
-			case tokens.Comma:
-			case tokens.Colon:
-				*i = start
-				goto end
-			default:
-				continue
-			}
-			b.pushTypeToTypes(&types, toks[last:*i], toks[*i-1])
-			last = *i + 1
-		}
-		if len(types) > 1 {
-			t.MultiTyped = true
-			t.Tag = types
-		} else {
-			t = types[0]
-		}
-		ok = true
-		return
+		return b.funcMultiTypeRet(toks, i)
 	}
-end:
 	return b.DataType(toks, i, false)
 }
 
@@ -1483,7 +1487,7 @@ func (b *Builder) pushArg(args *Args, toks Toks, err Tok) {
 		if len(toks) > 1 {
 			tok := toks[1]
 			if tok.Id == tokens.Operator && tok.Kind == tokens.EQUAL {
-				args.Targetted = true
+				args.Targeted = true
 				arg.TargetId = arg.Tok.Kind
 				toks = toks[2:]
 			}
