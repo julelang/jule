@@ -51,7 +51,7 @@ func (b *Builder) pusherr(tok Tok, key string, args ...any) {
 	b.Errs = append(b.Errs, compilerErr(tok, key, args...))
 }
 
-// Parts returns parts seperated by given token identifier.
+// Parts returns parts separated by given token identifier.
 // It's skips parentheses ranges.
 //
 // Special case is;
@@ -148,7 +148,7 @@ func (b *Builder) Build() {
 	b.wg.Wait()
 }
 
-// Type builds AST model of type defination statement.
+// Type builds AST model of type definition statement.
 func (b *Builder) Type(toks Toks) (t Type) {
 	i := 1 // Initialize value is 1 for skip keyword.
 	if i >= len(toks) {
@@ -969,7 +969,7 @@ func (b *Builder) funcMultiTypeRet(toks Toks, i *int) (t DataType, ok bool) {
 	return
 }
 
-// FuncRetDataType builds ret data-type of funtion.
+// FuncRetDataType builds ret data-type of function.
 func (b *Builder) FuncRetDataType(toks Toks, i *int) (t DataType, ok bool) {
 	if *i >= len(toks) {
 		return
