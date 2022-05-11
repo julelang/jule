@@ -33,21 +33,24 @@ func (f function) String() string {
 // Head returns declaration head of function.
 func (f *function) Head() string {
 	var cxx strings.Builder
+	cxx.WriteString(f.declHead())
+	cxx.WriteString(paramsToCxx(f.Ast.Params))
+	return cxx.String()
+}
+
+func (f *function) declHead() string {
+	var cxx strings.Builder
 	cxx.WriteString(attributesToString(f.Attributes))
 	cxx.WriteString(f.Ast.RetType.String())
 	cxx.WriteByte(' ')
 	cxx.WriteString(f.outId())
-	cxx.WriteString(paramsToCxx(f.Ast.Params))
 	return cxx.String()
 }
 
 // Prototype returns prototype cxx code of function.
 func (f *function) Prototype() string {
 	var cxx strings.Builder
-	cxx.WriteString(attributesToString(f.Attributes))
-	cxx.WriteString(f.Ast.RetType.String())
-	cxx.WriteByte(' ')
-	cxx.WriteString(f.outId())
+	cxx.WriteString(f.declHead())
 	cxx.WriteString(f.PrototypeParams())
 	cxx.WriteByte(';')
 	return cxx.String()

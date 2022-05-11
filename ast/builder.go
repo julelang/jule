@@ -36,15 +36,59 @@ func NewBuilder(toks Toks) *Builder {
 	return b
 }
 
-// pusherr appends error by specified token.
-func (b *Builder) pusherr(tok Tok, key string, args ...any) {
-	b.Errs = append(b.Errs, xlog.CompilerLog{
+func compilerErr(tok Tok, key string, args ...any) xlog.CompilerLog {
+	return xlog.CompilerLog{
 		Type:   xlog.Err,
 		Row:    tok.Row,
 		Column: tok.Column,
 		Path:   tok.File.Path,
 		Msg:    x.GetErr(key, args...),
-	})
+	}
+}
+
+// pusherr appends error by specified token.
+func (b *Builder) pusherr(tok Tok, key string, args ...any) {
+	b.Errs = append(b.Errs, compilerErr(tok, key, args...))
+}
+
+// Parts returns parts seperated by given token identifier.
+// It's skips parentheses ranges.
+//
+// Special case is;
+//  Parts(toks) = nil if len(toks) == 0
+func Parts(toks Toks, id uint8) ([]Toks, []xlog.CompilerLog) {
+	if len(toks) == 0 {
+		return nil, nil
+	}
+	parts := make([]Toks, 0)
+	errs := make([]xlog.CompilerLog, 0)
+	braceCount := 0
+	last := 0
+	for i, tok := range toks {
+		if tok.Id == tokens.Brace {
+			switch tok.Kind {
+			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
+				braceCount++
+				continue
+			default:
+				braceCount--
+			}
+		}
+		if braceCount > 0 {
+			continue
+		}
+		if tok.Id == id {
+			if i-last <= 0 {
+				errs = append(errs, compilerErr(tok, "missing_expr"))
+			}
+			parts = append(parts, toks[last:i])
+			last = i + 1
+		}
+	}
+	if last < len(toks) {
+		parts = append(parts, toks[last:])
+	}
+	return parts, errs
 }
 
 // Ended reports position is at end of tokens or not.
@@ -129,6 +173,36 @@ func (b *Builder) Type(toks Toks) (t Type) {
 	}
 }
 
+func (b *Builder) buildEnumItemExpr(i *int, toks Toks) Expr {
+	braceCount := 0
+	exprStart := *i
+	for ; *i < len(toks); *i++ {
+		tok := toks[*i]
+		if tok.Id == tokens.Brace {
+			switch tok.Kind {
+			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
+				braceCount++
+				continue
+			default:
+				braceCount--
+			}
+		}
+		if braceCount > 0 {
+			continue
+		}
+		if tok.Id == tokens.Comma || *i+1 >= len(toks) {
+			var exprToks Toks
+			if tok.Id == tokens.Comma {
+				exprToks = toks[exprStart:*i]
+			} else {
+				exprToks = toks[exprStart:]
+			}
+			return b.Expr(exprToks)
+		}
+	}
+	return Expr{}
+}
+
 func (b *Builder) buildEnumItems(toks Toks) []*EnumItem {
 	items := make([]*EnumItem, 0)
 	for i := 0; i < len(toks); i++ {
@@ -156,34 +230,8 @@ func (b *Builder) buildEnumItems(toks Toks) []*EnumItem {
 			b.pusherr(toks[0], "missing_expr")
 			continue
 		}
-		braceCount := 0
-		exprStart := i
-		for ; i < len(toks); i++ {
-			tok = toks[i]
-			if tok.Id == tokens.Brace {
-				switch tok.Kind {
-				case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
-					braceCount++
-					continue
-				default:
-					braceCount--
-				}
-			}
-			if braceCount > 0 {
-				continue
-			}
-			if tok.Id == tokens.Comma || i+1 >= len(toks) {
-				var exprToks Toks
-				if tok.Id == tokens.Comma {
-					exprToks = toks[exprStart:i]
-				} else {
-					exprToks = toks[exprStart:]
-				}
-				item.Expr = b.Expr(exprToks)
-				items = append(items, item)
-				break
-			}
-		}
+		item.Expr = b.buildEnumItemExpr(&i, toks)
+		items = append(items, item)
 	}
 	return items
 }
@@ -549,29 +597,13 @@ func (b *Builder) GlobalVar(toks Toks) {
 
 // Params builds AST model of function parameters.
 func (b *Builder) Params(fn *Func, toks Toks) {
-	last := 0
-	braceCount := 0
-	for i, tok := range toks {
-		if tok.Id == tokens.Brace {
-			switch tok.Kind {
-			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
-				braceCount++
-			default:
-				braceCount--
-			}
+	parts, errs := Parts(toks, tokens.Comma)
+	b.Errs = append(b.Errs, errs...)
+	for _, part := range parts {
+		if len(parts) > 0 {
+			b.pushParam(fn, part)
 		}
-		if braceCount > 0 || tok.Id != tokens.Comma {
-			continue
-		}
-		b.pushParam(fn, toks[last:i], tok)
-		last = i + 1
-	}
-	if last < len(toks) {
-		if last == 0 {
-			b.pushParam(fn, toks[last:], toks[last])
-		} else {
-			b.pushParam(fn, toks[last:], toks[last-1])
-		}
+
 	}
 	b.wg.Add(1)
 	go b.checkParamsAsync(fn)
@@ -594,11 +626,7 @@ func (b *Builder) checkParamsAsync(f *Func) {
 	}
 }
 
-func (b *Builder) pushParam(f *Func, toks Toks, errtok Tok) {
-	if len(toks) == 0 {
-		b.pusherr(errtok, "invalid_syntax")
-		return
-	}
+func (b *Builder) pushParam(f *Func, toks Toks) {
 	var p Param
 	for i, tok := range toks {
 		switch tok.Id {
@@ -1669,43 +1697,16 @@ func (b *Builder) getWhileIterProfile(toks Toks) WhileProfile {
 	return WhileProfile{b.Expr(toks)}
 }
 
-func (b *Builder) pushVarsToksPart(vars *[]Toks, toks Toks, errTok Tok) {
-	if len(toks) == 0 {
-		b.pusherr(errTok, "missing_expr")
-	}
-	*vars = append(*vars, toks)
-}
-
 func (b *Builder) getForeachVarsToks(toks Toks) []Toks {
-	var vars []Toks
-	braceCount := 0
-	last := 0
-	for i, tok := range toks {
-		if tok.Id == tokens.Brace {
-			switch tok.Kind {
-			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
-				braceCount++
-			default:
-				braceCount--
-			}
-		}
-		if braceCount > 0 {
-			continue
-		}
-		if tok.Id == tokens.Comma {
-			part := toks[last:i]
-			b.pushVarsToksPart(&vars, part, tok)
-			last = i + 1
-		}
-	}
-	if last < len(toks) {
-		part := toks[last:]
-		b.pushVarsToksPart(&vars, part, toks[last])
-	}
+	vars, errs := Parts(toks, tokens.Comma)
+	b.Errs = append(b.Errs, errs...)
 	return vars
 }
 
 func (b *Builder) getVarProfile(toks Toks) (vast Var) {
+	if len(toks) == 0 {
+		return
+	}
 	vast.IdTok = toks[0]
 	if vast.IdTok.Id != tokens.Id {
 		b.pusherr(vast.IdTok, "invalid_syntax")

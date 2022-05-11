@@ -69,7 +69,7 @@ func initProject(cmd string) {
 		println("This module can only be used as single!")
 		return
 	}
-	bytes, err := json.MarshalIndent(*xset.Default, "", "  ")
+	bytes, err := json.MarshalIndent(*xset.Default, "", "\t")
 	if err != nil {
 		println(err)
 		os.Exit(0)

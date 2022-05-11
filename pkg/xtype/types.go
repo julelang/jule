@@ -54,21 +54,22 @@ const (
 	VoidTypeStr    = "<void>"
 )
 
+// GetRealCode returns real type code of code.
+// If types is "int" or "uint", set to bit-specific type code.
+func GetRealCode(t uint8) uint8 {
+	switch t {
+	case Int, Intptr:
+		t = IntCode
+	case UInt, UIntptr:
+		t = UIntCode
+	}
+	return t
+}
+
 // TypeGreaterThan reports type one is greater than type two or not.
 func TypeGreaterThan(t1, t2 uint8) bool {
-	// If types is "int" or "uint", set to bit-specific type code.
-	switch t1 {
-	case Int, Intptr:
-		t1 = IntCode
-	case UInt, UIntptr:
-		t1 = UIntCode
-	}
-	switch t2 {
-	case Int, Intptr:
-		t2 = IntCode
-	case UInt, UIntptr:
-		t2 = UIntCode
-	}
+	t1 = GetRealCode(t1)
+	t2 = GetRealCode(t2)
 
 	switch t1 {
 	case I16:
@@ -105,19 +106,8 @@ func TypesAreCompatible(t1, t2 uint8, ignoreany bool) bool {
 		return true
 	}
 
-	// If types is "int" or "uint", set to bit-specific type code.
-	switch t1 {
-	case Int, Intptr:
-		t1 = IntCode
-	case UInt, UIntptr:
-		t1 = UIntCode
-	}
-	switch t2 {
-	case Int, Intptr:
-		t2 = IntCode
-	case UInt, UIntptr:
-		t2 = UIntCode
-	}
+	t1 = GetRealCode(t1)
+	t2 = GetRealCode(t2)
 
 	// Check.
 	switch t1 {
@@ -197,14 +187,10 @@ func IsIntegerType(t uint8) bool {
 }
 
 // IsNumericType reports type is numeric or not.
-func IsNumericType(t uint8) bool {
-	return IsIntegerType(t) || IsFloatType(t)
-}
+func IsNumericType(t uint8) bool { return IsIntegerType(t) || IsFloatType(t) }
 
 // IsFloatType reports type is float or not.
-func IsFloatType(t uint8) bool {
-	return t == F32 || t == F64
-}
+func IsFloatType(t uint8) bool { return t == F32 || t == F64 }
 
 // IsSignedNumericType reports type is signed numeric or not.
 func IsSignedNumericType(t uint8) bool {

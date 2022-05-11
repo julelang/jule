@@ -56,7 +56,7 @@ func (l *Lex) pusherrtok(tok Tok, err string) {
 		Row:    tok.Row,
 		Column: tok.Column,
 		Path:   l.File.Path,
-		Msg:    x.Errs[err],
+		Msg:    x.GetErr(err),
 	})
 }
 

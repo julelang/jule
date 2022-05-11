@@ -90,7 +90,8 @@ type DataType struct {
 	Tag        any
 }
 
-func (dt *DataType) getValWithOriginalId() string {
+// ValWithOriginalId returns dt.Val with OriginalId.
+func (dt *DataType) ValWithOriginalId() string {
 	if dt.OriginalId == "" {
 		return dt.Val
 	}
@@ -120,7 +121,7 @@ func (dt DataType) String() string {
 	if dt.Val != "" {
 		switch {
 		case strings.HasPrefix(dt.Val, "[]"):
-			dt.Val = dt.getValWithOriginalId()
+			dt.Val = dt.ValWithOriginalId()
 			pointers := cxx.String()
 			cxx.Reset()
 			cxx.WriteString("array<")
@@ -146,7 +147,7 @@ func (dt DataType) String() string {
 		return dt.FuncString() + cxx.String()
 	}
 	if dt.OriginalId != "" {
-		dt.Val = dt.getValWithOriginalId()
+		dt.Val = dt.ValWithOriginalId()
 		dt.Id = xtype.Id
 	}
 	switch dt.Id {

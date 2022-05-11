@@ -13,77 +13,19 @@ type namespace struct {
 	Defs *Defmap
 }
 
-func (ns *namespace) cxxFuncPrototypes() string {
-	var cxx strings.Builder
-	for _, f := range ns.Defs.Funcs {
-		if f.used {
-			cxx.WriteString(ast.IndentString())
-			cxx.WriteString(f.Prototype())
-			cxx.WriteByte('\n')
-		}
-	}
-	return cxx.String()
-}
-
-func (ns *namespace) cxxStructures() string {
-	var cxx strings.Builder
-	for _, s := range ns.Defs.Structs {
-		if s.Used {
-			cxx.WriteByte('\n')
-			cxx.WriteString(ast.IndentString())
-			cxx.WriteString(s.String())
-		}
-	}
-	return cxx.String()
-}
-
-func (ns *namespace) cxxGlobals() string {
-	var cxx strings.Builder
-	for _, g := range ns.Defs.Globals {
-		if g.Used {
-			cxx.WriteByte('\n')
-			cxx.WriteString(ast.IndentString())
-			cxx.WriteString(g.String())
-		}
-	}
-	return cxx.String()
-}
-
-func (ns *namespace) cxxFuncs() string {
-	var cxx strings.Builder
-	for _, f := range ns.Defs.Funcs {
-		if f.used {
-			cxx.WriteByte('\n')
-			cxx.WriteString(ast.IndentString())
-			cxx.WriteString(f.String())
-		}
-	}
-	return cxx.String()
-}
-
-func (ns *namespace) cxxNamespaces() string {
-	var cxx strings.Builder
-	for _, n := range ns.Defs.Namespaces {
-		cxx.WriteByte('\n')
-		cxx.WriteString(ast.IndentString())
-		cxx.WriteString(n.String())
-	}
-	return cxx.String()
-}
-
 func (ns namespace) String() string {
 	var cxx strings.Builder
 	cxx.WriteString("namespace ")
 	cxx.WriteString(xapi.OutId(ns.Id, ns.Tok.File))
 	cxx.WriteString(" {\n")
 	ast.AddIndent()
-	cxx.WriteString(ns.cxxFuncPrototypes())
-	cxx.WriteString(ns.cxxStructures())
-	cxx.WriteString(ns.cxxGlobals())
+	cxx.WriteString(cxxPrototypes(ns.Defs))
+	cxx.WriteString(cxxStructs(ns.Defs))
+	cxx.WriteString(cxxGlobals(ns.Defs))
 	cxx.WriteByte('\n')
-	cxx.WriteString(ns.cxxFuncs())
+	cxx.WriteString(cxxFuncs(ns.Defs))
 	cxx.WriteByte('\n')
-	cxx.WriteString(ns.cxxNamespaces())
+	cxx.WriteString(cxxNamespaces(ns.Defs))
 	ast.DoneIndent()
 	cxx.WriteByte('\n')
 	cxx.WriteString(ast.IndentString())

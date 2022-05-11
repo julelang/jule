@@ -84,12 +84,6 @@ func checkMapCompability(mapT, t DataType) bool {
 	if t.Id == xtype.Nil {
 		return true
 	}
-	/*t1types := t1.Tag.([]DataType)
-	t2types := t2.Tag.([]DataType)
-	if !typesAreCompatible(t1types[0], t2types[0], ignoreany) {
-		return false
-	}
-	return typesAreCompatible(t1types[1], t2types[1], ignoreany)*/
 	return mapT.Val == t.Val
 }
 
@@ -109,26 +103,26 @@ func checkPtrCompability(t1, t2 DataType) bool {
 
 func typesAreCompatible(t1, t2 DataType, ignoreany bool) bool {
 	switch {
-	case typeIsPtr(t1) || typeIsPtr(t2):
+	case typeIsPtr(t1), typeIsPtr(t2):
 		if typeIsPtr(t2) {
 			t1, t2 = t2, t1
 		}
 		return checkPtrCompability(t1, t2)
-	case typeIsArray(t1) || typeIsArray(t2):
+	case typeIsArray(t1), typeIsArray(t2):
 		if typeIsArray(t2) {
 			t1, t2 = t2, t1
 		}
 		return checkArrayCompatiblity(t1, t2)
-	case typeIsMap(t1) || typeIsMap(t2):
+	case typeIsMap(t1), typeIsMap(t2):
 		if typeIsMap(t2) {
 			t1, t2 = t2, t1
 		}
 		return checkMapCompability(t1, t2)
-	case typeIsNilCompatible(t1) || typeIsNilCompatible(t2):
+	case typeIsNilCompatible(t1), typeIsNilCompatible(t2):
 		return t1.Id == xtype.Nil || t2.Id == xtype.Nil
-	case t1.Id == xtype.Enum || t2.Id == xtype.Enum:
+	case t1.Id == xtype.Enum, t2.Id == xtype.Enum:
 		return t1.Id == t2.Id && t1.Val == t2.Val
-	case t1.Id == xtype.Struct || t2.Id == xtype.Struct:
+	case t1.Id == xtype.Struct, t2.Id == xtype.Struct:
 		return t1.Tag == t2.Tag
 	}
 	return xtype.TypesAreCompatible(t1.Id, t2.Id, ignoreany)

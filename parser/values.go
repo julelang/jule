@@ -65,7 +65,7 @@ func checkFloatBit(v ast.Value, bit int) bool {
 
 func defaultValueOfType(t DataType) string {
 	if typeIsNilCompatible(t) {
-		return "nil"
+		return tokens.NIL
 	}
 	return xtype.DefaultValOfType(t.Id)
 }

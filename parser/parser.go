@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -145,26 +144,33 @@ func (p *Parser) CxxEmbeds() string {
 	return cxx.String()
 }
 
+func cxxTypes(dm *Defmap) string {
+	var cxx strings.Builder
+	for _, t := range dm.Types {
+		if t.Used && t.Tok.Id != tokens.NA {
+			cxx.WriteString(t.String())
+			cxx.WriteByte('\n')
+		}
+	}
+	return cxx.String()
+}
+
 // CxxTypes returns C++ code of types.
 func (p *Parser) CxxTypes() string {
 	var cxx strings.Builder
-	for _, t := range Builtin.Types {
-		if t.Used && t.Tok.Id != tokens.NA {
-			cxx.WriteString(t.String())
-			cxx.WriteString("\n\n")
-		}
-	}
+	cxx.WriteString(cxxTypes(Builtin))
 	for _, use := range used {
-		for _, t := range use.defs.Types {
-			if t.Used {
-				cxx.WriteString(t.String())
-				cxx.WriteString("\n\n")
-			}
-		}
+		cxx.WriteString(cxxTypes(use.defs))
 	}
-	for _, t := range p.Defs.Types {
-		if t.Used {
-			cxx.WriteString(t.String())
+	cxx.WriteString(cxxTypes(p.Defs))
+	return cxx.String()
+}
+
+func cxxEnums(dm *Defmap) string {
+	var cxx strings.Builder
+	for _, e := range dm.Enums {
+		if e.Used && e.Tok.Id != tokens.NA {
+			cxx.WriteString(e.String())
 			cxx.WriteString("\n\n")
 		}
 	}
@@ -174,23 +180,19 @@ func (p *Parser) CxxTypes() string {
 // CxxEnums returns C++ code of enums.
 func (p *Parser) CxxEnums() string {
 	var cxx strings.Builder
-	for _, e := range Builtin.Enums {
-		if e.Used && e.Tok.Id != tokens.NA {
-			cxx.WriteString(e.String())
-			cxx.WriteString("\n\n")
-		}
-	}
+	cxx.WriteString(cxxEnums(Builtin))
 	for _, use := range used {
-		for _, e := range use.defs.Enums {
-			if e.Used {
-				cxx.WriteString(e.String())
-				cxx.WriteString("\n\n")
-			}
-		}
+		cxx.WriteString(cxxEnums(use.defs))
 	}
-	for _, e := range p.Defs.Enums {
-		if e.Used {
-			cxx.WriteString(e.String())
+	cxx.WriteString(cxxEnums(p.Defs))
+	return cxx.String()
+}
+
+func cxxStructs(dm *Defmap) string {
+	var cxx strings.Builder
+	for _, s := range dm.Structs {
+		if s.Used && s.Ast.Tok.Id != tokens.NA {
+			cxx.WriteString(s.String())
 			cxx.WriteString("\n\n")
 		}
 	}
@@ -198,27 +200,21 @@ func (p *Parser) CxxEnums() string {
 }
 
 // CxxEnums returns C++ code of structures.
-func (p *Parser) CxxStruct() string {
+func (p *Parser) CxxStructs() string {
 	var cxx strings.Builder
-	for _, s := range Builtin.Structs {
-		if s.Used && s.Ast.Tok.Id != tokens.NA {
-			cxx.WriteString(s.String())
-			cxx.WriteString("\n\n")
-		}
-	}
+	cxx.WriteString(cxxStructs(Builtin))
 	for _, use := range used {
-		for _, s := range use.defs.Structs {
-			if s.Used {
-				cxx.WriteString(s.String())
-				cxx.WriteString("\n\n")
-			}
-		}
+		cxx.WriteString(cxxStructs(use.defs))
 	}
-	for _, s := range p.Defs.Structs {
-		if s.Used {
-			cxx.WriteString(s.String())
-			cxx.WriteString("\n\n")
-		}
+	cxx.WriteString(cxxStructs(p.Defs))
+	return cxx.String()
+}
+
+func cxxNamespaces(dm *Defmap) string {
+	var cxx strings.Builder
+	for _, ns := range dm.Namespaces {
+		cxx.WriteString(ns.String())
+		cxx.WriteString("\n\n")
 	}
 	return cxx.String()
 }
@@ -226,19 +222,21 @@ func (p *Parser) CxxStruct() string {
 // CxxNamespaces returns C++ code of namespaces.
 func (p *Parser) CxxNamespaces() string {
 	var cxx strings.Builder
-	for _, ns := range Builtin.Namespaces {
-		cxx.WriteString(ns.String())
-		cxx.WriteString("\n\n")
-	}
+	cxx.WriteString(cxxNamespaces(Builtin))
 	for _, use := range used {
-		for _, ns := range use.defs.Namespaces {
-			cxx.WriteString(ns.String())
-			cxx.WriteString("\n\n")
-		}
+		cxx.WriteString(cxxNamespaces(use.defs))
 	}
-	for _, ns := range p.Defs.Namespaces {
-		cxx.WriteString(ns.String())
-		cxx.WriteString("\n\n")
+	cxx.WriteString(cxxNamespaces(p.Defs))
+	return cxx.String()
+}
+
+func cxxPrototypes(dm *Defmap) string {
+	var cxx strings.Builder
+	for _, f := range dm.Funcs {
+		if f.used && f.Ast.Tok.Id != tokens.NA {
+			cxx.WriteString(f.Prototype())
+			cxx.WriteByte('\n')
+		}
 	}
 	return cxx.String()
 }
@@ -246,23 +244,19 @@ func (p *Parser) CxxNamespaces() string {
 // CxxPrototypes returns C++ code of prototypes of C++ code.
 func (p *Parser) CxxPrototypes() string {
 	var cxx strings.Builder
-	for _, f := range Builtin.Funcs {
-		if f.used && f.Ast.Tok.Id != tokens.NA {
-			cxx.WriteString(f.Prototype())
-			cxx.WriteByte('\n')
-		}
-	}
+	cxx.WriteString(cxxPrototypes(Builtin))
 	for _, use := range used {
-		for _, f := range use.defs.Funcs {
-			if f.used {
-				cxx.WriteString(f.Prototype())
-				cxx.WriteByte('\n')
-			}
-		}
+		cxx.WriteString(cxxPrototypes(use.defs))
 	}
-	for _, f := range p.Defs.Funcs {
-		if f.used {
-			cxx.WriteString(f.Prototype())
+	cxx.WriteString(cxxPrototypes(p.Defs))
+	return cxx.String()
+}
+
+func cxxGlobals(dm *Defmap) string {
+	var cxx strings.Builder
+	for _, g := range Builtin.Globals {
+		if g.Used && g.IdTok.Id != tokens.NA {
+			cxx.WriteString(g.String())
 			cxx.WriteByte('\n')
 		}
 	}
@@ -272,24 +266,20 @@ func (p *Parser) CxxPrototypes() string {
 // CxxGlobals returns C++ code of global variables.
 func (p *Parser) CxxGlobals() string {
 	var cxx strings.Builder
-	for _, g := range Builtin.Globals {
-		if g.Used && g.IdTok.Id != tokens.NA {
-			cxx.WriteString(g.String())
-			cxx.WriteByte('\n')
-		}
-	}
+	cxx.WriteString(cxxGlobals(Builtin))
 	for _, use := range used {
-		for _, g := range use.defs.Globals {
-			if g.Used {
-				cxx.WriteString(g.String())
-				cxx.WriteByte('\n')
-			}
-		}
+		cxx.WriteString(cxxGlobals(use.defs))
 	}
-	for _, g := range p.Defs.Globals {
-		if g.Used {
-			cxx.WriteString(g.String())
-			cxx.WriteByte('\n')
+	cxx.WriteString(cxxGlobals(p.Defs))
+	return cxx.String()
+}
+
+func cxxFuncs(dm *Defmap) string {
+	var cxx strings.Builder
+	for _, f := range dm.Funcs {
+		if f.used && f.Ast.Tok.Id != tokens.NA {
+			cxx.WriteString(f.String())
+			cxx.WriteString("\n\n")
 		}
 	}
 	return cxx.String()
@@ -298,26 +288,11 @@ func (p *Parser) CxxGlobals() string {
 // CxxFuncs returns C++ code of functions.
 func (p *Parser) CxxFuncs() string {
 	var cxx strings.Builder
-	for _, f := range Builtin.Funcs {
-		if f.used && f.Ast.Tok.Id != tokens.NA {
-			cxx.WriteString(f.String())
-			cxx.WriteString("\n\n")
-		}
-	}
+	cxx.WriteString(cxxFuncs(Builtin))
 	for _, use := range used {
-		for _, f := range use.defs.Funcs {
-			if f.used {
-				cxx.WriteString(f.String())
-				cxx.WriteString("\n\n")
-			}
-		}
+		cxx.WriteString(cxxFuncs(use.defs))
 	}
-	for _, f := range p.Defs.Funcs {
-		if f.used {
-			cxx.WriteString(f.String())
-			cxx.WriteString("\n\n")
-		}
-	}
+	cxx.WriteString(cxxFuncs(p.Defs))
 	return cxx.String()
 }
 
@@ -328,7 +303,7 @@ func (p *Parser) Cxx() string {
 	cxx.WriteString("\n\n")
 	cxx.WriteString(p.CxxTypes())
 	cxx.WriteString(p.CxxEnums())
-	cxx.WriteString(p.CxxStruct())
+	cxx.WriteString(p.CxxStructs())
 	cxx.WriteString(p.CxxPrototypes())
 	cxx.WriteString("\n\n")
 	cxx.WriteString(p.CxxGlobals())
@@ -411,73 +386,13 @@ func (p *Parser) pushUseNamespaces(use, dm *Defmap) {
 	}
 }
 
-func (p *Parser) pushUseTypes(use, dm *Defmap) {
-	for _, t := range dm.Types {
-		def, _, _ := p.typeById(t.Id)
-		if def != nil {
-			p.pusherrmsgtok(def.Tok,
-				fmt.Sprintf(`"%s" identifier is already defined in this source`, t.Id))
-		} else {
-			use.Types = append(use.Types, t)
-		}
-	}
-}
-
-func (p *Parser) pushUseEnums(use, dm *Defmap) {
-	for _, e := range dm.Enums {
-		def, _, _ := p.enumById(e.Id)
-		if def != nil {
-			p.pusherrmsgtok(def.Tok,
-				fmt.Sprintf(`"%s" identifier is already defined in this source`, e.Id))
-		} else {
-			use.Enums = append(use.Enums, e)
-		}
-	}
-}
-
-func (p *Parser) pushUseStructs(use, dm *Defmap) {
-	for _, s := range dm.Structs {
-		def, _, _ := p.structById(s.Ast.Id)
-		if def != nil {
-			p.pusherrmsgtok(def.Ast.Tok,
-				fmt.Sprintf(`"%s" identifier is already defined in this source`, s.Ast.Id))
-		} else {
-			use.Structs = append(use.Structs, s)
-		}
-	}
-}
-
-func (p *Parser) pushUseGlobals(use, dm *Defmap) {
-	for _, g := range dm.Globals {
-		def, _, _ := p.Defs.globalById(g.Id, nil)
-		if def != nil {
-			p.pusherrmsgtok(def.IdTok,
-				fmt.Sprintf(`"%s" identifier is already defined in this source`, g.Id))
-		} else {
-			use.Globals = append(use.Globals, g)
-		}
-	}
-}
-
-func (p *Parser) pushUseFuncs(use, dm *Defmap) {
-	for _, f := range dm.Funcs {
-		def, _, _ := p.Defs.funcById(f.Ast.Id, nil)
-		if def != nil {
-			p.pusherrmsgtok(def.Ast.Tok,
-				fmt.Sprintf(`"%s" identifier is already defined in this source`, f.Ast.Id))
-		} else {
-			use.Funcs = append(use.Funcs, f)
-		}
-	}
-}
-
 func (p *Parser) pushUseDefs(use *use, dm *Defmap) {
 	p.pushUseNamespaces(use.defs, dm)
-	p.pushUseTypes(use.defs, dm)
-	p.pushUseStructs(use.defs, dm)
-	p.pushUseEnums(use.defs, dm)
-	p.pushUseGlobals(use.defs, dm)
-	p.pushUseFuncs(use.defs, dm)
+	use.defs.Types = append(use.defs.Types, dm.Types...)
+	use.defs.Structs = append(use.defs.Structs, dm.Structs...)
+	use.defs.Enums = append(use.defs.Enums, dm.Enums...)
+	use.defs.Globals = append(use.defs.Globals, dm.Globals...)
+	use.defs.Funcs = append(use.defs.Funcs, dm.Funcs...)
 }
 
 func (p *Parser) use(useAST *ast.Use) {
@@ -694,7 +609,7 @@ func (p *Parser) Enum(e Enum) {
 	}
 	e.Desc = p.docText.String()
 	p.docText.Reset()
-	e.Type, _ = p.readyType(e.Type, true)
+	e.Type, _ = p.realType(e.Type, true)
 	if !typeIsSingle(e.Type) || !xtype.IsIntegerType(e.Type.Id) {
 		p.pusherrtok(e.Type.Tok, "invalid_type_source")
 		return
@@ -871,7 +786,7 @@ func (p *Parser) Statement(s ast.Statement) {
 }
 
 func (p *Parser) param(param *Param) {
-	param.Type, _ = p.readyType(param.Type, true)
+	param.Type, _ = p.realType(param.Type, true)
 	if !typeIsAllowForConst(param.Type) {
 		p.pusherrtok(param.Tok, "invalid_type_for_const", param.Type.Val)
 	}
@@ -969,7 +884,7 @@ func (p *Parser) Var(v Var) *Var {
 		}
 	}
 	if v.Type.Id != xtype.Void {
-		v.Type, _ = p.readyType(v.Type, true)
+		v.Type, _ = p.realType(v.Type, true)
 		if v.SetterTok.Id != tokens.NA {
 			p.wg.Add(1)
 			go assignChecker{
@@ -1197,7 +1112,7 @@ func (p *Parser) checkAsync() {
 func (p *Parser) checkTypesAsync() {
 	defer func() { p.wg.Done() }()
 	for i, t := range p.Defs.Types {
-		p.Defs.Types[i].Type, _ = p.readyType(t.Type, true)
+		p.Defs.Types[i].Type, _ = p.realType(t.Type, true)
 	}
 }
 
@@ -1740,7 +1655,8 @@ func (s *solver) bool() (v ast.Value) {
 
 func (s *solver) float() (v ast.Value) {
 	v.Tok = s.operator
-	if !xtype.IsNumericType(s.leftVal.Type.Id) || !xtype.IsNumericType(s.rightVal.Type.Id) {
+	if !xtype.IsNumericType(s.leftVal.Type.Id) ||
+		!xtype.IsNumericType(s.rightVal.Type.Id) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.Type.Val, s.leftVal.Type.Val)
 		return
@@ -1763,7 +1679,8 @@ func (s *solver) float() (v ast.Value) {
 
 func (s *solver) signed() (v ast.Value) {
 	v.Tok = s.operator
-	if !xtype.IsNumericType(s.leftVal.Type.Id) || !xtype.IsNumericType(s.rightVal.Type.Id) {
+	if !xtype.IsNumericType(s.leftVal.Type.Id) ||
+		!xtype.IsNumericType(s.rightVal.Type.Id) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.Type.Val, s.leftVal.Type.Val)
 		return
@@ -1793,7 +1710,8 @@ func (s *solver) signed() (v ast.Value) {
 
 func (s *solver) unsigned() (v ast.Value) {
 	v.Tok = s.operator
-	if !xtype.IsNumericType(s.leftVal.Type.Id) || !xtype.IsNumericType(s.rightVal.Type.Id) {
+	if !xtype.IsNumericType(s.leftVal.Type.Id) ||
+		!xtype.IsNumericType(s.rightVal.Type.Id) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.Type.Val, s.leftVal.Type.Val)
 		return
@@ -1821,11 +1739,8 @@ func (s *solver) logical() (v ast.Value) {
 	v.Tok = s.operator
 	v.Type.Id = xtype.Bool
 	v.Type.Val = tokens.BOOL
-	if s.leftVal.Type.Id != xtype.Bool {
-		s.p.pusherrtok(s.leftVal.Tok, "logical_not_bool")
-	}
-	if s.rightVal.Type.Id != xtype.Bool {
-		s.p.pusherrtok(s.rightVal.Tok, "logical_not_bool")
+	if s.leftVal.Type.Id != xtype.Bool || s.rightVal.Type.Id != xtype.Bool {
+		s.p.pusherrtok(s.operator, "logical_not_bool")
 	}
 	return
 }
@@ -1966,9 +1881,7 @@ type unaryProcessor struct {
 
 func (p *unaryProcessor) minus() value {
 	v := p.parser.evalExprPart(p.toks, p.model)
-	if !typeIsSingle(v.ast.Type) {
-		p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", '-')
-	} else if !xtype.IsNumericType(v.ast.Type.Id) {
+	if !typeIsSingle(v.ast.Type) || !xtype.IsNumericType(v.ast.Type.Id) {
 		p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", '-')
 	}
 	if isConstNum(v.ast.Data) {
@@ -1979,9 +1892,7 @@ func (p *unaryProcessor) minus() value {
 
 func (p *unaryProcessor) plus() value {
 	v := p.parser.evalExprPart(p.toks, p.model)
-	if !typeIsSingle(v.ast.Type) {
-		p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", '+')
-	} else if !xtype.IsNumericType(v.ast.Type.Id) {
+	if !typeIsSingle(v.ast.Type) || !xtype.IsNumericType(v.ast.Type.Id) {
 		p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", '+')
 	}
 	return v
@@ -1989,9 +1900,7 @@ func (p *unaryProcessor) plus() value {
 
 func (p *unaryProcessor) tilde() value {
 	v := p.parser.evalExprPart(p.toks, p.model)
-	if !typeIsSingle(v.ast.Type) {
-		p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", '~')
-	} else if !xtype.IsIntegerType(v.ast.Type.Id) {
+	if !typeIsSingle(v.ast.Type) || !xtype.IsIntegerType(v.ast.Type.Id) {
 		p.parser.pusherrtok(p.tok, "invalid_type_unary_operator", '~')
 	}
 	return v
@@ -2046,7 +1955,7 @@ func (p *unaryProcessor) amper() value {
 	return v
 }
 
-func (p *Parser) evalOperatorExprPart(toks Toks, m *exprModel) value {
+func (p *Parser) evalUnaryExprPart(toks Toks, m *exprModel) value {
 	var v value
 	//? Length is 1 cause all length of operator tokens is 1.
 	//? Change "1" with length of token's value
@@ -2106,7 +2015,7 @@ func (p *Parser) evalHeapAllocExpr(toks Toks, m *exprModel) (v value) {
 	var alloc newHeapAllocExpr
 	if exprToks == nil {
 		dt, ok = b.DataType(toks, i, true)
-		dt, _ = p.readyType(dt, true)
+		dt, _ = p.realType(dt, true)
 		alloc.typeAST = dt
 		m.appendSubNode(alloc)
 		if *i < len(toks)-1 {
@@ -2114,7 +2023,7 @@ func (p *Parser) evalHeapAllocExpr(toks Toks, m *exprModel) (v value) {
 		}
 	} else {
 		dt, ok = b.DataType(exprToks, i, true)
-		dt, _ = p.readyType(dt, true)
+		dt, _ = p.realType(dt, true)
 		alloc.typeAST = dt
 		if *i < len(exprToks)-1 {
 			p.pusherrtok(exprToks[*i+1], "invalid_syntax")
@@ -2164,7 +2073,7 @@ func (p *Parser) evalExprPart(toks Toks, m *exprModel) (v value) {
 	tok := toks[0]
 	switch tok.Id {
 	case tokens.Operator:
-		return p.evalOperatorExprPart(toks, m)
+		return p.evalUnaryExprPart(toks, m)
 	case tokens.New:
 		return p.evalHeapAllocExpr(toks, m)
 	case tokens.Brace:
@@ -2502,7 +2411,7 @@ func (p *Parser) evalTryCastExpr(toks Toks, m *exprModel) (v value, _ bool) {
 		if !ok {
 			return
 		}
-		dt, ok = p.readyType(dt, false)
+		dt, ok = p.realType(dt, false)
 		if !ok {
 			return
 		}
@@ -2686,7 +2595,7 @@ func (p *Parser) callSizeof(toks Toks, m *exprModel) (v value) {
 	} else if *i+1 < len(toks) {
 		p.pusherrtok(toks[*i+1], "invalid_syntax")
 	}
-	t, _ = p.readyType(t, true)
+	t, _ = p.realType(t, true)
 	m.appendSubNode(t)
 	return
 }
@@ -2934,34 +2843,8 @@ func (p *Parser) evalPtrSelect(ptrv, selectv value, errtok Tok) value {
 //! IMPORTANT: Tokens is should be store enumerable parentheses.
 func (p *Parser) buildEnumerableParts(toks Toks) []Toks {
 	toks = toks[1 : len(toks)-1]
-	braceCount := 0
-	lastComma := -1
-	var parts []Toks
-	for i, tok := range toks {
-		if tok.Id == tokens.Brace {
-			switch tok.Kind {
-			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
-				braceCount++
-			default:
-				braceCount--
-			}
-		}
-		if braceCount > 0 {
-			continue
-		}
-		if tok.Id == tokens.Comma {
-			if i-lastComma-1 == 0 {
-				p.pusherrtok(tok, "missing_expr")
-				lastComma = i
-				continue
-			}
-			parts = append(parts, toks[lastComma+1:i])
-			lastComma = i
-		}
-	}
-	if lastComma+1 < len(toks) {
-		parts = append(parts, toks[lastComma+1:])
-	}
+	parts, errs := ast.Parts(toks, tokens.Comma)
+	p.pusherrs(errs...)
 	return parts
 }
 
@@ -3511,7 +3394,7 @@ func (p *Parser) checkBlock(b *ast.Block) {
 			model.Val = t
 		case Type:
 			if p.checkTypeAST(t) {
-				t.Type, _ = p.readyType(t.Type, true)
+				t.Type, _ = p.realType(t.Type, true)
 			}
 			p.BlockTypes = append(p.BlockTypes, &t)
 		case ast.Block:
@@ -3639,6 +3522,19 @@ parent_scopes:
 	return true
 }
 
+func (p *Parser) checkGotoScope(gt *ast.Goto, label *ast.Label) {
+	for i := gt.Index; i < len(gt.Block.Tree); i++ {
+		s := &gt.Block.Tree[i]
+		switch {
+		case s.Tok.Row >= label.Tok.Row:
+			return
+		case statementIsDef(s):
+			p.pusherrtok(gt.Tok, "goto_jumps_declarations", gt.Label)
+			return
+		}
+	}
+}
+
 func (p *Parser) checkDiffScopeGoto(gt *ast.Goto, label *ast.Label) {
 	switch {
 	case label.Block.SubIndex > 0 && gt.Block.SubIndex == 0:
@@ -3663,31 +3559,10 @@ func (p *Parser) checkDiffScopeGoto(gt *ast.Goto, label *ast.Label) {
 		}
 	}
 	// Parent Scopes
-parent_scopes:
 	if block.Parent != nil && block.Parent != gt.Block {
-		block = block.Parent
-		for i := 0; i < len(block.Tree); i++ {
-			s := &block.Tree[i]
-			switch {
-			case s.Tok.Row >= label.Tok.Row:
-				return
-			case statementIsDef(s):
-				p.pusherrtok(gt.Tok, "goto_jumps_declarations", gt.Label)
-				return
-			}
-		}
-		goto parent_scopes
+		_ = p.checkLabelParents(gt, label)
 	} else { // goto Scope
-		for i := gt.Index; i < len(gt.Block.Tree); i++ {
-			s := &gt.Block.Tree[i]
-			switch {
-			case s.Tok.Row >= label.Tok.Row:
-				return
-			case statementIsDef(s):
-				p.pusherrtok(gt.Tok, "goto_jumps_declarations", gt.Label)
-				return
-			}
-		}
+		p.checkGotoScope(gt, label)
 	}
 }
 
@@ -4092,7 +3967,7 @@ func (fc *foreachChecker) checkKeyASize() {
 		return
 	}
 	var ok bool
-	keyA.Type, ok = fc.p.readyType(keyA.Type, true)
+	keyA.Type, ok = fc.p.realType(keyA.Type, true)
 	if ok {
 		if !typeIsSingle(keyA.Type) || !xtype.IsNumericType(keyA.Type.Id) {
 			fc.p.pusherrtok(keyA.IdTok, "incompatible_datatype",
@@ -4234,7 +4109,7 @@ func (p *Parser) checkCatch(try *ast.Try, catch *ast.Catch) {
 		p.pusherrtok(catch.Var.IdTok, "exist_id", catch.Var.Id)
 	}
 	if catch.Var.Type.Tok.Id != tokens.NA {
-		catch.Var.Type, _ = p.readyType(catch.Var.Type, true)
+		catch.Var.Type, _ = p.realType(catch.Var.Type, true)
 		if catch.Var.Type.Val != errorType.Val {
 			p.pusherrtok(catch.Var.Type.Tok, "invalid_type_source")
 		}
@@ -4308,23 +4183,65 @@ func (p *Parser) checkValidityForAutoType(t DataType, errtok Tok) {
 	}
 }
 
-func (p *Parser) readyType(dt DataType, err bool) (ret DataType, ok bool) {
+func (p *Parser) typeSourceOfMultiTyped(dt DataType, err bool) (DataType, bool) {
+	types := dt.Tag.([]DataType)
+	ok := false
+	for i, t := range types {
+		t, okr := p.typeSource(t, err)
+		types[i] = t
+		if ok {
+			ok = okr
+		}
+	}
+	dt.Tag = types
+	return dt, ok
+}
+
+func (p *Parser) typeSourceIsType(dt, t DataType, err bool) (DataType, bool) {
+	originalId := dt.OriginalId
+	val := dt.Val[:len(dt.Val)-len(dt.Tok.Kind)] + t.Val
+	dt = t
+	dt.OriginalId = originalId
+	dt.Val = val
+	return p.typeSource(dt, err)
+}
+
+func (p *Parser) typeSourceIsEnum(e *Enum) (dt DataType, _ bool) {
+	dt.Id = xtype.Enum
+	dt.Val = e.Id
+	dt.Tag = e
+	return dt, true
+}
+
+func (p *Parser) typeSourceIsFunc(dt DataType, err bool) (DataType, bool) {
+	f := dt.Tag.(Func)
+	for i, param := range f.Params {
+		f.Params[i].Type, _ = p.typeSource(param.Type, err)
+	}
+	f.RetType, _ = p.typeSource(f.RetType, err)
+	dt.Val = dt.Tag.(Func).DataTypeString()
+	return dt, true
+}
+
+func (p *Parser) typeSourceIsStruct(s *xstruct) (dt DataType, _ bool) {
+	dt.Id = xtype.Struct
+	dt.Val = dt.Val[:len(dt.Val)-len(dt.Tok.Kind)] + s.Ast.Id
+	dt.Tag = s
+	// If type is built-in.
+	if s.Ast.Tok.Id == tokens.NA {
+		dt.Tok = s.Ast.Tok
+	}
+	return dt, true
+}
+
+func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 	originalId := dt.OriginalId
 	defer func() { ret.OriginalId = originalId }()
 	if dt.Val == "" {
 		return dt, true
 	}
 	if dt.MultiTyped {
-		types := dt.Tag.([]DataType)
-		for i, t := range types {
-			t, okr := p.readyType(t, err)
-			types[i] = t
-			if ok {
-				ok = okr
-			}
-		}
-		dt.Tag = types
-		return dt, ok
+		return p.typeSourceOfMultiTyped(dt, err)
 	}
 	switch dt.Id {
 	case xtype.Id:
@@ -4332,27 +4249,13 @@ func (p *Parser) readyType(dt DataType, err bool) (ret DataType, ok bool) {
 		switch t := def.(type) {
 		case *Type:
 			t.Used = true
-			val := dt.Val[:len(dt.Val)-len(dt.Tok.Kind)] + t.Type.Val
-			dt = t.Type
-			dt.OriginalId = originalId
-			dt.Val = val
-			return p.readyType(dt, err)
+			return p.typeSourceIsType(dt, t.Type, err)
 		case *Enum:
 			t.Used = true
-			dt.Id = xtype.Enum
-			dt.Val = t.Id
-			dt.Tag = t
-			return dt, true
+			return p.typeSourceIsEnum(t)
 		case *xstruct:
 			t.Used = true
-			dt.Id = xtype.Struct
-			dt.Val = dt.Val[:len(dt.Val)-len(dt.Tok.Kind)] + t.Ast.Id
-			dt.Tag = t
-			// If type is built-in.
-			if t.Ast.Tok.Id == tokens.NA {
-				dt.Tok = t.Ast.Tok
-			}
-			return dt, true
+			return p.typeSourceIsStruct(t)
 		default:
 			if err {
 				p.pusherrtok(dt.Tok, "invalid_type_source")
@@ -4360,14 +4263,14 @@ func (p *Parser) readyType(dt DataType, err bool) (ret DataType, ok bool) {
 			return dt, false
 		}
 	case xtype.Func:
-		f := dt.Tag.(Func)
-		for i, param := range f.Params {
-			f.Params[i].Type, _ = p.readyType(param.Type, err)
-		}
-		f.RetType, _ = p.readyType(f.RetType, err)
-		dt.Val = dt.Tag.(Func).DataTypeString()
+		return p.typeSourceIsFunc(dt, err)
 	}
 	return dt, true
+}
+
+func (p *Parser) realType(dt DataType, err bool) (DataType, bool) {
+	dt.Val = dt.ValWithOriginalId()
+	return p.typeSource(dt, err)
 }
 
 func (p *Parser) checkMultiTypeAsync(real, check DataType, ignoreAny bool, errTok Tok) {
