@@ -454,39 +454,15 @@ func (l *Lex) Tok() Tok {
 	case l.isop(txt, tokens.LPARENTHESES, tokens.Brace, &tok):
 		l.braces = append(l.braces, tok)
 	case l.isop(txt, tokens.RPARENTHESES, tokens.Brace, &tok):
-		len := len(l.braces)
-		if len == 0 {
-			l.pusherrtok(tok, "extra_closed_parentheses")
-			break
-		} else if l.braces[len-1].Kind != tokens.LPARENTHESES {
-			l.wg.Add(1)
-			go l.pushWrongOrderCloseErrAsync(tok)
-		}
-		l.rmrange(len-1, tok.Kind)
+		l.pushRangeClose(tok, tokens.LPARENTHESES)
 	case l.isop(txt, tokens.LBRACE, tokens.Brace, &tok):
 		l.braces = append(l.braces, tok)
 	case l.isop(txt, tokens.RBRACE, tokens.Brace, &tok):
-		len := len(l.braces)
-		if len == 0 {
-			l.pusherrtok(tok, "extra_closed_braces")
-			break
-		} else if l.braces[len-1].Kind != tokens.LBRACE {
-			l.wg.Add(1)
-			go l.pushWrongOrderCloseErrAsync(tok)
-		}
-		l.rmrange(len-1, tok.Kind)
+		l.pushRangeClose(tok, tokens.LBRACE)
 	case l.isop(txt, tokens.LBRACKET, tokens.Brace, &tok):
 		l.braces = append(l.braces, tok)
 	case l.isop(txt, tokens.RBRACKET, tokens.Brace, &tok):
-		len := len(l.braces)
-		if len == 0 {
-			l.pusherrtok(tok, "extra_closed_brackets")
-			break
-		} else if l.braces[len-1].Kind != tokens.LBRACKET {
-			l.wg.Add(1)
-			go l.pushWrongOrderCloseErrAsync(tok)
-		}
-		l.rmrange(len-1, tok.Kind)
+		l.pushRangeClose(tok, tokens.LBRACKET)
 	case
 		l.firstTokOfLine && l.isop(txt, tokens.SHARP, tokens.Preprocessor, &tok),
 		l.lexBasicOps(txt, &tok),
@@ -533,6 +509,25 @@ func (l *Lex) rmrange(i int, kind string) {
 		l.braces = append(l.braces[:i], l.braces[i+1:]...)
 		break
 	}
+}
+
+func (l *Lex) pushRangeClose(tok Tok, open string) {
+	len := len(l.braces)
+	if len == 0 {
+		switch tok.Kind {
+		case tokens.RBRACKET:
+			l.pusherrtok(tok, "extra_closed_brackets")
+		case tokens.RBRACE:
+			l.pusherrtok(tok, "extra_closed_braces")
+		case tokens.RPARENTHESES:
+			l.pusherrtok(tok, "extra_closed_parentheses")
+		}
+		return
+	} else if l.braces[len-1].Kind != open {
+		l.wg.Add(1)
+		go l.pushWrongOrderCloseErrAsync(tok)
+	}
+	l.rmrange(len-1, tok.Kind)
 }
 
 func (l *Lex) pushWrongOrderCloseErrAsync(tok Tok) {

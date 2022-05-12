@@ -91,46 +91,46 @@ func GetRealCode(t uint8) uint8 {
 	return t
 }
 
-// I16GreaterThan reports I16 is greater or not data-type than specifed type.
+// I16GreaterThan reports I16 is greater or not data-type than specified type.
 func I16GreaterThan(t uint8) bool {
 	t = GetRealCode(t)
 	return t == U8
 }
 
-// I32GreaterThan reports I32 is greater or not data-type than specifed type.
+// I32GreaterThan reports I32 is greater or not data-type than specified type.
 func I32GreaterThan(t uint8) bool {
 	t = GetRealCode(t)
 	return t == I8 || t == I16
 }
 
-// I64GreaterThan reports I64 is greater or not data-type than specifed type.
+// I64GreaterThan reports I64 is greater or not data-type than specified type.
 func I64GreaterThan(t uint8) bool {
 	t = GetRealCode(t)
 	return t == I8 || t == I16 || t == I32
 }
 
-// U16GreaterThan reports U16 is greater or not data-type than specifed type.
+// U16GreaterThan reports U16 is greater or not data-type than specified type.
 func U16GreaterThan(t uint8) bool {
 	t = GetRealCode(t)
 	return t == U8
 }
 
-// U32GreaterThan reports U32 is greater or not data-type than specifed type.
+// U32GreaterThan reports U32 is greater or not data-type than specified type.
 func U32GreaterThan(t uint8) bool {
 	t = GetRealCode(t)
 	return t == U8 || t == U16
 }
 
-// U64GreaterThan reports U64 is greater or not data-type than specifed type.
+// U64GreaterThan reports U64 is greater or not data-type than specified type.
 func U64GreaterThan(t uint8) bool {
 	t = GetRealCode(t)
 	return t == U8 || t == U16 || t == U32
 }
 
-// F32GreaterThan reports F32 is greater or not data-type than specifed type.
+// F32GreaterThan reports F32 is greater or not data-type than specified type.
 func F32GreaterThan(t uint8) bool { return t != Any && t != F64 }
 
-// F64GreaterThan reports F64 is greater or not data-type than specifed type.
+// F64GreaterThan reports F64 is greater or not data-type than specified type.
 func F64GreaterThan(t uint8) bool { return t != Any }
 
 // TypeGreaterThan reports type one is greater than type two or not.
@@ -159,25 +159,25 @@ func TypeGreaterThan(t1, t2 uint8) bool {
 	return false
 }
 
-// I8CompatibleWith reports i8 is compatible or not with data-type specifed type.
+// I8CompatibleWith reports i8 is compatible or not with data-type specified type.
 func I8CompatibleWith(t uint8) bool {
 	t = GetRealCode(t)
 	return t == I8
 }
 
-// I16CompatibleWith reports i16 is compatible or not with data-type specifed type.
+// I16CompatibleWith reports i16 is compatible or not with data-type specified type.
 func I16CompatibleWith(t uint8) bool {
 	t = GetRealCode(t)
 	return t == I8 || t == I16 || t == U8
 }
 
-// I32CompatibleWith reports i32 is compatible or not with data-type specifed type.
+// I32CompatibleWith reports i32 is compatible or not with data-type specified type.
 func I32CompatibleWith(t uint8) bool {
 	t = GetRealCode(t)
 	return t == I8 || t == I16 || t == I32 || t == U8 || t == U16
 }
 
-// I64CompatibleWith reports i64 is compatible or not with data-type specifed type.
+// I64CompatibleWith reports i64 is compatible or not with data-type specified type.
 func I64CompatibleWith(t uint8) bool {
 	t = GetRealCode(t)
 	switch t {
@@ -188,31 +188,31 @@ func I64CompatibleWith(t uint8) bool {
 	}
 }
 
-// U8CompatibleWith reports u8 is compatible or not with data-type specifed type.
+// U8CompatibleWith reports u8 is compatible or not with data-type specified type.
 func U8CompatibleWith(t uint8) bool {
 	t = GetRealCode(t)
 	return t == U8
 }
 
-// U16CompatibleWith reports u16 is compatible or not with data-type specifed type.
+// U16CompatibleWith reports u16 is compatible or not with data-type specified type.
 func U16CompatibleWith(t uint8) bool {
 	t = GetRealCode(t)
 	return t == U8 || t == U16
 }
 
-// U32CompatibleWith reports u32 is compatible or not with data-type specifed type.
+// U32CompatibleWith reports u32 is compatible or not with data-type specified type.
 func U32CompatibleWith(t uint8) bool {
 	t = GetRealCode(t)
 	return t == U8 || t == U16 || t == U32
 }
 
-// U16CompatibleWith reports u64 is compatible or not with data-type specifed type.
+// U16CompatibleWith reports u64 is compatible or not with data-type specified type.
 func U64CompatibleWith(t uint8) bool {
 	t = GetRealCode(t)
 	return t == U8 || t == U16 || t == U32 || t == U64
 }
 
-// F32CompatibleWith reports f32 is compatible or not with data-type specifed type.
+// F32CompatibleWith reports f32 is compatible or not with data-type specified type.
 func F32CompatibleWith(t uint8) bool {
 	t = GetRealCode(t)
 	switch t {
@@ -223,7 +223,7 @@ func F32CompatibleWith(t uint8) bool {
 	}
 }
 
-// F64CompatibleWith reports f64 is compatible or not with data-type specifed type.
+// F64CompatibleWith reports f64 is compatible or not with data-type specified type.
 func F64CompatibleWith(t uint8) bool {
 	t = GetRealCode(t)
 	switch t {
@@ -236,11 +236,10 @@ func F64CompatibleWith(t uint8) bool {
 
 // TypeAreCompatible reports type one and type two is compatible or not.
 func TypesAreCompatible(t1, t2 uint8, ignoreany bool) bool {
-	if !ignoreany && t1 == Any {
-		return true
-	}
 	t1 = GetRealCode(t1)
 	switch t1 {
+	case Any:
+		return !ignoreany
 	case I8:
 		return I8CompatibleWith(t2)
 	case I16:
