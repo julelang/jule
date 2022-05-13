@@ -8,7 +8,7 @@ import (
 )
 
 type function struct {
-	Ast        Func
+	Ast        *Func
 	Attributes []Attribute
 	Desc       string
 	used       bool
@@ -38,8 +38,22 @@ func (f *function) Head() string {
 	return cxx.String()
 }
 
+func (f *function) generics() string {
+	if len(f.Ast.Generics) == 0 {
+		return ""
+	}
+	var cxx strings.Builder
+	for _, generic := range f.Ast.Generics {
+		cxx.WriteString(generic.String())
+		cxx.WriteByte('\n')
+	}
+	return cxx.String()[:cxx.Len()-1]
+}
+
 func (f *function) declHead() string {
 	var cxx strings.Builder
+	cxx.WriteString(f.generics())
+	cxx.WriteByte('\n')
 	cxx.WriteString(attributesToString(f.Attributes))
 	cxx.WriteString(f.Ast.RetType.String())
 	cxx.WriteByte(' ')
@@ -87,7 +101,7 @@ func paramsToCxx(params []Param) string {
 	cxx.WriteByte('(')
 	for _, p := range params {
 		cxx.WriteString(p.String())
-		cxx.WriteString(", ")
+		cxx.WriteByte(',')
 	}
-	return cxx.String()[:cxx.Len()-2] + ")"
+	return cxx.String()[:cxx.Len()-1] + ")"
 }

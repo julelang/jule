@@ -91,6 +91,36 @@ func Parts(toks Toks, id uint8) ([]Toks, []xlog.CompilerLog) {
 	return parts, errs
 }
 
+// GetRangeLast returns last range from tokens.
+//
+// Special cases are;
+//  GetRangeLast(toks) = toks, nil if len(toks) == 0
+//  GetRangeLast(toks) = toks, nil if toks is not has range at last
+func GetRangeLast(toks Toks) (cutted, cut Toks) {
+	if len(toks) == 0 {
+		return toks, nil
+	} else if toks[len(toks)-1].Id != tokens.Brace {
+		return toks, nil
+	}
+	braceCount := 0
+	for i := len(toks) - 1; i >= 0; i-- {
+		tok := toks[i]
+		if tok.Id == tokens.Brace {
+			switch tok.Kind {
+			case tokens.RBRACE, tokens.RBRACKET, tokens.RPARENTHESES:
+				braceCount++
+				continue
+			default:
+				braceCount--
+			}
+		}
+		if braceCount == 0 {
+			return toks[:i], toks[i:]
+		}
+	}
+	return toks, nil
+}
+
 // Ended reports position is at end of tokens or not.
 func (ast *Builder) Ended() bool { return ast.Pos >= len(ast.Toks) }
 
@@ -106,10 +136,7 @@ func (b *Builder) buildNode(toks Toks) {
 	case tokens.Const, tokens.Volatile:
 		b.GlobalVar(toks)
 	case tokens.Type:
-		t := b.Type(toks)
-		t.Pub = b.pub
-		b.pub = false
-		b.Tree = append(b.Tree, Obj{t.Tok, t})
+		b.Tree = append(b.Tree, b.TypeOrGenerics(toks))
 	case tokens.Enum:
 		b.Enum(toks)
 	case tokens.Struct:
@@ -578,12 +605,62 @@ func (b *Builder) Func(toks Toks, anon bool) (f Func) {
 	if blockToks == nil {
 		b.pusherr(f.Tok, "body_not_exist")
 		return
-	}
-	if i < len(toks) {
+	} else if i < len(toks) {
 		b.pusherr(toks[i], "invalid_syntax")
 	}
 	f.Block = b.Block(blockToks)
 	return
+}
+
+func (b *Builder) generic(toks Toks) GenericType {
+	if len(toks) > 1 {
+		b.pusherr(toks[1], "invalid_syntax")
+	}
+	var gt GenericType
+	gt.Tok = toks[0]
+	if gt.Tok.Id != tokens.Id {
+		b.pusherr(gt.Tok, "invalid_syntax")
+	}
+	gt.Id = gt.Tok.Kind
+	return gt
+}
+
+// Generic builds generic type.
+func (b *Builder) Generics(toks Toks) []GenericType {
+	tok := toks[0]
+	i := 1
+	genericsToks := getrange(&i, tokens.LBRACKET, tokens.RBRACKET, toks)
+	if len(genericsToks) == 0 {
+		b.pusherr(tok, "missing_expr")
+		return make([]GenericType, 0)
+	} else if i < len(toks) {
+		b.pusherr(toks[i], "invalid_syntax")
+	}
+	parts, errs := Parts(genericsToks, tokens.Comma)
+	b.Errs = append(b.Errs, errs...)
+	generics := make([]GenericType, len(parts))
+	for i, part := range parts {
+		if len(parts) == 0 {
+			continue
+		}
+		generics[i] = b.generic(part)
+	}
+	return generics
+}
+
+// TypeOrGenerics builds type alias or generics type declaration.
+func (b *Builder) TypeOrGenerics(toks Toks) Obj {
+	if len(toks) > 1 {
+		tok := toks[1]
+		if tok.Id == tokens.Brace && tok.Kind == tokens.LBRACKET {
+			generics := b.Generics(toks)
+			return Obj{tok, generics}
+		}
+	}
+	t := b.Type(toks)
+	t.Pub = b.pub
+	b.pub = false
+	return Obj{t.Tok, t}
 }
 
 // GlobalVar builds AST model of global variable.
@@ -727,6 +804,7 @@ end:
 
 // DataType builds AST model of data type.
 func (b *Builder) DataType(toks Toks, i *int, err bool) (t DataType, ok bool) {
+	defer func() { t.Original = t }()
 	first := *i
 	var dtv strings.Builder
 	for ; *i < len(toks); *i++ {
@@ -741,7 +819,6 @@ func (b *Builder) DataType(toks Toks, i *int, err bool) (t DataType, ok bool) {
 		case tokens.Id:
 			t.Tok = tok
 			t.Id = xtype.Id
-			t.OriginalId = t.Tok.Kind
 			dtv.WriteString(t.Tok.Kind)
 			ok = true
 			goto ret
@@ -762,7 +839,7 @@ func (b *Builder) DataType(toks Toks, i *int, err bool) (t DataType, ok bool) {
 				val, f := b.FuncDataTypeHead(toks, i)
 				f.RetType, _ = b.FuncRetDataType(toks, i)
 				dtv.WriteString(val)
-				t.Tag = f
+				t.Tag = &f
 				ok = true
 				goto ret
 			case tokens.LBRACKET:
@@ -812,6 +889,7 @@ ret:
 
 // MapDataType builds map data-type.
 func (b *Builder) MapDataType(toks Toks, i *int, err bool) (t DataType, _ string) {
+	defer func() { t.Original = t }()
 	t.Id = xtype.Map
 	t.Tok = toks[0]
 	braceCount := 0
@@ -911,6 +989,7 @@ func (b *Builder) pushTypeToTypes(types *[]DataType, toks Toks, errTok Tok) {
 }
 
 func (b *Builder) funcMultiTypeRet(toks Toks, i *int) (t DataType, ok bool) {
+	defer func() { t.Original = t }()
 	start := *i
 	tok := toks[*i]
 	t.Val += tok.Kind
@@ -971,6 +1050,7 @@ func (b *Builder) funcMultiTypeRet(toks Toks, i *int) (t DataType, ok bool) {
 
 // FuncRetDataType builds ret data-type of function.
 func (b *Builder) FuncRetDataType(toks Toks, i *int) (t DataType, ok bool) {
+	defer func() { t.Original = t }()
 	if *i >= len(toks) {
 		return
 	}

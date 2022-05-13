@@ -84,7 +84,7 @@ func ParseBlock(b Block) string {
 type DataType struct {
 	Tok        Tok
 	Id         uint8
-	OriginalId string
+	Original   any
 	Val        string
 	MultiTyped bool
 	Tag        any
@@ -92,21 +92,41 @@ type DataType struct {
 
 // ValWithOriginalId returns dt.Val with OriginalId.
 func (dt *DataType) ValWithOriginalId() string {
-	if dt.OriginalId == "" {
+	if dt.Original == nil {
 		return dt.Val
 	}
+	original := dt.Original.(DataType)
 	runes := []rune(dt.Val)
 	for i := len(runes) - 1; i >= 0; i-- {
 		r := runes[i]
 		if r != '_' && unicode.IsPunct(r) {
-			return string(runes[:i+1]) + dt.OriginalId
+			return string(runes[:i+1]) + original.Tok.Kind
 		}
 	}
-	return dt.OriginalId
+	return original.Tok.Kind
+}
+
+// GetValId returns dt.Val's identifier.
+func (dt *DataType) GetValId() string {
+	runes := []rune(dt.Val)
+	for i := len(runes) - 1; i >= 0; i-- {
+		r := runes[i]
+		if r != '_' && unicode.IsPunct(r) {
+			return string(runes[i+1:])
+		}
+	}
+	return dt.Val
 }
 
 func (dt DataType) String() string {
 	var cxx strings.Builder
+	if dt.Original != nil {
+		tok := dt.Tok
+		val := dt.ValWithOriginalId()
+		dt = dt.Original.(DataType)
+		dt.Val = val
+		dt.Tok = tok
+	}
 	for i, run := range dt.Val {
 		if run == '*' {
 			cxx.WriteRune(run)
@@ -121,7 +141,6 @@ func (dt DataType) String() string {
 	if dt.Val != "" {
 		switch {
 		case strings.HasPrefix(dt.Val, "[]"):
-			dt.Val = dt.ValWithOriginalId()
 			pointers := cxx.String()
 			cxx.Reset()
 			cxx.WriteString("array<")
@@ -146,10 +165,6 @@ func (dt DataType) String() string {
 	if dt.Id == xtype.Func {
 		return dt.FuncString() + cxx.String()
 	}
-	if dt.OriginalId != "" {
-		dt.Val = dt.ValWithOriginalId()
-		dt.Id = xtype.Id
-	}
 	switch dt.Id {
 	case xtype.Id, xtype.Enum, xtype.Struct:
 		return xapi.OutId(dt.Val, dt.Tok.File) + cxx.String()
@@ -161,7 +176,7 @@ func (dt DataType) String() string {
 func (dt *DataType) FuncString() string {
 	var cxx strings.Builder
 	cxx.WriteString("func<")
-	fun := dt.Tag.(Func)
+	fun := dt.Tag.(*Func)
 	cxx.WriteString(fun.RetType.String())
 	cxx.WriteByte('(')
 	if len(fun.Params) > 0 {
@@ -190,6 +205,20 @@ func (dt *DataType) MultiTypeString() string {
 	return cxx.String()[:cxx.Len()-1] + ">"
 }
 
+// GenericType is the AST model of generic data-type.
+type GenericType struct {
+	Tok Tok
+	Id  string
+}
+
+func (gt GenericType) String() string {
+	var cxx strings.Builder
+	cxx.WriteString("template<typename ")
+	cxx.WriteString(xapi.OutId(gt.Id, gt.Tok.File))
+	cxx.WriteByte('>')
+	return cxx.String()
+}
+
 // Type is type declaration.
 type Type struct {
 	Pub  bool
@@ -212,20 +241,32 @@ func (t Type) String() string {
 
 // Func is function declaration AST model.
 type Func struct {
-	Pub     bool
-	Tok     Tok
-	Id      string
-	Params  []Param
-	RetType DataType
-	Block   Block
+	Pub      bool
+	Tok      Tok
+	Id       string
+	Generics []*GenericType
+	Combines [][]DataType
+	Params   []Param
+	RetType  DataType
+	Block    Block
+}
+
+// FindGeneric returns index of generic if exist, return -1 if not.
+func (f *Func) FindGeneric(id string) int {
+	for i, generic := range f.Generics {
+		if generic.Id == id {
+			return i
+		}
+	}
+	return -1
 }
 
 // DataTypeString returns data type string of function.
-func (fc Func) DataTypeString() string {
+func (f *Func) DataTypeString() string {
 	var cxx strings.Builder
 	cxx.WriteByte('(')
-	if len(fc.Params) > 0 {
-		for _, p := range fc.Params {
+	if len(f.Params) > 0 {
+		for _, p := range f.Params {
 			if p.Variadic {
 				cxx.WriteString("...")
 			}
@@ -237,8 +278,8 @@ func (fc Func) DataTypeString() string {
 		cxx.WriteString(cxxStr)
 	}
 	cxx.WriteByte(')')
-	if fc.RetType.Id != xtype.Void {
-		cxx.WriteString(fc.RetType.String())
+	if f.RetType.Id != xtype.Void {
+		cxx.WriteString(f.RetType.String())
 	}
 	return cxx.String()
 }
@@ -265,7 +306,7 @@ func (p Param) String() string {
 }
 
 // Prototype returns prototype cxx of parameter.
-func (p Param) Prototype() string {
+func (p *Param) Prototype() string {
 	var cxx strings.Builder
 	if p.Volatile {
 		cxx.WriteString("volatile ")

@@ -55,6 +55,7 @@ main() {
 + Zero cost for C/C++ interoperability
 + Deferred calls
 + Documenter
++ Generic programming
 
 <h2 id="why-x">Why X?</h2>
 

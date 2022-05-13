@@ -524,14 +524,12 @@ func (l *Lex) pushRangeClose(tok Tok, open string) {
 		}
 		return
 	} else if l.braces[len-1].Kind != open {
-		l.wg.Add(1)
-		go l.pushWrongOrderCloseErrAsync(tok)
+		l.pushWrongOrderCloseErr(tok)
 	}
 	l.rmrange(len-1, tok.Kind)
 }
 
-func (l *Lex) pushWrongOrderCloseErrAsync(tok Tok) {
-	defer func() { l.wg.Done() }()
+func (l *Lex) pushWrongOrderCloseErr(tok Tok) {
 	var msg string
 	switch l.braces[len(l.braces)-1].Kind {
 	case tokens.LPARENTHESES:

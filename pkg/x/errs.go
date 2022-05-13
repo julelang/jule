@@ -63,6 +63,7 @@ var Errs = map[string]string{
 	`missing_pragma_directive`:          `missing pragma directive`,
 	`missing_goto_label`:                `missing label identifier for goto statement`,
 	`missing_argument_for`:              `missing argument for %s parameter`,
+	`missing_generics`:                  `missing generics types`,
 	`nil_for_autotype`:                  `nil is cannot use with auto-type definitions`,
 	`void_for_autotype`:                 `void data is cannot use for auto-type definitions`,
 	`rune_empty`:                        `rune is cannot empty`,
@@ -96,6 +97,7 @@ var Errs = map[string]string{
 	`notallow_declares`:                 `declare not allowed`,
 	`notallow_multiple_assign`:          `multiple assignments not allowed`,
 	`attribute_not_supports`:            `attribute is not supports by define`,
+	`generics_not_supports`:             `generics is not supports by define`,
 	`use_at_content`:                    `use declaration must be start of source code`,
 	`use_not_found`:                     `used directory path not found/access: %s`,
 	`use_has_errors`:                    `used package has errors`,
@@ -115,6 +117,9 @@ var Errs = map[string]string{
 	`param_must_have_default_arg`:       `%s paramater is must have a default argument`,
 	`namespace_not_exist`:               `namespace is not exist in this identifier: %s`,
 	`enum_overflow_limits`:              `enum overflow the limit of data-type`,
+	`generics_overflow`:                 `overflow generics types`,
+	`has_generics`:                      `define has generics types`,
+	`not_has_generics`:                  `define not has generics types`,
 	`error`:                             `error: %s`,
 }
 

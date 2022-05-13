@@ -226,7 +226,7 @@ var errorType = DataType{Id: xtype.Struct, Val: "error", Tag: errorStruct}
 var Builtin = &Defmap{
 	Funcs: []*function{
 		{
-			Ast: Func{
+			Ast: &Func{
 				Id:      "out",
 				RetType: DataType{Id: xtype.Void, Val: xtype.VoidTypeStr},
 				Params: []Param{{
@@ -238,7 +238,7 @@ var Builtin = &Defmap{
 			},
 		},
 		{
-			Ast: Func{
+			Ast: &Func{
 				Id:      "outln",
 				RetType: DataType{Id: xtype.Void, Val: xtype.VoidTypeStr},
 				Params: []Param{{
@@ -262,41 +262,41 @@ var strDefs = &Defmap{
 		},
 	},
 	Funcs: []*function{
-		{Ast: Func{
+		{Ast: &Func{
 			Id:      "empty",
 			RetType: DataType{Id: xtype.Bool, Val: tokens.BOOL},
 		}},
-		{Ast: Func{
+		{Ast: &Func{
 			Id:      "has_prefix",
 			Params:  []Param{{Id: "sub", Type: DataType{Id: xtype.Str, Val: tokens.STR}}},
 			RetType: DataType{Id: xtype.Bool, Val: tokens.BOOL},
 		}},
-		{Ast: Func{
+		{Ast: &Func{
 			Id:      "has_suffix",
 			Params:  []Param{{Id: "sub", Type: DataType{Id: xtype.Str, Val: tokens.STR}}},
 			RetType: DataType{Id: xtype.Bool, Val: tokens.BOOL},
 		}},
-		{Ast: Func{
+		{Ast: &Func{
 			Id:      "find",
 			Params:  []Param{{Id: "sub", Type: DataType{Id: xtype.Str, Val: tokens.STR}}},
 			RetType: DataType{Id: xtype.UInt, Val: tokens.UINT},
 		}},
-		{Ast: Func{
+		{Ast: &Func{
 			Id:      "rfind",
 			Params:  []Param{{Id: "sub", Type: DataType{Id: xtype.Str, Val: tokens.STR}}},
 			RetType: DataType{Id: xtype.UInt, Val: tokens.UINT},
 		}},
-		{Ast: Func{
+		{Ast: &Func{
 			Id:      "trim",
 			Params:  []Param{{Id: "bytes", Type: DataType{Id: xtype.Str, Val: tokens.STR}}},
 			RetType: DataType{Id: xtype.Str, Val: tokens.STR},
 		}},
-		{Ast: Func{
+		{Ast: &Func{
 			Id:      "rtrim",
 			Params:  []Param{{Id: "bytes", Type: DataType{Id: xtype.Str, Val: tokens.STR}}},
 			RetType: DataType{Id: xtype.Str, Val: tokens.STR},
 		}},
-		{Ast: Func{
+		{Ast: &Func{
 			Id: "split",
 			Params: []Param{
 				{Id: "sub", Type: DataType{Id: xtype.Str, Val: tokens.STR}},
@@ -308,7 +308,7 @@ var strDefs = &Defmap{
 			},
 			RetType: DataType{Id: xtype.Str, Val: "[]" + tokens.STR},
 		}},
-		{Ast: Func{
+		{Ast: &Func{
 			Id: "replace",
 			Params: []Param{
 				{Id: "sub", Type: DataType{Id: xtype.Str, Val: tokens.STR}},
@@ -334,32 +334,32 @@ var arrDefs = &Defmap{
 		},
 	},
 	Funcs: []*function{
-		{Ast: Func{Id: "clear"}},
-		{Ast: Func{
+		{Ast: &Func{Id: "clear"}},
+		{Ast: &Func{
 			Id:      "empty",
 			RetType: DataType{Id: xtype.Bool, Val: tokens.BOOL},
 		}},
-		{Ast: Func{
+		{Ast: &Func{
 			Id:     "find",
 			Params: []Param{{Id: "value"}},
 		}},
-		{Ast: Func{
+		{Ast: &Func{
 			Id:     "rfind",
 			Params: []Param{{Id: "value"}},
 		}},
-		{Ast: Func{
+		{Ast: &Func{
 			Id:     "erase",
 			Params: []Param{{Id: "value"}},
 		}},
-		{Ast: Func{
+		{Ast: &Func{
 			Id:     "erase_all",
 			Params: []Param{{Id: "value"}},
 		}},
-		{Ast: Func{
+		{Ast: &Func{
 			Id:     "append",
 			Params: []Param{{Id: "values", Variadic: true}},
 		}},
-		{Ast: Func{
+		{Ast: &Func{
 			Id: "insert",
 			Params: []Param{
 				{Id: "start", Type: DataType{Id: xtype.UInt, Val: tokens.UINT}},
@@ -406,19 +406,19 @@ var mapDefs = &Defmap{
 		},
 	},
 	Funcs: []*function{
-		{Ast: Func{Id: "clear"}},
-		{Ast: Func{Id: "keys"}},
-		{Ast: Func{Id: "values"}},
-		{Ast: Func{
+		{Ast: &Func{Id: "clear"}},
+		{Ast: &Func{Id: "keys"}},
+		{Ast: &Func{Id: "values"}},
+		{Ast: &Func{
 			Id:      "empty",
 			RetType: DataType{Id: xtype.Bool, Val: tokens.BOOL},
 		}},
-		{Ast: Func{
+		{Ast: &Func{
 			Id:      "has",
 			Params:  []Param{{Id: "key", Const: true}},
 			RetType: DataType{Id: xtype.Bool, Val: tokens.BOOL},
 		}},
-		{Ast: Func{
+		{Ast: &Func{
 			Id:     "del",
 			Params: []Param{{Id: "key", Const: true}},
 		}},
