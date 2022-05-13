@@ -74,9 +74,6 @@ In addition, the generated C++ result is human readable, understandable and effi
 X is pretty easy to learn. <br>
 It's not a compelling option for those new to programming either.
 
-On the other hand, X is also a way to learn algorithms and see the C++ equivalent in an easier way since it is translated into human readable C++ code.
-In this way, X can also be used as an easy interface for learning C++.
-
 <h2 id="os-support">OS Support</h2>
 
 <table>
@@ -173,5 +170,5 @@ To discussions and questions, please use <a href="https://github.com/the-xlang/x
 
 <h2 id="license">License</h2>
 
-X and standard library is distributed under the terms of the BSD 3-Clause license. <br>
+The XXC and standard library is distributed under the terms of the BSD 3-Clause license. <br>
 [See License Details](https://the-xlang.github.io/website/pages/license.html)
