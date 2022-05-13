@@ -100,7 +100,8 @@ func iskw(ln, kw string) bool {
 	r := rune(ln[0])
 	return ln == "" ||
 		unicode.IsSpace(r) ||
-		(r != '_' && unicode.IsPunct(r))
+		(r != '_' && unicode.IsPunct(r)) ||
+		!unicode.IsLetter(r)
 }
 
 // id returns identifer if next token is identifer,
