@@ -1145,7 +1145,7 @@ func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) bool {
 
 func (p *Parser) param(f *Func, param *Param) {
 	param.Type, _ = p.realType(param.Type, true)
-	if !typeIsAllowForConst(param.Type) {
+	if param.Const && !typeIsAllowForConst(param.Type) {
 		p.pusherrtok(param.Tok, "invalid_type_for_const", param.Type.Val)
 	}
 	p.checkParamDefaultExpr(f, param)
