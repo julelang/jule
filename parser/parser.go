@@ -304,6 +304,7 @@ func (p *Parser) Cxx() string {
 	cxx.WriteString(p.CxxEmbeds())
 	cxx.WriteString("\n\n")
 	cxx.WriteString(p.CxxTypes())
+	cxx.WriteByte('\n')
 	cxx.WriteString(p.CxxEnums())
 	cxx.WriteString(p.CxxStructs())
 	cxx.WriteString(p.CxxPrototypes())
@@ -594,17 +595,6 @@ func (p *Parser) checkGenerics(obj ast.Obj) {
 	p.generics = nil
 }
 
-func (p *Parser) checkTypeAST(t Type) bool {
-	if _, tok, _, canshadow := p.defById(t.Id); tok.Id != tokens.NA && !canshadow {
-		p.pusherrtok(t.Tok, "exist_id", t.Id)
-		return false
-	} else if xapi.IsIgnoreId(t.Id) {
-		p.pusherrtok(t.Tok, "ignore_id")
-		return false
-	}
-	return true
-}
-
 // Generics parses generics.
 func (p *Parser) Generics(generics []GenericType) {
 	for i, generic := range generics {
@@ -628,7 +618,11 @@ func (p *Parser) Generics(generics []GenericType) {
 
 // Type parses X type define statement.
 func (p *Parser) Type(t Type) {
-	if !p.checkTypeAST(t) {
+	if _, tok, _, canshadow := p.defById(t.Id); tok.Id != tokens.NA && !canshadow {
+		p.pusherrtok(t.Tok, "exist_id", t.Id)
+		return
+	} else if xapi.IsIgnoreId(t.Id) {
+		p.pusherrtok(t.Tok, "ignore_id")
 		return
 	}
 	t.Desc = p.docText.String()
@@ -707,7 +701,9 @@ func (p *Parser) Enum(e Enum) {
 
 func (p *Parser) processStructFields(s *xstruct) {
 	s.constructor = new(Func)
+	s.constructor.Id = s.Ast.Id
 	s.constructor.Params = make([]ast.Param, len(s.Ast.Fields))
+	s.constructor.RetType = DataType{Id: xtype.Struct, Val: s.Ast.Id, Tok: s.Ast.Tok, Tag: s}
 	for i, f := range s.Ast.Fields {
 		for _, cf := range s.Ast.Fields {
 			if f == cf {
@@ -838,6 +834,11 @@ func (p *Parser) Func(fast Func) {
 	f.Desc = p.docText.String()
 	p.docText.Reset()
 	f.Ast.Generics = p.generics
+	for i, param := range f.Ast.Params {
+		if f.Ast.FindGeneric(param.Type.Tok.Kind) == -1 {
+			f.Ast.Params[i].Type, _ = p.realType(param.Type, true)
+		}
+	}
 	if f.Ast.FindGeneric(f.Ast.RetType.Tok.Kind) == -1 {
 		f.Ast.RetType, _ = p.realType(f.Ast.RetType, true)
 	}
@@ -984,11 +985,11 @@ func (p *Parser) nsById(id string, parent bool) *namespace {
 }
 
 func (p *Parser) typeById(id string) (*Type, *Defmap, bool) {
-	if t, _, _ := Builtin.typeById(id, nil); t != nil {
-		return t, nil, false
-	}
 	if t := p.blockTypesById(id); t != nil {
 		return t, p.Defs, false
+	}
+	if t, _, _ := Builtin.typeById(id, nil); t != nil {
+		return t, nil, false
 	}
 	for _, use := range p.Uses {
 		t, m, _ := use.defs.typeById(id, p.File)
@@ -1000,6 +1001,9 @@ func (p *Parser) typeById(id string) (*Type, *Defmap, bool) {
 }
 
 func (p *Parser) enumById(id string) (*Enum, *Defmap, bool) {
+	if s, _, _ := Builtin.enumById(id, nil); s != nil {
+		return s, nil, false
+	}
 	for _, use := range p.Uses {
 		t, m, _ := use.defs.enumById(id, p.File)
 		if t != nil {
@@ -3033,7 +3037,7 @@ func (p *Parser) addGenericsToBlockTypes(f *Func, generics []DataType) {
 	}
 }
 
-func (p *Parser) applyGenerics(f *Func) {
+func (p *Parser) reloadFuncTypes(f *Func) {
 	for i, param := range f.Params {
 		f.Params[i].Type, _ = p.realType(param.Type, true)
 	}
@@ -3070,7 +3074,7 @@ func (p *Parser) parseGenerics(f *Func, generics []DataType, m *exprModel, errTo
 	p.blockTypes = nil
 	defer func() { p.blockTypes, p.blockVars = blockTypes, blockVars }()
 	p.addGenericsToBlockTypes(f, generics)
-	p.applyGenerics(f)
+	p.reloadFuncTypes(f)
 	if itsCombined(f, generics) {
 		return true
 	}
@@ -3080,6 +3084,14 @@ func (p *Parser) parseGenerics(f *Func, generics []DataType, m *exprModel, errTo
 	p.rootBlock = nil
 	p.parseFunc(f)
 	return true
+}
+
+func isConstructor(f *Func) bool {
+	if f.RetType.Id != xtype.Struct {
+		return false
+	}
+	s := f.RetType.Tag.(*xstruct)
+	return f.Id == s.Ast.Id
 }
 
 func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *ast.Args, m *exprModel, errTok Tok) (v value) {
@@ -3096,8 +3108,13 @@ func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *ast.Args, m *
 		v.ast.Type = f.RetType
 		v.ast.Type.Original = v.ast.Type
 	}
-	m.appendSubNode(exprNode{tokens.LPARENTHESES})
-	defer m.appendSubNode(exprNode{tokens.RPARENTHESES})
+	if isConstructor(f) {
+		m.appendSubNode(exprNode{tokens.LBRACE})
+		defer m.appendSubNode(exprNode{tokens.RBRACE})
+	} else {
+		m.appendSubNode(exprNode{tokens.LPARENTHESES})
+		defer m.appendSubNode(exprNode{tokens.RPARENTHESES})
+	}
 	if args == nil {
 		return
 	}
@@ -3537,9 +3554,14 @@ func (p *Parser) checkBlock(b *ast.Block) {
 			p.checkTry(&t, &i, b.Tree)
 			model.Val = t
 		case Type:
-			if p.checkTypeAST(t) {
-				t.Type, _ = p.realType(t.Type, true)
+			if def, _ := p.blockDefById(t.Id); def != nil {
+				p.pusherrtok(t.Tok, "exist_id", t.Id)
+				break
+			} else if xapi.IsIgnoreId(t.Id) {
+				p.pusherrtok(t.Tok, "ignore_id")
+				break
 			}
+			t.Type, _ = p.realType(t.Type, true)
 			p.blockTypes = append(p.blockTypes, &t)
 		case ast.Block:
 			p.checkNewBlock(&t)
@@ -4341,10 +4363,11 @@ func (p *Parser) typeSourceOfMultiTyped(dt DataType, err bool) (DataType, bool) 
 	return dt, ok
 }
 
-func (p *Parser) typeSourceIsType(dt, t DataType, err bool) (DataType, bool) {
+func (p *Parser) typeSourceIsType(dt DataType, t *Type, err bool) (DataType, bool) {
 	original := dt.Original
-	val := dt.Val[:len(dt.Val)-len(dt.Tok.Kind)] + t.Val
-	dt = t
+	val := dt.Val[:len(dt.Val)-len(dt.Tok.Kind)] + t.Type.Val
+	dt = t.Type
+	dt.Tok = t.Tok
 	dt.Original = original
 	dt.Val = val
 	return p.typeSource(dt, err)
@@ -4354,15 +4377,13 @@ func (p *Parser) typeSourceIsEnum(e *Enum) (dt DataType, _ bool) {
 	dt.Id = xtype.Enum
 	dt.Val = e.Id
 	dt.Tag = e
+	dt.Tok = e.Tok
 	return dt, true
 }
 
 func (p *Parser) typeSourceIsFunc(dt DataType, err bool) (DataType, bool) {
 	f := dt.Tag.(*Func)
-	for i, param := range f.Params {
-		f.Params[i].Type, _ = p.typeSource(param.Type, err)
-	}
-	f.RetType, _ = p.typeSource(f.RetType, err)
+	p.reloadFuncTypes(f)
 	dt.Val = dt.Tag.(*Func).DataTypeString()
 	return dt, true
 }
@@ -4371,10 +4392,7 @@ func (p *Parser) typeSourceIsStruct(s *xstruct) (dt DataType, _ bool) {
 	dt.Id = xtype.Struct
 	dt.Val = dt.Val[:len(dt.Val)-len(dt.Tok.Kind)] + s.Ast.Id
 	dt.Tag = s
-	// If type is built-in.
-	if s.Ast.Tok.Id == tokens.NA {
-		dt.Tok = s.Ast.Tok
-	}
+	dt.Tok = s.Ast.Tok
 	return dt, true
 }
 
@@ -4393,7 +4411,7 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 		switch t := def.(type) {
 		case *Type:
 			t.Used = true
-			return p.typeSourceIsType(dt, t.Type, err)
+			return p.typeSourceIsType(dt, t, err)
 		case *Enum:
 			t.Used = true
 			return p.typeSourceIsEnum(t)

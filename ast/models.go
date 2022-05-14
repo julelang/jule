@@ -82,6 +82,8 @@ func ParseBlock(b Block) string {
 
 // DataType is data type identifier.
 type DataType struct {
+	// Tok used for usually *File comparisons.
+	// For this reason, you don't use token as val, identifier or etc.
 	Tok        Tok
 	Id         uint8
 	Original   any
@@ -121,8 +123,8 @@ func (dt *DataType) GetValId() string {
 func (dt DataType) String() string {
 	var cxx strings.Builder
 	if dt.Original != nil {
-		tok := dt.Tok
 		val := dt.ValWithOriginalId()
+		tok := dt.Tok
 		dt = dt.Original.(DataType)
 		dt.Val = val
 		dt.Tok = tok
@@ -162,12 +164,11 @@ func (dt DataType) String() string {
 			return cxx.String()
 		}
 	}
-	if dt.Id == xtype.Func {
-		return dt.FuncString() + cxx.String()
-	}
 	switch dt.Id {
 	case xtype.Id, xtype.Enum, xtype.Struct:
 		return xapi.OutId(dt.Val, dt.Tok.File) + cxx.String()
+	case xtype.Func:
+		return dt.FuncString() + cxx.String()
 	default:
 		return xtype.CxxTypeIdFromType(dt.Id) + cxx.String()
 	}
