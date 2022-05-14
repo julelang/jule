@@ -3080,8 +3080,10 @@ func (p *Parser) parseGenerics(f *Func, generics []DataType, m *exprModel, errTo
 	}
 	f.Combines = append(f.Combines, generics)
 	rootBlock := p.rootBlock
-	defer func() { p.rootBlock = rootBlock }()
+	nodeBlock := p.nodeBlock
+	defer func() { p.rootBlock, p.nodeBlock = rootBlock, nodeBlock }()
 	p.rootBlock = nil
+	p.nodeBlock = nil
 	p.parseFunc(f)
 	return true
 }
