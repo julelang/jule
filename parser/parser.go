@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -99,7 +100,7 @@ func (p *Parser) pusherrmsgtok(tok Tok, msg string) {
 		Type:   xlog.Err,
 		Row:    tok.Row,
 		Column: tok.Column,
-		Path:   p.File.Path,
+		Path:   tok.File.Path,
 		Msg:    msg,
 	})
 }
@@ -110,7 +111,7 @@ func (p *Parser) pushwarntok(tok Tok, key string, args ...any) {
 		Type:   xlog.Warn,
 		Row:    tok.Row,
 		Column: tok.Column,
-		Path:   p.File.Path,
+		Path:   tok.File.Path,
 		Msg:    x.GetWarn(key, args...),
 	})
 }
@@ -831,9 +832,11 @@ func (p *Parser) Func(fast Func) {
 	*f.Ast = fast
 	f.Attributes = p.attributes
 	p.attributes = nil
+	p.checkFuncAttributes(f.Attributes)
 	f.Desc = p.docText.String()
 	p.docText.Reset()
 	f.Ast.Generics = p.generics
+	p.generics = nil
 	for i, param := range f.Ast.Params {
 		if f.Ast.FindGeneric(param.Type.Tok.Kind) == -1 {
 			f.Ast.Params[i].Type, _ = p.realType(param.Type, true)
@@ -842,8 +845,6 @@ func (p *Parser) Func(fast Func) {
 	if f.Ast.FindGeneric(f.Ast.RetType.Tok.Kind) == -1 {
 		f.Ast.RetType, _ = p.realType(f.Ast.RetType, true)
 	}
-	p.generics = nil
-	p.checkFuncAttributes(f.Attributes)
 	p.Defs.Funcs = append(p.Defs.Funcs, f)
 }
 
@@ -1122,13 +1123,14 @@ func (p *Parser) WaitingGlobals() {
 }
 
 func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) bool {
-	if !paramHasDefaultArg(param) {
+	if !paramHasDefaultArg(param) || param.Tok.Id == tokens.NA {
 		return true
 	}
 	dt := param.Type
 	if param.Variadic {
 		dt.Val = "[]" + dt.Val // For array.
 	}
+	fmt.Println(param.Id)
 	v, model := p.evalExpr(param.Default)
 	param.Default.Model = model
 	p.wg.Add(1)
@@ -3155,7 +3157,7 @@ func (p *Parser) parseArgs(f *Func, args *ast.Args, m *exprModel, errTok Tok) {
 }
 
 func paramHasDefaultArg(param *Param) bool {
-	return param.Default.Toks != nil || param.Default.Model != nil
+	return len(param.Default.Processes) > 0 || param.Default.Model != nil
 }
 
 //             [identifier]
