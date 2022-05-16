@@ -10,6 +10,10 @@ import (
 
 type Defmap = parser.Defmap
 
+type generic struct {
+	Id string
+}
+
 type use struct {
 	Path         string `json:"path"`
 	StandardPath bool   `json:"standard_path"`
@@ -44,6 +48,7 @@ type global struct {
 type function struct {
 	Id         string      `json:"id"`
 	Ret        string      `json:"ret"`
+	Generics   []generic   `json:"generics"`
 	Params     []parameter `json:"parameters"`
 	Desc       string      `json:"description"`
 	Attributes []string    `json:"attributes"`
@@ -163,12 +168,23 @@ func attributes(attributes []ast.Attribute) []string {
 	return attrs
 }
 
+func generics(genericTypes []*ast.GenericType) []generic {
+	generics := make([]generic, len(genericTypes))
+	for i, gt := range genericTypes {
+		var g generic
+		g.Id = gt.Id
+		generics[i] = g
+	}
+	return generics
+}
+
 func funcs(dm *Defmap) []function {
 	funcs := make([]function, len(dm.Funcs))
 	for i, f := range dm.Funcs {
 		fun := function{
 			Id:         f.Ast.Id,
 			Ret:        f.Ast.RetType.Val,
+			Generics:   generics(f.Ast.Generics),
 			Params:     params(f.Ast.Params),
 			Desc:       descriptize(f.Desc),
 			Attributes: attributes(f.Attributes),
@@ -210,7 +226,7 @@ func Documentize(p *parser.Parser) (string, error) {
 		funcs(p.Defs),
 		namespaces(p.Defs),
 	}
-	bytes, err := json.MarshalIndent(doc, "", "  ")
+	bytes, err := json.MarshalIndent(doc, "", "\t")
 	if err != nil {
 		return "", err
 	}

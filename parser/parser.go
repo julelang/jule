@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -1130,7 +1129,6 @@ func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) bool {
 	if param.Variadic {
 		dt.Val = "[]" + dt.Val // For array.
 	}
-	fmt.Println(param.Id)
 	v, model := p.evalExpr(param.Default)
 	param.Default.Model = model
 	p.wg.Add(1)

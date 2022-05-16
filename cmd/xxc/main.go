@@ -100,6 +100,7 @@ func doc(cmd string) {
 			fmt.Println(x.GetErr("error", err.Error()))
 			continue
 		}
+		path = path[len(filepath.Dir(path)):]
 		path = filepath.Join(x.Set.CxxOutDir, path+x.DocExt)
 		writeOutput(path, docjson)
 	}
@@ -368,7 +369,7 @@ func compile(path string, main, justDefs bool) *Parser {
 		return nil
 	}
 	p.File = f
-	p.Parsef(true, false)
+	p.Parsef(main, justDefs)
 	return p
 }
 
