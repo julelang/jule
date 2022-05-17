@@ -131,7 +131,7 @@ func init() {
 	execp = filepath.Dir(execp)
 	x.ExecPath = execp
 	x.StdlibPath = filepath.Join(x.ExecPath, x.Stdlib)
-	x.LangsPath = filepath.Join(x.ExecPath, x.Langs)
+	x.LangsPath = filepath.Join(x.ExecPath, x.Localizations)
 
 	// Not started with arguments.
 	// Here is "2" but "os.Args" always have one element for store working directory.

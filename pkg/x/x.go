@@ -4,12 +4,12 @@ import "github.com/the-xlang/xxc/pkg/xset"
 
 // X constants.
 const (
-	Version      = `@developer_beta 0.0.1`
-	SrcExt       = `.xx`
-	DocExt       = ".xdoc"
-	SettingsFile = "x.set"
-	Stdlib       = "lib"
-	Langs        = "langs"
+	Version       = `@developer_beta 0.0.1`
+	SrcExt        = `.xx`
+	DocExt        = ".xdoc"
+	SettingsFile  = "x.set"
+	Stdlib        = "lib"
+	Localizations = "localization"
 
 	EntryPoint = "main"
 
