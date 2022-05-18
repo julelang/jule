@@ -287,13 +287,14 @@ func (f *Func) DataTypeString() string {
 
 // Param is function parameter AST model.
 type Param struct {
-	Tok      Tok
-	Id       string
-	Const    bool
-	Volatile bool
-	Variadic bool
-	Type     DataType
-	Default  Expr
+	Tok       Tok
+	Id        string
+	Const     bool
+	Volatile  bool
+	Variadic  bool
+	Reference bool
+	Type      DataType
+	Default   Expr
 }
 
 func (p Param) String() string {
@@ -321,6 +322,9 @@ func (p *Param) Prototype() string {
 		cxx.WriteByte('>')
 	} else {
 		cxx.WriteString(p.Type.String())
+	}
+	if p.Reference {
+		cxx.WriteByte('&')
 	}
 	return cxx.String()
 }

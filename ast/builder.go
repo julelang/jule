@@ -720,15 +720,22 @@ func (b *Builder) pushParam(f *Func, toks Toks) {
 			}
 			p.Volatile = true
 		case tokens.Operator:
-			if tok.Kind != tokens.TRIPLE_DOT {
+			switch tok.Kind {
+			case tokens.TRIPLE_DOT:
+				if p.Variadic {
+					b.pusherr(tok, "already_variadic")
+					continue
+				}
+				p.Variadic = true
+			case tokens.AMPER:
+				if p.Reference {
+					b.pusherr(tok, "already_reference")
+					continue
+				}
+				p.Reference = true
+			default:
 				b.pusherr(tok, "invalid_syntax")
-				continue
 			}
-			if p.Variadic {
-				b.pusherr(tok, "already_variadic")
-				continue
-			}
-			p.Variadic = true
 		case tokens.Id:
 			toks = toks[i:]
 			p.Tok = tok

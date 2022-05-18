@@ -256,7 +256,7 @@ func (p *Parser) CxxPrototypes() string {
 
 func cxxGlobals(dm *Defmap) string {
 	var cxx strings.Builder
-	for _, g := range Builtin.Globals {
+	for _, g := range dm.Globals {
 		if g.Used && g.IdTok.Id != tokens.NA {
 			cxx.WriteString(g.String())
 			cxx.WriteByte('\n')
@@ -1121,9 +1121,9 @@ func (p *Parser) WaitingGlobals() {
 	p.Defs = pdefs
 }
 
-func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) bool {
+func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) {
 	if !paramHasDefaultArg(param) || param.Tok.Id == tokens.NA {
-		return true
+		return
 	}
 	dt := param.Type
 	if param.Variadic {
@@ -1132,21 +1132,21 @@ func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) bool {
 	v, model := p.evalExpr(param.Default)
 	param.Default.Model = model
 	p.wg.Add(1)
-	go assignChecker{
-		p:         p,
-		constant:  param.Const,
-		t:         dt,
-		v:         v,
-		ignoreAny: false,
-		errtok:    param.Tok,
-	}.checkAssignTypeAsync()
-	return true
+	go p.checkArgTypeAsync(*param, v, false, param.Tok)
 }
 
 func (p *Parser) param(f *Func, param *Param) {
 	param.Type, _ = p.realType(param.Type, true)
 	if param.Const && !typeIsAllowForConst(param.Type) {
 		p.pusherrtok(param.Tok, "invalid_type_for_const", param.Type.Val)
+	}
+	if param.Reference {
+		if param.Variadic {
+			p.pusherrtok(param.Tok, "variadic_reference_param")
+		}
+		if typeIsPtr(param.Type) {
+			p.pusherrtok(param.Tok, "pointer_reference")
+		}
 	}
 	p.checkParamDefaultExpr(f, param)
 }
@@ -3435,6 +3435,9 @@ func (p *Parser) parseArg(param Param, arg *Arg, variadiced *bool) {
 
 func (p *Parser) checkArgTypeAsync(param Param, val value, ignoreAny bool, errTok Tok) {
 	defer func() { p.wg.Done() }()
+	if !param.Const && param.Reference && !val.lvalue {
+		p.pusherrtok(errTok, "not_lvalue_for_reference_param")
+	}
 	p.wg.Add(1)
 	go assignChecker{
 		p,

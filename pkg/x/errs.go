@@ -74,6 +74,7 @@ var Errs = map[string]string{
 	`already_constant`:                  `this define is already constant`,
 	`already_variadic`:                  `this define is already variadic`,
 	`already_volatile`:                  `this define is already volatile`,
+	`already_reference`:                 `this define is already reference`,
 	`already_uses`:                      `this path is already uses`,
 	`ignore_id`:                         `ignore operator cannot use as identifier`,
 	`overflow_multiassign_identifiers`:  `overflow multi assignment identifers`,
@@ -120,6 +121,9 @@ var Errs = map[string]string{
 	`generics_overflow`:                 `overflow generics types`,
 	`has_generics`:                      `define has generics types`,
 	`not_has_generics`:                  `define not has generics types`,
+	`not_lvalue_for_reference_param`:    `require lvalue for not constant reference parameter`,
+	`variadic_reference_param`:          `referencing can't combined with variadic parameters`,
+	`pointer_reference`:                 `referencing can't combined with pointer`,
 	`error`:                             `error: %s`,
 }
 
