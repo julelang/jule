@@ -25,6 +25,12 @@ var CxxDefault = `#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) ||
 #include <thread>
 // endregion X_STANDARD_IMPORTS
 
+#define _CONCAT(_A, _B) _A ## _B
+#define CONCAT(_A, _B) _CONCAT(_A, _B)
+#define XID(_Identifier) CONCAT(_, _Identifier)
+
+static inline void XID(panic)(const char *_Error);
+
 // region X_CXX_API
 // region X_BUILTIN_VALUES
 #define nil nullptr
@@ -75,6 +81,7 @@ public:
 
     inline void clear(void) noexcept        { this->_buffer.clear(); }
     inline uint_xt len(void) const noexcept { return this->_buffer.size(); }
+    inline bool empty(void) const noexcept  { return this->_buffer.empty(); }
 
     _Item_t *find(const _Item_t &_Item) noexcept {
         iterator _it{this->begin()};
@@ -110,9 +117,8 @@ public:
         { if (_Item == *_it) { this->_buffer.erase(_it); } }
     }
 
-    void append(const array<_Item_t> &_Items) noexcept {
-        for (const _Item_t _item: _Items) { this->_buffer.push_back(_item); }
-    }
+    void append(const array<_Item_t> &_Items) noexcept
+    { for (const _Item_t _item: _Items) { this->_buffer.push_back(_item); } }
 
     bool insert(const uint_xt &_Start, const array<_Item_t> &_Items) noexcept {
         auto _it{this->_buffer.begin()+_Start};
@@ -120,8 +126,6 @@ public:
         this->_buffer.insert(_it, _Items.begin(), _Items.end());
         return true;
     }
-
-    inline bool empty(void) const noexcept { return this->_buffer.empty(); }
 
     bool operator==(const array<_Item_t> &_Src) const noexcept {
         const uint_xt _length{this->_buffer.size()};
@@ -135,7 +139,11 @@ public:
     bool operator==(const std::nullptr_t) const noexcept       { return this->_buffer.empty(); }
     bool operator!=(const array<_Item_t> &_Src) const noexcept { return !(*this == _Src); }
     bool operator!=(const std::nullptr_t) const noexcept       { return !this->_buffer.empty(); }
-    _Item_t& operator[](const uint_xt _Index)                  { return this->_buffer[_Index]; }
+
+    _Item_t& operator[](const uint_xt _Index) {
+        if (this->len() <= _Index) { XID(panic)("index out of range"); }
+        return this->_buffer[_Index];
+    }
 
     friend std::ostream& operator<<(std::ostream &_Stream,
                                     const array<_Item_t> &_Src) {
@@ -333,7 +341,10 @@ public:
     operator char*(void) const noexcept
     { return (char*)(this->_buffer.c_str()); }
 
-    char &operator[](uint_xt _Index) { return this->_buffer[_Index]; }
+    char &operator[](uint_xt _Index) {
+        if (this->len() <= _Index) { XID(panic)("index out of range"); }
+        return this->_buffer[_Index];
+    }
 
     void operator+=(const str_xt _Str) noexcept        { this->_buffer += _Str._buffer; }
     str_xt operator+(const str_xt _Str) const noexcept { return str_xt{this->_buffer + _Str._buffer}; }
@@ -440,22 +451,22 @@ str_xt tostr(const _Obj_t &_Obj) noexcept {
     return str_xt{_stream.str()};
 }
 
-#define _CONCAT(_A, _B) _A ## _B
-#define CONCAT(_A, _B) _CONCAT(_A, _B)
-#define XID(_Identifier) CONCAT(_, _Identifier)
 #define DEFER(_Expr) defer CONCAT(XXDEFER_, __LINE__){[&](void) mutable -> void { _Expr; }}
 #define CO(_Expr) std::thread{[&](void) mutable -> void { _Expr; }}.detach()
 // endregion X_MISC
 
-// region X_BUILTIN_STRUCTURES
+// region PANIC_DEFINES
 struct XID(error) {
 public:
     str_xt XID(message);
 };
-    
+
 std::ostream &operator<<(std::ostream &_Stream, const XID(error) &_Error)
 { return _Stream << _Error.XID(message); }
-// endregion X_BUILTIN_STRUCTURES
+
+static inline void XID(panic)(const struct XID(error) &_Error) { throw _Error; }
+static inline void XID(panic)(const char *_Error) { XID(panic)(XID(error){_Error}); }
+// endregion PANIC_DEFINES
 
 // region X_BUILTIN_FUNCTIONS
 template<typename _Obj_t>
@@ -466,9 +477,7 @@ static inline void XID(outln)(const _Obj_t _Obj) noexcept {
     XID(out)<_Obj_t>(_Obj);
     std::cout << std::endl;
 }
-
-static inline void XID(panic)(const struct XID(error) &_Error) { throw _Error; }
-// endregion X_BUILTIN_FUNCTIONS,
+// endregion X_BUILTIN_FUNCTIONS
 
 // region BOTTOM_MISC
 void x_terminate_handler(void) noexcept {
