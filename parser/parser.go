@@ -4322,6 +4322,7 @@ node:
 			p.pusherrtok(t.Tok, "if_notbool_expr")
 		}
 		p.checkNewBlock(&t.Block)
+		statements[*i].Val = t
 		goto node
 	case ast.Else:
 		p.checkElseBlock(&t)
