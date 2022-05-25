@@ -3027,13 +3027,33 @@ func (p *Parser) checkGenericsQuantity(f *Func, generics []DataType, errTok Tok)
 	}
 }
 
-func (p *Parser) addGenericsToBlockTypes(f *Func, generics []DataType) {
+// pushGenerics add generics to blockTypes and
+// applies to function's used generics definitions.
+func (p *Parser) pushGenerics(f *Func, generics []DataType) {
 	for i, generic := range f.Generics {
 		p.blockTypes = append(p.blockTypes, &Type{
 			Id:   generic.Id,
 			Tok:  generic.Tok,
 			Type: generics[i],
 		})
+	}
+	apply := func(t *DataType) bool {
+		id := t.OriginalValId()
+		if id == "" {
+			return false
+		}
+		index := f.FindGeneric(id)
+		if index == -1 {
+			return false
+		}
+		*t, _ = p.realType(*t, true)
+		return true
+	}
+	for i := range f.Params {
+		_ = apply(&f.Params[i].Type)
+	}
+	if apply(&f.RetType) {
+		f.RetType.Original = nil
 	}
 }
 
@@ -3073,8 +3093,7 @@ func (p *Parser) parseGenerics(f *Func, generics []DataType, m *exprModel, errTo
 	blockVars := p.blockVars
 	p.blockTypes = nil
 	defer func() { p.blockTypes, p.blockVars = blockTypes, blockVars }()
-	p.addGenericsToBlockTypes(f, generics)
-	p.reloadFuncTypes(f)
+	p.pushGenerics(f, generics)
 	if itsCombined(f, generics) {
 		return true
 	}

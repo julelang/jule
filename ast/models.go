@@ -108,6 +108,18 @@ func (dt *DataType) ValWithOriginalId() string {
 	return original.Tok.Kind
 }
 
+// OriginalValId returns dt.Val's identifier of official.
+//
+// Special case is:
+//   OriginalValId() -> "" if DataType has not original
+func (dt *DataType) OriginalValId() string {
+	if dt.Original == nil {
+		return ""
+	}
+	t := dt.Original.(DataType)
+	return t.GetValId()
+}
+
 // GetValId returns dt.Val's identifier.
 func (dt *DataType) GetValId() string {
 	runes := []rune(dt.Val)
