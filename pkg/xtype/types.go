@@ -288,6 +288,7 @@ func IsSignedNumericType(t uint8) bool {
 
 // IsSignedIntegerType reports type is signed integer or not.
 func IsSignedIntegerType(t uint8) bool {
+	t = GetRealCode(t)
 	switch t {
 	case I8, I16, I32, I64, Int, Intptr:
 		return true
@@ -298,6 +299,7 @@ func IsSignedIntegerType(t uint8) bool {
 
 // IsUnsignedNumericType reports type is unsigned numeric or not.
 func IsUnsignedNumericType(t uint8) bool {
+	t = GetRealCode(t)
 	switch t {
 	case U8, U16, U32, U64, UInt, UIntptr:
 		return true
