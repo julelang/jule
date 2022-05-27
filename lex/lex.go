@@ -421,6 +421,26 @@ func (l *Lex) lexBasicOps(txt string, tok *Tok) bool {
 	return false
 }
 
+func (l *Lex) lexIdentifier(txt string, tok *Tok) bool {
+	lex := l.id(txt)
+	if lex == "" {
+		return false
+	}
+	tok.Kind = lex
+	tok.Id = tokens.Id
+	return true
+}
+
+func (l *Lex) lexNumeric(txt string, tok *Tok) bool {
+	lex := l.num(txt)
+	if lex == "" {
+		return false
+	}
+	tok.Kind = lex
+	tok.Id = tokens.Value
+	return true
+}
+
 // Tok generates next token from resume at position.
 func (l *Lex) Tok() Tok {
 	defer func() { l.firstTokOfLine = false }()
@@ -448,7 +468,7 @@ func (l *Lex) Tok() Tok {
 		return tok
 	case strings.HasPrefix(txt, tokens.LINE_COMMENT):
 		l.lncomment(&tok)
-		goto ret
+		return tok
 	case strings.HasPrefix(txt, tokens.RANGE_COMMENT_OPEN):
 		l.rangecomment()
 		return tok
@@ -467,20 +487,10 @@ func (l *Lex) Tok() Tok {
 	case
 		l.firstTokOfLine && l.isop(txt, tokens.SHARP, tokens.Preprocessor, &tok),
 		l.lexBasicOps(txt, &tok),
-		l.lexKeywords(txt, &tok):
+		l.lexKeywords(txt, &tok),
+		l.lexIdentifier(txt, &tok),
+		l.lexNumeric(txt, &tok):
 	default:
-		lex := l.id(txt)
-		if lex != "" {
-			tok.Kind = lex
-			tok.Id = tokens.Id
-			break
-		}
-		lex = l.num(txt)
-		if lex != "" {
-			tok.Kind = lex
-			tok.Id = tokens.Value
-			break
-		}
 		r, sz := utf8.DecodeRuneInString(txt)
 		l.pusherr("invalid_token", r)
 		l.Column += sz
@@ -488,13 +498,12 @@ func (l *Lex) Tok() Tok {
 		return tok
 	}
 	l.Column += len(tok.Kind)
-ret:
 	return tok
 }
 
-func (l *Lex) rmrange(i int, kind string) {
+func getCloseKindOfBrace(open string) string {
 	var close string
-	switch kind {
+	switch open {
 	case tokens.RPARENTHESES:
 		close = tokens.LPARENTHESES
 	case tokens.RBRACE:
@@ -502,6 +511,11 @@ func (l *Lex) rmrange(i int, kind string) {
 	case tokens.RBRACKET:
 		close = tokens.LBRACKET
 	}
+	return close
+}
+
+func (l *Lex) rmrange(i int, kind string) {
+	close := getCloseKindOfBrace(kind)
 	for ; i >= 0; i-- {
 		tok := l.braces[i]
 		if tok.Kind != close {
