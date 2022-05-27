@@ -3634,8 +3634,8 @@ func (p *Parser) cxxEmbedStatement(cxx *ast.CxxEmbed) {
 			case *Type:
 				t.Used = true
 			}
-			cxx.Content = cxx.Content[:start] + xapi.OutId(id, tok.File) + cxx.Content[end:]
 		}
+		cxx.Content = cxx.Content[:start] + xapi.OutId(id, tok.File) + cxx.Content[end:]
 		match = rexpr.FindStringIndex(cxx.Content)
 	}
 }
