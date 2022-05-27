@@ -703,9 +703,9 @@ func (b *Builder) checkParamsAsync(f *Func) {
 	}
 }
 
-func (b *Builder) pushParam(f *Func, toks Toks) {
-	var p Param
-	for i, tok := range toks {
+func (b *Builder) paramBegin(p *Param, i *int, toks Toks) {
+	for ; *i < len(toks); *i++ {
+		tok := toks[*i]
 		switch tok.Id {
 		case tokens.Const:
 			if p.Const {
@@ -736,80 +736,110 @@ func (b *Builder) pushParam(f *Func, toks Toks) {
 			default:
 				b.pusherr(tok, "invalid_syntax")
 			}
-		case tokens.Id:
-			toks = toks[i:]
-			p.Tok = tok
-			if !xapi.IsIgnoreId(tok.Kind) {
-				for _, param := range f.Params {
-					if param.Id == tok.Kind {
-						b.pusherr(tok, "parameter_exist", tok.Kind)
-						break
-					}
-				}
-				p.Id = tok.Kind
-			} else {
-				p.Id = x.Anonymous
-			}
-			if len(toks) == 1 {
-				goto end
-			}
-			toks = toks[1:]
-			if tok := toks[0]; tok.Id == tokens.Brace && tok.Kind == tokens.LBRACE {
-				braceCount := 0
-				for i, tok := range toks {
-					if tok.Id == tokens.Brace {
-						switch tok.Kind {
-						case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
-							braceCount++
-							continue
-						default:
-							braceCount--
-						}
-					}
-					if braceCount > 0 {
-						continue
-					}
-					exprToks := toks[1:i]
-					toks = toks[i+1:]
-					if len(exprToks) > 0 {
-						p.Default = b.Expr(exprToks)
-					}
-					break
-				}
-			}
-			if len(toks) > 0 {
-				i := 0
-				p.Type, _ = b.DataType(toks, &i, true)
-				i++
-				if i < len(toks) {
-					b.pusherr(toks[i], "invalid_syntax")
-				}
-				i = len(f.Params) - 1
-				for ; i >= 0; i-- {
-					param := &f.Params[i]
-					if param.Type.Tok.Id != tokens.NA {
-						break
-					}
-					param.Type = p.Type
-				}
-			}
-			goto end
 		default:
-			if t, ok := b.DataType(toks, &i, true); ok {
-				if i+1 == len(toks) {
-					p.Type = t
-					goto end
-				}
-			}
-			b.pusherr(tok, "invalid_syntax")
-			goto end
+			return
 		}
 	}
+}
+
+func (b *Builder) paramBodyId(f *Func, p *Param, tok Tok) {
+	if xapi.IsIgnoreId(tok.Kind) {
+		p.Id = x.Anonymous
+		return
+	}
+	for _, param := range f.Params {
+		if param.Id == tok.Kind {
+			b.pusherr(tok, "parameter_exist", tok.Kind)
+			break
+		}
+	}
+	p.Id = tok.Kind
+}
+
+func (b *Builder) paramBodyDefaultExpr(p *Param, toks *Toks) {
+	braceCount := 0
+	for i, tok := range *toks {
+		if tok.Id == tokens.Brace {
+			switch tok.Kind {
+			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
+				braceCount++
+				continue
+			default:
+				braceCount--
+			}
+		}
+		if braceCount > 0 {
+			continue
+		}
+		exprToks := (*toks)[1:i]
+		*toks = (*toks)[i+1:]
+		if len(exprToks) > 0 {
+			p.Default = b.Expr(exprToks)
+		}
+		break
+	}
+}
+
+func (b *Builder) paramBodyDataType(f *Func, p *Param, toks Toks) {
+	i := 0
+	p.Type, _ = b.DataType(toks, &i, true)
+	i++
+	if i < len(toks) {
+		b.pusherr(toks[i], "invalid_syntax")
+	}
+	// Set param data-types to this data-type
+	// if parameter has not any data-type.
+	i = len(f.Params) - 1
+	for ; i >= 0; i-- {
+		param := &f.Params[i]
+		if param.Type.Tok.Id != tokens.NA {
+			break
+		}
+		param.Type = p.Type
+	}
+}
+
+func (b *Builder) paramBody(f *Func, p *Param, i *int, toks Toks) {
+	b.paramBodyId(f, p, toks[*i])
+	// +1 for skip identifier token
+	toks = toks[*i+1:]
+	if len(toks) == 0 {
+		return
+	}
+	if tok := toks[0]; tok.Id == tokens.Brace || tok.Kind == tokens.LBRACE {
+		b.paramBodyDefaultExpr(p, &toks)
+	}
+	if len(toks) > 0 {
+		b.paramBodyDataType(f, p, toks)
+	}
+}
+
+func (b *Builder) pushParam(f *Func, toks Toks) {
+	var p Param
+	i := 0
+	b.paramBegin(&p, &i, toks)
+	if i >= len(toks) {
+		return
+	}
+	tok := toks[i]
+	p.Tok = tok
+	// Just given data-type.
+	if tok.Id != tokens.Id {
+		if t, ok := b.DataType(toks, &i, true); ok {
+			if i+1 == len(toks) {
+				p.Type = t
+				goto end
+			}
+		}
+		b.pusherr(tok, "invalid_syntax")
+		goto end
+	}
+	b.paramBody(f, &p, &i, toks)
 end:
 	f.Params = append(f.Params, p)
 }
 
-// DataType builds AST model of data type.
+// DataType builds AST model of data-type.
 func (b *Builder) DataType(toks Toks, i *int, err bool) (t DataType, ok bool) {
 	defer func() { t.Original = t }()
 	first := *i
@@ -1584,85 +1614,92 @@ func (b *Builder) pushArg(args *Args, toks Toks, err Tok) {
 	args.Src = append(args.Src, arg)
 }
 
-// Var builds AST model of variable statement.
-func (b *Builder) Var(toks Toks) (vast Var) {
-	vast.Pub = b.pub
-	b.pub = false
-	i := 0
-	vast.DefTok = toks[i]
-	for ; i < len(toks); i++ {
-		tok := toks[i]
+func (b *Builder) varBegin(v *Var, i *int, toks Toks) {
+	for ; *i < len(toks); *i++ {
+		tok := toks[*i]
 		if tok.Id == tokens.Id {
 			break
 		}
 		switch tok.Id {
 		case tokens.Const:
-			if vast.Const {
-				b.pusherr(tok, "invalid_constant")
+			if v.Const {
+				b.pusherr(tok, "already_constant")
 				break
 			}
-			vast.Const = true
+			v.Const = true
 		case tokens.Volatile:
-			if vast.Volatile {
-				b.pusherr(tok, "invalid_volatile")
+			if v.Volatile {
+				b.pusherr(tok, "already_volatile")
 				break
 			}
-			vast.Volatile = true
+			v.Volatile = true
 		default:
 			b.pusherr(tok, "invalid_syntax")
 		}
 	}
+}
+
+func (b *Builder) varTypeNExpr(v *Var, toks Toks, i int) {
+	tok := toks[i]
+	t, ok := b.DataType(toks, &i, false)
+	if ok {
+		v.Type = t
+		i++
+		if i >= len(toks) {
+			return
+		}
+		tok = toks[i]
+	}
+	if tok.Id == tokens.Operator {
+		if tok.Kind != tokens.EQUAL {
+			b.pusherr(tok, "invalid_syntax")
+			return
+		}
+		valueToks := toks[i+1:]
+		if len(valueToks) == 0 {
+			b.pusherr(tok, "missing_expr")
+			return
+		}
+		v.Val = b.Expr(valueToks)
+		v.SetterTok = tok
+	} else {
+		b.pusherr(tok, "invalid_syntax")
+	}
+}
+
+// Var builds AST model of variable statement.
+func (b *Builder) Var(toks Toks) (v Var) {
+	v.Pub = b.pub
+	b.pub = false
+	i := 0
+	v.DefTok = toks[i]
+	b.varBegin(&v, &i, toks)
 	if i >= len(toks) {
 		return
 	}
-	vast.IdTok = toks[i]
-	if vast.IdTok.Id != tokens.Id {
-		b.pusherr(vast.IdTok, "invalid_syntax")
+	v.IdTok = toks[i]
+	if v.IdTok.Id != tokens.Id {
+		b.pusherr(v.IdTok, "invalid_syntax")
 	}
-	vast.Id = vast.IdTok.Kind
-	vast.Type.Id = xtype.Void
-	vast.Type.Val = xtype.VoidTypeStr
+	v.Id = v.IdTok.Kind
+	v.Type.Id = xtype.Void
+	v.Type.Val = xtype.VoidTypeStr
 	// Skip type definer operator(':')
 	i++
 	if i >= len(toks) {
 		b.pusherr(toks[i-1], "invalid_syntax")
 		return
 	}
-	if vast.DefTok.File != nil {
+	// If exist deftok, this token is now should be colon.
+	if v.DefTok.File != nil {
 		if toks[i].Id != tokens.Colon {
 			b.pusherr(toks[i], "invalid_syntax")
 			return
 		}
 		i++
-	} else {
-		i++
 	}
 	if i < len(toks) {
-		tok := toks[i]
-		t, ok := b.DataType(toks, &i, false)
-		if ok {
-			vast.Type = t
-			i++
-			if i >= len(toks) {
-				return
-			}
-			tok = toks[i]
-		}
-		if tok.Id == tokens.Operator {
-			if tok.Kind != tokens.EQUAL {
-				b.pusherr(tok, "invalid_syntax")
-				return
-			}
-			valueToks := toks[i+1:]
-			if len(valueToks) == 0 {
-				b.pusherr(tok, "missing_expr")
-				return
-			}
-			vast.Val = b.Expr(valueToks)
-			vast.SetterTok = tok
-		} else {
-			b.pusherr(tok, "invalid_syntax")
-		}
+		b.varTypeNExpr(&v, toks, i)
 	}
 	return
 }
