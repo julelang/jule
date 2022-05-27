@@ -308,7 +308,7 @@ func (b *Builder) Enum(toks Toks) {
 func (b *Builder) Comment(tok Tok) {
 	tok.Kind = strings.TrimSpace(tok.Kind[2:])
 	if strings.HasPrefix(tok.Kind, "cxx:") {
-		b.Tree = append(b.Tree, Obj{tok, CxxEmbed{tok.Kind[4:]}})
+		b.Tree = append(b.Tree, Obj{tok, CxxEmbed{tok, tok.Kind[4:]}})
 		return
 	}
 	b.Tree = append(b.Tree, Obj{tok, Comment{tok.Kind}})
@@ -1678,7 +1678,7 @@ func (b *Builder) CommentStatement(tok Tok) (s Statement) {
 	s.Tok = tok
 	tok.Kind = strings.TrimSpace(tok.Kind[2:])
 	if strings.HasPrefix(tok.Kind, "cxx:") {
-		s.Val = CxxEmbed{tok.Kind[4:]}
+		s.Val = CxxEmbed{tok, tok.Kind[4:]}
 	} else {
 		s.Val = Comment{tok.Kind}
 	}

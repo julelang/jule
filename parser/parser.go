@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/the-xlang/xxc/ast"
 	"github.com/the-xlang/xxc/lex"
@@ -3618,6 +3619,8 @@ func (p *Parser) checkBlock(b *ast.Block) {
 	}
 }
 
+func isCxxReturn(s string) bool { return strings.HasPrefix(s, "return") }
+
 func (p *Parser) cxxEmbedStatement(cxx *ast.CxxEmbed) {
 	rexpr := regexp.MustCompile(`@[\p{L}|_]([\p{L}0-9_]+)?`)
 	match := rexpr.FindStringIndex(cxx.Content)
@@ -3637,6 +3640,25 @@ func (p *Parser) cxxEmbedStatement(cxx *ast.CxxEmbed) {
 		}
 		cxx.Content = cxx.Content[:start] + xapi.OutId(id, tok.File) + cxx.Content[end:]
 		match = rexpr.FindStringIndex(cxx.Content)
+	}
+	cxxcode := strings.TrimLeftFunc(cxx.Content, unicode.IsSpace)
+	if isCxxReturn(cxxcode) {
+		p.checkEmbedReturn(cxxcode, cxx.Tok)
+	}
+}
+
+func (p *Parser) checkEmbedReturn(cxx string, errTok Tok) {
+	returnKwLen := 6
+	cxx = cxx[returnKwLen:]
+	cxx = strings.TrimLeftFunc(cxx, unicode.IsSpace)
+	if cxx[len(cxx)-1] == ';' {
+		cxx = cxx[:len(cxx)-1]
+	}
+	f := p.rootBlock.Func
+	if len(cxx) == 0 && !typeIsVoid(f.RetType) {
+		p.pusherrtok(errTok, "require_return_value")
+	} else if len(cxx) > 0 && typeIsVoid(f.RetType) {
+		p.pusherrtok(errTok, "void_function_return_value")
 	}
 }
 
@@ -3921,9 +3943,14 @@ func (rc *retChecker) check() {
 
 func (p *Parser) checkRets(f *Func) {
 	for _, s := range f.Block.Tree {
-		switch s.Val.(type) {
+		switch t := s.Val.(type) {
 		case ast.Ret:
 			return
+		case ast.CxxEmbed:
+			cxx := strings.TrimLeftFunc(t.Content, unicode.IsSpace)
+			if isCxxReturn(cxx) {
+				return
+			}
 		}
 	}
 	if !typeIsVoid(f.RetType) {
