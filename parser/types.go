@@ -11,15 +11,12 @@ func typeIsVoid(t DataType) bool          { return t.Id == xtype.Void && !t.Mult
 func typeIsVariadicable(t DataType) bool  { return typeIsArray(t) }
 func typeIsMut(t DataType) bool           { return typeIsPtr(t) }
 func typeIsAllowForConst(t DataType) bool { return typeIsSingle(t) }
+func typeIsSinglePtr(t DataType) bool     { return t.Id == xtype.Voidptr }
 
 func typeOfArrayItems(t DataType) DataType {
 	// Remove array syntax "[]"
 	t.Val = t.Val[2:]
 	return t
-}
-
-func typeIsSinglePtr(t DataType) bool {
-	return t.Id == xtype.Voidptr || t.Id == xtype.UIntptr || t.Id == xtype.Intptr
 }
 
 func typeIsExplicitPtr(t DataType) bool {

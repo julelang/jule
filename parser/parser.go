@@ -1624,14 +1624,6 @@ func (s *solver) ptr() (v ast.Value) {
 		v.Type.Id = xtype.Bool
 		v.Type.Val = tokens.BOOL
 	default:
-		if typeIsSinglePtr(s.leftVal.Type) {
-			switch s.leftVal.Type.Id {
-			case xtype.Intptr:
-				return s.signed()
-			case xtype.UIntptr:
-				return s.unsigned()
-			}
-		}
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "pointer")
 	}
 	return
@@ -2548,7 +2540,9 @@ func (p *Parser) checkCastEnum(t, vt DataType, errtok Tok) {
 }
 
 func (p *Parser) checkCastInteger(t, vt DataType, errtok Tok) {
-	if typeIsPtr(vt) && (t.Id == xtype.I64 || xtype.Id == xtype.U64) {
+	if typeIsPtr(vt) &&
+		(t.Id == xtype.I64 || t.Id == xtype.U64 ||
+			t.Id == xtype.Intptr || t.Id == xtype.UIntptr) {
 		return
 	}
 	if typeIsSingle(vt) && xtype.IsNumericType(vt.Id) {
