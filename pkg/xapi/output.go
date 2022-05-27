@@ -4,6 +4,10 @@ package xapi
 var CxxMain = `// region X_ENTRY_POINT
 int main(void) {
     std::set_terminate(&x_terminate_handler);
+#ifdef _WINDOWS
+    SetConsoleOutputCP(CP_UTF8);
+    _setmode(_fileno(stdin), 0x00020000);
+#endif
     XID(main());
     return EXIT_SUCCESS;
 }
@@ -23,6 +27,12 @@ var CxxDefault = `#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) ||
 #include <vector>
 #include <map>
 #include <thread>
+#ifdef _WINDOWS
+#include <locale>
+#include <codecvt>
+#include <windows.h>
+#include <fcntl.h>
+#endif
 // endregion X_STANDARD_IMPORTS
 
 #define _CONCAT(_A, _B) _A ## _B
