@@ -79,19 +79,23 @@ It's not a compelling option for those new to programming either.
 <table>
     <tr>
         <td><strong>Operating System</strong></td>
-        <td><strong>State</strong></td>
+        <td><strong>Transpiler</strong></td>
+        <td><strong>Compiler</strong></td>
     </tr>
     <tr>
         <td>Windows</td>
-        <td>Supports transpiler, not supports compiler yet</td>
+        <td>Supports</td>
+        <td>Not supports yet</td>
     </tr>
     <tr>
         <td>Linux</td>
-        <td>Supports transpiler, not supports compiler yet</td>
+        <td>Supports</td>
+        <td>Not supports yet</td>
     </tr>
     <tr>
         <td>MacOS</td>
-        <td>Supports transpiler, not supports compiler yet</td>
+        <td>Supports</td>
+        <td>Not supports yet</td>
     </tr>
 </table>
 
@@ -151,9 +155,17 @@ That is until the X programming language matures. <br>
 Later, XXC is planned to be developed with the X programming language.
 
 ### Building with Go Compiler
+
+#### Windows - PowerShell
 ```
-go build -v cmd/xxc/main.go
+go build -o xxc.exe -v cmd/xxc/main.go
 ```
+
+#### Linux - Bash
+```
+go build -o xxc -v cmd/xxc/main.go
+```
+
 Run the above command in your terminal, in the XXC project directory.
 
 <h2 id="contributing">Contributing</h2>
