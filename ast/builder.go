@@ -1307,7 +1307,8 @@ func IsFuncCall(toks Toks) Toks {
 		return nil
 	}
 	braceCount := 0
-	for i := len(toks) - 1; i >= 0; i-- {
+	// Loops to 1 because expression must be has function expression at begin.
+	for i := len(toks) - 1; i >= 1; i-- {
 		tok := toks[i]
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
@@ -1317,7 +1318,10 @@ func IsFuncCall(toks Toks) Toks {
 				braceCount--
 			}
 			if braceCount == 0 {
-				return toks[:i]
+				tok = toks[i-1]
+				if tok.Id == tokens.Brace || tok.Id == tokens.Id {
+					return toks[:i]
+				}
 			}
 		}
 	}
