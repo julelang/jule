@@ -715,14 +715,16 @@ func (p *Parser) processStructFields(s *xstruct) {
 				break
 			}
 		}
-		param := ast.Param{Id: f.Id}
+		v := p.Var(*f)
+		if v.Type.Id == xtype.Struct && v.Type.Tag == s && typeIsSingle(v.Type) {
+			p.pusherrtok(f.Type.Tok, "invalid_type_source")
+		}
+		param := ast.Param{Id: f.Id, Type: v.Type}
 		if f.Val.Toks != nil {
 			param.Default = f.Val
 		} else {
-			param.Default.Model = exprNode{defaultValueOfType(f.Type)}
+			param.Default.Model = exprNode{defaultValueOfType(param.Type)}
 		}
-		v := p.Var(*f)
-		param.Type = v.Type
 		s.Defs.Globals = append(s.Defs.Globals, v)
 		s.constructor.Params[i] = param
 	}
@@ -738,12 +740,12 @@ func (p *Parser) Struct(s Struct) {
 		return
 	}
 	xs := new(xstruct)
+	p.Defs.Structs = append(p.Defs.Structs, xs)
 	xs.Desc = p.docText.String()
 	p.docText.Reset()
 	xs.Ast = s
 	xs.Defs = new(Defmap)
 	p.processStructFields(xs)
-	p.Defs.Structs = append(p.Defs.Structs, xs)
 }
 
 // pushNS pushes namespace to defmap and returns leaf namespace.
@@ -2151,7 +2153,7 @@ func (p *Parser) evalExprPart(toks Toks, m *exprModel) (v value) {
 }
 
 func (p *Parser) evalXObjSubId(dm *Defmap, val value, idTok Tok, m *exprModel) (v value) {
-	i, dm, t := dm.defById(idTok.Kind, nil)
+	i, dm, t := dm.defById(idTok.Kind, idTok.File)
 	if i == -1 {
 		p.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
 		return
@@ -4411,11 +4413,10 @@ func (p *Parser) typeSourceOfMultiTyped(dt DataType, err bool) (DataType, bool) 
 
 func (p *Parser) typeSourceIsType(dt DataType, t *Type, err bool) (DataType, bool) {
 	original := dt.Original
-	val := dt.Val[:len(dt.Val)-len(dt.Tok.Kind)] + t.Type.Val
 	dt = t.Type
 	dt.Tok = t.Tok
 	dt.Original = original
-	dt.Val = val
+	dt.Val = t.Type.Val
 	return p.typeSource(dt, err)
 }
 
@@ -4436,7 +4437,7 @@ func (p *Parser) typeSourceIsFunc(dt DataType, err bool) (DataType, bool) {
 
 func (p *Parser) typeSourceIsStruct(s *xstruct) (dt DataType, _ bool) {
 	dt.Id = xtype.Struct
-	dt.Val = dt.Val[:len(dt.Val)-len(dt.Tok.Kind)] + s.Ast.Id
+	dt.Val = s.Ast.Id
 	dt.Tag = s
 	dt.Tok = s.Ast.Tok
 	return dt, true
@@ -4453,7 +4454,9 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 	}
 	switch dt.Id {
 	case xtype.Id:
-		def, _, _, _ := p.defById(dt.GetValId())
+		id, prefix := dt.GetValId()
+		defer func() { ret.Val = prefix + ret.Val }()
+		def, _, _, _ := p.defById(id)
 		switch t := def.(type) {
 		case *Type:
 			t.Used = true

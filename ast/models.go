@@ -117,19 +117,20 @@ func (dt *DataType) OriginalValId() string {
 		return ""
 	}
 	t := dt.Original.(DataType)
-	return t.GetValId()
+	id, _ := t.GetValId()
+	return id
 }
 
 // GetValId returns dt.Val's identifier.
-func (dt *DataType) GetValId() string {
+func (dt *DataType) GetValId() (id, prefix string) {
 	runes := []rune(dt.Val)
 	for i := len(runes) - 1; i >= 0; i-- {
 		r := runes[i]
 		if r != '_' && unicode.IsPunct(r) {
-			return string(runes[i+1:])
+			return string(runes[i+1:]), string(runes[:i+1])
 		}
 	}
-	return dt.Val
+	return dt.Val, ""
 }
 
 func (dt DataType) String() string {
