@@ -61,7 +61,7 @@ func version(cmd string) {
 		println("This module can only be used as single!")
 		return
 	}
-	println("The X Programming Language\n" + x.Version)
+	println("xxc version", x.Version)
 }
 
 func initProject(cmd string) {
