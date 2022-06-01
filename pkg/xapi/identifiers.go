@@ -31,15 +31,15 @@ func getPtrAsId(ptr unsafe.Pointer) string {
 
 // OutId returns cxx output identifier form of given identifier.
 func OutId(id string, f *xio.File) string {
-	var out strings.Builder
-	/*path = strings.ReplaceAll(path, string(os.PathSeparator), "_")
-	pah = strings.ReplaceAll(path, ":", "_")*/
 	if f != nil {
+		var out strings.Builder
+		out.WriteByte('f')
 		out.WriteString(getPtrAsId(unsafe.Pointer(f)))
 		out.WriteByte('_')
+		out.WriteString(id)
+		return out.String()
 	}
-	out.WriteString(id)
-	return AsId(out.String())
+	return AsId(id)
 }
 
 // AsTypeId returns given identifier as output type identifier.
