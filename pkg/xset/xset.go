@@ -14,6 +14,8 @@ type XSet struct {
 	Language     string   `json:"language"`
 	Mode         string   `json:"mode"`
 	PostCommands []string `json:"post_commands"`
+	Indent       string   `json:"indent"`
+	IndentCount  int      `json:"indent_count"`
 }
 
 // Default XSet instance.
@@ -23,6 +25,8 @@ var Default = &XSet{
 	OutName:      "main",
 	Language:     "",
 	Mode:         "transpile",
+	Indent:       "\t",
+	IndentCount:  1,
 	PostCommands: make([]string, 0),
 }
 

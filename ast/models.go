@@ -7,6 +7,7 @@ import (
 	"unicode"
 
 	"github.com/the-xlang/xxc/lex/tokens"
+	"github.com/the-xlang/xxc/pkg/x"
 	"github.com/the-xlang/xxc/pkg/xapi"
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
@@ -39,15 +40,14 @@ type Block struct {
 	Func     *Func
 }
 
-// IndentSpace of blocks.
-const IndentSpace = 2
-
 // Indent is indention count.
 // This should be manuplate atomic.
 var Indent uint32 = 0
 
 // IndentString returns indent space of current block.
-func IndentString() string { return strings.Repeat(" ", int(Indent)*IndentSpace) }
+func IndentString() string {
+	return strings.Repeat(x.Set.Indent, int(Indent)*x.Set.IndentCount)
+}
 
 // AddIndent adds new indent to IndentString.
 func AddIndent() { atomic.AddUint32(&Indent, 1) }
@@ -75,7 +75,7 @@ func ParseBlock(b Block) string {
 		cxx.WriteString(s.String())
 	}
 	cxx.WriteByte('\n')
-	cxx.WriteString(strings.Repeat(" ", int(Indent-1)*IndentSpace))
+	cxx.WriteString(strings.Repeat(x.Set.Indent, int(Indent-1)*x.Set.IndentCount))
 	cxx.WriteByte('}')
 	return cxx.String()
 }
