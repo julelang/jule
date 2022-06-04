@@ -1838,46 +1838,56 @@ func (s *solver) nil() (v ast.Value) {
 	return
 }
 
+func (s *solver) check() bool {
+	switch s.operator.Kind {
+	case tokens.PLUS, tokens.MINUS, tokens.STAR, tokens.SLASH, tokens.PERCENT, tokens.RSHIFT,
+		tokens.LSHIFT, tokens.AMPER, tokens.VLINE, tokens.CARET, tokens.EQUALS, tokens.NOT_EQUALS,
+		tokens.GREAT, tokens.LESS, tokens.GREAT_EQUAL, tokens.LESS_EQUAL:
+	case tokens.AND, tokens.OR:
+	default:
+		s.p.pusherrtok(s.operator, "invalid_operator")
+		return false
+	}
+	return true
+}
+
 func (s *solver) solve() (v ast.Value) {
 	defer func() {
 		if v.Type.Id == xtype.Void {
 			v.Type.Val = xtype.VoidTypeStr
 		}
 	}()
+	if !s.check() {
+		return
+	}
 	switch s.operator.Kind {
-	case tokens.PLUS, tokens.MINUS, tokens.STAR, tokens.SLASH, tokens.PERCENT, tokens.RSHIFT,
-		tokens.LSHIFT, tokens.AMPER, tokens.VLINE, tokens.CARET, tokens.EQUALS, tokens.NOT_EQUALS,
-		tokens.GREAT, tokens.LESS, tokens.GREAT_EQUAL, tokens.LESS_EQUAL:
-		break
 	case tokens.AND, tokens.OR:
 		return s.logical()
-	default:
-		s.p.pusherrtok(s.operator, "invalid_operator")
 	}
 	switch {
-	case typeIsArray(s.leftVal.Type) || typeIsArray(s.rightVal.Type):
+	case typeIsArray(s.leftVal.Type), typeIsArray(s.rightVal.Type):
 		return s.array()
-	case typeIsPtr(s.leftVal.Type) || typeIsPtr(s.rightVal.Type):
+	case typeIsPtr(s.leftVal.Type), typeIsPtr(s.rightVal.Type):
 		return s.ptr()
-	case s.leftVal.Type.Id == xtype.Enum || s.rightVal.Type.Id == xtype.Enum:
+	case s.leftVal.Type.Id == xtype.Enum, s.rightVal.Type.Id == xtype.Enum:
 		return s.enum()
-	case s.leftVal.Type.Id == xtype.Nil || s.rightVal.Type.Id == xtype.Nil:
+	case s.leftVal.Type.Id == xtype.Nil, s.rightVal.Type.Id == xtype.Nil:
 		return s.nil()
-	case s.leftVal.Type.Id == xtype.Char || s.rightVal.Type.Id == xtype.Char:
+	case s.leftVal.Type.Id == xtype.Char, s.rightVal.Type.Id == xtype.Char:
 		return s.char()
-	case s.leftVal.Type.Id == xtype.Any || s.rightVal.Type.Id == xtype.Any:
+	case s.leftVal.Type.Id == xtype.Any, s.rightVal.Type.Id == xtype.Any:
 		return s.any()
-	case s.leftVal.Type.Id == xtype.Bool || s.rightVal.Type.Id == xtype.Bool:
+	case s.leftVal.Type.Id == xtype.Bool, s.rightVal.Type.Id == xtype.Bool:
 		return s.bool()
-	case s.leftVal.Type.Id == xtype.Str || s.rightVal.Type.Id == xtype.Str:
+	case s.leftVal.Type.Id == xtype.Str, s.rightVal.Type.Id == xtype.Str:
 		return s.str()
-	case xtype.IsFloatType(s.leftVal.Type.Id) ||
+	case xtype.IsFloatType(s.leftVal.Type.Id),
 		xtype.IsFloatType(s.rightVal.Type.Id):
 		return s.float()
-	case xtype.IsUnsignedNumericType(s.leftVal.Type.Id) ||
+	case xtype.IsUnsignedNumericType(s.leftVal.Type.Id),
 		xtype.IsUnsignedNumericType(s.rightVal.Type.Id):
 		return s.unsigned()
-	case xtype.IsSignedNumericType(s.leftVal.Type.Id) ||
+	case xtype.IsSignedNumericType(s.leftVal.Type.Id),
 		xtype.IsSignedNumericType(s.rightVal.Type.Id):
 		return s.signed()
 	}

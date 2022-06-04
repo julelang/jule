@@ -924,15 +924,11 @@ ret:
 	return
 }
 
-// MapDataType builds map data-type.
-func (b *Builder) MapDataType(toks Toks, i *int, err bool) (t DataType, _ string) {
-	defer func() { t.Original = t }()
-	t.Id = xtype.Map
-	t.Tok = toks[0]
+func getMapDataTypeInfo(toks Toks, i *int) (typeToks Toks, colon int) {
+	typeToks = nil
+	colon = -1
 	braceCount := 0
-	colon := -1
 	start := *i
-	var mapToks Toks
 	for ; *i < len(toks); *i++ {
 		tok := toks[*i]
 		if tok.Id == tokens.Brace {
@@ -947,7 +943,7 @@ func (b *Builder) MapDataType(toks Toks, i *int, err bool) (t DataType, _ string
 			if start+1 > *i {
 				return
 			}
-			mapToks = toks[start+1 : *i]
+			typeToks = toks[start+1 : *i]
 			break
 		} else if braceCount != 1 {
 			continue
@@ -956,16 +952,25 @@ func (b *Builder) MapDataType(toks Toks, i *int, err bool) (t DataType, _ string
 			colon = *i - start - 1
 		}
 	}
-	if mapToks == nil || colon == -1 {
+	return
+}
+
+// MapDataType builds map data-type.
+func (b *Builder) MapDataType(toks Toks, i *int, err bool) (t DataType, _ string) {
+	defer func() { t.Original = t }()
+	t.Id = xtype.Map
+	t.Tok = toks[0]
+	typeToks, colon := getMapDataTypeInfo(toks, i)
+	if typeToks == nil || colon == -1 {
 		return
 	}
 	colonTok := toks[colon]
-	if colon == 0 || colon+1 >= len(mapToks) {
+	if colon == 0 || colon+1 >= len(typeToks) {
 		b.pusherr(colonTok, "missing_expr")
 		return t, " " // Space for ignore "invalid_syntax" error
 	}
-	keyTypeToks := mapToks[:colon]
-	valTypeToks := mapToks[colon+1:]
+	keyTypeToks := typeToks[:colon]
+	valTypeToks := typeToks[colon+1:]
 	types := make([]DataType, 2)
 	j := 0
 	types[0], _ = b.DataType(keyTypeToks, &j, err)
@@ -2137,94 +2142,117 @@ func isOverflowOperator(kind string) bool {
 
 func isExprOperator(kind string) bool { return kind == tokens.TRIPLE_DOT }
 
+type exprProcessInfo struct {
+	processes        []Toks
+	part             Toks
+	operator         bool
+	value            bool
+	singleOperatored bool
+	newKeyword       bool
+	pushedError      bool
+	braceCount       int
+	toks             Toks
+	i                int
+}
+
+func (b *Builder) exprOperatorPart(info *exprProcessInfo, tok Tok) {
+	if info.newKeyword ||
+		isExprOperator(tok.Kind) ||
+		isAssignOperator(tok.Kind) {
+		info.part = append(info.part, tok)
+		return
+	}
+	if !info.operator {
+		if IsSingleOperator(tok.Kind) && !info.singleOperatored {
+			info.part = append(info.part, tok)
+			info.singleOperatored = true
+			return
+		}
+		if info.braceCount == 0 && isOverflowOperator(tok.Kind) {
+			b.pusherr(tok, "operator_overflow")
+		}
+	}
+	info.singleOperatored = false
+	info.operator = false
+	info.value = true
+	if info.braceCount > 0 {
+		info.part = append(info.part, tok)
+		return
+	}
+	info.processes = append(info.processes, info.part)
+	info.processes = append(info.processes, Toks{tok})
+	info.part = Toks{}
+}
+
+func (b *Builder) exprValuePart(info *exprProcessInfo, tok Tok) {
+	if info.i > 0 && info.braceCount == 0 {
+		lt := info.toks[info.i-1]
+		if (lt.Id == tokens.Id || lt.Id == tokens.Value) &&
+			(tok.Id == tokens.Id || tok.Id == tokens.Value) {
+			b.pusherr(tok, "invalid_syntax")
+			info.pushedError = true
+		}
+	}
+	b.checkExprTok(tok)
+	info.part = append(info.part, tok)
+	info.operator = requireOperatorForProcess(tok, info.i, len(info.toks))
+	info.value = false
+}
+
+func (b *Builder) exprBracePart(info *exprProcessInfo, tok Tok) bool {
+	switch tok.Kind {
+	case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
+		if tok.Kind == tokens.LBRACKET {
+			oldIndex := info.i
+			_, ok := b.DataType(info.toks, &info.i, false)
+			if ok {
+				info.part = append(info.part, info.toks[oldIndex:info.i+1]...)
+				return true
+			}
+			info.i = oldIndex
+		}
+		info.singleOperatored = false
+		info.braceCount++
+	default:
+		info.braceCount--
+	}
+	return false
+}
+
 func (b *Builder) getExprProcesses(toks Toks) []Toks {
-	var processes []Toks
-	var part Toks
-	operator := false
-	value := false
-	braceCount := 0
-	pushedError := false
-	singleOperatored := false
-	newKeyword := false
-	for i := 0; i < len(toks); i++ {
-		tok := toks[i]
+	var info exprProcessInfo
+	info.toks = toks
+	for ; info.i < len(info.toks); info.i++ {
+		tok := info.toks[info.i]
 		switch tok.Id {
 		case tokens.Operator:
-			if newKeyword ||
-				isExprOperator(tok.Kind) ||
-				isAssignOperator(tok.Kind) {
-				part = append(part, tok)
-				continue
-			}
-			if !operator {
-				if IsSingleOperator(tok.Kind) && !singleOperatored {
-					part = append(part, tok)
-					singleOperatored = true
-					continue
-				}
-				if braceCount == 0 && isOverflowOperator(tok.Kind) {
-					b.pusherr(tok, "operator_overflow")
-				}
-			}
-			singleOperatored = false
-			operator = false
-			value = true
-			if braceCount > 0 {
-				part = append(part, tok)
-				continue
-			}
-			processes = append(processes, part)
-			processes = append(processes, Toks{tok})
-			part = Toks{}
+			b.exprOperatorPart(&info, tok)
 			continue
 		case tokens.Brace:
-			switch tok.Kind {
-			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
-				if tok.Kind == tokens.LBRACKET {
-					oldIndex := i
-					_, ok := b.DataType(toks, &i, false)
-					if ok {
-						part = append(part, toks[oldIndex:i+1]...)
-						continue
-					}
-					i = oldIndex
-				}
-				singleOperatored = false
-				braceCount++
-			default:
-				braceCount--
+			skipStep := b.exprBracePart(&info, tok)
+			if skipStep {
+				continue
 			}
 		case tokens.New:
-			newKeyword = true
+			info.newKeyword = true
 		case tokens.Id:
-			if braceCount == 0 {
-				newKeyword = false
+			if info.braceCount == 0 {
+				info.newKeyword = false
 			}
 		}
-		if i > 0 && braceCount == 0 {
-			lt := toks[i-1]
-			if (lt.Id == tokens.Id || lt.Id == tokens.Value) &&
-				(tok.Id == tokens.Id || tok.Id == tokens.Value) {
-				b.pusherr(tok, "invalid_syntax")
-				pushedError = true
-			}
-		}
-		b.checkExprTok(tok)
-		part = append(part, tok)
-		operator = requireOperatorForProcess(tok, i, len(toks))
-		value = false
+		b.exprValuePart(&info, tok)
 	}
-	if len(part) > 0 {
-		processes = append(processes, part)
+	if len(info.part) > 0 {
+		info.processes = append(info.processes, info.part)
 	}
-	if value {
-		b.pusherr(processes[len(processes)-1][0], "operator_overflow")
-		pushedError = true
+	if info.value {
+		b.pusherr(info.processes[len(info.processes)-1][0], "operator_overflow")
+		info.pushedError = true
 	}
-	if pushedError {
+	if info.pushedError {
 		return nil
 	}
-	return processes
+	return info.processes
 }
 
 func requireOperatorForProcess(tok Tok, index, len int) bool {
