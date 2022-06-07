@@ -467,7 +467,6 @@ func (b *Builder) structFields(toks Toks) []*Var {
 			}
 			varToks = varToks[1:]
 		}
-		b.Var(varToks)
 		vast := b.Var(varToks)
 		vast.Pub = pub
 		fields = append(fields, &vast)
@@ -839,6 +838,58 @@ end:
 	f.Params = append(f.Params, p)
 }
 
+func (b *Builder) idGenericsParts(toks Toks, i *int) []Toks {
+	first := *i
+	braceCount := 0
+	for ; *i < len(toks); *i++ {
+		tok := toks[*i]
+		if tok.Id == tokens.Brace {
+			switch tok.Kind {
+			case tokens.LBRACKET:
+				braceCount++
+			case tokens.RBRACKET:
+				braceCount--
+			}
+		}
+		if braceCount == 0 {
+			break
+		}
+	}
+	toks = toks[first+1 : *i]
+	parts, errs := Parts(toks, tokens.Comma)
+	b.Errs = append(b.Errs, errs...)
+	return parts
+}
+
+func (b *Builder) idDataTypePartEnd(t *DataType, dtv *strings.Builder, toks Toks, i *int) {
+	if *i+1 >= len(toks) {
+		return
+	}
+	*i++
+	tok := toks[*i]
+	if tok.Id != tokens.Brace || tok.Kind != tokens.LBRACKET {
+		*i--
+		return
+	}
+	dtv.WriteByte('[')
+	var genericsStr strings.Builder
+	parts := b.idGenericsParts(toks, i)
+	generics := make([]DataType, len(parts))
+	for i, part := range parts {
+		index := 0
+		t, _ := b.DataType(part, &index, true)
+		if index+1 < len(part) {
+			b.pusherr(part[index+1], "invalid_syntax")
+		}
+		genericsStr.WriteString(t.String())
+		genericsStr.WriteByte(',')
+		generics[i] = t
+	}
+	dtv.WriteString(genericsStr.String()[:genericsStr.Len()-1])
+	dtv.WriteByte(']')
+	t.Tag = generics
+}
+
 // DataType builds AST model of data-type.
 func (b *Builder) DataType(toks Toks, i *int, err bool) (t DataType, ok bool) {
 	defer func() { t.Original = t }()
@@ -854,9 +905,10 @@ func (b *Builder) DataType(toks Toks, i *int, err bool) (t DataType, ok bool) {
 			ok = true
 			goto ret
 		case tokens.Id:
-			t.Tok = tok
 			t.Id = xtype.Id
+			t.Tok = tok
 			dtv.WriteString(t.Tok.Kind)
+			b.idDataTypePartEnd(&t, &dtv, toks, i)
 			ok = true
 			goto ret
 		case tokens.Operator:
@@ -2143,16 +2195,17 @@ func isOverflowOperator(kind string) bool {
 func isExprOperator(kind string) bool { return kind == tokens.TRIPLE_DOT }
 
 type exprProcessInfo struct {
-	processes        []Toks
-	part             Toks
-	operator         bool
-	value            bool
-	singleOperatored bool
-	newKeyword       bool
-	pushedError      bool
-	braceCount       int
-	toks             Toks
-	i                int
+	processes           []Toks
+	part                Toks
+	operator            bool
+	value               bool
+	singleOperatored    bool
+	newKeyword          bool
+	braceZeroedNewFalse bool
+	pushedError         bool
+	braceCount          int
+	toks                Toks
+	i                   int
 }
 
 func (b *Builder) exprOperatorPart(info *exprProcessInfo, tok Tok) {
@@ -2215,6 +2268,10 @@ func (b *Builder) exprBracePart(info *exprProcessInfo, tok Tok) bool {
 		info.braceCount++
 	default:
 		info.braceCount--
+		if info.braceCount == 0 && info.braceZeroedNewFalse {
+			info.braceZeroedNewFalse = false
+			info.newKeyword = false
+		}
 	}
 	return false
 }
@@ -2236,9 +2293,17 @@ func (b *Builder) getExprProcesses(toks Toks) []Toks {
 		case tokens.New:
 			info.newKeyword = true
 		case tokens.Id:
-			if info.braceCount == 0 {
-				info.newKeyword = false
+			if info.braceCount != 0 {
+				break
 			}
+			if info.i+1 < len(info.toks) {
+				tok := info.toks[info.i+1]
+				if tok.Id == tokens.Brace && tok.Kind == tokens.LBRACKET {
+					info.braceZeroedNewFalse = true
+					break
+				}
+			}
+			info.newKeyword = false
 		}
 		b.exprValuePart(&info, tok)
 	}

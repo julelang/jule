@@ -7,6 +7,18 @@ import (
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
+func genericsToCxx(generics []*GenericType) string {
+	if len(generics) == 0 {
+		return ""
+	}
+	var cxx strings.Builder
+	for _, generic := range generics {
+		cxx.WriteString(generic.String())
+		cxx.WriteByte('\n')
+	}
+	return cxx.String()[:cxx.Len()-1]
+}
+
 func typeIsVoid(t DataType) bool          { return t.Id == xtype.Void && !t.MultiTyped }
 func typeIsVariadicable(t DataType) bool  { return typeIsArray(t) }
 func typeIsMut(t DataType) bool           { return typeIsPtr(t) }
@@ -98,6 +110,35 @@ func checkPtrCompability(t1, t2 DataType) bool {
 	return false
 }
 
+func typesEquals(t1, t2 DataType) bool {
+	return t1.Id == t2.Id && t1.Val == t2.Val
+}
+
+func checkStructCompability(t1, t2 DataType) bool {
+	s1, s2 := t1.Tag.(*xstruct), t2.Tag.(*xstruct)
+	switch {
+	case s1.Ast.Id != s2.Ast.Id,
+		s1.Ast.Tok.File != s2.Ast.Tok.File:
+		return false
+	}
+	if len(s1.Ast.Generics) == 0 {
+		return true
+	}
+	n1, n2 := len(s1.generics), len(s2.generics)
+	if n1 > 0 || n2 > 0 {
+		if n1 != n2 {
+			return false
+		}
+		for i, g1 := range s1.generics {
+			g2 := s2.generics[i]
+			if !typesEquals(g1, g2) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func typesAreCompatible(t1, t2 DataType, ignoreany bool) bool {
 	switch {
 	case typeIsPtr(t1), typeIsPtr(t2):
@@ -120,7 +161,10 @@ func typesAreCompatible(t1, t2 DataType, ignoreany bool) bool {
 	case t1.Id == xtype.Enum, t2.Id == xtype.Enum:
 		return t1.Id == t2.Id && t1.Val == t2.Val
 	case t1.Id == xtype.Struct, t2.Id == xtype.Struct:
-		return t1.Tag == t2.Tag
+		if t2.Id == xtype.Struct {
+			t1, t2 = t2, t1
+		}
+		return checkStructCompability(t1, t2)
 	}
 	return xtype.TypesAreCompatible(t1.Id, t2.Id, ignoreany)
 }

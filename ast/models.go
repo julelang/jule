@@ -12,6 +12,12 @@ import (
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
+// Genericable instance.
+type Genericable interface {
+	Generics() []DataType
+	SetGenerics([]DataType)
+}
+
 // Obj is an element of AST.
 type Obj struct {
 	Tok   Tok
@@ -80,6 +86,11 @@ func ParseBlock(b Block) string {
 	return cxx.String()
 }
 
+type genericableTypes struct{ types []DataType }
+
+func (gt genericableTypes) Generics() []DataType   { return gt.types }
+func (gt genericableTypes) SetGenerics([]DataType) {}
+
 // DataType is data type identifier.
 type DataType struct {
 	// Tok used for usually *File comparisons.
@@ -97,15 +108,9 @@ func (dt *DataType) ValWithOriginalId() string {
 	if dt.Original == nil {
 		return dt.Val
 	}
+	_, prefix := dt.GetValId()
 	original := dt.Original.(DataType)
-	runes := []rune(dt.Val)
-	for i := len(runes) - 1; i >= 0; i-- {
-		r := runes[i]
-		if r != '_' && unicode.IsPunct(r) {
-			return string(runes[:i+1]) + original.Tok.Kind
-		}
-	}
-	return original.Tok.Kind
+	return prefix + original.Tok.Kind
 }
 
 // OriginalValId returns dt.Val's identifier of official.
@@ -123,14 +128,23 @@ func (dt *DataType) OriginalValId() string {
 
 // GetValId returns dt.Val's identifier.
 func (dt *DataType) GetValId() (id, prefix string) {
+	id = dt.Val
 	runes := []rune(dt.Val)
-	for i := len(runes) - 1; i >= 0; i-- {
-		r := runes[i]
-		if r != '_' && unicode.IsPunct(r) {
-			return string(runes[i+1:]), string(runes[:i+1])
+	for i, r := range dt.Val {
+		if r == '_' || unicode.IsLetter(r) {
+			id = string(runes[i:])
+			prefix = string(runes[:i])
+			break
 		}
 	}
-	return dt.Val, ""
+	runes = []rune(id)
+	for i, r := range runes {
+		if r != '_' && !unicode.IsLetter(r) {
+			id = string(runes[:i])
+			break
+		}
+	}
+	return
 }
 
 func (dt DataType) String() string {
@@ -177,9 +191,20 @@ func (dt DataType) String() string {
 			return cxx.String()
 		}
 	}
+	if dt.Tag != nil {
+		switch t := dt.Tag.(type) {
+		case Genericable:
+			return dt.StructString() + cxx.String()
+		case []DataType:
+			dt.Tag = genericableTypes{t}
+			return dt.StructString() + cxx.String()
+		}
+	}
 	switch dt.Id {
-	case xtype.Id, xtype.Enum, xtype.Struct:
+	case xtype.Id, xtype.Enum:
 		return xapi.OutId(dt.Val, dt.Tok.File) + cxx.String()
+	case xtype.Struct:
+		return dt.StructString() + cxx.String()
 	case xtype.Func:
 		return dt.FuncString() + cxx.String()
 	default:
@@ -187,6 +212,24 @@ func (dt DataType) String() string {
 	}
 }
 
+// StructString returns cxx value of struct DataType.
+func (dt *DataType) StructString() string {
+	var cxx strings.Builder
+	cxx.WriteString(xapi.OutId(dt.Val, dt.Tok.File))
+	s := dt.Tag.(Genericable)
+	types := s.Generics()
+	if len(types) == 0 {
+		return cxx.String()
+	}
+	cxx.WriteByte('<')
+	for _, t := range types {
+		cxx.WriteString(t.String())
+		cxx.WriteByte(',')
+	}
+	return cxx.String()[:cxx.Len()-1] + ">"
+}
+
+// FuncString returns cxx value of function DataType.
 func (dt *DataType) FuncString() string {
 	var cxx strings.Builder
 	cxx.WriteString("func<")
@@ -208,6 +251,7 @@ func (dt *DataType) FuncString() string {
 	return cxx.String()
 }
 
+// MultiTypeString returns cxx value of muli-typed DataType.
 func (dt *DataType) MultiTypeString() string {
 	types := dt.Tag.([]DataType)
 	var cxx strings.Builder
@@ -266,8 +310,8 @@ type Func struct {
 }
 
 // FindGeneric returns index of generic if exist, return -1 if not.
-func (f *Func) FindGeneric(id string) int {
-	for i, generic := range f.Generics {
+func FindGeneric(generics []*GenericType, id string) int {
+	for i, generic := range generics {
 		if generic.Id == id {
 			return i
 		}
@@ -942,10 +986,11 @@ func (e Enum) String() string {
 
 // Struct is the AST model of structures.
 type Struct struct {
-	Tok    Tok
-	Id     string
-	Pub    bool
-	Fields []*Var
+	Tok      Tok
+	Id       string
+	Pub      bool
+	Fields   []*Var
+	Generics []*GenericType
 }
 
 // ConcurrentCall is the AST model of concurrent calls.

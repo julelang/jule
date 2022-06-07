@@ -38,21 +38,9 @@ func (f *function) Head() string {
 	return cxx.String()
 }
 
-func (f *function) generics() string {
-	if len(f.Ast.Generics) == 0 {
-		return ""
-	}
-	var cxx strings.Builder
-	for _, generic := range f.Ast.Generics {
-		cxx.WriteString(generic.String())
-		cxx.WriteByte('\n')
-	}
-	return cxx.String()[:cxx.Len()-1]
-}
-
 func (f *function) declHead() string {
 	var cxx strings.Builder
-	cxx.WriteString(f.generics())
+	cxx.WriteString(genericsToCxx(f.Ast.Generics))
 	cxx.WriteByte('\n')
 	cxx.WriteString(attributesToString(f.Attributes))
 	cxx.WriteString(f.Ast.RetType.String())

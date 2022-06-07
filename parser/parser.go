@@ -700,33 +700,36 @@ func (p *Parser) Enum(e Enum) {
 	}
 }
 
-func (p *Parser) processStructFields(s *xstruct) {
+func (p *Parser) pushField(s *xstruct, f *Var, i int) {
+	for _, cf := range s.Ast.Fields {
+		if f == cf {
+			break
+		}
+		if f.Id == cf.Id {
+			p.pusherrtok(f.IdTok, "exist_id", f.Id)
+			break
+		}
+	}
+	param := ast.Param{Id: f.Id, Type: f.Type}
+	param.Default.Model = exprNode{"{}"}
+	s.constructor.Params[i] = param
+}
+
+func (p *Parser) processFields(s *xstruct) {
 	s.constructor = new(Func)
 	s.constructor.Id = s.Ast.Id
 	s.constructor.Params = make([]ast.Param, len(s.Ast.Fields))
 	s.constructor.RetType = DataType{Id: xtype.Struct, Val: s.Ast.Id, Tok: s.Ast.Tok, Tag: s}
+	s.constructor.Generics = make([]*ast.GenericType, len(s.Ast.Generics))
+	for i, generic := range s.Ast.Generics {
+		ng := new(ast.GenericType)
+		*ng = *generic
+		s.constructor.Generics[i] = ng
+	}
+	s.Defs.Globals = make([]*ast.Var, len(s.Ast.Fields))
 	for i, f := range s.Ast.Fields {
-		for _, cf := range s.Ast.Fields {
-			if f == cf {
-				break
-			}
-			if f.Id == cf.Id {
-				p.pusherrtok(f.IdTok, "exist_id", f.Id)
-				break
-			}
-		}
-		v := p.Var(*f)
-		if v.Type.Id == xtype.Struct && v.Type.Tag == s && typeIsSingle(v.Type) {
-			p.pusherrtok(f.Type.Tok, "invalid_type_source")
-		}
-		param := ast.Param{Id: f.Id, Type: v.Type}
-		if f.Val.Toks != nil {
-			param.Default = f.Val
-		} else {
-			param.Default.Model = exprNode{defaultValueOfType(param.Type)}
-		}
-		s.Defs.Globals = append(s.Defs.Globals, v)
-		s.constructor.Params[i] = param
+		s.Defs.Globals[i] = f
+		p.pushField(s, f, i)
 	}
 }
 
@@ -744,8 +747,10 @@ func (p *Parser) Struct(s Struct) {
 	xs.Desc = p.docText.String()
 	p.docText.Reset()
 	xs.Ast = s
+	xs.Ast.Generics = p.generics
+	p.generics = nil
 	xs.Defs = new(Defmap)
-	p.processStructFields(xs)
+	p.processFields(xs)
 }
 
 // pushNS pushes namespace to defmap and returns leaf namespace.
@@ -840,11 +845,11 @@ func (p *Parser) Func(fast Func) {
 	f.Ast.Generics = p.generics
 	p.generics = nil
 	for i, param := range f.Ast.Params {
-		if f.Ast.FindGeneric(param.Type.Tok.Kind) == -1 {
+		if ast.FindGeneric(f.Ast.Generics, param.Type.Tok.Kind) == -1 {
 			f.Ast.Params[i].Type, _ = p.realType(param.Type, true)
 		}
 	}
-	if f.Ast.FindGeneric(f.Ast.RetType.Tok.Kind) == -1 {
+	if ast.FindGeneric(f.Ast.Generics, f.Ast.RetType.Tok.Kind) == -1 {
 		f.Ast.RetType, _ = p.realType(f.Ast.RetType, true)
 	}
 	p.Defs.Funcs = append(p.Defs.Funcs, f)
@@ -2689,17 +2694,55 @@ func (p *Parser) evalParenthesesRangeExpr(toks Toks, m *exprModel) (v value) {
 	switch {
 	case typeIsFunc(v.ast.Type):
 		f := v.ast.Type.Tag.(*Func)
-		v = p.parseFuncCallToks(f, genericsToks, rangeExpr, m)
-		v.lvalue = typeIsLvalue(v.ast.Type)
+		return p.callFunc(f, genericsToks, rangeExpr, m)
 	case valIsStruct(v):
-		f := v.ast.Type.Tag.(*xstruct).constructor
-		v = p.parseFuncCallToks(f, genericsToks, rangeExpr, m)
-		v.isType = false
-		v.lvalue = false
-	default:
-		p.pusherrtok(exprToks[len(exprToks)-1], "invalid_syntax")
+		s := v.ast.Type.Tag.(*xstruct)
+		return p.callStructConstructor(s, genericsToks, rangeExpr, m)
 	}
+	p.pusherrtok(exprToks[len(exprToks)-1], "invalid_syntax")
 	return
+}
+
+func (p *Parser) callFunc(f *Func, genericsToks, argsToks Toks, m *exprModel) value {
+	v := p.parseFuncCallToks(f, genericsToks, argsToks, m)
+	v.lvalue = typeIsLvalue(v.ast.Type)
+	return v
+}
+
+func (p *Parser) callStructConstructor(s *xstruct, genericsToks, argsToks Toks, m *exprModel) value {
+	v := p.parseFuncCallToks(s.constructor, genericsToks, argsToks, m)
+	v.isType = false
+	v.lvalue = false
+	return v
+}
+
+func (p *Parser) parseField(s *xstruct, f **Var, i int) {
+	*f = p.Var(**f)
+	v := *f
+	param := ast.Param{Id: v.Id, Type: v.Type}
+	if v.Type.Id == xtype.Struct && v.Type.Tag == s && typeIsSingle(v.Type) {
+		p.pusherrtok(v.Type.Tok, "invalid_type_source")
+	}
+	if v.Val.Toks != nil {
+		param.Default = v.Val
+	} else {
+		param.Default.Model = exprNode{defaultValueOfType(param.Type)}
+	}
+	s.constructor.Params[i] = param
+}
+
+func (p *Parser) structConstructorInstance(as xstruct) *xstruct {
+	s := new(xstruct)
+	s.Ast = as.Ast
+	s.constructor = new(Func)
+	*s.constructor = *as.constructor
+	s.constructor.RetType.Tag = &s
+	s.Defs = new(Defmap)
+	*s.Defs = *as.Defs
+	for i := range s.Ast.Fields {
+		p.parseField(s, &s.Defs.Globals[i], i)
+	}
+	return s
 }
 
 func (p *Parser) evalBraceRangeExpr(toks Toks, m *exprModel) (v value) {
@@ -3015,18 +3058,19 @@ func (p *Parser) getGenerics(toks Toks) []DataType {
 	return generics
 }
 
-func (p *Parser) checkGenericsQuantity(f *Func, generics []DataType, errTok Tok) bool {
+func (p *Parser) checkGenericsQuantity(n int, generics []DataType, errTok Tok) bool {
+	// n = length of required generic type source.
 	switch {
-	case len(f.Generics) == 0 && len(generics) > 0:
+	case n == 0 && len(generics) > 0:
 		p.pusherrtok(errTok, "not_has_generics")
 		return false
-	case len(f.Generics) > 0 && len(generics) == 0:
+	case len(generics) == 0:
 		p.pusherrtok(errTok, "has_generics")
 		return false
-	case len(f.Generics) < len(generics):
+	case n < len(generics):
 		p.pusherrtok(errTok, "generics_overflow")
 		return false
-	case len(f.Generics) > len(generics):
+	case n > len(generics):
 		p.pusherrtok(errTok, "missing_generics")
 		return false
 	default:
@@ -3034,22 +3078,24 @@ func (p *Parser) checkGenericsQuantity(f *Func, generics []DataType, errTok Tok)
 	}
 }
 
-// pushGenerics add generics to blockTypes and
-// applies to function's used generics definitions.
-func (p *Parser) pushGenerics(f *Func, generics []DataType) {
-	for i, generic := range f.Generics {
+func (p *Parser) pushGenerics(generics []*GenericType, sources []DataType) {
+	for i, generic := range generics {
 		p.blockTypes = append(p.blockTypes, &Type{
 			Id:   generic.Id,
 			Tok:  generic.Tok,
-			Type: generics[i],
+			Type: sources[i],
 		})
 	}
+}
+
+// applyGenerics applies to function's used generics definitions.
+func (p *Parser) applyGenerics(f *Func) {
 	apply := func(t *DataType) bool {
 		id := t.OriginalValId()
 		if id == "" {
 			return false
 		}
-		index := f.FindGeneric(id)
+		index := ast.FindGeneric(f.Generics, id)
 		if index == -1 {
 			return false
 		}
@@ -3075,7 +3121,7 @@ func itsCombined(f *Func, generics []DataType) bool {
 	for _, combine := range f.Combines {
 		for i, gt := range generics {
 			ct := combine[i]
-			if gt.Id == ct.Id && gt.Val == ct.Val {
+			if typesEquals(gt, ct) {
 				return true
 			}
 		}
@@ -3084,7 +3130,7 @@ func itsCombined(f *Func, generics []DataType) bool {
 }
 
 func (p *Parser) parseGenerics(f *Func, generics []DataType, m *exprModel, errTok Tok) bool {
-	if !p.checkGenericsQuantity(f, generics, errTok) {
+	if !p.checkGenericsQuantity(len(f.Generics), generics, errTok) {
 		return false
 	}
 	// Add generic types to call expression
@@ -3100,7 +3146,12 @@ func (p *Parser) parseGenerics(f *Func, generics []DataType, m *exprModel, errTo
 	blockVars := p.blockVars
 	p.blockTypes = nil
 	defer func() { p.blockTypes, p.blockVars = blockTypes, blockVars }()
-	p.pushGenerics(f, generics)
+	p.pushGenerics(f.Generics, generics)
+	if isConstructor(f) {
+		p.readyConstructor(&f)
+		return true
+	}
+	p.applyGenerics(f)
 	if itsCombined(f, generics) {
 		return true
 	}
@@ -3122,6 +3173,12 @@ func isConstructor(f *Func) bool {
 	return f.Id == s.Ast.Id
 }
 
+func (p *Parser) readyConstructor(f **Func) {
+	s := (*f).RetType.Tag.(*xstruct)
+	s = p.structConstructorInstance(*s)
+	*f = s.constructor
+}
+
 func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *ast.Args, m *exprModel, errTok Tok) (v value) {
 	v.ast.Type = f.RetType
 	v.ast.Type.Original = v.ast.Type
@@ -3137,6 +3194,9 @@ func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *ast.Args, m *
 		v.ast.Type.Original = v.ast.Type
 	}
 	if isConstructor(f) {
+		s := f.RetType.Tag.(*xstruct)
+		s.SetGenerics(generics)
+		v.ast.Type.Val = s.dataTypeString()
 		m.appendSubNode(exprNode{tokens.LBRACE})
 		defer m.appendSubNode(exprNode{tokens.RBRACE})
 	} else {
@@ -3965,6 +4025,9 @@ func (p *Parser) checkRets(f *Func) {
 }
 
 func (p *Parser) checkFunc(f *Func) {
+	if f.Block.Tree == nil {
+		return
+	}
 	f.Block.Func = f
 	p.checkNewBlock(&f.Block)
 	p.checkRets(f)
@@ -4445,9 +4508,23 @@ func (p *Parser) typeSourceIsFunc(dt DataType, err bool) (DataType, bool) {
 	return dt, true
 }
 
-func (p *Parser) typeSourceIsStruct(s *xstruct) (dt DataType, _ bool) {
+func (p *Parser) typeSourceIsStruct(s *xstruct, tag any, errTok Tok) (dt DataType, _ bool) {
+	var generics []DataType
+	// Has generics?
+	if tag != nil {
+		generics = tag.([]DataType)
+		_ = p.checkGenericsQuantity(len(s.Ast.Generics), generics, errTok)
+		blockTypes := p.blockTypes
+		defer func() { p.blockTypes = blockTypes }()
+		p.pushGenerics(s.Ast.Generics, generics)
+		for i, generic := range generics {
+			generics[i], _ = p.typeSource(generic, true)
+		}
+	}
+	s = p.structConstructorInstance(*s)
+	s.SetGenerics(generics)
 	dt.Id = xtype.Struct
-	dt.Val = s.Ast.Id
+	dt.Val = s.dataTypeString()
 	dt.Tag = s
 	dt.Tok = s.Ast.Tok
 	return dt, true
@@ -4476,7 +4553,7 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 			return p.typeSourceIsEnum(t)
 		case *xstruct:
 			t.Used = true
-			return p.typeSourceIsStruct(t)
+			return p.typeSourceIsStruct(t, dt.Tag, dt.Tok)
 		default:
 			if err {
 				p.pusherrtok(dt.Tok, "invalid_type_source")
