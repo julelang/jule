@@ -250,6 +250,9 @@ var Builtin = &Defmap{
 			},
 		},
 	},
+	Structs: []*xstruct{
+		errorStruct,
+	},
 }
 
 var strDefs = &Defmap{
@@ -463,5 +466,12 @@ func init() {
 	case 64:
 		intMax.Tag = i64statics.Globals[0].Tag
 		intMin.Tag = i64statics.Globals[1].Tag
+	}
+
+	errorStruct.constructor.Id = errorStruct.Ast.Id
+	errorStruct.constructor.RetType = DataType{
+		Id:  xtype.Struct,
+		Val: errorStruct.Ast.Id,
+		Tag: errorStruct,
 	}
 }
