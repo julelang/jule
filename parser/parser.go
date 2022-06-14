@@ -844,14 +844,14 @@ func (p *Parser) Func(fast Func) {
 	p.docText.Reset()
 	f.Ast.Generics = p.generics
 	p.generics = nil
-	for i, param := range f.Ast.Params {
+	/*for i, param := range f.Ast.Params {
 		if ast.FindGeneric(f.Ast.Generics, param.Type.Tok.Kind) == -1 {
 			f.Ast.Params[i].Type, _ = p.realType(param.Type, true)
 		}
 	}
 	if ast.FindGeneric(f.Ast.Generics, f.Ast.RetType.Tok.Kind) == -1 {
 		f.Ast.RetType, _ = p.realType(f.Ast.RetType, true)
-	}
+	}*/
 	p.Defs.Funcs = append(p.Defs.Funcs, f)
 }
 
@@ -3100,28 +3100,6 @@ func (p *Parser) pushGenerics(generics []*GenericType, sources []DataType) {
 	}
 }
 
-// applyGenerics applies to function's used generics definitions.
-func (p *Parser) applyGenerics(f *Func) {
-	apply := func(t *DataType) bool {
-		id := t.OriginalValId()
-		if id == "" {
-			return false
-		}
-		index := ast.FindGeneric(f.Generics, id)
-		if index == -1 {
-			return false
-		}
-		*t, _ = p.realType(*t, true)
-		return true
-	}
-	for i := range f.Params {
-		_ = apply(&f.Params[i].Type)
-	}
-	if apply(&f.RetType) {
-		f.RetType.Original = nil
-	}
-}
-
 func (p *Parser) reloadFuncTypes(f *Func) {
 	for i, param := range f.Params {
 		f.Params[i].Type, _ = p.realType(param.Type, true)
@@ -3163,7 +3141,7 @@ func (p *Parser) parseGenerics(f *Func, generics []DataType, m *exprModel, errTo
 		p.readyConstructor(&f)
 		return true
 	}
-	p.applyGenerics(f)
+	p.reloadFuncTypes(f)
 	if itsCombined(f, generics) {
 		return true
 	}
@@ -3192,8 +3170,6 @@ func (p *Parser) readyConstructor(f **Func) {
 }
 
 func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *ast.Args, m *exprModel, errTok Tok) (v value) {
-	v.ast.Type = f.RetType
-	v.ast.Type.Original = v.ast.Type
 	if len(f.Generics) > 0 {
 		params := make([]Param, len(f.Params))
 		copy(params, f.Params)
@@ -3202,6 +3178,10 @@ func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *ast.Args, m *
 		if !p.parseGenerics(f, generics, m, errTok) {
 			return
 		}
+		v.ast.Type = f.RetType
+		v.ast.Type.Original = v.ast.Type
+	} else {
+		p.reloadFuncTypes(f)
 		v.ast.Type = f.RetType
 		v.ast.Type.Original = v.ast.Type
 	}
@@ -4516,7 +4496,7 @@ func (p *Parser) typeSourceIsEnum(e *Enum) (dt DataType, _ bool) {
 func (p *Parser) typeSourceIsFunc(dt DataType, err bool) (DataType, bool) {
 	f := dt.Tag.(*Func)
 	p.reloadFuncTypes(f)
-	dt.Val = dt.Tag.(*Func).DataTypeString()
+	dt.Val = f.DataTypeString()
 	return dt, true
 }
 
