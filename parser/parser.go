@@ -3018,6 +3018,7 @@ func (p *Parser) buildMap(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
 }
 
 func (p *Parser) checkAnonFunc(f *Func) {
+	p.reloadFuncTypes(f)
 	globals := p.Defs.Globals
 	blockVariables := p.blockVars
 	p.Defs.Globals = append(blockVariables, p.Defs.Globals...)
