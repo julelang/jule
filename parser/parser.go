@@ -4521,7 +4521,7 @@ func (p *Parser) typeSourceIsStruct(s *xstruct, tag any, errTok Tok) (dt DataTyp
 			generics[i], _ = p.typeSource(generic, true)
 		}
 	} else if len(s.Ast.Generics) > 0 {
-		p.pusherrtok(errTok, "missing_generics")
+		p.pusherrtok(errTok, "has_generics")
 	}
 	s = p.structConstructorInstance(*s)
 	s.SetGenerics(generics)
