@@ -805,7 +805,7 @@ func (b *Builder) paramBody(f *Func, p *Param, i *int, toks Toks) {
 	if len(toks) == 0 {
 		return
 	}
-	if tok := toks[0]; tok.Id == tokens.Brace || tok.Kind == tokens.LBRACE {
+	if tok := toks[0]; tok.Id == tokens.Brace && tok.Kind == tokens.LBRACE {
 		b.paramBodyDefaultExpr(p, &toks)
 	}
 	if len(toks) > 0 {
