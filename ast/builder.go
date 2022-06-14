@@ -1334,7 +1334,12 @@ func (b *Builder) Statement(bs *blockStatement) (s Statement) {
 	if IsFuncCall(bs.toks) != nil {
 		return b.ExprStatement(bs.toks)
 	}
-	bs.toks = append([]Tok{{Id: tokens.Ret, Kind: tokens.RET}}, bs.toks...)
+	tok = Tok{
+		File: tok.File,
+		Id:   tokens.Ret,
+		Kind: tokens.RET,
+	}
+	bs.toks = append([]Tok{tok}, bs.toks...)
 	return b.RetStatement(bs.toks)
 }
 
@@ -1839,12 +1844,12 @@ func (b *Builder) GotoStatement(toks Toks) (s Statement) {
 
 // RetStatement builds AST model of return statement.
 func (b *Builder) RetStatement(toks Toks) Statement {
-	var returnModel Ret
-	returnModel.Tok = toks[0]
+	var ret Ret
+	ret.Tok = toks[0]
 	if len(toks) > 1 {
-		returnModel.Expr = b.Expr(toks[1:])
+		ret.Expr = b.Expr(toks[1:])
 	}
-	return Statement{returnModel.Tok, returnModel, false}
+	return Statement{ret.Tok, ret, false}
 }
 
 // FreeStatement builds AST model of free statement.
