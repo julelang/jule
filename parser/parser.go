@@ -2474,6 +2474,17 @@ func (p *Parser) evalTryCastExpr(toks Toks, m *exprModel) (v value, _ bool) {
 			return
 		}
 		exprToks := toks[i+1:]
+		if len(exprToks) == 0 {
+			return
+		}
+		tok = exprToks[0]
+		if tok.Id != tokens.Brace || tok.Kind != tokens.LPARENTHESES {
+			return
+		}
+		exprToks, ok = p.getRange(tokens.LPARENTHESES, tokens.RPARENTHESES, exprToks)
+		if !ok {
+			return
+		}
 		m.appendSubNode(exprNode{tokens.LPARENTHESES + dt.String() + tokens.RPARENTHESES})
 		val := p.evalExprPart(exprToks, m)
 		val = p.evalCast(val, dt, errTok)
