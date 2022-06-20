@@ -356,19 +356,13 @@ func compile(path string, main, justDefs bool) *Parser {
 		return nil
 	}
 	if !xio.IsUseable(path) {
-		p.Errs = append(p.Errs, xlog.CompilerLog{
-			Type: xlog.FlatErr,
-			Msg:  "file is not useable for this platform",
-		})
+		p.PushErr("file_not_useable")
 		return p
 	}
 	// Check standard library.
 	inf, err := os.Stat(x.StdlibPath)
 	if err != nil || !inf.IsDir() {
-		p.Errs = append(p.Errs, xlog.CompilerLog{
-			Type: xlog.FlatErr,
-			Msg:  "standard library directory not found",
-		})
+		p.PushErr("no_stdlib")
 		return p
 	}
 	if !loadBuiltin() {

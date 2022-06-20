@@ -4,6 +4,8 @@ import "fmt"
 
 // Error messages.
 var Errs = map[string]string{
+	`no_stdlib`:                         `standard library directory not found`,
+	`file_not_useable`:                  `file is not useable for this operating system or architecture`,
 	`file_not_x`:                        `this is not x source file: %s`,
 	`invalid_token`:                     `undefined code content: %c`,
 	`invalid_syntax`:                    `invalid syntax`,

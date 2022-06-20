@@ -119,8 +119,8 @@ func (p *Parser) pushwarntok(tok Tok, key string, args ...any) {
 // pusherrs appends specified errors.
 func (p *Parser) pusherrs(errs ...xlog.CompilerLog) { p.Errs = append(p.Errs, errs...) }
 
-// pusherr appends new error.
-func (p *Parser) pusherr(key string, args ...any) {
+// PushErr appends new error.
+func (p *Parser) PushErr(key string, args ...any) {
 	p.pusherrmsg(x.GetErr(key, args...))
 }
 
@@ -1100,7 +1100,7 @@ func (p *Parser) checkAsync() {
 	defer func() { p.wg.Done() }()
 	if p.main && !p.justDefs {
 		if f, _, _ := p.FuncById(x.EntryPoint); f == nil {
-			p.pusherr("no_entry_point")
+			p.PushErr("no_entry_point")
 		} else {
 			f.used = true
 		}
