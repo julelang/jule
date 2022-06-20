@@ -20,6 +20,11 @@ const (
 	PlatformWindows = "windows"
 	PlatformLinux   = "linux"
 	PlatformDarwin  = "darwin"
+
+	ArchArm   = "arm"
+	ArchArm64 = "arm64"
+	ArchAmd64 = "amd64"
+	ArchI386  = "i386"
 )
 
 // Environment Variables.
