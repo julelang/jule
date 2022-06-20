@@ -45,7 +45,7 @@ func (l *Lex) pusherr(key string, args ...any) {
 		Type:   xlog.Err,
 		Row:    l.Row,
 		Column: l.Column,
-		Path:   l.File.Path,
+		Path:   l.File.Path(),
 		Msg:    x.GetErr(key, args...),
 	})
 }
@@ -55,7 +55,7 @@ func (l *Lex) pusherrtok(tok Tok, err string) {
 		Type:   xlog.Err,
 		Row:    tok.Row,
 		Column: tok.Column,
-		Path:   l.File.Path,
+		Path:   l.File.Path(),
 		Msg:    x.GetErr(err),
 	})
 }

@@ -36,7 +36,7 @@ func (dm *Defmap) nsById(id string, parent bool) *namespace {
 func (dm *Defmap) findStructById(id string, f *File) (int, *Defmap, bool) {
 	for i, s := range dm.Structs {
 		if s != nil && s.Ast.Id == id {
-			if f == s.Ast.Tok.File || s.Ast.Pub {
+			if s.Ast.Pub || f == nil || f.Dir == s.Ast.Tok.File.Dir {
 				return i, dm, false
 			}
 		}
@@ -59,7 +59,7 @@ func (dm *Defmap) structById(id string, f *File) (*xstruct, *Defmap, bool) {
 func (dm *Defmap) findEnumById(id string, f *File) (int, *Defmap, bool) {
 	for i, e := range dm.Enums {
 		if e != nil && e.Id == id {
-			if f == e.Tok.File || e.Pub {
+			if e.Pub || f == nil || f.Dir == e.Tok.File.Dir {
 				return i, dm, false
 			}
 		}
@@ -82,7 +82,7 @@ func (dm *Defmap) enumById(id string, f *File) (*Enum, *Defmap, bool) {
 func (dm *Defmap) findTypeById(id string, f *File) (int, *Defmap, bool) {
 	for i, t := range dm.Types {
 		if t != nil && t.Id == id {
-			if f == t.Tok.File || t.Pub {
+			if t.Pub || f == nil || f.Dir == t.Tok.File.Dir {
 				return i, dm, false
 			}
 		}
@@ -105,7 +105,7 @@ func (dm *Defmap) typeById(id string, f *File) (*Type, *Defmap, bool) {
 func (dm *Defmap) findFuncById(id string, f *File) (int, *Defmap, bool) {
 	for i, fn := range dm.Funcs {
 		if fn != nil && fn.Ast.Id == id {
-			if f == fn.Ast.Tok.File || fn.Ast.Pub {
+			if fn.Ast.Pub || f == nil || f.Dir == fn.Ast.Tok.File.Dir {
 				return i, dm, false
 			}
 		}
@@ -132,7 +132,7 @@ func (dm *Defmap) funcById(id string, f *File) (*function, *Defmap, bool) {
 func (dm *Defmap) findGlobalById(id string, f *File) (int, *Defmap, bool) {
 	for i, v := range dm.Globals {
 		if v != nil && v.Type.Id != xtype.Void && v.Id == id {
-			if f == v.IdTok.File || v.Pub {
+			if v.Pub || f == nil || f.Dir == v.IdTok.File.Dir {
 				return i, dm, false
 			}
 		}

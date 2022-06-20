@@ -10,6 +10,7 @@ import (
 
 // Openfx returns X source file.
 func Openfx(path string) (*File, error) {
+	path, _ = filepath.Abs(path)
 	if filepath.Ext(path) != x.SrcExt {
 		return nil, errors.New(x.GetErr("file_not_x", path))
 	}
@@ -18,7 +19,7 @@ func Openfx(path string) (*File, error) {
 		return nil, err
 	}
 	f := new(File)
-	f.Path = path
+	f.Dir, f.Name = filepath.Split(path)
 	f.Data = []rune(string(bytes))
 	return f, nil
 }

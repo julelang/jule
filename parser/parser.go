@@ -100,7 +100,7 @@ func (p *Parser) pusherrmsgtok(tok Tok, msg string) {
 		Type:   xlog.Err,
 		Row:    tok.Row,
 		Column: tok.Column,
-		Path:   tok.File.Path,
+		Path:   tok.File.Path(),
 		Msg:    msg,
 	})
 }
@@ -111,7 +111,7 @@ func (p *Parser) pushwarntok(tok Tok, key string, args ...any) {
 		Type:   xlog.Warn,
 		Row:    tok.Row,
 		Column: tok.Column,
-		Path:   tok.File.Path,
+		Path:   tok.File.Path(),
 		Msg:    x.GetWarn(key, args...),
 	})
 }
@@ -491,23 +491,21 @@ func (p *Parser) useLocalPakcage(tree *[]ast.Obj) {
 	if p.File == nil {
 		return
 	}
-	dir := filepath.Dir(p.File.Path)
-	infos, err := ioutil.ReadDir(dir)
+	infos, err := ioutil.ReadDir(p.File.Dir)
 	if err != nil {
 		p.pusherrmsg(err.Error())
 		return
 	}
-	_, mainName := filepath.Split(p.File.Path)
 	for _, info := range infos {
 		name := info.Name()
 		// Skip directories.
 		if info.IsDir() ||
 			!strings.HasSuffix(name, x.SrcExt) ||
 			!xio.IsUseable(name) ||
-			name == mainName {
+			name == p.File.Name {
 			continue
 		}
-		f, err := xio.Openfx(filepath.Join(dir, name))
+		f, err := xio.Openfx(filepath.Join(p.File.Dir, name))
 		if err != nil {
 			p.pusherrmsg(err.Error())
 			continue
