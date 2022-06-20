@@ -16,6 +16,10 @@ const (
 	Anonymous = "<anonymous>"
 
 	DocPrefix = "doc:"
+
+	PlatformWindows = "windows"
+	PlatformLinux   = "linux"
+	PlatformDarwin  = "darwin"
 )
 
 // Environment Variables.

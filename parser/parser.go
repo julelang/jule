@@ -355,7 +355,9 @@ func (p *Parser) compileUse(useAST *ast.Use) *use {
 	for _, info := range infos {
 		name := info.Name()
 		// Skip directories.
-		if info.IsDir() || !strings.HasSuffix(name, x.SrcExt) {
+		if info.IsDir() ||
+			!strings.HasSuffix(name, x.SrcExt) ||
+			!xio.IsUseable(name) {
 			continue
 		}
 		f, err := xio.Openfx(filepath.Join(useAST.Path, name))
@@ -501,6 +503,7 @@ func (p *Parser) useLocalPakcage(tree *[]ast.Obj) {
 		// Skip directories.
 		if info.IsDir() ||
 			!strings.HasSuffix(name, x.SrcExt) ||
+			!xio.IsUseable(name) ||
 			name == mainName {
 			continue
 		}

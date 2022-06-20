@@ -349,10 +349,19 @@ func loadBuiltin() bool {
 
 func compile(path string, main, justDefs bool) *Parser {
 	loadXSet()
-	if !loadBuiltin() {
+	p := parser.New(nil)
+	f, err := xio.Openfx(path)
+	if err != nil {
+		println(err.Error())
 		return nil
 	}
-	p := parser.New(nil)
+	if !xio.IsUseable(path) {
+		p.Errs = append(p.Errs, xlog.CompilerLog{
+			Type: xlog.FlatErr,
+			Msg:  "file is not useable for this platform",
+		})
+		return p
+	}
 	// Check standard library.
 	inf, err := os.Stat(x.StdlibPath)
 	if err != nil || !inf.IsDir() {
@@ -362,10 +371,7 @@ func compile(path string, main, justDefs bool) *Parser {
 		})
 		return p
 	}
-
-	f, err := xio.Openfx(path)
-	if err != nil {
-		println(err.Error())
+	if !loadBuiltin() {
 		return nil
 	}
 	p.File = f
