@@ -22,13 +22,11 @@ var CxxDefault = `#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) ||
 #include <iostream>
 #include <string>
 #include <sstream>
-#include <string.h>
 #include <functional>
 #include <vector>
 #include <map>
 #include <thread>
 #ifdef _WINDOWS
-#include <locale>
 #include <codecvt>
 #include <windows.h>
 #include <fcntl.h>
