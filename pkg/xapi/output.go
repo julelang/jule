@@ -20,12 +20,14 @@ var CxxDefault = `#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) ||
 
 // region X_STANDARD_IMPORTS
 #include <iostream>
+#include <cstring>
 #include <string>
 #include <sstream>
 #include <functional>
 #include <vector>
 #include <map>
 #include <thread>
+#include <typeinfo>
 #ifdef _WINDOWS
 #include <codecvt>
 #include <windows.h>
@@ -361,6 +363,69 @@ public:
 
     friend std::ostream& operator<<(std::ostream &_Stream, const str_xt &_Src)
     { return _Stream << _Src._buffer; }
+};
+
+struct any_xt {
+private:
+    void *_expr{nullptr};
+    const char *_inf{nullptr};
+
+    void _delete(void) noexcept {
+        this->_inf = nullptr;
+        std::free(this->_expr);
+        this->_expr = nullptr;
+    }
+public:
+    any_xt(const std::nullptr_t) noexcept {}
+
+    template<typename T>
+    any_xt(const T &_Expr) noexcept {
+        this->_expr = (void*)(new(std::nothrow) T{_Expr});
+        this->_inf  = typeid(T).name();
+    }
+ 
+    ~any_xt(void) noexcept
+    { this->_delete(); }
+
+    template<typename T>
+    void operator=(const T &_Expr) noexcept {
+        this->_delete();
+        this->_expr = (void*)(new(std::nothrow) T{_Expr});
+        this->_inf  = typeid(T).name();
+    }
+
+    void operator=(const std::nullptr_t) noexcept
+    { this->_delete(); }
+
+    template<typename T>
+    operator T(void) const noexcept {
+        if (!this->_expr)
+        { XID(panic)("casting failed because data is nil"); }
+        if (std::strcmp(this->_inf, typeid(T).name()) != 0)
+        { XID(panic)("incompatible type"); }
+        return *(T*)(this->_expr);
+   }
+
+    template<typename T>
+    bool operator==(const T &_Expr) const noexcept {
+        if (!this->_expr)
+        { return std::is_same<std::nullptr_t, T>::value; }
+        if (std::strcmp(this->_inf, typeid(T).name()) != 0) { return false; }
+        return *(T*)(this->_expr) == _Expr;
+    }
+
+    template<typename T>
+    inline bool operator!=(const T &_Expr) const noexcept
+    { return !this->operator==(_Expr); }
+
+    bool operator==(const any_xt &_Any) const noexcept
+    { return this->_expr == _Any._expr; }
+
+    inline bool operator!=(const any_xt &_Any) const noexcept
+    { return !this->operator==(_Any); }
+
+    friend std::ostream& operator<<(std::ostream &_Stream, const any_xt &_Src)
+    { return _Stream << _Src._expr; }
 };
 // endregion X_BUILTIN_TYPES
 
