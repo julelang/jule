@@ -517,6 +517,9 @@ std::ostream &operator<<(std::ostream &_Stream, const i8_xt &_Src)
 std::ostream &operator<<(std::ostream &_Stream, const u8_xt &_Src)
 { return _Stream << (i32_xt)(_Src); }
 
+std::ostream &operator<<(std::ostream &_Stream, const std::nullptr_t)
+{ return _Stream << "<nil>"; }
+
 template<typename _Obj_t>
 str_xt tostr(const _Obj_t &_Obj) noexcept {
     std::stringstream _stream;
