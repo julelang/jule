@@ -1507,11 +1507,11 @@ func (ve *valueEvaluator) nil() value {
 func (ve *valueEvaluator) num() value {
 	var v value
 	v.ast.Data = ve.tok.Kind
-	ve.model.appendSubNode(exprNode{ve.tok.Kind})
 	if strings.Contains(ve.tok.Kind, tokens.DOT) ||
 		strings.ContainsAny(ve.tok.Kind, "eE") {
 		v.ast.Type.Id = xtype.F64
 		v.ast.Type.Val = tokens.F64
+		ve.model.appendSubNode(exprNode{ve.tok.Kind})
 	} else {
 		v.ast.Type.Id = xtype.Int
 		v.ast.Type.Val = tokens.INT
@@ -1520,6 +1520,9 @@ func (ve *valueEvaluator) num() value {
 		if !ok && bit < xbits.MaxInt {
 			v.ast.Type.Id = xtype.I64
 			v.ast.Type.Val = tokens.I64
+			ve.model.appendSubNode(exprNode{ve.tok.Kind})
+		} else {
+			ve.model.appendSubNode(exprNode{"int_xt{" + ve.tok.Kind + "}"})
 		}
 	}
 	return v
