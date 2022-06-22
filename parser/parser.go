@@ -2487,7 +2487,9 @@ func (p *Parser) evalTryCastExpr(toks Toks, m *exprModel) (v value, _ bool) {
 			return
 		}
 		m.appendSubNode(exprNode{tokens.LPARENTHESES + dt.String() + tokens.RPARENTHESES})
+		m.appendSubNode(exprNode{tokens.LPARENTHESES})
 		val := p.evalExprPart(exprToks, m)
+		m.appendSubNode(exprNode{tokens.RPARENTHESES})
 		val = p.evalCast(val, dt, errTok)
 		return val, true
 	}
