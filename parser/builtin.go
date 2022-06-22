@@ -415,7 +415,7 @@ var arrDefs = &Defmap{
 }
 
 func readyArrDefs(arrt DataType) {
-	elemType := typeOfArrayItems(arrt)
+	elemType := typeOfArrayComponents(arrt)
 
 	findFunc, _, _ := arrDefs.funcById("find", nil)
 	findFunc.Ast.Params[0].Type = elemType
