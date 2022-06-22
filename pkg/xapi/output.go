@@ -144,9 +144,9 @@ public:
         return true;
     }
 
+    bool operator!=(const array<_Item_t> &_Src) const noexcept { return !this->operator==(_Src); }
     bool operator==(const std::nullptr_t) const noexcept       { return this->_buffer.empty(); }
-    bool operator!=(const array<_Item_t> &_Src) const noexcept { return !(*this == _Src); }
-    bool operator!=(const std::nullptr_t) const noexcept       { return !this->_buffer.empty(); }
+    bool operator!=(const std::nullptr_t) const noexcept       { return !this->operator==(nil); }
 
     _Item_t& operator[](const uint_xt _Index) {
         if (this->len() <= _Index) { XID(panic)("index out of range"); }
@@ -192,7 +192,7 @@ public:
     inline void del(const _Key_t _Key) noexcept { this->erase(_Key); }
 
     bool operator==(const std::nullptr_t) const noexcept { return this->empty(); }
-    bool operator!=(const std::nullptr_t) const noexcept { return !this->empty(); }
+    bool operator!=(const std::nullptr_t) const noexcept { return !this->operator==(nil); }
 
     friend std::ostream& operator<<(std::ostream &_Stream,
                                     const map<_Key_t, _Value_t> &_Src) {
@@ -357,7 +357,7 @@ public:
     void operator+=(const str_xt _Str) noexcept        { this->_buffer += _Str._buffer; }
     str_xt operator+(const str_xt _Str) const noexcept { return str_xt{this->_buffer + _Str._buffer}; }
     bool operator==(const str_xt &_Str) const noexcept { return this->_buffer == _Str._buffer; }
-    bool operator!=(const str_xt &_Str) const noexcept { return this->_buffer != _Str._buffer; }
+    bool operator!=(const str_xt &_Str) const noexcept { return !this->operator==(_Str); }
 
     friend std::ostream& operator<<(std::ostream &_Stream, const str_xt &_Src)
     { return _Stream << _Src._buffer; }
