@@ -337,14 +337,14 @@ func writeOutput(path, content string) {
 
 func loadBuiltin() bool {
 	f, err := xio.Openfx(filepath.Join(x.StdlibPath, "lib.xx"))
-	p := parser.New(f)
 	if err != nil {
 		println(err.Error())
 		return false
 	}
+	p := parser.New(f)
 	p.Defs = parser.Builtin
 	p.Parsef(false, false)
-	return true
+	return !printlogs(p)
 }
 
 func compile(path string, main, justDefs bool) *Parser {

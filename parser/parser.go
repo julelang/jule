@@ -317,16 +317,10 @@ func (p *Parser) Cxx() string {
 	return cxx.String()
 }
 
-func getTree(toks Toks, errs *[]xlog.CompilerLog) []ast.Obj {
+func getTree(toks Toks) ([]ast.Obj, []xlog.CompilerLog) {
 	b := ast.NewBuilder(toks)
 	b.Build()
-	if len(b.Errs) > 0 {
-		if errs != nil {
-			*errs = append(*errs, b.Errs...)
-		}
-		return nil
-	}
-	return b.Tree
+	return b.Tree, b.Errs
 }
 
 func (p *Parser) checkUsePath(use *ast.Use) bool {
@@ -516,10 +510,8 @@ func (p *Parser) useLocalPakcage(tree *[]ast.Obj) {
 			p.pusherrs(lexer.Logs...)
 			continue
 		}
-		subtree := getTree(toks, &p.Errs)
-		if subtree == nil {
-			continue
-		}
+		subtree, errors := getTree(toks)
+		p.pusherrs(errors...)
 		preprocessor.TrimEnofi(&subtree)
 		p.parseUses(&subtree)
 		*tree = append(*tree, subtree...)
@@ -543,8 +535,9 @@ func (p *Parser) Parset(tree []ast.Obj, main, justDefs bool) {
 
 // Parses X code from tokens.
 func (p *Parser) Parse(toks Toks, main, justDefs bool) {
-	tree := getTree(toks, &p.Errs)
-	if tree == nil {
+	tree, errors := getTree(toks)
+	if len(errors) > 0 {
+		p.pusherrs(errors...)
 		return
 	}
 	p.Parset(tree, main, justDefs)
