@@ -2645,12 +2645,27 @@ func valIsEnum(v value) bool {
 	return v.isType && v.ast.Type.Id == xtype.Enum
 }
 
-func (p *Parser) getDataTypeFunc(tok Tok, m *exprModel) (v value) {
+func (p *Parser) getDataTypeFunc(expr, callRange Toks, m *exprModel) (v value, isret bool) {
+	tok := expr[0]
 	switch tok.Kind {
 	case tokens.STR:
 		m.appendSubNode(exprNode{"tostr"})
 		// Val: "()" for accept DataType as function.
 		v.ast.Type = DataType{Id: xtype.Func, Val: "()", Tag: strDefaultFunc}
+	default:
+		isret = true
+		toks := append([]lex.Tok{{
+			Id:   tokens.Brace,
+			Kind: tokens.LPARENTHESES,
+			File: tok.File,
+		}}, expr...)
+		toks = append(toks, Tok{
+			Id:   tokens.Brace,
+			Kind: tokens.RPARENTHESES,
+			File: tok.File,
+		})
+		toks = append(toks, callRange...)
+		v, _ = p.evalTryCastExpr(toks, m)
 	}
 	return
 }
@@ -2702,7 +2717,10 @@ func (p *Parser) evalParenthesesRangeExpr(toks Toks, m *exprModel) (v value) {
 	}
 	switch tok := exprToks[0]; tok.Id {
 	case tokens.DataType:
-		v = p.getDataTypeFunc(tok, m)
+		v, isret := p.getDataTypeFunc(exprToks, rangeExpr, m)
+		if isret {
+			return v
+		}
 	case tokens.Sizeof:
 		rangeExpr = rangeExpr[1 : len(rangeExpr)-1]
 		return p.callSizeof(rangeExpr, m)
