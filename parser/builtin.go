@@ -218,7 +218,7 @@ var strDefaultFunc = Func{
 
 var errorStruct = &xstruct{
 	Ast: Struct{
-		Id: "error",
+		Id: "Error",
 	},
 	Defs: &Defmap{
 		Globals: []*Var{
@@ -241,7 +241,11 @@ var errorStruct = &xstruct{
 	},
 }
 
-var errorType = DataType{Id: xtype.Struct, Val: "error", Tag: errorStruct}
+var errorType = DataType{
+	Id:  xtype.Struct,
+	Val: errorStruct.Ast.Id,
+	Tag: errorStruct,
+}
 
 // Builtin definitions.
 var Builtin = &Defmap{
@@ -514,9 +518,5 @@ func init() {
 	}
 
 	errorStruct.constructor.Id = errorStruct.Ast.Id
-	errorStruct.constructor.RetType = DataType{
-		Id:  xtype.Struct,
-		Val: errorStruct.Ast.Id,
-		Tag: errorStruct,
-	}
+	errorStruct.constructor.RetType = errorType
 }

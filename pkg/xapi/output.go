@@ -39,7 +39,7 @@ var CxxDefault = `#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) ||
 #define CONCAT(_A, _B) _CONCAT(_A, _B)
 #define XID(_Identifier) CONCAT(_, _Identifier)
 
-static inline void XID(panic)(const char *_Error);
+static inline void XID(panic)(const char *_Message);
 
 // region X_CXX_API
 // region X_BUILTIN_VALUES
@@ -532,16 +532,16 @@ str_xt tostr(const _Obj_t &_Obj) noexcept {
 // endregion X_MISC
 
 // region PANIC_DEFINES
-struct XID(error) {
+struct XID(Error) {
 public:
     str_xt XID(message);
 };
 
-std::ostream &operator<<(std::ostream &_Stream, const XID(error) &_Error)
+std::ostream &operator<<(std::ostream &_Stream, const XID(Error) &_Error)
 { return _Stream << _Error.XID(message); }
 
-static inline void XID(panic)(const struct XID(error) &_Error) { throw _Error; }
-static inline void XID(panic)(const char *_Error) { XID(panic)(XID(error){_Error}); }
+static inline void XID(panic)(const struct XID(Error) &_Error) { throw _Error; }
+static inline void XID(panic)(const char *_Message) { XID(panic)(XID(Error){_Message}); }
 // endregion PANIC_DEFINES
 
 // region X_BUILTIN_FUNCTIONS
@@ -558,7 +558,7 @@ static inline void XID(outln)(const _Obj_t _Obj) noexcept {
 // region BOTTOM_MISC
 void x_terminate_handler(void) noexcept {
     try { std::rethrow_exception(std::current_exception()); }
-    catch (const XID(error) _error)
+    catch (const XID(Error) _error)
     { std::cout << "panic: " << _error.XID(message) << std::endl; }
     catch (...)
     { std::cout << "panic: <undefined panics>" << std::endl; }
