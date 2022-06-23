@@ -12,11 +12,12 @@ func genericsToCxx(generics []*GenericType) string {
 		return ""
 	}
 	var cxx strings.Builder
+	cxx.WriteString("template<")
 	for _, generic := range generics {
 		cxx.WriteString(generic.String())
-		cxx.WriteByte('\n')
+		cxx.WriteByte(',')
 	}
-	return cxx.String()[:cxx.Len()-1]
+	return cxx.String()[:cxx.Len()-1] + ">"
 }
 
 func typeIsVoid(t DataType) bool          { return t.Id == xtype.Void && !t.MultiTyped }
