@@ -1175,8 +1175,8 @@ func (p *Parser) params(f *Func) {
 }
 
 func (p *Parser) parseFunc(f *Func) {
-	p.blockVars = p.varsFromParams(f.Params)
 	p.params(f)
+	p.blockVars = p.varsFromParams(f.Params)
 	p.checkFunc(f)
 	p.blockTypes = nil
 	p.blockVars = nil
