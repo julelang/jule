@@ -2670,26 +2670,6 @@ func (p *Parser) getDataTypeFunc(expr, callRange Toks, m *exprModel) (v value, i
 	return
 }
 
-func (p *Parser) callSizeof(toks Toks, m *exprModel) (v value) {
-	m.appendSubNode(exprNode{"sizeof"})
-	// Write parentheses.
-	m.appendSubNode(exprNode{tokens.LPARENTHESES})
-	defer m.appendSubNode(exprNode{tokens.RPARENTHESES})
-	v.ast.Type = DataType{Id: xtype.UInt, Val: tokens.UINT}
-	b := ast.NewBuilder(nil)
-	i := new(int)
-	t, ok := b.DataType(toks, i, true)
-	if !ok {
-		p.pusherrs(b.Errs...)
-		return
-	} else if *i+1 < len(toks) {
-		p.pusherrtok(toks[*i+1], "invalid_syntax")
-	}
-	t, _ = p.realType(t, true)
-	m.appendSubNode(t)
-	return
-}
-
 func (p *Parser) evalBetweenParenthesesExpr(toks Toks, m *exprModel) value {
 	// Write parentheses.
 	m.appendSubNode(exprNode{tokens.LPARENTHESES})
@@ -2721,9 +2701,6 @@ func (p *Parser) evalParenthesesRangeExpr(toks Toks, m *exprModel) (v value) {
 		if isret {
 			return v
 		}
-	case tokens.Sizeof:
-		rangeExpr = rangeExpr[1 : len(rangeExpr)-1]
-		return p.callSizeof(rangeExpr, m)
 	default:
 		v = p.evalExprPart(exprToks, m)
 	}

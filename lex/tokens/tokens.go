@@ -93,7 +93,6 @@ const (
 	CO                  = "co"
 	TRY                 = "try"
 	CATCH               = "catch"
-	SIZEOF              = "sizeof"
 )
 
 // Token types.
@@ -133,5 +132,4 @@ const (
 	Co           uint8 = 32
 	Try          uint8 = 33
 	Catch        uint8 = 34
-	Sizeof       uint8 = 35
 )
