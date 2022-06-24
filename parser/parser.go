@@ -695,6 +695,7 @@ func (p *Parser) Enum(e Enum) {
 }
 
 func (p *Parser) pushField(s *xstruct, f *Var, i int) {
+	p.parseNonGenericType(s.Ast.Generics, &f.Type)
 	for _, cf := range s.Ast.Fields {
 		if f == cf {
 			break
@@ -814,6 +815,19 @@ func (p *Parser) PushAttribute(attribute Attribute) {
 	p.attributes = append(p.attributes, attribute)
 }
 
+func genericsToCxx(generics []*GenericType) string {
+	if len(generics) == 0 {
+		return ""
+	}
+	var cxx strings.Builder
+	cxx.WriteString("template<")
+	for _, generic := range generics {
+		cxx.WriteString(generic.String())
+		cxx.WriteByte(',')
+	}
+	return cxx.String()[:cxx.Len()-1] + ">"
+}
+
 // Statement parse X statement.
 func (p *Parser) Statement(s ast.Statement) {
 	switch t := s.Val.(type) {
@@ -824,6 +838,53 @@ func (p *Parser) Statement(s ast.Statement) {
 	default:
 		p.pusherrtok(s.Tok, "invalid_syntax")
 	}
+}
+
+func (p *Parser) parseFuncNonGenericType(generics []*GenericType, t *DataType) {
+	f := t.Tag.(*Func)
+	for i := range f.Params {
+		p.parseNonGenericType(generics, &f.Params[i].Type)
+	}
+	p.parseNonGenericType(generics, &f.RetType)
+}
+
+func (p *Parser) parseMultiNonGenericType(generics []*GenericType, t *DataType) {
+	types := t.Tag.([]DataType)
+	for i := range types {
+		mt := &types[i]
+		p.parseNonGenericType(generics, mt)
+	}
+}
+
+func (p *Parser) parseMapNonGenericType(generics []*GenericType, t *DataType) {
+	p.parseMultiNonGenericType(generics, t)
+}
+
+func (p *Parser) parseCommonNonGenericType(generics []*GenericType, t *DataType) {
+	if !typeIsGeneric(generics, *t) {
+		*t, _ = p.realType(*t, true)
+	}
+}
+
+func (p *Parser) parseNonGenericType(generics []*GenericType, t *DataType) {
+	switch {
+	case t.MultiTyped:
+		p.parseMultiNonGenericType(generics, t)
+	case typeIsFunc(*t):
+		p.parseFuncNonGenericType(generics, t)
+	case typeIsMap(*t):
+		p.parseMapNonGenericType(generics, t)
+	default:
+		p.parseCommonNonGenericType(generics, t)
+
+	}
+}
+
+func (p *Parser) parseTypesNonGenerics(f *function) {
+	for i := range f.Ast.Params {
+		p.parseNonGenericType(f.Ast.Generics, &f.Ast.Params[i].Type)
+	}
+	p.parseNonGenericType(f.Ast.Generics, &f.Ast.RetType)
 }
 
 // Func parse X function.
@@ -843,6 +904,7 @@ func (p *Parser) Func(fast Func) {
 	f.Ast.Generics = p.generics
 	p.generics = nil
 	p.checkFuncAttributes(f)
+	p.parseTypesNonGenerics(f)
 	p.Defs.Funcs = append(p.Defs.Funcs, f)
 }
 

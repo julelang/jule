@@ -7,24 +7,24 @@ import (
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
-func genericsToCxx(generics []*GenericType) string {
-	if len(generics) == 0 {
-		return ""
-	}
-	var cxx strings.Builder
-	cxx.WriteString("template<")
-	for _, generic := range generics {
-		cxx.WriteString(generic.String())
-		cxx.WriteByte(',')
-	}
-	return cxx.String()[:cxx.Len()-1] + ">"
-}
-
 func typeIsVoid(t DataType) bool          { return t.Id == xtype.Void && !t.MultiTyped }
 func typeIsVariadicable(t DataType) bool  { return typeIsArray(t) }
 func typeIsMut(t DataType) bool           { return typeIsPtr(t) }
 func typeIsAllowForConst(t DataType) bool { return typeIsSingle(t) }
 func typeIsSinglePtr(t DataType) bool     { return t.Id == xtype.Voidptr }
+
+func typeIsGeneric(generics []*GenericType, t DataType) bool {
+	if t.Id != xtype.Id {
+		return false
+	}
+	id, _ := t.GetValId()
+	for _, generic := range generics {
+		if id == generic.Id {
+			return true
+		}
+	}
+	return false
+}
 
 func typeOfArrayComponents(t DataType) DataType {
 	// Remove array syntax "[]"
