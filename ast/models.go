@@ -308,16 +308,6 @@ type Func struct {
 	Block    Block
 }
 
-// FindGeneric returns index of generic if exist, return -1 if not.
-func FindGeneric(generics []*GenericType, id string) int {
-	for i, generic := range generics {
-		if generic.Id == id {
-			return i
-		}
-	}
-	return -1
-}
-
 // DataTypeString returns data type string of function.
 func (f *Func) DataTypeString() string {
 	var cxx strings.Builder
