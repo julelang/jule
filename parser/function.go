@@ -8,11 +8,10 @@ import (
 )
 
 type function struct {
-	Ast        *Func
-	Attributes []Attribute
-	Desc       string
-	used       bool
-	checked    bool
+	Ast     *Func
+	Desc    string
+	used    bool
+	checked bool
 }
 
 func (f *function) outId() string {
@@ -42,7 +41,7 @@ func (f *function) declHead() string {
 	var cxx strings.Builder
 	cxx.WriteString(genericsToCxx(f.Ast.Generics))
 	cxx.WriteByte('\n')
-	cxx.WriteString(attributesToString(f.Attributes))
+	cxx.WriteString(attributesToString(f.Ast.Attributes))
 	cxx.WriteString(f.Ast.RetType.String())
 	cxx.WriteByte(' ')
 	cxx.WriteString(f.outId())
@@ -72,11 +71,17 @@ func (f *function) PrototypeParams() string {
 	return cxx.String()[:cxx.Len()-1] + ")"
 }
 
+func isOutableAttribute(kind string) bool {
+	return kind == x.Attribute_Inline
+}
+
 func attributesToString(attributes []Attribute) string {
 	var cxx strings.Builder
 	for _, attr := range attributes {
-		cxx.WriteString(attr.String())
-		cxx.WriteByte(' ')
+		if isOutableAttribute(attr.Tag.Kind) {
+			cxx.WriteString(attr.String())
+			cxx.WriteByte(' ')
+		}
 	}
 	return cxx.String()
 }

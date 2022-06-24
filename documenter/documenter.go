@@ -187,7 +187,7 @@ func funcs(dm *Defmap) []function {
 			Generics:   generics(f.Ast.Generics),
 			Params:     params(f.Ast.Params),
 			Desc:       descriptize(f.Desc),
-			Attributes: attributes(f.Attributes),
+			Attributes: attributes(f.Ast.Attributes),
 		}
 		funcs[i] = fun
 	}

@@ -298,14 +298,26 @@ func (t Type) String() string {
 
 // Func is function declaration AST model.
 type Func struct {
-	Pub      bool
-	Tok      Tok
-	Id       string
-	Generics []*GenericType
-	Combines [][]DataType
-	Params   []Param
-	RetType  DataType
-	Block    Block
+	Pub        bool
+	Tok        Tok
+	Id         string
+	Generics   []*GenericType
+	Combines   [][]DataType
+	Attributes []Attribute
+	Params     []Param
+	RetType    DataType
+	Block      Block
+}
+
+// FindAttribute returns attribute if exist, nil if not.
+func (f *Func) FindAttribute(kind string) *Attribute {
+	for i := range f.Attributes {
+		attribute := &f.Attributes[i]
+		if attribute.Tag.Kind == kind {
+			return attribute
+		}
+	}
+	return nil
 }
 
 // DataTypeString returns data type string of function.

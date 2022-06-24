@@ -97,10 +97,15 @@ func iskw(ln, kw string) bool {
 		return false
 	}
 	ln = ln[len(kw):]
-	r := rune(ln[0])
-	return ln == "" ||
-		unicode.IsSpace(r) ||
-		(r != '_' && unicode.IsPunct(r)) ||
+	if ln == "" {
+		return true
+	}
+	r, _ := utf8.DecodeRuneInString(ln)
+	if r == '_' {
+		return false
+	}
+	return unicode.IsSpace(r) ||
+		unicode.IsPunct(r) ||
 		!unicode.IsLetter(r)
 }
 
@@ -361,46 +366,45 @@ type oppair struct {
 	id uint8
 }
 
-//                [  op  ]id
-var basicOps = []oppair{
-	{tokens.DOUBLE_COLON, tokens.DoubleColon},
-	{tokens.COLON, tokens.Colon},
-	{tokens.SEMICOLON, tokens.SemiColon},
-	{tokens.COMMA, tokens.Comma},
-	{tokens.AT, tokens.At},
-	{tokens.TRIPLE_DOT, tokens.Operator},
-	{tokens.DOT, tokens.Dot},
-	{tokens.PLUS_EQUAL, tokens.Operator},
-	{tokens.MINUS_EQUAL, tokens.Operator},
-	{tokens.STAR_EQUAL, tokens.Operator},
-	{tokens.SLASH_EQUAL, tokens.Operator},
-	{tokens.PERCENT_EQUAL, tokens.Operator},
-	{tokens.LSHIFT_EQUAL, tokens.Operator},
-	{tokens.RSHIFT_EQUAL, tokens.Operator},
-	{tokens.CARET_EQUAL, tokens.Operator},
-	{tokens.AMPER_EQUAL, tokens.Operator},
-	{tokens.VLINE_EQUAL, tokens.Operator},
-	{tokens.EQUALS, tokens.Operator},
-	{tokens.NOT_EQUALS, tokens.Operator},
-	{tokens.GREAT_EQUAL, tokens.Operator},
-	{tokens.LESS_EQUAL, tokens.Operator},
-	{tokens.AND, tokens.Operator},
-	{tokens.OR, tokens.Operator},
-	{tokens.LSHIFT, tokens.Operator},
-	{tokens.RSHIFT, tokens.Operator},
-	{tokens.PLUS, tokens.Operator},
-	{tokens.MINUS, tokens.Operator},
-	{tokens.STAR, tokens.Operator},
-	{tokens.SLASH, tokens.Operator},
-	{tokens.PERCENT, tokens.Operator},
-	{tokens.TILDE, tokens.Operator},
-	{tokens.AMPER, tokens.Operator},
-	{tokens.VLINE, tokens.Operator},
-	{tokens.CARET, tokens.Operator},
-	{tokens.EXCLAMATION, tokens.Operator},
-	{tokens.LESS, tokens.Operator},
-	{tokens.GREAT, tokens.Operator},
-	{tokens.EQUAL, tokens.Operator},
+var basicOps = [...]oppair{
+	0:  {tokens.DOUBLE_COLON, tokens.DoubleColon},
+	1:  {tokens.COLON, tokens.Colon},
+	2:  {tokens.SEMICOLON, tokens.SemiColon},
+	3:  {tokens.COMMA, tokens.Comma},
+	4:  {tokens.AT, tokens.At},
+	5:  {tokens.TRIPLE_DOT, tokens.Operator},
+	6:  {tokens.DOT, tokens.Dot},
+	7:  {tokens.PLUS_EQUAL, tokens.Operator},
+	8:  {tokens.MINUS_EQUAL, tokens.Operator},
+	9:  {tokens.STAR_EQUAL, tokens.Operator},
+	10: {tokens.SLASH_EQUAL, tokens.Operator},
+	11: {tokens.PERCENT_EQUAL, tokens.Operator},
+	12: {tokens.LSHIFT_EQUAL, tokens.Operator},
+	13: {tokens.RSHIFT_EQUAL, tokens.Operator},
+	14: {tokens.CARET_EQUAL, tokens.Operator},
+	15: {tokens.AMPER_EQUAL, tokens.Operator},
+	16: {tokens.VLINE_EQUAL, tokens.Operator},
+	17: {tokens.EQUALS, tokens.Operator},
+	18: {tokens.NOT_EQUALS, tokens.Operator},
+	19: {tokens.GREAT_EQUAL, tokens.Operator},
+	20: {tokens.LESS_EQUAL, tokens.Operator},
+	21: {tokens.AND, tokens.Operator},
+	22: {tokens.OR, tokens.Operator},
+	23: {tokens.LSHIFT, tokens.Operator},
+	24: {tokens.RSHIFT, tokens.Operator},
+	25: {tokens.PLUS, tokens.Operator},
+	26: {tokens.MINUS, tokens.Operator},
+	27: {tokens.STAR, tokens.Operator},
+	28: {tokens.SLASH, tokens.Operator},
+	29: {tokens.PERCENT, tokens.Operator},
+	30: {tokens.TILDE, tokens.Operator},
+	31: {tokens.AMPER, tokens.Operator},
+	32: {tokens.VLINE, tokens.Operator},
+	33: {tokens.CARET, tokens.Operator},
+	34: {tokens.EXCLAMATION, tokens.Operator},
+	35: {tokens.LESS, tokens.Operator},
+	36: {tokens.GREAT, tokens.Operator},
+	37: {tokens.EQUAL, tokens.Operator},
 }
 
 func (l *Lex) lexKeywords(txt string, tok *Tok) bool {

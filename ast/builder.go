@@ -544,8 +544,7 @@ func (b *Builder) Attribute(toks Toks) {
 		return
 	}
 	a.Tag = toks[i]
-	if a.Tag.Id != tokens.Id ||
-		a.Tok.Column+1 != a.Tag.Column {
+	if a.Tag.Id != tokens.Id || a.Tok.Column+1 != a.Tag.Column {
 		b.pusherr(a.Tag, "invalid_syntax")
 		return
 	}

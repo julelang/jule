@@ -795,9 +795,14 @@ write:
 
 // PushAttribute processes and appends to attribute list.
 func (p *Parser) PushAttribute(attribute Attribute) {
-	switch attribute.Tag.Kind {
-	case "inline":
-	default:
+	ok := false
+	for _, kind := range x.Attributes {
+		if attribute.Tag.Kind == kind {
+			ok = true
+			break
+		}
+	}
+	if !ok {
 		p.pusherrtok(attribute.Tag, "undefined_attribute")
 	}
 	for _, attr := range p.attributes {
@@ -831,21 +836,13 @@ func (p *Parser) Func(fast Func) {
 	f := new(function)
 	f.Ast = new(Func)
 	*f.Ast = fast
-	f.Attributes = p.attributes
+	f.Ast.Attributes = p.attributes
 	p.attributes = nil
-	p.checkFuncAttributes(f.Attributes)
 	f.Desc = p.docText.String()
 	p.docText.Reset()
 	f.Ast.Generics = p.generics
 	p.generics = nil
-	/*for i, param := range f.Ast.Params {
-		if ast.FindGeneric(f.Ast.Generics, param.Type.Tok.Kind) == -1 {
-			f.Ast.Params[i].Type, _ = p.realType(param.Type, true)
-		}
-	}
-	if ast.FindGeneric(f.Ast.Generics, f.Ast.RetType.Tok.Kind) == -1 {
-		f.Ast.RetType, _ = p.realType(f.Ast.RetType, true)
-	}*/
+	p.checkFuncAttributes(f)
 	p.Defs.Funcs = append(p.Defs.Funcs, f)
 }
 
@@ -910,10 +907,21 @@ func (p *Parser) Var(v Var) *Var {
 	return &v
 }
 
-func (p *Parser) checkFuncAttributes(attributes []Attribute) {
-	for _, attribute := range attributes {
+func (p *Parser) checkTypeParam(f *function) {
+	if len(f.Ast.Generics) == 0 {
+		p.pusherrtok(f.Ast.Tok, "func_must_have_generics_if_has_attribute", x.Attribute_TypeParam)
+	}
+	if len(f.Ast.Params) != 0 {
+		p.pusherrtok(f.Ast.Tok, "func_cant_have_params_if_has_attribute", x.Attribute_TypeParam)
+	}
+}
+
+func (p *Parser) checkFuncAttributes(f *function) {
+	for _, attribute := range f.Ast.Attributes {
 		switch attribute.Tag.Kind {
-		case "inline":
+		case x.Attribute_Inline:
+		case x.Attribute_TypeParam:
+			p.checkTypeParam(f)
 		default:
 			p.pusherrtok(attribute.Tok, "invalid_attribute")
 		}
@@ -3046,6 +3054,7 @@ func (p *Parser) getGenerics(toks Toks) []DataType {
 	if len(toks) == 0 {
 		return nil
 	}
+	// Remove braces
 	toks = toks[1 : len(toks)-1]
 	parts, errs := ast.Parts(toks, tokens.Comma)
 	generics := make([]DataType, len(parts))
@@ -3201,9 +3210,19 @@ func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *ast.Args, m *
 	return
 }
 
-func (p *Parser) parseFuncCallToks(f *Func, genericsToks, argsToks Toks, m *exprModel) value {
-	generics := p.getGenerics(genericsToks)
-	args := p.getArgs(argsToks)
+func (p *Parser) parseFuncCallToks(f *Func, genericsToks, argsToks Toks, m *exprModel) (v value) {
+	var generics []DataType = nil
+	var args *ast.Args = nil
+	if f.FindAttribute(x.Attribute_TypeParam) != nil {
+		if len(genericsToks) > 0 {
+			p.pusherrtok(genericsToks[0], "invalid_syntax")
+			return
+		}
+		generics = p.getGenerics(argsToks)
+	} else {
+		generics = p.getGenerics(genericsToks)
+		args = p.getArgs(argsToks)
+	}
 	return p.parseFuncCall(f, generics, args, m, argsToks[0])
 }
 
@@ -3557,7 +3576,7 @@ func (p *Parser) checkEntryPointSpecialCases(fun *function) {
 	if fun.Ast.RetType.Id != xtype.Void {
 		p.pusherrtok(fun.Ast.RetType.Tok, "entrypoint_have_return")
 	}
-	if fun.Attributes != nil {
+	if fun.Ast.Attributes != nil {
 		p.pusherrtok(fun.Ast.Tok, "entrypoint_have_attributes")
 	}
 }
