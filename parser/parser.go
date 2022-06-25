@@ -2799,7 +2799,7 @@ func (p *Parser) parseField(s *xstruct, f **Var, i int) {
 	if v.Type.Id == xtype.Struct && v.Type.Tag == s && typeIsSingle(v.Type) {
 		p.pusherrtok(v.Type.Tok, "invalid_type_source")
 	}
-	if v.Val.Toks != nil {
+	if len(v.Val.Toks) > 0 {
 		param.Default = v.Val
 	} else {
 		param.Default.Model = exprNode{defaultValueOfType(param.Type)}
@@ -2812,7 +2812,7 @@ func (p *Parser) structConstructorInstance(as xstruct) *xstruct {
 	s.Ast = as.Ast
 	s.constructor = new(Func)
 	*s.constructor = *as.constructor
-	s.constructor.RetType.Tag = &s
+	s.constructor.RetType.Tag = s
 	s.Defs = new(Defmap)
 	*s.Defs = *as.Defs
 	for i := range s.Ast.Fields {
@@ -3205,7 +3205,6 @@ func (p *Parser) parseGenerics(f *Func, generics []DataType, m *exprModel, errTo
 	defer func() { p.blockTypes, p.blockVars = blockTypes, blockVars }()
 	p.pushGenerics(f.Generics, generics)
 	if isConstructor(f) {
-		p.readyConstructor(&f)
 		return true
 	}
 	p.reloadFuncTypes(f)
@@ -3245,14 +3244,11 @@ func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *ast.Args, m *
 		if !p.parseGenerics(f, generics, m, errTok) {
 			return
 		}
-		v.ast.Type = f.RetType
-		v.ast.Type.Original = v.ast.Type
 	} else {
 		p.reloadFuncTypes(f)
-		v.ast.Type = f.RetType
-		v.ast.Type.Original = v.ast.Type
 	}
 	if isConstructor(f) {
+		p.readyConstructor(&f)
 		s := f.RetType.Tag.(*xstruct)
 		s.SetGenerics(generics)
 		v.ast.Type.Val = s.dataTypeString()
@@ -3262,6 +3258,8 @@ func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *ast.Args, m *
 		m.appendSubNode(exprNode{tokens.LPARENTHESES})
 		defer m.appendSubNode(exprNode{tokens.RPARENTHESES})
 	}
+	v.ast.Type = f.RetType
+	v.ast.Type.Original = v.ast.Type
 	if args == nil {
 		return
 	}
@@ -3309,9 +3307,11 @@ func (p *Parser) parseArgs(f *Func, args *ast.Args, m *exprModel, errTok Tok) {
 	pap.parse()
 }
 
-func paramHasDefaultArg(param *Param) bool {
-	return len(param.Default.Processes) > 0 || param.Default.Model != nil
+func hasExpr(expr Expr) bool {
+	return len(expr.Processes) > 0 || expr.Model != nil
 }
+
+func paramHasDefaultArg(param *Param) bool { return hasExpr(param.Default) }
 
 //             [identifier]
 type paramMap map[string]*paramMapPair
