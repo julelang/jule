@@ -1116,7 +1116,7 @@ func (p *Parser) blockVarById(id string) *Var {
 	return nil
 }
 
-func (p *Parser) defById(id string) (def interface{}, tok Tok, m *Defmap, canshadow bool) {
+func (p *Parser) defById(id string) (def any, tok Tok, m *Defmap, canshadow bool) {
 	var t *Type
 	t, m, canshadow = p.typeById(id)
 	if t != nil {
@@ -1147,7 +1147,7 @@ func (p *Parser) defById(id string) (def interface{}, tok Tok, m *Defmap, cansha
 	return
 }
 
-func (p *Parser) blockDefById(id string) (def interface{}, tok Tok) {
+func (p *Parser) blockDefById(id string) (def any, tok Tok) {
 	if bv := p.blockVarById(id); bv != nil {
 		return bv, bv.IdTok
 	}
