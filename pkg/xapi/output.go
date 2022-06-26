@@ -366,32 +366,34 @@ public:
 };
 
 struct any_xt {
-private:
-    void *_expr{nullptr};
-    const char *_inf{nullptr};
-
-    void _delete(void) noexcept {
-        this->_inf = nullptr;
-        std::free(this->_expr);
-        this->_expr = nullptr;
-    }
 public:
-    any_xt(const std::nullptr_t) noexcept {}
+    void *_expr{nil};
+    char *_inf{nil};
 
     template<typename T>
-    any_xt(const T &_Expr) noexcept {
-        this->_expr = (void*)(new(std::nothrow) T{_Expr});
-        this->_inf  = typeid(T).name();
-    }
- 
+    any_xt(const T &_Expr) noexcept
+    { this->operator=(_Expr); }
+
     ~any_xt(void) noexcept
     { this->_delete(); }
+
+    inline void _delete(void) noexcept {
+        this->_expr = nil;
+        this->_inf = nil;
+    }
+
+    template<typename T>
+    inline bool type_is(void) const noexcept {
+        if (!this->_expr)
+        { return std::is_same<std::nullptr_t, T>::value; }
+        return std::strcmp(this->_inf, typeid(T).name()) == 0;
+    }
 
     template<typename T>
     void operator=(const T &_Expr) noexcept {
         this->_delete();
-        this->_expr = (void*)(new(std::nothrow) T{_Expr});
-        this->_inf  = typeid(T).name();
+        this->_expr = (void*)&_Expr;
+        this->_inf  = (char*)(typeid(T).name());
     }
 
     void operator=(const std::nullptr_t) noexcept
@@ -404,21 +406,17 @@ public:
         if (std::strcmp(this->_inf, typeid(T).name()) != 0)
         { XID(panic)("incompatible type"); }
         return *(T*)(this->_expr);
-   }
+    }
 
     template<typename T>
-    bool operator==(const T &_Expr) const noexcept {
-        if (!this->_expr)
-        { return std::is_same<std::nullptr_t, T>::value; }
-        if (std::strcmp(this->_inf, typeid(T).name()) != 0) { return false; }
-        return *(T*)(this->_expr) == _Expr;
-    }
+    inline bool operator==(const T &_Expr) const noexcept
+    { return this->type_is<T>() && *(T*)(this->_expr) == _Expr; }
 
     template<typename T>
     inline bool operator!=(const T &_Expr) const noexcept
     { return !this->operator==(_Expr); }
 
-    bool operator==(const any_xt &_Any) const noexcept
+    inline bool operator==(const any_xt &_Any) const noexcept
     { return this->_expr == _Any._expr; }
 
     inline bool operator!=(const any_xt &_Any) const noexcept
