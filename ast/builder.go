@@ -1364,10 +1364,12 @@ type assignInfo struct {
 // IsFuncCall returns function expressions without call expression
 // if tokens are function call, nil if not.
 func IsFuncCall(toks Toks) Toks {
-	if tok := toks[0]; tok.Id != tokens.Brace && tok.Id != tokens.Id {
-		return nil
-	} else if t := toks[len(toks)-1]; t.Id != tokens.Brace && t.Kind != tokens.RPARENTHESES {
-		return nil
+	switch toks[0].Id {
+	case tokens.Brace, tokens.Id, tokens.DataType:
+	default:
+		if tok := toks[len(toks)-1]; tok.Id != tokens.Brace && tok.Kind != tokens.RPARENTHESES {
+			return nil
+		}
 	}
 	braceCount := 0
 	// Loops to 1 because expression must be has function expression at begin.

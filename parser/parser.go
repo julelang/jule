@@ -2131,54 +2131,66 @@ func (p *Parser) evalHeapAllocExpr(toks Toks, m *exprModel) (v value) {
 	toks = toks[1:]
 	b := new(ast.Builder)
 	i := new(int)
-	exprToks := ast.IsFuncCall(toks)
 	var dt DataType
 	var ok bool
 	var alloc newHeapAllocExpr
-	if exprToks == nil {
+	funcExprToks := ast.IsFuncCall(toks)
+	if funcExprToks == nil {
 		dt, ok = b.DataType(toks, i, true)
-		dt, _ = p.realType(dt, true)
+		if !ok {
+			goto check
+		}
+		dt, ok = p.realType(dt, true)
+		if !ok {
+			goto check
+		}
 		alloc.typeAST = dt
-		m.appendSubNode(alloc)
 		if *i < len(toks)-1 {
 			p.pusherrtok(toks[*i+1], "invalid_syntax")
 		}
-	} else {
-		dt, ok = b.DataType(exprToks, i, true)
-		dt, _ = p.realType(dt, true)
-		alloc.typeAST = dt
-		if *i < len(exprToks)-1 {
-			p.pusherrtok(exprToks[*i+1], "invalid_syntax")
-		}
-		if dt.Id == xtype.Struct {
-			allocExpr := new(exprModel)
-			allocExpr.nodes = make([]exprBuildNode, 1)
-			alloc.expr.Model = allocExpr
-			m.appendSubNode(alloc)
-			dt = p.evalExprPart(toks, allocExpr).ast.Type
-		} else {
-			m.appendSubNode(alloc)
-			// Get function call expression tokens without parentheses.
-			exprToks = toks[len(exprToks)+1 : len(toks)-1]
-			if len(exprToks) > 0 {
-				val, model := p.evalToks(exprToks)
-				alloc.expr.Model = model
-				p.wg.Add(1)
-				go assignChecker{
-					p:      p,
-					t:      dt,
-					v:      val,
-					errtok: exprToks[0],
-				}.checkAssignTypeAsync()
-			}
-		}
+		goto end
 	}
+	dt, ok = b.DataType(funcExprToks, i, true)
+	if !ok {
+		goto check
+	}
+	dt, ok = p.realType(dt, true)
+	if !ok {
+		goto check
+	}
+	alloc.typeAST = dt
+	if *i < len(funcExprToks)-1 {
+		p.pusherrtok(funcExprToks[*i+1], "invalid_syntax")
+	}
+	toks = toks[len(funcExprToks):]
+	if dt.Id == xtype.Struct {
+		allocExpr := new(exprModel)
+		allocExpr.nodes = make([]exprBuildNode, 1)
+		alloc.expr.Model = allocExpr
+		dt = p.evalExprPart(toks, allocExpr).ast.Type
+		goto end
+	}
+	// Get function call expression tokens without parentheses.
+	toks = toks[1 : len(toks)-1]
+	if len(toks) > 0 {
+		val, model := p.evalToks(toks)
+		alloc.expr.Model = model
+		p.wg.Add(1)
+		go assignChecker{
+			p:      p,
+			t:      dt,
+			v:      val,
+			errtok: funcExprToks[0],
+		}.checkAssignTypeAsync()
+	}
+check:
+	if !ok {
+		p.pusherrtok(v.ast.Tok, "fail_build_heap_allocation_type", dt.Val)
+	}
+end:
 	dt.Val = tokens.STAR + dt.Val
 	v.ast.Type = dt
-	if !ok {
-		p.pusherrtok(toks[0], "fail_build_heap_allocation_type", dt.Val)
-		return
-	}
+	m.appendSubNode(alloc)
 	return
 }
 
