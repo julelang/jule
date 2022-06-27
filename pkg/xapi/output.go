@@ -4,6 +4,7 @@ package xapi
 var CxxMain = `// region X_ENTRY_POINT
 int main(void) {
     std::set_terminate(&x_terminate_handler);
+    std::cout << std::boolalpha;
 #ifdef _WINDOWS
     SetConsoleOutputCP(CP_UTF8);
     _setmode(_fileno(stdin), 0x00020000);
