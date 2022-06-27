@@ -2550,7 +2550,8 @@ func (p *Parser) evalTryCastExpr(toks Toks, m *exprModel) (v value, _ bool) {
 		}
 		m.appendSubNode(exprNode{tokens.LPARENTHESES + dt.String() + tokens.RPARENTHESES})
 		m.appendSubNode(exprNode{tokens.LPARENTHESES})
-		val := p.evalExprPart(exprToks, m)
+		val, model := p.evalToks(exprToks)
+		m.appendSubNode(model)
 		m.appendSubNode(exprNode{tokens.RPARENTHESES})
 		val = p.evalCast(val, dt, errTok)
 		return val, true
@@ -4111,15 +4112,13 @@ func (p *Parser) checkVarStatement(v *Var, noParse bool) {
 func (p *Parser) checkDeferStatement(d *ast.Defer) {
 	m := new(exprModel)
 	m.nodes = make([]exprBuildNode, 1)
-	_ = p.evalExprPart(d.Expr.Toks, m)
-	d.Expr.Model = m
+	_, d.Expr.Model = p.evalExpr(d.Expr)
 }
 
 func (p *Parser) checkConcurrentCallStatement(cc *ast.ConcurrentCall) {
 	m := new(exprModel)
 	m.nodes = make([]exprBuildNode, 1)
-	_ = p.evalExprPart(cc.Expr.Toks, m)
-	cc.Expr.Model = m
+	_, cc.Expr.Model = p.evalExpr(cc.Expr)
 }
 
 func (p *Parser) checkAssignment(selected value, errtok Tok) bool {
