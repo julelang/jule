@@ -4242,7 +4242,9 @@ func (p *Parser) checkAssign(assign *ast.Assign) {
 		return
 	}
 	if valueLength == 1 {
-		firstVal, _ := p.evalExpr(assign.ValueExprs[0])
+		expr := &assign.ValueExprs[0]
+		firstVal, model := p.evalExpr(*expr)
+		expr.Model = model
 		if firstVal.ast.Type.MultiTyped {
 			assign.MultipleRet = true
 			p.processFuncMultiAssign(assign, firstVal)
