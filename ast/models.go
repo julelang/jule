@@ -12,6 +12,10 @@ import (
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
+type exprNode struct{ expr string }
+
+func (en exprNode) String() string { return en.expr }
+
 // Genericable instance.
 type Genericable interface {
 	Generics() []DataType

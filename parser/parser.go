@@ -1194,7 +1194,11 @@ func (p *Parser) WaitingGlobals() {
 }
 
 func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) {
-	if !paramHasDefaultArg(param) || param.Tok.Id == tokens.NA {
+	if (!paramHasDefaultArg(param)) || param.Tok.Id == tokens.NA {
+		return
+	}
+	// Skip default argument with default value
+	if param.Default.Model != nil && param.Default.Model.String() == "{}" {
 		return
 	}
 	dt := param.Type
