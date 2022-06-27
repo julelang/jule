@@ -2756,11 +2756,12 @@ func (p *Parser) evalParenthesesRangeExpr(toks Toks, m *exprModel) (v value) {
 		exprToks, genericsToks = ast.GetRangeLast(exprToks)
 	}
 	switch tok := exprToks[0]; tok.Id {
-	case tokens.DataType:
+	case tokens.DataType, tokens.Id:
 		v, isret := p.getDataTypeFunc(exprToks, rangeExpr, m)
 		if isret {
 			return v
 		}
+		fallthrough
 	default:
 		v = p.evalExprPart(exprToks, m)
 	}
