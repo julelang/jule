@@ -1574,20 +1574,22 @@ func (ve *valueEvaluator) num() value {
 		strings.ContainsAny(ve.tok.Kind, "eE") {
 		v.ast.Type.Id = xtype.F64
 		v.ast.Type.Val = tokens.F64
-		ve.model.appendSubNode(exprNode{ve.tok.Kind})
 	} else {
-		v.ast.Type.Id = xtype.Int
-		v.ast.Type.Val = tokens.INT
-		bit := xbits.BitsizeType(xtype.Int)
-		ok := xbits.CheckBitInt(ve.tok.Kind, bit)
-		if !ok && bit < xbits.MaxInt {
+		intbit := xbits.BitsizeType(xtype.Int)
+		switch {
+		case xbits.CheckBitInt(ve.tok.Kind, intbit):
+			v.ast.Type.Id = xtype.Int
+			v.ast.Type.Val = tokens.INT
+		case intbit < xbits.MaxInt && xbits.CheckBitInt(ve.tok.Kind, xbits.MaxInt):
 			v.ast.Type.Id = xtype.I64
 			v.ast.Type.Val = tokens.I64
-			ve.model.appendSubNode(exprNode{ve.tok.Kind})
-		} else {
-			ve.model.appendSubNode(exprNode{"int_xt{" + ve.tok.Kind + "}"})
+		default:
+			v.ast.Type.Id = xtype.U64
+			v.ast.Type.Val = tokens.U64
 		}
 	}
+	node := exprNode{xtype.CxxTypeIdFromType(v.ast.Type.Id) + "{" + ve.tok.Kind + "}"}
+	ve.model.appendSubNode(node)
 	return v
 }
 
