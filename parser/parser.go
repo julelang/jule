@@ -1350,11 +1350,15 @@ func (p *Parser) evalNonLogicProcesses(processes []Toks) (v value, e iExpr) {
 	left := processes[:m.index]
 	leftV, leftExpr := p.evalProcesses(left)
 	m.index-- // Step to left
+	m.appendSubNode(exprNode{tokens.LPARENTHESES})
 	m.appendSubNode(leftExpr)
+	m.appendSubNode(exprNode{tokens.RPARENTHESES})
 	m.index += 2 // Step to right
 	right := processes[m.index:]
 	rightV, rightExpr := p.evalProcesses(right)
+	m.appendSubNode(exprNode{tokens.LPARENTHESES})
 	m.appendSubNode(rightExpr)
+	m.appendSubNode(exprNode{tokens.RPARENTHESES})
 	process.leftVal = leftV.ast
 	process.rightVal = rightV.ast
 	v.ast = process.solve()
