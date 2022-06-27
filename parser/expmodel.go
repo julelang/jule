@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/the-xlang/xxc/ast"
-	"github.com/the-xlang/xxc/pkg/xapi"
 )
 
 type iExpr interface{ String() string }
@@ -128,15 +127,6 @@ func (mre multiRetExpr) String() string {
 		cxx.WriteByte(',')
 	}
 	return cxx.String()[:cxx.Len()-1] + ")"
-}
-
-type newHeapAllocExpr struct {
-	typeAST DataType
-	expr    Expr
-}
-
-func (nha newHeapAllocExpr) String() string {
-	return xapi.ToXAlloc(nha.typeAST.String(), nha.expr.String())
 }
 
 type assignExpr struct{ assign ast.Assign }

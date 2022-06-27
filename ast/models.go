@@ -696,19 +696,6 @@ func (a Assign) String() string {
 	return cxx.String()
 }
 
-type Free struct {
-	Tok  Tok
-	Expr Expr
-}
-
-func (f Free) String() string {
-	var cxx strings.Builder
-	cxx.WriteString("delete ")
-	cxx.WriteString(f.Expr.String())
-	cxx.WriteByte(';')
-	return cxx.String()
-}
-
 // IterProfile interface for iteration profiles.
 type IterProfile interface {
 	String(iter Iter) string

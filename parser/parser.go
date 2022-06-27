@@ -2147,79 +2147,6 @@ func canGetPtr(v value) bool {
 	}
 }
 
-func (p *Parser) evalHeapAllocExpr(toks Toks, m *exprModel) (v value) {
-	if len(toks) == 1 {
-		p.pusherrtok(toks[0], "invalid_syntax_keyword_new")
-		return
-	}
-	v.lvalue = true
-	v.ast.Tok = toks[0]
-	toks = toks[1:]
-	b := new(ast.Builder)
-	i := new(int)
-	var dt DataType
-	var ok bool
-	var alloc newHeapAllocExpr
-	funcExprToks := ast.IsFuncCall(toks)
-	if funcExprToks == nil {
-		dt, ok = b.DataType(toks, i, true)
-		if !ok {
-			goto check
-		}
-		dt, ok = p.realType(dt, true)
-		if !ok {
-			goto check
-		}
-		alloc.typeAST = dt
-		if *i < len(toks)-1 {
-			p.pusherrtok(toks[*i+1], "invalid_syntax")
-		}
-		goto end
-	}
-	dt, ok = b.DataType(funcExprToks, i, true)
-	if !ok {
-		goto check
-	}
-	dt, ok = p.realType(dt, true)
-	if !ok {
-		goto check
-	}
-	alloc.typeAST = dt
-	if *i < len(funcExprToks)-1 {
-		p.pusherrtok(funcExprToks[*i+1], "invalid_syntax")
-	}
-	toks = toks[len(funcExprToks):]
-	if dt.Id == xtype.Struct {
-		allocExpr := new(exprModel)
-		allocExpr.nodes = make([]exprBuildNode, 1)
-		alloc.expr.Model = allocExpr
-		dt = p.evalExprPart(toks, allocExpr).ast.Type
-		goto end
-	}
-	// Get function call expression tokens without parentheses.
-	toks = toks[1 : len(toks)-1]
-	if len(toks) > 0 {
-		val, model := p.evalToks(toks)
-		alloc.expr.Model = model
-		p.wg.Add(1)
-		go assignChecker{
-			p:      p,
-			t:      dt,
-			v:      val,
-			errtok: funcExprToks[0],
-		}.checkAssignTypeAsync()
-	}
-check:
-	if !ok {
-		p.pusherrtok(v.ast.Tok, "fail_build_heap_allocation_type", dt.Val)
-	}
-end:
-	dt.Val = tokens.STAR + dt.Val
-	v.ast.Type = dt
-	m.appendSubNode(alloc)
-	return
-}
-
 func (p *Parser) evalExprPart(toks Toks, m *exprModel) (v value) {
 	defer func() {
 		if v.ast.Type.Id == xtype.Void {
@@ -2234,8 +2161,6 @@ func (p *Parser) evalExprPart(toks Toks, m *exprModel) (v value) {
 	switch tok.Id {
 	case tokens.Operator:
 		return p.evalUnaryExprPart(toks, m)
-	case tokens.New:
-		return p.evalHeapAllocExpr(toks, m)
 	case tokens.Brace:
 		switch tok.Kind {
 		case tokens.LPARENTHESES:
@@ -3736,9 +3661,6 @@ func (p *Parser) checkBlock(b *ast.Block) {
 		case ast.Assign:
 			p.checkAssign(&t)
 			model.Val = t
-		case ast.Free:
-			p.checkFreeStatement(&t)
-			model.Val = t
 		case ast.Iter:
 			p.checkIterExpr(&t)
 			model.Val = t
@@ -4333,14 +4255,6 @@ func (p *Parser) checkAssign(assign *ast.Assign) {
 		return
 	}
 	p.processMultiAssign(assign, p.assignExprs(assign))
-}
-
-func (p *Parser) checkFreeStatement(freeAST *ast.Free) {
-	val, model := p.evalExpr(freeAST.Expr)
-	freeAST.Expr.Model = model
-	if !typeIsPtr(val.ast.Type) {
-		p.pusherrtok(freeAST.Tok, "free_nonpointer")
-	}
 }
 
 func (p *Parser) checkWhileProfile(iter *ast.Iter) {

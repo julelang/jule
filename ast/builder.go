@@ -1317,8 +1317,6 @@ func (b *Builder) Statement(bs *blockStatement) (s Statement) {
 		return b.VarStatement(bs.toks)
 	case tokens.Ret:
 		return b.RetStatement(bs.toks)
-	case tokens.Free:
-		return b.FreeStatement(bs.toks)
 	case tokens.Iter:
 		return b.IterExpr(bs.toks)
 	case tokens.Break:
@@ -1875,19 +1873,6 @@ func (b *Builder) RetStatement(toks Toks) Statement {
 	return Statement{ret.Tok, ret, false}
 }
 
-// FreeStatement builds AST model of free statement.
-func (b *Builder) FreeStatement(toks Toks) Statement {
-	var free Free
-	free.Tok = toks[0]
-	toks = toks[1:]
-	if len(toks) == 0 {
-		b.pusherr(free.Tok, "missing_expr")
-	} else {
-		free.Expr = b.Expr(toks)
-	}
-	return Statement{free.Tok, free, false}
-}
-
 func blockExprToks(toks Toks) (expr Toks) {
 	braceCount := 0
 	for i, tok := range toks {
@@ -2223,22 +2208,19 @@ func isOverflowOperator(kind string) bool {
 func isExprOperator(kind string) bool { return kind == tokens.TRIPLE_DOT }
 
 type exprProcessInfo struct {
-	processes           []Toks
-	part                Toks
-	operator            bool
-	value               bool
-	singleOperatored    bool
-	newKeyword          bool
-	braceZeroedNewFalse bool
-	pushedError         bool
-	braceCount          int
-	toks                Toks
-	i                   int
+	processes        []Toks
+	part             Toks
+	operator         bool
+	value            bool
+	singleOperatored bool
+	pushedError      bool
+	braceCount       int
+	toks             Toks
+	i                int
 }
 
 func (b *Builder) exprOperatorPart(info *exprProcessInfo, tok Tok) {
-	if info.newKeyword ||
-		isExprOperator(tok.Kind) ||
+	if isExprOperator(tok.Kind) ||
 		isAssignOperator(tok.Kind) {
 		info.part = append(info.part, tok)
 		return
@@ -2296,10 +2278,6 @@ func (b *Builder) exprBracePart(info *exprProcessInfo, tok Tok) bool {
 		info.braceCount++
 	default:
 		info.braceCount--
-		if info.braceCount == 0 && info.braceZeroedNewFalse {
-			info.braceZeroedNewFalse = false
-			info.newKeyword = false
-		}
 	}
 	return false
 }
@@ -2318,20 +2296,6 @@ func (b *Builder) getExprProcesses(toks Toks) []Toks {
 			if skipStep {
 				continue
 			}
-		case tokens.New:
-			info.newKeyword = true
-		case tokens.Id:
-			if info.braceCount != 0 {
-				break
-			}
-			if info.i+1 < len(info.toks) {
-				tok := info.toks[info.i+1]
-				if tok.Id == tokens.Brace && tok.Kind == tokens.LBRACKET {
-					info.braceZeroedNewFalse = true
-					break
-				}
-			}
-			info.newKeyword = false
 		}
 		b.exprValuePart(&info, tok)
 	}
