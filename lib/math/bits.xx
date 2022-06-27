@@ -5,6 +5,7 @@
 const uvnan   :u64 = 0x7FF8000000000001
 const uvinf   :u64 = 0x7FF0000000000000
 const uvneginf:u64 = 0xFFF0000000000000
+const bias    :    = 1023
 
 //doc: Returns an IEEE 754 “not-a-number” value.
 @inline
@@ -20,9 +21,9 @@ pub isnan(const f f64) bool {
 	ret f != f
 }
 
-//doc: Returns positive infinity if sign, negative infinity if !sign.
-pub inf(const sign bool) f64 {
-	if sign {
+//doc: Returns positive infinity if sign >= 0, negative infinity if !sign < 0.
+pub inf(const sign int) f64 {
+	if sign >= 0 {
 		ret f64_from_bits(uvinf)
 	}
 	ret f64_from_bits(uvneginf)
@@ -40,4 +41,15 @@ pub isinf(const f f64, const sign{0} int) bool {
 	//	x: = f64_bits(f);
 	//	ret sign >= 0 && x == uvinf || sign <= 0 && x == uvneginf;
 	ret sign >= 0 && f > f64.max || sign <= 0 && f < -f64.max
+}
+
+//doc:
+// Returns a normal number y and exponent exp
+// satisfying x == y × 2**exp. It assumes x is finite and non-zero.
+normalize(const x f64) [/* y */ f64, /* exp */ int] {
+	const smallest_normal: = 2.2250738585072014e-308 // 2**-1022
+	if abs(x) < smallest_normal {
+		ret x * (1 << 52), -52
+	}
+	ret x, 0
 }
