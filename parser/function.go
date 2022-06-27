@@ -3,6 +3,7 @@ package parser
 import (
 	"strings"
 
+	"github.com/the-xlang/xxc/ast"
 	"github.com/the-xlang/xxc/pkg/x"
 	"github.com/the-xlang/xxc/pkg/xapi"
 )
@@ -25,7 +26,19 @@ func (f function) String() string {
 	var cxx strings.Builder
 	cxx.WriteString(f.Head())
 	cxx.WriteByte(' ')
-	cxx.WriteString(f.Ast.Block.String())
+	block := f.Ast.Block
+	vars := f.Ast.RetType.Vars()
+	if vars != nil {
+		statements := make([]ast.Statement, len(vars))
+		for i, v := range vars {
+			statements[i] = ast.Statement{
+				Tok: v.IdTok,
+				Val: *v,
+			}
+		}
+		block.Tree = append(statements, block.Tree...)
+	}
+	cxx.WriteString(block.String())
 	return cxx.String()
 }
 

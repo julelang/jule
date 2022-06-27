@@ -213,7 +213,7 @@ var strDefaultFunc = Func{
 	Pub:     true,
 	Id:      "str",
 	Params:  []Param{{Id: "obj", Type: DataType{Id: xtype.Any, Val: tokens.ANY}}},
-	RetType: DataType{Id: xtype.Str, Val: tokens.STR},
+	RetType: RetType{Type: DataType{Id: xtype.Str, Val: tokens.STR}},
 }
 
 var errorStruct = &xstruct{
@@ -254,7 +254,7 @@ var Builtin = &Defmap{
 			Ast: &Func{
 				Pub:     true,
 				Id:      "out",
-				RetType: DataType{Id: xtype.Void, Val: xtype.VoidTypeStr},
+				RetType: RetType{Type: DataType{Id: xtype.Void, Val: xtype.VoidTypeStr}},
 				Params: []Param{{
 					Id:      "v",
 					Const:   true,
@@ -267,7 +267,7 @@ var Builtin = &Defmap{
 			Ast: &Func{
 				Pub:     true,
 				Id:      "outln",
-				RetType: DataType{Id: xtype.Void, Val: xtype.VoidTypeStr},
+				RetType: RetType{Type: DataType{Id: xtype.Void, Val: xtype.VoidTypeStr}},
 				Params: []Param{{
 					Id:      "v",
 					Const:   true,
@@ -296,43 +296,43 @@ var strDefs = &Defmap{
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "empty",
-			RetType: DataType{Id: xtype.Bool, Val: tokens.BOOL},
+			RetType: RetType{Type: DataType{Id: xtype.Bool, Val: tokens.BOOL}},
 		}},
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "has_prefix",
 			Params:  []Param{{Id: "sub", Type: DataType{Id: xtype.Str, Val: tokens.STR}}},
-			RetType: DataType{Id: xtype.Bool, Val: tokens.BOOL},
+			RetType: RetType{Type: DataType{Id: xtype.Bool, Val: tokens.BOOL}},
 		}},
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "has_suffix",
 			Params:  []Param{{Id: "sub", Type: DataType{Id: xtype.Str, Val: tokens.STR}}},
-			RetType: DataType{Id: xtype.Bool, Val: tokens.BOOL},
+			RetType: RetType{Type: DataType{Id: xtype.Bool, Val: tokens.BOOL}},
 		}},
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "find",
 			Params:  []Param{{Id: "sub", Type: DataType{Id: xtype.Str, Val: tokens.STR}}},
-			RetType: DataType{Id: xtype.UInt, Val: tokens.UINT},
+			RetType: RetType{Type: DataType{Id: xtype.UInt, Val: tokens.UINT}},
 		}},
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "rfind",
 			Params:  []Param{{Id: "sub", Type: DataType{Id: xtype.Str, Val: tokens.STR}}},
-			RetType: DataType{Id: xtype.UInt, Val: tokens.UINT},
+			RetType: RetType{Type: DataType{Id: xtype.UInt, Val: tokens.UINT}},
 		}},
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "trim",
 			Params:  []Param{{Id: "bytes", Type: DataType{Id: xtype.Str, Val: tokens.STR}}},
-			RetType: DataType{Id: xtype.Str, Val: tokens.STR},
+			RetType: RetType{Type: DataType{Id: xtype.Str, Val: tokens.STR}},
 		}},
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "rtrim",
 			Params:  []Param{{Id: "bytes", Type: DataType{Id: xtype.Str, Val: tokens.STR}}},
-			RetType: DataType{Id: xtype.Str, Val: tokens.STR},
+			RetType: RetType{Type: DataType{Id: xtype.Str, Val: tokens.STR}},
 		}},
 		{Ast: &Func{
 			Pub: true,
@@ -345,7 +345,7 @@ var strDefs = &Defmap{
 					Default: Expr{Model: exprNode{"-1"}},
 				},
 			},
-			RetType: DataType{Id: xtype.Str, Val: "[]" + tokens.STR},
+			RetType: RetType{Type: DataType{Id: xtype.Str, Val: "[]" + tokens.STR}},
 		}},
 		{Ast: &Func{
 			Pub: true,
@@ -359,7 +359,7 @@ var strDefs = &Defmap{
 					Default: Expr{Model: exprNode{"-1"}},
 				},
 			},
-			RetType: DataType{Id: xtype.Str, Val: tokens.STR},
+			RetType: RetType{Type: DataType{Id: xtype.Str, Val: tokens.STR}},
 		}},
 	},
 }
@@ -379,7 +379,7 @@ var arrDefs = &Defmap{
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "empty",
-			RetType: DataType{Id: xtype.Bool, Val: tokens.BOOL},
+			RetType: RetType{Type: DataType{Id: xtype.Bool, Val: tokens.BOOL}},
 		}},
 		{Ast: &Func{
 			Pub:    true,
@@ -413,7 +413,7 @@ var arrDefs = &Defmap{
 				{Id: "start", Type: DataType{Id: xtype.UInt, Val: tokens.UINT}},
 				{Id: "values", Variadic: true},
 			},
-			RetType: DataType{Id: xtype.Bool, Val: tokens.BOOL},
+			RetType: RetType{Type: DataType{Id: xtype.Bool, Val: tokens.BOOL}},
 		}},
 	},
 }
@@ -423,13 +423,13 @@ func readyArrDefs(arrt DataType) {
 
 	findFunc, _, _ := arrDefs.funcById("find", nil)
 	findFunc.Ast.Params[0].Type = elemType
-	findFunc.Ast.RetType = elemType
-	findFunc.Ast.RetType.Val = tokens.STAR + findFunc.Ast.RetType.Val
+	findFunc.Ast.RetType.Type = elemType
+	findFunc.Ast.RetType.Type.Val = tokens.STAR + findFunc.Ast.RetType.Type.Val
 
 	rfindFunc, _, _ := arrDefs.funcById("rfind", nil)
 	rfindFunc.Ast.Params[0].Type = elemType
-	rfindFunc.Ast.RetType = elemType
-	rfindFunc.Ast.RetType.Val = tokens.STAR + rfindFunc.Ast.RetType.Val
+	rfindFunc.Ast.RetType.Type = elemType
+	rfindFunc.Ast.RetType.Type.Val = tokens.STAR + rfindFunc.Ast.RetType.Type.Val
 
 	eraseFunc, _, _ := arrDefs.funcById("erase", nil)
 	eraseFunc.Ast.Params[0].Type = elemType
@@ -461,13 +461,13 @@ var mapDefs = &Defmap{
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "empty",
-			RetType: DataType{Id: xtype.Bool, Val: tokens.BOOL},
+			RetType: RetType{Type: DataType{Id: xtype.Bool, Val: tokens.BOOL}},
 		}},
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "has",
 			Params:  []Param{{Id: "key", Const: true}},
-			RetType: DataType{Id: xtype.Bool, Val: tokens.BOOL},
+			RetType: RetType{Type: DataType{Id: xtype.Bool, Val: tokens.BOOL}},
 		}},
 		{Ast: &Func{
 			Pub:    true,
@@ -485,12 +485,12 @@ func readyMapDefs(mapt DataType) {
 	valt := types[1]
 
 	keysFunc, _, _ := mapDefs.funcById("keys", nil)
-	keysFunc.Ast.RetType = keyt
-	keysFunc.Ast.RetType.Val = "[]" + keysFunc.Ast.RetType.Val
+	keysFunc.Ast.RetType.Type = keyt
+	keysFunc.Ast.RetType.Type.Val = "[]" + keysFunc.Ast.RetType.Type.Val
 
 	valuesFunc, _, _ := mapDefs.funcById("values", nil)
-	valuesFunc.Ast.RetType = valt
-	valuesFunc.Ast.RetType.Val = "[]" + valuesFunc.Ast.RetType.Val
+	valuesFunc.Ast.RetType.Type = valt
+	valuesFunc.Ast.RetType.Type.Val = "[]" + valuesFunc.Ast.RetType.Type.Val
 
 	hasFunc, _, _ := mapDefs.funcById("has", nil)
 	hasFunc.Ast.Params[0].Type = keyt
@@ -518,5 +518,5 @@ func init() {
 	}
 
 	errorStruct.constructor.Id = errorStruct.Ast.Id
-	errorStruct.constructor.RetType = errorType
+	errorStruct.constructor.RetType.Type = errorType
 }

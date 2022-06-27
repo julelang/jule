@@ -36,6 +36,7 @@ type Attribute = ast.Attribute
 type Enum = ast.Enum
 type Struct = ast.Struct
 type GenericType = ast.GenericType
+type RetType = ast.RetType
 
 type use struct {
 	Path string
@@ -706,7 +707,7 @@ func (p *Parser) pushField(s *xstruct, f *Var, i int) {
 		}
 	}
 	param := ast.Param{Id: f.Id, Type: f.Type}
-	param.Default.Model = exprNode{"{}"}
+	param.Default.Model = exprNode{xapi.DefaultExpr}
 	s.constructor.Params[i] = param
 }
 
@@ -714,7 +715,7 @@ func (p *Parser) processFields(s *xstruct) {
 	s.constructor = new(Func)
 	s.constructor.Id = s.Ast.Id
 	s.constructor.Params = make([]ast.Param, len(s.Ast.Fields))
-	s.constructor.RetType = DataType{Id: xtype.Struct, Val: s.Ast.Id, Tok: s.Ast.Tok, Tag: s}
+	s.constructor.RetType.Type = DataType{Id: xtype.Struct, Val: s.Ast.Id, Tok: s.Ast.Tok, Tag: s}
 	s.constructor.Generics = make([]*ast.GenericType, len(s.Ast.Generics))
 	for i, generic := range s.Ast.Generics {
 		ng := new(ast.GenericType)
@@ -845,7 +846,7 @@ func (p *Parser) parseFuncNonGenericType(generics []*GenericType, t *DataType) {
 	for i := range f.Params {
 		p.parseNonGenericType(generics, &f.Params[i].Type)
 	}
-	p.parseNonGenericType(generics, &f.RetType)
+	p.parseNonGenericType(generics, &f.RetType.Type)
 }
 
 func (p *Parser) parseMultiNonGenericType(generics []*GenericType, t *DataType) {
@@ -884,7 +885,37 @@ func (p *Parser) parseTypesNonGenerics(f *function) {
 	for i := range f.Ast.Params {
 		p.parseNonGenericType(f.Ast.Generics, &f.Ast.Params[i].Type)
 	}
-	p.parseNonGenericType(f.Ast.Generics, &f.Ast.RetType)
+	p.parseNonGenericType(f.Ast.Generics, &f.Ast.RetType.Type)
+}
+
+func (p *Parser) checkRetVars(f *function) {
+	for i, v := range f.Ast.RetType.Identifiers {
+		if xapi.IsIgnoreId(v.Kind) {
+			continue
+		}
+		for _, generic := range f.Ast.Generics {
+			if v.Kind == generic.Id {
+				goto exist
+			}
+		}
+		for _, param := range f.Ast.Params {
+			if v.Kind == param.Id {
+				goto exist
+			}
+		}
+		for j, jv := range f.Ast.RetType.Identifiers {
+			if j >= i {
+				break
+			}
+			if jv.Kind == v.Kind {
+				goto exist
+			}
+		}
+		continue
+	exist:
+		p.pusherrtok(v, "exist_id", v.Kind)
+
+	}
 }
 
 // Func parse X function.
@@ -903,6 +934,7 @@ func (p *Parser) Func(fast Func) {
 	p.docText.Reset()
 	f.Ast.Generics = p.generics
 	p.generics = nil
+	p.checkRetVars(f)
 	p.checkFuncAttributes(f)
 	p.parseTypesNonGenerics(f)
 	p.Defs.Funcs = append(p.Defs.Funcs, f)
@@ -1198,7 +1230,7 @@ func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) {
 		return
 	}
 	// Skip default argument with default value
-	if param.Default.Model != nil && param.Default.Model.String() == "{}" {
+	if param.Default.Model != nil && param.Default.Model.String() == xapi.DefaultExpr {
 		return
 	}
 	dt := param.Type
@@ -1241,9 +1273,15 @@ func (p *Parser) params(f *Func) {
 	}
 }
 
+func (p *Parser) blockVarsOfFunc(f *Func) []*Var {
+	vars := p.varsFromParams(f.Params)
+	vars = append(vars, f.RetType.Vars()...)
+	return vars
+}
+
 func (p *Parser) parseFunc(f *Func) {
 	p.params(f)
-	p.blockVars = p.varsFromParams(f.Params)
+	p.blockVars = p.blockVarsOfFunc(f)
 	p.checkFunc(f)
 	p.blockTypes = nil
 	p.blockVars = nil
@@ -2813,7 +2851,7 @@ func (p *Parser) structConstructorInstance(as xstruct) *xstruct {
 	s.Ast = as.Ast
 	s.constructor = new(Func)
 	*s.constructor = *as.constructor
-	s.constructor.RetType.Tag = s
+	s.constructor.RetType.Type.Tag = s
 	s.Defs = new(Defmap)
 	*s.Defs = *as.Defs
 	for i := range s.Ast.Fields {
@@ -3172,7 +3210,7 @@ func (p *Parser) reloadFuncTypes(f *Func) {
 	for i, param := range f.Params {
 		f.Params[i].Type, _ = p.realType(param.Type, true)
 	}
-	f.RetType, _ = p.realType(f.RetType, true)
+	f.RetType.Type, _ = p.realType(f.RetType.Type, true)
 }
 
 func itsCombined(f *Func, generics []DataType) bool {
@@ -3223,15 +3261,15 @@ func (p *Parser) parseGenerics(f *Func, generics []DataType, m *exprModel, errTo
 }
 
 func isConstructor(f *Func) bool {
-	if f.RetType.Id != xtype.Struct {
+	if f.RetType.Type.Id != xtype.Struct {
 		return false
 	}
-	s := f.RetType.Tag.(*xstruct)
+	s := f.RetType.Type.Tag.(*xstruct)
 	return f.Id == s.Ast.Id
 }
 
 func (p *Parser) readyConstructor(f **Func) {
-	s := (*f).RetType.Tag.(*xstruct)
+	s := (*f).RetType.Type.Tag.(*xstruct)
 	s = p.structConstructorInstance(*s)
 	*f = s.constructor
 }
@@ -3250,7 +3288,7 @@ func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *ast.Args, m *
 	}
 	if isConstructor(f) {
 		p.readyConstructor(&f)
-		s := f.RetType.Tag.(*xstruct)
+		s := f.RetType.Type.Tag.(*xstruct)
 		s.SetGenerics(generics)
 		v.ast.Type.Val = s.dataTypeString()
 		m.appendSubNode(exprNode{tokens.LBRACE})
@@ -3259,7 +3297,7 @@ func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *ast.Args, m *
 		m.appendSubNode(exprNode{tokens.LPARENTHESES})
 		defer m.appendSubNode(exprNode{tokens.RPARENTHESES})
 	}
-	v.ast.Type = f.RetType
+	v.ast.Type = f.RetType.Type
 	v.ast.Type.Original = v.ast.Type
 	if args == nil {
 		return
@@ -3636,8 +3674,8 @@ func (p *Parser) checkEntryPointSpecialCases(fun *function) {
 	if len(fun.Ast.Params) > 0 {
 		p.pusherrtok(fun.Ast.Tok, "entrypoint_have_parameters")
 	}
-	if fun.Ast.RetType.Id != xtype.Void {
-		p.pusherrtok(fun.Ast.RetType.Tok, "entrypoint_have_return")
+	if fun.Ast.RetType.Type.Id != xtype.Void {
+		p.pusherrtok(fun.Ast.RetType.Type.Tok, "entrypoint_have_return")
 	}
 	if fun.Ast.Attributes != nil {
 		p.pusherrtok(fun.Ast.Tok, "entrypoint_have_attributes")
@@ -3791,9 +3829,9 @@ func (p *Parser) checkEmbedReturn(cxx string, errTok Tok) {
 		cxx = cxx[:len(cxx)-1]
 	}
 	f := p.rootBlock.Func
-	if len(cxx) == 0 && !typeIsVoid(f.RetType) {
+	if len(cxx) == 0 && !typeIsVoid(f.RetType.Type) {
 		p.pusherrtok(errTok, "require_return_value")
-	} else if len(cxx) > 0 && typeIsVoid(f.RetType) {
+	} else if len(cxx) > 0 && typeIsVoid(f.RetType.Type) {
 		p.pusherrtok(errTok, "void_function_return_value")
 	}
 }
@@ -3985,14 +4023,14 @@ func (rc *retChecker) checkepxrs() {
 			rc.pushval(last, length, rc.retAST.Expr.Toks[last-1])
 		}
 	}
-	if !typeIsVoid(rc.f.RetType) {
+	if !typeIsVoid(rc.f.RetType.Type) {
 		rc.checkExprTypes()
 	}
 }
 
 func (rc *retChecker) checkExprTypes() {
 	valLength := len(rc.values)
-	if !rc.f.RetType.MultiTyped { // Single return
+	if !rc.f.RetType.Type.MultiTyped { // Single return
 		rc.retAST.Expr.Model = rc.expModel.models[0]
 		if valLength > 1 {
 			rc.p.pusherrtok(rc.retAST.Tok, "overflow_return")
@@ -4001,7 +4039,7 @@ func (rc *retChecker) checkExprTypes() {
 		go assignChecker{
 			p:         rc.p,
 			constant:  false,
-			t:         rc.f.RetType,
+			t:         rc.f.RetType.Type,
 			v:         rc.values[0],
 			ignoreAny: false,
 			errtok:    rc.retAST.Tok,
@@ -4010,7 +4048,7 @@ func (rc *retChecker) checkExprTypes() {
 	}
 	// Multi return
 	rc.retAST.Expr.Model = rc.expModel
-	types := rc.f.RetType.Tag.([]DataType)
+	types := rc.f.RetType.Type.Tag.([]DataType)
 	if valLength == 1 {
 		rc.checkMultiRetAsMutliRet()
 		return
@@ -4040,7 +4078,7 @@ func (rc *retChecker) checkMultiRetAsMutliRet() {
 		return
 	}
 	valTypes := val.ast.Type.Tag.([]DataType)
-	retTypes := rc.f.RetType.Tag.([]DataType)
+	retTypes := rc.f.RetType.Type.Tag.([]DataType)
 	if len(valTypes) < len(retTypes) {
 		rc.p.pusherrtok(rc.retAST.Tok, "missing_multi_return")
 		return
@@ -4065,13 +4103,44 @@ func (rc *retChecker) checkMultiRetAsMutliRet() {
 	}
 }
 
-func (rc *retChecker) check() {
-	exprToksLen := len(rc.retAST.Expr.Toks)
-	if exprToksLen == 0 && !typeIsVoid(rc.f.RetType) {
-		rc.p.pusherrtok(rc.retAST.Tok, "require_return_value")
+func (rc *retChecker) retsVars() {
+	if !rc.f.RetType.Type.MultiTyped {
+		for _, v := range rc.f.RetType.Identifiers {
+			if !xapi.IsIgnoreId(v.Kind) {
+				rc.retAST.Expr.Model = exprNode{v.Kind}
+				break
+			}
+		}
 		return
 	}
-	if exprToksLen > 0 && typeIsVoid(rc.f.RetType) {
+	types := rc.f.RetType.Type.Tag.([]DataType)
+	for i, v := range rc.f.RetType.Identifiers {
+		if xapi.IsIgnoreId(v.Kind) {
+			node := exprNode{}
+			node.value = types[i].String()
+			node.value += xapi.DefaultExpr
+			rc.expModel.models = append(rc.expModel.models, node)
+			continue
+		}
+		model := new(exprModel)
+		model.index = 0
+		model.nodes = make([]exprBuildNode, 1)
+		_, _ = rc.p.evalSingleExpr(v, model)
+		rc.expModel.models = append(rc.expModel.models, model)
+	}
+	rc.retAST.Expr.Model = rc.expModel
+}
+
+func (rc *retChecker) check() {
+	exprToksLen := len(rc.retAST.Expr.Toks)
+	if exprToksLen == 0 && !typeIsVoid(rc.f.RetType.Type) {
+		if !rc.f.RetType.AnyVar() {
+			rc.p.pusherrtok(rc.retAST.Tok, "require_return_value")
+		}
+		rc.retsVars()
+		return
+	}
+	if exprToksLen > 0 && typeIsVoid(rc.f.RetType.Type) {
 		rc.p.pusherrtok(rc.retAST.Tok, "void_function_return_value")
 	}
 	rc.checkepxrs()
@@ -4089,7 +4158,7 @@ func (p *Parser) checkRets(f *Func) {
 			}
 		}
 	}
-	if !typeIsVoid(f.RetType) {
+	if !typeIsVoid(f.RetType.Type) {
 		p.pusherrtok(f.Tok, "missing_ret")
 	}
 }

@@ -183,7 +183,7 @@ func funcs(dm *Defmap) []function {
 	for i, f := range dm.Funcs {
 		fun := function{
 			Id:         f.Ast.Id,
-			Ret:        f.Ast.RetType.Val,
+			Ret:        f.Ast.RetType.Type.Val,
 			Generics:   generics(f.Ast.Generics),
 			Params:     params(f.Ast.Params),
 			Desc:       descriptize(f.Desc),

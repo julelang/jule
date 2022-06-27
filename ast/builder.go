@@ -566,8 +566,8 @@ func (b *Builder) Func(toks Toks, anon bool) (f Func) {
 		f.Id = f.Tok.Kind
 		i++
 	}
-	f.RetType.Id = xtype.Void
-	f.RetType.Val = xtype.VoidTypeStr
+	f.RetType.Type.Id = xtype.Void
+	f.RetType.Type.Val = xtype.VoidTypeStr
 	paramToks := b.getrange(&i, tokens.LPARENTHESES, tokens.RPARENTHESES, &toks)
 	if len(paramToks) > 0 {
 		b.Params(&f, paramToks)
@@ -774,7 +774,7 @@ func (b *Builder) paramBodyDefaultExpr(p *Param, toks *Toks) {
 		if len(exprToks) > 0 {
 			p.Default = b.Expr(exprToks)
 		} else {
-			p.Default.Model = exprNode{"{}"}
+			p.Default.Model = exprNode{xapi.DefaultExpr}
 		}
 		break
 	}
@@ -1074,36 +1074,52 @@ func (b *Builder) FuncDataTypeHead(toks Toks, i *int) (string, Func) {
 	return "", f
 }
 
-func (b *Builder) pushTypeToTypes(types *[]DataType, toks Toks, errTok Tok) {
+func (b *Builder) pushTypeToTypes(ids *Toks, types *[]DataType, toks Toks, errTok Tok) {
 	if len(toks) == 0 {
 		b.pusherr(errTok, "missing_expr")
 		return
 	}
-	currentDt, _ := b.DataType(toks, new(int), false)
+	tok := toks[0]
+	if tok.Id == tokens.Id && len(toks) > 1 {
+		*ids = append(*ids, tok)
+		toks = toks[1:]
+	} else {
+		*ids = append(*ids, Tok{Kind: xapi.Ignore})
+	}
+	index := new(int)
+	currentDt, ok := b.DataType(toks, index, true)
+	if !ok {
+		return
+	} else if *index < len(toks)-1 {
+		b.pusherr(toks[*index], "invalid_syntax")
+	}
 	*types = append(*types, currentDt)
 }
 
-func (b *Builder) funcMultiTypeRet(toks Toks, i *int) (t DataType, ok bool) {
-	defer func() { t.Original = t }()
+func (b *Builder) funcMultiTypeRet(toks Toks, i *int) (t RetType, ok bool) {
+	defer func() { t.Type.Original = t.Type }()
 	start := *i
 	tok := toks[*i]
-	t.Val += tok.Kind
+	t.Type.Val += tok.Kind
 	*i++
 	if *i >= len(toks) {
 		*i--
-		return b.DataType(toks, i, false)
+		t.Type, ok = b.DataType(toks, i, false)
+		return
 	}
 	tok = toks[*i]
+	// Is array?
 	if tok.Id == tokens.Brace && tok.Kind == tokens.RBRACKET {
 		*i--
-		return b.DataType(toks, i, false)
+		t.Type, ok = b.DataType(toks, i, false)
+		return
 	}
 	var types []DataType
 	braceCount := 1
 	last := *i
 	for ; *i < len(toks); *i++ {
 		tok := toks[*i]
-		t.Val += tok.Kind
+		t.Type.Val += tok.Kind
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
 			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
@@ -1115,9 +1131,10 @@ func (b *Builder) funcMultiTypeRet(toks Toks, i *int) (t DataType, ok bool) {
 		if braceCount == 0 {
 			if tok.Id == tokens.Colon {
 				*i = start
-				return b.DataType(toks, i, false)
+				t.Type, ok = b.DataType(toks, i, false)
+				return
 			}
-			b.pushTypeToTypes(&types, toks[last:*i], toks[last-1])
+			b.pushTypeToTypes(&t.Identifiers, &types, toks[last:*i], toks[last-1])
 			break
 		} else if braceCount > 1 {
 			continue
@@ -1126,34 +1143,37 @@ func (b *Builder) funcMultiTypeRet(toks Toks, i *int) (t DataType, ok bool) {
 		case tokens.Comma:
 		case tokens.Colon:
 			*i = start
-			return b.DataType(toks, i, false)
+			t.Type, ok = b.DataType(toks, i, false)
+			return
 		default:
 			continue
 		}
-		b.pushTypeToTypes(&types, toks[last:*i], toks[*i-1])
+		b.pushTypeToTypes(&t.Identifiers, &types, toks[last:*i], toks[*i-1])
 		last = *i + 1
 	}
 	if len(types) > 1 {
-		t.MultiTyped = true
-		t.Tag = types
+		t.Type.MultiTyped = true
+		t.Type.Tag = types
 	} else {
-		t = types[0]
+		t.Type = types[0]
 	}
 	ok = true
 	return
 }
 
 // FuncRetDataType builds ret data-type of function.
-func (b *Builder) FuncRetDataType(toks Toks, i *int) (t DataType, ok bool) {
-	defer func() { t.Original = t }()
+func (b *Builder) FuncRetDataType(toks Toks, i *int) (t RetType, ok bool) {
+	defer func() { t.Type.Original = t.Type }()
 	if *i >= len(toks) {
 		return
 	}
 	tok := toks[*i]
-	if tok.Id == tokens.Brace && tok.Kind == tokens.LBRACKET { // Multityped?
+	// Multityped?
+	if tok.Id == tokens.Brace && tok.Kind == tokens.LBRACKET {
 		return b.funcMultiTypeRet(toks, i)
 	}
-	return b.DataType(toks, i, false)
+	t.Type, ok = b.DataType(toks, i, false)
+	return
 }
 
 // IsSigleOperator is returns true
