@@ -1296,13 +1296,6 @@ type value struct {
 	isType   bool
 }
 
-func eliminateProcesses(processes *[]Toks, i, to int) {
-	for i < to {
-		(*processes)[i] = nil
-		i++
-	}
-}
-
 func (p *Parser) evalLogicProcesses(processes []Toks) (v value, e iExpr) {
 	m := new(exprModel)
 	e = m
@@ -1341,71 +1334,31 @@ func (p *Parser) evalLogicProcesses(processes []Toks) (v value, e iExpr) {
 }
 
 func (p *Parser) evalNonLogicProcesses(processes []Toks) (v value, e iExpr) {
-	defer func() {
-		if v.isType {
-			p.pusherrtok(v.ast.Tok, "invalid_syntax")
-		}
-	}()
 	m := newExprModel(processes)
 	e = m
 	if len(processes) == 1 {
 		v = p.evalExprPart(processes[0], m)
 		return
 	}
-	process := solver{p: p, model: m}
-	boolean := false
-	for i := p.nextOperator(processes); i != -1 && !noData(processes); i = p.nextOperator(processes) {
-		if !boolean {
-			boolean = v.ast.Type.Id == xtype.Bool
-		}
-		if boolean {
-			v.ast.Type.Id = xtype.Bool
-		}
-		m.index = i
-		process.operator = processes[m.index][0]
-		m.appendSubNode(exprNode{process.operator.Kind})
-		if processes[i-1] == nil {
-			process.leftVal = v.ast
-			m.index = i + 1
-			process.right = processes[m.index]
-			process.rightVal = p.evalExprPart(process.right, m).ast
-			v.ast = process.solve()
-			eliminateProcesses(&processes, i, i+2)
-			continue
-		} else if processes[i+1] == nil {
-			m.index = i - 1
-			process.left = processes[m.index]
-			process.leftVal = p.evalExprPart(process.left, m).ast
-			process.rightVal = v.ast
-			v.ast = process.solve()
-			eliminateProcesses(&processes, i-1, i+1)
-			continue
-		} else if isOperator(processes[i-1]) {
-			process.leftVal = v.ast
-			m.index = i + 1
-			process.right = processes[m.index]
-			process.rightVal = p.evalExprPart(process.right, m).ast
-			v.ast = process.solve()
-			eliminateProcesses(&processes, i, i+1)
-			continue
-		}
-		m.index = i - 1
-		process.left = processes[m.index]
-		process.leftVal = p.evalExprPart(process.left, m).ast
-		m.index = i + 1
-		process.right = processes[m.index]
-		process.rightVal = p.evalExprPart(process.right, m).ast
-		solvedv := process.solve()
-		if v.ast.Type.Id != xtype.Void {
-			process.operator.Kind = tokens.PLUS
-			process.leftVal = v.ast
-			process.right = processes[i+1]
-			process.rightVal = solvedv
-			solvedv = process.solve()
-		}
-		v.ast = solvedv
-		eliminateProcesses(&processes, i-1, i+2)
+	m.index = p.nextOperator(processes)
+	if m.index == -1 {
+		return
 	}
+	process := solver{p: p, model: m}
+	process.operator = processes[m.index][0]
+	m.appendSubNode(exprNode{process.operator.Kind})
+	left := processes[:m.index]
+	leftV, leftExpr := p.evalProcesses(left)
+	m.index-- // Step to left
+	m.appendSubNode(leftExpr)
+	m.index += 2 // Step to right
+	right := processes[m.index:]
+	rightV, rightExpr := p.evalProcesses(right)
+	m.appendSubNode(rightExpr)
+	process.leftVal = leftV.ast
+	process.rightVal = rightV.ast
+	v.ast = process.solve()
+	v.lvalue = typeIsLvalue(v.ast.Type)
 	return
 }
 
@@ -1420,15 +1373,6 @@ func (p *Parser) evalProcesses(processes []Toks) (v value, e iExpr) {
 	}
 }
 
-func noData(processes []Toks) bool {
-	for _, p := range processes {
-		if !isOperator(p) && p != nil {
-			return false
-		}
-	}
-	return true
-}
-
 func isOperator(process Toks) bool {
 	return len(process) == 1 && process[0].Id == tokens.Operator
 }
@@ -1436,11 +1380,14 @@ func isOperator(process Toks) bool {
 // nextOperator find index of priority operator and returns index of operator
 // if found, returns -1 if not.
 func (p *Parser) nextOperator(processes []Toks) int {
-	precedence5 := -1
-	precedence4 := -1
-	precedence3 := -1
-	precedence2 := -1
 	precedence1 := -1
+	precedence2 := -1
+	precedence3 := -1
+	precedence4 := -1
+	precedence5 := -1
+	precedence6 := -1
+	precedence7 := -1
+	precedence8 := -1
 	for i, process := range processes {
 		if !isOperator(process) {
 			continue
@@ -1449,29 +1396,60 @@ func (p *Parser) nextOperator(processes []Toks) int {
 			continue
 		}
 		switch process[0].Kind {
-		case tokens.STAR, tokens.SLASH, tokens.PERCENT,
-			tokens.LSHIFT, tokens.RSHIFT, tokens.AMPER:
-			precedence5 = i
-		case tokens.PLUS, tokens.MINUS, tokens.VLINE, tokens.CARET:
-			precedence4 = i
-		case tokens.EQUALS, tokens.NOT_EQUALS, tokens.LESS, tokens.LESS_EQUAL,
+		case tokens.STAR, tokens.SLASH, tokens.PERCENT:
+			if precedence1 == -1 {
+				precedence1 = i
+			}
+		case tokens.PLUS, tokens.MINUS:
+			if precedence2 == -1 {
+				precedence2 = i
+			}
+		case tokens.LSHIFT, tokens.RSHIFT:
+			if precedence3 == -1 {
+				precedence3 = i
+			}
+		case tokens.LESS, tokens.LESS_EQUAL,
 			tokens.GREAT, tokens.GREAT_EQUAL:
-			precedence3 = i
+			if precedence4 == -1 {
+				precedence4 = i
+			}
+		case tokens.EQUALS, tokens.NOT_EQUALS:
+			if precedence5 == -1 {
+				precedence5 = i
+			}
+		case tokens.AMPER:
+			if precedence6 == -1 {
+				precedence6 = i
+			}
+		case tokens.CARET:
+			if precedence7 == -1 {
+				precedence7 = i
+			}
+		case tokens.VLINE:
+			if precedence8 == -1 {
+				precedence8 = i
+			}
 		default:
 			p.pusherrtok(process[0], "invalid_operator")
 		}
 	}
 	switch {
-	case precedence5 != -1:
-		return precedence5
-	case precedence4 != -1:
-		return precedence4
-	case precedence3 != -1:
-		return precedence3
+	case precedence1 != -1:
+		return precedence1
 	case precedence2 != -1:
 		return precedence2
+	case precedence3 != -1:
+		return precedence3
+	case precedence4 != -1:
+		return precedence4
+	case precedence5 != -1:
+		return precedence5
+	case precedence6 != -1:
+		return precedence6
+	case precedence7 != -1:
+		return precedence7
 	default:
-		return precedence1
+		return precedence8
 	}
 }
 
@@ -3285,8 +3263,8 @@ func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *ast.Args, m *
 }
 
 func (p *Parser) parseFuncCallToks(f *Func, genericsToks, argsToks Toks, m *exprModel) (v value) {
-	var generics []DataType = nil
-	var args *ast.Args = nil
+	var generics []DataType
+	var args *ast.Args
 	if f.FindAttribute(x.Attribute_TypeParam) != nil {
 		if len(genericsToks) > 0 {
 			p.pusherrtok(genericsToks[0], "invalid_syntax")
