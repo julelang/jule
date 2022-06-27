@@ -2713,7 +2713,6 @@ func (p *Parser) getDataTypeFunc(expr, callRange Toks, m *exprModel) (v value, i
 		// Val: "()" for accept DataType as function.
 		v.ast.Type = DataType{Id: xtype.Func, Val: "()", Tag: strDefaultFunc}
 	default:
-		isret = true
 		toks := append([]lex.Tok{{
 			Id:   tokens.Brace,
 			Kind: tokens.LPARENTHESES,
@@ -2725,7 +2724,7 @@ func (p *Parser) getDataTypeFunc(expr, callRange Toks, m *exprModel) (v value, i
 			File: tok.File,
 		})
 		toks = append(toks, callRange...)
-		v, _ = p.evalTryCastExpr(toks, m)
+		v, isret = p.evalTryCastExpr(toks, m)
 	}
 	return
 }
