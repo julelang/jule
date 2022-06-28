@@ -329,8 +329,8 @@ func (b *Builder) Preprocessor(toks Toks) {
 	}
 	ok := false
 	switch tok.Kind {
-	case "pragma":
-		ok = b.Pragma(&pp, toks)
+	case x.PreprocessorDirective:
+		ok = b.PreprocessorDirective(&pp, toks)
 	default:
 		b.pusherr(tok, "invalid_preprocessor")
 		return
@@ -340,9 +340,9 @@ func (b *Builder) Preprocessor(toks Toks) {
 	}
 }
 
-// Pragma builds AST model of preprocessor pragma directive.
+// PreprocessorDirective builds AST model of preprocessor pragma directive.
 // Returns true if success, returns false if not.
-func (b *Builder) Pragma(pp *Preprocessor, toks Toks) bool {
+func (b *Builder) PreprocessorDirective(pp *Preprocessor, toks Toks) bool {
 	if len(toks) == 1 {
 		b.pusherr(toks[0], "missing_pragma_directive")
 		return false
@@ -356,8 +356,8 @@ func (b *Builder) Pragma(pp *Preprocessor, toks Toks) bool {
 	var d Directive
 	ok := false
 	switch tok.Kind {
-	case "enofi":
-		ok = b.pragmaEnofi(&d, toks)
+	case x.PreprocessorDirectiveEnofi:
+		ok = b.directiveEnofi(&d, toks)
 	default:
 		b.pusherr(tok, "invalid_pragma_directive")
 	}
@@ -365,7 +365,7 @@ func (b *Builder) Pragma(pp *Preprocessor, toks Toks) bool {
 	return ok
 }
 
-func (b *Builder) pragmaEnofi(d *Directive, toks Toks) bool {
+func (b *Builder) directiveEnofi(d *Directive, toks Toks) bool {
 	if len(toks) > 1 {
 		b.pusherr(toks[1], "invalid_syntax")
 		return false

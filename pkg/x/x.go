@@ -28,6 +28,9 @@ const (
 
 	Attribute_Inline    = "inline"
 	Attribute_TypeParam = "type_param"
+
+	PreprocessorDirective      = "pragma"
+	PreprocessorDirectiveEnofi = "enofi"
 )
 
 // Environment Variables.

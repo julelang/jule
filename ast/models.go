@@ -916,8 +916,6 @@ func (d Directive) String() string { return fmt.Sprint(d.Command) }
 // EnofiDirective is the AST model of enofi directive.
 type EnofiDirective struct{}
 
-func (EnofiDirective) String() string { return "" }
-
 // Defer is the AST model of deferred calls.
 type Defer struct {
 	Tok  Tok

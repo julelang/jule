@@ -513,7 +513,7 @@ func (p *Parser) useLocalPakcage(tree *[]ast.Obj) {
 		}
 		subtree, errors := getTree(toks)
 		p.pusherrs(errors...)
-		preprocessor.TrimEnofi(&subtree)
+		preprocessor.Process(&subtree)
 		p.parseUses(&subtree)
 		*tree = append(*tree, subtree...)
 	}
@@ -523,11 +523,11 @@ func (p *Parser) useLocalPakcage(tree *[]ast.Obj) {
 func (p *Parser) Parset(tree []ast.Obj, main, justDefs bool) {
 	p.main = main
 	p.justDefs = justDefs
+	if !main {
+		preprocessor.Process(&tree)
+	}
 	if !p.isLocalPkg {
 		p.useLocalPakcage(&tree)
-	}
-	if !main {
-		preprocessor.TrimEnofi(&tree)
 	}
 	p.parseTree(tree)
 	p.checkParse()
@@ -1423,80 +1423,78 @@ func isOperator(process Toks) bool {
 	return len(process) == 1 && process[0].Id == tokens.Operator
 }
 
+type precedencer struct {
+	pairs [][]any
+}
+
+func (p *precedencer) set(level uint, expr any) {
+	for _, pair := range p.pairs {
+		pairLevel := pair[0].(uint)
+		if pairLevel == level {
+			if pair[1] == nil {
+				pair[1] = expr
+			}
+			return
+		}
+	}
+	for i, pair := range p.pairs {
+		pairLevel := pair[0].(uint)
+		if level < pairLevel {
+			p.pairs = append(p.pairs[:i],
+				append([][]any{{level, expr}}, p.pairs[i:]...)...)
+			return
+		}
+	}
+	p.pairs = append(p.pairs, []any{level, expr})
+}
+
+func (p *precedencer) get() any {
+	for _, pair := range p.pairs {
+		data := pair[1]
+		if data != nil {
+			return data
+		}
+	}
+	return nil
+}
+
 // nextOperator find index of priority operator and returns index of operator
 // if found, returns -1 if not.
 func (p *Parser) nextOperator(processes []Toks) int {
-	precedence1 := -1
-	precedence2 := -1
-	precedence3 := -1
-	precedence4 := -1
-	precedence5 := -1
-	precedence6 := -1
-	precedence7 := -1
-	precedence8 := -1
+	prec := precedencer{}
 	for i, process := range processes {
-		if !isOperator(process) {
-			continue
-		}
-		if processes[i-1] == nil && processes[i+1] == nil {
+		switch {
+		case !isOperator(process),
+			processes[i-1] == nil && processes[i+1] == nil:
 			continue
 		}
 		switch process[0].Kind {
 		case tokens.STAR, tokens.SLASH, tokens.PERCENT:
-			if precedence1 == -1 {
-				precedence1 = i
-			}
+			prec.set(1, i)
 		case tokens.PLUS, tokens.MINUS:
-			if precedence2 == -1 {
-				precedence2 = i
-			}
+			prec.set(2, i)
 		case tokens.LSHIFT, tokens.RSHIFT:
-			if precedence3 == -1 {
-				precedence3 = i
-			}
+			prec.set(3, i)
 		case tokens.LESS, tokens.LESS_EQUAL,
 			tokens.GREAT, tokens.GREAT_EQUAL:
-			if precedence4 == -1 {
-				precedence4 = i
-			}
+			prec.set(4, i)
 		case tokens.EQUALS, tokens.NOT_EQUALS:
-			if precedence5 == -1 {
-				precedence5 = i
-			}
+			prec.set(5, i)
 		case tokens.AMPER:
-			if precedence6 == -1 {
-				precedence6 = i
-			}
+			prec.set(6, i)
 		case tokens.CARET:
-			if precedence7 == -1 {
-				precedence7 = i
-			}
+			prec.set(7, i)
 		case tokens.VLINE:
-			if precedence8 == -1 {
-				precedence8 = i
-			}
+			prec.set(8, i)
 		default:
 			p.pusherrtok(process[0], "invalid_operator")
 		}
 	}
-	switch {
-	case precedence1 != -1:
-		return precedence1
-	case precedence2 != -1:
-		return precedence2
-	case precedence3 != -1:
-		return precedence3
-	case precedence4 != -1:
-		return precedence4
-	case precedence5 != -1:
-		return precedence5
-	case precedence6 != -1:
-		return precedence6
-	case precedence7 != -1:
-		return precedence7
-	default:
-		return precedence8
+	data := prec.get()
+	if data == nil {
+		return -1
 	}
+	return data.(int)
 }
 
 func isLogicEval(processes []Toks) bool {
@@ -3250,17 +3248,17 @@ func (p *Parser) parseFuncCallToks(f *Func, genericsToks, argsToks Toks, m *expr
 	return p.parseFuncCall(f, generics, args, m, argsToks[0])
 }
 
-func (p *Parser) parseArgs(f *Func, args *ast.Args, m *exprModel, errTok Tok) {
-	if args.Targeted {
-		tap := targetedArgParser{
-			p:      p,
-			f:      f,
-			args:   args,
-			errTok: errTok,
-		}
-		tap.parse()
-		return
+func (p *Parser) parseTargettedArgs(f *Func, args *ast.Args, errTok Tok) {
+	tap := targetedArgParser{
+		p:      p,
+		f:      f,
+		args:   args,
+		errTok: errTok,
 	}
+	tap.parse()
+}
+
+func (p *Parser) parsePureArgs(f *Func, args *ast.Args, m *exprModel, errTok Tok) {
 	pap := pureArgParser{
 		p:      p,
 		f:      f,
@@ -3271,11 +3269,21 @@ func (p *Parser) parseArgs(f *Func, args *ast.Args, m *exprModel, errTok Tok) {
 	pap.parse()
 }
 
+func (p *Parser) parseArgs(f *Func, args *ast.Args, m *exprModel, errTok Tok) {
+	if args.Targeted {
+		p.parseTargettedArgs(f, args, errTok)
+		return
+	}
+	p.parsePureArgs(f, args, m, errTok)
+}
+
 func hasExpr(expr Expr) bool {
 	return len(expr.Processes) > 0 || expr.Model != nil
 }
 
-func paramHasDefaultArg(param *Param) bool { return hasExpr(param.Default) }
+func paramHasDefaultArg(param *Param) bool {
+	return hasExpr(param.Default)
+}
 
 //             [identifier]
 type paramMap map[string]*paramMapPair
@@ -3648,70 +3656,74 @@ func (p *Parser) checkNewBlockCustom(b *ast.Block, oldBlockVars []*Var) {
 
 func (p *Parser) checkNewBlock(b *ast.Block) { p.checkNewBlockCustom(b, p.blockVars) }
 
+func (p *Parser) checkStatement(b *ast.Block, i *int) {
+	s := &b.Tree[*i]
+	switch t := s.Val.(type) {
+	case ast.ExprStatement:
+		_, t.Expr.Model = p.evalExpr(t.Expr)
+		s.Val = t
+	case Var:
+		p.checkVarStatement(&t, false)
+		s.Val = t
+	case ast.Assign:
+		p.checkAssign(&t)
+		s.Val = t
+	case ast.Iter:
+		p.checkIterExpr(&t)
+		s.Val = t
+	case ast.Break:
+		p.checkBreakStatement(&t)
+	case ast.Continue:
+		p.checkContinueStatement(&t)
+	case ast.If:
+		p.checkIfExpr(&t, i, b.Tree)
+		s.Val = t
+	case ast.Try:
+		p.checkTry(&t, i, b.Tree)
+		s.Val = t
+	case Type:
+		if def, _ := p.blockDefById(t.Id); def != nil {
+			p.pusherrtok(t.Tok, "exist_id", t.Id)
+			break
+		} else if xapi.IsIgnoreId(t.Id) {
+			p.pusherrtok(t.Tok, "ignore_id")
+			break
+		}
+		t.Type, _ = p.realType(t.Type, true)
+		p.blockTypes = append(p.blockTypes, &t)
+	case ast.Block:
+		p.checkNewBlock(&t)
+		s.Val = t
+	case ast.Defer:
+		p.checkDeferStatement(&t)
+		s.Val = t
+	case ast.ConcurrentCall:
+		p.checkConcurrentCallStatement(&t)
+		s.Val = t
+	case ast.Label:
+		t.Index = *i
+		t.Block = b
+		*p.rootBlock.Labels = append(*p.rootBlock.Labels, &t)
+	case ast.Ret:
+		rc := retChecker{p: p, retAST: &t, f: b.Func}
+		rc.check()
+		s.Val = t
+	case ast.Goto:
+		t.Index = *i
+		t.Block = b
+		*p.rootBlock.Gotos = append(*p.rootBlock.Gotos, &t)
+	case ast.CxxEmbed:
+		p.cxxEmbedStatement(&t)
+		s.Val = t
+	case ast.Comment:
+	default:
+		p.pusherrtok(s.Tok, "invalid_syntax")
+	}
+}
+
 func (p *Parser) checkBlock(b *ast.Block) {
 	for i := 0; i < len(b.Tree); i++ {
-		model := &b.Tree[i]
-		switch t := model.Val.(type) {
-		case ast.ExprStatement:
-			_, t.Expr.Model = p.evalExpr(t.Expr)
-			model.Val = t
-		case Var:
-			p.checkVarStatement(&t, false)
-			model.Val = t
-		case ast.Assign:
-			p.checkAssign(&t)
-			model.Val = t
-		case ast.Iter:
-			p.checkIterExpr(&t)
-			model.Val = t
-		case ast.Break:
-			p.checkBreakStatement(&t)
-		case ast.Continue:
-			p.checkContinueStatement(&t)
-		case ast.If:
-			p.checkIfExpr(&t, &i, b.Tree)
-			model.Val = t
-		case ast.Try:
-			p.checkTry(&t, &i, b.Tree)
-			model.Val = t
-		case Type:
-			if def, _ := p.blockDefById(t.Id); def != nil {
-				p.pusherrtok(t.Tok, "exist_id", t.Id)
-				break
-			} else if xapi.IsIgnoreId(t.Id) {
-				p.pusherrtok(t.Tok, "ignore_id")
-				break
-			}
-			t.Type, _ = p.realType(t.Type, true)
-			p.blockTypes = append(p.blockTypes, &t)
-		case ast.Block:
-			p.checkNewBlock(&t)
-			model.Val = t
-		case ast.Defer:
-			p.checkDeferStatement(&t)
-			model.Val = t
-		case ast.ConcurrentCall:
-			p.checkConcurrentCallStatement(&t)
-			model.Val = t
-		case ast.Label:
-			t.Index = i
-			t.Block = b
-			*p.rootBlock.Labels = append(*p.rootBlock.Labels, &t)
-		case ast.Ret:
-			rc := retChecker{p: p, retAST: &t, f: b.Func}
-			rc.check()
-			model.Val = t
-		case ast.Goto:
-			t.Index = i
-			t.Block = b
-			*p.rootBlock.Gotos = append(*p.rootBlock.Gotos, &t)
-		case ast.CxxEmbed:
-			p.cxxEmbedStatement(&t)
-			model.Val = t
-		case ast.Comment:
-		default:
-			p.pusherrtok(model.Tok, "invalid_syntax")
-		}
+		p.checkStatement(b, &i)
 	}
 }
 
@@ -3950,27 +3962,26 @@ func (rc *retChecker) checkepxrs() {
 	}
 }
 
-func (rc *retChecker) checkExprTypes() {
-	valLength := len(rc.values)
-	if !rc.f.RetType.Type.MultiTyped { // Single return
-		rc.retAST.Expr.Model = rc.expModel.models[0]
-		if valLength > 1 {
-			rc.p.pusherrtok(rc.retAST.Tok, "overflow_return")
-		}
-		rc.p.wg.Add(1)
-		go assignChecker{
-			p:         rc.p,
-			constant:  false,
-			t:         rc.f.RetType.Type,
-			v:         rc.values[0],
-			ignoreAny: false,
-			errtok:    rc.retAST.Tok,
-		}.checkAssignTypeAsync()
-		return
+func (rc *retChecker) single() {
+	rc.retAST.Expr.Model = rc.expModel.models[0]
+	if len(rc.values) > 1 {
+		rc.p.pusherrtok(rc.retAST.Tok, "overflow_return")
 	}
-	// Multi return
+	rc.p.wg.Add(1)
+	go assignChecker{
+		p:         rc.p,
+		constant:  false,
+		t:         rc.f.RetType.Type,
+		v:         rc.values[0],
+		ignoreAny: false,
+		errtok:    rc.retAST.Tok,
+	}.checkAssignTypeAsync()
+}
+
+func (rc *retChecker) multi() {
 	rc.retAST.Expr.Model = rc.expModel
 	types := rc.f.RetType.Type.Tag.([]DataType)
+	valLength := len(rc.values)
 	if valLength == 1 {
 		rc.checkMultiRetAsMutliRet()
 		return
@@ -3991,6 +4002,15 @@ func (rc *retChecker) checkExprTypes() {
 			errtok:    rc.retAST.Tok,
 		}.checkAssignTypeAsync()
 	}
+}
+
+func (rc *retChecker) checkExprTypes() {
+	if !rc.f.RetType.Type.MultiTyped { // Single return
+		rc.single()
+		return
+	}
+	// Multi return
+	rc.multi()
 }
 
 func (rc *retChecker) checkMultiRetAsMutliRet() {
