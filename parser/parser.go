@@ -1375,37 +1375,54 @@ func (p *Parser) evalLogicProcesses(processes []Toks) (v value, e iExpr) {
 	return
 }
 
+func (p *Parser) evalValProcesses(exprs []any, processes []Toks) (v value, e iExpr) {
+	i := p.nextOperator(processes)
+	if len(exprs) == 1 {
+		expr := exprs[0].([]any)
+		v.ast, e = expr[0].(ast.Value), expr[1].(iExpr)
+		v.lvalue = typeIsLvalue(v.ast.Type)
+		return
+	}
+	process := solver{p: p}
+	process.operator = processes[i][0]
+	left := exprs[i-1].([]any)
+	leftV, leftExpr := left[0].(ast.Value), left[1].(iExpr)
+	right := exprs[i+1].([]any)
+	rightV, rightExpr := right[0].(ast.Value), right[1].(iExpr)
+	process.left = processes[i-1]
+	process.leftVal = leftV
+	process.right = processes[i+1]
+	process.rightVal = rightV
+	val := process.solve()
+	expr := serieExpr{}
+	expr.exprs = make([]any, 5)
+	expr.exprs[0] = exprNode{tokens.LPARENTHESES}
+	expr.exprs[1] = leftExpr
+	expr.exprs[2] = exprNode{process.operator.Kind}
+	expr.exprs[3] = rightExpr
+	expr.exprs[4] = exprNode{tokens.RPARENTHESES}
+	processes = append(processes[:i-1], append([]Toks{{}}, processes[i+2:]...)...)
+	exprs = append(exprs[:i-1], append([]any{[]any{val, expr}}, exprs[i+2:]...)...)
+	return p.evalValProcesses(exprs, processes)
+}
+
 func (p *Parser) evalNonLogicProcesses(processes []Toks) (v value, e iExpr) {
-	m := newExprModel(processes)
-	e = m
 	if len(processes) == 1 {
+		m := newExprModel(processes)
+		e = m
 		v = p.evalExprPart(processes[0], m)
 		return
 	}
-	m.index = p.nextOperator(processes)
-	if m.index == -1 {
-		return
+	valProcesses := make([]any, len(processes))
+	for i, process := range processes {
+		if isOperator(process) {
+			valProcesses[i] = nil
+			continue
+		}
+		val, model := p.evalToks(process)
+		valProcesses[i] = []any{val.ast, model}
 	}
-	process := solver{p: p, model: m}
-	process.operator = processes[m.index][0]
-	m.appendSubNode(exprNode{process.operator.Kind})
-	left := processes[:m.index]
-	leftV, leftExpr := p.evalProcesses(left)
-	m.index-- // Step to left
-	m.appendSubNode(exprNode{tokens.LPARENTHESES})
-	m.appendSubNode(leftExpr)
-	m.appendSubNode(exprNode{tokens.RPARENTHESES})
-	m.index += 2 // Step to right
-	right := processes[m.index:]
-	rightV, rightExpr := p.evalProcesses(right)
-	m.appendSubNode(exprNode{tokens.LPARENTHESES})
-	m.appendSubNode(rightExpr)
-	m.appendSubNode(exprNode{tokens.RPARENTHESES})
-	process.leftVal = leftV.ast
-	process.rightVal = rightV.ast
-	v.ast = process.solve()
-	v.lvalue = typeIsLvalue(v.ast.Type)
-	return
+	return p.evalValProcesses(valProcesses, processes)
 }
 
 func (p *Parser) evalProcesses(processes []Toks) (v value, e iExpr) {
@@ -1469,23 +1486,21 @@ func (p *Parser) nextOperator(processes []Toks) int {
 			continue
 		}
 		switch process[0].Kind {
-		case tokens.STAR, tokens.SLASH, tokens.PERCENT:
-			prec.set(1, i)
-		case tokens.PLUS, tokens.MINUS:
-			prec.set(2, i)
 		case tokens.LSHIFT, tokens.RSHIFT:
+			prec.set(1, i)
+		case tokens.STAR, tokens.SLASH, tokens.PERCENT:
+			prec.set(2, i)
+		case tokens.AMPER:
 			prec.set(3, i)
+		case tokens.VLINE, tokens.CARET:
+			prec.set(4, i)
+		case tokens.PLUS, tokens.MINUS:
+			prec.set(5, i)
+		case tokens.EQUALS, tokens.NOT_EQUALS:
+			prec.set(6, i)
 		case tokens.LESS, tokens.LESS_EQUAL,
 			tokens.GREAT, tokens.GREAT_EQUAL:
-			prec.set(4, i)
-		case tokens.EQUALS, tokens.NOT_EQUALS:
-			prec.set(5, i)
-		case tokens.AMPER:
-			prec.set(6, i)
-		case tokens.CARET:
 			prec.set(7, i)
-		case tokens.VLINE:
-			prec.set(8, i)
 		default:
 			p.pusherrtok(process[0], "invalid_operator")
 		}
@@ -1702,7 +1717,6 @@ type solver struct {
 	right    Toks
 	rightVal ast.Value
 	operator Tok
-	model    *exprModel
 }
 
 func (s *solver) ptr() (v ast.Value) {

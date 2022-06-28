@@ -2185,7 +2185,7 @@ func (b *Builder) ContinueStatement(toks Toks) Statement {
 
 // Expr builds AST model of expression.
 func (b *Builder) Expr(toks Toks) (e Expr) {
-	e.Processes = b.getExprProcesses(toks)
+	e.Processes = b.exprProcesses(toks)
 	e.Toks = toks
 	return
 }
@@ -2282,7 +2282,7 @@ func (b *Builder) exprBracePart(info *exprProcessInfo, tok Tok) bool {
 	return false
 }
 
-func (b *Builder) getExprProcesses(toks Toks) []Toks {
+func (b *Builder) exprProcesses(toks Toks) []Toks {
 	var info exprProcessInfo
 	info.toks = toks
 	for ; info.i < len(info.toks); info.i++ {
