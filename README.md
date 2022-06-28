@@ -1,6 +1,6 @@
 <div align="center">
 <p>
-    <img width="250" src="https://raw.githubusercontent.com/the-xlang/resources/main/x.svg?sanitize=true">
+    <img width="100" src="https://raw.githubusercontent.com/the-xlang/resources/main/x.svg?sanitize=true">
 </p>
 <h1>The X Programming Language</h1>
 <strong>Simple, efficent and compiled system programming language.
@@ -12,67 +12,44 @@
 </strong>
 </div>
 
-## Table of Contents
-<div class="toc">
-  <ul>
-    <li><a href="#what-is-xxc">What is XXC?</li>
-    <li><a href="#overview">Overview</a></li>
-    <li><a href="#key-features">Key Features</a></li>
-    <li><a href="#why-x">Why X?</a></li>
-    <li><a href="#os-support">OS Support</a></li>
-    <li><a href="#project-build-state">Project Build State</a></li>
-    <li><a href="#documentations">Documentations</a></li>
-    <li><a href="#building-project">Building Project</a></li>
-    <li><a href="#contributing">Contributing</a></li>
-    <li><a href="#code-of-conduct">Code of Conduct</a></li>
-    <li><a href="#license">License</a></li>
-  </ul>
-</div>
+<h2 id="key-features">Key Features</h2>
 
-<h2 id="what-is-xxc">What is XXC?</h2>
-XXC is the name of the reference compiler for the X programming language. <br>
-It is the original compiler of the X programming language. <br>
-The features that XXC has is a representation of the official and must-have features of the X programming language.
++ Simple and elegant
++ As efficient and performance as C/C++
++ Zero cost for C/C++ interoperability
++ Deferred calls
++ Language integrated concurrency
++ Language integrated documentation
++ Generic programming
++ C/C++ code embedding
++ C/C++ backends
 
-<h2 id="overview">Overview</h2>
+<h2 id="introduction">Introduction</h2>
 
 The X programming language is compiled, static typed, fast, modern and simple.<br>
 Before the X source code is compiled, it is translated to C++ code and compiled from C++.<br>
 Transpiling to C++ only instead of compiling is also an option.<br>
 It aims to be advanced, readable and a good choice for systems programming.
 
-<strong>Example X code;</strong>
+<strong>Hello Github;</strong>
 ```go
 main() {
   outln("Hello, GitHub!")
 }
 ```
 
-<h2 id="key-features">Key Features</h2>
+<h3 id="whats-new">What's New</h3>
 
-+ Simple and elegant
-+ Efficient and performance
-+ Zero cost for C/C++ interoperability
++ Multiple assignments
++ Multiple function returns
++ Return type identifiers
 + Deferred calls
-+ Documenter
-+ Generic programming
++ Language integrated concurrency
++ Language integrated documentation
++ Type constants
++ Argument targetting
 
-<h2 id="why-x">Why X?</h2>
-
-<h3>Simplicity</h3>
-
-X is a simple language that anyone can understand. <br>
-It is clear, simple and useful for beginners or experts.
-
-<h3>Efficient</h3>
-
-The translation of X to C++ code happens very quickly and efficiently. <br>
-In addition, the generated C++ result is human readable, understandable and efficient code.
-
-<h3>Learning</h3>
-
-X is pretty easy to learn. <br>
-It's not a compelling option for those new to programming either.
+and more...
 
 <h2 id="os-support">OS Support</h2>
 
@@ -98,6 +75,16 @@ It's not a compelling option for those new to programming either.
         <td>Not supports yet</td>
     </tr>
 </table>
+
+<h2 id="what-is-xxc">What is XXC?</h2>
+XXC is the name of the reference compiler for the X programming language. <br>
+It is the original compiler of the X programming language. <br>
+The features that XXC has is a representation of the official and must-have features of the X programming language.
+
+<h2 id="documentations">Documentations</h2>
+
+All documentation about XXC (naturally X programming language) is on the website. <br>
+[See Documentations](https://the-xlang.github.io/website/pages/docs.html)
 
 <h2 id="project-build-state">Project Build State</h2>
 
@@ -131,11 +118,6 @@ It's not a compelling option for those new to programming either.
         </td>
     </tr>
 </table>
-
-<h2 id="documentations">Documentations</h2>
-
-All documentation about XXC (naturally X programming language) is on the website. <br>
-[See Documentations](https://the-xlang.github.io/website/pages/docs.html)
 
 <h2 id="building-project">Building Project</h2>
 
