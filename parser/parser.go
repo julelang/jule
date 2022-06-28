@@ -1295,8 +1295,8 @@ func (p *Parser) checkFuncsAsync() {
 		if f.checked || (len(f.Ast.Generics) > 0 && len(f.Ast.Combines) == 0) {
 			return
 		}
-		f.checked = true
 		p.blockTypes = nil
+		f.checked = true
 		p.parseFunc(f.Ast)
 	}
 	for _, use := range p.Uses {
@@ -4069,10 +4069,11 @@ func (p *Parser) checkRets(f *Func) {
 
 func (p *Parser) checkFunc(f *Func) {
 	if f.Block.Tree == nil {
-		return
+		goto always
 	}
 	f.Block.Func = f
 	p.checkNewBlock(&f.Block)
+always:
 	p.checkRets(f)
 }
 
