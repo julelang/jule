@@ -1338,43 +1338,6 @@ type value struct {
 	isType   bool
 }
 
-func (p *Parser) evalLogicProcesses(processes []Toks) (v value, e iExpr) {
-	m := new(exprModel)
-	e = m
-	v.ast.Type.Id = xtype.Bool
-	v.ast.Type.Val = tokens.BOOL
-	last := 0
-	evalProcesses := func(tok Tok, i int) {
-		exprProcesses := processes[last:i]
-		val, e := p.evalNonLogicProcesses(exprProcesses)
-		node := exprBuildNode{[]iExpr{e}}
-		m.nodes = append(m.nodes, node)
-		if !isBoolExpr(val) {
-			p.pusherrtok(tok, "invalid_type")
-		}
-	}
-	for i, process := range processes {
-		if !isOperator(process) {
-			continue
-		}
-		tok := process[0]
-		switch {
-		case tok.Id != tokens.Operator:
-			continue
-		case tok.Kind != tokens.AND && tok.Kind != tokens.OR:
-			continue
-		}
-		evalProcesses(tok, i)
-		node := exprBuildNode{[]iExpr{exprNode{tok.Kind}}}
-		m.nodes = append(m.nodes, node)
-		last = i + 1
-	}
-	if last < len(processes) {
-		evalProcesses(processes[last-1][0], len(processes))
-	}
-	return
-}
-
 func (p *Parser) evalValProcesses(exprs []any, processes []Toks) (v value, e iExpr) {
 	i := p.nextOperator(processes)
 	if len(exprs) == 1 {
@@ -1406,7 +1369,10 @@ func (p *Parser) evalValProcesses(exprs []any, processes []Toks) (v value, e iEx
 	return p.evalValProcesses(exprs, processes)
 }
 
-func (p *Parser) evalNonLogicProcesses(processes []Toks) (v value, e iExpr) {
+func (p *Parser) evalProcesses(processes []Toks) (v value, e iExpr) {
+	if processes == nil {
+		return
+	}
 	if len(processes) == 1 {
 		m := newExprModel(processes)
 		e = m
@@ -1423,17 +1389,6 @@ func (p *Parser) evalNonLogicProcesses(processes []Toks) (v value, e iExpr) {
 		valProcesses[i] = []any{val.ast, model}
 	}
 	return p.evalValProcesses(valProcesses, processes)
-}
-
-func (p *Parser) evalProcesses(processes []Toks) (v value, e iExpr) {
-	switch {
-	case processes == nil:
-		return
-	case isLogicEval(processes):
-		return p.evalLogicProcesses(processes)
-	default:
-		return p.evalNonLogicProcesses(processes)
-	}
 }
 
 func isOperator(process Toks) bool {
@@ -1501,6 +1456,8 @@ func (p *Parser) nextOperator(processes []Toks) int {
 		case tokens.LESS, tokens.LESS_EQUAL,
 			tokens.GREAT, tokens.GREAT_EQUAL:
 			prec.set(7, i)
+		case tokens.AND, tokens.OR:
+			prec.set(8, i)
 		default:
 			p.pusherrtok(process[0], "invalid_operator")
 		}
@@ -1510,19 +1467,6 @@ func (p *Parser) nextOperator(processes []Toks) int {
 		return -1
 	}
 	return data.(int)
-}
-
-func isLogicEval(processes []Toks) bool {
-	for _, process := range processes {
-		if !isOperator(process) {
-			continue
-		}
-		switch process[0].Kind {
-		case tokens.AND, tokens.OR:
-			return true
-		}
-	}
-	return false
 }
 
 func (p *Parser) evalToks(toks Toks) (value, iExpr) {
