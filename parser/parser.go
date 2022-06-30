@@ -1339,13 +1339,18 @@ type value struct {
 }
 
 func (p *Parser) evalValProcesses(exprs []any, processes []Toks) (v value, e iExpr) {
-	i := p.nextOperator(processes)
-	if len(exprs) == 1 {
+	switch len(exprs) {
+	case 0:
+		v.ast.Type.Id = xtype.Void
+		v.ast.Type.Val = xtype.VoidTypeStr
+		return
+	case 1:
 		expr := exprs[0].([]any)
 		v.ast, e = expr[0].(ast.Value), expr[1].(iExpr)
 		v.lvalue = typeIsLvalue(v.ast.Type)
 		return
 	}
+	i := p.nextOperator(processes)
 	process := solver{p: p}
 	process.operator = processes[i][0]
 	left := exprs[i-1].([]any)
