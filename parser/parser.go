@@ -1482,10 +1482,8 @@ func (p *Parser) evalToks(toks Toks) (value, iExpr) {
 	return p.evalExpr(new(ast.Builder).Expr(toks))
 }
 
-func (p *Parser) evalExpr(ex Expr) (value, iExpr) {
-	processes := make([]Toks, len(ex.Processes))
-	copy(processes, ex.Processes)
-	return p.evalProcesses(processes)
+func (p *Parser) evalExpr(expr Expr) (value, iExpr) {
+	return p.evalProcesses(expr.Processes)
 }
 
 func toRawStrLiteral(literal string) string {
