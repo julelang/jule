@@ -1458,10 +1458,10 @@ func (p *Parser) nextOperator(processes []Toks) int {
 			prec.set(5, i)
 		case tokens.PLUS, tokens.MINUS:
 			prec.set(6, i)
-		case tokens.EQUALS, tokens.NOT_EQUALS:
-			prec.set(7, i)
 		case tokens.LESS, tokens.LESS_EQUAL,
 			tokens.GREAT, tokens.GREAT_EQUAL:
+			prec.set(7, i)
+		case tokens.EQUALS, tokens.NOT_EQUALS:
 			prec.set(8, i)
 		case tokens.AND:
 			prec.set(9, i)
