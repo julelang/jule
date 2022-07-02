@@ -1243,10 +1243,14 @@ func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) {
 	go p.checkArgTypeAsync(*param, v, false, param.Tok)
 }
 
+func paramIsAllowForConst(param *Param) bool {
+	return !param.Variadic && typeIsAllowForConst(param.Type)
+}
+
 func (p *Parser) param(f *Func, param *Param) {
 	param.Type, _ = p.realType(param.Type, true)
-	if param.Const && !typeIsAllowForConst(param.Type) {
-		p.pusherrtok(param.Tok, "invalid_type_for_const", param.Type.Val)
+	if param.Const && !paramIsAllowForConst(param) {
+		p.pusherrtok(param.Tok, "invalid_type_for_const", param.TypeString())
 	}
 	if param.Reference {
 		if param.Variadic {

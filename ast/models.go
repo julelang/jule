@@ -397,6 +397,19 @@ type Param struct {
 	Default   Expr
 }
 
+// TypeString returns data type string of parameter.
+func (p *Param) TypeString() string {
+	var ts strings.Builder
+	if p.Variadic {
+		ts.WriteString(tokens.TRIPLE_DOT)
+	}
+	if p.Reference {
+		ts.WriteString(tokens.AMPER)
+	}
+	ts.WriteString(p.Type.Val)
+	return ts.String()
+}
+
 func (p Param) String() string {
 	var cxx strings.Builder
 	cxx.WriteString(p.Prototype())
