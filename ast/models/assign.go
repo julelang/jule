@@ -120,9 +120,18 @@ func (a *Assign) cxxNewDefines() string {
 	return cxx.String()
 }
 
+func (a *Assign) cxxPostfix() string {
+	var cxx strings.Builder
+	cxx.WriteString(a.Left[0].Expr.String())
+	cxx.WriteString(a.Setter.Kind)
+	return cxx.String()
+}
+
 func (a Assign) String() string {
 	var cxx strings.Builder
 	switch {
+	case len(a.Right) == 0:
+		cxx.WriteString(a.cxxPostfix())
 	case a.MultipleRet:
 		cxx.WriteString(a.cxxMultipleReturn())
 	case len(a.Left) == 1:

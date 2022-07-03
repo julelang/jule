@@ -1255,23 +1255,30 @@ func (b *Builder) assignInfo(toks Toks) (info AssignInfo) {
 		}
 		if braceCount > 0 {
 			continue
+		} else if tok.Id != tokens.Operator {
+			continue
+		} else if !IsAssignOperator(tok.Kind) {
+			continue
 		}
-		if tok.Id == tokens.Operator &&
-			tok.Kind[len(tok.Kind)-1] == '=' {
-			info.Left = toks[:i]
-			if info.Left == nil {
-				b.pusherr(tok, "invalid_syntax")
-				info.Ok = false
-			}
-			info.Setter = tok
-			if i+1 >= len(toks) {
-				// b.pusherr(tok, "missing_expr")
-				info.Ok = false
-			} else {
-				info.Right = toks[i+1:]
-			}
-			return
+		info.Left = toks[:i]
+		if info.Left == nil {
+			b.pusherr(tok, "invalid_syntax")
+			info.Ok = false
 		}
+		info.Setter = tok
+		if i+1 >= len(toks) {
+			info.Right = nil
+			info.Ok = IsPostfixOperator(info.Setter.Kind)
+			break
+		}
+		info.Right = toks[i+1:]
+		if IsPostfixOperator(info.Setter.Kind) {
+			if info.Right != nil {
+				b.pusherr(info.Right[0], "invalid_syntax")
+				info.Right = nil
+			}
+		}
+		break
 	}
 	return
 }
@@ -1399,7 +1406,9 @@ func (b *Builder) AssignExpr(toks Toks, isExpr bool) (assign models.Assign, ok b
 	if isExpr && len(assign.Left) > 1 {
 		b.pusherr(assign.Setter, "notallow_multiple_assign")
 	}
-	assign.Right = b.assignExprs(info)
+	if info.Right != nil {
+		assign.Right = b.assignExprs(info)
+	}
 	return
 }
 

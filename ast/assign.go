@@ -19,10 +19,17 @@ func IsAssign(id uint8) bool {
 		id == tokens.Operator
 }
 
+// IsPostfixOperator reports operator kind is postfix operator or not.
+func IsPostfixOperator(kind string) bool {
+	return kind == tokens.DOUBLE_PLUS ||
+		kind == tokens.DOUBLE_MINUS
+}
+
 // IsAssignOperator reports operator kind is
 // assignment operator or not.
 func IsAssignOperator(kind string) bool {
-	return kind == tokens.EQUAL ||
+	return IsPostfixOperator(kind) ||
+		kind == tokens.EQUAL ||
 		kind == tokens.PLUS_EQUAL ||
 		kind == tokens.MINUS_EQUAL ||
 		kind == tokens.SLASH_EQUAL ||

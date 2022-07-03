@@ -1898,6 +1898,9 @@ func (p *Parser) evalTryAssignExpr(toks Toks, m *exprModel) (v value, ok bool) {
 		return
 	}
 	v, _ = p.evalExpr(assign.Left[0].Expr)
+	if v.lvalue && ast.IsPostfixOperator(assign.Setter.Kind) {
+		v.lvalue = false
+	}
 	p.checkAssign(&assign)
 	m.appendSubNode(assignExpr{assign})
 	return
@@ -3184,17 +3187,37 @@ func (p *Parser) processMultiAssign(assign *models.Assign, vals []value) {
 	}
 }
 
+func (p *Parser) checkPostfix(assign *models.Assign) {
+	if len(assign.Right) > 0 {
+		p.pusherrtok(assign.Setter, "invalid_syntax")
+		return
+	}
+	left := &assign.Left[0]
+	value, model := p.evalExpr(left.Expr)
+	left.Expr.Model = model
+	_ = p.checkAssignment(value, assign.Setter)
+	if typeIsPtr(value.ast.Type) {
+		return
+	}
+	if typeIsSingle(value.ast.Type) && xtype.IsNumericType(value.ast.Type.Id) {
+		return
+	}
+	p.pusherrtok(assign.Setter, "operator_notfor_xtype", assign.Setter.Kind, value.ast.Type.Val)
+}
+
 func (p *Parser) checkAssign(assign *models.Assign) {
 	selectLength := len(assign.Left)
 	valueLength := len(assign.Right)
-	if selectLength == 1 && !assign.Left[0].Var.New {
+	if valueLength == 0 && ast.IsPostfixOperator(assign.Setter.Kind) { // Postfix
+		p.checkPostfix(assign)
+		return
+	} else if selectLength == 1 && !assign.Left[0].Var.New {
 		p.checkSingleAssign(assign)
 		return
 	} else if assign.Setter.Kind != tokens.EQUAL {
 		p.pusherrtok(assign.Setter, "invalid_syntax")
 		return
-	}
-	if valueLength == 1 {
+	} else if valueLength == 1 {
 		expr := &assign.Right[0]
 		firstVal, model := p.evalExpr(*expr)
 		expr.Model = model
