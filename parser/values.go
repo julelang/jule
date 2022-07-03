@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"github.com/the-xlang/xxc/ast"
+	"github.com/the-xlang/xxc/ast/models"
 	"github.com/the-xlang/xxc/lex/tokens"
 	"github.com/the-xlang/xxc/pkg/xbits"
 	"github.com/the-xlang/xxc/pkg/xtype"
@@ -46,7 +46,7 @@ func isConstExpr(v string) bool {
 	return isConstNum(v) || isstr(v) || ischar(v) || isnil(v) || isbool(v)
 }
 
-func checkIntBit(v ast.Value, bit int) bool {
+func checkIntBit(v models.Value, bit int) bool {
 	if bit == 0 {
 		return false
 	}
@@ -56,7 +56,7 @@ func checkIntBit(v ast.Value, bit int) bool {
 	return xbits.CheckBitUInt(v.Data, bit)
 }
 
-func checkFloatBit(v ast.Value, bit int) bool {
+func checkFloatBit(v models.Value, bit int) bool {
 	if bit == 0 {
 		return false
 	}

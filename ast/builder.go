@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/the-xlang/xxc/ast/models"
 	"github.com/the-xlang/xxc/lex"
 	"github.com/the-xlang/xxc/lex/tokens"
 	"github.com/the-xlang/xxc/pkg/x"
@@ -22,7 +23,7 @@ type Builder struct {
 	wg  sync.WaitGroup
 	pub bool
 
-	Tree []Obj
+	Tree []models.Object
 	Errs []xlog.CompilerLog
 	Toks Toks
 	Pos  int
@@ -49,76 +50,6 @@ func compilerErr(tok Tok, key string, args ...any) xlog.CompilerLog {
 // pusherr appends error by specified token.
 func (b *Builder) pusherr(tok Tok, key string, args ...any) {
 	b.Errs = append(b.Errs, compilerErr(tok, key, args...))
-}
-
-// Parts returns parts separated by given token identifier.
-// It's skips parentheses ranges.
-//
-// Special case is;
-//  Parts(toks) = nil if len(toks) == 0
-func Parts(toks Toks, id uint8) ([]Toks, []xlog.CompilerLog) {
-	if len(toks) == 0 {
-		return nil, nil
-	}
-	parts := make([]Toks, 0)
-	errs := make([]xlog.CompilerLog, 0)
-	braceCount := 0
-	last := 0
-	for i, tok := range toks {
-		if tok.Id == tokens.Brace {
-			switch tok.Kind {
-			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
-				braceCount++
-				continue
-			default:
-				braceCount--
-			}
-		}
-		if braceCount > 0 {
-			continue
-		}
-		if tok.Id == id {
-			if i-last <= 0 {
-				errs = append(errs, compilerErr(tok, "missing_expr"))
-			}
-			parts = append(parts, toks[last:i])
-			last = i + 1
-		}
-	}
-	if last < len(toks) {
-		parts = append(parts, toks[last:])
-	}
-	return parts, errs
-}
-
-// GetRangeLast returns last range from tokens.
-//
-// Special cases are;
-//  GetRangeLast(toks) = toks, nil if len(toks) == 0
-//  GetRangeLast(toks) = toks, nil if toks is not has range at last
-func GetRangeLast(toks Toks) (cutted, cut Toks) {
-	if len(toks) == 0 {
-		return toks, nil
-	} else if toks[len(toks)-1].Id != tokens.Brace {
-		return toks, nil
-	}
-	braceCount := 0
-	for i := len(toks) - 1; i >= 0; i-- {
-		tok := toks[i]
-		if tok.Id == tokens.Brace {
-			switch tok.Kind {
-			case tokens.RBRACE, tokens.RBRACKET, tokens.RPARENTHESES:
-				braceCount++
-				continue
-			default:
-				braceCount--
-			}
-		}
-		if braceCount == 0 {
-			return toks[:i], toks[i:]
-		}
-	}
-	return toks, nil
 }
 
 // Ended reports position is at end of tokens or not.
@@ -176,7 +107,7 @@ func (b *Builder) Build() {
 }
 
 // Type builds AST model of type definition statement.
-func (b *Builder) Type(toks Toks) (t Type) {
+func (b *Builder) Type(toks Toks) (t models.Type) {
 	i := 1 // Initialize value is 1 for skip keyword.
 	if i >= len(toks) {
 		b.pusherr(toks[i-1], "invalid_syntax")
@@ -193,14 +124,14 @@ func (b *Builder) Type(toks Toks) (t Type) {
 	}
 	destType, _ := b.DataType(toks[i:], new(int), true)
 	tok = toks[1]
-	return Type{
+	return models.Type{
 		Tok:  tok,
 		Id:   tok.Kind,
 		Type: destType,
 	}
 }
 
-func (b *Builder) buildEnumItemExpr(i *int, toks Toks) Expr {
+func (b *Builder) buildEnumItemExpr(i *int, toks Toks) models.Expr {
 	braceCount := 0
 	exprStart := *i
 	for ; *i < len(toks); *i++ {
@@ -227,14 +158,14 @@ func (b *Builder) buildEnumItemExpr(i *int, toks Toks) Expr {
 			return b.Expr(exprToks)
 		}
 	}
-	return Expr{}
+	return models.Expr{}
 }
 
-func (b *Builder) buildEnumItems(toks Toks) []*EnumItem {
-	items := make([]*EnumItem, 0)
+func (b *Builder) buildEnumItems(toks Toks) []*models.EnumItem {
+	items := make([]*models.EnumItem, 0)
 	for i := 0; i < len(toks); i++ {
 		tok := toks[i]
-		item := new(EnumItem)
+		item := new(models.EnumItem)
 		item.Tok = tok
 		if item.Tok.Id != tokens.Id {
 			b.pusherr(item.Tok, "invalid_syntax")
@@ -265,7 +196,7 @@ func (b *Builder) buildEnumItems(toks Toks) []*EnumItem {
 
 // Enum builds AST model of enumerator statement.
 func (b *Builder) Enum(toks Toks) {
-	var enum Enum
+	var enum models.Enum
 	if len(toks) < 2 || len(toks) < 3 {
 		b.pusherr(toks[0], "invalid_syntax")
 		return
@@ -289,7 +220,7 @@ func (b *Builder) Enum(toks Toks) {
 			return
 		}
 	} else {
-		enum.Type = DataType{Id: xtype.U32, Val: tokens.U32}
+		enum.Type = models.DataType{Id: xtype.U32, Val: tokens.U32}
 	}
 	itemToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
 	if itemToks == nil {
@@ -301,17 +232,30 @@ func (b *Builder) Enum(toks Toks) {
 	enum.Pub = b.pub
 	b.pub = false
 	enum.Items = b.buildEnumItems(itemToks)
-	b.Tree = append(b.Tree, Obj{enum.Tok, enum})
+	b.Tree = append(b.Tree, models.Object{
+		Tok:   enum.Tok,
+		Value: enum,
+	})
 }
 
 // Comment builds AST model of comment.
 func (b *Builder) Comment(tok Tok) {
 	tok.Kind = strings.TrimSpace(tok.Kind[2:])
 	if strings.HasPrefix(tok.Kind, "cxx:") {
-		b.Tree = append(b.Tree, Obj{tok, CxxEmbed{tok, tok.Kind[4:]}})
+		b.Tree = append(b.Tree, models.Object{
+			Tok: tok,
+			Value: models.CxxEmbed{
+				Tok:     tok,
+				Content: tok.Kind[4:]},
+		})
 		return
 	}
-	b.Tree = append(b.Tree, Obj{tok, Comment{tok.Kind}})
+	b.Tree = append(b.Tree, models.Object{
+		Tok: tok,
+		Value: models.Comment{
+			Content: tok.Kind,
+		},
+	})
 }
 
 // Preprocessor builds AST model of preprocessor directives.
@@ -320,7 +264,7 @@ func (b *Builder) Preprocessor(toks Toks) {
 		b.pusherr(toks[0], "invalid_syntax")
 		return
 	}
-	var pp Preprocessor
+	var pp models.Preprocessor
 	toks = toks[1:] // Remove directive mark
 	tok := toks[0]
 	if tok.Id != tokens.Id {
@@ -336,13 +280,16 @@ func (b *Builder) Preprocessor(toks Toks) {
 		return
 	}
 	if ok {
-		b.Tree = append(b.Tree, Obj{pp.Tok, pp})
+		b.Tree = append(b.Tree, models.Object{
+			Tok:   pp.Tok,
+			Value: pp,
+		})
 	}
 }
 
 // PreprocessorDirective builds AST model of preprocessor pragma directive.
 // Returns true if success, returns false if not.
-func (b *Builder) PreprocessorDirective(pp *Preprocessor, toks Toks) bool {
+func (b *Builder) PreprocessorDirective(pp *models.Preprocessor, toks Toks) bool {
 	if len(toks) == 1 {
 		b.pusherr(toks[0], "missing_pragma_directive")
 		return false
@@ -353,7 +300,7 @@ func (b *Builder) PreprocessorDirective(pp *Preprocessor, toks Toks) bool {
 		b.pusherr(tok, "invalid_syntax")
 		return false
 	}
-	var d Directive
+	var d models.Directive
 	ok := false
 	switch tok.Kind {
 	case x.PreprocessorDirectiveEnofi:
@@ -365,12 +312,12 @@ func (b *Builder) PreprocessorDirective(pp *Preprocessor, toks Toks) bool {
 	return ok
 }
 
-func (b *Builder) directiveEnofi(d *Directive, toks Toks) bool {
+func (b *Builder) directiveEnofi(d *models.Directive, toks Toks) bool {
 	if len(toks) > 1 {
 		b.pusherr(toks[1], "invalid_syntax")
 		return false
 	}
-	d.Command = EnofiDirective{}
+	d.Command = models.DirectiveEnofi{}
 	return true
 }
 
@@ -395,8 +342,14 @@ func (b *Builder) Id(toks Toks) {
 			return
 		case tokens.LPARENTHESES: // Function.
 			f := b.Func(toks, false)
-			s := Statement{f.Tok, f, false}
-			b.Tree = append(b.Tree, Obj{f.Tok, s})
+			s := models.Statement{
+				Tok: f.Tok,
+				Val: f,
+			}
+			b.Tree = append(b.Tree, models.Object{
+				Tok:   f.Tok,
+				Value: s,
+			})
 			return
 		}
 	}
@@ -428,7 +381,7 @@ ret:
 
 // Namespace builds AST model of namespace statement.
 func (b *Builder) Namespace(toks Toks) {
-	var ns Namespace
+	var ns models.Namespace
 	ns.Tok = toks[0]
 	i := new(int)
 	ns.Ids = b.nsIds(toks, i)
@@ -451,11 +404,14 @@ func (b *Builder) Namespace(toks Toks) {
 	b.Pos = pos
 	ns.Tree = b.Tree
 	b.Tree = tree
-	b.Tree = append(b.Tree, Obj{ns.Tok, ns})
+	b.Tree = append(b.Tree, models.Object{
+		Tok:   ns.Tok,
+		Value: ns,
+	})
 }
 
-func (b *Builder) structFields(toks Toks) []*Var {
-	fields := make([]*Var, 0)
+func (b *Builder) structFields(toks Toks) []*models.Var {
+	fields := make([]*models.Var, 0)
 	i := new(int)
 	for *i < len(toks) {
 		varToks := b.skipStatement(i, &toks)
@@ -476,7 +432,7 @@ func (b *Builder) structFields(toks Toks) []*Var {
 
 // Struct builds AST model of structure.
 func (b *Builder) Struct(toks Toks) {
-	var s Struct
+	var s models.Struct
 	s.Pub = b.pub
 	b.pub = false
 	if len(toks) < 3 {
@@ -498,19 +454,25 @@ func (b *Builder) Struct(toks Toks) {
 		b.pusherr(toks[i], "invalid_syntax")
 	}
 	s.Fields = b.structFields(bodyToks)
-	b.Tree = append(b.Tree, Obj{s.Tok, s})
+	b.Tree = append(b.Tree, models.Object{
+		Tok:   s.Tok,
+		Value: s,
+	})
 }
 
 // Use builds AST model of use declaration.
 func (b *Builder) Use(toks Toks) {
-	var use Use
+	var use models.Use
 	use.Tok = toks[0]
 	if len(toks) < 2 {
 		b.pusherr(use.Tok, "missing_use_path")
 		return
 	}
 	use.Path = b.usePath(toks[1:])
-	b.Tree = append(b.Tree, Obj{use.Tok, use})
+	b.Tree = append(b.Tree, models.Object{
+		Tok:   use.Tok,
+		Value: use,
+	})
 }
 
 func (b *Builder) usePath(toks Toks) string {
@@ -535,7 +497,7 @@ func (b *Builder) usePath(toks Toks) string {
 
 // Attribute builds AST model of attribute.
 func (b *Builder) Attribute(toks Toks) {
-	var a Attribute
+	var a models.Attribute
 	i := 0
 	a.Tok = toks[i]
 	i++
@@ -548,11 +510,14 @@ func (b *Builder) Attribute(toks Toks) {
 		b.pusherr(a.Tag, "invalid_syntax")
 		return
 	}
-	b.Tree = append(b.Tree, Obj{a.Tok, a})
+	b.Tree = append(b.Tree, models.Object{
+		Tok:   a.Tok,
+		Value: a,
+	})
 }
 
 // Func builds AST model of function.
-func (b *Builder) Func(toks Toks, anon bool) (f Func) {
+func (b *Builder) Func(toks Toks, anon bool) (f models.Func) {
 	f.Tok = toks[0]
 	i := 0
 	f.Pub = b.pub
@@ -610,11 +575,11 @@ func (b *Builder) Func(toks Toks, anon bool) (f Func) {
 	return
 }
 
-func (b *Builder) generic(toks Toks) GenericType {
+func (b *Builder) generic(toks Toks) models.GenericType {
 	if len(toks) > 1 {
 		b.pusherr(toks[1], "invalid_syntax")
 	}
-	var gt GenericType
+	var gt models.GenericType
 	gt.Tok = toks[0]
 	if gt.Tok.Id != tokens.Id {
 		b.pusherr(gt.Tok, "invalid_syntax")
@@ -624,19 +589,19 @@ func (b *Builder) generic(toks Toks) GenericType {
 }
 
 // Generic builds generic type.
-func (b *Builder) Generics(toks Toks) []GenericType {
+func (b *Builder) Generics(toks Toks) []models.GenericType {
 	tok := toks[0]
 	i := 1
-	genericsToks := getrange(&i, tokens.LBRACKET, tokens.RBRACKET, toks)
+	genericsToks := Range(&i, tokens.LBRACKET, tokens.RBRACKET, toks)
 	if len(genericsToks) == 0 {
 		b.pusherr(tok, "missing_expr")
-		return make([]GenericType, 0)
+		return make([]models.GenericType, 0)
 	} else if i < len(toks) {
 		b.pusherr(toks[i], "invalid_syntax")
 	}
 	parts, errs := Parts(genericsToks, tokens.Comma)
 	b.Errs = append(b.Errs, errs...)
-	generics := make([]GenericType, len(parts))
+	generics := make([]models.GenericType, len(parts))
 	for i, part := range parts {
 		if len(parts) == 0 {
 			continue
@@ -647,18 +612,24 @@ func (b *Builder) Generics(toks Toks) []GenericType {
 }
 
 // TypeOrGenerics builds type alias or generics type declaration.
-func (b *Builder) TypeOrGenerics(toks Toks) Obj {
+func (b *Builder) TypeOrGenerics(toks Toks) models.Object {
 	if len(toks) > 1 {
 		tok := toks[1]
 		if tok.Id == tokens.Brace && tok.Kind == tokens.LBRACKET {
 			generics := b.Generics(toks)
-			return Obj{tok, generics}
+			return models.Object{
+				Tok:   tok,
+				Value: generics,
+			}
 		}
 	}
 	t := b.Type(toks)
 	t.Pub = b.pub
 	b.pub = false
-	return Obj{t.Tok, t}
+	return models.Object{
+		Tok:   t.Tok,
+		Value: t,
+	}
 }
 
 // GlobalVar builds AST model of global variable.
@@ -667,11 +638,14 @@ func (b *Builder) GlobalVar(toks Toks) {
 		return
 	}
 	s := b.VarStatement(toks)
-	b.Tree = append(b.Tree, Obj{s.Tok, s})
+	b.Tree = append(b.Tree, models.Object{
+		Tok:   s.Tok,
+		Value: s,
+	})
 }
 
 // Params builds AST model of function parameters.
-func (b *Builder) Params(fn *Func, toks Toks) {
+func (b *Builder) Params(fn *models.Func, toks Toks) {
 	parts, errs := Parts(toks, tokens.Comma)
 	b.Errs = append(b.Errs, errs...)
 	for _, part := range parts {
@@ -684,7 +658,7 @@ func (b *Builder) Params(fn *Func, toks Toks) {
 	go b.checkParamsAsync(fn)
 }
 
-func (b *Builder) checkParamsAsync(f *Func) {
+func (b *Builder) checkParamsAsync(f *models.Func) {
 	defer func() { b.wg.Done() }()
 	for i, p := range f.Params {
 		if p.Type.Tok.Id == tokens.NA {
@@ -701,7 +675,7 @@ func (b *Builder) checkParamsAsync(f *Func) {
 	}
 }
 
-func (b *Builder) paramBegin(p *Param, i *int, toks Toks) {
+func (b *Builder) paramBegin(p *models.Param, i *int, toks Toks) {
 	for ; *i < len(toks); *i++ {
 		tok := toks[*i]
 		switch tok.Id {
@@ -740,7 +714,7 @@ func (b *Builder) paramBegin(p *Param, i *int, toks Toks) {
 	}
 }
 
-func (b *Builder) paramBodyId(f *Func, p *Param, tok Tok) {
+func (b *Builder) paramBodyId(f *models.Func, p *models.Param, tok Tok) {
 	if xapi.IsIgnoreId(tok.Kind) {
 		p.Id = x.Anonymous
 		return
@@ -754,7 +728,11 @@ func (b *Builder) paramBodyId(f *Func, p *Param, tok Tok) {
 	p.Id = tok.Kind
 }
 
-func (b *Builder) paramBodyDefaultExpr(p *Param, toks *Toks) {
+type exprNode struct{ expr string }
+
+func (en exprNode) String() string { return en.expr }
+
+func (b *Builder) paramBodyDefaultExpr(p *models.Param, toks *Toks) {
 	braceCount := 0
 	for i, tok := range *toks {
 		if tok.Id == tokens.Brace {
@@ -780,7 +758,7 @@ func (b *Builder) paramBodyDefaultExpr(p *Param, toks *Toks) {
 	}
 }
 
-func (b *Builder) paramBodyDataType(f *Func, p *Param, toks Toks) {
+func (b *Builder) paramBodyDataType(f *models.Func, p *models.Param, toks Toks) {
 	i := 0
 	p.Type, _ = b.DataType(toks, &i, true)
 	i++
@@ -799,7 +777,7 @@ func (b *Builder) paramBodyDataType(f *Func, p *Param, toks Toks) {
 	}
 }
 
-func (b *Builder) paramBody(f *Func, p *Param, i *int, toks Toks) {
+func (b *Builder) paramBody(f *models.Func, p *models.Param, i *int, toks Toks) {
 	b.paramBodyId(f, p, toks[*i])
 	// +1 for skip identifier token
 	toks = toks[*i+1:]
@@ -814,8 +792,8 @@ func (b *Builder) paramBody(f *Func, p *Param, i *int, toks Toks) {
 	}
 }
 
-func (b *Builder) pushParam(f *Func, toks Toks) {
-	var p Param
+func (b *Builder) pushParam(f *models.Func, toks Toks) {
+	var p models.Param
 	i := 0
 	b.paramBegin(&p, &i, toks)
 	if i >= len(toks) {
@@ -862,7 +840,7 @@ func (b *Builder) idGenericsParts(toks Toks, i *int) []Toks {
 	return parts
 }
 
-func (b *Builder) idDataTypePartEnd(t *DataType, dtv *strings.Builder, toks Toks, i *int) {
+func (b *Builder) idDataTypePartEnd(t *models.DataType, dtv *strings.Builder, toks Toks, i *int) {
 	if *i+1 >= len(toks) {
 		return
 	}
@@ -875,7 +853,7 @@ func (b *Builder) idDataTypePartEnd(t *DataType, dtv *strings.Builder, toks Toks
 	dtv.WriteByte('[')
 	var genericsStr strings.Builder
 	parts := b.idGenericsParts(toks, i)
-	generics := make([]DataType, len(parts))
+	generics := make([]models.DataType, len(parts))
 	for i, part := range parts {
 		index := 0
 		t, _ := b.DataType(part, &index, true)
@@ -892,7 +870,7 @@ func (b *Builder) idDataTypePartEnd(t *DataType, dtv *strings.Builder, toks Toks
 }
 
 // DataType builds AST model of data-type.
-func (b *Builder) DataType(toks Toks, i *int, err bool) (t DataType, ok bool) {
+func (b *Builder) DataType(toks Toks, i *int, err bool) (t models.DataType, ok bool) {
 	defer func() { t.Original = t }()
 	first := *i
 	var dtv strings.Builder
@@ -977,43 +955,12 @@ ret:
 	return
 }
 
-func getMapDataTypeInfo(toks Toks, i *int) (typeToks Toks, colon int) {
-	typeToks = nil
-	colon = -1
-	braceCount := 0
-	start := *i
-	for ; *i < len(toks); *i++ {
-		tok := toks[*i]
-		if tok.Id == tokens.Brace {
-			switch tok.Kind {
-			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
-				braceCount++
-			default:
-				braceCount--
-			}
-		}
-		if braceCount == 0 {
-			if start+1 > *i {
-				return
-			}
-			typeToks = toks[start+1 : *i]
-			break
-		} else if braceCount != 1 {
-			continue
-		}
-		if colon == -1 && tok.Id == tokens.Colon {
-			colon = *i - start - 1
-		}
-	}
-	return
-}
-
 // MapDataType builds map data-type.
-func (b *Builder) MapDataType(toks Toks, i *int, err bool) (t DataType, _ string) {
+func (b *Builder) MapDataType(toks Toks, i *int, err bool) (t models.DataType, _ string) {
 	defer func() { t.Original = t }()
 	t.Id = xtype.Map
 	t.Tok = toks[0]
-	typeToks, colon := getMapDataTypeInfo(toks, i)
+	typeToks, colon := MapDataTypeInfo(toks, i)
 	if typeToks == nil || colon == -1 {
 		return
 	}
@@ -1024,7 +971,7 @@ func (b *Builder) MapDataType(toks Toks, i *int, err bool) (t DataType, _ string
 	}
 	keyTypeToks := typeToks[:colon]
 	valTypeToks := typeToks[colon+1:]
-	types := make([]DataType, 2)
+	types := make([]models.DataType, 2)
 	j := 0
 	types[0], _ = b.DataType(keyTypeToks, &j, err)
 	if j < len(keyTypeToks) && err {
@@ -1046,8 +993,8 @@ func (b *Builder) MapDataType(toks Toks, i *int, err bool) (t DataType, _ string
 }
 
 // FuncDataTypeHead builds head part of function data-type.
-func (b *Builder) FuncDataTypeHead(toks Toks, i *int) (string, Func) {
-	var f Func
+func (b *Builder) FuncDataTypeHead(toks Toks, i *int) (string, models.Func) {
+	var f models.Func
 	var typeVal strings.Builder
 	typeVal.WriteByte('(')
 	brace := 1
@@ -1074,7 +1021,7 @@ func (b *Builder) FuncDataTypeHead(toks Toks, i *int) (string, Func) {
 	return "", f
 }
 
-func (b *Builder) pushTypeToTypes(ids *Toks, types *[]DataType, toks Toks, errTok Tok) {
+func (b *Builder) pushTypeToTypes(ids *Toks, types *[]models.DataType, toks Toks, errTok Tok) {
 	if len(toks) == 0 {
 		b.pusherr(errTok, "missing_expr")
 		return
@@ -1096,7 +1043,7 @@ func (b *Builder) pushTypeToTypes(ids *Toks, types *[]DataType, toks Toks, errTo
 	*types = append(*types, currentDt)
 }
 
-func (b *Builder) funcMultiTypeRet(toks Toks, i *int) (t RetType, ok bool) {
+func (b *Builder) funcMultiTypeRet(toks Toks, i *int) (t models.RetType, ok bool) {
 	defer func() { t.Type.Original = t.Type }()
 	start := *i
 	tok := toks[*i]
@@ -1114,7 +1061,7 @@ func (b *Builder) funcMultiTypeRet(toks Toks, i *int) (t RetType, ok bool) {
 		t.Type, ok = b.DataType(toks, i, false)
 		return
 	}
-	var types []DataType
+	var types []models.DataType
 	braceCount := 1
 	last := *i
 	for ; *i < len(toks); *i++ {
@@ -1162,7 +1109,7 @@ func (b *Builder) funcMultiTypeRet(toks Toks, i *int) (t RetType, ok bool) {
 }
 
 // FuncRetDataType builds ret data-type of function.
-func (b *Builder) FuncRetDataType(toks Toks, i *int) (t RetType, ok bool) {
+func (b *Builder) FuncRetDataType(toks Toks, i *int) (t models.RetType, ok bool) {
 	defer func() { t.Type.Original = t.Type }()
 	if *i >= len(toks) {
 		return
@@ -1174,18 +1121,6 @@ func (b *Builder) FuncRetDataType(toks Toks, i *int) (t RetType, ok bool) {
 	}
 	t.Type, ok = b.DataType(toks, i, false)
 	return
-}
-
-// IsSigleOperator is returns true
-// if operator is unary or smilar to unary,
-// returns false if not.
-func IsSingleOperator(kind string) bool {
-	return kind == tokens.MINUS ||
-		kind == tokens.PLUS ||
-		kind == tokens.TILDE ||
-		kind == tokens.EXCLAMATION ||
-		kind == tokens.STAR ||
-		kind == tokens.AMPER
 }
 
 func (b *Builder) pushStatementToBlock(bs *blockStatement) {
@@ -1207,80 +1142,13 @@ func (b *Builder) pushStatementToBlock(bs *blockStatement) {
 	bs.block.Tree = append(bs.block.Tree, s)
 }
 
-// IsStatement reports token is
-// statement finish point or not.
-func IsStatement(current, prev Tok) (ok bool, withTerminator bool) {
-	ok = current.Id == tokens.SemiColon || prev.Row < current.Row
-	withTerminator = current.Id == tokens.SemiColon
-	return
-}
-
-func nextStatementPos(toks Toks, start int) (int, bool) {
-	braceCount := 0
-	i := start
-	for ; i < len(toks); i++ {
-		var isStatement, withTerminator bool
-		tok := toks[i]
-		if tok.Id == tokens.Brace {
-			switch tok.Kind {
-			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
-				if braceCount == 0 && i > start {
-					isStatement, withTerminator = IsStatement(tok, toks[i-1])
-					if isStatement {
-						goto ret
-					}
-				}
-				braceCount++
-				continue
-			default:
-				braceCount--
-				if braceCount == 0 && i+1 < len(toks) {
-					isStatement, withTerminator = IsStatement(toks[i+1], tok)
-					if isStatement {
-						i++
-						goto ret
-					}
-				}
-				continue
-			}
-		}
-		if braceCount != 0 {
-			continue
-		}
-		if i > start {
-			isStatement, withTerminator = IsStatement(tok, toks[i-1])
-		} else {
-			isStatement, withTerminator = IsStatement(tok, tok)
-		}
-		if !isStatement {
-			continue
-		}
-	ret:
-		if withTerminator {
-			i++
-		}
-		return i, withTerminator
-	}
-	return i, false
-}
-
-type blockStatement struct {
-	pos            int
-	block          *Block
-	srcToks        *Toks
-	blockToks      *Toks
-	toks           Toks
-	nextToks       Toks
-	withTerminator bool
-}
-
 // Block builds AST model of statements of code block.
-func (b *Builder) Block(toks Toks) (block Block) {
+func (b *Builder) Block(toks Toks) (block models.Block) {
 	bs := new(blockStatement)
 	bs.block = &block
 	bs.srcToks = &toks
 	for {
-		bs.pos, bs.withTerminator = nextStatementPos(toks, 0)
+		bs.pos, bs.withTerminator = NextStatementPos(toks, 0)
 		statementToks := toks[:bs.pos]
 		bs.blockToks = &toks
 		bs.toks = statementToks
@@ -1301,7 +1169,7 @@ func (b *Builder) Block(toks Toks) (block Block) {
 }
 
 // Statement builds AST model of statement.
-func (b *Builder) Statement(bs *blockStatement) (s Statement) {
+func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
 	s, ok := b.AssignStatement(bs.toks, false)
 	if ok {
 		return s
@@ -1362,56 +1230,19 @@ func (b *Builder) Statement(bs *blockStatement) (s Statement) {
 	return b.RetStatement(bs.toks)
 }
 
-func (b *Builder) blockStatement(toks Toks) Statement {
+func (b *Builder) blockStatement(toks Toks) models.Statement {
 	i := new(int)
 	tok := toks[0]
-	toks = getrange(i, tokens.LBRACE, tokens.RBRACE, toks)
+	toks = Range(i, tokens.LBRACE, tokens.RBRACE, toks)
 	if *i < len(toks) {
 		b.pusherr(toks[*i], "invalid_syntax")
 	}
 	block := b.Block(toks)
-	return Statement{Tok: tok, Val: block}
+	return models.Statement{Tok: tok, Val: block}
 }
 
-type assignInfo struct {
-	selectorToks Toks
-	exprToks     Toks
-	setter       Tok
-	ok           bool
-	isExpr       bool
-}
-
-// IsFuncCall returns function expressions without call expression
-// if tokens are function call, nil if not.
-func IsFuncCall(toks Toks) Toks {
-	switch toks[0].Id {
-	case tokens.Brace, tokens.Id, tokens.DataType:
-	default:
-		if tok := toks[len(toks)-1]; tok.Id != tokens.Brace && tok.Kind != tokens.RPARENTHESES {
-			return nil
-		}
-	}
-	braceCount := 0
-	// Loops to 1 because expression must be has function expression at begin.
-	for i := len(toks) - 1; i >= 1; i-- {
-		tok := toks[i]
-		if tok.Id == tokens.Brace {
-			switch tok.Kind {
-			case tokens.RPARENTHESES:
-				braceCount++
-			case tokens.LPARENTHESES:
-				braceCount--
-			}
-			if braceCount == 0 {
-				return toks[:i]
-			}
-		}
-	}
-	return nil
-}
-
-func (b *Builder) assignInfo(toks Toks) (info assignInfo) {
-	info.ok = true
+func (b *Builder) assignInfo(toks Toks) (info AssignInfo) {
+	info.Ok = true
 	braceCount := 0
 	for i, tok := range toks {
 		if tok.Id == tokens.Brace {
@@ -1427,17 +1258,17 @@ func (b *Builder) assignInfo(toks Toks) (info assignInfo) {
 		}
 		if tok.Id == tokens.Operator &&
 			tok.Kind[len(tok.Kind)-1] == '=' {
-			info.selectorToks = toks[:i]
-			if info.selectorToks == nil {
+			info.Left = toks[:i]
+			if info.Left == nil {
 				b.pusherr(tok, "invalid_syntax")
-				info.ok = false
+				info.Ok = false
 			}
-			info.setter = tok
+			info.Setter = tok
 			if i+1 >= len(toks) {
 				// b.pusherr(tok, "missing_expr")
-				info.ok = false
+				info.Ok = false
 			} else {
-				info.exprToks = toks[i+1:]
+				info.Right = toks[i+1:]
 			}
 			return
 		}
@@ -1445,24 +1276,24 @@ func (b *Builder) assignInfo(toks Toks) (info assignInfo) {
 	return
 }
 
-func (b *Builder) pushAssignSelector(selectors *[]AssignSelector, last, current int, info assignInfo) {
-	var selector AssignSelector
-	selector.Expr.Toks = info.selectorToks[last:current]
+func (b *Builder) pushAssignSelector(selectors *[]models.AssignLeft, last, current int, info AssignInfo) {
+	var selector models.AssignLeft
+	selector.Expr.Toks = info.Left[last:current]
 	if last-current == 0 {
-		b.pusherr(info.selectorToks[current-1], "missing_expr")
+		b.pusherr(info.Left[current-1], "missing_expr")
 		return
 	}
 	// Variable is new?
 	if selector.Expr.Toks[0].Id == tokens.Id &&
 		current-last > 1 &&
 		selector.Expr.Toks[1].Id == tokens.Colon {
-		if info.isExpr {
+		if info.IsExpr {
 			b.pusherr(selector.Expr.Toks[0], "notallow_declares")
 		}
 		selector.Var.New = true
 		selector.Var.IdTok = selector.Expr.Toks[0]
 		selector.Var.Id = selector.Var.IdTok.Kind
-		selector.Var.SetterTok = info.setter
+		selector.Var.SetterTok = info.Setter
 		// Has specific data-type?
 		if current-last > 2 {
 			selector.Var.Type, _ = b.DataType(selector.Expr.Toks[2:], new(int), false)
@@ -1477,11 +1308,11 @@ func (b *Builder) pushAssignSelector(selectors *[]AssignSelector, last, current 
 	*selectors = append(*selectors, selector)
 }
 
-func (b *Builder) assignSelectors(info assignInfo) []AssignSelector {
-	var selectors []AssignSelector
+func (b *Builder) assignSelectors(info AssignInfo) []models.AssignLeft {
+	var selectors []models.AssignLeft
 	braceCount := 0
 	lastIndex := 0
-	for i, tok := range info.selectorToks {
+	for i, tok := range info.Left {
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
 			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
@@ -1498,26 +1329,26 @@ func (b *Builder) assignSelectors(info assignInfo) []AssignSelector {
 		b.pushAssignSelector(&selectors, lastIndex, i, info)
 		lastIndex = i + 1
 	}
-	if lastIndex < len(info.selectorToks) {
-		b.pushAssignSelector(&selectors, lastIndex, len(info.selectorToks), info)
+	if lastIndex < len(info.Left) {
+		b.pushAssignSelector(&selectors, lastIndex, len(info.Left), info)
 	}
 	return selectors
 }
 
-func (b *Builder) pushAssignExpr(exps *[]Expr, last, current int, info assignInfo) {
-	toks := info.exprToks[last:current]
+func (b *Builder) pushAssignExpr(exps *[]models.Expr, last, current int, info AssignInfo) {
+	toks := info.Right[last:current]
 	if toks == nil {
-		b.pusherr(info.exprToks[current-1], "missing_expr")
+		b.pusherr(info.Right[current-1], "missing_expr")
 		return
 	}
 	*exps = append(*exps, b.Expr(toks))
 }
 
-func (b *Builder) assignExprs(info assignInfo) []Expr {
-	var exprs []Expr
+func (b *Builder) assignExprs(info AssignInfo) []models.Expr {
+	var exprs []models.Expr
 	braceCount := 0
 	lastIndex := 0
-	for i, tok := range info.exprToks {
+	for i, tok := range info.Right {
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
 			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
@@ -1534,61 +1365,14 @@ func (b *Builder) assignExprs(info assignInfo) []Expr {
 		b.pushAssignExpr(&exprs, lastIndex, i, info)
 		lastIndex = i + 1
 	}
-	if lastIndex < len(info.exprToks) {
-		b.pushAssignExpr(&exprs, lastIndex, len(info.exprToks), info)
+	if lastIndex < len(info.Right) {
+		b.pushAssignExpr(&exprs, lastIndex, len(info.Right), info)
 	}
 	return exprs
 }
 
-func isAssignTok(id uint8) bool {
-	return id == tokens.Id ||
-		id == tokens.Brace ||
-		id == tokens.Operator
-}
-
-func isAssignOperator(kind string) bool {
-	return kind == tokens.EQUAL ||
-		kind == tokens.PLUS_EQUAL ||
-		kind == tokens.MINUS_EQUAL ||
-		kind == tokens.SLASH_EQUAL ||
-		kind == tokens.STAR_EQUAL ||
-		kind == tokens.PERCENT_EQUAL ||
-		kind == tokens.RSHIFT_EQUAL ||
-		kind == tokens.LSHIFT_EQUAL ||
-		kind == tokens.VLINE_EQUAL ||
-		kind == tokens.AMPER_EQUAL ||
-		kind == tokens.CARET_EQUAL
-}
-
-func checkAssignToks(toks Toks) bool {
-	if len(toks) == 0 || !isAssignTok(toks[0].Id) {
-		return false
-	}
-	braceCount := 0
-	for _, tok := range toks {
-		if tok.Id == tokens.Brace {
-			switch tok.Kind {
-			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
-				braceCount++
-			default:
-				braceCount--
-			}
-		}
-		if braceCount < 0 {
-			return false
-		} else if braceCount > 0 {
-			continue
-		}
-		if tok.Id == tokens.Operator &&
-			isAssignOperator(tok.Kind) {
-			return true
-		}
-	}
-	return false
-}
-
 // AssignStatement builds AST model of assignment statement.
-func (b *Builder) AssignStatement(toks Toks, isExpr bool) (s Statement, _ bool) {
+func (b *Builder) AssignStatement(toks Toks, isExpr bool) (s models.Statement, _ bool) {
 	assign, ok := b.AssignExpr(toks, isExpr)
 	if !ok {
 		return
@@ -1599,28 +1383,28 @@ func (b *Builder) AssignStatement(toks Toks, isExpr bool) (s Statement, _ bool) 
 }
 
 // AssignExpr builds AST model of assignment expression.
-func (b *Builder) AssignExpr(toks Toks, isExpr bool) (assign Assign, ok bool) {
-	if !checkAssignToks(toks) {
+func (b *Builder) AssignExpr(toks Toks, isExpr bool) (assign models.Assign, ok bool) {
+	if !CheckAssignToks(toks) {
 		return
 	}
 	info := b.assignInfo(toks)
-	if !info.ok {
+	if !info.Ok {
 		return
 	}
 	ok = true
-	info.isExpr = isExpr
+	info.IsExpr = isExpr
 	assign.IsExpr = isExpr
-	assign.Setter = info.setter
-	assign.SelectExprs = b.assignSelectors(info)
-	if isExpr && len(assign.SelectExprs) > 1 {
+	assign.Setter = info.Setter
+	assign.Left = b.assignSelectors(info)
+	if isExpr && len(assign.Left) > 1 {
 		b.pusherr(assign.Setter, "notallow_multiple_assign")
 	}
-	assign.ValueExprs = b.assignExprs(info)
+	assign.Right = b.assignExprs(info)
 	return
 }
 
 // BuildReturnStatement builds AST model of return statement.
-func (b *Builder) IdStatement(toks Toks) (s Statement, _ bool) {
+func (b *Builder) IdStatement(toks Toks) (s models.Statement, _ bool) {
 	if len(toks) == 1 {
 		return
 	}
@@ -1636,22 +1420,27 @@ func (b *Builder) IdStatement(toks Toks) (s Statement, _ bool) {
 }
 
 // LabelStatement builds AST model of label.
-func (b *Builder) LabelStatement(tok Tok) Statement {
-	var l Label
+func (b *Builder) LabelStatement(tok Tok) models.Statement {
+	var l models.Label
 	l.Tok = tok
 	l.Label = tok.Kind
-	return Statement{Tok: tok, Val: l}
+	return models.Statement{Tok: tok, Val: l}
 }
 
 // ExprStatement builds AST model of expression.
-func (b *Builder) ExprStatement(toks Toks) Statement {
-	block := ExprStatement{b.Expr(toks)}
-	return Statement{toks[0], block, false}
+func (b *Builder) ExprStatement(toks Toks) models.Statement {
+	block := models.ExprStatement{
+		Expr: b.Expr(toks),
+	}
+	return models.Statement{
+		Tok: toks[0],
+		Val: block,
+	}
 }
 
 // Args builds AST model of arguments.
-func (b *Builder) Args(toks Toks) *Args {
-	args := new(Args)
+func (b *Builder) Args(toks Toks) *models.Args {
+	args := new(models.Args)
 	last := 0
 	braceCount := 0
 	for i, tok := range toks {
@@ -1679,12 +1468,12 @@ func (b *Builder) Args(toks Toks) *Args {
 	return args
 }
 
-func (b *Builder) pushArg(args *Args, toks Toks, err Tok) {
+func (b *Builder) pushArg(args *models.Args, toks Toks, err Tok) {
 	if len(toks) == 0 {
 		b.pusherr(err, "invalid_syntax")
 		return
 	}
-	var arg Arg
+	var arg models.Arg
 	arg.Tok = toks[0]
 	if arg.Tok.Id == tokens.Id {
 		if len(toks) > 1 {
@@ -1700,7 +1489,7 @@ func (b *Builder) pushArg(args *Args, toks Toks, err Tok) {
 	args.Src = append(args.Src, arg)
 }
 
-func (b *Builder) varBegin(v *Var, i *int, toks Toks) {
+func (b *Builder) varBegin(v *models.Var, i *int, toks Toks) {
 	for ; *i < len(toks); *i++ {
 		tok := toks[*i]
 		if tok.Id == tokens.Id {
@@ -1725,7 +1514,7 @@ func (b *Builder) varBegin(v *Var, i *int, toks Toks) {
 	}
 }
 
-func (b *Builder) varTypeNExpr(v *Var, toks Toks, i int) {
+func (b *Builder) varTypeNExpr(v *models.Var, toks Toks, i int) {
 	tok := toks[i]
 	t, ok := b.DataType(toks, &i, false)
 	if ok {
@@ -1754,7 +1543,7 @@ func (b *Builder) varTypeNExpr(v *Var, toks Toks, i int) {
 }
 
 // Var builds AST model of variable statement.
-func (b *Builder) Var(toks Toks) (v Var) {
+func (b *Builder) Var(toks Toks) (v models.Var) {
 	v.Pub = b.pub
 	b.pub = false
 	i := 0
@@ -1791,26 +1580,34 @@ func (b *Builder) Var(toks Toks) (v Var) {
 }
 
 // VarStatement builds AST model of variable declaration statement.
-func (b *Builder) VarStatement(toks Toks) Statement {
+func (b *Builder) VarStatement(toks Toks) models.Statement {
 	vast := b.Var(toks)
-	return Statement{vast.IdTok, vast, false}
+	return models.Statement{
+		Tok: vast.IdTok,
+		Val: vast,
+	}
 }
 
 // CommentStatement builds AST model of comment statement.
-func (b *Builder) CommentStatement(tok Tok) (s Statement) {
+func (b *Builder) CommentStatement(tok Tok) (s models.Statement) {
 	s.Tok = tok
 	tok.Kind = strings.TrimSpace(tok.Kind[2:])
 	if strings.HasPrefix(tok.Kind, "cxx:") {
-		s.Val = CxxEmbed{tok, tok.Kind[4:]}
+		s.Val = models.CxxEmbed{
+			Tok:     tok,
+			Content: tok.Kind[4:],
+		}
 	} else {
-		s.Val = Comment{tok.Kind}
+		s.Val = models.Comment{
+			Content: tok.Kind,
+		}
 	}
 	return
 }
 
 // DeferStatement builds AST model of deferred call statement.
-func (b *Builder) DeferStatement(toks Toks) (s Statement) {
-	var d Defer
+func (b *Builder) DeferStatement(toks Toks) (s models.Statement) {
+	var d models.Defer
 	d.Tok = toks[0]
 	toks = toks[1:]
 	if len(toks) == 0 {
@@ -1826,8 +1623,8 @@ func (b *Builder) DeferStatement(toks Toks) (s Statement) {
 	return
 }
 
-func (b *Builder) ConcurrentCallStatement(toks Toks) (s Statement) {
-	var cc ConcurrentCall
+func (b *Builder) ConcurrentCallStatement(toks Toks) (s models.Statement) {
+	var cc models.ConcurrentCall
 	cc.Tok = toks[0]
 	toks = toks[1:]
 	if len(toks) == 0 {
@@ -1843,7 +1640,7 @@ func (b *Builder) ConcurrentCallStatement(toks Toks) (s Statement) {
 	return
 }
 
-func (b *Builder) GotoStatement(toks Toks) (s Statement) {
+func (b *Builder) GotoStatement(toks Toks) (s models.Statement) {
 	s.Tok = toks[0]
 	if len(toks) == 1 {
 		b.pusherr(s.Tok, "missing_goto_label")
@@ -1856,7 +1653,7 @@ func (b *Builder) GotoStatement(toks Toks) (s Statement) {
 		b.pusherr(idTok, "invalid_syntax")
 		return
 	}
-	var gt Goto
+	var gt models.Goto
 	gt.Tok = s.Tok
 	gt.Label = idTok.Kind
 	s.Val = gt
@@ -1864,38 +1661,22 @@ func (b *Builder) GotoStatement(toks Toks) (s Statement) {
 }
 
 // RetStatement builds AST model of return statement.
-func (b *Builder) RetStatement(toks Toks) Statement {
-	var ret Ret
+func (b *Builder) RetStatement(toks Toks) models.Statement {
+	var ret models.Ret
 	ret.Tok = toks[0]
 	if len(toks) > 1 {
 		ret.Expr = b.Expr(toks[1:])
 	}
-	return Statement{ret.Tok, ret, false}
-}
-
-func blockExprToks(toks Toks) (expr Toks) {
-	braceCount := 0
-	for i, tok := range toks {
-		if tok.Id == tokens.Brace {
-			switch tok.Kind {
-			case tokens.LBRACE:
-				if braceCount > 0 {
-					braceCount++
-					break
-				}
-				return toks[:i]
-			case tokens.LBRACKET, tokens.LPARENTHESES:
-				braceCount++
-			default:
-				braceCount--
-			}
-		}
+	return models.Statement{
+		Tok: ret.Tok,
+		Val: ret,
 	}
-	return nil
 }
 
-func (b *Builder) getWhileIterProfile(toks Toks) WhileProfile {
-	return WhileProfile{b.Expr(toks)}
+func (b *Builder) getWhileIterProfile(toks Toks) models.IterWhile {
+	return models.IterWhile{
+		Expr: b.Expr(toks),
+	}
 }
 
 func (b *Builder) getForeachVarsToks(toks Toks) []Toks {
@@ -1904,7 +1685,7 @@ func (b *Builder) getForeachVarsToks(toks Toks) []Toks {
 	return vars
 }
 
-func (b *Builder) getVarProfile(toks Toks) (vast Var) {
+func (b *Builder) getVarProfile(toks Toks) (vast models.Var) {
 	if len(toks) == 0 {
 		return
 	}
@@ -1934,41 +1715,41 @@ func (b *Builder) getVarProfile(toks Toks) (vast Var) {
 	return
 }
 
-func (b *Builder) getForeachIterVars(varsToks []Toks) []Var {
-	var vars []Var
+func (b *Builder) getForeachIterVars(varsToks []Toks) []models.Var {
+	var vars []models.Var
 	for _, toks := range varsToks {
 		vars = append(vars, b.getVarProfile(toks))
 	}
 	return vars
 }
 
-func (b *Builder) getForeachIterProfile(varToks, exprToks Toks, inTok Tok) ForeachProfile {
-	var profile ForeachProfile
-	profile.InTok = inTok
-	profile.Expr = b.Expr(exprToks)
+func (b *Builder) getForeachIterProfile(varToks, exprToks Toks, inTok Tok) models.IterForeach {
+	var foreach models.IterForeach
+	foreach.InTok = inTok
+	foreach.Expr = b.Expr(exprToks)
 	if len(varToks) == 0 {
-		profile.KeyA.Id = xapi.Ignore
-		profile.KeyB.Id = xapi.Ignore
+		foreach.KeyA.Id = xapi.Ignore
+		foreach.KeyB.Id = xapi.Ignore
 	} else {
 		varsToks := b.getForeachVarsToks(varToks)
 		if len(varsToks) == 0 {
-			return profile
+			return foreach
 		}
 		if len(varsToks) > 2 {
 			b.pusherr(inTok, "much_foreach_vars")
 		}
 		vars := b.getForeachIterVars(varsToks)
-		profile.KeyA = vars[0]
+		foreach.KeyA = vars[0]
 		if len(vars) > 1 {
-			profile.KeyB = vars[1]
+			foreach.KeyB = vars[1]
 		} else {
-			profile.KeyB.Id = xapi.Ignore
+			foreach.KeyB.Id = xapi.Ignore
 		}
 	}
-	return profile
+	return foreach
 }
 
-func (b *Builder) getIterProfile(toks Toks) IterProfile {
+func (b *Builder) getIterProfile(toks Toks) models.IterProfile {
 	braceCount := 0
 	for i, tok := range toks {
 		if tok.Id == tokens.Brace {
@@ -1991,15 +1772,15 @@ func (b *Builder) getIterProfile(toks Toks) IterProfile {
 	return b.getWhileIterProfile(toks)
 }
 
-func (b *Builder) IterExpr(toks Toks) (s Statement) {
-	var iter Iter
+func (b *Builder) IterExpr(toks Toks) (s models.Statement) {
+	var iter models.Iter
 	iter.Tok = toks[0]
 	toks = toks[1:]
 	if len(toks) == 0 {
 		b.pusherr(iter.Tok, "body_not_exist")
 		return
 	}
-	exprToks := blockExprToks(toks)
+	exprToks := BlockExpr(toks)
 	if len(exprToks) > 0 {
 		iter.Profile = b.getIterProfile(exprToks)
 	}
@@ -2014,12 +1795,15 @@ func (b *Builder) IterExpr(toks Toks) (s Statement) {
 		b.pusherr(toks[*i], "invalid_syntax")
 	}
 	iter.Block = b.Block(blockToks)
-	return Statement{iter.Tok, iter, false}
+	return models.Statement{
+		Tok: iter.Tok,
+		Val: iter,
+	}
 }
 
 // TryBlock build try block.
-func (b *Builder) TryBlock(bs *blockStatement) (s Statement) {
-	var try Try
+func (b *Builder) TryBlock(bs *blockStatement) (s models.Statement) {
+	var try models.Try
 	try.Tok = bs.toks[0]
 	bs.toks = bs.toks[1:]
 	i := new(int)
@@ -2036,15 +1820,18 @@ func (b *Builder) TryBlock(bs *blockStatement) (s Statement) {
 		}
 	}
 	try.Block = b.Block(blockToks)
-	return Statement{try.Tok, try, false}
+	return models.Statement{
+		Tok: try.Tok,
+		Val: try,
+	}
 }
 
 // CatchBlock build catch block.
-func (b *Builder) CatchBlock(bs *blockStatement) (s Statement) {
-	var catch Catch
+func (b *Builder) CatchBlock(bs *blockStatement) (s models.Statement) {
+	var catch models.Catch
 	catch.Tok = bs.toks[0]
 	bs.toks = bs.toks[1:]
-	varToks := blockExprToks(bs.toks)
+	varToks := BlockExpr(bs.toks)
 	i := new(int)
 	*i = len(varToks)
 	blockToks := b.getrange(i, tokens.LBRACE, tokens.RBRACE, &bs.toks)
@@ -2063,15 +1850,18 @@ func (b *Builder) CatchBlock(bs *blockStatement) (s Statement) {
 		catch.Var = b.getVarProfile(varToks)
 	}
 	catch.Block = b.Block(blockToks)
-	return Statement{catch.Tok, catch, false}
+	return models.Statement{
+		Tok: catch.Tok,
+		Val: catch,
+	}
 }
 
 // IfExpr builds AST model of if expression.
-func (b *Builder) IfExpr(bs *blockStatement) (s Statement) {
-	var ifast If
+func (b *Builder) IfExpr(bs *blockStatement) (s models.Statement) {
+	var ifast models.If
 	ifast.Tok = bs.toks[0]
 	bs.toks = bs.toks[1:]
-	exprToks := blockExprToks(bs.toks)
+	exprToks := BlockExpr(bs.toks)
 	i := new(int)
 	if len(exprToks) == 0 {
 		if len(bs.toks) == 0 || bs.pos >= len(*bs.srcToks) {
@@ -2080,7 +1870,7 @@ func (b *Builder) IfExpr(bs *blockStatement) (s Statement) {
 		}
 		exprToks = bs.toks
 		*bs.srcToks = (*bs.srcToks)[bs.pos:]
-		bs.pos, bs.withTerminator = nextStatementPos(*bs.srcToks, 0)
+		bs.pos, bs.withTerminator = NextStatementPos(*bs.srcToks, 0)
 		bs.toks = (*bs.srcToks)[:bs.pos]
 	} else {
 		*i = len(exprToks)
@@ -2099,15 +1889,18 @@ func (b *Builder) IfExpr(bs *blockStatement) (s Statement) {
 	}
 	ifast.Expr = b.Expr(exprToks)
 	ifast.Block = b.Block(blockToks)
-	return Statement{ifast.Tok, ifast, false}
+	return models.Statement{
+		Tok: ifast.Tok,
+		Val: ifast,
+	}
 }
 
 // ElseIfEpxr builds AST model of else if expression.
-func (b *Builder) ElseIfExpr(bs *blockStatement) (s Statement) {
-	var elif ElseIf
+func (b *Builder) ElseIfExpr(bs *blockStatement) (s models.Statement) {
+	var elif models.ElseIf
 	elif.Tok = bs.toks[1]
 	bs.toks = bs.toks[2:]
-	exprToks := blockExprToks(bs.toks)
+	exprToks := BlockExpr(bs.toks)
 	i := new(int)
 	if len(exprToks) == 0 {
 		if len(bs.toks) == 0 || bs.pos >= len(*bs.srcToks) {
@@ -2116,7 +1909,7 @@ func (b *Builder) ElseIfExpr(bs *blockStatement) (s Statement) {
 		}
 		exprToks = bs.toks
 		*bs.srcToks = (*bs.srcToks)[bs.pos:]
-		bs.pos, bs.withTerminator = nextStatementPos(*bs.srcToks, 0)
+		bs.pos, bs.withTerminator = NextStatementPos(*bs.srcToks, 0)
 		bs.toks = (*bs.srcToks)[:bs.pos]
 	} else {
 		*i = len(exprToks)
@@ -2135,15 +1928,18 @@ func (b *Builder) ElseIfExpr(bs *blockStatement) (s Statement) {
 	}
 	elif.Expr = b.Expr(exprToks)
 	elif.Block = b.Block(blockToks)
-	return Statement{elif.Tok, elif, false}
+	return models.Statement{
+		Tok: elif.Tok,
+		Val: elif,
+	}
 }
 
 // ElseBlock builds AST model of else block.
-func (b *Builder) ElseBlock(bs *blockStatement) (s Statement) {
+func (b *Builder) ElseBlock(bs *blockStatement) (s models.Statement) {
 	if len(bs.toks) > 1 && bs.toks[1].Id == tokens.If {
 		return b.ElseIfExpr(bs)
 	}
-	var elseast Else
+	var elseast models.Else
 	elseast.Tok = bs.toks[0]
 	bs.toks = bs.toks[1:]
 	i := new(int)
@@ -2160,52 +1956,44 @@ func (b *Builder) ElseBlock(bs *blockStatement) (s Statement) {
 		b.pusherr(bs.toks[*i], "invalid_syntax")
 	}
 	elseast.Block = b.Block(blockToks)
-	return Statement{elseast.Tok, elseast, false}
+	return models.Statement{
+		Tok: elseast.Tok,
+		Val: elseast,
+	}
 }
 
 // BreakStatement builds AST model of break statement.
-func (b *Builder) BreakStatement(toks Toks) Statement {
-	var breakAST Break
+func (b *Builder) BreakStatement(toks Toks) models.Statement {
+	var breakAST models.Break
 	breakAST.Tok = toks[0]
 	if len(toks) > 1 {
 		b.pusherr(toks[1], "invalid_syntax")
 	}
-	return Statement{breakAST.Tok, breakAST, false}
+	return models.Statement{
+		Tok: breakAST.Tok,
+		Val: breakAST,
+	}
 }
 
 // ContinueStatement builds AST model of continue statement.
-func (b *Builder) ContinueStatement(toks Toks) Statement {
-	var continueAST Continue
+func (b *Builder) ContinueStatement(toks Toks) models.Statement {
+	var continueAST models.Continue
 	continueAST.Tok = toks[0]
 	if len(toks) > 1 {
 		b.pusherr(toks[1], "invalid_syntax")
 	}
-	return Statement{continueAST.Tok, continueAST, false}
+	return models.Statement{
+		Tok: continueAST.Tok,
+		Val: continueAST,
+	}
 }
 
 // Expr builds AST model of expression.
-func (b *Builder) Expr(toks Toks) (e Expr) {
+func (b *Builder) Expr(toks Toks) (e models.Expr) {
 	e.Processes = b.exprProcesses(toks)
 	e.Toks = toks
 	return
 }
-
-func isOverflowOperator(kind string) bool {
-	return kind == tokens.PLUS ||
-		kind == tokens.MINUS ||
-		kind == tokens.STAR ||
-		kind == tokens.SLASH ||
-		kind == tokens.PERCENT ||
-		kind == tokens.AMPER ||
-		kind == tokens.VLINE ||
-		kind == tokens.CARET ||
-		kind == tokens.LESS ||
-		kind == tokens.GREAT ||
-		kind == tokens.TILDE ||
-		kind == tokens.EXCLAMATION
-}
-
-func isExprOperator(kind string) bool { return kind == tokens.TRIPLE_DOT }
 
 type exprProcessInfo struct {
 	processes        []Toks
@@ -2220,8 +2008,8 @@ type exprProcessInfo struct {
 }
 
 func (b *Builder) exprOperatorPart(info *exprProcessInfo, tok Tok) {
-	if isExprOperator(tok.Kind) ||
-		isAssignOperator(tok.Kind) {
+	if IsExprOperator(tok.Kind) ||
+		IsAssignOperator(tok.Kind) {
 		info.part = append(info.part, tok)
 		return
 	}
@@ -2231,7 +2019,7 @@ func (b *Builder) exprOperatorPart(info *exprProcessInfo, tok Tok) {
 			info.singleOperatored = true
 			return
 		}
-		if info.braceCount == 0 && isOverflowOperator(tok.Kind) {
+		if info.braceCount == 0 && IsSolidOperator(tok.Kind) {
 			b.pusherr(tok, "operator_overflow")
 		}
 	}
@@ -2258,7 +2046,7 @@ func (b *Builder) exprValuePart(info *exprProcessInfo, tok Tok) {
 	}
 	b.checkExprTok(tok)
 	info.part = append(info.part, tok)
-	info.operator = requireOperatorForProcess(tok, info.i, len(info.toks))
+	info.operator = RequireOperatorToProcess(tok, info.i, len(info.toks))
 	info.value = false
 }
 
@@ -2312,19 +2100,6 @@ func (b *Builder) exprProcesses(toks Toks) []Toks {
 	return info.processes
 }
 
-func requireOperatorForProcess(tok Tok, index, len int) bool {
-	switch tok.Id {
-	case tokens.Comma:
-		return false
-	case tokens.Brace:
-		if tok.Kind == tokens.LPARENTHESES ||
-			tok.Kind == tokens.LBRACE {
-			return false
-		}
-	}
-	return index < len-1
-}
-
 func (b *Builder) checkExprTok(tok Tok) {
 	if lex.NumRegexp.MatchString(tok.Kind) {
 		var result bool
@@ -2344,7 +2119,7 @@ func (b *Builder) checkExprTok(tok Tok) {
 }
 
 func (b *Builder) getrange(i *int, open, close string, toks *Toks) Toks {
-	rang := getrange(i, open, close, *toks)
+	rang := Range(i, open, close, *toks)
 	if rang != nil {
 		return rang
 	}
@@ -2353,38 +2128,13 @@ func (b *Builder) getrange(i *int, open, close string, toks *Toks) Toks {
 	}
 	*i = 0
 	*toks = b.nextBuilderStatement()
-	rang = getrange(i, open, close, *toks)
+	rang = Range(i, open, close, *toks)
 	return rang
-}
-
-func getrange(i *int, open, close string, toks Toks) Toks {
-	if *i >= len(toks) {
-		return nil
-	}
-	tok := toks[*i]
-	if tok.Id == tokens.Brace && tok.Kind == open {
-		*i++
-		braceCount := 1
-		start := *i
-		for ; braceCount > 0 && *i < len(toks); *i++ {
-			tok := toks[*i]
-			if tok.Id != tokens.Brace {
-				continue
-			}
-			if tok.Kind == open {
-				braceCount++
-			} else if tok.Kind == close {
-				braceCount--
-			}
-		}
-		return toks[start : *i-1]
-	}
-	return nil
 }
 
 func (b *Builder) skipStatement(i *int, toks *Toks) Toks {
 	start := *i
-	*i, _ = nextStatementPos(*toks, start)
+	*i, _ = NextStatementPos(*toks, start)
 	stoks := (*toks)[start:*i]
 	if stoks[len(stoks)-1].Id == tokens.SemiColon {
 		if len(stoks) == 1 {

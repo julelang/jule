@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/the-xlang/xxc/ast"
+	"github.com/the-xlang/xxc/ast/models"
 )
 
 type iExpr interface{ String() string }
@@ -104,7 +104,7 @@ func (m mapExpr) String() string {
 	return cxx.String()
 }
 
-type argsExpr struct{ args []ast.Arg }
+type argsExpr struct{ args []models.Arg }
 
 func (a argsExpr) String() string {
 	if len(a.args) == 0 {
@@ -130,7 +130,7 @@ func (mre multiRetExpr) String() string {
 	return cxx.String()[:cxx.Len()-1] + ")"
 }
 
-type assignExpr struct{ assign ast.Assign }
+type assignExpr struct{ assign models.Assign }
 
 func (a assignExpr) String() string {
 	var cxx strings.Builder

@@ -95,7 +95,7 @@ func doc(cmd string) {
 			fmt.Println(x.GetErr("doc_couldnt_generated", path))
 			continue
 		}
-		docjson, err := documenter.Documentize(p)
+		docjson, err := documenter.Doc(p)
 		if err != nil {
 			fmt.Println(x.GetErr("error", err.Error()))
 			continue

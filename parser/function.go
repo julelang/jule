@@ -3,7 +3,7 @@ package parser
 import (
 	"strings"
 
-	"github.com/the-xlang/xxc/ast"
+	"github.com/the-xlang/xxc/ast/models"
 	"github.com/the-xlang/xxc/pkg/x"
 	"github.com/the-xlang/xxc/pkg/xapi"
 )
@@ -29,9 +29,9 @@ func (f function) String() string {
 	block := f.Ast.Block
 	vars := f.Ast.RetType.Vars()
 	if vars != nil {
-		statements := make([]ast.Statement, len(vars))
+		statements := make([]models.Statement, len(vars))
 		for i, v := range vars {
-			statements[i] = ast.Statement{
+			statements[i] = models.Statement{
 				Tok: v.IdTok,
 				Val: *v,
 			}

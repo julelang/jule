@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/the-xlang/xxc/ast"
+	"github.com/the-xlang/xxc/ast/models"
 	"github.com/the-xlang/xxc/pkg/xapi"
 )
 
@@ -25,14 +25,14 @@ func (s *xstruct) declString() string {
 	cxx.WriteString("struct ")
 	cxx.WriteString(xapi.OutId(s.Ast.Id, s.Ast.Tok.File))
 	cxx.WriteString(" {\n")
-	ast.AddIndent()
+	models.AddIndent()
 	for _, g := range s.Defs.Globals {
-		cxx.WriteString(ast.IndentString())
+		cxx.WriteString(models.IndentString())
 		cxx.WriteString(g.FieldString())
 		cxx.WriteByte('\n')
 	}
-	ast.DoneIndent()
-	cxx.WriteString(ast.IndentString())
+	models.DoneIndent()
+	cxx.WriteString(models.IndentString())
 	cxx.WriteString("};")
 	return cxx.String()
 }
@@ -58,13 +58,13 @@ func (s *xstruct) ostreams() string {
 	cxx.WriteString(xapi.OutId(s.Ast.Id, s.Ast.Tok.File))
 	cxx.WriteString(generics)
 	cxx.WriteString(" &_Src) {\n")
-	ast.AddIndent()
-	cxx.WriteString(ast.IndentString())
+	models.AddIndent()
+	cxx.WriteString(models.IndentString())
 	cxx.WriteString(`_Stream << "`)
 	cxx.WriteString(s.Ast.Id)
 	cxx.WriteString("{\";\n")
 	for i, field := range s.Ast.Fields {
-		cxx.WriteString(ast.IndentString())
+		cxx.WriteString(models.IndentString())
 		cxx.WriteString(`_Stream << "`)
 		cxx.WriteString(field.Id)
 		cxx.WriteString(`:" << _Src.`)
@@ -74,12 +74,12 @@ func (s *xstruct) ostreams() string {
 		}
 		cxx.WriteString(";\n")
 	}
-	cxx.WriteString(ast.IndentString())
+	cxx.WriteString(models.IndentString())
 	cxx.WriteString("_Stream << \"}\";\n")
-	cxx.WriteString(ast.IndentString())
+	cxx.WriteString(models.IndentString())
 	cxx.WriteString("return _Stream;\n")
-	ast.DoneIndent()
-	cxx.WriteString(ast.IndentString())
+	models.DoneIndent()
+	cxx.WriteString(models.IndentString())
 	cxx.WriteString("}")
 	return cxx.String()
 }
@@ -88,7 +88,7 @@ func (s xstruct) String() string {
 	var cxx strings.Builder
 	cxx.WriteString(s.declString())
 	cxx.WriteString("\n\n")
-	cxx.WriteString(ast.IndentString())
+	cxx.WriteString(models.IndentString())
 	cxx.WriteString(s.ostreams())
 	return cxx.String()
 }

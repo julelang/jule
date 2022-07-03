@@ -3,7 +3,7 @@ package documenter
 import (
 	"encoding/json"
 
-	"github.com/the-xlang/xxc/ast"
+	"github.com/the-xlang/xxc/ast/models"
 	"github.com/the-xlang/xxc/parser"
 	"github.com/the-xlang/xxc/pkg/x"
 )
@@ -99,7 +99,7 @@ func enums(dm *Defmap) []enum {
 	for i, e := range dm.Enums {
 		var conv enum
 		conv.Id = e.Id
-		conv.Desc = descriptize(e.Desc)
+		conv.Desc = Descriptize(e.Desc)
 		conv.Items = make([]string, len(e.Items))
 		for i, item := range e.Items {
 			conv.Items[i] = item.Id
@@ -114,7 +114,7 @@ func structs(dm *Defmap) []xstruct {
 	for i, s := range dm.Structs {
 		var xs xstruct
 		xs.Id = s.Ast.Id
-		xs.Desc = descriptize(s.Desc)
+		xs.Desc = Descriptize(s.Desc)
 		xs.Fields = globals(s.Defs)
 		structs[i] = xs
 	}
@@ -127,7 +127,7 @@ func types(dm *Defmap) []xtype {
 		types[i] = xtype{
 			Id:    t.Id,
 			Alias: t.Type.Val,
-			Desc:  descriptize(t.Desc),
+			Desc:  Descriptize(t.Desc),
 		}
 	}
 	return types
@@ -141,13 +141,13 @@ func globals(dm *Defmap) []global {
 			Type:     v.Type.Val,
 			Constant: v.Const,
 			Volatile: v.Volatile,
-			Desc:     descriptize(v.Desc),
+			Desc:     Descriptize(v.Desc),
 		}
 	}
 	return globals
 }
 
-func params(parameters []ast.Param) []parameter {
+func params(parameters []models.Param) []parameter {
 	params := make([]parameter, len(parameters))
 	for i, p := range parameters {
 		params[i] = parameter{
@@ -160,7 +160,7 @@ func params(parameters []ast.Param) []parameter {
 	return params
 }
 
-func attributes(attributes []ast.Attribute) []string {
+func attributes(attributes []models.Attribute) []string {
 	attrs := make([]string, len(attributes))
 	for i, attr := range attributes {
 		attrs[i] = attr.String()
@@ -168,7 +168,7 @@ func attributes(attributes []ast.Attribute) []string {
 	return attrs
 }
 
-func generics(genericTypes []*ast.GenericType) []generic {
+func generics(genericTypes []*models.GenericType) []generic {
 	generics := make([]generic, len(genericTypes))
 	for i, gt := range genericTypes {
 		var g generic
@@ -186,7 +186,7 @@ func funcs(dm *Defmap) []function {
 			Ret:        f.Ast.RetType.Type.Val,
 			Generics:   generics(f.Ast.Generics),
 			Params:     params(f.Ast.Params),
-			Desc:       descriptize(f.Desc),
+			Desc:       Descriptize(f.Desc),
 			Attributes: attributes(f.Ast.Attributes),
 		}
 		funcs[i] = fun
@@ -215,8 +215,8 @@ func namespaces(dm *Defmap) []namespace {
 	return namespaces
 }
 
-// Documentize Parser defines with JSON format.
-func Documentize(p *parser.Parser) (string, error) {
+// Doc returns documentation of code into JSON format.
+func Doc(p *parser.Parser) (string, error) {
 	doc := document{
 		uses(p),
 		enums(p.Defs),
