@@ -47,7 +47,7 @@ main() {
 + Language integrated concurrency
 + Language integrated documentation
 + Type constants
-+ Argument targetting
++ Argument targeting
 
 and more...
 
