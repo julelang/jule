@@ -2,7 +2,7 @@
 <p>
     <img width="100" src="https://raw.githubusercontent.com/the-xlang/resources/main/x.svg?sanitize=true">
 </p>
-<h1>The X Programming Language</h1>
+<h2>The X Programming Language</h2>
 <strong>Simple, efficent and compiled system programming language.
 
 [Website](https://the-xlang.github.io/website/) |
