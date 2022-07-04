@@ -6,4 +6,6 @@ type Attribute struct {
 	Tag Tok
 }
 
-func (a Attribute) String() string { return a.Tag.Kind }
+func (a Attribute) String() string {
+	return a.Tag.Kind
+}

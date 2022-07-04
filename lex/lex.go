@@ -42,21 +42,21 @@ func NewLex(f *File) *Lex {
 
 func (l *Lex) pusherr(key string, args ...any) {
 	l.Logs = append(l.Logs, xlog.CompilerLog{
-		Type:   xlog.Err,
-		Row:    l.Row,
-		Column: l.Column,
-		Path:   l.File.Path(),
-		Msg:    x.GetErr(key, args...),
+		Type:    xlog.Error,
+		Row:     l.Row,
+		Column:  l.Column,
+		Path:    l.File.Path(),
+		Message: x.GetError(key, args...),
 	})
 }
 
 func (l *Lex) pusherrtok(tok Tok, err string) {
 	l.Logs = append(l.Logs, xlog.CompilerLog{
-		Type:   xlog.Err,
-		Row:    tok.Row,
-		Column: tok.Column,
-		Path:   l.File.Path(),
-		Msg:    x.GetErr(err),
+		Type:    xlog.Error,
+		Row:     tok.Row,
+		Column:  tok.Column,
+		Path:    l.File.Path(),
+		Message: x.GetError(err),
 	})
 }
 

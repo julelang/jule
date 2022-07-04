@@ -12,7 +12,7 @@ import (
 func Openfx(path string) (*File, error) {
 	path, _ = filepath.Abs(path)
 	if filepath.Ext(path) != x.SrcExt {
-		return nil, errors.New(x.GetErr("file_not_x", path))
+		return nil, errors.New(x.GetError("file_not_x", path))
 	}
 	bytes, err := os.ReadFile(path)
 	if err != nil {

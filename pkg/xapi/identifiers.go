@@ -11,11 +11,17 @@ import (
 // Ignore operator.
 const Ignore = "_"
 
+const typeExtension = "_xt"
+
 // IsIgnoreId reports identifier is ignore or not.
-func IsIgnoreId(id string) bool { return id == Ignore }
+func IsIgnoreId(id string) bool {
+	return id == Ignore
+}
 
 // Returns specified identifer as X identifer.
-func AsId(id string) string { return "XID(" + id + ")" }
+func AsId(id string) string {
+	return "XID(" + id + ")"
+}
 
 func getPtrAsId(ptr unsafe.Pointer) string {
 	address := fmt.Sprintf("%p", ptr)
@@ -43,4 +49,6 @@ func OutId(id string, f *xio.File) string {
 }
 
 // AsTypeId returns given identifier as output type identifier.
-func AsTypeId(id string) string { return id + "_xt" }
+func AsTypeId(id string) string {
+	return id + typeExtension
+}

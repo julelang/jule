@@ -56,8 +56,7 @@ func NextStatementPos(toks Toks, start int) (int, bool) {
 		}
 		if braceCount != 0 {
 			continue
-		}
-		if i > start {
+		} else if i > start {
 			isStatement, withTerminator = IsStatement(tok, toks[i-1])
 		} else {
 			isStatement, withTerminator = IsStatement(tok, tok)

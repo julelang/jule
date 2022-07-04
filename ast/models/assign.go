@@ -51,7 +51,7 @@ func (a *Assign) cxxSingleAssign() string {
 	return cxx.String()
 }
 
-func (a *Assign) hasSelector() bool {
+func (a *Assign) hasLeft() bool {
 	for _, s := range a.Left {
 		if !s.Ignore {
 			return true
@@ -62,9 +62,9 @@ func (a *Assign) hasSelector() bool {
 
 func (a *Assign) cxxMultipleAssign() string {
 	var cxx strings.Builder
-	if !a.hasSelector() {
-		for _, expr := range a.Right {
-			cxx.WriteString(expr.String())
+	if !a.hasLeft() {
+		for _, right := range a.Right {
+			cxx.WriteString(right.String())
 			cxx.WriteByte(';')
 		}
 		return cxx.String()[:cxx.Len()-1] // Remove last semicolon
@@ -73,8 +73,8 @@ func (a *Assign) cxxMultipleAssign() string {
 	cxx.WriteString("std::tie(")
 	var expCxx strings.Builder
 	expCxx.WriteString("std::make_tuple(")
-	for i, selector := range a.Left {
-		cxx.WriteString(selector.String())
+	for i, left := range a.Left {
+		cxx.WriteString(left.String())
 		cxx.WriteByte(',')
 		expCxx.WriteString(a.Right[i].String())
 		expCxx.WriteByte(',')
@@ -87,17 +87,17 @@ func (a *Assign) cxxMultipleAssign() string {
 	return cxx.String()
 }
 
-func (a *Assign) cxxMultipleReturn() string {
+func (a *Assign) cxxMultiRet() string {
 	var cxx strings.Builder
 	cxx.WriteString(a.cxxNewDefines())
 	cxx.WriteString("std::tie(")
-	for _, selector := range a.Left {
-		if selector.Ignore {
+	for _, left := range a.Left {
+		if left.Ignore {
 			cxx.WriteString(xapi.CxxIgnore)
 			cxx.WriteByte(',')
 			continue
 		}
-		cxx.WriteString(selector.String())
+		cxx.WriteString(left.String())
 		cxx.WriteByte(',')
 	}
 	str := cxx.String()[:cxx.Len()-1]
@@ -111,16 +111,16 @@ func (a *Assign) cxxMultipleReturn() string {
 
 func (a *Assign) cxxNewDefines() string {
 	var cxx strings.Builder
-	for _, selector := range a.Left {
-		if selector.Ignore || !selector.Var.New {
+	for _, left := range a.Left {
+		if left.Ignore || !left.Var.New {
 			continue
 		}
-		cxx.WriteString(selector.Var.String() + " ")
+		cxx.WriteString(left.Var.String() + " ")
 	}
 	return cxx.String()
 }
 
-func (a *Assign) cxxPostfix() string {
+func (a *Assign) cxxSuffix() string {
 	var cxx strings.Builder
 	cxx.WriteString(a.Left[0].Expr.String())
 	cxx.WriteString(a.Setter.Kind)
@@ -131,9 +131,9 @@ func (a Assign) String() string {
 	var cxx strings.Builder
 	switch {
 	case len(a.Right) == 0:
-		cxx.WriteString(a.cxxPostfix())
+		cxx.WriteString(a.cxxSuffix())
 	case a.MultipleRet:
-		cxx.WriteString(a.cxxMultipleReturn())
+		cxx.WriteString(a.cxxMultiRet())
 	case len(a.Left) == 1:
 		cxx.WriteString(a.cxxSingleAssign())
 	default:

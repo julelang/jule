@@ -27,7 +27,7 @@ var Default = &XSet{
 	Mode:         "transpile",
 	Indent:       "\t",
 	IndentCount:  1,
-	PostCommands: make([]string, 0),
+	PostCommands: []string{},
 }
 
 // Load loads XSet from json string.

@@ -10,17 +10,17 @@ import (
 type solver struct {
 	p        *Parser
 	left     Toks
-	leftVal  models.Value
+	leftVal  models.Data
 	right    Toks
-	rightVal models.Value
+	rightVal models.Data
 	operator Tok
 }
 
-func (s *solver) ptr() (v models.Value) {
+func (s *solver) ptr() (v models.Data) {
 	v.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
-			s.rightVal.Type.Val, s.leftVal.Type.Val)
+			s.rightVal.Type.Kind, s.leftVal.Type.Kind)
 		return
 	}
 	if !typeIsPtr(s.leftVal.Type) {
@@ -31,14 +31,14 @@ func (s *solver) ptr() (v models.Value) {
 		v.Type = s.leftVal.Type
 	case tokens.EQUALS, tokens.NOT_EQUALS:
 		v.Type.Id = xtype.Bool
-		v.Type.Val = tokens.BOOL
+		v.Type.Kind = tokens.BOOL
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "pointer")
 	}
 	return
 }
 
-func (s *solver) enum() (v models.Value) {
+func (s *solver) enum() (v models.Data) {
 	if s.leftVal.Type.Id == xtype.Enum {
 		s.leftVal.Type = s.leftVal.Type.Tag.(*Enum).Type
 	}
@@ -48,21 +48,21 @@ func (s *solver) enum() (v models.Value) {
 	return s.solve()
 }
 
-func (s *solver) str() (v models.Value) {
+func (s *solver) str() (v models.Data) {
 	v.Tok = s.operator
 	// Not both string?
 	if s.leftVal.Type.Id != s.rightVal.Type.Id {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
-			s.leftVal.Type.Val, s.rightVal.Type.Val)
+			s.leftVal.Type.Kind, s.rightVal.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
 	case tokens.PLUS:
 		v.Type.Id = xtype.Str
-		v.Type.Val = tokens.STR
+		v.Type.Kind = tokens.STR
 	case tokens.EQUALS, tokens.NOT_EQUALS:
 		v.Type.Id = xtype.Bool
-		v.Type.Val = tokens.BOOL
+		v.Type.Kind = tokens.BOOL
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
 			s.operator.Kind, tokens.STR)
@@ -70,29 +70,29 @@ func (s *solver) str() (v models.Value) {
 	return
 }
 
-func (s *solver) any() (v models.Value) {
+func (s *solver) any() (v models.Data) {
 	v.Tok = s.operator
 	switch s.operator.Kind {
 	case tokens.EQUALS, tokens.NOT_EQUALS:
 		v.Type.Id = xtype.Bool
-		v.Type.Val = tokens.BOOL
+		v.Type.Kind = tokens.BOOL
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, tokens.ANY)
 	}
 	return
 }
 
-func (s *solver) bool() (v models.Value) {
+func (s *solver) bool() (v models.Data) {
 	v.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
-			s.rightVal.Type.Val, s.leftVal.Type.Val)
+			s.rightVal.Type.Kind, s.leftVal.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
 	case tokens.EQUALS, tokens.NOT_EQUALS:
 		v.Type.Id = xtype.Bool
-		v.Type.Val = tokens.BOOL
+		v.Type.Kind = tokens.BOOL
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
 			s.operator.Kind, tokens.BOOL)
@@ -100,19 +100,19 @@ func (s *solver) bool() (v models.Value) {
 	return
 }
 
-func (s *solver) float() (v models.Value) {
+func (s *solver) float() (v models.Data) {
 	v.Tok = s.operator
 	if !xtype.IsNumericType(s.leftVal.Type.Id) ||
 		!xtype.IsNumericType(s.rightVal.Type.Id) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
-			s.rightVal.Type.Val, s.leftVal.Type.Val)
+			s.rightVal.Type.Kind, s.leftVal.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
 	case tokens.EQUALS, tokens.NOT_EQUALS, tokens.LESS, tokens.GREAT,
 		tokens.GREAT_EQUAL, tokens.LESS_EQUAL:
 		v.Type.Id = xtype.Bool
-		v.Type.Val = tokens.BOOL
+		v.Type.Kind = tokens.BOOL
 	case tokens.PLUS, tokens.MINUS, tokens.STAR, tokens.SLASH:
 		v.Type.Id = xtype.F32
 		if s.leftVal.Type.Id == xtype.F64 || s.rightVal.Type.Id == xtype.F64 {
@@ -124,19 +124,19 @@ func (s *solver) float() (v models.Value) {
 	return
 }
 
-func (s *solver) signed() (v models.Value) {
+func (s *solver) signed() (v models.Data) {
 	v.Tok = s.operator
 	if !xtype.IsNumericType(s.leftVal.Type.Id) ||
 		!xtype.IsNumericType(s.rightVal.Type.Id) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
-			s.rightVal.Type.Val, s.leftVal.Type.Val)
+			s.rightVal.Type.Kind, s.leftVal.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
 	case tokens.EQUALS, tokens.NOT_EQUALS, tokens.LESS,
 		tokens.GREAT, tokens.GREAT_EQUAL, tokens.LESS_EQUAL:
 		v.Type.Id = xtype.Bool
-		v.Type.Val = tokens.BOOL
+		v.Type.Kind = tokens.BOOL
 	case tokens.PLUS, tokens.MINUS, tokens.STAR, tokens.SLASH,
 		tokens.PERCENT, tokens.AMPER, tokens.VLINE, tokens.CARET:
 		v.Type = s.leftVal.Type
@@ -155,19 +155,19 @@ func (s *solver) signed() (v models.Value) {
 	return
 }
 
-func (s *solver) unsigned() (v models.Value) {
+func (s *solver) unsigned() (v models.Data) {
 	v.Tok = s.operator
 	if !xtype.IsNumericType(s.leftVal.Type.Id) ||
 		!xtype.IsNumericType(s.rightVal.Type.Id) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
-			s.rightVal.Type.Val, s.leftVal.Type.Val)
+			s.rightVal.Type.Kind, s.leftVal.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
 	case tokens.EQUALS, tokens.NOT_EQUALS, tokens.LESS,
 		tokens.GREAT, tokens.GREAT_EQUAL, tokens.LESS_EQUAL:
 		v.Type.Id = xtype.Bool
-		v.Type.Val = tokens.BOOL
+		v.Type.Kind = tokens.BOOL
 	case tokens.PLUS, tokens.MINUS, tokens.STAR, tokens.SLASH,
 		tokens.PERCENT, tokens.AMPER, tokens.VLINE, tokens.CARET:
 		v.Type = s.leftVal.Type
@@ -182,27 +182,27 @@ func (s *solver) unsigned() (v models.Value) {
 	return
 }
 
-func (s *solver) logical() (v models.Value) {
+func (s *solver) logical() (v models.Data) {
 	v.Tok = s.operator
 	v.Type.Id = xtype.Bool
-	v.Type.Val = tokens.BOOL
+	v.Type.Kind = tokens.BOOL
 	if s.leftVal.Type.Id != xtype.Bool || s.rightVal.Type.Id != xtype.Bool {
 		s.p.pusherrtok(s.operator, "logical_not_bool")
 	}
 	return
 }
 
-func (s *solver) char() (v models.Value) {
+func (s *solver) char() (v models.Data) {
 	v.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
-			s.rightVal.Type.Val, s.leftVal.Type.Val)
+			s.rightVal.Type.Kind, s.leftVal.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
 	case tokens.EQUALS, tokens.NOT_EQUALS:
 		v.Type.Id = xtype.Bool
-		v.Type.Val = tokens.BOOL
+		v.Type.Kind = tokens.BOOL
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
 			s.operator.Kind, tokens.CHAR)
@@ -210,34 +210,34 @@ func (s *solver) char() (v models.Value) {
 	return
 }
 
-func (s *solver) array() (v models.Value) {
+func (s *solver) array() (v models.Data) {
 	v.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
-			s.rightVal.Type.Val, s.leftVal.Type.Val)
+			s.rightVal.Type.Kind, s.leftVal.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
 	case tokens.EQUALS, tokens.NOT_EQUALS:
 		v.Type.Id = xtype.Bool
-		v.Type.Val = tokens.BOOL
+		v.Type.Kind = tokens.BOOL
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "array")
 	}
 	return
 }
 
-func (s *solver) nil() (v models.Value) {
+func (s *solver) nil() (v models.Data) {
 	v.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, false) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
-			s.rightVal.Type.Val, s.leftVal.Type.Val)
+			s.rightVal.Type.Kind, s.leftVal.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
 	case tokens.NOT_EQUALS, tokens.EQUALS:
 		v.Type.Id = xtype.Bool
-		v.Type.Val = tokens.BOOL
+		v.Type.Kind = tokens.BOOL
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
 			s.operator.Kind, tokens.NIL)
@@ -258,10 +258,10 @@ func (s *solver) check() bool {
 	return true
 }
 
-func (s *solver) solve() (v models.Value) {
+func (s *solver) solve() (v models.Data) {
 	defer func() {
 		if v.Type.Id == xtype.Void {
-			v.Type.Val = xtype.VoidTypeStr
+			v.Type.Kind = xtype.VoidTypeStr
 		}
 	}()
 	if !s.check() {

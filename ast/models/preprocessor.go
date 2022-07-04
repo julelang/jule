@@ -8,12 +8,18 @@ type Preprocessor struct {
 	Command any
 }
 
-func (pp Preprocessor) String() string { return fmt.Sprint(pp.Command) }
+func (pp Preprocessor) String() string {
+	return fmt.Sprint(pp.Command)
+}
 
 // Directive is the AST model of directives.
-type Directive struct{ Command any }
+type Directive struct {
+	Command any
+}
 
-func (d Directive) String() string { return fmt.Sprint(d.Command) }
+func (d Directive) String() string {
+	return fmt.Sprint(d.Command)
+}
 
 // DirectiveEnofi is the AST model of enofi directive.
 type DirectiveEnofi struct{}

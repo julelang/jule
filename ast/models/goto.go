@@ -17,7 +17,9 @@ type Label struct {
 	Block *Block
 }
 
-func (l Label) String() string { return l.Label + ":;" }
+func (l Label) String() string {
+	return l.Label + ":;"
+}
 
 // Goto is the AST model of goto statements.
 type Goto struct {

@@ -1,8 +1,6 @@
 package parser
 
 import (
-	"strings"
-
 	"github.com/the-xlang/xxc/lex/tokens"
 	"github.com/the-xlang/xxc/pkg/xapi"
 	"github.com/the-xlang/xxc/pkg/xbits"
@@ -39,9 +37,9 @@ type valueEvaluator struct {
 
 func (p *valueEvaluator) str() value {
 	var v value
-	v.ast.Data = p.tok.Kind
-	v.ast.Type.Id = xtype.Str
-	v.ast.Type.Val = tokens.STR
+	v.data.Value = p.tok.Kind
+	v.data.Type.Id = xtype.Str
+	v.data.Type.Kind = tokens.STR
 	if israwstr(p.tok.Kind) {
 		p.model.appendSubNode(exprNode{toRawStrLiteral(p.tok.Kind)})
 	} else {
@@ -52,65 +50,78 @@ func (p *valueEvaluator) str() value {
 
 func (ve *valueEvaluator) char() value {
 	var v value
-	v.ast.Data = ve.tok.Kind
+	v.data.Value = ve.tok.Kind
 	literal, _ := toCharLiteral(ve.tok.Kind)
-	v.ast.Type.Id = xtype.Char
-	v.ast.Type.Val = tokens.CHAR
+	v.data.Type.Id = xtype.Char
+	v.data.Type.Kind = tokens.CHAR
 	ve.model.appendSubNode(exprNode{literal})
 	return v
 }
 
 func (ve *valueEvaluator) bool() value {
 	var v value
-	v.ast.Data = ve.tok.Kind
-	v.ast.Type.Id = xtype.Bool
-	v.ast.Type.Val = tokens.BOOL
+	v.data.Value = ve.tok.Kind
+	v.data.Type.Id = xtype.Bool
+	v.data.Type.Kind = tokens.BOOL
 	ve.model.appendSubNode(exprNode{ve.tok.Kind})
 	return v
 }
 
 func (ve *valueEvaluator) nil() value {
 	var v value
-	v.ast.Data = ve.tok.Kind
-	v.ast.Type.Id = xtype.Nil
-	v.ast.Type.Val = xtype.NilTypeStr
+	v.data.Value = ve.tok.Kind
+	v.data.Type.Id = xtype.Nil
+	v.data.Type.Kind = xtype.NilTypeStr
 	ve.model.appendSubNode(exprNode{ve.tok.Kind})
 	return v
 }
 
-func (ve *valueEvaluator) num() value {
+func (ve *valueEvaluator) float() value {
 	var v value
-	v.ast.Data = ve.tok.Kind
-	if strings.Contains(ve.tok.Kind, tokens.DOT) ||
-		strings.ContainsAny(ve.tok.Kind, "eE") {
-		v.ast.Type.Id = xtype.F64
-		v.ast.Type.Val = tokens.F64
-	} else {
-		intbit := xbits.BitsizeType(xtype.Int)
-		switch {
-		case xbits.CheckBitInt(ve.tok.Kind, intbit):
-			v.ast.Type.Id = xtype.Int
-			v.ast.Type.Val = tokens.INT
-		case intbit < xbits.MaxInt && xbits.CheckBitInt(ve.tok.Kind, xbits.MaxInt):
-			v.ast.Type.Id = xtype.I64
-			v.ast.Type.Val = tokens.I64
-		default:
-			v.ast.Type.Id = xtype.U64
-			v.ast.Type.Val = tokens.U64
-		}
+	v.data.Value = ve.tok.Kind
+	v.data.Type.Id = xtype.F64
+	v.data.Type.Kind = tokens.F64
+	return v
+}
+
+func (ve *valueEvaluator) integer() value {
+	var v value
+	v.data.Value = ve.tok.Kind
+	intbit := xbits.BitsizeType(xtype.Int)
+	switch {
+	case xbits.CheckBitInt(ve.tok.Kind, intbit):
+		v.data.Type.Id = xtype.Int
+		v.data.Type.Kind = tokens.INT
+	case intbit < xbits.MaxInt && xbits.CheckBitInt(ve.tok.Kind, xbits.MaxInt):
+		v.data.Type.Id = xtype.I64
+		v.data.Type.Kind = tokens.I64
+	default:
+		v.data.Type.Id = xtype.U64
+		v.data.Type.Kind = tokens.U64
 	}
-	node := exprNode{xtype.CxxTypeIdFromType(v.ast.Type.Id) + "{" + ve.tok.Kind + "}"}
+	return v
+}
+
+func (ve *valueEvaluator) numeric() value {
+	var v value
+	if isfloat(ve.tok.Kind) {
+		v = ve.float()
+	} else {
+		v = ve.integer()
+	}
+	cxxId := xtype.CxxTypeIdFromType(v.data.Type.Id)
+	node := exprNode{cxxId + "{" + ve.tok.Kind + "}"}
 	ve.model.appendSubNode(node)
 	return v
 }
 
 func (ve *valueEvaluator) varId(id string, variable *Var) (v value) {
 	variable.Used = true
-	v.ast.Data = id
-	v.ast.Type = variable.Type
+	v.data.Value = id
+	v.data.Type = variable.Type
 	v.constant = variable.Const
 	v.volatile = variable.Volatile
-	v.ast.Tok = variable.IdTok
+	v.data.Tok = variable.IdTok
 	v.lvalue = true
 	// If built-in.
 	if variable.IdTok.Id == tokens.NA {
@@ -123,22 +134,22 @@ func (ve *valueEvaluator) varId(id string, variable *Var) (v value) {
 
 func (ve *valueEvaluator) funcId(id string, f *function) (v value) {
 	f.used = true
-	v.ast.Data = id
-	v.ast.Type.Id = xtype.Func
-	v.ast.Type.Tag = f.Ast
-	v.ast.Type.Val = f.Ast.DataTypeString()
-	v.ast.Tok = f.Ast.Tok
+	v.data.Value = id
+	v.data.Type.Id = xtype.Func
+	v.data.Type.Tag = f.Ast
+	v.data.Type.Kind = f.Ast.DataTypeString()
+	v.data.Tok = f.Ast.Tok
 	ve.model.appendSubNode(exprNode{f.outId()})
 	return
 }
 
 func (ve *valueEvaluator) enumId(id string, e *Enum) (v value) {
 	e.Used = true
-	v.ast.Data = id
-	v.ast.Type.Id = xtype.Enum
-	v.ast.Type.Tag = e
-	v.ast.Type.Val = e.Id
-	v.ast.Tok = e.Tok
+	v.data.Value = id
+	v.data.Type.Id = xtype.Enum
+	v.data.Type.Tag = e
+	v.data.Type.Kind = e.Id
+	v.data.Tok = e.Tok
 	v.constant = true
 	v.isType = true
 	// If built-in.
@@ -152,12 +163,12 @@ func (ve *valueEvaluator) enumId(id string, e *Enum) (v value) {
 
 func (ve *valueEvaluator) structId(id string, s *xstruct) (v value) {
 	s.Used = true
-	v.ast.Data = id
-	v.ast.Type.Id = xtype.Struct
-	v.ast.Type.Tag = s
-	v.ast.Type.Val = s.Ast.Id
-	v.ast.Type.Tok = s.Ast.Tok
-	v.ast.Tok = s.Ast.Tok
+	v.data.Value = id
+	v.data.Type.Id = xtype.Struct
+	v.data.Type.Tag = s
+	v.data.Type.Kind = s.Ast.Id
+	v.data.Type.Tok = s.Ast.Tok
+	v.data.Tok = s.Ast.Tok
 	v.isType = true
 	// If built-in.
 	if s.Ast.Tok.Id == tokens.NA {

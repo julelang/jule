@@ -12,4 +12,6 @@ type IterProfile interface {
 }
 
 // IExprModel for special expression model to Cxx string.
-type IExprModel interface{ String() string }
+type IExprModel interface {
+	String() string
+}

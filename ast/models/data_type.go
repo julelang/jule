@@ -13,7 +13,9 @@ type genericableTypes struct {
 }
 
 // Generics returns generic types.
-func (gt genericableTypes) Generics() []DataType { return gt.types }
+func (gt genericableTypes) Generics() []DataType {
+	return gt.types
+}
 
 // SetGenerics sets generics.
 func (gt genericableTypes) SetGenerics([]DataType) {}
@@ -21,11 +23,11 @@ func (gt genericableTypes) SetGenerics([]DataType) {}
 // DataType is data type identifier.
 type DataType struct {
 	// Tok used for usually *File comparisons.
-	// For this reason, you don't use token as val, identifier or etc.
+	// For this reason, you don't use token as value, identifier or etc.
 	Tok        Tok
 	Id         uint8
 	Original   any
-	Val        string
+	Kind       string
 	MultiTyped bool
 	Tag        any
 }
@@ -33,7 +35,7 @@ type DataType struct {
 // ValWithOriginalId returns dt.Val with OriginalId.
 func (dt *DataType) ValWithOriginalId() string {
 	if dt.Original == nil {
-		return dt.Val
+		return dt.Kind
 	}
 	_, prefix := dt.GetValId()
 	original := dt.Original.(DataType)
@@ -55,9 +57,9 @@ func (dt *DataType) OriginalValId() string {
 
 // GetValId returns dt.Val's identifier.
 func (dt *DataType) GetValId() (id, prefix string) {
-	id = dt.Val
-	runes := []rune(dt.Val)
-	for i, r := range dt.Val {
+	id = dt.Kind
+	runes := []rune(dt.Kind)
+	for i, r := range dt.Kind {
 		if r == '_' || unicode.IsLetter(r) {
 			id = string(runes[i:])
 			prefix = string(runes[:i])
@@ -74,75 +76,89 @@ func (dt *DataType) GetValId() (id, prefix string) {
 	return
 }
 
-func (dt DataType) String() string {
-	var cxx strings.Builder
-	if dt.Original != nil {
-		val := dt.ValWithOriginalId()
-		tok := dt.Tok
-		dt = dt.Original.(DataType)
-		dt.Val = val
-		dt.Tok = tok
+func (dt *DataType) setToOriginal() {
+	if dt.Original == nil {
+		return
 	}
-	for i, run := range dt.Val {
-		if run == '*' {
-			cxx.WriteRune(run)
-			continue
+	val := dt.ValWithOriginalId()
+	tok := dt.Tok
+	*dt = dt.Original.(DataType)
+	dt.Kind = val
+	dt.Tok = tok
+}
+
+// Pointers returns pointer marks of data type.
+func (dt *DataType) Pointers() string {
+	for i, run := range dt.Kind {
+		if run != '*' {
+			return dt.Kind[:i]
 		}
-		dt.Val = dt.Val[i:]
-		break
 	}
+	return ""
+}
+
+func (dt DataType) String() string {
+	dt.setToOriginal()
 	if dt.MultiTyped {
-		return dt.MultiTypeString() + cxx.String()
+		return dt.MultiTypeString()
 	}
-	if dt.Val != "" {
+	pointers := dt.Pointers()
+	dt.Kind = dt.Kind[len(pointers):]
+	if dt.Kind != "" {
 		switch {
-		case strings.HasPrefix(dt.Val, "[]"):
-			pointers := cxx.String()
-			cxx.Reset()
-			cxx.WriteString("array<")
-			dt.Val = dt.Val[2:]
-			cxx.WriteString(dt.String())
-			cxx.WriteByte('>')
-			cxx.WriteString(pointers)
-			return cxx.String()
-		case dt.Id == xtype.Map && dt.Val[0] == '[':
-			pointers := cxx.String()
-			types := dt.Tag.([]DataType)
-			cxx.Reset()
-			cxx.WriteString("map<")
-			cxx.WriteString(types[0].String())
-			cxx.WriteByte(',')
-			cxx.WriteString(types[1].String())
-			cxx.WriteByte('>')
-			cxx.WriteString(pointers)
-			return cxx.String()
+		case strings.HasPrefix(dt.Kind, "[]"):
+			return dt.ArrayString() + pointers
+		case dt.Id == xtype.Map && dt.Kind[0] == '[':
+			return dt.MapString() + pointers
 		}
 	}
 	if dt.Tag != nil {
 		switch t := dt.Tag.(type) {
-		case Genericable:
-			return dt.StructString() + cxx.String()
 		case []DataType:
 			dt.Tag = genericableTypes{t}
-			return dt.StructString() + cxx.String()
+			return dt.StructString()
+		case Genericable:
+			return dt.StructString()
 		}
 	}
 	switch dt.Id {
 	case xtype.Id, xtype.Enum:
-		return xapi.OutId(dt.Val, dt.Tok.File) + cxx.String()
+		return xapi.OutId(dt.Kind, dt.Tok.File) + pointers
 	case xtype.Struct:
-		return dt.StructString() + cxx.String()
+		return dt.StructString() + pointers
 	case xtype.Func:
-		return dt.FuncString() + cxx.String()
+		return dt.FuncString() + pointers
 	default:
-		return xtype.CxxTypeIdFromType(dt.Id) + cxx.String()
+		return xtype.CxxTypeIdFromType(dt.Id) + pointers
 	}
 }
 
-// StructString returns cxx value of struct DataType.
+// ArrayString returns cxx value of array data type.
+func (dt DataType) ArrayString() string {
+	var cxx strings.Builder
+	cxx.WriteString("array<")
+	dt.Kind = dt.Kind[2:]
+	cxx.WriteString(dt.String())
+	cxx.WriteByte('>')
+	return cxx.String()
+}
+
+// MapString returns cxx value of map data type.
+func (dt *DataType) MapString() string {
+	var cxx strings.Builder
+	types := dt.Tag.([]DataType)
+	cxx.WriteString("map<")
+	cxx.WriteString(types[0].String())
+	cxx.WriteByte(',')
+	cxx.WriteString(types[1].String())
+	cxx.WriteByte('>')
+	return cxx.String()
+}
+
+// StructString returns cxx value of struct data type.
 func (dt *DataType) StructString() string {
 	var cxx strings.Builder
-	cxx.WriteString(xapi.OutId(dt.Val, dt.Tok.File))
+	cxx.WriteString(xapi.OutId(dt.Kind, dt.Tok.File))
 	s := dt.Tag.(Genericable)
 	types := s.Generics()
 	if len(types) == 0 {
@@ -187,5 +203,5 @@ func (dt *DataType) MultiTypeString() string {
 		cxx.WriteString(t.String())
 		cxx.WriteByte(',')
 	}
-	return cxx.String()[:cxx.Len()-1] + ">"
+	return cxx.String()[:cxx.Len()-1] + ">" + dt.Pointers()
 }

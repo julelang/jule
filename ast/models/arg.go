@@ -7,4 +7,6 @@ type Arg struct {
 	Expr     Expr
 }
 
-func (a Arg) String() string { return a.Expr.String() }
+func (a Arg) String() string {
+	return a.Expr.String()
+}

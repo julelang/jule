@@ -3,7 +3,7 @@ package parser
 import "github.com/the-xlang/xxc/ast/models"
 
 type value struct {
-	ast      models.Value
+	data     models.Data
 	constant bool
 	volatile bool
 	lvalue   bool

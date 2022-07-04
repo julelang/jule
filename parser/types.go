@@ -7,11 +7,25 @@ import (
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
-func typeIsVoid(t DataType) bool          { return t.Id == xtype.Void && !t.MultiTyped }
-func typeIsVariadicable(t DataType) bool  { return typeIsArray(t) }
-func typeIsMut(t DataType) bool           { return typeIsPtr(t) }
-func typeIsAllowForConst(t DataType) bool { return typeIsSingle(t) }
-func typeIsSinglePtr(t DataType) bool     { return t.Id == xtype.Voidptr }
+func typeIsVoid(t DataType) bool {
+	return t.Id == xtype.Void && !t.MultiTyped
+}
+
+func typeIsVariadicable(t DataType) bool {
+	return typeIsArray(t)
+}
+
+func typeIsMut(t DataType) bool {
+	return typeIsPtr(t)
+}
+
+func typeIsAllowForConst(t DataType) bool {
+	return typeIsPure(t)
+}
+
+func typeIsSinglePtr(t DataType) bool {
+	return t.Id == xtype.Voidptr
+}
 
 func typeIsGeneric(generics []*GenericType, t DataType) bool {
 	if t.Id != xtype.Id {
@@ -28,15 +42,15 @@ func typeIsGeneric(generics []*GenericType, t DataType) bool {
 
 func typeOfArrayComponents(t DataType) DataType {
 	// Remove array syntax "[]"
-	t.Val = t.Val[2:]
+	t.Kind = t.Kind[2:]
 	return t
 }
 
 func typeIsExplicitPtr(t DataType) bool {
-	if t.Val == "" {
+	if t.Kind == "" {
 		return false
 	}
-	return t.Val[0] == '*'
+	return t.Kind[0] == '*'
 }
 
 func typeIsPtr(t DataType) bool {
@@ -44,28 +58,28 @@ func typeIsPtr(t DataType) bool {
 }
 
 func typeIsArray(t DataType) bool {
-	if t.Val == "" {
+	if t.Kind == "" {
 		return false
 	}
-	return strings.HasPrefix(t.Val, "[]")
+	return strings.HasPrefix(t.Kind, "[]")
 }
 
 func typeIsMap(t DataType) bool {
-	if t.Val == "" {
+	if t.Kind == "" || t.Id != xtype.Map {
 		return false
 	}
-	return t.Id == xtype.Map && t.Val[0] == '[' && !strings.HasPrefix(t.Val, "[]")
+	return t.Kind[0] == '[' && !strings.HasPrefix(t.Kind, "[]")
 }
 
 func typeIsFunc(t DataType) bool {
-	if t.Id != xtype.Func || t.Val == "" {
+	if t.Id != xtype.Func || t.Kind == "" {
 		return false
 	}
-	return t.Val[0] == '('
+	return t.Kind[0] == '('
 }
 
 // Includes single ptr types.
-func typeIsSingle(t DataType) bool {
+func typeIsPure(t DataType) bool {
 	return !typeIsPtr(t) &&
 		!typeIsArray(t) &&
 		!typeIsMap(t) &&
@@ -87,14 +101,14 @@ func checkArrayCompatiblity(arrT, t DataType) bool {
 	if t.Id == xtype.Nil {
 		return true
 	}
-	return arrT.Val == t.Val
+	return arrT.Kind == t.Kind
 }
 
 func checkMapCompability(mapT, t DataType) bool {
 	if t.Id == xtype.Nil {
 		return true
 	}
-	return mapT.Val == t.Val
+	return mapT.Kind == t.Kind
 }
 
 func typeIsLvalue(t DataType) bool {
@@ -105,14 +119,14 @@ func checkPtrCompability(t1, t2 DataType) bool {
 	if typeIsPtr(t2) {
 		return true
 	}
-	if typeIsSingle(t2) && xtype.IsIntegerType(t2.Id) {
+	if typeIsPure(t2) && xtype.IsIntegerType(t2.Id) {
 		return true
 	}
 	return false
 }
 
 func typesEquals(t1, t2 DataType) bool {
-	return t1.Id == t2.Id && t1.Val == t2.Val
+	return t1.Id == t2.Id && t1.Kind == t2.Kind
 }
 
 func checkStructCompability(t1, t2 DataType) bool {
@@ -160,7 +174,7 @@ func typesAreCompatible(t1, t2 DataType, ignoreany bool) bool {
 	case typeIsNilCompatible(t1), typeIsNilCompatible(t2):
 		return t1.Id == xtype.Nil || t2.Id == xtype.Nil
 	case t1.Id == xtype.Enum, t2.Id == xtype.Enum:
-		return t1.Id == t2.Id && t1.Val == t2.Val
+		return t1.Id == t2.Id && t1.Kind == t2.Kind
 	case t1.Id == xtype.Struct, t2.Id == xtype.Struct:
 		if t2.Id == xtype.Struct {
 			t1, t2 = t2, t1

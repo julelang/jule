@@ -21,22 +21,32 @@ import (
 	"github.com/the-xlang/xxc/pkg/x"
 	"github.com/the-xlang/xxc/pkg/xapi"
 	"github.com/the-xlang/xxc/pkg/xio"
-	"github.com/the-xlang/xxc/pkg/xlog"
 	"github.com/the-xlang/xxc/pkg/xset"
 )
 
 type Parser = parser.Parser
 
+const commandHelp = "help"
+const commandVersion = "version"
+const commandInit = "init"
+const commandDoc = "doc"
+
+const localizationErrors = "error.json"
+const localizationWarnings = "warning.json"
+
+const builtinBaseFile = "lib.xx"
+
+var helpmap = [...][2]string{
+	0: {commandHelp, "Show help."},
+	1: {commandVersion, "Show version."},
+	2: {commandInit, "Initialize new project here."},
+	3: {commandDoc, "Documentize X source code."},
+}
+
 func help(cmd string) {
 	if cmd != "" {
 		println("This module can only be used as single!")
 		return
-	}
-	helpmap := [][]string{
-		{"help", "Show help."},
-		{"version", "Show version."},
-		{"init", "Initialize new project here."},
-		{"doc", "Documentize X source code."},
 	}
 	max := len(helpmap[0][0])
 	for _, key := range helpmap {
@@ -92,12 +102,12 @@ func doc(cmd string) {
 			continue
 		}
 		if printlogs(p) {
-			fmt.Println(x.GetErr("doc_couldnt_generated", path))
+			fmt.Println(x.GetError("doc_couldnt_generated", path))
 			continue
 		}
 		docjson, err := documenter.Doc(p)
 		if err != nil {
-			fmt.Println(x.GetErr("error", err.Error()))
+			fmt.Println(x.GetError("error", err.Error()))
 			continue
 		}
 		path = path[len(filepath.Dir(path)):]
@@ -108,13 +118,13 @@ func doc(cmd string) {
 
 func processCommand(namespace, cmd string) bool {
 	switch namespace {
-	case "help":
+	case commandHelp:
 		help(cmd)
-	case "version":
+	case commandVersion:
 		version(cmd)
-	case "init":
+	case commandInit:
 		initProject(cmd)
-	case "doc":
+	case commandDoc:
 		doc(cmd)
 	default:
 		return false
@@ -156,7 +166,7 @@ func init() {
 func loadLangWarns(path string, infos []fs.FileInfo) {
 	i := -1
 	for j, f := range infos {
-		if f.IsDir() || f.Name() != "warns.json" {
+		if f.IsDir() || f.Name() != localizationWarnings {
 			continue
 		}
 		i = j
@@ -172,7 +182,7 @@ func loadLangWarns(path string, infos []fs.FileInfo) {
 		println(err.Error())
 		return
 	}
-	err = json.Unmarshal(bytes, &x.Warns)
+	err = json.Unmarshal(bytes, &x.Warnings)
 	if err != nil {
 		println("Language's warnings couldn't loaded (uses default);")
 		println(err.Error())
@@ -183,7 +193,7 @@ func loadLangWarns(path string, infos []fs.FileInfo) {
 func loadLangErrs(path string, infos []fs.FileInfo) {
 	i := -1
 	for j, f := range infos {
-		if f.IsDir() || f.Name() != "errs.json" {
+		if f.IsDir() || f.Name() != localizationErrors {
 			continue
 		}
 		i = j
@@ -199,7 +209,7 @@ func loadLangErrs(path string, infos []fs.FileInfo) {
 		println(err.Error())
 		return
 	}
-	err = json.Unmarshal(bytes, &x.Errs)
+	err = json.Unmarshal(bytes, &x.Errors)
 	if err != nil {
 		println("Language's errors couldn't loaded (uses default);")
 		println(err.Error())
@@ -231,7 +241,7 @@ func checkMode() {
 		tag := string(key.Tag)
 		// 6 for skip "json:
 		tag = tag[6 : len(tag)-1]
-		println(x.GetErr("invalid_value_for_key", x.Set.Mode, tag))
+		println(x.GetError("invalid_value_for_key", x.Set.Mode, tag))
 		os.Exit(0)
 	}
 	x.Set.Mode = lower
@@ -263,41 +273,16 @@ func loadXSet() {
 // if logs has error, false if not.
 func printlogs(p *Parser) bool {
 	var str strings.Builder
-	for _, log := range p.Warns {
-		switch log.Type {
-		case xlog.FlatWarn:
-			str.WriteString("WARNING: ")
-			str.WriteString(log.Msg)
-		case xlog.Warn:
-			str.WriteString("WARNING: ")
-			str.WriteString(log.Path)
-			str.WriteByte(':')
-			str.WriteString(fmt.Sprint(log.Row))
-			str.WriteByte(':')
-			str.WriteString(fmt.Sprint(log.Column))
-			str.WriteByte(' ')
-			str.WriteString(log.Msg)
-		}
+	for _, log := range p.Warnings {
+		str.WriteString(log.String())
 		str.WriteByte('\n')
 	}
-	for _, log := range p.Errs {
-		switch log.Type {
-		case xlog.FlatErr:
-			str.WriteString("ERROR: ")
-			str.WriteString(log.Msg)
-		case xlog.Err:
-			str.WriteString(log.Path)
-			str.WriteByte(':')
-			str.WriteString(fmt.Sprint(log.Row))
-			str.WriteByte(':')
-			str.WriteString(fmt.Sprint(log.Column))
-			str.WriteByte(' ')
-			str.WriteString(log.Msg)
-		}
+	for _, log := range p.Errors {
+		str.WriteString(log.String())
 		str.WriteByte('\n')
 	}
 	print(str.String())
-	return len(p.Errs) > 0
+	return len(p.Errors) > 0
 }
 
 func appendStandard(code *string) {
@@ -322,13 +307,13 @@ func appendStandard(code *string) {
 }
 
 func writeOutput(path, content string) {
-	err := os.MkdirAll(x.Set.CxxOutDir, 0777)
+	err := os.MkdirAll(x.Set.CxxOutDir, 0o777)
 	if err != nil {
 		println(err.Error())
 		os.Exit(0)
 	}
 	bytes := []byte(content)
-	err = ioutil.WriteFile(path, bytes, 0666)
+	err = ioutil.WriteFile(path, bytes, 0o666)
 	if err != nil {
 		println(err.Error())
 		os.Exit(0)
@@ -336,7 +321,7 @@ func writeOutput(path, content string) {
 }
 
 func loadBuiltin() bool {
-	f, err := xio.Openfx(filepath.Join(x.StdlibPath, "lib.xx"))
+	f, err := xio.Openfx(filepath.Join(x.StdlibPath, builtinBaseFile))
 	if err != nil {
 		println(err.Error())
 		return false

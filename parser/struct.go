@@ -97,13 +97,17 @@ func (s xstruct) String() string {
 //
 // This function is should be have this function
 // for Genericable interface of ast package.
-func (s *xstruct) Generics() []DataType { return s.generics }
+func (s *xstruct) Generics() []DataType {
+	return s.generics
+}
 
 // SetGenerics set generics of type.
 //
 // This function is should be have this function
 // for Genericable interface of ast package.
-func (s *xstruct) SetGenerics(generics []DataType) { s.generics = generics }
+func (s *xstruct) SetGenerics(generics []DataType) {
+	s.generics = generics
+}
 
 func (s *xstruct) dataTypeString() string {
 	var dts strings.Builder

@@ -17,8 +17,9 @@ func (p *precedencer) set(level uint, expr any) {
 	for i, pair := range p.pairs {
 		pairLevel := pair[0].(uint)
 		if level < pairLevel {
-			p.pairs = append(p.pairs[:i],
-				append([][]any{{level, expr}}, p.pairs[i:]...)...)
+			first := p.pairs[:i]
+			appended := append([][]any{{level, expr}}, p.pairs[i:]...)
+			p.pairs = append(first, appended...)
 			return
 		}
 	}

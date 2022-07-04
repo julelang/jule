@@ -12,10 +12,14 @@ type Statement struct {
 	WithTerminator bool
 }
 
-func (s Statement) String() string { return fmt.Sprint(s.Val) }
+func (s Statement) String() string {
+	return fmt.Sprint(s.Val)
+}
 
 // ExprStatement is AST model of expression statement in block.
-type ExprStatement struct{ Expr Expr }
+type ExprStatement struct {
+	Expr Expr
+}
 
 func (be ExprStatement) String() string {
 	var cxx strings.Builder

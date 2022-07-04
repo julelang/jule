@@ -15,18 +15,18 @@ type unary struct {
 
 func (u *unary) minus() value {
 	v := u.parser.evalExprPart(u.toks, u.model)
-	if !typeIsSingle(v.ast.Type) || !xtype.IsNumericType(v.ast.Type.Id) {
+	if !typeIsPure(v.data.Type) || !xtype.IsNumericType(v.data.Type.Id) {
 		u.parser.pusherrtok(u.tok, "invalid_type_unary_operator", '-')
 	}
-	if isConstNum(v.ast.Data) {
-		v.ast.Data = tokens.MINUS + v.ast.Data
+	if isConstNumeric(v.data.Value) {
+		v.data.Value = tokens.MINUS + v.data.Value
 	}
 	return v
 }
 
 func (u *unary) plus() value {
 	v := u.parser.evalExprPart(u.toks, u.model)
-	if !typeIsSingle(v.ast.Type) || !xtype.IsNumericType(v.ast.Type.Id) {
+	if !typeIsPure(v.data.Type) || !xtype.IsNumericType(v.data.Type.Id) {
 		u.parser.pusherrtok(u.tok, "invalid_type_unary_operator", '+')
 	}
 	return v
@@ -34,7 +34,7 @@ func (u *unary) plus() value {
 
 func (u *unary) tilde() value {
 	v := u.parser.evalExprPart(u.toks, u.model)
-	if !typeIsSingle(v.ast.Type) || !xtype.IsIntegerType(v.ast.Type.Id) {
+	if !typeIsPure(v.data.Type) || !xtype.IsIntegerType(v.data.Type.Id) {
 		u.parser.pusherrtok(u.tok, "invalid_type_unary_operator", '~')
 	}
 	return v
@@ -45,18 +45,18 @@ func (u *unary) logicalNot() value {
 	if !isBoolExpr(v) {
 		u.parser.pusherrtok(u.tok, "invalid_type_unary_operator", '!')
 	}
-	v.ast.Type.Id = xtype.Bool
-	v.ast.Type.Val = tokens.BOOL
+	v.data.Type.Id = xtype.Bool
+	v.data.Type.Kind = tokens.BOOL
 	return v
 }
 
 func (u *unary) star() value {
 	v := u.parser.evalExprPart(u.toks, u.model)
 	v.lvalue = true
-	if !typeIsExplicitPtr(v.ast.Type) {
+	if !typeIsExplicitPtr(v.data.Type) {
 		u.parser.pusherrtok(u.tok, "invalid_type_unary_operator", '*')
 	} else {
-		v.ast.Type.Val = v.ast.Type.Val[1:]
+		v.data.Type.Kind = v.data.Type.Kind[1:]
 	}
 	return v
 }
@@ -64,7 +64,7 @@ func (u *unary) star() value {
 func (u *unary) amper() value {
 	v := u.parser.evalExprPart(u.toks, u.model)
 	switch {
-	case typeIsFunc(v.ast.Type):
+	case typeIsFunc(v.data.Type):
 		mainNode := &u.model.nodes[u.model.index]
 		mainNode.nodes = mainNode.nodes[1:] // Remove unary operator from model
 		node := &u.model.nodes[u.model.index].nodes[0]
@@ -84,7 +84,7 @@ func (u *unary) amper() value {
 			u.parser.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.AMPER)
 		}
 		v.lvalue = true
-		v.ast.Type.Val = tokens.STAR + v.ast.Type.Val
+		v.data.Type.Kind = tokens.STAR + v.data.Type.Kind
 	}
 	return v
 }

@@ -8,7 +8,8 @@ func IsFuncCall(toks Toks) Toks {
 	switch toks[0].Id {
 	case tokens.Brace, tokens.Id, tokens.DataType:
 	default:
-		if tok := toks[len(toks)-1]; tok.Id != tokens.Brace && tok.Kind != tokens.RPARENTHESES {
+		tok := toks[len(toks)-1]
+		if tok.Id != tokens.Brace && tok.Kind != tokens.RPARENTHESES {
 			return nil
 		}
 	}

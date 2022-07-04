@@ -26,7 +26,7 @@ func (pap *pureArgParser) buildArgs() {
 			pap.args.Src = append(pap.args.Src, arg)
 		case pair.param.Variadic:
 			model := arrayExpr{pair.param.Type, nil}
-			model.dataType.Val = "[]" + model.dataType.Val // For array.
+			model.dataType.Kind = "[]" + model.dataType.Kind // For array.
 			arg := Arg{Expr: Expr{Model: model}}
 			pap.args.Src = append(pap.args.Src, arg)
 		}
@@ -35,7 +35,7 @@ func (pap *pureArgParser) buildArgs() {
 
 func (pap *pureArgParser) pushVariadicArgs(pair *paramMapPair) {
 	model := arrayExpr{pair.param.Type, nil}
-	model.dataType.Val = "[]" + model.dataType.Val // For array.
+	model.dataType.Kind = "[]" + model.dataType.Kind // For array.
 	variadiced := false
 	pap.p.parseArg(*pair.param, pair.arg, &variadiced)
 	model.expr = append(model.expr, pair.arg.Expr.Model.(iExpr))
@@ -110,10 +110,10 @@ func (pap *pureArgParser) tryFuncMultiRetAsArgs() bool {
 	arg := pap.args.Src[0]
 	val, model := pap.p.evalExpr(arg.Expr)
 	arg.Expr.Model = model
-	if !val.ast.Type.MultiTyped {
+	if !val.data.Type.MultiTyped {
 		return false
 	}
-	types := val.ast.Type.Tag.([]DataType)
+	types := val.data.Type.Tag.([]DataType)
 	if len(types) < len(pap.f.Params) {
 		return false
 	} else if len(types) > len(pap.f.Params) {
@@ -129,7 +129,7 @@ func (pap *pureArgParser) tryFuncMultiRetAsArgs() bool {
 	for i, param := range pap.f.Params {
 		rt := types[i]
 		pap.p.wg.Add(1)
-		val := value{ast: models.Value{Type: rt}}
+		val := value{data: models.Data{Type: rt}}
 		go pap.p.checkArgTypeAsync(param, val, false, arg.Tok)
 	}
 	return true

@@ -23,10 +23,10 @@ type Builder struct {
 	wg  sync.WaitGroup
 	pub bool
 
-	Tree []models.Object
-	Errs []xlog.CompilerLog
-	Toks Toks
-	Pos  int
+	Tree   []models.Object
+	Errors []xlog.CompilerLog
+	Toks   Toks
+	Pos    int
 }
 
 // NewBuilder instance.
@@ -39,17 +39,17 @@ func NewBuilder(toks Toks) *Builder {
 
 func compilerErr(tok Tok, key string, args ...any) xlog.CompilerLog {
 	return xlog.CompilerLog{
-		Type:   xlog.Err,
-		Row:    tok.Row,
-		Column: tok.Column,
-		Path:   tok.File.Path(),
-		Msg:    x.GetErr(key, args...),
+		Type:    xlog.Error,
+		Row:     tok.Row,
+		Column:  tok.Column,
+		Path:    tok.File.Path(),
+		Message: x.GetError(key, args...),
 	}
 }
 
 // pusherr appends error by specified token.
 func (b *Builder) pusherr(tok Tok, key string, args ...any) {
-	b.Errs = append(b.Errs, compilerErr(tok, key, args...))
+	b.Errors = append(b.Errors, compilerErr(tok, key, args...))
 }
 
 // Ended reports position is at end of tokens or not.
@@ -220,7 +220,7 @@ func (b *Builder) Enum(toks Toks) {
 			return
 		}
 	} else {
-		enum.Type = models.DataType{Id: xtype.U32, Val: tokens.U32}
+		enum.Type = models.DataType{Id: xtype.U32, Kind: tokens.U32}
 	}
 	itemToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
 	if itemToks == nil {
@@ -532,7 +532,7 @@ func (b *Builder) Func(toks Toks, anon bool) (f models.Func) {
 		i++
 	}
 	f.RetType.Type.Id = xtype.Void
-	f.RetType.Type.Val = xtype.VoidTypeStr
+	f.RetType.Type.Kind = xtype.VoidTypeStr
 	paramToks := b.getrange(&i, tokens.LPARENTHESES, tokens.RPARENTHESES, &toks)
 	if len(paramToks) > 0 {
 		b.Params(&f, paramToks)
@@ -600,7 +600,7 @@ func (b *Builder) Generics(toks Toks) []models.GenericType {
 		b.pusherr(toks[i], "invalid_syntax")
 	}
 	parts, errs := Parts(genericsToks, tokens.Comma)
-	b.Errs = append(b.Errs, errs...)
+	b.Errors = append(b.Errors, errs...)
 	generics := make([]models.GenericType, len(parts))
 	for i, part := range parts {
 		if len(parts) == 0 {
@@ -647,7 +647,7 @@ func (b *Builder) GlobalVar(toks Toks) {
 // Params builds AST model of function parameters.
 func (b *Builder) Params(fn *models.Func, toks Toks) {
 	parts, errs := Parts(toks, tokens.Comma)
-	b.Errs = append(b.Errs, errs...)
+	b.Errors = append(b.Errors, errs...)
 	for _, part := range parts {
 		if len(parts) > 0 {
 			b.pushParam(fn, part)
@@ -667,7 +667,7 @@ func (b *Builder) checkParamsAsync(f *models.Func) {
 			} else {
 				p.Type.Tok = p.Tok
 				p.Type.Id = xtype.Id
-				p.Type.Val = p.Type.Tok.Kind
+				p.Type.Kind = p.Type.Tok.Kind
 				f.Params[i] = p
 				p.Tok = lex.Tok{}
 			}
@@ -836,7 +836,7 @@ func (b *Builder) idGenericsParts(toks Toks, i *int) []Toks {
 	}
 	toks = toks[first+1 : *i]
 	parts, errs := Parts(toks, tokens.Comma)
-	b.Errs = append(b.Errs, errs...)
+	b.Errors = append(b.Errors, errs...)
 	return parts
 }
 
@@ -951,7 +951,7 @@ func (b *Builder) DataType(toks Toks, i *int, err bool) (t models.DataType, ok b
 		b.pusherr(toks[first], "invalid_type")
 	}
 ret:
-	t.Val = dtv.String()
+	t.Kind = dtv.String()
 	return
 }
 
@@ -985,9 +985,9 @@ func (b *Builder) MapDataType(toks Toks, i *int, err bool) (t models.DataType, _
 	t.Tag = types
 	var val strings.Builder
 	val.WriteByte('[')
-	val.WriteString(types[0].Val)
+	val.WriteString(types[0].Kind)
 	val.WriteByte(':')
-	val.WriteString(types[1].Val)
+	val.WriteString(types[1].Kind)
 	val.WriteByte(']')
 	return t, val.String()
 }
@@ -1047,7 +1047,7 @@ func (b *Builder) funcMultiTypeRet(toks Toks, i *int) (t models.RetType, ok bool
 	defer func() { t.Type.Original = t.Type }()
 	start := *i
 	tok := toks[*i]
-	t.Type.Val += tok.Kind
+	t.Type.Kind += tok.Kind
 	*i++
 	if *i >= len(toks) {
 		*i--
@@ -1066,7 +1066,7 @@ func (b *Builder) funcMultiTypeRet(toks Toks, i *int) (t models.RetType, ok bool
 	last := *i
 	for ; *i < len(toks); *i++ {
 		tok := toks[*i]
-		t.Type.Val += tok.Kind
+		t.Type.Kind += tok.Kind
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
 			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
@@ -1268,11 +1268,11 @@ func (b *Builder) assignInfo(toks Toks) (info AssignInfo) {
 		info.Setter = tok
 		if i+1 >= len(toks) {
 			info.Right = nil
-			info.Ok = IsPostfixOperator(info.Setter.Kind)
+			info.Ok = IsSuffixOperator(info.Setter.Kind)
 			break
 		}
 		info.Right = toks[i+1:]
-		if IsPostfixOperator(info.Setter.Kind) {
+		if IsSuffixOperator(info.Setter.Kind) {
 			if info.Right != nil {
 				b.pusherr(info.Right[0], "invalid_syntax")
 				info.Right = nil
@@ -1567,7 +1567,7 @@ func (b *Builder) Var(toks Toks) (v models.Var) {
 	}
 	v.Id = v.IdTok.Kind
 	v.Type.Id = xtype.Void
-	v.Type.Val = xtype.VoidTypeStr
+	v.Type.Kind = xtype.VoidTypeStr
 	// Skip type definer operator(':')
 	i++
 	if i >= len(toks) {
@@ -1690,7 +1690,7 @@ func (b *Builder) getWhileIterProfile(toks Toks) models.IterWhile {
 
 func (b *Builder) getForeachVarsToks(toks Toks) []Toks {
 	vars, errs := Parts(toks, tokens.Comma)
-	b.Errs = append(b.Errs, errs...)
+	b.Errors = append(b.Errors, errs...)
 	return vars
 }
 
@@ -2017,13 +2017,13 @@ type exprProcessInfo struct {
 }
 
 func (b *Builder) exprOperatorPart(info *exprProcessInfo, tok Tok) {
-	if IsExprOperator(tok.Kind) ||
+	if IsExpressionOperator(tok.Kind) ||
 		IsAssignOperator(tok.Kind) {
 		info.part = append(info.part, tok)
 		return
 	}
 	if !info.operator {
-		if IsSingleOperator(tok.Kind) && !info.singleOperatored {
+		if IsUnaryOperator(tok.Kind) && !info.singleOperatored {
 			info.part = append(info.part, tok)
 			info.singleOperatored = true
 			return

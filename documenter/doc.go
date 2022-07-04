@@ -126,7 +126,7 @@ func types(dm *Defmap) []xtype {
 	for i, t := range dm.Types {
 		types[i] = xtype{
 			Id:    t.Id,
-			Alias: t.Type.Val,
+			Alias: t.Type.Kind,
 			Desc:  Descriptize(t.Desc),
 		}
 	}
@@ -138,7 +138,7 @@ func globals(dm *Defmap) []global {
 	for i, v := range dm.Globals {
 		globals[i] = global{
 			Id:       v.Id,
-			Type:     v.Type.Val,
+			Type:     v.Type.Kind,
 			Constant: v.Const,
 			Volatile: v.Volatile,
 			Desc:     Descriptize(v.Desc),
@@ -152,7 +152,7 @@ func params(parameters []models.Param) []parameter {
 	for i, p := range parameters {
 		params[i] = parameter{
 			Id:       p.Id,
-			Type:     p.Type.Val,
+			Type:     p.Type.Kind,
 			Constant: p.Const,
 			Volatile: p.Volatile,
 		}
@@ -183,7 +183,7 @@ func funcs(dm *Defmap) []function {
 	for i, f := range dm.Funcs {
 		fun := function{
 			Id:         f.Ast.Id,
-			Ret:        f.Ast.RetType.Type.Val,
+			Ret:        f.Ast.RetType.Type.Kind,
 			Generics:   generics(f.Ast.Generics),
 			Params:     params(f.Ast.Params),
 			Desc:       Descriptize(f.Desc),

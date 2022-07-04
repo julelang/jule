@@ -15,6 +15,7 @@ func MapDataTypeInfo(toks Toks, i *int) (typeToks Toks, colon int) {
 			switch tok.Kind {
 			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
 				braceCount++
+				continue
 			default:
 				braceCount--
 			}

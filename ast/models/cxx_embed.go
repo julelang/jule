@@ -6,4 +6,6 @@ type CxxEmbed struct {
 	Content string
 }
 
-func (ce CxxEmbed) String() string { return ce.Content }
+func (ce CxxEmbed) String() string {
+	return ce.Content
+}

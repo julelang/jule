@@ -8,7 +8,9 @@ type Defer struct {
 	Expr Expr
 }
 
-func (d Defer) String() string { return xapi.ToDeferredCall(d.Expr.String()) }
+func (d Defer) String() string {
+	return xapi.ToDeferredCall(d.Expr.String())
+}
 
 // ConcurrentCall is the AST model of concurrent calls.
 type ConcurrentCall struct {

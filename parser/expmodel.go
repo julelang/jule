@@ -7,9 +7,13 @@ import (
 	"github.com/the-xlang/xxc/ast/models"
 )
 
-type iExpr interface{ String() string }
+type iExpr interface {
+	String() string
+}
 
-type exprBuildNode struct{ nodes []iExpr }
+type exprBuildNode struct {
+	nodes []iExpr
+}
 
 type exprModel struct {
 	index int
@@ -38,11 +42,17 @@ func (m exprModel) String() string {
 	return expr.String()
 }
 
-func (m *exprModel) Expr() Expr { return Expr{Model: m} }
+func (m *exprModel) Expr() Expr {
+	return Expr{Model: m}
+}
 
-type exprNode struct{ value string }
+type exprNode struct {
+	value string
+}
 
-func (node exprNode) String() string { return node.value }
+func (node exprNode) String() string {
+	return node.value
+}
 
 type anonFuncExpr struct {
 	ast     Func
@@ -104,7 +114,9 @@ func (m mapExpr) String() string {
 	return cxx.String()
 }
 
-type argsExpr struct{ args []models.Arg }
+type argsExpr struct {
+	args []models.Arg
+}
 
 func (a argsExpr) String() string {
 	if len(a.args) == 0 {
@@ -118,7 +130,9 @@ func (a argsExpr) String() string {
 	return cxx.String()[:cxx.Len()-1]
 }
 
-type multiRetExpr struct{ models []iExpr }
+type multiRetExpr struct {
+	models []iExpr
+}
 
 func (mre multiRetExpr) String() string {
 	var cxx strings.Builder
@@ -130,7 +144,9 @@ func (mre multiRetExpr) String() string {
 	return cxx.String()[:cxx.Len()-1] + ")"
 }
 
-type assignExpr struct{ assign models.Assign }
+type assignExpr struct {
+	assign models.Assign
+}
 
 func (a assignExpr) String() string {
 	var cxx strings.Builder
@@ -140,7 +156,9 @@ func (a assignExpr) String() string {
 	return cxx.String()
 }
 
-type serieExpr struct{ exprs []any }
+type serieExpr struct {
+	exprs []any
+}
 
 func (se serieExpr) String() string {
 	var exprs strings.Builder

@@ -1,6 +1,9 @@
 package parser
 
-import "github.com/the-xlang/xxc/pkg/xtype"
+import (
+	"github.com/the-xlang/xxc/pkg/xio"
+	"github.com/the-xlang/xxc/pkg/xtype"
+)
 
 // Defmap is definition map.
 type Defmap struct {
@@ -163,23 +166,17 @@ func (dm *Defmap) globalById(id string, f *File) (*Var, *Defmap, bool) {
 // 'e' -> enum
 // 's' -> struct
 func (dm *Defmap) defById(id string, f *File) (int, *Defmap, byte) {
-	var i int
-	var m *Defmap
-	i, m, _ = dm.findGlobalById(id, f)
-	if i != -1 {
-		return i, m, 'g'
+	var finders = map[byte]func(string, *xio.File) (int, *Defmap, bool){
+		'g': dm.findGlobalById,
+		'f': dm.findFuncById,
+		'e': dm.findEnumById,
+		's': dm.findStructById,
 	}
-	i, m, _ = dm.findFuncById(id, f)
-	if i != -1 {
-		return i, m, 'f'
+	for code, finder := range finders {
+		i, m, _ := finder(id, f)
+		if i != -1 {
+			return i, m, code
+		}
 	}
-	i, m, _ = dm.findEnumById(id, f)
-	if i != -1 {
-		return i, m, 'e'
-	}
-	i, m, _ = dm.findStructById(id, f)
-	if i != -1 {
-		return i, m, 's'
-	}
-	return -1, m, ' '
+	return -1, nil, ' '
 }

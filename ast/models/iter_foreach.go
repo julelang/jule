@@ -78,10 +78,10 @@ func (f *IterForeach) MapString(iter Iter) string {
 
 func (f *IterForeach) ForeachString(iter Iter) string {
 	switch {
-	case f.ExprType.Val == tokens.STR,
-		strings.HasPrefix(f.ExprType.Val, "[]"):
+	case f.ExprType.Kind == tokens.STR,
+		strings.HasPrefix(f.ExprType.Kind, "[]"):
 		return f.ClassicString(iter)
-	case f.ExprType.Val[0] == '[':
+	case f.ExprType.Kind[0] == '[':
 		return f.MapString(iter)
 	}
 	return ""

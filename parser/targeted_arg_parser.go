@@ -24,7 +24,7 @@ func (tap *targetedArgParser) buildArgs() {
 			tap.args.Src = append(tap.args.Src, arg)
 		case pair.param.Variadic:
 			model := arrayExpr{pair.param.Type, nil}
-			model.dataType.Val = "[]" + model.dataType.Val // For array.
+			model.dataType.Kind = "[]" + model.dataType.Kind // For array.
 			arg := Arg{Expr: Expr{Model: model}}
 			tap.args.Src = append(tap.args.Src, arg)
 		}
@@ -33,7 +33,7 @@ func (tap *targetedArgParser) buildArgs() {
 
 func (tap *targetedArgParser) pushVariadicArgs(pair *paramMapPair) {
 	model := arrayExpr{pair.param.Type, nil}
-	model.dataType.Val = "[]" + model.dataType.Val // For array.
+	model.dataType.Kind = "[]" + model.dataType.Kind // For array.
 	variadiced := false
 	tap.p.parseArg(*pair.param, pair.arg, &variadiced)
 	model.expr = append(model.expr, pair.arg.Expr.Model.(iExpr))

@@ -19,14 +19,15 @@ func Range(i *int, open, close string, toks Toks) Toks {
 		*i++
 		braceCount := 1
 		start := *i
-		for ; braceCount > 0 && *i < len(toks); *i++ {
+		for ; braceCount != 0 && *i < len(toks); *i++ {
 			tok := toks[*i]
 			if tok.Id != tokens.Brace {
 				continue
 			}
-			if tok.Kind == open {
+			switch tok.Kind {
+			case open:
 				braceCount++
-			} else if tok.Kind == close {
+			case close:
 				braceCount--
 			}
 		}

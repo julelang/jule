@@ -10,4 +10,6 @@ type File struct {
 }
 
 // Path returns full path of file.
-func (f *File) Path() string { return filepath.Join(f.Dir, f.Name) }
+func (f *File) Path() string {
+	return filepath.Join(f.Dir, f.Name)
+}

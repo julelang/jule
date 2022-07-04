@@ -39,7 +39,7 @@ func (f *Func) DataTypeString() string {
 			if p.Variadic {
 				cxx.WriteString("...")
 			}
-			cxx.WriteString(p.Type.Val)
+			cxx.WriteString(p.Type.Kind)
 			cxx.WriteString(", ")
 		}
 		cxxStr := cxx.String()[:cxx.Len()-2]
@@ -48,7 +48,7 @@ func (f *Func) DataTypeString() string {
 	}
 	cxx.WriteByte(')')
 	if f.RetType.Type.Id != xtype.Void {
-		cxx.WriteString(f.RetType.Type.Val)
+		cxx.WriteString(f.RetType.Type.Kind)
 	}
 	return cxx.String()
 }

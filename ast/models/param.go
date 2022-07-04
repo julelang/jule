@@ -28,7 +28,7 @@ func (p *Param) TypeString() string {
 	if p.Reference {
 		ts.WriteString(tokens.AMPER)
 	}
-	ts.WriteString(p.Type.Val)
+	ts.WriteString(p.Type.Kind)
 	return ts.String()
 }
 
