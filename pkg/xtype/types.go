@@ -72,10 +72,14 @@ func U64GreaterThan(t uint8) bool {
 }
 
 // F32GreaterThan reports F32 is greater or not data-type than specified type.
-func F32GreaterThan(t uint8) bool { return t != Any && t != F64 }
+func F32GreaterThan(t uint8) bool {
+	return t != Any && t != F64
+}
 
 // F64GreaterThan reports F64 is greater or not data-type than specified type.
-func F64GreaterThan(t uint8) bool { return t != Any }
+func F64GreaterThan(t uint8) bool {
+	return t != Any
+}
 
 // TypeGreaterThan reports type one is greater than type two or not.
 func TypeGreaterThan(t1, t2 uint8) bool {
@@ -220,10 +224,14 @@ func IsIntegerType(t uint8) bool {
 }
 
 // IsNumericType reports type is numeric or not.
-func IsNumericType(t uint8) bool { return IsIntegerType(t) || IsFloatType(t) }
+func IsNumericType(t uint8) bool {
+	return IsIntegerType(t) || IsFloatType(t)
+}
 
 // IsFloatType reports type is float or not.
-func IsFloatType(t uint8) bool { return t == F32 || t == F64 }
+func IsFloatType(t uint8) bool {
+	return t == F32 || t == F64
+}
 
 // IsSignedNumericType reports type is signed numeric or not.
 func IsSignedNumericType(t uint8) bool {
