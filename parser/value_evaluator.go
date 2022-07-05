@@ -52,8 +52,8 @@ func (ve *valueEvaluator) char() value {
 	var v value
 	v.data.Value = ve.tok.Kind
 	literal, _ := toCharLiteral(ve.tok.Kind)
-	v.data.Type.Id = xtype.Char
-	v.data.Type.Kind = tokens.CHAR
+	v.data.Type.Id = xtype.U8
+	v.data.Type.Kind = tokens.U8
 	ve.model.appendSubNode(exprNode{literal})
 	return v
 }
@@ -181,8 +181,8 @@ func (ve *valueEvaluator) structId(id string, s *xstruct) (v value) {
 
 func (ve *valueEvaluator) id() (_ value, ok bool) {
 	id := ve.tok.Kind
-	if variable, _ := ve.p.varById(id); variable != nil {
-		return ve.varId(id, variable), true
+	if v, _ := ve.p.varById(id); v != nil {
+		return ve.varId(id, v), true
 	} else if f, _, _ := ve.p.FuncById(id); f != nil {
 		return ve.funcId(id, f), true
 	} else if e, _, _ := ve.p.enumById(id); e != nil {

@@ -18,18 +18,17 @@ const (
 	F32     uint8 = 11
 	F64     uint8 = 12
 	Any     uint8 = 13
-	Char    uint8 = 14
-	Id      uint8 = 15
-	Func    uint8 = 16
-	Nil     uint8 = 17
-	UInt    uint8 = 18
-	Int     uint8 = 19
-	Map     uint8 = 20
-	Voidptr uint8 = 21
-	Intptr  uint8 = 22
-	UIntptr uint8 = 23
-	Enum    uint8 = 24
-	Struct  uint8 = 25
+	Id      uint8 = 14
+	Func    uint8 = 15
+	Nil     uint8 = 16
+	UInt    uint8 = 17
+	Int     uint8 = 18
+	Map     uint8 = 19
+	Voidptr uint8 = 20
+	Intptr  uint8 = 21
+	UIntptr uint8 = 22
+	Enum    uint8 = 23
+	Struct  uint8 = 24
 )
 
 // TypeMap keep data-type codes and identifiers.
@@ -47,7 +46,6 @@ var TypeMap = map[uint8]string{
 	F32:     tokens.F32,
 	F64:     tokens.F64,
 	Any:     tokens.ANY,
-	Char:    tokens.CHAR,
 	UInt:    tokens.UINT,
 	Int:     tokens.INT,
 	Voidptr: tokens.VOIDPTR,

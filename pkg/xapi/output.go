@@ -456,6 +456,11 @@ static inline void foreach(const map<_Key_t, _Value_t> _Map,
     for (const auto _pair: _Map) { _Body(_pair.first, _pair.second); }
 }
 
+template<typename ...T>
+static inline std::string strpol(const T... _Expressions) noexcept {
+    return (std::stringstream{} << ... << _Expressions).str();
+}
+
 template<typename Type, unsigned N, unsigned Last>
 struct tuple_ostream {
     static void arrow(std::ostream &_Stream, const Type &_Type) {

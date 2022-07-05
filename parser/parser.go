@@ -1970,7 +1970,7 @@ func (p *Parser) checkCastStr(vt DataType, errtok Tok) {
 		return
 	}
 	vt.Kind = vt.Kind[2:] // Remove array brackets
-	if !typeIsPure(vt) || (vt.Id != xtype.Char && vt.Id != xtype.U8) {
+	if !typeIsPure(vt) || vt.Id != xtype.U8 {
 		p.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
 	}
 }
@@ -2017,7 +2017,7 @@ func (p *Parser) checkCastArray(t, vt DataType, errtok Tok) {
 		return
 	}
 	t.Kind = t.Kind[2:] // Remove array brackets
-	if !typeIsPure(t) || (t.Id != xtype.Char && t.Id != xtype.U8) {
+	if !typeIsPure(t) || t.Id != xtype.U8 {
 		p.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
 	}
 }
@@ -2314,7 +2314,7 @@ func (p *Parser) evalMapSelect(mapv, selectv value, errtok Tok) value {
 
 func (p *Parser) evalStrSelect(strv, selectv value, errtok Tok) value {
 	strv.lvalue = true
-	strv.data.Type.Id = xtype.Char
+	strv.data.Type.Id = xtype.U8
 	p.wg.Add(1)
 	go assignChecker{
 		p:      p,

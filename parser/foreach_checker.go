@@ -87,8 +87,8 @@ func (fc *foreachChecker) str() {
 		return
 	}
 	runeType := DataType{
-		Id:   xtype.Char,
-		Kind: xtype.CxxTypeIdFromType(xtype.Char),
+		Id:   xtype.U8,
+		Kind: xtype.CxxTypeIdFromType(xtype.U8),
 	}
 	keyB := &fc.profile.KeyB
 	if keyB.Type.Id == xtype.Void {
