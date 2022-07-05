@@ -2315,6 +2315,7 @@ func (p *Parser) evalMapSelect(mapv, selectv value, errtok Tok) value {
 func (p *Parser) evalStrSelect(strv, selectv value, errtok Tok) value {
 	strv.lvalue = true
 	strv.data.Type.Id = xtype.U8
+	strv.data.Type.Kind = xtype.TypeMap[strv.data.Type.Id]
 	p.wg.Add(1)
 	go assignChecker{
 		p:      p,
