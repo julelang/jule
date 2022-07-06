@@ -904,10 +904,14 @@ func (b *Builder) DataType(toks Toks, i *int, err bool) (t models.DataType, ok b
 			case tokens.LPARENTHESES:
 				t.Tok = tok
 				t.Id = xtype.Func
-				val, f := b.FuncDataTypeHead(toks, i)
-				f.RetType, _ = b.FuncRetDataType(toks, i)
-				dtv.WriteString(val)
+				f := b.FuncDataTypeHead(toks, i)
+				*i++
+				f.RetType, ok = b.FuncRetDataType(toks, i)
+				if !ok {
+					*i--
+				}
 				t.Tag = &f
+				dtv.WriteString(f.DataTypeString())
 				ok = true
 				goto ret
 			case tokens.LBRACKET:
@@ -993,15 +997,12 @@ func (b *Builder) MapDataType(toks Toks, i *int, err bool) (t models.DataType, _
 }
 
 // FuncDataTypeHead builds head part of function data-type.
-func (b *Builder) FuncDataTypeHead(toks Toks, i *int) (string, models.Func) {
+func (b *Builder) FuncDataTypeHead(toks Toks, i *int) models.Func {
 	var f models.Func
-	var typeVal strings.Builder
-	typeVal.WriteByte('(')
 	brace := 1
 	firstIndex := *i
 	for *i++; *i < len(toks); *i++ {
 		tok := toks[*i]
-		typeVal.WriteString(tok.Kind)
 		switch tok.Id {
 		case tokens.Brace:
 			switch tok.Kind {
@@ -1013,12 +1014,11 @@ func (b *Builder) FuncDataTypeHead(toks Toks, i *int) (string, models.Func) {
 		}
 		if brace == 0 {
 			b.Params(&f, toks[firstIndex+1:*i])
-			*i++
-			return typeVal.String(), f
+			return f
 		}
 	}
 	b.pusherr(toks[firstIndex], "invalid_type")
-	return "", f
+	return f
 }
 
 func (b *Builder) pushTypeToTypes(ids *Toks, types *[]models.DataType, toks Toks, errTok Tok) {
@@ -1111,6 +1111,8 @@ func (b *Builder) funcMultiTypeRet(toks Toks, i *int) (t models.RetType, ok bool
 // FuncRetDataType builds ret data-type of function.
 func (b *Builder) FuncRetDataType(toks Toks, i *int) (t models.RetType, ok bool) {
 	defer func() { t.Type.Original = t.Type }()
+	t.Type.Id = xtype.Void
+	t.Type.Kind = xtype.VoidTypeStr
 	if *i >= len(toks) {
 		return
 	}
