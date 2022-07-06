@@ -1980,9 +1980,7 @@ func (b *Builder) MatchCase(toks Toks) (s models.Statement) {
 	s.Tok = match.Tok
 	toks = toks[1:]
 	exprToks := BlockExpr(toks)
-	if len(exprToks) == 0 {
-		b.pusherr(match.Tok, "missing_expr")
-	} else {
+	if len(exprToks) > 0 {
 		match.Expr = b.Expr(exprToks)
 	}
 	i := new(int)

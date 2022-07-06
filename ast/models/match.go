@@ -14,8 +14,10 @@ func (c *Case) String(matchExpr string) string {
 		cxx.WriteString("if (")
 		for i, expr := range c.Exprs {
 			cxx.WriteString(expr.String())
-			cxx.WriteString(" == ")
-			cxx.WriteString(matchExpr)
+			if matchExpr != "" {
+				cxx.WriteString(" == ")
+				cxx.WriteString(matchExpr)
+			}
 			if i+1 < len(c.Exprs) {
 				cxx.WriteString(" || ")
 			}
@@ -39,7 +41,7 @@ type Match struct {
 	Cases   []Case
 }
 
-func (m Match) String() string {
+func (m *Match) MatchExprString() string {
 	if len(m.Cases) == 0 {
 		if m.Default != nil {
 			return m.Default.String("")
@@ -59,4 +61,26 @@ func (m Match) String() string {
 		cxx.WriteByte('}')
 	}
 	return cxx.String()
+}
+
+func (m *Match) MatchBoolString() string {
+	var cxx strings.Builder
+	cxx.WriteString(m.Cases[0].String(""))
+	for _, c := range m.Cases[1:] {
+		cxx.WriteString("else ")
+		cxx.WriteString(c.String(""))
+	}
+	if m.Default != nil {
+		cxx.WriteString("else ")
+		cxx.WriteString(m.Default.String(""))
+		cxx.WriteByte('}')
+	}
+	return cxx.String()
+}
+
+func (m Match) String() string {
+	if m.Expr.Model != nil {
+		return m.MatchExprString()
+	}
+	return m.MatchBoolString()
 }
