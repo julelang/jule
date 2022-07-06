@@ -1797,8 +1797,16 @@ func (p *Parser) evalExprSubId(toks Toks, m *exprModel) (v value) {
 	i--
 	valTok := toks[i]
 	toks = toks[:i]
-	if len(toks) == 1 && toks[0].Id == tokens.DataType {
-		return p.evalTypeSubId(toks[0], idTok, m)
+	if len(toks) == 1 {
+		tok := toks[0]
+		if tok.Id == tokens.DataType {
+			return p.evalTypeSubId(tok, idTok, m)
+		} else if tok.Id == tokens.Id {
+			t, _, _ := p.typeById(tok.Kind)
+			if t != nil {
+				return p.evalTypeSubId(t.Type.Tok, idTok, m)
+			}
+		}
 	}
 	val := p.evalExprPart(toks, m)
 	checkType := val.data.Type
