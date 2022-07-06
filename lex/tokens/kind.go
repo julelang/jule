@@ -92,4 +92,7 @@ const (
 	CO                  = "co"
 	TRY                 = "try"
 	CATCH               = "catch"
+	MATCH               = "match"
+	CASE                = "case"
+	DEFAULT             = "default"
 )

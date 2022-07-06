@@ -1212,6 +1212,8 @@ func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
 		s.Tok = t.Tok
 		s.Val = t
 		return
+	case tokens.Match:
+		return b.MatchCase(bs.toks)
 	case tokens.Operator:
 	case tokens.Brace:
 		if tok.Kind == tokens.LBRACE {
@@ -1863,6 +1865,134 @@ func (b *Builder) CatchBlock(bs *blockStatement) (s models.Statement) {
 		Tok: catch.Tok,
 		Val: catch,
 	}
+}
+
+func (b *Builder) caseexprs(toks *Toks, caseIsDefault bool) []models.Expr {
+	var exprs []models.Expr
+	pushExpr := func(toks Toks, tok Tok) {
+		if caseIsDefault {
+			if len(toks) > 0 {
+				b.pusherr(tok, "invalid_syntax")
+			}
+			return
+		}
+		if len(toks) > 0 {
+			exprs = append(exprs, b.Expr(toks))
+			return
+		}
+		b.pusherr(tok, "missing_expr")
+	}
+	braceCount := 0
+	j := 0
+	var i int
+	var tok Tok
+	for i, tok = range *toks {
+		if tok.Id == tokens.Brace {
+			switch tok.Kind {
+			case tokens.LPARENTHESES, tokens.LBRACE, tokens.LBRACKET:
+				braceCount++
+			default:
+				braceCount--
+			}
+			continue
+		} else if braceCount != 0 {
+			continue
+		}
+		switch tok.Id {
+		case tokens.Comma:
+			pushExpr((*toks)[j:i], tok)
+			j = i + 1
+		case tokens.Colon:
+			pushExpr((*toks)[j:i], tok)
+			*toks = (*toks)[i+1:]
+			return exprs
+		}
+	}
+	b.pusherr((*toks)[0], "invalid_syntax")
+	*toks = nil
+	return nil
+}
+
+func (b *Builder) caseblock(toks *Toks) models.Block {
+	braceCount := 0
+	for i, tok := range *toks {
+		if tok.Id == tokens.Brace {
+			switch tok.Kind {
+			case tokens.LPARENTHESES, tokens.LBRACE, tokens.LBRACKET:
+				braceCount++
+			default:
+				braceCount--
+			}
+			continue
+		} else if braceCount != 0 {
+			continue
+		}
+		switch tok.Id {
+		case tokens.Case, tokens.Default:
+			blockToks := (*toks)[:i]
+			*toks = (*toks)[i:]
+			return b.Block(blockToks)
+		}
+	}
+	block := b.Block(*toks)
+	*toks = nil
+	return block
+}
+
+func (b *Builder) getcase(toks *Toks) models.Case {
+	var c models.Case
+	tok := (*toks)[0]
+	*toks = (*toks)[1:]
+	c.Exprs = b.caseexprs(toks, tok.Id == tokens.Default)
+	c.Block = b.caseblock(toks)
+	return c
+}
+
+func (b *Builder) cases(toks Toks) ([]models.Case, *models.Case) {
+	var cases []models.Case
+	var def *models.Case
+	for len(toks) > 0 {
+		tok := toks[0]
+		switch tok.Id {
+		case tokens.Case:
+			cases = append(cases, b.getcase(&toks))
+		case tokens.Default:
+			c := b.getcase(&toks)
+			if def == nil {
+				def = new(models.Case)
+				*def = c
+				break
+			}
+			fallthrough
+		default:
+			b.pusherr(tok, "invalid_syntax")
+		}
+	}
+	return cases, def
+}
+
+// MatchCase builds AST model of match-case.
+func (b *Builder) MatchCase(toks Toks) (s models.Statement) {
+	var match models.Match
+	match.Tok = toks[0]
+	s.Tok = match.Tok
+	toks = toks[1:]
+	exprToks := BlockExpr(toks)
+	if len(exprToks) == 0 {
+		b.pusherr(match.Tok, "missing_expr")
+	} else {
+		match.Expr = b.Expr(exprToks)
+	}
+	i := new(int)
+	*i = len(exprToks)
+	blockToks := b.getrange(i, tokens.LBRACE, tokens.RBRACE, &toks)
+	if blockToks == nil {
+		b.pusherr(match.Tok, "body_not_exist")
+		return
+	}
+	match.Cases, match.Default = b.cases(blockToks)
+	s.Val = match
+	return
 }
 
 // IfExpr builds AST model of if expression.

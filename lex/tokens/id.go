@@ -35,4 +35,7 @@ const (
 	Co           uint8 = 30
 	Try          uint8 = 31
 	Catch        uint8 = 32
+	Match        uint8 = 33
+	Case         uint8 = 34
+	Default      uint8 = 35
 )
