@@ -2597,8 +2597,6 @@ func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *models.Args, 
 		if !p.parseGenerics(f, generics, m, errTok) {
 			return
 		}
-	} else {
-		p.reloadFuncTypes(f)
 	}
 	if isConstructor(f) {
 		p.readyConstructor(&f)
@@ -2613,6 +2611,7 @@ func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *models.Args, 
 	}
 	v.data.Type = f.RetType.Type
 	v.data.Type.Original = v.data.Type
+	v.data.Type.DontUseOriginal = true
 	if args == nil {
 		return
 	}
