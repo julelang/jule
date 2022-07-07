@@ -671,6 +671,7 @@ func (b *Builder) checkParamsAsync(f *models.Func) {
 				p.Type.Tok = p.Tok
 				p.Type.Id = xtype.Id
 				p.Type.Kind = p.Type.Tok.Kind
+				p.Type.Original = p.Type
 				p.Id = x.Anonymous
 				p.Tok = lex.Tok{}
 			}
