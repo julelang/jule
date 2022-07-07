@@ -33,31 +33,31 @@ type DataType struct {
 	DontUseOriginal bool
 }
 
-// ValWithOriginalId returns dt.Val with OriginalId.
-func (dt *DataType) ValWithOriginalId() string {
+// KindWithOriginalId returns dt.Kind with OriginalId.
+func (dt *DataType) KindWithOriginalId() string {
 	if dt.Original == nil {
 		return dt.Kind
 	}
-	_, prefix := dt.GetValId()
+	_, prefix := dt.KindId()
 	original := dt.Original.(DataType)
 	return prefix + original.Tok.Kind
 }
 
-// OriginalValId returns dt.Val's identifier of official.
+// OriginalKindId returns dt.Kind's identifier of official.
 //
 // Special case is:
-//   OriginalValId() -> "" if DataType has not original
-func (dt *DataType) OriginalValId() string {
+//   OriginalKindId() -> "" if DataType has not original
+func (dt *DataType) OriginalKindId() string {
 	if dt.Original == nil {
 		return ""
 	}
 	t := dt.Original.(DataType)
-	id, _ := t.GetValId()
+	id, _ := t.KindId()
 	return id
 }
 
-// GetValId returns dt.Val's identifier.
-func (dt *DataType) GetValId() (id, prefix string) {
+// KindId returns dt.Kind's identifier.
+func (dt *DataType) KindId() (id, prefix string) {
 	id = dt.Kind
 	runes := []rune(dt.Kind)
 	for i, r := range dt.Kind {
@@ -81,7 +81,7 @@ func (dt *DataType) setToOriginal() {
 	if dt.DontUseOriginal || dt.Original == nil {
 		return
 	}
-	val := dt.ValWithOriginalId()
+	val := dt.KindWithOriginalId()
 	tok := dt.Tok
 	*dt = dt.Original.(DataType)
 	dt.Kind = val
@@ -163,7 +163,8 @@ func (dt *DataType) MapString() string {
 // StructString returns cxx value of struct data type.
 func (dt *DataType) StructString() string {
 	var cxx strings.Builder
-	cxx.WriteString(xapi.OutId(dt.Kind, dt.Tok.File))
+	id, _ := dt.KindId()
+	cxx.WriteString(xapi.OutId(id, dt.Tok.File))
 	s := dt.Tag.(Genericable)
 	types := s.Generics()
 	if len(types) == 0 {

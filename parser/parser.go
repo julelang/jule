@@ -2114,9 +2114,11 @@ func (p *Parser) evalParenthesesRangeExpr(toks Toks, m *exprModel) (v value) {
 	}
 	switch tok := exprToks[0]; tok.Id {
 	case tokens.DataType, tokens.Id:
-		v, isret := p.getDataTypeFunc(exprToks, rangeExpr, m)
-		if isret {
-			return v
+		if len(exprToks) == 1 && len(genericsToks) == 0 {
+			v, isret := p.getDataTypeFunc(exprToks, rangeExpr, m)
+			if isret {
+				return v
+			}
 		}
 		fallthrough
 	default:
@@ -2557,10 +2559,11 @@ func (p *Parser) parseGenerics(f *Func, generics []DataType, m *exprModel, errTo
 	p.blockTypes = nil
 	defer func() { p.blockTypes, p.blockVars = blockTypes, blockVars }()
 	p.pushGenerics(f.Generics, generics)
+	p.reloadFuncTypes(f)
 	if isConstructor(f) {
+		p.readyConstructor(&f)
 		return true
 	}
-	p.reloadFuncTypes(f)
 	if itsCombined(f, generics) {
 		return true
 	}
@@ -2598,8 +2601,10 @@ func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *models.Args, 
 			return
 		}
 	}
+	v.data.Type = f.RetType.Type
+	v.data.Type.Original = v.data.Type
+	v.data.Type.DontUseOriginal = true
 	if isConstructor(f) {
-		p.readyConstructor(&f)
 		s := f.RetType.Type.Tag.(*xstruct)
 		s.SetGenerics(generics)
 		v.data.Type.Kind = s.dataTypeString()
@@ -2609,9 +2614,6 @@ func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *models.Args, 
 		m.appendSubNode(exprNode{tokens.LPARENTHESES})
 		defer m.appendSubNode(exprNode{tokens.RPARENTHESES})
 	}
-	v.data.Type = f.RetType.Type
-	v.data.Type.Original = v.data.Type
-	v.data.Type.DontUseOriginal = true
 	if args == nil {
 		return
 	}
@@ -3545,7 +3547,7 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 	}
 	switch dt.Id {
 	case xtype.Id:
-		id, prefix := dt.GetValId()
+		id, prefix := dt.KindId()
 		defer func() { ret.Kind = prefix + ret.Kind }()
 		def, _, _, _ := p.defById(id)
 		switch t := def.(type) {
