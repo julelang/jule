@@ -53,7 +53,9 @@ func (b *Builder) pusherr(tok Tok, key string, args ...any) {
 }
 
 // Ended reports position is at end of tokens or not.
-func (ast *Builder) Ended() bool { return ast.Pos >= len(ast.Toks) }
+func (ast *Builder) Ended() bool {
+	return ast.Pos >= len(ast.Toks)
+}
 
 func (b *Builder) buildNode(toks Toks) {
 	tok := toks[0]
@@ -103,8 +105,11 @@ func (b *Builder) Build() {
 		}
 		b.buildNode(toks)
 	}
-	b.wg.Wait()
+	b.Wait()
 }
+
+// Wait waits for concurrency.
+func (b *Builder) Wait() { b.wg.Wait() }
 
 // Type builds AST model of type definition statement.
 func (b *Builder) Type(toks Toks) (t models.Type) {
@@ -645,22 +650,20 @@ func (b *Builder) GlobalVar(toks Toks) {
 }
 
 // Params builds AST model of function parameters.
-func (b *Builder) Params(fn *models.Func, toks Toks) {
+func (b *Builder) Params(f *models.Func, toks Toks) {
 	parts, errs := Parts(toks, tokens.Comma)
 	b.Errors = append(b.Errors, errs...)
 	for _, part := range parts {
-		if len(parts) > 0 {
-			b.pushParam(fn, part)
-		}
-
+		b.pushParam(f, part)
 	}
 	b.wg.Add(1)
-	go b.checkParamsAsync(fn)
+	go b.checkParamsAsync(f)
 }
 
 func (b *Builder) checkParamsAsync(f *models.Func) {
 	defer func() { b.wg.Done() }()
-	for i, p := range f.Params {
+	for i := range f.Params {
+		p := &f.Params[i]
 		if p.Type.Tok.Id == tokens.NA {
 			if p.Tok.Id == tokens.NA {
 				b.pusherr(p.Tok, "missing_type")
@@ -668,7 +671,7 @@ func (b *Builder) checkParamsAsync(f *models.Func) {
 				p.Type.Tok = p.Tok
 				p.Type.Id = xtype.Id
 				p.Type.Kind = p.Type.Tok.Kind
-				f.Params[i] = p
+				p.Id = x.Anonymous
 				p.Tok = lex.Tok{}
 			}
 		}
@@ -728,9 +731,13 @@ func (b *Builder) paramBodyId(f *models.Func, p *models.Param, tok Tok) {
 	p.Id = tok.Kind
 }
 
-type exprNode struct{ expr string }
+type exprNode struct {
+	expr string
+}
 
-func (en exprNode) String() string { return en.expr }
+func (en exprNode) String() string {
+	return en.expr
+}
 
 func (b *Builder) paramBodyDefaultExpr(p *models.Param, toks *Toks) {
 	braceCount := 0

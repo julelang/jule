@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/the-xlang/xxc/lex/tokens"
+	"github.com/the-xlang/xxc/pkg/x"
 	"github.com/the-xlang/xxc/pkg/xapi"
 )
 
@@ -35,7 +36,7 @@ func (p *Param) TypeString() string {
 func (p Param) String() string {
 	var cxx strings.Builder
 	cxx.WriteString(p.Prototype())
-	if p.Id != "" {
+	if p.Id != "" && !xapi.IsIgnoreId(p.Id) && p.Id != x.Anonymous {
 		cxx.WriteByte(' ')
 		cxx.WriteString(xapi.OutId(p.Id, p.Tok.File))
 	}
