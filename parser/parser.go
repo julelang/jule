@@ -384,7 +384,9 @@ func (p *Parser) compileUse(useAST *models.Use) (_ *use, hasErr bool) {
 		psub.Parsef(false, false)
 		use := new(use)
 		use.defs = new(Defmap)
+		use.tok = useAST.Tok
 		use.Path = useAST.Path
+		use.LinkString = useAST.LinkString
 		p.pusherrs(psub.Errors...)
 		p.Warnings = append(p.Warnings, psub.Warnings...)
 		p.embeds.WriteString(psub.embeds.String())
@@ -1104,6 +1106,7 @@ func (p *Parser) FuncById(id string) (*function, *Defmap, bool) {
 	for _, use := range p.Uses {
 		f, m, _ := use.defs.funcById(id, p.File)
 		if f != nil {
+			use.used = true
 			return f, m, false
 		}
 	}
@@ -1122,6 +1125,7 @@ func (p *Parser) globalById(id string) (*Var, *Defmap) {
 	for _, use := range p.Uses {
 		g, m, _ := use.defs.globalById(id, p.File)
 		if g != nil {
+			use.used = true
 			return g, m
 		}
 	}
@@ -1133,6 +1137,7 @@ func (p *Parser) nsById(id string, parent bool) *namespace {
 	for _, use := range p.Uses {
 		ns := use.defs.nsById(id, parent)
 		if ns != nil {
+			use.used = true
 			return ns
 		}
 	}
@@ -1151,6 +1156,7 @@ func (p *Parser) typeById(id string) (*Type, *Defmap, bool) {
 	for _, use := range p.Uses {
 		t, m, _ := use.defs.typeById(id, p.File)
 		if t != nil {
+			use.used = true
 			return t, m, false
 		}
 	}
@@ -1165,6 +1171,7 @@ func (p *Parser) enumById(id string) (*Enum, *Defmap, bool) {
 	for _, use := range p.Uses {
 		t, m, _ := use.defs.enumById(id, p.File)
 		if t != nil {
+			use.used = true
 			return t, m, false
 		}
 	}
@@ -1179,6 +1186,7 @@ func (p *Parser) structById(id string) (*xstruct, *Defmap, bool) {
 	for _, use := range p.Uses {
 		s, m, _ := use.defs.structById(id, p.File)
 		if s != nil {
+			use.used = true
 			return s, m, false
 		}
 	}
@@ -1246,6 +1254,15 @@ func (p *Parser) blockDefById(id string) (def any, tok Tok) {
 	return
 }
 
+func (p *Parser) checkUsesAsync() {
+	defer func() { p.wg.Done() }()
+	for _, use := range p.Uses {
+		if !use.used {
+			p.pusherrtok(use.tok, "declared_but_not_used", use.LinkString)
+		}
+	}
+}
+
 func (p *Parser) checkAsync() {
 	defer func() { p.wg.Done() }()
 	if p.main && !p.justDefs {
@@ -1261,8 +1278,9 @@ func (p *Parser) checkAsync() {
 	p.WaitingGlobals()
 	p.waitingGlobals = nil
 	if !p.justDefs {
+		p.checkFuncs()
 		p.wg.Add(1)
-		go p.checkFuncsAsync()
+		go p.checkUsesAsync()
 	}
 }
 
@@ -1368,8 +1386,7 @@ func (p *Parser) parseFunc(f *Func) (err bool) {
 	return
 }
 
-func (p *Parser) checkFuncsAsync() {
-	defer func() { p.wg.Done() }()
+func (p *Parser) checkFuncs() {
 	err := false
 	check := func(f *function) {
 		if f.Ast.Tok.File != p.File {

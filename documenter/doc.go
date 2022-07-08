@@ -5,7 +5,6 @@ import (
 
 	"github.com/the-xlang/xxc/ast/models"
 	"github.com/the-xlang/xxc/parser"
-	"github.com/the-xlang/xxc/pkg/x"
 )
 
 type Defmap = parser.Defmap
@@ -15,8 +14,8 @@ type generic struct {
 }
 
 type use struct {
-	Path         string `json:"path"`
-	StandardPath bool   `json:"standard_path"`
+	Path   string `json:"path"`
+	Stdlib bool   `json:"stdlib"`
 }
 
 type xstruct struct {
@@ -84,11 +83,9 @@ type document struct {
 func uses(p *parser.Parser) []use {
 	uses := make([]use, len(p.Uses))
 	for i, u := range p.Uses {
-		path := u.Path
-		path = path[len(x.StdlibPath)+1:]
 		uses[i] = use{
-			Path:         path,
-			StandardPath: true,
+			Path:   u.LinkString,
+			Stdlib: u.LinkString[0] != '"',
 		}
 	}
 	return uses
