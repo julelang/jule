@@ -1951,6 +1951,16 @@ func (p *Parser) evalIdExprPart(toks Toks, m *exprModel) (v value) {
 	}
 }
 
+func (p *Parser) evalCastExpr(dt DataType, exprToks Toks, m *exprModel, errTok Tok) value {
+	m.appendSubNode(exprNode{tokens.LPARENTHESES + dt.String() + tokens.RPARENTHESES})
+	m.appendSubNode(exprNode{tokens.LPARENTHESES})
+	val, model := p.evalToks(exprToks)
+	m.appendSubNode(model)
+	m.appendSubNode(exprNode{tokens.RPARENTHESES})
+	val = p.evalCast(val, dt, errTok)
+	return val
+}
+
 func (p *Parser) evalTryCastExpr(toks Toks, m *exprModel) (v value, _ bool) {
 	braceCount := 0
 	errTok := toks[0]
@@ -1996,12 +2006,7 @@ func (p *Parser) evalTryCastExpr(toks Toks, m *exprModel) (v value, _ bool) {
 		if !ok {
 			return
 		}
-		m.appendSubNode(exprNode{tokens.LPARENTHESES + dt.String() + tokens.RPARENTHESES})
-		m.appendSubNode(exprNode{tokens.LPARENTHESES})
-		val, model := p.evalToks(exprToks)
-		m.appendSubNode(model)
-		m.appendSubNode(exprNode{tokens.RPARENTHESES})
-		val = p.evalCast(val, dt, errTok)
+		val := p.evalCastExpr(dt, exprToks, m, errTok)
 		return val, true
 	}
 	return
@@ -2156,26 +2161,22 @@ func valIsEnum(v value) bool {
 	return v.isType && v.data.Type.Id == xtype.Enum
 }
 
-func (p *Parser) getDataTypeFunc(expr, callRange Toks, m *exprModel) (v value, isret bool) {
-	tok := expr[0]
-	switch tok.Kind {
+func (p *Parser) getDataTypeFunc(expr Tok, callRange Toks, m *exprModel) (v value, isret bool) {
+	switch expr.Kind {
 	case tokens.STR:
 		m.appendSubNode(exprNode{"tostr"})
 		// Val: "()" for accept DataType as function.
 		v.data.Type = DataType{Id: xtype.Func, Kind: "()", Tag: strDefaultFunc}
 	default:
-		toks := append([]lex.Tok{{
-			Id:   tokens.Brace,
-			Kind: tokens.LPARENTHESES,
-			File: tok.File,
-		}}, expr...)
-		toks = append(toks, Tok{
-			Id:   tokens.Brace,
-			Kind: tokens.RPARENTHESES,
-			File: tok.File,
-		})
-		toks = append(toks, callRange...)
-		v, isret = p.evalTryCastExpr(toks, m)
+		def, _, _, _ := p.defById(expr.Kind)
+		if def == nil {
+			break
+		}
+		switch t := def.(type) {
+		case *Type:
+			isret = true
+			v = p.evalCastExpr(t.Type, callRange, m, expr)
+		}
 	}
 	return
 }
@@ -2208,7 +2209,7 @@ func (p *Parser) evalParenthesesRangeExpr(toks Toks, m *exprModel) (v value) {
 	switch tok := exprToks[0]; tok.Id {
 	case tokens.DataType, tokens.Id:
 		if len(exprToks) == 1 && len(genericsToks) == 0 {
-			v, isret := p.getDataTypeFunc(exprToks, rangeExpr, m)
+			v, isret := p.getDataTypeFunc(exprToks[0], rangeExpr, m)
 			if isret {
 				return v
 			}
