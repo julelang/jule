@@ -53,7 +53,9 @@ func (f *function) Head() string {
 func (f *function) declHead() string {
 	var cxx strings.Builder
 	cxx.WriteString(genericsToCxx(f.Ast.Generics))
-	cxx.WriteByte('\n')
+	if cxx.Len() > 0 {
+		cxx.WriteByte('\n')
+	}
 	cxx.WriteString(attributesToString(f.Ast.Attributes))
 	cxx.WriteString(f.Ast.RetType.String())
 	cxx.WriteByte(' ')
