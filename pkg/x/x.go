@@ -11,7 +11,8 @@ const (
 	Stdlib        = "lib"
 	Localizations = "localization"
 
-	EntryPoint = "main"
+	EntryPoint          = "main"
+	InitializerFunction = "init"
 
 	Anonymous = "<anonymous>"
 

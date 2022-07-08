@@ -11,6 +11,9 @@ import (
 // Ignore operator.
 const Ignore = "_"
 
+// InitializerCaller identifier.
+const InitializerCaller = "_xxc___call_initializers"
+
 const typeExtension = "_xt"
 
 // IsIgnoreId reports identifier is ignore or not.

@@ -9,7 +9,10 @@ int main(void) {
     SetConsoleOutputCP(CP_UTF8);
     _setmode(_fileno(stdin), 0x00020000);
 #endif
+
+    ` + InitializerCaller + `();
     XID(main());
+
     return EXIT_SUCCESS;
 }
 // endregion X_ENTRY_POINT`
