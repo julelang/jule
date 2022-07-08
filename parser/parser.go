@@ -360,11 +360,11 @@ func (p *Parser) checkUsePath(use *models.Use) bool {
 	return true
 }
 
-func (p *Parser) compileUse(useAST *models.Use) *use {
+func (p *Parser) compileUse(useAST *models.Use) (_ *use, hasErr bool) {
 	infos, err := ioutil.ReadDir(useAST.Path)
 	if err != nil {
 		p.pusherrmsg(err.Error())
-		return nil
+		return nil, true
 	}
 	for _, info := range infos {
 		name := info.Name()
@@ -381,9 +381,6 @@ func (p *Parser) compileUse(useAST *models.Use) *use {
 		}
 		psub := New(f)
 		psub.Parsef(false, false)
-		if psub.Errors != nil {
-			p.pusherrtok(useAST.Tok, "use_has_errors")
-		}
 		use := new(use)
 		use.defs = new(Defmap)
 		use.Path = useAST.Path
@@ -391,9 +388,13 @@ func (p *Parser) compileUse(useAST *models.Use) *use {
 		p.Warnings = append(p.Warnings, psub.Warnings...)
 		p.embeds.WriteString(psub.embeds.String())
 		p.pushUseDefs(use, psub.Defs)
-		return use
+		if psub.Errors != nil {
+			p.pusherrtok(useAST.Tok, "use_has_errors")
+			return use, true
+		}
+		return use, false
 	}
-	return nil
+	return nil, false
 }
 
 func (p *Parser) pushUseNamespaces(use, dm *Defmap) {
@@ -415,9 +416,9 @@ func (p *Parser) pushUseDefs(use *use, dm *Defmap) {
 	use.defs.Funcs = append(use.defs.Funcs, dm.Funcs...)
 }
 
-func (p *Parser) use(useAST *models.Use) {
+func (p *Parser) use(useAST *models.Use) (err bool) {
 	if !p.checkUsePath(useAST) {
-		return
+		return true
 	}
 	// Already parsed?
 	for _, use := range used {
@@ -426,19 +427,22 @@ func (p *Parser) use(useAST *models.Use) {
 			return
 		}
 	}
-	use := p.compileUse(useAST)
+	use, err := p.compileUse(useAST)
 	if use == nil {
-		return
+		return err
 	}
 	used = append(used, use)
 	p.Uses = append(p.Uses, use)
+	return err
 }
 
-func (p *Parser) parseUses(tree *[]models.Object) {
+func (p *Parser) parseUses(tree *[]models.Object) (err bool) {
 	for i, obj := range *tree {
 		switch t := obj.Value.(type) {
 		case models.Use:
-			p.use(&t)
+			// || operator used for ignore compiling of other packages
+			// if already have errors
+			err = err || p.use(&t)
 		case models.Comment: // Ignore beginning comments.
 		default:
 			*tree = (*tree)[i:]
@@ -446,6 +450,7 @@ func (p *Parser) parseUses(tree *[]models.Object) {
 		}
 	}
 	*tree = nil
+	return
 }
 
 func (p *Parser) parseSrcTreeObj(obj models.Object) {
@@ -486,9 +491,12 @@ func (p *Parser) parseSrcTree(tree []models.Object) {
 	}
 }
 
-func (p *Parser) parseTree(tree []models.Object) {
-	p.parseUses(&tree)
+func (p *Parser) parseTree(tree []models.Object) (ok bool) {
+	if p.parseUses(&tree) {
+		return false
+	}
 	p.parseSrcTree(tree)
+	return true
 }
 
 func (p *Parser) checkParse() {
@@ -501,14 +509,14 @@ func (p *Parser) checkParse() {
 
 // Special case is;
 //  p.useLocalPackage() -> nothing if p.File is nil
-func (p *Parser) useLocalPakcage(tree *[]models.Object) {
+func (p *Parser) useLocalPakcage(tree *[]models.Object) (hasErr bool) {
 	if p.File == nil {
 		return
 	}
 	infos, err := ioutil.ReadDir(p.File.Dir)
 	if err != nil {
 		p.pusherrmsg(err.Error())
-		return
+		return true
 	}
 	for _, info := range infos {
 		name := info.Name()
@@ -522,20 +530,23 @@ func (p *Parser) useLocalPakcage(tree *[]models.Object) {
 		f, err := xio.Openfx(filepath.Join(p.File.Dir, name))
 		if err != nil {
 			p.pusherrmsg(err.Error())
-			continue
+			return true
 		}
 		lexer := lex.NewLex(f)
 		toks := lexer.Lex()
 		if lexer.Logs != nil {
 			p.pusherrs(lexer.Logs...)
-			continue
+			return true
 		}
 		subtree, errors := getTree(toks)
 		p.pusherrs(errors...)
 		preprocessor.Process(&subtree)
-		p.parseUses(&subtree)
+		if p.parseUses(&subtree) {
+			return
+		}
 		*tree = append(*tree, subtree...)
 	}
+	return
 }
 
 // Parses X code from object tree.
@@ -546,9 +557,13 @@ func (p *Parser) Parset(tree []models.Object, main, justDefs bool) {
 		preprocessor.Process(&tree)
 	}
 	if !p.isLocalPkg {
-		p.useLocalPakcage(&tree)
+		if p.useLocalPakcage(&tree) {
+			return
+		}
 	}
-	p.parseTree(tree)
+	if !p.parseTree(tree) {
+		return
+	}
 	p.checkParse()
 	p.wg.Wait()
 }
@@ -1282,34 +1297,43 @@ func paramIsAllowForConst(param *Param) bool {
 	return !param.Variadic && typeIsAllowForConst(param.Type)
 }
 
-func (p *Parser) param(f *Func, param *Param) {
-	param.Type, _ = p.realType(param.Type, true)
+func (p *Parser) param(f *Func, param *Param) (err bool) {
+	param.Type, err = p.realType(param.Type, true)
+	// Assign to !err because p.realType
+	// returns true if success, false if not.
+	err = !err
 	if param.Const && !paramIsAllowForConst(param) {
 		p.pusherrtok(param.Tok, "invalid_type_for_const", param.TypeString())
+		err = true
 	}
 	if param.Reference {
 		if param.Variadic {
 			p.pusherrtok(param.Tok, "variadic_reference_param")
+			err = true
 		}
 		if typeIsPtr(param.Type) {
 			p.pusherrtok(param.Tok, "pointer_reference")
+			err = true
 		}
 	}
 	p.checkParamDefaultExpr(f, param)
+	return
 }
 
-func (p *Parser) params(f *Func) {
+func (p *Parser) params(f *Func) (err bool) {
 	hasDefaultArg := false
 	for i := range f.Params {
 		param := &f.Params[i]
-		p.param(f, param)
+		err = err || p.param(f, param)
 		if !hasDefaultArg {
 			hasDefaultArg = paramHasDefaultArg(param)
 			continue
 		} else if !paramHasDefaultArg(param) && !param.Variadic {
 			p.pusherrtok(param.Tok, "param_must_have_default_arg", param.Id)
+			err = true
 		}
 	}
+	return
 }
 
 func (p *Parser) blockVarsOfFunc(f *Func) []*Var {
@@ -1318,25 +1342,32 @@ func (p *Parser) blockVarsOfFunc(f *Func) []*Var {
 	return vars
 }
 
-func (p *Parser) parseFunc(f *Func) {
-	p.params(f)
+func (p *Parser) parseFunc(f *Func) (err bool) {
+	err = p.params(f)
+	if err {
+		return
+	}
 	p.blockVars = p.blockVarsOfFunc(f)
 	p.checkFunc(f)
 	p.blockTypes = nil
 	p.blockVars = nil
+	return
 }
 
 func (p *Parser) checkFuncsAsync() {
 	defer func() { p.wg.Done() }()
+	err := false
 	check := func(f *function) {
 		p.wg.Add(1)
 		go p.checkFuncSpecialCasesAsync(f.Ast)
-		if f.checked || (len(f.Ast.Generics) > 0 && len(f.Ast.Combines) == 0) {
+		if err ||
+			f.checked ||
+			(len(f.Ast.Generics) > 0 && len(f.Ast.Combines) == 0) {
 			return
 		}
 		p.blockTypes = nil
 		f.checked = true
-		p.parseFunc(f.Ast)
+		err = p.parseFunc(f.Ast)
 	}
 	for _, use := range p.Uses {
 		for _, ns := range use.defs.Namespaces {
