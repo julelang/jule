@@ -3669,6 +3669,7 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 func (p *Parser) realType(dt DataType, err bool) (ret DataType, _ bool) {
 	original := dt.Original
 	defer func() { ret.Original = original }()
+	dt.SetToOriginal()
 	return p.typeSource(dt, err)
 }
 
