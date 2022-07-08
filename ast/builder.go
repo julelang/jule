@@ -1234,9 +1234,11 @@ func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
 		return b.ExprStatement(bs.toks)
 	}
 	tok = Tok{
-		File: tok.File,
-		Id:   tokens.Ret,
-		Kind: tokens.RET,
+		File:   tok.File,
+		Id:     tokens.Ret,
+		Kind:   tokens.RET,
+		Row:    tok.Row,
+		Column: tok.Column,
 	}
 	bs.toks = append([]Tok{tok}, bs.toks...)
 	return b.RetStatement(bs.toks)
