@@ -52,10 +52,6 @@ type Parser struct {
 	iterCount      int
 	caseCount      int
 	wg             sync.WaitGroup
-	justDefs       bool
-	main           bool
-	isLocalPkg     bool
-	noCheck        bool
 	rootBlock      *models.Block
 	nodeBlock      *models.Block
 	generics       []*GenericType
@@ -64,18 +60,21 @@ type Parser struct {
 	embeds         strings.Builder
 	waitingGlobals []globalWaitPair
 
-	Uses     []*use
-	Defs     *Defmap
-	Errors   []xlog.CompilerLog
-	Warnings []xlog.CompilerLog
-	File     *File
+	NoLocalPkg bool
+	JustDefs   bool
+	NoCheck    bool
+	IsMain     bool
+	Uses       []*use
+	Defs       *Defmap
+	Errors     []xlog.CompilerLog
+	Warnings   []xlog.CompilerLog
+	File       *File
 }
 
 // New returns new instance of Parser.
 func New(f *File) *Parser {
 	p := new(Parser)
 	p.File = f
-	p.isLocalPkg = false
 	p.Defs = new(Defmap)
 	return p
 }
@@ -503,7 +502,7 @@ func (p *Parser) parseTree(tree []models.Object) (ok bool) {
 }
 
 func (p *Parser) checkParse() {
-	if p.noCheck {
+	if p.NoCheck {
 		return
 	}
 	if p.docText.Len() > 0 {
@@ -540,15 +539,15 @@ func (p *Parser) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 			return true
 		}
 		fp := New(f)
-		fp.isLocalPkg = true
-		fp.noCheck = true
+		fp.NoLocalPkg = true
+		fp.NoCheck = true
 		fp.Defs = p.Defs
 		fp.Parsef(false, true)
 		parsers = append(parsers, fp)
 	}
 	for _, fp := range parsers {
-		fp.noCheck = false
-		fp.justDefs = false
+		fp.NoCheck = false
+		fp.JustDefs = false
 		fp.checkParse()
 		fp.wg.Wait()
 		if len(fp.Errors) > 0 {
@@ -561,15 +560,15 @@ func (p *Parser) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 
 // Parses X code from object tree.
 func (p *Parser) Parset(tree []models.Object, main, justDefs bool) {
-	p.main = main
-	p.justDefs = justDefs
+	p.IsMain = main
+	p.JustDefs = justDefs
 	if !main {
 		preprocessor.Process(&tree)
 	}
 	if !p.parseTree(tree) {
 		return
 	}
-	if !p.isLocalPkg {
+	if !p.NoLocalPkg {
 		if p.useLocalPackage(&tree) {
 			return
 		}
@@ -1265,7 +1264,7 @@ func (p *Parser) checkUsesAsync() {
 
 func (p *Parser) checkAsync() {
 	defer func() { p.wg.Done() }()
-	if p.main && !p.justDefs {
+	if p.IsMain && !p.JustDefs {
 		f, _, _ := p.Defs.funcById(x.EntryPoint, p.File)
 		if f == nil {
 			p.PushErr("no_entry_point")
@@ -1277,7 +1276,7 @@ func (p *Parser) checkAsync() {
 	go p.checkTypesAsync()
 	p.WaitingGlobals()
 	p.waitingGlobals = nil
-	if !p.justDefs {
+	if !p.JustDefs {
 		p.checkFuncs()
 		p.wg.Add(1)
 		go p.checkUsesAsync()

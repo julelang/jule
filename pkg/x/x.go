@@ -6,7 +6,7 @@ import "github.com/the-xlang/xxc/pkg/xset"
 const (
 	Version       = `@developer_beta 0.0.1`
 	SrcExt        = `.xx`
-	DocExt        = ".xdoc"
+	DocExt        = SrcExt + "doc"
 	SettingsFile  = "x.set"
 	Stdlib        = "lib"
 	Localizations = "localization"

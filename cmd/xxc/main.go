@@ -97,7 +97,7 @@ func doc(cmd string) {
 	paths := strings.SplitN(cmd, " ", -1)
 	for _, path := range paths {
 		path = strings.TrimSpace(path)
-		p := compile(path, false, true)
+		p := compile(path, false, true, true)
 		if p == nil {
 			continue
 		}
@@ -110,7 +110,8 @@ func doc(cmd string) {
 			fmt.Println(x.GetError("error", err.Error()))
 			continue
 		}
-		path = path[len(filepath.Dir(path)):]
+		// Remove SrcExt from path
+		path = path[:len(path)-len(x.SrcExt)]
 		path = filepath.Join(x.Set.CxxOutDir, path+x.DocExt)
 		writeOutput(path, docjson)
 	}
@@ -307,7 +308,8 @@ func appendStandard(code *string) {
 }
 
 func writeOutput(path, content string) {
-	err := os.MkdirAll(x.Set.CxxOutDir, 0o777)
+	dir := filepath.Dir(path)
+	err := os.MkdirAll(dir, 0o777)
 	if err != nil {
 		println(err.Error())
 		os.Exit(0)
@@ -332,7 +334,7 @@ func loadBuiltin() bool {
 	return !printlogs(p)
 }
 
-func compile(path string, main, justDefs bool) *Parser {
+func compile(path string, main, nolocal, justDefs bool) *Parser {
 	loadXSet()
 	p := parser.New(nil)
 	f, err := xio.Openfx(path)
@@ -354,6 +356,7 @@ func compile(path string, main, justDefs bool) *Parser {
 		return nil
 	}
 	p.File = f
+	p.NoLocalPkg = nolocal
 	p.Parsef(main, justDefs)
 	return p
 }
@@ -381,7 +384,7 @@ func doSpell(path, cxx string) {
 
 func main() {
 	fpath := os.Args[0]
-	p := compile(fpath, true, false)
+	p := compile(fpath, true, false, false)
 	if p == nil {
 		return
 	}
