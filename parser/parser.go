@@ -2287,6 +2287,8 @@ func (p *Parser) buildEnumerable(exprToks Toks, t DataType, m *exprModel) (v val
 		v, model = p.buildArray(p.buildEnumerableParts(exprToks), t, exprToks[0])
 	case typeIsMap(t):
 		v, model = p.buildMap(p.buildEnumerableParts(exprToks), t, exprToks[0])
+	default:
+		p.pusherrtok(exprToks[0], "invalid_type_source")
 	}
 	m.appendSubNode(model)
 	return
