@@ -2718,10 +2718,9 @@ func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *models.Args, 
 		if !p.parseGenerics(f, generics, m, errTok) {
 			return
 		}
+		f.RetType.Type.DontUseOriginal = true
 	}
 	v.data.Type = f.RetType.Type
-	v.data.Type.Original = v.data.Type
-	v.data.Type.DontUseOriginal = true
 	if isConstructor(f) {
 		s := f.RetType.Type.Tag.(*xstruct)
 		s.SetGenerics(generics)
