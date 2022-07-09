@@ -2153,12 +2153,24 @@ func (p *Parser) evalVariadicExprPart(toks Toks, m *exprModel, errtok Tok) (v va
 }
 
 func (p *Parser) getDataTypeFunc(expr Tok, callRange Toks, m *exprModel) (v value, isret bool) {
-	switch expr.Kind {
-	case tokens.STR:
-		m.appendSubNode(exprNode{"tostr"})
-		// Val: "()" for accept DataType as function.
-		v.data.Type = DataType{Id: xtype.Func, Kind: "()", Tag: strDefaultFunc}
-	default:
+	switch expr.Id {
+	case tokens.DataType:
+		switch expr.Kind {
+		case tokens.STR:
+			m.appendSubNode(exprNode{"tostr"})
+			// Val: "()" for accept DataType as function.
+			v.data.Type = DataType{Id: xtype.Func, Kind: "()", Tag: strDefaultFunc}
+			isret = true
+		default:
+			dt := DataType{
+				Tok:  expr,
+				Id:   xtype.TypeFromId(expr.Kind),
+				Kind: expr.Kind,
+			}
+			isret = true
+			v = p.evalCastExpr(dt, callRange, m, expr)
+		}
+	case tokens.Id:
 		def, _, _, _ := p.defById(expr.Kind)
 		if def == nil {
 			break
