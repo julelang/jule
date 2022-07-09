@@ -1913,7 +1913,7 @@ func (p *Parser) evalExprSubId(toks Toks, m *exprModel) (v value) {
 		switch {
 		case checkType.Id == xtype.Str:
 			return p.evalStrObjSubId(val, idTok, m)
-		case valIsEnum(val):
+		case valIsEnumType(val):
 			return p.evalEnumSubId(val, idTok, m)
 		case valIsStructIns(val):
 			return p.evalStructObjSubId(val, idTok, m)
@@ -1945,10 +1945,9 @@ func (p *Parser) evalIdExprPart(toks Toks, m *exprModel) (v value) {
 		return p.evalExprSubId(toks, m)
 	case tokens.DoubleColon:
 		return p.evalNsSubId(toks, m)
-	default:
-		p.pusherrtok(toks[i], "invalid_syntax")
-		return
 	}
+	p.pusherrtok(toks[i], "invalid_syntax")
+	return
 }
 
 func (p *Parser) evalCastExpr(dt DataType, exprToks Toks, m *exprModel, errTok Tok) value {
@@ -2153,14 +2152,6 @@ func (p *Parser) evalVariadicExprPart(toks Toks, m *exprModel, errtok Tok) (v va
 	return
 }
 
-func valIsStruct(v value) bool {
-	return v.isType && v.data.Type.Id == xtype.Struct
-}
-
-func valIsEnum(v value) bool {
-	return v.isType && v.data.Type.Id == xtype.Enum
-}
-
 func (p *Parser) getDataTypeFunc(expr Tok, callRange Toks, m *exprModel) (v value, isret bool) {
 	switch expr.Kind {
 	case tokens.STR:
@@ -2174,8 +2165,12 @@ func (p *Parser) getDataTypeFunc(expr Tok, callRange Toks, m *exprModel) (v valu
 		}
 		switch t := def.(type) {
 		case *Type:
+			dt, ok := p.realType(t.Type, true)
+			if !ok || typeIsStruct(dt) {
+				return
+			}
 			isret = true
-			v = p.evalCastExpr(t.Type, callRange, m, expr)
+			v = p.evalCastExpr(dt, callRange, m, expr)
 		}
 	}
 	return
@@ -2222,7 +2217,7 @@ func (p *Parser) evalParenthesesRangeExpr(toks Toks, m *exprModel) (v value) {
 	case typeIsFunc(v.data.Type):
 		f := v.data.Type.Tag.(*Func)
 		return p.callFunc(f, genericsToks, rangeExpr, m)
-	case valIsStruct(v):
+	case valIsStructType(v):
 		s := v.data.Type.Tag.(*xstruct)
 		return p.callStructConstructor(s, genericsToks, rangeExpr, m)
 	}

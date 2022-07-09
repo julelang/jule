@@ -179,6 +179,17 @@ func (ve *valueEvaluator) structId(id string, s *xstruct) (v value) {
 	return
 }
 
+func (ve *valueEvaluator) typeId(id string, t *Type) (_ value, _ bool) {
+	dt, ok := ve.p.realType(t.Type, true)
+	if !ok {
+		return
+	}
+	if typeIsStruct(dt) {
+		return ve.structId(id, dt.Tag.(*xstruct)), true
+	}
+	return
+}
+
 func (ve *valueEvaluator) id() (_ value, ok bool) {
 	id := ve.tok.Kind
 	if v, _ := ve.p.varById(id); v != nil {
@@ -189,6 +200,8 @@ func (ve *valueEvaluator) id() (_ value, ok bool) {
 		return ve.enumId(id, e), true
 	} else if s, _, _ := ve.p.structById(id); s != nil {
 		return ve.structId(id, s), true
+	} else if t, _, _ := ve.p.typeById(id); t != nil {
+		return ve.typeId(id, t)
 	} else {
 		ve.p.pusherrtok(ve.tok, "id_noexist", id)
 	}

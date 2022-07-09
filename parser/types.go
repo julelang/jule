@@ -27,6 +27,14 @@ func typeIsSinglePtr(t DataType) bool {
 	return t.Id == xtype.Voidptr
 }
 
+func typeIsStruct(dt DataType) bool {
+	return dt.Id == xtype.Struct
+}
+
+func typeIsEnum(dt DataType) bool {
+	return dt.Id == xtype.Enum
+}
+
 func typeIsGeneric(generics []*GenericType, t DataType) bool {
 	if t.Id != xtype.Id {
 		return false
