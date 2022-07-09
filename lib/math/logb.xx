@@ -6,7 +6,7 @@
 // Returns the binary exponent of x.
 //
 // Special cases are:
-//  logb(±Inf) = +inf
+//  logb(±inf) = +inf
 //  logb(0) = -inf
 //  logb(nan) = nan
 pub logb(const x f64) f64 {
@@ -19,11 +19,31 @@ pub logb(const x f64) f64 {
 	case isnan(x):
 		ret x
 	}
-	ret f64(ilogb(x))
+	ret f64(_ilogb(x))
+}
+
+//doc:
+// Returns the binary exponent of x as an integer.
+//
+// Special cases are:
+//  ilogb(±inf) = i32.max
+//  ilogb(0) = i32.min
+//  ilogb(nan) = i32.max
+pub ilogb(const x f64) int {
+	// special cases
+	match {
+	case x == 0:
+		ret i32.min
+	case isnan(x):
+		ret i32.max
+	case isinf(x, 0):
+		ret i32.max
+	}
+	ret _ilogb(x)
 }
 
 //doc: Returns the binary exponent of x. It assumes x is finite and non-zero.
-ilogb(x f64) int {
+_ilogb(x f64) int {
 	x, exp := normalize(x)
 	ret int((f64_bits(x)>>shift)&mask) - bias + exp
 }
