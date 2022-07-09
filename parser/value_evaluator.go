@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"strings"
+
 	"github.com/the-xlang/xxc/lex/tokens"
 	"github.com/the-xlang/xxc/pkg/xapi"
 	"github.com/the-xlang/xxc/pkg/xbits"
@@ -80,7 +82,7 @@ func (ve *valueEvaluator) float() value {
 	var v value
 	v.data.Value = ve.tok.Kind
 	v.data.Type.Id = xtype.F64
-	v.data.Type.Kind = tokens.F64
+	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
 	return v
 }
 
@@ -89,16 +91,16 @@ func (ve *valueEvaluator) integer() value {
 	v.data.Value = ve.tok.Kind
 	intbit := xbits.BitsizeType(xtype.Int)
 	switch {
+	case strings.HasPrefix(ve.tok.Kind, "0x"):
+		v.data.Type.Id = xtype.U64
 	case xbits.CheckBitInt(ve.tok.Kind, intbit):
 		v.data.Type.Id = xtype.Int
-		v.data.Type.Kind = tokens.INT
 	case intbit < xbits.MaxInt && xbits.CheckBitInt(ve.tok.Kind, xbits.MaxInt):
 		v.data.Type.Id = xtype.I64
-		v.data.Type.Kind = tokens.I64
 	default:
 		v.data.Type.Id = xtype.U64
-		v.data.Type.Kind = tokens.U64
 	}
+	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
 	return v
 }
 
