@@ -1,0 +1,42 @@
+// Copyright 2022 The X Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+//doc:
+// Is the inverse of frexp.
+// It returns frac × 2**exp.
+//
+// Special cases are:
+//  ldexp(±0, exp) = ±0
+//  ldexp(±inf, exp) = ±inf
+//  ldexp(nan, exp) = nan
+pub ldexp(frac f64, exp int) f64 {
+	// special cases
+	match {
+	case frac == 0:
+		ret frac // correctly return -0
+	case isinf(frac, 0) || isnan(frac):
+		ret frac
+	}
+	frac, e: = normalize(frac)
+	exp += e
+	x: = f64_bits(frac)
+	exp += int(x>>shift)&mask - bias
+	if exp < -1075 {
+		ret copysign(0, frac) // underflow
+	}
+	if exp > 1023 { // overflow
+		if frac < 0 {
+			ret inf(-1)
+		}
+		ret inf(1)
+	}
+	m:f64 = 1
+	if exp < -1022 { // denormal
+		exp += 53
+		m = 1.0 / (1 << 53) // 2**-53
+	}
+	x &= ~(mask << shift)
+	x |= u64(exp+bias) << shift
+	ret m * f64_from_bits(x)
+}
