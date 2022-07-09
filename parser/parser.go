@@ -2280,7 +2280,10 @@ func (p *Parser) evalTypeId(toks Toks, m *exprModel) (v value) {
 }
 
 func (p *Parser) buildEnumerable(exprToks Toks, t DataType, m *exprModel) (v value) {
-	t, _ = p.realType(t, true)
+	t, ok := p.realType(t, true)
+	if !ok {
+		return
+	}
 	var model iExpr
 	switch {
 	case typeIsArray(t):
@@ -2289,6 +2292,7 @@ func (p *Parser) buildEnumerable(exprToks Toks, t DataType, m *exprModel) (v val
 		v, model = p.buildMap(p.buildEnumerableParts(exprToks), t, exprToks[0])
 	default:
 		p.pusherrtok(exprToks[0], "invalid_type_source")
+		return
 	}
 	m.appendSubNode(model)
 	return
@@ -2341,8 +2345,7 @@ func (p *Parser) evalBraceRangeExpr(toks Toks, m *exprModel) (v value) {
 				p.pusherrtok(toks[*i+1], "invalid_syntax")
 			}
 			exprToks = toks[len(exprToks):]
-			p.buildEnumerable(exprToks, t, m)
-			return
+			return p.buildEnumerable(exprToks, t, m)
 		case tokens.LPARENTHESES:
 			b := ast.NewBuilder(toks)
 			f := b.Func(b.Toks, true)
