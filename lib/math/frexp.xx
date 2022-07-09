@@ -1,0 +1,30 @@
+// Copyright 2022 The X Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+//doc:
+// Breaks f into a normalized fraction
+// and an integral power of two.
+// It returns frac and exp satisfying f == frac × 2**exp,
+// with the absolute value of frac in the interval [½, 1).
+//
+// Special cases are:
+//  frexp(±0) = ±0, 0
+//  frexp(±inf) = ±inf, 0
+//  frexp(nan) = nan, 0
+pub frexp(f f64) [frac f64, exp int] {
+	// special cases
+	match {
+	case f == 0:
+		ret f, 0 // correctly return -0
+	case isinf(f, 0) || isnan(f):
+		ret f, 0
+	}
+	f, exp = normalize(f)
+	x: = f64_bits(f)
+	exp += int((x>>shift)&mask) - bias + 1
+	x &= ~(mask << shift)
+	x |= (-1 + bias) << shift
+	frac = f64_from_bits(x)
+	ret
+}
