@@ -2267,6 +2267,31 @@ func (p *Parser) structConstructorInstance(as xstruct) *xstruct {
 	return s
 }
 
+func (p *Parser) evalTypeId(toks Toks, m *exprModel) (v value) {
+	tok := toks[0]
+	t, _, _ := p.typeById(tok.Kind)
+	if t == nil {
+		v.data.Type.Id = xtype.Void
+		v.data.Type.Kind = xtype.VoidTypeStr
+		return
+	}
+	toks = toks[1:]
+	return p.buildEnumerable(toks, t.Type, m)
+}
+
+func (p *Parser) buildEnumerable(exprToks Toks, t DataType, m *exprModel) (v value) {
+	t, _ = p.realType(t, true)
+	var model iExpr
+	switch {
+	case typeIsArray(t):
+		v, model = p.buildArray(p.buildEnumerableParts(exprToks), t, exprToks[0])
+	case typeIsMap(t):
+		v, model = p.buildMap(p.buildEnumerableParts(exprToks), t, exprToks[0])
+	}
+	m.appendSubNode(model)
+	return
+}
+
 func (p *Parser) evalBraceRangeExpr(toks Toks, m *exprModel) (v value) {
 	var exprToks Toks
 	braceCount := 0
@@ -2281,7 +2306,7 @@ func (p *Parser) evalBraceRangeExpr(toks Toks, m *exprModel) (v value) {
 		default:
 			braceCount--
 		}
-		if braceCount > 0 {
+		if braceCount != 0 {
 			continue
 		}
 		exprToks = toks[:i]
@@ -2292,7 +2317,14 @@ func (p *Parser) evalBraceRangeExpr(toks Toks, m *exprModel) (v value) {
 		p.pusherrtok(toks[0], "invalid_syntax")
 		return
 	}
+	tok := exprToks[0]
 	switch exprToks[0].Id {
+	case tokens.Id:
+		if len(exprToks) > 1 {
+			p.pusherrtok(tok, "invalid_syntax")
+			return
+		}
+		return p.evalTypeId(toks, m)
 	case tokens.Brace:
 		switch exprToks[0].Kind {
 		case tokens.LBRACKET:
@@ -2306,16 +2338,8 @@ func (p *Parser) evalBraceRangeExpr(toks Toks, m *exprModel) (v value) {
 			} else if *i+1 < len(exprToks) {
 				p.pusherrtok(toks[*i+1], "invalid_syntax")
 			}
-			t, _ = p.typeSource(t, true)
 			exprToks = toks[len(exprToks):]
-			var model iExpr
-			switch {
-			case typeIsArray(t):
-				v, model = p.buildArray(p.buildEnumerableParts(exprToks), t, exprToks[0])
-			case typeIsMap(t):
-				v, model = p.buildMap(p.buildEnumerableParts(exprToks), t, exprToks[0])
-			}
-			m.appendSubNode(model)
+			p.buildEnumerable(exprToks, t, m)
 			return
 		case tokens.LPARENTHESES:
 			b := ast.NewBuilder(toks)
