@@ -40,11 +40,6 @@ type RetType = models.RetType
 
 var used []*use
 
-type globalWaitPair struct {
-	vast *Var
-	defs *Defmap
-}
-
 // Parser is parser of X code.
 type Parser struct {
 	attributes     []Attribute
@@ -58,7 +53,7 @@ type Parser struct {
 	blockTypes     []*Type
 	blockVars      []*Var
 	embeds         strings.Builder
-	waitingGlobals []globalWaitPair
+	waitingGlobals []*Var
 
 	NoLocalPkg bool
 	JustDefs   bool
@@ -523,7 +518,6 @@ func (p *Parser) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 		p.pusherrmsg(err.Error())
 		return true
 	}
-	var parsers []*Parser
 	for _, info := range infos {
 		name := info.Name()
 		// Skip directories.
@@ -543,17 +537,8 @@ func (p *Parser) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 		fp.NoCheck = true
 		fp.Defs = p.Defs
 		fp.Parsef(false, true)
-		parsers = append(parsers, fp)
-	}
-	for _, fp := range parsers {
-		fp.NoCheck = false
-		fp.JustDefs = false
-		fp.checkParse()
 		fp.wg.Wait()
-		if len(fp.Errors) > 0 {
-			p.pusherrs(fp.Errors...)
-			hasErr = true
-		}
+		p.waitingGlobals = append(p.waitingGlobals, fp.waitingGlobals...)
 	}
 	return
 }
@@ -562,9 +547,7 @@ func (p *Parser) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 func (p *Parser) Parset(tree []models.Object, main, justDefs bool) {
 	p.IsMain = main
 	p.JustDefs = justDefs
-	if !main {
-		preprocessor.Process(&tree)
-	}
+	preprocessor.Process(&tree)
 	if !p.parseTree(tree) {
 		return
 	}
@@ -1001,7 +984,7 @@ func (p *Parser) Global(vast Var) {
 	p.docText.Reset()
 	v := new(Var)
 	*v = vast
-	p.waitingGlobals = append(p.waitingGlobals, globalWaitPair{v, p.Defs})
+	p.waitingGlobals = append(p.waitingGlobals, v)
 	p.Defs.Globals = append(p.Defs.Globals, v)
 }
 
@@ -1253,8 +1236,7 @@ func (p *Parser) blockDefById(id string) (def any, tok Tok) {
 	return
 }
 
-func (p *Parser) checkUsesAsync() {
-	defer func() { p.wg.Done() }()
+func (p *Parser) checkUses() {
 	for _, use := range p.Uses {
 		if !use.used {
 			p.pusherrtok(use.tok, "declared_but_not_used", use.LinkString)
@@ -1272,38 +1254,26 @@ func (p *Parser) checkAsync() {
 			f.used = true
 		}
 	}
-	p.wg.Add(1)
-	go p.checkTypesAsync()
+	p.checkTypes()
 	p.WaitingGlobals()
 	p.waitingGlobals = nil
 	if !p.JustDefs {
 		p.checkFuncs()
-		p.wg.Add(1)
-		go p.checkUsesAsync()
+		p.checkUses()
 	}
 }
 
-func (p *Parser) checkTypesAsync() {
-	defer func() { p.wg.Done() }()
+func (p *Parser) checkTypes() {
 	for i, t := range p.Defs.Types {
-		if t.Tok.File != p.File {
-			continue
-		}
 		p.Defs.Types[i].Type, _ = p.realType(t.Type, true)
 	}
 }
 
 // WaitingGlobals parses X global variables for waiting to parsing.
 func (p *Parser) WaitingGlobals() {
-	pdefs := p.Defs
-	for _, wg := range p.waitingGlobals {
-		if wg.vast.IdTok.File != p.File {
-			continue
-		}
-		p.Defs = wg.defs
-		*wg.vast = *p.Var(*wg.vast)
+	for _, v := range p.waitingGlobals {
+		*v = *p.Var(*v)
 	}
-	p.Defs = pdefs
 }
 
 func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) {
@@ -1388,9 +1358,6 @@ func (p *Parser) parseFunc(f *Func) (err bool) {
 func (p *Parser) checkFuncs() {
 	err := false
 	check := func(f *function) {
-		if f.Ast.Tok.File != p.File {
-			return
-		}
 		p.wg.Add(1)
 		go p.checkFuncSpecialCasesAsync(f.Ast)
 		if err ||
