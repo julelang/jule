@@ -179,7 +179,7 @@ const sb7: = -2.24409524465858183362e+01 // 0xC03670E242712D62
 // Returns the error function of x.
 //
 // Special cases are:
-//  erf(+inf) = 1
+//  erf(inf) = 1
 //  erf(-inf) = -1
 //  erf(nan) = nan
 pub erf(x f64) f64 {
@@ -250,4 +250,84 @@ pub erf(x f64) f64 {
 		ret r/x - 1
 	}
 	ret 1 - r/x
+}
+
+//doc:
+// Returns the complementary error function of x.
+//
+// Special cases are:
+//  erfc(inf) = 0
+//  erfc(-inf) = 2
+//  erfc(nan) = nan
+pub erfc(x f64) f64 {
+	const TINY: = 1.0 / (1 << 56) // 2**-56
+	// special cases
+	match {
+	case isnan(x):
+		ret nan()
+	case isinf(x, 1):
+		ret 0
+	case isinf(x, -1):
+		ret 2
+	}
+	sign: = false
+	if x < 0 {
+		x = -x
+		sign = true
+	}
+	if x < 0.84375 { // |x| < 0.84375
+		temp:f64
+		if x < TINY { // |x| < 2**-56
+			temp = x
+		} else {
+			z: = x * x
+			r: = pp0 + z*(pp1+z*(pp2+z*(pp3+z*pp4)))
+			s: = 1 + z*(qq1+z*(qq2+z*(qq3+z*(qq4+z*qq5))))
+			y: = r / s
+			if x < 0.25 { // |x| < 1/4
+				temp = x + x*y
+			} else {
+				temp = 0.5 + (x*y + (x - 0.5))
+			}
+		}
+		if sign {
+			ret 1 + temp
+		}
+		ret 1 - temp
+	}
+	if x < 1.25 { // 0.84375 <= |x| < 1.25
+		s: = x - 1
+		P: = pa0 + s*(pa1+s*(pa2+s*(pa3+s*(pa4+s*(pa5+s*pa6)))))
+		Q: = 1 + s*(qa1+s*(qa2+s*(qa3+s*(qa4+s*(qa5+s*qa6)))))
+		if sign {
+			ret 1 + erx + P/Q
+		}
+		ret 1 - erx - P/Q
+
+	}
+	if x < 28 { // |x| < 28
+		s: = 1 / (x * x)
+		R:f64
+		S:f64
+		if x < 1/0.35 { // |x| < 1 / 0.35 ~ 2.857143
+			R = ra0 + s*(ra1+s*(ra2+s*(ra3+s*(ra4+s*(ra5+s*(ra6+s*ra7))))))
+			S = 1 + s*(sa1+s*(sa2+s*(sa3+s*(sa4+s*(sa5+s*(sa6+s*(sa7+s*sa8)))))))
+		} else { // |x| >= 1 / 0.35 ~ 2.857143
+			if sign && x > 6 {
+				ret 2 // x < -6
+			}
+			R = rb0 + s*(rb1+s*(rb2+s*(rb3+s*(rb4+s*(rb5+s*rb6)))))
+			S = 1 + s*(sb1+s*(sb2+s*(sb3+s*(sb4+s*(sb5+s*(sb6+s*sb7))))))
+		}
+		z: = f64_from_bits(f64_bits(x) & 0xffffffff00000000) // pseudo-single (20-bit) precision x
+		r: = exp(-z*z-0.5625) * exp((z-x)*(z+x)+R/S)
+		if sign {
+			ret 2 - r/x
+		}
+		ret r / x
+	}
+	if sign {
+		ret 2
+	}
+	ret 0
 }
