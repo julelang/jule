@@ -1,0 +1,43 @@
+// Copyright 2022 The X Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+/*
+  Floating-point mod function.
+*/
+
+//doc:
+// Returns the floating-point remainder of x/y.
+// The magnitude of the result is less than y and its
+// sign agrees with that of x.
+//
+// Special cases are:
+//  mod(±inf, y) = nan
+//  mod(nan, y) = nan
+//  mod(x, 0) = nan
+//  mod(x, ±inf) = x
+//  mod(x, nan) = nan
+pub mod(const x, y f64) f64 {
+	if y == 0 || isinf(x, 0) || isnan(x) || isnan(y) {
+		ret nan()
+	}
+	y = abs(y)
+
+	yfr:, yexp: = frexp(y)
+	r: = x
+	if x < 0 {
+		r = -x
+	}
+
+	iter r >= y {
+		rfr:, rexp: = frexp(r)
+		if rfr < yfr {
+			rexp = rexp - 1
+		}
+		r = r - ldexp(y, rexp-yexp)
+	}
+	if x < 0 {
+		r = -r
+	}
+	ret r
+}
