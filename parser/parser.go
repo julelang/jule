@@ -504,7 +504,7 @@ func (p *Parser) checkParse() {
 		p.pushwarn("exist_undefined_doc")
 	}
 	p.wg.Add(1)
-	go p.checkAsync()
+	go p.check()
 }
 
 // Special case is;
@@ -709,7 +709,7 @@ func (p *Parser) Enum(e Enum) {
 				v:         val,
 				ignoreAny: true,
 				errtok:    item.Tok,
-			}.checkAssignTypeAsync()
+			}.checkAssignType()
 		} else {
 			item.Expr.Model = exprNode{strconv.Itoa(i)}
 		}
@@ -1012,7 +1012,7 @@ func (p *Parser) Var(v Var) *Var {
 				t:        v.Type,
 				v:        val,
 				errtok:   v.IdTok,
-			}.checkAssignTypeAsync()
+			}.checkAssignType()
 		}
 	} else {
 		if v.SetterTok.Id == tokens.NA {
@@ -1244,8 +1244,8 @@ func (p *Parser) checkUses() {
 	}
 }
 
-func (p *Parser) checkAsync() {
-	defer func() { p.wg.Done() }()
+func (p *Parser) check() {
+	defer p.wg.Done()
 	if p.IsMain && !p.JustDefs {
 		f, _, _ := p.Defs.funcById(x.EntryPoint, p.File)
 		if f == nil {
@@ -1291,7 +1291,7 @@ func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) {
 	v, model := p.evalExpr(param.Default)
 	param.Default.Model = model
 	p.wg.Add(1)
-	go p.checkArgTypeAsync(*param, v, false, param.Tok)
+	go p.checkArgType(*param, v, false, param.Tok)
 }
 
 func paramIsAllowForConst(param *Param) bool {
@@ -1359,7 +1359,7 @@ func (p *Parser) checkFuncs() {
 	err := false
 	check := func(f *function) {
 		p.wg.Add(1)
-		go p.checkFuncSpecialCasesAsync(f.Ast)
+		go p.checkFuncSpecialCases(f.Ast)
 		if err ||
 			f.checked ||
 			(len(f.Ast.Generics) > 0 && len(f.Ast.Combines) == 0) {
@@ -1391,8 +1391,8 @@ func (p *Parser) checkFuncs() {
 	}
 }
 
-func (p *Parser) checkFuncSpecialCasesAsync(f *Func) {
-	defer func() { p.wg.Done() }()
+func (p *Parser) checkFuncSpecialCases(f *Func) {
+	defer p.wg.Done()
 	switch f.Id {
 	case x.EntryPoint, x.InitializerFunction:
 		p.checkSolidFuncSpecialCases(f)
@@ -2408,7 +2408,7 @@ func (p *Parser) evalArraySelect(arrv, selectv value, errtok Tok) value {
 		t:      DataType{Id: xtype.UInt, Kind: tokens.UINT},
 		v:      selectv,
 		errtok: errtok,
-	}.checkAssignTypeAsync()
+	}.checkAssignType()
 	return arrv
 }
 
@@ -2419,7 +2419,7 @@ func (p *Parser) evalMapSelect(mapv, selectv value, errtok Tok) value {
 	valType := types[1]
 	mapv.data.Type = valType
 	p.wg.Add(1)
-	go p.checkTypeAsync(keyType, selectv.data.Type, false, errtok)
+	go p.checkType(keyType, selectv.data.Type, false, errtok)
 	return mapv
 }
 
@@ -2433,7 +2433,7 @@ func (p *Parser) evalStrSelect(strv, selectv value, errtok Tok) value {
 		t:      DataType{Id: xtype.UInt, Kind: tokens.UINT},
 		v:      selectv,
 		errtok: errtok,
-	}.checkAssignTypeAsync()
+	}.checkAssignType()
 	return strv
 }
 
@@ -2447,7 +2447,7 @@ func (p *Parser) evalPtrSelect(ptrv, selectv value, errtok Tok) value {
 		t:      DataType{Id: xtype.UInt, Kind: tokens.UINT},
 		v:      selectv,
 		errtok: errtok,
-	}.checkAssignTypeAsync()
+	}.checkAssignType()
 	return ptrv
 }
 
@@ -2473,7 +2473,7 @@ func (p *Parser) buildArray(parts []Toks, t DataType, errtok Tok) (value, iExpr)
 			t:      elemType,
 			v:      partVal,
 			errtok: part[0],
-		}.checkAssignTypeAsync()
+		}.checkAssignType()
 	}
 	return v, model
 }
@@ -2522,14 +2522,14 @@ func (p *Parser) buildMap(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
 			t:      keyType,
 			v:      key,
 			errtok: colonTok,
-		}.checkAssignTypeAsync()
+		}.checkAssignType()
 		p.wg.Add(1)
 		go assignChecker{
 			p:      p,
 			t:      valType,
 			v:      val,
 			errtok: colonTok,
-		}.checkAssignTypeAsync()
+		}.checkAssignType()
 	}
 	return v, model
 }
@@ -2797,11 +2797,11 @@ func (p *Parser) parseArg(param Param, arg *Arg, variadiced *bool) {
 		*variadiced = value.variadic
 	}
 	p.wg.Add(1)
-	go p.checkArgTypeAsync(param, value, false, arg.Tok)
+	go p.checkArgType(param, value, false, arg.Tok)
 }
 
-func (p *Parser) checkArgTypeAsync(param Param, val value, ignoreAny bool, errTok Tok) {
-	defer func() { p.wg.Done() }()
+func (p *Parser) checkArgType(param Param, val value, ignoreAny bool, errTok Tok) {
+	defer p.wg.Done()
 	if !param.Const && param.Reference && !val.lvalue {
 		p.pusherrtok(errTok, "not_lvalue_for_reference_param")
 	}
@@ -2812,7 +2812,7 @@ func (p *Parser) checkArgTypeAsync(param Param, val value, ignoreAny bool, errTo
 		t:        param.Type,
 		v:        val,
 		errtok:   errTok,
-	}.checkAssignTypeAsync()
+	}.checkAssignType()
 }
 
 // Returns between of brackets.
@@ -2982,7 +2982,7 @@ func (p *Parser) parseCase(c *models.Case, t DataType) {
 			t:      t,
 			v:      value,
 			errtok: expr.Toks[0],
-		}.checkAssignTypeAsync()
+		}.checkAssignType()
 	}
 	p.caseCount++
 	defer func() { p.caseCount-- }()
@@ -3300,7 +3300,7 @@ func (p *Parser) checkSingleAssign(assign *models.Assign) {
 		t:        leftExpr.data.Type,
 		v:        val,
 		errtok:   assign.Setter,
-	}.checkAssignTypeAsync()
+	}.checkAssignType()
 }
 
 func (p *Parser) assignExprs(vsAST *models.Assign) []value {
@@ -3347,7 +3347,7 @@ func (p *Parser) processMultiAssign(assign *models.Assign, right []value) {
 				t:        leftExpr.data.Type,
 				v:        right,
 				errtok:   assign.Setter,
-			}.checkAssignTypeAsync()
+			}.checkAssignType()
 			continue
 		}
 		left.Var.Tag = right
@@ -3675,8 +3675,8 @@ func (p *Parser) realType(dt DataType, err bool) (ret DataType, _ bool) {
 	return p.typeSource(dt, err)
 }
 
-func (p *Parser) checkMultiTypeAsync(real, check DataType, ignoreAny bool, errTok Tok) {
-	defer func() { p.wg.Done() }()
+func (p *Parser) checkMultiType(real, check DataType, ignoreAny bool, errTok Tok) {
+	defer p.wg.Done()
 	if real.MultiTyped != check.MultiTyped {
 		p.pusherrtok(errTok, "incompatible_datatype", real.Kind, check.Kind)
 		return
@@ -3690,7 +3690,7 @@ func (p *Parser) checkMultiTypeAsync(real, check DataType, ignoreAny bool, errTo
 	for i := 0; i < len(realTypes); i++ {
 		realType := realTypes[i]
 		checkType := checkTypes[i]
-		p.checkTypeAsync(realType, checkType, ignoreAny, errTok)
+		p.checkType(realType, checkType, ignoreAny, errTok)
 	}
 }
 
@@ -3700,8 +3700,8 @@ func (p *Parser) checkAssignConst(constant bool, t DataType, val value, errTok T
 	}
 }
 
-func (p *Parser) checkTypeAsync(real, check DataType, ignoreAny bool, errTok Tok) {
-	defer func() { p.wg.Done() }()
+func (p *Parser) checkType(real, check DataType, ignoreAny bool, errTok Tok) {
+	defer p.wg.Done()
 	if typeIsVoid(check) {
 		p.pusherrtok(errTok, "incompatible_datatype", real.Kind, check.Kind)
 		return
@@ -3711,7 +3711,7 @@ func (p *Parser) checkTypeAsync(real, check DataType, ignoreAny bool, errTok Tok
 	}
 	if real.MultiTyped || check.MultiTyped {
 		p.wg.Add(1)
-		go p.checkMultiTypeAsync(real, check, ignoreAny, errTok)
+		go p.checkMultiType(real, check, ignoreAny, errTok)
 		return
 	}
 	switch {

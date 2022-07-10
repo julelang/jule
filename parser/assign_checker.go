@@ -14,8 +14,8 @@ type assignChecker struct {
 	errtok    Tok
 }
 
-func (ac assignChecker) checkAssignTypeAsync() {
-	defer func() { ac.p.wg.Done() }()
+func (ac assignChecker) checkAssignType() {
+	defer ac.p.wg.Done()
 	ac.p.checkAssignConst(ac.constant, ac.t, ac.v, ac.errtok)
 	if typeIsPure(ac.t) && isConstNumeric(ac.v.data.Value) {
 		switch {
@@ -34,5 +34,5 @@ func (ac assignChecker) checkAssignTypeAsync() {
 		}
 	}
 	ac.p.wg.Add(1)
-	go ac.p.checkTypeAsync(ac.t, ac.v.data.Type, ac.ignoreAny, ac.errtok)
+	go ac.p.checkType(ac.t, ac.v.data.Type, ac.ignoreAny, ac.errtok)
 }

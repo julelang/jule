@@ -72,13 +72,13 @@ func (l *Lex) Lex() []Tok {
 		}
 	}
 	l.wg.Add(1)
-	go l.checkRangesAsync()
+	go l.checkRanges()
 	l.wg.Wait()
 	return toks
 }
 
-func (l *Lex) checkRangesAsync() {
-	defer func() { l.wg.Done() }()
+func (l *Lex) checkRanges() {
+	defer l.wg.Done()
 	for _, tok := range l.braces {
 		switch tok.Kind {
 		case tokens.LPARENTHESES:

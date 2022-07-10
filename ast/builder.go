@@ -667,11 +667,11 @@ func (b *Builder) Params(f *models.Func, toks Toks) {
 		b.pushParam(f, part)
 	}
 	b.wg.Add(1)
-	go b.checkParamsAsync(f)
+	go b.checkParams(f)
 }
 
-func (b *Builder) checkParamsAsync(f *models.Func) {
-	defer func() { b.wg.Done() }()
+func (b *Builder) checkParams(f *models.Func) {
+	defer b.wg.Done()
 	for i := range f.Params {
 		p := &f.Params[i]
 		if p.Type.Tok.Id == tokens.NA {

@@ -130,7 +130,7 @@ func (pap *pureArgParser) tryFuncMultiRetAsArgs() bool {
 		rt := types[i]
 		pap.p.wg.Add(1)
 		val := value{data: models.Data{Type: rt}}
-		go pap.p.checkArgTypeAsync(param, val, false, arg.Tok)
+		go pap.p.checkArgType(param, val, false, arg.Tok)
 	}
 	return true
 }

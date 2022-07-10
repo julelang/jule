@@ -25,7 +25,7 @@ func (fc *foreachChecker) array() {
 		return
 	}
 	fc.p.wg.Add(1)
-	go fc.p.checkTypeAsync(elementType, keyB.Type, true, fc.profile.InTok)
+	go fc.p.checkType(elementType, keyB.Type, true, fc.profile.InTok)
 }
 
 func (fc *foreachChecker) xmap() {
@@ -64,7 +64,7 @@ func (fc *foreachChecker) checkKeyAMapKey() {
 		return
 	}
 	fc.p.wg.Add(1)
-	go fc.p.checkTypeAsync(keyType, keyA.Type, true, fc.profile.InTok)
+	go fc.p.checkType(keyType, keyA.Type, true, fc.profile.InTok)
 }
 
 func (fc *foreachChecker) checkKeyBMapVal() {
@@ -78,7 +78,7 @@ func (fc *foreachChecker) checkKeyBMapVal() {
 		return
 	}
 	fc.p.wg.Add(1)
-	go fc.p.checkTypeAsync(valType, keyB.Type, true, fc.profile.InTok)
+	go fc.p.checkType(valType, keyB.Type, true, fc.profile.InTok)
 }
 
 func (fc *foreachChecker) str() {
@@ -96,7 +96,7 @@ func (fc *foreachChecker) str() {
 		return
 	}
 	fc.p.wg.Add(1)
-	go fc.p.checkTypeAsync(runeType, keyB.Type, true, fc.profile.InTok)
+	go fc.p.checkType(runeType, keyB.Type, true, fc.profile.InTok)
 }
 
 func (fc *foreachChecker) check() {

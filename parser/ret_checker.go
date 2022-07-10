@@ -67,7 +67,7 @@ func (rc *retChecker) single() {
 		t:      rc.f.RetType.Type,
 		v:      rc.values[0],
 		errtok: rc.retAST.Tok,
-	}.checkAssignTypeAsync()
+	}.checkAssignType()
 }
 
 func (rc *retChecker) multi() {
@@ -90,7 +90,7 @@ func (rc *retChecker) multi() {
 			t:      t,
 			v:      rc.values[i],
 			errtok: rc.retAST.Tok,
-		}.checkAssignTypeAsync()
+		}.checkAssignType()
 	}
 }
 
@@ -129,7 +129,7 @@ func (rc *retChecker) checkMultiRetAsMutliRet() {
 			t:      rt,
 			v:      val,
 			errtok: rc.retAST.Tok,
-		}.checkAssignTypeAsync()
+		}.checkAssignType()
 	}
 }
 

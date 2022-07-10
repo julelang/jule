@@ -90,7 +90,7 @@ func isOutableAttribute(kind string) bool {
 	return kind == x.Attribute_Inline
 }
 
-func attributesToString(attributes []Attribute) string {
+func attributesToString(attributes []models.Attribute) string {
 	var cxx strings.Builder
 	for _, attr := range attributes {
 		if isOutableAttribute(attr.Tag.Kind) {
