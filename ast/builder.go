@@ -1234,7 +1234,6 @@ func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
 		return
 	case tokens.Match:
 		return b.MatchCase(bs.toks)
-	case tokens.Operator:
 	case tokens.Brace:
 		if tok.Kind == tokens.LBRACE {
 			return b.blockStatement(bs.toks)

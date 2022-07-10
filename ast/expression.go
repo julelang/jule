@@ -13,6 +13,10 @@ func IsFuncCall(toks Toks) Toks {
 			return nil
 		}
 	}
+	tok := toks[len(toks)-1]
+	if tok.Id != tokens.Brace || tok.Kind != tokens.RPARENTHESES {
+		return nil
+	}
 	braceCount := 0
 	// Loops i >= 1 because expression must be has function expression at begin.
 	// For this reason, ignore first token.
