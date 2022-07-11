@@ -541,6 +541,10 @@ func (p *Parser) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 		fp.Defs = p.Defs
 		fp.Parsef(false, true)
 		fp.wg.Wait()
+		if len(fp.Errors) > 0 {
+			p.pusherrs(fp.Errors...)
+			return true
+		}
 		p.waitingGlobals = append(p.waitingGlobals, fp.waitingGlobals...)
 	}
 	return
