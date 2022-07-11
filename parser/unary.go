@@ -16,7 +16,7 @@ type unary struct {
 func (u *unary) minus() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !typeIsPure(v.data.Type) || !xtype.IsNumericType(v.data.Type.Id) {
-		u.p.pusherrtok(u.tok, "invalid_type_unary_operator", '-')
+		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", '-')
 	}
 	if isConstNumeric(v.data.Value) {
 		v.data.Value = tokens.MINUS + v.data.Value
@@ -27,7 +27,7 @@ func (u *unary) minus() value {
 func (u *unary) plus() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !typeIsPure(v.data.Type) || !xtype.IsNumericType(v.data.Type.Id) {
-		u.p.pusherrtok(u.tok, "invalid_type_unary_operator", '+')
+		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", '+')
 	}
 	return v
 }
@@ -35,7 +35,7 @@ func (u *unary) plus() value {
 func (u *unary) tilde() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !typeIsPure(v.data.Type) || !xtype.IsIntegerType(v.data.Type.Id) {
-		u.p.pusherrtok(u.tok, "invalid_type_unary_operator", '~')
+		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", '~')
 	}
 	return v
 }
@@ -43,7 +43,7 @@ func (u *unary) tilde() value {
 func (u *unary) logicalNot() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !isBoolExpr(v) {
-		u.p.pusherrtok(u.tok, "invalid_type_unary_operator", '!')
+		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", '!')
 	}
 	v.data.Type.Id = xtype.Bool
 	v.data.Type.Kind = tokens.BOOL
@@ -54,7 +54,7 @@ func (u *unary) star() value {
 	v := u.p.eval.process(u.toks, u.model)
 	v.lvalue = true
 	if !typeIsExplicitPtr(v.data.Type) {
-		u.p.pusherrtok(u.tok, "invalid_type_unary_operator", '*')
+		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", '*')
 	} else {
 		v.data.Type.Kind = v.data.Type.Kind[1:]
 	}
@@ -71,17 +71,17 @@ func (u *unary) amper() value {
 		switch t := (*node).(type) {
 		case anonFuncExpr:
 			if t.capture == xapi.LambdaByReference {
-				u.p.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.AMPER)
+				u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.AMPER)
 				break
 			}
 			t.capture = xapi.LambdaByReference
 			*node = t
 		default:
-			u.p.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.AMPER)
+			u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.AMPER)
 		}
 	default:
 		if !canGetPtr(v) {
-			u.p.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.AMPER)
+			u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.AMPER)
 		}
 		v.lvalue = true
 		v.data.Type.Kind = tokens.STAR + v.data.Type.Kind

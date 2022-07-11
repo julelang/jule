@@ -703,7 +703,7 @@ func (p *Parser) Enum(e Enum) {
 			}
 		}
 		if item.Expr.Toks != nil {
-			val, model := p.eval.expr(item.Expr)
+			val, model := p.evalExpr(item.Expr)
 			item.Expr.Model = model
 			p.wg.Add(1)
 			go assignChecker{
@@ -1002,7 +1002,7 @@ func (p *Parser) Var(v Var) *Var {
 		val = t
 	default:
 		if v.SetterTok.Id != tokens.NA {
-			val, v.Val.Model = p.eval.expr(v.Val)
+			val, v.Val.Model = p.evalExpr(v.Val)
 		}
 	}
 	if v.Type.Id != xtype.Void {
@@ -1021,6 +1021,7 @@ func (p *Parser) Var(v Var) *Var {
 		if v.SetterTok.Id == tokens.NA {
 			p.pusherrtok(v.IdTok, "missing_autotype_value")
 		} else {
+			p.eval.hasError = p.eval.hasError || val.data.Value == ""
 			v.Type = val.data.Type
 			p.checkValidityForAutoType(v.Type, v.SetterTok)
 			p.checkAssignConst(v.Const, v.Type, val, v.SetterTok)
@@ -1291,7 +1292,7 @@ func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) {
 	if param.Variadic {
 		dt.Kind = "[]" + dt.Kind // For array.
 	}
-	v, model := p.eval.expr(param.Default)
+	v, model := p.evalExpr(param.Default)
 	param.Default.Model = model
 	p.wg.Add(1)
 	go p.checkArgType(*param, v, false, param.Tok)
@@ -1701,7 +1702,7 @@ func getParamMap(params []Param) *paramMap {
 }
 
 func (p *Parser) parseArg(param Param, arg *Arg, variadiced *bool) {
-	value, model := p.eval.expr(arg.Expr)
+	value, model := p.evalExpr(arg.Expr)
 	arg.Expr.Model = model
 	if variadiced != nil && !*variadiced {
 		*variadiced = value.variadic
@@ -1810,7 +1811,7 @@ func (p *Parser) checkNewBlock(b *models.Block) {
 func (p *Parser) statement(s *models.Statement) bool {
 	switch t := s.Val.(type) {
 	case models.ExprStatement:
-		_, t.Expr.Model = p.eval.expr(t.Expr)
+		_, t.Expr.Model = p.evalExpr(t.Expr)
 		s.Val = t
 	case Var:
 		p.varStatement(&t, false)
@@ -1895,7 +1896,7 @@ func (p *Parser) checkBlock(b *models.Block) {
 func (p *Parser) parseCase(c *models.Case, t DataType) {
 	for i := range c.Exprs {
 		expr := &c.Exprs[i]
-		value, model := p.eval.expr(*expr)
+		value, model := p.evalExpr(*expr)
 		expr.Model = model
 		p.wg.Add(1)
 		go assignChecker{
@@ -1919,7 +1920,7 @@ func (p *Parser) cases(cases []models.Case, t DataType) {
 func (p *Parser) matchcase(t *models.Match) {
 	var dt DataType
 	if len(t.Expr.Processes) > 0 {
-		value, model := p.eval.expr(t.Expr)
+		value, model := p.evalExpr(t.Expr)
 		t.Expr.Model = model
 		dt = value.data.Type
 	} else {
@@ -2159,13 +2160,13 @@ func (p *Parser) varStatement(v *Var, noParse bool) {
 func (p *Parser) deferredCall(d *models.Defer) {
 	m := new(exprModel)
 	m.nodes = make([]exprBuildNode, 1)
-	_, d.Expr.Model = p.eval.expr(d.Expr)
+	_, d.Expr.Model = p.evalExpr(d.Expr)
 }
 
 func (p *Parser) concurrentCall(cc *models.ConcurrentCall) {
 	m := new(exprModel)
 	m.nodes = make([]exprBuildNode, 1)
-	_, cc.Expr.Model = p.eval.expr(cc.Expr)
+	_, cc.Expr.Model = p.evalExpr(cc.Expr)
 }
 
 func (p *Parser) assignment(selected value, errtok Tok) bool {
@@ -2190,13 +2191,13 @@ func (p *Parser) assignment(selected value, errtok Tok) bool {
 
 func (p *Parser) SingleAssign(assign *models.Assign) {
 	right := &assign.Right[0]
-	val, model := p.eval.expr(*right)
+	val, model := p.evalExpr(*right)
 	right.Model = model
 	left := &assign.Left[0].Expr
 	if len(left.Toks) == 1 && xapi.IsIgnoreId(left.Toks[0].Kind) {
 		return
 	}
-	leftExpr, model := p.eval.expr(*left)
+	leftExpr, model := p.evalExpr(*left)
 	left.Model = model
 	if !p.assignment(leftExpr, assign.Setter) {
 		return
@@ -2227,7 +2228,7 @@ func (p *Parser) SingleAssign(assign *models.Assign) {
 func (p *Parser) assignExprs(vsAST *models.Assign) []value {
 	vals := make([]value, len(vsAST.Right))
 	for i, expr := range vsAST.Right {
-		val, model := p.eval.expr(expr)
+		val, model := p.evalExpr(expr)
 		vsAST.Right[i].Model = model
 		vals[i] = val
 	}
@@ -2256,7 +2257,7 @@ func (p *Parser) multiAssign(assign *models.Assign, right []value) {
 			if left.Ignore {
 				continue
 			}
-			leftExpr, model := p.eval.expr(left.Expr)
+			leftExpr, model := p.evalExpr(left.Expr)
 			left.Expr.Model = model
 			if !p.assignment(leftExpr, assign.Setter) {
 				return
@@ -2282,7 +2283,7 @@ func (p *Parser) suffix(assign *models.Assign) {
 		return
 	}
 	left := &assign.Left[0]
-	value, model := p.eval.expr(left.Expr)
+	value, model := p.evalExpr(left.Expr)
 	left.Expr.Model = model
 	_ = p.assignment(value, assign.Setter)
 	if typeIsPtr(value.data.Type) {
@@ -2308,7 +2309,7 @@ func (p *Parser) assign(assign *models.Assign) {
 		return
 	} else if rightLength == 1 {
 		expr := &assign.Right[0]
-		firstVal, model := p.eval.expr(*expr)
+		firstVal, model := p.evalExpr(*expr)
 		expr.Model = model
 		if firstVal.data.Type.MultiTyped {
 			assign.MultipleRet = true
@@ -2329,7 +2330,7 @@ func (p *Parser) assign(assign *models.Assign) {
 
 func (p *Parser) whileProfile(iter *models.Iter) {
 	profile := iter.Profile.(models.IterWhile)
-	val, model := p.eval.expr(profile.Expr)
+	val, model := p.evalExpr(profile.Expr)
 	profile.Expr.Model = model
 	iter.Profile = profile
 	if !isBoolExpr(val) {
@@ -2340,7 +2341,7 @@ func (p *Parser) whileProfile(iter *models.Iter) {
 
 func (p *Parser) foreachProfile(iter *models.Iter) {
 	profile := iter.Profile.(models.IterForeach)
-	val, model := p.eval.expr(profile.Expr)
+	val, model := p.evalExpr(profile.Expr)
 	profile.Expr.Model = model
 	profile.ExprType = val.data.Type
 	if !isForeachIterExpr(val) {
@@ -2373,7 +2374,7 @@ func (p *Parser) forProfile(iter *models.Iter) {
 		_ = p.statement(&profile.Once)
 	}
 	if len(profile.Condition.Processes) > 0 {
-		val, model := p.eval.expr(profile.Condition)
+		val, model := p.evalExpr(profile.Condition)
 		profile.Condition.Model = model
 		p.wg.Add(1)
 		go assignChecker{
@@ -2458,7 +2459,7 @@ func (p *Parser) catch(try *models.Try, catch *models.Catch) {
 }
 
 func (p *Parser) ifExpr(ifast *models.If, i *int, statements []models.Statement) {
-	val, model := p.eval.expr(ifast.Expr)
+	val, model := p.evalExpr(ifast.Expr)
 	ifast.Expr.Model = model
 	statement := statements[*i]
 	if !isBoolExpr(val) {
@@ -2477,7 +2478,7 @@ node:
 	statement = statements[*i]
 	switch t := statement.Val.(type) {
 	case models.ElseIf:
-		val, model := p.eval.expr(t.Expr)
+		val, model := p.evalExpr(t.Expr)
 		t.Expr.Model = model
 		if !isBoolExpr(val) {
 			p.pusherrtok(t.Tok, "if_notbool_expr")
@@ -2510,6 +2511,9 @@ func (p *Parser) continueStatement(continueAST *models.Continue) {
 }
 
 func (p *Parser) checkValidityForAutoType(t DataType, errtok Tok) {
+	if p.eval.hasError {
+		return
+	}
 	switch t.Id {
 	case xtype.Nil:
 		p.pusherrtok(errtok, "nil_for_autotype")
@@ -2651,7 +2655,7 @@ func (p *Parser) checkAssignConst(constant bool, t DataType, val value, errTok T
 func (p *Parser) checkType(real, check DataType, ignoreAny bool, errTok Tok) {
 	defer p.wg.Done()
 	if typeIsVoid(check) {
-		p.pusherrtok(errTok, "incompatible_datatype", real.Kind, check.Kind)
+		p.eval.pusherrtok(errTok, "incompatible_datatype", real.Kind, check.Kind)
 		return
 	}
 	if !ignoreAny && real.Id == xtype.Any {
@@ -2671,4 +2675,14 @@ func (p *Parser) checkType(real, check DataType, ignoreAny bool, errTok Tok) {
 	if real.Kind != check.Kind {
 		p.pusherrtok(errTok, "incompatible_datatype", real.Kind, check.Kind)
 	}
+}
+
+func (p *Parser) evalExpr(expr Expr) (value, iExpr) {
+	p.eval.hasError = false
+	return p.eval.expr(expr)
+}
+
+func (p *Parser) evalToks(toks Toks) (value, iExpr) {
+	p.eval.hasError = false
+	return p.eval.toks(toks)
 }

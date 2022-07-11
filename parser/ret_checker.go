@@ -20,7 +20,7 @@ func (rc *retChecker) pushval(last, current int, errTk Tok) {
 		return
 	}
 	toks := rc.retAST.Expr.Toks[last:current]
-	val, model := rc.p.eval.toks(toks)
+	val, model := rc.p.evalToks(toks)
 	rc.expModel.models = append(rc.expModel.models, model)
 	rc.values = append(rc.values, val)
 }

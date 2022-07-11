@@ -5,6 +5,7 @@ import (
 	"github.com/the-xlang/xxc/ast/models"
 	"github.com/the-xlang/xxc/lex/tokens"
 	"github.com/the-xlang/xxc/pkg/xapi"
+	"github.com/the-xlang/xxc/pkg/xlog"
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
@@ -13,7 +14,24 @@ func isOperator(process Toks) bool {
 }
 
 type eval struct {
-	p *Parser
+	p        *Parser
+	hasError bool
+}
+
+func (e *eval) pusherrtok(tok Tok, err string, args ...any) {
+	if e.hasError {
+		return
+	}
+	e.hasError = true
+	e.p.pusherrtok(tok, err, args...)
+}
+
+func (e *eval) pusherrs(errs ...xlog.CompilerLog) {
+	if e.hasError {
+		return
+	}
+	e.hasError = true
+	e.p.pusherrs(errs...)
 }
 
 func (e *eval) toks(toks Toks) (value, iExpr) {
@@ -27,7 +45,13 @@ func (e *eval) expr(expr Expr) (value, iExpr) {
 }
 
 func (e *eval) processes(processes []Toks) (v value, expr iExpr) {
-	if processes == nil {
+	defer func() {
+		if typeIsVoid(v.data.Type) {
+			v.data.Type.Id = xtype.Void
+			v.data.Type.Kind = xtype.VoidTypeStr
+		}
+	}()
+	if processes == nil || e.hasError {
 		return
 	}
 	if len(processes) == 1 {
@@ -37,13 +61,18 @@ func (e *eval) processes(processes []Toks) (v value, expr iExpr) {
 		return
 	}
 	valProcesses := make([]any, len(processes))
+	hasError := e.hasError
 	for i, process := range processes {
 		if isOperator(process) {
 			valProcesses[i] = nil
 			continue
 		}
-		val, model := e.toks(process)
+		val, model := e.p.evalToks(process)
+		hasError = hasError || e.hasError
 		valProcesses[i] = []any{val.data, model}
+	}
+	if hasError {
+		return
 	}
 	return e.valProcesses(valProcesses, processes)
 }
@@ -117,7 +146,7 @@ func (e *eval) nextOperator(processes []Toks) int {
 		case tokens.OR:
 			prec.set(10, i)
 		default:
-			e.p.pusherrtok(process[0], "invalid_operator")
+			e.pusherrtok(process[0], "invalid_operator")
 		}
 	}
 	data := prec.get()
@@ -150,7 +179,7 @@ func (e *eval) single(tok Tok, m *exprModel) (v value, ok bool) {
 	case tokens.Id:
 		v, ok = eval.id()
 	default:
-		e.p.pusherrtok(tok, "invalid_syntax")
+		e.pusherrtok(tok, "invalid_syntax")
 	}
 	return
 }
@@ -164,7 +193,7 @@ func (e *eval) unary(toks Toks, m *exprModel) value {
 	processor := unary{toks[0], exprToks, m, e.p}
 	m.appendSubNode(exprNode{processor.tok.Kind})
 	if processor.toks == nil {
-		e.p.pusherrtok(processor.tok, "invalid_syntax")
+		e.pusherrtok(processor.tok, "invalid_syntax")
 		return v
 	}
 	switch processor.tok.Kind {
@@ -181,7 +210,7 @@ func (e *eval) unary(toks Toks, m *exprModel) value {
 	case tokens.AMPER:
 		v = processor.amper()
 	default:
-		e.p.pusherrtok(processor.tok, "invalid_syntax")
+		e.pusherrtok(processor.tok, "invalid_syntax")
 	}
 	v.data.Tok = processor.tok
 	return v
@@ -195,7 +224,7 @@ func (e *eval) betweenParentheses(toks Toks, m *exprModel) value {
 	tk := toks[0]
 	toks = toks[1 : len(toks)-1]
 	if len(toks) == 0 {
-		e.p.pusherrtok(tk, "invalid_syntax")
+		e.pusherrtok(tk, "invalid_syntax")
 	}
 	val, model := e.toks(toks)
 	m.appendSubNode(model)
@@ -268,7 +297,7 @@ func (e *eval) parenthesesRange(toks Toks, m *exprModel) (v value) {
 		s := v.data.Type.Tag.(*xstruct)
 		return e.p.callStructConstructor(s, genericsToks, rangeExpr, m)
 	}
-	e.p.pusherrtok(exprToks[len(exprToks)-1], "invalid_syntax")
+	e.pusherrtok(exprToks[len(exprToks)-1], "invalid_syntax")
 	return
 }
 
@@ -317,7 +346,7 @@ func (e *eval) process(toks Toks, m *exprModel) (v value) {
 			return e.bracketRange(toks, m)
 		}
 	default:
-		e.p.pusherrtok(toks[0], "invalid_syntax")
+		e.pusherrtok(toks[0], "invalid_syntax")
 	}
 	return
 }
@@ -360,7 +389,7 @@ func (e *eval) subId(toks Toks, m *exprModel) (v value) {
 	case typeIsMap(checkType):
 		return e.mapObjSubId(val, idTok, m)
 	}
-	e.p.pusherrtok(valTok, "obj_not_support_sub_fields", val.data.Type.Kind)
+	e.pusherrtok(valTok, "obj_not_support_sub_fields", val.data.Type.Kind)
 	return
 }
 
@@ -436,7 +465,7 @@ func (e *eval) cast(v value, t DataType, errtok Tok) value {
 		v.lvalue = false
 		e.castSingle(t, v.data.Type, errtok)
 	default:
-		e.p.pusherrtok(errtok, "type_notsupports_casting", t.Kind)
+		e.pusherrtok(errtok, "type_notsupports_casting", t.Kind)
 	}
 	v.data.Value = ""
 	v.data.Type = t
@@ -460,18 +489,18 @@ func (e *eval) castSingle(t, vt DataType, errtok Tok) {
 	case xtype.IsNumericType(t.Id):
 		e.castNumeric(t, vt, errtok)
 	default:
-		e.p.pusherrtok(errtok, "type_notsupports_casting", t.Kind)
+		e.pusherrtok(errtok, "type_notsupports_casting", t.Kind)
 	}
 }
 
 func (e *eval) castStr(vt DataType, errtok Tok) {
 	if !typeIsArray(vt) {
-		e.p.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
+		e.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
 		return
 	}
 	vt.Kind = vt.Kind[2:] // Remove array brackets
 	if !typeIsPure(vt) || vt.Id != xtype.U8 {
-		e.p.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
+		e.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
 	}
 }
 
@@ -491,14 +520,14 @@ func (e *eval) castInteger(t, vt DataType, errtok Tok) {
 	if typeIsPure(vt) && xtype.IsNumericType(vt.Id) {
 		return
 	}
-	e.p.pusherrtok(errtok, "type_notsupports_casting_to", vt.Kind, t.Kind)
+	e.pusherrtok(errtok, "type_notsupports_casting_to", vt.Kind, t.Kind)
 }
 
 func (e *eval) castNumeric(t, vt DataType, errtok Tok) {
 	if typeIsPure(vt) && xtype.IsNumericType(vt.Id) {
 		return
 	}
-	e.p.pusherrtok(errtok, "type_notsupports_casting_to", vt.Kind, t.Kind)
+	e.pusherrtok(errtok, "type_notsupports_casting_to", vt.Kind, t.Kind)
 }
 
 func (e *eval) castPtr(vt DataType, errtok Tok) {
@@ -508,17 +537,17 @@ func (e *eval) castPtr(vt DataType, errtok Tok) {
 	if typeIsPure(vt) && xtype.IsIntegerType(vt.Id) {
 		return
 	}
-	e.p.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
+	e.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
 }
 
 func (e *eval) castArray(t, vt DataType, errtok Tok) {
 	if !typeIsPure(vt) || vt.Id != xtype.Str {
-		e.p.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
+		e.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
 		return
 	}
 	t.Kind = t.Kind[2:] // Remove array brackets
 	if !typeIsPure(t) || t.Id != xtype.U8 {
-		e.p.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
+		e.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
 	}
 }
 
@@ -531,7 +560,7 @@ func (e *eval) tryAssign(toks Toks, m *exprModel) (v value, ok bool) {
 	}
 	ok = true
 	if len(b.Errors) > 0 {
-		e.p.pusherrs(b.Errors...)
+		e.pusherrs(b.Errors...)
 		return
 	}
 	v, _ = e.expr(assign.Left[0].Expr)
@@ -546,7 +575,7 @@ func (e *eval) tryAssign(toks Toks, m *exprModel) (v value, ok bool) {
 func (e *eval) xTypeSubId(dm *Defmap, idTok Tok, m *exprModel) (v value) {
 	i, dm, t := dm.defById(idTok.Kind, nil)
 	if i == -1 {
-		e.p.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
+		e.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
 		return
 	}
 	v.lvalue = false
@@ -642,7 +671,7 @@ func (e *eval) typeSubId(typeTok, idTok Tok, m *exprModel) (v value) {
 	case tokens.STR:
 		return e.strSubId(idTok, m)
 	}
-	e.p.pusherrtok(typeTok, "obj_not_support_sub_fields", typeTok.Kind)
+	e.pusherrtok(typeTok, "obj_not_support_sub_fields", typeTok.Kind)
 	return
 }
 
@@ -661,7 +690,7 @@ func (e *eval) typeId(toks Toks, m *exprModel) (v value) {
 func (e *eval) xObjSubId(dm *Defmap, val value, idTok Tok, m *exprModel) (v value) {
 	i, dm, t := dm.defById(idTok.Kind, idTok.File)
 	if i == -1 {
-		e.p.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
+		e.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
 		return
 	}
 	v = val
@@ -712,7 +741,7 @@ func (e *eval) enumSubId(val value, idTok Tok, m *exprModel) (v value) {
 	m.appendSubNode(exprNode{"::"})
 	m.appendSubNode(exprNode{xapi.OutId(idTok.Kind, enum.Tok.File)})
 	if enum.ItemById(idTok.Kind) == nil {
-		e.p.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
+		e.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
 	}
 	return
 }
@@ -734,7 +763,7 @@ func (e *eval) nsSubId(toks Toks, m *exprModel) (v value) {
 	for i, tok := range toks {
 		if (i+1)%2 != 0 {
 			if tok.Id != tokens.Id {
-				e.p.pusherrtok(tok, "invalid_syntax")
+				e.pusherrtok(tok, "invalid_syntax")
 				continue
 			}
 			src := prev.nsById(tok.Kind, false)
@@ -743,7 +772,7 @@ func (e *eval) nsSubId(toks Toks, m *exprModel) (v value) {
 					toks = toks[i:]
 					goto eval
 				}
-				e.p.pusherrtok(tok, "namespace_not_exist", tok.Kind)
+				e.pusherrtok(tok, "namespace_not_exist", tok.Kind)
 				return
 			}
 			prev = src.Defs
@@ -778,7 +807,7 @@ func (e *eval) id(toks Toks, m *exprModel) (v value) {
 	}
 	i--
 	if i == 0 {
-		e.p.pusherrtok(toks[i], "invalid_syntax")
+		e.pusherrtok(toks[i], "invalid_syntax")
 		return
 	}
 	tok = toks[i]
@@ -788,7 +817,7 @@ func (e *eval) id(toks Toks, m *exprModel) (v value) {
 	case tokens.DoubleColon:
 		return e.nsSubId(toks, m)
 	}
-	e.p.pusherrtok(toks[i], "invalid_syntax")
+	e.pusherrtok(toks[i], "invalid_syntax")
 	return
 }
 
@@ -799,7 +828,7 @@ func (e *eval) operatorRight(toks Toks, m *exprModel) (v value) {
 		toks = toks[:len(toks)-1]
 		return e.variadic(toks, m, tok)
 	default:
-		e.p.pusherrtok(tok, "invalid_syntax")
+		e.pusherrtok(tok, "invalid_syntax")
 	}
 	return
 }
@@ -807,7 +836,7 @@ func (e *eval) operatorRight(toks Toks, m *exprModel) (v value) {
 func (e *eval) variadic(toks Toks, m *exprModel, errtok Tok) (v value) {
 	v = e.process(toks, m)
 	if !typeIsVariadicable(v.data.Type) {
-		e.p.pusherrtok(errtok, "variadic_with_nonvariadicable", v.data.Type.Kind)
+		e.pusherrtok(errtok, "variadic_with_nonvariadicable", v.data.Type.Kind)
 		return
 	}
 	v.data.Type.Kind = v.data.Type.Kind[2:] // Remove array type.
@@ -837,7 +866,7 @@ func (e *eval) bracketRange(toks Toks, m *exprModel) (v value) {
 	}
 	valToksLen := len(exprToks)
 	if valToksLen == 0 || braceCount > 0 {
-		e.p.pusherrtok(toks[0], "invalid_syntax")
+		e.pusherrtok(toks[0], "invalid_syntax")
 		return
 	}
 	var model iExpr
@@ -862,7 +891,7 @@ func (e *eval) enumerableSelect(enumv, selectv value, errtok Tok) (v value) {
 	case typeIsExplicitPtr(enumv.data.Type):
 		return e.ptrSelect(enumv, selectv, errtok)
 	}
-	e.p.pusherrtok(errtok, "not_enumerable")
+	e.pusherrtok(errtok, "not_enumerable")
 	return
 }
 
@@ -973,7 +1002,7 @@ func (e *eval) buildMap(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
 			}
 		}
 		if colon < 1 || colon+1 >= len(part) {
-			e.p.pusherrtok(errtok, "missing_expr")
+			e.pusherrtok(errtok, "missing_expr")
 			continue
 		}
 		colonTok := part[colon]
@@ -1013,7 +1042,7 @@ func (e *eval) buildEnumerable(exprToks Toks, t DataType, m *exprModel) (v value
 	case typeIsMap(t):
 		v, model = e.buildMap(e.buildEnumerableParts(exprToks), t, exprToks[0])
 	default:
-		e.p.pusherrtok(exprToks[0], "invalid_type_source")
+		e.pusherrtok(exprToks[0], "invalid_type_source")
 		return
 	}
 	m.appendSubNode(model)
@@ -1042,14 +1071,14 @@ func (e *eval) braceRange(toks Toks, m *exprModel) (v value) {
 	}
 	valToksLen := len(exprToks)
 	if valToksLen == 0 || braceCount > 0 {
-		e.p.pusherrtok(toks[0], "invalid_syntax")
+		e.pusherrtok(toks[0], "invalid_syntax")
 		return
 	}
 	tok := exprToks[0]
 	switch exprToks[0].Id {
 	case tokens.Id:
 		if len(exprToks) > 1 {
-			e.p.pusherrtok(tok, "invalid_syntax")
+			e.pusherrtok(tok, "invalid_syntax")
 			return
 		}
 		return e.typeId(toks, m)
@@ -1064,7 +1093,7 @@ func (e *eval) braceRange(toks Toks, m *exprModel) (v value) {
 				e.p.pusherrs(b.Errors...)
 				return
 			} else if *i+1 < len(exprToks) {
-				e.p.pusherrtok(toks[*i+1], "invalid_syntax")
+				e.pusherrtok(toks[*i+1], "invalid_syntax")
 			}
 			exprToks = toks[len(exprToks):]
 			return e.buildEnumerable(exprToks, t, m)
@@ -1077,16 +1106,17 @@ func (e *eval) braceRange(toks Toks, m *exprModel) (v value) {
 				return
 			}
 			e.p.checkAnonFunc(&f)
+			v.data.Value = f.Id
 			v.data.Type.Tag = &f
 			v.data.Type.Id = xtype.Func
 			v.data.Type.Kind = f.DataTypeString()
 			m.appendSubNode(anonFuncExpr{f, xapi.LambdaByCopy})
 			return
 		default:
-			e.p.pusherrtok(exprToks[0], "invalid_syntax")
+			e.pusherrtok(exprToks[0], "invalid_syntax")
 		}
 	default:
-		e.p.pusherrtok(exprToks[0], "invalid_syntax")
+		e.pusherrtok(exprToks[0], "invalid_syntax")
 	}
 	return
 }

@@ -131,6 +131,7 @@ func (ve *valueEvaluator) varId(id string, variable *Var) (v value) {
 	} else {
 		ve.model.appendSubNode(exprNode{xapi.OutId(id, variable.IdTok.File)})
 	}
+	ve.p.eval.hasError = ve.p.eval.hasError || typeIsVoid(v.data.Type)
 	return
 }
 
@@ -205,7 +206,7 @@ func (ve *valueEvaluator) id() (_ value, ok bool) {
 	} else if t, _, _ := ve.p.typeById(id); t != nil {
 		return ve.typeId(id, t)
 	} else {
-		ve.p.pusherrtok(ve.tok, "id_noexist", id)
+		ve.p.eval.pusherrtok(ve.tok, "id_noexist", id)
 	}
 	return
 }
