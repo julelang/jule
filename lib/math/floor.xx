@@ -88,3 +88,43 @@ pub round(const x f64) f64 {
 	}
 	ret f64_from_bits(bits)
 }
+
+//doc:
+// Returns the nearest integer, rounding ties to even.
+//
+// Special cases are:
+//  round_even(±0) = ±0
+//  round_even(±inf) = ±inf
+//  round_even(nan) = nan
+pub round_even(const x f64) f64 {
+	// round_even is a faster implementation of:
+	//
+	// pub round_even(const x f64) f64 {
+	//   t: = trunc(x)
+	//   odd: = remainder(t, 2) != 0
+	//   d: = abs(x - t)
+	//   if d > 0.5 || (d == 0.5 && odd) {
+	//       ret t + copysign(1, x)
+	//   }
+	//   ret t
+	// }
+	bits: = f64_bits(x)
+	e := uint(bits>>shift) & mask
+	if e >= bias {
+		// Round abs(x) >= 1.
+		// - Large numbers without fractional components, infinity, and NaN are unchanged.
+		// - Add 0.499.. or 0.5 before truncating depending on whether the truncated
+		//   number is even or odd (respectively).
+		const half_minus_ULP: = (1 << (shift - 1)) - 1
+		e -= bias
+		bits += (half_minus_ULP + (bits>>(shift-e))&1) >> e
+		bits &= ~(frac_mask >> e)
+	} else if e == bias-1 && bits&frac_mask != 0 {
+		// Round 0.5 < abs(x) < 1.
+		bits = bits&sign_mask | uvone // +-1
+	} else {
+		// Round abs(x) <= 0.5 including denormals.
+		bits &= sign_mask // +-0
+	}
+	ret f64_from_bits(bits)
+}
