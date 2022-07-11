@@ -24,20 +24,33 @@ func (rt *RetType) AnyVar() bool {
 
 // Vars returns variables of ret type if exist, nil if not.
 func (rt *RetType) Vars() []*Var {
+	get := func(tok Tok, t DataType) *Var {
+		if xapi.IsIgnoreId(tok.Kind) {
+			return nil
+		}
+		v := new(Var)
+		v.IdTok = tok
+		v.Id = tok.Kind
+		v.Type = t
+		return v
+	}
 	if !rt.Type.MultiTyped {
+		if len(rt.Identifiers) > 0 {
+			v := get(rt.Identifiers[0], rt.Type)
+			if v == nil {
+				return nil
+			}
+			return []*Var{v}
+		}
 		return nil
 	}
-	types := rt.Type.Tag.([]DataType)
 	var vars []*Var
+	types := rt.Type.Tag.([]DataType)
 	for i, tok := range rt.Identifiers {
-		if xapi.IsIgnoreId(tok.Kind) {
-			continue
+		v := get(tok, types[i])
+		if v != nil {
+			vars = append(vars, v)
 		}
-		variable := new(Var)
-		variable.IdTok = tok
-		variable.Id = tok.Kind
-		variable.Type = types[i]
-		vars = append(vars, variable)
 	}
 	return vars
 }
