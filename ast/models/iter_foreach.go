@@ -87,7 +87,7 @@ func (f *IterForeach) ForeachString(iter Iter) string {
 	return ""
 }
 
-func (f IterForeach) IterationString(iter Iter) string {
+func (f *IterForeach) IterationString(iter Iter) string {
 	var cxx strings.Builder
 	cxx.WriteString("for (auto ")
 	cxx.WriteString(xapi.OutId(f.KeyB.Id, f.KeyB.IdTok.File))

@@ -614,7 +614,7 @@ func (b *Builder) Generics(toks Toks) []models.GenericType {
 	} else if i < len(toks) {
 		b.pusherr(toks[i], "invalid_syntax")
 	}
-	parts, errs := Parts(genericsToks, tokens.Comma)
+	parts, errs := Parts(genericsToks, tokens.Comma, true)
 	b.Errors = append(b.Errors, errs...)
 	generics := make([]models.GenericType, len(parts))
 	for i, part := range parts {
@@ -661,7 +661,7 @@ func (b *Builder) GlobalVar(toks Toks) {
 
 // Params builds AST model of function parameters.
 func (b *Builder) Params(f *models.Func, toks Toks) {
-	parts, errs := Parts(toks, tokens.Comma)
+	parts, errs := Parts(toks, tokens.Comma, true)
 	b.Errors = append(b.Errors, errs...)
 	for _, part := range parts {
 		b.pushParam(f, part)
@@ -853,7 +853,7 @@ func (b *Builder) idGenericsParts(toks Toks, i *int) []Toks {
 		}
 	}
 	toks = toks[first+1 : *i]
-	parts, errs := Parts(toks, tokens.Comma)
+	parts, errs := Parts(toks, tokens.Comma, true)
 	b.Errors = append(b.Errors, errs...)
 	return parts
 }
@@ -1712,7 +1712,7 @@ func (b *Builder) getWhileIterProfile(toks Toks) models.IterWhile {
 }
 
 func (b *Builder) getForeachVarsToks(toks Toks) []Toks {
-	vars, errs := Parts(toks, tokens.Comma)
+	vars, errs := Parts(toks, tokens.Comma, true)
 	b.Errors = append(b.Errors, errs...)
 	return vars
 }
@@ -1781,13 +1781,50 @@ func (b *Builder) getForeachIterProfile(varToks, exprToks Toks, inTok Tok) model
 	return foreach
 }
 
-func (b *Builder) getIterProfile(toks Toks) models.IterProfile {
+func (b *Builder) getForIterProfile(toks Toks, errtok Tok) models.IterProfile {
+	parts, errs := Parts(toks, tokens.Comma, false)
+	switch {
+	case len(errs) > 0:
+		b.Errors = append(b.Errors, errs...)
+		return nil
+	case len(parts) != 3:
+		b.pusherr(errtok, "invalid_syntax")
+		return nil
+	}
+	var fp models.IterFor
+	once := parts[0]
+	if len(once) > 0 {
+		fp.Once = b.forStatement(once)
+	}
+	condition := parts[1]
+	if len(condition) > 0 {
+		fp.Condition = b.Expr(condition)
+	}
+	next := parts[2]
+	if len(next) > 0 {
+		fp.Next = b.forStatement(next)
+	}
+	return fp
+}
+
+func (b *Builder) forStatement(toks Toks) models.Statement {
+	s := b.Statement(&blockStatement{toks: toks})
+	switch s.Val.(type) {
+	case models.ExprStatement, models.Assign:
+	default:
+		b.pusherr(s.Tok, "invalid_syntax")
+	}
+	return s
+}
+
+func (b *Builder) getIterProfile(toks Toks, errtok Tok) models.IterProfile {
 	braceCount := 0
 	for i, tok := range toks {
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
 			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
 				braceCount++
+				continue
 			default:
 				braceCount--
 			}
@@ -1795,10 +1832,13 @@ func (b *Builder) getIterProfile(toks Toks) models.IterProfile {
 		if braceCount != 0 {
 			continue
 		}
-		if tok.Id == tokens.In {
+		switch tok.Id {
+		case tokens.In:
 			varToks := toks[:i]
 			exprToks := toks[i+1:]
 			return b.getForeachIterProfile(varToks, exprToks, tok)
+		case tokens.Comma:
+			return b.getForIterProfile(toks, errtok)
 		}
 	}
 	return b.getWhileIterProfile(toks)
@@ -1814,7 +1854,7 @@ func (b *Builder) IterExpr(toks Toks) (s models.Statement) {
 	}
 	exprToks := BlockExpr(toks)
 	if len(exprToks) > 0 {
-		iter.Profile = b.getIterProfile(exprToks)
+		iter.Profile = b.getIterProfile(exprToks, iter.Tok)
 	}
 	i := new(int)
 	*i = len(exprToks)

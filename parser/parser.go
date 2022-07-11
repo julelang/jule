@@ -2454,7 +2454,7 @@ func (p *Parser) evalPtrSelect(ptrv, selectv value, errtok Tok) value {
 //! IMPORTANT: Tokens is should be store enumerable parentheses.
 func (p *Parser) buildEnumerableParts(toks Toks) []Toks {
 	toks = toks[1 : len(toks)-1]
-	parts, errs := ast.Parts(toks, tokens.Comma)
+	parts, errs := ast.Parts(toks, tokens.Comma, true)
 	p.pusherrs(errs...)
 	return parts
 }
@@ -2569,7 +2569,7 @@ func (p *Parser) getGenerics(toks Toks) []DataType {
 	}
 	// Remove braces
 	toks = toks[1 : len(toks)-1]
-	parts, errs := ast.Parts(toks, tokens.Comma)
+	parts, errs := ast.Parts(toks, tokens.Comma, true)
 	generics := make([]DataType, len(parts))
 	p.pusherrs(errs...)
 	for i, part := range parts {
@@ -2897,8 +2897,7 @@ func (p *Parser) checkNewBlock(b *models.Block) {
 	p.checkNewBlockCustom(b, p.blockVars)
 }
 
-func (p *Parser) checkStatement(b *models.Block, i *int) {
-	s := &b.Tree[*i]
+func (p *Parser) statement(s *models.Statement) bool {
 	switch t := s.Val.(type) {
 	case models.ExprStatement:
 		_, t.Expr.Model = p.evalExpr(t.Expr)
@@ -2916,12 +2915,6 @@ func (p *Parser) checkStatement(b *models.Block, i *int) {
 		p.checkBreakStatement(&t)
 	case models.Continue:
 		p.checkContinueStatement(&t)
-	case models.If:
-		p.checkIfExpr(&t, i, b.Tree)
-		s.Val = t
-	case models.Try:
-		p.checkTry(&t, i, b.Tree)
-		s.Val = t
 	case Type:
 		if def, _ := p.blockDefById(t.Id); def != nil {
 			p.pusherrtok(t.Tok, "exist_id", t.Id)
@@ -2941,25 +2934,39 @@ func (p *Parser) checkStatement(b *models.Block, i *int) {
 	case models.ConcurrentCall:
 		p.checkConcurrentCallStatement(&t)
 		s.Val = t
-	case models.Label:
-		t.Index = *i
-		t.Block = b
-		*p.rootBlock.Labels = append(*p.rootBlock.Labels, &t)
-	case models.Ret:
-		rc := retChecker{p: p, retAST: &t, f: b.Func}
-		rc.check()
-		s.Val = t
 	case models.Match:
 		p.checkMatchCase(&t)
+		s.Val = t
+	case models.CxxEmbed:
+		p.cxxEmbedStatement(&t)
+		s.Val = t
+	case models.Comment:
+	default:
+		return false
+	}
+	return true
+}
+
+func (p *Parser) checkStatement(b *models.Block, i *int) {
+	s := &b.Tree[*i]
+	if p.statement(s) {
+		return
+	}
+	switch t := s.Val.(type) {
+	case models.If:
+		p.checkIfExpr(&t, i, b.Tree)
+		s.Val = t
+	case models.Try:
+		p.checkTry(&t, i, b.Tree)
 		s.Val = t
 	case models.Goto:
 		t.Index = *i
 		t.Block = b
 		*p.rootBlock.Gotos = append(*p.rootBlock.Gotos, &t)
-	case models.CxxEmbed:
-		p.cxxEmbedStatement(&t)
+	case models.Ret:
+		rc := retChecker{p: p, retAST: &t, f: b.Func}
+		rc.check()
 		s.Val = t
-	case models.Comment:
 	default:
 		p.pusherrtok(s.Tok, "invalid_syntax")
 	}
@@ -3445,6 +3452,31 @@ func (p *Parser) checkForeachProfile(iter *models.Iter) {
 	p.checkNewBlockCustom(&iter.Block, blockVars)
 }
 
+func (p *Parser) checkForProfile(iter *models.Iter) {
+	profile := iter.Profile.(models.IterFor)
+	blockVars := p.blockVars
+	if profile.Once.Val != nil {
+		_ = p.statement(&profile.Once)
+	}
+	if len(profile.Condition.Processes) > 0 {
+		val, model := p.evalExpr(profile.Condition)
+		profile.Condition.Model = model
+		p.wg.Add(1)
+		go assignChecker{
+			p:      p,
+			t:      DataType{Id: xtype.Bool, Kind: xtype.TypeMap[xtype.Bool]},
+			v:      val,
+			errtok: profile.Condition.Toks[0],
+		}.checkAssignType()
+	}
+	if profile.Next.Val != nil {
+		_ = p.statement(&profile.Next)
+	}
+	iter.Profile = profile
+	p.checkNewBlock(&iter.Block)
+	p.blockVars = blockVars
+}
+
 func (p *Parser) checkIterExpr(iter *models.Iter) {
 	p.iterCount++
 	defer func() { p.iterCount-- }()
@@ -3454,6 +3486,8 @@ func (p *Parser) checkIterExpr(iter *models.Iter) {
 			p.checkWhileProfile(iter)
 		case models.IterForeach:
 			p.checkForeachProfile(iter)
+		case models.IterFor:
+			p.checkForProfile(iter)
 		}
 	}
 }

@@ -71,7 +71,7 @@ func RangeLast(toks Toks) (cutted, cut Toks) {
 //
 // Special case is;
 //  Parts(toks) = nil if len(toks) == 0
-func Parts(toks Toks, id uint8) ([]Toks, []xlog.CompilerLog) {
+func Parts(toks Toks, id uint8, exprMust bool) ([]Toks, []xlog.CompilerLog) {
 	if len(toks) == 0 {
 		return nil, nil
 	}
@@ -93,7 +93,7 @@ func Parts(toks Toks, id uint8) ([]Toks, []xlog.CompilerLog) {
 			continue
 		}
 		if tok.Id == id {
-			if i-last <= 0 {
+			if exprMust && i-last <= 0 {
 				errs = append(errs, compilerErr(tok, "missing_expr"))
 			}
 			parts = append(parts, toks[last:i])
@@ -102,6 +102,8 @@ func Parts(toks Toks, id uint8) ([]Toks, []xlog.CompilerLog) {
 	}
 	if last < len(toks) {
 		parts = append(parts, toks[last:])
+	} else if !exprMust {
+		parts = append(parts, Toks{})
 	}
 	return parts, errs
 }
