@@ -137,7 +137,11 @@ func (rc *retChecker) retsVars() {
 	if !rc.f.RetType.Type.MultiTyped {
 		for _, v := range rc.f.RetType.Identifiers {
 			if !xapi.IsIgnoreId(v.Kind) {
-				rc.retAST.Expr.Model = exprNode{v.Kind}
+				model := new(exprModel)
+				model.index = 0
+				model.nodes = make([]exprBuildNode, 1)
+				_, _ = rc.p.evalSingleExpr(v, model)
+				rc.retAST.Expr.Model = model
 				break
 			}
 		}
