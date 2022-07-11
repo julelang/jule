@@ -55,6 +55,22 @@ func isfloat(s string) bool {
 		strings.ContainsAny(s, "eE")
 }
 
+func canGetPtr(v value) bool {
+	if !v.lvalue {
+		return false
+	}
+	switch v.data.Type.Id {
+	case xtype.Func, xtype.Enum:
+		return false
+	default:
+		return v.data.Tok.Id == tokens.Id
+	}
+}
+
+func valIsStructIns(val value) bool {
+	return !val.isType && val.data.Type.Id == xtype.Struct
+}
+
 func isForeachIterExpr(val value) bool {
 	switch {
 	case typeIsArray(val.data.Type),

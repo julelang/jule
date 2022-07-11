@@ -20,7 +20,7 @@ func (rc *retChecker) pushval(last, current int, errTk Tok) {
 		return
 	}
 	toks := rc.retAST.Expr.Toks[last:current]
-	val, model := rc.p.evalToks(toks)
+	val, model := rc.p.eval.toks(toks)
 	rc.expModel.models = append(rc.expModel.models, model)
 	rc.values = append(rc.values, val)
 }
@@ -140,7 +140,7 @@ func (rc *retChecker) retsVars() {
 				model := new(exprModel)
 				model.index = 0
 				model.nodes = make([]exprBuildNode, 1)
-				_, _ = rc.p.evalSingleExpr(v, model)
+				_, _ = rc.p.eval.single(v, model)
 				rc.retAST.Expr.Model = model
 				break
 			}
@@ -159,7 +159,7 @@ func (rc *retChecker) retsVars() {
 		model := new(exprModel)
 		model.index = 0
 		model.nodes = make([]exprBuildNode, 1)
-		_, _ = rc.p.evalSingleExpr(v, model)
+		_, _ = rc.p.eval.single(v, model)
 		rc.expModel.models = append(rc.expModel.models, model)
 	}
 	rc.retAST.Expr.Model = rc.expModel
