@@ -2242,6 +2242,8 @@ func (b *Builder) exprProcesses(toks Toks) []Toks {
 			if skipStep {
 				continue
 			}
+		case tokens.Comma:
+			info.singleOperatored = false
 		}
 		b.exprValuePart(&info, tok)
 	}
