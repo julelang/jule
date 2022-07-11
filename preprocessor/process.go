@@ -6,6 +6,8 @@ import "github.com/the-xlang/xxc/ast/models"
 type Tree = []models.Object
 
 // Process all preprocessor directives and commands.
-func Process(tree *Tree) {
-	TrimEnofi(tree)
+func Process(tree *Tree, includeEnofi bool) {
+	if includeEnofi {
+		TrimEnofi(tree)
+	}
 }

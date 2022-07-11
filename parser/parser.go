@@ -547,7 +547,7 @@ func (p *Parser) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 func (p *Parser) Parset(tree []models.Object, main, justDefs bool) {
 	p.IsMain = main
 	p.JustDefs = justDefs
-	preprocessor.Process(&tree)
+	preprocessor.Process(&tree, !main)
 	if !p.parseTree(tree) {
 		return
 	}
@@ -1247,7 +1247,7 @@ func (p *Parser) checkUses() {
 func (p *Parser) check() {
 	defer p.wg.Done()
 	if p.IsMain && !p.JustDefs {
-		f, _, _ := p.Defs.funcById(x.EntryPoint, p.File)
+		f, _, _ := p.Defs.funcById(x.EntryPoint, nil)
 		if f == nil {
 			p.PushErr("no_entry_point")
 		} else {
@@ -2967,6 +2967,10 @@ func (p *Parser) checkStatement(b *models.Block, i *int) {
 		rc := retChecker{p: p, retAST: &t, f: b.Func}
 		rc.check()
 		s.Val = t
+	case models.Label:
+		t.Block = b
+		t.Index = *i
+		*p.rootBlock.Labels = append(*b.Labels, &t)
 	default:
 		p.pusherrtok(s.Tok, "invalid_syntax")
 	}

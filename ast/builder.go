@@ -1436,7 +1436,7 @@ func (b *Builder) AssignExpr(toks Toks, isExpr bool) (assign models.Assign, ok b
 }
 
 // BuildReturnStatement builds AST model of return statement.
-func (b *Builder) IdStatement(toks Toks) (s models.Statement, _ bool) {
+func (b *Builder) IdStatement(toks Toks) (s models.Statement, ok bool) {
 	if len(toks) == 1 {
 		return
 	}
@@ -1819,6 +1819,7 @@ func (b *Builder) forStatement(toks Toks) models.Statement {
 
 func (b *Builder) getIterProfile(toks Toks, errtok Tok) models.IterProfile {
 	braceCount := 0
+	comma := false
 	for i, tok := range toks {
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
@@ -1838,8 +1839,11 @@ func (b *Builder) getIterProfile(toks Toks, errtok Tok) models.IterProfile {
 			exprToks := toks[i+1:]
 			return b.getForeachIterProfile(varToks, exprToks, tok)
 		case tokens.Comma:
-			return b.getForIterProfile(toks, errtok)
+			comma = true
 		}
+	}
+	if comma {
+		return b.getForIterProfile(toks, errtok)
 	}
 	return b.getWhileIterProfile(toks)
 }
