@@ -49,6 +49,7 @@ func (e *eval) processes(processes []Toks) (v value, expr iExpr) {
 		if typeIsVoid(v.data.Type) {
 			v.data.Type.Id = xtype.Void
 			v.data.Type.Kind = xtype.VoidTypeStr
+			e.hasError = true
 		}
 	}()
 	if processes == nil || e.hasError {
@@ -72,6 +73,7 @@ func (e *eval) processes(processes []Toks) (v value, expr iExpr) {
 		valProcesses[i] = []any{val.data, model}
 	}
 	if hasError {
+		e.hasError = true
 		return
 	}
 	return e.valProcesses(valProcesses, processes)
