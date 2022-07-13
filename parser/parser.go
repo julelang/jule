@@ -1059,10 +1059,10 @@ func (p *Parser) Var(v Var) *Var {
 
 func (p *Parser) checkTypeParam(f *function) {
 	if len(f.Ast.Generics) == 0 {
-		p.pusherrtok(f.Ast.Tok, "func_must_have_generics_if_has_attribute", x.Attribute_TypeParam)
+		p.pusherrtok(f.Ast.Tok, "func_must_have_generics_if_has_attribute", x.Attribute_TypeArg)
 	}
 	if len(f.Ast.Params) != 0 {
-		p.pusherrtok(f.Ast.Tok, "func_cant_have_params_if_has_attribute", x.Attribute_TypeParam)
+		p.pusherrtok(f.Ast.Tok, "func_cant_have_params_if_has_attribute", x.Attribute_TypeArg)
 	}
 }
 
@@ -1070,7 +1070,7 @@ func (p *Parser) checkFuncAttributes(f *function) {
 	for _, attribute := range f.Ast.Attributes {
 		switch attribute.Tag.Kind {
 		case x.Attribute_Inline:
-		case x.Attribute_TypeParam:
+		case x.Attribute_TypeArg:
 			p.checkTypeParam(f)
 		default:
 			p.pusherrtok(attribute.Tok, "invalid_attribute")
@@ -1777,7 +1777,7 @@ func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *models.Args, 
 func (p *Parser) parseFuncCallToks(f *Func, genericsToks, argsToks Toks, m *exprModel) (v value) {
 	var generics []DataType
 	var args *models.Args
-	if f.FindAttribute(x.Attribute_TypeParam) != nil {
+	if f.FindAttribute(x.Attribute_TypeArg) != nil {
 		if len(genericsToks) > 0 {
 			p.pusherrtok(genericsToks[0], "invalid_syntax")
 			return

@@ -27,8 +27,8 @@ const (
 	ArchAmd64 = "amd64"
 	ArchI386  = "i386"
 
-	Attribute_Inline    = "inline"
-	Attribute_TypeParam = "type_param"
+	Attribute_Inline  = "inline"
+	Attribute_TypeArg = "typearg"
 
 	PreprocessorDirective      = "pragma"
 	PreprocessorDirectiveEnofi = "enofi"
