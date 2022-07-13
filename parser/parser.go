@@ -1284,13 +1284,22 @@ func (p *Parser) WaitingGlobals() {
 	}
 }
 
+func (p *Parser) checkParamDefaultExprWithDefault(param *Param) {
+	if typeIsFunc(param.Type) {
+		p.pusherrtok(param.Tok, "invalid_type_for_default_arg", param.Type.Kind)
+	}
+}
+
 func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) {
 	if !paramHasDefaultArg(param) || param.Tok.Id == tokens.NA {
 		return
 	}
 	// Skip default argument with default value
-	if param.Default.Model != nil && param.Default.Model.String() == xapi.DefaultExpr {
-		return
+	if param.Default.Model != nil {
+		if param.Default.Model.String() == xapi.DefaultExpr {
+			p.checkParamDefaultExprWithDefault(param)
+			return
+		}
 	}
 	dt := param.Type
 	if param.Variadic {
