@@ -9,14 +9,15 @@ import (
 )
 
 type function struct {
-	Ast     *Func
-	Desc    string
-	used    bool
-	checked bool
+	Ast          *Func
+	Desc         string
+	used         bool
+	checked      bool
+	isEntryPoint bool
 }
 
 func (f *function) outId() string {
-	if f.Ast.Id == x.EntryPoint {
+	if f.isEntryPoint {
 		return xapi.OutId(f.Ast.Id, nil)
 	}
 	return xapi.OutId(f.Ast.Id, f.Ast.Tok.File)

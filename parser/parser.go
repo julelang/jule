@@ -1259,6 +1259,7 @@ func (p *Parser) check() {
 		if f == nil {
 			p.PushErr("no_entry_point")
 		} else {
+			f.isEntryPoint = true
 			f.used = true
 		}
 	}
