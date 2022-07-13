@@ -59,6 +59,11 @@ func (ast *Builder) Ended() bool {
 
 func (b *Builder) buildNode(toks Toks) {
 	tok := toks[0]
+	if tok.Id == tokens.Id || tok.Id == tokens.Operator {
+		if b.GlobalFunc(toks) {
+			return
+		}
+	}
 	switch tok.Id {
 	case tokens.Use:
 		b.Use(toks)
@@ -238,8 +243,8 @@ func (b *Builder) Enum(toks Toks) {
 	b.pub = false
 	enum.Items = b.buildEnumItems(itemToks)
 	b.Tree = append(b.Tree, models.Object{
-		Tok:   enum.Tok,
-		Value: enum,
+		Tok:  enum.Tok,
+		Data: enum,
 	})
 }
 
@@ -249,7 +254,7 @@ func (b *Builder) Comment(tok Tok) {
 	if strings.HasPrefix(tok.Kind, "cxx:") {
 		b.Tree = append(b.Tree, models.Object{
 			Tok: tok,
-			Value: models.CxxEmbed{
+			Data: models.CxxEmbed{
 				Tok:     tok,
 				Content: tok.Kind[4:]},
 		})
@@ -257,7 +262,7 @@ func (b *Builder) Comment(tok Tok) {
 	}
 	b.Tree = append(b.Tree, models.Object{
 		Tok: tok,
-		Value: models.Comment{
+		Data: models.Comment{
 			Content: tok.Kind,
 		},
 	})
@@ -286,8 +291,8 @@ func (b *Builder) Preprocessor(toks Toks) {
 	}
 	if ok {
 		b.Tree = append(b.Tree, models.Object{
-			Tok:   pp.Tok,
-			Value: pp,
+			Tok:  pp.Tok,
+			Data: pp,
 		})
 	}
 }
@@ -345,17 +350,6 @@ func (b *Builder) Id(toks Toks) {
 		case tokens.LBRACE: // Namespace.
 			b.Namespace(toks)
 			return
-		case tokens.LPARENTHESES: // Function.
-			f := b.Func(toks, false)
-			s := models.Statement{
-				Tok: f.Tok,
-				Val: f,
-			}
-			b.Tree = append(b.Tree, models.Object{
-				Tok:   f.Tok,
-				Value: s,
-			})
-			return
 		}
 	}
 	b.pusherr(tok, "invalid_syntax")
@@ -410,8 +404,8 @@ func (b *Builder) Namespace(toks Toks) {
 	ns.Tree = b.Tree
 	b.Tree = tree
 	b.Tree = append(b.Tree, models.Object{
-		Tok:   ns.Tok,
-		Value: ns,
+		Tok:  ns.Tok,
+		Data: ns,
 	})
 }
 
@@ -460,8 +454,8 @@ func (b *Builder) Struct(toks Toks) {
 	}
 	s.Fields = b.structFields(bodyToks)
 	b.Tree = append(b.Tree, models.Object{
-		Tok:   s.Tok,
-		Value: s,
+		Tok:  s.Tok,
+		Data: s,
 	})
 }
 
@@ -485,8 +479,8 @@ func (b *Builder) Use(toks Toks) {
 	use.LinkString = tokstoa(toks)
 	use.Path = b.usePath(toks)
 	b.Tree = append(b.Tree, models.Object{
-		Tok:   use.Tok,
-		Value: use,
+		Tok:  use.Tok,
+		Data: use,
 	})
 }
 
@@ -526,9 +520,53 @@ func (b *Builder) Attribute(toks Toks) {
 		return
 	}
 	b.Tree = append(b.Tree, models.Object{
-		Tok:   a.Tok,
-		Value: a,
+		Tok:  a.Tok,
+		Data: a,
 	})
+}
+
+// GlobalFunc builds AST model of global scope function.
+func (b *Builder) GlobalFunc(toks Toks) bool {
+	if len(toks) == 0 {
+		return false
+	}
+	i := 0
+	tok := toks[i]
+	if tok.Id == tokens.Operator {
+		if tok.Kind != tokens.STAR {
+			return false
+		}
+		i++
+		tok = toks[i]
+	}
+	if tok.Id != tokens.Id {
+		return false
+	}
+	if i+1 >= len(toks) {
+		return false
+	}
+	var receiver *models.DataType
+	funcToks := toks
+	i++
+	tok = toks[i]
+	if tok.Id == tokens.Dot {
+		typeToks := toks[:i]
+		funcToks = toks[i+1:]
+		receiver = new(models.DataType)
+		*receiver, _ = b.DataType(typeToks, new(int), true)
+	}
+	if len(funcToks) < 2 {
+		return false
+	}
+	tok = funcToks[1]
+	if tok.Id != tokens.Brace || tok.Kind != tokens.LPARENTHESES {
+		return false
+	}
+	f := b.Func(funcToks, false)
+	f.Receiver = receiver
+	s := models.Statement{Tok: f.Tok, Data: f}
+	b.Tree = append(b.Tree, models.Object{Tok: f.Tok, Data: s})
+	return true
 }
 
 // Func builds AST model of function.
@@ -633,8 +671,8 @@ func (b *Builder) TypeOrGenerics(toks Toks) models.Object {
 		if tok.Id == tokens.Brace && tok.Kind == tokens.LBRACKET {
 			generics := b.Generics(toks)
 			return models.Object{
-				Tok:   tok,
-				Value: generics,
+				Tok:  tok,
+				Data: generics,
 			}
 		}
 	}
@@ -642,8 +680,8 @@ func (b *Builder) TypeOrGenerics(toks Toks) models.Object {
 	t.Pub = b.pub
 	b.pub = false
 	return models.Object{
-		Tok:   t.Tok,
-		Value: t,
+		Tok:  t.Tok,
+		Data: t,
 	}
 }
 
@@ -654,8 +692,8 @@ func (b *Builder) GlobalVar(toks Toks) {
 	}
 	s := b.VarStatement(toks)
 	b.Tree = append(b.Tree, models.Object{
-		Tok:   s.Tok,
-		Value: s,
+		Tok:  s.Tok,
+		Data: s,
 	})
 }
 
@@ -1155,7 +1193,7 @@ func (b *Builder) pushStatementToBlock(bs *blockStatement) {
 		bs.toks = bs.toks[:len(bs.toks)-1]
 	}
 	s := b.Statement(bs)
-	if s.Val == nil {
+	if s.Data == nil {
 		return
 	}
 	s.WithTerminator = bs.withTerminator
@@ -1230,7 +1268,7 @@ func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
 	case tokens.Type:
 		t := b.Type(bs.toks)
 		s.Tok = t.Tok
-		s.Val = t
+		s.Data = t
 		return
 	case tokens.Match:
 		return b.MatchCase(bs.toks)
@@ -1261,7 +1299,7 @@ func (b *Builder) blockStatement(toks Toks) models.Statement {
 		b.pusherr(toks[*i], "invalid_syntax")
 	}
 	block := b.Block(toks)
-	return models.Statement{Tok: tok, Val: block}
+	return models.Statement{Tok: tok, Data: block}
 }
 
 func (b *Builder) assignInfo(toks Toks) (info AssignInfo) {
@@ -1408,7 +1446,7 @@ func (b *Builder) AssignStatement(toks Toks, isExpr bool) (s models.Statement, _
 		return
 	}
 	s.Tok = toks[0]
-	s.Val = assign
+	s.Data = assign
 	return s, true
 }
 
@@ -1456,7 +1494,7 @@ func (b *Builder) LabelStatement(tok Tok) models.Statement {
 	var l models.Label
 	l.Tok = tok
 	l.Label = tok.Kind
-	return models.Statement{Tok: tok, Val: l}
+	return models.Statement{Tok: tok, Data: l}
 }
 
 // ExprStatement builds AST model of expression.
@@ -1465,8 +1503,8 @@ func (b *Builder) ExprStatement(toks Toks) models.Statement {
 		Expr: b.Expr(toks),
 	}
 	return models.Statement{
-		Tok: toks[0],
-		Val: block,
+		Tok:  toks[0],
+		Data: block,
 	}
 }
 
@@ -1615,8 +1653,8 @@ func (b *Builder) Var(toks Toks) (v models.Var) {
 func (b *Builder) VarStatement(toks Toks) models.Statement {
 	vast := b.Var(toks)
 	return models.Statement{
-		Tok: vast.IdTok,
-		Val: vast,
+		Tok:  vast.IdTok,
+		Data: vast,
 	}
 }
 
@@ -1625,12 +1663,12 @@ func (b *Builder) CommentStatement(tok Tok) (s models.Statement) {
 	s.Tok = tok
 	tok.Kind = strings.TrimSpace(tok.Kind[2:])
 	if strings.HasPrefix(tok.Kind, "cxx:") {
-		s.Val = models.CxxEmbed{
+		s.Data = models.CxxEmbed{
 			Tok:     tok,
 			Content: tok.Kind[4:],
 		}
 	} else {
-		s.Val = models.Comment{
+		s.Data = models.Comment{
 			Content: tok.Kind,
 		}
 	}
@@ -1651,7 +1689,7 @@ func (b *Builder) DeferStatement(toks Toks) (s models.Statement) {
 	}
 	d.Expr = b.Expr(toks)
 	s.Tok = d.Tok
-	s.Val = d
+	s.Data = d
 	return
 }
 
@@ -1668,7 +1706,7 @@ func (b *Builder) ConcurrentCallStatement(toks Toks) (s models.Statement) {
 	}
 	cc.Expr = b.Expr(toks)
 	s.Tok = cc.Tok
-	s.Val = cc
+	s.Data = cc
 	return
 }
 
@@ -1688,7 +1726,7 @@ func (b *Builder) GotoStatement(toks Toks) (s models.Statement) {
 	var gt models.Goto
 	gt.Tok = s.Tok
 	gt.Label = idTok.Kind
-	s.Val = gt
+	s.Data = gt
 	return
 }
 
@@ -1700,8 +1738,8 @@ func (b *Builder) RetStatement(toks Toks) models.Statement {
 		ret.Expr = b.Expr(toks[1:])
 	}
 	return models.Statement{
-		Tok: ret.Tok,
-		Val: ret,
+		Tok:  ret.Tok,
+		Data: ret,
 	}
 }
 
@@ -1809,7 +1847,7 @@ func (b *Builder) getForIterProfile(toks Toks, errtok Tok) models.IterProfile {
 
 func (b *Builder) forStatement(toks Toks) models.Statement {
 	s := b.Statement(&blockStatement{toks: toks})
-	switch s.Val.(type) {
+	switch s.Data.(type) {
 	case models.ExprStatement, models.Assign:
 	default:
 		b.pusherr(s.Tok, "invalid_syntax")
@@ -1872,8 +1910,8 @@ func (b *Builder) IterExpr(toks Toks) (s models.Statement) {
 	}
 	iter.Block = b.Block(blockToks)
 	return models.Statement{
-		Tok: iter.Tok,
-		Val: iter,
+		Tok:  iter.Tok,
+		Data: iter,
 	}
 }
 
@@ -1897,8 +1935,8 @@ func (b *Builder) TryBlock(bs *blockStatement) (s models.Statement) {
 	}
 	try.Block = b.Block(blockToks)
 	return models.Statement{
-		Tok: try.Tok,
-		Val: try,
+		Tok:  try.Tok,
+		Data: try,
 	}
 }
 
@@ -1927,8 +1965,8 @@ func (b *Builder) CatchBlock(bs *blockStatement) (s models.Statement) {
 	}
 	catch.Block = b.Block(blockToks)
 	return models.Statement{
-		Tok: catch.Tok,
-		Val: catch,
+		Tok:  catch.Tok,
+		Data: catch,
 	}
 }
 
@@ -2054,7 +2092,7 @@ func (b *Builder) MatchCase(toks Toks) (s models.Statement) {
 		return
 	}
 	match.Cases, match.Default = b.cases(blockToks)
-	s.Val = match
+	s.Data = match
 	return
 }
 
@@ -2092,8 +2130,8 @@ func (b *Builder) IfExpr(bs *blockStatement) (s models.Statement) {
 	ifast.Expr = b.Expr(exprToks)
 	ifast.Block = b.Block(blockToks)
 	return models.Statement{
-		Tok: ifast.Tok,
-		Val: ifast,
+		Tok:  ifast.Tok,
+		Data: ifast,
 	}
 }
 
@@ -2131,8 +2169,8 @@ func (b *Builder) ElseIfExpr(bs *blockStatement) (s models.Statement) {
 	elif.Expr = b.Expr(exprToks)
 	elif.Block = b.Block(blockToks)
 	return models.Statement{
-		Tok: elif.Tok,
-		Val: elif,
+		Tok:  elif.Tok,
+		Data: elif,
 	}
 }
 
@@ -2159,8 +2197,8 @@ func (b *Builder) ElseBlock(bs *blockStatement) (s models.Statement) {
 	}
 	elseast.Block = b.Block(blockToks)
 	return models.Statement{
-		Tok: elseast.Tok,
-		Val: elseast,
+		Tok:  elseast.Tok,
+		Data: elseast,
 	}
 }
 
@@ -2172,8 +2210,8 @@ func (b *Builder) BreakStatement(toks Toks) models.Statement {
 		b.pusherr(toks[1], "invalid_syntax")
 	}
 	return models.Statement{
-		Tok: breakAST.Tok,
-		Val: breakAST,
+		Tok:  breakAST.Tok,
+		Data: breakAST,
 	}
 }
 
@@ -2185,8 +2223,8 @@ func (b *Builder) ContinueStatement(toks Toks) models.Statement {
 		b.pusherr(toks[1], "invalid_syntax")
 	}
 	return models.Statement{
-		Tok: continueAST.Tok,
-		Val: continueAST,
+		Tok:  continueAST.Tok,
+		Data: continueAST,
 	}
 }
 

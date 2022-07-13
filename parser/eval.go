@@ -373,8 +373,7 @@ func (e *eval) subId(toks Toks, m *exprModel) (v value) {
 	val := e.process(toks, m)
 	checkType := val.data.Type
 	if typeIsExplicitPtr(checkType) {
-		// Remove pointer mark
-		checkType.Kind = checkType.Kind[1:]
+		checkType = unptrType(checkType)
 	}
 	switch {
 	case typeIsPure(checkType):
@@ -700,6 +699,7 @@ func (e *eval) xObjSubId(dm *Defmap, val value, idTok Tok, m *exprModel) (v valu
 	switch t {
 	case 'g':
 		g := dm.Globals[i]
+		g.Used = true
 		if g.Tag == nil {
 			m.appendSubNode(exprNode{xapi.OutId(g.Id, g.DefTok.File)})
 		} else {
@@ -710,6 +710,7 @@ func (e *eval) xObjSubId(dm *Defmap, val value, idTok Tok, m *exprModel) (v valu
 		v.constant = g.Const
 	case 'f':
 		f := dm.Funcs[i]
+		f.used = true
 		v.data.Type.Id = xtype.Func
 		v.data.Type.Tag = f.Ast
 		v.data.Type.Kind = f.Ast.DataTypeString()

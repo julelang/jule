@@ -8,12 +8,12 @@ import (
 // Statement is statement.
 type Statement struct {
 	Tok            Tok
-	Val            any
+	Data           any
 	WithTerminator bool
 }
 
 func (s Statement) String() string {
-	return fmt.Sprint(s.Val)
+	return fmt.Sprint(s.Data)
 }
 
 // ExprStatement is AST model of expression statement in block.

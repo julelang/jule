@@ -7,6 +7,15 @@ import (
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
+func findGeneric(id string, generics []*GenericType) *GenericType {
+	for _, generic := range generics {
+		if generic.Id == id {
+			return generic
+		}
+	}
+	return nil
+}
+
 func typeIsVoid(t DataType) bool {
 	return t.Id == xtype.Void && !t.MultiTyped
 }
@@ -33,6 +42,11 @@ func typeIsStruct(dt DataType) bool {
 
 func typeIsEnum(dt DataType) bool {
 	return dt.Id == xtype.Enum
+}
+
+func unptrType(t DataType) DataType {
+	t.Kind = t.Kind[1:]
+	return t
 }
 
 func typeIsGeneric(generics []*GenericType, t DataType) bool {

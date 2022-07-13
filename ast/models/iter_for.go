@@ -12,14 +12,14 @@ type IterFor struct {
 func (f IterFor) String(iter Iter) string {
 	var cxx strings.Builder
 	cxx.WriteString("for (")
-	if f.Once.Val != nil {
+	if f.Once.Data != nil {
 		cxx.WriteString(f.Once.String())
 	} else {
 		cxx.WriteString("; ")
 	}
 	cxx.WriteString(f.Condition.String())
 	cxx.WriteString("; ")
-	if f.Next.Val != nil {
+	if f.Next.Data != nil {
 		s := f.Next.String()
 		// Remove statement terminator
 		cxx.WriteString(s[:len(s)-1])

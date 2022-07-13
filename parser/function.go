@@ -17,6 +17,9 @@ type function struct {
 }
 
 func (f *function) outId() string {
+	if f.Ast.Receiver != nil {
+		return f.Ast.Id
+	}
 	if f.isEntryPoint {
 		return xapi.OutId(f.Ast.Id, nil)
 	}
@@ -33,8 +36,8 @@ func (f function) String() string {
 		statements := make([]models.Statement, len(vars))
 		for i, v := range vars {
 			statements[i] = models.Statement{
-				Tok: v.IdTok,
-				Val: *v,
+				Tok:  v.IdTok,
+				Data: *v,
 			}
 		}
 		block.Tree = append(statements, block.Tree...)
@@ -56,6 +59,7 @@ func (f *function) declHead() string {
 	cxx.WriteString(genericsToCxx(f.Ast.Generics))
 	if cxx.Len() > 0 {
 		cxx.WriteByte('\n')
+		cxx.WriteString(models.IndentString())
 	}
 	cxx.WriteString(attributesToString(f.Ast.Attributes))
 	cxx.WriteString(f.Ast.RetType.String())

@@ -18,7 +18,7 @@ type xstruct struct {
 	generics []DataType
 }
 
-func (s *xstruct) declString() string {
+func (s *xstruct) decldefString() string {
 	var cxx strings.Builder
 	cxx.WriteString(genericsToCxx(s.Ast.Generics))
 	cxx.WriteByte('\n')
@@ -26,10 +26,20 @@ func (s *xstruct) declString() string {
 	cxx.WriteString(xapi.OutId(s.Ast.Id, s.Ast.Tok.File))
 	cxx.WriteString(" {\n")
 	models.AddIndent()
-	for _, g := range s.Defs.Globals {
-		cxx.WriteString(models.IndentString())
-		cxx.WriteString(g.FieldString())
-		cxx.WriteByte('\n')
+	if len(s.Defs.Globals) > 0 {
+		for _, g := range s.Defs.Globals {
+			cxx.WriteString(models.IndentString())
+			cxx.WriteString(g.FieldString())
+			cxx.WriteByte('\n')
+		}
+		cxx.WriteString("\n\n")
+	}
+	for _, f := range s.Defs.Funcs {
+		if f.used {
+			cxx.WriteString(models.IndentString())
+			cxx.WriteString(f.String())
+			cxx.WriteString("\n\n")
+		}
 	}
 	models.DoneIndent()
 	cxx.WriteString(models.IndentString())
@@ -86,7 +96,7 @@ func (s *xstruct) ostreams() string {
 
 func (s xstruct) String() string {
 	var cxx strings.Builder
-	cxx.WriteString(s.declString())
+	cxx.WriteString(s.decldefString())
 	cxx.WriteString("\n\n")
 	cxx.WriteString(models.IndentString())
 	cxx.WriteString(s.ostreams())

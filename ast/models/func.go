@@ -12,11 +12,12 @@ type Func struct {
 	Tok        Tok
 	Id         string
 	Generics   []*GenericType
-	Combines   [][]DataType
+	Combines   *[][]DataType
 	Attributes []Attribute
 	Params     []Param
 	RetType    RetType
 	Block      Block
+	Receiver   *DataType
 }
 
 // FindAttribute returns attribute if exist, nil if not.
