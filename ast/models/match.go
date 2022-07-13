@@ -35,10 +35,11 @@ func (c *Case) String(matchExpr string) string {
 
 // Match the AST model of match-case.
 type Match struct {
-	Tok     Tok
-	Expr    Expr
-	Default *Case
-	Cases   []Case
+	Tok      Tok
+	Expr     Expr
+	ExprType DataType
+	Default  *Case
+	Cases    []Case
 }
 
 func (m *Match) MatchExprString() string {
@@ -49,17 +50,28 @@ func (m *Match) MatchExprString() string {
 		return ""
 	}
 	var cxx strings.Builder
-	expr := m.Expr.String()
-	cxx.WriteString(m.Cases[0].String(expr))
+	cxx.WriteString("{\n")
+	AddIndent()
+	cxx.WriteString(IndentString())
+	cxx.WriteString(m.ExprType.String())
+	cxx.WriteString(" &&expr{")
+	cxx.WriteString(m.Expr.String())
+	cxx.WriteString("};\n")
+	cxx.WriteString(IndentString())
+	cxx.WriteString(m.Cases[0].String("expr"))
 	for _, c := range m.Cases[1:] {
 		cxx.WriteString("else ")
-		cxx.WriteString(c.String(expr))
+		cxx.WriteString(c.String("expr"))
 	}
 	if m.Default != nil {
 		cxx.WriteString("else ")
 		cxx.WriteString(m.Default.String(""))
 		cxx.WriteByte('}')
 	}
+	cxx.WriteByte('\n')
+	DoneIndent()
+	cxx.WriteString(IndentString())
+	cxx.WriteByte('}')
 	return cxx.String()
 }
 
