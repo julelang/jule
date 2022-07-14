@@ -178,7 +178,7 @@ func (e *eval) single(tok Tok, m *exprModel) (v value, ok bool) {
 		default:
 			v = eval.numeric()
 		}
-	case tokens.Id:
+	case tokens.Id, tokens.Self:
 		v, ok = eval.id()
 	default:
 		e.pusherrtok(tok, "invalid_syntax")
@@ -357,9 +357,15 @@ func (e *eval) subId(toks Toks, m *exprModel) (v value) {
 	i := len(toks) - 1
 	idTok := toks[i]
 	i--
-	valTok := toks[i]
+	dotTok := toks[i]
 	toks = toks[:i]
-	if len(toks) == 1 {
+	switch len(toks) {
+	case 0:
+		tok := dotTok
+		tok.Id = tokens.Self
+		tok.Kind = tokens.SELF
+		toks = Toks{tok}
+	case 1:
 		tok := toks[0]
 		if tok.Id == tokens.DataType {
 			return e.typeSubId(tok, idTok, m)
@@ -390,7 +396,7 @@ func (e *eval) subId(toks Toks, m *exprModel) (v value) {
 	case typeIsMap(checkType):
 		return e.mapObjSubId(val, idTok, m)
 	}
-	e.pusherrtok(valTok, "obj_not_support_sub_fields", val.data.Type.Kind)
+	e.pusherrtok(dotTok, "obj_not_support_sub_fields", val.data.Type.Kind)
 	return
 }
 
@@ -809,10 +815,6 @@ func (e *eval) id(toks Toks, m *exprModel) (v value) {
 		return
 	}
 	i--
-	if i == 0 {
-		e.pusherrtok(toks[i], "invalid_syntax")
-		return
-	}
 	tok = toks[i]
 	switch tok.Id {
 	case tokens.Dot:
