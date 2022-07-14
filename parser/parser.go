@@ -2343,7 +2343,7 @@ func (p *Parser) concurrentCall(cc *models.ConcurrentCall) {
 func (p *Parser) assignment(selected value, errtok Tok) bool {
 	state := true
 	if !selected.lvalue {
-		p.pusherrtok(errtok, "assign_nonlvalue")
+		p.eval.pusherrtok(errtok, "assign_nonlvalue")
 		state = false
 	}
 	if selected.constant {
