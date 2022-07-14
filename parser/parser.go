@@ -2356,10 +2356,9 @@ func (p *Parser) assignment(selected value, errtok Tok) bool {
 	return state
 }
 
-func (p *Parser) SingleAssign(assign *models.Assign) {
+func (p *Parser) SingleAssign(assign *models.Assign, exprs []value) {
 	right := &assign.Right[0]
-	val, model := p.evalExpr(*right)
-	right.Model = model
+	val := exprs[0]
 	left := &assign.Left[0].Expr
 	if len(left.Toks) == 1 && xapi.IsIgnoreId(left.Toks[0].Kind) {
 		return
@@ -2444,43 +2443,40 @@ func (p *Parser) multiAssign(assign *models.Assign, right []value) {
 	}
 }
 
-func (p *Parser) suffix(assign *models.Assign) {
-	if len(assign.Right) > 0 {
+func (p *Parser) suffix(assign *models.Assign, exprs []value) {
+	if len(exprs) > 0 {
 		p.pusherrtok(assign.Setter, "invalid_syntax")
 		return
 	}
-	left := &assign.Left[0]
-	value, model := p.evalExpr(left.Expr)
-	left.Expr.Model = model
-	_ = p.assignment(value, assign.Setter)
-	if typeIsPtr(value.data.Type) {
+	val := exprs[0]
+	_ = p.assignment(val, assign.Setter)
+	if typeIsPtr(val.data.Type) {
 		return
 	}
-	if typeIsPure(value.data.Type) && xtype.IsNumericType(value.data.Type.Id) {
+	if typeIsPure(val.data.Type) && xtype.IsNumericType(val.data.Type.Id) {
 		return
 	}
-	p.pusherrtok(assign.Setter, "operator_notfor_xtype", assign.Setter.Kind, value.data.Type.Kind)
+	p.pusherrtok(assign.Setter, "operator_notfor_xtype", assign.Setter.Kind, val.data.Type.Kind)
 }
 
 func (p *Parser) assign(assign *models.Assign) {
 	leftLength := len(assign.Left)
 	rightLength := len(assign.Right)
+	exprs := p.assignExprs(assign)
 	if rightLength == 0 && ast.IsSuffixOperator(assign.Setter.Kind) { // Suffix
-		p.suffix(assign)
+		p.suffix(assign, exprs)
 		return
 	} else if leftLength == 1 && !assign.Left[0].Var.New {
-		p.SingleAssign(assign)
+		p.SingleAssign(assign, exprs)
 		return
 	} else if assign.Setter.Kind != tokens.EQUAL {
 		p.pusherrtok(assign.Setter, "invalid_syntax")
 		return
 	} else if rightLength == 1 {
-		expr := &assign.Right[0]
-		firstVal, model := p.evalExpr(*expr)
-		expr.Model = model
-		if firstVal.data.Type.MultiTyped {
+		expr := exprs[0]
+		if expr.data.Type.MultiTyped {
 			assign.MultipleRet = true
-			p.funcMultiAssign(assign, firstVal)
+			p.funcMultiAssign(assign, expr)
 			return
 		}
 	}
@@ -2492,7 +2488,7 @@ func (p *Parser) assign(assign *models.Assign) {
 		p.pusherrtok(assign.Setter, "missing_multiassign_identifiers")
 		return
 	}
-	p.multiAssign(assign, p.assignExprs(assign))
+	p.multiAssign(assign, exprs)
 }
 
 func (p *Parser) whileProfile(iter *models.Iter) {
