@@ -162,15 +162,13 @@ func checkStructCompability(t1, t2 DataType) bool {
 		return true
 	}
 	n1, n2 := len(s1.generics), len(s2.generics)
-	if n1 > 0 || n2 > 0 {
-		if n1 != n2 {
+	if n1 != n2 {
+		return false
+	}
+	for i, g1 := range s1.generics {
+		g2 := s2.generics[i]
+		if !typesEquals(g1, g2) {
 			return false
-		}
-		for i, g1 := range s1.generics {
-			g2 := s2.generics[i]
-			if !typesEquals(g1, g2) {
-				return false
-			}
 		}
 	}
 	return true
@@ -195,9 +193,9 @@ func typesAreCompatible(t1, t2 DataType, ignoreany bool) bool {
 		return checkMapCompability(t1, t2)
 	case typeIsNilCompatible(t1), typeIsNilCompatible(t2):
 		return t1.Id == xtype.Nil || t2.Id == xtype.Nil
-	case t1.Id == xtype.Enum, t2.Id == xtype.Enum:
+	case typeIsEnum(t1), typeIsEnum(t2):
 		return t1.Id == t2.Id && t1.Kind == t2.Kind
-	case t1.Id == xtype.Struct, t2.Id == xtype.Struct:
+	case typeIsStruct(t1), typeIsStruct(t2):
 		if t2.Id == xtype.Struct {
 			t1, t2 = t2, t1
 		}

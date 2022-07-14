@@ -924,11 +924,11 @@ func (p *Parser) parseNonGenericType(generics []*GenericType, t *DataType) {
 	}
 }
 
-func (p *Parser) parseTypesNonGenerics(f *function) {
-	for i := range f.Ast.Params {
-		p.parseNonGenericType(f.Ast.Generics, &f.Ast.Params[i].Type)
+func (p *Parser) parseTypesNonGenerics(f *Func) {
+	for i := range f.Params {
+		p.parseNonGenericType(f.Generics, &f.Params[i].Type)
 	}
-	p.parseNonGenericType(f.Ast.Generics, &f.Ast.RetType.Type)
+	p.parseNonGenericType(f.Generics, &f.RetType.Type)
 }
 
 func (p *Parser) checkRetVars(f *function) {
@@ -983,10 +983,10 @@ func (p *Parser) Func(fast Func) {
 	p.generics = nil
 	p.checkRetVars(f)
 	p.checkFuncAttributes(f)
-	p.parseTypesNonGenerics(f)
 	f.used = f.Ast.Id == x.InitializerFunction
 	if f.Ast.Receiver == nil {
 		p.Defs.Funcs = append(p.Defs.Funcs, f)
+		p.parseTypesNonGenerics(f.Ast)
 	} else {
 		p.receiveredFuncs = append(p.receiveredFuncs, f)
 	}
@@ -1468,6 +1468,7 @@ func (p *Parser) parseStructFunc(s *xstruct, f *function) (err bool) {
 		return
 	}
 	if len(s.Ast.Generics) == 0 {
+		p.parseTypesNonGenerics(f.Ast)
 		return p.parseFunc(f)
 	}
 	if len(*s.constructor.Combines) == 0 {
@@ -1475,6 +1476,7 @@ func (p *Parser) parseStructFunc(s *xstruct, f *function) (err bool) {
 	}
 	for _, combine := range *s.constructor.Combines {
 		p.pushGenerics(s.Ast.Generics, combine)
+		p.reloadFuncTypes(f.Ast)
 		err = p.parseFunc(f)
 		if err {
 			return
@@ -1576,8 +1578,12 @@ func (p *Parser) structConstructorInstance(as xstruct) *xstruct {
 	for i := range s.Ast.Fields {
 		p.parseField(s, &s.Defs.Globals[i], i)
 	}
-	for _, f := range s.Defs.Funcs {
-		f.Ast.Receiver.Tag = s
+	for i := range s.Defs.Funcs {
+		f := &s.Defs.Funcs[i]
+		nf := new(function)
+		*nf = **f
+		nf.Ast.Receiver.Tag = s
+		*f = nf
 	}
 	return s
 }
@@ -1706,9 +1712,6 @@ func (p *Parser) parseGenerics(f *Func, generics []DataType, m *exprModel, errTo
 	p.pushGenerics(f.Generics, generics)
 	if isConstructor(f) {
 		p.readyConstructor(&f)
-		s := f.RetType.Type.Tag.(*xstruct)
-		s.SetGenerics(generics)
-		f.RetType.Type.Kind = s.dataTypeString()
 	}
 	if f.Receiver != nil {
 		s := f.Receiver.Tag.(*xstruct)
@@ -1755,9 +1758,20 @@ func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *models.Args, 
 			return
 		}
 		f.RetType.Type.DontUseOriginal = true
+	} else if f.Receiver != nil {
+		s := f.Receiver.Tag.(*xstruct)
+		blockTypes := p.blockTypes
+		p.blockTypes = nil
+		p.pushGenerics(s.Ast.Generics, s.Generics())
+		p.reloadFuncTypes(f)
+		p.blockTypes = blockTypes
 	}
 	v.data.Type = f.RetType.Type
+	v.data.Value = f.Id
 	if isConstructor(f) {
+		s := f.RetType.Type.Tag.(*xstruct)
+		s.SetGenerics(generics)
+		v.data.Type.Kind = s.dataTypeString()
 		m.appendSubNode(exprNode{tokens.LBRACE})
 		defer m.appendSubNode(exprNode{tokens.RBRACE})
 	} else {
