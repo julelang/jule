@@ -2452,7 +2452,9 @@ func (p *Parser) suffix(assign *models.Assign, exprs []value) {
 		p.pusherrtok(assign.Setter, "invalid_syntax")
 		return
 	}
-	val := exprs[0]
+	left := &assign.Left[0]
+	val, model := p.evalExpr(left.Expr)
+	left.Expr.Model = model
 	_ = p.assignment(val, assign.Setter)
 	if typeIsPtr(val.data.Type) {
 		return
