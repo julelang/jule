@@ -519,6 +519,14 @@ func (b *Builder) Attribute(toks Toks) {
 		b.pusherr(a.Tag, "invalid_syntax")
 		return
 	}
+	toks = toks[i+1:]
+	if len(toks) > 0 {
+		tok := toks[0]
+		if a.Tok.Column+len(a.Tag.Kind)+1 == tok.Column {
+			b.pusherr(tok, "invalid_syntax")
+		}
+		b.Toks = append(toks, b.Toks...)
+	}
 	b.Tree = append(b.Tree, models.Object{
 		Tok:  a.Tok,
 		Data: a,
