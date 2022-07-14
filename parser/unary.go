@@ -16,7 +16,7 @@ type unary struct {
 func (u *unary) minus() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !typeIsPure(v.data.Type) || !xtype.IsNumericType(v.data.Type.Id) {
-		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", '-')
+		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.MINUS)
 	}
 	if isConstNumeric(v.data.Value) {
 		v.data.Value = tokens.MINUS + v.data.Value
@@ -27,7 +27,7 @@ func (u *unary) minus() value {
 func (u *unary) plus() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !typeIsPure(v.data.Type) || !xtype.IsNumericType(v.data.Type.Id) {
-		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", '+')
+		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.PLUS)
 	}
 	return v
 }
@@ -35,7 +35,7 @@ func (u *unary) plus() value {
 func (u *unary) tilde() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !typeIsPure(v.data.Type) || !xtype.IsIntegerType(v.data.Type.Id) {
-		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", '~')
+		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.TILDE)
 	}
 	return v
 }
@@ -43,7 +43,7 @@ func (u *unary) tilde() value {
 func (u *unary) logicalNot() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !isBoolExpr(v) {
-		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", '!')
+		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.EXCLAMATION)
 	}
 	v.data.Type.Id = xtype.Bool
 	v.data.Type.Kind = tokens.BOOL
@@ -54,7 +54,7 @@ func (u *unary) star() value {
 	v := u.p.eval.process(u.toks, u.model)
 	v.lvalue = true
 	if !typeIsExplicitPtr(v.data.Type) {
-		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", '*')
+		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.STAR)
 	} else {
 		v.data.Type.Kind = v.data.Type.Kind[1:]
 	}
