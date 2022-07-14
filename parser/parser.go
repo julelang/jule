@@ -1374,6 +1374,10 @@ func (p *Parser) params(f *Func) (err bool) {
 func (p *Parser) blockVarsOfFunc(f *Func) []*Var {
 	vars := p.varsFromParams(f.Params)
 	vars = append(vars, f.RetType.Vars()...)
+	if f.Receiver != nil {
+		s := f.Receiver.Tag.(*xstruct)
+		vars = append(vars, s.selfVar(*f.Receiver))
+	}
 	return vars
 }
 

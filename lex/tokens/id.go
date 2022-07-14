@@ -38,4 +38,5 @@ const (
 	Match        uint8 = 33
 	Case         uint8 = 34
 	Default      uint8 = 35
+	Self         uint8 = 36
 )

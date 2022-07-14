@@ -95,4 +95,5 @@ const (
 	MATCH               = "match"
 	CASE                = "case"
 	DEFAULT             = "default"
+	SELF                = "self"
 )

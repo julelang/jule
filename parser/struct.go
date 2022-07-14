@@ -5,7 +5,9 @@ import (
 	"strings"
 
 	"github.com/the-xlang/xxc/ast/models"
+	"github.com/the-xlang/xxc/lex/tokens"
 	"github.com/the-xlang/xxc/pkg/xapi"
+	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
 type xstruct struct {
@@ -117,6 +119,20 @@ func (s *xstruct) Generics() []DataType {
 // for Genericable interface of ast package.
 func (s *xstruct) SetGenerics(generics []DataType) {
 	s.generics = generics
+}
+
+func (s *xstruct) selfVar(receiver DataType) *Var {
+	v := new(models.Var)
+	v.IdTok = s.Ast.Tok
+	v.Type = receiver
+	v.Type.Id = xtype.Struct
+	v.Id = tokens.SELF
+	if typeIsPtr(receiver) {
+		v.Val.Model = exprNode{xapi.CxxSelf}
+	} else {
+		v.Val.Model = exprNode{tokens.STAR + xapi.CxxSelf}
+	}
+	return v
 }
 
 func (s *xstruct) dataTypeString() string {

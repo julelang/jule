@@ -35,9 +35,7 @@ func (v Var) String() string {
 	cxx.WriteByte(' ')
 	cxx.WriteString(xapi.OutId(v.Id, v.IdTok.File))
 	cxx.WriteByte('{')
-	if v.Val.Processes != nil {
-		cxx.WriteString(v.Val.String())
-	}
+	cxx.WriteString(v.Val.String())
 	cxx.WriteByte('}')
 	cxx.WriteByte(';')
 	return cxx.String()

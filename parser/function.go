@@ -35,11 +35,15 @@ func (f function) String() string {
 	if vars != nil {
 		statements := make([]models.Statement, len(vars))
 		for i, v := range vars {
-			statements[i] = models.Statement{
-				Tok:  v.IdTok,
-				Data: *v,
-			}
+			statements[i] = models.Statement{Tok: v.IdTok, Data: *v}
 		}
+		block.Tree = append(statements, block.Tree...)
+	}
+	if f.Ast.Receiver != nil && !typeIsPtr(*f.Ast.Receiver) {
+		s := f.Ast.Receiver.Tag.(*xstruct)
+		self := s.selfVar(*f.Ast.Receiver)
+		statements := make([]models.Statement, 1)
+		statements[0] = models.Statement{Tok: s.Ast.Tok, Data: self}
 		block.Tree = append(statements, block.Tree...)
 	}
 	cxx.WriteString(block.String())

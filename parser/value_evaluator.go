@@ -125,13 +125,12 @@ func (ve *valueEvaluator) varId(id string, variable *Var) (v value) {
 	v.volatile = variable.Volatile
 	v.data.Tok = variable.IdTok
 	v.lvalue = true
-	// If built-in.
-	if variable.IdTok.Id == tokens.NA {
-		ve.model.appendSubNode(exprNode{xapi.OutId(id, nil)})
+	if id == tokens.SELF && typeIsPtr(variable.Type) {
+		ve.model.appendSubNode(exprNode{xapi.CxxSelf})
 	} else {
 		ve.model.appendSubNode(exprNode{xapi.OutId(id, variable.IdTok.File)})
+		ve.p.eval.hasError = ve.p.eval.hasError || typeIsVoid(v.data.Type)
 	}
-	ve.p.eval.hasError = ve.p.eval.hasError || typeIsVoid(v.data.Type)
 	return
 }
 

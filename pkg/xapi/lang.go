@@ -5,6 +5,9 @@ import "strings"
 // CxxIgnore is the ignoring of cxx.
 const CxxIgnore = "std::ignore"
 
+// CxxSelf is the self keyword equavalent of cxx.
+const CxxSelf = "this"
+
 // ToDeferredCall returns cxx of deferred function call expression string.
 func ToDeferredCall(expr string) string {
 	var cxx strings.Builder
