@@ -1281,8 +1281,8 @@ func (p *Parser) check() {
 	p.checkTypes()
 	p.WaitingGlobals()
 	p.waitingGlobals = nil
+	p.checkReceivers()
 	if !p.JustDefs {
-		p.checkReceivers()
 		p.checkFuncs()
 		p.checkUses()
 	}
@@ -1391,6 +1391,7 @@ func (p *Parser) receiver(f *Func) {
 		p.pusherrtok(f.Receiver.Tok, "invalid_type_source")
 		return
 	}
+	f.Receiver.Tag = s
 	d, _, _ := s.Defs.defById(f.Id, nil)
 	if d != -1 {
 		p.pusherrtok(f.Receiver.Tok, "exist_id", f.Id)
@@ -1460,7 +1461,9 @@ func (p *Parser) checkFuncs() {
 	for _, f := range p.Defs.Funcs {
 		check(f)
 	}
-	p.checkStructFuncs()
+	if p.IsMain {
+		p.checkStructFuncs()
+	}
 }
 
 func (p *Parser) parseStructFunc(s *xstruct, f *function) (err bool) {
@@ -1504,14 +1507,18 @@ func (p *Parser) checkStructFuncs() {
 		}
 	}
 	for _, use := range p.Uses {
+		pdefs := p.Defs
+		for _, s := range use.defs.Structs {
+			p.Defs = use.defs
+			check(s)
+		}
 		for _, ns := range use.defs.Namespaces {
-			pdefs := p.Defs
 			p.Defs = ns.Defs
 			for _, s := range ns.Defs.Structs {
 				check(s)
 			}
-			p.Defs = pdefs
 		}
+		p.Defs = pdefs
 	}
 	for _, ns := range p.Defs.Namespaces {
 		p.Defs = ns.Defs
@@ -1712,8 +1719,9 @@ func (p *Parser) parseGenerics(f *Func, generics []DataType, m *exprModel, errTo
 	p.pushGenerics(f.Generics, generics)
 	if isConstructor(f) {
 		p.readyConstructor(&f)
-	}
-	if f.Receiver != nil {
+		s := f.RetType.Type.Tag.(*xstruct)
+		s.SetGenerics(generics)
+	} else if f.Receiver != nil {
 		s := f.Receiver.Tag.(*xstruct)
 		p.pushGenerics(s.Ast.Generics, s.Generics())
 	}
@@ -1760,11 +1768,14 @@ func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *models.Args, 
 		f.RetType.Type.DontUseOriginal = true
 	} else if f.Receiver != nil {
 		s := f.Receiver.Tag.(*xstruct)
-		blockTypes := p.blockTypes
-		p.blockTypes = nil
-		p.pushGenerics(s.Ast.Generics, s.Generics())
-		p.reloadFuncTypes(f)
-		p.blockTypes = blockTypes
+		generics := s.Generics()
+		if len(generics) > 0 {
+			blockTypes := p.blockTypes
+			p.blockTypes = nil
+			p.pushGenerics(s.Ast.Generics, generics)
+			p.reloadFuncTypes(f)
+			p.blockTypes = blockTypes
+		}
 	}
 	v.data.Type = f.RetType.Type
 	v.data.Value = f.Id
