@@ -139,6 +139,34 @@ public:
         return nil;
     }
 
+    void erase(const _Item_t &_Item) noexcept {
+        auto _it{this->_buffer.begin()};
+        auto _end{this->_buffer.end()};
+        for (; _it < _end; ++_it) {
+            if (_Item == *_it) {
+                this->_buffer.erase(_it);
+                return;
+            }
+        }
+    }
+
+    void erase_all(const _Item_t &_Item) noexcept {
+        auto _it{this->_buffer.begin()};
+        auto _end{this->_buffer.end()};
+        for (; _it < _end; ++_it)
+        { if (_Item == *_it) { this->_buffer.erase(_it); } }
+    }
+
+    void append(const slice<_Item_t> &_Items) noexcept
+    { for (const _Item_t _item: _Items) { this->_buffer.push_back(_item); } }
+
+    bool insert(const uint_xt &_Start, const slice<_Item_t> &_Items) noexcept {
+        auto _it{this->_buffer.begin()+_Start};
+        if (_it >= this->_buffer.end()) { return false; }
+        this->_buffer.insert(_it, _Items.begin(), _Items.end());
+        return true;
+    }
+
     bool operator==(const slice<_Item_t> &_Src) const noexcept {
         const uint_xt _length{this->_buffer.size()};
         const uint_xt _Src_length{_Src._buffer.size()};
