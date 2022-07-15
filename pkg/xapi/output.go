@@ -82,20 +82,39 @@ public:
     array<_Item_t>(const array<_Item_t>& _Src) noexcept { this->_buffer = _Src._buffer; }
 
     array<_Item_t>(const std::initializer_list<_Item_t> &_Src) noexcept
-    { this->_buffer = std::vector<_Item_t>{_Src.begin(), _Src.end()}; }
+    { this->_buffer = std::vector<_Item_t>{_Src}; }
 
-    ~array<_Item_t>(void) noexcept { this->_buffer.clear(); }
+    ~array<_Item_t>(void) noexcept
+    { this->_buffer.clear(); }
 
     typedef _Item_t       *iterator;
     typedef const _Item_t *const_iterator;
-    iterator begin(void) noexcept             { return &this->_buffer[0]; }
-    const_iterator begin(void) const noexcept { return &this->_buffer[0]; }
-    iterator end(void) noexcept               { return &this->_buffer[this->_buffer.size()]; }
-    const_iterator end(void) const noexcept   { return &this->_buffer[this->_buffer.size()]; }
 
-    inline void clear(void) noexcept        { this->_buffer.clear(); }
-    inline uint_xt len(void) const noexcept { return this->_buffer.size(); }
-    inline bool empty(void) const noexcept  { return this->_buffer.empty(); }
+    inline constexpr
+    iterator begin(void) noexcept
+    { return &this->_buffer[0]; }
+
+    inline constexpr
+    const_iterator begin(void) const noexcept
+    { return &this->_buffer[0]; }
+
+    inline constexpr
+    iterator end(void) noexcept
+    { return &this->_buffer[this->_buffer.size()]; }
+
+    inline constexpr
+    const_iterator end(void) const noexcept
+    { return &this->_buffer[this->_buffer.size()]; }
+
+    inline void clear(void) noexcept
+    { this->_buffer.clear(); }
+
+    inline constexpr
+    uint_xt len(void) const noexcept
+    { return this->_buffer.size(); }
+
+    inline bool empty(void) const noexcept
+    { return this->_buffer.empty(); }
 
     _Item_t *find(const _Item_t &_Item) noexcept {
         iterator _it{this->begin()};
@@ -150,9 +169,17 @@ public:
         return true;
     }
 
-    bool operator!=(const array<_Item_t> &_Src) const noexcept { return !this->operator==(_Src); }
-    bool operator==(const std::nullptr_t) const noexcept       { return this->_buffer.empty(); }
-    bool operator!=(const std::nullptr_t) const noexcept       { return !this->operator==(nil); }
+    inline constexpr
+    bool operator!=(const array<_Item_t> &_Src) const noexcept
+    { return !this->operator==(_Src); }
+
+    inline constexpr
+    bool operator==(const std::nullptr_t) const noexcept
+    { return this->_buffer.empty(); }
+
+    inline constexpr
+    bool operator!=(const std::nullptr_t) const noexcept
+    { return !this->operator==(nil); }
 
     _Item_t& operator[](const uint_xt _Index) {
         if (this->len() <= _Index) { XID(panic)("index out of range"); }
@@ -173,7 +200,7 @@ public:
 };
 
 template<typename _Key_t, typename _Value_t>
-class map: public std::map<_Key_t, _Value_t> {
+class map: public std::unordered_map<_Key_t, _Value_t> {
 public:
     map<_Key_t, _Value_t>(void) noexcept                 {}
     map<_Key_t, _Value_t>(const std::nullptr_t) noexcept {}
@@ -194,11 +221,18 @@ public:
         return _values;
     }
 
-    inline bool has(const _Key_t _Key) const noexcept { return this->find(_Key) != this->end(); }
-    inline void del(const _Key_t _Key) noexcept { this->erase(_Key); }
+    inline constexpr
+    bool has(const _Key_t _Key) const noexcept
+    { return this->find(_Key) != this->end(); }
 
-    bool operator==(const std::nullptr_t) const noexcept { return this->empty(); }
-    bool operator!=(const std::nullptr_t) const noexcept { return !this->operator==(nil); }
+    inline void del(const _Key_t _Key) noexcept
+    { this->erase(_Key); }
+
+    inline bool operator==(const std::nullptr_t) const noexcept
+    { return this->empty(); }
+
+    inline bool operator!=(const std::nullptr_t) const noexcept
+    { return !this->operator==(nil); }
 
     friend std::ostream& operator<<(std::ostream &_Stream,
                                     const map<_Key_t, _Value_t> &_Src) {
@@ -233,13 +267,24 @@ public:
 
     typedef char_xt       *iterator;
     typedef const char_xt *const_iterator;
-    iterator begin(void) noexcept             { return (iterator)(&this->_buffer[0]); }
-    const_iterator begin(void) const noexcept { return (const_iterator)(&this->_buffer[0]); }
-    iterator end(void) noexcept               { return (iterator)(&this->_buffer[this->len()]); }
-    const_iterator end(void) const noexcept   { return (const_iterator)(&this->_buffer[this->len()]); }
 
-    inline uint_xt len(void) const noexcept { return this->_buffer.length(); }
-    inline bool empty(void) const noexcept  { return this->_buffer.empty(); }
+    inline iterator begin(void) noexcept
+    { return (iterator)(&this->_buffer[0]); }
+
+    inline const_iterator begin(void) const noexcept
+    { return (const_iterator)(&this->_buffer[0]); }
+
+    inline iterator end(void) noexcept
+    { return (iterator)(&this->_buffer[this->len()]); }
+
+    inline const_iterator end(void) const noexcept
+    { return (const_iterator)(&this->_buffer[this->len()]); }
+
+    inline uint_xt len(void) const noexcept
+    { return this->_buffer.length(); }
+
+    inline bool empty(void) const noexcept
+    { return this->_buffer.empty(); }
 
     inline str_xt sub(const uint_xt start, const uint_xt end) const noexcept
     { return this->_buffer.substr(start, end); }
@@ -349,10 +394,10 @@ public:
         return _array;
     }
 
-    operator const char*(void) const noexcept
+    inline operator const char*(void) const noexcept
     { return this->_buffer.c_str(); }
     
-    operator char*(void) const noexcept
+    inline operator char*(void) const noexcept
     { return (char*)(this->_buffer.c_str()); }
 
     char &operator[](uint_xt _Index) {
@@ -360,10 +405,17 @@ public:
         return this->_buffer[_Index];
     }
 
-    void operator+=(const str_xt _Str) noexcept        { this->_buffer += _Str._buffer; }
-    str_xt operator+(const str_xt _Str) const noexcept { return str_xt{this->_buffer + _Str._buffer}; }
-    bool operator==(const str_xt &_Str) const noexcept { return this->_buffer == _Str._buffer; }
-    bool operator!=(const str_xt &_Str) const noexcept { return !this->operator==(_Str); }
+    inline void operator+=(const str_xt &_Str) noexcept
+    { this->_buffer += _Str._buffer; }
+
+    inline str_xt operator+(const str_xt &_Str) const noexcept
+    { return str_xt{this->_buffer + _Str._buffer}; }
+
+    inline bool operator==(const str_xt &_Str) const noexcept
+    { return this->_buffer == _Str._buffer; }
+
+    inline bool operator!=(const str_xt &_Str) const noexcept
+    { return !this->operator==(_Str); }
 
     friend std::ostream& operator<<(std::ostream &_Stream, const str_xt &_Src)
     { return _Stream << _Src._buffer; }
@@ -400,7 +452,7 @@ public:
         this->_inf  = (char*)(typeid(T).name());
     }
 
-    void operator=(const std::nullptr_t) noexcept
+    inline void operator=(const std::nullptr_t) noexcept
     { this->_delete(); }
 
     template<typename T>
@@ -417,13 +469,16 @@ public:
     { return this->type_is<T>() && *(T*)(this->_expr) == _Expr; }
 
     template<typename T>
-    inline bool operator!=(const T &_Expr) const noexcept
+    inline constexpr
+    bool operator!=(const T &_Expr) const noexcept
     { return !this->operator==(_Expr); }
 
-    inline bool operator==(const any_xt &_Any) const noexcept
+    inline constexpr
+    bool operator==(const any_xt &_Any) const noexcept
     { return this->_expr == _Any._expr; }
 
-    inline bool operator!=(const any_xt &_Any) const noexcept
+    inline constexpr
+    bool operator!=(const any_xt &_Any) const noexcept
     { return !this->operator==(_Any); }
 
     friend std::ostream& operator<<(std::ostream &_Stream, const any_xt &_Src)
