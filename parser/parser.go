@@ -756,13 +756,9 @@ func (p *Parser) parseFields(s *xstruct) {
 		Tok:  s.Ast.Tok,
 		Tag:  s,
 	}
-	s.constructor.Generics = make([]*models.GenericType, len(s.Ast.Generics))
-	for i, generic := range s.Ast.Generics {
-		ng := new(models.GenericType)
-		*ng = *generic
-		s.constructor.Generics[i] = ng
-	}
 	if len(s.Ast.Generics) > 0 {
+		s.constructor.Generics = make([]*models.GenericType, len(s.Ast.Generics))
+		copy(s.constructor.Generics, s.Ast.Generics)
 		s.constructor.Combines = new([][]models.DataType)
 	}
 	s.Defs.Globals = make([]*models.Var, len(s.Ast.Fields))
@@ -1660,7 +1656,7 @@ func (p *Parser) checkGenericsQuantity(n int, generics []DataType, errTok Tok) b
 	case n == 0 && len(generics) > 0:
 		p.pusherrtok(errTok, "not_has_generics")
 		return false
-	case len(generics) == 0:
+	case n > 0 && len(generics) == 0:
 		p.pusherrtok(errTok, "has_generics")
 		return false
 	case n < len(generics):
@@ -1770,15 +1766,18 @@ func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *models.Args, 
 			return
 		}
 		f.RetType.Type.DontUseOriginal = true
-	} else if f.Receiver != nil {
-		s := f.Receiver.Tag.(*xstruct)
-		generics := s.Generics()
-		if len(generics) > 0 {
-			blockTypes := p.blockTypes
-			p.blockTypes = nil
-			p.pushGenerics(s.Ast.Generics, generics)
-			p.reloadFuncTypes(f)
-			p.blockTypes = blockTypes
+	} else {
+		_ = p.checkGenericsQuantity(len(f.Generics), generics, errTok)
+		if f.Receiver != nil {
+			s := f.Receiver.Tag.(*xstruct)
+			generics := s.Generics()
+			if len(generics) > 0 {
+				blockTypes := p.blockTypes
+				p.blockTypes = nil
+				p.pushGenerics(s.Ast.Generics, generics)
+				p.reloadFuncTypes(f)
+				p.blockTypes = blockTypes
+			}
 		}
 	}
 	v.data.Type = f.RetType.Type
