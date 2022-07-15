@@ -77,12 +77,22 @@ class array {
 public:
     std::vector<_Item_t> _buffer{};
 
-    array<_Item_t>(void) noexcept                       {}
-    array<_Item_t>(const std::nullptr_t) noexcept       {}
-    array<_Item_t>(const array<_Item_t>& _Src) noexcept { this->_buffer = _Src._buffer; }
+    array<_Item_t>(const uint_xt &_N) noexcept
+    { this->_buffer = std::vector<_Item_t>(_N); }
 
-    array<_Item_t>(const std::initializer_list<_Item_t> &_Src) noexcept
-    { this->_buffer = std::vector<_Item_t>{_Src}; }
+    array<_Item_t>(void) noexcept {}
+
+    array<_Item_t>(const std::nullptr_t) noexcept {}
+
+    array<_Item_t>(const array<_Item_t>& _Src) noexcept
+    { this->_buffer = _Src._buffer; }
+
+    array<_Item_t>(const std::initializer_list<_Item_t> &_Src) noexcept {
+        this->_buffer = std::vector<_Item_t>(_Src.size());
+        const auto _Src_begin{_Src.begin()};
+        for (uint_xt _index{0}; _index < _Src.size(); ++_index)
+        { this->_buffer[_index] = *(_Item_t*)(_Src_begin+_index); }
+    }
 
     ~array<_Item_t>(void) noexcept
     { this->_buffer.clear(); }
@@ -106,9 +116,6 @@ public:
     const_iterator end(void) const noexcept
     { return &this->_buffer[this->_buffer.size()]; }
 
-    inline void clear(void) noexcept
-    { this->_buffer.clear(); }
-
     inline constexpr
     uint_xt len(void) const noexcept
     { return this->_buffer.size(); }
@@ -130,34 +137,6 @@ public:
         for (; _it >= _begin; --_it)
         { if (_Item == *_it) { return _it; } }
         return nil;
-    }
-
-    void erase(const _Item_t &_Item) noexcept {
-        auto _it{this->_buffer.begin()};
-        auto _end{this->_buffer.end()};
-        for (; _it < _end; ++_it) {
-            if (_Item == *_it) {
-                this->_buffer.erase(_it);
-                return;
-            }
-        }
-    }
-
-    void erase_all(const _Item_t &_Item) noexcept {
-        auto _it{this->_buffer.begin()};
-        auto _end{this->_buffer.end()};
-        for (; _it < _end; ++_it)
-        { if (_Item == *_it) { this->_buffer.erase(_it); } }
-    }
-
-    void append(const array<_Item_t> &_Items) noexcept
-    { for (const _Item_t _item: _Items) { this->_buffer.push_back(_item); } }
-
-    bool insert(const uint_xt &_Start, const array<_Item_t> &_Items) noexcept {
-        auto _it{this->_buffer.begin()+_Start};
-        if (_it >= this->_buffer.end()) { return false; }
-        this->_buffer.insert(_it, _Items.begin(), _Items.end());
-        return true;
     }
 
     bool operator==(const array<_Item_t> &_Src) const noexcept {
@@ -208,17 +187,19 @@ public:
     { for (const auto _data: _Src) { this->insert(_data); } }
 
     array<_Key_t> keys(void) const noexcept {
-        array<_Key_t> _keys{};
-        for (const auto _pair: *this)
-        { _keys._buffer.push_back(_pair.first); }
+        array<_Key_t> _keys(this->size());
+        uint_xt _index{0};
+        for (const auto &_pair: *this)
+        { _keys._buffer[_index++] = _pair.first; }
         return _keys;
     }
 
     array<_Value_t> values(void) const noexcept {
-        array<_Value_t> _values{};
-        for (const auto _pair: *this)
-        { _values._buffer.push_back(_pair.second); }
-        return _values;
+        array<_Value_t> _keys(this->size());
+        uint_xt _index{0};
+        for (const auto &_pair: *this)
+        { _keys._buffer[_index++] = _pair.second; }
+        return _keys;
     }
 
     inline constexpr
