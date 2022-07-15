@@ -690,7 +690,7 @@ func (p *Parser) Enum(e Enum) {
 	max := xtype.MaxOfType(e.Type.Id)
 	for i, item := range e.Items {
 		if max == 0 {
-			p.pusherrtok(item.Tok, "enum_overflow_limits")
+			p.pusherrtok(item.Tok, "overflow_limits")
 		} else {
 			max--
 		}
@@ -1003,6 +1003,34 @@ func (p *Parser) Global(vast Var) {
 	p.Defs.Globals = append(p.Defs.Globals, v)
 }
 
+func (p *Parser) checkArrayType(t *DataType) {
+	exprs := t.Tag.([][]any)
+	for i := range exprs {
+		exprSlice := exprs[i]
+		expr := exprSlice[1].(models.Expr)
+		if expr.Model != nil {
+			continue
+		}
+		if arrayExprIsAutoSized(expr) {
+			p.eval.pusherrtok(t.Tok, "invalid_syntax")
+			continue
+		}
+		val, model := p.evalExpr(expr)
+		expr.Model = model
+		exprSlice[1] = expr
+		if isConstNumeric(val.data.Value) {
+			exprSlice[0], _ = strconv.ParseUint(val.data.Value, 10, xtype.BitSize)
+		}
+		p.wg.Add(1)
+		go assignChecker{
+			p:      p,
+			t:      DataType{Id: xtype.UInt, Kind: xtype.TypeMap[xtype.UInt]},
+			v:      val,
+			errtok: expr.Toks[0],
+		}.checkAssignType()
+	}
+}
+
 // Var parse X variable.
 func (p *Parser) Var(v Var) *Var {
 	if xapi.IsIgnoreId(v.Id) {
@@ -1088,7 +1116,7 @@ func (p *Parser) varsFromParams(params []Param) []*Var {
 			if length-i > 1 {
 				p.pusherrtok(param.Tok, "variadic_parameter_notlast")
 			}
-			v.Type.Kind = "[]" + v.Type.Kind
+			v.Type.Kind = x.Prefix_Slice + v.Type.Kind
 		}
 		vars[i] = v
 	}
@@ -1316,7 +1344,7 @@ func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) {
 	}
 	dt := param.Type
 	if param.Variadic {
-		dt.Kind = "[]" + dt.Kind // For array.
+		dt.Kind = x.Prefix_Array + dt.Kind // For slice.
 	}
 	v, model := p.evalExpr(param.Default)
 	param.Default.Model = model
@@ -1639,7 +1667,7 @@ func (p *Parser) getGenerics(toks Toks) []DataType {
 		}
 		b := ast.NewBuilder(nil)
 		index := 0
-		generic, _ := b.DataType(part, &index, true)
+		generic, _ := b.DataType(part, &index, false, true)
 		b.Wait()
 		if index+1 < len(part) {
 			p.pusherrtok(part[index+1], "invalid_syntax")
@@ -2359,7 +2387,7 @@ func (p *Parser) assignment(selected value, errtok Tok) bool {
 	return state
 }
 
-func (p *Parser) SingleAssign(assign *models.Assign, exprs []value) {
+func (p *Parser) singleAssign(assign *models.Assign, exprs []value) {
 	right := &assign.Right[0]
 	val := exprs[0]
 	left := &assign.Left[0].Expr
@@ -2472,7 +2500,7 @@ func (p *Parser) assign(assign *models.Assign) {
 		p.suffix(assign, exprs)
 		return
 	} else if leftLength == 1 && !assign.Left[0].Var.New {
-		p.SingleAssign(assign, exprs)
+		p.singleAssign(assign, exprs)
 		return
 	} else if assign.Setter.Kind != tokens.EQUAL {
 		p.pusherrtok(assign.Setter, "invalid_syntax")
@@ -2706,11 +2734,16 @@ func (p *Parser) typeSourceOfMultiTyped(dt DataType, err bool) (DataType, bool) 
 
 func (p *Parser) typeSourceIsType(dt DataType, t *Type, err bool) (DataType, bool) {
 	original := dt.Original
+	old := dt
 	dt = t.Type
 	dt.Tok = t.Tok
 	dt.Original = original
 	dt.Kind = t.Type.Kind
-	return p.typeSource(dt, err)
+	dt, ok := p.typeSource(dt, err)
+	if ok && typeIsArray(t.Type) && typeIsSlice(old) {
+		p.pusherrtok(dt.Tok, "invalid_type_source")
+	}
+	return dt, ok
 }
 
 func (p *Parser) typeSourceIsEnum(e *Enum) (dt DataType, _ bool) {
@@ -2725,6 +2758,16 @@ func (p *Parser) typeSourceIsFunc(dt DataType, err bool) (DataType, bool) {
 	f := dt.Tag.(*Func)
 	p.reloadFuncTypes(f)
 	dt.Kind = f.DataTypeString()
+	return dt, true
+}
+
+func (p *Parser) typeSourceIsMap(dt DataType, err bool) (DataType, bool) {
+	types := dt.Tag.([]DataType)
+	key := &types[0]
+	*key, _ = p.realType(*key, err)
+	value := &types[1]
+	*value, _ = p.realType(*value, err)
+	dt.Kind = dt.MapKind()
 	return dt, true
 }
 
@@ -2760,6 +2803,11 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 	}
 	if dt.MultiTyped {
 		return p.typeSourceOfMultiTyped(dt, err)
+	} else if typeIsMap(dt) {
+		return p.typeSourceIsMap(dt, err)
+	}
+	if typeIsArray(dt) {
+		p.checkArrayType(&dt)
 	}
 	switch dt.Id {
 	case xtype.Id:
@@ -2842,6 +2890,16 @@ func (p *Parser) checkType(real, check DataType, ignoreAny bool, errTok Tok) {
 	}
 	if real.Kind != check.Kind {
 		p.pusherrtok(errTok, "incompatible_datatype", real.Kind, check.Kind)
+	} else if typeIsArray(real) || typeIsArray(check) {
+		if typeIsArray(real) != typeIsArray(check) {
+			p.pusherrtok(errTok, "incompatible_datatype", real.Kind, check.Kind)
+			return
+		}
+		i := real.Tag.([][]any)[0][0].(uint64)
+		j := check.Tag.([][]any)[0][0].(uint64)
+		realKind := strings.Replace(real.Kind, "...", strconv.FormatUint(i, 10), 1)
+		checkKind := strings.Replace(check.Kind, "...", strconv.FormatUint(j, 10), 1)
+		p.pusherrtok(errTok, "incompatible_datatype", realKind, checkKind)
 	}
 }
 

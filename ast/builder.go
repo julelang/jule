@@ -123,6 +123,8 @@ func (b *Builder) Type(toks Toks) (t models.Type) {
 		b.pusherr(toks[i-1], "invalid_syntax")
 		return
 	}
+	t.Tok = toks[1]
+	t.Id = t.Tok.Kind
 	tok := toks[i]
 	if tok.Id != tokens.Id {
 		b.pusherr(tok, "invalid_syntax")
@@ -132,13 +134,12 @@ func (b *Builder) Type(toks Toks) (t models.Type) {
 		b.pusherr(toks[i-1], "invalid_syntax")
 		return
 	}
-	destType, _ := b.DataType(toks[i:], new(int), true)
-	tok = toks[1]
-	return models.Type{
-		Tok:  tok,
-		Id:   tok.Kind,
-		Type: destType,
+	destType, ok := b.DataType(toks, &i, true, true)
+	t.Type = destType
+	if ok && i+1 < len(toks) {
+		b.pusherr(toks[i+1], "invalid_syntax")
 	}
+	return
 }
 
 func (b *Builder) buildEnumItemExpr(i *int, toks Toks) models.Expr {
@@ -223,7 +224,7 @@ func (b *Builder) Enum(toks Toks) {
 			b.pusherr(toks[i-1], "invalid_syntax")
 			return
 		}
-		enum.Type, _ = b.DataType(toks, &i, true)
+		enum.Type, _ = b.DataType(toks, &i, false, true)
 		i++
 		if i >= len(toks) {
 			b.pusherr(enum.Tok, "body_not_exist")
@@ -561,7 +562,7 @@ func (b *Builder) GlobalFunc(toks Toks) bool {
 		typeToks := toks[:i]
 		funcToks = toks[i+1:]
 		receiver = new(models.DataType)
-		*receiver, _ = b.DataType(typeToks, new(int), true)
+		*receiver, _ = b.DataType(typeToks, new(int), true, true)
 	}
 	if len(funcToks) < 2 {
 		return false
@@ -824,7 +825,7 @@ func (b *Builder) paramBodyDefaultExpr(p *models.Param, toks *Toks) {
 
 func (b *Builder) paramBodyDataType(f *models.Func, p *models.Param, toks Toks) {
 	i := 0
-	p.Type, _ = b.DataType(toks, &i, true)
+	p.Type, _ = b.DataType(toks, &i, false, true)
 	i++
 	if i < len(toks) {
 		b.pusherr(toks[i], "invalid_syntax")
@@ -867,7 +868,7 @@ func (b *Builder) pushParam(f *models.Func, toks Toks) {
 	p.Tok = tok
 	// Just given data-type.
 	if tok.Id != tokens.Id {
-		if t, ok := b.DataType(toks, &i, true); ok {
+		if t, ok := b.DataType(toks, &i, false, true); ok {
 			if i+1 == len(toks) {
 				p.Type = t
 				goto end
@@ -920,7 +921,7 @@ func (b *Builder) idDataTypePartEnd(t *models.DataType, dtv *strings.Builder, to
 	generics := make([]models.DataType, len(parts))
 	for i, part := range parts {
 		index := 0
-		t, _ := b.DataType(part, &index, true)
+		t, _ := b.DataType(part, &index, false, true)
 		if index+1 < len(part) {
 			b.pusherr(part[index+1], "invalid_syntax")
 		}
@@ -934,7 +935,7 @@ func (b *Builder) idDataTypePartEnd(t *models.DataType, dtv *strings.Builder, to
 }
 
 // DataType builds AST model of data-type.
-func (b *Builder) DataType(toks Toks, i *int, err bool) (t models.DataType, ok bool) {
+func (b *Builder) DataType(toks Toks, i *int, arrays, err bool) (t models.DataType, ok bool) {
 	defer func() { t.Original = t }()
 	first := *i
 	var dtv strings.Builder
@@ -988,21 +989,25 @@ func (b *Builder) DataType(toks Toks, i *int, err bool) (t models.DataType, ok b
 				}
 				tok = toks[*i]
 				if tok.Id == tokens.Brace && tok.Kind == tokens.RBRACKET {
-					dtv.WriteString("[]")
+					arrays = false
+					dtv.WriteString(x.Prefix_Slice)
 					continue
 				}
 				*i-- // Start from bracket
-				dt, val := b.MapDataType(toks, i, err)
-				if val == "" {
+				if arrays {
+					t = b.MapOrArrayDataType(toks, i, err)
+				} else {
+					t = b.MapDataType(toks, i, err)
+				}
+				if t.Id == xtype.Void {
 					if err {
 						b.pusherr(tok, "invalid_syntax")
 					}
 					return
 				}
-				t = dt
-				dtv.WriteString(val)
+				t.Kind = dtv.String() + t.Kind
 				ok = true
-				goto ret
+				return
 			}
 			/*if err {
 				ast.pusherrtok(tok, "invalid_syntax")
@@ -1023,41 +1028,70 @@ ret:
 	return
 }
 
-// MapDataType builds map data-type.
-func (b *Builder) MapDataType(toks Toks, i *int, err bool) (t models.DataType, _ string) {
+func (b *Builder) arrayDataType(toks Toks, i *int, err bool) (t models.DataType) {
 	defer func() { t.Original = t }()
-	t.Id = xtype.Map
-	t.Tok = toks[0]
+	if *i+1 >= len(toks) {
+		return
+	}
+	*i++
+	exprI := *i
+	t, ok := b.DataType(toks, i, true, err)
+	if !ok {
+		return
+	}
+	var exprs [][]any
+	if t.Tag != nil {
+		exprs = t.Tag.([][]any)
+	}
+	_, exprToks := RangeLast(toks[:exprI])
+	exprToks = exprToks[1 : len(exprToks)-1]
+	tok := exprToks[0]
+	if len(exprToks) == 1 && tok.Id == tokens.Operator && tok.Kind == tokens.TRIPLE_DOT {
+		exprs = append([][]any{{uint64(0), models.Expr{}}}, exprs...)
+	} else {
+		exprs = append([][]any{{uint64(0), b.Expr(exprToks)}}, exprs...)
+	}
+	t.Tag = exprs
+	t.Kind = x.Prefix_Array + t.Kind
+	return t
+}
+
+func (b *Builder) MapOrArrayDataType(toks Toks, i *int, err bool) models.DataType {
+	t := b.MapDataType(toks, i, err)
+	if t.Id == xtype.Void { // Array
+		return b.arrayDataType(toks, i, err)
+	}
+	return t
+}
+
+// MapDataType builds map data-type.
+func (b *Builder) MapDataType(toks Toks, i *int, err bool) (t models.DataType) {
 	typeToks, colon := MapDataTypeInfo(toks, i)
 	if typeToks == nil || colon == -1 {
 		return
 	}
+	return b.mapDataType(toks, typeToks, colon, err)
+}
+
+func (b *Builder) mapDataType(toks, typeToks Toks, colon int, err bool) (t models.DataType) {
+	defer func() { t.Original = t }()
+	t.Id = xtype.Map
+	t.Tok = toks[0]
 	colonTok := toks[colon]
 	if colon == 0 || colon+1 >= len(typeToks) {
 		b.pusherr(colonTok, "missing_expr")
-		return t, " " // Space for ignore "invalid_syntax" error
+		return t
 	}
 	keyTypeToks := typeToks[:colon]
 	valTypeToks := typeToks[colon+1:]
 	types := make([]models.DataType, 2)
 	j := 0
-	types[0], _ = b.DataType(keyTypeToks, &j, err)
-	if j < len(keyTypeToks) && err {
-		b.pusherr(keyTypeToks[j], "invalid_syntax")
-	}
+	types[0], _ = b.DataType(keyTypeToks, &j, true, true)
 	j = 0
-	types[1], _ = b.DataType(valTypeToks, &j, err)
-	if j < len(valTypeToks) && err {
-		b.pusherr(valTypeToks[j], "invalid_syntax")
-	}
+	types[1], _ = b.DataType(valTypeToks, &j, true, true)
 	t.Tag = types
-	var val strings.Builder
-	val.WriteByte('[')
-	val.WriteString(types[0].Kind)
-	val.WriteByte(':')
-	val.WriteString(types[1].Kind)
-	val.WriteByte(']')
-	return t, val.String()
+	t.Kind = t.MapKind()
+	return t
 }
 
 // FuncDataTypeHead builds head part of function data-type.
@@ -1098,7 +1132,7 @@ func (b *Builder) pushTypeToTypes(ids *Toks, types *[]models.DataType, toks Toks
 		*ids = append(*ids, Tok{Kind: xapi.Ignore})
 	}
 	index := new(int)
-	currentDt, ok := b.DataType(toks, index, true)
+	currentDt, ok := b.DataType(toks, index, false, true)
 	if !ok {
 		return
 	} else if *index < len(toks)-1 {
@@ -1115,14 +1149,14 @@ func (b *Builder) funcMultiTypeRet(toks Toks, i *int) (t models.RetType, ok bool
 	*i++
 	if *i >= len(toks) {
 		*i--
-		t.Type, ok = b.DataType(toks, i, false)
+		t.Type, ok = b.DataType(toks, i, false, false)
 		return
 	}
 	tok = toks[*i]
-	// Is array?
+	// Is slice?
 	if tok.Id == tokens.Brace && tok.Kind == tokens.RBRACKET {
 		*i--
-		t.Type, ok = b.DataType(toks, i, false)
+		t.Type, ok = b.DataType(toks, i, false, false)
 		return
 	}
 	var types []models.DataType
@@ -1140,9 +1174,9 @@ func (b *Builder) funcMultiTypeRet(toks Toks, i *int) (t models.RetType, ok bool
 			}
 		}
 		if braceCount == 0 {
-			if tok.Id == tokens.Colon {
+			if tok.Id == tokens.Colon { // Is map
 				*i = start
-				t.Type, ok = b.DataType(toks, i, false)
+				t.Type, ok = b.DataType(toks, i, false, false)
 				return
 			}
 			b.pushTypeToTypes(&t.Identifiers, &types, toks[last:*i], toks[last-1])
@@ -1154,7 +1188,7 @@ func (b *Builder) funcMultiTypeRet(toks Toks, i *int) (t models.RetType, ok bool
 		case tokens.Comma:
 		case tokens.Colon:
 			*i = start
-			t.Type, ok = b.DataType(toks, i, false)
+			t.Type, ok = b.DataType(toks, i, false, false)
 			return
 		default:
 			continue
@@ -1185,7 +1219,7 @@ func (b *Builder) FuncRetDataType(toks Toks, i *int) (t models.RetType, ok bool)
 	if tok.Id == tokens.Brace && tok.Kind == tokens.LBRACKET {
 		return b.funcMultiTypeRet(toks, i)
 	}
-	t.Type, ok = b.DataType(toks, i, false)
+	t.Type, ok = b.DataType(toks, i, false, false)
 	return
 }
 
@@ -1352,40 +1386,40 @@ func (b *Builder) assignInfo(toks Toks) (info AssignInfo) {
 	return
 }
 
-func (b *Builder) pushAssignSelector(selectors *[]models.AssignLeft, last, current int, info AssignInfo) {
-	var selector models.AssignLeft
-	selector.Expr.Toks = info.Left[last:current]
+func (b *Builder) pushAssignLeft(lefts *[]models.AssignLeft, last, current int, info AssignInfo) {
+	var left models.AssignLeft
+	left.Expr.Toks = info.Left[last:current]
 	if last-current == 0 {
 		b.pusherr(info.Left[current-1], "missing_expr")
 		return
 	}
 	// Variable is new?
-	if selector.Expr.Toks[0].Id == tokens.Id &&
+	if left.Expr.Toks[0].Id == tokens.Id &&
 		current-last > 1 &&
-		selector.Expr.Toks[1].Id == tokens.Colon {
+		left.Expr.Toks[1].Id == tokens.Colon {
 		if info.IsExpr {
-			b.pusherr(selector.Expr.Toks[0], "notallow_declares")
+			b.pusherr(left.Expr.Toks[0], "notallow_declares")
 		}
-		selector.Var.New = true
-		selector.Var.IdTok = selector.Expr.Toks[0]
-		selector.Var.Id = selector.Var.IdTok.Kind
-		selector.Var.SetterTok = info.Setter
+		left.Var.New = true
+		left.Var.IdTok = left.Expr.Toks[0]
+		left.Var.Id = left.Var.IdTok.Kind
+		left.Var.SetterTok = info.Setter
 		// Has specific data-type?
 		if current-last > 2 {
-			selector.Var.Type, _ = b.DataType(selector.Expr.Toks[2:], new(int), false)
+			left.Var.Type, _ = b.DataType(left.Expr.Toks[2:], new(int), true, false)
 		}
 	} else {
-		if selector.Expr.Toks[0].Id == tokens.Id {
-			selector.Var.IdTok = selector.Expr.Toks[0]
-			selector.Var.Id = selector.Var.IdTok.Kind
+		if left.Expr.Toks[0].Id == tokens.Id {
+			left.Var.IdTok = left.Expr.Toks[0]
+			left.Var.Id = left.Var.IdTok.Kind
 		}
-		selector.Expr = b.Expr(selector.Expr.Toks)
+		left.Expr = b.Expr(left.Expr.Toks)
 	}
-	*selectors = append(*selectors, selector)
+	*lefts = append(*lefts, left)
 }
 
-func (b *Builder) assignSelectors(info AssignInfo) []models.AssignLeft {
-	var selectors []models.AssignLeft
+func (b *Builder) assignLefts(info AssignInfo) []models.AssignLeft {
+	var lefts []models.AssignLeft
 	braceCount := 0
 	lastIndex := 0
 	for i, tok := range info.Left {
@@ -1402,13 +1436,13 @@ func (b *Builder) assignSelectors(info AssignInfo) []models.AssignLeft {
 		} else if tok.Id != tokens.Comma {
 			continue
 		}
-		b.pushAssignSelector(&selectors, lastIndex, i, info)
+		b.pushAssignLeft(&lefts, lastIndex, i, info)
 		lastIndex = i + 1
 	}
 	if lastIndex < len(info.Left) {
-		b.pushAssignSelector(&selectors, lastIndex, len(info.Left), info)
+		b.pushAssignLeft(&lefts, lastIndex, len(info.Left), info)
 	}
-	return selectors
+	return lefts
 }
 
 func (b *Builder) pushAssignExpr(exps *[]models.Expr, last, current int, info AssignInfo) {
@@ -1471,7 +1505,7 @@ func (b *Builder) AssignExpr(toks Toks, isExpr bool) (assign models.Assign, ok b
 	info.IsExpr = isExpr
 	assign.IsExpr = isExpr
 	assign.Setter = info.Setter
-	assign.Left = b.assignSelectors(info)
+	assign.Left = b.assignLefts(info)
 	if isExpr && len(assign.Left) > 1 {
 		b.pusherr(assign.Setter, "notallow_multiple_assign")
 	}
@@ -1594,7 +1628,7 @@ func (b *Builder) varBegin(v *models.Var, i *int, toks Toks) {
 
 func (b *Builder) varTypeNExpr(v *models.Var, toks Toks, i int) {
 	tok := toks[i]
-	t, ok := b.DataType(toks, &i, false)
+	t, ok := b.DataType(toks, &i, true, false)
 	if ok {
 		v.Type = t
 		i++
@@ -1786,7 +1820,7 @@ func (b *Builder) getVarProfile(toks Toks) (vast models.Var) {
 	if *i >= len(toks) {
 		return
 	}
-	vast.Type, _ = b.DataType(toks, i, true)
+	vast.Type, _ = b.DataType(toks, i, false, true)
 	if *i < len(toks)-1 {
 		b.pusherr(toks[*i], "invalid_syntax")
 	}
@@ -2303,7 +2337,7 @@ func (b *Builder) exprBracePart(info *exprProcessInfo, tok Tok) bool {
 	case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
 		if tok.Kind == tokens.LBRACKET {
 			oldIndex := info.i
-			_, ok := b.DataType(info.toks, &info.i, false)
+			_, ok := b.DataType(info.toks, &info.i, false, false)
 			if ok {
 				info.part = append(info.part, info.toks[oldIndex:info.i+1]...)
 				return true

@@ -1,9 +1,12 @@
 package parser
 
 import (
+	"strconv"
+
 	"github.com/the-xlang/xxc/ast"
 	"github.com/the-xlang/xxc/ast/models"
 	"github.com/the-xlang/xxc/lex/tokens"
+	"github.com/the-xlang/xxc/pkg/x"
 	"github.com/the-xlang/xxc/pkg/xapi"
 	"github.com/the-xlang/xxc/pkg/xlog"
 	"github.com/the-xlang/xxc/pkg/xtype"
@@ -391,6 +394,8 @@ func (e *eval) subId(toks Toks, m *exprModel) (v value) {
 		case valIsStructIns(val):
 			return e.structObjSubId(val, idTok, m)
 		}
+	case typeIsSlice(checkType):
+		return e.sliceObjSubId(val, idTok, m)
 	case typeIsArray(checkType):
 		return e.arrayObjSubId(val, idTok, m)
 	case typeIsMap(checkType):
@@ -431,7 +436,7 @@ func (e *eval) tryCast(toks Toks, m *exprModel) (v value, _ bool) {
 		b := ast.NewBuilder(nil)
 		dtindex := 0
 		typeToks := toks[1:i]
-		dt, ok := b.DataType(typeToks, &dtindex, false)
+		dt, ok := b.DataType(typeToks, &dtindex, false, false)
 		b.Wait()
 		if !ok {
 			return
@@ -466,8 +471,8 @@ func (e *eval) cast(v value, t DataType, errtok Tok) value {
 	case typeIsPure(v.data.Type) && v.data.Type.Id == xtype.Any:
 	case typeIsPtr(t):
 		e.castPtr(v.data.Type, errtok)
-	case typeIsArray(t):
-		e.castArray(t, v.data.Type, errtok)
+	case typeIsSlice(t):
+		e.castSlice(t, v.data.Type, errtok)
 	case typeIsPure(t):
 		v.lvalue = false
 		e.castSingle(t, v.data.Type, errtok)
@@ -501,11 +506,11 @@ func (e *eval) castSingle(t, vt DataType, errtok Tok) {
 }
 
 func (e *eval) castStr(vt DataType, errtok Tok) {
-	if !typeIsArray(vt) {
+	if !typeIsSlice(vt) {
 		e.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
 		return
 	}
-	vt.Kind = vt.Kind[2:] // Remove array brackets
+	vt = typeOfSliceComponents(vt)
 	if !typeIsPure(vt) || vt.Id != xtype.U8 {
 		e.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
 	}
@@ -547,12 +552,12 @@ func (e *eval) castPtr(vt DataType, errtok Tok) {
 	e.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
 }
 
-func (e *eval) castArray(t, vt DataType, errtok Tok) {
+func (e *eval) castSlice(t, vt DataType, errtok Tok) {
 	if !typeIsPure(vt) || vt.Id != xtype.Str {
 		e.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
 		return
 	}
-	t.Kind = t.Kind[2:] // Remove array brackets
+	t = typeOfSliceComponents(t)
 	if !typeIsPure(t) || t.Id != xtype.U8 {
 		e.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
 	}
@@ -691,7 +696,7 @@ func (e *eval) typeId(toks Toks, m *exprModel) (v value) {
 		return
 	}
 	toks = toks[1:]
-	return e.buildEnumerable(toks, t.Type, m)
+	return e.enumerable(toks, t.Type, m)
 }
 
 func (e *eval) xObjSubId(dm *Defmap, val value, idTok Tok, m *exprModel) (v value) {
@@ -730,9 +735,13 @@ func (e *eval) strObjSubId(val value, idTok Tok, m *exprModel) value {
 	return e.xObjSubId(strDefs, val, idTok, m)
 }
 
+func (e *eval) sliceObjSubId(val value, idTok Tok, m *exprModel) value {
+	readySliceDefs(val.data.Type)
+	return e.xObjSubId(sliceDefs, val, idTok, m)
+}
+
 func (e *eval) arrayObjSubId(val value, idTok Tok, m *exprModel) value {
-	readyArrDefs(val.data.Type)
-	return e.xObjSubId(arrDefs, val, idTok, m)
+	return e.xObjSubId(arrayDefs, val, idTok, m)
 }
 
 func (e *eval) mapObjSubId(val value, idTok Tok, m *exprModel) value {
@@ -844,7 +853,7 @@ func (e *eval) variadic(toks Toks, m *exprModel, errtok Tok) (v value) {
 		e.pusherrtok(errtok, "variadic_with_nonvariadicable", v.data.Type.Kind)
 		return
 	}
-	v.data.Type.Kind = v.data.Type.Kind[2:] // Remove array type.
+	v.data.Type = typeOfSliceComponents(v.data.Type)
 	v.variadic = true
 	return
 }
@@ -877,7 +886,7 @@ func (e *eval) bracketRange(toks Toks, m *exprModel) (v value) {
 	var model iExpr
 	v, model = e.toks(exprToks)
 	m.appendSubNode(model)
-	toks = toks[len(exprToks)+1 : len(toks)-1] // Removed array syntax "["..."]"
+	toks = toks[len(exprToks)+1 : len(toks)-1] // Removed syntax "["..."]"
 	m.appendSubNode(exprNode{tokens.LBRACKET})
 	selectv, model := e.toks(toks)
 	m.appendSubNode(model)
@@ -889,6 +898,8 @@ func (e *eval) enumerableSelect(enumv, selectv value, errtok Tok) (v value) {
 	switch {
 	case typeIsArray(enumv.data.Type):
 		return e.arraySelect(enumv, selectv, errtok)
+	case typeIsSlice(enumv.data.Type):
+		return e.sliceSelect(enumv, selectv, errtok)
 	case typeIsMap(enumv.data.Type):
 		return e.mapSelect(enumv, selectv, errtok)
 	case typeIsPure(enumv.data.Type):
@@ -898,6 +909,19 @@ func (e *eval) enumerableSelect(enumv, selectv value, errtok Tok) (v value) {
 	}
 	e.pusherrtok(errtok, "not_enumerable")
 	return
+}
+
+func (e *eval) sliceSelect(slicev, selectv value, errtok Tok) value {
+	slicev.lvalue = true
+	slicev.data.Type = typeOfSliceComponents(slicev.data.Type)
+	e.p.wg.Add(1)
+	go assignChecker{
+		p:      e.p,
+		t:      DataType{Id: xtype.UInt, Kind: tokens.UINT},
+		v:      selectv,
+		errtok: errtok,
+	}.checkAssignType()
+	return slicev
 }
 
 func (e *eval) arraySelect(arrv, selectv value, errtok Tok) value {
@@ -953,7 +977,7 @@ func (e *eval) ptrSelect(ptrv, selectv value, errtok Tok) value {
 }
 
 //! IMPORTANT: Tokens is should be store enumerable parentheses.
-func (e *eval) buildEnumerableParts(toks Toks) []Toks {
+func (e *eval) enumerableParts(toks Toks) []Toks {
 	toks = toks[1 : len(toks)-1]
 	parts, errs := ast.Parts(toks, tokens.Comma, true)
 	e.p.pusherrs(errs...)
@@ -961,10 +985,46 @@ func (e *eval) buildEnumerableParts(toks Toks) []Toks {
 }
 
 func (e *eval) buildArray(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
+	if !arrayIsAutoSized(t) {
+		n := t.Tag.([][]any)[0][0].(uint64)
+		if uint64(len(parts)) > n {
+			e.p.pusherrtok(errtok, "overflow_limits")
+		}
+	} else {
+		tag := t.Tag.([][]any)[0]
+		n := uint64(len(parts))
+		tag[0] = n
+		tag[1] = models.Expr{
+			Model: exprNode{
+				value: xtype.TypeMap[xtype.UInt] + "{" + strconv.FormatUint(n, 10) + "}",
+			},
+		}
+	}
 	var v value
+	v.data.Value = t.Kind
 	v.data.Type = t
-	model := arrayExpr{dataType: t}
+	model := sliceExpr{dataType: t}
 	elemType := typeOfArrayComponents(t)
+	for _, part := range parts {
+		partVal, expModel := e.toks(part)
+		model.expr = append(model.expr, expModel)
+		e.p.wg.Add(1)
+		go assignChecker{
+			p:      e.p,
+			t:      elemType,
+			v:      partVal,
+			errtok: part[0],
+		}.checkAssignType()
+	}
+	return v, model
+}
+
+func (e *eval) buildSlice(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
+	var v value
+	v.data.Value = t.Kind
+	v.data.Type = t
+	model := sliceExpr{dataType: t}
+	elemType := typeOfSliceComponents(t)
 	for _, part := range parts {
 		partVal, expModel := e.toks(part)
 		model.expr = append(model.expr, expModel)
@@ -981,6 +1041,7 @@ func (e *eval) buildArray(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
 
 func (e *eval) buildMap(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
 	var v value
+	v.data.Value = t.Kind
 	v.data.Type = t
 	model := mapExpr{dataType: t}
 	types := t.Tag.([]DataType)
@@ -1035,21 +1096,39 @@ func (e *eval) buildMap(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
 	return v, model
 }
 
-func (e *eval) buildEnumerable(exprToks Toks, t DataType, m *exprModel) (v value) {
-	t, ok := e.p.realType(t, true)
-	if !ok {
-		return
-	}
+func (e *eval) enumerable(exprToks Toks, t DataType, m *exprModel) (v value) {
 	var model iExpr
+	if typeIsArray(t) && arrayIsAutoSized(t) {
+		exprs := t.Tag.([][]any)[0]
+		t = typeOfArrayComponents(t)
+		var ok bool
+		t, ok = e.p.realType(t, true)
+		if !ok {
+			return
+		}
+		t.Kind = x.Prefix_Array + t.Kind
+		t.Tag = append([][]any{exprs}, t.Tag.([][]any)...)
+		v, model = e.buildArray(e.enumerableParts(exprToks), t, exprToks[0])
+		goto ret
+	} else {
+		var ok bool
+		t, ok = e.p.realType(t, true)
+		if !ok {
+			return
+		}
+	}
 	switch {
 	case typeIsArray(t):
-		v, model = e.buildArray(e.buildEnumerableParts(exprToks), t, exprToks[0])
+		v, model = e.buildArray(e.enumerableParts(exprToks), t, exprToks[0])
+	case typeIsSlice(t):
+		v, model = e.buildSlice(e.enumerableParts(exprToks), t, exprToks[0])
 	case typeIsMap(t):
-		v, model = e.buildMap(e.buildEnumerableParts(exprToks), t, exprToks[0])
+		v, model = e.buildMap(e.enumerableParts(exprToks), t, exprToks[0])
 	default:
 		e.pusherrtok(exprToks[0], "invalid_type_source")
 		return
 	}
+ret:
 	m.appendSubNode(model)
 	return
 }
@@ -1092,7 +1171,7 @@ func (e *eval) braceRange(toks Toks, m *exprModel) (v value) {
 		case tokens.LBRACKET:
 			b := ast.NewBuilder(nil)
 			i := new(int)
-			t, ok := b.DataType(exprToks, i, true)
+			t, ok := b.DataType(exprToks, i, true, true)
 			b.Wait()
 			if !ok {
 				e.p.pusherrs(b.Errors...)
@@ -1101,7 +1180,7 @@ func (e *eval) braceRange(toks Toks, m *exprModel) (v value) {
 				e.pusherrtok(toks[*i+1], "invalid_syntax")
 			}
 			exprToks = toks[len(exprToks):]
-			return e.buildEnumerable(exprToks, t, m)
+			return e.enumerable(exprToks, t, m)
 		case tokens.LPARENTHESES:
 			b := ast.NewBuilder(toks)
 			f := b.Func(b.Toks, true)

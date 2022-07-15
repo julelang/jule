@@ -207,7 +207,24 @@ func (s *solver) array() (v models.Data) {
 		v.Type.Id = xtype.Bool
 		v.Type.Kind = tokens.BOOL
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "array")
+		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, s.leftVal.Type.Kind)
+	}
+	return
+}
+
+func (s *solver) slice() (v models.Data) {
+	v.Tok = s.operator
+	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
+		s.p.pusherrtok(s.operator, "incompatible_datatype",
+			s.rightVal.Type.Kind, s.leftVal.Type.Kind)
+		return
+	}
+	switch s.operator.Kind {
+	case tokens.EQUALS, tokens.NOT_EQUALS:
+		v.Type.Id = xtype.Bool
+		v.Type.Kind = tokens.BOOL
+	default:
+		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, s.leftVal.Type.Kind)
 	}
 	return
 }
@@ -259,6 +276,8 @@ func (s *solver) solve() (v models.Data) {
 	switch {
 	case typeIsArray(s.leftVal.Type), typeIsArray(s.rightVal.Type):
 		return s.array()
+	case typeIsSlice(s.leftVal.Type), typeIsSlice(s.rightVal.Type):
+		return s.slice()
 	case typeIsPtr(s.leftVal.Type), typeIsPtr(s.rightVal.Type):
 		return s.ptr()
 	case s.leftVal.Type.Id == xtype.Enum, s.rightVal.Type.Id == xtype.Enum:

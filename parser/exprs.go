@@ -9,6 +9,10 @@ import (
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
+func arrayExprIsAutoSized(expr models.Expr) bool {
+	return len(expr.Processes) == 0 || len(expr.Toks) == 0
+}
+
 func isstr(s string) bool {
 	return s != "" && (s[0] == '"' || israwstr(s))
 }
@@ -73,7 +77,8 @@ func valIsStructIns(val value) bool {
 
 func isForeachIterExpr(val value) bool {
 	switch {
-	case typeIsArray(val.data.Type),
+	case typeIsSlice(val.data.Type),
+		typeIsArray(val.data.Type),
 		typeIsMap(val.data.Type):
 		return true
 	case !typeIsPure(val.data.Type):

@@ -1,6 +1,9 @@
 package parser
 
-import "github.com/the-xlang/xxc/ast/models"
+import (
+	"github.com/the-xlang/xxc/ast/models"
+	"github.com/the-xlang/xxc/pkg/x"
+)
 
 type pureArgParser struct {
 	p       *Parser
@@ -25,8 +28,8 @@ func (pap *pureArgParser) buildArgs() {
 			arg := Arg{Expr: pair.param.Default}
 			pap.args.Src = append(pap.args.Src, arg)
 		case pair.param.Variadic:
-			model := arrayExpr{pair.param.Type, nil}
-			model.dataType.Kind = "[]" + model.dataType.Kind // For array.
+			model := sliceExpr{pair.param.Type, nil}
+			model.dataType.Kind = x.Prefix_Slice + model.dataType.Kind // For slice.
 			arg := Arg{Expr: Expr{Model: model}}
 			pap.args.Src = append(pap.args.Src, arg)
 		}
@@ -34,8 +37,8 @@ func (pap *pureArgParser) buildArgs() {
 }
 
 func (pap *pureArgParser) pushVariadicArgs(pair *paramMapPair) {
-	model := arrayExpr{pair.param.Type, nil}
-	model.dataType.Kind = "[]" + model.dataType.Kind // For array.
+	model := sliceExpr{pair.param.Type, nil}
+	model.dataType.Kind = x.Prefix_Slice + model.dataType.Kind // For slice.
 	variadiced := false
 	pap.p.parseArg(*pair.param, pair.arg, &variadiced)
 	model.expr = append(model.expr, pair.arg.Expr.Model.(iExpr))

@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/the-xlang/xxc/lex/tokens"
+	"github.com/the-xlang/xxc/pkg/x"
 	"github.com/the-xlang/xxc/pkg/xapi"
 )
 
@@ -79,7 +80,8 @@ func (f *IterForeach) MapString(iter Iter) string {
 func (f *IterForeach) ForeachString(iter Iter) string {
 	switch {
 	case f.ExprType.Kind == tokens.STR,
-		strings.HasPrefix(f.ExprType.Kind, "[]"):
+		strings.HasPrefix(f.ExprType.Kind, x.Prefix_Slice),
+		strings.HasPrefix(f.ExprType.Kind, x.Prefix_Array):
 		return f.ClassicString(iter)
 	case f.ExprType.Kind[0] == '[':
 		return f.MapString(iter)

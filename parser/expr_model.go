@@ -72,12 +72,12 @@ func (af anonFuncExpr) String() string {
 	return cxx.String()
 }
 
-type arrayExpr struct {
+type sliceExpr struct {
 	dataType DataType
 	expr     []iExpr
 }
 
-func (a arrayExpr) String() string {
+func (a sliceExpr) String() string {
 	var cxx strings.Builder
 	cxx.WriteString(a.dataType.String())
 	cxx.WriteString("({")

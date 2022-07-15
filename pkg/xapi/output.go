@@ -73,28 +73,28 @@ typedef uintptr_t                         uintptr_xt;
 
 // region X_STRUCTURES
 template<typename _Item_t>
-class array {
+class slice {
 public:
     std::vector<_Item_t> _buffer{};
 
-    array<_Item_t>(const uint_xt &_N) noexcept
+    slice<_Item_t>(const uint_xt &_N) noexcept
     { this->_buffer = std::vector<_Item_t>(_N); }
 
-    array<_Item_t>(void) noexcept {}
+    slice<_Item_t>(void) noexcept {}
 
-    array<_Item_t>(const std::nullptr_t) noexcept {}
+    slice<_Item_t>(const std::nullptr_t) noexcept {}
 
-    array<_Item_t>(const array<_Item_t>& _Src) noexcept
+    slice<_Item_t>(const slice<_Item_t>& _Src) noexcept
     { this->_buffer = _Src._buffer; }
 
-    array<_Item_t>(const std::initializer_list<_Item_t> &_Src) noexcept {
+    slice<_Item_t>(const std::initializer_list<_Item_t> &_Src) noexcept {
         this->_buffer = std::vector<_Item_t>(_Src.size());
         const auto _Src_begin{_Src.begin()};
         for (uint_xt _index{0}; _index < _Src.size(); ++_index)
         { this->_buffer[_index] = *(_Item_t*)(_Src_begin+_index); }
     }
 
-    ~array<_Item_t>(void) noexcept
+    ~slice<_Item_t>(void) noexcept
     { this->_buffer.clear(); }
 
     typedef _Item_t       *iterator;
@@ -139,7 +139,7 @@ public:
         return nil;
     }
 
-    bool operator==(const array<_Item_t> &_Src) const noexcept {
+    bool operator==(const slice<_Item_t> &_Src) const noexcept {
         const uint_xt _length{this->_buffer.size()};
         const uint_xt _Src_length{_Src._buffer.size()};
         if (_length != _Src_length) { return false; }
@@ -149,7 +149,7 @@ public:
     }
 
     inline constexpr
-    bool operator!=(const array<_Item_t> &_Src) const noexcept
+    bool operator!=(const slice<_Item_t> &_Src) const noexcept
     { return !this->operator==(_Src); }
 
     inline constexpr
@@ -160,18 +160,83 @@ public:
     bool operator!=(const std::nullptr_t) const noexcept
     { return !this->operator==(nil); }
 
-    _Item_t& operator[](const uint_xt _Index) {
-        if (this->len() <= _Index) { XID(panic)("index out of range"); }
+    _Item_t& operator[](const uint_xt &_Index) {
+        if (this->empty() || this->len() <= _Index)
+        { XID(panic)("index out of range"); }
         return this->_buffer[_Index];
     }
 
     friend std::ostream& operator<<(std::ostream &_Stream,
-                                    const array<_Item_t> &_Src) {
+                                    const slice<_Item_t> &_Src) {
         _Stream << '[';
         const uint_xt _length{_Src._buffer.size()};
         for (uint_xt _index{0}; _index < _length;) {
             _Stream << _Src._buffer[_index++];
             if (_index < _length) { _Stream << u8", "; }
+        }
+        _Stream << ']';
+        return _Stream;
+    }
+};
+
+template<typename _Item_t, const uint_xt _N>
+struct array {
+public:
+    std::array<_Item_t, _N> _buffer{};
+
+    array<_Item_t, _N>(const std::initializer_list<_Item_t> &_Src) noexcept {
+        const auto _Src_begin{_Src.begin()};
+        for (uint_xt _index{0}; _index < _Src.size(); ++_index)
+        { this->_buffer[_index] = *(_Item_t*)(_Src_begin+_index); }
+    }
+
+    typedef _Item_t       *iterator;
+    typedef const _Item_t *const_iterator;
+
+    inline constexpr
+    iterator begin(void) noexcept
+    { return &this->_buffer[0]; }
+
+    inline constexpr
+    const_iterator begin(void) const noexcept
+    { return &this->_buffer[0]; }
+
+    inline constexpr
+    iterator end(void) noexcept
+    { return &this->_buffer[_N]; }
+
+    inline constexpr
+    const_iterator end(void) const noexcept
+    { return &this->_buffer[_N]; }
+
+    inline constexpr
+    uint_xt len(void) const noexcept
+    { return _N; }
+
+    inline constexpr
+    bool empty(void) const noexcept
+    { return this->_buffer.empty(); }
+
+    inline constexpr
+    bool operator==(const array<_Item_t, _N> &_Src) const noexcept
+    { return this->_buffer == _Src._buffer; }
+
+    inline constexpr
+    bool operator!=(const array<_Item_t, _N> &_Src) const noexcept
+    { return !this->operator==(_Src); }
+
+    _Item_t& operator[](const uint_xt &_Index) {
+        if (this->empty() || this->len() <= _Index)
+        { XID(panic)("index out of range"); }
+        return this->_buffer[_Index];
+    }
+
+    friend std::ostream& operator<<(std::ostream &_Stream,
+                                    const array<_Item_t, _N> &_Src) {
+        _Stream << '[';
+        for (uint_xt _index{0}; _index < _Src.len();) {
+            _Stream << _Src._buffer[_index++];
+            if (_index < _Src.len()) { _Stream << u8", "; }
         }
         _Stream << ']';
         return _Stream;
@@ -186,16 +251,16 @@ public:
     map<_Key_t, _Value_t>(const std::initializer_list<std::pair<_Key_t, _Value_t>> _Src)
     { for (const auto _data: _Src) { this->insert(_data); } }
 
-    array<_Key_t> keys(void) const noexcept {
-        array<_Key_t> _keys(this->size());
+    slice<_Key_t> keys(void) const noexcept {
+        slice<_Key_t> _keys(this->size());
         uint_xt _index{0};
         for (const auto &_pair: *this)
         { _keys._buffer[_index++] = _pair.first; }
         return _keys;
     }
 
-    array<_Value_t> values(void) const noexcept {
-        array<_Value_t> _keys(this->size());
+    slice<_Value_t> values(void) const noexcept {
+        slice<_Value_t> _keys(this->size());
         uint_xt _index{0};
         for (const auto &_pair: *this)
         { _keys._buffer[_index++] = _pair.second; }
@@ -240,10 +305,10 @@ public:
     str_xt(const std::string _Src) noexcept { this->_buffer = _Src; }
     str_xt(const str_xt &_Src) noexcept     { this->_buffer = _Src._buffer; }
     
-    str_xt(const array<char> &_Src) noexcept
+    str_xt(const slice<char> &_Src) noexcept
     { this->_buffer = std::string{_Src.begin(), _Src.end()}; }
 
-    str_xt(const array<u8_xt> &_Src) noexcept
+    str_xt(const slice<u8_xt> &_Src) noexcept
     { this->_buffer = std::string{_Src.begin(), _Src.end()}; }
 
     typedef char_xt       *iterator;
@@ -317,8 +382,8 @@ public:
         return str_xt{u8""};
     }
 
-    array<str_xt> split(const str_xt &_Sub, const i64_xt &_N) const noexcept {
-        array<str_xt> _parts{};
+    slice<str_xt> split(const str_xt &_Sub, const i64_xt &_N) const noexcept {
+        slice<str_xt> _parts{};
         if (_N == 0) { return _parts; }
         const const_iterator _begin{this->begin()};
         std::string _s{this->_buffer};
@@ -363,16 +428,16 @@ public:
         return str_xt{_s};
     }
 
-    operator array<char>(void) const noexcept {
-        array<char> _array{};
-        _array._buffer = std::vector<char>{this->begin(), this->end()};
-        return _array;
+    operator slice<char>(void) const noexcept {
+        slice<char> _slice{};
+        _slice._buffer = std::vector<char>{this->begin(), this->end()};
+        return _slice;
     }
 
-    operator array<u8_xt>(void) const noexcept {
-        array<u8_xt> _array{};
-        _array._buffer = std::vector<u8_xt>{this->begin(), this->end()};
-        return _array;
+    operator slice<u8_xt>(void) const noexcept {
+        slice<u8_xt> _slice{};
+        _slice._buffer = std::vector<u8_xt>{this->begin(), this->end()};
+        return _slice;
     }
 
     inline operator const char*(void) const noexcept

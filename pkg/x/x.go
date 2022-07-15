@@ -32,6 +32,9 @@ const (
 
 	PreprocessorDirective      = "pragma"
 	PreprocessorDirectiveEnofi = "enofi"
+
+	Prefix_Slice = "[]"
+	Prefix_Array = "[...]"
 )
 
 // Environment Variables.

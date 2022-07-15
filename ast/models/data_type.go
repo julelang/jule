@@ -4,6 +4,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/the-xlang/xxc/pkg/x"
 	"github.com/the-xlang/xxc/pkg/xapi"
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
@@ -40,7 +41,8 @@ func (dt *DataType) KindWithOriginalId() string {
 	}
 	_, prefix := dt.KindId()
 	original := dt.Original.(DataType)
-	return prefix + original.Tok.Kind
+	id, _ := original.KindId()
+	return prefix + id
 }
 
 // OriginalKindId returns dt.Kind's identifier of official.
@@ -58,6 +60,9 @@ func (dt *DataType) OriginalKindId() string {
 
 // KindId returns dt.Kind's identifier.
 func (dt *DataType) KindId() (id, prefix string) {
+	if dt.Id == xtype.Map || dt.Id == xtype.Func {
+		return dt.Kind, ""
+	}
 	id = dt.Kind
 	runes := []rune(dt.Kind)
 	for i, r := range dt.Kind {
@@ -81,11 +86,15 @@ func (dt *DataType) SetToOriginal() {
 	if dt.DontUseOriginal || dt.Original == nil {
 		return
 	}
-	val := dt.KindWithOriginalId()
+	tag := dt.Tag
+	kind := dt.KindWithOriginalId()
 	tok := dt.Tok
 	*dt = dt.Original.(DataType)
-	dt.Kind = val
+	dt.Kind = kind
 	dt.Tok = tok
+	if strings.HasPrefix(dt.Kind, x.Prefix_Array) {
+		dt.Tag = tag
+	}
 }
 
 // Pointers returns pointer marks of data type.
@@ -107,9 +116,11 @@ func (dt DataType) String() string {
 	dt.Kind = dt.Kind[len(pointers):]
 	if dt.Kind != "" {
 		switch {
-		case strings.HasPrefix(dt.Kind, "[]"):
+		case strings.HasPrefix(dt.Kind, x.Prefix_Slice):
+			return dt.SliceString() + pointers
+		case strings.HasPrefix(dt.Kind, x.Prefix_Array):
 			return dt.ArrayString() + pointers
-		case dt.Id == xtype.Map && dt.Kind[0] == '[':
+		case dt.Id == xtype.Map && dt.Kind[0] == '[' && dt.Kind[len(dt.Kind)-1] == ']':
 			return dt.MapString() + pointers
 		}
 	}
@@ -134,12 +145,33 @@ func (dt DataType) String() string {
 	}
 }
 
-// ArrayString returns cxx value of array data type.
+// SliceString returns cxx value of slice data type.
+func (dt DataType) SliceString() string {
+	var cxx strings.Builder
+	cxx.WriteString("slice<")
+	dt.Kind = dt.Kind[len(x.Prefix_Slice):] // Remove slice
+	cxx.WriteString(dt.String())
+	cxx.WriteByte('>')
+	return cxx.String()
+}
+
+// ArrayComponent returns data type of array components.
+func (dt DataType) ArrayComponent() DataType {
+	dt.Kind = dt.Kind[len(x.Prefix_Array):] // Remove array
+	exprs := dt.Tag.([][]any)[1:]
+	dt.Tag = exprs
+	return dt
+}
+
+// ArrayString returns cxx value of map data type.
 func (dt DataType) ArrayString() string {
 	var cxx strings.Builder
 	cxx.WriteString("array<")
-	dt.Kind = dt.Kind[2:]
-	cxx.WriteString(dt.String())
+	exprs := dt.Tag.([][]any)
+	expr := exprs[0][1].(Expr)
+	cxx.WriteString(dt.ArrayComponent().String())
+	cxx.WriteByte(',')
+	cxx.WriteString(expr.String())
 	cxx.WriteByte('>')
 	return cxx.String()
 }
@@ -214,4 +246,16 @@ func (dt *DataType) MultiTypeString() string {
 		cxx.WriteByte(',')
 	}
 	return cxx.String()[:cxx.Len()-1] + ">" + dt.Pointers()
+}
+
+// MapKind returns data type kind string of map data type.
+func (dt *DataType) MapKind() string {
+	types := dt.Tag.([]DataType)
+	var kind strings.Builder
+	kind.WriteByte('[')
+	kind.WriteString(types[0].Kind)
+	kind.WriteByte(':')
+	kind.WriteString(types[1].Kind)
+	kind.WriteByte(']')
+	return kind.String()
 }

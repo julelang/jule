@@ -17,15 +17,29 @@ func (fc *foreachChecker) array() {
 	if xapi.IsIgnoreId(fc.profile.KeyB.Id) {
 		return
 	}
-	elementType := fc.profile.ExprType
-	elementType.Kind = elementType.Kind[2:]
+	componentType := typeOfArrayComponents(fc.profile.ExprType)
 	keyB := &fc.profile.KeyB
 	if keyB.Type.Id == xtype.Void {
-		keyB.Type = elementType
+		keyB.Type = componentType
 		return
 	}
 	fc.p.wg.Add(1)
-	go fc.p.checkType(elementType, keyB.Type, true, fc.profile.InTok)
+	go fc.p.checkType(componentType, keyB.Type, true, fc.profile.InTok)
+}
+
+func (fc *foreachChecker) slice() {
+	fc.checkKeyASize()
+	if xapi.IsIgnoreId(fc.profile.KeyB.Id) {
+		return
+	}
+	componentType := typeOfSliceComponents(fc.profile.ExprType)
+	keyB := &fc.profile.KeyB
+	if keyB.Type.Id == xtype.Void {
+		keyB.Type = componentType
+		return
+	}
+	fc.p.wg.Add(1)
+	go fc.p.checkType(componentType, keyB.Type, true, fc.profile.InTok)
 }
 
 func (fc *foreachChecker) xmap() {
@@ -101,6 +115,8 @@ func (fc *foreachChecker) str() {
 
 func (fc *foreachChecker) check() {
 	switch {
+	case typeIsSlice(fc.val.data.Type):
+		fc.slice()
 	case typeIsArray(fc.val.data.Type):
 		fc.array()
 	case typeIsMap(fc.val.data.Type):

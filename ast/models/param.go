@@ -53,7 +53,7 @@ func (p *Param) Prototype() string {
 		cxx.WriteString("const ")
 	}
 	if p.Variadic {
-		cxx.WriteString("array<")
+		cxx.WriteString("slice<")
 		cxx.WriteString(p.Type.String())
 		cxx.WriteByte('>')
 	} else {

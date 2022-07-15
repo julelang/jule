@@ -3,7 +3,9 @@ package parser
 import (
 	"strings"
 
+	"github.com/the-xlang/xxc/ast/models"
 	"github.com/the-xlang/xxc/lex/tokens"
+	"github.com/the-xlang/xxc/pkg/x"
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
@@ -16,12 +18,16 @@ func findGeneric(id string, generics []*GenericType) *GenericType {
 	return nil
 }
 
+func arrayIsAutoSized(t DataType) bool {
+	return arrayExprIsAutoSized(t.Tag.([][]any)[0][1].(models.Expr))
+}
+
 func typeIsVoid(t DataType) bool {
 	return t.Id == xtype.Void && !t.MultiTyped
 }
 
 func typeIsVariadicable(t DataType) bool {
-	return typeIsArray(t)
+	return typeIsSlice(t)
 }
 
 func typeIsMut(t DataType) bool {
@@ -62,10 +68,14 @@ func typeIsGeneric(generics []*GenericType, t DataType) bool {
 	return false
 }
 
-func typeOfArrayComponents(t DataType) DataType {
-	// Remove array syntax "[]"
-	t.Kind = t.Kind[2:]
+func typeOfSliceComponents(t DataType) DataType {
+	// Remove slice syntax
+	t.Kind = t.Kind[len(x.Prefix_Slice):]
 	return t
+}
+
+func typeOfArrayComponents(t DataType) DataType {
+	return t.ArrayComponent()
 }
 
 func typeIsExplicitPtr(t DataType) bool {
@@ -79,18 +89,19 @@ func typeIsPtr(t DataType) bool {
 	return typeIsExplicitPtr(t) || typeIsSinglePtr(t)
 }
 
+func typeIsSlice(t DataType) bool {
+	return strings.HasPrefix(t.Kind, x.Prefix_Slice)
+}
+
 func typeIsArray(t DataType) bool {
-	if t.Kind == "" {
-		return false
-	}
-	return strings.HasPrefix(t.Kind, "[]")
+	return strings.HasPrefix(t.Kind, x.Prefix_Array)
 }
 
 func typeIsMap(t DataType) bool {
 	if t.Kind == "" || t.Id != xtype.Map {
 		return false
 	}
-	return t.Kind[0] == '[' && !strings.HasPrefix(t.Kind, "[]")
+	return t.Kind[0] == '[' && t.Kind[len(t.Kind)-1] == ']'
 }
 
 func typeIsFunc(t DataType) bool {
@@ -103,6 +114,7 @@ func typeIsFunc(t DataType) bool {
 // Includes single ptr types.
 func typeIsPure(t DataType) bool {
 	return !typeIsPtr(t) &&
+		!typeIsSlice(t) &&
 		!typeIsArray(t) &&
 		!typeIsMap(t) &&
 		!typeIsFunc(t)
@@ -116,14 +128,23 @@ func subIdAccessorOfType(t DataType) string {
 }
 
 func typeIsNilCompatible(t DataType) bool {
-	return typeIsFunc(t) || typeIsPtr(t) || typeIsArray(t) || typeIsMap(t)
+	return typeIsFunc(t) || typeIsPtr(t) || typeIsSlice(t) || typeIsMap(t)
 }
 
-func checkArrayCompatiblity(arrT, t DataType) bool {
+func checkSliceCompatiblity(arrT, t DataType) bool {
 	if t.Id == xtype.Nil {
 		return true
 	}
 	return arrT.Kind == t.Kind
+}
+
+func checkArrayCompatiblity(arrT, t DataType) bool {
+	if !typeIsArray(t) {
+		return false
+	}
+	i := arrT.Tag.([][]any)[0][0].(uint64)
+	j := t.Tag.([][]any)[0][0].(uint64)
+	return i == j
 }
 
 func checkMapCompability(mapT, t DataType) bool {
@@ -134,7 +155,7 @@ func checkMapCompability(mapT, t DataType) bool {
 }
 
 func typeIsLvalue(t DataType) bool {
-	return typeIsPtr(t) || typeIsArray(t) || typeIsMap(t)
+	return typeIsPtr(t) || typeIsSlice(t) || typeIsMap(t)
 }
 
 func checkPtrCompability(t1, t2 DataType) bool {
@@ -181,6 +202,11 @@ func typesAreCompatible(t1, t2 DataType, ignoreany bool) bool {
 			t1, t2 = t2, t1
 		}
 		return checkPtrCompability(t1, t2)
+	case typeIsSlice(t1), typeIsSlice(t2):
+		if typeIsSlice(t2) {
+			t1, t2 = t2, t1
+		}
+		return checkSliceCompatiblity(t1, t2)
 	case typeIsArray(t1), typeIsArray(t2):
 		if typeIsArray(t2) {
 			t1, t2 = t2, t1
