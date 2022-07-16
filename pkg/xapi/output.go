@@ -68,7 +68,6 @@ typedef uint32_t                          u32_xt;
 typedef uint64_t                          u64_xt;
 typedef float                             f32_xt;
 typedef double                            f64_xt;
-typedef unsigned char                     char_xt;
 typedef bool                              bool_xt;
 typedef void                              *voidptr_xt;
 typedef intptr_t                          intptr_xt;
@@ -77,16 +76,14 @@ typedef uintptr_t                         uintptr_xt;
 // region X_CXX_API_FUNCTIONS
 template<typename _Slice_t, typename _Src_Ptr_T>
 _Slice_t ___slice_type(_Src_Ptr_T _Src,
-                       const uint_xt &_Start=0,
-                       const uint_xt &_End=-1) {
+                       const uint_xt &_Start,
+                       const uint_xt &_End) {
     if (_Start > _End) {
         std::stringstream _sstream;
         _sstream << "index out of range [" << _Start << ':' << _End << ']';
         XID(panic)(_sstream.str().c_str());
     } else if (_Start == _End) { return _Slice_t(uint_xt{0}); }
-    uint_xt _n;
-    if (_End == -1) { _n = _Src->len()-_Start; }
-    else            { _n = _End-_Start; }
+    const uint_xt _n{_End-_Start};
     _Slice_t _slice(_n);
     for (uint_xt _index{0}; _index < _n;)
     { _slice[_index++] = (*_Src)[_Start+_index]; }
@@ -139,11 +136,17 @@ public:
     const_iterator end(void) const noexcept
     { return &this->_buffer[this->_buffer.size()]; }
 
-    inline slice<_Item_t> ___slice(const uint_xt &_Start=0,
-                                   const uint_xt &_End=-1) const noexcept {
+    inline slice<_Item_t> ___slice(const uint_xt &_Start,
+                                   const uint_xt &_End) const noexcept {
         return ___slice_type<slice<_Item_t>, slice<_Item_t>*>
             ((slice<_Item_t>*)(this), _Start, _End);
     }
+
+    inline slice<_Item_t> ___slice(const uint_xt &_Start) const noexcept
+    { return this->___slice(_Start, this->len()); }
+
+    inline slice<_Item_t> ___slice(void) const noexcept
+    { return this->___slice(0, this->len()); }
 
     inline constexpr
     uint_xt len(void) const noexcept
@@ -229,7 +232,7 @@ public:
         const uint_xt _length{_Src._buffer.size()};
         for (uint_xt _index{0}; _index < _length;) {
             _Stream << _Src._buffer[_index++];
-            if (_index < _length) { _Stream << u8", "; }
+            if (_index < _length) { _Stream << ", "; }
         }
         _Stream << ']';
         return _Stream;
@@ -266,11 +269,17 @@ public:
     const_iterator end(void) const noexcept
     { return &this->_buffer[_N]; }
 
-    inline slice<_Item_t> ___slice(const uint_xt &_Start=0,
-                                   const uint_xt &_End=-1) const noexcept {
+    inline slice<_Item_t> ___slice(const uint_xt &_Start,
+                                   const uint_xt &_End) const noexcept {
         return ___slice_type<slice<_Item_t>, array<_Item_t, _N>*>
             ((array<_Item_t, _N>*)(this), _Start, _End);
     }
+
+    inline slice<_Item_t> ___slice(const uint_xt &_Start) const noexcept
+    { return this->___slice(_Start, this->len()); }
+
+    inline slice<_Item_t> ___slice(void) const noexcept
+    { return this->___slice(0, this->len()); }
 
     inline constexpr
     uint_xt len(void) const noexcept
@@ -299,7 +308,7 @@ public:
         _Stream << '[';
         for (uint_xt _index{0}; _index < _Src.len();) {
             _Stream << _Src._buffer[_index++];
-            if (_index < _Src.len()) { _Stream << u8", "; }
+            if (_index < _Src.len()) { _Stream << ", "; }
         }
         _Stream << ']';
         return _Stream;
@@ -351,7 +360,7 @@ public:
             _Stream << _pair.first;
             _Stream << ':';
             _Stream << _pair.second;
-            if (--_length > 0) { _Stream << u8", "; }
+            if (--_length > 0) { _Stream << ", "; }
         }
         _Stream << '}';
         return _Stream;
@@ -375,8 +384,8 @@ public:
     str_xt(const slice<u8_xt> &_Src) noexcept
     { this->_buffer = std::string{_Src.begin(), _Src.end()}; }
 
-    typedef char_xt       *iterator;
-    typedef const char_xt *const_iterator;
+    typedef u8_xt       *iterator;
+    typedef const u8_xt *const_iterator;
 
     inline iterator begin(void) noexcept
     { return (iterator)(&this->_buffer[0]); }
@@ -390,11 +399,17 @@ public:
     inline const_iterator end(void) const noexcept
     { return (const_iterator)(&this->_buffer[this->len()]); }
 
-    inline str_xt ___slice(const uint_xt &_Start=0,
-                                   const uint_xt &_End=-1) const noexcept {
+    inline str_xt ___slice(const uint_xt &_Start,
+                           const uint_xt &_End) const noexcept {
         return ___slice_type<str_xt, str_xt*>
             ((str_xt*)(this), _Start, _End);
     }
+
+    inline str_xt ___slice(const uint_xt &_Start) const noexcept
+    { return this->___slice(_Start, this->len()); }
+
+    inline str_xt ___slice(void) const noexcept
+    { return this->___slice(0, this->len()); }
 
     inline uint_xt len(void) const noexcept
     { return this->_buffer.length(); }
@@ -435,7 +450,7 @@ public:
             { if ((exist = *_it == *_bytes_it)) { break; } }
             if (!exist) { return this->sub(_it-_begin); }
         }
-        return str_xt{u8""};
+        return str_xt{""};
     }
 
     str_xt rtrim(const str_xt &_Bytes) const noexcept {
@@ -449,7 +464,7 @@ public:
             { if ((exist = *_it == *_bytes_it)) { break; } }
             if (!exist) { return this->sub(0, _it-_begin+1); }
         }
-        return str_xt{u8""};
+        return str_xt{""};
     }
 
     slice<str_xt> split(const str_xt &_Sub, const i64_xt &_N) const noexcept {
@@ -517,7 +532,8 @@ public:
     { return (char*)(this->_buffer.c_str()); }
 
     char &operator[](uint_xt _Index) {
-        if (this->len() <= _Index) { XID(panic)("index out of range"); }
+        if (this->empty() || this->len() <= _Index)
+        { XID(panic)("index out of range"); }
         return this->_buffer[_Index];
     }
 
@@ -638,7 +654,7 @@ static inline std::string strpol(const T... _Expressions) noexcept {
 template<typename Type, unsigned N, unsigned Last>
 struct tuple_ostream {
     static void arrow(std::ostream &_Stream, const Type &_Type) {
-        _Stream << std::get<N>(_Type) << u8", ";
+        _Stream << std::get<N>(_Type) << ", ";
         tuple_ostream<Type, N + 1, Last>::arrow(_Stream, _Type);
     }
 };
@@ -652,9 +668,9 @@ struct tuple_ostream<Type, N, N> {
 template<typename... Types>
 std::ostream& operator<<(std::ostream &_Stream,
                          const std::tuple<Types...> &_Tuple) {
-    _Stream << u8"(";
+    _Stream << '(';
     tuple_ostream<std::tuple<Types...>, 0, sizeof...(Types)-1>::arrow(_Stream, _Tuple);
-    _Stream << u8")";
+    _Stream << ')';
     return _Stream;
 }
 
@@ -730,8 +746,12 @@ void x_terminate_handler(void) noexcept {
     try { std::rethrow_exception(std::current_exception()); }
     catch (const XID(Error) _error)
     { std::cout << "panic: " << _error.XID(message) << std::endl; }
-    catch (...)
-    { std::cout << "panic: <undefined panics>" << std::endl; }
+    catch (std::exception _exception) {
+        const char *_what = _exception.what();
+        // Not exception?
+        if (std::strcmp(_what, "std::exception") == 0) { return; }
+        std::cout << "exception: " << _what << std::endl;
+    }
     std::exit(EXIT_FAILURE);
 }
 // endregion BOTTOM_MIST
