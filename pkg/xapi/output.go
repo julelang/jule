@@ -744,15 +744,10 @@ static inline void XID(outln)(const _Obj_t _Obj) noexcept {
 // region BOTTOM_MISC
 void x_terminate_handler(void) noexcept {
     try { std::rethrow_exception(std::current_exception()); }
-    catch (const XID(Error) _error)
-    { std::cout << "panic: " << _error.XID(message) << std::endl; }
-    catch (std::exception _exception) {
-        const char *_what = _exception.what();
-        // Not exception?
-        if (std::strcmp(_what, "std::exception") == 0) { return; }
-        std::cout << "exception: " << _what << std::endl;
+    catch (const XID(Error) _error) {
+        std::cout << "panic: " << _error.XID(message) << std::endl;
+        std::exit(EXIT_SUCCESS);
     }
-    std::exit(EXIT_FAILURE);
 }
 // endregion BOTTOM_MIST
 // endregion X_CXX_API`
