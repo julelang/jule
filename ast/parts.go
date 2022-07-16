@@ -107,3 +107,37 @@ func Parts(toks Toks, id uint8, exprMust bool) ([]Toks, []xlog.CompilerLog) {
 	}
 	return parts, errs
 }
+
+// SplitColon returns colon index and range tokens.
+// Starts at i.
+func SplitColon(toks Toks, i *int) (rangeToks Toks, colon int) {
+	rangeToks = nil
+	colon = -1
+	braceCount := 0
+	start := *i
+	for ; *i < len(toks); *i++ {
+		tok := toks[*i]
+		if tok.Id == tokens.Brace {
+			switch tok.Kind {
+			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
+				braceCount++
+				continue
+			default:
+				braceCount--
+			}
+		}
+		if braceCount == 0 {
+			if start+1 > *i {
+				return
+			}
+			rangeToks = toks[start+1 : *i]
+			break
+		} else if braceCount != 1 {
+			continue
+		}
+		if colon == -1 && tok.Id == tokens.Colon {
+			colon = *i - start - 1
+		}
+	}
+	return
+}

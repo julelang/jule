@@ -214,7 +214,7 @@ func (dt *DataType) StructString() string {
 // FuncString returns cxx value of function DataType.
 func (dt *DataType) FuncString() string {
 	var cxx strings.Builder
-	cxx.WriteString("func<")
+	cxx.WriteString("std::function<")
 	f := dt.Tag.(*Func)
 	f.RetType.Type.DontUseOriginal = dt.DontUseOriginal
 	cxx.WriteString(f.RetType.String())

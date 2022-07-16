@@ -1066,7 +1066,7 @@ func (b *Builder) MapOrArrayDataType(toks Toks, i *int, err bool) models.DataTyp
 
 // MapDataType builds map data-type.
 func (b *Builder) MapDataType(toks Toks, i *int, err bool) (t models.DataType) {
-	typeToks, colon := MapDataTypeInfo(toks, i)
+	typeToks, colon := SplitColon(toks, i)
 	if typeToks == nil || colon == -1 {
 		return
 	}
@@ -1079,16 +1079,18 @@ func (b *Builder) mapDataType(toks, typeToks Toks, colon int, err bool) (t model
 	t.Tok = toks[0]
 	colonTok := toks[colon]
 	if colon == 0 || colon+1 >= len(typeToks) {
-		b.pusherr(colonTok, "missing_expr")
+		if err {
+			b.pusherr(colonTok, "missing_expr")
+		}
 		return t
 	}
 	keyTypeToks := typeToks[:colon]
-	valTypeToks := typeToks[colon+1:]
+	valueTypeToks := typeToks[colon+1:]
 	types := make([]models.DataType, 2)
 	j := 0
-	types[0], _ = b.DataType(keyTypeToks, &j, true, true)
+	types[0], _ = b.DataType(keyTypeToks, &j, true, err)
 	j = 0
-	types[1], _ = b.DataType(valTypeToks, &j, true, true)
+	types[1], _ = b.DataType(valueTypeToks, &j, true, err)
 	t.Tag = types
 	t.Kind = t.MapKind()
 	return t

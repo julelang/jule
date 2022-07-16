@@ -43,9 +43,14 @@ var CxxDefault = `#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) ||
 #define CONCAT(_A, _B) _CONCAT(_A, _B)
 #define XID(_Identifier) CONCAT(_, _Identifier)
 
-static inline void XID(panic)(const char *_Message);
-
 // region X_CXX_API
+// region X_DECLARATIONS
+template<typename _Item_t> class slice;
+class str_xt;
+
+static inline void XID(panic)(const char *_Message);
+// endregion X_DECLARATIONS
+
 // region X_BUILTIN_VALUES
 #define nil nullptr
 // endregion X_BUILTIN_VALUES
@@ -69,7 +74,25 @@ typedef void                              *voidptr_xt;
 typedef intptr_t                          intptr_xt;
 typedef uintptr_t                         uintptr_xt;
 
-#define func std::function
+// region X_CXX_API_FUNCTIONS
+template<typename _Slice_t, typename _Src_Ptr_T>
+_Slice_t ___slice_type(_Src_Ptr_T _Src,
+                       const uint_xt &_Start=0,
+                       const uint_xt &_End=-1) {
+    if (_Start > _End) {
+        std::stringstream _sstream;
+        _sstream << "index out of range [" << _Start << ':' << _End << ']';
+        XID(panic)(_sstream.str().c_str());
+    } else if (_Start == _End) { return _Slice_t(uint_xt{0}); }
+    uint_xt _n;
+    if (_End == -1) { _n = _Src->len()-_Start; }
+    else            { _n = _End-_Start; }
+    _Slice_t _slice(_n);
+    for (uint_xt _index{0}; _index < _n;)
+    { _slice[_index++] = (*_Src)[_Start+_index]; }
+    return _slice;
+}
+// endregion X_CXX_API_FUNCTIONS
 
 // region X_STRUCTURES
 template<typename _Item_t>
@@ -115,6 +138,12 @@ public:
     inline constexpr
     const_iterator end(void) const noexcept
     { return &this->_buffer[this->_buffer.size()]; }
+
+    inline slice<_Item_t> ___slice(const uint_xt &_Start=0,
+                                   const uint_xt &_End=-1) const noexcept {
+        return ___slice_type<slice<_Item_t>, slice<_Item_t>*>
+            ((slice<_Item_t>*)(this), _Start, _End);
+    }
 
     inline constexpr
     uint_xt len(void) const noexcept
@@ -237,13 +266,19 @@ public:
     const_iterator end(void) const noexcept
     { return &this->_buffer[_N]; }
 
+    inline slice<_Item_t> ___slice(const uint_xt &_Start=0,
+                                   const uint_xt &_End=-1) const noexcept {
+        return ___slice_type<slice<_Item_t>, array<_Item_t, _N>*>
+            ((array<_Item_t, _N>*)(this), _Start, _End);
+    }
+
     inline constexpr
     uint_xt len(void) const noexcept
     { return _N; }
 
     inline constexpr
     bool empty(void) const noexcept
-    { return this->_buffer.empty(); }
+    { return _N == 0; }
 
     inline constexpr
     bool operator==(const array<_Item_t, _N> &_Src) const noexcept
@@ -332,6 +367,7 @@ public:
     str_xt(const char *_Src) noexcept       { this->_buffer = _Src ? _Src : ""; }
     str_xt(const std::string _Src) noexcept { this->_buffer = _Src; }
     str_xt(const str_xt &_Src) noexcept     { this->_buffer = _Src._buffer; }
+    str_xt(const uint_xt &_N) noexcept      { this->_buffer = std::string("", _N); }
     
     str_xt(const slice<char> &_Src) noexcept
     { this->_buffer = std::string{_Src.begin(), _Src.end()}; }
@@ -353,6 +389,12 @@ public:
 
     inline const_iterator end(void) const noexcept
     { return (const_iterator)(&this->_buffer[this->len()]); }
+
+    inline str_xt ___slice(const uint_xt &_Start=0,
+                                   const uint_xt &_End=-1) const noexcept {
+        return ___slice_type<str_xt, str_xt*>
+            ((str_xt*)(this), _Start, _End);
+    }
 
     inline uint_xt len(void) const noexcept
     { return this->_buffer.length(); }
@@ -563,14 +605,14 @@ public:
 // region X_MISC
 template <typename _Enum_t, typename _Index_t, typename _Item_t>
 static inline void foreach(const _Enum_t _Enum,
-                           const func<void(_Index_t, _Item_t)> _Body) {
+                           const std::function<void(_Index_t, _Item_t)> _Body) {
     _Index_t _index{0};
     for (auto _item: _Enum) { _Body(_index++, _item); }
 }
 
 template <typename _Enum_t, typename _Index_t>
 static inline void foreach(const _Enum_t _Enum,
-                           const func<void(_Index_t)> _Body) {
+                           const std::function<void(_Index_t)> _Body) {
     _Index_t _index{0};
     for (auto begin = _Enum.begin(), end = _Enum.end(); begin < end; ++begin)
     { _Body(_index++); }
@@ -578,13 +620,13 @@ static inline void foreach(const _Enum_t _Enum,
 
 template <typename _Key_t, typename _Value_t>
 static inline void foreach(const map<_Key_t, _Value_t> _Map,
-                           const func<void(_Key_t)> _Body) {
+                           const std::function<void(_Key_t)> _Body) {
     for (const auto _pair: _Map) { _Body(_pair.first); }
 }
 
 template <typename _Key_t, typename _Value_t>
 static inline void foreach(const map<_Key_t, _Value_t> _Map,
-                           const func<void(_Key_t, _Value_t)> _Body) {
+                           const std::function<void(_Key_t, _Value_t)> _Body) {
     for (const auto _pair: _Map) { _Body(_pair.first, _pair.second); }
 }
 
@@ -629,7 +671,7 @@ inline auto tuple_as_args(const _Function_t _Function, const _Tuple_t _Tuple) {
 }
 
 struct defer {
-    typedef func<void(void)> _Function_t;
+    typedef std::function<void(void)> _Function_t;
     template<class Callable>
     defer(Callable &&_function): _function(std::forward<Callable>(_function)) {}
     defer(defer &&_Src): _function(std::move(_Src._function))                 { _Src._function = nullptr; }

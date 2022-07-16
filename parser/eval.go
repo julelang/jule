@@ -52,7 +52,6 @@ func (e *eval) processes(processes []Toks) (v value, expr iExpr) {
 		if typeIsVoid(v.data.Type) {
 			v.data.Type.Id = xtype.Void
 			v.data.Type.Kind = xtype.VoidTypeStr
-			e.hasError = true
 		}
 	}()
 	if processes == nil || e.hasError {
@@ -308,7 +307,7 @@ func (e *eval) parenthesesRange(toks Toks, m *exprModel) (v value) {
 
 func (e *eval) process(toks Toks, m *exprModel) (v value) {
 	defer func() {
-		if v.data.Type.Id == xtype.Void {
+		if typeIsVoid(v.data.Type) {
 			v.data.Type.Kind = xtype.VoidTypeStr
 		}
 	}()
@@ -859,6 +858,7 @@ func (e *eval) variadic(toks Toks, m *exprModel, errtok Tok) (v value) {
 }
 
 func (e *eval) bracketRange(toks Toks, m *exprModel) (v value) {
+	errTok := toks[0]
 	var exprToks Toks
 	braceCount := 0
 	for i := len(toks) - 1; i >= 0; i-- {
@@ -878,77 +878,112 @@ func (e *eval) bracketRange(toks Toks, m *exprModel) (v value) {
 		exprToks = toks[:i]
 		break
 	}
-	valToksLen := len(exprToks)
-	if valToksLen == 0 || braceCount > 0 {
-		e.pusherrtok(toks[0], "invalid_syntax")
+	exprToksLen := len(exprToks)
+	if exprToksLen == 0 || braceCount > 0 {
+		e.pusherrtok(errTok, "invalid_syntax")
 		return
 	}
 	var model iExpr
 	v, model = e.toks(exprToks)
 	m.appendSubNode(model)
-	toks = toks[len(exprToks)+1 : len(toks)-1] // Removed syntax "["..."]"
+	toks = toks[len(exprToks):] // Tokens of [...]
+	if toks, colon := ast.SplitColon(toks, new(int)); colon != -1 {
+		var leftV, rightV value
+		leftToks := toks[:colon]
+		rightToks := toks[colon+1:]
+		m.appendSubNode(exprNode{".___slice("})
+		if len(leftToks) > 0 {
+			var model iExpr
+			leftV, model = e.p.evalToks(leftToks)
+			m.appendSubNode(model)
+			e.p.wg.Add(1)
+			go assignChecker{
+				p:      e.p,
+				t:      DataType{Id: xtype.UInt, Kind: xtype.TypeMap[xtype.UInt]},
+				v:      leftV,
+				errtok: errTok,
+			}.checkAssignType()
+		} else {
+			m.appendSubNode(exprNode{"0"})
+		}
+		if len(rightToks) > 0 {
+			m.appendSubNode(exprNode{","})
+			var model iExpr
+			rightV, model = e.p.evalToks(rightToks)
+			m.appendSubNode(model)
+			e.p.wg.Add(1)
+			go assignChecker{
+				p:      e.p,
+				t:      DataType{Id: xtype.UInt, Kind: xtype.TypeMap[xtype.UInt]},
+				v:      rightV,
+				errtok: errTok,
+			}.checkAssignType()
+		}
+		m.appendSubNode(exprNode{")"})
+		return e.slicing(v, errTok)
+	}
 	m.appendSubNode(exprNode{tokens.LBRACKET})
-	selectv, model := e.toks(toks)
+	leftv, model := e.toks(toks)
 	m.appendSubNode(model)
 	m.appendSubNode(exprNode{tokens.RBRACKET})
-	return e.enumerableSelect(v, selectv, toks[0])
+	return e.indexing(v, leftv, errTok)
 }
 
-func (e *eval) enumerableSelect(enumv, selectv value, errtok Tok) (v value) {
+func (e *eval) indexing(enumv, leftv value, errtok Tok) (v value) {
 	switch {
 	case typeIsArray(enumv.data.Type):
-		return e.arraySelect(enumv, selectv, errtok)
+		return e.indexingArray(enumv, leftv, errtok)
 	case typeIsSlice(enumv.data.Type):
-		return e.sliceSelect(enumv, selectv, errtok)
+		return e.indexingSlice(enumv, leftv, errtok)
 	case typeIsMap(enumv.data.Type):
-		return e.mapSelect(enumv, selectv, errtok)
+		return e.indexingMap(enumv, leftv, errtok)
 	case typeIsPure(enumv.data.Type):
-		return e.strSelect(enumv, selectv, errtok)
+		return e.indexingStr(enumv, leftv, errtok)
 	case typeIsExplicitPtr(enumv.data.Type):
-		return e.ptrSelect(enumv, selectv, errtok)
+		return e.indexingPtr(enumv, leftv, errtok)
 	}
-	e.pusherrtok(errtok, "not_enumerable")
+	e.pusherrtok(errtok, "not_supports_indexing", enumv.data.Type.Kind)
 	return
 }
 
-func (e *eval) sliceSelect(slicev, selectv value, errtok Tok) value {
+func (e *eval) indexingSlice(slicev, leftv value, errtok Tok) value {
 	slicev.lvalue = true
 	slicev.data.Type = typeOfSliceComponents(slicev.data.Type)
 	e.p.wg.Add(1)
 	go assignChecker{
 		p:      e.p,
 		t:      DataType{Id: xtype.UInt, Kind: tokens.UINT},
-		v:      selectv,
+		v:      leftv,
 		errtok: errtok,
 	}.checkAssignType()
 	return slicev
 }
 
-func (e *eval) arraySelect(arrv, selectv value, errtok Tok) value {
+func (e *eval) indexingArray(arrv, leftv value, errtok Tok) value {
 	arrv.lvalue = true
 	arrv.data.Type = typeOfArrayComponents(arrv.data.Type)
 	e.p.wg.Add(1)
 	go assignChecker{
 		p:      e.p,
 		t:      DataType{Id: xtype.UInt, Kind: tokens.UINT},
-		v:      selectv,
+		v:      leftv,
 		errtok: errtok,
 	}.checkAssignType()
 	return arrv
 }
 
-func (e *eval) mapSelect(mapv, selectv value, errtok Tok) value {
+func (e *eval) indexingMap(mapv, leftv value, errtok Tok) value {
 	mapv.lvalue = true
 	types := mapv.data.Type.Tag.([]DataType)
 	keyType := types[0]
 	valType := types[1]
 	mapv.data.Type = valType
 	e.p.wg.Add(1)
-	go e.p.checkType(keyType, selectv.data.Type, false, errtok)
+	go e.p.checkType(keyType, leftv.data.Type, false, errtok)
 	return mapv
 }
 
-func (e *eval) strSelect(strv, selectv value, errtok Tok) value {
+func (e *eval) indexingStr(strv, leftv value, errtok Tok) value {
 	strv.lvalue = true
 	strv.data.Type.Id = xtype.U8
 	strv.data.Type.Kind = xtype.TypeMap[strv.data.Type.Id]
@@ -956,13 +991,13 @@ func (e *eval) strSelect(strv, selectv value, errtok Tok) value {
 	go assignChecker{
 		p:      e.p,
 		t:      DataType{Id: xtype.UInt, Kind: tokens.UINT},
-		v:      selectv,
+		v:      leftv,
 		errtok: errtok,
 	}.checkAssignType()
 	return strv
 }
 
-func (e *eval) ptrSelect(ptrv, selectv value, errtok Tok) value {
+func (e *eval) indexingPtr(ptrv, leftv value, errtok Tok) value {
 	ptrv.lvalue = true
 	// Remove pointer mark.
 	ptrv.data.Type.Kind = ptrv.data.Type.Kind[1:]
@@ -970,10 +1005,42 @@ func (e *eval) ptrSelect(ptrv, selectv value, errtok Tok) value {
 	go assignChecker{
 		p:      e.p,
 		t:      DataType{Id: xtype.UInt, Kind: tokens.UINT},
-		v:      selectv,
+		v:      leftv,
 		errtok: errtok,
 	}.checkAssignType()
 	return ptrv
+}
+
+func (e *eval) slicing(enumv value, errtok Tok) (v value) {
+	switch {
+	case typeIsArray(enumv.data.Type):
+		return e.slicingArray(enumv, errtok)
+	case typeIsSlice(enumv.data.Type):
+		return e.slicingSlice(enumv, errtok)
+	case typeIsPure(enumv.data.Type):
+		return e.slicingStr(enumv, errtok)
+	}
+	e.pusherrtok(errtok, "not_supports_slicing", enumv.data.Type.Kind)
+	return
+}
+
+func (e *eval) slicingSlice(v value, errtok Tok) value {
+	v.lvalue = false
+	return v
+}
+
+func (e *eval) slicingArray(v value, errtok Tok) value {
+	v.lvalue = false
+	v.data.Type = typeOfArrayComponents(v.data.Type)
+	v.data.Type.Kind = x.Prefix_Slice + xtype.TypeMap[v.data.Type.Id]
+	return v
+}
+
+func (e *eval) slicingStr(v value, errtok Tok) value {
+	v.lvalue = false
+	v.data.Type.Id = xtype.Str
+	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+	return v
 }
 
 //! IMPORTANT: Tokens is should be store enumerable parentheses.

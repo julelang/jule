@@ -31,6 +31,7 @@ var SolidOperators = [...]string{
 // ExpressionOperators.
 var ExpressionOperators = [...]string{
 	0: tokens.TRIPLE_DOT,
+	1: tokens.COLON,
 }
 
 // IsUnaryOperator is returns true
