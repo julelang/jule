@@ -289,9 +289,9 @@ func (e *eval) parenthesesRange(toks Toks, m *exprModel) (v value) {
 			}
 		}
 	}
-	exprToks, rangeExpr := ast.RangeLast(toks)
+	exprToks, rangeToks := ast.RangeLast(toks)
 	if len(exprToks) == 0 {
-		return e.betweenParentheses(rangeExpr, m)
+		return e.betweenParentheses(rangeToks, m)
 	}
 	// Below is call expression
 	var genericsToks Toks
@@ -301,7 +301,7 @@ func (e *eval) parenthesesRange(toks Toks, m *exprModel) (v value) {
 	switch tok := exprToks[0]; tok.Id {
 	case tokens.DataType, tokens.Id:
 		if len(exprToks) == 1 && len(genericsToks) == 0 {
-			v, isret := e.dataTypeFunc(exprToks[0], rangeExpr, m)
+			v, isret := e.dataTypeFunc(exprToks[0], rangeToks, m)
 			if isret {
 				return v
 			}
@@ -313,10 +313,10 @@ func (e *eval) parenthesesRange(toks Toks, m *exprModel) (v value) {
 	switch {
 	case typeIsFunc(v.data.Type):
 		f := v.data.Type.Tag.(*Func)
-		return e.p.callFunc(f, genericsToks, rangeExpr, m)
+		return e.p.callFunc(f, genericsToks, rangeToks, m)
 	case valIsStructType(v):
 		s := v.data.Type.Tag.(*xstruct)
-		return e.p.callStructConstructor(s, genericsToks, rangeExpr, m)
+		return e.p.callStructConstructor(s, genericsToks, rangeToks, m)
 	}
 	e.pusherrtok(exprToks[len(exprToks)-1], "invalid_syntax")
 	return
