@@ -272,6 +272,23 @@ func (e *eval) dataTypeFunc(expr Tok, callRange Toks, m *exprModel) (v value, is
 }
 
 func (e *eval) parenthesesRange(toks Toks, m *exprModel) (v value) {
+	tok := toks[0]
+	switch tok.Id {
+	case tokens.Brace:
+		switch tok.Kind {
+		case tokens.LPARENTHESES:
+			val, ok := e.tryCast(toks, m)
+			if ok {
+				v = val
+				return
+			}
+			val, ok = e.tryAssign(toks, m)
+			if ok {
+				v = val
+				return
+			}
+		}
+	}
 	exprToks, rangeExpr := ast.RangeLast(toks)
 	if len(exprToks) == 0 {
 		return e.betweenParentheses(rangeExpr, m)
@@ -319,20 +336,6 @@ func (e *eval) process(toks Toks, m *exprModel) (v value) {
 	switch tok.Id {
 	case tokens.Operator:
 		return e.unary(toks, m)
-	case tokens.Brace:
-		switch tok.Kind {
-		case tokens.LPARENTHESES:
-			val, ok := e.tryCast(toks, m)
-			if ok {
-				v = val
-				return
-			}
-			val, ok = e.tryAssign(toks, m)
-			if ok {
-				v = val
-				return
-			}
-		}
 	}
 	tok = toks[len(toks)-1]
 	switch tok.Id {
@@ -349,9 +352,8 @@ func (e *eval) process(toks Toks, m *exprModel) (v value) {
 		case tokens.RBRACKET:
 			return e.bracketRange(toks, m)
 		}
-	default:
-		e.pusherrtok(toks[0], "invalid_syntax")
 	}
+	e.pusherrtok(toks[0], "invalid_syntax")
 	return
 }
 
@@ -863,23 +865,20 @@ func (e *eval) bracketRange(toks Toks, m *exprModel) (v value) {
 	braceCount := 0
 	for i := len(toks) - 1; i >= 0; i-- {
 		tok := toks[i]
-		if tok.Id != tokens.Brace {
-			continue
+		if tok.Id == tokens.Brace {
+			switch tok.Kind {
+			case tokens.RBRACE, tokens.RBRACKET, tokens.RPARENTHESES:
+				braceCount++
+			default:
+				braceCount--
+			}
 		}
-		switch tok.Kind {
-		case tokens.RBRACE, tokens.RBRACKET, tokens.RPARENTHESES:
-			braceCount++
-		default:
-			braceCount--
+		if braceCount == 0 {
+			exprToks = toks[:i]
+			break
 		}
-		if braceCount > 0 {
-			continue
-		}
-		exprToks = toks[:i]
-		break
 	}
-	exprToksLen := len(exprToks)
-	if exprToksLen == 0 || braceCount > 0 {
+	if len(exprToks) == 0 || braceCount > 0 {
 		e.pusherrtok(errTok, "invalid_syntax")
 		return
 	}
@@ -923,7 +922,7 @@ func (e *eval) bracketRange(toks Toks, m *exprModel) (v value) {
 		return e.slicing(v, errTok)
 	}
 	m.appendSubNode(exprNode{tokens.LBRACKET})
-	leftv, model := e.toks(toks)
+	leftv, model := e.toks(toks[1 : len(toks)-1])
 	m.appendSubNode(model)
 	m.appendSubNode(exprNode{tokens.RBRACKET})
 	return e.indexing(v, leftv, errTok)
@@ -947,7 +946,6 @@ func (e *eval) indexing(enumv, leftv value, errtok Tok) (v value) {
 }
 
 func (e *eval) indexingSlice(slicev, leftv value, errtok Tok) value {
-	slicev.lvalue = true
 	slicev.data.Type = typeOfSliceComponents(slicev.data.Type)
 	e.p.wg.Add(1)
 	go assignChecker{
@@ -960,7 +958,6 @@ func (e *eval) indexingSlice(slicev, leftv value, errtok Tok) value {
 }
 
 func (e *eval) indexingArray(arrv, leftv value, errtok Tok) value {
-	arrv.lvalue = true
 	arrv.data.Type = typeOfArrayComponents(arrv.data.Type)
 	e.p.wg.Add(1)
 	go assignChecker{
@@ -973,7 +970,6 @@ func (e *eval) indexingArray(arrv, leftv value, errtok Tok) value {
 }
 
 func (e *eval) indexingMap(mapv, leftv value, errtok Tok) value {
-	mapv.lvalue = true
 	types := mapv.data.Type.Tag.([]DataType)
 	keyType := types[0]
 	valType := types[1]
@@ -984,7 +980,6 @@ func (e *eval) indexingMap(mapv, leftv value, errtok Tok) value {
 }
 
 func (e *eval) indexingStr(strv, leftv value, errtok Tok) value {
-	strv.lvalue = true
 	strv.data.Type.Id = xtype.U8
 	strv.data.Type.Kind = xtype.TypeMap[strv.data.Type.Id]
 	e.p.wg.Add(1)
