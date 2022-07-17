@@ -5,6 +5,7 @@ import (
 
 	"github.com/the-xlang/xxc/ast/models"
 	"github.com/the-xlang/xxc/parser"
+	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
 type Defmap = parser.Defmap
@@ -19,9 +20,10 @@ type use struct {
 }
 
 type xstruct struct {
-	Id     string   `json:"id"`
-	Desc   string   `json:"description"`
-	Fields []global `json:"fields"`
+	Id     string     `json:"id"`
+	Desc   string     `json:"description"`
+	Fields []global   `json:"fields"`
+	Funcs  []function `json:"functions"`
 }
 
 type enum struct {
@@ -30,7 +32,7 @@ type enum struct {
 	Items []string `json:"items"`
 }
 
-type xtype struct {
+type type_alias struct {
 	Id    string `json:"id"`
 	Alias string `json:"alias"`
 	Desc  string `json:"description"`
@@ -61,23 +63,30 @@ type parameter struct {
 }
 
 type namespace struct {
-	Id         string      `json:"id"`
-	Enums      []enum      `json:"enums"`
-	Structs    []xstruct   `json:"structs"`
-	Types      []xtype     `json:"types"`
-	Globals    []global    `json:"globals"`
-	Funcs      []function  `json:"functions"`
-	Namespaces []namespace `json:"namespaces"`
+	Id         string       `json:"id"`
+	Enums      []enum       `json:"enums"`
+	Structs    []xstruct    `json:"structs"`
+	Types      []type_alias `json:"types"`
+	Globals    []global     `json:"globals"`
+	Funcs      []function   `json:"functions"`
+	Namespaces []namespace  `json:"namespaces"`
 }
 
 type document struct {
-	Uses       []use       `json:"uses"`
-	Enums      []enum      `json:"enums"`
-	Structs    []xstruct   `json:"structs"`
-	Types      []xtype     `json:"types"`
-	Globals    []global    `json:"globals"`
-	Funcs      []function  `json:"functions"`
-	Namespaces []namespace `json:"namespaces"`
+	Uses       []use        `json:"uses"`
+	Enums      []enum       `json:"enums"`
+	Structs    []xstruct    `json:"structs"`
+	Types      []type_alias `json:"types"`
+	Globals    []global     `json:"globals"`
+	Funcs      []function   `json:"functions"`
+	Namespaces []namespace  `json:"namespaces"`
+}
+
+func ttoa(t models.DataType) string {
+	if t.Kind == xtype.VoidTypeStr {
+		return ""
+	}
+	return t.Kind
 }
 
 func uses(p *parser.Parser) []use {
@@ -113,17 +122,18 @@ func structs(dm *Defmap) []xstruct {
 		xs.Id = s.Ast.Id
 		xs.Desc = Descriptize(s.Desc)
 		xs.Fields = globals(s.Defs)
+		xs.Funcs = funcs(s.Defs)
 		structs[i] = xs
 	}
 	return structs
 }
 
-func types(dm *Defmap) []xtype {
-	types := make([]xtype, len(dm.Types))
+func types(dm *Defmap) []type_alias {
+	types := make([]type_alias, len(dm.Types))
 	for i, t := range dm.Types {
-		types[i] = xtype{
+		types[i] = type_alias{
 			Id:    t.Id,
-			Alias: t.Type.Kind,
+			Alias: ttoa(t.Type),
 			Desc:  Descriptize(t.Desc),
 		}
 	}
@@ -135,7 +145,7 @@ func globals(dm *Defmap) []global {
 	for i, v := range dm.Globals {
 		globals[i] = global{
 			Id:       v.Id,
-			Type:     v.Type.Kind,
+			Type:     ttoa(v.Type),
 			Constant: v.Const,
 			Volatile: v.Volatile,
 			Desc:     Descriptize(v.Desc),
@@ -149,7 +159,7 @@ func params(parameters []models.Param) []parameter {
 	for i, p := range parameters {
 		params[i] = parameter{
 			Id:       p.Id,
-			Type:     p.Type.Kind,
+			Type:     ttoa(p.Type),
 			Constant: p.Const,
 			Volatile: p.Volatile,
 		}
@@ -180,7 +190,7 @@ func funcs(dm *Defmap) []function {
 	for i, f := range dm.Funcs {
 		fun := function{
 			Id:         f.Ast.Id,
-			Ret:        f.Ast.RetType.Type.Kind,
+			Ret:        ttoa(f.Ast.RetType.Type),
 			Generics:   generics(f.Ast.Generics),
 			Params:     params(f.Ast.Params),
 			Desc:       Descriptize(f.Desc),
