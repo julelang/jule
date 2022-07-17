@@ -221,8 +221,11 @@ public:
     { return !this->operator==(nil); }
 
     _Item_t& operator[](const uint_xt &_Index) {
-        if (this->empty() || this->len() <= _Index)
-        { XID(panic)("index out of range"); }
+        if (this->empty() || this->len() <= _Index) {
+            std::stringstream _sstream;
+            _sstream << "index out of range [" << _Index << ']';
+            XID(panic)(_sstream.str().c_str());
+        }
         return this->_buffer[_Index];
     }
 
@@ -298,8 +301,11 @@ public:
     { return !this->operator==(_Src); }
 
     _Item_t& operator[](const uint_xt &_Index) {
-        if (this->empty() || this->len() <= _Index)
-        { XID(panic)("index out of range"); }
+        if (this->empty() || this->len() <= _Index) {
+            std::stringstream _sstream;
+            _sstream << "index out of range [" << _Index << ']';
+            XID(panic)(_sstream.str().c_str());
+        }
         return this->_buffer[_Index];
     }
 
@@ -532,8 +538,11 @@ public:
     { return (char*)(this->_buffer.c_str()); }
 
     char &operator[](uint_xt _Index) {
-        if (this->empty() || this->len() <= _Index)
-        { XID(panic)("index out of range"); }
+        if (this->empty() || this->len() <= _Index) {
+            std::stringstream _sstream;
+            _sstream << "index out of range [" << _Index << ']';
+            XID(panic)(_sstream.str().c_str());
+        }
         return this->_buffer[_Index];
     }
 

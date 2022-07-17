@@ -571,16 +571,16 @@ func (b *Builder) GlobalFunc(toks Toks) bool {
 	if tok.Id != tokens.Brace || tok.Kind != tokens.LPARENTHESES {
 		return false
 	}
-	f := b.Func(funcToks, false)
+	f := b.Func(funcToks, false, false)
 	f.Receiver = receiver
 	s := models.Statement{Tok: f.Tok, Data: f}
 	b.Tree = append(b.Tree, models.Object{Tok: f.Tok, Data: s})
 	return true
 }
 
-// Func builds AST model of function.
-func (b *Builder) Func(toks Toks, anon bool) (f models.Func) {
-	f.Tok = toks[0]
+func (b *Builder) funcPrototype(toks *Toks, anon bool) (f models.Func, ok bool) {
+	ok = true
+	f.Tok = (*toks)[0]
 	i := 0
 	f.Pub = b.pub
 	b.pub = false
@@ -589,39 +589,46 @@ func (b *Builder) Func(toks Toks, anon bool) (f models.Func) {
 	} else {
 		if f.Tok.Id != tokens.Id {
 			b.pusherr(f.Tok, "invalid_syntax")
+			ok = false
 		}
 		f.Id = f.Tok.Kind
 		i++
 	}
 	f.RetType.Type.Id = xtype.Void
 	f.RetType.Type.Kind = xtype.VoidTypeStr
-	paramToks := b.getrange(&i, tokens.LPARENTHESES, tokens.RPARENTHESES, &toks)
+	paramToks := b.getrange(&i, tokens.LPARENTHESES, tokens.RPARENTHESES, toks)
 	if len(paramToks) > 0 {
 		b.Params(&f, paramToks)
 	}
-	if i >= len(toks) {
-		if b.Ended() {
+	t, retok := b.FuncRetDataType(*toks, &i)
+	if retok {
+		f.RetType = t
+		i++
+	}
+	*toks = (*toks)[i:]
+	return
+}
+
+// Func builds AST model of function.
+func (b *Builder) Func(toks Toks, anon, prototype bool) (f models.Func) {
+	f, ok := b.funcPrototype(&toks, anon)
+	if !ok {
+		return
+	}
+	if len(toks) == 0 {
+		if prototype {
+			return
+		} else if b.Ended() {
 			b.pusherr(f.Tok, "body_not_exist")
 			return
 		}
-		i = 0
 		toks = b.nextBuilderStatement()
+	} else if prototype {
+		b.pusherr(f.Tok, "invalid_syntax")
+		return
 	}
+	i := 0
 	tok := toks[i]
-	t, ok := b.FuncRetDataType(toks, &i)
-	if ok {
-		f.RetType = t
-		i++
-		if i >= len(toks) {
-			if b.Ended() {
-				b.pusherr(f.Tok, "body_not_exist")
-				return
-			}
-			i = 0
-			toks = b.nextBuilderStatement()
-		}
-		tok = toks[i]
-	}
 	if tok.Id != tokens.Brace || tok.Kind != tokens.LBRACE {
 		b.pusherr(tok, "invalid_syntax")
 		return

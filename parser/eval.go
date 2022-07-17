@@ -1245,7 +1245,7 @@ func (e *eval) braceRange(toks Toks, m *exprModel) (v value) {
 			return e.enumerable(exprToks, t, m)
 		case tokens.LPARENTHESES:
 			b := ast.NewBuilder(toks)
-			f := b.Func(b.Toks, true)
+			f := b.Func(b.Toks, true, false)
 			b.Wait()
 			if len(b.Errors) > 0 {
 				e.p.pusherrs(b.Errors...)

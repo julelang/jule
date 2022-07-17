@@ -2746,11 +2746,14 @@ func (p *Parser) typeSourceIsType(dt DataType, t *Type, err bool) (DataType, boo
 	return dt, ok
 }
 
-func (p *Parser) typeSourceIsEnum(e *Enum) (dt DataType, _ bool) {
+func (p *Parser) typeSourceIsEnum(e *Enum, tag any) (dt DataType, _ bool) {
 	dt.Id = xtype.Enum
 	dt.Kind = e.Id
 	dt.Tag = e
 	dt.Tok = e.Tok
+	if tag != nil {
+		p.pusherrtok(dt.Tok, "invalid_type_source")
+	}
 	return dt, true
 }
 
@@ -2820,7 +2823,7 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 			return p.typeSourceIsType(dt, t, err)
 		case *Enum:
 			t.Used = true
-			return p.typeSourceIsEnum(t)
+			return p.typeSourceIsEnum(t, dt.Tag)
 		case *xstruct:
 			t.Used = true
 			return p.typeSourceIsStruct(t, dt.Tag, dt.Tok)
