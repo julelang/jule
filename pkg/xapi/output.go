@@ -376,19 +376,32 @@ public:
 
 class str_xt {
 public:
-    std::string _buffer{};
+    std::basic_string<u8_xt> _buffer{};
 
-    str_xt(void) noexcept                   {}
-    str_xt(const char *_Src) noexcept       { this->_buffer = _Src ? _Src : ""; }
-    str_xt(const std::string _Src) noexcept { this->_buffer = _Src; }
-    str_xt(const str_xt &_Src) noexcept     { this->_buffer = _Src._buffer; }
-    str_xt(const uint_xt &_N) noexcept      { this->_buffer = std::string("", _N); }
-    
+    str_xt(void) noexcept {}
+
+    str_xt(const char *_Src) noexcept {
+        if (!_Src) { return; }
+        this->_buffer = std::basic_string<u8_xt>(&_Src[0], &_Src[std::strlen(_Src)]);
+    }
+
+    str_xt(const std::basic_string<u8_xt> &_Src) noexcept
+    { this->_buffer = _Src; }
+
+    str_xt(const std::string &_Src) noexcept
+    { this->_buffer = std::basic_string<u8_xt>(_Src.begin(), _Src.end()); }
+
+    str_xt(const str_xt &_Src) noexcept
+    { this->_buffer = _Src._buffer; }
+
+    str_xt(const uint_xt &_N) noexcept
+    { this->_buffer = std::basic_string<u8_xt>(0, _N); }
+
     str_xt(const slice<char> &_Src) noexcept
-    { this->_buffer = std::string{_Src.begin(), _Src.end()}; }
+    { this->_buffer = std::basic_string<u8_xt>(_Src.begin(), _Src.end()); }
 
     str_xt(const slice<u8_xt> &_Src) noexcept
-    { this->_buffer = std::string{_Src.begin(), _Src.end()}; }
+    { this->_buffer = std::basic_string<u8_xt>(_Src.begin(), _Src.end()); }
 
     typedef u8_xt       *iterator;
     typedef const u8_xt *const_iterator;
@@ -442,7 +455,7 @@ public:
     { return this->_buffer.rfind(_Sub._buffer); }
 
     inline const char* cstr(void) const noexcept
-    { return this->_buffer.c_str(); }
+    { return (const char*)(this->_buffer.c_str()); }
 
     str_xt trim(const str_xt &_Bytes) const noexcept {
         const_iterator _it{this->begin()};
@@ -477,7 +490,7 @@ public:
         slice<str_xt> _parts{};
         if (_N == 0) { return _parts; }
         const const_iterator _begin{this->begin()};
-        std::string _s{this->_buffer};
+        std::basic_string<u8_xt> _s{this->_buffer};
         uint_xt _pos{std::string::npos};
         if (_N < 0) {
             while ((_pos = _s.find(_Sub._buffer)) != std::string::npos) {
@@ -501,7 +514,7 @@ public:
                    const str_xt &_New,
                    const i64_xt &_N) const noexcept {
         if (_N == 0) { return *this; }
-        std::string _s{this->_buffer};
+        std::basic_string<u8_xt> _s{this->_buffer};
         uint_xt start_pos{0};
         if (_N < 0) {
             while((start_pos = _s.find(_Sub._buffer, start_pos)) != std::string::npos) {
@@ -532,12 +545,12 @@ public:
     }
 
     inline operator const char*(void) const noexcept
-    { return this->_buffer.c_str(); }
+    { return (const char*)(this->_buffer.c_str()); }
     
     inline operator char*(void) const noexcept
     { return (char*)(this->_buffer.c_str()); }
 
-    char &operator[](uint_xt _Index) {
+    u8_xt &operator[](const uint_xt &_Index) {
         if (this->empty() || this->len() <= _Index) {
             std::stringstream _sstream;
             _sstream << "index out of range [" << _Index << ']';
@@ -545,6 +558,9 @@ public:
         }
         return this->_buffer[_Index];
     }
+
+    inline u8_xt operator[](const uint_xt &_Index) const
+    { return (*this)._buffer[_Index]; }
 
     inline void operator+=(const str_xt &_Str) noexcept
     { this->_buffer += _Str._buffer; }
@@ -558,8 +574,11 @@ public:
     inline bool operator!=(const str_xt &_Str) const noexcept
     { return !this->operator==(_Str); }
 
-    friend std::ostream& operator<<(std::ostream &_Stream, const str_xt &_Src)
-    { return _Stream << _Src._buffer; }
+    friend std::ostream& operator<<(std::ostream &_Stream, const str_xt &_Src) {
+        for (const u8_xt &_byte: _Src)
+        { _Stream << _byte; }
+        return _Stream;
+    }
 };
 
 struct any_xt {

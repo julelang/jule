@@ -1,7 +1,6 @@
 package xapi
 
 import (
-	"encoding/hex"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -54,7 +53,7 @@ func btoa(b byte) string {
 	if b <= 127 { // ASCII
 		return string(b)
 	}
-	return "\\x" + hex.EncodeToString([]byte{b})
+	return "\\" + strconv.FormatUint(uint64(b), 8)
 }
 
 func bytesToStr(bytes []byte) string {
