@@ -532,23 +532,11 @@ public:
         return str_xt{_s};
     }
 
-    operator slice<char>(void) const noexcept {
-        slice<char> _slice{};
-        _slice._buffer = std::vector<char>{this->begin(), this->end()};
-        return _slice;
-    }
-
     operator slice<u8_xt>(void) const noexcept {
         slice<u8_xt> _slice{};
         _slice._buffer = std::vector<u8_xt>{this->begin(), this->end()};
         return _slice;
     }
-
-    inline operator const char*(void) const noexcept
-    { return (const char*)(this->_buffer.c_str()); }
-    
-    inline operator char*(void) const noexcept
-    { return (char*)(this->_buffer.c_str()); }
 
     u8_xt &operator[](const uint_xt &_Index) {
         if (this->empty() || this->len() <= _Index) {
