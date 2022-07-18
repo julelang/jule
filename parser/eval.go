@@ -1169,7 +1169,11 @@ func (e *eval) enumerable(exprToks Toks, t DataType, m *exprModel) (v value) {
 			return
 		}
 		t.Kind = x.Prefix_Array + t.Kind
-		t.Tag = append([][]any{exprs}, t.Tag.([][]any)...)
+		if t.Tag != nil {
+			t.Tag = append([][]any{exprs}, t.Tag.([][]any)...)
+		} else {
+			t.Tag = [][]any{exprs}
+		}
 		v, model = e.buildArray(e.enumerableParts(exprToks), t, exprToks[0])
 		goto ret
 	} else {
