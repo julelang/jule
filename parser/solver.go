@@ -113,7 +113,7 @@ func (s *solver) float() (v models.Data) {
 		tokens.GREAT_EQUAL, tokens.LESS_EQUAL:
 		v.Type.Id = xtype.Bool
 		v.Type.Kind = tokens.BOOL
-	case tokens.PLUS, tokens.MINUS, tokens.STAR, tokens.SLASH:
+	case tokens.PLUS, tokens.MINUS, tokens.STAR, tokens.SOLIDUS:
 		v.Type = s.leftVal.Type
 		if xtype.TypeGreaterThan(s.rightVal.Type.Id, v.Type.Id) {
 			v.Type = s.rightVal.Type
@@ -137,7 +137,7 @@ func (s *solver) signed() (v models.Data) {
 		tokens.GREAT, tokens.GREAT_EQUAL, tokens.LESS_EQUAL:
 		v.Type.Id = xtype.Bool
 		v.Type.Kind = tokens.BOOL
-	case tokens.PLUS, tokens.MINUS, tokens.STAR, tokens.SLASH,
+	case tokens.PLUS, tokens.MINUS, tokens.STAR, tokens.SOLIDUS,
 		tokens.PERCENT, tokens.AMPER, tokens.VLINE, tokens.CARET:
 		v.Type = s.leftVal.Type
 		if xtype.TypeGreaterThan(s.rightVal.Type.Id, v.Type.Id) {
@@ -168,7 +168,7 @@ func (s *solver) unsigned() (v models.Data) {
 		tokens.GREAT, tokens.GREAT_EQUAL, tokens.LESS_EQUAL:
 		v.Type.Id = xtype.Bool
 		v.Type.Kind = tokens.BOOL
-	case tokens.PLUS, tokens.MINUS, tokens.STAR, tokens.SLASH,
+	case tokens.PLUS, tokens.MINUS, tokens.STAR, tokens.SOLIDUS,
 		tokens.PERCENT, tokens.AMPER, tokens.VLINE, tokens.CARET:
 		v.Type = s.leftVal.Type
 		if xtype.TypeGreaterThan(s.rightVal.Type.Id, v.Type.Id) {
@@ -249,7 +249,7 @@ func (s *solver) nil() (v models.Data) {
 
 func (s *solver) check() bool {
 	switch s.operator.Kind {
-	case tokens.PLUS, tokens.MINUS, tokens.STAR, tokens.SLASH, tokens.PERCENT, tokens.RSHIFT,
+	case tokens.PLUS, tokens.MINUS, tokens.STAR, tokens.SOLIDUS, tokens.PERCENT, tokens.RSHIFT,
 		tokens.LSHIFT, tokens.AMPER, tokens.VLINE, tokens.CARET, tokens.EQUALS, tokens.NOT_EQUALS,
 		tokens.GREAT, tokens.LESS, tokens.GREAT_EQUAL, tokens.LESS_EQUAL:
 	case tokens.AND, tokens.OR:

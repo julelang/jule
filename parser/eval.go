@@ -130,7 +130,7 @@ func (e *eval) nextOperator(processes []Toks) int {
 		switch process[0].Kind {
 		case tokens.LSHIFT, tokens.RSHIFT:
 			prec.set(1, i)
-		case tokens.STAR, tokens.SLASH, tokens.PERCENT:
+		case tokens.STAR, tokens.SOLIDUS, tokens.PERCENT:
 			prec.set(2, i)
 		case tokens.AMPER:
 			prec.set(3, i)

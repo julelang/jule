@@ -6,33 +6,20 @@ import (
 	"unicode/utf8"
 )
 
-// Raw-String literal.
-const RawStrMark = "R"
-
 // ToStr returns specified literal as X string literal for cxx.
 func ToStr(bytes []byte) string {
 	var cxx strings.Builder
-	cxx.WriteString("str_xt{\"")
+	cxx.WriteString("str_xt{{")
 	cxx.WriteString(bytesToStr(bytes))
-	cxx.WriteString("\"}")
+	cxx.WriteString("}}")
 	return cxx.String()
 }
 
 // ToRawStr returns specified literal as X raw-string literal for cxx.
-func ToRawStr(bytes []byte) string {
-	var cxx strings.Builder
-	cxx.WriteString("str_xt{")
-	cxx.WriteString(RawStrMark)
-	cxx.WriteString("\"(")
-	cxx.WriteString(bytesToStr(bytes))
-	cxx.WriteString(")\"}")
-	return cxx.String()
-}
+func ToRawStr(bytes []byte) string { return ToStr(bytes) }
 
 // ToChar returns specified literal as X rune literal for cxx.
-func ToChar(b byte) string {
-	return "'" + string(b) + "'"
-}
+func ToChar(b byte) string { return btoa(b) }
 
 // ToRune returns specified literal as X rune literal for cxx.
 func ToRune(bytes []byte) string {
@@ -50,16 +37,38 @@ func ToRune(bytes []byte) string {
 }
 
 func btoa(b byte) string {
-	if b <= 127 { // ASCII
-		return string(b)
-	}
-	return "\\" + strconv.FormatUint(uint64(b), 8)
+	return "0x" + strconv.FormatUint(uint64(b), 16)
 }
 
 func bytesToStr(bytes []byte) string {
 	var str strings.Builder
-	for _, b := range bytes {
-		str.WriteString(btoa(b))
+	for i := 0; i < len(bytes); i++ {
+		b := bytes[i]
+		if b == '\\' {
+			i++
+			switch bytes[i] {
+			case 'u':
+				rc, _ := strconv.ParseUint(string(bytes[i+1:i+5]), 16, 32)
+				r := rune(rc)
+				str.WriteString(bytesToStr([]byte(string(r))))
+				i += 4
+			case 'U':
+				rc, _ := strconv.ParseUint(string(bytes[i+1:i+9]), 16, 32)
+				r := rune(rc)
+				str.WriteString(bytesToStr([]byte(string(r))))
+				i += 8
+			case 'x':
+				str.WriteByte('0')
+				str.Write(bytes[i : i+3])
+				i += 2
+			default:
+				str.Write(bytes[i : i+3])
+				i += 2
+			}
+		} else {
+			str.WriteString(btoa(b))
+		}
+		str.WriteByte(',')
 	}
-	return str.String()
+	return str.String()[:str.Len()-1]
 }

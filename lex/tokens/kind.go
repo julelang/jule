@@ -33,7 +33,7 @@ const (
 	PLUS                = "+"
 	MINUS               = "-"
 	STAR                = "*"
-	SLASH               = "/"
+	SOLIDUS             = "/"
 	PERCENT             = "%"
 	TILDE               = "~"
 	AMPER               = "&"

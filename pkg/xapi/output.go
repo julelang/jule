@@ -385,6 +385,9 @@ public:
         this->_buffer = std::basic_string<u8_xt>(&_Src[0], &_Src[std::strlen(_Src)]);
     }
 
+    str_xt(const std::initializer_list<u8_xt> &_Src) noexcept
+    { this->_buffer = _Src; }
+
     str_xt(const std::basic_string<u8_xt> &_Src) noexcept
     { this->_buffer = _Src; }
 
@@ -396,9 +399,6 @@ public:
 
     str_xt(const uint_xt &_N) noexcept
     { this->_buffer = std::basic_string<u8_xt>(0, _N); }
-
-    str_xt(const slice<char> &_Src) noexcept
-    { this->_buffer = std::basic_string<u8_xt>(_Src.begin(), _Src.end()); }
 
     str_xt(const slice<u8_xt> &_Src) noexcept
     { this->_buffer = std::basic_string<u8_xt>(_Src.begin(), _Src.end()); }

@@ -398,7 +398,7 @@ var basicOps = [...]oppair{
 	27: {tokens.PLUS, tokens.Operator},
 	28: {tokens.MINUS, tokens.Operator},
 	29: {tokens.STAR, tokens.Operator},
-	30: {tokens.SLASH, tokens.Operator},
+	30: {tokens.SOLIDUS, tokens.Operator},
 	31: {tokens.PERCENT, tokens.Operator},
 	32: {tokens.TILDE, tokens.Operator},
 	33: {tokens.AMPER, tokens.Operator},
