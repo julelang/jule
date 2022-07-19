@@ -29,7 +29,8 @@ func (s *solver) ptr() (v models.Data) {
 	switch s.operator.Kind {
 	case tokens.PLUS, tokens.MINUS:
 		v.Type = s.leftVal.Type
-	case tokens.EQUALS, tokens.NOT_EQUALS:
+	case tokens.EQUALS, tokens.NOT_EQUALS, tokens.LESS, tokens.GREAT,
+		tokens.GREAT_EQUAL, tokens.LESS_EQUAL:
 		v.Type.Id = xtype.Bool
 		v.Type.Kind = tokens.BOOL
 	default:
