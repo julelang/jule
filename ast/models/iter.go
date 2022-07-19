@@ -5,7 +5,7 @@ import "strings"
 // Iter is the AST model of iterations.
 type Iter struct {
 	Tok     Tok
-	Block   Block
+	Block   *Block
 	Profile IterProfile
 }
 

@@ -6,7 +6,7 @@ import "strings"
 type If struct {
 	Tok   Tok
 	Expr  Expr
-	Block Block
+	Block *Block
 }
 
 func (ifast If) String() string {

@@ -5,7 +5,7 @@ import "strings"
 // Else is the AST model of else blocks.
 type Else struct {
 	Tok   Tok
-	Block Block
+	Block *Block
 }
 
 func (elseast Else) String() string {

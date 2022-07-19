@@ -3,6 +3,7 @@ package models
 import (
 	"strings"
 
+	"github.com/the-xlang/xxc/pkg/xapi"
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
@@ -16,7 +17,7 @@ type Func struct {
 	Attributes []Attribute
 	Params     []Param
 	RetType    RetType
-	Block      Block
+	Block      *Block
 	Receiver   *DataType
 }
 
@@ -52,4 +53,12 @@ func (f *Func) DataTypeString() string {
 		cxx.WriteString(f.RetType.Type.Kind)
 	}
 	return cxx.String()
+}
+
+// OutId returns xapi.OutId result of function.
+func (f *Func) OutId() string {
+	if f.Receiver != nil {
+		return f.Id
+	}
+	return xapi.OutId(f.Id, f.Tok.File)
 }

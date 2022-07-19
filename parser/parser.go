@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/the-xlang/xxc/ast"
 	"github.com/the-xlang/xxc/ast/models"
@@ -2010,10 +2011,11 @@ func (p *Parser) checkNewBlock(b *models.Block) {
 	p.checkNewBlockCustom(b, p.blockVars)
 }
 
-func (p *Parser) statement(s *models.Statement) bool {
+func (p *Parser) statement(s *models.Statement, recover bool) bool {
 	switch t := s.Data.(type) {
 	case models.ExprStatement:
-		p.exprStatement(s)
+		p.exprStatement(&t, recover)
+		s.Data = t
 	case Var:
 		p.varStatement(&t, false)
 		s.Data = t
@@ -2060,9 +2062,9 @@ func (p *Parser) statement(s *models.Statement) bool {
 }
 
 func (p *Parser) checkStatement(b *models.Block, i *int) {
-	s := &b.Tree[*i]
-	s.Block = b
-	if p.statement(s) {
+	s := b.Tree[*i]
+	defer func(i int) { b.Tree[i] = s }(*i)
+	if p.statement(&s, true) {
 		return
 	}
 	switch t := s.Data.(type) {
@@ -2092,10 +2094,9 @@ func (p *Parser) checkBlock(b *models.Block) {
 	}
 }
 
-func (p *Parser) recoverFuncExprStatement(s *models.Statement) {
-	es := s.Data.(models.ExprStatement)
-	errtok := es.Expr.Processes[0][0]
-	callToks := es.Expr.Processes[0][1:]
+func (p *Parser) recoverFuncExprStatement(s *models.ExprStatement) {
+	errtok := s.Expr.Processes[0][0]
+	callToks := s.Expr.Processes[0][1:]
 	args := p.getArgs(callToks)
 	handleParam := recoverFunc.Ast.Params[0]
 	if len(args.Src) == 0 {
@@ -2106,32 +2107,42 @@ func (p *Parser) recoverFuncExprStatement(s *models.Statement) {
 	}
 	v, _ := p.evalExpr(args.Src[0].Expr)
 	if v.data.Type.Kind != handleParam.Type.Kind {
-		p.pusherrtok(errtok, "incompatible_datatype", handleParam.Type.Kind, v.data.Type.Kind)
+		p.eval.pusherrtok(errtok, "incompatible_datatype", handleParam.Type.Kind, v.data.Type.Kind)
 		return
 	}
 	handler := v.data.Type.Tag.(*Func)
-	es.Expr.Model = exprNode{"try{\n"}
-	s.Data = es
+	s.Expr.Model = exprNode{"try{\n"}
 	var catcher serieExpr
 	catcher.exprs = append(catcher.exprs, "} catch(XID(Error) ")
 	catcher.exprs = append(catcher.exprs, handler.Params[0].OutId())
 	catcher.exprs = append(catcher.exprs, ") ")
-	catcher.exprs = append(catcher.exprs, &handler.Block)
+	r, _ := utf8.DecodeRuneInString(v.data.Value)
+	if r == '_' || unicode.IsLetter(r) { // Function source
+		catcher.exprs = append(catcher.exprs, "{")
+		catcher.exprs = append(catcher.exprs, handler.OutId())
+		catcher.exprs = append(catcher.exprs, "(")
+		catcher.exprs = append(catcher.exprs, handler.Params[0].OutId())
+		catcher.exprs = append(catcher.exprs, "); }")
+	} else {
+		catcher.exprs = append(catcher.exprs, handler.Block)
+	}
 	catchExpr := models.Statement{
 		Data: models.ExprStatement{
 			Expr: models.Expr{Model: catcher},
 		},
 	}
-	s.Block.Tree = append(s.Block.Tree, catchExpr)
+	p.nodeBlock.Tree = append(p.nodeBlock.Tree, catchExpr)
 }
 
-func (p *Parser) exprStatement(s *models.Statement) {
-	es := s.Data.(models.ExprStatement)
-	if es.Expr.Processes != nil && !isOperator(es.Expr.Processes[0]) {
-		process := es.Expr.Processes[0]
+func (p *Parser) exprStatement(s *models.ExprStatement, recover bool) {
+	if s.Expr.Processes != nil && !isOperator(s.Expr.Processes[0]) {
+		process := s.Expr.Processes[0]
 		tok := process[0]
 		if tok.Id == tokens.Id && tok.Kind == recoverFunc.Ast.Id {
-			if ast.IsFuncCall(es.Expr.Toks) != nil {
+			if ast.IsFuncCall(s.Expr.Toks) != nil {
+				if !recover {
+					p.pusherrtok(tok, "invalid_syntax")
+				}
 				def, _, _, _ := p.defById(tok.Kind)
 				if def == recoverFunc {
 					p.recoverFuncExprStatement(s)
@@ -2140,9 +2151,8 @@ func (p *Parser) exprStatement(s *models.Statement) {
 			}
 		}
 	}
-	if es.Expr.Model == nil {
-		_, es.Expr.Model = p.evalExpr(es.Expr)
-		s.Data = es
+	if s.Expr.Model == nil {
+		_, s.Expr.Model = p.evalExpr(s.Expr)
 	}
 }
 
@@ -2161,7 +2171,7 @@ func (p *Parser) parseCase(c *models.Case, t DataType) {
 	}
 	p.caseCount++
 	defer func() { p.caseCount-- }()
-	p.checkNewBlock(&c.Block)
+	p.checkNewBlock(c.Block)
 }
 
 func (p *Parser) cases(cases []models.Case, t DataType) {
@@ -2373,14 +2383,16 @@ func (p *Parser) checkLabelNGoto() {
 }
 
 func (p *Parser) checkRets(f *Func) {
-	for _, s := range f.Block.Tree {
-		switch t := s.Data.(type) {
-		case models.Ret:
-			return
-		case models.CxxEmbed:
-			cxx := strings.TrimLeftFunc(t.Content, unicode.IsSpace)
-			if isCxxReturn(cxx) {
+	if f.Block != nil {
+		for _, s := range f.Block.Tree {
+			switch t := s.Data.(type) {
+			case models.Ret:
 				return
+			case models.CxxEmbed:
+				cxx := strings.TrimLeftFunc(t.Content, unicode.IsSpace)
+				if isCxxReturn(cxx) {
+					return
+				}
 			}
 		}
 	}
@@ -2390,11 +2402,11 @@ func (p *Parser) checkRets(f *Func) {
 }
 
 func (p *Parser) checkFunc(f *Func) {
-	if f.Block.Tree == nil {
+	if f.Block == nil || f.Block.Tree == nil {
 		goto always
 	}
 	f.Block.Func = f
-	p.checkNewBlock(&f.Block)
+	p.checkNewBlock(f.Block)
 always:
 	p.checkRets(f)
 }
@@ -2586,7 +2598,7 @@ func (p *Parser) whileProfile(iter *models.Iter) {
 	if !isBoolExpr(val) {
 		p.pusherrtok(iter.Tok, "iter_while_notbool_expr")
 	}
-	p.checkNewBlock(&iter.Block)
+	p.checkNewBlock(iter.Block)
 }
 
 func (p *Parser) foreachProfile(iter *models.Iter) {
@@ -2614,14 +2626,14 @@ func (p *Parser) foreachProfile(iter *models.Iter) {
 		}
 		p.varStatement(&profile.KeyB, true)
 	}
-	p.checkNewBlockCustom(&iter.Block, blockVars)
+	p.checkNewBlockCustom(iter.Block, blockVars)
 }
 
 func (p *Parser) forProfile(iter *models.Iter) {
 	profile := iter.Profile.(models.IterFor)
 	blockVars := p.blockVars
 	if profile.Once.Data != nil {
-		_ = p.statement(&profile.Once)
+		_ = p.statement(&profile.Once, false)
 	}
 	if len(profile.Condition.Processes) > 0 {
 		val, model := p.evalExpr(profile.Condition)
@@ -2635,10 +2647,10 @@ func (p *Parser) forProfile(iter *models.Iter) {
 		}.checkAssignType()
 	}
 	if profile.Next.Data != nil {
-		_ = p.statement(&profile.Next)
+		_ = p.statement(&profile.Next, false)
 	}
 	iter.Profile = profile
-	p.checkNewBlock(&iter.Block)
+	p.checkNewBlock(iter.Block)
 	p.blockVars = blockVars
 }
 
@@ -2664,7 +2676,7 @@ func (p *Parser) ifExpr(ifast *models.If, i *int, statements []models.Statement)
 	if !isBoolExpr(val) {
 		p.pusherrtok(ifast.Tok, "if_notbool_expr")
 	}
-	p.checkNewBlock(&ifast.Block)
+	p.checkNewBlock(ifast.Block)
 node:
 	if statement.WithTerminator {
 		return
@@ -2682,7 +2694,7 @@ node:
 		if !isBoolExpr(val) {
 			p.pusherrtok(t.Tok, "if_notbool_expr")
 		}
-		p.checkNewBlock(&t.Block)
+		p.checkNewBlock(t.Block)
 		statements[*i].Data = t
 		goto node
 	case models.Else:
@@ -2694,7 +2706,7 @@ node:
 }
 
 func (p *Parser) elseBlock(elseast *models.Else) {
-	p.checkNewBlock(&elseast.Block)
+	p.checkNewBlock(elseast.Block)
 }
 
 func (p *Parser) breakStatement(breakAST *models.Break) {

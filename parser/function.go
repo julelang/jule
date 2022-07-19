@@ -17,13 +17,10 @@ type function struct {
 }
 
 func (f *function) outId() string {
-	if f.Ast.Receiver != nil {
-		return f.Ast.Id
-	}
 	if f.isEntryPoint {
 		return xapi.OutId(f.Ast.Id, nil)
 	}
-	return xapi.OutId(f.Ast.Id, f.Ast.Tok.File)
+	return f.Ast.OutId()
 }
 
 func (f *function) getTracePointStatements() []models.Statement {

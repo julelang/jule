@@ -5,7 +5,7 @@ import "strings"
 // Case the AST model of case.
 type Case struct {
 	Exprs []Expr
-	Block Block
+	Block *Block
 }
 
 func (c *Case) String(matchExpr string) string {

@@ -10,7 +10,6 @@ type Statement struct {
 	Tok            Tok
 	Data           any
 	WithTerminator bool
-	Block          *Block
 }
 
 func (s Statement) String() string {

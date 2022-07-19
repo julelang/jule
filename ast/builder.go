@@ -1252,9 +1252,10 @@ func (b *Builder) pushStatementToBlock(bs *blockStatement) {
 }
 
 // Block builds AST model of statements of code block.
-func (b *Builder) Block(toks Toks) (block models.Block) {
+func (b *Builder) Block(toks Toks) (block *models.Block) {
+	block = new(models.Block)
 	bs := new(blockStatement)
-	bs.block = &block
+	bs.block = block
 	bs.srcToks = &toks
 	for {
 		bs.pos, bs.withTerminator = NextStatementPos(toks, 0)
@@ -1279,7 +1280,6 @@ func (b *Builder) Block(toks Toks) (block models.Block) {
 
 // Statement builds AST model of statement.
 func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
-	defer func() { s.Block = bs.block }()
 	s, ok := b.AssignStatement(bs.toks, false)
 	if ok {
 		return s
@@ -2009,7 +2009,7 @@ func (b *Builder) caseexprs(toks *Toks, caseIsDefault bool) []models.Expr {
 	return nil
 }
 
-func (b *Builder) caseblock(toks *Toks) models.Block {
+func (b *Builder) caseblock(toks *Toks) *models.Block {
 	braceCount := 0
 	for i, tok := range *toks {
 		if tok.Id == tokens.Brace {
