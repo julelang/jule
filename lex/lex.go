@@ -354,8 +354,6 @@ var keywords = map[string]uint8{
 	tokens.ENUM:     tokens.Enum,
 	tokens.STRUCT:   tokens.Struct,
 	tokens.CO:       tokens.Co,
-	tokens.TRY:      tokens.Try,
-	tokens.CATCH:    tokens.Catch,
 	tokens.MATCH:    tokens.Match,
 	tokens.CASE:     tokens.Case,
 	tokens.DEFAULT:  tokens.Default,

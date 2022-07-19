@@ -1630,9 +1630,12 @@ func (p *Parser) checkAnonFunc(f *Func) {
 	p.Defs.Globals = append(blockVariables, p.Defs.Globals...)
 	p.blockVars = p.varsFromParams(f.Params)
 	rootBlock := p.rootBlock
+	nodeBlock := p.nodeBlock
 	p.rootBlock = nil
+	p.nodeBlock = nil
 	p.checkFunc(f)
 	p.rootBlock = rootBlock
+	p.nodeBlock = nodeBlock
 	p.Defs.Globals = globals
 	p.blockVars = blockVariables
 }
@@ -2010,8 +2013,7 @@ func (p *Parser) checkNewBlock(b *models.Block) {
 func (p *Parser) statement(s *models.Statement) bool {
 	switch t := s.Data.(type) {
 	case models.ExprStatement:
-		_, t.Expr.Model = p.evalExpr(t.Expr)
-		s.Data = t
+		p.exprStatement(s)
 	case Var:
 		p.varStatement(&t, false)
 		s.Data = t
@@ -2059,15 +2061,13 @@ func (p *Parser) statement(s *models.Statement) bool {
 
 func (p *Parser) checkStatement(b *models.Block, i *int) {
 	s := &b.Tree[*i]
+	s.Block = b
 	if p.statement(s) {
 		return
 	}
 	switch t := s.Data.(type) {
 	case models.If:
 		p.ifExpr(&t, i, b.Tree)
-		s.Data = t
-	case models.Try:
-		p.try(&t, i, b.Tree)
 		s.Data = t
 	case models.Goto:
 		t.Index = *i
@@ -2089,6 +2089,60 @@ func (p *Parser) checkStatement(b *models.Block, i *int) {
 func (p *Parser) checkBlock(b *models.Block) {
 	for i := 0; i < len(b.Tree); i++ {
 		p.checkStatement(b, &i)
+	}
+}
+
+func (p *Parser) recoverFuncExprStatement(s *models.Statement) {
+	es := s.Data.(models.ExprStatement)
+	errtok := es.Expr.Processes[0][0]
+	callToks := es.Expr.Processes[0][1:]
+	args := p.getArgs(callToks)
+	handleParam := recoverFunc.Ast.Params[0]
+	if len(args.Src) == 0 {
+		p.pusherrtok(errtok, "missing_argument_for", handleParam.Id)
+		return
+	} else if len(args.Src) > 1 {
+		p.pusherrtok(errtok, "argument_overflow")
+	}
+	v, _ := p.evalExpr(args.Src[0].Expr)
+	if v.data.Type.Kind != handleParam.Type.Kind {
+		p.pusherrtok(errtok, "incompatible_datatype", handleParam.Type.Kind, v.data.Type.Kind)
+		return
+	}
+	handler := v.data.Type.Tag.(*Func)
+	es.Expr.Model = exprNode{"try{\n"}
+	s.Data = es
+	var catcher serieExpr
+	catcher.exprs = append(catcher.exprs, "} catch(XID(Error) ")
+	catcher.exprs = append(catcher.exprs, handler.Params[0].OutId())
+	catcher.exprs = append(catcher.exprs, ") ")
+	catcher.exprs = append(catcher.exprs, &handler.Block)
+	catchExpr := models.Statement{
+		Data: models.ExprStatement{
+			Expr: models.Expr{Model: catcher},
+		},
+	}
+	s.Block.Tree = append(s.Block.Tree, catchExpr)
+}
+
+func (p *Parser) exprStatement(s *models.Statement) {
+	es := s.Data.(models.ExprStatement)
+	if es.Expr.Processes != nil && !isOperator(es.Expr.Processes[0]) {
+		process := es.Expr.Processes[0]
+		tok := process[0]
+		if tok.Id == tokens.Id && tok.Kind == recoverFunc.Ast.Id {
+			if ast.IsFuncCall(es.Expr.Toks) != nil {
+				def, _, _, _ := p.defById(tok.Kind)
+				if def == recoverFunc {
+					p.recoverFuncExprStatement(s)
+					return
+				}
+			}
+		}
+	}
+	if es.Expr.Model == nil {
+		_, es.Expr.Model = p.evalExpr(es.Expr)
+		s.Data = es
 	}
 }
 
@@ -2603,57 +2657,6 @@ func (p *Parser) iter(iter *models.Iter) {
 	}
 }
 
-func (p *Parser) try(try *models.Try, i *int, statements []models.Statement) {
-	p.checkNewBlock(&try.Block)
-	statement := statements[*i]
-	if statement.WithTerminator {
-		return
-	}
-	*i++
-	if *i >= len(statements) {
-		*i--
-		return
-	}
-	statement = statements[*i]
-	switch t := statement.Data.(type) {
-	case models.Catch:
-		p.catch(try, &t)
-		try.Catch = t
-		// Set statatement.Val to nil because *Try has catch instance and
-		// parses catches cxx itself String method. If statement.Val is not nil,
-		// parses each catch block two times.
-		statements[*i].Data = nil
-	default:
-		*i--
-	}
-}
-
-func (p *Parser) catch(try *models.Try, catch *models.Catch) {
-	if catch.Var.Id == "" {
-		p.checkNewBlock(&catch.Block)
-		return
-	}
-	_, defTok := p.blockDefById(catch.Var.Id)
-	if defTok.Id != tokens.NA {
-		p.pusherrtok(catch.Var.IdTok, "exist_id", catch.Var.Id)
-	}
-	if catch.Var.Type.Tok.Id != tokens.NA {
-		catch.Var.Type, _ = p.realType(catch.Var.Type, true)
-		if catch.Var.Type.Kind != errorType.Kind {
-			p.pusherrtok(catch.Var.Type.Tok, "invalid_type_source")
-		}
-	} else {
-		catch.Var.Type = errorType
-	}
-	if xapi.IsIgnoreId(catch.Var.Id) {
-		p.checkNewBlock(&catch.Block)
-		return
-	}
-	blockVars := p.blockVars
-	p.blockVars = append(p.blockVars, &catch.Var)
-	p.checkNewBlockCustom(&catch.Block, blockVars)
-}
-
 func (p *Parser) ifExpr(ifast *models.If, i *int, statements []models.Statement) {
 	val, model := p.evalExpr(ifast.Expr)
 	ifast.Expr.Model = model
@@ -2900,8 +2903,8 @@ func (p *Parser) checkType(real, check DataType, ignoreAny bool, errTok Tok) {
 		}
 		i := real.Tag.([][]any)[0][0].(uint64)
 		j := check.Tag.([][]any)[0][0].(uint64)
-		realKind := strings.Replace(real.Kind, "...", strconv.FormatUint(i, 10), 1)
-		checkKind := strings.Replace(check.Kind, "...", strconv.FormatUint(j, 10), 1)
+		realKind := strings.Replace(real.Kind, x.Mark_Array, strconv.FormatUint(i, 10), 1)
+		checkKind := strings.Replace(check.Kind, x.Mark_Array, strconv.FormatUint(j, 10), 1)
 		p.pusherrtok(errTok, "incompatible_datatype", realKind, checkKind)
 	}
 }

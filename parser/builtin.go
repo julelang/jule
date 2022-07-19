@@ -261,10 +261,45 @@ var panicFunc = &function{
 	},
 }
 
+var errorHandlerFunc = &models.Func{
+	Id: "handler",
+	Params: []models.Param{
+		{
+			Const: true,
+			Id:    "error",
+			Type:  errorType,
+		},
+	},
+	RetType: models.RetType{
+		Type: models.DataType{
+			Id:   xtype.Void,
+			Kind: xtype.VoidTypeStr,
+		},
+	},
+}
+
+var recoverFunc = &function{
+	Ast: &models.Func{
+		Pub: true,
+		Id:  "recover",
+		Params: []models.Param{
+			{
+				Id: "handler",
+				Type: models.DataType{
+					Id:   xtype.Func,
+					Kind: errorHandlerFunc.DataTypeString(),
+					Tag:  errorHandlerFunc,
+				},
+			},
+		},
+	},
+}
+
 // Builtin definitions.
 var Builtin = &Defmap{
 	Funcs: []*function{
 		panicFunc,
+		recoverFunc,
 		{
 			Ast: &Func{
 				Pub:     true,

@@ -1279,6 +1279,7 @@ func (b *Builder) Block(toks Toks) (block models.Block) {
 
 // Statement builds AST model of statement.
 func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
+	defer func() { s.Block = bs.block }()
 	s, ok := b.AssignStatement(bs.toks, false)
 	if ok {
 		return s
@@ -1312,10 +1313,6 @@ func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
 		return b.ConcurrentCallStatement(bs.toks)
 	case tokens.Goto:
 		return b.GotoStatement(bs.toks)
-	case tokens.Try:
-		return b.TryBlock(bs)
-	case tokens.Catch:
-		return b.CatchBlock(bs)
 	case tokens.Type:
 		t := b.Type(bs.toks)
 		s.Tok = t.Tok
@@ -1329,7 +1326,7 @@ func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
 		}
 	}
 	if IsFuncCall(bs.toks) != nil {
-		return b.ExprStatement(bs.toks)
+		return b.ExprStatement(bs)
 	}
 	tok = Tok{
 		File:   tok.File,
@@ -1549,13 +1546,13 @@ func (b *Builder) LabelStatement(tok Tok) models.Statement {
 }
 
 // ExprStatement builds AST model of expression.
-func (b *Builder) ExprStatement(toks Toks) models.Statement {
-	block := models.ExprStatement{
-		Expr: b.Expr(toks),
+func (b *Builder) ExprStatement(bs *blockStatement) models.Statement {
+	expr := models.ExprStatement{
+		Expr: b.Expr(bs.toks),
 	}
 	return models.Statement{
-		Tok:  toks[0],
-		Data: block,
+		Tok:  bs.toks[0],
+		Data: expr,
 	}
 }
 
@@ -1963,61 +1960,6 @@ func (b *Builder) IterExpr(toks Toks) (s models.Statement) {
 	return models.Statement{
 		Tok:  iter.Tok,
 		Data: iter,
-	}
-}
-
-// TryBlock build try block.
-func (b *Builder) TryBlock(bs *blockStatement) (s models.Statement) {
-	var try models.Try
-	try.Tok = bs.toks[0]
-	bs.toks = bs.toks[1:]
-	i := new(int)
-	blockToks := b.getrange(i, tokens.LBRACE, tokens.RBRACE, &bs.toks)
-	if blockToks == nil {
-		b.pusherr(try.Tok, "body_not_exist")
-		return
-	}
-	if *i < len(bs.toks) {
-		if bs.toks[*i].Id == tokens.Catch {
-			bs.nextToks = bs.toks[*i:]
-		} else {
-			b.pusherr(bs.toks[*i], "invalid_syntax")
-		}
-	}
-	try.Block = b.Block(blockToks)
-	return models.Statement{
-		Tok:  try.Tok,
-		Data: try,
-	}
-}
-
-// CatchBlock build catch block.
-func (b *Builder) CatchBlock(bs *blockStatement) (s models.Statement) {
-	var catch models.Catch
-	catch.Tok = bs.toks[0]
-	bs.toks = bs.toks[1:]
-	varToks := BlockExpr(bs.toks)
-	i := new(int)
-	*i = len(varToks)
-	blockToks := b.getrange(i, tokens.LBRACE, tokens.RBRACE, &bs.toks)
-	if blockToks == nil {
-		b.pusherr(catch.Tok, "body_not_exist")
-		return
-	}
-	if *i < len(bs.toks) {
-		if bs.toks[*i].Id == tokens.Catch {
-			bs.nextToks = bs.toks[*i:]
-		} else {
-			b.pusherr(bs.toks[*i], "invalid_syntax")
-		}
-	}
-	if len(varToks) > 0 {
-		catch.Var = b.getVarProfile(varToks)
-	}
-	catch.Block = b.Block(blockToks)
-	return models.Statement{
-		Tok:  catch.Tok,
-		Data: catch,
 	}
 }
 

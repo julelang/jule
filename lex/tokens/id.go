@@ -33,10 +33,8 @@ const (
 	Enum         uint8 = 28
 	Struct       uint8 = 29
 	Co           uint8 = 30
-	Try          uint8 = 31
-	Catch        uint8 = 32
-	Match        uint8 = 33
-	Case         uint8 = 34
-	Default      uint8 = 35
-	Self         uint8 = 36
+	Match        uint8 = 31
+	Case         uint8 = 32
+	Default      uint8 = 33
+	Self         uint8 = 34
 )

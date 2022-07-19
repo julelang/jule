@@ -33,12 +33,17 @@ func (p *Param) TypeString() string {
 	return ts.String()
 }
 
+// OutId returns xapi.OutId result of param.
+func (p *Param) OutId() string {
+	return xapi.OutId(p.Id, p.Tok.File)
+}
+
 func (p Param) String() string {
 	var cxx strings.Builder
 	cxx.WriteString(p.Prototype())
 	if p.Id != "" && !xapi.IsIgnoreId(p.Id) && p.Id != x.Anonymous {
 		cxx.WriteByte(' ')
-		cxx.WriteString(xapi.OutId(p.Id, p.Tok.File))
+		cxx.WriteString(p.OutId())
 	}
 	return cxx.String()
 }
