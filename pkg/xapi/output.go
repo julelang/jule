@@ -39,6 +39,7 @@ var CxxDefault = `#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) ||
 #endif
 // endregion X_STANDARD_IMPORTS
 
+#define X_EXIT_PANIC 2
 #define _CONCAT(_A, _B) _A ## _B
 #define CONCAT(_A, _B) _CONCAT(_A, _B)
 #define XID(_Identifier) CONCAT(_, _Identifier)
@@ -757,13 +758,47 @@ static inline void XID(outln)(const _Obj_t _Obj) noexcept {
 }
 // endregion X_BUILTIN_FUNCTIONS
 
-// region BOTTOM_MISC
+// region X_TERMINATE
+struct tracer {
+    static constexpr uint_xt _n{20};
+
+    std::array<str_xt, _n> _traces;
+
+    void push(const str_xt &_Src) {
+        for (uint_xt _index{_n-1}; _index > 0; _index--) {
+            this->_traces[_index] = this->_traces[_index-1];
+        }
+        this->_traces[0] = _Src;
+    }
+
+    str_xt string(void) noexcept {
+        str_xt _traces{};
+        for (const str_xt &_trace: this->_traces) {
+            if (_trace.empty()) { break; }
+            _traces += _trace;
+            _traces += "\n";
+        }
+        return _traces;
+    }
+
+    void ok(void) noexcept {
+        for (uint_xt _index{0}; _index < _n; _index++) {
+            this->_traces[_index] = this->_traces[_index+1];
+            if (this->_traces[_index+1].empty()) { break; }
+        }
+    }
+};
+
+tracer ___trace{};
+
 void x_terminate_handler(void) noexcept {
     try { std::rethrow_exception(std::current_exception()); }
     catch (const XID(Error) _error) {
-        std::cout << "panic: " << _error.XID(message) << std::endl;
-        std::exit(EXIT_SUCCESS);
+        std::cout << "panic: " << _error.XID(message) << std::endl << std::endl;
+        std::cout << ___trace.string();
+        std::exit(X_EXIT_PANIC);
     }
 }
-// endregion BOTTOM_MIST
+// endregion X_TERMINATE
+
 // endregion X_CXX_API`

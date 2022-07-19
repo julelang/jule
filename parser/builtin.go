@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"github.com/the-xlang/xxc/ast/models"
 	"github.com/the-xlang/xxc/lex/tokens"
 	"github.com/the-xlang/xxc/pkg/x"
 	"github.com/the-xlang/xxc/pkg/xapi"
@@ -246,9 +247,24 @@ var errorType = DataType{
 	Tag:  errorStruct,
 }
 
+var panicFunc = &function{
+	Ast: &models.Func{
+		Pub: true,
+		Id:  "panic",
+		Params: []models.Param{
+			{
+				Const: true,
+				Id:    "error",
+				Type:  errorType,
+			},
+		},
+	},
+}
+
 // Builtin definitions.
 var Builtin = &Defmap{
 	Funcs: []*function{
+		panicFunc,
 		{
 			Ast: &Func{
 				Pub:     true,

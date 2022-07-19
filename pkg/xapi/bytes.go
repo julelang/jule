@@ -41,6 +41,9 @@ func btoa(b byte) string {
 }
 
 func bytesToStr(bytes []byte) string {
+	if len(bytes) == 0 {
+		return ""
+	}
 	var str strings.Builder
 	for i := 0; i < len(bytes); i++ {
 		b := bytes[i]

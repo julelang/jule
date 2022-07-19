@@ -26,6 +26,26 @@ func (f *function) outId() string {
 	return xapi.OutId(f.Ast.Id, f.Ast.Tok.File)
 }
 
+func (f *function) getTracePointStatements() []models.Statement {
+	var trace strings.Builder
+	trace.WriteString(`___trace.push(`)
+	var tracepoint strings.Builder
+	tracepoint.WriteString(f.Ast.Id)
+	tracepoint.WriteString(f.Ast.DataTypeString())
+	tracepoint.WriteString("\n\t")
+	tracepoint.WriteString(f.Ast.Tok.File.Path())
+	trace.WriteString(xapi.ToStr([]byte(tracepoint.String())))
+	trace.WriteByte(')')
+	statements := []models.Statement{{}, {}}
+	statements[0].Data = models.ExprStatement{
+		Expr: models.Expr{Model: exprNode{trace.String()}},
+	}
+	statements[1].Data = models.ExprStatement{
+		Expr: models.Expr{Model: exprNode{"DEFER(___trace.ok())"}},
+	}
+	return statements
+}
+
 func (f function) String() string {
 	var cxx strings.Builder
 	cxx.WriteString(f.Head())
@@ -46,6 +66,7 @@ func (f function) String() string {
 		statements[0] = models.Statement{Tok: s.Ast.Tok, Data: self}
 		block.Tree = append(statements, block.Tree...)
 	}
+	block.Tree = append(f.getTracePointStatements(), block.Tree...)
 	cxx.WriteString(block.String())
 	return cxx.String()
 }
