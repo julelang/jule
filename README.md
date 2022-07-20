@@ -3,7 +3,6 @@
     <img width="100" src="https://raw.githubusercontent.com/the-xlang/resources/main/x.svg?sanitize=true">
 </p>
 <h2>The X Programming Language</h2>
-<strong>Simple, efficent and compiled system programming language.
 
 [Website](https://the-xlang.github.io/website/) |
 [Documentations](https://the-xlang.github.io/website/pages/docs.html) |
@@ -16,12 +15,11 @@
 
 + Simple and elegant
 + As efficient and performance as C/C++
-+ Zero cost for C/C++ interoperability
++ High C/C++ interoperability
 + Deferred calls
 + Language integrated concurrency
 + Language integrated documentation
 + Generic programming
-+ C/C++ code embedding
 + C/C++ backends
 
 <h2 id="introduction">Introduction</h2>
