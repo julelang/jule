@@ -1354,7 +1354,7 @@ func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) {
 	v, model := p.evalExpr(param.Default)
 	param.Default.Model = model
 	p.wg.Add(1)
-	go p.checkArgType(*param, v, false, param.Tok)
+	go p.checkArgType(*param, v, param.Tok)
 }
 
 func paramIsAllowForConst(param *Param) bool {
@@ -1917,10 +1917,10 @@ func (p *Parser) parseArg(param Param, arg *Arg, variadiced *bool) {
 		*variadiced = value.variadic
 	}
 	p.wg.Add(1)
-	go p.checkArgType(param, value, false, arg.Tok)
+	go p.checkArgType(param, value, arg.Tok)
 }
 
-func (p *Parser) checkArgType(param Param, val value, ignoreAny bool, errTok Tok) {
+func (p *Parser) checkArgType(param Param, val value, errTok Tok) {
 	defer p.wg.Done()
 	if !param.Const && param.Reference && !val.lvalue {
 		p.pusherrtok(errTok, "not_lvalue_for_reference_param")
@@ -2732,8 +2732,6 @@ func (p *Parser) checkValidityForAutoType(t DataType, errtok Tok) {
 		return
 	}
 	switch t.Id {
-	case xtype.Default:
-		p.pusherrtok(errtok, "default_for_autotype")
 	case xtype.Nil:
 		p.pusherrtok(errtok, "nil_for_autotype")
 	case xtype.Void:
