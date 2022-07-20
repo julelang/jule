@@ -739,6 +739,9 @@ struct XID(Error) {
 public:
     str_xt XID(message);
 
+    XID(Error)(str_xt _Message) noexcept
+    { this->XID(message) = _Message; }
+
     inline bool operator==(const XID(Error) &_Src) const
     { return this->XID(message) == _Src.XID(message); }
 

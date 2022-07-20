@@ -1164,6 +1164,10 @@ func (p *Parser) globalById(id string) (*Var, *Defmap) {
 }
 
 func (p *Parser) nsById(id string, parent bool) *namespace {
+	ns := Builtin.nsById(id, parent)
+	if ns != nil {
+		return ns
+	}
 	for _, use := range p.Uses {
 		ns := use.defs.nsById(id, parent)
 		if ns != nil {

@@ -4,6 +4,7 @@ import (
 	"github.com/the-xlang/xxc/ast/models"
 	"github.com/the-xlang/xxc/lex/tokens"
 	"github.com/the-xlang/xxc/pkg/x"
+	"github.com/the-xlang/xxc/pkg/xapi"
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
@@ -234,7 +235,7 @@ var errorStruct = &xstruct{
 			{
 				Id:      "message",
 				Type:    DataType{Id: xtype.Str, Kind: tokens.STR},
-				Default: Expr{Model: exprNode{}},
+				Default: Expr{Model: exprNode{xtype.CxxTypeIdFromType(xtype.Str) + xapi.DefaultExpr}},
 			},
 		},
 	},
