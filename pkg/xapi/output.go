@@ -738,6 +738,12 @@ str_xt tostr(const _Obj_t &_Obj) noexcept {
 struct XID(Error) {
 public:
     str_xt XID(message);
+
+    inline bool operator==(const XID(Error) &_Src) const
+    { return this->XID(message) == _Src.XID(message); }
+
+    inline bool operator!=(const XID(Error) &_Src) const
+    { return !this->operator==(_Src); }
 };
 
 std::ostream &operator<<(std::ostream &_Stream, const XID(Error) &_Error)

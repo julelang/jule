@@ -248,6 +248,24 @@ func (s *solver) nil() (v models.Data) {
 	return
 }
 
+func (s *solver) structure() (v models.Data) {
+	v.Tok = s.operator
+	if s.leftVal.Type.Kind != s.rightVal.Type.Kind {
+		s.p.pusherrtok(s.operator, "incompatible_datatype",
+			s.rightVal.Type.Kind, s.leftVal.Type.Kind)
+		return
+	}
+	switch s.operator.Kind {
+	case tokens.NOT_EQUALS, tokens.EQUALS:
+		v.Type.Id = xtype.Bool
+		v.Type.Kind = tokens.BOOL
+	default:
+		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
+			s.operator.Kind, tokens.STRUCT)
+	}
+	return
+}
+
 func (s *solver) check() bool {
 	switch s.operator.Kind {
 	case tokens.PLUS, tokens.MINUS, tokens.STAR, tokens.SOLIDUS, tokens.PERCENT, tokens.RSHIFT,
@@ -281,8 +299,10 @@ func (s *solver) solve() (v models.Data) {
 		return s.slice()
 	case typeIsPtr(s.leftVal.Type), typeIsPtr(s.rightVal.Type):
 		return s.ptr()
-	case s.leftVal.Type.Id == xtype.Enum, s.rightVal.Type.Id == xtype.Enum:
+	case typeIsEnum(s.leftVal.Type), typeIsEnum(s.rightVal.Type):
 		return s.enum()
+	case typeIsStruct(s.leftVal.Type), typeIsStruct(s.rightVal.Type):
+		return s.structure()
 	case s.leftVal.Type.Id == xtype.Nil, s.rightVal.Type.Id == xtype.Nil:
 		return s.nil()
 	case s.leftVal.Type.Id == xtype.Any, s.rightVal.Type.Id == xtype.Any:

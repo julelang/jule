@@ -20,12 +20,85 @@ type xstruct struct {
 	generics []DataType
 }
 
+func (s *xstruct) cxxGenerics() (def string, serie string) {
+	if len(s.Ast.Generics) == 0 {
+		return "", ""
+	}
+	var cxxDef strings.Builder
+	cxxDef.WriteString("template<typename ")
+	var cxxSerie strings.Builder
+	cxxSerie.WriteByte('<')
+	for i := range s.Ast.Generics {
+		cxxSerie.WriteByte('T')
+		cxxSerie.WriteString(strconv.Itoa(i))
+		cxxSerie.WriteByte(',')
+	}
+	serie = cxxSerie.String()[:cxxSerie.Len()-1] + ">"
+	cxxDef.WriteString(serie[1:])
+	cxxDef.WriteByte('\n')
+	return cxxDef.String(), serie
+}
+
+func (s *xstruct) outId() string {
+	return xapi.OutId(s.Ast.Id, s.Ast.Tok.File)
+}
+
+func (s *xstruct) operators() string {
+	outid := s.outId()
+	genericsDef, genericsSerie := s.cxxGenerics()
+	var cxx strings.Builder
+	cxx.WriteString(models.IndentString())
+	if l, _ := cxx.WriteString(genericsDef); l > 0 {
+		cxx.WriteString(models.IndentString())
+	}
+	cxx.WriteString("inline bool operator==(const ")
+	cxx.WriteString(outid)
+	cxx.WriteString(genericsSerie)
+	cxx.WriteString(" &_Src) {")
+	if len(s.Defs.Globals) > 0 {
+		models.AddIndent()
+		cxx.WriteByte('\n')
+		cxx.WriteString(models.IndentString())
+		var expr strings.Builder
+		expr.WriteString("return ")
+		models.AddIndent()
+		for _, g := range s.Defs.Globals {
+			expr.WriteByte('\n')
+			expr.WriteString(models.IndentString())
+			expr.WriteString("this->")
+			gid := g.OutId()
+			expr.WriteString(gid)
+			expr.WriteString(" == _Src.")
+			expr.WriteString(gid)
+			expr.WriteString(" &&")
+		}
+		models.DoneIndent()
+		cxx.WriteString(expr.String()[:expr.Len()-3])
+		cxx.WriteString(";\n")
+		models.DoneIndent()
+		cxx.WriteString(models.IndentString())
+		cxx.WriteByte('}')
+	} else {
+		cxx.WriteString(" return true; }")
+	}
+	cxx.WriteString("\n\n")
+	cxx.WriteString(models.IndentString())
+	if l, _ := cxx.WriteString(genericsDef); l > 0 {
+		cxx.WriteString(models.IndentString())
+	}
+	cxx.WriteString("inline bool operator!=(const ")
+	cxx.WriteString(outid)
+	cxx.WriteString(genericsSerie)
+	cxx.WriteString(" &_Src) { return !this->operator==(_Src); }")
+	return cxx.String()
+}
+
 func (s *xstruct) decldefString() string {
 	var cxx strings.Builder
 	cxx.WriteString(genericsToCxx(s.Ast.Generics))
 	cxx.WriteByte('\n')
 	cxx.WriteString("struct ")
-	cxx.WriteString(xapi.OutId(s.Ast.Id, s.Ast.Tok.File))
+	cxx.WriteString(s.outId())
 	cxx.WriteString(" {\n")
 	models.AddIndent()
 	if len(s.Defs.Globals) > 0 {
@@ -43,32 +116,24 @@ func (s *xstruct) decldefString() string {
 			cxx.WriteString("\n\n")
 		}
 	}
+	cxx.WriteString(s.operators())
+	cxx.WriteByte('\n')
 	models.DoneIndent()
 	cxx.WriteString(models.IndentString())
 	cxx.WriteString("};")
 	return cxx.String()
 }
 
-func (s *xstruct) ostreams() string {
+func (s *xstruct) ostream() string {
 	var cxx strings.Builder
-	var generics string
-	if len(s.Ast.Generics) > 0 {
-		var gb strings.Builder
-		gb.WriteByte('<')
-		for i := range s.Ast.Generics {
-			gb.WriteByte('T')
-			gb.WriteString(strconv.Itoa(i))
-			gb.WriteByte(',')
-		}
-		generics = gb.String()[:gb.Len()-1] + ">"
-		cxx.WriteString("template<typename ")
-		// Starts 1 for skip "<"
-		cxx.WriteString(generics[1:])
-		cxx.WriteByte('\n')
+	genericsDef, genericsSerie := s.cxxGenerics()
+	cxx.WriteString(models.IndentString())
+	if l, _ := cxx.WriteString(genericsDef); l > 0 {
+		cxx.WriteString(models.IndentString())
 	}
 	cxx.WriteString("std::ostream &operator<<(std::ostream &_Stream, const ")
-	cxx.WriteString(xapi.OutId(s.Ast.Id, s.Ast.Tok.File))
-	cxx.WriteString(generics)
+	cxx.WriteString(s.outId())
+	cxx.WriteString(genericsSerie)
 	cxx.WriteString(" &_Src) {\n")
 	models.AddIndent()
 	cxx.WriteString(models.IndentString())
@@ -80,7 +145,7 @@ func (s *xstruct) ostreams() string {
 		cxx.WriteString(`_Stream << "`)
 		cxx.WriteString(field.Id)
 		cxx.WriteString(`:" << _Src.`)
-		cxx.WriteString(xapi.OutId(field.Id, s.Ast.Tok.File))
+		cxx.WriteString(field.OutId())
 		if i+1 < len(s.Ast.Fields) {
 			cxx.WriteString(" << \", \"")
 		}
@@ -100,8 +165,7 @@ func (s xstruct) String() string {
 	var cxx strings.Builder
 	cxx.WriteString(s.decldefString())
 	cxx.WriteString("\n\n")
-	cxx.WriteString(models.IndentString())
-	cxx.WriteString(s.ostreams())
+	cxx.WriteString(s.ostream())
 	return cxx.String()
 }
 

@@ -23,6 +23,11 @@ type Var struct {
 	Used      bool
 }
 
+// OutId returns xapi.OutId result of var.
+func (v *Var) OutId() string {
+	return xapi.OutId(v.Id, v.IdTok.File)
+}
+
 func (v Var) String() string {
 	var cxx strings.Builder
 	if v.Volatile {
@@ -33,7 +38,7 @@ func (v Var) String() string {
 	}
 	cxx.WriteString(v.Type.String())
 	cxx.WriteByte(' ')
-	cxx.WriteString(xapi.OutId(v.Id, v.IdTok.File))
+	cxx.WriteString(v.OutId())
 	cxx.WriteByte('{')
 	cxx.WriteString(v.Val.String())
 	cxx.WriteByte('}')
@@ -52,7 +57,7 @@ func (v *Var) FieldString() string {
 	}
 	cxx.WriteString(v.Type.String())
 	cxx.WriteByte(' ')
-	cxx.WriteString(xapi.OutId(v.Id, v.IdTok.File))
+	cxx.WriteString(v.OutId())
 	cxx.WriteByte(';')
 	return cxx.String()
 }
