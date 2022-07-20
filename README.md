@@ -26,10 +26,10 @@
 
 <h2 id="introduction">Introduction</h2>
 
-The X programming language is compiled, static typed, fast, modern and simple.<br>
-Before the X source code is compiled, it is translated to C++ code and compiled from C++.<br>
-Transpiling to C++ only instead of compiling is also an option.<br>
-It aims to be advanced, readable and a good choice for systems programming.
+X is a statically typed compiled programming language designed for system development, building maintainable and reliable software. <br>
+The purpose of X is to keep functionality high while maintaining a simple form and readability. <br>
+It is based on not having any content that restricts the developer. <br>
+That means manual memory management, unsafe memory operations if you want and more.
 
 <strong>Hello Github;</strong>
 ```go
