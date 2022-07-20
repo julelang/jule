@@ -480,7 +480,7 @@ func (e *eval) cast(v value, t DataType, errtok Tok) value {
 	default:
 		e.pusherrtok(errtok, "type_notsupports_casting", t.Kind)
 	}
-	v.data.Value = ""
+	v.data.Value = t.Kind
 	v.data.Type = t
 	v.constant = false
 	v.volatile = false

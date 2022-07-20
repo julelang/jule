@@ -69,6 +69,11 @@ func (dt *DataType) KindId() (id, prefix string) {
 		if r == '_' || unicode.IsLetter(r) {
 			id = string(runes[i:])
 			prefix = string(runes[:i])
+			break
+		}
+	}
+	for _, dt := range xtype.TypeMap {
+		if dt == id {
 			return
 		}
 	}
