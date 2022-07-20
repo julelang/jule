@@ -469,7 +469,6 @@ func (e *eval) tryCast(toks Toks, m *exprModel) (v value, _ bool) {
 
 func (e *eval) cast(v value, t DataType, errtok Tok) value {
 	switch {
-	case typeIsPure(v.data.Type) && v.data.Type.Id == xtype.Any:
 	case typeIsPtr(t):
 		e.castPtr(v.data.Type, errtok)
 	case typeIsSlice(t):
@@ -489,6 +488,8 @@ func (e *eval) cast(v value, t DataType, errtok Tok) value {
 
 func (e *eval) castSingle(t, vt DataType, errtok Tok) {
 	switch t.Id {
+	case xtype.Any:
+		return
 	case xtype.Str:
 		e.castStr(vt, errtok)
 		return
