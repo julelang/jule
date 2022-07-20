@@ -116,9 +116,11 @@ func checkFloatBit(v models.Data, bit int) bool {
 	return xbits.CheckBitFloat(v.Value, bit)
 }
 
+/*
 func defaultValueOfType(t DataType) string {
 	if typeIsNilCompatible(t) {
 		return tokens.NIL
 	}
 	return xtype.DefaultValOfType(t.Id)
 }
+*/

@@ -415,8 +415,20 @@ func (e *eval) subId(toks Toks, m *exprModel) (v value) {
 func (e *eval) castExpr(dt DataType, exprToks Toks, m *exprModel, errTok Tok) value {
 	val, model := e.toks(exprToks)
 	if val.data.Type.Id == xtype.Default {
-		m.appendSubNode(exprNode{dt.String()})
-		m.appendSubNode(exprNode{xapi.DefaultExpr})
+		if typeIsStruct(dt) {
+			m.appendSubNode(exprNode{})
+			s := dt.Tag.(*xstruct)
+			m.appendSubNode(exprNode{s.outId()})
+			argsToks := []Tok{
+				{Id: tokens.Brace, Kind: tokens.LPARENTHESES},
+				{Id: tokens.Brace, Kind: tokens.RPARENTHESES},
+			}
+			args := e.p.getArgs(argsToks)
+			_ = e.p.parseFuncCall(s.constructor, s.Generics(), args, m, errTok)
+		} else {
+			m.appendSubNode(exprNode{dt.String()})
+			m.appendSubNode(exprNode{xapi.DefaultExpr})
+		}
 	} else {
 		m.appendSubNode(exprNode{tokens.LPARENTHESES + dt.String() + tokens.RPARENTHESES})
 		m.appendSubNode(exprNode{tokens.LPARENTHESES})

@@ -1578,7 +1578,9 @@ func (b *Builder) Args(toks Toks) *models.Args {
 	}
 	if last < len(toks) {
 		if last == 0 {
-			b.pushArg(args, toks[last:], toks[last])
+			if len(toks) > 0 {
+				b.pushArg(args, toks[last:], toks[last])
+			}
 		} else {
 			b.pushArg(args, toks[last:], toks[last-1])
 		}

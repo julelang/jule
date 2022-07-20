@@ -1595,10 +1595,10 @@ func (p *Parser) parseField(s *xstruct, f **Var, i int) {
 	if v.Type.Id == xtype.Struct && v.Type.Tag == s && typeIsPure(v.Type) {
 		p.pusherrtok(v.Type.Tok, "invalid_type_source")
 	}
-	if len(v.Expr.Toks) > 0 {
+	if hasExpr(v.Expr) {
 		param.Default = v.Expr
 	} else {
-		param.Default.Model = exprNode{defaultValueOfType(param.Type)}
+		param.Default.Model = exprNode{xapi.DefaultExpr}
 	}
 	s.constructor.Params[i] = param
 }
@@ -1775,7 +1775,7 @@ func (p *Parser) parseGenerics(f *Func, generics []DataType, m *exprModel, errTo
 }
 
 func isConstructor(f *Func) bool {
-	if f.RetType.Type.Id != xtype.Struct {
+	if !typeIsStruct(f.RetType.Type) {
 		return false
 	}
 	s := f.RetType.Type.Tag.(*xstruct)
@@ -1815,12 +1815,17 @@ func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *models.Args, 
 	v.data.Type = f.RetType.Type
 	v.data.Value = f.Id
 	if isConstructor(f) {
+		if len(f.Generics) == 0 {
+			p.readyConstructor(&f)
+		}
 		s := f.RetType.Type.Tag.(*xstruct)
 		s.SetGenerics(generics)
 		v.data.Type.Kind = s.dataTypeString()
 	}
-	m.appendSubNode(exprNode{tokens.LPARENTHESES})
-	defer m.appendSubNode(exprNode{tokens.RPARENTHESES})
+	if m != nil {
+		m.appendSubNode(exprNode{tokens.LPARENTHESES})
+		defer m.appendSubNode(exprNode{tokens.RPARENTHESES})
+	}
 	if args == nil {
 		return
 	}
