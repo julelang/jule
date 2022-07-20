@@ -1818,12 +1818,9 @@ func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *models.Args, 
 		s := f.RetType.Type.Tag.(*xstruct)
 		s.SetGenerics(generics)
 		v.data.Type.Kind = s.dataTypeString()
-		m.appendSubNode(exprNode{tokens.LBRACE})
-		defer m.appendSubNode(exprNode{tokens.RBRACE})
-	} else {
-		m.appendSubNode(exprNode{tokens.LPARENTHESES})
-		defer m.appendSubNode(exprNode{tokens.RPARENTHESES})
 	}
+	m.appendSubNode(exprNode{tokens.LPARENTHESES})
+	defer m.appendSubNode(exprNode{tokens.RPARENTHESES})
 	if args == nil {
 		return
 	}

@@ -93,6 +93,53 @@ func (s *xstruct) operators() string {
 	return cxx.String()
 }
 
+func (s *xstruct) cxxDefaultConstructor() string {
+	var cxx strings.Builder
+	cxx.WriteString(models.IndentString())
+	cxx.WriteString(s.outId())
+	cxx.WriteString("(void) noexcept {")
+	if len(s.Defs.Globals) > 0 {
+		models.AddIndent()
+		for _, g := range s.Defs.Globals {
+			cxx.WriteByte('\n')
+			cxx.WriteString(models.IndentString())
+			cxx.WriteString(g.OutId())
+			cxx.WriteString(" = ")
+			cxx.WriteString(xapi.DefaultExpr)
+			cxx.WriteByte(';')
+		}
+		models.DoneIndent()
+		cxx.WriteByte('\n')
+	}
+	cxx.WriteString(models.IndentString())
+	cxx.WriteByte('}')
+	return cxx.String()
+}
+
+func (s *xstruct) cxxConstructor() string {
+	var cxx strings.Builder
+	cxx.WriteString(models.IndentString())
+	cxx.WriteString(s.outId())
+	cxx.WriteString(paramsToCxx(s.constructor.Params))
+	cxx.WriteString(" noexcept {")
+	if len(s.Defs.Globals) > 0 {
+		models.AddIndent()
+		for i, g := range s.Defs.Globals {
+			cxx.WriteByte('\n')
+			cxx.WriteString(models.IndentString())
+			cxx.WriteString(g.OutId())
+			cxx.WriteString(" = ")
+			cxx.WriteString(s.constructor.Params[i].OutId())
+			cxx.WriteByte(';')
+		}
+		models.DoneIndent()
+		cxx.WriteByte('\n')
+	}
+	cxx.WriteString(models.IndentString())
+	cxx.WriteByte('}')
+	return cxx.String()
+}
+
 func (s *xstruct) decldefString() string {
 	var cxx strings.Builder
 	cxx.WriteString(genericsToCxx(s.Ast.Generics))
@@ -109,6 +156,10 @@ func (s *xstruct) decldefString() string {
 		}
 		cxx.WriteString("\n\n")
 	}
+	cxx.WriteString(s.cxxDefaultConstructor())
+	cxx.WriteString("\n\n")
+	cxx.WriteString(s.cxxConstructor())
+	cxx.WriteString("\n\n")
 	for _, f := range s.Defs.Funcs {
 		if f.used {
 			cxx.WriteString(models.IndentString())
