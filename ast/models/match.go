@@ -54,7 +54,7 @@ func (m *Match) MatchExprString() string {
 	AddIndent()
 	cxx.WriteString(IndentString())
 	cxx.WriteString(m.ExprType.String())
-	cxx.WriteString(" &&expr{")
+	cxx.WriteString(" expr{")
 	cxx.WriteString(m.Expr.String())
 	cxx.WriteString("};\n")
 	cxx.WriteString(IndentString())
