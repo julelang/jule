@@ -18,6 +18,8 @@ func (ac assignChecker) checkAssignType() {
 	defer ac.p.wg.Done()
 	if ac.p.eval.hasError || ac.v.data.Value == "" {
 		return
+	} else if ac.v.data.Type.Id == xtype.Default {
+		return
 	}
 	ac.p.checkAssignConst(ac.constant, ac.t, ac.v, ac.errtok)
 	if typeIsPure(ac.t) && isConstNumeric(ac.v.data.Value) {

@@ -192,9 +192,9 @@ func (s *xstruct) selfVar(receiver DataType) *Var {
 	v.Type.Id = xtype.Struct
 	v.Id = tokens.SELF
 	if typeIsPtr(receiver) {
-		v.Val.Model = exprNode{xapi.CxxSelf}
+		v.Expr.Model = exprNode{xapi.CxxSelf}
 	} else {
-		v.Val.Model = exprNode{tokens.STAR + xapi.CxxSelf}
+		v.Expr.Model = exprNode{tokens.STAR + xapi.CxxSelf}
 	}
 	return v
 }

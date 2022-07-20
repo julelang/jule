@@ -1043,7 +1043,7 @@ func (p *Parser) Var(v Var) *Var {
 		val = t
 	default:
 		if v.SetterTok.Id != tokens.NA {
-			val, v.Val.Model = p.evalExpr(v.Val)
+			val, v.Expr.Model = p.evalExpr(v.Expr)
 		}
 	}
 	if v.Type.Id != xtype.Void {
@@ -1595,8 +1595,8 @@ func (p *Parser) parseField(s *xstruct, f **Var, i int) {
 	if v.Type.Id == xtype.Struct && v.Type.Tag == s && typeIsPure(v.Type) {
 		p.pusherrtok(v.Type.Tok, "invalid_type_source")
 	}
-	if len(v.Val.Toks) > 0 {
-		param.Default = v.Val
+	if len(v.Expr.Toks) > 0 {
+		param.Default = v.Expr
 	} else {
 		param.Default.Model = exprNode{defaultValueOfType(param.Type)}
 	}
@@ -2726,6 +2726,8 @@ func (p *Parser) checkValidityForAutoType(t DataType, errtok Tok) {
 		return
 	}
 	switch t.Id {
+	case xtype.Default:
+		p.pusherrtok(errtok, "default_for_autotype")
 	case xtype.Nil:
 		p.pusherrtok(errtok, "nil_for_autotype")
 	case xtype.Void:

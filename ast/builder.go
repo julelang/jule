@@ -1653,7 +1653,7 @@ func (b *Builder) varTypeNExpr(v *models.Var, toks Toks, i int) {
 			b.pusherr(tok, "missing_expr")
 			return
 		}
-		v.Val = b.Expr(valueToks)
+		v.Expr = b.Expr(valueToks)
 		v.SetterTok = tok
 	} else {
 		b.pusherr(tok, "invalid_syntax")

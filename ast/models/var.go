@@ -14,7 +14,7 @@ type Var struct {
 	SetterTok Tok
 	Id        string
 	Type      DataType
-	Val       Expr
+	Expr      Expr
 	Const     bool
 	Volatile  bool
 	New       bool
@@ -39,9 +39,13 @@ func (v Var) String() string {
 	cxx.WriteString(v.Type.String())
 	cxx.WriteByte(' ')
 	cxx.WriteString(v.OutId())
-	cxx.WriteByte('{')
-	cxx.WriteString(v.Val.String())
-	cxx.WriteByte('}')
+	expr := v.Expr.String()
+	if expr != "" {
+		cxx.WriteString(" = ")
+		cxx.WriteString(v.Expr.String())
+	} else {
+		cxx.WriteString(xapi.DefaultExpr)
+	}
 	cxx.WriteByte(';')
 	return cxx.String()
 }

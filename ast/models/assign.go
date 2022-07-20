@@ -37,7 +37,7 @@ type Assign struct {
 func (a *Assign) cxxSingleAssign() string {
 	expr := a.Left[0]
 	if expr.Var.New {
-		expr.Var.Val = a.Right[0]
+		expr.Var.Expr = a.Right[0]
 		s := expr.Var.String()
 		return s[:len(s)-1] // Remove statement terminator
 	}

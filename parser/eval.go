@@ -182,6 +182,12 @@ func (e *eval) single(tok Tok, m *exprModel) (v value, ok bool) {
 		}
 	case tokens.Id, tokens.Self:
 		v, ok = eval.id()
+	case tokens.Default:
+		ok = true
+		v.data.Type.Id = xtype.Default
+		v.data.Type.Kind = tokens.DEFAULT
+		v.data.Value = v.data.Type.Kind
+		m.appendSubNode(exprNode{xapi.DefaultExpr})
 	default:
 		e.pusherrtok(tok, "invalid_syntax")
 	}
@@ -407,11 +413,16 @@ func (e *eval) subId(toks Toks, m *exprModel) (v value) {
 }
 
 func (e *eval) castExpr(dt DataType, exprToks Toks, m *exprModel, errTok Tok) value {
-	m.appendSubNode(exprNode{tokens.LPARENTHESES + dt.String() + tokens.RPARENTHESES})
-	m.appendSubNode(exprNode{tokens.LPARENTHESES})
 	val, model := e.toks(exprToks)
-	m.appendSubNode(model)
-	m.appendSubNode(exprNode{tokens.RPARENTHESES})
+	if val.data.Type.Id == xtype.Default {
+		m.appendSubNode(exprNode{dt.String()})
+		m.appendSubNode(exprNode{xapi.DefaultExpr})
+	} else {
+		m.appendSubNode(exprNode{tokens.LPARENTHESES + dt.String() + tokens.RPARENTHESES})
+		m.appendSubNode(exprNode{tokens.LPARENTHESES})
+		m.appendSubNode(model)
+		m.appendSubNode(exprNode{tokens.RPARENTHESES})
+	}
 	val = e.cast(val, dt, errTok)
 	return val
 }
@@ -468,6 +479,9 @@ func (e *eval) tryCast(toks Toks, m *exprModel) (v value, _ bool) {
 }
 
 func (e *eval) cast(v value, t DataType, errtok Tok) value {
+	if v.data.Type.Id == xtype.Default {
+		goto ret
+	}
 	switch {
 	case typeIsPtr(t):
 		e.castPtr(v.data.Type, errtok)
@@ -479,6 +493,7 @@ func (e *eval) cast(v value, t DataType, errtok Tok) value {
 	default:
 		e.pusherrtok(errtok, "type_notsupports_casting", t.Kind)
 	}
+ret:
 	v.data.Value = t.Kind
 	v.data.Type = t
 	v.constant = false
