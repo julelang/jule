@@ -56,10 +56,8 @@ type function struct {
 }
 
 type parameter struct {
-	Id       string `json:"id"`
-	Type     string `json:"type"`
-	Constant bool   `json:"constant"`
-	Volatile bool   `json:"volatile"`
+	Id   string `json:"id"`
+	Type string `json:"type"`
 }
 
 type namespace struct {
@@ -158,10 +156,8 @@ func params(parameters []models.Param) []parameter {
 	params := make([]parameter, len(parameters))
 	for i, p := range parameters {
 		params[i] = parameter{
-			Id:       p.Id,
-			Type:     ttoa(p.Type),
-			Constant: p.Const,
-			Volatile: p.Volatile,
+			Id:   p.Id,
+			Type: ttoa(p.Type),
 		}
 	}
 	return params

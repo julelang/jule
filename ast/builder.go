@@ -747,18 +747,6 @@ func (b *Builder) paramBegin(p *models.Param, i *int, toks Toks) {
 	for ; *i < len(toks); *i++ {
 		tok := toks[*i]
 		switch tok.Id {
-		case tokens.Const:
-			if p.Const {
-				b.pusherr(tok, "already_constant")
-				continue
-			}
-			p.Const = true
-		case tokens.Volatile:
-			if p.Volatile {
-				b.pusherr(tok, "already_volatile")
-				continue
-			}
-			p.Volatile = true
 		case tokens.Operator:
 			switch tok.Kind {
 			case tokens.TRIPLE_DOT:
@@ -837,8 +825,8 @@ func (b *Builder) paramBodyDataType(f *models.Func, p *models.Param, toks Toks) 
 	if i < len(toks) {
 		b.pusherr(toks[i], "invalid_syntax")
 	}
-	// Set param data-types to this data-type
-	// if parameter has not any data-type.
+	// Set param data types to this data type
+	// if parameter has not any data type.
 	i = len(f.Params) - 1
 	for ; i >= 0; i-- {
 		param := &f.Params[i]
@@ -878,10 +866,8 @@ func (b *Builder) pushParam(f *models.Func, toks Toks) {
 		if t, ok := b.DataType(toks, &i, false, true); ok {
 			if i+1 == len(toks) {
 				p.Type = t
-				goto end
 			}
 		}
-		b.pusherr(tok, "invalid_syntax")
 		goto end
 	}
 	b.paramBody(f, &p, &i, toks)

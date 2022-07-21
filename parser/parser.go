@@ -1111,8 +1111,6 @@ func (p *Parser) varsFromParams(params []Param) []*Var {
 		v.Id = param.Id
 		v.IdTok = param.Tok
 		v.Type = param.Type
-		v.Const = param.Const
-		v.Volatile = param.Volatile
 		if param.Variadic {
 			if length-i > 1 {
 				p.pusherrtok(param.Tok, "variadic_parameter_notlast")
@@ -1357,19 +1355,11 @@ func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) {
 	go p.checkArgType(*param, v, param.Tok)
 }
 
-func paramIsAllowForConst(param *Param) bool {
-	return !param.Variadic && typeIsAllowForConst(param.Type)
-}
-
 func (p *Parser) param(f *Func, param *Param) (err bool) {
 	param.Type, err = p.realType(param.Type, true)
 	// Assign to !err because p.realType
 	// returns true if success, false if not.
 	err = !err
-	if param.Const && !paramIsAllowForConst(param) {
-		p.pusherrtok(param.Tok, "invalid_type_for_const", param.TypeString())
-		err = true
-	}
 	if param.Reference {
 		if param.Variadic {
 			p.pusherrtok(param.Tok, "variadic_reference_param")
@@ -1922,16 +1912,15 @@ func (p *Parser) parseArg(param Param, arg *Arg, variadiced *bool) {
 
 func (p *Parser) checkArgType(param Param, val value, errTok Tok) {
 	defer p.wg.Done()
-	if !param.Const && param.Reference && !val.lvalue {
+	if param.Reference && !val.lvalue {
 		p.pusherrtok(errTok, "not_lvalue_for_reference_param")
 	}
 	p.wg.Add(1)
 	go assignChecker{
-		p:        p,
-		constant: param.Const,
-		t:        param.Type,
-		v:        val,
-		errtok:   errTok,
+		p:      p,
+		t:      param.Type,
+		v:      val,
+		errtok: errTok,
 	}.checkAssignType()
 }
 

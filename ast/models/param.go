@@ -12,8 +12,6 @@ import (
 type Param struct {
 	Tok       Tok
 	Id        string
-	Const     bool
-	Volatile  bool
 	Variadic  bool
 	Reference bool
 	Type      DataType
@@ -51,12 +49,6 @@ func (p Param) String() string {
 // Prototype returns prototype cxx of parameter.
 func (p *Param) Prototype() string {
 	var cxx strings.Builder
-	if p.Volatile {
-		cxx.WriteString("volatile ")
-	}
-	if p.Const {
-		cxx.WriteString("const ")
-	}
 	if p.Variadic {
 		cxx.WriteString("slice<")
 		cxx.WriteString(p.Type.String())

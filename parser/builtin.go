@@ -223,21 +223,15 @@ var errorStruct = &xstruct{
 	Defs: &Defmap{
 		Globals: []*Var{
 			{
-				Pub:  true,
-				Id:   "message",
-				Type: DataType{Id: xtype.Str, Kind: tokens.STR},
+				Pub:   true,
+				Const: true,
+				Id:    "message",
+				Type:  DataType{Id: xtype.Str, Kind: tokens.STR},
 			},
 		},
 	},
 	constructor: &Func{
 		Pub: true,
-		Params: []Param{
-			{
-				Id:      "message",
-				Type:    DataType{Id: xtype.Str, Kind: tokens.STR},
-				Default: Expr{Model: exprNode{xtype.CxxTypeIdFromType(xtype.Str) + xapi.DefaultExpr}},
-			},
-		},
 	},
 }
 
@@ -253,9 +247,8 @@ var panicFunc = &function{
 		Id:  "panic",
 		Params: []models.Param{
 			{
-				Const: true,
-				Id:    "error",
-				Type:  errorType,
+				Id:   "error",
+				Type: errorType,
 			},
 		},
 	},
@@ -265,9 +258,8 @@ var errorHandlerFunc = &models.Func{
 	Id: "handler",
 	Params: []models.Param{
 		{
-			Const: true,
-			Id:    "error",
-			Type:  errorType,
+			Id:   "error",
+			Type: errorType,
 		},
 	},
 	RetType: models.RetType{
@@ -306,7 +298,6 @@ var Builtin = &Defmap{
 				Id:      "out",
 				RetType: RetType{Type: DataType{Id: xtype.Void, Kind: xtype.VoidTypeStr}},
 				Params: []Param{{
-					Const:   true,
 					Id:      "v",
 					Type:    DataType{Id: xtype.Any, Kind: tokens.ANY},
 					Default: Expr{Model: exprNode{`""`}},
@@ -319,7 +310,6 @@ var Builtin = &Defmap{
 				Id:      "outln",
 				RetType: RetType{Type: DataType{Id: xtype.Void, Kind: xtype.VoidTypeStr}},
 				Params: []Param{{
-					Const:   true,
 					Id:      "v",
 					Type:    DataType{Id: xtype.Any, Kind: tokens.ANY},
 					Default: Expr{Model: exprNode{`""`}},
@@ -547,13 +537,13 @@ var mapDefs = &Defmap{
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "has",
-			Params:  []Param{{Id: "key", Const: true}},
+			Params:  []Param{{Id: "key"}},
 			RetType: RetType{Type: DataType{Id: xtype.Bool, Kind: tokens.BOOL}},
 		}},
 		{Ast: &Func{
 			Pub:    true,
 			Id:     "del",
-			Params: []Param{{Id: "key", Const: true}},
+			Params: []Param{{Id: "key"}},
 		}},
 	},
 }
@@ -600,4 +590,11 @@ func init() {
 
 	errorStruct.constructor.Id = errorStruct.Ast.Id
 	errorStruct.constructor.RetType.Type = errorType
+	for _, field := range errorStruct.Defs.Globals {
+		var param Param
+		param.Id = field.Id
+		param.Type = field.Type
+		param.Default.Model = exprNode{xtype.CxxTypeIdFromType(param.Type.Id) + xapi.DefaultExpr}
+		errorStruct.constructor.Params = append(errorStruct.constructor.Params, param)
+	}
 }
