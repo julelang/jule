@@ -128,6 +128,7 @@ var Errors = map[string]string{
 	`pointer_reference`:                        `referencing cannot combined with pointer`,
 	`func_must_have_generics_if_has_attribute`: `function is must be have minimum one generic type if has @%s attribute`,
 	`func_cant_have_params_if_has_attribute`:   `function is cannot have parameter(s) if has @%s attribute`,
+	`const_volatile`:                           `constant cannot volatile`,
 	`error`:                                    `error: %s`,
 }
 

@@ -1081,6 +1081,9 @@ func (p *Parser) Var(v Var) *Var {
 		}
 	}
 	if v.Const {
+		if v.Volatile {
+			p.pusherrtok(v.IdTok, "const_volatile")
+		}
 		if !typeIsAllowForConst(v.Type) {
 			p.pusherrtok(v.IdTok, "invalid_type_for_const", v.Type.Kind)
 		}
