@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"github.com/the-xlang/xxc/ast/models"
 	"github.com/the-xlang/xxc/lex/tokens"
 	"github.com/the-xlang/xxc/pkg/xbits"
 	"github.com/the-xlang/xxc/pkg/xtype"
@@ -10,60 +9,60 @@ import (
 type solver struct {
 	p        *Parser
 	left     Toks
-	leftVal  models.Data
+	leftVal  value
 	right    Toks
-	rightVal models.Data
+	rightVal value
 	operator Tok
 }
 
-func (s *solver) ptr() (v models.Data) {
-	v.Tok = s.operator
-	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
+func (s *solver) ptr() (v value) {
+	v.data.Tok = s.operator
+	if !typesAreCompatible(s.leftVal.data.Type, s.rightVal.data.Type, true) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
-			s.rightVal.Type.Kind, s.leftVal.Type.Kind)
+			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
-	if !typeIsPtr(s.leftVal.Type) {
+	if !typeIsPtr(s.leftVal.data.Type) {
 		s.leftVal, s.rightVal = s.rightVal, s.leftVal
 	}
 	switch s.operator.Kind {
 	case tokens.PLUS, tokens.MINUS:
-		v.Type = s.leftVal.Type
+		v.data.Type = s.leftVal.data.Type
 	case tokens.EQUALS, tokens.NOT_EQUALS, tokens.LESS, tokens.GREAT,
 		tokens.GREAT_EQUAL, tokens.LESS_EQUAL:
-		v.Type.Id = xtype.Bool
-		v.Type.Kind = tokens.BOOL
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "pointer")
 	}
 	return
 }
 
-func (s *solver) enum() (v models.Data) {
-	if s.leftVal.Type.Id == xtype.Enum {
-		s.leftVal.Type = s.leftVal.Type.Tag.(*Enum).Type
+func (s *solver) enum() (v value) {
+	if typeIsEnum(s.leftVal.data.Type) {
+		s.leftVal.data.Type = s.leftVal.data.Type.Tag.(*Enum).Type
 	}
-	if s.rightVal.Type.Id == xtype.Enum {
-		s.rightVal.Type = s.rightVal.Type.Tag.(*Enum).Type
+	if typeIsEnum(s.rightVal.data.Type) {
+		s.rightVal.data.Type = s.rightVal.data.Type.Tag.(*Enum).Type
 	}
 	return s.solve()
 }
 
-func (s *solver) str() (v models.Data) {
-	v.Tok = s.operator
+func (s *solver) str() (v value) {
+	v.data.Tok = s.operator
 	// Not both string?
-	if s.leftVal.Type.Id != s.rightVal.Type.Id {
+	if s.leftVal.data.Type.Id != s.rightVal.data.Type.Id {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
-			s.leftVal.Type.Kind, s.rightVal.Type.Kind)
+			s.leftVal.data.Type.Kind, s.rightVal.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
 	case tokens.PLUS:
-		v.Type.Id = xtype.Str
-		v.Type.Kind = tokens.STR
+		v.data.Type.Id = xtype.Str
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
 	case tokens.EQUALS, tokens.NOT_EQUALS:
-		v.Type.Id = xtype.Bool
-		v.Type.Kind = tokens.BOOL
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
 			s.operator.Kind, tokens.STR)
@@ -71,29 +70,29 @@ func (s *solver) str() (v models.Data) {
 	return
 }
 
-func (s *solver) any() (v models.Data) {
-	v.Tok = s.operator
+func (s *solver) any() (v value) {
+	v.data.Tok = s.operator
 	switch s.operator.Kind {
 	case tokens.EQUALS, tokens.NOT_EQUALS:
-		v.Type.Id = xtype.Bool
-		v.Type.Kind = tokens.BOOL
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, tokens.ANY)
 	}
 	return
 }
 
-func (s *solver) bool() (v models.Data) {
-	v.Tok = s.operator
-	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
+func (s *solver) bool() (v value) {
+	v.data.Tok = s.operator
+	if !typesAreCompatible(s.leftVal.data.Type, s.rightVal.data.Type, true) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
-			s.rightVal.Type.Kind, s.leftVal.Type.Kind)
+			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
 	case tokens.EQUALS, tokens.NOT_EQUALS:
-		v.Type.Id = xtype.Bool
-		v.Type.Kind = tokens.BOOL
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
 			s.operator.Kind, tokens.BOOL)
@@ -101,23 +100,23 @@ func (s *solver) bool() (v models.Data) {
 	return
 }
 
-func (s *solver) float() (v models.Data) {
-	v.Tok = s.operator
-	if !xtype.IsNumericType(s.leftVal.Type.Id) ||
-		!xtype.IsNumericType(s.rightVal.Type.Id) {
+func (s *solver) float() (v value) {
+	v.data.Tok = s.operator
+	if !xtype.IsNumericType(s.leftVal.data.Type.Id) ||
+		!xtype.IsNumericType(s.rightVal.data.Type.Id) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
-			s.rightVal.Type.Kind, s.leftVal.Type.Kind)
+			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
 	case tokens.EQUALS, tokens.NOT_EQUALS, tokens.LESS, tokens.GREAT,
 		tokens.GREAT_EQUAL, tokens.LESS_EQUAL:
-		v.Type.Id = xtype.Bool
-		v.Type.Kind = tokens.BOOL
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
 	case tokens.PLUS, tokens.MINUS, tokens.STAR, tokens.SOLIDUS:
-		v.Type = s.leftVal.Type
-		if xtype.TypeGreaterThan(s.rightVal.Type.Id, v.Type.Id) {
-			v.Type = s.rightVal.Type
+		v.data.Type = s.leftVal.data.Type
+		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.rightVal.data.Type
 		}
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_float", s.operator.Kind)
@@ -125,30 +124,30 @@ func (s *solver) float() (v models.Data) {
 	return
 }
 
-func (s *solver) signed() (v models.Data) {
-	v.Tok = s.operator
-	if !xtype.IsNumericType(s.leftVal.Type.Id) ||
-		!xtype.IsNumericType(s.rightVal.Type.Id) {
+func (s *solver) signed() (v value) {
+	v.data.Tok = s.operator
+	if !xtype.IsNumericType(s.leftVal.data.Type.Id) ||
+		!xtype.IsNumericType(s.rightVal.data.Type.Id) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
-			s.rightVal.Type.Kind, s.leftVal.Type.Kind)
+			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
 	case tokens.EQUALS, tokens.NOT_EQUALS, tokens.LESS,
 		tokens.GREAT, tokens.GREAT_EQUAL, tokens.LESS_EQUAL:
-		v.Type.Id = xtype.Bool
-		v.Type.Kind = tokens.BOOL
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
 	case tokens.PLUS, tokens.MINUS, tokens.STAR, tokens.SOLIDUS,
 		tokens.PERCENT, tokens.AMPER, tokens.VLINE, tokens.CARET:
-		v.Type = s.leftVal.Type
-		if xtype.TypeGreaterThan(s.rightVal.Type.Id, v.Type.Id) {
-			v.Type = s.rightVal.Type
+		v.data.Type = s.leftVal.data.Type
+		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.rightVal.data.Type
 		}
 	case tokens.RSHIFT, tokens.LSHIFT:
-		v.Type = s.leftVal.Type
-		if !xtype.IsUnsignedNumericType(s.rightVal.Type.Id) &&
-			!checkIntBit(s.rightVal, xbits.BitsizeType(xtype.U64)) {
-			s.p.pusherrtok(s.rightVal.Tok, "bitshift_must_unsigned")
+		v.data.Type = s.leftVal.data.Type
+		if !xtype.IsUnsignedNumericType(s.rightVal.data.Type.Id) &&
+			!checkIntBit(s.rightVal.data, xbits.BitsizeType(xtype.U64)) {
+			s.p.pusherrtok(s.rightVal.data.Tok, "bitshift_must_unsigned")
 		}
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_int", s.operator.Kind)
@@ -156,29 +155,29 @@ func (s *solver) signed() (v models.Data) {
 	return
 }
 
-func (s *solver) unsigned() (v models.Data) {
-	v.Tok = s.operator
-	if !xtype.IsNumericType(s.leftVal.Type.Id) ||
-		!xtype.IsNumericType(s.rightVal.Type.Id) {
+func (s *solver) unsigned() (v value) {
+	v.data.Tok = s.operator
+	if !xtype.IsNumericType(s.leftVal.data.Type.Id) ||
+		!xtype.IsNumericType(s.rightVal.data.Type.Id) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
-			s.rightVal.Type.Kind, s.leftVal.Type.Kind)
+			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
 	case tokens.EQUALS, tokens.NOT_EQUALS, tokens.LESS,
 		tokens.GREAT, tokens.GREAT_EQUAL, tokens.LESS_EQUAL:
-		v.Type.Id = xtype.Bool
-		v.Type.Kind = tokens.BOOL
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
 	case tokens.PLUS, tokens.MINUS, tokens.STAR, tokens.SOLIDUS,
 		tokens.PERCENT, tokens.AMPER, tokens.VLINE, tokens.CARET:
-		v.Type = s.leftVal.Type
-		if xtype.TypeGreaterThan(s.rightVal.Type.Id, v.Type.Id) {
-			v.Type = s.rightVal.Type
+		v.data.Type = s.leftVal.data.Type
+		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.rightVal.data.Type
 		}
 	case tokens.RSHIFT, tokens.LSHIFT:
-		v.Type = s.leftVal.Type
-		if xtype.TypeGreaterThan(s.rightVal.Type.Id, v.Type.Id) {
-			v.Type = s.rightVal.Type
+		v.data.Type = s.leftVal.data.Type
+		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.rightVal.data.Type
 		}
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_uint", s.operator.Kind)
@@ -186,61 +185,62 @@ func (s *solver) unsigned() (v models.Data) {
 	return
 }
 
-func (s *solver) logical() (v models.Data) {
-	v.Tok = s.operator
-	v.Type.Id = xtype.Bool
-	v.Type.Kind = tokens.BOOL
-	if s.leftVal.Type.Id != xtype.Bool || s.rightVal.Type.Id != xtype.Bool {
+func (s *solver) logical() (v value) {
+	v.data.Tok = s.operator
+	v.data.Type.Id = xtype.Bool
+	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+	if s.leftVal.data.Type.Id != xtype.Bool || s.rightVal.data.Type.Id != xtype.Bool {
 		s.p.pusherrtok(s.operator, "logical_not_bool")
 	}
 	return
 }
 
-func (s *solver) array() (v models.Data) {
-	v.Tok = s.operator
-	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
+func (s *solver) array() (v value) {
+	v.data.Tok = s.operator
+	if !typesAreCompatible(s.leftVal.data.Type, s.rightVal.data.Type, true) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
-			s.rightVal.Type.Kind, s.leftVal.Type.Kind)
+			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
 	case tokens.EQUALS, tokens.NOT_EQUALS:
-		v.Type.Id = xtype.Bool
-		v.Type.Kind = tokens.BOOL
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, s.leftVal.Type.Kind)
+		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, s.leftVal.data.Type.Kind)
 	}
 	return
 }
 
-func (s *solver) slice() (v models.Data) {
-	v.Tok = s.operator
-	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, true) {
+func (s *solver) slice() (v value) {
+	v.data.Tok = s.operator
+	if !typesAreCompatible(s.leftVal.data.Type, s.rightVal.data.Type, true) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
-			s.rightVal.Type.Kind, s.leftVal.Type.Kind)
+			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
 	case tokens.EQUALS, tokens.NOT_EQUALS:
-		v.Type.Id = xtype.Bool
-		v.Type.Kind = tokens.BOOL
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, s.leftVal.Type.Kind)
+		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
+			s.operator.Kind, s.leftVal.data.Type.Kind)
 	}
 	return
 }
 
-func (s *solver) nil() (v models.Data) {
-	v.Tok = s.operator
-	if !typesAreCompatible(s.leftVal.Type, s.rightVal.Type, false) {
+func (s *solver) nil() (v value) {
+	v.data.Tok = s.operator
+	if !typesAreCompatible(s.leftVal.data.Type, s.rightVal.data.Type, false) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
-			s.rightVal.Type.Kind, s.leftVal.Type.Kind)
+			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
 	case tokens.NOT_EQUALS, tokens.EQUALS:
-		v.Type.Id = xtype.Bool
-		v.Type.Kind = tokens.BOOL
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
 			s.operator.Kind, tokens.NIL)
@@ -248,17 +248,17 @@ func (s *solver) nil() (v models.Data) {
 	return
 }
 
-func (s *solver) structure() (v models.Data) {
-	v.Tok = s.operator
-	if s.leftVal.Type.Kind != s.rightVal.Type.Kind {
+func (s *solver) structure() (v value) {
+	v.data.Tok = s.operator
+	if s.leftVal.data.Type.Kind != s.rightVal.data.Type.Kind {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
-			s.rightVal.Type.Kind, s.leftVal.Type.Kind)
+			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
 	case tokens.NOT_EQUALS, tokens.EQUALS:
-		v.Type.Id = xtype.Bool
-		v.Type.Kind = tokens.BOOL
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
 			s.operator.Kind, tokens.STRUCT)
@@ -279,10 +279,12 @@ func (s *solver) check() bool {
 	return true
 }
 
-func (s *solver) solve() (v models.Data) {
+func (s *solver) solve() (v value) {
 	defer func() {
-		if v.Type.Id == xtype.Void {
-			v.Type.Kind = xtype.VoidTypeStr
+		if typeIsVoid(v.data.Type) {
+			v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		} else {
+			v.constExpr = s.leftVal.constExpr && s.rightVal.constExpr
 		}
 	}()
 	if !s.check() {
@@ -293,32 +295,32 @@ func (s *solver) solve() (v models.Data) {
 		return s.logical()
 	}
 	switch {
-	case typeIsArray(s.leftVal.Type), typeIsArray(s.rightVal.Type):
+	case typeIsArray(s.leftVal.data.Type), typeIsArray(s.rightVal.data.Type):
 		return s.array()
-	case typeIsSlice(s.leftVal.Type), typeIsSlice(s.rightVal.Type):
+	case typeIsSlice(s.leftVal.data.Type), typeIsSlice(s.rightVal.data.Type):
 		return s.slice()
-	case typeIsPtr(s.leftVal.Type), typeIsPtr(s.rightVal.Type):
+	case typeIsPtr(s.leftVal.data.Type), typeIsPtr(s.rightVal.data.Type):
 		return s.ptr()
-	case typeIsEnum(s.leftVal.Type), typeIsEnum(s.rightVal.Type):
+	case typeIsEnum(s.leftVal.data.Type), typeIsEnum(s.rightVal.data.Type):
 		return s.enum()
-	case typeIsStruct(s.leftVal.Type), typeIsStruct(s.rightVal.Type):
+	case typeIsStruct(s.leftVal.data.Type), typeIsStruct(s.rightVal.data.Type):
 		return s.structure()
-	case s.leftVal.Type.Id == xtype.Nil, s.rightVal.Type.Id == xtype.Nil:
+	case s.leftVal.data.Type.Id == xtype.Nil, s.rightVal.data.Type.Id == xtype.Nil:
 		return s.nil()
-	case s.leftVal.Type.Id == xtype.Any, s.rightVal.Type.Id == xtype.Any:
+	case s.leftVal.data.Type.Id == xtype.Any, s.rightVal.data.Type.Id == xtype.Any:
 		return s.any()
-	case s.leftVal.Type.Id == xtype.Bool, s.rightVal.Type.Id == xtype.Bool:
+	case s.leftVal.data.Type.Id == xtype.Bool, s.rightVal.data.Type.Id == xtype.Bool:
 		return s.bool()
-	case s.leftVal.Type.Id == xtype.Str, s.rightVal.Type.Id == xtype.Str:
+	case s.leftVal.data.Type.Id == xtype.Str, s.rightVal.data.Type.Id == xtype.Str:
 		return s.str()
-	case xtype.IsFloatType(s.leftVal.Type.Id),
-		xtype.IsFloatType(s.rightVal.Type.Id):
+	case xtype.IsFloatType(s.leftVal.data.Type.Id),
+		xtype.IsFloatType(s.rightVal.data.Type.Id):
 		return s.float()
-	case xtype.IsUnsignedNumericType(s.leftVal.Type.Id),
-		xtype.IsUnsignedNumericType(s.rightVal.Type.Id):
+	case xtype.IsUnsignedNumericType(s.leftVal.data.Type.Id),
+		xtype.IsUnsignedNumericType(s.rightVal.data.Type.Id):
 		return s.unsigned()
-	case xtype.IsSignedNumericType(s.leftVal.Type.Id),
-		xtype.IsSignedNumericType(s.rightVal.Type.Id):
+	case xtype.IsSignedNumericType(s.leftVal.data.Type.Id),
+		xtype.IsSignedNumericType(s.rightVal.data.Type.Id):
 		return s.signed()
 	}
 	return

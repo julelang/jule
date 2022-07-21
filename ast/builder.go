@@ -595,7 +595,7 @@ func (b *Builder) funcPrototype(toks *Toks, anon bool) (f models.Func, ok bool) 
 		i++
 	}
 	f.RetType.Type.Id = xtype.Void
-	f.RetType.Type.Kind = xtype.VoidTypeStr
+	f.RetType.Type.Kind = xtype.TypeMap[f.RetType.Type.Id]
 	paramToks := b.getrange(&i, tokens.LPARENTHESES, tokens.RPARENTHESES, toks)
 	if len(paramToks) > 0 {
 		b.Params(&f, paramToks)
@@ -1205,7 +1205,7 @@ func (b *Builder) funcMultiTypeRet(toks Toks, i *int) (t models.RetType, ok bool
 func (b *Builder) FuncRetDataType(toks Toks, i *int) (t models.RetType, ok bool) {
 	defer func() { t.Type.Original = t.Type }()
 	t.Type.Id = xtype.Void
-	t.Type.Kind = xtype.VoidTypeStr
+	t.Type.Kind = xtype.TypeMap[t.Type.Id]
 	if *i >= len(toks) {
 		return
 	}
@@ -1664,7 +1664,7 @@ func (b *Builder) Var(toks Toks) (v models.Var) {
 	}
 	v.Id = v.IdTok.Kind
 	v.Type.Id = xtype.Void
-	v.Type.Kind = xtype.VoidTypeStr
+	v.Type.Kind = xtype.TypeMap[v.Type.Id]
 	// Skip type definer operator(':')
 	i++
 	if i >= len(toks) {

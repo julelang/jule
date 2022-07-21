@@ -265,7 +265,7 @@ var errorHandlerFunc = &models.Func{
 	RetType: models.RetType{
 		Type: models.DataType{
 			Id:   xtype.Void,
-			Kind: xtype.VoidTypeStr,
+			Kind: xtype.TypeMap[xtype.Void],
 		},
 	},
 }
@@ -294,9 +294,11 @@ var Builtin = &Defmap{
 		recoverFunc,
 		{
 			Ast: &Func{
-				Pub:     true,
-				Id:      "out",
-				RetType: RetType{Type: DataType{Id: xtype.Void, Kind: xtype.VoidTypeStr}},
+				Pub: true,
+				Id:  "out",
+				RetType: RetType{
+					Type: DataType{Id: xtype.Void, Kind: xtype.TypeMap[xtype.Void]},
+				},
 				Params: []Param{{
 					Id:      "v",
 					Type:    DataType{Id: xtype.Any, Kind: tokens.ANY},
@@ -306,9 +308,11 @@ var Builtin = &Defmap{
 		},
 		{
 			Ast: &Func{
-				Pub:     true,
-				Id:      "outln",
-				RetType: RetType{Type: DataType{Id: xtype.Void, Kind: xtype.VoidTypeStr}},
+				Pub: true,
+				Id:  "outln",
+				RetType: RetType{
+					Type: DataType{Id: xtype.Void, Kind: xtype.TypeMap[xtype.Void]},
+				},
 				Params: []Param{{
 					Id:      "v",
 					Type:    DataType{Id: xtype.Any, Kind: tokens.ANY},

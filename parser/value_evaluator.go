@@ -122,7 +122,7 @@ func (ve *valueEvaluator) varId(id string, variable *Var) (v value) {
 	v.data.Value = id
 	v.data.Type = variable.Type
 	v.constant = variable.Const
-	v.volatile = variable.Volatile
+	v.constExpr = v.constant
 	v.data.Tok = variable.IdTok
 	v.lvalue = true
 	if id == tokens.SELF && typeIsPtr(variable.Type) {

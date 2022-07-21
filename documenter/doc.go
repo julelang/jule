@@ -81,7 +81,7 @@ type document struct {
 }
 
 func ttoa(t models.DataType) string {
-	if t.Kind == xtype.VoidTypeStr {
+	if t.Kind == xtype.TypeMap[xtype.Void] {
 		return ""
 	}
 	return t.Kind

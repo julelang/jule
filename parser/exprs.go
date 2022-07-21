@@ -116,6 +116,8 @@ func checkFloatBit(v models.Data, bit int) bool {
 	return xbits.CheckBitFloat(v.Value, bit)
 }
 
+func validExprForConst(v value) bool { return v.constExpr }
+
 /*
 func defaultValueOfType(t DataType) string {
 	if typeIsNilCompatible(t) {

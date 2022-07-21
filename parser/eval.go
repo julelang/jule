@@ -12,6 +12,15 @@ import (
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
+type value struct {
+	data      models.Data
+	constant  bool
+	constExpr bool
+	lvalue    bool
+	variadic  bool
+	isType    bool
+}
+
 func isOperator(process Toks) bool {
 	return len(process) == 1 && process[0].Id == tokens.Operator
 }
@@ -51,7 +60,7 @@ func (e *eval) processes(processes []Toks) (v value, expr iExpr) {
 	defer func() {
 		if typeIsVoid(v.data.Type) {
 			v.data.Type.Id = xtype.Void
-			v.data.Type.Kind = xtype.VoidTypeStr
+			v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
 		}
 	}()
 	if processes == nil || e.hasError {
@@ -72,7 +81,7 @@ func (e *eval) processes(processes []Toks) (v value, expr iExpr) {
 		}
 		val, model := e.p.evalToks(process)
 		hasError = hasError || e.hasError
-		valProcesses[i] = []any{val.data, model}
+		valProcesses[i] = []any{val, model}
 	}
 	if hasError {
 		e.hasError = true
@@ -85,11 +94,11 @@ func (e *eval) valProcesses(exprs []any, processes []Toks) (v value, model iExpr
 	switch len(exprs) {
 	case 0:
 		v.data.Type.Id = xtype.Void
-		v.data.Type.Kind = xtype.VoidTypeStr
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
 		return
 	case 1:
 		expr := exprs[0].([]any)
-		v.data, model = expr[0].(models.Data), expr[1].(iExpr)
+		v, model = expr[0].(value), expr[1].(iExpr)
 		v.lvalue = typeIsLvalue(v.data.Type)
 		return
 	}
@@ -97,9 +106,9 @@ func (e *eval) valProcesses(exprs []any, processes []Toks) (v value, model iExpr
 	process := solver{p: e.p}
 	process.operator = processes[i][0]
 	left := exprs[i-1].([]any)
-	leftV, leftExpr := left[0].(models.Data), left[1].(iExpr)
+	leftV, leftExpr := left[0].(value), left[1].(iExpr)
 	right := exprs[i+1].([]any)
-	rightV, rightExpr := right[0].(models.Data), right[1].(iExpr)
+	rightV, rightExpr := right[0].(value), right[1].(iExpr)
 	process.left = processes[i-1]
 	process.leftVal = leftV
 	process.right = processes[i+1]
@@ -163,7 +172,7 @@ func (e *eval) nextOperator(processes []Toks) int {
 func (e *eval) single(tok Tok, m *exprModel) (v value, ok bool) {
 	eval := valueEvaluator{tok, m, e.p}
 	v.data.Type.Id = xtype.Void
-	v.data.Type.Kind = xtype.VoidTypeStr
+	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
 	v.data.Tok = tok
 	switch tok.Id {
 	case tokens.Value:
@@ -180,6 +189,7 @@ func (e *eval) single(tok Tok, m *exprModel) (v value, ok bool) {
 		default:
 			v = eval.numeric()
 		}
+		v.constExpr = true
 	case tokens.Id, tokens.Self:
 		v, ok = eval.id()
 	default:
@@ -325,9 +335,11 @@ func (e *eval) parenthesesRange(toks Toks, m *exprModel) (v value) {
 func (e *eval) process(toks Toks, m *exprModel) (v value) {
 	defer func() {
 		if typeIsVoid(v.data.Type) {
-			v.data.Type.Kind = xtype.VoidTypeStr
+			v.data.Type.Kind = xtype.TypeMap[xtype.Void]
+			v.constExpr = false
 		}
 	}()
+	v.constExpr = true
 	if len(toks) == 1 {
 		v, _ = e.single(toks[0], m)
 		return
@@ -482,7 +494,6 @@ func (e *eval) cast(v value, t DataType, errtok Tok) value {
 	v.data.Value = t.Kind
 	v.data.Type = t
 	v.constant = false
-	v.volatile = false
 	return v
 }
 
@@ -694,7 +705,7 @@ func (e *eval) typeId(toks Toks, m *exprModel) (v value) {
 	t, _, _ := e.p.typeById(tok.Kind)
 	if t == nil {
 		v.data.Type.Id = xtype.Void
-		v.data.Type.Kind = xtype.VoidTypeStr
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
 		return
 	}
 	toks = toks[1:]

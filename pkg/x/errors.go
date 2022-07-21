@@ -68,6 +68,7 @@ var Errors = map[string]string{
 	`missing_goto_label`:                       `missing label identifier for goto statement`,
 	`missing_argument_for`:                     `missing argument for %s parameter`,
 	`missing_generics`:                         `missing generics`,
+	`expr_not_const`:                           `expressions is not constant expression`,
 	`nil_for_autotype`:                         `nil is cannot use with auto-type definitions`,
 	`void_for_autotype`:                        `void data is cannot use for auto-type definitions`,
 	`rune_empty`:                               `rune is cannot empty`,

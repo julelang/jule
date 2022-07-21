@@ -991,10 +991,17 @@ func (p *Parser) Func(fast Func) {
 
 // ParseVariable parse X global variable.
 func (p *Parser) Global(vast Var) {
-	_, tok, m, _ := p.defById(vast.Id)
-	if tok.Id != tokens.NA && m == p.Defs {
+	def, _, _, _ := p.defById(vast.Id)
+	if def != nil {
 		p.pusherrtok(vast.IdTok, "exist_id", vast.Id)
 		return
+	} else {
+		for _, g := range p.waitingGlobals {
+			if vast.Id == g.Id {
+				p.pusherrtok(vast.IdTok, "exist_id", vast.Id)
+				return
+			}
+		}
 	}
 	vast.Desc = p.docText.String()
 	p.docText.Reset()
@@ -1021,6 +1028,8 @@ func (p *Parser) checkArrayType(t *DataType) {
 		exprSlice[1] = expr
 		if isConstNumeric(val.data.Value) {
 			exprSlice[0], _ = strconv.ParseUint(val.data.Value, 10, xtype.BitSize)
+		} else {
+			p.eval.pusherrtok(t.Tok, "expr_not_const")
 		}
 		p.wg.Add(1)
 		go assignChecker{
@@ -1074,6 +1083,9 @@ func (p *Parser) Var(v Var) *Var {
 	if v.Const {
 		if !typeIsAllowForConst(v.Type) {
 			p.pusherrtok(v.IdTok, "invalid_type_for_const", v.Type.Kind)
+		}
+		if !validExprForConst(val) {
+			p.eval.pusherrtok(v.IdTok, "expr_not_const")
 		}
 		if v.SetterTok.Id == tokens.NA {
 			p.pusherrtok(v.IdTok, "missing_const_value")
@@ -2465,12 +2477,12 @@ func (p *Parser) singleAssign(assign *models.Assign, exprs []value) {
 		solver := solver{
 			p:        p,
 			left:     left.Toks,
-			leftVal:  leftExpr.data,
+			leftVal:  leftExpr,
 			right:    right.Toks,
-			rightVal: val.data,
+			rightVal: val,
 			operator: assign.Setter,
 		}
-		val.data = solver.solve()
+		val = solver.solve()
 		assign.Setter.Kind += tokens.EQUAL
 	}
 	p.wg.Add(1)

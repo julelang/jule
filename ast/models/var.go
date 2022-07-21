@@ -34,7 +34,7 @@ func (v Var) String() string {
 		cxx.WriteString("volatile ")
 	}
 	if v.Const {
-		cxx.WriteString("const ")
+		cxx.WriteString("constexpr ")
 	}
 	cxx.WriteString(v.Type.String())
 	cxx.WriteByte(' ')
@@ -57,7 +57,7 @@ func (v *Var) FieldString() string {
 		cxx.WriteString("volatile ")
 	}
 	if v.Const {
-		cxx.WriteString("const ")
+		cxx.WriteString("constexpr ")
 	}
 	cxx.WriteString(v.Type.String())
 	cxx.WriteByte(' ')
