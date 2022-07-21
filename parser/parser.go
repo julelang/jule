@@ -2049,8 +2049,8 @@ func (p *Parser) statement(s *models.Statement, recover bool) bool {
 		}
 		t.Type, _ = p.realType(t.Type, true)
 		p.blockTypes = append(p.blockTypes, &t)
-	case models.Block:
-		p.checkNewBlock(&t)
+	case *models.Block:
+		p.checkNewBlock(t)
 		s.Data = t
 	case models.Defer:
 		p.deferredCall(&t)
