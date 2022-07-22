@@ -2841,6 +2841,26 @@ func (p *Parser) typeSourceIsStruct(s *xstruct, tag any, errTok Tok) (dt DataTyp
 	return dt, true
 }
 
+func (p *Parser) tokenizeDataType(id string) []Tok {
+	parts := strings.SplitN(id, tokens.DOUBLE_COLON, -1)
+	var toks []Tok
+	for i, part := range parts {
+		toks = append(toks, Tok{
+			Id:   tokens.Id,
+			Kind: part,
+			File: p.File,
+		})
+		if i%2 == 0 {
+			toks = append(toks, Tok{
+				Id:   tokens.DoubleColon,
+				Kind: tokens.DOUBLE_COLON,
+				File: p.File,
+			})
+		}
+	}
+	return toks
+}
+
 func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 	original := dt.Original
 	defer func() { ret.Original = original }()
@@ -2859,7 +2879,25 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 	case xtype.Id:
 		id, prefix := dt.KindId()
 		defer func() { ret.Kind = prefix + ret.Kind }()
-		def, _, _, _ := p.defById(id)
+		var def any
+		if strings.Contains(id, tokens.DOUBLE_COLON) { // Has namespace?
+			toks := p.tokenizeDataType(id)
+			defs := p.eval.getNsDefs(&toks, nil)
+			if defs == nil {
+				return
+			}
+			i, defs, t := defs.defById(toks[0].Kind, p.File)
+			switch t {
+			case 't':
+				def = defs.Types[i]
+			case 's':
+				def = defs.Structs[i]
+			case 'e':
+				def = defs.Enums[i]
+			}
+		} else {
+			def, _, _, _ = p.defById(id)
+		}
 		switch t := def.(type) {
 		case *Type:
 			t.Used = true

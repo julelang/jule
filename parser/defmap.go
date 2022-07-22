@@ -165,12 +165,14 @@ func (dm *Defmap) globalById(id string, f *File) (*Var, *Defmap, bool) {
 // 'f' -> function
 // 'e' -> enum
 // 's' -> struct
+// 't' -> type alias
 func (dm *Defmap) defById(id string, f *File) (int, *Defmap, byte) {
 	var finders = map[byte]func(string, *xio.File) (int, *Defmap, bool){
 		'g': dm.findGlobalById,
 		'f': dm.findFuncById,
 		'e': dm.findEnumById,
 		's': dm.findStructById,
+		't': dm.findTypeById,
 	}
 	for code, finder := range finders {
 		i, m, _ := finder(id, f)

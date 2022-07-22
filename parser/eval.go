@@ -814,9 +814,10 @@ type nsFind interface {
 	nsById(string, bool) *namespace
 }
 
-func (e *eval) nsSubId(toks Toks, m *exprModel) (v value) {
+func (e *eval) getNsDefs(toks *Toks, m *exprModel) *Defmap {
 	var prev nsFind = e.p
-	for i, tok := range toks {
+	var defs *Defmap
+	for i, tok := range *toks {
 		if (i+1)%2 != 0 {
 			if tok.Id != tokens.Id {
 				e.pusherrtok(tok, "invalid_syntax")
@@ -825,26 +826,38 @@ func (e *eval) nsSubId(toks Toks, m *exprModel) (v value) {
 			src := prev.nsById(tok.Kind, false)
 			if src == nil {
 				if i > 0 {
-					toks = toks[i:]
-					goto eval
+					*toks = (*toks)[i:]
+					return defs
 				}
 				e.pusherrtok(tok, "namespace_not_exist", tok.Kind)
-				return
+				return nil
 			}
 			prev = src.Defs
-			m.appendSubNode(exprNode{xapi.OutId(src.Id, src.Tok.File)})
+			defs = src.Defs
+			if m != nil {
+				m.appendSubNode(exprNode{xapi.OutId(src.Id, src.Tok.File)})
+			}
 			continue
 		}
 		switch tok.Id {
 		case tokens.DoubleColon:
-			m.appendSubNode(exprNode{tokens.DOUBLE_COLON})
+			if m != nil {
+				m.appendSubNode(exprNode{tokens.DOUBLE_COLON})
+			}
 		default:
-			goto eval
+			return defs
 		}
 	}
-eval:
+	return nil
+}
+
+func (e *eval) nsSubId(toks Toks, m *exprModel) (v value) {
+	nsDefs := e.getNsDefs(&toks, m)
+	if nsDefs == nil {
+		return
+	}
 	pdefs := e.p.Defs
-	e.p.Defs = prev.(*Defmap)
+	e.p.Defs = nsDefs
 	parent := e.p.Defs.parent
 	e.p.Defs.parent = nil
 	defer func() {

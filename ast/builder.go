@@ -942,12 +942,17 @@ func (b *Builder) DataType(toks Toks, i *int, arrays, err bool) (t models.DataTy
 			ok = true
 			goto ret
 		case tokens.Id:
+			dtv.WriteString(tok.Kind)
+			if *i+1 < len(toks) && toks[*i+1].Id == tokens.DoubleColon {
+				break
+			}
 			t.Id = xtype.Id
 			t.Tok = tok
-			dtv.WriteString(t.Tok.Kind)
 			b.idDataTypePartEnd(&t, &dtv, toks, i)
 			ok = true
 			goto ret
+		case tokens.DoubleColon:
+			dtv.WriteString(tok.Kind)
 		case tokens.Operator:
 			if tok.Kind == tokens.STAR {
 				dtv.WriteString(tok.Kind)

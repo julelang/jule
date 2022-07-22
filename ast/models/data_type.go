@@ -78,7 +78,12 @@ func (dt *DataType) KindId() (id, prefix string) {
 		}
 	}
 	runes = []rune(id)
-	for i, r := range runes {
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
+		if r == ':' && i+1 < len(runes) && runes[i+1] == ':' { // Namespace?
+			i++
+			continue
+		}
 		if r != '_' && !unicode.IsLetter(r) {
 			id = string(runes[:i])
 			break
