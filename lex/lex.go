@@ -139,9 +139,12 @@ func (l *Lex) resume() string {
 	for i, r := range runes {
 		if unicode.IsSpace(r) {
 			l.Pos++
-			if r == '\n' {
+			switch r {
+			case '\n':
 				l.Newln()
-			} else {
+			case '\t':
+				l.Column += 4
+			default:
 				l.Column++
 			}
 			continue
