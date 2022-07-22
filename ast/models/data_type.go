@@ -146,7 +146,7 @@ func (dt DataType) String() string {
 	case xtype.Func:
 		return dt.FuncString() + pointers
 	default:
-		return xtype.CxxTypeIdFromType(dt.Id) + pointers
+		return xtype.CxxId(dt.Id) + pointers
 	}
 }
 

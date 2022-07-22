@@ -15,6 +15,87 @@ type solver struct {
 	operator Tok
 }
 
+func setshift(v *value, right uint64) {
+	switch {
+	case right <= 6:
+		v.data.Type.Id = xtype.I8
+	case right <= 7:
+		v.data.Type.Id = xtype.U8
+	case right <= 14:
+		v.data.Type.Id = xtype.I16
+	case right <= 15:
+		v.data.Type.Id = xtype.U16
+	case right <= 30:
+		v.data.Type.Id = xtype.I32
+	case right <= 31:
+		v.data.Type.Id = xtype.U32
+	case right <= 62:
+		v.data.Type.Id = xtype.I64
+	case right <= 63:
+		v.data.Type.Id = xtype.U64
+	case right <= 127:
+		v.data.Type.Id = xtype.F32
+	default:
+		v.data.Type.Id = xtype.F64
+	}
+}
+
+func bitize(v *value) {
+	switch {
+	case xtype.IsSignedInteger(v.data.Type.Id):
+		v.expr = tonums(v.expr)
+	case xtype.IsUnsignedInteger(v.data.Type.Id):
+		v.expr = tonumu(v.expr)
+	}
+	switch t := v.expr.(type) {
+	case float64:
+		v.data.Type.Id = xtype.FloatFromBits(xbits.BitsizeFloat(t))
+	case int64:
+		v.data.Type.Id = xtype.IntFromBits(xbits.BitsizeInt(t))
+	case uint64:
+		v.data.Type.Id = xtype.UIntFromBits(xbits.BitsizeUInt(t))
+	default:
+		return
+	}
+	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+}
+
+func tonumf(expr any) float64 {
+	switch t := expr.(type) {
+	case float64:
+		return t
+	case int64:
+		return float64(t)
+	case uint64:
+		return float64(t)
+	}
+	return 0
+}
+
+func tonumu(expr any) uint64 {
+	switch t := expr.(type) {
+	case float64:
+		return uint64(t)
+	case int64:
+		return uint64(t)
+	case uint64:
+		return t
+	}
+	return 0
+}
+
+func tonums(expr any) int64 {
+	switch t := expr.(type) {
+	case float64:
+		return int64(t)
+	case int64:
+		return t
+	case uint64:
+		return int64(t)
+	}
+	return 0
+}
+
 func (s *solver) ptr() (v value) {
 	v.data.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.data.Type, s.rightVal.data.Type, true) {
@@ -60,9 +141,21 @@ func (s *solver) str() (v value) {
 	case tokens.PLUS:
 		v.data.Type.Id = xtype.Str
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-	case tokens.EQUALS, tokens.NOT_EQUALS:
+		if s.isConstExpr() {
+			v.expr = s.leftVal.expr.(string) + s.rightVal.expr.(string)
+		}
+	case tokens.EQUALS:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		if s.isConstExpr() {
+			v.expr = s.leftVal.expr.(string) == s.rightVal.expr.(string)
+		}
+	case tokens.NOT_EQUALS:
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		if s.isConstExpr() {
+			v.expr = s.leftVal.expr.(string) != s.rightVal.expr.(string)
+		}
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
 			s.operator.Kind, tokens.STR)
@@ -90,9 +183,18 @@ func (s *solver) bool() (v value) {
 		return
 	}
 	switch s.operator.Kind {
-	case tokens.EQUALS, tokens.NOT_EQUALS:
+	case tokens.EQUALS:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		if s.isConstExpr() {
+			v.expr = s.leftVal.expr.(bool) == s.rightVal.expr.(bool)
+		}
+	case tokens.NOT_EQUALS:
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		if s.isConstExpr() {
+			v.expr = s.leftVal.expr.(bool) != s.rightVal.expr.(bool)
+		}
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
 			s.operator.Kind, tokens.BOOL)
@@ -102,21 +204,85 @@ func (s *solver) bool() (v value) {
 
 func (s *solver) float() (v value) {
 	v.data.Tok = s.operator
-	if !xtype.IsNumericType(s.leftVal.data.Type.Id) ||
-		!xtype.IsNumericType(s.rightVal.data.Type.Id) {
+	if !xtype.IsNumeric(s.leftVal.data.Type.Id) ||
+		!xtype.IsNumeric(s.rightVal.data.Type.Id) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
-	case tokens.EQUALS, tokens.NOT_EQUALS, tokens.LESS, tokens.GREAT,
-		tokens.GREAT_EQUAL, tokens.LESS_EQUAL:
+	case tokens.EQUALS:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-	case tokens.PLUS, tokens.MINUS, tokens.STAR, tokens.SOLIDUS:
+		if s.isConstExpr() {
+			v.expr = tonumf(s.leftVal.expr) == tonumf(s.rightVal.expr)
+		}
+	case tokens.NOT_EQUALS:
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		if s.isConstExpr() {
+			v.expr = tonumf(s.leftVal.expr) != tonumf(s.rightVal.expr)
+		}
+	case tokens.LESS:
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		if s.isConstExpr() {
+			v.expr = tonumf(s.leftVal.expr) < tonumf(s.rightVal.expr)
+		}
+	case tokens.GREAT:
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		if s.isConstExpr() {
+			v.expr = tonumf(s.leftVal.expr) > tonumf(s.rightVal.expr)
+		}
+	case tokens.GREAT_EQUAL:
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		if s.isConstExpr() {
+			v.expr = tonumf(s.leftVal.expr) >= tonumf(s.rightVal.expr)
+		}
+	case tokens.LESS_EQUAL:
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		if s.isConstExpr() {
+			v.expr = tonumf(s.leftVal.expr) <= tonumf(s.rightVal.expr)
+		}
+	case tokens.PLUS:
 		v.data.Type = s.leftVal.data.Type
 		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
+		}
+		if s.isConstExpr() {
+			v.expr = tonumf(s.leftVal.expr) + tonumf(s.rightVal.expr)
+		}
+	case tokens.MINUS:
+		v.data.Type = s.leftVal.data.Type
+		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.rightVal.data.Type
+		}
+		if s.isConstExpr() {
+			v.expr = tonumf(s.leftVal.expr) - tonumf(s.rightVal.expr)
+		}
+	case tokens.STAR:
+		v.data.Type = s.leftVal.data.Type
+		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.rightVal.data.Type
+		}
+		if s.isConstExpr() {
+			v.expr = tonumf(s.leftVal.expr) * tonumf(s.rightVal.expr)
+		}
+	case tokens.SOLIDUS:
+		v.data.Type = s.leftVal.data.Type
+		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.rightVal.data.Type
+		}
+		if s.isConstExpr() {
+			right := tonumf(s.rightVal.expr)
+			if right != 0 {
+				v.expr = tonumf(s.leftVal.expr) / right
+			} else {
+				s.p.pusherrtok(s.operator, "divide_by_zero")
+			}
 		}
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_float", s.operator.Kind)
@@ -126,28 +292,139 @@ func (s *solver) float() (v value) {
 
 func (s *solver) signed() (v value) {
 	v.data.Tok = s.operator
-	if !xtype.IsNumericType(s.leftVal.data.Type.Id) ||
-		!xtype.IsNumericType(s.rightVal.data.Type.Id) {
+	if !xtype.IsNumeric(s.leftVal.data.Type.Id) ||
+		!xtype.IsNumeric(s.rightVal.data.Type.Id) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
-	case tokens.EQUALS, tokens.NOT_EQUALS, tokens.LESS,
-		tokens.GREAT, tokens.GREAT_EQUAL, tokens.LESS_EQUAL:
+	case tokens.EQUALS:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-	case tokens.PLUS, tokens.MINUS, tokens.STAR, tokens.SOLIDUS,
-		tokens.PERCENT, tokens.AMPER, tokens.VLINE, tokens.CARET:
+		if s.isConstExpr() {
+			v.expr = tonums(s.leftVal.expr) == tonums(s.rightVal.expr)
+		}
+	case tokens.NOT_EQUALS:
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		if s.isConstExpr() {
+			v.expr = tonums(s.leftVal.expr) != tonums(s.rightVal.expr)
+		}
+	case tokens.LESS:
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		if s.isConstExpr() {
+			v.expr = tonums(s.leftVal.expr) < tonums(s.rightVal.expr)
+		}
+	case tokens.GREAT:
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		if s.isConstExpr() {
+			v.expr = tonums(s.leftVal.expr) > tonums(s.rightVal.expr)
+		}
+	case tokens.GREAT_EQUAL:
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		if s.isConstExpr() {
+			v.expr = tonums(s.leftVal.expr) >= tonums(s.rightVal.expr)
+		}
+	case tokens.LESS_EQUAL:
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		if s.isConstExpr() {
+			v.expr = tonums(s.leftVal.expr) <= tonums(s.rightVal.expr)
+		}
+	case tokens.PLUS:
 		v.data.Type = s.leftVal.data.Type
 		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
-	case tokens.RSHIFT, tokens.LSHIFT:
+		if s.isConstExpr() {
+			v.expr = tonums(s.leftVal.expr) + tonums(s.rightVal.expr)
+		}
+	case tokens.MINUS:
 		v.data.Type = s.leftVal.data.Type
-		if !xtype.IsUnsignedNumericType(s.rightVal.data.Type.Id) &&
-			!checkIntBit(s.rightVal.data, xbits.BitsizeType(xtype.U64)) {
-			s.p.pusherrtok(s.rightVal.data.Tok, "bitshift_must_unsigned")
+		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.rightVal.data.Type
+		}
+		if s.isConstExpr() {
+			v.expr = tonums(s.leftVal.expr) - tonums(s.rightVal.expr)
+		}
+	case tokens.STAR:
+		v.data.Type = s.leftVal.data.Type
+		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.rightVal.data.Type
+		}
+		if s.isConstExpr() {
+			v.expr = tonums(s.leftVal.expr) * tonums(s.rightVal.expr)
+		}
+	case tokens.SOLIDUS:
+		v.data.Type = s.leftVal.data.Type
+		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.rightVal.data.Type
+		}
+		if s.isConstExpr() {
+			right := tonums(s.rightVal.expr)
+			if right != 0 {
+				v.expr = tonums(s.leftVal.expr) / right
+			} else {
+				s.p.pusherrtok(s.operator, "divide_by_zero")
+			}
+		}
+	case tokens.PERCENT:
+		v.data.Type = s.leftVal.data.Type
+		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.rightVal.data.Type
+		}
+		if s.isConstExpr() {
+			v.expr = tonums(s.leftVal.expr) % tonums(s.rightVal.expr)
+		}
+	case tokens.AMPER:
+		v.data.Type = s.leftVal.data.Type
+		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.rightVal.data.Type
+		}
+		if s.isConstExpr() {
+			v.expr = tonums(s.leftVal.expr) & tonums(s.rightVal.expr)
+		}
+	case tokens.VLINE:
+		v.data.Type = s.leftVal.data.Type
+		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.rightVal.data.Type
+		}
+		if s.isConstExpr() {
+			v.expr = tonums(s.leftVal.expr) | tonums(s.rightVal.expr)
+		}
+	case tokens.CARET:
+		v.data.Type = s.leftVal.data.Type
+		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.rightVal.data.Type
+		}
+		if s.isConstExpr() {
+			v.expr = tonums(s.leftVal.expr) ^ tonums(s.rightVal.expr)
+		}
+	case tokens.RSHIFT:
+		v.data.Type.Id = xtype.U64
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		if !okForShifting(s.rightVal) {
+			s.p.pusherrtok(s.operator, "bitshift_must_unsigned")
+		}
+		if s.isConstExpr() {
+			right := tonumu(s.rightVal.expr)
+			v.expr = tonums(s.leftVal.expr) >> right
+			setshift(&v, right)
+		}
+	case tokens.LSHIFT:
+		v.data.Type.Id = xtype.U64
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		if !okForShifting(s.rightVal) {
+			s.p.pusherrtok(s.operator, "bitshift_must_unsigned")
+		}
+		if s.isConstExpr() {
+			right := tonumu(s.rightVal.expr)
+			v.expr = tonums(s.leftVal.expr) << right
+			setshift(&v, right)
 		}
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_int", s.operator.Kind)
@@ -157,27 +434,139 @@ func (s *solver) signed() (v value) {
 
 func (s *solver) unsigned() (v value) {
 	v.data.Tok = s.operator
-	if !xtype.IsNumericType(s.leftVal.data.Type.Id) ||
-		!xtype.IsNumericType(s.rightVal.data.Type.Id) {
+	if !xtype.IsNumeric(s.leftVal.data.Type.Id) ||
+		!xtype.IsNumeric(s.rightVal.data.Type.Id) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
-	case tokens.EQUALS, tokens.NOT_EQUALS, tokens.LESS,
-		tokens.GREAT, tokens.GREAT_EQUAL, tokens.LESS_EQUAL:
+	case tokens.EQUALS:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-	case tokens.PLUS, tokens.MINUS, tokens.STAR, tokens.SOLIDUS,
-		tokens.PERCENT, tokens.AMPER, tokens.VLINE, tokens.CARET:
+		if s.isConstExpr() {
+			v.expr = tonumu(s.leftVal.expr) == tonumu(s.rightVal.expr)
+		}
+	case tokens.NOT_EQUALS:
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		if s.isConstExpr() {
+			v.expr = tonumu(s.leftVal.expr) != tonumu(s.rightVal.expr)
+		}
+	case tokens.LESS:
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		if s.isConstExpr() {
+			v.expr = tonumu(s.leftVal.expr) < tonumu(s.rightVal.expr)
+		}
+	case tokens.GREAT:
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		if s.isConstExpr() {
+			v.expr = tonumu(s.leftVal.expr) > tonumu(s.rightVal.expr)
+		}
+	case tokens.GREAT_EQUAL:
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		if s.isConstExpr() {
+			v.expr = tonumu(s.leftVal.expr) >= tonumu(s.rightVal.expr)
+		}
+	case tokens.LESS_EQUAL:
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		if s.isConstExpr() {
+			v.expr = tonumu(s.leftVal.expr) <= tonumu(s.rightVal.expr)
+		}
+	case tokens.PLUS:
 		v.data.Type = s.leftVal.data.Type
 		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
-	case tokens.RSHIFT, tokens.LSHIFT:
+		if s.isConstExpr() {
+			v.expr = tonumu(s.leftVal.expr) + tonumu(s.rightVal.expr)
+		}
+	case tokens.MINUS:
 		v.data.Type = s.leftVal.data.Type
 		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
+		}
+		if s.isConstExpr() {
+			v.expr = tonumu(s.leftVal.expr) - tonumu(s.rightVal.expr)
+		}
+	case tokens.STAR:
+		v.data.Type = s.leftVal.data.Type
+		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.rightVal.data.Type
+		}
+		if s.isConstExpr() {
+			v.expr = tonumu(s.leftVal.expr) * tonumu(s.rightVal.expr)
+		}
+	case tokens.SOLIDUS:
+		v.data.Type = s.leftVal.data.Type
+		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.rightVal.data.Type
+		}
+		if s.isConstExpr() {
+			right := tonumu(s.rightVal.expr)
+			if right != 0 {
+				v.expr = tonumu(s.leftVal.expr) / right
+			} else {
+				s.p.pusherrtok(s.operator, "divide_by_zero")
+			}
+		}
+	case tokens.PERCENT:
+		v.data.Type = s.leftVal.data.Type
+		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.rightVal.data.Type
+		}
+		if s.isConstExpr() {
+			v.expr = tonumu(s.leftVal.expr) % tonumu(s.rightVal.expr)
+		}
+	case tokens.AMPER:
+		v.data.Type = s.leftVal.data.Type
+		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.rightVal.data.Type
+		}
+		if s.isConstExpr() {
+			v.expr = tonumu(s.leftVal.expr) & tonumu(s.rightVal.expr)
+		}
+	case tokens.VLINE:
+		v.data.Type = s.leftVal.data.Type
+		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.rightVal.data.Type
+		}
+		if s.isConstExpr() {
+			v.expr = tonumu(s.leftVal.expr) | tonumu(s.rightVal.expr)
+		}
+	case tokens.CARET:
+		v.data.Type = s.leftVal.data.Type
+		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.rightVal.data.Type
+		}
+		if s.isConstExpr() {
+			v.expr = tonumu(s.leftVal.expr) ^ tonumu(s.rightVal.expr)
+		}
+	case tokens.RSHIFT:
+		v.data.Type.Id = xtype.U64
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		if !okForShifting(s.rightVal) {
+			s.p.pusherrtok(s.operator, "bitshift_must_unsigned")
+		}
+		if s.isConstExpr() {
+			right := tonumu(s.rightVal.expr)
+			v.expr = tonumu(s.leftVal.expr) >> right
+			setshift(&v, right)
+		}
+	case tokens.LSHIFT:
+		v.data.Type.Id = xtype.U64
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		if !okForShifting(s.rightVal) {
+			s.p.pusherrtok(s.operator, "bitshift_must_unsigned")
+		}
+		if s.isConstExpr() {
+			right := tonumu(s.rightVal.expr)
+			v.expr = tonumu(s.leftVal.expr) << right
+			setshift(&v, right)
 		}
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_uint", s.operator.Kind)
@@ -191,6 +580,16 @@ func (s *solver) logical() (v value) {
 	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
 	if s.leftVal.data.Type.Id != xtype.Bool || s.rightVal.data.Type.Id != xtype.Bool {
 		s.p.pusherrtok(s.operator, "logical_not_bool")
+		return
+	}
+	if !s.isConstExpr() {
+		return
+	}
+	switch s.operator.Kind {
+	case tokens.AND:
+		v.expr = s.leftVal.expr.(bool) && s.rightVal.expr.(bool)
+	case tokens.OR:
+		v.expr = s.leftVal.expr.(bool) || s.rightVal.expr.(bool)
 	}
 	return
 }
@@ -238,9 +637,18 @@ func (s *solver) nil() (v value) {
 		return
 	}
 	switch s.operator.Kind {
-	case tokens.NOT_EQUALS, tokens.EQUALS:
+	case tokens.NOT_EQUALS:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		if s.isConstExpr() {
+			v.expr = s.leftVal.expr != nil && s.rightVal.expr != nil
+		}
+	case tokens.EQUALS:
+		v.data.Type.Id = xtype.Bool
+		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		if s.isConstExpr() {
+			v.expr = s.leftVal.expr == nil && s.rightVal.expr == nil
+		}
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
 			s.operator.Kind, tokens.NIL)
@@ -279,12 +687,20 @@ func (s *solver) check() bool {
 	return true
 }
 
+func (s *solver) isConstExpr() bool {
+	return s.leftVal.constExpr && s.rightVal.constExpr
+}
+
 func (s *solver) solve() (v value) {
 	defer func() {
 		if typeIsVoid(v.data.Type) {
 			v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
 		} else {
-			v.constExpr = s.leftVal.constExpr && s.rightVal.constExpr
+			v.constExpr = s.isConstExpr()
+			if v.constExpr {
+				bitize(&v)
+				v.model = getModel(v)
+			}
 		}
 	}()
 	if !s.check() {
@@ -313,14 +729,14 @@ func (s *solver) solve() (v value) {
 		return s.bool()
 	case s.leftVal.data.Type.Id == xtype.Str, s.rightVal.data.Type.Id == xtype.Str:
 		return s.str()
-	case xtype.IsFloatType(s.leftVal.data.Type.Id),
-		xtype.IsFloatType(s.rightVal.data.Type.Id):
+	case xtype.IsFloat(s.leftVal.data.Type.Id),
+		xtype.IsFloat(s.rightVal.data.Type.Id):
 		return s.float()
-	case xtype.IsUnsignedNumericType(s.leftVal.data.Type.Id),
-		xtype.IsUnsignedNumericType(s.rightVal.data.Type.Id):
+	case xtype.IsUnsignedInteger(s.leftVal.data.Type.Id),
+		xtype.IsUnsignedInteger(s.rightVal.data.Type.Id):
 		return s.unsigned()
-	case xtype.IsSignedNumericType(s.leftVal.data.Type.Id),
-		xtype.IsSignedNumericType(s.rightVal.data.Type.Id):
+	case xtype.IsSignedNumeric(s.leftVal.data.Type.Id),
+		xtype.IsSignedNumeric(s.rightVal.data.Type.Id):
 		return s.signed()
 	}
 	return

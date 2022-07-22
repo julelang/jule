@@ -34,6 +34,7 @@ const (
 // TypeMap keep data type codes and kinds.
 var TypeMap = map[uint8]string{
 	Void:    VoidTypeStr,
+	Nil:     NilTypeStr,
 	I8:      tokens.I8,
 	I16:     tokens.I16,
 	I32:     tokens.I32,

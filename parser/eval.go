@@ -16,6 +16,8 @@ type value struct {
 	data      models.Data
 	constant  bool
 	constExpr bool
+	model     iExpr
+	expr      any
 	lvalue    bool
 	variadic  bool
 	isType    bool
@@ -56,7 +58,7 @@ func (e *eval) expr(expr Expr) (value, iExpr) {
 	return e.processes(processes)
 }
 
-func (e *eval) processes(processes []Toks) (v value, expr iExpr) {
+func (e *eval) processes(processes []Toks) (v value, model iExpr) {
 	defer func() {
 		if typeIsVoid(v.data.Type) {
 			v.data.Type.Id = xtype.Void
@@ -68,8 +70,11 @@ func (e *eval) processes(processes []Toks) (v value, expr iExpr) {
 	}
 	if len(processes) == 1 {
 		m := newExprModel(processes)
-		expr = m
+		model = m
 		v = e.process(processes[0], m)
+		if v.constExpr {
+			model = v.model
+		}
 		return
 	}
 	valProcesses := make([]any, len(processes))
@@ -100,6 +105,9 @@ func (e *eval) valProcesses(exprs []any, processes []Toks) (v value, model iExpr
 		expr := exprs[0].([]any)
 		v, model = expr[0].(value), expr[1].(iExpr)
 		v.lvalue = typeIsLvalue(v.data.Type)
+		if v.constExpr {
+			model = v.model
+		}
 		return
 	}
 	i := e.nextOperator(processes)
@@ -114,13 +122,19 @@ func (e *eval) valProcesses(exprs []any, processes []Toks) (v value, model iExpr
 	process.right = processes[i+1]
 	process.rightVal = rightV
 	val := process.solve()
-	expr := serieExpr{}
-	expr.exprs = make([]any, 5)
-	expr.exprs[0] = exprNode{tokens.LPARENTHESES}
-	expr.exprs[1] = leftExpr
-	expr.exprs[2] = exprNode{process.operator.Kind}
-	expr.exprs[3] = rightExpr
-	expr.exprs[4] = exprNode{tokens.RPARENTHESES}
+	var expr iExpr
+	if val.constExpr {
+		expr = val.model
+	} else {
+		sexpr := serieExpr{}
+		sexpr.exprs = make([]any, 5)
+		sexpr.exprs[0] = exprNode{tokens.LPARENTHESES}
+		sexpr.exprs[1] = leftExpr
+		sexpr.exprs[2] = exprNode{process.operator.Kind}
+		sexpr.exprs[3] = rightExpr
+		sexpr.exprs[4] = exprNode{tokens.RPARENTHESES}
+		expr = sexpr
+	}
 	processes = append(processes[:i-1], append([]Toks{{}}, processes[i+2:]...)...)
 	exprs = append(exprs[:i-1], append([]any{[]any{val, expr}}, exprs[i+2:]...)...)
 	return e.valProcesses(exprs, processes)
@@ -189,7 +203,6 @@ func (e *eval) single(tok Tok, m *exprModel) (v value, ok bool) {
 		default:
 			v = eval.numeric()
 		}
-		v.constExpr = true
 	case tokens.Id, tokens.Self:
 		v, ok = eval.id()
 	default:
@@ -425,6 +438,9 @@ func (e *eval) castExpr(dt DataType, exprToks Toks, m *exprModel, errTok Tok) va
 	m.appendSubNode(model)
 	m.appendSubNode(exprNode{tokens.RPARENTHESES})
 	val = e.cast(val, dt, errTok)
+	if val.constExpr {
+		val.model = m
+	}
 	return val
 }
 
@@ -509,9 +525,9 @@ func (e *eval) castSingle(t, vt DataType, errtok Tok) {
 		return
 	}
 	switch {
-	case xtype.IsIntegerType(t.Id):
+	case xtype.IsInteger(t.Id):
 		e.castInteger(t, vt, errtok)
-	case xtype.IsNumericType(t.Id):
+	case xtype.IsNumeric(t.Id):
 		e.castNumeric(t, vt, errtok)
 	default:
 		e.pusherrtok(errtok, "type_notsupports_casting", t.Kind)
@@ -542,14 +558,14 @@ func (e *eval) castInteger(t, vt DataType, errtok Tok) {
 			t.Id == xtype.Intptr || t.Id == xtype.UIntptr) {
 		return
 	}
-	if typeIsPure(vt) && xtype.IsNumericType(vt.Id) {
+	if typeIsPure(vt) && xtype.IsNumeric(vt.Id) {
 		return
 	}
 	e.pusherrtok(errtok, "type_notsupports_casting_to", vt.Kind, t.Kind)
 }
 
 func (e *eval) castNumeric(t, vt DataType, errtok Tok) {
-	if typeIsPure(vt) && xtype.IsNumericType(vt.Id) {
+	if typeIsPure(vt) && xtype.IsNumeric(vt.Id) {
 		return
 	}
 	e.pusherrtok(errtok, "type_notsupports_casting_to", vt.Kind, t.Kind)
@@ -559,7 +575,7 @@ func (e *eval) castPtr(vt DataType, errtok Tok) {
 	if typeIsPtr(vt) {
 		return
 	}
-	if typeIsPure(vt) && xtype.IsIntegerType(vt.Id) {
+	if typeIsPure(vt) && xtype.IsInteger(vt.Id) {
 		return
 	}
 	e.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
@@ -608,9 +624,16 @@ func (e *eval) xTypeSubId(dm *Defmap, idTok Tok, m *exprModel) (v value) {
 	switch t {
 	case 'g':
 		g := dm.Globals[i]
-		m.appendSubNode(exprNode{g.Tag.(string)})
 		v.data.Type = g.Type
 		v.constant = g.Const
+		v.constExpr = v.constant
+		if v.constExpr {
+			v.expr = g.ExprTag
+			v.model = g.Expr.Model
+			m.appendSubNode(v.model)
+		} else {
+			m.appendSubNode(exprNode{g.Tag.(string)})
+		}
 	}
 	return
 }
@@ -724,14 +747,14 @@ func (e *eval) xObjSubId(dm *Defmap, val value, idTok Tok, m *exprModel) (v valu
 	case 'g':
 		g := dm.Globals[i]
 		g.Used = true
+		v.data.Type = g.Type
+		v.lvalue = true
+		v.constant = g.Const
 		if g.Tag == nil {
 			m.appendSubNode(exprNode{xapi.OutId(g.Id, g.DefTok.File)})
 		} else {
 			m.appendSubNode(exprNode{g.Tag.(string)})
 		}
-		v.data.Type = g.Type
-		v.lvalue = true
-		v.constant = g.Const
 	case 'f':
 		f := dm.Funcs[i]
 		f.used = true
@@ -782,7 +805,9 @@ func (e *eval) structObjSubId(val value, idTok Tok, m *exprModel) value {
 	val.constant = false
 	val.lvalue = false
 	val.isType = false
-	return e.xObjSubId(s.Defs, val, idTok, m)
+	val = e.xObjSubId(s.Defs, val, idTok, m)
+	val.constExpr = false
+	return val
 }
 
 type nsFind interface {

@@ -19,6 +19,7 @@ type Var struct {
 	Volatile  bool
 	New       bool
 	Tag       any
+	ExprTag   any
 	Desc      string
 	Used      bool
 }
@@ -29,12 +30,12 @@ func (v *Var) OutId() string {
 }
 
 func (v Var) String() string {
+	if v.Const {
+		return ""
+	}
 	var cxx strings.Builder
 	if v.Volatile {
 		cxx.WriteString("volatile ")
-	}
-	if v.Const {
-		cxx.WriteString("constexpr ")
 	}
 	cxx.WriteString(v.Type.String())
 	cxx.WriteByte(' ')
@@ -57,7 +58,7 @@ func (v *Var) FieldString() string {
 		cxx.WriteString("volatile ")
 	}
 	if v.Const {
-		cxx.WriteString("constexpr ")
+		cxx.WriteString("const ")
 	}
 	cxx.WriteString(v.Type.String())
 	cxx.WriteByte(' ')

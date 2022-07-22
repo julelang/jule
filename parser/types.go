@@ -128,7 +128,11 @@ func subIdAccessorOfType(t DataType) string {
 }
 
 func typeIsNilCompatible(t DataType) bool {
-	return typeIsFunc(t) || typeIsPtr(t) || typeIsSlice(t) || typeIsMap(t)
+	return t.Id == xtype.Nil ||
+		typeIsFunc(t) ||
+		typeIsPtr(t) ||
+		typeIsSlice(t) ||
+		typeIsMap(t)
 }
 
 func checkSliceCompatiblity(arrT, t DataType) bool {
@@ -159,10 +163,10 @@ func typeIsLvalue(t DataType) bool {
 }
 
 func checkPtrCompability(t1, t2 DataType) bool {
-	if typeIsPtr(t2) {
+	if t2.Id == xtype.Nil || typeIsPtr(t2) {
 		return true
 	}
-	if typeIsPure(t2) && xtype.IsIntegerType(t2.Id) {
+	if typeIsPure(t2) && xtype.IsInteger(t2.Id) {
 		return true
 	}
 	return false

@@ -250,7 +250,7 @@ func (p *Parser) CxxPrototypes() string {
 func cxxGlobals(dm *Defmap) string {
 	var cxx strings.Builder
 	for _, g := range dm.Globals {
-		if g.Used && g.IdTok.Id != tokens.NA {
+		if !g.Const && g.Used && g.IdTok.Id != tokens.NA {
 			cxx.WriteString(g.String())
 			cxx.WriteByte('\n')
 		}
@@ -673,7 +673,7 @@ func (p *Parser) Enum(e Enum) {
 	e.Desc = p.docText.String()
 	p.docText.Reset()
 	e.Type, _ = p.realType(e.Type, true)
-	if !typeIsPure(e.Type) || !xtype.IsIntegerType(e.Type.Id) {
+	if !typeIsPure(e.Type) || !xtype.IsInteger(e.Type.Id) {
 		p.pusherrtok(e.Type.Tok, "invalid_type_source")
 		return
 	}
@@ -731,7 +731,6 @@ func (p *Parser) Enum(e Enum) {
 }
 
 func (p *Parser) pushField(s *xstruct, f *Var, i int) {
-	p.parseNonGenericType(s.Ast.Generics, &f.Type)
 	for _, cf := range s.Ast.Fields {
 		if f == cf {
 			break
@@ -741,9 +740,14 @@ func (p *Parser) pushField(s *xstruct, f *Var, i int) {
 			break
 		}
 	}
-	param := models.Param{Id: f.Id, Type: f.Type}
-	param.Default.Model = exprNode{xapi.DefaultExpr}
-	s.constructor.Params[i] = param
+	if len(s.Ast.Generics) == 0 {
+		p.parseField(s, &f, i)
+	} else {
+		p.parseNonGenericType(s.Ast.Generics, &f.Type)
+		param := models.Param{Id: f.Id, Type: f.Type}
+		param.Default.Model = exprNode{xapi.DefaultExpr}
+		s.constructor.Params[i] = param
+	}
 }
 
 func (p *Parser) parseFields(s *xstruct) {
@@ -1026,8 +1030,8 @@ func (p *Parser) checkArrayType(t *DataType) {
 		val, model := p.evalExpr(expr)
 		expr.Model = model
 		exprSlice[1] = expr
-		if isConstNumeric(val.data.Value) {
-			exprSlice[0], _ = strconv.ParseUint(val.data.Value, 10, xtype.BitSize)
+		if val.constExpr {
+			exprSlice[0] = tonumu(val.expr)
 		} else {
 			p.eval.pusherrtok(t.Tok, "expr_not_const")
 		}
@@ -1076,22 +1080,34 @@ func (p *Parser) Var(v Var) *Var {
 		} else {
 			p.eval.hasError = p.eval.hasError || val.data.Value == ""
 			v.Type = val.data.Type
+			if typeIsPure(v.Type) && xtype.IsInteger(v.Type.Id) {
+				dt := DataType{
+					Id:   xtype.I64,
+					Kind: xtype.TypeMap[xtype.I64],
+				}
+				if integerAssignable(dt, val) {
+					v.Type.Id = xtype.Int
+					v.Type.Kind = xtype.TypeMap[v.Type.Id]
+				}
+			}
 			p.checkValidityForAutoType(v.Type, v.SetterTok)
 			p.checkAssignConst(v.Const, v.Type, val, v.SetterTok)
 		}
 	}
 	if v.Const {
+		v.ExprTag = val.expr
 		if v.Volatile {
 			p.pusherrtok(v.IdTok, "const_volatile")
 		}
 		if !typeIsAllowForConst(v.Type) {
 			p.pusherrtok(v.IdTok, "invalid_type_for_const", v.Type.Kind)
 		}
-		if !validExprForConst(val) {
-			p.eval.pusherrtok(v.IdTok, "expr_not_const")
-		}
 		if v.SetterTok.Id == tokens.NA {
 			p.pusherrtok(v.IdTok, "missing_const_value")
+		} else {
+			if !validExprForConst(val) {
+				p.eval.pusherrtok(v.IdTok, "expr_not_const")
+			}
 		}
 	}
 	return &v
@@ -1620,8 +1636,10 @@ func (p *Parser) structConstructorInstance(as xstruct) *xstruct {
 	s.constructor.RetType.Type.Tag = s
 	s.Defs = new(Defmap)
 	*s.Defs = *as.Defs
-	for i := range s.Ast.Fields {
-		p.parseField(s, &s.Defs.Globals[i], i)
+	if len(as.Ast.Generics) > 0 { // Parse if has generics
+		for i := range s.Ast.Fields {
+			p.parseField(s, &s.Defs.Globals[i], i)
+		}
 	}
 	for i := range s.Defs.Funcs {
 		f := &s.Defs.Funcs[i]
@@ -2562,7 +2580,7 @@ func (p *Parser) suffix(assign *models.Assign, exprs []value) {
 	if typeIsPtr(val.data.Type) {
 		return
 	}
-	if typeIsPure(val.data.Type) && xtype.IsNumericType(val.data.Type.Id) {
+	if typeIsPure(val.data.Type) && xtype.IsNumeric(val.data.Type.Id) {
 		return
 	}
 	p.pusherrtok(assign.Setter, "operator_notfor_xtype", assign.Setter.Kind, val.data.Type.Kind)

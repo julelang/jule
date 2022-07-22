@@ -15,27 +15,56 @@ type unary struct {
 
 func (u *unary) minus() value {
 	v := u.p.eval.process(u.toks, u.model)
-	if !typeIsPure(v.data.Type) || !xtype.IsNumericType(v.data.Type.Id) {
+	if !typeIsPure(v.data.Type) || !xtype.IsNumeric(v.data.Type.Id) {
 		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.MINUS)
 	}
-	if isConstNumeric(v.data.Value) {
+	if v.constExpr {
 		v.data.Value = tokens.MINUS + v.data.Value
+		switch t := v.expr.(type) {
+		case float64:
+			v.expr = -t
+		case int64:
+			v.expr = -t
+		case uint64:
+			v.expr = -t
+		}
+		v.model = numericModel(v)
 	}
 	return v
 }
 
 func (u *unary) plus() value {
 	v := u.p.eval.process(u.toks, u.model)
-	if !typeIsPure(v.data.Type) || !xtype.IsNumericType(v.data.Type.Id) {
+	if !typeIsPure(v.data.Type) || !xtype.IsNumeric(v.data.Type.Id) {
 		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.PLUS)
+	}
+	if v.constExpr {
+		switch t := v.expr.(type) {
+		case float64:
+			v.expr = +t
+		case int64:
+			v.expr = +t
+		case uint64:
+			v.expr = +t
+		}
+		v.model = numericModel(v)
 	}
 	return v
 }
 
 func (u *unary) tilde() value {
 	v := u.p.eval.process(u.toks, u.model)
-	if !typeIsPure(v.data.Type) || !xtype.IsIntegerType(v.data.Type.Id) {
+	if !typeIsPure(v.data.Type) || !xtype.IsInteger(v.data.Type.Id) {
 		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.TILDE)
+	}
+	if v.constExpr {
+		switch t := v.expr.(type) {
+		case int64:
+			v.expr = ^t
+		case uint64:
+			v.expr = ^t
+		}
+		v.model = numericModel(v)
 	}
 	return v
 }
@@ -44,6 +73,9 @@ func (u *unary) logicalNot() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !isBoolExpr(v) {
 		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.EXCLAMATION)
+	} else if v.constExpr {
+		v.expr = !v.expr.(bool)
+		v.model = boolModel(v)
 	}
 	v.data.Type.Id = xtype.Bool
 	v.data.Type.Kind = tokens.BOOL
@@ -52,6 +84,7 @@ func (u *unary) logicalNot() value {
 
 func (u *unary) star() value {
 	v := u.p.eval.process(u.toks, u.model)
+	v.constExpr = false
 	v.lvalue = true
 	if !typeIsExplicitPtr(v.data.Type) {
 		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.STAR)
@@ -63,6 +96,7 @@ func (u *unary) star() value {
 
 func (u *unary) amper() value {
 	v := u.p.eval.process(u.toks, u.model)
+	v.constExpr = false
 	switch {
 	case typeIsFunc(v.data.Type):
 		mainNode := &u.model.nodes[u.model.index]

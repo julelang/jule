@@ -1,11 +1,12 @@
 package parser
 
 import (
+	"math/big"
+	"strconv"
 	"strings"
 
 	"github.com/the-xlang/xxc/lex/tokens"
 	"github.com/the-xlang/xxc/pkg/xapi"
-	"github.com/the-xlang/xxc/pkg/xbits"
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
@@ -15,17 +16,57 @@ type valueEvaluator struct {
 	p     *Parser
 }
 
+func strModel(v value) iExpr {
+	content := v.expr.(string)
+	if israwstr(content) {
+		return exprNode{xapi.ToRawStr([]byte(content))}
+	}
+	return exprNode{xapi.ToStr([]byte(content))}
+}
+
+func boolModel(v value) iExpr {
+	if v.expr.(bool) {
+		return exprNode{tokens.TRUE}
+	}
+	return exprNode{tokens.FALSE}
+}
+
+func getModel(v value) iExpr {
+	switch v.expr.(type) {
+	case string:
+		return strModel(v)
+	case bool:
+		return boolModel(v)
+	default:
+		return numericModel(v)
+	}
+}
+
+func numericModel(v value) iExpr {
+	cxxId := xtype.CxxId(v.data.Type.Id)
+	switch t := v.expr.(type) {
+	case uint64:
+		return exprNode{cxxId + "{" + strconv.FormatUint(t, 10) + "}"}
+	case int64:
+		return exprNode{cxxId + "{" + strconv.FormatInt(t, 10) + "}"}
+	case float64:
+		var bigf big.Float
+		_ = bigf.SetFloat64(t)
+		return exprNode{cxxId + "{" + bigf.String() + "}"}
+	}
+	return nil
+}
+
 func (ve *valueEvaluator) str() value {
 	var v value
+	v.constExpr = true
 	v.data.Value = ve.tok.Kind
 	v.data.Type.Id = xtype.Str
-	v.data.Type.Kind = tokens.STR
-	content := []byte(ve.tok.Kind[1 : len(ve.tok.Kind)-1])
-	if israwstr(ve.tok.Kind) {
-		ve.model.appendSubNode(exprNode{xapi.ToRawStr(content)})
-	} else {
-		ve.model.appendSubNode(exprNode{xapi.ToStr(content)})
-	}
+	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+	content := ve.tok.Kind[1 : len(ve.tok.Kind)-1]
+	v.expr = content
+	v.model = strModel(v)
+	ve.model.appendSubNode(v.model)
 	return v
 }
 
@@ -45,36 +86,44 @@ func toCharLiteral(kind string) (string, bool) {
 
 func (ve *valueEvaluator) char() value {
 	var v value
+	v.constExpr = true
 	v.data.Value = ve.tok.Kind
 	content, isByte := toCharLiteral(ve.tok.Kind)
 	if isByte {
 		v.data.Type.Id = xtype.U8
-		v.data.Type.Kind = tokens.U8
 		content = xapi.ToChar(content[0])
 	} else { // rune
 		v.data.Type.Id = xtype.I32
-		v.data.Type.Kind = tokens.I32
 		content = xapi.ToRune([]byte(content))
 	}
-	ve.model.appendSubNode(exprNode{content})
+	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+	v.expr, _ = strconv.ParseInt(content[2:], 16, 64)
+	v.model = exprNode{content}
+	ve.model.appendSubNode(v.model)
 	return v
 }
 
 func (ve *valueEvaluator) bool() value {
 	var v value
+	v.constExpr = true
 	v.data.Value = ve.tok.Kind
 	v.data.Type.Id = xtype.Bool
-	v.data.Type.Kind = tokens.BOOL
-	ve.model.appendSubNode(exprNode{ve.tok.Kind})
+	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+	v.expr = ve.tok.Kind == tokens.TRUE
+	v.model = boolModel(v)
+	ve.model.appendSubNode(v.model)
 	return v
 }
 
 func (ve *valueEvaluator) nil() value {
 	var v value
+	v.constExpr = true
 	v.data.Value = ve.tok.Kind
 	v.data.Type.Id = xtype.Nil
-	v.data.Type.Kind = xtype.NilTypeStr
-	ve.model.appendSubNode(exprNode{ve.tok.Kind})
+	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+	v.expr = nil
+	v.model = exprNode{ve.tok.Kind}
+	ve.model.appendSubNode(v.model)
 	return v
 }
 
@@ -83,24 +132,30 @@ func (ve *valueEvaluator) float() value {
 	v.data.Value = ve.tok.Kind
 	v.data.Type.Id = xtype.F64
 	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+	v.expr, _ = strconv.ParseFloat(v.data.Value, 64)
 	return v
 }
 
 func (ve *valueEvaluator) integer() value {
 	var v value
 	v.data.Value = ve.tok.Kind
-	intbit := xbits.BitsizeType(xtype.Int)
+	var bigint big.Int
 	switch {
 	case strings.HasPrefix(ve.tok.Kind, "0x"):
-		v.data.Type.Id = xtype.U64
-	case xbits.CheckBitInt(ve.tok.Kind, intbit):
-		v.data.Type.Id = xtype.Int
-	case intbit < xbits.MaxInt && xbits.CheckBitInt(ve.tok.Kind, xbits.MaxInt):
-		v.data.Type.Id = xtype.I64
+		_, _ = bigint.SetString(ve.tok.Kind[2:], 16)
+	case strings.HasPrefix(ve.tok.Kind, "0b"):
+		_, _ = bigint.SetString(ve.tok.Kind[2:], 2)
+	case ve.tok.Kind[0] == '0':
+		_, _ = bigint.SetString(ve.tok.Kind[1:], 8)
 	default:
-		v.data.Type.Id = xtype.U64
+		_, _ = bigint.SetString(ve.tok.Kind, 10)
 	}
-	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+	if bigint.IsInt64() {
+		v.expr = bigint.Int64()
+	} else {
+		v.expr = bigint.Uint64()
+	}
+	bitize(&v)
 	return v
 }
 
@@ -111,9 +166,9 @@ func (ve *valueEvaluator) numeric() value {
 	} else {
 		v = ve.integer()
 	}
-	cxxId := xtype.CxxTypeIdFromType(v.data.Type.Id)
-	node := exprNode{cxxId + "{" + ve.tok.Kind + "}"}
-	ve.model.appendSubNode(node)
+	v.constExpr = true
+	v.model = numericModel(v)
+	ve.model.appendSubNode(v.model)
 	return v
 }
 
@@ -127,6 +182,9 @@ func (ve *valueEvaluator) varId(id string, variable *Var) (v value) {
 	v.lvalue = true
 	if id == tokens.SELF && typeIsPtr(variable.Type) {
 		ve.model.appendSubNode(exprNode{xapi.CxxSelf})
+	} else if v.constExpr {
+		v.expr = variable.ExprTag
+		v.model = variable.Expr.Model
 	} else {
 		ve.model.appendSubNode(exprNode{xapi.OutId(id, variable.IdTok.File)})
 		ve.p.eval.hasError = ve.p.eval.hasError || typeIsVoid(v.data.Type)

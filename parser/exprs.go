@@ -99,6 +99,7 @@ func isConstExpression(v string) bool {
 	return isConstNumeric(v) || isstr(v) || ischar(v) || isnil(v) || isbool(v)
 }
 
+/*
 func checkIntBit(v models.Data, bit int) bool {
 	if bit == 0 {
 		return false
@@ -108,6 +109,7 @@ func checkIntBit(v models.Data, bit int) bool {
 	}
 	return xbits.CheckBitUInt(v.Value, bit)
 }
+*/
 
 func checkFloatBit(v models.Data, bit int) bool {
 	if bit == 0 {
@@ -116,7 +118,26 @@ func checkFloatBit(v models.Data, bit int) bool {
 	return xbits.CheckBitFloat(v.Value, bit)
 }
 
-func validExprForConst(v value) bool { return v.constExpr }
+func validExprForConst(v value) bool {
+	return v.constExpr
+}
+
+func okForShifting(v value) bool {
+	if !typeIsPure(v.data.Type) ||
+		!xtype.IsInteger(v.data.Type.Id) {
+		return false
+	}
+	if !v.constExpr {
+		return true
+	}
+	switch t := v.expr.(type) {
+	case int64:
+		return t >= 0
+	case uint64:
+		return true
+	}
+	return false
+}
 
 /*
 func defaultValueOfType(t DataType) string {

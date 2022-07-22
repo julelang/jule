@@ -54,13 +54,13 @@ func (fc *foreachChecker) checkKeyASize() {
 	keyA := &fc.profile.KeyA
 	if keyA.Type.Id == xtype.Void {
 		keyA.Type.Id = xtype.UInt
-		keyA.Type.Kind = xtype.CxxTypeIdFromType(keyA.Type.Id)
+		keyA.Type.Kind = xtype.CxxId(keyA.Type.Id)
 		return
 	}
 	var ok bool
 	keyA.Type, ok = fc.p.realType(keyA.Type, true)
 	if ok {
-		if !typeIsPure(keyA.Type) || !xtype.IsNumericType(keyA.Type.Id) {
+		if !typeIsPure(keyA.Type) || !xtype.IsNumeric(keyA.Type.Id) {
 			fc.p.pusherrtok(keyA.IdTok, "incompatible_datatype",
 				keyA.Type.Kind, xtype.NumericTypeStr)
 		}
@@ -102,7 +102,7 @@ func (fc *foreachChecker) str() {
 	}
 	runeType := DataType{
 		Id:   xtype.U8,
-		Kind: xtype.CxxTypeIdFromType(xtype.U8),
+		Kind: xtype.CxxId(xtype.U8),
 	}
 	keyB := &fc.profile.KeyB
 	if keyB.Type.Id == xtype.Void {

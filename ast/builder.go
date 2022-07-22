@@ -423,7 +423,7 @@ func (b *Builder) structFields(toks Toks) []*models.Var {
 			}
 			varToks = varToks[1:]
 		}
-		vast := b.Var(varToks)
+		vast := b.Var(varToks, false)
 		vast.Pub = pub
 		fields = append(fields, &vast)
 	}
@@ -1649,14 +1649,16 @@ func (b *Builder) varTypeNExpr(v *models.Var, toks Toks, i int) {
 }
 
 // Var builds AST model of variable statement.
-func (b *Builder) Var(toks Toks) (v models.Var) {
+func (b *Builder) Var(toks Toks, begin bool) (v models.Var) {
 	v.Pub = b.pub
 	b.pub = false
 	i := 0
 	v.DefTok = toks[i]
-	b.varBegin(&v, &i, toks)
-	if i >= len(toks) {
-		return
+	if begin {
+		b.varBegin(&v, &i, toks)
+		if i >= len(toks) {
+			return
+		}
 	}
 	v.IdTok = toks[i]
 	if v.IdTok.Id != tokens.Id {
@@ -1687,7 +1689,7 @@ func (b *Builder) Var(toks Toks) (v models.Var) {
 
 // VarStatement builds AST model of variable declaration statement.
 func (b *Builder) VarStatement(toks Toks) models.Statement {
-	vast := b.Var(toks)
+	vast := b.Var(toks, true)
 	return models.Statement{
 		Tok:  vast.IdTok,
 		Data: vast,

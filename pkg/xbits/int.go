@@ -1,6 +1,7 @@
 package xbits
 
 import (
+	"math"
 	"strconv"
 	"strings"
 )
@@ -44,4 +45,32 @@ func checkBit(val string, bit int, checker bitChecker) bool {
 		err = checker(val, 10, bit)
 	}
 	return err == nil
+}
+
+// BitsizeInt returns minimum bitsize of given value.
+func BitsizeInt(x int64) uint64 {
+	switch {
+	case x >= math.MinInt8 && x <= math.MaxInt8:
+		return 8
+	case x >= math.MinInt16 && x <= math.MaxInt16:
+		return 16
+	case x >= math.MinInt32 && x <= math.MaxInt32:
+		return 32
+	default:
+		return MaxInt
+	}
+}
+
+// BitsizeUInt returns minimum bitsize of given value.
+func BitsizeUInt(x uint64) uint64 {
+	switch {
+	case x <= math.MaxUint8:
+		return 8
+	case x <= math.MaxUint16:
+		return 16
+	case x <= math.MaxUint32:
+		return 32
+	default:
+		return MaxInt
+	}
 }

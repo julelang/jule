@@ -218,28 +218,28 @@ func TypesAreCompatible(t1, t2 uint8, ignoreany bool) bool {
 	return false
 }
 
-// IsIntegerType reports type is signed/unsigned integer or not.
-func IsIntegerType(t uint8) bool {
-	return IsSignedIntegerType(t) || IsUnsignedNumericType(t)
+// IsInteger reports type is signed/unsigned integer or not.
+func IsInteger(t uint8) bool {
+	return IsSignedInteger(t) || IsUnsignedInteger(t)
 }
 
-// IsNumericType reports type is numeric or not.
-func IsNumericType(t uint8) bool {
-	return IsIntegerType(t) || IsFloatType(t)
+// IsNumeric reports type is numeric or not.
+func IsNumeric(t uint8) bool {
+	return IsInteger(t) || IsFloat(t)
 }
 
-// IsFloatType reports type is float or not.
-func IsFloatType(t uint8) bool {
+// IsFloat reports type is float or not.
+func IsFloat(t uint8) bool {
 	return t == F32 || t == F64
 }
 
-// IsSignedNumericType reports type is signed numeric or not.
-func IsSignedNumericType(t uint8) bool {
-	return IsSignedIntegerType(t) || IsFloatType(t)
+// IsSignedNumeric reports type is signed numeric or not.
+func IsSignedNumeric(t uint8) bool {
+	return IsSignedInteger(t) || IsFloat(t)
 }
 
-// IsSignedIntegerType reports type is signed integer or not.
-func IsSignedIntegerType(t uint8) bool {
+// IsSignedInteger reports type is signed integer or not.
+func IsSignedInteger(t uint8) bool {
 	t = GetRealCode(t)
 	switch t {
 	case I8, I16, I32, I64, Int, Intptr:
@@ -249,8 +249,8 @@ func IsSignedIntegerType(t uint8) bool {
 	}
 }
 
-// IsUnsignedNumericType reports type is unsigned numeric or not.
-func IsUnsignedNumericType(t uint8) bool {
+// IsUnsignedInteger reports type is unsigned integer or not.
+func IsUnsignedInteger(t uint8) bool {
 	t = GetRealCode(t)
 	switch t {
 	case U8, U16, U32, U64, UInt, UIntptr:
@@ -270,8 +270,8 @@ func TypeFromId(id string) uint8 {
 	return 0
 }
 
-// CxxTypeIdFromType returns cxx output identifier of data-type.
-func CxxTypeIdFromType(t uint8) string {
+// CxxId returns cxx output identifier of data-type.
+func CxxId(t uint8) string {
 	if t == Void {
 		return "void"
 	}
@@ -290,7 +290,7 @@ func CxxTypeIdFromType(t uint8) string {
 //  DefaultValOfType(t) = "nil" if t is not have default value
 func DefaultValOfType(t uint8) string {
 	t = GetRealCode(t)
-	if IsNumericType(t) || t == Enum {
+	if IsNumeric(t) || t == Enum {
 		return "0"
 	}
 	switch t {
@@ -300,6 +300,44 @@ func DefaultValOfType(t uint8) string {
 		return `""`
 	}
 	return "nil"
+}
+
+// IntFromBits returns type code by bits.
+func IntFromBits(bits uint64) uint8 {
+	switch bits {
+	case 8:
+		return I8
+	case 16:
+		return I16
+	case 32:
+		return I32
+	default:
+		return I64
+	}
+}
+
+// UIntFromBits returns type code by bits.
+func UIntFromBits(bits uint64) uint8 {
+	switch bits {
+	case 8:
+		return U8
+	case 16:
+		return U16
+	case 32:
+		return U32
+	default:
+		return U64
+	}
+}
+
+// FloatFromBits returns type code by bits.
+func FloatFromBits(bits uint64) uint8 {
+	switch bits {
+	case 32:
+		return F32
+	default:
+		return F64
+	}
 }
 
 func init() {

@@ -1,6 +1,9 @@
 package parser
 
 import (
+	"math"
+	"strconv"
+
 	"github.com/the-xlang/xxc/ast/models"
 	"github.com/the-xlang/xxc/lex/tokens"
 	"github.com/the-xlang/xxc/pkg/x"
@@ -11,18 +14,24 @@ import (
 var i8statics = &Defmap{
 	Globals: []*Var{
 		{
-			Pub:   true,
-			Const: true,
-			Id:    "max",
-			Type:  DataType{Id: xtype.I8, Kind: tokens.I8},
-			Tag:   "INT8_MAX",
+			Pub:     true,
+			Const:   true,
+			Id:      "max",
+			Type:    DataType{Id: xtype.I8, Kind: tokens.I8},
+			ExprTag: int64(math.MaxInt8),
+			Expr: models.Expr{
+				Model: exprNode{xtype.CxxId(xtype.I8) + "{" + strconv.FormatInt(math.MaxInt8, 10) + "}"},
+			},
 		},
 		{
-			Pub:   true,
-			Const: true,
-			Id:    "min",
-			Type:  DataType{Id: xtype.I8, Kind: tokens.I8},
-			Tag:   "INT8_MIN",
+			Pub:     true,
+			Const:   true,
+			Id:      "min",
+			Type:    DataType{Id: xtype.I8, Kind: tokens.I8},
+			ExprTag: int64(math.MinInt8),
+			Expr: models.Expr{
+				Model: exprNode{xtype.CxxId(xtype.I8) + "{" + strconv.FormatInt(math.MinInt8, 10) + "}"},
+			},
 		},
 	},
 }
@@ -30,18 +39,24 @@ var i8statics = &Defmap{
 var i16statics = &Defmap{
 	Globals: []*Var{
 		{
-			Pub:   true,
-			Const: true,
-			Id:    "max",
-			Type:  DataType{Id: xtype.I16, Kind: tokens.I16},
-			Tag:   "INT16_MAX",
+			Pub:     true,
+			Const:   true,
+			Id:      "max",
+			Type:    DataType{Id: xtype.I16, Kind: tokens.I16},
+			ExprTag: int64(math.MaxInt16),
+			Expr: models.Expr{
+				Model: exprNode{xtype.CxxId(xtype.I16) + "{" + strconv.FormatInt(math.MaxInt16, 10) + "}"},
+			},
 		},
 		{
-			Pub:   true,
-			Const: true,
-			Id:    "min",
-			Type:  DataType{Id: xtype.I16, Kind: tokens.I16},
-			Tag:   "INT16_MIN",
+			Pub:     true,
+			Const:   true,
+			Id:      "min",
+			Type:    DataType{Id: xtype.I16, Kind: tokens.I16},
+			ExprTag: int64(math.MinInt16),
+			Expr: models.Expr{
+				Model: exprNode{xtype.CxxId(xtype.I16) + "{" + strconv.FormatInt(math.MinInt16, 10) + "}"},
+			},
 		},
 	},
 }
@@ -49,18 +64,24 @@ var i16statics = &Defmap{
 var i32statics = &Defmap{
 	Globals: []*Var{
 		{
-			Pub:   true,
-			Const: true,
-			Id:    "max",
-			Type:  DataType{Id: xtype.I32, Kind: tokens.I32},
-			Tag:   "INT32_MAX",
+			Pub:     true,
+			Const:   true,
+			Id:      "max",
+			Type:    DataType{Id: xtype.I32, Kind: tokens.I32},
+			ExprTag: int64(math.MaxInt32),
+			Expr: models.Expr{
+				Model: exprNode{xtype.CxxId(xtype.I32) + "{" + strconv.FormatInt(math.MaxInt32, 10) + "}"},
+			},
 		},
 		{
-			Pub:   true,
-			Const: true,
-			Id:    "min",
-			Type:  DataType{Id: xtype.I32, Kind: tokens.I32},
-			Tag:   "INT32_MIN",
+			Pub:     true,
+			Const:   true,
+			Id:      "min",
+			Type:    DataType{Id: xtype.I32, Kind: tokens.I32},
+			ExprTag: int64(math.MinInt32),
+			Expr: models.Expr{
+				Model: exprNode{xtype.CxxId(xtype.I32) + "{" + strconv.FormatInt(math.MinInt32, 10) + "}"},
+			},
 		},
 	},
 }
@@ -68,18 +89,24 @@ var i32statics = &Defmap{
 var i64statics = &Defmap{
 	Globals: []*Var{
 		{
-			Pub:   true,
-			Const: true,
-			Id:    "max",
-			Type:  DataType{Id: xtype.I64, Kind: tokens.I64},
-			Tag:   "INT64_MAX",
+			Pub:     true,
+			Const:   true,
+			Id:      "max",
+			Type:    DataType{Id: xtype.I64, Kind: tokens.I64},
+			ExprTag: int64(math.MaxInt64),
+			Expr: models.Expr{
+				Model: exprNode{xtype.CxxId(xtype.I64) + "{" + strconv.FormatInt(math.MaxInt64, 10) + "}"},
+			},
 		},
 		{
-			Pub:   true,
-			Const: true,
-			Id:    "min",
-			Type:  DataType{Id: xtype.I64, Kind: tokens.I64},
-			Tag:   "INT64_MIN",
+			Pub:     true,
+			Const:   true,
+			Id:      "min",
+			Type:    DataType{Id: xtype.I64, Kind: tokens.I64},
+			ExprTag: int64(math.MinInt64),
+			Expr: models.Expr{
+				Model: exprNode{xtype.CxxId(xtype.I64) + "{" + strconv.FormatInt(math.MinInt64, 10) + "}"},
+			},
 		},
 	},
 }
@@ -87,11 +114,14 @@ var i64statics = &Defmap{
 var u8statics = &Defmap{
 	Globals: []*Var{
 		{
-			Pub:   true,
-			Const: true,
-			Id:    "max",
-			Type:  DataType{Id: xtype.U8, Kind: tokens.U8},
-			Tag:   "UINT8_MAX",
+			Pub:     true,
+			Const:   true,
+			Id:      "max",
+			Type:    DataType{Id: xtype.U8, Kind: tokens.U8},
+			ExprTag: uint64(math.MaxUint8),
+			Expr: models.Expr{
+				Model: exprNode{xtype.CxxId(xtype.U8) + "{" + strconv.FormatUint(math.MaxUint8, 10) + "}"},
+			},
 		},
 	},
 }
@@ -99,11 +129,14 @@ var u8statics = &Defmap{
 var u16statics = &Defmap{
 	Globals: []*Var{
 		{
-			Pub:   true,
-			Const: true,
-			Id:    "max",
-			Type:  DataType{Id: xtype.U16, Kind: tokens.U16},
-			Tag:   "UINT16_MAX",
+			Pub:     true,
+			Const:   true,
+			Id:      "max",
+			Type:    DataType{Id: xtype.U16, Kind: tokens.U16},
+			ExprTag: uint64(math.MaxUint16),
+			Expr: models.Expr{
+				Model: exprNode{xtype.CxxId(xtype.U16) + "{" + strconv.FormatUint(math.MaxUint16, 10) + "}"},
+			},
 		},
 	},
 }
@@ -111,11 +144,14 @@ var u16statics = &Defmap{
 var u32statics = &Defmap{
 	Globals: []*Var{
 		{
-			Pub:   true,
-			Const: true,
-			Id:    "max",
-			Type:  DataType{Id: xtype.U32, Kind: tokens.U32},
-			Tag:   "UINT32_MAX",
+			Pub:     true,
+			Const:   true,
+			Id:      "max",
+			Type:    DataType{Id: xtype.U32, Kind: tokens.U32},
+			ExprTag: uint64(math.MaxUint32),
+			Expr: models.Expr{
+				Model: exprNode{xtype.CxxId(xtype.U32) + "{" + strconv.FormatUint(math.MaxUint32, 10) + "}"},
+			},
 		},
 	},
 }
@@ -123,11 +159,14 @@ var u32statics = &Defmap{
 var u64statics = &Defmap{
 	Globals: []*Var{
 		{
-			Pub:   true,
-			Const: true,
-			Id:    "max",
-			Type:  DataType{Id: xtype.U64, Kind: tokens.U64},
-			Tag:   "UINT64_MAX",
+			Pub:     true,
+			Const:   true,
+			Id:      "max",
+			Type:    DataType{Id: xtype.U64, Kind: tokens.U64},
+			ExprTag: uint64(math.MaxUint64),
+			Expr: models.Expr{
+				Model: exprNode{xtype.CxxId(xtype.U64) + "{" + strconv.FormatUint(math.MaxUint64, 10) + "}"},
+			},
 		},
 	},
 }
@@ -139,7 +178,6 @@ var uintStatics = &Defmap{
 			Const: true,
 			Id:    "max",
 			Type:  DataType{Id: xtype.UInt, Kind: tokens.UINT},
-			Tag:   "SIZE_MAX",
 		},
 	},
 }
@@ -159,40 +197,52 @@ var intStatics = &Defmap{
 	},
 }
 
+const f32min = float64(1.17549435082228750796873653722224568e-38)
+
+var f32min_model = exprNode{xtype.CxxId(xtype.F32) + "{1.17549435082228750796873653722224568e-38F}"}
+
 var f32statics = &Defmap{
 	Globals: []*Var{
 		{
-			Pub:   true,
-			Const: true,
-			Id:    "max",
-			Type:  DataType{Id: xtype.F32, Kind: tokens.F32},
-			Tag:   "__FLT_MAX__",
+			Pub:     true,
+			Const:   true,
+			Id:      "max",
+			Type:    DataType{Id: xtype.F32, Kind: tokens.F32},
+			ExprTag: float64(math.MaxFloat32),
+			Expr:    models.Expr{Model: exprNode{strconv.FormatFloat(math.MaxFloat32, 'e', -1, 32) + "F"}},
 		},
 		{
-			Pub:   true,
-			Const: true,
-			Id:    "min",
-			Type:  DataType{Id: xtype.F32, Kind: tokens.F32},
-			Tag:   "__FLT_MIN__",
+			Pub:     true,
+			Const:   true,
+			Id:      "min",
+			Type:    DataType{Id: xtype.F32, Kind: tokens.F32},
+			ExprTag: f32min,
+			Expr:    models.Expr{Model: f32min_model},
 		},
 	},
 }
 
+const f64min = float64(2.22507385850720138309023271733240406e-308)
+
+var f64min_model = exprNode{xtype.CxxId(xtype.F64) + "{2.22507385850720138309023271733240406e-308}"}
+
 var f64statics = &Defmap{
 	Globals: []*Var{
 		{
-			Pub:   true,
-			Const: true,
-			Id:    "max",
-			Type:  DataType{Id: xtype.F64, Kind: tokens.F64},
-			Tag:   "__DBL_MAX__",
+			Pub:     true,
+			Const:   true,
+			Id:      "max",
+			Type:    DataType{Id: xtype.F64, Kind: tokens.F64},
+			ExprTag: float64(math.MaxFloat64),
+			Expr:    models.Expr{Model: exprNode{strconv.FormatFloat(math.MaxFloat64, 'e', -1, 64)}},
 		},
 		{
-			Pub:   true,
-			Const: true,
-			Id:    "min",
-			Type:  DataType{Id: xtype.F64, Kind: tokens.F64},
-			Tag:   "__DBL_MIN__",
+			Pub:     true,
+			Const:   true,
+			Id:      "min",
+			Type:    DataType{Id: xtype.F64, Kind: tokens.F64},
+			ExprTag: f64min,
+			Expr:    models.Expr{Model: f64min_model},
 		},
 	},
 }
@@ -577,19 +627,40 @@ func readyMapDefs(mapt DataType) {
 func init() {
 	intMax := intStatics.Globals[0]
 	intMin := intStatics.Globals[1]
+	uintMax := uintStatics.Globals[0]
 	switch xtype.BitSize {
 	case 8:
-		intMax.Tag = i8statics.Globals[0].Tag
-		intMin.Tag = i8statics.Globals[1].Tag
+		intMax.Expr = i8statics.Globals[0].Expr
+		intMax.ExprTag = i8statics.Globals[0].ExprTag
+		intMin.Expr = i8statics.Globals[1].Expr
+		intMin.ExprTag = i8statics.Globals[1].ExprTag
+
+		uintMax.Expr = u8statics.Globals[0].Expr
+		uintMax.ExprTag = u8statics.Globals[0].ExprTag
 	case 16:
-		intMax.Tag = i16statics.Globals[0].Tag
-		intMin.Tag = i16statics.Globals[1].Tag
+		intMax.Expr = i16statics.Globals[0].Expr
+		intMax.ExprTag = i16statics.Globals[0].ExprTag
+		intMin.Expr = i16statics.Globals[1].Expr
+		intMin.ExprTag = i16statics.Globals[1].ExprTag
+
+		uintMax.Expr = u16statics.Globals[0].Expr
+		uintMax.ExprTag = u16statics.Globals[0].ExprTag
 	case 32:
-		intMax.Tag = i32statics.Globals[0].Tag
-		intMin.Tag = i32statics.Globals[1].Tag
+		intMax.Expr = i32statics.Globals[0].Expr
+		intMax.ExprTag = i32statics.Globals[0].ExprTag
+		intMin.Expr = i32statics.Globals[1].Expr
+		intMin.ExprTag = i32statics.Globals[1].ExprTag
+
+		uintMax.Expr = u32statics.Globals[0].Expr
+		uintMax.ExprTag = u32statics.Globals[0].ExprTag
 	case 64:
-		intMax.Tag = i64statics.Globals[0].Tag
-		intMin.Tag = i64statics.Globals[1].Tag
+		intMax.Expr = i64statics.Globals[0].Expr
+		intMax.ExprTag = i64statics.Globals[0].ExprTag
+		intMin.Expr = i64statics.Globals[1].Expr
+		intMin.ExprTag = i64statics.Globals[1].ExprTag
+
+		uintMax.Expr = u64statics.Globals[0].Expr
+		uintMax.ExprTag = u64statics.Globals[0].ExprTag
 	}
 
 	errorStruct.constructor.Id = errorStruct.Ast.Id
@@ -598,7 +669,7 @@ func init() {
 		var param Param
 		param.Id = field.Id
 		param.Type = field.Type
-		param.Default.Model = exprNode{xtype.CxxTypeIdFromType(param.Type.Id) + xapi.DefaultExpr}
+		param.Default.Model = exprNode{xtype.CxxId(param.Type.Id) + xapi.DefaultExpr}
 		errorStruct.constructor.Params = append(errorStruct.constructor.Params, param)
 	}
 }
