@@ -6,15 +6,6 @@ import (
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
-type solver struct {
-	p        *Parser
-	left     Toks
-	leftVal  value
-	right    Toks
-	rightVal value
-	operator Tok
-}
-
 func setshift(v *value, right uint64) {
 	switch {
 	case right <= 6:
@@ -96,6 +87,285 @@ func tonums(expr any) int64 {
 	return 0
 }
 
+type solver struct {
+	p        *Parser
+	left     Toks
+	leftVal  value
+	right    Toks
+	rightVal value
+	operator Tok
+}
+
+func (s *solver) eq(v *value) {
+	if !s.isConstExpr() {
+		return
+	}
+	switch left := s.leftVal.expr.(type) {
+	case bool:
+		v.expr = left == s.rightVal.expr.(bool)
+	case string:
+		v.expr = left == s.rightVal.expr.(string)
+	case float64:
+		v.expr = left == tonumf(s.rightVal.expr)
+	case int64:
+		v.expr = left == tonums(s.rightVal.expr)
+	case uint64:
+		v.expr = left == tonumu(s.rightVal.expr)
+	}
+}
+
+func (s *solver) noteq(v *value) {
+	if !s.isConstExpr() {
+		return
+	}
+	s.eq(v)
+	v.expr = !v.expr.(bool)
+}
+
+func (s *solver) lt(v *value) {
+	if !s.isConstExpr() {
+		return
+	}
+	switch left := s.leftVal.expr.(type) {
+	case float64:
+		v.expr = left < tonumf(s.rightVal.expr)
+	case int64:
+		v.expr = left < tonums(s.rightVal.expr)
+	case uint64:
+		v.expr = left < tonumu(s.rightVal.expr)
+	}
+}
+
+func (s *solver) gt(v *value) {
+	if !s.isConstExpr() {
+		return
+	}
+	switch left := s.leftVal.expr.(type) {
+	case float64:
+		v.expr = left > tonumf(s.rightVal.expr)
+	case int64:
+		v.expr = left > tonums(s.rightVal.expr)
+	case uint64:
+		v.expr = left > tonumu(s.rightVal.expr)
+	}
+}
+
+func (s *solver) lteq(v *value) {
+	if !s.isConstExpr() {
+		return
+	}
+	switch left := s.leftVal.expr.(type) {
+	case float64:
+		v.expr = left <= tonumf(s.rightVal.expr)
+	case int64:
+		v.expr = left <= tonums(s.rightVal.expr)
+	case uint64:
+		v.expr = left <= tonumu(s.rightVal.expr)
+	}
+}
+
+func (s *solver) gteq(v *value) {
+	if !s.isConstExpr() {
+		return
+	}
+	switch left := s.leftVal.expr.(type) {
+	case float64:
+		v.expr = left >= tonumf(s.rightVal.expr)
+	case int64:
+		v.expr = left >= tonums(s.rightVal.expr)
+	case uint64:
+		v.expr = left >= tonumu(s.rightVal.expr)
+	}
+}
+
+func (s *solver) add(v *value) {
+	if !s.isConstExpr() {
+		return
+	}
+	switch left := s.leftVal.expr.(type) {
+	case string:
+		v.expr = left + s.rightVal.expr.(string)
+	case float64:
+		v.expr = left + tonumf(s.rightVal.expr)
+	case int64:
+		v.expr = int64(float64(left) + tonumf(s.rightVal.expr))
+	case uint64:
+		v.expr = uint64(float64(left) + tonumf(s.rightVal.expr))
+	}
+}
+
+func (s *solver) sub(v *value) {
+	if !s.isConstExpr() {
+		return
+	}
+	switch left := s.leftVal.expr.(type) {
+	case float64:
+		v.expr = left - tonumf(s.rightVal.expr)
+	case int64:
+		v.expr = int64(float64(left) - tonumf(s.rightVal.expr))
+	case uint64:
+		v.expr = uint64(float64(left) - tonumf(s.rightVal.expr))
+	}
+}
+
+func (s *solver) mul(v *value) {
+	if !s.isConstExpr() {
+		return
+	}
+	switch left := s.leftVal.expr.(type) {
+	case float64:
+		v.expr = left * tonumf(s.rightVal.expr)
+	case int64:
+		v.expr = int64(float64(left) * tonumf(s.rightVal.expr))
+	case uint64:
+		v.expr = uint64(float64(left) * tonumf(s.rightVal.expr))
+	}
+}
+
+func (s *solver) div(v *value) {
+	if !s.isConstExpr() {
+		return
+	}
+	switch left := s.leftVal.expr.(type) {
+	case float64:
+		right := tonumf(s.rightVal.expr)
+		if right != 0 {
+			v.expr = left / right
+		} else {
+			s.p.pusherrtok(s.operator, "divide_by_zero")
+			v.expr = float64(0)
+		}
+	case int64:
+		right := tonumf(s.rightVal.expr)
+		if right != 0 {
+			v.expr = int64(float64(left) / right)
+		} else {
+			s.p.pusherrtok(s.operator, "divide_by_zero")
+			v.expr = int64(0)
+		}
+	case uint64:
+		right := tonumf(s.rightVal.expr)
+		if right != 0 {
+			v.expr = uint64(float64(left) / right)
+		} else {
+			s.p.pusherrtok(s.operator, "divide_by_zero")
+			v.expr = uint64(0)
+		}
+	}
+}
+
+func (s *solver) mod(v *value) {
+	if !s.isConstExpr() {
+		return
+	}
+	switch left := s.leftVal.expr.(type) {
+	case int64:
+		right := tonums(s.rightVal.expr)
+		if right != 0 {
+			v.expr = left % right
+		} else {
+			s.p.pusherrtok(s.operator, "divide_by_zero")
+			v.expr = int64(0)
+		}
+	case uint64:
+		right := tonumu(s.rightVal.expr)
+		if right != 0 {
+			v.expr = left % right
+		} else {
+			s.p.pusherrtok(s.operator, "divide_by_zero")
+			v.expr = uint64(0)
+		}
+	}
+}
+
+func (s *solver) bitwiseAnd(v *value) {
+	if !s.isConstExpr() {
+		return
+	}
+	switch left := s.leftVal.expr.(type) {
+	case int64:
+		v.expr = left & tonums(s.rightVal.expr)
+	case uint64:
+		v.expr = left & tonumu(s.rightVal.expr)
+	}
+}
+
+func (s *solver) bitwiseOr(v *value) {
+	if !s.isConstExpr() {
+		return
+	}
+	switch left := s.leftVal.expr.(type) {
+	case int64:
+		v.expr = left | tonums(s.rightVal.expr)
+	case uint64:
+		v.expr = left | tonumu(s.rightVal.expr)
+	}
+}
+
+func (s *solver) bitwiseXor(v *value) {
+	if !s.isConstExpr() {
+		return
+	}
+	switch left := s.leftVal.expr.(type) {
+	case int64:
+		v.expr = left ^ tonums(s.rightVal.expr)
+	case uint64:
+		v.expr = left ^ tonumu(s.rightVal.expr)
+	}
+}
+
+func (s *solver) rshift(v *value) {
+	if !s.isConstExpr() {
+		return
+	}
+	switch left := s.leftVal.expr.(type) {
+	case int64:
+		right := tonumu(s.rightVal.expr)
+		v.expr = left >> right
+		setshift(v, right)
+	case uint64:
+		right := tonumu(s.rightVal.expr)
+		v.expr = left >> right
+		setshift(v, right)
+	}
+}
+
+func (s *solver) lshift(v *value) {
+	if !s.isConstExpr() {
+		return
+	}
+	switch left := s.leftVal.expr.(type) {
+	case int64:
+		right := tonumu(s.rightVal.expr)
+		v.expr = left << right
+		setshift(v, right)
+	case uint64:
+		right := tonumu(s.rightVal.expr)
+		v.expr = left << right
+		setshift(v, right)
+	}
+}
+
+func (s *solver) and(v *value) {
+	if !s.isConstExpr() {
+		return
+	}
+	switch left := s.leftVal.expr.(type) {
+	case bool:
+		v.expr = left && s.rightVal.expr.(bool)
+	}
+}
+
+func (s *solver) or(v *value) {
+	if !s.isConstExpr() {
+		return
+	}
+	switch left := s.leftVal.expr.(type) {
+	case bool:
+		v.expr = left || s.rightVal.expr.(bool)
+	}
+}
+
 func (s *solver) ptr() (v value) {
 	v.data.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.data.Type, s.rightVal.data.Type, true) {
@@ -141,21 +411,15 @@ func (s *solver) str() (v value) {
 	case tokens.PLUS:
 		v.data.Type.Id = xtype.Str
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-		if s.isConstExpr() {
-			v.expr = s.leftVal.expr.(string) + s.rightVal.expr.(string)
-		}
+		s.add(&v)
 	case tokens.EQUALS:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-		if s.isConstExpr() {
-			v.expr = s.leftVal.expr.(string) == s.rightVal.expr.(string)
-		}
+		s.eq(&v)
 	case tokens.NOT_EQUALS:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-		if s.isConstExpr() {
-			v.expr = s.leftVal.expr.(string) != s.rightVal.expr.(string)
-		}
+		s.noteq(&v)
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
 			s.operator.Kind, tokens.STR)
@@ -186,15 +450,11 @@ func (s *solver) bool() (v value) {
 	case tokens.EQUALS:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-		if s.isConstExpr() {
-			v.expr = s.leftVal.expr.(bool) == s.rightVal.expr.(bool)
-		}
+		s.eq(&v)
 	case tokens.NOT_EQUALS:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-		if s.isConstExpr() {
-			v.expr = s.leftVal.expr.(bool) != s.rightVal.expr.(bool)
-		}
+		s.noteq(&v)
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
 			s.operator.Kind, tokens.BOOL)
@@ -214,76 +474,51 @@ func (s *solver) float() (v value) {
 	case tokens.EQUALS:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-		if s.isConstExpr() {
-			v.expr = tonumf(s.leftVal.expr) == tonumf(s.rightVal.expr)
-		}
+		s.eq(&v)
 	case tokens.NOT_EQUALS:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-		if s.isConstExpr() {
-			v.expr = tonumf(s.leftVal.expr) != tonumf(s.rightVal.expr)
-		}
+		s.noteq(&v)
 	case tokens.LESS:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-		if s.isConstExpr() {
-			v.expr = tonumf(s.leftVal.expr) < tonumf(s.rightVal.expr)
-		}
+		s.lt(&v)
 	case tokens.GREAT:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-		if s.isConstExpr() {
-			v.expr = tonumf(s.leftVal.expr) > tonumf(s.rightVal.expr)
-		}
+		s.gt(&v)
 	case tokens.GREAT_EQUAL:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-		if s.isConstExpr() {
-			v.expr = tonumf(s.leftVal.expr) >= tonumf(s.rightVal.expr)
-		}
+		s.gteq(&v)
 	case tokens.LESS_EQUAL:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-		if s.isConstExpr() {
-			v.expr = tonumf(s.leftVal.expr) <= tonumf(s.rightVal.expr)
-		}
+		s.lteq(&v)
 	case tokens.PLUS:
 		v.data.Type = s.leftVal.data.Type
 		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
-		if s.isConstExpr() {
-			v.expr = tonumf(s.leftVal.expr) + tonumf(s.rightVal.expr)
-		}
+		s.add(&v)
 	case tokens.MINUS:
 		v.data.Type = s.leftVal.data.Type
 		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
-		if s.isConstExpr() {
-			v.expr = tonumf(s.leftVal.expr) - tonumf(s.rightVal.expr)
-		}
+		s.sub(&v)
 	case tokens.STAR:
 		v.data.Type = s.leftVal.data.Type
 		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
-		if s.isConstExpr() {
-			v.expr = tonumf(s.leftVal.expr) * tonumf(s.rightVal.expr)
-		}
+		s.mul(&v)
 	case tokens.SOLIDUS:
 		v.data.Type = s.leftVal.data.Type
 		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
-		if s.isConstExpr() {
-			right := tonumf(s.rightVal.expr)
-			if right != 0 {
-				v.expr = tonumf(s.leftVal.expr) / right
-			} else {
-				s.p.pusherrtok(s.operator, "divide_by_zero")
-			}
-		}
+		s.div(&v)
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_float", s.operator.Kind)
 	}
@@ -302,130 +537,89 @@ func (s *solver) signed() (v value) {
 	case tokens.EQUALS:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-		if s.isConstExpr() {
-			v.expr = tonums(s.leftVal.expr) == tonums(s.rightVal.expr)
-		}
+		s.eq(&v)
 	case tokens.NOT_EQUALS:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-		if s.isConstExpr() {
-			v.expr = tonums(s.leftVal.expr) != tonums(s.rightVal.expr)
-		}
+		s.noteq(&v)
 	case tokens.LESS:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-		if s.isConstExpr() {
-			v.expr = tonums(s.leftVal.expr) < tonums(s.rightVal.expr)
-		}
+		s.lt(&v)
 	case tokens.GREAT:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-		if s.isConstExpr() {
-			v.expr = tonums(s.leftVal.expr) > tonums(s.rightVal.expr)
-		}
+		s.gt(&v)
 	case tokens.GREAT_EQUAL:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-		if s.isConstExpr() {
-			v.expr = tonums(s.leftVal.expr) >= tonums(s.rightVal.expr)
-		}
+		s.gteq(&v)
 	case tokens.LESS_EQUAL:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-		if s.isConstExpr() {
-			v.expr = tonums(s.leftVal.expr) <= tonums(s.rightVal.expr)
-		}
+		s.lteq(&v)
 	case tokens.PLUS:
 		v.data.Type = s.leftVal.data.Type
 		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
-		if s.isConstExpr() {
-			v.expr = tonums(s.leftVal.expr) + tonums(s.rightVal.expr)
-		}
+		s.add(&v)
 	case tokens.MINUS:
 		v.data.Type = s.leftVal.data.Type
 		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
-		if s.isConstExpr() {
-			v.expr = tonums(s.leftVal.expr) - tonums(s.rightVal.expr)
-		}
+		s.sub(&v)
 	case tokens.STAR:
 		v.data.Type = s.leftVal.data.Type
 		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
-		if s.isConstExpr() {
-			v.expr = tonums(s.leftVal.expr) * tonums(s.rightVal.expr)
-		}
+		s.mul(&v)
 	case tokens.SOLIDUS:
 		v.data.Type = s.leftVal.data.Type
 		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
-		if s.isConstExpr() {
-			right := tonums(s.rightVal.expr)
-			if right != 0 {
-				v.expr = tonums(s.leftVal.expr) / right
-			} else {
-				s.p.pusherrtok(s.operator, "divide_by_zero")
-			}
-		}
+		s.div(&v)
 	case tokens.PERCENT:
 		v.data.Type = s.leftVal.data.Type
 		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
-		if s.isConstExpr() {
-			v.expr = tonums(s.leftVal.expr) % tonums(s.rightVal.expr)
-		}
+		s.mod(&v)
 	case tokens.AMPER:
 		v.data.Type = s.leftVal.data.Type
 		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
-		if s.isConstExpr() {
-			v.expr = tonums(s.leftVal.expr) & tonums(s.rightVal.expr)
-		}
+		s.bitwiseAnd(&v)
 	case tokens.VLINE:
 		v.data.Type = s.leftVal.data.Type
 		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
-		if s.isConstExpr() {
-			v.expr = tonums(s.leftVal.expr) | tonums(s.rightVal.expr)
-		}
+		s.bitwiseOr(&v)
 	case tokens.CARET:
 		v.data.Type = s.leftVal.data.Type
 		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
-		if s.isConstExpr() {
-			v.expr = tonums(s.leftVal.expr) ^ tonums(s.rightVal.expr)
-		}
+		s.bitwiseXor(&v)
 	case tokens.RSHIFT:
 		v.data.Type.Id = xtype.U64
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
 		if !okForShifting(s.rightVal) {
 			s.p.pusherrtok(s.operator, "bitshift_must_unsigned")
 		}
-		if s.isConstExpr() {
-			right := tonumu(s.rightVal.expr)
-			v.expr = tonums(s.leftVal.expr) >> right
-			setshift(&v, right)
-		}
+		s.rshift(&v)
 	case tokens.LSHIFT:
 		v.data.Type.Id = xtype.U64
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
 		if !okForShifting(s.rightVal) {
 			s.p.pusherrtok(s.operator, "bitshift_must_unsigned")
 		}
-		if s.isConstExpr() {
-			right := tonumu(s.rightVal.expr)
-			v.expr = tonums(s.leftVal.expr) << right
-			setshift(&v, right)
-		}
+		s.lshift(&v)
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_int", s.operator.Kind)
 	}
@@ -444,130 +638,89 @@ func (s *solver) unsigned() (v value) {
 	case tokens.EQUALS:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-		if s.isConstExpr() {
-			v.expr = tonumu(s.leftVal.expr) == tonumu(s.rightVal.expr)
-		}
+		s.eq(&v)
 	case tokens.NOT_EQUALS:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-		if s.isConstExpr() {
-			v.expr = tonumu(s.leftVal.expr) != tonumu(s.rightVal.expr)
-		}
+		s.noteq(&v)
 	case tokens.LESS:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-		if s.isConstExpr() {
-			v.expr = tonumu(s.leftVal.expr) < tonumu(s.rightVal.expr)
-		}
+		s.lt(&v)
 	case tokens.GREAT:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-		if s.isConstExpr() {
-			v.expr = tonumu(s.leftVal.expr) > tonumu(s.rightVal.expr)
-		}
+		s.gt(&v)
 	case tokens.GREAT_EQUAL:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-		if s.isConstExpr() {
-			v.expr = tonumu(s.leftVal.expr) >= tonumu(s.rightVal.expr)
-		}
+		s.gteq(&v)
 	case tokens.LESS_EQUAL:
 		v.data.Type.Id = xtype.Bool
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-		if s.isConstExpr() {
-			v.expr = tonumu(s.leftVal.expr) <= tonumu(s.rightVal.expr)
-		}
+		s.lteq(&v)
 	case tokens.PLUS:
 		v.data.Type = s.leftVal.data.Type
 		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
-		if s.isConstExpr() {
-			v.expr = tonumu(s.leftVal.expr) + tonumu(s.rightVal.expr)
-		}
+		s.add(&v)
 	case tokens.MINUS:
 		v.data.Type = s.leftVal.data.Type
 		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
-		if s.isConstExpr() {
-			v.expr = tonumu(s.leftVal.expr) - tonumu(s.rightVal.expr)
-		}
+		s.sub(&v)
 	case tokens.STAR:
 		v.data.Type = s.leftVal.data.Type
 		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
-		if s.isConstExpr() {
-			v.expr = tonumu(s.leftVal.expr) * tonumu(s.rightVal.expr)
-		}
+		s.mul(&v)
 	case tokens.SOLIDUS:
 		v.data.Type = s.leftVal.data.Type
 		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
-		if s.isConstExpr() {
-			right := tonumu(s.rightVal.expr)
-			if right != 0 {
-				v.expr = tonumu(s.leftVal.expr) / right
-			} else {
-				s.p.pusherrtok(s.operator, "divide_by_zero")
-			}
-		}
+		s.div(&v)
 	case tokens.PERCENT:
 		v.data.Type = s.leftVal.data.Type
 		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
-		if s.isConstExpr() {
-			v.expr = tonumu(s.leftVal.expr) % tonumu(s.rightVal.expr)
-		}
+		s.mod(&v)
 	case tokens.AMPER:
 		v.data.Type = s.leftVal.data.Type
 		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
-		if s.isConstExpr() {
-			v.expr = tonumu(s.leftVal.expr) & tonumu(s.rightVal.expr)
-		}
+		s.bitwiseAnd(&v)
 	case tokens.VLINE:
 		v.data.Type = s.leftVal.data.Type
 		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
-		if s.isConstExpr() {
-			v.expr = tonumu(s.leftVal.expr) | tonumu(s.rightVal.expr)
-		}
+		s.bitwiseOr(&v)
 	case tokens.CARET:
 		v.data.Type = s.leftVal.data.Type
 		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
-		if s.isConstExpr() {
-			v.expr = tonumu(s.leftVal.expr) ^ tonumu(s.rightVal.expr)
-		}
+		s.bitwiseXor(&v)
 	case tokens.RSHIFT:
 		v.data.Type.Id = xtype.U64
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
 		if !okForShifting(s.rightVal) {
 			s.p.pusherrtok(s.operator, "bitshift_must_unsigned")
 		}
-		if s.isConstExpr() {
-			right := tonumu(s.rightVal.expr)
-			v.expr = tonumu(s.leftVal.expr) >> right
-			setshift(&v, right)
-		}
+		s.rshift(&v)
 	case tokens.LSHIFT:
 		v.data.Type.Id = xtype.U64
 		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
 		if !okForShifting(s.rightVal) {
 			s.p.pusherrtok(s.operator, "bitshift_must_unsigned")
 		}
-		if s.isConstExpr() {
-			right := tonumu(s.rightVal.expr)
-			v.expr = tonumu(s.leftVal.expr) << right
-			setshift(&v, right)
-		}
+		s.lshift(&v)
 	default:
 		s.p.pusherrtok(s.operator, "operator_notfor_uint", s.operator.Kind)
 	}
@@ -587,9 +740,9 @@ func (s *solver) logical() (v value) {
 	}
 	switch s.operator.Kind {
 	case tokens.AND:
-		v.expr = s.leftVal.expr.(bool) && s.rightVal.expr.(bool)
+		s.and(&v)
 	case tokens.OR:
-		v.expr = s.leftVal.expr.(bool) || s.rightVal.expr.(bool)
+		s.or(&v)
 	}
 	return
 }
