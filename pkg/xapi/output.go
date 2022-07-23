@@ -18,7 +18,8 @@ int main(void) {
 // endregion X_ENTRY_POINT`
 
 // CxxDefault is the default pre-cxx code output of X-CXX code.
-var CxxDefault = `#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+var CxxDefault = `
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 #define _WINDOWS
 #endif
 
@@ -45,13 +46,6 @@ var CxxDefault = `#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) ||
 #define XID(_Identifier) CONCAT(_, _Identifier)
 
 // region X_CXX_API
-// region X_DECLARATIONS
-template<typename _Item_t> class slice;
-class str_xt;
-
-static inline void XID(panic)(const char *_Message);
-// endregion X_DECLARATIONS
-
 // region X_BUILTIN_VALUES
 #define nil nullptr
 // endregion X_BUILTIN_VALUES
@@ -73,6 +67,13 @@ typedef bool                              bool_xt;
 typedef void                              *voidptr_xt;
 typedef intptr_t                          intptr_xt;
 typedef uintptr_t                         uintptr_xt;
+
+// region X_DECLARATIONS
+template<typename _Item_t> class slice;
+class str_xt;
+
+inline void XID(panic)(const char *_Message);
+// endregion X_DECLARATIONS
 
 // region X_CXX_API_FUNCTIONS
 template<typename _Slice_t, typename _Src_Ptr_T>
@@ -742,6 +743,9 @@ public:
     XID(Error)(str_xt _Message) noexcept
     { this->XID(message) = _Message; }
 
+    inline operator bool(void) const noexcept
+    { return !this->XID(message).empty(); }
+
     inline bool operator==(const XID(Error) &_Src) const
     { return this->XID(message) == _Src.XID(message); }
 
@@ -752,16 +756,16 @@ public:
 std::ostream &operator<<(std::ostream &_Stream, const XID(Error) &_Error)
 { return _Stream << _Error.XID(message); }
 
-static inline void XID(panic)(const struct XID(Error) &_Error) { throw _Error; }
-static inline void XID(panic)(const char *_Message) { XID(panic)(XID(Error){_Message}); }
+inline void XID(panic)(const struct XID(Error) &_Error) { throw _Error; }
+inline void XID(panic)(const char *_Message) { XID(panic)(XID(Error)(_Message)); }
 // endregion PANIC_DEFINES
 
 // region X_BUILTIN_FUNCTIONS
 template<typename _Obj_t>
-static inline void XID(out)(const _Obj_t _Obj) noexcept { std::cout << _Obj; }
+inline void XID(out)(const _Obj_t _Obj) noexcept { std::cout << _Obj; }
 
 template<typename _Obj_t>
-static inline void XID(outln)(const _Obj_t _Obj) noexcept {
+inline void XID(outln)(const _Obj_t _Obj) noexcept {
     XID(out)<_Obj_t>(_Obj);
     std::cout << std::endl;
 }
@@ -810,4 +814,5 @@ void x_terminate_handler(void) noexcept {
 }
 // endregion X_TERMINATE
 
-// endregion X_CXX_API`
+// endregion X_CXX_API
+`

@@ -41,12 +41,17 @@ func valIsEnumType(v value) bool {
 	return v.isType && typeIsEnum(v.data.Type)
 }
 
-func isBoolExpr(val value) bool {
+func isBoolExpr(v value) bool {
 	switch {
-	case typeIsNilCompatible(val.data.Type):
+	case typeIsNilCompatible(v.data.Type):
 		return true
-	case val.data.Type.Id == xtype.Bool && typeIsPure(val.data.Type):
-		return true
+	case typeIsPure(v.data.Type):
+		switch {
+		case v.data.Type.Id == xtype.Bool:
+			return true
+		case typeIsStruct(v.data.Type) && v.data.Type.Tag == errorStruct:
+			return true
+		}
 	}
 	return false
 }

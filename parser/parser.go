@@ -41,6 +41,11 @@ type RetType = models.RetType
 
 var used []*use
 
+type waitingGlobal struct {
+	Var  *Var
+	Defs *Defmap
+}
+
 // Parser is parser of X code.
 type Parser struct {
 	attributes      []Attribute
@@ -54,7 +59,7 @@ type Parser struct {
 	blockTypes      []*Type
 	blockVars       []*Var
 	embeds          strings.Builder
-	waitingGlobals  []*Var
+	waitingGlobals  []waitingGlobal
 	eval            *eval
 	receiveredFuncs []*function
 
@@ -1001,7 +1006,7 @@ func (p *Parser) Global(vast Var) {
 		return
 	} else {
 		for _, g := range p.waitingGlobals {
-			if vast.Id == g.Id {
+			if vast.Id == g.Var.Id {
 				p.pusherrtok(vast.IdTok, "exist_id", vast.Id)
 				return
 			}
@@ -1011,7 +1016,8 @@ func (p *Parser) Global(vast Var) {
 	p.docText.Reset()
 	v := new(Var)
 	*v = vast
-	p.waitingGlobals = append(p.waitingGlobals, v)
+	wg := waitingGlobal{Var: v, Defs: p.Defs}
+	p.waitingGlobals = append(p.waitingGlobals, wg)
 	p.Defs.Globals = append(p.Defs.Globals, v)
 }
 
@@ -1354,9 +1360,12 @@ func (p *Parser) checkTypes() {
 
 // WaitingGlobals parses X global variables for waiting to parsing.
 func (p *Parser) WaitingGlobals() {
-	for _, v := range p.waitingGlobals {
-		*v = *p.Var(*v)
+	pdefs := p.Defs
+	for _, g := range p.waitingGlobals {
+		p.Defs = g.Defs // Set defs for namespaces
+		*g.Var = *p.Var(*g.Var)
 	}
+	p.Defs = pdefs
 }
 
 func (p *Parser) checkParamDefaultExprWithDefault(param *Param) {
@@ -1628,7 +1637,10 @@ func (p *Parser) parseField(s *xstruct, f **Var, i int) {
 	s.constructor.Params[i] = param
 }
 
-func (p *Parser) structConstructorInstance(as xstruct) *xstruct {
+func (p *Parser) structConstructorInstance(as *xstruct) *xstruct {
+	if as == errorStruct {
+		return as
+	}
 	s := new(xstruct)
 	s.Ast = as.Ast
 	s.constructor = new(Func)
@@ -1811,7 +1823,7 @@ func isConstructor(f *Func) bool {
 
 func (p *Parser) readyConstructor(f **Func) {
 	s := (*f).RetType.Type.Tag.(*xstruct)
-	s = p.structConstructorInstance(*s)
+	s = p.structConstructorInstance(s)
 	*f = s.constructor
 }
 
@@ -2832,7 +2844,7 @@ func (p *Parser) typeSourceIsStruct(s *xstruct, tag any, errTok Tok) (dt DataTyp
 	} else if len(s.Ast.Generics) > 0 {
 		p.pusherrtok(errTok, "has_generics")
 	}
-	s = p.structConstructorInstance(*s)
+	s = p.structConstructorInstance(s)
 	s.SetGenerics(generics)
 	dt.Id = xtype.Struct
 	dt.Kind = s.dataTypeString()

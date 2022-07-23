@@ -273,10 +273,9 @@ var errorStruct = &xstruct{
 	Defs: &Defmap{
 		Globals: []*Var{
 			{
-				Pub:   true,
-				Const: true,
-				Id:    "message",
-				Type:  DataType{Id: xtype.Str, Kind: tokens.STR},
+				Pub:  true,
+				Id:   "message",
+				Type: DataType{Id: xtype.Str, Kind: tokens.STR},
 			},
 		},
 	},
