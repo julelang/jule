@@ -33,6 +33,7 @@ var CxxDefault = `
 #include <map>
 #include <thread>
 #include <typeinfo>
+#include <any>
 #ifdef _WINDOWS
 #include <codecvt>
 #include <windows.h>
@@ -573,8 +574,9 @@ public:
 
 struct any_xt {
 public:
-    void *_expr{nil};
-    char *_inf{nil};
+    std::any _expr;
+
+    any_xt(void) noexcept {}
 
     template<typename T>
     any_xt(const T &_Expr) noexcept
@@ -583,23 +585,23 @@ public:
     ~any_xt(void) noexcept
     { this->_delete(); }
 
-    inline void _delete(void) noexcept {
-        this->_expr = nil;
-        this->_inf = nil;
-    }
+    inline void _delete(void) noexcept
+    { this->_expr.reset(); }
+
+    inline bool _isnil(void) const noexcept
+    { return !this->_expr.has_value(); }
 
     template<typename T>
     inline bool type_is(void) const noexcept {
-        if (!this->_expr)
-        { return std::is_same<std::nullptr_t, T>::value; }
-        return std::strcmp(this->_inf, typeid(T).name()) == 0;
+        if (std::is_same<T, nullptr_t>::value) { return false; }
+        if (this->_isnil()) { return false; }
+        return std::strcmp(this->_expr.type().name(), typeid(T).name()) == 0;
     }
 
     template<typename T>
     void operator=(const T &_Expr) noexcept {
         this->_delete();
-        this->_expr = (void*)&_Expr;
-        this->_inf  = (char*)(typeid(T).name());
+        this->_expr = _Expr;
     }
 
     inline void operator=(const std::nullptr_t) noexcept
@@ -607,32 +609,33 @@ public:
 
     template<typename T>
     operator T(void) const noexcept {
-        if (!this->_expr)
-        { XID(panic)("casting failed because data is nil"); }
-        if (std::strcmp(this->_inf, typeid(T).name()) != 0)
-        { XID(panic)("incompatible type"); }
-        return *(T*)(this->_expr);
+        if (this->_isnil()) { XID(panic)("casting failed because data is nil"); }
+        if (!this->type_is<T>()) { XID(panic)("incompatible type"); }
+        return std::any_cast<T>(this->_expr);
     }
 
     template<typename T>
     inline bool operator==(const T &_Expr) const noexcept
-    { return this->type_is<T>() && *(T*)(this->_expr) == _Expr; }
+    { return this->type_is<T>() && this->operator T() == _Expr; }
 
     template<typename T>
     inline constexpr
     bool operator!=(const T &_Expr) const noexcept
     { return !this->operator==(_Expr); }
 
-    inline constexpr
-    bool operator==(const any_xt &_Any) const noexcept
-    { return this->_expr == _Any._expr; }
+    inline bool operator==(const any_xt &_Any) const noexcept {
+        if (this->_isnil() && _Any._isnil()) { return true; }
+        return std::strcmp(this->_expr.type().name(), _Any._expr.type().name()) == 0;
+    }
 
-    inline constexpr
-    bool operator!=(const any_xt &_Any) const noexcept
+    inline bool operator!=(const any_xt &_Any) const noexcept
     { return !this->operator==(_Any); }
 
-    friend std::ostream& operator<<(std::ostream &_Stream, const any_xt &_Src)
-    { return _Stream << _Src._expr; }
+    friend std::ostream& operator<<(std::ostream &_Stream, const any_xt &_Src) {
+        if (_Src._expr.has_value()) { _Stream << "<any>"; }
+        else { _Stream << 0; }
+        return _Stream;
+    }
 };
 // endregion X_BUILTIN_TYPES
 
@@ -721,9 +724,6 @@ std::ostream &operator<<(std::ostream &_Stream, const i8_xt &_Src)
 std::ostream &operator<<(std::ostream &_Stream, const u8_xt &_Src)
 { return _Stream << (i32_xt)(_Src); }
 
-std::ostream &operator<<(std::ostream &_Stream, const std::nullptr_t)
-{ return _Stream << "<nil>"; }
-
 template<typename _Obj_t>
 str_xt tostr(const _Obj_t &_Obj) noexcept {
     std::stringstream _stream;
@@ -762,7 +762,10 @@ inline void XID(panic)(const char *_Message) { XID(panic)(XID(Error)(_Message));
 
 // region X_BUILTIN_FUNCTIONS
 template<typename _Obj_t>
-inline void XID(out)(const _Obj_t _Obj) noexcept { std::cout << _Obj; }
+inline void XID(out)(const _Obj_t _Obj) noexcept {
+    if (_Obj == nil) { std::cout << "<nil>"; }
+    else { std::cout <<_Obj; }
+}
 
 template<typename _Obj_t>
 inline void XID(outln)(const _Obj_t _Obj) noexcept {
