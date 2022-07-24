@@ -27,7 +27,7 @@ const (
 // If types is "int" or "uint", set to bit-specific type code.
 func GetRealCode(t uint8) uint8 {
 	switch t {
-	case Int, Intptr:
+	case Int:
 		t = IntCode
 	case UInt, UIntptr:
 		t = UIntCode
@@ -242,7 +242,7 @@ func IsSignedNumeric(t uint8) bool {
 func IsSignedInteger(t uint8) bool {
 	t = GetRealCode(t)
 	switch t {
-	case I8, I16, I32, I64, Int, Intptr:
+	case I8, I16, I32, I64, Int:
 		return true
 	default:
 		return false

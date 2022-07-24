@@ -65,12 +65,11 @@ typedef uint64_t                          u64_xt;
 typedef float                             f32_xt;
 typedef double                            f64_xt;
 typedef bool                              bool_xt;
-typedef void                              *voidptr_xt;
-typedef intptr_t                          intptr_xt;
 typedef uintptr_t                         uintptr_xt;
 
 // region X_DECLARATIONS
 template<typename _Item_t> class slice;
+template<typename T> struct ptr;
 class str_xt;
 
 void XID(panic)(const char *_Message);
@@ -233,7 +232,7 @@ public:
     }
 
     friend std::ostream& operator<<(std::ostream &_Stream,
-                                    const slice<_Item_t> &_Src) {
+                                    const slice<_Item_t> &_Src) noexcept {
         _Stream << '[';
         const uint_xt _length{_Src._buffer.size()};
         for (uint_xt _index{0}; _index < _length;) {
@@ -313,7 +312,7 @@ public:
     }
 
     friend std::ostream& operator<<(std::ostream &_Stream,
-                                    const array<_Item_t, _N> &_Src) {
+                                    const array<_Item_t, _N> &_Src) noexcept {
         _Stream << '[';
         for (uint_xt _index{0}; _index < _Src.len();) {
             _Stream << _Src._buffer[_index++];
@@ -362,7 +361,7 @@ public:
     { return !this->operator==(nil); }
 
     friend std::ostream& operator<<(std::ostream &_Stream,
-                                    const map<_Key_t, _Value_t> &_Src) {
+                                    const map<_Key_t, _Value_t> &_Src) noexcept {
         _Stream << '{';
         uint_xt _length{_Src.size()};
         for (const auto _pair: _Src) {
@@ -565,7 +564,7 @@ public:
     inline bool operator!=(const str_xt &_Str) const noexcept
     { return !this->operator==(_Str); }
 
-    friend std::ostream& operator<<(std::ostream &_Stream, const str_xt &_Src) {
+    friend std::ostream& operator<<(std::ostream &_Stream, const str_xt &_Src) noexcept {
         for (const u8_xt &_byte: _Src)
         { _Stream << _byte; }
         return _Stream;
@@ -631,7 +630,7 @@ public:
     inline bool operator!=(const any_xt &_Any) const noexcept
     { return !this->operator==(_Any); }
 
-    friend std::ostream& operator<<(std::ostream &_Stream, const any_xt &_Src) {
+    friend std::ostream& operator<<(std::ostream &_Stream, const any_xt &_Src) noexcept {
         if (_Src._expr.has_value()) { _Stream << "<any>"; }
         else { _Stream << 0; }
         return _Stream;
@@ -684,6 +683,120 @@ public:
 
     inline bool operator!=(std::nullptr_t) const noexcept
     { return !this->operator==(nil); }
+};
+
+struct voidptr_xt {
+    void *_ptr{nil};
+
+    voidptr_xt(void) noexcept {}
+    voidptr_xt(std::nullptr_t) noexcept {}
+
+    template<typename T>
+    voidptr_xt(const T *_Ptr) noexcept
+    { this->_ptr = (void*)(_Ptr); }
+
+    inline operator uintptr_xt(void) const noexcept
+    { return (uintptr_xt)(this->_ptr); }
+
+    inline operator void*(void) const noexcept
+    { return this->_ptr; }
+
+    template<typename T>
+    inline operator ptr<T>(void) const noexcept
+    { return (T*)(this->_ptr); }
+
+    inline void operator=(void *_Ptr) noexcept
+    { this->_ptr = _Ptr; }
+
+    inline void operator=(std::nullptr_t) noexcept
+    { this->_ptr = nil; }
+
+    inline bool operator==(const void *_Ptr) const noexcept
+    { return this->_ptr == _Ptr; }
+
+    inline bool operator!=(const void *_Ptr) const noexcept
+    { return !this->operator==(_Ptr); }
+
+    inline bool operator==(std::nullptr_t) const noexcept
+    { return !this->_ptr; }
+
+    inline bool operator!=(std::nullptr_t) const noexcept
+    { return !this->operator==(nil); }
+
+    friend inline
+    std::ostream& operator<<(std::ostream &_Stream, const voidptr_xt &_Src) noexcept
+    { return _Stream << _Src._ptr; }
+};
+
+template<typename T>
+struct ptr {
+    T *_ptr{nil};
+
+    ptr<T>(void) noexcept {}
+    ptr<T>(std::nullptr_t) noexcept {}
+
+    ptr<T>(T *_Ptr) noexcept
+    { this->_ptr = _Ptr; }
+
+    inline T &operator*(void) noexcept {
+        if (!this->_ptr) { XID(panic)("pointer is nil"); }
+        return *this->_ptr;
+    }
+
+    inline operator uintptr_xt(void) const noexcept
+    { return (uintptr_xt)(this->_ptr); }
+
+    inline operator voidptr_xt(void) const noexcept
+    { return (voidptr_xt)(this->_ptr); }
+
+    inline void operator=(T *_Ptr) noexcept
+    { this->_ptr = _Ptr; }
+
+    inline void operator=(std::nullptr_t) noexcept
+    { this->_ptr = nil; }
+
+    inline T *operator+=(const uintptr_xt &_N) noexcept
+    { return (this->_ptr += _N); }
+
+    inline T *operator+(const uintptr_xt &_N) noexcept
+    { return this->_ptr + _N; }
+
+    inline ptr<T> operator++(int) noexcept {
+        ptr<T> _ptr;
+        _ptr._ptr = ++this->_ptr;
+        return _ptr;
+    }
+
+    inline ptr<T> operator--(int) noexcept {
+        ptr<T> _ptr;
+        _ptr._ptr = --this->_ptr;
+        return _ptr;
+    }
+
+    inline bool operator>(T *_Ptr) const noexcept
+    { return this->_ptr > _Ptr; }
+
+    inline bool operator<(T *_Ptr) const noexcept
+    { return this->_ptr < _Ptr; }
+
+    inline bool operator==(const T *_Ptr) const noexcept
+    { return this->_ptr == _Ptr; }
+
+    inline bool operator!=(const T *_Ptr) const noexcept
+    { return !this->operator==(_Ptr); }
+
+    inline bool operator==(std::nullptr_t) const noexcept
+    { return !this->_ptr; }
+
+    inline bool operator!=(std::nullptr_t) const noexcept
+    { return !this->operator==(nil); }
+
+    inline T &operator[](const uint_xt &_Index) noexcept
+    { return this->_ptr[_Index]; }
+
+    friend inline
+    std::ostream& operator<<(std::ostream &_Stream, const ptr<T> &_Src) noexcept
+    { return _Stream << _Src._ptr; }
 };
 // endregion X_BUILTIN_TYPES
 

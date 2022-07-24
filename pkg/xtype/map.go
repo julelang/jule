@@ -25,11 +25,10 @@ const (
 	Int     uint8 = 18
 	Map     uint8 = 19
 	Voidptr uint8 = 20
-	Intptr  uint8 = 21
-	UIntptr uint8 = 22
-	Enum    uint8 = 23
-	Struct  uint8 = 24
-	Trait   uint8 = 25
+	UIntptr uint8 = 21
+	Enum    uint8 = 22
+	Struct  uint8 = 23
+	Trait   uint8 = 24
 )
 
 // TypeMap keep data type codes and kinds.
@@ -52,6 +51,5 @@ var TypeMap = map[uint8]string{
 	UInt:    tokens.UINT,
 	Int:     tokens.INT,
 	Voidptr: tokens.VOIDPTR,
-	Intptr:  tokens.INTPTR,
 	UIntptr: tokens.UINTPTR,
 }

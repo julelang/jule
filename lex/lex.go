@@ -332,7 +332,6 @@ var keywords = map[string]uint8{
 	tokens.UINT:     tokens.DataType,
 	tokens.INT:      tokens.DataType,
 	tokens.UINTPTR:  tokens.DataType,
-	tokens.INTPTR:   tokens.DataType,
 	tokens.BOOL:     tokens.DataType,
 	tokens.STR:      tokens.DataType,
 	tokens.VOIDPTR:  tokens.DataType,

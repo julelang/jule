@@ -2166,7 +2166,6 @@ func (p *Parser) checkNewBlockCustom(b *models.Block, oldBlockVars []*Var) {
 			p.pusherrtok(t.Tok, "declared_but_not_used", t.Id)
 		}
 	}
-
 	p.blockVars = oldBlockVars
 	p.blockTypes = blockTypes
 }
@@ -2713,7 +2712,7 @@ func (p *Parser) suffix(assign *models.Assign, exprs []value) {
 	val, model := p.evalExpr(left.Expr)
 	left.Expr.Model = model
 	_ = p.assignment(val, assign.Setter)
-	if typeIsPtr(val.data.Type) {
+	if typeIsExplicitPtr(val.data.Type) {
 		return
 	}
 	if typeIsPure(val.data.Type) && xtype.IsNumeric(val.data.Type.Id) {
@@ -2916,6 +2915,7 @@ func (p *Parser) typeSourceIsType(dt DataType, t *Type, err bool) (DataType, boo
 	dt.Original = original
 	dt.Kind = t.Type.Kind
 	dt, ok := p.typeSource(dt, err)
+	dt.DontUseOriginal = false
 	if ok && typeIsArray(t.Type) && typeIsSlice(old) {
 		p.pusherrtok(dt.Tok, "invalid_type_source")
 	}
@@ -3025,15 +3025,16 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 	if dt.Kind == "" {
 		return dt, true
 	}
-	if !dt.DontUseOriginal {
-		original := dt.Original
-		defer func() {
-			if !ret.DontUseOriginal {
-				ret.Original = original
-			}
-		}()
-		dt.SetToOriginal()
+	original := dt.Original
+	defer func() {
+		if !ret.DontUseOriginal {
+			ret.Original = original
+		}
+	}()
+	if dt.Original != nil {
+		dt = dt.Original.(models.DataType)
 	}
+	dt.SetToOriginal()
 	if dt.MultiTyped {
 		return p.typeSourceOfMultiTyped(dt, err)
 	} else if typeIsMap(dt) {
@@ -3100,7 +3101,9 @@ func (p *Parser) realType(dt DataType, err bool) (ret DataType, _ bool) {
 				ret.Original = original
 			}
 		}()
-		dt.SetToOriginal()
+	}
+	if dt.Original != nil {
+		dt = dt.Original.(models.DataType)
 	}
 	return p.typeSource(dt, err)
 }
@@ -3147,7 +3150,7 @@ func (p *Parser) checkType(real, check DataType, ignoreAny bool, errTok Tok) {
 	switch {
 	case typesAreCompatible(real, check, ignoreAny),
 		typeIsNilCompatible(real) && check.Id == xtype.Nil,
-		typeIsSinglePtr(real) && !typeIsPtr(check):
+		typeIsVoidptr(real) && !typeIsPtr(check):
 		return
 	}
 	if real.Kind != check.Kind {

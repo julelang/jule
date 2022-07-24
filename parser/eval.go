@@ -510,7 +510,7 @@ func (e *eval) tryCast(toks Toks, m *exprModel) (v value, _ bool) {
 func (e *eval) cast(v value, t DataType, errtok Tok) value {
 	switch {
 	case typeIsPtr(t):
-		e.castPtr(v.data.Type, errtok)
+		e.castPtr(t, v.data.Type, errtok)
 	case typeIsSlice(t):
 		e.castSlice(t, v.data.Type, errtok)
 	case typeIsPure(t):
@@ -565,9 +565,7 @@ func (e *eval) castEnum(t, vt DataType, errtok Tok) {
 }
 
 func (e *eval) castInteger(t, vt DataType, errtok Tok) {
-	if typeIsPtr(vt) &&
-		(t.Id == xtype.I64 || t.Id == xtype.U64 ||
-			t.Id == xtype.Intptr || t.Id == xtype.UIntptr) {
+	if typeIsPtr(vt) && t.Id == xtype.UIntptr {
 		return
 	}
 	if typeIsPure(vt) && xtype.IsNumeric(vt.Id) {
@@ -583,14 +581,11 @@ func (e *eval) castNumeric(t, vt DataType, errtok Tok) {
 	e.pusherrtok(errtok, "type_notsupports_casting_to", vt.Kind, t.Kind)
 }
 
-func (e *eval) castPtr(vt DataType, errtok Tok) {
-	if typeIsPtr(vt) {
+func (e *eval) castPtr(t, vt DataType, errtok Tok) {
+	if typeIsVoidptr(vt) || typeIsVoidptr(t) {
 		return
 	}
-	if typeIsPure(vt) && xtype.IsInteger(vt.Id) {
-		return
-	}
-	e.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
+	e.pusherrtok(errtok, "type_notsupports_casting_to", vt.Kind, t.Kind)
 }
 
 func (e *eval) castSlice(t, vt DataType, errtok Tok) {

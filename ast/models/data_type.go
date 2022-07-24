@@ -117,21 +117,33 @@ func (dt *DataType) Pointers() string {
 	return ""
 }
 
-func (dt DataType) String() string {
+func (dt DataType) String() (s string) {
 	dt.SetToOriginal()
 	if dt.MultiTyped {
 		return dt.MultiTypeString()
 	}
 	pointers := dt.Pointers()
+	// Apply pointers
+	defer func() {
+		var cxx strings.Builder
+		for range pointers {
+			cxx.WriteString("ptr<")
+		}
+		cxx.WriteString(s)
+		for range pointers {
+			cxx.WriteString(">")
+		}
+		s = cxx.String()
+	}()
 	dt.Kind = dt.Kind[len(pointers):]
 	if dt.Kind != "" {
 		switch {
 		case strings.HasPrefix(dt.Kind, x.Prefix_Slice):
-			return dt.SliceString() + pointers
+			return dt.SliceString()
 		case strings.HasPrefix(dt.Kind, x.Prefix_Array):
-			return dt.ArrayString() + pointers
+			return dt.ArrayString()
 		case dt.Id == xtype.Map && dt.Kind[0] == '[' && dt.Kind[len(dt.Kind)-1] == ']':
-			return dt.MapString() + pointers
+			return dt.MapString()
 		}
 	}
 	if dt.Tag != nil {
@@ -145,15 +157,15 @@ func (dt DataType) String() string {
 	}
 	switch dt.Id {
 	case xtype.Id, xtype.Enum:
-		return xapi.OutId(dt.Kind, dt.Tok.File) + pointers
+		return xapi.OutId(dt.Kind, dt.Tok.File)
 	case xtype.Trait:
-		return dt.TraitString() + pointers
+		return dt.TraitString()
 	case xtype.Struct:
-		return dt.StructString() + pointers
+		return dt.StructString()
 	case xtype.Func:
-		return dt.FuncString() + pointers
+		return dt.FuncString()
 	default:
-		return xtype.CxxId(dt.Id) + pointers
+		return xtype.CxxId(dt.Id)
 	}
 }
 

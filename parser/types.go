@@ -41,7 +41,7 @@ func typeIsAllowForConst(t DataType) bool {
 	return t.Id == xtype.Str || xtype.IsNumeric(t.Id)
 }
 
-func typeIsSinglePtr(t DataType) bool {
+func typeIsVoidptr(t DataType) bool {
 	return t.Id == xtype.Voidptr
 }
 
@@ -93,7 +93,7 @@ func typeIsExplicitPtr(t DataType) bool {
 }
 
 func typeIsPtr(t DataType) bool {
-	return typeIsExplicitPtr(t) || typeIsSinglePtr(t)
+	return typeIsExplicitPtr(t) || typeIsVoidptr(t)
 }
 
 func typeIsSlice(t DataType) bool {
@@ -171,13 +171,14 @@ func typeIsLvalue(t DataType) bool {
 }
 
 func checkPtrCompability(t1, t2 DataType) bool {
-	if t2.Id == xtype.Nil || typeIsPtr(t2) {
+	if t2.Id == xtype.Nil {
+		return true
+	} else if typeIsVoidptr(t2) {
+		return true
+	} else if typeIsPure(t2) && xtype.IsInteger(t2.Id) {
 		return true
 	}
-	if typeIsPure(t2) && xtype.IsInteger(t2.Id) {
-		return true
-	}
-	return false
+	return t1.Kind == t2.Kind
 }
 
 func typesEquals(t1, t2 DataType) bool {

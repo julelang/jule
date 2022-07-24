@@ -65,7 +65,6 @@ const (
 	UINT                = "uint"
 	INT                 = "int"
 	UINTPTR             = "uintptr"
-	INTPTR              = "intptr"
 	BOOL                = "bool"
 	STR                 = "str"
 	VOIDPTR             = "voidptr"
