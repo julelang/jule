@@ -15,25 +15,25 @@ func Range(i *int, open, close string, toks Toks) Toks {
 		return nil
 	}
 	tok := toks[*i]
-	if tok.Id == tokens.Brace && tok.Kind == open {
-		*i++
-		braceCount := 1
-		start := *i
-		for ; braceCount != 0 && *i < len(toks); *i++ {
-			tok := toks[*i]
-			if tok.Id != tokens.Brace {
-				continue
-			}
-			switch tok.Kind {
-			case open:
-				braceCount++
-			case close:
-				braceCount--
-			}
-		}
-		return toks[start : *i-1]
+	if tok.Id != tokens.Brace || tok.Kind != open {
+		return nil
 	}
-	return nil
+	*i++
+	braceCount := 1
+	start := *i
+	for ; braceCount != 0 && *i < len(toks); *i++ {
+		tok := toks[*i]
+		if tok.Id != tokens.Brace {
+			continue
+		}
+		switch tok.Kind {
+		case open:
+			braceCount++
+		case close:
+			braceCount--
+		}
+	}
+	return toks[start : *i-1]
 }
 
 // RangeLast returns last range from tokens.

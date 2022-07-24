@@ -37,4 +37,6 @@ const (
 	Case         uint8 = 32
 	Default      uint8 = 33
 	Self         uint8 = 34
+	Trait        uint8 = 35
+	Impl         uint8 = 36
 )

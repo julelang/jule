@@ -94,4 +94,6 @@ const (
 	CASE                = "case"
 	DEFAULT             = "default"
 	SELF                = "self"
+	TRAIT               = "trait"
+	IMPL                = "impl"
 )

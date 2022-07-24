@@ -10,6 +10,7 @@ type Defmap struct {
 	Namespaces []*namespace
 	Enums      []*Enum
 	Structs    []*xstruct
+	Traits     []*trait
 	Types      []*Type
 	Funcs      []*function
 	Globals    []*Var
@@ -57,6 +58,29 @@ func (dm *Defmap) structById(id string, f *File) (*xstruct, *Defmap, bool) {
 		return nil, nil, false
 	}
 	return m.Structs[i], m, canshadow
+}
+
+func (dm *Defmap) findTraitById(id string, f *File) (int, *Defmap, bool) {
+	for i, t := range dm.Traits {
+		if t != nil && t.Ast.Id == id {
+			if t.Ast.Pub || f == nil || f.Dir == t.Ast.Tok.File.Dir {
+				return i, dm, false
+			}
+		}
+	}
+	if dm.parent != nil {
+		i, m, _ := dm.parent.findTraitById(id, f)
+		return i, m, true
+	}
+	return -1, nil, false
+}
+
+func (dm *Defmap) traitById(id string, f *File) (*trait, *Defmap, bool) {
+	i, m, canshadow := dm.findTraitById(id, f)
+	if i == -1 {
+		return nil, nil, false
+	}
+	return m.Traits[i], m, canshadow
 }
 
 func (dm *Defmap) findEnumById(id string, f *File) (int, *Defmap, bool) {
@@ -166,6 +190,7 @@ func (dm *Defmap) globalById(id string, f *File) (*Var, *Defmap, bool) {
 // 'e' -> enum
 // 's' -> struct
 // 't' -> type alias
+// 'i' -> trait
 func (dm *Defmap) defById(id string, f *File) (int, *Defmap, byte) {
 	var finders = map[byte]func(string, *xio.File) (int, *Defmap, bool){
 		'g': dm.findGlobalById,
@@ -173,6 +198,7 @@ func (dm *Defmap) defById(id string, f *File) (int, *Defmap, byte) {
 		'e': dm.findEnumById,
 		's': dm.findStructById,
 		't': dm.findTypeById,
+		'i': dm.findTraitById,
 	}
 	for code, finder := range finders {
 		i, m, _ := finder(id, f)

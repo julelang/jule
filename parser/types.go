@@ -35,7 +35,10 @@ func typeIsMut(t DataType) bool {
 }
 
 func typeIsAllowForConst(t DataType) bool {
-	return typeIsPure(t)
+	if !typeIsPure(t) {
+		return false
+	}
+	return t.Id == xtype.Str || xtype.IsNumeric(t.Id)
 }
 
 func typeIsSinglePtr(t DataType) bool {
@@ -44,6 +47,10 @@ func typeIsSinglePtr(t DataType) bool {
 
 func typeIsStruct(dt DataType) bool {
 	return dt.Id == xtype.Struct
+}
+
+func typeIsTrait(dt DataType) bool {
+	return dt.Id == xtype.Trait
 }
 
 func typeIsEnum(dt DataType) bool {
@@ -132,6 +139,7 @@ func typeIsNilCompatible(t DataType) bool {
 		typeIsFunc(t) ||
 		typeIsPtr(t) ||
 		typeIsSlice(t) ||
+		typeIsTrait(t) ||
 		typeIsMap(t)
 }
 
@@ -174,6 +182,18 @@ func checkPtrCompability(t1, t2 DataType) bool {
 
 func typesEquals(t1, t2 DataType) bool {
 	return t1.Id == t2.Id && t1.Kind == t2.Kind
+}
+
+func checkTraitCompability(t1, t2 DataType) bool {
+	t := t1.Tag.(*trait)
+	switch {
+	case typeIsTrait(t2):
+		return t == t2.Tag.(*trait)
+	case typeIsStruct(t2):
+		s := t2.Tag.(*xstruct)
+		return s.hasTrait(t)
+	}
+	return true
 }
 
 func checkStructCompability(t1, t2 DataType) bool {
@@ -221,6 +241,11 @@ func typesAreCompatible(t1, t2 DataType, ignoreany bool) bool {
 			t1, t2 = t2, t1
 		}
 		return checkMapCompability(t1, t2)
+	case typeIsTrait(t1), typeIsTrait(t2):
+		if typeIsTrait(t2) {
+			t1, t2 = t2, t1
+		}
+		return checkTraitCompability(t1, t2)
 	case typeIsNilCompatible(t1), typeIsNilCompatible(t2):
 		return t1.Id == xtype.Nil || t2.Id == xtype.Nil
 	case typeIsEnum(t1), typeIsEnum(t2):

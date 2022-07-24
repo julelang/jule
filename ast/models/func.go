@@ -62,3 +62,8 @@ func (f *Func) OutId() string {
 	}
 	return xapi.OutId(f.Id, f.Tok.File)
 }
+
+// DefString returns define string of function.
+func (f *Func) DefString() string {
+	return f.Id + f.DataTypeString()
+}

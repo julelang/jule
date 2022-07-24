@@ -79,6 +79,10 @@ func (b *Builder) buildNode(toks Toks) {
 		b.Enum(toks)
 	case tokens.Struct:
 		b.Struct(toks)
+	case tokens.Trait:
+		b.Trait(toks)
+	case tokens.Impl:
+		b.Impl(toks)
 	case tokens.Comment:
 		b.Comment(toks[0])
 	case tokens.Preprocessor:
@@ -460,6 +464,119 @@ func (b *Builder) Struct(toks Toks) {
 	})
 }
 
+func (b *Builder) traitFuncs(toks Toks) []*models.Func {
+	var funcs []*models.Func
+	i := 0
+	for i < len(toks) {
+		funcToks := b.skipStatement(&i, &toks)
+		f := b.Func(funcToks, false, true)
+		f.Pub = true
+		funcs = append(funcs, &f)
+	}
+	return funcs
+}
+
+// Trait builds AST model of trait.
+func (b *Builder) Trait(toks Toks) {
+	var t models.Trait
+	t.Pub = b.pub
+	b.pub = false
+	if len(toks) < 3 {
+		b.pusherr(toks[0], "invalid_syntax")
+		return
+	}
+	t.Tok = toks[1]
+	if t.Tok.Id != tokens.Id {
+		b.pusherr(t.Tok, "invalid_syntax")
+	}
+	t.Id = t.Tok.Kind
+	i := 2
+	bodyToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
+	if bodyToks == nil {
+		b.pusherr(t.Tok, "body_not_exist")
+		return
+	}
+	if i < len(toks) {
+		b.pusherr(toks[i], "invalid_syntax")
+	}
+	t.Funcs = b.traitFuncs(bodyToks)
+	b.Tree = append(b.Tree, models.Object{Tok: t.Tok, Data: t})
+}
+
+func (b *Builder) implFuncs(toks Toks) []*models.Func {
+	var funcs []*models.Func
+	i := 0
+	for i < len(toks) {
+		funcToks := b.skipStatement(&i, &toks)
+		f := b.Func(funcToks, false, false)
+		f.Pub = true
+		funcs = append(funcs, &f)
+	}
+	return funcs
+}
+
+// Impl builds AST model of impl statement.
+func (b *Builder) Impl(toks Toks) {
+	tok := toks[0]
+	if len(toks) < 2 {
+		b.pusherr(tok, "invalid_syntax")
+		return
+	}
+	tok = toks[1]
+	if tok.Id != tokens.Id {
+		b.pusherr(tok, "invalid_syntax")
+		return
+	}
+	if len(toks) < 3 {
+		b.pusherr(tok, "invalid_syntax")
+		return
+	}
+	var impl models.Impl
+	impl.Trait = tok
+	tok = toks[2]
+	if tok.Id != tokens.In {
+		b.pusherr(tok, "invalid_syntax")
+		return
+	}
+	if len(toks) < 4 {
+		b.pusherr(tok, "invalid_syntax")
+		return
+	}
+	i := 3
+	tok = toks[i]
+	if tok.Id == tokens.Operator {
+		if tok.Kind != tokens.STAR {
+			b.pusherr(tok, "invalid_syntax")
+			return
+		}
+		i++
+		tok = toks[i]
+	}
+	if tok.Id != tokens.Id {
+		b.pusherr(tok, "invalid_syntax")
+		return
+	}
+	i++
+	receiverToks := toks[3:i]
+	toks = toks[i:]
+	i = 0
+	impl.Target, _ = b.DataType(receiverToks, &i, false, true)
+	if i+1 < len(receiverToks) {
+		b.pusherr(receiverToks[i+1], "invalid_syntax")
+	}
+	i = 0
+	bodyToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
+	if bodyToks == nil {
+		b.pusherr(impl.Trait, "body_not_exist")
+		return
+	}
+	if i < len(toks) {
+		b.pusherr(toks[i], "invalid_syntax")
+	}
+	impl.Funcs = b.implFuncs(bodyToks)
+	b.Tree = append(b.Tree, models.Object{Tok: impl.Trait, Data: impl})
+}
+
 func tokstoa(toks Toks) string {
 	var str strings.Builder
 	for _, tok := range toks {
@@ -628,11 +745,6 @@ func (b *Builder) Func(toks Toks, anon, prototype bool) (f models.Func) {
 		return
 	}
 	i := 0
-	tok := toks[i]
-	if tok.Id != tokens.Brace || tok.Kind != tokens.LBRACE {
-		b.pusherr(tok, "invalid_syntax")
-		return
-	}
 	blockToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
 	if blockToks == nil {
 		b.pusherr(f.Tok, "body_not_exist")

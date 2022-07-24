@@ -637,6 +637,48 @@ public:
         return _Stream;
     }
 };
+
+template<typename T>
+struct trait {
+public:
+    T *_data{nil};
+    uint_xt _used{0};
+
+    trait<T>(void) noexcept {}
+    trait<T>(std::nullptr_t) noexcept {}
+
+    template<typename TT>
+    trait<T>(const TT &_Data) noexcept {
+        TT *_alloc = new(std::nothrow) TT{_Data};
+        if (!_alloc) { XID(panic)("memory allocation failed"); }
+        this->_data = _alloc;
+    }
+
+    trait<T>(trait<T> &_Src) noexcept
+    { this->operator=(_Src); }
+
+    trait<T>(const trait<T> &&_Src) noexcept
+    { this->operator=(_Src); }
+
+    T &get(void) noexcept {
+        if (!this->_data) { XID(panic)("interface is nil"); }
+        return *this->_data;
+    }
+
+    ~trait(void) noexcept {
+        if (this->_used > 0) { return; }
+        delete this->_data;
+        this->_data = nil;
+    }
+
+    inline void operator=(trait<T> &_Src) noexcept {
+        this->_data = _Src._data;
+        _Src._used++;
+    }
+
+    inline void operator=(const trait<T> &&_Src) noexcept
+    { this->_data = _Src._data; }
+};
 // endregion X_BUILTIN_TYPES
 
 // region X_MISC

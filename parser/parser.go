@@ -188,6 +188,28 @@ func (p *Parser) CxxEnums() string {
 	return cxx.String()
 }
 
+func cxxTraits(dm *Defmap) string {
+	var cxx strings.Builder
+	for _, t := range dm.Traits {
+		if t.Used && t.Ast.Tok.Id != tokens.NA {
+			cxx.WriteString(t.String())
+			cxx.WriteString("\n\n")
+		}
+	}
+	return cxx.String()
+}
+
+// CxxTraits returns C++ code of traits.
+func (p *Parser) CxxTraits() string {
+	var cxx strings.Builder
+	cxx.WriteString(cxxTraits(Builtin))
+	for _, use := range used {
+		cxx.WriteString(cxxTraits(use.defs))
+	}
+	cxx.WriteString(cxxTraits(p.Defs))
+	return cxx.String()
+}
+
 func cxxStructs(dm *Defmap) string {
 	var cxx strings.Builder
 	for _, s := range dm.Structs {
@@ -199,7 +221,7 @@ func cxxStructs(dm *Defmap) string {
 	return cxx.String()
 }
 
-// CxxEnums returns C++ code of structures.
+// CxxTraits returns C++ code of structures.
 func (p *Parser) CxxStructs() string {
 	var cxx strings.Builder
 	cxx.WriteString(cxxStructs(Builtin))
@@ -331,6 +353,7 @@ func (p *Parser) Cxx() string {
 	cxx.WriteString(p.CxxTypes())
 	cxx.WriteByte('\n')
 	cxx.WriteString(p.CxxEnums())
+	cxx.WriteString(p.CxxTraits())
 	cxx.WriteString(p.CxxStructs())
 	cxx.WriteString(p.CxxPrototypes())
 	cxx.WriteString("\n\n")
@@ -474,6 +497,10 @@ func (p *Parser) parseSrcTreeObj(obj models.Object) {
 		p.Enum(t)
 	case Struct:
 		p.Struct(t)
+	case models.Trait:
+		p.Trait(t)
+	case models.Impl:
+		// Parse at end
 	case models.CxxEmbed:
 		p.embeds.WriteString(t.String())
 		p.embeds.WriteByte('\n')
@@ -489,9 +516,16 @@ func (p *Parser) parseSrcTreeObj(obj models.Object) {
 	}
 }
 
-func (p *Parser) parseSrcTree(tree []models.Object) {
+func (p *Parser) parseSrcTreeEndObj(obj models.Object) {
+	switch t := obj.Data.(type) {
+	case models.Impl:
+		p.Impl(t)
+	}
+}
+
+func (p *Parser) parseSrcTree(tree []models.Object, parser func(models.Object)) {
 	for _, obj := range tree {
-		p.parseSrcTreeObj(obj)
+		parser(obj)
 		p.checkDoc(obj)
 		p.checkAttribute(obj)
 		p.checkGenerics(obj)
@@ -502,7 +536,8 @@ func (p *Parser) parseTree(tree []models.Object) (ok bool) {
 	if p.parseUses(&tree) {
 		return false
 	}
-	p.parseSrcTree(tree)
+	p.parseSrcTree(tree, p.parseSrcTreeObj)
+	p.parseSrcTree(tree, p.parseSrcTreeEndObj)
 	return true
 }
 
@@ -798,6 +833,66 @@ func (p *Parser) Struct(s Struct) {
 	p.parseFields(xs)
 }
 
+// Trait parses X trait.
+func (p *Parser) Trait(t models.Trait) {
+	if xapi.IsIgnoreId(t.Id) {
+		p.pusherrtok(t.Tok, "ignore_id")
+		return
+	} else if _, tok, _, _ := p.defById(t.Id); tok.Id != tokens.NA {
+		p.pusherrtok(t.Tok, "exist_id", t.Id)
+		return
+	}
+	trait := new(trait)
+	trait.Defs = new(Defmap)
+	trait.Defs.Funcs = make([]*function, len(t.Funcs))
+	trait.Desc = p.docText.String()
+	p.docText.Reset()
+	trait.Ast = &t
+	p.Defs.Traits = append(p.Defs.Traits, trait)
+}
+
+// Impl parses X impl.
+func (p *Parser) Impl(impl models.Impl) {
+	trait, _, _ := p.traitById(impl.Trait.Kind)
+	if trait == nil {
+		p.pusherrtok(impl.Trait, "id_noexist", impl.Trait.Kind)
+		return
+	}
+	trait.Used = true
+	sid, _ := impl.Target.KindId()
+	xs, _, _ := p.structById(sid)
+	if xs == nil {
+		p.pusherrtok(impl.Target.Tok, "id_noexist", sid)
+		return
+	}
+	impl.Target.Tag = xs
+	xs.traits = append(xs.traits, trait)
+	for _, tf := range trait.Ast.Funcs {
+		ok := false
+		ds := tf.DefString()
+		for _, f := range impl.Funcs {
+			if tf.Pub == f.Pub && ds == f.DefString() {
+				ok = true
+				break
+			}
+		}
+		if !ok {
+			p.pusherrtok(impl.Target.Tok, "notimpl_trait_def", trait.Ast.Id, ds)
+		}
+	}
+	for _, f := range impl.Funcs {
+		if trait.FindFunc(f.Id) == nil {
+			p.pusherrtok(impl.Target.Tok, "trait_hasnt_id", trait.Ast.Id, f.Id)
+			break
+		}
+		sf := new(function)
+		sf.Ast = f
+		sf.Ast.Receiver = &impl.Target
+		sf.used = true
+		xs.Defs.Funcs = append(xs.Defs.Funcs, sf)
+	}
+}
+
 // pushNS pushes namespace to defmap and returns leaf namespace.
 func (p *Parser) pushNs(ns *models.Namespace) *namespace {
 	var src *namespace
@@ -822,7 +917,7 @@ func (p *Parser) Namespace(ns models.Namespace) {
 	src := p.pushNs(&ns)
 	pdefs := p.Defs
 	p.Defs = src.Defs
-	p.parseSrcTree(ns.Tree)
+	p.parseTree(ns.Tree)
 	p.Defs = pdefs
 }
 
@@ -1262,6 +1357,21 @@ func (p *Parser) structById(id string) (*xstruct, *Defmap, bool) {
 	return p.Defs.structById(id, p.File)
 }
 
+func (p *Parser) traitById(id string) (*trait, *Defmap, bool) {
+	t, _, _ := Builtin.traitById(id, nil)
+	if t != nil {
+		return t, nil, false
+	}
+	for _, use := range p.Uses {
+		t, m, _ := use.defs.traitById(id, p.File)
+		if t != nil {
+			use.used = true
+			return t, m, false
+		}
+	}
+	return p.Defs.traitById(id, p.File)
+}
+
 func (p *Parser) blockTypesById(id string) *Type {
 	for _, t := range p.blockTypes {
 		if t != nil && t.Id == id {
@@ -1295,6 +1405,11 @@ func (p *Parser) defById(id string) (def any, tok Tok, m *Defmap, canshadow bool
 	s, m, canshadow = p.structById(id)
 	if s != nil {
 		return s, s.Ast.Tok, m, canshadow
+	}
+	var trait *trait
+	trait, m, canshadow = p.traitById(id)
+	if trait != nil {
+		return trait, trait.Ast.Tok, m, canshadow
 	}
 	var f *function
 	f, m, canshadow = p.FuncById(id)
@@ -1347,8 +1462,42 @@ func (p *Parser) check() {
 	p.waitingGlobals = nil
 	p.checkReceivers()
 	if !p.JustDefs {
+		p.checkTraits()
 		p.checkFuncs()
+		p.checkStructs()
 		p.checkUses()
+	}
+}
+
+func (p *Parser) checkTrait(t *trait) {
+	for i, f := range t.Ast.Funcs {
+		if xapi.IsIgnoreId(f.Id) {
+			p.pusherrtok(f.Tok, "ignore_id")
+		}
+		for j, jf := range t.Ast.Funcs {
+			if j >= i {
+				break
+			} else if f.Id == jf.Id {
+				p.pusherrtok(f.Tok, "exist_id", f.Id)
+			}
+		}
+		p.parseTypesNonGenerics(f)
+		tf := new(function)
+		tf.Ast = f
+		t.Defs.Funcs[i] = tf
+	}
+}
+
+func (p *Parser) checkTraits() {
+	for _, ns := range p.Defs.Namespaces {
+		p.Defs = ns.Defs
+		for _, t := range ns.Defs.Traits {
+			p.checkTrait(t)
+		}
+		p.Defs = p.Defs.parent
+	}
+	for _, t := range p.Defs.Traits {
+		p.checkTrait(t)
 	}
 }
 
@@ -1524,9 +1673,6 @@ func (p *Parser) checkFuncs() {
 	for _, f := range p.Defs.Funcs {
 		check(f)
 	}
-	if p.IsMain {
-		p.checkStructFuncs()
-	}
 }
 
 func (p *Parser) parseStructFunc(s *xstruct, f *function) (err bool) {
@@ -1537,51 +1683,31 @@ func (p *Parser) parseStructFunc(s *xstruct, f *function) (err bool) {
 		p.parseTypesNonGenerics(f.Ast)
 		return p.parseFunc(f)
 	}
-	if len(*s.constructor.Combines) == 0 {
-		return
-	}
-	for _, combine := range *s.constructor.Combines {
-		p.pushGenerics(s.Ast.Generics, combine)
-		p.reloadFuncTypes(f.Ast)
-		err = p.parseFunc(f)
-		if err {
-			return
+	return
+}
+
+func (p *Parser) checkStruct(xs *xstruct) (err bool) {
+	for _, f := range xs.Defs.Funcs {
+		if f.checked {
+			continue
 		}
+		p.blockTypes = nil
+		err = p.parseStructFunc(xs, f)
+		if err {
+			break
+		}
+		f.checked = true
 	}
 	return
 }
 
-func (p *Parser) checkStructFuncs() {
+func (p *Parser) checkStructs() {
 	err := false
-	check := func(s *xstruct) {
+	check := func(xs *xstruct) {
 		if err {
 			return
 		}
-		for _, f := range s.Defs.Funcs {
-			if f.checked {
-				continue
-			}
-			p.blockTypes = nil
-			err = p.parseStructFunc(s, f)
-			if err {
-				break
-			}
-			f.checked = true
-		}
-	}
-	for _, use := range p.Uses {
-		pdefs := p.Defs
-		for _, s := range use.defs.Structs {
-			p.Defs = use.defs
-			check(s)
-		}
-		for _, ns := range use.defs.Namespaces {
-			p.Defs = ns.Defs
-			for _, s := range ns.Defs.Structs {
-				check(s)
-			}
-		}
-		p.Defs = pdefs
+		p.checkStruct(xs)
 	}
 	for _, ns := range p.Defs.Namespaces {
 		p.Defs = ns.Defs
@@ -2853,6 +2979,18 @@ func (p *Parser) typeSourceIsStruct(s *xstruct, tag any, errTok Tok) (dt DataTyp
 	return dt, true
 }
 
+func (p *Parser) typeSourceIsTrait(t *trait, tag any, errTok Tok) (dt DataType, _ bool) {
+	if tag != nil {
+		p.pusherrtok(errTok, "invalid_type_source")
+	}
+	dt.Id = xtype.Trait
+	dt.Kind = t.Ast.Id
+	dt.Tag = t
+	dt.Tok = t.Ast.Tok
+	dt.DontUseOriginal = true
+	return dt, true
+}
+
 func (p *Parser) tokenizeDataType(id string) []Tok {
 	parts := strings.SplitN(id, tokens.DOUBLE_COLON, -1)
 	var toks []Tok
@@ -2906,6 +3044,8 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 				def = defs.Structs[i]
 			case 'e':
 				def = defs.Enums[i]
+			case 'i':
+				def = defs.Traits[i]
 			}
 		} else {
 			def, _, _, _ = p.defById(id)
@@ -2920,6 +3060,9 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 		case *xstruct:
 			t.Used = true
 			return p.typeSourceIsStruct(t, dt.Tag, dt.Tok)
+		case *trait:
+			t.Used = true
+			return p.typeSourceIsTrait(t, dt.Tag, dt.Tok)
 		default:
 			if err {
 				p.pusherrtok(dt.Tok, "invalid_type_source")

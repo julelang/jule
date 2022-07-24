@@ -29,6 +29,7 @@ const (
 	UIntptr uint8 = 22
 	Enum    uint8 = 23
 	Struct  uint8 = 24
+	Trait   uint8 = 25
 )
 
 // TypeMap keep data type codes and kinds.

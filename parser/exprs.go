@@ -43,7 +43,7 @@ func valIsEnumType(v value) bool {
 
 func isBoolExpr(v value) bool {
 	switch {
-	case typeIsNilCompatible(v.data.Type):
+	case typeIsPtr(v.data.Type):
 		return true
 	case typeIsPure(v.data.Type):
 		switch {
@@ -77,7 +77,11 @@ func canGetPtr(v value) bool {
 }
 
 func valIsStructIns(val value) bool {
-	return !val.isType && val.data.Type.Id == xtype.Struct
+	return !val.isType && typeIsStruct(val.data.Type)
+}
+
+func valIsTraitIns(val value) bool {
+	return !val.isType && typeIsTrait(val.data.Type)
 }
 
 func isForeachIterExpr(val value) bool {

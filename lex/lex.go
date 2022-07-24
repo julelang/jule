@@ -361,6 +361,8 @@ var keywords = map[string]uint8{
 	tokens.CASE:     tokens.Case,
 	tokens.DEFAULT:  tokens.Default,
 	tokens.SELF:     tokens.Self,
+	tokens.TRAIT:    tokens.Trait,
+	tokens.IMPL:     tokens.Impl,
 }
 
 type oppair struct {

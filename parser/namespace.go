@@ -20,6 +20,7 @@ func (ns namespace) String() string {
 	cxx.WriteString(" {\n")
 	models.AddIndent()
 	cxx.WriteString(cxxPrototypes(ns.Defs))
+	cxx.WriteString(cxxTraits(ns.Defs))
 	cxx.WriteString(cxxStructs(ns.Defs))
 	cxx.WriteString(cxxGlobals(ns.Defs))
 	cxx.WriteByte('\n')

@@ -16,8 +16,18 @@ type xstruct struct {
 	Used        bool
 	Desc        string
 	constructor *Func
+	traits      []*trait
 	// Instance generics.
 	generics []DataType
+}
+
+func (s *xstruct) hasTrait(t *trait) bool {
+	for _, st := range s.traits {
+		if t == st {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *xstruct) cxxGenerics() (def string, serie string) {
@@ -117,12 +127,27 @@ func (s *xstruct) cxxConstructor() string {
 	return cxx.String()
 }
 
+func (s *xstruct) cxxTraits() string {
+	if len(s.traits) == 0 {
+		return ""
+	}
+	var cxx strings.Builder
+	cxx.WriteString(": ")
+	for _, t := range s.traits {
+		cxx.WriteString("public ")
+		cxx.WriteString(t.OutId())
+		cxx.WriteByte(',')
+	}
+	return cxx.String()[:cxx.Len()-1]
+}
+
 func (s *xstruct) decldefString() string {
 	var cxx strings.Builder
 	cxx.WriteString(genericsToCxx(s.Ast.Generics))
 	cxx.WriteByte('\n')
 	cxx.WriteString("struct ")
 	cxx.WriteString(s.outId())
+	cxx.WriteString(s.cxxTraits())
 	cxx.WriteString(" {\n")
 	models.AddIndent()
 	if len(s.Defs.Globals) > 0 {

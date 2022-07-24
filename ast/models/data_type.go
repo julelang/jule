@@ -146,6 +146,8 @@ func (dt DataType) String() string {
 	switch dt.Id {
 	case xtype.Id, xtype.Enum:
 		return xapi.OutId(dt.Kind, dt.Tok.File) + pointers
+	case xtype.Trait:
+		return dt.TraitString() + pointers
 	case xtype.Struct:
 		return dt.StructString() + pointers
 	case xtype.Func:
@@ -198,6 +200,16 @@ func (dt *DataType) MapString() string {
 	value := types[1]
 	value.DontUseOriginal = dt.DontUseOriginal
 	cxx.WriteString(value.String())
+	cxx.WriteByte('>')
+	return cxx.String()
+}
+
+// TraitString returns cxx value of trait data type.
+func (dt *DataType) TraitString() string {
+	var cxx strings.Builder
+	id, _ := dt.KindId()
+	cxx.WriteString("trait<")
+	cxx.WriteString(xapi.OutId(id, dt.Tok.File))
 	cxx.WriteByte('>')
 	return cxx.String()
 }

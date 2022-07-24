@@ -130,6 +130,8 @@ var Errors = map[string]string{
 	`func_cant_have_params_if_has_attribute`:   `function is cannot have parameter(s) if has @%s attribute`,
 	`const_volatile`:                           `constant cannot volatile`,
 	`divide_by_zero`:                           `divide by zero`,
+	`trait_hasnt_id`:                           `%s trait is not have this identifier: %s`,
+	`notimpl_trait_def`:                        `not implemented %s trait's %s define`,
 	`error`:                                    `error: %s`,
 }
 

@@ -419,6 +419,8 @@ func (e *eval) subId(toks Toks, m *exprModel) (v value) {
 			return e.enumSubId(val, idTok, m)
 		case valIsStructIns(val):
 			return e.structObjSubId(val, idTok, m)
+		case valIsTraitIns(val):
+			return e.traitObjSubId(val, idTok, m)
 		}
 	case typeIsSlice(checkType):
 		return e.sliceObjSubId(val, idTok, m)
@@ -806,6 +808,17 @@ func (e *eval) structObjSubId(val value, idTok Tok, m *exprModel) value {
 	val.lvalue = false
 	val.isType = false
 	val = e.xObjSubId(s.Defs, val, idTok, m)
+	val.constExpr = false
+	return val
+}
+
+func (e *eval) traitObjSubId(val value, idTok Tok, m *exprModel) value {
+	m.appendSubNode(exprNode{".get()"})
+	t := val.data.Type.Tag.(*trait)
+	val.constant = false
+	val.lvalue = false
+	val.isType = false
+	val = e.xObjSubId(t.Defs, val, idTok, m)
 	val.constExpr = false
 	return val
 }
