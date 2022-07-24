@@ -683,6 +683,10 @@ public:
 
     inline bool operator!=(std::nullptr_t) const noexcept
     { return !this->operator==(nil); }
+
+    friend inline
+    std::ostream& operator<<(std::ostream &_Stream, const trait<T> &_Src) noexcept
+    { return _Stream << _Src._data; }
 };
 
 struct voidptr_xt {
@@ -732,6 +736,9 @@ template<typename T>
 struct ptr {
     T *_ptr{nil};
 
+    inline void __ok(void) const noexcept
+    { if (!this->_ptr) { XID(panic)("pointer is nil"); } }
+
     ptr<T>(void) noexcept {}
     ptr<T>(std::nullptr_t) noexcept {}
 
@@ -739,7 +746,7 @@ struct ptr {
     { this->_ptr = _Ptr; }
 
     inline T &operator*(void) noexcept {
-        if (!this->_ptr) { XID(panic)("pointer is nil"); }
+        this->__ok();
         return *this->_ptr;
     }
 
@@ -791,8 +798,10 @@ struct ptr {
     inline bool operator!=(std::nullptr_t) const noexcept
     { return !this->operator==(nil); }
 
-    inline T &operator[](const uint_xt &_Index) noexcept
-    { return this->_ptr[_Index]; }
+    inline T &operator[](const uint_xt &_Index) noexcept {
+        this->__ok();
+        return this->_ptr[_Index];
+    }
 
     friend inline
     std::ostream& operator<<(std::ostream &_Stream, const ptr<T> &_Src) noexcept
