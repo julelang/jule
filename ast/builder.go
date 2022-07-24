@@ -896,40 +896,6 @@ func (b *Builder) paramBodyId(f *models.Func, p *models.Param, tok Tok) {
 	p.Id = tok.Kind
 }
 
-type exprNode struct {
-	expr string
-}
-
-func (en exprNode) String() string {
-	return en.expr
-}
-
-func (b *Builder) paramBodyDefaultExpr(p *models.Param, toks *Toks) {
-	braceCount := 0
-	for i, tok := range *toks {
-		if tok.Id == tokens.Brace {
-			switch tok.Kind {
-			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
-				braceCount++
-				continue
-			default:
-				braceCount--
-			}
-		}
-		if braceCount > 0 {
-			continue
-		}
-		exprToks := (*toks)[1:i]
-		*toks = (*toks)[i+1:]
-		if len(exprToks) > 0 {
-			p.Default = b.Expr(exprToks)
-		} else {
-			p.Default.Model = exprNode{xapi.DefaultExpr}
-		}
-		break
-	}
-}
-
 func (b *Builder) paramBodyDataType(f *models.Func, p *models.Param, toks Toks) {
 	i := 0
 	p.Type, _ = b.DataType(toks, &i, false, true)
@@ -955,9 +921,6 @@ func (b *Builder) paramBody(f *models.Func, p *models.Param, i *int, toks Toks) 
 	toks = toks[*i+1:]
 	if len(toks) == 0 {
 		return
-	}
-	if tok := toks[0]; tok.Id == tokens.Brace && tok.Kind == tokens.LBRACE {
-		b.paramBodyDefaultExpr(p, &toks)
 	}
 	if len(toks) > 0 {
 		b.paramBodyDataType(f, p, toks)
