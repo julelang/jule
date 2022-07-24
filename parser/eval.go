@@ -294,6 +294,24 @@ func (e *eval) dataTypeFunc(expr Tok, callRange Toks, m *exprModel) (v value, is
 	return
 }
 
+type callData struct {
+	expr     Toks
+	args     Toks
+	generics Toks
+}
+
+func getCallData(toks Toks, m *exprModel) (data callData) {
+	data.expr, data.args = ast.RangeLast(toks)
+	if len(data.expr) == 0 {
+		return
+	}
+	// Below is call expression
+	if tok := data.expr[len(data.expr)-1]; tok.Id == tokens.Brace && tok.Kind == tokens.RBRACKET {
+		data.expr, data.generics = ast.RangeLast(data.expr)
+	}
+	return
+}
+
 func (e *eval) parenthesesRange(toks Toks, m *exprModel) (v value) {
 	tok := toks[0]
 	switch tok.Id {
@@ -312,36 +330,28 @@ func (e *eval) parenthesesRange(toks Toks, m *exprModel) (v value) {
 			}
 		}
 	}
-	exprToks, rangeToks := ast.RangeLast(toks)
-	if len(exprToks) == 0 {
-		return e.betweenParentheses(rangeToks, m)
+	data := getCallData(toks, m)
+	if len(data.expr) == 0 {
+		return e.betweenParentheses(data.args, m)
 	}
-	// Below is call expression
-	var genericsToks Toks
-	if tok := exprToks[len(exprToks)-1]; tok.Id == tokens.Brace && tok.Kind == tokens.RBRACKET {
-		exprToks, genericsToks = ast.RangeLast(exprToks)
-	}
-	switch tok := exprToks[0]; tok.Id {
+	switch tok := data.expr[0]; tok.Id {
 	case tokens.DataType, tokens.Id:
-		if len(exprToks) == 1 && len(genericsToks) == 0 {
-			v, isret := e.dataTypeFunc(exprToks[0], rangeToks, m)
+		if len(data.expr) == 1 && len(data.generics) == 0 {
+			v, isret := e.dataTypeFunc(data.expr[0], data.args, m)
 			if isret {
 				return v
 			}
 		}
 		fallthrough
 	default:
-		v = e.process(exprToks, m)
+		v = e.process(data.expr, m)
 	}
 	switch {
 	case typeIsFunc(v.data.Type):
 		f := v.data.Type.Tag.(*Func)
-		return e.p.callFunc(f, genericsToks, rangeToks, m)
-	case valIsStructType(v):
-		s := v.data.Type.Tag.(*xstruct)
-		return e.p.callStructConstructor(s, genericsToks, rangeToks, m)
+		return e.p.callFunc(f, data.generics, data.args, m)
 	}
-	e.pusherrtok(exprToks[len(exprToks)-1], "invalid_syntax")
+	e.pusherrtok(data.expr[len(data.expr)-1], "invalid_syntax")
 	return
 }
 
@@ -726,15 +736,33 @@ func (e *eval) typeSubId(typeTok, idTok Tok, m *exprModel) (v value) {
 }
 
 func (e *eval) typeId(toks Toks, m *exprModel) (v value) {
-	tok := toks[0]
-	t, _, _ := e.p.typeById(tok.Kind)
-	if t == nil {
-		v.data.Type.Id = xtype.Void
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+	v.data.Type.Id = xtype.Void
+	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+	b := ast.NewBuilder(nil)
+	i := 0
+	t, ok := b.DataType(toks, &i, true, true)
+	b.Wait()
+	if !ok {
+		e.p.pusherrs(b.Errors...)
+		return
+	} else if i+1 >= len(toks) {
+		e.pusherrtok(toks[0], "invalid_syntax")
 		return
 	}
-	toks = toks[1:]
-	return e.enumerable(toks, t.Type, m)
+	t, ok = e.p.realType(t, true)
+	if !ok {
+		return
+	}
+	toks = toks[i+1:]
+	if toks[0].Id != tokens.Brace || toks[0].Kind != tokens.LBRACE {
+		e.pusherrtok(toks[0], "invalid_syntax")
+		return
+	}
+	if typeIsPure(t) && typeIsStruct(t) {
+		s := t.Tag.(*xstruct)
+		return e.p.callStructConstructor(s, toks, m)
+	}
+	return e.enumerable(toks, t, m)
 }
 
 func (e *eval) xObjSubId(dm *Defmap, val value, idTok Tok, m *exprModel) (v value) {
@@ -1287,26 +1315,21 @@ func (e *eval) braceRange(toks Toks, m *exprModel) (v value) {
 		e.pusherrtok(toks[0], "invalid_syntax")
 		return
 	}
-	tok := exprToks[0]
 	switch exprToks[0].Id {
 	case tokens.Id:
-		if len(exprToks) > 1 {
-			e.pusherrtok(tok, "invalid_syntax")
-			return
-		}
 		return e.typeId(toks, m)
 	case tokens.Brace:
 		switch exprToks[0].Kind {
 		case tokens.LBRACKET:
 			b := ast.NewBuilder(nil)
-			i := new(int)
-			t, ok := b.DataType(exprToks, i, true, true)
+			i := 0
+			t, ok := b.DataType(exprToks, &i, true, true)
 			b.Wait()
 			if !ok {
 				e.p.pusherrs(b.Errors...)
 				return
-			} else if *i+1 < len(exprToks) {
-				e.pusherrtok(toks[*i+1], "invalid_syntax")
+			} else if i+1 < len(exprToks) {
+				e.pusherrtok(toks[i+1], "invalid_syntax")
 			}
 			exprToks = toks[len(exprToks):]
 			return e.enumerable(exprToks, t, m)

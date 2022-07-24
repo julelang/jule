@@ -33,9 +33,11 @@ func isbool(s string) bool {
 	return s == tokens.TRUE || s == tokens.FALSE
 }
 
+/*
 func valIsStructType(v value) bool {
 	return v.isType && typeIsStruct(v.data.Type)
 }
+*/
 
 func valIsEnumType(v value) bool {
 	return v.isType && typeIsEnum(v.data.Type)

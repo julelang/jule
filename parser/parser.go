@@ -918,6 +918,11 @@ func (p *Parser) implStruct(impl models.Impl) {
 			sf.Ast.Receiver.Tag = xs
 			setGenerics(sf.Ast, p.generics)
 			p.generics = nil
+			for _, generic := range t.Generics {
+				if findGeneric(generic.Id, xs.Ast.Generics) != nil {
+					p.pusherrtok(generic.Tok, "exist_id", generic.Id)
+				}
+			}
 			xs.Defs.Funcs = append(xs.Defs.Funcs, sf)
 		}
 		p.checkGenerics(obj)
@@ -1692,6 +1697,17 @@ func (p *Parser) parseStructFunc(s *xstruct, f *function) (err bool) {
 		p.parseTypesNonGenerics(f.Ast)
 		return p.parseFunc(f)
 	}
+	/*if len(*s.constructor.Combines) == 0 {
+		return
+	}
+	for _, combine := range *s.constructor.Combines {
+		p.pushGenerics(s.Ast.Generics, combine)
+		p.reloadFuncTypes(f.Ast)
+		err = p.parseFunc(f)
+		if err {
+			return
+		}
+	}*/
 	return
 }
 
@@ -1744,10 +1760,25 @@ func (p *Parser) callFunc(f *Func, genericsToks, argsToks Toks, m *exprModel) va
 	return v
 }
 
-func (p *Parser) callStructConstructor(s *xstruct, genericsToks, argsToks Toks, m *exprModel) value {
-	v := p.parseFuncCallToks(s.constructor, genericsToks, argsToks, m)
+func (p *Parser) callStructConstructor(s *xstruct, argsToks Toks, m *exprModel) (v value) {
+	f := s.constructor
+	s = f.RetType.Type.Tag.(*xstruct)
+	v.data.Type = f.RetType.Type
+	v.data.Type.Kind = s.dataTypeString()
 	v.isType = false
 	v.lvalue = false
+	v.constExpr = false
+	// Set braces to parentheses
+	argsToks[0].Kind = tokens.LPARENTHESES
+	argsToks[len(argsToks)-1].Kind = tokens.RPARENTHESES
+	args := p.getArgs(argsToks, true)
+	m.appendSubNode(exprNode{f.RetType.String()})
+	m.appendSubNode(exprNode{tokens.LPARENTHESES})
+	p.parseArgs(f, args, m, f.Tok)
+	if m != nil {
+		m.appendSubNode(argsExpr{args.Src})
+	}
+	m.appendSubNode(exprNode{tokens.RPARENTHESES})
 	return v
 }
 
@@ -1809,13 +1840,13 @@ func (p *Parser) checkAnonFunc(f *Func) {
 	p.blockVars = blockVariables
 }
 
-func (p *Parser) getArgs(toks Toks) *models.Args {
+func (p *Parser) getArgs(toks Toks, targeting bool) *models.Args {
 	toks, _ = p.getRange(tokens.LPARENTHESES, tokens.RPARENTHESES, toks)
 	if toks == nil {
 		toks = make(Toks, 0)
 	}
 	b := new(ast.Builder)
-	args := b.Args(toks)
+	args := b.Args(toks, targeting)
 	if len(b.Errors) > 0 {
 		p.pusherrs(b.Errors...)
 		args = nil
@@ -1899,6 +1930,29 @@ func itsCombined(f *Func, generics []DataType) bool {
 	return false
 }
 
+func (p *Parser) parseGenericFunc(f *Func, generics []DataType) {
+	blockTypes := p.blockTypes
+	blockVars := p.blockVars
+	p.blockTypes = nil
+	defer func() { p.blockTypes, p.blockVars = blockTypes, blockVars }()
+	p.pushGenerics(f.Generics, generics)
+	if f.Receiver != nil {
+		s := f.Receiver.Tag.(*xstruct)
+		p.pushGenerics(s.Ast.Generics, s.Generics())
+	}
+	p.reloadFuncTypes(f)
+	if itsCombined(f, generics) {
+		return
+	}
+	*f.Combines = append(*f.Combines, generics)
+	rootBlock := p.rootBlock
+	nodeBlock := p.nodeBlock
+	defer func() { p.rootBlock, p.nodeBlock = rootBlock, nodeBlock }()
+	p.rootBlock = nil
+	p.nodeBlock = nil
+	p.parsePureFunc(f)
+}
+
 func (p *Parser) parseGenerics(f *Func, generics []DataType, m *exprModel, errTok Tok) bool {
 	if !p.checkGenericsQuantity(len(f.Generics), generics, errTok) {
 		return false
@@ -1911,37 +1965,11 @@ func (p *Parser) parseGenerics(f *Func, generics []DataType, m *exprModel, errTo
 		cxx.WriteByte(',')
 	}
 	m.appendSubNode(exprNode{cxx.String()[:cxx.Len()-1] + ">"})
-	// Apply generics
-	blockTypes := p.blockTypes
-	blockVars := p.blockVars
-	p.blockTypes = nil
-	defer func() { p.blockTypes, p.blockVars = blockTypes, blockVars }()
-	p.pushGenerics(f.Generics, generics)
-	if isConstructor(f) {
-		p.readyConstructor(&f)
-		s := f.RetType.Type.Tag.(*xstruct)
-		s.SetGenerics(generics)
-	} else if f.Receiver != nil {
-		s := f.Receiver.Tag.(*xstruct)
-		p.pushGenerics(s.Ast.Generics, s.Generics())
-	}
-	p.reloadFuncTypes(f)
-	if itsCombined(f, generics) {
-		return true
-	}
-	*f.Combines = append(*f.Combines, generics)
-	if isConstructor(f) {
-		return true
-	}
-	rootBlock := p.rootBlock
-	nodeBlock := p.nodeBlock
-	defer func() { p.rootBlock, p.nodeBlock = rootBlock, nodeBlock }()
-	p.rootBlock = nil
-	p.nodeBlock = nil
-	p.parsePureFunc(f)
+	p.parseGenericFunc(f, generics)
 	return true
 }
 
+/*
 func isConstructor(f *Func) bool {
 	if !typeIsStruct(f.RetType.Type) {
 		return false
@@ -1949,12 +1977,7 @@ func isConstructor(f *Func) bool {
 	s := f.RetType.Type.Tag.(*xstruct)
 	return f.Id == s.Ast.Id
 }
-
-func (p *Parser) readyConstructor(f **Func) {
-	s := (*f).RetType.Type.Tag.(*xstruct)
-	s = p.structConstructorInstance(s)
-	*f = s.constructor
-}
+*/
 
 func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *models.Args, m *exprModel, errTok Tok) (v value) {
 	if len(f.Generics) > 0 {
@@ -1982,14 +2005,6 @@ func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *models.Args, 
 	}
 	v.data.Type = f.RetType.Type
 	v.data.Value = f.Id
-	if isConstructor(f) {
-		if len(f.Generics) == 0 {
-			p.readyConstructor(&f)
-		}
-		s := f.RetType.Type.Tag.(*xstruct)
-		s.SetGenerics(generics)
-		v.data.Type.Kind = s.dataTypeString()
-	}
 	if m != nil {
 		m.appendSubNode(exprNode{tokens.LPARENTHESES})
 		defer m.appendSubNode(exprNode{tokens.RPARENTHESES})
@@ -2015,7 +2030,7 @@ func (p *Parser) parseFuncCallToks(f *Func, genericsToks, argsToks Toks, m *expr
 		generics = p.getGenerics(argsToks)
 	} else {
 		generics = p.getGenerics(genericsToks)
-		args = p.getArgs(argsToks)
+		args = p.getArgs(argsToks, false)
 	}
 	return p.parseFuncCall(f, generics, args, m, argsToks[0])
 }
@@ -2266,7 +2281,7 @@ func (p *Parser) checkBlock(b *models.Block) {
 func (p *Parser) recoverFuncExprStatement(s *models.ExprStatement) {
 	errtok := s.Expr.Processes[0][0]
 	callToks := s.Expr.Processes[0][1:]
-	args := p.getArgs(callToks)
+	args := p.getArgs(callToks, false)
 	handleParam := recoverFunc.Ast.Params[0]
 	if len(args.Src) == 0 {
 		p.pusherrtok(errtok, "missing_argument_for", handleParam.Id)
@@ -2959,22 +2974,37 @@ func (p *Parser) typeSourceIsMap(dt DataType, err bool) (DataType, bool) {
 }
 
 func (p *Parser) typeSourceIsStruct(s *xstruct, tag any, errTok Tok) (dt DataType, _ bool) {
+	s = p.structConstructorInstance(s)
 	var generics []DataType
 	// Has generics?
 	if tag != nil {
 		generics = tag.([]DataType)
+		*s.constructor.Combines = append(*s.constructor.Combines, generics)
+		s.SetGenerics(generics)
 		_ = p.checkGenericsQuantity(len(s.Ast.Generics), generics, errTok)
+		rootBlock := p.rootBlock
+		nodeBlock := p.nodeBlock
+		blockVars := p.blockVars
 		blockTypes := p.blockTypes
-		defer func() { p.blockTypes = blockTypes }()
 		p.pushGenerics(s.Ast.Generics, generics)
 		for i, generic := range generics {
 			generics[i], _ = p.typeSource(generic, true)
 		}
+		for _, f := range s.Defs.Funcs {
+			if len(f.Ast.Generics) == 0 {
+				p.rootBlock = nil
+				p.nodeBlock = nil
+				p.reloadFuncTypes(f.Ast)
+				_ = p.parseFunc(f)
+			}
+		}
+		p.blockVars = blockVars
+		p.blockTypes = blockTypes
+		p.rootBlock = rootBlock
+		p.nodeBlock = nodeBlock
 	} else if len(s.Ast.Generics) > 0 {
 		p.pusherrtok(errTok, "has_generics")
 	}
-	s = p.structConstructorInstance(s)
-	s.SetGenerics(generics)
 	dt.Id = xtype.Struct
 	dt.Kind = s.dataTypeString()
 	dt.Tag = s

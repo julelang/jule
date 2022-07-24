@@ -1633,7 +1633,7 @@ func (b *Builder) ExprStatement(bs *blockStatement) models.Statement {
 }
 
 // Args builds AST model of arguments.
-func (b *Builder) Args(toks Toks) *models.Args {
+func (b *Builder) Args(toks Toks, targeting bool) *models.Args {
 	args := new(models.Args)
 	last := 0
 	braceCount := 0
@@ -1649,32 +1649,32 @@ func (b *Builder) Args(toks Toks) *models.Args {
 		if braceCount > 0 || tok.Id != tokens.Comma {
 			continue
 		}
-		b.pushArg(args, toks[last:i], tok)
+		b.pushArg(args, targeting, toks[last:i], tok)
 		last = i + 1
 	}
 	if last < len(toks) {
 		if last == 0 {
 			if len(toks) > 0 {
-				b.pushArg(args, toks[last:], toks[last])
+				b.pushArg(args, targeting, toks[last:], toks[last])
 			}
 		} else {
-			b.pushArg(args, toks[last:], toks[last-1])
+			b.pushArg(args, targeting, toks[last:], toks[last-1])
 		}
 	}
 	return args
 }
 
-func (b *Builder) pushArg(args *models.Args, toks Toks, err Tok) {
+func (b *Builder) pushArg(args *models.Args, targeting bool, toks Toks, err Tok) {
 	if len(toks) == 0 {
 		b.pusherr(err, "invalid_syntax")
 		return
 	}
 	var arg models.Arg
 	arg.Tok = toks[0]
-	if arg.Tok.Id == tokens.Id {
+	if targeting && arg.Tok.Id == tokens.Id {
 		if len(toks) > 1 {
 			tok := toks[1]
-			if tok.Id == tokens.Operator && tok.Kind == tokens.EQUAL {
+			if tok.Id == tokens.Colon {
 				args.Targeted = true
 				arg.TargetId = arg.Tok.Kind
 				toks = toks[2:]

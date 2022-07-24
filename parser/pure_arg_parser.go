@@ -65,9 +65,7 @@ func (pap *pureArgParser) pushVariadicArgs(pair *paramMapPair) {
 
 func (pap *pureArgParser) checkPasses() {
 	for _, pair := range *pap.pmap {
-		if pair.arg == nil &&
-			!pair.param.Variadic &&
-			!paramHasDefaultArg(pair.param) {
+		if pair.arg == nil && !pair.param.Variadic {
 			pap.p.pusherrtok(pap.errTok, "missing_argument_for", pair.param.Id)
 		}
 	}
