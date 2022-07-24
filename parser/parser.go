@@ -868,7 +868,8 @@ func (p *Parser) implTrait(impl models.Impl) {
 	for _, tf := range trait.Ast.Funcs {
 		ok := false
 		ds := tf.DefString()
-		for _, f := range impl.Funcs {
+		for _, obj := range impl.Tree {
+			f := obj.Data.(*Func)
 			if tf.Pub == f.Pub && ds == f.DefString() {
 				ok = true
 				break
@@ -878,7 +879,8 @@ func (p *Parser) implTrait(impl models.Impl) {
 			p.pusherrtok(impl.Target.Tok, "notimpl_trait_def", trait.Ast.Id, ds)
 		}
 	}
-	for _, f := range impl.Funcs {
+	for _, obj := range impl.Tree {
+		f := obj.Data.(*Func)
 		if trait.FindFunc(f.Id) == nil {
 			p.pusherrtok(impl.Target.Tok, "trait_hasnt_id", trait.Ast.Id, f.Id)
 			break
@@ -901,16 +903,24 @@ func (p *Parser) implStruct(impl models.Impl) {
 		p.pusherrtok(impl.Trait, "id_noexist", impl.Trait.Kind)
 		return
 	}
-	for _, f := range impl.Funcs {
-		if xf, _, _ := xs.Defs.funcById(f.Id, nil); xf != nil {
-			p.pusherrtok(f.Tok, "exist_id", f.Id)
-			continue
+	for _, obj := range impl.Tree {
+		switch t := obj.Data.(type) {
+		case []GenericType:
+			p.Generics(t)
+		case *Func:
+			if xf, _, _ := xs.Defs.funcById(t.Id, nil); xf != nil {
+				p.pusherrtok(t.Tok, "exist_id", t.Id)
+				continue
+			}
+			sf := new(function)
+			sf.Ast = t
+			sf.Ast.Receiver.Tok = xs.Ast.Tok
+			sf.Ast.Receiver.Tag = xs
+			setGenerics(sf.Ast, p.generics)
+			p.generics = nil
+			xs.Defs.Funcs = append(xs.Defs.Funcs, sf)
 		}
-		sf := new(function)
-		sf.Ast = f
-		sf.Ast.Receiver.Tok = xs.Ast.Tok
-		sf.Ast.Receiver.Tag = xs
-		xs.Defs.Funcs = append(xs.Defs.Funcs, sf)
+		p.checkGenerics(obj)
 	}
 }
 
@@ -1092,6 +1102,13 @@ func (p *Parser) checkRetVars(f *function) {
 	}
 }
 
+func setGenerics(f *Func, generics []*models.GenericType) {
+	f.Generics = generics
+	if len(f.Generics) > 0 {
+		f.Combines = new([][]models.DataType)
+	}
+}
+
 // Func parse X function.
 func (p *Parser) Func(fast Func) {
 	_, tok, _, canshadow := p.defById(fast.Id)
@@ -1107,10 +1124,7 @@ func (p *Parser) Func(fast Func) {
 	p.attributes = nil
 	f.Desc = p.docText.String()
 	p.docText.Reset()
-	f.Ast.Generics = p.generics
-	if len(f.Ast.Generics) > 0 {
-		f.Ast.Combines = new([][]models.DataType)
-	}
+	setGenerics(f.Ast, p.generics)
 	p.generics = nil
 	p.checkRetVars(f)
 	p.checkFuncAttributes(f)
@@ -1612,36 +1626,6 @@ func (p *Parser) blockVarsOfFunc(f *Func) []*Var {
 		vars = append(vars, s.selfVar(*f.Receiver))
 	}
 	return vars
-}
-
-func (p *Parser) receiver(f *Func) {
-	if f.Receiver == nil {
-		return
-	}
-	if f.Receiver.Id != xtype.Id {
-		p.pusherrtok(f.Receiver.Tok, "invalid_type_source")
-		return
-	}
-	id, _ := f.Receiver.KindId()
-	s, _, _ := p.Defs.structById(id, nil)
-	if s == nil {
-		p.pusherrtok(f.Receiver.Tok, "invalid_type_source")
-		return
-	}
-	f.Receiver.Tag = s
-	d, _, _ := s.Defs.defById(f.Id, nil)
-	if d != -1 {
-		p.pusherrtok(f.Receiver.Tok, "exist_id", f.Id)
-		return
-	}
-	for _, generic := range f.Generics {
-		if findGeneric(generic.Id, s.Ast.Generics) != nil {
-			p.pusherrtok(generic.Tok, "exist_id", generic.Id)
-		}
-	}
-	fn := new(function)
-	fn.Ast = f
-	s.Defs.Funcs = append(s.Defs.Funcs, fn)
 }
 
 func (p *Parser) parsePureFunc(f *Func) (err bool) {

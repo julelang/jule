@@ -804,10 +804,7 @@ inline void XID(panic)(const char *_Message) { XID(panic)(XID(Error)(_Message));
 
 // region X_BUILTIN_FUNCTIONS
 template<typename _Obj_t>
-inline void XID(out)(const _Obj_t _Obj) noexcept {
-    if (_Obj == nil) { std::cout << "<nil>"; }
-    else { std::cout <<_Obj; }
-}
+inline void XID(out)(const _Obj_t _Obj) noexcept { std::cout <<_Obj; }
 
 template<typename _Obj_t>
 inline void XID(outln)(const _Obj_t _Obj) noexcept {

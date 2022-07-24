@@ -59,11 +59,6 @@ func (ast *Builder) Ended() bool {
 
 func (b *Builder) buildNode(toks Toks) {
 	tok := toks[0]
-	if tok.Id == tokens.Id || tok.Id == tokens.Operator {
-		if b.GlobalFunc(toks) {
-			return
-		}
-	}
 	switch tok.Id {
 	case tokens.Use:
 		b.Use(toks)
@@ -352,6 +347,11 @@ func (b *Builder) Id(toks Toks) {
 		return
 	case tokens.Brace:
 		switch tok.Kind {
+		case tokens.LPARENTHESES: // Function.
+			s := models.Statement{Tok: tok}
+			s.Data = b.Func(toks, false, false)
+			b.Tree = append(b.Tree, models.Object{Tok: s.Tok, Data: s})
+			return
 		case tokens.LBRACE: // Namespace.
 			b.Namespace(toks)
 			return
@@ -522,7 +522,7 @@ func (b *Builder) implTraitFuncs(impl *models.Impl, toks Toks) {
 		if ref {
 			f.Receiver.Kind = tokens.STAR + f.Receiver.Kind
 		}
-		impl.Funcs = append(impl.Funcs, &f)
+		impl.Tree = append(impl.Tree, models.Object{Tok: f.Tok, Data: &f})
 	}
 }
 
@@ -532,6 +532,13 @@ func (b *Builder) implStruct(impl *models.Impl, toks Toks) {
 		funcToks := b.skipStatement(&i, &toks)
 		tok := funcToks[0]
 		pub := false
+		if tok.Id == tokens.Type {
+			impl.Tree = append(impl.Tree, models.Object{
+				Tok:  tok,
+				Data: b.Generics(funcToks),
+			})
+			continue
+		}
 		if tok.Id == tokens.Pub {
 			pub = true
 			if len(funcToks) == 1 {
@@ -552,12 +559,12 @@ func (b *Builder) implStruct(impl *models.Impl, toks Toks) {
 		f.Pub = pub
 		f.Receiver = &models.DataType{
 			Id:   xtype.Struct,
-			Kind: impl.Target.Kind,
+			Kind: impl.Trait.Kind,
 		}
 		if ref {
 			f.Receiver.Kind = tokens.STAR + f.Receiver.Kind
 		}
-		impl.Funcs = append(impl.Funcs, &f)
+		impl.Tree = append(impl.Tree, models.Object{Tok: f.Tok, Data: &f})
 	}
 }
 
@@ -696,50 +703,6 @@ func (b *Builder) Attribute(toks Toks) {
 		Tok:  a.Tok,
 		Data: a,
 	})
-}
-
-// GlobalFunc builds AST model of global scope function.
-func (b *Builder) GlobalFunc(toks Toks) bool {
-	if len(toks) == 0 {
-		return false
-	}
-	i := 0
-	tok := toks[i]
-	if tok.Id == tokens.Operator {
-		if tok.Kind != tokens.STAR {
-			return false
-		}
-		i++
-		tok = toks[i]
-	}
-	if tok.Id != tokens.Id {
-		return false
-	}
-	if i+1 >= len(toks) {
-		return false
-	}
-	var receiver *models.DataType
-	funcToks := toks
-	i++
-	tok = toks[i]
-	if tok.Id == tokens.Dot {
-		typeToks := toks[:i]
-		funcToks = toks[i+1:]
-		receiver = new(models.DataType)
-		*receiver, _ = b.DataType(typeToks, new(int), true, true)
-	}
-	if len(funcToks) < 2 {
-		return false
-	}
-	tok = funcToks[1]
-	if tok.Id != tokens.Brace || tok.Kind != tokens.LPARENTHESES {
-		return false
-	}
-	f := b.Func(funcToks, false, false)
-	f.Receiver = receiver
-	s := models.Statement{Tok: f.Tok, Data: f}
-	b.Tree = append(b.Tree, models.Object{Tok: f.Tok, Data: s})
-	return true
 }
 
 func (b *Builder) funcPrototype(toks *Toks, anon bool) (f models.Func, ok bool) {

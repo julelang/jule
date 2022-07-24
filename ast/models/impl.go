@@ -4,5 +4,5 @@ package models
 type Impl struct {
 	Trait  Tok
 	Target DataType
-	Funcs  []*Func
+	Tree   []Object
 }
