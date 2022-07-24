@@ -7,7 +7,6 @@ import (
 	"github.com/the-xlang/xxc/ast/models"
 	"github.com/the-xlang/xxc/lex/tokens"
 	"github.com/the-xlang/xxc/pkg/x"
-	"github.com/the-xlang/xxc/pkg/xapi"
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
@@ -266,28 +265,26 @@ var strDefaultFunc = Func{
 	RetType: RetType{Type: DataType{Id: xtype.Str, Kind: tokens.STR}},
 }
 
-var errorStruct = &xstruct{
-	Ast: Struct{
+var errorTrait = &trait{
+	Ast: &models.Trait{
 		Id: "Error",
 	},
 	Defs: &Defmap{
-		Globals: []*Var{
-			{
-				Pub:  true,
-				Id:   "message",
-				Type: DataType{Id: xtype.Str, Kind: tokens.STR},
-			},
+		Funcs: []*function{
+			{Ast: &models.Func{
+				Pub:     true,
+				Id:      "error",
+				RetType: models.RetType{Type: DataType{Id: xtype.Str, Kind: tokens.STR}},
+			}},
 		},
-	},
-	constructor: &Func{
-		Pub: true,
 	},
 }
 
 var errorType = DataType{
-	Id:   xtype.Struct,
-	Kind: errorStruct.Ast.Id,
-	Tag:  errorStruct,
+	Id:              xtype.Trait,
+	Kind:            errorTrait.Ast.Id,
+	Tag:             errorTrait,
+	DontUseOriginal: true,
 }
 
 var panicFunc = &function{
@@ -370,8 +367,8 @@ var Builtin = &Defmap{
 			},
 		},
 	},
-	Structs: []*xstruct{
-		errorStruct,
+	Traits: []*trait{
+		errorTrait,
 	},
 }
 
@@ -660,15 +657,5 @@ func init() {
 
 		uintMax.Expr = u64statics.Globals[0].Expr
 		uintMax.ExprTag = u64statics.Globals[0].ExprTag
-	}
-
-	errorStruct.constructor.Id = errorStruct.Ast.Id
-	errorStruct.constructor.RetType.Type = errorType
-	for _, field := range errorStruct.Defs.Globals {
-		var param Param
-		param.Id = field.Id
-		param.Type = field.Type
-		param.Default.Model = exprNode{xtype.CxxId(param.Type.Id) + xapi.DefaultExpr}
-		errorStruct.constructor.Params = append(errorStruct.constructor.Params, param)
 	}
 }

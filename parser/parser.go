@@ -842,11 +842,27 @@ func (p *Parser) Trait(t models.Trait) {
 		return
 	}
 	trait := new(trait)
-	trait.Defs = new(Defmap)
-	trait.Defs.Funcs = make([]*function, len(t.Funcs))
 	trait.Desc = p.docText.String()
 	p.docText.Reset()
 	trait.Ast = &t
+	trait.Defs = new(Defmap)
+	trait.Defs.Funcs = make([]*function, len(t.Funcs))
+	for i, f := range trait.Ast.Funcs {
+		if xapi.IsIgnoreId(f.Id) {
+			p.pusherrtok(f.Tok, "ignore_id")
+		}
+		for j, jf := range trait.Ast.Funcs {
+			if j >= i {
+				break
+			} else if f.Id == jf.Id {
+				p.pusherrtok(f.Tok, "exist_id", f.Id)
+			}
+		}
+		p.parseTypesNonGenerics(f)
+		tf := new(function)
+		tf.Ast = f
+		trait.Defs.Funcs[i] = tf
+	}
 	p.Defs.Traits = append(p.Defs.Traits, trait)
 }
 
@@ -865,12 +881,12 @@ func (p *Parser) implTrait(impl models.Impl) {
 	}
 	impl.Target.Tag = xs
 	xs.traits = append(xs.traits, trait)
-	for _, tf := range trait.Ast.Funcs {
+	for _, tf := range trait.Defs.Funcs {
 		ok := false
-		ds := tf.DefString()
+		ds := tf.Ast.DefString()
 		for _, obj := range impl.Tree {
 			f := obj.Data.(*Func)
-			if tf.Pub == f.Pub && ds == f.DefString() {
+			if tf.Ast.Pub == f.Pub && ds == f.DefString() {
 				ok = true
 				break
 			}
@@ -1506,42 +1522,9 @@ func (p *Parser) check() {
 	p.WaitingGlobals()
 	p.waitingGlobals = nil
 	if !p.JustDefs {
-		p.checkTraits()
 		p.checkFuncs()
 		p.checkStructs()
 		p.checkUses()
-	}
-}
-
-func (p *Parser) checkTrait(t *trait) {
-	for i, f := range t.Ast.Funcs {
-		if xapi.IsIgnoreId(f.Id) {
-			p.pusherrtok(f.Tok, "ignore_id")
-		}
-		for j, jf := range t.Ast.Funcs {
-			if j >= i {
-				break
-			} else if f.Id == jf.Id {
-				p.pusherrtok(f.Tok, "exist_id", f.Id)
-			}
-		}
-		p.parseTypesNonGenerics(f)
-		tf := new(function)
-		tf.Ast = f
-		t.Defs.Funcs[i] = tf
-	}
-}
-
-func (p *Parser) checkTraits() {
-	for _, ns := range p.Defs.Namespaces {
-		p.Defs = ns.Defs
-		for _, t := range ns.Defs.Traits {
-			p.checkTrait(t)
-		}
-		p.Defs = p.Defs.parent
-	}
-	for _, t := range p.Defs.Traits {
-		p.checkTrait(t)
 	}
 }
 
@@ -1798,9 +1781,6 @@ func (p *Parser) parseField(s *xstruct, f **Var, i int) {
 }
 
 func (p *Parser) structConstructorInstance(as *xstruct) *xstruct {
-	if as == errorStruct {
-		return as
-	}
 	s := new(xstruct)
 	s.Ast = as.Ast
 	s.constructor = new(Func)
@@ -2297,7 +2277,7 @@ func (p *Parser) recoverFuncExprStatement(s *models.ExprStatement) {
 	handler := v.data.Type.Tag.(*Func)
 	s.Expr.Model = exprNode{"try{\n"}
 	var catcher serieExpr
-	catcher.exprs = append(catcher.exprs, "} catch(XID(Error) ")
+	catcher.exprs = append(catcher.exprs, "} catch(trait<XID(Error)> ")
 	catcher.exprs = append(catcher.exprs, handler.Params[0].OutId())
 	catcher.exprs = append(catcher.exprs, ") ")
 	r, _ := utf8.DecodeRuneInString(v.data.Value)
@@ -2921,11 +2901,8 @@ func (p *Parser) typeSourceOfMultiTyped(dt DataType, err bool) (DataType, bool) 
 	types := dt.Tag.([]DataType)
 	ok := false
 	for i, t := range types {
-		t, okr := p.typeSource(t, err)
+		t, ok = p.typeSource(t, err)
 		types[i] = t
-		if ok {
-			ok = okr
-		}
 	}
 	dt.Tag = types
 	return dt, ok
@@ -3045,10 +3022,17 @@ func (p *Parser) tokenizeDataType(id string) []Tok {
 }
 
 func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
-	original := dt.Original
-	defer func() { ret.Original = original }()
 	if dt.Kind == "" {
 		return dt, true
+	}
+	if !dt.DontUseOriginal {
+		original := dt.Original
+		defer func() {
+			if !ret.DontUseOriginal {
+				ret.Original = original
+			}
+		}()
+		dt.SetToOriginal()
 	}
 	if dt.MultiTyped {
 		return p.typeSourceOfMultiTyped(dt, err)
@@ -3109,9 +3093,15 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 }
 
 func (p *Parser) realType(dt DataType, err bool) (ret DataType, _ bool) {
-	original := dt.Original
-	defer func() { ret.Original = original }()
-	dt.SetToOriginal()
+	if !dt.DontUseOriginal {
+		original := dt.Original
+		defer func() {
+			if !ret.DontUseOriginal {
+				ret.Original = original
+			}
+		}()
+		dt.SetToOriginal()
+	}
 	return p.typeSource(dt, err)
 }
 

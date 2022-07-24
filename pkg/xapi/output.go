@@ -73,7 +73,7 @@ typedef uintptr_t                         uintptr_xt;
 template<typename _Item_t> class slice;
 class str_xt;
 
-inline void XID(panic)(const char *_Message);
+void XID(panic)(const char *_Message);
 // endregion X_DECLARATIONS
 
 // region X_CXX_API_FUNCTIONS
@@ -642,7 +642,7 @@ template<typename T>
 struct trait {
 public:
     T *_data{nil};
-    uint_xt _used{0};
+    mutable uint_xt _used{0};
 
     trait<T>(void) noexcept {}
     trait<T>(std::nullptr_t) noexcept {}
@@ -654,7 +654,7 @@ public:
         this->_data = _alloc;
     }
 
-    trait<T>(trait<T> &_Src) noexcept
+    trait<T>(const trait<T> &_Src) noexcept
     { this->operator=(_Src); }
 
     trait<T>(const trait<T> &&_Src) noexcept
@@ -671,16 +671,16 @@ public:
         this->_data = nil;
     }
 
-    inline void operator=(trait<T> &_Src) noexcept {
+    inline void operator=(const trait<T> &_Src) noexcept {
         this->_data = _Src._data;
         _Src._used++;
     }
 
-    inline void operator=(const trait<T> &&_Src) noexcept
+    inline void operator=(trait<T> &_Src) noexcept
     { this->_data = _Src._data; }
 
     inline bool operator==(std::nullptr_t) const noexcept
-    { return this->_data; }
+    { return !this->_data; }
 
     inline bool operator!=(std::nullptr_t) const noexcept
     { return !this->operator==(nil); }
@@ -785,27 +785,20 @@ str_xt tostr(const _Obj_t &_Obj) noexcept {
 
 // region PANIC_DEFINES
 struct XID(Error) {
-public:
-    str_xt XID(message);
-
-    XID(Error)(str_xt _Message) noexcept
-    { this->XID(message) = _Message; }
-
-    inline operator bool(void) const noexcept
-    { return !this->XID(message).empty(); }
-
-    inline bool operator==(const XID(Error) &_Src) const
-    { return this->XID(message) == _Src.XID(message); }
-
-    inline bool operator!=(const XID(Error) &_Src) const
-    { return !this->operator==(_Src); }
+    virtual str_xt error(void) = 0;
 };
 
-std::ostream &operator<<(std::ostream &_Stream, const XID(Error) &_Error)
-{ return _Stream << _Error.XID(message); }
+inline void XID(panic)(trait<XID(Error)> _Error) { throw _Error; }
 
-inline void XID(panic)(const struct XID(Error) &_Error) { throw _Error; }
-inline void XID(panic)(const char *_Message) { XID(panic)(XID(Error)(_Message)); }
+inline void XID(panic)(const char *_Message) {
+    struct panic_error: public XID(Error) {
+        const char *_message;
+        str_xt error(void) { return this->_message; }
+    };
+    panic_error _error;
+    _error._message = _Message;
+    XID(panic)(_error);
+}
 // endregion PANIC_DEFINES
 
 // region X_BUILTIN_FUNCTIONS
@@ -854,8 +847,8 @@ tracer ___trace{};
 
 void x_terminate_handler(void) noexcept {
     try { std::rethrow_exception(std::current_exception()); }
-    catch (const XID(Error) _error) {
-        std::cout << "panic: " << _error.XID(message) << std::endl << std::endl;
+    catch (trait<XID(Error)> _error) {
+        std::cout << "panic: " << _error.get().error() << std::endl << std::endl;
         std::cout << ___trace.string();
         std::exit(X_EXIT_PANIC);
     }

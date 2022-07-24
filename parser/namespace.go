@@ -19,6 +19,8 @@ func (ns namespace) String() string {
 	cxx.WriteString(xapi.OutId(ns.Id, ns.Tok.File))
 	cxx.WriteString(" {\n")
 	models.AddIndent()
+	cxx.WriteString(cxxTypes(ns.Defs))
+	cxx.WriteByte('\n')
 	cxx.WriteString(cxxPrototypes(ns.Defs))
 	cxx.WriteString(cxxTraits(ns.Defs))
 	cxx.WriteString(cxxStructs(ns.Defs))

@@ -49,7 +49,14 @@ func (f *Func) DataTypeString() string {
 		cxx.WriteString(cxxStr)
 	}
 	cxx.WriteByte(')')
-	if f.RetType.Type.Id != xtype.Void {
+	if f.RetType.Type.MultiTyped {
+		cxx.WriteByte('[')
+		for _, t := range f.RetType.Type.Tag.([]DataType) {
+			cxx.WriteString(t.Kind)
+			cxx.WriteByte(',')
+		}
+		return cxx.String()[:cxx.Len()-1] + "]"
+	} else if f.RetType.Type.Id != xtype.Void {
 		cxx.WriteString(f.RetType.Type.Kind)
 	}
 	return cxx.String()
