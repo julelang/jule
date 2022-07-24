@@ -48,20 +48,19 @@ type waitingGlobal struct {
 
 // Parser is parser of X code.
 type Parser struct {
-	attributes      []Attribute
-	docText         strings.Builder
-	iterCount       int
-	caseCount       int
-	wg              sync.WaitGroup
-	rootBlock       *models.Block
-	nodeBlock       *models.Block
-	generics        []*GenericType
-	blockTypes      []*Type
-	blockVars       []*Var
-	embeds          strings.Builder
-	waitingGlobals  []waitingGlobal
-	eval            *eval
-	receiveredFuncs []*function
+	attributes     []Attribute
+	docText        strings.Builder
+	iterCount      int
+	caseCount      int
+	wg             sync.WaitGroup
+	rootBlock      *models.Block
+	nodeBlock      *models.Block
+	generics       []*GenericType
+	blockTypes     []*Type
+	blockVars      []*Var
+	embeds         strings.Builder
+	waitingGlobals []waitingGlobal
+	eval           *eval
 
 	NoLocalPkg bool
 	JustDefs   bool
@@ -851,8 +850,7 @@ func (p *Parser) Trait(t models.Trait) {
 	p.Defs.Traits = append(p.Defs.Traits, trait)
 }
 
-// Impl parses X impl.
-func (p *Parser) Impl(impl models.Impl) {
+func (p *Parser) implTrait(impl models.Impl) {
 	trait, _, _ := p.traitById(impl.Trait.Kind)
 	if trait == nil {
 		p.pusherrtok(impl.Trait, "id_noexist", impl.Trait.Kind)
@@ -884,13 +882,45 @@ func (p *Parser) Impl(impl models.Impl) {
 		if trait.FindFunc(f.Id) == nil {
 			p.pusherrtok(impl.Target.Tok, "trait_hasnt_id", trait.Ast.Id, f.Id)
 			break
+		} else if xf, _, _ := xs.Defs.funcById(f.Id, nil); xf != nil {
+			p.pusherrtok(f.Tok, "exist_id", f.Id)
+			continue
 		}
 		sf := new(function)
 		sf.Ast = f
-		sf.Ast.Receiver = &impl.Target
+		sf.Ast.Receiver.Tok = xs.Ast.Tok
+		sf.Ast.Receiver.Tag = xs
 		sf.used = true
 		xs.Defs.Funcs = append(xs.Defs.Funcs, sf)
 	}
+}
+
+func (p *Parser) implStruct(impl models.Impl) {
+	xs, _, _ := p.structById(impl.Trait.Kind)
+	if xs == nil {
+		p.pusherrtok(impl.Trait, "id_noexist", impl.Trait.Kind)
+		return
+	}
+	for _, f := range impl.Funcs {
+		if xf, _, _ := xs.Defs.funcById(f.Id, nil); xf != nil {
+			p.pusherrtok(f.Tok, "exist_id", f.Id)
+			continue
+		}
+		sf := new(function)
+		sf.Ast = f
+		sf.Ast.Receiver.Tok = xs.Ast.Tok
+		sf.Ast.Receiver.Tag = xs
+		xs.Defs.Funcs = append(xs.Defs.Funcs, sf)
+	}
+}
+
+// Impl parses X impl.
+func (p *Parser) Impl(impl models.Impl) {
+	if !typeIsVoid(impl.Target) {
+		p.implTrait(impl)
+		return
+	}
+	p.implStruct(impl)
 }
 
 // pushNS pushes namespace to defmap and returns leaf namespace.
@@ -1085,12 +1115,8 @@ func (p *Parser) Func(fast Func) {
 	p.checkRetVars(f)
 	p.checkFuncAttributes(f)
 	f.used = f.Ast.Id == x.InitializerFunction
-	if f.Ast.Receiver == nil {
-		p.Defs.Funcs = append(p.Defs.Funcs, f)
-		p.parseTypesNonGenerics(f.Ast)
-	} else {
-		p.receiveredFuncs = append(p.receiveredFuncs, f)
-	}
+	p.parseTypesNonGenerics(f.Ast)
+	p.Defs.Funcs = append(p.Defs.Funcs, f)
 }
 
 // ParseVariable parse X global variable.
@@ -1460,7 +1486,6 @@ func (p *Parser) check() {
 	p.checkTypes()
 	p.WaitingGlobals()
 	p.waitingGlobals = nil
-	p.checkReceivers()
 	if !p.JustDefs {
 		p.checkTraits()
 		p.checkFuncs()
@@ -1718,12 +1743,6 @@ func (p *Parser) checkStructs() {
 	}
 	for _, s := range p.Defs.Structs {
 		check(s)
-	}
-}
-
-func (p *Parser) checkReceivers() {
-	for _, f := range p.receiveredFuncs {
-		p.receiver(f.Ast)
 	}
 }
 

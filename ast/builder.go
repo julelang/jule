@@ -503,16 +503,70 @@ func (b *Builder) Trait(toks Toks) {
 	b.Tree = append(b.Tree, models.Object{Tok: t.Tok, Data: t})
 }
 
-func (b *Builder) implFuncs(toks Toks) []*models.Func {
-	var funcs []*models.Func
+func (b *Builder) implTraitFuncs(impl *models.Impl, toks Toks) {
 	i := 0
 	for i < len(toks) {
 		funcToks := b.skipStatement(&i, &toks)
+		ref := false
+		tok := funcToks[0]
+		if tok.Id == tokens.Operator && tok.Kind == tokens.AMPER {
+			ref = true
+			funcToks = funcToks[1:]
+		}
 		f := b.Func(funcToks, false, false)
 		f.Pub = true
-		funcs = append(funcs, &f)
+		f.Receiver = &models.DataType{
+			Id:   xtype.Struct,
+			Kind: impl.Target.Kind,
+		}
+		if ref {
+			f.Receiver.Kind = tokens.STAR + f.Receiver.Kind
+		}
+		impl.Funcs = append(impl.Funcs, &f)
 	}
-	return funcs
+}
+
+func (b *Builder) implStruct(impl *models.Impl, toks Toks) {
+	i := 0
+	for i < len(toks) {
+		funcToks := b.skipStatement(&i, &toks)
+		tok := funcToks[0]
+		pub := false
+		if tok.Id == tokens.Pub {
+			pub = true
+			if len(funcToks) == 1 {
+				b.pusherr(funcToks[0], "invalid_syntax")
+				continue
+			}
+			funcToks = funcToks[1:]
+			if len(funcToks) > 0 {
+				tok = funcToks[0]
+			}
+		}
+		ref := false
+		if tok.Id == tokens.Operator && tok.Kind == tokens.AMPER {
+			ref = true
+			funcToks = funcToks[1:]
+		}
+		f := b.Func(funcToks, false, false)
+		f.Pub = pub
+		f.Receiver = &models.DataType{
+			Id:   xtype.Struct,
+			Kind: impl.Target.Kind,
+		}
+		if ref {
+			f.Receiver.Kind = tokens.STAR + f.Receiver.Kind
+		}
+		impl.Funcs = append(impl.Funcs, &f)
+	}
+}
+
+func (b *Builder) implFuncs(impl *models.Impl, toks Toks) {
+	if impl.Target.Id != xtype.Void {
+		b.implTraitFuncs(impl, toks)
+		return
+	}
+	b.implStruct(impl, toks)
 }
 
 // Impl builds AST model of impl statement.
@@ -527,14 +581,18 @@ func (b *Builder) Impl(toks Toks) {
 		b.pusherr(tok, "invalid_syntax")
 		return
 	}
+	var impl models.Impl
 	if len(toks) < 3 {
 		b.pusherr(tok, "invalid_syntax")
 		return
 	}
-	var impl models.Impl
 	impl.Trait = tok
 	tok = toks[2]
 	if tok.Id != tokens.In {
+		if tok.Id == tokens.Brace && tok.Kind == tokens.LBRACE {
+			toks = toks[2:]
+			goto body
+		}
 		b.pusherr(tok, "invalid_syntax")
 		return
 	}
@@ -542,29 +600,18 @@ func (b *Builder) Impl(toks Toks) {
 		b.pusherr(tok, "invalid_syntax")
 		return
 	}
-	i := 3
-	tok = toks[i]
-	if tok.Id == tokens.Operator {
-		if tok.Kind != tokens.STAR {
-			b.pusherr(tok, "invalid_syntax")
-			return
-		}
-		i++
-		tok = toks[i]
-	}
+	tok = toks[3]
 	if tok.Id != tokens.Id {
 		b.pusherr(tok, "invalid_syntax")
 		return
 	}
-	i++
-	receiverToks := toks[3:i]
-	toks = toks[i:]
-	i = 0
-	impl.Target, _ = b.DataType(receiverToks, &i, false, true)
-	if i+1 < len(receiverToks) {
-		b.pusherr(receiverToks[i+1], "invalid_syntax")
+	{
+		i := 0
+		impl.Target, _ = b.DataType(toks[3:4], &i, false, true)
+		toks = toks[4:]
 	}
-	i = 0
+body:
+	i := 0
 	bodyToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
 	if bodyToks == nil {
 		b.pusherr(impl.Trait, "body_not_exist")
@@ -573,7 +620,7 @@ func (b *Builder) Impl(toks Toks) {
 	if i < len(toks) {
 		b.pusherr(toks[i], "invalid_syntax")
 	}
-	impl.Funcs = b.implFuncs(bodyToks)
+	b.implFuncs(&impl, bodyToks)
 	b.Tree = append(b.Tree, models.Object{Tok: impl.Trait, Data: impl})
 }
 
