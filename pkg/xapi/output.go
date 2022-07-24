@@ -678,6 +678,12 @@ public:
 
     inline void operator=(const trait<T> &&_Src) noexcept
     { this->_data = _Src._data; }
+
+    inline bool operator==(std::nullptr_t) const noexcept
+    { return this->_data; }
+
+    inline bool operator!=(std::nullptr_t) const noexcept
+    { return !this->operator==(nil); }
 };
 // endregion X_BUILTIN_TYPES
 

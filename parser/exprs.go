@@ -44,18 +44,7 @@ func valIsEnumType(v value) bool {
 }
 
 func isBoolExpr(v value) bool {
-	switch {
-	case typeIsPtr(v.data.Type):
-		return true
-	case typeIsPure(v.data.Type):
-		switch {
-		case v.data.Type.Id == xtype.Bool:
-			return true
-		case typeIsStruct(v.data.Type) && v.data.Type.Tag == errorStruct:
-			return true
-		}
-	}
-	return false
+	return typeIsPure(v.data.Type) && v.data.Type.Id == xtype.Bool
 }
 
 func isfloat(s string) bool {
