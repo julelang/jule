@@ -638,10 +638,84 @@ public:
 };
 
 template<typename T>
+struct ptr {
+    T *_ptr{nil};
+    mutable uint_xt *_ref{nil};
+
+    ptr<T>(void) noexcept {}
+
+    ptr<T>(T* _Ptr) noexcept
+    { this->_ptr = _Ptr; }
+
+    ptr<T>(const ptr<T> &_Ptr) noexcept
+    { this->operator=(_Ptr); }
+
+    ~ptr<T>(void) noexcept
+    { this->__dealloc(); }
+
+    inline void __check_valid(void) const noexcept
+    { if(!this->_ptr) { XID(panic)("nil pointer"); } }
+
+    void __dealloc(void) noexcept {
+        if (!this->_ref) { return; }
+        (*this->_ref)--;
+        if ((*this->_ref) != 0) { return; }
+        delete this->_ref;
+        this->_ref = nil;
+        delete this->_ptr;
+        this->_ptr = nil;
+    }
+
+    inline T &operator*(void) noexcept {
+        this->__check_valid();
+        return *this->_ptr;
+    }
+
+    inline T *operator->(void) noexcept {
+        this->__check_valid();
+        return this->_ptr;
+    }
+
+    inline operator uintptr_xt(void) const noexcept
+    { return (uintptr_xt)(this->_ptr); }
+
+    void operator=(const ptr<T> &_Ptr) noexcept {
+        this->__dealloc();
+        if (_Ptr._ref) { (*_Ptr._ref)++; }
+        this->_ref = _Ptr._ref;
+        this->_ptr = _Ptr._ptr;
+    }
+
+    void operator=(const std::nullptr_t) noexcept {
+        if (!this->_ref) {
+            this->_ptr = nil;
+            return;
+        }
+        this->__dealloc();
+    }
+
+    inline bool operator==(const std::nullptr_t) const noexcept
+    { return this->_ptr == nil; }
+
+    inline bool operator!=(const std::nullptr_t) const noexcept
+    { return !this->operator==(nil); }
+
+    inline bool operator==(const ptr<T> &_Ptr) const noexcept
+    { return this->_ptr == _Ptr; }
+
+    inline bool operator!=(const ptr<T> &_Ptr) const noexcept
+    { return !this->operator==(_Ptr); }
+
+    friend inline
+    std::ostream& operator<<(std::ostream &_Stream, const ptr<T> &_Src) noexcept
+    { return _Stream << _Src._ptr; }
+};
+
+template<typename T>
 struct trait {
 public:
     T *_data{nil};
-    mutable uint_xt _used{0};
+    mutable uint_xt *_ref{nil};
 
     trait<T>(void) noexcept {}
     trait<T>(std::nullptr_t) noexcept {}
@@ -650,33 +724,42 @@ public:
     trait<T>(const TT &_Data) noexcept {
         TT *_alloc = new(std::nothrow) TT{_Data};
         if (!_alloc) { XID(panic)("memory allocation failed"); }
-        this->_data = _alloc;
+        this->_data = (T*)(_alloc);
+        this->_ref = new(std::nothrow) uint_xt{1};
+        if (!this->_ref) { XID(panic)("memory allocation failed"); }
     }
 
     trait<T>(const trait<T> &_Src) noexcept
     { this->operator=(_Src); }
 
-    trait<T>(const trait<T> &&_Src) noexcept
-    { this->operator=(_Src); }
+    void __dealloc(void) noexcept {
+        if (!this->_ref) { return; }
+        (*this->_ref)--;
+        if (*this->_ref != 0) { return; }
+        delete this->_ref;
+        this->_ref = nil;
+        delete this->_data;
+        this->_data = nil;
+        std::cout << "deallocate" << std::endl;
+    }
 
     T &get(void) noexcept {
         if (!this->_data) { XID(panic)("interface is nil"); }
         return *this->_data;
     }
 
-    ~trait(void) noexcept {
-        if (this->_used > 0) { return; }
-        delete this->_data;
-        this->_data = nil;
-    }
+    ~trait(void) noexcept
+    { this->__dealloc(); }
+
+    inline void operator=(const std::nullptr_t) noexcept
+    { this->__dealloc(); }
 
     inline void operator=(const trait<T> &_Src) noexcept {
+        this->__dealloc();
+        (*_Src._ref)++;
         this->_data = _Src._data;
-        _Src._used++;
+        this->_ref = _Src._ref;
     }
-
-    inline void operator=(trait<T> &_Src) noexcept
-    { this->_data = _Src._data; }
 
     inline bool operator==(std::nullptr_t) const noexcept
     { return !this->_data; }
@@ -687,125 +770,6 @@ public:
     friend inline
     std::ostream& operator<<(std::ostream &_Stream, const trait<T> &_Src) noexcept
     { return _Stream << _Src._data; }
-};
-
-struct voidptr_xt {
-    void *_ptr{nil};
-
-    voidptr_xt(void) noexcept {}
-    voidptr_xt(std::nullptr_t) noexcept {}
-
-    template<typename T>
-    voidptr_xt(const T *_Ptr) noexcept
-    { this->_ptr = (void*)(_Ptr); }
-
-    inline operator uintptr_xt(void) const noexcept
-    { return (uintptr_xt)(this->_ptr); }
-
-    inline operator void*(void) const noexcept
-    { return this->_ptr; }
-
-    template<typename T>
-    inline operator ptr<T>(void) const noexcept
-    { return (T*)(this->_ptr); }
-
-    inline void operator=(void *_Ptr) noexcept
-    { this->_ptr = _Ptr; }
-
-    inline void operator=(std::nullptr_t) noexcept
-    { this->_ptr = nil; }
-
-    inline bool operator==(const void *_Ptr) const noexcept
-    { return this->_ptr == _Ptr; }
-
-    inline bool operator!=(const void *_Ptr) const noexcept
-    { return !this->operator==(_Ptr); }
-
-    inline bool operator==(std::nullptr_t) const noexcept
-    { return !this->_ptr; }
-
-    inline bool operator!=(std::nullptr_t) const noexcept
-    { return !this->operator==(nil); }
-
-    friend inline
-    std::ostream& operator<<(std::ostream &_Stream, const voidptr_xt &_Src) noexcept
-    { return _Stream << _Src._ptr; }
-};
-
-template<typename T>
-struct ptr {
-    T *_ptr{nil};
-
-    inline void __ok(void) const noexcept
-    { if (!this->_ptr) { XID(panic)("pointer is nil"); } }
-
-    ptr<T>(void) noexcept {}
-    ptr<T>(std::nullptr_t) noexcept {}
-
-    ptr<T>(T *_Ptr) noexcept
-    { this->_ptr = _Ptr; }
-
-    inline T &operator*(void) noexcept {
-        this->__ok();
-        return *this->_ptr;
-    }
-
-    inline operator uintptr_xt(void) const noexcept
-    { return (uintptr_xt)(this->_ptr); }
-
-    inline operator voidptr_xt(void) const noexcept
-    { return (voidptr_xt)(this->_ptr); }
-
-    inline void operator=(T *_Ptr) noexcept
-    { this->_ptr = _Ptr; }
-
-    inline void operator=(std::nullptr_t) noexcept
-    { this->_ptr = nil; }
-
-    inline T *operator+=(const uintptr_xt &_N) noexcept
-    { return (this->_ptr += _N); }
-
-    inline T *operator+(const uintptr_xt &_N) noexcept
-    { return this->_ptr + _N; }
-
-    inline ptr<T> operator++(int) noexcept {
-        ptr<T> _ptr;
-        _ptr._ptr = ++this->_ptr;
-        return _ptr;
-    }
-
-    inline ptr<T> operator--(int) noexcept {
-        ptr<T> _ptr;
-        _ptr._ptr = --this->_ptr;
-        return _ptr;
-    }
-
-    inline bool operator>(T *_Ptr) const noexcept
-    { return this->_ptr > _Ptr; }
-
-    inline bool operator<(T *_Ptr) const noexcept
-    { return this->_ptr < _Ptr; }
-
-    inline bool operator==(const T *_Ptr) const noexcept
-    { return this->_ptr == _Ptr; }
-
-    inline bool operator!=(const T *_Ptr) const noexcept
-    { return !this->operator==(_Ptr); }
-
-    inline bool operator==(std::nullptr_t) const noexcept
-    { return !this->_ptr; }
-
-    inline bool operator!=(std::nullptr_t) const noexcept
-    { return !this->operator==(nil); }
-
-    inline T &operator[](const uint_xt &_Index) noexcept {
-        this->__ok();
-        return this->_ptr[_Index];
-    }
-
-    friend inline
-    std::ostream& operator<<(std::ostream &_Stream, const ptr<T> &_Src) noexcept
-    { return _Stream << _Src._ptr; }
 };
 // endregion X_BUILTIN_TYPES
 
