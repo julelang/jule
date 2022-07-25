@@ -66,6 +66,8 @@ typedef float                             f32_xt;
 typedef double                            f64_xt;
 typedef bool                              bool_xt;
 typedef uintptr_t                         uintptr_xt;
+typedef u8_xt                             XID(byte);
+typedef i32_xt                            XID(rune);
 
 // region X_DECLARATIONS
 template<typename _Item_t> class slice;
@@ -866,6 +868,16 @@ str_xt tostr(const _Obj_t &_Obj) noexcept {
 
 #define DEFER(_Expr) defer CONCAT(XXDEFER_, __LINE__){[&](void) mutable -> void { _Expr; }}
 #define CO(_Expr) std::thread{[&](void) mutable -> void { _Expr; }}.detach()
+
+template<typename T>
+ptr<T> XID(new)(void) noexcept {
+    ptr<T> _ptr;
+    _ptr._ptr = new(std::nothrow) T;
+    if (!_ptr._ptr) { XID(panic)("allocation failed"); }
+    _ptr._ref = new(std::nothrow) uint_xt{1};
+    if (!_ptr._ref) { XID(panic)("allocation failed"); }
+    return _ptr;
+}
 // endregion X_MISC
 
 // region PANIC_DEFINES

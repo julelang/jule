@@ -61,6 +61,7 @@ type Parser struct {
 	embeds         strings.Builder
 	waitingGlobals []waitingGlobal
 	eval           *eval
+	allowBuiltin   bool
 
 	NoLocalPkg bool
 	JustDefs   bool
@@ -157,7 +158,6 @@ func cxxTypes(dm *Defmap) string {
 // CxxTypes returns C++ code of types.
 func (p *Parser) CxxTypes() string {
 	var cxx strings.Builder
-	cxx.WriteString(cxxTypes(Builtin))
 	for _, use := range used {
 		cxx.WriteString(cxxTypes(use.defs))
 	}
@@ -179,7 +179,6 @@ func cxxEnums(dm *Defmap) string {
 // CxxEnums returns C++ code of enums.
 func (p *Parser) CxxEnums() string {
 	var cxx strings.Builder
-	cxx.WriteString(cxxEnums(Builtin))
 	for _, use := range used {
 		cxx.WriteString(cxxEnums(use.defs))
 	}
@@ -201,7 +200,6 @@ func cxxTraits(dm *Defmap) string {
 // CxxTraits returns C++ code of traits.
 func (p *Parser) CxxTraits() string {
 	var cxx strings.Builder
-	cxx.WriteString(cxxTraits(Builtin))
 	for _, use := range used {
 		cxx.WriteString(cxxTraits(use.defs))
 	}
@@ -223,31 +221,10 @@ func cxxStructs(dm *Defmap) string {
 // CxxTraits returns C++ code of structures.
 func (p *Parser) CxxStructs() string {
 	var cxx strings.Builder
-	cxx.WriteString(cxxStructs(Builtin))
 	for _, use := range used {
 		cxx.WriteString(cxxStructs(use.defs))
 	}
 	cxx.WriteString(cxxStructs(p.Defs))
-	return cxx.String()
-}
-
-func cxxNamespaces(dm *Defmap) string {
-	var cxx strings.Builder
-	for _, ns := range dm.Namespaces {
-		cxx.WriteString(ns.String())
-		cxx.WriteString("\n\n")
-	}
-	return cxx.String()
-}
-
-// CxxNamespaces returns C++ code of namespaces.
-func (p *Parser) CxxNamespaces() string {
-	var cxx strings.Builder
-	cxx.WriteString(cxxNamespaces(Builtin))
-	for _, use := range used {
-		cxx.WriteString(cxxNamespaces(use.defs))
-	}
-	cxx.WriteString(cxxNamespaces(p.Defs))
 	return cxx.String()
 }
 
@@ -265,7 +242,6 @@ func cxxPrototypes(dm *Defmap) string {
 // CxxPrototypes returns C++ code of prototypes of C++ code.
 func (p *Parser) CxxPrototypes() string {
 	var cxx strings.Builder
-	cxx.WriteString(cxxPrototypes(Builtin))
 	for _, use := range used {
 		cxx.WriteString(cxxPrototypes(use.defs))
 	}
@@ -287,7 +263,6 @@ func cxxGlobals(dm *Defmap) string {
 // CxxGlobals returns C++ code of global variables.
 func (p *Parser) CxxGlobals() string {
 	var cxx strings.Builder
-	cxx.WriteString(cxxGlobals(Builtin))
 	for _, use := range used {
 		cxx.WriteString(cxxGlobals(use.defs))
 	}
@@ -309,7 +284,6 @@ func cxxFuncs(dm *Defmap) string {
 // CxxFuncs returns C++ code of functions.
 func (p *Parser) CxxFuncs() string {
 	var cxx strings.Builder
-	cxx.WriteString(cxxFuncs(Builtin))
 	for _, use := range used {
 		cxx.WriteString(cxxFuncs(use.defs))
 	}
@@ -327,7 +301,7 @@ func (p *Parser) CxxInitializerCaller() string {
 	indent := models.IndentString()
 	models.DoneIndent()
 	pushInit := func(defs *Defmap) {
-		f, _, _ := defs.funcById(x.InitializerFunction, nil)
+		f, _ := defs.funcById(x.InitializerFunction, nil)
 		if f == nil {
 			return
 		}
@@ -358,7 +332,6 @@ func (p *Parser) Cxx() string {
 	cxx.WriteString("\n\n")
 	cxx.WriteString(p.CxxGlobals())
 	cxx.WriteString("\n\n")
-	cxx.WriteString(p.CxxNamespaces())
 	cxx.WriteString(p.CxxFuncs())
 	cxx.WriteString(p.CxxInitializerCaller())
 	return cxx.String()
@@ -416,7 +389,12 @@ func (p *Parser) compileUse(useAST *models.Use) (_ *use, hasErr bool) {
 		p.pusherrs(psub.Errors...)
 		p.Warnings = append(p.Warnings, psub.Warnings...)
 		p.embeds.WriteString(psub.embeds.String())
-		p.pushUseDefs(use, psub.Defs)
+		pushDefs(use.defs, psub.Defs)
+		ns := models.Namespace{}
+		ns.Ids = strings.SplitN(useAST.LinkString, tokens.DOUBLE_COLON, -1)
+		ns.Tok = useAST.Tok
+		src := p.pushNs(&ns)
+		src.Defs = use.defs
 		if psub.Errors != nil {
 			p.pusherrtok(useAST.Tok, "use_has_errors")
 			return use, true
@@ -426,23 +404,12 @@ func (p *Parser) compileUse(useAST *models.Use) (_ *use, hasErr bool) {
 	return nil, false
 }
 
-func (p *Parser) pushUseNamespaces(use, dm *Defmap) {
-	for _, ns := range dm.Namespaces {
-		def := p.nsById(ns.Id, false)
-		if def == nil {
-			use.Namespaces = append(use.Namespaces, ns)
-			continue
-		}
-	}
-}
-
-func (p *Parser) pushUseDefs(use *use, dm *Defmap) {
-	p.pushUseNamespaces(use.defs, dm)
-	use.defs.Types = append(use.defs.Types, dm.Types...)
-	use.defs.Structs = append(use.defs.Structs, dm.Structs...)
-	use.defs.Enums = append(use.defs.Enums, dm.Enums...)
-	use.defs.Globals = append(use.defs.Globals, dm.Globals...)
-	use.defs.Funcs = append(use.defs.Funcs, dm.Funcs...)
+func pushDefs(dest, src *Defmap) {
+	dest.Types = append(dest.Types, src.Types...)
+	dest.Structs = append(dest.Structs, src.Structs...)
+	dest.Enums = append(dest.Enums, src.Enums...)
+	dest.Globals = append(dest.Globals, src.Globals...)
+	dest.Funcs = append(dest.Funcs, src.Funcs...)
 }
 
 func (p *Parser) use(useAST *models.Use) (err bool) {
@@ -452,6 +419,11 @@ func (p *Parser) use(useAST *models.Use) (err bool) {
 	// Already parsed?
 	for _, use := range used {
 		if useAST.Path == use.Path {
+			ns := models.Namespace{}
+			ns.Ids = strings.SplitN(useAST.LinkString, tokens.DOUBLE_COLON, -1)
+			ns.Tok = useAST.Tok
+			src := p.pushNs(&ns)
+			src.Defs = use.defs
 			p.Uses = append(p.Uses, use)
 			return
 		}
@@ -505,8 +477,6 @@ func (p *Parser) parseSrcTreeObj(obj models.Object) {
 		p.embeds.WriteByte('\n')
 	case models.Comment:
 		p.Comment(t)
-	case models.Namespace:
-		p.Namespace(t)
 	case models.Use:
 		p.pusherrtok(obj.Tok, "use_at_content")
 	case models.Preprocessor:
@@ -688,7 +658,7 @@ func (p *Parser) Generics(generics []GenericType) {
 
 // Type parses X type define statement.
 func (p *Parser) Type(t Type) {
-	if _, tok, _, canshadow := p.defById(t.Id); tok.Id != tokens.NA && !canshadow {
+	if _, tok, canshadow := p.defById(t.Id); tok.Id != tokens.NA && !canshadow {
 		p.pusherrtok(t.Tok, "exist_id", t.Id)
 		return
 	} else if xapi.IsIgnoreId(t.Id) {
@@ -705,7 +675,7 @@ func (p *Parser) Enum(e Enum) {
 	if xapi.IsIgnoreId(e.Id) {
 		p.pusherrtok(e.Tok, "ignore_id")
 		return
-	} else if _, tok, _, _ := p.defById(e.Id); tok.Id != tokens.NA {
+	} else if _, tok, _ := p.defById(e.Id); tok.Id != tokens.NA {
 		p.pusherrtok(e.Tok, "exist_id", e.Id)
 		return
 	}
@@ -817,7 +787,7 @@ func (p *Parser) Struct(s Struct) {
 	if xapi.IsIgnoreId(s.Id) {
 		p.pusherrtok(s.Tok, "ignore_id")
 		return
-	} else if _, tok, _, _ := p.defById(s.Id); tok.Id != tokens.NA {
+	} else if _, tok, _ := p.defById(s.Id); tok.Id != tokens.NA {
 		p.pusherrtok(s.Tok, "exist_id", s.Id)
 		return
 	}
@@ -837,7 +807,7 @@ func (p *Parser) Trait(t models.Trait) {
 	if xapi.IsIgnoreId(t.Id) {
 		p.pusherrtok(t.Tok, "ignore_id")
 		return
-	} else if _, tok, _, _ := p.defById(t.Id); tok.Id != tokens.NA {
+	} else if _, tok, _ := p.defById(t.Id); tok.Id != tokens.NA {
 		p.pusherrtok(t.Tok, "exist_id", t.Id)
 		return
 	}
@@ -867,14 +837,14 @@ func (p *Parser) Trait(t models.Trait) {
 }
 
 func (p *Parser) implTrait(impl models.Impl) {
-	trait, _, _ := p.traitById(impl.Trait.Kind)
+	trait, _ := p.traitById(impl.Trait.Kind)
 	if trait == nil {
 		p.pusherrtok(impl.Trait, "id_noexist", impl.Trait.Kind)
 		return
 	}
 	trait.Used = true
 	sid, _ := impl.Target.KindId()
-	xs, _, _ := p.structById(sid)
+	xs, _ := p.structById(sid)
 	if xs == nil {
 		p.pusherrtok(impl.Target.Tok, "id_noexist", sid)
 		return
@@ -900,7 +870,7 @@ func (p *Parser) implTrait(impl models.Impl) {
 		if trait.FindFunc(f.Id) == nil {
 			p.pusherrtok(impl.Target.Tok, "trait_hasnt_id", trait.Ast.Id, f.Id)
 			break
-		} else if xf, _, _ := xs.Defs.funcById(f.Id, nil); xf != nil {
+		} else if xf, _ := xs.Defs.funcById(f.Id, nil); xf != nil {
 			p.pusherrtok(f.Tok, "exist_id", f.Id)
 			continue
 		}
@@ -914,7 +884,7 @@ func (p *Parser) implTrait(impl models.Impl) {
 }
 
 func (p *Parser) implStruct(impl models.Impl) {
-	xs, _, _ := p.structById(impl.Trait.Kind)
+	xs, _ := p.structById(impl.Trait.Kind)
 	if xs == nil {
 		p.pusherrtok(impl.Trait, "id_noexist", impl.Trait.Kind)
 		return
@@ -924,7 +894,7 @@ func (p *Parser) implStruct(impl models.Impl) {
 		case []GenericType:
 			p.Generics(t)
 		case *Func:
-			if xf, _, _ := xs.Defs.funcById(t.Id, nil); xf != nil {
+			if xf, _ := xs.Defs.funcById(t.Id, nil); xf != nil {
 				p.pusherrtok(t.Tok, "exist_id", t.Id)
 				continue
 			}
@@ -959,27 +929,17 @@ func (p *Parser) pushNs(ns *models.Namespace) *namespace {
 	var src *namespace
 	prev := p.Defs
 	for _, id := range ns.Ids {
-		src = p.nsById(id, false)
+		src = p.nsById(id)
 		if src == nil {
 			src = new(namespace)
+			src.Defs = new(Defmap)
 			src.Id = id
 			src.Tok = ns.Tok
-			src.Defs = new(Defmap)
-			src.Defs.parent = prev
 			prev.Namespaces = append(prev.Namespaces, src)
 		}
 		prev = src.Defs
 	}
 	return src
-}
-
-// Namespace parses namespace statement.
-func (p *Parser) Namespace(ns models.Namespace) {
-	src := p.pushNs(&ns)
-	pdefs := p.Defs
-	p.Defs = src.Defs
-	p.parseTree(ns.Tree)
-	p.Defs = pdefs
 }
 
 // Comment parses X documentation comments line.
@@ -1132,7 +1092,7 @@ func setGenerics(f *Func, generics []*models.GenericType) {
 
 // Func parse X function.
 func (p *Parser) Func(fast Func) {
-	_, tok, _, canshadow := p.defById(fast.Id)
+	_, tok, canshadow := p.defById(fast.Id)
 	if tok.Id != tokens.NA && !canshadow {
 		p.pusherrtok(fast.Tok, "exist_id", fast.Id)
 	} else if xapi.IsIgnoreId(fast.Id) {
@@ -1156,7 +1116,7 @@ func (p *Parser) Func(fast Func) {
 
 // ParseVariable parse X global variable.
 func (p *Parser) Global(vast Var) {
-	def, _, _, _ := p.defById(vast.Id)
+	def, _, _ := p.defById(vast.Id)
 	if def != nil {
 		p.pusherrtok(vast.IdTok, "exist_id", vast.Id)
 		return
@@ -1319,116 +1279,65 @@ func (p *Parser) varsFromParams(params []Param) []*Var {
 //
 // Special case:
 //  FuncById(id) -> nil: if function is not exist.
-func (p *Parser) FuncById(id string) (*function, *Defmap, bool) {
-	f, _, _ := Builtin.funcById(id, nil)
-	if f != nil {
-		return f, nil, false
-	}
-	for _, use := range p.Uses {
-		f, m, _ := use.defs.funcById(id, p.File)
+func (p *Parser) FuncById(id string) (*function, bool) {
+	if p.allowBuiltin {
+		f, _ := Builtin.funcById(id, nil)
 		if f != nil {
-			use.used = true
-			return f, m, false
+			return f, false
 		}
 	}
 	return p.Defs.funcById(id, p.File)
 }
 
-func (p *Parser) varById(id string) (*Var, *Defmap) {
+func (p *Parser) varById(id string) *Var {
 	bv := p.blockVarById(id)
 	if bv != nil {
-		return bv, p.Defs
+		return bv
 	}
 	return p.globalById(id)
 }
 
-func (p *Parser) globalById(id string) (*Var, *Defmap) {
-	for _, use := range p.Uses {
-		g, m, _ := use.defs.globalById(id, p.File)
-		if g != nil {
-			use.used = true
-			return g, m
-		}
-	}
-	g, m, _ := p.Defs.globalById(id, p.File)
-	return g, m
+func (p *Parser) globalById(id string) *Var {
+	g, _ := p.Defs.globalById(id, p.File)
+	return g
 }
 
-func (p *Parser) nsById(id string, parent bool) *namespace {
-	ns := Builtin.nsById(id, parent)
-	if ns != nil {
-		return ns
-	}
-	for _, use := range p.Uses {
-		ns := use.defs.nsById(id, parent)
-		if ns != nil {
-			use.used = true
-			return ns
-		}
-	}
-	return p.Defs.nsById(id, parent)
+func (p *Parser) nsById(id string) *namespace {
+	return p.Defs.nsById(id)
 }
 
-func (p *Parser) typeById(id string) (*Type, *Defmap, bool) {
+func (p *Parser) typeById(id string) (*Type, bool) {
 	t := p.blockTypesById(id)
 	if t != nil {
-		return t, p.Defs, false
+		return t, false
 	}
-	t, _, _ = Builtin.typeById(id, nil)
+	t, _ = Builtin.typeById(id, nil)
 	if t != nil {
-		return t, nil, false
-	}
-	for _, use := range p.Uses {
-		t, m, _ := use.defs.typeById(id, p.File)
-		if t != nil {
-			use.used = true
-			return t, m, false
-		}
+		return t, false
 	}
 	return p.Defs.typeById(id, p.File)
 }
 
-func (p *Parser) enumById(id string) (*Enum, *Defmap, bool) {
-	s, _, _ := Builtin.enumById(id, nil)
+func (p *Parser) enumById(id string) (*Enum, bool) {
+	s, _ := Builtin.enumById(id, nil)
 	if s != nil {
-		return s, nil, false
-	}
-	for _, use := range p.Uses {
-		t, m, _ := use.defs.enumById(id, p.File)
-		if t != nil {
-			use.used = true
-			return t, m, false
-		}
+		return s, false
 	}
 	return p.Defs.enumById(id, p.File)
 }
 
-func (p *Parser) structById(id string) (*xstruct, *Defmap, bool) {
-	s, _, _ := Builtin.structById(id, nil)
+func (p *Parser) structById(id string) (*xstruct, bool) {
+	s, _ := Builtin.structById(id, nil)
 	if s != nil {
-		return s, nil, false
-	}
-	for _, use := range p.Uses {
-		s, m, _ := use.defs.structById(id, p.File)
-		if s != nil {
-			use.used = true
-			return s, m, false
-		}
+		return s, false
 	}
 	return p.Defs.structById(id, p.File)
 }
 
-func (p *Parser) traitById(id string) (*trait, *Defmap, bool) {
-	t, _, _ := Builtin.traitById(id, nil)
+func (p *Parser) traitById(id string) (*trait, bool) {
+	t, _ := Builtin.traitById(id, nil)
 	if t != nil {
-		return t, nil, false
-	}
-	for _, use := range p.Uses {
-		t, m, _ := use.defs.traitById(id, p.File)
-		if t != nil {
-			use.used = true
-			return t, m, false
-		}
+		return t, false
 	}
 	return p.Defs.traitById(id, p.File)
 }
@@ -1451,38 +1360,38 @@ func (p *Parser) blockVarById(id string) *Var {
 	return nil
 }
 
-func (p *Parser) defById(id string) (def any, tok Tok, m *Defmap, canshadow bool) {
+func (p *Parser) defById(id string) (def any, tok Tok, canshadow bool) {
 	var t *Type
-	t, m, canshadow = p.typeById(id)
+	t, canshadow = p.typeById(id)
 	if t != nil {
-		return t, t.Tok, m, canshadow
+		return t, t.Tok, canshadow
 	}
 	var e *Enum
-	e, m, canshadow = p.enumById(id)
+	e, canshadow = p.enumById(id)
 	if e != nil {
-		return e, e.Tok, m, canshadow
+		return e, e.Tok, canshadow
 	}
 	var s *xstruct
-	s, m, canshadow = p.structById(id)
+	s, canshadow = p.structById(id)
 	if s != nil {
-		return s, s.Ast.Tok, m, canshadow
+		return s, s.Ast.Tok, canshadow
 	}
 	var trait *trait
-	trait, m, canshadow = p.traitById(id)
+	trait, canshadow = p.traitById(id)
 	if trait != nil {
-		return trait, trait.Ast.Tok, m, canshadow
+		return trait, trait.Ast.Tok, canshadow
 	}
 	var f *function
-	f, m, canshadow = p.FuncById(id)
+	f, canshadow = p.FuncById(id)
 	if f != nil {
-		return f, f.Ast.Tok, m, canshadow
+		return f, f.Ast.Tok, canshadow
 	}
 	if bv := p.blockVarById(id); bv != nil {
-		return bv, bv.IdTok, p.Defs, false
+		return bv, bv.IdTok, false
 	}
-	g, m := p.globalById(id)
+	g := p.globalById(id)
 	if g != nil {
-		return g, g.IdTok, m, true
+		return g, g.IdTok, true
 	}
 	return
 }
@@ -1499,18 +1408,10 @@ func (p *Parser) blockDefById(id string) (def any, tok Tok) {
 	return
 }
 
-func (p *Parser) checkUses() {
-	for _, use := range p.Uses {
-		if !use.used {
-			p.pusherrtok(use.tok, "declared_but_not_used", use.LinkString)
-		}
-	}
-}
-
 func (p *Parser) check() {
 	defer p.wg.Done()
 	if p.IsMain && !p.JustDefs {
-		f, _, _ := p.Defs.funcById(x.EntryPoint, nil)
+		f, _ := p.Defs.funcById(x.EntryPoint, nil)
 		if f == nil {
 			p.PushErr("no_entry_point")
 		} else {
@@ -1525,6 +1426,14 @@ func (p *Parser) check() {
 		p.checkFuncs()
 		p.checkStructs()
 		p.checkUses()
+	}
+}
+
+func (p *Parser) checkUses() {
+	for _, ns := range p.Defs.Namespaces {
+		if !ns.used {
+			p.pusherrtok(ns.Tok, "declared_but_not_used", ns.Id)
+		}
 	}
 }
 
@@ -1631,8 +1540,7 @@ func (p *Parser) parsePureFunc(f *Func) (err bool) {
 }
 
 func (p *Parser) parseFunc(f *function) (err bool) {
-	if f.checked ||
-		(len(f.Ast.Generics) > 0 && len(*f.Ast.Combines) == 0) {
+	if f.checked || len(f.Ast.Generics) > 0 {
 		return false
 	}
 	return p.parsePureFunc(f.Ast)
@@ -1650,23 +1558,6 @@ func (p *Parser) checkFuncs() {
 		err = p.parseFunc(f)
 		f.checked = true
 	}
-	for _, use := range p.Uses {
-		for _, ns := range use.defs.Namespaces {
-			pdefs := p.Defs
-			p.Defs = ns.Defs
-			for _, f := range ns.Defs.Funcs {
-				check(f)
-			}
-			p.Defs = pdefs
-		}
-	}
-	for _, ns := range p.Defs.Namespaces {
-		p.Defs = ns.Defs
-		for _, f := range ns.Defs.Funcs {
-			check(f)
-		}
-		p.Defs = p.Defs.parent
-	}
 	for _, f := range p.Defs.Funcs {
 		check(f)
 	}
@@ -1680,17 +1571,6 @@ func (p *Parser) parseStructFunc(s *xstruct, f *function) (err bool) {
 		p.parseTypesNonGenerics(f.Ast)
 		return p.parseFunc(f)
 	}
-	/*if len(*s.constructor.Combines) == 0 {
-		return
-	}
-	for _, combine := range *s.constructor.Combines {
-		p.pushGenerics(s.Ast.Generics, combine)
-		p.reloadFuncTypes(f.Ast)
-		err = p.parseFunc(f)
-		if err {
-			return
-		}
-	}*/
 	return
 }
 
@@ -1716,13 +1596,6 @@ func (p *Parser) checkStructs() {
 			return
 		}
 		p.checkStruct(xs)
-	}
-	for _, ns := range p.Defs.Namespaces {
-		p.Defs = ns.Defs
-		for _, s := range ns.Defs.Structs {
-			check(s)
-		}
-		p.Defs = p.Defs.parent
 	}
 	for _, s := range p.Defs.Structs {
 		check(s)
@@ -1835,9 +1708,9 @@ func (p *Parser) getArgs(toks Toks, targeting bool) *models.Args {
 }
 
 // Should toks include brackets.
-func (p *Parser) getGenerics(toks Toks) []DataType {
+func (p *Parser) getGenerics(toks Toks) (_ []DataType, err bool) {
 	if len(toks) == 0 {
-		return nil
+		return nil, false
 	}
 	// Remove braces
 	toks = toks[1 : len(toks)-1]
@@ -1856,9 +1729,13 @@ func (p *Parser) getGenerics(toks Toks) []DataType {
 			p.pusherrtok(part[index+1], "invalid_syntax")
 		}
 		p.pusherrs(b.Errors...)
-		generics[i], _ = p.realType(generic, true)
+		var ok bool
+		generics[i], ok = p.realType(generic, true)
+		if !ok {
+			err = true
+		}
 	}
-	return generics
+	return generics, err
 }
 
 func (p *Parser) checkGenericsQuantity(n int, generics []DataType, errTok Tok) bool {
@@ -1899,6 +1776,9 @@ func (p *Parser) reloadFuncTypes(f *Func) {
 }
 
 func itsCombined(f *Func, generics []DataType) bool {
+	if f.Combines == nil { // Built-in
+		return true
+	}
 	for _, combine := range *f.Combines {
 		for i, gt := range generics {
 			ct := combine[i]
@@ -2007,9 +1887,19 @@ func (p *Parser) parseFuncCallToks(f *Func, genericsToks, argsToks Toks, m *expr
 			p.pusherrtok(genericsToks[0], "invalid_syntax")
 			return
 		}
-		generics = p.getGenerics(argsToks)
+		var err bool
+		generics, err = p.getGenerics(argsToks)
+		if err {
+			p.eval.hasError = true
+			return
+		}
 	} else {
-		generics = p.getGenerics(genericsToks)
+		var err bool
+		generics, err = p.getGenerics(genericsToks)
+		if err {
+			p.eval.hasError = true
+			return
+		}
 		args = p.getArgs(argsToks, false)
 	}
 	return p.parseFuncCall(f, generics, args, m, argsToks[0])
@@ -2306,7 +2196,7 @@ func (p *Parser) exprStatement(s *models.ExprStatement, recover bool) {
 				if !recover {
 					p.pusherrtok(tok, "invalid_syntax")
 				}
-				def, _, _, _ := p.defById(tok.Kind)
+				def, _, _ := p.defById(tok.Kind)
 				if def == recoverFunc {
 					p.recoverFuncExprStatement(s)
 					return
@@ -2608,7 +2498,8 @@ func (p *Parser) assignment(selected value, errtok Tok) bool {
 	}
 	switch selected.data.Type.Tag.(type) {
 	case Func:
-		if f, _, _ := p.FuncById(selected.data.Tok.Kind); f != nil {
+		f, _ := p.FuncById(selected.data.Tok.Kind)
+		if f != nil {
 			p.pusherrtok(errtok, "assign_type_not_support_value")
 			state = false
 		}
@@ -3050,23 +2941,24 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 		var def any
 		if strings.Contains(id, tokens.DOUBLE_COLON) { // Has namespace?
 			toks := p.tokenizeDataType(id)
-			defs := p.eval.getNsDefs(&toks, nil)
-			if defs == nil {
+			ns := p.eval.getNs(&toks, nil)
+			if ns == nil {
 				return
 			}
-			i, defs, t := defs.defById(toks[0].Kind, p.File)
+			ns.used = true
+			i, t := ns.Defs.findById(toks[0].Kind, p.File)
 			switch t {
 			case 't':
-				def = defs.Types[i]
+				def = ns.Defs.Types[i]
 			case 's':
-				def = defs.Structs[i]
+				def = ns.Defs.Structs[i]
 			case 'e':
-				def = defs.Enums[i]
+				def = ns.Defs.Enums[i]
 			case 'i':
-				def = defs.Traits[i]
+				def = ns.Defs.Traits[i]
 			}
 		} else {
-			def, _, _, _ = p.defById(id)
+			def, _, _ = p.defById(id)
 		}
 		switch t := def.(type) {
 		case *Type:

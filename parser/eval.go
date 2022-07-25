@@ -277,7 +277,7 @@ func (e *eval) dataTypeFunc(expr Tok, callRange Toks, m *exprModel) (v value, is
 			v = e.castExpr(dt, callRange, m, expr)
 		}
 	case tokens.Id:
-		def, _, _, _ := e.p.defById(expr.Kind)
+		def, _, _ := e.p.defById(expr.Kind)
 		if def == nil {
 			break
 		}
@@ -409,7 +409,7 @@ func (e *eval) subId(toks Toks, m *exprModel) (v value) {
 		if tok.Id == tokens.DataType {
 			return e.typeSubId(tok, idTok, m)
 		} else if tok.Id == tokens.Id {
-			t, _, _ := e.p.typeById(tok.Kind)
+			t, _ := e.p.typeById(tok.Kind)
 			if t != nil {
 				return e.typeSubId(t.Type.Tok, idTok, m)
 			}
@@ -612,7 +612,7 @@ func (e *eval) tryAssign(toks Toks, m *exprModel) (v value, ok bool) {
 }
 
 func (e *eval) xTypeSubId(dm *Defmap, idTok Tok, m *exprModel) (v value) {
-	i, dm, t := dm.defById(idTok.Kind, nil)
+	i, t := dm.findById(idTok.Kind, nil)
 	if i == -1 {
 		e.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
 		return
@@ -752,7 +752,7 @@ func (e *eval) typeId(toks Toks, m *exprModel) (v value) {
 }
 
 func (e *eval) xObjSubId(dm *Defmap, val value, idTok Tok, m *exprModel) (v value) {
-	i, dm, t := dm.defById(idTok.Kind, idTok.File)
+	i, t := dm.findById(idTok.Kind, idTok.File)
 	if i == -1 {
 		e.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
 		return
@@ -838,58 +838,50 @@ func (e *eval) traitObjSubId(val value, idTok Tok, m *exprModel) value {
 }
 
 type nsFind interface {
-	nsById(string, bool) *namespace
+	nsById(string) *namespace
 }
 
-func (e *eval) getNsDefs(toks *Toks, m *exprModel) *Defmap {
+func (e *eval) getNs(toks *Toks, m *exprModel) *namespace {
 	var prev nsFind = e.p
-	var defs *Defmap
+	var ns *namespace
 	for i, tok := range *toks {
 		if (i+1)%2 != 0 {
 			if tok.Id != tokens.Id {
 				e.pusherrtok(tok, "invalid_syntax")
 				continue
 			}
-			src := prev.nsById(tok.Kind, false)
+			src := prev.nsById(tok.Kind)
 			if src == nil {
 				if i > 0 {
 					*toks = (*toks)[i:]
-					return defs
+					return ns
 				}
 				e.pusherrtok(tok, "namespace_not_exist", tok.Kind)
 				return nil
 			}
 			prev = src.Defs
-			defs = src.Defs
-			if m != nil {
-				m.appendSubNode(exprNode{xapi.OutId(src.Id, src.Tok.File)})
-			}
+			ns = src
 			continue
 		}
-		switch tok.Id {
-		case tokens.DoubleColon:
-			if m != nil {
-				m.appendSubNode(exprNode{tokens.DOUBLE_COLON})
-			}
-		default:
-			return defs
+		if tok.Id != tokens.DoubleColon {
+			return ns
 		}
 	}
-	return nil
+	return ns
 }
 
 func (e *eval) nsSubId(toks Toks, m *exprModel) (v value) {
-	nsDefs := e.getNsDefs(&toks, m)
-	if nsDefs == nil {
+	ns := e.getNs(&toks, m)
+	if ns == nil {
 		return
 	}
+	ns.used = true
 	pdefs := e.p.Defs
-	e.p.Defs = nsDefs
-	parent := e.p.Defs.parent
-	e.p.Defs.parent = nil
+	e.p.Defs = ns.Defs
+	e.p.allowBuiltin = false
 	defer func() {
-		e.p.Defs.parent = parent
 		e.p.Defs = pdefs
+		e.p.allowBuiltin = true
 	}()
 	return e.process(toks, m)
 }

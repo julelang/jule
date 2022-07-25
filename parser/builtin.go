@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/the-xlang/xxc/ast/models"
+	"github.com/the-xlang/xxc/lex"
 	"github.com/the-xlang/xxc/lex/tokens"
 	"github.com/the-xlang/xxc/pkg/x"
 	"github.com/the-xlang/xxc/pkg/xtype"
@@ -335,6 +336,18 @@ var recoverFunc = &function{
 
 // Builtin definitions.
 var Builtin = &Defmap{
+	Types: []*models.Type{
+		{
+			Pub:  true,
+			Id:   "byte",
+			Type: DataType{Id: xtype.U8, Kind: xtype.TypeMap[xtype.U8]},
+		},
+		{
+			Pub:  true,
+			Id:   "rune",
+			Type: DataType{Id: xtype.I32, Kind: xtype.TypeMap[xtype.I32]},
+		},
+	},
 	Funcs: []*function{
 		panicFunc,
 		recoverFunc,
@@ -364,6 +377,21 @@ var Builtin = &Defmap{
 					Type:    DataType{Id: xtype.Any, Kind: tokens.ANY},
 					Default: Expr{Model: exprNode{`""`}},
 				}},
+			},
+		},
+		{
+			Ast: &Func{
+				Pub: true,
+				Id:  "new",
+				Attributes: []models.Attribute{
+					{Tag: lex.Tok{Kind: x.Attribute_TypeArg}},
+				},
+				Generics: []*models.GenericType{
+					{Id: "T"},
+				},
+				RetType: RetType{
+					Type: DataType{Id: xtype.Id, Kind: "*T"},
+				},
 			},
 		},
 	},
@@ -533,26 +561,26 @@ var arrayDefs = &Defmap{
 func readySliceDefs(t DataType) {
 	elemType := typeOfSliceComponents(t)
 
-	findFunc, _, _ := sliceDefs.funcById("find", nil)
+	findFunc, _ := sliceDefs.funcById("find", nil)
 	findFunc.Ast.Params[0].Type = elemType
 	findFunc.Ast.RetType.Type = elemType
 	findFunc.Ast.RetType.Type.Kind = tokens.STAR + findFunc.Ast.RetType.Type.Kind
 
-	rfindFunc, _, _ := sliceDefs.funcById("rfind", nil)
+	rfindFunc, _ := sliceDefs.funcById("rfind", nil)
 	rfindFunc.Ast.Params[0].Type = elemType
 	rfindFunc.Ast.RetType.Type = elemType
 	rfindFunc.Ast.RetType.Type.Kind = tokens.STAR + rfindFunc.Ast.RetType.Type.Kind
 
-	eraseFunc, _, _ := sliceDefs.funcById("erase", nil)
+	eraseFunc, _ := sliceDefs.funcById("erase", nil)
 	eraseFunc.Ast.Params[0].Type = elemType
 
-	eraseAllFunc, _, _ := sliceDefs.funcById("erase_all", nil)
+	eraseAllFunc, _ := sliceDefs.funcById("erase_all", nil)
 	eraseAllFunc.Ast.Params[0].Type = elemType
 
-	appendFunc, _, _ := sliceDefs.funcById("append", nil)
+	appendFunc, _ := sliceDefs.funcById("append", nil)
 	appendFunc.Ast.Params[0].Type = elemType
 
-	insertFunc, _, _ := sliceDefs.funcById("insert", nil)
+	insertFunc, _ := sliceDefs.funcById("insert", nil)
 	insertFunc.Ast.Params[1].Type = elemType
 }
 
@@ -605,18 +633,18 @@ func readyMapDefs(mapt DataType) {
 	keyt := types[0]
 	valt := types[1]
 
-	keysFunc, _, _ := mapDefs.funcById("keys", nil)
+	keysFunc, _ := mapDefs.funcById("keys", nil)
 	keysFunc.Ast.RetType.Type = keyt
 	keysFunc.Ast.RetType.Type.Kind = x.Prefix_Slice + keysFunc.Ast.RetType.Type.Kind
 
-	valuesFunc, _, _ := mapDefs.funcById("values", nil)
+	valuesFunc, _ := mapDefs.funcById("values", nil)
 	valuesFunc.Ast.RetType.Type = valt
 	valuesFunc.Ast.RetType.Type.Kind = x.Prefix_Slice + valuesFunc.Ast.RetType.Type.Kind
 
-	hasFunc, _, _ := mapDefs.funcById("has", nil)
+	hasFunc, _ := mapDefs.funcById("has", nil)
 	hasFunc.Ast.Params[0].Type = keyt
 
-	delFunc, _, _ := mapDefs.funcById("del", nil)
+	delFunc, _ := mapDefs.funcById("del", nil)
 	delFunc.Ast.Params[0].Type = keyt
 }
 

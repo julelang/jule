@@ -252,15 +252,15 @@ func (ve *valueEvaluator) typeId(id string, t *Type) (_ value, _ bool) {
 
 func (ve *valueEvaluator) id() (_ value, ok bool) {
 	id := ve.tok.Kind
-	if v, _ := ve.p.varById(id); v != nil {
+	if v := ve.p.varById(id); v != nil {
 		return ve.varId(id, v), true
-	} else if f, _, _ := ve.p.FuncById(id); f != nil {
+	} else if f, _ := ve.p.FuncById(id); f != nil {
 		return ve.funcId(id, f), true
-	} else if e, _, _ := ve.p.enumById(id); e != nil {
+	} else if e, _ := ve.p.enumById(id); e != nil {
 		return ve.enumId(id, e), true
-	} else if s, _, _ := ve.p.structById(id); s != nil {
+	} else if s, _ := ve.p.structById(id); s != nil {
 		return ve.structId(id, s), true
-	} else if t, _, _ := ve.p.typeById(id); t != nil {
+	} else if t, _ := ve.p.typeById(id); t != nil {
 		return ve.typeId(id, t)
 	} else {
 		ve.p.eval.pusherrtok(ve.tok, "id_noexist", id)

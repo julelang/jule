@@ -342,9 +342,6 @@ func (b *Builder) Id(toks Toks) {
 	case tokens.Colon:
 		b.GlobalVar(toks)
 		return
-	case tokens.DoubleColon:
-		b.Namespace(toks)
-		return
 	case tokens.Brace:
 		switch tok.Kind {
 		case tokens.LPARENTHESES: // Function.
@@ -352,66 +349,9 @@ func (b *Builder) Id(toks Toks) {
 			s.Data = b.Func(toks, false, false)
 			b.Tree = append(b.Tree, models.Object{Tok: s.Tok, Data: s})
 			return
-		case tokens.LBRACE: // Namespace.
-			b.Namespace(toks)
-			return
 		}
 	}
 	b.pusherr(tok, "invalid_syntax")
-}
-
-func (b *Builder) nsIds(toks Toks, i *int) []string {
-	var ids []string
-	for ; *i < len(toks); *i++ {
-		tok := toks[*i]
-		if (*i+1)%2 != 0 {
-			if tok.Id != tokens.Id {
-				b.pusherr(tok, "invalid_syntax")
-				continue
-			}
-			ids = append(ids, tok.Kind)
-			continue
-		}
-		switch tok.Id {
-		case tokens.DoubleColon:
-			continue
-		default:
-			goto ret
-		}
-	}
-ret:
-	return ids
-}
-
-// Namespace builds AST model of namespace statement.
-func (b *Builder) Namespace(toks Toks) {
-	var ns models.Namespace
-	ns.Tok = toks[0]
-	i := new(int)
-	ns.Ids = b.nsIds(toks, i)
-	treeToks := b.getrange(i, tokens.LBRACE, tokens.RBRACE, &toks)
-	if treeToks == nil {
-		b.pusherr(ns.Tok, "body_not_exist")
-		return
-	}
-	if *i < len(toks) {
-		b.pusherr(toks[*i], "invalid_syntax")
-	}
-	tree := b.Tree
-	b.Tree = nil
-	btoks := b.Toks
-	pos := b.Pos
-	b.Toks = treeToks
-	b.Pos = 0
-	b.Build()
-	b.Toks = btoks
-	b.Pos = pos
-	ns.Tree = b.Tree
-	b.Tree = tree
-	b.Tree = append(b.Tree, models.Object{
-		Tok:  ns.Tok,
-		Data: ns,
-	})
 }
 
 func (b *Builder) structFields(toks Toks) []*models.Var {
@@ -662,7 +602,7 @@ func (b *Builder) usePath(toks Toks) string {
 	path.WriteRune(os.PathSeparator)
 	for i, tok := range toks {
 		if i%2 != 0 {
-			if tok.Id != tokens.Dot {
+			if tok.Id != tokens.DoubleColon {
 				b.pusherr(tok, "invalid_syntax")
 			}
 			path.WriteRune(os.PathSeparator)
