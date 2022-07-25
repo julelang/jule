@@ -3149,8 +3149,7 @@ func (p *Parser) checkType(real, check DataType, ignoreAny bool, errTok Tok) {
 	}
 	switch {
 	case typesAreCompatible(real, check, ignoreAny),
-		typeIsNilCompatible(real) && check.Id == xtype.Nil,
-		typeIsVoidptr(real) && !typeIsPtr(check):
+		typeIsNilCompatible(real) && check.Id == xtype.Nil:
 		return
 	}
 	if real.Kind != check.Kind {

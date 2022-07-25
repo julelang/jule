@@ -509,8 +509,6 @@ func (e *eval) tryCast(toks Toks, m *exprModel) (v value, _ bool) {
 
 func (e *eval) cast(v value, t DataType, errtok Tok) value {
 	switch {
-	case typeIsPtr(t):
-		e.castPtr(t, v.data.Type, errtok)
 	case typeIsSlice(t):
 		e.castSlice(t, v.data.Type, errtok)
 	case typeIsPure(t):
@@ -576,13 +574,6 @@ func (e *eval) castInteger(t, vt DataType, errtok Tok) {
 
 func (e *eval) castNumeric(t, vt DataType, errtok Tok) {
 	if typeIsPure(vt) && xtype.IsNumeric(vt.Id) {
-		return
-	}
-	e.pusherrtok(errtok, "type_notsupports_casting_to", vt.Kind, t.Kind)
-}
-
-func (e *eval) castPtr(t, vt DataType, errtok Tok) {
-	if typeIsVoidptr(vt) || typeIsVoidptr(t) {
 		return
 	}
 	e.pusherrtok(errtok, "type_notsupports_casting_to", vt.Kind, t.Kind)

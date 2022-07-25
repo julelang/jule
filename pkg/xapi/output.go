@@ -740,7 +740,6 @@ public:
         this->_ref = nil;
         delete this->_data;
         this->_data = nil;
-        std::cout << "deallocate" << std::endl;
     }
 
     T &get(void) noexcept {
