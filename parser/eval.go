@@ -740,13 +740,17 @@ func (e *eval) typeId(toks Toks, m *exprModel) (v value) {
 		return
 	}
 	toks = toks[i+1:]
-	if toks[0].Id != tokens.Brace || toks[0].Kind != tokens.LBRACE {
-		e.pusherrtok(toks[0], "invalid_syntax")
-		return
-	}
 	if typeIsPure(t) && typeIsStruct(t) {
+		if toks[0].Id != tokens.Brace || toks[0].Kind != tokens.LBRACE {
+			e.pusherrtok(toks[0], "invalid_syntax")
+			return
+		}
 		s := t.Tag.(*xstruct)
 		return e.p.callStructConstructor(s, toks, m)
+	}
+	if toks[0].Id != tokens.Brace || toks[0].Kind != tokens.LBRACKET {
+		e.pusherrtok(toks[0], "invalid_syntax")
+		return
 	}
 	return e.enumerable(toks, t, m)
 }
@@ -1232,6 +1236,7 @@ func (e *eval) enumerable(exprToks Toks, t DataType, m *exprModel) (v value) {
 	if typeIsArray(t) && arrayIsAutoSized(t) {
 		exprs := t.Tag.([][]any)[0]
 		t = typeOfArrayComponents(t)
+		t.Original = nil
 		var ok bool
 		t, ok = e.p.realType(t, true)
 		if !ok {

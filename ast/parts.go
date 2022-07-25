@@ -75,8 +75,8 @@ func Parts(toks Toks, id uint8, exprMust bool) ([]Toks, []xlog.CompilerLog) {
 	if len(toks) == 0 {
 		return nil, nil
 	}
-	parts := make([]Toks, 0)
-	errs := make([]xlog.CompilerLog, 0)
+	var parts []Toks
+	var errs []xlog.CompilerLog
 	braceCount := 0
 	last := 0
 	for i, tok := range toks {

@@ -81,6 +81,7 @@ func New(f *File) *Parser {
 	p.Defs = new(Defmap)
 	p.eval = new(eval)
 	p.eval.p = p
+	p.allowBuiltin = true
 	return p
 }
 
@@ -1146,7 +1147,6 @@ func (p *Parser) checkArrayType(t *DataType) {
 			continue
 		}
 		if arrayExprIsAutoSized(expr) {
-			p.eval.pusherrtok(t.Tok, "invalid_syntax")
 			continue
 		}
 		val, model := p.evalExpr(expr)
@@ -1311,33 +1311,41 @@ func (p *Parser) typeById(id string) (*Type, bool) {
 	if t != nil {
 		return t, false
 	}
-	t, _ = Builtin.typeById(id, nil)
-	if t != nil {
-		return t, false
+	if p.allowBuiltin {
+		t, _ = Builtin.typeById(id, nil)
+		if t != nil {
+			return t, false
+		}
 	}
 	return p.Defs.typeById(id, p.File)
 }
 
 func (p *Parser) enumById(id string) (*Enum, bool) {
-	s, _ := Builtin.enumById(id, nil)
-	if s != nil {
-		return s, false
+	if p.allowBuiltin {
+		s, _ := Builtin.enumById(id, nil)
+		if s != nil {
+			return s, false
+		}
 	}
 	return p.Defs.enumById(id, p.File)
 }
 
 func (p *Parser) structById(id string) (*xstruct, bool) {
-	s, _ := Builtin.structById(id, nil)
-	if s != nil {
-		return s, false
+	if p.allowBuiltin {
+		s, _ := Builtin.structById(id, nil)
+		if s != nil {
+			return s, false
+		}
 	}
 	return p.Defs.structById(id, p.File)
 }
 
 func (p *Parser) traitById(id string) (*trait, bool) {
-	t, _ := Builtin.traitById(id, nil)
-	if t != nil {
-		return t, false
+	if p.allowBuiltin {
+		t, _ := Builtin.traitById(id, nil)
+		if t != nil {
+			return t, false
+		}
 	}
 	return p.Defs.traitById(id, p.File)
 }
