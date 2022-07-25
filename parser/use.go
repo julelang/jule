@@ -5,4 +5,5 @@ type use struct {
 	LinkString string
 	defs       *Defmap
 	tok        Tok
+	fullUse    bool
 }

@@ -44,9 +44,6 @@ func valIsEnumType(v value) bool {
 }
 
 func isBoolExpr(v value) bool {
-	if typeIsPtr(v.data.Type) {
-		return true
-	}
 	return typeIsPure(v.data.Type) && v.data.Type.Id == xtype.Bool
 }
 

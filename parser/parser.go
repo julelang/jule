@@ -160,7 +160,9 @@ func cxxTypes(dm *Defmap) string {
 func (p *Parser) CxxTypes() string {
 	var cxx strings.Builder
 	for _, use := range used {
-		cxx.WriteString(cxxTypes(use.defs))
+		if !use.fullUse {
+			cxx.WriteString(cxxTypes(use.defs))
+		}
 	}
 	cxx.WriteString(cxxTypes(p.Defs))
 	return cxx.String()
@@ -181,7 +183,9 @@ func cxxEnums(dm *Defmap) string {
 func (p *Parser) CxxEnums() string {
 	var cxx strings.Builder
 	for _, use := range used {
-		cxx.WriteString(cxxEnums(use.defs))
+		if !use.fullUse {
+			cxx.WriteString(cxxEnums(use.defs))
+		}
 	}
 	cxx.WriteString(cxxEnums(p.Defs))
 	return cxx.String()
@@ -202,7 +206,9 @@ func cxxTraits(dm *Defmap) string {
 func (p *Parser) CxxTraits() string {
 	var cxx strings.Builder
 	for _, use := range used {
-		cxx.WriteString(cxxTraits(use.defs))
+		if !use.fullUse {
+			cxx.WriteString(cxxTraits(use.defs))
+		}
 	}
 	cxx.WriteString(cxxTraits(p.Defs))
 	return cxx.String()
@@ -223,7 +229,9 @@ func cxxStructs(dm *Defmap) string {
 func (p *Parser) CxxStructs() string {
 	var cxx strings.Builder
 	for _, use := range used {
-		cxx.WriteString(cxxStructs(use.defs))
+		if !use.fullUse {
+			cxx.WriteString(cxxStructs(use.defs))
+		}
 	}
 	cxx.WriteString(cxxStructs(p.Defs))
 	return cxx.String()
@@ -244,7 +252,9 @@ func cxxPrototypes(dm *Defmap) string {
 func (p *Parser) CxxPrototypes() string {
 	var cxx strings.Builder
 	for _, use := range used {
-		cxx.WriteString(cxxPrototypes(use.defs))
+		if !use.fullUse {
+			cxx.WriteString(cxxPrototypes(use.defs))
+		}
 	}
 	cxx.WriteString(cxxPrototypes(p.Defs))
 	return cxx.String()
@@ -265,7 +275,9 @@ func cxxGlobals(dm *Defmap) string {
 func (p *Parser) CxxGlobals() string {
 	var cxx strings.Builder
 	for _, use := range used {
-		cxx.WriteString(cxxGlobals(use.defs))
+		if !use.fullUse {
+			cxx.WriteString(cxxGlobals(use.defs))
+		}
 	}
 	cxx.WriteString(cxxGlobals(p.Defs))
 	return cxx.String()
@@ -286,7 +298,9 @@ func cxxFuncs(dm *Defmap) string {
 func (p *Parser) CxxFuncs() string {
 	var cxx strings.Builder
 	for _, use := range used {
-		cxx.WriteString(cxxFuncs(use.defs))
+		if !use.fullUse {
+			cxx.WriteString(cxxFuncs(use.defs))
+		}
 	}
 	cxx.WriteString(cxxFuncs(p.Defs))
 	return cxx.String()
@@ -361,6 +375,64 @@ func (p *Parser) checkUsePath(use *models.Use) bool {
 	return true
 }
 
+func (p *Parser) pushSelects(use *use, selectors []Tok) (addNs bool) {
+	for i, id := range selectors {
+		for j, jid := range selectors {
+			if j >= i {
+				break
+			} else if jid.Kind == id.Kind {
+				p.pusherrtok(id, "exist_id", id.Kind)
+				i = -1
+				break
+			}
+		}
+		if i == -1 {
+			break
+		}
+		if id.Id == tokens.Self {
+			addNs = true
+			continue
+		}
+		i, t := use.defs.findById(id.Kind, p.File)
+		if i == -1 {
+			p.pusherrtok(id, "id_noexist", id.Kind)
+			continue
+		}
+		switch t {
+		case 'i':
+			p.Defs.Traits = append(p.Defs.Traits, use.defs.Traits[i])
+		case 'f':
+			p.Defs.Funcs = append(p.Defs.Funcs, use.defs.Funcs[i])
+		case 'e':
+			p.Defs.Enums = append(p.Defs.Enums, use.defs.Enums[i])
+		case 'g':
+			p.Defs.Globals = append(p.Defs.Globals, use.defs.Globals[i])
+		case 't':
+			p.Defs.Types = append(p.Defs.Types, use.defs.Types[i])
+		case 's':
+			p.Defs.Structs = append(p.Defs.Structs, use.defs.Structs[i])
+		}
+	}
+	return
+}
+
+func (p *Parser) pushUse(use *use, selectors []Tok) {
+	if len(selectors) > 0 {
+		if !p.pushSelects(use, selectors) {
+			return
+		}
+	} else if selectors != nil {
+		return
+	} else if use.fullUse {
+		pushDefs(p.Defs, use.defs)
+	}
+	ns := models.Namespace{}
+	ns.Ids = strings.SplitN(use.LinkString, tokens.DOUBLE_COLON, -1)
+	ns.Tok = use.tok
+	src := p.pushNs(&ns)
+	src.Defs = use.defs
+}
+
 func (p *Parser) compileUse(useAST *models.Use) (_ *use, hasErr bool) {
 	infos, err := ioutil.ReadDir(useAST.Path)
 	if err != nil {
@@ -387,15 +459,12 @@ func (p *Parser) compileUse(useAST *models.Use) (_ *use, hasErr bool) {
 		use.tok = useAST.Tok
 		use.Path = useAST.Path
 		use.LinkString = useAST.LinkString
+		use.fullUse = useAST.FullUse
 		p.pusherrs(psub.Errors...)
 		p.Warnings = append(p.Warnings, psub.Warnings...)
 		p.embeds.WriteString(psub.embeds.String())
 		pushDefs(use.defs, psub.Defs)
-		ns := models.Namespace{}
-		ns.Ids = strings.SplitN(useAST.LinkString, tokens.DOUBLE_COLON, -1)
-		ns.Tok = useAST.Tok
-		src := p.pushNs(&ns)
-		src.Defs = use.defs
+		p.pushUse(use, useAST.Selectors)
 		if psub.Errors != nil {
 			p.pusherrtok(useAST.Tok, "use_has_errors")
 			return use, true
@@ -420,11 +489,7 @@ func (p *Parser) use(useAST *models.Use) (err bool) {
 	// Already parsed?
 	for _, use := range used {
 		if useAST.Path == use.Path {
-			ns := models.Namespace{}
-			ns.Ids = strings.SplitN(useAST.LinkString, tokens.DOUBLE_COLON, -1)
-			ns.Tok = useAST.Tok
-			src := p.pushNs(&ns)
-			src.Defs = use.defs
+			p.pushUse(use, nil)
 			p.Uses = append(p.Uses, use)
 			return
 		}
@@ -1433,15 +1498,6 @@ func (p *Parser) check() {
 	if !p.JustDefs {
 		p.checkFuncs()
 		p.checkStructs()
-		p.checkUses()
-	}
-}
-
-func (p *Parser) checkUses() {
-	for _, ns := range p.Defs.Namespaces {
-		if !ns.used {
-			p.pusherrtok(ns.Tok, "declared_but_not_used", ns.Id)
-		}
 	}
 }
 
@@ -2953,7 +3009,6 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 			if ns == nil {
 				return
 			}
-			ns.used = true
 			i, t := ns.Defs.findById(toks[0].Kind, p.File)
 			switch t {
 			case 't':

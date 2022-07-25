@@ -588,18 +588,97 @@ func (b *Builder) Use(toks Toks) {
 		return
 	}
 	toks = toks[1:]
-	use.LinkString = tokstoa(toks)
-	use.Path = b.usePath(toks)
+	b.buildUseDecl(&use, toks)
 	b.Tree = append(b.Tree, models.Object{
 		Tok:  use.Tok,
 		Data: use,
 	})
 }
 
-func (b *Builder) usePath(toks Toks) string {
+func (b *Builder) getSelectors(toks Toks) []Tok {
+	toks = b.getrange(new(int), tokens.LBRACE, tokens.RBRACE, &toks)
+	parts, errs := Parts(toks, tokens.Comma, true)
+	if len(errs) > 0 {
+		b.Errors = append(b.Errors, errs...)
+		return nil
+	}
+	selectors := make([]Tok, len(parts))
+	for i, part := range parts {
+		if len(part) > 1 {
+			b.pusherr(part[1], "invalid_syntax")
+		}
+		tok := part[0]
+		if tok.Id != tokens.Id && tok.Id != tokens.Self {
+			b.pusherr(tok, "invalid_syntax")
+			continue
+		}
+		selectors[i] = tok
+	}
+	return selectors
+}
+
+func (b *Builder) buildUseDecl(use *models.Use, toks Toks) {
 	var path strings.Builder
 	path.WriteString(x.StdlibPath)
 	path.WriteRune(os.PathSeparator)
+	tok := toks[0]
+	if tok.Id != tokens.Id || tok.Kind != "std" {
+		b.pusherr(toks[0], "invalid_syntax")
+	}
+	if len(toks) < 3 {
+		b.pusherr(tok, "invalid_syntax")
+		return
+	}
+	toks = toks[2:]
+	tok = toks[len(toks)-1]
+	switch tok.Id {
+	case tokens.DoubleColon:
+		b.pusherr(tok, "invalid_syntax")
+		return
+	case tokens.Brace:
+		if tok.Kind != tokens.RBRACE {
+			b.pusherr(tok, "invalid_syntax")
+			return
+		}
+		var selectors Toks
+		toks, selectors = RangeLast(toks)
+		use.Selectors = b.getSelectors(selectors)
+		if len(toks) == 0 {
+			b.pusherr(tok, "invalid_syntax")
+			return
+		}
+		tok = toks[len(toks)-1]
+		if tok.Id != tokens.DoubleColon {
+			b.pusherr(tok, "invalid_syntax")
+			return
+		}
+		toks = toks[:len(toks)-1]
+		if len(toks) == 0 {
+			b.pusherr(tok, "invalid_syntax")
+			return
+		}
+	case tokens.Operator:
+		if tok.Kind != tokens.STAR {
+			b.pusherr(tok, "invalid_syntax")
+			return
+		}
+		toks = toks[:len(toks)-1]
+		if len(toks) == 0 {
+			b.pusherr(tok, "invalid_syntax")
+			return
+		}
+		tok = toks[len(toks)-1]
+		if tok.Id != tokens.DoubleColon {
+			b.pusherr(tok, "invalid_syntax")
+			return
+		}
+		toks = toks[:len(toks)-1]
+		if len(toks) == 0 {
+			b.pusherr(tok, "invalid_syntax")
+			return
+		}
+		use.FullUse = true
+	}
 	for i, tok := range toks {
 		if i%2 != 0 {
 			if tok.Id != tokens.DoubleColon {
@@ -613,7 +692,8 @@ func (b *Builder) usePath(toks Toks) string {
 		}
 		path.WriteString(tok.Kind)
 	}
-	return path.String()
+	use.LinkString = tokstoa(toks)
+	use.Path = path.String()
 }
 
 // Attribute builds AST model of attribute.
@@ -888,6 +968,7 @@ func (b *Builder) pushParam(f *models.Func, toks Toks) {
 	p.Tok = tok
 	// Just given data-type.
 	if tok.Id != tokens.Id {
+		p.Id = x.Anonymous
 		if t, ok := b.DataType(toks, &i, false, true); ok {
 			if i+1 == len(toks) {
 				p.Type = t

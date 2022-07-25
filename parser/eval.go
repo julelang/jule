@@ -879,7 +879,6 @@ func (e *eval) nsSubId(toks Toks, m *exprModel) (v value) {
 	if ns == nil {
 		return
 	}
-	ns.used = true
 	pdefs := e.p.Defs
 	e.p.Defs = ns.Defs
 	e.p.allowBuiltin = false
