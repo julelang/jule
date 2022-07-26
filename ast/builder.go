@@ -63,7 +63,10 @@ func (b *Builder) buildNode(toks Toks) {
 	case tokens.Use:
 		b.Use(toks)
 	case tokens.At:
-		b.Attribute(toks)
+		b.Tree = append(b.Tree, models.Object{
+			Tok:  tok,
+			Data: b.Attribute(toks),
+		})
 	case tokens.Id:
 		b.Id(toks)
 	case tokens.Const, tokens.Volatile:
@@ -449,6 +452,14 @@ func (b *Builder) implTraitFuncs(impl *models.Impl, toks Toks) {
 		funcToks := b.skipStatement(&i, &toks)
 		ref := false
 		tok := funcToks[0]
+		switch tok.Id {
+		case tokens.At:
+			impl.Tree = append(impl.Tree, models.Object{
+				Tok:  tok,
+				Data: b.Attribute(funcToks),
+			})
+			continue
+		}
 		if tok.Id == tokens.Operator && tok.Kind == tokens.AMPER {
 			ref = true
 			funcToks = funcToks[1:]
@@ -472,7 +483,14 @@ func (b *Builder) implStruct(impl *models.Impl, toks Toks) {
 		funcToks := b.skipStatement(&i, &toks)
 		tok := funcToks[0]
 		pub := false
-		if tok.Id == tokens.Type {
+		switch tok.Id {
+		case tokens.At:
+			impl.Tree = append(impl.Tree, models.Object{
+				Tok:  tok,
+				Data: b.Attribute(funcToks),
+			})
+			continue
+		case tokens.Type:
 			impl.Tree = append(impl.Tree, models.Object{
 				Tok:  tok,
 				Data: b.Generics(funcToks),
@@ -702,8 +720,7 @@ func (b *Builder) buildUseDecl(use *models.Use, toks Toks) {
 }
 
 // Attribute builds AST model of attribute.
-func (b *Builder) Attribute(toks Toks) {
-	var a models.Attribute
+func (b *Builder) Attribute(toks Toks) (a models.Attribute) {
 	i := 0
 	a.Tok = toks[i]
 	i++
@@ -724,10 +741,7 @@ func (b *Builder) Attribute(toks Toks) {
 		}
 		b.Toks = append(toks, b.Toks...)
 	}
-	b.Tree = append(b.Tree, models.Object{
-		Tok:  a.Tok,
-		Data: a,
-	})
+	return
 }
 
 func (b *Builder) funcPrototype(toks *Toks, anon bool) (f models.Func, ok bool) {

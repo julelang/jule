@@ -466,12 +466,6 @@ func (p *Parser) compileUse(useAST *models.Use) (_ *use, hasErr bool) {
 }
 
 func (p *Parser) pushDefs(dest, src *Defmap) {
-	for _, ns := range src.Namespaces {
-		def := p.nsById(ns.Id)
-		if def == nil {
-			dest.Namespaces = append(dest.Namespaces, ns)
-		}
-	}
 	dest.Types = append(dest.Types, src.Types...)
 	dest.Structs = append(dest.Structs, src.Structs...)
 	dest.Enums = append(dest.Enums, src.Enums...)
@@ -907,7 +901,7 @@ func (p *Parser) implTrait(impl models.Impl) {
 	}
 	trait.Used = true
 	sid, _ := impl.Target.KindId()
-	xs, _, _ := p.structById(sid)
+	xs, _, _ := p.Defs.structById(sid, nil)
 	if xs == nil {
 		p.pusherrtok(impl.Target.Tok, "id_noexist", sid)
 		return
@@ -918,10 +912,12 @@ func (p *Parser) implTrait(impl models.Impl) {
 		ok := false
 		ds := tf.Ast.DefString()
 		for _, obj := range impl.Tree {
-			f := obj.Data.(*Func)
-			if tf.Ast.Pub == f.Pub && ds == f.DefString() {
-				ok = true
-				break
+			switch t := obj.Data.(type) {
+			case *Func:
+				if tf.Ast.Pub == t.Pub && ds == t.DefString() {
+					ok = true
+					break
+				}
 			}
 		}
 		if !ok {
@@ -929,35 +925,14 @@ func (p *Parser) implTrait(impl models.Impl) {
 		}
 	}
 	for _, obj := range impl.Tree {
-		f := obj.Data.(*Func)
-		if trait.FindFunc(f.Id) == nil {
-			p.pusherrtok(impl.Target.Tok, "trait_hasnt_id", trait.Ast.Id, f.Id)
-			break
-		} else if xf, _, _ := xs.Defs.funcById(f.Id, nil); xf != nil {
-			p.pusherrtok(f.Tok, "exist_id", f.Id)
-			continue
-		}
-		sf := new(function)
-		sf.Ast = f
-		sf.Ast.Receiver.Tok = xs.Ast.Tok
-		sf.Ast.Receiver.Tag = xs
-		sf.used = true
-		xs.Defs.Funcs = append(xs.Defs.Funcs, sf)
-	}
-}
-
-func (p *Parser) implStruct(impl models.Impl) {
-	xs, _, _ := p.structById(impl.Trait.Kind)
-	if xs == nil {
-		p.pusherrtok(impl.Trait, "id_noexist", impl.Trait.Kind)
-		return
-	}
-	for _, obj := range impl.Tree {
 		switch t := obj.Data.(type) {
-		case []GenericType:
-			p.Generics(t)
+		case models.Attribute:
+			p.PushAttribute(t)
 		case *Func:
-			if xf, _, _ := xs.Defs.funcById(t.Id, nil); xf != nil {
+			if trait.FindFunc(t.Id) == nil {
+				p.pusherrtok(impl.Target.Tok, "trait_hasnt_id", trait.Ast.Id, t.Id)
+				break
+			} else if xf, _, _ := xs.Defs.funcById(t.Id, nil); xf != nil {
 				p.pusherrtok(t.Tok, "exist_id", t.Id)
 				continue
 			}
@@ -965,6 +940,38 @@ func (p *Parser) implStruct(impl models.Impl) {
 			sf.Ast = t
 			sf.Ast.Receiver.Tok = xs.Ast.Tok
 			sf.Ast.Receiver.Tag = xs
+			sf.Ast.Attributes = p.attributes
+			p.attributes = nil
+			sf.used = true
+			xs.Defs.Funcs = append(xs.Defs.Funcs, sf)
+		}
+	}
+}
+
+func (p *Parser) implStruct(impl models.Impl) {
+	xs, _, _ := p.Defs.structById(impl.Trait.Kind, nil)
+	if xs == nil {
+		p.pusherrtok(impl.Trait, "id_noexist", impl.Trait.Kind)
+		return
+	}
+	for _, obj := range impl.Tree {
+		switch t := obj.Data.(type) {
+		case models.Attribute:
+			p.PushAttribute(t)
+		case []GenericType:
+			p.Generics(t)
+		case *Func:
+			xf, _, _ := xs.Defs.funcById(t.Id, nil)
+			if xf != nil {
+				p.pusherrtok(t.Tok, "exist_id", t.Id)
+				continue
+			}
+			sf := new(function)
+			sf.Ast = t
+			sf.Ast.Receiver.Tok = xs.Ast.Tok
+			sf.Ast.Receiver.Tag = xs
+			sf.Ast.Attributes = p.attributes
+			p.attributes = nil
 			setGenerics(sf.Ast, p.generics)
 			p.generics = nil
 			for _, generic := range t.Generics {
@@ -974,7 +981,6 @@ func (p *Parser) implStruct(impl models.Impl) {
 			}
 			xs.Defs.Funcs = append(xs.Defs.Funcs, sf)
 		}
-		p.checkGenerics(obj)
 	}
 }
 
@@ -1720,8 +1726,7 @@ func (p *Parser) structConstructorInstance(as *xstruct) *xstruct {
 	s.constructor = new(Func)
 	*s.constructor = *as.constructor
 	s.constructor.RetType.Type.Tag = s
-	s.Defs = new(Defmap)
-	*s.Defs = *as.Defs
+	s.Defs = as.Defs
 	if len(as.Ast.Generics) > 0 { // Parse if has generics
 		for i := range s.Ast.Fields {
 			p.parseField(s, &s.Defs.Globals[i], i)
