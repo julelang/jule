@@ -82,7 +82,7 @@ func (b *Builder) buildNode(toks Toks) {
 	case tokens.Impl:
 		b.Impl(toks)
 	case tokens.Comment:
-		b.Comment(toks[0])
+		b.Tree = append(b.Tree, b.Comment(toks[0]))
 	case tokens.Preprocessor:
 		b.Preprocessor(toks)
 	default:
@@ -252,23 +252,22 @@ func (b *Builder) Enum(toks Toks) {
 }
 
 // Comment builds AST model of comment.
-func (b *Builder) Comment(tok Tok) {
+func (b *Builder) Comment(tok Tok) models.Object {
 	tok.Kind = strings.TrimSpace(tok.Kind[2:])
 	if strings.HasPrefix(tok.Kind, "cxx:") {
-		b.Tree = append(b.Tree, models.Object{
+		return models.Object{
 			Tok: tok,
 			Data: models.CxxEmbed{
 				Tok:     tok,
 				Content: tok.Kind[4:]},
-		})
-		return
+		}
 	}
-	b.Tree = append(b.Tree, models.Object{
+	return models.Object{
 		Tok: tok,
 		Data: models.Comment{
 			Content: tok.Kind,
 		},
-	})
+	}
 }
 
 // Preprocessor builds AST model of preprocessor directives.
@@ -453,6 +452,9 @@ func (b *Builder) implTraitFuncs(impl *models.Impl, toks Toks) {
 		ref := false
 		tok := funcToks[0]
 		switch tok.Id {
+		case tokens.Comment:
+			impl.Tree = append(impl.Tree, b.Comment(tok))
+			continue
 		case tokens.At:
 			impl.Tree = append(impl.Tree, models.Object{
 				Tok:  tok,
@@ -484,6 +486,9 @@ func (b *Builder) implStruct(impl *models.Impl, toks Toks) {
 		tok := funcToks[0]
 		pub := false
 		switch tok.Id {
+		case tokens.Comment:
+			impl.Tree = append(impl.Tree, b.Comment(tok))
+			continue
 		case tokens.At:
 			impl.Tree = append(impl.Tree, models.Object{
 				Tok:  tok,

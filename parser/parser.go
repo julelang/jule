@@ -928,6 +928,8 @@ func (p *Parser) implTrait(impl models.Impl) {
 		switch t := obj.Data.(type) {
 		case models.Attribute:
 			p.PushAttribute(t)
+		case models.Comment:
+			p.Comment(t)
 		case *Func:
 			if trait.FindFunc(t.Id) == nil {
 				p.pusherrtok(impl.Target.Tok, "trait_hasnt_id", trait.Ast.Id, t.Id)
@@ -942,6 +944,8 @@ func (p *Parser) implTrait(impl models.Impl) {
 			sf.Ast.Receiver.Tag = xs
 			sf.Ast.Attributes = p.attributes
 			p.attributes = nil
+			sf.Desc = p.docText.String()
+			p.docText.Reset()
 			sf.used = true
 			xs.Defs.Funcs = append(xs.Defs.Funcs, sf)
 		}
@@ -960,6 +964,8 @@ func (p *Parser) implStruct(impl models.Impl) {
 			p.PushAttribute(t)
 		case []GenericType:
 			p.Generics(t)
+		case models.Comment:
+			p.Comment(t)
 		case *Func:
 			xf, _, _ := xs.Defs.funcById(t.Id, nil)
 			if xf != nil {
@@ -971,6 +977,8 @@ func (p *Parser) implStruct(impl models.Impl) {
 			sf.Ast.Receiver.Tok = xs.Ast.Tok
 			sf.Ast.Receiver.Tag = xs
 			sf.Ast.Attributes = p.attributes
+			sf.Desc = p.docText.String()
+			p.docText.Reset()
 			p.attributes = nil
 			setGenerics(sf.Ast, p.generics)
 			p.generics = nil
