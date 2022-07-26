@@ -34,8 +34,6 @@ const commandDoc = "doc"
 const localizationErrors = "error.json"
 const localizationWarnings = "warning.json"
 
-const builtinBaseFile = "lib.xx"
-
 var helpmap = [...][2]string{
 	0: {commandHelp, "Show help."},
 	1: {commandVersion, "Show version."},
@@ -322,18 +320,6 @@ func writeOutput(path, content string) {
 	}
 }
 
-func loadBuiltin() bool {
-	f, err := xio.Openfx(filepath.Join(x.StdlibPath, builtinBaseFile))
-	if err != nil {
-		println(err.Error())
-		return false
-	}
-	p := parser.New(f)
-	p.Defs = parser.Builtin
-	p.Parsef(false, false)
-	return !printlogs(p)
-}
-
 func compile(path string, main, nolocal, justDefs bool) *Parser {
 	loadXSet()
 	p := parser.New(nil)
@@ -351,9 +337,6 @@ func compile(path string, main, nolocal, justDefs bool) *Parser {
 	if err != nil || !inf.IsDir() {
 		p.PushErr("no_stdlib")
 		return p
-	}
-	if !loadBuiltin() {
-		return nil
 	}
 	p.File = f
 	p.NoLocalPkg = nolocal
