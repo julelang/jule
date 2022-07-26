@@ -561,26 +561,26 @@ var arrayDefs = &Defmap{
 func readySliceDefs(t DataType) {
 	elemType := typeOfSliceComponents(t)
 
-	findFunc, _ := sliceDefs.funcById("find", nil)
+	findFunc, _, _ := sliceDefs.funcById("find", nil)
 	findFunc.Ast.Params[0].Type = elemType
 	findFunc.Ast.RetType.Type = elemType
 	findFunc.Ast.RetType.Type.Kind = tokens.STAR + findFunc.Ast.RetType.Type.Kind
 
-	rfindFunc, _ := sliceDefs.funcById("rfind", nil)
+	rfindFunc, _, _ := sliceDefs.funcById("rfind", nil)
 	rfindFunc.Ast.Params[0].Type = elemType
 	rfindFunc.Ast.RetType.Type = elemType
 	rfindFunc.Ast.RetType.Type.Kind = tokens.STAR + rfindFunc.Ast.RetType.Type.Kind
 
-	eraseFunc, _ := sliceDefs.funcById("erase", nil)
+	eraseFunc, _, _ := sliceDefs.funcById("erase", nil)
 	eraseFunc.Ast.Params[0].Type = elemType
 
-	eraseAllFunc, _ := sliceDefs.funcById("erase_all", nil)
+	eraseAllFunc, _, _ := sliceDefs.funcById("erase_all", nil)
 	eraseAllFunc.Ast.Params[0].Type = elemType
 
-	appendFunc, _ := sliceDefs.funcById("append", nil)
+	appendFunc, _, _ := sliceDefs.funcById("append", nil)
 	appendFunc.Ast.Params[0].Type = elemType
 
-	insertFunc, _ := sliceDefs.funcById("insert", nil)
+	insertFunc, _, _ := sliceDefs.funcById("insert", nil)
 	insertFunc.Ast.Params[1].Type = elemType
 }
 
@@ -633,18 +633,18 @@ func readyMapDefs(mapt DataType) {
 	keyt := types[0]
 	valt := types[1]
 
-	keysFunc, _ := mapDefs.funcById("keys", nil)
+	keysFunc, _, _ := mapDefs.funcById("keys", nil)
 	keysFunc.Ast.RetType.Type = keyt
 	keysFunc.Ast.RetType.Type.Kind = x.Prefix_Slice + keysFunc.Ast.RetType.Type.Kind
 
-	valuesFunc, _ := mapDefs.funcById("values", nil)
+	valuesFunc, _, _ := mapDefs.funcById("values", nil)
 	valuesFunc.Ast.RetType.Type = valt
 	valuesFunc.Ast.RetType.Type.Kind = x.Prefix_Slice + valuesFunc.Ast.RetType.Type.Kind
 
-	hasFunc, _ := mapDefs.funcById("has", nil)
+	hasFunc, _, _ := mapDefs.funcById("has", nil)
 	hasFunc.Ast.Params[0].Type = keyt
 
-	delFunc, _ := mapDefs.funcById("del", nil)
+	delFunc, _, _ := mapDefs.funcById("del", nil)
 	delFunc.Ast.Params[0].Type = keyt
 }
 

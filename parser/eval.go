@@ -409,7 +409,7 @@ func (e *eval) subId(toks Toks, m *exprModel) (v value) {
 		if tok.Id == tokens.DataType {
 			return e.typeSubId(tok, idTok, m)
 		} else if tok.Id == tokens.Id {
-			t, _ := e.p.typeById(tok.Kind)
+			t, _, _ := e.p.typeById(tok.Kind)
 			if t != nil {
 				return e.typeSubId(t.Type.Tok, idTok, m)
 			}
@@ -612,7 +612,7 @@ func (e *eval) tryAssign(toks Toks, m *exprModel) (v value, ok bool) {
 }
 
 func (e *eval) xTypeSubId(dm *Defmap, idTok Tok, m *exprModel) (v value) {
-	i, t := dm.findById(idTok.Kind, nil)
+	i, dm, t := dm.findById(idTok.Kind, nil)
 	if i == -1 {
 		e.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
 		return
@@ -756,7 +756,7 @@ func (e *eval) typeId(toks Toks, m *exprModel) (v value) {
 }
 
 func (e *eval) xObjSubId(dm *Defmap, val value, idTok Tok, m *exprModel) (v value) {
-	i, t := dm.findById(idTok.Kind, idTok.File)
+	i, dm, t := dm.findById(idTok.Kind, idTok.File)
 	if i == -1 {
 		e.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
 		return
@@ -845,7 +845,7 @@ type nsFind interface {
 	nsById(string) *namespace
 }
 
-func (e *eval) getNs(toks *Toks, m *exprModel) *namespace {
+func (e *eval) getNs(toks *Toks) *Defmap {
 	var prev nsFind = e.p
 	var ns *namespace
 	for i, tok := range *toks {
@@ -856,9 +856,9 @@ func (e *eval) getNs(toks *Toks, m *exprModel) *namespace {
 			}
 			src := prev.nsById(tok.Kind)
 			if src == nil {
-				if i > 0 {
+				if ns != nil {
 					*toks = (*toks)[i:]
-					return ns
+					return ns.Defs
 				}
 				e.pusherrtok(tok, "namespace_not_exist", tok.Kind)
 				return nil
@@ -868,19 +868,19 @@ func (e *eval) getNs(toks *Toks, m *exprModel) *namespace {
 			continue
 		}
 		if tok.Id != tokens.DoubleColon {
-			return ns
+			return ns.Defs
 		}
 	}
-	return ns
+	return ns.Defs
 }
 
 func (e *eval) nsSubId(toks Toks, m *exprModel) (v value) {
-	ns := e.getNs(&toks, m)
-	if ns == nil {
+	defs := e.getNs(&toks)
+	if defs == nil {
 		return
 	}
 	pdefs := e.p.Defs
-	e.p.Defs = ns.Defs
+	e.p.Defs = defs
 	e.p.allowBuiltin = false
 	defer func() {
 		e.p.Defs = pdefs

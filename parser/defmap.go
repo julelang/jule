@@ -14,6 +14,7 @@ type Defmap struct {
 	Types      []*Type
 	Funcs      []*function
 	Globals    []*Var
+	side       *Defmap
 }
 
 func (dm *Defmap) findNsById(id string) int {
@@ -33,122 +34,146 @@ func (dm *Defmap) nsById(id string) *namespace {
 	return dm.Namespaces[i]
 }
 
-func (dm *Defmap) findStructById(id string, f *File) (int, bool) {
+func (dm *Defmap) findStructById(id string, f *File) (int, *Defmap, bool) {
 	for i, s := range dm.Structs {
 		if s != nil && s.Ast.Id == id {
 			if s.Ast.Pub || f == nil || f.Dir == s.Ast.Tok.File.Dir {
-				return i, false
+				return i, dm, false
 			}
 		}
 	}
-	return -1, false
-}
-
-func (dm *Defmap) structById(id string, f *File) (*xstruct, bool) {
-	i, canshadow := dm.findStructById(id, f)
-	if i == -1 {
-		return nil, false
+	if dm.side != nil {
+		i, m, _ := dm.side.findStructById(id, f)
+		return i, m, true
 	}
-	return dm.Structs[i], canshadow
+	return -1, nil, false
 }
 
-func (dm *Defmap) findTraitById(id string, f *File) (int, bool) {
+func (dm *Defmap) structById(id string, f *File) (*xstruct, *Defmap, bool) {
+	i, m, canshadow := dm.findStructById(id, f)
+	if i == -1 {
+		return nil, nil, false
+	}
+	return m.Structs[i], m, canshadow
+}
+
+func (dm *Defmap) findTraitById(id string, f *File) (int, *Defmap, bool) {
 	for i, t := range dm.Traits {
 		if t != nil && t.Ast.Id == id {
 			if t.Ast.Pub || f == nil || f.Dir == t.Ast.Tok.File.Dir {
-				return i, false
+				return i, dm, false
 			}
 		}
 	}
-	return -1, false
-}
-
-func (dm *Defmap) traitById(id string, f *File) (*trait, bool) {
-	i, canshadow := dm.findTraitById(id, f)
-	if i == -1 {
-		return nil, false
+	if dm.side != nil {
+		i, m, _ := dm.side.findTraitById(id, f)
+		return i, m, true
 	}
-	return dm.Traits[i], canshadow
+	return -1, nil, false
 }
 
-func (dm *Defmap) findEnumById(id string, f *File) (int, bool) {
+func (dm *Defmap) traitById(id string, f *File) (*trait, *Defmap, bool) {
+	i, m, canshadow := dm.findTraitById(id, f)
+	if i == -1 {
+		return nil, nil, false
+	}
+	return m.Traits[i], m, canshadow
+}
+
+func (dm *Defmap) findEnumById(id string, f *File) (int, *Defmap, bool) {
 	for i, e := range dm.Enums {
 		if e != nil && e.Id == id {
 			if e.Pub || f == nil || f.Dir == e.Tok.File.Dir {
-				return i, false
+				return i, dm, false
 			}
 		}
 	}
-	return -1, false
-}
-
-func (dm *Defmap) enumById(id string, f *File) (*Enum, bool) {
-	i, canshadow := dm.findEnumById(id, f)
-	if i == -1 {
-		return nil, false
+	if dm.side != nil {
+		i, m, _ := dm.side.findEnumById(id, f)
+		return i, m, true
 	}
-	return dm.Enums[i], canshadow
+	return -1, nil, false
 }
 
-func (dm *Defmap) findTypeById(id string, f *File) (int, bool) {
+func (dm *Defmap) enumById(id string, f *File) (*Enum, *Defmap, bool) {
+	i, m, canshadow := dm.findEnumById(id, f)
+	if i == -1 {
+		return nil, nil, false
+	}
+	return m.Enums[i], m, canshadow
+}
+
+func (dm *Defmap) findTypeById(id string, f *File) (int, *Defmap, bool) {
 	for i, t := range dm.Types {
 		if t != nil && t.Id == id {
 			if t.Pub || f == nil || f.Dir == t.Tok.File.Dir {
-				return i, false
+				return i, dm, false
 			}
 		}
 	}
-	return -1, false
-}
-
-func (dm *Defmap) typeById(id string, f *File) (*Type, bool) {
-	i, canshadow := dm.findTypeById(id, f)
-	if i == -1 {
-		return nil, false
+	if dm.side != nil {
+		i, m, _ := dm.side.findTypeById(id, f)
+		return i, m, true
 	}
-	return dm.Types[i], canshadow
+	return -1, nil, false
 }
 
-func (dm *Defmap) findFuncById(id string, f *File) (int, bool) {
+func (dm *Defmap) typeById(id string, f *File) (*Type, *Defmap, bool) {
+	i, m, canshadow := dm.findTypeById(id, f)
+	if i == -1 {
+		return nil, nil, false
+	}
+	return m.Types[i], m, canshadow
+}
+
+func (dm *Defmap) findFuncById(id string, f *File) (int, *Defmap, bool) {
 	for i, fn := range dm.Funcs {
 		if fn != nil && fn.Ast.Id == id {
 			if fn.Ast.Pub || f == nil || f.Dir == fn.Ast.Tok.File.Dir {
-				return i, false
+				return i, dm, false
 			}
 		}
 	}
-	return -1, false
+	if dm.side != nil {
+		i, m, _ := dm.side.findFuncById(id, f)
+		return i, m, true
+	}
+	return -1, nil, false
 }
 
 // funcById returns function by specified id.
 //
 // Special case:
 //  funcById(id) -> nil: if function is not exist.
-func (dm *Defmap) funcById(id string, f *File) (*function, bool) {
-	i, canshadow := dm.findFuncById(id, f)
+func (dm *Defmap) funcById(id string, f *File) (*function, *Defmap, bool) {
+	i, m, canshadow := dm.findFuncById(id, f)
 	if i == -1 {
-		return nil, false
+		return nil, nil, false
 	}
-	return dm.Funcs[i], canshadow
+	return m.Funcs[i], m, canshadow
 }
 
-func (dm *Defmap) findGlobalById(id string, f *File) (int, bool) {
+func (dm *Defmap) findGlobalById(id string, f *File) (int, *Defmap, bool) {
 	for i, v := range dm.Globals {
 		if v != nil && v.Type.Id != xtype.Void && v.Id == id {
 			if v.Pub || f == nil || f.Dir == v.IdTok.File.Dir {
-				return i, false
+				return i, dm, false
 			}
 		}
 	}
-	return -1, false
+	if dm.side != nil {
+		i, m, _ := dm.side.findGlobalById(id, f)
+		return i, m, true
+	}
+	return -1, nil, false
 }
 
-func (dm *Defmap) globalById(id string, f *File) (*Var, bool) {
-	i, canshadow := dm.findGlobalById(id, f)
+func (dm *Defmap) globalById(id string, f *File) (*Var, *Defmap, bool) {
+	i, m, canshadow := dm.findGlobalById(id, f)
 	if i == -1 {
-		return nil, false
+		return nil, nil, false
 	}
-	return dm.Globals[i], canshadow
+	return m.Globals[i], m, canshadow
 }
 
 // findById returns index of definition with type if exist.
@@ -163,8 +188,8 @@ func (dm *Defmap) globalById(id string, f *File) (*Var, bool) {
 // 's' -> struct
 // 't' -> type alias
 // 'i' -> trait
-func (dm *Defmap) findById(id string, f *File) (int, byte) {
-	var finders = map[byte]func(string, *xio.File) (int, bool){
+func (dm *Defmap) findById(id string, f *File) (int, *Defmap, byte) {
+	var finders = map[byte]func(string, *xio.File) (int, *Defmap, bool){
 		'g': dm.findGlobalById,
 		'f': dm.findFuncById,
 		'e': dm.findEnumById,
@@ -173,10 +198,10 @@ func (dm *Defmap) findById(id string, f *File) (int, byte) {
 		'i': dm.findTraitById,
 	}
 	for code, finder := range finders {
-		i, _ := finder(id, f)
+		i, m, _ := finder(id, f)
 		if i != -1 {
-			return i, code
+			return i, m, code
 		}
 	}
-	return -1, ' '
+	return -1, nil, ' '
 }

@@ -622,9 +622,11 @@ func (b *Builder) buildUseDecl(use *models.Use, toks Toks) {
 	path.WriteString(x.StdlibPath)
 	path.WriteRune(os.PathSeparator)
 	tok := toks[0]
+	isStd := false
 	if tok.Id != tokens.Id || tok.Kind != "std" {
 		b.pusherr(toks[0], "invalid_syntax")
 	}
+	isStd = true
 	if len(toks) < 3 {
 		b.pusherr(tok, "invalid_syntax")
 		return
@@ -693,6 +695,9 @@ func (b *Builder) buildUseDecl(use *models.Use, toks Toks) {
 		path.WriteString(tok.Kind)
 	}
 	use.LinkString = tokstoa(toks)
+	if isStd {
+		use.LinkString = "std::" + use.LinkString
+	}
 	use.Path = path.String()
 }
 

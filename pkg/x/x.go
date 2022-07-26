@@ -8,7 +8,7 @@ const (
 	SrcExt        = `.xx`
 	DocExt        = SrcExt + "doc"
 	SettingsFile  = "x.set"
-	Stdlib        = "lib"
+	Stdlib        = "std"
 	Localizations = "localization"
 
 	EntryPoint          = "main"
