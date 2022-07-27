@@ -402,23 +402,21 @@ public:
     inline bool empty(void) const noexcept
     { return this->_buffer.empty(); }
 
-    inline str_xt sub(const uint_xt start, const uint_xt end) const noexcept
-    { return this->_buffer.substr(start, end); }
+    inline bool has_prefix(const str_xt &_Sub) const noexcept {
+        return this->len() >= _Sub.len() &&
+                this->_buffer.substr(0, _Sub.len()) == _Sub._buffer;
+    }
 
-    inline str_xt sub(const uint_xt start) const noexcept
-    { return this->_buffer.substr(start); }
+    inline bool has_suffix(const str_xt &_Sub) const noexcept {
+        return this->len() >= _Sub.len() &&
+            this->_buffer.substr(this->len()-_Sub.len()) == _Sub._buffer;
+    }
 
-    inline bool has_prefix(const str_xt &_Sub) const noexcept
-    { return this->len() >= _Sub.len() && this->sub(0, _Sub.len()) == _Sub._buffer; }
+    inline int_xt find(const str_xt &_Sub) const noexcept
+    { return (int_xt)(this->_buffer.find(_Sub._buffer)); }
 
-    inline bool has_suffix(const str_xt &_Sub) const noexcept
-    { return this->len() >= _Sub.len() && this->sub(this->len()-_Sub.len()) == _Sub; }
-
-    inline uint_xt find(const str_xt &_Sub) const noexcept
-    { return this->_buffer.find(_Sub._buffer); }
-
-    inline uint_xt rfind(const str_xt &_Sub) const noexcept
-    { return this->_buffer.rfind(_Sub._buffer); }
+    inline int_xt rfind(const str_xt &_Sub) const noexcept
+    { return (int_xt)(this->_buffer.rfind(_Sub._buffer)); }
 
     inline const char* cstr(void) const noexcept
     { return (const char*)(this->_buffer.c_str()); }
@@ -433,7 +431,7 @@ public:
             const const_iterator _bytes_end{_Bytes.end()};
             for (; _bytes_it < _bytes_end; ++_bytes_it)
             { if ((exist = *_it == *_bytes_it)) { break; } }
-            if (!exist) { return this->sub(_it-_begin); }
+            if (!exist) { return this->_buffer.substr(_it-_begin); }
         }
         return str_xt{""};
     }
@@ -447,7 +445,7 @@ public:
             const const_iterator _bytes_end{_Bytes.end()};
             for (; _bytes_it < _bytes_end; ++_bytes_it)
             { if ((exist = *_it == *_bytes_it)) { break; } }
-            if (!exist) { return this->sub(0, _it-_begin+1); }
+            if (!exist) { return this->_buffer.substr(0, _it-_begin+1); }
         }
         return str_xt{""};
     }

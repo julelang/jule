@@ -9,9 +9,14 @@ import (
 // ToStr returns specified literal as X string literal for cxx.
 func ToStr(bytes []byte) string {
 	var cxx strings.Builder
-	cxx.WriteString("str_xt{{")
-	cxx.WriteString(bytesToStr(bytes))
-	cxx.WriteString("}}")
+	cxx.WriteString("str_xt{")
+	btoa := bytesToStr(bytes)
+	if btoa != "" {
+		cxx.WriteByte('{')
+		cxx.WriteString(btoa)
+		cxx.WriteByte('}')
+	}
+	cxx.WriteString("}")
 	return cxx.String()
 }
 

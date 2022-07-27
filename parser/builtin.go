@@ -419,13 +419,13 @@ var strDefs = &Defmap{
 			Pub:     true,
 			Id:      "find",
 			Params:  []Param{{Id: "sub", Type: DataType{Id: xtype.Str, Kind: tokens.STR}}},
-			RetType: RetType{Type: DataType{Id: xtype.UInt, Kind: tokens.UINT}},
+			RetType: RetType{Type: DataType{Id: xtype.Int, Kind: tokens.INT}},
 		}},
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "rfind",
 			Params:  []Param{{Id: "sub", Type: DataType{Id: xtype.Str, Kind: tokens.STR}}},
-			RetType: RetType{Type: DataType{Id: xtype.UInt, Kind: tokens.UINT}},
+			RetType: RetType{Type: DataType{Id: xtype.Int, Kind: tokens.INT}},
 		}},
 		{Ast: &Func{
 			Pub:     true,
@@ -446,7 +446,7 @@ var strDefs = &Defmap{
 				{Id: "sub", Type: DataType{Id: xtype.Str, Kind: tokens.STR}},
 				{
 					Id:      "n",
-					Type:    DataType{Id: xtype.I64, Kind: tokens.I64},
+					Type:    DataType{Id: xtype.Int, Kind: tokens.INT},
 					Default: Expr{Model: exprNode{"-1"}},
 				},
 			},
@@ -460,7 +460,7 @@ var strDefs = &Defmap{
 				{Id: "new", Type: DataType{Id: xtype.Str, Kind: tokens.STR}},
 				{
 					Id:      "n",
-					Type:    DataType{Id: xtype.I64, Kind: tokens.I64},
+					Type:    DataType{Id: xtype.Int, Kind: tokens.INT},
 					Default: Expr{Model: exprNode{"-1"}},
 				},
 			},
