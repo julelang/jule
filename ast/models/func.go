@@ -19,6 +19,7 @@ type Func struct {
 	RetType    RetType
 	Block      *Block
 	Receiver   *DataType
+	Owner      any
 }
 
 // FindAttribute returns attribute if exist, nil if not.

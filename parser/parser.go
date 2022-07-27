@@ -421,7 +421,7 @@ func (p *Parser) pushUse(use *use, selectors []Tok) {
 	ns := new(models.Namespace)
 	ns.Ids = strings.SplitN(use.LinkString, tokens.DOUBLE_COLON, -1)
 	src := p.pushNs(ns)
-	src.Defs = use.defs
+	src.defs = use.defs
 	//p.pushDefs(src.Defs, use.defs)
 }
 
@@ -946,6 +946,7 @@ func (p *Parser) implTrait(impl models.Impl) {
 			sf.Ast.Receiver.Tok = xs.Ast.Tok
 			sf.Ast.Receiver.Tag = xs
 			sf.Ast.Attributes = p.attributes
+			sf.Ast.Owner = p
 			p.attributes = nil
 			sf.Desc = p.docText.String()
 			p.docText.Reset()
@@ -981,6 +982,7 @@ func (p *Parser) implStruct(impl models.Impl) {
 			sf.Ast.Receiver.Tag = xs
 			sf.Ast.Attributes = p.attributes
 			sf.Desc = p.docText.String()
+			sf.Ast.Owner = p
 			p.docText.Reset()
 			p.attributes = nil
 			setGenerics(sf.Ast, p.generics)
@@ -1014,10 +1016,10 @@ func (p *Parser) pushNs(ns *models.Namespace) *namespace {
 			src = new(namespace)
 			src.Id = id
 			src.Tok = ns.Tok
-			src.Defs = new(Defmap)
+			src.defs = new(Defmap)
 			prev.Namespaces = append(prev.Namespaces, src)
 		}
-		prev = src.Defs
+		prev = src.defs
 	}
 	return src
 }
@@ -1107,9 +1109,20 @@ func (p *Parser) parseMapNonGenericType(generics []*GenericType, t *DataType) {
 }
 
 func (p *Parser) parseCommonNonGenericType(generics []*GenericType, t *DataType) {
-	if !typeIsGeneric(generics, *t) {
-		*t, _ = p.realType(*t, true)
+	if typeIsGeneric(generics, *t) {
+		return
 	}
+	if t.Tag != nil {
+		switch t := t.Tag.(type) {
+		case []DataType:
+			for _, ct := range t {
+				if typeIsGeneric(generics, ct) {
+					return
+				}
+			}
+		}
+	}
+	*t, _ = p.realType(*t, true)
 }
 
 func (p *Parser) parseNonGenericType(generics []*GenericType, t *DataType) {
@@ -1153,9 +1166,21 @@ func (p *Parser) parseMapGenericType(generics []*GenericType, t *DataType) {
 }
 
 func (p *Parser) parseCommonGenericType(generics []*GenericType, t *DataType) {
-	if typeIsGeneric(generics, *t) {
-		*t, _ = p.realType(*t, true)
+	if !typeIsGeneric(generics, *t) {
+		if t.Tag != nil {
+			switch t := t.Tag.(type) {
+			case []DataType:
+				for _, ct := range t {
+					if typeIsGeneric(generics, ct) {
+						goto parse
+					}
+				}
+			}
+		}
+		return
 	}
+parse:
+	*t, _ = p.realType(*t, true)
 }
 
 func (p *Parser) parseGenericType(generics []*GenericType, t *DataType) {
@@ -1228,6 +1253,7 @@ func (p *Parser) Func(fast Func) {
 	*f.Ast = fast
 	f.Ast.Attributes = p.attributes
 	p.attributes = nil
+	f.Ast.Owner = p
 	f.Desc = p.docText.String()
 	p.docText.Reset()
 	setGenerics(f.Ast, p.generics)
@@ -1655,10 +1681,16 @@ func (p *Parser) parsePureFunc(f *Func) (err bool) {
 	if err {
 		return
 	}
-	p.blockVars = p.blockVarsOfFunc(f)
-	p.checkFunc(f)
-	p.blockTypes = nil
-	p.blockVars = nil
+	owner := f.Owner.(*Parser)
+	owner.blockVars = owner.blockVarsOfFunc(f)
+	owner.checkFunc(f)
+	if owner != p {
+		owner.wg.Wait()
+		p.pusherrs(owner.Errors...)
+		owner.Errors = nil
+	}
+	owner.blockTypes = nil
+	owner.blockVars = nil
 	return
 }
 
@@ -1747,6 +1779,7 @@ func (p *Parser) callStructConstructor(s *xstruct, argsToks Toks, m *exprModel) 
 	v.isType = false
 	v.lvalue = false
 	v.constExpr = false
+	v.data.Value = s.Ast.Id
 	// Set braces to parentheses
 	argsToks[0].Kind = tokens.LPARENTHESES
 	argsToks[len(argsToks)-1].Kind = tokens.RPARENTHESES
@@ -1909,26 +1942,22 @@ func itsCombined(f *Func, generics []DataType) bool {
 }
 
 func (p *Parser) parseGenericFunc(f *Func, generics []DataType) {
-	blockTypes := p.blockTypes
-	blockVars := p.blockVars
-	p.blockTypes = nil
-	defer func() { p.blockTypes, p.blockVars = blockTypes, blockVars }()
-	p.pushGenerics(f.Generics, generics)
+	owner := f.Owner.(*Parser)
+	owner.pushGenerics(f.Generics, generics)
 	if f.Receiver != nil {
 		s := f.Receiver.Tag.(*xstruct)
-		p.pushGenerics(s.Ast.Generics, s.Generics())
+		owner.pushGenerics(s.Ast.Generics, s.Generics())
 	}
-	p.parseTypesGenerics(f)
+	owner.parseTypesGenerics(f)
 	if itsCombined(f, generics) {
 		return
 	}
 	*f.Combines = append(*f.Combines, generics)
-	rootBlock := p.rootBlock
-	nodeBlock := p.nodeBlock
-	defer func() { p.rootBlock, p.nodeBlock = rootBlock, nodeBlock }()
-	p.rootBlock = nil
-	p.nodeBlock = nil
 	p.parsePureFunc(f)
+	owner.blockTypes = nil
+	owner.blockVars = nil
+	owner.rootBlock = nil
+	owner.nodeBlock = nil
 }
 
 func (p *Parser) parseGenerics(f *Func, generics []DataType, m *exprModel, errTok Tok) bool {
@@ -2970,7 +2999,10 @@ func (p *Parser) typeSourceIsStruct(s *xstruct, tag any, errTok Tok) (dt DataTyp
 		}
 		for i, g := range generics {
 			var ok bool
-			generics[i], ok = p.realType(g, true)
+			g, ok = p.realType(g, true)
+			g.DontUseOriginal = true
+			g.Original = nil
+			generics[i] = g
 			if !ok {
 				goto end
 			}

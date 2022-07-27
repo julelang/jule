@@ -858,20 +858,20 @@ func (e *eval) getNs(toks *Toks) *Defmap {
 			if src == nil {
 				if ns != nil {
 					*toks = (*toks)[i:]
-					return ns.Defs
+					return ns.defs
 				}
 				e.pusherrtok(tok, "namespace_not_exist", tok.Kind)
 				return nil
 			}
-			prev = src.Defs
+			prev = src.defs
 			ns = src
 			continue
 		}
 		if tok.Id != tokens.DoubleColon {
-			return ns.Defs
+			return ns.defs
 		}
 	}
-	return ns.Defs
+	return ns.defs
 }
 
 func (e *eval) nsSubId(toks Toks, m *exprModel) (v value) {
@@ -1324,6 +1324,7 @@ func (e *eval) braceRange(toks Toks, m *exprModel) (v value) {
 				return
 			}
 			e.p.checkAnonFunc(&f)
+			f.Owner = e.p
 			v.data.Value = f.Id
 			v.data.Type.Tag = &f
 			v.data.Type.Id = xtype.Func

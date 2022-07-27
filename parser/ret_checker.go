@@ -14,9 +14,9 @@ type retChecker struct {
 	values   []value
 }
 
-func (rc *retChecker) pushval(last, current int, errTk Tok) {
+func (rc *retChecker) pushval(last, current int, errTok Tok) {
 	if current-last == 0 {
-		rc.p.pusherrtok(errTk, "missing_expr")
+		rc.p.pusherrtok(errTok, "missing_expr")
 		return
 	}
 	toks := rc.retAST.Expr.Toks[last:current]

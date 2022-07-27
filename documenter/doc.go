@@ -60,24 +60,13 @@ type parameter struct {
 	Type string `json:"type"`
 }
 
-type namespace struct {
-	Id         string       `json:"id"`
-	Enums      []enum       `json:"enums"`
-	Structs    []xstruct    `json:"structs"`
-	Types      []type_alias `json:"types"`
-	Globals    []global     `json:"globals"`
-	Funcs      []function   `json:"functions"`
-	Namespaces []namespace  `json:"namespaces"`
-}
-
 type document struct {
-	Uses       []use        `json:"uses"`
-	Enums      []enum       `json:"enums"`
-	Structs    []xstruct    `json:"structs"`
-	Types      []type_alias `json:"types"`
-	Globals    []global     `json:"globals"`
-	Funcs      []function   `json:"functions"`
-	Namespaces []namespace  `json:"namespaces"`
+	Uses    []use        `json:"uses"`
+	Enums   []enum       `json:"enums"`
+	Structs []xstruct    `json:"structs"`
+	Types   []type_alias `json:"types"`
+	Globals []global     `json:"globals"`
+	Funcs   []function   `json:"functions"`
 }
 
 func ttoa(t models.DataType) string {
@@ -197,27 +186,6 @@ func funcs(dm *Defmap) []function {
 	return funcs
 }
 
-func makeNamespace(dm *Defmap) namespace {
-	var ns namespace
-	ns.Enums = enums(dm)
-	ns.Structs = structs(dm)
-	ns.Types = types(dm)
-	ns.Globals = globals(dm)
-	ns.Funcs = funcs(dm)
-	ns.Namespaces = namespaces(dm)
-	return ns
-}
-
-func namespaces(dm *Defmap) []namespace {
-	namespaces := make([]namespace, len(dm.Namespaces))
-	for i, ns := range dm.Namespaces {
-		nspace := makeNamespace(ns.Defs)
-		nspace.Id = ns.Id
-		namespaces[i] = nspace
-	}
-	return namespaces
-}
-
 // Doc returns documentation of code into JSON format.
 func Doc(p *parser.Parser) (string, error) {
 	doc := document{
@@ -227,7 +195,6 @@ func Doc(p *parser.Parser) (string, error) {
 		types(p.Defs),
 		globals(p.Defs),
 		funcs(p.Defs),
-		namespaces(p.Defs),
 	}
 	bytes, err := json.MarshalIndent(doc, "", "\t")
 	if err != nil {
