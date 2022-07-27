@@ -16,7 +16,6 @@ type Var struct {
 	Type      DataType
 	Expr      Expr
 	Const     bool
-	Volatile  bool
 	New       bool
 	Tag       any
 	ExprTag   any
@@ -34,9 +33,6 @@ func (v Var) String() string {
 		return ""
 	}
 	var cxx strings.Builder
-	if v.Volatile {
-		cxx.WriteString("volatile ")
-	}
 	cxx.WriteString(v.Type.String())
 	cxx.WriteByte(' ')
 	cxx.WriteString(v.OutId())
@@ -54,9 +50,6 @@ func (v Var) String() string {
 // FieldString returns variable as cxx struct field.
 func (v *Var) FieldString() string {
 	var cxx strings.Builder
-	if v.Volatile {
-		cxx.WriteString("volatile ")
-	}
 	if v.Const {
 		cxx.WriteString("const ")
 	}

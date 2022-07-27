@@ -42,7 +42,6 @@ type global struct {
 	Id       string `json:"id"`
 	Type     string `json:"type"`
 	Constant bool   `json:"constant"`
-	Volatile bool   `json:"volatile"`
 	Desc     string `json:"description"`
 }
 
@@ -134,7 +133,6 @@ func globals(dm *Defmap) []global {
 			Id:       v.Id,
 			Type:     ttoa(v.Type),
 			Constant: v.Const,
-			Volatile: v.Volatile,
 			Desc:     Descriptize(v.Desc),
 		}
 	}

@@ -69,7 +69,7 @@ func (b *Builder) buildNode(toks Toks) {
 		})
 	case tokens.Id:
 		b.Id(toks)
-	case tokens.Const, tokens.Volatile:
+	case tokens.Const:
 		b.GlobalVar(toks)
 	case tokens.Type:
 		b.Tree = append(b.Tree, b.TypeOrGenerics(toks))
@@ -1408,7 +1408,7 @@ func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
 		if ok {
 			return s
 		}
-	case tokens.Const, tokens.Volatile:
+	case tokens.Const:
 		return b.VarStatement(bs.toks)
 	case tokens.Ret:
 		return b.RetStatement(bs.toks)
@@ -1739,12 +1739,6 @@ func (b *Builder) varBegin(v *models.Var, i *int, toks Toks) {
 				break
 			}
 			v.Const = true
-		case tokens.Volatile:
-			if v.Volatile {
-				b.pusherr(tok, "already_volatile")
-				break
-			}
-			v.Volatile = true
 		default:
 			b.pusherr(tok, "invalid_syntax")
 		}

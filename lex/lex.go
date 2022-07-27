@@ -347,7 +347,6 @@ var keywords = map[string]uint8{
 	tokens.IN:       tokens.In,
 	tokens.IF:       tokens.If,
 	tokens.ELSE:     tokens.Else,
-	tokens.VOLATILE: tokens.Volatile,
 	tokens.USE:      tokens.Use,
 	tokens.PUB:      tokens.Pub,
 	tokens.DEFER:    tokens.Defer,

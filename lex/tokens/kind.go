@@ -80,7 +80,6 @@ const (
 	IN                  = "in"
 	IF                  = "if"
 	ELSE                = "else"
-	VOLATILE            = "volatile"
 	USE                 = "use"
 	PUB                 = "pub"
 	DEFER               = "defer"
