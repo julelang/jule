@@ -2,19 +2,19 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-const uvnan    : = 0x7FF8000000000001
-const uvinf    : = 0x7FF0000000000000
-const uvneginf : = 0xFFF0000000000000
-const uvone    : = 0x3FF0000000000000
-const mask     : = 0x7FF
-const shift    : = 64 - 11 - 1
-const bias     : = 1023
-const sign_mask: = 1 << 63
-const frac_mask: = 1<<shift - 1
+const UVNAN    : = 0x7FF8000000000001
+const UVINF    : = 0x7FF0000000000000
+const UVNEGINF : = 0xFFF0000000000000
+const UVONE    : = 0x3FF0000000000000
+const MASK     : = 0x7FF
+const SHIFT    : = 64 - 11 - 1
+const BIAS     : = 1023
+const SIGN_MASK: = 1 << 63
+const FRAC_MASK: = 1<<SHIFT - 1
 
 //doc: Returns an IEEE 754 “not-a-number” value.
 @inline
-pub nan() f64 { ret f64_from_bits(uvnan) }
+pub nan() f64 { ret f64_from_bits(UVNAN) }
 
 //doc: Reports whether f is an IEEE 754 “not-a-number” value.
 @inline
@@ -22,16 +22,16 @@ pub isnan(f f64) bool {
 	// IEEE 754 says that only NaNs satisfy f != f.
 	// To avoid the floating-point hardware, could use:
 	//	x: = f64_bits(f);
-	//	ret u32(x>>shift)&mask == mask && x != uvinf && x != uvneginf
+	//	ret u32(x>>SHIFT)&MASK == MASK && x != UVINF && x != UVNEGINF
 	ret f != f
 }
 
 //doc: Returns positive infinity if sign >= 0, negative infinity if !sign < 0.
 pub inf(sign int) f64 {
 	if sign >= 0 {
-		ret f64_from_bits(uvinf)
+		ret f64_from_bits(UVINF)
 	}
-	ret f64_from_bits(uvneginf)
+	ret f64_from_bits(UVNEGINF)
 }
 
 //doc:
@@ -44,7 +44,7 @@ pub isinf(f f64, sign int) bool {
 	// Test for infinity by comparing against maximum float.
 	// To avoid the floating-point hardware, could use:
 	//	x: = f64_bits(f);
-	//	ret sign >= 0 && x == uvinf || sign <= 0 && x == uvneginf;
+	//	ret sign >= 0 && x == UVINF || sign <= 0 && x == UVNEGINF;
 	ret sign >= 0 && f > f64.max || sign <= 0 && f < -f64.max
 }
 
@@ -52,8 +52,8 @@ pub isinf(f f64, sign int) bool {
 // Returns a normal number y and exponent exp
 // satisfying x == y × 2**exp. It assumes x is finite and non-zero.
 normalize(x f64) [y f64, exp int] {
-	const smallest_normal: = 2.2250738585072014e-308 // 2**-1022
-	if abs(x) < smallest_normal {
+	const SMALLEST_NORMAL: = 2.2250738585072014e-308 // 2**-1022
+	if abs(x) < SMALLEST_NORMAL {
 		ret x * (1 << 52), -52
 	}
 	ret x, 0

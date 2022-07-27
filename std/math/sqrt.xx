@@ -98,26 +98,26 @@ pub sqrt(x f64) f64 {
 	}
 	ix: = f64_bits(x)
 	// normalize x
-	exp: = int((ix >> shift) & mask)
+	exp: = int((ix >> SHIFT) & MASK)
 	if exp == 0 { // subnormal x
-		iter ix&(1<<shift) == 0 {
+		iter ix&(1<<SHIFT) == 0 {
 			ix <<= 1
 			exp--
 		}
 		exp++
 	}
-	exp -= bias // unbias exponent
-	ix &= ~(mask << shift)
-	ix |= 1 << shift
+	exp -= BIAS // unbias exponent
+	ix &= ~(MASK << SHIFT)
+	ix |= 1 << SHIFT
 	if exp&1 == 1 { // odd exp, double x to make it even
 		ix <<= 1
 	}
 	exp >>= 1 // exp = exp/2, exponent of square root
 	// generate sqrt(x) bit by bit
 	ix <<= 1
-	q:u64 // q = sqrt(x)
-	s:u64
-	r: = u64(1 << (shift + 1)) // r = moving bit from MSB to LSB
+	q: u64 // q = sqrt(x)
+	s: u64
+	r: = u64(1 << (SHIFT + 1)) // r = moving bit from MSB to LSB
 	iter r != 0 {
 		t: = s + r
 		if t <= ix {
@@ -132,6 +132,6 @@ pub sqrt(x f64) f64 {
 	if ix != 0 { // remainder, result not exact
 		q += q & 1 // round according to extra bit
 	}
-	ix = q>>1 + u64(exp-1+bias)<<shift // significand + biased exponent
+	ix = q>>1 + u64(exp-1+BIAS)<<SHIFT // significand + biased exponent
 	ret f64_from_bits(ix)
 }

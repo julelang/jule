@@ -1782,8 +1782,7 @@ func (p *Parser) structConstructorInstance(as *xstruct) *xstruct {
 	s.constructor = new(Func)
 	*s.constructor = *as.constructor
 	s.constructor.RetType.Type.Tag = s
-	s.Defs = new(Defmap)
-	p.pushDefs(s.Defs, as.Defs)
+	s.Defs = as.Defs
 	return s
 }
 
