@@ -11,43 +11,42 @@
 </strong>
 </div>
 
-<h2 id="key-features">Key Features</h2>
-
-+ Simple and elegant
-+ As efficient and performance as C/C++
-+ High C/C++ interoperability
-+ Deferred calls
-+ Language integrated concurrency
-+ Language integrated documentation
-+ Generic programming
-+ C/C++ backends
-
-<h2 id="introduction">Introduction</h2>
+<h2 id="motivation">Motivation</h2>
 
 X is a statically typed compiled programming language designed for system development, building maintainable and reliable software. <br>
 The purpose of X is to keep functionality high while maintaining a simple form and readability. <br>
-It is based on not having any content that restricts the developer. <br>
-That means manual memory management, unsafe memory operations if you want and more.
+It guarantees memory safety and does not contain undefined behavior.
 
-<strong>Hello Github;</strong>
-```go
-main() {
-  outln("Hello, GitHub!")
-}
-```
+<h2 id="why">Memory Safety and Management</h2>
+The memory safety and the memory management.
+A major challenge in the C and C++ or similar programming languages.
+X guarantees memory safety and uses reference counting for memory management.
+An account-allocation is automatically released as soon as the reference count reaches zero.
+There are no dangling pointers, and accessing a null pointer will obviously get you an error.
+<br><br>
 
-<h3 id="whats-new">What's New</h3>
++ A heap allocation is a developer's choice only
++ Instant automatic memory initialization
++ Bounds checking
 
-+ Multiple assignments
-+ Multiple function returns
-+ Return type identifiers
-+ Deferred calls
-+ Language integrated concurrency
-+ Language integrated documentation
-+ Type constants
-+ Argument targeting
+<h2 id="goals">Goals</h2>
 
-and more...
++ Simplcity and maintainability
++ Fast and scalable development
++ Performance-critical software
++ Memory safety
++ As efficient and performance as C/C++
++ High C/C++ interoperability
+
+<h2 id="what-is-xxc">What is XXC?</h2>
+XXC is the name of the reference compiler for the X programming language. <br>
+It is the original compiler of the X programming language. <br>
+The features that XXC has is a representation of the official and must-have features of the X programming language.
+
+<h2 id="documentations">Documentations</h2>
+
+All documentation about XXC (naturally X programming language) is on the website. <br>
+[See Documentations](https://the-xlang.github.io/website/pages/docs.html)
 
 <h2 id="os-support">OS Support</h2>
 
@@ -71,49 +70,6 @@ and more...
         <td>MacOS</td>
         <td>Supports</td>
         <td>Not supports yet</td>
-    </tr>
-</table>
-
-<h2 id="what-is-xxc">What is XXC?</h2>
-XXC is the name of the reference compiler for the X programming language. <br>
-It is the original compiler of the X programming language. <br>
-The features that XXC has is a representation of the official and must-have features of the X programming language.
-
-<h2 id="documentations">Documentations</h2>
-
-All documentation about XXC (naturally X programming language) is on the website. <br>
-[See Documentations](https://the-xlang.github.io/website/pages/docs.html)
-
-<h2 id="project-build-state">Project Build State</h2>
-
-<table>
-    <tr>
-        <td><strong>Operating System</strong></td>
-        <td><strong>State</strong></td>
-    </tr>
-    <tr>
-        <td>Windows</td>
-        <td>
-            <a href="https://github.com/the-xlang/xxc/actions/workflows/windows.yml">
-                <img src="https://github.com/the-xlang/xxc/actions/workflows/windows.yml/badge.svg")>
-            </a>
-        </td>
-    </tr>
-    <tr>
-        <td>Ubuntu</td>
-        <td>
-            <a href="https://github.com/the-xlang/xxc/actions/workflows/ubuntu.yml">
-                <img src="https://github.com/the-xlang/xxc/actions/workflows/ubuntu.yml/badge.svg")>
-            </a>
-        </td>
-    </tr>
-    <tr>
-        <td>MacOS</td>
-        <td>
-            <a href="https://github.com/the-xlang/xxc/actions/workflows/macos.yml">
-                <img src="https://github.com/the-xlang/xxc/actions/workflows/macos.yml/badge.svg")>
-            </a>
-        </td>
     </tr>
 </table>
 
@@ -147,6 +103,39 @@ go build -o xxc -v cmd/xxc/main.go
 ```
 
 Run the above command in your terminal, in the XXC project directory.
+
+<h2 id="project-build-state">Project Build State</h2>
+
+<table>
+    <tr>
+        <td><strong>Operating System</strong></td>
+        <td><strong>State</strong></td>
+    </tr>
+    <tr>
+        <td>Windows</td>
+        <td>
+            <a href="https://github.com/the-xlang/xxc/actions/workflows/windows.yml">
+                <img src="https://github.com/the-xlang/xxc/actions/workflows/windows.yml/badge.svg")>
+            </a>
+        </td>
+    </tr>
+    <tr>
+        <td>Ubuntu</td>
+        <td>
+            <a href="https://github.com/the-xlang/xxc/actions/workflows/ubuntu.yml">
+                <img src="https://github.com/the-xlang/xxc/actions/workflows/ubuntu.yml/badge.svg")>
+            </a>
+        </td>
+    </tr>
+    <tr>
+        <td>MacOS</td>
+        <td>
+            <a href="https://github.com/the-xlang/xxc/actions/workflows/macos.yml">
+                <img src="https://github.com/the-xlang/xxc/actions/workflows/macos.yml/badge.svg")>
+            </a>
+        </td>
+    </tr>
+</table>
 
 <h2 id="contributing">Contributing</h2>
 
