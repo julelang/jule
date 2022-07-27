@@ -176,8 +176,7 @@ func (ve *valueEvaluator) varId(id string, variable *Var) (v value) {
 	variable.Used = true
 	v.data.Value = id
 	v.data.Type = variable.Type
-	v.constant = variable.Const
-	v.constExpr = v.constant
+	v.constExpr = variable.Const
 	v.data.Tok = variable.IdTok
 	v.lvalue = true
 	if id == tokens.SELF && typeIsPtr(variable.Type) {
@@ -210,7 +209,7 @@ func (ve *valueEvaluator) enumId(id string, e *Enum) (v value) {
 	v.data.Type.Tag = e
 	v.data.Type.Kind = e.Id
 	v.data.Tok = e.Tok
-	v.constant = true
+	v.constExpr = true
 	v.isType = true
 	// If built-in.
 	if e.Tok.Id == tokens.NA {

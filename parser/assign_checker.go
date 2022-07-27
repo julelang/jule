@@ -63,7 +63,6 @@ func integerAssignable(dt DataType, v value) bool {
 
 type assignChecker struct {
 	p         *Parser
-	constant  bool
 	t         DataType
 	v         value
 	ignoreAny bool
@@ -75,7 +74,7 @@ func (ac assignChecker) checkAssignType() {
 	if ac.p.eval.hasError || ac.v.data.Value == "" {
 		return
 	}
-	ac.p.checkAssignConst(ac.constant, ac.t, ac.v, ac.errtok)
+	ac.p.checkAssignConst(ac.t, ac.v, ac.errtok)
 	if typeIsPure(ac.t) && ac.v.constExpr && typeIsPure(ac.v.data.Type) {
 		switch {
 		case xtype.IsFloat(ac.t.Id):

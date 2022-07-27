@@ -1346,11 +1346,10 @@ func (p *Parser) Var(v Var) *Var {
 			if v.SetterTok.Id != tokens.NA {
 				p.wg.Add(1)
 				go assignChecker{
-					p:        p,
-					constant: v.Const,
-					t:        v.Type,
-					v:        val,
-					errtok:   v.IdTok,
+					p:      p,
+					t:      v.Type,
+					v:      val,
+					errtok: v.IdTok,
 				}.checkAssignType()
 			}
 		}
@@ -1360,18 +1359,28 @@ func (p *Parser) Var(v Var) *Var {
 		} else {
 			p.eval.hasError = p.eval.hasError || val.data.Value == ""
 			v.Type = val.data.Type
-			if typeIsPure(v.Type) && xtype.IsInteger(v.Type.Id) {
-				dt := DataType{
-					Id:   xtype.I64,
-					Kind: xtype.TypeMap[xtype.I64],
-				}
-				if integerAssignable(dt, val) {
-					v.Type.Id = xtype.Int
-					v.Type.Kind = xtype.TypeMap[v.Type.Id]
+			if val.constExpr && typeIsPure(v.Type) {
+				switch val.expr.(type) {
+				case int64:
+					dt := DataType{
+						Id:   xtype.Int,
+						Kind: xtype.TypeMap[xtype.Int],
+					}
+					if integerAssignable(dt, val) {
+						v.Type = dt
+					}
+				case uint64:
+					dt := DataType{
+						Id:   xtype.UInt,
+						Kind: xtype.TypeMap[xtype.UInt],
+					}
+					if integerAssignable(dt, val) {
+						v.Type = dt
+					}
 				}
 			}
 			p.checkValidityForAutoType(v.Type, v.SetterTok)
-			p.checkAssignConst(v.Const, v.Type, val, v.SetterTok)
+			p.checkAssignConst(v.Type, val, v.SetterTok)
 		}
 	}
 	if v.Const {
@@ -2633,7 +2642,7 @@ func (p *Parser) assignment(selected value, errtok Tok) bool {
 		p.eval.pusherrtok(errtok, "assign_nonlvalue")
 		state = false
 	}
-	if selected.constant {
+	if selected.constExpr {
 		p.pusherrtok(errtok, "assign_const")
 		state = false
 	}
@@ -2675,11 +2684,10 @@ func (p *Parser) singleAssign(assign *models.Assign, exprs []value) {
 	}
 	p.wg.Add(1)
 	go assignChecker{
-		p:        p,
-		constant: leftExpr.constant,
-		t:        leftExpr.data.Type,
-		v:        val,
-		errtok:   assign.Setter,
+		p:      p,
+		t:      leftExpr.data.Type,
+		v:      val,
+		errtok: assign.Setter,
 	}.checkAssignType()
 }
 
@@ -2722,11 +2730,10 @@ func (p *Parser) multiAssign(assign *models.Assign, right []value) {
 			}
 			p.wg.Add(1)
 			go assignChecker{
-				p:        p,
-				constant: leftExpr.constant,
-				t:        leftExpr.data.Type,
-				v:        right,
-				errtok:   assign.Setter,
+				p:      p,
+				t:      leftExpr.data.Type,
+				v:      right,
+				errtok: assign.Setter,
 			}.checkAssignType()
 			continue
 		}
@@ -3173,8 +3180,8 @@ func (p *Parser) checkMultiType(real, check DataType, ignoreAny bool, errTok Tok
 	}
 }
 
-func (p *Parser) checkAssignConst(constant bool, t DataType, val value, errTok Tok) {
-	if typeIsMut(t) && val.constant && !constant {
+func (p *Parser) checkAssignConst(t DataType, val value, errTok Tok) {
+	if typeIsMut(t) && val.constExpr {
 		p.pusherrtok(errTok, "constant_assignto_nonconstant")
 	}
 }

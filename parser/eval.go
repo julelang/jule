@@ -13,7 +13,6 @@ import (
 
 type value struct {
 	data      models.Data
-	constant  bool
 	constExpr bool
 	model     iExpr
 	expr      any
@@ -499,32 +498,32 @@ func (e *eval) cast(v value, t DataType, errtok Tok) value {
 		e.castSlice(t, v.data.Type, errtok)
 	case typeIsPure(t):
 		v.lvalue = false
-		e.castSingle(t, v.data.Type, errtok)
+		e.castSingle(t, &v, errtok)
 	default:
 		e.pusherrtok(errtok, "type_notsupports_casting", t.Kind)
 	}
 	v.data.Value = t.Kind
 	v.data.Type = t
-	v.constant = false
+	//v.constant = false
 	return v
 }
 
-func (e *eval) castSingle(t, vt DataType, errtok Tok) {
+func (e *eval) castSingle(t DataType, v *value, errtok Tok) {
 	switch t.Id {
 	case xtype.Any:
 		return
 	case xtype.Str:
-		e.castStr(vt, errtok)
+		e.castStr(v.data.Type, errtok)
 		return
 	case xtype.Enum:
-		e.castEnum(t, vt, errtok)
+		e.castEnum(t, v, errtok)
 		return
 	}
 	switch {
 	case xtype.IsInteger(t.Id):
-		e.castInteger(t, vt, errtok)
+		e.castInteger(t, v, errtok)
 	case xtype.IsNumeric(t.Id):
-		e.castNumeric(t, vt, errtok)
+		e.castNumeric(t, v, errtok)
 	default:
 		e.pusherrtok(errtok, "type_notsupports_casting", t.Kind)
 	}
@@ -541,28 +540,46 @@ func (e *eval) castStr(vt DataType, errtok Tok) {
 	}
 }
 
-func (e *eval) castEnum(t, vt DataType, errtok Tok) {
+func (e *eval) castEnum(t DataType, v *value, errtok Tok) {
 	enum := t.Tag.(*Enum)
 	t = enum.Type
 	t.Kind = enum.Id
-	e.castNumeric(t, vt, errtok)
+	e.castNumeric(t, v, errtok)
 }
 
-func (e *eval) castInteger(t, vt DataType, errtok Tok) {
-	if typeIsPtr(vt) && t.Id == xtype.UIntptr {
+func (e *eval) castInteger(t DataType, v *value, errtok Tok) {
+	if v.constExpr {
+		switch {
+		case xtype.IsSignedInteger(t.Id):
+			v.expr = tonums(v)
+		default:
+			v.expr = tonumu(v)
+		}
+	}
+	if typeIsPtr(v.data.Type) && t.Id == xtype.UIntptr {
 		return
 	}
-	if typeIsPure(vt) && xtype.IsNumeric(vt.Id) {
+	if typeIsPure(v.data.Type) && xtype.IsNumeric(v.data.Type.Id) {
 		return
 	}
-	e.pusherrtok(errtok, "type_notsupports_casting_to", vt.Kind, t.Kind)
+	e.pusherrtok(errtok, "type_notsupports_casting_to", v.data.Type.Kind, t.Kind)
 }
 
-func (e *eval) castNumeric(t, vt DataType, errtok Tok) {
-	if typeIsPure(vt) && xtype.IsNumeric(vt.Id) {
+func (e *eval) castNumeric(t DataType, v *value, errtok Tok) {
+	if v.constExpr {
+		switch {
+		case xtype.IsFloat(t.Id):
+			v.expr = tonumf(v)
+		case xtype.IsSignedInteger(t.Id):
+			v.expr = tonums(v)
+		default:
+			v.expr = tonumu(v)
+		}
+	}
+	if typeIsPure(v.data.Type) && xtype.IsNumeric(v.data.Type.Id) {
 		return
 	}
-	e.pusherrtok(errtok, "type_notsupports_casting_to", vt.Kind, t.Kind)
+	e.pusherrtok(errtok, "type_notsupports_casting_to", v.data.Type.Kind, t.Kind)
 }
 
 func (e *eval) castSlice(t, vt DataType, errtok Tok) {
@@ -588,8 +605,7 @@ func (e *eval) xTypeSubId(dm *Defmap, idTok Tok, m *exprModel) (v value) {
 	case 'g':
 		g := dm.Globals[i]
 		v.data.Type = g.Type
-		v.constant = g.Const
-		v.constExpr = v.constant
+		v.constExpr = g.Const
 		if v.constExpr {
 			v.expr = g.ExprTag
 			v.model = g.Expr.Model
@@ -734,7 +750,7 @@ func (e *eval) xObjSubId(dm *Defmap, val value, idTok Tok, m *exprModel) (v valu
 		g.Used = true
 		v.data.Type = g.Type
 		v.lvalue = true
-		v.constant = g.Const
+		v.constExpr = g.Const
 		if g.Tag == nil {
 			m.appendSubNode(exprNode{xapi.OutId(g.Id, g.DefTok.File)})
 		} else {
@@ -774,7 +790,7 @@ func (e *eval) enumSubId(val value, idTok Tok, m *exprModel) (v value) {
 	enum := val.data.Type.Tag.(*Enum)
 	v = val
 	v.data.Type.Tok = enum.Tok
-	v.constant = true
+	v.constExpr = true
 	v.lvalue = false
 	v.isType = false
 	m.appendSubNode(exprNode{"::"})
@@ -787,7 +803,7 @@ func (e *eval) enumSubId(val value, idTok Tok, m *exprModel) (v value) {
 
 func (e *eval) structObjSubId(val value, idTok Tok, m *exprModel) value {
 	s := val.data.Type.Tag.(*xstruct)
-	val.constant = false
+	val.constExpr = false
 	val.lvalue = false
 	val.isType = false
 	val = e.xObjSubId(s.Defs, val, idTok, m)
@@ -798,7 +814,7 @@ func (e *eval) structObjSubId(val value, idTok Tok, m *exprModel) value {
 func (e *eval) traitObjSubId(val value, idTok Tok, m *exprModel) value {
 	m.appendSubNode(exprNode{".get()"})
 	t := val.data.Type.Tag.(*trait)
-	val.constant = false
+	val.constExpr = false
 	val.lvalue = false
 	val.isType = false
 	val = e.xObjSubId(t.Defs, val, idTok, m)
