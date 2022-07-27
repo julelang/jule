@@ -934,7 +934,9 @@ func (p *Parser) implTrait(impl models.Impl) {
 			if trait.FindFunc(t.Id) == nil {
 				p.pusherrtok(impl.Target.Tok, "trait_hasnt_id", trait.Ast.Id, t.Id)
 				break
-			} else if xf, _, _ := xs.Defs.funcById(t.Id, nil); xf != nil {
+			}
+			i, _, _ := xs.Defs.findById(t.Id, nil)
+			if i != -1 {
 				p.pusherrtok(t.Tok, "exist_id", t.Id)
 				continue
 			}
@@ -967,8 +969,8 @@ func (p *Parser) implStruct(impl models.Impl) {
 		case models.Comment:
 			p.Comment(t)
 		case *Func:
-			xf, _, _ := xs.Defs.funcById(t.Id, nil)
-			if xf != nil {
+			i, _, _ := xs.Defs.findById(t.Id, nil)
+			if i != -1 {
 				p.pusherrtok(t.Tok, "exist_id", t.Id)
 				continue
 			}
@@ -1128,6 +1130,52 @@ func (p *Parser) parseTypesNonGenerics(f *Func) {
 		p.parseNonGenericType(f.Generics, &f.Params[i].Type)
 	}
 	p.parseNonGenericType(f.Generics, &f.RetType.Type)
+}
+
+func (p *Parser) parseFuncGenericType(generics []*GenericType, t *DataType) {
+	f := t.Tag.(*Func)
+	for i := range f.Params {
+		p.parseGenericType(generics, &f.Params[i].Type)
+	}
+	p.parseGenericType(generics, &f.RetType.Type)
+}
+
+func (p *Parser) parseMultiGenericType(generics []*GenericType, t *DataType) {
+	types := t.Tag.([]DataType)
+	for i := range types {
+		mt := &types[i]
+		p.parseGenericType(generics, mt)
+	}
+}
+
+func (p *Parser) parseMapGenericType(generics []*GenericType, t *DataType) {
+	p.parseMultiGenericType(generics, t)
+}
+
+func (p *Parser) parseCommonGenericType(generics []*GenericType, t *DataType) {
+	if typeIsGeneric(generics, *t) {
+		*t, _ = p.realType(*t, true)
+	}
+}
+
+func (p *Parser) parseGenericType(generics []*GenericType, t *DataType) {
+	switch {
+	case t.MultiTyped:
+		p.parseMultiGenericType(generics, t)
+	case typeIsFunc(*t):
+		p.parseFuncGenericType(generics, t)
+	case typeIsMap(*t):
+		p.parseMapGenericType(generics, t)
+	default:
+		p.parseCommonGenericType(generics, t)
+	}
+}
+
+func (p *Parser) parseTypesGenerics(f *Func) {
+	for i := range f.Params {
+		p.parseGenericType(f.Generics, &f.Params[i].Type)
+	}
+	p.parseGenericType(f.Generics, &f.RetType.Type)
 }
 
 func (p *Parser) checkRetVars(f *function) {
@@ -1383,7 +1431,7 @@ func (p *Parser) nsById(id string) *namespace {
 }
 
 func (p *Parser) typeById(id string) (*Type, *Defmap, bool) {
-	t := p.blockTypesById(id)
+	t := p.blockTypeById(id)
 	if t != nil {
 		return t, nil, false
 	}
@@ -1426,7 +1474,7 @@ func (p *Parser) traitById(id string) (*trait, *Defmap, bool) {
 	return p.Defs.traitById(id, p.File)
 }
 
-func (p *Parser) blockTypesById(id string) *Type {
+func (p *Parser) blockTypeById(id string) *Type {
 	for _, t := range p.blockTypes {
 		if t != nil && t.Id == id {
 			return t
@@ -1485,7 +1533,7 @@ func (p *Parser) blockDefById(id string) (def any, tok Tok) {
 	if bv != nil {
 		return bv, bv.IdTok
 	}
-	t := p.blockTypesById(id)
+	t := p.blockTypeById(id)
 	if t != nil {
 		return t, t.Tok
 	}
@@ -1734,19 +1782,8 @@ func (p *Parser) structConstructorInstance(as *xstruct) *xstruct {
 	s.constructor = new(Func)
 	*s.constructor = *as.constructor
 	s.constructor.RetType.Type.Tag = s
-	s.Defs = as.Defs
-	if len(as.Ast.Generics) > 0 { // Parse if has generics
-		for i := range s.Ast.Fields {
-			p.parseField(s, &s.Defs.Globals[i], i)
-		}
-	}
-	for i := range s.Defs.Funcs {
-		f := &s.Defs.Funcs[i]
-		nf := new(function)
-		*nf = **f
-		nf.Ast.Receiver.Tag = s
-		*f = nf
-	}
+	s.Defs = new(Defmap)
+	p.pushDefs(s.Defs, as.Defs)
 	return s
 }
 
@@ -1834,11 +1871,12 @@ func (p *Parser) checkGenericsQuantity(n int, generics []DataType, errTok Tok) b
 
 func (p *Parser) pushGenerics(generics []*GenericType, sources []DataType) {
 	for i, generic := range generics {
-		p.blockTypes = append(p.blockTypes, &Type{
+		t := &Type{
 			Id:   generic.Id,
 			Tok:  generic.Tok,
 			Type: sources[i],
-		})
+		}
+		p.blockTypes = append(p.blockTypes, t)
 	}
 }
 
@@ -1874,7 +1912,7 @@ func (p *Parser) parseGenericFunc(f *Func, generics []DataType) {
 		s := f.Receiver.Tag.(*xstruct)
 		p.pushGenerics(s.Ast.Generics, s.Generics())
 	}
-	p.reloadFuncTypes(f)
+	p.parseTypesGenerics(f)
 	if itsCombined(f, generics) {
 		return
 	}
@@ -2921,32 +2959,37 @@ func (p *Parser) typeSourceIsStruct(s *xstruct, tag any, errTok Tok) (dt DataTyp
 	// Has generics?
 	if tag != nil {
 		generics = tag.([]DataType)
+		if !p.checkGenericsQuantity(len(s.Ast.Generics), generics, errTok) {
+			goto end
+		}
 		*s.constructor.Combines = append(*s.constructor.Combines, generics)
 		s.SetGenerics(generics)
-		_ = p.checkGenericsQuantity(len(s.Ast.Generics), generics, errTok)
-		rootBlock := p.rootBlock
-		nodeBlock := p.nodeBlock
 		blockVars := p.blockVars
 		blockTypes := p.blockTypes
 		p.pushGenerics(s.Ast.Generics, generics)
-		for i, generic := range generics {
-			generics[i], _ = p.typeSource(generic, true)
+		for i, f := range s.Ast.Fields {
+			p.parseField(s, &f, i)
 		}
-		for _, f := range s.Defs.Funcs {
-			if len(f.Ast.Generics) == 0 {
-				p.rootBlock = nil
-				p.nodeBlock = nil
-				p.reloadFuncTypes(f.Ast)
-				_ = p.parseFunc(f)
+		if len(s.Defs.Funcs) > 0 {
+			rootBlock := p.rootBlock
+			nodeBlock := p.nodeBlock
+			for _, f := range s.Defs.Funcs {
+				if len(f.Ast.Generics) == 0 {
+					p.rootBlock = nil
+					p.nodeBlock = nil
+					p.parseTypesGenerics(f.Ast)
+					_ = p.parseFunc(f)
+				}
 			}
+			p.rootBlock = rootBlock
+			p.nodeBlock = nodeBlock
 		}
 		p.blockVars = blockVars
 		p.blockTypes = blockTypes
-		p.rootBlock = rootBlock
-		p.nodeBlock = nodeBlock
 	} else if len(s.Ast.Generics) > 0 {
 		p.pusherrtok(errTok, "has_generics")
 	}
+end:
 	dt.Id = xtype.Struct
 	dt.Kind = s.dataTypeString()
 	dt.Tag = s
@@ -3112,9 +3155,7 @@ func (p *Parser) checkType(real, check DataType, ignoreAny bool, errTok Tok) {
 		go p.checkMultiType(real, check, ignoreAny, errTok)
 		return
 	}
-	switch {
-	case typesAreCompatible(real, check, ignoreAny),
-		typeIsNilCompatible(real) && check.Id == xtype.Nil:
+	if typesAreCompatible(real, check, ignoreAny) {
 		return
 	}
 	if real.Kind != check.Kind {

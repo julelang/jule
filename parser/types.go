@@ -239,8 +239,10 @@ func typesAreCompatible(t1, t2 DataType, ignoreany bool) bool {
 			t1, t2 = t2, t1
 		}
 		return checkTraitCompability(t1, t2)
-	case typeIsNilCompatible(t1), typeIsNilCompatible(t2):
-		return t1.Id == xtype.Nil || t2.Id == xtype.Nil
+	case typeIsNilCompatible(t1):
+		return t2.Id == xtype.Nil
+	case typeIsNilCompatible(t2):
+		return t1.Id == xtype.Nil
 	case typeIsEnum(t1), typeIsEnum(t2):
 		return t1.Id == t2.Id && t1.Kind == t2.Kind
 	case typeIsStruct(t1), typeIsStruct(t2):
