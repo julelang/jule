@@ -144,18 +144,6 @@ func (mre multiRetExpr) String() string {
 	return cxx.String()[:cxx.Len()-1] + ")"
 }
 
-type assignExpr struct {
-	assign models.Assign
-}
-
-func (a assignExpr) String() string {
-	var cxx strings.Builder
-	cxx.WriteByte('(')
-	cxx.WriteString(a.assign.String())
-	cxx.WriteByte(')')
-	return cxx.String()
-}
-
 type serieExpr struct {
 	exprs []any
 }

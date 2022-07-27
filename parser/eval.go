@@ -8,7 +8,6 @@ import (
 	"github.com/the-xlang/xxc/lex/tokens"
 	"github.com/the-xlang/xxc/pkg/x"
 	"github.com/the-xlang/xxc/pkg/xapi"
-	"github.com/the-xlang/xxc/pkg/xlog"
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
@@ -38,14 +37,6 @@ func (e *eval) pusherrtok(tok Tok, err string, args ...any) {
 	}
 	e.hasError = true
 	e.p.pusherrtok(tok, err, args...)
-}
-
-func (e *eval) pusherrs(errs ...xlog.CompilerLog) {
-	if e.hasError {
-		return
-	}
-	e.hasError = true
-	e.p.pusherrs(errs...)
 }
 
 func (e *eval) toks(toks Toks) (value, iExpr) {
@@ -323,11 +314,6 @@ func (e *eval) parenthesesRange(toks Toks, m *exprModel) (v value) {
 				v = val
 				return
 			}
-			val, ok = e.tryAssign(toks, m)
-			if ok {
-				v = val
-				return
-			}
 		}
 	}
 	data := getCallData(toks, m)
@@ -588,27 +574,6 @@ func (e *eval) castSlice(t, vt DataType, errtok Tok) {
 	if !typeIsPure(t) || t.Id != xtype.U8 {
 		e.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
 	}
-}
-
-func (e *eval) tryAssign(toks Toks, m *exprModel) (v value, ok bool) {
-	b := ast.NewBuilder(nil)
-	toks = toks[1 : len(toks)-1] // Remove first-last parentheses
-	assign, ok := b.AssignExpr(toks, true)
-	if !ok {
-		return
-	}
-	ok = true
-	if len(b.Errors) > 0 {
-		e.pusherrs(b.Errors...)
-		return
-	}
-	v, _ = e.expr(assign.Left[0].Expr)
-	if v.lvalue && ast.IsSuffixOperator(assign.Setter.Kind) {
-		v.lvalue = false
-	}
-	e.p.assign(&assign)
-	m.appendSubNode(assignExpr{assign})
-	return
 }
 
 func (e *eval) xTypeSubId(dm *Defmap, idTok Tok, m *exprModel) (v value) {
