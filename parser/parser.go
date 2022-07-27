@@ -1858,6 +1858,7 @@ func (p *Parser) checkAnonFunc(f *Func) {
 	p.blockVars = blockVariables
 }
 
+// Returns nil if has error.
 func (p *Parser) getArgs(toks Toks, targeting bool) *models.Args {
 	toks, _ = p.getRange(tokens.LPARENTHESES, tokens.RPARENTHESES, toks)
 	if toks == nil {

@@ -28,48 +28,23 @@ type structArgParser struct {
 }
 
 func (sap *structArgParser) buildArgs() {
-	sap.args.Src = make([]models.Arg, 0)
+	sap.args.Src = make([]models.Arg, len(*sap.fmap))
+	i := -1
 	for _, pair := range *sap.fmap {
+		i++
 		switch {
 		case pair.arg != nil:
-			sap.args.Src = append(sap.args.Src, *pair.arg)
+			sap.args.Src[i] = *pair.arg
 		case paramHasDefaultArg(pair.param):
 			arg := Arg{Expr: pair.param.Default}
-			sap.args.Src = append(sap.args.Src, arg)
+			sap.args.Src[i] = arg
 		case pair.param.Variadic:
 			model := sliceExpr{pair.param.Type, nil}
 			model.dataType.Kind = x.Prefix_Slice + model.dataType.Kind // For slice.
 			arg := Arg{Expr: Expr{Model: model}}
-			sap.args.Src = append(sap.args.Src, arg)
+			sap.args.Src[i] = arg
 		}
 	}
-}
-
-func (sap *structArgParser) pushVariadicArgs(pair *paramMapPair) {
-	model := sliceExpr{pair.param.Type, nil}
-	model.dataType.Kind = x.Prefix_Slice + model.dataType.Kind // For slice.
-	variadiced := false
-	sap.p.parseArg(*pair.param, pair.arg, &variadiced)
-	model.expr = append(model.expr, pair.arg.Expr.Model.(iExpr))
-	once := false
-	for sap.i++; sap.i < len(sap.args.Src); sap.i++ {
-		arg := sap.args.Src[sap.i]
-		if arg.TargetId != "" {
-			sap.i--
-			break
-		}
-		once = true
-		sap.p.parseArg(*pair.param, &arg, &variadiced)
-		model.expr = append(model.expr, arg.Expr.Model.(iExpr))
-	}
-	if !once {
-		return
-	}
-	// Variadic argument have one more variadiced expressions.
-	if variadiced {
-		sap.p.pusherrtok(sap.errTok, "more_args_with_variadiced")
-	}
-	pair.arg.Expr.Model = model
 }
 
 func (sap *structArgParser) pushArg() {
@@ -88,11 +63,7 @@ func (sap *structArgParser) pushArg() {
 	}
 	arg := sap.arg
 	pair.arg = &arg
-	if pair.param.Variadic {
-		sap.pushVariadicArgs(pair)
-	} else {
-		sap.p.parseArg(*pair.param, pair.arg, nil)
-	}
+	sap.p.parseArg(*pair.param, pair.arg, nil)
 }
 
 func (sap *structArgParser) checkPasses() {

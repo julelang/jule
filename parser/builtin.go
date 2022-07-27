@@ -247,18 +247,6 @@ var f64statics = &Defmap{
 	},
 }
 
-var strStatics = &Defmap{
-	Globals: []*Var{
-		{
-			Pub:   true,
-			Const: true,
-			Id:    "npos",
-			Type:  DataType{Id: xtype.UInt, Kind: tokens.UINT},
-			Tag:   "std::string::npos",
-		},
-	},
-}
-
 var strDefaultFunc = Func{
 	Pub:     true,
 	Id:      "str",
@@ -403,11 +391,10 @@ var Builtin = &Defmap{
 var strDefs = &Defmap{
 	Globals: []*Var{
 		{
-			Pub:   true,
-			Const: true,
-			Id:    "len",
-			Type:  DataType{Id: xtype.UInt, Kind: tokens.UINT},
-			Tag:   "len()",
+			Pub:  true,
+			Id:   "len",
+			Type: DataType{Id: xtype.Int, Kind: tokens.INT},
+			Tag:  "len()",
 		},
 	},
 	Funcs: []*function{
@@ -485,18 +472,13 @@ var strDefs = &Defmap{
 var sliceDefs = &Defmap{
 	Globals: []*Var{
 		{
-			Pub:   true,
-			Const: true,
-			Id:    "len",
-			Type:  DataType{Id: xtype.UInt, Kind: tokens.UINT},
-			Tag:   "len()",
+			Pub:  true,
+			Id:   "len",
+			Type: DataType{Id: xtype.Int, Kind: tokens.INT},
+			Tag:  "len()",
 		},
 	},
 	Funcs: []*function{
-		{Ast: &Func{
-			Pub: true,
-			Id:  "clear",
-		}},
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "empty",
@@ -504,37 +486,8 @@ var sliceDefs = &Defmap{
 		}},
 		{Ast: &Func{
 			Pub:    true,
-			Id:     "find",
-			Params: []Param{{Id: "value"}},
-		}},
-		{Ast: &Func{
-			Pub:    true,
-			Id:     "rfind",
-			Params: []Param{{Id: "value"}},
-		}},
-		{Ast: &Func{
-			Pub:    true,
-			Id:     "erase",
-			Params: []Param{{Id: "value"}},
-		}},
-		{Ast: &Func{
-			Pub:    true,
-			Id:     "erase_all",
-			Params: []Param{{Id: "value"}},
-		}},
-		{Ast: &Func{
-			Pub:    true,
 			Id:     "append",
 			Params: []Param{{Id: "values", Variadic: true}},
-		}},
-		{Ast: &Func{
-			Pub: true,
-			Id:  "insert",
-			Params: []Param{
-				{Id: "start", Type: DataType{Id: xtype.UInt, Kind: tokens.UINT}},
-				{Id: "values", Variadic: true},
-			},
-			RetType: RetType{Type: DataType{Id: xtype.Bool, Kind: tokens.BOOL}},
 		}},
 	},
 }
@@ -542,11 +495,10 @@ var sliceDefs = &Defmap{
 var arrayDefs = &Defmap{
 	Globals: []*Var{
 		{
-			Pub:   true,
-			Const: true,
-			Id:    "len",
-			Type:  DataType{Id: xtype.UInt, Kind: tokens.UINT},
-			Tag:   "len()",
+			Pub:  true,
+			Id:   "len",
+			Type: DataType{Id: xtype.Int, Kind: tokens.INT},
+			Tag:  "len()",
 		},
 	},
 	Funcs: []*function{
@@ -561,37 +513,17 @@ var arrayDefs = &Defmap{
 func readySliceDefs(t DataType) {
 	elemType := typeOfSliceComponents(t)
 
-	findFunc, _, _ := sliceDefs.funcById("find", nil)
-	findFunc.Ast.Params[0].Type = elemType
-	findFunc.Ast.RetType.Type = elemType
-	findFunc.Ast.RetType.Type.Kind = tokens.STAR + findFunc.Ast.RetType.Type.Kind
-
-	rfindFunc, _, _ := sliceDefs.funcById("rfind", nil)
-	rfindFunc.Ast.Params[0].Type = elemType
-	rfindFunc.Ast.RetType.Type = elemType
-	rfindFunc.Ast.RetType.Type.Kind = tokens.STAR + rfindFunc.Ast.RetType.Type.Kind
-
-	eraseFunc, _, _ := sliceDefs.funcById("erase", nil)
-	eraseFunc.Ast.Params[0].Type = elemType
-
-	eraseAllFunc, _, _ := sliceDefs.funcById("erase_all", nil)
-	eraseAllFunc.Ast.Params[0].Type = elemType
-
 	appendFunc, _, _ := sliceDefs.funcById("append", nil)
 	appendFunc.Ast.Params[0].Type = elemType
-
-	insertFunc, _, _ := sliceDefs.funcById("insert", nil)
-	insertFunc.Ast.Params[1].Type = elemType
 }
 
 var mapDefs = &Defmap{
 	Globals: []*Var{
 		{
-			Pub:   true,
-			Const: true,
-			Id:    "len",
-			Type:  DataType{Id: xtype.UInt, Kind: tokens.UINT},
-			Tag:   "size()",
+			Pub:  true,
+			Id:   "len",
+			Type: DataType{Id: xtype.Int, Kind: tokens.INT},
+			Tag:  "len()",
 		},
 	},
 	Funcs: []*function{

@@ -52,6 +52,7 @@ var Errors = map[string]string{
 	`invalid_pragma_directive`:                 `invalid pragma directive`,
 	`invalid_type_for_const`:                   `%s is invalid data-type for constant`,
 	`invalid_value_for_key`:                    `"%s" is invalid value for the "%s" key`,
+	`invalid_expr`:                             `invalid expression`,
 	`missing_autotype_value`:                   `auto-type declarations should have a initializer`,
 	`missing_type`:                             `data-type missing`,
 	`missing_expr`:                             `expression missing`,

@@ -11,7 +11,6 @@ func getParamMap(params []Param) *paramMap {
 	for i := range params {
 		param := &params[i]
 		(*pmap)[param.Id] = &paramMapPair{param, nil}
-
 	}
 	return pmap
 }
@@ -29,19 +28,18 @@ type pureArgParser struct {
 }
 
 func (pap *pureArgParser) buildArgs() {
-	pap.args.Src = make([]Arg, 0)
+	pap.args.Src = make([]Arg, len(*pap.pmap))
+	i := -1
 	for _, pair := range *pap.pmap {
+		i++
 		switch {
 		case pair.arg != nil:
-			pap.args.Src = append(pap.args.Src, *pair.arg)
-		case paramHasDefaultArg(pair.param):
-			arg := Arg{Expr: pair.param.Default}
-			pap.args.Src = append(pap.args.Src, arg)
+			pap.args.Src[i] = *pair.arg
 		case pair.param.Variadic:
 			model := sliceExpr{pair.param.Type, nil}
 			model.dataType.Kind = x.Prefix_Slice + model.dataType.Kind // For slice.
 			arg := Arg{Expr: Expr{Model: model}}
-			pap.args.Src = append(pap.args.Src, arg)
+			pap.args.Src[i] = arg
 		}
 	}
 }

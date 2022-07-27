@@ -665,10 +665,6 @@ func (e *eval) f64SubId(idTok Tok, m *exprModel) value {
 	return e.xTypeSubId(f64statics, idTok, m)
 }
 
-func (e *eval) strSubId(idTok Tok, m *exprModel) value {
-	return e.xTypeSubId(strStatics, idTok, m)
-}
-
 func (e *eval) typeSubId(typeTok, idTok Tok, m *exprModel) (v value) {
 	switch typeTok.Kind {
 	case tokens.I8:
@@ -695,8 +691,6 @@ func (e *eval) typeSubId(typeTok, idTok Tok, m *exprModel) (v value) {
 		return e.f32SubId(idTok, m)
 	case tokens.F64:
 		return e.f64SubId(idTok, m)
-	case tokens.STR:
-		return e.strSubId(idTok, m)
 	}
 	e.pusherrtok(typeTok, "obj_not_support_sub_fields", typeTok.Kind)
 	return
@@ -769,21 +763,29 @@ func (e *eval) xObjSubId(dm *Defmap, val value, idTok Tok, m *exprModel) (v valu
 }
 
 func (e *eval) strObjSubId(val value, idTok Tok, m *exprModel) value {
-	return e.xObjSubId(strDefs, val, idTok, m)
+	v := e.xObjSubId(strDefs, val, idTok, m)
+	v.lvalue = false
+	return v
 }
 
 func (e *eval) sliceObjSubId(val value, idTok Tok, m *exprModel) value {
 	readySliceDefs(val.data.Type)
-	return e.xObjSubId(sliceDefs, val, idTok, m)
+	v := e.xObjSubId(sliceDefs, val, idTok, m)
+	v.lvalue = false
+	return v
 }
 
 func (e *eval) arrayObjSubId(val value, idTok Tok, m *exprModel) value {
-	return e.xObjSubId(arrayDefs, val, idTok, m)
+	v := e.xObjSubId(arrayDefs, val, idTok, m)
+	v.lvalue = false
+	return v
 }
 
 func (e *eval) mapObjSubId(val value, idTok Tok, m *exprModel) value {
 	readyMapDefs(val.data.Type)
-	return e.xObjSubId(mapDefs, val, idTok, m)
+	v := e.xObjSubId(mapDefs, val, idTok, m)
+	v.lvalue = false
+	return v
 }
 
 func (e *eval) enumSubId(val value, idTok Tok, m *exprModel) (v value) {
@@ -951,10 +953,13 @@ func (e *eval) bracketRange(toks Toks, m *exprModel) (v value) {
 			e.p.wg.Add(1)
 			go assignChecker{
 				p:      e.p,
-				t:      DataType{Id: xtype.UInt, Kind: xtype.TypeMap[xtype.UInt]},
+				t:      DataType{Id: xtype.Int, Kind: xtype.TypeMap[xtype.Int]},
 				v:      leftV,
 				errtok: errTok,
 			}.checkAssignType()
+			if leftV.constExpr && tonums(leftV.expr) < 0 {
+				e.p.pusherrtok(leftV.data.Tok, "invalid_expr")
+			}
 		} else {
 			m.appendSubNode(exprNode{"0"})
 		}
@@ -966,10 +971,13 @@ func (e *eval) bracketRange(toks Toks, m *exprModel) (v value) {
 			e.p.wg.Add(1)
 			go assignChecker{
 				p:      e.p,
-				t:      DataType{Id: xtype.UInt, Kind: xtype.TypeMap[xtype.UInt]},
+				t:      DataType{Id: xtype.Int, Kind: xtype.TypeMap[xtype.Int]},
 				v:      rightV,
 				errtok: errTok,
 			}.checkAssignType()
+			if rightV.constExpr && tonums(rightV.expr) < 0 {
+				e.p.pusherrtok(rightV.data.Tok, "invalid_expr")
+			}
 		}
 		m.appendSubNode(exprNode{")"})
 		return e.slicing(v, errTok)
@@ -991,34 +999,38 @@ func (e *eval) indexing(enumv, leftv value, errtok Tok) (v value) {
 		return e.indexingMap(enumv, leftv, errtok)
 	case typeIsPure(enumv.data.Type):
 		return e.indexingStr(enumv, leftv, errtok)
-	case typeIsExplicitPtr(enumv.data.Type):
-		return e.indexingPtr(enumv, leftv, errtok)
 	}
 	e.pusherrtok(errtok, "not_supports_indexing", enumv.data.Type.Kind)
 	return
 }
 
-func (e *eval) indexingSlice(slicev, leftv value, errtok Tok) value {
+func (e *eval) indexingSlice(slicev, index value, errtok Tok) value {
 	slicev.data.Type = typeOfSliceComponents(slicev.data.Type)
 	e.p.wg.Add(1)
 	go assignChecker{
 		p:      e.p,
-		t:      DataType{Id: xtype.UInt, Kind: tokens.UINT},
-		v:      leftv,
+		t:      DataType{Id: xtype.Int, Kind: xtype.TypeMap[xtype.Int]},
+		v:      index,
 		errtok: errtok,
 	}.checkAssignType()
+	if index.constExpr && tonums(index.expr) < 0 {
+		e.p.pusherrtok(index.data.Tok, "invalid_expr")
+	}
 	return slicev
 }
 
-func (e *eval) indexingArray(arrv, leftv value, errtok Tok) value {
+func (e *eval) indexingArray(arrv, index value, errtok Tok) value {
 	arrv.data.Type = typeOfArrayComponents(arrv.data.Type)
 	e.p.wg.Add(1)
 	go assignChecker{
 		p:      e.p,
-		t:      DataType{Id: xtype.UInt, Kind: tokens.UINT},
-		v:      leftv,
+		t:      DataType{Id: xtype.Int, Kind: xtype.TypeMap[xtype.Int]},
+		v:      index,
 		errtok: errtok,
 	}.checkAssignType()
+	if index.constExpr && tonums(index.expr) < 0 {
+		e.p.pusherrtok(index.data.Tok, "invalid_expr")
+	}
 	return arrv
 }
 
@@ -1032,31 +1044,20 @@ func (e *eval) indexingMap(mapv, leftv value, errtok Tok) value {
 	return mapv
 }
 
-func (e *eval) indexingStr(strv, leftv value, errtok Tok) value {
+func (e *eval) indexingStr(strv, index value, errtok Tok) value {
 	strv.data.Type.Id = xtype.U8
 	strv.data.Type.Kind = xtype.TypeMap[strv.data.Type.Id]
 	e.p.wg.Add(1)
 	go assignChecker{
 		p:      e.p,
-		t:      DataType{Id: xtype.UInt, Kind: tokens.UINT},
-		v:      leftv,
+		t:      DataType{Id: xtype.Int, Kind: xtype.TypeMap[xtype.Int]},
+		v:      index,
 		errtok: errtok,
 	}.checkAssignType()
+	if index.constExpr && tonums(index.expr) < 0 {
+		e.p.pusherrtok(index.data.Tok, "invalid_expr")
+	}
 	return strv
-}
-
-func (e *eval) indexingPtr(ptrv, leftv value, errtok Tok) value {
-	ptrv.lvalue = true
-	// Remove pointer mark.
-	ptrv.data.Type.Kind = ptrv.data.Type.Kind[1:]
-	e.p.wg.Add(1)
-	go assignChecker{
-		p:      e.p,
-		t:      DataType{Id: xtype.UInt, Kind: tokens.UINT},
-		v:      leftv,
-		errtok: errtok,
-	}.checkAssignType()
-	return ptrv
 }
 
 func (e *eval) slicing(enumv value, errtok Tok) (v value) {
