@@ -13,11 +13,13 @@
 
 <h2 id="motivation">Motivation</h2>
 
-X is a statically typed compiled programming language designed for system development, building maintainable and reliable software. <br>
-The purpose of X is to keep functionality high while maintaining a simple form and readability. <br>
+X is a statically typed compiled programming language designed for system development, building maintainable and reliable software.
+The purpose of X is to keep functionality high while maintaining a simple form and readability.
 It guarantees memory safety and does not contain undefined behavior.
 
-<h2 id="why">Memory Safety and Management</h2>
+<img src="./docs/images/quick_sort.png"/>
+
+<h2 id="memory-safety">Memory Safety and Management</h2>
 The memory safety and the memory management.
 A major challenge in the C and C++ or similar programming languages.
 X guarantees memory safety and uses reference counting for memory management.
@@ -42,6 +44,20 @@ There are no dangling pointers, and accessing a null pointer will obviously get 
 XXC is the name of the reference compiler for the X programming language. <br>
 It is the original compiler of the X programming language. <br>
 The features that XXC has is a representation of the official and must-have features of the X programming language.
+
+<h2 id="about-project">About Project</h2>
+XXC, the reference compiler for X, is still in development.
+Currently, it can only be built from source.
+Due to the fact that it is still under development, there may be changes in the design and syntax of the language.
+<br><br>
+It is planned to rewrite the compiler with X after reference compiler reaches sufficient maturity.
+XXC has or is very close to many of the things X was intended to have, such as memory safety, properties, structures with methods and generics.
+<br><br>
+Currently, project structure, its lexical and syntactic structure has appeared.
+However, when the reference compiler is rewritten with X, it is thought that AST, Lexer and some packages will be included in the standard library.
+This will be a change that will cause the official compiler's project structure to be rebuilt.
+The reference compiler will probably use the standard library a lot.
+This will also allow developers to quickly develop tools for the language by leveraging X's standard library.
 
 <h2 id="documentations">Documentations</h2>
 
@@ -87,8 +103,6 @@ These scripts are written to run from the home directory.
 
 XXC aims to have a single main build file. <br>
 XXC is in development with the [Go](https://github.com/golang/go) programming language. <br>
-That is until the X programming language matures. <br>
-Later, XXC is planned to be developed with the X programming language.
 
 ### Building with Go Compiler
 
