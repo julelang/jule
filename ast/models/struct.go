@@ -7,4 +7,5 @@ type Struct struct {
 	Pub      bool
 	Fields   []*Var
 	Generics []*GenericType
+	Owner    any
 }

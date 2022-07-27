@@ -5,6 +5,17 @@ import (
 	"github.com/the-xlang/xxc/pkg/x"
 )
 
+func getParamMap(params []Param) *paramMap {
+	pmap := new(paramMap)
+	*pmap = make(paramMap, len(params))
+	for i := range params {
+		param := &params[i]
+		(*pmap)[param.Id] = &paramMapPair{param, nil}
+
+	}
+	return pmap
+}
+
 type pureArgParser struct {
 	p       *Parser
 	pmap    *paramMap
@@ -19,8 +30,7 @@ type pureArgParser struct {
 
 func (pap *pureArgParser) buildArgs() {
 	pap.args.Src = make([]Arg, 0)
-	for _, p := range pap.f.Params {
-		pair := (*pap.pmap)[p.Id]
+	for _, pair := range *pap.pmap {
 		switch {
 		case pair.arg != nil:
 			pap.args.Src = append(pap.args.Src, *pair.arg)
@@ -66,7 +76,7 @@ func (pap *pureArgParser) pushVariadicArgs(pair *paramMapPair) {
 func (pap *pureArgParser) checkPasses() {
 	for _, pair := range *pap.pmap {
 		if pair.arg == nil && !pair.param.Variadic {
-			pap.p.pusherrtok(pap.errTok, "missing_argument_for", pair.param.Id)
+			pap.p.pusherrtok(pap.errTok, "missing_expr_for", pair.param.Id)
 		}
 	}
 }

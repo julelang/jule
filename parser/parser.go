@@ -468,6 +468,7 @@ func (p *Parser) compileUse(useAST *models.Use) (_ *use, hasErr bool) {
 
 func (p *Parser) pushDefs(dest, src *Defmap) {
 	dest.Types = append(dest.Types, src.Types...)
+	dest.Traits = append(dest.Traits, src.Traits...)
 	dest.Structs = append(dest.Structs, src.Structs...)
 	dest.Enums = append(dest.Enums, src.Enums...)
 	dest.Globals = append(dest.Globals, src.Globals...)
@@ -854,6 +855,7 @@ func (p *Parser) Struct(s Struct) {
 	xs.Desc = p.docText.String()
 	p.docText.Reset()
 	xs.Ast = s
+	xs.Ast.Owner = p
 	xs.Ast.Generics = p.generics
 	p.generics = nil
 	xs.Defs = new(Defmap)
@@ -951,6 +953,9 @@ func (p *Parser) implTrait(impl models.Impl) {
 			sf.Desc = p.docText.String()
 			p.docText.Reset()
 			sf.used = true
+			if len(xs.Ast.Generics) == 0 {
+				p.parseTypesNonGenerics(sf.Ast)
+			}
 			xs.Defs.Funcs = append(xs.Defs.Funcs, sf)
 		}
 	}
@@ -991,6 +996,9 @@ func (p *Parser) implStruct(impl models.Impl) {
 				if findGeneric(generic.Id, xs.Ast.Generics) != nil {
 					p.pusherrtok(generic.Tok, "exist_id", generic.Id)
 				}
+			}
+			if len(xs.Ast.Generics) == 0 {
+				p.parseTypesNonGenerics(sf.Ast)
 			}
 			xs.Defs.Funcs = append(xs.Defs.Funcs, sf)
 		}
@@ -1999,14 +2007,12 @@ func (p *Parser) parseFuncCall(f *Func, generics []DataType, args *models.Args, 
 	} else {
 		_ = p.checkGenericsQuantity(len(f.Generics), generics, errTok)
 		if f.Receiver != nil {
+			owner := f.Owner.(*Parser)
 			s := f.Receiver.Tag.(*xstruct)
 			generics := s.Generics()
 			if len(generics) > 0 {
-				blockTypes := p.blockTypes
-				p.blockTypes = nil
-				p.pushGenerics(s.Ast.Generics, generics)
-				p.reloadFuncTypes(f)
-				p.blockTypes = blockTypes
+				owner.pushGenerics(s.Ast.Generics, generics)
+				owner.parseTypesGenerics(f)
 			}
 		}
 	}
@@ -2052,14 +2058,14 @@ func (p *Parser) parseFuncCallToks(f *Func, genericsToks, argsToks Toks, m *expr
 	return p.parseFuncCall(f, generics, args, m, argsToks[0])
 }
 
-func (p *Parser) parseTargetedArgs(f *Func, args *models.Args, errTok Tok) {
-	tap := targetedArgParser{
+func (p *Parser) parseStructArgs(f *Func, args *models.Args, errTok Tok) {
+	sap := structArgParser{
 		p:      p,
 		f:      f,
 		args:   args,
 		errTok: errTok,
 	}
-	tap.parse()
+	sap.parse()
 }
 
 func (p *Parser) parsePureArgs(f *Func, args *models.Args, m *exprModel, errTok Tok) {
@@ -2075,7 +2081,7 @@ func (p *Parser) parsePureArgs(f *Func, args *models.Args, m *exprModel, errTok 
 
 func (p *Parser) parseArgs(f *Func, args *models.Args, m *exprModel, errTok Tok) {
 	if args.Targeted {
-		p.parseTargetedArgs(f, args, errTok)
+		p.parseStructArgs(f, args, errTok)
 		return
 	}
 	p.parsePureArgs(f, args, m, errTok)
@@ -2094,16 +2100,6 @@ type paramMap map[string]*paramMapPair
 type paramMapPair struct {
 	param *Param
 	arg   *Arg
-}
-
-func getParamMap(params []Param) *paramMap {
-	pmap := new(paramMap)
-	*pmap = make(paramMap, len(params))
-	for i := range params {
-		p := &params[i]
-		(*pmap)[p.Id] = &paramMapPair{p, nil}
-	}
-	return pmap
 }
 
 func (p *Parser) parseArg(param Param, arg *Arg, variadiced *bool) {
@@ -2300,7 +2296,7 @@ func (p *Parser) recoverFuncExprStatement(s *models.ExprStatement) {
 	args := p.getArgs(callToks, false)
 	handleParam := recoverFunc.Ast.Params[0]
 	if len(args.Src) == 0 {
-		p.pusherrtok(errtok, "missing_argument_for", handleParam.Id)
+		p.pusherrtok(errtok, "missing_expr_for", handleParam.Id)
 		return
 	} else if len(args.Src) > 1 {
 		p.pusherrtok(errtok, "argument_overflow")
@@ -3008,30 +3004,27 @@ func (p *Parser) typeSourceIsStruct(s *xstruct, tag any, errTok Tok) (dt DataTyp
 			}
 		}
 		*s.constructor.Combines = append(*s.constructor.Combines, generics)
+		owner := s.Ast.Owner.(*Parser)
 		s.SetGenerics(generics)
-		blockVars := p.blockVars
-		blockTypes := p.blockTypes
-		p.pushGenerics(s.Ast.Generics, generics)
+		owner.pushGenerics(s.Ast.Generics, generics)
 		for i, f := range s.Ast.Fields {
-			p.parseField(s, &f, i)
+			owner.parseField(s, &f, i)
 		}
 		if len(s.Defs.Funcs) > 0 {
-			rootBlock := p.rootBlock
-			nodeBlock := p.nodeBlock
 			for _, f := range s.Defs.Funcs {
 				if len(f.Ast.Generics) == 0 {
-					p.rootBlock = nil
-					p.nodeBlock = nil
-					f.checked = false
-					p.parseTypesGenerics(f.Ast)
-					_ = p.parseFunc(f)
+					blockTypes := owner.blockTypes
+					owner.reloadFuncTypes(f.Ast)
+					_ = p.parsePureFunc(f.Ast)
+					owner.blockTypes = blockTypes
 				}
 			}
-			p.rootBlock = rootBlock
-			p.nodeBlock = nodeBlock
 		}
-		p.blockVars = blockVars
-		p.blockTypes = blockTypes
+		if owner != p {
+			owner.wg.Wait()
+			p.pusherrs(owner.Errors...)
+			owner.Errors = nil
+		}
 	} else if len(s.Ast.Generics) > 0 {
 		p.pusherrtok(errTok, "has_generics")
 	}
@@ -3047,6 +3040,7 @@ func (p *Parser) typeSourceIsTrait(t *trait, tag any, errTok Tok) (dt DataType, 
 	if tag != nil {
 		p.pusherrtok(errTok, "invalid_type_source")
 	}
+	t.Used = true
 	dt.Id = xtype.Trait
 	dt.Kind = t.Ast.Id
 	dt.Tag = t

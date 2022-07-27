@@ -5,6 +5,10 @@ import (
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
+func isAccessable(finder, target *File, defIsPub bool) bool {
+	return defIsPub || finder == nil || finder.Dir == target.Dir
+}
+
 // Defmap is definition map.
 type Defmap struct {
 	Namespaces []*namespace
@@ -37,7 +41,7 @@ func (dm *Defmap) nsById(id string) *namespace {
 func (dm *Defmap) findStructById(id string, f *File) (int, *Defmap, bool) {
 	for i, s := range dm.Structs {
 		if s != nil && s.Ast.Id == id {
-			if s.Ast.Pub || f == nil || f.Dir == s.Ast.Tok.File.Dir {
+			if isAccessable(f, s.Ast.Tok.File, s.Ast.Pub) {
 				return i, dm, false
 			}
 		}
@@ -60,7 +64,7 @@ func (dm *Defmap) structById(id string, f *File) (*xstruct, *Defmap, bool) {
 func (dm *Defmap) findTraitById(id string, f *File) (int, *Defmap, bool) {
 	for i, t := range dm.Traits {
 		if t != nil && t.Ast.Id == id {
-			if t.Ast.Pub || f == nil || f.Dir == t.Ast.Tok.File.Dir {
+			if isAccessable(f, t.Ast.Tok.File, t.Ast.Pub) {
 				return i, dm, false
 			}
 		}
@@ -83,7 +87,7 @@ func (dm *Defmap) traitById(id string, f *File) (*trait, *Defmap, bool) {
 func (dm *Defmap) findEnumById(id string, f *File) (int, *Defmap, bool) {
 	for i, e := range dm.Enums {
 		if e != nil && e.Id == id {
-			if e.Pub || f == nil || f.Dir == e.Tok.File.Dir {
+			if isAccessable(f, e.Tok.File, e.Pub) {
 				return i, dm, false
 			}
 		}
@@ -106,7 +110,7 @@ func (dm *Defmap) enumById(id string, f *File) (*Enum, *Defmap, bool) {
 func (dm *Defmap) findTypeById(id string, f *File) (int, *Defmap, bool) {
 	for i, t := range dm.Types {
 		if t != nil && t.Id == id {
-			if t.Pub || f == nil || f.Dir == t.Tok.File.Dir {
+			if isAccessable(f, t.Tok.File, t.Pub) {
 				return i, dm, false
 			}
 		}
@@ -129,7 +133,7 @@ func (dm *Defmap) typeById(id string, f *File) (*Type, *Defmap, bool) {
 func (dm *Defmap) findFuncById(id string, f *File) (int, *Defmap, bool) {
 	for i, fn := range dm.Funcs {
 		if fn != nil && fn.Ast.Id == id {
-			if fn.Ast.Pub || f == nil || f.Dir == fn.Ast.Tok.File.Dir {
+			if isAccessable(f, fn.Ast.Tok.File, fn.Ast.Pub) {
 				return i, dm, false
 			}
 		}
@@ -154,9 +158,9 @@ func (dm *Defmap) funcById(id string, f *File) (*function, *Defmap, bool) {
 }
 
 func (dm *Defmap) findGlobalById(id string, f *File) (int, *Defmap, bool) {
-	for i, v := range dm.Globals {
-		if v != nil && v.Type.Id != xtype.Void && v.Id == id {
-			if v.Pub || f == nil || f.Dir == v.IdTok.File.Dir {
+	for i, g := range dm.Globals {
+		if g != nil && g.Type.Id != xtype.Void && g.Id == id {
+			if isAccessable(f, g.IdTok.File, g.Pub) {
 				return i, dm, false
 			}
 		}

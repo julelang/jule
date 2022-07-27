@@ -1,0 +1,132 @@
+package parser
+
+import (
+	"github.com/the-xlang/xxc/ast/models"
+	"github.com/the-xlang/xxc/pkg/x"
+)
+
+func (p *Parser) getFieldMap(f *Func) *paramMap {
+	pmap := new(paramMap)
+	s := f.RetType.Type.Tag.(*xstruct)
+	for i, g := range s.Defs.Globals {
+		if isAccessable(p.File, g.DefTok.File, g.Pub) {
+			param := &f.Params[i]
+			(*pmap)[param.Id] = &paramMapPair{param, nil}
+		}
+	}
+	return pmap
+}
+
+type structArgParser struct {
+	p      *Parser
+	fmap   *paramMap
+	f      *Func
+	args   *models.Args
+	i      int
+	arg    Arg
+	errTok Tok
+}
+
+func (sap *structArgParser) buildArgs() {
+	sap.args.Src = make([]models.Arg, 0)
+	for _, pair := range *sap.fmap {
+		switch {
+		case pair.arg != nil:
+			sap.args.Src = append(sap.args.Src, *pair.arg)
+		case paramHasDefaultArg(pair.param):
+			arg := Arg{Expr: pair.param.Default}
+			sap.args.Src = append(sap.args.Src, arg)
+		case pair.param.Variadic:
+			model := sliceExpr{pair.param.Type, nil}
+			model.dataType.Kind = x.Prefix_Slice + model.dataType.Kind // For slice.
+			arg := Arg{Expr: Expr{Model: model}}
+			sap.args.Src = append(sap.args.Src, arg)
+		}
+	}
+}
+
+func (sap *structArgParser) pushVariadicArgs(pair *paramMapPair) {
+	model := sliceExpr{pair.param.Type, nil}
+	model.dataType.Kind = x.Prefix_Slice + model.dataType.Kind // For slice.
+	variadiced := false
+	sap.p.parseArg(*pair.param, pair.arg, &variadiced)
+	model.expr = append(model.expr, pair.arg.Expr.Model.(iExpr))
+	once := false
+	for sap.i++; sap.i < len(sap.args.Src); sap.i++ {
+		arg := sap.args.Src[sap.i]
+		if arg.TargetId != "" {
+			sap.i--
+			break
+		}
+		once = true
+		sap.p.parseArg(*pair.param, &arg, &variadiced)
+		model.expr = append(model.expr, arg.Expr.Model.(iExpr))
+	}
+	if !once {
+		return
+	}
+	// Variadic argument have one more variadiced expressions.
+	if variadiced {
+		sap.p.pusherrtok(sap.errTok, "more_args_with_variadiced")
+	}
+	pair.arg.Expr.Model = model
+}
+
+func (sap *structArgParser) pushArg() {
+	defer func() { sap.i++ }()
+	if sap.arg.TargetId == "" {
+		sap.p.pusherrtok(sap.arg.Tok, "argument_must_target_to_parameter")
+		return
+	}
+	pair, ok := (*sap.fmap)[sap.arg.TargetId]
+	if !ok {
+		sap.p.pusherrtok(sap.arg.Tok, "id_noexist", sap.arg.TargetId)
+		return
+	} else if pair.arg != nil {
+		sap.p.pusherrtok(sap.arg.Tok, "already_has_expr", sap.arg.TargetId)
+		return
+	}
+	arg := sap.arg
+	pair.arg = &arg
+	if pair.param.Variadic {
+		sap.pushVariadicArgs(pair)
+	} else {
+		sap.p.parseArg(*pair.param, pair.arg, nil)
+	}
+}
+
+func (sap *structArgParser) checkPasses() {
+	for _, pair := range *sap.fmap {
+		if pair.arg == nil &&
+			!pair.param.Variadic &&
+			!paramHasDefaultArg(pair.param) {
+			sap.p.pusherrtok(sap.errTok, "missing_expr_for", pair.param.Id)
+		}
+	}
+}
+
+func (sap *structArgParser) parse() {
+	sap.fmap = sap.p.getFieldMap(sap.f)
+	// Check non targeteds
+	argCount := 0
+	for sap.i, sap.arg = range sap.args.Src {
+		if sap.arg.TargetId != "" { // Targeted?
+			break
+		}
+		if argCount >= len(sap.f.Params) {
+			sap.p.pusherrtok(sap.errTok, "argument_overflow")
+			return
+		}
+		argCount++
+		param := sap.f.Params[sap.i]
+		arg := sap.arg
+		(*sap.fmap)[param.Id].arg = &arg
+		sap.p.parseArg(param, &arg, nil)
+	}
+	for sap.i < len(sap.args.Src) {
+		sap.arg = sap.args.Src[sap.i]
+		sap.pushArg()
+	}
+	sap.checkPasses()
+	sap.buildArgs()
+}
