@@ -29,9 +29,8 @@ type pureArgParser struct {
 
 func (pap *pureArgParser) buildArgs() {
 	pap.args.Src = make([]Arg, len(*pap.pmap))
-	i := -1
-	for _, pair := range *pap.pmap {
-		i++
+	for i, p := range pap.f.Params {
+		pair := (*pap.pmap)[p.Id]
 		switch {
 		case pair.arg != nil:
 			pap.args.Src[i] = *pair.arg

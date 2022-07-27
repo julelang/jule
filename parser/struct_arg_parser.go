@@ -29,9 +29,8 @@ type structArgParser struct {
 
 func (sap *structArgParser) buildArgs() {
 	sap.args.Src = make([]models.Arg, len(*sap.fmap))
-	i := -1
-	for _, pair := range *sap.fmap {
-		i++
+	for i, p := range sap.f.Params {
+		pair := (*sap.fmap)[p.Id]
 		switch {
 		case pair.arg != nil:
 			sap.args.Src[i] = *pair.arg
