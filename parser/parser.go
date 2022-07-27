@@ -421,7 +421,8 @@ func (p *Parser) pushUse(use *use, selectors []Tok) {
 	ns := new(models.Namespace)
 	ns.Ids = strings.SplitN(use.LinkString, tokens.DOUBLE_COLON, -1)
 	src := p.pushNs(ns)
-	p.pushDefs(src.Defs, use.defs)
+	src.Defs = use.defs
+	//p.pushDefs(src.Defs, use.defs)
 }
 
 func (p *Parser) compileUse(useAST *models.Use) (_ *use, hasErr bool) {
@@ -1121,7 +1122,6 @@ func (p *Parser) parseNonGenericType(generics []*GenericType, t *DataType) {
 		p.parseMapNonGenericType(generics, t)
 	default:
 		p.parseCommonNonGenericType(generics, t)
-
 	}
 }
 
@@ -1783,6 +1783,13 @@ func (p *Parser) structConstructorInstance(as *xstruct) *xstruct {
 	*s.constructor = *as.constructor
 	s.constructor.RetType.Type.Tag = s
 	s.Defs = as.Defs
+	for i := range s.Defs.Funcs {
+		f := &s.Defs.Funcs[i]
+		nf := new(function)
+		*nf = **f
+		nf.Ast.Receiver.Tag = s
+		*f = nf
+	}
 	return s
 }
 
@@ -2961,6 +2968,13 @@ func (p *Parser) typeSourceIsStruct(s *xstruct, tag any, errTok Tok) (dt DataTyp
 		if !p.checkGenericsQuantity(len(s.Ast.Generics), generics, errTok) {
 			goto end
 		}
+		for i, g := range generics {
+			var ok bool
+			generics[i], ok = p.realType(g, true)
+			if !ok {
+				goto end
+			}
+		}
 		*s.constructor.Combines = append(*s.constructor.Combines, generics)
 		s.SetGenerics(generics)
 		blockVars := p.blockVars
@@ -2976,6 +2990,7 @@ func (p *Parser) typeSourceIsStruct(s *xstruct, tag any, errTok Tok) (dt DataTyp
 				if len(f.Ast.Generics) == 0 {
 					p.rootBlock = nil
 					p.nodeBlock = nil
+					f.checked = false
 					p.parseTypesGenerics(f.Ast)
 					_ = p.parseFunc(f)
 				}
