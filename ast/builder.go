@@ -558,7 +558,7 @@ func (b *Builder) Impl(toks Toks) {
 	}
 	impl.Trait = tok
 	tok = toks[2]
-	if tok.Id != tokens.In {
+	if tok.Id != tokens.For {
 		if tok.Id == tokens.Brace && tok.Kind == tokens.LBRACE {
 			toks = toks[2:]
 			goto body
@@ -1412,7 +1412,7 @@ func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
 		return b.VarStatement(bs.toks)
 	case tokens.Ret:
 		return b.RetStatement(bs.toks)
-	case tokens.Iter:
+	case tokens.For:
 		return b.IterExpr(bs.toks)
 	case tokens.Break:
 		return b.BreakStatement(bs.toks)

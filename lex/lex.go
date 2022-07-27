@@ -341,7 +341,7 @@ var keywords = map[string]uint8{
 	tokens.CONST:    tokens.Const,
 	tokens.RET:      tokens.Ret,
 	tokens.TYPE:     tokens.Type,
-	tokens.ITER:     tokens.Iter,
+	tokens.FOR:      tokens.For,
 	tokens.BREAK:    tokens.Break,
 	tokens.CONTINUE: tokens.Continue,
 	tokens.IN:       tokens.In,

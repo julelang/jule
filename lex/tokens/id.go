@@ -15,7 +15,7 @@ const (
 	Type         uint8 = 10
 	Colon        uint8 = 11
 	At           uint8 = 12
-	Iter         uint8 = 13
+	For          uint8 = 13
 	Break        uint8 = 14
 	Continue     uint8 = 15
 	In           uint8 = 16

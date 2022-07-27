@@ -74,7 +74,7 @@ const (
 	CONST               = "const"
 	RET                 = "ret"
 	TYPE                = "type"
-	ITER                = "iter"
+	FOR                 = "for"
 	BREAK               = "break"
 	CONTINUE            = "continue"
 	IN                  = "in"
