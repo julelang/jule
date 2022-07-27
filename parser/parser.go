@@ -1817,6 +1817,7 @@ func (p *Parser) parseField(s *xstruct, f **Var, i int) {
 func (p *Parser) structConstructorInstance(as *xstruct) *xstruct {
 	s := new(xstruct)
 	s.Ast = as.Ast
+	s.traits = as.traits
 	s.constructor = new(Func)
 	*s.constructor = *as.constructor
 	s.constructor.RetType.Type.Tag = s

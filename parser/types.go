@@ -186,7 +186,7 @@ func checkTraitCompability(t1, t2 DataType) bool {
 		s := t2.Tag.(*xstruct)
 		return s.hasTrait(t)
 	}
-	return true
+	return false
 }
 
 func checkStructCompability(t1, t2 DataType) bool {
