@@ -33,12 +33,12 @@ There are no dangling pointers, and accessing a null pointer will obviously get 
 
 <h2 id="goals">Goals</h2>
 
-+ Simplcity and maintainability
++ Simplicity and maintainability
 + Fast and scalable development
 + Performance-critical software
 + Memory safety
-+ As efficient and performance as C/C++
-+ High C/C++ interoperability
++ As efficient and performance as C++
++ High C++ interoperability
 
 <h2 id="what-is-xxc">What is XXC?</h2>
 XXC is the name of the reference compiler for the X programming language. <br>
