@@ -1959,16 +1959,30 @@ func itsCombined(f *Func, generics []DataType) bool {
 
 func (p *Parser) parseGenericFunc(f *Func, generics []DataType) {
 	owner := f.Owner.(*Parser)
+	if owner == p {
+		rootBlock := p.rootBlock
+		nodeBlock := p.nodeBlock
+		blockVars := p.blockVars
+		blockTypes := p.blockTypes
+		defer func() {
+			p.rootBlock = rootBlock
+			p.nodeBlock = nodeBlock
+			p.blockVars = blockVars
+			p.blockTypes = blockTypes
+		}()
+	}
 	owner.pushGenerics(f.Generics, generics)
 	if f.Receiver != nil {
 		s := f.Receiver.Tag.(*xstruct)
 		owner.pushGenerics(s.Ast.Generics, s.Generics())
 	}
-	owner.parseTypesGenerics(f)
 	if itsCombined(f, generics) {
 		return
 	}
 	*f.Combines = append(*f.Combines, generics)
+	owner.parseTypesGenerics(f)
+	owner.rootBlock = nil
+	owner.nodeBlock = nil
 	p.parsePureFunc(f)
 	owner.blockTypes = nil
 	owner.blockVars = nil

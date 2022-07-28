@@ -791,7 +791,7 @@ func (e *eval) enumSubId(val value, idTok Tok, m *exprModel) (v value) {
 	enum := val.data.Type.Tag.(*Enum)
 	v = val
 	v.data.Type.Tok = enum.Tok
-	v.constExpr = true
+	v.constExpr = false
 	v.lvalue = false
 	v.isType = false
 	m.appendSubNode(exprNode{"::"})

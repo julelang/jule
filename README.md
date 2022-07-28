@@ -27,9 +27,9 @@ An account-allocation is automatically released as soon as the reference count r
 There are no dangling pointers, and accessing a null pointer will obviously get you an error.
 <br><br>
 
-+ A heap allocation is a developer's choice only
 + Instant automatic memory initialization
 + Bounds checking
++ Null checking
 
 <h2 id="goals">Goals</h2>
 
