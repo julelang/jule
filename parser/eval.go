@@ -769,7 +769,6 @@ func (e *eval) strObjSubId(val value, idTok Tok, m *exprModel) value {
 }
 
 func (e *eval) sliceObjSubId(val value, idTok Tok, m *exprModel) value {
-	readySliceDefs(val.data.Type)
 	v := e.xObjSubId(sliceDefs, val, idTok, m)
 	v.lvalue = false
 	return v

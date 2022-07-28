@@ -482,11 +482,6 @@ var sliceDefs = &Defmap{
 			Id:      "empty",
 			RetType: RetType{Type: DataType{Id: xtype.Bool, Kind: tokens.BOOL}},
 		}},
-		{Ast: &Func{
-			Pub:    true,
-			Id:     "append",
-			Params: []Param{{Id: "values", Variadic: true}},
-		}},
 	},
 }
 
@@ -506,13 +501,6 @@ var arrayDefs = &Defmap{
 			RetType: RetType{Type: DataType{Id: xtype.Bool, Kind: tokens.BOOL}},
 		}},
 	},
-}
-
-func readySliceDefs(t DataType) {
-	elemType := typeOfSliceComponents(t)
-
-	appendFunc, _, _ := sliceDefs.funcById("append", nil)
-	appendFunc.Ast.Params[0].Type = elemType
 }
 
 var mapDefs = &Defmap{

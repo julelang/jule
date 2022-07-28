@@ -54,18 +54,18 @@ var CxxDefault = `
 // region X_BUILTIN_TYPES
 typedef std::size_t                       uint_xt;
 typedef std::make_signed<uint_xt>::type   int_xt;
-typedef int8_t                            i8_xt;
-typedef int16_t                           i16_xt;
-typedef int32_t                           i32_xt;
-typedef int64_t                           i64_xt;
-typedef uint8_t                           u8_xt;
-typedef uint16_t                          u16_xt;
-typedef uint32_t                          u32_xt;
-typedef uint64_t                          u64_xt;
+typedef std::int8_t                       i8_xt;
+typedef std::int16_t                      i16_xt;
+typedef std::int32_t                      i32_xt;
+typedef std::int64_t                      i64_xt;
+typedef std::uint8_t                      u8_xt;
+typedef std::uint16_t                     u16_xt;
+typedef std::uint32_t                     u32_xt;
+typedef std::uint64_t                     u64_xt;
 typedef float                             f32_xt;
 typedef double                            f64_xt;
 typedef bool                              bool_xt;
-typedef uintptr_t                         uintptr_xt;
+typedef std::uintptr_t                    uintptr_xt;
 typedef u8_xt                             XID(byte);
 typedef i32_xt                            XID(rune);
 
@@ -99,27 +99,51 @@ _Slice_t ___slice_type(_Src_Ptr_T _Src,
 template<typename _Item_t>
 class slice {
 public:
-    std::vector<_Item_t> _buffer{};
-
-    slice<_Item_t>(const uint_xt &_N) noexcept
-    { this->_buffer = std::vector<_Item_t>(_N); }
+    _Item_t *_buffer{nil};
+    mutable uint_xt *_ref{nil};
+    int_xt _size{0};
 
     slice<_Item_t>(void) noexcept {}
-
     slice<_Item_t>(const std::nullptr_t) noexcept {}
 
+    slice<_Item_t>(const uint_xt &_N) noexcept
+    { this->__alloc_new(_N); }
+
     slice<_Item_t>(const slice<_Item_t>& _Src) noexcept
-    { this->_buffer = _Src._buffer; }
+    { this->operator=(_Src); }
 
     slice<_Item_t>(const std::initializer_list<_Item_t> &_Src) noexcept {
-        this->_buffer = std::vector<_Item_t>(_Src.size());
+        this->__alloc_new(_Src.size());
         const auto _Src_begin{_Src.begin()};
-        for (int_xt _index{0}; _index < _Src.size(); ++_index)
+        for (int_xt _index{0}; _index < this->_size; ++_index)
         { this->_buffer[_index] = *(_Item_t*)(_Src_begin+_index); }
     }
 
     ~slice<_Item_t>(void) noexcept
-    { this->_buffer.clear(); }
+    { this->__dealloc(); }
+
+    void __check(void) const noexcept
+    { if(!this->_buffer) { XID(panic)("invalid memory address or nil pointer deference"); } }
+
+    void __dealloc(void) noexcept {
+        if (!this->_ref) { return; }
+        (*this->_ref)--;
+        if ((*this->_ref) != 0) { return; }
+        delete this->_ref;
+        this->_ref = nil;
+        delete[] this->_buffer;
+        this->_buffer = nil;
+        this->_size = 0;
+    }
+
+    void __alloc_new(const int_xt _N) noexcept {
+        this->__dealloc();
+        this->_buffer = new(std::nothrow) _Item_t[_N];
+        if (!this->_buffer) { XID(panic)("memory allocation failed"); }
+        this->_ref = new(std::nothrow) uint_xt{1};
+        if (!this->_ref) { XID(panic)("memory allocation failed"); }
+        this->_size = _N;
+    }
 
     typedef _Item_t       *iterator;
     typedef const _Item_t *const_iterator;
@@ -134,16 +158,24 @@ public:
 
     inline constexpr
     iterator end(void) noexcept
-    { return &this->_buffer[this->_buffer.size()]; }
+    { return &this->_buffer[this->_size]; }
 
     inline constexpr
     const_iterator end(void) const noexcept
-    { return &this->_buffer[this->_buffer.size()]; }
+    { return &this->_buffer[this->_size]; }
 
     inline slice<_Item_t> ___slice(const int_xt &_Start,
                                    const int_xt &_End) const noexcept {
-        return ___slice_type<slice<_Item_t>, slice<_Item_t>*>
-            ((slice<_Item_t>*)(this), _Start, _End);
+        this->__check();
+        if (_Start < 0 || _End < 0 || _Start > _End) {
+            std::stringstream _sstream;
+            _sstream << "index out of range [" << _Start << ':' << _End << ']';
+            XID(panic)(_sstream.str().c_str());
+        } else if (_Start == _End) { return slice<_Item_t>(); }
+        slice<_Item_t> _slice;
+        _slice._buffer = &this->_buffer[_Start];
+        _slice._size = _End-_Start;
+        return _slice;
     }
 
     inline slice<_Item_t> ___slice(const int_xt &_Start) const noexcept
@@ -154,19 +186,26 @@ public:
 
     inline constexpr
     int_xt len(void) const noexcept
-    { return this->_buffer.size(); }
+    { return this->_size; }
 
     inline bool empty(void) const noexcept
-    { return this->_buffer.empty(); }
+    { return !this->_buffer || this->_size == 0; }
 
-    void append(const slice<_Item_t> &_Items) noexcept
-    { for (const _Item_t _item: _Items) { this->_buffer.push_back(_item); } }
+    void __push(const _Item_t &_Item) noexcept {
+        _Item_t *_new = new(std::nothrow) _Item_t[this->_size+1];
+        if (!_new) { XID(panic)("memory allocation failed"); }
+        for (int_xt _index{0}; _index < this->_size; ++_index)
+        { _new[_index] = this->_buffer[_index]; }
+        _new[this->_size] = _Item;
+        delete[] this->_buffer;
+        this->_buffer = nil;
+        this->_buffer = _new;
+        ++this->_size;
+    }
 
     bool operator==(const slice<_Item_t> &_Src) const noexcept {
-        const uint_xt _length{this->_buffer.size()};
-        const uint_xt _Src_length{_Src._buffer.size()};
-        if (_length != _Src_length) { return false; }
-        for (int_xt _index{0}; _index < _length; ++_index)
+        if (this->_size != _Src._size) { return false; }
+        for (int_xt _index{0}; _index < this->_size; ++_index)
         { if (this->_buffer[_index] != _Src._buffer[_index]) { return false; } }
         return true;
     }
@@ -177,13 +216,14 @@ public:
 
     inline constexpr
     bool operator==(const std::nullptr_t) const noexcept
-    { return this->_buffer.empty(); }
+    { return !this->_buffer; }
 
     inline constexpr
     bool operator!=(const std::nullptr_t) const noexcept
     { return !this->operator==(nil); }
 
-    _Item_t& operator[](const int_xt &_Index) {
+    _Item_t &operator[](const int_xt &_Index) {
+        this->__check();
         if (this->empty() || _Index < 0 || this->len() <= _Index) {
             std::stringstream _sstream;
             _sstream << "index out of range [" << _Index << ']';
@@ -192,13 +232,28 @@ public:
         return this->_buffer[_Index];
     }
 
-    friend std::ostream& operator<<(std::ostream &_Stream,
+    void operator=(const slice<_Item_t> &_Src) noexcept {
+        this->__dealloc();
+        if (_Src._ref) { (*_Src._ref)++; }
+        this->_size = _Src._size;
+        this->_ref = _Src._ref;
+        this->_buffer = _Src._buffer;
+    }
+
+    void operator=(const std::nullptr_t) noexcept {
+        if (!this->_ref) {
+            this->_ptr = nil;
+            return;
+        }
+        this->__dealloc();
+    }
+
+    friend std::ostream &operator<<(std::ostream &_Stream,
                                     const slice<_Item_t> &_Src) noexcept {
         _Stream << '[';
-        const uint_xt _length{_Src._buffer.size()};
-        for (int_xt _index{0}; _index < _length;) {
+        for (int_xt _index{0}; _index < _Src._size;) {
             _Stream << _Src._buffer[_index++];
-            if (_index < _length) { _Stream << ", "; }
+            if (_index < _Src._size) { _Stream << ", "; }
         }
         _Stream << ']';
         return _Stream;
@@ -263,7 +318,7 @@ public:
     bool operator!=(const array<_Item_t, _N> &_Src) const noexcept
     { return !this->operator==(_Src); }
 
-    _Item_t& operator[](const int_xt &_Index) {
+    _Item_t &operator[](const int_xt &_Index) {
         if (this->empty() || _Index < 0 || this->len() <= _Index) {
             std::stringstream _sstream;
             _sstream << "index out of range [" << _Index << ']';
@@ -272,7 +327,7 @@ public:
         return this->_buffer[_Index];
     }
 
-    friend std::ostream& operator<<(std::ostream &_Stream,
+    friend std::ostream &operator<<(std::ostream &_Stream,
                                     const array<_Item_t, _N> &_Src) noexcept {
         _Stream << '[';
         for (int_xt _index{0}; _index < _Src.len();) {
@@ -324,7 +379,7 @@ public:
     inline bool operator!=(const std::nullptr_t) const noexcept
     { return !this->operator==(nil); }
 
-    friend std::ostream& operator<<(std::ostream &_Stream,
+    friend std::ostream &operator<<(std::ostream &_Stream,
                                     const map<_Key_t, _Value_t> &_Src) noexcept {
         _Stream << '{';
         uint_xt _length{_Src.size()};
@@ -451,25 +506,25 @@ public:
     }
 
     slice<str_xt> split(const str_xt &_Sub, const i64_xt &_N) const noexcept {
-        slice<str_xt> _parts{};
+        slice<str_xt> _parts;
         if (_N == 0) { return _parts; }
         const const_iterator _begin{this->begin()};
         std::basic_string<u8_xt> _s{this->_buffer};
         uint_xt _pos{std::string::npos};
         if (_N < 0) {
             while ((_pos = _s.find(_Sub._buffer)) != std::string::npos) {
-                _parts._buffer.push_back(_s.substr(0, _pos));
+                _parts.__push(_s.substr(0, _pos));
                 _s = _s.substr(_pos+_Sub.len());
             }
-            if (!_parts.empty()) { _parts._buffer.push_back(str_xt{_s}); }
+            if (!_parts.empty()) { _parts.__push(str_xt{_s}); }
         } else {
             uint_xt _n{0};
             while ((_pos = _s.find(_Sub._buffer)) != std::string::npos) {
-                _parts._buffer.push_back(_s.substr(0, _pos));
+                _parts.__push(_s.substr(0, _pos));
                 _s = _s.substr(_pos+_Sub.len());
                 if (++_n >= _N) { break; }
             }
-            if (!_parts.empty() && _n < _N) { _parts._buffer.push_back(str_xt{_s}); }
+            if (!_parts.empty() && _n < _N) { _parts.__push(str_xt{_s}); }
         }
         return _parts;
     }
@@ -497,8 +552,9 @@ public:
     }
 
     operator slice<u8_xt>(void) const noexcept {
-        slice<u8_xt> _slice{};
-        _slice._buffer = std::vector<u8_xt>{this->begin(), this->end()};
+        slice<u8_xt> _slice(this->len());
+        for (int_xt _index{0}; _index < this->len(); ++_index)
+        { _slice[_index] = this->operator[](_index);  }
         return _slice;
     }
 
@@ -526,7 +582,7 @@ public:
     inline bool operator!=(const str_xt &_Str) const noexcept
     { return !this->operator==(_Str); }
 
-    friend std::ostream& operator<<(std::ostream &_Stream, const str_xt &_Src) noexcept {
+    friend std::ostream &operator<<(std::ostream &_Stream, const str_xt &_Src) noexcept {
         for (const u8_xt &_byte: _Src)
         { _Stream << _byte; }
         return _Stream;
@@ -570,7 +626,7 @@ public:
 
     template<typename T>
     operator T(void) const noexcept {
-        if (this->_isnil()) { XID(panic)("casting failed because data is nil"); }
+        if (this->_isnil()) { XID(panic)("invalid memory address or nil pointer deference"); }
         if (!this->type_is<T>()) { XID(panic)("incompatible type"); }
         return std::any_cast<T>(this->_expr);
     }
@@ -592,7 +648,7 @@ public:
     inline bool operator!=(const any_xt &_Any) const noexcept
     { return !this->operator==(_Any); }
 
-    friend std::ostream& operator<<(std::ostream &_Stream, const any_xt &_Src) noexcept {
+    friend std::ostream &operator<<(std::ostream &_Stream, const any_xt &_Src) noexcept {
         if (_Src._expr.has_value()) { _Stream << "<any>"; }
         else { _Stream << 0; }
         return _Stream;
@@ -616,7 +672,7 @@ struct ptr {
     { this->__dealloc(); }
 
     inline void __check_valid(void) const noexcept
-    { if(!this->_ptr) { XID(panic)("nil pointer"); } }
+    { if(!this->_ptr) { XID(panic)("invalid memory address or nil pointer deference"); } }
 
     void __dealloc(void) noexcept {
         if (!this->_ref) { return; }
@@ -669,7 +725,7 @@ struct ptr {
     { return !this->operator==(_Ptr); }
 
     friend inline
-    std::ostream& operator<<(std::ostream &_Stream, const ptr<T> &_Src) noexcept
+    std::ostream &operator<<(std::ostream &_Stream, const ptr<T> &_Src) noexcept
     { return _Stream << _Src._ptr; }
 };
 
@@ -705,7 +761,7 @@ public:
     }
 
     T &get(void) noexcept {
-        if (!this->_data) { XID(panic)("interface is nil"); }
+        if (!this->_data) { XID(panic)("invalid memory address or nil pointer deference"); }
         return *this->_data;
     }
 
@@ -729,7 +785,7 @@ public:
     { return !this->operator==(nil); }
 
     friend inline
-    std::ostream& operator<<(std::ostream &_Stream, const trait<T> &_Src) noexcept
+    std::ostream &operator<<(std::ostream &_Stream, const trait<T> &_Src) noexcept
     { return _Stream << _Src._data; }
 };
 // endregion X_BUILTIN_TYPES
@@ -782,7 +838,7 @@ struct tuple_ostream<Type, N, N> {
 };
 
 template<typename... Types>
-std::ostream& operator<<(std::ostream &_Stream,
+std::ostream &operator<<(std::ostream &_Stream,
                          const std::tuple<Types...> &_Tuple) {
     _Stream << '(';
     tuple_ostream<std::tuple<Types...>, 0, sizeof...(Types)-1>::arrow(_Stream, _Tuple);
