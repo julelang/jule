@@ -62,7 +62,7 @@ func (sap *structArgParser) pushArg() {
 	}
 	arg := sap.arg
 	pair.arg = &arg
-	sap.p.parseArg(*pair.param, pair.arg, nil)
+	sap.p.parseArg(nil, pair, sap.args, nil)
 }
 
 func (sap *structArgParser) checkPasses() {
@@ -88,10 +88,10 @@ func (sap *structArgParser) parse() {
 			return
 		}
 		argCount++
-		param := sap.f.Params[sap.i]
+		param := &sap.f.Params[sap.i]
 		arg := sap.arg
 		(*sap.fmap)[param.Id].arg = &arg
-		sap.p.parseArg(param, &arg, nil)
+		sap.p.parseArg(nil, (*sap.fmap)[param.Id], sap.args, nil)
 	}
 	for sap.i < len(sap.args.Src) {
 		sap.arg = sap.args.Src[sap.i]

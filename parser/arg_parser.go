@@ -47,18 +47,14 @@ func (pap *pureArgParser) pushVariadicArgs(pair *paramMapPair) {
 	model := sliceExpr{pair.param.Type, nil}
 	model.dataType.Kind = x.Prefix_Slice + model.dataType.Kind // For slice.
 	variadiced := false
-	pap.p.parseArg(*pair.param, pair.arg, &variadiced)
+	pap.p.parseArg(pap.f, pair, pap.args, &variadiced)
 	model.expr = append(model.expr, pair.arg.Expr.Model.(iExpr))
 	once := false
 	for pap.i++; pap.i < len(pap.args.Src); pap.i++ {
-		arg := pap.args.Src[pap.i]
-		if arg.TargetId != "" {
-			pap.i--
-			break
-		}
+		pair.arg = &pap.args.Src[pap.i]
 		once = true
-		pap.p.parseArg(*pair.param, &arg, &variadiced)
-		model.expr = append(model.expr, arg.Expr.Model.(iExpr))
+		pap.p.parseArg(pap.f, pair, pap.args, &variadiced)
+		model.expr = append(model.expr, pair.arg.Expr.Model.(iExpr))
 	}
 	if !once {
 		return
@@ -86,7 +82,7 @@ func (pap *pureArgParser) pushArg() {
 	if pair.param.Variadic {
 		pap.pushVariadicArgs(pair)
 	} else {
-		pap.p.parseArg(*pair.param, pair.arg, nil)
+		pap.p.parseArg(pap.f, pair, pap.args, nil)
 	}
 }
 
@@ -138,7 +134,7 @@ func (pap *pureArgParser) tryFuncMultiRetAsArgs() bool {
 		rt := types[i]
 		pap.p.wg.Add(1)
 		val := value{data: models.Data{Type: rt}}
-		go pap.p.checkArgType(param, val, arg.Tok)
+		go pap.p.checkArgType(&param, val, arg.Tok)
 	}
 	return true
 }

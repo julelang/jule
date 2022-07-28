@@ -114,6 +114,23 @@ func (m mapExpr) String() string {
 	return cxx.String()
 }
 
+type genericsExpr struct {
+	types []DataType
+}
+
+func (ge genericsExpr) String() string {
+	if len(ge.types) == 0 {
+		return ""
+	}
+	var cxx strings.Builder
+	cxx.WriteByte('<')
+	for _, generic := range ge.types {
+		cxx.WriteString(generic.String())
+		cxx.WriteByte(',')
+	}
+	return cxx.String()[:cxx.Len()-1] + ">"
+}
+
 type argsExpr struct {
 	args []models.Arg
 }
@@ -128,6 +145,20 @@ func (a argsExpr) String() string {
 		cxx.WriteByte(',')
 	}
 	return cxx.String()[:cxx.Len()-1]
+}
+
+type callExpr struct {
+	generics genericsExpr
+	args     argsExpr
+}
+
+func (ce callExpr) String() string {
+	var cxx strings.Builder
+	cxx.WriteString(ce.generics.String())
+	cxx.WriteByte('(')
+	cxx.WriteString(ce.args.String())
+	cxx.WriteByte(')')
+	return cxx.String()
 }
 
 type multiRetExpr struct {

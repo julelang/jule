@@ -58,13 +58,48 @@ func unptrType(t DataType) DataType {
 	return t
 }
 
+func typeHasThisGeneric(generic *GenericType, t DataType) bool {
+	switch {
+	case typeIsFunc(t):
+		f := t.Tag.(*Func)
+		for _, p := range f.Params {
+			if typeHasThisGeneric(generic, p.Type) {
+				return true
+			}
+		}
+		return typeHasThisGeneric(generic, f.RetType.Type)
+	case t.MultiTyped, typeIsMap(t):
+		types := t.Tag.([]DataType)
+		for _, t := range types {
+			if typeHasThisGeneric(generic, t) {
+				return true
+			}
+		}
+		return false
+	}
+	return typeIsThisGeneric(generic, t)
+}
+
+func typeHasGenerics(generics []*GenericType, t DataType) bool {
+	for _, generic := range generics {
+		if typeHasThisGeneric(generic, t) {
+			return true
+		}
+	}
+	return false
+}
+
+func typeIsThisGeneric(generic *GenericType, t DataType) bool {
+	id, _ := t.KindId()
+	return id == generic.Id
+}
+
 func typeIsGeneric(generics []*GenericType, t DataType) bool {
 	if t.Id != xtype.Id {
 		return false
 	}
-	id, _ := t.KindId()
 	for _, generic := range generics {
-		if id == generic.Id {
+		if typeIsThisGeneric(generic, t) {
 			return true
 		}
 	}

@@ -883,7 +883,7 @@ func (b *Builder) Params(f *models.Func, toks Toks) {
 		b.pushParam(f, part)
 	}
 	b.wg.Add(1)
-	go b.checkParams(f)
+	b.checkParams(f)
 }
 
 func (b *Builder) checkParams(f *models.Func) {

@@ -84,7 +84,7 @@ func (dt *DataType) KindId() (id, prefix string) {
 			i++
 			continue
 		}
-		if r != '_' && !unicode.IsLetter(r) {
+		if r != '_' && !unicode.IsLetter(r) && !unicode.IsDigit(r) {
 			id = string(runes[:i])
 			break
 		}
