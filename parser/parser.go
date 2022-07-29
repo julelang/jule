@@ -3141,8 +3141,6 @@ func (p *Parser) typeSourceIsStruct(s *xstruct, tag any, errTok Tok) (dt DataTyp
 		for i, g := range generics {
 			var ok bool
 			g, ok = p.realType(g, true)
-			g.DontUseOriginal = true
-			g.Original = nil
 			generics[i] = g
 			if !ok {
 				goto end
