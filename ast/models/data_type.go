@@ -10,18 +10,6 @@ import (
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
-type genericableTypes struct {
-	types []DataType
-}
-
-// Generics returns generic types.
-func (gt genericableTypes) Generics() []DataType {
-	return gt.types
-}
-
-// SetGenerics sets generics.
-func (gt genericableTypes) SetGenerics([]DataType) {}
-
 // DataType is data type identifier.
 type DataType struct {
 	// Tok used for usually *File comparisons.
@@ -152,14 +140,9 @@ func (dt DataType) String() (s string) {
 			return dt.MapString()
 		}
 	}
-	if dt.Tag != nil {
-		switch t := dt.Tag.(type) {
-		case []DataType:
-			dt.Tag = genericableTypes{t}
-			return dt.StructString()
-		case Genericable:
-			return dt.StructString()
-		}
+	switch dt.Tag.(type) {
+	case CompiledStruct:
+		return dt.StructString()
 	}
 	switch dt.Id {
 	case xtype.Id, xtype.Enum:
@@ -235,9 +218,8 @@ func (dt *DataType) TraitString() string {
 // StructString returns cxx value of struct data type.
 func (dt *DataType) StructString() string {
 	var cxx strings.Builder
-	id, _ := dt.KindId()
-	cxx.WriteString(xapi.OutId(id, dt.Tok.File))
-	s := dt.Tag.(Genericable)
+	s := dt.Tag.(CompiledStruct)
+	cxx.WriteString(s.OutId())
 	types := s.Generics()
 	if len(types) == 0 {
 		return cxx.String()

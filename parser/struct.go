@@ -49,12 +49,16 @@ func (s *xstruct) cxxGenerics() (def string, serie string) {
 	return cxxDef.String(), serie
 }
 
-func (s *xstruct) outId() string {
+// OutId returns xapi.OutId of struct.
+//
+// This function is should be have this function
+// for CompiledStruct interface of ast package.
+func (s *xstruct) OutId() string {
 	return xapi.OutId(s.Ast.Id, s.Ast.Tok.File)
 }
 
 func (s *xstruct) operators() string {
-	outid := s.outId()
+	outid := s.OutId()
 	genericsDef, genericsSerie := s.cxxGenerics()
 	var cxx strings.Builder
 	cxx.WriteString(models.IndentString())
@@ -106,7 +110,7 @@ func (s *xstruct) operators() string {
 func (s *xstruct) cxxConstructor() string {
 	var cxx strings.Builder
 	cxx.WriteString(models.IndentString())
-	cxx.WriteString(s.outId())
+	cxx.WriteString(s.OutId())
 	cxx.WriteString(paramsToCxx(s.constructor.Params))
 	cxx.WriteString(" noexcept {")
 	if len(s.Defs.Globals) > 0 {
@@ -145,7 +149,7 @@ func (s *xstruct) prototype() string {
 	var cxx strings.Builder
 	cxx.WriteString(genericsToCxx(s.Ast.Generics))
 	cxx.WriteString(" struct ")
-	cxx.WriteString(s.outId())
+	cxx.WriteString(s.OutId())
 	cxx.WriteByte(';')
 	return cxx.String()
 }
@@ -155,7 +159,7 @@ func (s *xstruct) decldefString() string {
 	cxx.WriteString(genericsToCxx(s.Ast.Generics))
 	cxx.WriteByte('\n')
 	cxx.WriteString("struct ")
-	cxx.WriteString(s.outId())
+	cxx.WriteString(s.OutId())
 	cxx.WriteString(s.cxxTraits())
 	cxx.WriteString(" {\n")
 	models.AddIndent()
@@ -170,7 +174,7 @@ func (s *xstruct) decldefString() string {
 		cxx.WriteString("\n\n")
 	} else {
 		cxx.WriteString(models.IndentString())
-		cxx.WriteString(s.outId())
+		cxx.WriteString(s.OutId())
 		cxx.WriteString("(void) noexcept {}\n\n")
 	}
 	for _, f := range s.Defs.Funcs {
@@ -196,7 +200,7 @@ func (s *xstruct) ostream() string {
 		cxx.WriteString(models.IndentString())
 	}
 	cxx.WriteString("std::ostream &operator<<(std::ostream &_Stream, const ")
-	cxx.WriteString(s.outId())
+	cxx.WriteString(s.OutId())
 	cxx.WriteString(genericsSerie)
 	cxx.WriteString(" &_Src) {\n")
 	models.AddIndent()
@@ -236,7 +240,7 @@ func (s xstruct) String() string {
 // Generics returns generics of type.
 //
 // This function is should be have this function
-// for Genericable interface of ast package.
+// for Genericable & CompiledStruct interface of ast package.
 func (s *xstruct) Generics() []DataType {
 	return s.generics
 }
@@ -244,7 +248,7 @@ func (s *xstruct) Generics() []DataType {
 // SetGenerics set generics of type.
 //
 // This function is should be have this function
-// for Genericable interface of ast package.
+// for Genericable & CompiledStruct interface of ast package.
 func (s *xstruct) SetGenerics(generics []DataType) {
 	s.generics = generics
 }

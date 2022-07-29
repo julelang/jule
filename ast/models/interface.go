@@ -1,5 +1,12 @@
 package models
 
+// CompiledStruct instance.
+type CompiledStruct interface {
+	OutId() string
+	Generics() []DataType
+	SetGenerics([]DataType)
+}
+
 // Genericable instance.
 type Genericable interface {
 	Generics() []DataType

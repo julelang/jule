@@ -1131,6 +1131,21 @@ func (p *Parser) parseMapNonGenericType(generics []*GenericType, t *DataType) {
 }
 
 func (p *Parser) parseCommonNonGenericType(generics []*GenericType, t *DataType) {
+	if t.Id == xtype.Id {
+		id, _ := t.KindId()
+		def, _, _ := p.defById(id)
+		switch deft := def.(type) {
+		case *xstruct:
+			deft = p.structConstructorInstance(deft)
+			if t.Tag != nil {
+				deft.SetGenerics(t.Tag.([]DataType))
+			}
+			t.Id = xtype.Struct
+			t.Tag = deft
+			t.DontUseOriginal = true
+			t.Original = nil
+		}
+	}
 	if typeIsGeneric(generics, *t) {
 		return
 	}
@@ -1283,7 +1298,6 @@ func (p *Parser) Func(fast Func) {
 	p.checkRetVars(f)
 	p.checkFuncAttributes(f)
 	f.used = f.Ast.Id == x.InitializerFunction
-	p.parseTypesNonGenerics(f.Ast)
 	p.Defs.Funcs = append(p.Defs.Funcs, f)
 }
 
@@ -1731,6 +1745,7 @@ func (p *Parser) parseFunc(f *function) (err bool) {
 func (p *Parser) checkFuncs() {
 	err := false
 	check := func(f *function) {
+		p.parseTypesNonGenerics(f.Ast)
 		p.wg.Add(1)
 		go p.checkFuncSpecialCases(f.Ast)
 		if err {
@@ -3129,12 +3144,9 @@ func (p *Parser) typeSourceIsMap(dt DataType, err bool) (DataType, bool) {
 	return dt, true
 }
 
-func (p *Parser) typeSourceIsStruct(s *xstruct, tag any, errTok Tok) (dt DataType, _ bool) {
-	s = p.structConstructorInstance(s)
-	var generics []DataType
-	// Has generics?
-	if tag != nil {
-		generics = tag.([]DataType)
+func (p *Parser) typeSourceIsStruct(s *xstruct, errTok Tok) (dt DataType, _ bool) {
+	generics := s.Generics()
+	if len(generics) > 0 {
 		if !p.checkGenericsQuantity(len(s.Ast.Generics), generics, errTok) {
 			goto end
 		}
@@ -3177,8 +3189,8 @@ func (p *Parser) typeSourceIsStruct(s *xstruct, tag any, errTok Tok) (dt DataTyp
 		p.pusherrtok(errTok, "has_generics")
 	}
 end:
-	dt.Kind = s.dataTypeString()
 	dt.Id = xtype.Struct
+	dt.Kind = s.dataTypeString()
 	dt.Tag = s
 	dt.Tok = s.Ast.Tok
 	return dt, true
@@ -3272,7 +3284,11 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 			return p.typeSourceIsEnum(t, dt.Tag)
 		case *xstruct:
 			t.Used = true
-			return p.typeSourceIsStruct(t, dt.Tag, dt.Tok)
+			t = p.structConstructorInstance(t)
+			if dt.Tag != nil {
+				t.SetGenerics(dt.Tag.([]models.DataType))
+			}
+			return p.typeSourceIsStruct(t, dt.Tok)
 		case *trait:
 			t.Used = true
 			return p.typeSourceIsTrait(t, dt.Tag, dt.Tok)
