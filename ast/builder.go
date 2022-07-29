@@ -446,9 +446,13 @@ func (b *Builder) Trait(toks Toks) {
 }
 
 func (b *Builder) implTraitFuncs(impl *models.Impl, toks Toks) {
-	i := 0
-	for i < len(toks) {
-		funcToks := b.skipStatement(&i, &toks)
+	pos, btoks := b.Pos, make([]Tok, len(b.Toks))
+	copy(btoks, b.Toks)
+	defer func() { b.Pos, b.Toks = pos, btoks }()
+	b.Pos = 0
+	b.Toks = toks
+	for b.Pos != -1 && !b.Ended() {
+		funcToks := b.nextBuilderStatement()
 		ref := false
 		tok := funcToks[0]
 		switch tok.Id {
@@ -480,9 +484,13 @@ func (b *Builder) implTraitFuncs(impl *models.Impl, toks Toks) {
 }
 
 func (b *Builder) implStruct(impl *models.Impl, toks Toks) {
-	i := 0
-	for i < len(toks) {
-		funcToks := b.skipStatement(&i, &toks)
+	pos, btoks := b.Pos, make([]Tok, len(b.Toks))
+	copy(btoks, b.Toks)
+	defer func() { b.Pos, b.Toks = pos, btoks }()
+	b.Pos = 0
+	b.Toks = toks
+	for b.Pos != -1 && !b.Ended() {
+		funcToks := b.nextBuilderStatement()
 		tok := funcToks[0]
 		pub := false
 		switch tok.Id {
@@ -1341,9 +1349,13 @@ func (b *Builder) FuncRetDataType(toks Toks, i *int) (t models.RetType, ok bool)
 		return
 	}
 	tok := toks[*i]
-	// Multityped?
-	if tok.Id == tokens.Brace && tok.Kind == tokens.LBRACKET {
-		return b.funcMultiTypeRet(toks, i)
+	if tok.Id == tokens.Brace {
+		switch tok.Kind {
+		case tokens.LBRACKET:
+			return b.funcMultiTypeRet(toks, i)
+		case tokens.LBRACE:
+			return
+		}
 	}
 	t.Type, ok = b.DataType(toks, i, false, false)
 	return
