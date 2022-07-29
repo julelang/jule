@@ -166,11 +166,13 @@ func (s *xstruct) decldefString() string {
 			cxx.WriteByte('\n')
 		}
 		cxx.WriteString("\n\n")
+		cxx.WriteString(s.cxxConstructor())
+		cxx.WriteString("\n\n")
+	} else {
+		cxx.WriteString(models.IndentString())
+		cxx.WriteString(s.outId())
+		cxx.WriteString("(void) noexcept {}\n\n")
 	}
-	cxx.WriteString(s.outId())
-	cxx.WriteString("(void) noexcept {}\n\n")
-	cxx.WriteString(s.cxxConstructor())
-	cxx.WriteString("\n\n")
 	for _, f := range s.Defs.Funcs {
 		if f.used {
 			cxx.WriteString(models.IndentString())
