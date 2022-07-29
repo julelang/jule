@@ -1991,7 +1991,7 @@ func (p *Parser) parseGenericFunc(f *Func, generics []DataType) {
 	owner.nodeBlock = nil
 }
 
-func (p *Parser) parseGenerics(f *Func, generics []DataType, m *exprModel, errTok Tok) bool {
+func (p *Parser) parseGenerics(f *Func, generics []DataType, errTok Tok) bool {
 	if len(f.Generics) > 0 && len(generics) == 0 {
 		for _, generic := range f.Generics {
 			ok := false
@@ -2037,7 +2037,7 @@ func (p *Parser) parseFuncCall(f *Func, args *models.Args, m *exprModel, errTok 
 			f.Params, f.RetType = params, retType
 			p.blockTypes = blockTypes
 		}()
-		if !p.parseGenerics(f, args.Generics, m, errTok) {
+		if !p.parseGenerics(f, args.Generics, errTok) {
 			return
 		}
 	} else {
@@ -3140,6 +3140,7 @@ func (p *Parser) typeSourceIsStruct(s *xstruct, tag any, errTok Tok) (dt DataTyp
 					owner.reloadFuncTypes(f.Ast)
 					_ = p.parsePureFunc(f.Ast)
 					owner.blockVars = blockVars
+					owner.blockTypes = blockTypes
 				}
 			}
 		}

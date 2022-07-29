@@ -7,6 +7,7 @@ import (
 
 func (p *Parser) getFieldMap(f *Func) *paramMap {
 	pmap := new(paramMap)
+	*pmap = paramMap{}
 	s := f.RetType.Type.Tag.(*xstruct)
 	for i, g := range s.Defs.Globals {
 		if isAccessable(p.File, g.DefTok.File, g.Pub) {
@@ -62,7 +63,7 @@ func (sap *structArgParser) pushArg() {
 	}
 	arg := sap.arg
 	pair.arg = &arg
-	sap.p.parseArg(nil, pair, sap.args, nil)
+	sap.p.parseArg(sap.f, pair, sap.args, nil)
 }
 
 func (sap *structArgParser) checkPasses() {
@@ -91,7 +92,7 @@ func (sap *structArgParser) parse() {
 		param := &sap.f.Params[sap.i]
 		arg := sap.arg
 		(*sap.fmap)[param.Id].arg = &arg
-		sap.p.parseArg(nil, (*sap.fmap)[param.Id], sap.args, nil)
+		sap.p.parseArg(sap.f, (*sap.fmap)[param.Id], sap.args, nil)
 	}
 	for sap.i < len(sap.args.Src) {
 		sap.arg = sap.args.Src[sap.i]
