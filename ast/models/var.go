@@ -56,6 +56,7 @@ func (v *Var) FieldString() string {
 	cxx.WriteString(v.Type.String())
 	cxx.WriteByte(' ')
 	cxx.WriteString(v.OutId())
+	cxx.WriteString(xapi.DefaultExpr)
 	cxx.WriteByte(';')
 	return cxx.String()
 }

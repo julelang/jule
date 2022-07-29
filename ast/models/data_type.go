@@ -4,6 +4,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/the-xlang/xxc/lex/tokens"
 	"github.com/the-xlang/xxc/pkg/x"
 	"github.com/the-xlang/xxc/pkg/xapi"
 	"github.com/the-xlang/xxc/pkg/xtype"
@@ -121,6 +122,11 @@ func (dt DataType) String() (s string) {
 	dt.SetToOriginal()
 	if dt.MultiTyped {
 		return dt.MultiTypeString()
+	}
+	// Remove namespace
+	i := strings.LastIndex(dt.Kind, tokens.DOUBLE_COLON)
+	if i != -1 {
+		dt.Kind = dt.Kind[i+len(tokens.DOUBLE_COLON):]
 	}
 	pointers := dt.Pointers()
 	// Apply pointers

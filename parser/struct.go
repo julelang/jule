@@ -141,6 +141,15 @@ func (s *xstruct) cxxTraits() string {
 	return cxx.String()[:cxx.Len()-1]
 }
 
+func (s *xstruct) prototype() string {
+	var cxx strings.Builder
+	cxx.WriteString(genericsToCxx(s.Ast.Generics))
+	cxx.WriteString(" struct ")
+	cxx.WriteString(s.outId())
+	cxx.WriteByte(';')
+	return cxx.String()
+}
+
 func (s *xstruct) decldefString() string {
 	var cxx strings.Builder
 	cxx.WriteString(genericsToCxx(s.Ast.Generics))
@@ -158,6 +167,8 @@ func (s *xstruct) decldefString() string {
 		}
 		cxx.WriteString("\n\n")
 	}
+	cxx.WriteString(s.outId())
+	cxx.WriteString("(void) noexcept {}\n\n")
 	cxx.WriteString(s.cxxConstructor())
 	cxx.WriteString("\n\n")
 	for _, f := range s.Defs.Funcs {

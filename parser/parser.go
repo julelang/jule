@@ -229,7 +229,18 @@ func (p *Parser) CxxStructs() string {
 	return cxx.String()
 }
 
-func cxxPrototypes(dm *Defmap) string {
+func cxxStructPrototypes(dm *Defmap) string {
+	var cxx strings.Builder
+	for _, s := range dm.Structs {
+		if s.Used && s.Ast.Tok.Id != tokens.NA {
+			cxx.WriteString(s.prototype())
+			cxx.WriteByte('\n')
+		}
+	}
+	return cxx.String()
+}
+
+func cxxFuncPrototypes(dm *Defmap) string {
 	var cxx strings.Builder
 	for _, f := range dm.Funcs {
 		if f.used && f.Ast.Tok.Id != tokens.NA {
@@ -244,9 +255,13 @@ func cxxPrototypes(dm *Defmap) string {
 func (p *Parser) CxxPrototypes() string {
 	var cxx strings.Builder
 	for _, use := range used {
-		cxx.WriteString(cxxPrototypes(use.defs))
+		cxx.WriteString(cxxStructPrototypes(use.defs))
 	}
-	cxx.WriteString(cxxPrototypes(p.Defs))
+	cxx.WriteString(cxxStructPrototypes(p.Defs))
+	for _, use := range used {
+		cxx.WriteString(cxxFuncPrototypes(use.defs))
+	}
+	cxx.WriteString(cxxFuncPrototypes(p.Defs))
 	return cxx.String()
 }
 
@@ -328,8 +343,8 @@ func (p *Parser) Cxx() string {
 	cxx.WriteByte('\n')
 	cxx.WriteString(p.CxxEnums())
 	cxx.WriteString(p.CxxTraits())
-	cxx.WriteString(p.CxxStructs())
 	cxx.WriteString(p.CxxPrototypes())
+	cxx.WriteString(p.CxxStructs())
 	cxx.WriteString("\n\n")
 	cxx.WriteString(p.CxxGlobals())
 	cxx.WriteString("\n\n")
@@ -422,7 +437,6 @@ func (p *Parser) pushUse(use *use, selectors []Tok) {
 	ns.Ids = strings.SplitN(use.LinkString, tokens.DOUBLE_COLON, -1)
 	src := p.pushNs(ns)
 	src.defs = use.defs
-	//p.pushDefs(src.Defs, use.defs)
 }
 
 func (p *Parser) compileUse(useAST *models.Use) (_ *use, hasErr bool) {
@@ -3148,6 +3162,7 @@ func (p *Parser) typeSourceIsStruct(s *xstruct, tag any, errTok Tok) (dt DataTyp
 			for _, f := range s.Defs.Funcs {
 				if len(f.Ast.Generics) == 0 {
 					blockVars := owner.blockVars
+					blockTypes := owner.blockTypes
 					owner.reloadFuncTypes(f.Ast)
 					_ = p.parsePureFunc(f.Ast)
 					owner.blockVars = blockVars
@@ -3164,8 +3179,8 @@ func (p *Parser) typeSourceIsStruct(s *xstruct, tag any, errTok Tok) (dt DataTyp
 		p.pusherrtok(errTok, "has_generics")
 	}
 end:
-	dt.Id = xtype.Struct
 	dt.Kind = s.dataTypeString()
+	dt.Id = xtype.Struct
 	dt.Tag = s
 	dt.Tok = s.Ast.Tok
 	return dt, true
