@@ -1140,17 +1140,26 @@ func (p *Parser) parseCommonNonGenericType(generics []*GenericType, t *DataType)
 			if t.Tag != nil {
 				deft.SetGenerics(t.Tag.([]DataType))
 			}
+			t.Kind = deft.dataTypeString()
 			t.Id = xtype.Struct
 			t.Tag = deft
 			t.DontUseOriginal = true
 			t.Original = nil
+			goto tagcheck
 		}
 	}
 	if typeIsGeneric(generics, *t) {
 		return
 	}
+tagcheck:
 	if t.Tag != nil {
 		switch t := t.Tag.(type) {
+		case *xstruct:
+			for _, ct := range t.Generics() {
+				if typeIsGeneric(generics, ct) {
+					return
+				}
+			}
 		case []DataType:
 			for _, ct := range t {
 				if typeIsGeneric(generics, ct) {
@@ -1206,6 +1215,13 @@ func (p *Parser) parseCommonGenericType(generics []*GenericType, t *DataType) {
 	if !typeIsGeneric(generics, *t) {
 		if t.Tag != nil {
 			switch t := t.Tag.(type) {
+			case *xstruct:
+				sgenerics := t.Generics()
+				for _, ct := range sgenerics {
+					if typeIsGeneric(generics, ct) {
+						goto parse
+					}
+				}
 			case []DataType:
 				for _, ct := range t {
 					if typeIsGeneric(generics, ct) {
@@ -1298,6 +1314,7 @@ func (p *Parser) Func(fast Func) {
 	p.checkRetVars(f)
 	p.checkFuncAttributes(f)
 	f.used = f.Ast.Id == x.InitializerFunction
+	p.parseTypesNonGenerics(f.Ast)
 	p.Defs.Funcs = append(p.Defs.Funcs, f)
 }
 
@@ -2093,6 +2110,7 @@ func (p *Parser) parseFuncCall(f *Func, args *models.Args, m *exprModel, errTok 
 	if len(args.Generics) > 0 {
 		p.parseGenericFunc(f, args.Generics)
 		f.RetType.Type.DontUseOriginal = true
+		f.RetType.Type.Original = nil
 		v.data.Type = f.RetType.Type
 		v.data.Value = f.Id
 	}
@@ -3160,7 +3178,6 @@ func (p *Parser) typeSourceIsStruct(s *xstruct, errTok Tok) (dt DataType, _ bool
 		}
 		*s.constructor.Combines = append(*s.constructor.Combines, generics)
 		owner := s.Ast.Owner.(*Parser)
-		s.SetGenerics(generics)
 		blockTypes := owner.blockTypes
 		owner.blockTypes = nil
 		defer func() { owner.blockTypes = blockTypes }()
@@ -3239,9 +3256,7 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 			ret.Original = original
 		}
 	}()
-	if dt.Original != nil {
-		dt = dt.Original.(models.DataType)
-	}
+	dt.SetToOriginal()
 	if dt.MultiTyped {
 		return p.typeSourceOfMultiTyped(dt, err)
 	} else if typeIsMap(dt) {
@@ -3251,6 +3266,8 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 		p.checkArrayType(&dt)
 	}
 	switch dt.Id {
+	case xtype.Struct:
+		return p.typeSourceIsStruct(dt.Tag.(*xstruct), dt.Tok)
 	case xtype.Id:
 		id, prefix := dt.KindId()
 		defer func() { ret.Kind = prefix + ret.Kind }()
@@ -3285,8 +3302,9 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 		case *xstruct:
 			t.Used = true
 			t = p.structConstructorInstance(t)
-			if dt.Tag != nil {
-				t.SetGenerics(dt.Tag.([]models.DataType))
+			switch tagt := dt.Tag.(type) {
+			case []models.DataType:
+				t.SetGenerics(tagt)
 			}
 			return p.typeSourceIsStruct(t, dt.Tok)
 		case *trait:
@@ -3313,9 +3331,7 @@ func (p *Parser) realType(dt DataType, err bool) (ret DataType, _ bool) {
 			}
 		}()
 	}
-	if dt.Original != nil {
-		dt = dt.Original.(models.DataType)
-	}
+	dt.SetToOriginal()
 	return p.typeSource(dt, err)
 }
 

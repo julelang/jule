@@ -86,6 +86,10 @@ func (dt *DataType) SetToOriginal() {
 		return
 	}
 	tag := dt.Tag
+	switch tag.(type) {
+	case Genericable:
+		defer func() { dt.Tag = tag }()
+	}
 	kind := dt.KindWithOriginalId()
 	tok := dt.Tok
 	*dt = dt.Original.(DataType)
@@ -226,7 +230,6 @@ func (dt *DataType) StructString() string {
 	}
 	cxx.WriteByte('<')
 	for _, t := range types {
-		t.DontUseOriginal = dt.DontUseOriginal
 		cxx.WriteString(t.String())
 		cxx.WriteByte(',')
 	}

@@ -172,11 +172,10 @@ func (s *xstruct) decldefString() string {
 		cxx.WriteString("\n\n")
 		cxx.WriteString(s.cxxConstructor())
 		cxx.WriteString("\n\n")
-	} else {
-		cxx.WriteString(models.IndentString())
-		cxx.WriteString(s.OutId())
-		cxx.WriteString("(void) noexcept {}\n\n")
 	}
+	cxx.WriteString(models.IndentString())
+	cxx.WriteString(s.OutId())
+	cxx.WriteString("(void) noexcept {}\n\n")
 	for _, f := range s.Defs.Funcs {
 		if f.used {
 			cxx.WriteString(models.IndentString())
@@ -276,7 +275,7 @@ func (s *xstruct) dataTypeString() string {
 		// Instance
 		if len(s.generics) > 0 {
 			for _, generic := range s.generics {
-				gs.WriteString(generic.String())
+				gs.WriteString(generic.Kind)
 				gs.WriteByte(',')
 			}
 		} else {
