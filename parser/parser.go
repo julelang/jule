@@ -2147,27 +2147,30 @@ type paramMapPair struct {
 	arg   *Arg
 }
 
-func (p *Parser) pushGenericByFunc(f *Func, pair *paramMapPair, args *models.Args, t DataType) {
+func (p *Parser) pushGenericByFunc(f *Func, pair *paramMapPair, args *models.Args, t DataType) bool {
 	tf := t.Tag.(*Func)
 	cf := pair.param.Type.Tag.(*Func)
 	if len(tf.Params) != len(cf.Params) {
-		return
+		return false
 	}
 	for i, param := range tf.Params {
 		pair := *pair
 		pair.param = &cf.Params[i]
-		p.pushGenericByArg(f, &pair, args, param.Type)
+		ok := p.pushGenericByArg(f, &pair, args, param.Type)
+		if !ok {
+			return ok
+		}
 	}
 	{
 		pair := *pair
 		pair.param = &models.Param{
 			Type: cf.RetType.Type,
 		}
-		p.pushGenericByArg(f, &pair, args, tf.RetType.Type)
+		return p.pushGenericByArg(f, &pair, args, tf.RetType.Type)
 	}
 }
 
-func (p *Parser) pushGenericByMultiTyped(f *Func, pair *paramMapPair, args *models.Args, t DataType) {
+func (p *Parser) pushGenericByMultiTyped(f *Func, pair *paramMapPair, args *models.Args, t DataType) bool {
 	types := t.Tag.([]DataType)
 	for _, t := range types {
 		for _, generic := range f.Generics {
@@ -2180,9 +2183,10 @@ func (p *Parser) pushGenericByMultiTyped(f *Func, pair *paramMapPair, args *mode
 			}
 		}
 	}
+	return true
 }
 
-func (p *Parser) pushGenericByCommonArg(f *Func, pair *paramMapPair, args *models.Args, t DataType) {
+func (p *Parser) pushGenericByCommonArg(f *Func, pair *paramMapPair, args *models.Args, t DataType) bool {
 	for _, generic := range f.Generics {
 		if typeIsThisGeneric(generic, pair.param.Type) {
 			if p.blockTypeById(generic.Id) != nil {
@@ -2192,6 +2196,7 @@ func (p *Parser) pushGenericByCommonArg(f *Func, pair *paramMapPair, args *model
 			break
 		}
 	}
+	return true
 }
 
 func (p *Parser) pushGenericByType(generic *GenericType, args *models.Args, t DataType) {
@@ -2201,14 +2206,19 @@ func (p *Parser) pushGenericByType(generic *GenericType, args *models.Args, t Da
 	args.Generics = append(args.Generics, t)
 }
 
-func (p *Parser) pushGenericByArg(f *Func, pair *paramMapPair, args *models.Args, argType DataType) {
+func (p *Parser) pushGenericByArg(f *Func, pair *paramMapPair, args *models.Args, argType DataType) bool {
+	_, prefix := pair.param.Type.KindId()
+	_, tprefix := argType.KindId()
+	if prefix != tprefix {
+		return false
+	}
 	switch {
 	case typeIsFunc(argType):
-		p.pushGenericByFunc(f, pair, args, argType)
+		return p.pushGenericByFunc(f, pair, args, argType)
 	case argType.MultiTyped, typeIsMap(argType):
-		p.pushGenericByMultiTyped(f, pair, args, argType)
+		return p.pushGenericByMultiTyped(f, pair, args, argType)
 	default:
-		p.pushGenericByCommonArg(f, pair, args, argType)
+		return p.pushGenericByCommonArg(f, pair, args, argType)
 	}
 }
 
@@ -2219,9 +2229,11 @@ func (p *Parser) parseArg(f *Func, pair *paramMapPair, args *models.Args, variad
 		*variadiced = value.variadic
 	}
 	if typeHasGenerics(f.Generics, pair.param.Type) {
-		p.pushGenericByArg(f, pair, args, value.data.Type)
-		p.parseGenericType(f.Generics, &pair.param.Type)
-		return
+		ok := p.pushGenericByArg(f, pair, args, value.data.Type)
+		if ok {
+			p.parseGenericType(f.Generics, &pair.param.Type)
+			return
+		}
 	}
 	p.wg.Add(1)
 	go p.checkArgType(pair.param, value, pair.arg.Tok)
