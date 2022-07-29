@@ -1380,7 +1380,6 @@ func (p *Parser) Var(v Var) *Var {
 				}
 			}
 			p.checkValidityForAutoType(v.Type, v.SetterTok)
-			p.checkAssignConst(v.Type, val, v.SetterTok)
 		}
 	}
 	if v.Const {
@@ -1653,10 +1652,10 @@ func (p *Parser) param(f *Func, param *Param) (err bool) {
 			p.pusherrtok(param.Tok, "variadic_reference_param")
 			err = true
 		}
-		if typeIsPtr(param.Type) {
+		/*if typeIsPtr(param.Type) {
 			p.pusherrtok(param.Tok, "pointer_reference")
 			err = true
-		}
+		}*/
 	}
 	p.checkParamDefaultExpr(f, param)
 	return
@@ -3307,12 +3306,6 @@ func (p *Parser) checkMultiType(real, check DataType, ignoreAny bool, errTok Tok
 		realType := realTypes[i]
 		checkType := checkTypes[i]
 		p.checkType(realType, checkType, ignoreAny, errTok)
-	}
-}
-
-func (p *Parser) checkAssignConst(t DataType, val value, errTok Tok) {
-	if typeIsMut(t) && val.constExpr {
-		p.pusherrtok(errTok, "constant_assignto_nonconstant")
 	}
 }
 

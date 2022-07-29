@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/the-xlang/xxc/ast/models"
-	"github.com/the-xlang/xxc/lex"
 	"github.com/the-xlang/xxc/lex/tokens"
 	"github.com/the-xlang/xxc/pkg/x"
 	"github.com/the-xlang/xxc/pkg/xtype"
@@ -363,21 +362,6 @@ var Builtin = &Defmap{
 					Id:   "expr",
 					Type: DataType{Id: xtype.Any, Kind: tokens.ANY},
 				}},
-			},
-		},
-		{
-			Ast: &Func{
-				Pub: true,
-				Id:  "new",
-				Attributes: []models.Attribute{
-					{Tag: lex.Tok{Kind: x.Attribute_TypeArg}},
-				},
-				Generics: []*models.GenericType{
-					{Id: "T"},
-				},
-				RetType: RetType{
-					Type: DataType{Id: xtype.Id, Kind: "*T"},
-				},
 			},
 		},
 	},

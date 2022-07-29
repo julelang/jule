@@ -30,10 +30,6 @@ func typeIsVariadicable(t DataType) bool {
 	return typeIsSlice(t)
 }
 
-func typeIsMut(t DataType) bool {
-	return typeIsPtr(t)
-}
-
 func typeIsAllowForConst(t DataType) bool {
 	if !typeIsPure(t) {
 		return false

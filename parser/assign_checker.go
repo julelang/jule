@@ -74,7 +74,6 @@ func (ac assignChecker) checkAssignType() {
 	if ac.p.eval.hasError || ac.v.data.Value == "" {
 		return
 	}
-	ac.p.checkAssignConst(ac.t, ac.v, ac.errtok)
 	if typeIsPure(ac.t) && ac.v.constExpr && typeIsPure(ac.v.data.Type) {
 		switch {
 		case xtype.IsFloat(ac.t.Id):
