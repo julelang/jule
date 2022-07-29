@@ -347,9 +347,8 @@ var Builtin = &Defmap{
 					Type: DataType{Id: xtype.Void, Kind: xtype.TypeMap[xtype.Void]},
 				},
 				Params: []Param{{
-					Id:      "v",
-					Type:    DataType{Id: xtype.Any, Kind: tokens.ANY},
-					Default: Expr{Model: exprNode{`""`}},
+					Id:   "expr",
+					Type: DataType{Id: xtype.Any, Kind: tokens.ANY},
 				}},
 			},
 		},
@@ -361,9 +360,8 @@ var Builtin = &Defmap{
 					Type: DataType{Id: xtype.Void, Kind: xtype.TypeMap[xtype.Void]},
 				},
 				Params: []Param{{
-					Id:      "v",
-					Type:    DataType{Id: xtype.Any, Kind: tokens.ANY},
-					Default: Expr{Model: exprNode{`""`}},
+					Id:   "expr",
+					Type: DataType{Id: xtype.Any, Kind: tokens.ANY},
 				}},
 			},
 		},

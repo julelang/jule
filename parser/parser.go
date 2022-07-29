@@ -2040,7 +2040,6 @@ func (p *Parser) parseFuncCall(f *Func, args *models.Args, m *exprModel, errTok 
 		if !p.parseGenerics(f, args.Generics, m, errTok) {
 			return
 		}
-		f.RetType.Type.DontUseOriginal = true
 	} else {
 		_ = p.checkGenericsQuantity(len(f.Generics), args.Generics, errTok)
 		if f.Receiver != nil {
@@ -2065,6 +2064,9 @@ func (p *Parser) parseFuncCall(f *Func, args *models.Args, m *exprModel, errTok 
 	}
 	if len(args.Generics) > 0 {
 		p.parseGenericFunc(f, args.Generics)
+		f.RetType.Type.DontUseOriginal = true
+		v.data.Type = f.RetType.Type
+		v.data.Value = f.Id
 	}
 	if m != nil {
 		m.appendSubNode(callExpr)
@@ -2086,6 +2088,8 @@ func (p *Parser) parseFuncCallToks(f *Func, genericsToks, argsToks Toks, m *expr
 			p.eval.hasError = true
 			return
 		}
+		args = new(models.Args)
+		args.Generics = generics
 	} else {
 		var err bool
 		generics, err = p.getGenerics(genericsToks)
@@ -2094,8 +2098,8 @@ func (p *Parser) parseFuncCallToks(f *Func, genericsToks, argsToks Toks, m *expr
 			return
 		}
 		args = p.getArgs(argsToks, false)
+		args.Generics = generics
 	}
-	args.Generics = generics
 	return p.parseFuncCall(f, args, m, argsToks[0])
 }
 
