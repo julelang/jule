@@ -1931,11 +1931,11 @@ func (p *Parser) getGenerics(toks Toks) (_ []DataType, err bool) {
 			continue
 		}
 		b := ast.NewBuilder(nil)
-		index := 0
-		generic, _ := b.DataType(part, &index, false, true)
+		j := 0
+		generic, _ := b.DataType(part, &j, false, true)
 		b.Wait()
-		if index+1 < len(part) {
-			p.pusherrtok(part[index+1], "invalid_syntax")
+		if j+1 < len(part) {
+			p.pusherrtok(part[j+1], "invalid_syntax")
 		}
 		p.pusherrs(b.Errors...)
 		var ok bool
@@ -2058,6 +2058,7 @@ check:
 		return false
 	}
 	p.pushGenerics(f.Generics, args.Generics)
+	p.parseTypesGenerics(f)
 ok:
 	return true
 }
@@ -2236,13 +2237,13 @@ func (p *Parser) pushGenericByCommonArg(f *Func, pair *paramMapPair, args *model
 	for _, generic := range f.Generics {
 		if typeIsThisGeneric(generic, pair.param.Type) {
 			if p.blockTypeById(generic.Id) != nil {
-				break
+				return true
 			}
 			p.pushGenericByType(generic, args, t)
-			break
+			return true
 		}
 	}
-	return true
+	return false
 }
 
 func (p *Parser) pushGenericByType(generic *GenericType, args *models.Args, t DataType) {
