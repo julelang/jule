@@ -2079,6 +2079,7 @@ func (p *Parser) parseFuncCall(f *Func, args *models.Args, m *exprModel, errTok 
 		blockTypes := p.blockTypes
 		params := make([]Param, len(f.Params))
 		copy(params, f.Params)
+		f.RetType.Type.DontUseOriginal = false
 		retType := f.RetType
 		defer func() {
 			f.Params, f.RetType = params, retType
@@ -2106,15 +2107,16 @@ func (p *Parser) parseFuncCall(f *Func, args *models.Args, m *exprModel, errTok 
 	}
 	p.parseArgs(f, args, m, errTok)
 	callExpr := callExpr{
-		generics: genericsExpr{args.Generics},
+		generics: genericsExpr{args.Generics[:len(f.Generics)]},
 		args:     argsExpr{args.Src},
 	}
 	if len(args.Generics) > 0 {
 		p.parseGenericFunc(f, args.Generics, errTok)
-		f.RetType.Type.DontUseOriginal = true
-		f.RetType.Type.Original = nil
-		v.data.Type = f.RetType.Type
-		v.data.Value = f.Id
+	}
+	v.data.Type = f.RetType.Type
+	if args.NeedsPureType {
+		v.data.Type.DontUseOriginal = true
+		v.data.Type.Original = nil
 	}
 	if m != nil {
 		m.appendSubNode(callExpr)
@@ -2223,9 +2225,6 @@ func (p *Parser) pushGenericByMultiTyped(f *Func, pair *paramMapPair, args *mode
 	for _, t := range types {
 		for _, generic := range f.Generics {
 			if typeHasThisGeneric(generic, pair.param.Type) {
-				if p.blockTypeById(generic.Id) != nil {
-					continue
-				}
 				p.pushGenericByType(generic, args, t)
 				break
 			}
@@ -2237,9 +2236,6 @@ func (p *Parser) pushGenericByMultiTyped(f *Func, pair *paramMapPair, args *mode
 func (p *Parser) pushGenericByCommonArg(f *Func, pair *paramMapPair, args *models.Args, t DataType) bool {
 	for _, generic := range f.Generics {
 		if typeIsThisGeneric(generic, pair.param.Type) {
-			if p.blockTypeById(generic.Id) != nil {
-				return true
-			}
 			p.pushGenericByType(generic, args, t)
 			return true
 		}
@@ -3166,10 +3162,10 @@ func (p *Parser) typeSourceIsMap(dt DataType, err bool) (DataType, bool) {
 	return dt, true
 }
 
-func (p *Parser) typeSourceIsStruct(s *xstruct, errTok Tok) (dt DataType, _ bool) {
+func (p *Parser) typeSourceIsStruct(s *xstruct, t DataType) (dt DataType, _ bool) {
 	generics := s.Generics()
 	if len(generics) > 0 {
-		if !p.checkGenericsQuantity(len(s.Ast.Generics), generics, errTok) {
+		if !p.checkGenericsQuantity(len(s.Ast.Generics), generics, t.Tok) {
 			goto end
 		}
 		for i, g := range generics {
@@ -3207,7 +3203,7 @@ func (p *Parser) typeSourceIsStruct(s *xstruct, errTok Tok) (dt DataType, _ bool
 			owner.Errors = nil
 		}
 	} else if len(s.Ast.Generics) > 0 {
-		p.pusherrtok(errTok, "has_generics")
+		p.pusherrtok(t.Tok, "has_generics")
 	}
 end:
 	dt.Id = xtype.Struct
@@ -3271,7 +3267,7 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 	}
 	switch dt.Id {
 	case xtype.Struct:
-		return p.typeSourceIsStruct(dt.Tag.(*xstruct), dt.Tok)
+		return p.typeSourceIsStruct(dt.Tag.(*xstruct), dt)
 	case xtype.Id:
 		id, prefix := dt.KindId()
 		defer func() { ret.Kind = prefix + ret.Kind }()
@@ -3310,7 +3306,7 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 			case []models.DataType:
 				t.SetGenerics(tagt)
 			}
-			return p.typeSourceIsStruct(t, dt.Tok)
+			return p.typeSourceIsStruct(t, dt)
 		case *trait:
 			t.Used = true
 			return p.typeSourceIsTrait(t, dt.Tag, dt.Tok)

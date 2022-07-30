@@ -230,6 +230,7 @@ func (dt *DataType) StructString() string {
 	}
 	cxx.WriteByte('<')
 	for _, t := range types {
+		t.DontUseOriginal = dt.DontUseOriginal
 		cxx.WriteString(t.String())
 		cxx.WriteByte(',')
 	}
