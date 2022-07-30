@@ -44,8 +44,7 @@ func (pap *pureArgParser) buildArgs() {
 }
 
 func (pap *pureArgParser) pushVariadicArgs(pair *paramMapPair) {
-	model := sliceExpr{pair.param.Type, nil}
-	model.dataType.Kind = x.Prefix_Slice + model.dataType.Kind // For slice.
+	var model sliceExpr
 	variadiced := false
 	pap.p.parseArg(pap.f, pair, pap.args, &variadiced)
 	model.expr = append(model.expr, pair.arg.Expr.Model.(iExpr))
@@ -55,6 +54,12 @@ func (pap *pureArgParser) pushVariadicArgs(pair *paramMapPair) {
 		once = true
 		pap.p.parseArg(pap.f, pair, pap.args, &variadiced)
 		model.expr = append(model.expr, pair.arg.Expr.Model.(iExpr))
+	}
+	model.dataType = pair.param.Type
+	model.dataType.Kind = x.Prefix_Slice + model.dataType.Kind // For slice.
+	if pap.args.NeedsPureType {
+		model.dataType.DontUseOriginal = true
+		model.dataType.Original = nil
 	}
 	if !once {
 		return

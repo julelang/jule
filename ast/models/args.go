@@ -6,4 +6,5 @@ type Args struct {
 	Targeted                 bool
 	Generics                 []DataType
 	DynamicGenericAnnotation bool
+	NeedsPureType            bool
 }
