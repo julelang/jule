@@ -2005,7 +2005,7 @@ func itsCombined(f *Func, generics []DataType) bool {
 	return false
 }
 
-func (p *Parser) parseGenericFunc(f *Func, generics []DataType) {
+func (p *Parser) parseGenericFunc(f *Func, generics []DataType, errtok Tok) {
 	owner := f.Owner.(*Parser)
 	if owner == p {
 		rootBlock := p.rootBlock
@@ -2036,8 +2036,8 @@ func (p *Parser) parseGenericFunc(f *Func, generics []DataType) {
 	owner.nodeBlock = nil
 }
 
-func (p *Parser) parseGenerics(f *Func, generics []DataType, errTok Tok) bool {
-	if len(f.Generics) > 0 && len(generics) == 0 {
+func (p *Parser) parseGenerics(f *Func, args *models.Args, errTok Tok) bool {
+	if len(f.Generics) > 0 && len(args.Generics) == 0 {
 		for _, generic := range f.Generics {
 			ok := false
 			for _, param := range f.Params {
@@ -2050,15 +2050,15 @@ func (p *Parser) parseGenerics(f *Func, generics []DataType, errTok Tok) bool {
 				goto check
 			}
 		}
-		goto fine
+		args.DynamicGenericAnnotation = true
+		goto ok
 	}
 check:
-	if !p.checkGenericsQuantity(len(f.Generics), generics, errTok) {
+	if !p.checkGenericsQuantity(len(f.Generics), args.Generics, errTok) {
 		return false
 	}
-	p.pushGenerics(f.Generics, generics)
-fine:
-	//p.parseGenericFunc(f, generics)
+	p.pushGenerics(f.Generics, args.Generics)
+ok:
 	return true
 }
 
@@ -2082,7 +2082,7 @@ func (p *Parser) parseFuncCall(f *Func, args *models.Args, m *exprModel, errTok 
 			f.Params, f.RetType = params, retType
 			p.blockTypes = blockTypes
 		}()
-		if !p.parseGenerics(f, args.Generics, errTok) {
+		if !p.parseGenerics(f, args, errTok) {
 			return
 		}
 	} else {
@@ -2108,7 +2108,7 @@ func (p *Parser) parseFuncCall(f *Func, args *models.Args, m *exprModel, errTok 
 		args:     argsExpr{args.Src},
 	}
 	if len(args.Generics) > 0 {
-		p.parseGenericFunc(f, args.Generics)
+		p.parseGenericFunc(f, args.Generics, errTok)
 		f.RetType.Type.DontUseOriginal = true
 		f.RetType.Type.Original = nil
 		v.data.Type = f.RetType.Type
@@ -2274,12 +2274,14 @@ func (p *Parser) parseArg(f *Func, pair *paramMapPair, args *models.Args, variad
 	if variadiced != nil && !*variadiced {
 		*variadiced = value.variadic
 	}
-	if typeHasGenerics(f.Generics, pair.param.Type) {
+	if args.DynamicGenericAnnotation && typeHasGenerics(f.Generics, pair.param.Type) {
 		ok := p.pushGenericByArg(f, pair, args, value.data.Type)
 		if ok {
 			p.parseGenericType(f.Generics, &pair.param.Type)
-			return
+		} else {
+			p.pusherrtok(pair.arg.Tok, "dynamic_generic_annotation_failed")
 		}
+		return
 	}
 	p.wg.Add(1)
 	go p.checkArgType(pair.param, value, pair.arg.Tok)
