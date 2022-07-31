@@ -54,14 +54,14 @@ var CxxDefault = `
 // region X_BUILTIN_TYPES
 typedef std::size_t                       uint_xt;
 typedef std::make_signed<uint_xt>::type   int_xt;
-typedef std::int8_t                       i8_xt;
-typedef std::int16_t                      i16_xt;
-typedef std::int32_t                      i32_xt;
-typedef std::int64_t                      i64_xt;
-typedef std::uint8_t                      u8_xt;
-typedef std::uint16_t                     u16_xt;
-typedef std::uint32_t                     u32_xt;
-typedef std::uint64_t                     u64_xt;
+typedef signed char                       i8_xt;
+typedef signed short                      i16_xt;
+typedef signed long                       i32_xt;
+typedef signed long long                  i64_xt;
+typedef unsigned char                     u8_xt;
+typedef unsigned short                    u16_xt;
+typedef unsigned long                     u32_xt;
+typedef unsigned long long                u64_xt;
 typedef float                             f32_xt;
 typedef double                            f64_xt;
 typedef bool                              bool_xt;
