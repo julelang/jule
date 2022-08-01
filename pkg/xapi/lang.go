@@ -2,6 +2,9 @@ package xapi
 
 import "strings"
 
+// XXCHeader is the header path of "xxc.hpp"
+var XXCHeader = ""
+
 // CxxIgnore is the ignoring of cxx.
 const CxxIgnore = "std::ignore"
 

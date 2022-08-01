@@ -140,6 +140,8 @@ func init() {
 	execp = filepath.Dir(execp)
 	x.ExecPath = execp
 	x.StdlibPath = filepath.Join(x.ExecPath, x.Stdlib)
+	xapi.XXCHeader = filepath.Join(x.ExecPath, "api")
+	xapi.XXCHeader = filepath.Join(xapi.XXCHeader, "xxc.hpp")
 	x.LangsPath = filepath.Join(x.ExecPath, x.Localizations)
 
 	// Not started with arguments.
@@ -296,12 +298,10 @@ func appendStandard(code *string) {
 	sb.WriteByte('\n')
 	sb.WriteString("// Date: ")
 	sb.WriteString(timeStr)
-	sb.WriteString("\n\n")
-	sb.WriteString(xapi.CxxDefault)
-	sb.WriteString("\n\n// region TRANSPILED_X_CODE\n")
+	sb.WriteString("\n\n#include \"")
+	sb.WriteString(xapi.XXCHeader)
+	sb.WriteString("\"\n")
 	sb.WriteString(*code)
-	sb.WriteString("\n// endregion TRANSPILED_X_CODE\n\n")
-	sb.WriteString(xapi.CxxMain)
 	*code = sb.String()
 }
 
