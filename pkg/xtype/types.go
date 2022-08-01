@@ -270,8 +270,8 @@ func TypeFromId(id string) uint8 {
 	return 0
 }
 
-// CxxId returns cxx output identifier of data-type.
-func CxxId(t uint8) string {
+// CppId returns cpp output identifier of data-type.
+func CppId(t uint8) string {
 	if t == Void {
 		return "void"
 	}

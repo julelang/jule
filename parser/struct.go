@@ -30,23 +30,23 @@ func (s *xstruct) hasTrait(t *trait) bool {
 	return false
 }
 
-func (s *xstruct) cxxGenerics() (def string, serie string) {
+func (s *xstruct) cppGenerics() (def string, serie string) {
 	if len(s.Ast.Generics) == 0 {
 		return "", ""
 	}
-	var cxxDef strings.Builder
-	cxxDef.WriteString("template<typename ")
-	var cxxSerie strings.Builder
-	cxxSerie.WriteByte('<')
+	var cppDef strings.Builder
+	cppDef.WriteString("template<typename ")
+	var cppSerie strings.Builder
+	cppSerie.WriteByte('<')
 	for i := range s.Ast.Generics {
-		cxxSerie.WriteByte('T')
-		cxxSerie.WriteString(strconv.Itoa(i))
-		cxxSerie.WriteByte(',')
+		cppSerie.WriteByte('T')
+		cppSerie.WriteString(strconv.Itoa(i))
+		cppSerie.WriteByte(',')
 	}
-	serie = cxxSerie.String()[:cxxSerie.Len()-1] + ">"
-	cxxDef.WriteString(serie[1:])
-	cxxDef.WriteByte('\n')
-	return cxxDef.String(), serie
+	serie = cppSerie.String()[:cppSerie.Len()-1] + ">"
+	cppDef.WriteString(serie[1:])
+	cppDef.WriteByte('\n')
+	return cppDef.String(), serie
 }
 
 // OutId returns xapi.OutId of struct.
@@ -59,20 +59,20 @@ func (s *xstruct) OutId() string {
 
 func (s *xstruct) operators() string {
 	outid := s.OutId()
-	genericsDef, genericsSerie := s.cxxGenerics()
-	var cxx strings.Builder
-	cxx.WriteString(models.IndentString())
-	if l, _ := cxx.WriteString(genericsDef); l > 0 {
-		cxx.WriteString(models.IndentString())
+	genericsDef, genericsSerie := s.cppGenerics()
+	var cpp strings.Builder
+	cpp.WriteString(models.IndentString())
+	if l, _ := cpp.WriteString(genericsDef); l > 0 {
+		cpp.WriteString(models.IndentString())
 	}
-	cxx.WriteString("inline bool operator==(const ")
-	cxx.WriteString(outid)
-	cxx.WriteString(genericsSerie)
-	cxx.WriteString(" &_Src) {")
+	cpp.WriteString("inline bool operator==(const ")
+	cpp.WriteString(outid)
+	cpp.WriteString(genericsSerie)
+	cpp.WriteString(" &_Src) {")
 	if len(s.Defs.Globals) > 0 {
 		models.AddIndent()
-		cxx.WriteByte('\n')
-		cxx.WriteString(models.IndentString())
+		cpp.WriteByte('\n')
+		cpp.WriteString(models.IndentString())
 		var expr strings.Builder
 		expr.WriteString("return ")
 		models.AddIndent()
@@ -87,153 +87,153 @@ func (s *xstruct) operators() string {
 			expr.WriteString(" &&")
 		}
 		models.DoneIndent()
-		cxx.WriteString(expr.String()[:expr.Len()-3])
-		cxx.WriteString(";\n")
+		cpp.WriteString(expr.String()[:expr.Len()-3])
+		cpp.WriteString(";\n")
 		models.DoneIndent()
-		cxx.WriteString(models.IndentString())
-		cxx.WriteByte('}')
+		cpp.WriteString(models.IndentString())
+		cpp.WriteByte('}')
 	} else {
-		cxx.WriteString(" return true; }")
+		cpp.WriteString(" return true; }")
 	}
-	cxx.WriteString("\n\n")
-	cxx.WriteString(models.IndentString())
-	if l, _ := cxx.WriteString(genericsDef); l > 0 {
-		cxx.WriteString(models.IndentString())
+	cpp.WriteString("\n\n")
+	cpp.WriteString(models.IndentString())
+	if l, _ := cpp.WriteString(genericsDef); l > 0 {
+		cpp.WriteString(models.IndentString())
 	}
-	cxx.WriteString("inline bool operator!=(const ")
-	cxx.WriteString(outid)
-	cxx.WriteString(genericsSerie)
-	cxx.WriteString(" &_Src) { return !this->operator==(_Src); }")
-	return cxx.String()
+	cpp.WriteString("inline bool operator!=(const ")
+	cpp.WriteString(outid)
+	cpp.WriteString(genericsSerie)
+	cpp.WriteString(" &_Src) { return !this->operator==(_Src); }")
+	return cpp.String()
 }
 
-func (s *xstruct) cxxConstructor() string {
-	var cxx strings.Builder
-	cxx.WriteString(models.IndentString())
-	cxx.WriteString(s.OutId())
-	cxx.WriteString(paramsToCxx(s.constructor.Params))
-	cxx.WriteString(" noexcept {")
+func (s *xstruct) cppConstructor() string {
+	var cpp strings.Builder
+	cpp.WriteString(models.IndentString())
+	cpp.WriteString(s.OutId())
+	cpp.WriteString(paramsToCpp(s.constructor.Params))
+	cpp.WriteString(" noexcept {")
 	if len(s.Defs.Globals) > 0 {
 		models.AddIndent()
 		for i, g := range s.Defs.Globals {
-			cxx.WriteByte('\n')
-			cxx.WriteString(models.IndentString())
-			cxx.WriteString(g.OutId())
-			cxx.WriteString(" = ")
-			cxx.WriteString(s.constructor.Params[i].OutId())
-			cxx.WriteByte(';')
+			cpp.WriteByte('\n')
+			cpp.WriteString(models.IndentString())
+			cpp.WriteString(g.OutId())
+			cpp.WriteString(" = ")
+			cpp.WriteString(s.constructor.Params[i].OutId())
+			cpp.WriteByte(';')
 		}
 		models.DoneIndent()
-		cxx.WriteByte('\n')
+		cpp.WriteByte('\n')
 	}
-	cxx.WriteString(models.IndentString())
-	cxx.WriteByte('}')
-	return cxx.String()
+	cpp.WriteString(models.IndentString())
+	cpp.WriteByte('}')
+	return cpp.String()
 }
 
-func (s *xstruct) cxxTraits() string {
+func (s *xstruct) cppTraits() string {
 	if len(s.traits) == 0 {
 		return ""
 	}
-	var cxx strings.Builder
-	cxx.WriteString(": ")
+	var cpp strings.Builder
+	cpp.WriteString(": ")
 	for _, t := range s.traits {
-		cxx.WriteString("public ")
-		cxx.WriteString(t.OutId())
-		cxx.WriteByte(',')
+		cpp.WriteString("public ")
+		cpp.WriteString(t.OutId())
+		cpp.WriteByte(',')
 	}
-	return cxx.String()[:cxx.Len()-1]
+	return cpp.String()[:cpp.Len()-1]
 }
 
 func (s *xstruct) prototype() string {
-	var cxx strings.Builder
-	cxx.WriteString(genericsToCxx(s.Ast.Generics))
-	cxx.WriteString(" struct ")
-	cxx.WriteString(s.OutId())
-	cxx.WriteByte(';')
-	return cxx.String()
+	var cpp strings.Builder
+	cpp.WriteString(genericsToCpp(s.Ast.Generics))
+	cpp.WriteString(" struct ")
+	cpp.WriteString(s.OutId())
+	cpp.WriteByte(';')
+	return cpp.String()
 }
 
 func (s *xstruct) decldefString() string {
-	var cxx strings.Builder
-	cxx.WriteString(genericsToCxx(s.Ast.Generics))
-	cxx.WriteByte('\n')
-	cxx.WriteString("struct ")
-	cxx.WriteString(s.OutId())
-	cxx.WriteString(s.cxxTraits())
-	cxx.WriteString(" {\n")
+	var cpp strings.Builder
+	cpp.WriteString(genericsToCpp(s.Ast.Generics))
+	cpp.WriteByte('\n')
+	cpp.WriteString("struct ")
+	cpp.WriteString(s.OutId())
+	cpp.WriteString(s.cppTraits())
+	cpp.WriteString(" {\n")
 	models.AddIndent()
 	if len(s.Defs.Globals) > 0 {
 		for _, g := range s.Defs.Globals {
-			cxx.WriteString(models.IndentString())
-			cxx.WriteString(g.FieldString())
-			cxx.WriteByte('\n')
+			cpp.WriteString(models.IndentString())
+			cpp.WriteString(g.FieldString())
+			cpp.WriteByte('\n')
 		}
-		cxx.WriteString("\n\n")
-		cxx.WriteString(s.cxxConstructor())
-		cxx.WriteString("\n\n")
+		cpp.WriteString("\n\n")
+		cpp.WriteString(s.cppConstructor())
+		cpp.WriteString("\n\n")
 	}
-	cxx.WriteString(models.IndentString())
-	cxx.WriteString(s.OutId())
-	cxx.WriteString("(void) noexcept {}\n\n")
+	cpp.WriteString(models.IndentString())
+	cpp.WriteString(s.OutId())
+	cpp.WriteString("(void) noexcept {}\n\n")
 	for _, f := range s.Defs.Funcs {
 		if f.used {
-			cxx.WriteString(models.IndentString())
-			cxx.WriteString(f.String())
-			cxx.WriteString("\n\n")
+			cpp.WriteString(models.IndentString())
+			cpp.WriteString(f.String())
+			cpp.WriteString("\n\n")
 		}
 	}
-	cxx.WriteString(s.operators())
-	cxx.WriteByte('\n')
+	cpp.WriteString(s.operators())
+	cpp.WriteByte('\n')
 	models.DoneIndent()
-	cxx.WriteString(models.IndentString())
-	cxx.WriteString("};")
-	return cxx.String()
+	cpp.WriteString(models.IndentString())
+	cpp.WriteString("};")
+	return cpp.String()
 }
 
 func (s *xstruct) ostream() string {
-	var cxx strings.Builder
-	genericsDef, genericsSerie := s.cxxGenerics()
-	cxx.WriteString(models.IndentString())
-	if l, _ := cxx.WriteString(genericsDef); l > 0 {
-		cxx.WriteString(models.IndentString())
+	var cpp strings.Builder
+	genericsDef, genericsSerie := s.cppGenerics()
+	cpp.WriteString(models.IndentString())
+	if l, _ := cpp.WriteString(genericsDef); l > 0 {
+		cpp.WriteString(models.IndentString())
 	}
-	cxx.WriteString("std::ostream &operator<<(std::ostream &_Stream, const ")
-	cxx.WriteString(s.OutId())
-	cxx.WriteString(genericsSerie)
-	cxx.WriteString(" &_Src) {\n")
+	cpp.WriteString("std::ostream &operator<<(std::ostream &_Stream, const ")
+	cpp.WriteString(s.OutId())
+	cpp.WriteString(genericsSerie)
+	cpp.WriteString(" &_Src) {\n")
 	models.AddIndent()
-	cxx.WriteString(models.IndentString())
-	cxx.WriteString(`_Stream << "`)
-	cxx.WriteString(s.Ast.Id)
-	cxx.WriteString("{\";\n")
+	cpp.WriteString(models.IndentString())
+	cpp.WriteString(`_Stream << "`)
+	cpp.WriteString(s.Ast.Id)
+	cpp.WriteString("{\";\n")
 	for i, field := range s.Ast.Fields {
-		cxx.WriteString(models.IndentString())
-		cxx.WriteString(`_Stream << "`)
-		cxx.WriteString(field.Id)
-		cxx.WriteString(`:" << _Src.`)
-		cxx.WriteString(field.OutId())
+		cpp.WriteString(models.IndentString())
+		cpp.WriteString(`_Stream << "`)
+		cpp.WriteString(field.Id)
+		cpp.WriteString(`:" << _Src.`)
+		cpp.WriteString(field.OutId())
 		if i+1 < len(s.Ast.Fields) {
-			cxx.WriteString(" << \", \"")
+			cpp.WriteString(" << \", \"")
 		}
-		cxx.WriteString(";\n")
+		cpp.WriteString(";\n")
 	}
-	cxx.WriteString(models.IndentString())
-	cxx.WriteString("_Stream << \"}\";\n")
-	cxx.WriteString(models.IndentString())
-	cxx.WriteString("return _Stream;\n")
+	cpp.WriteString(models.IndentString())
+	cpp.WriteString("_Stream << \"}\";\n")
+	cpp.WriteString(models.IndentString())
+	cpp.WriteString("return _Stream;\n")
 	models.DoneIndent()
-	cxx.WriteString(models.IndentString())
-	cxx.WriteString("}")
-	return cxx.String()
+	cpp.WriteString(models.IndentString())
+	cpp.WriteString("}")
+	return cpp.String()
 }
 
 func (s xstruct) String() string {
-	var cxx strings.Builder
-	cxx.WriteString(s.decldefString())
-	cxx.WriteString("\n\n")
-	cxx.WriteString(s.ostream())
-	return cxx.String()
+	var cpp strings.Builder
+	cpp.WriteString(s.decldefString())
+	cpp.WriteString("\n\n")
+	cpp.WriteString(s.ostream())
+	return cpp.String()
 }
 
 // Generics returns generics of type.
@@ -259,9 +259,9 @@ func (s *xstruct) selfVar(receiver DataType) *Var {
 	v.Type.Id = xtype.Struct
 	v.Id = tokens.SELF
 	if typeIsPtr(receiver) {
-		v.Expr.Model = exprNode{xapi.CxxSelf}
+		v.Expr.Model = exprNode{xapi.CppSelf}
 	} else {
-		v.Expr.Model = exprNode{tokens.STAR + xapi.CxxSelf}
+		v.Expr.Model = exprNode{tokens.STAR + xapi.CppSelf}
 	}
 	return v
 }

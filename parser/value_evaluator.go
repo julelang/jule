@@ -43,16 +43,16 @@ func getModel(v value) iExpr {
 }
 
 func numericModel(v value) iExpr {
-	cxxId := xtype.CxxId(v.data.Type.Id)
+	cppId := xtype.CppId(v.data.Type.Id)
 	switch t := v.expr.(type) {
 	case uint64:
-		return exprNode{cxxId + "{" + strconv.FormatUint(t, 10) + "}"}
+		return exprNode{cppId + "{" + strconv.FormatUint(t, 10) + "}"}
 	case int64:
-		return exprNode{cxxId + "{" + strconv.FormatInt(t, 10) + "}"}
+		return exprNode{cppId + "{" + strconv.FormatInt(t, 10) + "}"}
 	case float64:
 		var bigf big.Float
 		_ = bigf.SetFloat64(t)
-		return exprNode{cxxId + "{" + bigf.String() + "}"}
+		return exprNode{cppId + "{" + bigf.String() + "}"}
 	}
 	return nil
 }
@@ -180,7 +180,7 @@ func (ve *valueEvaluator) varId(id string, variable *Var) (v value) {
 	v.data.Tok = variable.IdTok
 	v.lvalue = true
 	if id == tokens.SELF && typeIsPtr(variable.Type) {
-		ve.model.appendSubNode(exprNode{xapi.CxxSelf})
+		ve.model.appendSubNode(exprNode{xapi.CppSelf})
 	} else if v.constExpr {
 		v.expr = variable.ExprTag
 		v.model = variable.Expr.Model

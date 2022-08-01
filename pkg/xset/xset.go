@@ -8,8 +8,8 @@ const (
 )
 
 type XSet struct {
-	CxxOutDir    string   `json:"cxx_out_dir"`
-	CxxOutName   string   `json:"cxx_out_name"`
+	CppOutDir    string   `json:"cpp_out_dir"`
+	CppOutName   string   `json:"cpp_out_name"`
 	OutName      string   `json:"out_name"`
 	Language     string   `json:"language"`
 	Mode         string   `json:"mode"`
@@ -20,8 +20,8 @@ type XSet struct {
 
 // Default XSet instance.
 var Default = &XSet{
-	CxxOutDir:    "./dist",
-	CxxOutName:   "x.cxx",
+	CppOutDir:    "./dist",
+	CppOutName:   "x.cpp",
 	OutName:      "main",
 	Language:     "",
 	Mode:         "transpile",

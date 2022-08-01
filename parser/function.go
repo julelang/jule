@@ -44,9 +44,9 @@ func (f *function) getTracePointStatements() []models.Statement {
 }
 
 func (f function) String() string {
-	var cxx strings.Builder
-	cxx.WriteString(f.Head())
-	cxx.WriteByte(' ')
+	var cpp strings.Builder
+	cpp.WriteString(f.Head())
+	cpp.WriteByte(' ')
 	block := f.Ast.Block
 	vars := f.Ast.RetType.Vars()
 	if vars != nil {
@@ -64,53 +64,53 @@ func (f function) String() string {
 		block.Tree = append(statements, block.Tree...)
 	}
 	block.Tree = append(f.getTracePointStatements(), block.Tree...)
-	cxx.WriteString(block.String())
-	return cxx.String()
+	cpp.WriteString(block.String())
+	return cpp.String()
 }
 
 // Head returns declaration head of function.
 func (f *function) Head() string {
-	var cxx strings.Builder
-	cxx.WriteString(f.declHead())
-	cxx.WriteString(paramsToCxx(f.Ast.Params))
-	return cxx.String()
+	var cpp strings.Builder
+	cpp.WriteString(f.declHead())
+	cpp.WriteString(paramsToCpp(f.Ast.Params))
+	return cpp.String()
 }
 
 func (f *function) declHead() string {
-	var cxx strings.Builder
-	cxx.WriteString(genericsToCxx(f.Ast.Generics))
-	if cxx.Len() > 0 {
-		cxx.WriteByte('\n')
-		cxx.WriteString(models.IndentString())
+	var cpp strings.Builder
+	cpp.WriteString(genericsToCpp(f.Ast.Generics))
+	if cpp.Len() > 0 {
+		cpp.WriteByte('\n')
+		cpp.WriteString(models.IndentString())
 	}
-	cxx.WriteString(attributesToString(f.Ast.Attributes))
-	cxx.WriteString(f.Ast.RetType.String())
-	cxx.WriteByte(' ')
-	cxx.WriteString(f.outId())
-	return cxx.String()
+	cpp.WriteString(attributesToString(f.Ast.Attributes))
+	cpp.WriteString(f.Ast.RetType.String())
+	cpp.WriteByte(' ')
+	cpp.WriteString(f.outId())
+	return cpp.String()
 }
 
-// Prototype returns prototype cxx code of function.
+// Prototype returns prototype cpp code of function.
 func (f *function) Prototype() string {
-	var cxx strings.Builder
-	cxx.WriteString(f.declHead())
-	cxx.WriteString(f.PrototypeParams())
-	cxx.WriteByte(';')
-	return cxx.String()
+	var cpp strings.Builder
+	cpp.WriteString(f.declHead())
+	cpp.WriteString(f.PrototypeParams())
+	cpp.WriteByte(';')
+	return cpp.String()
 }
 
-// PrototypeParams returns prototype cxx code of function parameters.
+// PrototypeParams returns prototype cpp code of function parameters.
 func (f *function) PrototypeParams() string {
 	if len(f.Ast.Params) == 0 {
 		return "(void)"
 	}
-	var cxx strings.Builder
-	cxx.WriteByte('(')
+	var cpp strings.Builder
+	cpp.WriteByte('(')
 	for _, p := range f.Ast.Params {
-		cxx.WriteString(p.Prototype())
-		cxx.WriteByte(',')
+		cpp.WriteString(p.Prototype())
+		cpp.WriteByte(',')
 	}
-	return cxx.String()[:cxx.Len()-1] + ")"
+	return cpp.String()[:cpp.Len()-1] + ")"
 }
 
 func isOutableAttribute(kind string) bool {
@@ -118,25 +118,25 @@ func isOutableAttribute(kind string) bool {
 }
 
 func attributesToString(attributes []models.Attribute) string {
-	var cxx strings.Builder
+	var cpp strings.Builder
 	for _, attr := range attributes {
 		if isOutableAttribute(attr.Tag.Kind) {
-			cxx.WriteString(attr.String())
-			cxx.WriteByte(' ')
+			cpp.WriteString(attr.String())
+			cpp.WriteByte(' ')
 		}
 	}
-	return cxx.String()
+	return cpp.String()
 }
 
-func paramsToCxx(params []Param) string {
+func paramsToCpp(params []Param) string {
 	if len(params) == 0 {
 		return "(void)"
 	}
-	var cxx strings.Builder
-	cxx.WriteByte('(')
+	var cpp strings.Builder
+	cpp.WriteByte('(')
 	for _, p := range params {
-		cxx.WriteString(p.String())
-		cxx.WriteByte(',')
+		cpp.WriteString(p.String())
+		cpp.WriteByte(',')
 	}
-	return cxx.String()[:cxx.Len()-1] + ")"
+	return cpp.String()[:cpp.Len()-1] + ")"
 }

@@ -6,27 +6,27 @@ import (
 	"unicode/utf8"
 )
 
-// ToStr returns specified literal as X string literal for cxx.
+// ToStr returns specified literal as X string literal for cpp.
 func ToStr(bytes []byte) string {
-	var cxx strings.Builder
-	cxx.WriteString("str_xt{")
+	var cpp strings.Builder
+	cpp.WriteString("str_xt{")
 	btoa := bytesToStr(bytes)
 	if btoa != "" {
-		cxx.WriteByte('{')
-		cxx.WriteString(btoa)
-		cxx.WriteByte('}')
+		cpp.WriteByte('{')
+		cpp.WriteString(btoa)
+		cpp.WriteByte('}')
 	}
-	cxx.WriteString("}")
-	return cxx.String()
+	cpp.WriteString("}")
+	return cpp.String()
 }
 
-// ToRawStr returns specified literal as X raw-string literal for cxx.
+// ToRawStr returns specified literal as X raw-string literal for cpp.
 func ToRawStr(bytes []byte) string { return ToStr(bytes) }
 
-// ToChar returns specified literal as X rune literal for cxx.
+// ToChar returns specified literal as X rune literal for cpp.
 func ToChar(b byte) string { return btoa(b) }
 
-// ToRune returns specified literal as X rune literal for cxx.
+// ToRune returns specified literal as X rune literal for cpp.
 func ToRune(bytes []byte) string {
 	if len(bytes) == 0 {
 		return ""

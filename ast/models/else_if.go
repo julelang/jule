@@ -10,10 +10,10 @@ type ElseIf struct {
 }
 
 func (elif ElseIf) String() string {
-	var cxx strings.Builder
-	cxx.WriteString("else if (")
-	cxx.WriteString(elif.Expr.String())
-	cxx.WriteString(") ")
-	cxx.WriteString(elif.Block.String())
-	return cxx.String()
+	var cpp strings.Builder
+	cpp.WriteString("else if (")
+	cpp.WriteString(elif.Expr.String())
+	cpp.WriteString(") ")
+	cpp.WriteString(elif.Block.String())
+	return cpp.String()
 }

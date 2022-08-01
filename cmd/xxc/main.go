@@ -110,7 +110,7 @@ func doc(cmd string) {
 		}
 		// Remove SrcExt from path
 		path = path[:len(path)-len(x.SrcExt)]
-		path = filepath.Join(x.Set.CxxOutDir, path+x.DocExt)
+		path = filepath.Join(x.Set.CppOutDir, path+x.DocExt)
 		writeOutput(path, docjson)
 	}
 }
@@ -374,8 +374,8 @@ func main() {
 	if printlogs(p) {
 		os.Exit(0)
 	}
-	cxx := p.Cxx()
+	cxx := p.Cpp()
 	appendStandard(&cxx)
-	path := filepath.Join(x.Set.CxxOutDir, x.Set.CxxOutName)
+	path := filepath.Join(x.Set.CppOutDir, x.Set.CppOutName)
 	doSpell(path, cxx)
 }

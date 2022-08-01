@@ -6,8 +6,8 @@ import "strings"
 type Comment struct{ Content string }
 
 func (c Comment) String() string {
-	var cxx strings.Builder
-	cxx.WriteString("// ")
-	cxx.WriteString(c.Content)
-	return cxx.String()
+	var cpp strings.Builder
+	cpp.WriteString("// ")
+	cpp.WriteString(c.Content)
+	return cpp.String()
 }

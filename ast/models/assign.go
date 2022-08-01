@@ -20,7 +20,7 @@ func (as AssignLeft) String() string {
 		tok := as.Expr.Toks[0]
 		return xapi.OutId(tok.Kind, tok.File)
 	case as.Ignore:
-		return xapi.CxxIgnore
+		return xapi.CppIgnore
 	}
 	return as.Expr.String()
 }
@@ -34,21 +34,21 @@ type Assign struct {
 	MultipleRet bool
 }
 
-func (a *Assign) cxxSingleAssign() string {
+func (a *Assign) cppSingleAssign() string {
 	expr := a.Left[0]
 	if expr.Var.New {
 		expr.Var.Expr = a.Right[0]
 		s := expr.Var.String()
 		return s[:len(s)-1] // Remove statement terminator
 	}
-	var cxx strings.Builder
+	var cpp strings.Builder
 	if len(expr.Expr.Toks) != 1 ||
 		!xapi.IsIgnoreId(expr.Expr.Toks[0].Kind) {
-		cxx.WriteString(expr.String())
-		cxx.WriteString(a.Setter.Kind)
+		cpp.WriteString(expr.String())
+		cpp.WriteString(a.Setter.Kind)
 	}
-	cxx.WriteString(a.Right[0].String())
-	return cxx.String()
+	cpp.WriteString(a.Right[0].String())
+	return cpp.String()
 }
 
 func (a *Assign) hasLeft() bool {
@@ -60,87 +60,87 @@ func (a *Assign) hasLeft() bool {
 	return false
 }
 
-func (a *Assign) cxxMultipleAssign() string {
-	var cxx strings.Builder
+func (a *Assign) cppMultipleAssign() string {
+	var cpp strings.Builder
 	if !a.hasLeft() {
 		for _, right := range a.Right {
-			cxx.WriteString(right.String())
-			cxx.WriteByte(';')
+			cpp.WriteString(right.String())
+			cpp.WriteByte(';')
 		}
-		return cxx.String()[:cxx.Len()-1] // Remove last semicolon
+		return cpp.String()[:cpp.Len()-1] // Remove last semicolon
 	}
-	cxx.WriteString(a.cxxNewDefines())
-	cxx.WriteString("std::tie(")
-	var expCxx strings.Builder
-	expCxx.WriteString("std::make_tuple(")
+	cpp.WriteString(a.cppNewDefines())
+	cpp.WriteString("std::tie(")
+	var exprCpp strings.Builder
+	exprCpp.WriteString("std::make_tuple(")
 	for i, left := range a.Left {
-		cxx.WriteString(left.String())
-		cxx.WriteByte(',')
-		expCxx.WriteString(a.Right[i].String())
-		expCxx.WriteByte(',')
+		cpp.WriteString(left.String())
+		cpp.WriteByte(',')
+		exprCpp.WriteString(a.Right[i].String())
+		exprCpp.WriteByte(',')
 	}
-	str := cxx.String()[:cxx.Len()-1] + ")"
-	cxx.Reset()
-	cxx.WriteString(str)
-	cxx.WriteString(a.Setter.Kind)
-	cxx.WriteString(expCxx.String()[:expCxx.Len()-1] + ")")
-	return cxx.String()
+	str := cpp.String()[:cpp.Len()-1] + ")"
+	cpp.Reset()
+	cpp.WriteString(str)
+	cpp.WriteString(a.Setter.Kind)
+	cpp.WriteString(exprCpp.String()[:exprCpp.Len()-1] + ")")
+	return cpp.String()
 }
 
-func (a *Assign) cxxMultiRet() string {
-	var cxx strings.Builder
-	cxx.WriteString(a.cxxNewDefines())
-	cxx.WriteString("std::tie(")
+func (a *Assign) cppMultiRet() string {
+	var cpp strings.Builder
+	cpp.WriteString(a.cppNewDefines())
+	cpp.WriteString("std::tie(")
 	for _, left := range a.Left {
 		if left.Ignore {
-			cxx.WriteString(xapi.CxxIgnore)
-			cxx.WriteByte(',')
+			cpp.WriteString(xapi.CppIgnore)
+			cpp.WriteByte(',')
 			continue
 		}
-		cxx.WriteString(left.String())
-		cxx.WriteByte(',')
+		cpp.WriteString(left.String())
+		cpp.WriteByte(',')
 	}
-	str := cxx.String()[:cxx.Len()-1]
-	cxx.Reset()
-	cxx.WriteString(str)
-	cxx.WriteByte(')')
-	cxx.WriteString(a.Setter.Kind)
-	cxx.WriteString(a.Right[0].String())
-	return cxx.String()
+	str := cpp.String()[:cpp.Len()-1]
+	cpp.Reset()
+	cpp.WriteString(str)
+	cpp.WriteByte(')')
+	cpp.WriteString(a.Setter.Kind)
+	cpp.WriteString(a.Right[0].String())
+	return cpp.String()
 }
 
-func (a *Assign) cxxNewDefines() string {
-	var cxx strings.Builder
+func (a *Assign) cppNewDefines() string {
+	var cpp strings.Builder
 	for _, left := range a.Left {
 		if left.Ignore || !left.Var.New {
 			continue
 		}
-		cxx.WriteString(left.Var.String() + " ")
+		cpp.WriteString(left.Var.String() + " ")
 	}
-	return cxx.String()
+	return cpp.String()
 }
 
-func (a *Assign) cxxSuffix() string {
-	var cxx strings.Builder
-	cxx.WriteString(a.Left[0].Expr.String())
-	cxx.WriteString(a.Setter.Kind)
-	return cxx.String()
+func (a *Assign) cppSuffix() string {
+	var cpp strings.Builder
+	cpp.WriteString(a.Left[0].Expr.String())
+	cpp.WriteString(a.Setter.Kind)
+	return cpp.String()
 }
 
 func (a Assign) String() string {
-	var cxx strings.Builder
+	var cpp strings.Builder
 	switch {
 	case len(a.Right) == 0:
-		cxx.WriteString(a.cxxSuffix())
+		cpp.WriteString(a.cppSuffix())
 	case a.MultipleRet:
-		cxx.WriteString(a.cxxMultiRet())
+		cpp.WriteString(a.cppMultiRet())
 	case len(a.Left) == 1:
-		cxx.WriteString(a.cxxSingleAssign())
+		cpp.WriteString(a.cppSingleAssign())
 	default:
-		cxx.WriteString(a.cxxMultipleAssign())
+		cpp.WriteString(a.cppMultipleAssign())
 	}
 	if !a.IsExpr {
-		cxx.WriteByte(';')
+		cpp.WriteByte(';')
 	}
-	return cxx.String()
+	return cpp.String()
 }

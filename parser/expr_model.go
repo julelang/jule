@@ -60,16 +60,16 @@ type anonFuncExpr struct {
 }
 
 func (af anonFuncExpr) String() string {
-	var cxx strings.Builder
-	cxx.WriteByte('[')
-	cxx.WriteByte(af.capture)
-	cxx.WriteByte(']')
-	cxx.WriteString(paramsToCxx(af.ast.Params))
-	cxx.WriteString(" mutable -> ")
-	cxx.WriteString(af.ast.RetType.String())
-	cxx.WriteByte(' ')
-	cxx.WriteString(af.ast.Block.String())
-	return cxx.String()
+	var cpp strings.Builder
+	cpp.WriteByte('[')
+	cpp.WriteByte(af.capture)
+	cpp.WriteByte(']')
+	cpp.WriteString(paramsToCpp(af.ast.Params))
+	cpp.WriteString(" mutable -> ")
+	cpp.WriteString(af.ast.RetType.String())
+	cpp.WriteByte(' ')
+	cpp.WriteString(af.ast.Block.String())
+	return cpp.String()
 }
 
 type sliceExpr struct {
@@ -78,18 +78,18 @@ type sliceExpr struct {
 }
 
 func (a sliceExpr) String() string {
-	var cxx strings.Builder
-	cxx.WriteString(a.dataType.String())
-	cxx.WriteString("({")
+	var cpp strings.Builder
+	cpp.WriteString(a.dataType.String())
+	cpp.WriteString("({")
 	if len(a.expr) == 0 {
-		cxx.WriteString("})")
-		return cxx.String()
+		cpp.WriteString("})")
+		return cpp.String()
 	}
 	for _, exp := range a.expr {
-		cxx.WriteString(exp.String())
-		cxx.WriteByte(',')
+		cpp.WriteString(exp.String())
+		cpp.WriteByte(',')
 	}
-	return cxx.String()[:cxx.Len()-1] + "})"
+	return cpp.String()[:cpp.Len()-1] + "})"
 }
 
 type mapExpr struct {
@@ -99,19 +99,19 @@ type mapExpr struct {
 }
 
 func (m mapExpr) String() string {
-	var cxx strings.Builder
-	cxx.WriteString(m.dataType.String())
-	cxx.WriteByte('{')
+	var cpp strings.Builder
+	cpp.WriteString(m.dataType.String())
+	cpp.WriteByte('{')
 	for i, k := range m.keyExprs {
 		v := m.valExprs[i]
-		cxx.WriteByte('{')
-		cxx.WriteString(k.String())
-		cxx.WriteByte(',')
-		cxx.WriteString(v.String())
-		cxx.WriteString("},")
+		cpp.WriteByte('{')
+		cpp.WriteString(k.String())
+		cpp.WriteByte(',')
+		cpp.WriteString(v.String())
+		cpp.WriteString("},")
 	}
-	cxx.WriteByte('}')
-	return cxx.String()
+	cpp.WriteByte('}')
+	return cpp.String()
 }
 
 type genericsExpr struct {
@@ -122,13 +122,13 @@ func (ge genericsExpr) String() string {
 	if len(ge.types) == 0 {
 		return ""
 	}
-	var cxx strings.Builder
-	cxx.WriteByte('<')
+	var cpp strings.Builder
+	cpp.WriteByte('<')
 	for _, generic := range ge.types {
-		cxx.WriteString(generic.String())
-		cxx.WriteByte(',')
+		cpp.WriteString(generic.String())
+		cpp.WriteByte(',')
 	}
-	return cxx.String()[:cxx.Len()-1] + ">"
+	return cpp.String()[:cpp.Len()-1] + ">"
 }
 
 type argsExpr struct {
@@ -139,12 +139,12 @@ func (a argsExpr) String() string {
 	if len(a.args) == 0 {
 		return ""
 	}
-	var cxx strings.Builder
+	var cpp strings.Builder
 	for _, arg := range a.args {
-		cxx.WriteString(arg.String())
-		cxx.WriteByte(',')
+		cpp.WriteString(arg.String())
+		cpp.WriteByte(',')
 	}
-	return cxx.String()[:cxx.Len()-1]
+	return cpp.String()[:cpp.Len()-1]
 }
 
 type callExpr struct {
@@ -153,12 +153,12 @@ type callExpr struct {
 }
 
 func (ce callExpr) String() string {
-	var cxx strings.Builder
-	cxx.WriteString(ce.generics.String())
-	cxx.WriteByte('(')
-	cxx.WriteString(ce.args.String())
-	cxx.WriteByte(')')
-	return cxx.String()
+	var cpp strings.Builder
+	cpp.WriteString(ce.generics.String())
+	cpp.WriteByte('(')
+	cpp.WriteString(ce.args.String())
+	cpp.WriteByte(')')
+	return cpp.String()
 }
 
 type multiRetExpr struct {
@@ -166,13 +166,13 @@ type multiRetExpr struct {
 }
 
 func (mre multiRetExpr) String() string {
-	var cxx strings.Builder
-	cxx.WriteString("std::make_tuple(")
+	var cpp strings.Builder
+	cpp.WriteString("std::make_tuple(")
 	for _, model := range mre.models {
-		cxx.WriteString(model.String())
-		cxx.WriteByte(',')
+		cpp.WriteString(model.String())
+		cpp.WriteByte(',')
 	}
-	return cxx.String()[:cxx.Len()-1] + ")"
+	return cpp.String()[:cpp.Len()-1] + ")"
 }
 
 type serieExpr struct {

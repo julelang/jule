@@ -31,22 +31,22 @@ func (t *trait) OutId() string {
 }
 
 func (t *trait) String() string {
-	var cxx strings.Builder
-	cxx.WriteString("struct ")
-	cxx.WriteString(t.OutId())
-	cxx.WriteString(" {\n")
+	var cpp strings.Builder
+	cpp.WriteString("struct ")
+	cpp.WriteString(t.OutId())
+	cpp.WriteString(" {\n")
 	models.AddIndent()
 	is := models.IndentString()
 	for _, f := range t.Ast.Funcs {
-		cxx.WriteString(is)
-		cxx.WriteString("virtual ")
-		cxx.WriteString(f.RetType.String())
-		cxx.WriteByte(' ')
-		cxx.WriteString(f.Id)
-		cxx.WriteString(paramsToCxx(f.Params))
-		cxx.WriteString(" = 0;\n")
+		cpp.WriteString(is)
+		cpp.WriteString("virtual ")
+		cpp.WriteString(f.RetType.String())
+		cpp.WriteByte(' ')
+		cpp.WriteString(f.Id)
+		cpp.WriteString(paramsToCpp(f.Params))
+		cpp.WriteString(" = 0;\n")
 	}
 	models.DoneIndent()
-	cxx.WriteString("};")
-	return cxx.String()
+	cpp.WriteString("};")
+	return cpp.String()
 }

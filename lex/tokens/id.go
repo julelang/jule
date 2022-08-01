@@ -38,4 +38,5 @@ const (
 	Self         uint8 = 33
 	Trait        uint8 = 34
 	Impl         uint8 = 35
+	Cpp          uint8 = 36
 )

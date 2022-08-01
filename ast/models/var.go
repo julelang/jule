@@ -32,31 +32,31 @@ func (v Var) String() string {
 	if v.Const {
 		return ""
 	}
-	var cxx strings.Builder
-	cxx.WriteString(v.Type.String())
-	cxx.WriteByte(' ')
-	cxx.WriteString(v.OutId())
+	var cpp strings.Builder
+	cpp.WriteString(v.Type.String())
+	cpp.WriteByte(' ')
+	cpp.WriteString(v.OutId())
 	expr := v.Expr.String()
 	if expr != "" {
-		cxx.WriteString(" = ")
-		cxx.WriteString(v.Expr.String())
+		cpp.WriteString(" = ")
+		cpp.WriteString(v.Expr.String())
 	} else {
-		cxx.WriteString(xapi.DefaultExpr)
+		cpp.WriteString(xapi.DefaultExpr)
 	}
-	cxx.WriteByte(';')
-	return cxx.String()
+	cpp.WriteByte(';')
+	return cpp.String()
 }
 
-// FieldString returns variable as cxx struct field.
+// FieldString returns variable as cpp struct field.
 func (v *Var) FieldString() string {
-	var cxx strings.Builder
+	var cpp strings.Builder
 	if v.Const {
-		cxx.WriteString("const ")
+		cpp.WriteString("const ")
 	}
-	cxx.WriteString(v.Type.String())
-	cxx.WriteByte(' ')
-	cxx.WriteString(v.OutId())
-	cxx.WriteString(xapi.DefaultExpr)
-	cxx.WriteByte(';')
-	return cxx.String()
+	cpp.WriteString(v.Type.String())
+	cpp.WriteByte(' ')
+	cpp.WriteString(v.OutId())
+	cpp.WriteString(xapi.DefaultExpr)
+	cpp.WriteByte(';')
+	return cpp.String()
 }

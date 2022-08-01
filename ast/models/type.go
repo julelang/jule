@@ -21,11 +21,11 @@ type Type struct {
 }
 
 func (t Type) String() string {
-	var cxx strings.Builder
-	cxx.WriteString("typedef ")
-	cxx.WriteString(t.Type.String())
-	cxx.WriteByte(' ')
-	cxx.WriteString(xapi.OutId(t.Id, t.Tok.File))
-	cxx.WriteByte(';')
-	return cxx.String()
+	var cpp strings.Builder
+	cpp.WriteString("typedef ")
+	cpp.WriteString(t.Type.String())
+	cpp.WriteByte(' ')
+	cpp.WriteString(xapi.OutId(t.Id, t.Tok.File))
+	cpp.WriteByte(';')
+	return cpp.String()
 }

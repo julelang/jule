@@ -38,7 +38,7 @@ func getPtrAsId(ptr unsafe.Pointer) string {
 	return address
 }
 
-// OutId returns cxx output identifier form of given identifier.
+// OutId returns cpp output identifier form of given identifier.
 func OutId(id string, f *xio.File) string {
 	if f != nil {
 		var out strings.Builder

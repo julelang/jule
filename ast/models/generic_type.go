@@ -13,8 +13,8 @@ type GenericType struct {
 }
 
 func (gt GenericType) String() string {
-	var cxx strings.Builder
-	cxx.WriteString("typename ")
-	cxx.WriteString(xapi.OutId(gt.Id, gt.Tok.File))
-	return cxx.String()
+	var cpp strings.Builder
+	cpp.WriteString("typename ")
+	cpp.WriteString(xapi.OutId(gt.Id, gt.Tok.File))
+	return cpp.String()
 }

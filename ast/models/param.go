@@ -37,27 +37,27 @@ func (p *Param) OutId() string {
 }
 
 func (p Param) String() string {
-	var cxx strings.Builder
-	cxx.WriteString(p.Prototype())
+	var cpp strings.Builder
+	cpp.WriteString(p.Prototype())
 	if p.Id != "" && !xapi.IsIgnoreId(p.Id) && p.Id != x.Anonymous {
-		cxx.WriteByte(' ')
-		cxx.WriteString(p.OutId())
+		cpp.WriteByte(' ')
+		cpp.WriteString(p.OutId())
 	}
-	return cxx.String()
+	return cpp.String()
 }
 
-// Prototype returns prototype cxx of parameter.
+// Prototype returns prototype cpp of parameter.
 func (p *Param) Prototype() string {
-	var cxx strings.Builder
+	var cpp strings.Builder
 	if p.Variadic {
-		cxx.WriteString("slice<")
-		cxx.WriteString(p.Type.String())
-		cxx.WriteByte('>')
+		cpp.WriteString("slice<")
+		cpp.WriteString(p.Type.String())
+		cpp.WriteByte('>')
 	} else {
-		cxx.WriteString(p.Type.String())
+		cpp.WriteString(p.Type.String())
 	}
 	if p.Reference {
-		cxx.WriteByte('&')
+		cpp.WriteByte('&')
 	}
-	return cxx.String()
+	return cpp.String()
 }

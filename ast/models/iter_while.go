@@ -8,10 +8,10 @@ type IterWhile struct {
 }
 
 func (w IterWhile) String(iter Iter) string {
-	var cxx strings.Builder
-	cxx.WriteString("while (")
-	cxx.WriteString(w.Expr.String())
-	cxx.WriteString(") ")
-	cxx.WriteString(iter.Block.String())
-	return cxx.String()
+	var cpp strings.Builder
+	cpp.WriteString("while (")
+	cpp.WriteString(w.Expr.String())
+	cpp.WriteString(") ")
+	cpp.WriteString(iter.Block.String())
+	return cpp.String()
 }

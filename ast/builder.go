@@ -254,14 +254,6 @@ func (b *Builder) Enum(toks Toks) {
 // Comment builds AST model of comment.
 func (b *Builder) Comment(tok Tok) models.Object {
 	tok.Kind = strings.TrimSpace(tok.Kind[2:])
-	if strings.HasPrefix(tok.Kind, "cxx:") {
-		return models.Object{
-			Tok: tok,
-			Data: models.CxxEmbed{
-				Tok:     tok,
-				Content: tok.Kind[4:]},
-		}
-	}
 	return models.Object{
 		Tok: tok,
 		Data: models.Comment{
@@ -648,12 +640,29 @@ func (b *Builder) getSelectors(toks Toks) []Tok {
 	return selectors
 }
 
+func (b *Builder) buildUseCppDecl(use *models.Use, toks Toks) {
+	if len(toks) > 2 {
+		b.pusherr(toks[2], "invalid_syntax")
+	}
+	tok := toks[1]
+	if tok.Id != tokens.Value || tok.Kind[0] != '`' {
+		b.pusherr(tok, "invalid_expr")
+		return
+	}
+	use.Cpp = true
+	use.Path = tok.Kind[1 : len(tok.Kind)-1]
+}
+
 func (b *Builder) buildUseDecl(use *models.Use, toks Toks) {
 	var path strings.Builder
 	path.WriteString(x.StdlibPath)
 	path.WriteRune(os.PathSeparator)
 	tok := toks[0]
 	isStd := false
+	if tok.Id == tokens.Cpp {
+		b.buildUseCppDecl(use, toks)
+		return
+	}
 	if tok.Id != tokens.Id || tok.Kind != "std" {
 		b.pusherr(toks[0], "invalid_syntax")
 	}
@@ -1837,15 +1846,8 @@ func (b *Builder) VarStatement(toks Toks) models.Statement {
 func (b *Builder) CommentStatement(tok Tok) (s models.Statement) {
 	s.Tok = tok
 	tok.Kind = strings.TrimSpace(tok.Kind[2:])
-	if strings.HasPrefix(tok.Kind, "cxx:") {
-		s.Data = models.CxxEmbed{
-			Tok:     tok,
-			Content: tok.Kind[4:],
-		}
-	} else {
-		s.Data = models.Comment{
-			Content: tok.Kind,
-		}
+	s.Data = models.Comment{
+		Content: tok.Kind,
 	}
 	return
 }

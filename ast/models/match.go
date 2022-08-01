@@ -9,28 +9,28 @@ type Case struct {
 }
 
 func (c *Case) String(matchExpr string) string {
-	var cxx strings.Builder
+	var cpp strings.Builder
 	if len(c.Exprs) > 0 {
-		cxx.WriteString("if (")
+		cpp.WriteString("if (")
 		for i, expr := range c.Exprs {
-			cxx.WriteString(expr.String())
+			cpp.WriteString(expr.String())
 			if matchExpr != "" {
-				cxx.WriteString(" == ")
-				cxx.WriteString(matchExpr)
+				cpp.WriteString(" == ")
+				cpp.WriteString(matchExpr)
 			}
 			if i+1 < len(c.Exprs) {
-				cxx.WriteString(" || ")
+				cpp.WriteString(" || ")
 			}
 		}
-		cxx.WriteByte(')')
+		cpp.WriteByte(')')
 	}
-	cxx.WriteString(" { do ")
-	cxx.WriteString(c.Block.String())
-	cxx.WriteString("while(false);")
+	cpp.WriteString(" { do ")
+	cpp.WriteString(c.Block.String())
+	cpp.WriteString("while(false);")
 	if len(c.Exprs) > 0 {
-		cxx.WriteByte('}')
+		cpp.WriteByte('}')
 	}
-	return cxx.String()
+	return cpp.String()
 }
 
 // Match the AST model of match-case.
@@ -49,45 +49,45 @@ func (m *Match) MatchExprString() string {
 		}
 		return ""
 	}
-	var cxx strings.Builder
-	cxx.WriteString("{\n")
+	var cpp strings.Builder
+	cpp.WriteString("{\n")
 	AddIndent()
-	cxx.WriteString(IndentString())
-	cxx.WriteString(m.ExprType.String())
-	cxx.WriteString(" expr{")
-	cxx.WriteString(m.Expr.String())
-	cxx.WriteString("};\n")
-	cxx.WriteString(IndentString())
-	cxx.WriteString(m.Cases[0].String("expr"))
+	cpp.WriteString(IndentString())
+	cpp.WriteString(m.ExprType.String())
+	cpp.WriteString(" expr{")
+	cpp.WriteString(m.Expr.String())
+	cpp.WriteString("};\n")
+	cpp.WriteString(IndentString())
+	cpp.WriteString(m.Cases[0].String("expr"))
 	for _, c := range m.Cases[1:] {
-		cxx.WriteString("else ")
-		cxx.WriteString(c.String("expr"))
+		cpp.WriteString("else ")
+		cpp.WriteString(c.String("expr"))
 	}
 	if m.Default != nil {
-		cxx.WriteString("else ")
-		cxx.WriteString(m.Default.String(""))
-		cxx.WriteByte('}')
+		cpp.WriteString("else ")
+		cpp.WriteString(m.Default.String(""))
+		cpp.WriteByte('}')
 	}
-	cxx.WriteByte('\n')
+	cpp.WriteByte('\n')
 	DoneIndent()
-	cxx.WriteString(IndentString())
-	cxx.WriteByte('}')
-	return cxx.String()
+	cpp.WriteString(IndentString())
+	cpp.WriteByte('}')
+	return cpp.String()
 }
 
 func (m *Match) MatchBoolString() string {
-	var cxx strings.Builder
-	cxx.WriteString(m.Cases[0].String(""))
+	var cpp strings.Builder
+	cpp.WriteString(m.Cases[0].String(""))
 	for _, c := range m.Cases[1:] {
-		cxx.WriteString("else ")
-		cxx.WriteString(c.String(""))
+		cpp.WriteString("else ")
+		cpp.WriteString(c.String(""))
 	}
 	if m.Default != nil {
-		cxx.WriteString("else ")
-		cxx.WriteString(m.Default.String(""))
-		cxx.WriteByte('}')
+		cpp.WriteString("else ")
+		cpp.WriteString(m.Default.String(""))
+		cpp.WriteByte('}')
 	}
-	return cxx.String()
+	return cpp.String()
 }
 
 func (m Match) String() string {

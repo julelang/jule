@@ -123,15 +123,15 @@ func (dt DataType) String() (s string) {
 	pointers := dt.Pointers()
 	// Apply pointers
 	defer func() {
-		var cxx strings.Builder
+		var cpp strings.Builder
 		for range pointers {
-			cxx.WriteString("ptr<")
+			cpp.WriteString("ptr<")
 		}
-		cxx.WriteString(s)
+		cpp.WriteString(s)
 		for range pointers {
-			cxx.WriteString(">")
+			cpp.WriteString(">")
 		}
-		s = cxx.String()
+		s = cpp.String()
 	}()
 	dt.Kind = dt.Kind[len(pointers):]
 	if dt.Kind != "" {
@@ -158,18 +158,18 @@ func (dt DataType) String() (s string) {
 	case xtype.Func:
 		return dt.FuncString()
 	default:
-		return xtype.CxxId(dt.Id)
+		return xtype.CppId(dt.Id)
 	}
 }
 
-// SliceString returns cxx value of slice data type.
+// SliceString returns cpp value of slice data type.
 func (dt DataType) SliceString() string {
-	var cxx strings.Builder
-	cxx.WriteString("slice<")
+	var cpp strings.Builder
+	cpp.WriteString("slice<")
 	dt.Kind = dt.Kind[len(x.Prefix_Slice):] // Remove slice
-	cxx.WriteString(dt.String())
-	cxx.WriteByte('>')
-	return cxx.String()
+	cpp.WriteString(dt.String())
+	cpp.WriteByte('>')
+	return cpp.String()
 }
 
 // ArrayComponent returns data type of array components.
@@ -180,98 +180,98 @@ func (dt DataType) ArrayComponent() DataType {
 	return dt
 }
 
-// ArrayString returns cxx value of map data type.
+// ArrayString returns cpp value of map data type.
 func (dt DataType) ArrayString() string {
-	var cxx strings.Builder
-	cxx.WriteString("array<")
+	var cpp strings.Builder
+	cpp.WriteString("array<")
 	exprs := dt.Tag.([][]any)
 	expr := exprs[0][1].(Expr)
-	cxx.WriteString(dt.ArrayComponent().String())
-	cxx.WriteByte(',')
-	cxx.WriteString(expr.String())
-	cxx.WriteByte('>')
-	return cxx.String()
+	cpp.WriteString(dt.ArrayComponent().String())
+	cpp.WriteByte(',')
+	cpp.WriteString(expr.String())
+	cpp.WriteByte('>')
+	return cpp.String()
 }
 
-// MapString returns cxx value of map data type.
+// MapString returns cpp value of map data type.
 func (dt *DataType) MapString() string {
-	var cxx strings.Builder
+	var cpp strings.Builder
 	types := dt.Tag.([]DataType)
-	cxx.WriteString("map<")
+	cpp.WriteString("map<")
 	key := types[0]
 	key.DontUseOriginal = dt.DontUseOriginal
-	cxx.WriteString(key.String())
-	cxx.WriteByte(',')
+	cpp.WriteString(key.String())
+	cpp.WriteByte(',')
 	value := types[1]
 	value.DontUseOriginal = dt.DontUseOriginal
-	cxx.WriteString(value.String())
-	cxx.WriteByte('>')
-	return cxx.String()
+	cpp.WriteString(value.String())
+	cpp.WriteByte('>')
+	return cpp.String()
 }
 
-// TraitString returns cxx value of trait data type.
+// TraitString returns cpp value of trait data type.
 func (dt *DataType) TraitString() string {
-	var cxx strings.Builder
+	var cpp strings.Builder
 	id, _ := dt.KindId()
-	cxx.WriteString("trait<")
-	cxx.WriteString(xapi.OutId(id, dt.Tok.File))
-	cxx.WriteByte('>')
-	return cxx.String()
+	cpp.WriteString("trait<")
+	cpp.WriteString(xapi.OutId(id, dt.Tok.File))
+	cpp.WriteByte('>')
+	return cpp.String()
 }
 
-// StructString returns cxx value of struct data type.
+// StructString returns cpp value of struct data type.
 func (dt *DataType) StructString() string {
-	var cxx strings.Builder
+	var cpp strings.Builder
 	s := dt.Tag.(CompiledStruct)
-	cxx.WriteString(s.OutId())
+	cpp.WriteString(s.OutId())
 	types := s.Generics()
 	if len(types) == 0 {
-		return cxx.String()
+		return cpp.String()
 	}
-	cxx.WriteByte('<')
+	cpp.WriteByte('<')
 	for _, t := range types {
 		t.DontUseOriginal = dt.DontUseOriginal
-		cxx.WriteString(t.String())
-		cxx.WriteByte(',')
+		cpp.WriteString(t.String())
+		cpp.WriteByte(',')
 	}
-	return cxx.String()[:cxx.Len()-1] + ">"
+	return cpp.String()[:cpp.Len()-1] + ">"
 }
 
-// FuncString returns cxx value of function DataType.
+// FuncString returns cpp value of function DataType.
 func (dt *DataType) FuncString() string {
-	var cxx strings.Builder
-	cxx.WriteString("std::function<")
+	var cpp strings.Builder
+	cpp.WriteString("std::function<")
 	f := dt.Tag.(*Func)
 	f.RetType.Type.DontUseOriginal = dt.DontUseOriginal
-	cxx.WriteString(f.RetType.String())
-	cxx.WriteByte('(')
+	cpp.WriteString(f.RetType.String())
+	cpp.WriteByte('(')
 	if len(f.Params) > 0 {
 		for _, param := range f.Params {
 			param.Type.DontUseOriginal = dt.DontUseOriginal
-			cxx.WriteString(param.Prototype())
-			cxx.WriteByte(',')
+			cpp.WriteString(param.Prototype())
+			cpp.WriteByte(',')
 		}
-		cxxStr := cxx.String()[:cxx.Len()-1]
-		cxx.Reset()
-		cxx.WriteString(cxxStr)
+		cppStr := cpp.String()[:cpp.Len()-1]
+		cpp.Reset()
+		cpp.WriteString(cppStr)
 	} else {
-		cxx.WriteString("void")
+		cpp.WriteString("void")
 	}
-	cxx.WriteString(")>")
-	return cxx.String()
+	cpp.WriteString(")>")
+	return cpp.String()
 }
 
-// MultiTypeString returns cxx value of muli-typed DataType.
+// MultiTypeString returns cpp value of muli-typed DataType.
 func (dt *DataType) MultiTypeString() string {
 	types := dt.Tag.([]DataType)
-	var cxx strings.Builder
-	cxx.WriteString("std::tuple<")
+	var cpp strings.Builder
+	cpp.WriteString("std::tuple<")
 	for _, t := range types {
 		t.DontUseOriginal = dt.DontUseOriginal
-		cxx.WriteString(t.String())
-		cxx.WriteByte(',')
+		cpp.WriteString(t.String())
+		cpp.WriteByte(',')
 	}
-	return cxx.String()[:cxx.Len()-1] + ">" + dt.Pointers()
+	return cpp.String()[:cpp.Len()-1] + ">" + dt.Pointers()
 }
 
 // MapKind returns data type kind string of map data type.

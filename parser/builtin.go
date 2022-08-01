@@ -19,7 +19,7 @@ var i8statics = &Defmap{
 			Type:    DataType{Id: xtype.I8, Kind: tokens.I8},
 			ExprTag: int64(math.MaxInt8),
 			Expr: models.Expr{
-				Model: exprNode{xtype.CxxId(xtype.I8) + "{" + strconv.FormatInt(math.MaxInt8, 10) + "}"},
+				Model: exprNode{xtype.CppId(xtype.I8) + "{" + strconv.FormatInt(math.MaxInt8, 10) + "}"},
 			},
 		},
 		{
@@ -29,7 +29,7 @@ var i8statics = &Defmap{
 			Type:    DataType{Id: xtype.I8, Kind: tokens.I8},
 			ExprTag: int64(math.MinInt8),
 			Expr: models.Expr{
-				Model: exprNode{xtype.CxxId(xtype.I8) + "{" + strconv.FormatInt(math.MinInt8, 10) + "}"},
+				Model: exprNode{xtype.CppId(xtype.I8) + "{" + strconv.FormatInt(math.MinInt8, 10) + "}"},
 			},
 		},
 	},
@@ -44,7 +44,7 @@ var i16statics = &Defmap{
 			Type:    DataType{Id: xtype.I16, Kind: tokens.I16},
 			ExprTag: int64(math.MaxInt16),
 			Expr: models.Expr{
-				Model: exprNode{xtype.CxxId(xtype.I16) + "{" + strconv.FormatInt(math.MaxInt16, 10) + "}"},
+				Model: exprNode{xtype.CppId(xtype.I16) + "{" + strconv.FormatInt(math.MaxInt16, 10) + "}"},
 			},
 		},
 		{
@@ -54,7 +54,7 @@ var i16statics = &Defmap{
 			Type:    DataType{Id: xtype.I16, Kind: tokens.I16},
 			ExprTag: int64(math.MinInt16),
 			Expr: models.Expr{
-				Model: exprNode{xtype.CxxId(xtype.I16) + "{" + strconv.FormatInt(math.MinInt16, 10) + "}"},
+				Model: exprNode{xtype.CppId(xtype.I16) + "{" + strconv.FormatInt(math.MinInt16, 10) + "}"},
 			},
 		},
 	},
@@ -69,7 +69,7 @@ var i32statics = &Defmap{
 			Type:    DataType{Id: xtype.I32, Kind: tokens.I32},
 			ExprTag: int64(math.MaxInt32),
 			Expr: models.Expr{
-				Model: exprNode{xtype.CxxId(xtype.I32) + "{" + strconv.FormatInt(math.MaxInt32, 10) + "}"},
+				Model: exprNode{xtype.CppId(xtype.I32) + "{" + strconv.FormatInt(math.MaxInt32, 10) + "}"},
 			},
 		},
 		{
@@ -79,7 +79,7 @@ var i32statics = &Defmap{
 			Type:    DataType{Id: xtype.I32, Kind: tokens.I32},
 			ExprTag: int64(math.MinInt32),
 			Expr: models.Expr{
-				Model: exprNode{xtype.CxxId(xtype.I32) + "{" + strconv.FormatInt(math.MinInt32, 10) + "}"},
+				Model: exprNode{xtype.CppId(xtype.I32) + "{" + strconv.FormatInt(math.MinInt32, 10) + "}"},
 			},
 		},
 	},
@@ -94,7 +94,7 @@ var i64statics = &Defmap{
 			Type:    DataType{Id: xtype.I64, Kind: tokens.I64},
 			ExprTag: int64(math.MaxInt64),
 			Expr: models.Expr{
-				Model: exprNode{xtype.CxxId(xtype.I64) + "{" + strconv.FormatInt(math.MaxInt64, 10) + "}"},
+				Model: exprNode{xtype.CppId(xtype.I64) + "{" + strconv.FormatInt(math.MaxInt64, 10) + "}"},
 			},
 		},
 		{
@@ -104,7 +104,7 @@ var i64statics = &Defmap{
 			Type:    DataType{Id: xtype.I64, Kind: tokens.I64},
 			ExprTag: int64(math.MinInt64),
 			Expr: models.Expr{
-				Model: exprNode{xtype.CxxId(xtype.I64) + "{" + strconv.FormatInt(math.MinInt64, 10) + "}"},
+				Model: exprNode{xtype.CppId(xtype.I64) + "{" + strconv.FormatInt(math.MinInt64, 10) + "}"},
 			},
 		},
 	},
@@ -119,7 +119,7 @@ var u8statics = &Defmap{
 			Type:    DataType{Id: xtype.U8, Kind: tokens.U8},
 			ExprTag: uint64(math.MaxUint8),
 			Expr: models.Expr{
-				Model: exprNode{xtype.CxxId(xtype.U8) + "{" + strconv.FormatUint(math.MaxUint8, 10) + "}"},
+				Model: exprNode{xtype.CppId(xtype.U8) + "{" + strconv.FormatUint(math.MaxUint8, 10) + "}"},
 			},
 		},
 	},
@@ -134,7 +134,7 @@ var u16statics = &Defmap{
 			Type:    DataType{Id: xtype.U16, Kind: tokens.U16},
 			ExprTag: uint64(math.MaxUint16),
 			Expr: models.Expr{
-				Model: exprNode{xtype.CxxId(xtype.U16) + "{" + strconv.FormatUint(math.MaxUint16, 10) + "}"},
+				Model: exprNode{xtype.CppId(xtype.U16) + "{" + strconv.FormatUint(math.MaxUint16, 10) + "}"},
 			},
 		},
 	},
@@ -149,7 +149,7 @@ var u32statics = &Defmap{
 			Type:    DataType{Id: xtype.U32, Kind: tokens.U32},
 			ExprTag: uint64(math.MaxUint32),
 			Expr: models.Expr{
-				Model: exprNode{xtype.CxxId(xtype.U32) + "{" + strconv.FormatUint(math.MaxUint32, 10) + "}"},
+				Model: exprNode{xtype.CppId(xtype.U32) + "{" + strconv.FormatUint(math.MaxUint32, 10) + "}"},
 			},
 		},
 	},
@@ -164,7 +164,7 @@ var u64statics = &Defmap{
 			Type:    DataType{Id: xtype.U64, Kind: tokens.U64},
 			ExprTag: uint64(math.MaxUint64),
 			Expr: models.Expr{
-				Model: exprNode{xtype.CxxId(xtype.U64) + "{" + strconv.FormatUint(math.MaxUint64, 10) + "}"},
+				Model: exprNode{xtype.CppId(xtype.U64) + "{" + strconv.FormatUint(math.MaxUint64, 10) + "}"},
 			},
 		},
 	},
@@ -198,7 +198,7 @@ var intStatics = &Defmap{
 
 const f32min = float64(1.17549435082228750796873653722224568e-38)
 
-var f32min_model = exprNode{xtype.CxxId(xtype.F32) + "{1.17549435082228750796873653722224568e-38F}"}
+var f32min_model = exprNode{xtype.CppId(xtype.F32) + "{1.17549435082228750796873653722224568e-38F}"}
 
 var f32statics = &Defmap{
 	Globals: []*Var{
@@ -223,7 +223,7 @@ var f32statics = &Defmap{
 
 const f64min = float64(2.22507385850720138309023271733240406e-308)
 
-var f64min_model = exprNode{xtype.CxxId(xtype.F64) + "{2.22507385850720138309023271733240406e-308}"}
+var f64min_model = exprNode{xtype.CppId(xtype.F64) + "{2.22507385850720138309023271733240406e-308}"}
 
 var f64statics = &Defmap{
 	Globals: []*Var{

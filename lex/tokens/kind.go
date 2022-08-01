@@ -93,4 +93,5 @@ const (
 	SELF                = "self"
 	TRAIT               = "trait"
 	IMPL                = "impl"
+	CPP                 = "cpp"
 )

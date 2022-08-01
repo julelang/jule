@@ -9,8 +9,8 @@ type Else struct {
 }
 
 func (elseast Else) String() string {
-	var cxx strings.Builder
-	cxx.WriteString("else ")
-	cxx.WriteString(elseast.Block.String())
-	return cxx.String()
+	var cpp strings.Builder
+	cpp.WriteString("else ")
+	cpp.WriteString(elseast.Block.String())
+	return cpp.String()
 }

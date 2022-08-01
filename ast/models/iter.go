@@ -11,10 +11,10 @@ type Iter struct {
 
 func (iter Iter) String() string {
 	if iter.Profile == nil {
-		var cxx strings.Builder
-		cxx.WriteString("while (true) ")
-		cxx.WriteString(iter.Block.String())
-		return cxx.String()
+		var cpp strings.Builder
+		cpp.WriteString("while (true) ")
+		cpp.WriteString(iter.Block.String())
+		return cpp.String()
 	}
 	return iter.Profile.String(iter)
 }

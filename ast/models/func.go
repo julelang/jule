@@ -35,32 +35,32 @@ func (f *Func) FindAttribute(kind string) *Attribute {
 
 // DataTypeString returns data type string of function.
 func (f *Func) DataTypeString() string {
-	var cxx strings.Builder
-	cxx.WriteByte('(')
+	var cpp strings.Builder
+	cpp.WriteByte('(')
 	if len(f.Params) > 0 {
 		for _, p := range f.Params {
 			if p.Variadic {
-				cxx.WriteString("...")
+				cpp.WriteString("...")
 			}
-			cxx.WriteString(p.Type.Kind)
-			cxx.WriteString(", ")
+			cpp.WriteString(p.Type.Kind)
+			cpp.WriteString(", ")
 		}
-		cxxStr := cxx.String()[:cxx.Len()-2]
-		cxx.Reset()
-		cxx.WriteString(cxxStr)
+		cppStr := cpp.String()[:cpp.Len()-2]
+		cpp.Reset()
+		cpp.WriteString(cppStr)
 	}
-	cxx.WriteByte(')')
+	cpp.WriteByte(')')
 	if f.RetType.Type.MultiTyped {
-		cxx.WriteByte('[')
+		cpp.WriteByte('[')
 		for _, t := range f.RetType.Type.Tag.([]DataType) {
-			cxx.WriteString(t.Kind)
-			cxx.WriteByte(',')
+			cpp.WriteString(t.Kind)
+			cpp.WriteByte(',')
 		}
-		return cxx.String()[:cxx.Len()-1] + "]"
+		return cpp.String()[:cpp.Len()-1] + "]"
 	} else if f.RetType.Type.Id != xtype.Void {
-		cxx.WriteString(f.RetType.Type.Kind)
+		cpp.WriteString(f.RetType.Type.Kind)
 	}
-	return cxx.String()
+	return cpp.String()
 }
 
 // OutId returns xapi.OutId result of function.

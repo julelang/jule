@@ -10,10 +10,10 @@ type If struct {
 }
 
 func (ifast If) String() string {
-	var cxx strings.Builder
-	cxx.WriteString("if (")
-	cxx.WriteString(ifast.Expr.String())
-	cxx.WriteString(") ")
-	cxx.WriteString(ifast.Block.String())
-	return cxx.String()
+	var cpp strings.Builder
+	cpp.WriteString("if (")
+	cpp.WriteString(ifast.Expr.String())
+	cpp.WriteString(") ")
+	cpp.WriteString(ifast.Block.String())
+	return cpp.String()
 }

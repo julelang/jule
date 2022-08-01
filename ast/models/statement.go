@@ -22,8 +22,8 @@ type ExprStatement struct {
 }
 
 func (be ExprStatement) String() string {
-	var cxx strings.Builder
-	cxx.WriteString(be.Expr.String())
-	cxx.WriteByte(';')
-	return cxx.String()
+	var cpp strings.Builder
+	cpp.WriteString(be.Expr.String())
+	cpp.WriteByte(';')
+	return cpp.String()
 }

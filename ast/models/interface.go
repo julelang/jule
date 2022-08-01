@@ -18,7 +18,7 @@ type IterProfile interface {
 	String(iter Iter) string
 }
 
-// IExprModel for special expression model to Cxx string.
+// IExprModel for special expression model to cpp string.
 type IExprModel interface {
 	String() string
 }

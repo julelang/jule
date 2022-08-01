@@ -360,6 +360,7 @@ var keywords = map[string]uint8{
 	tokens.SELF:     tokens.Self,
 	tokens.TRAIT:    tokens.Trait,
 	tokens.IMPL:     tokens.Impl,
+	tokens.CPP:      tokens.Cpp,
 }
 
 type oppair struct {
