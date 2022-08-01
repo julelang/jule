@@ -1086,6 +1086,7 @@ func (e *eval) slicingArray(v value, errtok Tok) value {
 
 func (e *eval) slicingStr(v value, errtok Tok) value {
 	v.lvalue = false
+	v.constExpr = false
 	v.data.Type.Id = xtype.Str
 	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
 	return v
