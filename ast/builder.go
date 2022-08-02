@@ -603,6 +603,11 @@ func (b *Builder) CppLink(toks Toks) {
 		b.pusherr(tok, "invalid_syntax")
 		return
 	}
+
+	// Catch pub not supported
+	bpub := b.pub
+	defer func() { b.pub = bpub }()
+
 	var link models.CppLink
 	link.Tok = tok
 	link.Link = new(models.Func)
