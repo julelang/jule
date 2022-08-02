@@ -36,7 +36,7 @@ X is designed to be interoperable with C++.
 A C++ header file dependency can be added to the X code and its functions can be linked.
 It's pretty easy to write C++ code that is compatible with the X code compiled by the compiler.
 XXC keeps all the C++ code it uses for X in its <a href="https://github.com/the-xlang/xxc/tree/main/api">api</a> directory.
-
+<ol></ol> <!-- for space -->
 <img src="./docs/images/cpp_interop.png"/>
 
 <h2 id="goals">Goals</h2>
