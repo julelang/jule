@@ -129,7 +129,6 @@ var Errors = map[string]string{
 	`trait_hasnt_id`:                           `%s trait is not have this identifier: %s`,
 	`notimpl_trait_def`:                        `not implemented %s trait's %s define`,
 	`dynamic_generic_annotation_failed`:        `dynamic generic type annotation failed`,
-	`error`:                                    `error: %s`,
 }
 
 // GetError returns error.
