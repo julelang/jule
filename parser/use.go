@@ -6,4 +6,5 @@ type use struct {
 	defs       *Defmap
 	tok        Tok
 	fullUse    bool
+	cppLink    bool
 }

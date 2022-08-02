@@ -53,6 +53,7 @@ var Errors = map[string]string{
 	`invalid_type_for_const`:                   `%s is invalid data-type for constant`,
 	`invalid_value_for_key`:                    `"%s" is invalid value for the "%s" key`,
 	`invalid_expr`:                             `invalid expression`,
+	`invalid_header_ext`:                       `invalid header extension: %s`,
 	`missing_autotype_value`:                   `auto-type declarations should have a initializer`,
 	`missing_type`:                             `data-type missing`,
 	`missing_expr`:                             `expression missing`,

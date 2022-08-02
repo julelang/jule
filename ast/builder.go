@@ -81,6 +81,8 @@ func (b *Builder) buildNode(toks Toks) {
 		b.Trait(toks)
 	case tokens.Impl:
 		b.Impl(toks)
+	case tokens.Cpp:
+		b.CppLink(toks)
 	case tokens.Comment:
 		b.Tree = append(b.Tree, b.Comment(toks[0]))
 	case tokens.Preprocessor:
@@ -592,6 +594,20 @@ body:
 	}
 	b.implFuncs(&impl, bodyToks)
 	b.Tree = append(b.Tree, models.Object{Tok: impl.Trait, Data: impl})
+}
+
+// CppLinks builds AST model of cpp link statement.
+func (b *Builder) CppLink(toks Toks) {
+	tok := toks[0]
+	if len(toks) == 1 {
+		b.pusherr(tok, "invalid_syntax")
+		return
+	}
+	var link models.CppLink
+	link.Tok = tok
+	link.Link = new(models.Func)
+	*link.Link = b.Func(toks[1:], false, true)
+	b.Tree = append(b.Tree, models.Object{Tok: tok, Data: link})
 }
 
 func tokstoa(toks Toks) string {
