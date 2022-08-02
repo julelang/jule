@@ -666,7 +666,7 @@ func (b *Builder) buildUseCppDecl(use *models.Use, toks Toks) {
 		b.pusherr(toks[2], "invalid_syntax")
 	}
 	tok := toks[1]
-	if tok.Id != tokens.Value || tok.Kind[0] != '`' {
+	if tok.Id != tokens.Value || (tok.Kind[0] != '`' && tok.Kind[0] != '"') {
 		b.pusherr(tok, "invalid_expr")
 		return
 	}
