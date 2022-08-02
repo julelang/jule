@@ -17,7 +17,7 @@ X is a statically typed compiled programming language designed for system develo
 The purpose of X is to keep functionality high while maintaining a simple form and readability.
 It guarantees memory safety and does not contain undefined behavior.
 
-<img src="./docs/images/quick_sort.png"/>
+<img src="./docs/images/quicksort.png"/>
 
 <h2 id="memory-safety">Memory Safety and Management</h2>
 The memory safety and the memory management.
@@ -30,6 +30,14 @@ There are no dangling pointers, and accessing a null pointer will obviously get 
 + Instant automatic memory initialization
 + Bounds checking
 + Null checking
+
+<h2 id="cpp-interoperability">C++ Interoperability</h2>
+X is designed to be interoperable with C++.
+A C++ header file dependency can be added to the X code and its functions can be linked.
+It's pretty easy to write C++ code that is compatible with the X code compiled by the compiler.
+XXC keeps all the C++ code it uses for X in its <a href="https://github.com/the-xlang/xxc/tree/main/api">api</a> directory.
+
+<img src="./docs/images/cpp_interop.png"/>
 
 <h2 id="goals">Goals</h2>
 
