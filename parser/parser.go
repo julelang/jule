@@ -3310,6 +3310,10 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 	}
 	if typeIsArray(dt) {
 		p.checkArrayType(&dt)
+		// Not return here for correct type parsing
+		// But remember tag for array
+		tag := dt.Tag
+		defer func() { ret.Tag = tag }()
 	}
 	switch dt.Id {
 	case xtype.Struct:
