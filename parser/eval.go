@@ -141,27 +141,18 @@ func (e *eval) nextOperator(processes []Toks) int {
 			continue
 		}
 		switch process[0].Kind {
-		case tokens.LSHIFT, tokens.RSHIFT:
+		case tokens.STAR, tokens.PERCENT, tokens.SOLIDUS,
+			tokens.RSHIFT, tokens.LSHIFT, tokens.AMPER:
 			prec.set(1, i)
-		case tokens.STAR, tokens.SOLIDUS, tokens.PERCENT:
+		case tokens.PLUS, tokens.MINUS, tokens.VLINE, tokens.CARET:
 			prec.set(2, i)
-		case tokens.AMPER:
+		case tokens.EQUALS, tokens.NOT_EQUALS, tokens.LESS,
+			tokens.LESS_EQUAL, tokens.GREAT, tokens.GREAT_EQUAL:
 			prec.set(3, i)
-		case tokens.CARET:
-			prec.set(4, i)
-		case tokens.VLINE:
-			prec.set(5, i)
-		case tokens.PLUS, tokens.MINUS:
-			prec.set(6, i)
-		case tokens.LESS, tokens.LESS_EQUAL,
-			tokens.GREAT, tokens.GREAT_EQUAL:
-			prec.set(7, i)
-		case tokens.EQUALS, tokens.NOT_EQUALS:
-			prec.set(8, i)
 		case tokens.AND:
-			prec.set(9, i)
+			prec.set(4, i)
 		case tokens.OR:
-			prec.set(10, i)
+			prec.set(5, i)
 		default:
 			e.pusherrtok(process[0], "invalid_operator")
 		}
