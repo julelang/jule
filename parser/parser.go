@@ -3145,7 +3145,7 @@ func (p *Parser) typeSourceIsType(dt DataType, t *Type, err bool) (DataType, boo
 	dt.Kind = t.Type.Kind
 	dt, ok := p.typeSource(dt, err)
 	dt.DontUseOriginal = false
-	if ok && typeIsArray(t.Type) && typeIsSlice(old) {
+	if ok && old.Tag != nil && !typeIsStruct(t.Type) { // Has generics
 		p.pusherrtok(dt.Tok, "invalid_type_source")
 	}
 	return dt, ok
@@ -3291,6 +3291,14 @@ func (p *Parser) typeSourceIsArrayType(t *DataType) (ok bool) {
 	return
 }
 
+func (p *Parser) typeSourceIsSliceType(t *DataType) (ok bool) {
+	*t.ComponentType, ok = p.realType(*t.ComponentType, true)
+	if ok && typeIsArray(*t.ComponentType) { // Array into slice
+		p.pusherrtok(t.Tok, "invalid_type_source")
+	}
+	return
+}
+
 func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 	if dt.Kind == "" {
 		return dt, true
@@ -3302,13 +3310,16 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 		}
 	}()
 	dt.SetToOriginal()
-	if dt.MultiTyped {
+	switch {
+	case dt.MultiTyped:
 		return p.typeSourceOfMultiTyped(dt, err)
-	} else if typeIsMap(dt) {
+	case typeIsMap(dt):
 		return p.typeSourceIsMap(dt, err)
-	}
-	if typeIsArray(dt) {
+	case typeIsArray(dt):
 		ok = p.typeSourceIsArrayType(&dt)
+		return dt, ok
+	case typeIsSlice(dt):
+		ok = p.typeSourceIsSliceType(&dt)
 		return dt, ok
 	}
 	switch dt.Id {

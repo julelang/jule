@@ -1154,6 +1154,7 @@ func (b *Builder) datatype(t *models.DataType, toks Toks, i *int, arrays, err bo
 					dtv.WriteString(x.Prefix_Slice)
 					t.ComponentType = new(models.DataType)
 					t.Id = xtype.Slice
+					t.Tok = tok
 					*i++
 					ok = b.datatype(t.ComponentType, toks, i, arrays, err)
 					dtv.WriteString(t.ComponentType.Kind)
@@ -1171,6 +1172,7 @@ func (b *Builder) datatype(t *models.DataType, toks Toks, i *int, arrays, err bo
 					}
 					return
 				}
+				t.Tok = tok
 				t.Kind = dtv.String() + t.Kind
 				ok = true
 				return
