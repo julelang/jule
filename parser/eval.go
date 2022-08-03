@@ -569,7 +569,7 @@ func (e *eval) castStr(vt DataType, errtok Tok) {
 		e.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
 		return
 	}
-	vt = typeOfSliceComponents(vt)
+	vt = *vt.ComponentType
 	if !typeIsPure(vt) || vt.Id != xtype.U8 {
 		e.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
 	}
@@ -622,7 +622,7 @@ func (e *eval) castSlice(t, vt DataType, errtok Tok) {
 		e.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
 		return
 	}
-	t = typeOfSliceComponents(t)
+	t = *t.ComponentType
 	if !typeIsPure(t) || t.Id != xtype.U8 {
 		e.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
 	}
@@ -943,7 +943,7 @@ func (e *eval) variadic(toks Toks, m *exprModel, errtok Tok) (v value) {
 		e.pusherrtok(errtok, "variadic_with_nonvariadicable", v.data.Type.Kind)
 		return
 	}
-	v.data.Type = typeOfSliceComponents(v.data.Type)
+	v.data.Type = *v.data.Type.ComponentType
 	v.variadic = true
 	return
 }
@@ -1036,7 +1036,7 @@ func (e *eval) indexing(enumv, leftv value, errtok Tok) (v value) {
 }
 
 func (e *eval) indexingSlice(slicev, index value, errtok Tok) value {
-	slicev.data.Type = typeOfSliceComponents(slicev.data.Type)
+	slicev.data.Type = *slicev.data.Type.ComponentType
 	e.checkIntegerIndexing(index, errtok)
 	if index.constExpr && tonums(index.expr) < 0 {
 		e.p.pusherrtok(index.data.Tok, "invalid_expr")
@@ -1045,7 +1045,7 @@ func (e *eval) indexingSlice(slicev, index value, errtok Tok) value {
 }
 
 func (e *eval) indexingArray(arrv, index value, errtok Tok) value {
-	arrv.data.Type = typeOfArrayComponents(arrv.data.Type)
+	arrv.data.Type = *arrv.data.Type.ComponentType
 	e.checkIntegerIndexing(index, errtok)
 	if index.constExpr && tonums(index.expr) < 0 {
 		e.p.pusherrtok(index.data.Tok, "invalid_expr")
@@ -1093,7 +1093,7 @@ func (e *eval) slicingSlice(v value, errtok Tok) value {
 
 func (e *eval) slicingArray(v value, errtok Tok) value {
 	v.lvalue = false
-	v.data.Type = typeOfArrayComponents(v.data.Type)
+	v.data.Type = *v.data.Type.ComponentType
 	v.data.Type.Kind = x.Prefix_Slice + xtype.TypeMap[v.data.Type.Id]
 	return v
 }
@@ -1115,18 +1115,15 @@ func (e *eval) enumerableParts(toks Toks) []Toks {
 }
 
 func (e *eval) buildArray(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
-	if !arrayIsAutoSized(t) {
-		n := t.Tag.([][]any)[0][0].(uint64)
-		if uint64(len(parts)) > n {
+	if !t.Size.AutoSized {
+		if models.Size(len(parts)) > t.Size.N {
 			e.p.pusherrtok(errtok, "overflow_limits")
 		}
 	} else {
-		tag := t.Tag.([][]any)[0]
-		n := uint64(len(parts))
-		tag[0] = n
-		tag[1] = models.Expr{
+		t.Size.N = models.Size(len(parts))
+		t.Size.Expr = models.Expr{
 			Model: exprNode{
-				value: xtype.TypeMap[xtype.UInt] + "{" + strconv.FormatUint(n, 10) + "}",
+				value: xtype.TypeMap[xtype.UInt] + "{" + strconv.FormatUint(uint64(t.Size.N), 10) + "}",
 			},
 		}
 	}
@@ -1134,14 +1131,13 @@ func (e *eval) buildArray(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
 	v.data.Value = t.Kind
 	v.data.Type = t
 	model := sliceExpr{dataType: t}
-	elemType := typeOfArrayComponents(t)
 	for _, part := range parts {
 		partVal, expModel := e.toks(part)
 		model.expr = append(model.expr, expModel)
 		e.p.wg.Add(1)
 		go assignChecker{
 			p:      e.p,
-			t:      elemType,
+			t:      *t.ComponentType,
 			v:      partVal,
 			errtok: part[0],
 		}.checkAssignType()
@@ -1154,14 +1150,13 @@ func (e *eval) buildSlice(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
 	v.data.Value = t.Kind
 	v.data.Type = t
 	model := sliceExpr{dataType: t}
-	elemType := typeOfSliceComponents(t)
 	for _, part := range parts {
 		partVal, expModel := e.toks(part)
 		model.expr = append(model.expr, expModel)
 		e.p.wg.Add(1)
 		go assignChecker{
 			p:      e.p,
-			t:      elemType,
+			t:      *t.ComponentType,
 			v:      partVal,
 			errtok: part[0],
 		}.checkAssignType()
@@ -1228,29 +1223,9 @@ func (e *eval) buildMap(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
 
 func (e *eval) enumerable(exprToks Toks, t DataType, m *exprModel) (v value) {
 	var model iExpr
-	if typeIsArray(t) && arrayIsAutoSized(t) {
-		exprs := t.Tag.([][]any)[0]
-		t = typeOfArrayComponents(t)
-		t.Original = nil
-		var ok bool
-		t, ok = e.p.realType(t, true)
-		if !ok {
-			return
-		}
-		t.Kind = x.Prefix_Array + t.Kind
-		if t.Tag != nil {
-			t.Tag = append([][]any{exprs}, t.Tag.([][]any)...)
-		} else {
-			t.Tag = [][]any{exprs}
-		}
-		v, model = e.buildArray(e.enumerableParts(exprToks), t, exprToks[0])
-		goto ret
-	} else {
-		var ok bool
-		t, ok = e.p.realType(t, true)
-		if !ok {
-			return
-		}
+	t, ok := e.p.realType(t, true)
+	if !ok {
+		return
 	}
 	switch {
 	case typeIsArray(t):
@@ -1263,7 +1238,6 @@ func (e *eval) enumerable(exprToks Toks, t DataType, m *exprModel) (v value) {
 		e.pusherrtok(exprToks[0], "invalid_type_source")
 		return
 	}
-ret:
 	m.appendSubNode(model)
 	return
 }

@@ -1,11 +1,7 @@
 package parser
 
 import (
-	"strings"
-
-	"github.com/the-xlang/xxc/ast/models"
 	"github.com/the-xlang/xxc/lex/tokens"
-	"github.com/the-xlang/xxc/pkg/x"
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
@@ -16,10 +12,6 @@ func findGeneric(id string, generics []*GenericType) *GenericType {
 		}
 	}
 	return nil
-}
-
-func arrayIsAutoSized(t DataType) bool {
-	return arrayExprIsAutoSized(t.Tag.([][]any)[0][1].(models.Expr))
 }
 
 func typeIsVoid(t DataType) bool {
@@ -102,16 +94,6 @@ func typeIsGeneric(generics []*GenericType, t DataType) bool {
 	return false
 }
 
-func typeOfSliceComponents(t DataType) DataType {
-	// Remove slice syntax
-	t.Kind = t.Kind[len(x.Prefix_Slice):]
-	return t
-}
-
-func typeOfArrayComponents(t DataType) DataType {
-	return t.ArrayComponent()
-}
-
 func typeIsExplicitPtr(t DataType) bool {
 	if t.Kind == "" {
 		return false
@@ -124,11 +106,11 @@ func typeIsPtr(t DataType) bool {
 }
 
 func typeIsSlice(t DataType) bool {
-	return strings.HasPrefix(t.Kind, x.Prefix_Slice)
+	return t.Id == xtype.Slice
 }
 
 func typeIsArray(t DataType) bool {
-	return strings.HasPrefix(t.Kind, x.Prefix_Array)
+	return t.Id == xtype.Array
 }
 
 func typeIsMap(t DataType) bool {

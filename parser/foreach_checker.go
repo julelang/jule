@@ -17,7 +17,7 @@ func (fc *foreachChecker) array() {
 	if xapi.IsIgnoreId(fc.profile.KeyB.Id) {
 		return
 	}
-	componentType := typeOfArrayComponents(fc.profile.ExprType)
+	componentType := *fc.profile.ExprType.ComponentType
 	keyB := &fc.profile.KeyB
 	if keyB.Type.Id == xtype.Void {
 		keyB.Type = componentType
@@ -32,7 +32,7 @@ func (fc *foreachChecker) slice() {
 	if xapi.IsIgnoreId(fc.profile.KeyB.Id) {
 		return
 	}
-	componentType := typeOfSliceComponents(fc.profile.ExprType)
+	componentType := *fc.profile.ExprType.ComponentType
 	keyB := &fc.profile.KeyB
 	if keyB.Type.Id == xtype.Void {
 		keyB.Type = componentType

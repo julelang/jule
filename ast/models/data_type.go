@@ -5,10 +5,19 @@ import (
 	"unicode"
 
 	"github.com/the-xlang/xxc/lex/tokens"
-	"github.com/the-xlang/xxc/pkg/x"
 	"github.com/the-xlang/xxc/pkg/xapi"
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
+
+// Size is the represents data type of sizes (array or etc)
+type Size = int
+
+// TypeSize is the represents data type sizes with expression
+type TypeSize struct {
+	N         Size
+	Expr      Expr
+	AutoSized bool
+}
 
 // DataType is data type identifier.
 type DataType struct {
@@ -19,6 +28,8 @@ type DataType struct {
 	Original        any
 	Kind            string
 	MultiTyped      bool
+	ComponentType   *DataType
+	Size            TypeSize
 	Tag             any
 	DontUseOriginal bool
 }
@@ -95,9 +106,6 @@ func (dt *DataType) SetToOriginal() {
 	*dt = dt.Original.(DataType)
 	dt.Kind = kind
 	dt.Tok = tok
-	if strings.HasPrefix(dt.Kind, x.Prefix_Array) {
-		dt.Tag = tag
-	}
 }
 
 // Pointers returns pointer marks of data type.
@@ -134,15 +142,13 @@ func (dt DataType) String() (s string) {
 		s = cpp.String()
 	}()
 	dt.Kind = dt.Kind[len(pointers):]
-	if dt.Kind != "" {
-		switch {
-		case strings.HasPrefix(dt.Kind, x.Prefix_Slice):
-			return dt.SliceString()
-		case strings.HasPrefix(dt.Kind, x.Prefix_Array):
-			return dt.ArrayString()
-		case dt.Id == xtype.Map && dt.Kind[0] == '[' && dt.Kind[len(dt.Kind)-1] == ']':
-			return dt.MapString()
-		}
+	switch dt.Id {
+	case xtype.Slice:
+		return dt.SliceString()
+	case xtype.Array:
+		return dt.ArrayString()
+	case xtype.Map:
+		return dt.MapString()
 	}
 	switch dt.Tag.(type) {
 	case CompiledStruct:
@@ -163,32 +169,21 @@ func (dt DataType) String() (s string) {
 }
 
 // SliceString returns cpp value of slice data type.
-func (dt DataType) SliceString() string {
+func (dt *DataType) SliceString() string {
 	var cpp strings.Builder
 	cpp.WriteString("slice<")
-	dt.Kind = dt.Kind[len(x.Prefix_Slice):] // Remove slice
-	cpp.WriteString(dt.String())
+	cpp.WriteString(dt.ComponentType.String())
 	cpp.WriteByte('>')
 	return cpp.String()
 }
 
-// ArrayComponent returns data type of array components.
-func (dt DataType) ArrayComponent() DataType {
-	dt.Kind = dt.Kind[len(x.Prefix_Array):] // Remove array
-	exprs := dt.Tag.([][]any)[1:]
-	dt.Tag = exprs
-	return dt
-}
-
 // ArrayString returns cpp value of map data type.
-func (dt DataType) ArrayString() string {
+func (dt *DataType) ArrayString() string {
 	var cpp strings.Builder
 	cpp.WriteString("array<")
-	exprs := dt.Tag.([][]any)
-	expr := exprs[0][1].(Expr)
-	cpp.WriteString(dt.ArrayComponent().String())
+	cpp.WriteString(dt.ComponentType.String())
 	cpp.WriteByte(',')
-	cpp.WriteString(expr.String())
+	cpp.WriteString(dt.Size.Expr.String())
 	cpp.WriteByte('>')
 	return cpp.String()
 }
