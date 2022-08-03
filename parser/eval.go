@@ -984,13 +984,7 @@ func (e *eval) bracketRange(toks Toks, m *exprModel) (v value) {
 			var model iExpr
 			leftV, model = e.p.evalToks(leftToks)
 			m.appendSubNode(model)
-			e.p.wg.Add(1)
-			go assignChecker{
-				p:      e.p,
-				t:      DataType{Id: xtype.Int, Kind: xtype.TypeMap[xtype.Int]},
-				v:      leftV,
-				errtok: errTok,
-			}.checkAssignType()
+			e.checkIntegerIndexing(leftV, errTok)
 			if leftV.constExpr && tonums(leftV.expr) < 0 {
 				e.p.pusherrtok(leftV.data.Tok, "invalid_expr")
 			}
@@ -1002,13 +996,7 @@ func (e *eval) bracketRange(toks Toks, m *exprModel) (v value) {
 			var model iExpr
 			rightV, model = e.p.evalToks(rightToks)
 			m.appendSubNode(model)
-			e.p.wg.Add(1)
-			go assignChecker{
-				p:      e.p,
-				t:      DataType{Id: xtype.Int, Kind: xtype.TypeMap[xtype.Int]},
-				v:      rightV,
-				errtok: errTok,
-			}.checkAssignType()
+			e.checkIntegerIndexing(rightV, errTok)
 			if rightV.constExpr && tonums(rightV.expr) < 0 {
 				e.p.pusherrtok(rightV.data.Tok, "invalid_expr")
 			}
@@ -1021,6 +1009,15 @@ func (e *eval) bracketRange(toks Toks, m *exprModel) (v value) {
 	m.appendSubNode(model)
 	m.appendSubNode(exprNode{tokens.RBRACKET})
 	return e.indexing(v, leftv, errTok)
+}
+
+func (e *eval) checkIntegerIndexing(v value, errtok Tok) {
+	switch {
+	case !typeIsPure(v.data.Type):
+		e.pusherrtok(errtok, "invalid_expr")
+	case !xtype.IsInteger(v.data.Type.Id):
+		e.pusherrtok(errtok, "invalid_expr")
+	}
 }
 
 func (e *eval) indexing(enumv, leftv value, errtok Tok) (v value) {
@@ -1040,13 +1037,7 @@ func (e *eval) indexing(enumv, leftv value, errtok Tok) (v value) {
 
 func (e *eval) indexingSlice(slicev, index value, errtok Tok) value {
 	slicev.data.Type = typeOfSliceComponents(slicev.data.Type)
-	e.p.wg.Add(1)
-	go assignChecker{
-		p:      e.p,
-		t:      DataType{Id: xtype.Int, Kind: xtype.TypeMap[xtype.Int]},
-		v:      index,
-		errtok: errtok,
-	}.checkAssignType()
+	e.checkIntegerIndexing(index, errtok)
 	if index.constExpr && tonums(index.expr) < 0 {
 		e.p.pusherrtok(index.data.Tok, "invalid_expr")
 	}
@@ -1055,13 +1046,7 @@ func (e *eval) indexingSlice(slicev, index value, errtok Tok) value {
 
 func (e *eval) indexingArray(arrv, index value, errtok Tok) value {
 	arrv.data.Type = typeOfArrayComponents(arrv.data.Type)
-	e.p.wg.Add(1)
-	go assignChecker{
-		p:      e.p,
-		t:      DataType{Id: xtype.Int, Kind: xtype.TypeMap[xtype.Int]},
-		v:      index,
-		errtok: errtok,
-	}.checkAssignType()
+	e.checkIntegerIndexing(index, errtok)
 	if index.constExpr && tonums(index.expr) < 0 {
 		e.p.pusherrtok(index.data.Tok, "invalid_expr")
 	}
@@ -1081,13 +1066,7 @@ func (e *eval) indexingMap(mapv, leftv value, errtok Tok) value {
 func (e *eval) indexingStr(strv, index value, errtok Tok) value {
 	strv.data.Type.Id = xtype.U8
 	strv.data.Type.Kind = xtype.TypeMap[strv.data.Type.Id]
-	e.p.wg.Add(1)
-	go assignChecker{
-		p:      e.p,
-		t:      DataType{Id: xtype.Int, Kind: xtype.TypeMap[xtype.Int]},
-		v:      index,
-		errtok: errtok,
-	}.checkAssignType()
+	e.checkIntegerIndexing(index, errtok)
 	if index.constExpr && tonums(index.expr) < 0 {
 		e.p.pusherrtok(index.data.Tok, "invalid_expr")
 	}
