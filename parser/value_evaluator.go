@@ -185,7 +185,7 @@ func (ve *valueEvaluator) varId(id string, variable *Var) (v value) {
 		v.expr = variable.ExprTag
 		v.model = variable.Expr.Model
 	} else {
-		ve.model.appendSubNode(exprNode{xapi.OutId(id, variable.IdTok.File)})
+		ve.model.appendSubNode(exprNode{variable.OutId()})
 		ve.p.eval.hasError = ve.p.eval.hasError || typeIsVoid(v.data.Type)
 	}
 	return

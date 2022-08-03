@@ -21,11 +21,17 @@ type Var struct {
 	ExprTag   any
 	Desc      string
 	Used      bool
+	IsField   bool
 }
 
 // OutId returns xapi.OutId result of var.
 func (v *Var) OutId() string {
-	return xapi.OutId(v.Id, v.IdTok.File)
+	switch {
+	case v.IsField:
+		return xapi.AsId(v.Id)
+	default:
+		return xapi.OutId(v.Id, v.IdTok.File)
+	}
 }
 
 func (v Var) String() string {

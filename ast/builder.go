@@ -365,6 +365,7 @@ func (b *Builder) structFields(toks Toks) []*models.Var {
 		}
 		vast := b.Var(varToks, false)
 		vast.Pub = pub
+		vast.IsField = true
 		fields = append(fields, &vast)
 	}
 	return fields

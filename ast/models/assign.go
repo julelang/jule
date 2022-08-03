@@ -16,9 +16,7 @@ type AssignLeft struct {
 func (as AssignLeft) String() string {
 	switch {
 	case as.Var.New:
-		// Returns variable identifier.
-		tok := as.Expr.Toks[0]
-		return xapi.OutId(tok.Kind, tok.File)
+		return as.Var.OutId()
 	case as.Ignore:
 		return xapi.CppIgnore
 	}

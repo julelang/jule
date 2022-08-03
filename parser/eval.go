@@ -771,11 +771,7 @@ func (e *eval) xObjSubId(dm *Defmap, val value, idTok Tok, m *exprModel) (v valu
 		v.data.Type = g.Type
 		v.lvalue = true
 		v.constExpr = g.Const
-		if g.Tag == nil {
-			m.appendSubNode(exprNode{xapi.OutId(g.Id, g.DefTok.File)})
-		} else {
-			m.appendSubNode(exprNode{g.Tag.(string)})
-		}
+		m.appendSubNode(exprNode{g.OutId()})
 	case 'f':
 		f := dm.Funcs[i]
 		f.used = true

@@ -33,7 +33,7 @@ func (p *Param) TypeString() string {
 
 // OutId returns xapi.OutId result of param.
 func (p *Param) OutId() string {
-	return xapi.OutId(p.Id, p.Tok.File)
+	return xapi.AsId(p.Id)
 }
 
 func (p Param) String() string {
