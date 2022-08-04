@@ -6,7 +6,7 @@ import "github.com/the-xlang/xxc/lex/tokens"
 var UnaryOperators = [...]string{
 	0: tokens.MINUS,
 	1: tokens.PLUS,
-	2: tokens.TILDE,
+	2: tokens.CARET,
 	3: tokens.EXCLAMATION,
 	4: tokens.STAR,
 	5: tokens.AMPER,
@@ -24,8 +24,7 @@ var SolidOperators = [...]string{
 	7:  tokens.CARET,
 	8:  tokens.LESS,
 	9:  tokens.GREAT,
-	10: tokens.TILDE,
-	11: tokens.EXCLAMATION,
+	10: tokens.EXCLAMATION,
 }
 
 // ExpressionOperators.

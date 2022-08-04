@@ -52,10 +52,10 @@ func (u *unary) plus() value {
 	return v
 }
 
-func (u *unary) tilde() value {
+func (u *unary) caret() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !typeIsPure(v.data.Type) || !xtype.IsInteger(v.data.Type.Id) {
-		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.TILDE)
+		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.CARET)
 	}
 	if v.constExpr {
 		switch t := v.expr.(type) {

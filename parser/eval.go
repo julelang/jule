@@ -199,23 +199,28 @@ func (e *eval) unary(toks Toks, m *exprModel) value {
 	// if all operators length is not 1.
 	exprToks := toks[1:]
 	processor := unary{toks[0], exprToks, m, e.p}
-	m.appendSubNode(exprNode{processor.tok.Kind})
 	if processor.toks == nil {
 		e.pusherrtok(processor.tok, "invalid_syntax")
 		return v
 	}
 	switch processor.tok.Kind {
 	case tokens.MINUS:
+		m.appendSubNode(exprNode{processor.tok.Kind})
 		v = processor.minus()
 	case tokens.PLUS:
+		m.appendSubNode(exprNode{processor.tok.Kind})
 		v = processor.plus()
-	case tokens.TILDE:
-		v = processor.tilde()
+	case tokens.CARET:
+		m.appendSubNode(exprNode{"~"})
+		v = processor.caret()
 	case tokens.EXCLAMATION:
+		m.appendSubNode(exprNode{processor.tok.Kind})
 		v = processor.logicalNot()
 	case tokens.STAR:
+		m.appendSubNode(exprNode{processor.tok.Kind})
 		v = processor.star()
 	case tokens.AMPER:
+		m.appendSubNode(exprNode{processor.tok.Kind})
 		v = processor.amper()
 	default:
 		e.pusherrtok(processor.tok, "invalid_syntax")

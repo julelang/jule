@@ -401,14 +401,13 @@ var basicOps = [...]oppair{
 	29: {tokens.STAR, tokens.Operator},
 	30: {tokens.SOLIDUS, tokens.Operator},
 	31: {tokens.PERCENT, tokens.Operator},
-	32: {tokens.TILDE, tokens.Operator},
-	33: {tokens.AMPER, tokens.Operator},
-	34: {tokens.VLINE, tokens.Operator},
-	35: {tokens.CARET, tokens.Operator},
-	36: {tokens.EXCLAMATION, tokens.Operator},
-	37: {tokens.LESS, tokens.Operator},
-	38: {tokens.GREAT, tokens.Operator},
-	39: {tokens.EQUAL, tokens.Operator},
+	32: {tokens.AMPER, tokens.Operator},
+	33: {tokens.VLINE, tokens.Operator},
+	34: {tokens.CARET, tokens.Operator},
+	35: {tokens.EXCLAMATION, tokens.Operator},
+	36: {tokens.LESS, tokens.Operator},
+	37: {tokens.GREAT, tokens.Operator},
+	38: {tokens.EQUAL, tokens.Operator},
 }
 
 func (l *Lex) lexKeywords(txt string, tok *Tok) bool {
