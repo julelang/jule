@@ -337,6 +337,25 @@ pub add64(x, y, carry u64) [sum, carryout u64] {
 	ret
 }
 
+// --- Subtract with borrow ---
+
+//doc:
+// Returns the difference of x, y and borrow, diff = x - y - borrow.
+// The borrow input must be 0 or 1; otherwise the behavior is undefined.
+// The borrowout output is guaranteed to be 0 or 1.
+//
+// This function's execution time does not depend on the inputs.
+pub sub32(x, y, borrow u32) [diff, borrowout u32] {
+	diff = x - y - borrow
+	// The difference will underflow if the top bit of x is not set and the top
+	// bit of y is set (^x & y) or if they are the same (^(x ^ y)) and a borrow
+	// from the lower place happens. If that borrow happens, the result will be
+	// 1 - 1 - 1 = 0 - 0 - 1 = 1 (& diff).
+	borrowout = ((~x & y) | (~(x ^ y) & diff)) >> 31
+	ret
+}
+
+
 // --- Full-width multiply ---
 
 //doc:
