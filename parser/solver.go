@@ -238,7 +238,7 @@ func (s *solver) div(v *value) {
 	case int64:
 		right := tonumf(s.rightVal.expr)
 		if right != 0 {
-			v.expr = int64(float64(left) / right)
+			v.expr = float64(left) / right
 		} else {
 			s.p.pusherrtok(s.operator, "divide_by_zero")
 			v.expr = int64(0)
@@ -246,10 +246,10 @@ func (s *solver) div(v *value) {
 	case uint64:
 		right := tonumf(s.rightVal.expr)
 		if right != 0 {
-			v.expr = uint64(float64(left) / right)
+			v.expr = float64(left) / right
 		} else {
 			s.p.pusherrtok(s.operator, "divide_by_zero")
-			v.expr = uint64(0)
+			v.expr = float64(0)
 		}
 	}
 }
