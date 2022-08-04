@@ -419,3 +419,53 @@ pub div32(hi, lo, y u32) [quo, rem u32] {
 	quo, rem = u32(z/u64(y)), u32(z%u64(y))
 	ret
 }
+
+//doc:
+// Returns the quotient and remainder of (hi, lo) divided by y:
+// quo = (hi, lo)/y, rem = (hi, lo)%y with the dividend bits' upper
+// half in parameter hi and the lower half in parameter lo.
+// div64 panics for y == 0 (division by zero) or y <= hi (quotient overflow).
+pub div64(hi, lo, y u64) [quo, rem u64] {
+	const two32:  = 1 << 32
+	const mask32: = two32 - 1
+	if y == 0 {
+		panic(divide_error)
+	}
+	if y <= hi {
+		panic(overflow_error)
+	}
+
+	s: = uint(leading_zeros64(y))
+	y <<= s
+
+	yn1: = y >> 32
+	yn0: = y & mask32
+	un32: = hi<<s | lo>>(64-s)
+	un10: = lo << s
+	un1: = un10 >> 32
+	un0: = un10 & mask32
+	q1: = un32 / yn1
+	rhat: = un32 - q1*yn1
+
+	for q1 >= two32 || q1*yn0 > two32*rhat+un1 {
+		q1--
+		rhat += yn1
+		if rhat >= two32 {
+			break
+		}
+	}
+
+	un21: = un32*two32 + un1 - q1*y
+	q0: = un21 / yn1
+	rhat = un21 - q0*yn1
+
+	for q0 >= two32 || q0*yn0 > two32*rhat+un0 {
+		q0--
+		rhat += yn1
+		if rhat >= two32 {
+			break
+		}
+	}
+
+	ret q1*two32 + q0, (un21*two32 + un0 - q0*y) >> s
+}
