@@ -64,6 +64,8 @@ func typeHasThisGeneric(generic *GenericType, t DataType) bool {
 			}
 		}
 		return false
+	case typeIsSlice(t), typeIsArray(t):
+		return typeHasThisGeneric(generic, *t.ComponentType)
 	}
 	return typeIsThisGeneric(generic, t)
 }
@@ -163,9 +165,7 @@ func checkArrayCompatiblity(arrT, t DataType) bool {
 	if !typeIsArray(t) {
 		return false
 	}
-	i := arrT.Tag.([][]any)[0][0].(uint64)
-	j := t.Tag.([][]any)[0][0].(uint64)
-	return i == j
+	return arrT.Size.N == t.Size.N
 }
 
 func checkMapCompability(mapT, t DataType) bool {

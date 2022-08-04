@@ -29,7 +29,6 @@ var Errors = map[string]string{
 	`operator_notfor_uint`:                     `%s operator is not defined for unsigned integer type(s)`,
 	`id_noexist`:                               `identifier is not exist: %s`,
 	`not_function_call`:                        `value is not function`,
-	`parameter_exist`:                          `parameter is already exist in this identifer: %s`,
 	`argument_overflow`:                        `argument overflow`,
 	`func_have_return`:                         `%s function cannot have return type`,
 	`func_have_parameters`:                     `%s function cannot have parameter(s)`,

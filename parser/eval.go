@@ -508,7 +508,7 @@ func (e *eval) tryCast(toks Toks, m *exprModel) (v value, _ bool) {
 		if tok.Id != tokens.Brace || tok.Kind != tokens.LPARENTHESES {
 			return
 		}
-		exprToks, ok = e.p.getRange(tokens.LPARENTHESES, tokens.RPARENTHESES, exprToks)
+		exprToks, ok = e.p.getrange(tokens.LPARENTHESES, tokens.RPARENTHESES, exprToks)
 		if !ok {
 			return
 		}
@@ -771,7 +771,11 @@ func (e *eval) xObjSubId(dm *Defmap, val value, idTok Tok, m *exprModel) (v valu
 		v.data.Type = g.Type
 		v.lvalue = true
 		v.constExpr = g.Const
-		m.appendSubNode(exprNode{g.OutId()})
+		if g.Tag != nil {
+			m.appendSubNode(exprNode{g.Tag.(string)})
+		} else {
+			m.appendSubNode(exprNode{g.OutId()})
+		}
 	case 'f':
 		f := dm.Funcs[i]
 		f.used = true

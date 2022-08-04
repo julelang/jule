@@ -3,9 +3,8 @@ package models
 import (
 	"strings"
 
-	"github.com/the-xlang/xxc/lex/tokens"
-	"github.com/the-xlang/xxc/pkg/x"
 	"github.com/the-xlang/xxc/pkg/xapi"
+	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
 // IterForeach is foreach iteration profile.
@@ -39,12 +38,12 @@ func (f *IterForeach) ClassicString(iter Iter) string {
 	cpp.WriteString(", [&](")
 	cpp.WriteString(f.KeyA.Type.String())
 	cpp.WriteByte(' ')
-	cpp.WriteString(xapi.OutId(f.KeyA.Id, f.KeyA.IdTok.File))
+	cpp.WriteString(f.KeyA.OutId())
 	if !xapi.IsIgnoreId(f.KeyB.Id) {
 		cpp.WriteByte(',')
 		cpp.WriteString(f.KeyB.Type.String())
 		cpp.WriteByte(' ')
-		cpp.WriteString(xapi.OutId(f.KeyB.Id, f.KeyB.IdTok.File))
+		cpp.WriteString(f.KeyB.OutId())
 	}
 	cpp.WriteString(") -> void ")
 	cpp.WriteString(iter.Block.String())
@@ -64,12 +63,12 @@ func (f *IterForeach) MapString(iter Iter) string {
 	cpp.WriteString(", [&](")
 	cpp.WriteString(f.KeyA.Type.String())
 	cpp.WriteByte(' ')
-	cpp.WriteString(xapi.OutId(f.KeyA.Id, f.KeyA.IdTok.File))
+	cpp.WriteString(f.KeyA.OutId())
 	if !xapi.IsIgnoreId(f.KeyB.Id) {
 		cpp.WriteByte(',')
 		cpp.WriteString(f.KeyB.Type.String())
 		cpp.WriteByte(' ')
-		cpp.WriteString(xapi.OutId(f.KeyB.Id, f.KeyB.IdTok.File))
+		cpp.WriteString(f.KeyB.OutId())
 	}
 	cpp.WriteString(") -> void ")
 	cpp.WriteString(iter.Block.String())
@@ -78,12 +77,10 @@ func (f *IterForeach) MapString(iter Iter) string {
 }
 
 func (f *IterForeach) ForeachString(iter Iter) string {
-	switch {
-	case f.ExprType.Kind == tokens.STR,
-		strings.HasPrefix(f.ExprType.Kind, x.Prefix_Slice),
-		strings.HasPrefix(f.ExprType.Kind, x.Prefix_Array):
+	switch f.ExprType.Id {
+	case xtype.Str, xtype.Slice, xtype.Array:
 		return f.ClassicString(iter)
-	case f.ExprType.Kind[0] == '[':
+	case xtype.Map:
 		return f.MapString(iter)
 	}
 	return ""
@@ -92,7 +89,7 @@ func (f *IterForeach) ForeachString(iter Iter) string {
 func (f *IterForeach) IterationString(iter Iter) string {
 	var cpp strings.Builder
 	cpp.WriteString("for (auto ")
-	cpp.WriteString(xapi.OutId(f.KeyB.Id, f.KeyB.IdTok.File))
+	cpp.WriteString(f.KeyB.OutId())
 	cpp.WriteString(" : ")
 	cpp.WriteString(f.Expr.String())
 	cpp.WriteString(") ")

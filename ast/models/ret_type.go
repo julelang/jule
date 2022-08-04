@@ -32,6 +32,7 @@ func (rt *RetType) Vars() []*Var {
 		v.IdTok = tok
 		v.Id = tok.Kind
 		v.Type = t
+		v.IsField = true
 		return v
 	}
 	if !rt.Type.MultiTyped {

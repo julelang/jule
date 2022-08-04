@@ -989,6 +989,7 @@ func (p *Parser) Trait(t models.Trait) {
 				p.pusherrtok(f.Tok, "exist_id", f.Id)
 			}
 		}
+		_ = p.checkParamDup(f.Params)
 		p.parseTypesNonGenerics(f)
 		tf := new(function)
 		tf.Ast = f
@@ -1266,6 +1267,12 @@ func (p *Parser) parseNonGenericType(generics []*GenericType, t *DataType) {
 		p.parseFuncNonGenericType(generics, t)
 	case typeIsMap(*t):
 		p.parseMapNonGenericType(generics, t)
+	case typeIsArray(*t):
+		p.parseNonGenericType(generics, t.ComponentType)
+		t.Kind = x.Prefix_Array + t.ComponentType.Kind
+	case typeIsSlice(*t):
+		p.parseNonGenericType(generics, t.ComponentType)
+		t.Kind = x.Prefix_Slice + t.ComponentType.Kind
 	default:
 		p.parseCommonNonGenericType(generics, t)
 	}
@@ -1331,6 +1338,12 @@ func (p *Parser) parseGenericType(generics []*GenericType, t *DataType) {
 		p.parseFuncGenericType(generics, t)
 	case typeIsMap(*t):
 		p.parseMapGenericType(generics, t)
+	case typeIsArray(*t):
+		p.parseGenericType(generics, t.ComponentType)
+		t.Kind = x.Prefix_Array + t.ComponentType.Kind
+	case typeIsSlice(*t):
+		p.parseGenericType(generics, t.ComponentType)
+		t.Kind = x.Prefix_Slice + t.ComponentType.Kind
 	default:
 		p.parseCommonGenericType(generics, t)
 	}
@@ -1535,7 +1548,11 @@ func (p *Parser) varsFromParams(params []Param) []*Var {
 			if length-i > 1 {
 				p.pusherrtok(param.Tok, "variadic_parameter_notlast")
 			}
+			v.Type.Original = nil
+			v.Type.DontUseOriginal = true
+			v.Type.Id = xtype.Slice
 			v.Type.Kind = x.Prefix_Slice + v.Type.Kind
+			v.Type.ComponentType = &param.Type
 		}
 		vars[i] = v
 	}
@@ -1747,7 +1764,11 @@ func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) {
 	}
 	dt := param.Type
 	if param.Variadic {
-		dt.Kind = x.Prefix_Array + dt.Kind // For slice.
+		dt.Id = xtype.Slice
+		dt.Kind = x.Prefix_Array + dt.Kind
+		dt.ComponentType = &param.Type
+		dt.Original = nil
+		dt.DontUseOriginal = true
 	}
 	v, model := p.evalExpr(param.Default)
 	param.Default.Model = model
@@ -1765,17 +1786,28 @@ func (p *Parser) param(f *Func, param *Param) (err bool) {
 			p.pusherrtok(param.Tok, "variadic_reference_param")
 			err = true
 		}
-		/*if typeIsPtr(param.Type) {
-			p.pusherrtok(param.Tok, "pointer_reference")
-			err = true
-		}*/
 	}
 	p.checkParamDefaultExpr(f, param)
 	return
 }
 
+func (p *Parser) checkParamDup(params []models.Param) (err bool) {
+	for i, param := range params {
+		for j, jparam := range params {
+			if j >= i {
+				break
+			} else if param.Id == jparam.Id {
+				err = true
+				p.pusherrtok(param.Tok, "exist_id", param.Id)
+			}
+		}
+	}
+	return
+}
+
 func (p *Parser) params(f *Func) (err bool) {
 	hasDefaultArg := false
+	err = p.checkParamDup(f.Params)
 	for i := range f.Params {
 		param := &f.Params[i]
 		err = err || p.param(f, param)
@@ -1971,7 +2003,7 @@ func (p *Parser) checkAnonFunc(f *Func) {
 
 // Returns nil if has error.
 func (p *Parser) getArgs(toks Toks, targeting bool) *models.Args {
-	toks, _ = p.getRange(tokens.LPARENTHESES, tokens.RPARENTHESES, toks)
+	toks, _ = p.getrange(tokens.LPARENTHESES, tokens.RPARENTHESES, toks)
 	if toks == nil {
 		toks = make(Toks, 0)
 	}
@@ -2133,16 +2165,6 @@ check:
 ok:
 	return true
 }
-
-/*
-func isConstructor(f *Func) bool {
-	if !typeIsStruct(f.RetType.Type) {
-		return false
-	}
-	s := f.RetType.Type.Tag.(*xstruct)
-	return f.Id == s.Ast.Id
-}
-*/
 
 func (p *Parser) parseFuncCall(f *Func, args *models.Args, m *exprModel, errTok Tok) (v value) {
 	args.NeedsPureType = len(p.rootBlock.Func.Generics) == 0
@@ -2321,6 +2343,13 @@ func (p *Parser) pushGenericByType(generic *GenericType, args *models.Args, t Da
 	args.Generics = append(args.Generics, t)
 }
 
+func (p *Parser) pushGenericByComponent(f *Func, pair *paramMapPair, args *models.Args, argType DataType) bool {
+	for argType.ComponentType != nil {
+		argType = *argType.ComponentType
+	}
+	return p.pushGenericByCommonArg(f, pair, args, argType)
+}
+
 func (p *Parser) pushGenericByArg(f *Func, pair *paramMapPair, args *models.Args, argType DataType) bool {
 	_, prefix := pair.param.Type.KindId()
 	_, tprefix := argType.KindId()
@@ -2332,6 +2361,8 @@ func (p *Parser) pushGenericByArg(f *Func, pair *paramMapPair, args *models.Args
 		return p.pushGenericByFunc(f, pair, args, argType)
 	case argType.MultiTyped, typeIsMap(argType):
 		return p.pushGenericByMultiTyped(f, pair, args, argType)
+	case typeIsArray(argType), typeIsSlice(argType):
+		return p.pushGenericByComponent(f, pair, args, argType)
 	default:
 		return p.pushGenericByCommonArg(f, pair, args, argType)
 	}
@@ -2370,31 +2401,14 @@ func (p *Parser) checkArgType(param *Param, val value, errTok Tok) {
 	}.checkAssignType()
 }
 
-// Returns between of brackets.
+// getrange returns between of brackets.
 //
 // Special case is:
-//  getRange(open, close, tokens) = nil, false if first token is not brace.
-func (p *Parser) getRange(open, close string, toks Toks) (_ Toks, ok bool) {
-	braceCount := 0
-	start := 1
-	if toks[0].Id != tokens.Brace {
-		return nil, false
-	}
-	for i, tok := range toks {
-		if tok.Id != tokens.Brace {
-			continue
-		}
-		if tok.Kind == open {
-			braceCount++
-		} else if tok.Kind == close {
-			braceCount--
-		}
-		if braceCount > 0 {
-			continue
-		}
-		return toks[start:i], true
-	}
-	return nil, false
+//  getrange(open, close, tokens) = nil, false if fail
+func (p *Parser) getrange(open, close string, toks Toks) (_ Toks, ok bool) {
+	i := 0
+	toks = ast.Range(&i, open, close, toks)
+	return toks, toks != nil
 }
 
 func (p *Parser) checkSolidFuncSpecialCases(f *Func) {
@@ -2997,6 +3011,8 @@ func (p *Parser) whileProfile(iter *models.Iter) {
 
 func (p *Parser) foreachProfile(iter *models.Iter) {
 	profile := iter.Profile.(models.IterForeach)
+	profile.KeyA.IsField = true
+	profile.KeyB.IsField = true
 	val, model := p.evalExpr(profile.Expr)
 	profile.Expr.Model = model
 	profile.ExprType = val.data.Type
@@ -3144,7 +3160,6 @@ func (p *Parser) typeSourceIsType(dt DataType, t *Type, err bool) (DataType, boo
 	dt = t.Type
 	dt.Tok = t.Tok
 	dt.Original = original
-	dt.Kind = t.Type.Kind
 	dt, ok := p.typeSource(dt, err)
 	dt.DontUseOriginal = false
 	if ok && old.Tag != nil && !typeIsStruct(t.Type) { // Has generics
@@ -3273,6 +3288,7 @@ func (p *Parser) typeSourceIsArrayType(t *DataType) (ok bool) {
 	if !ok {
 		return
 	}
+	t.Kind = x.Prefix_Array + t.ComponentType.Kind
 	if t.Size.AutoSized || t.Size.Expr.Model != nil {
 		return
 	}
@@ -3295,6 +3311,7 @@ func (p *Parser) typeSourceIsArrayType(t *DataType) (ok bool) {
 
 func (p *Parser) typeSourceIsSliceType(t *DataType) (ok bool) {
 	*t.ComponentType, ok = p.realType(*t.ComponentType, true)
+	t.Kind = x.Prefix_Slice + t.ComponentType.Kind
 	if ok && typeIsArray(*t.ComponentType) { // Array into slice
 		p.pusherrtok(t.Tok, "invalid_type_source")
 	}

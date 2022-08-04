@@ -3,6 +3,7 @@ package parser
 import (
 	"github.com/the-xlang/xxc/ast/models"
 	"github.com/the-xlang/xxc/pkg/x"
+	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
 func getParamMap(params []Param) *paramMap {
@@ -35,8 +36,15 @@ func (pap *pureArgParser) buildArgs() {
 		case pair.arg != nil:
 			pap.args.Src[i] = *pair.arg
 		case pair.param.Variadic:
-			model := sliceExpr{pair.param.Type, nil}
-			model.dataType.Kind = x.Prefix_Slice + model.dataType.Kind // For slice.
+			t := DataType{
+				Id:              xtype.Slice,
+				Tok:             pair.param.Type.Tok,
+				Kind:            x.Prefix_Slice + pair.param.Type.Kind,
+				DontUseOriginal: true,
+				ComponentType:   new(DataType),
+			}
+			*t.ComponentType = pair.param.Type
+			model := sliceExpr{t, nil}
 			arg := Arg{Expr: Expr{Model: model}}
 			pap.args.Src[i] = arg
 		}
@@ -55,11 +63,15 @@ func (pap *pureArgParser) pushVariadicArgs(pair *paramMapPair) {
 		pap.p.parseArg(pap.f, pair, pap.args, &variadiced)
 		model.expr = append(model.expr, pair.arg.Expr.Model.(iExpr))
 	}
-	model.dataType = pair.param.Type
-	model.dataType.Kind = x.Prefix_Slice + model.dataType.Kind // For slice.
+	model.dataType.Id = xtype.Slice
+	model.dataType.Kind = x.Prefix_Slice + model.dataType.Kind
+	model.dataType.ComponentType = new(DataType)
+	*model.dataType.ComponentType = pair.param.Type
+	model.dataType.Original = nil
+	model.dataType.DontUseOriginal = true
 	if pap.args.NeedsPureType {
-		model.dataType.DontUseOriginal = true
-		model.dataType.Original = nil
+		model.dataType.ComponentType.DontUseOriginal = true
+		model.dataType.ComponentType.Original = nil
 	}
 	if !once {
 		return
