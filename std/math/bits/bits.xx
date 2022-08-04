@@ -478,3 +478,18 @@ pub div64(hi, lo, y u64) [quo, rem u64] {
 pub rem32(hi, lo, y u32) u32 {
 	ret u32((u64(hi)<<32 | u64(lo)) % u64(y))
 }
+
+//doc:
+// Returns the remainder of (hi, lo) divided by y. rem64 panics
+// for y == 0 (division by zero) but, unlike div64, it doesn't panic
+// on a quotient overflow.
+pub rem64(hi, lo, y u64) u64 {
+	// We scale down hi so that hi < y, then use div64 to compute the
+	// rem with the guarantee that it won't panic on quotient overflow.
+	// Given that
+	//   hi ≡ hi%y    (mod y)
+	// we have
+	//   hi<<64 + lo ≡ (hi%y)<<64 + lo    (mod y)
+	_, rem: = div64(hi%y, lo, y)
+	ret rem
+}
