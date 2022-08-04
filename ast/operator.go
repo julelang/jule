@@ -46,9 +46,9 @@ func IsSolidOperator(kind string) bool {
 	return existOperator(kind, SolidOperators[:])
 }
 
-// IsExpressionOperator reports operator kind
+// IsExprOperator reports operator kind
 // is allow as expression operator or not.
-func IsExpressionOperator(kind string) bool {
+func IsExprOperator(kind string) bool {
 	return existOperator(kind, ExpressionOperators[:])
 }
 

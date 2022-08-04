@@ -2352,18 +2352,17 @@ type exprProcessInfo struct {
 }
 
 func (b *Builder) exprOperatorPart(info *exprProcessInfo, tok Tok) {
-	if IsExpressionOperator(tok.Kind) ||
-		IsAssignOperator(tok.Kind) {
+	if IsExprOperator(tok.Kind) {
 		info.part = append(info.part, tok)
 		return
 	}
 	if !info.operator {
-		if IsUnaryOperator(tok.Kind) && !info.singleOperatored {
+		if !info.singleOperatored && IsUnaryOperator(tok.Kind) {
 			info.part = append(info.part, tok)
 			info.singleOperatored = true
 			return
 		}
-		if info.braceCount == 0 && IsSolidOperator(tok.Kind) {
+		if IsSolidOperator(tok.Kind) {
 			b.pusherr(tok, "operator_overflow")
 		}
 	}
@@ -2407,6 +2406,7 @@ func (b *Builder) exprBracePart(info *exprProcessInfo, tok Tok) bool {
 			info.i = oldIndex
 		}
 		info.singleOperatored = false
+		info.operator = false
 		info.braceCount++
 	default:
 		info.braceCount--

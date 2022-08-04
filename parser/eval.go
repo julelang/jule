@@ -194,9 +194,9 @@ func (e *eval) single(tok Tok, m *exprModel) (v value, ok bool) {
 
 func (e *eval) unary(toks Toks, m *exprModel) value {
 	var v value
-	//? Length is 1 cause all length of operator tokens is 1.
-	//? Change "1" with length of token's value
-	//? if all operators length is not 1.
+	// Length is 1 cause all length of operator tokens is 1.
+	// Change "1" with length of token's value
+	// if all operators length is not 1.
 	exprToks := toks[1:]
 	processor := unary{toks[0], exprToks, m, e.p}
 	m.appendSubNode(exprNode{processor.tok.Kind})
