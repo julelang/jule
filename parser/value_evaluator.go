@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"math/big"
 	"strconv"
 	"strings"
@@ -50,9 +51,7 @@ func numericModel(v value) iExpr {
 	case int64:
 		return exprNode{cppId + "{" + strconv.FormatInt(t, 10) + "}"}
 	case float64:
-		var bigf big.Float
-		_ = bigf.SetFloat64(t)
-		return exprNode{cppId + "{" + bigf.String() + "}"}
+		return exprNode{cppId + "{" + fmt.Sprint(t) + "}"}
 	}
 	return nil
 }
