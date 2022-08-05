@@ -93,4 +93,5 @@ const (
 	TRAIT               = "trait"
 	IMPL                = "impl"
 	CPP                 = "cpp"
+	FALLTHROUGH         = "fallthrough"
 )

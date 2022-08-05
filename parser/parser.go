@@ -1770,7 +1770,6 @@ func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) {
 	}
 	v, model := p.evalExpr(param.Default)
 	param.Default.Model = model
-	p.wg.Add(1)
 	p.checkArgType(param, v, param.Tok)
 }
 
@@ -2508,6 +2507,18 @@ func (p *Parser) statement(s *models.Statement, recover bool) bool {
 	return true
 }
 
+func (p *Parser) fallthroughStatement(f *models.Fallthrough, b *models.Block, i *int) {
+	switch {
+	case p.currentCase == nil || *i+1 < len(b.Tree):
+		p.pusherrtok(f.Tok, "fallthrough_wrong_use")
+		return
+	case p.currentCase.Next == nil:
+		p.pusherrtok(f.Tok, "fallthrough_into_final_case")
+		return
+	}
+	f.Case = p.currentCase
+}
+
 func (p *Parser) checkStatement(b *models.Block, i *int) {
 	s := b.Tree[*i]
 	defer func(i int) { b.Tree[i] = s }(*i)
@@ -2515,6 +2526,9 @@ func (p *Parser) checkStatement(b *models.Block, i *int) {
 		return
 	}
 	switch t := s.Data.(type) {
+	case models.Fallthrough:
+		p.fallthroughStatement(&t, b, i)
+		s.Data = t
 	case models.If:
 		p.ifExpr(&t, i, b.Tree)
 		s.Data = t
@@ -2603,8 +2617,7 @@ func (p *Parser) exprStatement(s *models.ExprStatement, recover bool) {
 	}
 }
 
-func (p *Parser) parseCase(m *models.Match, c *models.Case, t DataType) {
-	c.Match = m
+func (p *Parser) parseCase(c *models.Case, t DataType) {
 	for i := range c.Exprs {
 		expr := &c.Exprs[i]
 		value, model := p.evalExpr(*expr)
@@ -2627,7 +2640,7 @@ func (p *Parser) parseCase(m *models.Match, c *models.Case, t DataType) {
 
 func (p *Parser) cases(m *models.Match, t DataType) {
 	for i := range m.Cases {
-		p.parseCase(m, &m.Cases[i], t)
+		p.parseCase(&m.Cases[i], t)
 	}
 }
 
@@ -2642,7 +2655,7 @@ func (p *Parser) matchcase(t *models.Match) {
 	}
 	p.cases(t, t.ExprType)
 	if t.Default != nil {
-		p.parseCase(t, t.Default, t.ExprType)
+		p.parseCase(t.Default, t.ExprType)
 	}
 }
 
@@ -3442,7 +3455,6 @@ func (p *Parser) checkType(real, check DataType, ignoreAny bool, errTok Tok) {
 		return
 	}
 	if real.MultiTyped || check.MultiTyped {
-		p.wg.Add(1)
 		p.checkMultiType(real, check, ignoreAny, errTok)
 		return
 	}

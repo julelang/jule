@@ -39,4 +39,5 @@ const (
 	Trait        uint8 = 34
 	Impl         uint8 = 35
 	Cpp          uint8 = 36
+	Fallthrough  uint8 = 37
 )

@@ -5,14 +5,35 @@ import (
 	"strings"
 )
 
+type Fallthrough struct {
+	Tok  Tok
+	Case *Case
+}
+
+func (f Fallthrough) String() string {
+	var cpp strings.Builder
+	cpp.WriteString("goto ")
+	cpp.WriteString(f.Case.Next.BeginLabel())
+	cpp.WriteByte(';')
+	return cpp.String()
+}
+
 // Case the AST model of case.
 type Case struct {
 	Tok   Tok
 	Exprs []Expr
-	// Number of case
-	CaseN int
 	Block *Block
 	Match *Match
+	Next  *Case
+}
+
+// BeginLabel returns of cpp goto label identifier of case begin.
+func (c *Case) BeginLabel() string {
+	var cpp strings.Builder
+	cpp.WriteString("case_begin_")
+	cpp.WriteString(strconv.FormatInt(int64(c.Tok.Row), 10))
+	cpp.WriteString(strconv.FormatInt(int64(c.Tok.Column), 10))
+	return cpp.String()
 }
 
 // EndLabel returns of cpp goto label identifier of case end.
@@ -44,6 +65,9 @@ func (c *Case) String(matchExpr string) string {
 		cpp.WriteString("; }\n")
 	}
 	if len(c.Block.Tree) > 0 {
+		cpp.WriteString(IndentString())
+		cpp.WriteString(c.BeginLabel())
+		cpp.WriteString(":;\n")
 		cpp.WriteString(IndentString())
 		cpp.WriteString(c.Block.String())
 		cpp.WriteByte('\n')

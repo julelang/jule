@@ -1433,6 +1433,8 @@ func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
 		return b.ConcurrentCallStatement(bs.toks)
 	case tokens.Goto:
 		return b.GotoStatement(bs.toks)
+	case tokens.Fallthrough:
+		return b.Fallthrough(bs.toks)
 	case tokens.Type:
 		t := b.Type(bs.toks)
 		s.Tok = t.Tok
@@ -1866,6 +1868,17 @@ func (b *Builder) ConcurrentCallStatement(toks Toks) (s models.Statement) {
 	return
 }
 
+func (b *Builder) Fallthrough(toks Toks) (s models.Statement) {
+	s.Tok = toks[0]
+	if len(toks) > 1 {
+		b.pusherr(toks[1], "invalid_syntax")
+	}
+	s.Data = models.Fallthrough{
+		Tok: s.Tok,
+	}
+	return
+}
+
 func (b *Builder) GotoStatement(toks Toks) (s models.Statement) {
 	s.Tok = toks[0]
 	if len(toks) == 1 {
@@ -2194,6 +2207,19 @@ func (b *Builder) MatchCase(toks Toks) (s models.Statement) {
 		return
 	}
 	match.Cases, match.Default = b.cases(blockToks)
+	for i := range match.Cases {
+		c := &match.Cases[i]
+		c.Match = &match
+		if i > 0 {
+			match.Cases[i-1].Next = c
+		}
+	}
+	if match.Default != nil {
+		if len(match.Cases) > 0 {
+			match.Cases[len(match.Cases)-1].Next = match.Default
+		}
+		match.Default.Match = &match
+	}
 	s.Data = match
 	return
 }
