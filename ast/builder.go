@@ -1527,8 +1527,8 @@ func (b *Builder) pushAssignLeft(lefts *[]models.AssignLeft, last, current int, 
 			b.pusherr(left.Expr.Toks[0], "notallow_declares")
 		}
 		left.Var.New = true
-		left.Var.IdTok = left.Expr.Toks[0]
-		left.Var.Id = left.Var.IdTok.Kind
+		left.Var.Token = left.Expr.Toks[0]
+		left.Var.Id = left.Var.Token.Kind
 		left.Var.SetterTok = info.Setter
 		// Has specific data-type?
 		if current-last > 2 {
@@ -1536,8 +1536,8 @@ func (b *Builder) pushAssignLeft(lefts *[]models.AssignLeft, last, current int, 
 		}
 	} else {
 		if left.Expr.Toks[0].Id == tokens.Id {
-			left.Var.IdTok = left.Expr.Toks[0]
-			left.Var.Id = left.Var.IdTok.Kind
+			left.Var.Token = left.Expr.Toks[0]
+			left.Var.Id = left.Var.Token.Kind
 		}
 		left.Expr = b.Expr(left.Expr.Toks)
 	}
@@ -1781,18 +1781,18 @@ func (b *Builder) Var(toks Toks, begin bool) (v models.Var) {
 	v.Pub = b.pub
 	b.pub = false
 	i := 0
-	v.DefTok = toks[i]
+	v.Token = toks[i]
 	if begin {
 		b.varBegin(&v, &i, toks)
 		if i >= len(toks) {
 			return
 		}
 	}
-	v.IdTok = toks[i]
-	if v.IdTok.Id != tokens.Id {
-		b.pusherr(v.IdTok, "invalid_syntax")
+	v.Token = toks[i]
+	if v.Token.Id != tokens.Id {
+		b.pusherr(v.Token, "invalid_syntax")
 	}
-	v.Id = v.IdTok.Kind
+	v.Id = v.Token.Kind
 	v.Type.Id = xtype.Void
 	v.Type.Kind = xtype.TypeMap[v.Type.Id]
 	// Skip type definer operator(':')
@@ -1801,14 +1801,11 @@ func (b *Builder) Var(toks Toks, begin bool) (v models.Var) {
 		b.pusherr(toks[i-1], "invalid_syntax")
 		return
 	}
-	// If exist deftok, this token is now should be colon.
-	if v.DefTok.File != nil {
-		if toks[i].Id != tokens.Colon {
-			b.pusherr(toks[i], "invalid_syntax")
-			return
-		}
-		i++
+	if toks[i].Id != tokens.Colon {
+		b.pusherr(toks[i], "invalid_syntax")
+		return
 	}
+	i++
 	if i < len(toks) {
 		b.varTypeNExpr(&v, toks, i)
 	}
@@ -1819,7 +1816,7 @@ func (b *Builder) Var(toks Toks, begin bool) (v models.Var) {
 func (b *Builder) VarStatement(toks Toks) models.Statement {
 	vast := b.Var(toks, true)
 	return models.Statement{
-		Tok:  vast.IdTok,
+		Tok:  vast.Token,
 		Data: vast,
 	}
 }
@@ -1918,12 +1915,12 @@ func (b *Builder) getVarProfile(toks Toks) (vast models.Var) {
 	if len(toks) == 0 {
 		return
 	}
-	vast.IdTok = toks[0]
-	if vast.IdTok.Id != tokens.Id {
-		b.pusherr(vast.IdTok, "invalid_syntax")
+	vast.Token = toks[0]
+	if vast.Token.Id != tokens.Id {
+		b.pusherr(vast.Token, "invalid_syntax")
 		return
 	}
-	vast.Id = vast.IdTok.Kind
+	vast.Id = vast.Token.Kind
 	if len(toks) == 1 {
 		return
 	}

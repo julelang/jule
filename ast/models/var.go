@@ -9,8 +9,7 @@ import (
 // Var is variable declaration AST model.
 type Var struct {
 	Pub       bool
-	DefTok    Tok
-	IdTok     Tok
+	Token     Tok
 	SetterTok Tok
 	Id        string
 	Type      DataType
@@ -30,7 +29,7 @@ func (v *Var) OutId() string {
 	case v.IsField:
 		return xapi.AsId(v.Id)
 	default:
-		return xapi.OutId(v.Id, v.IdTok.File)
+		return xapi.OutId(v.Id, v.Token.File)
 	}
 }
 

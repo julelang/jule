@@ -177,7 +177,7 @@ func (ve *valueEvaluator) varId(id string, variable *Var) (v value) {
 	v.data.Value = id
 	v.data.Type = variable.Type
 	v.constExpr = variable.Const
-	v.data.Tok = variable.IdTok
+	v.data.Tok = variable.Token
 	v.lvalue = true
 	if id == tokens.SELF && typeIsPtr(variable.Type) {
 		ve.model.appendSubNode(exprNode{xapi.CppSelf})

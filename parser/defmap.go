@@ -160,7 +160,7 @@ func (dm *Defmap) funcById(id string, f *File) (*function, *Defmap, bool) {
 func (dm *Defmap) findGlobalById(id string, f *File) (int, *Defmap, bool) {
 	for i, g := range dm.Globals {
 		if g != nil && g.Type.Id != xtype.Void && g.Id == id {
-			if isAccessable(f, g.IdTok.File, g.Pub) {
+			if isAccessable(f, g.Token.File, g.Pub) {
 				return i, dm, false
 			}
 		}

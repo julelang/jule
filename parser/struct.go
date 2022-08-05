@@ -255,7 +255,7 @@ func (s *xstruct) SetGenerics(generics []DataType) {
 
 func (s *xstruct) selfVar(receiver DataType) *Var {
 	v := new(models.Var)
-	v.IdTok = s.Ast.Tok
+	v.Token = s.Ast.Tok
 	v.Type = receiver
 	v.Type.Id = xtype.Struct
 	v.Id = tokens.SELF

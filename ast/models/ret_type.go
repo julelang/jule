@@ -29,7 +29,7 @@ func (rt *RetType) Vars() []*Var {
 			return nil
 		}
 		v := new(Var)
-		v.IdTok = tok
+		v.Token = tok
 		v.Id = tok.Kind
 		v.Type = t
 		v.IsField = true

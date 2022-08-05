@@ -52,7 +52,7 @@ func (f function) String() string {
 	if vars != nil {
 		statements := make([]models.Statement, len(vars))
 		for i, v := range vars {
-			statements[i] = models.Statement{Tok: v.IdTok, Data: *v}
+			statements[i] = models.Statement{Tok: v.Token, Data: *v}
 		}
 		block.Tree = append(statements, block.Tree...)
 	}
