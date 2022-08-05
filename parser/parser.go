@@ -49,8 +49,8 @@ type waitingGlobal struct {
 type Parser struct {
 	attributes     []Attribute
 	docText        strings.Builder
-	iterCount      int
-	caseCount      int
+	isNowIntoIter  bool
+	currentCase    *models.Case
 	wg             sync.WaitGroup
 	rootBlock      *models.Block
 	nodeBlock      *models.Block
@@ -2476,6 +2476,7 @@ func (p *Parser) statement(s *models.Statement, recover bool) bool {
 		s.Data = t
 	case models.Break:
 		p.breakStatement(&t)
+		s.Data = t
 	case models.Continue:
 		p.continueStatement(&t)
 	case Type:
@@ -2602,7 +2603,8 @@ func (p *Parser) exprStatement(s *models.ExprStatement, recover bool) {
 	}
 }
 
-func (p *Parser) parseCase(c *models.Case, t DataType) {
+func (p *Parser) parseCase(m *models.Match, c *models.Case, t DataType) {
+	c.Match = m
 	for i := range c.Exprs {
 		expr := &c.Exprs[i]
 		value, model := p.evalExpr(*expr)
@@ -2614,14 +2616,18 @@ func (p *Parser) parseCase(c *models.Case, t DataType) {
 			errtok: expr.Toks[0],
 		}.checkAssignType()
 	}
-	p.caseCount++
-	defer func() { p.caseCount-- }()
+	oldCase := p.currentCase
+	oldIter := p.isNowIntoIter
+	p.currentCase = c
+	p.isNowIntoIter = false
 	p.checkNewBlock(c.Block)
+	p.currentCase = oldCase
+	p.isNowIntoIter = oldIter
 }
 
-func (p *Parser) cases(cases []models.Case, t DataType) {
-	for i := range cases {
-		p.parseCase(&cases[i], t)
+func (p *Parser) cases(m *models.Match, t DataType) {
+	for i := range m.Cases {
+		p.parseCase(m, &m.Cases[i], t)
 	}
 }
 
@@ -2634,9 +2640,9 @@ func (p *Parser) matchcase(t *models.Match) {
 		t.ExprType.Id = xtype.Bool
 		t.ExprType.Kind = xtype.TypeMap[t.ExprType.Id]
 	}
-	p.cases(t.Cases, t.ExprType)
+	p.cases(t, t.ExprType)
 	if t.Default != nil {
-		p.parseCase(t.Default, t.ExprType)
+		p.parseCase(t, t.Default, t.ExprType)
 	}
 }
 
@@ -3056,8 +3062,10 @@ func (p *Parser) forProfile(iter *models.Iter) {
 }
 
 func (p *Parser) iter(iter *models.Iter) {
-	p.iterCount++
-	defer func() { p.iterCount-- }()
+	oldCase := p.currentCase
+	oldIter := p.isNowIntoIter
+	p.currentCase = nil
+	p.isNowIntoIter = true
 	if iter.Profile != nil {
 		switch iter.Profile.(type) {
 		case models.IterWhile:
@@ -3068,6 +3076,8 @@ func (p *Parser) iter(iter *models.Iter) {
 			p.forProfile(iter)
 		}
 	}
+	p.currentCase = oldCase
+	p.isNowIntoIter = oldIter
 }
 
 func (p *Parser) ifExpr(ifast *models.If, i *int, statements []models.Statement) {
@@ -3111,13 +3121,17 @@ func (p *Parser) elseBlock(elseast *models.Else) {
 }
 
 func (p *Parser) breakStatement(breakAST *models.Break) {
-	if p.iterCount == 0 && p.caseCount == 0 {
+	switch {
+	case p.isNowIntoIter:
+	case p.currentCase != nil:
+		breakAST.Case = p.currentCase
+	default:
 		p.pusherrtok(breakAST.Tok, "break_at_outiter")
 	}
 }
 
 func (p *Parser) continueStatement(continueAST *models.Continue) {
-	if p.iterCount == 0 {
+	if !p.isNowIntoIter {
 		p.pusherrtok(continueAST.Tok, "continue_at_outiter")
 	}
 }

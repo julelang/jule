@@ -1,17 +1,34 @@
 package models
 
-import "strings"
+import (
+	"strconv"
+	"strings"
+)
 
 // Case the AST model of case.
 type Case struct {
+	Tok   Tok
 	Exprs []Expr
+	// Number of case
+	CaseN int
 	Block *Block
+	Match *Match
+}
+
+// EndLabel returns of cpp goto label identifier of case end.
+func (c *Case) EndLabel() string {
+	var cpp strings.Builder
+	cpp.WriteString("case_end_")
+	cpp.WriteString(strconv.FormatInt(int64(c.Tok.Row), 10))
+	cpp.WriteString(strconv.FormatInt(int64(c.Tok.Column), 10))
+	return cpp.String()
 }
 
 func (c *Case) String(matchExpr string) string {
+	endlabel := c.EndLabel()
 	var cpp strings.Builder
 	if len(c.Exprs) > 0 {
-		cpp.WriteString("if (")
+		cpp.WriteString("if (!(")
 		for i, expr := range c.Exprs {
 			cpp.WriteString(expr.String())
 			if matchExpr != "" {
@@ -22,14 +39,23 @@ func (c *Case) String(matchExpr string) string {
 				cpp.WriteString(" || ")
 			}
 		}
-		cpp.WriteByte(')')
+		cpp.WriteString(")) { goto ")
+		cpp.WriteString(endlabel)
+		cpp.WriteString("; }\n")
 	}
-	cpp.WriteString(" { do ")
-	cpp.WriteString(c.Block.String())
-	cpp.WriteString("while(false);")
-	if len(c.Exprs) > 0 {
-		cpp.WriteByte('}')
+	if len(c.Block.Tree) > 0 {
+		cpp.WriteString(IndentString())
+		cpp.WriteString(c.Block.String())
+		cpp.WriteByte('\n')
+		cpp.WriteString(IndentString())
+		cpp.WriteString("goto ")
+		cpp.WriteString(c.Match.EndLabel())
+		cpp.WriteString(";")
+		cpp.WriteByte('\n')
 	}
+	cpp.WriteString(IndentString())
+	cpp.WriteString(endlabel)
+	cpp.WriteString(":;")
 	return cpp.String()
 }
 
@@ -58,15 +84,16 @@ func (m *Match) MatchExprString() string {
 	cpp.WriteString(m.Expr.String())
 	cpp.WriteString("};\n")
 	cpp.WriteString(IndentString())
-	cpp.WriteString(m.Cases[0].String("expr"))
-	for _, c := range m.Cases[1:] {
-		cpp.WriteString("else ")
-		cpp.WriteString(c.String("expr"))
+	if len(m.Cases) > 0 {
+		cpp.WriteString(m.Cases[0].String("expr"))
+		for _, c := range m.Cases[1:] {
+			cpp.WriteByte('\n')
+			cpp.WriteString(IndentString())
+			cpp.WriteString(c.String("expr"))
+		}
 	}
 	if m.Default != nil {
-		cpp.WriteString("else ")
 		cpp.WriteString(m.Default.String(""))
-		cpp.WriteByte('}')
 	}
 	cpp.WriteByte('\n')
 	DoneIndent()
@@ -77,22 +104,41 @@ func (m *Match) MatchExprString() string {
 
 func (m *Match) MatchBoolString() string {
 	var cpp strings.Builder
-	cpp.WriteString(m.Cases[0].String(""))
-	for _, c := range m.Cases[1:] {
-		cpp.WriteString("else ")
-		cpp.WriteString(c.String(""))
+	if len(m.Cases) > 0 {
+		cpp.WriteString(m.Cases[0].String(""))
+		for _, c := range m.Cases[1:] {
+			cpp.WriteByte('\n')
+			cpp.WriteString(IndentString())
+			cpp.WriteString(c.String(""))
+		}
 	}
 	if m.Default != nil {
-		cpp.WriteString("else ")
+		cpp.WriteByte('\n')
 		cpp.WriteString(m.Default.String(""))
-		cpp.WriteByte('}')
+		cpp.WriteByte('\n')
 	}
 	return cpp.String()
 }
 
+// EndLabel returns of cpp goto label identifier of end.
+func (m *Match) EndLabel() string {
+	var cpp strings.Builder
+	cpp.WriteString("match_end_")
+	cpp.WriteString(strconv.FormatInt(int64(m.Tok.Row), 10))
+	cpp.WriteString(strconv.FormatInt(int64(m.Tok.Column), 10))
+	return cpp.String()
+}
+
 func (m Match) String() string {
+	var cpp strings.Builder
 	if m.Expr.Model != nil {
-		return m.MatchExprString()
+		cpp.WriteString(m.MatchExprString())
+	} else {
+		cpp.WriteString(m.MatchBoolString())
 	}
-	return m.MatchBoolString()
+	cpp.WriteByte('\n')
+	cpp.WriteString(IndentString())
+	cpp.WriteString(m.EndLabel())
+	cpp.WriteString(":;")
+	return cpp.String()
 }

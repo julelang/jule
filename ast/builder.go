@@ -2145,9 +2145,9 @@ func (b *Builder) caseblock(toks *Toks) *models.Block {
 
 func (b *Builder) getcase(toks *Toks) models.Case {
 	var c models.Case
-	tok := (*toks)[0]
+	c.Tok = (*toks)[0]
 	*toks = (*toks)[1:]
-	c.Exprs = b.caseexprs(toks, tok.Id == tokens.Default)
+	c.Exprs = b.caseexprs(toks, c.Tok.Id == tokens.Default)
 	c.Block = b.caseblock(toks)
 	return c
 }
@@ -2162,6 +2162,7 @@ func (b *Builder) cases(toks Toks) ([]models.Case, *models.Case) {
 			cases = append(cases, b.getcase(&toks))
 		case tokens.Default:
 			c := b.getcase(&toks)
+			c.Tok = tok
 			if def == nil {
 				def = new(models.Case)
 				*def = c
