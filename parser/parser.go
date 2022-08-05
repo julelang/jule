@@ -3306,7 +3306,8 @@ func (p *Parser) typeSourceIsArrayType(t *DataType) (ok bool) {
 	if !ok {
 		return
 	}
-	t.Kind = x.Prefix_Array + t.ComponentType.Kind
+	ptrs := t.Pointers()
+	t.Kind = ptrs + x.Prefix_Array + t.ComponentType.Kind
 	if t.Size.AutoSized || t.Size.Expr.Model != nil {
 		return
 	}
@@ -3328,7 +3329,8 @@ func (p *Parser) typeSourceIsArrayType(t *DataType) (ok bool) {
 
 func (p *Parser) typeSourceIsSliceType(t *DataType) (ok bool) {
 	*t.ComponentType, ok = p.realType(*t.ComponentType, true)
-	t.Kind = x.Prefix_Slice + t.ComponentType.Kind
+	ptrs := t.Pointers()
+	t.Kind = ptrs + x.Prefix_Slice + t.ComponentType.Kind
 	if ok && typeIsArray(*t.ComponentType) { // Array into slice
 		p.pusherrtok(t.Tok, "invalid_type_source")
 	}

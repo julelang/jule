@@ -1,7 +1,10 @@
 package parser
 
 import (
+	"strings"
+
 	"github.com/the-xlang/xxc/lex/tokens"
+	"github.com/the-xlang/xxc/pkg/x"
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
@@ -108,11 +111,11 @@ func typeIsPtr(t DataType) bool {
 }
 
 func typeIsSlice(t DataType) bool {
-	return t.Id == xtype.Slice
+	return t.Id == xtype.Slice && strings.HasPrefix(t.Kind, x.Prefix_Slice)
 }
 
 func typeIsArray(t DataType) bool {
-	return t.Id == xtype.Array
+	return t.Id == xtype.Array && strings.HasPrefix(t.Kind, x.Prefix_Array)
 }
 
 func typeIsMap(t DataType) bool {
