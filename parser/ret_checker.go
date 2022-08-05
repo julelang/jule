@@ -61,8 +61,7 @@ func (rc *retChecker) single() {
 	if len(rc.values) > 1 {
 		rc.p.pusherrtok(rc.retAST.Tok, "overflow_return")
 	}
-	rc.p.wg.Add(1)
-	go assignChecker{
+	assignChecker{
 		p:      rc.p,
 		t:      rc.f.RetType.Type,
 		v:      rc.values[0],
@@ -84,8 +83,7 @@ func (rc *retChecker) multi() {
 		if i >= valLength {
 			break
 		}
-		rc.p.wg.Add(1)
-		go assignChecker{
+		assignChecker{
 			p:      rc.p,
 			t:      t,
 			v:      rc.values[i],
@@ -123,8 +121,7 @@ func (rc *retChecker) checkMultiRetAsMutliRet() {
 	for i, rt := range retTypes {
 		vt := valTypes[i]
 		val := value{data: models.Data{Type: vt}}
-		rc.p.wg.Add(1)
-		go assignChecker{
+		assignChecker{
 			p:      rc.p,
 			t:      rt,
 			v:      val,

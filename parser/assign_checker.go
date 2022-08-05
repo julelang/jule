@@ -70,7 +70,6 @@ type assignChecker struct {
 }
 
 func (ac assignChecker) checkAssignType() {
-	defer ac.p.wg.Done()
 	if ac.p.eval.hasError || ac.v.data.Value == "" {
 		return
 	}
@@ -88,6 +87,5 @@ func (ac assignChecker) checkAssignType() {
 			return
 		}
 	}
-	ac.p.wg.Add(1)
-	go ac.p.checkType(ac.t, ac.v.data.Type, ac.ignoreAny, ac.errtok)
+	ac.p.checkType(ac.t, ac.v.data.Type, ac.ignoreAny, ac.errtok)
 }

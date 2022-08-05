@@ -1054,8 +1054,7 @@ func (e *eval) indexingMap(mapv, leftv value, errtok Tok) value {
 	keyType := types[0]
 	valType := types[1]
 	mapv.data.Type = valType
-	e.p.wg.Add(1)
-	go e.p.checkType(keyType, leftv.data.Type, false, errtok)
+	e.p.checkType(keyType, leftv.data.Type, false, errtok)
 	return mapv
 }
 
@@ -1130,8 +1129,7 @@ func (e *eval) buildArray(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
 	for _, part := range parts {
 		partVal, expModel := e.toks(part)
 		model.expr = append(model.expr, expModel)
-		e.p.wg.Add(1)
-		go assignChecker{
+		assignChecker{
 			p:      e.p,
 			t:      *t.ComponentType,
 			v:      partVal,
@@ -1149,8 +1147,7 @@ func (e *eval) buildSlice(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
 	for _, part := range parts {
 		partVal, expModel := e.toks(part)
 		model.expr = append(model.expr, expModel)
-		e.p.wg.Add(1)
-		go assignChecker{
+		assignChecker{
 			p:      e.p,
 			t:      *t.ComponentType,
 			v:      partVal,
@@ -1199,15 +1196,13 @@ func (e *eval) buildMap(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
 		model.keyExprs = append(model.keyExprs, keyModel)
 		val, valModel := e.toks(valToks)
 		model.valExprs = append(model.valExprs, valModel)
-		e.p.wg.Add(1)
-		go assignChecker{
+		assignChecker{
 			p:      e.p,
 			t:      keyType,
 			v:      key,
 			errtok: colonTok,
 		}.checkAssignType()
-		e.p.wg.Add(1)
-		go assignChecker{
+		assignChecker{
 			p:      e.p,
 			t:      valType,
 			v:      val,

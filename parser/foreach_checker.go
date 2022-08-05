@@ -23,8 +23,7 @@ func (fc *foreachChecker) array() {
 		keyB.Type = componentType
 		return
 	}
-	fc.p.wg.Add(1)
-	go fc.p.checkType(componentType, keyB.Type, true, fc.profile.InTok)
+	fc.p.checkType(componentType, keyB.Type, true, fc.profile.InTok)
 }
 
 func (fc *foreachChecker) slice() {
@@ -38,8 +37,7 @@ func (fc *foreachChecker) slice() {
 		keyB.Type = componentType
 		return
 	}
-	fc.p.wg.Add(1)
-	go fc.p.checkType(componentType, keyB.Type, true, fc.profile.InTok)
+	fc.p.checkType(componentType, keyB.Type, true, fc.profile.InTok)
 }
 
 func (fc *foreachChecker) xmap() {
@@ -77,8 +75,7 @@ func (fc *foreachChecker) checkKeyAMapKey() {
 		keyA.Type = keyType
 		return
 	}
-	fc.p.wg.Add(1)
-	go fc.p.checkType(keyType, keyA.Type, true, fc.profile.InTok)
+	fc.p.checkType(keyType, keyA.Type, true, fc.profile.InTok)
 }
 
 func (fc *foreachChecker) checkKeyBMapVal() {
@@ -91,8 +88,7 @@ func (fc *foreachChecker) checkKeyBMapVal() {
 		keyB.Type = valType
 		return
 	}
-	fc.p.wg.Add(1)
-	go fc.p.checkType(valType, keyB.Type, true, fc.profile.InTok)
+	fc.p.checkType(valType, keyB.Type, true, fc.profile.InTok)
 }
 
 func (fc *foreachChecker) str() {
@@ -109,8 +105,7 @@ func (fc *foreachChecker) str() {
 		keyB.Type = runeType
 		return
 	}
-	fc.p.wg.Add(1)
-	go fc.p.checkType(runeType, keyB.Type, true, fc.profile.InTok)
+	fc.p.checkType(runeType, keyB.Type, true, fc.profile.InTok)
 }
 
 func (fc *foreachChecker) check() {

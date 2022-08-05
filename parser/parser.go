@@ -865,8 +865,7 @@ func (p *Parser) Enum(e Enum) {
 		if item.Expr.Toks != nil {
 			val, model := p.evalExpr(item.Expr)
 			item.Expr.Model = model
-			p.wg.Add(1)
-			go assignChecker{
+			assignChecker{
 				p:         p,
 				t:         e.Type,
 				v:         val,
@@ -1460,8 +1459,7 @@ func (p *Parser) Var(v Var) *Var {
 		if ok {
 			v.Type = t
 			if v.SetterTok.Id != tokens.NA {
-				p.wg.Add(1)
-				go assignChecker{
+				assignChecker{
 					p:      p,
 					t:      v.Type,
 					v:      val,
@@ -1773,7 +1771,7 @@ func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) {
 	v, model := p.evalExpr(param.Default)
 	param.Default.Model = model
 	p.wg.Add(1)
-	go p.checkArgType(param, v, param.Tok)
+	p.checkArgType(param, v, param.Tok)
 }
 
 func (p *Parser) param(f *Func, param *Param) (err bool) {
@@ -2383,17 +2381,14 @@ func (p *Parser) parseArg(f *Func, pair *paramMapPair, args *models.Args, variad
 		}
 		return
 	}
-	p.wg.Add(1)
-	go p.checkArgType(pair.param, value, pair.arg.Tok)
+	p.checkArgType(pair.param, value, pair.arg.Tok)
 }
 
 func (p *Parser) checkArgType(param *Param, val value, errTok Tok) {
-	defer p.wg.Done()
 	if param.Reference && !val.lvalue {
 		p.pusherrtok(errTok, "not_lvalue_for_reference_param")
 	}
-	p.wg.Add(1)
-	go assignChecker{
+	assignChecker{
 		p:      p,
 		t:      param.Type,
 		v:      val,
@@ -2612,8 +2607,7 @@ func (p *Parser) parseCase(c *models.Case, t DataType) {
 		expr := &c.Exprs[i]
 		value, model := p.evalExpr(*expr)
 		expr.Model = model
-		p.wg.Add(1)
-		go assignChecker{
+		assignChecker{
 			p:      p,
 			t:      t,
 			v:      value,
@@ -2888,8 +2882,7 @@ func (p *Parser) singleAssign(assign *models.Assign, exprs []value) {
 		val = solver.solve()
 		assign.Setter.Kind += tokens.EQUAL
 	}
-	p.wg.Add(1)
-	go assignChecker{
+	assignChecker{
 		p:      p,
 		t:      leftExpr.data.Type,
 		v:      val,
@@ -2934,8 +2927,7 @@ func (p *Parser) multiAssign(assign *models.Assign, right []value) {
 			if !p.assignment(leftExpr, assign.Setter) {
 				return
 			}
-			p.wg.Add(1)
-			go assignChecker{
+			assignChecker{
 				p:      p,
 				t:      leftExpr.data.Type,
 				v:      right,
@@ -3048,8 +3040,7 @@ func (p *Parser) forProfile(iter *models.Iter) {
 	if len(profile.Condition.Processes) > 0 {
 		val, model := p.evalExpr(profile.Condition)
 		profile.Condition.Model = model
-		p.wg.Add(1)
-		go assignChecker{
+		assignChecker{
 			p:      p,
 			t:      DataType{Id: xtype.Bool, Kind: xtype.TypeMap[xtype.Bool]},
 			v:      val,
@@ -3299,8 +3290,7 @@ func (p *Parser) typeSourceIsArrayType(t *DataType) (ok bool) {
 	} else {
 		p.eval.pusherrtok(t.Tok, "expr_not_const")
 	}
-	p.wg.Add(1)
-	go assignChecker{
+	assignChecker{
 		p:      p,
 		t:      DataType{Id: xtype.UInt, Kind: xtype.TypeMap[xtype.UInt]},
 		v:      val,
@@ -3412,7 +3402,6 @@ func (p *Parser) realType(dt DataType, err bool) (ret DataType, _ bool) {
 }
 
 func (p *Parser) checkMultiType(real, check DataType, ignoreAny bool, errTok Tok) {
-	defer p.wg.Done()
 	if real.MultiTyped != check.MultiTyped {
 		p.pusherrtok(errTok, "incompatible_datatype", real.Kind, check.Kind)
 		return
@@ -3431,7 +3420,6 @@ func (p *Parser) checkMultiType(real, check DataType, ignoreAny bool, errTok Tok
 }
 
 func (p *Parser) checkType(real, check DataType, ignoreAny bool, errTok Tok) {
-	defer p.wg.Done()
 	if typeIsVoid(check) {
 		p.eval.pusherrtok(errTok, "incompatible_datatype", real.Kind, check.Kind)
 		return
@@ -3441,7 +3429,7 @@ func (p *Parser) checkType(real, check DataType, ignoreAny bool, errTok Tok) {
 	}
 	if real.MultiTyped || check.MultiTyped {
 		p.wg.Add(1)
-		go p.checkMultiType(real, check, ignoreAny, errTok)
+		p.checkMultiType(real, check, ignoreAny, errTok)
 		return
 	}
 	if typesAreCompatible(real, check, ignoreAny) {
