@@ -3066,15 +3066,15 @@ func (p *Parser) iter(iter *models.Iter) {
 	oldIter := p.isNowIntoIter
 	p.currentCase = nil
 	p.isNowIntoIter = true
-	if iter.Profile != nil {
-		switch iter.Profile.(type) {
-		case models.IterWhile:
-			p.whileProfile(iter)
-		case models.IterForeach:
-			p.foreachProfile(iter)
-		case models.IterFor:
-			p.forProfile(iter)
-		}
+	switch iter.Profile.(type) {
+	case models.IterWhile:
+		p.whileProfile(iter)
+	case models.IterForeach:
+		p.foreachProfile(iter)
+	case models.IterFor:
+		p.forProfile(iter)
+	default:
+		p.checkNewBlock(iter.Block)
 	}
 	p.currentCase = oldCase
 	p.isNowIntoIter = oldIter
