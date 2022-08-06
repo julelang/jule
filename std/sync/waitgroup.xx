@@ -1,0 +1,68 @@
+// Copyright 2022 The X Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::errors
+use std::sync::atomic
+
+//doc:
+// Do not copy an instance of WaitGroup, use a ref or pointer instead.
+//
+// usage: in main thread:
+// `wg: std::sync::WaitGroup
+// `wg.add(delta)` before starting tasks with `co ...`
+// `wg.wait()` to wait for all tasks to have finished
+//
+// in each parallel job:
+// `wg.done()` when finished
+pub struct WaitGroup {
+	task_n: u32       // current task count - reading/writing should be atomic
+	wait_n: u32       // current wait count - reading/writing should be atomic
+}
+
+impl WaitGroup {
+	//doc:
+	// Increments (+delta) or decrements (-delta) task count by delta
+	// and unblocks any wait() calls if task count becomes zero.
+	// Panics if task count reaches below zero.
+	pub &add(delta int) {
+		old_nr_tasks: = int(std::sync::atomic::add_u32(&.task_n, u32(delta)))
+		new_nr_tasks: = old_nr_tasks + delta
+		if new_nr_tasks < 0 {
+			panic(std::errors::new("Negative number of tasks in WaitGroup"))
+		}
+
+		if new_nr_tasks != 0 {
+			ret
+		}
+
+		n_waiters: = std::sync::atomic::load_u32(&.wait_n)
+		if n_waiters == 0 {
+			ret
+		}
+		// clear waiters
+		for {
+			_ = std::sync::atomic::compare_swap_u32(&.wait_n, n_waiters, 0)
+			if n_waiters == 0 {
+				ret
+			}
+			n_waiters = std::sync::atomic::load_u32(&.wait_n)
+		}
+	}
+
+	//doc: Decrements the WaitGroup counter by one.
+	@inline
+	pub &done() { .add(-1) }
+
+	//doc: Blocks until all tasks are done (task count becomes zero)
+	pub &wait() {
+		nr_tasks: = int(std::sync::atomic::load_u32(&.task_n))
+		if nr_tasks == 0 {
+			// no need to wait
+			ret
+		}
+		_ = std::sync::atomic::add_u32(&.wait_n, 1)
+		// blocks until task_n becomes 0
+		for std::sync::atomic::load_u32(&.wait_n) != 0 {}
+	}
+}
