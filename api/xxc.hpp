@@ -46,7 +46,6 @@ void XID(panic)(const char *_Message);
 #include "map.hpp"
 #include "str.hpp"
 #include "any.hpp"
-#include "tracer.hpp"
 #include "ptr.hpp"
 #include "defer.hpp"
 #include "builtin.hpp"
@@ -177,13 +176,10 @@ str_xt tostr(const _Obj_t &_Obj) noexcept {
     return str_xt{_stream.str()};
 }
 
-tracer ___trace{};
-
 void x_terminate_handler(void) noexcept {
     try { std::rethrow_exception(std::current_exception()); }
     catch (trait<XID(Error)> _error) {
-        std::cout << "panic: " << _error.get().error() << std::endl << std::endl;
-        std::cout << ___trace.string();
+        std::cout << "panic: " << _error.get().error() << std::endl;
         std::exit(X_EXIT_PANIC);
     }
 }

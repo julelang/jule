@@ -19,7 +19,7 @@
 #define __xxc_atomic_store(ADDR, VAL) \
     __xxc_atomic_store_explicit (ADDR, VAL, __ATOMIC_SEQ_CST)
 
-#define atomic_load_explicit(PTR, MO)   \
+#define __xxc_atomic_load_explicit(PTR, MO)   \
     __extension__   \
     ({  \
         auto __atomic_load_ptr = (PTR); \
@@ -28,7 +28,7 @@
         __atomic_load_tmp;  \
     })
 
-#define __xxc_atomic_load(PTR)  atomic_load_explicit (PTR, __ATOMIC_SEQ_CST)
+#define __xxc_atomic_load(PTR) __xxc_atomic_load_explicit (PTR, __ATOMIC_SEQ_CST)
 
 #define __xxc_atomic_swap_explicit(ADDR, NEW, MO) \
     __extension__ \
