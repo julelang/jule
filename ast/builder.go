@@ -1450,15 +1450,8 @@ func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
 	if IsFuncCall(bs.toks) != nil {
 		return b.ExprStatement(bs)
 	}
-	tok = Tok{
-		File:   tok.File,
-		Id:     tokens.Ret,
-		Kind:   tokens.RET,
-		Row:    tok.Row,
-		Column: tok.Column,
-	}
-	bs.toks = append([]Tok{tok}, bs.toks...)
-	return b.RetStatement(bs.toks)
+	b.pusherr(tok, "invalid_syntax")
+	return
 }
 
 func (b *Builder) blockStatement(toks Toks) models.Statement {
@@ -1525,16 +1518,10 @@ func (b *Builder) pushAssignLeft(lefts *[]models.AssignLeft, last, current int, 
 	if left.Expr.Toks[0].Id == tokens.Id &&
 		current-last > 1 &&
 		left.Expr.Toks[1].Id == tokens.Colon {
+		left.Var = b.Var(left.Expr.Toks, false)
+		left.Var.New = true
 		if info.IsExpr {
 			b.pusherr(left.Expr.Toks[0], "notallow_declares")
-		}
-		left.Var.New = true
-		left.Var.Token = left.Expr.Toks[0]
-		left.Var.Id = left.Var.Token.Kind
-		left.Var.SetterTok = info.Setter
-		// Has specific data-type?
-		if current-last > 2 {
-			left.Var.Type, _ = b.DataType(left.Expr.Toks[2:], new(int), true, false)
 		}
 	} else {
 		if left.Expr.Toks[0].Id == tokens.Id {

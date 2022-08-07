@@ -1468,7 +1468,7 @@ func (p *Parser) Var(v Var) *Var {
 			}
 		}
 	} else {
-		if v.SetterTok.Id == tokens.NA {
+		if val.data.Value == "" {
 			p.pusherrtok(v.Token, "missing_autotype_value")
 		} else {
 			p.eval.hasError = p.eval.hasError || val.data.Value == ""
