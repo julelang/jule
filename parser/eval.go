@@ -13,9 +13,10 @@ import (
 
 type value struct {
 	data      models.Data
-	constExpr bool
 	model     iExpr
 	expr      any
+	constExpr bool
+	heapMust  bool
 	lvalue    bool
 	variadic  bool
 	isType    bool

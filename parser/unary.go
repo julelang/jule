@@ -102,8 +102,14 @@ func (u *unary) amper() value {
 	v.lvalue = true
 	v.data.Type.Kind = tokens.STAR + v.data.Type.Kind
 	nodes := &u.model.nodes[u.model.index].nodes
+	var func_call string
+	if v.heapMust {
+		func_call = "__xxc_ptr_of"
+	} else {
+		func_call = "__xxc_not_heap_ptr_of"
+	}
 	expr := []iExpr{
-		exprNode{v.data.Type.String()},
+		exprNode{func_call},
 		exprNode{tokens.LPARENTHESES},
 	}
 	*nodes = append(expr, *nodes...)

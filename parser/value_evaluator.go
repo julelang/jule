@@ -171,13 +171,14 @@ func (ve *valueEvaluator) numeric() value {
 	return v
 }
 
-func (ve *valueEvaluator) varId(id string, variable *Var) (v value) {
+func (ve *valueEvaluator) varId(id string, variable *Var, global bool) (v value) {
 	variable.Used = true
 	v.data.Value = id
 	v.data.Type = variable.Type
 	v.constExpr = variable.Const
 	v.data.Tok = variable.Token
 	v.lvalue = true
+	v.heapMust = !global
 	if id == tokens.SELF && typeIsPtr(variable.Type) {
 		ve.model.appendSubNode(exprNode{xapi.CppSelf})
 	} else if v.constExpr {
@@ -251,9 +252,14 @@ func (ve *valueEvaluator) typeId(id string, t *Type) (_ value, _ bool) {
 func (ve *valueEvaluator) id() (_ value, ok bool) {
 	id := ve.tok.Kind
 
-	v, _, _ := ve.p.varById(id)
+	v, _, _ := ve.p.globalById(id)
 	if v != nil {
-		return ve.varId(id, v), true
+		return ve.varId(id, v, true), true
+	} else {
+		v, _, _ = ve.p.varById(id)
+		if v != nil {
+			return ve.varId(id, v, false), true
+		}
 	}
 
 	f, _, _ := ve.p.FuncById(id)
