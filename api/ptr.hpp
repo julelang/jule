@@ -16,7 +16,7 @@ struct ptr {
 
     ptr<T>(void) noexcept {}
 
-    ptr<T>(T* _Ptr) noexcept
+    ptr<T>(T *_Ptr) noexcept
     { this->_ptr = _Ptr; }
 
     ptr<T>(const ptr<T> &_Ptr) noexcept

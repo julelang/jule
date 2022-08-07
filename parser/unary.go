@@ -2,7 +2,6 @@ package parser
 
 import (
 	"github.com/the-xlang/xxc/lex/tokens"
-	"github.com/the-xlang/xxc/pkg/xapi"
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
 
@@ -97,28 +96,10 @@ func (u *unary) star() value {
 func (u *unary) amper() value {
 	v := u.p.eval.process(u.toks, u.model)
 	v.constExpr = false
-	switch {
-	case typeIsFunc(v.data.Type):
-		mainNode := &u.model.nodes[u.model.index]
-		mainNode.nodes = mainNode.nodes[1:] // Remove unary operator from model
-		node := &u.model.nodes[u.model.index].nodes[0]
-		switch t := (*node).(type) {
-		case anonFuncExpr:
-			if t.capture == xapi.LambdaByReference {
-				u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.AMPER)
-				break
-			}
-			t.capture = xapi.LambdaByReference
-			*node = t
-		default:
-			u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.AMPER)
-		}
-	default:
-		if !canGetPtr(v) {
-			u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.AMPER)
-		}
-		v.lvalue = true
-		v.data.Type.Kind = tokens.STAR + v.data.Type.Kind
+	if !canGetPtr(v) {
+		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.AMPER)
 	}
+	v.lvalue = true
+	v.data.Type.Kind = tokens.STAR + v.data.Type.Kind
 	return v
 }

@@ -55,20 +55,24 @@ func (node exprNode) String() string {
 }
 
 type anonFuncExpr struct {
-	ast     Func
-	capture byte
+	ast *Func
 }
 
 func (af anonFuncExpr) String() string {
 	var cpp strings.Builder
-	cpp.WriteByte('[')
-	cpp.WriteByte(af.capture)
-	cpp.WriteByte(']')
+	t := DataType{
+		Tok:  af.ast.Tok,
+		Kind: af.ast.DataTypeString(),
+		Tag:  af.ast,
+	}
+	cpp.WriteString(t.FuncString())
+	cpp.WriteString("([&]")
 	cpp.WriteString(paramsToCpp(af.ast.Params))
 	cpp.WriteString(" mutable -> ")
 	cpp.WriteString(af.ast.RetType.String())
 	cpp.WriteByte(' ')
 	cpp.WriteString(af.ast.Block.String())
+	cpp.WriteByte(')')
 	return cpp.String()
 }
 
