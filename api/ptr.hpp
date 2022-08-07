@@ -46,6 +46,15 @@ struct ptr {
         this->_ptr = nil;
     }
 
+    ptr<T> &__must_heap(void) noexcept {
+        if (this->_ref) { return *this; }
+        if (!this->_ptr) { return *this; }
+        T _data{*this->_ptr};
+        this->__alloc();
+        *this->_ptr = _data;
+        return *this;
+    }
+
     inline T &operator*(void) noexcept {
         this->__check_valid();
         return *this->_ptr;

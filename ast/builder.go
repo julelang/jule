@@ -1520,6 +1520,7 @@ func (b *Builder) pushAssignLeft(lefts *[]models.AssignLeft, last, current int, 
 		left.Expr.Toks[1].Id == tokens.Colon {
 		left.Var = b.Var(left.Expr.Toks, false)
 		left.Var.New = true
+		left.Var.SetterTok = info.Setter
 		if info.IsExpr {
 			b.pusherr(left.Expr.Toks[0], "notallow_declares")
 		}

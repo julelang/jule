@@ -66,7 +66,7 @@ func (af anonFuncExpr) String() string {
 		Tag:  af.ast,
 	}
 	cpp.WriteString(t.FuncString())
-	cpp.WriteString("([&]")
+	cpp.WriteString("([=]")
 	cpp.WriteString(paramsToCpp(af.ast.Params))
 	cpp.WriteString(" mutable -> ")
 	cpp.WriteString(af.ast.RetType.String())
@@ -165,18 +165,39 @@ func (ce callExpr) String() string {
 	return cpp.String()
 }
 
-type multiRetExpr struct {
+type retExpr struct {
 	models []iExpr
+	values []value
 }
 
-func (mre multiRetExpr) String() string {
+func (re *retExpr) multiRetString() string {
 	var cpp strings.Builder
 	cpp.WriteString("std::make_tuple(")
-	for _, model := range mre.models {
+	for i, model := range re.models {
 		cpp.WriteString(model.String())
+		if typeIsPtr(re.values[i].data.Type) {
+			cpp.WriteString(".__must_heap()")
+		}
 		cpp.WriteByte(',')
 	}
 	return cpp.String()[:cpp.Len()-1] + ")"
+}
+
+func (re *retExpr) singleRetString() string {
+	var cpp strings.Builder
+	v := re.values[0]
+	cpp.WriteString(re.models[0].String())
+	if typeIsPtr(v.data.Type) {
+		cpp.WriteString(".__must_heap()")
+	}
+	return cpp.String()
+}
+
+func (re retExpr) String() string {
+	if len(re.values) > 1 {
+		return re.multiRetString()
+	}
+	return re.singleRetString()
 }
 
 type serieExpr struct {

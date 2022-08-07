@@ -10,8 +10,7 @@ type retChecker struct {
 	p        *Parser
 	retAST   *models.Ret
 	f        *Func
-	expModel multiRetExpr
-	values   []value
+	expModel retExpr
 }
 
 func (rc *retChecker) pushval(last, current int, errTok Tok) {
@@ -22,7 +21,7 @@ func (rc *retChecker) pushval(last, current int, errTok Tok) {
 	toks := rc.retAST.Expr.Toks[last:current]
 	val, model := rc.p.evalToks(toks)
 	rc.expModel.models = append(rc.expModel.models, model)
-	rc.values = append(rc.values, val)
+	rc.expModel.values = append(rc.expModel.values, val)
 }
 
 func (rc *retChecker) checkepxrs() {
@@ -53,26 +52,26 @@ func (rc *retChecker) checkepxrs() {
 	}
 	if !typeIsVoid(rc.f.RetType.Type) {
 		rc.checkExprTypes()
+		rc.retAST.Expr.Model = rc.expModel
 	}
 }
 
 func (rc *retChecker) single() {
-	rc.retAST.Expr.Model = rc.expModel.models[0]
-	if len(rc.values) > 1 {
+	rc.expModel.models = append(rc.expModel.models, rc.expModel.models[0])
+	if len(rc.expModel.values) > 1 {
 		rc.p.pusherrtok(rc.retAST.Tok, "overflow_return")
 	}
 	assignChecker{
 		p:      rc.p,
 		t:      rc.f.RetType.Type,
-		v:      rc.values[0],
+		v:      rc.expModel.values[0],
 		errtok: rc.retAST.Tok,
 	}.checkAssignType()
 }
 
 func (rc *retChecker) multi() {
-	rc.retAST.Expr.Model = rc.expModel
 	types := rc.f.RetType.Type.Tag.([]DataType)
-	valLength := len(rc.values)
+	valLength := len(rc.expModel.values)
 	if valLength == 1 {
 		rc.checkMultiRetAsMutliRet()
 		return
@@ -86,7 +85,7 @@ func (rc *retChecker) multi() {
 		assignChecker{
 			p:      rc.p,
 			t:      t,
-			v:      rc.values[i],
+			v:      rc.expModel.values[i],
 			errtok: rc.retAST.Tok,
 		}.checkAssignType()
 	}
@@ -102,7 +101,7 @@ func (rc *retChecker) checkExprTypes() {
 }
 
 func (rc *retChecker) checkMultiRetAsMutliRet() {
-	val := rc.values[0]
+	val := rc.expModel.values[0]
 	if !val.data.Type.MultiTyped {
 		rc.p.pusherrtok(rc.retAST.Tok, "missing_multi_return")
 		return
@@ -116,8 +115,7 @@ func (rc *retChecker) checkMultiRetAsMutliRet() {
 		rc.p.pusherrtok(rc.retAST.Tok, "overflow_return")
 		return
 	}
-	// Set model for just signle return
-	rc.retAST.Expr.Model = rc.expModel.models[0]
+	rc.expModel.models = append(rc.expModel.models, rc.expModel.models[0])
 	for i, rt := range retTypes {
 		vt := valTypes[i]
 		val := value{data: models.Data{Type: vt}}

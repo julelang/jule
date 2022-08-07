@@ -101,5 +101,12 @@ func (u *unary) amper() value {
 	}
 	v.lvalue = true
 	v.data.Type.Kind = tokens.STAR + v.data.Type.Kind
+	nodes := &u.model.nodes[u.model.index].nodes
+	expr := []iExpr{
+		exprNode{v.data.Type.String()},
+		exprNode{tokens.LPARENTHESES},
+	}
+	*nodes = append(expr, *nodes...)
+	*nodes = append(*nodes, exprNode{tokens.RPARENTHESES})
 	return v
 }
