@@ -5,7 +5,8 @@
 #ifndef __XXC_PTR_HPP
 #define __XXC_PTR_HPP
 
-#define __XXC_PTR_NEVER_HEAP_ALLOCATE_REF (uintptr_xt*)(0x0000001)
+#define __XXC_PTR_NEVER_HEAP (bool**)(1U)
+#define __XXC_PTR_HEAP_TRUE (bool*)(1U)
 
 #define __xxc_ptr_of(_PTR) _PTR
 
@@ -17,13 +18,21 @@ ptr<T> __xxc_not_heap_ptr_of(T *_T) noexcept;
 
 template<typename T>
 struct ptr {
-    T *_ptr{nil};
+    T               **_ptr{nil};
     mutable uint_xt *_ref{nil};
+    mutable bool    **_heap{nil};
 
     ptr<T>(void) noexcept {}
 
-    ptr<T>(T *_Ptr) noexcept
-    { this->_ptr = _Ptr; }
+    ptr<T>(T *_Ptr) noexcept {
+        this->_ptr = new(std::nothrow) T*;
+        if (!this->_ptr) { XID(panic)("memory allocation failed"); }
+        this->_heap = new(std::nothrow) bool*;
+        if (!this->_heap) { XID(panic)("memory allocation failed"); }
+        this->_ref = new(std::nothrow) uint_xt{1};
+        if (!this->_ref) { XID(panic)("memory allocation failed"); }
+        *this->_ptr = _Ptr;
+    }
 
     ptr<T>(const ptr<T> &_Ptr) noexcept
     { this->operator=(_Ptr); }
@@ -31,46 +40,53 @@ struct ptr {
     ~ptr<T>(void) noexcept
     { this->__dealloc(); }
 
-    inline void __check_valid(void) const noexcept
-    { if(!this->_ptr) { XID(panic)("invalid memory address or nil pointer deference"); } }
-
-    void __alloc(void) noexcept {
-        this->_ptr = new(std::nothrow) T;
-        if (!this->_ptr) { XID(panic)("memory allocation failed"); }
-        this->_ref = new(std::nothrow) uint_xt{1};
-        if (!this->_ref) { XID(panic)("memory allocation failed"); }
+    inline void __check_valid(void) const noexcept {
+        if(!this->_ptr)
+        { XID(panic)("invalid memory address or nil pointer deference"); }
     }
 
-    inline bool __ref_available(void) const noexcept
-    { return this->_ref && this->_ref != __XXC_PTR_NEVER_HEAP_ALLOCATE_REF; }
-
     void __dealloc(void) noexcept {
-        if (!this->__ref_available()) { return; }
-        (*this->_ref)--;
+        if (!this->_ref) { return; }
+        --(*this->_ref);
+        if (!this->_heap ||
+            (this->_heap != __XXC_PTR_NEVER_HEAP &&
+                *this->_heap != __XXC_PTR_HEAP_TRUE))
+            { return; }
         if ((*this->_ref) != 0) { return; }
+        std::cout << "dealloc" << std::endl;
+        if (this->_heap != __XXC_PTR_NEVER_HEAP)
+        { delete this->_heap; }
+        this->_heap = nil;
         delete this->_ref;
         this->_ref = nil;
+        delete *this->_ptr;
+        *this->_ptr = nil;
         delete this->_ptr;
         this->_ptr = nil;
     }
 
     ptr<T> &__must_heap(void) noexcept {
-        if (this->_ref) { return *this; }
+        if (this->_heap &&
+            (this->_heap == __XXC_PTR_NEVER_HEAP ||
+             *this->_heap == __XXC_PTR_HEAP_TRUE)) { return *this; }
         if (!this->_ptr) { return *this; }
-        T _data{*this->_ptr};
-        this->__alloc();
-        *this->_ptr = _data;
+        std::cout << "heaped" << std::endl;
+        const T _data{**this->_ptr};
+        *this->_ptr = new(std::nothrow) T;
+        if (!*this->_ptr) { XID(panic)("memory allocation failed"); }
+        **this->_ptr = _data;
+        *this->_heap = __XXC_PTR_HEAP_TRUE;
         return *this;
     }
 
     inline T &operator*(void) noexcept {
         this->__check_valid();
-        return *this->_ptr;
+        return **this->_ptr;
     }
 
     inline T *operator->(void) noexcept {
         this->__check_valid();
-        return this->_ptr;
+        return *this->_ptr;
     }
 
     inline operator uintptr_xt(void) const noexcept
@@ -78,18 +94,14 @@ struct ptr {
 
     void operator=(const ptr<T> &_Ptr) noexcept {
         this->__dealloc();
-        if (_Ptr.__ref_available()) { (*_Ptr._ref)++; }
+        if (_Ptr._ref) { ++(*_Ptr._ref); }
         this->_ref = _Ptr._ref;
         this->_ptr = _Ptr._ptr;
+        this->_heap = _Ptr._heap;
     }
 
-    void operator=(const std::nullptr_t) noexcept {
-        if (!this->_ref) {
-            this->_ptr = nil;
-            return;
-        }
-        this->__dealloc();
-    }
+    inline void operator=(const std::nullptr_t) noexcept
+    { this->__dealloc(); }
 
     inline bool operator==(const std::nullptr_t) const noexcept
     { return this->_ptr == nil; }
@@ -111,8 +123,10 @@ struct ptr {
 template<typename T>
 ptr<T> __xxc_not_heap_ptr_of(T *_T) noexcept {
     ptr<T> _ptr;
-    _ptr._ptr = _T;
-    _ptr._ref = __XXC_PTR_NEVER_HEAP_ALLOCATE_REF; // Avoid heap allocation
+    _ptr._ptr = new(std::nothrow) T*;
+    if (!_ptr._ptr) { XID(panic)("memory allocation failed"); }
+    *_ptr._ptr = _T;
+    _ptr._heap = __XXC_PTR_NEVER_HEAP; // Avoid heap allocation
     return _ptr;
 }
 

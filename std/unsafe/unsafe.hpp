@@ -12,7 +12,11 @@ template<typename T>
 inline ptr<T> __xxc_uintptr_cast_to_raw(const uintptr_xt &_Addr) noexcept;
 
 template<typename T>
-inline ptr<T> __xxc_uintptr_cast_to_raw(const uintptr_xt &_Addr) noexcept
-{ return __xxc_not_heap_ptr_of((T*)(_Addr)); }
+inline ptr<T> __xxc_uintptr_cast_to_raw(const uintptr_xt &_Addr) noexcept {
+    ptr<T> _ptr;
+    _ptr._ptr = (T**)(_Addr);
+    _ptr._heap = __XXC_PTR_NEVER_HEAP; // Avoid heap allocation
+    return _ptr;
+}
 
 #endif // #ifndef __XXC_STD_UNSAFE_UNSAFE_HPP
