@@ -237,7 +237,7 @@ func (dt *DataType) StructString() string {
 // FuncString returns cpp value of function DataType.
 func (dt *DataType) FuncString() string {
 	var cpp strings.Builder
-	cpp.WriteString("std::function<")
+	cpp.WriteString("func<std::function<")
 	f := dt.Tag.(*Func)
 	f.RetType.Type.DontUseOriginal = dt.DontUseOriginal
 	cpp.WriteString(f.RetType.String())
@@ -254,7 +254,7 @@ func (dt *DataType) FuncString() string {
 	} else {
 		cpp.WriteString("void")
 	}
-	cpp.WriteString(")>")
+	cpp.WriteString(")>>")
 	return cpp.String()
 }
 

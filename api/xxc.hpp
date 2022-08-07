@@ -47,6 +47,7 @@ void XID(panic)(const char *_Message);
 #include "str.hpp"
 #include "any.hpp"
 #include "ptr.hpp"
+#include "func.hpp"
 #include "defer.hpp"
 #include "builtin.hpp"
 
