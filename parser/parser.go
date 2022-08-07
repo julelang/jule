@@ -1580,14 +1580,6 @@ func (p *Parser) FuncById(id string) (*function, *Defmap, bool) {
 	return p.Defs.funcById(id, p.File)
 }
 
-func (p *Parser) varById(id string) (*Var, *Defmap, bool) {
-	bv := p.blockVarById(id)
-	if bv != nil {
-		return bv, nil, false
-	}
-	return p.globalById(id)
-}
-
 func (p *Parser) globalById(id string) (*Var, *Defmap, bool) {
 	g, m, _ := p.Defs.globalById(id, p.File)
 	return g, m, true
@@ -1688,9 +1680,9 @@ func (p *Parser) defById(id string) (def any, tok Tok, canshadow bool) {
 	if bv := p.blockVarById(id); bv != nil {
 		return bv, bv.Token, false
 	}
-	g, _, canshadow := p.globalById(id)
+	g, _, _ := p.globalById(id)
 	if g != nil {
-		return g, g.Token, canshadow
+		return g, g.Token, true
 	}
 	return
 }
