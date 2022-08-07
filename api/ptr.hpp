@@ -28,6 +28,14 @@ struct ptr {
     inline void __check_valid(void) const noexcept
     { if(!this->_ptr) { XID(panic)("invalid memory address or nil pointer deference"); } }
 
+    void __alloc(void) noexcept {
+        this->_ptr = new(std::nothrow) T;
+        if (!this->_ptr)
+        { XID(panic)("memory allocation failed"); }
+        this->_ref = new(std::nothrow) uint_xt{1};
+        if (!this->_ref) { XID(panic)("memory allocation failed"); }
+    }
+
     void __dealloc(void) noexcept {
         if (!this->_ref) { return; }
         (*this->_ref)--;
