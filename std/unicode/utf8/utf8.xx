@@ -263,6 +263,56 @@ pub rune_len(r rune) int {
 @inline
 pub rune_start(b byte) bool { ret b&0xC0 != 0x80 }
 
+//doc: Reports whether p consists entirely of valid UTF-8-encoded runes.
+pub valid(p []byte) bool {
+	// Fast path. Check for and skip 8 bytes of ASCII characters per iteration.
+	for p.len >= 8 {
+		// Combining two 32 bit loads allows the same code to be used
+		// for 32 and 64 bit platforms.
+		first32: = u32(p[0]) | u32(p[1])<<8 | u32(p[2])<<16 | u32(p[3])<<24
+		second32: = u32(p[4]) | u32(p[5])<<8 | u32(p[6])<<16 | u32(p[7])<<24
+		if (first32|second32)&0x80808080 != 0 {
+			// Found a non ASCII byte (>= RUNE_SELF).
+			break
+		}
+		p = p[8:]
+	}
+	for i: = 0, i < p.len, {
+		pi: = p[i]
+		if pi < RUNE_SELF {
+			i++
+			continue
+		}
+		x: = first[pi]
+		if x == XX {
+			ret false // Illegal starter byte.
+		}
+		size: = int(x & 7)
+		if i+size > p.len {
+			ret false // Short or invalid.
+		}
+		accept: = accept_ranges[x>>4]
+		c: = p[i+1]
+		if c < accept.lo || accept.hi < c {
+			ret false
+		} else if size == 2 {
+		} else {
+			c = p[i+2]
+			if c < LOCB || HICB < c {
+				ret false
+			} else if size == 3 {
+			} else {
+				c = p[i+3]
+				if c < LOCB || HICB < c {
+					ret false
+				}
+			}
+		}
+		i += size
+	}
+	ret true
+}
+
 //doc:
 // Reports whether r can be legally encoded as UTF-8.
 // Code points that are out of range or a surrogate half are illegal.
