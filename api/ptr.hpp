@@ -53,7 +53,6 @@ struct ptr {
                 *this->_heap != __XXC_PTR_HEAP_TRUE))
             { return; }
         if ((*this->_ref) != 0) { return; }
-        std::cout << "dealloc" << std::endl;
         if (this->_heap != __XXC_PTR_NEVER_HEAP)
         { delete this->_heap; }
         this->_heap = nil;
@@ -70,7 +69,6 @@ struct ptr {
             (this->_heap == __XXC_PTR_NEVER_HEAP ||
              *this->_heap == __XXC_PTR_HEAP_TRUE)) { return *this; }
         if (!this->_ptr) { return *this; }
-        std::cout << "heaped" << std::endl;
         const T _data{**this->_ptr};
         *this->_ptr = new(std::nothrow) T;
         if (!*this->_ptr) { XID(panic)("memory allocation failed"); }

@@ -55,7 +55,8 @@ func (node exprNode) String() string {
 }
 
 type anonFuncExpr struct {
-	ast *Func
+	ast  *Func
+	vars []*Var
 }
 
 func (af anonFuncExpr) String() string {
@@ -66,7 +67,22 @@ func (af anonFuncExpr) String() string {
 		Tag:  af.ast,
 	}
 	cpp.WriteString(t.FuncString())
-	cpp.WriteString("([=]")
+	cpp.WriteString("([")
+	if len(af.vars) > 0 {
+		var vars strings.Builder
+		for _, v := range af.vars {
+			id := v.OutId()
+			vars.WriteString(id)
+			if typeIsPtr(v.Type) {
+				vars.WriteByte('=')
+				vars.WriteString(id)
+				vars.WriteString(".__must_heap()")
+			}
+			vars.WriteByte(',')
+		}
+		cpp.WriteString(vars.String()[:vars.Len()-1])
+	}
+	cpp.WriteByte(']')
 	cpp.WriteString(paramsToCpp(af.ast.Params))
 	cpp.WriteString(" mutable -> ")
 	cpp.WriteString(af.ast.RetType.String())
