@@ -2120,7 +2120,7 @@ func (p *Parser) parseGenericFunc(f *Func, generics []DataType, errtok Tok) {
 		return
 	}
 	*f.Combines = append(*f.Combines, generics)
-	owner.parseTypesGenerics(f)
+	p.parseTypesGenerics(f)
 	p.parsePureFunc(f)
 	owner.blockTypes = nil
 	owner.blockVars = nil
@@ -2365,9 +2365,7 @@ func (p *Parser) parseArg(f *Func, pair *paramMapPair, args *models.Args, variad
 	}
 	if args.DynamicGenericAnnotation && typeHasGenerics(f.Generics, pair.param.Type) {
 		ok := p.pushGenericByArg(f, pair, args, value.data.Type)
-		if ok {
-			p.parseGenericType(f.Generics, &pair.param.Type)
-		} else {
+		if !ok {
 			p.pusherrtok(pair.arg.Tok, "dynamic_generic_annotation_failed")
 		}
 		return
