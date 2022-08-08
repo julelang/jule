@@ -300,6 +300,47 @@ pub rune_count(p []byte) [n int] {
 	ret n
 }
 
+//doc: Is like rune_count but its input is a string.
+pub rune_count_str(s str) [n int] {
+	for i := 0, i < s.len, n++ {
+		c: = s[i]
+		if c < RUNE_SELF {
+			// ASCII fast path
+			i++
+			continue
+		}
+		x: = first[c]
+		if x == XX {
+			i++ // invalid.
+			continue
+		}
+		size: = int(x & 7)
+		if i+size > s.len {
+			i++ // Short or invalid.
+			continue
+		}
+		accept := accept_ranges[x>>4]
+		c = s[i+1]
+		if c < accept.lo || accept.hi < c {
+			size = 1
+		} else if size == 2 {
+		} else {
+			c = s[i+2]
+			if c < LOCB || HICB < c {
+			size = 1
+			} else if size == 3 {
+			} else {
+				c = s[i+3]
+				if c < LOCB || HICB < c {
+					size = 1
+				}
+			}
+		}
+		i += size
+	}
+	ret n
+}
+
 //doc:
 // Reports whether the byte could be the first byte of an encoded,
 // possibly invalid rune. Second and subsequent bytes always have the top two
