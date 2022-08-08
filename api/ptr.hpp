@@ -68,7 +68,7 @@ struct ptr {
         if (this->_heap &&
             (this->_heap == __XXC_PTR_NEVER_HEAP ||
              *this->_heap == __XXC_PTR_HEAP_TRUE)) { return *this; }
-        if (!this->_ptr) { return *this; }
+        if (!this->_ptr || !*this->_ptr) { return *this; }
         const T _data{**this->_ptr};
         *this->_ptr = new(std::nothrow) T;
         if (!*this->_ptr) { XID(panic)("memory allocation failed"); }
@@ -108,7 +108,7 @@ struct ptr {
     { return !this->operator==(nil); }
 
     inline bool operator==(const ptr<T> &_Ptr) const noexcept
-    { return this->_ptr == _Ptr; }
+    { return this->_ptr == _Ptr._ptr; }
 
     inline bool operator!=(const ptr<T> &_Ptr) const noexcept
     { return !this->operator==(_Ptr); }

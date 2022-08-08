@@ -883,21 +883,21 @@ func (p *Parser) Enum(e Enum) {
 	}
 }
 
-func (p *Parser) pushField(s *xstruct, f *Var, i int) {
+func (p *Parser) pushField(s *xstruct, f **Var, i int) {
 	for _, cf := range s.Ast.Fields {
-		if f == cf {
+		if *f == cf {
 			break
 		}
-		if f.Id == cf.Id {
-			p.pusherrtok(f.Token, "exist_id", f.Id)
+		if (*f).Id == cf.Id {
+			p.pusherrtok((*f).Token, "exist_id", (*f).Id)
 			break
 		}
 	}
 	if len(s.Ast.Generics) == 0 {
-		p.parseField(s, &f, i)
+		p.parseField(s, f, i)
 	} else {
-		p.parseNonGenericType(s.Ast.Generics, &f.Type)
-		param := models.Param{Id: f.Id, Type: f.Type}
+		p.parseNonGenericType(s.Ast.Generics, &(*f).Type)
+		param := models.Param{Id: (*f).Id, Type: (*f).Type}
 		param.Default.Model = exprNode{xapi.DefaultExpr}
 		s.constructor.Params[i] = param
 	}
@@ -921,8 +921,8 @@ func (p *Parser) parseFields(s *xstruct) {
 	}
 	s.Defs.Globals = make([]*models.Var, len(s.Ast.Fields))
 	for i, f := range s.Ast.Fields {
+		p.pushField(s, &f, i)
 		s.Defs.Globals[i] = f
-		p.pushField(s, f, i)
 	}
 }
 
