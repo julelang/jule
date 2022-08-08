@@ -257,6 +257,50 @@ pub rune_len(r rune) int {
 }
 
 //doc:
+// Returns the number of runes in p. Erroneous and short
+// encodings are treated as single runes of width 1 byte.
+pub rune_count(p []byte) [n int] {
+	for i: = 0, i < p.len, {
+		n++
+		c: = p[i]
+		if c < RUNE_SELF {
+			// ASCII fast path
+			i++
+			continue
+		}
+		x: = first[c]
+		if x == XX {
+			i++ // invalid.
+			continue
+		}
+		size: = int(x & 7)
+		if i+size > p.len {
+			i++ // Short or invalid.
+			continue
+		}
+		accept: = accept_ranges[x>>4]
+		c = p[i+1]
+		if c < accept.lo || accept.hi < c {
+			size = 1
+		} else if size == 2 {
+		} else {
+			c = p[i+2]
+			if c < LOCB || HICB < c {
+			size = 1
+			} else if size == 3 {
+			} else {
+				c = p[i+3]
+				if c < LOCB || HICB < c {
+					size = 1
+				}
+			}
+		}
+		i += size
+	}
+	ret n
+}
+
+//doc:
 // Reports whether the byte could be the first byte of an encoded,
 // possibly invalid rune. Second and subsequent bytes always have the top two
 // bits set to 10.
