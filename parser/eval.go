@@ -1007,7 +1007,11 @@ func (e *eval) bracketRange(toks Toks, m *exprModel) (v value) {
 	leftv, model := e.toks(toks[1 : len(toks)-1])
 	m.appendSubNode(model)
 	m.appendSubNode(exprNode{tokens.RBRACKET})
-	return e.indexing(v, leftv, errTok)
+	v = e.indexing(v, leftv, errTok)
+	// Ignore indexed type from original
+	v.data.Type.DontUseOriginal = true
+	v.data.Type.Original = nil
+	return v
 }
 
 func (e *eval) checkIntegerIndexing(v value, errtok Tok) {
