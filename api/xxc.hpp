@@ -53,46 +53,41 @@ void XID(panic)(const char *_Message);
 
 // Declarations
 
+// Moves to heap pointer types.
+template<typename T>
+inline ptr<T> &__xxc_must_heap(const ptr<T> &_Ptr) noexcept;
+// Interface for ignore compilation errors.
+template<typename T>
+inline T __xxc_must_heap(const T &_Obj) noexcept;
 template <typename _Enum_t, typename _Index_t, typename _Item_t>
 static inline void foreach(const _Enum_t _Enum,
                            const std::function<void(_Index_t, _Item_t)> _Body);
-
 template <typename _Enum_t, typename _Index_t>
 static inline void foreach(const _Enum_t _Enum,
                            const std::function<void(_Index_t)> _Body);
-
 template <typename _Key_t, typename _Value_t>
 static inline void foreach(const map<_Key_t, _Value_t> _Map,
                            const std::function<void(_Key_t)> _Body);
-
 template <typename _Key_t, typename _Value_t>
 static inline void foreach(const map<_Key_t, _Value_t> _Map,
                            const std::function<void(_Key_t, _Value_t)> _Body);
-
 template<typename Type, unsigned N, unsigned Last>
 struct tuple_ostream;
-
 template<typename Type, unsigned N>
 struct tuple_ostream<Type, N, N>;
-
 template<typename... Types>
 std::ostream &operator<<(std::ostream &_Stream,
                          const std::tuple<Types...> &_Tuple);
-
 template<typename _Function_t, typename _Tuple_t, size_t ... _I_t>
 inline auto tuple_as_args(const _Function_t _Function,
                           const _Tuple_t _Tuple,
                           const std::index_sequence<_I_t ...>);
-
 template<typename _Function_t, typename _Tuple_t>
 inline auto tuple_as_args(const _Function_t _Function, const _Tuple_t _Tuple);
-
 std::ostream &operator<<(std::ostream &_Stream, const i8_xt &_Src);
 std::ostream &operator<<(std::ostream &_Stream, const u8_xt &_Src);
-
 template<typename _Obj_t>
 str_xt tostr(const _Obj_t &_Obj) noexcept;
-
 void x_terminate_handler(void) noexcept;
 // Entry point function of generated X code, generates by XXC.
 void XID(main)(void);
@@ -101,6 +96,13 @@ void _xxc___call_initializers(void);
 int main(void);
 
 // Definitions
+
+template<typename T>
+inline ptr<T> &__xxc_must_heap(const ptr<T> &_Ptr) noexcept
+{ return ((ptr<T>&)(_Ptr)).__must_heap(); }
+
+template<typename T>
+inline T __xxc_must_heap(const T &_Obj) noexcept { return _Obj; }
 
 template <typename _Enum_t, typename _Index_t, typename _Item_t>
 static inline void foreach(const _Enum_t _Enum,

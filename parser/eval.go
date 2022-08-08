@@ -20,6 +20,7 @@ type value struct {
 	lvalue    bool
 	variadic  bool
 	isType    bool
+	isField   bool
 }
 
 func isOperator(process Toks) bool {
@@ -777,6 +778,7 @@ func (e *eval) xObjSubId(dm *Defmap, val value, idTok Tok, m *exprModel) (v valu
 		v.data.Type = g.Type
 		v.lvalue = true
 		v.constExpr = g.Const
+		v.isField = true
 		if g.Tag != nil {
 			m.appendSubNode(exprNode{g.Tag.(string)})
 		} else {

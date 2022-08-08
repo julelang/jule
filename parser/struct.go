@@ -121,7 +121,7 @@ func (s *xstruct) cppConstructor() string {
 			cpp.WriteString("this->")
 			cpp.WriteString(g.OutId())
 			cpp.WriteString(" = ")
-			cpp.WriteString(s.constructor.Params[i].OutId())
+			cpp.WriteString(exprMustHeap(s.constructor.Params[i].OutId()))
 			cpp.WriteByte(';')
 		}
 		models.DoneIndent()
