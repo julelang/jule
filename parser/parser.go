@@ -2234,6 +2234,11 @@ func (p *Parser) pushGenericByCommonArg(f *Func, pair *paramMapPair, args *model
 }
 
 func (p *Parser) pushGenericByType(f *Func, generic *GenericType, args *models.Args, t DataType) {
+	owner := f.Owner.(*Parser)
+	// Already added
+	if owner.blockTypeById(generic.Id) != nil {
+		return
+	}
 	id, _ := t.KindId()
 	t.Kind = id
 	f.Owner.(*Parser).pushGeneric(generic, t)
