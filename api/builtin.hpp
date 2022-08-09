@@ -21,6 +21,8 @@ int_xt XID(copy)(const slice<_Item_t> &_Dest,
 template<typename _Item_t>
 slice<_Item_t> XID(append)(const slice<_Item_t> &_Src,
                            const slice<_Item_t> &_Components) noexcept;
+template<typename T>
+ptr<T> XID(new)(void) noexcept;
 
 // Definitions
 
@@ -41,7 +43,7 @@ inline void XID(panic)(trait<XID(Error)> _Error) { throw _Error; }
 
 template<typename _Item_t>
 inline slice<_Item_t> XID(make)(const int_xt &_N) noexcept
-{ return slice<_Item_t>(_N); }
+{ return _N < 0 ? nil : slice<_Item_t>(_N); }
 
 template<typename _Item_t>
 int_xt XID(copy)(const slice<_Item_t> &_Dest,
@@ -65,6 +67,20 @@ slice<_Item_t> XID(append)(const slice<_Item_t> &_Src,
     for (int_xt _index{0}; _index < _Components.len(); ++_index)
     { _buffer[_Src.len()+_index] = _Components._buffer[_index]; }
     return _buffer;
+}
+
+template<typename T>
+ptr<T> XID(new)(void) noexcept {
+    ptr<T> _ptr;
+    _ptr._heap = new(std::nothrow) bool*{__XXC_PTR_HEAP_TRUE};
+    if (!_ptr._heap) { XID(panic)("memory allocation failed"); }
+    _ptr._ptr = new(std::nothrow) T*;
+    if (!_ptr._ptr) { XID(panic)("memory allocation failed"); }
+    *_ptr._ptr = new(std::nothrow) T;
+    if (!*_ptr._ptr) { XID(panic)("memory allocation failed"); }
+    _ptr._ref = new(std::nothrow) uint_xt{1};
+    if (!_ptr._ref) { XID(panic)("memory allocation failed"); }
+    return _ptr;
 }
 
 #endif // #ifndef __XXC_BUILTIN_HPP

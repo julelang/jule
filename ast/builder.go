@@ -768,15 +768,16 @@ func (b *Builder) Attribute(toks Toks) (a models.Attribute) {
 	i := 0
 	a.Tok = toks[i]
 	i++
-	a.Tag = toks[i]
-	if a.Tag.Id != tokens.Id || a.Tok.Column+1 != a.Tag.Column {
-		b.pusherr(a.Tag, "invalid_syntax")
+	tag := toks[i]
+	if tag.Id != tokens.Id || a.Tok.Column+1 != tag.Column {
+		b.pusherr(tag, "invalid_syntax")
 		return
 	}
+	a.Tag = tag.Kind
 	toks = toks[i+1:]
 	if len(toks) > 0 {
 		tok := toks[0]
-		if a.Tok.Column+len(a.Tag.Kind)+1 == tok.Column {
+		if a.Tok.Column+len(a.Tag)+1 == tok.Column {
 			b.pusherr(tok, "invalid_syntax")
 		}
 		b.Toks = append(toks, b.Toks...)

@@ -99,7 +99,7 @@ func isOutableAttribute(kind string) bool {
 func attributesToString(attributes []models.Attribute) string {
 	var cpp strings.Builder
 	for _, attr := range attributes {
-		if isOutableAttribute(attr.Tag.Kind) {
+		if isOutableAttribute(attr.Tag) {
 			cpp.WriteString(attr.String())
 			cpp.WriteByte(' ')
 		}

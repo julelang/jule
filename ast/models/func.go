@@ -26,7 +26,7 @@ type Func struct {
 func (f *Func) FindAttribute(kind string) *Attribute {
 	for i := range f.Attributes {
 		attribute := &f.Attributes[i]
-		if attribute.Tag.Kind == kind {
+		if attribute.Tag == kind {
 			return attribute
 		}
 	}

@@ -1155,17 +1155,17 @@ write:
 func (p *Parser) PushAttribute(attribute Attribute) {
 	ok := false
 	for _, kind := range x.Attributes {
-		if attribute.Tag.Kind == kind {
+		if attribute.Tag == kind {
 			ok = true
 			break
 		}
 	}
 	if !ok {
-		p.pusherrtok(attribute.Tag, "undefined_attribute")
+		p.pusherrtok(attribute.Tok, "undefined_attribute")
 	}
 	for _, attr := range p.attributes {
-		if attr.Tag.Kind == attribute.Tag.Kind {
-			p.pusherrtok(attribute.Tag, "attribute_repeat")
+		if attr.Tag == attribute.Tag {
+			p.pusherrtok(attribute.Tok, "attribute_repeat")
 			return
 		}
 	}
@@ -1452,7 +1452,7 @@ func (p *Parser) checkTypeParam(f *function) {
 
 func (p *Parser) checkFuncAttributes(f *function) {
 	for _, attribute := range f.Ast.Attributes {
-		switch attribute.Tag.Kind {
+		switch attribute.Tag {
 		case x.Attribute_Inline:
 		case x.Attribute_TypeArg:
 			p.checkTypeParam(f)

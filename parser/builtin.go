@@ -353,20 +353,25 @@ var Builtin = &Defmap{
 			}},
 		}},
 		{Ast: &Func{
-			Pub:   true,
-			Id:    "make",
-			Owner: genericFile,
-			Generics: []*GenericType{
-				{Id: "Item"},
+			Pub:      true,
+			Id:       "new",
+			Owner:    genericFile,
+			Generics: []*GenericType{{Id: "T"}},
+			Attributes: []Attribute{
+				models.Attribute{Tag: x.Attribute_TypeArg},
 			},
+			RetType: RetType{Type: DataType{Id: xtype.Id, Kind: tokens.STAR + "T"}},
+		}},
+		{Ast: &Func{
+			Pub:      true,
+			Id:       "make",
+			Owner:    genericFile,
+			Generics: []*GenericType{{Id: "Item"}},
 			RetType: models.RetType{
 				Type: DataType{
-					Id:   xtype.Slice,
-					Kind: x.Prefix_Slice + "Item",
-					ComponentType: &DataType{
-						Id:   xtype.Id,
-						Kind: "Item",
-					},
+					Id:            xtype.Slice,
+					Kind:          x.Prefix_Slice + "Item",
+					ComponentType: &DataType{Id: xtype.Id, Kind: "Item"},
 				},
 			},
 			Params: []models.Param{
@@ -377,65 +382,49 @@ var Builtin = &Defmap{
 			},
 		}},
 		{Ast: &Func{
-			Pub:   true,
-			Id:    "copy",
-			Owner: genericFile,
-			Generics: []*GenericType{
-				{Id: "Item"},
-			},
-			RetType: models.RetType{Type: DataType{Id: xtype.Int, Kind: xtype.TypeMap[xtype.Int]}},
+			Pub:      true,
+			Id:       "copy",
+			Owner:    genericFile,
+			Generics: []*GenericType{{Id: "Item"}},
+			RetType:  models.RetType{Type: DataType{Id: xtype.Int, Kind: xtype.TypeMap[xtype.Int]}},
 			Params: []models.Param{
 				{
 					Id: "dest",
 					Type: DataType{
-						Id:   xtype.Slice,
-						Kind: x.Prefix_Slice + "Item",
-						ComponentType: &DataType{
-							Id:   xtype.Id,
-							Kind: "Item",
-						},
+						Id:            xtype.Slice,
+						Kind:          x.Prefix_Slice + "Item",
+						ComponentType: &DataType{Id: xtype.Id, Kind: "Item"},
 					},
 				},
 				{
 					Id: "src",
 					Type: DataType{
-						Id:   xtype.Slice,
-						Kind: x.Prefix_Slice + "Item",
-						ComponentType: &DataType{
-							Id:   xtype.Id,
-							Kind: "Item",
-						},
+						Id:            xtype.Slice,
+						Kind:          x.Prefix_Slice + "Item",
+						ComponentType: &DataType{Id: xtype.Id, Kind: "Item"},
 					},
 				},
 			},
 		}},
 		{Ast: &Func{
-			Pub:   true,
-			Id:    "append",
-			Owner: genericFile,
-			Generics: []*GenericType{
-				{Id: "Item"},
-			},
+			Pub:      true,
+			Id:       "append",
+			Owner:    genericFile,
+			Generics: []*GenericType{{Id: "Item"}},
 			RetType: models.RetType{
 				Type: DataType{
-					Id:   xtype.Slice,
-					Kind: x.Prefix_Slice + "Item",
-					ComponentType: &DataType{
-						Id:   xtype.Id,
-						Kind: "Item",
-					},
+					Id:            xtype.Slice,
+					Kind:          x.Prefix_Slice + "Item",
+					ComponentType: &DataType{Id: xtype.Id, Kind: "Item"},
 				},
 			},
 			Params: []models.Param{
 				{
 					Id: "src",
 					Type: DataType{
-						Id:   xtype.Slice,
-						Kind: x.Prefix_Slice + "Item",
-						ComponentType: &DataType{
-							Id:   xtype.Id,
-							Kind: "Item",
-						},
+						Id:            xtype.Slice,
+						Kind:          x.Prefix_Slice + "Item",
+						ComponentType: &DataType{Id: xtype.Id, Kind: "Item"},
 					},
 				},
 				{
