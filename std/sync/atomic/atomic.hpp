@@ -117,31 +117,31 @@ inline void __xxc_atomic_store_uintptr(const ptr<uintptr_xt> &_Addr,
 
 inline i32_xt
 __xxc_atomic_swap_i32(const ptr<i32_xt> &_Addr, const i32_xt &_New) noexcept
-{ return __xxc_atomic_swap(_Addr._ptr, _New); }
+{ return __xxc_atomic_swap(*_Addr._ptr, _New); }
 
 inline i64_xt
 __xxc_atomic_swap_i64(const ptr<i64_xt> &_Addr, const i64_xt &_New) noexcept
-{ return __xxc_atomic_swap(_Addr._ptr, _New); }
+{ return __xxc_atomic_swap(*_Addr._ptr, _New); }
 
 inline u32_xt
 __xxc_atomic_swap_u32(const ptr<u32_xt> &_Addr, const u32_xt &_New) noexcept
-{ return __xxc_atomic_swap(_Addr._ptr, _New); }
+{ return __xxc_atomic_swap(*_Addr._ptr, _New); }
 
 inline u64_xt
 __xxc_atomic_swap_u64(const ptr<u64_xt> &_Addr, const u64_xt &_New) noexcept
-{ return __xxc_atomic_swap(_Addr._ptr, _New); }
+{ return __xxc_atomic_swap(*_Addr._ptr, _New); }
 
 inline uintptr_xt
 __xxc_atomic_swap_uintptr(const ptr<uintptr_xt> &_Addr,
                           const uintptr_xt &_New) noexcept
-{ return __xxc_atomic_swap(_Addr._ptr, _New); }
+{ return __xxc_atomic_swap(*_Addr._ptr, _New); }
 
 inline bool
 __xxc_atomic_compare_swap_i32(const ptr<i32_xt> &_Addr,
                               const i32_xt &_Old,
                               const i32_xt &_New) noexcept {
     return __xxc_atomic_compare_swap(
-        (i32_xt*)(_Addr._ptr), (i32_xt*)(&_Old), _New);
+        (i32_xt*)(*_Addr._ptr), (i32_xt*)(&_Old), _New);
 }
 
 inline bool
@@ -149,7 +149,7 @@ __xxc_atomic_compare_swap_i64(const ptr<i64_xt> &_Addr,
                               const i64_xt &_Old,
                               const i64_xt &_New) noexcept {
     return __xxc_atomic_compare_swap(
-        (i64_xt*)(_Addr._ptr), (i64_xt*)(&_Old), _New);
+        (i64_xt*)(*_Addr._ptr), (i64_xt*)(&_Old), _New);
 }
 
 inline bool
@@ -157,7 +157,7 @@ __xxc_atomic_compare_swap_u32(const ptr<u32_xt> &_Addr,
                               const u32_xt &_Old,
                               const u32_xt &_New) noexcept {
     return __xxc_atomic_compare_swap(
-        (u32_xt*)(_Addr._ptr), (u32_xt*)(&_Old), _New);
+        (u32_xt*)(*_Addr._ptr), (u32_xt*)(&_Old), _New);
 }
 
 inline bool
@@ -165,7 +165,7 @@ __xxc_atomic_compare_swap_u64(const ptr<u64_xt> &_Addr,
                               const u64_xt &_Old,
                               const u64_xt &_New) noexcept {
     return __xxc_atomic_compare_swap(
-        (u64_xt*)(_Addr._ptr), (u64_xt*)(&_Old), _New);
+        (u64_xt*)(*_Addr._ptr), (u64_xt*)(&_Old), _New);
 }
 
 inline bool
@@ -173,64 +173,64 @@ __xxc_atomic_compare_swap_uintptr(const ptr<uintptr_xt> &_Addr,
                                   const uintptr_xt &_Old,
                                   const uintptr_xt &_New) noexcept {
     return __xxc_atomic_compare_swap(
-        (uintptr_xt*)(_Addr._ptr), (uintptr_xt*)(&_Old), _New);
+        (uintptr_xt*)(*_Addr._ptr), (uintptr_xt*)(&_Old), _New);
 }
 
 inline i32_xt
 __xxc_atomic_add_i32(const ptr<i32_xt> &_Addr, const i32_xt &_Delta) noexcept
-{ return __xxc_atomic_add(_Addr._ptr, _Delta); }
+{ return __xxc_atomic_add(*_Addr._ptr, _Delta); }
 
 inline i64_xt
 __xxc_atomic_add_i64(const ptr<i64_xt> &_Addr, const i64_xt &_Delta) noexcept
-{ return __xxc_atomic_add(_Addr._ptr, _Delta); }
+{ return __xxc_atomic_add(*_Addr._ptr, _Delta); }
 
 inline u32_xt
 __xxc_atomic_add_u32(const ptr<u32_xt> &_Addr, const u32_xt &_Delta) noexcept
-{ return __xxc_atomic_add(_Addr._ptr, _Delta); }
+{ return __xxc_atomic_add(*_Addr._ptr, _Delta); }
 
 inline u64_xt
 __xxc_atomic_add_u64(const ptr<u64_xt> &_Addr, const u64_xt &_Delta) noexcept
-{ return __xxc_atomic_add(_Addr._ptr, _Delta); }
+{ return __xxc_atomic_add(*_Addr._ptr, _Delta); }
 
 inline uintptr_xt
 __xxc_atomic_add_uintptr(const ptr<uintptr_xt> &_Addr,
                          const uintptr_xt &_Delta) noexcept
-{ return __xxc_atomic_add(_Addr._ptr, _Delta); }
+{ return __xxc_atomic_add(*_Addr._ptr, _Delta); }
 
 inline i32_xt __xxc_atomic_load_i32(const ptr<i32_xt> &_Addr) noexcept
-{ return __xxc_atomic_load(_Addr._ptr); }
+{ return __xxc_atomic_load(*_Addr._ptr); }
 
 inline i64_xt __xxc_atomic_load_i64(const ptr<i64_xt> &_Addr) noexcept
-{ return __xxc_atomic_load(_Addr._ptr); }
+{ return __xxc_atomic_load(*_Addr._ptr); }
 
 inline u32_xt __xxc_atomic_load_u32(const ptr<u32_xt> &_Addr) noexcept
-{ return __xxc_atomic_load(_Addr._ptr); }
+{ return __xxc_atomic_load(*_Addr._ptr); }
 
 inline u64_xt __xxc_atomic_load_u64(const ptr<u64_xt> &_Addr) noexcept
-{ return __xxc_atomic_load(_Addr._ptr); }
+{ return __xxc_atomic_load(*_Addr._ptr); }
 
 inline uintptr_xt __xxc_atomic_load_uintptr(const ptr<uintptr_xt> &_Addr) noexcept
-{ return __xxc_atomic_load(_Addr._ptr); }
+{ return __xxc_atomic_load(*_Addr._ptr); }
 
 inline void
 __xxc_atomic_store_i32(const ptr<i32_xt> &_Addr, const i32_xt &_Val) noexcept
-{ __xxc_atomic_store(_Addr._ptr, _Val); }
+{ __xxc_atomic_store(*_Addr._ptr, _Val); }
 
 inline void
 __xxc_atomic_store_i64(const ptr<i64_xt> &_Addr, const i64_xt &_Val) noexcept
-{ __xxc_atomic_store(_Addr._ptr, _Val); }
+{ __xxc_atomic_store(*_Addr._ptr, _Val); }
 
 inline void
 __xxc_atomic_store_u32(const ptr<u32_xt> &_Addr, const u32_xt &_Val) noexcept
-{ __xxc_atomic_store(_Addr._ptr, _Val); }
+{ __xxc_atomic_store(*_Addr._ptr, _Val); }
 
 inline void
 __xxc_atomic_store_u64(const ptr<u64_xt> &_Addr, const u64_xt &_Val) noexcept
-{ __xxc_atomic_store(_Addr._ptr, _Val); }
+{ __xxc_atomic_store(*_Addr._ptr, _Val); }
 
 inline void
 __xxc_atomic_store_uintptr(const ptr<uintptr_xt> &_Addr,
                            const uintptr_xt &_Val) noexcept
-{ __xxc_atomic_store(_Addr._ptr, _Val); }
+{ __xxc_atomic_store(*_Addr._ptr, _Val); }
 
 #endif // #ifndef __XXC_STD_SYNC_ATOMIC_ATOMIC_HPP
