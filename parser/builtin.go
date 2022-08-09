@@ -321,6 +321,9 @@ var recoverFunc = &function{
 	},
 }
 
+// Parser instance for built-in generics.
+var genericFile = &Parser{}
+
 // Builtin definitions.
 var Builtin = &Defmap{
 	Types: []*models.Type{
@@ -338,32 +341,110 @@ var Builtin = &Defmap{
 	Funcs: []*function{
 		panicFunc,
 		recoverFunc,
-		{
-			Ast: &Func{
-				Pub: true,
-				Id:  "out",
-				RetType: RetType{
-					Type: DataType{Id: xtype.Void, Kind: xtype.TypeMap[xtype.Void]},
-				},
-				Params: []Param{{
-					Id:   "expr",
-					Type: DataType{Id: xtype.Any, Kind: tokens.ANY},
-				}},
+		{Ast: &Func{
+			Pub: true,
+			Id:  "out",
+			RetType: RetType{
+				Type: DataType{Id: xtype.Void, Kind: xtype.TypeMap[xtype.Void]},
 			},
-		},
-		{
-			Ast: &Func{
-				Pub: true,
-				Id:  "outln",
-				RetType: RetType{
-					Type: DataType{Id: xtype.Void, Kind: xtype.TypeMap[xtype.Void]},
-				},
-				Params: []Param{{
-					Id:   "expr",
-					Type: DataType{Id: xtype.Any, Kind: tokens.ANY},
-				}},
+			Params: []Param{{
+				Id:   "expr",
+				Type: DataType{Id: xtype.Any, Kind: tokens.ANY},
+			}},
+		}},
+		{Ast: &Func{
+			Pub:   true,
+			Id:    "make",
+			Owner: genericFile,
+			Generics: []*GenericType{
+				{Id: "Item"},
 			},
-		},
+			RetType: models.RetType{
+				Type: DataType{
+					Id:   xtype.Slice,
+					Kind: x.Prefix_Slice + "Item",
+					ComponentType: &DataType{
+						Id:   xtype.Id,
+						Kind: "Item",
+					},
+				},
+			},
+			Params: []models.Param{
+				{
+					Id:   "n",
+					Type: DataType{Id: xtype.Int, Kind: xtype.TypeMap[xtype.Int]},
+				},
+			},
+		}},
+		{Ast: &Func{
+			Pub:   true,
+			Id:    "copy",
+			Owner: genericFile,
+			Generics: []*GenericType{
+				{Id: "Item"},
+			},
+			RetType: models.RetType{Type: DataType{Id: xtype.Int, Kind: xtype.TypeMap[xtype.Int]}},
+			Params: []models.Param{
+				{
+					Id: "dest",
+					Type: DataType{
+						Id:   xtype.Slice,
+						Kind: x.Prefix_Slice + "Item",
+						ComponentType: &DataType{
+							Id:   xtype.Id,
+							Kind: "Item",
+						},
+					},
+				},
+				{
+					Id: "src",
+					Type: DataType{
+						Id:   xtype.Slice,
+						Kind: x.Prefix_Slice + "Item",
+						ComponentType: &DataType{
+							Id:   xtype.Id,
+							Kind: "Item",
+						},
+					},
+				},
+			},
+		}},
+		{Ast: &Func{
+			Pub:   true,
+			Id:    "append",
+			Owner: genericFile,
+			Generics: []*GenericType{
+				{Id: "Item"},
+			},
+			RetType: models.RetType{
+				Type: DataType{
+					Id:   xtype.Slice,
+					Kind: x.Prefix_Slice + "Item",
+					ComponentType: &DataType{
+						Id:   xtype.Id,
+						Kind: "Item",
+					},
+				},
+			},
+			Params: []models.Param{
+				{
+					Id: "src",
+					Type: DataType{
+						Id:   xtype.Slice,
+						Kind: x.Prefix_Slice + "Item",
+						ComponentType: &DataType{
+							Id:   xtype.Id,
+							Kind: "Item",
+						},
+					},
+				},
+				{
+					Id:       "components",
+					Type:     DataType{Id: xtype.Id, Kind: "Item"},
+					Variadic: true,
+				},
+			},
+		}},
 	},
 	Traits: []*trait{
 		errorTrait,
@@ -549,6 +630,16 @@ func readyMapDefs(mapt DataType) {
 }
 
 func init() {
+	// Copy out function as outln
+	outFunc, _, _ := Builtin.funcById("out", nil)
+	outlnFunc := new(function)
+	*outlnFunc = *outFunc
+	outlnFunc.Ast = new(models.Func)
+	*outlnFunc.Ast = *outFunc.Ast
+	outlnFunc.Ast.Id = "outln"
+	Builtin.Funcs = append(Builtin.Funcs, outlnFunc)
+
+	// Set bits of platform-dependent types
 	intMax := intStatics.Globals[0]
 	intMin := intStatics.Globals[1]
 	uintMax := uintStatics.Globals[0]

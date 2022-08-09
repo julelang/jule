@@ -1,4 +1,4 @@
-# lib
+# std
 
 Standard library directory. <br>
 The directories in this directory, accept as package. <br>
