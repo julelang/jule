@@ -59,7 +59,6 @@ type Parser struct {
 	blockVars      []*Var
 	waitingGlobals []waitingGlobal
 	eval           *eval
-	allowBuiltin   bool
 	cppLinks       []*models.CppLink
 
 	NoLocalPkg bool
@@ -80,7 +79,6 @@ func New(f *File) *Parser {
 	p.Defs = new(Defmap)
 	p.eval = new(eval)
 	p.eval.p = p
-	p.allowBuiltin = true
 	return p
 }
 
@@ -803,7 +801,8 @@ func (p *Parser) Generics(generics []GenericType) {
 
 // Type parses X type define statement.
 func (p *Parser) Type(t Type) {
-	if _, tok, canshadow := p.defById(t.Id); tok.Id != tokens.NA && !canshadow {
+	_, tok, canshadow := p.defById(t.Id)
+	if tok.Id != tokens.NA && !canshadow {
 		p.pusherrtok(t.Tok, "exist_id", t.Id)
 		return
 	} else if xapi.IsIgnoreId(t.Id) {
@@ -1501,11 +1500,9 @@ func (p *Parser) linkById(id string) *models.CppLink {
 // Special case:
 //  FuncById(id) -> nil: if function is not exist.
 func (p *Parser) FuncById(id string) (*function, *Defmap, bool) {
-	if p.allowBuiltin {
-		f, _, _ := Builtin.funcById(id, nil)
-		if f != nil {
-			return f, nil, false
-		}
+	f, _, _ := Builtin.funcById(id, nil)
+	if f != nil {
+		return f, nil, false
 	}
 	return p.Defs.funcById(id, p.File)
 }
@@ -1524,41 +1521,33 @@ func (p *Parser) typeById(id string) (*Type, *Defmap, bool) {
 	if t != nil {
 		return t, nil, false
 	}
-	if p.allowBuiltin {
-		t, _, _ = Builtin.typeById(id, nil)
-		if t != nil {
-			return t, nil, false
-		}
+	t, _, _ = Builtin.typeById(id, nil)
+	if t != nil {
+		return t, nil, false
 	}
 	return p.Defs.typeById(id, p.File)
 }
 
 func (p *Parser) enumById(id string) (*Enum, *Defmap, bool) {
-	if p.allowBuiltin {
-		s, _, _ := Builtin.enumById(id, nil)
-		if s != nil {
-			return s, nil, false
-		}
+	s, _, _ := Builtin.enumById(id, nil)
+	if s != nil {
+		return s, nil, false
 	}
 	return p.Defs.enumById(id, p.File)
 }
 
 func (p *Parser) structById(id string) (*xstruct, *Defmap, bool) {
-	if p.allowBuiltin {
-		s, _, _ := Builtin.structById(id, nil)
-		if s != nil {
-			return s, nil, false
-		}
+	s, _, _ := Builtin.structById(id, nil)
+	if s != nil {
+		return s, nil, false
 	}
 	return p.Defs.structById(id, p.File)
 }
 
 func (p *Parser) traitById(id string) (*trait, *Defmap, bool) {
-	if p.allowBuiltin {
-		t, _, _ := Builtin.traitById(id, nil)
-		if t != nil {
-			return t, nil, false
-		}
+	t, _, _ := Builtin.traitById(id, nil)
+	if t != nil {
+		return t, nil, false
 	}
 	return p.Defs.traitById(id, p.File)
 }
@@ -1607,7 +1596,8 @@ func (p *Parser) defById(id string) (def any, tok Tok, canshadow bool) {
 	if f != nil {
 		return f, f.Ast.Tok, canshadow
 	}
-	if bv := p.blockVarById(id); bv != nil {
+	bv := p.blockVarById(id)
+	if bv != nil {
 		return bv, bv.Token, false
 	}
 	g, _, _ := p.globalById(id)

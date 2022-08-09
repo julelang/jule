@@ -895,14 +895,20 @@ func (e *eval) nsSubId(toks Toks, m *exprModel) (v value) {
 	if defs == nil {
 		return
 	}
+	// Temporary clean of local defines
+	// Because this defines has high priority
+	// So shadows defines of namespace
+	blockTypes := e.p.blockTypes
+	blockVars := e.p.blockVars
+	e.p.blockTypes = nil
+	e.p.blockVars = nil
 	pdefs := e.p.Defs
 	e.p.Defs = defs
-	e.p.allowBuiltin = false
-	defer func() {
-		e.p.Defs = pdefs
-		e.p.allowBuiltin = true
-	}()
-	return e.process(toks, m)
+	v, _ = e.single(toks[0], m)
+	e.p.blockTypes = blockTypes
+	e.p.blockVars = blockVars
+	e.p.Defs = pdefs
+	return
 }
 
 func (e *eval) id(toks Toks, m *exprModel) (v value) {
