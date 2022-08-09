@@ -2063,7 +2063,7 @@ ok:
 }
 
 func (p *Parser) parseFuncCall(f *Func, args *models.Args, m *exprModel, errTok Tok) (v value) {
-	args.NeedsPureType = len(p.rootBlock.Func.Generics) == 0
+	args.NeedsPureType = p.rootBlock == nil || len(p.rootBlock.Func.Generics) == 0
 	if len(f.Generics) > 0 {
 		owner := f.Owner.(*Parser)
 		rootBlock := owner.rootBlock
