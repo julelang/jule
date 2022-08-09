@@ -89,7 +89,7 @@ struct ptr {
     }
 
     inline operator uintptr_xt(void) const noexcept
-    { return (uintptr_xt)(this->_ptr); }
+    { return (uintptr_xt)(*this->_ptr); }
 
     void operator=(const ptr<T> &_Ptr) noexcept {
         this->__dealloc();
