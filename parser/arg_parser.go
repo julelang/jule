@@ -37,11 +37,11 @@ func (pap *pureArgParser) buildArgs() {
 			pap.args.Src[i] = *pair.arg
 		case pair.param.Variadic:
 			t := DataType{
-				Id:              xtype.Slice,
-				Tok:             pair.param.Type.Tok,
-				Kind:            x.Prefix_Slice + pair.param.Type.Kind,
-				DontUseOriginal: true,
-				ComponentType:   new(DataType),
+				Id:            xtype.Slice,
+				Tok:           pair.param.Type.Tok,
+				Kind:          x.Prefix_Slice + pair.param.Type.Kind,
+				Pure:          true,
+				ComponentType: new(DataType),
 			}
 			*t.ComponentType = pair.param.Type
 			model := sliceExpr{t, nil}
@@ -68,9 +68,9 @@ func (pap *pureArgParser) pushVariadicArgs(pair *paramMapPair) {
 	model.dataType.ComponentType = new(DataType)
 	*model.dataType.ComponentType = pair.param.Type
 	model.dataType.Original = nil
-	model.dataType.DontUseOriginal = true
+	model.dataType.Pure = true
 	if pap.args.NeedsPureType {
-		model.dataType.ComponentType.DontUseOriginal = true
+		model.dataType.ComponentType.Pure = true
 		model.dataType.ComponentType.Original = nil
 	}
 	if !once {

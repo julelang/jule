@@ -15,6 +15,6 @@ type GenericType struct {
 func (gt GenericType) String() string {
 	var cpp strings.Builder
 	cpp.WriteString("typename ")
-	cpp.WriteString(xapi.OutId(gt.Id, gt.Tok.File))
+	cpp.WriteString(xapi.AsId(gt.Id))
 	return cpp.String()
 }

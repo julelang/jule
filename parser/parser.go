@@ -1231,7 +1231,7 @@ func (p *Parser) parseCommonNonGenericType(generics []*GenericType, t *DataType)
 			t.Kind = deft.dataTypeString()
 			t.Id = xtype.Struct
 			t.Tag = deft
-			t.DontUseOriginal = true
+			t.Pure = true
 			t.Original = nil
 			goto tagcheck
 		}
@@ -1283,77 +1283,6 @@ func (p *Parser) parseTypesNonGenerics(f *Func) {
 		p.parseNonGenericType(f.Generics, &f.Params[i].Type)
 	}
 	p.parseNonGenericType(f.Generics, &f.RetType.Type)
-}
-
-func (p *Parser) parseFuncGenericType(generics []*GenericType, t *DataType) {
-	f := t.Tag.(*Func)
-	for i := range f.Params {
-		p.parseGenericType(generics, &f.Params[i].Type)
-	}
-	p.parseGenericType(generics, &f.RetType.Type)
-}
-
-func (p *Parser) parseMultiGenericType(generics []*GenericType, t *DataType) {
-	types := t.Tag.([]DataType)
-	for i := range types {
-		mt := &types[i]
-		p.parseGenericType(generics, mt)
-	}
-}
-
-func (p *Parser) parseMapGenericType(generics []*GenericType, t *DataType) {
-	p.parseMultiGenericType(generics, t)
-}
-
-func (p *Parser) parseCommonGenericType(generics []*GenericType, t *DataType) {
-	if !typeIsGeneric(generics, *t) {
-		if t.Tag != nil {
-			switch t := t.Tag.(type) {
-			case *xstruct:
-				sgenerics := t.Generics()
-				for _, ct := range sgenerics {
-					if typeIsGeneric(generics, ct) {
-						goto parse
-					}
-				}
-			case []DataType:
-				for _, ct := range t {
-					if typeIsGeneric(generics, ct) {
-						goto parse
-					}
-				}
-			}
-		}
-		return
-	}
-parse:
-	*t, _ = p.realType(*t, true)
-}
-
-func (p *Parser) parseGenericType(generics []*GenericType, t *DataType) {
-	switch {
-	case t.MultiTyped:
-		p.parseMultiGenericType(generics, t)
-	case typeIsFunc(*t):
-		p.parseFuncGenericType(generics, t)
-	case typeIsMap(*t):
-		p.parseMapGenericType(generics, t)
-	case typeIsArray(*t):
-		p.parseGenericType(generics, t.ComponentType)
-		t.Kind = x.Prefix_Array + t.ComponentType.Kind
-	case typeIsSlice(*t):
-		p.parseGenericType(generics, t.ComponentType)
-		t.Kind = x.Prefix_Slice + t.ComponentType.Kind
-	default:
-		p.parseCommonGenericType(generics, t)
-	}
-}
-
-func (p *Parser) parseTypesGenerics(f *Func) {
-	for i := range f.Params {
-		p.parseGenericType(f.Generics, &f.Params[i].Type)
-	}
-	p.parseGenericType(f.Generics, &f.RetType.Type)
 }
 
 func (p *Parser) checkRetVars(f *function) {
@@ -1548,10 +1477,10 @@ func (p *Parser) varsFromParams(params []Param) []*Var {
 				p.pusherrtok(param.Tok, "variadic_parameter_notlast")
 			}
 			v.Type.Original = nil
-			v.Type.DontUseOriginal = true
+			v.Type.ComponentType = new(models.DataType)
+			*v.Type.ComponentType = param.Type
 			v.Type.Id = xtype.Slice
 			v.Type.Kind = x.Prefix_Slice + v.Type.Kind
-			v.Type.ComponentType = &param.Type
 		}
 		vars[i] = v
 	}
@@ -1756,10 +1685,11 @@ func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) {
 	dt := param.Type
 	if param.Variadic {
 		dt.Id = xtype.Slice
-		dt.Kind = x.Prefix_Array + dt.Kind
-		dt.ComponentType = &param.Type
+		dt.Kind = x.Prefix_Slice + dt.Kind
+		dt.ComponentType = new(models.DataType)
+		*dt.ComponentType = param.Type
 		dt.Original = nil
-		dt.DontUseOriginal = true
+		dt.Pure = true
 	}
 	v, model := p.evalExpr(param.Default)
 	param.Default.Model = model
@@ -1926,7 +1856,7 @@ func (p *Parser) callFunc(f *Func, data callData, m *exprModel) value {
 func (p *Parser) callStructConstructor(s *xstruct, argsToks Toks, m *exprModel) (v value) {
 	f := s.constructor
 	s = f.RetType.Type.Tag.(*xstruct)
-	v.data.Type = f.RetType.Type
+	v.data.Type = f.RetType.Type.Copy()
 	v.data.Type.Kind = s.dataTypeString()
 	v.isType = false
 	v.lvalue = false
@@ -2062,10 +1992,11 @@ func (p *Parser) checkGenericsQuantity(n int, generics []DataType, errTok Tok) b
 
 func (p *Parser) pushGeneric(generic *GenericType, source DataType) {
 	t := &Type{
-		Id:   generic.Id,
-		Tok:  generic.Tok,
-		Type: source,
-		Used: true,
+		Id:      generic.Id,
+		Tok:     generic.Tok,
+		Type:    source,
+		Used:    true,
+		Generic: true,
 	}
 	p.blockTypes = append(p.blockTypes, t)
 }
@@ -2104,6 +2035,7 @@ func (p *Parser) parseGenericFunc(f *Func, generics []DataType, errtok Tok) {
 		s := f.Receiver.Tag.(*xstruct)
 		owner.pushGenerics(s.Ast.Generics, s.Generics())
 	}
+	owner.reloadFuncTypes(f)
 	if f.Block == nil {
 		return
 	} else if itsCombined(f, generics) {
@@ -2135,7 +2067,7 @@ check:
 		return false
 	}
 	f.Owner.(*Parser).pushGenerics(f.Generics, args.Generics)
-	f.Owner.(*Parser).parseTypesGenerics(f)
+	f.Owner.(*Parser).reloadFuncTypes(f)
 ok:
 	return true
 }
@@ -2143,10 +2075,6 @@ ok:
 func (p *Parser) parseFuncCall(f *Func, args *models.Args, m *exprModel, errTok Tok) (v value) {
 	args.NeedsPureType = len(p.rootBlock.Func.Generics) == 0
 	if len(f.Generics) > 0 {
-		params := make([]Param, len(f.Params))
-		copy(params, f.Params)
-		f.RetType.Type.DontUseOriginal = false
-		retType := f.RetType
 		owner := f.Owner.(*Parser)
 		rootBlock := owner.rootBlock
 		nodeBlock := owner.nodeBlock
@@ -2157,7 +2085,6 @@ func (p *Parser) parseFuncCall(f *Func, args *models.Args, m *exprModel, errTok 
 			owner.nodeBlock = nodeBlock
 			owner.blockVars = blockVars
 			owner.blockTypes = blockTypes
-			f.Params, f.RetType = params, retType
 		}()
 		if !p.parseGenerics(f, args, errTok) {
 			return
@@ -2170,30 +2097,29 @@ func (p *Parser) parseFuncCall(f *Func, args *models.Args, m *exprModel, errTok 
 			generics := s.Generics()
 			if len(generics) > 0 {
 				owner.pushGenerics(s.Ast.Generics, generics)
-				owner.parseTypesGenerics(f)
+				owner.reloadFuncTypes(f)
 			}
 		}
 	}
-	v.data.Type = f.RetType.Type
-	v.data.Value = f.Id
 	if args == nil {
-		return
+		goto end
 	}
 	p.parseArgs(f, args, m, errTok)
-	callExpr := callExpr{
-		generics: genericsExpr{args.Generics},
-		args:     argsExpr{args.Src},
-	}
 	if len(args.Generics) > 0 {
 		p.parseGenericFunc(f, args.Generics, errTok)
 	}
-	v.data.Type = f.RetType.Type
-	if args.NeedsPureType {
-		v.data.Type.DontUseOriginal = true
-		v.data.Type.Original = nil
-	}
 	if m != nil {
-		m.appendSubNode(callExpr)
+		m.appendSubNode(callExpr{
+			generics: genericsExpr{args.Generics},
+			args:     argsExpr{args.Src},
+		})
+	}
+end:
+	v.data.Value = f.Id
+	v.data.Type = f.RetType.Type.Copy()
+	if args.NeedsPureType {
+		v.data.Type.Pure = true
+		v.data.Type.Original = nil
 	}
 	return
 }
@@ -3166,9 +3092,10 @@ func (p *Parser) typeSourceIsType(dt DataType, t *Type, err bool) (DataType, boo
 	old := dt
 	dt = t.Type
 	dt.Tok = t.Tok
+	dt.Generic = t.Generic
 	dt.Original = original
 	dt, ok := p.typeSource(dt, err)
-	dt.DontUseOriginal = false
+	dt.Pure = false
 	if ok && old.Tag != nil && !typeIsStruct(t.Type) { // Has generics
 		p.pusherrtok(dt.Tok, "invalid_type_source")
 	}
@@ -3263,7 +3190,7 @@ func (p *Parser) typeSourceIsTrait(t *trait, tag any, errTok Tok) (dt DataType, 
 	dt.Kind = t.Ast.Id
 	dt.Tag = t
 	dt.Tok = t.Ast.Tok
-	dt.DontUseOriginal = true
+	dt.Pure = true
 	return dt, true
 }
 
@@ -3290,7 +3217,7 @@ func (p *Parser) tokenizeDataType(id string) []Tok {
 func (p *Parser) typeSourceIsArrayType(t *DataType) (ok bool) {
 	ok = true
 	t.Original = nil
-	t.DontUseOriginal = true
+	t.Pure = true
 	*t.ComponentType, ok = p.realType(*t.ComponentType, true)
 	if !ok {
 		return
@@ -3331,11 +3258,7 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 		return dt, true
 	}
 	original := dt.Original
-	defer func() {
-		if !ret.DontUseOriginal {
-			ret.Original = original
-		}
-	}()
+	defer func() { ret.Original = original }()
 	dt.SetToOriginal()
 	switch {
 	case dt.MultiTyped:
@@ -3407,14 +3330,8 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 }
 
 func (p *Parser) realType(dt DataType, err bool) (ret DataType, _ bool) {
-	if !dt.DontUseOriginal {
-		original := dt.Original
-		defer func() {
-			if !ret.DontUseOriginal {
-				ret.Original = original
-			}
-		}()
-	}
+	original := dt.Original
+	defer func() { ret.Original = original }()
 	dt.SetToOriginal()
 	return p.typeSource(dt, err)
 }

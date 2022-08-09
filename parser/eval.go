@@ -1009,7 +1009,7 @@ func (e *eval) bracketRange(toks Toks, m *exprModel) (v value) {
 	m.appendSubNode(exprNode{tokens.RBRACKET})
 	v = e.indexing(v, leftv, errTok)
 	// Ignore indexed type from original
-	v.data.Type.DontUseOriginal = true
+	v.data.Type.Pure = true
 	v.data.Type.Original = nil
 	return v
 }
