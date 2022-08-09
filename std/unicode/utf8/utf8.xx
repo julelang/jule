@@ -257,6 +257,37 @@ pub rune_len(r rune) int {
 }
 
 //doc:
+// Writes into p (which must be large enough) the UTF-8 encoding of the rune.
+// If the rune is out of range, it writes the encoding of RUNE_ERROR.
+// It returns the number of bytes written.
+pub encode_rune(p []byte, r rune) int {
+	// Negative values are erroneous. Making it unsigned addresses the problem.
+	i: = u32(r)
+	match {
+	case i <= RUNE1_MAX:
+		p[0] = byte(r)
+		ret 1
+	case i <= RUNE2_MAX:
+		p[0] = T2 | byte(r>>6)
+		p[1] = TX | byte(r)&MASKX
+		ret 2
+	case i > MAX_RUNE, SURROGATE_MIN <= i && i <= SURROGATE_MAX:
+		r = RUNE_ERROR
+		fallthrough
+	case i <= RUNE3_MAX:
+		p[0] = T3 | byte(r>>12)
+		p[1] = TX | byte(r>>6)&MASKX
+		p[2] = TX | byte(r)&MASKX
+		ret 3
+	}
+	p[0] = T4 | byte(r>>18)
+	p[1] = TX | byte(r>>12)&MASKX
+	p[2] = TX | byte(r>>6)&MASKX
+	p[3] = TX | byte(r)&MASKX
+	ret 4
+}
+
+//doc:
 // Appends the UTF-8 encoding of r to the end of p and
 // returns the extended buffer. If the rune is out of range,
 // it appends the encoding of RUNE_ERROR.
