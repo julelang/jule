@@ -169,11 +169,26 @@ public:
         return str_xt{_s};
     }
 
+    // Casting of []byte
     operator slice<u8_xt>(void) const noexcept {
         slice<u8_xt> _slice(this->len());
         for (int_xt _index{0}; _index < this->len(); ++_index)
         { _slice[_index] = this->operator[](_index);  }
         return _slice;
+    }
+
+    // Casting of []rune
+    operator slice<i32_xt>(void) const noexcept {
+        slice<i32_xt> _runes;
+        const char *_str{this->cstr()};
+        for (int_xt _index{0}; _index < this->len(); ) {
+            i32_xt _rune;
+            int_xt _n;
+            std::tie(_rune, _n) = decode_rune_str(_str+_index);
+            _index += _n;
+            _runes.__push(_rune);
+        }
+        return _runes;
     }
 
     u8_xt &operator[](const int_xt &_Index) {

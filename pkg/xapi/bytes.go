@@ -6,6 +6,10 @@ import (
 	"unicode/utf8"
 )
 
+// String are generated as clean byte encoded, not string literal.
+// Because X's strings are UTF-8 byte encoded and some
+// C++ compilers compiles wrong C++ string literals.
+
 // ToStr returns specified literal as X string literal for cpp.
 func ToStr(bytes []byte) string {
 	var cpp strings.Builder

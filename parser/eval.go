@@ -531,17 +531,16 @@ func (e *eval) cast(v value, t DataType, errtok Tok) value {
 		e.castSlice(t, v.data.Type, errtok)
 	case typeIsPure(t):
 		v.lvalue = false
-		e.castSingle(t, &v, errtok)
+		e.castPure(t, &v, errtok)
 	default:
 		e.pusherrtok(errtok, "type_notsupports_casting", t.Kind)
 	}
 	v.data.Value = t.Kind
 	v.data.Type = t
-	//v.constant = false
 	return v
 }
 
-func (e *eval) castSingle(t DataType, v *value, errtok Tok) {
+func (e *eval) castPure(t DataType, v *value, errtok Tok) {
 	switch t.Id {
 	case xtype.Any:
 		return
@@ -617,12 +616,13 @@ func (e *eval) castNumeric(t DataType, v *value, errtok Tok) {
 
 func (e *eval) castSlice(t, vt DataType, errtok Tok) {
 	if !typeIsPure(vt) || vt.Id != xtype.Str {
-		e.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
+		e.pusherrtok(errtok, "type_notsupports_casting_to", vt.Kind, t.Kind)
 		return
 	}
 	t = *t.ComponentType
-	if !typeIsPure(t) || t.Id != xtype.U8 {
-		e.pusherrtok(errtok, "type_notsupports_casting", vt.Kind)
+	// I32 for rune casting
+	if !typeIsPure(t) || (t.Id != xtype.U8 && t.Id != xtype.I32) {
+		e.pusherrtok(errtok, "type_notsupports_casting_to", vt.Kind, t.Kind)
 	}
 }
 
