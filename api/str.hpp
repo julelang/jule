@@ -37,6 +37,14 @@ public:
     str_xt(const slice<u8_xt> &_Src) noexcept
     { this->_buffer = std::basic_string<u8_xt>(_Src.begin(), _Src.end()); }
 
+    str_xt(const slice<i32_xt> &_Src) noexcept {
+        for (const i32_xt &_rune: _Src) {
+            const slice<u8_xt> _bytes{__xxc_rune_to_bytes(_rune)};
+            for (const u8_xt _byte: _bytes)
+            { this->_buffer += _byte; }
+        }
+    }
+
     typedef u8_xt       *iterator;
     typedef const u8_xt *const_iterator;
 
@@ -169,7 +177,6 @@ public:
         return str_xt{_s};
     }
 
-    // Casting of []byte
     operator slice<u8_xt>(void) const noexcept {
         slice<u8_xt> _slice(this->len());
         for (int_xt _index{0}; _index < this->len(); ++_index)
@@ -177,14 +184,13 @@ public:
         return _slice;
     }
 
-    // Casting of []rune
     operator slice<i32_xt>(void) const noexcept {
         slice<i32_xt> _runes;
         const char *_str{this->cstr()};
         for (int_xt _index{0}; _index < this->len(); ) {
             i32_xt _rune;
             int_xt _n;
-            std::tie(_rune, _n) = decode_rune_str(_str+_index);
+            std::tie(_rune, _n) = __xxc_decode_rune_str(_str+_index);
             _index += _n;
             _runes.__push(_rune);
         }
