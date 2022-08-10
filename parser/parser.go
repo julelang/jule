@@ -171,29 +171,6 @@ func (p *Parser) CppTypes() string {
 	return cpp.String()
 }
 
-func cppEnums(dm *Defmap) string {
-	var cpp strings.Builder
-	for _, e := range dm.Enums {
-		if e.Used && e.Tok.Id != tokens.NA {
-			cpp.WriteString(e.String())
-			cpp.WriteString("\n\n")
-		}
-	}
-	return cpp.String()
-}
-
-// CppEnums returns cpp code of enums.
-func (p *Parser) CppEnums() string {
-	var cpp strings.Builder
-	for _, use := range used {
-		if !use.cppLink {
-			cpp.WriteString(cppEnums(use.defs))
-		}
-	}
-	cpp.WriteString(cppEnums(p.Defs))
-	return cpp.String()
-}
-
 func cppTraits(dm *Defmap) string {
 	var cpp strings.Builder
 	for _, t := range dm.Traits {
@@ -362,7 +339,6 @@ func (p *Parser) Cpp() string {
 	cpp.WriteByte('\n')
 	cpp.WriteString(p.CppTypes())
 	cpp.WriteByte('\n')
-	cpp.WriteString(p.CppEnums())
 	cpp.WriteString(p.CppTraits())
 	cpp.WriteString(p.CppPrototypes())
 	cpp.WriteString(p.CppStructs())
@@ -831,14 +807,11 @@ func (p *Parser) Enum(e Enum) {
 		return
 	}
 	pdefs := p.Defs
-	uses := p.Uses
-	p.Defs = nil
-	p.Uses = nil
+	puses := p.Uses
 	p.Defs = new(Defmap)
 	defer func() {
-		p.Defs = nil
 		p.Defs = pdefs
-		p.Uses = uses
+		p.Uses = puses
 		p.Defs.Enums = append(p.Defs.Enums, &e)
 	}()
 	max := xtype.MaxOfType(e.Type.Id)
@@ -863,6 +836,10 @@ func (p *Parser) Enum(e Enum) {
 		}
 		if item.Expr.Toks != nil {
 			val, model := p.evalExpr(item.Expr)
+			if !val.constExpr && !p.eval.hasError {
+				p.pusherrtok(item.Expr.Toks[0], "expr_not_const")
+			}
+			item.ExprTag = val.expr
 			item.Expr.Model = model
 			assignChecker{
 				p:         p,
@@ -872,12 +849,16 @@ func (p *Parser) Enum(e Enum) {
 				errtok:    item.Tok,
 			}.checkAssignType()
 		} else {
-			item.Expr.Model = exprNode{strconv.Itoa(i)}
+			expr := max - (max - uint64(i))
+			item.ExprTag = uint64(expr)
+			item.Expr.Model = exprNode{strconv.FormatUint(expr, 16)}
 		}
 		itemVar := new(Var)
 		itemVar.Const = true
+		itemVar.ExprTag = item.ExprTag
 		itemVar.Id = item.Id
 		itemVar.Type = e.Type
+		itemVar.Token = e.Tok
 		p.Defs.Globals = append(p.Defs.Globals, itemVar)
 	}
 }

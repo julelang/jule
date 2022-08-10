@@ -8,9 +8,10 @@ import (
 
 // EnumItem is the AST model of enumerator items.
 type EnumItem struct {
-	Tok  Tok
-	Id   string
-	Expr Expr
+	Tok     Tok
+	Id      string
+	Expr    Expr
+	ExprTag any
 }
 
 func (ei EnumItem) String() string {

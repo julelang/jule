@@ -247,20 +247,15 @@ func (b *Builder) Enum(toks Toks) {
 	enum.Pub = b.pub
 	b.pub = false
 	enum.Items = b.buildEnumItems(itemToks)
-	b.Tree = append(b.Tree, models.Object{
-		Tok:  enum.Tok,
-		Data: enum,
-	})
+	b.Tree = append(b.Tree, models.Object{Tok: enum.Tok, Data: enum})
 }
 
 // Comment builds AST model of comment.
 func (b *Builder) Comment(tok Tok) models.Object {
 	tok.Kind = strings.TrimSpace(tok.Kind[2:])
 	return models.Object{
-		Tok: tok,
-		Data: models.Comment{
-			Content: tok.Kind,
-		},
+		Tok:  tok,
+		Data: models.Comment{Content: tok.Kind},
 	}
 }
 
@@ -286,10 +281,7 @@ func (b *Builder) Preprocessor(toks Toks) {
 		return
 	}
 	if ok {
-		b.Tree = append(b.Tree, models.Object{
-			Tok:  pp.Tok,
-			Data: pp,
-		})
+		b.Tree = append(b.Tree, models.Object{Tok: pp.Tok, Data: pp})
 	}
 }
 
@@ -395,10 +387,7 @@ func (b *Builder) Struct(toks Toks) {
 		b.pusherr(toks[i], "invalid_syntax")
 	}
 	s.Fields = b.structFields(bodyToks)
-	b.Tree = append(b.Tree, models.Object{
-		Tok:  s.Tok,
-		Data: s,
-	})
+	b.Tree = append(b.Tree, models.Object{Tok: s.Tok, Data: s})
 }
 
 func (b *Builder) traitFuncs(toks Toks) []*models.Func {
@@ -634,10 +623,7 @@ func (b *Builder) Use(toks Toks) {
 	}
 	toks = toks[1:]
 	b.buildUseDecl(&use, toks)
-	b.Tree = append(b.Tree, models.Object{
-		Tok:  use.Tok,
-		Data: use,
-	})
+	b.Tree = append(b.Tree, models.Object{Tok: use.Tok, Data: use})
 }
 
 func (b *Builder) getSelectors(toks Toks) []Tok {
