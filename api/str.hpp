@@ -39,7 +39,7 @@ public:
 
     str_xt(const slice<i32_xt> &_Src) noexcept {
         for (const i32_xt &_rune: _Src) {
-            const slice<u8_xt> _bytes{__xxc_rune_to_bytes(_rune)};
+            const slice<u8_xt> _bytes{__xxc_utf8_rune_to_bytes(_rune)};
             for (const u8_xt _byte: _bytes)
             { this->_buffer += _byte; }
         }
@@ -190,7 +190,7 @@ public:
         for (int_xt _index{0}; _index < this->len(); ) {
             i32_xt _rune;
             int_xt _n;
-            std::tie(_rune, _n) = __xxc_decode_rune_str(_str+_index);
+            std::tie(_rune, _n) = __xxc_utf8_decode_rune_str(_str+_index);
             _index += _n;
             _runes.__push(_rune);
         }
