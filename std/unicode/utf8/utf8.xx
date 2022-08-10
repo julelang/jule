@@ -245,10 +245,10 @@ pub decode_rune_str(s str) [r rune, size int] {
 // out of range, or is not the shortest possible UTF-8 encoding for the
 // value. No other validation is performed.
 pub decode_last_rune(p []byte) [r rune, size int] {
-	end: = p.len
-	if end == 0 {
+	if p.empty() {
 		ret RUNE_ERROR, 0
 	}
+	end: = p.len
 	start: = end - 1
 	r = rune(p[start])
 	if r < RUNE_SELF {
@@ -270,6 +270,47 @@ pub decode_last_rune(p []byte) [r rune, size int] {
 		start = 0
 	}
 	r, size = decode_rune(p[start:end])
+	if start+size != end {
+		ret RUNE_ERROR, 1
+	}
+	ret r, size
+}
+
+//doc:
+// Is like decode_last_rune but its input is a string. If
+// s is empty it returns (RUNE_ERROR, 0). Otherwise, if the encoding is invalid,
+// it returns (RUNE_ERROR, 1). Both are impossible results for correct,
+// non-empty UTF-8.
+//
+// An encoding is invalid if it is incorrect UTF-8, encodes a rune that is
+// out of range, or is not the shortest possible UTF-8 encoding for the
+// value. No other validation is performed.
+pub decode_last_rune_str(s str) [r rune, size int] {
+	if s.empty() {
+		ret RUNE_ERROR, 0
+	}
+	end: = s.len
+	start: = end - 1
+	r = rune(s[start])
+	if r < RUNE_SELF {
+		ret r, 1
+	}
+	// guard against O(n^2) behavior when traversing
+	// backwards through strings with long sequences of
+	// invalid UTF-8.
+	lim := end - UTF_MAX
+	if lim < 0 {
+		lim = 0
+	}
+	for start--, start >= lim, start-- {
+		if rune_start(s[start]) {
+			break
+		}
+	}
+	if start < 0 {
+		start = 0
+	}
+	r, size = decode_rune_str(s[start:end])
 	if start+size != end {
 		ret RUNE_ERROR, 1
 	}
