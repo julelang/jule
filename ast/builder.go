@@ -1372,6 +1372,20 @@ func (b *Builder) pushStatementToBlock(bs *blockStatement) {
 	bs.block.Tree = append(bs.block.Tree, s)
 }
 
+func setToNextStatement(bs *blockStatement) {
+	*bs.srcToks = (*bs.srcToks)[bs.pos:]
+	bs.pos, bs.withTerminator = NextStatementPos(*bs.srcToks, 0)
+	if bs.withTerminator {
+		bs.toks = (*bs.srcToks)[:bs.pos-1]
+	} else {
+		bs.toks = (*bs.srcToks)[:bs.pos]
+	}
+}
+
+func blockStatementFinished(bs *blockStatement) bool {
+	return bs.pos >= len(*bs.srcToks)
+}
+
 // Block builds AST model of statements of code block.
 func (b *Builder) Block(toks Toks) (block *models.Block) {
 	block = new(models.Block)
@@ -1379,10 +1393,7 @@ func (b *Builder) Block(toks Toks) (block *models.Block) {
 	bs.block = block
 	bs.srcToks = &toks
 	for {
-		bs.pos, bs.withTerminator = NextStatementPos(toks, 0)
-		statementToks := toks[:bs.pos]
-		bs.blockToks = &toks
-		bs.toks = statementToks
+		setToNextStatement(bs)
 		b.pushStatementToBlock(bs)
 	next:
 		if len(bs.nextToks) > 0 {
@@ -1391,10 +1402,9 @@ func (b *Builder) Block(toks Toks) (block *models.Block) {
 			b.pushStatementToBlock(bs)
 			goto next
 		}
-		if bs.pos >= len(toks) {
+		if blockStatementFinished(bs) {
 			break
 		}
-		toks = toks[bs.pos:]
 	}
 	return
 }
@@ -1417,7 +1427,7 @@ func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
 	case tokens.Ret:
 		return b.RetStatement(bs.toks)
 	case tokens.For:
-		return b.IterExpr(bs.toks)
+		return b.IterExpr(bs)
 	case tokens.Break:
 		return b.BreakStatement(bs.toks)
 	case tokens.Continue:
@@ -1977,45 +1987,8 @@ func (b *Builder) getForeachIterProfile(varToks, exprToks Toks, inTok Tok) model
 	return foreach
 }
 
-func (b *Builder) getForIterProfile(toks Toks, errtok Tok) models.IterProfile {
-	parts, errs := Parts(toks, tokens.Comma, false)
-	switch {
-	case len(errs) > 0:
-		b.Errors = append(b.Errors, errs...)
-		return nil
-	case len(parts) != 3:
-		b.pusherr(errtok, "invalid_syntax")
-		return nil
-	}
-	var fp models.IterFor
-	once := parts[0]
-	if len(once) > 0 {
-		fp.Once = b.forStatement(once)
-	}
-	condition := parts[1]
-	if len(condition) > 0 {
-		fp.Condition = b.Expr(condition)
-	}
-	next := parts[2]
-	if len(next) > 0 {
-		fp.Next = b.forStatement(next)
-	}
-	return fp
-}
-
-func (b *Builder) forStatement(toks Toks) models.Statement {
-	s := b.Statement(&blockStatement{toks: toks})
-	switch s.Data.(type) {
-	case models.ExprStatement, models.Assign:
-	default:
-		b.pusherr(s.Tok, "invalid_syntax")
-	}
-	return s
-}
-
 func (b *Builder) getIterProfile(toks Toks, errtok Tok) models.IterProfile {
 	braceCount := 0
-	comma := false
 	for i, tok := range toks {
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
@@ -2034,17 +2007,62 @@ func (b *Builder) getIterProfile(toks Toks, errtok Tok) models.IterProfile {
 			varToks := toks[:i]
 			exprToks := toks[i+1:]
 			return b.getForeachIterProfile(varToks, exprToks, tok)
-		case tokens.Comma:
-			comma = true
 		}
-	}
-	if comma {
-		return b.getForIterProfile(toks, errtok)
 	}
 	return b.getWhileIterProfile(toks)
 }
 
-func (b *Builder) IterExpr(toks Toks) (s models.Statement) {
+func (b *Builder) forStatement(toks Toks) models.Statement {
+	s := b.Statement(&blockStatement{toks: toks})
+	switch s.Data.(type) {
+	case models.ExprStatement, models.Assign:
+	default:
+		b.pusherr(toks[0], "invalid_syntax")
+	}
+	return s
+}
+
+func (b *Builder) forIterProfile(bs *blockStatement) (s models.Statement) {
+	var iter models.Iter
+	iter.Tok = bs.toks[0]
+	bs.toks = bs.toks[1:]
+	var profile models.IterFor
+	if len(bs.toks) > 0 {
+		profile.Once = b.forStatement(bs.toks)
+	}
+	if blockStatementFinished(bs) {
+		b.pusherr(iter.Tok, "invalid_syntax")
+		return
+	}
+	setToNextStatement(bs)
+	if len(bs.toks) > 0 {
+		profile.Condition = b.Expr(bs.toks)
+	}
+	if blockStatementFinished(bs) {
+		b.pusherr(iter.Tok, "invalid_syntax")
+		return
+	}
+	setToNextStatement(bs)
+	exprToks := BlockExpr(bs.toks)
+	if len(exprToks) > 0 {
+		profile.Next = b.forStatement(exprToks)
+	}
+	i := new(int)
+	*i = len(exprToks)
+	blockToks := b.getrange(i, tokens.LBRACE, tokens.RBRACE, &bs.toks)
+	if blockToks == nil {
+		b.pusherr(iter.Tok, "body_not_exist")
+		return
+	}
+	if *i < len(bs.toks) {
+		b.pusherr(bs.toks[*i], "invalid_syntax")
+	}
+	iter.Block = b.Block(blockToks)
+	iter.Profile = profile
+	return models.Statement{Tok: iter.Tok, Data: iter}
+}
+
+func (b *Builder) commonIterProfile(toks []Tok) (s models.Statement) {
 	var iter models.Iter
 	iter.Tok = toks[0]
 	toks = toks[1:]
@@ -2067,10 +2085,14 @@ func (b *Builder) IterExpr(toks Toks) (s models.Statement) {
 		b.pusherr(toks[*i], "invalid_syntax")
 	}
 	iter.Block = b.Block(blockToks)
-	return models.Statement{
-		Tok:  iter.Tok,
-		Data: iter,
+	return models.Statement{Tok: iter.Tok, Data: iter}
+}
+
+func (b *Builder) IterExpr(bs *blockStatement) models.Statement {
+	if bs.withTerminator {
+		return b.forIterProfile(bs)
 	}
+	return b.commonIterProfile(bs.toks)
 }
 
 func (b *Builder) caseexprs(toks *Toks, caseIsDefault bool) []models.Expr {
@@ -2226,9 +2248,7 @@ func (b *Builder) IfExpr(bs *blockStatement) (s models.Statement) {
 			return
 		}
 		exprToks = bs.toks
-		*bs.srcToks = (*bs.srcToks)[bs.pos:]
-		bs.pos, bs.withTerminator = NextStatementPos(*bs.srcToks, 0)
-		bs.toks = (*bs.srcToks)[:bs.pos]
+		setToNextStatement(bs)
 	} else {
 		*i = len(exprToks)
 	}
@@ -2246,10 +2266,7 @@ func (b *Builder) IfExpr(bs *blockStatement) (s models.Statement) {
 	}
 	ifast.Expr = b.Expr(exprToks)
 	ifast.Block = b.Block(blockToks)
-	return models.Statement{
-		Tok:  ifast.Tok,
-		Data: ifast,
-	}
+	return models.Statement{Tok: ifast.Tok, Data: ifast}
 }
 
 // ElseIfEpxr builds AST model of else if expression.
@@ -2265,9 +2282,7 @@ func (b *Builder) ElseIfExpr(bs *blockStatement) (s models.Statement) {
 			return
 		}
 		exprToks = bs.toks
-		*bs.srcToks = (*bs.srcToks)[bs.pos:]
-		bs.pos, bs.withTerminator = NextStatementPos(*bs.srcToks, 0)
-		bs.toks = (*bs.srcToks)[:bs.pos]
+		setToNextStatement(bs)
 	} else {
 		*i = len(exprToks)
 	}
@@ -2285,10 +2300,7 @@ func (b *Builder) ElseIfExpr(bs *blockStatement) (s models.Statement) {
 	}
 	elif.Expr = b.Expr(exprToks)
 	elif.Block = b.Block(blockToks)
-	return models.Statement{
-		Tok:  elif.Tok,
-		Data: elif,
-	}
+	return models.Statement{Tok: elif.Tok, Data: elif}
 }
 
 // ElseBlock builds AST model of else block.
@@ -2313,10 +2325,7 @@ func (b *Builder) ElseBlock(bs *blockStatement) (s models.Statement) {
 		b.pusherr(bs.toks[*i], "invalid_syntax")
 	}
 	elseast.Block = b.Block(blockToks)
-	return models.Statement{
-		Tok:  elseast.Tok,
-		Data: elseast,
-	}
+	return models.Statement{Tok: elseast.Tok, Data: elseast}
 }
 
 // BreakStatement builds AST model of break statement.

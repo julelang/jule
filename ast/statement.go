@@ -9,7 +9,6 @@ type blockStatement struct {
 	pos            int
 	block          *models.Block
 	srcToks        *Toks
-	blockToks      *Toks
 	toks           Toks
 	nextToks       Toks
 	withTerminator bool
