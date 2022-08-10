@@ -1960,19 +1960,19 @@ func (p *Parser) getGenerics(toks Toks) (_ []DataType, err bool) {
 	return generics, err
 }
 
-func (p *Parser) checkGenericsQuantity(n int, generics []DataType, errTok Tok) bool {
+func (p *Parser) checkGenericsQuantity(required, given int, errTok Tok) bool {
 	// n = length of required generic type source
 	switch {
-	case n == 0 && len(generics) > 0:
+	case required == 0 && given > 0:
 		p.pusherrtok(errTok, "not_has_generics")
 		return false
-	case n > 0 && len(generics) == 0:
+	case required > 0 && given == 0:
 		p.pusherrtok(errTok, "has_generics")
 		return false
-	case n < len(generics):
+	case required < given:
 		p.pusherrtok(errTok, "generics_overflow")
 		return false
-	case n > len(generics):
+	case required > given:
 		p.pusherrtok(errTok, "missing_generics")
 		return false
 	default:
@@ -2053,7 +2053,7 @@ func (p *Parser) parseGenerics(f *Func, args *models.Args, errTok Tok) bool {
 		goto ok
 	}
 check:
-	if !p.checkGenericsQuantity(len(f.Generics), args.Generics, errTok) {
+	if !p.checkGenericsQuantity(len(f.Generics), len(args.Generics), errTok) {
 		return false
 	}
 	f.Owner.(*Parser).pushGenerics(f.Generics, args.Generics)
@@ -2065,6 +2065,9 @@ ok:
 func (p *Parser) parseFuncCall(f *Func, args *models.Args, m *exprModel, errTok Tok) (v value) {
 	args.NeedsPureType = p.rootBlock == nil || len(p.rootBlock.Func.Generics) == 0
 	if len(f.Generics) > 0 {
+		params := make([]Param, len(f.Params))
+		copy(params, f.Params)
+		retType := f.RetType.Type
 		owner := f.Owner.(*Parser)
 		rootBlock := owner.rootBlock
 		nodeBlock := owner.nodeBlock
@@ -2075,12 +2078,20 @@ func (p *Parser) parseFuncCall(f *Func, args *models.Args, m *exprModel, errTok 
 			owner.nodeBlock = nodeBlock
 			owner.blockVars = blockVars
 			owner.blockTypes = blockTypes
+
+			// Remember generics
+			for i := range params {
+				params[i].Type.Generic = f.Params[i].Type.Generic
+			}
+			retType.Generic = f.RetType.Type.Generic
+			f.Params = params
+			f.RetType.Type = retType
 		}()
 		if !p.parseGenerics(f, args, errTok) {
 			return
 		}
 	} else {
-		_ = p.checkGenericsQuantity(len(f.Generics), args.Generics, errTok)
+		_ = p.checkGenericsQuantity(len(f.Generics), len(args.Generics), errTok)
 		if f.Receiver != nil {
 			owner := f.Owner.(*Parser)
 			s := f.Receiver.Tag.(*xstruct)
@@ -3128,7 +3139,7 @@ func (p *Parser) typeSourceIsMap(dt DataType, err bool) (DataType, bool) {
 func (p *Parser) typeSourceIsStruct(s *xstruct, t DataType) (dt DataType, _ bool) {
 	generics := s.Generics()
 	if len(generics) > 0 {
-		if !p.checkGenericsQuantity(len(s.Ast.Generics), generics, t.Tok) {
+		if !p.checkGenericsQuantity(len(s.Ast.Generics), len(generics), t.Tok) {
 			goto end
 		}
 		for i, g := range generics {

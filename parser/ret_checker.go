@@ -135,8 +135,9 @@ func (rc *retChecker) retsVars() {
 				model := new(exprModel)
 				model.index = 0
 				model.nodes = make([]exprBuildNode, 1)
-				_, _ = rc.p.eval.single(v, model)
-				rc.retAST.Expr.Model = model
+				val, _ := rc.p.eval.single(v, model)
+				rc.expModel.models = append(rc.expModel.models, model)
+				rc.expModel.values = append(rc.expModel.values, val)
 				break
 			}
 		}
@@ -154,8 +155,9 @@ func (rc *retChecker) retsVars() {
 		model := new(exprModel)
 		model.index = 0
 		model.nodes = make([]exprBuildNode, 1)
-		_, _ = rc.p.eval.single(v, model)
+		val, _ := rc.p.eval.single(v, model)
 		rc.expModel.models = append(rc.expModel.models, model)
+		rc.expModel.values = append(rc.expModel.values, val)
 	}
 	rc.retAST.Expr.Model = rc.expModel
 }
