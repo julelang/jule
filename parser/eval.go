@@ -1100,7 +1100,7 @@ func (e *eval) slicing(enumv, leftv, rightv value, errtok Tok) (v value) {
 	if rightv.constExpr && tonums(rightv.expr) < 0 {
 		e.p.pusherrtok(errtok, "overflow_limits")
 	}
-	if leftv.constExpr && rightv.constExpr {
+	if leftv.constExpr && rightv.constExpr && rightv.expr != nil {
 		if tonums(leftv.expr) > tonums(rightv.expr) {
 			e.p.pusherrtok(errtok, "overflow_limits")
 		}
