@@ -228,7 +228,7 @@ func commonNum(txt string) (literal string) {
 		b := txt[i]
 		if b == '.' {
 			return floatNum(txt, i)
-		} else if b == 'e' || b == 'E' {
+		} else if isScientific(b, i) {
 			return scientific(txt, i)
 		} else if !IsDecimal(b) {
 			break
@@ -260,6 +260,8 @@ func binaryNum(txt string) (literal string) {
 	return txt[:i]
 }
 
+func isScientific(b byte, i int) bool { return i > 0 && (b == 'e' || b == 'E') }
+
 func octalNum(txt string) (literal string) {
 	if txt[0] != '0' {
 		return ""
@@ -271,7 +273,7 @@ func octalNum(txt string) (literal string) {
 	i := octalStart
 	for ; i < len(txt); i++ {
 		b := txt[i]
-		if b == 'e' || b == 'E' {
+		if isScientific(b, i) {
 			return scientific(txt, i)
 		} else if !IsOctal(b) {
 			break
