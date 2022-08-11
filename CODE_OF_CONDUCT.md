@@ -1,3 +1,3 @@
 # Code of Conduct
 
-Please read the [X Community Code of Conduct.](https://the-xlang.github.io/website/pages/contributing.html)
+Please read the [Jule Community Code of Conduct.](https://jule-lang.github.io/website/pages/contributing.html)

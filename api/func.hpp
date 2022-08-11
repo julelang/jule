@@ -1,8 +1,8 @@
-// Copyright 2022 The X Programming Language.
+// Copyright 2022 The Jule Programming Language.
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-// std::function wrapper of XXC.
+// std::function wrapper of JuleC.
 template <typename _Func_t>
 struct func;
 

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/the-xlang/xxc/ast/models"
+	"github.com/jule-lang/jule/ast/models"
 )
 
 type iExpr interface {

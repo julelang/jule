@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/the-xlang/xxc/lex/tokens"
-	"github.com/the-xlang/xxc/pkg/xapi"
-	"github.com/the-xlang/xxc/pkg/xtype"
+	"github.com/jule-lang/jule/lex/tokens"
+	"github.com/jule-lang/jule/pkg/juleapi"
+	"github.com/jule-lang/jule/pkg/juletype"
 )
 
 type valueEvaluator struct {
@@ -20,9 +20,9 @@ type valueEvaluator struct {
 func strModel(v value) iExpr {
 	content := v.expr.(string)
 	if israwstr(content) {
-		return exprNode{xapi.ToRawStr([]byte(content))}
+		return exprNode{juleapi.ToRawStr([]byte(content))}
 	}
-	return exprNode{xapi.ToStr([]byte(content))}
+	return exprNode{juleapi.ToStr([]byte(content))}
 }
 
 func boolModel(v value) iExpr {
@@ -44,7 +44,7 @@ func getModel(v value) iExpr {
 }
 
 func numericModel(v value) iExpr {
-	cppId := xtype.CppId(v.data.Type.Id)
+	cppId := juletype.CppId(v.data.Type.Id)
 	switch t := v.expr.(type) {
 	case uint64:
 		return exprNode{cppId + "{" + strconv.FormatUint(t, 10) + "}"}
@@ -60,8 +60,8 @@ func (ve *valueEvaluator) str() value {
 	var v value
 	v.constExpr = true
 	v.data.Value = ve.tok.Kind
-	v.data.Type.Id = xtype.Str
-	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+	v.data.Type.Id = juletype.Str
+	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	content := ve.tok.Kind[1 : len(ve.tok.Kind)-1]
 	v.expr = content
 	v.model = strModel(v)
@@ -89,13 +89,13 @@ func (ve *valueEvaluator) char() value {
 	v.data.Value = ve.tok.Kind
 	content, isByte := toCharLiteral(ve.tok.Kind)
 	if isByte {
-		v.data.Type.Id = xtype.U8
-		content = xapi.ToChar(content[0])
+		v.data.Type.Id = juletype.U8
+		content = juleapi.ToChar(content[0])
 	} else { // rune
-		v.data.Type.Id = xtype.I32
-		content = xapi.ToRune([]byte(content))
+		v.data.Type.Id = juletype.I32
+		content = juleapi.ToRune([]byte(content))
 	}
-	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	v.expr, _ = strconv.ParseInt(content[2:], 16, 64)
 	v.model = exprNode{content}
 	ve.model.appendSubNode(v.model)
@@ -106,8 +106,8 @@ func (ve *valueEvaluator) bool() value {
 	var v value
 	v.constExpr = true
 	v.data.Value = ve.tok.Kind
-	v.data.Type.Id = xtype.Bool
-	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+	v.data.Type.Id = juletype.Bool
+	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	v.expr = ve.tok.Kind == tokens.TRUE
 	v.model = boolModel(v)
 	ve.model.appendSubNode(v.model)
@@ -118,8 +118,8 @@ func (ve *valueEvaluator) nil() value {
 	var v value
 	v.constExpr = true
 	v.data.Value = ve.tok.Kind
-	v.data.Type.Id = xtype.Nil
-	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+	v.data.Type.Id = juletype.Nil
+	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	v.expr = nil
 	v.model = exprNode{ve.tok.Kind}
 	ve.model.appendSubNode(v.model)
@@ -129,8 +129,8 @@ func (ve *valueEvaluator) nil() value {
 func (ve *valueEvaluator) float() value {
 	var v value
 	v.data.Value = ve.tok.Kind
-	v.data.Type.Id = xtype.F64
-	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+	v.data.Type.Id = juletype.F64
+	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	v.expr, _ = strconv.ParseFloat(v.data.Value, 64)
 	return v
 }
@@ -180,7 +180,7 @@ func (ve *valueEvaluator) varId(id string, variable *Var, global bool) (v value)
 	v.lvalue = true
 	v.heapMust = !global
 	if id == tokens.SELF && typeIsPtr(variable.Type) {
-		ve.model.appendSubNode(exprNode{xapi.CppSelf})
+		ve.model.appendSubNode(exprNode{juleapi.CppSelf})
 	} else if v.constExpr {
 		v.expr = variable.ExprTag
 		v.model = variable.Expr.Model
@@ -194,7 +194,7 @@ func (ve *valueEvaluator) varId(id string, variable *Var, global bool) (v value)
 func (ve *valueEvaluator) funcId(id string, f *function) (v value) {
 	f.used = true
 	v.data.Value = id
-	v.data.Type.Id = xtype.Func
+	v.data.Type.Id = juletype.Func
 	v.data.Type.Tag = f.Ast
 	v.data.Type.Kind = f.Ast.DataTypeString()
 	v.data.Tok = f.Ast.Tok
@@ -205,7 +205,7 @@ func (ve *valueEvaluator) funcId(id string, f *function) (v value) {
 func (ve *valueEvaluator) enumId(id string, e *Enum) (v value) {
 	e.Used = true
 	v.data.Value = id
-	v.data.Type.Id = xtype.Enum
+	v.data.Type.Id = juletype.Enum
 	v.data.Type.Kind = e.Id
 	v.data.Type.Tag = e
 	v.data.Tok = e.Tok
@@ -213,9 +213,9 @@ func (ve *valueEvaluator) enumId(id string, e *Enum) (v value) {
 	v.isType = true
 	// If built-in.
 	if e.Tok.Id == tokens.NA {
-		ve.model.appendSubNode(exprNode{xapi.OutId(id, nil)})
+		ve.model.appendSubNode(exprNode{juleapi.OutId(id, nil)})
 	} else {
-		ve.model.appendSubNode(exprNode{xapi.OutId(id, e.Tok.File)})
+		ve.model.appendSubNode(exprNode{juleapi.OutId(id, e.Tok.File)})
 	}
 	return
 }
@@ -223,7 +223,7 @@ func (ve *valueEvaluator) enumId(id string, e *Enum) (v value) {
 func (ve *valueEvaluator) structId(id string, s *xstruct) (v value) {
 	s.Used = true
 	v.data.Value = id
-	v.data.Type.Id = xtype.Struct
+	v.data.Type.Id = juletype.Struct
 	v.data.Type.Tag = s
 	v.data.Type.Kind = s.Ast.Id
 	v.data.Type.Tok = s.Ast.Tok
@@ -231,9 +231,9 @@ func (ve *valueEvaluator) structId(id string, s *xstruct) (v value) {
 	v.isType = true
 	// If built-in.
 	if s.Ast.Tok.Id == tokens.NA {
-		ve.model.appendSubNode(exprNode{xapi.OutId(id, nil)})
+		ve.model.appendSubNode(exprNode{juleapi.OutId(id, nil)})
 	} else {
-		ve.model.appendSubNode(exprNode{xapi.OutId(id, s.Ast.Tok.File)})
+		ve.model.appendSubNode(exprNode{juleapi.OutId(id, s.Ast.Tok.File)})
 	}
 	return
 }

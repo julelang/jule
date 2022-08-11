@@ -3,8 +3,8 @@ package models
 import (
 	"strings"
 
-	"github.com/the-xlang/xxc/lex/tokens"
-	"github.com/the-xlang/xxc/pkg/xapi"
+	"github.com/jule-lang/jule/lex/tokens"
+	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
 // Expr is AST model of expression.
@@ -23,7 +23,7 @@ func (e Expr) String() string {
 		for _, tok := range process {
 			switch tok.Id {
 			case tokens.Id:
-				expr.WriteString(xapi.OutId(tok.Kind, tok.File))
+				expr.WriteString(juleapi.OutId(tok.Kind, tok.File))
 			default:
 				expr.WriteString(tok.Kind)
 			}

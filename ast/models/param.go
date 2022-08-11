@@ -3,9 +3,9 @@ package models
 import (
 	"strings"
 
-	"github.com/the-xlang/xxc/lex/tokens"
-	"github.com/the-xlang/xxc/pkg/x"
-	"github.com/the-xlang/xxc/pkg/xapi"
+	"github.com/jule-lang/jule/lex/tokens"
+	"github.com/jule-lang/jule/pkg/jule"
+	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
 // Param is function parameter AST model.
@@ -31,15 +31,15 @@ func (p *Param) TypeString() string {
 	return ts.String()
 }
 
-// OutId returns xapi.OutId result of param.
+// OutId returns juleapi.OutId result of param.
 func (p *Param) OutId() string {
-	return xapi.AsId(p.Id)
+	return juleapi.AsId(p.Id)
 }
 
 func (p Param) String() string {
 	var cpp strings.Builder
 	cpp.WriteString(p.Prototype())
-	if p.Id != "" && !xapi.IsIgnoreId(p.Id) && p.Id != x.Anonymous {
+	if p.Id != "" && !juleapi.IsIgnoreId(p.Id) && p.Id != jule.Anonymous {
 		cpp.WriteByte(' ')
 		cpp.WriteString(p.OutId())
 	}

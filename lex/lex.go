@@ -5,13 +5,13 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/the-xlang/xxc/lex/tokens"
-	"github.com/the-xlang/xxc/pkg/x"
-	"github.com/the-xlang/xxc/pkg/xio"
-	"github.com/the-xlang/xxc/pkg/xlog"
+	"github.com/jule-lang/jule/lex/tokens"
+	"github.com/jule-lang/jule/pkg/jule"
+	"github.com/jule-lang/jule/pkg/juleio"
+	"github.com/jule-lang/jule/pkg/julelog"
 )
 
-type File = xio.File
+type File = juleio.File
 
 // Lex is lexer of Fract.
 type Lex struct {
@@ -22,7 +22,7 @@ type Lex struct {
 	Column int
 	Row    int
 	// Logs are only errors
-	Logs []xlog.CompilerLog
+	Logs []julelog.CompilerLog
 
 	braces []Tok
 }
@@ -38,22 +38,22 @@ func NewLex(f *File) *Lex {
 }
 
 func (l *Lex) pusherr(key string, args ...any) {
-	l.Logs = append(l.Logs, xlog.CompilerLog{
-		Type:    xlog.Error,
+	l.Logs = append(l.Logs, julelog.CompilerLog{
+		Type:    julelog.Error,
 		Row:     l.Row,
 		Column:  l.Column,
 		Path:    l.File.Path(),
-		Message: x.GetError(key, args...),
+		Message: jule.GetError(key, args...),
 	})
 }
 
 func (l *Lex) pusherrtok(tok Tok, err string) {
-	l.Logs = append(l.Logs, xlog.CompilerLog{
-		Type:    xlog.Error,
+	l.Logs = append(l.Logs, julelog.CompilerLog{
+		Type:    julelog.Error,
 		Row:     tok.Row,
 		Column:  tok.Column,
 		Path:    l.File.Path(),
-		Message: x.GetError(err),
+		Message: jule.GetError(err),
 	})
 }
 
@@ -368,7 +368,7 @@ func bigUnicodePointEsq(txt string) string { return hexEsq(txt, 10) }
 // Pattern (RegEx): ^\\u.{4}
 func littleUnicodePointEsq(txt string) string { return hexEsq(txt, 6) }
 
-// Pattern (RegEx): ^\\x..
+// Pattern (RegEx): ^\\jule..
 func hexByteEsq(txt string) string { return hexEsq(txt, 4) }
 
 // Patter (RegEx): ^\\[0-7]{1,3}

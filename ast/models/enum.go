@@ -3,7 +3,7 @@ package models
 import (
 	"strings"
 
-	"github.com/the-xlang/xxc/pkg/xapi"
+	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
 // EnumItem is the AST model of enumerator items.
@@ -16,7 +16,7 @@ type EnumItem struct {
 
 func (ei EnumItem) String() string {
 	var cpp strings.Builder
-	cpp.WriteString(xapi.OutId(ei.Id, ei.Tok.File))
+	cpp.WriteString(juleapi.OutId(ei.Id, ei.Tok.File))
 	cpp.WriteString(" = ")
 	cpp.WriteString(ei.Expr.String())
 	return cpp.String()
@@ -46,7 +46,7 @@ func (e *Enum) ItemById(id string) *EnumItem {
 func (e Enum) String() string {
 	var cpp strings.Builder
 	cpp.WriteString("enum ")
-	cpp.WriteString(xapi.OutId(e.Id, e.Tok.File))
+	cpp.WriteString(juleapi.OutId(e.Id, e.Tok.File))
 	cpp.WriteByte(':')
 	cpp.WriteString(e.Type.String())
 	cpp.WriteString(" {\n")

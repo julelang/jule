@@ -1,0 +1,148 @@
+// Copyright 2022 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// Special cases taken from FreeBSD's /usr/src/lib/msun/src/e_pow.c
+// updated by IEEE Std. 754-2008 "Section 9.2.1 Special values".
+
+//doc:
+// Returns x**y, the base-x exponential of y.
+//
+// Special cases are (in order):
+//  pow(x, ±0) = 1 for any x
+//  pow(1, y) = 1 for any y
+//  pow(x, 1) = x for any x
+//  pow(nan, y) = nan
+//  pow(x, nan) = nan
+//  pow(±0, y) = ±inf for y an odd integer < 0
+//  pow(±0, -inf) = inf
+//  pow(±0, inf) = +0
+//  pow(±0, y) = inf for finite y < 0 and not an odd integer
+//  pow(±0, y) = ±0 for y an odd integer > 0
+//  pow(±0, y) = +0 for finite y > 0 and not an odd integer
+//  pow(-1, ±inf) = 1
+//  pow(x, inf) = inf for |x| > 1
+//  pow(x, -inf) = +0 for |x| > 1
+//  pow(x, inf) = +0 for |x| < 1
+//  pow(x, -inf) = inf for |x| < 1
+//  pow(inf, y) = inf for y > 0
+//  pow(inf, y) = +0 for y < 0
+//  pow(-inf, y) = pow(-0, -y)
+//  pow(x, y) = nan for finite x < 0 and finite non-integer y
+pub pow(x, y f64) f64 {
+	match {
+	case y == 0 || x == 1:
+		ret 1
+	case y == 1:
+		ret x
+	case isnan(x) || isnan(y):
+		ret nan()
+	case x == 0:
+		match {
+		case y < 0:
+			if is_odd_int(y) {
+				ret copysign(inf(1), x)
+			}
+			ret inf(1)
+		case y > 0:
+			if is_odd_int(y) {
+				ret x
+			}
+			ret 0
+		}
+	case isinf(y, 0):
+		match {
+		case x == -1:
+			ret 1
+		case (abs(x) < 1) == isinf(y, 1):
+			ret 0
+		default:
+			ret inf(1)
+		}
+	case isinf(x, 0):
+		if isinf(x, -1) {
+			ret pow(1/x, -y) // pow(-0, -y)
+		}
+		match {
+		case y < 0:
+			ret 0
+		case y > 0:
+			ret inf(1)
+		}
+	case y == 0.5:
+		ret sqrt(x)
+	case y == -0.5:
+		ret 1 / sqrt(x)
+	}
+
+	yi:, yf: = modf(abs(y))
+	if yf != 0 && x < 0 {
+		ret nan()
+	}
+	if yi >= 1<<63 {
+		// yi is a large even int that will lead to overflow (or underflow to 0)
+		// for all x except -1 (x == 1 was handled earlier)
+		match {
+		case x == -1:
+			ret 1
+		case (abs(x) < 1) == (y > 0):
+			ret 0
+		default:
+			ret inf(1)
+		}
+	}
+
+	// ans = a1 * 2**ae (= 1 for now).
+	a1: = 1.0
+	ae: = 0
+
+	// ans *= x**yf
+	if yf != 0 {
+		if yf > 0.5 {
+			yf--
+			yi++
+		}
+		a1 = exp(yf * log(x))
+	}
+
+	// ans *= x**yi
+	// by multiplying in successive squarings
+	// of x according to bits of yi.
+	// accumulate powers of two into exp.
+	x1:, xe: = frexp(x)
+	for i: = i64(yi); i != 0; i >>= 1 {
+		if xe < -1<<12 || 1<<12 < xe {
+			// catch xe before it overflows the left shift below
+			// Since i !=0 it has at least one bit still set, so ae will accumulate xe
+			// on at least one more iteration, ae += xe is a lower bound on ae
+			// the lower bound on ae exceeds the size of a float64 exp
+			// so the final call to Ldexp will produce under/overflow (0/Inf)
+			ae += xe
+			break
+		}
+		if i&1 == 1 {
+			a1 *= x1
+			ae += xe
+		}
+		x1 *= x1
+		xe <<= 1
+		if x1 < 0.5 {
+			x1 += x1
+			xe--
+		}
+	}
+
+	// ans = a1*2**ae
+	// if y < 0 { ans = 1 / ans }
+	// but in the opposite order
+	if y < 0 {
+		a1 = 1 / a1
+		ae = -ae
+	}
+	ret ldexp(a1, ae)
+}
+
+is_odd_int(x f64) bool {
+	xi:, xf: = modf(x)
+	ret xf == 0 && i64(xi)&1 == 1
+}

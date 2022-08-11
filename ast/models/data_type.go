@@ -4,9 +4,9 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/the-xlang/xxc/lex/tokens"
-	"github.com/the-xlang/xxc/pkg/xapi"
-	"github.com/the-xlang/xxc/pkg/xtype"
+	"github.com/jule-lang/jule/lex/tokens"
+	"github.com/jule-lang/jule/pkg/juleapi"
+	juletype "github.com/jule-lang/jule/pkg/juletype"
 )
 
 // Size is the represents data type of sizes (array or etc)
@@ -71,7 +71,7 @@ func (dt *DataType) OriginalKindId() string {
 
 // KindId returns dt.Kind's identifier.
 func (dt *DataType) KindId() (id, prefix string) {
-	if dt.Id == xtype.Map || dt.Id == xtype.Func {
+	if dt.Id == juletype.Map || dt.Id == juletype.Func {
 		return dt.Kind, ""
 	}
 	id = dt.Kind
@@ -83,7 +83,7 @@ func (dt *DataType) KindId() (id, prefix string) {
 			break
 		}
 	}
-	for _, dt := range xtype.TypeMap {
+	for _, dt := range juletype.TypeMap {
 		if dt == id {
 			return
 		}
@@ -157,11 +157,11 @@ func (dt DataType) String() (s string) {
 	}()
 	dt.Kind = dt.Kind[len(pointers):]
 	switch dt.Id {
-	case xtype.Slice:
+	case juletype.Slice:
 		return dt.SliceString()
-	case xtype.Array:
+	case juletype.Array:
 		return dt.ArrayString()
-	case xtype.Map:
+	case juletype.Map:
 		return dt.MapString()
 	}
 	switch dt.Tag.(type) {
@@ -169,21 +169,21 @@ func (dt DataType) String() (s string) {
 		return dt.StructString()
 	}
 	switch dt.Id {
-	case xtype.Id:
+	case juletype.Id:
 		if dt.Generic {
-			return xapi.AsId(dt.Kind)
+			return juleapi.AsId(dt.Kind)
 		}
-		return xapi.OutId(dt.Kind, dt.Tok.File)
-	case xtype.Enum:
-		return xapi.OutId(dt.Kind, dt.Tok.File)
-	case xtype.Trait:
+		return juleapi.OutId(dt.Kind, dt.Tok.File)
+	case juletype.Enum:
+		return juleapi.OutId(dt.Kind, dt.Tok.File)
+	case juletype.Trait:
 		return dt.TraitString()
-	case xtype.Struct:
+	case juletype.Struct:
 		return dt.StructString()
-	case xtype.Func:
+	case juletype.Func:
 		return dt.FuncString()
 	default:
-		return xtype.CppId(dt.Id)
+		return juletype.CppId(dt.Id)
 	}
 }
 
@@ -230,7 +230,7 @@ func (dt *DataType) TraitString() string {
 	var cpp strings.Builder
 	id, _ := dt.KindId()
 	cpp.WriteString("trait<")
-	cpp.WriteString(xapi.OutId(id, dt.Tok.File))
+	cpp.WriteString(juleapi.OutId(id, dt.Tok.File))
 	cpp.WriteByte('>')
 	return cpp.String()
 }

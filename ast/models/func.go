@@ -3,8 +3,8 @@ package models
 import (
 	"strings"
 
-	"github.com/the-xlang/xxc/pkg/xapi"
-	"github.com/the-xlang/xxc/pkg/xtype"
+	"github.com/jule-lang/jule/pkg/juleapi"
+	"github.com/jule-lang/jule/pkg/juletype"
 )
 
 // Func is function declaration AST model.
@@ -57,18 +57,18 @@ func (f *Func) DataTypeString() string {
 			cpp.WriteByte(',')
 		}
 		return cpp.String()[:cpp.Len()-1] + "]"
-	} else if f.RetType.Type.Id != xtype.Void {
+	} else if f.RetType.Type.Id != juletype.Void {
 		cpp.WriteString(f.RetType.Type.Kind)
 	}
 	return cpp.String()
 }
 
-// OutId returns xapi.OutId result of function.
+// OutId returns juleapi.OutId result of function.
 func (f *Func) OutId() string {
 	if f.Receiver != nil {
 		return f.Id
 	}
-	return xapi.OutId(f.Id, f.Tok.File)
+	return juleapi.OutId(f.Id, f.Tok.File)
 }
 
 // DefString returns define string of function.

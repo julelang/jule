@@ -1,8 +1,8 @@
 package ast
 
 import (
-	"github.com/the-xlang/xxc/ast/models"
-	"github.com/the-xlang/xxc/lex/tokens"
+	"github.com/jule-lang/jule/ast/models"
+	"github.com/jule-lang/jule/lex/tokens"
 )
 
 type blockStatement struct {

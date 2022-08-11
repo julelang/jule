@@ -3,7 +3,7 @@ package models
 import (
 	"strings"
 
-	"github.com/the-xlang/xxc/pkg/xapi"
+	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
 // Var is variable declaration AST model.
@@ -23,13 +23,13 @@ type Var struct {
 	IsField   bool
 }
 
-// OutId returns xapi.OutId result of var.
+// OutId returns juleapi.OutId result of var.
 func (v *Var) OutId() string {
 	switch {
 	case v.IsField:
-		return xapi.AsId(v.Id)
+		return juleapi.AsId(v.Id)
 	default:
-		return xapi.OutId(v.Id, v.Token.File)
+		return juleapi.OutId(v.Id, v.Token.File)
 	}
 }
 
@@ -46,7 +46,7 @@ func (v Var) String() string {
 		cpp.WriteString(" = ")
 		cpp.WriteString(v.Expr.String())
 	} else {
-		cpp.WriteString(xapi.DefaultExpr)
+		cpp.WriteString(juleapi.DefaultExpr)
 	}
 	cpp.WriteByte(';')
 	return cpp.String()
@@ -61,7 +61,7 @@ func (v *Var) FieldString() string {
 	cpp.WriteString(v.Type.String())
 	cpp.WriteByte(' ')
 	cpp.WriteString(v.OutId())
-	cpp.WriteString(xapi.DefaultExpr)
+	cpp.WriteString(juleapi.DefaultExpr)
 	cpp.WriteByte(';')
 	return cpp.String()
 }

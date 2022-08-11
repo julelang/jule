@@ -3,15 +3,15 @@ package parser
 import (
 	"strings"
 
-	"github.com/the-xlang/xxc/ast/models"
-	"github.com/the-xlang/xxc/lex/tokens"
-	"github.com/the-xlang/xxc/pkg/xbits"
-	"github.com/the-xlang/xxc/pkg/xtype"
+	"github.com/jule-lang/jule/ast/models"
+	"github.com/jule-lang/jule/lex/tokens"
+	"github.com/jule-lang/jule/pkg/julebits"
+	"github.com/jule-lang/jule/pkg/juletype"
 )
 
 func exprMustHeap(expr string) string {
 	var cpp strings.Builder
-	cpp.WriteString("__xxc_must_heap(")
+	cpp.WriteString("__julec_must_heap(")
 	cpp.WriteString(expr)
 	cpp.WriteByte(')')
 	return cpp.String()
@@ -48,7 +48,7 @@ func valIsEnumType(v value) bool {
 }
 
 func isBoolExpr(v value) bool {
-	return typeIsPure(v.data.Type) && v.data.Type.Id == xtype.Bool
+	return typeIsPure(v.data.Type) && v.data.Type.Id == juletype.Bool
 }
 
 func isfloat(s string) bool {
@@ -64,7 +64,7 @@ func canGetPtr(v value) bool {
 		return false
 	}
 	switch v.data.Type.Id {
-	case xtype.Func, xtype.Enum:
+	case juletype.Func, juletype.Enum:
 		return false
 	default:
 		return v.data.Tok.Id == tokens.Id
@@ -89,7 +89,7 @@ func isForeachIterExpr(val value) bool {
 		return false
 	}
 	code := val.data.Type.Id
-	return code == xtype.Str
+	return code == juletype.Str
 }
 
 func isConstNumeric(v string) bool {
@@ -108,10 +108,10 @@ func checkIntBit(v models.Data, bit int) bool {
 	if bit == 0 {
 		return false
 	}
-	if xtype.IsSignedNumericType(v.Type.Id) {
-		return xbits.CheckBitInt(v.Value, bit)
+	if juletype.IsSignedNumericType(v.Type.Id) {
+		return julebits.CheckBitInt(v.Value, bit)
 	}
-	return xbits.CheckBitUInt(v.Value, bit)
+	return julebits.CheckBitUInt(v.Value, bit)
 }
 */
 
@@ -119,7 +119,7 @@ func checkFloatBit(v models.Data, bit int) bool {
 	if bit == 0 {
 		return false
 	}
-	return xbits.CheckBitFloat(v.Value, bit)
+	return julebits.CheckBitFloat(v.Value, bit)
 }
 
 func validExprForConst(v value) bool {
@@ -128,7 +128,7 @@ func validExprForConst(v value) bool {
 
 func okForShifting(v value) bool {
 	if !typeIsPure(v.data.Type) ||
-		!xtype.IsInteger(v.data.Type.Id) {
+		!juletype.IsInteger(v.data.Type.Id) {
 		return false
 	}
 	if !v.constExpr {
@@ -148,6 +148,6 @@ func defaultValueOfType(t DataType) string {
 	if typeIsNilCompatible(t) {
 		return tokens.NIL
 	}
-	return xtype.DefaultValOfType(t.Id)
+	return juletype.DefaultValOfType(t.Id)
 }
 */

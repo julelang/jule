@@ -1,20 +1,20 @@
-: Copyright 2022 The X Programming Language.
+: Copyright 2022 The Jule Programming Language.
 : Use of this source code is governed by a BSD 3-Clause
 : license that can be found in the LICENSE file.
 
 @echo off
 
-if exist .\xxc.exe ( del /f xxc.exe )
+if exist .\jule.exe ( del /f jule.exe )
 
-if exist cmd\xxc\main.go (
-  go build -o xxc.exe -v cmd\xxc\main.go
+if exist cmd\jule\main.go (
+  go build -o jule.exe -v cmd\julec\main.go
 ) else (
-  go build -o xxc.exe -v ..\cmd\xxc\main.go
+  go build -o jule.exe -v ..\cmd\julec\main.go
 )
 
-if exist .\xxc.exe (
-  .\xxc.exe %*
+if exist .\jule.exe (
+  .\jule.exe %*
 ) else (
   echo -----------------------------------------------------------------------
-  echo An unexpected error occurred while compiling X. Check errors above.
+  echo An unexpected error occurred while compiling JuleC. Check errors above.
 )

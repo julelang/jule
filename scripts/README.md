@@ -1,6 +1,6 @@
 # Scripts
 
-These scripts for compile XXC.
+These scripts for compile JuleC.
 
 ## Example Uses for Build Scripts
 

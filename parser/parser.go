@@ -10,19 +10,19 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/the-xlang/xxc/ast"
-	"github.com/the-xlang/xxc/ast/models"
-	"github.com/the-xlang/xxc/lex"
-	"github.com/the-xlang/xxc/lex/tokens"
-	"github.com/the-xlang/xxc/pkg/x"
-	"github.com/the-xlang/xxc/pkg/xapi"
-	"github.com/the-xlang/xxc/pkg/xio"
-	"github.com/the-xlang/xxc/pkg/xlog"
-	"github.com/the-xlang/xxc/pkg/xtype"
-	"github.com/the-xlang/xxc/preprocessor"
+	"github.com/jule-lang/jule/ast"
+	"github.com/jule-lang/jule/ast/models"
+	"github.com/jule-lang/jule/lex"
+	"github.com/jule-lang/jule/lex/tokens"
+	"github.com/jule-lang/jule/pkg/jule"
+	"github.com/jule-lang/jule/pkg/juleapi"
+	"github.com/jule-lang/jule/pkg/juleio"
+	"github.com/jule-lang/jule/pkg/julelog"
+	"github.com/jule-lang/jule/pkg/juletype"
+	"github.com/jule-lang/jule/preprocessor"
 )
 
-type File = xio.File
+type File = juleio.File
 type Type = models.Type
 type Var = models.Var
 type Func = models.Func
@@ -67,8 +67,8 @@ type Parser struct {
 	IsMain     bool
 	Uses       []*use
 	Defs       *Defmap
-	Errors     []xlog.CompilerLog
-	Warnings   []xlog.CompilerLog
+	Errors     []julelog.CompilerLog
+	Warnings   []julelog.CompilerLog
 	File       *File
 }
 
@@ -84,13 +84,13 @@ func New(f *File) *Parser {
 
 // pusherrtok appends new error by token.
 func (p *Parser) pusherrtok(tok Tok, key string, args ...any) {
-	p.pusherrmsgtok(tok, x.GetError(key, args...))
+	p.pusherrmsgtok(tok, jule.GetError(key, args...))
 }
 
 // pusherrtok appends new error message by token.
 func (p *Parser) pusherrmsgtok(tok Tok, msg string) {
-	p.Errors = append(p.Errors, xlog.CompilerLog{
-		Type:    xlog.Error,
+	p.Errors = append(p.Errors, julelog.CompilerLog{
+		Type:    julelog.Error,
 		Row:     tok.Row,
 		Column:  tok.Column,
 		Path:    tok.File.Path(),
@@ -100,38 +100,38 @@ func (p *Parser) pusherrmsgtok(tok Tok, msg string) {
 
 // pushwarntok appends new warning by token.
 func (p *Parser) pushwarntok(tok Tok, key string, args ...any) {
-	p.Warnings = append(p.Warnings, xlog.CompilerLog{
-		Type:    xlog.Warning,
+	p.Warnings = append(p.Warnings, julelog.CompilerLog{
+		Type:    julelog.Warning,
 		Row:     tok.Row,
 		Column:  tok.Column,
 		Path:    tok.File.Path(),
-		Message: x.GetWarning(key, args...),
+		Message: jule.GetWarning(key, args...),
 	})
 }
 
 // pusherrs appends specified errors.
-func (p *Parser) pusherrs(errs ...xlog.CompilerLog) {
+func (p *Parser) pusherrs(errs ...julelog.CompilerLog) {
 	p.Errors = append(p.Errors, errs...)
 }
 
 // PushErr appends new error.
 func (p *Parser) PushErr(key string, args ...any) {
-	p.pusherrmsg(x.GetError(key, args...))
+	p.pusherrmsg(jule.GetError(key, args...))
 }
 
 // pusherrmsh appends new flat error message
 func (p *Parser) pusherrmsg(msg string) {
-	p.Errors = append(p.Errors, xlog.CompilerLog{
-		Type:    xlog.FlatError,
+	p.Errors = append(p.Errors, julelog.CompilerLog{
+		Type:    julelog.FlatError,
 		Message: msg,
 	})
 }
 
 // pusherr appends new warning.
 func (p *Parser) pushwarn(key string, args ...any) {
-	p.Warnings = append(p.Warnings, xlog.CompilerLog{
-		Type:    xlog.FlatWarning,
-		Message: x.GetWarning(key, args...),
+	p.Warnings = append(p.Warnings, julelog.CompilerLog{
+		Type:    julelog.FlatWarning,
+		Message: jule.GetWarning(key, args...),
 	})
 }
 
@@ -307,13 +307,13 @@ func (p *Parser) CppFuncs() string {
 func (p *Parser) CppInitializerCaller() string {
 	var cpp strings.Builder
 	cpp.WriteString("void ")
-	cpp.WriteString(xapi.InitializerCaller)
+	cpp.WriteString(juleapi.InitializerCaller)
 	cpp.WriteString("(void) {")
 	models.AddIndent()
 	indent := models.IndentString()
 	models.DoneIndent()
 	pushInit := func(defs *Defmap) {
-		f, _, _ := defs.funcById(x.InitializerFunction, nil)
+		f, _, _ := defs.funcById(jule.InitializerFunction, nil)
 		if f == nil {
 			return
 		}
@@ -350,7 +350,7 @@ func (p *Parser) Cpp() string {
 	return cpp.String()
 }
 
-func getTree(toks Toks) ([]models.Object, []xlog.CompilerLog) {
+func getTree(toks Toks) ([]models.Object, []julelog.CompilerLog) {
 	b := ast.NewBuilder(toks)
 	b.Build()
 	return b.Tree, b.Errors
@@ -358,7 +358,7 @@ func getTree(toks Toks) ([]models.Object, []xlog.CompilerLog) {
 
 func (p *Parser) checkCppUsePath(use *models.Use) bool {
 	ext := filepath.Ext(use.Path)
-	if !xapi.IsValidHeader(ext) {
+	if !juleapi.IsValidHeader(ext) {
 		p.pusherrtok(use.Tok, "invalid_header_ext", ext)
 		return false
 	}
@@ -375,7 +375,7 @@ func (p *Parser) checkCppUsePath(use *models.Use) bool {
 	}
 	// Set to absolute path for correct include path
 	use.Path, _ = filepath.Abs(use.Path)
-	_ = os.Chdir(x.ExecPath)
+	_ = os.Chdir(jule.ExecPath)
 	return true
 }
 
@@ -490,11 +490,11 @@ func (p *Parser) compilePureUse(useAST *models.Use) (_ *use, hassErr bool) {
 		name := info.Name()
 		// Skip directories.
 		if info.IsDir() ||
-			!strings.HasSuffix(name, x.SrcExt) ||
-			!xio.IsUseable(name) {
+			!strings.HasSuffix(name, jule.SrcExt) ||
+			!juleio.IsUseable(name) {
 			continue
 		}
-		f, err := xio.Openfx(filepath.Join(useAST.Path, name))
+		f, err := juleio.Openfx(filepath.Join(useAST.Path, name))
 		if err != nil {
 			p.pusherrmsg(err.Error())
 			continue
@@ -655,12 +655,12 @@ func (p *Parser) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 		name := info.Name()
 		// Skip directories.
 		if info.IsDir() ||
-			!strings.HasSuffix(name, x.SrcExt) ||
-			!xio.IsUseable(name) ||
+			!strings.HasSuffix(name, jule.SrcExt) ||
+			!juleio.IsUseable(name) ||
 			name == p.File.Name {
 			continue
 		}
-		f, err := xio.Openfx(filepath.Join(p.File.Dir, name))
+		f, err := juleio.Openfx(filepath.Join(p.File.Dir, name))
 		if err != nil {
 			p.pusherrmsg(err.Error())
 			return true
@@ -757,7 +757,7 @@ func (p *Parser) checkGenerics(obj models.Object) {
 // Generics parses generics.
 func (p *Parser) Generics(generics []GenericType) {
 	for i, generic := range generics {
-		if xapi.IsIgnoreId(generic.Id) {
+		if juleapi.IsIgnoreId(generic.Id) {
 			p.pusherrtok(generic.Tok, "ignore_id")
 			continue
 		}
@@ -781,7 +781,7 @@ func (p *Parser) Type(t Type) {
 	if tok.Id != tokens.NA && !canshadow {
 		p.pusherrtok(t.Tok, "exist_id", t.Id)
 		return
-	} else if xapi.IsIgnoreId(t.Id) {
+	} else if juleapi.IsIgnoreId(t.Id) {
 		p.pusherrtok(t.Tok, "ignore_id")
 		return
 	}
@@ -792,7 +792,7 @@ func (p *Parser) Type(t Type) {
 
 // Enum parses X enumerator statement.
 func (p *Parser) Enum(e Enum) {
-	if xapi.IsIgnoreId(e.Id) {
+	if juleapi.IsIgnoreId(e.Id) {
 		p.pusherrtok(e.Tok, "ignore_id")
 		return
 	} else if _, tok, _ := p.defById(e.Id); tok.Id != tokens.NA {
@@ -802,7 +802,7 @@ func (p *Parser) Enum(e Enum) {
 	e.Desc = p.docText.String()
 	p.docText.Reset()
 	e.Type, _ = p.realType(e.Type, true)
-	if !typeIsPure(e.Type) || !xtype.IsInteger(e.Type.Id) {
+	if !typeIsPure(e.Type) || !juletype.IsInteger(e.Type.Id) {
 		p.pusherrtok(e.Type.Tok, "invalid_type_source")
 		return
 	}
@@ -814,14 +814,14 @@ func (p *Parser) Enum(e Enum) {
 		p.Uses = puses
 		p.Defs.Enums = append(p.Defs.Enums, &e)
 	}()
-	max := xtype.MaxOfType(e.Type.Id)
+	max := juletype.MaxOfType(e.Type.Id)
 	for i, item := range e.Items {
 		if max == 0 {
 			p.pusherrtok(item.Tok, "overflow_limits")
 		} else {
 			max--
 		}
-		if xapi.IsIgnoreId(item.Id) {
+		if juleapi.IsIgnoreId(item.Id) {
 			p.pusherrtok(item.Tok, "ignore_id")
 		} else {
 			for _, checkItem := range e.Items {
@@ -878,7 +878,7 @@ func (p *Parser) pushField(s *xstruct, f **Var, i int) {
 	} else {
 		p.parseNonGenericType(s.Ast.Generics, &(*f).Type)
 		param := models.Param{Id: (*f).Id, Type: (*f).Type}
-		param.Default.Model = exprNode{xapi.DefaultExpr}
+		param.Default.Model = exprNode{juleapi.DefaultExpr}
 		s.constructor.Params[i] = param
 	}
 }
@@ -889,7 +889,7 @@ func (p *Parser) parseFields(s *xstruct) {
 	s.constructor.Tok = s.Ast.Tok
 	s.constructor.Params = make([]models.Param, len(s.Ast.Fields))
 	s.constructor.RetType.Type = DataType{
-		Id:   xtype.Struct,
+		Id:   juletype.Struct,
 		Kind: s.Ast.Id,
 		Tok:  s.Ast.Tok,
 		Tag:  s,
@@ -908,7 +908,7 @@ func (p *Parser) parseFields(s *xstruct) {
 
 // Struct parses X structure.
 func (p *Parser) Struct(s Struct) {
-	if xapi.IsIgnoreId(s.Id) {
+	if juleapi.IsIgnoreId(s.Id) {
 		p.pusherrtok(s.Tok, "ignore_id")
 		return
 	} else if _, tok, _ := p.defById(s.Id); tok.Id != tokens.NA {
@@ -929,7 +929,7 @@ func (p *Parser) Struct(s Struct) {
 
 // CppLink parses cpp link.
 func (p *Parser) CppLink(link models.CppLink) {
-	if xapi.IsIgnoreId(link.Link.Id) {
+	if juleapi.IsIgnoreId(link.Link.Id) {
 		p.pusherrtok(link.Tok, "ignore_id")
 		return
 	} else if p.linkById(link.Link.Id) != nil {
@@ -945,7 +945,7 @@ func (p *Parser) CppLink(link models.CppLink) {
 
 // Trait parses X trait.
 func (p *Parser) Trait(t models.Trait) {
-	if xapi.IsIgnoreId(t.Id) {
+	if juleapi.IsIgnoreId(t.Id) {
 		p.pusherrtok(t.Tok, "ignore_id")
 		return
 	} else if _, tok, _ := p.defById(t.Id); tok.Id != tokens.NA {
@@ -959,7 +959,7 @@ func (p *Parser) Trait(t models.Trait) {
 	trait.Defs = new(Defmap)
 	trait.Defs.Funcs = make([]*function, len(t.Funcs))
 	for i, f := range trait.Ast.Funcs {
-		if xapi.IsIgnoreId(f.Id) {
+		if juleapi.IsIgnoreId(f.Id) {
 			p.pusherrtok(f.Tok, "ignore_id")
 		}
 		for j, jf := range trait.Ast.Funcs {
@@ -1118,7 +1118,7 @@ func (p *Parser) pushNs(ns *models.Namespace) *namespace {
 func (p *Parser) Comment(c models.Comment) {
 	c.Content = strings.TrimSpace(c.Content)
 	if p.docText.Len() == 0 {
-		if strings.HasPrefix(c.Content, x.DocPrefix) {
+		if strings.HasPrefix(c.Content, jule.DocPrefix) {
 			c.Content = c.Content[4:]
 			if c.Content == "" {
 				c.Content = " "
@@ -1135,7 +1135,7 @@ write:
 // PushAttribute processes and appends to attribute list.
 func (p *Parser) PushAttribute(attribute Attribute) {
 	ok := false
-	for _, kind := range x.Attributes {
+	for _, kind := range jule.Attributes {
 		if attribute.Tag == kind {
 			ok = true
 			break
@@ -1199,7 +1199,7 @@ func (p *Parser) parseMapNonGenericType(generics []*GenericType, t *DataType) {
 }
 
 func (p *Parser) parseCommonNonGenericType(generics []*GenericType, t *DataType) {
-	if t.Id == xtype.Id {
+	if t.Id == juletype.Id {
 		id, _ := t.KindId()
 		def, _, _ := p.defById(id)
 		switch deft := def.(type) {
@@ -1209,7 +1209,7 @@ func (p *Parser) parseCommonNonGenericType(generics []*GenericType, t *DataType)
 				deft.SetGenerics(t.Tag.([]DataType))
 			}
 			t.Kind = deft.dataTypeString()
-			t.Id = xtype.Struct
+			t.Id = juletype.Struct
 			t.Tag = deft
 			t.Pure = true
 			t.Original = nil
@@ -1249,10 +1249,10 @@ func (p *Parser) parseNonGenericType(generics []*GenericType, t *DataType) {
 		p.parseMapNonGenericType(generics, t)
 	case typeIsArray(*t):
 		p.parseNonGenericType(generics, t.ComponentType)
-		t.Kind = x.Prefix_Array + t.ComponentType.Kind
+		t.Kind = jule.Prefix_Array + t.ComponentType.Kind
 	case typeIsSlice(*t):
 		p.parseNonGenericType(generics, t.ComponentType)
-		t.Kind = x.Prefix_Slice + t.ComponentType.Kind
+		t.Kind = jule.Prefix_Slice + t.ComponentType.Kind
 	default:
 		p.parseCommonNonGenericType(generics, t)
 	}
@@ -1267,7 +1267,7 @@ func (p *Parser) parseTypesNonGenerics(f *Func) {
 
 func (p *Parser) checkRetVars(f *function) {
 	for i, v := range f.Ast.RetType.Identifiers {
-		if xapi.IsIgnoreId(v.Kind) {
+		if juleapi.IsIgnoreId(v.Kind) {
 			continue
 		}
 		for _, generic := range f.Ast.Generics {
@@ -1307,7 +1307,7 @@ func (p *Parser) Func(fast Func) {
 	_, tok, canshadow := p.defById(fast.Id)
 	if tok.Id != tokens.NA && !canshadow {
 		p.pusherrtok(fast.Tok, "exist_id", fast.Id)
-	} else if xapi.IsIgnoreId(fast.Id) {
+	} else if juleapi.IsIgnoreId(fast.Id) {
 		p.pusherrtok(fast.Tok, "ignore_id")
 	}
 	f := new(function)
@@ -1322,7 +1322,7 @@ func (p *Parser) Func(fast Func) {
 	p.generics = nil
 	p.checkRetVars(f)
 	p.checkFuncAttributes(f)
-	f.used = f.Ast.Id == x.InitializerFunction
+	f.used = f.Ast.Id == jule.InitializerFunction
 	p.parseTypesNonGenerics(f.Ast)
 	p.Defs.Funcs = append(p.Defs.Funcs, f)
 }
@@ -1352,7 +1352,7 @@ func (p *Parser) Global(vast Var) {
 
 // Var parse X variable.
 func (p *Parser) Var(v Var) *Var {
-	if xapi.IsIgnoreId(v.Id) {
+	if juleapi.IsIgnoreId(v.Id) {
 		p.pusherrtok(v.Token, "ignore_id")
 	}
 	var val value
@@ -1364,7 +1364,7 @@ func (p *Parser) Var(v Var) *Var {
 			val, v.Expr.Model = p.evalExpr(v.Expr)
 		}
 	}
-	if v.Type.Id != xtype.Void {
+	if v.Type.Id != juletype.Void {
 		t, ok := p.realType(v.Type, true)
 		if ok {
 			v.Type = t
@@ -1387,16 +1387,16 @@ func (p *Parser) Var(v Var) *Var {
 				switch val.expr.(type) {
 				case int64:
 					dt := DataType{
-						Id:   xtype.Int,
-						Kind: xtype.TypeMap[xtype.Int],
+						Id:   juletype.Int,
+						Kind: juletype.TypeMap[juletype.Int],
 					}
 					if integerAssignable(dt, val) {
 						v.Type = dt
 					}
 				case uint64:
 					dt := DataType{
-						Id:   xtype.UInt,
-						Kind: xtype.TypeMap[xtype.UInt],
+						Id:   juletype.UInt,
+						Kind: juletype.TypeMap[juletype.UInt],
 					}
 					if integerAssignable(dt, val) {
 						v.Type = dt
@@ -1424,18 +1424,18 @@ func (p *Parser) Var(v Var) *Var {
 
 func (p *Parser) checkTypeParam(f *function) {
 	if len(f.Ast.Generics) == 0 {
-		p.pusherrtok(f.Ast.Tok, "func_must_have_generics_if_has_attribute", x.Attribute_TypeArg)
+		p.pusherrtok(f.Ast.Tok, "func_must_have_generics_if_has_attribute", jule.Attribute_TypeArg)
 	}
 	if len(f.Ast.Params) != 0 {
-		p.pusherrtok(f.Ast.Tok, "func_cant_have_params_if_has_attribute", x.Attribute_TypeArg)
+		p.pusherrtok(f.Ast.Tok, "func_cant_have_params_if_has_attribute", jule.Attribute_TypeArg)
 	}
 }
 
 func (p *Parser) checkFuncAttributes(f *function) {
 	for _, attribute := range f.Ast.Attributes {
 		switch attribute.Tag {
-		case x.Attribute_Inline:
-		case x.Attribute_TypeArg:
+		case jule.Attribute_Inline:
+		case jule.Attribute_TypeArg:
 			p.checkTypeParam(f)
 		default:
 			p.pusherrtok(attribute.Tok, "invalid_attribute")
@@ -1459,8 +1459,8 @@ func (p *Parser) varsFromParams(params []Param) []*Var {
 			v.Type.Original = nil
 			v.Type.ComponentType = new(models.DataType)
 			*v.Type.ComponentType = param.Type
-			v.Type.Id = xtype.Slice
-			v.Type.Kind = x.Prefix_Slice + v.Type.Kind
+			v.Type.Id = juletype.Slice
+			v.Type.Kind = jule.Prefix_Slice + v.Type.Kind
 		}
 		vars[i] = v
 	}
@@ -1603,7 +1603,7 @@ func (p *Parser) blockDefById(id string) (def any, tok Tok) {
 func (p *Parser) check() {
 	defer p.wg.Done()
 	if p.IsMain && !p.JustDefs {
-		f, _, _ := p.Defs.funcById(x.EntryPoint, nil)
+		f, _, _ := p.Defs.funcById(jule.EntryPoint, nil)
 		if f == nil {
 			p.PushErr("no_entry_point")
 		} else {
@@ -1648,15 +1648,15 @@ func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) {
 	}
 	// Skip default argument with default value
 	if param.Default.Model != nil {
-		if param.Default.Model.String() == xapi.DefaultExpr {
+		if param.Default.Model.String() == juleapi.DefaultExpr {
 			p.checkParamDefaultExprWithDefault(param)
 			return
 		}
 	}
 	dt := param.Type
 	if param.Variadic {
-		dt.Id = xtype.Slice
-		dt.Kind = x.Prefix_Slice + dt.Kind
+		dt.Id = juletype.Slice
+		dt.Kind = jule.Prefix_Slice + dt.Kind
 		dt.ComponentType = new(models.DataType)
 		*dt.ComponentType = param.Type
 		dt.Original = nil
@@ -1813,7 +1813,7 @@ func (p *Parser) checkStructs() {
 func (p *Parser) checkFuncSpecialCases(f *Func) {
 	defer p.wg.Done()
 	switch f.Id {
-	case x.EntryPoint, x.InitializerFunction:
+	case jule.EntryPoint, jule.InitializerFunction:
 		p.checkSolidFuncSpecialCases(f)
 	}
 }
@@ -1851,13 +1851,13 @@ func (p *Parser) parseField(s *xstruct, f **Var, i int) {
 	*f = p.Var(**f)
 	v := *f
 	param := models.Param{Id: v.Id, Type: v.Type}
-	if v.Type.Id == xtype.Struct && v.Type.Tag == s && typeIsPure(v.Type) {
+	if v.Type.Id == juletype.Struct && v.Type.Tag == s && typeIsPure(v.Type) {
 		p.pusherrtok(v.Type.Tok, "invalid_type_source")
 	}
 	if hasExpr(v.Expr) {
 		param.Default = v.Expr
 	} else {
-		param.Default.Model = exprNode{xapi.DefaultExpr}
+		param.Default.Model = exprNode{juleapi.DefaultExpr}
 	}
 	s.constructor.Params[i] = param
 }
@@ -2109,7 +2109,7 @@ end:
 func (p *Parser) parseFuncCallToks(f *Func, genericsToks, argsToks Toks, m *exprModel) (v value) {
 	var generics []DataType
 	var args *models.Args
-	if f.FindAttribute(x.Attribute_TypeArg) != nil {
+	if f.FindAttribute(jule.Attribute_TypeArg) != nil {
 		if len(genericsToks) > 0 {
 			p.pusherrtok(genericsToks[0], "invalid_syntax")
 			return
@@ -2304,7 +2304,7 @@ func (p *Parser) checkSolidFuncSpecialCases(f *Func) {
 	if len(f.Params) > 0 {
 		p.pusherrtok(f.Tok, "func_have_parameters", f.Id)
 	}
-	if f.RetType.Type.Id != xtype.Void {
+	if f.RetType.Type.Id != juletype.Void {
 		p.pusherrtok(f.RetType.Type.Tok, "func_have_return", f.Id)
 	}
 	if f.Attributes != nil {
@@ -2377,7 +2377,7 @@ func (p *Parser) statement(s *models.Statement, recover bool) bool {
 		if def, _ := p.blockDefById(t.Id); def != nil {
 			p.pusherrtok(t.Tok, "exist_id", t.Id)
 			break
-		} else if xapi.IsIgnoreId(t.Id) {
+		} else if juleapi.IsIgnoreId(t.Id) {
 			p.pusherrtok(t.Tok, "ignore_id")
 			break
 		}
@@ -2545,8 +2545,8 @@ func (p *Parser) matchcase(t *models.Match) {
 		t.Expr.Model = model
 		t.ExprType = value.data.Type
 	} else {
-		t.ExprType.Id = xtype.Bool
-		t.ExprType.Kind = xtype.TypeMap[t.ExprType.Id]
+		t.ExprType.Id = juletype.Bool
+		t.ExprType.Kind = juletype.TypeMap[t.ExprType.Id]
 	}
 	p.cases(t, t.ExprType)
 	if t.Default != nil {
@@ -2775,7 +2775,7 @@ func (p *Parser) singleAssign(assign *models.Assign, exprs []value) {
 	right := &assign.Right[0]
 	val := exprs[0]
 	left := &assign.Left[0].Expr
-	if len(left.Toks) == 1 && xapi.IsIgnoreId(left.Toks[0].Kind) {
+	if len(left.Toks) == 1 && juleapi.IsIgnoreId(left.Toks[0].Kind) {
 		return
 	}
 	leftExpr, model := p.evalExpr(*left)
@@ -2833,7 +2833,7 @@ func (p *Parser) funcMultiAssign(vsAST *models.Assign, funcVal value) {
 func (p *Parser) multiAssign(assign *models.Assign, right []value) {
 	for i := range assign.Left {
 		left := &assign.Left[i]
-		left.Ignore = xapi.IsIgnoreId(left.Var.Id)
+		left.Ignore = juleapi.IsIgnoreId(left.Var.Id)
 		right := right[i]
 		if !left.Var.New {
 			if left.Ignore {
@@ -2873,10 +2873,10 @@ func (p *Parser) suffix(assign *models.Assign, exprs []value) {
 	if typeIsExplicitPtr(val.data.Type) {
 		return
 	}
-	if typeIsPure(val.data.Type) && xtype.IsNumeric(val.data.Type.Id) {
+	if typeIsPure(val.data.Type) && juletype.IsNumeric(val.data.Type.Id) {
 		return
 	}
-	p.pusherrtok(assign.Setter, "operator_notfor_xtype", assign.Setter.Kind, val.data.Type.Kind)
+	p.pusherrtok(assign.Setter, "operator_notfor_juletype", assign.Setter.Kind, val.data.Type.Kind)
 }
 
 func (p *Parser) assign(assign *models.Assign) {
@@ -2938,13 +2938,13 @@ func (p *Parser) foreachProfile(iter *models.Iter) {
 	iter.Profile = profile
 	blockVars := p.blockVars
 	if profile.KeyA.New {
-		if xapi.IsIgnoreId(profile.KeyA.Id) {
+		if juleapi.IsIgnoreId(profile.KeyA.Id) {
 			p.pusherrtok(profile.KeyA.Token, "ignore_id")
 		}
 		p.varStatement(&profile.KeyA, true)
 	}
 	if profile.KeyB.New {
-		if xapi.IsIgnoreId(profile.KeyB.Id) {
+		if juleapi.IsIgnoreId(profile.KeyB.Id) {
 			p.pusherrtok(profile.KeyB.Token, "ignore_id")
 		}
 		p.varStatement(&profile.KeyB, true)
@@ -2963,7 +2963,7 @@ func (p *Parser) forProfile(iter *models.Iter) {
 		profile.Condition.Model = model
 		assignChecker{
 			p:      p,
-			t:      DataType{Id: xtype.Bool, Kind: xtype.TypeMap[xtype.Bool]},
+			t:      DataType{Id: juletype.Bool, Kind: juletype.TypeMap[juletype.Bool]},
 			v:      val,
 			errtok: profile.Condition.Toks[0],
 		}.checkAssignType()
@@ -3056,9 +3056,9 @@ func (p *Parser) checkValidityForAutoType(t DataType, errtok Tok) {
 		return
 	}
 	switch t.Id {
-	case xtype.Nil:
+	case juletype.Nil:
 		p.pusherrtok(errtok, "nil_for_autotype")
-	case xtype.Void:
+	case juletype.Void:
 		p.pusherrtok(errtok, "void_for_autotype")
 	}
 }
@@ -3090,7 +3090,7 @@ func (p *Parser) typeSourceIsType(dt DataType, t *Type, err bool) (DataType, boo
 }
 
 func (p *Parser) typeSourceIsEnum(e *Enum, tag any) (dt DataType, _ bool) {
-	dt.Id = xtype.Enum
+	dt.Id = juletype.Enum
 	dt.Kind = e.Id
 	dt.Tag = e
 	dt.Tok = e.Tok
@@ -3161,7 +3161,7 @@ func (p *Parser) typeSourceIsStruct(s *xstruct, t DataType) (dt DataType, _ bool
 		p.pusherrtok(t.Tok, "has_generics")
 	}
 end:
-	dt.Id = xtype.Struct
+	dt.Id = juletype.Struct
 	dt.Kind = s.dataTypeString()
 	dt.Tag = s
 	dt.Tok = s.Ast.Tok
@@ -3173,7 +3173,7 @@ func (p *Parser) typeSourceIsTrait(t *trait, tag any, errTok Tok) (dt DataType, 
 		p.pusherrtok(errTok, "invalid_type_source")
 	}
 	t.Used = true
-	dt.Id = xtype.Trait
+	dt.Id = juletype.Trait
 	dt.Kind = t.Ast.Id
 	dt.Tag = t
 	dt.Tok = t.Ast.Tok
@@ -3210,7 +3210,7 @@ func (p *Parser) typeSourceIsArrayType(t *DataType) (ok bool) {
 		return
 	}
 	ptrs := t.Pointers()
-	t.Kind = ptrs + x.Prefix_Array + t.ComponentType.Kind
+	t.Kind = ptrs + jule.Prefix_Array + t.ComponentType.Kind
 	if t.Size.AutoSized || t.Size.Expr.Model != nil {
 		return
 	}
@@ -3223,7 +3223,7 @@ func (p *Parser) typeSourceIsArrayType(t *DataType) (ok bool) {
 	}
 	assignChecker{
 		p:      p,
-		t:      DataType{Id: xtype.UInt, Kind: xtype.TypeMap[xtype.UInt]},
+		t:      DataType{Id: juletype.UInt, Kind: juletype.TypeMap[juletype.UInt]},
 		v:      val,
 		errtok: t.Size.Expr.Toks[0],
 	}.checkAssignType()
@@ -3233,7 +3233,7 @@ func (p *Parser) typeSourceIsArrayType(t *DataType) (ok bool) {
 func (p *Parser) typeSourceIsSliceType(t *DataType) (ok bool) {
 	*t.ComponentType, ok = p.realType(*t.ComponentType, true)
 	ptrs := t.Pointers()
-	t.Kind = ptrs + x.Prefix_Slice + t.ComponentType.Kind
+	t.Kind = ptrs + jule.Prefix_Slice + t.ComponentType.Kind
 	if ok && typeIsArray(*t.ComponentType) { // Array into slice
 		p.pusherrtok(t.Tok, "invalid_type_source")
 	}
@@ -3260,9 +3260,9 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 		return dt, ok
 	}
 	switch dt.Id {
-	case xtype.Struct:
+	case juletype.Struct:
 		return p.typeSourceIsStruct(dt.Tag.(*xstruct), dt)
-	case xtype.Id:
+	case juletype.Id:
 		id, prefix := dt.KindId()
 		defer func() { ret.Kind = prefix + ret.Kind }()
 		var def any
@@ -3310,7 +3310,7 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 			}
 			return dt, false
 		}
-	case xtype.Func:
+	case juletype.Func:
 		return p.typeSourceIsFunc(dt, err)
 	}
 	return dt, true
@@ -3346,7 +3346,7 @@ func (p *Parser) checkType(real, check DataType, ignoreAny bool, errTok Tok) {
 		p.eval.pusherrtok(errTok, "incompatible_datatype", real.Kind, check.Kind)
 		return
 	}
-	if !ignoreAny && real.Id == xtype.Any {
+	if !ignoreAny && real.Id == juletype.Any {
 		return
 	}
 	if real.MultiTyped || check.MultiTyped {
@@ -3365,8 +3365,8 @@ func (p *Parser) checkType(real, check DataType, ignoreAny bool, errTok Tok) {
 		}
 		i := real.Tag.([][]any)[0][0].(uint64)
 		j := check.Tag.([][]any)[0][0].(uint64)
-		realKind := strings.Replace(real.Kind, x.Mark_Array, strconv.FormatUint(i, 10), 1)
-		checkKind := strings.Replace(check.Kind, x.Mark_Array, strconv.FormatUint(j, 10), 1)
+		realKind := strings.Replace(real.Kind, jule.Mark_Array, strconv.FormatUint(i, 10), 1)
+		checkKind := strings.Replace(check.Kind, jule.Mark_Array, strconv.FormatUint(j, 10), 1)
 		p.pusherrtok(errTok, "incompatible_datatype", realKind, checkKind)
 	}
 }

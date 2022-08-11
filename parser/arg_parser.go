@@ -1,10 +1,10 @@
 package parser
 
 import (
-	"github.com/the-xlang/xxc/ast/models"
-	"github.com/the-xlang/xxc/lex/tokens"
-	"github.com/the-xlang/xxc/pkg/x"
-	"github.com/the-xlang/xxc/pkg/xtype"
+	"github.com/jule-lang/jule/ast/models"
+	"github.com/jule-lang/jule/lex/tokens"
+	"github.com/jule-lang/jule/pkg/jule"
+	"github.com/jule-lang/jule/pkg/juletype"
 )
 
 func getParamMap(params []Param) *paramMap {
@@ -38,9 +38,9 @@ func (pap *pureArgParser) buildArgs() {
 			pap.args.Src[i] = *pair.arg
 		case pair.param.Variadic:
 			t := DataType{
-				Id:            xtype.Slice,
+				Id:            juletype.Slice,
 				Tok:           pair.param.Type.Tok,
-				Kind:          x.Prefix_Slice + pair.param.Type.Kind,
+				Kind:          jule.Prefix_Slice + pair.param.Type.Kind,
 				Pure:          true,
 				ComponentType: new(DataType),
 			}

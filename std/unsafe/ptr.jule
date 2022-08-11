@@ -1,0 +1,64 @@
+// Copyright 2022 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use cpp "unsafe.hpp"
+
+type[T]
+cpp __julec_uintptr_cast_to_raw(addr uintptr) *T
+
+//doc: Wrapper structure for unsafe raw pointer.
+type[T]
+pub struct Ptr {
+	ptr: uintptr
+}
+
+impl Ptr {
+	//doc: Returns unsafe pointer as unsafe voidptr.
+	@inline
+	pub &to_voidptr() Voidptr {
+		ret voidptr_from(.ptr)
+	}
+
+	//doc:
+	// Moves the pointer from its pointing position by the size of the data type.
+	// The offset amount is determined by n.
+	// Moving back requires a negative expression,
+	// and moving forward requires a positive expression.
+	//
+	// Special cases are:
+	//  move(n) = address sets as zero (nil)
+	@inline
+	pub &move(n int) {
+		.ptr += n * sizeof_t(T)
+	}
+
+	//doc: Returns data of pointer.
+	@inline
+	pub &get() T {
+		ret *cpp.__julec_uintptr_cast_to_raw[T](.ptr)
+	}
+}
+
+impl Pointer for Ptr {
+	@inline
+	&addr() uintptr {
+		ret .ptr
+	}
+}
+
+//doc: Returns unsafe pointer for given raw pointer.
+@inline
+type[T]
+pub ptr_of(ptr *T) Ptr[T] {
+	ret ptr_from[T](uintptr(ptr))
+}
+
+//doc: Returns unsafe pointer from given address.
+@inline
+type[T]
+pub ptr_from(addr uintptr) Ptr[T] {
+	ret Ptr[T]{
+		ptr: addr,
+	}
+}

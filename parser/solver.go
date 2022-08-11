@@ -1,54 +1,54 @@
 package parser
 
 import (
-	"github.com/the-xlang/xxc/lex/tokens"
-	"github.com/the-xlang/xxc/pkg/xbits"
-	"github.com/the-xlang/xxc/pkg/xtype"
+	"github.com/jule-lang/jule/lex/tokens"
+	"github.com/jule-lang/jule/pkg/julebits"
+	"github.com/jule-lang/jule/pkg/juletype"
 )
 
 func setshift(v *value, right uint64) {
 	switch {
 	case right <= 6:
-		v.data.Type.Id = xtype.I8
+		v.data.Type.Id = juletype.I8
 	case right <= 7:
-		v.data.Type.Id = xtype.U8
+		v.data.Type.Id = juletype.U8
 	case right <= 14:
-		v.data.Type.Id = xtype.I16
+		v.data.Type.Id = juletype.I16
 	case right <= 15:
-		v.data.Type.Id = xtype.U16
+		v.data.Type.Id = juletype.U16
 	case right <= 30:
-		v.data.Type.Id = xtype.I32
+		v.data.Type.Id = juletype.I32
 	case right <= 31:
-		v.data.Type.Id = xtype.U32
+		v.data.Type.Id = juletype.U32
 	case right <= 62:
-		v.data.Type.Id = xtype.I64
+		v.data.Type.Id = juletype.I64
 	case right <= 63:
-		v.data.Type.Id = xtype.U64
+		v.data.Type.Id = juletype.U64
 	case right <= 127:
-		v.data.Type.Id = xtype.F32
+		v.data.Type.Id = juletype.F32
 	default:
-		v.data.Type.Id = xtype.F64
+		v.data.Type.Id = juletype.F64
 	}
 }
 
 func bitize(v *value) {
 	switch {
-	case xtype.IsSignedInteger(v.data.Type.Id):
+	case juletype.IsSignedInteger(v.data.Type.Id):
 		v.expr = tonums(v.expr)
-	case xtype.IsUnsignedInteger(v.data.Type.Id):
+	case juletype.IsUnsignedInteger(v.data.Type.Id):
 		v.expr = tonumu(v.expr)
 	}
 	switch t := v.expr.(type) {
 	case float64:
-		v.data.Type.Id = xtype.FloatFromBits(xbits.BitsizeFloat(t))
+		v.data.Type.Id = juletype.FloatFromBits(julebits.BitsizeFloat(t))
 	case int64:
-		v.data.Type.Id = xtype.IntFromBits(xbits.BitsizeInt(t))
+		v.data.Type.Id = juletype.IntFromBits(julebits.BitsizeInt(t))
 	case uint64:
-		v.data.Type.Id = xtype.UIntFromBits(xbits.BitsizeUInt(t))
+		v.data.Type.Id = juletype.UIntFromBits(julebits.BitsizeUInt(t))
 	default:
 		return
 	}
-	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 }
 
 func tonumf(expr any) float64 {
@@ -381,10 +381,10 @@ func (s *solver) ptr() (v value) {
 		v.data.Type = s.leftVal.data.Type
 	case tokens.EQUALS, tokens.NOT_EQUALS, tokens.LESS, tokens.GREAT,
 		tokens.GREAT_EQUAL, tokens.LESS_EQUAL:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, "pointer")
+		s.p.pusherrtok(s.operator, "operator_notfor_juletype", s.operator.Kind, "pointer")
 	}
 	return
 }
@@ -409,19 +409,19 @@ func (s *solver) str() (v value) {
 	}
 	switch s.operator.Kind {
 	case tokens.PLUS:
-		v.data.Type.Id = xtype.Str
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Str
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.add(&v)
 	case tokens.EQUALS:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.eq(&v)
 	case tokens.NOT_EQUALS:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.noteq(&v)
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
+		s.p.pusherrtok(s.operator, "operator_notfor_juletype",
 			s.operator.Kind, tokens.STR)
 	}
 	return
@@ -431,10 +431,10 @@ func (s *solver) any() (v value) {
 	v.data.Tok = s.operator
 	switch s.operator.Kind {
 	case tokens.EQUALS, tokens.NOT_EQUALS:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, tokens.ANY)
+		s.p.pusherrtok(s.operator, "operator_notfor_juletype", s.operator.Kind, tokens.ANY)
 	}
 	return
 }
@@ -448,15 +448,15 @@ func (s *solver) bool() (v value) {
 	}
 	switch s.operator.Kind {
 	case tokens.EQUALS:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.eq(&v)
 	case tokens.NOT_EQUALS:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.noteq(&v)
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
+		s.p.pusherrtok(s.operator, "operator_notfor_juletype",
 			s.operator.Kind, tokens.BOOL)
 	}
 	return
@@ -464,58 +464,58 @@ func (s *solver) bool() (v value) {
 
 func (s *solver) float() (v value) {
 	v.data.Tok = s.operator
-	if !xtype.IsNumeric(s.leftVal.data.Type.Id) ||
-		!xtype.IsNumeric(s.rightVal.data.Type.Id) {
+	if !juletype.IsNumeric(s.leftVal.data.Type.Id) ||
+		!juletype.IsNumeric(s.rightVal.data.Type.Id) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
 	case tokens.EQUALS:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.eq(&v)
 	case tokens.NOT_EQUALS:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.noteq(&v)
 	case tokens.LESS:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.lt(&v)
 	case tokens.GREAT:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.gt(&v)
 	case tokens.GREAT_EQUAL:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.gteq(&v)
 	case tokens.LESS_EQUAL:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.lteq(&v)
 	case tokens.PLUS:
 		v.data.Type = s.leftVal.data.Type
-		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
 		s.add(&v)
 	case tokens.MINUS:
 		v.data.Type = s.leftVal.data.Type
-		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
 		s.sub(&v)
 	case tokens.STAR:
 		v.data.Type = s.leftVal.data.Type
-		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
 		s.mul(&v)
 	case tokens.SOLIDUS:
 		v.data.Type = s.leftVal.data.Type
-		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
 		s.div(&v)
@@ -527,95 +527,95 @@ func (s *solver) float() (v value) {
 
 func (s *solver) signed() (v value) {
 	v.data.Tok = s.operator
-	if !xtype.IsNumeric(s.leftVal.data.Type.Id) ||
-		!xtype.IsNumeric(s.rightVal.data.Type.Id) {
+	if !juletype.IsNumeric(s.leftVal.data.Type.Id) ||
+		!juletype.IsNumeric(s.rightVal.data.Type.Id) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
 	case tokens.EQUALS:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.eq(&v)
 	case tokens.NOT_EQUALS:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.noteq(&v)
 	case tokens.LESS:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.lt(&v)
 	case tokens.GREAT:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.gt(&v)
 	case tokens.GREAT_EQUAL:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.gteq(&v)
 	case tokens.LESS_EQUAL:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.lteq(&v)
 	case tokens.PLUS:
 		v.data.Type = s.leftVal.data.Type
-		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
 		s.add(&v)
 	case tokens.MINUS:
 		v.data.Type = s.leftVal.data.Type
-		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
 		s.sub(&v)
 	case tokens.STAR:
 		v.data.Type = s.leftVal.data.Type
-		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
 		s.mul(&v)
 	case tokens.SOLIDUS:
 		v.data.Type = s.leftVal.data.Type
-		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
 		s.div(&v)
 	case tokens.PERCENT:
 		v.data.Type = s.leftVal.data.Type
-		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
 		s.mod(&v)
 	case tokens.AMPER:
 		v.data.Type = s.leftVal.data.Type
-		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
 		s.bitwiseAnd(&v)
 	case tokens.VLINE:
 		v.data.Type = s.leftVal.data.Type
-		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
 		s.bitwiseOr(&v)
 	case tokens.CARET:
 		v.data.Type = s.leftVal.data.Type
-		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
 		s.bitwiseXor(&v)
 	case tokens.RSHIFT:
-		v.data.Type.Id = xtype.U64
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.U64
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		if !okForShifting(s.rightVal) {
 			s.p.pusherrtok(s.operator, "bitshift_must_unsigned")
 		}
 		s.rshift(&v)
 	case tokens.LSHIFT:
-		v.data.Type.Id = xtype.U64
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.U64
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		if !okForShifting(s.rightVal) {
 			s.p.pusherrtok(s.operator, "bitshift_must_unsigned")
 		}
@@ -628,95 +628,95 @@ func (s *solver) signed() (v value) {
 
 func (s *solver) unsigned() (v value) {
 	v.data.Tok = s.operator
-	if !xtype.IsNumeric(s.leftVal.data.Type.Id) ||
-		!xtype.IsNumeric(s.rightVal.data.Type.Id) {
+	if !juletype.IsNumeric(s.leftVal.data.Type.Id) ||
+		!juletype.IsNumeric(s.rightVal.data.Type.Id) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
 	case tokens.EQUALS:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.eq(&v)
 	case tokens.NOT_EQUALS:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.noteq(&v)
 	case tokens.LESS:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.lt(&v)
 	case tokens.GREAT:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.gt(&v)
 	case tokens.GREAT_EQUAL:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.gteq(&v)
 	case tokens.LESS_EQUAL:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.lteq(&v)
 	case tokens.PLUS:
 		v.data.Type = s.leftVal.data.Type
-		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
 		s.add(&v)
 	case tokens.MINUS:
 		v.data.Type = s.leftVal.data.Type
-		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
 		s.sub(&v)
 	case tokens.STAR:
 		v.data.Type = s.leftVal.data.Type
-		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
 		s.mul(&v)
 	case tokens.SOLIDUS:
 		v.data.Type = s.leftVal.data.Type
-		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
 		s.div(&v)
 	case tokens.PERCENT:
 		v.data.Type = s.leftVal.data.Type
-		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
 		s.mod(&v)
 	case tokens.AMPER:
 		v.data.Type = s.leftVal.data.Type
-		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
 		s.bitwiseAnd(&v)
 	case tokens.VLINE:
 		v.data.Type = s.leftVal.data.Type
-		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
 		s.bitwiseOr(&v)
 	case tokens.CARET:
 		v.data.Type = s.leftVal.data.Type
-		if xtype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
+		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
 		}
 		s.bitwiseXor(&v)
 	case tokens.RSHIFT:
-		v.data.Type.Id = xtype.U64
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.U64
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		if !okForShifting(s.rightVal) {
 			s.p.pusherrtok(s.operator, "bitshift_must_unsigned")
 		}
 		s.rshift(&v)
 	case tokens.LSHIFT:
-		v.data.Type.Id = xtype.U64
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.U64
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		if !okForShifting(s.rightVal) {
 			s.p.pusherrtok(s.operator, "bitshift_must_unsigned")
 		}
@@ -729,9 +729,9 @@ func (s *solver) unsigned() (v value) {
 
 func (s *solver) logical() (v value) {
 	v.data.Tok = s.operator
-	v.data.Type.Id = xtype.Bool
-	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
-	if s.leftVal.data.Type.Id != xtype.Bool || s.rightVal.data.Type.Id != xtype.Bool {
+	v.data.Type.Id = juletype.Bool
+	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
+	if s.leftVal.data.Type.Id != juletype.Bool || s.rightVal.data.Type.Id != juletype.Bool {
 		s.p.pusherrtok(s.operator, "logical_not_bool")
 		return
 	}
@@ -756,10 +756,10 @@ func (s *solver) array() (v value) {
 	}
 	switch s.operator.Kind {
 	case tokens.EQUALS, tokens.NOT_EQUALS:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_xtype", s.operator.Kind, s.leftVal.data.Type.Kind)
+		s.p.pusherrtok(s.operator, "operator_notfor_juletype", s.operator.Kind, s.leftVal.data.Type.Kind)
 	}
 	return
 }
@@ -773,10 +773,10 @@ func (s *solver) slice() (v value) {
 	}
 	switch s.operator.Kind {
 	case tokens.EQUALS, tokens.NOT_EQUALS:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
+		s.p.pusherrtok(s.operator, "operator_notfor_juletype",
 			s.operator.Kind, s.leftVal.data.Type.Kind)
 	}
 	return
@@ -791,19 +791,19 @@ func (s *solver) nil() (v value) {
 	}
 	switch s.operator.Kind {
 	case tokens.NOT_EQUALS:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		if s.isConstExpr() {
 			v.expr = s.leftVal.expr != nil && s.rightVal.expr != nil
 		}
 	case tokens.EQUALS:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		if s.isConstExpr() {
 			v.expr = s.leftVal.expr == nil && s.rightVal.expr == nil
 		}
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
+		s.p.pusherrtok(s.operator, "operator_notfor_juletype",
 			s.operator.Kind, tokens.NIL)
 	}
 	return
@@ -818,10 +818,10 @@ func (s *solver) structure() (v value) {
 	}
 	switch s.operator.Kind {
 	case tokens.NOT_EQUALS, tokens.EQUALS:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
+		s.p.pusherrtok(s.operator, "operator_notfor_juletype",
 			s.operator.Kind, tokens.STRUCT)
 	}
 	return
@@ -829,21 +829,21 @@ func (s *solver) structure() (v value) {
 
 func (s *solver) function() (v value) {
 	v.data.Tok = s.operator
-	if (!typeIsPure(s.leftVal.data.Type) || s.leftVal.data.Type.Id != xtype.Nil) &&
-		(!typeIsPure(s.rightVal.data.Type) || s.rightVal.data.Type.Id != xtype.Nil) {
+	if (!typeIsPure(s.leftVal.data.Type) || s.leftVal.data.Type.Id != juletype.Nil) &&
+		(!typeIsPure(s.rightVal.data.Type) || s.rightVal.data.Type.Id != juletype.Nil) {
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
 	case tokens.NOT_EQUALS:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	case tokens.EQUALS:
-		v.data.Type.Id = xtype.Bool
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
-		s.p.pusherrtok(s.operator, "operator_notfor_xtype",
+		s.p.pusherrtok(s.operator, "operator_notfor_juletype",
 			s.operator.Kind, tokens.NIL)
 	}
 	return
@@ -869,7 +869,7 @@ func (s *solver) isConstExpr() bool {
 func (s *solver) solve() (v value) {
 	defer func() {
 		if typeIsVoid(v.data.Type) {
-			v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+			v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		} else {
 			v.constExpr = s.isConstExpr()
 			if v.constExpr {
@@ -898,22 +898,22 @@ func (s *solver) solve() (v value) {
 		return s.enum()
 	case typeIsStruct(s.leftVal.data.Type), typeIsStruct(s.rightVal.data.Type):
 		return s.structure()
-	case s.leftVal.data.Type.Id == xtype.Nil, s.rightVal.data.Type.Id == xtype.Nil:
+	case s.leftVal.data.Type.Id == juletype.Nil, s.rightVal.data.Type.Id == juletype.Nil:
 		return s.nil()
-	case s.leftVal.data.Type.Id == xtype.Any, s.rightVal.data.Type.Id == xtype.Any:
+	case s.leftVal.data.Type.Id == juletype.Any, s.rightVal.data.Type.Id == juletype.Any:
 		return s.any()
-	case s.leftVal.data.Type.Id == xtype.Bool, s.rightVal.data.Type.Id == xtype.Bool:
+	case s.leftVal.data.Type.Id == juletype.Bool, s.rightVal.data.Type.Id == juletype.Bool:
 		return s.bool()
-	case s.leftVal.data.Type.Id == xtype.Str, s.rightVal.data.Type.Id == xtype.Str:
+	case s.leftVal.data.Type.Id == juletype.Str, s.rightVal.data.Type.Id == juletype.Str:
 		return s.str()
-	case xtype.IsFloat(s.leftVal.data.Type.Id),
-		xtype.IsFloat(s.rightVal.data.Type.Id):
+	case juletype.IsFloat(s.leftVal.data.Type.Id),
+		juletype.IsFloat(s.rightVal.data.Type.Id):
 		return s.float()
-	case xtype.IsUnsignedInteger(s.leftVal.data.Type.Id),
-		xtype.IsUnsignedInteger(s.rightVal.data.Type.Id):
+	case juletype.IsUnsignedInteger(s.leftVal.data.Type.Id),
+		juletype.IsUnsignedInteger(s.rightVal.data.Type.Id):
 		return s.unsigned()
-	case xtype.IsSignedNumeric(s.leftVal.data.Type.Id),
-		xtype.IsSignedNumeric(s.rightVal.data.Type.Id):
+	case juletype.IsSignedNumeric(s.leftVal.data.Type.Id),
+		juletype.IsSignedNumeric(s.rightVal.data.Type.Id):
 		return s.signed()
 	}
 	return

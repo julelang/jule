@@ -1,9 +1,9 @@
-// Copyright 2022 The X Programming Language.
+// Copyright 2022 The Jule Programming Language.
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-#ifndef __XXC_SLICE_HPP
-#define __XXC_SLICE_HPP
+#ifndef __JULEC_SLICE_HPP
+#define __JULEC_SLICE_HPP
 
 // Built-in slice type.
 template<typename _Item_t>
@@ -13,13 +13,13 @@ template<typename _Item_t>
 class slice {
 public:
     _Item_t *_buffer{nil};
-    mutable uint_xt *_ref{nil};
-    int_xt _size{0};
+    mutable uint_julet *_ref{nil};
+    int_julet _size{0};
 
     slice<_Item_t>(void) noexcept {}
     slice<_Item_t>(const std::nullptr_t) noexcept {}
 
-    slice<_Item_t>(const uint_xt &_N) noexcept
+    slice<_Item_t>(const uint_julet &_N) noexcept
     { this->__alloc_new(_N); }
 
     slice<_Item_t>(const slice<_Item_t>& _Src) noexcept
@@ -28,7 +28,7 @@ public:
     slice<_Item_t>(const std::initializer_list<_Item_t> &_Src) noexcept {
         this->__alloc_new(_Src.size());
         const auto _Src_begin{_Src.begin()};
-        for (int_xt _index{0}; _index < this->_size; ++_index)
+        for (int_julet _index{0}; _index < this->_size; ++_index)
         { this->_buffer[_index] = *(_Item_t*)(_Src_begin+_index); }
     }
 
@@ -49,11 +49,11 @@ public:
         this->_size = 0;
     }
 
-    void __alloc_new(const int_xt _N) noexcept {
+    void __alloc_new(const int_julet _N) noexcept {
         this->__dealloc();
         this->_buffer = new(std::nothrow) _Item_t[_N];
         if (!this->_buffer) { XID(panic)("memory allocation failed"); }
-        this->_ref = new(std::nothrow) uint_xt{1};
+        this->_ref = new(std::nothrow) uint_julet{1};
         if (!this->_ref) { XID(panic)("memory allocation failed"); }
         this->_size = _N;
     }
@@ -77,8 +77,8 @@ public:
     const_iterator end(void) const noexcept
     { return &this->_buffer[this->_size]; }
 
-    inline slice<_Item_t> ___slice(const int_xt &_Start,
-                                   const int_xt &_End) const noexcept {
+    inline slice<_Item_t> ___slice(const int_julet &_Start,
+                                   const int_julet &_End) const noexcept {
         this->__check();
         if (_Start < 0 || _End < 0 || _Start > _End) {
             std::stringstream _sstream;
@@ -91,14 +91,14 @@ public:
         return _slice;
     }
 
-    inline slice<_Item_t> ___slice(const int_xt &_Start) const noexcept
+    inline slice<_Item_t> ___slice(const int_julet &_Start) const noexcept
     { return this->___slice(_Start, this->len()); }
 
     inline slice<_Item_t> ___slice(void) const noexcept
     { return this->___slice(0, this->len()); }
 
     inline constexpr
-    int_xt len(void) const noexcept
+    int_julet len(void) const noexcept
     { return this->_size; }
 
     inline bool empty(void) const noexcept
@@ -107,7 +107,7 @@ public:
     void __push(const _Item_t &_Item) noexcept {
         _Item_t *_new = new(std::nothrow) _Item_t[this->_size+1];
         if (!_new) { XID(panic)("memory allocation failed"); }
-        for (int_xt _index{0}; _index < this->_size; ++_index)
+        for (int_julet _index{0}; _index < this->_size; ++_index)
         { _new[_index] = this->_buffer[_index]; }
         _new[this->_size] = _Item;
         delete[] this->_buffer;
@@ -118,7 +118,7 @@ public:
 
     bool operator==(const slice<_Item_t> &_Src) const noexcept {
         if (this->_size != _Src._size) { return false; }
-        for (int_xt _index{0}; _index < this->_size; ++_index)
+        for (int_julet _index{0}; _index < this->_size; ++_index)
         { if (this->_buffer[_index] != _Src._buffer[_index]) { return false; } }
         return true;
     }
@@ -135,7 +135,7 @@ public:
     bool operator!=(const std::nullptr_t) const noexcept
     { return !this->operator==(nil); }
 
-    _Item_t &operator[](const int_xt &_Index) {
+    _Item_t &operator[](const int_julet &_Index) {
         this->__check();
         if (this->empty() || _Index < 0 || this->len() <= _Index) {
             std::stringstream _sstream;
@@ -164,7 +164,7 @@ public:
     friend std::ostream &operator<<(std::ostream &_Stream,
                                     const slice<_Item_t> &_Src) noexcept {
         _Stream << '[';
-        for (int_xt _index{0}; _index < _Src._size;) {
+        for (int_julet _index{0}; _index < _Src._size;) {
             _Stream << _Src._buffer[_index++];
             if (_index < _Src._size) { _Stream << ", "; }
         }
@@ -173,4 +173,4 @@ public:
     }
 };
 
-#endif // #ifndef __XXC_SLICE_HPP
+#endif // #ifndef __JULEC_SLICE_HPP

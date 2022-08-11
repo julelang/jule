@@ -1,24 +1,24 @@
-// Copyright 2022 The X Programming Language.
+// Copyright 2022 The Jule Programming Language.
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-#ifndef __XXC_ANY_HPP
-#define __XXC_ANY_HPP
+#ifndef __JULEC_ANY_HPP
+#define __JULEC_ANY_HPP
 
 // Built-in any type.
-struct any_xt;
+struct any_julet;
 
-struct any_xt {
+struct any_julet {
 public:
     std::any _expr;
 
-    any_xt(void) noexcept {}
+    any_julet(void) noexcept {}
 
     template<typename T>
-    any_xt(const T &_Expr) noexcept
+    any_julet(const T &_Expr) noexcept
     { this->operator=(_Expr); }
 
-    ~any_xt(void) noexcept
+    ~any_julet(void) noexcept
     { this->_delete(); }
 
     inline void _delete(void) noexcept
@@ -59,19 +59,20 @@ public:
     bool operator!=(const T &_Expr) const noexcept
     { return !this->operator==(_Expr); }
 
-    inline bool operator==(const any_xt &_Any) const noexcept {
+    inline bool operator==(const any_julet &_Any) const noexcept {
         if (this->_isnil() && _Any._isnil()) { return true; }
         return std::strcmp(this->_expr.type().name(), _Any._expr.type().name()) == 0;
     }
 
-    inline bool operator!=(const any_xt &_Any) const noexcept
+    inline bool operator!=(const any_julet &_Any) const noexcept
     { return !this->operator==(_Any); }
 
-    friend std::ostream &operator<<(std::ostream &_Stream, const any_xt &_Src) noexcept {
+    friend std::ostream &operator<<(std::ostream &_Stream,
+                                    const any_julet &_Src) noexcept {
         if (_Src._expr.has_value()) { _Stream << "<any>"; }
         else { _Stream << 0; }
         return _Stream;
     }
 };
 
-#endif // #ifndef __XXC_ANY_HPP
+#endif // #ifndef __JULEC_ANY_HPP

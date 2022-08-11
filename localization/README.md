@@ -1,6 +1,6 @@
 # Language Packs
 
-Language packs are for the messages and logs of the XXC compiler. <br>
+Language packs are for the messages and logs of the JuleC compiler. <br>
 They are functional in many ways, such as easily preparing translations for languages and creating alternative language packs.
 
 Language packs are available in directories. <br>
@@ -8,10 +8,10 @@ The names of the directories are also the names of the language packs.
 
 The directories contain the content of languages in JSON format. <br>
 For the display of the contents, the language elements addressed by the relevant fields must be in the JSON file with a specific name. <br>
-XXC only tries to make sense of JSON files with those names. <br>
+JuleC only tries to make sense of JSON files with those names. <br>
 It's okay if language packs contain directories or different files.
 
-Language packs do not affect all XXC's messages. <br>
+Language packs do not affect all JuleC's messages. <br>
 Some messages or parts are rendered in English until the language settings are valid. <br>
 However, there are content that the language settings do not affect at all.
 

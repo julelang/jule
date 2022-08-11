@@ -3,8 +3,8 @@ package parser
 import (
 	"strings"
 
-	"github.com/the-xlang/xxc/ast/models"
-	"github.com/the-xlang/xxc/pkg/xapi"
+	"github.com/jule-lang/jule/ast/models"
+	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
 type trait struct {
@@ -25,9 +25,9 @@ func (t *trait) FindFunc(id string) *function {
 	return nil
 }
 
-// OutId returns xapi.OutId result of trait.
+// OutId returns juleapi.OutId result of trait.
 func (t *trait) OutId() string {
-	return xapi.OutId(t.Ast.Id, t.Ast.Tok.File)
+	return juleapi.OutId(t.Ast.Id, t.Ast.Tok.File)
 }
 
 func (t *trait) String() string {

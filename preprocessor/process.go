@@ -1,6 +1,6 @@
 package preprocessor
 
-import "github.com/the-xlang/xxc/ast/models"
+import "github.com/jule-lang/jule/ast/models"
 
 // Tree is the AST tree.
 type Tree = []models.Object

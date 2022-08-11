@@ -3,7 +3,7 @@ package models
 import (
 	"strings"
 
-	"github.com/the-xlang/xxc/pkg/xapi"
+	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
 // AssignLeft is selector for assignment operation.
@@ -18,7 +18,7 @@ func (as AssignLeft) String() string {
 	case as.Var.New:
 		return as.Var.OutId()
 	case as.Ignore:
-		return xapi.CppIgnore
+		return juleapi.CppIgnore
 	}
 	return as.Expr.String()
 }
@@ -41,7 +41,7 @@ func (a *Assign) cppSingleAssign() string {
 	}
 	var cpp strings.Builder
 	if len(expr.Expr.Toks) != 1 ||
-		!xapi.IsIgnoreId(expr.Expr.Toks[0].Kind) {
+		!juleapi.IsIgnoreId(expr.Expr.Toks[0].Kind) {
 		cpp.WriteString(expr.String())
 		cpp.WriteString(a.Setter.Kind)
 	}
@@ -91,7 +91,7 @@ func (a *Assign) cppMultiRet() string {
 	cpp.WriteString("std::tie(")
 	for _, left := range a.Left {
 		if left.Ignore {
-			cpp.WriteString(xapi.CppIgnore)
+			cpp.WriteString(juleapi.CppIgnore)
 			cpp.WriteByte(',')
 			continue
 		}

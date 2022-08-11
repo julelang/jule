@@ -3,11 +3,11 @@ package parser
 import (
 	"strconv"
 
-	"github.com/the-xlang/xxc/ast"
-	"github.com/the-xlang/xxc/ast/models"
-	"github.com/the-xlang/xxc/lex/tokens"
-	"github.com/the-xlang/xxc/pkg/x"
-	"github.com/the-xlang/xxc/pkg/xtype"
+	"github.com/jule-lang/jule/ast"
+	"github.com/jule-lang/jule/ast/models"
+	"github.com/jule-lang/jule/lex/tokens"
+	"github.com/jule-lang/jule/pkg/jule"
+	"github.com/jule-lang/jule/pkg/juletype"
 )
 
 type value struct {
@@ -52,8 +52,8 @@ func (e *eval) expr(expr Expr) (value, iExpr) {
 func (e *eval) processes(processes []Toks) (v value, model iExpr) {
 	defer func() {
 		if typeIsVoid(v.data.Type) {
-			v.data.Type.Id = xtype.Void
-			v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+			v.data.Type.Id = juletype.Void
+			v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		}
 	}()
 	if processes == nil || e.hasError {
@@ -89,8 +89,8 @@ func (e *eval) processes(processes []Toks) (v value, model iExpr) {
 func (e *eval) valProcesses(exprs []any, processes []Toks) (v value, model iExpr) {
 	switch len(exprs) {
 	case 0:
-		v.data.Type.Id = xtype.Void
-		v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+		v.data.Type.Id = juletype.Void
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		return
 	case 1:
 		expr := exprs[0].([]any)
@@ -167,8 +167,8 @@ func (e *eval) nextOperator(processes []Toks) int {
 
 func (e *eval) single(tok Tok, m *exprModel) (v value, ok bool) {
 	eval := valueEvaluator{tok, m, e.p}
-	v.data.Type.Id = xtype.Void
-	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+	v.data.Type.Id = juletype.Void
+	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	v.data.Tok = tok
 	switch tok.Id {
 	case tokens.Value:
@@ -252,12 +252,12 @@ func (e *eval) dataTypeFunc(expr Tok, callRange Toks, m *exprModel) (v value, is
 		case tokens.STR:
 			m.appendSubNode(exprNode{"tostr"})
 			// Val: "()" for accept DataType as function.
-			v.data.Type = DataType{Id: xtype.Func, Kind: "()", Tag: strDefaultFunc}
+			v.data.Type = DataType{Id: juletype.Func, Kind: "()", Tag: strDefaultFunc}
 			isret = true
 		default:
 			dt := DataType{
 				Tok:  expr,
-				Id:   xtype.TypeFromId(expr.Kind),
+				Id:   juletype.TypeFromId(expr.Kind),
 				Kind: expr.Kind,
 			}
 			isret = true
@@ -300,8 +300,8 @@ func getCallData(toks Toks, m *exprModel) (data callData) {
 }
 
 func (e *eval) callCppLink(data callData, m *exprModel) (v value) {
-	v.data.Type.Id = xtype.Void
-	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+	v.data.Type.Id = juletype.Void
+	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	tok := data.expr[0]
 	data.expr = data.expr[1:] // Remove cpp keyword
 	if len(data.expr) == 0 {
@@ -375,7 +375,7 @@ func (e *eval) parenthesesRange(toks Toks, m *exprModel) (v value) {
 func (e *eval) process(toks Toks, m *exprModel) (v value) {
 	defer func() {
 		if typeIsVoid(v.data.Type) {
-			v.data.Type.Kind = xtype.TypeMap[xtype.Void]
+			v.data.Type.Kind = juletype.TypeMap[juletype.Void]
 			v.constExpr = false
 		}
 	}()
@@ -440,7 +440,7 @@ func (e *eval) subId(toks Toks, m *exprModel) (v value) {
 	switch {
 	case typeIsPure(checkType):
 		switch {
-		case checkType.Id == xtype.Str:
+		case checkType.Id == juletype.Str:
 			return e.strObjSubId(val, idTok, m)
 		case valIsEnumType(val):
 			return e.enumSubId(val, idTok, m)
@@ -541,19 +541,19 @@ func (e *eval) cast(v value, t DataType, errtok Tok) value {
 
 func (e *eval) castPure(t DataType, v *value, errtok Tok) {
 	switch t.Id {
-	case xtype.Any:
+	case juletype.Any:
 		return
-	case xtype.Str:
+	case juletype.Str:
 		e.castStr(v.data.Type, errtok)
 		return
-	case xtype.Enum:
+	case juletype.Enum:
 		e.castEnum(t, v, errtok)
 		return
 	}
 	switch {
-	case xtype.IsInteger(t.Id):
+	case juletype.IsInteger(t.Id):
 		e.castInteger(t, v, errtok)
-	case xtype.IsNumeric(t.Id):
+	case juletype.IsNumeric(t.Id):
 		e.castNumeric(t, v, errtok)
 	default:
 		e.pusherrtok(errtok, "type_notsupports_casting", t.Kind)
@@ -562,12 +562,12 @@ func (e *eval) castPure(t DataType, v *value, errtok Tok) {
 
 func (e *eval) castStr(t DataType, errtok Tok) {
 	if !typeIsSlice(t) {
-		e.pusherrtok(errtok, "type_notsupports_casting_to", xtype.TypeMap[xtype.Str], t.Kind)
+		e.pusherrtok(errtok, "type_notsupports_casting_to", juletype.TypeMap[juletype.Str], t.Kind)
 		return
 	}
 	t = *t.ComponentType
-	if !typeIsPure(t) || (t.Id != xtype.U8 && t.Id != xtype.I32) {
-		e.pusherrtok(errtok, "type_notsupports_casting_to", xtype.TypeMap[xtype.Str], t.Kind)
+	if !typeIsPure(t) || (t.Id != juletype.U8 && t.Id != juletype.I32) {
+		e.pusherrtok(errtok, "type_notsupports_casting_to", juletype.TypeMap[juletype.Str], t.Kind)
 	}
 }
 
@@ -581,16 +581,16 @@ func (e *eval) castEnum(t DataType, v *value, errtok Tok) {
 func (e *eval) castInteger(t DataType, v *value, errtok Tok) {
 	if v.constExpr {
 		switch {
-		case xtype.IsSignedInteger(t.Id):
+		case juletype.IsSignedInteger(t.Id):
 			v.expr = tonums(v)
 		default:
 			v.expr = tonumu(v)
 		}
 	}
-	if typeIsPtr(v.data.Type) && t.Id == xtype.UIntptr {
+	if typeIsPtr(v.data.Type) && t.Id == juletype.UIntptr {
 		return
 	}
-	if typeIsPure(v.data.Type) && xtype.IsNumeric(v.data.Type.Id) {
+	if typeIsPure(v.data.Type) && juletype.IsNumeric(v.data.Type.Id) {
 		return
 	}
 	e.pusherrtok(errtok, "type_notsupports_casting_to", v.data.Type.Kind, t.Kind)
@@ -599,32 +599,32 @@ func (e *eval) castInteger(t DataType, v *value, errtok Tok) {
 func (e *eval) castNumeric(t DataType, v *value, errtok Tok) {
 	if v.constExpr {
 		switch {
-		case xtype.IsFloat(t.Id):
+		case juletype.IsFloat(t.Id):
 			v.expr = tonumf(v)
-		case xtype.IsSignedInteger(t.Id):
+		case juletype.IsSignedInteger(t.Id):
 			v.expr = tonums(v)
 		default:
 			v.expr = tonumu(v)
 		}
 	}
-	if typeIsPure(v.data.Type) && xtype.IsNumeric(v.data.Type.Id) {
+	if typeIsPure(v.data.Type) && juletype.IsNumeric(v.data.Type.Id) {
 		return
 	}
 	e.pusherrtok(errtok, "type_notsupports_casting_to", v.data.Type.Kind, t.Kind)
 }
 
 func (e *eval) castSlice(t, vt DataType, errtok Tok) {
-	if !typeIsPure(vt) || vt.Id != xtype.Str {
+	if !typeIsPure(vt) || vt.Id != juletype.Str {
 		e.pusherrtok(errtok, "type_notsupports_casting_to", vt.Kind, t.Kind)
 		return
 	}
 	t = *t.ComponentType
-	if !typeIsPure(t) || (t.Id != xtype.U8 && t.Id != xtype.I32) {
+	if !typeIsPure(t) || (t.Id != juletype.U8 && t.Id != juletype.I32) {
 		e.pusherrtok(errtok, "type_notsupports_casting_to", vt.Kind, t.Kind)
 	}
 }
 
-func (e *eval) xTypeSubId(dm *Defmap, idTok Tok, m *exprModel) (v value) {
+func (e *eval) juletypeSubId(dm *Defmap, idTok Tok, m *exprModel) (v value) {
 	i, dm, t := dm.findById(idTok.Kind, nil)
 	if i == -1 {
 		e.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
@@ -649,51 +649,51 @@ func (e *eval) xTypeSubId(dm *Defmap, idTok Tok, m *exprModel) (v value) {
 }
 
 func (e *eval) i8SubId(idTok Tok, m *exprModel) value {
-	return e.xTypeSubId(i8statics, idTok, m)
+	return e.juletypeSubId(i8statics, idTok, m)
 }
 
 func (e *eval) i16SubId(idTok Tok, m *exprModel) value {
-	return e.xTypeSubId(i16statics, idTok, m)
+	return e.juletypeSubId(i16statics, idTok, m)
 }
 
 func (e *eval) i32SubId(idTok Tok, m *exprModel) value {
-	return e.xTypeSubId(i32statics, idTok, m)
+	return e.juletypeSubId(i32statics, idTok, m)
 }
 
 func (e *eval) i64SubId(idTok Tok, m *exprModel) value {
-	return e.xTypeSubId(i64statics, idTok, m)
+	return e.juletypeSubId(i64statics, idTok, m)
 }
 
 func (e *eval) u8SubId(idTok Tok, m *exprModel) value {
-	return e.xTypeSubId(u8statics, idTok, m)
+	return e.juletypeSubId(u8statics, idTok, m)
 }
 
 func (e *eval) u16SubId(idTok Tok, m *exprModel) value {
-	return e.xTypeSubId(u16statics, idTok, m)
+	return e.juletypeSubId(u16statics, idTok, m)
 }
 
 func (e *eval) u32SubId(idTok Tok, m *exprModel) value {
-	return e.xTypeSubId(u32statics, idTok, m)
+	return e.juletypeSubId(u32statics, idTok, m)
 }
 
 func (e *eval) u64SubId(idTok Tok, m *exprModel) value {
-	return e.xTypeSubId(u64statics, idTok, m)
+	return e.juletypeSubId(u64statics, idTok, m)
 }
 
 func (e *eval) uintSubId(idTok Tok, m *exprModel) value {
-	return e.xTypeSubId(uintStatics, idTok, m)
+	return e.juletypeSubId(uintStatics, idTok, m)
 }
 
 func (e *eval) intSubId(idTok Tok, m *exprModel) value {
-	return e.xTypeSubId(intStatics, idTok, m)
+	return e.juletypeSubId(intStatics, idTok, m)
 }
 
 func (e *eval) f32SubId(idTok Tok, m *exprModel) value {
-	return e.xTypeSubId(f32statics, idTok, m)
+	return e.juletypeSubId(f32statics, idTok, m)
 }
 
 func (e *eval) f64SubId(idTok Tok, m *exprModel) value {
-	return e.xTypeSubId(f64statics, idTok, m)
+	return e.juletypeSubId(f64statics, idTok, m)
 }
 
 func (e *eval) typeSubId(typeTok, idTok Tok, m *exprModel) (v value) {
@@ -728,8 +728,8 @@ func (e *eval) typeSubId(typeTok, idTok Tok, m *exprModel) (v value) {
 }
 
 func (e *eval) typeId(toks Toks, m *exprModel) (v value) {
-	v.data.Type.Id = xtype.Void
-	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+	v.data.Type.Id = juletype.Void
+	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	b := ast.NewBuilder(nil)
 	i := 0
 	t, ok := b.DataType(toks, &i, true, true)
@@ -785,7 +785,7 @@ func (e *eval) xObjSubId(dm *Defmap, val value, idTok Tok, m *exprModel) (v valu
 	case 'f':
 		f := dm.Funcs[i]
 		f.used = true
-		v.data.Type.Id = xtype.Func
+		v.data.Type.Id = juletype.Func
 		v.data.Type.Tag = f.Ast
 		v.data.Type.Kind = f.Ast.DataTypeString()
 		v.data.Tok = f.Ast.Tok
@@ -1024,7 +1024,7 @@ func (e *eval) checkIntegerIndexing(v value, errtok Tok) {
 	switch {
 	case !typeIsPure(v.data.Type):
 		e.pusherrtok(errtok, "invalid_expr")
-	case !xtype.IsInteger(v.data.Type.Id):
+	case !juletype.IsInteger(v.data.Type.Id):
 		e.pusherrtok(errtok, "invalid_expr")
 	}
 }
@@ -1072,8 +1072,8 @@ func (e *eval) indexingMap(mapv, leftv value, errtok Tok) value {
 }
 
 func (e *eval) indexingStr(strv, index value, errtok Tok) value {
-	strv.data.Type.Id = xtype.U8
-	strv.data.Type.Kind = xtype.TypeMap[strv.data.Type.Id]
+	strv.data.Type.Id = juletype.U8
+	strv.data.Type.Kind = juletype.TypeMap[strv.data.Type.Id]
 	e.checkIntegerIndexing(index, errtok)
 	if !index.constExpr {
 		return strv
@@ -1125,14 +1125,14 @@ func (e *eval) slicingSlice(v value, errtok Tok) value {
 func (e *eval) slicingArray(v value, errtok Tok) value {
 	v.lvalue = false
 	v.data.Type = *v.data.Type.ComponentType
-	v.data.Type.Kind = x.Prefix_Slice + xtype.TypeMap[v.data.Type.Id]
+	v.data.Type.Kind = jule.Prefix_Slice + juletype.TypeMap[v.data.Type.Id]
 	return v
 }
 
 func (e *eval) slicingStr(v, leftv, rightv value, errtok Tok) value {
 	v.lvalue = false
-	v.data.Type.Id = xtype.Str
-	v.data.Type.Kind = xtype.TypeMap[v.data.Type.Id]
+	v.data.Type.Id = juletype.Str
+	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	if !v.constExpr {
 		return v
 	}
@@ -1183,7 +1183,7 @@ func (e *eval) buildArray(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
 		t.Size.N = models.Size(len(parts))
 		t.Size.Expr = models.Expr{
 			Model: exprNode{
-				value: xtype.TypeMap[xtype.UInt] + "{" + strconv.FormatUint(uint64(t.Size.N), 10) + "}",
+				value: juletype.TypeMap[juletype.UInt] + "{" + strconv.FormatUint(uint64(t.Size.N), 10) + "}",
 			},
 		}
 	}
@@ -1353,7 +1353,7 @@ func (e *eval) braceRange(toks Toks, m *exprModel) (v value) {
 			f.Owner = e.p
 			v.data.Value = f.Id
 			v.data.Type.Tag = &f
-			v.data.Type.Id = xtype.Func
+			v.data.Type.Id = juletype.Func
 			v.data.Type.Kind = f.DataTypeString()
 			m.appendSubNode(anonFuncExpr{&f, e.p.blockVars})
 			return

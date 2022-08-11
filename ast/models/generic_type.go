@@ -3,7 +3,7 @@ package models
 import (
 	"strings"
 
-	"github.com/the-xlang/xxc/pkg/xapi"
+	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
 // GenericType is the AST model of generic data-type.
@@ -15,6 +15,6 @@ type GenericType struct {
 func (gt GenericType) String() string {
 	var cpp strings.Builder
 	cpp.WriteString("typename ")
-	cpp.WriteString(xapi.AsId(gt.Id))
+	cpp.WriteString(juleapi.AsId(gt.Id))
 	return cpp.String()
 }

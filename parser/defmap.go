@@ -1,8 +1,8 @@
 package parser
 
 import (
-	"github.com/the-xlang/xxc/pkg/xio"
-	"github.com/the-xlang/xxc/pkg/xtype"
+	"github.com/jule-lang/jule/pkg/juleio"
+	"github.com/jule-lang/jule/pkg/juletype"
 )
 
 func isAccessable(finder, target *File, defIsPub bool) bool {
@@ -159,7 +159,7 @@ func (dm *Defmap) funcById(id string, f *File) (*function, *Defmap, bool) {
 
 func (dm *Defmap) findGlobalById(id string, f *File) (int, *Defmap, bool) {
 	for i, g := range dm.Globals {
-		if g != nil && g.Type.Id != xtype.Void && g.Id == id {
+		if g != nil && g.Type.Id != juletype.Void && g.Id == id {
 			if isAccessable(f, g.Token.File, g.Pub) {
 				return i, dm, false
 			}
@@ -193,7 +193,7 @@ func (dm *Defmap) globalById(id string, f *File) (*Var, *Defmap, bool) {
 // 't' -> type alias
 // 'i' -> trait
 func (dm *Defmap) findById(id string, f *File) (int, *Defmap, byte) {
-	var finders = map[byte]func(string, *xio.File) (int, *Defmap, bool){
+	var finders = map[byte]func(string, *juleio.File) (int, *Defmap, bool){
 		'g': dm.findGlobalById,
 		'f': dm.findFuncById,
 		'e': dm.findEnumById,

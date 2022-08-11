@@ -1,0 +1,49 @@
+// Copyright 2022 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+//doc:
+// Returns the binary exponent of x.
+//
+// Special cases are:
+//  logb(±inf) = inf
+//  logb(0) = -inf
+//  logb(nan) = nan
+pub logb(x f64) f64 {
+	// special cases
+	match {
+	case x == 0:
+		ret inf(-1)
+	case isinf(x, 0):
+		ret inf(1)
+	case isnan(x):
+		ret x
+	}
+	ret f64(_ilogb(x))
+}
+
+//doc:
+// Returns the binary exponent of x as an integer.
+//
+// Special cases are:
+//  ilogb(±inf) = i32.max
+//  ilogb(0) = i32.min
+//  ilogb(nan) = i32.max
+pub ilogb(x f64) int {
+	// special cases
+	match {
+	case x == 0:
+		ret i32.min
+	case isnan(x):
+		ret i32.max
+	case isinf(x, 0):
+		ret i32.max
+	}
+	ret _ilogb(x)
+}
+
+//doc: Returns the binary exponent of x. It assumes x is finite and non-zero.
+_ilogb(x f64) int {
+	x, exp: = normalize(x)
+	ret int((f64_bits(x)>>SHIFT)&MASK) - BIAS + exp
+}

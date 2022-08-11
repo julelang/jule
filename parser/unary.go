@@ -1,8 +1,8 @@
 package parser
 
 import (
-	"github.com/the-xlang/xxc/lex/tokens"
-	"github.com/the-xlang/xxc/pkg/xtype"
+	"github.com/jule-lang/jule/lex/tokens"
+	"github.com/jule-lang/jule/pkg/juletype"
 )
 
 type unary struct {
@@ -14,7 +14,7 @@ type unary struct {
 
 func (u *unary) minus() value {
 	v := u.p.eval.process(u.toks, u.model)
-	if !typeIsPure(v.data.Type) || !xtype.IsNumeric(v.data.Type.Id) {
+	if !typeIsPure(v.data.Type) || !juletype.IsNumeric(v.data.Type.Id) {
 		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.MINUS)
 	}
 	if v.constExpr {
@@ -34,7 +34,7 @@ func (u *unary) minus() value {
 
 func (u *unary) plus() value {
 	v := u.p.eval.process(u.toks, u.model)
-	if !typeIsPure(v.data.Type) || !xtype.IsNumeric(v.data.Type.Id) {
+	if !typeIsPure(v.data.Type) || !juletype.IsNumeric(v.data.Type.Id) {
 		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.PLUS)
 	}
 	if v.constExpr {
@@ -53,7 +53,7 @@ func (u *unary) plus() value {
 
 func (u *unary) caret() value {
 	v := u.p.eval.process(u.toks, u.model)
-	if !typeIsPure(v.data.Type) || !xtype.IsInteger(v.data.Type.Id) {
+	if !typeIsPure(v.data.Type) || !juletype.IsInteger(v.data.Type.Id) {
 		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.CARET)
 	}
 	if v.constExpr {
@@ -76,7 +76,7 @@ func (u *unary) logicalNot() value {
 		v.expr = !v.expr.(bool)
 		v.model = boolModel(v)
 	}
-	v.data.Type.Id = xtype.Bool
+	v.data.Type.Id = juletype.Bool
 	v.data.Type.Kind = tokens.BOOL
 	return v
 }
@@ -104,9 +104,9 @@ func (u *unary) amper() value {
 	nodes := &u.model.nodes[u.model.index].nodes
 	var func_call string
 	if v.heapMust {
-		func_call = "__xxc_ptr_of"
+		func_call = "__julec_ptr_of"
 	} else {
-		func_call = "__xxc_not_heap_ptr_of"
+		func_call = "__julec_not_heap_ptr_of"
 	}
 	expr := []iExpr{
 		exprNode{func_call},

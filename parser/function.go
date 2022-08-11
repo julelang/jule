@@ -3,9 +3,9 @@ package parser
 import (
 	"strings"
 
-	"github.com/the-xlang/xxc/ast/models"
-	"github.com/the-xlang/xxc/pkg/x"
-	"github.com/the-xlang/xxc/pkg/xapi"
+	"github.com/jule-lang/jule/ast/models"
+	"github.com/jule-lang/jule/pkg/jule"
+	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
 type function struct {
@@ -18,7 +18,7 @@ type function struct {
 
 func (f *function) outId() string {
 	if f.isEntryPoint {
-		return xapi.OutId(f.Ast.Id, nil)
+		return juleapi.OutId(f.Ast.Id, nil)
 	}
 	return f.Ast.OutId()
 }
@@ -93,7 +93,7 @@ func (f *function) PrototypeParams() string {
 }
 
 func isOutableAttribute(kind string) bool {
-	return kind == x.Attribute_Inline
+	return kind == jule.Attribute_Inline
 }
 
 func attributesToString(attributes []models.Attribute) string {

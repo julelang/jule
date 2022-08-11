@@ -4,10 +4,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/the-xlang/xxc/ast/models"
-	"github.com/the-xlang/xxc/lex/tokens"
-	"github.com/the-xlang/xxc/pkg/xapi"
-	"github.com/the-xlang/xxc/pkg/xtype"
+	"github.com/jule-lang/jule/ast/models"
+	"github.com/jule-lang/jule/lex/tokens"
+	"github.com/jule-lang/jule/pkg/juleapi"
+	"github.com/jule-lang/jule/pkg/juletype"
 )
 
 type xstruct struct {
@@ -49,12 +49,12 @@ func (s *xstruct) cppGenerics() (def string, serie string) {
 	return cppDef.String(), serie
 }
 
-// OutId returns xapi.OutId of struct.
+// OutId returns juleapi.OutId of struct.
 //
 // This function is should be have this function
 // for CompiledStruct interface of ast package.
 func (s *xstruct) OutId() string {
-	return xapi.OutId(s.Ast.Id, s.Ast.Tok.File)
+	return juleapi.OutId(s.Ast.Id, s.Ast.Tok.File)
 }
 
 func (s *xstruct) operators() string {
@@ -257,12 +257,12 @@ func (s *xstruct) selfVar(receiver DataType) *Var {
 	v := new(models.Var)
 	v.Token = s.Ast.Tok
 	v.Type = receiver
-	v.Type.Id = xtype.Struct
+	v.Type.Id = juletype.Struct
 	v.Id = tokens.SELF
 	if typeIsPtr(receiver) {
-		v.Expr.Model = exprNode{xapi.CppSelf}
+		v.Expr.Model = exprNode{juleapi.CppSelf}
 	} else {
-		v.Expr.Model = exprNode{tokens.STAR + xapi.CppSelf}
+		v.Expr.Model = exprNode{tokens.STAR + juleapi.CppSelf}
 	}
 	return v
 }

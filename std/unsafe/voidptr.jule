@@ -1,0 +1,51 @@
+// Copyright 2022 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use cpp "unsafe.hpp"
+
+type[T]
+cpp __julec_uintptr_cast_to_raw(addr uintptr) *T
+
+//doc: Wrapper structure for voidptr.
+pub struct Voidptr {
+	ptr: uintptr
+}
+
+impl Voidptr {
+	//doc: Returns casted raw pointer of given type.
+	@typearg
+	type[T]
+	pub &cast() *T {
+		ret cpp.__julec_uintptr_cast_to_raw[T](.ptr)
+	}
+
+	// doc: Returns unsafe pointer of given type.
+	@inline @typearg
+	type[T]
+	pub &to_ptr() Ptr[T] {
+		ret ptr_from[T](.ptr)
+	}
+}
+
+impl Pointer for Voidptr {
+	@inline
+	&addr() uintptr {
+		ret .ptr
+	}
+}
+
+//doc: Returns unsafe voidptr for given raw pointer.
+@inline
+type[T]
+pub voidptr_of(ptr *T) Voidptr {
+	ret voidptr_from(uintptr(ptr))
+}
+
+//doc: Returns unsafe voidptr from given address.
+@inline
+pub voidptr_from(addr uintptr) Voidptr {
+	ret Voidptr{
+		ptr: addr
+	}
+}

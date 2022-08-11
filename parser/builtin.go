@@ -4,10 +4,10 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/the-xlang/xxc/ast/models"
-	"github.com/the-xlang/xxc/lex/tokens"
-	"github.com/the-xlang/xxc/pkg/x"
-	"github.com/the-xlang/xxc/pkg/xtype"
+	"github.com/jule-lang/jule/ast/models"
+	"github.com/jule-lang/jule/lex/tokens"
+	"github.com/jule-lang/jule/pkg/jule"
+	"github.com/jule-lang/jule/pkg/juletype"
 )
 
 var i8statics = &Defmap{
@@ -16,20 +16,20 @@ var i8statics = &Defmap{
 			Pub:     true,
 			Const:   true,
 			Id:      "max",
-			Type:    DataType{Id: xtype.I8, Kind: tokens.I8},
+			Type:    DataType{Id: juletype.I8, Kind: tokens.I8},
 			ExprTag: int64(math.MaxInt8),
 			Expr: models.Expr{
-				Model: exprNode{xtype.CppId(xtype.I8) + "{" + strconv.FormatInt(math.MaxInt8, 10) + "}"},
+				Model: exprNode{juletype.CppId(juletype.I8) + "{" + strconv.FormatInt(math.MaxInt8, 10) + "}"},
 			},
 		},
 		{
 			Pub:     true,
 			Const:   true,
 			Id:      "min",
-			Type:    DataType{Id: xtype.I8, Kind: tokens.I8},
+			Type:    DataType{Id: juletype.I8, Kind: tokens.I8},
 			ExprTag: int64(math.MinInt8),
 			Expr: models.Expr{
-				Model: exprNode{xtype.CppId(xtype.I8) + "{" + strconv.FormatInt(math.MinInt8, 10) + "}"},
+				Model: exprNode{juletype.CppId(juletype.I8) + "{" + strconv.FormatInt(math.MinInt8, 10) + "}"},
 			},
 		},
 	},
@@ -41,20 +41,20 @@ var i16statics = &Defmap{
 			Pub:     true,
 			Const:   true,
 			Id:      "max",
-			Type:    DataType{Id: xtype.I16, Kind: tokens.I16},
+			Type:    DataType{Id: juletype.I16, Kind: tokens.I16},
 			ExprTag: int64(math.MaxInt16),
 			Expr: models.Expr{
-				Model: exprNode{xtype.CppId(xtype.I16) + "{" + strconv.FormatInt(math.MaxInt16, 10) + "}"},
+				Model: exprNode{juletype.CppId(juletype.I16) + "{" + strconv.FormatInt(math.MaxInt16, 10) + "}"},
 			},
 		},
 		{
 			Pub:     true,
 			Const:   true,
 			Id:      "min",
-			Type:    DataType{Id: xtype.I16, Kind: tokens.I16},
+			Type:    DataType{Id: juletype.I16, Kind: tokens.I16},
 			ExprTag: int64(math.MinInt16),
 			Expr: models.Expr{
-				Model: exprNode{xtype.CppId(xtype.I16) + "{" + strconv.FormatInt(math.MinInt16, 10) + "}"},
+				Model: exprNode{juletype.CppId(juletype.I16) + "{" + strconv.FormatInt(math.MinInt16, 10) + "}"},
 			},
 		},
 	},
@@ -66,20 +66,20 @@ var i32statics = &Defmap{
 			Pub:     true,
 			Const:   true,
 			Id:      "max",
-			Type:    DataType{Id: xtype.I32, Kind: tokens.I32},
+			Type:    DataType{Id: juletype.I32, Kind: tokens.I32},
 			ExprTag: int64(math.MaxInt32),
 			Expr: models.Expr{
-				Model: exprNode{xtype.CppId(xtype.I32) + "{" + strconv.FormatInt(math.MaxInt32, 10) + "}"},
+				Model: exprNode{juletype.CppId(juletype.I32) + "{" + strconv.FormatInt(math.MaxInt32, 10) + "}"},
 			},
 		},
 		{
 			Pub:     true,
 			Const:   true,
 			Id:      "min",
-			Type:    DataType{Id: xtype.I32, Kind: tokens.I32},
+			Type:    DataType{Id: juletype.I32, Kind: tokens.I32},
 			ExprTag: int64(math.MinInt32),
 			Expr: models.Expr{
-				Model: exprNode{xtype.CppId(xtype.I32) + "{" + strconv.FormatInt(math.MinInt32, 10) + "}"},
+				Model: exprNode{juletype.CppId(juletype.I32) + "{" + strconv.FormatInt(math.MinInt32, 10) + "}"},
 			},
 		},
 	},
@@ -91,20 +91,20 @@ var i64statics = &Defmap{
 			Pub:     true,
 			Const:   true,
 			Id:      "max",
-			Type:    DataType{Id: xtype.I64, Kind: tokens.I64},
+			Type:    DataType{Id: juletype.I64, Kind: tokens.I64},
 			ExprTag: int64(math.MaxInt64),
 			Expr: models.Expr{
-				Model: exprNode{xtype.CppId(xtype.I64) + "{" + strconv.FormatInt(math.MaxInt64, 10) + "}"},
+				Model: exprNode{juletype.CppId(juletype.I64) + "{" + strconv.FormatInt(math.MaxInt64, 10) + "}"},
 			},
 		},
 		{
 			Pub:     true,
 			Const:   true,
 			Id:      "min",
-			Type:    DataType{Id: xtype.I64, Kind: tokens.I64},
+			Type:    DataType{Id: juletype.I64, Kind: tokens.I64},
 			ExprTag: int64(math.MinInt64),
 			Expr: models.Expr{
-				Model: exprNode{xtype.CppId(xtype.I64) + "{" + strconv.FormatInt(math.MinInt64, 10) + "}"},
+				Model: exprNode{juletype.CppId(juletype.I64) + "{" + strconv.FormatInt(math.MinInt64, 10) + "}"},
 			},
 		},
 	},
@@ -116,10 +116,10 @@ var u8statics = &Defmap{
 			Pub:     true,
 			Const:   true,
 			Id:      "max",
-			Type:    DataType{Id: xtype.U8, Kind: tokens.U8},
+			Type:    DataType{Id: juletype.U8, Kind: tokens.U8},
 			ExprTag: uint64(math.MaxUint8),
 			Expr: models.Expr{
-				Model: exprNode{xtype.CppId(xtype.U8) + "{" + strconv.FormatUint(math.MaxUint8, 10) + "}"},
+				Model: exprNode{juletype.CppId(juletype.U8) + "{" + strconv.FormatUint(math.MaxUint8, 10) + "}"},
 			},
 		},
 	},
@@ -131,10 +131,10 @@ var u16statics = &Defmap{
 			Pub:     true,
 			Const:   true,
 			Id:      "max",
-			Type:    DataType{Id: xtype.U16, Kind: tokens.U16},
+			Type:    DataType{Id: juletype.U16, Kind: tokens.U16},
 			ExprTag: uint64(math.MaxUint16),
 			Expr: models.Expr{
-				Model: exprNode{xtype.CppId(xtype.U16) + "{" + strconv.FormatUint(math.MaxUint16, 10) + "}"},
+				Model: exprNode{juletype.CppId(juletype.U16) + "{" + strconv.FormatUint(math.MaxUint16, 10) + "}"},
 			},
 		},
 	},
@@ -146,10 +146,10 @@ var u32statics = &Defmap{
 			Pub:     true,
 			Const:   true,
 			Id:      "max",
-			Type:    DataType{Id: xtype.U32, Kind: tokens.U32},
+			Type:    DataType{Id: juletype.U32, Kind: tokens.U32},
 			ExprTag: uint64(math.MaxUint32),
 			Expr: models.Expr{
-				Model: exprNode{xtype.CppId(xtype.U32) + "{" + strconv.FormatUint(math.MaxUint32, 10) + "}"},
+				Model: exprNode{juletype.CppId(juletype.U32) + "{" + strconv.FormatUint(math.MaxUint32, 10) + "}"},
 			},
 		},
 	},
@@ -161,10 +161,10 @@ var u64statics = &Defmap{
 			Pub:     true,
 			Const:   true,
 			Id:      "max",
-			Type:    DataType{Id: xtype.U64, Kind: tokens.U64},
+			Type:    DataType{Id: juletype.U64, Kind: tokens.U64},
 			ExprTag: uint64(math.MaxUint64),
 			Expr: models.Expr{
-				Model: exprNode{xtype.CppId(xtype.U64) + "{" + strconv.FormatUint(math.MaxUint64, 10) + "}"},
+				Model: exprNode{juletype.CppId(juletype.U64) + "{" + strconv.FormatUint(math.MaxUint64, 10) + "}"},
 			},
 		},
 	},
@@ -176,7 +176,7 @@ var uintStatics = &Defmap{
 			Pub:   true,
 			Const: true,
 			Id:    "max",
-			Type:  DataType{Id: xtype.UInt, Kind: tokens.UINT},
+			Type:  DataType{Id: juletype.UInt, Kind: tokens.UINT},
 		},
 	},
 }
@@ -186,19 +186,19 @@ var intStatics = &Defmap{
 		{
 			Const: true,
 			Id:    "max",
-			Type:  DataType{Id: xtype.Int, Kind: tokens.INT},
+			Type:  DataType{Id: juletype.Int, Kind: tokens.INT},
 		},
 		{
 			Const: true,
 			Id:    "min",
-			Type:  DataType{Id: xtype.Int, Kind: tokens.INT},
+			Type:  DataType{Id: juletype.Int, Kind: tokens.INT},
 		},
 	},
 }
 
 const f32min = float64(1.17549435082228750796873653722224568e-38)
 
-var f32min_model = exprNode{xtype.CppId(xtype.F32) + "{1.17549435082228750796873653722224568e-38F}"}
+var f32min_model = exprNode{juletype.CppId(juletype.F32) + "{1.17549435082228750796873653722224568e-38F}"}
 
 var f32statics = &Defmap{
 	Globals: []*Var{
@@ -206,7 +206,7 @@ var f32statics = &Defmap{
 			Pub:     true,
 			Const:   true,
 			Id:      "max",
-			Type:    DataType{Id: xtype.F32, Kind: tokens.F32},
+			Type:    DataType{Id: juletype.F32, Kind: tokens.F32},
 			ExprTag: float64(math.MaxFloat32),
 			Expr:    models.Expr{Model: exprNode{strconv.FormatFloat(math.MaxFloat32, 'e', -1, 32) + "F"}},
 		},
@@ -214,7 +214,7 @@ var f32statics = &Defmap{
 			Pub:     true,
 			Const:   true,
 			Id:      "min",
-			Type:    DataType{Id: xtype.F32, Kind: tokens.F32},
+			Type:    DataType{Id: juletype.F32, Kind: tokens.F32},
 			ExprTag: f32min,
 			Expr:    models.Expr{Model: f32min_model},
 		},
@@ -223,7 +223,7 @@ var f32statics = &Defmap{
 
 const f64min = float64(2.22507385850720138309023271733240406e-308)
 
-var f64min_model = exprNode{xtype.CppId(xtype.F64) + "{2.22507385850720138309023271733240406e-308}"}
+var f64min_model = exprNode{juletype.CppId(juletype.F64) + "{2.22507385850720138309023271733240406e-308}"}
 
 var f64statics = &Defmap{
 	Globals: []*Var{
@@ -231,7 +231,7 @@ var f64statics = &Defmap{
 			Pub:     true,
 			Const:   true,
 			Id:      "max",
-			Type:    DataType{Id: xtype.F64, Kind: tokens.F64},
+			Type:    DataType{Id: juletype.F64, Kind: tokens.F64},
 			ExprTag: float64(math.MaxFloat64),
 			Expr:    models.Expr{Model: exprNode{strconv.FormatFloat(math.MaxFloat64, 'e', -1, 64)}},
 		},
@@ -239,7 +239,7 @@ var f64statics = &Defmap{
 			Pub:     true,
 			Const:   true,
 			Id:      "min",
-			Type:    DataType{Id: xtype.F64, Kind: tokens.F64},
+			Type:    DataType{Id: juletype.F64, Kind: tokens.F64},
 			ExprTag: f64min,
 			Expr:    models.Expr{Model: f64min_model},
 		},
@@ -249,8 +249,8 @@ var f64statics = &Defmap{
 var strDefaultFunc = Func{
 	Pub:     true,
 	Id:      "str",
-	Params:  []Param{{Id: "obj", Type: DataType{Id: xtype.Any, Kind: tokens.ANY}}},
-	RetType: RetType{Type: DataType{Id: xtype.Str, Kind: tokens.STR}},
+	Params:  []Param{{Id: "obj", Type: DataType{Id: juletype.Any, Kind: tokens.ANY}}},
+	RetType: RetType{Type: DataType{Id: juletype.Str, Kind: tokens.STR}},
 }
 
 var errorTrait = &trait{
@@ -262,14 +262,14 @@ var errorTrait = &trait{
 			{Ast: &models.Func{
 				Pub:     true,
 				Id:      "error",
-				RetType: models.RetType{Type: DataType{Id: xtype.Str, Kind: tokens.STR}},
+				RetType: models.RetType{Type: DataType{Id: juletype.Str, Kind: tokens.STR}},
 			}},
 		},
 	},
 }
 
 var errorType = DataType{
-	Id:   xtype.Trait,
+	Id:   juletype.Trait,
 	Kind: errorTrait.Ast.Id,
 	Tag:  errorTrait,
 	Pure: true,
@@ -298,8 +298,8 @@ var errorHandlerFunc = &models.Func{
 	},
 	RetType: models.RetType{
 		Type: models.DataType{
-			Id:   xtype.Void,
-			Kind: xtype.TypeMap[xtype.Void],
+			Id:   juletype.Void,
+			Kind: juletype.TypeMap[juletype.Void],
 		},
 	},
 }
@@ -312,7 +312,7 @@ var recoverFunc = &function{
 			{
 				Id: "handler",
 				Type: models.DataType{
-					Id:   xtype.Func,
+					Id:   juletype.Func,
 					Kind: errorHandlerFunc.DataTypeString(),
 					Tag:  errorHandlerFunc,
 				},
@@ -330,12 +330,12 @@ var Builtin = &Defmap{
 		{
 			Pub:  true,
 			Id:   "byte",
-			Type: DataType{Id: xtype.U8, Kind: xtype.TypeMap[xtype.U8]},
+			Type: DataType{Id: juletype.U8, Kind: juletype.TypeMap[juletype.U8]},
 		},
 		{
 			Pub:  true,
 			Id:   "rune",
-			Type: DataType{Id: xtype.I32, Kind: xtype.TypeMap[xtype.I32]},
+			Type: DataType{Id: juletype.I32, Kind: juletype.TypeMap[juletype.I32]},
 		},
 	},
 	Funcs: []*function{
@@ -345,11 +345,11 @@ var Builtin = &Defmap{
 			Pub: true,
 			Id:  "out",
 			RetType: RetType{
-				Type: DataType{Id: xtype.Void, Kind: xtype.TypeMap[xtype.Void]},
+				Type: DataType{Id: juletype.Void, Kind: juletype.TypeMap[juletype.Void]},
 			},
 			Params: []Param{{
 				Id:   "expr",
-				Type: DataType{Id: xtype.Any, Kind: tokens.ANY},
+				Type: DataType{Id: juletype.Any, Kind: tokens.ANY},
 			}},
 		}},
 		{Ast: &Func{
@@ -358,9 +358,9 @@ var Builtin = &Defmap{
 			Owner:    genericFile,
 			Generics: []*GenericType{{Id: "T"}},
 			Attributes: []Attribute{
-				models.Attribute{Tag: x.Attribute_TypeArg},
+				models.Attribute{Tag: jule.Attribute_TypeArg},
 			},
-			RetType: RetType{Type: DataType{Id: xtype.Id, Kind: tokens.STAR + "T"}},
+			RetType: RetType{Type: DataType{Id: juletype.Id, Kind: tokens.STAR + "T"}},
 		}},
 		{Ast: &Func{
 			Pub:      true,
@@ -369,15 +369,15 @@ var Builtin = &Defmap{
 			Generics: []*GenericType{{Id: "Item"}},
 			RetType: models.RetType{
 				Type: DataType{
-					Id:            xtype.Slice,
-					Kind:          x.Prefix_Slice + "Item",
-					ComponentType: &DataType{Id: xtype.Id, Kind: "Item"},
+					Id:            juletype.Slice,
+					Kind:          jule.Prefix_Slice + "Item",
+					ComponentType: &DataType{Id: juletype.Id, Kind: "Item"},
 				},
 			},
 			Params: []models.Param{
 				{
 					Id:   "n",
-					Type: DataType{Id: xtype.Int, Kind: xtype.TypeMap[xtype.Int]},
+					Type: DataType{Id: juletype.Int, Kind: juletype.TypeMap[juletype.Int]},
 				},
 			},
 		}},
@@ -386,22 +386,22 @@ var Builtin = &Defmap{
 			Id:       "copy",
 			Owner:    genericFile,
 			Generics: []*GenericType{{Id: "Item"}},
-			RetType:  models.RetType{Type: DataType{Id: xtype.Int, Kind: xtype.TypeMap[xtype.Int]}},
+			RetType:  models.RetType{Type: DataType{Id: juletype.Int, Kind: juletype.TypeMap[juletype.Int]}},
 			Params: []models.Param{
 				{
 					Id: "dest",
 					Type: DataType{
-						Id:            xtype.Slice,
-						Kind:          x.Prefix_Slice + "Item",
-						ComponentType: &DataType{Id: xtype.Id, Kind: "Item"},
+						Id:            juletype.Slice,
+						Kind:          jule.Prefix_Slice + "Item",
+						ComponentType: &DataType{Id: juletype.Id, Kind: "Item"},
 					},
 				},
 				{
 					Id: "src",
 					Type: DataType{
-						Id:            xtype.Slice,
-						Kind:          x.Prefix_Slice + "Item",
-						ComponentType: &DataType{Id: xtype.Id, Kind: "Item"},
+						Id:            juletype.Slice,
+						Kind:          jule.Prefix_Slice + "Item",
+						ComponentType: &DataType{Id: juletype.Id, Kind: "Item"},
 					},
 				},
 			},
@@ -413,23 +413,23 @@ var Builtin = &Defmap{
 			Generics: []*GenericType{{Id: "Item"}},
 			RetType: models.RetType{
 				Type: DataType{
-					Id:            xtype.Slice,
-					Kind:          x.Prefix_Slice + "Item",
-					ComponentType: &DataType{Id: xtype.Id, Kind: "Item"},
+					Id:            juletype.Slice,
+					Kind:          jule.Prefix_Slice + "Item",
+					ComponentType: &DataType{Id: juletype.Id, Kind: "Item"},
 				},
 			},
 			Params: []models.Param{
 				{
 					Id: "src",
 					Type: DataType{
-						Id:            xtype.Slice,
-						Kind:          x.Prefix_Slice + "Item",
-						ComponentType: &DataType{Id: xtype.Id, Kind: "Item"},
+						Id:            juletype.Slice,
+						Kind:          jule.Prefix_Slice + "Item",
+						ComponentType: &DataType{Id: juletype.Id, Kind: "Item"},
 					},
 				},
 				{
 					Id:       "components",
-					Type:     DataType{Id: xtype.Id, Kind: "Item"},
+					Type:     DataType{Id: juletype.Id, Kind: "Item"},
 					Variadic: true,
 				},
 			},
@@ -445,7 +445,7 @@ var strDefs = &Defmap{
 		{
 			Pub:  true,
 			Id:   "len",
-			Type: DataType{Id: xtype.Int, Kind: tokens.INT},
+			Type: DataType{Id: juletype.Int, Kind: tokens.INT},
 			Tag:  "len()",
 		},
 	},
@@ -453,68 +453,68 @@ var strDefs = &Defmap{
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "empty",
-			RetType: RetType{Type: DataType{Id: xtype.Bool, Kind: tokens.BOOL}},
+			RetType: RetType{Type: DataType{Id: juletype.Bool, Kind: tokens.BOOL}},
 		}},
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "has_prefix",
-			Params:  []Param{{Id: "sub", Type: DataType{Id: xtype.Str, Kind: tokens.STR}}},
-			RetType: RetType{Type: DataType{Id: xtype.Bool, Kind: tokens.BOOL}},
+			Params:  []Param{{Id: "sub", Type: DataType{Id: juletype.Str, Kind: tokens.STR}}},
+			RetType: RetType{Type: DataType{Id: juletype.Bool, Kind: tokens.BOOL}},
 		}},
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "has_suffix",
-			Params:  []Param{{Id: "sub", Type: DataType{Id: xtype.Str, Kind: tokens.STR}}},
-			RetType: RetType{Type: DataType{Id: xtype.Bool, Kind: tokens.BOOL}},
+			Params:  []Param{{Id: "sub", Type: DataType{Id: juletype.Str, Kind: tokens.STR}}},
+			RetType: RetType{Type: DataType{Id: juletype.Bool, Kind: tokens.BOOL}},
 		}},
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "find",
-			Params:  []Param{{Id: "sub", Type: DataType{Id: xtype.Str, Kind: tokens.STR}}},
-			RetType: RetType{Type: DataType{Id: xtype.Int, Kind: tokens.INT}},
+			Params:  []Param{{Id: "sub", Type: DataType{Id: juletype.Str, Kind: tokens.STR}}},
+			RetType: RetType{Type: DataType{Id: juletype.Int, Kind: tokens.INT}},
 		}},
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "rfind",
-			Params:  []Param{{Id: "sub", Type: DataType{Id: xtype.Str, Kind: tokens.STR}}},
-			RetType: RetType{Type: DataType{Id: xtype.Int, Kind: tokens.INT}},
+			Params:  []Param{{Id: "sub", Type: DataType{Id: juletype.Str, Kind: tokens.STR}}},
+			RetType: RetType{Type: DataType{Id: juletype.Int, Kind: tokens.INT}},
 		}},
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "trim",
-			Params:  []Param{{Id: "bytes", Type: DataType{Id: xtype.Str, Kind: tokens.STR}}},
-			RetType: RetType{Type: DataType{Id: xtype.Str, Kind: tokens.STR}},
+			Params:  []Param{{Id: "bytes", Type: DataType{Id: juletype.Str, Kind: tokens.STR}}},
+			RetType: RetType{Type: DataType{Id: juletype.Str, Kind: tokens.STR}},
 		}},
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "rtrim",
-			Params:  []Param{{Id: "bytes", Type: DataType{Id: xtype.Str, Kind: tokens.STR}}},
-			RetType: RetType{Type: DataType{Id: xtype.Str, Kind: tokens.STR}},
+			Params:  []Param{{Id: "bytes", Type: DataType{Id: juletype.Str, Kind: tokens.STR}}},
+			RetType: RetType{Type: DataType{Id: juletype.Str, Kind: tokens.STR}},
 		}},
 		{Ast: &Func{
 			Pub: true,
 			Id:  "split",
 			Params: []Param{
-				{Id: "sub", Type: DataType{Id: xtype.Str, Kind: tokens.STR}},
+				{Id: "sub", Type: DataType{Id: juletype.Str, Kind: tokens.STR}},
 				{
 					Id:   "n",
-					Type: DataType{Id: xtype.Int, Kind: tokens.INT},
+					Type: DataType{Id: juletype.Int, Kind: tokens.INT},
 				},
 			},
-			RetType: RetType{Type: DataType{Id: xtype.Str, Kind: x.Prefix_Slice + tokens.STR}},
+			RetType: RetType{Type: DataType{Id: juletype.Str, Kind: jule.Prefix_Slice + tokens.STR}},
 		}},
 		{Ast: &Func{
 			Pub: true,
 			Id:  "replace",
 			Params: []Param{
-				{Id: "sub", Type: DataType{Id: xtype.Str, Kind: tokens.STR}},
-				{Id: "new", Type: DataType{Id: xtype.Str, Kind: tokens.STR}},
+				{Id: "sub", Type: DataType{Id: juletype.Str, Kind: tokens.STR}},
+				{Id: "new", Type: DataType{Id: juletype.Str, Kind: tokens.STR}},
 				{
 					Id:   "n",
-					Type: DataType{Id: xtype.Int, Kind: tokens.INT},
+					Type: DataType{Id: juletype.Int, Kind: tokens.INT},
 				},
 			},
-			RetType: RetType{Type: DataType{Id: xtype.Str, Kind: tokens.STR}},
+			RetType: RetType{Type: DataType{Id: juletype.Str, Kind: tokens.STR}},
 		}},
 	},
 }
@@ -524,7 +524,7 @@ var sliceDefs = &Defmap{
 		{
 			Pub:  true,
 			Id:   "len",
-			Type: DataType{Id: xtype.Int, Kind: tokens.INT},
+			Type: DataType{Id: juletype.Int, Kind: tokens.INT},
 			Tag:  "len()",
 		},
 	},
@@ -532,7 +532,7 @@ var sliceDefs = &Defmap{
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "empty",
-			RetType: RetType{Type: DataType{Id: xtype.Bool, Kind: tokens.BOOL}},
+			RetType: RetType{Type: DataType{Id: juletype.Bool, Kind: tokens.BOOL}},
 		}},
 	},
 }
@@ -542,7 +542,7 @@ var arrayDefs = &Defmap{
 		{
 			Pub:  true,
 			Id:   "len",
-			Type: DataType{Id: xtype.Int, Kind: tokens.INT},
+			Type: DataType{Id: juletype.Int, Kind: tokens.INT},
 			Tag:  "len()",
 		},
 	},
@@ -550,7 +550,7 @@ var arrayDefs = &Defmap{
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "empty",
-			RetType: RetType{Type: DataType{Id: xtype.Bool, Kind: tokens.BOOL}},
+			RetType: RetType{Type: DataType{Id: juletype.Bool, Kind: tokens.BOOL}},
 		}},
 	},
 }
@@ -560,7 +560,7 @@ var mapDefs = &Defmap{
 		{
 			Pub:  true,
 			Id:   "len",
-			Type: DataType{Id: xtype.Int, Kind: tokens.INT},
+			Type: DataType{Id: juletype.Int, Kind: tokens.INT},
 			Tag:  "len()",
 		},
 	},
@@ -580,13 +580,13 @@ var mapDefs = &Defmap{
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "empty",
-			RetType: RetType{Type: DataType{Id: xtype.Bool, Kind: tokens.BOOL}},
+			RetType: RetType{Type: DataType{Id: juletype.Bool, Kind: tokens.BOOL}},
 		}},
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "has",
 			Params:  []Param{{Id: "key"}},
-			RetType: RetType{Type: DataType{Id: xtype.Bool, Kind: tokens.BOOL}},
+			RetType: RetType{Type: DataType{Id: juletype.Bool, Kind: tokens.BOOL}},
 		}},
 		{Ast: &Func{
 			Pub:    true,
@@ -605,11 +605,11 @@ func readyMapDefs(mapt DataType) {
 
 	keysFunc, _, _ := mapDefs.funcById("keys", nil)
 	keysFunc.Ast.RetType.Type = keyt
-	keysFunc.Ast.RetType.Type.Kind = x.Prefix_Slice + keysFunc.Ast.RetType.Type.Kind
+	keysFunc.Ast.RetType.Type.Kind = jule.Prefix_Slice + keysFunc.Ast.RetType.Type.Kind
 
 	valuesFunc, _, _ := mapDefs.funcById("values", nil)
 	valuesFunc.Ast.RetType.Type = valt
-	valuesFunc.Ast.RetType.Type.Kind = x.Prefix_Slice + valuesFunc.Ast.RetType.Type.Kind
+	valuesFunc.Ast.RetType.Type.Kind = jule.Prefix_Slice + valuesFunc.Ast.RetType.Type.Kind
 
 	hasFunc, _, _ := mapDefs.funcById("has", nil)
 	hasFunc.Ast.Params[0].Type = keyt
@@ -632,7 +632,7 @@ func init() {
 	intMax := intStatics.Globals[0]
 	intMin := intStatics.Globals[1]
 	uintMax := uintStatics.Globals[0]
-	switch xtype.BitSize {
+	switch juletype.BitSize {
 	case 8:
 		intMax.Expr = i8statics.Globals[0].Expr
 		intMax.ExprTag = i8statics.Globals[0].ExprTag

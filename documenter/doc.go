@@ -3,9 +3,9 @@ package documenter
 import (
 	"encoding/json"
 
-	"github.com/the-xlang/xxc/ast/models"
-	"github.com/the-xlang/xxc/parser"
-	"github.com/the-xlang/xxc/pkg/xtype"
+	"github.com/jule-lang/jule/ast/models"
+	"github.com/jule-lang/jule/parser"
+	"github.com/jule-lang/jule/pkg/juletype"
 )
 
 type Defmap = parser.Defmap
@@ -69,7 +69,7 @@ type document struct {
 }
 
 func ttoa(t models.DataType) string {
-	if t.Kind == xtype.TypeMap[xtype.Void] {
+	if t.Kind == juletype.TypeMap[juletype.Void] {
 		return ""
 	}
 	return t.Kind

@@ -1,11 +1,11 @@
-// Copyright 2022 The X Programming Language.
+// Copyright 2022 The Jule Programming Language.
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-#ifndef __XXC_DEFER_HPP
-#define __XXC_DEFER_HPP
+#ifndef __JULEC_DEFER_HPP
+#define __JULEC_DEFER_HPP
 
-#define DEFER(_Expr) defer CONCAT(XXDEFER_, __LINE__){[&](void) mutable -> void { _Expr; }}
+#define DEFER(_Expr) defer CONCAT(JULEDEFER_, __LINE__){[&](void) mutable -> void { _Expr; }}
 
 // Deferred call infrastructure.
 struct defer;
@@ -22,4 +22,4 @@ struct defer {
 };
 
 
-#endif // #ifndef __XXC_DEFER_HPP
+#endif // #ifndef __JULEC_DEFER_HPP

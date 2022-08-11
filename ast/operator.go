@@ -1,6 +1,6 @@
 package ast
 
-import "github.com/the-xlang/xxc/lex/tokens"
+import "github.com/jule-lang/jule/lex/tokens"
 
 // UnaryOperators.
 var UnaryOperators = [...]string{

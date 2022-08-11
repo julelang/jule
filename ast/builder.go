@@ -5,13 +5,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/the-xlang/xxc/ast/models"
-	"github.com/the-xlang/xxc/lex"
-	"github.com/the-xlang/xxc/lex/tokens"
-	"github.com/the-xlang/xxc/pkg/x"
-	"github.com/the-xlang/xxc/pkg/xapi"
-	"github.com/the-xlang/xxc/pkg/xlog"
-	"github.com/the-xlang/xxc/pkg/xtype"
+	"github.com/jule-lang/jule/ast/models"
+	"github.com/jule-lang/jule/lex"
+	"github.com/jule-lang/jule/lex/tokens"
+	"github.com/jule-lang/jule/pkg/jule"
+	"github.com/jule-lang/jule/pkg/juleapi"
+	"github.com/jule-lang/jule/pkg/julelog"
+	"github.com/jule-lang/jule/pkg/juletype"
 )
 
 type Tok = lex.Tok
@@ -23,7 +23,7 @@ type Builder struct {
 	pub bool
 
 	Tree   []models.Object
-	Errors []xlog.CompilerLog
+	Errors []julelog.CompilerLog
 	Toks   Toks
 	Pos    int
 }
@@ -36,13 +36,13 @@ func NewBuilder(toks Toks) *Builder {
 	return b
 }
 
-func compilerErr(tok Tok, key string, args ...any) xlog.CompilerLog {
-	return xlog.CompilerLog{
-		Type:    xlog.Error,
+func compilerErr(tok Tok, key string, args ...any) julelog.CompilerLog {
+	return julelog.CompilerLog{
+		Type:    julelog.Error,
 		Row:     tok.Row,
 		Column:  tok.Column,
 		Path:    tok.File.Path(),
-		Message: x.GetError(key, args...),
+		Message: jule.GetError(key, args...),
 	}
 }
 
@@ -234,7 +234,7 @@ func (b *Builder) Enum(toks Toks) {
 			return
 		}
 	} else {
-		enum.Type = models.DataType{Id: xtype.U32, Kind: tokens.U32}
+		enum.Type = models.DataType{Id: juletype.U32, Kind: tokens.U32}
 	}
 	itemToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
 	if itemToks == nil {
@@ -273,7 +273,7 @@ func (b *Builder) Preprocessor(toks Toks) {
 	}
 	ok := false
 	switch tok.Kind {
-	case x.PreprocessorDirective:
+	case jule.PreprocessorDirective:
 		ok = b.PreprocessorDirective(&pp, toks)
 	default:
 		b.pusherr(tok, "invalid_preprocessor")
@@ -300,7 +300,7 @@ func (b *Builder) PreprocessorDirective(pp *models.Preprocessor, toks Toks) bool
 	var d models.Directive
 	ok := false
 	switch tok.Kind {
-	case x.PreprocessorDirectiveEnofi:
+	case jule.PreprocessorDirectiveEnofi:
 		ok = b.directiveEnofi(&d, toks)
 	default:
 		b.pusherr(tok, "invalid_pragma_directive")
@@ -456,7 +456,7 @@ func (b *Builder) implTraitFuncs(impl *models.Impl, toks Toks) {
 		f := b.Func(funcToks, false, false)
 		f.Pub = true
 		f.Receiver = &models.DataType{
-			Id:   xtype.Struct,
+			Id:   juletype.Struct,
 			Kind: impl.Target.Kind,
 		}
 		if ref {
@@ -512,7 +512,7 @@ func (b *Builder) implStruct(impl *models.Impl, toks Toks) {
 		f := b.Func(funcToks, false, false)
 		f.Pub = pub
 		f.Receiver = &models.DataType{
-			Id:   xtype.Struct,
+			Id:   juletype.Struct,
 			Kind: impl.Trait.Kind,
 		}
 		if ref {
@@ -523,7 +523,7 @@ func (b *Builder) implStruct(impl *models.Impl, toks Toks) {
 }
 
 func (b *Builder) implFuncs(impl *models.Impl, toks Toks) {
-	if impl.Target.Id != xtype.Void {
+	if impl.Target.Id != juletype.Void {
 		b.implTraitFuncs(impl, toks)
 		return
 	}
@@ -662,7 +662,7 @@ func (b *Builder) buildUseCppDecl(use *models.Use, toks Toks) {
 
 func (b *Builder) buildUseDecl(use *models.Use, toks Toks) {
 	var path strings.Builder
-	path.WriteString(x.StdlibPath)
+	path.WriteString(jule.StdlibPath)
 	path.WriteRune(os.PathSeparator)
 	tok := toks[0]
 	isStd := false
@@ -777,7 +777,7 @@ func (b *Builder) funcPrototype(toks *Toks, anon bool) (f models.Func, ok bool) 
 	f.Pub = b.pub
 	b.pub = false
 	if anon {
-		f.Id = x.Anonymous
+		f.Id = jule.Anonymous
 	} else {
 		if f.Tok.Id != tokens.Id {
 			b.pusherr(f.Tok, "invalid_syntax")
@@ -786,8 +786,8 @@ func (b *Builder) funcPrototype(toks *Toks, anon bool) (f models.Func, ok bool) 
 		f.Id = f.Tok.Kind
 		i++
 	}
-	f.RetType.Type.Id = xtype.Void
-	f.RetType.Type.Kind = xtype.TypeMap[f.RetType.Type.Id]
+	f.RetType.Type.Id = juletype.Void
+	f.RetType.Type.Kind = juletype.TypeMap[f.RetType.Type.Id]
 	paramToks := b.getrange(&i, tokens.LPARENTHESES, tokens.RPARENTHESES, toks)
 	if len(paramToks) > 0 {
 		f.Params = b.Params(paramToks, false)
@@ -922,10 +922,10 @@ func (b *Builder) checkParams(params *[]models.Param) {
 			b.pusherr(p.Tok, "missing_type")
 		} else {
 			p.Type.Tok = p.Tok
-			p.Type.Id = xtype.Id
+			p.Type.Id = juletype.Id
 			p.Type.Kind = p.Type.Tok.Kind
 			p.Type.Original = p.Type
-			p.Id = x.Anonymous
+			p.Id = jule.Anonymous
 			p.Tok = lex.Tok{}
 		}
 	}
@@ -959,8 +959,8 @@ func (b *Builder) paramBegin(p *models.Param, i *int, toks Toks) {
 }
 
 func (b *Builder) paramBodyId(p *models.Param, tok Tok) {
-	if xapi.IsIgnoreId(tok.Kind) {
-		p.Id = x.Anonymous
+	if juleapi.IsIgnoreId(tok.Kind) {
+		p.Id = jule.Anonymous
 		return
 	}
 	p.Id = tok.Kind
@@ -1010,7 +1010,7 @@ func (b *Builder) pushParam(params *[]models.Param, toks Toks, mustPure bool) {
 	param.Tok = tok
 	// Just given data-type.
 	if tok.Id != tokens.Id {
-		param.Id = x.Anonymous
+		param.Id = jule.Anonymous
 		if t, ok := b.DataType(toks, &i, false, true); ok {
 			if i+1 == len(toks) {
 				param.Type = t
@@ -1084,7 +1084,7 @@ func (b *Builder) datatype(t *models.DataType, toks Toks, i *int, arrays, err bo
 		switch tok.Id {
 		case tokens.DataType:
 			t.Tok = tok
-			t.Id = xtype.TypeFromId(t.Tok.Kind)
+			t.Id = juletype.TypeFromId(t.Tok.Kind)
 			dtv.WriteString(t.Tok.Kind)
 			ok = true
 			goto ret
@@ -1093,7 +1093,7 @@ func (b *Builder) datatype(t *models.DataType, toks Toks, i *int, arrays, err bo
 			if *i+1 < len(toks) && toks[*i+1].Id == tokens.DoubleColon {
 				break
 			}
-			t.Id = xtype.Id
+			t.Id = juletype.Id
 			t.Tok = tok
 			b.idDataTypePartEnd(t, &dtv, toks, i)
 			ok = true
@@ -1113,7 +1113,7 @@ func (b *Builder) datatype(t *models.DataType, toks Toks, i *int, arrays, err bo
 			switch tok.Kind {
 			case tokens.LPARENTHESES:
 				t.Tok = tok
-				t.Id = xtype.Func
+				t.Id = juletype.Func
 				f := b.FuncDataTypeHead(toks, i)
 				*i++
 				f.RetType, ok = b.FuncRetDataType(toks, i)
@@ -1135,9 +1135,9 @@ func (b *Builder) datatype(t *models.DataType, toks Toks, i *int, arrays, err bo
 				tok = toks[*i]
 				if tok.Id == tokens.Brace && tok.Kind == tokens.RBRACKET {
 					arrays = false
-					dtv.WriteString(x.Prefix_Slice)
+					dtv.WriteString(jule.Prefix_Slice)
 					t.ComponentType = new(models.DataType)
-					t.Id = xtype.Slice
+					t.Id = juletype.Slice
 					t.Tok = tok
 					*i++
 					ok = b.datatype(t.ComponentType, toks, i, arrays, err)
@@ -1150,7 +1150,7 @@ func (b *Builder) datatype(t *models.DataType, toks Toks, i *int, arrays, err bo
 				} else {
 					b.MapDataType(t, toks, i, err)
 				}
-				if t.Id == xtype.Void {
+				if t.Id == juletype.Void {
 					if err {
 						b.pusherr(tok, "invalid_syntax")
 					}
@@ -1188,7 +1188,7 @@ func (b *Builder) arrayDataType(t *models.DataType, toks Toks, i *int, err bool)
 	if *i+1 >= len(toks) {
 		return
 	}
-	t.Id = xtype.Array
+	t.Id = juletype.Array
 	*i++
 	exprI := *i
 	t.ComponentType = new(models.DataType)
@@ -1204,12 +1204,12 @@ func (b *Builder) arrayDataType(t *models.DataType, toks Toks, i *int, err bool)
 	} else {
 		t.Size.Expr = b.Expr(exprToks)
 	}
-	t.Kind = x.Prefix_Array + t.ComponentType.Kind
+	t.Kind = jule.Prefix_Array + t.ComponentType.Kind
 }
 
 func (b *Builder) MapOrArrayDataType(t *models.DataType, toks Toks, i *int, err bool) {
 	b.MapDataType(t, toks, i, err)
-	if t.Id == xtype.Void {
+	if t.Id == juletype.Void {
 		b.arrayDataType(t, toks, i, err)
 	}
 }
@@ -1225,7 +1225,7 @@ func (b *Builder) MapDataType(t *models.DataType, toks Toks, i *int, err bool) {
 
 func (b *Builder) mapDataType(t *models.DataType, toks, typeToks Toks, colon int, err bool) {
 	defer func() { t.Original = *t }()
-	t.Id = xtype.Map
+	t.Id = juletype.Map
 	t.Tok = toks[0]
 	colonTok := toks[colon]
 	if colon == 0 || colon+1 >= len(typeToks) {
@@ -1299,10 +1299,10 @@ func (b *Builder) funcMultiTypeRet(toks Toks, i *int) (t models.RetType, ok bool
 	types := make([]models.DataType, len(params))
 	for i, param := range params {
 		types[i] = param.Type
-		if param.Id != x.Anonymous {
+		if param.Id != jule.Anonymous {
 			param.Tok.Kind = param.Id
 		} else {
-			param.Tok.Kind = xapi.Ignore
+			param.Tok.Kind = juleapi.Ignore
 		}
 		t.Identifiers = append(t.Identifiers, param.Tok)
 	}
@@ -1320,8 +1320,8 @@ func (b *Builder) funcMultiTypeRet(toks Toks, i *int) (t models.RetType, ok bool
 
 // FuncRetDataType builds ret data-type of function.
 func (b *Builder) FuncRetDataType(toks Toks, i *int) (t models.RetType, ok bool) {
-	t.Type.Id = xtype.Void
-	t.Type.Kind = xtype.TypeMap[t.Type.Id]
+	t.Type.Id = juletype.Void
+	t.Type.Kind = juletype.TypeMap[t.Type.Id]
 	if *i >= len(toks) {
 		return
 	}
@@ -1779,8 +1779,8 @@ func (b *Builder) Var(toks Toks, begin bool) (v models.Var) {
 		b.pusherr(v.Token, "invalid_syntax")
 	}
 	v.Id = v.Token.Kind
-	v.Type.Id = xtype.Void
-	v.Type.Kind = xtype.TypeMap[v.Type.Id]
+	v.Type.Id = juletype.Void
+	v.Type.Kind = juletype.TypeMap[v.Type.Id]
 	// Skip type definer operator(':')
 	i++
 	if i >= len(toks) {
@@ -1951,8 +1951,8 @@ func (b *Builder) getForeachIterProfile(varToks, exprToks Toks, inTok Tok) model
 	foreach.InTok = inTok
 	foreach.Expr = b.Expr(exprToks)
 	if len(varToks) == 0 {
-		foreach.KeyA.Id = xapi.Ignore
-		foreach.KeyB.Id = xapi.Ignore
+		foreach.KeyA.Id = juleapi.Ignore
+		foreach.KeyB.Id = juleapi.Ignore
 	} else {
 		varsToks := b.getForeachVarsToks(varToks)
 		if len(varsToks) == 0 {
@@ -1966,7 +1966,7 @@ func (b *Builder) getForeachIterProfile(varToks, exprToks Toks, inTok Tok) model
 		if len(vars) > 1 {
 			foreach.KeyB = vars[1]
 		} else {
-			foreach.KeyB.Id = xapi.Ignore
+			foreach.KeyB.Id = juleapi.Ignore
 		}
 	}
 	return foreach

@@ -8,8 +8,8 @@ assignees: ''
 ---
 
 <pre>
-$ xxc version
-// Output of "xxc version" command
+$ jule version
+// Output of "jule version" command
 </pre>
 
 ### Does this issue reproduce with the latest release?

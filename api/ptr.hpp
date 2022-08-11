@@ -1,25 +1,25 @@
-// Copyright 2022 The X Programming Language.
+// Copyright 2022 The Jule Programming Language.
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-#ifndef __XXC_PTR_HPP
-#define __XXC_PTR_HPP
+#ifndef __JULEC_PTR_HPP
+#define __JULEC_PTR_HPP
 
-#define __XXC_PTR_NEVER_HEAP (bool**)(1U)
-#define __XXC_PTR_HEAP_TRUE (bool*)(1U)
+#define __JULEC_PTR_NEVER_HEAP (bool**)(1U)
+#define __JULEC_PTR_HEAP_TRUE (bool*)(1U)
 
-#define __xxc_ptr_of(_PTR) _PTR
+#define __julec_ptr_of(_PTR) _PTR
 
-// Wrapper structure for raw pointer of X.
+// Wrapper structure for raw pointer of JuleC.
 template<typename T>
 struct ptr;
 template<typename T>
-ptr<T> __xxc_not_heap_ptr_of(T *_T) noexcept;
+ptr<T> __julec_not_heap_ptr_of(T *_T) noexcept;
 
 template<typename T>
 struct ptr {
     T               **_ptr{nil};
-    mutable uint_xt *_ref{nil};
+    mutable uint_julet *_ref{nil};
     mutable bool    **_heap{nil};
 
     ptr<T>(void) noexcept {}
@@ -30,7 +30,7 @@ struct ptr {
         if (!this->_ptr) { XID(panic)("memory allocation failed"); }
         this->_heap = new(std::nothrow) bool*;
         if (!this->_heap) { XID(panic)("memory allocation failed"); }
-        this->_ref = new(std::nothrow) uint_xt{1};
+        this->_ref = new(std::nothrow) uint_julet{1};
         if (!this->_ref) { XID(panic)("memory allocation failed"); }
         *this->_ptr = _Ptr;
     }
@@ -50,11 +50,11 @@ struct ptr {
         if (!this->_ref) { return; }
         --(*this->_ref);
         if (!this->_heap ||
-            (this->_heap != __XXC_PTR_NEVER_HEAP &&
-                *this->_heap != __XXC_PTR_HEAP_TRUE))
+            (this->_heap != __JULEC_PTR_NEVER_HEAP &&
+                *this->_heap != __JULEC_PTR_HEAP_TRUE))
             { return; }
         if ((*this->_ref) != 0) { return; }
-        if (this->_heap != __XXC_PTR_NEVER_HEAP)
+        if (this->_heap != __JULEC_PTR_NEVER_HEAP)
         { delete this->_heap; }
         this->_heap = nil;
         delete this->_ref;
@@ -67,14 +67,14 @@ struct ptr {
 
     ptr<T> &__must_heap(void) noexcept {
         if (this->_heap &&
-            (this->_heap == __XXC_PTR_NEVER_HEAP ||
-             *this->_heap == __XXC_PTR_HEAP_TRUE)) { return *this; }
+            (this->_heap == __JULEC_PTR_NEVER_HEAP ||
+             *this->_heap == __JULEC_PTR_HEAP_TRUE)) { return *this; }
         if (!this->_ptr || !*this->_ptr) { return *this; }
         const T _data{**this->_ptr};
         *this->_ptr = new(std::nothrow) T;
         if (!*this->_ptr) { XID(panic)("memory allocation failed"); }
         **this->_ptr = _data;
-        *this->_heap = __XXC_PTR_HEAP_TRUE;
+        *this->_heap = __JULEC_PTR_HEAP_TRUE;
         return *this;
     }
 
@@ -88,8 +88,8 @@ struct ptr {
         return *this->_ptr;
     }
 
-    inline operator uintptr_xt(void) const noexcept
-    { return !this->_ptr ? 0 : (uintptr_xt)(*this->_ptr); }
+    inline operator uintptr_julet(void) const noexcept
+    { return !this->_ptr ? 0 : (uintptr_julet)(*this->_ptr); }
 
     void operator=(const ptr<T> &_Ptr) noexcept {
         this->__dealloc();
@@ -120,13 +120,13 @@ struct ptr {
 };
 
 template<typename T>
-ptr<T> __xxc_not_heap_ptr_of(T *_T) noexcept {
+ptr<T> __julec_not_heap_ptr_of(T *_T) noexcept {
     ptr<T> _ptr;
     _ptr._ptr = new(std::nothrow) T*;
     if (!_ptr._ptr) { XID(panic)("memory allocation failed"); }
     *_ptr._ptr = _T;
-    _ptr._heap = __XXC_PTR_NEVER_HEAP; // Avoid heap allocation
+    _ptr._heap = __JULEC_PTR_NEVER_HEAP; // Avoid heap allocation
     return _ptr;
 }
 
-#endif // #ifndef __XXC_PTR_HPP
+#endif // #ifndef __JULEC_PTR_HPP

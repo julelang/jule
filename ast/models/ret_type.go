@@ -1,6 +1,6 @@
 package models
 
-import "github.com/the-xlang/xxc/pkg/xapi"
+import "github.com/jule-lang/jule/pkg/juleapi"
 
 // RetType is function return type AST model.
 type RetType struct {
@@ -15,7 +15,7 @@ func (rt RetType) String() string {
 // AnyVar reports exist any variable or not.
 func (rt *RetType) AnyVar() bool {
 	for _, tok := range rt.Identifiers {
-		if !xapi.IsIgnoreId(tok.Kind) {
+		if !juleapi.IsIgnoreId(tok.Kind) {
 			return true
 		}
 	}
@@ -25,7 +25,7 @@ func (rt *RetType) AnyVar() bool {
 // Vars returns variables of ret type if exist, nil if not.
 func (rt *RetType) Vars() []*Var {
 	get := func(tok Tok, t DataType) *Var {
-		if xapi.IsIgnoreId(tok.Kind) {
+		if juleapi.IsIgnoreId(tok.Kind) {
 			return nil
 		}
 		v := new(Var)

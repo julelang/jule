@@ -1,7 +1,7 @@
 package preprocessor
 
 import (
-	"github.com/the-xlang/xxc/ast/models"
+	"github.com/jule-lang/jule/ast/models"
 )
 
 // TrimEnofi trims tree by enofi pragma directive.

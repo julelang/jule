@@ -1,0 +1,80 @@
+// Copyright 2022 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+//doc:
+// Returns the maximum of x-y or 0.
+//
+// Special cases are:
+//  dim(inf, inf) = nan
+//  dim(-inf, -inf) = nan
+//  dim(x, nan) = dim(nan, x) = nan
+pub dim(x, y f64) f64 {
+	// The special cases result in nan after the subtraction:
+	//       inf - inf  = nan
+	//      -inf - -inf = nan
+	//       nan - y    = nan
+	//         x - nan  = nan
+	v: = x - y
+	if v <= 0 {
+		// v is negative or 0
+		ret 0
+	}
+	// v is positive or nan
+	ret v
+}
+
+//doc:
+// Returns the larger of x or y.
+//
+// Special cases are:
+//  max(x, inf) = max(inf, x) = inf
+//  max(x, nan) = max(nan, x) = nan
+//  max(+0, ±0) = max(±0, +0) = +0
+//  max(-0, -0) = -0
+pub max(x, y f64) f64 {
+	// special cases
+	match {
+	case isinf(x, 1) || isinf(y, 1):
+		ret inf(1)
+	case isnan(x) || isnan(y):
+		ret nan()
+	case x == 0 && x == y:
+		if signbit(x) {
+			ret y
+		}
+		ret x
+	}
+
+	if x > y {
+		ret x
+	}
+	ret y
+}
+
+//doc:
+// Returns the smaller of x or y.
+//
+// Special cases are:
+//  min(x, -inf) = min(-inf, x) = -inf
+//  min(x, nan)  = min(nan, x) = nan
+//  min(-0, ±0)  = min(±0, -0) = -0
+pub min(x, y f64) f64 {
+	// special cases
+	match {
+	case isinf(x, -1) || isinf(y, -1):
+		ret inf(-1)
+	case isnan(x) || isnan(y):
+		ret nan()
+	case x == 0 && x == y:
+		if signbit(x) {
+			ret x
+		}
+		ret y
+	}
+
+	if x < y {
+		ret x
+	}
+	ret y
+}

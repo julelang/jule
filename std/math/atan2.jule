@@ -1,0 +1,68 @@
+// Copyright 2022 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+//doc:
+// Returns the arc tangent of y/x, using
+// the signs of the two to determine the quadrant
+// of the return value.
+//
+// Special cases are (in order):
+//  atan2(y, nan) = nan
+//  atan2(nan, x) = nan
+//  atan2(+0, x>=0) = +0
+//  atan2(-0, x>=0) = -0
+//  atan2(+0, x<=-0) = +PI
+//  atan2(-0, x<=-0) = -PI
+//  atan2(y>0, 0) = +PI/2
+//  atan2(y<0, 0) = -PI/2
+//  atan2(inf, inf) = +PI/4
+//  atan2(-inf, inf) = -PI/4
+//  atan2(inf, -inf) = 3PI/4
+//  atan2(-inf, -inf) = -3PI/4
+//  atan2(y, inf) = 0
+//  atan2(y>0, -inf) = +PI
+//  atan2(y<0, -inf) = -PI
+//  atan2(inf, x) = +PI/2
+//  atan2(-inf, x) = -PI/2
+pub atan2(y, x f64) f64 {
+	// special cases
+	match {
+	case isnan(y) || isnan(x):
+		ret nan()
+	case y == 0:
+		if x >= 0 && !signbit(x) {
+			ret copysign(0, y)
+		}
+		ret copysign(PI, y)
+	case x == 0:
+		ret copysign(PI/2, y)
+	case isinf(x, 0):
+		if isinf(x, 1) {
+			match {
+			case isinf(y, 0):
+				ret copysign(PI/4, y)
+			default:
+				ret copysign(0, y)
+			}
+		}
+		match {
+		case isinf(y, 0):
+			ret copysign(3*PI/4, y)
+		default:
+			ret copysign(PI, y)
+		}
+	case isinf(y, 0):
+		ret copysign(PI/2, y)
+	}
+
+	// Call atan and determine the quadrant.
+	q: = atan(y / x)
+	if x < 0 {
+		if q <= 0 {
+			ret q + PI
+		}
+		ret q - PI
+	}
+	ret q
+}

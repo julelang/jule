@@ -1,9 +1,9 @@
-// Copyright 2022 The X Programming Language.
+// Copyright 2022 The Jule Programming Language.
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-#ifndef __XXC_MAP_HPP
-#define __XXC_MAP_HPP
+#ifndef __JULEC_MAP_HPP
+#define __JULEC_MAP_HPP
 
 // Built-in map type.
 template<typename _Key_t, typename _Value_t>
@@ -19,7 +19,7 @@ public:
 
     slice<_Key_t> keys(void) const noexcept {
         slice<_Key_t> _keys(this->size());
-        uint_xt _index{0};
+        uint_julet _index{0};
         for (const auto &_pair: *this)
         { _keys._buffer[_index++] = _pair.first; }
         return _keys;
@@ -27,7 +27,7 @@ public:
 
     slice<_Value_t> values(void) const noexcept {
         slice<_Value_t> _keys(this->size());
-        uint_xt _index{0};
+        uint_julet _index{0};
         for (const auto &_pair: *this)
         { _keys._buffer[_index++] = _pair.second; }
         return _keys;
@@ -37,7 +37,7 @@ public:
     bool has(const _Key_t _Key) const noexcept
     { return this->find(_Key) != this->end(); }
 
-    inline int_xt len(void) const noexcept
+    inline int_julet len(void) const noexcept
     { return this->size(); }
 
     inline void del(const _Key_t _Key) noexcept
@@ -52,7 +52,7 @@ public:
     friend std::ostream &operator<<(std::ostream &_Stream,
                                     const map<_Key_t, _Value_t> &_Src) noexcept {
         _Stream << '{';
-        uint_xt _length{_Src.size()};
+        uint_julet _length{_Src.size()};
         for (const auto _pair: _Src) {
             _Stream << _pair.first;
             _Stream << ':';
@@ -64,4 +64,4 @@ public:
     }
 };
 
-#endif // #ifndef __XXC_MAP_HPP
+#endif // #ifndef __JULEC_MAP_HPP

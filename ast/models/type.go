@@ -3,8 +3,8 @@ package models
 import (
 	"strings"
 
-	"github.com/the-xlang/xxc/lex"
-	"github.com/the-xlang/xxc/pkg/xapi"
+	"github.com/jule-lang/jule/lex"
+	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
 type Tok = lex.Tok
@@ -27,9 +27,9 @@ func (t Type) String() string {
 	cpp.WriteString(t.Type.String())
 	cpp.WriteByte(' ')
 	if t.Generic {
-		cpp.WriteString(xapi.AsId(t.Id))
+		cpp.WriteString(juleapi.AsId(t.Id))
 	} else {
-		cpp.WriteString(xapi.OutId(t.Id, t.Tok.File))
+		cpp.WriteString(juleapi.OutId(t.Id, t.Tok.File))
 	}
 	cpp.WriteByte(';')
 	return cpp.String()

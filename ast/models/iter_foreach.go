@@ -3,8 +3,8 @@ package models
 import (
 	"strings"
 
-	"github.com/the-xlang/xxc/pkg/xapi"
-	"github.com/the-xlang/xxc/pkg/xtype"
+	"github.com/jule-lang/jule/pkg/juleapi"
+	"github.com/jule-lang/jule/pkg/juletype"
 )
 
 // IterForeach is foreach iteration profile.
@@ -17,7 +17,7 @@ type IterForeach struct {
 }
 
 func (f IterForeach) String(iter Iter) string {
-	if !xapi.IsIgnoreId(f.KeyA.Id) {
+	if !juleapi.IsIgnoreId(f.KeyA.Id) {
 		return f.ForeachString(iter)
 	}
 	return f.IterationString(iter)
@@ -29,7 +29,7 @@ func (f *IterForeach) ClassicString(iter Iter) string {
 	cpp.WriteString(f.ExprType.String())
 	cpp.WriteByte(',')
 	cpp.WriteString(f.KeyA.Type.String())
-	if !xapi.IsIgnoreId(f.KeyB.Id) {
+	if !juleapi.IsIgnoreId(f.KeyB.Id) {
 		cpp.WriteByte(',')
 		cpp.WriteString(f.KeyB.Type.String())
 	}
@@ -39,7 +39,7 @@ func (f *IterForeach) ClassicString(iter Iter) string {
 	cpp.WriteString(f.KeyA.Type.String())
 	cpp.WriteByte(' ')
 	cpp.WriteString(f.KeyA.OutId())
-	if !xapi.IsIgnoreId(f.KeyB.Id) {
+	if !juleapi.IsIgnoreId(f.KeyB.Id) {
 		cpp.WriteByte(',')
 		cpp.WriteString(f.KeyB.Type.String())
 		cpp.WriteByte(' ')
@@ -64,7 +64,7 @@ func (f *IterForeach) MapString(iter Iter) string {
 	cpp.WriteString(f.KeyA.Type.String())
 	cpp.WriteByte(' ')
 	cpp.WriteString(f.KeyA.OutId())
-	if !xapi.IsIgnoreId(f.KeyB.Id) {
+	if !juleapi.IsIgnoreId(f.KeyB.Id) {
 		cpp.WriteByte(',')
 		cpp.WriteString(f.KeyB.Type.String())
 		cpp.WriteByte(' ')
@@ -78,9 +78,9 @@ func (f *IterForeach) MapString(iter Iter) string {
 
 func (f *IterForeach) ForeachString(iter Iter) string {
 	switch f.ExprType.Id {
-	case xtype.Str, xtype.Slice, xtype.Array:
+	case juletype.Str, juletype.Slice, juletype.Array:
 		return f.ClassicString(iter)
-	case xtype.Map:
+	case juletype.Map:
 		return f.MapString(iter)
 	}
 	return ""

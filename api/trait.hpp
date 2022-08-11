@@ -1,9 +1,9 @@
-// Copyright 2022 The X Programming Language.
+// Copyright 2022 The Jule Programming Language.
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-#ifndef __XXC_TRAIT_HPP
-#define __XXC_TRAIT_HPP
+#ifndef __JULEC_TRAIT_HPP
+#define __JULEC_TRAIT_HPP
 
 // Wrapper structure for traits.
 template<typename T>
@@ -13,7 +13,7 @@ template<typename T>
 struct trait {
 public:
     T *_data{nil};
-    mutable uint_xt *_ref{nil};
+    mutable uint_julet *_ref{nil};
 
     trait<T>(void) noexcept {}
     trait<T>(std::nullptr_t) noexcept {}
@@ -23,7 +23,7 @@ public:
         TT *_alloc = new(std::nothrow) TT{_Data};
         if (!_alloc) { XID(panic)("memory allocation failed"); }
         this->_data = (T*)(_alloc);
-        this->_ref = new(std::nothrow) uint_xt{1};
+        this->_ref = new(std::nothrow) uint_julet{1};
         if (!this->_ref) { XID(panic)("memory allocation failed"); }
     }
 
@@ -69,4 +69,4 @@ public:
     { return _Stream << _Src._data; }
 };
 
-#endif // #ifndef __XXC_TRAIT_HPP
+#endif // #ifndef __JULEC_TRAIT_HPP

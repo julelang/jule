@@ -1,9 +1,9 @@
 package parser
 
 import (
-	"github.com/the-xlang/xxc/ast/models"
-	"github.com/the-xlang/xxc/lex/tokens"
-	"github.com/the-xlang/xxc/pkg/xapi"
+	"github.com/jule-lang/jule/ast/models"
+	"github.com/jule-lang/jule/lex/tokens"
+	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
 type retChecker struct {
@@ -131,7 +131,7 @@ func (rc *retChecker) checkMultiRetAsMutliRet() {
 func (rc *retChecker) retsVars() {
 	if !rc.f.RetType.Type.MultiTyped {
 		for _, v := range rc.f.RetType.Identifiers {
-			if !xapi.IsIgnoreId(v.Kind) {
+			if !juleapi.IsIgnoreId(v.Kind) {
 				model := new(exprModel)
 				model.index = 0
 				model.nodes = make([]exprBuildNode, 1)
@@ -145,10 +145,10 @@ func (rc *retChecker) retsVars() {
 	}
 	types := rc.f.RetType.Type.Tag.([]DataType)
 	for i, v := range rc.f.RetType.Identifiers {
-		if xapi.IsIgnoreId(v.Kind) {
+		if juleapi.IsIgnoreId(v.Kind) {
 			node := exprNode{}
 			node.value = types[i].String()
-			node.value += xapi.DefaultExpr
+			node.value += juleapi.DefaultExpr
 			rc.expModel.models = append(rc.expModel.models, node)
 			continue
 		}

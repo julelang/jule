@@ -1,6 +1,6 @@
 package models
 
-import "github.com/the-xlang/xxc/pkg/xapi"
+import "github.com/jule-lang/jule/pkg/juleapi"
 
 // Defer is the AST model of deferred calls.
 type Defer struct {
@@ -9,7 +9,7 @@ type Defer struct {
 }
 
 func (d Defer) String() string {
-	return xapi.ToDeferredCall(d.Expr.String())
+	return juleapi.ToDeferredCall(d.Expr.String())
 }
 
 // ConcurrentCall is the AST model of concurrent calls.
@@ -19,5 +19,5 @@ type ConcurrentCall struct {
 }
 
 func (cc ConcurrentCall) String() string {
-	return xapi.ToConcurrentCall(cc.Expr.String())
+	return juleapi.ToConcurrentCall(cc.Expr.String())
 }

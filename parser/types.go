@@ -3,9 +3,9 @@ package parser
 import (
 	"strings"
 
-	"github.com/the-xlang/xxc/lex/tokens"
-	"github.com/the-xlang/xxc/pkg/x"
-	"github.com/the-xlang/xxc/pkg/xtype"
+	"github.com/jule-lang/jule/lex/tokens"
+	"github.com/jule-lang/jule/pkg/jule"
+	"github.com/jule-lang/jule/pkg/juletype"
 )
 
 func findGeneric(id string, generics []*GenericType) *GenericType {
@@ -18,7 +18,7 @@ func findGeneric(id string, generics []*GenericType) *GenericType {
 }
 
 func typeIsVoid(t DataType) bool {
-	return t.Id == xtype.Void && !t.MultiTyped
+	return t.Id == juletype.Void && !t.MultiTyped
 }
 
 func typeIsVariadicable(t DataType) bool {
@@ -29,19 +29,19 @@ func typeIsAllowForConst(t DataType) bool {
 	if !typeIsPure(t) {
 		return false
 	}
-	return t.Id == xtype.Str || xtype.IsNumeric(t.Id)
+	return t.Id == juletype.Str || juletype.IsNumeric(t.Id)
 }
 
 func typeIsStruct(dt DataType) bool {
-	return dt.Id == xtype.Struct
+	return dt.Id == juletype.Struct
 }
 
 func typeIsTrait(dt DataType) bool {
-	return dt.Id == xtype.Trait
+	return dt.Id == juletype.Trait
 }
 
 func typeIsEnum(dt DataType) bool {
-	return dt.Id == xtype.Enum
+	return dt.Id == juletype.Enum
 }
 
 func unptrType(t DataType) DataType {
@@ -88,7 +88,7 @@ func typeIsThisGeneric(generic *GenericType, t DataType) bool {
 }
 
 func typeIsGeneric(generics []*GenericType, t DataType) bool {
-	if t.Id != xtype.Id {
+	if t.Id != juletype.Id {
 		return false
 	}
 	for _, generic := range generics {
@@ -111,22 +111,22 @@ func typeIsPtr(t DataType) bool {
 }
 
 func typeIsSlice(t DataType) bool {
-	return t.Id == xtype.Slice && strings.HasPrefix(t.Kind, x.Prefix_Slice)
+	return t.Id == juletype.Slice && strings.HasPrefix(t.Kind, jule.Prefix_Slice)
 }
 
 func typeIsArray(t DataType) bool {
-	return t.Id == xtype.Array && strings.HasPrefix(t.Kind, x.Prefix_Array)
+	return t.Id == juletype.Array && strings.HasPrefix(t.Kind, jule.Prefix_Array)
 }
 
 func typeIsMap(t DataType) bool {
-	if t.Kind == "" || t.Id != xtype.Map {
+	if t.Kind == "" || t.Id != juletype.Map {
 		return false
 	}
 	return t.Kind[0] == '[' && t.Kind[len(t.Kind)-1] == ']'
 }
 
 func typeIsFunc(t DataType) bool {
-	if t.Id != xtype.Func || t.Kind == "" {
+	if t.Id != juletype.Func || t.Kind == "" {
 		return false
 	}
 	return t.Kind[0] == '('
@@ -149,7 +149,7 @@ func subIdAccessorOfType(t DataType) string {
 }
 
 func typeIsNilCompatible(t DataType) bool {
-	return t.Id == xtype.Nil ||
+	return t.Id == juletype.Nil ||
 		typeIsFunc(t) ||
 		typeIsPtr(t) ||
 		typeIsSlice(t) ||
@@ -158,7 +158,7 @@ func typeIsNilCompatible(t DataType) bool {
 }
 
 func checkSliceCompatiblity(arrT, t DataType) bool {
-	if t.Id == xtype.Nil {
+	if t.Id == juletype.Nil {
 		return true
 	}
 	return arrT.Kind == t.Kind
@@ -172,7 +172,7 @@ func checkArrayCompatiblity(arrT, t DataType) bool {
 }
 
 func checkMapCompability(mapT, t DataType) bool {
-	if t.Id == xtype.Nil {
+	if t.Id == juletype.Nil {
 		return true
 	}
 	return mapT.Kind == t.Kind
@@ -183,7 +183,7 @@ func typeIsLvalue(t DataType) bool {
 }
 
 func checkPtrCompability(t1, t2 DataType) bool {
-	if t2.Id == xtype.Nil {
+	if t2.Id == juletype.Nil {
 		return true
 	}
 	return t1.Kind == t2.Kind
@@ -256,16 +256,16 @@ func typesAreCompatible(t1, t2 DataType, ignoreany bool) bool {
 		}
 		return checkTraitCompability(t1, t2)
 	case typeIsNilCompatible(t1):
-		return t2.Id == xtype.Nil
+		return t2.Id == juletype.Nil
 	case typeIsNilCompatible(t2):
-		return t1.Id == xtype.Nil
+		return t1.Id == juletype.Nil
 	case typeIsEnum(t1), typeIsEnum(t2):
 		return t1.Id == t2.Id && t1.Kind == t2.Kind
 	case typeIsStruct(t1), typeIsStruct(t2):
-		if t2.Id == xtype.Struct {
+		if t2.Id == juletype.Struct {
 			t1, t2 = t2, t1
 		}
 		return checkStructCompability(t1, t2)
 	}
-	return xtype.TypesAreCompatible(t1.Id, t2.Id, ignoreany)
+	return juletype.TypesAreCompatible(t1.Id, t2.Id, ignoreany)
 }
