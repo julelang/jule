@@ -4,6 +4,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/the-xlang/xxc/lex"
 )
 
 // String are generated as clean byte encoded, not string literal.
@@ -49,6 +51,24 @@ func btoa(b byte) string {
 	return "0x" + strconv.FormatUint(uint64(b), 16)
 }
 
+func byteSeq(bytes []byte, i int) (seq []byte, n int) {
+	byten := len(bytes) - i
+	switch {
+	case byten == 1:
+		n = 1
+	case !lex.IsOctal(bytes[i+1]):
+		n = 1
+	case byten == 2:
+		n = 2
+	case !lex.IsOctal(bytes[i+2]):
+		n = 2
+	default:
+		n = 3
+	}
+	seq = bytes[i : i+n]
+	return
+}
+
 func bytesToStr(bytes []byte) string {
 	if len(bytes) == 0 {
 		return ""
@@ -74,8 +94,10 @@ func bytesToStr(bytes []byte) string {
 				str.Write(bytes[i : i+3])
 				i += 2
 			default:
-				str.Write(bytes[i : i+3])
-				i += 2
+				seq, n := byteSeq(bytes, i)
+				i += n - 1
+				b, _ := strconv.ParseUint(string(seq), 8, 8)
+				str.WriteString(btoa(byte(b)))
 			}
 		} else {
 			str.WriteString(btoa(b))

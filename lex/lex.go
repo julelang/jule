@@ -202,9 +202,11 @@ func (l *Lex) num(txt string) string {
 	return val
 }
 
-func isOctal(b byte) bool { return '0' <= b && b <= '7' }
+// Reports byte is octal sequence or not.
+func IsOctal(b byte) bool { return '0' <= b && b <= '7' }
 
-func isHex(b byte) bool {
+// Reports byte is hexadecimal sequence or not.
+func IsHex(b byte) bool {
 	switch {
 	case '0' <= b && b <= '9':
 		return true
@@ -222,7 +224,7 @@ func hexEsq(txt string, n int) (seq string) {
 	}
 	const hexStart = 2
 	for i := hexStart; i < n; i++ {
-		if !isHex(txt[i]) {
+		if !IsHex(txt[i]) {
 			return
 		}
 	}
@@ -244,17 +246,17 @@ func byteEsq(txt string) (seq string) {
 	if len(txt) < 2 {
 		return
 	}
-	if !isOctal(txt[1]) {
+	if !IsOctal(txt[1]) {
 		return
 	}
 	switch {
 	case len(txt) == 2:
 		seq = txt[:2]
-	case !isOctal(txt[2]):
+	case !IsOctal(txt[2]):
 		seq = txt[:2]
 	case len(txt) == 3:
 		seq = txt[:3]
-	case !isOctal(txt[3]):
+	case !IsOctal(txt[3]):
 		seq = txt[:3]
 	default:
 		seq = txt[:4]
