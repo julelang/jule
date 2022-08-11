@@ -1,6 +1,6 @@
 <div align="center">
 <p>
-    <img width="150" src="https://raw.githubusercontent.com/jule-lang/resources/main/jule.png?sanitize=true">
+    <img width="150" src="https://raw.githubusercontent.com/jule-lang/resources/main/jule.svg?sanitize=true">
 </p>
 <h2>The Jule Programming Language</h2>
 
