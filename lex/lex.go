@@ -202,16 +202,91 @@ func (l *Lex) num(txt string) string {
 	return val
 }
 
-var escSeqRegexp = regexp.MustCompile(`^\\([\\'"abfnrtv]|U.{8}|u.{4}|x..|[0-7]{1,3})`)
+func isOctal(b byte) bool { return '0' <= b && b <= '7' }
+
+func isHex(b byte) bool {
+	switch {
+	case '0' <= b && b <= '9':
+		return true
+	case 'a' <= b && b <= 'f':
+		return true
+	case 'A' <= b && b <= 'F':
+		return true
+	}
+	return false
+}
+
+func hexEsq(txt string, n int) (seq string) {
+	if len(txt) < n {
+		return
+	}
+	const hexStart = 2
+	for i := hexStart; i < n; i++ {
+		if !isHex(txt[i]) {
+			return
+		}
+	}
+	seq = txt[:n]
+	return
+}
+
+// Pattern (RegEx): ^\\U.{8}
+func bigUnicodePointEsq(txt string) string { return hexEsq(txt, 10) }
+
+// Pattern (RegEx): ^\\u.{4}
+func littleUnicodePointEsq(txt string) string { return hexEsq(txt, 6) }
+
+// Pattern (RegEx): ^\\x..
+func hexByteEsq(txt string) string { return hexEsq(txt, 4) }
+
+// Patter (RegEx): ^\\[0-7]{1,3}
+func byteEsq(txt string) (seq string) {
+	if len(txt) < 2 {
+		return
+	}
+	if !isOctal(txt[1]) {
+		return
+	}
+	switch {
+	case len(txt) == 2:
+		seq = txt[:2]
+	case !isOctal(txt[2]):
+		seq = txt[:2]
+	case len(txt) == 3:
+		seq = txt[:3]
+	case !isOctal(txt[3]):
+		seq = txt[:3]
+	default:
+		seq = txt[:4]
+	}
+	return
+}
 
 func (l *Lex) escseq(txt string) string {
-	seq := escSeqRegexp.FindString(txt)
-	if seq != "" {
-		l.Pos += len([]rune(seq))
-		return seq
+	seq := ""
+	if len(txt) < 2 {
+		goto end
 	}
-	l.Pos++
-	l.pusherr("invalid_escape_sequence")
+	switch txt[1] {
+	case '\'', '"', 'a', 'b', 'f', 'n', 'r', 't', 'v':
+		l.Pos += 2
+		return txt[:3]
+	case 'U':
+		seq = bigUnicodePointEsq(txt)
+	case 'u':
+		seq = littleUnicodePointEsq(txt)
+	case 'x':
+		seq = hexByteEsq(txt)
+	default:
+		seq = byteEsq(txt)
+	}
+end:
+	if seq == "" {
+		l.Pos++
+		l.pusherr("invalid_escape_sequence")
+		return ""
+	}
+	l.Pos += len(seq)
 	return seq
 }
 
