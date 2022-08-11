@@ -1,9 +1,7 @@
 package lex
 
 import (
-	"regexp"
 	"strings"
-	"sync"
 	"unicode"
 	"unicode/utf8"
 
@@ -17,7 +15,6 @@ type File = xio.File
 
 // Lex is lexer of Fract.
 type Lex struct {
-	wg             sync.WaitGroup
 	firstTokOfLine bool
 
 	File   *File
@@ -71,14 +68,11 @@ func (l *Lex) Lex() []Tok {
 			toks = append(toks, tok)
 		}
 	}
-	l.wg.Add(1)
-	go l.checkRanges()
-	l.wg.Wait()
+	l.checkRanges()
 	return toks
 }
 
 func (l *Lex) checkRanges() {
-	defer l.wg.Done()
 	for _, tok := range l.braces {
 		switch tok.Kind {
 		case tokens.LPARENTHESES:
@@ -191,21 +185,155 @@ func (l *Lex) rangecomment() {
 	l.pusherr("missing_block_comment")
 }
 
-// NumRegexp is regular expression pattern for numericals.
-var NumRegexp = *regexp.MustCompile(`^((0x[[:xdigit:]]+)|0b([0-1]{1,})|0([0-7]{1,})|(\d+((\.\d+)?((e|E)(\-|\+|)\d+)?|(\.\d+))))`)
-
-// num returns numeric if next token is numeric,
-// returns empty string if not.
-func (l *Lex) num(txt string) string {
-	val := NumRegexp.FindString(txt)
-	l.Pos += len(val)
-	return val
+func scientific(txt string, i int) (literal string) {
+	i++ // Skip E | e
+	if i >= len(txt) {
+		return
+	}
+	b := txt[i]
+	if b == '+' || b == '-' {
+		i++ // Skip operator
+		if i >= len(txt) {
+			return
+		}
+	}
+	for ; i < len(txt); i++ {
+		b := txt[i]
+		if !IsDecimal(b) {
+			break
+		}
+	}
+	return txt[:i]
 }
 
-// Reports byte is octal sequence or not.
+func floatNum(txt string, i int) (literal string) {
+	i++ // Skip dot
+	for ; i < len(txt); i++ {
+		b := txt[i]
+		if b == 'e' || b == 'E' {
+			return scientific(txt, i)
+		} else if !IsDecimal(b) {
+			break
+		}
+	}
+	if i == 1 { // Just dot
+		return
+	}
+	return txt[:i]
+}
+
+func commonNum(txt string) (literal string) {
+	i := 0
+	for ; i < len(txt); i++ {
+		b := txt[i]
+		if b == '.' {
+			return floatNum(txt, i)
+		} else if b == 'e' || b == 'E' {
+			return scientific(txt, i)
+		} else if !IsDecimal(b) {
+			break
+		}
+	}
+	if i == 0 {
+		return
+	}
+	return txt[:i]
+}
+
+func binaryNum(txt string) (literal string) {
+	if !strings.HasPrefix(txt, "0b") {
+		return ""
+	}
+	if len(txt) < 2 {
+		return
+	}
+	const binaryStart = 2
+	i := binaryStart
+	for ; i < len(txt); i++ {
+		if !IsBinary(txt[i]) {
+			break
+		}
+	}
+	if i == binaryStart {
+		return
+	}
+	return txt[:i]
+}
+
+func octalNum(txt string) (literal string) {
+	if txt[0] != '0' {
+		return ""
+	}
+	if len(txt) < 2 {
+		return
+	}
+	const octalStart = 1
+	i := octalStart
+	for ; i < len(txt); i++ {
+		b := txt[i]
+		if b == 'e' || b == 'E' {
+			return scientific(txt, i)
+		} else if !IsOctal(b) {
+			break
+		}
+	}
+	if i == octalStart {
+		return
+	}
+	return txt[:i]
+}
+
+func hexNum(txt string) (literal string) {
+	if !strings.HasPrefix(txt, "0x") {
+		return ""
+	}
+	if len(txt) < 3 {
+		return
+	}
+	const hexStart = 2
+	i := hexStart
+	for ; i < len(txt); i++ {
+		if !IsHex(txt[i]) {
+			break
+		}
+	}
+	if i == hexStart {
+		return
+	}
+	return txt[:i]
+}
+
+// num returns literal if next token is numeric,
+// returns empty string if not.
+func (l *Lex) num(txt string) (literal string) {
+	literal = hexNum(txt)
+	if literal != "" {
+		goto end
+	}
+	literal = octalNum(txt)
+	if literal != "" {
+		goto end
+	}
+	literal = binaryNum(txt)
+	if literal != "" {
+		goto end
+	}
+	literal = commonNum(txt)
+end:
+	l.Pos += len(literal)
+	return
+}
+
+// IsDecimal reports byte is decimal sequence or not.
+func IsDecimal(b byte) bool { return '0' <= b && b <= '9' }
+
+// IsBinary reports byte is binary sequence or not.
+func IsBinary(b byte) bool { return b == '0' || b == '1' }
+
+// IsOctal reports byte is octal sequence or not.
 func IsOctal(b byte) bool { return '0' <= b && b <= '7' }
 
-// Reports byte is hexadecimal sequence or not.
+// IsHex reports byte is hexadecimal sequence or not.
 func IsHex(b byte) bool {
 	switch {
 	case '0' <= b && b <= '9':
@@ -543,6 +671,7 @@ func (l *Lex) Tok() Tok {
 
 	//* Tokenize
 	switch {
+	case l.lexNumeric(txt, &tok):
 	case txt[0] == '\'':
 		tok.Kind = l.rune(txt)
 		tok.Id = tokens.Value
@@ -573,8 +702,7 @@ func (l *Lex) Tok() Tok {
 		l.firstTokOfLine && l.isop(txt, tokens.SHARP, tokens.Preprocessor, &tok),
 		l.lexBasicOps(txt, &tok),
 		l.lexKeywords(txt, &tok),
-		l.lexIdentifier(txt, &tok),
-		l.lexNumeric(txt, &tok):
+		l.lexIdentifier(txt, &tok):
 	default:
 		r, sz := utf8.DecodeRuneInString(txt)
 		l.pusherr("invalid_token", r)

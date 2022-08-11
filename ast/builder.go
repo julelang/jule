@@ -10,7 +10,6 @@ import (
 	"github.com/the-xlang/xxc/lex/tokens"
 	"github.com/the-xlang/xxc/pkg/x"
 	"github.com/the-xlang/xxc/pkg/xapi"
-	"github.com/the-xlang/xxc/pkg/xbits"
 	"github.com/the-xlang/xxc/pkg/xlog"
 	"github.com/the-xlang/xxc/pkg/xtype"
 )
@@ -2395,7 +2394,6 @@ func (b *Builder) exprValuePart(info *exprProcessInfo, tok Tok) {
 			info.pushedError = true
 		}
 	}
-	b.checkExprTok(tok)
 	info.part = append(info.part, tok)
 	info.operator = RequireOperatorToProcess(tok, info.i, len(info.toks))
 	info.value = false
@@ -2454,24 +2452,6 @@ func (b *Builder) exprProcesses(toks Toks) []Toks {
 		return nil
 	}
 	return info.processes
-}
-
-func (b *Builder) checkExprTok(tok Tok) {
-	if lex.NumRegexp.MatchString(tok.Kind) {
-		var result bool
-		if strings.Contains(tok.Kind, tokens.DOT) ||
-			(!strings.HasPrefix(tok.Kind, "0x") && strings.ContainsAny(tok.Kind, "eE")) {
-			result = xbits.CheckBitFloat(tok.Kind, 64)
-		} else {
-			result = xbits.CheckBitInt(tok.Kind, xbits.MaxInt)
-			if !result {
-				result = xbits.CheckBitUInt(tok.Kind, xbits.MaxInt)
-			}
-		}
-		if !result {
-			b.pusherr(tok, "invalid_numeric_range")
-		}
-	}
 }
 
 func (b *Builder) getrange(i *int, open, close string, toks *Toks) Toks {
