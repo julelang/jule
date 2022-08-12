@@ -197,11 +197,15 @@ func scientific(txt string, i int) (literal string) {
 			return
 		}
 	}
+	first := i
 	for ; i < len(txt); i++ {
 		b := txt[i]
 		if !IsDecimal(b) {
 			break
 		}
+	}
+	if i == first {
+		return ""
 	}
 	return txt[:i]
 }
@@ -210,7 +214,7 @@ func floatNum(txt string, i int) (literal string) {
 	i++ // Skip dot
 	for ; i < len(txt); i++ {
 		b := txt[i]
-		if b == 'e' || b == 'E' {
+		if i > 1 && (b == 'e' || b == 'E') {
 			return scientific(txt, i)
 		} else if !IsDecimal(b) {
 			break
