@@ -111,12 +111,12 @@ JuleC is in development with the [Go](https://github.com/golang/go) programming 
 
 #### Windows - PowerShell
 ```
-go build -o jule.exe -v cmd/julec/main.go
+go build -o julec.exe -v cmd/julec/main.go
 ```
 
 #### Linux - Bash
 ```
-go build -o jule -v cmd/julec/main.go
+go build -o julec -v cmd/julec/main.go
 ```
 
 Run the above command in your terminal, in the Jule project directory.

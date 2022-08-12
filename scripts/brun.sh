@@ -9,10 +9,10 @@ else
   MAIN_FILE="../cmd/julec/main.go"
 fi
 
-go build -o jule -v $MAIN_FILE
+go build -o julec -v $MAIN_FILE
 
 if [ $? -eq 0 ]; then
-  ./jule $@
+  ./julec $@
 else
   echo "-----------------------------------------------------------------------"
   echo "An unexpected error occurred while compiling JuleC. Check errors above."

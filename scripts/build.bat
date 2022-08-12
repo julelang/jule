@@ -4,15 +4,15 @@
 
 @echo off
 
-if exist .\jule.exe ( del /f jule.exe )
+if exist .\julec.exe ( del /f julec.exe )
 
 if exist cmd\julec\main.go (
-  go build -o jule.exe -v cmd\julec\main.go
+  go build -o julec.exe -v cmd\julec\main.go
 ) else (
-  go build -o jule.exe -v ..\cmd\julec\main.go
+  go build -o julec.exe -v ..\cmd\julec\main.go
 )
 
-if exist .\jule.exe (
+if exist .\julec.exe (
   echo Compile is successful!
 ) else (
   echo -----------------------------------------------------------------------

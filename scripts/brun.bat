@@ -4,16 +4,16 @@
 
 @echo off
 
-if exist .\jule.exe ( del /f jule.exe )
+if exist .\julec.exe ( del /f julec.exe )
 
 if exist cmd\jule\main.go (
-  go build -o jule.exe -v cmd\julec\main.go
+  go build -o julec.exe -v cmd\julec\main.go
 ) else (
-  go build -o jule.exe -v ..\cmd\julec\main.go
+  go build -o julec.exe -v ..\cmd\julec\main.go
 )
 
-if exist .\jule.exe (
-  .\jule.exe %*
+if exist .\julec.exe (
+  .\julec.exe %*
 ) else (
   echo -----------------------------------------------------------------------
   echo An unexpected error occurred while compiling JuleC. Check errors above.
