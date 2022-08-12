@@ -906,7 +906,9 @@ func (e *eval) nsSubId(toks Toks, m *exprModel) (v value) {
 	e.p.blockVars = nil
 	pdefs := e.p.Defs
 	e.p.Defs = defs
+	e.p.allowBuiltin = false
 	v, _ = e.single(toks[0], m)
+	e.p.allowBuiltin = true
 	e.p.blockTypes = blockTypes
 	e.p.blockVars = blockVars
 	e.p.Defs = pdefs

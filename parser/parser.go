@@ -60,6 +60,7 @@ type Parser struct {
 	waitingGlobals []waitingGlobal
 	eval           *eval
 	cppLinks       []*models.CppLink
+	allowBuiltin   bool
 
 	NoLocalPkg bool
 	JustDefs   bool
@@ -76,6 +77,7 @@ type Parser struct {
 func New(f *File) *Parser {
 	p := new(Parser)
 	p.File = f
+	p.allowBuiltin = true
 	p.Defs = new(Defmap)
 	p.eval = new(eval)
 	p.eval.p = p
@@ -1481,9 +1483,11 @@ func (p *Parser) linkById(id string) *models.CppLink {
 // Special case:
 //  FuncById(id) -> nil: if function is not exist.
 func (p *Parser) FuncById(id string) (*function, *Defmap, bool) {
-	f, _, _ := Builtin.funcById(id, nil)
-	if f != nil {
-		return f, nil, false
+	if p.allowBuiltin {
+		f, _, _ := Builtin.funcById(id, nil)
+		if f != nil {
+			return f, nil, false
+		}
 	}
 	return p.Defs.funcById(id, p.File)
 }
@@ -1502,33 +1506,41 @@ func (p *Parser) typeById(id string) (*Type, *Defmap, bool) {
 	if t != nil {
 		return t, nil, false
 	}
-	t, _, _ = Builtin.typeById(id, nil)
-	if t != nil {
-		return t, nil, false
+	if p.allowBuiltin {
+		t, _, _ = Builtin.typeById(id, nil)
+		if t != nil {
+			return t, nil, false
+		}
 	}
 	return p.Defs.typeById(id, p.File)
 }
 
 func (p *Parser) enumById(id string) (*Enum, *Defmap, bool) {
-	s, _, _ := Builtin.enumById(id, nil)
-	if s != nil {
-		return s, nil, false
+	if p.allowBuiltin {
+		s, _, _ := Builtin.enumById(id, nil)
+		if s != nil {
+			return s, nil, false
+		}
 	}
 	return p.Defs.enumById(id, p.File)
 }
 
 func (p *Parser) structById(id string) (*xstruct, *Defmap, bool) {
-	s, _, _ := Builtin.structById(id, nil)
-	if s != nil {
-		return s, nil, false
+	if p.allowBuiltin {
+		s, _, _ := Builtin.structById(id, nil)
+		if s != nil {
+			return s, nil, false
+		}
 	}
 	return p.Defs.structById(id, p.File)
 }
 
 func (p *Parser) traitById(id string) (*trait, *Defmap, bool) {
-	t, _, _ := Builtin.traitById(id, nil)
-	if t != nil {
-		return t, nil, false
+	if p.allowBuiltin {
+		t, _, _ := Builtin.traitById(id, nil)
+		if t != nil {
+			return t, nil, false
+		}
 	}
 	return p.Defs.traitById(id, p.File)
 }
