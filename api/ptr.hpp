@@ -47,12 +47,17 @@ struct ptr {
     }
 
     void __dealloc(void) noexcept {
-        if (!this->_ref) { return; }
+        if (!this->_ref) {
+            this->_ptr = nil;
+            return;
+        }
         --(*this->_ref);
         if (!this->_heap ||
             (this->_heap != __JULEC_PTR_NEVER_HEAP &&
-                *this->_heap != __JULEC_PTR_HEAP_TRUE))
-            { return; }
+                *this->_heap != __JULEC_PTR_HEAP_TRUE)) {
+            this->_ptr = nil;
+            return;
+        }
         if ((*this->_ref) != 0) { return; }
         if (this->_heap != __JULEC_PTR_NEVER_HEAP)
         { delete this->_heap; }
@@ -103,7 +108,7 @@ struct ptr {
     { this->__dealloc(); }
 
     inline bool operator==(const std::nullptr_t) const noexcept
-    { return this->_ptr == nil; }
+    { return !this->_ptr || !*this->_ptr; }
 
     inline bool operator!=(const std::nullptr_t) const noexcept
     { return !this->operator==(nil); }
