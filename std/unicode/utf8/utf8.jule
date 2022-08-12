@@ -102,7 +102,7 @@ accept_ranges: = [16]accept_range{
 //doc:
 // Reports whether the bytes in p begin with a full UTF-8 encoding of a rune.
 // An invalid encoding is considered a full Rune since it will convert as a width-1 error rune.
-pub full_rune(p []byte) bool {
+pub full_rune(p: []byte) bool {
 	if p.empty() {
 		ret false
 	}
@@ -121,7 +121,7 @@ pub full_rune(p []byte) bool {
 }
 
 //doc: Is like full_rune but its input is a string.
-pub full_rune_str(s str) bool {
+pub full_rune_str(s: str) bool {
 	if s.empty() {
 		ret false
 	}
@@ -148,7 +148,7 @@ pub full_rune_str(s str) bool {
 // An encoding is invalid if it is incorrect UTF-8, encodes a rune that is
 // out of range, or is not the shortest possible UTF-8 encoding for the
 // value. No other validation is performed.
-pub decode_rune(p []byte) [r rune, size int] {
+pub decode_rune(p: []byte) [r: rune, size: int] {
 	if p.len < 1 {
 		ret RUNE_ERROR, 0
 	}
@@ -196,7 +196,7 @@ pub decode_rune(p []byte) [r rune, size int] {
 // An encoding is invalid if it is incorrect UTF-8, encodes a rune that is
 // out of range, or is not the shortest possible UTF-8 encoding for the
 // value. No other validation is performed.
-pub decode_rune_str(s str) [r rune, size int] {
+pub decode_rune_str(s: str) [r: rune, size: int] {
 	if s.len < 1 {
 		ret RUNE_ERROR, 0
 	}
@@ -244,7 +244,7 @@ pub decode_rune_str(s str) [r rune, size int] {
 // An encoding is invalid if it is incorrect UTF-8, encodes a rune that is
 // out of range, or is not the shortest possible UTF-8 encoding for the
 // value. No other validation is performed.
-pub decode_last_rune(p []byte) [r rune, size int] {
+pub decode_last_rune(p: []byte) [r: rune, size: int] {
 	if p.empty() {
 		ret RUNE_ERROR, 0
 	}
@@ -285,7 +285,7 @@ pub decode_last_rune(p []byte) [r rune, size int] {
 // An encoding is invalid if it is incorrect UTF-8, encodes a rune that is
 // out of range, or is not the shortest possible UTF-8 encoding for the
 // value. No other validation is performed.
-pub decode_last_rune_str(s str) [r rune, size int] {
+pub decode_last_rune_str(s: str) [r: rune, size: int] {
 	if s.empty() {
 		ret RUNE_ERROR, 0
 	}
@@ -320,7 +320,7 @@ pub decode_last_rune_str(s str) [r rune, size int] {
 //doc:
 // Returns the number of bytes required to encode the rune.
 // It returns -1 if the rune is not a valid value to encode in UTF-8.
-pub rune_len(r rune) int {
+pub rune_len(r: rune) int {
 	match {
 	case r < 0:
 		ret -1
@@ -342,7 +342,7 @@ pub rune_len(r rune) int {
 // Writes into p (which must be large enough) the UTF-8 encoding of the rune.
 // If the rune is out of range, it writes the encoding of RUNE_ERROR.
 // It returns the number of bytes written.
-pub encode_rune(p []byte, r rune) int {
+pub encode_rune(p: []byte, r: rune) int {
 	// Negative values are erroneous. Making it unsigned addresses the problem.
 	i: = u32(r)
 	match {
@@ -373,14 +373,14 @@ pub encode_rune(p []byte, r rune) int {
 // Appends the UTF-8 encoding of r to the end of p and
 // returns the extended buffer. If the rune is out of range,
 // it appends the encoding of RUNE_ERROR.
-pub append_rune(p []byte, r rune) []byte {
+pub append_rune(p: []byte, r: rune) []byte {
 	if u32(r) <= RUNE1_MAX {
 		ret append[byte](p, byte(r))
 	}
 	ret append_rune_non_ascii(p, r)
 }
 
-append_rune_non_ascii(p []byte, r rune) []byte {
+append_rune_non_ascii(p: []byte, r: rune) []byte {
 	// Negative values are erroneous. Making it unsigned addresses the problem.
 	i: = u32(r)
 	match {
@@ -398,7 +398,7 @@ append_rune_non_ascii(p []byte, r rune) []byte {
 //doc:
 // Returns the number of runes in p. Erroneous and short
 // encodings are treated as single runes of width 1 byte.
-pub rune_count(p []byte) [n int] {
+pub rune_count(p: []byte) [n: int] {
 	for i: = 0; i < p.len; {
 		n++
 		c: = p[i]
@@ -440,8 +440,8 @@ pub rune_count(p []byte) [n int] {
 }
 
 //doc: Is like rune_count but its input is a string.
-pub rune_count_str(s str) [n int] {
-	for i := 0; i < s.len; n++ {
+pub rune_count_str(s: str) [n: int] {
+	for i: = 0; i < s.len; n++ {
 		c: = s[i]
 		if c < RUNE_SELF {
 			// ASCII fast path
@@ -485,10 +485,10 @@ pub rune_count_str(s str) [n int] {
 // possibly invalid rune. Second and subsequent bytes always have the top two
 // bits set to 10.
 @inline
-pub rune_start(b byte) bool { ret b&0xC0 != 0x80 }
+pub rune_start(b: byte) bool { ret b&0xC0 != 0x80 }
 
 //doc: Reports whether p consists entirely of valid UTF-8-encoded runes.
-pub valid(p []byte) bool {
+pub valid(p: []byte) bool {
 	// Fast path. Check for and skip 8 bytes of ASCII characters per iteration.
 	for p.len >= 8 {
 		// Combining two 32 bit loads allows the same code to be used
@@ -538,7 +538,7 @@ pub valid(p []byte) bool {
 }
 
 //doc: Reports whether s consists entirely of valid UTF-8-encoded runes.
-pub valid_str(s str) bool {
+pub valid_str(s: str) bool {
 	// Fast path. Check for and skip 8 bytes of ASCII characters per iteration.
 	for s.len >= 8 {
 		// Combining two 32 bit loads allows the same code to be used
@@ -590,7 +590,7 @@ pub valid_str(s str) bool {
 //doc:
 // Reports whether r can be legally encoded as UTF-8.
 // Code points that are out of range or a surrogate half are illegal.
-pub valid_rune(r rune) bool {
+pub valid_rune(r: rune) bool {
 	match {
 	case 0 <= r && r < SURROGATE_MIN:
 		ret true

@@ -137,6 +137,16 @@ func (b *Builder) Type(toks Toks) (t models.Type) {
 		b.pusherr(toks[i-1], "invalid_syntax")
 		return
 	}
+	tok = toks[i]
+	if tok.Id != tokens.Colon {
+		b.pusherr(toks[i-1], "invalid_syntax")
+		return
+	}
+	i++
+	if i >= len(toks) {
+		b.pusherr(toks[i-1], "missing_type")
+		return
+	}
 	destType, ok := b.DataType(toks, &i, true, true)
 	t.Type = destType
 	if ok && i+1 < len(toks) {
@@ -931,7 +941,7 @@ func (b *Builder) checkParams(params *[]models.Param) {
 	}
 }
 
-func (b *Builder) paramBegin(p *models.Param, i *int, toks Toks) {
+func (b *Builder) paramTypeBegin(p *models.Param, i *int, toks Toks) {
 	for ; *i < len(toks); *i++ {
 		tok := toks[*i]
 		switch tok.Id {
@@ -950,7 +960,7 @@ func (b *Builder) paramBegin(p *models.Param, i *int, toks Toks) {
 				}
 				p.Reference = true
 			default:
-				b.pusherr(tok, "invalid_syntax")
+				return
 			}
 		default:
 			return
@@ -966,60 +976,52 @@ func (b *Builder) paramBodyId(p *models.Param, tok Tok) {
 	p.Id = tok.Kind
 }
 
-func (b *Builder) paramBodyDataType(params *[]models.Param, p *models.Param, toks Toks) {
+func (b *Builder) paramBody(p *models.Param, i *int, toks Toks, mustPure bool) {
+	b.paramBodyId(p, toks[*i])
+	// +1 for skip identifier token
+	tok := toks[*i]
+	toks = toks[*i+1:]
+	if len(toks) == 0 {
+		return
+	} else if len(toks) < 2 {
+		b.pusherr(tok, "missing_type")
+		return
+	}
+	tok = toks[*i]
+	if tok.Id != tokens.Colon {
+		b.pusherr(tok, "invalid_syntax")
+		return
+	}
+	toks = toks[*i+1:] // Skip colon
+	b.paramType(p, toks, mustPure)
+}
+
+func (b *Builder) paramType(p *models.Param, toks Toks, mustPure bool) {
 	i := 0
+	if !mustPure {
+		b.paramTypeBegin(p, &i, toks)
+		if i >= len(toks) {
+			return
+		}
+	}
 	p.Type, _ = b.DataType(toks, &i, false, true)
 	i++
 	if i < len(toks) {
 		b.pusherr(toks[i], "invalid_syntax")
 	}
-	// Set param data types to this data type
-	// if parameter has not any data type.
-	i = len(*params) - 1
-	for ; i >= 0; i-- {
-		param := &(*params)[i]
-		if param.Type.Tok.Id != tokens.NA {
-			break
-		}
-		param.Type = p.Type
-	}
-}
-
-func (b *Builder) paramBody(params *[]models.Param, p *models.Param, i *int, toks Toks) {
-	b.paramBodyId(p, toks[*i])
-	// +1 for skip identifier token
-	toks = toks[*i+1:]
-	if len(toks) == 0 {
-		return
-	}
-	if len(toks) > 0 {
-		b.paramBodyDataType(params, p, toks)
-	}
 }
 
 func (b *Builder) pushParam(params *[]models.Param, toks Toks, mustPure bool) {
 	var param models.Param
-	i := 0
-	if !mustPure {
-		b.paramBegin(&param, &i, toks)
-		if i >= len(toks) {
-			return
-		}
-	}
-	tok := toks[i]
-	param.Tok = tok
-	// Just given data-type.
-	if tok.Id != tokens.Id {
+	param.Tok = toks[0]
+	// Just data type
+	if param.Tok.Id != tokens.Id {
 		param.Id = jule.Anonymous
-		if t, ok := b.DataType(toks, &i, false, true); ok {
-			if i+1 == len(toks) {
-				param.Type = t
-			}
-		}
-		goto end
+		b.paramType(&param, toks, mustPure)
+	} else {
+		i := 0
+		b.paramBody(&param, &i, toks, mustPure)
 	}
-	b.paramBody(params, &param, &i, toks)
-end:
 	*params = append(*params, param)
 }
 
