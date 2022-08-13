@@ -27,11 +27,11 @@ struct ptr {
 
     ptr<T>(T *_Ptr) noexcept {
         this->_ptr = new(std::nothrow) T*{nil};
-        if (!this->_ptr) { XID(panic)("memory allocation failed"); }
+        if (!this->_ptr) { JULEC_ID(panic)("memory allocation failed"); }
         this->_heap = new(std::nothrow) bool*{nil};
-        if (!this->_heap) { XID(panic)("memory allocation failed"); }
+        if (!this->_heap) { JULEC_ID(panic)("memory allocation failed"); }
         this->_ref = new(std::nothrow) uint_julet{1};
-        if (!this->_ref) { XID(panic)("memory allocation failed"); }
+        if (!this->_ref) { JULEC_ID(panic)("memory allocation failed"); }
         *this->_ptr = _Ptr;
     }
 
@@ -43,7 +43,7 @@ struct ptr {
 
     inline void __check_valid(void) const noexcept {
         if(this->operator==(nil))
-        { XID(panic)("invalid memory address or nil pointer deference"); }
+        { JULEC_ID(panic)("invalid memory address or nil pointer deference"); }
     }
 
     void __dealloc(void) noexcept {
@@ -77,7 +77,7 @@ struct ptr {
         if (!this->_ptr || !*this->_ptr) { return *this; }
         const T _data{**this->_ptr};
         *this->_ptr = new(std::nothrow) T;
-        if (!*this->_ptr) { XID(panic)("memory allocation failed"); }
+        if (!*this->_ptr) { JULEC_ID(panic)("memory allocation failed"); }
         **this->_ptr = _data;
         *this->_heap = __JULEC_PTR_HEAP_TRUE;
         return *this;
@@ -128,7 +128,7 @@ template<typename T>
 ptr<T> __julec_not_heap_ptr_of(T *_T) noexcept {
     ptr<T> _ptr;
     _ptr._ptr = new(std::nothrow) T*{0};
-    if (!_ptr._ptr) { XID(panic)("memory allocation failed"); }
+    if (!_ptr._ptr) { JULEC_ID(panic)("memory allocation failed"); }
     *_ptr._ptr = _T;
     _ptr._heap = __JULEC_PTR_NEVER_HEAP; // Avoid heap allocation
     return _ptr;

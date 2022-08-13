@@ -45,8 +45,8 @@ public:
 
     template<typename T>
     operator T(void) const noexcept {
-        if (this->_isnil()) { XID(panic)("invalid memory address or nil pointer deference"); }
-        if (!this->type_is<T>()) { XID(panic)("incompatible type"); }
+        if (this->_isnil()) { JULEC_ID(panic)("invalid memory address or nil pointer deference"); }
+        if (!this->type_is<T>()) { JULEC_ID(panic)("incompatible type"); }
         return std::any_cast<T>(this->_expr);
     }
 

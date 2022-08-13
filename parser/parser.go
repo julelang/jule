@@ -2495,7 +2495,7 @@ func (p *Parser) recoverFuncExprStatement(s *models.ExprStatement) {
 	handler := v.data.Type.Tag.(*Func)
 	s.Expr.Model = exprNode{"try{\n"}
 	var catcher serieExpr
-	catcher.exprs = append(catcher.exprs, "} catch(trait<XID(Error)> ")
+	catcher.exprs = append(catcher.exprs, "} catch(trait<JULEC_ID(Error)> ")
 	catcher.exprs = append(catcher.exprs, handler.Params[0].OutId())
 	catcher.exprs = append(catcher.exprs, ") ")
 	r, _ := utf8.DecodeRuneInString(v.data.Value)

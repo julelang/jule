@@ -29,15 +29,15 @@
 #endif // #ifdef _WINDOWS
 
 
-#define X_EXIT_PANIC 2
+#define __JULEC_EXIT_PANIC 2
 #define _CONCAT(_A, _B) _A ## _B
 #define CONCAT(_A, _B) _CONCAT(_A, _B)
-#define XID(_Identifier) CONCAT(_, _Identifier)
+#define JULEC_ID(_Identifier) CONCAT(_, _Identifier)
 #define nil nullptr
 #define CO(_Expr) std::thread{[&](void) mutable -> void { _Expr; }}.detach()
 
 // Libraries uses this function for throw panic.
-void XID(panic)(const char *_Message);
+void JULEC_ID(panic)(const char *_Message);
 
 #include "typedef.hpp"
 #include "trait.hpp"
@@ -91,7 +91,7 @@ template<typename _Obj_t>
 str_julet tostr(const _Obj_t &_Obj) noexcept;
 void x_terminate_handler(void) noexcept;
 // Entry point function of generated Jule code, generates by JuleC.
-void XID(main)(void);
+void JULEC_ID(main)(void);
 // Package initializer caller function, generates by JuleC.
 void _julec___call_initializers(void);
 int main(void);
@@ -182,20 +182,20 @@ str_julet tostr(const _Obj_t &_Obj) noexcept {
 
 void x_terminate_handler(void) noexcept {
     try { std::rethrow_exception(std::current_exception()); }
-    catch (trait<XID(Error)> _error) {
+    catch (trait<JULEC_ID(Error)> _error) {
         std::cout << "panic: " << _error.get().error() << std::endl;
-        std::exit(X_EXIT_PANIC);
+        std::exit(__JULEC_EXIT_PANIC);
     }
 }
 
-inline void XID(panic)(const char *_Message) {
-    struct panic_error: public XID(Error) {
+inline void JULEC_ID(panic)(const char *_Message) {
+    struct panic_error: public JULEC_ID(Error) {
         const char *_message;
         str_julet error(void) { return this->_message; }
     };
-    panic_error _error;
+    struct panic_error _error;
     _error._message = _Message;
-    XID(panic)(_error);
+    JULEC_ID(panic)(_error);
 }
 
 int main(void) {
@@ -208,7 +208,7 @@ int main(void) {
 #endif
 
     _julec___call_initializers();
-    XID(main());
+    JULEC_ID(main());
 
     return EXIT_SUCCESS;
 }

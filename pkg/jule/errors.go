@@ -106,7 +106,7 @@ var Errors = map[string]string{
 	`def_not_support_pub`:                      `define is not supports pub modifier`,
 	`obj_not_support_sub_fields`:               `object is not supports sub fields: %s`,
 	`obj_have_not_id`:                          `object is not have sub field in this identifier: %s`,
-	`doc_couldnt_generated`:                    `%s: documentation could not generated because X source code has an errors`,
+	`doc_couldnt_generated`:                    `%s: documentation could not generated because Jule source code has an errors`,
 	`declared_but_not_used`:                    `%s declared but not used`,
 	`expr_not_func_call`:                       `statement must have function call expression`,
 	`label_exist`:                              `label is already exist in this identifier: %s`,

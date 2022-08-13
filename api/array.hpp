@@ -44,7 +44,7 @@ public:
         if (_Start < 0 || _End < 0 || _Start > _End) {
             std::stringstream _sstream;
             _sstream << "index out of range [" << _Start << ':' << _End << ']';
-            XID(panic)(_sstream.str().c_str());
+            JULEC_ID(panic)(_sstream.str().c_str());
         } else if (_Start == _End) { return slice<_Item_t>(); }
         const int_julet _n{_End-_Start};
         slice<_Item_t> _slice(_n);
@@ -79,7 +79,7 @@ public:
         if (this->empty() || _Index < 0 || this->len() <= _Index) {
             std::stringstream _sstream;
             _sstream << "index out of range [" << _Index << ']';
-            XID(panic)(_sstream.str().c_str());
+            JULEC_ID(panic)(_sstream.str().c_str());
         }
         return this->_buffer[_Index];
     }

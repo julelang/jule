@@ -21,9 +21,9 @@ func IsIgnoreId(id string) bool {
 	return id == Ignore
 }
 
-// Returns specified identifer as X identifer.
+// Returns specified identifer as JuleC identifer.
 func AsId(id string) string {
-	return "XID(" + id + ")"
+	return "JULEC_ID(" + id + ")"
 }
 
 func getPtrAsId(ptr unsafe.Pointer) string {

@@ -35,8 +35,10 @@ public:
     ~slice<_Item_t>(void) noexcept
     { this->__dealloc(); }
 
-    void __check(void) const noexcept
-    { if(!this->_buffer) { XID(panic)("invalid memory address or nil pointer deference"); } }
+    void __check(void) const noexcept {
+        if(!this->_buffer)
+        { JULEC_ID(panic)("invalid memory address or nil pointer deference"); }
+    }
 
     void __dealloc(void) noexcept {
         if (!this->_ref) { return; }
@@ -52,9 +54,9 @@ public:
     void __alloc_new(const int_julet _N) noexcept {
         this->__dealloc();
         this->_buffer = new(std::nothrow) _Item_t[_N];
-        if (!this->_buffer) { XID(panic)("memory allocation failed"); }
+        if (!this->_buffer) { JULEC_ID(panic)("memory allocation failed"); }
         this->_ref = new(std::nothrow) uint_julet{1};
-        if (!this->_ref) { XID(panic)("memory allocation failed"); }
+        if (!this->_ref) { JULEC_ID(panic)("memory allocation failed"); }
         this->_size = _N;
     }
 
@@ -83,7 +85,7 @@ public:
         if (_Start < 0 || _End < 0 || _Start > _End) {
             std::stringstream _sstream;
             _sstream << "index out of range [" << _Start << ':' << _End << ']';
-            XID(panic)(_sstream.str().c_str());
+            JULEC_ID(panic)(_sstream.str().c_str());
         } else if (_Start == _End) { return slice<_Item_t>(); }
         slice<_Item_t> _slice;
         _slice._buffer = &this->_buffer[_Start];
@@ -106,7 +108,7 @@ public:
 
     void __push(const _Item_t &_Item) noexcept {
         _Item_t *_new = new(std::nothrow) _Item_t[this->_size+1];
-        if (!_new) { XID(panic)("memory allocation failed"); }
+        if (!_new) { JULEC_ID(panic)("memory allocation failed"); }
         for (int_julet _index{0}; _index < this->_size; ++_index)
         { _new[_index] = this->_buffer[_index]; }
         _new[this->_size] = _Item;
@@ -140,7 +142,7 @@ public:
         if (this->empty() || _Index < 0 || this->len() <= _Index) {
             std::stringstream _sstream;
             _sstream << "index out of range [" << _Index << ']';
-            XID(panic)(_sstream.str().c_str());
+            JULEC_ID(panic)(_sstream.str().c_str());
         }
         return this->_buffer[_Index];
     }

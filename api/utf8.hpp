@@ -67,7 +67,7 @@ constexpr u8_julet __julec_utf8_first[256] = {
     __JULEC_UTF8_S5, __JULEC_UTF8_S6, __JULEC_UTF8_S6, __JULEC_UTF8_S6, __JULEC_UTF8_S7, __JULEC_UTF8_XX, __JULEC_UTF8_XX, __JULEC_UTF8_XX, __JULEC_UTF8_XX, __JULEC_UTF8_XX, __JULEC_UTF8_XX, __JULEC_UTF8_XX, __JULEC_UTF8_XX, __JULEC_UTF8_XX, __JULEC_UTF8_XX, __JULEC_UTF8_XX,
 };
 
-struct __julec_utf8_accept_range{ u8_julet _lo, _hi; };
+struct __julec_utf8_accept_range{ const u8_julet _lo, _hi; };
 
 constexpr struct __julec_utf8_accept_range __julec_utf8_accept_ranges[16] = {
     {__JULEC_UTF8_LOCB, __JULEC_UTF8_HICB},
