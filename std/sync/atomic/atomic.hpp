@@ -28,7 +28,8 @@
         __atomic_load_tmp;  \
     })
 
-#define __julec_atomic_load(ADDR) __julec_atomic_load_explicit (ADDR, __ATOMIC_SEQ_CST)
+#define __julec_atomic_load(ADDR) \
+    __julec_atomic_load_explicit (ADDR, __ATOMIC_SEQ_CST)
 
 #define __julec_atomic_swap_explicit(ADDR, NEW, MO) \
     __extension__ \

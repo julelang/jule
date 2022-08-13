@@ -9,8 +9,15 @@
 #define __JULEC_STD_MEM_HEAP_HPP
 
 #define __julec_is_guaranteed(_JULEC_PTR) \
-    (_JULEC_PTR._heap && ( \
+    (_JULEC_PTR != nil && \
+        _JULEC_PTR._heap && \
         _JULEC_PTR._heap != __JULEC_PTR_NEVER_HEAP && \
-        *_JULEC_PTR._heap == __JULEC_PTR_HEAP_TRUE))
+        *_JULEC_PTR._heap == __JULEC_PTR_HEAP_TRUE)
+
+#define __julec_can_guarantee(_JULEC_PTR) \
+    (_JULEC_PTR != nil && \
+        _JULEC_PTR._heap && \
+        _JULEC_PTR._heap != __JULEC_PTR_NEVER_HEAP && \
+        *_JULEC_PTR._heap != __JULEC_PTR_HEAP_TRUE)
 
 #endif // #ifndef __JULEC_STD_MEM_HEAP_HPP

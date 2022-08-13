@@ -5,8 +5,8 @@
 #ifndef __JULEC_PTR_HPP
 #define __JULEC_PTR_HPP
 
-#define __JULEC_PTR_NEVER_HEAP (bool**)(1U)
-#define __JULEC_PTR_HEAP_TRUE (bool*)(1U)
+#define __JULEC_PTR_NEVER_HEAP (bool**)(0x0000001)
+#define __JULEC_PTR_HEAP_TRUE (bool*)(0x0000001)
 
 #define __julec_ptr_of(_PTR) _PTR
 
@@ -18,17 +18,17 @@ ptr<T> __julec_not_heap_ptr_of(T *_T) noexcept;
 
 template<typename T>
 struct ptr {
-    T               **_ptr{nil};
+    T **_ptr{nil};
     mutable uint_julet *_ref{nil};
-    mutable bool    **_heap{nil};
+    mutable bool **_heap{nil};
 
     ptr<T>(void) noexcept {}
     ptr<T>(std::nullptr_t) noexcept {}
 
     ptr<T>(T *_Ptr) noexcept {
-        this->_ptr = new(std::nothrow) T*;
+        this->_ptr = new(std::nothrow) T*{nil};
         if (!this->_ptr) { XID(panic)("memory allocation failed"); }
-        this->_heap = new(std::nothrow) bool*;
+        this->_heap = new(std::nothrow) bool*{nil};
         if (!this->_heap) { XID(panic)("memory allocation failed"); }
         this->_ref = new(std::nothrow) uint_julet{1};
         if (!this->_ref) { XID(panic)("memory allocation failed"); }
@@ -127,7 +127,7 @@ struct ptr {
 template<typename T>
 ptr<T> __julec_not_heap_ptr_of(T *_T) noexcept {
     ptr<T> _ptr;
-    _ptr._ptr = new(std::nothrow) T*;
+    _ptr._ptr = new(std::nothrow) T*{0};
     if (!_ptr._ptr) { XID(panic)("memory allocation failed"); }
     *_ptr._ptr = _T;
     _ptr._heap = __JULEC_PTR_NEVER_HEAP; // Avoid heap allocation
