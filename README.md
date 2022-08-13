@@ -48,6 +48,11 @@ JuleC keeps all the C++ code it uses for Jule in its <a href="https://github.com
 + As efficient and performance as C++
 + High C++ interoperability
 
+<h2 id="what-is-julec">What is JuleC?</h2>
+JuleC is the name of the reference compiler for the Jule programming language.
+It is the original compiler of the Jule programming language.
+The features that JuleC has is a representation of the official and must-have features of the Jule programming language.
+
 <h2 id="about-project">About Project</h2>
 JuleC, the reference compiler for Jule, is still in development.
 Currently, it can only be built from source.
