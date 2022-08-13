@@ -20,4 +20,7 @@
         _JULEC_PTR._heap != __JULEC_PTR_NEVER_HEAP && \
         *_JULEC_PTR._heap != __JULEC_PTR_HEAP_TRUE)
 
+#define __julec_guarantee(_JULEC_PTR) \
+    (_JULEC_PTR.__must_heap())
+
 #endif // #ifndef __JULEC_STD_MEM_HEAP_HPP
