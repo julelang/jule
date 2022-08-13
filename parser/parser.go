@@ -909,24 +909,25 @@ func (p *Parser) parseFields(s *structure) {
 }
 
 // Struct parses Jule structure.
-func (p *Parser) Struct(s Struct) {
-	if juleapi.IsIgnoreId(s.Id) {
-		p.pusherrtok(s.Tok, "ignore_id")
+func (p *Parser) Struct(ast Struct) {
+	if juleapi.IsIgnoreId(ast.Id) {
+		p.pusherrtok(ast.Tok, "ignore_id")
 		return
-	} else if _, tok, _ := p.defById(s.Id); tok.Id != tokens.NA {
-		p.pusherrtok(s.Tok, "exist_id", s.Id)
+	} else if _, tok, _ := p.defById(ast.Id); tok.Id != tokens.NA {
+		p.pusherrtok(ast.Tok, "exist_id", ast.Id)
 		return
 	}
-	xs := new(structure)
-	p.Defs.Structs = append(p.Defs.Structs, xs)
-	xs.Desc = p.docText.String()
+	s := new(structure)
+	p.Defs.Structs = append(p.Defs.Structs, s)
+	s.Desc = p.docText.String()
 	p.docText.Reset()
-	xs.Ast = s
-	xs.Ast.Owner = p
-	xs.Ast.Generics = p.generics
+	s.Ast = ast
+	s.traits = new([]*trait)
+	s.Ast.Owner = p
+	s.Ast.Generics = p.generics
 	p.generics = nil
-	xs.Defs = new(Defmap)
-	p.parseFields(xs)
+	s.Defs = new(Defmap)
+	p.parseFields(s)
 }
 
 func (p *Parser) checkCppLinkAttributes(f *Func) {
@@ -1001,13 +1002,13 @@ func (p *Parser) implTrait(impl models.Impl) {
 	}
 	trait.Used = true
 	sid, _ := impl.Target.KindId()
-	xs, _, _ := p.Defs.structById(sid, nil)
-	if xs == nil {
+	s, _, _ := p.Defs.structById(sid, nil)
+	if s == nil {
 		p.pusherrtok(impl.Target.Tok, "id_noexist", sid)
 		return
 	}
-	impl.Target.Tag = xs
-	xs.traits = append(xs.traits, trait)
+	impl.Target.Tag = s
+	*s.traits = append(*s.traits, trait)
 	for _, tf := range trait.Defs.Funcs {
 		ok := false
 		ds := tf.Ast.DefString()
@@ -1035,32 +1036,32 @@ func (p *Parser) implTrait(impl models.Impl) {
 				p.pusherrtok(impl.Target.Tok, "trait_hasnt_id", trait.Ast.Id, t.Id)
 				break
 			}
-			i, _, _ := xs.Defs.findById(t.Id, nil)
+			i, _, _ := s.Defs.findById(t.Id, nil)
 			if i != -1 {
 				p.pusherrtok(t.Tok, "exist_id", t.Id)
 				continue
 			}
 			sf := new(function)
 			sf.Ast = t
-			sf.Ast.Receiver.Tok = xs.Ast.Tok
-			sf.Ast.Receiver.Tag = xs
+			sf.Ast.Receiver.Tok = s.Ast.Tok
+			sf.Ast.Receiver.Tag = s
 			sf.Ast.Attributes = p.attributes
 			sf.Ast.Owner = p
 			p.attributes = nil
 			sf.Desc = p.docText.String()
 			p.docText.Reset()
 			sf.used = true
-			if len(xs.Ast.Generics) == 0 {
+			if len(s.Ast.Generics) == 0 {
 				p.parseTypesNonGenerics(sf.Ast)
 			}
-			xs.Defs.Funcs = append(xs.Defs.Funcs, sf)
+			s.Defs.Funcs = append(s.Defs.Funcs, sf)
 		}
 	}
 }
 
 func (p *Parser) implStruct(impl models.Impl) {
-	xs, _, _ := p.Defs.structById(impl.Trait.Kind, nil)
-	if xs == nil {
+	s, _, _ := p.Defs.structById(impl.Trait.Kind, nil)
+	if s == nil {
 		p.pusherrtok(impl.Trait, "id_noexist", impl.Trait.Kind)
 		return
 	}
@@ -1073,15 +1074,15 @@ func (p *Parser) implStruct(impl models.Impl) {
 		case models.Comment:
 			p.Comment(t)
 		case *Func:
-			i, _, _ := xs.Defs.findById(t.Id, nil)
+			i, _, _ := s.Defs.findById(t.Id, nil)
 			if i != -1 {
 				p.pusherrtok(t.Tok, "exist_id", t.Id)
 				continue
 			}
 			sf := new(function)
 			sf.Ast = t
-			sf.Ast.Receiver.Tok = xs.Ast.Tok
-			sf.Ast.Receiver.Tag = xs
+			sf.Ast.Receiver.Tok = s.Ast.Tok
+			sf.Ast.Receiver.Tag = s
 			sf.Ast.Attributes = p.attributes
 			sf.Desc = p.docText.String()
 			sf.Ast.Owner = p
@@ -1090,14 +1091,14 @@ func (p *Parser) implStruct(impl models.Impl) {
 			setGenerics(sf.Ast, p.generics)
 			p.generics = nil
 			for _, generic := range t.Generics {
-				if findGeneric(generic.Id, xs.Ast.Generics) != nil {
+				if findGeneric(generic.Id, s.Ast.Generics) != nil {
 					p.pusherrtok(generic.Tok, "exist_id", generic.Id)
 				}
 			}
-			if len(xs.Ast.Generics) == 0 {
+			if len(s.Ast.Generics) == 0 {
 				p.parseTypesNonGenerics(sf.Ast)
 			}
-			xs.Defs.Funcs = append(xs.Defs.Funcs, sf)
+			s.Defs.Funcs = append(s.Defs.Funcs, sf)
 		}
 	}
 }
