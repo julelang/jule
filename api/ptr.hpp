@@ -42,7 +42,7 @@ struct ptr {
     { this->__dealloc(); }
 
     inline void __check_valid(void) const noexcept {
-        if(!this->_ptr)
+        if(this->operator==(nil))
         { XID(panic)("invalid memory address or nil pointer deference"); }
     }
 
