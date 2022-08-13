@@ -96,23 +96,28 @@ func (u *unary) star() value {
 func (u *unary) amper() value {
 	v := u.p.eval.process(u.toks, u.model)
 	v.constExpr = false
-	if !canGetPtr(v) {
-		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.AMPER)
-	}
 	v.lvalue = true
 	v.data.Type.Kind = tokens.STAR + v.data.Type.Kind
 	nodes := &u.model.nodes[u.model.index].nodes
-	var func_call string
+	switch {
+	case valIsStructIns(v):
+		s := v.data.Type.Tag.(*xstruct)
+		// Is not struct literal
+		if s.Ast.Id != v.data.Value {
+			break
+		}
+		(*nodes)[0] = exprNode{"__julec_guaranteed_ptr(new "}
+		goto end
+	case !canGetPtr(v):
+		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.AMPER)
+		return v
+	}
 	if v.heapMust {
-		func_call = "__julec_ptr_of"
+		(*nodes)[0] = exprNode{"__julec_ptr(&"}
 	} else {
-		func_call = "__julec_not_heap_ptr_of"
+		(*nodes)[0] = exprNode{"__julec_never_guarantee_ptr(&"}
 	}
-	expr := []iExpr{
-		exprNode{func_call},
-		exprNode{tokens.LPARENTHESES},
-	}
-	*nodes = append(expr, *nodes...)
+end:
 	*nodes = append(*nodes, exprNode{tokens.RPARENTHESES})
 	return v
 }

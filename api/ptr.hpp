@@ -8,13 +8,15 @@
 #define __JULEC_PTR_NEVER_HEAP (bool**)(0x0000001)
 #define __JULEC_PTR_HEAP_TRUE (bool*)(0x0000001)
 
-#define __julec_ptr_of(_PTR) _PTR
+#define __julec_ptr(_PTR) (_PTR)
 
 // Wrapper structure for raw pointer of JuleC.
 template<typename T>
 struct ptr;
 template<typename T>
-ptr<T> __julec_not_heap_ptr_of(T *_T) noexcept;
+ptr<T> __julec_never_guarantee_ptr(T *_Ptr) noexcept;
+template<typename T>
+ptr<T> __julec_guaranteed_ptr(T *_Ptr);
 
 template<typename T>
 struct ptr {
@@ -125,12 +127,20 @@ struct ptr {
 };
 
 template<typename T>
-ptr<T> __julec_not_heap_ptr_of(T *_T) noexcept {
+ptr<T> __julec_never_guarantee_ptr(T *_Ptr) noexcept {
     ptr<T> _ptr;
-    _ptr._ptr = new(std::nothrow) T*{0};
+    _ptr._ptr = new(std::nothrow) T*{nil};
     if (!_ptr._ptr) { JULEC_ID(panic)("memory allocation failed"); }
-    *_ptr._ptr = _T;
+    *_ptr._ptr = _Ptr;
     _ptr._heap = __JULEC_PTR_NEVER_HEAP; // Avoid heap allocation
+    return _ptr;
+}
+
+template<typename T>
+ptr<T> __julec_guaranteed_ptr(T *_Ptr) {
+    ptr<T> _ptr{__julec_never_guarantee_ptr(_Ptr)};
+    _ptr._heap = new(std::nothrow) bool*{__JULEC_PTR_HEAP_TRUE};
+    if (!_ptr._heap) { JULEC_ID(panic)("memory allocation failed"); }
     return _ptr;
 }
 
