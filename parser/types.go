@@ -199,14 +199,14 @@ func checkTraitCompability(t1, t2 DataType) bool {
 	case typeIsTrait(t2):
 		return t == t2.Tag.(*trait)
 	case typeIsStruct(t2):
-		s := t2.Tag.(*xstruct)
+		s := t2.Tag.(*structure)
 		return s.hasTrait(t)
 	}
 	return false
 }
 
 func checkStructCompability(t1, t2 DataType) bool {
-	s1, s2 := t1.Tag.(*xstruct), t2.Tag.(*xstruct)
+	s1, s2 := t1.Tag.(*structure), t2.Tag.(*structure)
 	switch {
 	case s1.Ast.Id != s2.Ast.Id,
 		s1.Ast.Tok.File != s2.Ast.Tok.File:

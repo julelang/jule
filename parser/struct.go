@@ -10,7 +10,7 @@ import (
 	"github.com/jule-lang/jule/pkg/juletype"
 )
 
-type xstruct struct {
+type structure struct {
 	Ast         Struct
 	Defs        *Defmap
 	Used        bool
@@ -21,7 +21,7 @@ type xstruct struct {
 	generics []DataType
 }
 
-func (s *xstruct) hasTrait(t *trait) bool {
+func (s *structure) hasTrait(t *trait) bool {
 	for _, st := range s.traits {
 		if t == st {
 			return true
@@ -30,7 +30,7 @@ func (s *xstruct) hasTrait(t *trait) bool {
 	return false
 }
 
-func (s *xstruct) cppGenerics() (def string, serie string) {
+func (s *structure) cppGenerics() (def string, serie string) {
 	if len(s.Ast.Generics) == 0 {
 		return "", ""
 	}
@@ -53,11 +53,11 @@ func (s *xstruct) cppGenerics() (def string, serie string) {
 //
 // This function is should be have this function
 // for CompiledStruct interface of ast package.
-func (s *xstruct) OutId() string {
+func (s *structure) OutId() string {
 	return juleapi.OutId(s.Ast.Id, s.Ast.Tok.File)
 }
 
-func (s *xstruct) operators() string {
+func (s *structure) operators() string {
 	outid := s.OutId()
 	genericsDef, genericsSerie := s.cppGenerics()
 	var cpp strings.Builder
@@ -107,7 +107,7 @@ func (s *xstruct) operators() string {
 	return cpp.String()
 }
 
-func (s *xstruct) cppConstructor() string {
+func (s *structure) cppConstructor() string {
 	var cpp strings.Builder
 	cpp.WriteString(models.IndentString())
 	cpp.WriteString(s.OutId())
@@ -132,7 +132,7 @@ func (s *xstruct) cppConstructor() string {
 	return cpp.String()
 }
 
-func (s *xstruct) cppTraits() string {
+func (s *structure) cppTraits() string {
 	if len(s.traits) == 0 {
 		return ""
 	}
@@ -146,7 +146,7 @@ func (s *xstruct) cppTraits() string {
 	return cpp.String()[:cpp.Len()-1]
 }
 
-func (s *xstruct) prototype() string {
+func (s *structure) prototype() string {
 	var cpp strings.Builder
 	cpp.WriteString(genericsToCpp(s.Ast.Generics))
 	cpp.WriteString(" struct ")
@@ -155,7 +155,7 @@ func (s *xstruct) prototype() string {
 	return cpp.String()
 }
 
-func (s *xstruct) decldefString() string {
+func (s *structure) decldefString() string {
 	var cpp strings.Builder
 	cpp.WriteString(genericsToCpp(s.Ast.Generics))
 	cpp.WriteByte('\n')
@@ -192,7 +192,7 @@ func (s *xstruct) decldefString() string {
 	return cpp.String()
 }
 
-func (s *xstruct) ostream() string {
+func (s *structure) ostream() string {
 	var cpp strings.Builder
 	genericsDef, genericsSerie := s.cppGenerics()
 	cpp.WriteString(models.IndentString())
@@ -229,7 +229,7 @@ func (s *xstruct) ostream() string {
 	return cpp.String()
 }
 
-func (s xstruct) String() string {
+func (s structure) String() string {
 	var cpp strings.Builder
 	cpp.WriteString(s.decldefString())
 	cpp.WriteString("\n\n")
@@ -241,7 +241,7 @@ func (s xstruct) String() string {
 //
 // This function is should be have this function
 // for Genericable & CompiledStruct interface of ast package.
-func (s *xstruct) Generics() []DataType {
+func (s *structure) Generics() []DataType {
 	return s.generics
 }
 
@@ -249,11 +249,11 @@ func (s *xstruct) Generics() []DataType {
 //
 // This function is should be have this function
 // for Genericable & CompiledStruct interface of ast package.
-func (s *xstruct) SetGenerics(generics []DataType) {
+func (s *structure) SetGenerics(generics []DataType) {
 	s.generics = generics
 }
 
-func (s *xstruct) selfVar(receiver DataType) *Var {
+func (s *structure) selfVar(receiver DataType) *Var {
 	v := new(models.Var)
 	v.Token = s.Ast.Tok
 	v.Type = receiver
@@ -267,7 +267,7 @@ func (s *xstruct) selfVar(receiver DataType) *Var {
 	return v
 }
 
-func (s *xstruct) dataTypeString() string {
+func (s *structure) dataTypeString() string {
 	var dts strings.Builder
 	dts.WriteString(s.Ast.Id)
 	if len(s.Ast.Generics) > 0 {

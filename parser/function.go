@@ -37,7 +37,7 @@ func (f function) String() string {
 		block.Tree = append(statements, block.Tree...)
 	}
 	if f.Ast.Receiver != nil && !typeIsPtr(*f.Ast.Receiver) {
-		s := f.Ast.Receiver.Tag.(*xstruct)
+		s := f.Ast.Receiver.Tag.(*structure)
 		self := s.selfVar(*f.Ast.Receiver)
 		statements := make([]models.Statement, 1)
 		statements[0] = models.Statement{Tok: s.Ast.Tok, Data: self}

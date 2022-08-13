@@ -865,7 +865,7 @@ func (p *Parser) Enum(e Enum) {
 	}
 }
 
-func (p *Parser) pushField(s *xstruct, f **Var, i int) {
+func (p *Parser) pushField(s *structure, f **Var, i int) {
 	for _, cf := range s.Ast.Fields {
 		if *f == cf {
 			break
@@ -885,7 +885,7 @@ func (p *Parser) pushField(s *xstruct, f **Var, i int) {
 	}
 }
 
-func (p *Parser) parseFields(s *xstruct) {
+func (p *Parser) parseFields(s *structure) {
 	s.constructor = new(Func)
 	s.constructor.Id = s.Ast.Id
 	s.constructor.Tok = s.Ast.Tok
@@ -917,7 +917,7 @@ func (p *Parser) Struct(s Struct) {
 		p.pusherrtok(s.Tok, "exist_id", s.Id)
 		return
 	}
-	xs := new(xstruct)
+	xs := new(structure)
 	p.Defs.Structs = append(p.Defs.Structs, xs)
 	xs.Desc = p.docText.String()
 	p.docText.Reset()
@@ -1215,15 +1215,15 @@ func (p *Parser) parseMapNonGenericType(generics []*GenericType, t *DataType) {
 
 func (p *Parser) parseCommonNonGenericType(generics []*GenericType, t *DataType) {
 	if t.Id == juletype.Id {
-		id, _ := t.KindId()
+		id, prefix := t.KindId()
 		def, _, _ := p.defById(id)
 		switch deft := def.(type) {
-		case *xstruct:
+		case *structure:
 			deft = p.structConstructorInstance(deft)
 			if t.Tag != nil {
 				deft.SetGenerics(t.Tag.([]DataType))
 			}
-			t.Kind = deft.dataTypeString()
+			t.Kind = prefix + deft.dataTypeString()
 			t.Id = juletype.Struct
 			t.Tag = deft
 			t.Pure = true
@@ -1237,7 +1237,7 @@ func (p *Parser) parseCommonNonGenericType(generics []*GenericType, t *DataType)
 tagcheck:
 	if t.Tag != nil {
 		switch t := t.Tag.(type) {
-		case *xstruct:
+		case *structure:
 			for _, ct := range t.Generics() {
 				if typeIsGeneric(generics, ct) {
 					return
@@ -1538,7 +1538,7 @@ func (p *Parser) enumById(id string) (*Enum, *Defmap, bool) {
 	return p.Defs.enumById(id, p.File)
 }
 
-func (p *Parser) structById(id string) (*xstruct, *Defmap, bool) {
+func (p *Parser) structById(id string) (*structure, *Defmap, bool) {
 	if p.allowBuiltin {
 		s, _, _ := Builtin.structById(id, nil)
 		if s != nil {
@@ -1587,7 +1587,7 @@ func (p *Parser) defById(id string) (def any, tok Tok, canshadow bool) {
 	if e != nil {
 		return e, e.Tok, canshadow
 	}
-	var s *xstruct
+	var s *structure
 	s, _, canshadow = p.structById(id)
 	if s != nil {
 		return s, s.Ast.Tok, canshadow
@@ -1742,7 +1742,7 @@ func (p *Parser) blockVarsOfFunc(f *Func) []*Var {
 	vars := p.varsFromParams(f.Params)
 	vars = append(vars, f.RetType.Vars()...)
 	if f.Receiver != nil {
-		s := f.Receiver.Tag.(*xstruct)
+		s := f.Receiver.Tag.(*structure)
 		vars = append(vars, s.selfVar(*f.Receiver))
 	}
 	return vars
@@ -1796,7 +1796,7 @@ func (p *Parser) checkFuncs() {
 	}
 }
 
-func (p *Parser) parseStructFunc(s *xstruct, f *function) (err bool) {
+func (p *Parser) parseStructFunc(s *structure, f *function) (err bool) {
 	if len(f.Ast.Generics) > 0 {
 		return
 	}
@@ -1807,7 +1807,7 @@ func (p *Parser) parseStructFunc(s *xstruct, f *function) (err bool) {
 	return
 }
 
-func (p *Parser) checkStruct(xs *xstruct) (err bool) {
+func (p *Parser) checkStruct(xs *structure) (err bool) {
 	for _, f := range xs.Defs.Funcs {
 		if f.checked {
 			continue
@@ -1824,7 +1824,7 @@ func (p *Parser) checkStruct(xs *xstruct) (err bool) {
 
 func (p *Parser) checkStructs() {
 	err := false
-	check := func(xs *xstruct) {
+	check := func(xs *structure) {
 		if err {
 			return
 		}
@@ -1849,9 +1849,9 @@ func (p *Parser) callFunc(f *Func, data callData, m *exprModel) value {
 	return v
 }
 
-func (p *Parser) callStructConstructor(s *xstruct, argsToks Toks, m *exprModel) (v value) {
+func (p *Parser) callStructConstructor(s *structure, argsToks Toks, m *exprModel) (v value) {
 	f := s.constructor
-	s = f.RetType.Type.Tag.(*xstruct)
+	s = f.RetType.Type.Tag.(*structure)
 	v.data.Type = f.RetType.Type.Copy()
 	v.data.Type.Kind = s.dataTypeString()
 	v.isType = false
@@ -1872,7 +1872,7 @@ func (p *Parser) callStructConstructor(s *xstruct, argsToks Toks, m *exprModel) 
 	return v
 }
 
-func (p *Parser) parseField(s *xstruct, f **Var, i int) {
+func (p *Parser) parseField(s *structure, f **Var, i int) {
 	*f = p.Var(**f)
 	v := *f
 	param := models.Param{Id: v.Id, Type: v.Type}
@@ -1887,8 +1887,8 @@ func (p *Parser) parseField(s *xstruct, f **Var, i int) {
 	s.constructor.Params[i] = param
 }
 
-func (p *Parser) structConstructorInstance(as *xstruct) *xstruct {
-	s := new(xstruct)
+func (p *Parser) structConstructorInstance(as *structure) *structure {
+	s := new(structure)
 	s.Ast = as.Ast
 	s.traits = as.traits
 	s.constructor = new(Func)
@@ -2028,7 +2028,7 @@ func itsCombined(f *Func, generics []DataType) bool {
 func (p *Parser) parseGenericFunc(f *Func, generics []DataType, errtok Tok) {
 	owner := f.Owner.(*Parser)
 	if f.Receiver != nil {
-		s := f.Receiver.Tag.(*xstruct)
+		s := f.Receiver.Tag.(*structure)
 		owner.pushGenerics(s.Ast.Generics, s.Generics())
 	}
 	owner.reloadFuncTypes(f)
@@ -2100,7 +2100,7 @@ func (p *Parser) parseFuncCall(f *Func, args *models.Args, m *exprModel, errTok 
 		_ = p.checkGenericsQuantity(len(f.Generics), len(args.Generics), errTok)
 		if f.Receiver != nil {
 			owner := f.Owner.(*Parser)
-			s := f.Receiver.Tag.(*xstruct)
+			s := f.Receiver.Tag.(*structure)
 			generics := s.Generics()
 			if len(generics) > 0 {
 				owner.pushGenerics(s.Ast.Generics, generics)
@@ -3143,7 +3143,7 @@ func (p *Parser) typeSourceIsMap(dt DataType, err bool) (DataType, bool) {
 	return dt, true
 }
 
-func (p *Parser) typeSourceIsStruct(s *xstruct, t DataType) (dt DataType, _ bool) {
+func (p *Parser) typeSourceIsStruct(s *structure, t DataType) (dt DataType, _ bool) {
 	generics := s.Generics()
 	if len(generics) > 0 {
 		if !p.checkGenericsQuantity(len(s.Ast.Generics), len(generics), t.Tok) {
@@ -3287,7 +3287,9 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 	}
 	switch dt.Id {
 	case juletype.Struct:
-		return p.typeSourceIsStruct(dt.Tag.(*xstruct), dt)
+		_, prefix := dt.KindId()
+		defer func() { ret.Kind = prefix + ret.Kind }()
+		return p.typeSourceIsStruct(dt.Tag.(*structure), dt)
 	case juletype.Id:
 		id, prefix := dt.KindId()
 		defer func() { ret.Kind = prefix + ret.Kind }()
@@ -3319,7 +3321,7 @@ func (p *Parser) typeSource(dt DataType, err bool) (ret DataType, ok bool) {
 		case *Enum:
 			t.Used = true
 			return p.typeSourceIsEnum(t, dt.Tag)
-		case *xstruct:
+		case *structure:
 			t.Used = true
 			t = p.structConstructorInstance(t)
 			switch tagt := dt.Tag.(type) {

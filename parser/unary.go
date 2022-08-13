@@ -101,7 +101,7 @@ func (u *unary) amper() value {
 	nodes := &u.model.nodes[u.model.index].nodes
 	switch {
 	case valIsStructIns(v):
-		s := v.data.Type.Tag.(*xstruct)
+		s := v.data.Type.Tag.(*structure)
 		// Is not struct literal
 		if s.Ast.Id != v.data.Value {
 			break

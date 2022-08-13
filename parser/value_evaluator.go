@@ -220,7 +220,7 @@ func (ve *valueEvaluator) enumId(id string, e *Enum) (v value) {
 	return
 }
 
-func (ve *valueEvaluator) structId(id string, s *xstruct) (v value) {
+func (ve *valueEvaluator) structId(id string, s *structure) (v value) {
 	s.Used = true
 	v.data.Value = id
 	v.data.Type.Id = juletype.Struct
@@ -244,7 +244,7 @@ func (ve *valueEvaluator) typeId(id string, t *Type) (_ value, _ bool) {
 		return
 	}
 	if typeIsStruct(dt) {
-		return ve.structId(id, dt.Tag.(*xstruct)), true
+		return ve.structId(id, dt.Tag.(*structure)), true
 	}
 	return
 }

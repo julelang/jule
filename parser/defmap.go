@@ -13,7 +13,7 @@ func isAccessable(finder, target *File, defIsPub bool) bool {
 type Defmap struct {
 	Namespaces []*namespace
 	Enums      []*Enum
-	Structs    []*xstruct
+	Structs    []*structure
 	Traits     []*trait
 	Types      []*Type
 	Funcs      []*function
@@ -53,7 +53,7 @@ func (dm *Defmap) findStructById(id string, f *File) (int, *Defmap, bool) {
 	return -1, nil, false
 }
 
-func (dm *Defmap) structById(id string, f *File) (*xstruct, *Defmap, bool) {
+func (dm *Defmap) structById(id string, f *File) (*structure, *Defmap, bool) {
 	i, m, canshadow := dm.findStructById(id, f)
 	if i == -1 {
 		return nil, nil, false

@@ -751,7 +751,7 @@ func (e *eval) typeId(toks Toks, m *exprModel) (v value) {
 			e.pusherrtok(toks[0], "invalid_syntax")
 			return
 		}
-		s := t.Tag.(*xstruct)
+		s := t.Tag.(*structure)
 		return e.p.callStructConstructor(s, toks, m)
 	}
 	if toks[0].Id != tokens.Brace || toks[0].Kind != tokens.LBRACKET {
@@ -839,7 +839,7 @@ func (e *eval) enumSubId(val value, idTok Tok, m *exprModel) (v value) {
 }
 
 func (e *eval) structObjSubId(val value, idTok Tok, m *exprModel) value {
-	s := val.data.Type.Tag.(*xstruct)
+	s := val.data.Type.Tag.(*structure)
 	val.constExpr = false
 	val.lvalue = false
 	val.isType = false

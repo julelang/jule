@@ -8,7 +8,7 @@ import (
 func (p *Parser) getFieldMap(f *Func) *paramMap {
 	pmap := new(paramMap)
 	*pmap = paramMap{}
-	s := f.RetType.Type.Tag.(*xstruct)
+	s := f.RetType.Type.Tag.(*structure)
 	for i, g := range s.Defs.Globals {
 		if isAccessable(p.File, g.Token.File, g.Pub) {
 			param := &f.Params[i]
