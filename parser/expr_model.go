@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/jule-lang/jule/ast/models"
+	"github.com/jule-lang/jule/pkg/jule"
 )
 
 type iExpr interface {
@@ -168,13 +169,16 @@ func (a argsExpr) String() string {
 }
 
 type callExpr struct {
+	f        *Func
 	generics genericsExpr
 	args     argsExpr
 }
 
 func (ce callExpr) String() string {
 	var cpp strings.Builder
-	cpp.WriteString(ce.generics.String())
+	if ce.f.FindAttribute(jule.Attribute_CDef) == nil {
+		cpp.WriteString(ce.generics.String())
+	}
 	cpp.WriteByte('(')
 	cpp.WriteString(ce.args.String())
 	cpp.WriteByte(')')

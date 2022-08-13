@@ -45,7 +45,7 @@ type waitingGlobal struct {
 	Defs *Defmap
 }
 
-// Parser is parser of X code.
+// Parser is parser of Jule code.
 type Parser struct {
 	attributes     []Attribute
 	docText        strings.Builder
@@ -682,7 +682,7 @@ func (p *Parser) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 	return
 }
 
-// Parses X code from object tree.
+// Parses Jule code from object tree.
 func (p *Parser) Parset(tree []models.Object, main, justDefs bool) {
 	p.IsMain = main
 	p.JustDefs = justDefs
@@ -699,7 +699,7 @@ func (p *Parser) Parset(tree []models.Object, main, justDefs bool) {
 	p.wg.Wait()
 }
 
-// Parses X code from tokens.
+// Parses Jule code from tokens.
 func (p *Parser) Parse(toks Toks, main, justDefs bool) {
 	tree, errors := getTree(toks)
 	if len(errors) > 0 {
@@ -709,7 +709,7 @@ func (p *Parser) Parse(toks Toks, main, justDefs bool) {
 	p.Parset(tree, main, justDefs)
 }
 
-// Parses X code from file.
+// Parses Jule code from file.
 func (p *Parser) Parsef(main, justDefs bool) {
 	lexer := lex.NewLex(p.File)
 	toks := lexer.Lex()
@@ -777,7 +777,7 @@ func (p *Parser) Generics(generics []GenericType) {
 	}
 }
 
-// Type parses X type define statement.
+// Type parses Jule type define statement.
 func (p *Parser) Type(t Type) {
 	_, tok, canshadow := p.defById(t.Id)
 	if tok.Id != tokens.NA && !canshadow {
@@ -792,7 +792,7 @@ func (p *Parser) Type(t Type) {
 	p.Defs.Types = append(p.Defs.Types, &t)
 }
 
-// Enum parses X enumerator statement.
+// Enum parses Jule enumerator statement.
 func (p *Parser) Enum(e Enum) {
 	if juleapi.IsIgnoreId(e.Id) {
 		p.pusherrtok(e.Tok, "ignore_id")
@@ -908,7 +908,7 @@ func (p *Parser) parseFields(s *xstruct) {
 	}
 }
 
-// Struct parses X structure.
+// Struct parses Jule structure.
 func (p *Parser) Struct(s Struct) {
 	if juleapi.IsIgnoreId(s.Id) {
 		p.pusherrtok(s.Tok, "ignore_id")
@@ -929,6 +929,16 @@ func (p *Parser) Struct(s Struct) {
 	p.parseFields(xs)
 }
 
+func (p *Parser) checkCppLinkAttributes(f *Func) {
+	for _, attribute := range f.Attributes {
+		switch attribute.Tag {
+		case jule.Attribute_CDef:
+		default:
+			p.pusherrtok(attribute.Tok, "invalid_attribute")
+		}
+	}
+}
+
 // CppLink parses cpp link.
 func (p *Parser) CppLink(link models.CppLink) {
 	if juleapi.IsIgnoreId(link.Link.Id) {
@@ -942,10 +952,13 @@ func (p *Parser) CppLink(link models.CppLink) {
 	linkf.Owner = p
 	setGenerics(linkf, p.generics)
 	p.generics = nil
+	linkf.Attributes = p.attributes
+	p.attributes = nil
+	p.checkCppLinkAttributes(linkf)
 	p.cppLinks = append(p.cppLinks, &link)
 }
 
-// Trait parses X trait.
+// Trait parses Jule trait.
 func (p *Parser) Trait(t models.Trait) {
 	if juleapi.IsIgnoreId(t.Id) {
 		p.pusherrtok(t.Tok, "ignore_id")
@@ -1089,7 +1102,7 @@ func (p *Parser) implStruct(impl models.Impl) {
 	}
 }
 
-// Impl parses X impl.
+// Impl parses Jule impl.
 func (p *Parser) Impl(impl models.Impl) {
 	if !typeIsVoid(impl.Target) {
 		p.implTrait(impl)
@@ -1116,7 +1129,7 @@ func (p *Parser) pushNs(ns *models.Namespace) *namespace {
 	return src
 }
 
-// Comment parses X documentation comments line.
+// Comment parses Jule documentation comments line.
 func (p *Parser) Comment(c models.Comment) {
 	c.Content = strings.TrimSpace(c.Content)
 	if p.docText.Len() == 0 {
@@ -1168,7 +1181,7 @@ func genericsToCpp(generics []*GenericType) string {
 	return cpp.String()[:cpp.Len()-1] + ">"
 }
 
-// Statement parse X statement.
+// Statement parse Jule statement.
 func (p *Parser) Statement(s models.Statement) {
 	switch t := s.Data.(type) {
 	case Func:
@@ -1304,7 +1317,7 @@ func setGenerics(f *Func, generics []*models.GenericType) {
 	}
 }
 
-// Func parse X function.
+// Func parse Jule function.
 func (p *Parser) Func(fast Func) {
 	_, tok, canshadow := p.defById(fast.Id)
 	if tok.Id != tokens.NA && !canshadow {
@@ -1329,7 +1342,7 @@ func (p *Parser) Func(fast Func) {
 	p.Defs.Funcs = append(p.Defs.Funcs, f)
 }
 
-// ParseVariable parse X global variable.
+// ParseVariable parse Jule global variable.
 func (p *Parser) Global(vast Var) {
 	def, _, _ := p.defById(vast.Id)
 	if def != nil {
@@ -1352,7 +1365,7 @@ func (p *Parser) Global(vast Var) {
 	p.Defs.Globals = append(p.Defs.Globals, v)
 }
 
-// Var parse X variable.
+// Var parse Jule variable.
 func (p *Parser) Var(v Var) *Var {
 	if juleapi.IsIgnoreId(v.Id) {
 		p.pusherrtok(v.Token, "ignore_id")
@@ -1638,7 +1651,7 @@ func (p *Parser) checkTypes() {
 	}
 }
 
-// WaitingGlobals parses X global variables for waiting to parsing.
+// WaitingGlobals parses Jule global variables for waiting to parsing.
 func (p *Parser) WaitingGlobals() {
 	pdefs := p.Defs
 	for _, g := range p.waitingGlobals {
@@ -2106,6 +2119,7 @@ func (p *Parser) parseFuncCall(f *Func, args *models.Args, m *exprModel, errTok 
 		m.appendSubNode(callExpr{
 			generics: genericsExpr{args.Generics},
 			args:     argsExpr{args.Src},
+			f:        f,
 		})
 	}
 end:
