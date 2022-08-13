@@ -194,13 +194,22 @@ func typesEquals(t1, t2 DataType) bool {
 }
 
 func checkTraitCompability(t1, t2 DataType) bool {
-	t := t1.Tag.(*trait)
-	switch {
-	case t2.Id == juletype.Nil:
+	if t2.Id == juletype.Nil {
 		return true
+	}
+	t := t1.Tag.(*trait)
+	t1ptr := t1.Pointers()
+	switch {
 	case typeIsTrait(t2):
-		return t == t2.Tag.(*trait)
+		return t == t2.Tag.(*trait) && t1ptr == t2.Pointers()
 	case typeIsStruct(t2):
+		if t1ptr != "" {
+			return false
+		}
+		t2ptr := t2.Pointers()
+		if t2ptr != "" {
+			return false
+		}
 		s := t2.Tag.(*structure)
 		return s.hasTrait(t)
 	}
@@ -232,6 +241,11 @@ func checkStructCompability(t1, t2 DataType) bool {
 
 func typesAreCompatible(t1, t2 DataType, ignoreany bool) bool {
 	switch {
+	case typeIsTrait(t1), typeIsTrait(t2):
+		if typeIsTrait(t2) {
+			t1, t2 = t2, t1
+		}
+		return checkTraitCompability(t1, t2)
 	case typeIsPtr(t1), typeIsPtr(t2):
 		if typeIsPtr(t2) {
 			t1, t2 = t2, t1
@@ -252,11 +266,6 @@ func typesAreCompatible(t1, t2 DataType, ignoreany bool) bool {
 			t1, t2 = t2, t1
 		}
 		return checkMapCompability(t1, t2)
-	case typeIsTrait(t1), typeIsTrait(t2):
-		if typeIsTrait(t2) {
-			t1, t2 = t2, t1
-		}
-		return checkTraitCompability(t1, t2)
 	case typeIsNilCompatible(t1):
 		return t2.Id == juletype.Nil
 	case typeIsNilCompatible(t2):
