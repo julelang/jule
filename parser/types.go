@@ -196,6 +196,8 @@ func typesEquals(t1, t2 DataType) bool {
 func checkTraitCompability(t1, t2 DataType) bool {
 	t := t1.Tag.(*trait)
 	switch {
+	case t2.Id == juletype.Nil:
+		return true
 	case typeIsTrait(t2):
 		return t == t2.Tag.(*trait)
 	case typeIsStruct(t2):
