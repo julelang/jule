@@ -93,9 +93,6 @@ var i64statics = &Defmap{
 			Id:      "max",
 			Type:    DataType{Id: juletype.I64, Kind: tokens.I64},
 			ExprTag: int64(math.MaxInt64),
-			Expr: models.Expr{
-				Model: exprNode{juletype.CppId(juletype.I64) + "{" + strconv.FormatInt(math.MaxInt64, 10) + "}"},
-			},
 		},
 		{
 			Pub:     true,
@@ -103,9 +100,6 @@ var i64statics = &Defmap{
 			Id:      "min",
 			Type:    DataType{Id: juletype.I64, Kind: tokens.I64},
 			ExprTag: int64(math.MinInt64),
-			Expr: models.Expr{
-				Model: exprNode{juletype.CppId(juletype.I64) + "{" + strconv.FormatInt(math.MinInt64, 10) + "}"},
-			},
 		},
 	},
 }
@@ -163,9 +157,6 @@ var u64statics = &Defmap{
 			Id:      "max",
 			Type:    DataType{Id: juletype.U64, Kind: tokens.U64},
 			ExprTag: uint64(math.MaxUint64),
-			Expr: models.Expr{
-				Model: exprNode{juletype.CppId(juletype.U64) + "{" + strconv.FormatUint(math.MaxUint64, 10) + "}"},
-			},
 		},
 	},
 }
@@ -627,6 +618,29 @@ func init() {
 	*outlnFunc.Ast = *outFunc.Ast
 	outlnFunc.Ast.Id = "outln"
 	Builtin.Funcs = append(Builtin.Funcs, outlnFunc)
+
+	// Set models
+	i64min := i64statics.Globals[0]
+	i64min.Expr.Model = getModel(value{
+		data: models.Data{
+			Type: i64min.Type,
+		},
+		expr: i64min.ExprTag,
+	})
+	i64max := i64statics.Globals[1]
+	i64min.Expr.Model = getModel(value{
+		data: models.Data{
+			Type: i64max.Type,
+		},
+		expr: i64max.ExprTag,
+	})
+	u64max := u64statics.Globals[0]
+	u64max.Expr.Model = getModel(value{
+		data: models.Data{
+			Type: u64max.Type,
+		},
+		expr: u64max.ExprTag,
+	})
 
 	// Set bits of platform-dependent types
 	intMax := intStatics.Globals[0]
