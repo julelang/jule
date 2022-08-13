@@ -93,7 +93,7 @@ void x_terminate_handler(void) noexcept;
 // Entry point function of generated Jule code, generates by JuleC.
 void JULEC_ID(main)(void);
 // Package initializer caller function, generates by JuleC.
-void _julec___call_initializers(void);
+void __julec_call_package_initializers(void);
 int main(void);
 
 // Definitions
@@ -207,7 +207,7 @@ int main(void) {
     _setmode(_fileno(stdin), 0x00020000);
 #endif
 
-    _julec___call_initializers();
+    __julec_call_package_initializers();
     JULEC_ID(main());
 
     return EXIT_SUCCESS;

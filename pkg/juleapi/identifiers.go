@@ -12,7 +12,7 @@ import (
 const Ignore = "_"
 
 // InitializerCaller identifier.
-const InitializerCaller = "_julec___call_initializers"
+const InitializerCaller = "__julec_call_package_initializers"
 
 const typeExtension = "_julet"
 
@@ -23,7 +23,7 @@ func IsIgnoreId(id string) bool {
 
 // Returns specified identifer as JuleC identifer.
 func AsId(id string) string {
-	return "JULEC_ID(" + id + ")"
+	return "_" + id // Equavalents: "JULEC_ID(" + id + ")"
 }
 
 func getPtrAsId(ptr unsafe.Pointer) string {
