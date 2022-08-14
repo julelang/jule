@@ -2735,7 +2735,18 @@ func hasRet(b *models.Block) bool {
 			if t.Default == nil {
 				break
 			}
-			return hasRet(t.Default.Block)
+			ok := true
+			for _, c := range t.Cases {
+				if !hasRet(c.Block) {
+					ok = false
+					break
+				}
+			}
+			ok = ok && hasRet(t.Default.Block)
+			if !ok {
+				break
+			}
+			return true
 		}
 	}
 	return false
