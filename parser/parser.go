@@ -1319,16 +1319,16 @@ func setGenerics(f *Func, generics []*models.GenericType) {
 }
 
 // Func parse Jule function.
-func (p *Parser) Func(fast Func) {
-	_, tok, canshadow := p.defById(fast.Id)
+func (p *Parser) Func(ast Func) {
+	_, tok, canshadow := p.defById(ast.Id)
 	if tok.Id != tokens.NA && !canshadow {
-		p.pusherrtok(fast.Tok, "exist_id", fast.Id)
-	} else if juleapi.IsIgnoreId(fast.Id) {
-		p.pusherrtok(fast.Tok, "ignore_id")
+		p.pusherrtok(ast.Tok, "exist_id", ast.Id)
+	} else if juleapi.IsIgnoreId(ast.Id) {
+		p.pusherrtok(ast.Tok, "ignore_id")
 	}
 	f := new(function)
 	f.Ast = new(Func)
-	*f.Ast = fast
+	*f.Ast = ast
 	f.Ast.Attributes = p.attributes
 	p.attributes = nil
 	f.Ast.Owner = p
@@ -1464,7 +1464,7 @@ func (p *Parser) varsFromParams(params []Param) []*Var {
 	vars := make([]*Var, length)
 	for i, param := range params {
 		v := new(models.Var)
-		v.IsField = true
+		v.IsLocal = true
 		v.Id = param.Id
 		v.Token = param.Tok
 		v.Type = param.Type
@@ -2761,7 +2761,7 @@ func (p *Parser) varStatement(v *Var, noParse bool) {
 	if !noParse {
 		*v = *p.Var(*v)
 	}
-	v.IsField = true
+	v.IsLocal = true
 	p.blockVars = append(p.blockVars, v)
 }
 
@@ -2951,8 +2951,8 @@ func (p *Parser) whileProfile(iter *models.Iter) {
 
 func (p *Parser) foreachProfile(iter *models.Iter) {
 	profile := iter.Profile.(models.IterForeach)
-	profile.KeyA.IsField = true
-	profile.KeyB.IsField = true
+	profile.KeyA.IsLocal = true
+	profile.KeyB.IsLocal = true
 	val, model := p.evalExpr(profile.Expr)
 	profile.Expr.Model = model
 	profile.ExprType = val.data.Type

@@ -54,10 +54,17 @@ public:
 
     inline void operator=(const trait<T> &_Src) noexcept {
         this->__dealloc();
+        if (_Src == nil) { return; }
         (*_Src._ref)++;
         this->_data = _Src._data;
         this->_ref = _Src._ref;
     }
+
+    inline bool operator==(const trait<T> &_Src) const noexcept
+    { return this->_data == this->_data; }
+
+    inline bool operator!=(const trait<T> &_Src) const noexcept
+    { return !this->operator==(_Src); }
 
     inline bool operator==(std::nullptr_t) const noexcept
     { return !this->_data; }

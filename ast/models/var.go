@@ -21,13 +21,16 @@ type Var struct {
 	Desc      string
 	Used      bool
 	IsField   bool
+	IsLocal   bool
 }
 
 // OutId returns juleapi.OutId result of var.
 func (v *Var) OutId() string {
 	switch {
-	case v.IsField:
+	case v.IsLocal:
 		return juleapi.AsId(v.Id)
+	case v.IsField:
+		return "__julec_field_" + juleapi.AsId(v.Id)
 	default:
 		return juleapi.OutId(v.Id, v.Token.File)
 	}

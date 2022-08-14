@@ -279,11 +279,13 @@ func (dt *DataType) FuncString() string {
 
 // MultiTypeString returns cpp value of muli-typed DataType.
 func (dt *DataType) MultiTypeString() string {
-	types := dt.Tag.([]DataType)
 	var cpp strings.Builder
 	cpp.WriteString("std::tuple<")
+	types := dt.Tag.([]DataType)
 	for _, t := range types {
-		t.Pure = dt.Pure
+		if !t.Pure {
+			t.Pure = dt.Pure
+		}
 		cpp.WriteString(t.String())
 		cpp.WriteByte(',')
 	}
