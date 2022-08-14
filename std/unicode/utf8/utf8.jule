@@ -334,8 +334,9 @@ pub rune_len(r: rune) int {
 		ret 3
 	case r <= MAX_RUNE:
 		ret 4
+	default:
+		ret -1
 	}
-	ret -1
 }
 
 //doc:
@@ -361,12 +362,13 @@ pub encode_rune(p: []byte, r: rune) int {
 		p[1] = TX | byte(r>>6)&MASKX
 		p[2] = TX | byte(r)&MASKX
 		ret 3
+	default:
+		p[0] = T4 | byte(r>>18)
+		p[1] = TX | byte(r>>12)&MASKX
+		p[2] = TX | byte(r>>6)&MASKX
+		p[3] = TX | byte(r)&MASKX
+		ret 4
 	}
-	p[0] = T4 | byte(r>>18)
-	p[1] = TX | byte(r>>12)&MASKX
-	p[2] = TX | byte(r>>6)&MASKX
-	p[3] = TX | byte(r)&MASKX
-	ret 4
 }
 
 //doc:
@@ -391,8 +393,9 @@ append_rune_non_ascii(p: []byte, r: rune) []byte {
 		fallthrough
 	case i <= RUNE3_MAX:
 		ret append[byte](p, T3|byte(r>>12), TX|byte(r>>6)&MASKX, TX|byte(r)&MASKX)
+	default:
+		ret append[byte](p, T4|byte(r>>18), TX|byte(r>>12)&MASKX, TX|byte(r>>6)&MASKX, TX|byte(r)&MASKX)
 	}
-	ret append[byte](p, T4|byte(r>>18), TX|byte(r>>12)&MASKX, TX|byte(r>>6)&MASKX, TX|byte(r)&MASKX)
 }
 
 //doc:
@@ -596,6 +599,7 @@ pub valid_rune(r: rune) bool {
 		ret true
 	case SURROGATE_MAX < r && r <= MAX_RUNE:
 		ret true
+	default:
+		ret false
 	}
-	ret false
 }

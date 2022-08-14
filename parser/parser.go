@@ -2723,14 +2723,27 @@ func (p *Parser) checkLabelNGoto() {
 	p.checkLabels()
 }
 
-func (p *Parser) checkRets(f *Func) {
-	if f.Block != nil {
-		for _, s := range f.Block.Tree {
-			switch s.Data.(type) {
-			case models.Ret:
-				return
+func hasRet(b *models.Block) bool {
+	if b == nil {
+		return false
+	}
+	for _, s := range b.Tree {
+		switch t := s.Data.(type) {
+		case models.Ret:
+			return true
+		case models.Match:
+			if t.Default == nil {
+				break
 			}
+			return hasRet(t.Default.Block)
 		}
+	}
+	return false
+}
+
+func (p *Parser) checkRets(f *Func) {
+	if hasRet(f.Block) {
+		return
 	}
 	if !typeIsVoid(f.RetType.Type) {
 		p.pusherrtok(f.Tok, "missing_ret")
