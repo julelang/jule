@@ -41,7 +41,7 @@ public:
     }
 
     T &get(void) noexcept {
-        if (!this->_data)
+        if (this->operator==(nil))
         { JULEC_ID(panic)("invalid memory address or nil pointer deference"); }
         return *this->_data;
     }
