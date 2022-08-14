@@ -14,7 +14,6 @@ template<typename _Obj_t>
 inline void JULEC_ID(out)(const _Obj_t _Obj) noexcept;
 template<typename _Obj_t>
 inline void JULEC_ID(outln)(const _Obj_t _Obj) noexcept;
-inline void JULEC_ID(panic)(trait<JULEC_ID(Error)> _Error);
 template<typename _Item_t>
 int_julet JULEC_ID(copy)(const slice<_Item_t> &_Dest,
                          const slice<_Item_t> &_Src) noexcept;
@@ -25,6 +24,8 @@ template<typename T>
 ptr<T> JULEC_ID(new)(void) noexcept;
 
 // Definitions
+
+/* Panic function defined at main header */
 
 template<typename _Obj_t>
 inline void JULEC_ID(out)(const _Obj_t _Obj) noexcept { std::cout <<_Obj; }
@@ -38,8 +39,6 @@ inline void JULEC_ID(outln)(const _Obj_t _Obj) noexcept {
 struct JULEC_ID(Error) {
     virtual str_julet error(void) = 0;
 };
-
-inline void JULEC_ID(panic)(trait<JULEC_ID(Error)> _Error) { throw _Error; }
 
 template<typename _Item_t>
 inline slice<_Item_t> JULEC_ID(make)(const int_julet &_N) noexcept

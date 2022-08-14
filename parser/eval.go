@@ -250,10 +250,17 @@ func (e *eval) dataTypeFunc(expr Tok, callRange Toks, m *exprModel) (v value, is
 	case tokens.DataType:
 		switch expr.Kind {
 		case tokens.STR:
-			m.appendSubNode(exprNode{"tostr"})
-			// Val: "()" for accept DataType as function.
-			v.data.Type = DataType{Id: juletype.Func, Kind: "()", Tag: strDefaultFunc}
+			m.appendSubNode(exprNode{"__julec_tostr("})
+			_, vm := e.p.evalToks(callRange)
+			m.appendSubNode(vm)
+			m.appendSubNode(exprNode{tokens.RPARENTHESES})
+			v.data.Type = DataType{
+				Id:   juletype.Func,
+				Kind: strDefaultFunc.DataTypeString(),
+				Tag:  strDefaultFunc,
+			}
 			isret = true
+
 		default:
 			dt := DataType{
 				Tok:  expr,

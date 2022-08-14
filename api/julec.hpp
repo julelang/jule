@@ -33,11 +33,13 @@
 #define _CONCAT(_A, _B) _A ## _B
 #define CONCAT(_A, _B) _CONCAT(_A, _B)
 #define JULEC_ID(_Identifier) CONCAT(_, _Identifier)
-#define nil nullptr
-#define CO(_Expr) std::thread{[&](void) mutable -> void { _Expr; }}.detach()
+#define nil (nullptr)
+#define CO(_EXPR) (std::thread{[&](void) mutable -> void { _EXPR; }}.detach())
 
 // Libraries uses this function for throw panic.
-void JULEC_ID(panic)(const char *_Message);
+// Also it is builtin panic function.
+template<typename _Obj_t>
+void JULEC_ID(panic)(const _Obj_t &_Expr);
 
 #include "typedef.hpp"
 #include "trait.hpp"
@@ -54,6 +56,9 @@ void JULEC_ID(panic)(const char *_Message);
 
 // Declarations
 
+inline void JULEC_ID(panic)(const trait<JULEC_ID(Error)> &_Error);
+template<typename _Obj_t>
+str_julet __julec_tostr(const _Obj_t &_Obj) noexcept;
 // Moves to heap pointer types.
 template<typename T>
 inline ptr<T> &__julec_must_heap(const ptr<T> &_Ptr) noexcept;
@@ -87,9 +92,7 @@ template<typename _Func_t, typename _Tuple_t>
 inline auto tuple_as_args(const func<_Func_t> &_Function, const _Tuple_t _Tuple);
 std::ostream &operator<<(std::ostream &_Stream, const i8_julet &_Src);
 std::ostream &operator<<(std::ostream &_Stream, const u8_julet &_Src);
-template<typename _Obj_t>
-str_julet tostr(const _Obj_t &_Obj) noexcept;
-void x_terminate_handler(void) noexcept;
+void __julec_terminate_handler(void) noexcept;
 // Entry point function of generated Jule code, generates by JuleC.
 void JULEC_ID(main)(void);
 // Package initializer caller function, generates by JuleC.
@@ -174,13 +177,30 @@ std::ostream &operator<<(std::ostream &_Stream, const u8_julet &_Src)
 { return _Stream << (i32_julet)(_Src); }
 
 template<typename _Obj_t>
-str_julet tostr(const _Obj_t &_Obj) noexcept {
+str_julet __julec_tostr(const _Obj_t &_Obj) noexcept {
     std::stringstream _stream;
     _stream << _Obj;
-    return str_julet{_stream.str()};
+    return str_julet(_stream.str());
 }
 
-void x_terminate_handler(void) noexcept {
+inline void JULEC_ID(panic)(const trait<JULEC_ID(Error)> &_Error)
+{ throw (_Error); }
+
+template<typename _Obj_t>
+void JULEC_ID(panic)(const _Obj_t &_Expr) {
+    struct panic_error: public JULEC_ID(Error) {
+        str_julet _message;
+        str_julet error(void) { return this->_message; }
+    };
+    struct panic_error _error;
+    if (std::is_same<_Obj_t, str_julet>::value)
+    { _error._message = _Expr; }
+    else
+    { _error._message = __julec_tostr(_Expr); }
+    throw (trait<JULEC_ID(Error)>(_error));
+}
+
+void __julec_terminate_handler(void) noexcept {
     try { std::rethrow_exception(std::current_exception()); }
     catch (trait<JULEC_ID(Error)> _error) {
         std::cout << "panic: " << _error.get().error() << std::endl;
@@ -188,18 +208,8 @@ void x_terminate_handler(void) noexcept {
     }
 }
 
-inline void JULEC_ID(panic)(const char *_Message) {
-    struct panic_error: public JULEC_ID(Error) {
-        const char *_message;
-        str_julet error(void) { return this->_message; }
-    };
-    struct panic_error _error;
-    _error._message = _Message;
-    JULEC_ID(panic)(_error);
-}
-
 int main(void) {
-    std::set_terminate(&x_terminate_handler);
+    std::set_terminate(&__julec_terminate_handler);
     std::cout << std::boolalpha;
 #ifdef _WINDOWS
     // Windows needs little spell for UTF-8

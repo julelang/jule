@@ -273,7 +273,7 @@ var panicFunc = &function{
 		Params: []models.Param{
 			{
 				Id:   "error",
-				Type: errorType,
+				Type: DataType{Id: juletype.Any, Kind: juletype.TypeMap[juletype.Any]},
 			},
 		},
 	},
