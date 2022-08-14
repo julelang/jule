@@ -510,6 +510,20 @@ var strDefs = &Defmap{
 	},
 }
 
+// Use this at before use strDefs if necessary.
+// Because some definitions is responsive for str data types.
+func readyStrDefs(s value) {
+	lenVar := strDefs.Globals[0]
+	lenVar.Const = s.constExpr
+	if lenVar.Const {
+		lenVar.ExprTag = int64(len(s.expr.(string)))
+		lenVar.Expr.Model = getModel(value{
+			expr: lenVar.ExprTag,
+			data: models.Data{Type: lenVar.Type},
+		})
+	}
+}
+
 var sliceDefs = &Defmap{
 	Globals: []*Var{
 		{

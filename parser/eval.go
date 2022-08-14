@@ -783,6 +783,10 @@ func (e *eval) xObjSubId(dm *Defmap, val value, idTok Tok, m *exprModel) (v valu
 		v.data.Type = g.Type
 		v.lvalue = true
 		v.constExpr = g.Const
+		if g.Const {
+			v.expr = g.ExprTag
+			v.model = g.Expr.Model
+		}
 		v.isField = true
 		if g.Tag != nil {
 			m.appendSubNode(exprNode{g.Tag.(string)})
@@ -802,6 +806,7 @@ func (e *eval) xObjSubId(dm *Defmap, val value, idTok Tok, m *exprModel) (v valu
 }
 
 func (e *eval) strObjSubId(val value, idTok Tok, m *exprModel) value {
+	readyStrDefs(val)
 	v := e.xObjSubId(strDefs, val, idTok, m)
 	v.lvalue = false
 	return v
