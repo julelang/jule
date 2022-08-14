@@ -1133,8 +1133,8 @@ func (e *eval) slicingSlice(v value, errtok Tok) value {
 
 func (e *eval) slicingArray(v value, errtok Tok) value {
 	v.lvalue = false
-	v.data.Type = *v.data.Type.ComponentType
-	v.data.Type.Kind = jule.Prefix_Slice + juletype.TypeMap[v.data.Type.Id]
+	v.data.Type.Id = juletype.Slice
+	v.data.Type.Kind = jule.Prefix_Slice + v.data.Type.ComponentType.Kind
 	return v
 }
 
