@@ -1047,7 +1047,10 @@ func (e *eval) indexing(enumv, indexv value, errtok Tok) (v value) {
 	case typeIsMap(enumv.data.Type):
 		return e.indexingMap(enumv, indexv, errtok)
 	case typeIsPure(enumv.data.Type):
-		return e.indexingStr(enumv, indexv, errtok)
+		switch enumv.data.Type.Id {
+		case juletype.Str:
+			return e.indexingStr(enumv, indexv, errtok)
+		}
 	}
 	e.pusherrtok(errtok, "not_supports_indexing", enumv.data.Type.Kind)
 	return
@@ -1120,7 +1123,10 @@ func (e *eval) slicing(enumv, leftv, rightv value, errtok Tok) (v value) {
 	case typeIsSlice(enumv.data.Type):
 		return e.slicingSlice(enumv, errtok)
 	case typeIsPure(enumv.data.Type):
-		return e.slicingStr(enumv, leftv, rightv, errtok)
+		switch enumv.data.Type.Id {
+		case juletype.Str:
+			return e.slicingStr(enumv, leftv, rightv, errtok)
+		}
 	}
 	e.pusherrtok(errtok, "not_supports_slicing", enumv.data.Type.Kind)
 	return
