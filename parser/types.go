@@ -29,7 +29,12 @@ func typeIsAllowForConst(t DataType) bool {
 	if !typeIsPure(t) {
 		return false
 	}
-	return t.Id == juletype.Str || juletype.IsNumeric(t.Id)
+	switch t.Id {
+	case juletype.Str, juletype.Bool:
+		return true
+	default:
+		return juletype.IsNumeric(t.Id)
+	}
 }
 
 func typeIsStruct(dt DataType) bool {
