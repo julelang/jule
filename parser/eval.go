@@ -1088,6 +1088,7 @@ func (e *eval) indexingStr(strv, index value, errtok Tok) value {
 	strv.data.Type.Kind = juletype.TypeMap[strv.data.Type.Id]
 	e.checkIntegerIndexing(index, errtok)
 	if !index.constExpr {
+		strv.constExpr = false
 		return strv
 	}
 	i := tonums(index.expr)
