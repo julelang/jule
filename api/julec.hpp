@@ -193,10 +193,7 @@ void JULEC_ID(panic)(const _Obj_t &_Expr) {
         str_julet error(void) { return this->_message; }
     };
     struct panic_error _error;
-    if (std::is_same<_Obj_t, str_julet>::value)
-    { _error._message = _Expr; }
-    else
-    { _error._message = __julec_tostr(_Expr); }
+    _error._message = __julec_tostr(_Expr);
     throw (trait<JULEC_ID(Error)>(_error));
 }
 
@@ -212,7 +209,7 @@ int main(void) {
     std::set_terminate(&__julec_terminate_handler);
     std::cout << std::boolalpha;
 #ifdef _WINDOWS
-    // Windows needs little spell for UTF-8
+    // Windows needs little magic for UTF-8
     SetConsoleOutputCP(CP_UTF8);
     _setmode(_fileno(stdin), 0x00020000);
 #endif
