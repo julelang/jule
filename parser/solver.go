@@ -514,6 +514,13 @@ func (s *solver) float() (v value) {
 		}
 		s.mul(&v)
 	case tokens.SOLIDUS:
+		// Ignore float if expression has integer
+		if juletype.IsInteger(s.leftVal.data.Type.Id) && juletype.IsInteger(s.rightVal.data.Type.Id) {
+		} else if juletype.IsInteger(s.leftVal.data.Type.Id) {
+			s.rightVal.data.Type = s.leftVal.data.Type
+		} else if juletype.IsInteger(s.rightVal.data.Type.Id) {
+			s.leftVal.data.Type = s.rightVal.data.Type
+		}
 		v.data.Type = s.leftVal.data.Type
 		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
 			v.data.Type = s.rightVal.data.Type
