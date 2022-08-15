@@ -1694,10 +1694,6 @@ func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) {
 }
 
 func (p *Parser) param(f *Func, param *Param) (err bool) {
-	param.Type, err = p.realType(param.Type, true)
-	// Assign to !err because p.realType
-	// returns true if success, false if not.
-	err = !err
 	if param.Reference {
 		if param.Variadic {
 			p.pusherrtok(param.Tok, "variadic_reference_param")
