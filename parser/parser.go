@@ -2963,7 +2963,7 @@ func (p *Parser) whileProfile(iter *models.Iter) {
 	val, model := p.evalExpr(profile.Expr)
 	profile.Expr.Model = model
 	iter.Profile = profile
-	if !isBoolExpr(val) {
+	if !p.eval.hasError && val.data.Value != "" && !isBoolExpr(val) {
 		p.pusherrtok(iter.Tok, "iter_while_notbool_expr")
 	}
 	p.checkNewBlock(iter.Block)
@@ -2976,7 +2976,7 @@ func (p *Parser) foreachProfile(iter *models.Iter) {
 	val, model := p.evalExpr(profile.Expr)
 	profile.Expr.Model = model
 	profile.ExprType = val.data.Type
-	if !isForeachIterExpr(val) {
+	if !p.eval.hasError && val.data.Value != "" && !isForeachIterExpr(val) {
 		p.pusherrtok(iter.Tok, "iter_foreach_nonenumerable_expr")
 	} else {
 		fc := foreachChecker{p, &profile, val}
@@ -3046,7 +3046,7 @@ func (p *Parser) ifExpr(ifast *models.If, i *int, statements []models.Statement)
 	val, model := p.evalExpr(ifast.Expr)
 	ifast.Expr.Model = model
 	statement := statements[*i]
-	if !isBoolExpr(val) {
+	if !p.eval.hasError && val.data.Value != "" && !isBoolExpr(val) {
 		p.pusherrtok(ifast.Tok, "if_notbool_expr")
 	}
 	p.checkNewBlock(ifast.Block)
@@ -3064,7 +3064,7 @@ node:
 	case models.ElseIf:
 		val, model := p.evalExpr(t.Expr)
 		t.Expr.Model = model
-		if !isBoolExpr(val) {
+		if !p.eval.hasError && val.data.Value != "" && !isBoolExpr(val) {
 			p.pusherrtok(t.Tok, "if_notbool_expr")
 		}
 		p.checkNewBlock(t.Block)
