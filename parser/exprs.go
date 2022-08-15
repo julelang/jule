@@ -9,6 +9,15 @@ import (
 	"github.com/jule-lang/jule/pkg/juletype"
 )
 
+func indexingExprModel(index iExpr) iExpr {
+	var model exprNode
+	model.value = juletype.CppId(juletype.Int)
+	model.value += tokens.LPARENTHESES
+	model.value += index.String()
+	model.value += tokens.RPARENTHESES
+	return model
+}
+
 func exprMustHeap(expr string) string {
 	var cpp strings.Builder
 	cpp.WriteString("__julec_must_heap(")

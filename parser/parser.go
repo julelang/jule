@@ -2486,7 +2486,8 @@ func (p *Parser) recoverFuncExprStatement(s *models.ExprStatement) {
 	}
 	v, _ := p.evalExpr(args.Src[0].Expr)
 	if v.data.Type.Kind != handleParam.Type.Kind {
-		p.eval.pusherrtok(errtok, "incompatible_datatype", handleParam.Type.Kind, v.data.Type.Kind)
+		p.eval.pusherrtok(errtok, "incompatible_datatype",
+			handleParam.Type.Kind, v.data.Type.Kind)
 		return
 	}
 	handler := v.data.Type.Tag.(*Func)

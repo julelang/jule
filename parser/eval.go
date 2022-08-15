@@ -1006,7 +1006,7 @@ func (e *eval) bracketRange(toks Toks, m *exprModel) (v value) {
 		if len(leftToks) > 0 {
 			var model iExpr
 			leftv, model = e.p.evalToks(leftToks)
-			m.appendSubNode(model)
+			m.appendSubNode(indexingExprModel(model))
 			e.checkIntegerIndexing(leftv, errTok)
 		} else {
 			leftv.expr = int64(0)
@@ -1017,7 +1017,7 @@ func (e *eval) bracketRange(toks Toks, m *exprModel) (v value) {
 			m.appendSubNode(exprNode{","})
 			var model iExpr
 			rightv, model = e.p.evalToks(rightToks)
-			m.appendSubNode(model)
+			m.appendSubNode(indexingExprModel(model))
 			e.checkIntegerIndexing(rightv, errTok)
 		}
 		m.appendSubNode(exprNode{")"})
@@ -1025,7 +1025,7 @@ func (e *eval) bracketRange(toks Toks, m *exprModel) (v value) {
 	}
 	m.appendSubNode(exprNode{tokens.LBRACKET})
 	indexv, model := e.toks(toks[1 : len(toks)-1])
-	m.appendSubNode(model)
+	m.appendSubNode(indexingExprModel(model))
 	m.appendSubNode(exprNode{tokens.RBRACKET})
 	v = e.indexing(v, indexv, errTok)
 	// Ignore indexed type from original
