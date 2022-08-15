@@ -11,6 +11,15 @@
 </strong>
 </div>
 
+<h2 id="key-features">Key Features</h2>
+
++ Simplicity and maintainability
++ Fast and scalable development
++ Performance-critical software
++ Memory safety
++ As efficient and performance as C++
++ High C++ interoperability
+
 <h2 id="motivation">Motivation</h2>
 
 Jule is a statically typed compiled programming language designed for system development, building maintainable and reliable software.
@@ -29,7 +38,7 @@ There are no dangling pointers, and accessing a null pointer will obviously get 
 
 + Instant automatic memory initialization
 + Bounds checking
-+ Null checking
++ Nil (aka null) checking
 
 <h2 id="cpp-interoperability">C++ Interoperability</h2>
 Jule is designed to be interoperable with C++.
@@ -39,23 +48,13 @@ JuleC keeps all the C++ code it uses for Jule in its <a href="https://github.com
 <ol></ol> <!-- for space -->
 <img src="./docs/images/cpp_interop.png"/>
 
-<h2 id="goals">Goals</h2>
-
-+ Simplicity and maintainability
-+ Fast and scalable development
-+ Performance-critical software
-+ Memory safety
-+ As efficient and performance as C++
-+ High C++ interoperability
-
 <h2 id="what-is-julec">What is JuleC?</h2>
 JuleC is the name of the reference compiler for the Jule programming language.
 It is the original compiler of the Jule programming language.
 The features that JuleC has is a representation of the official and must-have features of the Jule programming language.
 
 <h2 id="about-project">About Project</h2>
-JuleC, the reference compiler for Jule, is still in development.
-Currently, it can only be built from source.
+JuleC currently, it can only be built from source.
 Due to the fact that it is still under development, there may be changes in the design and syntax of the language.
 <br><br>
 It is planned to rewrite the compiler with Jule after reference compiler reaches sufficient maturity.
@@ -66,6 +65,24 @@ However, when the reference compiler is rewritten with Jule, it is thought that 
 This will be a change that will cause the official compiler's project structure to be rebuilt.
 The reference compiler will probably use the standard library a lot.
 This will also allow developers to quickly develop tools for the language by leveraging Jule's standard library.
+
+<h2 id="future-changes">Future Changes</h2>
+JuleC is in early development.
+However, despite being in the early development stage, many algorithms (<a href="https://github.com/jule-lang/jule/tree/main/std">See the standard library</a>) can be successfully implemented.
+A release is not expected until JuleC itself is developed with the Jule programming language.
+The syntax and language design of the Jule programming language has emerged and is not expected to undergo major changes.
+<br><br>
+There is an idea to include a package manager in JuleC as well, although it doesn't have it yet.
+Jule's modern understanding of language and convenience suggests that there should be a package manager that comes with the compiler.
+This package manager will provide management of non-standard library packages developed and published by the community.
+Jule's standard library only gets updates with compiler releases.
+<br><br>
+The language and standard library will continue to evolve and change in the future but JuleC will guarantee stability since its first stable release.
+Some packages of the standard library
+(<a href="https://github.com/jule-lang/jule/tree/main/std/math">std::math</a>,
+<a href="https://github.com/jule-lang/jule/tree/main/std/math/bits">std::math::bits</a>,
+<a href="https://github.com/jule-lang/jule/tree/main/std/unicode/utf8">std::unicode::utf8</a>
+or etc.) are almost complete and are not expected to undergo major changes.
 
 <h2 id="documentations">Documentations</h2>
 
@@ -162,6 +179,8 @@ Run the above command in your terminal, in the Jule project directory.
 <h2 id="contributing">Contributing</h2>
 
 Thanks for you want contributing to Jule!
+<br>
+Every contribution, big or small, to Jule is greatly appreciated.
 <br><br>
 The Jule project use issues for only bug reports and proposals. <br>
 To contribute, please read the contribution guidelines from <a href="https://jule-lang.github.io/website/pages/contributing.html">here</a>. <br>
