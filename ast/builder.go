@@ -352,10 +352,13 @@ func (b *Builder) Id(toks Toks) {
 }
 
 func (b *Builder) structFields(toks Toks) []*models.Var {
-	fields := make([]*models.Var, 0)
+	var fields []*models.Var
 	i := new(int)
 	for *i < len(toks) {
 		varToks := b.skipStatement(i, &toks)
+		if varToks[0].Id == tokens.Comment {
+			continue
+		}
 		pub := varToks[0].Id == tokens.Pub
 		if pub {
 			if len(varToks) == 1 {

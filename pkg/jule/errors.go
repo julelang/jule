@@ -23,7 +23,7 @@ var Errors = map[string]string{
 	`body_not_exist`:                           `body is not exist`,
 	`operator_overflow`:                        `operator overflow`,
 	`incompatible_datatype`:                    `%s and %s data-types are not compatible`,
-	`operator_notfor_xtype`:                    `%s operator is not defined for %s type`,
+	`operator_notfor_juletype`:                 `%s operator is not defined for %s type`,
 	`operator_notfor_float`:                    `%s operator is not defined for float type(s)`,
 	`operator_notfor_int`:                      `%s operator is not defined for integer type(s)`,
 	`operator_notfor_uint`:                     `%s operator is not defined for unsigned integer type(s)`,
