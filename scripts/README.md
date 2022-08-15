@@ -17,5 +17,5 @@ PS @DIR> scripts/build.bat
 
 Bash;
 ```
-$ scripts/build.sh
+$ sh scripts/build.sh
 ```
