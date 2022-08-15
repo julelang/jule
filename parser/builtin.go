@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"math"
 	"strconv"
 
 	"github.com/jule-lang/jule/ast/models"
@@ -10,6 +9,19 @@ import (
 	"github.com/jule-lang/jule/pkg/juletype"
 )
 
+const maxI8 = 127
+const minI8 = -128
+const maxI16 = 32767
+const minI16 = -32768
+const maxI32 = 2147483647
+const minI32 = -2147483648
+const maxI64 = 9223372036854775807
+const minI64 = -9223372036854775808
+const maxU8 = 255
+const maxU16 = 65535
+const maxU32 = 4294967295
+const maxU64 = 18446744073709551615
+
 var i8statics = &Defmap{
 	Globals: []*Var{
 		{
@@ -17,9 +29,9 @@ var i8statics = &Defmap{
 			Const:   true,
 			Id:      "max",
 			Type:    DataType{Id: juletype.I8, Kind: tokens.I8},
-			ExprTag: int64(math.MaxInt8),
+			ExprTag: int64(maxI8),
 			Expr: models.Expr{
-				Model: exprNode{juletype.CppId(juletype.I8) + "{" + strconv.FormatInt(math.MaxInt8, 10) + "}"},
+				Model: exprNode{juletype.CppId(juletype.I8) + "{" + strconv.FormatInt(maxI8, 10) + "}"},
 			},
 		},
 		{
@@ -27,9 +39,9 @@ var i8statics = &Defmap{
 			Const:   true,
 			Id:      "min",
 			Type:    DataType{Id: juletype.I8, Kind: tokens.I8},
-			ExprTag: int64(math.MinInt8),
+			ExprTag: int64(minI8),
 			Expr: models.Expr{
-				Model: exprNode{juletype.CppId(juletype.I8) + "{" + strconv.FormatInt(math.MinInt8, 10) + "}"},
+				Model: exprNode{juletype.CppId(juletype.I8) + "{" + strconv.FormatInt(minI8, 10) + "}"},
 			},
 		},
 	},
@@ -42,9 +54,9 @@ var i16statics = &Defmap{
 			Const:   true,
 			Id:      "max",
 			Type:    DataType{Id: juletype.I16, Kind: tokens.I16},
-			ExprTag: int64(math.MaxInt16),
+			ExprTag: int64(maxI16),
 			Expr: models.Expr{
-				Model: exprNode{juletype.CppId(juletype.I16) + "{" + strconv.FormatInt(math.MaxInt16, 10) + "}"},
+				Model: exprNode{juletype.CppId(juletype.I16) + "{" + strconv.FormatInt(maxI16, 10) + "}"},
 			},
 		},
 		{
@@ -52,9 +64,9 @@ var i16statics = &Defmap{
 			Const:   true,
 			Id:      "min",
 			Type:    DataType{Id: juletype.I16, Kind: tokens.I16},
-			ExprTag: int64(math.MinInt16),
+			ExprTag: int64(minI16),
 			Expr: models.Expr{
-				Model: exprNode{juletype.CppId(juletype.I16) + "{" + strconv.FormatInt(math.MinInt16, 10) + "}"},
+				Model: exprNode{juletype.CppId(juletype.I16) + "{" + strconv.FormatInt(minI16, 10) + "}"},
 			},
 		},
 	},
@@ -67,9 +79,9 @@ var i32statics = &Defmap{
 			Const:   true,
 			Id:      "max",
 			Type:    DataType{Id: juletype.I32, Kind: tokens.I32},
-			ExprTag: int64(math.MaxInt32),
+			ExprTag: int64(maxI32),
 			Expr: models.Expr{
-				Model: exprNode{juletype.CppId(juletype.I32) + "{" + strconv.FormatInt(math.MaxInt32, 10) + "}"},
+				Model: exprNode{juletype.CppId(juletype.I32) + "{" + strconv.FormatInt(maxI32, 10) + "}"},
 			},
 		},
 		{
@@ -77,9 +89,9 @@ var i32statics = &Defmap{
 			Const:   true,
 			Id:      "min",
 			Type:    DataType{Id: juletype.I32, Kind: tokens.I32},
-			ExprTag: int64(math.MinInt32),
+			ExprTag: int64(minI32),
 			Expr: models.Expr{
-				Model: exprNode{juletype.CppId(juletype.I32) + "{" + strconv.FormatInt(math.MinInt32, 10) + "}"},
+				Model: exprNode{juletype.CppId(juletype.I32) + "{" + strconv.FormatInt(minI32, 10) + "}"},
 			},
 		},
 	},
@@ -92,14 +104,20 @@ var i64statics = &Defmap{
 			Const:   true,
 			Id:      "max",
 			Type:    DataType{Id: juletype.I64, Kind: tokens.I64},
-			ExprTag: int64(math.MaxInt64),
+			ExprTag: int64(maxI64),
+			Expr: models.Expr{
+				Model: exprNode{juletype.CppId(juletype.I64) + "{" + strconv.FormatInt(maxI64, 10) + "LL}"},
+			},
 		},
 		{
 			Pub:     true,
 			Const:   true,
 			Id:      "min",
 			Type:    DataType{Id: juletype.I64, Kind: tokens.I64},
-			ExprTag: int64(math.MinInt64),
+			ExprTag: int64(minI64),
+			Expr: models.Expr{
+				Model: exprNode{juletype.CppId(juletype.I64) + "{" + strconv.FormatInt(minI64, 10) + "LL}"},
+			},
 		},
 	},
 }
@@ -111,9 +129,9 @@ var u8statics = &Defmap{
 			Const:   true,
 			Id:      "max",
 			Type:    DataType{Id: juletype.U8, Kind: tokens.U8},
-			ExprTag: uint64(math.MaxUint8),
+			ExprTag: uint64(maxU8),
 			Expr: models.Expr{
-				Model: exprNode{juletype.CppId(juletype.U8) + "{" + strconv.FormatUint(math.MaxUint8, 10) + "}"},
+				Model: exprNode{juletype.CppId(juletype.U8) + "{" + strconv.FormatUint(maxU8, 10) + "}"},
 			},
 		},
 	},
@@ -126,9 +144,9 @@ var u16statics = &Defmap{
 			Const:   true,
 			Id:      "max",
 			Type:    DataType{Id: juletype.U16, Kind: tokens.U16},
-			ExprTag: uint64(math.MaxUint16),
+			ExprTag: uint64(maxU16),
 			Expr: models.Expr{
-				Model: exprNode{juletype.CppId(juletype.U16) + "{" + strconv.FormatUint(math.MaxUint16, 10) + "}"},
+				Model: exprNode{juletype.CppId(juletype.U16) + "{" + strconv.FormatUint(maxU16, 10) + "}"},
 			},
 		},
 	},
@@ -141,9 +159,9 @@ var u32statics = &Defmap{
 			Const:   true,
 			Id:      "max",
 			Type:    DataType{Id: juletype.U32, Kind: tokens.U32},
-			ExprTag: uint64(math.MaxUint32),
+			ExprTag: uint64(maxU32),
 			Expr: models.Expr{
-				Model: exprNode{juletype.CppId(juletype.U32) + "{" + strconv.FormatUint(math.MaxUint32, 10) + "}"},
+				Model: exprNode{juletype.CppId(juletype.U32) + "{" + strconv.FormatUint(maxU32, 10) + "}"},
 			},
 		},
 	},
@@ -156,7 +174,10 @@ var u64statics = &Defmap{
 			Const:   true,
 			Id:      "max",
 			Type:    DataType{Id: juletype.U64, Kind: tokens.U64},
-			ExprTag: uint64(math.MaxUint64),
+			ExprTag: uint64(maxU64),
+			Expr: models.Expr{
+				Model: exprNode{juletype.CppId(juletype.U64) + "{" + strconv.FormatUint(maxU64, 10) + "ULL}"},
+			},
 		},
 	},
 }
@@ -187,9 +208,10 @@ var intStatics = &Defmap{
 	},
 }
 
-const f32min = float64(1.17549435082228750796873653722224568e-38)
+const maxF32 = 3.40282e+38
+const minF32 = 1.17549435082228750796873653722224568e-38
 
-var f32min_model = exprNode{juletype.CppId(juletype.F32) + "{1.17549435082228750796873653722224568e-38F}"}
+var min_modelF32 = exprNode{juletype.CppId(juletype.F32) + "{1.17549435082228750796873653722224568e-38F}"}
 
 var f32statics = &Defmap{
 	Globals: []*Var{
@@ -198,23 +220,24 @@ var f32statics = &Defmap{
 			Const:   true,
 			Id:      "max",
 			Type:    DataType{Id: juletype.F32, Kind: tokens.F32},
-			ExprTag: float64(math.MaxFloat32),
-			Expr:    models.Expr{Model: exprNode{strconv.FormatFloat(math.MaxFloat32, 'e', -1, 32) + "F"}},
+			ExprTag: float64(maxF32),
+			Expr:    models.Expr{Model: exprNode{strconv.FormatFloat(maxF32, 'e', -1, 32) + "F"}},
 		},
 		{
 			Pub:     true,
 			Const:   true,
 			Id:      "min",
 			Type:    DataType{Id: juletype.F32, Kind: tokens.F32},
-			ExprTag: f32min,
-			Expr:    models.Expr{Model: f32min_model},
+			ExprTag: float64(minF32),
+			Expr:    models.Expr{Model: min_modelF32},
 		},
 	},
 }
 
-const f64min = float64(2.22507385850720138309023271733240406e-308)
+const maxF64 = 1.79769e+308
+const minF64 = 2.22507385850720138309023271733240406e-308
 
-var f64min_model = exprNode{juletype.CppId(juletype.F64) + "{2.22507385850720138309023271733240406e-308}"}
+var min_modelF64 = exprNode{juletype.CppId(juletype.F64) + "{2.22507385850720138309023271733240406e-308}"}
 
 var f64statics = &Defmap{
 	Globals: []*Var{
@@ -223,16 +246,16 @@ var f64statics = &Defmap{
 			Const:   true,
 			Id:      "max",
 			Type:    DataType{Id: juletype.F64, Kind: tokens.F64},
-			ExprTag: float64(math.MaxFloat64),
-			Expr:    models.Expr{Model: exprNode{strconv.FormatFloat(math.MaxFloat64, 'e', -1, 64)}},
+			ExprTag: float64(maxF64),
+			Expr:    models.Expr{Model: exprNode{strconv.FormatFloat(maxF64, 'e', -1, 64)}},
 		},
 		{
 			Pub:     true,
 			Const:   true,
 			Id:      "min",
 			Type:    DataType{Id: juletype.F64, Kind: tokens.F64},
-			ExprTag: f64min,
-			Expr:    models.Expr{Model: f64min_model},
+			ExprTag: float64(minF64),
+			Expr:    models.Expr{Model: min_modelF64},
 		},
 	},
 }
@@ -632,29 +655,6 @@ func init() {
 	*outlnFunc.Ast = *outFunc.Ast
 	outlnFunc.Ast.Id = "outln"
 	Builtin.Funcs = append(Builtin.Funcs, outlnFunc)
-
-	// Set models
-	i64min := i64statics.Globals[0]
-	i64min.Expr.Model = getModel(value{
-		data: models.Data{
-			Type: i64min.Type,
-		},
-		expr: i64min.ExprTag,
-	})
-	i64max := i64statics.Globals[1]
-	i64min.Expr.Model = getModel(value{
-		data: models.Data{
-			Type: i64max.Type,
-		},
-		expr: i64max.ExprTag,
-	})
-	u64max := u64statics.Globals[0]
-	u64max.Expr.Model = getModel(value{
-		data: models.Data{
-			Type: u64max.Type,
-		},
-		expr: u64max.ExprTag,
-	})
 
 	// Set bits of platform-dependent types
 	intMax := intStatics.Globals[0]
