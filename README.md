@@ -53,24 +53,18 @@ JuleC is the name of the reference compiler for the Jule programming language.
 It is the original compiler of the Jule programming language.
 The features that JuleC has is a representation of the official and must-have features of the Jule programming language.
 
-<h2 id="about-project">About Project</h2>
-JuleC currently, it can only be built from source.
-Due to the fact that it is still under development, there may be changes in the design and syntax of the language.
-<br><br>
-It is planned to rewrite the compiler with Jule after reference compiler reaches sufficient maturity.
+<h2 id="future-changes">Future Changes</h2>
+JuleC is in early development and currently iy can only be built from source.
+However, despite being in the early development stage, many algorithms (<a href="https://github.com/jule-lang/jule/tree/main/std">See the standard library</a>) can be successfully implemented.
+It is planned to rewrite the compiler with Jule after reference compiler and standard library reaches sufficient maturity.
 JuleC has or is very close to many of the things Jule was intended to have, such as memory safety, properties, structures with methods and generics.
 <br><br>
-Currently, project structure, its lexical and syntactic structure has appeared.
-However, when the reference compiler is rewritten with Jule, it is thought that AST, Lexer and some packages will be included in the standard library.
+A release is not expected until JuleC itself is developed with the Jule programming language.
+The syntax and language design of the Jule programming language has emerged and is not expected to undergo major changes.
+When the reference compiler is rewritten with Jule, it is thought that AST, Lexer and some packages will be included in the standard library.
 This will be a change that will cause the official compiler's project structure to be rebuilt.
 The reference compiler will probably use the standard library a lot.
 This will also allow developers to quickly develop tools for the language by leveraging Jule's standard library.
-
-<h2 id="future-changes">Future Changes</h2>
-JuleC is in early development.
-However, despite being in the early development stage, many algorithms (<a href="https://github.com/jule-lang/jule/tree/main/std">See the standard library</a>) can be successfully implemented.
-A release is not expected until JuleC itself is developed with the Jule programming language.
-The syntax and language design of the Jule programming language has emerged and is not expected to undergo major changes.
 <br><br>
 There is an idea to include a package manager in JuleC as well, although it doesn't have it yet.
 Jule's modern understanding of language and convenience suggests that there should be a package manager that comes with the compiler.
@@ -86,10 +80,12 @@ or etc.) are almost complete and are not expected to undergo major changes.
 
 <h2 id="documentations">Documentations</h2>
 
-All documentation about Jule is on the website. <br>
+All documentation about Jule and JuleC is on the website. <br>
 [See Documentations](https://jule-lang.github.io/website/pages/docs.html)
 
 <h2 id="os-support">OS Support</h2>
+
+> Compiler support available from the first stable release of JuleC.
 
 <table>
     <tr>
