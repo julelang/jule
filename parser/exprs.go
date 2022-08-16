@@ -10,6 +10,9 @@ import (
 )
 
 func indexingExprModel(index iExpr) iExpr {
+	if index == nil {
+		return index
+	}
 	var model exprNode
 	model.value = juletype.CppId(juletype.Int)
 	model.value += tokens.LPARENTHESES
