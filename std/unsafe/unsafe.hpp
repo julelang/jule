@@ -8,15 +8,15 @@
 #ifndef __JULEC_STD_UNSAFE_UNSAFE_HPP
 #define __JULEC_STD_UNSAFE_UNSAFE_HPP
 
+// Declarations
+
 template<typename T>
 inline ptr<T> __julec_uintptr_cast_to_raw(const uintptr_julet &_Addr) noexcept;
 
+// Definitions
+
 template<typename T>
-inline ptr<T> __julec_uintptr_cast_to_raw(const uintptr_julet &_Addr) noexcept {
-    ptr<T> _ptr;
-    _ptr._ptr = (T**)(&_Addr);
-    _ptr._heap = __JULEC_PTR_NEVER_HEAP; // Avoid heap allocation
-    return _ptr;
-}
+inline ptr<T> __julec_uintptr_cast_to_raw(const uintptr_julet &_Addr) noexcept
+{ return __julec_never_guarantee_ptr((T*)(_Addr)); }
 
 #endif // #ifndef __JULEC_STD_UNSAFE_UNSAFE_HPP
