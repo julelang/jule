@@ -963,6 +963,7 @@ func (e *eval) variadic(toks Toks, m *exprModel, errtok Tok) (v value) {
 	}
 	v.data.Type = *v.data.Type.ComponentType
 	v.variadic = true
+	v.constExpr = false
 	return
 }
 
