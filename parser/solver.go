@@ -369,6 +369,7 @@ func (s *solver) or(v *value) {
 func (s *solver) ptr() (v value) {
 	v.data.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.data.Type, s.rightVal.data.Type, true) {
+		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
@@ -384,6 +385,7 @@ func (s *solver) ptr() (v value) {
 		v.data.Type.Id = juletype.Bool
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
+		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "operator_notfor_juletype", s.operator.Kind, "pointer")
 	}
 	return
@@ -403,6 +405,7 @@ func (s *solver) str() (v value) {
 	v.data.Tok = s.operator
 	// Not both string?
 	if s.leftVal.data.Type.Id != s.rightVal.data.Type.Id {
+		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.leftVal.data.Type.Kind, s.rightVal.data.Type.Kind)
 		return
@@ -421,6 +424,7 @@ func (s *solver) str() (v value) {
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.noteq(&v)
 	default:
+		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "operator_notfor_juletype",
 			s.operator.Kind, tokens.STR)
 	}
@@ -434,6 +438,7 @@ func (s *solver) any() (v value) {
 		v.data.Type.Id = juletype.Bool
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
+		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "operator_notfor_juletype", s.operator.Kind, tokens.ANY)
 	}
 	return
@@ -442,6 +447,7 @@ func (s *solver) any() (v value) {
 func (s *solver) bool() (v value) {
 	v.data.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.data.Type, s.rightVal.data.Type, true) {
+		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
@@ -456,6 +462,7 @@ func (s *solver) bool() (v value) {
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.noteq(&v)
 	default:
+		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "operator_notfor_juletype",
 			s.operator.Kind, tokens.BOOL)
 	}
@@ -466,6 +473,7 @@ func (s *solver) float() (v value) {
 	v.data.Tok = s.operator
 	if !juletype.IsNumeric(s.leftVal.data.Type.Id) ||
 		!juletype.IsNumeric(s.rightVal.data.Type.Id) {
+		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
@@ -527,6 +535,7 @@ func (s *solver) float() (v value) {
 		}
 		s.div(&v)
 	default:
+		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "operator_notfor_float", s.operator.Kind)
 	}
 	return
@@ -536,6 +545,7 @@ func (s *solver) signed() (v value) {
 	v.data.Tok = s.operator
 	if !juletype.IsNumeric(s.leftVal.data.Type.Id) ||
 		!juletype.IsNumeric(s.rightVal.data.Type.Id) {
+		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
@@ -628,6 +638,7 @@ func (s *solver) signed() (v value) {
 		}
 		s.lshift(&v)
 	default:
+		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "operator_notfor_int", s.operator.Kind)
 	}
 	return
@@ -637,6 +648,7 @@ func (s *solver) unsigned() (v value) {
 	v.data.Tok = s.operator
 	if !juletype.IsNumeric(s.leftVal.data.Type.Id) ||
 		!juletype.IsNumeric(s.rightVal.data.Type.Id) {
+		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
@@ -729,6 +741,7 @@ func (s *solver) unsigned() (v value) {
 		}
 		s.lshift(&v)
 	default:
+		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "operator_notfor_uint", s.operator.Kind)
 	}
 	return
@@ -738,7 +751,9 @@ func (s *solver) logical() (v value) {
 	v.data.Tok = s.operator
 	v.data.Type.Id = juletype.Bool
 	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
-	if s.leftVal.data.Type.Id != juletype.Bool || s.rightVal.data.Type.Id != juletype.Bool {
+	if s.leftVal.data.Type.Id != juletype.Bool ||
+		s.rightVal.data.Type.Id != juletype.Bool {
+		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "logical_not_bool")
 		return
 	}
@@ -757,6 +772,7 @@ func (s *solver) logical() (v value) {
 func (s *solver) array() (v value) {
 	v.data.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.data.Type, s.rightVal.data.Type, true) {
+		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
@@ -766,6 +782,7 @@ func (s *solver) array() (v value) {
 		v.data.Type.Id = juletype.Bool
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
+		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "operator_notfor_juletype", s.operator.Kind, s.leftVal.data.Type.Kind)
 	}
 	return
@@ -774,6 +791,7 @@ func (s *solver) array() (v value) {
 func (s *solver) slice() (v value) {
 	v.data.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.data.Type, s.rightVal.data.Type, true) {
+		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
@@ -783,6 +801,7 @@ func (s *solver) slice() (v value) {
 		v.data.Type.Id = juletype.Bool
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
+		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "operator_notfor_juletype",
 			s.operator.Kind, s.leftVal.data.Type.Kind)
 	}
@@ -792,6 +811,7 @@ func (s *solver) slice() (v value) {
 func (s *solver) nil() (v value) {
 	v.data.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.data.Type, s.rightVal.data.Type, false) {
+		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
@@ -810,6 +830,7 @@ func (s *solver) nil() (v value) {
 			v.expr = s.leftVal.expr == nil && s.rightVal.expr == nil
 		}
 	default:
+		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "operator_notfor_juletype",
 			s.operator.Kind, tokens.NIL)
 	}
@@ -819,6 +840,7 @@ func (s *solver) nil() (v value) {
 func (s *solver) structure() (v value) {
 	v.data.Tok = s.operator
 	if s.leftVal.data.Type.Kind != s.rightVal.data.Type.Kind {
+		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
@@ -828,6 +850,7 @@ func (s *solver) structure() (v value) {
 		v.data.Type.Id = juletype.Bool
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
+		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "operator_notfor_juletype",
 			s.operator.Kind, tokens.STRUCT)
 	}
@@ -838,6 +861,7 @@ func (s *solver) function() (v value) {
 	v.data.Tok = s.operator
 	if (!typeIsPure(s.leftVal.data.Type) || s.leftVal.data.Type.Id != juletype.Nil) &&
 		(!typeIsPure(s.rightVal.data.Type) || s.rightVal.data.Type.Id != juletype.Nil) {
+		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "incompatible_datatype",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
@@ -850,23 +874,11 @@ func (s *solver) function() (v value) {
 		v.data.Type.Id = juletype.Bool
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
+		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "operator_notfor_juletype",
 			s.operator.Kind, tokens.NIL)
 	}
 	return
-}
-
-func (s *solver) check() bool {
-	switch s.operator.Kind {
-	case tokens.PLUS, tokens.MINUS, tokens.STAR, tokens.SOLIDUS, tokens.PERCENT, tokens.RSHIFT,
-		tokens.LSHIFT, tokens.AMPER, tokens.VLINE, tokens.CARET, tokens.EQUALS, tokens.NOT_EQUALS,
-		tokens.GREAT, tokens.LESS, tokens.GREAT_EQUAL, tokens.LESS_EQUAL:
-	case tokens.AND, tokens.OR:
-	default:
-		s.p.pusherrtok(s.operator, "invalid_operator")
-		return false
-	}
-	return true
 }
 
 func (s *solver) isConstExpr() bool {
@@ -885,9 +897,6 @@ func (s *solver) solve() (v value) {
 			}
 		}
 	}()
-	if !s.check() {
-		return
-	}
 	switch s.operator.Kind {
 	case tokens.AND, tokens.OR:
 		return s.logical()
