@@ -138,7 +138,7 @@ func (p *Parser) pushwarn(key string, args ...any) {
 }
 
 // CppLinks returns cpp code of cpp links.
-func (p *Parser) CppLinks() string {
+func (p *Parser) CppLinks(out chan string) {
 	var cpp strings.Builder
 	for _, use := range used {
 		if use.cppLink {
@@ -147,7 +147,7 @@ func (p *Parser) CppLinks() string {
 			cpp.WriteString("\"\n")
 		}
 	}
-	return cpp.String()
+	out <- cpp.String()
 }
 
 func cppTypes(dm *Defmap) string {
@@ -162,7 +162,7 @@ func cppTypes(dm *Defmap) string {
 }
 
 // CppTypes returns cpp code of types.
-func (p *Parser) CppTypes() string {
+func (p *Parser) CppTypes(out chan string) {
 	var cpp strings.Builder
 	for _, use := range used {
 		if !use.cppLink {
@@ -170,7 +170,7 @@ func (p *Parser) CppTypes() string {
 		}
 	}
 	cpp.WriteString(cppTypes(p.Defs))
-	return cpp.String()
+	out <- cpp.String()
 }
 
 func cppTraits(dm *Defmap) string {
@@ -185,7 +185,7 @@ func cppTraits(dm *Defmap) string {
 }
 
 // CppTraits returns cpp code of traits.
-func (p *Parser) CppTraits() string {
+func (p *Parser) CppTraits(out chan string) {
 	var cpp strings.Builder
 	for _, use := range used {
 		if !use.cppLink {
@@ -193,7 +193,7 @@ func (p *Parser) CppTraits() string {
 		}
 	}
 	cpp.WriteString(cppTraits(p.Defs))
-	return cpp.String()
+	out <- cpp.String()
 }
 
 func cppStructs(dm *Defmap) string {
@@ -208,7 +208,7 @@ func cppStructs(dm *Defmap) string {
 }
 
 // CppStructs returns cpp code of structures.
-func (p *Parser) CppStructs() string {
+func (p *Parser) CppStructs(out chan string) {
 	var cpp strings.Builder
 	for _, use := range used {
 		if !use.cppLink {
@@ -216,7 +216,7 @@ func (p *Parser) CppStructs() string {
 		}
 	}
 	cpp.WriteString(cppStructs(p.Defs))
-	return cpp.String()
+	out <- cpp.String()
 }
 
 func cppStructPrototypes(dm *Defmap) string {
@@ -242,7 +242,7 @@ func cppFuncPrototypes(dm *Defmap) string {
 }
 
 // CppPrototypes returns cpp code of prototypes.
-func (p *Parser) CppPrototypes() string {
+func (p *Parser) CppPrototypes(out chan string) {
 	var cpp strings.Builder
 	for _, use := range used {
 		if !use.cppLink {
@@ -256,7 +256,7 @@ func (p *Parser) CppPrototypes() string {
 		}
 	}
 	cpp.WriteString(cppFuncPrototypes(p.Defs))
-	return cpp.String()
+	out <- cpp.String()
 }
 
 func cppGlobals(dm *Defmap) string {
@@ -271,7 +271,7 @@ func cppGlobals(dm *Defmap) string {
 }
 
 // CppGlobals returns cpp code of global variables.
-func (p *Parser) CppGlobals() string {
+func (p *Parser) CppGlobals(out chan string) {
 	var cpp strings.Builder
 	for _, use := range used {
 		if !use.cppLink {
@@ -279,7 +279,7 @@ func (p *Parser) CppGlobals() string {
 		}
 	}
 	cpp.WriteString(cppGlobals(p.Defs))
-	return cpp.String()
+	out <- cpp.String()
 }
 
 func cppFuncs(dm *Defmap) string {
@@ -294,7 +294,7 @@ func cppFuncs(dm *Defmap) string {
 }
 
 // CppFuncs returns cpp code of functions.
-func (p *Parser) CppFuncs() string {
+func (p *Parser) CppFuncs(out chan string) {
 	var cpp strings.Builder
 	for _, use := range used {
 		if !use.cppLink {
@@ -302,11 +302,11 @@ func (p *Parser) CppFuncs() string {
 		}
 	}
 	cpp.WriteString(cppFuncs(p.Defs))
-	return cpp.String()
+	out <- cpp.String()
 }
 
 // CppInitializerCaller returns cpp code of initializer caller.
-func (p *Parser) CppInitializerCaller() string {
+func (p *Parser) CppInitializerCaller(out chan string) {
 	var cpp strings.Builder
 	cpp.WriteString("void ")
 	cpp.WriteString(juleapi.InitializerCaller)
@@ -331,24 +331,40 @@ func (p *Parser) CppInitializerCaller() string {
 	}
 	pushInit(p.Defs)
 	cpp.WriteString("\n}")
-	return cpp.String()
+	out <- cpp.String()
 }
 
 // Cpp returns full cpp code of parsed objects.
 func (p *Parser) Cpp() string {
+	links := make(chan string)
+	types := make(chan string)
+	traits := make(chan string)
+	prototypes := make(chan string)
+	structs := make(chan string)
+	globals := make(chan string)
+	funcs := make(chan string)
+	initializerCaller := make(chan string)
+	go p.CppLinks(links)
+	go p.CppTypes(types)
+	go p.CppTraits(traits)
+	go p.CppPrototypes(prototypes)
+	go p.CppStructs(structs)
+	go p.CppGlobals(globals)
+	go p.CppFuncs(funcs)
+	go p.CppInitializerCaller(initializerCaller)
 	var cpp strings.Builder
-	cpp.WriteString(p.CppLinks())
+	cpp.WriteString(<-links)
 	cpp.WriteByte('\n')
-	cpp.WriteString(p.CppTypes())
+	cpp.WriteString(<-types)
 	cpp.WriteByte('\n')
-	cpp.WriteString(p.CppTraits())
-	cpp.WriteString(p.CppPrototypes())
-	cpp.WriteString(p.CppStructs())
+	cpp.WriteString(<-traits)
+	cpp.WriteString(<-prototypes)
+	cpp.WriteString(<-structs)
 	cpp.WriteString("\n\n")
-	cpp.WriteString(p.CppGlobals())
+	cpp.WriteString(<-globals)
 	cpp.WriteString("\n\n")
-	cpp.WriteString(p.CppFuncs())
-	cpp.WriteString(p.CppInitializerCaller())
+	cpp.WriteString(<-funcs)
+	cpp.WriteString(<-initializerCaller)
 	return cpp.String()
 }
 
