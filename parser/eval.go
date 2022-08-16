@@ -955,8 +955,20 @@ func (e *eval) operatorRight(toks Toks, m *exprModel) (v value) {
 	return
 }
 
+func readyToVariadic(v *value) {
+	if v.data.Type.Id != juletype.Str || !typeIsPure(v.data.Type) {
+		return
+	}
+	v.data.Type.Id = juletype.Slice
+	v.data.Type.ComponentType = new(DataType)
+	v.data.Type.ComponentType.Id = juletype.U8
+	v.data.Type.ComponentType.Kind = juletype.TypeMap[v.data.Type.Id]
+	v.data.Type.Kind = jule.Prefix_Slice + v.data.Type.ComponentType.Kind
+}
+
 func (e *eval) variadic(toks Toks, m *exprModel, errtok Tok) (v value) {
 	v = e.process(toks, m)
+	readyToVariadic(&v)
 	if !typeIsVariadicable(v.data.Type) {
 		e.pusherrtok(errtok, "variadic_with_nonvariadicable", v.data.Type.Kind)
 		return
