@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"math"
 	"strconv"
 
 	"github.com/jule-lang/jule/pkg/julebits"
@@ -24,7 +25,11 @@ func signedAssignable(dt uint8, v value) bool {
 	max := int64(juletype.MaxOfType(dt))
 	switch t := v.expr.(type) {
 	case float64:
-		return t >= float64(min) && t <= float64(max)
+		i, frac := math.Modf(t)
+		if frac != 0 {
+			return false
+		}
+		return i >= float64(min) && i <= float64(max)
 	case uint64:
 		if t <= uint64(max) {
 			return true
@@ -42,7 +47,11 @@ func unsignedAssignable(dt uint8, v value) bool {
 		if t < 0 {
 			return false
 		}
-		return t <= float64(max)
+		i, frac := math.Modf(t)
+		if frac != 0 {
+			return false
+		}
+		return i <= float64(max)
 	case uint64:
 		if t <= max {
 			return true

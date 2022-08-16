@@ -44,20 +44,21 @@ func getModel(v value) iExpr {
 }
 
 func numericModel(v value) iExpr {
-	cppId := juletype.CppId(v.data.Type.Id)
 	switch t := v.expr.(type) {
 	case uint64:
-		return exprNode{cppId + "(" + strconv.FormatUint(t, 10) + "ULL)"}
+		fmt := strconv.FormatUint(t, 10)
+		return exprNode{"(" + fmt + "LLU)"}
 	case int64:
-		return exprNode{cppId + "(" + strconv.FormatInt(t, 10) + "LL)"}
+		fmt := strconv.FormatInt(t, 10)
+		return exprNode{"(" + fmt + "LL)"}
 	case float64:
 		switch {
 		case normalize(&v):
 			return numericModel(v)
 		case v.data.Type.Id == juletype.F32:
-			return exprNode{fmt.Sprint(t) + "f"}
+			return exprNode{"(" + fmt.Sprint(t) + "f)"}
 		case v.data.Type.Id == juletype.F64:
-			return exprNode{fmt.Sprint(t)}
+			return exprNode{"(" + fmt.Sprint(t) + ")"}
 		}
 	}
 	return nil
@@ -137,16 +138,16 @@ func normalize(v *value) (normalized bool) {
 	switch {
 	case !v.constExpr:
 		return
-	case integerAssignable(juletype.I64, *v):
-		v.data.Type.Id = juletype.I64
-		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
-		v.expr = tonums(v.expr)
-		bitize(v)
-		return true
 	case integerAssignable(juletype.U64, *v):
 		v.data.Type.Id = juletype.U64
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		v.expr = tonumu(v.expr)
+		bitize(v)
+		return true
+	case integerAssignable(juletype.I64, *v):
+		v.data.Type.Id = juletype.I64
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
+		v.expr = tonums(v.expr)
 		bitize(v)
 		return true
 	}
