@@ -469,6 +469,30 @@ func (s *solver) bool() (v value) {
 	return
 }
 
+func (s *solver) floatMod() (v value, ok bool) {
+	if !juletype.IsInteger(s.leftVal.data.Type.Id) {
+		if !juletype.IsInteger(s.rightVal.data.Type.Id) {
+			return
+		}
+		s.leftVal, s.rightVal = s.rightVal, s.leftVal
+	}
+	switch {
+	case juletype.IsSignedInteger(s.leftVal.data.Type.Id):
+		switch {
+		case integerAssignable(juletype.I64, s.rightVal):
+			return s.signed(), true
+		case integerAssignable(juletype.U64, s.rightVal):
+			return s.unsigned(), true
+		}
+	case juletype.IsUnsignedInteger(s.leftVal.data.Type.Id):
+		if integerAssignable(juletype.I64, s.rightVal) ||
+			integerAssignable(juletype.U64, s.rightVal) {
+			return s.unsigned(), true
+		}
+	}
+	return
+}
+
 func (s *solver) float() (v value) {
 	v.data.Tok = s.operator
 	if !juletype.IsNumeric(s.leftVal.data.Type.Id) ||
@@ -534,6 +558,13 @@ func (s *solver) float() (v value) {
 			v.data.Type = s.rightVal.data.Type
 		}
 		s.div(&v)
+	case tokens.PERCENT:
+		var ok bool
+		v, ok = s.floatMod()
+		if ok {
+			break
+		}
+		fallthrough
 	default:
 		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "operator_notfor_float", s.operator.Kind)

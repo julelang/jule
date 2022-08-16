@@ -7,7 +7,7 @@ import (
 	"github.com/jule-lang/jule/pkg/juletype"
 )
 
-func floatAssignable(dt DataType, v value) bool {
+func floatAssignable(dt uint8, v value) bool {
 	switch t := v.expr.(type) {
 	case float64:
 		v.data.Value = strconv.FormatFloat(t, 'e', -1, 64)
@@ -16,14 +16,15 @@ func floatAssignable(dt DataType, v value) bool {
 	case uint64:
 		v.data.Value = strconv.FormatFloat(float64(t), 'e', -1, 64)
 	}
-	return checkFloatBit(v.data, julebits.BitsizeType(dt.Id))
+	return checkFloatBit(v.data, julebits.BitsizeType(dt))
 }
 
-func signedAssignable(dt DataType, v value) bool {
-	min := juletype.MinOfType(dt.Id)
-	max := int64(juletype.MaxOfType(dt.Id))
+func signedAssignable(dt uint8, v value) bool {
+	min := juletype.MinOfType(dt)
+	max := int64(juletype.MaxOfType(dt))
 	switch t := v.expr.(type) {
 	case float64:
+		return t >= float64(min) && t <= float64(max)
 	case uint64:
 		if t <= uint64(max) {
 			return true
@@ -34,10 +35,14 @@ func signedAssignable(dt DataType, v value) bool {
 	return false
 }
 
-func unsignedAssignable(dt DataType, v value) bool {
-	max := juletype.MaxOfType(dt.Id)
+func unsignedAssignable(dt uint8, v value) bool {
+	max := juletype.MaxOfType(dt)
 	switch t := v.expr.(type) {
 	case float64:
+		if t < 0 {
+			return false
+		}
+		return t <= float64(max)
 	case uint64:
 		if t <= max {
 			return true
@@ -51,11 +56,11 @@ func unsignedAssignable(dt DataType, v value) bool {
 	return false
 }
 
-func integerAssignable(dt DataType, v value) bool {
+func integerAssignable(dt uint8, v value) bool {
 	switch {
-	case juletype.IsSignedInteger(dt.Id):
+	case juletype.IsSignedInteger(dt):
 		return signedAssignable(dt, v)
-	case juletype.IsUnsignedInteger(dt.Id):
+	case juletype.IsUnsignedInteger(dt):
 		return unsignedAssignable(dt, v)
 	}
 	return false
@@ -76,12 +81,12 @@ func (ac assignChecker) checkAssignType() {
 	if typeIsPure(ac.t) && ac.v.constExpr && typeIsPure(ac.v.data.Type) {
 		switch {
 		case juletype.IsFloat(ac.t.Id):
-			if !floatAssignable(ac.t, ac.v) {
+			if !floatAssignable(ac.t.Id, ac.v) {
 				ac.p.pusherrtok(ac.errtok, "overflow_limits")
 			}
 			return
 		case juletype.IsInteger(ac.t.Id) && juletype.IsInteger(ac.v.data.Type.Id):
-			if !integerAssignable(ac.t, ac.v) {
+			if !integerAssignable(ac.t.Id, ac.v) {
 				ac.p.pusherrtok(ac.errtok, "overflow_limits")
 			}
 			return

@@ -1406,7 +1406,7 @@ func (p *Parser) Var(v Var) *Var {
 						Id:   juletype.Int,
 						Kind: juletype.TypeMap[juletype.Int],
 					}
-					if integerAssignable(dt, val) {
+					if integerAssignable(dt.Id, val) {
 						v.Type = dt
 					}
 				case uint64:
@@ -1414,7 +1414,7 @@ func (p *Parser) Var(v Var) *Var {
 						Id:   juletype.UInt,
 						Kind: juletype.TypeMap[juletype.UInt],
 					}
-					if integerAssignable(dt, val) {
+					if integerAssignable(dt.Id, val) {
 						v.Type = dt
 					}
 				}
