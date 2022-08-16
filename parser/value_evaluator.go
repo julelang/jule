@@ -47,11 +47,11 @@ func numericModel(v value) iExpr {
 	cppId := juletype.CppId(v.data.Type.Id)
 	switch t := v.expr.(type) {
 	case uint64:
-		return exprNode{cppId + "{" + strconv.FormatUint(t, 10) + "ULL}"}
+		return exprNode{cppId + "(" + strconv.FormatUint(t, 10) + "ULL)"}
 	case int64:
-		return exprNode{cppId + "{" + strconv.FormatInt(t, 10) + "LL}"}
+		return exprNode{cppId + "(" + strconv.FormatInt(t, 10) + "LL)"}
 	case float64:
-		return exprNode{cppId + "{" + fmt.Sprint(t) + "}"}
+		return exprNode{cppId + "(" + fmt.Sprint(t) + ")"}
 	}
 	return nil
 }

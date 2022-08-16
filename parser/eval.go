@@ -474,9 +474,6 @@ func (e *eval) castExpr(dt DataType, exprToks Toks, m *exprModel, errTok Tok) va
 	m.appendSubNode(model)
 	m.appendSubNode(exprNode{tokens.RPARENTHESES})
 	val = e.cast(val, dt, errTok)
-	if val.constExpr {
-		val.model = m
-	}
 	return val
 }
 

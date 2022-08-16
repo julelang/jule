@@ -1399,7 +1399,7 @@ func (p *Parser) Var(v Var) *Var {
 		} else {
 			p.eval.hasError = p.eval.hasError || val.data.Value == ""
 			v.Type = val.data.Type
-			if val.constExpr && typeIsPure(v.Type) {
+			if val.constExpr && typeIsPure(v.Type) && isConstExpression(val.data.Value) {
 				switch val.expr.(type) {
 				case int64:
 					dt := DataType{
