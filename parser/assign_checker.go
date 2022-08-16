@@ -85,7 +85,7 @@ func (ac assignChecker) checkAssignType() {
 				ac.p.pusherrtok(ac.errtok, "overflow_limits")
 			}
 			return
-		case juletype.IsInteger(ac.t.Id) && juletype.IsInteger(ac.v.data.Type.Id):
+		case juletype.IsInteger(ac.t.Id):
 			if !integerAssignable(ac.t.Id, ac.v) {
 				ac.p.pusherrtok(ac.errtok, "overflow_limits")
 			}

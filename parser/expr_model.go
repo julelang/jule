@@ -37,7 +37,9 @@ func (m exprModel) String() string {
 	var expr strings.Builder
 	for _, node := range m.nodes {
 		for _, node := range node.nodes {
-			expr.WriteString(node.String())
+			if node != nil {
+				expr.WriteString(node.String())
+			}
 		}
 	}
 	return expr.String()
