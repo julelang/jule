@@ -208,7 +208,7 @@ var intStatics = &Defmap{
 	},
 }
 
-const maxF32 = 3.40282e+38
+const maxF32 = 0x1p127 * (1 + (1 - 0x1p-23))
 const minF32 = 1.17549435082228750796873653722224568e-38
 
 var min_modelF32 = exprNode{juletype.CppId(juletype.F32) + "{1.17549435082228750796873653722224568e-38F}"}
@@ -234,7 +234,7 @@ var f32statics = &Defmap{
 	},
 }
 
-const maxF64 = 1.79769e+308
+const maxF64 = 0x1p1023 * (1 + (1 - 0x1p-52))
 const minF64 = 2.22507385850720138309023271733240406e-308
 
 var min_modelF64 = exprNode{juletype.CppId(juletype.F64) + "{2.22507385850720138309023271733240406e-308}"}

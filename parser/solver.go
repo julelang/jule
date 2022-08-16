@@ -32,12 +32,6 @@ func setshift(v *value, right uint64) {
 }
 
 func bitize(v *value) {
-	switch {
-	case juletype.IsSignedInteger(v.data.Type.Id):
-		v.expr = tonums(v.expr)
-	case juletype.IsUnsignedInteger(v.data.Type.Id):
-		v.expr = tonumu(v.expr)
-	}
 	switch t := v.expr.(type) {
 	case float64:
 		v.data.Type.Id = juletype.FloatFromBits(julebits.BitsizeFloat(t))
@@ -314,20 +308,36 @@ func (s *solver) bitwiseXor(v *value) {
 	}
 }
 
+func (s *solver) urshift(v *value) {
+	left := tonumu(s.leftVal.expr)
+	right := tonumu(s.rightVal.expr)
+	v.expr = left >> right
+	setshift(v, right)
+}
+
 func (s *solver) rshift(v *value) {
 	if !s.isConstExpr() {
 		return
 	}
 	switch left := s.leftVal.expr.(type) {
 	case int64:
-		right := tonumu(s.rightVal.expr)
-		v.expr = left >> right
-		setshift(v, right)
+		if left < 0 {
+			right := tonumu(s.rightVal.expr)
+			v.expr = left >> right
+			setshift(v, right)
+		} else {
+			s.urshift(v)
+		}
 	case uint64:
-		right := tonumu(s.rightVal.expr)
-		v.expr = left >> right
-		setshift(v, right)
+		s.urshift(v)
 	}
+}
+
+func (s *solver) ulshift(v *value) {
+	left := tonumu(s.leftVal.expr)
+	right := tonumu(s.rightVal.expr)
+	v.expr = left << right
+	setshift(v, right)
 }
 
 func (s *solver) lshift(v *value) {
@@ -336,13 +346,15 @@ func (s *solver) lshift(v *value) {
 	}
 	switch left := s.leftVal.expr.(type) {
 	case int64:
-		right := tonumu(s.rightVal.expr)
-		v.expr = left << right
-		setshift(v, right)
+		if left < 0 {
+			right := tonumu(s.rightVal.expr)
+			v.expr = left << right
+			setshift(v, right)
+		} else {
+			s.ulshift(v)
+		}
 	case uint64:
-		right := tonumu(s.rightVal.expr)
-		v.expr = left << right
-		setshift(v, right)
+		s.ulshift(v)
 	}
 }
 

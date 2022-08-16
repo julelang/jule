@@ -139,10 +139,14 @@ func normalize(v *value) (normalized bool) {
 		return
 	case integerAssignable(juletype.I64, *v):
 		v.data.Type.Id = juletype.I64
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
+		v.expr = tonums(v.expr)
 		bitize(v)
 		return true
 	case integerAssignable(juletype.U64, *v):
 		v.data.Type.Id = juletype.U64
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
+		v.expr = tonumu(v.expr)
 		bitize(v)
 		return true
 	}
