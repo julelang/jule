@@ -51,7 +51,14 @@ func numericModel(v value) iExpr {
 	case int64:
 		return exprNode{cppId + "(" + strconv.FormatInt(t, 10) + "LL)"}
 	case float64:
-		return exprNode{cppId + "(" + fmt.Sprint(t) + ")"}
+		switch {
+		case normalize(&v):
+			return numericModel(v)
+		case v.data.Type.Id == juletype.F32:
+			return exprNode{fmt.Sprint(t) + "f"}
+		case v.data.Type.Id == juletype.F64:
+			return exprNode{fmt.Sprint(t)}
+		}
 	}
 	return nil
 }
@@ -124,6 +131,22 @@ func (ve *valueEvaluator) nil() value {
 	v.model = exprNode{ve.tok.Kind}
 	ve.model.appendSubNode(v.model)
 	return v
+}
+
+func normalize(v *value) (normalized bool) {
+	switch {
+	case !v.constExpr:
+		return
+	case integerAssignable(juletype.I64, *v):
+		v.data.Type.Id = juletype.I64
+		bitize(v)
+		return true
+	case integerAssignable(juletype.U64, *v):
+		v.data.Type.Id = juletype.U64
+		bitize(v)
+		return true
+	}
+	return
 }
 
 func (ve *valueEvaluator) float() value {
