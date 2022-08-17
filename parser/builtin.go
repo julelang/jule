@@ -661,22 +661,6 @@ func init() {
 	intMin := intStatics.Globals[1]
 	uintMax := uintStatics.Globals[0]
 	switch juletype.BitSize {
-	case 8:
-		intMax.Expr = i8statics.Globals[0].Expr
-		intMax.ExprTag = i8statics.Globals[0].ExprTag
-		intMin.Expr = i8statics.Globals[1].Expr
-		intMin.ExprTag = i8statics.Globals[1].ExprTag
-
-		uintMax.Expr = u8statics.Globals[0].Expr
-		uintMax.ExprTag = u8statics.Globals[0].ExprTag
-	case 16:
-		intMax.Expr = i16statics.Globals[0].Expr
-		intMax.ExprTag = i16statics.Globals[0].ExprTag
-		intMin.Expr = i16statics.Globals[1].Expr
-		intMin.ExprTag = i16statics.Globals[1].ExprTag
-
-		uintMax.Expr = u16statics.Globals[0].Expr
-		uintMax.ExprTag = u16statics.Globals[0].ExprTag
 	case 32:
 		intMax.Expr = i32statics.Globals[0].Expr
 		intMax.ExprTag = i32statics.Globals[0].ExprTag

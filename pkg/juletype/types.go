@@ -343,12 +343,6 @@ func FloatFromBits(bits uint64) uint8 {
 func init() {
 	BitSize = strconv.IntSize
 	switch BitSize {
-	case 8:
-		IntCode = I8
-		UIntCode = U8
-	case 16:
-		IntCode = I16
-		UIntCode = U16
 	case 32:
 		IntCode = I32
 		UIntCode = U32
