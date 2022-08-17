@@ -2569,12 +2569,9 @@ func (p *Parser) parseCase(c *models.Case, t DataType) {
 		}.checkAssignType()
 	}
 	oldCase := p.currentCase
-	oldIter := p.isNowIntoIter
 	p.currentCase = c
-	p.isNowIntoIter = false
 	p.checkNewBlock(c.Block)
 	p.currentCase = oldCase
-	p.isNowIntoIter = oldIter
 }
 
 func (p *Parser) cases(m *models.Match, t DataType) {
