@@ -16,7 +16,8 @@ str_julet __julec_readln() noexcept;
 #include <locale>
 #include <codecvt>
 
-inline std::string __julec_std_io_encode_utf8(const std::wstring &_WStr) noexcept {
+inline std::string
+__julec_std_io_encode_utf8(const std::wstring &_WStr) noexcept {
     std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> conv{};
     return conv.to_bytes(_WStr);
 }

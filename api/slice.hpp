@@ -38,7 +38,7 @@ public:
 
     inline void __check(void) const noexcept {
         if(this->operator==(nil))
-        { JULEC_ID(panic)("invalid memory address or nil pointer deference"); }
+        { JULEC_ID(panic)(__JULEC_ERROR_INVALID_MEMORY); }
     }
 
     void __dealloc(void) noexcept {
@@ -56,9 +56,11 @@ public:
     void __alloc_new(const int_julet _N) noexcept {
         this->__dealloc();
         this->_alloc = new(std::nothrow) _Item_t[_N];
-        if (!this->_alloc) { JULEC_ID(panic)("memory allocation failed"); }
+        if (!this->_alloc)
+        { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
         this->_ref = new(std::nothrow) uint_julet{1};
-        if (!this->_ref) { JULEC_ID(panic)("memory allocation failed"); }
+        if (!this->_ref)
+        { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
         this->_size = _N;
         this->_slice = this->_alloc;
     }
@@ -87,7 +89,7 @@ public:
         this->__check();
         if (_Start < 0 || _End < 0 || _Start > _End) {
             std::stringstream _sstream;
-            _sstream << "index out of range [" << _Start << ':' << _End << ']';
+            __JULEC_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(_sstream, _Start, _End);
             JULEC_ID(panic)(_sstream.str().c_str());
         } else if (_Start == _End) { return slice<_Item_t>(); }
         slice<_Item_t> _slice;
@@ -115,7 +117,7 @@ public:
     void __push(const _Item_t &_Item) noexcept {
         _Item_t *_new = new(std::nothrow) _Item_t[this->_size+1];
         if (!_new)
-        { JULEC_ID(panic)("memory allocation failed"); }
+        { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
         for (int_julet _index{0}; _index < this->_size; ++_index)
         { _new[_index] = this->_alloc[_index]; }
         _new[this->_size] = _Item;
@@ -152,7 +154,7 @@ public:
         this->__check();
         if (this->empty() || _Index < 0 || this->len() <= _Index) {
             std::stringstream _sstream;
-            _sstream << "index out of range [" << _Index << ']';
+            __JULEC_WRITE_ERROR_INDEX_OUT_OF_RANGE(_sstream, _Index);
             JULEC_ID(panic)(_sstream.str().c_str());
         }
         return this->_slice[_Index];

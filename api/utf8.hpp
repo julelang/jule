@@ -70,11 +70,11 @@ constexpr u8_julet __julec_utf8_first[256] = {
 struct __julec_utf8_accept_range{ const u8_julet _lo, _hi; };
 
 constexpr struct __julec_utf8_accept_range __julec_utf8_accept_ranges[16] = {
-    {__JULEC_UTF8_LOCB, __JULEC_UTF8_HICB},
-    {0xA0, __JULEC_UTF8_HICB},
-    {__JULEC_UTF8_LOCB, 0x9F},
-    {0x90, __JULEC_UTF8_HICB},
-    {__JULEC_UTF8_LOCB, 0x8F},
+    __julec_utf8_accept_range{__JULEC_UTF8_LOCB, __JULEC_UTF8_HICB},
+    __julec_utf8_accept_range{0xA0, __JULEC_UTF8_HICB},
+    __julec_utf8_accept_range{__JULEC_UTF8_LOCB, 0x9F},
+    __julec_utf8_accept_range{0x90, __JULEC_UTF8_HICB},
+    __julec_utf8_accept_range{__JULEC_UTF8_LOCB, 0x8F},
 };
 
 std::tuple<i32_julet, int_julet> __julec_utf8_decode_rune_str(const char *_S) noexcept {

@@ -64,7 +64,7 @@ public:
                            const int_julet &_End) const noexcept {
         if (_Start < 0 || _End < 0 || _Start > _End) {
             std::stringstream _sstream;
-            _sstream << "index out of range [" << _Start << ':' << _End << ']';
+            __JULEC_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(_sstream, _Start, _End);
             JULEC_ID(panic)(_sstream.str().c_str());
         } else if (_Start == _End) { return str_julet(); }
         const int_julet _n{_End-_Start};
@@ -131,7 +131,8 @@ public:
         return str_julet{""};
     }
 
-    slice<str_julet> split(const str_julet &_Sub, const i64_julet &_N) const noexcept {
+    slice<str_julet> split(const str_julet &_Sub,
+                           const i64_julet &_N) const noexcept {
         slice<str_julet> _parts;
         if (_N == 0) { return _parts; }
         const const_iterator _begin{this->begin()};
@@ -156,8 +157,8 @@ public:
     }
 
     str_julet replace(const str_julet &_Sub,
-                   const str_julet &_New,
-                   const i64_julet &_N) const noexcept {
+                      const str_julet &_New,
+                      const i64_julet &_N) const noexcept {
         if (_N == 0) { return *this; }
         std::basic_string<u8_julet> _s{this->_buffer};
         uint_julet start_pos{0};
@@ -200,7 +201,7 @@ public:
     u8_julet &operator[](const int_julet &_Index) {
         if (this->empty() || _Index < 0 || this->len() <= _Index) {
             std::stringstream _sstream;
-            _sstream << "index out of range [" << _Index << ']';
+            __JULEC_WRITE_ERROR_INDEX_OUT_OF_RANGE(_sstream, _Index);
             JULEC_ID(panic)(_sstream.str().c_str());
         }
         return this->_buffer[_Index];
@@ -221,7 +222,8 @@ public:
     inline bool operator!=(const str_julet &_Str) const noexcept
     { return !this->operator==(_Str); }
 
-    friend std::ostream &operator<<(std::ostream &_Stream, const str_julet &_Src) noexcept {
+    friend std::ostream &operator<<(std::ostream &_Stream,
+                                    const str_julet &_Src) noexcept {
         for (const u8_julet &_byte: _Src)
         { _Stream << _byte; }
         return _Stream;

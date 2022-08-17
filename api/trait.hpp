@@ -21,19 +21,23 @@ public:
     template<typename TT>
     trait<T>(const TT &_Data) noexcept {
         TT *_alloc = new(std::nothrow) TT{_Data};
-        if (!_alloc) { JULEC_ID(panic)("memory allocation failed"); }
+        if (!_alloc)
+        { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
         this->_data = (T*)(_alloc);
         this->_ref = new(std::nothrow) uint_julet{1};
-        if (!this->_ref) { JULEC_ID(panic)("memory allocation failed"); }
+        if (!this->_ref)
+        { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
     }
 
     trait<T>(const trait<T> &_Src) noexcept
     { this->operator=(_Src); }
 
     void __dealloc(void) noexcept {
-        if (!this->_ref) { return; }
+        if (!this->_ref)
+        { return; }
         (*this->_ref)--;
-        if (*this->_ref != 0) { return; }
+        if (*this->_ref != 0)
+        { return; }
         delete this->_ref;
         this->_ref = nil;
         delete this->_data;
@@ -42,7 +46,7 @@ public:
 
     T &get(void) noexcept {
         if (this->operator==(nil))
-        { JULEC_ID(panic)("invalid memory address or nil pointer deference"); }
+        { JULEC_ID(panic)(__JULEC_ERROR_INVALID_MEMORY); }
         return *this->_data;
     }
 

@@ -5,8 +5,8 @@
 #ifndef __JULEC_PTR_HPP
 #define __JULEC_PTR_HPP
 
-#define __JULEC_PTR_NEVER_HEAP (bool**)(0x0000001)
-#define __JULEC_PTR_HEAP_TRUE (bool*)(0x0000001)
+#define __JULEC_PTR_NEVER_HEAP ((bool**)(0x0000001))
+#define __JULEC_PTR_HEAP_TRUE ((bool*)(0x0000001))
 
 #define __julec_ptr(_PTR) (_PTR)
 
@@ -29,11 +29,14 @@ struct ptr {
 
     ptr<T>(T *_Ptr) noexcept {
         this->_ptr = new(std::nothrow) T*{nil};
-        if (!this->_ptr) { JULEC_ID(panic)("memory allocation failed"); }
+        if (!this->_ptr)
+        { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
         this->_heap = new(std::nothrow) bool*{nil};
-        if (!this->_heap) { JULEC_ID(panic)("memory allocation failed"); }
+        if (!this->_heap)
+        { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
         this->_ref = new(std::nothrow) uint_julet{1};
-        if (!this->_ref) { JULEC_ID(panic)("memory allocation failed"); }
+        if (!this->_ref)
+        { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
         *this->_ptr = _Ptr;
     }
 
@@ -45,7 +48,7 @@ struct ptr {
 
     inline void __check_valid(void) const noexcept {
         if(this->operator==(nil))
-        { JULEC_ID(panic)("invalid memory address or nil pointer deference"); }
+        { JULEC_ID(panic)(__JULEC_ERROR_INVALID_MEMORY); }
     }
 
     void __dealloc(void) noexcept {
@@ -79,7 +82,8 @@ struct ptr {
         if (!this->_ptr || !*this->_ptr) { return *this; }
         const T _data{**this->_ptr};
         *this->_ptr = new(std::nothrow) T;
-        if (!*this->_ptr) { JULEC_ID(panic)("memory allocation failed"); }
+        if (!*this->_ptr)
+        { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
         **this->_ptr = _data;
         *this->_heap = __JULEC_PTR_HEAP_TRUE;
         return *this;
@@ -130,7 +134,8 @@ template<typename T>
 ptr<T> __julec_never_guarantee_ptr(T *_Ptr) noexcept {
     ptr<T> _ptr;
     _ptr._ptr = new(std::nothrow) T*{nil};
-    if (!_ptr._ptr) { JULEC_ID(panic)("memory allocation failed"); }
+    if (!_ptr._ptr)
+    { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
     *_ptr._ptr = _Ptr;
     _ptr._heap = __JULEC_PTR_NEVER_HEAP; // Avoid heap allocation
     return _ptr;
@@ -140,7 +145,8 @@ template<typename T>
 ptr<T> __julec_guaranteed_ptr(T *_Ptr) {
     ptr<T> _ptr{__julec_never_guarantee_ptr(_Ptr)};
     _ptr._heap = new(std::nothrow) bool*{__JULEC_PTR_HEAP_TRUE};
-    if (!_ptr._heap) { JULEC_ID(panic)("memory allocation failed"); }
+    if (!_ptr._heap)
+    { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
     return _ptr;
 }
 

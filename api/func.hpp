@@ -16,7 +16,7 @@ struct func {
     template<typename ..._Args_t>
     auto operator()(_Args_t... _Args) noexcept {
         if (this->_buffer == nil)
-        { JULEC_ID(panic)("invalid memory address or nil pointer deference"); }
+        { JULEC_ID(panic)(__JULEC_ERROR_INVALID_MEMORY); }
         return this->_buffer(_Args...);
     }
 

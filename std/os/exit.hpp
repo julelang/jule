@@ -8,9 +8,7 @@
 #ifndef __JULEC_STD_OS_EXIT_HPP
 #define __JULEC_STD_OS_EXIT_HPP
 
-inline void __julec_exit(const int_julet &_Code) noexcept;
-
-inline void __julec_exit(const int_julet &_Code) noexcept
-{ std::exit(_Code); }
+#define __julec_exit(_CODE) \
+    (std::exit(_CODE))
 
 #endif // #ifndef __JULEC_STD_OS_EXIT_HPP

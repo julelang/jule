@@ -5,8 +5,6 @@
 #ifndef __JULEC_DEFER_HPP
 #define __JULEC_DEFER_HPP
 
-#define DEFER(_Expr) defer CONCAT(JULEDEFER_, __LINE__){[&](void) mutable -> void { _Expr; }}
-
 // Deferred call infrastructure.
 struct defer;
 

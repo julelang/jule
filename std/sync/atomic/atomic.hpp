@@ -8,230 +8,148 @@
 #ifndef __JULEC_STD_SYNC_ATOMIC_ATOMIC_HPP
 #define __JULEC_STD_SYNC_ATOMIC_ATOMIC_HPP
 
-#define __julec_atomic_store_explicit(ADDR, VAL, MO) \
-    __extension__ \
-    ({    \
-        auto __atomic_store_ptr = (ADDR);    \
-        __typeof__((void)0, *__atomic_store_ptr) __atomic_store_tmp = (VAL); \
-        __atomic_store(__atomic_store_ptr, &__atomic_store_tmp, (MO)); \
-    })
-
-#define __julec_atomic_store(ADDR, VAL) \
-    __julec_atomic_store_explicit (ADDR, VAL, __ATOMIC_SEQ_CST)
-
-#define __julec_atomic_load_explicit(ADDR, MO)   \
+#define __julec_atomic_store_explicit(_ADDR, _VAL, _MO) \
     __extension__   \
     ({  \
-        auto __atomic_load_ptr = (ADDR); \
-        __typeof__ ((void)0, *__atomic_load_ptr) __atomic_load_tmp;  \
-        __atomic_load (__atomic_load_ptr, &__atomic_load_tmp, (MO)); \
+        auto __atomic_store_ptr = (_ADDR);  \
+        __typeof__((void)(0), *__atomic_store_ptr) __atomic_store_tmp = (_VAL); \
+        __atomic_store(__atomic_store_ptr, &__atomic_store_tmp, (_MO)); \
+    })
+
+#define __julec_atomic_store(_ADDR,  _VAL)  \
+    __julec_atomic_store_explicit (_ADDR, _VAL, __ATOMIC_SEQ_CST)
+
+#define __julec_atomic_load_explicit(_ADDR, _MO)    \
+    __extension__   \
+    ({  \
+        auto __atomic_load_ptr = (_ADDR);   \
+        __typeof__ ((void)(0), *__atomic_load_ptr) __atomic_load_tmp;   \
+        __atomic_load (__atomic_load_ptr, &__atomic_load_tmp, (_MO));   \
         __atomic_load_tmp;  \
     })
 
-#define __julec_atomic_load(ADDR) \
-    __julec_atomic_load_explicit (ADDR, __ATOMIC_SEQ_CST)
+#define __julec_atomic_load(_ADDR)  \
+    __julec_atomic_load_explicit (_ADDR, __ATOMIC_SEQ_CST)
 
-#define __julec_atomic_swap_explicit(ADDR, NEW, MO) \
-    __extension__ \
+#define __julec_atomic_swap_explicit(_ADDR, _NEW, _MO)  \
+    __extension__   \
     ({    \
-        auto __atomic_exchange_ptr = (ADDR); \
-        __typeof__((void)0, *__atomic_exchange_ptr) __atomic_exchange_val = (NEW);   \
-        __typeof__((void)0, *__atomic_exchange_ptr) __atomic_exchange_tmp; \
-        __atomic_exchange(__atomic_exchange_ptr, &__atomic_exchange_val,   \
-               &__atomic_exchange_tmp, (MO));   \
+        auto __atomic_exchange_ptr = (_ADDR);   \
+        __typeof__((void)(0), *__atomic_exchange_ptr) __atomic_exchange_val = (_NEW);   \
+        __typeof__((void)(0), *__atomic_exchange_ptr) __atomic_exchange_tmp;    \
+        __atomic_exchange(__atomic_exchange_ptr, &__atomic_exchange_val,    \
+               &__atomic_exchange_tmp, (_MO));  \
         __atomic_exchange_tmp;  \
     })
 
-#define __julec_atomic_swap(ADDR, NEW) \
-    __julec_atomic_swap_explicit(ADDR, NEW, __ATOMIC_SEQ_CST)
+#define __julec_atomic_swap(_ADDR, _NEW)    \
+    __julec_atomic_swap_explicit(_ADDR, _NEW, __ATOMIC_SEQ_CST)
 
-#define __julec_atomic_compare_swap_explicit(ADDR, OLD, NEW, SUC, FAIL) \
-    __extension__ \
-    ({    \
-        auto __atomic_compare_exchange_ptr = (ADDR); \
-        __typeof__((void)0, *__atomic_compare_exchange_ptr) __atomic_compare_exchange_tmp \
-            = (NEW);  \
-        __atomic_compare_exchange(__atomic_compare_exchange_ptr, (OLD),  \
-                 &__atomic_compare_exchange_tmp, 0, (SUC), (FAIL)); \
+#define __julec_atomic_compare_swap_explicit(_ADDR, _OLD, _NEW, _SUC, _FAIL)    \
+    __extension__   \
+    ({  \
+        auto __atomic_compare_exchange_ptr = (_ADDR);   \
+        __typeof__((void)(0), *__atomic_compare_exchange_ptr) __atomic_compare_exchange_tmp \
+            = (_NEW);   \
+        __atomic_compare_exchange(__atomic_compare_exchange_ptr, (_OLD),    \
+                 &__atomic_compare_exchange_tmp, 0, (_SUC), (_FAIL));   \
     })
 
-#define __julec_atomic_compare_swap(ADDR, OLD, NEW) \
-    __julec_atomic_compare_swap_explicit(ADDR, OLD, NEW, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
+#define __julec_atomic_compare_swap(_ADDR, _OLD, _NEW)  \
+    __julec_atomic_compare_swap_explicit(   \
+        _ADDR, _OLD, _NEW, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
 
-#define __julec_atomic_add(ADDR, DELTA) \
-    __atomic_fetch_add((ADDR), (DELTA), __ATOMIC_SEQ_CST)
+#define __julec_atomic_add(_ADDR, _DELTA)   \
+    __atomic_fetch_add((_ADDR), (_DELTA), __ATOMIC_SEQ_CST)
 
-// Declarations
+#define __julec_atomic_swap_i32(_JULEC_PTR, _NEW)   \
+    (__julec_atomic_swap(*((_JULEC_PTR)._ptr), _NEW))
 
-inline i32_julet __julec_atomic_swap_i32(const ptr<i32_julet> &_Addr,
-                                    const i32_julet &_New) noexcept;
-inline i64_julet __julec_atomic_swap_i64(const ptr<i64_julet> &_Addr,
-                                    const i64_julet &_New) noexcept;
-inline u32_julet __julec_atomic_swap_u32(const ptr<u32_julet> &_Addr,
-                                    const u32_julet &_New) noexcept;
-inline u64_julet __julec_atomic_swap_u64(const ptr<u64_julet> &_Addr,
-                                    const u64_julet &_New) noexcept;
-inline uintptr_julet __julec_atomic_swap_uintptr(const ptr<uintptr_julet> &_Addr,
-                                            const uintptr_julet &_New) noexcept;
-inline bool __julec_atomic_compare_swap_i32(const ptr<i32_julet> &_Addr,
-                                          const i32_julet &_Old,
-                                          const i32_julet &_New) noexcept;
-inline bool __julec_atomic_compare_swap_i64(const ptr<i64_julet> &_Addr,
-                                          const i64_julet &_Old,
-                                          const i64_julet &_New) noexcept;
-inline bool __julec_atomic_compare_swap_u32(const ptr<u32_julet> &_Addr,
-                                          const u32_julet &_Old,
-                                          const u32_julet &_New) noexcept;
-inline bool __julec_atomic_compare_swap_u64(const ptr<u64_julet> &_Addr,
-                                          const u64_julet &_Old,
-                                          const u64_julet &_New) noexcept;
-inline bool __julec_atomic_compare_swap_uintptr(const ptr<uintptr_julet> &_Addr,
-                                              const uintptr_julet &_Old,
-                                              const uintptr_julet &_New) noexcept;
-inline i32_julet __julec_atomic_add_i32(const ptr<i32_julet> &_Addr,
-                                   const i32_julet &_Delta) noexcept;
-inline i64_julet __julec_atomic_add_i64(const ptr<i64_julet> &_Addr,
-                                   const i64_julet &_Delta) noexcept;
-inline u32_julet __julec_atomic_add_u32(const ptr<u32_julet> &_Addr,
-                                   const u32_julet &_Delta) noexcept;
-inline u64_julet __julec_atomic_add_u64(const ptr<u64_julet> &_Addr,
-                                   const u64_julet &_Delta) noexcept;
-inline uintptr_julet __julec_atomic_add_uintptr(const ptr<uintptr_julet> &_Addr,
-                                           const uintptr_julet &_Delta) noexcept;
-inline i32_julet __julec_atomic_load_i32(const ptr<i32_julet> &_Addr) noexcept;
-inline i64_julet __julec_atomic_load_i64(const ptr<i64_julet> &_Addr) noexcept;
-inline u32_julet __julec_atomic_load_u32(const ptr<u32_julet> &_Addr) noexcept;
-inline u64_julet __julec_atomic_load_u64(const ptr<u64_julet> &_Addr) noexcept;
-inline uintptr_julet __julec_atomic_load_uintptr(const ptr<uintptr_julet> &_Addr) noexcept;
-inline void __julec_atomic_store_i32(const ptr<i32_julet> &_Addr,
-                                   const i32_julet &_Val) noexcept;
-inline void __julec_atomic_store_i64(const ptr<i64_julet> &_Addr,
-                                   const i64_julet &_Val) noexcept;
-inline void __julec_atomic_store_u32(const ptr<u32_julet> &_Addr,
-                                   const u32_julet &_Val) noexcept;
-inline void __julec_atomic_store_u64(const ptr<u64_julet> &_Addr,
-                                   const u64_julet &_Val) noexcept;
-inline void __julec_atomic_store_uintptr(const ptr<uintptr_julet> &_Addr,
-                                       const uintptr_julet &_Val) noexcept;
+#define __julec_atomic_swap_i64(_JULEC_PTR, _NEW)   \
+    (__julec_atomic_swap(*((_JULEC_PTR)._ptr), _NEW))
 
-// Definitions
+#define __julec_atomic_swap_u32(_JULEC_PTR, _NEW)   \
+    (__julec_atomic_swap(*((_JULEC_PTR)._ptr), _NEW))
 
-inline i32_julet
-__julec_atomic_swap_i32(const ptr<i32_julet> &_Addr, const i32_julet &_New) noexcept
-{ return __julec_atomic_swap(*_Addr._ptr, _New); }
+#define __julec_atomic_swap_u64(_JULEC_PTR, _NEW)   \
+    (__julec_atomic_swap(*((_JULEC_PTR)._ptr), _NEW))
 
-inline i64_julet
-__julec_atomic_swap_i64(const ptr<i64_julet> &_Addr, const i64_julet &_New) noexcept
-{ return __julec_atomic_swap(*_Addr._ptr, _New); }
+#define __julec_atomic_swap_uintptr(_JULEC_PTR, _NEW)   \
+    (__julec_atomic_swap(*((_JULEC_PTR)._ptr), _NEW))
 
-inline u32_julet
-__julec_atomic_swap_u32(const ptr<u32_julet> &_Addr, const u32_julet &_New) noexcept
-{ return __julec_atomic_swap(*_Addr._ptr, _New); }
+#define __julec_atomic_compare_swap_i32(_JULEC_PTR, _OLD, _NEW) \
+    (   \
+        __julec_atomic_compare_swap ((i32_julet*)(*((_JULEC_PTR)._ptr)),    \
+                                     (i32_julet*)(&_OLD), _NEW) \
+    )
 
-inline u64_julet
-__julec_atomic_swap_u64(const ptr<u64_julet> &_Addr, const u64_julet &_New) noexcept
-{ return __julec_atomic_swap(*_Addr._ptr, _New); }
+#define __julec_atomic_compare_swap_i64(_JULEC_PTR, _OLD, _NEW) \
+    (   \
+        __julec_atomic_compare_swap ((i64_julet*)(*((_JULEC_PTR)._ptr)),    \
+                                     (i64_julet*)(&_OLD), _NEW) \
+    )
 
-inline uintptr_julet
-__julec_atomic_swap_uintptr(const ptr<uintptr_julet> &_Addr,
-                          const uintptr_julet &_New) noexcept
-{ return __julec_atomic_swap(*_Addr._ptr, _New); }
+#define __julec_atomic_compare_swap_u32(_JULEC_PTR, _OLD, _NEW) \
+    (   \
+        __julec_atomic_compare_swap ((u32_julet*)(*((_JULEC_PTR)._ptr)),    \
+                                     (u32_julet*)(&_OLD), _NEW) \
+    )
 
-inline bool
-__julec_atomic_compare_swap_i32(const ptr<i32_julet> &_Addr,
-                              const i32_julet &_Old,
-                              const i32_julet &_New) noexcept {
-    return __julec_atomic_compare_swap(
-        (i32_julet*)(*_Addr._ptr), (i32_julet*)(&_Old), _New);
-}
+#define __julec_atomic_compare_swap_u64(_JULEC_PTR, _OLD, _NEW) \
+    (   \
+        __julec_atomic_compare_swap ((u64_julet*)(*((_JULEC_PTR)._ptr)),    \
+                                     (u64_julet*)(&_OLD), _NEW) \
+    )
 
-inline bool
-__julec_atomic_compare_swap_i64(const ptr<i64_julet> &_Addr,
-                              const i64_julet &_Old,
-                              const i64_julet &_New) noexcept {
-    return __julec_atomic_compare_swap(
-        (i64_julet*)(*_Addr._ptr), (i64_julet*)(&_Old), _New);
-}
+#define __julec_atomic_compare_swap_uintptr(_JULEC_PTR, _OLD, _NEW) \
+    (   \
+        __julec_atomic_compare_swap ((uintptr_julet*)(*((_JULEC_PTR)._ptr)),    \
+                                     (uintptr_julet*)(&_OLD), _NEW) \
+    )
 
-inline bool
-__julec_atomic_compare_swap_u32(const ptr<u32_julet> &_Addr,
-                              const u32_julet &_Old,
-                              const u32_julet &_New) noexcept {
-    return __julec_atomic_compare_swap(
-        (u32_julet*)(*_Addr._ptr), (u32_julet*)(&_Old), _New);
-}
+#define __julec_atomic_add_i32(_JULEC_PTR, _DELTA)  \
+    (__julec_atomic_add(*((_JULEC_PTR)._ptr), _DELTA))
 
-inline bool
-__julec_atomic_compare_swap_u64(const ptr<u64_julet> &_Addr,
-                              const u64_julet &_Old,
-                              const u64_julet &_New) noexcept {
-    return __julec_atomic_compare_swap(
-        (u64_julet*)(*_Addr._ptr), (u64_julet*)(&_Old), _New);
-}
+#define __julec_atomic_add_i64(_JULEC_PTR, _DELTA)  \
+    (__julec_atomic_add(*((_JULEC_PTR)._ptr), _DELTA))
 
-inline bool
-__julec_atomic_compare_swap_uintptr(const ptr<uintptr_julet> &_Addr,
-                                  const uintptr_julet &_Old,
-                                  const uintptr_julet &_New) noexcept {
-    return __julec_atomic_compare_swap(
-        (uintptr_julet*)(*_Addr._ptr), (uintptr_julet*)(&_Old), _New);
-}
+#define __julec_atomic_add_u32(_JULEC_PTR, _DELTA)  \
+    (__julec_atomic_add(*((_JULEC_PTR)._ptr), _DELTA))
 
-inline i32_julet
-__julec_atomic_add_i32(const ptr<i32_julet> &_Addr, const i32_julet &_Delta) noexcept
-{ return __julec_atomic_add(*_Addr._ptr, _Delta); }
+#define __julec_atomic_add_u64(_JULEC_PTR, _DELTA)  \
+    (__julec_atomic_add(*((_JULEC_PTR)._ptr), _DELTA))
 
-inline i64_julet
-__julec_atomic_add_i64(const ptr<i64_julet> &_Addr, const i64_julet &_Delta) noexcept
-{ return __julec_atomic_add(*_Addr._ptr, _Delta); }
+#define __julec_atomic_add_uintptr(_JULEC_PTR, _DELTA)  \
+    (__julec_atomic_add(*((_JULEC_PTR)._ptr), _DELTA))
 
-inline u32_julet
-__julec_atomic_add_u32(const ptr<u32_julet> &_Addr, const u32_julet &_Delta) noexcept
-{ return __julec_atomic_add(*_Addr._ptr, _Delta); }
+#define __julec_atomic_load_i32(_JULEC_PTR) \
+    (__julec_atomic_load(*((_JULEC_PTR)._ptr)))
 
-inline u64_julet
-__julec_atomic_add_u64(const ptr<u64_julet> &_Addr, const u64_julet &_Delta) noexcept
-{ return __julec_atomic_add(*_Addr._ptr, _Delta); }
+#define __julec_atomic_load_i64(_JULEC_PTR) \
+    (__julec_atomic_load(*((_JULEC_PTR)._ptr)))
 
-inline uintptr_julet
-__julec_atomic_add_uintptr(const ptr<uintptr_julet> &_Addr,
-                         const uintptr_julet &_Delta) noexcept
-{ return __julec_atomic_add(*_Addr._ptr, _Delta); }
+#define __julec_atomic_load_u32(_JULEC_PTR) \
+    (__julec_atomic_load(*((_JULEC_PTR)._ptr)))
 
-inline i32_julet __julec_atomic_load_i32(const ptr<i32_julet> &_Addr) noexcept
-{ return __julec_atomic_load(*_Addr._ptr); }
+#define __julec_atomic_load_u64(_JULEC_PTR) \
+    (__julec_atomic_load(*((_JULEC_PTR)._ptr)))
 
-inline i64_julet __julec_atomic_load_i64(const ptr<i64_julet> &_Addr) noexcept
-{ return __julec_atomic_load(*_Addr._ptr); }
+#define __julec_atomic_load_uintptr(_JULEC_PTR) \
+    (__julec_atomic_load(*((_JULEC_PTR)._ptr)))
 
-inline u32_julet __julec_atomic_load_u32(const ptr<u32_julet> &_Addr) noexcept
-{ return __julec_atomic_load(*_Addr._ptr); }
+#define __julec_atomic_store_i32(_JULEC_PTR, _VAL)  \
+    (__julec_atomic_store(*((_JULEC_PTR)._ptr), _VAL))
 
-inline u64_julet __julec_atomic_load_u64(const ptr<u64_julet> &_Addr) noexcept
-{ return __julec_atomic_load(*_Addr._ptr); }
+#define __julec_atomic_store_i64(_JULEC_PTR, _VAL)  \
+    (__julec_atomic_store(*((_JULEC_PTR)._ptr), _VAL))
 
-inline uintptr_julet __julec_atomic_load_uintptr(const ptr<uintptr_julet> &_Addr) noexcept
-{ return __julec_atomic_load(*_Addr._ptr); }
+#define __julec_atomic_store_u32(_JULEC_PTR, _VAL)  \
+    (__julec_atomic_store(*((_JULEC_PTR)._ptr), _VAL))
 
-inline void
-__julec_atomic_store_i32(const ptr<i32_julet> &_Addr, const i32_julet &_Val) noexcept
-{ __julec_atomic_store(*_Addr._ptr, _Val); }
+#define __julec_atomic_store_u64(_JULEC_PTR, _VAL)  \
+    (__julec_atomic_store(*((_JULEC_PTR)._ptr), _VAL))
 
-inline void
-__julec_atomic_store_i64(const ptr<i64_julet> &_Addr, const i64_julet &_Val) noexcept
-{ __julec_atomic_store(*_Addr._ptr, _Val); }
-
-inline void
-__julec_atomic_store_u32(const ptr<u32_julet> &_Addr, const u32_julet &_Val) noexcept
-{ __julec_atomic_store(*_Addr._ptr, _Val); }
-
-inline void
-__julec_atomic_store_u64(const ptr<u64_julet> &_Addr, const u64_julet &_Val) noexcept
-{ __julec_atomic_store(*_Addr._ptr, _Val); }
-
-inline void
-__julec_atomic_store_uintptr(const ptr<uintptr_julet> &_Addr,
-                           const uintptr_julet &_Val) noexcept
-{ __julec_atomic_store(*_Addr._ptr, _Val); }
+#define __julec_atomic_store_uintptr(_JULEC_PTR, _VAL)  \
+    (__julec_atomic_store(*((_JULEC_PTR)._ptr), _VAL))
 
 #endif // #ifndef __JULEC_STD_SYNC_ATOMIC_ATOMIC_HPP

@@ -43,7 +43,7 @@ public:
                                    const int_julet &_End) const noexcept {
         if (_Start < 0 || _End < 0 || _Start > _End) {
             std::stringstream _sstream;
-            _sstream << "index out of range [" << _Start << ':' << _End << ']';
+            __JULEC_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(_sstream, _Start, _End);
             JULEC_ID(panic)(_sstream.str().c_str());
         } else if (_Start == _End) { return slice<_Item_t>(); }
         const int_julet _n{_End-_Start};
@@ -78,7 +78,7 @@ public:
     _Item_t &operator[](const int_julet &_Index) {
         if (this->empty() || _Index < 0 || this->len() <= _Index) {
             std::stringstream _sstream;
-            _sstream << "index out of range [" << _Index << ']';
+            __JULEC_WRITE_ERROR_INDEX_OUT_OF_RANGE(_sstream, _Index);
             JULEC_ID(panic)(_sstream.str().c_str());
         }
         return this->_buffer[_Index];
@@ -89,7 +89,7 @@ public:
         _Stream << '[';
         for (int_julet _index{0}; _index < _Src.len();) {
             _Stream << _Src._buffer[_index++];
-            if (_index < _Src.len()) { _Stream << ", "; }
+            if (_index < _Src.len()) { _Stream << " "; }
         }
         _Stream << ']';
         return _Stream;

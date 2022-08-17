@@ -9,7 +9,7 @@
 #ifndef _WINDOWS
 #define _WINDOWS
 #endif // #ifndef _WINDOWS
-#endif // #if ...
+#endif // if Windows
 
 
 #include <iostream>
@@ -29,12 +29,39 @@
 #endif // #ifdef _WINDOWS
 
 
-#define __JULEC_EXIT_PANIC 2
-#define _CONCAT(_A, _B) _A ## _B
-#define CONCAT(_A, _B) _CONCAT(_A, _B)
-#define JULEC_ID(_Identifier) CONCAT(_, _Identifier)
+#define __JULEC_ERROR_INVALID_MEMORY \
+    ("invalid memory address or nil pointer deference")
+#define __JULEC_ERROR_INCOMPATIBLE_TYPE \
+    ("incompatible type")
+#define __JULEC_ERROR_MEMORY_ALLOCATION_FAILED \
+    ("memory allocation failed")
+#define __JULEC_ERROR_INDEX_OUT_OF_RANGE \
+    ("index out of range")
+#define __JULEC_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(_STREAM, _START, _LEN)   \
+    (   \
+        _STREAM << __JULEC_ERROR_INDEX_OUT_OF_RANGE \
+                << '['  \
+                << _START   \
+                << ':'  \
+                << _LEN \
+                << ']'  \
+    )
+#define __JULEC_WRITE_ERROR_INDEX_OUT_OF_RANGE(_STREAM, _INDEX) \
+    (   \
+        _STREAM << __JULEC_ERROR_INDEX_OUT_OF_RANGE \
+                << '['  \
+                << _INDEX   \
+                << ']'  \
+    )
+#define __JULEC_EXIT_PANIC (2)
+#define __JULEC_CCONCAT(_A, _B) _A ## _B
+#define __JULEC_CONCAT(_A, _B) __JULEC_CCONCAT(_A, _B)
+#define __JULEC_IDENTIFIER_PREFIX _
+#define JULEC_ID(_IDENTIFIER)   \
+    __JULEC_CONCAT(__JULEC_IDENTIFIER_PREFIX, _IDENTIFIER)
 #define nil (nullptr)
 #define CO(_EXPR) (std::thread{[&](void) mutable -> void { _EXPR; }}.detach())
+
 
 // Libraries uses this function for throw panic.
 // Also it is builtin panic function.
