@@ -512,7 +512,7 @@ func (p *Parser) compilePureUse(useAST *models.Use) (_ *use, hassErr bool) {
 			!juleio.IsUseable(name) {
 			continue
 		}
-		f, err := juleio.Openfx(filepath.Join(useAST.Path, name))
+		f, err := juleio.OpenJuleF(filepath.Join(useAST.Path, name))
 		if err != nil {
 			p.pusherrmsg(err.Error())
 			continue
@@ -678,7 +678,7 @@ func (p *Parser) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 			name == p.File.Name {
 			continue
 		}
-		f, err := juleio.Openfx(filepath.Join(p.File.Dir, name))
+		f, err := juleio.OpenJuleF(filepath.Join(p.File.Dir, name))
 		if err != nil {
 			p.pusherrmsg(err.Error())
 			return true

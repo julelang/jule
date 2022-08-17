@@ -8,11 +8,11 @@ import (
 	"github.com/jule-lang/jule/pkg/jule"
 )
 
-// Openfx returns X source file.
-func Openfx(path string) (*File, error) {
+// OpenJuleF returns Jule source file.
+func OpenJuleF(path string) (*File, error) {
 	path, _ = filepath.Abs(path)
 	if filepath.Ext(path) != jule.SrcExt {
-		return nil, errors.New(jule.GetError("file_not_x", path))
+		return nil, errors.New(jule.GetError("file_not_jule", path))
 	}
 	bytes, err := os.ReadFile(path)
 	if err != nil {

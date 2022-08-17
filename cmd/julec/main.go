@@ -248,7 +248,7 @@ func checkMode() {
 	jule.Set.Mode = lower
 }
 
-func loadXSet() {
+func loadJuleSet() {
 	// File check.
 	info, err := os.Stat(jule.SettingsFile)
 	if err != nil || info.IsDir() {
@@ -321,21 +321,21 @@ func writeOutput(path, content string) {
 }
 
 func compile(path string, main, nolocal, justDefs bool) *Parser {
-	loadXSet()
+	loadJuleSet()
 	p := parser.New(nil)
-	f, err := juleio.Openfx(path)
+	// Check standard library.
+	inf, err := os.Stat(jule.StdlibPath)
+	if err != nil || !inf.IsDir() {
+		p.PushErr("no_stdlib")
+		return p
+	}
+	f, err := juleio.OpenJuleF(path)
 	if err != nil {
 		println(err.Error())
 		return nil
 	}
 	if !juleio.IsUseable(path) {
 		p.PushErr("file_not_useable")
-		return p
-	}
-	// Check standard library.
-	inf, err := os.Stat(jule.StdlibPath)
-	if err != nil || !inf.IsDir() {
-		p.PushErr("no_stdlib")
 		return p
 	}
 	p.File = f
