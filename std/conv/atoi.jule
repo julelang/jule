@@ -4,8 +4,10 @@
 
 const __INT_SIZE: = 32 << (^uint(0) >> 63)
 
-// IntSize is the size in bits of an int or uint value.
+//doc: Is the size in bits of an int or uint value.
 pub const INT_SIZE: = __INT_SIZE
+
+const MAX_UINT64: = 1<<64 - 1
 
 //doc:
 // Is a lower-case letter if and only if
@@ -15,4 +17,167 @@ pub const INT_SIZE: = __INT_SIZE
 @inline
 lower(c: byte) byte {
 	ret c | ('x' - 'X')
+}
+
+//doc:
+// Is like parse_int but for unsigned numbers.
+//
+// A sign prefix is not permitted.
+pub parse_uint(s: str, base: int, bit_size: int) [u64, Error] {
+	const FN_PARSE_UINT: = "parse_uint"
+
+	if s == "" {
+		ret 0, syntax_error(FN_PARSE_UINT, s)
+	}
+
+	base0: = base == 0
+
+	s0: = s
+	match {
+	case 2 <= base && base <= 36:
+		// valid base; nothing to do
+	case base == 0:
+		// Look for octal, hex prefix.
+		base = 10
+		if s[0] == '0' {
+			match {
+			case s.len >= 3 && lower(s[1]) == 'b':
+				base = 2
+				s = s[2:]
+			case s.len >= 3 && lower(s[1]) == 'o':
+				base = 8
+				s = s[2:]
+			case s.len >= 3 && lower(s[1]) == 'x':
+				base = 16
+				s = s[2:]
+			default:
+				base = 8
+				s = s[1:]
+			}
+		}
+	default:
+		ret 0, base_error(FN_PARSE_UINT, s0, base)
+	}
+
+	if bit_size == 0 {
+		bit_size = INT_SIZE
+	} else if bit_size < 0 || bit_size > 64 {
+		ret 0, bit_size_error(FN_PARSE_UINT, s0, bit_size)
+	}
+
+	// Cutoff is the smallest number such that cutoff*base > MAX_UINT64.
+	// Use compile-time constants for common cases.
+	cutoff: u64
+	match base {
+	case 10:
+		cutoff = MAX_UINT64/10 + 1
+	case 16:
+		cutoff = MAX_UINT64/16 + 1
+	default:
+		cutoff = MAX_UINT64/u64(base) + 1
+	}
+
+	max_val: u64
+	match bit_size {
+	case 32:
+		max_val = u32.max
+	case 64:
+		max_val = u64.max
+	}
+	/*
+	prec: = 1
+	if bit_size == 64 {
+		prec = 2
+	}
+	max_val: = u64(1)<<uint(bit_size) - prec*/
+
+	underscores: = false
+	n: u64
+	for _, c: in s {
+		d: byte
+		match {
+		case c == '_' && base0:
+			underscores = true
+			continue
+		case '0' <= c && c <= '9':
+			d = c - '0'
+		case 'a' <= lower(c) && lower(c) <= 'z':
+			d = lower(c) - 'a' + 10
+		default:
+			ret 0, syntax_error(FN_PARSE_UINT, s0)
+		}
+
+		if d >= byte(base) {
+			ret 0, syntax_error(FN_PARSE_UINT, s0)
+		}
+
+		if n >= cutoff {
+			// n*base overflows
+			ret max_val, range_error(FN_PARSE_UINT, s0)
+		}
+		n *= u64(base)
+
+		n1: = n + u64(d)
+		if n1 < n || n1 > max_val {
+			// n+d overflows
+			ret max_val, range_error(FN_PARSE_UINT, s0)
+		}
+		n = n1
+	}
+
+	if underscores && !underscore_ok(s0) {
+		ret 0, syntax_error(FN_PARSE_UINT, s0)
+	}
+
+	ret n, nil
+}
+
+//doc:
+// Reports whether the underscores in s are allowed.
+// Checking them in this one function lets all the parsers skip over them simply.
+// Underscore must appear only between digits or between a base prefix and a digit.
+underscore_ok(s: str) bool {
+	// saw tracks the last character (class) we saw:
+	// ^ for beginning of number,
+	// 0 for a digit or base prefix,
+	// _ for an underscore,
+	// ! for none of the above.
+	saw: = '^'
+	i: = 0
+
+	// Optional sign.
+	if s.len >= 1 && (s[0] == '-' || s[0] == '+') {
+		s = s[1:]
+	}
+
+	// Optional base prefix.
+	hex: = false
+	if s.len >= 2 && s[0] == '0' && (lower(s[1]) == 'b' || lower(s[1]) == 'o' || lower(s[1]) == 'x') {
+		i = 2
+		saw = '0' // base prefix counts as a digit for "underscore as digit separator"
+		hex = lower(s[1]) == 'x'
+	}
+
+	// Number proper.
+	for ; i < s.len; i++ {
+		// Digits are always okay.
+		if '0' <= s[i] && s[i] <= '9' || hex && 'a' <= lower(s[i]) && lower(s[i]) <= 'f' {
+			saw = '0'
+			continue
+		}
+		// Underscore must follow digit.
+		if s[i] == '_' {
+			if saw != '0' {
+				ret false
+			}
+			saw = '_'
+		}
+		// Underscore must also be followed by digit.
+		if saw == '_' {
+			ret false
+		}
+		// Saw non-digit, non-underscore.
+		saw = '!'
+	}
+	ret saw != '_'
 }
