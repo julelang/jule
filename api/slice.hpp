@@ -45,7 +45,6 @@ public:
         if (!this->_ref) { return; }
         (*this->_ref)--;
         if ((*this->_ref) != 0) { return; }
-        std::cout << "dealloc" << std::endl;
         delete this->_ref;
         this->_ref = nil;
         delete[] this->_alloc;
@@ -183,7 +182,7 @@ public:
         _Stream << '[';
         for (int_julet _index{0}; _index < _Src._size;) {
             _Stream << _Src._slice[_index++];
-            if (_index < _Src._size) { _Stream << ", "; }
+            if (_index < _Src._size) { _Stream << " "; }
         }
         _Stream << ']';
         return _Stream;
