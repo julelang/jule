@@ -2086,6 +2086,9 @@ func (p *Parser) parseFuncCall(f *Func, args *models.Args, m *exprModel, errTok 
 	if len(f.Generics) > 0 {
 		params := make([]Param, len(f.Params))
 		copy(params, f.Params)
+		for i := range params {
+			params[i].Type = params[i].Type.Copy()
+		}
 		retType := f.RetType.Type
 		owner := f.Owner.(*Parser)
 		rootBlock := owner.rootBlock
@@ -2307,7 +2310,8 @@ func (p *Parser) parseArg(f *Func, pair *paramMapPair, args *models.Args, variad
 	if variadiced != nil && !*variadiced {
 		*variadiced = value.variadic
 	}
-	if args.DynamicGenericAnnotation && typeHasGenerics(f.Generics, pair.param.Type) {
+	if args.DynamicGenericAnnotation &&
+		typeHasGenerics(f.Generics, pair.param.Type) {
 		ok := p.pushGenericByArg(f, pair, args, value.data.Type)
 		if !ok {
 			p.pusherrtok(pair.arg.Tok, "dynamic_generic_annotation_failed")
