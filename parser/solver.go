@@ -182,9 +182,9 @@ func (s *solver) add(v *value) {
 	case float64:
 		v.expr = left + tonumf(s.rightVal.expr)
 	case int64:
-		v.expr = int64(float64(left) + tonumf(s.rightVal.expr))
+		v.expr = int64(left + tonums(s.rightVal.expr))
 	case uint64:
-		v.expr = uint64(float64(left) + tonumf(s.rightVal.expr))
+		v.expr = uint64(left + tonumu(s.rightVal.expr))
 	}
 }
 
@@ -196,9 +196,9 @@ func (s *solver) sub(v *value) {
 	case float64:
 		v.expr = left - tonumf(s.rightVal.expr)
 	case int64:
-		v.expr = int64(float64(left) - tonumf(s.rightVal.expr))
+		v.expr = int64(left - tonums(s.rightVal.expr))
 	case uint64:
-		v.expr = uint64(float64(left) - tonumf(s.rightVal.expr))
+		v.expr = uint64(left - tonumu(s.rightVal.expr))
 	}
 }
 
@@ -210,9 +210,9 @@ func (s *solver) mul(v *value) {
 	case float64:
 		v.expr = left * tonumf(s.rightVal.expr)
 	case int64:
-		v.expr = int64(float64(left) * tonumf(s.rightVal.expr))
+		v.expr = int64(left * tonums(s.rightVal.expr))
 	case uint64:
-		v.expr = uint64(float64(left) * tonumf(s.rightVal.expr))
+		v.expr = uint64(left * tonumu(s.rightVal.expr))
 	}
 }
 
