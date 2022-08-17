@@ -48,12 +48,11 @@ template<typename _Item_t>
 int_julet JULEC_ID(copy)(const slice<_Item_t> &_Dest,
                          const slice<_Item_t> &_Src) noexcept {
     if (_Dest.empty() || _Src.empty()) { return 0; }
-    int_julet _len;
-    if (_Dest.len() > _Src.len())      { _len = _Src.len(); }
-    else if (_Src.len() > _Dest.len()) { _len = _Dest.len(); }
-    else                               { _len = _Src.len(); }
+    int_julet _len = _Dest.len() > _Src.len() ? _len = _Src.len()
+                     : _Src.len() > _Dest.len() ? _len = _Dest.len()
+                     : _len = _Src.len();
     for (int_julet _index{0}; _index < _len; ++_index)
-    { _Dest._buffer[_index] = _Src._buffer[_index]; }
+    { _Dest._slice[_index] = _Src._slice[_index]; }
     return _len;
 }
 
@@ -64,7 +63,7 @@ slice<_Item_t> JULEC_ID(append)(const slice<_Item_t> &_Src,
     slice<_Item_t> _buffer{JULEC_ID(make)<_Item_t>(_N)};
     JULEC_ID(copy)<_Item_t>(_buffer, _Src);
     for (int_julet _index{0}; _index < _Components.len(); ++_index)
-    { _buffer[_Src.len()+_index] = _Components._buffer[_index]; }
+    { _buffer[_Src.len()+_index] = _Components._slice[_index]; }
     return _buffer;
 }
 

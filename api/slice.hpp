@@ -12,7 +12,8 @@ class slice;
 template<typename _Item_t>
 class slice {
 public:
-    _Item_t *_buffer{nil};
+    _Item_t *_alloc{nil};
+    _Item_t *_slice{nil};
     mutable uint_julet *_ref{nil};
     int_julet _size{0};
 
@@ -29,14 +30,14 @@ public:
         this->__alloc_new(_Src.size());
         const auto _Src_begin{_Src.begin()};
         for (int_julet _index{0}; _index < this->_size; ++_index)
-        { this->_buffer[_index] = *(_Item_t*)(_Src_begin+_index); }
+        { this->_alloc[_index] = *(_Item_t*)(_Src_begin+_index); }
     }
 
     ~slice<_Item_t>(void) noexcept
     { this->__dealloc(); }
 
-    void __check(void) const noexcept {
-        if(!this->_buffer)
+    inline void __check(void) const noexcept {
+        if(this->operator==(nil))
         { JULEC_ID(panic)("invalid memory address or nil pointer deference"); }
     }
 
@@ -44,20 +45,23 @@ public:
         if (!this->_ref) { return; }
         (*this->_ref)--;
         if ((*this->_ref) != 0) { return; }
+        std::cout << "dealloc" << std::endl;
         delete this->_ref;
         this->_ref = nil;
-        delete[] this->_buffer;
-        this->_buffer = nil;
+        delete[] this->_alloc;
+        this->_alloc = nil;
+        this->_slice = nil;
         this->_size = 0;
     }
 
     void __alloc_new(const int_julet _N) noexcept {
         this->__dealloc();
-        this->_buffer = new(std::nothrow) _Item_t[_N];
-        if (!this->_buffer) { JULEC_ID(panic)("memory allocation failed"); }
+        this->_alloc = new(std::nothrow) _Item_t[_N];
+        if (!this->_alloc) { JULEC_ID(panic)("memory allocation failed"); }
         this->_ref = new(std::nothrow) uint_julet{1};
         if (!this->_ref) { JULEC_ID(panic)("memory allocation failed"); }
         this->_size = _N;
+        this->_slice = this->_alloc;
     }
 
     typedef _Item_t       *iterator;
@@ -65,19 +69,19 @@ public:
 
     inline constexpr
     iterator begin(void) noexcept
-    { return &this->_buffer[0]; }
+    { return &this->_slice[0]; }
 
     inline constexpr
     const_iterator begin(void) const noexcept
-    { return &this->_buffer[0]; }
+    { return &this->_slice[0]; }
 
     inline constexpr
     iterator end(void) noexcept
-    { return &this->_buffer[this->_size]; }
+    { return &this->_slice[this->_size]; }
 
     inline constexpr
     const_iterator end(void) const noexcept
-    { return &this->_buffer[this->_size]; }
+    { return &this->_slice[this->_size]; }
 
     inline slice<_Item_t> ___slice(const int_julet &_Start,
                                    const int_julet &_End) const noexcept {
@@ -88,7 +92,10 @@ public:
             JULEC_ID(panic)(_sstream.str().c_str());
         } else if (_Start == _End) { return slice<_Item_t>(); }
         slice<_Item_t> _slice;
-        _slice._buffer = &this->_buffer[_Start];
+        _slice._ref = this->_ref;
+        (*_slice._ref)++;
+        _slice._alloc = this->_alloc;
+        _slice._slice = &this->_slice[_Start];
         _slice._size = _End-_Start;
         return _slice;
     }
@@ -104,24 +111,29 @@ public:
     { return this->_size; }
 
     inline bool empty(void) const noexcept
-    { return !this->_buffer || this->_size == 0; }
+    { return !this->_slice || this->_size == 0; }
 
     void __push(const _Item_t &_Item) noexcept {
         _Item_t *_new = new(std::nothrow) _Item_t[this->_size+1];
-        if (!_new) { JULEC_ID(panic)("memory allocation failed"); }
+        if (!_new)
+        { JULEC_ID(panic)("memory allocation failed"); }
         for (int_julet _index{0}; _index < this->_size; ++_index)
-        { _new[_index] = this->_buffer[_index]; }
+        { _new[_index] = this->_alloc[_index]; }
         _new[this->_size] = _Item;
-        delete[] this->_buffer;
-        this->_buffer = nil;
-        this->_buffer = _new;
+        delete[] this->_alloc;
+        this->_alloc = nil;
+        this->_alloc = _new;
+        this->_slice = _alloc;
         ++this->_size;
     }
 
     bool operator==(const slice<_Item_t> &_Src) const noexcept {
-        if (this->_size != _Src._size) { return false; }
-        for (int_julet _index{0}; _index < this->_size; ++_index)
-        { if (this->_buffer[_index] != _Src._buffer[_index]) { return false; } }
+        if (this->_size != _Src._size)
+        { return false; }
+        for (int_julet _index{0}; _index < this->_size; ++_index) {
+            if (this->_slice[_index] != _Src._slice[_index])
+            { return false; }
+        }
         return true;
     }
 
@@ -131,7 +143,7 @@ public:
 
     inline constexpr
     bool operator==(const std::nullptr_t) const noexcept
-    { return !this->_buffer; }
+    { return !this->_slice; }
 
     inline constexpr
     bool operator!=(const std::nullptr_t) const noexcept
@@ -144,20 +156,23 @@ public:
             _sstream << "index out of range [" << _Index << ']';
             JULEC_ID(panic)(_sstream.str().c_str());
         }
-        return this->_buffer[_Index];
+        return this->_slice[_Index];
     }
 
     void operator=(const slice<_Item_t> &_Src) noexcept {
+        if (_Src._ref)
+        { (*_Src._ref)++; }
         this->__dealloc();
-        if (_Src._ref) { (*_Src._ref)++; }
         this->_size = _Src._size;
         this->_ref = _Src._ref;
-        this->_buffer = _Src._buffer;
+        this->_alloc = _Src._alloc;
+        this->_slice = _Src._slice;
     }
 
     void operator=(const std::nullptr_t) noexcept {
         if (!this->_ref) {
-            this->_ptr = nil;
+            this->_alloc = nil;
+            this->_slice = nil;
             return;
         }
         this->__dealloc();
@@ -167,7 +182,7 @@ public:
                                     const slice<_Item_t> &_Src) noexcept {
         _Stream << '[';
         for (int_julet _index{0}; _index < _Src._size;) {
-            _Stream << _Src._buffer[_index++];
+            _Stream << _Src._slice[_index++];
             if (_index < _Src._size) { _Stream << ", "; }
         }
         _Stream << ']';
