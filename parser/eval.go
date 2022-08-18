@@ -469,9 +469,11 @@ func (e *eval) subId(toks Toks, m *exprModel) (v value) {
 
 func (e *eval) castExpr(dt DataType, exprToks Toks, m *exprModel, errTok Tok) value {
 	val, model := e.toks(exprToks)
+	m.appendSubNode(exprNode{tokens.LPARENTHESES})
 	m.appendSubNode(exprNode{tokens.LPARENTHESES + dt.String() + tokens.RPARENTHESES})
 	m.appendSubNode(exprNode{tokens.LPARENTHESES})
 	m.appendSubNode(model)
+	m.appendSubNode(exprNode{tokens.RPARENTHESES})
 	m.appendSubNode(exprNode{tokens.RPARENTHESES})
 	val = e.cast(val, dt, errTok)
 	return val
@@ -529,13 +531,14 @@ func (e *eval) tryCast(toks Toks, m *exprModel) (v value, _ bool) {
 }
 
 func (e *eval) cast(v value, t DataType, errtok Tok) value {
+	v.lvalue = false
 	switch {
 	case typeIsSlice(t):
 		e.castSlice(t, v.data.Type, errtok)
+		v.lvalue = true
 	case typeIsStruct(t):
 		e.castStruct(t, &v, errtok)
 	case typeIsPure(t):
-		v.lvalue = false
 		e.castPure(t, &v, errtok)
 	default:
 		e.pusherrtok(errtok, "type_notsupports_casting", t.Kind)
