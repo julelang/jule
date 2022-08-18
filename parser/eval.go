@@ -530,7 +530,6 @@ func (e *eval) tryCast(toks Toks, m *exprModel) (v value, _ bool) {
 }
 
 func (e *eval) cast(v value, t DataType, errtok Tok) value {
-	v.lvalue = false
 	switch {
 	case typeIsSlice(t):
 		e.castSlice(t, v.data.Type, errtok)
@@ -540,7 +539,6 @@ func (e *eval) cast(v value, t DataType, errtok Tok) value {
 			e.pusherrtok(errtok, "type_notsupports_casting", t.Kind)
 			break
 		}
-		v.lvalue = true
 		fallthrough
 	case typeIsStruct(t):
 		e.castStruct(t, &v, errtok)
@@ -551,6 +549,7 @@ func (e *eval) cast(v value, t DataType, errtok Tok) value {
 	}
 	v.data.Value = t.Kind
 	v.data.Type = t
+	v.lvalue = typeIsLvalue(t)
 	return v
 }
 
@@ -801,7 +800,7 @@ func (e *eval) xObjSubId(dm *Defmap, val value, idTok Tok, m *exprModel) (v valu
 		g := dm.Globals[i]
 		g.Used = true
 		v.data.Type = g.Type
-		v.lvalue = true
+		v.lvalue = val.lvalue || typeIsLvalue(g.Type)
 		v.constExpr = g.Const
 		if g.Const {
 			v.expr = g.ExprTag
@@ -873,10 +872,8 @@ func (e *eval) enumSubId(val value, idTok Tok, m *exprModel) (v value) {
 func (e *eval) structObjSubId(val value, idTok Tok, m *exprModel) value {
 	s := val.data.Type.Tag.(*structure)
 	val.constExpr = false
-	val.lvalue = false
 	val.isType = false
 	val = e.xObjSubId(s.Defs, val, idTok, m)
-	val.constExpr = false
 	return val
 }
 
