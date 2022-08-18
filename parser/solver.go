@@ -791,15 +791,15 @@ func (s *solver) unsigned() (v value) {
 }
 
 func (s *solver) logical() (v value) {
-	v.data.Tok = s.operator
-	v.data.Type.Id = juletype.Bool
-	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	if s.leftVal.data.Type.Id != juletype.Bool ||
 		s.rightVal.data.Type.Id != juletype.Bool {
 		s.p.eval.hasError = true
 		s.p.pusherrtok(s.operator, "logical_not_bool")
 		return
 	}
+	v.data.Tok = s.operator
+	v.data.Type.Id = juletype.Bool
+	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	if !s.isConstExpr() {
 		return
 	}
@@ -900,6 +900,26 @@ func (s *solver) structure() (v value) {
 	return
 }
 
+func (s *solver) juletrait() (v value) {
+	v.data.Tok = s.operator
+	if !typesAreCompatible(s.leftVal.data.Type, s.rightVal.data.Type, true) {
+		s.p.eval.hasError = true
+		s.p.pusherrtok(s.operator, "incompatible_datatype",
+			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
+		return
+	}
+	switch s.operator.Kind {
+	case tokens.NOT_EQUALS, tokens.EQUALS:
+		v.data.Type.Id = juletype.Bool
+		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
+	default:
+		s.p.eval.hasError = true
+		s.p.pusherrtok(s.operator, "operator_notfor_juletype",
+			s.operator.Kind, tokens.TRAIT)
+	}
+	return
+}
+
 func (s *solver) function() (v value) {
 	v.data.Tok = s.operator
 	if (!typeIsPure(s.leftVal.data.Type) || s.leftVal.data.Type.Id != juletype.Nil) &&
@@ -957,6 +977,8 @@ func (s *solver) solve() (v value) {
 		return s.enum()
 	case typeIsStruct(s.leftVal.data.Type), typeIsStruct(s.rightVal.data.Type):
 		return s.structure()
+	case typeIsTrait(s.leftVal.data.Type), typeIsTrait(s.rightVal.data.Type):
+		return s.juletrait()
 	case s.leftVal.data.Type.Id == juletype.Nil, s.rightVal.data.Type.Id == juletype.Nil:
 		return s.nil()
 	case s.leftVal.data.Type.Id == juletype.Any, s.rightVal.data.Type.Id == juletype.Any:
