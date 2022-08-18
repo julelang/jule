@@ -72,11 +72,10 @@ func (e *eval) processes(processes []Toks) (v value, model iExpr) {
 	hasError := e.hasError
 	for i, process := range processes {
 		if isOperator(process) {
-			valProcesses[i] = nil
 			continue
 		}
 		val, model := e.p.evalToks(process)
-		hasError = hasError || e.hasError
+		hasError = hasError || e.hasError || val.data.Value == ""
 		valProcesses[i] = []any{val, model}
 	}
 	if hasError {
@@ -536,6 +535,13 @@ func (e *eval) cast(v value, t DataType, errtok Tok) value {
 	case typeIsSlice(t):
 		e.castSlice(t, v.data.Type, errtok)
 		v.lvalue = true
+	case typeIsPtr(t):
+		if !typeIsStruct(unptrType(t)) {
+			e.pusherrtok(errtok, "type_notsupports_casting", t.Kind)
+			break
+		}
+		v.lvalue = true
+		fallthrough
 	case typeIsStruct(t):
 		e.castStruct(t, &v, errtok)
 	case typeIsPure(t):

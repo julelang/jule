@@ -69,6 +69,7 @@ template<typename _Obj_t>
 void JULEC_ID(panic)(const _Obj_t &_Expr);
 
 #include "typedef.hpp"
+#include "ptr.hpp"
 #include "trait.hpp"
 #include "slice.hpp"
 #include "array.hpp"
@@ -76,7 +77,6 @@ void JULEC_ID(panic)(const _Obj_t &_Expr);
 #include "utf8.hpp"
 #include "str.hpp"
 #include "any.hpp"
-#include "ptr.hpp"
 #include "func.hpp"
 #include "defer.hpp"
 #include "builtin.hpp"

@@ -8,7 +8,7 @@
 #define __JULEC_PTR_NEVER_HEAP ((bool**)(0x0000001))
 #define __JULEC_PTR_HEAP_TRUE ((bool*)(0x0000001))
 
-#define __julec_ptr(_PTR) (_PTR)
+#define __julec_ptr(_PTR) (ptr(_PTR))
 
 // Wrapper structure for raw pointer of JuleC.
 template<typename T>
@@ -146,6 +146,9 @@ ptr<T> __julec_guaranteed_ptr(T *_Ptr) {
     ptr<T> _ptr{__julec_never_guarantee_ptr(_Ptr)};
     _ptr._heap = new(std::nothrow) bool*{__JULEC_PTR_HEAP_TRUE};
     if (!_ptr._heap)
+    { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
+    _ptr._ref = new(std::nothrow) uint_julet{1};
+    if (!_ptr._ref)
     { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
     return _ptr;
 }

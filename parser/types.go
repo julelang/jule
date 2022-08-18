@@ -207,6 +207,12 @@ func checkTraitCompability(t1, t2 DataType) bool {
 	switch {
 	case typeIsTrait(t2):
 		return t == t2.Tag.(*trait) && t1ptr == t2.Pointers()
+	case typeIsPtr(t2):
+		t2 = unptrType(t2)
+		if !typeIsStruct(t2) {
+			break
+		}
+		fallthrough
 	case typeIsStruct(t2):
 		if t1ptr != "" {
 			return false

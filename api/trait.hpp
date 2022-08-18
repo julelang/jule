@@ -31,6 +31,15 @@ public:
         this->type_id = typeid(_Data).name();
     }
 
+    template<typename TT>
+    trait<T>(const ptr<TT> &_Ptr) noexcept {
+        ( (ptr<TT>)(_Ptr) ).__must_heap();
+        this->_data = (T*)(*_Ptr._ptr);
+        this->_ref = _Ptr._ref;
+        (*this->_ref)++;
+        this->type_id = typeid(_Ptr).name();
+    }
+
     trait<T>(const trait<T> &_Src) noexcept
     { this->operator=(_Src); }
 
@@ -64,7 +73,19 @@ public:
         this->__must_ok();
         if (std::strcmp(this->type_id, typeid(TT).name()) != 0)
         { JULEC_ID(panic)(__JULEC_ERROR_INCOMPATIBLE_TYPE); }
-        return *((TT*)(this->_data));
+        return *( (TT*)(this->_data) );
+    }
+
+    template<typename TT>
+    operator ptr<TT>(void) noexcept {
+        this->__must_ok();
+        if (std::strcmp(this->type_id, typeid(ptr<TT>).name()) != 0)
+        { JULEC_ID(panic)(__JULEC_ERROR_INCOMPATIBLE_TYPE); }
+        ptr<TT> _ptr{__julec_guaranteed_ptr((TT*)(this->_data))};
+        delete _ptr._ref;
+        _ptr._ref = this->_ref;
+        (*this->_ref)++;
+        return _ptr;
     }
 
     inline void operator=(const std::nullptr_t) noexcept
