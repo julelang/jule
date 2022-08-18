@@ -72,10 +72,11 @@ func (e *eval) processes(processes []Toks) (v value, model iExpr) {
 	hasError := e.hasError
 	for i, process := range processes {
 		if isOperator(process) {
+			valProcesses[i] = nil
 			continue
 		}
 		val, model := e.p.evalToks(process)
-		hasError = hasError || e.hasError || val.data.Value == ""
+		hasError = hasError || e.hasError || model == nil
 		valProcesses[i] = []any{val, model}
 	}
 	if hasError {
@@ -149,9 +150,9 @@ func (e *eval) nextOperator(processes []Toks) int {
 		case tokens.EQUALS, tokens.NOT_EQUALS, tokens.LESS,
 			tokens.LESS_EQUAL, tokens.GREAT, tokens.GREAT_EQUAL:
 			prec.set(3, i)
-		case tokens.AND:
+		case tokens.DOUBLE_AMPER:
 			prec.set(2, i)
-		case tokens.OR:
+		case tokens.DOUBLE_VLINE:
 			prec.set(1, i)
 		default:
 			e.pusherrtok(process[0], "invalid_operator")

@@ -804,9 +804,9 @@ func (s *solver) logical() (v value) {
 		return
 	}
 	switch s.operator.Kind {
-	case tokens.AND:
+	case tokens.DOUBLE_AMPER:
 		s.and(&v)
-	case tokens.OR:
+	case tokens.DOUBLE_VLINE:
 		s.or(&v)
 	}
 	return
@@ -941,7 +941,7 @@ func (s *solver) solve() (v value) {
 		}
 	}()
 	switch s.operator.Kind {
-	case tokens.AND, tokens.OR:
+	case tokens.DOUBLE_AMPER, tokens.DOUBLE_VLINE:
 		return s.logical()
 	}
 	switch {

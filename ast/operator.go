@@ -25,6 +25,8 @@ var SolidOperators = [...]string{
 	8:  tokens.LESS,
 	9:  tokens.GREAT,
 	10: tokens.EXCLAMATION,
+	11: tokens.DOUBLE_AMPER,
+	12: tokens.DOUBLE_VLINE,
 }
 
 // ExpressionOperators.
