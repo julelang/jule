@@ -14,6 +14,7 @@ struct trait {
 public:
     T *_data{nil};
     mutable uint_julet *_ref{nil};
+    const char *type_id;
 
     trait<T>(void) noexcept {}
     trait<T>(std::nullptr_t) noexcept {}
@@ -27,6 +28,7 @@ public:
         this->_ref = new(std::nothrow) uint_julet{1};
         if (!this->_ref)
         { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
+        this->type_id = typeid(_Data).name();
     }
 
     trait<T>(const trait<T> &_Src) noexcept
@@ -44,14 +46,26 @@ public:
         this->_data = nil;
     }
 
-    T &get(void) noexcept {
+    inline void __must_ok(void) noexcept {
         if (this->operator==(nil))
         { JULEC_ID(panic)(__JULEC_ERROR_INVALID_MEMORY); }
+    }
+
+    inline T &get(void) noexcept {
+        this->__must_ok();
         return *this->_data;
     }
 
     ~trait(void) noexcept
     { this->__dealloc(); }
+
+    template<typename TT>
+    operator TT(void) noexcept {
+        this->__must_ok();
+        if (std::strcmp(this->type_id, typeid(TT).name()) != 0)
+        { JULEC_ID(panic)(__JULEC_ERROR_INCOMPATIBLE_TYPE); }
+        return *((TT*)(this->_data));
+    }
 
     inline void operator=(const std::nullptr_t) noexcept
     { this->__dealloc(); }
@@ -62,6 +76,7 @@ public:
         (*_Src._ref)++;
         this->_data = _Src._data;
         this->_ref = _Src._ref;
+        this->type_id = _Src.type_id;
     }
 
     inline bool operator==(const trait<T> &_Src) const noexcept

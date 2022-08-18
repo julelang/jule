@@ -532,6 +532,8 @@ func (e *eval) cast(v value, t DataType, errtok Tok) value {
 	switch {
 	case typeIsSlice(t):
 		e.castSlice(t, v.data.Type, errtok)
+	case typeIsStruct(t):
+		e.castStruct(t, &v, errtok)
 	case typeIsPure(t):
 		v.lvalue = false
 		e.castPure(t, &v, errtok)
@@ -541,6 +543,18 @@ func (e *eval) cast(v value, t DataType, errtok Tok) value {
 	v.data.Value = t.Kind
 	v.data.Type = t
 	return v
+}
+
+func (e *eval) castStruct(t DataType, v *value, errtok Tok) {
+	if !typeIsTrait(v.data.Type) {
+		e.pusherrtok(errtok, "type_notsupports_casting_to", v.data.Type.Kind, t.Kind)
+		return
+	}
+	s := t.Tag.(*structure)
+	tr := v.data.Type.Tag.(*trait)
+	if !s.hasTrait(tr) {
+		e.pusherrtok(errtok, "type_notsupports_casting_to", v.data.Type.Kind, t.Kind)
+	}
 }
 
 func (e *eval) castPure(t DataType, v *value, errtok Tok) {
