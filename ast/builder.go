@@ -66,6 +66,10 @@ func (b *Builder) buildNode(toks Toks) {
 			Tok:  tok,
 			Data: b.Attribute(toks),
 		})
+	case tokens.Fn:
+		s := models.Statement{Tok: tok}
+		s.Data = b.Func(toks, false, false)
+		b.Tree = append(b.Tree, models.Object{Tok: s.Tok, Data: s})
 	case tokens.Id:
 		b.Id(toks)
 	case tokens.Const:
@@ -339,14 +343,6 @@ func (b *Builder) Id(toks Toks) {
 	case tokens.Colon:
 		b.GlobalVar(toks)
 		return
-	case tokens.Brace:
-		switch tok.Kind {
-		case tokens.LPARENTHESES: // Function.
-			s := models.Statement{Tok: tok}
-			s.Data = b.Func(toks, false, false)
-			b.Tree = append(b.Tree, models.Object{Tok: s.Tok, Data: s})
-			return
-		}
 	}
 	b.pusherr(tok, "invalid_syntax")
 }
@@ -448,9 +444,9 @@ func (b *Builder) implTraitFuncs(impl *models.Impl, toks Toks) {
 	b.Pos = 0
 	b.Toks = toks
 	for b.Pos != -1 && !b.Ended() {
-		funcToks := b.nextBuilderStatement()
+		fnToks := b.nextBuilderStatement()
 		ref := false
-		tok := funcToks[0]
+		tok := fnToks[0]
 		switch tok.Id {
 		case tokens.Comment:
 			impl.Tree = append(impl.Tree, b.Comment(tok))
@@ -458,15 +454,23 @@ func (b *Builder) implTraitFuncs(impl *models.Impl, toks Toks) {
 		case tokens.At:
 			impl.Tree = append(impl.Tree, models.Object{
 				Tok:  tok,
-				Data: b.Attribute(funcToks),
+				Data: b.Attribute(fnToks),
 			})
 			continue
+		case tokens.Fn:
+			if len(fnToks) > 1 {
+				tok = fnToks[1]
+				if tok.Id == tokens.Operator && tok.Kind == tokens.AMPER {
+					ref = true
+					// Remove reference token
+					fnToks = append(fnToks[:1], fnToks[2:]...)
+				}
+			}
+		default:
+			b.pusherr(tok, "invalid_syntax")
+			continue
 		}
-		if tok.Id == tokens.Operator && tok.Kind == tokens.AMPER {
-			ref = true
-			funcToks = funcToks[1:]
-		}
-		f := b.Func(funcToks, false, false)
+		f := b.Func(fnToks, false, false)
 		f.Pub = true
 		f.Receiver = &models.DataType{
 			Id:   juletype.Struct,
@@ -486,8 +490,8 @@ func (b *Builder) implStruct(impl *models.Impl, toks Toks) {
 	b.Pos = 0
 	b.Toks = toks
 	for b.Pos != -1 && !b.Ended() {
-		funcToks := b.nextBuilderStatement()
-		tok := funcToks[0]
+		fnToks := b.nextBuilderStatement()
+		tok := fnToks[0]
 		pub := false
 		switch tok.Id {
 		case tokens.Comment:
@@ -496,33 +500,43 @@ func (b *Builder) implStruct(impl *models.Impl, toks Toks) {
 		case tokens.At:
 			impl.Tree = append(impl.Tree, models.Object{
 				Tok:  tok,
-				Data: b.Attribute(funcToks),
+				Data: b.Attribute(fnToks),
 			})
 			continue
 		case tokens.Type:
 			impl.Tree = append(impl.Tree, models.Object{
 				Tok:  tok,
-				Data: b.Generics(funcToks),
+				Data: b.Generics(fnToks),
 			})
 			continue
 		}
 		if tok.Id == tokens.Pub {
 			pub = true
-			if len(funcToks) == 1 {
-				b.pusherr(funcToks[0], "invalid_syntax")
+			if len(fnToks) == 1 {
+				b.pusherr(fnToks[0], "invalid_syntax")
 				continue
 			}
-			funcToks = funcToks[1:]
-			if len(funcToks) > 0 {
-				tok = funcToks[0]
+			fnToks = fnToks[1:]
+			if len(fnToks) > 0 {
+				tok = fnToks[0]
 			}
 		}
 		ref := false
-		if tok.Id == tokens.Operator && tok.Kind == tokens.AMPER {
-			ref = true
-			funcToks = funcToks[1:]
+		switch tok.Id {
+		case tokens.Fn:
+			if len(fnToks) > 1 {
+				tok = fnToks[1]
+				if tok.Id == tokens.Operator && tok.Kind == tokens.AMPER {
+					ref = true
+					// Remove reference token
+					fnToks = append(fnToks[:1], fnToks[2:]...)
+				}
+			}
+		default:
+			b.pusherr(tok, "invalid_syntax")
+			continue
 		}
-		f := b.Func(funcToks, false, false)
+		f := b.Func(fnToks, false, false)
 		f.Pub = pub
 		f.Receiver = &models.DataType{
 			Id:   juletype.Struct,
@@ -609,7 +623,6 @@ func (b *Builder) CppLink(toks Toks) {
 	// Catch pub not supported
 	bpub := b.pub
 	defer func() { b.pub = bpub }()
-
 	var link models.CppLink
 	link.Tok = tok
 	link.Link = new(models.Func)
@@ -783,44 +796,52 @@ func (b *Builder) Attribute(toks Toks) (a models.Attribute) {
 	return
 }
 
-func (b *Builder) funcPrototype(toks *Toks, anon bool) (f models.Func, ok bool) {
+func (b *Builder) funcPrototype(toks Toks, i *int, anon bool) (f models.Func, ok bool) {
 	ok = true
-	f.Tok = (*toks)[0]
-	i := 0
+	f.Tok = toks[*i]
+	// Skips fn tok
+	*i++
+	if *i >= len(toks) {
+		b.pusherr(f.Tok, "invalid_syntax")
+		ok = false
+		return
+	}
 	f.Pub = b.pub
 	b.pub = false
 	if anon {
 		f.Id = jule.Anonymous
 	} else {
-		if f.Tok.Id != tokens.Id {
-			b.pusherr(f.Tok, "invalid_syntax")
+		tok := toks[*i]
+		if tok.Id != tokens.Id {
+			b.pusherr(tok, "invalid_syntax")
 			ok = false
 		}
-		f.Id = f.Tok.Kind
-		i++
+		f.Id = tok.Kind
+		*i++
 	}
 	f.RetType.Type.Id = juletype.Void
 	f.RetType.Type.Kind = juletype.TypeMap[f.RetType.Type.Id]
-	paramToks := b.getrange(&i, tokens.LPARENTHESES, tokens.RPARENTHESES, toks)
+	paramToks := b.getrange(i, tokens.LPARENTHESES, tokens.RPARENTHESES, &toks)
 	if len(paramToks) > 0 {
 		f.Params = b.Params(paramToks, false)
 	}
-	t, retok := b.FuncRetDataType(*toks, &i)
+	t, retok := b.FuncRetDataType(toks, i)
 	if retok {
 		f.RetType = t
-		i++
+		*i++
 	}
-	*toks = (*toks)[i:]
 	return
 }
 
 // Func builds AST model of function.
 func (b *Builder) Func(toks Toks, anon, prototype bool) (f models.Func) {
-	f, ok := b.funcPrototype(&toks, anon)
+	var ok bool
+	i := 0
+	f, ok = b.funcPrototype(toks, &i, anon)
 	if !ok {
 		return
 	}
-	if len(toks) == 0 {
+	if i >= len(toks) {
 		if prototype {
 			return
 		} else if b.Ended() {
@@ -832,7 +853,6 @@ func (b *Builder) Func(toks Toks, anon, prototype bool) (f models.Func) {
 		b.pusherr(f.Tok, "invalid_syntax")
 		return
 	}
-	i := 0
 	blockToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
 	if blockToks == nil {
 		b.pusherr(f.Tok, "body_not_exist")
@@ -1105,6 +1125,18 @@ func (b *Builder) datatype(t *models.DataType, toks Toks, i *int, arrays, err bo
 			goto ret
 		case tokens.DoubleColon:
 			dtv.WriteString(tok.Kind)
+		case tokens.Fn:
+			t.Tok = tok
+			t.Id = juletype.Func
+			f, proto_ok := b.funcPrototype(toks, i, true)
+			if !proto_ok {
+				b.pusherr(tok, "invalid_type")
+				return false
+			}
+			t.Tag = &f
+			dtv.WriteString(f.DataTypeString())
+			ok = true
+			goto ret
 		case tokens.Operator:
 			if tok.Kind == tokens.STAR {
 				dtv.WriteString(tok.Kind)
@@ -1116,19 +1148,6 @@ func (b *Builder) datatype(t *models.DataType, toks Toks, i *int, arrays, err bo
 			return
 		case tokens.Brace:
 			switch tok.Kind {
-			case tokens.LPARENTHESES:
-				t.Tok = tok
-				t.Id = juletype.Func
-				f := b.FuncDataTypeHead(toks, i)
-				*i++
-				f.RetType, ok = b.FuncRetDataType(toks, i)
-				if !ok {
-					*i--
-				}
-				t.Tag = &f
-				dtv.WriteString(f.DataTypeString())
-				ok = true
-				goto ret
 			case tokens.LBRACKET:
 				*i++
 				if *i > len(toks) {
@@ -1250,33 +1269,7 @@ func (b *Builder) mapDataType(t *models.DataType, toks, typeToks Toks, colon int
 	t.Kind = t.MapKind()
 }
 
-// FuncDataTypeHead builds head part of function data-type.
-func (b *Builder) FuncDataTypeHead(toks Toks, i *int) models.Func {
-	var f models.Func
-	brace := 1
-	firstIndex := *i
-	for *i++; *i < len(toks); *i++ {
-		tok := toks[*i]
-		switch tok.Id {
-		case tokens.Brace:
-			switch tok.Kind {
-			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
-				brace++
-			default:
-				brace--
-			}
-		}
-		if brace == 0 {
-			f.Params = b.Params(toks[firstIndex+1:*i], false)
-			return f
-		}
-	}
-	b.pusherr(toks[firstIndex], "invalid_type")
-	return f
-}
-
 func (b *Builder) funcMultiTypeRet(toks Toks, i *int) (t models.RetType, ok bool) {
-	start := *i
 	tok := toks[*i]
 	t.Type.Kind += tok.Kind
 	*i++
@@ -1286,20 +1279,8 @@ func (b *Builder) funcMultiTypeRet(toks Toks, i *int) (t models.RetType, ok bool
 		return
 	}
 	tok = toks[*i]
-	// Slice
-	if tok.Id == tokens.Brace && tok.Kind == tokens.RBRACKET {
-		*i--
-		t.Type, ok = b.DataType(toks, i, false, false)
-		return
-	}
-	_, colon := SplitColon(toks, i)
-	if colon != -1 { // Map
-		*i = start
-		t.Type, ok = b.DataType(toks, i, false, false)
-		return
-	}
-	*i-- // For point to bracket - [ -
-	rang := Range(i, tokens.LBRACKET, tokens.RBRACKET, toks)
+	*i-- // For point to parenthses - ( -
+	rang := Range(i, tokens.LPARENTHESES, tokens.RPARENTHESES, toks)
 	params := b.Params(rang, true)
 	types := make([]models.DataType, len(params))
 	for i, param := range params {
@@ -1333,7 +1314,7 @@ func (b *Builder) FuncRetDataType(toks Toks, i *int) (t models.RetType, ok bool)
 	tok := toks[*i]
 	if tok.Id == tokens.Brace {
 		switch tok.Kind {
-		case tokens.LBRACKET:
+		case tokens.LPARENTHESES:
 			return b.funcMultiTypeRet(toks, i)
 		case tokens.LBRACE:
 			return

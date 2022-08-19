@@ -13,7 +13,7 @@ use std::math::bits
 // sharing the same rounding guarantees.
 
 // doc: ormats mant*(2^exp) with prec decimal digits.
-ryu_ftoa_fixed32(d: *DecimalSlice, mant: u32, exp: int, prec: int) {
+fn ryu_ftoa_fixed32(d: *DecimalSlice, mant: u32, exp: int, prec: int) {
 	if prec < 0 {
 		panic("ryu_ftoa_fixed32 called with negative prec")
 	}
@@ -86,7 +86,7 @@ ryu_ftoa_fixed32(d: *DecimalSlice, mant: u32, exp: int, prec: int) {
 }
 
 //doc: Formats mant*(2^exp) with prec decimal digits.
-ryu_ftoa_fixed64(d: *DecimalSlice, mant: u64, exp: int, prec: int) {
+fn ryu_ftoa_fixed64(d: *DecimalSlice, mant: u64, exp: int, prec: int) {
 	if prec > 18 {
 		panic("ryu_ftoa_fixed64 called with prec > 18")
 	}
@@ -167,7 +167,7 @@ u64pow10: = [...]u64{
 // Fills d with at most prec decimal digits
 // of mantissa m. The boolean trunc indicates whether m
 // is truncated compared to the original number being formatted.
-format_decimal(d: *DecimalSlice, m: u64, trunc: bool, round_up: bool, prec: int) {
+fn format_decimal(d: *DecimalSlice, m: u64, trunc: bool, round_up: bool, prec: int) {
 	max: = u64pow10[prec]
 	trimmed: = 0
 	for m >= max {
@@ -228,7 +228,7 @@ format_decimal(d: *DecimalSlice, m: u64, trunc: bool, round_up: bool, prec: int)
 }
 
 //doc: Formats mant*2^exp with prec decimal digits.
-ryu_ftoa_shortest(d: *DecimalSlice, mant: u64, exp: int, flt: *FloatInfo) {
+fn ryu_ftoa_shortest(d: *DecimalSlice, mant: u64, exp: int, flt: *FloatInfo) {
 	if mant == 0 {
 		d.nd, d.dp = 0, 0
 		ret
@@ -345,7 +345,7 @@ ryu_ftoa_shortest(d: *DecimalSlice, mant: u64, exp: int, flt: *FloatInfo) {
 // The range restriction lets us work in faster integer arithmetic instead of
 // slower floating point arithmetic. Correctness is verified by unit tests.
 @inline
-mul_by_log2_log10(x: int) int {
+fn mul_by_log2_log10(x: int) int {
 	// log(2)/log(10) ≈ 0.30102999566 ≈ 78913 / 2^18
 	ret (x * 78913) >> 18
 }
@@ -357,7 +357,7 @@ mul_by_log2_log10(x: int) int {
 // The range restriction lets us work in faster integer arithmetic instead of
 // slower floating point arithmetic. Correctness is verified by unit tests.
 @inline
-mul_by_log10_log2(x: int) int {
+fn mul_by_log10_log2(x: int) int {
 	// log(10)/log(2) ≈ 3.32192809489 ≈ 108853 / 2^15
 	ret (x * 108853) >> 15
 }
@@ -366,9 +366,8 @@ mul_by_log10_log2(x: int) int {
 // Returns a floating-point vector (l, c, u)×2^e2
 // where the mantissas are 55-bit (or 26-bit) integers, describing the interval
 // represented by the input f64 or f32.
-compute_bounds(mant: u64,
-			exp: int,
-			flt: *FloatInfo) [lower: u64, central: u64, upper: u64, e2: int] {
+fn compute_bounds(mant: u64, exp: int,
+				flt: *FloatInfo) (lower: u64, central: u64, upper: u64, e2: int) {
 	if mant != 1<<flt.mantbits || exp == flt.bias+1-int(flt.mantbits) {
 		// regular case (or denormals)
 		lower, central, upper = 2*mant-1, 2*mant, 2*mant+1
@@ -381,12 +380,7 @@ compute_bounds(mant: u64,
 	ret
 }
 
-ryu_digits(d: *DecimalSlice,
-		lower: u64,
-		central: u64,
-		upper: u64,
-		c0: bool,
-		cup: bool) {
+fn ryu_digits(d: *DecimalSlice, lower: u64, central: u64, upper: u64, c0: bool, cup: bool) {
 	lhi:, llo: = divmod1e9(lower)
 	chi:, clo: = divmod1e9(central)
 	uhi:, ulo: = divmod1e9(upper)
@@ -430,13 +424,8 @@ ryu_digits(d: *DecimalSlice,
 }
 
 //doc: Emits decimal digits for a number less than 1e9.
-ryu_digits32(d: *DecimalSlice,
-			lower: u32,
-			central: u32,
-			upper: u32,
-			c0: bool,
-			cup: bool,
-			endindex: int) {
+fn ryu_digits32(d: *DecimalSlice, lower: u32, central: u32,
+				upper: u32, c0: bool, cup: bool, endindex: int) {
 	if upper == 0 {
 		d.dp = endindex + 1
 		ret
@@ -518,7 +507,7 @@ ryu_digits32(d: *DecimalSlice,
 // That is:
 //  m*2^e2 * round(10^q) = resM * 2^resE + ε
 //  exact = ε == 0
-mult64bit_pow10(m: u32, e2: int, q: int) [resM: u32, resE: int, exact: bool] {
+fn mult64bit_pow10(m: u32, e2: int, q: int) (resM: u32, resE: int, exact: bool) {
 	if q == 0 {
 		// P == 1<<63
 		ret m << 6, e2 - 6, true
@@ -547,7 +536,7 @@ mult64bit_pow10(m: u32, e2: int, q: int) [resM: u32, resE: int, exact: bool] {
 // That is:
 //  m*2^e2 * round(10^q) = resM * 2^resE + ε
 //  exact = ε == 0
-mult128bit_pow10(m: u64, e2: int, q: int) [resM: u64, resE: int, exact: bool] {
+fn mult128bit_pow10(m: u64, e2: int, q: int) (resM: u64, resE: int, exact: bool) {
 	if q == 0 {
 		// P == 1<<127
 		ret m << 8, e2 - 8, true
@@ -571,7 +560,7 @@ mult128bit_pow10(m: u64, e2: int, q: int) [resM: u64, resE: int, exact: bool] {
 	ret h1<<9 | mid>>55, e2, mid<<9 == 0 && l0 == 0
 }
 
-divisible_by_pow5(m: u64, k: int) bool {
+fn divisible_by_pow5(m: u64, k: int) bool {
 	if m == 0 {
 		ret true
 	}
@@ -587,7 +576,7 @@ divisible_by_pow5(m: u64, k: int) bool {
 //doc:
 // Computes quotient and remainder of division by 1e9,
 // avoiding runtime u64 division on 32-bit platforms.
-divmod1e9(x: u64) [u32, u32] {
+fn divmod1e9(x: u64) (u32, u32) {
 	if !HOST_32BIT {
 		ret u32(x / 1e9), u32(x % 1e9)
 	}

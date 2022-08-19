@@ -44,11 +44,11 @@ struct DecimalSlice {
 // The special precision -1 uses the smallest number of digits
 // necessary such that ParseFloat will return f exactly.
 @inline
-pub fmt_float(f: f64, fmt: byte, prec: int, bit_size: int) str {
+pub fn fmt_float(f: f64, fmt: byte, prec: int, bit_size: int) str {
 	ret (str)(generic_ftoa(nil, f, fmt, prec, bit_size))
 }
 
-generic_ftoa(dst: []byte, val: f64, fmt: byte, prec: int, bit_size: int) []byte {
+fn generic_ftoa(dst: []byte, val: f64, fmt: byte, prec: int, bit_size: int) []byte {
 	bits: u64
 	flt: *FloatInfo
 	match bit_size {
@@ -152,13 +152,8 @@ generic_ftoa(dst: []byte, val: f64, fmt: byte, prec: int, bit_size: int) []byte 
 }
 
 //doc: Uses multiprecision computations to format a float.
-big_ftoa(dst: []byte,
-		prec: int,
-		fmt: byte,
-		neg: bool,
-		mant: u64,
-		exp: int,
-		flt: *FloatInfo) []byte {
+fn big_ftoa(dst: []byte, prec: int, fmt: byte, neg: bool,
+			mant: u64, exp: int, flt: *FloatInfo) []byte {
 	d: = new(Decimal)
 	d.assign(mant)
 	d.shift(exp - int(flt.mantbits))
@@ -194,12 +189,8 @@ big_ftoa(dst: []byte,
 	ret fmt_digits(dst, shortest, neg, digs, prec, fmt)
 }
 
-fmt_digits(dst: []byte,
-		shortest: bool,
-		neg: bool,
-		digs: DecimalSlice,
-		prec: int,
-		fmt: byte) []byte {
+fn fmt_digits(dst: []byte, shortest: bool, neg: bool,
+			digs: DecimalSlice, prec: int, fmt: byte) []byte {
 	match fmt {
 	case 'e', 'E':
 		ret fmt_e(dst, neg, digs, prec, fmt)
@@ -237,7 +228,7 @@ fmt_digits(dst: []byte,
 //doc:
 // Rounds d (= mant * 2^exp) to the shortest number of digits
 // that will let the original floating point value be precisely reconstructed.
-round_shortest(d: *Decimal, mant: u64, exp: int, flt: *FloatInfo) {
+fn round_shortest(d: *Decimal, mant: u64, exp: int, flt: *FloatInfo) {
 	// If mantissa is zero, the number is zero; stop now.
 	if mant == 0 {
 		d.nd = 0
@@ -375,7 +366,7 @@ round_shortest(d: *Decimal, mant: u64, exp: int, flt: *FloatInfo) {
 }
 
 // %e: -d.ddddde±dd
-fmt_e(dst: []byte, neg: bool, d: DecimalSlice, prec: int, fmt: byte) []byte {
+fn fmt_e(dst: []byte, neg: bool, d: DecimalSlice, prec: int, fmt: byte) []byte {
 	// sign
 	if neg {
 		dst = append[byte](dst, '-')
@@ -430,7 +421,7 @@ fmt_e(dst: []byte, neg: bool, d: DecimalSlice, prec: int, fmt: byte) []byte {
 }
 
 // %f: -ddddddd.ddddd
-fmt_f(dst: []byte, neg: bool, d: DecimalSlice, prec: int) []byte {
+fn fmt_f(dst: []byte, neg: bool, d: DecimalSlice, prec: int) []byte {
 	// sign
 	if neg {
 		dst = append[byte](dst, '-')
@@ -462,7 +453,7 @@ fmt_f(dst: []byte, neg: bool, d: DecimalSlice, prec: int) []byte {
 }
 
 // %b: -ddddddddp±ddd
-fmt_b(dst: []byte, neg: bool, mant: u64, exp: int, flt: *FloatInfo) []byte {
+fn fmt_b(dst: []byte, neg: bool, mant: u64, exp: int, flt: *FloatInfo) []byte {
 	// sign
 	if neg {
 		dst = append[byte](dst, '-')
@@ -484,7 +475,7 @@ fmt_b(dst: []byte, neg: bool, mant: u64, exp: int, flt: *FloatInfo) []byte {
 }
 
 // %x: -0x1.yyyyyyyyp±ddd or -0x0p+0. (y is hex digit, d is decimal digit)
-fmt_x(dst: []byte, prec: int, fmt: byte, neg: bool, mant: u64, exp: int, flt: *FloatInfo) []byte {
+fn fmt_x(dst: []byte, prec: int, fmt: byte, neg: bool, mant: u64, exp: int, flt: *FloatInfo) []byte {
 	if mant == 0 {
 		exp = 0
 	}
@@ -565,14 +556,14 @@ fmt_x(dst: []byte, prec: int, fmt: byte, neg: bool, mant: u64, exp: int, flt: *F
 	ret dst
 }
 
-min(a: int, b: int) int {
+fn min(a: int, b: int) int {
 	if a < b {
 		ret a
 	}
 	ret b
 }
 
-max(a: int, b: int) int {
+fn max(a: int, b: int) int {
 	if a > b {
 		ret a
 	}

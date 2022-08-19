@@ -3,6 +3,7 @@ package models
 import (
 	"strings"
 
+	"github.com/jule-lang/jule/lex/tokens"
 	"github.com/jule-lang/jule/pkg/juleapi"
 	"github.com/jule-lang/jule/pkg/juletype"
 )
@@ -36,6 +37,7 @@ func (f *Func) FindAttribute(kind string) *Attribute {
 // DataTypeString returns data type string of function.
 func (f *Func) DataTypeString() string {
 	var cpp strings.Builder
+	cpp.WriteString(tokens.FN)
 	cpp.WriteByte('(')
 	if len(f.Params) > 0 {
 		for _, p := range f.Params {
@@ -51,12 +53,12 @@ func (f *Func) DataTypeString() string {
 	}
 	cpp.WriteByte(')')
 	if f.RetType.Type.MultiTyped {
-		cpp.WriteByte('[')
+		cpp.WriteByte('(')
 		for _, t := range f.RetType.Type.Tag.([]DataType) {
 			cpp.WriteString(t.Kind)
 			cpp.WriteByte(',')
 		}
-		return cpp.String()[:cpp.Len()-1] + "]"
+		return cpp.String()[:cpp.Len()-1] + ")"
 	} else if f.RetType.Type.Id != juletype.Void {
 		cpp.WriteString(f.RetType.Type.Kind)
 	}

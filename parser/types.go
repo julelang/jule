@@ -131,10 +131,7 @@ func typeIsMap(t DataType) bool {
 }
 
 func typeIsFunc(t DataType) bool {
-	if t.Id != juletype.Func || t.Kind == "" {
-		return false
-	}
-	return t.Kind[0] == '('
+	return t.Id == juletype.Func && strings.HasPrefix(t.Kind, tokens.FN)
 }
 
 // Includes single ptr types.

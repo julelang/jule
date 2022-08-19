@@ -94,4 +94,5 @@ const (
 	IMPL                = "impl"
 	CPP                 = "cpp"
 	FALLTHROUGH         = "fallthrough"
+	FN                  = "fn"
 )

@@ -1350,6 +1350,24 @@ func (e *eval) enumerable(exprToks Toks, t DataType, m *exprModel) (v value) {
 	return
 }
 
+func (e *eval) anonymousFn(toks Toks, m *exprModel) (v value) {
+	b := ast.NewBuilder(toks)
+	f := b.Func(b.Toks, true, false)
+	b.Wait()
+	if len(b.Errors) > 0 {
+		e.p.pusherrs(b.Errors...)
+		return
+	}
+	e.p.checkAnonFunc(&f)
+	f.Owner = e.p
+	v.data.Value = f.Id
+	v.data.Type.Tag = &f
+	v.data.Type.Id = juletype.Func
+	v.data.Type.Kind = f.DataTypeString()
+	m.appendSubNode(anonFuncExpr{&f, e.p.blockVars})
+	return
+}
+
 func (e *eval) braceRange(toks Toks, m *exprModel) (v value) {
 	var exprToks Toks
 	braceCount := 0
@@ -1376,6 +1394,8 @@ func (e *eval) braceRange(toks Toks, m *exprModel) (v value) {
 		return
 	}
 	switch exprToks[0].Id {
+	case tokens.Fn:
+		return e.anonymousFn(toks, m)
 	case tokens.Id:
 		return e.typeId(toks, m)
 	case tokens.Brace:
@@ -1393,22 +1413,6 @@ func (e *eval) braceRange(toks Toks, m *exprModel) (v value) {
 			}
 			exprToks = toks[len(exprToks):]
 			return e.enumerable(exprToks, t, m)
-		case tokens.LPARENTHESES:
-			b := ast.NewBuilder(toks)
-			f := b.Func(b.Toks, true, false)
-			b.Wait()
-			if len(b.Errors) > 0 {
-				e.p.pusherrs(b.Errors...)
-				return
-			}
-			e.p.checkAnonFunc(&f)
-			f.Owner = e.p
-			v.data.Value = f.Id
-			v.data.Type.Tag = &f
-			v.data.Type.Id = juletype.Func
-			v.data.Type.Kind = f.DataTypeString()
-			m.appendSubNode(anonFuncExpr{&f, e.p.blockVars})
-			return
 		default:
 			e.pusherrtok(exprToks[0], "invalid_syntax")
 		}

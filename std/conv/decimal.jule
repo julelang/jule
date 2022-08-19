@@ -116,7 +116,7 @@ struct Decimal {
 
 impl Decimal {
 	//doc: Assign v.
-	&assign(v: u64) {
+	fn &assign(v: u64) {
 		buf: [24]byte
 
 		// Write reversed decimal in buf.
@@ -140,7 +140,7 @@ impl Decimal {
 	}
 
 	// Binary shift left (k > 0) or right (k < 0).
-	&shift(k: int) {
+	fn &shift(k: int) {
 		match {
 		case .nd == 0:
 			// nothing to do: a == 0
@@ -160,7 +160,7 @@ impl Decimal {
 	}
 
 	// Round a down to nd digits (or fewer).
-	&round_down(nd: int) {
+	fn &round_down(nd: int) {
 		if nd < 0 || nd >= .nd {
 			ret
 		}
@@ -169,7 +169,7 @@ impl Decimal {
 	}
 
 	// Round a up to nd digits (or fewer).
-	&round_up(nd: int) {
+	fn &round_up(nd: int) {
 		if nd < 0 || nd >= .nd {
 			ret
 		}
@@ -195,7 +195,7 @@ impl Decimal {
 	// If nd is zero, it means we're rounding
 	// just to the left of the digits, as in
 	// 0.09 -> 0.1.
-	&round(nd: int) {
+	fn &round(nd: int) {
 		if nd < 0 || nd >= .nd {
 			ret
 		}
@@ -207,7 +207,7 @@ impl Decimal {
 	}
 }
 
-digit_zero(dst: []byte) int {
+fn digit_zero(dst: []byte) int {
 	for i: in dst {
 		dst[i] = '0'
 	}
@@ -218,7 +218,7 @@ digit_zero(dst: []byte) int {
 // Trailing zeros from number.
 // (They are meaningless; the decimal point is tracked
 // independent of the number of digits.)
-trim(a: *Decimal) {
+fn trim(a: *Decimal) {
 	for a.nd > 0 && a.d[a.nd-1] == '0' {
 		a.nd--
 	}
@@ -228,7 +228,7 @@ trim(a: *Decimal) {
 }
 
 // Binary shift right (/ 2) by k bits.  k <= maxShift to avoid overflow.
-right_shift(a: *Decimal, k: uint) {
+fn right_shift(a: *Decimal, k: uint) {
 	r: = 0 // read pointer
 	w: = 0 // write pointer
 
@@ -282,7 +282,7 @@ right_shift(a: *Decimal, k: uint) {
 }
 
 // Is the leading prefix of b lexicographically less than s?
-prefix_is_less_than(b: []byte, s: str) bool {
+fn prefix_is_less_than(b: []byte, s: str) bool {
 	for i := 0; i < s.len; i++ {
 		if i >= b.len {
 			ret true
@@ -295,7 +295,7 @@ prefix_is_less_than(b: []byte, s: str) bool {
 }
 
 // Binary shift left (* 2) by k bits.  k <= maxShift to avoid overflow.
-left_shift(a: *Decimal, k: uint) {
+fn left_shift(a: *Decimal, k: uint) {
 	delta: = leftcheats[k].delta
 	if prefix_is_less_than(a.d[0:a.nd], leftcheats[k].cutoff) {
 		delta--
@@ -341,7 +341,7 @@ left_shift(a: *Decimal, k: uint) {
 }
 
 // If we chop a at nd digits, should we round up?
-should_round_up(a: *Decimal, nd: int) bool {
+fn should_round_up(a: *Decimal, nd: int) bool {
 	if nd < 0 || nd >= a.nd {
 		ret false
 	}
