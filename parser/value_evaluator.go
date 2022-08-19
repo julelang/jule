@@ -205,7 +205,7 @@ func (ve *valueEvaluator) varId(id string, variable *Var, global bool) (v value)
 	v.data.Type = variable.Type
 	v.constExpr = variable.Const
 	v.data.Tok = variable.Token
-	v.lvalue = true
+	v.lvalue = !v.constExpr
 	v.heapMust = !global
 	if id == tokens.SELF && typeIsPtr(variable.Type) {
 		ve.model.appendSubNode(exprNode{juleapi.CppSelf})

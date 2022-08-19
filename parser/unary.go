@@ -95,9 +95,6 @@ func (u *unary) star() value {
 
 func (u *unary) amper() value {
 	v := u.p.eval.process(u.toks, u.model)
-	v.constExpr = false
-	v.lvalue = true
-	v.data.Type.Kind = tokens.STAR + v.data.Type.Kind
 	nodes := &u.model.nodes[u.model.index].nodes
 	switch {
 	case valIsStructIns(v):
@@ -109,7 +106,7 @@ func (u *unary) amper() value {
 		(*nodes)[0] = exprNode{"__julec_guaranteed_ptr(new "}
 		goto end
 	case !canGetPtr(v):
-		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.AMPER)
+		u.p.eval.pusherrtok(u.tok, "invalid_expr_unary_operator", tokens.AMPER)
 		return v
 	}
 	if v.heapMust {
@@ -118,6 +115,9 @@ func (u *unary) amper() value {
 		(*nodes)[0] = exprNode{"__julec_never_guarantee_ptr(&"}
 	}
 end:
+	v.constExpr = false
+	v.lvalue = true
+	v.data.Type.Kind = tokens.STAR + v.data.Type.Kind
 	*nodes = append(*nodes, exprNode{tokens.RPARENTHESES})
 	return v
 }

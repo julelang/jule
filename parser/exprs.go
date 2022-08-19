@@ -72,7 +72,7 @@ func isfloat(s string) bool {
 }
 
 func canGetPtr(v value) bool {
-	if !v.lvalue {
+	if !v.lvalue || v.constExpr {
 		return false
 	}
 	switch v.data.Type.Id {
