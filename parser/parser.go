@@ -2737,37 +2737,56 @@ func (p *Parser) checkLabelNGoto() {
 	p.checkLabels()
 }
 
-func hasRet(b *models.Block) bool {
+func hasRet(b *models.Block) (ok bool, fall bool) {
 	if b == nil {
-		return false
+		return false, false
 	}
 	for _, s := range b.Tree {
 		switch t := s.Data.(type) {
+		case models.Fallthrough:
+			fall = true
 		case models.Ret:
-			return true
+			return true, fall
 		case models.Match:
 			if t.Default == nil {
 				break
 			}
 			ok := true
 			for _, c := range t.Cases {
-				if !hasRet(c.Block) {
-					ok = false
-					break
+				falled := fall
+				ok, fall = hasRet(c.Block)
+				if falled && !ok && !fall {
+					return false, fall
 				}
+				switch {
+				case !ok:
+					if !fall {
+						return false, fall
+					}
+					fallthrough
+				case fall:
+					if c.Next == nil {
+						return false, fall
+					}
+					continue
+				}
+				fall = false
 			}
-			ok = ok && hasRet(t.Default.Block)
+			if !ok {
+				ok, fall = hasRet(t.Default.Block)
+			}
 			if !ok {
 				break
 			}
-			return true
+			return true, fall
 		}
 	}
-	return false
+	return false, fall
 }
 
 func (p *Parser) checkRets(f *Func) {
-	if hasRet(f.Block) {
+	ok, _ := hasRet(f.Block)
+	if ok {
 		return
 	}
 	if !typeIsVoid(f.RetType.Type) {
