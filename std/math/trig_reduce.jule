@@ -16,7 +16,7 @@ use std::math::bits
 //
 // So, conservatively we can take x < 1<<29.
 // Above this threshold Payne-Hanek range reduction must be used.
-const reduce_threshold: = 1 << 29
+const REDUCE_THRESHOLD = 1 << 29
 
 //doc:
 // Implements Payne-Hanek range reduction by PI/4
@@ -27,35 +27,35 @@ const reduce_threshold: = 1 << 29
 // K. C. Ng et al, March 24, 1992
 // The simulated multi-precision calculation of x*B uses 64-bit integer arithmetic.
 fn trig_reduce(x: f64) (j: u64, z: f64) {
-	const PI4: = PI / 4
+	const PI4 = PI / 4
 	if x < PI4 {
 		ret 0, x
 	}
 	// Extract out the integer and exponent such that,
 	// x = ix * 2 ** exp.
-	ix: = f64_bits(x)
-	exp: = int(ix>>SHIFT&MASK) - BIAS - SHIFT
+	let ix = f64_bits(x)
+	let exp = int(ix>>SHIFT&MASK) - BIAS - SHIFT
 	ix &= ^(MASK << SHIFT)
 	ix |= 1 << SHIFT
 	// Use the exponent to extract the 3 appropriate uint64 digits from mPi4,
 	// B ~ (z0, z1, z2), such that the product leading digit has the exponent -61.
-	// Note, exp >= -53 since x >= PI4 and exp < 971 for maximum float64.
-	digit:, bitshift: = uint(exp+61)/64, uint(exp+61)%64
-	z0: = (mPi4[digit] << bitshift) | (mPi4[digit+1] >> (64 - bitshift))
-	z1: = (mPi4[digit+1] << bitshift) | (mPi4[digit+2] >> (64 - bitshift))
-	z2: = (mPi4[digit+2] << bitshift) | (mPi4[digit+3] >> (64 - bitshift))
+	// Note, exp >= -53 since x >= PI4 and exp < 971 for maximum f64.
+	let (digit, bitshift) = uint(exp+61)/64, uint(exp+61)%64
+	let z0 = (mPi4[digit] << bitshift) | (mPi4[digit+1] >> (64 - bitshift))
+	let z1 = (mPi4[digit+1] << bitshift) | (mPi4[digit+2] >> (64 - bitshift))
+	let z2 = (mPi4[digit+2] << bitshift) | (mPi4[digit+3] >> (64 - bitshift))
 	// Multiply mantissa by the digits and extract the upper two digits (hi, lo).
-	z2hi:, _ = std::math::bits::mul64(z2, ix)
-	z1hi:, z1lo: = std::math::bits::mul64(z1, ix)
-	z0lo: = z0 * ix
-	lo:, c: = std::math::bits::add64(z1lo, z2hi, 0)
-	hi:, _ = std::math::bits::add64(z0lo, z1hi, c)
+	let (z2hi, _) = std::math::bits::mul64(z2, ix)
+	let (z1hi, z1lo) = std::math::bits::mul64(z1, ix)
+	let z0lo = z0 * ix
+	let (lo, c) = std::math::bits::add64(z1lo, z2hi, 0)
+	let (hi, _) = std::math::bits::add64(z0lo, z1hi, c)
 	// The top 3 bits are j.
 	j = hi >> 61
 	// Extract the fraction and find its magnitude.
 	hi = hi<<3 | lo>>61
-	lz: = uint(std::math::bits::leading_zeros64(hi))
-	e: = u64(BIAS - (lz + 1))
+	let lz = uint(std::math::bits::leading_zeros64(hi))
+	let e = u64(BIAS - (lz + 1))
 	// Clear implicit mantissa bit and shift into place.
 	hi = (hi << (lz + 1)) | (lo >> (64 - (lz + 1)))
 	hi >>= 64 - SHIFT
@@ -77,7 +77,7 @@ fn trig_reduce(x: f64) (j: u64, z: f64) {
 // that is, 4/pi = Sum mPi4[i]*2^(-64*i)
 // 19 64-bit digits and the leading one bit give 1217 bits
 // of precision to handle the largest possible f64 exponent.
-mPi4: = [...]u64{
+let mPi4 = [...]u64{
 	0x0000000000000001,
 	0x45f306dc9c882a53,
 	0xf84eafa3ea69bb81,

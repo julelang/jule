@@ -95,4 +95,5 @@ const (
 	CPP                 = "cpp"
 	FALLTHROUGH         = "fallthrough"
 	FN                  = "fn"
+	LET                 = "let"
 )

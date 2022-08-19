@@ -35,8 +35,8 @@ fn shr(u1: u64, u2: u64, n: uint) (r1: u64, r2: u64) {
 	// For this reason, compute this shifting manually.
 	//
 	// TODO: Make sure this computation is fast and efficiency?
-	shift: = u1
-	shift_n: = n-64
+	let shift = u1
+	let shift_n = n-64
 	for shift > 0 && shift_n > 0 {
 		shift_n--
 		shift >>= 1
@@ -89,7 +89,7 @@ fn split(b: u64) (sign: u32, exp: i32, mantissa: u64) {
 
 	if exp == 0 {
 		// Normalize value if subnormal.
-		shift: = uint(std::math::bits::leading_zeros64(mantissa) - 11)
+		let shift = uint(std::math::bits::leading_zeros64(mantissa) - 11)
 		mantissa <<= shift
 		exp = 1 - i32(shift)
 	} else {
@@ -103,7 +103,7 @@ fn split(b: u64) (sign: u32, exp: i32, mantissa: u64) {
 // Returns x * y + z, computed with only one rounding.
 // (That is, fma returns the fused multiply-add of x, y, and z.)
 pub fn fma(x: f64, y: f64, z: f64) f64 {
-	bx:, by:, bz: = f64_bits(x), f64_bits(y), f64_bits(z)
+	let (bx, by, bz) = f64_bits(x), f64_bits(y), f64_bits(z)
 
 	// inf or nan or zero involved. At most one rounding will occur.
 	if x == 0.0 || y == 0.0 || z == 0.0 || bx&UVINF == UVINF || by&UVINF == UVINF {
@@ -117,23 +117,23 @@ pub fn fma(x: f64, y: f64, z: f64) f64 {
 
 	// Inputs are (sub)normal.
 	// Split x, y, z into sign, exponent, mantissa.
-	xs:, xe:, xm: = split(bx)
-	ys:, ye:, ym: = split(by)
-	zs:, ze:, zm: = split(bz)
+	let (xs, xe, xm) = split(bx)
+	let (ys, ye, ym) = split(by)
+	let (zs, ze, zm) = split(bz)
 
 	// Compute product p = x*y as sign, exponent, two-word mantissa.
 	// Start with exponent. "is normal" bit isn't subtracted yet.
-	pe: = xe + ye - BIAS + 1
+	let pe = xe + ye - BIAS + 1
 
 	// pm1:pm2 is the double-word mantissa for the product p.
 	// Shift left to leave top bit in product. Effectively
 	// shifts the 106-bit product to the left by 21.
-	pm1:, pm2: = std::math::bits::mul64(xm<<10, ym<<11)
-	zm1:, zm2: = zm<<10, u64(0)
-	ps: = xs ^ ys // product sign
+	let (pm1, pm2) = std::math::bits::mul64(xm<<10, ym<<11)
+	let (zm1, zm2) = zm<<10, u64(0)
+	let ps = xs ^ ys // product sign
 
 	// normalize to 62nd bit
-	is62zero: = uint((^pm1 >> 62) & 1)
+	let is62zero = uint((^pm1 >> 62) & 1)
 	pm1, pm2 = shl(pm1, pm2, is62zero)
 	pe -= i32(is62zero)
 
@@ -146,8 +146,8 @@ pub fn fma(x: f64, y: f64, z: f64) f64 {
 	zm1, zm2 = shrcompress(zm1, zm2, uint(pe-ze))
 
 	// Compute resulting significands, normalizing if necessary.
-	m: u64
-	c: u64
+	let m: u64
+	let c: u64
 	if ps == zs {
 		// Adding (pm1:pm2) + (zm1:zm2)
 		pm2, c = std::math::bits::add64(pm2, zm2, 0)
@@ -158,7 +158,7 @@ pub fn fma(x: f64, y: f64, z: f64) f64 {
 		// Subtracting (pm1:pm2) - (zm1:zm2)
 		pm2, c = std::math::bits::sub64(pm2, zm2, 0)
 		pm1, _ = std::math::bits::sub64(pm1, zm1, c)
-		nz: = lz(pm1, pm2)
+		let nz = lz(pm1, pm2)
 		pe -= nz
 		m, pm2 = shl(pm1, pm2, uint(nz-1))
 		m |= nonzero(pm2)
@@ -170,7 +170,7 @@ pub fn fma(x: f64, y: f64, z: f64) f64 {
 		ret f64_from_bits(u64(ps)<<63 | UVINF)
 	}
 	if pe < 0 {
-		n: = uint(-pe)
+		let n = uint(-pe)
 		m = m>>n | nonzero(m&(1<<n-1))
 		pe = 0
 	}

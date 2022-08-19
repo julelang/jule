@@ -10,8 +10,8 @@ struct FloatInfo {
 	bias    : int
 }
 
-f32_info: = FloatInfo{23, 8, -127}
-f64_info: = FloatInfo{52, 11, -1023}
+let f32_info = FloatInfo{23, 8, -127}
+let f64_info = FloatInfo{52, 11, -1023}
 
 struct DecimalSlice {
 	d  : []byte
@@ -62,14 +62,14 @@ fn generic_ftoa(dst: []byte, val: f64, fmt: byte, prec: int, bit_size: int) []by
 		panic("std::conv: illegal bit_size")
 	}
 
-	neg: = bits>>(flt.expbits+flt.mantbits) != 0
-	exp: = int(bits>>flt.mantbits) & (1<<flt.expbits - 1)
-	mant: = bits & (u64(1)<<flt.mantbits - 1)
+	let neg = bits>>(flt.expbits+flt.mantbits) != 0
+	let exp = int(bits>>flt.mantbits) & (1<<flt.expbits - 1)
+	let mant = bits & (u64(1)<<flt.mantbits - 1)
 
 	match exp {
 	case 1<<flt.expbits - 1:
 		// +inf, nan
-		s: str
+		let s: str
 		match {
 		case mant != 0:
 			s = "nan"
@@ -96,17 +96,17 @@ fn generic_ftoa(dst: []byte, val: f64, fmt: byte, prec: int, bit_size: int) []by
 		ret fmt_x(dst, prec, fmt, neg, mant, exp, flt)
 	}
 
-	if !optimize {
+	if !OPTIMIZE {
 		ret big_ftoa(dst, prec, fmt, neg, mant, exp, flt)
 	}
 
-	digs: DecimalSlice
-	ok: = false
+	let digs: DecimalSlice
+	let ok = false
 	// Negative precision means "only as much as needed to be exact."
-	shortest: = prec < 0
+	let shortest = prec < 0
 	if shortest {
 		// Use Ryu algorithm.
-		buf: [32]byte
+		let buf: [32]byte
 		digs.d = buf[:]
 		ryu_ftoa_shortest(&digs, mant, exp-int(flt.mantbits), flt)
 		ok = true
@@ -121,7 +121,7 @@ fn generic_ftoa(dst: []byte, val: f64, fmt: byte, prec: int, bit_size: int) []by
 		}
 	} else if fmt != 'f' {
 		// Fixed number of digits.
-		digits: = prec
+		let digits = prec
 		match fmt {
 		case 'e', 'E':
 			digits++
@@ -134,7 +134,7 @@ fn generic_ftoa(dst: []byte, val: f64, fmt: byte, prec: int, bit_size: int) []by
 			// Invalid mode.
 			digits = 1
 		}
-		buf: [24]byte
+		let buf: [24]byte
 		if bit_size == 32 && digits <= 9 {
 			digs.d = buf[:]
 			ryu_ftoa_fixed32(&digs, u32(mant), exp-int(flt.mantbits), digits)
@@ -154,11 +154,11 @@ fn generic_ftoa(dst: []byte, val: f64, fmt: byte, prec: int, bit_size: int) []by
 //doc: Uses multiprecision computations to format a float.
 fn big_ftoa(dst: []byte, prec: int, fmt: byte, neg: bool,
 			mant: u64, exp: int, flt: *FloatInfo) []byte {
-	d: = new(Decimal)
+	let d = new(Decimal)
 	d.assign(mant)
 	d.shift(exp - int(flt.mantbits))
-	digs: DecimalSlice
-	shortest: = prec < 0
+	let digs: DecimalSlice
+	let shortest = prec < 0
 	if shortest {
 		round_shortest(d, mant, exp, flt)
 		digs = DecimalSlice{d: d.d[:], nd: d.nd, dp: d.dp}
@@ -198,7 +198,7 @@ fn fmt_digits(dst: []byte, shortest: bool, neg: bool,
 		ret fmt_f(dst, neg, digs, prec)
 	case 'g', 'G':
 		// trailing fractional zeros in 'e' form will be trimmed.
-		eprec: = prec
+		let eprec = prec
 		if eprec > digs.nd && digs.nd >= digs.dp {
 			eprec = digs.nd
 		}
@@ -208,7 +208,7 @@ fn fmt_digits(dst: []byte, shortest: bool, neg: bool,
 		if shortest {
 			eprec = 6
 		}
-		exp: = digs.dp - 1
+		let exp = digs.dp - 1
 		if exp < -4 || exp >= eprec {
 			if prec > digs.nd {
 				prec = digs.nd
@@ -249,7 +249,7 @@ fn round_shortest(d: *Decimal, mant: u64, exp: int, flt: *FloatInfo) {
 	// So the number is already shortest if 10^(dp-nd) > 2^(exp-mantbits),
 	// or equivalently log2(10)*(dp-nd) > exp-mantbits.
 	// It is true if 332/100*(dp-nd) >= exp-mantbits (log2(10) > 3.32).
-	minexp: = flt.bias + 1 // minimum possible exponent
+	let minexp = flt.bias + 1 // minimum possible exponent
 	if exp > minexp && 332*(d.dp-d.nd) >= 100*(exp-int(flt.mantbits)) {
 		// The number is already shortest.
 		ret
@@ -258,7 +258,7 @@ fn round_shortest(d: *Decimal, mant: u64, exp: int, flt: *FloatInfo) {
 	// d = mant << (exp - mantbits)
 	// Next highest floating point number is mant+1 << exp-mantbits.
 	// Our upper bound is halfway between, mant*2+1 << exp-mantbits-1.
-	upper: = new(Decimal)
+	let upper = new(Decimal)
 	upper.assign(mant*2 + 1)
 	upper.shift(exp - int(flt.mantbits) - 1)
 
@@ -268,8 +268,8 @@ fn round_shortest(d: *Decimal, mant: u64, exp: int, flt: *FloatInfo) {
 	// in which case the next lowest is mant*2-1 << exp-mantbits-1.
 	// Either way, call it mantlo << explo-mantbits.
 	// Our lower bound is halfway between, mantlo*2+1 << explo-mantbits-1.
-	mantlo: u64
-	explo: int
+	let mantlo: u64
+	let explo: int
 	if mant > 1<<flt.mantbits || exp == minexp {
 		mantlo = mant - 1
 		explo = exp
@@ -277,14 +277,14 @@ fn round_shortest(d: *Decimal, mant: u64, exp: int, flt: *FloatInfo) {
 		mantlo = mant*2 - 1
 		explo = exp - 1
 	}
-	lower: = new(Decimal)
+	let lower = new(Decimal)
 	lower.assign(mantlo*2 + 1)
 	lower.shift(explo - int(flt.mantbits) - 1)
 
 	// The upper and lower bounds are possible outputs only if
 	// the original mantissa is even, so that IEEE round-to-even
 	// would round to the original mantissa and not the neighbors.
-	inclusive: = mant%2 == 0
+	let inclusive = mant%2 == 0
 
 	// As we walk the digits we want to know whether rounding up would fall
 	// within the upper bound. This is tracked by upperdelta:
@@ -297,28 +297,28 @@ fn round_shortest(d: *Decimal, mant: u64, exp: int, flt: *FloatInfo) {
 	//
 	// If upperdelta == 2, then the difference is greater than 1
 	// and we know that rounding up falls within the bound.
-	upperdelta: u8
+	let upperdelta: u8
 
 	// Now we can figure out the minimum number of digits required.
 	// Walk along until d has distinguished itself from upper and lower.
-	for ui: = 0; ; ui++ {
+	for let ui = 0; ; ui++ {
 		// lower, d, and upper may have the decimal points at different
 		// places. In this case upper is the longest, so we iterate from
 		// ui==0 and start li and mi at (possibly) -1.
-		mi: = ui - upper.dp + d.dp
+		let mi = ui - upper.dp + d.dp
 		if mi >= d.nd {
 			break
 		}
-		li: = ui - upper.dp + lower.dp
-		l: = byte('0') // lower digit
+		let li = ui - upper.dp + lower.dp
+		let l = byte('0') // lower digit
 		if li >= 0 && li < lower.nd {
 			l = lower.d[li]
 		}
-		m: = byte('0') // middle digit
+		let m = byte('0') // middle digit
 		if mi >= 0 {
 			m = d.d[mi]
 		}
-		u: = byte('0') // upper digit
+		let u = byte('0') // upper digit
 		if ui < upper.nd {
 			u = upper.d[ui]
 		}
@@ -326,7 +326,7 @@ fn round_shortest(d: *Decimal, mant: u64, exp: int, flt: *FloatInfo) {
 		// Okay to round down (truncate) if lower has a different digit
 		// or if lower is inclusive and is exactly the result of rounding
 		// down (i.e., and we have reached the final digit of lower).
-		okdown: = l != m || inclusive && li+1 == lower.nd
+		let okdown = l != m || inclusive && li+1 == lower.nd
 
 		match {
 		case upperdelta == 0 && m+1 < u:
@@ -347,7 +347,7 @@ fn round_shortest(d: *Decimal, mant: u64, exp: int, flt: *FloatInfo) {
 		}
 		// Okay to round up if upper has a different digit and either upper
 		// is inclusive or upper is bigger than the result of rounding up.
-		okup: = upperdelta > 0 && (inclusive || upperdelta > 1 || ui+1 < upper.nd)
+		let okup = upperdelta > 0 && (inclusive || upperdelta > 1 || ui+1 < upper.nd)
 
 		// If it's okay to do either, then round to the nearest one.
 		// If it's okay to do only one, do it.
@@ -373,7 +373,7 @@ fn fmt_e(dst: []byte, neg: bool, d: DecimalSlice, prec: int, fmt: byte) []byte {
 	}
 
 	// first digit
-	ch: = byte('0')
+	let ch = byte('0')
 	if d.nd != 0 {
 		ch = d.d[0]
 	}
@@ -382,8 +382,8 @@ fn fmt_e(dst: []byte, neg: bool, d: DecimalSlice, prec: int, fmt: byte) []byte {
 	// .moredigits
 	if prec > 0 {
 		dst = append[byte](dst, '.')
-		i: = 1
-		m: = min(d.nd, prec+1)
+		let i = 1
+		let m = min(d.nd, prec+1)
 		if i < m {
 			dst = append[byte](dst, d.d[i:m]...)
 			i = m
@@ -395,7 +395,7 @@ fn fmt_e(dst: []byte, neg: bool, d: DecimalSlice, prec: int, fmt: byte) []byte {
 
 	// e±
 	dst = append[byte](dst, fmt)
-	exp: = d.dp - 1
+	let exp = d.dp - 1
 	if d.nd == 0 { // special case: 0 has exponent 0
 		exp = 0
 	}
@@ -429,7 +429,7 @@ fn fmt_f(dst: []byte, neg: bool, d: DecimalSlice, prec: int) []byte {
 
 	// integer, padded with zeros as needed.
 	if d.dp > 0 {
-		m: = min(d.nd, d.dp)
+		let m = min(d.nd, d.dp)
 		dst = append[byte](dst, d.d[:m]...)
 		for ; m < d.dp; m++ {
 			dst = append[byte](dst, '0')
@@ -440,9 +440,9 @@ fn fmt_f(dst: []byte, neg: bool, d: DecimalSlice, prec: int) []byte {
 	// fraction
 	if prec > 0 {
 		dst = append[byte](dst, '.')
-		for i: = 0; i < prec; i++ {
-			ch: = byte('0')
-			j: = d.dp + i
+		for let i = 0; i < prec; i++ {
+			let ch = byte('0')
+			let j = d.dp + i
 			if 0 <= j && j < d.nd {
 				ch = d.d[j]
 			}
@@ -489,8 +489,8 @@ fn fmt_x(dst: []byte, prec: int, fmt: byte, neg: bool, mant: u64, exp: int, flt:
 
 	// Round if requested.
 	if prec >= 0 && prec < 15 {
-		shift: = uint(prec * 4)
-		extra: = (mant << shift) & (1<<60 - 1)
+		let shift = uint(prec * 4)
+		let extra = (mant << shift) & (1<<60 - 1)
 		mant >>= 60 - shift
 		if extra|(mant&1) > 1<<59 {
 			mant++
@@ -503,7 +503,7 @@ fn fmt_x(dst: []byte, prec: int, fmt: byte, neg: bool, mant: u64, exp: int, flt:
 		}
 	}
 
-	hex: = lowerhex
+	let hex = lowerhex
 	if fmt == 'X' {
 		hex = upperhex
 	}
@@ -524,14 +524,14 @@ fn fmt_x(dst: []byte, prec: int, fmt: byte, neg: bool, mant: u64, exp: int, flt:
 		}
 	} else if prec > 0 {
 		dst = append[byte](dst, '.')
-		for i: = 0; i < prec; i++ {
+		for let i = 0; i < prec; i++ {
 			dst = append[byte](dst, hex[(mant>>60)&15])
 			mant <<= 4
 		}
 	}
 
 	// p±
-	ch: = byte('P')
+	let ch = byte('P')
 	if fmt == lower(fmt) {
 		ch = 'p'
 	}

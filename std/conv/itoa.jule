@@ -5,12 +5,12 @@
 use std::math::bits
 
 // enable fast path for small integers
-const FAST_SMALLS: = true
-const N_SMALLS:    = 100
-const DIGITS:      = "0123456789abcdefghijklmnopqrstuvwxyz"
-const HOST_32BIT:  = ^uint(0)>>32 == 0
+const FAST_SMALLS = true
+const N_SMALLS    = 100
+const DIGITS      = "0123456789abcdefghijklmnopqrstuvwxyz"
+const HOST_32BIT  = ^uint(0)>>32 == 0
 
-const SMALLS_STR: = (
+const SMALLS_STR = (
 	"00010203040506070809" +
 	"10111213141516171819" +
 	"20212223242526272829" +
@@ -31,7 +31,7 @@ pub fn fmt_uint(i: u64, base: int) str {
 	if FAST_SMALLS && i < N_SMALLS && base == 10 {
 		ret small(int(i))
 	}
-	_, s: = fmt_bits(nil, i, base, false, false)
+	let (_, s) = fmt_bits(nil, i, base, false, false)
 	ret s
 }
 
@@ -43,7 +43,7 @@ pub fn fmt_int(i: i64, base: int) str {
 	if FAST_SMALLS && 0 <= i && i < N_SMALLS && base == 10 {
 		ret small(int(i))
 	}
-	_, s: = fmt_bits(nil, u64(i), base, i < 0, false)
+	let (_, s) = fmt_bits(nil, u64(i), base, i < 0, false)
 	ret s
 }
 
@@ -78,8 +78,8 @@ fn fmt_bits(dst: []byte, u: u64, base: int, neg: bool, append_: bool) (d: []byte
 	}
 	// 2 <= base && base <= DIGITS.len
 
-	a: [64 + 1]byte // +1 for sign of 64bit value in base 2
-	i: = a.len
+	let a: [64 + 1]byte // +1 for sign of 64bit value in base 2
+	let i = a.len
 
 	if neg {
 		u = -u
@@ -98,10 +98,10 @@ fn fmt_bits(dst: []byte, u: u64, base: int, neg: bool, append_: bool) (d: []byte
 				// Avoid using r = a%b in addition to q = a/b
 				// since 64bit division and modulo operations
 				// are calculated by runtime functions on 32bit machines.
-				q: = u / 1e9
-				us: = uint(u - q*1e9) // u % 1e9 fits into a uint
-				for j: = 4; j > 0; j-- {
-					is: = us % 100 * 2
+				let q = u / 1e9
+				let us = uint(u - q*1e9) // u % 1e9 fits into a uint
+				for let j = 4; j > 0; j-- {
+					let is = us % 100 * 2
 					us /= 100
 					i -= 2
 					a[i+1] = SMALLS_STR[is+1]
@@ -119,9 +119,9 @@ fn fmt_bits(dst: []byte, u: u64, base: int, neg: bool, append_: bool) (d: []byte
 		}
 
 		// u guaranteed to fit into a uint
-		us: = uint(u)
+		let us = uint(u)
 		for us >= 100 {
-			is: = us % 100 * 2
+			let is = us % 100 * 2
 			us /= 100
 			i -= 2
 			a[i+1] = SMALLS_STR[is+1]
@@ -129,7 +129,7 @@ fn fmt_bits(dst: []byte, u: u64, base: int, neg: bool, append_: bool) (d: []byte
 		}
 
 		// us < 100
-		is: = us * 2
+		let is = us * 2
 		i--
 		a[i] = SMALLS_STR[is+1]
 		if us >= 10 {
@@ -144,9 +144,9 @@ fn fmt_bits(dst: []byte, u: u64, base: int, neg: bool, append_: bool) (d: []byte
 		// the constant 7 we tell the compiler that the shift count is always
 		// less than 8 which is smaller than any register width. This allows
 		// the compiler to generate better code for the shift operation.
-		shift := uint(std::math::bits::trailing_zeros(uint(base))) & 7
-		b: = u64(base)
-		m: = uint(base) - 1 // == 1<<shift - 1
+		let shift = uint(std::math::bits::trailing_zeros(uint(base))) & 7
+		let b = u64(base)
+		let m = uint(base) - 1 // == 1<<shift - 1
 		for u >= b {
 			i--
 			a[i] = DIGITS[uint(u)&m]
@@ -157,13 +157,13 @@ fn fmt_bits(dst: []byte, u: u64, base: int, neg: bool, append_: bool) (d: []byte
 		a[i] = DIGITS[uint(u)]
 	} else {
 		// general case
-		b: = u64(base)
+		let b = u64(base)
 		for u >= b {
 			i--
 			// Avoid using r = a%b in addition to q = a/b
 			// since 64bit division and modulo operations
 			// are calculated by runtime functions on 32bit machines.
-			q: = u / b
+			let q = u / b
 			a[i] = DIGITS[uint(u-q*b)]
 			u = q
 		}

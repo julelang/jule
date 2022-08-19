@@ -8,7 +8,6 @@ type AssignInfo struct {
 	Right  Toks
 	Setter Tok
 	Ok     bool
-	IsExpr bool
 }
 
 // SuffixOperators.
@@ -37,6 +36,7 @@ var AssignOperators = [...]string{
 func IsAssign(id uint8) bool {
 	switch id {
 	case tokens.Id,
+		tokens.Let,
 		tokens.Dot,
 		tokens.Self,
 		tokens.Brace,

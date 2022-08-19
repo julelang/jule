@@ -13,57 +13,57 @@
 // Numbers fundamental to the encoding.
 
 //doc: The "error" rune or "Unicode replacement character"
-pub const RUNE_ERROR: = '\uFFFD'
+pub const RUNE_ERROR = '\uFFFD'
 
 //doc: Characters below RUNE_SELF are represented as themselves in a single byte.
-pub const RUNE_SELF: = 0x80
+pub const RUNE_SELF = 0x80
 
 //doc: Maximum valid Unicode code point.
-pub const MAX_RUNE: = '\U0010FFFF'
+pub const MAX_RUNE = '\U0010FFFF'
 
 //doc: Maximum number of bytes of a UTF-8 encoded Unicode character.
-pub const UTF_MAX: = 4
+pub const UTF_MAX = 4
 
 // Code points in the surrogate range are not valid for UTF-8.
-const SURROGATE_MIN: = 0xD800
-const SURROGATE_MAX: = 0xDFFF
+const SURROGATE_MIN = 0xD800
+const SURROGATE_MAX = 0xDFFF
 
-const T1: = 0b00000000
-const TX: = 0b10000000
-const T2: = 0b11000000
-const T3: = 0b11100000
-const T4: = 0b11110000
-const T5: = 0b11111000
+const T1 = 0b00000000
+const TX = 0b10000000
+const T2 = 0b11000000
+const T3 = 0b11100000
+const T4 = 0b11110000
+const T5 = 0b11111000
 
-const MASKX: = 0b00111111
-const MASK2: = 0b00011111
-const MASK3: = 0b00001111
-const MASK4: = 0b00000111
+const MASKX = 0b00111111
+const MASK2 = 0b00011111
+const MASK3 = 0b00001111
+const MASK4 = 0b00000111
 
-const RUNE1_MAX: = 1<<7 - 1
-const RUNE2_MAX: = 1<<11 - 1
-const RUNE3_MAX: = 1<<16 - 1
+const RUNE1_MAX = 1<<7 - 1
+const RUNE2_MAX = 1<<11 - 1
+const RUNE3_MAX = 1<<16 - 1
 
 // The default lowest and highest continuation byte.
-const LOCB: = 0b10000000
-const HICB: = 0b10111111
+const LOCB = 0b10000000
+const HICB = 0b10111111
 
 // These names of these constants are chosen to give nice alignment in the
 // table below. The first nibble is an index into accept_ranges or F for
 // special one-byte cases. The second nibble is the Rune length or the
 // Status for the special one-byte case.
-const XX: = 0xF1 // invalid: size 1
-const AS: = 0xF0 // ASCII: size 1
-const S1: = 0x02 // accept 0, size 2
-const S2: = 0x13 // accept 1, size 3
-const S3: = 0x03 // accept 0, size 3
-const S4: = 0x23 // accept 2, size 3
-const S5: = 0x34 // accept 3, size 4
-const S6: = 0x04 // accept 0, size 4
-const S7: = 0x44 // accept 4, size 4
+const XX = 0xF1 // invalid: size 1
+const AS = 0xF0 // ASCII: size 1
+const S1 = 0x02 // accept 0, size 2
+const S2 = 0x13 // accept 1, size 3
+const S3 = 0x03 // accept 0, size 3
+const S4 = 0x23 // accept 2, size 3
+const S5 = 0x34 // accept 3, size 4
+const S6 = 0x04 // accept 0, size 4
+const S7 = 0x44 // accept 4, size 4
 
 // Is information about the first byte in a UTF-8 sequence.
-first: = [256]byte{
+let first = [256]byte{
 	//   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
 	AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, // 0x00-0x0F
 	AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, // 0x10-0x1F
@@ -91,7 +91,7 @@ struct accept_range {
 }
 
 // Has size 16 to avoid bounds checks in the code that uses it.
-accept_ranges: = [16]accept_range{
+let accept_ranges = [16]accept_range{
 	accept_range{LOCB, HICB},
 	accept_range{0xA0, HICB},
 	accept_range{LOCB, 0x9F},
@@ -106,12 +106,12 @@ pub fn full_rune(p: []byte) bool {
 	if p.empty() {
 		ret false
 	}
-	x: = first[p[0]]
+	let x = first[p[0]]
 	if p.len >= int(x&7) {
 		ret true // ASCII, invalid or valid.
 	}
 	// Must be short or invalid.
-	accept: = accept_ranges[x>>4]
+	let accept = accept_ranges[x>>4]
 	if p.len > 1 && (p[1] < accept.lo || accept.hi < p[1]) {
 		ret true
 	} else if p.len > 2 && (p[2] < LOCB || HICB < p[2]) {
@@ -125,12 +125,12 @@ pub fn full_rune_str(s: str) bool {
 	if s.empty() {
 		ret false
 	}
-	x: = first[s[0]]
+	let x = first[s[0]]
 	if s.len >= int(x&7) {
 		ret true // ASCII, invalid, or valid.
 	}
 	// Must be short or invalid.
-	accept: = accept_ranges[x>>4]
+	let accept = accept_ranges[x>>4]
 	if s.len > 1 && (s[1] < accept.lo || accept.hi < s[1]) {
 		ret true
 	} else if s.len > 2 && (s[2] < LOCB || HICB < s[2]) {
@@ -152,35 +152,35 @@ pub fn decode_rune(p: []byte) (r: rune, size: int) {
 	if p.len < 1 {
 		ret RUNE_ERROR, 0
 	}
-	p0: = p[0]
-	x: = first[p0]
+	let p0 = p[0]
+	let x = first[p0]
 	if x >= AS {
 		// The following code simulates an additional check for x == XX and
 		// handling the ASCII and invalid cases accordingly. This mask-and-or
 		// approach prevents an additional branch.
-		mask: rune = x << 31 >> 31 // Create 0x0000 or 0xFFFF.
+		let mask: rune = x << 31 >> 31 // Create 0x0000 or 0xFFFF.
 		ret rune(p[0])&^mask | RUNE_ERROR&mask, 1
 	}
-	sz: = int(x & 7)
-	accept: = accept_ranges[x>>4]
+	let sz = int(x & 7)
+	let accept = accept_ranges[x>>4]
 	if p.len < sz {
 		ret RUNE_ERROR, 1
 	}
-	b1: = p[1]
+	let b1 = p[1]
 	if b1 < accept.lo || accept.hi < b1 {
 		ret RUNE_ERROR, 1
 	}
 	if sz <= 2 { // <= instead of == to help the compiler eliminate some bounds checks
 		ret rune(p0&MASK2)<<6 | rune(b1&MASKX), 2
 	}
-	b2: = p[2]
+	let b2 = p[2]
 	if b2 < LOCB || HICB < b2 {
 		ret RUNE_ERROR, 1
 	}
 	if sz <= 3 {
 		ret rune(p0&MASK3)<<12 | rune(b1&MASKX)<<6 | rune(b2&MASKX), 3
 	}
-	b3: = p[3]
+	let b3 = p[3]
 	if b3 < LOCB || HICB < b3 {
 		ret RUNE_ERROR, 1
 	}
@@ -200,35 +200,35 @@ pub fn decode_rune_str(s: str) (r: rune, size: int) {
 	if s.len < 1 {
 		ret RUNE_ERROR, 0
 	}
-	s0: = s[0]
-	x: = first[s0]
+	let s0 = s[0]
+	let x = first[s0]
 	if x >= AS {
 		// The following code simulates an additional check for x == xx and
 		// handling the ASCII and invalid cases accordingly. This mask-and-or
 		// approach prevents an additional branch.
-		mask: rune = x << 31 >> 31 // Create 0x0000 or 0xFFFF.
+		let mask: rune = x << 31 >> 31 // Create 0x0000 or 0xFFFF.
 		ret rune(s[0])&^mask | RUNE_ERROR&mask, 1
 	}
-	sz: = int(x & 7)
-	accept: = accept_ranges[x>>4]
+	let sz = int(x & 7)
+	let accept = accept_ranges[x>>4]
 	if s.len < sz {
 		ret RUNE_ERROR, 1
 	}
-	s1: = s[1]
+	let s1 = s[1]
 	if s1 < accept.lo || accept.hi < s1 {
 		ret RUNE_ERROR, 1
 	}
 	if sz <= 2 { // <= instead of == to help the compiler eliminate some bounds checks
 		ret rune(s0&MASK2)<<6 | rune(s1&MASKX), 2
 	}
-	s2: = s[2]
+	let s2 = s[2]
 	if s2 < LOCB || HICB < s2 {
 		ret RUNE_ERROR, 1
 	}
 	if sz <= 3 {
 		ret rune(s0&MASK3)<<12 | rune(s1&MASKX)<<6 | rune(s2&MASKX), 3
 	}
-	s3: = s[3]
+	let s3 = s[3]
 	if s3 < LOCB || HICB < s3 {
 		ret RUNE_ERROR, 1
 	}
@@ -248,8 +248,8 @@ pub fn decode_last_rune(p: []byte) (r: rune, size: int) {
 	if p.empty() {
 		ret RUNE_ERROR, 0
 	}
-	end: = p.len
-	start: = end - 1
+	let end = p.len
+	let start = end - 1
 	r = rune(p[start])
 	if r < RUNE_SELF {
 		ret r, 1
@@ -257,7 +257,7 @@ pub fn decode_last_rune(p: []byte) (r: rune, size: int) {
 	// guard against O(n^2) behavior when traversing
 	// backwards through strings with long sequences of
 	// invalid UTF-8.
-	lim: = end - UTF_MAX
+	let lim = end - UTF_MAX
 	if lim < 0 {
 		lim = 0
 	}
@@ -289,8 +289,8 @@ pub fn decode_last_rune_str(s: str) (r: rune, size: int) {
 	if s.empty() {
 		ret RUNE_ERROR, 0
 	}
-	end: = s.len
-	start: = end - 1
+	let end = s.len
+	let start = end - 1
 	r = rune(s[start])
 	if r < RUNE_SELF {
 		ret r, 1
@@ -298,7 +298,7 @@ pub fn decode_last_rune_str(s: str) (r: rune, size: int) {
 	// guard against O(n^2) behavior when traversing
 	// backwards through strings with long sequences of
 	// invalid UTF-8.
-	lim := end - UTF_MAX
+	let lim = end - UTF_MAX
 	if lim < 0 {
 		lim = 0
 	}
@@ -345,7 +345,7 @@ pub fn rune_len(r: rune) int {
 // It returns the number of bytes written.
 pub fn encode_rune(p: []byte, r: rune) int {
 	// Negative values are erroneous. Making it unsigned addresses the problem.
-	i: = u32(r)
+	let i = u32(r)
 	match {
 	case i <= RUNE1_MAX:
 		p[0] = byte(r)
@@ -384,7 +384,7 @@ pub fn append_rune(p: []byte, r: rune) []byte {
 
 fn append_rune_non_ascii(p: []byte, r: rune) []byte {
 	// Negative values are erroneous. Making it unsigned addresses the problem.
-	i: = u32(r)
+	let i = u32(r)
 	match {
 	case i <= RUNE2_MAX:
 		ret append[byte](p, T2|byte(r>>6), TX|byte(r)&MASKX)
@@ -402,25 +402,25 @@ fn append_rune_non_ascii(p: []byte, r: rune) []byte {
 // Returns the number of runes in p. Erroneous and short
 // encodings are treated as single runes of width 1 byte.
 pub fn rune_count(p: []byte) (n: int) {
-	for i: = 0; i < p.len; {
+	for let i = 0; i < p.len; {
 		n++
-		c: = p[i]
+		let c = p[i]
 		if c < RUNE_SELF {
 			// ASCII fast path
 			i++
 			continue
 		}
-		x: = first[c]
+		let x = first[c]
 		if x == XX {
 			i++ // invalid.
 			continue
 		}
-		size: = int(x & 7)
+		let size = int(x & 7)
 		if i+size > p.len {
 			i++ // Short or invalid.
 			continue
 		}
-		accept: = accept_ranges[x>>4]
+		let accept = accept_ranges[x>>4]
 		c = p[i+1]
 		if c < accept.lo || accept.hi < c {
 			size = 1
@@ -444,24 +444,24 @@ pub fn rune_count(p: []byte) (n: int) {
 
 //doc: Is like rune_count but its input is a string.
 pub fn rune_count_str(s: str) (n: int) {
-	for i: = 0; i < s.len; n++ {
-		c: = s[i]
+	for let i = 0; i < s.len; n++ {
+		let c = s[i]
 		if c < RUNE_SELF {
 			// ASCII fast path
 			i++
 			continue
 		}
-		x: = first[c]
+		let x = first[c]
 		if x == XX {
 			i++ // invalid.
 			continue
 		}
-		size: = int(x & 7)
+		let size = int(x & 7)
 		if i+size > s.len {
 			i++ // Short or invalid.
 			continue
 		}
-		accept := accept_ranges[x>>4]
+		let accept = accept_ranges[x>>4]
 		c = s[i+1]
 		if c < accept.lo || accept.hi < c {
 			size = 1
@@ -496,30 +496,30 @@ pub fn valid(p: []byte) bool {
 	for p.len >= 8 {
 		// Combining two 32 bit loads allows the same code to be used
 		// for 32 and 64 bit platforms.
-		first32: = u32(p[0]) | u32(p[1])<<8 | u32(p[2])<<16 | u32(p[3])<<24
-		second32: = u32(p[4]) | u32(p[5])<<8 | u32(p[6])<<16 | u32(p[7])<<24
+		let first32 = u32(p[0]) | u32(p[1])<<8 | u32(p[2])<<16 | u32(p[3])<<24
+		let second32 = u32(p[4]) | u32(p[5])<<8 | u32(p[6])<<16 | u32(p[7])<<24
 		if (first32|second32)&0x80808080 != 0 {
 			// Found a non ASCII byte (>= RUNE_SELF).
 			break
 		}
 		p = p[8:]
 	}
-	for i: = 0; i < p.len; {
-		pi: = p[i]
+	for let i = 0; i < p.len; {
+		let pi = p[i]
 		if pi < RUNE_SELF {
 			i++
 			continue
 		}
-		x: = first[pi]
+		let x = first[pi]
 		if x == XX {
 			ret false // Illegal starter byte.
 		}
-		size: = int(x & 7)
+		let size = int(x & 7)
 		if i+size > p.len {
 			ret false // Short or invalid.
 		}
-		accept: = accept_ranges[x>>4]
-		c: = p[i+1]
+		let accept = accept_ranges[x>>4]
+		let c = p[i+1]
 		if c < accept.lo || accept.hi < c {
 			ret false
 		} else if size == 2 {
@@ -546,30 +546,30 @@ pub fn valid_str(s: str) bool {
 	for s.len >= 8 {
 		// Combining two 32 bit loads allows the same code to be used
 		// for 32 and 64 bit platforms.
-		first32: = u32(s[0]) | u32(s[1])<<8 | u32(s[2])<<16 | u32(s[3])<<24
-		second32: = u32(s[4]) | u32(s[5])<<8 | u32(s[6])<<16 | u32(s[7])<<24
+		let first32 = u32(s[0]) | u32(s[1])<<8 | u32(s[2])<<16 | u32(s[3])<<24
+		let second32 = u32(s[4]) | u32(s[5])<<8 | u32(s[6])<<16 | u32(s[7])<<24
 		if (first32|second32)&0x80808080 != 0 {
 			// Found a non ASCII byte (>= RuneSelf).
 			break
 		}
 		s = s[8:]
 	}
-	for i: = 0; i < s.len; {
-		si: = s[i]
+	for let i = 0; i < s.len; {
+		let si = s[i]
 		if si < RUNE_SELF {
 			i++
 			continue
 		}
-		x: = first[si]
+		let x = first[si]
 		if x == XX {
 			ret false // Illegal starter byte.
 		}
-		size: = int(x & 7)
+		let size = int(x & 7)
 		if i+size > s.len {
 			ret false // Short or invalid.
 		}
-		accept: = accept_ranges[x>>4]
-		c: = s[i+1]
+		let accept = accept_ranges[x>>4]
+		let c = s[i+1]
 		if c < accept.lo || accept.hi < c {
 			ret false
 		} else if size == 2 {

@@ -26,8 +26,8 @@ fn ryu_ftoa_fixed32(d: *DecimalSlice, mant: u32, exp: int, prec: int) {
 		ret
 	}
 	// Renormalize to a 25-bit mantissa.
-	e2: = exp
-	b: = std::math::bits::len32(mant)
+	let e2 = exp
+	let b = std::math::bits::len32(mant)
 	if b < 25 {
 		mant <<= uint(25 - b)
 		e2 += int(b) - 25
@@ -38,14 +38,14 @@ fn ryu_ftoa_fixed32(d: *DecimalSlice, mant: u32, exp: int, prec: int) {
 	// Because mant >= 2^24, it is enough to choose:
 	//     2^(e2+24) >= 10^(-q+prec-1)
 	// or q = -mul_by_log2_log10(e2+24) + prec - 1
-	q: = -mul_by_log2_log10(e2+24) + prec - 1
+	let q = -mul_by_log2_log10(e2+24) + prec - 1
 
 	// Now compute mant*(2^e2)*(10^q).
 	// Is it an exact computation?
 	// Only small positive powers of 10 are exact (5^28 has 66 bits).
-	exact: = q <= 27 && q >= 0
+	let exact = q <= 27 && q >= 0
 
-	di:, dexp2:, d0: = mult64bit_pow10(mant, e2, q)
+	let (di, dexp2, d0) = mult64bit_pow10(mant, e2, q)
 	if dexp2 >= 0 {
 		panic("not enough significant bits after mult64bit_pow10")
 	}
@@ -58,11 +58,12 @@ fn ryu_ftoa_fixed32(d: *DecimalSlice, mant: u32, exp: int, prec: int) {
 		d0 = true
 	}
 	// Remove extra lower bits and keep rounding info.
-	extra: = uint(-dexp2)
-	extra_mask: = u32(1<<extra - 1)
+	let extra = uint(-dexp2)
+	let extra_mask = u32(1<<extra - 1)
 
-	di, dfrac: = di>>extra, di&extra_mask
-	round_up: = false
+	let dfrac: u32
+	di, dfrac = di>>extra, di&extra_mask
+	let round_up = false
 	if exact {
 		// If we computed an exact product, d + 1/2
 		// should round to d+1 if 'd' is odd.
@@ -96,8 +97,8 @@ fn ryu_ftoa_fixed64(d: *DecimalSlice, mant: u64, exp: int, prec: int) {
 		ret
 	}
 	// Renormalize to a 55-bit mantissa.
-	e2: = exp
-	b: = std::math::bits::len64(mant)
+	let e2 = exp
+	let b = std::math::bits::len64(mant)
 	if b < 55 {
 		mant = mant << uint(55-b)
 		e2 += int(b) - 55
@@ -111,14 +112,14 @@ fn ryu_ftoa_fixed64(d: *DecimalSlice, mant: u64, exp: int, prec: int) {
 	//
 	// The minimal required exponent is -mul_by_log2_log10(1025)+18 = -291
 	// The maximal required exponent is mul_by_log2_log10(1074)+18 = 342
-	q: = -mul_by_log2_log10(e2+54) + prec - 1
+	let q = -mul_by_log2_log10(e2+54) + prec - 1
 
 	// Now compute mant*(2^e2)*(10^q).
 	// Is it an exact computation?
 	// Only small positive powers of 10 are exact (5^55 has 128 bits).
-	exact: = q <= 55 && q >= 0
+	let exact = q <= 55 && q >= 0
 
-	di:, dexp2:, d0: = mult128bit_pow10(mant, e2, q)
+	let (di, dexp2, d0) = mult128bit_pow10(mant, e2, q)
 	if dexp2 >= 0 {
 		panic("not enough significant bits after mult128bit_pow10")
 	}
@@ -131,11 +132,12 @@ fn ryu_ftoa_fixed64(d: *DecimalSlice, mant: u64, exp: int, prec: int) {
 		d0 = true
 	}
 	// Remove extra lower bits and keep rounding info.
-	extra: = uint(-dexp2)
-	extra_mask: = u64(1<<extra - 1)
+	let extra = uint(-dexp2)
+	let extra_mask = u64(1<<extra - 1)
 
-	di, dfrac: = di>>extra, di&extra_mask
-	round_up: = false
+	let dfrac: u64
+	di, dfrac = di>>extra, di&extra_mask
+	let round_up = false
 	if exact {
 		// If we computed an exact product, d + 1/2
 		// should round to d+1 if 'd' is odd.
@@ -158,7 +160,7 @@ fn ryu_ftoa_fixed64(d: *DecimalSlice, mant: u64, exp: int, prec: int) {
 	d.dp -= q
 }
 
-u64pow10: = [...]u64{
+let u64pow10 = [...]u64{
 	1, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9,
 	1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19,
 }
@@ -168,10 +170,10 @@ u64pow10: = [...]u64{
 // of mantissa m. The boolean trunc indicates whether m
 // is truncated compared to the original number being formatted.
 fn format_decimal(d: *DecimalSlice, m: u64, trunc: bool, round_up: bool, prec: int) {
-	max: = u64pow10[prec]
-	trimmed: = 0
+	let max = u64pow10[prec]
+	let trimmed = 0
 	for m >= max {
-		a:, b: = m/10, m%10
+		let (a, b) = m/10, m%10
 		m = a
 		trimmed++
 		if b > 5 {
@@ -196,12 +198,12 @@ fn format_decimal(d: *DecimalSlice, m: u64, trunc: bool, round_up: bool, prec: i
 		trimmed++
 	}
 	// render digits (similar to formatBits)
-	n: = uint(prec)
+	let n = uint(prec)
 	d.nd = int(prec)
-	v: = m
+	let v = m
 	for v >= 100 {
-		v1: u64
-		v2: u64
+		let v1: u64
+		let v2: u64
 		if v>>32 == 0 {
 			v1, v2 = u64(u32(v)/100), u64(u32(v)%100)
 		} else {
@@ -240,26 +242,26 @@ fn ryu_ftoa_shortest(d: *DecimalSlice, mant: u64, exp: int, flt: *FloatInfo) {
 		ryu_digits(d, mant, mant, mant, true, false)
 		ret
 	}
-	ml:, mc:, mu:, e2: = compute_bounds(mant, exp, flt)
+	let (ml, mc, mu, e2) = compute_bounds(mant, exp, flt)
 	if e2 == 0 {
 		ryu_digits(d, ml, mc, mu, true, false)
 		ret
 	}
 	// Find 10^q *larger* than 2^-e2
-	q: = mul_by_log2_log10(-e2) + 1
+	let q = mul_by_log2_log10(-e2) + 1
 
 	// We are going to multiply by 10^q using 128-bit arithmetic.
 	// The exponent is the same for all 3 numbers.
-	dl: u64
-	dc: u64
-	du: u64
-	dl0: bool
-	dc0: bool
-	du0: bool
+	let dl: u64
+	let dc: u64
+	let du: u64
+	let dl0: bool
+	let dc0: bool
+	let du0: bool
 	if flt == &f32_info {
-		dl32: u32
-		dc32: u32
-		du32: u32
+		let dl32: u32
+		let dc32: u32
+		let du32: u32
 		dl32, _, dl0 = mult64bit_pow10(u32(ml), e2, q)
 		dc32, _, dc0 = mult64bit_pow10(u32(mc), e2, q)
 		du32, e2, du0 = mult64bit_pow10(u32(mu), e2, q)
@@ -292,17 +294,20 @@ fn ryu_ftoa_shortest(d: *DecimalSlice, mant: u64, exp: int, flt: *FloatInfo) {
 	}
 	// Express the results (dl, dc, du)*2^e2 as integers.
 	// Extra bits must be removed and rounding hints computed.
-	extra: = uint(-e2)
-	extra_mask: = u64(1<<extra - 1)
+	let extra = uint(-e2)
+	let extra_mask = u64(1<<extra - 1)
 	// Now compute the floored, integral base 10 mantissas.
-	dl, fracl: = dl>>extra, dl&extra_mask
-	dc, fracc: = dc>>extra, dc&extra_mask
-	du, fracu: = du>>extra, du&extra_mask
+	let fracl: u64
+	dl, fracl = dl>>extra, dl&extra_mask
+	let fracc: u64
+	dc, fracc = dc>>extra, dc&extra_mask
+	let fracu: u64
+	du, fracu = du>>extra, du&extra_mask
 	// Is it allowed to use 'du' as a result?
 	// It is always allowed when it is truncated, but also
 	// if it is exact and the original binary mantissa is even
 	// When disallowed, we can subtract 1.
-	uok: = !du0 || fracu > 0
+	let uok = !du0 || fracu > 0
 	if du0 && fracu == 0 {
 		uok = mant&1 == 0
 	}
@@ -311,7 +316,7 @@ fn ryu_ftoa_shortest(d: *DecimalSlice, mant: u64, exp: int, flt: *FloatInfo) {
 	}
 	// Is 'dc' the correctly rounded base 10 mantissa?
 	// The correct rounding might be dc+1
-	cup: = false // don't round up.
+	let cup = false // don't round up.
 	if dc0 {
 		// If we computed an exact product, the half integer
 		// should round to next (even) integer if 'dc' is odd.
@@ -327,12 +332,12 @@ fn ryu_ftoa_shortest(d: *DecimalSlice, mant: u64, exp: int, flt: *FloatInfo) {
 	// Is 'dl' an allowed representation?
 	// Only if it is an exact value, and if the original binary mantissa
 	// was even.
-	lok: = dl0 && fracl == 0 && (mant&1 == 0)
+	let lok = dl0 && fracl == 0 && (mant&1 == 0)
 	if !lok {
 		dl++
 	}
 	// We need to remember whether the trimmed digits of 'dc' are zero.
-	c0: = dc0 && fracc == 0
+	let c0 = dc0 && fracc == 0
 	// render digits
 	ryu_digits(d, dl, dc, du, c0, cup)
 	d.dp -= q
@@ -381,9 +386,9 @@ fn compute_bounds(mant: u64, exp: int,
 }
 
 fn ryu_digits(d: *DecimalSlice, lower: u64, central: u64, upper: u64, c0: bool, cup: bool) {
-	lhi:, llo: = divmod1e9(lower)
-	chi:, clo: = divmod1e9(central)
-	uhi:, ulo: = divmod1e9(upper)
+	let (lhi, llo) = divmod1e9(lower)
+	let (chi, clo) = divmod1e9(central)
+	let (uhi, ulo) = divmod1e9(upper)
 	if uhi == 0 {
 		// only low digits (for denormals)
 		ryu_digits32(d, llo, clo, ulo, c0, cup, 8)
@@ -399,9 +404,9 @@ fn ryu_digits(d: *DecimalSlice, lower: u64, central: u64, upper: u64, c0: bool, 
 	} else {
 		d.nd = 0
 		// emit high part
-		n: = uint(9)
-		for v: = chi; v > 0; {
-			v1:, v2: = v/10, v%10
+		let n = uint(9)
+		for let v = chi; v > 0; {
+			let (v1, v2) = v/10, v%10
 			v = v1
 			n--
 			d.d[n] = byte(v2 + '0')
@@ -430,19 +435,19 @@ fn ryu_digits32(d: *DecimalSlice, lower: u32, central: u32,
 		d.dp = endindex + 1
 		ret
 	}
-	trimmed := 0
+	let trimmed = 0
 	// Remember last trimmed digit to check for round-up.
 	// c0 will be used to remember zeroness of following digits.
-	c_next_digit: = 0
+	let c_next_digit = 0
 	for upper > 0 {
 		// Repeatedly compute:
 		// l = ceil(lower / 10^k)
 		// c = round(central / 10^k)
 		// u = floor(upper / 10^k)
 		// and stop when c goes out of the (l, u) interval.
-		l: = (lower + 9) / 10
-		c:, cdigit: = central/10, central%10
-		u: = upper / 10
+		let l = (lower + 9) / 10
+		let (c, cdigit) = central/10, central%10
+		let u = upper / 10
 		if l > u {
 			// don't trim the last digit as it is forbidden to go below l
 			// other, trim and exit now.
@@ -481,10 +486,10 @@ fn ryu_digits32(d: *DecimalSlice, lower: u32, central: u32,
 	}
 	// We know where the number ends, fill directly
 	endindex -= trimmed
-	v: = central
-	n: = endindex
+	let v = central
+	let n = endindex
 	for n > d.nd {
-		v1:, v2: = v/100, v%100
+		let (v1, v2) = v/100, v%100
 		d.d[n] = SMALLS_STR[2*v2+1]
 		d.d[n-1] = SMALLS_STR[2*v2+0]
 		n -= 2
@@ -516,12 +521,12 @@ fn mult64bit_pow10(m: u32, e2: int, q: int) (resM: u32, resE: int, exact: bool) 
 		// This never happens due to the range of f32/f64 exponent
 		panic("mult64bit_pow10: power of 10 is out of range")
 	}
-	pow: = detailed_pows_of_ten[q-detailed_pows_of_ten_min_exp10][1]
+	let pow = detailed_pows_of_ten[q-detailed_pows_of_ten_min_exp10][1]
 	if q < 0 {
 		// Inverse powers of ten must be rounded up.
 		pow += 1
 	}
-	hi:, lo: = std::math::bits::mul64(u64(m), pow)
+	let (hi, lo) = std::math::bits::mul64(u64(m), pow)
 	e2 += mul_by_log10_log2(q) - 63 + 57
 	ret u32(hi<<7 | lo>>57), e2, lo<<7 == 0
 }
@@ -545,7 +550,7 @@ fn mult128bit_pow10(m: u64, e2: int, q: int) (resM: u64, resE: int, exact: bool)
 		// This never happens due to the range of f32/f64 exponent
 		panic("mult128bit_pow10: power of 10 is out of range")
 	}
-	pow: = detailed_pows_of_ten[q-detailed_pows_of_ten_min_exp10]
+	let pow = detailed_pows_of_ten[q-detailed_pows_of_ten_min_exp10]
 	if q < 0 {
 		// Inverse powers of ten must be rounded up.
 		pow[0] += 1
@@ -553,9 +558,9 @@ fn mult128bit_pow10(m: u64, e2: int, q: int) (resM: u64, resE: int, exact: bool)
 	e2 += mul_by_log10_log2(q) - 127 + 119
 
 	// long multiplication
-	l1:, l0: = std::math::bits::mul64(m, pow[0])
-	h1:, h0: = std::math::bits::mul64(m, pow[1])
-	mid:, carry: = std::math::bits::add64(l1, h0, 0)
+	let (l1, l0) = std::math::bits::mul64(m, pow[0])
+	let (h1, h0) = std::math::bits::mul64(m, pow[1])
+	let (mid, carry) = std::math::bits::add64(l1, h0, 0)
 	h1 += carry
 	ret h1<<9 | mid>>55, e2, mid<<9 == 0 && l0 == 0
 }
@@ -564,7 +569,7 @@ fn divisible_by_pow5(m: u64, k: int) bool {
 	if m == 0 {
 		ret true
 	}
-	for i: = 0; i < k; i++ {
+	for let i = 0; i < k; i++ {
 		if m%5 != 0 {
 			ret false
 		}
@@ -581,7 +586,7 @@ fn divmod1e9(x: u64) (u32, u32) {
 		ret u32(x / 1e9), u32(x % 1e9)
 	}
 	// Use the same sequence of operations as the amd64 compiler.
-	hi:, _ = std::math::bits::mul64(x>>1, 0x89705f4136b4a598) // binary digits of 1e-9
-	q: = hi >> 28
+	let (hi, _) = std::math::bits::mul64(x>>1, 0x89705f4136b4a598) // binary digits of 1e-9
+	let q = hi >> 28
 	ret u32(q), u32(x - q*1e9)
 }

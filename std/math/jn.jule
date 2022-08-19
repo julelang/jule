@@ -50,8 +50,8 @@
 //  jn(n, ±inf) = 0
 //  jn(n, nan) = nan
 pub fn jn(n: int, x: f64) f64 {
-	const TWO_M29: = 1.0 / (1 << 29)    // 2**-29 0x3e10000000000000
-	const TWO302:  = 0x52D0000000000000 //1 << 302 // 2**302 0x52D0000000000000
+	const TWO_M29 = 1.0 / (1 << 29)    // 2**-29 0x3e10000000000000
+	const TWO302  = 0x52D0000000000000 //1 << 302 // 2**302 0x52D0000000000000
 	// special cases
 	match {
 	case isnan(x):
@@ -74,18 +74,17 @@ pub fn jn(n: int, x: f64) f64 {
 	if n == 1 {
 		ret j1(x)
 	}
-	sign: = false
+	let sign = false
 	if x < 0 {
 		x = -x
 		if n&1 == 1 {
 			sign = true // odd n and negative x
 		}
 	}
-	b: f64
+	let b: f64
 	if f64(n) <= x {
 		// Safe to use J(n+1,x)=2n/x *J(n,x)-J(n-1,x)
 		if x >= TWO302 { // x > 2**302
-
 			// (x >> n**2)
 			//          Jn(x) = cos(x-(2n+1)*pi/4)*sqrt(2/x*pi)
 			//          Yn(x) = sin(x-(2n+1)*pi/4)*sqrt(2/x*pi)
@@ -99,8 +98,8 @@ pub fn jn(n: int, x: f64) f64 {
 			//                 2    -s+c            -c-s
 			//                 3     s+c             c-s
 
-			temp: f64
-			s:, c: = sincos(x)
+			let temp: f64
+			let (s, c) = sincos(x)
 			match n & 3 {
 			case 0:
 				temp = c + s
@@ -114,7 +113,7 @@ pub fn jn(n: int, x: f64) f64 {
 			b = (1 / SQRT_PI) * temp / sqrt(x)
 		} else {
 			b = j1(x)
-			i:, a: = 1, j0(x)
+			let (i, a) = 1, j0(x)
 			for ; i < n; i++ {
 				a, b = b, b*(f64(i+i)/x)-a // avoid underflow
 			}
@@ -127,10 +126,10 @@ pub fn jn(n: int, x: f64) f64 {
 			if n > 33 { // underflow
 				b = 0
 			} else {
-				temp: = x * 0.5
+				let temp = x * 0.5
 				b = temp
-				a: = 1.0
-				for i: = 2; i <= n; i++ {
+				let a = 1.0
+				for let i = 2; i <= n; i++ {
 					a *= f64(i) // a = n!
 					b *= temp   // b = (x/2)**n
 				}
@@ -166,23 +165,23 @@ pub fn jn(n: int, x: f64) f64 {
 			// When Q(k) > 1e17	good for quadruple
 
 			// determine k
-			w: = f64(n+n) / x
-			h: = 2 / x
-			q0: = w
-			z: = w + h
-			q1: = w*z - 1
-			k: = 1
+			let w = f64(n+n) / x
+			let h = 2 / x
+			let q0 = w
+			let z = w + h
+			let q1 = w*z - 1
+			let k = 1
 			for q1 < 1e9 {
 				k++
 				z += h
 				q0, q1 = q1, z*q1-q0
 			}
-			m: = n + n
-			t: = 0.0
-			for i: = 2 * (n + k); i >= m; i -= 2 {
+			let m = n + n
+			let t = 0.0
+			for let i = 2 * (n + k); i >= m; i -= 2 {
 				t = 1 / (f64(i)/x - t)
 			}
-			a: = t
+			let a = t
 			b = 1
 			//  estimate log((2/x)**n*n!) = n*log(2/x)+n*ln(n)
 			//  Hence, if n*(log(2n/x)) > ...
@@ -192,17 +191,17 @@ pub fn jn(n: int, x: f64) f64 {
 			//  then recurrent value may overflow and the result is
 			//  likely underflow to zero
 
-			tmp: = f64(n)
-			v: = 2 / x
+			let tmp = f64(n)
+			let v = 2 / x
 			tmp = tmp * log(abs(v*tmp))
 			if tmp < 7.09782712893383973096e+02 {
-				for i: = n - 1; i > 0; i-- {
-					di: = f64(i + i)
+				for let i = n - 1; i > 0; i-- {
+					let di = f64(i + i)
 					a, b = b, b*di/x-a
 				}
 			} else {
-				for i: = n - 1; i > 0; i-- {
-					di: = f64(i + i)
+				for let i = n - 1; i > 0; i-- {
+					let di = f64(i + i)
 					a, b = b, b*di/x-a
 					// scale b to avoid spurious overflow
 					if b > 1e100 {
@@ -231,7 +230,7 @@ pub fn jn(n: int, x: f64) f64 {
 //  yn(n, x < 0) = nan
 //  yn(n, nan) = nan
 pub fn yn(n: int, x: f64) f64 {
-	const TWO302: = 0x52D0000000000000 // 1 << 302 // 2**302 0x52D0000000000000
+	const TWO302 = 0x52D0000000000000 // 1 << 302 // 2**302 0x52D0000000000000
 	// special cases
 	match {
 	case x < 0 || isnan(x):
@@ -249,7 +248,7 @@ pub fn yn(n: int, x: f64) f64 {
 		}
 		ret inf(-1)
 	}
-	sign: = false
+	let sign = false
 	if n < 0 {
 		n = -n
 		if n&1 == 1 {
@@ -262,7 +261,7 @@ pub fn yn(n: int, x: f64) f64 {
 		}
 		ret y1(x)
 	}
-	b: f64
+	let b: f64
 	if x >= TWO302 { // x > 2**302
 		// (x >> n**2)
 		//	    Jn(x) = cos(x-(2n+1)*pi/4)*sqrt(2/x*pi)
@@ -277,8 +276,8 @@ pub fn yn(n: int, x: f64) f64 {
 		//		   2	-s+c		-c-s
 		//		   3	 s+c		 c-s
 
-		temp: f64
-		s:, c: = sincos(x)
+		let temp: f64
+		let (s, c) = sincos(x)
 		match n & 3 {
 		case 0:
 			temp = s - c
@@ -291,10 +290,10 @@ pub fn yn(n: int, x: f64) f64 {
 		}
 		b = (1 / SQRT_PI) * temp / sqrt(x)
 	} else {
-		a: = y0(x)
+		let a = y0(x)
 		b = y1(x)
 		// quit if b is -inf
-		for i: = 1; i < n && !isinf(b, -1); i++ {
+		for let i = 1; i < n && !isinf(b, -1); i++ {
 			a, b = b, (f64(i+i)/x)*b-a
 		}
 	}

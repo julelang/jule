@@ -96,8 +96,6 @@ var Errors = map[string]string{
 	`more_args_with_variadiced`:                `variadic argument can't use with more argument`,
 	`type_notsupports_casting`:                 `%s data-type not supports casting`,
 	`type_notsupports_casting_to`:              `%s data-type not supports casting to %s data-type`,
-	`notallow_declares`:                        `declare not allowed`,
-	`notallow_multiple_assign`:                 `multiple assignments not allowed`,
 	`attribute_not_supports`:                   `attribute is not supports by define`,
 	`generics_not_supports`:                    `generics is not supports by define`,
 	`use_at_content`:                           `use declaration must be start of source code`,

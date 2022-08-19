@@ -14,13 +14,13 @@ pub fn floor(x: f64) f64 {
 		ret x
 	}
 	if x < 0 {
-		d:, fract: = modf(-x)
+		let (d, fract) = modf(-x)
 		if fract != 0.0 {
 			d = d + 1
 		}
 		ret -d
 	}
-	d:, _ = modf(x)
+	let (d, _) = modf(x)
 	ret d
 }
 
@@ -47,7 +47,7 @@ pub fn trunc(x: f64) f64 {
 	if x == 0 || isnan(x) || isinf(x, 0) {
 		ret x
 	}
-	d:, _ = modf(x)
+	let (d, _) = modf(x)
 	ret d
 }
 
@@ -68,8 +68,8 @@ pub fn round(x: f64) f64 {
 	//   }
 	//   ret t
 	// }
-	bits: = f64_bits(x)
-	e: = uint(bits>>SHIFT) & MASK
+	let bits = f64_bits(x)
+	let e = uint(bits>>SHIFT) & MASK
 	if e < BIAS {
 		// Round abs(x) < 1 including denormals.
 		bits &= SIGN_MASK // +-0
@@ -81,7 +81,7 @@ pub fn round(x: f64) f64 {
 		//
 		// Numbers with larger exponents are returned unchanged since they
 		// must be either an integer, infinity, or NaN.
-		const HALF: = 1 << (SHIFT - 1)
+		const HALF = 1 << (SHIFT - 1)
 		e -= BIAS
 		bits += HALF >> e
 		bits &= ^(FRAC_MASK >> e)
@@ -108,14 +108,14 @@ pub fn round_even(x: f64) f64 {
 	//   }
 	//   ret t
 	// }
-	bits: = f64_bits(x)
-	e: = uint(bits>>SHIFT) & MASK
+	let bits = f64_bits(x)
+	let e = uint(bits>>SHIFT) & MASK
 	if e >= BIAS {
 		// Round abs(x) >= 1.
 		// - Large numbers without fractional components, infinity, and NaN are unchanged.
 		// - Add 0.499.. or 0.5 before truncating depending on whether the truncated
 		//   number is even or odd (respectively).
-		const half_minus_ULP: = (1 << (SHIFT - 1)) - 1
+		const half_minus_ULP = (1 << (SHIFT - 1)) - 1
 		e -= BIAS
 		bits += (half_minus_ULP + (bits>>(SHIFT-e))&1) >> e
 		bits &= ^(FRAC_MASK >> e)

@@ -41,4 +41,5 @@ const (
 	Cpp          uint8 = 36
 	Fallthrough  uint8 = 37
 	Fn           uint8 = 38
+	Let          uint8 = 39
 )

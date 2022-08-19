@@ -70,9 +70,7 @@ func (b *Builder) buildNode(toks Toks) {
 		s := models.Statement{Tok: tok}
 		s.Data = b.Func(toks, false, false)
 		b.Tree = append(b.Tree, models.Object{Tok: s.Tok, Data: s})
-	case tokens.Id:
-		b.Id(toks)
-	case tokens.Const:
+	case tokens.Const, tokens.Let:
 		b.GlobalVar(toks)
 	case tokens.Type:
 		b.Tree = append(b.Tree, b.TypeOrGenerics(toks))
@@ -330,21 +328,6 @@ func (b *Builder) directiveEnofi(d *models.Directive, toks Toks) bool {
 	}
 	d.Command = models.DirectiveEnofi{}
 	return true
-}
-
-// Id builds AST model of global id statement.
-func (b *Builder) Id(toks Toks) {
-	if len(toks) == 1 {
-		b.pusherr(toks[0], "invalid_syntax")
-		return
-	}
-	tok := toks[1]
-	switch tok.Id {
-	case tokens.Colon:
-		b.GlobalVar(toks)
-		return
-	}
-	b.pusherr(tok, "invalid_syntax")
 }
 
 func (b *Builder) structFields(toks Toks) []*models.Var {
@@ -1133,6 +1116,7 @@ func (b *Builder) datatype(t *models.DataType, toks Toks, i *int, arrays, err bo
 				b.pusherr(tok, "invalid_type")
 				return false
 			}
+			*i--
 			t.Tag = &f
 			dtv.WriteString(f.DataTypeString())
 			ok = true
@@ -1382,7 +1366,7 @@ func (b *Builder) Block(toks Toks) (block *models.Block) {
 
 // Statement builds AST model of statement.
 func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
-	s, ok := b.AssignStatement(bs.toks, false)
+	s, ok := b.AssignStatement(bs.toks)
 	if ok {
 		return s
 	}
@@ -1393,7 +1377,7 @@ func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
 		if ok {
 			return s
 		}
-	case tokens.Const:
+	case tokens.Const, tokens.Let:
 		return b.VarStatement(bs.toks)
 	case tokens.Ret:
 		return b.RetStatement(bs.toks)
@@ -1489,99 +1473,41 @@ func (b *Builder) assignInfo(toks Toks) (info AssignInfo) {
 	return
 }
 
-func (b *Builder) pushAssignLeft(lefts *[]models.AssignLeft, last, current int, info AssignInfo) {
-	var left models.AssignLeft
-	left.Expr.Toks = info.Left[last:current]
-	if last-current == 0 {
-		b.pusherr(info.Left[current-1], "missing_expr")
-		return
+func (b *Builder) buildAssignLeft(toks Toks) (left models.AssignLeft) {
+	left.Expr.Toks = toks
+	if left.Expr.Toks[0].Id == tokens.Id {
+		left.Var.Token = left.Expr.Toks[0]
+		left.Var.Id = left.Var.Token.Kind
 	}
-	// Variable is new?
-	if left.Expr.Toks[0].Id == tokens.Id &&
-		current-last > 1 &&
-		left.Expr.Toks[1].Id == tokens.Colon {
-		left.Var = b.Var(left.Expr.Toks, false)
-		left.Var.New = true
-		left.Var.SetterTok = info.Setter
-		if info.IsExpr {
-			b.pusherr(left.Expr.Toks[0], "notallow_declares")
-		}
-	} else {
-		if left.Expr.Toks[0].Id == tokens.Id {
-			left.Var.Token = left.Expr.Toks[0]
-			left.Var.Id = left.Var.Token.Kind
-		}
-		left.Expr = b.Expr(left.Expr.Toks)
-	}
-	*lefts = append(*lefts, left)
+	left.Expr = b.Expr(left.Expr.Toks)
+	return
 }
 
-func (b *Builder) assignLefts(info AssignInfo) []models.AssignLeft {
+func (b *Builder) assignLefts(parts []Toks) []models.AssignLeft {
 	var lefts []models.AssignLeft
-	braceCount := 0
-	lastIndex := 0
-	for i, tok := range info.Left {
-		if tok.Id == tokens.Brace {
-			switch tok.Kind {
-			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
-				braceCount++
-			default:
-				braceCount--
-			}
-		}
-		if braceCount > 0 {
-			continue
-		} else if tok.Id != tokens.Comma {
-			continue
-		}
-		b.pushAssignLeft(&lefts, lastIndex, i, info)
-		lastIndex = i + 1
-	}
-	if lastIndex < len(info.Left) {
-		b.pushAssignLeft(&lefts, lastIndex, len(info.Left), info)
+	for _, part := range parts {
+		left := b.buildAssignLeft(part)
+		lefts = append(lefts, left)
 	}
 	return lefts
 }
 
-func (b *Builder) pushAssignExpr(exps *[]models.Expr, last, current int, info AssignInfo) {
-	toks := info.Right[last:current]
-	if toks == nil {
-		b.pusherr(info.Right[current-1], "missing_expr")
-		return
+func (b *Builder) assignExprs(toks Toks) []models.Expr {
+	parts, errs := Parts(toks, tokens.Comma, true)
+	if len(errs) > 0 {
+		b.Errors = append(b.Errors, errs...)
+		return nil
 	}
-	*exps = append(*exps, b.Expr(toks))
-}
-
-func (b *Builder) assignExprs(info AssignInfo) []models.Expr {
-	var exprs []models.Expr
-	braceCount := 0
-	lastIndex := 0
-	for i, tok := range info.Right {
-		if tok.Id == tokens.Brace {
-			switch tok.Kind {
-			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
-				braceCount++
-			default:
-				braceCount--
-			}
-		}
-		if braceCount > 0 {
-			continue
-		} else if tok.Id != tokens.Comma {
-			continue
-		}
-		b.pushAssignExpr(&exprs, lastIndex, i, info)
-		lastIndex = i + 1
-	}
-	if lastIndex < len(info.Right) {
-		b.pushAssignExpr(&exprs, lastIndex, len(info.Right), info)
+	exprs := make([]models.Expr, len(parts))
+	for i, part := range parts {
+		exprs[i] = b.Expr(part)
 	}
 	return exprs
 }
 
 // AssignStatement builds AST model of assignment statement.
-func (b *Builder) AssignStatement(toks Toks, isExpr bool) (s models.Statement, _ bool) {
-	assign, ok := b.AssignExpr(toks, isExpr)
+func (b *Builder) AssignStatement(toks Toks) (s models.Statement, _ bool) {
+	assign, ok := b.AssignExpr(toks)
 	if !ok {
 		return
 	}
@@ -1591,24 +1517,71 @@ func (b *Builder) AssignStatement(toks Toks, isExpr bool) (s models.Statement, _
 }
 
 // AssignExpr builds AST model of assignment expression.
-func (b *Builder) AssignExpr(toks Toks, isExpr bool) (assign models.Assign, ok bool) {
+func (b *Builder) AssignExpr(toks Toks) (assign models.Assign, ok bool) {
 	if !CheckAssignToks(toks) {
 		return
 	}
+	switch toks[0].Id {
+	case tokens.Let:
+		return b.letDeclAssign(toks)
+	default:
+		return b.plainAssign(toks)
+	}
+}
+
+func (b *Builder) letDeclAssign(toks Toks) (assign models.Assign, ok bool) {
+	if len(toks) < 1 {
+		return
+	}
+	// Skip "let" keyword
+	toks = toks[1:]
+	tok := toks[0]
+	if tok.Id != tokens.Brace || tok.Kind != tokens.LPARENTHESES {
+		return
+	}
+	ok = true
+	var i int
+	rang := Range(&i, tokens.LPARENTHESES, tokens.RPARENTHESES, toks)
+	if rang == nil {
+		b.pusherr(tok, "invalid_syntax")
+		return
+	} else if i+1 < len(toks) {
+		assign.Setter = toks[i]
+		i++
+		assign.Right = b.assignExprs(toks[i:])
+	}
+	parts, errs := Parts(rang, tokens.Comma, true)
+	if len(errs) > 0 {
+		b.Errors = append(b.Errors, errs...)
+		return
+	}
+	for _, part := range parts {
+		if len(part) > 1 {
+			b.pusherr(part[1], "invalid_syntax")
+		}
+		left := b.buildAssignLeft(part)
+		left.Var.New = !juleapi.IsIgnoreId(left.Var.Id)
+		left.Var.SetterTok = assign.Setter
+		assign.Left = append(assign.Left, left)
+	}
+	return
+}
+
+func (b *Builder) plainAssign(toks Toks) (assign models.Assign, ok bool) {
 	info := b.assignInfo(toks)
 	if !info.Ok {
 		return
 	}
 	ok = true
-	info.IsExpr = isExpr
-	assign.IsExpr = isExpr
 	assign.Setter = info.Setter
-	assign.Left = b.assignLefts(info)
-	if isExpr && len(assign.Left) > 1 {
-		b.pusherr(assign.Setter, "notallow_multiple_assign")
+	parts, errs := Parts(info.Left, tokens.Comma, true)
+	if len(errs) > 0 {
+		b.Errors = append(b.Errors, errs...)
+		return
 	}
+	assign.Left = b.assignLefts(parts)
 	if info.Right != nil {
-		assign.Right = b.assignExprs(info)
+		assign.Right = b.assignExprs(info.Right)
 	}
 	return
 }
@@ -1702,6 +1675,15 @@ func (b *Builder) pushArg(args *models.Args, targeting bool, toks Toks, err Tok)
 }
 
 func (b *Builder) varBegin(v *models.Var, i *int, toks Toks) {
+	tok := toks[*i]
+	if toks[*i].Id == tokens.Let {
+		// Initialize 1 for skip the let keyword
+		*i++
+		if *i >= len(toks) {
+			b.pusherr(tok, "invalid_syntax")
+		}
+		return
+	}
 	for ; *i < len(toks); *i++ {
 		tok := toks[*i]
 		if tok.Id == tokens.Id {
@@ -1722,14 +1704,22 @@ func (b *Builder) varBegin(v *models.Var, i *int, toks Toks) {
 
 func (b *Builder) varTypeNExpr(v *models.Var, toks Toks, i int) {
 	tok := toks[i]
-	t, ok := b.DataType(toks, &i, true, false)
-	if ok {
-		v.Type = t
-		i++
-		if i >= len(toks) {
+	if tok.Id == tokens.Colon {
+		i++ // Skip type annotation operator (:)
+		if i >= len(toks) ||
+			(toks[i].Id == tokens.Operator && toks[i].Kind == tokens.EQUAL) {
+			b.pusherr(tok, "missing_type")
 			return
 		}
-		tok = toks[i]
+		t, ok := b.DataType(toks, &i, true, false)
+		if ok {
+			v.Type = t
+			i++
+			if i >= len(toks) {
+				return
+			}
+			tok = toks[i]
+		}
 	}
 	if tok.Id == tokens.Operator {
 		if tok.Kind != tokens.EQUAL {
@@ -1763,18 +1753,12 @@ func (b *Builder) Var(toks Toks, begin bool) (v models.Var) {
 	v.Token = toks[i]
 	if v.Token.Id != tokens.Id {
 		b.pusherr(v.Token, "invalid_syntax")
+		return
 	}
 	v.Id = v.Token.Kind
 	v.Type.Id = juletype.Void
 	v.Type.Kind = juletype.TypeMap[v.Type.Id]
-	// Skip type definer operator(':')
-	i++
 	if i >= len(toks) {
-		b.pusherr(toks[i-1], "invalid_syntax")
-		return
-	}
-	if toks[i].Id != tokens.Colon {
-		b.pusherr(toks[i], "invalid_syntax")
 		return
 	}
 	i++
@@ -1787,19 +1771,14 @@ func (b *Builder) Var(toks Toks, begin bool) (v models.Var) {
 // VarStatement builds AST model of variable declaration statement.
 func (b *Builder) VarStatement(toks Toks) models.Statement {
 	vast := b.Var(toks, true)
-	return models.Statement{
-		Tok:  vast.Token,
-		Data: vast,
-	}
+	return models.Statement{Tok: vast.Token, Data: vast}
 }
 
 // CommentStatement builds AST model of comment statement.
 func (b *Builder) CommentStatement(tok Tok) (s models.Statement) {
 	s.Tok = tok
 	tok.Kind = strings.TrimSpace(tok.Kind[2:])
-	s.Data = models.Comment{
-		Content: tok.Kind,
-	}
+	s.Data = models.Comment{Content: tok.Kind}
 	return
 }
 
@@ -1986,7 +1965,7 @@ func (b *Builder) getIterProfile(toks Toks, errtok Tok) models.IterProfile {
 func (b *Builder) forStatement(toks Toks) models.Statement {
 	s := b.Statement(&blockStatement{toks: toks})
 	switch s.Data.(type) {
-	case models.ExprStatement, models.Assign:
+	case models.ExprStatement, models.Assign, models.Var:
 	default:
 		b.pusherr(toks[0], "invalid_syntax")
 	}

@@ -574,6 +574,7 @@ var keywords = map[string]uint8{
 	tokens.CPP:         tokens.Cpp,
 	tokens.FALLTHROUGH: tokens.Fallthrough,
 	tokens.FN:          tokens.Fn,
+	tokens.LET:         tokens.Let,
 }
 
 type oppair struct {
