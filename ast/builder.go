@@ -61,11 +61,6 @@ func (b *Builder) buildNode(toks Toks) {
 	switch tok.Id {
 	case tokens.Use:
 		b.Use(toks)
-	case tokens.At:
-		b.Tree = append(b.Tree, models.Object{
-			Tok:  tok,
-			Data: b.Attribute(toks),
-		})
 	case tokens.Fn:
 		s := models.Statement{Tok: tok}
 		s.Data = b.Func(toks, false, false)
@@ -265,8 +260,11 @@ func (b *Builder) Enum(toks Toks) {
 func (b *Builder) Comment(tok Tok) models.Object {
 	tok.Kind = strings.TrimSpace(tok.Kind[2:])
 	return models.Object{
-		Tok:  tok,
-		Data: models.Comment{Content: tok.Kind},
+		Tok: tok,
+		Data: models.Comment{
+			Token:   tok,
+			Content: tok.Kind,
+		},
 	}
 }
 
@@ -434,12 +432,6 @@ func (b *Builder) implTraitFuncs(impl *models.Impl, toks Toks) {
 		case tokens.Comment:
 			impl.Tree = append(impl.Tree, b.Comment(tok))
 			continue
-		case tokens.At:
-			impl.Tree = append(impl.Tree, models.Object{
-				Tok:  tok,
-				Data: b.Attribute(fnToks),
-			})
-			continue
 		case tokens.Fn:
 			if len(fnToks) > 1 {
 				tok = fnToks[1]
@@ -479,12 +471,6 @@ func (b *Builder) implStruct(impl *models.Impl, toks Toks) {
 		switch tok.Id {
 		case tokens.Comment:
 			impl.Tree = append(impl.Tree, b.Comment(tok))
-			continue
-		case tokens.At:
-			impl.Tree = append(impl.Tree, models.Object{
-				Tok:  tok,
-				Data: b.Attribute(fnToks),
-			})
 			continue
 		case tokens.Type:
 			impl.Tree = append(impl.Tree, models.Object{
@@ -760,10 +746,10 @@ func (b *Builder) buildUseDecl(use *models.Use, toks Toks) {
 // Attribute builds AST model of attribute.
 func (b *Builder) Attribute(toks Toks) (a models.Attribute) {
 	i := 0
-	a.Tok = toks[i]
+	a.Token = toks[i]
 	i++
 	tag := toks[i]
-	if tag.Id != tokens.Id || a.Tok.Column+1 != tag.Column {
+	if tag.Id != tokens.Id || a.Token.Column+1 != tag.Column {
 		b.pusherr(tag, "invalid_syntax")
 		return
 	}
@@ -771,7 +757,7 @@ func (b *Builder) Attribute(toks Toks) (a models.Attribute) {
 	toks = toks[i+1:]
 	if len(toks) > 0 {
 		tok := toks[0]
-		if a.Tok.Column+len(a.Tag)+1 == tok.Column {
+		if a.Token.Column+len(a.Tag)+1 == tok.Column {
 			b.pusherr(tok, "invalid_syntax")
 		}
 		b.Toks = append(toks, b.Toks...)

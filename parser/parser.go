@@ -32,7 +32,6 @@ type DataType = models.DataType
 type Expr = models.Expr
 type Tok = ast.Tok
 type Toks = ast.Toks
-type Attribute = models.Attribute
 type Enum = models.Enum
 type Struct = models.Struct
 type GenericType = models.GenericType
@@ -47,7 +46,7 @@ type waitingGlobal struct {
 
 // Parser is parser of Jule code.
 type Parser struct {
-	attributes     []Attribute
+	attributes     []models.Attribute
 	docText        strings.Builder
 	isNowIntoIter  bool
 	currentCase    *models.Case
@@ -582,9 +581,9 @@ func (p *Parser) parseUses(tree *[]models.Object) (err bool) {
 			// || operator used for ignore compiling of other packages
 			// if already have errors
 			err = err || p.use(&t)
+			(*tree)[i].Data = nil
 		case models.Comment: // Ignore beginning comments.
 		default:
-			*tree = (*tree)[i:]
 			return
 		}
 	}
@@ -592,10 +591,15 @@ func (p *Parser) parseUses(tree *[]models.Object) (err bool) {
 	return
 }
 
+func objectIsIgnored(obj *models.Object) bool {
+	return obj.Data == nil
+}
+
 func (p *Parser) parseSrcTreeObj(obj models.Object) {
+	if objectIsIgnored(&obj) {
+		return
+	}
 	switch t := obj.Data.(type) {
-	case Attribute:
-		p.PushAttribute(t)
 	case models.Statement:
 		p.Statement(t)
 	case Type:
@@ -741,7 +745,7 @@ func (p *Parser) checkDoc(obj models.Object) {
 		return
 	}
 	switch obj.Data.(type) {
-	case models.Comment, Attribute, []GenericType:
+	case models.Comment, models.Attribute, []GenericType:
 		return
 	}
 	p.pushwarntok(obj.Tok, "doc_ignored")
@@ -753,7 +757,7 @@ func (p *Parser) checkAttribute(obj models.Object) {
 		return
 	}
 	switch obj.Data.(type) {
-	case Attribute, models.Comment, []GenericType:
+	case models.Attribute, models.Comment, []GenericType:
 		return
 	}
 	p.pusherrtok(obj.Tok, "attribute_not_supports")
@@ -765,7 +769,7 @@ func (p *Parser) checkGenerics(obj models.Object) {
 		return
 	}
 	switch obj.Data.(type) {
-	case Attribute, models.Comment, []GenericType:
+	case models.Attribute, models.Comment, []GenericType:
 		return
 	}
 	p.pusherrtok(obj.Tok, "generics_not_supports")
@@ -951,7 +955,7 @@ func (p *Parser) checkCppLinkAttributes(f *Func) {
 		switch attribute.Tag {
 		case jule.Attribute_CDef:
 		default:
-			p.pusherrtok(attribute.Tok, "invalid_attribute")
+			p.pusherrtok(attribute.Token, "invalid_attribute")
 		}
 	}
 }
@@ -1043,8 +1047,6 @@ func (p *Parser) implTrait(impl models.Impl) {
 	}
 	for _, obj := range impl.Tree {
 		switch t := obj.Data.(type) {
-		case models.Attribute:
-			p.PushAttribute(t)
 		case models.Comment:
 			p.Comment(t)
 		case *Func:
@@ -1083,8 +1085,6 @@ func (p *Parser) implStruct(impl models.Impl) {
 	}
 	for _, obj := range impl.Tree {
 		switch t := obj.Data.(type) {
-		case models.Attribute:
-			p.PushAttribute(t)
 		case []GenericType:
 			p.Generics(t)
 		case models.Comment:
@@ -1149,8 +1149,12 @@ func (p *Parser) pushNs(ns *models.Namespace) *namespace {
 // Comment parses Jule documentation comments line.
 func (p *Parser) Comment(c models.Comment) {
 	c.Content = strings.TrimSpace(c.Content)
+	if strings.HasPrefix(c.Content, jule.AttributeCommentPrefix) {
+		p.PushAttribute(c)
+		return
+	}
 	if p.docText.Len() == 0 {
-		if strings.HasPrefix(c.Content, jule.DocPrefix) {
+		if strings.HasPrefix(c.Content, jule.DocCommentPrefix) {
 			c.Content = c.Content[4:]
 			if c.Content == "" {
 				c.Content = " "
@@ -1164,25 +1168,29 @@ write:
 	p.docText.WriteString(c.Content)
 }
 
-// PushAttribute processes and appends to attribute list.
-func (p *Parser) PushAttribute(attribute Attribute) {
+// PushAttribute process and appends to attribute list.
+func (p *Parser) PushAttribute(c models.Comment) {
+	var attr models.Attribute
+	// Skip attribute prefix
+	attr.Tag = c.Content[len(jule.AttributeCommentPrefix):]
+	attr.Token = c.Token
 	ok := false
 	for _, kind := range jule.Attributes {
-		if attribute.Tag == kind {
+		if attr.Tag == kind {
 			ok = true
 			break
 		}
 	}
 	if !ok {
-		p.pusherrtok(attribute.Tok, "undefined_attribute")
+		p.pusherrtok(attr.Token, "undefined_attribute")
 	}
-	for _, attr := range p.attributes {
-		if attr.Tag == attribute.Tag {
-			p.pusherrtok(attribute.Tok, "attribute_repeat")
+	for _, attr2 := range p.attributes {
+		if attr.Tag == attr2.Tag {
+			p.pusherrtok(attr.Token, "attribute_repeat")
 			return
 		}
 	}
-	p.attributes = append(p.attributes, attribute)
+	p.attributes = append(p.attributes, attr)
 }
 
 func genericsToCpp(generics []*GenericType) string {
@@ -1470,7 +1478,7 @@ func (p *Parser) checkFuncAttributes(f *function) {
 		case jule.Attribute_TypeArg:
 			p.checkTypeParam(f)
 		default:
-			p.pusherrtok(attribute.Tok, "invalid_attribute")
+			p.pusherrtok(attribute.Token, "invalid_attribute")
 		}
 	}
 }

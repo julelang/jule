@@ -7,7 +7,6 @@ const (
 	COLON               = ":"
 	SEMICOLON           = ";"
 	COMMA               = ","
-	AT                  = "@"
 	TRIPLE_DOT          = "..."
 	DOT                 = "."
 	PLUS_EQUAL          = "+="

@@ -371,8 +371,8 @@ var Builtin = &Defmap{
 			Id:       "new",
 			Owner:    genericFile,
 			Generics: []*GenericType{{Id: "T"}},
-			Attributes: []Attribute{
-				models.Attribute{Tag: jule.Attribute_TypeArg},
+			Attributes: []models.Attribute{
+				{Tag: jule.Attribute_TypeArg},
 			},
 			RetType: RetType{Type: DataType{Id: juletype.Id, Kind: tokens.STAR + "T"}},
 		}},

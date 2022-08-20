@@ -2,7 +2,7 @@ package jule
 
 import "github.com/jule-lang/jule/pkg/juleset"
 
-// X constants.
+// Jule constants.
 const (
 	Version       = `@developer_beta 0.0.1`
 	SrcExt        = `.jule`
@@ -16,7 +16,9 @@ const (
 
 	Anonymous = "<anonymous>"
 
-	DocPrefix = "doc:"
+	CommentPragmaSeparator = ":"
+	DocCommentPrefix       = "doc" + CommentPragmaSeparator
+	AttributeCommentPrefix = "jule" + CommentPragmaSeparator
 
 	PlatformWindows = "windows"
 	PlatformLinux   = "linux"

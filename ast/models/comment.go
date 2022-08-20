@@ -3,7 +3,10 @@ package models
 import "strings"
 
 // Comment is the AST model of just comment lines.
-type Comment struct{ Content string }
+type Comment struct {
+	Token   Tok
+	Content string
+}
 
 func (c Comment) String() string {
 	var cpp strings.Builder
