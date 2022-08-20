@@ -75,7 +75,7 @@ var Errors = map[string]string{
 	`rune_overflow`:                            `rune is should be single`,
 	`not_supports_indexing`:                    `%s data type is not support indexing`,
 	`not_supports_slicing`:                     `%s data type is not support slicing`,
-	`undefined_attribute`:                      `undefined attribute`,
+	`undefined_pragma`:                         `undefined pragma comment`,
 	`attribute_repeat`:                         `this attribute is already given`,
 	`already_constant`:                         `this define is already constant`,
 	`already_variadic`:                         `this define is already variadic`,

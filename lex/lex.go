@@ -706,7 +706,6 @@ func (l *Lex) Tok() Tok {
 	case l.isop(txt, tokens.RBRACKET, tokens.Brace, &tok):
 		l.pushRangeClose(tok, tokens.LBRACKET)
 	case
-		l.firstTokOfLine && l.isop(txt, tokens.SHARP, tokens.Preprocessor, &tok),
 		l.lexBasicOps(txt, &tok),
 		l.lexKeywords(txt, &tok),
 		l.lexIdentifier(txt, &tok):

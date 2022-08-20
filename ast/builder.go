@@ -81,8 +81,6 @@ func (b *Builder) buildNode(toks Toks) {
 		b.CppLink(toks)
 	case tokens.Comment:
 		b.Tree = append(b.Tree, b.Comment(toks[0]))
-	case tokens.Preprocessor:
-		b.Preprocessor(toks)
 	default:
 		b.pusherr(tok, "invalid_syntax")
 		return
@@ -266,66 +264,6 @@ func (b *Builder) Comment(tok Tok) models.Object {
 			Content: tok.Kind,
 		},
 	}
-}
-
-// Preprocessor builds AST model of preprocessor directives.
-func (b *Builder) Preprocessor(toks Toks) {
-	if len(toks) == 1 {
-		b.pusherr(toks[0], "invalid_syntax")
-		return
-	}
-	var pp models.Preprocessor
-	toks = toks[1:] // Remove directive mark
-	tok := toks[0]
-	if tok.Id != tokens.Id {
-		b.pusherr(pp.Tok, "invalid_syntax")
-		return
-	}
-	ok := false
-	switch tok.Kind {
-	case jule.PreprocessorDirective:
-		ok = b.PreprocessorDirective(&pp, toks)
-	default:
-		b.pusherr(tok, "invalid_preprocessor")
-		return
-	}
-	if ok {
-		b.Tree = append(b.Tree, models.Object{Tok: pp.Tok, Data: pp})
-	}
-}
-
-// PreprocessorDirective builds AST model of preprocessor pragma directive.
-// Returns true if success, returns false if not.
-func (b *Builder) PreprocessorDirective(pp *models.Preprocessor, toks Toks) bool {
-	if len(toks) == 1 {
-		b.pusherr(toks[0], "missing_pragma_directive")
-		return false
-	}
-	toks = toks[1:] // Remove pragma identifier
-	tok := toks[0]
-	if tok.Id != tokens.Id {
-		b.pusherr(tok, "invalid_syntax")
-		return false
-	}
-	var d models.Directive
-	ok := false
-	switch tok.Kind {
-	case jule.PreprocessorDirectiveEnofi:
-		ok = b.directiveEnofi(&d, toks)
-	default:
-		b.pusherr(tok, "invalid_pragma_directive")
-	}
-	pp.Command = d
-	return ok
-}
-
-func (b *Builder) directiveEnofi(d *models.Directive, toks Toks) bool {
-	if len(toks) > 1 {
-		b.pusherr(toks[1], "invalid_syntax")
-		return false
-	}
-	d.Command = models.DirectiveEnofi{}
-	return true
 }
 
 func (b *Builder) structFields(toks Toks) []*models.Var {

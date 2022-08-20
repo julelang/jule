@@ -2,7 +2,6 @@ package tokens
 
 // Token kinds.
 const (
-	SHARP               = "#"
 	DOUBLE_COLON        = "::"
 	COLON               = ":"
 	SEMICOLON           = ";"

@@ -2,20 +2,22 @@ package preprocessor
 
 import (
 	"github.com/jule-lang/jule/ast/models"
+	"github.com/jule-lang/jule/pkg/jule"
 )
 
 // TrimEnofi trims tree by enofi pragma directive.
 func TrimEnofi(tree *Tree) {
 	for i, obj := range *tree {
 		switch t := obj.Data.(type) {
-		case models.Preprocessor:
-			switch t := t.Command.(type) {
-			case models.Directive:
-				switch t.Command.(type) {
-				case models.DirectiveEnofi:
-					*tree = (*tree)[:i]
-					return
-				}
+		case models.Comment:
+			if !IsPreprocessorPragma(t.Content) {
+				continue
+			}
+			directive := getDirective(t.Content)
+			switch directive {
+			case jule.PreprocessorDirectiveEnofi:
+				*tree = (*tree)[:i]
+				return
 			}
 		}
 	}

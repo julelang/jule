@@ -601,7 +601,6 @@ func (p *Parser) parseSrcTreeObj(obj models.Object) {
 		p.Comment(t)
 	case models.Use:
 		p.pusherrtok(obj.Tok, "use_at_content")
-	case models.Preprocessor:
 	default:
 		p.pusherrtok(obj.Tok, "invalid_syntax")
 	}
@@ -1125,8 +1124,10 @@ func (p *Parser) pushNs(ns *models.Namespace) *namespace {
 
 // Comment parses Jule documentation comments line.
 func (p *Parser) Comment(c models.Comment) {
-	c.Content = strings.TrimSpace(c.Content)
-	if strings.HasPrefix(c.Content, jule.AttributeCommentPrefix) {
+	switch {
+	case preprocessor.IsPreprocessorPragma(c.Content):
+		return
+	case strings.HasPrefix(c.Content, jule.PragmaCommentPrefix):
 		p.PushAttribute(c)
 		return
 	}
@@ -1140,7 +1141,7 @@ func (p *Parser) Comment(c models.Comment) {
 func (p *Parser) PushAttribute(c models.Comment) {
 	var attr models.Attribute
 	// Skip attribute prefix
-	attr.Tag = c.Content[len(jule.AttributeCommentPrefix):]
+	attr.Tag = c.Content[len(jule.PragmaCommentPrefix):]
 	attr.Token = c.Token
 	ok := false
 	for _, kind := range jule.Attributes {
@@ -1150,7 +1151,8 @@ func (p *Parser) PushAttribute(c models.Comment) {
 		}
 	}
 	if !ok {
-		p.pusherrtok(attr.Token, "undefined_attribute")
+		p.pusherrtok(attr.Token, "undefined_pragma")
+		return
 	}
 	for _, attr2 := range p.attributes {
 		if attr.Tag == attr2.Tag {
