@@ -8,11 +8,11 @@
 typedef u8_julet   JULEC_ID(byte); // builtin: type byte: u8
 typedef i32_julet  JULEC_ID(rune); // builtin: type rune: i32
 
-// Update here manually if changed output of the JULEC_ID
-#define _out(_EXPR) \
-    (std::cout << _EXPR)
-
 // Declarations
+template<typename _Obj_t>
+inline void JULEC_ID(out)(const _Obj_t _Obj) noexcept;
+template<typename _Obj_t>
+inline void JULEC_ID(outln)(const _Obj_t _Obj) noexcept;
 struct JULEC_ID(Error);
 template<typename _Item_t>
 int_julet JULEC_ID(copy)(const slice<_Item_t> &_Dest,
@@ -26,6 +26,10 @@ ptr<T> JULEC_ID(new)(void) noexcept;
 // Definitions
 
 /* Panic function defined at main header */
+
+template<typename _Obj_t>
+inline void JULEC_ID(out)(const _Obj_t _Obj) noexcept
+{ std::cout << _Obj; }
 
 template<typename _Obj_t>
 inline void JULEC_ID(outln)(const _Obj_t _Obj) noexcept {
