@@ -1442,7 +1442,6 @@ func (p *Parser) checkTypeParam(f *function) {
 func (p *Parser) checkFuncAttributes(f *function) {
 	for _, attribute := range f.Ast.Attributes {
 		switch attribute.Tag {
-		case jule.Attribute_Inline:
 		case jule.Attribute_TypeArg:
 			p.checkTypeParam(f)
 		default:

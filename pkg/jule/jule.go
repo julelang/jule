@@ -29,7 +29,6 @@ const (
 	ArchI386  = "i386"
 
 	// This attributes should be added to the attribute map.
-	Attribute_Inline  = "inline"
 	Attribute_TypeArg = "typearg"
 	Attribute_CDef    = "cdef"
 

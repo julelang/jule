@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/jule-lang/jule/ast/models"
-	"github.com/jule-lang/jule/pkg/jule"
 	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
@@ -62,6 +61,9 @@ func (f *function) declHead() string {
 		cpp.WriteByte('\n')
 		cpp.WriteString(models.IndentString())
 	}
+	if !f.isEntryPoint {
+		cpp.WriteString("inline ")
+	}
 	cpp.WriteString(attributesToString(f.Ast.Attributes))
 	cpp.WriteString(f.Ast.RetType.String())
 	cpp.WriteByte(' ')
@@ -93,7 +95,7 @@ func (f *function) PrototypeParams() string {
 }
 
 func isOutableAttribute(kind string) bool {
-	return kind == jule.Attribute_Inline
+	return false
 }
 
 func attributesToString(attributes []models.Attribute) string {
