@@ -2745,6 +2745,36 @@ func (p *Parser) checkLabelNGoto() {
 	p.checkLabels()
 }
 
+func matchHasRet(m *models.Match) (ok bool) {
+	if m.Default == nil {
+		return
+	}
+	ok = true
+	fall := false
+	for _, c := range m.Cases {
+		falled := fall
+		ok, fall = hasRet(c.Block)
+		if falled && !ok && !fall {
+			return false
+		}
+		switch {
+		case !ok:
+			if !fall {
+				return false
+			}
+			fallthrough
+		case fall:
+			if c.Next == nil {
+				return false
+			}
+			continue
+		}
+		fall = false
+	}
+	ok, _ = hasRet(m.Default.Block)
+	return ok
+}
+
 func hasRet(b *models.Block) (ok bool, fall bool) {
 	if b == nil {
 		return false, false
@@ -2756,37 +2786,9 @@ func hasRet(b *models.Block) (ok bool, fall bool) {
 		case models.Ret:
 			return true, fall
 		case models.Match:
-			if t.Default == nil {
-				break
+			if matchHasRet(&t) {
+				return true, false
 			}
-			ok := true
-			for _, c := range t.Cases {
-				falled := fall
-				ok, fall = hasRet(c.Block)
-				if falled && !ok && !fall {
-					return false, fall
-				}
-				switch {
-				case !ok:
-					if !fall {
-						return false, fall
-					}
-					fallthrough
-				case fall:
-					if c.Next == nil {
-						return false, fall
-					}
-					continue
-				}
-				fall = false
-			}
-			if !ok {
-				ok, fall = hasRet(t.Default.Block)
-			}
-			if !ok {
-				break
-			}
-			return true, fall
 		}
 	}
 	return false, fall
