@@ -164,33 +164,6 @@ func init() {
 	}
 }
 
-func loadLangWarns(path string, infos []fs.FileInfo) {
-	i := -1
-	for j, f := range infos {
-		if f.IsDir() || f.Name() != localizationWarnings {
-			continue
-		}
-		i = j
-		path = filepath.Join(path, f.Name())
-		break
-	}
-	if i == -1 {
-		return
-	}
-	bytes, err := ioutil.ReadFile(path)
-	if err != nil {
-		println("Language's warnings couldn't loaded (uses default);")
-		println(err.Error())
-		return
-	}
-	err = json.Unmarshal(bytes, &jule.Warnings)
-	if err != nil {
-		println("Language's warnings couldn't loaded (uses default);")
-		println(err.Error())
-		return
-	}
-}
-
 func loadLangErrs(path string, infos []fs.FileInfo) {
 	i := -1
 	for j, f := range infos {
@@ -230,7 +203,6 @@ func loadLang() {
 		println(err.Error())
 		return
 	}
-	loadLangWarns(path, infos)
 	loadLangErrs(path, infos)
 }
 

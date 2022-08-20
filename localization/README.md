@@ -30,12 +30,8 @@ If the language pack does not have any of these files, the default language elem
     <td><strong>Content</strong></td>
   </tr>
   <tr>
-    <td>errs.json</td>
+    <td>errors.json</td>
     <td>Error messages</td>
-  </tr>
-  <tr>
-    <td>warns.json</td>
-    <td>Warning messages</td>
   </tr>
 </table>
 

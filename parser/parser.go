@@ -99,17 +99,6 @@ func (p *Parser) pusherrmsgtok(tok Tok, msg string) {
 	})
 }
 
-// pushwarntok appends new warning by token.
-func (p *Parser) pushwarntok(tok Tok, key string, args ...any) {
-	p.Warnings = append(p.Warnings, julelog.CompilerLog{
-		Type:    julelog.Warning,
-		Row:     tok.Row,
-		Column:  tok.Column,
-		Path:    tok.File.Path(),
-		Message: jule.GetWarning(key, args...),
-	})
-}
-
 // pusherrs appends specified errors.
 func (p *Parser) pusherrs(errs ...julelog.CompilerLog) {
 	p.Errors = append(p.Errors, errs...)
@@ -125,14 +114,6 @@ func (p *Parser) pusherrmsg(msg string) {
 	p.Errors = append(p.Errors, julelog.CompilerLog{
 		Type:    julelog.FlatError,
 		Message: msg,
-	})
-}
-
-// pusherr appends new warning.
-func (p *Parser) pushwarn(key string, args ...any) {
-	p.Warnings = append(p.Warnings, julelog.CompilerLog{
-		Type:    julelog.FlatWarning,
-		Message: jule.GetWarning(key, args...),
 	})
 }
 
@@ -655,9 +636,6 @@ func (p *Parser) checkParse() {
 	if p.NoCheck {
 		return
 	}
-	if p.docText.Len() > 0 {
-		p.pushwarn("exist_undefined_doc")
-	}
 	p.wg.Add(1)
 	go p.check()
 }
@@ -748,7 +726,6 @@ func (p *Parser) checkDoc(obj models.Object) {
 	case models.Comment, models.Attribute, []GenericType:
 		return
 	}
-	p.pushwarntok(obj.Tok, "doc_ignored")
 	p.docText.Reset()
 }
 
@@ -1154,18 +1131,9 @@ func (p *Parser) Comment(c models.Comment) {
 		return
 	}
 	if p.docText.Len() == 0 {
-		if strings.HasPrefix(c.Content, jule.DocCommentPrefix) {
-			c.Content = c.Content[4:]
-			if c.Content == "" {
-				c.Content = " "
-			}
-			goto write
-		}
-		return
+		p.docText.WriteString(c.Content)
 	}
 	p.docText.WriteByte('\n')
-write:
-	p.docText.WriteString(c.Content)
 }
 
 // PushAttribute process and appends to attribute list.

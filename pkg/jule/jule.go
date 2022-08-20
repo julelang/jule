@@ -17,7 +17,6 @@ const (
 	Anonymous = "<anonymous>"
 
 	CommentPragmaSeparator = ":"
-	DocCommentPrefix       = "doc" + CommentPragmaSeparator
 	AttributeCommentPrefix = "jule" + CommentPragmaSeparator
 
 	PlatformWindows = "windows"
