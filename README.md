@@ -1,6 +1,6 @@
 <div align="center">
 <p>
-    <img width="150" src="https://raw.githubusercontent.com/jule-lang/resources/main/jule.svg?sanitize=true">
+    <img width="150" src="https://raw.githubusercontent.com/jule-lang/resources/main/jule_icon.svg?sanitize=true">
 </p>
 <h2>The Jule Programming Language</h2>
 
@@ -95,18 +95,18 @@ All documentation about Jule and JuleC is on the website. <br>
     </tr>
     <tr>
         <td>Windows</td>
-        <td>Supports</td>
-        <td>Not supports yet</td>
+        <td>✔</td>
+        <td>✖</td>
     </tr>
     <tr>
         <td>Linux</td>
-        <td>Supports</td>
-        <td>Not supports yet</td>
+        <td>✔</td>
+        <td>✖</td>
     </tr>
     <tr>
-        <td>MacOS</td>
-        <td>Supports</td>
-        <td>Not supports yet</td>
+        <td>Darwin</td>
+        <td>✔</td>
+        <td>✖</td>
     </tr>
 </table>
 
@@ -163,10 +163,10 @@ Run the above command in your terminal, in the Jule project directory.
         </td>
     </tr>
     <tr>
-        <td>MacOS</td>
+        <td>Darwin</td>
         <td>
-            <a href="https://github.com/jule-lang/jule/actions/workflows/macos.yml">
-                <img src="https://github.com/jule-lang/jule/actions/workflows/macos.yml/badge.svg")>
+            <a href="https://github.com/jule-lang/jule/actions/workflows/darwin.yml">
+                <img src="https://github.com/jule-lang/jule/actions/workflows/darwin.yml/badge.svg")>
             </a>
         </td>
     </tr>
