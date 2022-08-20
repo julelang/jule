@@ -14,7 +14,7 @@ const CppSelf = "this"
 // ToDeferredCall returns cpp of deferred function call expression string.
 func ToDeferredCall(expr string) string {
 	var cpp strings.Builder
-	cpp.WriteString("DEFER(")
+	cpp.WriteString("__JULEC_DEFER(")
 	cpp.WriteString(expr)
 	cpp.WriteString(");")
 	return cpp.String()
@@ -23,7 +23,7 @@ func ToDeferredCall(expr string) string {
 // ToConcurrentCall returns cpp of concurrent function call expression string.
 func ToConcurrentCall(expr string) string {
 	var cpp strings.Builder
-	cpp.WriteString("CO(")
+	cpp.WriteString("__JULEC_CO(")
 	cpp.WriteString(expr)
 	cpp.WriteString(");")
 	return cpp.String()

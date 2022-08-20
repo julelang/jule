@@ -60,7 +60,11 @@
 #define JULEC_ID(_IDENTIFIER)   \
     __JULEC_CONCAT(__JULEC_IDENTIFIER_PREFIX, _IDENTIFIER)
 #define nil (nullptr)
-#define CO(_EXPR) (std::thread{[&](void) mutable -> void { _EXPR; }}.detach())
+#define __JULEC_CO(_EXPR)   \
+    (std::thread{[&](void) mutable -> void { _EXPR; }}.detach())
+#define __JULEC_DEFER(_EXPR)    \
+    defer __JULEC_CONCAT(JULEC_DEFER_, __LINE__){[&](void) -> void { _EXPR; }}
+
 
 
 // Libraries uses this function for throw panic.
