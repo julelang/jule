@@ -7,7 +7,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/fs"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -30,9 +29,6 @@ const commandHelp = "help"
 const commandVersion = "version"
 const commandInit = "init"
 const commandDoc = "doc"
-
-const localizationErrors = "error.json"
-const localizationWarnings = "warning.json"
 
 var helpmap = [...][2]string{
 	0: {commandHelp, "Show help."},
@@ -164,22 +160,15 @@ func init() {
 	}
 }
 
-func loadLangErrs(path string, infos []fs.FileInfo) {
-	i := -1
-	for j, f := range infos {
-		if f.IsDir() || f.Name() != localizationErrors {
-			continue
-		}
-		i = j
-		path = filepath.Join(path, f.Name())
-		break
-	}
-	if i == -1 {
+func loadLang() {
+	lang := strings.TrimSpace(jule.Set.Language)
+	if lang == "" || lang == "default" {
 		return
 	}
+	path := filepath.Join(jule.LangsPath, lang+".json")
 	bytes, err := ioutil.ReadFile(path)
 	if err != nil {
-		println("Language's errors couldn't loaded (uses default);")
+		println("Language couldn't loaded (uses default);")
 		println(err.Error())
 		return
 	}
@@ -189,21 +178,6 @@ func loadLangErrs(path string, infos []fs.FileInfo) {
 		println(err.Error())
 		return
 	}
-}
-
-func loadLang() {
-	lang := strings.TrimSpace(jule.Set.Language)
-	if lang == "" || lang == "default" {
-		return
-	}
-	path := filepath.Join(jule.LangsPath, lang)
-	infos, err := ioutil.ReadDir(path)
-	if err != nil {
-		println("Language couldn't loaded (uses default);")
-		println(err.Error())
-		return
-	}
-	loadLangErrs(path, infos)
 }
 
 func checkMode() {
