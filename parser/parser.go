@@ -63,6 +63,7 @@ type Parser struct {
 	blockVars      []*Var
 	waitingGlobals []*waitingGlobal
 	waitingImpls   []*waitingImpl
+	waitingFuncs   []*function
 	eval           *eval
 	cppLinks       []*models.CppLink
 	allowBuiltin   bool
@@ -675,6 +676,7 @@ func (p *Parser) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 			p.pusherrs(fp.Errors...)
 			return true
 		}
+		p.waitingFuncs = append(p.waitingFuncs, fp.waitingFuncs...)
 		p.waitingGlobals = append(p.waitingGlobals, fp.waitingGlobals...)
 		p.waitingImpls = append(p.waitingImpls, fp.waitingImpls...)
 	}
@@ -1335,8 +1337,8 @@ func (p *Parser) Func(ast Func) {
 	p.checkRetVars(f)
 	p.checkFuncAttributes(f)
 	f.used = f.Ast.Id == jule.InitializerFunction
-	p.parseTypesNonGenerics(f.Ast)
 	p.Defs.Funcs = append(p.Defs.Funcs, f)
+	p.waitingFuncs = append(p.waitingFuncs, f)
 }
 
 // ParseVariable parse Jule global variable.
@@ -1635,6 +1637,15 @@ func (p *Parser) check() {
 		}
 	}
 	p.checkTypes()
+	for _, f := range p.waitingFuncs {
+		owner := f.Ast.Owner.(*Parser)
+		owner.parseTypesNonGenerics(f.Ast)
+		if owner != p {
+			owner.wg.Wait()
+			p.pusherrs(owner.Errors...)
+		}
+	}
+	p.waitingFuncs = nil
 	p.WaitingImpls()
 	p.waitingImpls = nil
 	p.WaitingGlobals()
@@ -1781,7 +1792,6 @@ func (p *Parser) checkFuncs() {
 		if len(f.Ast.Generics) > 0 {
 			return
 		}
-		p.parseTypesNonGenerics(f.Ast)
 		p.wg.Add(1)
 		go p.checkFuncSpecialCases(f.Ast)
 		if err {
