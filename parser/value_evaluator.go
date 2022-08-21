@@ -310,6 +310,6 @@ func (ve *valueEvaluator) id() (_ value, ok bool) {
 		return ve.typeId(id, t)
 	}
 
-	ve.p.eval.pusherrtok(ve.tok, "id_noexist", id)
+	ve.p.eval.pusherrtok(ve.tok, "id_not_exist", id)
 	return
 }

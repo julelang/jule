@@ -332,7 +332,7 @@ func (e *eval) callCppLink(data callData, m *exprModel) (v value) {
 	}
 	link := e.p.linkById(tok.Kind)
 	if link == nil {
-		e.pusherrtok(tok, "id_noexist", tok.Kind)
+		e.pusherrtok(tok, "id_not_exist", tok.Kind)
 		return
 	}
 	m.appendSubNode(exprNode{link.Link.Id})

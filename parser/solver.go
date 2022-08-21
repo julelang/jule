@@ -398,7 +398,7 @@ func (s *solver) ptr() (v value) {
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
 		s.p.eval.hasError = true
-		s.p.pusherrtok(s.operator, "operator_notfor_juletype", s.operator.Kind, "pointer")
+		s.p.pusherrtok(s.operator, "operator_not_for_juletype", s.operator.Kind, "pointer")
 	}
 	return
 }
@@ -437,7 +437,7 @@ func (s *solver) str() (v value) {
 		s.noteq(&v)
 	default:
 		s.p.eval.hasError = true
-		s.p.pusherrtok(s.operator, "operator_notfor_juletype",
+		s.p.pusherrtok(s.operator, "operator_not_for_juletype",
 			s.operator.Kind, tokens.STR)
 	}
 	return
@@ -451,7 +451,7 @@ func (s *solver) any() (v value) {
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
 		s.p.eval.hasError = true
-		s.p.pusherrtok(s.operator, "operator_notfor_juletype", s.operator.Kind, tokens.ANY)
+		s.p.pusherrtok(s.operator, "operator_not_for_juletype", s.operator.Kind, tokens.ANY)
 	}
 	return
 }
@@ -475,7 +475,7 @@ func (s *solver) bool() (v value) {
 		s.noteq(&v)
 	default:
 		s.p.eval.hasError = true
-		s.p.pusherrtok(s.operator, "operator_notfor_juletype",
+		s.p.pusherrtok(s.operator, "operator_not_for_juletype",
 			s.operator.Kind, tokens.BOOL)
 	}
 	return
@@ -579,7 +579,7 @@ func (s *solver) float() (v value) {
 		fallthrough
 	default:
 		s.p.eval.hasError = true
-		s.p.pusherrtok(s.operator, "operator_notfor_float", s.operator.Kind)
+		s.p.pusherrtok(s.operator, "operator_not_for_float", s.operator.Kind)
 	}
 	return
 }
@@ -682,7 +682,7 @@ func (s *solver) signed() (v value) {
 		s.lshift(&v)
 	default:
 		s.p.eval.hasError = true
-		s.p.pusherrtok(s.operator, "operator_notfor_int", s.operator.Kind)
+		s.p.pusherrtok(s.operator, "operator_not_for_int", s.operator.Kind)
 	}
 	return
 }
@@ -785,7 +785,7 @@ func (s *solver) unsigned() (v value) {
 		s.lshift(&v)
 	default:
 		s.p.eval.hasError = true
-		s.p.pusherrtok(s.operator, "operator_notfor_uint", s.operator.Kind)
+		s.p.pusherrtok(s.operator, "operator_not_for_uint", s.operator.Kind)
 	}
 	return
 }
@@ -826,7 +826,7 @@ func (s *solver) array() (v value) {
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
 		s.p.eval.hasError = true
-		s.p.pusherrtok(s.operator, "operator_notfor_juletype", s.operator.Kind, s.leftVal.data.Type.Kind)
+		s.p.pusherrtok(s.operator, "operator_not_for_juletype", s.operator.Kind, s.leftVal.data.Type.Kind)
 	}
 	return
 }
@@ -845,7 +845,7 @@ func (s *solver) slice() (v value) {
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
 		s.p.eval.hasError = true
-		s.p.pusherrtok(s.operator, "operator_notfor_juletype",
+		s.p.pusherrtok(s.operator, "operator_not_for_juletype",
 			s.operator.Kind, s.leftVal.data.Type.Kind)
 	}
 	return
@@ -874,7 +874,7 @@ func (s *solver) nil() (v value) {
 		}
 	default:
 		s.p.eval.hasError = true
-		s.p.pusherrtok(s.operator, "operator_notfor_juletype",
+		s.p.pusherrtok(s.operator, "operator_not_for_juletype",
 			s.operator.Kind, tokens.NIL)
 	}
 	return
@@ -894,7 +894,7 @@ func (s *solver) structure() (v value) {
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
 		s.p.eval.hasError = true
-		s.p.pusherrtok(s.operator, "operator_notfor_juletype",
+		s.p.pusherrtok(s.operator, "operator_not_for_juletype",
 			s.operator.Kind, tokens.STRUCT)
 	}
 	return
@@ -914,7 +914,7 @@ func (s *solver) juletrait() (v value) {
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
 		s.p.eval.hasError = true
-		s.p.pusherrtok(s.operator, "operator_notfor_juletype",
+		s.p.pusherrtok(s.operator, "operator_not_for_juletype",
 			s.operator.Kind, tokens.TRAIT)
 	}
 	return
@@ -938,7 +938,7 @@ func (s *solver) function() (v value) {
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
 		s.p.eval.hasError = true
-		s.p.pusherrtok(s.operator, "operator_notfor_juletype",
+		s.p.pusherrtok(s.operator, "operator_not_for_juletype",
 			s.operator.Kind, tokens.NIL)
 	}
 	return

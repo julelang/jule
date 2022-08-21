@@ -454,7 +454,7 @@ func (p *Parser) pushSelects(use *use, selectors []Tok) (addNs bool) {
 		}
 		i, m, t := use.defs.findById(id.Kind, p.File)
 		if i == -1 {
-			p.pusherrtok(id, "id_noexist", id.Kind)
+			p.pusherrtok(id, "id_not_exist", id.Kind)
 			continue
 		}
 		switch t {
@@ -1014,14 +1014,14 @@ func (p *Parser) Trait(t models.Trait) {
 func (p *Parser) implTrait(impl *models.Impl) {
 	trait, _, _ := p.traitById(impl.Trait.Kind)
 	if trait == nil {
-		p.pusherrtok(impl.Trait, "id_noexist", impl.Trait.Kind)
+		p.pusherrtok(impl.Trait, "id_not_exist", impl.Trait.Kind)
 		return
 	}
 	trait.Used = true
 	sid, _ := impl.Target.KindId()
 	s, _, _ := p.Defs.structById(sid, nil)
 	if s == nil {
-		p.pusherrtok(impl.Target.Tok, "id_noexist", sid)
+		p.pusherrtok(impl.Target.Tok, "id_not_exist", sid)
 		return
 	}
 	impl.Target.Tag = s
@@ -1039,7 +1039,7 @@ func (p *Parser) implTrait(impl *models.Impl) {
 			}
 		}
 		if !ok {
-			p.pusherrtok(impl.Target.Tok, "notimpl_trait_def", trait.Ast.Id, ds)
+			p.pusherrtok(impl.Target.Tok, "not_impl_trait_def", trait.Ast.Id, ds)
 		}
 	}
 	for _, obj := range impl.Tree {
@@ -1077,7 +1077,7 @@ func (p *Parser) implTrait(impl *models.Impl) {
 func (p *Parser) implStruct(impl *models.Impl) {
 	s, _, _ := p.Defs.structById(impl.Trait.Kind, nil)
 	if s == nil {
-		p.pusherrtok(impl.Trait, "id_noexist", impl.Trait.Kind)
+		p.pusherrtok(impl.Trait, "id_not_exist", impl.Trait.Kind)
 		return
 	}
 	for _, obj := range impl.Tree {
@@ -2976,7 +2976,7 @@ func (p *Parser) suffix(assign *models.Assign, exprs []value) {
 	if typeIsPure(val.data.Type) && juletype.IsNumeric(val.data.Type.Id) {
 		return
 	}
-	p.pusherrtok(assign.Setter, "operator_notfor_juletype", assign.Setter.Kind, val.data.Type.Kind)
+	p.pusherrtok(assign.Setter, "operator_not_for_juletype", assign.Setter.Kind, val.data.Type.Kind)
 }
 
 func (p *Parser) assign(assign *models.Assign) {

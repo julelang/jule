@@ -55,7 +55,7 @@ func (sap *structArgParser) pushArg() {
 	}
 	pair, ok := (*sap.fmap)[sap.arg.TargetId]
 	if !ok {
-		sap.p.pusherrtok(sap.arg.Tok, "id_noexist", sap.arg.TargetId)
+		sap.p.pusherrtok(sap.arg.Tok, "id_not_exist", sap.arg.TargetId)
 		return
 	} else if pair.arg != nil {
 		sap.p.pusherrtok(sap.arg.Tok, "already_has_expr", sap.arg.TargetId)
