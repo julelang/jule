@@ -40,8 +40,13 @@ type RetType = models.RetType
 var used []*use
 
 type waitingGlobal struct {
-	Var  *Var
-	Defs *Defmap
+	file   *Parser
+	global *Var
+}
+
+type waitingImpl struct {
+	file *Parser
+	i    *models.Impl
 }
 
 // Parser is parser of Jule code.
@@ -56,7 +61,8 @@ type Parser struct {
 	generics       []*GenericType
 	blockTypes     []*Type
 	blockVars      []*Var
-	waitingGlobals []waitingGlobal
+	waitingGlobals []*waitingGlobal
+	waitingImpls   []*waitingImpl
 	eval           *eval
 	cppLinks       []*models.CppLink
 	allowBuiltin   bool
@@ -594,7 +600,10 @@ func (p *Parser) parseSrcTreeObj(obj models.Object) {
 	case models.Trait:
 		p.Trait(t)
 	case models.Impl:
-		// Parse at end
+		wi := new(waitingImpl)
+		wi.file = p
+		wi.i = &t
+		p.waitingImpls = append(p.waitingImpls, wi)
 	case models.CppLink:
 		p.CppLink(t)
 	case models.Comment:
@@ -606,16 +615,9 @@ func (p *Parser) parseSrcTreeObj(obj models.Object) {
 	}
 }
 
-func (p *Parser) parseSrcTreeEndObj(obj models.Object) {
-	switch t := obj.Data.(type) {
-	case models.Impl:
-		p.Impl(t)
-	}
-}
-
-func (p *Parser) parseSrcTree(tree []models.Object, parser func(models.Object)) {
+func (p *Parser) parseSrcTree(tree []models.Object) {
 	for _, obj := range tree {
-		parser(obj)
+		p.parseSrcTreeObj(obj)
 		p.checkDoc(obj)
 		p.checkAttribute(obj)
 		p.checkGenerics(obj)
@@ -626,8 +628,7 @@ func (p *Parser) parseTree(tree []models.Object) (ok bool) {
 	if p.parseUses(&tree) {
 		return false
 	}
-	p.parseSrcTree(tree, p.parseSrcTreeObj)
-	p.parseSrcTree(tree, p.parseSrcTreeEndObj)
+	p.parseSrcTree(tree)
 	return true
 }
 
@@ -675,6 +676,7 @@ func (p *Parser) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 			return true
 		}
 		p.waitingGlobals = append(p.waitingGlobals, fp.waitingGlobals...)
+		p.waitingImpls = append(p.waitingImpls, fp.waitingImpls...)
 	}
 	return
 }
@@ -990,7 +992,7 @@ func (p *Parser) Trait(t models.Trait) {
 	p.Defs.Traits = append(p.Defs.Traits, trait)
 }
 
-func (p *Parser) implTrait(impl models.Impl) {
+func (p *Parser) implTrait(impl *models.Impl) {
 	trait, _, _ := p.traitById(impl.Trait.Kind)
 	if trait == nil {
 		p.pusherrtok(impl.Trait, "id_noexist", impl.Trait.Kind)
@@ -1053,7 +1055,7 @@ func (p *Parser) implTrait(impl models.Impl) {
 	}
 }
 
-func (p *Parser) implStruct(impl models.Impl) {
+func (p *Parser) implStruct(impl *models.Impl) {
 	s, _, _ := p.Defs.structById(impl.Trait.Kind, nil)
 	if s == nil {
 		p.pusherrtok(impl.Trait, "id_noexist", impl.Trait.Kind)
@@ -1096,7 +1098,7 @@ func (p *Parser) implStruct(impl models.Impl) {
 }
 
 // Impl parses Jule impl.
-func (p *Parser) Impl(impl models.Impl) {
+func (p *Parser) Impl(impl *models.Impl) {
 	if !typeIsVoid(impl.Target) {
 		p.implTrait(impl)
 		return
@@ -1345,7 +1347,7 @@ func (p *Parser) Global(vast Var) {
 		return
 	} else {
 		for _, g := range p.waitingGlobals {
-			if vast.Id == g.Var.Id {
+			if vast.Id == g.global.Id {
 				p.pusherrtok(vast.Token, "exist_id", vast.Id)
 				return
 			}
@@ -1355,7 +1357,9 @@ func (p *Parser) Global(vast Var) {
 	p.docText.Reset()
 	v := new(Var)
 	*v = vast
-	wg := waitingGlobal{Var: v, Defs: p.Defs}
+	wg := new(waitingGlobal)
+	wg.file = p
+	wg.global = v
 	p.waitingGlobals = append(p.waitingGlobals, wg)
 	p.Defs.Globals = append(p.Defs.Globals, v)
 }
@@ -1631,6 +1635,8 @@ func (p *Parser) check() {
 		}
 	}
 	p.checkTypes()
+	p.WaitingImpls()
+	p.waitingImpls = nil
 	p.WaitingGlobals()
 	p.waitingGlobals = nil
 	if !p.JustDefs {
@@ -1647,12 +1653,16 @@ func (p *Parser) checkTypes() {
 
 // WaitingGlobals parses Jule global variables for waiting to parsing.
 func (p *Parser) WaitingGlobals() {
-	pdefs := p.Defs
 	for _, g := range p.waitingGlobals {
-		p.Defs = g.Defs // Set defs for namespaces
-		*g.Var = *p.Var(*g.Var)
+		*g.global = *g.file.Var(*g.global)
 	}
-	p.Defs = pdefs
+}
+
+// WaitingImpls parses Jule impls for waiting to parsing.
+func (p *Parser) WaitingImpls() {
+	for _, i := range p.waitingImpls {
+		i.file.Impl(i.i)
+	}
 }
 
 func (p *Parser) checkParamDefaultExprWithDefault(param *Param) {
