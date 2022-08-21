@@ -2,6 +2,150 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+fn eisel_lemire64(man: u64, exp10: int, neg: bool) (f: f64, ok: bool) {
+	// The terse comments in this function body refer to sections of the
+	// https://nigeltao.github.io/blog/2020/eisel-lemire.html blog post.
+
+	// Exp10 Range.
+	if man == 0 {
+		if neg {
+			f = std::math::f64_from_bits(0x8000000000000000) // Negative zero.
+		}
+		ret f, true
+	}
+	if exp10 < detailed_pows_of_ten_min_exp10 || detailed_pows_of_ten_max_exp10 < exp10 {
+		ret 0, false
+	}
+
+	// Normalization.
+	let clz = std::math::bits::leading_zeros64(man)
+	man <<= uint(clz)
+	const F64_EXPONENT_BIAS = 1023
+	let ret_exp2 = u64(217706*exp10>>16+64+F64_EXPONENT_BIAS) - u64(clz)
+
+	// Multiplication.
+	let (x_hi, x_lo) = std::math::bits::mul64(man, detailed_pows_of_ten[exp10-detailed_pows_of_ten_min_exp10][1])
+
+	// Wider Approximation.
+	if x_hi&0x1FF == 0x1FF && x_lo+man < man {
+		let (y_hi, y_lo) = std::math::bits::mul64(man, detailed_pows_of_ten[exp10-detailed_pows_of_ten_min_exp10][0])
+		let (merged_hi, merged_lo) = x_hi, x_lo+y_hi
+		if merged_lo < x_lo {
+			merged_hi++
+		}
+		if merged_hi&0x1FF == 0x1FF && merged_lo+1 == 0 && y_lo+man < man {
+			ret 0, false
+		}
+		x_hi, x_lo = merged_hi, merged_lo
+	}
+
+	// Shifting to 54 Bits.
+	let msb = x_hi >> 63
+	let ret_mantissa = x_hi >> (msb + 9)
+	ret_exp2 -= 1 ^ msb
+
+	// Half-way Ambiguity.
+	if x_lo == 0 && x_hi&0x1FF == 0 && ret_mantissa&3 == 1 {
+		ret 0, false
+	}
+
+	// From 54 to 53 Bits.
+	ret_mantissa += ret_mantissa & 1
+	ret_mantissa >>= 1
+	if ret_mantissa>>53 > 0 {
+		ret_mantissa >>= 1
+		ret_exp2 += 1
+	}
+	// ret_exp2 is a u64. Zero or underflow means that we're in subnormal
+	// f64 space. 0x7FF or above means that we're in inf/nan f64 space.
+	//
+	// The if block is equivalent to (but has fewer branches than):
+	//   if ret_exp2 <= 0 || ret_exp2 >= 0x7FF { etc }
+	if ret_exp2-1 >= 0x7FF-1 {
+		ret 0, false
+	}
+	let ret_bits = ret_exp2<<52 | ret_mantissa&0x000FFFFFFFFFFFFF
+	if neg {
+		ret_bits |= 0x8000000000000000
+	}
+	ret std::math::f64_from_bits(ret_bits), true
+}
+
+fn eisel_lemire32(man: u64, exp10: int, neg: bool) (f: f32, ok: bool) {
+	// The terse comments in this function body refer to sections of the
+	// https://nigeltao.github.io/blog/2020/eisel-lemire.html blog post.
+	//
+	// That blog post discusses the f64 flavor (11 exponent bits with a
+	// -1023 bias, 52 mantissa bits) of the algorithm, but the same approach
+	// applies to the f32 flavor (8 exponent bits with a -127 bias, 23
+	// mantissa bits). The computation here happens with 64-bit values (e.g.
+	// man, x_hi, ret_mantissa) before finally converting to a 32-bit float.
+
+	// Exp10 Range.
+	if man == 0 {
+		if neg {
+			f = std::math::f32_from_bits(0x80000000) // Negative zero.
+		}
+		ret f, true
+	}
+	if exp10 < detailed_pows_of_ten_min_exp10 || detailed_pows_of_ten_max_exp10 < exp10 {
+		ret 0, false
+	}
+
+	// Normalization.
+	let clz = std::math::bits::leading_zeros64(man)
+	man <<= uint(clz)
+	const F32_EXPONENT_BIAS = 127
+	let ret_exp2 = u64(217706*exp10>>16+64+F32_EXPONENT_BIAS) - u64(clz)
+
+	// Multiplication.
+	let (x_hi, x_lo) = std::math::bits::mul64(man, detailed_pows_of_ten[exp10-detailed_pows_of_ten_min_exp10][1])
+
+	// Wider Approximation.
+	if x_hi&0x3FFFFFFFFF == 0x3FFFFFFFFF && x_lo+man < man {
+		let (y_hi, y_lo) = std::math::bits::mul64(man, detailed_pows_of_ten[exp10-detailed_pows_of_ten_min_exp10][0])
+		let (merged_hi, merged_lo) = x_hi, x_lo+y_hi
+		if merged_lo < x_lo {
+			merged_hi++
+		}
+		if merged_hi&0x3FFFFFFFFF == 0x3FFFFFFFFF && merged_lo+1 == 0 && y_lo+man < man {
+			ret 0, false
+		}
+		x_hi, x_lo = merged_hi, merged_lo
+	}
+
+	// Shifting to 54 Bits (and for float32, it's shifting to 25 bits).
+	let msb = x_hi >> 63
+	let ret_mantissa = x_hi >> (msb + 38)
+	ret_exp2 -= 1 ^ msb
+
+	// Half-way Ambiguity.
+	if x_lo == 0 && x_hi&0x3FFFFFFFFF == 0 && ret_mantissa&3 == 1 {
+		ret 0, false
+	}
+
+	// From 54 to 53 Bits (and for f32, it's from 25 to 24 bits).
+	ret_mantissa += ret_mantissa & 1
+	ret_mantissa >>= 1
+	if ret_mantissa>>24 > 0 {
+		ret_mantissa >>= 1
+		ret_exp2 += 1
+	}
+	// ret_exp2 is a u64. Zero or underflow means that we're in subnormal
+	// f32 space. 0xFF or above means that we're in inf/nan f32 space.
+	//
+	// The if block is equivalent to (but has fewer branches than):
+	//   if ret_exp2 <= 0 || ret_exp2 >= 0xFF { etc }
+	if ret_exp2-1 >= 0xFF-1 {
+		ret 0, false
+	}
+	let ret_bits = ret_exp2<<23 | ret_mantissa&0x007FFFFF
+	if neg {
+		ret_bits |= 0x80000000
+	}
+	ret std::math::f32_from_bits(u32(ret_bits)), true
+}
+
 // detailed_pows_of_ten{min,max}exp10 is the power of 10 represented by the
 // first and last rows of detailed_pows_of_ten. Both bounds are inclusive.
 const detailed_pows_of_ten_min_exp10 = -348
