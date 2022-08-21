@@ -141,6 +141,7 @@ func (rc *retChecker) retsVars() {
 				break
 			}
 		}
+		rc.retAST.Expr.Model = rc.expModel
 		return
 	}
 	types := rc.f.RetType.Type.Tag.([]DataType)
