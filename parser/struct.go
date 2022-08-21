@@ -146,21 +146,23 @@ func (s *structure) cppTraits() string {
 	return cpp.String()[:cpp.Len()-1]
 }
 
-func (s *structure) prototype() string {
-	var cpp strings.Builder
-	cpp.WriteString(genericsToCpp(s.Ast.Generics))
-	cpp.WriteString(" struct ")
-	cpp.WriteString(s.OutId())
-	cpp.WriteByte(';')
-	return cpp.String()
-}
-
-func (s *structure) decldefString() string {
+func (s *structure) plainPrototype() string {
 	var cpp strings.Builder
 	cpp.WriteString(genericsToCpp(s.Ast.Generics))
 	cpp.WriteByte('\n')
 	cpp.WriteString("struct ")
 	cpp.WriteString(s.OutId())
+	cpp.WriteByte(';')
+	return cpp.String()
+}
+
+func (s *structure) prototype() string {
+	var cpp strings.Builder
+	cpp.WriteString(genericsToCpp(s.Ast.Generics))
+	cpp.WriteByte('\n')
+	cpp.WriteString("struct ")
+	outid := s.OutId()
+	cpp.WriteString(outid)
 	cpp.WriteString(s.cppTraits())
 	cpp.WriteString(" {\n")
 	models.AddIndent()
@@ -175,12 +177,12 @@ func (s *structure) decldefString() string {
 		cpp.WriteString("\n\n")
 	}
 	cpp.WriteString(models.IndentString())
-	cpp.WriteString(s.OutId())
+	cpp.WriteString(outid)
 	cpp.WriteString("(void) noexcept {}\n\n")
 	for _, f := range s.Defs.Funcs {
 		if f.used {
 			cpp.WriteString(models.IndentString())
-			cpp.WriteString(f.String())
+			cpp.WriteString(f.Prototype(""))
 			cpp.WriteString("\n\n")
 		}
 	}
@@ -189,6 +191,18 @@ func (s *structure) decldefString() string {
 	models.DoneIndent()
 	cpp.WriteString(models.IndentString())
 	cpp.WriteString("};")
+	return cpp.String()
+}
+
+func (s *structure) decldefString() string {
+	var cpp strings.Builder
+	for _, f := range s.Defs.Funcs {
+		if f.used {
+			cpp.WriteString(models.IndentString())
+			cpp.WriteString(f.stringOwner(s.OutId()))
+			cpp.WriteString("\n\n")
+		}
+	}
 	return cpp.String()
 }
 

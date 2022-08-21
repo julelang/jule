@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/jule-lang/jule/ast/models"
+	"github.com/jule-lang/jule/lex/tokens"
 	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
@@ -22,9 +23,9 @@ func (f *function) outId() string {
 	return f.Ast.OutId()
 }
 
-func (f function) String() string {
+func (f function) stringOwner(owner string) string {
 	var cpp strings.Builder
-	cpp.WriteString(f.Head())
+	cpp.WriteString(f.Head(owner))
 	cpp.WriteByte(' ')
 	block := f.Ast.Block
 	vars := f.Ast.RetType.Vars()
@@ -46,15 +47,19 @@ func (f function) String() string {
 	return cpp.String()
 }
 
+func (f function) String() string {
+	return f.stringOwner("")
+}
+
 // Head returns declaration head of function.
-func (f *function) Head() string {
+func (f *function) Head(owner string) string {
 	var cpp strings.Builder
-	cpp.WriteString(f.declHead())
+	cpp.WriteString(f.declHead(owner))
 	cpp.WriteString(paramsToCpp(f.Ast.Params))
 	return cpp.String()
 }
 
-func (f *function) declHead() string {
+func (f *function) declHead(owner string) string {
 	var cpp strings.Builder
 	cpp.WriteString(genericsToCpp(f.Ast.Generics))
 	if cpp.Len() > 0 {
@@ -67,14 +72,18 @@ func (f *function) declHead() string {
 	cpp.WriteString(attributesToString(f.Ast.Attributes))
 	cpp.WriteString(f.Ast.RetType.String())
 	cpp.WriteByte(' ')
+	if owner != "" {
+		cpp.WriteString(owner)
+		cpp.WriteString(tokens.DOUBLE_COLON)
+	}
 	cpp.WriteString(f.outId())
 	return cpp.String()
 }
 
 // Prototype returns prototype cpp code of function.
-func (f *function) Prototype() string {
+func (f *function) Prototype(owner string) string {
 	var cpp strings.Builder
-	cpp.WriteString(f.declHead())
+	cpp.WriteString(f.declHead(owner))
 	cpp.WriteString(f.PrototypeParams())
 	cpp.WriteByte(';')
 	return cpp.String()

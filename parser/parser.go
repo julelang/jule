@@ -206,6 +206,17 @@ func (p *Parser) CppStructs(out chan string) {
 	out <- cpp.String()
 }
 
+func cppStructPlainPrototypes(dm *Defmap) string {
+	var cpp strings.Builder
+	for _, s := range dm.Structs {
+		if s.Used && s.Ast.Tok.Id != tokens.NA {
+			cpp.WriteString(s.plainPrototype())
+			cpp.WriteByte('\n')
+		}
+	}
+	return cpp.String()
+}
+
 func cppStructPrototypes(dm *Defmap) string {
 	var cpp strings.Builder
 	for _, s := range dm.Structs {
@@ -221,7 +232,7 @@ func cppFuncPrototypes(dm *Defmap) string {
 	var cpp strings.Builder
 	for _, f := range dm.Funcs {
 		if f.used && f.Ast.Tok.Id != tokens.NA {
-			cpp.WriteString(f.Prototype())
+			cpp.WriteString(f.Prototype(""))
 			cpp.WriteByte('\n')
 		}
 	}
@@ -231,6 +242,12 @@ func cppFuncPrototypes(dm *Defmap) string {
 // CppPrototypes returns cpp code of prototypes.
 func (p *Parser) CppPrototypes(out chan string) {
 	var cpp strings.Builder
+	for _, use := range used {
+		if !use.cppLink {
+			cpp.WriteString(cppStructPlainPrototypes(use.defs))
+		}
+	}
+	cpp.WriteString(cppStructPlainPrototypes(p.Defs))
 	for _, use := range used {
 		if !use.cppLink {
 			cpp.WriteString(cppStructPrototypes(use.defs))
@@ -335,8 +352,8 @@ func (p *Parser) Cpp() string {
 	go p.CppTypes(types)
 	go p.CppTraits(traits)
 	go p.CppPrototypes(prototypes)
-	go p.CppStructs(structs)
 	go p.CppGlobals(globals)
+	go p.CppStructs(structs)
 	go p.CppFuncs(funcs)
 	go p.CppInitializerCaller(initializerCaller)
 	var cpp strings.Builder
@@ -346,9 +363,9 @@ func (p *Parser) Cpp() string {
 	cpp.WriteByte('\n')
 	cpp.WriteString(<-traits)
 	cpp.WriteString(<-prototypes)
-	cpp.WriteString(<-structs)
 	cpp.WriteString("\n\n")
 	cpp.WriteString(<-globals)
+	cpp.WriteString(<-structs)
 	cpp.WriteString("\n\n")
 	cpp.WriteString(<-funcs)
 	cpp.WriteString(<-initializerCaller)

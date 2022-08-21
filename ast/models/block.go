@@ -53,7 +53,11 @@ func IndentString() string {
 }
 
 // AddIndent adds new indent to IndentString.
-func AddIndent() { atomic.AddUint32(&Indent, 1) }
+func AddIndent() {
+	atomic.AddUint32(&Indent, 1)
+}
 
 // DoneIndent removes last indent from IndentString.
-func DoneIndent() { atomic.SwapUint32(&Indent, Indent-1) }
+func DoneIndent() {
+	atomic.SwapUint32(&Indent, atomic.LoadUint32(&Indent)-1)
+}
