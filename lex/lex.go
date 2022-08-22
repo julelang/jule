@@ -210,7 +210,19 @@ func float_fmt_e(txt string, i int) (literal string) {
 	return txt[:i]
 }
 
-func float_fmt_p(txt string, i int) (literal string) {
+func float_fmt_p(txt string, i int) string {
+	return float_fmt_e(txt, i)
+}
+
+func float_fmt_dotfp(txt string, i int) string {
+	// skip .f
+	i += 2
+	return float_fmt_e(txt, i)
+}
+
+func float_fmt_dotp(txt string, i int) string {
+	// skip .
+	i++
 	return float_fmt_e(txt, i)
 }
 
@@ -273,6 +285,36 @@ func binaryNum(txt string) (literal string) {
 func is_float_fmt_e(b byte, i int) bool { return i > 0 && (b == 'e' || b == 'E') }
 func is_float_fmt_p(b byte, i int) bool { return i > 0 && (b == 'p' || b == 'P') }
 
+func is_float_fmt_dotp(txt string, i int) bool {
+	txt = txt[i:]
+	switch {
+	case len(txt) < 3:
+		fallthrough
+	case txt[0] != '.':
+		fallthrough
+	case txt[2] != 'p' && txt[1] != 'P':
+		return false
+	default:
+		return true
+	}
+}
+
+func is_float_fmt_dotfp(txt string, i int) bool {
+	txt = txt[i:]
+	switch {
+	case len(txt) < 4:
+		fallthrough
+	case txt[0] != '.':
+		fallthrough
+	case txt[1] != 'f' && txt[1] != 'F':
+		fallthrough
+	case txt[2] != 'p' && txt[1] != 'P':
+		return false
+	default:
+		return true
+	}
+}
+
 func octalNum(txt string) (literal string) {
 	if txt[0] != '0' {
 		return ""
@@ -309,6 +351,10 @@ loop:
 	for ; i < len(txt); i++ {
 		b := txt[i]
 		switch {
+		case is_float_fmt_dotp(txt, i):
+			return float_fmt_dotp(txt, i)
+		case is_float_fmt_dotfp(txt, i):
+			return float_fmt_dotfp(txt, i)
 		case is_float_fmt_p(b, i):
 			return float_fmt_p(txt, i)
 		case !IsHex(b):
