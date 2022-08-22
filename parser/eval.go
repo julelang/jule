@@ -532,6 +532,8 @@ func (e *eval) tryCast(toks Toks, m *exprModel) (v value, _ bool) {
 
 func (e *eval) cast(v value, t DataType, errtok Tok) value {
 	switch {
+	case typeIsPure(v.data.Type) && v.data.Type.Id == juletype.Any:
+		// The any type supports casting to any data type.
 	case typeIsSlice(t):
 		e.castSlice(t, v.data.Type, errtok)
 		v.lvalue = true
