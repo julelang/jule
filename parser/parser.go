@@ -432,7 +432,7 @@ func (p *Parser) checkUsePath(use *models.Use) bool {
 }
 
 func (p *Parser) pushSelects(use *use, selectors []Tok) (addNs bool) {
-	if len(selectors) > 0 {
+	if len(selectors) > 0 && p.Defs.side == nil {
 		p.Defs.side = new(Defmap)
 	}
 	for i, id := range selectors {
@@ -486,7 +486,7 @@ func (p *Parser) pushUse(use *use, selectors []Tok) {
 		if p.Defs.side == nil {
 			p.Defs.side = new(Defmap)
 		}
-		p.pushDefs(p.Defs.side, use.defs)
+		pushDefs(p.Defs.side, use.defs)
 	}
 	ns := new(models.Namespace)
 	ns.Ids = strings.SplitN(use.LinkString, tokens.DOUBLE_COLON, -1)
@@ -531,7 +531,7 @@ func (p *Parser) compilePureUse(useAST *models.Use) (_ *use, hassErr bool) {
 		use.fullUse = useAST.FullUse
 		p.pusherrs(psub.Errors...)
 		p.Warnings = append(p.Warnings, psub.Warnings...)
-		p.pushDefs(use.defs, psub.Defs)
+		pushDefs(use.defs, psub.Defs)
 		p.pushUse(use, useAST.Selectors)
 		if psub.Errors != nil {
 			p.pusherrtok(useAST.Tok, "use_has_errors")
@@ -549,7 +549,7 @@ func (p *Parser) compileUse(useAST *models.Use) (*use, bool) {
 	return p.compilePureUse(useAST)
 }
 
-func (p *Parser) pushDefs(dest, src *Defmap) {
+func pushDefs(dest, src *Defmap) {
 	dest.Types = append(dest.Types, src.Types...)
 	dest.Traits = append(dest.Traits, src.Traits...)
 	dest.Structs = append(dest.Structs, src.Structs...)
