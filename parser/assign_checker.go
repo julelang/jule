@@ -87,7 +87,10 @@ func (ac assignChecker) checkAssignType() {
 	if ac.p.eval.hasError || ac.v.data.Value == "" {
 		return
 	}
-	if typeIsPure(ac.t) && ac.v.constExpr && typeIsPure(ac.v.data.Type) {
+	if ac.v.constExpr &&
+		typeIsPure(ac.t) &&
+		typeIsPure(ac.v.data.Type) &&
+		juletype.IsNumeric(ac.v.data.Type.Id) {
 		switch {
 		case juletype.IsFloat(ac.t.Id):
 			if !floatAssignable(ac.t.Id, ac.v) {

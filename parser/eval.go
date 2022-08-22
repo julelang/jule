@@ -14,7 +14,6 @@ type value struct {
 	data      models.Data
 	model     iExpr
 	expr      any
-	cast      *DataType
 	constExpr bool
 	heapMust  bool
 	lvalue    bool
