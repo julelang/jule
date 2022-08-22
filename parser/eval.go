@@ -14,6 +14,7 @@ type value struct {
 	data      models.Data
 	model     iExpr
 	expr      any
+	cast      *DataType
 	constExpr bool
 	heapMust  bool
 	lvalue    bool
@@ -63,9 +64,6 @@ func (e *eval) processes(processes []Toks) (v value, model iExpr) {
 		m := newExprModel(processes)
 		model = m
 		v = e.process(processes[0], m)
-		if v.constExpr {
-			model = v.model
-		}
 		return
 	}
 	valProcesses := make([]any, len(processes))
