@@ -185,7 +185,7 @@ func (l *Lex) rangecomment() {
 	l.pusherr("missing_block_comment")
 }
 
-func scientific(txt string, i int) (literal string) {
+func float_fmt_e(txt string, i int) (literal string) {
 	i++ // Skip E | e
 	if i >= len(txt) {
 		return
@@ -210,12 +210,16 @@ func scientific(txt string, i int) (literal string) {
 	return txt[:i]
 }
 
+func float_fmt_p(txt string, i int) (literal string) {
+	return float_fmt_e(txt, i)
+}
+
 func floatNum(txt string, i int) (literal string) {
 	i++ // Skip dot
 	for ; i < len(txt); i++ {
 		b := txt[i]
 		if i > 1 && (b == 'e' || b == 'E') {
-			return scientific(txt, i)
+			return float_fmt_e(txt, i)
 		} else if !IsDecimal(b) {
 			break
 		}
@@ -228,14 +232,16 @@ func floatNum(txt string, i int) (literal string) {
 
 func commonNum(txt string) (literal string) {
 	i := 0
+loop:
 	for ; i < len(txt); i++ {
 		b := txt[i]
-		if b == '.' {
+		switch {
+		case b == '.':
 			return floatNum(txt, i)
-		} else if isScientific(b, i) {
-			return scientific(txt, i)
-		} else if !IsDecimal(b) {
-			break
+		case is_float_fmt_e(b, i):
+			return float_fmt_e(txt, i)
+		case !IsDecimal(b):
+			break loop
 		}
 	}
 	if i == 0 {
@@ -264,7 +270,8 @@ func binaryNum(txt string) (literal string) {
 	return txt[:i]
 }
 
-func isScientific(b byte, i int) bool { return i > 0 && (b == 'e' || b == 'E') }
+func is_float_fmt_e(b byte, i int) bool { return i > 0 && (b == 'e' || b == 'E') }
+func is_float_fmt_p(b byte, i int) bool { return i > 0 && (b == 'p' || b == 'P') }
 
 func octalNum(txt string) (literal string) {
 	if txt[0] != '0' {
@@ -277,8 +284,8 @@ func octalNum(txt string) (literal string) {
 	i := octalStart
 	for ; i < len(txt); i++ {
 		b := txt[i]
-		if isScientific(b, i) {
-			return scientific(txt, i)
+		if is_float_fmt_e(b, i) {
+			return float_fmt_e(txt, i)
 		} else if !IsOctal(b) {
 			break
 		}
@@ -298,9 +305,14 @@ func hexNum(txt string) (literal string) {
 	}
 	const hexStart = 2
 	i := hexStart
+loop:
 	for ; i < len(txt); i++ {
-		if !IsHex(txt[i]) {
-			break
+		b := txt[i]
+		switch {
+		case is_float_fmt_p(b, i):
+			return float_fmt_p(txt, i)
+		case !IsHex(b):
+			break loop
 		}
 	}
 	if i == hexStart {
