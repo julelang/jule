@@ -64,7 +64,10 @@ func isBoolExpr(v value) bool {
 }
 
 func isfloat(s string) bool {
-	return strings.ContainsAny(s, ".eEpP")
+	if strings.HasPrefix(s, "0x") {
+		return strings.ContainsAny(s, ".pP")
+	}
+	return strings.ContainsAny(s, ".eE")
 }
 
 func canGetPtr(v value) bool {
