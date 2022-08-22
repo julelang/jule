@@ -22,6 +22,6 @@ inline bool __julec_is_same(void) noexcept
 
 template<typename T>
 inline bool __julec_any_is(const any_julet &_Src) noexcept
-{ return _Src.type_is<T>(); }
+{ return _Src.__type_is<T>(); }
 
 #endif // #ifndef __JULEC_STD_REFLECT_TYPE_TRAITS_HPP
