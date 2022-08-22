@@ -63,6 +63,9 @@ func (e *eval) processes(processes []Toks) (v value, model iExpr) {
 		m := newExprModel(processes)
 		model = m
 		v = e.process(processes[0], m)
+		if v.constExpr {
+			model = v.model
+		}
 		return
 	}
 	valProcesses := make([]any, len(processes))
@@ -550,6 +553,14 @@ func (e *eval) cast(v value, t DataType, errtok Tok) value {
 	v.data.Value = t.Kind
 	v.data.Type = t
 	v.lvalue = typeIsLvalue(t)
+	if v.constExpr {
+		var model exprNode
+		model.value = v.data.Type.String()
+		model.value += tokens.LPARENTHESES
+		model.value += v.model.String()
+		model.value += tokens.RPARENTHESES
+		v.model = model
+	}
 	return v
 }
 
