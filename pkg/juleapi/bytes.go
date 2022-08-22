@@ -36,8 +36,13 @@ func ToChar(b byte) string { return btoa(b) }
 func ToRune(bytes []byte) string {
 	if len(bytes) == 0 {
 		return ""
-	} else if bytes[0] == '\\' {
-		if len(bytes) > 1 && (bytes[1] == 'u' || bytes[1] == 'U') {
+	} else if bytes[0] == '\\' && len(bytes) > 1 {
+		seq, ok := tryBtoaCommonEsq(bytes)
+		if ok {
+			return btoa(seq)
+		}
+		switch bytes[1] {
+		case 'u', 'U':
 			bytes = bytes[2:]
 			i, _ := strconv.ParseInt(string(bytes), 16, 32)
 			return "0x" + strconv.FormatInt(i, 16)
@@ -49,6 +54,34 @@ func ToRune(bytes []byte) string {
 
 func btoa(b byte) string {
 	return "0x" + strconv.FormatUint(uint64(b), 16)
+}
+
+func tryBtoaCommonEsq(bytes []byte) (seq byte, ok bool) {
+	if len(bytes) < 2 || bytes[0] != '\\' {
+		return
+	}
+	switch bytes[1] {
+	case '\'':
+		seq = '\''
+	case '"':
+		seq = '"'
+	case 'a':
+		seq = '\a'
+	case 'b':
+		seq = '\b'
+	case 'f':
+		seq = '\f'
+	case 'n':
+		seq = '\n'
+	case 'r':
+		seq = '\r'
+	case 't':
+		seq = '\t'
+	case 'v':
+		seq = 'v'
+	}
+	ok = seq != 0
+	return
 }
 
 func byteSeq(bytes []byte, i int) (seq []byte, n int) {
@@ -69,6 +102,36 @@ func byteSeq(bytes []byte, i int) (seq []byte, n int) {
 	return
 }
 
+func strEsqSeq(bytes []byte, i *int) string {
+	seq, ok := tryBtoaCommonEsq(bytes[*i:])
+	*i++
+	if ok {
+		return btoa(seq)
+	}
+	switch bytes[*i] {
+	case 'u':
+		rc, _ := strconv.ParseUint(string(bytes[*i+1:*i+5]), 16, 32)
+		r := rune(rc)
+		*i += 4
+		return bytesToStr([]byte(string(r)))
+	case 'U':
+		rc, _ := strconv.ParseUint(string(bytes[*i+1:*i+9]), 16, 32)
+		r := rune(rc)
+		*i += 8
+		return bytesToStr([]byte(string(r)))
+	case 'x':
+		seq := "0"
+		seq += string(bytes[*i : *i+3])
+		*i += 2
+		return seq
+	default:
+		seq, n := byteSeq(bytes, *i)
+		*i += n - 1
+		b, _ := strconv.ParseUint(string(seq), 8, 8)
+		return btoa(byte(b))
+	}
+}
+
 func bytesToStr(bytes []byte) string {
 	if len(bytes) == 0 {
 		return ""
@@ -77,28 +140,8 @@ func bytesToStr(bytes []byte) string {
 	for i := 0; i < len(bytes); i++ {
 		b := bytes[i]
 		if b == '\\' {
-			i++
-			switch bytes[i] {
-			case 'u':
-				rc, _ := strconv.ParseUint(string(bytes[i+1:i+5]), 16, 32)
-				r := rune(rc)
-				str.WriteString(bytesToStr([]byte(string(r))))
-				i += 4
-			case 'U':
-				rc, _ := strconv.ParseUint(string(bytes[i+1:i+9]), 16, 32)
-				r := rune(rc)
-				str.WriteString(bytesToStr([]byte(string(r))))
-				i += 8
-			case 'x':
-				str.WriteByte('0')
-				str.Write(bytes[i : i+3])
-				i += 2
-			default:
-				seq, n := byteSeq(bytes, i)
-				i += n - 1
-				b, _ := strconv.ParseUint(string(seq), 8, 8)
-				str.WriteString(btoa(byte(b)))
-			}
+			seq := strEsqSeq(bytes, &i)
+			str.WriteString(seq)
 		} else {
 			str.WriteString(btoa(b))
 		}

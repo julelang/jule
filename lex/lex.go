@@ -464,7 +464,7 @@ func (l *Lex) escseq(txt string) string {
 	switch txt[1] {
 	case '\'', '"', 'a', 'b', 'f', 'n', 'r', 't', 'v':
 		l.Pos += 2
-		return txt[:3]
+		return txt[:2]
 	case 'U':
 		seq = bigUnicodePointEsq(txt)
 	case 'u':
