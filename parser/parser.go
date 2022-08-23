@@ -1139,8 +1139,7 @@ func (p *Parser) implStruct(impl *models.Impl) {
 }
 
 // Impl parses Jule impl.
-func (p *Parser) Impl(impl *models.Impl, wg *sync.WaitGroup) {
-	defer wg.Done()
+func (p *Parser) Impl(impl *models.Impl) {
 	if !typeIsVoid(impl.Target) {
 		p.implTrait(impl)
 		return
@@ -1677,14 +1676,9 @@ func (p *Parser) check() {
 		}
 	}
 	p.checkTypes()
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go p.WaitingFuncs(&wg)
-	wg.Add(1)
-	go p.WaitingImpls(&wg)
-	wg.Add(1)
-	go p.WaitingGlobals(&wg)
-	wg.Wait()
+	p.WaitingFuncs()
+	p.WaitingImpls()
+	p.WaitingGlobals()
 	p.waitingFuncs = nil
 	p.waitingImpls = nil
 	p.waitingGlobals = nil
@@ -1695,8 +1689,7 @@ func (p *Parser) check() {
 }
 
 // WaitingFuncs parses Jule global functions for waiting to parsing.
-func (p *Parser) WaitingFuncs(wg *sync.WaitGroup) {
-	defer wg.Done()
+func (p *Parser) WaitingFuncs() {
 	for _, f := range p.waitingFuncs {
 		owner := f.Ast.Owner.(*Parser)
 		owner.parseTypesNonGenerics(f.Ast)
@@ -1714,19 +1707,16 @@ func (p *Parser) checkTypes() {
 }
 
 // WaitingGlobals parses Jule global variables for waiting to parsing.
-func (p *Parser) WaitingGlobals(wg *sync.WaitGroup) {
-	defer wg.Done()
+func (p *Parser) WaitingGlobals() {
 	for _, g := range p.waitingGlobals {
 		*g.global = *g.file.Var(*g.global)
 	}
 }
 
 // WaitingImpls parses Jule impls for waiting to parsing.
-func (p *Parser) WaitingImpls(wg *sync.WaitGroup) {
-	defer wg.Done()
+func (p *Parser) WaitingImpls() {
 	for _, i := range p.waitingImpls {
-		wg.Add(1)
-		go i.file.Impl(i.i, wg)
+		i.file.Impl(i.i)
 	}
 }
 
