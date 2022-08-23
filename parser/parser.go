@@ -67,6 +67,8 @@ type Parser struct {
 	eval           *eval
 	cppLinks       []*models.CppLink
 	allowBuiltin   bool
+	use_mut        *sync.Mutex
+	cpp_use_mut    *sync.Mutex
 
 	NoLocalPkg bool
 	JustDefs   bool
@@ -87,6 +89,8 @@ func New(f *File) *Parser {
 	p.Defs = new(Defmap)
 	p.eval = new(eval)
 	p.eval.p = p
+	p.use_mut = &sync.Mutex{}
+	p.cpp_use_mut = &sync.Mutex{}
 	return p
 }
 
@@ -384,6 +388,8 @@ func (p *Parser) checkCppUsePath(use *models.Use) bool {
 		p.pusherrtok(use.Tok, "invalid_header_ext", ext)
 		return false
 	}
+	p.cpp_use_mut.Lock()
+	defer p.cpp_use_mut.Unlock()
 	err := os.Chdir(use.Tok.File.Dir)
 	if err != nil {
 		p.pusherrtok(use.Tok, "use_not_found", use.Path)
@@ -418,13 +424,6 @@ func (p *Parser) checkUsePath(use *models.Use) bool {
 		}
 	} else {
 		if !p.checkPureUsePath(use) {
-			return false
-		}
-	}
-	// Already uses?
-	for _, puse := range p.Uses {
-		if use.Path == puse.Path {
-			p.pusherrtok(use.Tok, "already_uses")
 			return false
 		}
 	}
@@ -558,42 +557,61 @@ func pushDefs(dest, src *Defmap) {
 	dest.Funcs = append(dest.Funcs, src.Funcs...)
 }
 
-func (p *Parser) use(useAST *models.Use) (err bool) {
-	if !p.checkUsePath(useAST) {
-		return true
+func (p *Parser) use(ast *models.Use, wg *sync.WaitGroup, err *bool) {
+	defer wg.Done()
+	if !p.checkUsePath(ast) {
+		*err = true
+		return
 	}
 	// Already parsed?
-	for _, use := range used {
-		if useAST.Path == use.Path {
-			p.pushUse(use, nil)
-			p.Uses = append(p.Uses, use)
+	for _, u := range used {
+		if ast.Path == u.Path {
+			p.pushUse(u, nil)
+			p.Uses = append(p.Uses, u)
 			return
 		}
 	}
-	use, err := p.compileUse(useAST)
-	if use == nil {
-		return err
+	var u *use
+	u, *err = p.compileUse(ast)
+	if u == nil {
+		return
 	}
-	used = append(used, use)
-	p.Uses = append(p.Uses, use)
-	return err
+	p.use_mut.Lock()
+	// Already uses?
+	for _, pu := range p.Uses {
+		if u.Path == pu.Path {
+			p.pusherrtok(ast.Tok, "already_uses")
+			goto end
+		}
+	}
+	used = append(used, u)
+	p.Uses = append(p.Uses, u)
+end:
+	p.use_mut.Unlock()
 }
 
-func (p *Parser) parseUses(tree *[]models.Object) (err bool) {
-	for i, obj := range *tree {
+func (p *Parser) parseUses(tree *[]models.Object) bool {
+	var wg sync.WaitGroup
+	err := new(bool)
+	for i := range *tree {
+		obj := &(*tree)[i]
 		switch t := obj.Data.(type) {
 		case models.Use:
-			// || operator used for ignore compiling of other packages
-			// if already have errors
-			err = err || p.use(&t)
-			(*tree)[i].Data = nil
-		case models.Comment: // Ignore beginning comments.
+			if !*err {
+				wg.Add(1)
+				go p.use(&t, &wg, err)
+			}
+			obj.Data = nil
+		case models.Comment:
+			// Ignore beginning comments.
 		default:
-			return
+			goto end
 		}
 	}
 	*tree = nil
-	return
+end:
+	wg.Wait()
+	return *err
 }
 
 func objectIsIgnored(obj *models.Object) bool {
@@ -633,7 +651,8 @@ func (p *Parser) parseSrcTreeObj(obj models.Object) {
 	}
 }
 
-func (p *Parser) parseSrcTree(tree []models.Object) {
+func (p *Parser) parseSrcTree(tree []models.Object, wg *sync.WaitGroup) {
+	defer wg.Done()
 	for _, obj := range tree {
 		p.parseSrcTreeObj(obj)
 		p.checkDoc(obj)
@@ -646,7 +665,10 @@ func (p *Parser) parseTree(tree []models.Object) (ok bool) {
 	if p.parseUses(&tree) {
 		return false
 	}
-	p.parseSrcTree(tree)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go p.parseSrcTree(tree, &wg)
+	wg.Wait()
 	return true
 }
 
@@ -1117,7 +1139,8 @@ func (p *Parser) implStruct(impl *models.Impl) {
 }
 
 // Impl parses Jule impl.
-func (p *Parser) Impl(impl *models.Impl) {
+func (p *Parser) Impl(impl *models.Impl, wg *sync.WaitGroup) {
+	defer wg.Done()
 	if !typeIsVoid(impl.Target) {
 		p.implTrait(impl)
 		return
@@ -1654,6 +1677,26 @@ func (p *Parser) check() {
 		}
 	}
 	p.checkTypes()
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go p.WaitingFuncs(&wg)
+	wg.Add(1)
+	go p.WaitingImpls(&wg)
+	wg.Add(1)
+	go p.WaitingGlobals(&wg)
+	wg.Wait()
+	p.waitingFuncs = nil
+	p.waitingImpls = nil
+	p.waitingGlobals = nil
+	if !p.JustDefs {
+		p.checkFuncs()
+		p.checkStructs()
+	}
+}
+
+// WaitingFuncs parses Jule global functions for waiting to parsing.
+func (p *Parser) WaitingFuncs(wg *sync.WaitGroup) {
+	defer wg.Done()
 	for _, f := range p.waitingFuncs {
 		owner := f.Ast.Owner.(*Parser)
 		owner.parseTypesNonGenerics(f.Ast)
@@ -1661,15 +1704,6 @@ func (p *Parser) check() {
 			owner.wg.Wait()
 			p.pusherrs(owner.Errors...)
 		}
-	}
-	p.waitingFuncs = nil
-	p.WaitingImpls()
-	p.waitingImpls = nil
-	p.WaitingGlobals()
-	p.waitingGlobals = nil
-	if !p.JustDefs {
-		p.checkFuncs()
-		p.checkStructs()
 	}
 }
 
@@ -1680,16 +1714,19 @@ func (p *Parser) checkTypes() {
 }
 
 // WaitingGlobals parses Jule global variables for waiting to parsing.
-func (p *Parser) WaitingGlobals() {
+func (p *Parser) WaitingGlobals(wg *sync.WaitGroup) {
+	defer wg.Done()
 	for _, g := range p.waitingGlobals {
 		*g.global = *g.file.Var(*g.global)
 	}
 }
 
 // WaitingImpls parses Jule impls for waiting to parsing.
-func (p *Parser) WaitingImpls() {
+func (p *Parser) WaitingImpls(wg *sync.WaitGroup) {
+	defer wg.Done()
 	for _, i := range p.waitingImpls {
-		i.file.Impl(i.i)
+		wg.Add(1)
+		go i.file.Impl(i.i, wg)
 	}
 }
 
