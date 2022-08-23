@@ -548,15 +548,6 @@ func (p *Parser) compileUse(useAST *models.Use) (*use, bool) {
 	return p.compilePureUse(useAST)
 }
 
-func pushDefs(dest, src *Defmap) {
-	dest.Types = append(dest.Types, src.Types...)
-	dest.Traits = append(dest.Traits, src.Traits...)
-	dest.Structs = append(dest.Structs, src.Structs...)
-	dest.Enums = append(dest.Enums, src.Enums...)
-	dest.Globals = append(dest.Globals, src.Globals...)
-	dest.Funcs = append(dest.Funcs, src.Funcs...)
-}
-
 func (p *Parser) use(ast *models.Use, wg *sync.WaitGroup, err *bool) {
 	defer wg.Done()
 	if !p.checkUsePath(ast) {
@@ -651,8 +642,7 @@ func (p *Parser) parseSrcTreeObj(obj models.Object) {
 	}
 }
 
-func (p *Parser) parseSrcTree(tree []models.Object, wg *sync.WaitGroup) {
-	defer wg.Done()
+func (p *Parser) parseSrcTree(tree []models.Object) {
 	for _, obj := range tree {
 		p.parseSrcTreeObj(obj)
 		p.checkDoc(obj)
@@ -665,10 +655,7 @@ func (p *Parser) parseTree(tree []models.Object) (ok bool) {
 	if p.parseUses(&tree) {
 		return false
 	}
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go p.parseSrcTree(tree, &wg)
-	wg.Wait()
+	p.parseSrcTree(tree)
 	return true
 }
 
@@ -1360,7 +1347,7 @@ func (p *Parser) Func(ast Func) {
 	_, tok, canshadow := p.defById(ast.Id)
 	if tok.Id != tokens.NA && !canshadow {
 		p.pusherrtok(ast.Tok, "exist_id", ast.Id)
-	} else if juleapi.IsIgnoreId(ast.Id) {
+		} else if juleapi.IsIgnoreId(ast.Id) {
 		p.pusherrtok(ast.Tok, "ignore_id")
 	}
 	f := new(function)
@@ -1692,7 +1679,11 @@ func (p *Parser) check() {
 func (p *Parser) WaitingFuncs() {
 	for _, f := range p.waitingFuncs {
 		owner := f.Ast.Owner.(*Parser)
-		owner.parseTypesNonGenerics(f.Ast)
+		if len(f.Ast.Generics) > 0 {
+			owner.parseTypesNonGenerics(f.Ast)
+		} else {
+			owner.reloadFuncTypes(f.Ast)
+		}
 		if owner != p {
 			owner.wg.Wait()
 			p.pusherrs(owner.Errors...)
@@ -1836,8 +1827,7 @@ func (p *Parser) checkFuncs() {
 		if len(f.Ast.Generics) > 0 {
 			return
 		}
-		p.wg.Add(1)
-		go p.checkFuncSpecialCases(f.Ast)
+		p.checkFuncSpecialCases(f.Ast)
 		if err {
 			return
 		}
@@ -1890,7 +1880,6 @@ func (p *Parser) checkStructs() {
 }
 
 func (p *Parser) checkFuncSpecialCases(f *Func) {
-	defer p.wg.Done()
 	switch f.Id {
 	case jule.EntryPoint, jule.InitializerFunction:
 		p.checkSolidFuncSpecialCases(f)

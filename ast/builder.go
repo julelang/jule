@@ -268,9 +268,9 @@ func (b *Builder) Comment(tok Tok) models.Object {
 
 func (b *Builder) structFields(toks Toks) []*models.Var {
 	var fields []*models.Var
-	i := new(int)
-	for *i < len(toks) {
-		varToks := b.skipStatement(i, &toks)
+	i := 0
+	for i < len(toks) {
+		varToks := b.skipStatement(&i, &toks)
 		if varToks[0].Id == tokens.Comment {
 			continue
 		}
@@ -559,7 +559,8 @@ func (b *Builder) Use(toks Toks) {
 }
 
 func (b *Builder) getSelectors(toks Toks) []Tok {
-	toks = b.getrange(new(int), tokens.LBRACE, tokens.RBRACE, &toks)
+	i := 0
+	toks = b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
 	parts, errs := Parts(toks, tokens.Comma, true)
 	if len(errs) > 0 {
 		b.Errors = append(b.Errors, errs...)
@@ -1268,20 +1269,20 @@ func blockStatementFinished(bs *blockStatement) bool {
 // Block builds AST model of statements of code block.
 func (b *Builder) Block(toks Toks) (block *models.Block) {
 	block = new(models.Block)
-	bs := new(blockStatement)
+	var bs blockStatement
 	bs.block = block
 	bs.srcToks = &toks
 	for {
-		setToNextStatement(bs)
-		b.pushStatementToBlock(bs)
+		setToNextStatement(&bs)
+		b.pushStatementToBlock(&bs)
 	next:
 		if len(bs.nextToks) > 0 {
 			bs.toks = bs.nextToks
 			bs.nextToks = nil
-			b.pushStatementToBlock(bs)
+			b.pushStatementToBlock(&bs)
 			goto next
 		}
-		if blockStatementFinished(bs) {
+		if blockStatementFinished(&bs) {
 			break
 		}
 	}
@@ -1345,11 +1346,11 @@ func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
 }
 
 func (b *Builder) blockStatement(toks Toks) models.Statement {
-	i := new(int)
+	i := 0
 	tok := toks[0]
-	toks = Range(i, tokens.LBRACE, tokens.RBRACE, toks)
-	if *i < len(toks) {
-		b.pusherr(toks[*i], "invalid_syntax")
+	toks = Range(&i, tokens.LBRACE, tokens.RBRACE, toks)
+	if i < len(toks) {
+		b.pusherr(toks[i], "invalid_syntax")
 	}
 	block := b.Block(toks)
 	return models.Statement{Tok: tok, Data: block}
@@ -1815,14 +1816,13 @@ func (b *Builder) getVarProfile(toks Toks) (vast models.Var) {
 		return
 	}
 	vast.New = true
-	i := new(int)
-	*i = 2
-	if *i >= len(toks) {
+	i := 2
+	if i >= len(toks) {
 		return
 	}
-	vast.Type, _ = b.DataType(toks, i, false, true)
-	if *i < len(toks)-1 {
-		b.pusherr(toks[*i], "invalid_syntax")
+	vast.Type, _ = b.DataType(toks, &i, false, true)
+	if i < len(toks)-1 {
+		b.pusherr(toks[i], "invalid_syntax")
 	}
 	return
 }
@@ -1921,15 +1921,14 @@ func (b *Builder) forIterProfile(bs *blockStatement) (s models.Statement) {
 	if len(exprToks) > 0 {
 		profile.Next = b.forStatement(exprToks)
 	}
-	i := new(int)
-	*i = len(exprToks)
-	blockToks := b.getrange(i, tokens.LBRACE, tokens.RBRACE, &bs.toks)
+	i := len(exprToks)
+	blockToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &bs.toks)
 	if blockToks == nil {
 		b.pusherr(iter.Tok, "body_not_exist")
 		return
 	}
-	if *i < len(bs.toks) {
-		b.pusherr(bs.toks[*i], "invalid_syntax")
+	if i < len(bs.toks) {
+		b.pusherr(bs.toks[i], "invalid_syntax")
 	}
 	iter.Block = b.Block(blockToks)
 	iter.Profile = profile
@@ -1948,15 +1947,14 @@ func (b *Builder) commonIterProfile(toks []Tok) (s models.Statement) {
 	if len(exprToks) > 0 {
 		iter.Profile = b.getIterProfile(exprToks, iter.Tok)
 	}
-	i := new(int)
-	*i = len(exprToks)
-	blockToks := b.getrange(i, tokens.LBRACE, tokens.RBRACE, &toks)
+	i := len(exprToks)
+	blockToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
 	if blockToks == nil {
 		b.pusherr(iter.Tok, "body_not_exist")
 		return
 	}
-	if *i < len(toks) {
-		b.pusherr(toks[*i], "invalid_syntax")
+	if i < len(toks) {
+		b.pusherr(toks[i], "invalid_syntax")
 	}
 	iter.Block = b.Block(blockToks)
 	return models.Statement{Tok: iter.Tok, Data: iter}
@@ -2084,9 +2082,8 @@ func (b *Builder) MatchCase(toks Toks) (s models.Statement) {
 	if len(exprToks) > 0 {
 		match.Expr = b.Expr(exprToks)
 	}
-	i := new(int)
-	*i = len(exprToks)
-	blockToks := b.getrange(i, tokens.LBRACE, tokens.RBRACE, &toks)
+	i := len(exprToks)
+	blockToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
 	if blockToks == nil {
 		b.pusherr(match.Tok, "body_not_exist")
 		return
@@ -2115,7 +2112,7 @@ func (b *Builder) IfExpr(bs *blockStatement) (s models.Statement) {
 	ifast.Tok = bs.toks[0]
 	bs.toks = bs.toks[1:]
 	exprToks := BlockExpr(bs.toks)
-	i := new(int)
+	i := 0
 	if len(exprToks) == 0 {
 		if len(bs.toks) == 0 || bs.pos >= len(*bs.srcToks) {
 			b.pusherr(ifast.Tok, "missing_expr")
@@ -2124,18 +2121,18 @@ func (b *Builder) IfExpr(bs *blockStatement) (s models.Statement) {
 		exprToks = bs.toks
 		setToNextStatement(bs)
 	} else {
-		*i = len(exprToks)
+		i = len(exprToks)
 	}
-	blockToks := b.getrange(i, tokens.LBRACE, tokens.RBRACE, &bs.toks)
+	blockToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &bs.toks)
 	if blockToks == nil {
 		b.pusherr(ifast.Tok, "body_not_exist")
 		return
 	}
-	if *i < len(bs.toks) {
-		if bs.toks[*i].Id == tokens.Else {
-			bs.nextToks = bs.toks[*i:]
+	if i < len(bs.toks) {
+		if bs.toks[i].Id == tokens.Else {
+			bs.nextToks = bs.toks[i:]
 		} else {
-			b.pusherr(bs.toks[*i], "invalid_syntax")
+			b.pusherr(bs.toks[i], "invalid_syntax")
 		}
 	}
 	ifast.Expr = b.Expr(exprToks)
@@ -2149,7 +2146,7 @@ func (b *Builder) ElseIfExpr(bs *blockStatement) (s models.Statement) {
 	elif.Tok = bs.toks[1]
 	bs.toks = bs.toks[2:]
 	exprToks := BlockExpr(bs.toks)
-	i := new(int)
+	i := 0
 	if len(exprToks) == 0 {
 		if len(bs.toks) == 0 || bs.pos >= len(*bs.srcToks) {
 			b.pusherr(elif.Tok, "missing_expr")
@@ -2158,18 +2155,18 @@ func (b *Builder) ElseIfExpr(bs *blockStatement) (s models.Statement) {
 		exprToks = bs.toks
 		setToNextStatement(bs)
 	} else {
-		*i = len(exprToks)
+		i = len(exprToks)
 	}
-	blockToks := b.getrange(i, tokens.LBRACE, tokens.RBRACE, &bs.toks)
+	blockToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &bs.toks)
 	if blockToks == nil {
 		b.pusherr(elif.Tok, "body_not_exist")
 		return
 	}
-	if *i < len(bs.toks) {
-		if bs.toks[*i].Id == tokens.Else {
-			bs.nextToks = bs.toks[*i:]
+	if i < len(bs.toks) {
+		if bs.toks[i].Id == tokens.Else {
+			bs.nextToks = bs.toks[i:]
 		} else {
-			b.pusherr(bs.toks[*i], "invalid_syntax")
+			b.pusherr(bs.toks[i], "invalid_syntax")
 		}
 	}
 	elif.Expr = b.Expr(exprToks)
@@ -2185,18 +2182,18 @@ func (b *Builder) ElseBlock(bs *blockStatement) (s models.Statement) {
 	var elseast models.Else
 	elseast.Tok = bs.toks[0]
 	bs.toks = bs.toks[1:]
-	i := new(int)
-	blockToks := b.getrange(i, tokens.LBRACE, tokens.RBRACE, &bs.toks)
+	i := 0
+	blockToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &bs.toks)
 	if blockToks == nil {
-		if *i < len(bs.toks) {
+		if i < len(bs.toks) {
 			b.pusherr(elseast.Tok, "else_have_expr")
 		} else {
 			b.pusherr(elseast.Tok, "body_not_exist")
 		}
 		return
 	}
-	if *i < len(bs.toks) {
-		b.pusherr(bs.toks[*i], "invalid_syntax")
+	if i < len(bs.toks) {
+		b.pusherr(bs.toks[i], "invalid_syntax")
 	}
 	elseast.Block = b.Block(blockToks)
 	return models.Statement{Tok: elseast.Tok, Data: elseast}

@@ -209,3 +209,12 @@ func (dm *Defmap) findById(id string, f *File) (int, *Defmap, byte) {
 	}
 	return -1, nil, ' '
 }
+
+func pushDefs(dest, src *Defmap) {
+	dest.Types = append(dest.Types, src.Types...)
+	dest.Traits = append(dest.Traits, src.Traits...)
+	dest.Structs = append(dest.Structs, src.Structs...)
+	dest.Enums = append(dest.Enums, src.Enums...)
+	dest.Globals = append(dest.Globals, src.Globals...)
+	dest.Funcs = append(dest.Funcs, src.Funcs...)
+}

@@ -741,7 +741,7 @@ func (l *Lex) Tok() Tok {
 		tok.Kind = l.rune(txt)
 		tok.Id = tokens.Value
 		return tok
-	case txt[0] == '"', txt[0] == '`':
+	case txt[0] == '"' || txt[0] == '`':
 		tok.Kind = l.str(txt)
 		tok.Id = tokens.Value
 		return tok
@@ -764,8 +764,8 @@ func (l *Lex) Tok() Tok {
 	case l.isop(txt, tokens.RBRACKET, tokens.Brace, &tok):
 		l.pushRangeClose(tok, tokens.LBRACKET)
 	case
-		l.lexBasicOps(txt, &tok),
-		l.lexKeywords(txt, &tok),
+		l.lexBasicOps(txt, &tok) ||
+		l.lexKeywords(txt, &tok) ||
 		l.lexIdentifier(txt, &tok):
 	default:
 		r, sz := utf8.DecodeRuneInString(txt)

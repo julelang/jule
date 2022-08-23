@@ -1037,7 +1037,9 @@ func (e *eval) bracketRange(toks Toks, m *exprModel) (v value) {
 	v, model = e.toks(exprToks)
 	m.appendSubNode(model)
 	toks = toks[len(exprToks):] // Tokens of [...]
-	if toks, colon := ast.SplitColon(toks, new(int)); colon != -1 {
+	i := 0
+	if toks, colon := ast.SplitColon(toks, &i); colon != -1 {
+		i = 0
 		var leftv, rightv value
 		leftv.constExpr = true
 		rightv.constExpr = true
