@@ -17,11 +17,8 @@
 #include <string>
 #include <sstream>
 #include <functional>
-#include <vector>
-#include <map>
 #include <thread>
 #include <typeinfo>
-#include <any>
 #ifdef _WINDOWS
 #include <codecvt>
 #include <windows.h>

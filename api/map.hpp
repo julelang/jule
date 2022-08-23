@@ -5,6 +5,8 @@
 #ifndef __JULEC_MAP_HPP
 #define __JULEC_MAP_HPP
 
+#include <unordered_map>
+
 // Built-in map type.
 template<typename _Key_t, typename _Value_t>
 class map;
