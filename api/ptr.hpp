@@ -8,11 +8,11 @@
 #define __JULEC_PTR_NEVER_HEAP ((bool**)(0x0000001))
 #define __JULEC_PTR_HEAP_TRUE ((bool*)(0x0000001))
 
-#define __julec_ptr(_PTR) (ptr(_PTR))
-
 // Wrapper structure for raw pointer of JuleC.
 template<typename T>
 struct ptr;
+template<typename T>
+inline ptr<T> __julec_ptr(T *_Ptr) noexcept;
 template<typename T>
 ptr<T> __julec_never_guarantee_ptr(T *_Ptr) noexcept;
 template<typename T>
@@ -129,6 +129,10 @@ struct ptr {
     std::ostream &operator<<(std::ostream &_Stream, const ptr<T> &_Src) noexcept
     { return _Stream << _Src._ptr; }
 };
+
+template<typename T>
+inline ptr<T> __julec_ptr(T *_Ptr) noexcept
+{ return ptr<T>(_Ptr); }
 
 template<typename T>
 ptr<T> __julec_never_guarantee_ptr(T *_Ptr) noexcept {

@@ -50,7 +50,7 @@ public:
 
     template<typename T>
     inline bool __type_is(void) const noexcept {
-        if (std::is_same<T, nullptr_t>::value)
+        if (std::is_same<T, std::nullptr_t>::value)
         { return false; }
         if (this->operator==(nil))
         { return false; }
