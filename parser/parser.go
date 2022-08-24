@@ -481,7 +481,7 @@ func (p *Parser) pushUse(use *use, selectors []Tok) {
 		}
 	} else if selectors != nil {
 		return
-	} else if use.fullUse {
+	} else if use.FullUse {
 		if p.Defs.side == nil {
 			p.Defs.side = new(Defmap)
 		}
@@ -527,7 +527,8 @@ func (p *Parser) compilePureUse(useAST *models.Use) (_ *use, hassErr bool) {
 		use.tok = useAST.Tok
 		use.Path = useAST.Path
 		use.LinkString = useAST.LinkString
-		use.fullUse = useAST.FullUse
+		use.FullUse = useAST.FullUse
+		use.Selectors = useAST.Selectors
 		p.pusherrs(psub.Errors...)
 		p.Warnings = append(p.Warnings, psub.Warnings...)
 		pushDefs(use.defs, psub.Defs)
@@ -1161,9 +1162,7 @@ func (p *Parser) Comment(c models.Comment) {
 		p.PushAttribute(c)
 		return
 	}
-	if p.docText.Len() == 0 {
-		p.docText.WriteString(c.Content)
-	}
+	p.docText.WriteString(c.Content)
 	p.docText.WriteByte('\n')
 }
 

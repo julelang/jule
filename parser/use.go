@@ -1,10 +1,12 @@
 package parser
 
 type use struct {
+	defs    *Defmap
+	tok     Tok
+	cppLink bool
+	
+	FullUse    bool
 	Path       string
 	LinkString string
-	defs       *Defmap
-	tok        Tok
-	fullUse    bool
-	cppLink    bool
+	Selectors  []Tok
 }
