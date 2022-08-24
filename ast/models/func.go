@@ -75,5 +75,5 @@ func (f *Func) OutId() string {
 
 // DefString returns define string of function.
 func (f *Func) DefString() string {
-	return f.Id + f.DataTypeString()
+	return "fn " + f.Id + f.DataTypeString()[2:]
 }
