@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"time"
 
@@ -29,12 +30,14 @@ const commandHelp = "help"
 const commandVersion = "version"
 const commandInit = "init"
 const commandDoc = "doc"
+const commandBug = "bug"
 
 var helpmap = [...][2]string{
-	0: {commandHelp, "Show help."},
-	1: {commandVersion, "Show version."},
-	2: {commandInit, "Initialize new project here."},
-	3: {commandDoc, "Documentize Jule source code."},
+	0: {commandHelp, "Show help"},
+	1: {commandVersion, "Show version"},
+	2: {commandInit, "Initialize new project here"},
+	3: {commandDoc, "Documentize Jule source code"},
+	4: {commandHelp, "Start a new bug report"},
 }
 
 func help(cmd string) {
@@ -111,6 +114,35 @@ func doc(cmd string) {
 	}
 }
 
+func open_url(url string) error {
+	var cmd string
+	var args []string
+
+	switch runtime.GOOS {
+	case "windows":
+		cmd = "cmd"
+		args = []string{"/c", "start"}
+	case "darwin":
+		cmd = "open"
+	default:
+		cmd = "xdg-open"
+	}
+	args = append(args, url)
+	command := exec.Command(cmd, args...)
+	return command.Start()
+}
+
+func bug(cmd string) {
+	if cmd != "" {
+		println("This module can only be used as single!")
+		return
+	}
+	err := open_url("https://github.com/jule-lang/jule/issues/new?assignees=&labels=bug&template=bug-report.md&title=bug%3A+parser+generates+wrong+variable+declaration")
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+}
+
 func processCommand(namespace, cmd string) bool {
 	switch namespace {
 	case commandHelp:
@@ -121,6 +153,8 @@ func processCommand(namespace, cmd string) bool {
 		initProject(cmd)
 	case commandDoc:
 		doc(cmd)
+	case commandBug:
+		bug(cmd)
 	default:
 		return false
 	}

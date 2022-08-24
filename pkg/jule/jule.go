@@ -4,7 +4,7 @@ import "github.com/jule-lang/jule/pkg/juleset"
 
 // Jule constants.
 const (
-	Version       = `@developer_beta 0.0.1`
+	Version       = `@development_channel`
 	SrcExt        = `.jule`
 	DocExt        = SrcExt + "doc"
 	SettingsFile  = "jule.set"
