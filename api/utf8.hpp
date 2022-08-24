@@ -114,7 +114,7 @@ slice<u8_julet> __julec_utf8_rune_to_bytes(const i32_julet &_R) noexcept {
     if (_i < __JULEC_UTF8_RUNE2_MAX)
     { return slice<u8_julet>({(u8_julet)(__JULEC_UTF8_T2|(u8_julet)(_R>>6)), (u8_julet)(__JULEC_UTF8_TX|((u8_julet)(_R)&__JULEC_UTF8_MASKX))}); }
     i32_julet _r{_R};
-    if (_i > __JULEC_UTF8_MAX_RUNE, __JULEC_UTF8_SURROGATE_MIN <= _i && _i <= __JULEC_UTF8_SURROGATE_MAX)
+    if ( ( _i > __JULEC_UTF8_MAX_RUNE ) || ( __JULEC_UTF8_SURROGATE_MIN <= _i && _i <= __JULEC_UTF8_SURROGATE_MAX) )
     { _r = __JULEC_UTF8_RUNE_ERROR; }
     if (_i <= __JULEC_UTF8_RUNE3_MAX)
     { return slice<u8_julet>({(u8_julet)(__JULEC_UTF8_T3|(u8_julet)(_r>>12)), (u8_julet)(__JULEC_UTF8_TX|((u8_julet)(_r>>6)&__JULEC_UTF8_MASKX)), (u8_julet)(__JULEC_UTF8_TX|((u8_julet)(_r)&__JULEC_UTF8_MASKX))}); }
