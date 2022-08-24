@@ -1291,17 +1291,18 @@ func (b *Builder) Block(toks Toks) (block *models.Block) {
 
 // Statement builds AST model of statement.
 func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
+	tok := bs.toks[0]
+	if tok.Id == tokens.Id {
+		s, ok := b.IdStatement(bs)
+		if ok {
+			return s
+		}
+	}
 	s, ok := b.AssignStatement(bs.toks)
 	if ok {
 		return s
 	}
-	tok := bs.toks[0]
 	switch tok.Id {
-	case tokens.Id:
-		s, ok := b.IdStatement(bs.toks)
-		if ok {
-			return s
-		}
 	case tokens.Const, tokens.Let:
 		return b.VarStatement(bs.toks)
 	case tokens.Ret:
@@ -1512,27 +1513,27 @@ func (b *Builder) plainAssign(toks Toks) (assign models.Assign, ok bool) {
 }
 
 // BuildReturnStatement builds AST model of return statement.
-func (b *Builder) IdStatement(toks Toks) (s models.Statement, ok bool) {
-	if len(toks) == 1 {
+func (b *Builder) IdStatement(bs *blockStatement) (s models.Statement, ok bool) {
+	if len(bs.toks) == 1 {
 		return
 	}
-	tok := toks[1]
+	tok := bs.toks[1]
 	switch tok.Id {
 	case tokens.Colon:
-		if len(toks) == 2 { // Label?
-			return b.LabelStatement(toks[0]), true
-		}
-		return b.VarStatement(toks), true
+		return b.LabelStatement(bs), true
 	}
 	return
 }
 
 // LabelStatement builds AST model of label.
-func (b *Builder) LabelStatement(tok Tok) models.Statement {
+func (b *Builder) LabelStatement(bs *blockStatement) models.Statement {
 	var l models.Label
-	l.Tok = tok
-	l.Label = tok.Kind
-	return models.Statement{Tok: tok, Data: l}
+	l.Tok = bs.toks[0]
+	l.Label = l.Tok.Kind
+	if len(bs.toks) > 2 {
+		bs.nextToks = bs.toks[2:]
+	}
+	return models.Statement{Tok: l.Tok, Data: l}
 }
 
 // ExprStatement builds AST model of expression.
