@@ -16,7 +16,7 @@ type Defmap struct {
 	Structs    []*structure
 	Traits     []*trait
 	Types      []*Type
-	Funcs      []*function
+	Funcs      []*Fn
 	Globals    []*Var
 	side       *Defmap
 }
@@ -149,7 +149,7 @@ func (dm *Defmap) findFuncById(id string, f *File) (int, *Defmap, bool) {
 //
 // Special case:
 //  funcById(id) -> nil: if function is not exist.
-func (dm *Defmap) funcById(id string, f *File) (*function, *Defmap, bool) {
+func (dm *Defmap) funcById(id string, f *File) (*Fn, *Defmap, bool) {
 	i, m, canshadow := dm.findFuncById(id, f)
 	if i == -1 {
 		return nil, nil, false

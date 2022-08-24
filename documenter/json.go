@@ -21,11 +21,18 @@ type use struct {
 	Stdlib bool   `json:"stdlib"`
 }
 
-type structure struct {
+type jtrait struct {
 	Id     string     `json:"id"`
 	Desc   string     `json:"description"`
-	Fields []global   `json:"fields"`
 	Funcs  []function `json:"functions"`
+}
+
+type structure struct {
+	Id     string              `json:"id"`
+	Desc   string              `json:"description"`
+	Fields []global            `json:"fields"`
+	Funcs  []function          `json:"functions"`
+	ImplementedTraits []string `json:"implemented_traits"`
 }
 
 type enum struct {
@@ -64,7 +71,8 @@ type parameter struct {
 type document struct {
 	Uses    []use        `json:"uses"`
 	Enums   []enum       `json:"enums"`
-	Structs []structure    `json:"structs"`
+	Traits  []jtrait     `json:"traits"`
+	Structs []structure  `json:"structs"`
 	Types   []type_alias `json:"types"`
 	Globals []global     `json:"globals"`
 	Funcs   []function   `json:"functions"`
@@ -103,15 +111,41 @@ func fmt_json_enums(dm *Defmap) []enum {
 	return enums
 }
 
+func fmt_json_traits(dm *Defmap) []jtrait {
+	traits := make([]jtrait, len(dm.Traits))
+	for i, e := range dm.Traits {
+		var t jtrait
+		t.Id = e.Ast.Id
+		t.Desc = fmt_json_doc_comment(e.Desc)
+		t.Funcs = make([]function, len(e.Ast.Funcs))
+		for i, f := range e.Ast.Funcs {
+			t.Funcs[i] = function{
+				Id: f.Id,
+				Attributes: fmt_json_attributes(f.Attributes),
+				Ret: fmt_json_ttoa(f.RetType.Type),
+				Generics: fmt_json_generics(f.Generics),
+				Params: fmt_json_params(f.Params),
+				
+			}
+		}
+		traits[i] = t
+	}
+	return traits
+}
+
 func fmt_json_structs(dm *Defmap) []structure {
 	structs := make([]structure, len(dm.Structs))
 	for i, s := range dm.Structs {
-		var xs structure
-		xs.Id = s.Ast.Id
-		xs.Desc = fmt_json_doc_comment(s.Desc)
-		xs.Fields = fmt_json_globals(s.Defs)
-		xs.Funcs = fmt_json_funcs(s.Defs)
-		structs[i] = xs
+		var ss structure
+		ss.Id = s.Ast.Id
+		ss.Desc = fmt_json_doc_comment(s.Desc)
+		ss.Fields = fmt_json_globals(s.Defs)
+		ss.Funcs = fmt_json_funcs(s.Defs)
+		ss.ImplementedTraits = make([]string, len(*s.Traits))
+		for i, t := range *s.Traits {
+			ss.ImplementedTraits[i] = t.Ast.Id
+		}
+		structs[i] = ss
 	}
 	return structs
 }
@@ -190,6 +224,7 @@ func doc_fmt_json(p *parser.Parser) (string, error) {
 	doc := document{
 		fmt_json_uses(p),
 		fmt_json_enums(p.Defs),
+		fmt_json_traits(p.Defs),
 		fmt_json_structs(p.Defs),
 		fmt_json_type_aliases(p.Defs),
 		fmt_json_globals(p.Defs),

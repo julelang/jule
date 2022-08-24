@@ -16,7 +16,7 @@ type trait struct {
 
 // FindFunc returns function by id.
 // Returns nil if not exist.
-func (t *trait) FindFunc(id string) *function {
+func (t *trait) FindFunc(id string) *Fn {
 	for _, f := range t.Defs.Funcs {
 		if f.Ast.Id == id {
 			return f

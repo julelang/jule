@@ -11,18 +11,19 @@ import (
 )
 
 type structure struct {
-	Ast         Struct
-	Defs        *Defmap
-	Used        bool
-	Desc        string
+	Ast    Struct
+	Defs   *Defmap
+	Traits *[]*trait
+	Used   bool
+	Desc   string
+
 	constructor *Func
-	traits      *[]*trait
 	// Instance generics.
 	generics []DataType
 }
 
 func (s *structure) hasTrait(t *trait) bool {
-	for _, st := range *s.traits {
+	for _, st := range *s.Traits {
 		if t == st {
 			return true
 		}
@@ -133,12 +134,12 @@ func (s *structure) cppConstructor() string {
 }
 
 func (s *structure) cppTraits() string {
-	if len(*s.traits) == 0 {
+	if len(*s.Traits) == 0 {
 		return ""
 	}
 	var cpp strings.Builder
 	cpp.WriteString(": ")
-	for _, t := range *s.traits {
+	for _, t := range *s.Traits {
 		cpp.WriteString("public ")
 		cpp.WriteString(t.OutId())
 		cpp.WriteByte(',')

@@ -219,7 +219,7 @@ func (ve *valueEvaluator) varId(id string, variable *Var, global bool) (v value)
 	return
 }
 
-func (ve *valueEvaluator) funcId(id string, f *function) (v value) {
+func (ve *valueEvaluator) funcId(id string, f *Fn) (v value) {
 	f.used = true
 	v.data.Value = id
 	v.data.Type.Id = juletype.Func

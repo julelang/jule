@@ -8,7 +8,7 @@ import (
 	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
-type function struct {
+type Fn struct {
 	Ast          *Func
 	Desc         string
 	used         bool
@@ -16,14 +16,14 @@ type function struct {
 	isEntryPoint bool
 }
 
-func (f *function) outId() string {
+func (f *Fn) outId() string {
 	if f.isEntryPoint {
 		return juleapi.OutId(f.Ast.Id, nil)
 	}
 	return f.Ast.OutId()
 }
 
-func (f function) stringOwner(owner string) string {
+func (f Fn) stringOwner(owner string) string {
 	var cpp strings.Builder
 	cpp.WriteString(f.Head(owner))
 	cpp.WriteByte(' ')
@@ -47,19 +47,19 @@ func (f function) stringOwner(owner string) string {
 	return cpp.String()
 }
 
-func (f function) String() string {
+func (f Fn) String() string {
 	return f.stringOwner("")
 }
 
 // Head returns declaration head of function.
-func (f *function) Head(owner string) string {
+func (f *Fn) Head(owner string) string {
 	var cpp strings.Builder
 	cpp.WriteString(f.declHead(owner))
 	cpp.WriteString(paramsToCpp(f.Ast.Params))
 	return cpp.String()
 }
 
-func (f *function) declHead(owner string) string {
+func (f *Fn) declHead(owner string) string {
 	var cpp strings.Builder
 	cpp.WriteString(genericsToCpp(f.Ast.Generics))
 	if cpp.Len() > 0 {
@@ -81,7 +81,7 @@ func (f *function) declHead(owner string) string {
 }
 
 // Prototype returns prototype cpp code of function.
-func (f *function) Prototype(owner string) string {
+func (f *Fn) Prototype(owner string) string {
 	var cpp strings.Builder
 	cpp.WriteString(f.declHead(owner))
 	cpp.WriteString(f.PrototypeParams())
@@ -90,7 +90,7 @@ func (f *function) Prototype(owner string) string {
 }
 
 // PrototypeParams returns prototype cpp code of function parameters.
-func (f *function) PrototypeParams() string {
+func (f *Fn) PrototypeParams() string {
 	if len(f.Ast.Params) == 0 {
 		return "(void)"
 	}

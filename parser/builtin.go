@@ -272,7 +272,7 @@ var errorTrait = &trait{
 		Id: "Error",
 	},
 	Defs: &Defmap{
-		Funcs: []*function{
+		Funcs: []*Fn{
 			{Ast: &models.Func{
 				Pub:     true,
 				Id:      "error",
@@ -289,7 +289,7 @@ var errorType = DataType{
 	Pure: true,
 }
 
-var panicFunc = &function{
+var panicFunc = &Fn{
 	Ast: &models.Func{
 		Pub: true,
 		Id:  "panic",
@@ -318,7 +318,7 @@ var errorHandlerFunc = &models.Func{
 	},
 }
 
-var recoverFunc = &function{
+var recoverFunc = &Fn{
 	Ast: &models.Func{
 		Pub: true,
 		Id:  "recover",
@@ -352,7 +352,7 @@ var Builtin = &Defmap{
 			Type: DataType{Id: juletype.I32, Kind: juletype.TypeMap[juletype.I32]},
 		},
 	},
-	Funcs: []*function{
+	Funcs: []*Fn{
 		panicFunc,
 		recoverFunc,
 		{Ast: &Func{
@@ -463,7 +463,7 @@ var strDefs = &Defmap{
 			Tag:  "len()",
 		},
 	},
-	Funcs: []*function{
+	Funcs: []*Fn{
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "empty",
@@ -556,7 +556,7 @@ var sliceDefs = &Defmap{
 			Tag:  "len()",
 		},
 	},
-	Funcs: []*function{
+	Funcs: []*Fn{
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "empty",
@@ -574,7 +574,7 @@ var arrayDefs = &Defmap{
 			Tag:  "len()",
 		},
 	},
-	Funcs: []*function{
+	Funcs: []*Fn{
 		{Ast: &Func{
 			Pub:     true,
 			Id:      "empty",
@@ -592,7 +592,7 @@ var mapDefs = &Defmap{
 			Tag:  "len()",
 		},
 	},
-	Funcs: []*function{
+	Funcs: []*Fn{
 		{Ast: &Func{
 			Pub: true,
 			Id:  "clear",
@@ -649,7 +649,7 @@ func readyMapDefs(mapt DataType) {
 func init() {
 	// Copy out function as outln
 	outFunc, _, _ := Builtin.funcById("out", nil)
-	outlnFunc := new(function)
+	outlnFunc := new(Fn)
 	*outlnFunc = *outFunc
 	outlnFunc.Ast = new(models.Func)
 	*outlnFunc.Ast = *outFunc.Ast

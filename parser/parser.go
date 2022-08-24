@@ -63,7 +63,7 @@ type Parser struct {
 	blockVars      []*Var
 	waitingGlobals []*waitingGlobal
 	waitingImpls   []*waitingImpl
-	waitingFuncs   []*function
+	waitingFuncs   []*Fn
 	eval           *eval
 	cppLinks       []*models.CppLink
 	allowBuiltin   bool
@@ -949,7 +949,7 @@ func (p *Parser) Struct(ast Struct) {
 	s.Desc = p.docText.String()
 	p.docText.Reset()
 	s.Ast = ast
-	s.traits = new([]*trait)
+	s.Traits = new([]*trait)
 	s.Ast.Owner = p
 	s.Ast.Generics = p.generics
 	p.generics = nil
@@ -1000,7 +1000,7 @@ func (p *Parser) Trait(t models.Trait) {
 	p.docText.Reset()
 	trait.Ast = &t
 	trait.Defs = new(Defmap)
-	trait.Defs.Funcs = make([]*function, len(t.Funcs))
+	trait.Defs.Funcs = make([]*Fn, len(t.Funcs))
 	for i, f := range trait.Ast.Funcs {
 		if juleapi.IsIgnoreId(f.Id) {
 			p.pusherrtok(f.Tok, "ignore_id")
@@ -1014,7 +1014,7 @@ func (p *Parser) Trait(t models.Trait) {
 		}
 		_ = p.checkParamDup(f.Params)
 		p.parseTypesNonGenerics(f)
-		tf := new(function)
+		tf := new(Fn)
 		tf.Ast = f
 		trait.Defs.Funcs[i] = tf
 	}
@@ -1035,7 +1035,7 @@ func (p *Parser) implTrait(impl *models.Impl) {
 		return
 	}
 	impl.Target.Tag = s
-	*s.traits = append(*s.traits, trait)
+	*s.Traits = append(*s.Traits, trait)
 	for _, tf := range trait.Defs.Funcs {
 		ok := false
 		ds := tf.Ast.DefString()
@@ -1066,7 +1066,7 @@ func (p *Parser) implTrait(impl *models.Impl) {
 				p.pusherrtok(t.Tok, "exist_id", t.Id)
 				continue
 			}
-			sf := new(function)
+			sf := new(Fn)
 			sf.Ast = t
 			sf.Ast.Receiver.Tok = s.Ast.Tok
 			sf.Ast.Receiver.Tag = s
@@ -1102,7 +1102,7 @@ func (p *Parser) implStruct(impl *models.Impl) {
 				p.pusherrtok(t.Tok, "exist_id", t.Id)
 				continue
 			}
-			sf := new(function)
+			sf := new(Fn)
 			sf.Ast = t
 			sf.Ast.Receiver.Tok = s.Ast.Tok
 			sf.Ast.Receiver.Tag = s
@@ -1304,7 +1304,7 @@ func (p *Parser) parseTypesNonGenerics(f *Func) {
 	p.parseNonGenericType(f.Generics, &f.RetType.Type)
 }
 
-func (p *Parser) checkRetVars(f *function) {
+func (p *Parser) checkRetVars(f *Fn) {
 	for i, v := range f.Ast.RetType.Identifiers {
 		if juleapi.IsIgnoreId(v.Kind) {
 			continue
@@ -1349,7 +1349,7 @@ func (p *Parser) Func(ast Func) {
 		} else if juleapi.IsIgnoreId(ast.Id) {
 		p.pusherrtok(ast.Tok, "ignore_id")
 	}
-	f := new(function)
+	f := new(Fn)
 	f.Ast = new(Func)
 	*f.Ast = ast
 	f.Ast.Attributes = p.attributes
@@ -1463,7 +1463,7 @@ func (p *Parser) Var(v Var) *Var {
 	return &v
 }
 
-func (p *Parser) checkTypeParam(f *function) {
+func (p *Parser) checkTypeParam(f *Fn) {
 	if len(f.Ast.Generics) == 0 {
 		p.pusherrtok(f.Ast.Tok, "func_must_have_generics_if_has_attribute", jule.Attribute_TypeArg)
 	}
@@ -1472,7 +1472,7 @@ func (p *Parser) checkTypeParam(f *function) {
 	}
 }
 
-func (p *Parser) checkFuncAttributes(f *function) {
+func (p *Parser) checkFuncAttributes(f *Fn) {
 	for _, attribute := range f.Ast.Attributes {
 		switch attribute.Tag {
 		case jule.Attribute_TypeArg:
@@ -1520,7 +1520,7 @@ func (p *Parser) linkById(id string) *models.CppLink {
 //
 // Special case:
 //  FuncById(id) -> nil: if function is not exist.
-func (p *Parser) FuncById(id string) (*function, *Defmap, bool) {
+func (p *Parser) FuncById(id string) (*Fn, *Defmap, bool) {
 	if p.allowBuiltin {
 		f, _, _ := Builtin.funcById(id, nil)
 		if f != nil {
@@ -1622,7 +1622,7 @@ func (p *Parser) defById(id string) (def any, tok Tok, canshadow bool) {
 	if trait != nil {
 		return trait, trait.Ast.Tok, canshadow
 	}
-	var f *function
+	var f *Fn
 	f, _, canshadow = p.FuncById(id)
 	if f != nil {
 		return f, f.Ast.Tok, canshadow
@@ -1813,7 +1813,7 @@ func (p *Parser) parsePureFunc(f *Func) (err bool) {
 	return
 }
 
-func (p *Parser) parseFunc(f *function) (err bool) {
+func (p *Parser) parseFunc(f *Fn) (err bool) {
 	if f.checked || len(f.Ast.Generics) > 0 {
 		return false
 	}
@@ -1822,7 +1822,7 @@ func (p *Parser) parseFunc(f *function) (err bool) {
 
 func (p *Parser) checkFuncs() {
 	err := false
-	check := func(f *function) {
+	check := func(f *Fn) {
 		if len(f.Ast.Generics) > 0 {
 			return
 		}
@@ -1839,7 +1839,7 @@ func (p *Parser) checkFuncs() {
 	}
 }
 
-func (p *Parser) parseStructFunc(s *structure, f *function) (err bool) {
+func (p *Parser) parseStructFunc(s *structure, f *Fn) (err bool) {
 	if len(f.Ast.Generics) > 0 {
 		return
 	}
@@ -1932,14 +1932,14 @@ func (p *Parser) parseField(s *structure, f **Var, i int) {
 func (p *Parser) structConstructorInstance(as *structure) *structure {
 	s := new(structure)
 	s.Ast = as.Ast
-	s.traits = as.traits
+	s.Traits = as.Traits
 	s.constructor = new(Func)
 	*s.constructor = *as.constructor
 	s.constructor.RetType.Type.Tag = s
 	s.Defs = as.Defs
 	for i := range s.Defs.Funcs {
 		f := &s.Defs.Funcs[i]
-		nf := new(function)
+		nf := new(Fn)
 		*nf = **f
 		nf.Ast.Receiver.Tag = s
 		*f = nf

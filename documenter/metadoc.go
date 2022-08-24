@@ -65,6 +65,28 @@ func fmt_meta_enums(dm *Defmap) string {
 	return meta.String()
 }
 
+func fmt_meta_traits(dm *Defmap) string {
+	var meta strings.Builder
+	for _, t := range dm.Traits {
+		meta.WriteString(fmt_meta_doc_comment(t.Desc))
+		meta.WriteString(fmt_meta_pub_identifier(t.Ast.Pub))
+		meta.WriteString("trait ")
+		meta.WriteString(t.Ast.Id)
+		meta.WriteString(" {\n")
+		indent := strings.Repeat(juleset.Default.Indent, juleset.Default.IndentCount)
+		for _, f := range t.Ast.Funcs {
+			meta.WriteString(indent)
+			ff := parser.Fn{
+				Ast: f,
+			}
+			meta.WriteString(fmt_meta_func(&ff))
+			meta.WriteString("\n")
+		}
+		meta.WriteString("}\n\n")
+	}
+	return meta.String()
+}
+
 func fmt_meta_structs(dm *Defmap) string {
 	var meta strings.Builder
 	for _, s := range dm.Structs {
@@ -75,12 +97,12 @@ func fmt_meta_structs(dm *Defmap) string {
 		meta.WriteString(s.Ast.Id)
 		meta.WriteString(" {\n")
 		indent := strings.Repeat(juleset.Default.Indent, juleset.Default.IndentCount)
-		for _, field := range s.Ast.Fields {
+		for _, f := range s.Ast.Fields {
 			meta.WriteString(indent)
-			meta.WriteString(fmt_meta_pub_identifier(field.Pub))
-			meta.WriteString(field.Id)
-			meta.WriteString(fmt_meta_ttoa(field.Type))
-			meta.WriteString(fmt_meta_assign_expr(field.Expr.Toks))
+			meta.WriteString(fmt_meta_pub_identifier(f.Pub))
+			meta.WriteString(f.Id)
+			meta.WriteString(fmt_meta_ttoa(f.Type))
+			meta.WriteString(fmt_meta_assign_expr(f.Expr.Toks))
 			meta.WriteString("\n")
 		}
 		meta.WriteString("}\n\n")
@@ -90,6 +112,16 @@ func fmt_meta_structs(dm *Defmap) string {
 			meta.WriteString(" {\n\n")
 			meta.WriteString(fmt_meta_funcs(s.Defs))
 			meta.WriteString("}\n\n")
+		}
+		if len(*s.Traits) > 0 {
+			for _, t := range *s.Traits {
+				meta.WriteString("impl ")
+				meta.WriteString(t.Ast.Id)
+				meta.WriteString(" for ")
+				meta.WriteString(s.Ast.Id)
+				meta.WriteByte('\n')
+			}
+			meta.WriteByte('\n')
 		}
 	}
 	return meta.String()
@@ -126,39 +158,45 @@ func fmt_meta_globals(dm *Defmap) string {
 	return meta.String()
 }
 
+func fmt_meta_func(f *parser.Fn) string {
+	var meta strings.Builder
+	meta.WriteString(fmt_meta_doc_comment(f.Desc))
+	meta.WriteString(fmt_meta_attributes(f.Ast.Attributes))
+	meta.WriteString(fmt_meta_generics(f.Ast.Generics))
+	meta.WriteString(fmt_meta_pub_identifier(f.Ast.Pub))
+	meta.WriteString("fn ")
+	if f.Ast.Receiver != nil && f.Ast.Receiver.Kind[0] == '*' {
+		meta.WriteByte('&')
+	}
+	meta.WriteString(f.Ast.Id)
+	meta.WriteByte('(')
+	n := len(f.Ast.Params)
+	for i, p := range f.Ast.Params {
+		meta.WriteString(p.Id)
+		meta.WriteString(": ")
+		if p.Variadic {
+			meta.WriteString("...")
+		}
+		if p.Reference {
+			meta.WriteByte('&')
+		}
+		meta.WriteString(fmt_meta_ttoa(p.Type)[2:])
+		if i+1 < n {
+			meta.WriteByte(',')
+		}
+	}
+	meta.WriteByte(')')
+	rt := fmt_meta_ttoa(f.Ast.RetType.Type)
+	if rt != "" {
+		meta.WriteString(" " + rt[2:])
+	}
+	return meta.String()
+}
+
 func fmt_meta_funcs(dm *Defmap) string {
 	var meta strings.Builder
 	for _, f := range dm.Funcs {
-		meta.WriteString(fmt_meta_doc_comment(f.Desc))
-		meta.WriteString(fmt_meta_attributes(f.Ast.Attributes))
-		meta.WriteString(fmt_meta_generics(f.Ast.Generics))
-		meta.WriteString(fmt_meta_pub_identifier(f.Ast.Pub))
-		meta.WriteString("fn ")
-		if f.Ast.Receiver != nil && f.Ast.Receiver.Kind[0] == '*' {
-			meta.WriteByte('&')
-		}
-		meta.WriteString(f.Ast.Id)
-		meta.WriteByte('(')
-		n := len(f.Ast.Params)
-		for i, p := range f.Ast.Params {
-			meta.WriteString(p.Id)
-			meta.WriteString(": ")
-			if p.Variadic {
-				meta.WriteString("...")
-			}
-			if p.Reference {
-				meta.WriteByte('&')
-			}
-			meta.WriteString(fmt_meta_ttoa(p.Type)[2:])
-			if i+1 < n {
-				meta.WriteByte(',')
-			}
-		}
-		meta.WriteByte(')')
-		rt := fmt_meta_ttoa(f.Ast.RetType.Type)
-		if rt != "" {
-			meta.WriteString(" " + rt[2:])
-		}
+		meta.WriteString(fmt_meta_func(f))
 		meta.WriteString("\n\n")
 	}
 	return meta.String()
@@ -169,6 +207,7 @@ func doc_fmt_meta(p *parser.Parser) (string, error) {
 	meta.WriteString(fmt_meta_uses(p))
 	meta.WriteByte('\n')
 	meta.WriteString(fmt_meta_enums(p.Defs))
+	meta.WriteString(fmt_meta_traits(p.Defs))
 	meta.WriteString(fmt_meta_structs(p.Defs))
 	meta.WriteString(fmt_meta_type_aliases(p.Defs))
 	meta.WriteByte('\n')
