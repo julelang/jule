@@ -15,7 +15,7 @@ type Genericable interface {
 
 // IterProfile interface for iteration profiles.
 type IterProfile interface {
-	String(iter Iter) string
+	String(i *Iter) string
 }
 
 // IExprModel for special expression model to cpp string.

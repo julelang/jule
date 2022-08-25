@@ -7,11 +7,26 @@ type IterWhile struct {
 	Expr Expr
 }
 
-func (w IterWhile) String(iter Iter) string {
+func (w IterWhile) String(i *Iter) string {
 	var cpp strings.Builder
-	cpp.WriteString("while (")
+	indent := IndentString()
+	begin := i.BeginLabel()
+	cpp.WriteString(begin)
+	cpp.WriteString(":;\n")
+	cpp.WriteString(indent)
+	cpp.WriteString(i.Block.String())
+	cpp.WriteByte('\n')
+	cpp.WriteString(indent)
+	cpp.WriteString(i.NextLabel())
+	cpp.WriteString(":;\n")
+	cpp.WriteString(indent)
+	cpp.WriteString("if (")
 	cpp.WriteString(w.Expr.String())
-	cpp.WriteString(") ")
-	cpp.WriteString(iter.Block.String())
+	cpp.WriteString(") { goto ")
+	cpp.WriteString(begin)
+	cpp.WriteString("; }\n")
+	cpp.WriteString(indent)
+	cpp.WriteString(i.EndLabel())
+	cpp.WriteString(":;")
 	return cpp.String()
 }

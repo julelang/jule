@@ -53,7 +53,7 @@ type waitingImpl struct {
 type Parser struct {
 	attributes     []models.Attribute
 	docText        strings.Builder
-	isNowIntoIter  bool
+	currentIter    *models.Iter
 	currentCase    *models.Case
 	wg             sync.WaitGroup
 	rootBlock      *models.Block
@@ -2445,6 +2445,7 @@ func (p *Parser) statement(s *models.Statement, recover bool) bool {
 		s.Data = t
 	case models.Continue:
 		p.continueStatement(&t)
+		s.Data = t
 	case Type:
 		if def, _ := p.blockDefById(t.Id); def != nil {
 			p.pusherrtok(t.Tok, "exist_id", t.Id)
@@ -3093,9 +3094,9 @@ func (p *Parser) forProfile(iter *models.Iter) {
 
 func (p *Parser) iter(iter *models.Iter) {
 	oldCase := p.currentCase
-	oldIter := p.isNowIntoIter
+	oldIter := p.currentIter
 	p.currentCase = nil
-	p.isNowIntoIter = true
+	p.currentIter = iter
 	switch iter.Profile.(type) {
 	case models.IterWhile:
 		p.whileProfile(iter)
@@ -3107,7 +3108,7 @@ func (p *Parser) iter(iter *models.Iter) {
 		p.checkNewBlock(iter.Block)
 	}
 	p.currentCase = oldCase
-	p.isNowIntoIter = oldIter
+	p.currentIter = oldIter
 }
 
 func (p *Parser) ifExpr(ifast *models.If, i *int, statements []models.Statement) {
@@ -3150,20 +3151,22 @@ func (p *Parser) elseBlock(elseast *models.Else) {
 	p.checkNewBlock(elseast.Block)
 }
 
-func (p *Parser) breakStatement(breakAST *models.Break) {
+func (p *Parser) breakStatement(ast *models.Break) {
 	switch {
-	case p.isNowIntoIter:
 	case p.currentCase != nil:
-		breakAST.Case = p.currentCase
+		ast.Label = p.currentCase.EndLabel()
+	case p.currentIter != nil:
+		ast.Label = p.currentIter.EndLabel()
 	default:
-		p.pusherrtok(breakAST.Tok, "break_at_outiter")
+		p.pusherrtok(ast.Tok, "break_at_outiter")
 	}
 }
 
-func (p *Parser) continueStatement(continueAST *models.Continue) {
-	if !p.isNowIntoIter {
-		p.pusherrtok(continueAST.Tok, "continue_at_outiter")
+func (p *Parser) continueStatement(ast *models.Continue) {
+	if p.currentIter == nil {
+		p.pusherrtok(ast.Token, "continue_at_outiter")
 	}
+	ast.Label = p.currentIter.NextLabel()
 }
 
 func (p *Parser) checkValidityForAutoType(t DataType, errtok Tok) {

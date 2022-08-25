@@ -93,18 +93,6 @@ inline ptr<T> &__julec_must_heap(const ptr<T> &_Ptr) noexcept;
 // Interface for ignore compilation errors.
 template<typename T>
 inline T __julec_must_heap(const T &_Obj) noexcept;
-template <typename _Enum_t, typename _Index_t, typename _Item_t>
-static inline void foreach(const _Enum_t _Enum,
-                           const std::function<void(_Index_t, _Item_t)> _Body);
-template <typename _Enum_t, typename _Index_t>
-static inline void foreach(const _Enum_t _Enum,
-                           const std::function<void(_Index_t)> _Body);
-template <typename _Key_t, typename _Value_t>
-static inline void foreach(const map<_Key_t, _Value_t> _Map,
-                           const std::function<void(_Key_t)> _Body);
-template <typename _Key_t, typename _Value_t>
-static inline void foreach(const map<_Key_t, _Value_t> _Map,
-                           const std::function<void(_Key_t, _Value_t)> _Body);
 template<typename Type, unsigned N, unsigned Last>
 struct tuple_ostream;
 template<typename Type, unsigned N>
@@ -135,33 +123,6 @@ inline ptr<T> &__julec_must_heap(const ptr<T> &_Ptr) noexcept
 
 template<typename T>
 inline T __julec_must_heap(const T &_Obj) noexcept { return _Obj; }
-
-template <typename _Enum_t, typename _Index_t, typename _Item_t>
-static inline void foreach(const _Enum_t _Enum,
-                           const std::function<void(_Index_t, _Item_t)> _Body) {
-    _Index_t _index{0};
-    for (auto _item: _Enum) { _Body(_index++, _item); }
-}
-
-template <typename _Enum_t, typename _Index_t>
-static inline void foreach(const _Enum_t _Enum,
-                           const std::function<void(_Index_t)> _Body) {
-    _Index_t _index{0};
-    for (auto begin = _Enum.begin(), end = _Enum.end(); begin < end; ++begin)
-    { _Body(_index++); }
-}
-
-template <typename _Key_t, typename _Value_t>
-static inline void foreach(const map<_Key_t, _Value_t> _Map,
-                           const std::function<void(_Key_t)> _Body) {
-    for (const auto _pair: _Map) { _Body(_pair.first); }
-}
-
-template <typename _Key_t, typename _Value_t>
-static inline void foreach(const map<_Key_t, _Value_t> _Map,
-                           const std::function<void(_Key_t, _Value_t)> _Body) {
-    for (const auto _pair: _Map) { _Body(_pair.first, _pair.second); }
-}
 
 template<typename Type, unsigned N, unsigned Last>
 struct tuple_ostream {

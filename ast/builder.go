@@ -2225,12 +2225,12 @@ func (b *Builder) BreakStatement(toks Toks) models.Statement {
 // ContinueStatement builds AST model of continue statement.
 func (b *Builder) ContinueStatement(toks Toks) models.Statement {
 	var continueAST models.Continue
-	continueAST.Tok = toks[0]
+	continueAST.Token = toks[0]
 	if len(toks) > 1 {
 		b.pusherr(toks[1], "invalid_syntax")
 	}
 	return models.Statement{
-		Tok:  continueAST.Tok,
+		Tok:  continueAST.Token,
 		Data: continueAST,
 	}
 }

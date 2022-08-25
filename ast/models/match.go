@@ -31,8 +31,8 @@ type Case struct {
 func (c *Case) BeginLabel() string {
 	var cpp strings.Builder
 	cpp.WriteString("case_begin_")
-	cpp.WriteString(strconv.FormatInt(int64(c.Tok.Row), 10))
-	cpp.WriteString(strconv.FormatInt(int64(c.Tok.Column), 10))
+	cpp.WriteString(strconv.Itoa(c.Tok.Row))
+	cpp.WriteString(strconv.Itoa(c.Tok.Column))
 	return cpp.String()
 }
 
@@ -40,8 +40,8 @@ func (c *Case) BeginLabel() string {
 func (c *Case) EndLabel() string {
 	var cpp strings.Builder
 	cpp.WriteString("case_end_")
-	cpp.WriteString(strconv.FormatInt(int64(c.Tok.Row), 10))
-	cpp.WriteString(strconv.FormatInt(int64(c.Tok.Column), 10))
+	cpp.WriteString(strconv.Itoa(c.Tok.Row))
+	cpp.WriteString(strconv.Itoa(c.Tok.Column))
 	return cpp.String()
 }
 

@@ -9,22 +9,46 @@ type IterFor struct {
 	Next      Statement
 }
 
-func (f IterFor) String(iter Iter) string {
+func (f IterFor) String(i *Iter) string {
 	var cpp strings.Builder
-	cpp.WriteString("for (")
+	var indent string
 	if f.Once.Data != nil {
+		cpp.WriteString("{\n")
+		AddIndent()
+		indent = IndentString()
+		cpp.WriteString(indent)
 		cpp.WriteString(f.Once.String())
+		cpp.WriteByte('\n')
+		cpp.WriteString(indent)
 	} else {
-		cpp.WriteString("; ")
+		indent = IndentString()
 	}
+	begin := i.BeginLabel()
+	cpp.WriteString(begin)
+	cpp.WriteString(":;\n")
+	cpp.WriteString(indent)
+	cpp.WriteString(i.Block.String())
+	cpp.WriteByte('\n')
+	cpp.WriteString(indent)
+	cpp.WriteString(i.NextLabel())
+	cpp.WriteString(":;\n")
+	cpp.WriteString(indent)
+	cpp.WriteString(f.Next.String())
+	cpp.WriteByte('\n')
+	cpp.WriteString(indent)
+	cpp.WriteString("if (")
 	cpp.WriteString(f.Condition.String())
-	cpp.WriteString("; ")
-	if f.Next.Data != nil {
-		s := f.Next.String()
-		// Remove statement terminator
-		cpp.WriteString(s[:len(s)-1])
+	cpp.WriteString(") { goto ")
+	cpp.WriteString(begin)
+	cpp.WriteString("; }\n")
+	cpp.WriteString(indent)
+	cpp.WriteString(i.EndLabel())
+	cpp.WriteString(":;")
+	if f.Once.Data != nil {
+		cpp.WriteByte('\n')
+		DoneIndent()
+		cpp.WriteString(IndentString())
+		cpp.WriteByte('}')
 	}
-	cpp.WriteString(") ")
-	cpp.WriteString(iter.Block.String())
 	return cpp.String()
 }
