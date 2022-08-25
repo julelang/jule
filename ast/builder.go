@@ -1079,9 +1079,9 @@ func (b *Builder) datatype(t *models.DataType, toks Toks, i *int, arrays, err bo
 				}
 				*i-- // Start from bracket
 				if arrays {
-					b.MapOrArrayDataType(t, toks, i, err)
+					ok = b.MapOrArrayDataType(t, toks, i, err)
 				} else {
-					b.MapDataType(t, toks, i, err)
+					ok = b.MapDataType(t, toks, i, err)
 				}
 				if t.Id == juletype.Void {
 					if err {
@@ -1091,7 +1091,6 @@ func (b *Builder) datatype(t *models.DataType, toks Toks, i *int, arrays, err bo
 				}
 				t.Tok = tok
 				t.Kind = dtv.String() + t.Kind
-				ok = true
 				return
 			}
 			return
@@ -1116,7 +1115,7 @@ func (b *Builder) DataType(toks Toks, i *int, arrays, err bool) (t models.DataTy
 	return
 }
 
-func (b *Builder) arrayDataType(t *models.DataType, toks Toks, i *int, err bool) {
+func (b *Builder) arrayDataType(t *models.DataType, toks Toks, i *int, err bool) (ok bool) {
 	defer func() { t.Original = *t }()
 	if *i+1 >= len(toks) {
 		return
@@ -1125,38 +1124,46 @@ func (b *Builder) arrayDataType(t *models.DataType, toks Toks, i *int, err bool)
 	*i++
 	exprI := *i
 	t.ComponentType = new(models.DataType)
-	ok := b.datatype(t.ComponentType, toks, i, true, err)
+	ok = b.datatype(t.ComponentType, toks, i, true, err)
 	if !ok {
 		return
+	}
+	if t.ComponentType.Size.AutoSized {
+		b.pusherr(t.ComponentType.Size.Expr.Toks[0], "invalid_syntax")
+		ok = false
 	}
 	_, exprToks := RangeLast(toks[:exprI])
 	exprToks = exprToks[1 : len(exprToks)-1]
 	tok := exprToks[0]
 	if len(exprToks) == 1 && tok.Id == tokens.Operator && tok.Kind == tokens.TRIPLE_DOT {
 		t.Size.AutoSized = true
+		t.Size.Expr.Toks = exprToks
 	} else {
 		t.Size.Expr = b.Expr(exprToks)
 	}
 	t.Kind = jule.Prefix_Array + t.ComponentType.Kind
+	return
 }
 
-func (b *Builder) MapOrArrayDataType(t *models.DataType, toks Toks, i *int, err bool) {
-	b.MapDataType(t, toks, i, err)
-	if t.Id == juletype.Void {
-		b.arrayDataType(t, toks, i, err)
+func (b *Builder) MapOrArrayDataType(t *models.DataType, toks Toks, i *int, err bool) (ok bool) {
+	ok = b.MapDataType(t, toks, i, err)
+	if !ok {
+		ok = b.arrayDataType(t, toks, i, err)
 	}
+	return
 }
 
 // MapDataType builds map data-type.
-func (b *Builder) MapDataType(t *models.DataType, toks Toks, i *int, err bool) {
+func (b *Builder) MapDataType(t *models.DataType, toks Toks, i *int, err bool) (ok bool) {
 	typeToks, colon := SplitColon(toks, i)
 	if typeToks == nil || colon == -1 {
 		return
 	}
-	b.mapDataType(t, toks, typeToks, colon, err)
+	return b.mapDataType(t, toks, typeToks, colon, err)
 }
 
-func (b *Builder) mapDataType(t *models.DataType, toks, typeToks Toks, colon int, err bool) {
+func (b *Builder) mapDataType(t *models.DataType, toks, typeToks Toks,
+	colon int, err bool) (ok bool) {
 	defer func() { t.Original = *t }()
 	t.Id = juletype.Map
 	t.Tok = toks[0]
@@ -1176,6 +1183,8 @@ func (b *Builder) mapDataType(t *models.DataType, toks, typeToks Toks, colon int
 	types[1], _ = b.DataType(valueTypeToks, &j, true, err)
 	t.Tag = types
 	t.Kind = t.MapKind()
+	ok = true
+	return
 }
 
 func (b *Builder) funcMultiTypeRet(toks Toks, i *int) (t models.RetType, ok bool) {
