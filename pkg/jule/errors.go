@@ -128,6 +128,7 @@ var Errors = map[string]string{
 	`dynamic_generic_annotation_failed`:        `dynamic generic type annotation failed`,
 	`fallthrough_wrong_use`:                    `fallthrough keyword can only useable at end of the case scopes`,
 	`fallthrough_into_final_case`:              `fallthrough cannot useable at final case`,
+	`unsafe_behavior_at_out_of_unsafe_scope`:   `unsafe behaviors cannot available out of unsafe scopes`,
 }
 
 // GetError returns error.

@@ -27,6 +27,9 @@ struct ptr {
     ptr<T>(void) noexcept {}
     ptr<T>(std::nullptr_t) noexcept {}
 
+    ptr<T>(const uintptr_julet &_Addr) noexcept
+    { *this = __julec_never_guarantee_ptr((T*)(_Addr)); }
+
     ptr<T>(T *_Ptr) noexcept {
         this->_ptr = new(std::nothrow) T*{nil};
         if (!this->_ptr)

@@ -1885,7 +1885,38 @@ func (p *Parser) checkFuncSpecialCases(f *Func) {
 	}
 }
 
+func (p *Parser) call_unsafe_sizeof_alignof_fn(data callData, m *exprModel) (v value) {
+	// Remove parentheses
+	data.args = data.args[1 : len(data.args)-1]
+	v.data.Type = DataType{
+		Id: juletype.UInt,
+		Kind: juletype.TypeMap[juletype.UInt],
+	}
+	nodes := m.nodes[m.index].nodes
+	node := &nodes[len(nodes)-1]
+	b := ast.NewBuilder(nil)
+	i := 0
+	t, ok := b.DataType(data.args, &i, true, true)
+	b.Wait()
+	if !ok {
+		v, model := p.evalToks(data.args)
+		*node = exprNode{"sizeof(" + model.String() + ")"}
+		v.constExpr = false
+		return v
+	}
+	if i+1 < len(data.args) {
+		p.pusherrtok(data.args[i+1], "invalid_syntax")
+	}
+	p.pusherrs(b.Errors...)
+	*node = exprNode{"sizeof(" + t.String() + ")"}
+	return
+}
+
 func (p *Parser) callFunc(f *Func, data callData, m *exprModel) value {
+	switch f {
+	case unsafe_sizeof_fn.Ast, unsafe_alignof_fn.Ast:
+		return p.call_unsafe_sizeof_alignof_fn(data, m)
+	}
 	v := p.parseFuncCallToks(f, data.generics, data.args, m)
 	v.lvalue = typeIsLvalue(v.data.Type)
 	return v

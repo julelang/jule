@@ -40,4 +40,5 @@ const (
 	Fallthrough uint8 = 35
 	Fn          uint8 = 36
 	Let         uint8 = 37
+	Unsafe      uint8 = 38
 )

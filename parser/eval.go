@@ -27,9 +27,10 @@ func isOperator(process Toks) bool {
 }
 
 type eval struct {
-	p           *Parser
-	has_error   bool
-	type_prefix *DataType
+	p            *Parser
+	has_error    bool
+	type_prefix  *DataType
+	allow_unsafe bool
 }
 
 func (e *eval) pusherrtok(tok Tok, err string, args ...any) {
@@ -541,20 +542,17 @@ func (e *eval) tryCast(toks Toks, m *exprModel) (v value, _ bool) {
 
 func (e *eval) cast(v value, t DataType, errtok Tok) value {
 	switch {
-	case typeIsPure(v.data.Type) && v.data.Type.Id == juletype.Any:
-		// The any type supports casting to any data type.
+	case typeIsPtr(t):
+		e.castPtr(t, &v, errtok)
 	case typeIsSlice(t):
 		e.castSlice(t, v.data.Type, errtok)
-		v.lvalue = true
-	case typeIsPtr(t):
-		if !typeIsStruct(unptrType(t)) {
-			e.pusherrtok(errtok, "type_notsupports_casting", t.Kind)
-			break
-		}
-		fallthrough
 	case typeIsStruct(t):
 		e.castStruct(t, &v, errtok)
 	case typeIsPure(t):
+		if v.data.Type.Id == juletype.Any {
+			// The any type supports casting to any data type.
+			break
+		}
 		e.castPure(t, &v, errtok)
 	default:
 		e.pusherrtok(errtok, "type_notsupports_casting", t.Kind)
@@ -581,6 +579,21 @@ func (e *eval) castStruct(t DataType, v *value, errtok Tok) {
 	s := t.Tag.(*structure)
 	tr := v.data.Type.Tag.(*trait)
 	if !s.hasTrait(tr) {
+		e.pusherrtok(errtok, "type_notsupports_casting_to", v.data.Type.Kind, t.Kind)
+	}
+}
+
+func (e *eval) castPtr(t DataType, v *value, errtok Tok) {
+	if typeIsStruct(unptrType(t)) {
+		e.castStruct(t, v, errtok)
+		return
+	} else if !e.allow_unsafe {
+		e.pusherrtok(errtok, "unsafe_behavior_at_out_of_unsafe_scope")
+		return
+	}
+	if !typeIsPtr(v.data.Type) &&
+		!typeIsPure(v.data.Type) &&
+		!juletype.IsInteger(v.data.Type.Id) {
 		e.pusherrtok(errtok, "type_notsupports_casting_to", v.data.Type.Kind, t.Kind)
 	}
 }
@@ -633,7 +646,16 @@ func (e *eval) castInteger(t DataType, v *value, errtok Tok) {
 			v.expr = tonumu(v)
 		}
 	}
-	if typeIsPtr(v.data.Type) && t.Id == juletype.UIntptr {
+	if typeIsPtr(v.data.Type) {
+		if t.Id == juletype.UIntptr {
+			return
+		} else if !e.allow_unsafe {
+			e.pusherrtok(errtok, "unsafe_behavior_at_out_of_unsafe_scope")
+			return
+		} else if t.Id != juletype.I32 && t.Id != juletype.I64 && 
+			t.Id != juletype.U16 && t.Id != juletype.U32 && t.Id != juletype.U64 {
+			e.pusherrtok(errtok, "type_notsupports_casting_to", v.data.Type.Kind, t.Kind)
+		}
 		return
 	}
 	if typeIsPure(v.data.Type) && juletype.IsNumeric(v.data.Type.Id) {
@@ -1395,6 +1417,25 @@ func (e *eval) anonymousFn(toks Toks, m *exprModel) (v value) {
 	return
 }
 
+func (e *eval) unsafeEval(toks Toks, m *exprModel) (v value) {
+	i := 0
+	rang := ast.Range(&i, tokens.LBRACE, tokens.RBRACE, toks)
+	if len(rang) == 0 {
+		e.pusherrtok(toks[0], "missing_expr")
+		return
+	}
+	old := e.allow_unsafe
+	old_funcs := e.p.Defs.Funcs
+	e.p.Defs.Funcs = append(e.p.Defs.Funcs, unsafe_funcs...)
+	defer func() {
+		e.allow_unsafe = old
+		e.p.Defs.Funcs = old_funcs
+	}()
+	e.allow_unsafe = true
+	v = e.process(rang, m)
+	return v
+}
+
 func (e *eval) braceRange(toks Toks, m *exprModel) (v value) {
 	var exprToks Toks
 	braceCount := 0
@@ -1432,6 +1473,8 @@ func (e *eval) braceRange(toks Toks, m *exprModel) (v value) {
 		return
 	}
 	switch exprToks[0].Id {
+	case tokens.Unsafe:
+		return e.unsafeEval(toks[1:], m)
 	case tokens.Fn:
 		return e.anonymousFn(toks, m)
 	case tokens.Id:

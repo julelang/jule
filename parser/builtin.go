@@ -318,6 +318,14 @@ var errorHandlerFunc = &models.Func{
 	},
 }
 
+var unsafe_sizeof_fn = &Fn{Ast: &models.Func{Id: "sizeof"}}
+var unsafe_alignof_fn = &Fn{Ast: &models.Func{Id: "alignof"}}
+
+var unsafe_funcs = []*Fn{
+	unsafe_sizeof_fn,
+	unsafe_alignof_fn,
+}
+
 var recoverFunc = &Fn{
 	Ast: &models.Func{
 		Pub: true,

@@ -94,4 +94,5 @@ const (
 	FALLTHROUGH         = "fallthrough"
 	FN                  = "fn"
 	LET                 = "let"
+	UNSAFE              = "unsafe"
 )

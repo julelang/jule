@@ -6,7 +6,7 @@ import (
 )
 
 func isAccessable(finder, target *File, defIsPub bool) bool {
-	return defIsPub || finder == nil || finder.Dir == target.Dir
+	return defIsPub || finder == nil || target == nil || finder.Dir == target.Dir
 }
 
 // Defmap is definition map.
