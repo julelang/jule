@@ -865,7 +865,7 @@ func (p *Parser) Enum(e Enum) {
 		}
 		if item.Expr.Toks != nil {
 			val, model := p.evalExpr(item.Expr)
-			if !val.constExpr && !p.eval.hasError {
+			if !val.constExpr && !p.eval.has_error {
 				p.pusherrtok(item.Expr.Toks[0], "expr_not_const")
 			}
 			item.ExprTag = val.expr
@@ -1422,7 +1422,7 @@ func (p *Parser) Var(v Var) *Var {
 		if v.SetterTok.Id == tokens.NA {
 			p.pusherrtok(v.Token, "missing_autotype_value")
 		} else {
-			p.eval.hasError = p.eval.hasError || val.data.Value == ""
+			p.eval.has_error = p.eval.has_error || val.data.Value == ""
 			v.Type = val.data.Type
 			if val.constExpr && typeIsPure(v.Type) && isConstExpression(val.data.Value) {
 				switch val.expr.(type) {
@@ -1794,8 +1794,8 @@ func (p *Parser) blockVarsOfFunc(f *Func) []*Var {
 }
 
 func (p *Parser) parsePureFunc(f *Func) (err bool) {
-	hasError := p.eval.hasError
-	defer func() { p.eval.hasError = hasError }()
+	hasError := p.eval.has_error
+	defer func() { p.eval.has_error = hasError }()
 	owner := f.Owner.(*Parser)
 	err = owner.params(f)
 	if err {
@@ -2188,7 +2188,7 @@ func (p *Parser) parseFuncCallToks(f *Func, genericsToks, argsToks Toks, m *expr
 		var err bool
 		generics, err = p.getGenerics(argsToks)
 		if err {
-			p.eval.hasError = true
+			p.eval.has_error = true
 			return
 		}
 		args = new(models.Args)
@@ -2197,7 +2197,7 @@ func (p *Parser) parseFuncCallToks(f *Func, genericsToks, argsToks Toks, m *expr
 		var err bool
 		generics, err = p.getGenerics(genericsToks)
 		if err {
-			p.eval.hasError = true
+			p.eval.has_error = true
 			return
 		}
 		args = p.getArgs(argsToks, false)
@@ -3031,7 +3031,7 @@ func (p *Parser) whileProfile(iter *models.Iter) {
 	val, model := p.evalExpr(profile.Expr)
 	profile.Expr.Model = model
 	iter.Profile = profile
-	if !p.eval.hasError && val.data.Value != "" && !isBoolExpr(val) {
+	if !p.eval.has_error && val.data.Value != "" && !isBoolExpr(val) {
 		p.pusherrtok(iter.Tok, "iter_while_notbool_expr")
 	}
 	p.checkNewBlock(iter.Block)
@@ -3044,7 +3044,7 @@ func (p *Parser) foreachProfile(iter *models.Iter) {
 	val, model := p.evalExpr(profile.Expr)
 	profile.Expr.Model = model
 	profile.ExprType = val.data.Type
-	if !p.eval.hasError && val.data.Value != "" && !isForeachIterExpr(val) {
+	if !p.eval.has_error && val.data.Value != "" && !isForeachIterExpr(val) {
 		p.pusherrtok(iter.Tok, "iter_foreach_nonenumerable_expr")
 	} else {
 		fc := foreachChecker{p, &profile, val}
@@ -3114,7 +3114,7 @@ func (p *Parser) ifExpr(ifast *models.If, i *int, statements []models.Statement)
 	val, model := p.evalExpr(ifast.Expr)
 	ifast.Expr.Model = model
 	statement := statements[*i]
-	if !p.eval.hasError && val.data.Value != "" && !isBoolExpr(val) {
+	if !p.eval.has_error && val.data.Value != "" && !isBoolExpr(val) {
 		p.pusherrtok(ifast.Tok, "if_notbool_expr")
 	}
 	p.checkNewBlock(ifast.Block)
@@ -3132,7 +3132,7 @@ node:
 	case models.ElseIf:
 		val, model := p.evalExpr(t.Expr)
 		t.Expr.Model = model
-		if !p.eval.hasError && val.data.Value != "" && !isBoolExpr(val) {
+		if !p.eval.has_error && val.data.Value != "" && !isBoolExpr(val) {
 			p.pusherrtok(t.Tok, "if_notbool_expr")
 		}
 		p.checkNewBlock(t.Block)
@@ -3167,7 +3167,7 @@ func (p *Parser) continueStatement(continueAST *models.Continue) {
 }
 
 func (p *Parser) checkValidityForAutoType(t DataType, errtok Tok) {
-	if p.eval.hasError {
+	if p.eval.has_error {
 		return
 	}
 	switch t.Id {
@@ -3489,11 +3489,11 @@ func (p *Parser) checkType(real, check DataType, ignoreAny bool, errTok Tok) {
 }
 
 func (p *Parser) evalExpr(expr Expr) (value, iExpr) {
-	p.eval.hasError = false
+	p.eval.has_error = false
 	return p.eval.expr(expr)
 }
 
 func (p *Parser) evalToks(toks Toks) (value, iExpr) {
-	p.eval.hasError = false
+	p.eval.has_error = false
 	return p.eval.toks(toks)
 }

@@ -27,15 +27,16 @@ func isOperator(process Toks) bool {
 }
 
 type eval struct {
-	p        *Parser
-	hasError bool
+	p           *Parser
+	has_error   bool
+	type_prefix *DataType
 }
 
 func (e *eval) pusherrtok(tok Tok, err string, args ...any) {
-	if e.hasError {
+	if e.has_error {
 		return
 	}
-	e.hasError = true
+	e.has_error = true
 	e.p.pusherrtok(tok, err, args...)
 }
 
@@ -56,7 +57,7 @@ func (e *eval) processes(processes []Toks) (v value, model iExpr) {
 			v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		}
 	}()
-	if processes == nil || e.hasError {
+	if processes == nil || e.has_error {
 		return
 	}
 	if len(processes) == 1 {
@@ -69,18 +70,18 @@ func (e *eval) processes(processes []Toks) (v value, model iExpr) {
 		return
 	}
 	valProcesses := make([]any, len(processes))
-	hasError := e.hasError
+	hasError := e.has_error
 	for i, process := range processes {
 		if isOperator(process) {
 			valProcesses[i] = nil
 			continue
 		}
 		val, model := e.p.evalToks(process)
-		hasError = hasError || e.hasError || model == nil
+		hasError = hasError || e.has_error || model == nil
 		valProcesses[i] = []any{val, model}
 	}
 	if hasError {
-		e.hasError = true
+		e.has_error = true
 		return
 	}
 	return e.valProcesses(valProcesses, processes)
@@ -1251,6 +1252,9 @@ func (e *eval) buildArray(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
 			},
 		}
 	}
+	old_type := e.type_prefix
+	e.type_prefix = t.ComponentType
+	defer func() { e.type_prefix = old_type }()
 	var v value
 	v.data.Value = t.Kind
 	v.data.Type = t
@@ -1269,6 +1273,9 @@ func (e *eval) buildArray(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
 }
 
 func (e *eval) buildSlice(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
+	old_type := e.type_prefix
+	e.type_prefix = t.ComponentType
+	defer func() { e.type_prefix = old_type }()
 	var v value
 	v.data.Value = t.Kind
 	v.data.Type = t
@@ -1400,8 +1407,19 @@ func (e *eval) braceRange(toks Toks, m *exprModel) (v value) {
 		exprToks = toks[:i]
 		break
 	}
-	valToksLen := len(exprToks)
-	if valToksLen == 0 || braceCount > 0 {
+	switch {
+	case len(exprToks) == 0:
+		if e.type_prefix != nil {
+			switch {
+			case typeIsArray(*e.type_prefix) || typeIsSlice(*e.type_prefix):
+				return e.enumerable(toks, *e.type_prefix, m)
+			case typeIsStruct(*e.type_prefix):
+				s := e.type_prefix.Tag.(*structure)
+				return e.p.callStructConstructor(s, toks, m)
+			}
+		}
+		fallthrough
+	case braceCount > 0:
 		e.pusherrtok(toks[0], "invalid_syntax")
 		return
 	}

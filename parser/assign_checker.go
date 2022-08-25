@@ -84,7 +84,7 @@ type assignChecker struct {
 }
 
 func (ac assignChecker) checkAssignType() {
-	if ac.p.eval.hasError || ac.v.data.Value == "" {
+	if ac.p.eval.has_error || ac.v.data.Value == "" {
 		return
 	}
 	if ac.v.constExpr &&

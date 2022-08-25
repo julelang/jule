@@ -214,7 +214,7 @@ func (ve *valueEvaluator) varId(id string, variable *Var, global bool) (v value)
 		v.model = variable.Expr.Model
 	} else {
 		ve.model.appendSubNode(exprNode{variable.OutId()})
-		ve.p.eval.hasError = ve.p.eval.hasError || typeIsVoid(v.data.Type)
+		ve.p.eval.has_error = ve.p.eval.has_error || typeIsVoid(v.data.Type)
 	}
 	return
 }
