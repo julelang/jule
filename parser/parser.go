@@ -3480,10 +3480,8 @@ func (p *Parser) checkType(real, check DataType, ignoreAny bool, errTok Tok) {
 			p.pusherrtok(errTok, "incompatible_datatype", real.Kind, check.Kind)
 			return
 		}
-		i := real.Tag.([][]any)[0][0].(uint64)
-		j := check.Tag.([][]any)[0][0].(uint64)
-		realKind := strings.Replace(real.Kind, jule.Mark_Array, strconv.FormatUint(i, 10), 1)
-		checkKind := strings.Replace(check.Kind, jule.Mark_Array, strconv.FormatUint(j, 10), 1)
+		realKind := strings.Replace(real.Kind, jule.Mark_Array, strconv.Itoa(real.Size.N), 1)
+		checkKind := strings.Replace(check.Kind, jule.Mark_Array, strconv.Itoa(check.Size.N), 1)
 		p.pusherrtok(errTok, "incompatible_datatype", realKind, checkKind)
 	}
 }

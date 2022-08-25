@@ -166,11 +166,11 @@ func checkSliceCompatiblity(arrT, t DataType) bool {
 	return arrT.Kind == t.Kind
 }
 
-func checkArrayCompatiblity(arrT, t DataType) bool {
-	if !typeIsArray(t) {
+func checkArrayCompatiblity(t1, t2 DataType) bool {
+	if !typeIsArray(t2) {
 		return false
 	}
-	return arrT.Size.N == t.Size.N
+	return t1.Size.N == t2.Size.N
 }
 
 func checkMapCompability(mapT, t DataType) bool {
