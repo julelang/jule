@@ -119,12 +119,20 @@ func (e *eval) valProcesses(exprs []any, processes []Toks) (v value, model iExpr
 		expr = val.model
 	} else {
 		sexpr := serieExpr{}
-		sexpr.exprs = make([]any, 5)
-		sexpr.exprs[0] = exprNode{tokens.LPARENTHESES}
-		sexpr.exprs[1] = leftExpr
-		sexpr.exprs[2] = exprNode{process.operator.Kind}
-		sexpr.exprs[3] = rightExpr
-		sexpr.exprs[4] = exprNode{tokens.RPARENTHESES}
+		// If processes has one more couple (see: [EXPR] [OPERATOR] [EXPR])
+		if len(processes) > 3 {
+			sexpr.exprs = make([]any, 5)
+			sexpr.exprs[0] = exprNode{tokens.LPARENTHESES}
+			sexpr.exprs[1] = leftExpr
+			sexpr.exprs[2] = exprNode{process.operator.Kind}
+			sexpr.exprs[3] = rightExpr
+			sexpr.exprs[4] = exprNode{tokens.RPARENTHESES}
+		} else {
+			sexpr.exprs = make([]any, 3)
+			sexpr.exprs[0] = leftExpr
+			sexpr.exprs[1] = exprNode{process.operator.Kind}
+			sexpr.exprs[2] = rightExpr
+		}
 		expr = sexpr
 	}
 	processes = append(processes[:i-1], append([]Toks{{}}, processes[i+2:]...)...)

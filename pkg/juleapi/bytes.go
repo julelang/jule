@@ -15,14 +15,14 @@ import (
 // ToStr returns specified literal as X string literal for cpp.
 func ToStr(bytes []byte) string {
 	var cpp strings.Builder
-	cpp.WriteString("str_julet{")
+	cpp.WriteString("str_julet(")
 	btoa := bytesToStr(bytes)
 	if btoa != "" {
 		cpp.WriteByte('{')
 		cpp.WriteString(btoa)
 		cpp.WriteByte('}')
 	}
-	cpp.WriteString("}")
+	cpp.WriteString(")")
 	return cpp.String()
 }
 
