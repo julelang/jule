@@ -10,11 +10,13 @@ import (
 // Block is code block.
 type Block struct {
 	Parent   *Block
-	SubIndex int // Anonymous block sub count
+	SubIndex int // Index of statement in parent block
 	Tree     []Statement
-	Gotos    *Gotos
-	Labels   *Labels
 	Func     *Func
+
+	// If block is the root block, has all labels and gotos of all sub blocks.
+	Gotos  *Gotos
+	Labels *Labels
 }
 
 func (b Block) String() string {

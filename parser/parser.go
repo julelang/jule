@@ -2535,18 +2535,26 @@ func (p *Parser) checkStatement(b *models.Block, i *int) {
 	case models.If:
 		p.ifExpr(&t, i, b.Tree)
 		s.Data = t
-	case models.Goto:
-		t.Index = *i
-		t.Block = b
-		*b.Gotos = append(*b.Gotos, &t)
 	case models.Ret:
 		rc := retChecker{p: p, retAST: &t, f: b.Func}
 		rc.check()
 		s.Data = t
+	case models.Goto:
+		obj := new(models.Goto)
+		*obj = t
+		obj.Index = *i
+		obj.Block = b
+		*b.Gotos = append(*b.Gotos, obj)
 	case models.Label:
-		t.Block = b
-		t.Index = *i
-		*b.Labels = append(*b.Labels, &t)
+		if find_label_parent(t.Label, b) != nil {
+			p.pusherrtok(t.Tok, "label_exist", t.Label)
+			break
+		}
+		obj := new(models.Label)
+		*obj = t
+		obj.Index = *i
+		obj.Block = b
+		*b.Labels = append(*b.Labels, obj)
 	default:
 		p.pusherrtok(s.Tok, "invalid_syntax")
 	}
@@ -2672,13 +2680,6 @@ func find_label(id string, b *models.Block) *models.Label {
 func (p *Parser) checkLabels() {
 	labels := p.rootBlock.Labels
 	for _, label := range *labels {
-		for _, checkLabel := range *labels {
-			if label.Index == checkLabel.Index {
-				break
-			} else if label.Label == checkLabel.Label {
-				p.pusherrtok(label.Tok, "label_exist", label.Label)
-			}
-		}
 		if !label.Used {
 			p.pusherrtok(label.Tok, "declared_but_not_used", label.Label+":")
 		}
