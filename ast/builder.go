@@ -1972,7 +1972,7 @@ func (b *Builder) commonIterProfile(toks []Tok) (s models.Statement) {
 
 func (b *Builder) IterExpr(bs *blockStatement) models.Statement {
 	if bs.withTerminator {
-		return b.forIterProfile(bs)
+		b.forIterProfile(bs)
 	}
 	return b.commonIterProfile(bs.toks)
 }
@@ -2084,7 +2084,7 @@ func (b *Builder) cases(toks Toks) ([]models.Case, *models.Case) {
 
 // MatchCase builds AST model of match-case.
 func (b *Builder) MatchCase(toks Toks) (s models.Statement) {
-	var match models.Match
+	match := new(models.Match)
 	match.Tok = toks[0]
 	s.Tok = match.Tok
 	toks = toks[1:]
@@ -2101,7 +2101,7 @@ func (b *Builder) MatchCase(toks Toks) (s models.Statement) {
 	match.Cases, match.Default = b.cases(blockToks)
 	for i := range match.Cases {
 		c := &match.Cases[i]
-		c.Match = &match
+		c.Match = match
 		if i > 0 {
 			match.Cases[i-1].Next = c
 		}
@@ -2110,7 +2110,7 @@ func (b *Builder) MatchCase(toks Toks) (s models.Statement) {
 		if len(match.Cases) > 0 {
 			match.Cases[len(match.Cases)-1].Next = match.Default
 		}
-		match.Default.Match = &match
+		match.Default.Match = match
 	}
 	s.Data = match
 	return
@@ -2214,7 +2214,14 @@ func (b *Builder) BreakStatement(toks Toks) models.Statement {
 	var breakAST models.Break
 	breakAST.Tok = toks[0]
 	if len(toks) > 1 {
-		b.pusherr(toks[1], "invalid_syntax")
+		if toks[1].Id != tokens.Id {
+			b.pusherr(toks[1], "invalid_syntax")
+		} else {
+			breakAST.LabelToken = toks[1]
+			if len(toks) > 2 {
+				b.pusherr(toks[1], "invalid_syntax")
+			}
+		}
 	}
 	return models.Statement{
 		Tok:  breakAST.Tok,
@@ -2227,7 +2234,14 @@ func (b *Builder) ContinueStatement(toks Toks) models.Statement {
 	var continueAST models.Continue
 	continueAST.Token = toks[0]
 	if len(toks) > 1 {
-		b.pusherr(toks[1], "invalid_syntax")
+		if toks[1].Id != tokens.Id {
+			b.pusherr(toks[1], "invalid_syntax")
+		} else {
+			continueAST.LoopLabel = toks[1]
+			if len(toks) > 2 {
+				b.pusherr(toks[1], "invalid_syntax")
+			}
+		}
 	}
 	return models.Statement{
 		Tok:  continueAST.Token,

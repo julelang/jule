@@ -9,6 +9,7 @@ import (
 type Iter struct {
 	Tok     Tok
 	Block   *Block
+	Parent  *Block
 	Profile IterProfile
 }
 

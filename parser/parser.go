@@ -2432,7 +2432,11 @@ func (p *Parser) checkNewBlockCustom(b *models.Block, oldBlockVars []*Var) {
 		b.Func = p.nodeBlock.Func
 		oldNode := p.nodeBlock
 		p.nodeBlock = b
-		defer func() { p.nodeBlock = oldNode }()
+		defer func() {
+			p.nodeBlock = oldNode
+			*p.rootBlock.Gotos = append(*p.rootBlock.Gotos, *b.Gotos...)
+			*p.rootBlock.Labels = append(*p.rootBlock.Labels, *b.Labels...)
+		}()
 	}
 	blockTypes := p.blockTypes
 	p.checkBlock(b)
@@ -2468,15 +2472,14 @@ func (p *Parser) statement(s *models.Statement, recover bool) bool {
 	case models.Assign:
 		p.assign(&t)
 		s.Data = t
-	case models.Iter:
-		p.iter(&t)
-		s.Data = t
 	case models.Break:
 		p.breakStatement(&t)
 		s.Data = t
 	case models.Continue:
 		p.continueStatement(&t)
 		s.Data = t
+	case *models.Match:
+		p.matchcase(t)
 	case Type:
 		if def, _ := p.blockDefById(t.Id); def != nil {
 			p.pusherrtok(t.Tok, "exist_id", t.Id)
@@ -2495,9 +2498,6 @@ func (p *Parser) statement(s *models.Statement, recover bool) bool {
 		s.Data = t
 	case models.ConcurrentCall:
 		p.concurrentCall(&t)
-		s.Data = t
-	case models.Match:
-		p.matchcase(&t)
 		s.Data = t
 	case models.Comment:
 	default:
@@ -2519,12 +2519,16 @@ func (p *Parser) fallthroughStatement(f *models.Fallthrough, b *models.Block, i 
 }
 
 func (p *Parser) checkStatement(b *models.Block, i *int) {
-	s := b.Tree[*i]
-	defer func(i int) { b.Tree[i] = s }(*i)
-	if p.statement(&s, true) {
+	s := &b.Tree[*i]
+	if p.statement(s, true) {
 		return
 	}
 	switch t := s.Data.(type) {
+	case models.Iter:
+		t.Parent = b
+		s.Data = t
+		p.iter(&t)
+		s.Data = t
 	case models.Fallthrough:
 		p.fallthroughStatement(&t, b, i)
 		s.Data = t
@@ -2534,7 +2538,7 @@ func (p *Parser) checkStatement(b *models.Block, i *int) {
 	case models.Goto:
 		t.Index = *i
 		t.Block = b
-		*p.rootBlock.Gotos = append(*p.rootBlock.Gotos, &t)
+		*b.Gotos = append(*b.Gotos, &t)
 	case models.Ret:
 		rc := retChecker{p: p, retAST: &t, f: b.Func}
 		rc.check()
@@ -2542,7 +2546,7 @@ func (p *Parser) checkStatement(b *models.Block, i *int) {
 	case models.Label:
 		t.Block = b
 		t.Index = *i
-		*p.rootBlock.Labels = append(*b.Labels, &t)
+		*b.Labels = append(*b.Labels, &t)
 	default:
 		p.pusherrtok(s.Tok, "invalid_syntax")
 	}
@@ -2656,8 +2660,8 @@ func (p *Parser) matchcase(t *models.Match) {
 	}
 }
 
-func (p *Parser) findLabel(id string) *models.Label {
-	for _, label := range *p.rootBlock.Labels {
+func find_label(id string, b *models.Block) *models.Label {
+	for _, label := range *b.Labels {
 		if label.Label == id {
 			return label
 		}
@@ -2783,7 +2787,7 @@ func (p *Parser) checkGoto(gt *models.Goto, label *models.Label) {
 
 func (p *Parser) checkGotos() {
 	for _, gt := range *p.rootBlock.Gotos {
-		label := p.findLabel(gt.Label)
+		label := find_label(gt.Label, p.rootBlock)
 		if label == nil {
 			p.pusherrtok(gt.Tok, "label_not_exist", gt.Label)
 			continue
@@ -2838,8 +2842,8 @@ func hasRet(b *models.Block) (ok bool, fall bool) {
 			fall = true
 		case models.Ret:
 			return true, fall
-		case models.Match:
-			if matchHasRet(&t) {
+		case *models.Match:
+			if matchHasRet(t) {
 				return true, false
 			}
 		}
@@ -3182,22 +3186,125 @@ func (p *Parser) elseBlock(elseast *models.Else) {
 	p.checkNewBlock(elseast.Block)
 }
 
+func find_label_parent(id string, b *models.Block) *models.Label {
+	label := find_label(id, b)
+	for label == nil {
+		if b.Parent == nil {
+			return nil
+		}
+		b = b.Parent
+		label = find_label(id, b)
+	}
+	return label
+}
+
+func (p *Parser) breakWithLabel(ast *models.Break) {
+	if p.currentIter == nil && p.currentCase == nil {
+		p.pusherrtok(ast.Tok, "break_at_out_of_valid_scope")
+		return
+	}
+	var label *models.Label
+	switch {
+	case p.currentCase != nil && p.currentIter != nil:
+		if p.currentCase.Block.Parent.SubIndex < p.currentIter.Parent.SubIndex {
+			label = find_label_parent(ast.LabelToken.Kind, p.currentIter.Parent)
+			if label == nil {
+				label = find_label_parent(ast.LabelToken.Kind, p.currentCase.Block.Parent)
+			}
+		} else {
+			label = find_label_parent(ast.LabelToken.Kind, p.currentCase.Block.Parent)
+			if label == nil {
+				label = find_label_parent(ast.LabelToken.Kind, p.currentIter.Parent)
+			}
+		}
+	case p.currentCase != nil:
+		label = find_label_parent(ast.LabelToken.Kind, p.currentCase.Block.Parent)
+	case p.currentIter != nil:
+		label = find_label_parent(ast.LabelToken.Kind, p.currentIter.Parent)
+	}
+	if label == nil {
+		p.pusherrtok(ast.LabelToken, "label_not_exist", ast.LabelToken.Kind)
+		return
+	} else if label.Index+1 >= len(label.Block.Tree) {
+		p.pusherrtok(ast.LabelToken, "invalid_label")
+		return
+	}
+	label.Used = true
+	for i := label.Index+1; i < len(label.Block.Tree); i++ {
+		obj := &label.Block.Tree[i]
+		if obj.Data == nil {
+			continue
+		}
+		switch t := obj.Data.(type) {
+		case models.Comment:
+			continue
+		case *models.Match:
+			label.Used = true
+			ast.Label = t.EndLabel()
+		case models.Iter:
+			label.Used = true
+			ast.Label = t.EndLabel()
+		default:
+			p.pusherrtok(ast.LabelToken, "invalid_label")
+		}
+		break
+	}
+}
+
+func (p *Parser) continueWithLabel(ast *models.Continue) {
+	if p.currentIter == nil {
+		p.pusherrtok(ast.Token, "continue_at_out_of_valid_scope")
+		return
+	}
+	label := find_label_parent(ast.LoopLabel.Kind, p.currentIter.Parent)
+	if label == nil {
+		p.pusherrtok(ast.LoopLabel, "label_not_exist", ast.LoopLabel.Kind)
+		return
+	} else if label.Index+1 >= len(label.Block.Tree) {
+		p.pusherrtok(ast.LoopLabel, "invalid_label")
+		return
+	}
+	label.Used = true
+	for i := label.Index+1; i < len(label.Block.Tree); i++ {
+		obj := &label.Block.Tree[i]
+		if obj.Data == nil {
+			continue
+		}
+		switch t := obj.Data.(type) {
+		case models.Comment:
+			continue
+		case models.Iter:
+			label.Used = true
+			ast.Label = t.NextLabel()
+		default:
+			p.pusherrtok(ast.LoopLabel, "invalid_label")
+		}
+		break
+	}
+}
+
 func (p *Parser) breakStatement(ast *models.Break) {
 	switch {
+	case ast.LabelToken.Id != tokens.NA:
+		p.breakWithLabel(ast)
 	case p.currentCase != nil:
-		ast.Label = p.currentCase.EndLabel()
+		ast.Label = p.currentCase.Match.EndLabel()
 	case p.currentIter != nil:
 		ast.Label = p.currentIter.EndLabel()
 	default:
-		p.pusherrtok(ast.Tok, "break_at_outiter")
+		p.pusherrtok(ast.Tok, "break_at_out_of_valid_scope")
 	}
 }
 
 func (p *Parser) continueStatement(ast *models.Continue) {
-	if p.currentIter == nil {
-		p.pusherrtok(ast.Token, "continue_at_outiter")
+	switch {
+	case p.currentIter == nil:
+		p.pusherrtok(ast.Token, "continue_at_out_of_valid_scope")
+	case ast.LoopLabel.Id != tokens.NA:
+		p.continueWithLabel(ast)
+	default:
+		ast.Label = p.currentIter.NextLabel()
 	}
-	ast.Label = p.currentIter.NextLabel()
 }
 
 func (p *Parser) checkValidityForAutoType(t DataType, errtok Tok) {
