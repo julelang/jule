@@ -37,7 +37,7 @@ var helpmap = [...][2]string{
 	1: {commandVersion, "Show version"},
 	2: {commandInit, "Initialize new project here"},
 	3: {commandDoc, "Documentize Jule source code"},
-	4: {commandHelp, "Start a new bug report"},
+	4: {commandBug, "Start a new bug report"},
 }
 
 func help(cmd string) {
