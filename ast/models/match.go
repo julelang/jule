@@ -3,11 +3,13 @@ package models
 import (
 	"strconv"
 	"strings"
+
+	"github.com/jule-lang/jule/lex"
 )
 
 type Fallthrough struct {
-	Tok  Tok
-	Case *Case
+	Token lex.Token
+	Case  *Case
 }
 
 func (f Fallthrough) String() string {
@@ -20,7 +22,7 @@ func (f Fallthrough) String() string {
 
 // Case the AST model of case.
 type Case struct {
-	Tok   Tok
+	Token lex.Token
 	Exprs []Expr
 	Block *Block
 	Match *Match
@@ -31,8 +33,8 @@ type Case struct {
 func (c *Case) BeginLabel() string {
 	var cpp strings.Builder
 	cpp.WriteString("case_begin_")
-	cpp.WriteString(strconv.Itoa(c.Tok.Row))
-	cpp.WriteString(strconv.Itoa(c.Tok.Column))
+	cpp.WriteString(strconv.Itoa(c.Token.Row))
+	cpp.WriteString(strconv.Itoa(c.Token.Column))
 	return cpp.String()
 }
 
@@ -40,8 +42,8 @@ func (c *Case) BeginLabel() string {
 func (c *Case) EndLabel() string {
 	var cpp strings.Builder
 	cpp.WriteString("case_end_")
-	cpp.WriteString(strconv.Itoa(c.Tok.Row))
-	cpp.WriteString(strconv.Itoa(c.Tok.Column))
+	cpp.WriteString(strconv.Itoa(c.Token.Row))
+	cpp.WriteString(strconv.Itoa(c.Token.Column))
 	return cpp.String()
 }
 
@@ -85,9 +87,9 @@ func (c *Case) String(matchExpr string) string {
 
 // Match the AST model of match-case.
 type Match struct {
-	Tok      Tok
+	Token    lex.Token
 	Expr     Expr
-	ExprType DataType
+	ExprType Type
 	Default  *Case
 	Cases    []Case
 }
@@ -148,8 +150,8 @@ func (m *Match) MatchBoolString() string {
 func (m *Match) EndLabel() string {
 	var cpp strings.Builder
 	cpp.WriteString("match_end_")
-	cpp.WriteString(strconv.FormatInt(int64(m.Tok.Row), 10))
-	cpp.WriteString(strconv.FormatInt(int64(m.Tok.Column), 10))
+	cpp.WriteString(strconv.FormatInt(int64(m.Token.Row), 10))
+	cpp.WriteString(strconv.FormatInt(int64(m.Token.Column), 10))
 	return cpp.String()
 }
 

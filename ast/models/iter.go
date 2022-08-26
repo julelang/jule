@@ -3,11 +3,35 @@ package models
 import (
 	"strconv"
 	"strings"
+
+	"github.com/jule-lang/jule/lex"
 )
+
+// Break is the AST model of break statement.
+type Break struct {
+	Token      lex.Token
+	LabelToken lex.Token
+	Label      string
+}
+
+func (b Break) String() string {
+	return "goto " + b.Label + ";"
+}
+
+// Continue is the AST model of break statement.
+type Continue struct{
+	Token     lex.Token
+	LoopLabel lex.Token
+	Label     string
+}
+
+func (c Continue) String() string {
+	return "goto " + c.Label + ";"
+}
 
 // Iter is the AST model of iterations.
 type Iter struct {
-	Tok     Tok
+	Token   lex.Token
 	Block   *Block
 	Parent  *Block
 	Profile IterProfile
@@ -17,8 +41,8 @@ type Iter struct {
 func (i *Iter) BeginLabel() string {
 	var cpp strings.Builder
 	cpp.WriteString("iter_begin_")
-	cpp.WriteString(strconv.Itoa(i.Tok.Row))
-	cpp.WriteString(strconv.Itoa(i.Tok.Column))
+	cpp.WriteString(strconv.Itoa(i.Token.Row))
+	cpp.WriteString(strconv.Itoa(i.Token.Column))
 	return cpp.String()
 }
 
@@ -27,8 +51,8 @@ func (i *Iter) BeginLabel() string {
 func (i *Iter) EndLabel() string {
 	var cpp strings.Builder
 	cpp.WriteString("iter_end_")
-	cpp.WriteString(strconv.Itoa(i.Tok.Row))
-	cpp.WriteString(strconv.Itoa(i.Tok.Column))
+	cpp.WriteString(strconv.Itoa(i.Token.Row))
+	cpp.WriteString(strconv.Itoa(i.Token.Column))
 	return cpp.String()
 }
 
@@ -37,8 +61,8 @@ func (i *Iter) EndLabel() string {
 func (i *Iter) NextLabel() string {
 	var cpp strings.Builder
 	cpp.WriteString("iter_next_")
-	cpp.WriteString(strconv.Itoa(i.Tok.Row))
-	cpp.WriteString(strconv.Itoa(i.Tok.Column))
+	cpp.WriteString(strconv.Itoa(i.Token.Row))
+	cpp.WriteString(strconv.Itoa(i.Token.Column))
 	return cpp.String()
 }
 

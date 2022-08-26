@@ -4,6 +4,7 @@ import (
 	"math"
 	"strconv"
 
+	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/pkg/julebits"
 	"github.com/jule-lang/jule/pkg/juletype"
 )
@@ -77,10 +78,10 @@ func integerAssignable(dt uint8, v value) bool {
 
 type assignChecker struct {
 	p         *Parser
-	t         DataType
+	t         Type
 	v         value
 	ignoreAny bool
-	errtok    Tok
+	errtok    lex.Token
 }
 
 func (ac assignChecker) checkAssignType() {

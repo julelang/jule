@@ -1,12 +1,15 @@
 package ast
 
-import "github.com/jule-lang/jule/lex/tokens"
+import (
+	"github.com/jule-lang/jule/lex"
+	"github.com/jule-lang/jule/lex/tokens"
+)
 
 // AssignInfo is the assignment information.
 type AssignInfo struct {
-	Left   Toks
-	Right  Toks
-	Setter Tok
+	Left   []lex.Token
+	Right  []lex.Token
+	Setter lex.Token
 	Ok     bool
 }
 
@@ -70,26 +73,26 @@ func IsAssignOperator(kind string) bool {
 	return false
 }
 
-// CheckAssignToks checks assignment tokens and reports is ok or not.
-func CheckAssignToks(toks Toks) bool {
+// CheckAssignTokens checks assignment tokens and reports is ok or not.
+func CheckAssignTokens(toks []lex.Token) bool {
 	if len(toks) == 0 || !IsAssign(toks[0].Id) {
 		return false
 	}
-	braceCount := 0
-	for _, tok := range toks {
-		if tok.Id == tokens.Brace {
-			switch tok.Kind {
+	brace_n := 0
+	for _, t := range toks {
+		if t.Id == tokens.Brace {
+			switch t.Kind {
 			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
-				braceCount++
+				brace_n++
 			default:
-				braceCount--
+				brace_n--
 			}
 		}
-		if braceCount < 0 {
+		if brace_n < 0 {
 			return false
-		} else if braceCount > 0 {
+		} else if brace_n > 0 {
 			continue
-		} else if tok.Id == tokens.Operator && IsAssignOperator(tok.Kind) {
+		} else if t.Id == tokens.Operator && IsAssignOperator(t.Kind) {
 			return true
 		}
 	}

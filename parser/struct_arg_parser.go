@@ -2,6 +2,7 @@ package parser
 
 import (
 	"github.com/jule-lang/jule/ast/models"
+	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/pkg/jule"
 )
 
@@ -9,7 +10,7 @@ func (p *Parser) getFieldMap(f *Func) *paramMap {
 	pmap := new(paramMap)
 	*pmap = paramMap{}
 	s := f.RetType.Type.Tag.(*structure)
-	for i, g := range s.Defs.Globals {
+	for i, g := range s.Defines.Globals {
 		if isAccessable(p.File, g.Token.File, g.Pub) {
 			param := &f.Params[i]
 			(*pmap)[param.Id] = &paramMapPair{param, nil}
@@ -25,7 +26,7 @@ type structArgParser struct {
 	args   *models.Args
 	i      int
 	arg    Arg
-	errTok Tok
+	errTok lex.Token
 }
 
 func (sap *structArgParser) buildArgs() {
@@ -50,15 +51,15 @@ func (sap *structArgParser) buildArgs() {
 func (sap *structArgParser) pushArg() {
 	defer func() { sap.i++ }()
 	if sap.arg.TargetId == "" {
-		sap.p.pusherrtok(sap.arg.Tok, "argument_must_target_to_parameter")
+		sap.p.pusherrtok(sap.arg.Token, "argument_must_target_to_parameter")
 		return
 	}
 	pair, ok := (*sap.fmap)[sap.arg.TargetId]
 	if !ok {
-		sap.p.pusherrtok(sap.arg.Tok, "id_not_exist", sap.arg.TargetId)
+		sap.p.pusherrtok(sap.arg.Token, "id_not_exist", sap.arg.TargetId)
 		return
 	} else if pair.arg != nil {
-		sap.p.pusherrtok(sap.arg.Tok, "already_has_expr", sap.arg.TargetId)
+		sap.p.pusherrtok(sap.arg.Token, "already_has_expr", sap.arg.TargetId)
 		return
 	}
 	arg := sap.arg

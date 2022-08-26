@@ -3,12 +3,13 @@ package models
 import (
 	"strings"
 
+	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
 // EnumItem is the AST model of enumerator items.
 type EnumItem struct {
-	Tok     Tok
+	Token   lex.Token
 	Id      string
 	Expr    Expr
 	ExprTag any
@@ -16,7 +17,7 @@ type EnumItem struct {
 
 func (ei EnumItem) String() string {
 	var cpp strings.Builder
-	cpp.WriteString(juleapi.OutId(ei.Id, ei.Tok.File))
+	cpp.WriteString(juleapi.OutId(ei.Id, ei.Token.File))
 	cpp.WriteString(" = ")
 	cpp.WriteString(ei.Expr.String())
 	return cpp.String()
@@ -25,9 +26,9 @@ func (ei EnumItem) String() string {
 // Enum is the AST model of enumerator statements.
 type Enum struct {
 	Pub   bool
-	Tok   Tok
+	Tok   lex.Token
 	Id    string
-	Type  DataType
+	Type  Type
 	Items []*EnumItem
 	Used  bool
 	Desc  string

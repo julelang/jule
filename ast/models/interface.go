@@ -3,14 +3,14 @@ package models
 // CompiledStruct instance.
 type CompiledStruct interface {
 	OutId() string
-	Generics() []DataType
-	SetGenerics([]DataType)
+	Generics() []Type
+	SetGenerics([]Type)
 }
 
 // Genericable instance.
 type Genericable interface {
-	Generics() []DataType
-	SetGenerics([]DataType)
+	Generics() []Type
+	SetGenerics([]Type)
 }
 
 // IterProfile interface for iteration profiles.

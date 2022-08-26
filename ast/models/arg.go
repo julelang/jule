@@ -1,8 +1,10 @@
 package models
 
+import "github.com/jule-lang/jule/lex"
+
 // Arg is AST model of argument.
 type Arg struct {
-	Tok      Tok
+	Token    lex.Token
 	TargetId string
 	Expr     Expr
 }

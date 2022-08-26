@@ -17,15 +17,15 @@ func findGeneric(id string, generics []*GenericType) *GenericType {
 	return nil
 }
 
-func typeIsVoid(t DataType) bool {
+func typeIsVoid(t Type) bool {
 	return t.Id == juletype.Void && !t.MultiTyped
 }
 
-func typeIsVariadicable(t DataType) bool {
+func typeIsVariadicable(t Type) bool {
 	return typeIsSlice(t)
 }
 
-func typeIsAllowForConst(t DataType) bool {
+func typeIsAllowForConst(t Type) bool {
 	if !typeIsPure(t) {
 		return false
 	}
@@ -37,24 +37,24 @@ func typeIsAllowForConst(t DataType) bool {
 	}
 }
 
-func typeIsStruct(dt DataType) bool {
+func typeIsStruct(dt Type) bool {
 	return dt.Id == juletype.Struct
 }
 
-func typeIsTrait(dt DataType) bool {
+func typeIsTrait(dt Type) bool {
 	return dt.Id == juletype.Trait
 }
 
-func typeIsEnum(dt DataType) bool {
+func typeIsEnum(dt Type) bool {
 	return dt.Id == juletype.Enum
 }
 
-func unptrType(t DataType) DataType {
+func unptrType(t Type) Type {
 	t.Kind = t.Kind[1:]
 	return t
 }
 
-func typeHasThisGeneric(generic *GenericType, t DataType) bool {
+func typeHasThisGeneric(generic *GenericType, t Type) bool {
 	switch {
 	case typeIsFunc(t):
 		f := t.Tag.(*Func)
@@ -65,7 +65,7 @@ func typeHasThisGeneric(generic *GenericType, t DataType) bool {
 		}
 		return typeHasThisGeneric(generic, f.RetType.Type)
 	case t.MultiTyped, typeIsMap(t):
-		types := t.Tag.([]DataType)
+		types := t.Tag.([]Type)
 		for _, t := range types {
 			if typeHasThisGeneric(generic, t) {
 				return true
@@ -78,7 +78,7 @@ func typeHasThisGeneric(generic *GenericType, t DataType) bool {
 	return typeIsThisGeneric(generic, t)
 }
 
-func typeHasGenerics(generics []*GenericType, t DataType) bool {
+func typeHasGenerics(generics []*GenericType, t Type) bool {
 	for _, generic := range generics {
 		if typeHasThisGeneric(generic, t) {
 			return true
@@ -87,12 +87,12 @@ func typeHasGenerics(generics []*GenericType, t DataType) bool {
 	return false
 }
 
-func typeIsThisGeneric(generic *GenericType, t DataType) bool {
+func typeIsThisGeneric(generic *GenericType, t Type) bool {
 	id, _ := t.KindId()
 	return id == generic.Id
 }
 
-func typeIsGeneric(generics []*GenericType, t DataType) bool {
+func typeIsGeneric(generics []*GenericType, t Type) bool {
 	if t.Id != juletype.Id {
 		return false
 	}
@@ -104,38 +104,38 @@ func typeIsGeneric(generics []*GenericType, t DataType) bool {
 	return false
 }
 
-func typeIsExplicitPtr(t DataType) bool {
+func typeIsExplicitPtr(t Type) bool {
 	if t.Kind == "" {
 		return false
 	}
 	return t.Kind[0] == '*'
 }
 
-func typeIsPtr(t DataType) bool {
+func typeIsPtr(t Type) bool {
 	return typeIsExplicitPtr(t)
 }
 
-func typeIsSlice(t DataType) bool {
+func typeIsSlice(t Type) bool {
 	return t.Id == juletype.Slice && strings.HasPrefix(t.Kind, jule.Prefix_Slice)
 }
 
-func typeIsArray(t DataType) bool {
+func typeIsArray(t Type) bool {
 	return t.Id == juletype.Array && strings.HasPrefix(t.Kind, jule.Prefix_Array)
 }
 
-func typeIsMap(t DataType) bool {
+func typeIsMap(t Type) bool {
 	if t.Kind == "" || t.Id != juletype.Map {
 		return false
 	}
 	return t.Kind[0] == '[' && t.Kind[len(t.Kind)-1] == ']'
 }
 
-func typeIsFunc(t DataType) bool {
+func typeIsFunc(t Type) bool {
 	return t.Id == juletype.Func && strings.HasPrefix(t.Kind, tokens.FN)
 }
 
 // Includes single ptr types.
-func typeIsPure(t DataType) bool {
+func typeIsPure(t Type) bool {
 	return !typeIsPtr(t) &&
 		!typeIsSlice(t) &&
 		!typeIsArray(t) &&
@@ -143,14 +143,14 @@ func typeIsPure(t DataType) bool {
 		!typeIsFunc(t)
 }
 
-func subIdAccessorOfType(t DataType) string {
+func subIdAccessorOfType(t Type) string {
 	if typeIsPtr(t) {
 		return "->"
 	}
 	return tokens.DOT
 }
 
-func typeIsNilCompatible(t DataType) bool {
+func typeIsNilCompatible(t Type) bool {
 	return t.Id == juletype.Nil ||
 		typeIsFunc(t) ||
 		typeIsPtr(t) ||
@@ -159,43 +159,43 @@ func typeIsNilCompatible(t DataType) bool {
 		typeIsMap(t)
 }
 
-func checkSliceCompatiblity(arrT, t DataType) bool {
+func checkSliceCompatiblity(arrT, t Type) bool {
 	if t.Id == juletype.Nil {
 		return true
 	}
 	return arrT.Kind == t.Kind
 }
 
-func checkArrayCompatiblity(t1, t2 DataType) bool {
+func checkArrayCompatiblity(t1, t2 Type) bool {
 	if !typeIsArray(t2) {
 		return false
 	}
 	return t1.Size.N == t2.Size.N
 }
 
-func checkMapCompability(mapT, t DataType) bool {
+func checkMapCompability(mapT, t Type) bool {
 	if t.Id == juletype.Nil {
 		return true
 	}
 	return mapT.Kind == t.Kind
 }
 
-func typeIsLvalue(t DataType) bool {
+func typeIsLvalue(t Type) bool {
 	return typeIsPtr(t) || typeIsSlice(t) || typeIsMap(t)
 }
 
-func checkPtrCompability(t1, t2 DataType) bool {
+func checkPtrCompability(t1, t2 Type) bool {
 	if t2.Id == juletype.Nil {
 		return true
 	}
 	return t1.Kind == t2.Kind
 }
 
-func typesEquals(t1, t2 DataType) bool {
+func typesEquals(t1, t2 Type) bool {
 	return t1.Id == t2.Id && t1.Kind == t2.Kind
 }
 
-func checkTraitCompability(t1, t2 DataType) bool {
+func checkTraitCompability(t1, t2 Type) bool {
 	if t2.Id == juletype.Nil {
 		return true
 	}
@@ -224,11 +224,11 @@ func checkTraitCompability(t1, t2 DataType) bool {
 	return false
 }
 
-func checkStructCompability(t1, t2 DataType) bool {
+func checkStructCompability(t1, t2 Type) bool {
 	s1, s2 := t1.Tag.(*structure), t2.Tag.(*structure)
 	switch {
 	case s1.Ast.Id != s2.Ast.Id,
-		s1.Ast.Tok.File != s2.Ast.Tok.File:
+		s1.Ast.Token.File != s2.Ast.Token.File:
 		return false
 	}
 	if len(s1.Ast.Generics) == 0 {
@@ -247,7 +247,7 @@ func checkStructCompability(t1, t2 DataType) bool {
 	return true
 }
 
-func typesAreCompatible(t1, t2 DataType, ignoreany bool) bool {
+func typesAreCompatible(t1, t2 Type, ignoreany bool) bool {
 	switch {
 	case typeIsTrait(t1), typeIsTrait(t2):
 		if typeIsTrait(t2) {

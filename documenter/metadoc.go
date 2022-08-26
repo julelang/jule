@@ -4,13 +4,14 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/ast/models"
 	"github.com/jule-lang/jule/parser"
 	"github.com/jule-lang/jule/pkg/juleset"
 	"github.com/jule-lang/jule/pkg/juletype"
 )
 
-func fmt_meta_ttoa(t models.DataType) string {
+func fmt_meta_ttoa(t models.Type) string {
 	if t.Kind == juletype.TypeMap[juletype.Void] {
 		return ""
 	}
@@ -57,7 +58,7 @@ func fmt_meta_enums(dm *Defmap) string {
 		for _, item := range e.Items {
 			meta.WriteString(indent)
 			meta.WriteString(item.Id)
-			meta.WriteString(fmt_meta_assign_expr(item.Expr.Toks))
+			meta.WriteString(fmt_meta_assign_expr(item.Expr.Tokens))
 			meta.WriteString(",\n")
 		}
 		meta.WriteString("}\n\n")
@@ -90,7 +91,7 @@ func fmt_meta_traits(dm *Defmap) string {
 func fmt_meta_structs(dm *Defmap) string {
 	var meta strings.Builder
 	for _, s := range dm.Structs {
-		meta.WriteString(fmt_meta_doc_comment(s.Desc))
+		meta.WriteString(fmt_meta_doc_comment(s.Description))
 		meta.WriteString(fmt_meta_generics(s.Ast.Generics))
 		meta.WriteString(fmt_meta_pub_identifier(s.Ast.Pub))
 		meta.WriteString("struct ")
@@ -102,15 +103,15 @@ func fmt_meta_structs(dm *Defmap) string {
 			meta.WriteString(fmt_meta_pub_identifier(f.Pub))
 			meta.WriteString(f.Id)
 			meta.WriteString(fmt_meta_ttoa(f.Type))
-			meta.WriteString(fmt_meta_assign_expr(f.Expr.Toks))
+			meta.WriteString(fmt_meta_assign_expr(f.Expr.Tokens))
 			meta.WriteString("\n")
 		}
 		meta.WriteString("}\n\n")
-		if len(s.Defs.Funcs) > 0 {
+		if len(s.Defines.Funcs) > 0 {
 			meta.WriteString("impl ")
 			meta.WriteString(s.Ast.Id)
 			meta.WriteString(" {\n\n")
-			meta.WriteString(fmt_meta_funcs(s.Defs))
+			meta.WriteString(fmt_meta_funcs(s.Defines))
 			meta.WriteString("}\n\n")
 		}
 		if len(*s.Traits) > 0 {
@@ -152,7 +153,7 @@ func fmt_meta_globals(dm *Defmap) string {
 		}
 		meta.WriteString(g.Id)
 		meta.WriteString(fmt_meta_ttoa(g.Type))
-		meta.WriteString(fmt_meta_assign_expr(g.Expr.Toks))
+		meta.WriteString(fmt_meta_assign_expr(g.Expr.Tokens))
 		meta.WriteByte('\n')
 	}
 	return meta.String()
@@ -206,13 +207,13 @@ func doc_fmt_meta(p *parser.Parser) (string, error) {
 	var meta strings.Builder
 	meta.WriteString(fmt_meta_uses(p))
 	meta.WriteByte('\n')
-	meta.WriteString(fmt_meta_enums(p.Defs))
-	meta.WriteString(fmt_meta_traits(p.Defs))
-	meta.WriteString(fmt_meta_structs(p.Defs))
-	meta.WriteString(fmt_meta_type_aliases(p.Defs))
+	meta.WriteString(fmt_meta_enums(p.Defines))
+	meta.WriteString(fmt_meta_traits(p.Defines))
+	meta.WriteString(fmt_meta_structs(p.Defines))
+	meta.WriteString(fmt_meta_type_aliases(p.Defines))
 	meta.WriteByte('\n')
-	meta.WriteString(fmt_meta_funcs(p.Defs))
-	meta.WriteString(fmt_meta_globals(p.Defs))
+	meta.WriteString(fmt_meta_funcs(p.Defines))
+	meta.WriteString(fmt_meta_globals(p.Defines))
 	return meta.String(), nil
 }
 
@@ -253,7 +254,7 @@ func fmt_meta_pub_identifier(is_pub bool) string {
 	return ""
 }
 
-func fmt_meta_assign_expr(toks []models.Tok) string {
+func fmt_meta_assign_expr(toks []lex.Token) string {
 	if len(toks) == 0 {
 		return ""
 	}

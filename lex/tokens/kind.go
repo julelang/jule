@@ -1,6 +1,6 @@
 package tokens
 
-// Token kinds.
+// lex.Tokenen kinds.
 const (
 	DOUBLE_COLON        = "::"
 	COLON               = ":"

@@ -1,12 +1,14 @@
 package parser
 
+import "github.com/jule-lang/jule/lex"
+
 type use struct {
-	defs    *Defmap
-	tok     Tok
+	defs    *DefineMap
+	token   lex.Token
 	cppLink bool
 	
 	FullUse    bool
 	Path       string
 	LinkString string
-	Selectors  []Tok
+	Selectors  []lex.Token
 }

@@ -1,8 +1,10 @@
 package lex
 
-// Tok is lexer token.
-type Tok struct {
-	File   *File
+import "github.com/jule-lang/jule/pkg/juleio"
+
+// Token is lexer token.
+type Token struct {
+	File   *juleio.File
 	Row    int
 	Column int
 	Kind   string

@@ -3,16 +3,17 @@ package models
 import (
 	"strings"
 
+	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
 // Var is variable declaration AST model.
 type Var struct {
 	Pub       bool
-	Token     Tok
-	SetterTok Tok
+	Token     lex.Token
+	SetterTok lex.Token
 	Id        string
-	Type      DataType
+	Type      Type
 	Expr      Expr
 	Const     bool
 	New       bool

@@ -1,10 +1,14 @@
 package models
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/jule-lang/jule/lex"
+)
 
 // If is the AST model of if expression.
 type If struct {
-	Tok   Tok
+	Token lex.Token
 	Expr  Expr
 	Block *Block
 }
@@ -20,7 +24,7 @@ func (ifast If) String() string {
 
 // ElseIf is the AST model of else if expression.
 type ElseIf struct {
-	Tok   Tok
+	Token lex.Token
 	Expr  Expr
 	Block *Block
 }
@@ -36,7 +40,7 @@ func (elif ElseIf) String() string {
 
 // Else is the AST model of else blocks.
 type Else struct {
-	Tok   Tok
+	Token lex.Token
 	Block *Block
 }
 

@@ -3,6 +3,7 @@ package models
 import (
 	"strings"
 
+	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
@@ -25,7 +26,7 @@ func (as AssignLeft) String() string {
 
 // Assign is assignment AST model.
 type Assign struct {
-	Setter      Tok
+	Setter      lex.Token
 	Left        []AssignLeft
 	Right       []Expr
 	IsExpr      bool
@@ -40,8 +41,8 @@ func (a *Assign) cppSingleAssign() string {
 		return s[:len(s)-1] // Remove statement terminator
 	}
 	var cpp strings.Builder
-	if len(expr.Expr.Toks) != 1 ||
-		!juleapi.IsIgnoreId(expr.Expr.Toks[0].Kind) {
+	if len(expr.Expr.Tokens) != 1 ||
+		!juleapi.IsIgnoreId(expr.Expr.Tokens[0].Kind) {
 		cpp.WriteString(expr.String())
 		cpp.WriteString(a.Setter.Kind)
 	}

@@ -3,11 +3,13 @@ package models
 import (
 	"fmt"
 	"strings"
+
+	"github.com/jule-lang/jule/lex"
 )
 
 // Statement is statement.
 type Statement struct {
-	Tok            Tok
+	Token          lex.Token
 	Data           any
 	WithTerminator bool
 }

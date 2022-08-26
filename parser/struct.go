@@ -11,15 +11,15 @@ import (
 )
 
 type structure struct {
-	Ast    Struct
-	Defs   *Defmap
-	Traits *[]*trait
-	Used   bool
-	Desc   string
+	Ast         Struct
+	Defines     *DefineMap
+	Traits      *[]*trait // Implemented traits
+	Used        bool
+	Description string
 
 	constructor *Func
 	// Instance generics.
-	generics []DataType
+	generics []Type
 }
 
 func (s *structure) hasTrait(t *trait) bool {
@@ -55,7 +55,7 @@ func (s *structure) cppGenerics() (def string, serie string) {
 // This function is should be have this function
 // for CompiledStruct interface of ast package.
 func (s *structure) OutId() string {
-	return juleapi.OutId(s.Ast.Id, s.Ast.Tok.File)
+	return juleapi.OutId(s.Ast.Id, s.Ast.Token.File)
 }
 
 func (s *structure) operators() string {
@@ -70,14 +70,14 @@ func (s *structure) operators() string {
 	cpp.WriteString(outid)
 	cpp.WriteString(genericsSerie)
 	cpp.WriteString(" &_Src) {")
-	if len(s.Defs.Globals) > 0 {
+	if len(s.Defines.Globals) > 0 {
 		models.AddIndent()
 		cpp.WriteByte('\n')
 		cpp.WriteString(models.IndentString())
 		var expr strings.Builder
 		expr.WriteString("return ")
 		models.AddIndent()
-		for _, g := range s.Defs.Globals {
+		for _, g := range s.Defines.Globals {
 			expr.WriteByte('\n')
 			expr.WriteString(models.IndentString())
 			expr.WriteString("this->")
@@ -114,9 +114,9 @@ func (s *structure) cppConstructor() string {
 	cpp.WriteString(s.OutId())
 	cpp.WriteString(paramsToCpp(s.constructor.Params))
 	cpp.WriteString(" noexcept {")
-	if len(s.Defs.Globals) > 0 {
+	if len(s.Defines.Globals) > 0 {
 		models.AddIndent()
-		for i, g := range s.Defs.Globals {
+		for i, g := range s.Defines.Globals {
 			cpp.WriteByte('\n')
 			cpp.WriteString(models.IndentString())
 			cpp.WriteString("this->")
@@ -167,8 +167,8 @@ func (s *structure) prototype() string {
 	cpp.WriteString(s.cppTraits())
 	cpp.WriteString(" {\n")
 	models.AddIndent()
-	if len(s.Defs.Globals) > 0 {
-		for _, g := range s.Defs.Globals {
+	if len(s.Defines.Globals) > 0 {
+		for _, g := range s.Defines.Globals {
 			cpp.WriteString(models.IndentString())
 			cpp.WriteString(g.FieldString())
 			cpp.WriteByte('\n')
@@ -180,7 +180,7 @@ func (s *structure) prototype() string {
 	cpp.WriteString(models.IndentString())
 	cpp.WriteString(outid)
 	cpp.WriteString("(void) noexcept {}\n\n")
-	for _, f := range s.Defs.Funcs {
+	for _, f := range s.Defines.Funcs {
 		if f.used {
 			cpp.WriteString(models.IndentString())
 			cpp.WriteString(f.Prototype(""))
@@ -197,7 +197,7 @@ func (s *structure) prototype() string {
 
 func (s *structure) decldefString() string {
 	var cpp strings.Builder
-	for _, f := range s.Defs.Funcs {
+	for _, f := range s.Defines.Funcs {
 		if f.used {
 			cpp.WriteString(models.IndentString())
 			cpp.WriteString(f.stringOwner(s.OutId()))
@@ -256,7 +256,7 @@ func (s structure) String() string {
 //
 // This function is should be have this function
 // for Genericable & CompiledStruct interface of ast package.
-func (s *structure) Generics() []DataType {
+func (s *structure) Generics() []Type {
 	return s.generics
 }
 
@@ -264,13 +264,13 @@ func (s *structure) Generics() []DataType {
 //
 // This function is should be have this function
 // for Genericable & CompiledStruct interface of ast package.
-func (s *structure) SetGenerics(generics []DataType) {
+func (s *structure) SetGenerics(generics []Type) {
 	s.generics = generics
 }
 
-func (s *structure) selfVar(receiver DataType) *Var {
+func (s *structure) selfVar(receiver Type) *Var {
 	v := new(models.Var)
-	v.Token = s.Ast.Tok
+	v.Token = s.Ast.Token
 	v.Type = receiver
 	v.Type.Id = juletype.Struct
 	v.Id = tokens.SELF

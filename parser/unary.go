@@ -1,13 +1,14 @@
 package parser
 
 import (
+	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/lex/tokens"
 	"github.com/jule-lang/jule/pkg/juletype"
 )
 
 type unary struct {
-	tok   Tok
-	toks  Toks
+	token lex.Token
+	toks  []lex.Token
 	model *exprModel
 	p     *Parser
 }
@@ -15,7 +16,7 @@ type unary struct {
 func (u *unary) minus() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !typeIsPure(v.data.Type) || !juletype.IsNumeric(v.data.Type.Id) {
-		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.MINUS)
+		u.p.eval.pusherrtok(u.token, "invalid_type_unary_operator", tokens.MINUS)
 	}
 	if v.constExpr {
 		v.data.Value = tokens.MINUS + v.data.Value
@@ -35,7 +36,7 @@ func (u *unary) minus() value {
 func (u *unary) plus() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !typeIsPure(v.data.Type) || !juletype.IsNumeric(v.data.Type.Id) {
-		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.PLUS)
+		u.p.eval.pusherrtok(u.token, "invalid_type_unary_operator", tokens.PLUS)
 	}
 	if v.constExpr {
 		switch t := v.expr.(type) {
@@ -54,7 +55,7 @@ func (u *unary) plus() value {
 func (u *unary) caret() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !typeIsPure(v.data.Type) || !juletype.IsInteger(v.data.Type.Id) {
-		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.CARET)
+		u.p.eval.pusherrtok(u.token, "invalid_type_unary_operator", tokens.CARET)
 	}
 	if v.constExpr {
 		switch t := v.expr.(type) {
@@ -71,7 +72,7 @@ func (u *unary) caret() value {
 func (u *unary) logicalNot() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !isBoolExpr(v) {
-		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.EXCLAMATION)
+		u.p.eval.pusherrtok(u.token, "invalid_type_unary_operator", tokens.EXCLAMATION)
 	} else if v.constExpr {
 		v.expr = !v.expr.(bool)
 		v.model = boolModel(v)
@@ -86,7 +87,7 @@ func (u *unary) star() value {
 	v.constExpr = false
 	v.lvalue = true
 	if !typeIsExplicitPtr(v.data.Type) {
-		u.p.eval.pusherrtok(u.tok, "invalid_type_unary_operator", tokens.STAR)
+		u.p.eval.pusherrtok(u.token, "invalid_type_unary_operator", tokens.STAR)
 	} else {
 		v.data.Type.Kind = v.data.Type.Kind[1:]
 	}
@@ -106,7 +107,7 @@ func (u *unary) amper() value {
 		(*nodes)[0] = exprNode{"__julec_guaranteed_ptr(new "}
 		goto end
 	case !canGetPtr(v):
-		u.p.eval.pusherrtok(u.tok, "invalid_expr_unary_operator", tokens.AMPER)
+		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.AMPER)
 		return v
 	}
 	if v.heapMust {

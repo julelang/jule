@@ -18,12 +18,12 @@ func (fc *foreachChecker) array() {
 		return
 	}
 	componentType := *fc.profile.ExprType.ComponentType
-	keyB := &fc.profile.KeyB
-	if keyB.Type.Id == juletype.Void {
-		keyB.Type = componentType
+	b := &fc.profile.KeyB
+	if b.Type.Id == juletype.Void {
+		b.Type = componentType
 		return
 	}
-	fc.p.checkType(componentType, keyB.Type, true, fc.profile.InTok)
+	fc.p.checkType(componentType, b.Type, true, fc.profile.InToken)
 }
 
 func (fc *foreachChecker) slice() {
@@ -32,12 +32,12 @@ func (fc *foreachChecker) slice() {
 		return
 	}
 	componentType := *fc.profile.ExprType.ComponentType
-	keyB := &fc.profile.KeyB
-	if keyB.Type.Id == juletype.Void {
-		keyB.Type = componentType
+	b := &fc.profile.KeyB
+	if b.Type.Id == juletype.Void {
+		b.Type = componentType
 		return
 	}
-	fc.p.checkType(componentType, keyB.Type, true, fc.profile.InTok)
+	fc.p.checkType(componentType, b.Type, true, fc.profile.InToken)
 }
 
 func (fc *foreachChecker) xmap() {
@@ -49,18 +49,18 @@ func (fc *foreachChecker) checkKeyASize() {
 	if juleapi.IsIgnoreId(fc.profile.KeyA.Id) {
 		return
 	}
-	keyA := &fc.profile.KeyA
-	if keyA.Type.Id == juletype.Void {
-		keyA.Type.Id = juletype.UInt
-		keyA.Type.Kind = juletype.CppId(keyA.Type.Id)
+	a := &fc.profile.KeyA
+	if a.Type.Id == juletype.Void {
+		a.Type.Id = juletype.UInt
+		a.Type.Kind = juletype.CppId(a.Type.Id)
 		return
 	}
 	var ok bool
-	keyA.Type, ok = fc.p.realType(keyA.Type, true)
+	a.Type, ok = fc.p.realType(a.Type, true)
 	if ok {
-		if !typeIsPure(keyA.Type) || !juletype.IsNumeric(keyA.Type.Id) {
-			fc.p.pusherrtok(keyA.Token, "incompatible_types",
-				keyA.Type.Kind, juletype.NumericTypeStr)
+		if !typeIsPure(a.Type) || !juletype.IsNumeric(a.Type.Id) {
+			fc.p.pusherrtok(a.Token, "incompatible_types",
+				a.Type.Kind, juletype.NumericTypeStr)
 		}
 	}
 }
@@ -69,26 +69,26 @@ func (fc *foreachChecker) checkKeyAMapKey() {
 	if juleapi.IsIgnoreId(fc.profile.KeyA.Id) {
 		return
 	}
-	keyType := fc.val.data.Type.Tag.([]DataType)[0]
-	keyA := &fc.profile.KeyA
-	if keyA.Type.Id == juletype.Void {
-		keyA.Type = keyType
+	keyType := fc.val.data.Type.Tag.([]Type)[0]
+	a := &fc.profile.KeyA
+	if a.Type.Id == juletype.Void {
+		a.Type = keyType
 		return
 	}
-	fc.p.checkType(keyType, keyA.Type, true, fc.profile.InTok)
+	fc.p.checkType(keyType, a.Type, true, fc.profile.InToken)
 }
 
 func (fc *foreachChecker) checkKeyBMapVal() {
 	if juleapi.IsIgnoreId(fc.profile.KeyB.Id) {
 		return
 	}
-	valType := fc.val.data.Type.Tag.([]DataType)[1]
-	keyB := &fc.profile.KeyB
-	if keyB.Type.Id == juletype.Void {
-		keyB.Type = valType
+	valType := fc.val.data.Type.Tag.([]Type)[1]
+	b := &fc.profile.KeyB
+	if b.Type.Id == juletype.Void {
+		b.Type = valType
 		return
 	}
-	fc.p.checkType(valType, keyB.Type, true, fc.profile.InTok)
+	fc.p.checkType(valType, b.Type, true, fc.profile.InToken)
 }
 
 func (fc *foreachChecker) str() {
@@ -96,16 +96,16 @@ func (fc *foreachChecker) str() {
 	if juleapi.IsIgnoreId(fc.profile.KeyB.Id) {
 		return
 	}
-	runeType := DataType{
+	runeType := Type{
 		Id:   juletype.U8,
 		Kind: juletype.CppId(juletype.U8),
 	}
-	keyB := &fc.profile.KeyB
-	if keyB.Type.Id == juletype.Void {
-		keyB.Type = runeType
+	b := &fc.profile.KeyB
+	if b.Type.Id == juletype.Void {
+		b.Type = runeType
 		return
 	}
-	fc.p.checkType(runeType, keyB.Type, true, fc.profile.InTok)
+	fc.p.checkType(runeType, b.Type, true, fc.profile.InToken)
 }
 
 func (fc *foreachChecker) check() {

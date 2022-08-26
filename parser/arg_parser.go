@@ -2,6 +2,7 @@ package parser
 
 import (
 	"github.com/jule-lang/jule/ast/models"
+	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/lex/tokens"
 	"github.com/jule-lang/jule/pkg/jule"
 	"github.com/jule-lang/jule/pkg/juletype"
@@ -24,7 +25,7 @@ type pureArgParser struct {
 	args    *models.Args
 	i       int
 	arg     Arg
-	errTok  Tok
+	errTok  lex.Token
 	m       *exprModel
 	paramId string
 }
@@ -37,12 +38,12 @@ func (pap *pureArgParser) buildArgs() {
 		case pair.arg != nil:
 			pap.args.Src[i] = *pair.arg
 		case pair.param.Variadic:
-			t := DataType{
+			t := Type{
 				Id:            juletype.Slice,
-				Tok:           pair.param.Type.Tok,
+				Token:           pair.param.Type.Token,
 				Kind:          jule.Prefix_Slice + pair.param.Type.Kind,
 				Pure:          true,
-				ComponentType: new(DataType),
+				ComponentType: new(Type),
 			}
 			*t.ComponentType = pair.param.Type
 			model := sliceExpr{t, nil}
@@ -129,7 +130,7 @@ func (pap *pureArgParser) tryFuncMultiRetAsArgs() bool {
 	if !val.data.Type.MultiTyped {
 		return false
 	}
-	types := val.data.Type.Tag.([]DataType)
+	types := val.data.Type.Tag.([]Type)
 	if len(types) < len(pap.f.Params) {
 		return false
 	} else if len(types) > len(pap.f.Params) {
@@ -145,7 +146,7 @@ func (pap *pureArgParser) tryFuncMultiRetAsArgs() bool {
 	for i, param := range pap.f.Params {
 		rt := types[i]
 		val := value{data: models.Data{Type: rt}}
-		pap.p.checkArgType(&param, val, arg.Tok)
+		pap.p.checkArgType(&param, val, arg.Token)
 	}
 	return true
 }

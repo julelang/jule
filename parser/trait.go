@@ -9,7 +9,7 @@ import (
 
 type trait struct {
 	Ast  *models.Trait
-	Defs *Defmap
+	Defines *DefineMap
 	Used bool
 	Desc string
 }
@@ -17,7 +17,7 @@ type trait struct {
 // FindFunc returns function by id.
 // Returns nil if not exist.
 func (t *trait) FindFunc(id string) *Fn {
-	for _, f := range t.Defs.Funcs {
+	for _, f := range t.Defines.Funcs {
 		if f.Ast.Id == id {
 			return f
 		}
@@ -27,7 +27,7 @@ func (t *trait) FindFunc(id string) *Fn {
 
 // OutId returns juleapi.OutId result of trait.
 func (t *trait) OutId() string {
-	return juleapi.OutId(t.Ast.Id, t.Ast.Tok.File)
+	return juleapi.OutId(t.Ast.Id, t.Ast.Token.File)
 }
 
 func (t *trait) String() string {

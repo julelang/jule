@@ -1,11 +1,14 @@
 package models
 
-import "github.com/jule-lang/jule/pkg/juleapi"
+import (
+	"github.com/jule-lang/jule/lex"
+	"github.com/jule-lang/jule/pkg/juleapi"
+)
 
 // Defer is the AST model of deferred calls.
 type Defer struct {
-	Tok  Tok
-	Expr Expr
+	Token lex.Token
+	Expr  Expr
 }
 
 func (d Defer) String() string {
@@ -14,7 +17,7 @@ func (d Defer) String() string {
 
 // ConcurrentCall is the AST model of concurrent calls.
 type ConcurrentCall struct {
-	Tok  Tok
+	Tok  lex.Token
 	Expr Expr
 }
 

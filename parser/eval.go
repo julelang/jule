@@ -5,6 +5,7 @@ import (
 
 	"github.com/jule-lang/jule/ast"
 	"github.com/jule-lang/jule/ast/models"
+	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/lex/tokens"
 	"github.com/jule-lang/jule/pkg/jule"
 	"github.com/jule-lang/jule/pkg/juletype"
@@ -22,18 +23,18 @@ type value struct {
 	isField   bool
 }
 
-func isOperator(process Toks) bool {
+func isOperator(process []lex.Token) bool {
 	return len(process) == 1 && process[0].Id == tokens.Operator
 }
 
 type eval struct {
 	p            *Parser
 	has_error    bool
-	type_prefix  *DataType
+	type_prefix  *Type
 	allow_unsafe bool
 }
 
-func (e *eval) pusherrtok(tok Tok, err string, args ...any) {
+func (e *eval) pusherrtok(tok lex.Token, err string, args ...any) {
 	if e.has_error {
 		return
 	}
@@ -41,17 +42,17 @@ func (e *eval) pusherrtok(tok Tok, err string, args ...any) {
 	e.p.pusherrtok(tok, err, args...)
 }
 
-func (e *eval) toks(toks Toks) (value, iExpr) {
+func (e *eval) toks(toks []lex.Token) (value, iExpr) {
 	return e.expr(new(ast.Builder).Expr(toks))
 }
 
 func (e *eval) expr(expr Expr) (value, iExpr) {
-	processes := make([]Toks, len(expr.Processes))
+	processes := make([][]lex.Token, len(expr.Processes))
 	copy(processes, expr.Processes)
 	return e.processes(processes)
 }
 
-func (e *eval) processes(processes []Toks) (v value, model iExpr) {
+func (e *eval) processes(processes [][]lex.Token) (v value, model iExpr) {
 	defer func() {
 		if typeIsVoid(v.data.Type) {
 			v.data.Type.Id = juletype.Void
@@ -88,7 +89,7 @@ func (e *eval) processes(processes []Toks) (v value, model iExpr) {
 	return e.valProcesses(valProcesses, processes)
 }
 
-func (e *eval) valProcesses(exprs []any, processes []Toks) (v value, model iExpr) {
+func (e *eval) valProcesses(exprs []any, processes [][]lex.Token) (v value, model iExpr) {
 	switch len(exprs) {
 	case 0:
 		v.data.Type.Id = juletype.Void
@@ -111,9 +112,9 @@ func (e *eval) valProcesses(exprs []any, processes []Toks) (v value, model iExpr
 	right := exprs[i+1].([]any)
 	rightV, rightExpr := right[0].(value), right[1].(iExpr)
 	process.left = processes[i-1]
-	process.leftVal = leftV
+	process.left_val = leftV
 	process.right = processes[i+1]
-	process.rightVal = rightV
+	process.right_val = rightV
 	val := process.solve()
 	var expr iExpr
 	if val.constExpr {
@@ -136,14 +137,14 @@ func (e *eval) valProcesses(exprs []any, processes []Toks) (v value, model iExpr
 		}
 		expr = sexpr
 	}
-	processes = append(processes[:i-1], append([]Toks{{}}, processes[i+2:]...)...)
+	processes = append(processes[:i-1], append([][]lex.Token{{}}, processes[i+2:]...)...)
 	exprs = append(exprs[:i-1], append([]any{[]any{val, expr}}, exprs[i+2:]...)...)
 	return e.valProcesses(exprs, processes)
 }
 
 // nextOperator find index of priority operator and returns index of operator
 // if found, returns -1 if not.
-func (e *eval) nextOperator(processes []Toks) int {
+func (e *eval) nextOperator(processes [][]lex.Token) int {
 	prec := precedencer{}
 	for i, process := range processes {
 		switch {
@@ -175,11 +176,11 @@ func (e *eval) nextOperator(processes []Toks) int {
 	return data.(int)
 }
 
-func (e *eval) single(tok Tok, m *exprModel) (v value, ok bool) {
+func (e *eval) single(tok lex.Token, m *exprModel) (v value, ok bool) {
 	eval := valueEvaluator{tok, m, e.p}
 	v.data.Type.Id = juletype.Void
 	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
-	v.data.Tok = tok
+	v.data.Token = tok
 	switch tok.Id {
 	case tokens.Value:
 		ok = true
@@ -203,7 +204,7 @@ func (e *eval) single(tok Tok, m *exprModel) (v value, ok bool) {
 	return
 }
 
-func (e *eval) unary(toks Toks, m *exprModel) value {
+func (e *eval) unary(toks []lex.Token, m *exprModel) value {
 	var v value
 	// Length is 1 cause all length of operator tokens is 1.
 	// Change "1" with length of token's value
@@ -211,36 +212,36 @@ func (e *eval) unary(toks Toks, m *exprModel) value {
 	exprToks := toks[1:]
 	processor := unary{toks[0], exprToks, m, e.p}
 	if processor.toks == nil {
-		e.pusherrtok(processor.tok, "invalid_syntax")
+		e.pusherrtok(processor.token, "invalid_syntax")
 		return v
 	}
-	switch processor.tok.Kind {
+	switch processor.token.Kind {
 	case tokens.MINUS:
-		m.appendSubNode(exprNode{processor.tok.Kind})
+		m.appendSubNode(exprNode{processor.token.Kind})
 		v = processor.minus()
 	case tokens.PLUS:
-		m.appendSubNode(exprNode{processor.tok.Kind})
+		m.appendSubNode(exprNode{processor.token.Kind})
 		v = processor.plus()
 	case tokens.CARET:
 		m.appendSubNode(exprNode{"~"})
 		v = processor.caret()
 	case tokens.EXCLAMATION:
-		m.appendSubNode(exprNode{processor.tok.Kind})
+		m.appendSubNode(exprNode{processor.token.Kind})
 		v = processor.logicalNot()
 	case tokens.STAR:
-		m.appendSubNode(exprNode{processor.tok.Kind})
+		m.appendSubNode(exprNode{processor.token.Kind})
 		v = processor.star()
 	case tokens.AMPER:
-		m.appendSubNode(exprNode{processor.tok.Kind})
+		m.appendSubNode(exprNode{processor.token.Kind})
 		v = processor.amper()
 	default:
-		e.pusherrtok(processor.tok, "invalid_syntax")
+		e.pusherrtok(processor.token, "invalid_syntax")
 	}
-	v.data.Tok = processor.tok
+	v.data.Token = processor.token
 	return v
 }
 
-func (e *eval) betweenParentheses(toks Toks, m *exprModel) value {
+func (e *eval) betweenParentheses(toks []lex.Token, m *exprModel) value {
 	// Write parentheses.
 	m.appendSubNode(exprNode{tokens.LPARENTHESES})
 	defer m.appendSubNode(exprNode{tokens.RPARENTHESES})
@@ -255,7 +256,7 @@ func (e *eval) betweenParentheses(toks Toks, m *exprModel) value {
 	return val
 }
 
-func (e *eval) dataTypeFunc(expr Tok, callRange Toks, m *exprModel) (v value, isret bool) {
+func (e *eval) dataTypeFunc(expr lex.Token, callRange []lex.Token, m *exprModel) (v value, isret bool) {
 	switch expr.Id {
 	case tokens.DataType:
 		switch expr.Kind {
@@ -264,7 +265,7 @@ func (e *eval) dataTypeFunc(expr Tok, callRange Toks, m *exprModel) (v value, is
 			_, vm := e.p.evalToks(callRange)
 			m.appendSubNode(vm)
 			m.appendSubNode(exprNode{tokens.RPARENTHESES})
-			v.data.Type = DataType{
+			v.data.Type = Type{
 				Id:   juletype.Func,
 				Kind: strDefaultFunc.DataTypeString(),
 				Tag:  strDefaultFunc,
@@ -272,8 +273,8 @@ func (e *eval) dataTypeFunc(expr Tok, callRange Toks, m *exprModel) (v value, is
 			isret = true
 
 		default:
-			dt := DataType{
-				Tok:  expr,
+			dt := Type{
+				Token:  expr,
 				Id:   juletype.TypeFromId(expr.Kind),
 				Kind: expr.Kind,
 			}
@@ -286,7 +287,7 @@ func (e *eval) dataTypeFunc(expr Tok, callRange Toks, m *exprModel) (v value, is
 			break
 		}
 		switch t := def.(type) {
-		case *Type:
+		case *TypeAlias:
 			dt, ok := e.p.realType(t.Type, true)
 			if !ok || typeIsStruct(dt) {
 				return
@@ -299,18 +300,19 @@ func (e *eval) dataTypeFunc(expr Tok, callRange Toks, m *exprModel) (v value, is
 }
 
 type callData struct {
-	expr     Toks
-	args     Toks
-	generics Toks
+	expr     []lex.Token
+	args     []lex.Token
+	generics []lex.Token
 }
 
-func getCallData(toks Toks, m *exprModel) (data callData) {
+func getCallData(toks []lex.Token, m *exprModel) (data callData) {
 	data.expr, data.args = ast.RangeLast(toks)
 	if len(data.expr) == 0 {
 		return
 	}
 	// Below is call expression
-	if tok := data.expr[len(data.expr)-1]; tok.Id == tokens.Brace && tok.Kind == tokens.RBRACKET {
+	tok := data.expr[len(data.expr)-1]
+	if tok.Id == tokens.Brace && tok.Kind == tokens.RBRACKET {
 		data.expr, data.generics = ast.RangeLast(data.expr)
 	}
 	return
@@ -349,7 +351,7 @@ func (e *eval) callCppLink(data callData, m *exprModel) (v value) {
 	return e.p.callFunc(link.Link, data, m)
 }
 
-func (e *eval) parenthesesRange(toks Toks, m *exprModel) (v value) {
+func (e *eval) parenthesesRange(toks []lex.Token, m *exprModel) (v value) {
 	tok := toks[0]
 	switch tok.Id {
 	case tokens.Brace:
@@ -389,7 +391,7 @@ func (e *eval) parenthesesRange(toks Toks, m *exprModel) (v value) {
 	return
 }
 
-func (e *eval) process(toks Toks, m *exprModel) (v value) {
+func (e *eval) process(toks []lex.Token, m *exprModel) (v value) {
 	defer func() {
 		if typeIsVoid(v.data.Type) {
 			v.data.Type.Kind = juletype.TypeMap[juletype.Void]
@@ -426,7 +428,7 @@ func (e *eval) process(toks Toks, m *exprModel) (v value) {
 	return
 }
 
-func (e *eval) subId(toks Toks, m *exprModel) (v value) {
+func (e *eval) subId(toks []lex.Token, m *exprModel) (v value) {
 	i := len(toks) - 1
 	idTok := toks[i]
 	i--
@@ -437,7 +439,7 @@ func (e *eval) subId(toks Toks, m *exprModel) (v value) {
 		tok := dotTok
 		tok.Id = tokens.Self
 		tok.Kind = tokens.SELF
-		toks = Toks{tok}
+		toks = []lex.Token{tok}
 	case 1:
 		tok := toks[0]
 		if tok.Id == tokens.DataType {
@@ -445,7 +447,7 @@ func (e *eval) subId(toks Toks, m *exprModel) (v value) {
 		} else if tok.Id == tokens.Id {
 			t, _, _ := e.p.typeById(tok.Kind)
 			if t != nil {
-				return e.typeSubId(t.Type.Tok, idTok, m)
+				return e.typeSubId(t.Type.Token, idTok, m)
 			}
 		}
 	}
@@ -477,7 +479,7 @@ func (e *eval) subId(toks Toks, m *exprModel) (v value) {
 	return
 }
 
-func (e *eval) castExpr(dt DataType, exprToks Toks, m *exprModel, errTok Tok) value {
+func (e *eval) castExpr(dt Type, exprToks []lex.Token, m *exprModel, errTok lex.Token) value {
 	val, model := e.toks(exprToks)
 	m.appendSubNode(exprNode{tokens.LPARENTHESES})
 	m.appendSubNode(exprNode{tokens.LPARENTHESES + dt.String() + tokens.RPARENTHESES})
@@ -489,20 +491,20 @@ func (e *eval) castExpr(dt DataType, exprToks Toks, m *exprModel, errTok Tok) va
 	return val
 }
 
-func (e *eval) tryCast(toks Toks, m *exprModel) (v value, _ bool) {
-	braceCount := 0
+func (e *eval) tryCast(toks []lex.Token, m *exprModel) (v value, _ bool) {
+	brace_n := 0
 	errTok := toks[0]
 	for i, tok := range toks {
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
 			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
-				braceCount++
+				brace_n++
 				continue
 			default:
-				braceCount--
+				brace_n--
 			}
 		}
-		if braceCount > 0 {
+		if brace_n > 0 {
 			continue
 		} else if i+1 == len(toks) {
 			return
@@ -540,7 +542,7 @@ func (e *eval) tryCast(toks Toks, m *exprModel) (v value, _ bool) {
 	return
 }
 
-func (e *eval) cast(v value, t DataType, errtok Tok) value {
+func (e *eval) cast(v value, t Type, errtok lex.Token) value {
 	switch {
 	case typeIsPtr(t):
 		e.castPtr(t, &v, errtok)
@@ -571,7 +573,7 @@ func (e *eval) cast(v value, t DataType, errtok Tok) value {
 	return v
 }
 
-func (e *eval) castStruct(t DataType, v *value, errtok Tok) {
+func (e *eval) castStruct(t Type, v *value, errtok lex.Token) {
 	if !typeIsTrait(v.data.Type) {
 		e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
 		return
@@ -583,7 +585,7 @@ func (e *eval) castStruct(t DataType, v *value, errtok Tok) {
 	}
 }
 
-func (e *eval) castPtr(t DataType, v *value, errtok Tok) {
+func (e *eval) castPtr(t Type, v *value, errtok lex.Token) {
 	if typeIsStruct(unptrType(t)) {
 		e.castStruct(t, v, errtok)
 		return
@@ -598,7 +600,7 @@ func (e *eval) castPtr(t DataType, v *value, errtok Tok) {
 	}
 }
 
-func (e *eval) castPure(t DataType, v *value, errtok Tok) {
+func (e *eval) castPure(t Type, v *value, errtok lex.Token) {
 	switch t.Id {
 	case juletype.Any:
 		return
@@ -619,7 +621,7 @@ func (e *eval) castPure(t DataType, v *value, errtok Tok) {
 	}
 }
 
-func (e *eval) castStr(t DataType, errtok Tok) {
+func (e *eval) castStr(t Type, errtok lex.Token) {
 	if !typeIsSlice(t) {
 		e.pusherrtok(errtok, "type_not_supports_casting_to", juletype.TypeMap[juletype.Str], t.Kind)
 		return
@@ -630,14 +632,14 @@ func (e *eval) castStr(t DataType, errtok Tok) {
 	}
 }
 
-func (e *eval) castEnum(t DataType, v *value, errtok Tok) {
+func (e *eval) castEnum(t Type, v *value, errtok lex.Token) {
 	enum := t.Tag.(*Enum)
 	t = enum.Type
 	t.Kind = enum.Id
 	e.castNumeric(t, v, errtok)
 }
 
-func (e *eval) castInteger(t DataType, v *value, errtok Tok) {
+func (e *eval) castInteger(t Type, v *value, errtok lex.Token) {
 	if v.constExpr {
 		switch {
 		case juletype.IsSignedInteger(t.Id):
@@ -664,7 +666,7 @@ func (e *eval) castInteger(t DataType, v *value, errtok Tok) {
 	e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
 }
 
-func (e *eval) castNumeric(t DataType, v *value, errtok Tok) {
+func (e *eval) castNumeric(t Type, v *value, errtok lex.Token) {
 	if v.constExpr {
 		switch {
 		case juletype.IsFloat(t.Id):
@@ -681,7 +683,7 @@ func (e *eval) castNumeric(t DataType, v *value, errtok Tok) {
 	e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
 }
 
-func (e *eval) castSlice(t, vt DataType, errtok Tok) {
+func (e *eval) castSlice(t, vt Type, errtok lex.Token) {
 	if !typeIsPure(vt) || vt.Id != juletype.Str {
 		e.pusherrtok(errtok, "type_not_supports_casting_to", vt.Kind, t.Kind)
 		return
@@ -692,7 +694,7 @@ func (e *eval) castSlice(t, vt DataType, errtok Tok) {
 	}
 }
 
-func (e *eval) juletypeSubId(dm *Defmap, idTok Tok, m *exprModel) (v value) {
+func (e *eval) juletypeSubId(dm *DefineMap, idTok lex.Token, m *exprModel) (v value) {
 	i, dm, t := dm.findById(idTok.Kind, nil)
 	if i == -1 {
 		e.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
@@ -716,55 +718,55 @@ func (e *eval) juletypeSubId(dm *Defmap, idTok Tok, m *exprModel) (v value) {
 	return
 }
 
-func (e *eval) i8SubId(idTok Tok, m *exprModel) value {
+func (e *eval) i8SubId(idTok lex.Token, m *exprModel) value {
 	return e.juletypeSubId(i8statics, idTok, m)
 }
 
-func (e *eval) i16SubId(idTok Tok, m *exprModel) value {
+func (e *eval) i16SubId(idTok lex.Token, m *exprModel) value {
 	return e.juletypeSubId(i16statics, idTok, m)
 }
 
-func (e *eval) i32SubId(idTok Tok, m *exprModel) value {
+func (e *eval) i32SubId(idTok lex.Token, m *exprModel) value {
 	return e.juletypeSubId(i32statics, idTok, m)
 }
 
-func (e *eval) i64SubId(idTok Tok, m *exprModel) value {
+func (e *eval) i64SubId(idTok lex.Token, m *exprModel) value {
 	return e.juletypeSubId(i64statics, idTok, m)
 }
 
-func (e *eval) u8SubId(idTok Tok, m *exprModel) value {
+func (e *eval) u8SubId(idTok lex.Token, m *exprModel) value {
 	return e.juletypeSubId(u8statics, idTok, m)
 }
 
-func (e *eval) u16SubId(idTok Tok, m *exprModel) value {
+func (e *eval) u16SubId(idTok lex.Token, m *exprModel) value {
 	return e.juletypeSubId(u16statics, idTok, m)
 }
 
-func (e *eval) u32SubId(idTok Tok, m *exprModel) value {
+func (e *eval) u32SubId(idTok lex.Token, m *exprModel) value {
 	return e.juletypeSubId(u32statics, idTok, m)
 }
 
-func (e *eval) u64SubId(idTok Tok, m *exprModel) value {
+func (e *eval) u64SubId(idTok lex.Token, m *exprModel) value {
 	return e.juletypeSubId(u64statics, idTok, m)
 }
 
-func (e *eval) uintSubId(idTok Tok, m *exprModel) value {
+func (e *eval) uintSubId(idTok lex.Token, m *exprModel) value {
 	return e.juletypeSubId(uintStatics, idTok, m)
 }
 
-func (e *eval) intSubId(idTok Tok, m *exprModel) value {
+func (e *eval) intSubId(idTok lex.Token, m *exprModel) value {
 	return e.juletypeSubId(intStatics, idTok, m)
 }
 
-func (e *eval) f32SubId(idTok Tok, m *exprModel) value {
+func (e *eval) f32SubId(idTok lex.Token, m *exprModel) value {
 	return e.juletypeSubId(f32statics, idTok, m)
 }
 
-func (e *eval) f64SubId(idTok Tok, m *exprModel) value {
+func (e *eval) f64SubId(idTok lex.Token, m *exprModel) value {
 	return e.juletypeSubId(f64statics, idTok, m)
 }
 
-func (e *eval) typeSubId(typeTok, idTok Tok, m *exprModel) (v value) {
+func (e *eval) typeSubId(typeTok, idTok lex.Token, m *exprModel) (v value) {
 	switch typeTok.Kind {
 	case tokens.I8:
 		return e.i8SubId(idTok, m)
@@ -795,7 +797,7 @@ func (e *eval) typeSubId(typeTok, idTok Tok, m *exprModel) (v value) {
 	return
 }
 
-func (e *eval) typeId(toks Toks, m *exprModel) (v value) {
+func (e *eval) typeId(toks []lex.Token, m *exprModel) (v value) {
 	v.data.Type.Id = juletype.Void
 	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	b := ast.NewBuilder(nil)
@@ -829,7 +831,7 @@ func (e *eval) typeId(toks Toks, m *exprModel) (v value) {
 	return e.enumerable(toks, t, m)
 }
 
-func (e *eval) xObjSubId(dm *Defmap, val value, idTok Tok, m *exprModel) (v value) {
+func (e *eval) xObjSubId(dm *DefineMap, val value, idTok lex.Token, m *exprModel) (v value) {
 	i, dm, t := dm.findById(idTok.Kind, idTok.File)
 	if i == -1 {
 		e.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
@@ -860,43 +862,43 @@ func (e *eval) xObjSubId(dm *Defmap, val value, idTok Tok, m *exprModel) (v valu
 		v.data.Type.Id = juletype.Func
 		v.data.Type.Tag = f.Ast
 		v.data.Type.Kind = f.Ast.DataTypeString()
-		v.data.Tok = f.Ast.Tok
+		v.data.Token = f.Ast.Token
 		m.appendSubNode(exprNode{f.Ast.Id})
 	}
 	return
 }
 
-func (e *eval) strObjSubId(val value, idTok Tok, m *exprModel) value {
-	readyStrDefs(val)
-	v := e.xObjSubId(strDefs, val, idTok, m)
+func (e *eval) strObjSubId(val value, idTok lex.Token, m *exprModel) value {
+	readyStrDefines(val)
+	v := e.xObjSubId(strDefines, val, idTok, m)
 	v.lvalue = false
 	return v
 }
 
-func (e *eval) sliceObjSubId(val value, idTok Tok, m *exprModel) value {
-	v := e.xObjSubId(sliceDefs, val, idTok, m)
+func (e *eval) sliceObjSubId(val value, idTok lex.Token, m *exprModel) value {
+	v := e.xObjSubId(sliceDefines, val, idTok, m)
 	v.lvalue = false
 	return v
 }
 
-func (e *eval) arrayObjSubId(val value, idTok Tok, m *exprModel) value {
-	v := e.xObjSubId(arrayDefs, val, idTok, m)
+func (e *eval) arrayObjSubId(val value, idTok lex.Token, m *exprModel) value {
+	v := e.xObjSubId(arrayDefines, val, idTok, m)
 	v.lvalue = false
 	return v
 }
 
-func (e *eval) mapObjSubId(val value, idTok Tok, m *exprModel) value {
-	readyMapDefs(val.data.Type)
-	v := e.xObjSubId(mapDefs, val, idTok, m)
+func (e *eval) mapObjSubId(val value, idTok lex.Token, m *exprModel) value {
+	readyMapDefines(val.data.Type)
+	v := e.xObjSubId(mapDefines, val, idTok, m)
 	v.lvalue = false
 	return v
 }
 
-func (e *eval) enumSubId(val value, idTok Tok, m *exprModel) (v value) {
+func (e *eval) enumSubId(val value, idTok lex.Token, m *exprModel) (v value) {
 	enum := val.data.Type.Tag.(*Enum)
 	v = val
 	v.data.Type = enum.Type
-	v.data.Type.Tok = enum.Tok
+	v.data.Type.Token = enum.Tok
 	v.lvalue = false
 	v.isType = false
 	item := enum.ItemById(idTok.Kind)
@@ -911,21 +913,21 @@ func (e *eval) enumSubId(val value, idTok Tok, m *exprModel) (v value) {
 	return
 }
 
-func (e *eval) structObjSubId(val value, idTok Tok, m *exprModel) value {
+func (e *eval) structObjSubId(val value, idTok lex.Token, m *exprModel) value {
 	s := val.data.Type.Tag.(*structure)
 	val.constExpr = false
 	val.isType = false
-	val = e.xObjSubId(s.Defs, val, idTok, m)
+	val = e.xObjSubId(s.Defines, val, idTok, m)
 	return val
 }
 
-func (e *eval) traitObjSubId(val value, idTok Tok, m *exprModel) value {
+func (e *eval) traitObjSubId(val value, idTok lex.Token, m *exprModel) value {
 	m.appendSubNode(exprNode{".get()"})
 	t := val.data.Type.Tag.(*trait)
 	val.constExpr = false
 	val.lvalue = false
 	val.isType = false
-	val = e.xObjSubId(t.Defs, val, idTok, m)
+	val = e.xObjSubId(t.Defines, val, idTok, m)
 	val.constExpr = false
 	return val
 }
@@ -934,7 +936,7 @@ type nsFind interface {
 	nsById(string) *namespace
 }
 
-func (e *eval) getNs(toks *Toks) *Defmap {
+func (e *eval) getNs(toks *[]lex.Token) *DefineMap {
 	var prev nsFind = e.p
 	var ns *namespace
 	for i, tok := range *toks {
@@ -947,23 +949,23 @@ func (e *eval) getNs(toks *Toks) *Defmap {
 			if src == nil {
 				if ns != nil {
 					*toks = (*toks)[i:]
-					return ns.defs
+					return ns.defines
 				}
 				e.pusherrtok(tok, "namespace_not_exist", tok.Kind)
 				return nil
 			}
-			prev = src.defs
+			prev = src.defines
 			ns = src
 			continue
 		}
 		if tok.Id != tokens.DoubleColon {
-			return ns.defs
+			return ns.defines
 		}
 	}
-	return ns.defs
+	return ns.defines
 }
 
-func (e *eval) nsSubId(toks Toks, m *exprModel) (v value) {
+func (e *eval) nsSubId(toks []lex.Token, m *exprModel) (v value) {
 	defs := e.getNs(&toks)
 	if defs == nil {
 		return
@@ -975,18 +977,18 @@ func (e *eval) nsSubId(toks Toks, m *exprModel) (v value) {
 	blockVars := e.p.blockVars
 	e.p.blockTypes = nil
 	e.p.blockVars = nil
-	pdefs := e.p.Defs
-	e.p.Defs = defs
+	pdefs := e.p.Defines
+	e.p.Defines = defs
 	e.p.allowBuiltin = false
 	v, _ = e.single(toks[0], m)
 	e.p.allowBuiltin = true
 	e.p.blockTypes = blockTypes
 	e.p.blockVars = blockVars
-	e.p.Defs = pdefs
+	e.p.Defines = pdefs
 	return
 }
 
-func (e *eval) id(toks Toks, m *exprModel) (v value) {
+func (e *eval) id(toks []lex.Token, m *exprModel) (v value) {
 	i := len(toks) - 1
 	tok := toks[i]
 	if i <= 0 {
@@ -1005,7 +1007,7 @@ func (e *eval) id(toks Toks, m *exprModel) (v value) {
 	return
 }
 
-func (e *eval) operatorRight(toks Toks, m *exprModel) (v value) {
+func (e *eval) operatorRight(toks []lex.Token, m *exprModel) (v value) {
 	tok := toks[len(toks)-1]
 	switch tok.Kind {
 	case tokens.TRIPLE_DOT:
@@ -1022,13 +1024,13 @@ func readyToVariadic(v *value) {
 		return
 	}
 	v.data.Type.Id = juletype.Slice
-	v.data.Type.ComponentType = new(DataType)
+	v.data.Type.ComponentType = new(Type)
 	v.data.Type.ComponentType.Id = juletype.U8
 	v.data.Type.ComponentType.Kind = juletype.TypeMap[v.data.Type.Id]
 	v.data.Type.Kind = jule.Prefix_Slice + v.data.Type.ComponentType.Kind
 }
 
-func (e *eval) variadic(toks Toks, m *exprModel, errtok Tok) (v value) {
+func (e *eval) variadic(toks []lex.Token, m *exprModel, errtok lex.Token) (v value) {
 	v = e.process(toks, m)
 	readyToVariadic(&v)
 	if !typeIsVariadicable(v.data.Type) {
@@ -1041,33 +1043,33 @@ func (e *eval) variadic(toks Toks, m *exprModel, errtok Tok) (v value) {
 	return
 }
 
-func (e *eval) bracketRange(toks Toks, m *exprModel) (v value) {
+func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 	errTok := toks[0]
-	var exprToks Toks
-	braceCount := 0
+	var exprToks []lex.Token
+	brace_n := 0
 	for i := len(toks) - 1; i >= 0; i-- {
 		tok := toks[i]
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
 			case tokens.RBRACE, tokens.RBRACKET, tokens.RPARENTHESES:
-				braceCount++
+				brace_n++
 			default:
-				braceCount--
+				brace_n--
 			}
 		}
-		if braceCount == 0 {
+		if brace_n == 0 {
 			exprToks = toks[:i]
 			break
 		}
 	}
-	if len(exprToks) == 0 || braceCount > 0 {
+	if len(exprToks) == 0 || brace_n > 0 {
 		e.pusherrtok(errTok, "invalid_syntax")
 		return
 	}
 	var model iExpr
 	v, model = e.toks(exprToks)
 	m.appendSubNode(model)
-	toks = toks[len(exprToks):] // Tokens of [...]
+	toks = toks[len(exprToks):] // lex.Tokenens of [...]
 	i := 0
 	if toks, colon := ast.SplitColon(toks, &i); colon != -1 {
 		i = 0
@@ -1108,7 +1110,7 @@ func (e *eval) bracketRange(toks Toks, m *exprModel) (v value) {
 	return v
 }
 
-func (e *eval) checkIntegerIndexing(v value, errtok Tok) {
+func (e *eval) checkIntegerIndexing(v value, errtok lex.Token) {
 	switch {
 	case !typeIsPure(v.data.Type):
 		e.pusherrtok(errtok, "invalid_expr")
@@ -1117,7 +1119,7 @@ func (e *eval) checkIntegerIndexing(v value, errtok Tok) {
 	}
 }
 
-func (e *eval) indexing(enumv, indexv value, errtok Tok) (v value) {
+func (e *eval) indexing(enumv, indexv value, errtok lex.Token) (v value) {
 	switch {
 	case typeIsArray(enumv.data.Type):
 		return e.indexingArray(enumv, indexv, errtok)
@@ -1135,26 +1137,26 @@ func (e *eval) indexing(enumv, indexv value, errtok Tok) (v value) {
 	return
 }
 
-func (e *eval) indexingSlice(slicev, index value, errtok Tok) value {
+func (e *eval) indexingSlice(slicev, index value, errtok lex.Token) value {
 	slicev.data.Type = *slicev.data.Type.ComponentType
 	e.checkIntegerIndexing(index, errtok)
 	if index.constExpr && tonums(index.expr) < 0 {
-		e.p.pusherrtok(index.data.Tok, "invalid_expr")
+		e.p.pusherrtok(index.data.Token, "invalid_expr")
 	}
 	return slicev
 }
 
-func (e *eval) indexingArray(arrv, index value, errtok Tok) value {
+func (e *eval) indexingArray(arrv, index value, errtok lex.Token) value {
 	arrv.data.Type = *arrv.data.Type.ComponentType
 	e.checkIntegerIndexing(index, errtok)
 	if index.constExpr && tonums(index.expr) < 0 {
-		e.p.pusherrtok(index.data.Tok, "invalid_expr")
+		e.p.pusherrtok(index.data.Token, "invalid_expr")
 	}
 	return arrv
 }
 
-func (e *eval) indexingMap(mapv, leftv value, errtok Tok) value {
-	types := mapv.data.Type.Tag.([]DataType)
+func (e *eval) indexingMap(mapv, leftv value, errtok lex.Token) value {
+	types := mapv.data.Type.Tag.([]Type)
 	keyType := types[0]
 	valType := types[1]
 	mapv.data.Type = valType
@@ -1162,7 +1164,7 @@ func (e *eval) indexingMap(mapv, leftv value, errtok Tok) value {
 	return mapv
 }
 
-func (e *eval) indexingStr(strv, index value, errtok Tok) value {
+func (e *eval) indexingStr(strv, index value, errtok lex.Token) value {
 	strv.data.Type.Id = juletype.U8
 	strv.data.Type.Kind = juletype.TypeMap[strv.data.Type.Id]
 	e.checkIntegerIndexing(index, errtok)
@@ -1185,7 +1187,7 @@ func (e *eval) indexingStr(strv, index value, errtok Tok) value {
 	return strv
 }
 
-func (e *eval) slicing(enumv, leftv, rightv value, errtok Tok) (v value) {
+func (e *eval) slicing(enumv, leftv, rightv value, errtok lex.Token) (v value) {
 	if leftv.constExpr && tonums(leftv.expr) < 0 {
 		e.p.pusherrtok(errtok, "overflow_limits")
 	}
@@ -1212,19 +1214,19 @@ func (e *eval) slicing(enumv, leftv, rightv value, errtok Tok) (v value) {
 	return
 }
 
-func (e *eval) slicingSlice(v value, errtok Tok) value {
+func (e *eval) slicingSlice(v value, errtok lex.Token) value {
 	v.lvalue = false
 	return v
 }
 
-func (e *eval) slicingArray(v value, errtok Tok) value {
+func (e *eval) slicingArray(v value, errtok lex.Token) value {
 	v.lvalue = false
 	v.data.Type.Id = juletype.Slice
 	v.data.Type.Kind = jule.Prefix_Slice + v.data.Type.ComponentType.Kind
 	return v
 }
 
-func (e *eval) slicingStr(v, leftv, rightv value, errtok Tok) value {
+func (e *eval) slicingStr(v, leftv, rightv value, errtok lex.Token) value {
 	v.lvalue = false
 	v.data.Type.Id = juletype.Str
 	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
@@ -1261,15 +1263,15 @@ func (e *eval) slicingStr(v, leftv, rightv value, errtok Tok) value {
 	return v
 }
 
-//! IMPORTANT: Tokens is should be store enumerable parentheses.
-func (e *eval) enumerableParts(toks Toks) []Toks {
+//! IMPORTANT: lex.Tokenens is should be store enumerable parentheses.
+func (e *eval) enumerableParts(toks []lex.Token) [][]lex.Token {
 	toks = toks[1 : len(toks)-1]
 	parts, errs := ast.Parts(toks, tokens.Comma, true)
 	e.p.pusherrs(errs...)
 	return parts
 }
 
-func (e *eval) buildArray(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
+func (e *eval) buildArray(parts [][]lex.Token, t Type, errtok lex.Token) (value, iExpr) {
 	if !t.Size.AutoSized {
 		if models.Size(len(parts)) > t.Size.N {
 			e.p.pusherrtok(errtok, "overflow_limits")
@@ -1302,7 +1304,7 @@ func (e *eval) buildArray(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
 	return v, model
 }
 
-func (e *eval) buildSlice(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
+func (e *eval) buildSlice(parts [][]lex.Token, t Type, errtok lex.Token) (value, iExpr) {
 	old_type := e.type_prefix
 	e.type_prefix = t.ComponentType
 	defer func() { e.type_prefix = old_type }()
@@ -1323,27 +1325,27 @@ func (e *eval) buildSlice(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
 	return v, model
 }
 
-func (e *eval) buildMap(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
+func (e *eval) buildMap(parts [][]lex.Token, t Type, errtok lex.Token) (value, iExpr) {
 	var v value
 	v.data.Value = t.Kind
 	v.data.Type = t
 	model := mapExpr{dataType: t}
-	types := t.Tag.([]DataType)
+	types := t.Tag.([]Type)
 	keyType := types[0]
 	valType := types[1]
 	for _, part := range parts {
-		braceCount := 0
+		brace_n := 0
 		colon := -1
 		for i, tok := range part {
 			if tok.Id == tokens.Brace {
 				switch tok.Kind {
 				case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
-					braceCount++
+					brace_n++
 				default:
-					braceCount--
+					brace_n--
 				}
 			}
-			if braceCount != 0 {
+			if brace_n != 0 {
 				continue
 			}
 			if tok.Id == tokens.Colon {
@@ -1378,7 +1380,7 @@ func (e *eval) buildMap(parts []Toks, t DataType, errtok Tok) (value, iExpr) {
 	return v, model
 }
 
-func (e *eval) enumerable(exprToks Toks, t DataType, m *exprModel) (v value) {
+func (e *eval) enumerable(exprToks []lex.Token, t Type, m *exprModel) (v value) {
 	var model iExpr
 	t, ok := e.p.realType(t, true)
 	if !ok {
@@ -1399,9 +1401,9 @@ func (e *eval) enumerable(exprToks Toks, t DataType, m *exprModel) (v value) {
 	return
 }
 
-func (e *eval) anonymousFn(toks Toks, m *exprModel) (v value) {
+func (e *eval) anonymousFn(toks []lex.Token, m *exprModel) (v value) {
 	b := ast.NewBuilder(toks)
-	f := b.Func(b.Toks, true, false)
+	f := b.Func(b.Tokens, true, false)
 	b.Wait()
 	if len(b.Errors) > 0 {
 		e.p.pusherrs(b.Errors...)
@@ -1417,7 +1419,7 @@ func (e *eval) anonymousFn(toks Toks, m *exprModel) (v value) {
 	return
 }
 
-func (e *eval) unsafeEval(toks Toks, m *exprModel) (v value) {
+func (e *eval) unsafeEval(toks []lex.Token, m *exprModel) (v value) {
 	i := 0
 	rang := ast.Range(&i, tokens.LBRACE, tokens.RBRACE, toks)
 	if len(rang) == 0 {
@@ -1425,20 +1427,20 @@ func (e *eval) unsafeEval(toks Toks, m *exprModel) (v value) {
 		return
 	}
 	old := e.allow_unsafe
-	old_funcs := e.p.Defs.Funcs
-	e.p.Defs.Funcs = append(e.p.Defs.Funcs, unsafe_funcs...)
+	old_funcs := e.p.Defines.Funcs
+	e.p.Defines.Funcs = append(e.p.Defines.Funcs, unsafe_funcs...)
 	defer func() {
 		e.allow_unsafe = old
-		e.p.Defs.Funcs = old_funcs
+		e.p.Defines.Funcs = old_funcs
 	}()
 	e.allow_unsafe = true
 	v = e.process(rang, m)
 	return v
 }
 
-func (e *eval) braceRange(toks Toks, m *exprModel) (v value) {
-	var exprToks Toks
-	braceCount := 0
+func (e *eval) braceRange(toks []lex.Token, m *exprModel) (v value) {
+	var exprToks []lex.Token
+	brace_n := 0
 	for i := len(toks) - 1; i >= 0; i-- {
 		tok := toks[i]
 		if tok.Id != tokens.Brace {
@@ -1446,11 +1448,11 @@ func (e *eval) braceRange(toks Toks, m *exprModel) (v value) {
 		}
 		switch tok.Kind {
 		case tokens.RBRACE, tokens.RBRACKET, tokens.RPARENTHESES:
-			braceCount++
+			brace_n++
 		default:
-			braceCount--
+			brace_n--
 		}
-		if braceCount != 0 {
+		if brace_n != 0 {
 			continue
 		}
 		exprToks = toks[:i]
@@ -1468,7 +1470,7 @@ func (e *eval) braceRange(toks Toks, m *exprModel) (v value) {
 			}
 		}
 		fallthrough
-	case braceCount > 0:
+	case brace_n > 0:
 		e.pusherrtok(toks[0], "invalid_syntax")
 		return
 	}

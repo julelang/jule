@@ -1,7 +1,9 @@
 package models
 
+import "github.com/jule-lang/jule/lex"
+
 // Object is an element of AST.
 type Object struct {
-	Tok  Tok
-	Data any
+	Token lex.Token
+	Data  any
 }

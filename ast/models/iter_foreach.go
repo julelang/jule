@@ -3,6 +3,7 @@ package models
 import (
 	"strings"
 
+	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/pkg/juleapi"
 	"github.com/jule-lang/jule/pkg/juletype"
 )
@@ -109,9 +110,9 @@ func (map_setter) next_steps(key_a, key_b Var, begin string) string {
 type IterForeach struct {
 	KeyA     Var
 	KeyB     Var
-	InTok    Tok
+	InToken    lex.Token
 	Expr     Expr
-	ExprType DataType
+	ExprType Type
 }
 
 func (f IterForeach) String(i *Iter) string {

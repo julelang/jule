@@ -3,6 +3,7 @@ package models
 import (
 	"strings"
 
+	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/lex/tokens"
 	"github.com/jule-lang/jule/pkg/jule"
 	"github.com/jule-lang/jule/pkg/juleapi"
@@ -10,11 +11,11 @@ import (
 
 // Param is function parameter AST model.
 type Param struct {
-	Tok       Tok
+	Token     lex.Token
 	Id        string
 	Variadic  bool
 	Reference bool
-	Type      DataType
+	Type      Type
 	Default   Expr
 }
 

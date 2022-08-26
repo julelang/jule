@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/ast/models"
 	"github.com/jule-lang/jule/pkg/jule"
 )
@@ -21,7 +22,7 @@ type exprModel struct {
 	nodes []exprBuildNode
 }
 
-func newExprModel(processes []Toks) *exprModel {
+func newExprModel(processes [][]lex.Token) *exprModel {
 	m := new(exprModel)
 	m.index = 0
 	m.nodes = make([]exprBuildNode, len(processes))
@@ -64,8 +65,8 @@ type anonFuncExpr struct {
 
 func (af anonFuncExpr) String() string {
 	var cpp strings.Builder
-	t := DataType{
-		Tok:  af.ast.Tok,
+	t := Type{
+		Token:  af.ast.Token,
 		Kind: af.ast.DataTypeString(),
 		Tag:  af.ast,
 	}
@@ -96,7 +97,7 @@ func (af anonFuncExpr) String() string {
 }
 
 type sliceExpr struct {
-	dataType DataType
+	dataType Type
 	expr     []iExpr
 }
 
@@ -116,7 +117,7 @@ func (a sliceExpr) String() string {
 }
 
 type mapExpr struct {
-	dataType DataType
+	dataType Type
 	keyExprs []iExpr
 	valExprs []iExpr
 }
@@ -138,7 +139,7 @@ func (m mapExpr) String() string {
 }
 
 type genericsExpr struct {
-	types []DataType
+	types []Type
 }
 
 func (ge genericsExpr) String() string {

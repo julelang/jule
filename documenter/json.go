@@ -10,7 +10,7 @@ import (
 	"github.com/jule-lang/jule/pkg/juletype"
 )
 
-type Defmap = parser.Defmap
+type Defmap = parser.DefineMap
 
 type generic struct {
 	Id string
@@ -78,7 +78,7 @@ type document struct {
 	Funcs   []function   `json:"functions"`
 }
 
-func fmt_json_ttoa(t models.DataType) string {
+func fmt_json_ttoa(t models.Type) string {
 	if t.Kind == juletype.TypeMap[juletype.Void] {
 		return ""
 	}
@@ -138,9 +138,9 @@ func fmt_json_structs(dm *Defmap) []structure {
 	for i, s := range dm.Structs {
 		var ss structure
 		ss.Id = s.Ast.Id
-		ss.Desc = fmt_json_doc_comment(s.Desc)
-		ss.Fields = fmt_json_globals(s.Defs)
-		ss.Funcs = fmt_json_funcs(s.Defs)
+		ss.Desc = fmt_json_doc_comment(s.Description)
+		ss.Fields = fmt_json_globals(s.Defines)
+		ss.Funcs = fmt_json_funcs(s.Defines)
 		ss.ImplementedTraits = make([]string, len(*s.Traits))
 		for i, t := range *s.Traits {
 			ss.ImplementedTraits[i] = t.Ast.Id
@@ -223,12 +223,12 @@ func fmt_json_funcs(dm *Defmap) []function {
 func doc_fmt_json(p *parser.Parser) (string, error) {
 	doc := document{
 		fmt_json_uses(p),
-		fmt_json_enums(p.Defs),
-		fmt_json_traits(p.Defs),
-		fmt_json_structs(p.Defs),
-		fmt_json_type_aliases(p.Defs),
-		fmt_json_globals(p.Defs),
-		fmt_json_funcs(p.Defs),
+		fmt_json_enums(p.Defines),
+		fmt_json_traits(p.Defines),
+		fmt_json_structs(p.Defines),
+		fmt_json_type_aliases(p.Defines),
+		fmt_json_globals(p.Defines),
+		fmt_json_funcs(p.Defines),
 	}
 	bytes, err := json.MarshalIndent(doc, "", "\t")
 	if err != nil {

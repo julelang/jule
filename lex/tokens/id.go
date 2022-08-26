@@ -1,6 +1,6 @@
 package tokens
 
-// Token identities.
+// lex.Tokenen identities.
 const (
 	NA          uint8 = 0
 	DataType    uint8 = 1

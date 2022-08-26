@@ -11,24 +11,22 @@ import (
 	"github.com/jule-lang/jule/pkg/julelog"
 )
 
-type File = juleio.File
-
 // Lex is lexer of Fract.
 type Lex struct {
-	firstTokOfLine bool
+	firstTokenOfLine bool
 
-	File   *File
+	File   *juleio.File
 	Pos    int
 	Column int
 	Row    int
 	// Logs are only errors
 	Logs []julelog.CompilerLog
 
-	braces []Tok
+	braces []Token
 }
 
 // New Lex instance.
-func NewLex(f *File) *Lex {
+func NewLex(f *juleio.File) *Lex {
 	l := new(Lex)
 	l.File = f
 	l.Pos = 0
@@ -47,7 +45,7 @@ func (l *Lex) pusherr(key string, args ...any) {
 	})
 }
 
-func (l *Lex) pusherrtok(tok Tok, err string) {
+func (l *Lex) pusherrtok(tok Token, err string) {
 	l.Logs = append(l.Logs, julelog.CompilerLog{
 		Type:    julelog.Error,
 		Row:     tok.Row,
@@ -58,12 +56,12 @@ func (l *Lex) pusherrtok(tok Tok, err string) {
 }
 
 // Lex all source content.
-func (l *Lex) Lex() []Tok {
-	var toks []Tok
+func (l *Lex) Lex() []Token {
+	var toks []Token
 	l.Logs = nil
 	l.Newln()
 	for l.Pos < len(l.File.Data) {
-		tok := l.Tok()
+		tok := l.Token()
 		if tok.Id != tokens.NA {
 			toks = append(toks, tok)
 		}
@@ -73,14 +71,14 @@ func (l *Lex) Lex() []Tok {
 }
 
 func (l *Lex) checkRanges() {
-	for _, tok := range l.braces {
-		switch tok.Kind {
+	for _, t := range l.braces {
+		switch t.Kind {
 		case tokens.LPARENTHESES:
-			l.pusherrtok(tok, "wait_close_parentheses")
+			l.pusherrtok(t, "wait_close_parentheses")
 		case tokens.LBRACE:
-			l.pusherrtok(tok, "wait_close_brace")
+			l.pusherrtok(t, "wait_close_brace")
 		case tokens.LBRACKET:
-			l.pusherrtok(tok, "wait_close_bracket")
+			l.pusherrtok(t, "wait_close_bracket")
 		}
 	}
 }
@@ -149,33 +147,33 @@ func (l *Lex) resume() string {
 	return ln
 }
 
-func (l *Lex) lncomment(tok *Tok) {
+func (l *Lex) lncomment(t *Token) {
 	start := l.Pos
 	l.Pos += 2
 	for ; l.Pos < len(l.File.Data); l.Pos++ {
 		if l.File.Data[l.Pos] == '\n' {
-			if l.firstTokOfLine {
-				tok.Id = tokens.Comment
-				tok.Kind = string(l.File.Data[start:l.Pos])
+			if l.firstTokenOfLine {
+				t.Id = tokens.Comment
+				t.Kind = string(l.File.Data[start:l.Pos])
 			}
 			return
 		}
 	}
-	if l.firstTokOfLine {
-		tok.Id = tokens.Comment
-		tok.Kind = string(l.File.Data[start:])
+	if l.firstTokenOfLine {
+		t.Id = tokens.Comment
+		t.Kind = string(l.File.Data[start:])
 	}
 }
 
 func (l *Lex) rangecomment() {
 	l.Pos += 2
 	for ; l.Pos < len(l.File.Data); l.Pos++ {
-		run := l.File.Data[l.Pos]
-		if run == '\n' {
+		r := l.File.Data[l.Pos]
+		if r == '\n' {
 			l.Newln()
 			continue
 		}
-		l.Column += len(string(run))
+		l.Column += len(string(r))
 		if strings.HasPrefix(string(l.File.Data[l.Pos:]), tokens.RANGE_COMMENT_CLOSE) {
 			l.Column += 2
 			l.Pos += 2
@@ -488,9 +486,9 @@ func (l *Lex) getrune(txt string, raw bool) string {
 	if !raw && txt[0] == '\\' {
 		return l.escseq(txt)
 	}
-	run, _ := utf8.DecodeRuneInString(txt)
+	r, _ := utf8.DecodeRuneInString(txt)
 	l.Pos++
-	return string(run)
+	return string(r)
 }
 
 func (l *Lex) rune(txt string) string {
@@ -498,7 +496,7 @@ func (l *Lex) rune(txt string) string {
 	sb.WriteByte('\'')
 	l.Column++
 	txt = txt[1:]
-	count := 0
+	n := 0
 	for i := 0; i < len(txt); i++ {
 		if txt[i] == '\n' {
 			l.pusherr("missing_rune_end")
@@ -506,22 +504,22 @@ func (l *Lex) rune(txt string) string {
 			l.Newln()
 			return ""
 		}
-		run := l.getrune(txt[i:], false)
-		sb.WriteString(run)
-		length := len(run)
+		r := l.getrune(txt[i:], false)
+		sb.WriteString(r)
+		length := len(r)
 		l.Column += length
-		if run == "'" {
+		if r == "'" {
 			l.Pos++
 			break
 		}
 		if length > 1 {
 			i += length - 1
 		}
-		count++
+		n++
 	}
-	if count == 0 {
+	if n == 0 {
 		l.pusherr("rune_empty")
-	} else if count > 1 {
+	} else if n > 1 {
 		l.pusherr("rune_overflow")
 	}
 	return sb.String()
@@ -544,16 +542,16 @@ func (l *Lex) str(txt string) string {
 				return ""
 			}
 		}
-		run := l.getrune(txt[i:], raw)
-		sb.WriteString(run)
-		length := len(run)
-		l.Column += length
+		r := l.getrune(txt[i:], raw)
+		sb.WriteString(r)
+		n := len(r)
+		l.Column += n
 		if ch == mark {
 			l.Pos++
 			break
 		}
-		if length > 1 {
-			i += length - 1
+		if n > 1 {
+			i += n - 1
 		}
 	}
 	return sb.String()
@@ -561,27 +559,27 @@ func (l *Lex) str(txt string) string {
 
 // Newln sets ready lexer to a new line lexing.
 func (l *Lex) Newln() {
-	l.firstTokOfLine = true
+	l.firstTokenOfLine = true
 	l.Row++
 	l.Column = 1
 }
 
-func (l *Lex) isop(txt, kind string, id uint8, tok *Tok) bool {
+func (l *Lex) isop(txt, kind string, id uint8, t *Token) bool {
 	if !strings.HasPrefix(txt, kind) {
 		return false
 	}
-	tok.Kind = kind
-	tok.Id = id
+	t.Kind = kind
+	t.Id = id
 	l.Pos += len([]rune(kind))
 	return true
 }
 
-func (l *Lex) iskw(txt, kind string, id uint8, tok *Tok) bool {
+func (l *Lex) iskw(txt, kind string, id uint8, t *Token) bool {
 	if !iskw(txt, kind) {
 		return false
 	}
-	tok.Kind = kind
-	tok.Id = id
+	t.Kind = kind
+	t.Id = id
 	l.Pos += len([]rune(kind))
 	return true
 }
@@ -682,16 +680,16 @@ var basicOps = [...]oppair{
 	37: {tokens.EQUAL, tokens.Operator},
 }
 
-func (l *Lex) lexKeywords(txt string, tok *Tok) bool {
-	for key, value := range keywords {
-		if l.iskw(txt, key, value, tok) {
+func (l *Lex) lexKeywords(txt string, tok *Token) bool {
+	for k, v := range keywords {
+		if l.iskw(txt, k, v, tok) {
 			return true
 		}
 	}
 	return false
 }
 
-func (l *Lex) lexBasicOps(txt string, tok *Tok) bool {
+func (l *Lex) lexBasicOps(txt string, tok *Token) bool {
 	for _, pair := range basicOps {
 		if l.isop(txt, pair.op, pair.id, tok) {
 			return true
@@ -700,96 +698,96 @@ func (l *Lex) lexBasicOps(txt string, tok *Tok) bool {
 	return false
 }
 
-func (l *Lex) lexIdentifier(txt string, tok *Tok) bool {
+func (l *Lex) lexIdentifier(txt string, t *Token) bool {
 	lex := l.id(txt)
 	if lex == "" {
 		return false
 	}
-	tok.Kind = lex
-	tok.Id = tokens.Id
+	t.Kind = lex
+	t.Id = tokens.Id
 	return true
 }
 
-func (l *Lex) lexNumeric(txt string, tok *Tok) bool {
+func (l *Lex) lexNumeric(txt string, t *Token) bool {
 	lex := l.num(txt)
 	if lex == "" {
 		return false
 	}
-	tok.Kind = lex
-	tok.Id = tokens.Value
+	t.Kind = lex
+	t.Id = tokens.Value
 	return true
 }
 
-// Tok generates next token from resume at position.
-func (l *Lex) Tok() Tok {
-	defer func() { l.firstTokOfLine = false }()
+// lex.Token generates next token from resume at position.
+func (l *Lex) Token() Token {
+	defer func() { l.firstTokenOfLine = false }()
 
-	tok := Tok{File: l.File, Id: tokens.NA}
+	t := Token{File: l.File, Id: tokens.NA}
 
 	txt := l.resume()
 	if txt == "" {
-		return tok
+		return t
 	}
 
 	// Set token values.
-	tok.Column = l.Column
-	tok.Row = l.Row
+	t.Column = l.Column
+	t.Row = l.Row
 
-	//* Tokenize
+	//* lex.Tokenenize
 	switch {
-	case l.lexNumeric(txt, &tok):
+	case l.lexNumeric(txt, &t):
 	case txt[0] == '\'':
-		tok.Kind = l.rune(txt)
-		tok.Id = tokens.Value
-		return tok
+		t.Kind = l.rune(txt)
+		t.Id = tokens.Value
+		return t
 	case txt[0] == '"' || txt[0] == '`':
-		tok.Kind = l.str(txt)
-		tok.Id = tokens.Value
-		return tok
+		t.Kind = l.str(txt)
+		t.Id = tokens.Value
+		return t
 	case strings.HasPrefix(txt, tokens.LINE_COMMENT):
-		l.lncomment(&tok)
-		return tok
+		l.lncomment(&t)
+		return t
 	case strings.HasPrefix(txt, tokens.RANGE_COMMENT_OPEN):
 		l.rangecomment()
-		return tok
-	case l.isop(txt, tokens.LPARENTHESES, tokens.Brace, &tok):
-		l.braces = append(l.braces, tok)
-	case l.isop(txt, tokens.RPARENTHESES, tokens.Brace, &tok):
-		l.pushRangeClose(tok, tokens.LPARENTHESES)
-	case l.isop(txt, tokens.LBRACE, tokens.Brace, &tok):
-		l.braces = append(l.braces, tok)
-	case l.isop(txt, tokens.RBRACE, tokens.Brace, &tok):
-		l.pushRangeClose(tok, tokens.LBRACE)
-	case l.isop(txt, tokens.LBRACKET, tokens.Brace, &tok):
-		l.braces = append(l.braces, tok)
-	case l.isop(txt, tokens.RBRACKET, tokens.Brace, &tok):
-		l.pushRangeClose(tok, tokens.LBRACKET)
+		return t
+	case l.isop(txt, tokens.LPARENTHESES, tokens.Brace, &t):
+		l.braces = append(l.braces, t)
+	case l.isop(txt, tokens.RPARENTHESES, tokens.Brace, &t):
+		l.pushRangeClose(t, tokens.LPARENTHESES)
+	case l.isop(txt, tokens.LBRACE, tokens.Brace, &t):
+		l.braces = append(l.braces, t)
+	case l.isop(txt, tokens.RBRACE, tokens.Brace, &t):
+		l.pushRangeClose(t, tokens.LBRACE)
+	case l.isop(txt, tokens.LBRACKET, tokens.Brace, &t):
+		l.braces = append(l.braces, t)
+	case l.isop(txt, tokens.RBRACKET, tokens.Brace, &t):
+		l.pushRangeClose(t, tokens.LBRACKET)
 	case
-		l.lexBasicOps(txt, &tok) ||
-		l.lexKeywords(txt, &tok) ||
-		l.lexIdentifier(txt, &tok):
+		l.lexBasicOps(txt, &t) ||
+		l.lexKeywords(txt, &t) ||
+		l.lexIdentifier(txt, &t):
 	default:
 		r, sz := utf8.DecodeRuneInString(txt)
 		l.pusherr("invalid_token", r)
 		l.Column += sz
 		l.Pos++
-		return tok
+		return t
 	}
-	l.Column += len(tok.Kind)
-	return tok
+	l.Column += len(t.Kind)
+	return t
 }
 
-func getCloseKindOfBrace(open string) string {
-	var close string
-	switch open {
+func getCloseKindOfBrace(left string) string {
+	var right string
+	switch left {
 	case tokens.RPARENTHESES:
-		close = tokens.LPARENTHESES
+		right = tokens.LPARENTHESES
 	case tokens.RBRACE:
-		close = tokens.LBRACE
+		right = tokens.LBRACE
 	case tokens.RBRACKET:
-		close = tokens.LBRACKET
+		right = tokens.LBRACKET
 	}
-	return close
+	return right
 }
 
 func (l *Lex) rmrange(i int, kind string) {
@@ -804,25 +802,25 @@ func (l *Lex) rmrange(i int, kind string) {
 	}
 }
 
-func (l *Lex) pushRangeClose(tok Tok, open string) {
-	len := len(l.braces)
-	if len == 0 {
-		switch tok.Kind {
+func (l *Lex) pushRangeClose(t Token, left string) {
+	n := len(l.braces)
+	if n == 0 {
+		switch t.Kind {
 		case tokens.RBRACKET:
-			l.pusherrtok(tok, "extra_closed_brackets")
+			l.pusherrtok(t, "extra_closed_brackets")
 		case tokens.RBRACE:
-			l.pusherrtok(tok, "extra_closed_braces")
+			l.pusherrtok(t, "extra_closed_braces")
 		case tokens.RPARENTHESES:
-			l.pusherrtok(tok, "extra_closed_parentheses")
+			l.pusherrtok(t, "extra_closed_parentheses")
 		}
 		return
-	} else if l.braces[len-1].Kind != open {
-		l.pushWrongOrderCloseErr(tok)
+	} else if l.braces[n-1].Kind != left {
+		l.pushWrongOrderCloseErr(t)
 	}
-	l.rmrange(len-1, tok.Kind)
+	l.rmrange(n-1, t.Kind)
 }
 
-func (l *Lex) pushWrongOrderCloseErr(tok Tok) {
+func (l *Lex) pushWrongOrderCloseErr(t Token) {
 	var msg string
 	switch l.braces[len(l.braces)-1].Kind {
 	case tokens.LPARENTHESES:
@@ -832,5 +830,5 @@ func (l *Lex) pushWrongOrderCloseErr(tok Tok) {
 	case tokens.LBRACKET:
 		msg = "expected_bracket_close"
 	}
-	l.pusherrtok(tok, msg)
+	l.pusherrtok(t, msg)
 }

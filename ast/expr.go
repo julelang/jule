@@ -1,10 +1,13 @@
 package ast
 
-import "github.com/jule-lang/jule/lex/tokens"
+import (
+	"github.com/jule-lang/jule/lex"
+	"github.com/jule-lang/jule/lex/tokens"
+)
 
 // IsFuncCall returns function expressions without call expression
 // if tokens are function call, nil if not.
-func IsFuncCall(toks Toks) Toks {
+func IsFuncCall(toks []lex.Token) []lex.Token {
 	switch toks[0].Id {
 	case tokens.Brace, tokens.Id, tokens.DataType:
 	default:
@@ -17,7 +20,7 @@ func IsFuncCall(toks Toks) Toks {
 	if tok.Id != tokens.Brace || tok.Kind != tokens.RPARENTHESES {
 		return nil
 	}
-	braceCount := 0
+	brace_n := 0
 	// Loops i >= 1 because expression must be has function expression at begin.
 	// For this reason, ignore first token.
 	for i := len(toks) - 1; i >= 1; i-- {
@@ -25,11 +28,11 @@ func IsFuncCall(toks Toks) Toks {
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
 			case tokens.RPARENTHESES:
-				braceCount++
+				brace_n++
 			case tokens.LPARENTHESES:
-				braceCount--
+				brace_n--
 			}
-			if braceCount == 0 {
+			if brace_n == 0 {
 				return toks[:i]
 			}
 		}
@@ -38,7 +41,7 @@ func IsFuncCall(toks Toks) Toks {
 }
 
 // RequireOperatorToProcess reports operator required for process or not.
-func RequireOperatorToProcess(tok Tok, index, len int) bool {
+func RequireOperatorToProcess(tok lex.Token, index, len int) bool {
 	switch tok.Id {
 	case tokens.Comma:
 		return false
@@ -52,21 +55,21 @@ func RequireOperatorToProcess(tok Tok, index, len int) bool {
 }
 
 // BlockExpr returns expression tokens comes before block if exist, nil if not.
-func BlockExpr(toks Toks) (expr Toks) {
-	braceCount := 0
+func BlockExpr(toks []lex.Token) (expr []lex.Token) {
+	brace_n := 0
 	for i, tok := range toks {
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
 			case tokens.LBRACE:
-				if braceCount > 0 {
-					braceCount++
+				if brace_n > 0 {
+					brace_n++
 					break
 				}
 				return toks[:i]
 			case tokens.LBRACKET, tokens.LPARENTHESES:
-				braceCount++
+				brace_n++
 			default:
-				braceCount--
+				brace_n--
 			}
 		}
 	}

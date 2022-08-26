@@ -3,6 +3,7 @@ package models
 import (
 	"strings"
 
+	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/lex/tokens"
 	"github.com/jule-lang/jule/pkg/juleapi"
 	"github.com/jule-lang/jule/pkg/juletype"
@@ -11,15 +12,15 @@ import (
 // Func is function declaration AST model.
 type Func struct {
 	Pub        bool
-	Tok        Tok
+	Token      lex.Token
 	Id         string
 	Generics   []*GenericType
-	Combines   *[][]DataType
+	Combines   *[][]Type
 	Attributes []Attribute
 	Params     []Param
 	RetType    RetType
 	Block      *Block
-	Receiver   *DataType
+	Receiver   *Type
 	Owner      any
 }
 
@@ -54,7 +55,7 @@ func (f *Func) DataTypeString() string {
 	cpp.WriteByte(')')
 	if f.RetType.Type.MultiTyped {
 		cpp.WriteByte('(')
-		for _, t := range f.RetType.Type.Tag.([]DataType) {
+		for _, t := range f.RetType.Type.Tag.([]Type) {
 			cpp.WriteString(t.Kind)
 			cpp.WriteByte(',')
 		}
@@ -70,7 +71,7 @@ func (f *Func) OutId() string {
 	if f.Receiver != nil {
 		return f.Id
 	}
-	return juleapi.OutId(f.Id, f.Tok.File)
+	return juleapi.OutId(f.Id, f.Token.File)
 }
 
 // DefString returns define string of function.

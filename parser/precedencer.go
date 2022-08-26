@@ -6,8 +6,8 @@ type precedencer struct {
 
 func (p *precedencer) set(level uint, expr any) {
 	for _, pair := range p.pairs {
-		pairLevel := pair[0].(uint)
-		if pairLevel == level {
+		pair_level := pair[0].(uint)
+		if pair_level == level {
 			if pair[1] == nil {
 				pair[1] = expr
 			}
@@ -15,8 +15,8 @@ func (p *precedencer) set(level uint, expr any) {
 		}
 	}
 	for i, pair := range p.pairs {
-		pairLevel := pair[0].(uint)
-		if level > pairLevel {
+		pair_level := pair[0].(uint)
+		if level > pair_level {
 			first := p.pairs[:i]
 			appended := append([][]any{{level, expr}}, p.pairs[i:]...)
 			p.pairs = append(first, appended...)

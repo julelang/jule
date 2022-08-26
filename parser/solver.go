@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/lex/tokens"
 	"github.com/jule-lang/jule/pkg/julebits"
 	"github.com/jule-lang/jule/pkg/juletype"
@@ -82,29 +83,29 @@ func tonums(expr any) int64 {
 }
 
 type solver struct {
-	p        *Parser
-	left     Toks
-	leftVal  value
-	right    Toks
-	rightVal value
-	operator Tok
+	p         *Parser
+	left      []lex.Token
+	left_val  value
+	right     []lex.Token
+	right_val value
+	operator  lex.Token
 }
 
 func (s *solver) eq(v *value) {
 	if !s.isConstExpr() {
 		return
 	}
-	switch left := s.leftVal.expr.(type) {
+	switch left := s.left_val.expr.(type) {
 	case bool:
-		v.expr = left == s.rightVal.expr.(bool)
+		v.expr = left == s.right_val.expr.(bool)
 	case string:
-		v.expr = left == s.rightVal.expr.(string)
+		v.expr = left == s.right_val.expr.(string)
 	case float64:
-		v.expr = left == tonumf(s.rightVal.expr)
+		v.expr = left == tonumf(s.right_val.expr)
 	case int64:
-		v.expr = left == tonums(s.rightVal.expr)
+		v.expr = left == tonums(s.right_val.expr)
 	case uint64:
-		v.expr = left == tonumu(s.rightVal.expr)
+		v.expr = left == tonumu(s.right_val.expr)
 	}
 }
 
@@ -120,13 +121,13 @@ func (s *solver) lt(v *value) {
 	if !s.isConstExpr() {
 		return
 	}
-	switch left := s.leftVal.expr.(type) {
+	switch left := s.left_val.expr.(type) {
 	case float64:
-		v.expr = left < tonumf(s.rightVal.expr)
+		v.expr = left < tonumf(s.right_val.expr)
 	case int64:
-		v.expr = left < tonums(s.rightVal.expr)
+		v.expr = left < tonums(s.right_val.expr)
 	case uint64:
-		v.expr = left < tonumu(s.rightVal.expr)
+		v.expr = left < tonumu(s.right_val.expr)
 	}
 }
 
@@ -134,13 +135,13 @@ func (s *solver) gt(v *value) {
 	if !s.isConstExpr() {
 		return
 	}
-	switch left := s.leftVal.expr.(type) {
+	switch left := s.left_val.expr.(type) {
 	case float64:
-		v.expr = left > tonumf(s.rightVal.expr)
+		v.expr = left > tonumf(s.right_val.expr)
 	case int64:
-		v.expr = left > tonums(s.rightVal.expr)
+		v.expr = left > tonums(s.right_val.expr)
 	case uint64:
-		v.expr = left > tonumu(s.rightVal.expr)
+		v.expr = left > tonumu(s.right_val.expr)
 	}
 }
 
@@ -148,13 +149,13 @@ func (s *solver) lteq(v *value) {
 	if !s.isConstExpr() {
 		return
 	}
-	switch left := s.leftVal.expr.(type) {
+	switch left := s.left_val.expr.(type) {
 	case float64:
-		v.expr = left <= tonumf(s.rightVal.expr)
+		v.expr = left <= tonumf(s.right_val.expr)
 	case int64:
-		v.expr = left <= tonums(s.rightVal.expr)
+		v.expr = left <= tonums(s.right_val.expr)
 	case uint64:
-		v.expr = left <= tonumu(s.rightVal.expr)
+		v.expr = left <= tonumu(s.right_val.expr)
 	}
 }
 
@@ -162,13 +163,13 @@ func (s *solver) gteq(v *value) {
 	if !s.isConstExpr() {
 		return
 	}
-	switch left := s.leftVal.expr.(type) {
+	switch left := s.left_val.expr.(type) {
 	case float64:
-		v.expr = left >= tonumf(s.rightVal.expr)
+		v.expr = left >= tonumf(s.right_val.expr)
 	case int64:
-		v.expr = left >= tonums(s.rightVal.expr)
+		v.expr = left >= tonums(s.right_val.expr)
 	case uint64:
-		v.expr = left >= tonumu(s.rightVal.expr)
+		v.expr = left >= tonumu(s.right_val.expr)
 	}
 }
 
@@ -176,15 +177,15 @@ func (s *solver) add(v *value) {
 	if !s.isConstExpr() {
 		return
 	}
-	switch left := s.leftVal.expr.(type) {
+	switch left := s.left_val.expr.(type) {
 	case string:
-		v.expr = left + s.rightVal.expr.(string)
+		v.expr = left + s.right_val.expr.(string)
 	case float64:
-		v.expr = left + tonumf(s.rightVal.expr)
+		v.expr = left + tonumf(s.right_val.expr)
 	case int64:
-		v.expr = int64(left + tonums(s.rightVal.expr))
+		v.expr = int64(left + tonums(s.right_val.expr))
 	case uint64:
-		v.expr = uint64(left + tonumu(s.rightVal.expr))
+		v.expr = uint64(left + tonumu(s.right_val.expr))
 	}
 }
 
@@ -192,13 +193,13 @@ func (s *solver) sub(v *value) {
 	if !s.isConstExpr() {
 		return
 	}
-	switch left := s.leftVal.expr.(type) {
+	switch left := s.left_val.expr.(type) {
 	case float64:
-		v.expr = left - tonumf(s.rightVal.expr)
+		v.expr = left - tonumf(s.right_val.expr)
 	case int64:
-		v.expr = int64(left - tonums(s.rightVal.expr))
+		v.expr = int64(left - tonums(s.right_val.expr))
 	case uint64:
-		v.expr = uint64(left - tonumu(s.rightVal.expr))
+		v.expr = uint64(left - tonumu(s.right_val.expr))
 	}
 }
 
@@ -206,13 +207,13 @@ func (s *solver) mul(v *value) {
 	if !s.isConstExpr() {
 		return
 	}
-	switch left := s.leftVal.expr.(type) {
+	switch left := s.left_val.expr.(type) {
 	case float64:
-		v.expr = left * tonumf(s.rightVal.expr)
+		v.expr = left * tonumf(s.right_val.expr)
 	case int64:
-		v.expr = int64(left * tonums(s.rightVal.expr))
+		v.expr = int64(left * tonums(s.right_val.expr))
 	case uint64:
-		v.expr = uint64(left * tonumu(s.rightVal.expr))
+		v.expr = uint64(left * tonumu(s.right_val.expr))
 	}
 }
 
@@ -220,9 +221,9 @@ func (s *solver) div(v *value) {
 	if !s.isConstExpr() {
 		return
 	}
-	switch left := s.leftVal.expr.(type) {
+	switch left := s.left_val.expr.(type) {
 	case float64:
-		right := tonumf(s.rightVal.expr)
+		right := tonumf(s.right_val.expr)
 		if right != 0 {
 			v.expr = left / right
 		} else {
@@ -230,7 +231,7 @@ func (s *solver) div(v *value) {
 			v.expr = float64(0)
 		}
 	case int64:
-		right := tonumf(s.rightVal.expr)
+		right := tonumf(s.right_val.expr)
 		if right != 0 {
 			v.expr = float64(left) / right
 		} else {
@@ -238,7 +239,7 @@ func (s *solver) div(v *value) {
 			v.expr = int64(0)
 		}
 	case uint64:
-		right := tonumf(s.rightVal.expr)
+		right := tonumf(s.right_val.expr)
 		if right != 0 {
 			v.expr = float64(left) / right
 		} else {
@@ -252,9 +253,9 @@ func (s *solver) mod(v *value) {
 	if !s.isConstExpr() {
 		return
 	}
-	switch left := s.leftVal.expr.(type) {
+	switch left := s.left_val.expr.(type) {
 	case int64:
-		right := tonums(s.rightVal.expr)
+		right := tonums(s.right_val.expr)
 		if right != 0 {
 			v.expr = left % right
 		} else {
@@ -262,7 +263,7 @@ func (s *solver) mod(v *value) {
 			v.expr = int64(0)
 		}
 	case uint64:
-		right := tonumu(s.rightVal.expr)
+		right := tonumu(s.right_val.expr)
 		if right != 0 {
 			v.expr = left % right
 		} else {
@@ -276,11 +277,11 @@ func (s *solver) bitwiseAnd(v *value) {
 	if !s.isConstExpr() {
 		return
 	}
-	switch left := s.leftVal.expr.(type) {
+	switch left := s.left_val.expr.(type) {
 	case int64:
-		v.expr = left & tonums(s.rightVal.expr)
+		v.expr = left & tonums(s.right_val.expr)
 	case uint64:
-		v.expr = left & tonumu(s.rightVal.expr)
+		v.expr = left & tonumu(s.right_val.expr)
 	}
 }
 
@@ -288,11 +289,11 @@ func (s *solver) bitwiseOr(v *value) {
 	if !s.isConstExpr() {
 		return
 	}
-	switch left := s.leftVal.expr.(type) {
+	switch left := s.left_val.expr.(type) {
 	case int64:
-		v.expr = left | tonums(s.rightVal.expr)
+		v.expr = left | tonums(s.right_val.expr)
 	case uint64:
-		v.expr = left | tonumu(s.rightVal.expr)
+		v.expr = left | tonumu(s.right_val.expr)
 	}
 }
 
@@ -300,17 +301,17 @@ func (s *solver) bitwiseXor(v *value) {
 	if !s.isConstExpr() {
 		return
 	}
-	switch left := s.leftVal.expr.(type) {
+	switch left := s.left_val.expr.(type) {
 	case int64:
-		v.expr = left ^ tonums(s.rightVal.expr)
+		v.expr = left ^ tonums(s.right_val.expr)
 	case uint64:
-		v.expr = left ^ tonumu(s.rightVal.expr)
+		v.expr = left ^ tonumu(s.right_val.expr)
 	}
 }
 
 func (s *solver) urshift(v *value) {
-	left := tonumu(s.leftVal.expr)
-	right := tonumu(s.rightVal.expr)
+	left := tonumu(s.left_val.expr)
+	right := tonumu(s.right_val.expr)
 	v.expr = left >> right
 	setshift(v, right)
 }
@@ -319,10 +320,10 @@ func (s *solver) rshift(v *value) {
 	if !s.isConstExpr() {
 		return
 	}
-	switch left := s.leftVal.expr.(type) {
+	switch left := s.left_val.expr.(type) {
 	case int64:
 		if left < 0 {
-			right := tonumu(s.rightVal.expr)
+			right := tonumu(s.right_val.expr)
 			v.expr = left >> right
 			setshift(v, right)
 		} else {
@@ -334,8 +335,8 @@ func (s *solver) rshift(v *value) {
 }
 
 func (s *solver) ulshift(v *value) {
-	left := tonumu(s.leftVal.expr)
-	right := tonumu(s.rightVal.expr)
+	left := tonumu(s.left_val.expr)
+	right := tonumu(s.right_val.expr)
 	v.expr = left << right
 	setshift(v, right)
 }
@@ -344,10 +345,10 @@ func (s *solver) lshift(v *value) {
 	if !s.isConstExpr() {
 		return
 	}
-	switch left := s.leftVal.expr.(type) {
+	switch left := s.left_val.expr.(type) {
 	case int64:
 		if left < 0 {
-			right := tonumu(s.rightVal.expr)
+			right := tonumu(s.right_val.expr)
 			v.expr = left << right
 			setshift(v, right)
 		} else {
@@ -362,9 +363,9 @@ func (s *solver) and(v *value) {
 	if !s.isConstExpr() {
 		return
 	}
-	switch left := s.leftVal.expr.(type) {
+	switch left := s.left_val.expr.(type) {
 	case bool:
-		v.expr = left && s.rightVal.expr.(bool)
+		v.expr = left && s.right_val.expr.(bool)
 	}
 }
 
@@ -372,26 +373,26 @@ func (s *solver) or(v *value) {
 	if !s.isConstExpr() {
 		return
 	}
-	switch left := s.leftVal.expr.(type) {
+	switch left := s.left_val.expr.(type) {
 	case bool:
-		v.expr = left || s.rightVal.expr.(bool)
+		v.expr = left || s.right_val.expr.(bool)
 	}
 }
 
 func (s *solver) ptr() (v value) {
-	v.data.Tok = s.operator
-	if !typesAreCompatible(s.leftVal.data.Type, s.rightVal.data.Type, true) {
+	v.data.Token = s.operator
+	if !typesAreCompatible(s.left_val.data.Type, s.right_val.data.Type, true) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.operator, "incompatible_types",
-			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
+			s.right_val.data.Type.Kind, s.left_val.data.Type.Kind)
 		return
 	}
-	if !typeIsPtr(s.leftVal.data.Type) {
-		s.leftVal, s.rightVal = s.rightVal, s.leftVal
+	if !typeIsPtr(s.left_val.data.Type) {
+		s.left_val, s.right_val = s.right_val, s.left_val
 	}
 	switch s.operator.Kind {
 	case tokens.PLUS, tokens.MINUS:
-		v.data.Type = s.leftVal.data.Type
+		v.data.Type = s.left_val.data.Type
 	case tokens.EQUALS, tokens.NOT_EQUALS, tokens.LESS, tokens.GREAT,
 		tokens.GREAT_EQUAL, tokens.LESS_EQUAL:
 		v.data.Type.Id = juletype.Bool
@@ -404,22 +405,22 @@ func (s *solver) ptr() (v value) {
 }
 
 func (s *solver) enum() (v value) {
-	if typeIsEnum(s.leftVal.data.Type) {
-		s.leftVal.data.Type = s.leftVal.data.Type.Tag.(*Enum).Type
+	if typeIsEnum(s.left_val.data.Type) {
+		s.left_val.data.Type = s.left_val.data.Type.Tag.(*Enum).Type
 	}
-	if typeIsEnum(s.rightVal.data.Type) {
-		s.rightVal.data.Type = s.rightVal.data.Type.Tag.(*Enum).Type
+	if typeIsEnum(s.right_val.data.Type) {
+		s.right_val.data.Type = s.right_val.data.Type.Tag.(*Enum).Type
 	}
 	return s.solve()
 }
 
 func (s *solver) str() (v value) {
-	v.data.Tok = s.operator
+	v.data.Token = s.operator
 	// Not both string?
-	if s.leftVal.data.Type.Id != s.rightVal.data.Type.Id {
+	if s.left_val.data.Type.Id != s.right_val.data.Type.Id {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.operator, "incompatible_types",
-			s.leftVal.data.Type.Kind, s.rightVal.data.Type.Kind)
+			s.left_val.data.Type.Kind, s.right_val.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
@@ -444,7 +445,7 @@ func (s *solver) str() (v value) {
 }
 
 func (s *solver) any() (v value) {
-	v.data.Tok = s.operator
+	v.data.Token = s.operator
 	switch s.operator.Kind {
 	case tokens.EQUALS, tokens.NOT_EQUALS:
 		v.data.Type.Id = juletype.Bool
@@ -457,11 +458,11 @@ func (s *solver) any() (v value) {
 }
 
 func (s *solver) bool() (v value) {
-	v.data.Tok = s.operator
-	if !typesAreCompatible(s.leftVal.data.Type, s.rightVal.data.Type, true) {
+	v.data.Token = s.operator
+	if !typesAreCompatible(s.left_val.data.Type, s.right_val.data.Type, true) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.operator, "incompatible_types",
-			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
+			s.right_val.data.Type.Kind, s.left_val.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
@@ -482,23 +483,23 @@ func (s *solver) bool() (v value) {
 }
 
 func (s *solver) floatMod() (v value, ok bool) {
-	if !juletype.IsInteger(s.leftVal.data.Type.Id) {
-		if !juletype.IsInteger(s.rightVal.data.Type.Id) {
+	if !juletype.IsInteger(s.left_val.data.Type.Id) {
+		if !juletype.IsInteger(s.right_val.data.Type.Id) {
 			return
 		}
-		s.leftVal, s.rightVal = s.rightVal, s.leftVal
+		s.left_val, s.right_val = s.right_val, s.left_val
 	}
 	switch {
-	case juletype.IsSignedInteger(s.leftVal.data.Type.Id):
+	case juletype.IsSignedInteger(s.left_val.data.Type.Id):
 		switch {
-		case integerAssignable(juletype.I64, s.rightVal):
+		case integerAssignable(juletype.I64, s.right_val):
 			return s.signed(), true
-		case integerAssignable(juletype.U64, s.rightVal):
+		case integerAssignable(juletype.U64, s.right_val):
 			return s.unsigned(), true
 		}
-	case juletype.IsUnsignedInteger(s.leftVal.data.Type.Id):
-		if integerAssignable(juletype.I64, s.rightVal) ||
-			integerAssignable(juletype.U64, s.rightVal) {
+	case juletype.IsUnsignedInteger(s.left_val.data.Type.Id):
+		if integerAssignable(juletype.I64, s.right_val) ||
+			integerAssignable(juletype.U64, s.right_val) {
 			return s.unsigned(), true
 		}
 	}
@@ -506,12 +507,12 @@ func (s *solver) floatMod() (v value, ok bool) {
 }
 
 func (s *solver) float() (v value) {
-	v.data.Tok = s.operator
-	if !juletype.IsNumeric(s.leftVal.data.Type.Id) ||
-		!juletype.IsNumeric(s.rightVal.data.Type.Id) {
+	v.data.Token = s.operator
+	if !juletype.IsNumeric(s.left_val.data.Type.Id) ||
+		!juletype.IsNumeric(s.right_val.data.Type.Id) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.operator, "incompatible_types",
-			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
+			s.right_val.data.Type.Kind, s.left_val.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
@@ -540,34 +541,34 @@ func (s *solver) float() (v value) {
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.lteq(&v)
 	case tokens.PLUS:
-		v.data.Type = s.leftVal.data.Type
-		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.rightVal.data.Type
+		v.data.Type = s.left_val.data.Type
+		if juletype.TypeGreaterThan(s.right_val.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.right_val.data.Type
 		}
 		s.add(&v)
 	case tokens.MINUS:
-		v.data.Type = s.leftVal.data.Type
-		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.rightVal.data.Type
+		v.data.Type = s.left_val.data.Type
+		if juletype.TypeGreaterThan(s.right_val.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.right_val.data.Type
 		}
 		s.sub(&v)
 	case tokens.STAR:
-		v.data.Type = s.leftVal.data.Type
-		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.rightVal.data.Type
+		v.data.Type = s.left_val.data.Type
+		if juletype.TypeGreaterThan(s.right_val.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.right_val.data.Type
 		}
 		s.mul(&v)
 	case tokens.SOLIDUS:
 		// Ignore float if expression has integer
-		if juletype.IsInteger(s.leftVal.data.Type.Id) && juletype.IsInteger(s.rightVal.data.Type.Id) {
-		} else if juletype.IsInteger(s.leftVal.data.Type.Id) {
-			s.rightVal.data.Type = s.leftVal.data.Type
-		} else if juletype.IsInteger(s.rightVal.data.Type.Id) {
-			s.leftVal.data.Type = s.rightVal.data.Type
+		if juletype.IsInteger(s.left_val.data.Type.Id) && juletype.IsInteger(s.right_val.data.Type.Id) {
+		} else if juletype.IsInteger(s.left_val.data.Type.Id) {
+			s.right_val.data.Type = s.left_val.data.Type
+		} else if juletype.IsInteger(s.right_val.data.Type.Id) {
+			s.left_val.data.Type = s.right_val.data.Type
 		}
-		v.data.Type = s.leftVal.data.Type
-		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.rightVal.data.Type
+		v.data.Type = s.left_val.data.Type
+		if juletype.TypeGreaterThan(s.right_val.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.right_val.data.Type
 		}
 		s.div(&v)
 	case tokens.PERCENT:
@@ -585,12 +586,12 @@ func (s *solver) float() (v value) {
 }
 
 func (s *solver) signed() (v value) {
-	v.data.Tok = s.operator
-	if !juletype.IsNumeric(s.leftVal.data.Type.Id) ||
-		!juletype.IsNumeric(s.rightVal.data.Type.Id) {
+	v.data.Token = s.operator
+	if !juletype.IsNumeric(s.left_val.data.Type.Id) ||
+		!juletype.IsNumeric(s.right_val.data.Type.Id) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.operator, "incompatible_types",
-			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
+			s.right_val.data.Type.Kind, s.left_val.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
@@ -619,64 +620,64 @@ func (s *solver) signed() (v value) {
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.lteq(&v)
 	case tokens.PLUS:
-		v.data.Type = s.leftVal.data.Type
-		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.rightVal.data.Type
+		v.data.Type = s.left_val.data.Type
+		if juletype.TypeGreaterThan(s.right_val.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.right_val.data.Type
 		}
 		s.add(&v)
 	case tokens.MINUS:
-		v.data.Type = s.leftVal.data.Type
-		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.rightVal.data.Type
+		v.data.Type = s.left_val.data.Type
+		if juletype.TypeGreaterThan(s.right_val.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.right_val.data.Type
 		}
 		s.sub(&v)
 	case tokens.STAR:
-		v.data.Type = s.leftVal.data.Type
-		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.rightVal.data.Type
+		v.data.Type = s.left_val.data.Type
+		if juletype.TypeGreaterThan(s.right_val.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.right_val.data.Type
 		}
 		s.mul(&v)
 	case tokens.SOLIDUS:
-		v.data.Type = s.leftVal.data.Type
-		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.rightVal.data.Type
+		v.data.Type = s.left_val.data.Type
+		if juletype.TypeGreaterThan(s.right_val.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.right_val.data.Type
 		}
 		s.div(&v)
 	case tokens.PERCENT:
-		v.data.Type = s.leftVal.data.Type
-		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.rightVal.data.Type
+		v.data.Type = s.left_val.data.Type
+		if juletype.TypeGreaterThan(s.right_val.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.right_val.data.Type
 		}
 		s.mod(&v)
 	case tokens.AMPER:
-		v.data.Type = s.leftVal.data.Type
-		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.rightVal.data.Type
+		v.data.Type = s.left_val.data.Type
+		if juletype.TypeGreaterThan(s.right_val.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.right_val.data.Type
 		}
 		s.bitwiseAnd(&v)
 	case tokens.VLINE:
-		v.data.Type = s.leftVal.data.Type
-		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.rightVal.data.Type
+		v.data.Type = s.left_val.data.Type
+		if juletype.TypeGreaterThan(s.right_val.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.right_val.data.Type
 		}
 		s.bitwiseOr(&v)
 	case tokens.CARET:
-		v.data.Type = s.leftVal.data.Type
-		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.rightVal.data.Type
+		v.data.Type = s.left_val.data.Type
+		if juletype.TypeGreaterThan(s.right_val.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.right_val.data.Type
 		}
 		s.bitwiseXor(&v)
 	case tokens.RSHIFT:
 		v.data.Type.Id = juletype.U64
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
-		if !okForShifting(s.rightVal) {
+		if !okForShifting(s.right_val) {
 			s.p.pusherrtok(s.operator, "bitshift_must_unsigned")
 		}
 		s.rshift(&v)
 	case tokens.LSHIFT:
 		v.data.Type.Id = juletype.U64
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
-		if !okForShifting(s.rightVal) {
+		if !okForShifting(s.right_val) {
 			s.p.pusherrtok(s.operator, "bitshift_must_unsigned")
 		}
 		s.lshift(&v)
@@ -688,12 +689,12 @@ func (s *solver) signed() (v value) {
 }
 
 func (s *solver) unsigned() (v value) {
-	v.data.Tok = s.operator
-	if !juletype.IsNumeric(s.leftVal.data.Type.Id) ||
-		!juletype.IsNumeric(s.rightVal.data.Type.Id) {
+	v.data.Token = s.operator
+	if !juletype.IsNumeric(s.left_val.data.Type.Id) ||
+		!juletype.IsNumeric(s.right_val.data.Type.Id) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.operator, "incompatible_types",
-			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
+			s.right_val.data.Type.Kind, s.left_val.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
@@ -722,64 +723,64 @@ func (s *solver) unsigned() (v value) {
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.lteq(&v)
 	case tokens.PLUS:
-		v.data.Type = s.leftVal.data.Type
-		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.rightVal.data.Type
+		v.data.Type = s.left_val.data.Type
+		if juletype.TypeGreaterThan(s.right_val.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.right_val.data.Type
 		}
 		s.add(&v)
 	case tokens.MINUS:
-		v.data.Type = s.leftVal.data.Type
-		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.rightVal.data.Type
+		v.data.Type = s.left_val.data.Type
+		if juletype.TypeGreaterThan(s.right_val.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.right_val.data.Type
 		}
 		s.sub(&v)
 	case tokens.STAR:
-		v.data.Type = s.leftVal.data.Type
-		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.rightVal.data.Type
+		v.data.Type = s.left_val.data.Type
+		if juletype.TypeGreaterThan(s.right_val.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.right_val.data.Type
 		}
 		s.mul(&v)
 	case tokens.SOLIDUS:
-		v.data.Type = s.leftVal.data.Type
-		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.rightVal.data.Type
+		v.data.Type = s.left_val.data.Type
+		if juletype.TypeGreaterThan(s.right_val.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.right_val.data.Type
 		}
 		s.div(&v)
 	case tokens.PERCENT:
-		v.data.Type = s.leftVal.data.Type
-		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.rightVal.data.Type
+		v.data.Type = s.left_val.data.Type
+		if juletype.TypeGreaterThan(s.right_val.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.right_val.data.Type
 		}
 		s.mod(&v)
 	case tokens.AMPER:
-		v.data.Type = s.leftVal.data.Type
-		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.rightVal.data.Type
+		v.data.Type = s.left_val.data.Type
+		if juletype.TypeGreaterThan(s.right_val.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.right_val.data.Type
 		}
 		s.bitwiseAnd(&v)
 	case tokens.VLINE:
-		v.data.Type = s.leftVal.data.Type
-		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.rightVal.data.Type
+		v.data.Type = s.left_val.data.Type
+		if juletype.TypeGreaterThan(s.right_val.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.right_val.data.Type
 		}
 		s.bitwiseOr(&v)
 	case tokens.CARET:
-		v.data.Type = s.leftVal.data.Type
-		if juletype.TypeGreaterThan(s.rightVal.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.rightVal.data.Type
+		v.data.Type = s.left_val.data.Type
+		if juletype.TypeGreaterThan(s.right_val.data.Type.Id, v.data.Type.Id) {
+			v.data.Type = s.right_val.data.Type
 		}
 		s.bitwiseXor(&v)
 	case tokens.RSHIFT:
 		v.data.Type.Id = juletype.U64
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
-		if !okForShifting(s.rightVal) {
+		if !okForShifting(s.right_val) {
 			s.p.pusherrtok(s.operator, "bitshift_must_unsigned")
 		}
 		s.rshift(&v)
 	case tokens.LSHIFT:
 		v.data.Type.Id = juletype.U64
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
-		if !okForShifting(s.rightVal) {
+		if !okForShifting(s.right_val) {
 			s.p.pusherrtok(s.operator, "bitshift_must_unsigned")
 		}
 		s.lshift(&v)
@@ -791,13 +792,13 @@ func (s *solver) unsigned() (v value) {
 }
 
 func (s *solver) logical() (v value) {
-	if s.leftVal.data.Type.Id != juletype.Bool ||
-		s.rightVal.data.Type.Id != juletype.Bool {
+	if s.left_val.data.Type.Id != juletype.Bool ||
+		s.right_val.data.Type.Id != juletype.Bool {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.operator, "logical_not_bool")
 		return
 	}
-	v.data.Tok = s.operator
+	v.data.Token = s.operator
 	v.data.Type.Id = juletype.Bool
 	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	if !s.isConstExpr() {
@@ -813,11 +814,11 @@ func (s *solver) logical() (v value) {
 }
 
 func (s *solver) array() (v value) {
-	v.data.Tok = s.operator
-	if !typesAreCompatible(s.leftVal.data.Type, s.rightVal.data.Type, true) {
+	v.data.Token = s.operator
+	if !typesAreCompatible(s.left_val.data.Type, s.right_val.data.Type, true) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.operator, "incompatible_types",
-			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
+			s.right_val.data.Type.Kind, s.left_val.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
@@ -826,17 +827,17 @@ func (s *solver) array() (v value) {
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
 		s.p.eval.has_error = true
-		s.p.pusherrtok(s.operator, "operator_not_for_juletype", s.operator.Kind, s.leftVal.data.Type.Kind)
+		s.p.pusherrtok(s.operator, "operator_not_for_juletype", s.operator.Kind, s.left_val.data.Type.Kind)
 	}
 	return
 }
 
 func (s *solver) slice() (v value) {
-	v.data.Tok = s.operator
-	if !typesAreCompatible(s.leftVal.data.Type, s.rightVal.data.Type, true) {
+	v.data.Token = s.operator
+	if !typesAreCompatible(s.left_val.data.Type, s.right_val.data.Type, true) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.operator, "incompatible_types",
-			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
+			s.right_val.data.Type.Kind, s.left_val.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
@@ -846,17 +847,17 @@ func (s *solver) slice() (v value) {
 	default:
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.operator, "operator_not_for_juletype",
-			s.operator.Kind, s.leftVal.data.Type.Kind)
+			s.operator.Kind, s.left_val.data.Type.Kind)
 	}
 	return
 }
 
 func (s *solver) nil() (v value) {
-	v.data.Tok = s.operator
-	if !typesAreCompatible(s.leftVal.data.Type, s.rightVal.data.Type, false) {
+	v.data.Token = s.operator
+	if !typesAreCompatible(s.left_val.data.Type, s.right_val.data.Type, false) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.operator, "incompatible_types",
-			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
+			s.right_val.data.Type.Kind, s.left_val.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
@@ -864,13 +865,13 @@ func (s *solver) nil() (v value) {
 		v.data.Type.Id = juletype.Bool
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		if s.isConstExpr() {
-			v.expr = s.leftVal.expr != nil && s.rightVal.expr != nil
+			v.expr = s.left_val.expr != nil && s.right_val.expr != nil
 		}
 	case tokens.EQUALS:
 		v.data.Type.Id = juletype.Bool
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		if s.isConstExpr() {
-			v.expr = s.leftVal.expr == nil && s.rightVal.expr == nil
+			v.expr = s.left_val.expr == nil && s.right_val.expr == nil
 		}
 	default:
 		s.p.eval.has_error = true
@@ -881,11 +882,11 @@ func (s *solver) nil() (v value) {
 }
 
 func (s *solver) structure() (v value) {
-	v.data.Tok = s.operator
-	if s.leftVal.data.Type.Kind != s.rightVal.data.Type.Kind {
+	v.data.Token = s.operator
+	if s.left_val.data.Type.Kind != s.right_val.data.Type.Kind {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.operator, "incompatible_types",
-			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
+			s.right_val.data.Type.Kind, s.left_val.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
@@ -901,11 +902,11 @@ func (s *solver) structure() (v value) {
 }
 
 func (s *solver) juletrait() (v value) {
-	v.data.Tok = s.operator
-	if !typesAreCompatible(s.leftVal.data.Type, s.rightVal.data.Type, true) {
+	v.data.Token = s.operator
+	if !typesAreCompatible(s.left_val.data.Type, s.right_val.data.Type, true) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.operator, "incompatible_types",
-			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
+			s.right_val.data.Type.Kind, s.left_val.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
@@ -921,12 +922,12 @@ func (s *solver) juletrait() (v value) {
 }
 
 func (s *solver) function() (v value) {
-	v.data.Tok = s.operator
-	if (!typeIsPure(s.leftVal.data.Type) || s.leftVal.data.Type.Id != juletype.Nil) &&
-		(!typeIsPure(s.rightVal.data.Type) || s.rightVal.data.Type.Id != juletype.Nil) {
+	v.data.Token = s.operator
+	if (!typeIsPure(s.left_val.data.Type) || s.left_val.data.Type.Id != juletype.Nil) &&
+		(!typeIsPure(s.right_val.data.Type) || s.right_val.data.Type.Id != juletype.Nil) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.operator, "incompatible_types",
-			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
+			s.right_val.data.Type.Kind, s.left_val.data.Type.Kind)
 		return
 	}
 	switch s.operator.Kind {
@@ -945,7 +946,7 @@ func (s *solver) function() (v value) {
 }
 
 func (s *solver) isConstExpr() bool {
-	return s.leftVal.constExpr && s.rightVal.constExpr
+	return s.left_val.constExpr && s.right_val.constExpr
 }
 
 func (s *solver) solve() (v value) {
@@ -965,36 +966,36 @@ func (s *solver) solve() (v value) {
 		return s.logical()
 	}
 	switch {
-	case typeIsFunc(s.leftVal.data.Type), typeIsFunc(s.rightVal.data.Type):
+	case typeIsFunc(s.left_val.data.Type), typeIsFunc(s.right_val.data.Type):
 		return s.function()
-	case typeIsArray(s.leftVal.data.Type), typeIsArray(s.rightVal.data.Type):
+	case typeIsArray(s.left_val.data.Type), typeIsArray(s.right_val.data.Type):
 		return s.array()
-	case typeIsSlice(s.leftVal.data.Type), typeIsSlice(s.rightVal.data.Type):
+	case typeIsSlice(s.left_val.data.Type), typeIsSlice(s.right_val.data.Type):
 		return s.slice()
-	case typeIsPtr(s.leftVal.data.Type), typeIsPtr(s.rightVal.data.Type):
+	case typeIsPtr(s.left_val.data.Type), typeIsPtr(s.right_val.data.Type):
 		return s.ptr()
-	case typeIsEnum(s.leftVal.data.Type), typeIsEnum(s.rightVal.data.Type):
+	case typeIsEnum(s.left_val.data.Type), typeIsEnum(s.right_val.data.Type):
 		return s.enum()
-	case typeIsStruct(s.leftVal.data.Type), typeIsStruct(s.rightVal.data.Type):
+	case typeIsStruct(s.left_val.data.Type), typeIsStruct(s.right_val.data.Type):
 		return s.structure()
-	case typeIsTrait(s.leftVal.data.Type), typeIsTrait(s.rightVal.data.Type):
+	case typeIsTrait(s.left_val.data.Type), typeIsTrait(s.right_val.data.Type):
 		return s.juletrait()
-	case s.leftVal.data.Type.Id == juletype.Nil, s.rightVal.data.Type.Id == juletype.Nil:
+	case s.left_val.data.Type.Id == juletype.Nil, s.right_val.data.Type.Id == juletype.Nil:
 		return s.nil()
-	case s.leftVal.data.Type.Id == juletype.Any, s.rightVal.data.Type.Id == juletype.Any:
+	case s.left_val.data.Type.Id == juletype.Any, s.right_val.data.Type.Id == juletype.Any:
 		return s.any()
-	case s.leftVal.data.Type.Id == juletype.Bool, s.rightVal.data.Type.Id == juletype.Bool:
+	case s.left_val.data.Type.Id == juletype.Bool, s.right_val.data.Type.Id == juletype.Bool:
 		return s.bool()
-	case s.leftVal.data.Type.Id == juletype.Str, s.rightVal.data.Type.Id == juletype.Str:
+	case s.left_val.data.Type.Id == juletype.Str, s.right_val.data.Type.Id == juletype.Str:
 		return s.str()
-	case juletype.IsFloat(s.leftVal.data.Type.Id),
-		juletype.IsFloat(s.rightVal.data.Type.Id):
+	case juletype.IsFloat(s.left_val.data.Type.Id),
+		juletype.IsFloat(s.right_val.data.Type.Id):
 		return s.float()
-	case juletype.IsUnsignedInteger(s.leftVal.data.Type.Id),
-		juletype.IsUnsignedInteger(s.rightVal.data.Type.Id):
+	case juletype.IsUnsignedInteger(s.left_val.data.Type.Id),
+		juletype.IsUnsignedInteger(s.right_val.data.Type.Id):
 		return s.unsigned()
-	case juletype.IsSignedNumeric(s.leftVal.data.Type.Id),
-		juletype.IsSignedNumeric(s.rightVal.data.Type.Id):
+	case juletype.IsSignedNumeric(s.left_val.data.Type.Id),
+		juletype.IsSignedNumeric(s.right_val.data.Type.Id):
 		return s.signed()
 	}
 	return

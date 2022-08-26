@@ -3,13 +3,14 @@ package models
 import (
 	"strings"
 
+	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
 // GenericType is the AST model of generic data-type.
 type GenericType struct {
-	Tok Tok
-	Id  string
+	Token lex.Token
+	Id    string
 }
 
 func (gt GenericType) String() string {

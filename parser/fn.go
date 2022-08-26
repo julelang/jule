@@ -32,7 +32,7 @@ func (f Fn) stringOwner(owner string) string {
 	if vars != nil {
 		statements := make([]models.Statement, len(vars))
 		for i, v := range vars {
-			statements[i] = models.Statement{Tok: v.Token, Data: *v}
+			statements[i] = models.Statement{Token: v.Token, Data: *v}
 		}
 		block.Tree = append(statements, block.Tree...)
 	}
@@ -40,7 +40,7 @@ func (f Fn) stringOwner(owner string) string {
 		s := f.Ast.Receiver.Tag.(*structure)
 		self := s.selfVar(*f.Ast.Receiver)
 		statements := make([]models.Statement, 1)
-		statements[0] = models.Statement{Tok: s.Ast.Tok, Data: self}
+		statements[0] = models.Statement{Token: s.Ast.Token, Data: self}
 		block.Tree = append(statements, block.Tree...)
 	}
 	cpp.WriteString(block.String())

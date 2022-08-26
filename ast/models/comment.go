@@ -1,10 +1,14 @@
 package models
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/jule-lang/jule/lex"
+)
 
 // Comment is the AST model of just comment lines.
 type Comment struct {
-	Token   Tok
+	Token   lex.Token
 	Content string
 }
 

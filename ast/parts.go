@@ -1,6 +1,7 @@
 package ast
 
 import (
+	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/lex/tokens"
 	"github.com/jule-lang/jule/pkg/julelog"
 )
@@ -10,7 +11,7 @@ import (
 // Special case is:
 //  Range(i, open, close, toks) = nil if *i > len(toks)
 //  Range(i, open, close, toks) = bil if (toks[i*]) Id != tokens.Brace && Kind != open
-func Range(i *int, open, close string, toks Toks) Toks {
+func Range(i *int, open, close string, toks []lex.Token) []lex.Token {
 	if *i >= len(toks) {
 		return nil
 	}
@@ -19,18 +20,18 @@ func Range(i *int, open, close string, toks Toks) Toks {
 		return nil
 	}
 	*i++
-	braceCount := 1
+	brace_n := 1
 	start := *i
-	for ; braceCount != 0 && *i < len(toks); *i++ {
+	for ; brace_n != 0 && *i < len(toks); *i++ {
 		tok := toks[*i]
 		if tok.Id != tokens.Brace {
 			continue
 		}
 		switch tok.Kind {
 		case open:
-			braceCount++
+			brace_n++
 		case close:
-			braceCount--
+			brace_n--
 		}
 	}
 	return toks[start : *i-1]
@@ -41,25 +42,25 @@ func Range(i *int, open, close string, toks Toks) Toks {
 // Special cases are;
 //  RangeLast(toks) = toks, nil if len(toks) == 0
 //  RangeLast(toks) = toks, nil if toks is not has range at last
-func RangeLast(toks Toks) (cutted, cut Toks) {
+func RangeLast(toks []lex.Token) (cutted, cut []lex.Token) {
 	if len(toks) == 0 {
 		return toks, nil
 	} else if toks[len(toks)-1].Id != tokens.Brace {
 		return toks, nil
 	}
-	braceCount := 0
+	brace_n := 0
 	for i := len(toks) - 1; i >= 0; i-- {
 		tok := toks[i]
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
 			case tokens.RBRACE, tokens.RBRACKET, tokens.RPARENTHESES:
-				braceCount++
+				brace_n++
 				continue
 			default:
-				braceCount--
+				brace_n--
 			}
 		}
-		if braceCount == 0 {
+		if brace_n == 0 {
 			return toks[:i], toks[i:]
 		}
 	}
@@ -71,25 +72,25 @@ func RangeLast(toks Toks) (cutted, cut Toks) {
 //
 // Special case is;
 //  Parts(toks) = nil if len(toks) == 0
-func Parts(toks Toks, id uint8, exprMust bool) ([]Toks, []julelog.CompilerLog) {
+func Parts(toks []lex.Token, id uint8, exprMust bool) ([][]lex.Token, []julelog.CompilerLog) {
 	if len(toks) == 0 {
 		return nil, nil
 	}
-	var parts []Toks
+	var parts [][]lex.Token
 	var errs []julelog.CompilerLog
-	braceCount := 0
+	brace_n := 0
 	last := 0
 	for i, tok := range toks {
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
 			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
-				braceCount++
+				brace_n++
 				continue
 			default:
-				braceCount--
+				brace_n--
 			}
 		}
-		if braceCount > 0 {
+		if brace_n > 0 {
 			continue
 		}
 		if tok.Id == id {
@@ -103,36 +104,36 @@ func Parts(toks Toks, id uint8, exprMust bool) ([]Toks, []julelog.CompilerLog) {
 	if last < len(toks) {
 		parts = append(parts, toks[last:])
 	} else if !exprMust {
-		parts = append(parts, Toks{})
+		parts = append(parts, []lex.Token{})
 	}
 	return parts, errs
 }
 
 // SplitColon returns colon index and range tokens.
 // Starts at i.
-func SplitColon(toks Toks, i *int) (rangeToks Toks, colon int) {
+func SplitColon(toks []lex.Token, i *int) (rangeToks []lex.Token, colon int) {
 	rangeToks = nil
 	colon = -1
-	braceCount := 0
+	brace_n := 0
 	start := *i
 	for ; *i < len(toks); *i++ {
 		tok := toks[*i]
 		if tok.Id == tokens.Brace {
 			switch tok.Kind {
 			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
-				braceCount++
+				brace_n++
 				continue
 			default:
-				braceCount--
+				brace_n--
 			}
 		}
-		if braceCount == 0 {
+		if brace_n == 0 {
 			if start+1 > *i {
 				return
 			}
 			rangeToks = toks[start+1 : *i]
 			break
-		} else if braceCount != 1 {
+		} else if brace_n != 1 {
 			continue
 		}
 		if colon == -1 && tok.Id == tokens.Colon {

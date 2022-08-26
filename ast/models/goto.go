@@ -1,6 +1,10 @@
 package models
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/jule-lang/jule/lex"
+)
 
 // Labels is label slice type.
 type Labels []*Label
@@ -10,7 +14,7 @@ type Gotos []*Goto
 
 // Label is the AST model of labels.
 type Label struct {
-	Tok   Tok
+	Token lex.Token
 	Label string
 	Index int
 	Used  bool
@@ -23,7 +27,7 @@ func (l Label) String() string {
 
 // Goto is the AST model of goto statements.
 type Goto struct {
-	Tok   Tok
+	Token lex.Token
 	Label string
 	Index int
 	Block *Block

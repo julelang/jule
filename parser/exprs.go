@@ -9,14 +9,14 @@ import (
 	"github.com/jule-lang/jule/pkg/juletype"
 )
 
-func indexingExprModel(index iExpr) iExpr {
-	if index == nil {
-		return index
+func indexingExprModel(i iExpr) iExpr {
+	if i == nil {
+		return i
 	}
 	var model exprNode
 	model.value = juletype.CppId(juletype.Int)
 	model.value += tokens.LPARENTHESES
-	model.value += index.String()
+	model.value += i.String()
 	model.value += tokens.RPARENTHESES
 	return model
 }
@@ -49,12 +49,6 @@ func isbool(s string) bool {
 	return s == tokens.TRUE || s == tokens.FALSE
 }
 
-/*
-func valIsStructType(v value) bool {
-	return v.isType && typeIsStruct(v.data.Type)
-}
-*/
-
 func valIsEnumType(v value) bool {
 	return v.isType && typeIsEnum(v.data.Type)
 }
@@ -78,7 +72,7 @@ func canGetPtr(v value) bool {
 	case juletype.Func, juletype.Enum:
 		return false
 	default:
-		return v.data.Tok.Id == tokens.Id
+		return v.data.Token.Id == tokens.Id
 	}
 }
 
@@ -114,18 +108,6 @@ func isConstExpression(v string) bool {
 	return isConstNumeric(v) || isstr(v) || ischar(v) || isnil(v) || isbool(v)
 }
 
-/*
-func checkIntBit(v models.Data, bit int) bool {
-	if bit == 0 {
-		return false
-	}
-	if juletype.IsSignedNumericType(v.Type.Id) {
-		return julebits.CheckBitInt(v.Value, bit)
-	}
-	return julebits.CheckBitUInt(v.Value, bit)
-}
-*/
-
 func checkFloatBit(v models.Data, bit int) bool {
 	if bit == 0 {
 		return false
@@ -153,12 +135,3 @@ func okForShifting(v value) bool {
 	}
 	return false
 }
-
-/*
-func defaultValueOfType(t DataType) string {
-	if typeIsNilCompatible(t) {
-		return tokens.NIL
-	}
-	return juletype.DefaultValOfType(t.Id)
-}
-*/
