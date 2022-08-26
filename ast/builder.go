@@ -1627,7 +1627,7 @@ func (b *Builder) varBegin(v *models.Var, i *int, toks Toks) {
 		switch tok.Id {
 		case tokens.Const:
 			if v.Const {
-				b.pusherr(tok, "already_constant")
+				b.pusherr(tok, "already_const")
 				break
 			}
 			v.Const = true

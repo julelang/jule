@@ -1494,7 +1494,7 @@ func (p *Parser) varsFromParams(params []Param) []*Var {
 		v.Type = param.Type
 		if param.Variadic {
 			if length-i > 1 {
-				p.pusherrtok(param.Tok, "variadic_parameter_notlast")
+				p.pusherrtok(param.Tok, "variadic_parameter_not_last")
 			}
 			v.Type.Original = nil
 			v.Type.ComponentType = new(models.DataType)
@@ -2579,7 +2579,7 @@ func (p *Parser) recoverFuncExprStatement(s *models.ExprStatement) {
 	}
 	v, _ := p.evalExpr(args.Src[0].Expr)
 	if v.data.Type.Kind != handleParam.Type.Kind {
-		p.eval.pusherrtok(errtok, "incompatible_datatype",
+		p.eval.pusherrtok(errtok, "incompatible_types",
 			handleParam.Type.Kind, v.data.Type.Kind)
 		return
 	}
@@ -2905,7 +2905,7 @@ func (p *Parser) concurrentCall(cc *models.ConcurrentCall) {
 func (p *Parser) assignment(selected value, errtok Tok) bool {
 	state := true
 	if !selected.lvalue {
-		p.eval.pusherrtok(errtok, "assign_nonlvalue")
+		p.eval.pusherrtok(errtok, "assign_require_lvalue")
 		state = false
 	}
 	if selected.constExpr {
@@ -2972,7 +2972,7 @@ func (p *Parser) assignExprs(vsAST *models.Assign) []value {
 func (p *Parser) funcMultiAssign(vsAST *models.Assign, funcVal value) {
 	types := funcVal.data.Type.Tag.([]DataType)
 	if len(types) != len(vsAST.Left) {
-		p.pusherrtok(vsAST.Setter, "missing_multiassign_identifiers")
+		p.pusherrtok(vsAST.Setter, "missing_multi_assign_identifiers")
 		return
 	}
 	vals := make([]value, len(types))
@@ -3054,10 +3054,10 @@ func (p *Parser) assign(assign *models.Assign) {
 	}
 	switch {
 	case leftLength > rightLength:
-		p.pusherrtok(assign.Setter, "overflow_multiassign_identifiers")
+		p.pusherrtok(assign.Setter, "overflow_multi_assign_identifiers")
 		return
 	case leftLength < rightLength:
-		p.pusherrtok(assign.Setter, "missing_multiassign_identifiers")
+		p.pusherrtok(assign.Setter, "missing_multi_assign_identifiers")
 		return
 	}
 	p.multiAssign(assign, exprs)
@@ -3069,7 +3069,7 @@ func (p *Parser) whileProfile(iter *models.Iter) {
 	profile.Expr.Model = model
 	iter.Profile = profile
 	if !p.eval.has_error && val.data.Value != "" && !isBoolExpr(val) {
-		p.pusherrtok(iter.Tok, "iter_while_notbool_expr")
+		p.pusherrtok(iter.Tok, "iter_while_require_bool_expr")
 	}
 	p.checkNewBlock(iter.Block)
 }
@@ -3082,7 +3082,7 @@ func (p *Parser) foreachProfile(iter *models.Iter) {
 	profile.Expr.Model = model
 	profile.ExprType = val.data.Type
 	if !p.eval.has_error && val.data.Value != "" && !isForeachIterExpr(val) {
-		p.pusherrtok(iter.Tok, "iter_foreach_nonenumerable_expr")
+		p.pusherrtok(iter.Tok, "iter_foreach_require_enumerable_expr")
 	} else {
 		fc := foreachChecker{p, &profile, val}
 		fc.check()
@@ -3152,7 +3152,7 @@ func (p *Parser) ifExpr(ifast *models.If, i *int, statements []models.Statement)
 	ifast.Expr.Model = model
 	statement := statements[*i]
 	if !p.eval.has_error && val.data.Value != "" && !isBoolExpr(val) {
-		p.pusherrtok(ifast.Tok, "if_notbool_expr")
+		p.pusherrtok(ifast.Tok, "if_require_bool_expr")
 	}
 	p.checkNewBlock(ifast.Block)
 node:
@@ -3170,7 +3170,7 @@ node:
 		val, model := p.evalExpr(t.Expr)
 		t.Expr.Model = model
 		if !p.eval.has_error && val.data.Value != "" && !isBoolExpr(val) {
-			p.pusherrtok(t.Tok, "if_notbool_expr")
+			p.pusherrtok(t.Tok, "if_require_bool_expr")
 		}
 		p.checkNewBlock(t.Block)
 		statements[*i].Data = t
@@ -3584,13 +3584,13 @@ func (p *Parser) realType(dt DataType, err bool) (ret DataType, _ bool) {
 
 func (p *Parser) checkMultiType(real, check DataType, ignoreAny bool, errTok Tok) {
 	if real.MultiTyped != check.MultiTyped {
-		p.pusherrtok(errTok, "incompatible_datatype", real.Kind, check.Kind)
+		p.pusherrtok(errTok, "incompatible_types", real.Kind, check.Kind)
 		return
 	}
 	realTypes := real.Tag.([]DataType)
 	checkTypes := real.Tag.([]DataType)
 	if len(realTypes) != len(checkTypes) {
-		p.pusherrtok(errTok, "incompatible_datatype", real.Kind, check.Kind)
+		p.pusherrtok(errTok, "incompatible_types", real.Kind, check.Kind)
 		return
 	}
 	for i := 0; i < len(realTypes); i++ {
@@ -3602,7 +3602,7 @@ func (p *Parser) checkMultiType(real, check DataType, ignoreAny bool, errTok Tok
 
 func (p *Parser) checkType(real, check DataType, ignoreAny bool, errTok Tok) {
 	if typeIsVoid(check) {
-		p.eval.pusherrtok(errTok, "incompatible_datatype", real.Kind, check.Kind)
+		p.eval.pusherrtok(errTok, "incompatible_types", real.Kind, check.Kind)
 		return
 	}
 	if !ignoreAny && real.Id == juletype.Any {
@@ -3616,15 +3616,15 @@ func (p *Parser) checkType(real, check DataType, ignoreAny bool, errTok Tok) {
 		return
 	}
 	if real.Kind != check.Kind {
-		p.pusherrtok(errTok, "incompatible_datatype", real.Kind, check.Kind)
+		p.pusherrtok(errTok, "incompatible_types", real.Kind, check.Kind)
 	} else if typeIsArray(real) || typeIsArray(check) {
 		if typeIsArray(real) != typeIsArray(check) {
-			p.pusherrtok(errTok, "incompatible_datatype", real.Kind, check.Kind)
+			p.pusherrtok(errTok, "incompatible_types", real.Kind, check.Kind)
 			return
 		}
 		realKind := strings.Replace(real.Kind, jule.Mark_Array, strconv.Itoa(real.Size.N), 1)
 		checkKind := strings.Replace(check.Kind, jule.Mark_Array, strconv.Itoa(check.Size.N), 1)
-		p.pusherrtok(errTok, "incompatible_datatype", realKind, checkKind)
+		p.pusherrtok(errTok, "incompatible_types", realKind, checkKind)
 	}
 }
 

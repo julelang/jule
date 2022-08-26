@@ -555,7 +555,7 @@ func (e *eval) cast(v value, t DataType, errtok Tok) value {
 		}
 		e.castPure(t, &v, errtok)
 	default:
-		e.pusherrtok(errtok, "type_notsupports_casting", t.Kind)
+		e.pusherrtok(errtok, "type_not_supports_casting", t.Kind)
 	}
 	v.data.Value = t.Kind
 	v.data.Type = t
@@ -573,13 +573,13 @@ func (e *eval) cast(v value, t DataType, errtok Tok) value {
 
 func (e *eval) castStruct(t DataType, v *value, errtok Tok) {
 	if !typeIsTrait(v.data.Type) {
-		e.pusherrtok(errtok, "type_notsupports_casting_to", v.data.Type.Kind, t.Kind)
+		e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
 		return
 	}
 	s := t.Tag.(*structure)
 	tr := v.data.Type.Tag.(*trait)
 	if !s.hasTrait(tr) {
-		e.pusherrtok(errtok, "type_notsupports_casting_to", v.data.Type.Kind, t.Kind)
+		e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
 	}
 }
 
@@ -594,7 +594,7 @@ func (e *eval) castPtr(t DataType, v *value, errtok Tok) {
 	if !typeIsPtr(v.data.Type) &&
 		!typeIsPure(v.data.Type) &&
 		!juletype.IsInteger(v.data.Type.Id) {
-		e.pusherrtok(errtok, "type_notsupports_casting_to", v.data.Type.Kind, t.Kind)
+		e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
 	}
 }
 
@@ -615,18 +615,18 @@ func (e *eval) castPure(t DataType, v *value, errtok Tok) {
 	case juletype.IsNumeric(t.Id):
 		e.castNumeric(t, v, errtok)
 	default:
-		e.pusherrtok(errtok, "type_notsupports_casting", t.Kind)
+		e.pusherrtok(errtok, "type_not_supports_casting", t.Kind)
 	}
 }
 
 func (e *eval) castStr(t DataType, errtok Tok) {
 	if !typeIsSlice(t) {
-		e.pusherrtok(errtok, "type_notsupports_casting_to", juletype.TypeMap[juletype.Str], t.Kind)
+		e.pusherrtok(errtok, "type_not_supports_casting_to", juletype.TypeMap[juletype.Str], t.Kind)
 		return
 	}
 	t = *t.ComponentType
 	if !typeIsPure(t) || (t.Id != juletype.U8 && t.Id != juletype.I32) {
-		e.pusherrtok(errtok, "type_notsupports_casting_to", juletype.TypeMap[juletype.Str], t.Kind)
+		e.pusherrtok(errtok, "type_not_supports_casting_to", juletype.TypeMap[juletype.Str], t.Kind)
 	}
 }
 
@@ -654,14 +654,14 @@ func (e *eval) castInteger(t DataType, v *value, errtok Tok) {
 			return
 		} else if t.Id != juletype.I32 && t.Id != juletype.I64 && 
 			t.Id != juletype.U16 && t.Id != juletype.U32 && t.Id != juletype.U64 {
-			e.pusherrtok(errtok, "type_notsupports_casting_to", v.data.Type.Kind, t.Kind)
+			e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
 		}
 		return
 	}
 	if typeIsPure(v.data.Type) && juletype.IsNumeric(v.data.Type.Id) {
 		return
 	}
-	e.pusherrtok(errtok, "type_notsupports_casting_to", v.data.Type.Kind, t.Kind)
+	e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
 }
 
 func (e *eval) castNumeric(t DataType, v *value, errtok Tok) {
@@ -678,17 +678,17 @@ func (e *eval) castNumeric(t DataType, v *value, errtok Tok) {
 	if typeIsPure(v.data.Type) && juletype.IsNumeric(v.data.Type.Id) {
 		return
 	}
-	e.pusherrtok(errtok, "type_notsupports_casting_to", v.data.Type.Kind, t.Kind)
+	e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
 }
 
 func (e *eval) castSlice(t, vt DataType, errtok Tok) {
 	if !typeIsPure(vt) || vt.Id != juletype.Str {
-		e.pusherrtok(errtok, "type_notsupports_casting_to", vt.Kind, t.Kind)
+		e.pusherrtok(errtok, "type_not_supports_casting_to", vt.Kind, t.Kind)
 		return
 	}
 	t = *t.ComponentType
 	if !typeIsPure(t) || (t.Id != juletype.U8 && t.Id != juletype.I32) {
-		e.pusherrtok(errtok, "type_notsupports_casting_to", vt.Kind, t.Kind)
+		e.pusherrtok(errtok, "type_not_supports_casting_to", vt.Kind, t.Kind)
 	}
 }
 
@@ -1032,7 +1032,7 @@ func (e *eval) variadic(toks Toks, m *exprModel, errtok Tok) (v value) {
 	v = e.process(toks, m)
 	readyToVariadic(&v)
 	if !typeIsVariadicable(v.data.Type) {
-		e.pusherrtok(errtok, "variadic_with_nonvariadicable", v.data.Type.Kind)
+		e.pusherrtok(errtok, "variadic_with_non_variadicable", v.data.Type.Kind)
 		return
 	}
 	v.data.Type = *v.data.Type.ComponentType

@@ -382,7 +382,7 @@ func (s *solver) ptr() (v value) {
 	v.data.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.data.Type, s.rightVal.data.Type, true) {
 		s.p.eval.has_error = true
-		s.p.pusherrtok(s.operator, "incompatible_datatype",
+		s.p.pusherrtok(s.operator, "incompatible_types",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
@@ -418,7 +418,7 @@ func (s *solver) str() (v value) {
 	// Not both string?
 	if s.leftVal.data.Type.Id != s.rightVal.data.Type.Id {
 		s.p.eval.has_error = true
-		s.p.pusherrtok(s.operator, "incompatible_datatype",
+		s.p.pusherrtok(s.operator, "incompatible_types",
 			s.leftVal.data.Type.Kind, s.rightVal.data.Type.Kind)
 		return
 	}
@@ -460,7 +460,7 @@ func (s *solver) bool() (v value) {
 	v.data.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.data.Type, s.rightVal.data.Type, true) {
 		s.p.eval.has_error = true
-		s.p.pusherrtok(s.operator, "incompatible_datatype",
+		s.p.pusherrtok(s.operator, "incompatible_types",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
@@ -510,7 +510,7 @@ func (s *solver) float() (v value) {
 	if !juletype.IsNumeric(s.leftVal.data.Type.Id) ||
 		!juletype.IsNumeric(s.rightVal.data.Type.Id) {
 		s.p.eval.has_error = true
-		s.p.pusherrtok(s.operator, "incompatible_datatype",
+		s.p.pusherrtok(s.operator, "incompatible_types",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
@@ -589,7 +589,7 @@ func (s *solver) signed() (v value) {
 	if !juletype.IsNumeric(s.leftVal.data.Type.Id) ||
 		!juletype.IsNumeric(s.rightVal.data.Type.Id) {
 		s.p.eval.has_error = true
-		s.p.pusherrtok(s.operator, "incompatible_datatype",
+		s.p.pusherrtok(s.operator, "incompatible_types",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
@@ -692,7 +692,7 @@ func (s *solver) unsigned() (v value) {
 	if !juletype.IsNumeric(s.leftVal.data.Type.Id) ||
 		!juletype.IsNumeric(s.rightVal.data.Type.Id) {
 		s.p.eval.has_error = true
-		s.p.pusherrtok(s.operator, "incompatible_datatype",
+		s.p.pusherrtok(s.operator, "incompatible_types",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
@@ -816,7 +816,7 @@ func (s *solver) array() (v value) {
 	v.data.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.data.Type, s.rightVal.data.Type, true) {
 		s.p.eval.has_error = true
-		s.p.pusherrtok(s.operator, "incompatible_datatype",
+		s.p.pusherrtok(s.operator, "incompatible_types",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
@@ -835,7 +835,7 @@ func (s *solver) slice() (v value) {
 	v.data.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.data.Type, s.rightVal.data.Type, true) {
 		s.p.eval.has_error = true
-		s.p.pusherrtok(s.operator, "incompatible_datatype",
+		s.p.pusherrtok(s.operator, "incompatible_types",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
@@ -855,7 +855,7 @@ func (s *solver) nil() (v value) {
 	v.data.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.data.Type, s.rightVal.data.Type, false) {
 		s.p.eval.has_error = true
-		s.p.pusherrtok(s.operator, "incompatible_datatype",
+		s.p.pusherrtok(s.operator, "incompatible_types",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
@@ -884,7 +884,7 @@ func (s *solver) structure() (v value) {
 	v.data.Tok = s.operator
 	if s.leftVal.data.Type.Kind != s.rightVal.data.Type.Kind {
 		s.p.eval.has_error = true
-		s.p.pusherrtok(s.operator, "incompatible_datatype",
+		s.p.pusherrtok(s.operator, "incompatible_types",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
@@ -904,7 +904,7 @@ func (s *solver) juletrait() (v value) {
 	v.data.Tok = s.operator
 	if !typesAreCompatible(s.leftVal.data.Type, s.rightVal.data.Type, true) {
 		s.p.eval.has_error = true
-		s.p.pusherrtok(s.operator, "incompatible_datatype",
+		s.p.pusherrtok(s.operator, "incompatible_types",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}
@@ -925,7 +925,7 @@ func (s *solver) function() (v value) {
 	if (!typeIsPure(s.leftVal.data.Type) || s.leftVal.data.Type.Id != juletype.Nil) &&
 		(!typeIsPure(s.rightVal.data.Type) || s.rightVal.data.Type.Id != juletype.Nil) {
 		s.p.eval.has_error = true
-		s.p.pusherrtok(s.operator, "incompatible_datatype",
+		s.p.pusherrtok(s.operator, "incompatible_types",
 			s.rightVal.data.Type.Kind, s.leftVal.data.Type.Kind)
 		return
 	}

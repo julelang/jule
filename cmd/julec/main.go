@@ -311,7 +311,7 @@ func compile(path string, main, nolocal, justDefs bool) *Parser {
 	// Check standard library.
 	inf, err := os.Stat(jule.StdlibPath)
 	if err != nil || !inf.IsDir() {
-		p.PushErr("no_stdlib")
+		p.PushErr("stdlib_not_exist")
 		return p
 	}
 	f, err := juleio.OpenJuleF(path)
