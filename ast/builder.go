@@ -1969,7 +1969,7 @@ func (b *Builder) commonIterProfile(toks []lex.Token) (s models.Statement) {
 
 func (b *Builder) IterExpr(bs *blockStatement) models.Statement {
 	if bs.withTerminator {
-		b.forIterProfile(bs)
+		return b.forIterProfile(bs)
 	}
 	return b.commonIterProfile(bs.toks)
 }
