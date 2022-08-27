@@ -155,7 +155,7 @@ func (p *Parser) CppTypes(out chan string) {
 	var cpp strings.Builder
 	for _, use := range used {
 		if !use.cppLink {
-			cpp.WriteString(cppTypes(use.defs))
+			cpp.WriteString(cppTypes(use.defines))
 		}
 	}
 	cpp.WriteString(cppTypes(p.Defines))
@@ -178,7 +178,7 @@ func (p *Parser) CppTraits(out chan string) {
 	var cpp strings.Builder
 	for _, use := range used {
 		if !use.cppLink {
-			cpp.WriteString(cppTraits(use.defs))
+			cpp.WriteString(cppTraits(use.defines))
 		}
 	}
 	cpp.WriteString(cppTraits(p.Defines))
@@ -201,7 +201,7 @@ func (p *Parser) CppStructs(out chan string) {
 	var cpp strings.Builder
 	for _, use := range used {
 		if !use.cppLink {
-			cpp.WriteString(cppStructs(use.defs))
+			cpp.WriteString(cppStructs(use.defines))
 		}
 	}
 	cpp.WriteString(cppStructs(p.Defines))
@@ -246,19 +246,19 @@ func (p *Parser) CppPrototypes(out chan string) {
 	var cpp strings.Builder
 	for _, use := range used {
 		if !use.cppLink {
-			cpp.WriteString(cppStructPlainPrototypes(use.defs))
+			cpp.WriteString(cppStructPlainPrototypes(use.defines))
 		}
 	}
 	cpp.WriteString(cppStructPlainPrototypes(p.Defines))
 	for _, use := range used {
 		if !use.cppLink {
-			cpp.WriteString(cppStructPrototypes(use.defs))
+			cpp.WriteString(cppStructPrototypes(use.defines))
 		}
 	}
 	cpp.WriteString(cppStructPrototypes(p.Defines))
 	for _, use := range used {
 		if !use.cppLink {
-			cpp.WriteString(cppFuncPrototypes(use.defs))
+			cpp.WriteString(cppFuncPrototypes(use.defines))
 		}
 	}
 	cpp.WriteString(cppFuncPrototypes(p.Defines))
@@ -281,7 +281,7 @@ func (p *Parser) CppGlobals(out chan string) {
 	var cpp strings.Builder
 	for _, use := range used {
 		if !use.cppLink {
-			cpp.WriteString(cppGlobals(use.defs))
+			cpp.WriteString(cppGlobals(use.defines))
 		}
 	}
 	cpp.WriteString(cppGlobals(p.Defines))
@@ -304,7 +304,7 @@ func (p *Parser) CppFuncs(out chan string) {
 	var cpp strings.Builder
 	for _, use := range used {
 		if !use.cppLink {
-			cpp.WriteString(cppFuncs(use.defs))
+			cpp.WriteString(cppFuncs(use.defines))
 		}
 	}
 	cpp.WriteString(cppFuncs(p.Defines))
@@ -332,7 +332,7 @@ func (p *Parser) CppInitializerCaller(out chan string) {
 	}
 	for _, use := range used {
 		if !use.cppLink {
-			pushInit(use.defs)
+			pushInit(use.defines)
 		}
 	}
 	pushInit(p.Defines)
@@ -449,7 +449,7 @@ func (p *Parser) pushSelects(use *use, selectors []lex.Token) (addNs bool) {
 			addNs = true
 			continue
 		}
-		i, m, t := use.defs.findById(id.Kind, p.File)
+		i, m, t := use.defines.findById(id.Kind, p.File)
 		if i == -1 {
 			p.pusherrtok(id, "id_not_exist", id.Kind)
 			continue
@@ -473,6 +473,10 @@ func (p *Parser) pushSelects(use *use, selectors []lex.Token) (addNs bool) {
 }
 
 func (p *Parser) pushUse(use *use, selectors []lex.Token) {
+	dm, ok := std_builtin_defines[use.LinkString]
+	if ok {
+		pushDefines(use.defines, dm)
+	}
 	if len(selectors) > 0 {
 		if !p.pushSelects(use, selectors) {
 			return
@@ -483,12 +487,12 @@ func (p *Parser) pushUse(use *use, selectors []lex.Token) {
 		if p.Defines.side == nil {
 			p.Defines.side = new(DefineMap)
 		}
-		pushDefines(p.Defines.side, use.defs)
+		pushDefines(p.Defines.side, use.defines)
 	}
 	ns := new(models.Namespace)
 	ns.Identifiers = strings.SplitN(use.LinkString, tokens.DOUBLE_COLON, -1)
 	src := p.pushNs(ns)
-	src.defines = use.defs
+	src.defines = use.defines
 }
 
 func (p *Parser) compileCppLinkUse(useAST *models.Use) (*use, bool) {
@@ -521,7 +525,7 @@ func (p *Parser) compilePureUse(useAST *models.Use) (_ *use, hassErr bool) {
 		psub := New(f)
 		psub.Parsef(false, false)
 		use := new(use)
-		use.defs = new(DefineMap)
+		use.defines = new(DefineMap)
 		use.token = useAST.Token
 		use.Path = useAST.Path
 		use.LinkString = useAST.LinkString
@@ -529,7 +533,7 @@ func (p *Parser) compilePureUse(useAST *models.Use) (_ *use, hassErr bool) {
 		use.Selectors = useAST.Selectors
 		p.pusherrs(psub.Errors...)
 		p.Warnings = append(p.Warnings, psub.Warnings...)
-		pushDefines(use.defs, psub.Defines)
+		pushDefines(use.defines, psub.Defines)
 		p.pushUse(use, useAST.Selectors)
 		if psub.Errors != nil {
 			p.pusherrtok(useAST.Token, "use_has_errors")
@@ -1883,38 +1887,7 @@ func (p *Parser) checkFuncSpecialCases(f *Func) {
 	}
 }
 
-func (p *Parser) call_unsafe_sizeof_alignof_fn(data callData, m *exprModel) (v value) {
-	// Remove parentheses
-	data.args = data.args[1 : len(data.args)-1]
-	v.data.Type = Type{
-		Id: juletype.UInt,
-		Kind: juletype.TypeMap[juletype.UInt],
-	}
-	nodes := m.nodes[m.index].nodes
-	node := &nodes[len(nodes)-1]
-	b := ast.NewBuilder(nil)
-	i := 0
-	t, ok := b.DataType(data.args, &i, true, true)
-	b.Wait()
-	if !ok {
-		v, model := p.evalToks(data.args)
-		*node = exprNode{"sizeof(" + model.String() + ")"}
-		v.constExpr = false
-		return v
-	}
-	if i+1 < len(data.args) {
-		p.pusherrtok(data.args[i+1], "invalid_syntax")
-	}
-	p.pusherrs(b.Errors...)
-	*node = exprNode{"sizeof(" + t.String() + ")"}
-	return
-}
-
 func (p *Parser) callFunc(f *Func, data callData, m *exprModel) value {
-	switch f {
-	case unsafe_sizeof_fn.Ast, unsafe_alignof_fn.Ast:
-		return p.call_unsafe_sizeof_alignof_fn(data, m)
-	}
 	v := p.parseFuncCallToks(f, data.generics, data.args, m)
 	v.lvalue = typeIsLvalue(v.data.Type)
 	return v

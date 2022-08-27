@@ -3,11 +3,14 @@ package parser
 import (
 	"strconv"
 
+	"github.com/jule-lang/jule/ast"
 	"github.com/jule-lang/jule/ast/models"
 	"github.com/jule-lang/jule/lex/tokens"
 	"github.com/jule-lang/jule/pkg/jule"
 	"github.com/jule-lang/jule/pkg/juletype"
 )
+
+type BuiltinCaller = func(*Parser, *Func, callData, *exprModel) value
 
 const maxI8 = 127
 const minI8 = -128
@@ -318,9 +321,6 @@ var errorHandlerFunc = &models.Fn{
 	},
 }
 
-var unsafe_sizeof_fn = &Fn{Ast: &models.Fn{IsUnsafe: true, Id: "sizeof"}}
-var unsafe_alignof_fn = &Fn{Ast: &models.Fn{IsUnsafe: true, Id: "alignof"}}
-
 var recoverFunc = &Fn{
 	Ast: &models.Fn{
 		Pub: true,
@@ -358,8 +358,6 @@ var Builtin = &DefineMap{
 	Funcs: []*Fn{
 		panicFunc,
 		recoverFunc,
-		unsafe_sizeof_fn,
-		unsafe_alignof_fn,
 		{Ast: &Func{
 			Pub: true,
 			Id:  "out",
@@ -683,4 +681,73 @@ func init() {
 		uintMax.Expr = u64statics.Globals[0].Expr
 		uintMax.ExprTag = u64statics.Globals[0].ExprTag
 	}
+}
+
+// Standard Library Builtin Callers
+
+// std::mem
+
+var std_mem_builtin = &DefineMap{
+	Funcs: []*Fn{
+		{Ast: &models.Fn{Id: "size_of", BuiltinCaller: caller_mem_sizeof}},
+		{Ast: &models.Fn{Id: "align_of", BuiltinCaller: caller_mem_alignof}},
+	},
+}
+
+func caller_mem_sizeof(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
+	// Remove parentheses
+	data.args = data.args[1 : len(data.args)-1]
+	v.data.Type = Type{
+		Id: juletype.UInt,
+		Kind: juletype.TypeMap[juletype.UInt],
+	}
+	nodes := m.nodes[m.index].nodes
+	node := &nodes[len(nodes)-1]
+	b := ast.NewBuilder(nil)
+	i := 0
+	t, ok := b.DataType(data.args, &i, true, true)
+	b.Wait()
+	if !ok {
+		v, model := p.evalToks(data.args)
+		*node = exprNode{"sizeof(" + model.String() + ")"}
+		v.constExpr = false
+		return v
+	}
+	if i+1 < len(data.args) {
+		p.pusherrtok(data.args[i+1], "invalid_syntax")
+	}
+	p.pusherrs(b.Errors...)
+	*node = exprNode{"sizeof(" + t.String() + ")"}
+	return
+}
+
+func caller_mem_alignof(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
+	// Remove parentheses
+	data.args = data.args[1 : len(data.args)-1]
+	v.data.Type = Type{
+		Id: juletype.UInt,
+		Kind: juletype.TypeMap[juletype.UInt],
+	}
+	nodes := m.nodes[m.index].nodes
+	node := &nodes[len(nodes)-1]
+	b := ast.NewBuilder(nil)
+	i := 0
+	t, ok := b.DataType(data.args, &i, true, true)
+	b.Wait()
+	if !ok {
+		v, model := p.evalToks(data.args)
+		*node = exprNode{"alignof(" + model.String() + ")"}
+		v.constExpr = false
+		return v
+	}
+	if i+1 < len(data.args) {
+		p.pusherrtok(data.args[i+1], "invalid_syntax")
+	}
+	p.pusherrs(b.Errors...)
+	*node = exprNode{"alignof(" + t.String() + ")"}
+	return
+}
+
+var std_builtin_defines = map[string]*DefineMap{
+	"std::mem": std_mem_builtin,
 }

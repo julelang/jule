@@ -361,6 +361,9 @@ func (e *eval) callFunc(f *Func, data callData, m *exprModel) value {
 	if !e.unsafe_allowed() && f.IsUnsafe {
 		e.pusherrtok(data.expr[0], "unsafe_behavior_at_out_of_unsafe_scope")
 	}
+	if f.BuiltinCaller != nil {
+		return f.BuiltinCaller.(BuiltinCaller)(e.p, f, data, m)
+	}
 	return e.p.callFunc(f, data, m)
 }
 

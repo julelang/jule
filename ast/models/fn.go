@@ -10,18 +10,19 @@ import (
 
 // Fn is function declaration AST model.
 type Fn struct {
-	Pub        bool
-	IsUnsafe     bool
-	Token      lex.Token
-	Id         string
-	Generics   []*GenericType
-	Combines   *[][]Type
-	Attributes []Attribute
-	Params     []Param
-	RetType    RetType
-	Block      *Block
-	Receiver   *Type
-	Owner      any
+	Pub           bool
+	IsUnsafe      bool
+	Token         lex.Token
+	Id            string
+	Generics      []*GenericType
+	Combines      *[][]Type
+	Attributes    []Attribute
+	Params        []Param
+	RetType       RetType
+	Block         *Block
+	Receiver      *Type
+	Owner         any
+	BuiltinCaller any
 }
 
 // FindAttribute returns attribute if exist, nil if not.

@@ -9,11 +9,11 @@ import (
 )
 
 type Fn struct {
-	Ast          *Func
-	Desc         string
-	used         bool
-	checked      bool
-	isEntryPoint bool
+	Ast            *Func
+	Desc           string
+	used           bool
+	checked        bool
+	isEntryPoint   bool
 }
 
 func (f *Fn) outId() string {
