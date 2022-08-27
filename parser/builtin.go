@@ -318,13 +318,8 @@ var errorHandlerFunc = &models.Func{
 	},
 }
 
-var unsafe_sizeof_fn = &Fn{Ast: &models.Func{Id: "sizeof"}}
-var unsafe_alignof_fn = &Fn{Ast: &models.Func{Id: "alignof"}}
-
-var unsafe_funcs = []*Fn{
-	unsafe_sizeof_fn,
-	unsafe_alignof_fn,
-}
+var unsafe_sizeof_fn = &Fn{Ast: &models.Func{IsUnsafe: true, Id: "sizeof"}}
+var unsafe_alignof_fn = &Fn{Ast: &models.Func{IsUnsafe: true, Id: "alignof"}}
 
 var recoverFunc = &Fn{
 	Ast: &models.Func{
@@ -363,6 +358,8 @@ var Builtin = &DefineMap{
 	Funcs: []*Fn{
 		panicFunc,
 		recoverFunc,
+		unsafe_sizeof_fn,
+		unsafe_alignof_fn,
 		{Ast: &Func{
 			Pub: true,
 			Id:  "out",

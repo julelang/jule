@@ -12,6 +12,7 @@ import (
 // Func is function declaration AST model.
 type Func struct {
 	Pub        bool
+	IsUnsafe     bool
 	Token      lex.Token
 	Id         string
 	Generics   []*GenericType

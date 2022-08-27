@@ -348,7 +348,14 @@ func (e *eval) callCppLink(data callData, m *exprModel) (v value) {
 		return
 	}
 	m.appendSubNode(exprNode{link.Link.Id})
-	return e.p.callFunc(link.Link, data, m)
+	return e.callFunc(link.Link, data, m)
+}
+
+func (e *eval) callFunc(f *Func, data callData, m *exprModel) value {
+	if !e.allow_unsafe && f.IsUnsafe {
+		e.pusherrtok(data.expr[0], "unsafe_behavior_at_out_of_unsafe_scope")
+	}
+	return e.p.callFunc(f, data, m)
 }
 
 func (e *eval) parenthesesRange(toks []lex.Token, m *exprModel) (v value) {
@@ -385,7 +392,7 @@ func (e *eval) parenthesesRange(toks []lex.Token, m *exprModel) (v value) {
 	switch {
 	case typeIsFunc(v.data.Type):
 		f := v.data.Type.Tag.(*Func)
-		return e.p.callFunc(f, data, m)
+		return e.callFunc(f, data, m)
 	}
 	e.pusherrtok(data.expr[len(data.expr)-1], "invalid_syntax")
 	return
@@ -1427,12 +1434,7 @@ func (e *eval) unsafeEval(toks []lex.Token, m *exprModel) (v value) {
 		return
 	}
 	old := e.allow_unsafe
-	old_funcs := e.p.Defines.Funcs
-	e.p.Defines.Funcs = append(e.p.Defines.Funcs, unsafe_funcs...)
-	defer func() {
-		e.allow_unsafe = old
-		e.p.Defines.Funcs = old_funcs
-	}()
+	defer func() { e.allow_unsafe = old }()
 	e.allow_unsafe = true
 	v = e.process(rang, m)
 	return v
