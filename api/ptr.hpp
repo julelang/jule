@@ -6,6 +6,7 @@
 #define __JULEC_PTR_HPP
 
 #define __JULEC_PTR_NEVER_HEAP ((bool**)(0x0000001))
+#define __JULEC_PTR_UNSAFE ((bool**)(0x0000002))
 #define __JULEC_PTR_HEAP_TRUE ((bool*)(0x0000001))
 
 // Wrapper structure for raw pointer of JuleC.
@@ -17,6 +18,8 @@ template<typename T>
 ptr<T> __julec_never_guarantee_ptr(T *_Ptr) noexcept;
 template<typename T>
 ptr<T> __julec_guaranteed_ptr(T *_Ptr);
+template<typename T>
+inline ptr<T> __julec_unsafe_ptr(T *_Ptr) noexcept;
 
 template<typename T>
 struct ptr {
@@ -28,7 +31,7 @@ struct ptr {
     ptr<T>(std::nullptr_t) noexcept {}
 
     ptr<T>(const uintptr_julet &_Addr) noexcept
-    { *this = __julec_never_guarantee_ptr((T*)(_Addr)); }
+    { *this = __julec_unsafe_ptr((T*)(_Addr)); }
 
     ptr<T>(T *_Ptr) noexcept {
         this->_ptr = new(std::nothrow) T*{nil};
@@ -81,6 +84,7 @@ struct ptr {
     ptr<T> &__must_heap(void) noexcept {
         if (this->_heap &&
             (this->_heap == __JULEC_PTR_NEVER_HEAP ||
+             this->_heap == __JULEC_PTR_UNSAFE ||
              *this->_heap == __JULEC_PTR_HEAP_TRUE)) { return *this; }
         if (!this->_ptr || !*this->_ptr) { return *this; }
         const T _data{**this->_ptr};
@@ -93,17 +97,24 @@ struct ptr {
     }
 
     inline T &operator*(void) noexcept {
+        if (this->_heap == __JULEC_PTR_UNSAFE)
+        { return *( (T*)(this->_ptr) ); }
         this->__check_valid();
         return **this->_ptr;
     }
 
     inline T *operator->(void) noexcept {
+        if (this->_heap == __JULEC_PTR_UNSAFE)
+        { return (T*)(this->_ptr); }
         this->__check_valid();
         return *this->_ptr;
     }
 
-    inline operator uintptr_julet(void) const noexcept
-    { return !this->_ptr ? 0 : (uintptr_julet)(*this->_ptr); }
+    inline operator uintptr_julet(void) const noexcept {
+        if (this->_heap == __JULEC_PTR_UNSAFE)
+        { return !this->_ptr ? 0 : (uintptr_julet)(this->_ptr); }
+        return !this->_ptr ? 0 : (uintptr_julet)(*this->_ptr);
+    }
 
     void operator=(const ptr<T> &_Ptr) noexcept {
         this->__dealloc();
@@ -117,7 +128,7 @@ struct ptr {
     { this->__dealloc(); }
 
     inline bool operator==(const std::nullptr_t) const noexcept
-    { return !this->_ptr || !*this->_ptr; }
+    { return !this->_ptr; }
 
     inline bool operator!=(const std::nullptr_t) const noexcept
     { return !this->operator==(nil); }
@@ -157,6 +168,14 @@ ptr<T> __julec_guaranteed_ptr(T *_Ptr) {
     _ptr._ref = new(std::nothrow) uint_julet{1};
     if (!_ptr._ref)
     { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
+    return _ptr;
+}
+
+template<typename T>
+inline ptr<T> __julec_unsafe_ptr(T *_Ptr) noexcept {
+    ptr<T> _ptr;
+    _ptr._ptr = (T**)(_Ptr);
+    _ptr._heap = __JULEC_PTR_UNSAFE;
     return _ptr;
 }
 

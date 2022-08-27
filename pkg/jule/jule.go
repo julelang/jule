@@ -43,8 +43,9 @@ const (
 
 // Environment Variables.
 var (
-	LangsPath  string
-	StdlibPath string
-	ExecPath   string
-	Set        *juleset.Set
+	LangsPath   string
+	StdlibPath  string
+	ExecPath    string
+	WorkingPath string
+	Set         *juleset.Set
 )

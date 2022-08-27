@@ -401,7 +401,7 @@ func (p *Parser) checkCppUsePath(use *models.Use) bool {
 	}
 	// Set to absolute path for correct include path
 	use.Path, _ = filepath.Abs(use.Path)
-	_ = os.Chdir(jule.ExecPath)
+	_ = os.Chdir(jule.WorkingPath)
 	return true
 }
 

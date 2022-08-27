@@ -110,7 +110,9 @@ func (u *unary) amper() value {
 		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.AMPER)
 		return v
 	}
-	if v.heapMust {
+	if u.p.eval.allow_unsafe {
+		(*nodes)[0] = exprNode{"__julec_unsafe_ptr(&"}
+	} else if v.heapMust {
 		(*nodes)[0] = exprNode{"__julec_ptr(&"}
 	} else {
 		(*nodes)[0] = exprNode{"__julec_never_guarantee_ptr(&"}

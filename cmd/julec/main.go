@@ -24,20 +24,18 @@ import (
 	"github.com/jule-lang/jule/pkg/juleset"
 )
 
-type Parser = parser.Parser
-
-const commandHelp = "help"
-const commandVersion = "version"
-const commandInit = "init"
-const commandDoc = "doc"
-const commandBug = "bug"
+const command_help = "help"
+const command_version = "version"
+const command_init = "init"
+const command_doc = "doc"
+const command_bug = "bug"
 
 var helpmap = [...][2]string{
-	0: {commandHelp, "Show help"},
-	1: {commandVersion, "Show version"},
-	2: {commandInit, "Initialize new project here"},
-	3: {commandDoc, "Documentize Jule source code"},
-	4: {commandBug, "Start a new bug report"},
+	0: {command_help, "Show help"},
+	1: {command_version, "Show version"},
+	2: {command_init, "Initialize new project here"},
+	3: {command_doc, "Documentize Jule source code"},
+	4: {command_bug, "Start a new bug report"},
 }
 
 func help(cmd string) {
@@ -71,7 +69,7 @@ func version(cmd string) {
 	println("julec version", jule.Version)
 }
 
-func initProject(cmd string) {
+func init_project(cmd string) {
 	if cmd != "" {
 		println("This module can only be used as single!")
 		return
@@ -103,7 +101,7 @@ func doc(cmd string) {
 		if p == nil {
 			continue
 		}
-		if printlogs(p) {
+		if print_logs(p) {
 			fmt.Println(jule.GetError("doc_couldnt_generated", path))
 			continue
 		}
@@ -115,7 +113,7 @@ func doc(cmd string) {
 		// Remove SrcExt from path
 		path = path[:len(path)-len(jule.SrcExt)]
 		path = filepath.Join(jule.Set.CppOutDir, path+jule.DocExt)
-		writeOutput(path, docjson)
+		write_output(path, docjson)
 	}
 }
 
@@ -148,17 +146,17 @@ func bug(cmd string) {
 	}
 }
 
-func processCommand(namespace, cmd string) bool {
+func process_command(namespace, cmd string) bool {
 	switch namespace {
-	case commandHelp:
+	case command_help:
 		help(cmd)
-	case commandVersion:
+	case command_version:
 		version(cmd)
-	case commandInit:
-		initProject(cmd)
-	case commandDoc:
+	case command_init:
+		init_project(cmd)
+	case command_doc:
 		doc(cmd)
-	case commandBug:
+	case command_bug:
 		bug(cmd)
 	default:
 		return false
@@ -168,6 +166,11 @@ func processCommand(namespace, cmd string) bool {
 
 func init() {
 	execp, err := os.Executable()
+	if err != nil {
+		println(err.Error())
+		os.Exit(0)
+	}
+	jule.WorkingPath, err = os.Getwd()
 	if err != nil {
 		println(err.Error())
 		os.Exit(0)
@@ -194,12 +197,12 @@ func init() {
 	if i == -1 {
 		i = len(arg)
 	}
-	if processCommand(arg[:i], arg[i:]) {
+	if process_command(arg[:i], arg[i:]) {
 		os.Exit(0)
 	}
 }
 
-func loadLang() {
+func load_localization() {
 	lang := strings.TrimSpace(jule.Set.Language)
 	if lang == "" || lang == "default" {
 		return
@@ -219,7 +222,7 @@ func loadLang() {
 	}
 }
 
-func checkMode() {
+func check_mode() {
 	lower := strings.ToLower(jule.Set.Mode)
 	if lower != juleset.ModeTranspile &&
 		lower != juleset.ModeCompile {
@@ -233,7 +236,7 @@ func checkMode() {
 	jule.Set.Mode = lower
 }
 
-func loadJuleSet() {
+func load_juleset() {
 	// File check.
 	info, err := os.Stat(jule.SettingsFile)
 	if err != nil || info.IsDir() {
@@ -251,13 +254,13 @@ func loadJuleSet() {
 		println(err.Error())
 		os.Exit(0)
 	}
-	loadLang()
-	checkMode()
+	load_localization()
+	check_mode()
 }
 
-// printlogs prints logs and returns true
+// print_logs prints logs and returns true
 // if logs has error, false if not.
-func printlogs(p *Parser) bool {
+func print_logs(p *parser.Parser) bool {
 	var str strings.Builder
 	for _, log := range p.Warnings {
 		str.WriteString(log.String())
@@ -271,7 +274,7 @@ func printlogs(p *Parser) bool {
 	return len(p.Errors) > 0
 }
 
-func appendStandard(code *string) {
+func append_standard(code *string) {
 	year, month, day := time.Now().Date()
 	hour, min, _ := time.Now().Clock()
 	timeStr := fmt.Sprintf("%d/%d/%d %d.%d (DD/MM/YYYY) (HH.MM)",
@@ -290,23 +293,27 @@ func appendStandard(code *string) {
 	*code = sb.String()
 }
 
-func writeOutput(path, content string) {
+func write_output(path, content string) {
 	dir := filepath.Dir(path)
 	err := os.MkdirAll(dir, 0o777)
 	if err != nil {
 		println(err.Error())
 		os.Exit(0)
 	}
-	bytes := []byte(content)
-	err = ioutil.WriteFile(path, bytes, 0o666)
+	f, err := os.Create(path)
+	if err != nil {
+		println(err.Error())
+		os.Exit(0)
+	}
+	_, err = f.WriteString(content)
 	if err != nil {
 		println(err.Error())
 		os.Exit(0)
 	}
 }
 
-func compile(path string, main, nolocal, justDefs bool) *Parser {
-	loadJuleSet()
+func compile(path string, main, nolocal, justDefs bool) *parser.Parser {
+	load_juleset()
 	p := parser.New(nil)
 	// Check standard library.
 	inf, err := os.Stat(jule.StdlibPath)
@@ -329,7 +336,7 @@ func compile(path string, main, nolocal, justDefs bool) *Parser {
 	return p
 }
 
-func execPostCommands() {
+func exec_post_commands() {
 	for _, cmd := range jule.Set.PostCommands {
 		fmt.Println(">", cmd)
 		parts := strings.SplitN(cmd, " ", -1)
@@ -340,9 +347,9 @@ func execPostCommands() {
 	}
 }
 
-func doSpell(path, cpp string) {
-	defer execPostCommands()
-	writeOutput(path, cpp)
+func do_spell(path, cpp string) {
+	defer exec_post_commands()
+	write_output(path, cpp)
 	switch jule.Set.Mode {
 	case juleset.ModeCompile:
 		defer os.Remove(path)
@@ -356,11 +363,12 @@ func main() {
 	if p == nil {
 		return
 	}
-	if printlogs(p) {
+	if print_logs(p) {
 		os.Exit(0)
 	}
 	cpp := p.Cpp()
-	appendStandard(&cpp)
-	path := filepath.Join(jule.Set.CppOutDir, jule.Set.CppOutName)
-	doSpell(path, cpp)
+	append_standard(&cpp)
+	path := filepath.Join(jule.WorkingPath, jule.Set.CppOutDir)
+	path = filepath.Join(path, jule.Set.CppOutName)
+	do_spell(path, cpp)
 }
