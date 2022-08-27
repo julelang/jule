@@ -1,21 +1,22 @@
 ---
 name: Bug Report
 about: Create a report to help us improve
-title: 'bug: parser generates wrong variable declaration'
+title: 'bug: describe bug'
 labels: bug
 assignees: ''
 
 ---
 
 <pre>
-$ jule version
-// Output of "jule version" command
+$ julec version
+// output of "julec version" command
 </pre>
 
 ### Does this issue reproduce with the latest release?
-Yes
 
 ### What did you do?
+For codes: code section or pastebin link.
+And optional description of what you did.
 
 ### Expected behavior
 A clear and concise description of what you expected to happen.
