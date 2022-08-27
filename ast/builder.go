@@ -1351,9 +1351,14 @@ func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
 		return
 	case tokens.Match:
 		return b.MatchCase(bs.toks)
+	case tokens.Unsafe:
+		if len(bs.toks) == 1 || bs.toks[1].Kind != tokens.LBRACE {
+			break
+		}
+		return b.blockStatement(bs.toks[1:], true)
 	case tokens.Brace:
 		if tok.Kind == tokens.LBRACE {
-			return b.blockStatement(bs.toks)
+			return b.blockStatement(bs.toks, false)
 		}
 	}
 	if IsFuncCall(bs.toks) != nil {
@@ -1363,7 +1368,7 @@ func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
 	return
 }
 
-func (b *Builder) blockStatement(toks []lex.Token) models.Statement {
+func (b *Builder) blockStatement(toks []lex.Token, is_unsafe bool) models.Statement {
 	i := 0
 	tok := toks[0]
 	toks = Range(&i, tokens.LBRACE, tokens.RBRACE, toks)
@@ -1371,6 +1376,7 @@ func (b *Builder) blockStatement(toks []lex.Token) models.Statement {
 		b.pusherr(toks[i], "invalid_syntax")
 	}
 	block := b.Block(toks)
+	block.IsUnsafe = is_unsafe
 	return models.Statement{Token: tok, Data: block}
 }
 
