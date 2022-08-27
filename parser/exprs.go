@@ -69,7 +69,7 @@ func canGetPtr(v value) bool {
 		return false
 	}
 	switch v.data.Type.Id {
-	case juletype.Func, juletype.Enum:
+	case juletype.Fn, juletype.Enum:
 		return false
 	default:
 		return v.data.Token.Id == tokens.Id

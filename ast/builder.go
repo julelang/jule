@@ -58,7 +58,7 @@ func (b *Builder) buildNode(toks []lex.Token) {
 	switch t.Id {
 	case tokens.Use:
 		b.Use(toks)
-	case tokens.Fn:
+	case tokens.Fn, tokens.Unsafe:
 		s := models.Statement{Token: t}
 		s.Data = b.Func(toks, false, false)
 		b.Tree = append(b.Tree, models.Object{Token: s.Token, Data: s})
@@ -314,8 +314,8 @@ func (b *Builder) Struct(toks []lex.Token) {
 	b.Tree = append(b.Tree, models.Object{Token: s.Token, Data: s})
 }
 
-func (b *Builder) traitFuncs(toks []lex.Token) []*models.Func {
-	var funcs []*models.Func
+func (b *Builder) traitFuncs(toks []lex.Token) []*models.Fn {
+	var funcs []*models.Fn
 	i := 0
 	for i < len(toks) {
 		funcToks := b.skipStatement(&i, &toks)
@@ -529,7 +529,7 @@ func (b *Builder) CppLink(toks []lex.Token) {
 	defer func() { b.pub = bpub }()
 	var link models.CppLink
 	link.Token = tok
-	link.Link = new(models.Func)
+	link.Link = new(models.Fn)
 	*link.Link = b.Func(toks[1:], false, true)
 	b.Tree = append(b.Tree, models.Object{Token: tok, Data: link})
 }
@@ -701,9 +701,19 @@ func (b *Builder) Attribute(toks []lex.Token) (a models.Attribute) {
 	return
 }
 
-func (b *Builder) funcPrototype(toks []lex.Token, i *int, anon bool) (f models.Func, ok bool) {
+func (b *Builder) funcPrototype(toks []lex.Token, i *int, anon bool) (f models.Fn, ok bool) {
 	ok = true
 	f.Token = toks[*i]
+	if f.Token.Id == tokens.Unsafe {
+		f.IsUnsafe = true
+		*i++
+		if *i >= len(toks) {
+			b.pusherr(f.Token, "invalid_syntax")
+			ok = false
+			return
+		}
+		f.Token = toks[*i]
+	}
 	// Skips fn tok
 	*i++
 	if *i >= len(toks) {
@@ -739,7 +749,7 @@ func (b *Builder) funcPrototype(toks []lex.Token, i *int, anon bool) (f models.F
 }
 
 // Func builds AST model of function.
-func (b *Builder) Func(toks []lex.Token, anon, prototype bool) (f models.Func) {
+func (b *Builder) Func(toks []lex.Token, anon, prototype bool) (f models.Fn) {
 	var ok bool
 	i := 0
 	f, ok = b.funcPrototype(toks, &i, anon)
@@ -766,6 +776,7 @@ func (b *Builder) Func(toks []lex.Token, anon, prototype bool) (f models.Func) {
 		b.pusherr(toks[i], "invalid_syntax")
 	}
 	f.Block = b.Block(blockToks)
+	f.Block.IsUnsafe = f.IsUnsafe
 	return
 }
 
@@ -1030,9 +1041,9 @@ func (b *Builder) datatype(t *models.Type, toks []lex.Token, i *int, arrays, err
 			goto ret
 		case tokens.DoubleColon:
 			dtv.WriteString(tok.Kind)
-		case tokens.Fn:
+		case tokens.Fn, tokens.Unsafe:
 			t.Token = tok
-			t.Id = juletype.Func
+			t.Id = juletype.Fn
 			f, proto_ok := b.funcPrototype(toks, i, true)
 			if !proto_ok {
 				b.pusherr(tok, "invalid_type")

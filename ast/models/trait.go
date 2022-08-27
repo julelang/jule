@@ -9,5 +9,5 @@ type Trait struct {
 	Id    string
 	Desc  string
 	Used  bool
-	Funcs []*Func
+	Funcs []*Fn
 }

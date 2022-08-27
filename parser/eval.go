@@ -266,7 +266,7 @@ func (e *eval) dataTypeFunc(expr lex.Token, callRange []lex.Token, m *exprModel)
 			m.appendSubNode(vm)
 			m.appendSubNode(exprNode{tokens.RPARENTHESES})
 			v.data.Type = Type{
-				Id:   juletype.Func,
+				Id:   juletype.Fn,
 				Kind: strDefaultFunc.DataTypeString(),
 				Tag:  strDefaultFunc,
 			}
@@ -351,8 +351,14 @@ func (e *eval) callCppLink(data callData, m *exprModel) (v value) {
 	return e.callFunc(link.Link, data, m)
 }
 
+func (e *eval) unsafe_allowed() bool {
+	return e.allow_unsafe ||
+		(e.p.rootBlock != nil && e.p.rootBlock.IsUnsafe) ||
+		(e.p.nodeBlock != nil && e.p.nodeBlock.IsUnsafe)
+}
+
 func (e *eval) callFunc(f *Func, data callData, m *exprModel) value {
-	if !e.allow_unsafe && f.IsUnsafe {
+	if !e.unsafe_allowed() && f.IsUnsafe {
 		e.pusherrtok(data.expr[0], "unsafe_behavior_at_out_of_unsafe_scope")
 	}
 	return e.p.callFunc(f, data, m)
@@ -596,7 +602,7 @@ func (e *eval) castPtr(t Type, v *value, errtok lex.Token) {
 	if typeIsStruct(unptrType(t)) {
 		e.castStruct(t, v, errtok)
 		return
-	} else if !e.allow_unsafe {
+	} else if !e.unsafe_allowed() {
 		e.pusherrtok(errtok, "unsafe_behavior_at_out_of_unsafe_scope")
 		return
 	}
@@ -658,7 +664,7 @@ func (e *eval) castInteger(t Type, v *value, errtok lex.Token) {
 	if typeIsPtr(v.data.Type) {
 		if t.Id == juletype.UIntptr {
 			return
-		} else if !e.allow_unsafe {
+		} else if !e.unsafe_allowed() {
 			e.pusherrtok(errtok, "unsafe_behavior_at_out_of_unsafe_scope")
 			return
 		} else if t.Id != juletype.I32 && t.Id != juletype.I64 && 
@@ -866,7 +872,7 @@ func (e *eval) xObjSubId(dm *DefineMap, val value, idTok lex.Token, m *exprModel
 	case 'f':
 		f := dm.Funcs[i]
 		f.used = true
-		v.data.Type.Id = juletype.Func
+		v.data.Type.Id = juletype.Fn
 		v.data.Type.Tag = f.Ast
 		v.data.Type.Kind = f.Ast.DataTypeString()
 		v.data.Token = f.Ast.Token
@@ -1420,7 +1426,7 @@ func (e *eval) anonymousFn(toks []lex.Token, m *exprModel) (v value) {
 	f.Owner = e.p
 	v.data.Value = f.Id
 	v.data.Type.Tag = &f
-	v.data.Type.Id = juletype.Func
+	v.data.Type.Id = juletype.Fn
 	v.data.Type.Kind = f.DataTypeString()
 	m.appendSubNode(anonFuncExpr{&f, e.p.blockVars})
 	return
@@ -1478,7 +1484,13 @@ func (e *eval) braceRange(toks []lex.Token, m *exprModel) (v value) {
 	}
 	switch exprToks[0].Id {
 	case tokens.Unsafe:
-		return e.unsafeEval(toks[1:], m)
+		if len(toks) == 0 {
+			e.pusherrtok(toks[0], "invalid_syntax")
+			return
+		} else if toks[1].Id != tokens.Fn {
+			return e.unsafeEval(toks[1:], m)
+		}
+		fallthrough
 	case tokens.Fn:
 		return e.anonymousFn(toks, m)
 	case tokens.Id:

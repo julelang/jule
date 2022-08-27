@@ -25,7 +25,7 @@ import (
 type File = juleio.File
 type TypeAlias = models.TypeAlias
 type Var = models.Var
-type Func = models.Func
+type Func = models.Fn
 type Arg = models.Arg
 type Param = models.Param
 type Type = models.Type
@@ -3567,7 +3567,7 @@ func (p *Parser) typeSource(dt Type, err bool) (ret Type, ok bool) {
 			}
 			return dt, false
 		}
-	case juletype.Func:
+	case juletype.Fn:
 		return p.typeSourceIsFunc(dt, err)
 	}
 	return dt, true

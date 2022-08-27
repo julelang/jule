@@ -72,7 +72,7 @@ func (dt *Type) OriginalKindId() string {
 
 // KindId returns dt.Kind's identifier.
 func (dt *Type) KindId() (id, prefix string) {
-	if dt.Id == juletype.Map || dt.Id == juletype.Func {
+	if dt.Id == juletype.Map || dt.Id == juletype.Fn {
 		return dt.Kind, ""
 	}
 	id = dt.Kind
@@ -181,7 +181,7 @@ func (dt Type) String() (s string) {
 		return dt.TraitString()
 	case juletype.Struct:
 		return dt.StructString()
-	case juletype.Func:
+	case juletype.Fn:
 		return dt.FuncString()
 	default:
 		return juletype.CppId(dt.Id)
@@ -258,7 +258,7 @@ func (dt *Type) StructString() string {
 func (dt *Type) FuncString() string {
 	var cpp strings.Builder
 	cpp.WriteString("func<std::function<")
-	f := dt.Tag.(*Func)
+	f := dt.Tag.(*Fn)
 	f.RetType.Type.Pure = dt.Pure
 	cpp.WriteString(f.RetType.String())
 	cpp.WriteByte('(')

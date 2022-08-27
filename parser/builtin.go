@@ -273,7 +273,7 @@ var errorTrait = &trait{
 	},
 	Defines: &DefineMap{
 		Funcs: []*Fn{
-			{Ast: &models.Func{
+			{Ast: &models.Fn{
 				Pub:     true,
 				Id:      "error",
 				RetType: models.RetType{Type: Type{Id: juletype.Str, Kind: tokens.STR}},
@@ -290,7 +290,7 @@ var errorType = Type{
 }
 
 var panicFunc = &Fn{
-	Ast: &models.Func{
+	Ast: &models.Fn{
 		Pub: true,
 		Id:  "panic",
 		Params: []models.Param{
@@ -302,7 +302,7 @@ var panicFunc = &Fn{
 	},
 }
 
-var errorHandlerFunc = &models.Func{
+var errorHandlerFunc = &models.Fn{
 	Id: "handler",
 	Params: []models.Param{
 		{
@@ -318,18 +318,18 @@ var errorHandlerFunc = &models.Func{
 	},
 }
 
-var unsafe_sizeof_fn = &Fn{Ast: &models.Func{IsUnsafe: true, Id: "sizeof"}}
-var unsafe_alignof_fn = &Fn{Ast: &models.Func{IsUnsafe: true, Id: "alignof"}}
+var unsafe_sizeof_fn = &Fn{Ast: &models.Fn{IsUnsafe: true, Id: "sizeof"}}
+var unsafe_alignof_fn = &Fn{Ast: &models.Fn{IsUnsafe: true, Id: "alignof"}}
 
 var recoverFunc = &Fn{
-	Ast: &models.Func{
+	Ast: &models.Fn{
 		Pub: true,
 		Id:  "recover",
 		Params: []models.Param{
 			{
 				Id: "handler",
 				Type: models.Type{
-					Id:   juletype.Func,
+					Id:   juletype.Fn,
 					Kind: errorHandlerFunc.DataTypeString(),
 					Tag:  errorHandlerFunc,
 				},
@@ -656,7 +656,7 @@ func init() {
 	outFunc, _, _ := Builtin.funcById("out", nil)
 	outlnFunc := new(Fn)
 	*outlnFunc = *outFunc
-	outlnFunc.Ast = new(models.Func)
+	outlnFunc.Ast = new(models.Fn)
 	*outlnFunc.Ast = *outFunc.Ast
 	outlnFunc.Ast.Id = "outln"
 	Builtin.Funcs = append(Builtin.Funcs, outlnFunc)

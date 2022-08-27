@@ -19,7 +19,7 @@ const (
 	F64     uint8 = 12
 	Any     uint8 = 13
 	Id      uint8 = 14
-	Func    uint8 = 15
+	Fn    uint8 = 15
 	Nil     uint8 = 16
 	UInt    uint8 = 17
 	Int     uint8 = 18
