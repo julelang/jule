@@ -2116,11 +2116,13 @@ func (p *Parser) parseFuncCall(f *Func, args *models.Args, m *exprModel, errTok 
 	args.NeedsPureType = p.rootBlock == nil || len(p.rootBlock.Func.Generics) == 0
 	if len(f.Generics) > 0 {
 		params := make([]Param, len(f.Params))
-		copy(params, f.Params)
 		for i := range params {
-			params[i].Type = params[i].Type.Copy()
+			param := &params[i]
+			fparam := &f.Params[i]
+			*param = *fparam
+			param.Type = fparam.Type.Copy()
 		}
-		retType := f.RetType.Type
+		retType := f.RetType.Type.Copy()
 		owner := f.Owner.(*Parser)
 		rootBlock := owner.rootBlock
 		nodeBlock := owner.nodeBlock
@@ -2137,6 +2139,7 @@ func (p *Parser) parseFuncCall(f *Func, args *models.Args, m *exprModel, errTok 
 				params[i].Type.Generic = f.Params[i].Type.Generic
 			}
 			retType.Generic = f.RetType.Type.Generic
+
 			f.Params = params
 			f.RetType.Type = retType
 		}()
