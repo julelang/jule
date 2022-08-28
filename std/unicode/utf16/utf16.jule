@@ -48,3 +48,34 @@ pub fn encode_rune(r: rune) (r1: rune, r2: rune) {
 	r -= SURR_SELF
 	ret SURR1 + (r>>10)&0x3ff, SURR2 + r&0x3ff
 }
+
+// Returns the UTF-16 encoding of the Unicode code point sequence s.
+pub fn encode(s: []rune) []u16 {
+	let n = s.len
+	for _, v: in s {
+		if v >= SURR_SELF {
+			n++
+		}
+	}
+
+	let a = make[u16](n)
+	n = 0
+	for _, v: in s {
+		match {
+		case 0 <= v && v < SURR1, SURR3 <= v && v < SURR_SELF:
+			// normal rune
+			a[n] = u16(v)
+			n++
+		case SURR_SELF <= v && v <= MAX_RUNE:
+			// needs surrogate sequence
+			let (r1, r2) = encode_rune(v)
+			a[n] = u16(r1)
+			a[n+1] = u16(r2)
+			n += 2
+		default:
+			a[n] = u16(REPLACEMENT_CHAR)
+			n++
+		}
+	}
+	ret a[:n]
+}
