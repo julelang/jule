@@ -852,7 +852,7 @@ func (e *eval) xObjSubId(dm *DefineMap, val value, idTok lex.Token, m *exprModel
 		return
 	}
 	v = val
-	m.appendSubNode(exprNode{subIdAccessorOfType(val.data.Type)})
+	m.appendSubNode(exprNode{subIdAccessorOfType(val.data.Type, e.unsafe_allowed())})
 	switch t {
 	case 'g':
 		g := dm.Globals[i]

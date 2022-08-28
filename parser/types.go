@@ -145,8 +145,11 @@ func typeIsPure(t Type) bool {
 		!typeIsFunc(t)
 }
 
-func subIdAccessorOfType(t Type) string {
+func subIdAccessorOfType(t Type, is_unsafe bool) string {
 	if typeIsPtr(t) {
+		if is_unsafe {
+			return ".unsafe_narrow()->"
+		}
 		return "->"
 	}
 	return tokens.DOT

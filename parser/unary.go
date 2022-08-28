@@ -91,6 +91,10 @@ func (u *unary) star() value {
 	} else {
 		v.data.Type.Kind = v.data.Type.Kind[1:]
 	}
+	if u.p.eval.unsafe_allowed() {
+		// Use unsafe deferencing
+		u.model.nodes[u.model.index].nodes[0] = exprNode{"~"}
+	}
 	return v
 }
 

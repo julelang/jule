@@ -97,16 +97,24 @@ struct ptr {
     }
 
     inline T &operator*(void) noexcept {
+        this->__check_valid();
+        return this->operator~();
+    }
+
+    inline T &operator~(void) noexcept {
         if (this->_heap == __JULEC_PTR_UNSAFE)
         { return *( (T*)(this->_ptr) ); }
-        this->__check_valid();
         return **this->_ptr;
     }
 
     inline T *operator->(void) noexcept {
+        this->__check_valid();
+        return this->unsafe_narrow();
+    }
+
+    inline T *unsafe_narrow(void) noexcept {
         if (this->_heap == __JULEC_PTR_UNSAFE)
         { return (T*)(this->_ptr); }
-        this->__check_valid();
         return *this->_ptr;
     }
 
