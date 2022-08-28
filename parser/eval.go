@@ -352,9 +352,7 @@ func (e *eval) callCppLink(data callData, m *exprModel) (v value) {
 }
 
 func (e *eval) unsafe_allowed() bool {
-	return e.allow_unsafe ||
-		(e.p.rootBlock != nil && e.p.rootBlock.IsUnsafe) ||
-		(e.p.nodeBlock != nil && e.p.nodeBlock.IsUnsafe)
+	return e.allow_unsafe || e.p.unsafe_allowed()
 }
 
 func (e *eval) callFunc(f *Func, data callData, m *exprModel) value {

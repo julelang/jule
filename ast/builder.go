@@ -1407,11 +1407,11 @@ func (b *Builder) assignInfo(toks []lex.Token) (info AssignInfo) {
 		info.Setter = tok
 		if i+1 >= len(toks) {
 			info.Right = nil
-			info.Ok = IsSuffixOperator(info.Setter.Kind)
+			info.Ok = IsPostfixOperator(info.Setter.Kind)
 			break
 		}
 		info.Right = toks[i+1:]
-		if IsSuffixOperator(info.Setter.Kind) {
+		if IsPostfixOperator(info.Setter.Kind) {
 			if info.Right != nil {
 				b.pusherr(info.Right[0], "invalid_syntax")
 				info.Right = nil

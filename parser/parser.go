@@ -2987,7 +2987,12 @@ func (p *Parser) multiAssign(assign *models.Assign, right []value) {
 	}
 }
 
-func (p *Parser) suffix(assign *models.Assign, exprs []value) {
+func (p *Parser) unsafe_allowed() bool {
+	return (p.rootBlock != nil && p.rootBlock.IsUnsafe) ||
+	(p.nodeBlock != nil && p.nodeBlock.IsUnsafe)
+}
+
+func (p *Parser) postfix(assign *models.Assign, exprs []value) {
 	if len(exprs) > 0 {
 		p.pusherrtok(assign.Setter, "invalid_syntax")
 		return
@@ -2997,6 +3002,9 @@ func (p *Parser) suffix(assign *models.Assign, exprs []value) {
 	left.Expr.Model = model
 	_ = p.assignment(val, assign.Setter)
 	if typeIsExplicitPtr(val.data.Type) {
+		if !p.unsafe_allowed() {
+			p.pusherrtok(left.Expr.Tokens[0], "unsafe_behavior_at_out_of_unsafe_scope")
+		}
 		return
 	}
 	if typeIsPure(val.data.Type) && juletype.IsNumeric(val.data.Type.Id) {
@@ -3009,8 +3017,8 @@ func (p *Parser) assign(assign *models.Assign) {
 	leftLength := len(assign.Left)
 	rightLength := len(assign.Right)
 	exprs := p.assignExprs(assign)
-	if rightLength == 0 && ast.IsSuffixOperator(assign.Setter.Kind) { // Suffix
-		p.suffix(assign, exprs)
+	if rightLength == 0 && ast.IsPostfixOperator(assign.Setter.Kind) { // Postfix
+		p.postfix(assign, exprs)
 		return
 	} else if leftLength == 1 && !assign.Left[0].Var.New {
 		p.singleAssign(assign, exprs)

@@ -127,6 +127,12 @@ struct ptr {
     inline void operator=(const std::nullptr_t) noexcept
     { this->__dealloc(); }
 
+    inline void operator++(int) noexcept
+    { this->_ptr++; }
+
+    inline void operator--(int) noexcept
+    { this->_ptr--; }
+
     inline bool operator==(const std::nullptr_t) const noexcept
     { return !this->_ptr; }
 

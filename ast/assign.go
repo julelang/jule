@@ -13,8 +13,8 @@ type AssignInfo struct {
 	Ok     bool
 }
 
-// SuffixOperators.
-var SuffixOperators = [...]string{
+// PostfixOperators.
+var PostfixOperators = [...]string{
 	0: tokens.DOUBLE_PLUS,
 	1: tokens.DOUBLE_MINUS,
 }
@@ -49,9 +49,9 @@ func IsAssign(id uint8) bool {
 	return false
 }
 
-// IsSuffixOperator reports operator kind is suffix operator or not.
-func IsSuffixOperator(kind string) bool {
-	for _, operator := range SuffixOperators {
+// IsPostfixOperator reports operator kind is postfix operator or not.
+func IsPostfixOperator(kind string) bool {
+	for _, operator := range PostfixOperators {
 		if kind == operator {
 			return true
 		}
@@ -62,7 +62,7 @@ func IsSuffixOperator(kind string) bool {
 // IsAssignOperator reports operator kind is
 // assignment operator or not.
 func IsAssignOperator(kind string) bool {
-	if IsSuffixOperator(kind) {
+	if IsPostfixOperator(kind) {
 		return true
 	}
 	for _, operator := range AssignOperators {
