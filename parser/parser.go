@@ -380,7 +380,7 @@ func getTree(toks []lex.Token) ([]models.Object, []julelog.CompilerLog) {
 	return b.Tree, b.Errors
 }
 
-func (p *Parser) checkCppUsePath(use *models.Use) bool {
+func (p *Parser) checkCppUsePath(use *models.UseDecl) bool {
 	ext := filepath.Ext(use.Path)
 	if !juleapi.IsValidHeader(ext) {
 		p.pusherrtok(use.Token, "invalid_header_ext", ext)
@@ -405,7 +405,7 @@ func (p *Parser) checkCppUsePath(use *models.Use) bool {
 	return true
 }
 
-func (p *Parser) checkPureUsePath(use *models.Use) bool {
+func (p *Parser) checkPureUsePath(use *models.UseDecl) bool {
 	info, err := os.Stat(use.Path)
 	// Exist?
 	if err != nil || !info.IsDir() {
@@ -415,7 +415,7 @@ func (p *Parser) checkPureUsePath(use *models.Use) bool {
 	return true
 }
 
-func (p *Parser) checkUsePath(use *models.Use) bool {
+func (p *Parser) checkUsePath(use *models.UseDecl) bool {
 	if use.Cpp {
 		if !p.checkCppUsePath(use) {
 			return false
@@ -495,7 +495,7 @@ func (p *Parser) pushUse(use *use, selectors []lex.Token) {
 	src.defines = use.defines
 }
 
-func (p *Parser) compileCppLinkUse(useAST *models.Use) (*use, bool) {
+func (p *Parser) compileCppLinkUse(useAST *models.UseDecl) (*use, bool) {
 	use := new(use)
 	use.cppLink = true
 	use.Path = useAST.Path
@@ -503,7 +503,7 @@ func (p *Parser) compileCppLinkUse(useAST *models.Use) (*use, bool) {
 	return use, false
 }
 
-func (p *Parser) compilePureUse(useAST *models.Use) (_ *use, hassErr bool) {
+func (p *Parser) compilePureUse(useAST *models.UseDecl) (_ *use, hassErr bool) {
 	infos, err := ioutil.ReadDir(useAST.Path)
 	if err != nil {
 		p.pusherrmsg(err.Error())
@@ -544,14 +544,14 @@ func (p *Parser) compilePureUse(useAST *models.Use) (_ *use, hassErr bool) {
 	return nil, false
 }
 
-func (p *Parser) compileUse(useAST *models.Use) (*use, bool) {
+func (p *Parser) compileUse(useAST *models.UseDecl) (*use, bool) {
 	if useAST.Cpp {
 		return p.compileCppLinkUse(useAST)
 	}
 	return p.compilePureUse(useAST)
 }
 
-func (p *Parser) use(ast *models.Use, wg *sync.WaitGroup, err *bool) {
+func (p *Parser) use(ast *models.UseDecl, wg *sync.WaitGroup, err *bool) {
 	defer wg.Done()
 	if !p.checkUsePath(ast) {
 		*err = true
@@ -590,7 +590,7 @@ func (p *Parser) parseUses(tree *[]models.Object) bool {
 	for i := range *tree {
 		obj := &(*tree)[i]
 		switch t := obj.Data.(type) {
-		case models.Use:
+		case models.UseDecl:
 			if !*err {
 				wg.Add(1)
 				go p.use(&t, &wg, err)
@@ -638,7 +638,7 @@ func (p *Parser) parseSrcTreeObj(obj models.Object) {
 		p.CppLink(t)
 	case models.Comment:
 		p.Comment(t)
-	case models.Use:
+	case models.UseDecl:
 		p.pusherrtok(obj.Token, "use_at_content")
 	default:
 		p.pusherrtok(obj.Token, "invalid_syntax")
@@ -1467,10 +1467,10 @@ func (p *Parser) Var(v Var) *Var {
 
 func (p *Parser) checkTypeParam(f *Fn) {
 	if len(f.Ast.Generics) == 0 {
-		p.pusherrtok(f.Ast.Token, "func_must_have_generics_if_has_attribute", jule.Attribute_TypeArg)
+		p.pusherrtok(f.Ast.Token, "fn_must_have_generics_if_has_attribute", jule.Attribute_TypeArg)
 	}
 	if len(f.Ast.Params) != 0 {
-		p.pusherrtok(f.Ast.Token, "func_cant_have_params_if_has_attribute", jule.Attribute_TypeArg)
+		p.pusherrtok(f.Ast.Token, "fn_cant_have_parameters_if_has_attribute", jule.Attribute_TypeArg)
 	}
 }
 
@@ -2376,13 +2376,13 @@ func (p *Parser) getrange(open, close string, toks []lex.Token) (_ []lex.Token, 
 
 func (p *Parser) checkSolidFuncSpecialCases(f *Func) {
 	if len(f.Params) > 0 {
-		p.pusherrtok(f.Token, "func_have_parameters", f.Id)
+		p.pusherrtok(f.Token, "fn_have_parameters", f.Id)
 	}
 	if f.RetType.Type.Id != juletype.Void {
-		p.pusherrtok(f.RetType.Type.Token, "func_have_return", f.Id)
+		p.pusherrtok(f.RetType.Type.Token, "fn_have_ret", f.Id)
 	}
 	if f.Attributes != nil {
-		p.pusherrtok(f.Token, "func_have_attributes", f.Id)
+		p.pusherrtok(f.Token, "fn_have_attributes", f.Id)
 	}
 }
 

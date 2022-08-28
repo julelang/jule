@@ -544,7 +544,7 @@ func tokstoa(toks []lex.Token) string {
 
 // Use builds AST model of use declaration.
 func (b *Builder) Use(toks []lex.Token) {
-	var use models.Use
+	var use models.UseDecl
 	use.Token = toks[0]
 	if len(toks) < 2 {
 		b.pusherr(use.Token, "missing_use_path")
@@ -578,7 +578,7 @@ func (b *Builder) getSelectors(toks []lex.Token) []lex.Token {
 	return selectors
 }
 
-func (b *Builder) buildUseCppDecl(use *models.Use, toks []lex.Token) {
+func (b *Builder) buildUseCppDecl(use *models.UseDecl, toks []lex.Token) {
 	if len(toks) > 2 {
 		b.pusherr(toks[2], "invalid_syntax")
 	}
@@ -591,7 +591,7 @@ func (b *Builder) buildUseCppDecl(use *models.Use, toks []lex.Token) {
 	use.Path = tok.Kind[1 : len(tok.Kind)-1]
 }
 
-func (b *Builder) buildUseDecl(use *models.Use, toks []lex.Token) {
+func (b *Builder) buildUseDecl(use *models.UseDecl, toks []lex.Token) {
 	var path strings.Builder
 	path.WriteString(jule.StdlibPath)
 	path.WriteRune(os.PathSeparator)
