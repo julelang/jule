@@ -79,3 +79,28 @@ pub fn encode(s: []rune) []u16 {
 	}
 	ret a[:n]
 }
+
+// Returns the Unicode code point sequence
+// represented by the UTF-16 encoding s.
+pub fn decode(s: []u16) []rune {
+	let a = make[rune](s.len)
+	let n = 0
+	for let i = 0; i < s.len; i++ {
+		let r = s[i]
+		match {
+		case r < SURR1 || SURR3 <= r:
+			// normal rune
+			a[n] = rune(r)
+		case (SURR1 <= r && r < SURR2 && i+1 < s.len &&
+				SURR2 <= s[i+1] && s[i+1] < SURR3):
+			// valid surrogate sequence
+			a[n] = decode_rune(rune(r), rune(s[i+1]))
+			i++
+		default:
+			// invalid surrogate sequence
+			a[n] = REPLACEMENT_CHAR
+		}
+		n++
+	}
+	ret a[:n]
+}
