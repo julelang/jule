@@ -27,3 +27,24 @@ const SURR_SELF = 0x10000
 pub fn is_surrogate(r: rune) bool {
 	ret SURR1 <= r && r < SURR3
 }
+
+// Returns the UTF-16 decoding of a surrogate pair.
+// If the pair is not a valid UTF-16 surrogate pair, decode_rune returns
+// the Unicode replacement code point U+FFFD.
+pub fn decode_rune(r1: rune, r2: rune) rune {
+	if SURR1 <= r1 && r1 < SURR2 && SURR2 <= r2 && r2 < SURR3 {
+		ret (r1-SURR1)<<10 | (r2 - SURR2) + SURR_SELF
+	}
+	ret REPLACEMENT_CHAR
+}
+
+// Returns the UTF-16 surrogate pair r1, r2 for the given rune.
+// If the rune is not a valid Unicode code point or does not need encoding,
+// encode_rune returns U+FFFD, U+FFFD.
+pub fn encode_rune(r: rune) (r1: rune, r2: rune) {
+	if r < SURR_SELF || r > MAX_RUNE {
+		ret REPLACEMENT_CHAR, REPLACEMENT_CHAR
+	}
+	r -= SURR_SELF
+	ret SURR1 + (r>>10)&0x3ff, SURR2 + r&0x3ff
+}
