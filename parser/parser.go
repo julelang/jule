@@ -2384,6 +2384,9 @@ func (p *Parser) checkSolidFuncSpecialCases(f *Func) {
 	if f.Attributes != nil {
 		p.pusherrtok(f.Token, "fn_have_attributes", f.Id)
 	}
+	if f.IsUnsafe {
+		p.pusherrtok(f.Token, "fn_is_unsafe", f.Id)
+	}
 }
 
 func (p *Parser) checkNewBlockCustom(b *models.Block, oldBlockVars []*Var) {
