@@ -33,14 +33,23 @@ func (f IterFor) String(i *Iter) string {
 	cpp.WriteString(i.NextLabel())
 	cpp.WriteString(":;\n")
 	cpp.WriteString(indent)
-	cpp.WriteString(f.Next.String())
-	cpp.WriteByte('\n')
-	cpp.WriteString(indent)
-	cpp.WriteString("if (")
-	cpp.WriteString(f.Condition.String())
-	cpp.WriteString(") { goto ")
-	cpp.WriteString(begin)
-	cpp.WriteString("; }\n")
+	if f.Next.Data != nil {
+		cpp.WriteString(f.Next.String())
+		cpp.WriteByte('\n')
+		cpp.WriteString(indent)
+	}
+	condition := f.Condition.String()
+	if condition != "" {
+		cpp.WriteString("if (")
+		cpp.WriteString(f.Condition.String())
+		cpp.WriteString(") { goto ")
+		cpp.WriteString(begin)
+		cpp.WriteString("; }\n")
+	} else {
+		cpp.WriteString("goto ")
+		cpp.WriteString(begin)
+		cpp.WriteString(";\n")
+	}
 	cpp.WriteString(indent)
 	cpp.WriteString(i.EndLabel())
 	cpp.WriteString(":;")

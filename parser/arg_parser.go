@@ -59,16 +59,17 @@ func (pap *pureArgParser) pushVariadicArgs(pair *paramMapPair) {
 	model.exprs = append(model.exprs, exprNode{tokens.LBRACE})
 	variadiced := false
 	pap.p.parseArg(pap.f, pair, pap.args, &variadiced)
-	model.exprs = append(model.exprs, pair.arg.Expr.Model.(iExpr))
+	model.exprs = append(model.exprs, pair.arg.String())
 	once := false
 	for pap.i++; pap.i < len(pap.args.Src); pap.i++ {
 		pair.arg = &pap.args.Src[pap.i]
 		once = true
 		pap.p.parseArg(pap.f, pair, pap.args, &variadiced)
 		model.exprs = append(model.exprs, exprNode{tokens.COMMA})
-		model.exprs = append(model.exprs, pair.arg.Expr.Model.(iExpr))
+		model.exprs = append(model.exprs, pair.arg.String())
 	}
 	model.exprs = append(model.exprs, exprNode{tokens.RBRACE})
+	pair.arg.CastType = nil
 	pair.arg.Expr.Model = model
 	if !once {
 		return

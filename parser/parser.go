@@ -2338,6 +2338,12 @@ func (p *Parser) pushGenericByArg(f *Func, pair *paramMapPair, args *models.Args
 func (p *Parser) parseArg(f *Func, pair *paramMapPair, args *models.Args, variadiced *bool) {
 	value, model := p.evalExpr(pair.arg.Expr)
 	pair.arg.Expr.Model = model
+	if !value.variadic &&
+		typeIsPure(pair.param.Type) &&
+		juletype.IsNumeric(pair.param.Type.Id) {
+		pair.arg.CastType = new(Type)
+		*pair.arg.CastType = pair.param.Type.Copy()
+	}
 	if variadiced != nil && !*variadiced {
 		*variadiced = value.variadic
 	}

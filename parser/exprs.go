@@ -13,12 +13,13 @@ func indexingExprModel(i iExpr) iExpr {
 	if i == nil {
 		return i
 	}
-	var model exprNode
-	model.value = juletype.CppId(juletype.Int)
-	model.value += tokens.LPARENTHESES
-	model.value += i.String()
-	model.value += tokens.RPARENTHESES
-	return model
+	var model strings.Builder
+	model.WriteString("static_cast<")
+	model.WriteString(juletype.CppId(juletype.Int))
+	model.WriteString(">(")
+	model.WriteString(i.String())
+	model.WriteByte(')')
+	return exprNode{model.String()}
 }
 
 func exprMustHeap(expr string) string {

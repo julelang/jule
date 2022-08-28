@@ -2,6 +2,7 @@ package parser
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/jule-lang/jule/ast"
 	"github.com/jule-lang/jule/ast/models"
@@ -126,13 +127,13 @@ func (e *eval) valProcesses(exprs []any, processes [][]lex.Token) (v value, mode
 			sexpr.exprs = make([]any, 5)
 			sexpr.exprs[0] = exprNode{tokens.LPARENTHESES}
 			sexpr.exprs[1] = leftExpr
-			sexpr.exprs[2] = exprNode{process.operator.Kind}
+			sexpr.exprs[2] = exprNode{" " + process.operator.Kind + " "}
 			sexpr.exprs[3] = rightExpr
 			sexpr.exprs[4] = exprNode{tokens.RPARENTHESES}
 		} else {
 			sexpr.exprs = make([]any, 3)
 			sexpr.exprs[0] = leftExpr
-			sexpr.exprs[1] = exprNode{process.operator.Kind}
+			sexpr.exprs[1] = exprNode{" " + process.operator.Kind + " "}
 			sexpr.exprs[2] = rightExpr
 		}
 		expr = sexpr
@@ -493,14 +494,32 @@ func (e *eval) subId(toks []lex.Token, m *exprModel) (v value) {
 	return
 }
 
+func (e *eval) get_cast_expr_model(t, vt Type, expr_model iExpr) iExpr {
+	var model strings.Builder
+	switch {
+	case typeIsPure(vt):
+		switch {
+		case typeIsTrait(vt):
+			model.WriteString(expr_model.String())
+			model.WriteString(subIdAccessorOfType(vt, e.unsafe_allowed()))
+			model.WriteString("operator ")
+			model.WriteString(t.String())
+			model.WriteString("()")
+			goto end
+		}
+	}
+	model.WriteString("static_cast<")
+	model.WriteString(t.String())
+	model.WriteString(">(")
+	model.WriteString(expr_model.String())
+	model.WriteByte(')')
+end:
+	return exprNode{model.String()}
+}
+
 func (e *eval) castExpr(dt Type, exprToks []lex.Token, m *exprModel, errTok lex.Token) value {
 	val, model := e.toks(exprToks)
-	m.appendSubNode(exprNode{tokens.LPARENTHESES})
-	m.appendSubNode(exprNode{tokens.LPARENTHESES + dt.String() + tokens.RPARENTHESES})
-	m.appendSubNode(exprNode{tokens.LPARENTHESES})
-	m.appendSubNode(model)
-	m.appendSubNode(exprNode{tokens.RPARENTHESES})
-	m.appendSubNode(exprNode{tokens.RPARENTHESES})
+	m.appendSubNode(e.get_cast_expr_model(dt, val.data.Type, model))
 	val = e.cast(val, dt, errTok)
 	return val
 }
