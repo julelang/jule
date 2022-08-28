@@ -2405,9 +2405,12 @@ func (p *Parser) checkNewBlockCustom(b *models.Block, oldBlockVars []*Var) {
 		b.SubIndex = p.nodeBlock.SubIndex + 1
 		b.Func = p.nodeBlock.Func
 		oldNode := p.nodeBlock
+		old_unsafe := b.IsUnsafe
+		b.IsUnsafe = b.IsUnsafe || oldNode.IsUnsafe
 		p.nodeBlock = b
 		defer func() {
 			p.nodeBlock = oldNode
+			b.IsUnsafe = old_unsafe
 			*p.rootBlock.Gotos = append(*p.rootBlock.Gotos, *b.Gotos...)
 			*p.rootBlock.Labels = append(*p.rootBlock.Labels, *b.Labels...)
 		}()
