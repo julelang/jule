@@ -1751,17 +1751,17 @@ func (b *Builder) DeferStatement(toks []lex.Token) (s models.Statement) {
 
 func (b *Builder) ConcurrentCallStatement(toks []lex.Token) (s models.Statement) {
 	var cc models.ConcurrentCall
-	cc.Tok = toks[0]
+	cc.Token = toks[0]
 	toks = toks[1:]
 	if len(toks) == 0 {
-		b.pusherr(cc.Tok, "missing_expr")
+		b.pusherr(cc.Token, "missing_expr")
 		return
 	}
 	if IsFuncCall(toks) == nil {
-		b.pusherr(cc.Tok, "expr_not_func_call")
+		b.pusherr(cc.Token, "expr_not_func_call")
 	}
 	cc.Expr = b.Expr(toks)
-	s.Token = cc.Tok
+	s.Token = cc.Token
 	s.Data = cc
 	return
 }

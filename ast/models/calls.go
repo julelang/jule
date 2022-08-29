@@ -17,7 +17,7 @@ func (d Defer) String() string {
 
 // ConcurrentCall is the AST model of concurrent calls.
 type ConcurrentCall struct {
-	Tok  lex.Token
+	Token  lex.Token
 	Expr Expr
 }
 

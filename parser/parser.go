@@ -2885,6 +2885,20 @@ func (p *Parser) deferredCall(d *models.Defer) {
 func (p *Parser) concurrentCall(cc *models.ConcurrentCall) {
 	m := new(exprModel)
 	m.nodes = make([]exprBuildNode, 1)
+	if !p.unsafe_allowed() {
+		fexpr, _ := ast.RangeLast(cc.Expr.Tokens)
+		v, _ := p.evalToks(fexpr)
+		if p.eval.has_error || v.data.Value == "" {
+			return
+		}
+		f := v.data.Type.Tag.(*Func)
+		for _, param := range f.Params {
+			if param.Reference {
+				p.pusherrtok(cc.Token, "unsafe_behavior_at_out_of_unsafe_scope")
+				break
+			}
+		}
+	}
 	_, cc.Expr.Model = p.evalExpr(cc.Expr)
 }
 
