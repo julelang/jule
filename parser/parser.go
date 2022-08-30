@@ -3017,7 +3017,11 @@ func (p *Parser) postfix(assign *models.Assign, exprs []value) {
 		}
 		return
 	}
-	if typeIsPure(val.data.Type) && juletype.IsNumeric(val.data.Type.Id) {
+	checkType := val.data.Type
+	if typeIsRef(checkType) {
+		checkType = un_ptr_or_ref_type(checkType)
+	}
+	if typeIsPure(checkType) && juletype.IsNumeric(checkType.Id) {
 		return
 	}
 	p.pusherrtok(assign.Setter, "operator_not_for_juletype", assign.Setter.Kind, val.data.Type.Kind)
