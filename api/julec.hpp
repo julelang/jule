@@ -69,6 +69,7 @@
 template<typename _Obj_t>
 void JULEC_ID(panic)(const _Obj_t &_Expr);
 
+#include "atomicity.hpp"
 #include "typedef.hpp"
 #include "ref.hpp"
 #include "trait.hpp"

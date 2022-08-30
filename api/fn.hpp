@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+#ifndef __JULEC_FN_HPP
+#define __JULEC_FN_HPP
+
 // std::function wrapper of JuleC.
 template <typename _Fn_t>
 struct fn;
@@ -33,3 +36,5 @@ struct fn {
     inline bool operator!=(std::nullptr_t) const noexcept
     { return !this->operator==(nil); }
 };
+
+#endif // #ifndef __JULEC_ATOMICITY_HPP
