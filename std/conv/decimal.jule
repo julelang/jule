@@ -116,7 +116,7 @@ struct Decimal {
 
 impl Decimal {
 	// Assign v.
-	fn &assign(v: u64) {
+	fn assign(v: u64) {
 		let buf: [24]byte
 
 		// Write reversed decimal in buf.
@@ -136,40 +136,40 @@ impl Decimal {
 			.nd++
 		}
 		.dp = .nd
-		trim(self)
+		unsafe{ trim(&self) }
 	}
 
 	// Binary shift left (k > 0) or right (k < 0).
-	fn &shift(k: int) {
+	fn shift(k: int) {
 		match {
 		case .nd == 0:
 			// nothing to do: a == 0
 		case k > 0:
 			for k > max_shift {
-				left_shift(self, max_shift)
+				unsafe{ left_shift(&self, max_shift) }
 				k -= max_shift
 			}
-			left_shift(self, uint(k))
+			unsafe{ left_shift(&self, uint(k)) }
 		case k < 0:
 			for k < -max_shift {
-				right_shift(self, max_shift)
+				unsafe{ right_shift(&self, max_shift) }
 				k += max_shift
 			}
-			right_shift(self, uint(-k))
+			unsafe{ right_shift(&self, uint(-k)) }
 		}
 	}
 
 	// Round a down to nd digits (or fewer).
-	fn &round_down(nd: int) {
+	fn round_down(nd: int) {
 		if nd < 0 || nd >= .nd {
 			ret
 		}
 		.nd = nd
-		trim(self)
+		unsafe{ trim(&self) }
 	}
 
 	// Round a up to nd digits (or fewer).
-	fn &round_up(nd: int) {
+	fn round_up(nd: int) {
 		if nd < 0 || nd >= .nd {
 			ret
 		}
@@ -195,11 +195,11 @@ impl Decimal {
 	// If nd is zero, it means we're rounding
 	// just to the left of the digits, as in
 	// 0.09 -> 0.1.
-	fn &round(nd: int) {
+	fn round(nd: int) {
 		if nd < 0 || nd >= .nd {
 			ret
 		}
-		if should_round_up(self, nd) {
+		if (unsafe{ should_round_up(&self, nd) }) {
 			.round_up(nd)
 		} else {
 			.round_down(nd)
@@ -208,7 +208,7 @@ impl Decimal {
 
 	// Extract integer part, rounded appropriately.
 	// No guarantees about overflow.
-	fn &rounded_integer() u64 {
+	fn rounded_integer() u64 {
 		if .dp > 20 {
 			ret 0xFFFFFFFFFFFFFFFF
 		}
@@ -220,7 +220,7 @@ impl Decimal {
 		for ; i < .dp; i++ {
 			n *= 10
 		}
-		if should_round_up(self, .dp) {
+		if (unsafe{ should_round_up(&self, .dp) }) {
 			n++
 		}
 		ret n
@@ -237,7 +237,7 @@ fn digit_zero(dst: []byte) int {
 // Trailing zeros from number.
 // (They are meaningless; the decimal point is tracked
 // independent of the number of digits.)
-fn trim(a: &Decimal) {
+unsafe fn trim(a: *Decimal) {
 	for a.nd > 0 && a.d[a.nd-1] == '0' {
 		a.nd--
 	}
@@ -247,7 +247,7 @@ fn trim(a: &Decimal) {
 }
 
 // Binary shift right (/ 2) by k bits.  k <= maxShift to avoid overflow.
-fn right_shift(a: &Decimal, k: uint) {
+unsafe fn right_shift(a: *Decimal, k: uint) {
 	let r = 0 // read pointer
 	let w = 0 // write pointer
 
@@ -314,7 +314,7 @@ fn prefix_is_less_than(b: []byte, s: str) bool {
 }
 
 // Binary shift left (* 2) by k bits.  k <= maxShift to avoid overflow.
-fn left_shift(a: &Decimal, k: uint) {
+unsafe fn left_shift(a: *Decimal, k: uint) {
 	let delta = leftcheats[k].delta
 	if prefix_is_less_than(a.d[0:a.nd], leftcheats[k].cutoff) {
 		delta--
@@ -360,7 +360,7 @@ fn left_shift(a: &Decimal, k: uint) {
 }
 
 // If we chop a at nd digits, should we round up?
-fn should_round_up(a: &Decimal, nd: int) bool {
+unsafe fn should_round_up(a: *Decimal, nd: int) bool {
 	if nd < 0 || nd >= a.nd {
 		ret false
 	}

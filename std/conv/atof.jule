@@ -196,7 +196,7 @@ loop_end:
 let powtab = []int{1, 3, 6, 9, 13, 16, 19, 23, 26}
 
 impl Decimal {
-	fn &set(s: str) (ok: bool) {
+	fn set(s: str) (ok: bool) {
 		let i = 0
 		.neg = false
 		.trunc = false
@@ -285,7 +285,7 @@ impl Decimal {
 		ret
 	}
 
-	fn &float_bits(flt: &FloatInfo) (b: u64, overflow: bool) {
+	unsafe fn float_bits(flt: *FloatInfo) (b: u64, overflow: bool) {
 		let exp: int
 		let mant: u64
 
@@ -509,7 +509,7 @@ fn atof32exact(mantissa: u64, exp: int, neg: bool) (f: f32, ok: bool) {
 // and returns it as a f64.
 // The string s has already been parsed into a mantissa, exponent, and sign (neg==true for negative).
 // If trunc is true, trailing non-zero bits have been omitted from the mantissa.
-fn atof_hex(s: str, flt: &FloatInfo, mantissa: u64, exp: int, neg: bool, trunc: bool) (f64, Error) {
+unsafe fn atof_hex(s: str, flt: *FloatInfo, mantissa: u64, exp: int, neg: bool, trunc: bool) (f64, Error) {
 	let max_exp = 1<<flt.expbits + flt.bias - 2
 	let min_exp = flt.bias + 1
 	exp += int(flt.mantbits) // mantissa now implicitly divided by 2^mantbits.
@@ -568,13 +568,13 @@ fn atof_hex(s: str, flt: &FloatInfo, mantissa: u64, exp: int, neg: bool, trunc: 
 	if neg {
 		bits |= 1 << flt.mantbits << flt.expbits
 	}
-	if flt == f32_info {
+	if *flt == f32_info {
 		ret f64(std::math::f32_from_bits(u32(bits))), err
 	}
 	ret std::math::f64_from_bits(bits), err
 }
 
-fn atof32(s: str) (f: f32, n: int, err: Error) {
+unsafe fn atof32(s: str) (f: f32, n: int, err: Error) {
 	{
 		let (val, _n, ok) = special(s)
 		if ok {
@@ -590,7 +590,7 @@ fn atof32(s: str) (f: f32, n: int, err: Error) {
 
 	if hex {
 		let ff: f64
-		ff, err = atof_hex(s[:n], f32_info, mantissa, exp, neg, trunc)
+		ff, err = atof_hex(s[:n], &f32_info, mantissa, exp, neg, trunc)
 		ret f32(ff), n, err
 	}
 
@@ -620,11 +620,11 @@ fn atof32(s: str) (f: f32, n: int, err: Error) {
 	}
 
 	// Slow fallback.
-	let d = new(Decimal)
+	let d: Decimal
 	if !d.set(s[:n]) {
 		ret 0, n, syntax_error(FN_PARSE_FLOAT, s)
 	}
-	let (b, ovf) = d.float_bits(f32_info)
+	let (b, ovf) = d.float_bits(&f32_info)
 	f = std::math::f32_from_bits(u32(b))
 	if ovf {
 		err = range_error(FN_PARSE_FLOAT, s)
@@ -632,7 +632,7 @@ fn atof32(s: str) (f: f32, n: int, err: Error) {
 	ret f, n, err
 }
 
-fn atof64(s: str) (f: f64, n: int, err: Error) {
+unsafe fn atof64(s: str) (f: f64, n: int, err: Error) {
 	{
 		let (val, _n, ok) = special(s)
 		if ok {
@@ -647,7 +647,7 @@ fn atof64(s: str) (f: f64, n: int, err: Error) {
 	}
 
 	if hex {
-		f, err = atof_hex(s[:n], f64_info, mantissa, exp, neg, trunc)
+		f, err = atof_hex(s[:n], &f64_info, mantissa, exp, neg, trunc)
 		ret f, n, err
 	}
 
@@ -677,11 +677,11 @@ fn atof64(s: str) (f: f64, n: int, err: Error) {
 	}
 
 	// Slow fallback.
-	let d = new(Decimal)
+	let d: Decimal
 	if !d.set(s[:n]) {
 		ret 0, n, syntax_error(FN_PARSE_FLOAT, s)
 	}
-	let (b, ovf) = d.float_bits(f64_info)
+	let (b, ovf) = d.float_bits(&f64_info)
 	f = std::math::f64_from_bits(b)
 	if ovf {
 		err = range_error(FN_PARSE_FLOAT, s)
@@ -689,7 +689,7 @@ fn atof64(s: str) (f: f64, n: int, err: Error) {
 	ret f, n, err
 }
 
-fn parse_float_prefix(s: str, bit_size: int) (f64, int, Error) {
+unsafe fn parse_float_prefix(s: str, bit_size: int) (f64, int, Error) {
 	if bit_size == 32 {
 		let (f, n, err) = atof32(s)
 		ret f64(f), n, err
@@ -723,7 +723,7 @@ fn parse_float_prefix(s: str, bit_size: int) (f64, int, Error) {
 // Recognizes the string "nan", and the (possibly signed) strings "inf" and "infinity"
 // as their respective special floating point values. It ignores case when matching.
 pub fn parse_float(s: str, bit_size: int) (f64, Error) {
-	let (f, n, err) = parse_float_prefix(s, bit_size)
+	let (f, n, err) = unsafe{ parse_float_prefix(s, bit_size) }
 	if n != s.len && (err == nil || ( (&ConvError)(err) ).Error  != ERROR_SYNTAX) {
 		ret 0, syntax_error(FN_PARSE_FLOAT, s)
 	}
