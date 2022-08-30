@@ -318,8 +318,24 @@ func (b *Builder) traitFuncs(toks []lex.Token) []*models.Fn {
 	var funcs []*models.Fn
 	i := 0
 	for i < len(toks) {
-		funcToks := b.skipStatement(&i, &toks)
-		f := b.Func(funcToks, false, true)
+		fnToks := b.skipStatement(&i, &toks)
+		/*tok := fnToks[0]
+		switch tok.Id {
+		case tokens.Fn, tokens.Unsafe:
+			i := 1
+			if tok.Id == tokens.Unsafe {
+				i++
+			}
+			if len(fnToks) > i {
+				tok = fnToks[i]
+				if tok.Id == tokens.Operator && tok.Kind == tokens.AMPER {
+					ref = true
+					// Remove reference token
+					fnToks = append(fnToks[:i], fnToks[i+1:]...)
+				}
+			}
+		}*/
+		f := b.Func(fnToks, false, true)
 		f.Pub = true
 		funcs = append(funcs, &f)
 	}
@@ -367,13 +383,17 @@ func (b *Builder) implTraitFuncs(impl *models.Impl, toks []lex.Token) {
 		case tokens.Comment:
 			impl.Tree = append(impl.Tree, b.Comment(tok))
 			continue
-		case tokens.Fn:
-			if len(fnToks) > 1 {
-				tok = fnToks[1]
+		case tokens.Fn, tokens.Unsafe:
+			i := 1
+			if tok.Id == tokens.Unsafe {
+				i++
+			}
+			if len(fnToks) > i {
+				tok = fnToks[i]
 				if tok.Id == tokens.Operator && tok.Kind == tokens.AMPER {
 					ref = true
 					// Remove reference token
-					fnToks = append(fnToks[:1], fnToks[2:]...)
+					fnToks = append(fnToks[:i], fnToks[i+1:]...)
 				}
 			}
 		default:
@@ -427,13 +447,17 @@ func (b *Builder) implStruct(impl *models.Impl, toks []lex.Token) {
 		}
 		ref := false
 		switch tok.Id {
-		case tokens.Fn:
-			if len(fnToks) > 1 {
-				tok = fnToks[1]
+		case tokens.Fn, tokens.Unsafe:
+			i := 1
+			if tok.Id == tokens.Unsafe {
+				i++
+			}
+			if len(fnToks) > i {
+				tok = fnToks[i]
 				if tok.Id == tokens.Operator && tok.Kind == tokens.AMPER {
 					ref = true
 					// Remove reference token
-					fnToks = append(fnToks[:1], fnToks[2:]...)
+					fnToks = append(fnToks[:i], fnToks[i+1:]...)
 				}
 			}
 		default:
