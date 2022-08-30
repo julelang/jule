@@ -56,100 +56,85 @@
     })
 
 #define __julec_atomic_compare_swap(_ADDR, _OLD, _NEW)  \
-    __julec_atomic_compare_swap_explicit(   \
-        _ADDR, _OLD, _NEW, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
+    __julec_atomic_compare_swap_explicit    (   \
+        _ADDR, _OLD, _NEW, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST )
 
 #define __julec_atomic_add(_ADDR, _DELTA)   \
-    __atomic_fetch_add((_ADDR), (_DELTA), __ATOMIC_SEQ_CST)
+    ( __atomic_fetch_add ( (_ADDR), (_DELTA), __ATOMIC_SEQ_CST ) )
 
-#define __julec_atomic_swap_i32(_JULEC_PTR, _NEW)   \
-    (__julec_atomic_swap(*((_JULEC_PTR)._ptr), _NEW))
+#define __julec_atomic_swap_i32(_PTR, _NEW)   \
+    ( __julec_atomic_swap ( (_PTR), _NEW) )
 
-#define __julec_atomic_swap_i64(_JULEC_PTR, _NEW)   \
-    (__julec_atomic_swap(*((_JULEC_PTR)._ptr), _NEW))
+#define __julec_atomic_swap_i64(_PTR, _NEW)   \
+    ( __julec_atomic_swap ( (_PTR), _NEW) )
 
-#define __julec_atomic_swap_u32(_JULEC_PTR, _NEW)   \
-    (__julec_atomic_swap(*((_JULEC_PTR)._ptr), _NEW))
+#define __julec_atomic_swap_u32(_PTR, _NEW)   \
+    ( __julec_atomic_swap ( (_PTR), _NEW ) )
 
-#define __julec_atomic_swap_u64(_JULEC_PTR, _NEW)   \
-    (__julec_atomic_swap(*((_JULEC_PTR)._ptr), _NEW))
+#define __julec_atomic_swap_u64(_PTR, _NEW)   \
+    ( __julec_atomic_swap ( (_PTR), _NEW ) )
 
-#define __julec_atomic_swap_uintptr(_JULEC_PTR, _NEW)   \
-    (__julec_atomic_swap(*((_JULEC_PTR)._ptr), _NEW))
+#define __julec_atomic_swap_uintptr(_PTR, _NEW)   \
+    ( __julec_atomic_swap ( (_PTR), _NEW ) )
 
-#define __julec_atomic_compare_swap_i32(_JULEC_PTR, _OLD, _NEW) \
-    (   \
-        __julec_atomic_compare_swap ((i32_julet*)(*((_JULEC_PTR)._ptr)),    \
-                                     (i32_julet*)(&_OLD), _NEW) \
-    )
+#define __julec_atomic_compare_swap_i32(_PTR, _OLD, _NEW) \
+    ( __julec_atomic_compare_swap ( (_PTR), (&_OLD), _NEW ) )
 
-#define __julec_atomic_compare_swap_i64(_JULEC_PTR, _OLD, _NEW) \
-    (   \
-        __julec_atomic_compare_swap ((i64_julet*)(*((_JULEC_PTR)._ptr)),    \
-                                     (i64_julet*)(&_OLD), _NEW) \
-    )
+#define __julec_atomic_compare_swap_i64(_PTR, _OLD, _NEW) \
+    ( __julec_atomic_compare_swap ( (_PTR), (&_OLD), _NEW) )
 
-#define __julec_atomic_compare_swap_u32(_JULEC_PTR, _OLD, _NEW) \
-    (   \
-        __julec_atomic_compare_swap ((u32_julet*)(*((_JULEC_PTR)._ptr)),    \
-                                     (u32_julet*)(&_OLD), _NEW) \
-    )
+#define __julec_atomic_compare_swap_u32(_PTR, _OLD, _NEW) \
+    ( __julec_atomic_compare_swap ( (_PTR), (&_OLD), _NEW) )
 
-#define __julec_atomic_compare_swap_u64(_JULEC_PTR, _OLD, _NEW) \
-    (   \
-        __julec_atomic_compare_swap ((u64_julet*)(*((_JULEC_PTR)._ptr)),    \
-                                     (u64_julet*)(&_OLD), _NEW) \
-    )
+#define __julec_atomic_compare_swap_u64(_PTR, _OLD, _NEW) \
+    ( __julec_atomic_compare_swap ( (_PTR), (&_OLD), _NEW ) )
 
-#define __julec_atomic_compare_swap_uintptr(_JULEC_PTR, _OLD, _NEW) \
-    (   \
-        __julec_atomic_compare_swap ((uintptr_julet*)(*((_JULEC_PTR)._ptr)),    \
-                                     (uintptr_julet*)(&_OLD), _NEW) \
-    )
+#define __julec_atomic_compare_swap_uintptr(_PTR, _OLD, _NEW) \
+    ( __julec_atomic_compare_swap ( (_PTR), (&_OLD), _NEW ) )
 
-#define __julec_atomic_add_i32(_JULEC_PTR, _DELTA)  \
-    (__julec_atomic_add(*((_JULEC_PTR)._ptr), _DELTA))
+#define __julec_atomic_add_i32(_PTR, _DELTA)  \
+    ( __julec_atomic_add ( (_PTR), _DELTA ) )
 
-#define __julec_atomic_add_i64(_JULEC_PTR, _DELTA)  \
-    (__julec_atomic_add(*((_JULEC_PTR)._ptr), _DELTA))
+#define __julec_atomic_add_i64(_PTR, _DELTA)  \
+    ( __julec_atomic_add ( (_PTR), _DELTA ) )
 
-#define __julec_atomic_add_u32(_JULEC_PTR, _DELTA)  \
-    (__julec_atomic_add(*((_JULEC_PTR)._ptr), _DELTA))
+#define __julec_atomic_add_u32(_PTR, _DELTA)  \
+    ( __julec_atomic_add ( (_PTR), _DELTA ) )
 
-#define __julec_atomic_add_u64(_JULEC_PTR, _DELTA)  \
-    (__julec_atomic_add(*((_JULEC_PTR)._ptr), _DELTA))
+#define __julec_atomic_add_u64(_PTR, _DELTA)  \
+    ( __julec_atomic_add ( (_PTR), _DELTA ) )
 
-#define __julec_atomic_add_uintptr(_JULEC_PTR, _DELTA)  \
-    (__julec_atomic_add(*((_JULEC_PTR)._ptr), _DELTA))
+#define __julec_atomic_add_uintptr(_PTR, _DELTA)  \
+    ( __julec_atomic_add ( (_PTR), _DELTA) )
 
-#define __julec_atomic_load_i32(_JULEC_PTR) \
-    (__julec_atomic_load(*((_JULEC_PTR)._ptr)))
+#define __julec_atomic_load_i32(_PTR) \
+    ( __julec_atomic_load ( (_PTR) ) )
 
-#define __julec_atomic_load_i64(_JULEC_PTR) \
-    (__julec_atomic_load(*((_JULEC_PTR)._ptr)))
+#define __julec_atomic_load_i64(_PTR) \
+    ( __julec_atomic_load ( (_PTR) ) )
 
-#define __julec_atomic_load_u32(_JULEC_PTR) \
-    (__julec_atomic_load(*((_JULEC_PTR)._ptr)))
+#define __julec_atomic_load_u32(_PTR) \
+    ( __julec_atomic_load ( (_PTR) ) )
 
-#define __julec_atomic_load_u64(_JULEC_PTR) \
-    (__julec_atomic_load(*((_JULEC_PTR)._ptr)))
+#define __julec_atomic_load_u64(_PTR) \
+    ( __julec_atomic_load ( (_PTR) ) )
 
-#define __julec_atomic_load_uintptr(_JULEC_PTR) \
-    (__julec_atomic_load(*((_JULEC_PTR)._ptr)))
+#define __julec_atomic_load_uintptr(_PTR) \
+    ( __julec_atomic_load ( (_PTR) ) )
 
-#define __julec_atomic_store_i32(_JULEC_PTR, _VAL)  \
-    (__julec_atomic_store(*((_JULEC_PTR)._ptr), _VAL))
+#define __julec_atomic_store_i32(_PTR, _VAL)  \
+    ( __julec_atomic_store ( (_PTR), _VAL ) )
 
-#define __julec_atomic_store_i64(_JULEC_PTR, _VAL)  \
-    (__julec_atomic_store(*((_JULEC_PTR)._ptr), _VAL))
+#define __julec_atomic_store_i64(_PTR, _VAL)  \
+    ( __julec_atomic_store ( (_PTR), _VAL ) )
 
-#define __julec_atomic_store_u32(_JULEC_PTR, _VAL)  \
-    (__julec_atomic_store(*((_JULEC_PTR)._ptr), _VAL))
+#define __julec_atomic_store_u32(_PTR, _VAL)  \
+    ( __julec_atomic_store ( (_PTR), _VAL ) )
 
-#define __julec_atomic_store_u64(_JULEC_PTR, _VAL)  \
-    (__julec_atomic_store(*((_JULEC_PTR)._ptr), _VAL))
+#define __julec_atomic_store_u64(_PTR, _VAL)  \
+    ( __julec_atomic_store ( (_PTR), _VAL ) )
 
-#define __julec_atomic_store_uintptr(_JULEC_PTR, _VAL)  \
-    (__julec_atomic_store(*((_JULEC_PTR)._ptr), _VAL))
+#define __julec_atomic_store_uintptr(_PTR, _VAL)  \
+    ( __julec_atomic_store ( (_PTR), _VAL ) )
 
 #endif // #ifndef __JULEC_STD_SYNC_ATOMIC_ATOMIC_HPP

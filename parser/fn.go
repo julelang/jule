@@ -36,13 +36,6 @@ func (f Fn) stringOwner(owner string) string {
 		}
 		block.Tree = append(statements, block.Tree...)
 	}
-	if f.Ast.Receiver != nil && !typeIsPtr(*f.Ast.Receiver) {
-		s := f.Ast.Receiver.Tag.(*structure)
-		self := s.selfVar(*f.Ast.Receiver)
-		statements := make([]models.Statement, 1)
-		statements[0] = models.Statement{Token: s.Ast.Token, Data: self}
-		block.Tree = append(statements, block.Tree...)
-	}
 	cpp.WriteString(block.String())
 	return cpp.String()
 }
@@ -129,4 +122,12 @@ func paramsToCpp(params []Param) string {
 		cpp.WriteByte(',')
 	}
 	return cpp.String()[:cpp.Len()-1] + ")"
+}
+
+func is_constructor(f *Func) bool {
+	if !typeIsStruct(f.RetType.Type) {
+		return false
+	}
+	s := f.RetType.Type.Tag.(*structure)
+	return s.Ast.Id == f.Id
 }

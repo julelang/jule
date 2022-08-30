@@ -17,11 +17,9 @@ type value struct {
 	model     iExpr
 	expr      any
 	constExpr bool
-	heapMust  bool
 	lvalue    bool
 	variadic  bool
 	isType    bool
-	isField   bool
 }
 
 func isOperator(process []lex.Token) bool {
@@ -469,7 +467,12 @@ func (e *eval) subId(toks []lex.Token, m *exprModel) (v value) {
 	val := e.process(toks, m)
 	checkType := val.data.Type
 	if typeIsExplicitPtr(checkType) {
-		checkType = unptrType(checkType)
+		if toks[0].Id != tokens.Self && !e.unsafe_allowed() {
+			e.pusherrtok(idTok, "unsafe_behavior_at_out_of_unsafe_scope")
+		}
+		checkType = un_ptr_or_ref_type(checkType)
+	} else if typeIsRef(checkType) {
+		checkType = un_ptr_or_ref_type(checkType)
 	}
 	switch {
 	case typeIsPure(checkType):
@@ -501,12 +504,19 @@ func (e *eval) get_cast_expr_model(t, vt Type, expr_model iExpr) iExpr {
 		switch {
 		case typeIsTrait(vt):
 			model.WriteString(expr_model.String())
-			model.WriteString(subIdAccessorOfType(vt, e.unsafe_allowed()))
+			model.WriteString(subIdAccessorOfType(vt))
 			model.WriteString("operator ")
 			model.WriteString(t.String())
 			model.WriteString("()")
 			goto end
 		}
+	case typeIsPtr(vt):
+		model.WriteString("((")
+		model.WriteString(t.String())
+		model.WriteString(")(")
+		model.WriteString(expr_model.String())
+		model.WriteString("))")
+		goto end
 	}
 	model.WriteString("static_cast<")
 	model.WriteString(t.String())
@@ -579,6 +589,8 @@ func (e *eval) cast(v value, t Type, errtok lex.Token) value {
 	switch {
 	case typeIsPtr(t):
 		e.castPtr(t, &v, errtok)
+	case typeIsRef(t):
+		e.cast_ref(t, &v, errtok)
 	case typeIsSlice(t):
 		e.castSlice(t, v.data.Type, errtok)
 	case typeIsStruct(t):
@@ -619,10 +631,7 @@ func (e *eval) castStruct(t Type, v *value, errtok lex.Token) {
 }
 
 func (e *eval) castPtr(t Type, v *value, errtok lex.Token) {
-	if typeIsStruct(unptrType(t)) {
-		e.castStruct(t, v, errtok)
-		return
-	} else if !e.unsafe_allowed() {
+	if !e.unsafe_allowed() {
 		e.pusherrtok(errtok, "unsafe_behavior_at_out_of_unsafe_scope")
 		return
 	}
@@ -631,6 +640,14 @@ func (e *eval) castPtr(t Type, v *value, errtok lex.Token) {
 		!juletype.IsInteger(v.data.Type.Id) {
 		e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
 	}
+}
+
+func (e *eval) cast_ref(t Type, v *value, errtok lex.Token) {
+	if typeIsStruct(un_ptr_or_ref_type(t)) {
+		e.castStruct(t, v, errtok)
+		return
+	}
+	e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
 }
 
 func (e *eval) castPure(t Type, v *value, errtok lex.Token) {
@@ -871,7 +888,7 @@ func (e *eval) xObjSubId(dm *DefineMap, val value, idTok lex.Token, m *exprModel
 		return
 	}
 	v = val
-	m.appendSubNode(exprNode{subIdAccessorOfType(val.data.Type, e.unsafe_allowed())})
+	m.appendSubNode(exprNode{subIdAccessorOfType(val.data.Type)})
 	switch t {
 	case 'g':
 		g := dm.Globals[i]
@@ -883,7 +900,6 @@ func (e *eval) xObjSubId(dm *DefineMap, val value, idTok lex.Token, m *exprModel
 			v.expr = g.ExprTag
 			v.model = g.Expr.Model
 		}
-		v.isField = true
 		if g.Tag != nil {
 			m.appendSubNode(exprNode{g.Tag.(string)})
 		} else {
@@ -947,10 +963,29 @@ func (e *eval) enumSubId(val value, idTok lex.Token, m *exprModel) (v value) {
 }
 
 func (e *eval) structObjSubId(val value, idTok lex.Token, m *exprModel) value {
+	parent_type := val.data.Type
 	s := val.data.Type.Tag.(*structure)
 	val.constExpr = false
 	val.isType = false
+	if val.data.Value == tokens.SELF {
+		nodes := &m.nodes[m.index].nodes
+		n := len(*nodes)
+		defer func() {
+			// Save unary
+			if ast.IsUnaryOperator((*nodes)[0].String()) {
+				*nodes = append([]iExpr{(*nodes)[0], exprNode{"this->"}}, (*nodes)[n+1:]...)
+				return
+			}
+			*nodes = append([]iExpr{exprNode{"this->"}}, (*nodes)[n+1:]...)
+		}()
+	}
 	val = e.xObjSubId(s.Defines, val, idTok, m)
+	if typeIsFunc(val.data.Type) {
+		f := val.data.Type.Tag.(*Func)
+		if f.Receiver != nil && typeIsRef(*f.Receiver) && !typeIsRef(parent_type) {
+			e.p.pusherrtok(idTok, "ref_method_used_with_not_ref_instance")
+		}
+	}
 	return val
 }
 
@@ -1193,7 +1228,7 @@ func (e *eval) indexingMap(mapv, leftv value, errtok lex.Token) value {
 	keyType := types[0]
 	valType := types[1]
 	mapv.data.Type = valType
-	e.p.checkType(keyType, leftv.data.Type, false, errtok)
+	e.p.checkType(keyType, leftv.data.Type, false, true, errtok)
 	return mapv
 }
 
@@ -1448,7 +1483,7 @@ func (e *eval) anonymousFn(toks []lex.Token, m *exprModel) (v value) {
 	v.data.Type.Tag = &f
 	v.data.Type.Id = juletype.Fn
 	v.data.Type.Kind = f.DataTypeString()
-	m.appendSubNode(anonFuncExpr{&f, e.p.blockVars})
+	m.appendSubNode(anonFuncExpr{&f})
 	return
 }
 

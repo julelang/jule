@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/jule-lang/jule/lex"
+	"github.com/jule-lang/jule/lex/tokens"
 	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
@@ -28,6 +29,8 @@ type Var struct {
 // OutId returns juleapi.OutId result of var.
 func (v *Var) OutId() string {
 	switch {
+	case v.Id == tokens.SELF:
+		return "self"
 	case v.IsLocal:
 		return juleapi.AsId(v.Id)
 	case v.IsField:

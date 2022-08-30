@@ -69,10 +69,12 @@ func (sap *structArgParser) pushArg() {
 
 func (sap *structArgParser) checkPasses() {
 	for _, pair := range *sap.fmap {
-		if pair.arg == nil &&
-			!pair.param.Variadic &&
-			!paramHasDefaultArg(pair.param) {
-			sap.p.pusherrtok(sap.errTok, "missing_expr_for", pair.param.Id)
+		if pair.arg == nil {
+			if typeIsRef(pair.param.Type) {
+				sap.p.pusherrtok(sap.errTok, "reference_field_not_initialized", pair.param.Id)
+			} else if !paramHasDefaultArg(pair.param) {
+				sap.p.pusherrtok(sap.errTok, "missing_expr_for", pair.param.Id)
+			}
 		}
 	}
 }

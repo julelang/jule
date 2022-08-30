@@ -14,7 +14,6 @@ type Param struct {
 	Token     lex.Token
 	Id        string
 	Variadic  bool
-	Reference bool
 	Type      Type
 	Default   Expr
 }
@@ -24,9 +23,6 @@ func (p *Param) TypeString() string {
 	var ts strings.Builder
 	if p.Variadic {
 		ts.WriteString(tokens.TRIPLE_DOT)
-	}
-	if p.Reference {
-		ts.WriteString(tokens.AMPER)
 	}
 	ts.WriteString(p.Type.Kind)
 	return ts.String()
@@ -56,9 +52,6 @@ func (p *Param) Prototype() string {
 		cpp.WriteByte('>')
 	} else {
 		cpp.WriteString(p.Type.String())
-	}
-	if p.Reference {
-		cpp.WriteByte('&')
 	}
 	return cpp.String()
 }

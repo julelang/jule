@@ -16,7 +16,7 @@ type unary struct {
 func (u *unary) minus() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !typeIsPure(v.data.Type) || !juletype.IsNumeric(v.data.Type.Id) {
-		u.p.eval.pusherrtok(u.token, "invalid_type_unary_operator", tokens.MINUS)
+		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.MINUS)
 	}
 	if v.constExpr {
 		v.data.Value = tokens.MINUS + v.data.Value
@@ -36,7 +36,7 @@ func (u *unary) minus() value {
 func (u *unary) plus() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !typeIsPure(v.data.Type) || !juletype.IsNumeric(v.data.Type.Id) {
-		u.p.eval.pusherrtok(u.token, "invalid_type_unary_operator", tokens.PLUS)
+		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.PLUS)
 	}
 	if v.constExpr {
 		switch t := v.expr.(type) {
@@ -55,7 +55,7 @@ func (u *unary) plus() value {
 func (u *unary) caret() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !typeIsPure(v.data.Type) || !juletype.IsInteger(v.data.Type.Id) {
-		u.p.eval.pusherrtok(u.token, "invalid_type_unary_operator", tokens.CARET)
+		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.CARET)
 	}
 	if v.constExpr {
 		switch t := v.expr.(type) {
@@ -72,7 +72,7 @@ func (u *unary) caret() value {
 func (u *unary) logicalNot() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !isBoolExpr(v) {
-		u.p.eval.pusherrtok(u.token, "invalid_type_unary_operator", tokens.EXCLAMATION)
+		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.EXCLAMATION)
 	} else if v.constExpr {
 		v.expr = !v.expr.(bool)
 		v.model = boolModel(v)
@@ -83,23 +83,26 @@ func (u *unary) logicalNot() value {
 }
 
 func (u *unary) star() value {
+	if !u.p.eval.unsafe_allowed() {
+		u.p.pusherrtok(u.token, "unsafe_behavior_at_out_of_unsafe_scope")
+	}
 	v := u.p.eval.process(u.toks, u.model)
 	v.constExpr = false
 	v.lvalue = true
-	if !typeIsExplicitPtr(v.data.Type) {
-		u.p.eval.pusherrtok(u.token, "invalid_type_unary_operator", tokens.STAR)
-	} else {
-		v.data.Type.Kind = v.data.Type.Kind[1:]
+	switch {
+	case !typeIsExplicitPtr(v.data.Type):
+		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.STAR)
+		goto end
 	}
-	if u.p.eval.unsafe_allowed() {
-		// Use unsafe deferencing
-		u.model.nodes[u.model.index].nodes[0] = exprNode{"~"}
-	}
+	v.data.Type.Kind = v.data.Type.Kind[1:]
+end:
 	return v
 }
 
 func (u *unary) amper() value {
 	v := u.p.eval.process(u.toks, u.model)
+	v.constExpr = false
+	v.lvalue = true
 	nodes := &u.model.nodes[u.model.index].nodes
 	switch {
 	case valIsStructIns(v):
@@ -108,23 +111,26 @@ func (u *unary) amper() value {
 		if s.Ast.Id != v.data.Value {
 			break
 		}
-		(*nodes)[0] = exprNode{"__julec_guaranteed_ptr(new "}
-		goto end
+		var alloc_model exprNode
+		alloc_model.value = "__julec_new_structure<"
+		alloc_model.value += s.OutId()
+		alloc_model.value += ">(new( std::nothrow ) "
+		(*nodes)[0] = alloc_model
+		last := &(*nodes)[len(*nodes)-1]
+		*last = exprNode{(*last).String() + ")"}
+		v.data.Type.Kind = tokens.AMPER + v.data.Type.Kind
+		return v
+	case typeIsRef(v.data.Type):
+		model := exprNode{(*nodes)[1].String() + "._alloc"}
+		*nodes = nil
+		*nodes = make([]iExpr, 1)
+		(*nodes)[0] = model
+		v.data.Type.Kind = tokens.STAR + un_ptr_or_ref_type(v.data.Type).Kind
+		return v
 	case !canGetPtr(v):
 		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.AMPER)
 		return v
 	}
-	if u.p.eval.unsafe_allowed() {
-		(*nodes)[0] = exprNode{"__julec_unsafe_ptr(&"}
-	} else if v.heapMust {
-		(*nodes)[0] = exprNode{"__julec_ptr(&"}
-	} else {
-		(*nodes)[0] = exprNode{"__julec_never_guarantee_ptr(&"}
-	}
-end:
-	v.constExpr = false
-	v.lvalue = true
 	v.data.Type.Kind = tokens.STAR + v.data.Type.Kind
-	*nodes = append(*nodes, exprNode{tokens.RPARENTHESES})
 	return v
 }

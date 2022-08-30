@@ -12,6 +12,7 @@ type retChecker struct {
 	ret_ast   *models.Ret
 	f         *Func
 	exp_model retExpr
+	values    []value
 }
 
 func (rc *retChecker) pushval(last, current int, errTok lex.Token) {
@@ -22,7 +23,7 @@ func (rc *retChecker) pushval(last, current int, errTok lex.Token) {
 	toks := rc.ret_ast.Expr.Tokens[last:current]
 	v, model := rc.p.evalToks(toks)
 	rc.exp_model.models = append(rc.exp_model.models, model)
-	rc.exp_model.values = append(rc.exp_model.values, v)
+	rc.values = append(rc.values, v)
 }
 
 func (rc *retChecker) checkepxrs() {
@@ -58,21 +59,20 @@ func (rc *retChecker) checkepxrs() {
 }
 
 func (rc *retChecker) single() {
-	rc.exp_model.models = append(rc.exp_model.models, rc.exp_model.models[0])
-	if len(rc.exp_model.values) > 1 {
+	if len(rc.values) > 1 {
 		rc.p.pusherrtok(rc.ret_ast.Token, "overflow_return")
 	}
 	assignChecker{
 		p:      rc.p,
 		t:      rc.f.RetType.Type,
-		v:      rc.exp_model.values[0],
+		v:      rc.values[0],
 		errtok: rc.ret_ast.Token,
 	}.checkAssignType()
 }
 
 func (rc *retChecker) multi() {
 	types := rc.f.RetType.Type.Tag.([]Type)
-	n := len(rc.exp_model.values)
+	n := len(rc.values)
 	if n == 1 {
 		rc.checkMultiRetAsMutliRet()
 		return
@@ -86,7 +86,7 @@ func (rc *retChecker) multi() {
 		assignChecker{
 			p:      rc.p,
 			t:      t,
-			v:      rc.exp_model.values[i],
+			v:      rc.values[i],
 			errtok: rc.ret_ast.Token,
 		}.checkAssignType()
 	}
@@ -102,7 +102,7 @@ func (rc *retChecker) checkExprTypes() {
 }
 
 func (rc *retChecker) checkMultiRetAsMutliRet() {
-	v := rc.exp_model.values[0]
+	v := rc.values[0]
 	if !v.data.Type.MultiTyped {
 		rc.p.pusherrtok(rc.ret_ast.Token, "missing_multi_return")
 		return
@@ -116,7 +116,6 @@ func (rc *retChecker) checkMultiRetAsMutliRet() {
 		rc.p.pusherrtok(rc.ret_ast.Token, "overflow_return")
 		return
 	}
-	rc.exp_model.models = append(rc.exp_model.models, rc.exp_model.models[0])
 	for i, rt := range retTypes {
 		vt := valTypes[i]
 		val := value{data: models.Data{Type: vt}}
@@ -138,7 +137,7 @@ func (rc *retChecker) retsVars() {
 				model.nodes = make([]exprBuildNode, 1)
 				val, _ := rc.p.eval.single(v, model)
 				rc.exp_model.models = append(rc.exp_model.models, model)
-				rc.exp_model.values = append(rc.exp_model.values, val)
+				rc.values = append(rc.values, val)
 				break
 			}
 		}
@@ -159,7 +158,7 @@ func (rc *retChecker) retsVars() {
 		model.nodes = make([]exprBuildNode, 1)
 		val, _ := rc.p.eval.single(v, model)
 		rc.exp_model.models = append(rc.exp_model.models, model)
-		rc.exp_model.values = append(rc.exp_model.values, val)
+		rc.values = append(rc.values, val)
 	}
 	rc.ret_ast.Expr.Model = rc.exp_model
 }

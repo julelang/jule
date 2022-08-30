@@ -70,7 +70,7 @@ template<typename _Obj_t>
 void JULEC_ID(panic)(const _Obj_t &_Expr);
 
 #include "typedef.hpp"
-#include "ptr.hpp"
+#include "ref.hpp"
 #include "trait.hpp"
 #include "slice.hpp"
 #include "array.hpp"
@@ -78,7 +78,7 @@ void JULEC_ID(panic)(const _Obj_t &_Expr);
 #include "utf8.hpp"
 #include "str.hpp"
 #include "any.hpp"
-#include "func.hpp"
+#include "fn.hpp"
 #include "defer.hpp"
 #include "builtin.hpp"
 
@@ -87,12 +87,6 @@ void JULEC_ID(panic)(const _Obj_t &_Expr);
 inline void JULEC_ID(panic)(const trait<JULEC_ID(Error)> &_Error);
 template<typename _Obj_t>
 str_julet __julec_tostr(const _Obj_t &_Obj) noexcept;
-// Moves to heap pointer types.
-template<typename T>
-inline ptr<T> &__julec_must_heap(const ptr<T> &_Ptr) noexcept;
-// Interface for ignore compilation errors.
-template<typename T>
-inline T __julec_must_heap(const T &_Obj) noexcept;
 template<typename Type, unsigned N, unsigned Last>
 struct tuple_ostream;
 template<typename Type, unsigned N>
@@ -100,12 +94,14 @@ struct tuple_ostream<Type, N, N>;
 template<typename... Types>
 std::ostream &operator<<(std::ostream &_Stream,
                          const std::tuple<Types...> &_Tuple);
-template<typename _Func_t, typename _Tuple_t, size_t ... _I_t>
-inline auto tuple_as_args(const func<_Func_t> &_Function,
+template<typename _Fn_t, typename _Tuple_t, size_t ... _I_t>
+inline auto tuple_as_args(const fn<_Fn_t> &_Function,
                           const _Tuple_t _Tuple,
                           const std::index_sequence<_I_t ...>);
-template<typename _Func_t, typename _Tuple_t>
-inline auto tuple_as_args(const func<_Func_t> &_Function, const _Tuple_t _Tuple);
+template<typename _Fn_t, typename _Tuple_t>
+inline auto tuple_as_args(const fn<_Fn_t> &_Function, const _Tuple_t _Tuple);
+template<typename T>
+inline jule_ref<T> __julec_new_structure(T *_Ptr);
 std::ostream &operator<<(std::ostream &_Stream, const i8_julet &_Src);
 std::ostream &operator<<(std::ostream &_Stream, const u8_julet &_Src);
 void __julec_terminate_handler(void) noexcept;
@@ -116,13 +112,6 @@ void __julec_call_package_initializers(void);
 int main(void);
 
 // Definitions
-
-template<typename T>
-inline ptr<T> &__julec_must_heap(const ptr<T> &_Ptr) noexcept
-{ return ((ptr<T>&)(_Ptr)).__must_heap(); }
-
-template<typename T>
-inline T __julec_must_heap(const T &_Obj) noexcept { return _Obj; }
 
 template<typename Type, unsigned N, unsigned Last>
 struct tuple_ostream {
@@ -147,16 +136,27 @@ std::ostream &operator<<(std::ostream &_Stream,
     return _Stream;
 }
 
-template<typename _Func_t, typename _Tuple_t, size_t ... _I_t>
-inline auto tuple_as_args(const func<_Func_t> &_Function,
+template<typename _Fn_t, typename _Tuple_t, size_t ... _I_t>
+inline auto tuple_as_args(const fn<_Fn_t> &_Function,
                           const _Tuple_t _Tuple,
                           const std::index_sequence<_I_t ...>)
 { return _Function._buffer(std::get<_I_t>(_Tuple) ...); }
 
-template<typename _Func_t, typename _Tuple_t>
-inline auto tuple_as_args(const func<_Func_t> &_Function, const _Tuple_t _Tuple) {
+template<typename _Fn_t, typename _Tuple_t>
+inline auto tuple_as_args(const fn<_Fn_t> &_Function, const _Tuple_t _Tuple) {
     static constexpr auto _size{std::tuple_size<_Tuple_t>::value};
     return tuple_as_args(_Function, _Tuple, std::make_index_sequence<_size>{});
+}
+
+template<typename T>
+inline jule_ref<T> __julec_new_structure(T *_Ptr) {
+    if (!_Ptr)
+    { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
+    _Ptr->self._ref = new( std::nothrow ) uint_julet;
+    if (!_Ptr->self._ref)
+    { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
+    *_Ptr->self._ref = 1;
+    return _Ptr->self;
 }
 
 std::ostream &operator<<(std::ostream &_Stream, const i8_julet &_Src)

@@ -23,7 +23,7 @@ func (fc *foreachChecker) array() {
 		b.Type = componentType
 		return
 	}
-	fc.p.checkType(componentType, b.Type, true, fc.profile.InToken)
+	fc.p.checkType(componentType, b.Type, true, true, fc.profile.InToken)
 }
 
 func (fc *foreachChecker) slice() {
@@ -37,7 +37,7 @@ func (fc *foreachChecker) slice() {
 		b.Type = componentType
 		return
 	}
-	fc.p.checkType(componentType, b.Type, true, fc.profile.InToken)
+	fc.p.checkType(componentType, b.Type, true, true, fc.profile.InToken)
 }
 
 func (fc *foreachChecker) xmap() {
@@ -75,7 +75,7 @@ func (fc *foreachChecker) checkKeyAMapKey() {
 		a.Type = keyType
 		return
 	}
-	fc.p.checkType(keyType, a.Type, true, fc.profile.InToken)
+	fc.p.checkType(keyType, a.Type, true, true, fc.profile.InToken)
 }
 
 func (fc *foreachChecker) checkKeyBMapVal() {
@@ -88,7 +88,7 @@ func (fc *foreachChecker) checkKeyBMapVal() {
 		b.Type = valType
 		return
 	}
-	fc.p.checkType(valType, b.Type, true, fc.profile.InToken)
+	fc.p.checkType(valType, b.Type, true, true, fc.profile.InToken)
 }
 
 func (fc *foreachChecker) str() {
@@ -105,7 +105,7 @@ func (fc *foreachChecker) str() {
 		b.Type = runeType
 		return
 	}
-	fc.p.checkType(runeType, b.Type, true, fc.profile.InToken)
+	fc.p.checkType(runeType, b.Type, true, true, fc.profile.InToken)
 }
 
 func (fc *foreachChecker) check() {

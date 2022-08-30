@@ -207,14 +207,15 @@ func (ve *valueEvaluator) varId(id string, variable *Var, global bool) (v value)
 	v.constExpr = variable.Const
 	v.data.Token = variable.Token
 	v.lvalue = !v.constExpr
-	v.heapMust = !global
-	if id == tokens.SELF && typeIsPtr(variable.Type) {
-		ve.model.appendSubNode(exprNode{juleapi.CppSelf})
-	} else if v.constExpr {
+	if v.constExpr {
 		v.expr = variable.ExprTag
 		v.model = variable.Expr.Model
 	} else {
-		ve.model.appendSubNode(exprNode{variable.OutId()})
+		if variable.Id == tokens.SELF && !typeIsRef(variable.Type) {
+			ve.model.appendSubNode(exprNode{"(*this)"})
+		} else {
+			ve.model.appendSubNode(exprNode{variable.OutId()})
+		}
 		ve.p.eval.has_error = ve.p.eval.has_error || typeIsVoid(v.data.Type)
 	}
 	return

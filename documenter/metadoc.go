@@ -178,9 +178,6 @@ func fmt_meta_func(f *parser.Fn) string {
 		if p.Variadic {
 			meta.WriteString("...")
 		}
-		if p.Reference {
-			meta.WriteByte('&')
-		}
 		meta.WriteString(fmt_meta_ttoa(p.Type)[2:])
 		if i+1 < n {
 			meta.WriteByte(',')

@@ -1000,7 +1000,8 @@ func (p *Parser) Trait(t models.Trait) {
 	trait := new(trait)
 	trait.Desc = p.docText.String()
 	p.docText.Reset()
-	trait.Ast = &t
+	trait.Ast = new(models.Trait)
+	*trait.Ast = t
 	trait.Defines = new(DefineMap)
 	trait.Defines.Funcs = make([]*Fn, len(t.Funcs))
 	for i, f := range trait.Ast.Funcs {
@@ -1413,10 +1414,11 @@ func (p *Parser) Var(v Var) *Var {
 			v.Type = t
 			if v.SetterTok.Id != tokens.NA {
 				assignChecker{
-					p:      p,
-					t:      v.Type,
-					v:      val,
-					errtok: v.Token,
+					p:                p,
+					t:                v.Type,
+					v:                val,
+					errtok:           v.Token,
+					not_allow_assign: typeIsRef(t),
 				}.checkAssignType()
 			}
 		}
@@ -1449,13 +1451,16 @@ func (p *Parser) Var(v Var) *Var {
 			p.checkValidityForAutoType(v.Type, v.SetterTok)
 		}
 	}
+	if !v.IsField && typeIsRef(v.Type) && v.SetterTok.Id == tokens.NA {
+		p.pusherrtok(v.Token, "reference_not_initialized")
+	}
 	if v.Const {
 		v.ExprTag = val.expr
 		if !typeIsAllowForConst(v.Type) {
 			p.pusherrtok(v.Token, "invalid_type_for_const", v.Type.Kind)
 		}
 		if v.SetterTok.Id == tokens.NA {
-			p.pusherrtok(v.Token, "missing_const_value")
+			p.pusherrtok(v.Token, "const_not_initialized")
 		} else {
 			if !validExprForConst(val) {
 				p.eval.pusherrtok(v.Token, "expr_not_const")
@@ -1744,12 +1749,6 @@ func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) {
 }
 
 func (p *Parser) param(f *Func, param *Param) (err bool) {
-	if param.Reference {
-		if param.Variadic {
-			p.pusherrtok(param.Token, "variadic_reference_param")
-			err = true
-		}
-	}
 	p.checkParamDefaultExpr(f, param)
 	return
 }
@@ -1920,8 +1919,11 @@ func (p *Parser) parseField(s *structure, f **Var, i int) {
 	*f = p.Var(**f)
 	v := *f
 	param := models.Param{Id: v.Id, Type: v.Type}
-	if v.Type.Id == juletype.Struct && v.Type.Tag == s && typeIsPure(v.Type) {
-		p.pusherrtok(v.Type.Token, "invalid_type_source")
+	if !typeIsPtr(v.Type) && typeIsStruct(v.Type) {
+		ts := v.Type.Tag.(*structure)
+		if structure_instances_is_uses_same_base(s, ts) {
+			p.pusherrtok(v.Type.Token, "illegal_cycle_in_declaration", s.Ast.Id)
+		}
 	}
 	if hasExpr(v.Expr) {
 		param.Default = v.Expr
@@ -2341,11 +2343,12 @@ func (p *Parser) pushGenericByArg(f *Func, pair *paramMapPair, args *models.Args
 func (p *Parser) parseArg(f *Func, pair *paramMapPair, args *models.Args, variadiced *bool) {
 	value, model := p.evalExpr(pair.arg.Expr)
 	pair.arg.Expr.Model = model
-	if !value.variadic &&
-		typeIsPure(pair.param.Type) &&
-		juletype.IsNumeric(pair.param.Type.Id) {
+	if f.FindAttribute(jule.Attribute_CDef) == nil && !value.variadic &&
+		typeIsPure(pair.param.Type) && juletype.IsNumeric(pair.param.Type.Id) {
 		pair.arg.CastType = new(Type)
 		*pair.arg.CastType = pair.param.Type.Copy()
+		pair.arg.CastType.Original = nil
+		pair.arg.CastType.Pure = true
 	}
 	if variadiced != nil && !*variadiced {
 		*variadiced = value.variadic
@@ -2362,9 +2365,6 @@ func (p *Parser) parseArg(f *Func, pair *paramMapPair, args *models.Args, variad
 }
 
 func (p *Parser) checkArgType(param *Param, val value, errTok lex.Token) {
-	if param.Reference && !val.lvalue {
-		p.pusherrtok(errTok, "not_lvalue_for_reference_param")
-	}
 	assignChecker{
 		p:      p,
 		t:      param.Type,
@@ -2825,6 +2825,11 @@ func hasRet(b *models.Block) (ok bool, fall bool) {
 	}
 	for _, s := range b.Tree {
 		switch t := s.Data.(type) {
+		case *models.Block:
+			ok, fall = hasRet(t)
+			if ok {
+				return true, fall
+			}
 		case models.Fallthrough:
 			fall = true
 		case models.Ret:
@@ -2885,20 +2890,6 @@ func (p *Parser) deferredCall(d *models.Defer) {
 func (p *Parser) concurrentCall(cc *models.ConcurrentCall) {
 	m := new(exprModel)
 	m.nodes = make([]exprBuildNode, 1)
-	if !p.unsafe_allowed() {
-		fexpr, _ := ast.RangeLast(cc.Expr.Tokens)
-		v, _ := p.evalToks(fexpr)
-		if p.eval.has_error || v.data.Value == "" {
-			return
-		}
-		f := v.data.Type.Tag.(*Func)
-		for _, param := range f.Params {
-			if param.Reference {
-				p.pusherrtok(cc.Token, "unsafe_behavior_at_out_of_unsafe_scope")
-				break
-			}
-		}
-	}
 	_, cc.Expr.Model = p.evalExpr(cc.Expr)
 }
 
@@ -2932,9 +2923,6 @@ func (p *Parser) singleAssign(assign *models.Assign, exprs []value) {
 	}
 	leftExpr, model := p.evalExpr(*left)
 	left.Model = model
-	if leftExpr.isField {
-		right.Model = exprNode{exprMustHeap(right.Model.String())}
-	}
 	if !p.assignment(leftExpr, assign.Setter) {
 		return
 	}
@@ -2993,10 +2981,6 @@ func (p *Parser) multiAssign(assign *models.Assign, right []value) {
 			}
 			leftExpr, model := p.evalExpr(left.Expr)
 			left.Expr.Model = model
-			if leftExpr.isField {
-				right := &assign.Right[i]
-				right.Model = exprNode{exprMustHeap(right.Model.String())}
-			}
 			if !p.assignment(leftExpr, assign.Setter) {
 				return
 			}
@@ -3474,8 +3458,8 @@ func (p *Parser) typeSourceIsArrayType(t *Type) (ok bool) {
 	if !ok {
 		return
 	}
-	ptrs := t.Pointers()
-	t.Kind = ptrs + jule.Prefix_Array + t.ComponentType.Kind
+	modifiers := t.Modifiers()
+	t.Kind = modifiers + jule.Prefix_Array + t.ComponentType.Kind
 	if t.Size.AutoSized || t.Size.Expr.Model != nil {
 		return
 	}
@@ -3497,12 +3481,23 @@ func (p *Parser) typeSourceIsArrayType(t *Type) (ok bool) {
 
 func (p *Parser) typeSourceIsSliceType(t *Type) (ok bool) {
 	*t.ComponentType, ok = p.realType(*t.ComponentType, true)
-	ptrs := t.Pointers()
-	t.Kind = ptrs + jule.Prefix_Slice + t.ComponentType.Kind
+	modifiers := t.Modifiers()
+	t.Kind = modifiers + jule.Prefix_Slice + t.ComponentType.Kind
 	if ok && typeIsArray(*t.ComponentType) { // Array into slice
 		p.pusherrtok(t.Token, "invalid_type_source")
 	}
 	return
+}
+
+func (p *Parser) check_type_validity(t Type, errtok lex.Token) {
+	modifiers := t.Modifiers()
+	if strings.Contains(modifiers, "&&") ||
+		(strings.Contains(modifiers, "*") && strings.Contains(modifiers, "&")) {
+		p.pusherrtok(t.Token, "invalid_type")
+	}
+	if typeIsRef(t) && !is_valid_type_for_reference(un_ptr_or_ref_type(t)) {
+		p.pusherrtok(errtok, "invalid_type")
+	}
 }
 
 func (p *Parser) typeSource(dt Type, err bool) (ret Type, ok bool) {
@@ -3510,7 +3505,10 @@ func (p *Parser) typeSource(dt Type, err bool) (ret Type, ok bool) {
 		return dt, true
 	}
 	original := dt.Original
-	defer func() { ret.Original = original }()
+	defer func() {
+		ret.Original = original
+		p.check_type_validity(ret, dt.Token)
+	}()
 	dt.SetToOriginal()
 	switch {
 	case dt.MultiTyped:
@@ -3604,11 +3602,11 @@ func (p *Parser) checkMultiType(real, check Type, ignoreAny bool, errTok lex.Tok
 	for i := 0; i < len(realTypes); i++ {
 		realType := realTypes[i]
 		checkType := checkTypes[i]
-		p.checkType(realType, checkType, ignoreAny, errTok)
+		p.checkType(realType, checkType, ignoreAny, true, errTok)
 	}
 }
 
-func (p *Parser) checkType(real, check Type, ignoreAny bool, errTok lex.Token) {
+func (p *Parser) checkType(real, check Type, ignoreAny, allow_assign bool, errTok lex.Token) {
 	if typeIsVoid(check) {
 		p.eval.pusherrtok(errTok, "incompatible_types", real.Kind, check.Kind)
 		return
@@ -3620,7 +3618,7 @@ func (p *Parser) checkType(real, check Type, ignoreAny bool, errTok lex.Token) {
 		p.checkMultiType(real, check, ignoreAny, errTok)
 		return
 	}
-	if typesAreCompatible(real, check, ignoreAny) {
+	if typesAreCompatible(real, check, ignoreAny, allow_assign) {
 		return
 	}
 	if real.Kind != check.Kind {

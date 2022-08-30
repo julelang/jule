@@ -38,6 +38,11 @@ func (f *Fn) FindAttribute(kind string) *Attribute {
 
 func (f *Fn) plainTypeString() string {
 	var s strings.Builder
+	if f.Receiver != nil {
+		if f.Receiver.Kind[0] == '&' {
+			s.WriteByte('&')
+		}
+	}
 	s.WriteByte('(')
 	if len(f.Params) > 0 {
 		for _, p := range f.Params {

@@ -60,7 +60,6 @@ func (node exprNode) String() string {
 
 type anonFuncExpr struct {
 	ast  *Func
-	vars []*Var
 }
 
 func (af anonFuncExpr) String() string {
@@ -71,22 +70,7 @@ func (af anonFuncExpr) String() string {
 		Tag:  af.ast,
 	}
 	cpp.WriteString(t.FuncString())
-	cpp.WriteString("([")
-	if len(af.vars) > 0 {
-		var vars strings.Builder
-		for _, v := range af.vars {
-			id := v.OutId()
-			vars.WriteString(id)
-			if typeIsPtr(v.Type) {
-				vars.WriteByte('=')
-				vars.WriteString(id)
-				vars.WriteString(".__must_heap()")
-			}
-			vars.WriteByte(',')
-		}
-		cpp.WriteString(vars.String()[:vars.Len()-1])
-	}
-	cpp.WriteByte(']')
+	cpp.WriteString("([=]")
 	cpp.WriteString(paramsToCpp(af.ast.Params))
 	cpp.WriteString(" mutable -> ")
 	cpp.WriteString(af.ast.RetType.String())
@@ -190,17 +174,13 @@ func (ce callExpr) String() string {
 
 type retExpr struct {
 	models []iExpr
-	values []value
 }
 
 func (re *retExpr) multiRetString() string {
 	var cpp strings.Builder
 	cpp.WriteString("std::make_tuple(")
-	for i, model := range re.models {
-		cpp.WriteString(model.String())
-		if typeIsPtr(re.values[i].data.Type) {
-			cpp.WriteString(".__must_heap()")
-		}
+	for _, m := range re.models {
+		cpp.WriteString(m.String())
 		cpp.WriteByte(',')
 	}
 	return cpp.String()[:cpp.Len()-1] + ")"
@@ -208,16 +188,12 @@ func (re *retExpr) multiRetString() string {
 
 func (re *retExpr) singleRetString() string {
 	var cpp strings.Builder
-	v := re.values[0]
 	cpp.WriteString(re.models[0].String())
-	if typeIsPtr(v.data.Type) {
-		cpp.WriteString(".__must_heap()")
-	}
 	return cpp.String()
 }
 
 func (re retExpr) String() string {
-	if len(re.values) > 1 {
+	if len(re.models) > 1 {
 		return re.multiRetString()
 	}
 	return re.singleRetString()

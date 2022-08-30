@@ -13,7 +13,7 @@ use std::math::bits
 // sharing the same rounding guarantees.
 
 // Formats mant*(2^exp) with prec decimal digits.
-fn ryu_ftoa_fixed32(d: *DecimalSlice, mant: u32, exp: int, prec: int) {
+fn ryu_ftoa_fixed32(d: &DecimalSlice, mant: u32, exp: int, prec: int) {
 	if prec < 0 {
 		panic("ryu_ftoa_fixed32 called with negative prec")
 	}
@@ -87,7 +87,7 @@ fn ryu_ftoa_fixed32(d: *DecimalSlice, mant: u32, exp: int, prec: int) {
 }
 
 // Formats mant*(2^exp) with prec decimal digits.
-fn ryu_ftoa_fixed64(d: *DecimalSlice, mant: u64, exp: int, prec: int) {
+fn ryu_ftoa_fixed64(d: &DecimalSlice, mant: u64, exp: int, prec: int) {
 	if prec > 18 {
 		panic("ryu_ftoa_fixed64 called with prec > 18")
 	}
@@ -168,7 +168,7 @@ let u64pow10 = [...]u64{
 // Fills d with at most prec decimal digits
 // of mantissa m. The boolean trunc indicates whether m
 // is truncated compared to the original number being formatted.
-fn format_decimal(d: *DecimalSlice, m: u64, trunc: bool, round_up: bool, prec: int) {
+fn format_decimal(d: &DecimalSlice, m: u64, trunc: bool, round_up: bool, prec: int) {
 	let max = u64pow10[prec]
 	let trimmed = 0
 	for m >= max {
@@ -229,7 +229,7 @@ fn format_decimal(d: *DecimalSlice, m: u64, trunc: bool, round_up: bool, prec: i
 }
 
 // Formats mant*2^exp with prec decimal digits.
-fn ryu_ftoa_shortest(d: *DecimalSlice, mant: u64, exp: int, flt: *FloatInfo) {
+fn ryu_ftoa_shortest(d: &DecimalSlice, mant: u64, exp: int, flt: &FloatInfo) {
 	if mant == 0 {
 		d.nd, d.dp = 0, 0
 		ret
@@ -257,7 +257,7 @@ fn ryu_ftoa_shortest(d: *DecimalSlice, mant: u64, exp: int, flt: *FloatInfo) {
 	let dl0: bool
 	let dc0: bool
 	let du0: bool
-	if flt == &f32_info {
+	if flt == f32_info {
 		let dl32: u32
 		let dc32: u32
 		let du32: u32
@@ -366,7 +366,7 @@ fn mul_by_log10_log2(x: int) int {
 // where the mantissas are 55-bit (or 26-bit) integers, describing the interval
 // represented by the input f64 or f32.
 fn compute_bounds(mant: u64, exp: int,
-				flt: *FloatInfo) (lower: u64, central: u64, upper: u64, e2: int) {
+				flt: &FloatInfo) (lower: u64, central: u64, upper: u64, e2: int) {
 	if mant != 1<<flt.mantbits || exp == flt.bias+1-int(flt.mantbits) {
 		// regular case (or denormals)
 		lower, central, upper = 2*mant-1, 2*mant, 2*mant+1
@@ -379,7 +379,7 @@ fn compute_bounds(mant: u64, exp: int,
 	ret
 }
 
-fn ryu_digits(d: *DecimalSlice, lower: u64, central: u64, upper: u64, c0: bool, cup: bool) {
+fn ryu_digits(d: &DecimalSlice, lower: u64, central: u64, upper: u64, c0: bool, cup: bool) {
 	let (lhi, llo) = divmod1e9(lower)
 	let (chi, clo) = divmod1e9(central)
 	let (uhi, ulo) = divmod1e9(upper)
@@ -423,7 +423,7 @@ fn ryu_digits(d: *DecimalSlice, lower: u64, central: u64, upper: u64, c0: bool, 
 }
 
 // Emits decimal digits for a number less than 1e9.
-fn ryu_digits32(d: *DecimalSlice, lower: u32, central: u32,
+fn ryu_digits32(d: &DecimalSlice, lower: u32, central: u32,
 				upper: u32, c0: bool, cup: bool, endindex: int) {
 	if upper == 0 {
 		d.dp = endindex + 1

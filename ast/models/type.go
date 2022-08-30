@@ -123,10 +123,30 @@ func (dt *Type) SetToOriginal() {
 	dt.Generic = generic
 }
 
-// Pointers returns pointer marks of data type.
+// Modifiers returns pointer and reference marks of data type.
+func (dt *Type) Modifiers() string {
+	for i, r := range dt.Kind {
+		if r != '*' && r != '&' {
+			return dt.Kind[:i]
+		}
+	}
+	return ""
+}
+
+// Modifiers returns pointer marks of data type.
 func (dt *Type) Pointers() string {
-	for i, run := range dt.Kind {
-		if run != '*' {
+	for i, r := range dt.Kind {
+		if r != '*' {
+			return dt.Kind[:i]
+		}
+	}
+	return ""
+}
+
+// Modifiers returns reference marks of data type.
+func (dt *Type) References() string {
+	for i, r := range dt.Kind {
+		if r != '&' {
 			return dt.Kind[:i]
 		}
 	}
@@ -143,20 +163,29 @@ func (dt Type) String() (s string) {
 	if i != -1 {
 		dt.Kind = dt.Kind[i+len(tokens.DOUBLE_COLON):]
 	}
-	pointers := dt.Pointers()
-	// Apply pointers
+	modifiers := dt.Modifiers()
+	// Apply modifiers.
 	defer func() {
 		var cpp strings.Builder
-		for range pointers {
-			cpp.WriteString("ptr<")
+		for _, r := range modifiers {
+			if r == '&' {
+				cpp.WriteString("jule_ref<")
+			}
 		}
 		cpp.WriteString(s)
-		for range pointers {
-			cpp.WriteString(">")
+		for _, r := range modifiers {
+			if r == '&' {
+				cpp.WriteByte('>')
+			}
+		}
+		for _, r := range modifiers {
+			if r == '*' {
+				cpp.WriteByte('*')
+			}
 		}
 		s = cpp.String()
 	}()
-	dt.Kind = dt.Kind[len(pointers):]
+	dt.Kind = dt.Kind[len(modifiers):]
 	switch dt.Id {
 	case juletype.Slice:
 		return dt.SliceString()
@@ -257,7 +286,7 @@ func (dt *Type) StructString() string {
 // FuncString returns cpp value of function DataType.
 func (dt *Type) FuncString() string {
 	var cpp strings.Builder
-	cpp.WriteString("func<std::function<")
+	cpp.WriteString("fn<std::function<")
 	f := dt.Tag.(*Fn)
 	f.RetType.Type.Pure = dt.Pure
 	cpp.WriteString(f.RetType.String())
@@ -290,7 +319,7 @@ func (dt *Type) MultiTypeString() string {
 		cpp.WriteString(t.String())
 		cpp.WriteByte(',')
 	}
-	return cpp.String()[:cpp.Len()-1] + ">" + dt.Pointers()
+	return cpp.String()[:cpp.Len()-1] + ">" + dt.Modifiers()
 }
 
 // MapKind returns data type kind string of map data type.

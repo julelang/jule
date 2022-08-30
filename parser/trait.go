@@ -33,10 +33,15 @@ func (t *trait) OutId() string {
 func (t *trait) String() string {
 	var cpp strings.Builder
 	cpp.WriteString("struct ")
-	cpp.WriteString(t.OutId())
+	outid := t.OutId()
+	cpp.WriteString(outid)
 	cpp.WriteString(" {\n")
 	models.AddIndent()
 	is := models.IndentString()
+	cpp.WriteString(is)
+	cpp.WriteString("virtual ~")
+	cpp.WriteString(outid)
+	cpp.WriteString("(void) noexcept {}\n\n")
 	for _, f := range t.Ast.Funcs {
 		cpp.WriteString(is)
 		cpp.WriteString("virtual ")

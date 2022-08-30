@@ -80,12 +80,38 @@ func (pap *pureArgParser) pushVariadicArgs(pair *paramMapPair) {
 	}
 }
 
-func (pap *pureArgParser) checkPasses() {
-	for _, pair := range *pap.pmap {
-		if pair.arg == nil && !pair.param.Variadic {
-			pap.p.pusherrtok(pap.errTok, "missing_expr_for", pair.param.Id)
-		}
+func (pap *pureArgParser) check_param_arg(pair *paramMapPair) {
+	if pair.arg == nil && !pair.param.Variadic {
+		pap.p.pusherrtok(pap.errTok, "missing_expr_for", pair.param.Id)
 	}
+}
+
+func (pap *pureArgParser) check_passes_struct() {
+	if len(pap.args.Src) == 0 {
+		for _, pair := range *pap.pmap {
+			if typeIsRef(pair.param.Type) {
+				pap.p.pusherrtok(pap.errTok, "reference_field_not_initialized", pair.param.Id)
+			}
+		}
+		return
+	}
+	for _, pair := range *pap.pmap {
+		pap.check_param_arg(pair)
+	}
+}
+
+func (pap *pureArgParser) check_passes_fn() {
+	for _, pair := range *pap.pmap {
+		pap.check_param_arg(pair)
+	}
+}
+
+func (pap *pureArgParser) checkPasses() {
+	if is_constructor(pap.f) {
+		pap.check_passes_struct()
+		return
+	}
+	pap.check_passes_fn()
 }
 
 func (pap *pureArgParser) pushArg() {

@@ -370,14 +370,9 @@ var Builtin = &DefineMap{
 			}},
 		}},
 		{Ast: &Func{
-			Pub:      true,
-			Id:       "new",
-			Owner:    genericFile,
-			Generics: []*GenericType{{Id: "T"}},
-			Attributes: []models.Attribute{
-				{Tag: jule.Attribute_TypeArg},
-			},
-			RetType: RetType{Type: Type{Id: juletype.Id, Kind: tokens.STAR + "T"}},
+			Pub:           true,
+			Id:            "new",
+			Owner:         genericFile,
 		}},
 		{Ast: &Func{
 			Pub:      true,
@@ -659,6 +654,10 @@ func init() {
 	outlnFunc.Ast.Id = "outln"
 	Builtin.Funcs = append(Builtin.Funcs, outlnFunc)
 
+	// Set up new function
+	fn_new, _, _ := Builtin.funcById("new", nil)
+	fn_new.Ast.BuiltinCaller = caller_new
+
 	// Set bits of platform-dependent types
 	intMax := intStatics.Globals[0]
 	intMin := intStatics.Globals[1]
@@ -684,6 +683,43 @@ func init() {
 }
 
 // Standard Library Builtin Callers
+
+// builtin
+
+func caller_new(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
+	// Remove parentheses
+	errtok := data.args[0]
+	data.args = data.args[1 : len(data.args)-1]
+	b := ast.NewBuilder(nil)
+	i := 0
+	t, ok := b.DataType(data.args, &i, true, true)
+	b.Wait()
+	if !ok {
+		p.pusherrs(b.Errors...)
+		return
+	}
+	if i+1 < len(data.args) {
+		p.pusherrtok(data.args[i+1], "invalid_syntax")
+	}
+	t, _ = p.realType(t, true)
+	if !is_valid_type_for_reference(t) {
+		p.pusherrtok(errtok, "invalid_type")
+	}
+	if typeIsStruct(t) {
+		s := t.Tag.(*structure)
+		for _, f := range s.Defines.Globals {
+			if typeIsRef(f.Type) {
+				p.pusherrtok(errtok, "ref_used_struct_used_at_new_fn")
+				break
+			}
+		}
+	}
+	m.appendSubNode(exprNode{"<" + t.String() + ">()"})
+	t.Kind = "&" + t.Kind
+	v.data.Type = t
+	v.data.Value = t.Kind
+	return
+}
 
 // std::mem
 
@@ -717,6 +753,7 @@ func caller_mem_sizeof(p *Parser, _ *Func, data callData, m *exprModel) (v value
 		p.pusherrtok(data.args[i+1], "invalid_syntax")
 	}
 	p.pusherrs(b.Errors...)
+	t, _ = p.realType(t, true)
 	*node = exprNode{"sizeof(" + t.String() + ")"}
 	return
 }
@@ -744,6 +781,7 @@ func caller_mem_alignof(p *Parser, _ *Func, data callData, m *exprModel) (v valu
 		p.pusherrtok(data.args[i+1], "invalid_syntax")
 	}
 	p.pusherrs(b.Errors...)
+	t, _ = p.realType(t, true)
 	*node = exprNode{"alignof(" + t.String() + ")"}
 	return
 }

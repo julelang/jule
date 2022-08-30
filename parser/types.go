@@ -49,7 +49,7 @@ func typeIsEnum(dt Type) bool {
 	return dt.Id == juletype.Enum
 }
 
-func unptrType(t Type) Type {
+func un_ptr_or_ref_type(t Type) Type {
 	t.Kind = t.Kind[1:]
 	return t
 }
@@ -115,6 +115,10 @@ func typeIsPtr(t Type) bool {
 	return typeIsExplicitPtr(t)
 }
 
+func typeIsRef(t Type) bool {
+	return t.Kind != "" && t.Kind[0] == '&'
+}
+
 func typeIsSlice(t Type) bool {
 	return t.Id == juletype.Slice && strings.HasPrefix(t.Kind, jule.Prefix_Slice)
 }
@@ -139,17 +143,19 @@ func typeIsFunc(t Type) bool {
 // Includes single ptr types.
 func typeIsPure(t Type) bool {
 	return !typeIsPtr(t) &&
+		!typeIsRef(t) &&
 		!typeIsSlice(t) &&
 		!typeIsArray(t) &&
 		!typeIsMap(t) &&
 		!typeIsFunc(t)
 }
 
-func subIdAccessorOfType(t Type, is_unsafe bool) string {
-	if typeIsPtr(t) {
-		if is_unsafe {
-			return ".unsafe_narrow()->"
-		}
+func is_valid_type_for_reference(t Type) bool {
+	return !(typeIsTrait(t) || typeIsEnum(t) || typeIsPtr(t) || typeIsRef(t))
+}
+
+func subIdAccessorOfType(t Type) string {
+	if typeIsRef(t) || typeIsPtr(t) {
 		return "->"
 	}
 	return tokens.DOT
@@ -186,7 +192,17 @@ func checkMapCompability(mapT, t Type) bool {
 }
 
 func typeIsLvalue(t Type) bool {
-	return typeIsPtr(t) || typeIsSlice(t) || typeIsMap(t)
+	return typeIsRef(t) || typeIsPtr(t) || typeIsSlice(t) || typeIsMap(t)
+}
+
+func checkRefCompability(t1, t2 Type, allow_assign bool) bool {
+	if t1.Kind == t2.Kind {
+		return true
+	} else if !allow_assign {
+		return false
+	}
+	t1 = un_ptr_or_ref_type(t1)
+	return typesAreCompatible(t1, t2, true, allow_assign)
 }
 
 func checkPtrCompability(t1, t2 Type) bool {
@@ -205,26 +221,26 @@ func checkTraitCompability(t1, t2 Type) bool {
 		return true
 	}
 	t := t1.Tag.(*trait)
-	t1ptr := t1.Pointers()
+	t1m := t1.Modifiers()
 	switch {
-	case typeIsTrait(t2):
-		return t == t2.Tag.(*trait) && t1ptr == t2.Pointers()
-	case typeIsPtr(t2):
-		t2 = unptrType(t2)
+	case typeIsRef(t2):
+		t2 = un_ptr_or_ref_type(t2)
 		if !typeIsStruct(t2) {
 			break
 		}
 		fallthrough
 	case typeIsStruct(t2):
-		if t1ptr != "" {
+		if t1m != "" {
 			return false
 		}
-		t2ptr := t2.Pointers()
-		if t2ptr != "" {
+		t2m := t2.Modifiers()
+		if t2m != "" {
 			return false
 		}
 		s := t2.Tag.(*structure)
 		return s.hasTrait(t)
+	case typeIsTrait(t2):
+		return t == t2.Tag.(*trait) && t1m == t2.Modifiers()
 	}
 	return false
 }
@@ -252,13 +268,18 @@ func checkStructCompability(t1, t2 Type) bool {
 	return true
 }
 
-func typesAreCompatible(t1, t2 Type, ignoreany bool) bool {
+func typesAreCompatible(t1, t2 Type, ignoreany, allow_assign bool) bool {
 	switch {
 	case typeIsTrait(t1), typeIsTrait(t2):
 		if typeIsTrait(t2) {
 			t1, t2 = t2, t1
 		}
 		return checkTraitCompability(t1, t2)
+	case typeIsRef(t1), typeIsRef(t2):
+		if typeIsRef(t2) {
+			t1, t2 = t2, t1
+		}
+		return checkRefCompability(t1, t2, allow_assign)
 	case typeIsPtr(t1), typeIsPtr(t2):
 		if typeIsPtr(t2) {
 			t1, t2 = t2, t1

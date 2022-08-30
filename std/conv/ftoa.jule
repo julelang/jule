@@ -10,8 +10,8 @@ struct FloatInfo {
 	bias    : int
 }
 
-let f32_info = FloatInfo{23, 8, -127}
-let f64_info = FloatInfo{52, 11, -1023}
+let f32_info = &FloatInfo{23, 8, -127}
+let f64_info = &FloatInfo{52, 11, -1023}
 
 struct DecimalSlice {
 	d  : []byte
@@ -48,14 +48,13 @@ pub fn fmt_float(f: f64, fmt: byte, prec: int, bit_size: int) str {
 
 fn generic_ftoa(dst: []byte, val: f64, fmt: byte, prec: int, bit_size: int) []byte {
 	let bits: u64
-	let flt: *FloatInfo
+	let flt: &FloatInfo = f32_info
 	match bit_size {
 	case 32:
 		bits = u64(std::math::f32_bits(f32(val)))
-		flt = &f32_info
 	case 64:
 		bits = std::math::f64_bits(val)
-		flt = &f64_info
+		flt = f64_info
 	default:
 		panic("std::conv: illegal bit_size")
 	}
@@ -98,7 +97,7 @@ fn generic_ftoa(dst: []byte, val: f64, fmt: byte, prec: int, bit_size: int) []by
 		ret big_ftoa(dst, prec, fmt, neg, mant, exp, flt)
 	}
 
-	let digs: DecimalSlice
+	let digs = new(DecimalSlice)
 	let ok = false
 	// Negative precision means "only as much as needed to be exact."
 	let shortest = prec < 0
@@ -106,7 +105,7 @@ fn generic_ftoa(dst: []byte, val: f64, fmt: byte, prec: int, bit_size: int) []by
 		// Use Ryu algorithm.
 		let buf: [32]byte
 		digs.d = buf[:]
-		ryu_ftoa_shortest(&digs, mant, exp-int(flt.mantbits), flt)
+		ryu_ftoa_shortest(digs, mant, exp-int(flt.mantbits), flt)
 		ok = true
 		// Precision for shortest representation mode.
 		match fmt {
@@ -135,11 +134,11 @@ fn generic_ftoa(dst: []byte, val: f64, fmt: byte, prec: int, bit_size: int) []by
 		let buf: [24]byte
 		if bit_size == 32 && digits <= 9 {
 			digs.d = buf[:]
-			ryu_ftoa_fixed32(&digs, u32(mant), exp-int(flt.mantbits), digits)
+			ryu_ftoa_fixed32(digs, u32(mant), exp-int(flt.mantbits), digits)
 			ok = true
 		} else if digits <= 18 {
 			digs.d = buf[:]
-			ryu_ftoa_fixed64(&digs, mant, exp-int(flt.mantbits), digits)
+			ryu_ftoa_fixed64(digs, mant, exp-int(flt.mantbits), digits)
 			ok = true
 		}
 	}
@@ -151,7 +150,7 @@ fn generic_ftoa(dst: []byte, val: f64, fmt: byte, prec: int, bit_size: int) []by
 
 // Uses multiprecision computations to format a float.
 fn big_ftoa(dst: []byte, prec: int, fmt: byte, neg: bool,
-			mant: u64, exp: int, flt: *FloatInfo) []byte {
+			mant: u64, exp: int, flt: &FloatInfo) []byte {
 	let d = new(Decimal)
 	d.assign(mant)
 	d.shift(exp - int(flt.mantbits))
@@ -225,7 +224,7 @@ fn fmt_digits(dst: []byte, shortest: bool, neg: bool,
 
 // Rounds d (= mant * 2^exp) to the shortest number of digits
 // that will let the original floating point value be precisely reconstructed.
-fn round_shortest(d: *Decimal, mant: u64, exp: int, flt: *FloatInfo) {
+fn round_shortest(d: &Decimal, mant: u64, exp: int, flt: &FloatInfo) {
 	// If mantissa is zero, the number is zero; stop now.
 	if mant == 0 {
 		d.nd = 0
@@ -450,7 +449,7 @@ fn fmt_f(dst: []byte, neg: bool, d: DecimalSlice, prec: int) []byte {
 }
 
 // %b: -ddddddddp±ddd
-fn fmt_b(dst: []byte, neg: bool, mant: u64, exp: int, flt: *FloatInfo) []byte {
+fn fmt_b(dst: []byte, neg: bool, mant: u64, exp: int, flt: &FloatInfo) []byte {
 	// sign
 	if neg {
 		dst = append[byte](dst, '-')
@@ -472,7 +471,7 @@ fn fmt_b(dst: []byte, neg: bool, mant: u64, exp: int, flt: *FloatInfo) []byte {
 }
 
 // %x: -0x1.yyyyyyyyp±ddd or -0x0p+0. (y is hex digit, d is decimal digit)
-fn fmt_x(dst: []byte, prec: int, fmt: byte, neg: bool, mant: u64, exp: int, flt: *FloatInfo) []byte {
+fn fmt_x(dst: []byte, prec: int, fmt: byte, neg: bool, mant: u64, exp: int, flt: &FloatInfo) []byte {
 	if mant == 0 {
 		exp = 0
 	}

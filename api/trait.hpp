@@ -21,27 +21,26 @@ public:
 
     template<typename TT>
     trait<T>(const TT &_Data) noexcept {
-        TT *_alloc = new(std::nothrow) TT{_Data};
+        TT *_alloc = new( std::nothrow ) TT{_Data};
         if (!_alloc)
         { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
         this->_data = (T*)(_alloc);
-        this->_ref = new(std::nothrow) uint_julet{1};
+        this->_ref = new( std::nothrow ) uint_julet{1};
         if (!this->_ref)
         { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
         this->type_id = typeid(_Data).name();
     }
 
     template<typename TT>
-    trait<T>(const ptr<TT> &_Ptr) noexcept {
-        ( (ptr<TT>)(_Ptr) ).__must_heap();
-        this->_data = (T*)(*_Ptr._ptr);
-        this->_ref = _Ptr._ref;
-        (*this->_ref)++;
-        this->type_id = typeid(_Ptr).name();
+    trait<T>(const jule_ref<TT> &_Ref) noexcept {
+        this->_data = _Ref._alloc;
+        this->_ref = _Ref._ref;
+        ( ++( *this->_ref ) );
+        this->type_id = typeid(_Ref).name();
     }
 
     trait<T>(const trait<T> &_Src) noexcept
-    { this->operator=(_Src); }
+    { this->operator=( _Src ); }
 
     void __dealloc(void) noexcept {
         if (!this->_ref)
@@ -56,7 +55,7 @@ public:
     }
 
     inline void __must_ok(void) noexcept {
-        if (this->operator==(nil))
+        if (this->operator==( nil ))
         { JULEC_ID(panic)(__JULEC_ERROR_INVALID_MEMORY); }
     }
 
@@ -77,15 +76,12 @@ public:
     }
 
     template<typename TT>
-    operator ptr<TT>(void) noexcept {
+    operator jule_ref<TT>(void) noexcept {
         this->__must_ok();
-        if (std::strcmp(this->type_id, typeid(ptr<TT>).name()) != 0)
+        if (std::strcmp(this->type_id, typeid(jule_ref<TT>).name()) != 0)
         { JULEC_ID(panic)(__JULEC_ERROR_INCOMPATIBLE_TYPE); }
-        ptr<TT> _ptr{__julec_guaranteed_ptr((TT*)(this->_data))};
-        delete _ptr._ref;
-        _ptr._ref = this->_ref;
-        (*this->_ref)++;
-        return _ptr;
+        ( ++( *this->_ref ) );
+        return jule_ref<TT>( (TT*)(this->_data), this->_ref );
     }
 
     inline void operator=(const std::nullptr_t) noexcept

@@ -77,21 +77,28 @@ func integerAssignable(dt uint8, v value) bool {
 }
 
 type assignChecker struct {
-	p         *Parser
-	t         Type
-	v         value
-	ignoreAny bool
-	errtok    lex.Token
+	p                *Parser
+	t                Type
+	v                value
+	ignoreAny        bool
+	not_allow_assign bool
+	errtok           lex.Token
 }
 
 func (ac assignChecker) checkAssignType() {
 	if ac.p.eval.has_error || ac.v.data.Value == "" {
 		return
 	}
-	if ac.v.constExpr &&
-		typeIsPure(ac.t) &&
-		typeIsPure(ac.v.data.Type) &&
-		juletype.IsNumeric(ac.v.data.Type.Id) {
+	if typeIsFunc(ac.t) && typeIsFunc(ac.v.data.Type) {
+		f := ac.v.data.Type.Tag.(*Func)
+		if f.Receiver != nil {
+			ac.p.pusherrtok(ac.errtok, "method_as_anonymous_fn")
+		} else if len(f.Generics) > 0 {
+			ac.p.pusherrtok(ac.errtok, "genericed_fn_as_anonymous_fn")
+		}
+		return
+	} else if ac.v.constExpr && typeIsPure(ac.t) &&
+		typeIsPure(ac.v.data.Type) && juletype.IsNumeric(ac.v.data.Type.Id) {
 		switch {
 		case juletype.IsFloat(ac.t.Id):
 			if !floatAssignable(ac.t.Id, ac.v) {
@@ -105,5 +112,5 @@ func (ac assignChecker) checkAssignType() {
 			return
 		}
 	}
-	ac.p.checkType(ac.t, ac.v.data.Type, ac.ignoreAny, ac.errtok)
+	ac.p.checkType(ac.t, ac.v.data.Type, ac.ignoreAny, !ac.not_allow_assign, ac.errtok)
 }

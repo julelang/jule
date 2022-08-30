@@ -33,12 +33,11 @@ The memory safety and the memory management.
 A major challenge in the C and C++ or similar programming languages.
 Jule guarantees memory safety and uses reference counting for memory management.
 An account-allocation is automatically released as soon as the reference count reaches zero.
-There are no dangling pointers, and accessing a null pointer will obviously get you an error.
 <br><br>
 
 + Instant automatic memory initialization
 + Bounds checking
-+ Nil (aka null) checking
++ References can't assign to nil (aka null)
 
 <h2 id="cpp-interoperability">C++ Interoperability</h2>
 Jule is designed to be interoperable with C++.

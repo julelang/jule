@@ -22,14 +22,6 @@ func indexingExprModel(i iExpr) iExpr {
 	return exprNode{model.String()}
 }
 
-func exprMustHeap(expr string) string {
-	var cpp strings.Builder
-	cpp.WriteString("__julec_must_heap(")
-	cpp.WriteString(expr)
-	cpp.WriteByte(')')
-	return cpp.String()
-}
-
 func isstr(s string) bool {
 	return s != "" && (s[0] == '"' || israwstr(s))
 }

@@ -279,7 +279,7 @@ func (b *Builder) structFields(toks []lex.Token) []*models.Var {
 			}
 			var_tokens = var_tokens[1:]
 		}
-		vast := b.Var(var_tokens, false)
+		vast := b.Var(var_tokens, false, false)
 		vast.Pub = pub
 		vast.IsField = true
 		fields = append(fields, &vast)
@@ -387,7 +387,7 @@ func (b *Builder) implTraitFuncs(impl *models.Impl, toks []lex.Token) {
 			Kind: impl.Target.Kind,
 		}
 		if ref {
-			f.Receiver.Kind = tokens.STAR + f.Receiver.Kind
+			f.Receiver.Kind = tokens.AMPER + f.Receiver.Kind
 		}
 		impl.Tree = append(impl.Tree, models.Object{Token: f.Token, Data: &f})
 	}
@@ -447,7 +447,7 @@ func (b *Builder) implStruct(impl *models.Impl, toks []lex.Token) {
 			Kind: impl.Trait.Kind,
 		}
 		if ref {
-			f.Receiver.Kind = tokens.STAR + f.Receiver.Kind
+			f.Receiver.Kind = tokens.AMPER + f.Receiver.Kind
 		}
 		impl.Tree = append(impl.Tree, models.Object{Token: f.Token, Data: &f})
 	}
@@ -892,12 +892,6 @@ func (b *Builder) paramTypeBegin(p *models.Param, i *int, toks []lex.Token) {
 					continue
 				}
 				p.Variadic = true
-			case tokens.AMPER:
-				if p.Reference {
-					b.pusherr(tok, "already_reference")
-					continue
-				}
-				p.Reference = true
 			default:
 				return
 			}
@@ -1055,14 +1049,15 @@ func (b *Builder) datatype(t *models.Type, toks []lex.Token, i *int, arrays, err
 			ok = true
 			goto ret
 		case tokens.Operator:
-			if tok.Kind == tokens.STAR {
+			switch tok.Kind {
+			case tokens.STAR, tokens.AMPER, tokens.DOUBLE_AMPER:
 				dtv.WriteString(tok.Kind)
-				break
+			default:
+				if err {
+					b.pusherr(tok, "invalid_syntax")
+				}
+				return
 			}
-			if err {
-				b.pusherr(tok, "invalid_syntax")
-			}
-			return
 		case tokens.Brace:
 			switch tok.Kind {
 			case tokens.LBRACKET:
@@ -1651,7 +1646,7 @@ func (b *Builder) varBegin(v *models.Var, i *int, toks []lex.Token) {
 	}
 }
 
-func (b *Builder) varTypeNExpr(v *models.Var, toks []lex.Token, i int) {
+func (b *Builder) varTypeNExpr(v *models.Var, toks []lex.Token, i int, expr bool) {
 	tok := toks[i]
 	if tok.Id == tokens.Colon {
 		i++ // Skip type annotation operator (:)
@@ -1670,7 +1665,7 @@ func (b *Builder) varTypeNExpr(v *models.Var, toks []lex.Token, i int) {
 			tok = toks[i]
 		}
 	}
-	if tok.Id == tokens.Operator {
+	if expr && tok.Id == tokens.Operator {
 		if tok.Kind != tokens.EQUAL {
 			b.pusherr(tok, "invalid_syntax")
 			return
@@ -1688,7 +1683,7 @@ func (b *Builder) varTypeNExpr(v *models.Var, toks []lex.Token, i int) {
 }
 
 // Var builds AST model of variable statement.
-func (b *Builder) Var(toks []lex.Token, begin bool) (v models.Var) {
+func (b *Builder) Var(toks []lex.Token, begin, expr bool) (v models.Var) {
 	v.Pub = b.pub
 	b.pub = false
 	i := 0
@@ -1712,14 +1707,16 @@ func (b *Builder) Var(toks []lex.Token, begin bool) (v models.Var) {
 	}
 	i++
 	if i < len(toks) {
-		b.varTypeNExpr(&v, toks, i)
+		b.varTypeNExpr(&v, toks, i, expr)
+	} else if !expr {
+		b.pusherr(v.Token, "missing_type")
 	}
 	return
 }
 
 // VarStatement builds AST model of variable declaration statement.
 func (b *Builder) VarStatement(toks []lex.Token) models.Statement {
-	vast := b.Var(toks, true)
+	vast := b.Var(toks, true, true)
 	return models.Statement{Token: vast.Token, Data: vast}
 }
 

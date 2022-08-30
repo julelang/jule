@@ -22,6 +22,11 @@ type structure struct {
 	generics []Type
 }
 
+func structure_instances_is_uses_same_base(s1, s2 *structure) bool {
+	// Traits are common into all instances.
+	return s1.Traits == s2.Traits
+}
+
 func (s *structure) hasTrait(t *trait) bool {
 	for _, st := range *s.Traits {
 		if t == st {
@@ -108,26 +113,37 @@ func (s *structure) operators() string {
 	return cpp.String()
 }
 
+func (s *structure) self_var_init_statement_str() string {
+	var cpp strings.Builder
+	cpp.WriteString("this->self = ")
+	cpp.WriteString(s.self_ref_var_type().String())
+	cpp.WriteString("(this, nil);")
+	return cpp.String()
+}
+
 func (s *structure) cppConstructor() string {
 	var cpp strings.Builder
 	cpp.WriteString(models.IndentString())
 	cpp.WriteString(s.OutId())
 	cpp.WriteString(paramsToCpp(s.constructor.Params))
-	cpp.WriteString(" noexcept {")
+	cpp.WriteString(" noexcept {\n")
+	models.AddIndent()
+	cpp.WriteString(models.IndentString())
+	cpp.WriteString(s.self_var_init_statement_str())
+	cpp.WriteByte('\n')
 	if len(s.Defines.Globals) > 0 {
-		models.AddIndent()
 		for i, g := range s.Defines.Globals {
 			cpp.WriteByte('\n')
 			cpp.WriteString(models.IndentString())
 			cpp.WriteString("this->")
 			cpp.WriteString(g.OutId())
 			cpp.WriteString(" = ")
-			cpp.WriteString(exprMustHeap(s.constructor.Params[i].OutId()))
+			cpp.WriteString(s.constructor.Params[i].OutId())
 			cpp.WriteByte(';')
 		}
-		models.DoneIndent()
-		cpp.WriteByte('\n')
 	}
+	models.DoneIndent()
+	cpp.WriteByte('\n')
 	cpp.WriteString(models.IndentString())
 	cpp.WriteByte('}')
 	return cpp.String()
@@ -157,6 +173,22 @@ func (s *structure) plainPrototype() string {
 	return cpp.String()
 }
 
+func (s *structure) self_ref_var_type() Type {
+	var t Type
+	t.Id = juletype.Struct
+	t.Kind = tokens.AMPER + s.Ast.Id
+	t.Tag = s
+	t.Token = s.Ast.Token
+	return t
+}
+
+func (s *structure) self_ref_var_str() string {
+	var cpp strings.Builder
+	cpp.WriteString(s.self_ref_var_type().String())
+	cpp.WriteString(" self;")
+	return cpp.String()
+}
+
 func (s *structure) prototype() string {
 	var cpp strings.Builder
 	cpp.WriteString(genericsToCpp(s.Ast.Generics))
@@ -167,6 +199,9 @@ func (s *structure) prototype() string {
 	cpp.WriteString(s.cppTraits())
 	cpp.WriteString(" {\n")
 	models.AddIndent()
+	cpp.WriteString(models.IndentString())
+	cpp.WriteString(s.self_ref_var_str())
+	cpp.WriteString("\n\n")
 	if len(s.Defines.Globals) > 0 {
 		for _, g := range s.Defines.Globals {
 			cpp.WriteString(models.IndentString())
@@ -174,12 +209,15 @@ func (s *structure) prototype() string {
 			cpp.WriteByte('\n')
 		}
 		cpp.WriteString("\n\n")
+		cpp.WriteString(models.IndentString())
 		cpp.WriteString(s.cppConstructor())
 		cpp.WriteString("\n\n")
 	}
 	cpp.WriteString(models.IndentString())
 	cpp.WriteString(outid)
-	cpp.WriteString("(void) noexcept {}\n\n")
+	cpp.WriteString("(void) noexcept { ")
+	cpp.WriteString(s.self_var_init_statement_str())
+	cpp.WriteString(" }\n\n")
 	for _, f := range s.Defines.Funcs {
 		if f.used {
 			cpp.WriteString(models.IndentString())
@@ -274,11 +312,6 @@ func (s *structure) selfVar(receiver Type) *Var {
 	v.Type = receiver
 	v.Type.Id = juletype.Struct
 	v.Id = tokens.SELF
-	if typeIsPtr(receiver) {
-		v.Expr.Model = exprNode{juleapi.CppSelf}
-	} else {
-		v.Expr.Model = exprNode{tokens.STAR + juleapi.CppSelf}
-	}
 	return v
 }
 

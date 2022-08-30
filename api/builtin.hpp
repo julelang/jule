@@ -10,9 +10,9 @@ typedef i32_julet  JULEC_ID(rune); // builtin: type rune: i32
 
 // Declarations
 template<typename _Obj_t>
-inline void JULEC_ID(out)(const _Obj_t _Obj) noexcept;
+inline void JULEC_ID(out)(const _Obj_t &_Obj) noexcept;
 template<typename _Obj_t>
-inline void JULEC_ID(outln)(const _Obj_t _Obj) noexcept;
+inline void JULEC_ID(outln)(const _Obj_t &_Obj) noexcept;
 struct JULEC_ID(Error);
 template<typename _Item_t>
 int_julet JULEC_ID(copy)(const slice<_Item_t> &_Dest,
@@ -21,18 +21,18 @@ template<typename _Item_t>
 slice<_Item_t> JULEC_ID(append)(const slice<_Item_t> &_Src,
                                 const slice<_Item_t> &_Components) noexcept;
 template<typename T>
-ptr<T> JULEC_ID(new)(void) noexcept;
+inline jule_ref<T> JULEC_ID(new)(void) noexcept;
 
 // Definitions
 
 /* Panic function defined at main header */
 
 template<typename _Obj_t>
-inline void JULEC_ID(out)(const _Obj_t _Obj) noexcept
+inline void JULEC_ID(out)(const _Obj_t &_Obj) noexcept
 { std::cout << _Obj; }
 
 template<typename _Obj_t>
-inline void JULEC_ID(outln)(const _Obj_t _Obj) noexcept {
+inline void JULEC_ID(outln)(const _Obj_t &_Obj) noexcept {
     JULEC_ID(out)(_Obj);
     std::cout << std::endl;
 }
@@ -71,21 +71,11 @@ slice<_Item_t> JULEC_ID(append)(const slice<_Item_t> &_Src,
 }
 
 template<typename T>
-ptr<T> JULEC_ID(new)(void) noexcept {
-    ptr<T> _ptr;
-    _ptr._heap = new(std::nothrow) bool*{__JULEC_PTR_HEAP_TRUE};
-    if (!_ptr._heap)
-    { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
-    _ptr._ptr = new(std::nothrow) T*;
-    if (!_ptr._ptr)
-    { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
-    *_ptr._ptr = new(std::nothrow) T;
-    if (!*_ptr._ptr)
-    { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
-    _ptr._ref = new(std::nothrow) uint_julet{1};
-    if (!_ptr._ref)
-    { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
-    return _ptr;
+inline jule_ref<T> JULEC_ID(new)(void) noexcept {
+    T *_alloc = new( std::nothrow ) T;
+    if (!_alloc)
+    { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED) ; }
+    return jule_ref<T>( _alloc );
 }
 
 #endif // #ifndef __JULEC_BUILTIN_HPP
