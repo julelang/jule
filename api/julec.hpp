@@ -183,8 +183,8 @@ void JULEC_ID(panic)(const _Obj_t &_Expr) {
         str_julet error(void) { return this->_message; }
     };
     struct panic_error _error;
-    _error._message = __julec_tostr(_Expr);
-    throw (trait<JULEC_ID(Error)>(_error));
+    _error._message = __julec_tostr ( _Expr );
+    throw ( trait<JULEC_ID(Error)> ( _error ) ) ;
 }
 
 void __julec_terminate_handler(void) noexcept {

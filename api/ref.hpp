@@ -37,11 +37,20 @@ struct jule_ref {
     ~jule_ref<T>(void) noexcept
     { this->__drop(); }
 
+    inline void __drop_ref(void) const noexcept
+    { ( --( *this->_ref ) ); }
+
+    inline void __add_ref(void) const noexcept
+    { ( ++( *this->_ref ) ); }
+
+    inline uint_julet __get_ref_n(void) const noexcept
+    { return ( *this->_ref ); }
+
     void __drop(void) noexcept {
         if (!this->_ref)
         { return; }
-        ( --( *this->_ref ) );
-        if ( ( *this->_ref ) != 0 )
+        this->__drop_ref();
+        if ( ( this->__get_ref_n() ) != 0 )
         { return; }
         delete this->_ref;
         this->_ref = nil;
@@ -61,7 +70,7 @@ struct jule_ref {
     void operator=(const jule_ref<T> &_Ref) noexcept {
         this->__drop();
         if (_Ref._ref)
-        { ( ++( *_Ref._ref ) ); }
+        { _Ref.__add_ref(); }
         this->_ref = _Ref._ref;
         this->_alloc = _Ref._alloc;
     }
