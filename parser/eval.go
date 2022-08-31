@@ -238,7 +238,6 @@ func (e *eval) unary(toks []lex.Token, m *exprModel) value {
 		e.pusherrtok(processor.token, "invalid_syntax")
 	}
 	v.data.Token = processor.token
-	v.data.Value = " "
 	return v
 }
 
@@ -609,7 +608,7 @@ func (e *eval) cast(v value, t Type, errtok lex.Token) value {
 	v.data.Value = t.Kind
 	v.data.Type = t
 	v.lvalue = typeIsLvalue(t)
-	v.mutable = type_is_mutable(t)
+	v.mutable = typeIsRef(t) || type_is_mutable(t)
 	if v.constExpr {
 		var model exprNode
 		model.value = v.data.Type.String()
@@ -900,7 +899,7 @@ func (e *eval) xObjSubId(dm *DefineMap, val value, idTok lex.Token, m *exprModel
 		v.data.Type = g.Type
 		v.lvalue = val.lvalue || typeIsLvalue(g.Type)
 		v.constExpr = g.Const
-		v.mutable = g.Mutable
+		v.mutable = val.mutable && g.Mutable
 		if g.Const {
 			v.expr = g.ExprTag
 			v.model = g.Expr.Model

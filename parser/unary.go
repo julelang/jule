@@ -96,6 +96,7 @@ func (u *unary) star() value {
 	}
 	v.data.Type.Kind = v.data.Type.Kind[1:]
 end:
+	v.data.Value = " "
 	return v
 }
 

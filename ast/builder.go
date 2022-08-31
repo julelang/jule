@@ -279,10 +279,11 @@ func (b *Builder) structFields(toks []lex.Token) []*models.Var {
 			}
 			var_tokens = var_tokens[1:]
 		}
-		vast := b.Var(var_tokens, false, false)
-		vast.Pub = pub
-		vast.IsField = true
-		fields = append(fields, &vast)
+		v := b.Var(var_tokens, false, false)
+		v.Pub = pub
+		v.IsField = true
+		v.Mutable = true
+		fields = append(fields, &v)
 	}
 	return fields
 }
@@ -1655,6 +1656,11 @@ func (b *Builder) varBegin(v *models.Var, i *int, toks []lex.Token) {
 	case tokens.Let:
 		// Initialize 1 for skip the let keyword
 		*i++
+		if toks[*i].Id == tokens.Mut {
+			v.Mutable = true
+			// Skip the mut keyword
+			*i++
+		}
 	case tokens.Const:
 		*i++
 		if v.Const {
@@ -1717,15 +1723,6 @@ func (b *Builder) Var(toks []lex.Token, begin, expr bool) (v models.Var) {
 	b.pub = false
 	i := 0
 	v.Token = toks[i]
-	if toks[i].Id == tokens.Mut {
-		v.Mutable = true
-		// Initialize 1 for skip the mut keyword
-		i++
-		if i >= len(toks) {
-			b.pusherr(toks[i-1], "invalid_syntax")
-			return
-		}
-	}
 	if begin {
 		b.varBegin(&v, &i, toks)
 		if i >= len(toks) {
