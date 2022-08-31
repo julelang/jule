@@ -207,6 +207,7 @@ func (ve *valueEvaluator) varId(id string, variable *Var, global bool) (v value)
 	v.constExpr = variable.Const
 	v.data.Token = variable.Token
 	v.lvalue = !v.constExpr
+	v.mutable = variable.Mutable
 	if v.constExpr {
 		v.expr = variable.ExprTag
 		v.model = variable.Expr.Model

@@ -95,4 +95,5 @@ const (
 	FN                  = "fn"
 	LET                 = "let"
 	UNSAFE              = "unsafe"
+	MUT                 = "mut"
 )

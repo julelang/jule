@@ -11,16 +11,20 @@ import (
 
 // Param is function parameter AST model.
 type Param struct {
-	Token     lex.Token
-	Id        string
-	Variadic  bool
-	Type      Type
-	Default   Expr
+	Token    lex.Token
+	Id       string
+	Variadic bool
+	Mutable  bool
+	Type     Type
+	Default  Expr
 }
 
 // TypeString returns data type string of parameter.
 func (p *Param) TypeString() string {
 	var ts strings.Builder
+	if p.Mutable {
+		ts.WriteString(tokens.MUT + " ")
+	}
 	if p.Variadic {
 		ts.WriteString(tokens.TRIPLE_DOT)
 	}

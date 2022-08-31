@@ -24,14 +24,14 @@ const REDUCE_THRESHOLD = 1 << 29
 // "ARGUMENT REDUCTION FOR HUGE ARGUMENTS: Good to the Last Bit"
 // K. C. Ng et al, March 24, 1992
 // The simulated multi-precision calculation of x*B uses 64-bit integer arithmetic.
-fn trig_reduce(x: f64) (j: u64, z: f64) {
+fn trig_reduce(mut x: f64) (j: u64, z: f64) {
 	const PI4 = PI / 4
 	if x < PI4 {
 		ret 0, x
 	}
 	// Extract out the integer and exponent such that,
 	// x = ix * 2 ** exp.
-	let ix = f64_bits(x)
+	mut let ix = f64_bits(x)
 	let exp = int(ix>>SHIFT&MASK) - BIAS - SHIFT
 	ix &= ^(MASK << SHIFT)
 	ix |= 1 << SHIFT
@@ -47,7 +47,7 @@ fn trig_reduce(x: f64) (j: u64, z: f64) {
 	let (z1hi, z1lo) = std::math::bits::mul64(z1, ix)
 	let z0lo = z0 * ix
 	let (lo, c) = std::math::bits::add64(z1lo, z2hi, 0)
-	let (hi, _) = std::math::bits::add64(z0lo, z1hi, c)
+	let (mut hi, _) = std::math::bits::add64(z0lo, z1hi, c)
 	// The top 3 bits are j.
 	j = hi >> 61
 	// Extract the fraction and find its magnitude.

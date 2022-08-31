@@ -58,15 +58,27 @@ func (rc *retChecker) checkepxrs() {
 	}
 }
 
+func (rc *retChecker) check_for_ret_expr(v value) {
+	if rc.p.unsafe_allowed() || !lex.IsIdentifierRune(v.data.Value) {
+		return
+	}
+	if !v.mutable && type_is_mutable(v.data.Type) {
+		rc.p.pusherrtok(rc.ret_ast.Token, "ret_with_mut_typed_non_mut")
+		return
+	}
+}
+
 func (rc *retChecker) single() {
 	if len(rc.values) > 1 {
 		rc.p.pusherrtok(rc.ret_ast.Token, "overflow_return")
 	}
+	v := rc.values[0]
+	rc.check_for_ret_expr(v)
 	assignChecker{
-		p:      rc.p,
-		t:      rc.f.RetType.Type,
-		v:      rc.values[0],
-		errtok: rc.ret_ast.Token,
+		p:       rc.p,
+		t:       rc.f.RetType.Type,
+		v:       v,
+		errtok:  rc.ret_ast.Token,
 	}.checkAssignType()
 }
 
@@ -83,11 +95,13 @@ func (rc *retChecker) multi() {
 		if i >= n {
 			break
 		}
+		v := rc.values[i]
+		rc.check_for_ret_expr(v)
 		assignChecker{
-			p:      rc.p,
-			t:      t,
-			v:      rc.values[i],
-			errtok: rc.ret_ast.Token,
+			p:       rc.p,
+			t:       t,
+			v:       v,
+			errtok:  rc.ret_ast.Token,
 		}.checkAssignType()
 	}
 }
@@ -120,10 +134,10 @@ func (rc *retChecker) checkMultiRetAsMutliRet() {
 		vt := valTypes[i]
 		val := value{data: models.Data{Type: vt}}
 		assignChecker{
-			p:      rc.p,
-			t:      rt,
-			v:      val,
-			errtok: rc.ret_ast.Token,
+			p:       rc.p,
+			t:       rt,
+			v:       val,
+			errtok:  rc.ret_ast.Token,
 		}.checkAssignType()
 	}
 }

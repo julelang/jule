@@ -13,7 +13,7 @@ use std::math::bits
 // sharing the same rounding guarantees.
 
 // Formats mant*(2^exp) with prec decimal digits.
-unsafe fn ryu_ftoa_fixed32(d: *DecimalSlice, mant: u32, exp: int, prec: int) {
+unsafe fn ryu_ftoa_fixed32(d: *DecimalSlice, mut mant: u32, exp: int, prec: int) {
 	if prec < 0 {
 		panic("ryu_ftoa_fixed32 called with negative prec")
 	}
@@ -26,7 +26,7 @@ unsafe fn ryu_ftoa_fixed32(d: *DecimalSlice, mant: u32, exp: int, prec: int) {
 		ret
 	}
 	// Renormalize to a 25-bit mantissa.
-	let e2 = exp
+	mut let e2 = exp
 	let b = std::math::bits::len32(mant)
 	if b < 25 {
 		mant <<= uint(25 - b)
@@ -43,9 +43,9 @@ unsafe fn ryu_ftoa_fixed32(d: *DecimalSlice, mant: u32, exp: int, prec: int) {
 	// Now compute mant*(2^e2)*(10^q).
 	// Is it an exact computation?
 	// Only small positive powers of 10 are exact (5^28 has 66 bits).
-	let exact = q <= 27 && q >= 0
+	mut let exact = q <= 27 && q >= 0
 
-	let (di, dexp2, d0) = mult64bit_pow10(mant, e2, q)
+	let (mut di, dexp2, mut d0) = mult64bit_pow10(mant, e2, q)
 	if dexp2 >= 0 {
 		panic("not enough significant bits after mult64bit_pow10")
 	}
@@ -61,9 +61,9 @@ unsafe fn ryu_ftoa_fixed32(d: *DecimalSlice, mant: u32, exp: int, prec: int) {
 	let extra = uint(-dexp2)
 	let extra_mask = u32(1<<extra - 1)
 
-	let dfrac: u32
+	mut let dfrac: u32
 	di, dfrac = di>>extra, di&extra_mask
-	let round_up = false
+	mut let round_up = false
 	if exact {
 		// If we computed an exact product, d + 1/2
 		// should round to d+1 if 'd' is odd.
@@ -87,7 +87,7 @@ unsafe fn ryu_ftoa_fixed32(d: *DecimalSlice, mant: u32, exp: int, prec: int) {
 }
 
 // Formats mant*(2^exp) with prec decimal digits.
-unsafe fn ryu_ftoa_fixed64(d: *DecimalSlice, mant: u64, exp: int, prec: int) {
+unsafe fn ryu_ftoa_fixed64(d: *DecimalSlice, mut mant: u64, exp: int, prec: int) {
 	if prec > 18 {
 		panic("ryu_ftoa_fixed64 called with prec > 18")
 	}
@@ -97,7 +97,7 @@ unsafe fn ryu_ftoa_fixed64(d: *DecimalSlice, mant: u64, exp: int, prec: int) {
 		ret
 	}
 	// Renormalize to a 55-bit mantissa.
-	let e2 = exp
+	mut let e2 = exp
 	let b = std::math::bits::len64(mant)
 	if b < 55 {
 		mant = mant << uint(55-b)
@@ -117,9 +117,9 @@ unsafe fn ryu_ftoa_fixed64(d: *DecimalSlice, mant: u64, exp: int, prec: int) {
 	// Now compute mant*(2^e2)*(10^q).
 	// Is it an exact computation?
 	// Only small positive powers of 10 are exact (5^55 has 128 bits).
-	let exact = q <= 55 && q >= 0
+	mut let exact = q <= 55 && q >= 0
 
-	let (di, dexp2, d0) = mult128bit_pow10(mant, e2, q)
+	let (mut di, dexp2, mut d0) = mult128bit_pow10(mant, e2, q)
 	if dexp2 >= 0 {
 		panic("not enough significant bits after mult128bit_pow10")
 	}
@@ -135,9 +135,9 @@ unsafe fn ryu_ftoa_fixed64(d: *DecimalSlice, mant: u64, exp: int, prec: int) {
 	let extra = uint(-dexp2)
 	let extra_mask = u64(1<<extra - 1)
 
-	let dfrac: u64
+	mut let dfrac: u64
 	di, dfrac = di>>extra, di&extra_mask
-	let round_up = false
+	mut let round_up = false
 	if exact {
 		// If we computed an exact product, d + 1/2
 		// should round to d+1 if 'd' is odd.
@@ -168,9 +168,9 @@ let u64pow10 = [...]u64{
 // Fills d with at most prec decimal digits
 // of mantissa m. The boolean trunc indicates whether m
 // is truncated compared to the original number being formatted.
-unsafe fn format_decimal(d: *DecimalSlice, m: u64, trunc: bool, round_up: bool, prec: int) {
+unsafe fn format_decimal(d: *DecimalSlice, mut m: u64, mut trunc: bool, mut round_up: bool, prec: int) {
 	let max = u64pow10[prec]
-	let trimmed = 0
+	mut let trimmed = 0
 	for m >= max {
 		let (a, b) = m/10, m%10
 		m = a
@@ -197,12 +197,12 @@ unsafe fn format_decimal(d: *DecimalSlice, m: u64, trunc: bool, round_up: bool, 
 		trimmed++
 	}
 	// render digits (similar to formatBits)
-	let n = uint(prec)
+	mut let n = uint(prec)
 	d.nd = int(prec)
-	let v = m
+	mut let v = m
 	for v >= 100 {
-		let v1: u64
-		let v2: u64
+		mut let v1: u64
+		mut let v2: u64
 		if v>>32 == 0 {
 			v1, v2 = u64(u32(v)/100), u64(u32(v)%100)
 		} else {
@@ -229,7 +229,7 @@ unsafe fn format_decimal(d: *DecimalSlice, m: u64, trunc: bool, round_up: bool, 
 }
 
 // Formats mant*2^exp with prec decimal digits.
-unsafe fn ryu_ftoa_shortest(d: *DecimalSlice, mant: u64, exp: int, flt: *FloatInfo) {
+unsafe fn ryu_ftoa_shortest(d: *DecimalSlice, mut mant: u64, exp: int, flt: *FloatInfo) {
 	if mant == 0 {
 		d.nd, d.dp = 0, 0
 		ret
@@ -241,7 +241,7 @@ unsafe fn ryu_ftoa_shortest(d: *DecimalSlice, mant: u64, exp: int, flt: *FloatIn
 		ryu_digits(d, mant, mant, mant, true, false)
 		ret
 	}
-	let (ml, mc, mu, e2) = compute_bounds(mant, exp, flt)
+	let (ml, mc, mu, mut e2) = compute_bounds(mant, exp, flt)
 	if e2 == 0 {
 		ryu_digits(d, ml, mc, mu, true, false)
 		ret
@@ -251,16 +251,16 @@ unsafe fn ryu_ftoa_shortest(d: *DecimalSlice, mant: u64, exp: int, flt: *FloatIn
 
 	// We are going to multiply by 10^q using 128-bit arithmetic.
 	// The exponent is the same for all 3 numbers.
-	let dl: u64
-	let dc: u64
-	let du: u64
-	let dl0: bool
-	let dc0: bool
-	let du0: bool
+	mut let dl: u64
+	mut let dc: u64
+	mut let du: u64
+	mut let dl0: bool
+	mut let dc0: bool
+	mut let du0: bool
 	if *flt == f32_info {
-		let dl32: u32
-		let dc32: u32
-		let du32: u32
+		mut let dl32: u32
+		mut let dc32: u32
+		mut let du32: u32
 		dl32, _, dl0 = mult64bit_pow10(u32(ml), e2, q)
 		dc32, _, dc0 = mult64bit_pow10(u32(mc), e2, q)
 		du32, e2, du0 = mult64bit_pow10(u32(mu), e2, q)
@@ -296,17 +296,17 @@ unsafe fn ryu_ftoa_shortest(d: *DecimalSlice, mant: u64, exp: int, flt: *FloatIn
 	let extra = uint(-e2)
 	let extra_mask = u64(1<<extra - 1)
 	// Now compute the floored, integral base 10 mantissas.
-	let fracl: u64
+	mut let fracl: u64
 	dl, fracl = dl>>extra, dl&extra_mask
-	let fracc: u64
+	mut let fracc: u64
 	dc, fracc = dc>>extra, dc&extra_mask
-	let fracu: u64
+	mut let fracu: u64
 	du, fracu = du>>extra, du&extra_mask
 	// Is it allowed to use 'du' as a result?
 	// It is always allowed when it is truncated, but also
 	// if it is exact and the original binary mantissa is even
 	// When disallowed, we can subtract 1.
-	let uok = !du0 || fracu > 0
+	mut let uok = !du0 || fracu > 0
 	if du0 && fracu == 0 {
 		uok = mant&1 == 0
 	}
@@ -315,7 +315,7 @@ unsafe fn ryu_ftoa_shortest(d: *DecimalSlice, mant: u64, exp: int, flt: *FloatIn
 	}
 	// Is 'dc' the correctly rounded base 10 mantissa?
 	// The correct rounding might be dc+1
-	let cup = false // don't round up.
+	mut let cup = false // don't round up.
 	if dc0 {
 		// If we computed an exact product, the half integer
 		// should round to next (even) integer if 'dc' is odd.
@@ -379,8 +379,8 @@ unsafe fn compute_bounds(mant: u64, exp: int,
 	ret
 }
 
-unsafe fn ryu_digits(d: *DecimalSlice, lower: u64, central: u64, upper: u64, c0: bool, cup: bool) {
-	let (lhi, llo) = divmod1e9(lower)
+unsafe fn ryu_digits(d: *DecimalSlice, lower: u64, central: u64, upper: u64, mut c0: bool, mut cup: bool) {
+	let (mut lhi, llo) = divmod1e9(lower)
 	let (chi, clo) = divmod1e9(central)
 	let (uhi, ulo) = divmod1e9(upper)
 	if uhi == 0 {
@@ -398,8 +398,8 @@ unsafe fn ryu_digits(d: *DecimalSlice, lower: u64, central: u64, upper: u64, c0:
 	} else {
 		d.nd = 0
 		// emit high part
-		let n = uint(9)
-		for let v = chi; v > 0; {
+		mut let n = uint(9)
+		for mut let v = chi; v > 0; {
 			let (v1, v2) = v/10, v%10
 			v = v1
 			n--
@@ -423,16 +423,16 @@ unsafe fn ryu_digits(d: *DecimalSlice, lower: u64, central: u64, upper: u64, c0:
 }
 
 // Emits decimal digits for a number less than 1e9.
-unsafe fn ryu_digits32(d: *DecimalSlice, lower: u32, central: u32,
-				upper: u32, c0: bool, cup: bool, endindex: int) {
+unsafe fn ryu_digits32(d: *DecimalSlice, mut lower: u32, mut central: u32,
+					mut upper: u32, mut c0: bool, mut cup: bool, mut endindex: int) {
 	if upper == 0 {
 		d.dp = endindex + 1
 		ret
 	}
-	let trimmed = 0
+	mut let trimmed = 0
 	// Remember last trimmed digit to check for round-up.
 	// c0 will be used to remember zeroness of following digits.
-	let c_next_digit = 0
+	mut let c_next_digit = 0
 	for upper > 0 {
 		// Repeatedly compute:
 		// l = ceil(lower / 10^k)
@@ -440,7 +440,7 @@ unsafe fn ryu_digits32(d: *DecimalSlice, lower: u32, central: u32,
 		// u = floor(upper / 10^k)
 		// and stop when c goes out of the (l, u) interval.
 		let l = (lower + 9) / 10
-		let (c, cdigit) = central/10, central%10
+		let (mut c, mut cdigit) = central/10, central%10
 		let u = upper / 10
 		if l > u {
 			// don't trim the last digit as it is forbidden to go below l
@@ -480,8 +480,8 @@ unsafe fn ryu_digits32(d: *DecimalSlice, lower: u32, central: u32,
 	}
 	// We know where the number ends, fill directly
 	endindex -= trimmed
-	let v = central
-	let n = endindex
+	mut let v = central
+	mut let n = endindex
 	for n > d.nd {
 		let (v1, v2) = v/100, v%100
 		d.d[n] = SMALLS_STR[2*v2+1]
@@ -505,7 +505,7 @@ unsafe fn ryu_digits32(d: *DecimalSlice, lower: u32, central: u32,
 // That is:
 //  m*2^e2 * round(10^q) = resM * 2^resE + ε
 //  exact = ε == 0
-fn mult64bit_pow10(m: u32, e2: int, q: int) (resM: u32, resE: int, exact: bool) {
+fn mult64bit_pow10(m: u32, mut e2: int, q: int) (resM: u32, resE: int, exact: bool) {
 	if q == 0 {
 		// P == 1<<63
 		ret m << 6, e2 - 6, true
@@ -514,7 +514,7 @@ fn mult64bit_pow10(m: u32, e2: int, q: int) (resM: u32, resE: int, exact: bool) 
 		// This never happens due to the range of f32/f64 exponent
 		panic("mult64bit_pow10: power of 10 is out of range")
 	}
-	let pow = detailed_pows_of_ten[q-detailed_pows_of_ten_min_exp10][1]
+	mut let pow = detailed_pows_of_ten[q-detailed_pows_of_ten_min_exp10][1]
 	if q < 0 {
 		// Inverse powers of ten must be rounded up.
 		pow += 1
@@ -533,7 +533,7 @@ fn mult64bit_pow10(m: u32, e2: int, q: int) (resM: u32, resE: int, exact: bool) 
 // That is:
 //  m*2^e2 * round(10^q) = resM * 2^resE + ε
 //  exact = ε == 0
-fn mult128bit_pow10(m: u64, e2: int, q: int) (resM: u64, resE: int, exact: bool) {
+fn mult128bit_pow10(m: u64, mut e2: int, q: int) (resM: u64, resE: int, exact: bool) {
 	if q == 0 {
 		// P == 1<<127
 		ret m << 8, e2 - 8, true
@@ -542,7 +542,7 @@ fn mult128bit_pow10(m: u64, e2: int, q: int) (resM: u64, resE: int, exact: bool)
 		// This never happens due to the range of f32/f64 exponent
 		panic("mult128bit_pow10: power of 10 is out of range")
 	}
-	let pow = detailed_pows_of_ten[q-detailed_pows_of_ten_min_exp10]
+	mut let pow = detailed_pows_of_ten[q-detailed_pows_of_ten_min_exp10]
 	if q < 0 {
 		// Inverse powers of ten must be rounded up.
 		pow[0] += 1
@@ -551,17 +551,17 @@ fn mult128bit_pow10(m: u64, e2: int, q: int) (resM: u64, resE: int, exact: bool)
 
 	// long multiplication
 	let (l1, l0) = std::math::bits::mul64(m, pow[0])
-	let (h1, h0) = std::math::bits::mul64(m, pow[1])
+	let (mut h1, h0) = std::math::bits::mul64(m, pow[1])
 	let (mid, carry) = std::math::bits::add64(l1, h0, 0)
 	h1 += carry
 	ret h1<<9 | mid>>55, e2, mid<<9 == 0 && l0 == 0
 }
 
-fn divisible_by_pow5(m: u64, k: int) bool {
+fn divisible_by_pow5(mut m: u64, k: int) bool {
 	if m == 0 {
 		ret true
 	}
-	for let i = 0; i < k; i++ {
+	for mut let i = 0; i < k; i++ {
 		if m%5 != 0 {
 			ret false
 		}

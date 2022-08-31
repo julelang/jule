@@ -1428,6 +1428,7 @@ func (p *Parser) Var(v Var) *Var {
 		} else {
 			p.eval.has_error = p.eval.has_error || val.data.Value == ""
 			v.Type = val.data.Type
+			p.check_valid_init_expr(v.Mutable, val, v.SetterTok)
 			if val.constExpr && typeIsPure(v.Type) && isConstExpression(val.data.Value) {
 				switch val.expr.(type) {
 				case int64:
@@ -1496,6 +1497,7 @@ func (p *Parser) varsFromParams(params []Param) []*Var {
 	for i, param := range params {
 		v := new(models.Var)
 		v.IsLocal = true
+		v.Mutable = param.Mutable
 		v.Id = param.Id
 		v.Token = param.Token
 		v.Type = param.Type
@@ -2175,7 +2177,7 @@ func (p *Parser) parseFuncCall(f *Func, args *models.Args, m *exprModel, errTok 
 		})
 	}
 end:
-	v.data.Value = f.Id
+	v.data.Value = " "
 	v.data.Type = f.RetType.Type.Copy()
 	if args.NeedsPureType {
 		v.data.Type.Pure = true
@@ -2365,11 +2367,12 @@ func (p *Parser) parseArg(f *Func, pair *paramMapPair, args *models.Args, variad
 }
 
 func (p *Parser) checkArgType(param *Param, val value, errTok lex.Token) {
+	p.check_valid_init_expr(param.Mutable, val, errTok)
 	assignChecker{
-		p:      p,
-		t:      param.Type,
-		v:      val,
-		errtok: errTok,
+		p:       p,
+		t:       param.Type,
+		v:       val,
+		errtok:  errTok,
 	}.checkAssignType()
 }
 
@@ -2621,10 +2624,10 @@ func (p *Parser) parseCase(c *models.Case, t Type) {
 		value, model := p.evalExpr(*expr)
 		expr.Model = model
 		assignChecker{
-			p:      p,
-			t:      t,
-			v:      value,
-			errtok: expr.Tokens[0],
+			p:       p,
+			t:       t,
+			v:       value,
+			errtok:  expr.Tokens[0],
 		}.checkAssignType()
 	}
 	oldCase := p.currentCase
@@ -2893,19 +2896,21 @@ func (p *Parser) concurrentCall(cc *models.ConcurrentCall) {
 	_, cc.Expr.Model = p.evalExpr(cc.Expr)
 }
 
-func (p *Parser) assignment(selected value, errtok lex.Token) bool {
+func (p *Parser) assignment(left value, errtok lex.Token) bool {
 	state := true
-	if !selected.lvalue {
+	if !left.lvalue {
 		p.eval.pusherrtok(errtok, "assign_require_lvalue")
 		state = false
 	}
-	if selected.constExpr {
+	if left.constExpr {
 		p.pusherrtok(errtok, "assign_const")
 		state = false
+	} else if !left.mutable {
+		p.pusherrtok(errtok, "assignment_to_non_mut")
 	}
-	switch selected.data.Type.Tag.(type) {
+	switch left.data.Type.Tag.(type) {
 	case Func:
-		f, _, _ := p.FuncById(selected.data.Token.Kind)
+		f, _, _ := p.FuncById(left.data.Token.Kind)
 		if f != nil {
 			p.pusherrtok(errtok, "assign_type_not_support_value")
 			state = false
@@ -2929,21 +2934,21 @@ func (p *Parser) singleAssign(assign *models.Assign, exprs []value) {
 	if assign.Setter.Kind != tokens.EQUAL && !isConstExpression(val.data.Value) {
 		assign.Setter.Kind = assign.Setter.Kind[:len(assign.Setter.Kind)-1]
 		solver := solver{
-			p:        p,
-			left:     left.Tokens,
+			p:         p,
+			left:      left.Tokens,
 			left_val:  leftExpr,
-			right:    right.Tokens,
+			right:     right.Tokens,
 			right_val: val,
-			operator: assign.Setter,
+			operator:  assign.Setter,
 		}
 		val = solver.solve()
 		assign.Setter.Kind += tokens.EQUAL
 	}
 	assignChecker{
-		p:      p,
-		t:      leftExpr.data.Type,
-		v:      val,
-		errtok: assign.Setter,
+		p:       p,
+		t:       leftExpr.data.Type,
+		v:       val,
+		errtok:  assign.Setter,
 	}.checkAssignType()
 }
 
@@ -2970,6 +2975,16 @@ func (p *Parser) funcMultiAssign(vsAST *models.Assign, funcVal value) {
 	p.multiAssign(vsAST, vals)
 }
 
+func (p *Parser) check_valid_init_expr(left_mutable bool, right value, errtok lex.Token) {
+	if p.unsafe_allowed() || !lex.IsIdentifierRune(right.data.Value) {
+		return
+	}
+	if left_mutable && !right.mutable && type_is_mutable(right.data.Type) {
+		p.pusherrtok(errtok, "assignment_non_mut_to_mut")
+		return
+	}
+}
+
 func (p *Parser) multiAssign(assign *models.Assign, right []value) {
 	for i := range assign.Left {
 		left := &assign.Left[i]
@@ -2984,11 +2999,12 @@ func (p *Parser) multiAssign(assign *models.Assign, right []value) {
 			if !p.assignment(leftExpr, assign.Setter) {
 				return
 			}
+			p.check_valid_init_expr(leftExpr.mutable, right, assign.Setter)
 			assignChecker{
-				p:      p,
-				t:      leftExpr.data.Type,
-				v:      right,
-				errtok: assign.Setter,
+				p:       p,
+				t:       leftExpr.data.Type,
+				v:       right,
+				errtok:  assign.Setter,
 			}.checkAssignType()
 			continue
 		}
@@ -3110,10 +3126,10 @@ func (p *Parser) forProfile(iter *models.Iter) {
 		val, model := p.evalExpr(profile.Condition)
 		profile.Condition.Model = model
 		assignChecker{
-			p:      p,
-			t:      Type{Id: juletype.Bool, Kind: juletype.TypeMap[juletype.Bool]},
-			v:      val,
-			errtok: profile.Condition.Tokens[0],
+			p:       p,
+			t:       Type{Id: juletype.Bool, Kind: juletype.TypeMap[juletype.Bool]},
+			v:       val,
+			errtok:  profile.Condition.Tokens[0],
 		}.checkAssignType()
 	}
 	if profile.Next.Data != nil {
@@ -3475,10 +3491,10 @@ func (p *Parser) typeSourceIsArrayType(t *Type) (ok bool) {
 		p.eval.pusherrtok(t.Token, "expr_not_const")
 	}
 	assignChecker{
-		p:      p,
-		t:      Type{Id: juletype.UInt, Kind: juletype.TypeMap[juletype.UInt]},
-		v:      val,
-		errtok: t.Size.Expr.Tokens[0],
+		p:       p,
+		t:       Type{Id: juletype.UInt, Kind: juletype.TypeMap[juletype.UInt]},
+		v:       val,
+		errtok:  t.Size.Expr.Tokens[0],
 	}.checkAssignType()
 	return
 }

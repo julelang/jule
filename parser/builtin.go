@@ -401,6 +401,7 @@ var Builtin = &DefineMap{
 			RetType:  models.RetType{Type: Type{Id: juletype.Int, Kind: juletype.TypeMap[juletype.Int]}},
 			Params: []models.Param{
 				{
+					Mutable: true,
 					Id: "dest",
 					Type: Type{
 						Id:            juletype.Slice,

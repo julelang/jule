@@ -17,6 +17,7 @@
 + Fast and scalable development
 + Performance-critical software
 + Memory safety
++ Immutability by default
 + As efficient and performance as C++
 + High C++ interoperability
 

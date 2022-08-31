@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-fn eisel_lemire64(man: u64, exp10: int, neg: bool) (f: f64, ok: bool) {
+fn eisel_lemire64(mut man: u64, exp10: int, neg: bool) (f: f64, ok: bool) {
 	// The terse comments in this function body refer to sections of the
 	// https://nigeltao.github.io/blog/2020/eisel-lemire.html blog post.
 
@@ -21,15 +21,15 @@ fn eisel_lemire64(man: u64, exp10: int, neg: bool) (f: f64, ok: bool) {
 	let clz = std::math::bits::leading_zeros64(man)
 	man <<= uint(clz)
 	const F64_EXPONENT_BIAS = 1023
-	let ret_exp2 = u64(217706*exp10>>16+64+F64_EXPONENT_BIAS) - u64(clz)
+	mut let ret_exp2 = u64(217706*exp10>>16+64+F64_EXPONENT_BIAS) - u64(clz)
 
 	// Multiplication.
-	let (x_hi, x_lo) = std::math::bits::mul64(man, detailed_pows_of_ten[exp10-detailed_pows_of_ten_min_exp10][1])
+	let (mut x_hi, mut x_lo) = std::math::bits::mul64(man, detailed_pows_of_ten[exp10-detailed_pows_of_ten_min_exp10][1])
 
 	// Wider Approximation.
 	if x_hi&0x1FF == 0x1FF && x_lo+man < man {
 		let (y_hi, y_lo) = std::math::bits::mul64(man, detailed_pows_of_ten[exp10-detailed_pows_of_ten_min_exp10][0])
-		let (merged_hi, merged_lo) = x_hi, x_lo+y_hi
+		let (mut merged_hi, merged_lo) = x_hi, x_lo+y_hi
 		if merged_lo < x_lo {
 			merged_hi++
 		}
@@ -41,7 +41,7 @@ fn eisel_lemire64(man: u64, exp10: int, neg: bool) (f: f64, ok: bool) {
 
 	// Shifting to 54 Bits.
 	let msb = x_hi >> 63
-	let ret_mantissa = x_hi >> (msb + 9)
+	mut let ret_mantissa = x_hi >> (msb + 9)
 	ret_exp2 -= 1 ^ msb
 
 	// Half-way Ambiguity.
@@ -64,14 +64,14 @@ fn eisel_lemire64(man: u64, exp10: int, neg: bool) (f: f64, ok: bool) {
 	if ret_exp2-1 >= 0x7FF-1 {
 		ret 0, false
 	}
-	let ret_bits = ret_exp2<<52 | ret_mantissa&0x000FFFFFFFFFFFFF
+	mut let ret_bits = ret_exp2<<52 | ret_mantissa&0x000FFFFFFFFFFFFF
 	if neg {
 		ret_bits |= 0x8000000000000000
 	}
 	ret std::math::f64_from_bits(ret_bits), true
 }
 
-fn eisel_lemire32(man: u64, exp10: int, neg: bool) (f: f32, ok: bool) {
+fn eisel_lemire32(mut man: u64, exp10: int, neg: bool) (f: f32, ok: bool) {
 	// The terse comments in this function body refer to sections of the
 	// https://nigeltao.github.io/blog/2020/eisel-lemire.html blog post.
 	//
@@ -96,15 +96,15 @@ fn eisel_lemire32(man: u64, exp10: int, neg: bool) (f: f32, ok: bool) {
 	let clz = std::math::bits::leading_zeros64(man)
 	man <<= uint(clz)
 	const F32_EXPONENT_BIAS = 127
-	let ret_exp2 = u64(217706*exp10>>16+64+F32_EXPONENT_BIAS) - u64(clz)
+	mut let ret_exp2 = u64(217706*exp10>>16+64+F32_EXPONENT_BIAS) - u64(clz)
 
 	// Multiplication.
-	let (x_hi, x_lo) = std::math::bits::mul64(man, detailed_pows_of_ten[exp10-detailed_pows_of_ten_min_exp10][1])
+	let (mut x_hi, mut x_lo) = std::math::bits::mul64(man, detailed_pows_of_ten[exp10-detailed_pows_of_ten_min_exp10][1])
 
 	// Wider Approximation.
 	if x_hi&0x3FFFFFFFFF == 0x3FFFFFFFFF && x_lo+man < man {
 		let (y_hi, y_lo) = std::math::bits::mul64(man, detailed_pows_of_ten[exp10-detailed_pows_of_ten_min_exp10][0])
-		let (merged_hi, merged_lo) = x_hi, x_lo+y_hi
+		let (mut merged_hi, merged_lo) = x_hi, x_lo+y_hi
 		if merged_lo < x_lo {
 			merged_hi++
 		}
@@ -116,7 +116,7 @@ fn eisel_lemire32(man: u64, exp10: int, neg: bool) (f: f32, ok: bool) {
 
 	// Shifting to 54 Bits (and for float32, it's shifting to 25 bits).
 	let msb = x_hi >> 63
-	let ret_mantissa = x_hi >> (msb + 38)
+	mut let ret_mantissa = x_hi >> (msb + 38)
 	ret_exp2 -= 1 ^ msb
 
 	// Half-way Ambiguity.
@@ -139,7 +139,7 @@ fn eisel_lemire32(man: u64, exp10: int, neg: bool) (f: f32, ok: bool) {
 	if ret_exp2-1 >= 0xFF-1 {
 		ret 0, false
 	}
-	let ret_bits = ret_exp2<<23 | ret_mantissa&0x007FFFFF
+	mut let ret_bits = ret_exp2<<23 | ret_mantissa&0x007FFFFF
 	if neg {
 		ret_bits |= 0x80000000
 	}

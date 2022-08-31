@@ -20,6 +20,7 @@ type value struct {
 	lvalue    bool
 	variadic  bool
 	isType    bool
+	mutable   bool
 }
 
 func isOperator(process []lex.Token) bool {
@@ -237,6 +238,7 @@ func (e *eval) unary(toks []lex.Token, m *exprModel) value {
 		e.pusherrtok(processor.token, "invalid_syntax")
 	}
 	v.data.Token = processor.token
+	v.data.Value = " "
 	return v
 }
 
@@ -607,6 +609,7 @@ func (e *eval) cast(v value, t Type, errtok lex.Token) value {
 	v.data.Value = t.Kind
 	v.data.Type = t
 	v.lvalue = typeIsLvalue(t)
+	v.mutable = type_is_mutable(t)
 	if v.constExpr {
 		var model exprNode
 		model.value = v.data.Type.String()
@@ -888,6 +891,7 @@ func (e *eval) xObjSubId(dm *DefineMap, val value, idTok lex.Token, m *exprModel
 		return
 	}
 	v = val
+	v.mutable = false
 	m.appendSubNode(exprNode{subIdAccessorOfType(val.data.Type)})
 	switch t {
 	case 'g':
@@ -896,6 +900,7 @@ func (e *eval) xObjSubId(dm *DefineMap, val value, idTok lex.Token, m *exprModel
 		v.data.Type = g.Type
 		v.lvalue = val.lvalue || typeIsLvalue(g.Type)
 		v.constExpr = g.Const
+		v.mutable = g.Mutable
 		if g.Const {
 			v.expr = g.ExprTag
 			v.model = g.Expr.Model
@@ -1165,13 +1170,20 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 			e.checkIntegerIndexing(rightv, errTok)
 		}
 		m.appendSubNode(exprNode{")"})
-		return e.slicing(v, leftv, rightv, errTok)
+		v = e.slicing(v, leftv, rightv, errTok)
+		if !type_is_mutable(v.data.Type) {
+			v.data.Value = " "
+		}
+		return v
 	}
 	m.appendSubNode(exprNode{tokens.LBRACKET})
 	indexv, model := e.toks(toks[1 : len(toks)-1])
 	m.appendSubNode(indexingExprModel(model))
 	m.appendSubNode(exprNode{tokens.RBRACKET})
 	v = e.indexing(v, indexv, errTok)
+	if !type_is_mutable(v.data.Type) {
+		v.data.Value = " "
+	}
 	// Ignore indexed type from original
 	v.data.Type.Pure = true
 	v.data.Type.Original = nil
@@ -1363,10 +1375,10 @@ func (e *eval) buildArray(parts [][]lex.Token, t Type, errtok lex.Token) (value,
 		partVal, expModel := e.toks(part)
 		model.expr = append(model.expr, expModel)
 		assignChecker{
-			p:      e.p,
-			t:      *t.ComponentType,
-			v:      partVal,
-			errtok: part[0],
+			p:       e.p,
+			t:       *t.ComponentType,
+			v:       partVal,
+			errtok:  part[0],
 		}.checkAssignType()
 	}
 	return v, model
@@ -1384,10 +1396,10 @@ func (e *eval) buildSlice(parts [][]lex.Token, t Type, errtok lex.Token) (value,
 		partVal, expModel := e.toks(part)
 		model.expr = append(model.expr, expModel)
 		assignChecker{
-			p:      e.p,
-			t:      *t.ComponentType,
-			v:      partVal,
-			errtok: part[0],
+			p:       e.p,
+			t:       *t.ComponentType,
+			v:       partVal,
+			errtok:  part[0],
 		}.checkAssignType()
 	}
 	return v, model

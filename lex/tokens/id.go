@@ -41,4 +41,5 @@ const (
 	Fn          uint8 = 36
 	Let         uint8 = 37
 	Unsafe      uint8 = 38
+	Mut         uint8 = 39
 )

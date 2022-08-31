@@ -11,6 +11,7 @@ import (
 // Var is variable declaration AST model.
 type Var struct {
 	Pub       bool
+	Mutable   bool
 	Token     lex.Token
 	SetterTok lex.Token
 	Id        string

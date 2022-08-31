@@ -38,6 +38,7 @@ func (rt *RetType) Vars() []*Var {
 		v.Id = tok.Kind
 		v.Type = t
 		v.IsLocal = true
+		v.Mutable = true
 		return v
 	}
 	if !rt.Type.MultiTyped {

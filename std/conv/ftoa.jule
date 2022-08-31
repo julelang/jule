@@ -14,10 +14,10 @@ let f32_info = FloatInfo{23, 8, -127}
 let f64_info = FloatInfo{52, 11, -1023}
 
 struct DecimalSlice {
-	d  : []byte
-	nd : int
-	dp : int
-	neg: bool
+	mut d: []byte
+	mut nd: int
+	mut dp: int
+	mut neg: bool
 }
 
 // Converts the floating-point number f to a string,
@@ -46,9 +46,9 @@ pub fn fmt_float(f: f64, fmt: byte, prec: int, bit_size: int) str {
 	ret unsafe{ (str)(generic_ftoa(nil, f, fmt, prec, bit_size)) }
 }
 
-unsafe fn generic_ftoa(dst: []byte, val: f64, fmt: byte, prec: int, bit_size: int) []byte {
-	let bits: u64
-	let flt: *FloatInfo
+unsafe fn generic_ftoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_size: int) []byte {
+	mut let bits: u64
+	mut let flt: *FloatInfo
 	match bit_size {
 	case 32:
 		bits = u64(std::math::f32_bits(f32(val)))
@@ -61,13 +61,13 @@ unsafe fn generic_ftoa(dst: []byte, val: f64, fmt: byte, prec: int, bit_size: in
 	}
 
 	let neg = bits>>(flt.expbits+flt.mantbits) != 0
-	let exp = int(bits>>flt.mantbits) & (1<<flt.expbits - 1)
-	let mant = bits & (u64(1)<<flt.mantbits - 1)
+	mut let exp = int(bits>>flt.mantbits) & (1<<flt.expbits - 1)
+	mut let mant = bits & (u64(1)<<flt.mantbits - 1)
 
 	match exp {
 	case 1<<flt.expbits - 1:
 		// +inf, nan
-		let s: str
+		mut let s: str
 		match {
 		case mant != 0:
 			s = "nan"
@@ -99,7 +99,7 @@ unsafe fn generic_ftoa(dst: []byte, val: f64, fmt: byte, prec: int, bit_size: in
 	}
 
 	let digs: DecimalSlice
-	let ok = false
+	mut let ok = false
 	// Negative precision means "only as much as needed to be exact."
 	let shortest = prec < 0
 	if shortest {
@@ -119,7 +119,7 @@ unsafe fn generic_ftoa(dst: []byte, val: f64, fmt: byte, prec: int, bit_size: in
 		}
 	} else if fmt != 'f' {
 		// Fixed number of digits.
-		let digits = prec
+		mut let digits = prec
 		match fmt {
 		case 'e', 'E':
 			digits++
@@ -150,12 +150,12 @@ unsafe fn generic_ftoa(dst: []byte, val: f64, fmt: byte, prec: int, bit_size: in
 }
 
 // Uses multiprecision computations to format a float.
-unsafe fn big_ftoa(dst: []byte, prec: int, fmt: byte, neg: bool,
+unsafe fn big_ftoa(mut dst: []byte, mut prec: int, fmt: byte, neg: bool,
 				mant: u64, exp: int, flt: *FloatInfo) []byte {
 	let d: Decimal
 	d.assign(mant)
 	d.shift(exp - int(flt.mantbits))
-	let digs: DecimalSlice
+	mut let digs: DecimalSlice
 	let shortest = prec < 0
 	if shortest {
 		round_shortest(&d, mant, exp, flt)
@@ -187,8 +187,8 @@ unsafe fn big_ftoa(dst: []byte, prec: int, fmt: byte, neg: bool,
 	ret fmt_digits(dst, shortest, neg, digs, prec, fmt)
 }
 
-fn fmt_digits(dst: []byte, shortest: bool, neg: bool,
-			digs: DecimalSlice, prec: int, fmt: byte) []byte {
+fn fmt_digits(mut dst: []byte, shortest: bool, neg: bool,
+			digs: DecimalSlice, mut prec: int, fmt: byte) []byte {
 	match fmt {
 	case 'e', 'E':
 		ret fmt_e(dst, neg, digs, prec, fmt)
@@ -196,7 +196,7 @@ fn fmt_digits(dst: []byte, shortest: bool, neg: bool,
 		ret fmt_f(dst, neg, digs, prec)
 	case 'g', 'G':
 		// trailing fractional zeros in 'e' form will be trimmed.
-		let eprec = prec
+		mut let eprec = prec
 		if eprec > digs.nd && digs.nd >= digs.dp {
 			eprec = digs.nd
 		}
@@ -255,7 +255,7 @@ unsafe fn round_shortest(d: *Decimal, mant: u64, exp: int, flt: *FloatInfo) {
 	// d = mant << (exp - mantbits)
 	// Next highest floating point number is mant+1 << exp-mantbits.
 	// Our upper bound is halfway between, mant*2+1 << exp-mantbits-1.
-	let upper = new(Decimal)
+	let upper: Decimal
 	upper.assign(mant*2 + 1)
 	upper.shift(exp - int(flt.mantbits) - 1)
 
@@ -265,8 +265,8 @@ unsafe fn round_shortest(d: *Decimal, mant: u64, exp: int, flt: *FloatInfo) {
 	// in which case the next lowest is mant*2-1 << exp-mantbits-1.
 	// Either way, call it mantlo << explo-mantbits.
 	// Our lower bound is halfway between, mantlo*2+1 << explo-mantbits-1.
-	let mantlo: u64
-	let explo: int
+	mut let mantlo: u64
+	mut let explo: int
 	if mant > 1<<flt.mantbits || exp == minexp {
 		mantlo = mant - 1
 		explo = exp
@@ -294,11 +294,11 @@ unsafe fn round_shortest(d: *Decimal, mant: u64, exp: int, flt: *FloatInfo) {
 	//
 	// If upperdelta == 2, then the difference is greater than 1
 	// and we know that rounding up falls within the bound.
-	let upperdelta: u8
+	mut let upperdelta: u8
 
 	// Now we can figure out the minimum number of digits required.
 	// Walk along until d has distinguished itself from upper and lower.
-	for let ui = 0; ; ui++ {
+	for mut let ui = 0; ; ui++ {
 		// lower, d, and upper may have the decimal points at different
 		// places. In this case upper is the longest, so we iterate from
 		// ui==0 and start li and mi at (possibly) -1.
@@ -307,15 +307,15 @@ unsafe fn round_shortest(d: *Decimal, mant: u64, exp: int, flt: *FloatInfo) {
 			break
 		}
 		let li = ui - upper.dp + lower.dp
-		let l = byte('0') // lower digit
+		mut let l = byte('0') // lower digit
 		if li >= 0 && li < lower.nd {
 			l = lower.d[li]
 		}
-		let m = byte('0') // middle digit
+		mut let m = byte('0') // middle digit
 		if mi >= 0 {
 			m = d.d[mi]
 		}
-		let u = byte('0') // upper digit
+		mut let u = byte('0') // upper digit
 		if ui < upper.nd {
 			u = upper.d[ui]
 		}
@@ -363,14 +363,14 @@ unsafe fn round_shortest(d: *Decimal, mant: u64, exp: int, flt: *FloatInfo) {
 }
 
 // %e: -d.ddddde±dd
-fn fmt_e(dst: []byte, neg: bool, d: DecimalSlice, prec: int, fmt: byte) []byte {
+fn fmt_e(mut dst: []byte, neg: bool, d: DecimalSlice, prec: int, fmt: byte) []byte {
 	// sign
 	if neg {
 		dst = append[byte](dst, '-')
 	}
 
 	// first digit
-	let ch = byte('0')
+	mut let ch: byte = '0'
 	if d.nd != 0 {
 		ch = d.d[0]
 	}
@@ -379,7 +379,7 @@ fn fmt_e(dst: []byte, neg: bool, d: DecimalSlice, prec: int, fmt: byte) []byte {
 	// .moredigits
 	if prec > 0 {
 		dst = append[byte](dst, '.')
-		let i = 1
+		mut let i = 1
 		let m = min(d.nd, prec+1)
 		if i < m {
 			dst = append[byte](dst, d.d[i:m]...)
@@ -392,7 +392,7 @@ fn fmt_e(dst: []byte, neg: bool, d: DecimalSlice, prec: int, fmt: byte) []byte {
 
 	// e±
 	dst = append[byte](dst, fmt)
-	let exp = d.dp - 1
+	mut let exp = d.dp - 1
 	if d.nd == 0 { // special case: 0 has exponent 0
 		exp = 0
 	}
@@ -418,7 +418,7 @@ fn fmt_e(dst: []byte, neg: bool, d: DecimalSlice, prec: int, fmt: byte) []byte {
 }
 
 // %f: -ddddddd.ddddd
-fn fmt_f(dst: []byte, neg: bool, d: DecimalSlice, prec: int) []byte {
+fn fmt_f(mut dst: []byte, neg: bool, d: DecimalSlice, prec: int) []byte {
 	// sign
 	if neg {
 		dst = append[byte](dst, '-')
@@ -426,7 +426,7 @@ fn fmt_f(dst: []byte, neg: bool, d: DecimalSlice, prec: int) []byte {
 
 	// integer, padded with zeros as needed.
 	if d.dp > 0 {
-		let m = min(d.nd, d.dp)
+		mut let m = min(d.nd, d.dp)
 		dst = append[byte](dst, d.d[:m]...)
 		for ; m < d.dp; m++ {
 			dst = append[byte](dst, '0')
@@ -437,8 +437,8 @@ fn fmt_f(dst: []byte, neg: bool, d: DecimalSlice, prec: int) []byte {
 	// fraction
 	if prec > 0 {
 		dst = append[byte](dst, '.')
-		for let i = 0; i < prec; i++ {
-			let ch = byte('0')
+		for mut let i = 0; i < prec; i++ {
+			mut let ch = byte('0')
 			let j = d.dp + i
 			if 0 <= j && j < d.nd {
 				ch = d.d[j]
@@ -450,7 +450,7 @@ fn fmt_f(dst: []byte, neg: bool, d: DecimalSlice, prec: int) []byte {
 }
 
 // %b: -ddddddddp±ddd
-unsafe fn fmt_b(dst: []byte, neg: bool, mant: u64, exp: int, flt: *FloatInfo) []byte {
+unsafe fn fmt_b(mut dst: []byte, neg: bool, mant: u64, mut exp: int, flt: *FloatInfo) []byte {
 	// sign
 	if neg {
 		dst = append[byte](dst, '-')
@@ -472,8 +472,8 @@ unsafe fn fmt_b(dst: []byte, neg: bool, mant: u64, exp: int, flt: *FloatInfo) []
 }
 
 // %x: -0x1.yyyyyyyyp±ddd or -0x0p+0. (y is hex digit, d is decimal digit)
-unsafe fn fmt_x(dst: []byte, prec: int, fmt: byte, neg: bool,
-				mant: u64, exp: int, flt: *FloatInfo) []byte {
+unsafe fn fmt_x(mut dst: []byte, prec: int, fmt: byte, neg: bool,
+				mut mant: u64, mut exp: int, flt: *FloatInfo) []byte {
 	if mant == 0 {
 		exp = 0
 	}
@@ -501,7 +501,7 @@ unsafe fn fmt_x(dst: []byte, prec: int, fmt: byte, neg: bool,
 		}
 	}
 
-	let hex = lowerhex
+	mut let hex = lowerhex
 	if fmt == 'X' {
 		hex = upperhex
 	}
@@ -522,14 +522,14 @@ unsafe fn fmt_x(dst: []byte, prec: int, fmt: byte, neg: bool,
 		}
 	} else if prec > 0 {
 		dst = append[byte](dst, '.')
-		for let i = 0; i < prec; i++ {
+		for mut let i = 0; i < prec; i++ {
 			dst = append[byte](dst, hex[(mant>>60)&15])
 			mant <<= 4
 		}
 	}
 
 	// p±
-	let ch = byte('P')
+	mut let ch = byte('P')
 	if fmt == lower(fmt) {
 		ch = 'p'
 	}

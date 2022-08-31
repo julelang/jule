@@ -101,14 +101,26 @@ func iskw(ln, kw string) bool {
 		!unicode.IsLetter(r)
 }
 
+// IsIdentifierRune returns true if first rune of string is allowed to
+// first char for identifiers, false if not.
+func IsIdentifierRune(s string) bool {
+	if s == "" {
+		return false
+	}
+	if s[0] != '_' {
+		r, _ := utf8.DecodeRuneInString(s)
+		if !unicode.IsLetter(r) {
+			return false
+		}
+	}
+	return true
+}
+
 // id returns identifer if next token is identifer,
 // returns empty string if not.
 func (l *Lex) id(ln string) string {
-	if ln[0] != '_' {
-		r, _ := utf8.DecodeRuneInString(ln)
-		if !unicode.IsLetter(r) {
-			return ""
-		}
+	if !IsIdentifierRune(ln) {
+		return ""
 	}
 	var sb strings.Builder
 	for _, r := range ln {
@@ -632,6 +644,7 @@ var keywords = map[string]uint8{
 	tokens.FN:          tokens.Fn,
 	tokens.LET:         tokens.Let,
 	tokens.UNSAFE:      tokens.Unsafe,
+	tokens.MUT:         tokens.Mut,
 }
 
 type oppair struct {

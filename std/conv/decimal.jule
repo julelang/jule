@@ -107,20 +107,20 @@ let leftcheats = []LeftCheat{
 }
 
 struct Decimal {
-	d    : [800]byte // digits, big-endian representation
-	nd   : int       // number of digits used
-	dp   : int       // decimal point
-	neg  : bool      // negative flag
-	trunc: bool      // discarded nonzero digits beyond d[:nd]
+	mut d: [800]byte // digits, big-endian representation
+	mut nd: int      // number of digits used
+	mut dp: int      // decimal point
+	mut neg: bool    // negative flag
+	mut trunc: bool  // discarded nonzero digits beyond d[:nd]
 }
 
 impl Decimal {
 	// Assign v.
-	fn assign(v: u64) {
-		let buf: [24]byte
+	fn assign(mut v: u64) {
+		mut let buf: [24]byte
 
 		// Write reversed decimal in buf.
-		let n = 0
+		mut let n = 0
 		for v > 0 {
 			let v1 = v / 10
 			v -= 10 * v1
@@ -140,7 +140,7 @@ impl Decimal {
 	}
 
 	// Binary shift left (k > 0) or right (k < 0).
-	fn shift(k: int) {
+	fn shift(mut k: int) {
 		match {
 		case .nd == 0:
 			// nothing to do: a == 0
@@ -175,7 +175,7 @@ impl Decimal {
 		}
 
 		// round up
-		for let i = nd - 1; i >= 0; i-- {
+		for mut let i = nd - 1; i >= 0; i-- {
 			let c = .d[i]
 			if c < '9' { // can stop after this digit
 				.d[i]++
@@ -212,8 +212,8 @@ impl Decimal {
 		if .dp > 20 {
 			ret 0xFFFFFFFFFFFFFFFF
 		}
-		let i: int
-		let n: u64 = 0
+		mut let i: int
+		mut let n: u64 = 0
 		for i = 0; i < .dp && i < .nd; i++ {
 			n = n*10 + u64(.d[i]-'0')
 		}
@@ -227,7 +227,7 @@ impl Decimal {
 	}
 }
 
-fn digit_zero(dst: []byte) int {
+fn digit_zero(mut dst: []byte) int {
 	for i: in dst {
 		dst[i] = '0'
 	}
@@ -248,11 +248,11 @@ unsafe fn trim(a: *Decimal) {
 
 // Binary shift right (/ 2) by k bits.  k <= maxShift to avoid overflow.
 unsafe fn right_shift(a: *Decimal, k: uint) {
-	let r = 0 // read pointer
-	let w = 0 // write pointer
+	mut let r = 0 // read pointer
+	mut let w = 0 // write pointer
 
 	// Pick up enough leading digits to cover first shift.
-	let n: uint
+	mut let n: uint
 	for ; n>>k == 0; r++ {
 		if r >= a.nd {
 			if n == 0 {
@@ -302,7 +302,7 @@ unsafe fn right_shift(a: *Decimal, k: uint) {
 
 // Is the leading prefix of b lexicographically less than s?
 fn prefix_is_less_than(b: []byte, s: str) bool {
-	for let i = 0; i < s.len; i++ {
+	for mut let i = 0; i < s.len; i++ {
 		if i >= b.len {
 			ret true
 		}
@@ -315,16 +315,16 @@ fn prefix_is_less_than(b: []byte, s: str) bool {
 
 // Binary shift left (* 2) by k bits.  k <= maxShift to avoid overflow.
 unsafe fn left_shift(a: *Decimal, k: uint) {
-	let delta = leftcheats[k].delta
+	mut let delta = leftcheats[k].delta
 	if prefix_is_less_than(a.d[0:a.nd], leftcheats[k].cutoff) {
 		delta--
 	}
 
-	let r = a.nd         // read index
-	let w = a.nd + delta // write index
+	mut let r = a.nd         // read index
+	mut let w = a.nd + delta // write index
 
 	// Pick up a digit, put down a digit.
-	let n: uint
+	mut let n: uint
 	for r--; r >= 0; r-- {
 		n += (uint(a.d[r]) - '0') << k
 		let quo = n / 10

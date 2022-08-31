@@ -62,7 +62,7 @@ func (b *Builder) buildNode(toks []lex.Token) {
 		s := models.Statement{Token: t}
 		s.Data = b.Func(toks, false, false)
 		b.Tree = append(b.Tree, models.Object{Token: s.Token, Data: s})
-	case tokens.Const, tokens.Let:
+	case tokens.Const, tokens.Let, tokens.Mut:
 		b.GlobalVar(toks)
 	case tokens.Type:
 		b.Tree = append(b.Tree, b.TypeOrGenerics(toks))
@@ -319,22 +319,6 @@ func (b *Builder) traitFuncs(toks []lex.Token) []*models.Fn {
 	i := 0
 	for i < len(toks) {
 		fnToks := b.skipStatement(&i, &toks)
-		/*tok := fnToks[0]
-		switch tok.Id {
-		case tokens.Fn, tokens.Unsafe:
-			i := 1
-			if tok.Id == tokens.Unsafe {
-				i++
-			}
-			if len(fnToks) > i {
-				tok = fnToks[i]
-				if tok.Id == tokens.Operator && tok.Kind == tokens.AMPER {
-					ref = true
-					// Remove reference token
-					fnToks = append(fnToks[:i], fnToks[i+1:]...)
-				}
-			}
-		}*/
 		f := b.Func(fnToks, false, true)
 		f.Pub = true
 		funcs = append(funcs, &f)
@@ -971,6 +955,18 @@ func (b *Builder) paramType(p *models.Param, toks []lex.Token, mustPure bool) {
 func (b *Builder) pushParam(params *[]models.Param, toks []lex.Token, mustPure bool) {
 	var param models.Param
 	param.Token = toks[0]
+	if param.Token.Id == tokens.Mut {
+		param.Mutable = true
+		if len(toks) == 1 {
+			b.pusherr(toks[0], "invalid_syntax")
+			return
+		}
+		param.Token = toks[1]
+		if param.Token.Id != tokens.Id {
+			b.pusherr(toks[0], "invalid_syntax")
+		}
+		toks = toks[1:]
+	}
 	// Just data type
 	if param.Token.Id != tokens.Id {
 		param.Id = jule.Anonymous
@@ -1339,7 +1335,7 @@ func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
 		return s
 	}
 	switch tok.Id {
-	case tokens.Const, tokens.Let:
+	case tokens.Const, tokens.Let, tokens.Mut:
 		return b.VarStatement(bs.toks)
 	case tokens.Ret:
 		return b.RetStatement(bs.toks)
@@ -1524,10 +1520,21 @@ func (b *Builder) letDeclAssign(toks []lex.Token) (assign models.Assign, ok bool
 		return
 	}
 	for _, part := range parts {
-		if len(part) > 1 {
-			b.pusherr(part[1], "invalid_syntax")
+		if len(part) > 2 {
+			b.pusherr(part[2], "invalid_syntax")
+		}
+		mutable := false
+		tok := part[0]
+		if tok.Id == tokens.Mut {
+			mutable = true
+			part = part[1:]
+			if len(part) == 0 {
+				b.pusherr(tok, "invalid_syntax")
+				continue
+			}
 		}
 		left := b.buildAssignLeft(part)
+		left.Var.Mutable = mutable
 		left.Var.New = !juleapi.IsIgnoreId(left.Var.Id)
 		left.Var.SetterTok = assign.Setter
 		assign.Left = append(assign.Left, left)
@@ -1644,29 +1651,27 @@ func (b *Builder) pushArg(args *models.Args, targeting bool, toks []lex.Token, e
 
 func (b *Builder) varBegin(v *models.Var, i *int, toks []lex.Token) {
 	tok := toks[*i]
-	if toks[*i].Id == tokens.Let {
+	switch tok.Id {
+	case tokens.Let:
 		// Initialize 1 for skip the let keyword
 		*i++
-		if *i >= len(toks) {
-			b.pusherr(tok, "invalid_syntax")
-		}
-		return
-	}
-	for ; *i < len(toks); *i++ {
-		tok := toks[*i]
-		if tok.Id == tokens.Id {
+	case tokens.Const:
+		*i++
+		if v.Const {
+			b.pusherr(tok, "already_const")
 			break
 		}
-		switch tok.Id {
-		case tokens.Const:
-			if v.Const {
-				b.pusherr(tok, "already_const")
-				break
-			}
-			v.Const = true
-		default:
-			b.pusherr(tok, "invalid_syntax")
+		v.Const = true
+		if !v.Mutable {
+			break
 		}
+		fallthrough
+	default:
+		b.pusherr(tok, "invalid_syntax")
+		return
+	}
+	if *i >= len(toks) {
+		b.pusherr(tok, "invalid_syntax")
 	}
 }
 
@@ -1712,6 +1717,15 @@ func (b *Builder) Var(toks []lex.Token, begin, expr bool) (v models.Var) {
 	b.pub = false
 	i := 0
 	v.Token = toks[i]
+	if toks[i].Id == tokens.Mut {
+		v.Mutable = true
+		// Initialize 1 for skip the mut keyword
+		i++
+		if i >= len(toks) {
+			b.pusherr(toks[i-1], "invalid_syntax")
+			return
+		}
+	}
 	if begin {
 		b.varBegin(&v, &i, toks)
 		if i >= len(toks) {

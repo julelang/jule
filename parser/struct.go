@@ -311,6 +311,7 @@ func (s *structure) selfVar(receiver Type) *Var {
 	v.Token = s.Ast.Token
 	v.Type = receiver
 	v.Type.Id = juletype.Struct
+	v.Mutable = false
 	v.Id = tokens.SELF
 	return v
 }

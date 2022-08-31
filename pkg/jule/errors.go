@@ -136,6 +136,9 @@ var Errors = map[string]string{
 	`ref_used_struct_used_at_new_fn`:           `reference field used structures cannot initialize with new function, use reference literal instead`,
 	`reference_field_not_initialized`:          `reference field is not initialized: %s`,
 	`illegal_cycle_in_declaration`:             `illegal cycle in declaration: %s`,
+	`assignment_to_non_mut`:                    `cannot assign to immutable define`,
+	`assignment_non_mut_to_mut`:                `cannot assign mutable type used immutable define to mutable define`,
+	`ret_with_mut_typed_non_mut`:               `mutable typed return expressions should be mutable`,
 }
 
 // GetError returns error.

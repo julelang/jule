@@ -120,7 +120,7 @@
 //  expm1(nan) = nan
 //
 // Very large values overflow to -1 or +inf.
-pub fn expm1(x: f64) f64 {
+pub fn expm1(mut x: f64) f64 {
 	const OTHRESHOLD  = 7.09782712893383973096e+02 // 0x40862E42FEFA39EF
 	const LN2_X56     = 3.88162421113569373274e+01 // 0x4043687a9f1af2b1
 	const LN2_HALF_X3 = 1.03972077083991796413e+00 // 0x3ff0a2b23f3bab73
@@ -144,8 +144,8 @@ pub fn expm1(x: f64) f64 {
 		ret -1
 	}
 
-	let absx = x
-	let sign = false
+	mut let absx = x
+	mut let sign = false
 	if x < 0 {
 		absx = -absx
 		sign = true
@@ -162,11 +162,11 @@ pub fn expm1(x: f64) f64 {
 	}
 
 	// argument reduction
-	let c: f64
-	let k: int
+	mut let c: f64
+	mut let k: int
 	if absx > LN2_HALF { // if  |x| > 0.5 * ln2
-		let hi: f64
-		let lo: f64
+		mut let hi: f64
+		mut let lo: f64
 		if absx < LN2_HALF_X3 { // and |x| < 1.5 * ln2
 			if !sign {
 				hi = x - LN2_HI
@@ -199,8 +199,8 @@ pub fn expm1(x: f64) f64 {
 	let hfx = 0.5 * x
 	let hxs = x * hfx
 	let r1 = 1 + hxs*(Q1+hxs*(Q2+hxs*(Q3+hxs*(Q4+hxs*Q5))))
-	let t = 3 - r1*hfx
-	let e = hxs * ((r1 - t) / (6.0 - x*t))
+	mut let t = 3 - r1*hfx
+	mut let e = hxs * ((r1 - t) / (6.0 - x*t))
 	if k == 0 {
 		ret x - (x*e - hxs) // c is 0
 	}
@@ -215,18 +215,18 @@ pub fn expm1(x: f64) f64 {
 		}
 		ret 1 + 2*(x-e)
 	case k <= -2 || k > 56: // suffice to return exp(x)-1
-		let y = 1 - (e - x)
+		mut let y = 1 - (e - x)
 		y = f64_from_bits(f64_bits(y) + u64(k)<<52) // add k to y's exponent
 		ret y - 1
 	}
 	if k < 20 {
 		let _t = f64_from_bits(0x3ff0000000000000 - (0x20000000000000 >> uint(k))) // t=1-2**-k
-		let y = _t - (e - x)
+		mut let y = _t - (e - x)
 		y = f64_from_bits(f64_bits(y) + u64(k)<<52) // add k to y's exponent
 		ret y
 	}
 	t = f64_from_bits(u64(0x3ff-k) << 52) // 2**-k
-	let y = x - (e + t)
+	mut let y = x - (e + t)
 	y++
 	y = f64_from_bits(f64_bits(y) + u64(k)<<52) // add k to y's exponent
 	ret y
