@@ -224,6 +224,25 @@ func float_fmt_p(txt string, i int) string {
 	return float_fmt_e(txt, i)
 }
 
+func float_fmt_dotnp(txt string, i int) string {
+	if txt[i] != '.' {
+		return ""
+	}
+loop:
+	for i++; i < len(txt); i++ {
+		b := txt[i]
+		switch {
+		case IsDecimal(b):
+			continue
+		case is_float_fmt_p(b, i):
+			return float_fmt_p(txt, i)
+		default:
+			break loop
+		}
+	}
+	return ""
+}
+
 func float_fmt_dotfp(txt string, i int) string {
 	// skip .f
 	i += 2
@@ -295,6 +314,25 @@ func binaryNum(txt string) (literal string) {
 func is_float_fmt_e(b byte, i int) bool { return i > 0 && (b == 'e' || b == 'E') }
 func is_float_fmt_p(b byte, i int) bool { return i > 0 && (b == 'p' || b == 'P') }
 
+func is_float_fmt_dotnp(txt string, i int) bool {
+	if txt[i] != '.' {
+		return false
+	}
+loop:
+	for i++; i < len(txt); i++ {
+		b := txt[i]
+		switch {
+		case IsDecimal(b):
+			continue
+		case is_float_fmt_p(b, i):
+			return true
+		default:
+			break loop
+		}
+	}
+	return false
+}
+
 func is_float_fmt_dotp(txt string, i int) bool {
 	txt = txt[i:]
 	switch {
@@ -349,10 +387,9 @@ func octalNum(txt string) (literal string) {
 }
 
 func hexNum(txt string) (literal string) {
-	if !strings.HasPrefix(txt, "0x") {
-		return ""
-	}
 	if len(txt) < 3 {
+		return
+	} else if txt[0] != '0' || (txt[1] != 'x' && txt[1] != 'X') {
 		return
 	}
 	const hexStart = 2
@@ -367,6 +404,8 @@ loop:
 			return float_fmt_dotfp(txt, i)
 		case is_float_fmt_p(b, i):
 			return float_fmt_p(txt, i)
+		case is_float_fmt_dotnp(txt, i):
+			return float_fmt_dotnp(txt, i)
 		case !IsHex(b):
 			break loop
 		}
