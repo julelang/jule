@@ -49,7 +49,7 @@ func (f *Fn) plainTypeString() string {
 			if p.Variadic {
 				s.WriteString("...")
 			}
-			s.WriteString(p.Type.Kind)
+			s.WriteString(p.TypeString())
 			s.WriteString(", ")
 		}
 		cppStr := s.String()[:s.Len()-2]
