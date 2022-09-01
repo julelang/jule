@@ -120,6 +120,7 @@ func (u *unary) amper() value {
 		last := &(*nodes)[len(*nodes)-1]
 		*last = exprNode{(*last).String() + ")"}
 		v.data.Type.Kind = tokens.AMPER + v.data.Type.Kind
+		v.mutable = true
 		return v
 	case typeIsRef(v.data.Type):
 		model := exprNode{(*nodes)[1].String() + "._alloc"}

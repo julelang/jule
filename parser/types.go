@@ -155,7 +155,7 @@ func is_valid_type_for_reference(t Type) bool {
 }
 
 func type_is_mutable(t Type) bool {
-	return typeIsSlice(t) || typeIsPtr(t)
+	return typeIsSlice(t) || typeIsPtr(t) || typeIsRef(t)
 }
 
 func subIdAccessorOfType(t Type) string {
