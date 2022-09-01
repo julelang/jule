@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/ast/models"
+	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/pkg/jule"
+	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
 type iExpr interface {
@@ -173,14 +174,26 @@ func (ce callExpr) String() string {
 }
 
 type retExpr struct {
+	vars   []*Var
 	models []iExpr
+}
+
+func (re *retExpr) model_str(i int) string {
+	if re.vars == nil {
+		return re.models[i].String()
+	}
+	v := re.vars[i]
+	if juleapi.IsIgnoreId(v.Id) {
+		return re.models[i].String()
+	}
+	return "(" + v.OutId() + "=" + re.models[i].String() + ")"
 }
 
 func (re *retExpr) multiRetString() string {
 	var cpp strings.Builder
 	cpp.WriteString("std::make_tuple(")
-	for _, m := range re.models {
-		cpp.WriteString(m.String())
+	for i := range re.models {
+		cpp.WriteString(re.model_str(i))
 		cpp.WriteByte(',')
 	}
 	return cpp.String()[:cpp.Len()-1] + ")"
@@ -188,7 +201,7 @@ func (re *retExpr) multiRetString() string {
 
 func (re *retExpr) singleRetString() string {
 	var cpp strings.Builder
-	cpp.WriteString(re.models[0].String())
+	cpp.WriteString(re.model_str(0))
 	return cpp.String()
 }
 

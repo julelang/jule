@@ -189,5 +189,6 @@ func (rc *retChecker) check() {
 	if n > 0 && typeIsVoid(rc.f.RetType.Type) {
 		rc.p.pusherrtok(rc.ret_ast.Token, "void_function_return_value")
 	}
+	rc.exp_model.vars = rc.f.RetType.Vars(rc.p.nodeBlock)
 	rc.checkepxrs()
 }
