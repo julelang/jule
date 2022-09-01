@@ -1853,32 +1853,26 @@ func (b *Builder) getForeachVarsToks(toks []lex.Token) [][]lex.Token {
 	return vars
 }
 
-func (b *Builder) getVarProfile(toks []lex.Token) (vast models.Var) {
+func (b *Builder) getVarProfile(toks []lex.Token) (v models.Var) {
 	if len(toks) == 0 {
 		return
 	}
-	vast.Token = toks[0]
-	if vast.Token.Id != tokens.Id {
-		b.pusherr(vast.Token, "invalid_syntax")
+	v.Token = toks[0]
+	if v.Token.Id == tokens.Mut {
+		v.Mutable = true
+		if len(toks) == 1 {
+			b.pusherr(v.Token, "invalid_syntax")
+		}
+		v.Token = toks[1]
+	} else if len(toks) > 1 {
+		b.pusherr(toks[1], "invalid_syntax")
+	}
+	if v.Token.Id != tokens.Id {
+		b.pusherr(v.Token, "invalid_syntax")
 		return
 	}
-	vast.Id = vast.Token.Kind
-	if len(toks) == 1 {
-		return
-	}
-	if colon := toks[1]; colon.Id != tokens.Colon {
-		b.pusherr(colon, "invalid_syntax")
-		return
-	}
-	vast.New = true
-	i := 2
-	if i >= len(toks) {
-		return
-	}
-	vast.Type, _ = b.DataType(toks, &i, false, true)
-	if i < len(toks)-1 {
-		b.pusherr(toks[i], "invalid_syntax")
-	}
+	v.Id = v.Token.Kind
+	v.New = true
 	return
 }
 
@@ -1890,28 +1884,57 @@ func (b *Builder) getForeachIterVars(varsToks [][]lex.Token) []models.Var {
 	return vars
 }
 
+func (b *Builder) setup_foreach_explicit_vars(f *models.IterForeach, toks []lex.Token) {
+	i := 0
+	rang := Range(&i, tokens.LPARENTHESES, tokens.RPARENTHESES, toks)
+	if i < len(toks) {
+		b.pusherr(f.InToken, "invalid_syntax")
+	}
+	b.setup_foreach_plain_vars(f, rang)
+}
+
+func (b *Builder) setup_foreach_plain_vars(f *models.IterForeach, toks []lex.Token) {
+	varsToks := b.getForeachVarsToks(toks)
+	if len(varsToks) == 0 {
+		return
+	}
+	if len(varsToks) > 2 {
+		b.pusherr(f.InToken, "much_foreach_vars")
+	}
+	vars := b.getForeachIterVars(varsToks)
+	f.KeyA = vars[0]
+	if len(vars) > 1 {
+		f.KeyB = vars[1]
+	} else {
+		f.KeyB.Id = juleapi.Ignore
+	}
+}
+
+func (b *Builder) setup_foreach_vars(f *models.IterForeach, toks []lex.Token) {
+	if toks[0].Id == tokens.Brace {
+		if toks[0].Kind != tokens.LPARENTHESES {
+			b.pusherr(toks[0], "invalid_syntax")
+			return
+		}
+		b.setup_foreach_explicit_vars(f, toks)
+		return
+	}
+	b.setup_foreach_plain_vars(f, toks)
+}
+
 func (b *Builder) getForeachIterProfile(varToks, exprToks []lex.Token, inTok lex.Token) models.IterForeach {
 	var foreach models.IterForeach
 	foreach.InToken = inTok
+	if len(exprToks) == 0 {
+		b.pusherr(inTok, "missing_expr")
+		return foreach
+	}
 	foreach.Expr = b.Expr(exprToks)
 	if len(varToks) == 0 {
 		foreach.KeyA.Id = juleapi.Ignore
 		foreach.KeyB.Id = juleapi.Ignore
 	} else {
-		varsToks := b.getForeachVarsToks(varToks)
-		if len(varsToks) == 0 {
-			return foreach
-		}
-		if len(varsToks) > 2 {
-			b.pusherr(inTok, "much_foreach_vars")
-		}
-		vars := b.getForeachIterVars(varsToks)
-		foreach.KeyA = vars[0]
-		if len(vars) > 1 {
-			foreach.KeyB = vars[1]
-		} else {
-			foreach.KeyB.Id = juleapi.Ignore
-		}
+		b.setup_foreach_vars(&foreach, varToks)
 	}
 	return foreach
 }

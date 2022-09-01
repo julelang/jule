@@ -19,11 +19,10 @@ func (fc *foreachChecker) array() {
 	}
 	componentType := *fc.profile.ExprType.ComponentType
 	b := &fc.profile.KeyB
-	if b.Type.Id == juletype.Void {
-		b.Type = componentType
-		return
-	}
-	fc.p.checkType(componentType, b.Type, true, true, fc.profile.InToken)
+	b.Type = componentType
+	val := fc.val
+	val.data.Type = componentType
+	fc.p.check_valid_init_expr(b.Mutable, val, fc.profile.InToken)
 }
 
 func (fc *foreachChecker) slice() {
@@ -33,14 +32,13 @@ func (fc *foreachChecker) slice() {
 	}
 	componentType := *fc.profile.ExprType.ComponentType
 	b := &fc.profile.KeyB
-	if b.Type.Id == juletype.Void {
-		b.Type = componentType
-		return
-	}
-	fc.p.checkType(componentType, b.Type, true, true, fc.profile.InToken)
+	b.Type = componentType
+	val := fc.val
+	val.data.Type = componentType
+	fc.p.check_valid_init_expr(b.Mutable, val, fc.profile.InToken)
 }
 
-func (fc *foreachChecker) xmap() {
+func (fc *foreachChecker) hashmap() {
 	fc.checkKeyAMapKey()
 	fc.checkKeyBMapVal()
 }
@@ -50,19 +48,8 @@ func (fc *foreachChecker) checkKeyASize() {
 		return
 	}
 	a := &fc.profile.KeyA
-	if a.Type.Id == juletype.Void {
-		a.Type.Id = juletype.UInt
-		a.Type.Kind = juletype.CppId(a.Type.Id)
-		return
-	}
-	var ok bool
-	a.Type, ok = fc.p.realType(a.Type, true)
-	if ok {
-		if !typeIsPure(a.Type) || !juletype.IsNumeric(a.Type.Id) {
-			fc.p.pusherrtok(a.Token, "incompatible_types",
-				a.Type.Kind, juletype.NumericTypeStr)
-		}
-	}
+	a.Type.Id = juletype.Int
+	a.Type.Kind = juletype.TypeMap[a.Type.Id]
 }
 
 func (fc *foreachChecker) checkKeyAMapKey() {
@@ -71,11 +58,10 @@ func (fc *foreachChecker) checkKeyAMapKey() {
 	}
 	keyType := fc.val.data.Type.Tag.([]Type)[0]
 	a := &fc.profile.KeyA
-	if a.Type.Id == juletype.Void {
-		a.Type = keyType
-		return
-	}
-	fc.p.checkType(keyType, a.Type, true, true, fc.profile.InToken)
+	a.Type = keyType
+	val := fc.val
+	val.data.Type = keyType
+	fc.p.check_valid_init_expr(a.Mutable, val, fc.profile.InToken)
 }
 
 func (fc *foreachChecker) checkKeyBMapVal() {
@@ -84,11 +70,10 @@ func (fc *foreachChecker) checkKeyBMapVal() {
 	}
 	valType := fc.val.data.Type.Tag.([]Type)[1]
 	b := &fc.profile.KeyB
-	if b.Type.Id == juletype.Void {
-		b.Type = valType
-		return
-	}
-	fc.p.checkType(valType, b.Type, true, true, fc.profile.InToken)
+	b.Type = valType
+	val := fc.val
+	val.data.Type = valType
+	fc.p.check_valid_init_expr(b.Mutable, val, fc.profile.InToken)
 }
 
 func (fc *foreachChecker) str() {
@@ -98,14 +83,10 @@ func (fc *foreachChecker) str() {
 	}
 	runeType := Type{
 		Id:   juletype.U8,
-		Kind: juletype.CppId(juletype.U8),
+		Kind: juletype.TypeMap[juletype.U8],
 	}
 	b := &fc.profile.KeyB
-	if b.Type.Id == juletype.Void {
-		b.Type = runeType
-		return
-	}
-	fc.p.checkType(runeType, b.Type, true, true, fc.profile.InToken)
+	b.Type = runeType
 }
 
 func (fc *foreachChecker) check() {
@@ -115,7 +96,7 @@ func (fc *foreachChecker) check() {
 	case typeIsArray(fc.val.data.Type):
 		fc.array()
 	case typeIsMap(fc.val.data.Type):
-		fc.xmap()
+		fc.hashmap()
 	case fc.val.data.Type.Id == juletype.Str:
 		fc.str()
 	}

@@ -2879,8 +2879,8 @@ always:
 }
 
 func (p *Parser) varStatement(v *Var, noParse bool) {
-	_, tok, canshadow := p.blockDefById(v.Id)
-	if tok.Id != tokens.NA && !canshadow {
+	def, _, canshadow := p.blockDefById(v.Id)
+	if !canshadow && def != nil {
 		p.pusherrtok(v.Token, "exist_id", v.Id)
 		return
 	}
@@ -3094,8 +3094,6 @@ func (p *Parser) whileProfile(iter *models.Iter) {
 
 func (p *Parser) foreachProfile(iter *models.Iter) {
 	profile := iter.Profile.(models.IterForeach)
-	profile.KeyA.Owner = iter.Block
-	profile.KeyB.Owner = iter.Block
 	val, model := p.evalExpr(profile.Expr)
 	profile.Expr.Model = model
 	profile.ExprType = val.data.Type
@@ -3107,17 +3105,11 @@ func (p *Parser) foreachProfile(iter *models.Iter) {
 	}
 	iter.Profile = profile
 	blockVars := p.blockVars
-	if profile.KeyA.New {
-		if juleapi.IsIgnoreId(profile.KeyA.Id) {
-			p.pusherrtok(profile.KeyA.Token, "ignore_id")
-		}
-		p.varStatement(&profile.KeyA, true)
+	if !juleapi.IsIgnoreId(profile.KeyA.Id) {
+		p.blockVars = append(p.blockVars, &profile.KeyA)
 	}
-	if profile.KeyB.New {
-		if juleapi.IsIgnoreId(profile.KeyB.Id) {
-			p.pusherrtok(profile.KeyB.Token, "ignore_id")
-		}
-		p.varStatement(&profile.KeyB, true)
+	if !juleapi.IsIgnoreId(profile.KeyB.Id) {
+		p.blockVars = append(p.blockVars, &profile.KeyB)
 	}
 	p.checkNewBlockCustom(iter.Block, blockVars)
 }
