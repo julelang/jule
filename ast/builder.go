@@ -962,11 +962,8 @@ func (b *Builder) pushParam(params *[]models.Param, toks []lex.Token, mustPure b
 			b.pusherr(toks[0], "invalid_syntax")
 			return
 		}
-		param.Token = toks[1]
-		if param.Token.Id != tokens.Id {
-			b.pusherr(toks[0], "invalid_syntax")
-		}
 		toks = toks[1:]
+		param.Token = toks[0]
 	}
 	// Just data type
 	if param.Token.Id != tokens.Id {
