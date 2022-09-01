@@ -302,7 +302,7 @@ func is_float_fmt_dotp(txt string, i int) bool {
 		fallthrough
 	case txt[0] != '.':
 		fallthrough
-	case txt[2] != 'p' && txt[1] != 'P':
+	case txt[1] != 'p' && txt[1] != 'P':
 		return false
 	default:
 		return true
