@@ -942,7 +942,7 @@ func (p *Parser) Struct(ast Struct) {
 	if juleapi.IsIgnoreId(ast.Id) {
 		p.pusherrtok(ast.Token, "ignore_id")
 		return
-	} else if _, tok, _ := p.defById(ast.Id); tok.Id != tokens.NA {
+	} else if def, _, _ := p.defById(ast.Id); def != nil {
 		p.pusherrtok(ast.Token, "exist_id", ast.Id)
 		return
 	}
@@ -993,7 +993,7 @@ func (p *Parser) Trait(t models.Trait) {
 	if juleapi.IsIgnoreId(t.Id) {
 		p.pusherrtok(t.Token, "ignore_id")
 		return
-	} else if _, tok, _ := p.defById(t.Id); tok.Id != tokens.NA {
+	} else if def, _, _ := p.defById(t.Id); def != nil {
 		p.pusherrtok(t.Token, "exist_id", t.Id)
 		return
 	}
