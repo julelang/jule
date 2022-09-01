@@ -30,14 +30,18 @@ type Var struct {
 
 func (v *Var) IsLocal() bool { return v.Owner != nil }
 
+func as_local_id(row, column int, id string) string {
+	id = strconv.Itoa(row) + strconv.Itoa(column) + "_" + id
+	return juleapi.AsId(id)
+}
+
 // OutId returns juleapi.OutId result of var.
 func (v *Var) OutId() string {
 	switch {
 	case v.Id == tokens.SELF:
 		return "self"
 	case v.IsLocal():
-		id := strconv.Itoa(v.Token.Row) + strconv.Itoa(v.Token.Column) + "_" + v.Id
-		return juleapi.AsId(id)
+		return as_local_id(v.Token.Row, v.Token.Column, v.Id)
 	case v.IsField:
 		return "__julec_field_" + juleapi.AsId(v.Id)
 	default:

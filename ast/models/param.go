@@ -34,7 +34,7 @@ func (p *Param) TypeString() string {
 
 // OutId returns juleapi.OutId result of param.
 func (p *Param) OutId() string {
-	return juleapi.AsId(p.Id)
+	return as_local_id(p.Token.Row, p.Token.Column, p.Id)
 }
 
 func (p Param) String() string {
