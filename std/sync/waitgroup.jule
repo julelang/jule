@@ -23,7 +23,7 @@ impl WaitGroup {
 	// and unblocks any wait() calls if task count becomes zero.
 	// Panics if task count reaches below zero.
 	pub fn add(delta: int) {
-		let old_nr_tasks = int(unsafe{ std::sync::atomic::add_u32(&.task_n, u32(delta)) })
+		let old_nr_tasks = int(unsafe{ std::sync::atomic::add_u32(&self.task_n, u32(delta)) })
 		let new_nr_tasks = old_nr_tasks + delta
 		if new_nr_tasks < 0 {
 			panic("Negative number of tasks in WaitGroup")
@@ -33,32 +33,32 @@ impl WaitGroup {
 			ret
 		}
 
-		let mut n_waiters = unsafe{ std::sync::atomic::load_u32(&.wait_n) }
+		let mut n_waiters = unsafe{ std::sync::atomic::load_u32(&self.wait_n) }
 		if n_waiters == 0 {
 			ret
 		}
 		// clear waiters
 		for {
-			_ = unsafe{ std::sync::atomic::compare_swap_u32(&.wait_n, n_waiters, 0) }
+			_ = unsafe{ std::sync::atomic::compare_swap_u32(&self.wait_n, n_waiters, 0) }
 			if n_waiters == 0 {
 				ret
 			}
-			n_waiters = unsafe{ std::sync::atomic::load_u32(&.wait_n) }
+			n_waiters = unsafe{ std::sync::atomic::load_u32(&self.wait_n) }
 		}
 	}
 
 	// Decrements the WaitGroup counter by one.
-	pub fn done() { .add(-1) }
+	pub fn done() { self.add(-1) }
 
 	// Blocks until all tasks are done (task count becomes zero)
 	pub fn wait() {
-		let nr_tasks = int(unsafe{ std::sync::atomic::load_u32(&.task_n) })
+		let nr_tasks = int(unsafe{ std::sync::atomic::load_u32(&self.task_n) })
 		if nr_tasks == 0 {
 			// no need to wait
 			ret
 		}
-		_ = unsafe{ std::sync::atomic::add_u32(&.wait_n, 1) }
+		_ = unsafe{ std::sync::atomic::add_u32(&self.wait_n, 1) }
 		// blocks until task_n becomes 0
-		for (unsafe{ std::sync::atomic::load_u32(&.wait_n) }) != 0 {}
+		for (unsafe{ std::sync::atomic::load_u32(&self.wait_n) }) != 0 {}
 	}
 }

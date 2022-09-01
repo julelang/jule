@@ -130,19 +130,19 @@ impl Decimal {
 		}
 
 		// Reverse again to produce forward decimal in a.d.
-		.nd = 0
+		self.nd = 0
 		for n--; n >= 0; n-- {
-			.d[.nd] = buf[n]
-			.nd++
+			self.d[self.nd] = buf[n]
+			self.nd++
 		}
-		.dp = .nd
+		self.dp = self.nd
 		unsafe{ trim(&self) }
 	}
 
 	// Binary shift left (k > 0) or right (k < 0).
 	fn shift(mut k: int) {
 		match {
-		case .nd == 0:
+		case self.nd == 0:
 			// nothing to do: a == 0
 		case k > 0:
 			for k > max_shift {
@@ -161,34 +161,34 @@ impl Decimal {
 
 	// Round a down to nd digits (or fewer).
 	fn round_down(nd: int) {
-		if nd < 0 || nd >= .nd {
+		if nd < 0 || nd >= self.nd {
 			ret
 		}
-		.nd = nd
+		self.nd = nd
 		unsafe{ trim(&self) }
 	}
 
 	// Round a up to nd digits (or fewer).
 	fn round_up(nd: int) {
-		if nd < 0 || nd >= .nd {
+		if nd < 0 || nd >= self.nd {
 			ret
 		}
 
 		// round up
 		for let mut i = nd - 1; i >= 0; i-- {
-			let c = .d[i]
+			let c = self.d[i]
 			if c < '9' { // can stop after this digit
-				.d[i]++
-				.nd = i + 1
+				self.d[i]++
+				self.nd = i + 1
 				ret
 			}
 		}
 
 		// Number is all 9s.
 		// Change to single 1 with adjusted decimal point.
-		.d[0] = '1'
-		.nd = 1
-		.dp++
+		self.d[0] = '1'
+		self.nd = 1
+		self.dp++
 	}
 
 	// Round a to nd digits (or fewer).
@@ -196,31 +196,31 @@ impl Decimal {
 	// just to the left of the digits, as in
 	// 0.09 -> 0.1.
 	fn round(nd: int) {
-		if nd < 0 || nd >= .nd {
+		if nd < 0 || nd >= self.nd {
 			ret
 		}
 		if (unsafe{ should_round_up(&self, nd) }) {
-			.round_up(nd)
+			self.round_up(nd)
 		} else {
-			.round_down(nd)
+			self.round_down(nd)
 		}
 	}
 
 	// Extract integer part, rounded appropriately.
 	// No guarantees about overflow.
 	fn rounded_integer() u64 {
-		if .dp > 20 {
+		if self.dp > 20 {
 			ret 0xFFFFFFFFFFFFFFFF
 		}
 		let mut i: int
 		let mut n: u64 = 0
-		for i = 0; i < .dp && i < .nd; i++ {
-			n = n*10 + u64(.d[i]-'0')
+		for i = 0; i < self.dp && i < self.nd; i++ {
+			n = n*10 + u64(self.d[i]-'0')
 		}
-		for ; i < .dp; i++ {
+		for ; i < self.dp; i++ {
 			n *= 10
 		}
-		if (unsafe{ should_round_up(&self, .dp) }) {
+		if (unsafe{ should_round_up(&self, self.dp) }) {
 			n++
 		}
 		ret n

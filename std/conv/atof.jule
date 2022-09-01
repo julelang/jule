@@ -198,8 +198,8 @@ let powtab = []int{1, 3, 6, 9, 13, 16, 19, 23, 26}
 impl Decimal {
 	fn set(s: str) (ok: bool) {
 		let mut i = 0
-		.neg = false
-		.trunc = false
+		self.neg = false
+		self.trunc = false
 
 		// optional sign
 		if i >= s.len {
@@ -209,7 +209,7 @@ impl Decimal {
 		case s[i] == '+':
 			i++
 		case s[i] == '-':
-			.neg = true
+			self.neg = true
 			i++
 		}
 
@@ -223,19 +223,19 @@ impl Decimal {
 					ret
 				}
 				sawdot = true
-				.dp = .nd
+				self.dp = self.nd
 				continue
 			case '0' <= s[i] && s[i] <= '9':
 				sawdigits = true
-				if s[i] == '0' && .nd == 0 { // ignore leading zeros
-					.dp--
+				if s[i] == '0' && self.nd == 0 { // ignore leading zeros
+					self.dp--
 					continue
 				}
-				if .nd < .d.len {
-					.d[.nd] = s[i]
-					.nd++
+				if self.nd < self.d.len {
+					self.d[self.nd] = s[i]
+					self.nd++
 				} else if s[i] != '0' {
-					.trunc = true
+					self.trunc = true
 				}
 				continue
 			}
@@ -245,7 +245,7 @@ impl Decimal {
 			ret
 		}
 		if !sawdot {
-			.dp = .nd
+			self.dp = self.nd
 		}
 
 		// optional exponent moves decimal point.
@@ -274,7 +274,7 @@ impl Decimal {
 					e = e*10 + int(s[i]) - '0'
 				}
 			}
-			.dp += e * esign
+			self.dp += e * esign
 		}
 
 		if i != s.len {
@@ -290,7 +290,7 @@ impl Decimal {
 		let mut mant: u64
 
 		// Zero is always a special case.
-		if .nd == 0 {
+		if self.nd == 0 {
 			mant = 0
 			exp = flt.bias
 			goto out
@@ -299,10 +299,10 @@ impl Decimal {
 		// Obvious overflow/underflow.
 		// These bounds are for 64-bit floats.
 		// Will have to change if we want to support 80-bit floats in the future.
-		if .dp > 310 {
+		if self.dp > 310 {
 			goto overflow
 		}
-		if .dp < -330 {
+		if self.dp < -330 {
 			// zero
 			mant = 0
 			exp = flt.bias
@@ -311,24 +311,24 @@ impl Decimal {
 
 		// Scale by powers of two until in range [0.5, 1.0)
 		exp = 0
-		for .dp > 0 {
+		for self.dp > 0 {
 			let mut n: int
-			if .dp >= powtab.len {
+			if self.dp >= powtab.len {
 				n = 27
 			} else {
-				n = powtab[.dp]
+				n = powtab[self.dp]
 			}
-			.shift(-n)
+			self.shift(-n)
 			exp += n
 		}
-		for .dp < 0 || .dp == 0 && .d[0] < '5' {
+		for self.dp < 0 || self.dp == 0 && self.d[0] < '5' {
 			let mut n: int
-			if -.dp >= powtab.len {
+			if -self.dp >= powtab.len {
 				n = 27
 			} else {
-				n = powtab[-.dp]
+				n = powtab[-self.dp]
 			}
-			.shift(n)
+			self.shift(n)
 			exp -= n
 		}
 
@@ -340,7 +340,7 @@ impl Decimal {
 		// adjust d accordingly.
 		if exp < flt.bias+1 {
 			let n = flt.bias + 1 - exp
-			.shift(-n)
+			self.shift(-n)
 			exp += n
 		}
 
@@ -349,8 +349,8 @@ impl Decimal {
 		}
 
 		// Extract 1+flt.mantbits bits.
-		.shift(int(1 + flt.mantbits))
-		mant = .rounded_integer()
+		self.shift(int(1 + flt.mantbits))
+		mant = self.rounded_integer()
 
 		// Rounding might have added a bit; shift down.
 		if mant == 2<<flt.mantbits {
@@ -377,7 +377,7 @@ impl Decimal {
 		// Assemble bits.
 		let mut bits = mant & (u64(1)<<flt.mantbits - 1)
 		bits |= u64((exp-flt.bias)&(1<<flt.expbits-1)) << flt.mantbits
-		if .neg {
+		if self.neg {
 			bits |= 1 << flt.mantbits << flt.expbits
 		}
 		ret bits, overflow

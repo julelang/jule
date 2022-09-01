@@ -450,10 +450,8 @@ func (e *eval) subId(toks []lex.Token, m *exprModel) (v value) {
 	toks = toks[:i]
 	switch len(toks) {
 	case 0:
-		tok := dotTok
-		tok.Id = tokens.Self
-		tok.Kind = tokens.SELF
-		toks = []lex.Token{tok}
+		e.pusherrtok(dotTok, "invalid_syntax")
+		return
 	case 1:
 		tok := toks[0]
 		if tok.Id == tokens.DataType {
