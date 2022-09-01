@@ -28,7 +28,7 @@ func (f Fn) stringOwner(owner string) string {
 	cpp.WriteString(f.Head(owner))
 	cpp.WriteByte(' ')
 	block := f.Ast.Block
-	vars := f.Ast.RetType.Vars()
+	vars := f.Ast.RetType.Vars(f.Ast.Block)
 	if vars != nil {
 		statements := make([]models.Statement, len(vars))
 		for i, v := range vars {

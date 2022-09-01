@@ -28,7 +28,7 @@ func (rt *RetType) AnyVar() bool {
 }
 
 // Vars returns variables of ret type if exist, nil if not.
-func (rt *RetType) Vars() []*Var {
+func (rt *RetType) Vars(owner *Block) []*Var {
 	get := func(tok lex.Token, t Type) *Var {
 		if juleapi.IsIgnoreId(tok.Kind) {
 			return nil
@@ -37,7 +37,7 @@ func (rt *RetType) Vars() []*Var {
 		v.Token = tok
 		v.Id = tok.Kind
 		v.Type = t
-		v.IsLocal = true
+		v.Owner = owner
 		v.Mutable = true
 		return v
 	}

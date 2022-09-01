@@ -9,6 +9,7 @@ import (
 
 // TypeAlias is type alias declaration.
 type TypeAlias struct {
+	Owner   *Block
 	Pub     bool
 	Token   lex.Token
 	Id      string

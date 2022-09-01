@@ -1491,12 +1491,12 @@ func (p *Parser) checkFuncAttributes(f *Fn) {
 	}
 }
 
-func (p *Parser) varsFromParams(params []Param) []*Var {
-	length := len(params)
+func (p *Parser) varsFromParams(f *Func) []*Var {
+	length := len(f.Params)
 	vars := make([]*Var, length)
-	for i, param := range params {
+	for i, param := range f.Params {
 		v := new(models.Var)
-		v.IsLocal = true
+		v.Owner = f.Block
 		v.Mutable = param.Mutable
 		v.Id = param.Id
 		v.Token = param.Token
@@ -1549,9 +1549,9 @@ func (p *Parser) nsById(id string) *namespace {
 }
 
 func (p *Parser) typeById(id string) (*TypeAlias, *DefineMap, bool) {
-	t := p.blockTypeById(id)
+	t, canshadow := p.blockTypeById(id)
 	if t != nil {
-		return t, nil, false
+		return t, nil, canshadow
 	}
 	if p.allowBuiltin {
 		t, _, _ = Builtin.typeById(id, nil)
@@ -1592,22 +1592,25 @@ func (p *Parser) traitById(id string) (*trait, *DefineMap, bool) {
 	return p.Defines.traitById(id, p.File)
 }
 
-func (p *Parser) blockTypeById(id string) *TypeAlias {
-	for _, t := range p.blockTypes {
+func (p *Parser) blockTypeById(id string) (_ *TypeAlias, can_shadow bool) {
+	for i := len(p.blockTypes)-1; i >= 0; i-- {
+		t := p.blockTypes[i]
 		if t != nil && t.Id == id {
-			return t
+			return t, !t.Generic && t.Owner != p.nodeBlock
 		}
 	}
-	return nil
+	return nil, false
+
 }
 
-func (p *Parser) blockVarById(id string) *Var {
-	for _, v := range p.blockVars {
+func (p *Parser) blockVarById(id string) (_ *Var, can_shadow bool) {
+	for i := len(p.blockVars)-1; i >= 0; i-- {
+		v := p.blockVars[i]
 		if v != nil && v.Id == id {
-			return v
+			return v, v.Owner != p.nodeBlock
 		}
 	}
-	return nil
+	return nil, false
 }
 
 func (p *Parser) defById(id string) (def any, tok lex.Token, canshadow bool) {
@@ -1636,9 +1639,9 @@ func (p *Parser) defById(id string) (def any, tok lex.Token, canshadow bool) {
 	if f != nil {
 		return f, f.Ast.Token, canshadow
 	}
-	bv := p.blockVarById(id)
+	bv, canshadow := p.blockVarById(id)
 	if bv != nil {
-		return bv, bv.Token, false
+		return bv, bv.Token, canshadow
 	}
 	g, _, _ := p.globalById(id)
 	if g != nil {
@@ -1647,14 +1650,14 @@ func (p *Parser) defById(id string) (def any, tok lex.Token, canshadow bool) {
 	return
 }
 
-func (p *Parser) blockDefById(id string) (def any, tok lex.Token) {
-	bv := p.blockVarById(id)
+func (p *Parser) blockDefById(id string) (def any, tok lex.Token, canshadow bool) {
+	bv, canshadow := p.blockVarById(id)
 	if bv != nil {
-		return bv, bv.Token
+		return bv, bv.Token, canshadow
 	}
-	t := p.blockTypeById(id)
+	t, canshadow := p.blockTypeById(id)
 	if t != nil {
-		return t, t.Token
+		return t, t.Token, canshadow
 	}
 	return
 }
@@ -1787,8 +1790,8 @@ func (p *Parser) params(f *Func) (err bool) {
 }
 
 func (p *Parser) blockVarsOfFunc(f *Func) []*Var {
-	vars := p.varsFromParams(f.Params)
-	vars = append(vars, f.RetType.Vars()...)
+	vars := p.varsFromParams(f)
+	vars = append(vars, f.RetType.Vars(f.Block)...)
 	if f.Receiver != nil {
 		s := f.Receiver.Tag.(*structure)
 		vars = append(vars, s.selfVar(*f.Receiver))
@@ -1958,7 +1961,7 @@ func (p *Parser) checkAnonFunc(f *Func) {
 	globals := p.Defines.Globals
 	blockVariables := p.blockVars
 	p.Defines.Globals = append(blockVariables, p.Defines.Globals...)
-	p.blockVars = p.varsFromParams(f.Params)
+	p.blockVars = p.varsFromParams(f)
 	rootBlock := p.rootBlock
 	nodeBlock := p.nodeBlock
 	p.checkFunc(f)
@@ -2308,7 +2311,8 @@ func (p *Parser) pushGenericByCommonArg(f *Func, pair *paramMapPair, args *model
 func (p *Parser) pushGenericByType(f *Func, generic *GenericType, args *models.Args, t Type) {
 	owner := f.Owner.(*Parser)
 	// Already added
-	if owner.blockTypeById(generic.Id) != nil {
+	alias, _ := owner.blockTypeById(generic.Id)
+	if alias != nil {
 		return
 	}
 	id, _ := t.KindId()
@@ -2470,7 +2474,8 @@ func (p *Parser) statement(s *models.Statement, recover bool) bool {
 	case *models.Match:
 		p.matchcase(t)
 	case TypeAlias:
-		if def, _ := p.blockDefById(t.Id); def != nil {
+		def, _, canshadow := p.blockDefById(t.Id)
+		if def != nil && !canshadow {
 			p.pusherrtok(t.Token, "exist_id", t.Id)
 			break
 		} else if juleapi.IsIgnoreId(t.Id) {
@@ -2874,13 +2879,14 @@ always:
 }
 
 func (p *Parser) varStatement(v *Var, noParse bool) {
-	if _, tok := p.blockDefById(v.Id); tok.Id != tokens.NA {
+	_, tok, canshadow := p.blockDefById(v.Id)
+	if tok.Id != tokens.NA && !canshadow {
 		p.pusherrtok(v.Token, "exist_id", v.Id)
+		return
 	}
 	if !noParse {
 		*v = *p.Var(*v)
 	}
-	v.IsLocal = true
 	p.blockVars = append(p.blockVars, v)
 }
 
@@ -3088,8 +3094,8 @@ func (p *Parser) whileProfile(iter *models.Iter) {
 
 func (p *Parser) foreachProfile(iter *models.Iter) {
 	profile := iter.Profile.(models.IterForeach)
-	profile.KeyA.IsLocal = true
-	profile.KeyB.IsLocal = true
+	profile.KeyA.Owner = iter.Block
+	profile.KeyB.Owner = iter.Block
 	val, model := p.evalExpr(profile.Expr)
 	profile.Expr.Model = model
 	profile.ExprType = val.data.Type

@@ -283,7 +283,7 @@ func (ve *valueEvaluator) typeId(id string, t *TypeAlias) (_ value, _ bool) {
 func (ve *valueEvaluator) id() (_ value, ok bool) {
 	id := ve.token.Kind
 
-	v := ve.p.blockVarById(id)
+	v, _ := ve.p.blockVarById(id)
 	if v != nil {
 		return ve.varId(id, v, false), true
 	} else {

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/jule-lang/jule/lex"
@@ -10,6 +11,7 @@ import (
 
 // Var is variable declaration AST model.
 type Var struct {
+	Owner     *Block
 	Pub       bool
 	Mutable   bool
 	Token     lex.Token
@@ -24,16 +26,18 @@ type Var struct {
 	Desc      string
 	Used      bool
 	IsField   bool
-	IsLocal   bool
 }
+
+func (v *Var) IsLocal() bool { return v.Owner != nil }
 
 // OutId returns juleapi.OutId result of var.
 func (v *Var) OutId() string {
 	switch {
 	case v.Id == tokens.SELF:
 		return "self"
-	case v.IsLocal:
-		return juleapi.AsId(v.Id)
+	case v.IsLocal():
+		id := strconv.Itoa(v.Token.Row) + strconv.Itoa(v.Token.Column) + "_" + v.Id
+		return juleapi.AsId(id)
 	case v.IsField:
 		return "__julec_field_" + juleapi.AsId(v.Id)
 	default:

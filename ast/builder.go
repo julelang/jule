@@ -851,7 +851,8 @@ func (b *Builder) GlobalVar(toks []lex.Token) {
 	if toks == nil {
 		return
 	}
-	s := b.VarStatement(toks)
+	bs := blockStatement{toks: toks}
+	s := b.VarStatement(&bs)
 	b.Tree = append(b.Tree, models.Object{
 		Token:  s.Token,
 		Data: s,
@@ -1334,7 +1335,7 @@ func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
 	}
 	switch tok.Id {
 	case tokens.Const, tokens.Let, tokens.Mut:
-		return b.VarStatement(bs.toks)
+		return b.VarStatement(bs)
 	case tokens.Ret:
 		return b.RetStatement(bs.toks)
 	case tokens.For:
@@ -1747,9 +1748,10 @@ func (b *Builder) Var(toks []lex.Token, begin, expr bool) (v models.Var) {
 }
 
 // VarStatement builds AST model of variable declaration statement.
-func (b *Builder) VarStatement(toks []lex.Token) models.Statement {
-	vast := b.Var(toks, true, true)
-	return models.Statement{Token: vast.Token, Data: vast}
+func (b *Builder) VarStatement(bs *blockStatement) models.Statement {
+	v := b.Var(bs.toks, true, true)
+	v.Owner = bs.block
+	return models.Statement{Token: v.Token, Data: v}
 }
 
 // CommentStatement builds AST model of comment statement.
