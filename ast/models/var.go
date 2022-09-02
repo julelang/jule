@@ -28,6 +28,7 @@ type Var struct {
 	IsField   bool
 }
 
+//IsLocal returns variable is into the scope or not.
 func (v *Var) IsLocal() bool { return v.Owner != nil }
 
 func as_local_id(row, column int, id string) string {
@@ -80,4 +81,17 @@ func (v *Var) FieldString() string {
 	cpp.WriteString(juleapi.DefaultExpr)
 	cpp.WriteByte(';')
 	return cpp.String()
+}
+
+// ReeiverTypeString returns receiver declaration string.
+func (v *Var) ReceiverTypeString() string {
+	var s strings.Builder
+	if v.Mutable {
+		s.WriteString("mut ")
+	}
+	if v.Type.Kind != "" && v.Type.Kind[0] == '&' {
+		s.WriteByte('&')
+	}
+	s.WriteString("self")
+	return s.String()
 }

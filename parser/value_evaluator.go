@@ -260,7 +260,7 @@ func (ve *valueEvaluator) structId(id string, s *structure) (v value) {
 	v.data.Type.Token = s.Ast.Token
 	v.data.Token = s.Ast.Token
 	v.isType = true
-	// If built-in.
+	// If builtin.
 	if s.Ast.Token.Id == tokens.NA {
 		ve.model.appendSubNode(exprNode{juleapi.OutId(id, nil)})
 	} else {

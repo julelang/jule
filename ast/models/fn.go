@@ -20,7 +20,7 @@ type Fn struct {
 	Params        []Param
 	RetType       RetType
 	Block         *Block
-	Receiver      *Type
+	Receiver      *Var
 	Owner         any
 	BuiltinCaller any
 }
@@ -38,13 +38,15 @@ func (f *Fn) FindAttribute(kind string) *Attribute {
 
 func (f *Fn) plainTypeString() string {
 	var s strings.Builder
+	s.WriteByte('(')
+	n := len(f.Params)
 	if f.Receiver != nil {
-		if f.Receiver.Kind[0] == '&' {
-			s.WriteByte('&')
+		s.WriteString(f.Receiver.ReceiverTypeString())
+		if n > 0 {
+			s.WriteString(", ")
 		}
 	}
-	s.WriteByte('(')
-	if len(f.Params) > 0 {
+	if n > 0 {
 		for _, p := range f.Params {
 			if p.Variadic {
 				s.WriteString("...")

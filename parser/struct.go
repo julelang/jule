@@ -306,12 +306,13 @@ func (s *structure) SetGenerics(generics []Type) {
 	s.generics = generics
 }
 
-func (s *structure) selfVar(receiver Type) *Var {
+func (s *structure) selfVar(receiver *Var) *Var {
 	v := new(models.Var)
 	v.Token = s.Ast.Token
-	v.Type = receiver
+	v.Type = receiver.Type
+	v.Type.Tag = s
 	v.Type.Id = juletype.Struct
-	v.Mutable = true
+	v.Mutable = receiver.Mutable
 	v.Id = tokens.SELF
 	return v
 }

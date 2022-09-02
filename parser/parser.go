@@ -1025,9 +1025,9 @@ func (p *Parser) Trait(t models.Trait) {
 }
 
 func (p *Parser) implTrait(impl *models.Impl) {
-	trait, _, _ := p.traitById(impl.Trait.Kind)
+	trait, _, _ := p.traitById(impl.Base.Kind)
 	if trait == nil {
-		p.pusherrtok(impl.Trait, "id_not_exist", impl.Trait.Kind)
+		p.pusherrtok(impl.Base, "id_not_exist", impl.Base.Kind)
 		return
 	}
 	trait.Used = true
@@ -1088,9 +1088,9 @@ func (p *Parser) implTrait(impl *models.Impl) {
 }
 
 func (p *Parser) implStruct(impl *models.Impl) {
-	s, _, _ := p.Defines.structById(impl.Trait.Kind, nil)
+	s, _, _ := p.Defines.structById(impl.Base.Kind, nil)
 	if s == nil {
-		p.pusherrtok(impl.Trait, "id_not_exist", impl.Trait.Kind)
+		p.pusherrtok(impl.Base, "id_not_exist", impl.Base.Kind)
 		return
 	}
 	for _, obj := range impl.Tree {
@@ -1794,7 +1794,7 @@ func (p *Parser) blockVarsOfFunc(f *Func) []*Var {
 	vars = append(vars, f.RetType.Vars(f.Block)...)
 	if f.Receiver != nil {
 		s := f.Receiver.Tag.(*structure)
-		vars = append(vars, s.selfVar(*f.Receiver))
+		vars = append(vars, s.selfVar(f.Receiver))
 	}
 	return vars
 }
@@ -2156,12 +2156,15 @@ func (p *Parser) parseFuncCall(f *Func, args *models.Args, m *exprModel, errTok 
 	} else {
 		_ = p.checkGenericsQuantity(len(f.Generics), len(args.Generics), errTok)
 		if f.Receiver != nil {
-			owner := f.Owner.(*Parser)
-			s := f.Receiver.Tag.(*structure)
-			generics := s.Generics()
-			if len(generics) > 0 {
-				owner.pushGenerics(s.Ast.Generics, generics)
-				owner.reloadFuncTypes(f)
+			switch f.Receiver.Tag.(type) {
+			case *structure:
+				owner := f.Owner.(*Parser)
+				s := f.Receiver.Tag.(*structure)
+				generics := s.Generics()
+				if len(generics) > 0 {
+					owner.pushGenerics(s.Ast.Generics, generics)
+					owner.reloadFuncTypes(f)
+				}
 			}
 		}
 	}

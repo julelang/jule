@@ -60,7 +60,7 @@ func (b *Builder) buildNode(toks []lex.Token) {
 		b.Use(toks)
 	case tokens.Fn, tokens.Unsafe:
 		s := models.Statement{Token: t}
-		s.Data = b.Func(toks, false, false)
+		s.Data = b.Func(toks, false, false, false)
 		b.Tree = append(b.Tree, models.Object{Token: s.Token, Data: s})
 	case tokens.Const, tokens.Let, tokens.Mut:
 		b.GlobalVar(toks)
@@ -315,12 +315,13 @@ func (b *Builder) Struct(toks []lex.Token) {
 	b.Tree = append(b.Tree, models.Object{Token: s.Token, Data: s})
 }
 
-func (b *Builder) traitFuncs(toks []lex.Token) []*models.Fn {
+func (b *Builder) traitFuncs(toks []lex.Token, trait_id string) []*models.Fn {
 	var funcs []*models.Fn
 	i := 0
 	for i < len(toks) {
 		fnToks := b.skipStatement(&i, &toks)
-		f := b.Func(fnToks, false, true)
+		f := b.Func(fnToks, true, false, true)
+		b.setup_receiver(&f, trait_id)
 		f.Pub = true
 		funcs = append(funcs, &f)
 	}
@@ -350,7 +351,7 @@ func (b *Builder) Trait(toks []lex.Token) {
 	if i < len(toks) {
 		b.pusherr(toks[i], "invalid_syntax")
 	}
-	t.Funcs = b.traitFuncs(bodyToks)
+	t.Funcs = b.traitFuncs(bodyToks, t.Id)
 	b.Tree = append(b.Tree, models.Object{Token: t.Token, Data: t})
 }
 
@@ -362,39 +363,20 @@ func (b *Builder) implTraitFuncs(impl *models.Impl, toks []lex.Token) {
 	b.Tokens = toks
 	for b.Pos != -1 && !b.Ended() {
 		fnToks := b.nextBuilderStatement()
-		ref := false
 		tok := fnToks[0]
 		switch tok.Id {
 		case tokens.Comment:
 			impl.Tree = append(impl.Tree, b.Comment(tok))
 			continue
 		case tokens.Fn, tokens.Unsafe:
-			i := 1
-			if tok.Id == tokens.Unsafe {
-				i++
-			}
-			if len(fnToks) > i {
-				tok = fnToks[i]
-				if tok.Id == tokens.Operator && tok.Kind == tokens.AMPER {
-					ref = true
-					// Remove reference token
-					fnToks = append(fnToks[:i], fnToks[i+1:]...)
-				}
-			}
+			f := b.get_method(fnToks)
+			f.Pub = true
+			b.setup_receiver(f, impl.Target.Kind)
+			impl.Tree = append(impl.Tree, models.Object{Token: f.Token, Data: f})
 		default:
 			b.pusherr(tok, "invalid_syntax")
 			continue
 		}
-		f := b.Func(fnToks, false, false)
-		f.Pub = true
-		f.Receiver = &models.Type{
-			Id:   juletype.Struct,
-			Kind: impl.Target.Kind,
-		}
-		if ref {
-			f.Receiver.Kind = tokens.AMPER + f.Receiver.Kind
-		}
-		impl.Tree = append(impl.Tree, models.Object{Token: f.Token, Data: &f})
 	}
 }
 
@@ -430,36 +412,36 @@ func (b *Builder) implStruct(impl *models.Impl, toks []lex.Token) {
 				tok = fnToks[0]
 			}
 		}
-		ref := false
 		switch tok.Id {
 		case tokens.Fn, tokens.Unsafe:
-			i := 1
-			if tok.Id == tokens.Unsafe {
-				i++
-			}
-			if len(fnToks) > i {
-				tok = fnToks[i]
-				if tok.Id == tokens.Operator && tok.Kind == tokens.AMPER {
-					ref = true
-					// Remove reference token
-					fnToks = append(fnToks[:i], fnToks[i+1:]...)
-				}
-			}
+			f := b.get_method(fnToks)
+			f.Pub = pub
+			b.setup_receiver(f, impl.Base.Kind)
+			impl.Tree = append(impl.Tree, models.Object{Token: f.Token, Data: f})
 		default:
 			b.pusherr(tok, "invalid_syntax")
 			continue
 		}
-		f := b.Func(fnToks, false, false)
-		f.Pub = pub
-		f.Receiver = &models.Type{
-			Id:   juletype.Struct,
-			Kind: impl.Trait.Kind,
-		}
-		if ref {
-			f.Receiver.Kind = tokens.AMPER + f.Receiver.Kind
-		}
-		impl.Tree = append(impl.Tree, models.Object{Token: f.Token, Data: &f})
 	}
+}
+
+func (b *Builder) get_method(toks []lex.Token) *models.Fn {
+	tok := toks[0]
+	if tok.Id == tokens.Unsafe {
+		toks = toks[1:]
+		if len(toks) == 0 || toks[0].Id != tokens.Fn {
+			b.pusherr(tok, "invalid_syntax")
+			return nil
+		}
+	} else if toks[0].Id != tokens.Fn {
+		b.pusherr(tok, "invalid_syntax")
+		return nil
+	}
+	f := new(models.Fn)
+	*f = b.Func(toks, true, false, false)
+	f.IsUnsafe = tok.Id == tokens.Unsafe
+	f.Block.IsUnsafe = f.IsUnsafe
+	return f
 }
 
 func (b *Builder) implFuncs(impl *models.Impl, toks []lex.Token) {
@@ -487,7 +469,7 @@ func (b *Builder) Impl(toks []lex.Token) {
 		b.pusherr(tok, "invalid_syntax")
 		return
 	}
-	impl.Trait = tok
+	impl.Base = tok
 	tok = toks[2]
 	if tok.Id != tokens.For {
 		if tok.Id == tokens.Brace && tok.Kind == tokens.LBRACE {
@@ -515,14 +497,14 @@ body:
 	i := 0
 	bodyToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
 	if bodyToks == nil {
-		b.pusherr(impl.Trait, "body_not_exist")
+		b.pusherr(impl.Base, "body_not_exist")
 		return
 	}
 	if i < len(toks) {
 		b.pusherr(toks[i], "invalid_syntax")
 	}
 	b.implFuncs(&impl, bodyToks)
-	b.Tree = append(b.Tree, models.Object{Token: impl.Trait, Data: impl})
+	b.Tree = append(b.Tree, models.Object{Token: impl.Base, Data: impl})
 }
 
 // CppLinks builds AST model of cpp link statement.
@@ -539,7 +521,7 @@ func (b *Builder) CppLink(toks []lex.Token) {
 	var link models.CppLink
 	link.Token = tok
 	link.Link = new(models.Fn)
-	*link.Link = b.Func(toks[1:], false, true)
+	*link.Link = b.Func(toks[1:], false, false, true)
 	b.Tree = append(b.Tree, models.Object{Token: tok, Data: link})
 }
 
@@ -710,7 +692,29 @@ func (b *Builder) Attribute(toks []lex.Token) (a models.Attribute) {
 	return
 }
 
-func (b *Builder) funcPrototype(toks []lex.Token, i *int, anon bool) (f models.Fn, ok bool) {
+func (b *Builder) setup_receiver(f *models.Fn, owner_id string) {
+	if len(f.Params) == 0 {
+		b.pusherr(f.Token, "missing_receiver")
+		return
+	}
+	param := f.Params[0]
+	if param.Id != tokens.SELF {
+		b.pusherr(f.Token, "missing_receiver")
+		return
+	}
+	f.Receiver = new(models.Var)
+	f.Receiver.Type = models.Type{
+		Id:   juletype.Struct,
+		Kind: owner_id,
+	}
+	f.Receiver.Mutable = param.Mutable
+	if param.Type.Kind != "" && param.Type.Kind[0] == '&' {
+		f.Receiver.Type.Kind = tokens.AMPER + f.Receiver.Type.Kind
+	}
+	f.Params = f.Params[1:]
+}
+
+func (b *Builder) funcPrototype(toks []lex.Token, i *int, method, anon bool) (f models.Fn, ok bool) {
 	ok = true
 	f.Token = toks[*i]
 	if f.Token.Id == tokens.Unsafe {
@@ -747,7 +751,7 @@ func (b *Builder) funcPrototype(toks []lex.Token, i *int, anon bool) (f models.F
 	f.RetType.Type.Kind = juletype.TypeMap[f.RetType.Type.Id]
 	paramToks := b.getrange(i, tokens.LPARENTHESES, tokens.RPARENTHESES, &toks)
 	if len(paramToks) > 0 {
-		f.Params = b.Params(paramToks, false)
+		f.Params = b.Params(paramToks, method, false)
 	}
 	t, retok := b.FuncRetDataType(toks, i)
 	if retok {
@@ -758,10 +762,10 @@ func (b *Builder) funcPrototype(toks []lex.Token, i *int, anon bool) (f models.F
 }
 
 // Func builds AST model of function.
-func (b *Builder) Func(toks []lex.Token, anon, prototype bool) (f models.Fn) {
+func (b *Builder) Func(toks []lex.Token, method, anon, prototype bool) (f models.Fn) {
 	var ok bool
 	i := 0
-	f, ok = b.funcPrototype(toks, &i, anon)
+	f, ok = b.funcPrototype(toks, &i, method, anon)
 	if !ok {
 		return
 	}
@@ -859,11 +863,53 @@ func (b *Builder) GlobalVar(toks []lex.Token) {
 	})
 }
 
+func (b *Builder) build_self(toks []lex.Token) (p models.Param) {
+	if len(toks) == 0 {
+		return
+	}
+	i := 0
+	if toks[i].Id == tokens.Mut {
+		p.Mutable = true
+		i++
+		if i >= len(toks) {
+			b.pusherr(toks[i-1], "invalid_syntax")
+			return
+		}
+	}
+	if toks[i].Kind == tokens.AMPER {
+		p.Type.Kind = "&"
+		i++
+		if i >= len(toks) {
+			b.pusherr(toks[i-1], "invalid_syntax")
+			return
+		}
+	}
+	if toks[i].Id == tokens.Self {
+		p.Id = tokens.SELF
+		p.Token = toks[i]
+		i++
+		if i < len(toks) {
+			b.pusherr(toks[i+1], "invalid_syntax")
+		}
+	}
+	return
+}
+
 // Params builds AST model of function parameters.
-func (b *Builder) Params(toks []lex.Token, mustPure bool) []models.Param {
+func (b *Builder) Params(toks []lex.Token, method, mustPure bool) []models.Param {
 	parts, errs := Parts(toks, tokens.Comma, true)
 	b.Errors = append(b.Errors, errs...)
+	if len(parts) == 0 {
+		return nil
+	}
 	var params []models.Param
+	if method && len(parts) > 0 {
+		param := b.build_self(parts[0])
+		if param.Id == tokens.SELF {
+			params = append(params, param)
+			parts = parts[1:]
+		}
+	}
 	for _, part := range parts {
 		b.pushParam(&params, part, mustPure)
 	}
@@ -874,7 +920,7 @@ func (b *Builder) Params(toks []lex.Token, mustPure bool) []models.Param {
 func (b *Builder) checkParams(params *[]models.Param) {
 	for i := range *params {
 		p := &(*params)[i]
-		if p.Type.Token.Id != tokens.NA {
+		if p.Id == tokens.SELF || p.Type.Token.Id != tokens.NA {
 			continue
 		}
 		if p.Token.Id == tokens.NA {
@@ -1057,7 +1103,7 @@ func (b *Builder) datatype(t *models.Type, toks []lex.Token, i *int, arrays, err
 		case tokens.Fn, tokens.Unsafe:
 			t.Token = tok
 			t.Id = juletype.Fn
-			f, proto_ok := b.funcPrototype(toks, i, true)
+			f, proto_ok := b.funcPrototype(toks, i, false, true)
 			if !proto_ok {
 				b.pusherr(tok, "invalid_type")
 				return false
@@ -1221,7 +1267,7 @@ func (b *Builder) funcMultiTypeRet(toks []lex.Token, i *int) (t models.RetType, 
 	tok = toks[*i]
 	*i-- // For point to parenthses - ( -
 	rang := Range(i, tokens.LPARENTHESES, tokens.RPARENTHESES, toks)
-	params := b.Params(rang, true)
+	params := b.Params(rang, false, true)
 	types := make([]models.Type, len(params))
 	for i, param := range params {
 		types[i] = param.Type

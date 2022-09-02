@@ -86,7 +86,8 @@ func (e *eval) processes(processes [][]lex.Token) (v value, model iExpr) {
 		e.has_error = true
 		return
 	}
-	return e.valProcesses(valProcesses, processes)
+	v, model = e.valProcesses(valProcesses, processes)
+	return
 }
 
 func (e *eval) valProcesses(exprs []any, processes [][]lex.Token) (v value, model iExpr) {
@@ -399,6 +400,9 @@ func (e *eval) parenthesesRange(toks []lex.Token, m *exprModel) (v value) {
 	switch {
 	case typeIsFunc(v.data.Type):
 		f := v.data.Type.Tag.(*Func)
+		if f.Receiver != nil && f.Receiver.Mutable && !v.mutable {
+			e.pusherrtok(data.expr[len(data.expr)-1], "mutable_operation_on_immutable")
+		}
 		return e.callFunc(f, data, m)
 	}
 	e.pusherrtok(data.expr[len(data.expr)-1], "invalid_syntax")
@@ -888,7 +892,6 @@ func (e *eval) xObjSubId(dm *DefineMap, val value, idTok lex.Token, m *exprModel
 		return
 	}
 	v = val
-	v.mutable = false
 	m.appendSubNode(exprNode{subIdAccessorOfType(val.data.Type)})
 	switch t {
 	case 'g':
@@ -897,7 +900,6 @@ func (e *eval) xObjSubId(dm *DefineMap, val value, idTok lex.Token, m *exprModel
 		v.data.Type = g.Type
 		v.lvalue = val.lvalue || typeIsLvalue(g.Type)
 		v.constExpr = g.Const
-		v.mutable = val.mutable && g.Mutable
 		if g.Const {
 			v.expr = g.ExprTag
 			v.model = g.Expr.Model
@@ -984,7 +986,7 @@ func (e *eval) structObjSubId(val value, idTok lex.Token, m *exprModel) value {
 	val = e.xObjSubId(s.Defines, val, idTok, m)
 	if typeIsFunc(val.data.Type) {
 		f := val.data.Type.Tag.(*Func)
-		if f.Receiver != nil && typeIsRef(*f.Receiver) && !typeIsRef(parent_type) {
+		if f.Receiver != nil && typeIsRef(f.Receiver.Type) && !typeIsRef(parent_type) {
 			e.p.pusherrtok(idTok, "ref_method_used_with_not_ref_instance")
 		}
 	}
@@ -1480,7 +1482,7 @@ func (e *eval) enumerable(exprToks []lex.Token, t Type, m *exprModel) (v value) 
 
 func (e *eval) anonymousFn(toks []lex.Token, m *exprModel) (v value) {
 	b := ast.NewBuilder(toks)
-	f := b.Func(b.Tokens, true, false)
+	f := b.Func(b.Tokens, false, true, false)
 	b.Wait()
 	if len(b.Errors) > 0 {
 		e.p.pusherrs(b.Errors...)

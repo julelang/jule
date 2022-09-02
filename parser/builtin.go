@@ -339,7 +339,7 @@ var recoverFunc = &Fn{
 }
 
 // Parser instance for built-in generics.
-var genericFile = &Parser{}
+var builtinFile = &Parser{}
 
 // Builtin definitions.
 var Builtin = &DefineMap{
@@ -372,12 +372,12 @@ var Builtin = &DefineMap{
 		{Ast: &Func{
 			Pub:           true,
 			Id:            "new",
-			Owner:         genericFile,
+			Owner:         builtinFile,
 		}},
 		{Ast: &Func{
 			Pub:      true,
 			Id:       "make",
-			Owner:    genericFile,
+			Owner:    builtinFile,
 			Generics: []*GenericType{{Id: "Item"}},
 			RetType: models.RetType{
 				Type: Type{
@@ -396,7 +396,7 @@ var Builtin = &DefineMap{
 		{Ast: &Func{
 			Pub:      true,
 			Id:       "copy",
-			Owner:    genericFile,
+			Owner:    builtinFile,
 			Generics: []*GenericType{{Id: "Item"}},
 			RetType:  models.RetType{Type: Type{Id: juletype.Int, Kind: juletype.TypeMap[juletype.Int]}},
 			Params: []models.Param{
@@ -422,7 +422,7 @@ var Builtin = &DefineMap{
 		{Ast: &Func{
 			Pub:      true,
 			Id:       "append",
-			Owner:    genericFile,
+			Owner:    builtinFile,
 			Generics: []*GenericType{{Id: "Item"}},
 			RetType: models.RetType{
 				Type: Type{
@@ -655,9 +655,18 @@ func init() {
 	outlnFunc.Ast.Id = "outln"
 	Builtin.Funcs = append(Builtin.Funcs, outlnFunc)
 
-	// Set up new function
+	// Setup new function
 	fn_new, _, _ := Builtin.funcById("new", nil)
 	fn_new.Ast.BuiltinCaller = caller_new
+
+	// Setup Error trait
+	receiver := new(Var)
+	receiver.Mutable = false
+	for _, f := range errorTrait.Defines.Funcs {
+		f.Ast.Receiver = receiver
+		f.Ast.Receiver.Tag = errorTrait
+		f.Ast.Owner = builtinFile
+	}
 
 	// Set bits of platform-dependent types
 	intMax := intStatics.Globals[0]

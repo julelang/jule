@@ -69,6 +69,7 @@ var Errors = map[string]string{
 	`missing_goto_label`:                       `missing label identifier for goto statement`,
 	`missing_expr_for`:                         `missing expression for %s`,
 	`missing_generics`:                         `missing generics`,
+	`missing_receiver`:                         `missing receiver parameter`,
 	`expr_not_const`:                           `expressions is not constant expression`,
 	`nil_for_autotype`:                         `nil is cannot use with auto type definitions`,
 	`void_for_autotype`:                        `void data is cannot use for auto type definitions`,
@@ -139,6 +140,7 @@ var Errors = map[string]string{
 	`assignment_to_non_mut`:                    `cannot assign to immutable define`,
 	`assignment_non_mut_to_mut`:                `cannot assign mutable type used immutable define to mutable define`,
 	`ret_with_mut_typed_non_mut`:               `mutable typed return expressions should be mutable`,
+	`mutable_operation_on_immutable`:           `mutable operation cannot used with immutable define`,
 }
 
 // GetError returns error.

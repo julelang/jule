@@ -166,12 +166,15 @@ func fmt_meta_func(f *parser.Fn) string {
 	meta.WriteString(fmt_meta_generics(f.Ast.Generics))
 	meta.WriteString(fmt_meta_pub_identifier(f.Ast.Pub))
 	meta.WriteString("fn ")
-	if f.Ast.Receiver != nil && f.Ast.Receiver.Kind[0] == '*' {
-		meta.WriteByte('&')
-	}
+	n := len(f.Ast.Params)
 	meta.WriteString(f.Ast.Id)
 	meta.WriteByte('(')
-	n := len(f.Ast.Params)
+	if f.Ast.Receiver != nil {
+		meta.WriteString(f.Ast.Receiver.ReceiverTypeString())
+		if n > 0 {
+			meta.WriteByte(',')
+		}
+	}
 	for i, p := range f.Ast.Params {
 		meta.WriteString(p.Id)
 		meta.WriteString(": ")
