@@ -186,7 +186,7 @@ func (re *retExpr) get_model(i int) string {
 		}
 		return v.OutId()
 	}
-	return re.models[0].String()
+	return re.models[i].String()
 }
 
 func (re *retExpr) setup_vars() string {
