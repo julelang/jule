@@ -178,22 +178,36 @@ type retExpr struct {
 	models []iExpr
 }
 
-func (re *retExpr) model_str(i int) string {
-	if re.vars == nil {
-		return re.models[i].String()
+func (re *retExpr) get_model(i int) string {
+	if len(re.vars) > 0 {
+		v := re.vars[i]
+		if juleapi.IsIgnoreId(v.Id) {
+			return re.models[i].String()
+		}
+		return v.OutId()
 	}
-	v := re.vars[i]
-	if juleapi.IsIgnoreId(v.Id) {
-		return re.models[i].String()
+	return re.models[0].String()
+}
+
+func (re *retExpr) setup_vars() string {
+	var cpp strings.Builder
+	for i, v := range re.vars {
+		if juleapi.IsIgnoreId(v.Id) {
+			continue
+		}
+		cpp.WriteString(v.OutId())
+		cpp.WriteByte('=')
+		cpp.WriteString(re.models[i].String())
+		cpp.WriteByte(';')
 	}
-	return "(" + v.OutId() + "=" + re.models[i].String() + ")"
+	return cpp.String()
 }
 
 func (re *retExpr) multiRetString() string {
 	var cpp strings.Builder
 	cpp.WriteString("std::make_tuple(")
 	for i := range re.models {
-		cpp.WriteString(re.model_str(i))
+		cpp.WriteString(re.get_model(i))
 		cpp.WriteByte(',')
 	}
 	return cpp.String()[:cpp.Len()-1] + ")"
@@ -201,15 +215,22 @@ func (re *retExpr) multiRetString() string {
 
 func (re *retExpr) singleRetString() string {
 	var cpp strings.Builder
-	cpp.WriteString(re.model_str(0))
+	cpp.WriteString(re.get_model(0))
 	return cpp.String()
 }
 
 func (re retExpr) String() string {
-	if len(re.models) > 1 {
-		return re.multiRetString()
+	var cpp strings.Builder
+	if len(re.vars) > 0 {
+		cpp.WriteString(re.setup_vars())
 	}
-	return re.singleRetString()
+	cpp.WriteString(" return ")
+	if len(re.models) > 1 {
+		cpp.WriteString(re.multiRetString())
+	} else {
+		cpp.WriteString(re.singleRetString())
+	}
+	return cpp.String()
 }
 
 type serieExpr struct {

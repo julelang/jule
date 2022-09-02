@@ -51,6 +51,9 @@ func (v *Var) OutId() string {
 }
 
 func (v Var) String() string {
+	if juleapi.IsIgnoreId(v.Id) {
+		return ""
+	}
 	if v.Const {
 		return ""
 	}

@@ -30,12 +30,13 @@ func (rt *RetType) AnyVar() bool {
 // Vars returns variables of ret type if exist, nil if not.
 func (rt *RetType) Vars(owner *Block) []*Var {
 	get := func(tok lex.Token, t Type) *Var {
-		if juleapi.IsIgnoreId(tok.Kind) {
-			return nil
-		}
 		v := new(Var)
 		v.Token = tok
-		v.Id = tok.Kind
+		if juleapi.IsIgnoreId(tok.Kind) {
+			v.Id = juleapi.Ignore
+		} else {
+			v.Id = tok.Kind
+		}
 		v.Type = t
 		v.Owner = owner
 		v.Mutable = true
@@ -70,7 +71,6 @@ type Ret struct {
 
 func (r Ret) String() string {
 	var cpp strings.Builder
-	cpp.WriteString("return ")
 	cpp.WriteString(r.Expr.String())
 	cpp.WriteByte(';')
 	return cpp.String()
