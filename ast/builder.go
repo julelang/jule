@@ -440,7 +440,9 @@ func (b *Builder) get_method(toks []lex.Token) *models.Fn {
 	f := new(models.Fn)
 	*f = b.Func(toks, true, false, false)
 	f.IsUnsafe = tok.Id == tokens.Unsafe
-	f.Block.IsUnsafe = f.IsUnsafe
+	if f.Block != nil {
+		f.Block.IsUnsafe = f.IsUnsafe
+	}
 	return f
 }
 
