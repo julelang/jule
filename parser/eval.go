@@ -68,6 +68,8 @@ func (e *eval) processes(processes [][]lex.Token) (v value, model iExpr) {
 		v = e.process(processes[0], m)
 		if v.constExpr {
 			model = v.model
+		} else if v.isType {
+			e.pusherrtok(v.data.Token, "invalid_expr")
 		}
 		return
 	}
