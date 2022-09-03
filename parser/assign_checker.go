@@ -85,32 +85,55 @@ type assignChecker struct {
 	errtok           lex.Token
 }
 
-func (ac assignChecker) checkAssignType() {
-	if ac.p.eval.has_error || ac.v.data.Value == "" {
-		return
-	}
+func (ac *assignChecker) has_error() bool {
+	return ac.p.eval.has_error || ac.v.data.Value == ""
+}
+
+func (ac *assignChecker) check_validity() (valid bool) {
+	valid = true
 	if typeIsFunc(ac.t) && typeIsFunc(ac.v.data.Type) {
 		f := ac.v.data.Type.Tag.(*Func)
 		if f.Receiver != nil {
 			ac.p.pusherrtok(ac.errtok, "method_as_anonymous_fn")
+			valid = false
 		} else if len(f.Generics) > 0 {
 			ac.p.pusherrtok(ac.errtok, "genericed_fn_as_anonymous_fn")
+			valid = false
 		}
+	}
+	return
+}
+
+func (ac *assignChecker) check_constant() (ok bool) {
+	if !ac.v.constExpr || !typeIsPure(ac.t) ||
+		!typeIsPure(ac.v.data.Type) || !juletype.IsNumeric(ac.v.data.Type.Id) {
 		return
-	} else if ac.v.constExpr && typeIsPure(ac.t) &&
-		typeIsPure(ac.v.data.Type) && juletype.IsNumeric(ac.v.data.Type.Id) {
-		switch {
-		case juletype.IsFloat(ac.t.Id):
-			if !floatAssignable(ac.t.Id, ac.v) {
-				ac.p.pusherrtok(ac.errtok, "overflow_limits")
-			}
-			return
-		case juletype.IsInteger(ac.t.Id):
-			if !integerAssignable(ac.t.Id, ac.v) {
-				ac.p.pusherrtok(ac.errtok, "overflow_limits")
-			}
-			return
+	}
+	ok = true
+	switch {
+	case juletype.IsFloat(ac.t.Id):
+		if !floatAssignable(ac.t.Id, ac.v) {
+			ac.p.pusherrtok(ac.errtok, "overflow_limits")
+			ok = false
 		}
+	case juletype.IsInteger(ac.t.Id):
+		if !integerAssignable(ac.t.Id, ac.v) {
+			ac.p.pusherrtok(ac.errtok, "overflow_limits")
+			ok = false
+		}
+	default:
+		ok = false
+	}
+	return
+}
+
+func (ac assignChecker) checkAssignType() {
+	if ac.has_error() {
+		return
+	} else if !ac.check_validity() {
+		return
+	} else if ac.check_constant() {
+		return
 	}
 	ac.p.checkType(ac.t, ac.v.data.Type, ac.ignoreAny, !ac.not_allow_assign, ac.errtok)
 }

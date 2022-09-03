@@ -3639,7 +3639,16 @@ func (p *Parser) checkType(real, check Type, ignoreAny, allow_assign bool, errTo
 		p.checkMultiType(real, check, ignoreAny, errTok)
 		return
 	}
-	if typesAreCompatible(real, check, ignoreAny, allow_assign) {
+	checker := type_checker{
+		errtok:       errTok,
+		p:            p,
+		left:         real,
+		right:        check,
+		ignore_any:   ignoreAny,
+		allow_assign: allow_assign,
+	}
+	ok := checker.check()
+	if ok || checker.error_logged {
 		return
 	}
 	if real.Kind != check.Kind {

@@ -14,6 +14,15 @@ type trait struct {
 	Desc string
 }
 
+func (t *trait) has_reference_receiver() bool {
+	for _, f := range t.Defines.Funcs {
+		if typeIsRef(f.Ast.Receiver.Type) {
+			return true
+		}
+	}
+	return false
+}
+
 // FindFunc returns function by id.
 // Returns nil if not exist.
 func (t *trait) FindFunc(id string) *Fn {

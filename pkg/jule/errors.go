@@ -141,6 +141,7 @@ var Errors = map[string]string{
 	`assignment_non_mut_to_mut`:                `cannot assign mutable type used immutable define to mutable define`,
 	`ret_with_mut_typed_non_mut`:               `mutable typed return expressions should be mutable`,
 	`mutable_operation_on_immutable`:           `mutable operation cannot used with immutable define`,
+	`trait_has_reference_parametered_function`: `trait has reference receiver parameter used method, cannot assign non-reference instance`,
 }
 
 // GetError returns error.

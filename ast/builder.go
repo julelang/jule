@@ -768,20 +768,20 @@ func (b *Builder) Func(toks []lex.Token, method, anon, prototype bool) (f models
 	var ok bool
 	i := 0
 	f, ok = b.funcPrototype(toks, &i, method, anon)
-	if !ok {
+	if prototype {
+		if i+1 < len(toks) {
+			b.pusherr(toks[i+1], "invalid_syntax")
+		}
+		return
+	} else if !ok {
 		return
 	}
 	if i >= len(toks) {
-		if prototype {
-			return
-		} else if b.Ended() {
+		if b.Ended() {
 			b.pusherr(f.Token, "body_not_exist")
 			return
 		}
 		toks = b.nextBuilderStatement()
-	} else if prototype {
-		b.pusherr(f.Token, "invalid_syntax")
-		return
 	}
 	blockToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
 	if blockToks == nil {

@@ -381,7 +381,7 @@ func (s *solver) or(v *value) {
 
 func (s *solver) ptr() (v value) {
 	v.data.Token = s.operator
-	if !typesAreCompatible(s.left_val.data.Type, s.right_val.data.Type, true, true) {
+	if !s.types_are_compatible(true) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.operator, "incompatible_types",
 			s.right_val.data.Type.Kind, s.left_val.data.Type.Kind)
@@ -459,7 +459,7 @@ func (s *solver) any() (v value) {
 
 func (s *solver) bool() (v value) {
 	v.data.Token = s.operator
-	if !typesAreCompatible(s.left_val.data.Type, s.right_val.data.Type, true, true) {
+	if !s.types_are_compatible(true) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.operator, "incompatible_types",
 			s.right_val.data.Type.Kind, s.left_val.data.Type.Kind)
@@ -815,7 +815,7 @@ func (s *solver) logical() (v value) {
 
 func (s *solver) array() (v value) {
 	v.data.Token = s.operator
-	if !typesAreCompatible(s.left_val.data.Type, s.right_val.data.Type, true, true) {
+	if !s.types_are_compatible(true) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.operator, "incompatible_types",
 			s.right_val.data.Type.Kind, s.left_val.data.Type.Kind)
@@ -834,7 +834,7 @@ func (s *solver) array() (v value) {
 
 func (s *solver) slice() (v value) {
 	v.data.Token = s.operator
-	if !typesAreCompatible(s.left_val.data.Type, s.right_val.data.Type, true, true) {
+	if !s.types_are_compatible(true) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.operator, "incompatible_types",
 			s.right_val.data.Type.Kind, s.left_val.data.Type.Kind)
@@ -854,7 +854,7 @@ func (s *solver) slice() (v value) {
 
 func (s *solver) nil() (v value) {
 	v.data.Token = s.operator
-	if !typesAreCompatible(s.left_val.data.Type, s.right_val.data.Type, false, true) {
+	if !s.types_are_compatible(false) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.operator, "incompatible_types",
 			s.right_val.data.Type.Kind, s.left_val.data.Type.Kind)
@@ -903,7 +903,7 @@ func (s *solver) structure() (v value) {
 
 func (s *solver) juletrait() (v value) {
 	v.data.Token = s.operator
-	if !typesAreCompatible(s.left_val.data.Type, s.right_val.data.Type, true, true) {
+	if !s.types_are_compatible(true) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.operator, "incompatible_types",
 			s.right_val.data.Type.Kind, s.left_val.data.Type.Kind)
@@ -943,6 +943,17 @@ func (s *solver) function() (v value) {
 			s.operator.Kind, tokens.NIL)
 	}
 	return
+}
+
+func (s *solver) types_are_compatible(ignore_any bool) bool {
+	checker := type_checker{
+		left:         s.left_val.data.Type,
+		right:        s.right_val.data.Type,
+		ignore_any:   ignore_any,
+		allow_assign: true,
+	}
+	ok := checker.check()
+	return ok
 }
 
 func (s *solver) isConstExpr() bool {
