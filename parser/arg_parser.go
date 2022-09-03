@@ -31,6 +31,9 @@ type pureArgParser struct {
 }
 
 func (pap *pureArgParser) buildArgs() {
+	if pap.args.Src == nil {
+		return
+	}
 	pap.args.Src = make([]Arg, len(*pap.pmap))
 	for i, p := range pap.f.Params {
 		pair := (*pap.pmap)[p.Id]
@@ -93,6 +96,7 @@ func (pap *pureArgParser) check_passes_struct() {
 				pap.p.pusherrtok(pap.errTok, "reference_field_not_initialized", pair.param.Id)
 			}
 		}
+		pap.args.Src = nil
 		return
 	}
 	for _, pair := range *pap.pmap {
