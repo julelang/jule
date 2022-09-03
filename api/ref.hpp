@@ -5,6 +5,8 @@
 #ifndef __JULEC_REF_HPP
 #define __JULEC_REF_HPP
 
+#define __JULEC_REFERENCE_DELTA ( 1 )
+
 // Wrapper structure for raw pointer of JuleC.
 // This structure is the used by Jule references for reference-counting
 // and memory management.
@@ -37,20 +39,19 @@ struct jule_ref {
     ~jule_ref<T>(void) noexcept
     { this->__drop(); }
 
-    inline void __drop_ref(void) const noexcept
-    { ( --( *this->_ref ) ); }
+    inline int_julet __drop_ref(void) const noexcept
+    { return __julec_atomic_add ( this->_ref, -__JULEC_REFERENCE_DELTA ); }
 
-    inline void __add_ref(void) const noexcept
-    { ( ++( *this->_ref ) ); }
+    inline int_julet __add_ref(void) const noexcept
+    { return __julec_atomic_add ( this->_ref, __JULEC_REFERENCE_DELTA ); }
 
     inline uint_julet __get_ref_n(void) const noexcept
-    { return ( *this->_ref ); }
+    { return __julec_atomic_load ( this->_ref ); }
 
     void __drop(void) noexcept {
         if (!this->_ref)
         { return; }
-        this->__drop_ref();
-        if ( ( this->__get_ref_n() ) != 0 )
+        if ( ( this->__drop_ref() ) != __JULEC_REFERENCE_DELTA )
         { return; }
         delete this->_ref;
         this->_ref = nil;

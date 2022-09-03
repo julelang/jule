@@ -31,13 +31,13 @@ public:
             this->_data._alloc = nil;
             return;
         }
-        // Use 1, DON'T USE __drop_ref METHOD BECAUSE
+        // Use __JULEC_REFERENCE_DELTA, DON'T USE __drop_ref METHOD BECAUSE
         // jule_ref does automatically this.
         // If not in this case:
-        //   if this is method called from destructor, reference count setted to -1
-        //   and reference count is unsigned, for this reason allocation is not
-        //   deallocated.
-        if ( ( this->_data.__get_ref_n() ) != 1 )
+        //   if this is method called from destructor, reference count setted to
+        //   negative integer but reference count is unsigned, for this reason
+        //   allocation is not deallocated.
+        if ( ( this->_data.__get_ref_n() ) != __JULEC_REFERENCE_DELTA )
         { return; }
         delete this->_data._ref;
         this->_data._ref = nil;
