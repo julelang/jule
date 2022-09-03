@@ -70,6 +70,9 @@ type Ret struct {
 }
 
 func (r Ret) String() string {
+	if r.Expr.Model == nil {
+		return "return;"
+	}
 	var cpp strings.Builder
 	cpp.WriteString(r.Expr.String())
 	cpp.WriteByte(';')
