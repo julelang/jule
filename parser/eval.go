@@ -887,7 +887,7 @@ func (e *eval) typeId(toks []lex.Token, m *exprModel) (v value) {
 	return e.enumerable(toks, t, m)
 }
 
-func (e *eval) xObjSubId(dm *DefineMap, val value, idTok lex.Token, m *exprModel) (v value) {
+func (e *eval) xObjSubId(dm *DefineMap, val value, interior_mutability bool, idTok lex.Token, m *exprModel) (v value) {
 	i, dm, t := dm.findById(idTok.Kind, idTok.File)
 	if i == -1 {
 		e.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
@@ -901,6 +901,7 @@ func (e *eval) xObjSubId(dm *DefineMap, val value, idTok lex.Token, m *exprModel
 		g.Used = true
 		v.data.Type = g.Type
 		v.lvalue = val.lvalue || typeIsLvalue(g.Type)
+		v.mutable = v.mutable || (g.Mutable && interior_mutability)
 		v.constExpr = g.Const
 		if g.Const {
 			v.expr = g.ExprTag
@@ -925,26 +926,26 @@ func (e *eval) xObjSubId(dm *DefineMap, val value, idTok lex.Token, m *exprModel
 
 func (e *eval) strObjSubId(val value, idTok lex.Token, m *exprModel) value {
 	readyStrDefines(val)
-	v := e.xObjSubId(strDefines, val, idTok, m)
+	v := e.xObjSubId(strDefines, val, false, idTok, m)
 	v.lvalue = false
 	return v
 }
 
 func (e *eval) sliceObjSubId(val value, idTok lex.Token, m *exprModel) value {
-	v := e.xObjSubId(sliceDefines, val, idTok, m)
+	v := e.xObjSubId(sliceDefines, val, false, idTok, m)
 	v.lvalue = false
 	return v
 }
 
 func (e *eval) arrayObjSubId(val value, idTok lex.Token, m *exprModel) value {
-	v := e.xObjSubId(arrayDefines, val, idTok, m)
+	v := e.xObjSubId(arrayDefines, val, false, idTok, m)
 	v.lvalue = false
 	return v
 }
 
 func (e *eval) mapObjSubId(val value, idTok lex.Token, m *exprModel) value {
 	readyMapDefines(val.data.Type)
-	v := e.xObjSubId(mapDefines, val, idTok, m)
+	v := e.xObjSubId(mapDefines, val, false, idTok, m)
 	v.lvalue = false
 	return v
 }
@@ -985,7 +986,14 @@ func (e *eval) structObjSubId(val value, idTok lex.Token, m *exprModel) value {
 			*nodes = append([]iExpr{exprNode{"this->"}}, (*nodes)[n+1:]...)
 		}()
 	}
-	val = e.xObjSubId(s.Defines, val, idTok, m)
+	interior_mutability := false
+	if e.p.rootBlock.Func.Receiver != nil {
+		switch t := e.p.rootBlock.Func.Receiver.Tag.(type) {
+		case *structure:
+			interior_mutability = structure_instances_is_uses_same_base(t, s)
+		}
+	}
+	val = e.xObjSubId(s.Defines, val, interior_mutability, idTok, m)
 	if typeIsFunc(val.data.Type) {
 		f := val.data.Type.Tag.(*Func)
 		if f.Receiver != nil && typeIsRef(f.Receiver.Type) && !typeIsRef(parent_type) {
@@ -1001,7 +1009,7 @@ func (e *eval) traitObjSubId(val value, idTok lex.Token, m *exprModel) value {
 	val.constExpr = false
 	val.lvalue = false
 	val.isType = false
-	val = e.xObjSubId(t.Defines, val, idTok, m)
+	val = e.xObjSubId(t.Defines, val, false, idTok, m)
 	val.constExpr = false
 	return val
 }

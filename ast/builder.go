@@ -271,8 +271,16 @@ func (b *Builder) structFields(toks []lex.Token) []*models.Var {
 		if var_tokens[0].Id == tokens.Comment {
 			continue
 		}
-		pub := var_tokens[0].Id == tokens.Pub
-		if pub {
+		is_pub := var_tokens[0].Id == tokens.Pub
+		if is_pub {
+			if len(var_tokens) == 1 {
+				b.pusherr(var_tokens[0], "invalid_syntax")
+				continue
+			}
+			var_tokens = var_tokens[1:]
+		}
+		is_mut := var_tokens[0].Id == tokens.Mut
+		if is_mut {
 			if len(var_tokens) == 1 {
 				b.pusherr(var_tokens[0], "invalid_syntax")
 				continue
@@ -280,9 +288,9 @@ func (b *Builder) structFields(toks []lex.Token) []*models.Var {
 			var_tokens = var_tokens[1:]
 		}
 		v := b.Var(var_tokens, false, false)
-		v.Pub = pub
+		v.Pub = is_pub
+		v.Mutable = is_mut
 		v.IsField = true
-		v.Mutable = true
 		fields = append(fields, &v)
 	}
 	return fields
