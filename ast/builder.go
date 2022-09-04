@@ -1137,7 +1137,7 @@ func (b *Builder) datatype(t *models.Type, toks []lex.Token, i *int, arrays, err
 			switch tok.Kind {
 			case tokens.LBRACKET:
 				*i++
-				if *i > len(toks) {
+				if *i >= len(toks) {
 					if err {
 						b.pusherr(tok, "invalid_syntax")
 					}
@@ -1189,7 +1189,11 @@ ret:
 
 // DataType builds AST model of data-type.
 func (b *Builder) DataType(toks []lex.Token, i *int, arrays, err bool) (t models.Type, ok bool) {
+	tok := toks[*i]
 	ok = b.datatype(&t, toks, i, arrays, err)
+	if err && t.Token.Id == tokens.NA {
+		b.pusherr(tok, "invalid_type")
+	}
 	return
 }
 
@@ -1316,7 +1320,7 @@ func (b *Builder) FuncRetDataType(toks []lex.Token, i *int) (t models.RetType, o
 			return
 		}
 	}
-	t.Type, ok = b.DataType(toks, i, false, false)
+	t.Type, ok = b.DataType(toks, i, false, true)
 	return
 }
 
