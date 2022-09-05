@@ -1312,11 +1312,16 @@ func (b *Builder) FuncRetDataType(toks []lex.Token, i *int) (t models.RetType, o
 		return
 	}
 	tok := toks[*i]
-	if tok.Id == tokens.Brace {
+	switch tok.Id {
+	case tokens.Brace:
 		switch tok.Kind {
 		case tokens.LPARENTHESES:
 			return b.funcMultiTypeRet(toks, i)
 		case tokens.LBRACE:
+			return
+		}
+	case tokens.Operator:
+		if tok.Kind == tokens.EQUAL {
 			return
 		}
 	}
