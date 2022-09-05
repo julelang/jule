@@ -47,8 +47,8 @@ pub fn fmt_float(f: f64, fmt: byte, prec: int, bit_size: int) str {
 }
 
 unsafe fn generic_ftoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_size: int) []byte {
-	let mut bits: u64
-	let mut flt: *FloatInfo
+	let mut bits: u64 = 0
+	let mut flt: *FloatInfo = nil
 	match bit_size {
 	case 32:
 		bits = u64(std::math::f32_bits(f32(val)))
@@ -67,7 +67,7 @@ unsafe fn generic_ftoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_
 	match exp {
 	case 1<<flt.expbits - 1:
 		// +inf, nan
-		let mut s: str
+		let mut s: str = ""
 		match {
 		case mant != 0:
 			s = "nan"
@@ -98,13 +98,13 @@ unsafe fn generic_ftoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_
 		ret big_ftoa(dst, prec, fmt, neg, mant, exp, flt)
 	}
 
-	let mut digs: DecimalSlice
+	let mut digs = DecimalSlice{}
 	let mut ok = false
 	// Negative precision means "only as much as needed to be exact."
 	let shortest = prec < 0
 	if shortest {
 		// Use Ryu algorithm.
-		let buf: [32]byte
+		let buf = [32]byte{}
 		digs.d = buf[:]
 		ryu_ftoa_shortest(&digs, mant, exp-int(flt.mantbits), flt)
 		ok = true
@@ -132,7 +132,7 @@ unsafe fn generic_ftoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_
 			// Invalid mode.
 			digits = 1
 		}
-		let buf: [24]byte
+		let buf = [24]byte{}
 		if bit_size == 32 && digits <= 9 {
 			digs.d = buf[:]
 			ryu_ftoa_fixed32(&digs, u32(mant), exp-int(flt.mantbits), digits)
@@ -152,10 +152,10 @@ unsafe fn generic_ftoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_
 // Uses multiprecision computations to format a float.
 unsafe fn big_ftoa(mut dst: []byte, mut prec: int, fmt: byte, neg: bool,
 				mant: u64, exp: int, flt: *FloatInfo) []byte {
-	let mut d: Decimal
+	let mut d = Decimal{}
 	d.assign(mant)
 	d.shift(exp - int(flt.mantbits))
-	let mut digs: DecimalSlice
+	let mut digs = DecimalSlice{}
 	let shortest = prec < 0
 	if shortest {
 		round_shortest(&d, mant, exp, flt)
@@ -255,7 +255,7 @@ unsafe fn round_shortest(mut d: *Decimal, mant: u64, exp: int, flt: *FloatInfo) 
 	// d = mant << (exp - mantbits)
 	// Next highest floating point number is mant+1 << exp-mantbits.
 	// Our upper bound is halfway between, mant*2+1 << exp-mantbits-1.
-	let mut upper: Decimal
+	let mut upper = Decimal{}
 	upper.assign(mant*2 + 1)
 	upper.shift(exp - int(flt.mantbits) - 1)
 
@@ -265,8 +265,8 @@ unsafe fn round_shortest(mut d: *Decimal, mant: u64, exp: int, flt: *FloatInfo) 
 	// in which case the next lowest is mant*2-1 << exp-mantbits-1.
 	// Either way, call it mantlo << explo-mantbits.
 	// Our lower bound is halfway between, mantlo*2+1 << explo-mantbits-1.
-	let mut mantlo: u64
-	let mut explo: int
+	let mut mantlo: u64 = 0
+	let mut explo: int = 0
 	if mant > 1<<flt.mantbits || exp == minexp {
 		mantlo = mant - 1
 		explo = exp
@@ -274,7 +274,7 @@ unsafe fn round_shortest(mut d: *Decimal, mant: u64, exp: int, flt: *FloatInfo) 
 		mantlo = mant*2 - 1
 		explo = exp - 1
 	}
-	let mut lower: Decimal
+	let mut lower = Decimal{}
 	lower.assign(mantlo*2 + 1)
 	lower.shift(explo - int(flt.mantbits) - 1)
 
@@ -294,7 +294,7 @@ unsafe fn round_shortest(mut d: *Decimal, mant: u64, exp: int, flt: *FloatInfo) 
 	//
 	// If upperdelta == 2, then the difference is greater than 1
 	// and we know that rounding up falls within the bound.
-	let mut upperdelta: u8
+	let mut upperdelta: u8 = 0
 
 	// Now we can figure out the minimum number of digits required.
 	// Walk along until d has distinguished itself from upper and lower.

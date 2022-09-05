@@ -1455,17 +1455,15 @@ func (p *Parser) Var(v Var) *Var {
 	if !v.IsField && typeIsRef(v.Type) && v.SetterTok.Id == tokens.NA {
 		p.pusherrtok(v.Token, "reference_not_initialized")
 	}
+	if !v.IsField && v.SetterTok.Id == tokens.NA {
+		p.pusherrtok(v.Token, "variable_not_initialized")
+	}
 	if v.Const {
 		v.ExprTag = val.expr
 		if !typeIsAllowForConst(v.Type) {
 			p.pusherrtok(v.Token, "invalid_type_for_const", v.Type.Kind)
-		}
-		if v.SetterTok.Id == tokens.NA {
-			p.pusherrtok(v.Token, "const_not_initialized")
-		} else {
-			if !validExprForConst(val) {
-				p.eval.pusherrtok(v.Token, "expr_not_const")
-			}
+		} else if v.SetterTok.Id != tokens.NA && !validExprForConst(val) {
+			p.eval.pusherrtok(v.Token, "expr_not_const")
 		}
 	}
 	return &v
