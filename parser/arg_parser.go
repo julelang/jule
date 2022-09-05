@@ -4,8 +4,7 @@ import (
 	"github.com/jule-lang/jule/ast/models"
 	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/lex/tokens"
-	"github.com/jule-lang/jule/pkg/jule"
-	"github.com/jule-lang/jule/pkg/juletype"
+	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
 func getParamMap(params []Param) *paramMap {
@@ -31,7 +30,7 @@ type pureArgParser struct {
 }
 
 func (pap *pureArgParser) buildArgs() {
-	if pap.args.Src == nil {
+	if pap.pmap == nil {
 		return
 	}
 	pap.args.Src = make([]Arg, len(*pap.pmap))
@@ -41,16 +40,7 @@ func (pap *pureArgParser) buildArgs() {
 		case pair.arg != nil:
 			pap.args.Src[i] = *pair.arg
 		case pair.param.Variadic:
-			t := Type{
-				Id:            juletype.Slice,
-				Token:           pair.param.Type.Token,
-				Kind:          jule.Prefix_Slice + pair.param.Type.Kind,
-				Pure:          true,
-				ComponentType: new(Type),
-			}
-			*t.ComponentType = pair.param.Type
-			model := sliceExpr{t, nil}
-			arg := Arg{Expr: Expr{Model: model}}
+			arg := Arg{Expr: Expr{Model: exprNode{juleapi.DefaultExpr}}}
 			pap.args.Src[i] = arg
 		}
 	}
@@ -96,7 +86,7 @@ func (pap *pureArgParser) check_passes_struct() {
 				pap.p.pusherrtok(pap.errTok, "reference_field_not_initialized", pair.param.Id)
 			}
 		}
-		pap.args.Src = nil
+		pap.pmap = nil
 		return
 	}
 	for _, pair := range *pap.pmap {
