@@ -26,25 +26,30 @@
 Jule is a statically typed compiled programming language designed for system development, building maintainable and reliable software.
 The purpose of Jule is to keep functionality high while maintaining a simple form and readability.
 It guarantees memory safety and does not contain undefined behavior.
+It also has a reference compiler with obsessions that encourage developers to build safe software.
 
 <img src="./docs/images/quicksort.png"/>
 
+
 <h2 id="memory-safety">Memory Safety and Management</h2>
-The memory safety and the memory management.
-A major challenge in the C and C++ or similar programming languages.
+The memory safety and the memory management is a major challenge in the C and C++ or similar programming languages.
+Jule has a reference-based memory management design to solve these issues.
 Jule guarantees memory safety and uses reference counting for memory management.
 An account-allocation is automatically released as soon as the reference count reaches zero.
+Please read the <a href="https://jule.dev/pages/docs.html?page=memory-memory-management">memory management documentations</a> for more information about reference-counting approach of Jule.
 <br><br>
-
-+ Instant automatic memory initialization
-+ Bounds checking
-+ References can't assign to nil (aka null)
+Variables are immutable by default, and each variable is encouraged to be initialized at declaration.
+Safe Jule performs bounds checking and nil (aka null) checking.
+It is committed to no undefined behavior.
+Unsafe behaviors are encouraged to be done deliberately with unsafe scopes.
+Please read the <a href="https://jule.dev/pages/docs.html?page=unsafe-jule">Unsafe Jule documentations</a> for more information about of Unsafe Jule.
 
 <h2 id="cpp-interoperability">C++ Interoperability</h2>
 Jule is designed to be interoperable with C++.
 A C++ header file dependency can be added to the Jule code and its functions can be linked.
 It's pretty easy to write C++ code that is compatible with the Jule code compiled by the compiler.
 JuleC keeps all the C++ code it uses for Jule in its <a href="https://github.com/jule-lang/jule/tree/main/api">api</a> directory.
+With the help of this API, it is very easy to write C++ codes that can be fully integrated into Jule.
 <ol></ol> <!-- for space -->
 <img src="./docs/images/cpp_interop.png"/>
 
@@ -52,10 +57,11 @@ JuleC keeps all the C++ code it uses for Jule in its <a href="https://github.com
 JuleC is the name of the reference compiler for the Jule programming language.
 It is the original compiler of the Jule programming language.
 The features that JuleC has is a representation of the official and must-have features of the Jule programming language.
+This is sort of a standard for the Jule programming language and represents the minimum competency that unofficial compilers should have.
 
 <h2 id="future-changes">Future Changes</h2>
 JuleC is in early development and currently iy can only be built from source.
-However, despite being in the early development stage, many algorithms (<a href="https://github.com/jule-lang/jule/tree/main/std">See the standard library</a>) can be successfully implemented.
+However, despite being in the early development stage, many algorithms (<a href="https://github.com/jule-lang/jule/tree/main/std">see the standard library</a>) can be successfully implemented.
 It is planned to rewrite the compiler with Jule after reference compiler and standard library reaches sufficient maturity.
 JuleC has or is very close to many of the things Jule was intended to have, such as memory safety, properties, structures with methods and generics.
 <br><br>
@@ -74,7 +80,7 @@ Jule's standard library only gets updates with compiler releases.
 The language and standard library will continue to evolve and change in the future but JuleC will guarantee stability since its first stable release.
 Some packages of the standard library
 (<a href="https://github.com/jule-lang/jule/tree/main/std/math">std::math</a>,
-<a href="https://github.com/jule-lang/jule/tree/main/std/math/bits">std::math::bits</a>,
+<a href="https://github.com/jule-lang/jule/tree/main/std/conv">std::conv</a>,
 <a href="https://github.com/jule-lang/jule/tree/main/std/unicode/utf8">std::unicode::utf8</a>
 or etc.) are almost complete and are not expected to undergo major changes.
 
@@ -82,33 +88,24 @@ or etc.) are almost complete and are not expected to undergo major changes.
 
 All documentation about Jule and JuleC is on the website. <br>
 [See Documentations](https://jule-lang.github.io/website/pages/docs.html)
+<br><br>
+To contribute website, documentations or something else, please use the <a href="https://github.com/jule-lang/website">website repository</a>.
 
-<h2 id="os-support">OS Support</h2>
+<h2 id="os-support">C++ Compiler Support</h2>
+JuleC commits that the codes it produces can be successfully compiled by the GNU Compiler Collection and Clang.
+Likewise, JuleC undertakes that the <a href="https://github.com/jule-lang/jule/tree/main/api">API</a> it has and openly offers can be compiled with these compilers. While this preference is entirely left to the developers, JuleC has primarily embraced generating Clang compatible code, so it is recommended that Clang be the primary choice.
+<br><br>
+Even if you can compile code generated outside of these compilers with a different compiler, it is not under official support and there is no commitment that the code will be compiled.
+<br><br>
+JuleC currently only promises to enable compiling generated code with these compilers and does not come with a compiler package in its own right.
+However, starting from the first stable release, JuleC is planned to come with a compiler package.
+It is highly likely that this compiler package is Clang.
 
-> Compiler support available from the first stable release of JuleC.
-
-<table>
-    <tr>
-        <td><strong>Operating System</strong></td>
-        <td><strong>Transpiler</strong></td>
-        <td><strong>Compiler</strong></td>
-    </tr>
-    <tr>
-        <td>Windows</td>
-        <td>✔</td>
-        <td>✖</td>
-    </tr>
-    <tr>
-        <td>Linux</td>
-        <td>✔</td>
-        <td>✖</td>
-    </tr>
-    <tr>
-        <td>Darwin</td>
-        <td>✔</td>
-        <td>✖</td>
-    </tr>
-</table>
+<h2 id="os-support">Platform Support</h2>
+Jule supports multiple platforms.
+It supports development on i386, amd64 architectures on Windows, Linux and Darwin platforms.
+JuleC undertakes that the code and standard library it produces will be compatible with all these platforms.
+All supported platforms by JuleC are documented in the <a href="https://jule.dev/pages/docs.html?page=compiler-platform-support">Platform Support documentations</a>.
 
 <h2 id="building-project">Building Project</h2>
 
