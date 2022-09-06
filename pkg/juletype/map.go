@@ -19,7 +19,7 @@ const (
 	F64     uint8 = 12
 	Any     uint8 = 13
 	Id      uint8 = 14
-	Fn    uint8 = 15
+	Fn      uint8 = 15
 	Nil     uint8 = 16
 	UInt    uint8 = 17
 	Int     uint8 = 18
@@ -30,6 +30,7 @@ const (
 	Trait   uint8 = 23
 	Slice   uint8 = 24
 	Array   uint8 = 25
+	Unsafe  uint8 = 26
 )
 
 // TypeMap keep data type codes and kinds.
@@ -52,4 +53,5 @@ var TypeMap = map[uint8]string{
 	UInt:    tokens.UINT,
 	Int:     tokens.INT,
 	UIntptr: tokens.UINTPTR,
+	Unsafe:  tokens.UNSAFE,
 }

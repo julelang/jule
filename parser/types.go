@@ -108,11 +108,18 @@ func typeIsExplicitPtr(t Type) bool {
 	if t.Kind == "" {
 		return false
 	}
-	return t.Kind[0] == '*'
+	return t.Kind[0] == '*' && !typeIsUnsafePtr(t)
+}
+
+func typeIsUnsafePtr(t Type) bool {
+	if t.Id != juletype.Unsafe {
+		return false
+	}
+	return len(t.Kind) - len(tokens.UNSAFE) == 1
 }
 
 func typeIsPtr(t Type) bool {
-	return typeIsExplicitPtr(t)
+	return typeIsExplicitPtr(t) || typeIsUnsafePtr(t)
 }
 
 func typeIsRef(t Type) bool {

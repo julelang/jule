@@ -272,7 +272,7 @@ func TypeFromId(id string) uint8 {
 
 // CppId returns cpp output identifier of data-type.
 func CppId(t uint8) string {
-	if t == Void {
+	if t == Void || t == Unsafe {
 		return "void"
 	}
 	id := TypeMap[t]

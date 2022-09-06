@@ -28,6 +28,8 @@ func (tc *type_checker) check_ref() bool {
 func (tc *type_checker) check_ptr() bool {
 	if tc.right.Id == juletype.Nil {
 		return true
+	} else if typeIsUnsafePtr(tc.left) {
+		return true
 	}
 	return tc.left.Kind == tc.right.Kind
 }
@@ -128,7 +130,7 @@ func (tc *type_checker) check() bool {
 		}
 		return tc.check_ref()
 	case typeIsPtr(tc.left), typeIsPtr(tc.right):
-		if typeIsPtr(tc.right) {
+		if !typeIsPtr(tc.left) && typeIsPtr(tc.right) {
 			tc.left, tc.right = tc.right, tc.left
 		}
 		return tc.check_ptr()

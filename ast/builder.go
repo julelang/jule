@@ -1110,7 +1110,16 @@ func (b *Builder) datatype(t *models.Type, toks []lex.Token, i *int, arrays, err
 			goto ret
 		case tokens.DoubleColon:
 			dtv.WriteString(tok.Kind)
-		case tokens.Fn, tokens.Unsafe:
+		case tokens.Unsafe:
+			if *i+1 >= len(toks) || toks[*i+1].Id != tokens.Fn {
+				t.Id = juletype.Unsafe
+				t.Token = tok
+				dtv.WriteString(tok.Kind)
+				ok = true
+				goto ret
+			}
+			fallthrough
+		case tokens.Fn:
 			t.Token = tok
 			t.Id = juletype.Fn
 			f, proto_ok := b.funcPrototype(toks, i, false, true)

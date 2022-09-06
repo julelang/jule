@@ -3513,9 +3513,17 @@ func (p *Parser) check_type_validity(t Type, errtok lex.Token) {
 	if strings.Contains(modifiers, "&&") ||
 		(strings.Contains(modifiers, "*") && strings.Contains(modifiers, "&")) {
 		p.pusherrtok(t.Token, "invalid_type")
+		return
 	}
 	if typeIsRef(t) && !is_valid_type_for_reference(un_ptr_or_ref_type(t)) {
 		p.pusherrtok(errtok, "invalid_type")
+		return
+	}
+	if t.Id == juletype.Unsafe {
+		n := len(t.Kind) - len(tokens.UNSAFE) - 1
+		if n < 0 || t.Kind[n] != '*' {
+			p.pusherrtok(errtok, "invalid_type")
+		}
 	}
 }
 
