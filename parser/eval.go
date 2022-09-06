@@ -1210,6 +1210,8 @@ func (e *eval) checkIntegerIndexing(v value, errtok lex.Token) {
 
 func (e *eval) indexing(enumv, indexv value, errtok lex.Token) (v value) {
 	switch {
+	case typeIsExplicitPtr(enumv.data.Type):
+		return e.indexing_explicit_ptr(enumv, indexv, errtok)
 	case typeIsArray(enumv.data.Type):
 		return e.indexingArray(enumv, indexv, errtok)
 	case typeIsSlice(enumv.data.Type):
@@ -1233,6 +1235,18 @@ func (e *eval) indexingSlice(slicev, index value, errtok lex.Token) value {
 		e.p.pusherrtok(index.data.Token, "invalid_expr")
 	}
 	return slicev
+}
+
+func (e *eval) indexing_explicit_ptr(ptrv, index value, errtok lex.Token) value {
+	if !e.unsafe_allowed() {
+		e.pusherrtok(errtok, "unsafe_behavior_at_out_of_unsafe_scope")
+	}
+	ptrv.data.Type = un_ptr_or_ref_type(ptrv.data.Type)
+	e.checkIntegerIndexing(index, errtok)
+	if index.constExpr && tonums(index.expr) < 0 {
+		e.p.pusherrtok(index.data.Token, "invalid_expr")
+	}
+	return ptrv
 }
 
 func (e *eval) indexingArray(arrv, index value, errtok lex.Token) value {
