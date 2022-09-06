@@ -1160,6 +1160,9 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 		rightv.constExpr = true
 		leftToks := toks[:colon]
 		rightToks := toks[colon+1:]
+		if len(leftToks) == 0 && len(rightToks) == 0 {
+			return v
+		}
 		m.appendSubNode(exprNode{".___slice("})
 		if len(leftToks) > 0 {
 			var model iExpr
