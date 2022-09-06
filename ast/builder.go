@@ -759,6 +759,13 @@ func (b *Builder) funcPrototype(toks []lex.Token, i *int, method, anon bool) (f 
 	}
 	f.RetType.Type.Id = juletype.Void
 	f.RetType.Type.Kind = juletype.TypeMap[f.RetType.Type.Id]
+	if *i >= len(toks) {
+		b.pusherr(f.Token, "invalid_syntax")
+		return
+	} else if toks[*i].Kind != tokens.LPARENTHESES {
+		b.pusherr(toks[*i], "missing_function_parentheses")
+		return
+	}
 	paramToks := b.getrange(i, tokens.LPARENTHESES, tokens.RPARENTHESES, &toks)
 	if len(paramToks) > 0 {
 		f.Params = b.Params(paramToks, method, false)

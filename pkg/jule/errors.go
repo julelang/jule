@@ -70,6 +70,7 @@ var Errors = map[string]string{
 	`missing_expr_for`:                         `missing expression for %s`,
 	`missing_generics`:                         `missing generics`,
 	`missing_receiver`:                         `missing receiver parameter`,
+	`missing_function_parentheses`:             `missing function parentheses`,
 	`expr_not_const`:                           `expressions is not constant expression`,
 	`nil_for_autotype`:                         `nil is cannot use with auto type definitions`,
 	`void_for_autotype`:                        `void data is cannot use for auto type definitions`,
