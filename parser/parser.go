@@ -872,13 +872,13 @@ func (p *Parser) Enum(e Enum) {
 			}
 			item.ExprTag = val.expr
 			item.Expr.Model = model
-			assignChecker{
+			assign_checker{
 				p:         p,
 				t:         e.Type,
 				v:         val,
 				ignoreAny: true,
 				errtok:    item.Token,
-			}.checkAssignType()
+			}.check()
 		} else {
 			expr := max - (max - uint64(i))
 			item.ExprTag = uint64(expr)
@@ -1413,13 +1413,13 @@ func (p *Parser) Var(v Var) *Var {
 		if ok {
 			v.Type = t
 			if v.SetterTok.Id != tokens.NA {
-				assignChecker{
+				assign_checker{
 					p:                p,
 					t:                v.Type,
 					v:                val,
 					errtok:           v.Token,
 					not_allow_assign: typeIsRef(t),
-				}.checkAssignType()
+				}.check()
 			}
 		}
 	} else {
@@ -2373,12 +2373,12 @@ func (p *Parser) parseArg(f *Func, pair *paramMapPair, args *models.Args, variad
 
 func (p *Parser) checkArgType(param *Param, val value, errTok lex.Token) {
 	p.check_valid_init_expr(param.Mutable, val, errTok)
-	assignChecker{
+	assign_checker{
 		p:       p,
 		t:       param.Type,
 		v:       val,
 		errtok:  errTok,
-	}.checkAssignType()
+	}.check()
 }
 
 // getrange returns between of brackets.
@@ -2629,12 +2629,12 @@ func (p *Parser) parseCase(c *models.Case, t Type) {
 		expr := &c.Exprs[i]
 		value, model := p.evalExpr(*expr)
 		expr.Model = model
-		assignChecker{
+		assign_checker{
 			p:       p,
 			t:       t,
 			v:       value,
 			errtok:  expr.Tokens[0],
-		}.checkAssignType()
+		}.check()
 	}
 	oldCase := p.currentCase
 	p.currentCase = c
@@ -2951,12 +2951,12 @@ func (p *Parser) singleAssign(assign *models.Assign, exprs []value) {
 		val = solver.solve()
 		assign.Setter.Kind += tokens.EQUAL
 	}
-	assignChecker{
+	assign_checker{
 		p:       p,
 		t:       leftExpr.data.Type,
 		v:       val,
 		errtok:  assign.Setter,
-	}.checkAssignType()
+	}.check()
 }
 
 func (p *Parser) assignExprs(vsAST *models.Assign) []value {
@@ -2990,6 +2990,12 @@ func (p *Parser) check_valid_init_expr(left_mutable bool, right value, errtok le
 		p.pusherrtok(errtok, "assignment_non_mut_to_mut")
 		return
 	}
+	checker := assign_checker{
+		p: p,
+		v: right,
+		errtok: errtok,
+	}
+	_ = checker.check_validity()
 }
 
 func (p *Parser) multiAssign(assign *models.Assign, right []value) {
@@ -3007,12 +3013,12 @@ func (p *Parser) multiAssign(assign *models.Assign, right []value) {
 				return
 			}
 			p.check_valid_init_expr(leftExpr.mutable, right, assign.Setter)
-			assignChecker{
+			assign_checker{
 				p:       p,
 				t:       leftExpr.data.Type,
 				v:       right,
 				errtok:  assign.Setter,
-			}.checkAssignType()
+			}.check()
 			continue
 		}
 		left.Var.Tag = right
@@ -3124,12 +3130,12 @@ func (p *Parser) forProfile(iter *models.Iter) {
 	if len(profile.Condition.Processes) > 0 {
 		val, model := p.evalExpr(profile.Condition)
 		profile.Condition.Model = model
-		assignChecker{
+		assign_checker{
 			p:       p,
 			t:       Type{Id: juletype.Bool, Kind: juletype.TypeMap[juletype.Bool]},
 			v:       val,
 			errtok:  profile.Condition.Tokens[0],
-		}.checkAssignType()
+		}.check()
 	}
 	if profile.Next.Data != nil {
 		_ = p.statement(&profile.Next, false)
@@ -3489,12 +3495,12 @@ func (p *Parser) typeSourceIsArrayType(t *Type) (ok bool) {
 	} else {
 		p.eval.pusherrtok(t.Token, "expr_not_const")
 	}
-	assignChecker{
+	assign_checker{
 		p:       p,
 		t:       Type{Id: juletype.UInt, Kind: juletype.TypeMap[juletype.UInt]},
 		v:       val,
 		errtok:  t.Size.Expr.Tokens[0],
-	}.checkAssignType()
+	}.check()
 	return
 }
 

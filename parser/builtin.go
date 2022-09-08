@@ -338,6 +338,20 @@ var recoverFunc = &Fn{
 	},
 }
 
+var out_fn = &Fn{Ast: &Func{
+	Pub:           true,
+	Id:            "out",
+	RetType: RetType{
+		Type: Type{Id: juletype.Void, Kind: juletype.TypeMap[juletype.Void]},
+	},
+	Params: []Param{{
+		Id:   "expr",
+		Type: Type{Id: juletype.Any, Kind: tokens.ANY},
+	}},
+}}
+
+var outln_fn *Fn
+
 // Parser instance for built-in generics.
 var builtinFile = &Parser{}
 
@@ -358,17 +372,6 @@ var Builtin = &DefineMap{
 	Funcs: []*Fn{
 		panicFunc,
 		recoverFunc,
-		{Ast: &Func{
-			Pub: true,
-			Id:  "out",
-			RetType: RetType{
-				Type: Type{Id: juletype.Void, Kind: juletype.TypeMap[juletype.Void]},
-			},
-			Params: []Param{{
-				Id:   "expr",
-				Type: Type{Id: juletype.Any, Kind: tokens.ANY},
-			}},
-		}},
 		{Ast: &Func{
 			Pub:           true,
 			Id:            "new",
@@ -647,13 +650,13 @@ func readyMapDefines(mapt Type) {
 
 func init() {
 	// Copy out function as outln
-	outFunc, _, _ := Builtin.funcById("out", nil)
-	outlnFunc := new(Fn)
-	*outlnFunc = *outFunc
-	outlnFunc.Ast = new(models.Fn)
-	*outlnFunc.Ast = *outFunc.Ast
-	outlnFunc.Ast.Id = "outln"
-	Builtin.Funcs = append(Builtin.Funcs, outlnFunc)
+	out_fn.Ast.BuiltinCaller = caller_out
+	outln_fn = new(Fn)
+	*outln_fn = *out_fn
+	outln_fn.Ast = new(models.Fn)
+	*outln_fn.Ast = *out_fn.Ast
+	outln_fn.Ast.Id = "outln"
+	Builtin.Funcs = append(Builtin.Funcs, outln_fn)
 
 	// Setup new function
 	fn_new, _, _ := Builtin.funcById("new", nil)
@@ -696,9 +699,23 @@ func init() {
 
 // builtin
 
-func caller_new(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
-	// Remove parentheses
+func caller_out(p *Parser, f *Func, data callData, m *exprModel) (v value) {
 	errtok := data.args[0]
+	v.data.Type = f.RetType.Type
+	// Remove parentheses
+	data.args = data.args[1 : len(data.args)-1]
+	arg, model := p.evalToks(data.args)
+	if typeIsFunc(arg.data.Type) {
+		p.pusherrtok(errtok, "invalid_expr")
+	}
+	m.appendSubNode(exprNode{"(" + model.String() + ")"})
+	arg.constExpr = false
+	return v
+}
+
+func caller_new(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
+	errtok := data.args[0]
+	// Remove parentheses
 	data.args = data.args[1 : len(data.args)-1]
 	b := ast.NewBuilder(nil)
 	i := 0
@@ -735,12 +752,12 @@ func caller_new(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
 
 var std_mem_builtin = &DefineMap{
 	Funcs: []*Fn{
-		{Ast: &models.Fn{Id: "size_of", BuiltinCaller: caller_mem_sizeof}},
-		{Ast: &models.Fn{Id: "align_of", BuiltinCaller: caller_mem_alignof}},
+		{Ast: &models.Fn{Id: "size_of", BuiltinCaller: caller_mem_size_of}},
+		{Ast: &models.Fn{Id: "align_of", BuiltinCaller: caller_mem_align_of}},
 	},
 }
 
-func caller_mem_sizeof(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
+func caller_mem_size_of(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
 	// Remove parentheses
 	data.args = data.args[1 : len(data.args)-1]
 	v.data.Type = Type{
@@ -768,7 +785,7 @@ func caller_mem_sizeof(p *Parser, _ *Func, data callData, m *exprModel) (v value
 	return
 }
 
-func caller_mem_alignof(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
+func caller_mem_align_of(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
 	// Remove parentheses
 	data.args = data.args[1 : len(data.args)-1]
 	v.data.Type = Type{

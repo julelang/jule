@@ -76,7 +76,7 @@ func integerAssignable(dt uint8, v value) bool {
 	return false
 }
 
-type assignChecker struct {
+type assign_checker struct {
 	p                *Parser
 	t                Type
 	v                value
@@ -85,13 +85,13 @@ type assignChecker struct {
 	errtok           lex.Token
 }
 
-func (ac *assignChecker) has_error() bool {
+func (ac *assign_checker) has_error() bool {
 	return ac.p.eval.has_error || ac.v.data.Value == ""
 }
 
-func (ac *assignChecker) check_validity() (valid bool) {
+func (ac *assign_checker) check_validity() (valid bool) {
 	valid = true
-	if typeIsFunc(ac.t) && typeIsFunc(ac.v.data.Type) {
+	if typeIsFunc(ac.v.data.Type) {
 		f := ac.v.data.Type.Tag.(*Func)
 		if f.Receiver != nil {
 			ac.p.pusherrtok(ac.errtok, "method_as_anonymous_fn")
@@ -104,7 +104,7 @@ func (ac *assignChecker) check_validity() (valid bool) {
 	return
 }
 
-func (ac *assignChecker) check_constant() (ok bool) {
+func (ac *assign_checker) check_constant() (ok bool) {
 	if !ac.v.constExpr || !typeIsPure(ac.t) ||
 		!typeIsPure(ac.v.data.Type) || !juletype.IsNumeric(ac.v.data.Type.Id) {
 		return
@@ -127,7 +127,7 @@ func (ac *assignChecker) check_constant() (ok bool) {
 	return
 }
 
-func (ac assignChecker) checkAssignType() {
+func (ac assign_checker) check() {
 	if ac.has_error() {
 		return
 	} else if !ac.check_validity() {

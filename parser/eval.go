@@ -1397,12 +1397,12 @@ func (e *eval) buildArray(parts [][]lex.Token, t Type, errtok lex.Token) (value,
 	for _, part := range parts {
 		partVal, expModel := e.toks(part)
 		model.expr = append(model.expr, expModel)
-		assignChecker{
+		assign_checker{
 			p:       e.p,
 			t:       *t.ComponentType,
 			v:       partVal,
 			errtok:  part[0],
-		}.checkAssignType()
+		}.check()
 	}
 	return v, model
 }
@@ -1418,12 +1418,12 @@ func (e *eval) buildSlice(parts [][]lex.Token, t Type, errtok lex.Token) (value,
 	for _, part := range parts {
 		partVal, expModel := e.toks(part)
 		model.expr = append(model.expr, expModel)
-		assignChecker{
+		assign_checker{
 			p:       e.p,
 			t:       *t.ComponentType,
 			v:       partVal,
 			errtok:  part[0],
-		}.checkAssignType()
+		}.check()
 	}
 	return v, model
 }
@@ -1467,18 +1467,18 @@ func (e *eval) buildMap(parts [][]lex.Token, t Type, errtok lex.Token) (value, i
 		model.keyExprs = append(model.keyExprs, keyModel)
 		val, valModel := e.toks(valToks)
 		model.valExprs = append(model.valExprs, valModel)
-		assignChecker{
+		assign_checker{
 			p:      e.p,
 			t:      keyType,
 			v:      key,
 			errtok: colonTok,
-		}.checkAssignType()
-		assignChecker{
+		}.check()
+		assign_checker{
 			p:      e.p,
 			t:      valType,
 			v:      val,
 			errtok: colonTok,
-		}.checkAssignType()
+		}.check()
 	}
 	return v, model
 }
