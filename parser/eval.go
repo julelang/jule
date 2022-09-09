@@ -953,8 +953,6 @@ func (e *eval) mapObjSubId(val value, idTok lex.Token, m *exprModel) value {
 func (e *eval) enumSubId(val value, idTok lex.Token, m *exprModel) (v value) {
 	enum := val.data.Type.Tag.(*Enum)
 	v = val
-	v.data.Type = enum.Type
-	v.data.Type.Token = enum.Tok
 	v.lvalue = false
 	v.isType = false
 	item := enum.ItemById(idTok.Kind)

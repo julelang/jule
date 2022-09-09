@@ -205,7 +205,8 @@ func (dt Type) String() (s string) {
 		}
 		return juleapi.OutId(dt.Kind, dt.Token.File)
 	case juletype.Enum:
-		return juleapi.OutId(dt.Kind, dt.Token.File)
+		e := dt.Tag.(*Enum)
+		return e.Type.String()
 	case juletype.Trait:
 		return dt.TraitString()
 	case juletype.Struct:

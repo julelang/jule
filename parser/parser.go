@@ -3368,6 +3368,7 @@ func (p *Parser) typeSourceIsEnum(e *Enum, tag any) (dt Type, _ bool) {
 	dt.Kind = e.Id
 	dt.Tag = e
 	dt.Token = e.Tok
+	dt.Pure = true
 	if tag != nil {
 		p.pusherrtok(dt.Token, "invalid_type_source")
 	}
