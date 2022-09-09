@@ -370,6 +370,7 @@ var Builtin = &DefineMap{
 		},
 	},
 	Funcs: []*Fn{
+		out_fn,
 		panicFunc,
 		recoverFunc,
 		{Ast: &Func{
