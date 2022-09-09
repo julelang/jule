@@ -9,30 +9,30 @@ import (
 )
 
 // String are generated as clean byte encoded, not string literal.
-// Because X's strings are UTF-8 byte encoded and some
+// Because Jule's strings are UTF-8 byte encoded and some
 // C++ compilers compiles wrong C++ string literals.
 
-// ToStr returns specified literal as X string literal for cpp.
+// ToStr returns specified literal as Jule string literal for cpp.
 func ToStr(bytes []byte) string {
 	var cpp strings.Builder
 	cpp.WriteString("str_julet(")
 	btoa := bytesToStr(bytes)
 	if btoa != "" {
-		cpp.WriteByte('{')
+		cpp.WriteByte('"')
 		cpp.WriteString(btoa)
-		cpp.WriteByte('}')
+		cpp.WriteByte('"')
 	}
 	cpp.WriteString(")")
 	return cpp.String()
 }
 
-// ToRawStr returns specified literal as X raw-string literal for cpp.
+// ToRawStr returns specified literal as Jule raw-string literal for cpp.
 func ToRawStr(bytes []byte) string { return ToStr(bytes) }
 
-// ToChar returns specified literal as X rune literal for cpp.
+// ToChar returns specified literal as Jule rune literal for cpp.
 func ToChar(b byte) string { return btoa(b) }
 
-// ToRune returns specified literal as X rune literal for cpp.
+// ToRune returns specified literal as Jule rune literal for cpp.
 func ToRune(bytes []byte) string {
 	if len(bytes) == 0 {
 		return ""
@@ -54,6 +54,43 @@ func ToRune(bytes []byte) string {
 
 func btoa(b byte) string {
 	return "0x" + strconv.FormatUint(uint64(b), 16)
+}
+
+func sbtoa(b byte) string {
+	if b < 128 {
+		seq := decompose_common_esq(b)
+		if seq != "" {
+			return seq
+		}
+		return string(b)
+	}
+	seq := strconv.FormatUint(uint64(b), 8)
+	return "\\" + seq
+}
+
+func decompose_common_esq(b byte) string {
+	switch b {
+	case '\'':
+		return "'"
+	case '"':
+		return `\"`
+	case '\a':
+		return `\a`
+	case '\b':
+		return `\b`
+	case '\f':
+		return `\f`
+	case '\n':
+		return `\n`
+	case '\r':
+		return `\r`
+	case '\t':
+		return `\t`
+	case '\v':
+		return `\v`
+	default:
+		return ""
+	}
 }
 
 func tryBtoaCommonEsq(bytes []byte) (seq byte, ok bool) {
@@ -106,7 +143,7 @@ func strEsqSeq(bytes []byte, i *int) string {
 	seq, ok := tryBtoaCommonEsq(bytes[*i:])
 	*i++
 	if ok {
-		return btoa(seq)
+		return sbtoa(seq)
 	}
 	switch bytes[*i] {
 	case 'u':
@@ -128,7 +165,7 @@ func strEsqSeq(bytes []byte, i *int) string {
 		seq, n := byteSeq(bytes, *i)
 		*i += n - 1
 		b, _ := strconv.ParseUint(string(seq), 8, 8)
-		return btoa(byte(b))
+		return sbtoa(byte(b))
 	}
 }
 
@@ -143,9 +180,8 @@ func bytesToStr(bytes []byte) string {
 			seq := strEsqSeq(bytes, &i)
 			str.WriteString(seq)
 		} else {
-			str.WriteString(btoa(b))
+			str.WriteString(sbtoa(b))
 		}
-		str.WriteByte(',')
 	}
-	return str.String()[:str.Len()-1]
+	return str.String()
 }
