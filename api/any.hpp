@@ -11,7 +11,7 @@ struct any_julet;
 struct any_julet {
 public:
     jule_ref<void*> _data;
-    const char *_type_id{nil};
+    const char *_type_id{ nil };
 
     any_julet(void) noexcept {}
 
@@ -50,10 +50,10 @@ public:
     template<typename T>
     inline bool __type_is(void) const noexcept {
         if (std::is_same<T, std::nullptr_t>::value)
-        { return false; }
+        { return ( false ); }
         if (this->operator==( nil ))
-        { return false; }
-        return std::strcmp(this->_type_id, typeid(T).name()) == 0;
+        { return ( false ); }
+        return std::strcmp( this->_type_id, typeid(T).name() ) == 0;
     }
 
     template<typename T>
@@ -61,10 +61,10 @@ public:
         this->__dealloc();
         T *_alloc{ new(std::nothrow) T };
         if (!_alloc)
-        { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
+        { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
         void **_main_alloc{ new(std::nothrow) void* };
         if (!_main_alloc)
-        { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
+        { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
         *_alloc = _Expr;
         *_main_alloc = ( (void*)(_alloc) );
         this->_data = jule_ref<void*>( _main_alloc );
@@ -86,36 +86,36 @@ public:
 
     template<typename T>
     operator T(void) const noexcept {
-        if (this->operator==(nil))
-        { JULEC_ID(panic)(__JULEC_ERROR_INVALID_MEMORY); }
+        if (this->operator==( nil ))
+        { JULEC_ID(panic)( __JULEC_ERROR_INVALID_MEMORY ); }
         if (!this->__type_is<T>())
-        { JULEC_ID(panic)(__JULEC_ERROR_INCOMPATIBLE_TYPE); }
-        return *( (T*)( *this->_data._alloc ) );
+        { JULEC_ID(panic)( __JULEC_ERROR_INCOMPATIBLE_TYPE ); }
+        return ( *( (T*)( *this->_data._alloc ) ) );
     }
 
     template<typename T>
     inline bool operator==(const T &_Expr) const noexcept
-    { return this->__type_is<T>() && this->operator T() == _Expr; }
+    { return ( this->__type_is<T>() && this->operator T() == _Expr ); }
 
     template<typename T>
     inline constexpr
     bool operator!=(const T &_Expr) const noexcept
-    { return !this->operator==( _Expr ); }
+    { return ( !this->operator==( _Expr ) ); }
 
     inline bool operator==(const any_julet &_Any) const noexcept {
         if (this->operator==( nil ) && _Any.operator==( nil ))
-        { return true; }
-        return std::strcmp(this->_type_id, _Any._type_id) == 0;
+        { return ( true ); }
+        return ( std::strcmp( this->_type_id, _Any._type_id ) == 0 );
     }
 
     inline bool operator!=(const any_julet &_Any) const noexcept
-    { return !this->operator==(_Any); }
+    { return ( !this->operator==( _Any ) ); }
 
     inline bool operator==(std::nullptr_t) const noexcept
-    { return !this->_data._alloc; }
+    { return ( !this->_data._alloc ); }
 
     inline bool operator!=(std::nullptr_t) const noexcept
-    { return !this->operator==( nil ); }
+    { return ( !this->operator==( nil ) ); }
 
     friend std::ostream &operator<<(std::ostream &_Stream,
                                     const any_julet &_Src) noexcept {
@@ -123,7 +123,7 @@ public:
         { _Stream << "<any>"; }
         else
         { _Stream << 0; }
-        return _Stream;
+        return ( _Stream );
     }
 };
 

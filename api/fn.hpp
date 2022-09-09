@@ -14,14 +14,15 @@ struct fn {
     _Fn_t _buffer;
     
     fn<_Fn_t>(void) noexcept {}
+
     fn<_Fn_t>(const _Fn_t &_Fn) noexcept
     { this->_buffer = _Fn; }
     
     template<typename ..._Args_t>
     auto operator()(_Args_t... _Args) noexcept {
         if (this->_buffer == nil)
-        { JULEC_ID(panic)(__JULEC_ERROR_INVALID_MEMORY); }
-        return this->_buffer(_Args...);
+        { JULEC_ID(panic)( __JULEC_ERROR_INVALID_MEMORY ); }
+        return ( this->_buffer(_Args...) );
     }
 
     inline void operator=(std::nullptr_t) noexcept
@@ -31,10 +32,10 @@ struct fn {
     { this->_buffer = _Func; }
 
     inline bool operator==(std::nullptr_t) const noexcept
-    { return this->_buffer == nil; }
+    { return ( this->_buffer == nil ); }
 
     inline bool operator!=(std::nullptr_t) const noexcept
-    { return !this->operator==(nil); }
+    { return ( !this->operator==( nil ) ); }
 };
 
 #endif // #ifndef __JULEC_ATOMICITY_HPP

@@ -15,8 +15,8 @@ struct jule_ref;
 
 template<typename T>
 struct jule_ref {
-    T *_alloc{nil};
-    mutable uint_julet *_ref{nil};
+    T *_alloc{ nil };
+    mutable uint_julet *_ref{ nil };
 
     jule_ref<T>(void) noexcept {}
 
@@ -26,7 +26,7 @@ struct jule_ref {
     }
 
     jule_ref<T>(T *_Ptr) noexcept {
-        this->_ref = new( std::nothrow ) uint_julet;
+        this->_ref = ( new( std::nothrow ) uint_julet );
         if (!this->_ref)
         { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
         *this->_ref = 1;
@@ -40,13 +40,13 @@ struct jule_ref {
     { this->__drop(); }
 
     inline int_julet __drop_ref(void) const noexcept
-    { return __julec_atomic_add ( this->_ref, -__JULEC_REFERENCE_DELTA ); }
+    { return ( __julec_atomic_add ( this->_ref, -__JULEC_REFERENCE_DELTA ) ); }
 
     inline int_julet __add_ref(void) const noexcept
-    { return __julec_atomic_add ( this->_ref, __JULEC_REFERENCE_DELTA ); }
+    { return ( __julec_atomic_add ( this->_ref, __JULEC_REFERENCE_DELTA ) ); }
 
     inline uint_julet __get_ref_n(void) const noexcept
-    { return __julec_atomic_load ( this->_ref ); }
+    { return ( __julec_atomic_load ( this->_ref ) ); }
 
     void __drop(void) noexcept {
         if (!this->_ref)

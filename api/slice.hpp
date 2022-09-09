@@ -178,7 +178,8 @@ public:
         _Stream << '[';
         for (int_julet _index{0}; _index < _Src._n;) {
             _Stream << _Src._slice[_index++];
-            if (_index < _Src._n) { _Stream << " "; }
+            if (_index < _Src._n)
+            { _Stream << ' '; }
         }
         _Stream << ']';
         return _Stream;
