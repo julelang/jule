@@ -6,7 +6,7 @@
 
 if exist .\julec.exe ( del /f julec.exe )
 
-if exist cmd\jule\main.go (
+if exist cmd\julec\main.go (
   go build -o julec.exe -v cmd\julec\main.go
 ) else (
   go build -o julec.exe -v ..\cmd\julec\main.go
