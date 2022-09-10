@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -504,7 +503,7 @@ func (p *Parser) compileCppLinkUse(useAST *models.UseDecl) (*use, bool) {
 }
 
 func (p *Parser) compilePureUse(useAST *models.UseDecl) (_ *use, hassErr bool) {
-	infos, err := ioutil.ReadDir(useAST.Path)
+	infos, err := os.ReadDir(useAST.Path)
 	if err != nil {
 		p.pusherrmsg(err.Error())
 		return nil, true
@@ -676,7 +675,7 @@ func (p *Parser) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 	if p.File == nil {
 		return
 	}
-	infos, err := ioutil.ReadDir(p.File.Dir)
+	infos, err := os.ReadDir(p.File.Dir)
 	if err != nil {
 		p.pusherrmsg(err.Error())
 		return true
