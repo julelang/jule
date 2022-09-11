@@ -155,18 +155,22 @@ public:
                 _parts.__push( _s.substr( 0, _pos ) );
                 _s = _s.substr( _pos+_Sub.len() );
             }
-            if (!_parts.empty())
-            { _parts.__push( str_julet(_s) ); }
+            if (!_s.empty())
+            { _parts.__push( str_julet( _s ) ); }
         } else {
             uint_julet _n{ 0 };
             while ((_pos = _s.find( _Sub._buffer )) != std::string::npos) {
+                if (++_n >= _N) {
+                    _parts.__push( str_julet( _s ) );
+                    break;
+                }
                 _parts.__push( _s.substr( 0, _pos ) );
                 _s = _s.substr( _pos+_Sub.len() );
-                if (++_n >= _N)
-                { break; }
             }
             if (!_parts.empty() && _n < _N)
-            { _parts.__push( str_julet(_s) ); }
+            { _parts.__push( str_julet( _s ) ); }
+            else if (_parts.empty())
+            { _parts.__push( str_julet( _s ) ); }
         }
         return ( _parts );
     }
