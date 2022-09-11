@@ -91,15 +91,20 @@ All documentation about Jule and JuleC is on the website. <br>
 <br><br>
 To contribute website, documentations or something else, please use the <a href="https://github.com/jule-lang/website">website repository</a>.
 
-<h2 id="os-support">C++ Compiler Support</h2>
-JuleC commits that the codes it produces can be successfully compiled by the GNU Compiler Collection and Clang.
-Likewise, JuleC undertakes that the <a href="https://github.com/jule-lang/jule/tree/main/api">API</a> it has and openly offers can be compiled with these compilers. While this preference is entirely left to the developers, JuleC has primarily embraced generating Clang compatible code, so it is recommended that Clang be the primary choice.
+<h2 id="os-support">Compiler and C++ Standard Support</h2>
+JuleC officially supports some C++ compilers.
+When you try to compile with these compilers, it promises that code can be compiled in the officially supported C++ standard.
+JuleC is committed to creating code according to the most ideal C++ standard it has adopted.
+Commits that the generated code can be compiled by C++ compilers that fully support this standard.
+Likewise, this commit is also available for the <a href="./api">API</a> of JuleC.
+Jule's ideal C++ standard is determined by the most ideal C++ standard, fully supported by officially supported C++ compilers.
 <br><br>
-Even if you can compile code generated outside of these compilers with a different compiler, it is not under official support and there is no commitment that the code will be compiled.
+If you are getting a compiler error even though you are using the officially supported compiler and standard, please let us know with the <a href="https://github.com/jule-lang/jule/issues">Jule Issue Tracker</a>.
+If you are trying to use a standard or compiler that is not officially supported, you can still contact us to find out about the problem.
+But keep in mind that since it's out of official support, it's likely that the maintainers won't take the effort to fix it.
 <br><br>
-JuleC currently only promises to enable compiling generated code with these compilers and does not come with a compiler package in its own right.
-However, starting from the first stable release, JuleC is planned to come with a compiler package.
-It is highly likely that this compiler package is Clang.
+
+[See Compiling Documentations](https://jule.dev/pages/docs.html?page=compiler-compiling) for supported compilers and C++ standards.
 
 <h2 id="os-support">Platform Support</h2>
 Jule supports multiple platforms.
