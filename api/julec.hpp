@@ -83,6 +83,7 @@ inline std::ostream &operator<<(std::ostream &_Stream,
 #include "array.hpp"
 #include "map.hpp"
 #include "utf8.hpp"
+#include "utf16.hpp"
 #include "str.hpp"
 #include "any.hpp"
 #include "fn.hpp"

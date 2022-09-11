@@ -153,7 +153,7 @@ public:
     bool operator!=(const std::nullptr_t) const noexcept
     { return !this->operator==( nil ); }
 
-    _Item_t &operator[](const int_julet &_Index) {
+    _Item_t &operator[](const int_julet &_Index) const {
         this->__check();
         if (this->empty() || _Index < 0 || this->len() <= _Index) {
             std::stringstream _sstream;

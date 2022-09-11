@@ -7,7 +7,8 @@
 
 //
 // Implements functions and constants to support text encoded in
-// UTF-8 for Jule strings. It includes functions to translate between runes and UTF-8 byte sequences.
+// UTF-8 for Jule strings. It includes functions to translate between
+// runes and UTF-8 byte sequences.
 // See https://en.wikipedia.org/wiki/UTF-8
 //
 // Based on std::unicode::utf8

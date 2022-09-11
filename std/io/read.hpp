@@ -8,42 +8,43 @@
 #ifndef __JULEC_STD_IO_READ_HPP
 #define __JULEC_STD_IO_READ_HPP
 
-str_julet __julec_read() noexcept;
-str_julet __julec_readln() noexcept;
+str_julet __julec_read(void) noexcept;
+str_julet __julec_readln(void) noexcept;
 
 #ifdef _WINDOWS
 #include <wchar.h>
-#include <locale>
-#include <codecvt>
 
-inline std::string
-__julec_std_io_encode_utf8(const std::wstring &_WStr) noexcept {
-    std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> conv{};
-    return conv.to_bytes(_WStr);
+str_julet __julec_std_io_utf16_to_utf8_str(const std::wstring &_WStr) noexcept;
+
+str_julet __julec_std_io_utf16_to_utf8_str(const std::wstring &_WStr) noexcept {
+    slice<u16_julet> _code_page( _WStr.length() );
+    for (int_julet _i{ 0 }; _i < _WStr.length(); ++_i)
+    { _code_page[_i] = static_cast<u16_julet>( _WStr[_i] ); }
+    return ( static_cast<str_julet>( __julec_utf16_decode( _code_page ) ) );
 }
 #endif // #ifdef _WINDOWS
 
-str_julet __julec_read() noexcept {
+str_julet __julec_read(void) noexcept {
 #ifdef _WINDOWS
     std::wstring buffer{};
     std::wcin >> buffer;
-    return __julec_std_io_encode_utf8(buffer).c_str();
+    return ( __julec_std_io_utf16_to_utf8_str( buffer ) );
 #else
     std::string buffer{};
     std::cin >> buffer;
-    return buffer.c_str();
+    return ( buffer.c_str() );
 #endif // #ifdef _WINDOWS
 }
 
-str_julet __julec_readln() noexcept {
+str_julet __julec_readln(void) noexcept {
 #ifdef _WINDOWS
     std::wstring buffer{};
-    std::getline(std::wcin, buffer);
-    return __julec_std_io_encode_utf8(buffer).c_str();
+    std::getline( std::wcin, buffer );
+    return ( __julec_std_io_utf16_to_utf8_str( buffer ) );
 #else
     std::string buffer{};
-    std::getline(std::cin, buffer);
-    return buffer.c_str();
+    std::getline( std::cin, buffer );
+    return ( str_julet( buffer.c_str() ) );
 #endif // #ifdef _WINDOWS
 }
 
