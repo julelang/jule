@@ -38,7 +38,7 @@ inline void JULEC_ID(outln)(const _Obj_t &_Obj) noexcept {
 }
 
 struct JULEC_ID(Error) {
-    virtual str_julet error(void) = 0;
+    virtual str_julet error(void) { return {}; };
 
     virtual ~JULEC_ID(Error)(void) noexcept {};
 };

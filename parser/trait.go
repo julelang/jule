@@ -58,7 +58,11 @@ func (t *trait) String() string {
 		cpp.WriteByte(' ')
 		cpp.WriteString(f.Id)
 		cpp.WriteString(paramsToCpp(f.Params))
-		cpp.WriteString(" = 0;\n")
+		cpp.WriteString(" {")
+		if !typeIsVoid(f.RetType.Type) {
+			cpp.WriteString(" return {}; ")
+		}
+		cpp.WriteString("}\n")
 	}
 	models.DoneIndent()
 	cpp.WriteString("};")
