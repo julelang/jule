@@ -75,6 +75,8 @@ inline std::ostream &operator<<(std::ostream &_Stream,
 inline std::ostream &operator<<(std::ostream &_Stream,
                                 const unsigned char _U8) noexcept;
 
+
+
 #include "typedef.hpp"
 #include "atomicity.hpp"
 #include "ref.hpp"
@@ -83,15 +85,21 @@ inline std::ostream &operator<<(std::ostream &_Stream,
 #include "array.hpp"
 #include "map.hpp"
 #include "utf8.hpp"
-#include "utf16.hpp"
 #include "str.hpp"
 #include "any.hpp"
 #include "fn.hpp"
 #include "defer.hpp"
 #include "builtin.hpp"
+#include "utf16.hpp"
+
+
+slice<str_julet> __julec_command_line_args;
+
+
 
 // Declarations
 
+inline slice<str_julet> __julec_get_command_line_args(void) noexcept;
 inline void JULEC_ID(panic)(const trait<JULEC_ID(Error)> &_Error);
 template<typename _Obj_t>
 str_julet __julec_tostr(const _Obj_t &_Obj) noexcept;
@@ -115,9 +123,13 @@ void __julec_terminate_handler(void) noexcept;
 void JULEC_ID(main)(void);
 // Package initializer caller function, generates by JuleC.
 void __julec_call_package_initializers(void);
-int main(void);
+void __julec_setup_command_line_args(int argc, char *argv[]) noexcept;
+int main(int argc, char *argv[]);
 
 // Definitions
+
+inline slice<str_julet> __julec_get_command_line_args(void) noexcept
+{ return __julec_command_line_args; }
 
 inline std::ostream &operator<<(std::ostream &_Stream,
                                 const signed char _I8) noexcept {
@@ -207,13 +219,44 @@ void __julec_terminate_handler(void) noexcept {
     }
 }
 
-int main(void) {
-    std::set_terminate( &__julec_terminate_handler );
+#ifdef _WINDOWS
+#endif // #ifdef _WINDOWS
+
+void __julec_setup_command_line_args(int argc, char *argv[]) noexcept {
+#ifdef _WINDOWS
+    const LPWSTR _cmdl{ GetCommandLineW() };
+    wchar_t *_wargs{ _cmdl };
+    const size_t _wargs_len{ std::wcslen(_wargs) };
+    slice<str_julet> _args;
+    int_julet _old{ 0 };
+    for (int_julet _i{ 0 }; _i < _wargs_len; ++_i) {
+        const wchar_t _r{ _wargs[_i] };
+        if (!std::iswspace( _r ))
+        { continue; }
+        else if (_i+1 < _wargs_len && std::iswspace( _wargs[_i+1] ))
+        { continue; }
+        _wargs[_i] = 0;
+        wchar_t *_warg{ _wargs+_old };
+        _old = _i+1;
+        _args.__push( __julec_utf16_to_utf8_str( _warg , std::wcslen( _warg ) ) );
+    }
+    _args.__push( __julec_utf16_to_utf8_str( _wargs+_old , std::wcslen( _wargs+_old ) ) );
+    __julec_command_line_args = _args;
+#else
+    __julec_args = slice<str_julet>( argc );
+    for (int_julet _i{ 0 }; _i < argc; ++_i)
+    { __julec_command_line_args[_i] = argv[_i]; }
+#endif // #ifdef _WINDOWS
+}
+
+int main(int argc, char *argv[]) {
 #ifdef _WINDOWS
     // Windows needs little magic for UTF-8
     SetConsoleOutputCP( CP_UTF8 );
-    _setmode( _fileno(stdin), (0x00020000) );
-#endif
+    _setmode( _fileno( stdin ) , ( 0x00020000 ) );
+#endif // #ifdef _WINDOWS
+    std::set_terminate( &__julec_terminate_handler );
+    __julec_setup_command_line_args( argc , argv );
 
     __julec_call_package_initializers();
     JULEC_ID( main() );

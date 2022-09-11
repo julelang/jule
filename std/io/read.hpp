@@ -11,40 +11,27 @@
 str_julet __julec_read(void) noexcept;
 str_julet __julec_readln(void) noexcept;
 
-#ifdef _WINDOWS
-#include <wchar.h>
-
-str_julet __julec_std_io_utf16_to_utf8_str(const std::wstring &_WStr) noexcept;
-
-str_julet __julec_std_io_utf16_to_utf8_str(const std::wstring &_WStr) noexcept {
-    slice<u16_julet> _code_page( _WStr.length() );
-    for (int_julet _i{ 0 }; _i < _WStr.length(); ++_i)
-    { _code_page[_i] = static_cast<u16_julet>( _WStr[_i] ); }
-    return ( static_cast<str_julet>( __julec_utf16_decode( _code_page ) ) );
-}
-#endif // #ifdef _WINDOWS
-
 str_julet __julec_read(void) noexcept {
 #ifdef _WINDOWS
-    std::wstring buffer{};
-    std::wcin >> buffer;
-    return ( __julec_std_io_utf16_to_utf8_str( buffer ) );
+    std::wstring _buffer{};
+    std::wcin >> _buffer;
+    return ( __julec_utf16_to_utf8_str( _buffer.c_str(), _buffer.length() ) );
 #else
-    std::string buffer{};
-    std::cin >> buffer;
-    return ( buffer.c_str() );
+    std::string _buffer{};
+    std::cin >> _buffer;
+    return ( _buffer.c_str() );
 #endif // #ifdef _WINDOWS
 }
 
 str_julet __julec_readln(void) noexcept {
 #ifdef _WINDOWS
-    std::wstring buffer{};
-    std::getline( std::wcin, buffer );
-    return ( __julec_std_io_utf16_to_utf8_str( buffer ) );
+    std::wstring _buffer{};
+    std::getline( std::wcin, _buffer );
+    return ( __julec_utf16_to_utf8_str( _buffer.c_str(), _buffer.length() ) );
 #else
-    std::string buffer{};
-    std::getline( std::cin, buffer );
-    return ( str_julet( buffer.c_str() ) );
+    std::string _buffer{};
+    std::getline( std::cin, _buffer );
+    return ( str_julet( _buffer.c_str() ) );
 #endif // #ifdef _WINDOWS
 }
 

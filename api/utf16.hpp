@@ -25,6 +25,8 @@
 inline i32_julet
 __julec_utf16_decode_rune(const i32_julet _R1, const i32_julet _R2) noexcept;
 slice<i32_julet> __julec_utf16_decode(const slice<i32_julet> _S) noexcept;
+str_julet __julec_utf16_to_utf8_str(const wchar_t *_WStr,
+                                    const std::size_t _Len) noexcept;
 
 inline i32_julet
 __julec_utf16_decode_rune(const i32_julet _R1, const i32_julet _R2) noexcept {
@@ -59,6 +61,14 @@ slice<i32_julet> __julec_utf16_decode(const slice<u16_julet> &_S) noexcept {
         ++_n;
     }
     return ( _a.___slice(0, _n) );
+}
+
+str_julet __julec_utf16_to_utf8_str(const wchar_t *_WStr,
+                                    const std::size_t _Len) noexcept {
+    slice<u16_julet> _code_page( _Len );
+    for (int_julet _i{ 0 }; _i < _Len; ++_i)
+    { _code_page[_i] = static_cast<u16_julet>( _WStr[_i] ); }
+    return ( static_cast<str_julet>( __julec_utf16_decode( _code_page ) ) );
 }
 
 #endif // #ifndef __JULEC_UTF16_HPP
