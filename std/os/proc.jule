@@ -1,0 +1,38 @@
+// Copyright 2022 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+cpp fn __julec_get_command_line_args() []str
+
+const COMMAND_LINE_ARGS_SPECIAL_CHARSET = `"'<>`
+
+// Command line arguments.
+pub let mut ARGS = []str{}
+
+fn make_clargs_pure() {
+    let mut arg = ARGS[0]
+    let mut start = -1
+    let mut end = -1
+    for i, b in arg {
+        if (start == -1 &&
+            !COMMAND_LINE_ARGS_SPECIAL_CHARSET.has_prefix( (str)(b) )) {
+            start = i
+        }
+        // -1 for correct reverse indexing
+        let end_index = arg.len-i-1
+        if (end == -1 &&
+            !COMMAND_LINE_ARGS_SPECIAL_CHARSET.has_prefix( (str)(arg[end_index]) )) {
+            // +1 for include this byte
+            end = end_index + 1
+        }
+        if start != -1 && end != -1 {
+            break
+        }
+    }
+    ARGS[0] = arg[start:end]
+}
+
+fn init() {
+    ARGS = cpp.__julec_get_command_line_args()
+    make_clargs_pure()
+}
