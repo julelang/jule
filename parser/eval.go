@@ -663,9 +663,6 @@ func (e *eval) castPure(t Type, v *value, errtok lex.Token) {
 	case juletype.Str:
 		e.castStr(v.data.Type, errtok)
 		return
-	case juletype.Enum:
-		e.castEnum(t, v, errtok)
-		return
 	}
 	switch {
 	case juletype.IsInteger(t.Id):
@@ -688,13 +685,6 @@ func (e *eval) castStr(t Type, errtok lex.Token) {
 	}
 }
 
-func (e *eval) castEnum(t Type, v *value, errtok lex.Token) {
-	enum := t.Tag.(*Enum)
-	t = enum.Type
-	t.Kind = enum.Id
-	e.castNumeric(t, v, errtok)
-}
-
 func (e *eval) castInteger(t Type, v *value, errtok lex.Token) {
 	if v.constExpr {
 		switch {
@@ -703,6 +693,9 @@ func (e *eval) castInteger(t Type, v *value, errtok lex.Token) {
 		default:
 			v.expr = tonumu(v)
 		}
+	}
+	if typeIsEnum(v.data.Type) {
+		return
 	}
 	if typeIsPtr(v.data.Type) {
 		if t.Id == juletype.UIntptr {
@@ -732,6 +725,9 @@ func (e *eval) castNumeric(t Type, v *value, errtok lex.Token) {
 		default:
 			v.expr = tonumu(v)
 		}
+	}
+	if typeIsEnum(v.data.Type) {
+		return
 	}
 	if typeIsPure(v.data.Type) && juletype.IsNumeric(v.data.Type.Id) {
 		return
