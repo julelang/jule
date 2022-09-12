@@ -7,7 +7,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -79,7 +78,7 @@ func init_project(cmd string) {
 		println(err)
 		os.Exit(0)
 	}
-	err = ioutil.WriteFile(jule.SettingsFile, bytes, 0666)
+	err = os.WriteFile(jule.SettingsFile, bytes, 0666)
 	if err != nil {
 		println(err.Error())
 		os.Exit(0)
@@ -208,7 +207,7 @@ func load_localization() {
 		return
 	}
 	path := filepath.Join(jule.LangsPath, lang+".json")
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		println("Language couldn't loaded (uses default);")
 		println(err.Error())
