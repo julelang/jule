@@ -9,13 +9,18 @@ const COMMAND_LINE_ARGS_SPECIAL_CHARSET = `"'<>`
 // Holds the command-line arguments.
 // Starts with the program name.
 //
-// Jule trims special bytes if program name have
+// Special bytes trimmed if program name have
 // any special byte at begin or end.
 // Special bytes are: " ' < >
-pub let mut ARGS = []str{}
+//
+// Command-line arguments sets at runtime with init function.
+// Initialize expression is nil.
+// You got nil slice if used as initialize expression to any global.
+pub let ARGS: []str = nil
 
-fn make_clargs_pure() {
-    let arg = ARGS[0]
+fn setup_command_line_args() {
+    let mut args = cpp.__julec_get_command_line_args()
+    let arg = args[0]
     let mut start = -1
     let mut end = -1
     for i, b in arg {
@@ -36,10 +41,14 @@ fn make_clargs_pure() {
             break
         }
     }
-    ARGS[0] = arg[start:end]
+    args[0] = arg[start:end]
+    unsafe {
+        // Break immutability for set parsed command-line arguments
+        let mut mut_args = &ARGS
+        *mut_args = args
+    }
 }
 
 fn init() {
-    ARGS = cpp.__julec_get_command_line_args()
-    make_clargs_pure()
+    setup_command_line_args()
 }
