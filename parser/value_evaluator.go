@@ -211,6 +211,7 @@ func (ve *valueEvaluator) varId(id string, variable *Var, global bool) (v value)
 	if v.constExpr {
 		v.expr = variable.ExprTag
 		v.model = variable.Expr.Model
+		ve.model.appendSubNode(v.model)
 	} else {
 		if variable.Id == tokens.SELF && !typeIsRef(variable.Type) {
 			ve.model.appendSubNode(exprNode{"(*this)"})
