@@ -984,7 +984,6 @@ func (p *Parser) CppLink(link models.CppLink) {
 	linkf.Attributes = p.attributes
 	p.attributes = nil
 	p.checkCppLinkAttributes(linkf)
-	p.reloadFuncTypes(linkf)
 	p.cppLinks = append(p.cppLinks, &link)
 }
 
@@ -1675,12 +1674,19 @@ func (p *Parser) check() {
 	p.WaitingFuncs()
 	p.WaitingImpls()
 	p.WaitingGlobals()
+	p.checkCppLinks()
 	p.waitingFuncs = nil
 	p.waitingImpls = nil
 	p.waitingGlobals = nil
 	if !p.JustDefines {
 		p.checkFuncs()
 		p.checkStructs()
+	}
+}
+
+func (p *Parser) checkCppLinks() {
+	for _, link := range p.cppLinks {
+		p.reloadFuncTypes(link.Link)
 	}
 }
 
