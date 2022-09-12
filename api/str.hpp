@@ -24,6 +24,9 @@ public:
     str_julet(const std::initializer_list<u8_julet> &_Src) noexcept
     { this->_buffer = _Src; }
 
+    str_julet(const i32_julet &_Rune) noexcept
+    : str_julet( __julec_utf8_rune_to_bytes( _Rune ) ) {}
+
     str_julet(const std::basic_string<u8_julet> &_Src) noexcept
     { this->_buffer = _Src; }
 
@@ -32,9 +35,6 @@ public:
 
     str_julet(const str_julet &_Src) noexcept
     { this->_buffer = _Src._buffer; }
-
-    str_julet(const uint_julet &_N) noexcept
-    { this->_buffer = std::basic_string<u8_julet>( 0, _N ); }
 
     str_julet(const slice<u8_julet> &_Src) noexcept
     { this->_buffer = std::basic_string<u8_julet>( _Src.begin(), _Src.end() ); }

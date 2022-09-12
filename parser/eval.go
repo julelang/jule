@@ -675,6 +675,9 @@ func (e *eval) castPure(t Type, v *value, errtok lex.Token) {
 }
 
 func (e *eval) castStr(t Type, errtok lex.Token) {
+	if typeIsPure(t) || (t.Id != juletype.U8 && t.Id != juletype.I32) {
+		return
+	}
 	if !typeIsSlice(t) {
 		e.pusherrtok(errtok, "type_not_supports_casting_to", juletype.TypeMap[juletype.Str], t.Kind)
 		return
