@@ -217,11 +217,11 @@ func (b *Builder) Enum(toks []lex.Token) {
 		b.pusherr(toks[0], "invalid_syntax")
 		return
 	}
-	e.Tok = toks[1]
-	if e.Tok.Id != tokens.Id {
-		b.pusherr(e.Tok, "invalid_syntax")
+	e.Token = toks[1]
+	if e.Token.Id != tokens.Id {
+		b.pusherr(e.Token, "invalid_syntax")
 	}
-	e.Id = e.Tok.Kind
+	e.Id = e.Token.Kind
 	i := 2
 	if toks[i].Id == tokens.Colon {
 		i++
@@ -232,7 +232,7 @@ func (b *Builder) Enum(toks []lex.Token) {
 		e.Type, _ = b.DataType(toks, &i, false, true)
 		i++
 		if i >= len(toks) {
-			b.pusherr(e.Tok, "body_not_exist")
+			b.pusherr(e.Token, "body_not_exist")
 			return
 		}
 	} else {
@@ -240,7 +240,7 @@ func (b *Builder) Enum(toks []lex.Token) {
 	}
 	itemToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
 	if itemToks == nil {
-		b.pusherr(e.Tok, "body_not_exist")
+		b.pusherr(e.Token, "body_not_exist")
 		return
 	} else if i < len(toks) {
 		b.pusherr(toks[i], "invalid_syntax")
@@ -248,7 +248,7 @@ func (b *Builder) Enum(toks []lex.Token) {
 	e.Pub = b.pub
 	b.pub = false
 	e.Items = b.buildEnumItems(itemToks)
-	b.Tree = append(b.Tree, models.Object{Token: e.Tok, Data: e})
+	b.Tree = append(b.Tree, models.Object{Token: e.Token, Data: e})
 }
 
 // Comment builds AST model of comment.

@@ -239,14 +239,14 @@ func (ve *valueEvaluator) enumId(id string, e *Enum) (v value) {
 	v.data.Type.Id = juletype.Enum
 	v.data.Type.Kind = e.Id
 	v.data.Type.Tag = e
-	v.data.Token = e.Tok
+	v.data.Token = e.Token
 	v.constExpr = true
 	v.isType = true
 	// If built-in.
-	if e.Tok.Id == tokens.NA {
+	if e.Token.Id == tokens.NA {
 		ve.model.appendSubNode(exprNode{juleapi.OutId(id, nil)})
 	} else {
-		ve.model.appendSubNode(exprNode{juleapi.OutId(id, e.Tok.File)})
+		ve.model.appendSubNode(exprNode{juleapi.OutId(id, e.Token.File)})
 	}
 	return
 }

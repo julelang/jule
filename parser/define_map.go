@@ -87,7 +87,7 @@ func (dm *DefineMap) traitById(id string, f *File) (*trait, *DefineMap, bool) {
 func (dm *DefineMap) findEnumById(id string, f *File) (int, *DefineMap, bool) {
 	for i, e := range dm.Enums {
 		if e != nil && e.Id == id {
-			if isAccessable(f, e.Tok.File, e.Pub) {
+			if isAccessable(f, e.Token.File, e.Pub) {
 				return i, dm, false
 			}
 		}

@@ -820,30 +820,51 @@ func (p *Parser) Type(t TypeAlias) {
 	p.Defines.Types = append(p.Defines.Types, &t)
 }
 
-// Enum parses Jule enumerator statement.
-func (p *Parser) Enum(e Enum) {
-	if juleapi.IsIgnoreId(e.Id) {
-		p.pusherrtok(e.Tok, "ignore_id")
-		return
-	} else if _, tok, _ := p.defById(e.Id); tok.Id != tokens.NA {
-		p.pusherrtok(e.Tok, "exist_id", e.Id)
-		return
+func (p *Parser) parse_enum_items_str(e *Enum) {
+	for _, item := range e.Items {
+		if juleapi.IsIgnoreId(item.Id) {
+			p.pusherrtok(item.Token, "ignore_id")
+		} else {
+			for _, checkItem := range e.Items {
+				if item == checkItem {
+					break
+				}
+				if item.Id == checkItem.Id {
+					p.pusherrtok(item.Token, "exist_id", item.Id)
+					break
+				}
+			}
+		}
+		if item.Expr.Tokens != nil {
+			val, model := p.evalExpr(item.Expr)
+			if !val.constExpr && !p.eval.has_error {
+				p.pusherrtok(item.Expr.Tokens[0], "expr_not_const")
+			}
+			item.ExprTag = val.expr
+			item.Expr.Model = model
+			assign_checker{
+				p:         p,
+				t:         e.Type,
+				v:         val,
+				ignoreAny: true,
+				errtok:    item.Token,
+			}.check()
+		} else {
+			expr := value{constExpr: true, expr: item.Id}
+			item.ExprTag = expr.expr
+			item.Expr.Model = strModel(expr)
+		}
+		itemVar := new(Var)
+		itemVar.Const = true
+		itemVar.ExprTag = item.ExprTag
+		itemVar.Id = item.Id
+		itemVar.Type = e.Type
+		itemVar.Token = e.Token
+		p.Defines.Globals = append(p.Defines.Globals, itemVar)
 	}
-	e.Desc = p.docText.String()
-	p.docText.Reset()
-	e.Type, _ = p.realType(e.Type, true)
-	if !typeIsPure(e.Type) || !juletype.IsInteger(e.Type.Id) {
-		p.pusherrtok(e.Type.Token, "invalid_type_source")
-		return
-	}
-	pdefs := p.Defines
-	puses := p.Uses
-	p.Defines = new(DefineMap)
-	defer func() {
-		p.Defines = pdefs
-		p.Uses = puses
-		p.Defines.Enums = append(p.Defines.Enums, &e)
-	}()
+}
+
+func (p *Parser) parse_enum_items_integer(e *Enum) {
 	max := juletype.MaxOfType(e.Type.Id)
 	for i, item := range e.Items {
 		if max == 0 {
@@ -888,8 +909,42 @@ func (p *Parser) Enum(e Enum) {
 		itemVar.ExprTag = item.ExprTag
 		itemVar.Id = item.Id
 		itemVar.Type = e.Type
-		itemVar.Token = e.Tok
+		itemVar.Token = e.Token
 		p.Defines.Globals = append(p.Defines.Globals, itemVar)
+	}
+}
+
+// Enum parses Jule enumerator statement.
+func (p *Parser) Enum(e Enum) {
+	if juleapi.IsIgnoreId(e.Id) {
+		p.pusherrtok(e.Token, "ignore_id")
+		return
+	} else if _, tok, _ := p.defById(e.Id); tok.Id != tokens.NA {
+		p.pusherrtok(e.Token, "exist_id", e.Id)
+		return
+	}
+	e.Desc = p.docText.String()
+	p.docText.Reset()
+	e.Type, _ = p.realType(e.Type, true)
+	if !typeIsPure(e.Type) {
+		p.pusherrtok(e.Token, "invalid_type_source")
+		return
+	}
+	pdefs := p.Defines
+	puses := p.Uses
+	p.Defines = new(DefineMap)
+	defer func() {
+		p.Defines = pdefs
+		p.Uses = puses
+		p.Defines.Enums = append(p.Defines.Enums, &e)
+	}()
+	switch {
+	case e.Type.Id == juletype.Str:
+		p.parse_enum_items_str(&e)
+	case juletype.IsInteger(e.Type.Id):
+		p.parse_enum_items_integer(&e)
+	default:
+		p.pusherrtok(e.Token, "invalid_type_source")
 	}
 }
 
@@ -1619,7 +1674,7 @@ func (p *Parser) defById(id string) (def any, tok lex.Token, canshadow bool) {
 	var e *Enum
 	e, _, canshadow = p.enumById(id)
 	if e != nil {
-		return e, e.Tok, canshadow
+		return e, e.Token, canshadow
 	}
 	var s *structure
 	s, _, canshadow = p.structById(id)
@@ -3373,7 +3428,7 @@ func (p *Parser) typeSourceIsEnum(e *Enum, tag any) (dt Type, _ bool) {
 	dt.Id = juletype.Enum
 	dt.Kind = e.Id
 	dt.Tag = e
-	dt.Token = e.Tok
+	dt.Token = e.Token
 	dt.Pure = true
 	if tag != nil {
 		p.pusherrtok(dt.Token, "invalid_type_source")

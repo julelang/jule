@@ -695,7 +695,10 @@ func (e *eval) castInteger(t Type, v *value, errtok lex.Token) {
 		}
 	}
 	if typeIsEnum(v.data.Type) {
-		return
+		e := v.data.Type.Tag.(*Enum)
+		if juletype.IsNumeric(e.Type.Id) {
+			return
+		}
 	}
 	if typeIsPtr(v.data.Type) {
 		if t.Id == juletype.UIntptr {
@@ -727,7 +730,10 @@ func (e *eval) castNumeric(t Type, v *value, errtok lex.Token) {
 		}
 	}
 	if typeIsEnum(v.data.Type) {
-		return
+		e := v.data.Type.Tag.(*Enum)
+		if juletype.IsNumeric(e.Type.Id) {
+			return
+		}
 	}
 	if typeIsPure(v.data.Type) && juletype.IsNumeric(v.data.Type.Id) {
 		return

@@ -26,7 +26,7 @@ func (ei EnumItem) String() string {
 // Enum is the AST model of enumerator statements.
 type Enum struct {
 	Pub   bool
-	Tok   lex.Token
+	Token   lex.Token
 	Id    string
 	Type  Type
 	Items []*EnumItem
@@ -47,7 +47,7 @@ func (e *Enum) ItemById(id string) *EnumItem {
 func (e Enum) String() string {
 	var cpp strings.Builder
 	cpp.WriteString("enum ")
-	cpp.WriteString(juleapi.OutId(e.Id, e.Tok.File))
+	cpp.WriteString(juleapi.OutId(e.Id, e.Token.File))
 	cpp.WriteByte(':')
 	cpp.WriteString(e.Type.String())
 	cpp.WriteString(" {\n")
