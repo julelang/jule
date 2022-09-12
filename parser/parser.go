@@ -984,6 +984,7 @@ func (p *Parser) CppLink(link models.CppLink) {
 	linkf.Attributes = p.attributes
 	p.attributes = nil
 	p.checkCppLinkAttributes(linkf)
+	p.reloadFuncTypes(linkf)
 	p.cppLinks = append(p.cppLinks, &link)
 }
 
