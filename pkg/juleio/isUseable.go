@@ -56,45 +56,51 @@ func checkArch(path string) (ok bool, exist bool) {
 // IsPassFileAnnotation returns true
 // if file path is passes file annotation,
 // returns false if not.
-func IsPassFileAnnotation(path string) bool {
-	path = filepath.Base(path)
-	path = path[:len(path)-len(filepath.Ext(path))]
+func IsPassFileAnnotation(p string) bool {
+	p = filepath.Base(p)
+	n := len(p)
+	p = p[:n-len(filepath.Ext(p))]
 
-	// Filter 1
-	i := strings.LastIndexByte(path, '_')
+	// a1 is the second annotation.
+	// Should be architecture annotation if exist annotation 2,
+	// can operating system or architecture annotation if not.
+	a1 := ""
+	// a2 is first filter.
+	// Should be operating system filter if exist and valid annotation.
+	a2 := ""
+
+	// Annotation 1
+	i := strings.LastIndexByte(p, '_')
 	if i == -1 {
 		return true
 	}
-	length := len(path)
-	if i+1 >= length {
+	if i+1 >= n {
 		return true
 	}
-	filter := path[i+1:]
-	ok, exist := checkPlatform(filter)
-	if exist && !ok {
-		return false
-	}
-	ok, exist = checkArch(filter)
-	if !exist {
-		return true
-	} else if !ok {
-		return false
+	a1 = p[i+1:]
+
+	p = p[:i]
+
+	// Annotation 2
+	i = strings.LastIndexByte(p, '_')
+	if i != -1 {
+		a2 = p[i+1:]
 	}
 
-	// Filter 2
-	path = path[:i]
-	i = strings.LastIndexByte(path, '_')
-	if i == -1 {
-		return true
+	
+	if a2 == "" {
+		ok, exist := checkPlatform(a1)
+		if exist && !ok {
+			return false
+		}
+		ok, exist = checkArch(a1)
+		return !exist || ok
 	}
-	if i+1 >= length {
-		return true
-	}
-	filter = path[i+1:]
-	ok, exist = checkPlatform(filter)
+	
+	ok, exist := checkArch(a1)
 	if exist && !ok {
 		return false
 	}
-	ok, exist = checkArch(filter)
+	ok, exist = checkPlatform(a2)
 	return !exist || ok
 }
