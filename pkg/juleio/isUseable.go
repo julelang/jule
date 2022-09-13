@@ -49,15 +49,29 @@ func checkArch(path string) (ok bool, exist bool) {
 func IsUseable(path string) bool {
 	path = filepath.Base(path)
 	path = path[:len(path)-len(filepath.Ext(path))]
-	index := strings.LastIndexByte(path, '_')
-	if index == -1 {
+	parts := strings.SplitN(path, "_", 3)
+	switch len(parts) {
+	case 1:
 		return true
+	case 3:
+		path := parts[2]
+		ok, exist := checkPlatform(path)
+		if exist && !ok {
+			return false
+		}
+		ok, exist = checkArch(path)
+		if exist && !ok {
+			return false
+		}
+		fallthrough
+	case 2:
+		path := parts[1]
+		ok, exist := checkPlatform(path)
+		if exist && !ok {
+			return false
+		}
+		ok, exist = checkArch(path)
+		return !exist || ok
 	}
-	path = path[index+1:]
-	ok, exist := checkPlatform(path)
-	if exist {
-		return ok
-	}
-	ok, _ = checkArch(path)
-	return ok
+	return true
 }
