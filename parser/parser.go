@@ -513,7 +513,7 @@ func (p *Parser) compilePureUse(useAST *models.UseDecl) (_ *use, hassErr bool) {
 		// Skip directories.
 		if info.IsDir() ||
 			!strings.HasSuffix(name, jule.SrcExt) ||
-			!juleio.IsUseable(name) {
+			!juleio.IsPassFileAnnotation(name) {
 			continue
 		}
 		f, err := juleio.OpenJuleF(filepath.Join(useAST.Path, name))
@@ -685,7 +685,7 @@ func (p *Parser) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 		// Skip directories.
 		if info.IsDir() ||
 			!strings.HasSuffix(name, jule.SrcExt) ||
-			!juleio.IsUseable(name) ||
+			!juleio.IsPassFileAnnotation(name) ||
 			name == p.File.Name {
 			continue
 		}

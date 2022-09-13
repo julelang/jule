@@ -354,7 +354,7 @@ func compile(path string, main, nolocal, justDefs bool) *parser.Parser {
 		println(err.Error())
 		return nil
 	}
-	if !juleio.IsUseable(path) {
+	if !juleio.IsPassFileAnnotation(path) {
 		p.PushErr("file_not_useable")
 		return p
 	}
