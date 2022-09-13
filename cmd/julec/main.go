@@ -28,6 +28,7 @@ const command_version = "version"
 const command_init = "init"
 const command_doc = "doc"
 const command_bug = "bug"
+const command_tool = "tool"
 
 var helpmap = [...][2]string{
 	0: {command_help, "Show help"},
@@ -35,6 +36,7 @@ var helpmap = [...][2]string{
 	2: {command_init, "Initialize new project here"},
 	3: {command_doc, "Documentize Jule source code"},
 	4: {command_bug, "Start a new bug report"},
+	5: {command_tool, "Tools for effective Jule"},
 }
 
 func help(cmd string) {
@@ -145,7 +147,32 @@ func bug(cmd string) {
 	}
 }
 
+func list_horizontal_slice(s []string) string {
+	lst := fmt.Sprint(s)
+	return lst[1 : len(lst)-1]
+}
+
+func tool(cmd string) {
+	if cmd == "" {
+		println(`tool commands:
+ distos     Lists all supported operating systems
+ distarch   Lists all supported architects`)
+		return
+	}
+	switch cmd {
+	case "distos":
+		print("supported operating systems:\n ")
+		println(list_horizontal_slice(jule.Distos))
+	case "distarch":
+		print("supported architects:\n ")
+		println(list_horizontal_slice(jule.Distarch))
+	default:
+		println("Undefined command: " + cmd)
+	}
+}
+
 func process_command(namespace, cmd string) bool {
+	cmd = strings.TrimSpace(cmd)
 	switch namespace {
 	case command_help:
 		help(cmd)
@@ -157,6 +184,8 @@ func process_command(namespace, cmd string) bool {
 		doc(cmd)
 	case command_bug:
 		bug(cmd)
+	case command_tool:
+		tool(cmd)
 	default:
 		return false
 	}
