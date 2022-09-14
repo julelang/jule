@@ -22,6 +22,7 @@ const (
 	PlatformWindows = "windows"
 	PlatformLinux   = "linux"
 	PlatformDarwin  = "darwin"
+	PlatformUnix    = "unix"
 
 	ArchArm   = "arm"
 	ArchArm64 = "arm64"

@@ -27,6 +27,11 @@ func checkPlatform(path string) (ok bool, exist bool) {
 		ok = runtime.GOOS == os_darwin
 	case jule.PlatformLinux:
 		ok = runtime.GOOS == os_linux
+	case jule.PlatformUnix:
+		switch runtime.GOOS {
+		case os_darwin, os_linux:
+			ok = true
+		}
 	default:
 		ok = true
 		exist = false
