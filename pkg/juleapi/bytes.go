@@ -70,6 +70,8 @@ func sbtoa(b byte) string {
 
 func decompose_common_esq(b byte) string {
 	switch b {
+	case '\\':
+		return "\\\\"
 	case '\'':
 		return "'"
 	case '"':
@@ -98,6 +100,8 @@ func tryBtoaCommonEsq(bytes []byte) (seq byte, ok bool) {
 		return
 	}
 	switch bytes[1] {
+	case '\\':
+		seq = '\\'
 	case '\'':
 		seq = '\''
 	case '"':

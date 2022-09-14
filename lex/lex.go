@@ -11,7 +11,7 @@ import (
 	"github.com/jule-lang/jule/pkg/julelog"
 )
 
-// Lex is lexer of Fract.
+// Lex is lexer of Jule.
 type Lex struct {
 	firstTokenOfLine bool
 
@@ -511,7 +511,7 @@ func (l *Lex) escseq(txt string) string {
 		goto end
 	}
 	switch txt[1] {
-	case '\'', '"', 'a', 'b', 'f', 'n', 'r', 't', 'v':
+	case '\\', '\'', '"', 'a', 'b', 'f', 'n', 'r', 't', 'v':
 		l.Pos += 2
 		return txt[:2]
 	case 'U':
