@@ -268,8 +268,9 @@ func load_juleset() {
 	// File check.
 	info, err := os.Stat(jule.SettingsFile)
 	if err != nil || info.IsDir() {
-		println(`Jule settings file ("` + jule.SettingsFile + `") is not found!`)
-		os.Exit(0)
+		jule.Set = new(juleset.Set)
+		*jule.Set = *juleset.Default
+		return
 	}
 	bytes, err := os.ReadFile(jule.SettingsFile)
 	if err != nil {
