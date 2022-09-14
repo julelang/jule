@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"runtime"
 	"strings"
 	"time"
@@ -251,17 +250,19 @@ func load_localization() {
 }
 
 func check_mode() {
-	lower := strings.ToLower(jule.Set.Mode)
-	if lower != juleset.ModeTranspile &&
-		lower != juleset.ModeCompile {
-		key, _ := reflect.TypeOf(jule.Set).Elem().FieldByName("Mode")
-		tag := string(key.Tag)
-		// 6 for skip "json:
-		tag = tag[6 : len(tag)-1]
-		println(jule.GetError("invalid_value_for_key", jule.Set.Mode, tag))
+	mode := jule.Set.Mode
+	if mode != juleset.ModeTranspile && mode != juleset.ModeCompile {
+		println(jule.GetError("invalid_value_for_key", mode, "mode"))
 		os.Exit(0)
 	}
-	jule.Set.Mode = lower
+}
+
+func check_compiler() {
+	c := jule.Set.Compiler
+	if c != jule.CompilerGCC && c != jule.CompilerClang {
+		println(jule.GetError("invalid_value_for_key", c, "compiler"))
+		os.Exit(0)
+	}
 }
 
 func load_juleset() {
@@ -285,6 +286,7 @@ func load_juleset() {
 	}
 	load_localization()
 	check_mode()
+	check_compiler()
 }
 
 // print_logs prints logs and returns true
@@ -376,11 +378,11 @@ func exec_post_commands() {
 	}
 }
 
-func generate_compile_command(path string) (c, cmd string) {
+func generate_compile_command(source_path string) (c, cmd string) {
 	var cpp strings.Builder
 	cpp.WriteString("-g -O0 ")
-	cpp.WriteString(path)
-	return jule.Set.Compiler, cpp.String()
+	cpp.WriteString(source_path)
+	return jule.Set.CompilerPath, cpp.String()
 }
 
 func do_spell(cpp string) {

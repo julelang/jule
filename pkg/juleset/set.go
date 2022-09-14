@@ -5,10 +5,8 @@ import (
 	"runtime"
 )
 
-const (
-	ModeTranspile = "transpile"
-	ModeCompile   = "compile"
-)
+const ModeTranspile = "transpile"
+const ModeCompile   = "compile"
 
 type Set struct {
 	CppOutDir    string   `json:"cpp_out_dir"`
@@ -20,6 +18,7 @@ type Set struct {
 	Indent       string   `json:"indent"`
 	IndentCount  int      `json:"indent_count"`
 	Compiler     string   `json:"compiler"`
+	CompilerPath string   `json:"compiler_path"`
 }
 
 // Default Set instance.
@@ -32,6 +31,7 @@ var Default = &Set{
 	Indent:       "\t",
 	IndentCount:  1,
 	Compiler:     "",
+	CompilerPath: "",
 	PostCommands: []string{},
 }
 
@@ -47,8 +47,10 @@ func Load(bytes []byte) (*Set, error) {
 
 func init() {
 	if runtime.GOOS == "windows" {
-		Default.Compiler = "g++"
+		Default.Compiler = "gcc"
+		Default.CompilerPath = "g++"
 	} else {
 		Default.Compiler = "clang"
+		Default.CompilerPath = "clang++"
 	}
 }

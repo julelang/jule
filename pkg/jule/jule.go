@@ -39,6 +39,9 @@ const (
 
 	Prefix_Slice = "[]"
 	Prefix_Array = "[" + Mark_Array + "]"
+
+	CompilerGCC   = "gcc"
+	CompilerClang = "clang"
 )
 
 // Environment Variables.
