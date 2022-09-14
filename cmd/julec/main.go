@@ -376,13 +376,31 @@ func exec_post_commands() {
 	}
 }
 
-func do_spell(path, cpp string) {
+func generate_compile_command(path string) (c, cmd string) {
+	var cpp strings.Builder
+	cpp.WriteString("-g -O0 ")
+	cpp.WriteString(path)
+	return jule.Set.Compiler, cpp.String()
+}
+
+func do_spell(cpp string) {
 	defer exec_post_commands()
+	path := filepath.Join(jule.WorkingPath, jule.Set.CppOutDir)
+	path = filepath.Join(path, jule.Set.CppOutName)
 	write_output(path, cpp)
 	switch jule.Set.Mode {
 	case juleset.ModeCompile:
-		defer os.Remove(path)
-		println("compilation is not supported yet")
+		c, cmd := generate_compile_command(path)
+		println(c + " " + cmd)
+		command := exec.Command(c, strings.SplitN(cmd, " ", -1)...)
+		err := command.Start()
+		if err != nil {
+			println(err.Error())
+		}
+		err = command.Wait()
+		if err != nil {
+			println(err.Error())
+		}
 	}
 }
 
@@ -397,7 +415,5 @@ func main() {
 	}
 	cpp := p.Cpp()
 	append_standard(&cpp)
-	path := filepath.Join(jule.WorkingPath, jule.Set.CppOutDir)
-	path = filepath.Join(path, jule.Set.CppOutName)
-	do_spell(path, cpp)
+	do_spell(cpp)
 }

@@ -1,6 +1,9 @@
 package juleset
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"runtime"
+)
 
 const (
 	ModeTranspile = "transpile"
@@ -16,6 +19,7 @@ type Set struct {
 	PostCommands []string `json:"post_commands"`
 	Indent       string   `json:"indent"`
 	IndentCount  int      `json:"indent_count"`
+	Compiler     string   `json:"compiler"`
 }
 
 // Default Set instance.
@@ -27,6 +31,7 @@ var Default = &Set{
 	Mode:         "transpile",
 	Indent:       "\t",
 	IndentCount:  1,
+	Compiler:     "",
 	PostCommands: []string{},
 }
 
@@ -38,4 +43,12 @@ func Load(bytes []byte) (*Set, error) {
 		return nil, err
 	}
 	return &set, nil
+}
+
+func init() {
+	if runtime.GOOS == "windows" {
+		Default.Compiler = "g++"
+	} else {
+		Default.Compiler = "clang"
+	}
 }
