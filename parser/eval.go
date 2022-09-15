@@ -1386,7 +1386,7 @@ func (e *eval) buildArray(parts [][]lex.Token, t Type, errtok lex.Token) (value,
 		t.Size.N = models.Size(len(parts))
 		t.Size.Expr = models.Expr{
 			Model: exprNode{
-				value: juletype.TypeMap[juletype.UInt] + "{" + strconv.FormatUint(uint64(t.Size.N), 10) + "}",
+				value: juletype.CppId(juletype.UInt) + "(" + strconv.FormatUint(uint64(t.Size.N), 10) + ")",
 			},
 		}
 	}
