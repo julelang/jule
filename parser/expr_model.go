@@ -217,7 +217,11 @@ func (re *retExpr) setup_one_expr_to_multi_vars() string {
 	cpp.WriteString("std::tie(")
 	for _, v := range re.vars {
 		if juleapi.IsIgnoreId(v.Id) {
-			cpp.WriteString(juleapi.CppIgnore)
+			// This assignment effects to original variable instance.
+			re.ready_ignored_var_to_decl(v)
+			cpp.WriteString(v.OutId())
+			// To default
+			v.Id = juleapi.Ignore
 		} else {
 			cpp.WriteString(v.OutId())
 		}
