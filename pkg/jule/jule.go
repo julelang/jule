@@ -28,6 +28,8 @@ const (
 	ArchArm64 = "arm64"
 	ArchAmd64 = "amd64"
 	ArchI386  = "i386"
+	Arch64Bit = "64bit"
+	Arch32Bit = "32bit"
 
 	// This attributes should be added to the attribute map.
 	Attribute_TypeArg = "typearg"

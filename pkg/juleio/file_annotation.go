@@ -51,6 +51,16 @@ func checkArch(path string) (ok bool, exist bool) {
 		ok = runtime.GOARCH == arch_arm
 	case jule.ArchArm64:
 		ok = runtime.GOARCH == arch_arm64
+	case jule.Arch64Bit:
+		switch runtime.GOARCH {
+		case arch_amd64, arch_arm64:
+			ok = true
+		}
+	case jule.Arch32Bit:
+		switch runtime.GOARCH {
+		case arch_i386, arch_arm:
+			ok = true
+		}
 	default:
 		ok = true
 		exist = false
