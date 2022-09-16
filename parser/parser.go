@@ -704,6 +704,7 @@ func (p *Parser) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 			p.pusherrs(fp.Errors...)
 			return true
 		}
+		p.cppLinks = append(p.cppLinks, fp.cppLinks...)
 		p.waitingFuncs = append(p.waitingFuncs, fp.waitingFuncs...)
 		p.waitingGlobals = append(p.waitingGlobals, fp.waitingGlobals...)
 		p.waitingImpls = append(p.waitingImpls, fp.waitingImpls...)
@@ -1741,7 +1742,9 @@ func (p *Parser) check() {
 
 func (p *Parser) checkCppLinks() {
 	for _, link := range p.cppLinks {
-		p.reloadFuncTypes(link.Link)
+		if len(link.Link.Generics) == 0 {
+			p.reloadFuncTypes(link.Link)
+		}
 	}
 }
 
