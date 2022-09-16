@@ -320,8 +320,8 @@ func (p *Parser) CppInitializerCaller(out chan string) {
 	indent := models.IndentString()
 	models.DoneIndent()
 	pushInit := func(defs *DefineMap) {
-		f, _, _ := defs.funcById(jule.InitializerFunction, nil)
-		if f == nil {
+		f, dm, _ := defs.funcById(jule.InitializerFunction, nil)
+		if f == nil || dm != defs {
 			return
 		}
 		cpp.WriteByte('\n')
