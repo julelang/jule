@@ -64,12 +64,15 @@
 
 
 
+// Pre-declarations
+
+// Defined at: str.hpp
+class str_julet;
+
 // Libraries uses this function for throw panic.
 // Also it is builtin panic function.
 template<typename _Obj_t>
 void JULEC_ID(panic)(const _Obj_t &_Expr);
-
-// Pre-declarations
 inline std::ostream &operator<<(std::ostream &_Stream,
                                 const signed char _I8) noexcept;
 inline std::ostream &operator<<(std::ostream &_Stream,
@@ -93,6 +96,7 @@ inline std::ostream &operator<<(std::ostream &_Stream,
 #include "utf16.hpp"
 
 
+
 slice<str_julet> __julec_command_line_args;
 
 
@@ -101,8 +105,6 @@ slice<str_julet> __julec_command_line_args;
 
 inline slice<str_julet> __julec_get_command_line_args(void) noexcept;
 inline void JULEC_ID(panic)(const trait<JULEC_ID(Error)> &_Error);
-template<typename _Obj_t>
-str_julet __julec_tostr(const _Obj_t &_Obj) noexcept;
 template<typename Type, unsigned N, unsigned Last>
 struct tuple_ostream;
 template<typename Type, unsigned N>
@@ -118,6 +120,10 @@ template<typename _Fn_t, typename _Tuple_t>
 inline auto tuple_as_args(const fn<_Fn_t> &_Function, const _Tuple_t _Tuple);
 template<typename T>
 inline jule_ref<T> __julec_new_structure(T *_Ptr);
+// Libraries uses this function for UTf-8 encoded Jule strings.
+// Also it is builtin str type constructor.
+template<typename _Obj_t>
+str_julet __julec_to_str(const _Obj_t &_Obj) noexcept;
 void __julec_terminate_handler(void) noexcept;
 // Entry point function of generated Jule code, generates by JuleC.
 void JULEC_ID(main)(void);
@@ -189,10 +195,10 @@ inline jule_ref<T> __julec_new_structure(T *_Ptr) {
 }
 
 template<typename _Obj_t>
-str_julet __julec_tostr(const _Obj_t &_Obj) noexcept {
+str_julet __julec_to_str(const _Obj_t &_Obj) noexcept {
     std::stringstream _stream;
     _stream << _Obj;
-    return str_julet( _stream.str() );
+    return ( str_julet( _stream.str() ) );
 }
 
 inline void JULEC_ID(panic)(const trait<JULEC_ID(Error)> &_Error)
@@ -204,10 +210,10 @@ void JULEC_ID(panic)(const _Obj_t &_Expr) {
         str_julet _message;
 
         str_julet error(void)
-        { return this->_message; }
+        { return ( this->_message ); }
     };
     struct panic_error _error;
-    _error._message = __julec_tostr ( _Expr );
+    _error._message = __julec_to_str ( _Expr );
     throw ( trait<JULEC_ID(Error)> ( _error ) ) ;
 }
 
@@ -218,9 +224,6 @@ void __julec_terminate_handler(void) noexcept {
         std::exit( __JULEC_EXIT_PANIC );
     }
 }
-
-#ifdef _WINDOWS
-#endif // #ifdef _WINDOWS
 
 void __julec_setup_command_line_args(int argc, char *argv[]) noexcept {
 #ifdef _WINDOWS

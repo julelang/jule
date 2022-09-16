@@ -28,6 +28,8 @@ slice<i32_julet> __julec_utf16_decode(const slice<i32_julet> _S) noexcept;
 str_julet __julec_utf16_to_utf8_str(const wchar_t *_WStr,
                                     const std::size_t _Len) noexcept;
 
+// Definitions
+
 inline i32_julet
 __julec_utf16_decode_rune(const i32_julet _R1, const i32_julet _R2) noexcept {
     if (__JULEC_UTF16_SURR1 <= _R1 &&
