@@ -198,6 +198,9 @@ public:
         return ( str_julet(_s) );
     }
 
+    inline operator const char*(void) const noexcept
+    { return ( this->cstr() ); }
+
     operator slice<u8_julet>(void) const noexcept {
         slice<u8_julet> _slice( this->len() );
         for (int_julet _index{ 0 }; _index < this->len(); ++_index)
