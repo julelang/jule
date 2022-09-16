@@ -76,7 +76,8 @@ func (af anonFuncExpr) String() string {
 	cpp.WriteString(" mutable -> ")
 	cpp.WriteString(af.ast.RetType.String())
 	cpp.WriteByte(' ')
-	cpp.WriteString(af.ast.Block.String())
+	vars := af.ast.RetType.Vars(af.ast.Block)
+	cpp.WriteString(fnBlockToString(vars, af.ast.Block))
 	cpp.WriteByte(')')
 	return cpp.String()
 }
@@ -189,7 +190,51 @@ func (re *retExpr) get_model(i int) string {
 	return re.models[i].String()
 }
 
-func (re *retExpr) setup_vars() string {
+func (re *retExpr) required_return_expr() int {
+	// vars always represents return expression count
+	return len(re.vars)
+}
+
+func (re *retExpr) is_one_expr_for_multi_ret() bool {
+	return re.required_return_expr() > 1 && len(re.models) == 1
+}
+
+func (re *retExpr) ready_ignored_var_to_decl(v *Var) {
+	v.Id = "ret_var"
+}
+
+func (re *retExpr) setup_one_expr_to_multi_vars() string {
+	var cpp strings.Builder
+	for _, v := range re.vars {
+		if juleapi.IsIgnoreId(v.Id) {
+			// This assignment effects to original variable instance.
+			re.ready_ignored_var_to_decl(v)
+			cpp.WriteString(v.String())
+			// To default
+			v.Id = juleapi.Ignore
+		}
+	}
+	cpp.WriteString("std::tie(")
+	for _, v := range re.vars {
+		if juleapi.IsIgnoreId(v.Id) {
+			cpp.WriteString(juleapi.CppIgnore)
+		} else {
+			cpp.WriteString(v.OutId())
+		}
+		cpp.WriteByte(',')
+	}
+	assign_expr := cpp.String()
+	// Remove comma
+	assign_expr = assign_expr[:cpp.Len()-1]
+	assign_expr += ")"
+	cpp.Reset()
+	cpp.WriteByte('=')
+	cpp.WriteString(re.models[0].String())
+	cpp.WriteByte(';')
+	return assign_expr + cpp.String()
+}
+
+func (re *retExpr) setup_plain_vars() string {
 	var cpp strings.Builder
 	for i, v := range re.vars {
 		if juleapi.IsIgnoreId(v.Id) {
@@ -201,6 +246,31 @@ func (re *retExpr) setup_vars() string {
 		cpp.WriteByte(';')
 	}
 	return cpp.String()
+}
+
+func (re *retExpr) setup_vars() string {
+	if re.is_one_expr_for_multi_ret() {
+		return re.setup_one_expr_to_multi_vars()
+	}
+	return re.setup_plain_vars()
+}
+
+func (re *retExpr) multi_with_one_expr_str() string {
+	var cpp strings.Builder
+	cpp.WriteString("std::make_tuple(")
+	for _, v := range re.vars {
+		if juleapi.IsIgnoreId(v.Id) {
+			// This assignment effects to original variable instance.
+			re.ready_ignored_var_to_decl(v)
+			cpp.WriteString(v.OutId())
+			// To default
+			v.Id = juleapi.Ignore
+		} else {
+			cpp.WriteString(v.OutId())
+		}
+		cpp.WriteByte(',')
+	}
+	return cpp.String()[:cpp.Len()-1] + ")"
 }
 
 func (re *retExpr) multiRetString() string {
@@ -225,9 +295,12 @@ func (re retExpr) String() string {
 		cpp.WriteString(re.setup_vars())
 	}
 	cpp.WriteString(" return ")
-	if len(re.models) > 1 {
+	switch {
+	case re.is_one_expr_for_multi_ret():
+		cpp.WriteString(re.multi_with_one_expr_str())
+	case len(re.models) > 1:
 		cpp.WriteString(re.multiRetString())
-	} else {
+	default:
 		cpp.WriteString(re.singleRetString())
 	}
 	return cpp.String()

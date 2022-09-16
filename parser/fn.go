@@ -23,20 +23,25 @@ func (f *Fn) outId() string {
 	return f.Ast.OutId()
 }
 
-func (f Fn) stringOwner(owner string) string {
+func fnBlockToString(vars []*Var, b *models.Block) string {
 	var cpp strings.Builder
-	cpp.WriteString(f.Head(owner))
-	cpp.WriteByte(' ')
-	block := f.Ast.Block
-	vars := f.Ast.RetType.Vars(f.Ast.Block)
 	if vars != nil {
 		statements := make([]models.Statement, len(vars))
 		for i, v := range vars {
 			statements[i] = models.Statement{Token: v.Token, Data: *v}
 		}
-		block.Tree = append(statements, block.Tree...)
+		b.Tree = append(statements, b.Tree...)
 	}
-	cpp.WriteString(block.String())
+	cpp.WriteString(b.String())
+	return cpp.String()
+}
+
+func (f Fn) stringOwner(owner string) string {
+	var cpp strings.Builder
+	cpp.WriteString(f.Head(owner))
+	cpp.WriteByte(' ')
+	vars := f.Ast.RetType.Vars(f.Ast.Block)
+	cpp.WriteString(fnBlockToString(vars, f.Ast.Block))
 	return cpp.String()
 }
 
