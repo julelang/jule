@@ -1094,22 +1094,6 @@ func (p *Parser) implTrait(impl *models.Impl) {
 	}
 	impl.Target.Tag = s
 	*s.Traits = append(*s.Traits, trait)
-	for _, tf := range trait.Defines.Funcs {
-		ok := false
-		ds := tf.Ast.DefString()
-		for _, obj := range impl.Tree {
-			switch t := obj.Data.(type) {
-			case *Func:
-				if tf.Ast.Pub == t.Pub && ds == t.DefString() {
-					ok = true
-					break
-				}
-			}
-		}
-		if !ok {
-			p.pusherrtok(impl.Target.Token, "not_impl_trait_def", trait.Ast.Id, ds)
-		}
-	}
 	for _, obj := range impl.Tree {
 		switch t := obj.Data.(type) {
 		case models.Comment:
@@ -1138,6 +1122,17 @@ func (p *Parser) implTrait(impl *models.Impl) {
 				p.parseTypesNonGenerics(sf.Ast)
 			}
 			s.Defines.Funcs = append(s.Defines.Funcs, sf)
+		}
+	}
+	for _, tf := range trait.Defines.Funcs {
+		ok := false
+		ds := tf.Ast.DefString()
+		sf, _, _ := s.Defines.funcById(tf.Ast.Id, nil)
+		if sf != nil {
+			ok = tf.Ast.Pub == sf.Ast.Pub && ds == sf.Ast.DefString()
+		}
+		if !ok {
+			p.pusherrtok(impl.Target.Token, "not_impl_trait_def", trait.Ast.Id, ds)
 		}
 	}
 }
