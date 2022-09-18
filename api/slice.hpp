@@ -62,12 +62,12 @@ public:
 
     void __alloc_new(const int_julet _N) noexcept {
         this->__dealloc();
-        _Item_t *_alloc{ new(std::nothrow) _Item_t[_N] };
+        _Item_t *_alloc{ new( std::nothrow ) _Item_t[_N] };
         if (!_alloc)
         { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
-        this->_n = _N;
         this->_data = jule_ref<_Item_t>( _alloc );
-        this->_slice = _alloc;
+        this->_n = _N;
+        this->_slice = &_alloc[0];
     }
 
     typedef _Item_t       *iterator;

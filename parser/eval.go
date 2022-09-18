@@ -277,9 +277,9 @@ func (e *eval) dataTypeFunc(expr lex.Token, callRange []lex.Token, m *exprModel)
 
 		default:
 			dt := Type{
-				Token:  expr,
-				Id:   juletype.TypeFromId(expr.Kind),
-				Kind: expr.Kind,
+				Token: expr,
+				Id:    juletype.TypeFromId(expr.Kind),
+				Kind:  expr.Kind,
 			}
 			isret = true
 			v = e.castExpr(dt, callRange, m, expr)
@@ -709,7 +709,7 @@ func (e *eval) castInteger(t Type, v *value, errtok lex.Token) {
 		} else if !e.unsafe_allowed() {
 			e.pusherrtok(errtok, "unsafe_behavior_at_out_of_unsafe_scope")
 			return
-		} else if t.Id != juletype.I32 && t.Id != juletype.I64 && 
+		} else if t.Id != juletype.I32 && t.Id != juletype.I64 &&
 			t.Id != juletype.U16 && t.Id != juletype.U32 && t.Id != juletype.U64 {
 			e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
 		}
@@ -1203,11 +1203,9 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 }
 
 func (e *eval) checkIntegerIndexing(v value, errtok lex.Token) {
-	switch {
-	case !typeIsPure(v.data.Type):
-		e.pusherrtok(errtok, "invalid_expr")
-	case !juletype.IsInteger(v.data.Type.Id):
-		e.pusherrtok(errtok, "invalid_expr")
+	err_key := check_value_for_indexing(v)
+	if err_key != "" {
+		e.pusherrtok(errtok, err_key)
 	}
 }
 
@@ -1234,9 +1232,6 @@ func (e *eval) indexing(enumv, indexv value, errtok lex.Token) (v value) {
 func (e *eval) indexingSlice(slicev, index value, errtok lex.Token) value {
 	slicev.data.Type = *slicev.data.Type.ComponentType
 	e.checkIntegerIndexing(index, errtok)
-	if index.constExpr && tonums(index.expr) < 0 {
-		e.p.pusherrtok(index.data.Token, "invalid_expr")
-	}
 	return slicev
 }
 
@@ -1246,18 +1241,12 @@ func (e *eval) indexing_explicit_ptr(ptrv, index value, errtok lex.Token) value 
 	}
 	ptrv.data.Type = un_ptr_or_ref_type(ptrv.data.Type)
 	e.checkIntegerIndexing(index, errtok)
-	if index.constExpr && tonums(index.expr) < 0 {
-		e.p.pusherrtok(index.data.Token, "invalid_expr")
-	}
 	return ptrv
 }
 
 func (e *eval) indexingArray(arrv, index value, errtok lex.Token) value {
 	arrv.data.Type = *arrv.data.Type.ComponentType
 	e.checkIntegerIndexing(index, errtok)
-	if index.constExpr && tonums(index.expr) < 0 {
-		e.p.pusherrtok(index.data.Token, "invalid_expr")
-	}
 	return arrv
 }
 
@@ -1278,10 +1267,8 @@ func (e *eval) indexingStr(strv, index value, errtok lex.Token) value {
 		strv.constExpr = false
 		return strv
 	}
-	i := tonums(index.expr)
-	if i < 0 {
-		e.p.pusherrtok(errtok, "overflow_limits")
-	} else if strv.constExpr {
+	if strv.constExpr {
+		i := tonums(index.expr)
 		s := strv.expr.(string)
 		if int(i) >= len(s) {
 			e.p.pusherrtok(errtok, "overflow_limits")
@@ -1294,17 +1281,6 @@ func (e *eval) indexingStr(strv, index value, errtok lex.Token) value {
 }
 
 func (e *eval) slicing(enumv, leftv, rightv value, errtok lex.Token) (v value) {
-	if leftv.constExpr && tonums(leftv.expr) < 0 {
-		e.p.pusherrtok(errtok, "overflow_limits")
-	}
-	if rightv.constExpr && tonums(rightv.expr) < 0 {
-		e.p.pusherrtok(errtok, "overflow_limits")
-	}
-	if leftv.constExpr && rightv.constExpr && rightv.expr != nil {
-		if tonums(leftv.expr) > tonums(rightv.expr) {
-			e.p.pusherrtok(errtok, "overflow_limits")
-		}
-	}
 	switch {
 	case typeIsArray(enumv.data.Type):
 		return e.slicingArray(enumv, errtok)
@@ -1369,7 +1345,7 @@ func (e *eval) slicingStr(v, leftv, rightv value, errtok lex.Token) value {
 	return v
 }
 
-//! IMPORTANT: lex.Tokenens is should be store enumerable parentheses.
+// ! IMPORTANT: lex.Tokenens is should be store enumerable parentheses.
 func (e *eval) enumerableParts(toks []lex.Token) [][]lex.Token {
 	toks = toks[1 : len(toks)-1]
 	parts, errs := ast.Parts(toks, tokens.Comma, true)
@@ -1401,10 +1377,10 @@ func (e *eval) buildArray(parts [][]lex.Token, t Type, errtok lex.Token) (value,
 		partVal, expModel := e.toks(part)
 		model.expr = append(model.expr, expModel)
 		assign_checker{
-			p:       e.p,
-			t:       *t.ComponentType,
-			v:       partVal,
-			errtok:  part[0],
+			p:      e.p,
+			t:      *t.ComponentType,
+			v:      partVal,
+			errtok: part[0],
 		}.check()
 	}
 	return v, model
@@ -1422,10 +1398,10 @@ func (e *eval) buildSlice(parts [][]lex.Token, t Type, errtok lex.Token) (value,
 		partVal, expModel := e.toks(part)
 		model.expr = append(model.expr, expModel)
 		assign_checker{
-			p:       e.p,
-			t:       *t.ComponentType,
-			v:       partVal,
-			errtok:  part[0],
+			p:      e.p,
+			t:      *t.ComponentType,
+			v:      partVal,
+			errtok: part[0],
 		}.check()
 	}
 	return v, model

@@ -339,8 +339,8 @@ var recoverFunc = &Fn{
 }
 
 var out_fn = &Fn{Ast: &Func{
-	Pub:           true,
-	Id:            "out",
+	Pub: true,
+	Id:  "out",
 	RetType: RetType{
 		Type: Type{Id: juletype.Void, Kind: juletype.TypeMap[juletype.Void]},
 	},
@@ -348,6 +348,11 @@ var out_fn = &Fn{Ast: &Func{
 		Id:   "expr",
 		Type: Type{Id: juletype.Any, Kind: tokens.ANY},
 	}},
+}}
+
+var make_fn = &Fn{Ast: &Func{
+	Pub: true,
+	Id:  "make",
 }}
 
 var outln_fn *Fn
@@ -373,29 +378,11 @@ var Builtin = &DefineMap{
 		out_fn,
 		panicFunc,
 		recoverFunc,
+		make_fn,
 		{Ast: &Func{
-			Pub:           true,
-			Id:            "new",
-			Owner:         builtinFile,
-		}},
-		{Ast: &Func{
-			Pub:      true,
-			Id:       "make",
-			Owner:    builtinFile,
-			Generics: []*GenericType{{Id: "Item"}},
-			RetType: models.RetType{
-				Type: Type{
-					Id:            juletype.Slice,
-					Kind:          jule.Prefix_Slice + "Item",
-					ComponentType: &Type{Id: juletype.Id, Kind: "Item"},
-				},
-			},
-			Params: []models.Param{
-				{
-					Id:   "n",
-					Type: Type{Id: juletype.Int, Kind: juletype.TypeMap[juletype.Int]},
-				},
-			},
+			Pub:   true,
+			Id:    "new",
+			Owner: builtinFile,
 		}},
 		{Ast: &Func{
 			Pub:      true,
@@ -406,7 +393,7 @@ var Builtin = &DefineMap{
 			Params: []models.Param{
 				{
 					Mutable: true,
-					Id: "dest",
+					Id:      "dest",
 					Type: Type{
 						Id:            juletype.Slice,
 						Kind:          jule.Prefix_Slice + "Item",
@@ -659,6 +646,9 @@ func init() {
 	outln_fn.Ast.Id = "outln"
 	Builtin.Funcs = append(Builtin.Funcs, outln_fn)
 
+	// Setup make function
+	make_fn.Ast.BuiltinCaller = caller_make
+
 	// Setup new function
 	fn_new, _, _ := Builtin.funcById("new", nil)
 	fn_new.Ast.BuiltinCaller = caller_new
@@ -714,6 +704,38 @@ func caller_out(p *Parser, f *Func, data callData, m *exprModel) (v value) {
 	return v
 }
 
+func caller_make(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
+	errtok := data.args[0]
+	args := p.getArgs(data.args, false)
+	if len(args.Src) == 0 {
+		p.pusherrtok(errtok, "missing_expr")
+		return
+	}
+	type_tokens := args.Src[0].Expr.Tokens
+	b := ast.NewBuilder(nil)
+	i := 0
+	t, ok := b.DataType(type_tokens, &i, false, true)
+	b.Wait()
+	if !ok {
+		p.pusherrs(b.Errors...)
+		return
+	}
+	if i+1 < len(type_tokens) {
+		p.pusherrtok(type_tokens[i+1], "invalid_syntax")
+	}
+	t, ok = p.realType(t, true)
+	if !ok {
+		return
+	}
+	switch {
+	case typeIsSlice(t):
+		return make_slice(p, m, t, args, errtok)
+	default:
+		p.pusherrtok(errtok, "invalid_type")
+	}
+	return
+}
+
 func caller_new(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
 	errtok := data.args[0]
 	// Remove parentheses
@@ -762,7 +784,7 @@ func caller_mem_size_of(p *Parser, _ *Func, data callData, m *exprModel) (v valu
 	// Remove parentheses
 	data.args = data.args[1 : len(data.args)-1]
 	v.data.Type = Type{
-		Id: juletype.UInt,
+		Id:   juletype.UInt,
 		Kind: juletype.TypeMap[juletype.UInt],
 	}
 	nodes := m.nodes[m.index].nodes
@@ -790,7 +812,7 @@ func caller_mem_align_of(p *Parser, _ *Func, data callData, m *exprModel) (v val
 	// Remove parentheses
 	data.args = data.args[1 : len(data.args)-1]
 	v.data.Type = Type{
-		Id: juletype.UInt,
+		Id:   juletype.UInt,
 		Kind: juletype.TypeMap[juletype.UInt],
 	}
 	nodes := m.nodes[m.index].nodes

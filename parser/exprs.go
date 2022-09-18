@@ -9,6 +9,19 @@ import (
 	"github.com/jule-lang/jule/pkg/juletype"
 )
 
+func check_value_for_indexing(v value) (err_key string) {
+	switch {
+	case !typeIsPure(v.data.Type):
+		return "invalid_expr"
+	case !juletype.IsInteger(v.data.Type.Id):
+		return "invalid_expr"
+	case v.constExpr && tonums(v.expr) < 0:
+		return "overflow_limits"
+	default:
+		return ""
+	}
+}
+
 func indexingExprModel(i iExpr) iExpr {
 	if i == nil {
 		return i

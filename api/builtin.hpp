@@ -44,10 +44,6 @@ struct JULEC_ID(Error) {
 };
 
 template<typename _Item_t>
-inline slice<_Item_t> JULEC_ID(make)(const int_julet &_N) noexcept
-{ return ( _N < 0 ? nil : slice<_Item_t>( _N ) ); }
-
-template<typename _Item_t>
 int_julet JULEC_ID(copy)(const slice<_Item_t> &_Dest,
                          const slice<_Item_t> &_Src) noexcept {
     if (_Dest.empty() || _Src.empty()) { return 0; }
@@ -63,7 +59,7 @@ template<typename _Item_t>
 slice<_Item_t> JULEC_ID(append)(const slice<_Item_t> &_Src,
                                 const slice<_Item_t> &_Components) noexcept {
     const int_julet _N{ _Src.len() + _Components.len() };
-    slice<_Item_t> _buffer{ JULEC_ID(make)<_Item_t>( _N )};
+    slice<_Item_t> _buffer{ slice<_Item_t>( _N )};
     JULEC_ID(copy)<_Item_t>( _buffer, _Src );
     for (int_julet _index{ 0 }; _index < _Components.len(); ++_index)
     { _buffer[_Src.len()+_index] = _Components._slice[_index]; }
