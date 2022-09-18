@@ -670,7 +670,8 @@ func (p *Parser) checkParse() {
 }
 
 // Special case is;
-//  p.useLocalPackage() -> nothing if p.File is nil
+//
+//	p.useLocalPackage() -> nothing if p.File is nil
 func (p *Parser) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 	if p.File == nil {
 		return
@@ -975,10 +976,10 @@ func (p *Parser) parseFields(s *structure) {
 	s.constructor.Token = s.Ast.Token
 	s.constructor.Params = make([]models.Param, len(s.Ast.Fields))
 	s.constructor.RetType.Type = Type{
-		Id:   juletype.Struct,
-		Kind: s.Ast.Id,
-		Token:  s.Ast.Token,
-		Tag:  s,
+		Id:    juletype.Struct,
+		Kind:  s.Ast.Id,
+		Token: s.Ast.Token,
+		Tag:   s,
 	}
 	if len(s.Ast.Generics) > 0 {
 		s.constructor.Generics = make([]*models.GenericType, len(s.Ast.Generics))
@@ -1399,7 +1400,7 @@ func (p *Parser) Func(ast Func) {
 	_, tok, canshadow := p.defById(ast.Id)
 	if tok.Id != tokens.NA && !canshadow {
 		p.pusherrtok(ast.Token, "exist_id", ast.Id)
-		} else if juleapi.IsIgnoreId(ast.Id) {
+	} else if juleapi.IsIgnoreId(ast.Id) {
 		p.pusherrtok(ast.Token, "ignore_id")
 	}
 	f := new(Fn)
@@ -1576,7 +1577,8 @@ func (p *Parser) linkById(id string) *models.CppLink {
 // FuncById returns function by specified id.
 //
 // Special case:
-//  FuncById(id) -> nil: if function is not exist.
+//
+//	FuncById(id) -> nil: if function is not exist.
 func (p *Parser) FuncById(id string) (*Fn, *DefineMap, bool) {
 	if p.allowBuiltin {
 		f, _, _ := Builtin.funcById(id, nil)
@@ -1641,7 +1643,7 @@ func (p *Parser) traitById(id string) (*trait, *DefineMap, bool) {
 }
 
 func (p *Parser) blockTypeById(id string) (_ *TypeAlias, can_shadow bool) {
-	for i := len(p.blockTypes)-1; i >= 0; i-- {
+	for i := len(p.blockTypes) - 1; i >= 0; i-- {
 		t := p.blockTypes[i]
 		if t != nil && t.Id == id {
 			return t, !t.Generic && t.Owner != p.nodeBlock
@@ -1652,7 +1654,7 @@ func (p *Parser) blockTypeById(id string) (_ *TypeAlias, can_shadow bool) {
 }
 
 func (p *Parser) blockVarById(id string) (_ *Var, can_shadow bool) {
-	for i := len(p.blockVars)-1; i >= 0; i-- {
+	for i := len(p.blockVars) - 1; i >= 0; i-- {
 		v := p.blockVars[i]
 		if v != nil && v.Id == id {
 			return v, v.Owner != p.nodeBlock
@@ -2097,7 +2099,7 @@ func (p *Parser) checkGenericsQuantity(required, given int, errTok lex.Token) bo
 func (p *Parser) pushGeneric(generic *GenericType, source Type) {
 	t := &TypeAlias{
 		Id:      generic.Id,
-		Token:     generic.Token,
+		Token:   generic.Token,
 		Type:    source,
 		Used:    true,
 		Generic: true,
@@ -2315,7 +2317,7 @@ func paramHasDefaultArg(param *Param) bool {
 	return hasExpr(param.Default)
 }
 
-//             [identifier]
+// [identifier]
 type paramMap map[string]*paramMapPair
 type paramMapPair struct {
 	param *Param
@@ -2433,17 +2435,18 @@ func (p *Parser) parseArg(f *Func, pair *paramMapPair, args *models.Args, variad
 func (p *Parser) checkArgType(param *Param, val value, errTok lex.Token) {
 	p.check_valid_init_expr(param.Mutable, val, errTok)
 	assign_checker{
-		p:       p,
-		t:       param.Type,
-		v:       val,
-		errtok:  errTok,
+		p:      p,
+		t:      param.Type,
+		v:      val,
+		errtok: errTok,
 	}.check()
 }
 
 // getrange returns between of brackets.
 //
 // Special case is:
-//  getrange(open, close, tokens) = nil, false if fail
+//
+//	getrange(open, close, tokens) = nil, false if fail
 func (p *Parser) getrange(open, close string, toks []lex.Token) (_ []lex.Token, ok bool) {
 	i := 0
 	toks = ast.Range(&i, open, close, toks)
@@ -2689,10 +2692,10 @@ func (p *Parser) parseCase(c *models.Case, t Type) {
 		value, model := p.evalExpr(*expr)
 		expr.Model = model
 		assign_checker{
-			p:       p,
-			t:       t,
-			v:       value,
-			errtok:  expr.Tokens[0],
+			p:      p,
+			t:      t,
+			v:      value,
+			errtok: expr.Tokens[0],
 		}.check()
 	}
 	oldCase := p.currentCase
@@ -3011,10 +3014,10 @@ func (p *Parser) singleAssign(assign *models.Assign, exprs []value) {
 		assign.Setter.Kind += tokens.EQUAL
 	}
 	assign_checker{
-		p:       p,
-		t:       leftExpr.data.Type,
-		v:       val,
-		errtok:  assign.Setter,
+		p:      p,
+		t:      leftExpr.data.Type,
+		v:      val,
+		errtok: assign.Setter,
 	}.check()
 }
 
@@ -3050,8 +3053,8 @@ func (p *Parser) check_valid_init_expr(left_mutable bool, right value, errtok le
 		return
 	}
 	checker := assign_checker{
-		p: p,
-		v: right,
+		p:      p,
+		v:      right,
 		errtok: errtok,
 	}
 	_ = checker.check_validity()
@@ -3073,10 +3076,10 @@ func (p *Parser) multiAssign(assign *models.Assign, right []value) {
 			}
 			p.check_valid_init_expr(leftExpr.mutable, right, assign.Setter)
 			assign_checker{
-				p:       p,
-				t:       leftExpr.data.Type,
-				v:       right,
-				errtok:  assign.Setter,
+				p:      p,
+				t:      leftExpr.data.Type,
+				v:      right,
+				errtok: assign.Setter,
 			}.check()
 			continue
 		}
@@ -3087,7 +3090,7 @@ func (p *Parser) multiAssign(assign *models.Assign, right []value) {
 
 func (p *Parser) unsafe_allowed() bool {
 	return (p.rootBlock != nil && p.rootBlock.IsUnsafe) ||
-	(p.nodeBlock != nil && p.nodeBlock.IsUnsafe)
+		(p.nodeBlock != nil && p.nodeBlock.IsUnsafe)
 }
 
 func (p *Parser) postfix(assign *models.Assign, exprs []value) {
@@ -3190,10 +3193,10 @@ func (p *Parser) forProfile(iter *models.Iter) {
 		val, model := p.evalExpr(profile.Condition)
 		profile.Condition.Model = model
 		assign_checker{
-			p:       p,
-			t:       Type{Id: juletype.Bool, Kind: juletype.TypeMap[juletype.Bool]},
-			v:       val,
-			errtok:  profile.Condition.Tokens[0],
+			p:      p,
+			t:      Type{Id: juletype.Bool, Kind: juletype.TypeMap[juletype.Bool]},
+			v:      val,
+			errtok: profile.Condition.Tokens[0],
 		}.check()
 	}
 	if profile.Next.Data != nil {
@@ -3307,7 +3310,7 @@ func (p *Parser) breakWithLabel(ast *models.Break) {
 		return
 	}
 	label.Used = true
-	for i := label.Index+1; i < len(label.Block.Tree); i++ {
+	for i := label.Index + 1; i < len(label.Block.Tree); i++ {
 		obj := &label.Block.Tree[i]
 		if obj.Data == nil {
 			continue
@@ -3342,7 +3345,7 @@ func (p *Parser) continueWithLabel(ast *models.Continue) {
 		return
 	}
 	label.Used = true
-	for i := label.Index+1; i < len(label.Block.Tree); i++ {
+	for i := label.Index + 1; i < len(label.Block.Tree); i++ {
 		obj := &label.Block.Tree[i]
 		if obj.Data == nil {
 			continue
@@ -3556,10 +3559,10 @@ func (p *Parser) typeSourceIsArrayType(t *Type) (ok bool) {
 		p.eval.pusherrtok(t.Token, "expr_not_const")
 	}
 	assign_checker{
-		p:       p,
-		t:       Type{Id: juletype.UInt, Kind: juletype.TypeMap[juletype.UInt]},
-		v:       val,
-		errtok:  t.Size.Expr.Tokens[0],
+		p:      p,
+		t:      Type{Id: juletype.UInt, Kind: juletype.TypeMap[juletype.UInt]},
+		v:      val,
+		errtok: t.Size.Expr.Tokens[0],
 	}.check()
 	return
 }

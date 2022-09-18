@@ -60,7 +60,8 @@ func (dt *Type) KindWithOriginalId() string {
 // OriginalKindId returns dt.Kind's identifier of official.
 //
 // Special case is:
-//   OriginalKindId() -> "" if DataType has not original
+//
+//	OriginalKindId() -> "" if DataType has not original
 func (dt *Type) OriginalKindId() string {
 	if dt.Original == nil {
 		return ""
@@ -104,6 +105,10 @@ func (dt *Type) KindId() (id, prefix string) {
 	return
 }
 
+func is_necessary_type(id uint8) bool {
+	return id == juletype.Trait
+}
+
 func (dt *Type) SetToOriginal() {
 	if dt.Pure || dt.Original == nil {
 		return
@@ -114,13 +119,17 @@ func (dt *Type) SetToOriginal() {
 		defer func() { dt.Tag = tag }()
 	}
 	kind := dt.KindWithOriginalId()
+	id := dt.Id
 	tok := dt.Token
 	generic := dt.Generic
 	*dt = dt.Original.(Type)
 	dt.Kind = kind
-	// Keep original file and generic state
+	// Keep original file, generic and necessary type code state
 	dt.Token = tok
 	dt.Generic = generic
+	if is_necessary_type(id) {
+		dt.Id = id
+	}
 }
 
 // Modifiers returns pointer and reference marks of data type.
