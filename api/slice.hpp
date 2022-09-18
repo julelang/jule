@@ -20,7 +20,7 @@ public:
     slice<_Item_t>(const std::nullptr_t) noexcept {}
 
     slice<_Item_t>(const uint_julet &_N) noexcept
-    { this->__alloc_new( _N ); }
+    { this->__alloc_new( _N < 0 ? 0 : _N ); }
 
     slice<_Item_t>(const slice<_Item_t>& _Src) noexcept
     { this->operator=( _Src ); }
@@ -62,7 +62,7 @@ public:
 
     void __alloc_new(const int_julet _N) noexcept {
         this->__dealloc();
-        _Item_t *_alloc{ new( std::nothrow ) _Item_t[_N] };
+        _Item_t *_alloc{ new( std::nothrow ) _Item_t[_N]{_Item_t()} };
         if (!_alloc)
         { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
         this->_data = jule_ref<_Item_t>( _alloc );
