@@ -10,7 +10,7 @@ struct any_julet;
 
 struct any_julet {
 public:
-    jule_ref<void*> _data;
+    jule_ref<void*> _data{ nil };
     const char *_type_id{ nil };
 
     any_julet(void) noexcept {}

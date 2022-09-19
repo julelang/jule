@@ -19,6 +19,8 @@ func make_slice(p *Parser, m *exprModel, t models.Type, args *models.Args, errto
 	err_key := check_value_for_indexing(len_v)
 	if err_key != "" {
 		p.pusherrtok(errtok, err_key)
+	} else if typeIsRef(*t.ComponentType) {
+		p.pusherrtok(errtok, "reference_not_initialized")
 	}
 	// Remove function identifier from model.
 	m.nodes[m.index].nodes[0] = nil

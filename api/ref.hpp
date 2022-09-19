@@ -18,7 +18,9 @@ struct jule_ref {
     T *_alloc{ nil };
     mutable uint_julet *_ref{ nil };
 
-    jule_ref<T>(void) noexcept {}
+    jule_ref<T>(void) noexcept: jule_ref<T>(T()) {}
+
+    jule_ref<T>(std::nullptr_t) noexcept {}
 
     jule_ref<T>(T *_Ptr, uint_julet *_Ref) noexcept {
         this->_alloc = _Ptr;
@@ -64,6 +66,7 @@ struct jule_ref {
         { return; }
         if ( ( this->__drop_ref() ) != __JULEC_REFERENCE_DELTA )
         { return; }
+        std::cout << "deallocated" << std::endl;
         delete this->_ref;
         this->_ref = nil;
         delete this->_alloc;

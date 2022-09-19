@@ -1355,8 +1355,11 @@ func (e *eval) enumerableParts(toks []lex.Token) [][]lex.Token {
 
 func (e *eval) buildArray(parts [][]lex.Token, t Type, errtok lex.Token) (value, iExpr) {
 	if !t.Size.AutoSized {
-		if models.Size(len(parts)) > t.Size.N {
+		n := models.Size(len(parts))
+		if n > t.Size.N {
 			e.p.pusherrtok(errtok, "overflow_limits")
+		} else if n < t.Size.N {
+			e.p.pusherrtok(errtok, "reference_not_initialized")
 		}
 	} else {
 		t.Size.N = models.Size(len(parts))

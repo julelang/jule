@@ -185,7 +185,7 @@ func (s *structure) self_ref_var_type() Type {
 func (s *structure) self_ref_var_str() string {
 	var cpp strings.Builder
 	cpp.WriteString(s.self_ref_var_type().String())
-	cpp.WriteString(" self;")
+	cpp.WriteString(" self{ nil };")
 	return cpp.String()
 }
 

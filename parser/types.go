@@ -115,7 +115,7 @@ func typeIsUnsafePtr(t Type) bool {
 	if t.Id != juletype.Unsafe {
 		return false
 	}
-	return len(t.Kind) - len(tokens.UNSAFE) == 1
+	return len(t.Kind)-len(tokens.UNSAFE) == 1
 }
 
 func typeIsPtr(t Type) bool {
@@ -144,7 +144,7 @@ func typeIsMap(t Type) bool {
 func typeIsFunc(t Type) bool {
 	return t.Id == juletype.Fn &&
 		(strings.HasPrefix(t.Kind, tokens.FN) ||
-		 strings.HasPrefix(t.Kind, tokens.UNSAFE + " " + tokens.FN))
+			strings.HasPrefix(t.Kind, tokens.UNSAFE+" "+tokens.FN))
 }
 
 // Includes single ptr types.
@@ -158,7 +158,12 @@ func typeIsPure(t Type) bool {
 }
 
 func is_valid_type_for_reference(t Type) bool {
-	return !(typeIsTrait(t) || typeIsEnum(t) || typeIsPtr(t) || typeIsRef(t))
+	return !(typeIsTrait(t) ||
+		typeIsEnum(t) ||
+		typeIsPtr(t) ||
+		typeIsRef(t) ||
+		typeIsSlice(t) ||
+		typeIsArray(t))
 }
 
 func type_is_mutable(t Type) bool {

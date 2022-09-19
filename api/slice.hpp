@@ -12,9 +12,9 @@ class slice;
 template<typename _Item_t>
 class slice {
 public:
-    jule_ref<_Item_t> _data;
-    _Item_t *_slice{nil};
-    int_julet _n{0};
+    jule_ref<_Item_t> _data{ nil };
+    _Item_t *_slice{ nil };
+    int_julet _n{ 0 };
 
     slice<_Item_t>(void) noexcept {}
     slice<_Item_t>(const std::nullptr_t) noexcept {}

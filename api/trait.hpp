@@ -12,8 +12,8 @@ struct trait;
 template<typename T>
 struct trait {
 public:
-    jule_ref<T> _data;
-    const char *type_id;
+    jule_ref<T> _data{ nil };
+    const char *type_id { nil };
 
     trait<T>(void) noexcept {}
     trait<T>(std::nullptr_t) noexcept {}
