@@ -404,8 +404,8 @@ func (b *Builder) implStruct(impl *models.Impl, toks []lex.Token) {
 			continue
 		case tokens.Type:
 			impl.Tree = append(impl.Tree, models.Object{
-				Token:  tok,
-				Data: b.Generics(fnToks),
+				Token: tok,
+				Data:  b.Generics(fnToks),
 			})
 			continue
 		}
@@ -853,8 +853,8 @@ func (b *Builder) TypeOrGenerics(toks []lex.Token) models.Object {
 		if tok.Id == tokens.Brace && tok.Kind == tokens.LBRACKET {
 			generics := b.Generics(toks)
 			return models.Object{
-				Token:  tok,
-				Data: generics,
+				Token: tok,
+				Data:  generics,
 			}
 		}
 	}
@@ -862,8 +862,8 @@ func (b *Builder) TypeOrGenerics(toks []lex.Token) models.Object {
 	t.Pub = b.pub
 	b.pub = false
 	return models.Object{
-		Token:  t.Token,
-		Data: t,
+		Token: t.Token,
+		Data:  t,
 	}
 }
 
@@ -875,8 +875,8 @@ func (b *Builder) GlobalVar(toks []lex.Token) {
 	bs := blockStatement{toks: toks}
 	s := b.VarStatement(&bs)
 	b.Tree = append(b.Tree, models.Object{
-		Token:  s.Token,
-		Data: s,
+		Token: s.Token,
+		Data:  s,
 	})
 }
 
@@ -1671,8 +1671,8 @@ func (b *Builder) ExprStatement(bs *blockStatement) models.Statement {
 		Expr: b.Expr(bs.toks),
 	}
 	return models.Statement{
-		Token:  bs.toks[0],
-		Data: expr,
+		Token: bs.toks[0],
+		Data:  expr,
 	}
 }
 
@@ -1917,8 +1917,8 @@ func (b *Builder) RetStatement(toks []lex.Token) models.Statement {
 		ret.Expr = b.Expr(toks[1:])
 	}
 	return models.Statement{
-		Token:  ret.Token,
-		Data: ret,
+		Token: ret.Token,
+		Data:  ret,
 	}
 }
 
@@ -2373,8 +2373,8 @@ func (b *Builder) BreakStatement(toks []lex.Token) models.Statement {
 		}
 	}
 	return models.Statement{
-		Token:  breakAST.Token,
-		Data: breakAST,
+		Token: breakAST.Token,
+		Data:  breakAST,
 	}
 }
 
@@ -2393,8 +2393,8 @@ func (b *Builder) ContinueStatement(toks []lex.Token) models.Statement {
 		}
 	}
 	return models.Statement{
-		Token:  continueAST.Token,
-		Data: continueAST,
+		Token: continueAST.Token,
+		Data:  continueAST,
 	}
 }
 
@@ -2412,7 +2412,7 @@ type exprProcessInfo struct {
 	value            bool
 	singleOperatored bool
 	pushedError      bool
-	brace_n       int
+	brace_n          int
 	toks             []lex.Token
 	i                int
 }
@@ -2479,11 +2479,26 @@ func (b *Builder) exprBracePart(info *exprProcessInfo, tok lex.Token) bool {
 	return false
 }
 
+func (b *Builder) tryTypeExpr(info *exprProcessInfo, tok lex.Token) bool {
+	i := info.i
+	_, ok := b.DataType(info.toks, &i, true, false)
+	if !ok {
+		return false
+	}
+	info.part = append(info.part, info.toks[info.i:i+1]...)
+	info.i += i - info.i
+	return true
+}
+
 func (b *Builder) exprProcesses(toks []lex.Token) [][]lex.Token {
 	var info exprProcessInfo
 	info.toks = toks
 	for ; info.i < len(info.toks); info.i++ {
 		tok := info.toks[info.i]
+		ok := b.tryTypeExpr(&info, tok)
+		if ok {
+			continue
+		}
 		switch tok.Id {
 		case tokens.Comment:
 			continue
