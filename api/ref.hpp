@@ -33,6 +33,17 @@ struct jule_ref {
         this->_alloc = _Ptr;
     }
 
+    jule_ref<T>(const T &_Instance) noexcept {
+        this->_alloc = ( new( std::nothrow ) T );
+        if (!this->_alloc)
+        { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
+        this->_ref = ( new( std::nothrow ) uint_julet );
+        if (!this->_ref)
+        { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
+        *this->_ref = 1;
+        *this->_alloc = _Instance;
+    }
+
     jule_ref<T>(const jule_ref<T> &_Ref) noexcept
     { this->operator=( _Ref ); }
 
