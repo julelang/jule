@@ -2479,26 +2479,11 @@ func (b *Builder) exprBracePart(info *exprProcessInfo, tok lex.Token) bool {
 	return false
 }
 
-func (b *Builder) tryTypeExpr(info *exprProcessInfo, tok lex.Token) bool {
-	i := info.i
-	_, ok := b.DataType(info.toks, &i, true, false)
-	if !ok {
-		return false
-	}
-	info.part = append(info.part, info.toks[info.i:i+1]...)
-	info.i += i - info.i
-	return true
-}
-
 func (b *Builder) exprProcesses(toks []lex.Token) [][]lex.Token {
 	var info exprProcessInfo
 	info.toks = toks
 	for ; info.i < len(info.toks); info.i++ {
 		tok := info.toks[info.i]
-		ok := b.tryTypeExpr(&info, tok)
-		if ok {
-			continue
-		}
 		switch tok.Id {
 		case tokens.Comment:
 			continue

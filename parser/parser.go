@@ -1450,28 +1450,33 @@ func (p *Parser) Var(v Var) *Var {
 	if juleapi.IsIgnoreId(v.Id) {
 		p.pusherrtok(v.Token, "ignore_id")
 	}
+	if v.Type.Id != juletype.Void {
+		t, ok := p.realType(v.Type, true)
+		if ok {
+			v.Type = t
+		} else {
+			v.Type = models.Type{}
+		}
+	}
 	var val value
 	switch t := v.Tag.(type) {
 	case value:
 		val = t
 	default:
 		if v.SetterTok.Id != tokens.NA {
+			p.eval.type_prefix = &v.Type
 			val, v.Expr.Model = p.evalExpr(v.Expr)
 		}
 	}
 	if v.Type.Id != juletype.Void {
-		t, ok := p.realType(v.Type, true)
-		if ok {
-			v.Type = t
-			if v.SetterTok.Id != tokens.NA {
-				assign_checker{
-					p:                p,
-					t:                v.Type,
-					v:                val,
-					errtok:           v.Token,
-					not_allow_assign: typeIsRef(t),
-				}.check()
-			}
+		if v.SetterTok.Id != tokens.NA {
+			assign_checker{
+				p:                p,
+				t:                v.Type,
+				v:                val,
+				errtok:           v.Token,
+				not_allow_assign: typeIsRef(v.Type),
+			}.check()
 		}
 	} else {
 		if v.SetterTok.Id == tokens.NA {
@@ -2409,6 +2414,7 @@ func (p *Parser) pushGenericByArg(f *Func, pair *paramMapPair, args *models.Args
 }
 
 func (p *Parser) parseArg(f *Func, pair *paramMapPair, args *models.Args, variadiced *bool) {
+	p.eval.type_prefix = &pair.param.Type
 	value, model := p.evalExpr(pair.arg.Expr)
 	pair.arg.Expr.Model = model
 	if f.FindAttribute(jule.Attribute_CDef) == nil && !value.variadic &&
