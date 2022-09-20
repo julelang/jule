@@ -1147,7 +1147,16 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 			break
 		}
 	}
-	if len(exprToks) == 0 || brace_n > 0 {
+	switch {
+	case len(exprToks) == 0:
+		if e.type_prefix != nil {
+			switch {
+			case typeIsArray(*e.type_prefix) || typeIsSlice(*e.type_prefix):
+				return e.enumerable(toks, *e.type_prefix, m)
+			}
+		}
+		fallthrough
+	case len(exprToks) == 0 || brace_n > 0:
 		e.pusherrtok(errTok, "invalid_syntax")
 		return
 	}
@@ -1542,8 +1551,6 @@ func (e *eval) braceRange(toks []lex.Token, m *exprModel) (v value) {
 	case len(exprToks) == 0:
 		if e.type_prefix != nil {
 			switch {
-			case typeIsArray(*e.type_prefix) || typeIsSlice(*e.type_prefix):
-				return e.enumerable(toks, *e.type_prefix, m)
 			case typeIsStruct(*e.type_prefix):
 				s := e.type_prefix.Tag.(*structure)
 				return e.p.callStructConstructor(s, toks, m)
