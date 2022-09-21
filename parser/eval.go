@@ -1384,12 +1384,12 @@ func (e *eval) enumerableParts(toks []lex.Token) [][]lex.Token {
 	return parts
 }
 
-func (e *eval) buildArray(parts [][]lex.Token, t Type, errtok lex.Token) (value, iExpr) {
+func (e *eval) build_array(parts [][]lex.Token, t Type, errtok lex.Token) (value, iExpr) {
 	if !t.Size.AutoSized {
 		n := models.Size(len(parts))
 		if n > t.Size.N {
 			e.p.pusherrtok(errtok, "overflow_limits")
-		} else if n < t.Size.N {
+		} else if typeIsRef(*t.ComponentType) && n < t.Size.N {
 			e.p.pusherrtok(errtok, "reference_not_initialized")
 		}
 	} else {
@@ -1531,15 +1531,16 @@ func (e *eval) enumerable(exprToks []lex.Token, t Type, m *exprModel) (v value) 
 	if !ok {
 		return
 	}
+	errtok := exprToks[0]
 	switch {
 	case typeIsArray(t):
-		v, model = e.buildArray(e.enumerableParts(exprToks), t, exprToks[0])
+		v, model = e.build_array(e.enumerableParts(exprToks), t, errtok)
 	case typeIsSlice(t):
-		v, model = e.build_slice_explicit(e.enumerableParts(exprToks), t, exprToks[0])
+		v, model = e.build_slice_explicit(e.enumerableParts(exprToks), t, errtok)
 	case typeIsMap(t):
-		v, model = e.buildMap(e.enumerableParts(exprToks), t, exprToks[0])
+		v, model = e.buildMap(e.enumerableParts(exprToks), t, errtok)
 	default:
-		e.pusherrtok(exprToks[0], "invalid_type_source")
+		e.pusherrtok(errtok, "invalid_type_source")
 		return
 	}
 	m.appendSubNode(model)
@@ -1603,8 +1604,11 @@ func (e *eval) braceRange(toks []lex.Token, m *exprModel) (v value) {
 		if e.type_prefix != nil {
 			switch {
 			case typeIsStruct(*e.type_prefix):
+				prefix := e.type_prefix
 				s := e.type_prefix.Tag.(*structure)
-				return e.p.callStructConstructor(s, toks, m)
+				v = e.p.callStructConstructor(s, toks, m)
+				e.type_prefix = prefix
+				return
 			}
 		}
 		fallthrough
@@ -1625,24 +1629,6 @@ func (e *eval) braceRange(toks []lex.Token, m *exprModel) (v value) {
 		return e.anonymousFn(toks, m)
 	case tokens.Id:
 		return e.typeId(toks, m)
-	case tokens.Brace:
-		switch exprToks[0].Kind {
-		case tokens.LBRACKET:
-			b := ast.NewBuilder(nil)
-			i := 0
-			t, ok := b.DataType(exprToks, &i, true, true)
-			b.Wait()
-			if !ok {
-				e.p.pusherrs(b.Errors...)
-				return
-			} else if i+1 < len(exprToks) {
-				e.pusherrtok(toks[i+1], "invalid_syntax")
-			}
-			exprToks = toks[len(exprToks):]
-			return e.enumerable(exprToks, t, m)
-		default:
-			e.pusherrtok(exprToks[0], "invalid_syntax")
-		}
 	default:
 		e.pusherrtok(exprToks[0], "invalid_syntax")
 	}

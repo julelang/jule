@@ -66,7 +66,6 @@ struct jule_ref {
         { return; }
         if ( ( this->__drop_ref() ) != __JULEC_REFERENCE_DELTA )
         { return; }
-        std::cout << "deallocated" << std::endl;
         delete this->_ref;
         this->_ref = nil;
         delete this->_alloc;

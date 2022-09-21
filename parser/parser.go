@@ -1469,6 +1469,9 @@ func (p *Parser) Var(v Var) *Var {
 	}
 	if v.Type.Id != juletype.Void {
 		if v.SetterTok.Id != tokens.NA {
+			if v.Type.Size.AutoSized && v.Type.Id == juletype.Array {
+				v.Type.Size = val.data.Type.Size
+			}
 			assign_checker{
 				p:                p,
 				t:                v.Type,
