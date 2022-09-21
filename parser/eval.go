@@ -416,6 +416,25 @@ func (e *eval) process(toks []lex.Token, m *exprModel) (v value) {
 		if typeIsVoid(v.data.Type) {
 			v.data.Type.Kind = juletype.TypeMap[juletype.Void]
 			v.constExpr = false
+		} else if v.constExpr && typeIsPure(v.data.Type) && isConstExpression(v.data.Value) {
+			switch v.expr.(type) {
+			case int64:
+				dt := Type{
+					Id:   juletype.Int,
+					Kind: juletype.TypeMap[juletype.Int],
+				}
+				if integerAssignable(dt.Id, v) {
+					v.data.Type = dt
+				}
+			case uint64:
+				dt := Type{
+					Id:   juletype.UInt,
+					Kind: juletype.TypeMap[juletype.UInt],
+				}
+				if integerAssignable(dt.Id, v) {
+					v.data.Type = dt
+				}
+			}
 		}
 	}()
 	v.constExpr = true

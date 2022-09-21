@@ -1484,26 +1484,6 @@ func (p *Parser) Var(v Var) *Var {
 			p.eval.has_error = p.eval.has_error || val.data.Value == ""
 			v.Type = val.data.Type
 			p.check_valid_init_expr(v.Mutable, val, v.SetterTok)
-			if val.constExpr && typeIsPure(v.Type) && isConstExpression(val.data.Value) {
-				switch val.expr.(type) {
-				case int64:
-					dt := Type{
-						Id:   juletype.Int,
-						Kind: juletype.TypeMap[juletype.Int],
-					}
-					if integerAssignable(dt.Id, val) {
-						v.Type = dt
-					}
-				case uint64:
-					dt := Type{
-						Id:   juletype.UInt,
-						Kind: juletype.TypeMap[juletype.UInt],
-					}
-					if integerAssignable(dt.Id, val) {
-						v.Type = dt
-					}
-				}
-			}
 			p.checkValidityForAutoType(v.Type, v.SetterTok)
 		}
 	}
