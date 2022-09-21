@@ -1155,7 +1155,10 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 				return e.enumerable(toks, *e.type_prefix, m)
 			}
 		}
-		fallthrough
+		var model iExpr
+		v, model = e.build_slice_implicit(e.enumerableParts(toks), toks[0])
+		m.appendSubNode(model)
+		return v
 	case len(exprToks) == 0 || brace_n > 0:
 		e.pusherrtok(errTok, "invalid_syntax")
 		return
@@ -1398,7 +1401,36 @@ func (e *eval) buildArray(parts [][]lex.Token, t Type, errtok lex.Token) (value,
 	return v, model
 }
 
-func (e *eval) buildSlice(parts [][]lex.Token, t Type, errtok lex.Token) (value, iExpr) {
+func (e *eval) build_slice_implicit(parts [][]lex.Token, errtok lex.Token) (value, iExpr) {
+	if len(parts) == 0 {
+		e.pusherrtok(errtok, "dynamic_type_annotation_failed")
+		return value{}, nil
+	}
+	v := value{}
+	model := sliceExpr{}
+	partVal, expModel := e.toks(parts[0])
+	model.expr = append(model.expr, expModel)
+	model.dataType = Type{
+		Id: juletype.Slice,
+		Kind: jule.Prefix_Slice + partVal.data.Type.Kind,
+	}
+	model.dataType.ComponentType = new(Type)
+	*model.dataType.ComponentType = partVal.data.Type
+	v.data.Type = model.dataType
+	for _, part := range parts[1:] {
+		partVal, expModel := e.toks(part)
+		model.expr = append(model.expr, expModel)
+		assign_checker{
+			p:      e.p,
+			t:      *model.dataType.ComponentType,
+			v:      partVal,
+			errtok: part[0],
+		}.check()
+	}
+	return v, model
+}
+
+func (e *eval) build_slice_explicit(parts [][]lex.Token, t Type, errtok lex.Token) (value, iExpr) {
 	old_type := e.type_prefix
 	e.type_prefix = t.ComponentType
 	defer func() { e.type_prefix = old_type }()
@@ -1484,7 +1516,7 @@ func (e *eval) enumerable(exprToks []lex.Token, t Type, m *exprModel) (v value) 
 	case typeIsArray(t):
 		v, model = e.buildArray(e.enumerableParts(exprToks), t, exprToks[0])
 	case typeIsSlice(t):
-		v, model = e.buildSlice(e.enumerableParts(exprToks), t, exprToks[0])
+		v, model = e.build_slice_explicit(e.enumerableParts(exprToks), t, exprToks[0])
 	case typeIsMap(t):
 		v, model = e.buildMap(e.enumerableParts(exprToks), t, exprToks[0])
 	default:

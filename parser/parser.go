@@ -2429,7 +2429,7 @@ func (p *Parser) parseArg(f *Func, pair *paramMapPair, args *models.Args, variad
 		typeHasGenerics(f.Generics, pair.param.Type) {
 		ok := p.pushGenericByArg(f, pair, args, value.data.Type)
 		if !ok {
-			p.pusherrtok(pair.arg.Token, "dynamic_generic_annotation_failed")
+			p.pusherrtok(pair.arg.Token, "dynamic_type_annotation_failed")
 		}
 		return
 	}
