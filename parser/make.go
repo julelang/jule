@@ -15,7 +15,7 @@ func make_slice(p *Parser, m *exprModel, t models.Type, args *models.Args, errto
 		p.pusherrtok(errtok, "argument_overflow")
 	}
 	len_expr := args.Src[1].Expr
-	len_v, len_expr_model := p.evalExpr(len_expr)
+	len_v, len_expr_model := p.evalExpr(len_expr, nil)
 	err_key := check_value_for_indexing(len_v)
 	if err_key != "" {
 		p.pusherrtok(errtok, err_key)

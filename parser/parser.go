@@ -838,7 +838,7 @@ func (p *Parser) parse_enum_items_str(e *Enum) {
 			}
 		}
 		if item.Expr.Tokens != nil {
-			val, model := p.evalExpr(item.Expr)
+			val, model := p.evalExpr(item.Expr, nil)
 			if !val.constExpr && !p.eval.has_error {
 				p.pusherrtok(item.Expr.Tokens[0], "expr_not_const")
 			}
@@ -888,7 +888,7 @@ func (p *Parser) parse_enum_items_integer(e *Enum) {
 			}
 		}
 		if item.Expr.Tokens != nil {
-			val, model := p.evalExpr(item.Expr)
+			val, model := p.evalExpr(item.Expr, nil)
 			if !val.constExpr && !p.eval.has_error {
 				p.pusherrtok(item.Expr.Tokens[0], "expr_not_const")
 			}
@@ -1464,8 +1464,7 @@ func (p *Parser) Var(v Var) *Var {
 		val = t
 	default:
 		if v.SetterTok.Id != tokens.NA {
-			p.eval.type_prefix = &v.Type
-			val, v.Expr.Model = p.evalExpr(v.Expr)
+			val, v.Expr.Model = p.evalExpr(v.Expr, &v.Type)
 		}
 	}
 	if v.Type.Id != juletype.Void {
@@ -1812,7 +1811,7 @@ func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) {
 		dt.Original = nil
 		dt.Pure = true
 	}
-	v, model := p.evalExpr(param.Default)
+	v, model := p.evalExpr(param.Default, nil)
 	param.Default.Model = model
 	p.checkArgType(param, v, param.Token)
 }
@@ -2414,8 +2413,7 @@ func (p *Parser) pushGenericByArg(f *Func, pair *paramMapPair, args *models.Args
 }
 
 func (p *Parser) parseArg(f *Func, pair *paramMapPair, args *models.Args, variadiced *bool) {
-	p.eval.type_prefix = &pair.param.Type
-	value, model := p.evalExpr(pair.arg.Expr)
+	value, model := p.evalExpr(pair.arg.Expr, &pair.param.Type)
 	pair.arg.Expr.Model = model
 	if f.FindAttribute(jule.Attribute_CDef) == nil && !value.variadic &&
 		typeIsPure(pair.param.Type) && juletype.IsNumeric(pair.param.Type.Id) {
@@ -2640,7 +2638,7 @@ func (p *Parser) recoverFuncExprStatement(s *models.ExprStatement) {
 	} else if len(args.Src) > 1 {
 		p.pusherrtok(errtok, "argument_overflow")
 	}
-	v, _ := p.evalExpr(args.Src[0].Expr)
+	v, _ := p.evalExpr(args.Src[0].Expr, nil)
 	if v.data.Type.Kind != handleParam.Type.Kind {
 		p.eval.pusherrtok(errtok, "incompatible_types",
 			handleParam.Type.Kind, v.data.Type.Kind)
@@ -2688,14 +2686,14 @@ func (p *Parser) exprStatement(s *models.ExprStatement, recover bool) {
 		}
 	}
 	if s.Expr.Model == nil {
-		_, s.Expr.Model = p.evalExpr(s.Expr)
+		_, s.Expr.Model = p.evalExpr(s.Expr, nil)
 	}
 }
 
 func (p *Parser) parseCase(c *models.Case, t Type) {
 	for i := range c.Exprs {
 		expr := &c.Exprs[i]
-		value, model := p.evalExpr(*expr)
+		value, model := p.evalExpr(*expr, nil)
 		expr.Model = model
 		assign_checker{
 			p:      p,
@@ -2718,7 +2716,7 @@ func (p *Parser) cases(m *models.Match, t Type) {
 
 func (p *Parser) matchcase(t *models.Match) {
 	if len(t.Expr.Processes) > 0 {
-		value, model := p.evalExpr(t.Expr)
+		value, model := p.evalExpr(t.Expr, nil)
 		t.Expr.Model = model
 		t.ExprType = value.data.Type
 	} else {
@@ -2962,13 +2960,13 @@ func (p *Parser) varStatement(v *Var, noParse bool) {
 func (p *Parser) deferredCall(d *models.Defer) {
 	m := new(exprModel)
 	m.nodes = make([]exprBuildNode, 1)
-	_, d.Expr.Model = p.evalExpr(d.Expr)
+	_, d.Expr.Model = p.evalExpr(d.Expr, nil)
 }
 
 func (p *Parser) concurrentCall(cc *models.ConcurrentCall) {
 	m := new(exprModel)
 	m.nodes = make([]exprBuildNode, 1)
-	_, cc.Expr.Model = p.evalExpr(cc.Expr)
+	_, cc.Expr.Model = p.evalExpr(cc.Expr, nil)
 }
 
 func (p *Parser) assignment(left value, errtok lex.Token) bool {
@@ -3001,7 +2999,7 @@ func (p *Parser) singleAssign(assign *models.Assign, exprs []value) {
 	if len(left.Tokens) == 1 && juleapi.IsIgnoreId(left.Tokens[0].Kind) {
 		return
 	}
-	leftExpr, model := p.evalExpr(*left)
+	leftExpr, model := p.evalExpr(*left, nil)
 	left.Model = model
 	if !p.assignment(leftExpr, assign.Setter) {
 		return
@@ -3030,7 +3028,7 @@ func (p *Parser) singleAssign(assign *models.Assign, exprs []value) {
 func (p *Parser) assignExprs(vsAST *models.Assign) []value {
 	vals := make([]value, len(vsAST.Right))
 	for i, expr := range vsAST.Right {
-		val, model := p.evalExpr(expr)
+		val, model := p.evalExpr(expr, nil)
 		vsAST.Right[i].Model = model
 		vals[i] = val
 	}
@@ -3075,7 +3073,7 @@ func (p *Parser) multiAssign(assign *models.Assign, right []value) {
 			if left.Ignore {
 				continue
 			}
-			leftExpr, model := p.evalExpr(left.Expr)
+			leftExpr, model := p.evalExpr(left.Expr, nil)
 			left.Expr.Model = model
 			if !p.assignment(leftExpr, assign.Setter) {
 				return
@@ -3105,7 +3103,7 @@ func (p *Parser) postfix(assign *models.Assign, exprs []value) {
 		return
 	}
 	left := &assign.Left[0]
-	val, model := p.evalExpr(left.Expr)
+	val, model := p.evalExpr(left.Expr, nil)
 	left.Expr.Model = model
 	_ = p.assignment(val, assign.Setter)
 	if typeIsExplicitPtr(val.data.Type) {
@@ -3158,7 +3156,7 @@ func (p *Parser) assign(assign *models.Assign) {
 
 func (p *Parser) whileProfile(iter *models.Iter) {
 	profile := iter.Profile.(models.IterWhile)
-	val, model := p.evalExpr(profile.Expr)
+	val, model := p.evalExpr(profile.Expr, nil)
 	profile.Expr.Model = model
 	iter.Profile = profile
 	if !p.eval.has_error && val.data.Value != "" && !isBoolExpr(val) {
@@ -3169,7 +3167,7 @@ func (p *Parser) whileProfile(iter *models.Iter) {
 
 func (p *Parser) foreachProfile(iter *models.Iter) {
 	profile := iter.Profile.(models.IterForeach)
-	val, model := p.evalExpr(profile.Expr)
+	val, model := p.evalExpr(profile.Expr, nil)
 	profile.Expr.Model = model
 	profile.ExprType = val.data.Type
 	if !p.eval.has_error && val.data.Value != "" && !isForeachIterExpr(val) {
@@ -3196,7 +3194,7 @@ func (p *Parser) forProfile(iter *models.Iter) {
 		_ = p.statement(&profile.Once, false)
 	}
 	if len(profile.Condition.Processes) > 0 {
-		val, model := p.evalExpr(profile.Condition)
+		val, model := p.evalExpr(profile.Condition, nil)
 		profile.Condition.Model = model
 		assign_checker{
 			p:      p,
@@ -3233,7 +3231,7 @@ func (p *Parser) iter(iter *models.Iter) {
 }
 
 func (p *Parser) ifExpr(ifast *models.If, i *int, statements []models.Statement) {
-	val, model := p.evalExpr(ifast.Expr)
+	val, model := p.evalExpr(ifast.Expr, nil)
 	ifast.Expr.Model = model
 	statement := statements[*i]
 	if !p.eval.has_error && val.data.Value != "" && !isBoolExpr(val) {
@@ -3252,7 +3250,7 @@ node:
 	statement = statements[*i]
 	switch t := statement.Data.(type) {
 	case models.ElseIf:
-		val, model := p.evalExpr(t.Expr)
+		val, model := p.evalExpr(t.Expr, nil)
 		t.Expr.Model = model
 		if !p.eval.has_error && val.data.Value != "" && !isBoolExpr(val) {
 			p.pusherrtok(t.Token, "if_require_bool_expr")
@@ -3557,7 +3555,7 @@ func (p *Parser) typeSourceIsArrayType(t *Type) (ok bool) {
 	if t.Size.AutoSized || t.Size.Expr.Model != nil {
 		return
 	}
-	val, model := p.evalExpr(t.Size.Expr)
+	val, model := p.evalExpr(t.Size.Expr, nil)
 	t.Size.Expr.Model = model
 	if val.constExpr {
 		t.Size.N = models.Size(tonumu(val.expr))
@@ -3745,12 +3743,14 @@ func (p *Parser) checkType(real, check Type, ignoreAny, allow_assign bool, errTo
 	}
 }
 
-func (p *Parser) evalExpr(expr Expr) (value, iExpr) {
+func (p *Parser) evalExpr(expr Expr, prefix *models.Type) (value, iExpr) {
 	p.eval.has_error = false
+	p.eval.type_prefix = prefix
 	return p.eval.expr(expr)
 }
 
 func (p *Parser) evalToks(toks []lex.Token) (value, iExpr) {
 	p.eval.has_error = false
+	p.eval.type_prefix = nil
 	return p.eval.toks(toks)
 }
