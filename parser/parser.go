@@ -2975,60 +2975,81 @@ func (p *Parser) assignment(left value, errtok lex.Token) bool {
 	return state
 }
 
-func (p *Parser) singleAssign(assign *models.Assign, exprs []value) {
-	right := &assign.Right[0]
-	val := exprs[0]
-	left := &assign.Left[0].Expr
-	if len(left.Tokens) == 1 && juleapi.IsIgnoreId(left.Tokens[0].Kind) {
+func (p *Parser) singleAssign(assign *models.Assign, l, r []value) {
+	left := l[0]
+	switch {
+	case juleapi.IsIgnoreId(left.data.Value):
+		return
+	case !p.assignment(left, assign.Setter):
 		return
 	}
-	leftExpr, model := p.evalExpr(*left, nil)
-	left.Model = model
-	if !p.assignment(leftExpr, assign.Setter) {
-		return
-	}
-	if assign.Setter.Kind != tokens.EQUAL && !isConstExpression(val.data.Value) {
+	right := r[0]
+	if assign.Setter.Kind != tokens.EQUAL && !isConstExpression(right.data.Value) {
 		assign.Setter.Kind = assign.Setter.Kind[:len(assign.Setter.Kind)-1]
 		solver := solver{
 			p:         p,
-			left:      left.Tokens,
-			left_val:  leftExpr,
-			right:     right.Tokens,
-			right_val: val,
+			left:      assign.Left[0].Expr.Tokens,
+			left_val:  left,
+			right:     assign.Right[0].Tokens,
+			right_val: right,
 			operator:  assign.Setter,
 		}
-		val = solver.solve()
+		right = solver.solve()
 		assign.Setter.Kind += tokens.EQUAL
 	}
 	assign_checker{
 		p:      p,
-		t:      leftExpr.data.Type,
-		v:      val,
+		t:      left.data.Type,
+		v:      right,
 		errtok: assign.Setter,
 	}.check()
 }
 
-func (p *Parser) assignExprs(vsAST *models.Assign) []value {
-	vals := make([]value, len(vsAST.Right))
-	for i, expr := range vsAST.Right {
-		val, model := p.evalExpr(expr, nil)
-		vsAST.Right[i].Model = model
-		vals[i] = val
+func (p *Parser) assignExprs(vsAST *models.Assign) (l []value, r []value) {
+	l = make([]value, len(vsAST.Left))
+	r = make([]value, len(vsAST.Right))
+	n := len(l)
+	if n < len(r) {
+		n = len(r)
 	}
-	return vals
+	for i := 0; i < n; i++ {
+		var r_type *Type = nil
+		if i < len(l) {
+			left := &vsAST.Left[i]
+			if !left.Var.New && !(len(left.Expr.Tokens) == 1 &&
+				juleapi.IsIgnoreId(left.Expr.Tokens[0].Kind)) {
+				v, model := p.evalExpr(left.Expr, nil)
+				left.Expr.Model = model
+				l[i] = v
+				r_type = &v.data.Type
+			} else {
+				l[i].data.Value = juleapi.Ignore
+			}
+		}
+		if i < len(r) {
+			left := &vsAST.Right[i]
+			v, model := p.evalExpr(*left, r_type)
+			left.Model = model
+			r[i] = v
+		}
+	}
+	return
 }
 
-func (p *Parser) funcMultiAssign(vsAST *models.Assign, funcVal value) {
-	types := funcVal.data.Type.Tag.([]Type)
-	if len(types) != len(vsAST.Left) {
+func (p *Parser) funcMultiAssign(vsAST *models.Assign, l, r []value) {
+	types := r[0].data.Type.Tag.([]Type)
+	if len(types) > len(vsAST.Left) {
 		p.pusherrtok(vsAST.Setter, "missing_multi_assign_identifiers")
 		return
+	} else if len(types) < len(vsAST.Left) {
+		p.pusherrtok(vsAST.Setter, "overflow_multi_assign_identifiers")
+		return
 	}
-	vals := make([]value, len(types))
+	rights := make([]value, len(types))
 	for i, t := range types {
-		vals[i] = value{data: models.Data{Token: t.Token, Type: t}}
+		rights[i] = value{data: models.Data{Token: t.Token, Type: t}}
 	}
-	p.multiAssign(vsAST, vals)
+	p.multiAssign(vsAST, l, rights)
 }
 
 func (p *Parser) check_valid_init_expr(left_mutable bool, right value, errtok lex.Token) {
@@ -3047,17 +3068,16 @@ func (p *Parser) check_valid_init_expr(left_mutable bool, right value, errtok le
 	_ = checker.check_validity()
 }
 
-func (p *Parser) multiAssign(assign *models.Assign, right []value) {
+func (p *Parser) multiAssign(assign *models.Assign, l, r []value) {
 	for i := range assign.Left {
 		left := &assign.Left[i]
 		left.Ignore = juleapi.IsIgnoreId(left.Var.Id)
-		right := right[i]
+		right := r[i]
 		if !left.Var.New {
 			if left.Ignore {
 				continue
 			}
-			leftExpr, model := p.evalExpr(left.Expr, nil)
-			left.Expr.Model = model
+			leftExpr := l[i]
 			if !p.assignment(leftExpr, assign.Setter) {
 				return
 			}
@@ -3080,61 +3100,60 @@ func (p *Parser) unsafe_allowed() bool {
 		(p.nodeBlock != nil && p.nodeBlock.IsUnsafe)
 }
 
-func (p *Parser) postfix(assign *models.Assign, exprs []value) {
-	if len(exprs) > 0 {
+func (p *Parser) postfix(assign *models.Assign, l, r []value) {
+	if len(r) > 0 {
 		p.pusherrtok(assign.Setter, "invalid_syntax")
 		return
 	}
-	left := &assign.Left[0]
-	val, model := p.evalExpr(left.Expr, nil)
-	left.Expr.Model = model
-	_ = p.assignment(val, assign.Setter)
-	if typeIsExplicitPtr(val.data.Type) {
+	left := l[0]
+	_ = p.assignment(left, assign.Setter)
+	if typeIsExplicitPtr(left.data.Type) {
 		if !p.unsafe_allowed() {
-			p.pusherrtok(left.Expr.Tokens[0], "unsafe_behavior_at_out_of_unsafe_scope")
+			p.pusherrtok(assign.Left[0].Expr.Tokens[0], "unsafe_behavior_at_out_of_unsafe_scope")
 		}
 		return
 	}
-	checkType := val.data.Type
+	checkType := left.data.Type
 	if typeIsRef(checkType) {
 		checkType = un_ptr_or_ref_type(checkType)
 	}
 	if typeIsPure(checkType) && juletype.IsNumeric(checkType.Id) {
 		return
 	}
-	p.pusherrtok(assign.Setter, "operator_not_for_juletype", assign.Setter.Kind, val.data.Type.Kind)
+	p.pusherrtok(assign.Setter, "operator_not_for_juletype", assign.Setter.Kind, left.data.Type.Kind)
 }
 
 func (p *Parser) assign(assign *models.Assign) {
-	leftLength := len(assign.Left)
-	rightLength := len(assign.Right)
-	exprs := p.assignExprs(assign)
-	if rightLength == 0 && ast.IsPostfixOperator(assign.Setter.Kind) { // Postfix
-		p.postfix(assign, exprs)
+	ln := len(assign.Left)
+	rn := len(assign.Right)
+	l, r := p.assignExprs(assign)
+	switch {
+	case rn == 0 && ast.IsPostfixOperator(assign.Setter.Kind):
+		p.postfix(assign, l, r)
 		return
-	} else if leftLength == 1 && !assign.Left[0].Var.New {
-		p.singleAssign(assign, exprs)
+	case ln == 1 && !assign.Left[0].Var.New:
+		p.singleAssign(assign, l, r)
 		return
-	} else if assign.Setter.Kind != tokens.EQUAL {
+	case assign.Setter.Kind != tokens.EQUAL:
 		p.pusherrtok(assign.Setter, "invalid_syntax")
 		return
-	} else if rightLength == 1 {
-		expr := exprs[0]
-		if expr.data.Type.MultiTyped {
+	case rn == 1:
+		right := r[0]
+		if right.data.Type.MultiTyped {
 			assign.MultipleRet = true
-			p.funcMultiAssign(assign, expr)
+			p.funcMultiAssign(assign, l, r)
 			return
 		}
 	}
 	switch {
-	case leftLength > rightLength:
+	case ln > rn:
 		p.pusherrtok(assign.Setter, "overflow_multi_assign_identifiers")
 		return
-	case leftLength < rightLength:
+	case ln < rn:
 		p.pusherrtok(assign.Setter, "missing_multi_assign_identifiers")
 		return
 	}
-	p.multiAssign(assign, exprs)
+	p.multiAssign(assign, l, r)
 }
 
 func (p *Parser) whileProfile(iter *models.Iter) {
