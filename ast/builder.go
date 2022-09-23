@@ -797,16 +797,19 @@ func (b *Builder) Func(toks []lex.Token, method, anon, prototype bool) (f models
 			return
 		}
 		toks = b.nextBuilderStatement()
+		i = 0
 	}
 	blockToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
-	if blockToks == nil {
+	if blockToks != nil {
+		f.Block = b.Block(blockToks)
+		f.Block.IsUnsafe = f.IsUnsafe
+		if i < len(toks) {
+			b.pusherr(toks[i], "invalid_syntax")
+		}
+	} else {
 		b.pusherr(f.Token, "body_not_exist")
-		return
-	} else if i < len(toks) {
-		b.pusherr(toks[i], "invalid_syntax")
+		b.Tokens = append(toks, b.Tokens...)
 	}
-	f.Block = b.Block(blockToks)
-	f.Block.IsUnsafe = f.IsUnsafe
 	return
 }
 
