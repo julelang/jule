@@ -130,9 +130,15 @@ func (p *Parser) CppLinks(out chan string) {
 	var cpp strings.Builder
 	for _, use := range used {
 		if use.cppLink {
-			cpp.WriteString(`#include "`)
-			cpp.WriteString(use.Path)
-			cpp.WriteString("\"\n")
+			cpp.WriteString("#include ")
+			if is_sys_header_path(use.Path) {
+				cpp.WriteString(use.Path)
+			} else {
+				cpp.WriteByte('"')
+				cpp.WriteString(use.Path)
+				cpp.WriteByte('"')
+			}
+			cpp.WriteByte('\n')
 		}
 	}
 	out <- cpp.String()
@@ -379,7 +385,14 @@ func getTree(toks []lex.Token) ([]models.Object, []julelog.CompilerLog) {
 	return b.Tree, b.Errors
 }
 
+func is_sys_header_path(p string) bool {
+	return p[0] == '<' && p[len(p)-1] == '>'
+}
+
 func (p *Parser) checkCppUsePath(use *models.UseDecl) bool {
+	if is_sys_header_path(use.Path) {
+		return true
+	}
 	ext := filepath.Ext(use.Path)
 	if !juleapi.IsValidHeader(ext) {
 		p.pusherrtok(use.Token, "invalid_header_ext", ext)
