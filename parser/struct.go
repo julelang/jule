@@ -149,6 +149,14 @@ func (s *structure) cppConstructor() string {
 	return cpp.String()
 }
 
+func (s *structure) cpp_destructor() string {
+	var cpp strings.Builder
+	cpp.WriteByte('~')
+	cpp.WriteString(s.OutId())
+	cpp.WriteString("(void) noexcept { /* heap allocations managed by traits or references */ this->self._ref = nil; }")
+	return cpp.String()
+}
+
 func (s *structure) cppTraits() string {
 	if len(*s.Traits) == 0 {
 		return ""
@@ -213,6 +221,9 @@ func (s *structure) prototype() string {
 		cpp.WriteString(s.cppConstructor())
 		cpp.WriteString("\n\n")
 	}
+	cpp.WriteString(models.IndentString())
+	cpp.WriteString(s.cpp_destructor())
+	cpp.WriteString("\n\n")
 	cpp.WriteString(models.IndentString())
 	cpp.WriteString(outid)
 	cpp.WriteString("(void) noexcept { ")

@@ -31,6 +31,7 @@ public:
     template<typename TT>
     trait<T>(const jule_ref<TT> &_Ref) noexcept {
         this->_data = jule_ref<T>( ( (T*)(_Ref._alloc) ), _Ref._ref );
+        this->_data.__add_ref();
         this->type_id = typeid( _Ref ).name();
     }
 

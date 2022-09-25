@@ -190,8 +190,9 @@ inline jule_ref<T> __julec_new_structure(T *_Ptr) {
     _Ptr->self._ref = new( std::nothrow ) uint_julet;
     if (!_Ptr->self._ref)
     { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
-    *_Ptr->self._ref = 1;
-    return _Ptr->self;
+    // Initialize with zero because return reference is counts 1 reference.
+    *_Ptr->self._ref = 0; // ( __JULEC_REFERENCE_DELTA - __JULEC_REFERENCE_DELTA );
+    return ( _Ptr->self );
 }
 
 template<typename _Obj_t>

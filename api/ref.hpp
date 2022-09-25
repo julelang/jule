@@ -42,7 +42,7 @@ struct jule_ref {
         this->_ref = ( new( std::nothrow ) uint_julet );
         if (!this->_ref)
         { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
-        *this->_ref = 1;
+        *this->_ref = __JULEC_REFERENCE_DELTA;
         *this->_alloc = _Instance;
     }
 
