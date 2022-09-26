@@ -2310,7 +2310,7 @@ func (p *Parser) parseArgs(f *Func, args *models.Args, m *exprModel, errTok lex.
 }
 
 func hasExpr(expr Expr) bool {
-	return len(expr.Processes) > 0 || expr.Model != nil
+	return len(expr.Tokens) > 0 || expr.Model != nil
 }
 
 func paramHasDefaultArg(param *Param) bool {
@@ -2624,8 +2624,8 @@ func (p *Parser) checkBlock(b *models.Block) {
 }
 
 func (p *Parser) recoverFuncExprStatement(s *models.ExprStatement) {
-	errtok := s.Expr.Processes[0][0]
-	callToks := s.Expr.Processes[0][1:]
+	errtok := s.Expr.Tokens[0]
+	callToks := s.Expr.Tokens[1:]
 	args := p.getArgs(callToks, false)
 	handleParam := recoverFunc.Ast.Params[0]
 	if len(args.Src) == 0 {
@@ -2665,9 +2665,9 @@ func (p *Parser) recoverFuncExprStatement(s *models.ExprStatement) {
 }
 
 func (p *Parser) exprStatement(s *models.ExprStatement, recover bool) {
-	if s.Expr.Processes != nil && !isOperator(s.Expr.Processes[0]) {
-		process := s.Expr.Processes[0]
-		tok := process[0]
+	if s.Expr.IsNotBinop() {
+		expr := s.Expr.Op.(models.BinopExpr)
+		tok := expr.Tokens[0]
 		if tok.Id == tokens.Id && tok.Kind == recoverFunc.Ast.Id {
 			if ast.IsFuncCall(s.Expr.Tokens) != nil {
 				if !recover {
@@ -2711,7 +2711,7 @@ func (p *Parser) cases(m *models.Match, t Type) {
 }
 
 func (p *Parser) matchcase(t *models.Match) {
-	if len(t.Expr.Processes) > 0 {
+	if !t.Expr.IsEmpty() {
 		value, model := p.evalExpr(t.Expr, nil)
 		t.Expr.Model = model
 		t.ExprType = value.data.Type
@@ -3001,11 +3001,9 @@ func (p *Parser) singleAssign(assign *models.Assign, l, r []value) {
 		assign.Setter.Kind = assign.Setter.Kind[:len(assign.Setter.Kind)-1]
 		solver := solver{
 			p:         p,
-			left:      assign.Left[0].Expr.Tokens,
-			left_val:  left,
-			right:     assign.Right[0].Tokens,
-			right_val: right,
-			operator:  assign.Setter,
+			l:  left,
+			r: right,
+			op:  assign.Setter,
 		}
 		right = solver.solve()
 		assign.Setter.Kind += tokens.EQUAL
@@ -3208,7 +3206,7 @@ func (p *Parser) forProfile(iter *models.Iter) {
 	if profile.Once.Data != nil {
 		_ = p.statement(&profile.Once, false)
 	}
-	if len(profile.Condition.Processes) > 0 {
+	if !profile.Condition.IsEmpty() {
 		val, model := p.evalExpr(profile.Condition, nil)
 		profile.Condition.Model = model
 		assign_checker{
@@ -3628,12 +3626,12 @@ func (p *Parser) typeSource(dt Type, err bool) (ret Type, ok bool) {
 	switch {
 	case dt.MultiTyped:
 		return p.typeSourceOfMultiTyped(dt, err)
-	case typeIsMap(dt):
+	case dt.Id == juletype.Map:
 		return p.typeSourceIsMap(dt, err)
-	case typeIsArray(dt):
+	case dt.Id == juletype.Array:
 		ok = p.typeSourceIsArrayType(&dt)
 		return dt, ok
-	case typeIsSlice(dt):
+	case dt.Id == juletype.Slice:
 		ok = p.typeSourceIsSliceType(&dt)
 		return dt, ok
 	}
@@ -3761,11 +3759,11 @@ func (p *Parser) checkType(real, check Type, ignoreAny, allow_assign bool, errTo
 func (p *Parser) evalExpr(expr Expr, prefix *models.Type) (value, iExpr) {
 	p.eval.has_error = false
 	p.eval.type_prefix = prefix
-	return p.eval.expr(expr)
+	return p.eval.eval_expr(expr)
 }
 
 func (p *Parser) evalToks(toks []lex.Token) (value, iExpr) {
 	p.eval.has_error = false
 	p.eval.type_prefix = nil
-	return p.eval.toks(toks)
+	return p.eval.eval_toks(toks)
 }

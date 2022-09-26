@@ -23,10 +23,6 @@ type value struct {
 	mutable   bool
 }
 
-func isOperator(process []lex.Token) bool {
-	return len(process) == 1 && process[0].Id == tokens.Operator
-}
-
 type eval struct {
 	p            *Parser
 	has_error    bool
@@ -42,141 +38,92 @@ func (e *eval) pusherrtok(tok lex.Token, err string, args ...any) {
 	e.p.pusherrtok(tok, err, args...)
 }
 
-func (e *eval) toks(toks []lex.Token) (value, iExpr) {
-	return e.expr(new(ast.Builder).Expr(toks))
+func (e *eval) eval_toks(toks []lex.Token) (value, iExpr) {
+	builder := ast.Builder{}
+	return e.eval_expr(builder.Expr(toks))
 }
 
-func (e *eval) expr(expr Expr) (value, iExpr) {
-	processes := make([][]lex.Token, len(expr.Processes))
-	copy(processes, expr.Processes)
-	return e.processes(processes)
+func (e *eval) eval_expr(expr Expr) (value, iExpr) {
+	return e.eval(expr.Op)
 }
 
-func (e *eval) processes(processes [][]lex.Token) (v value, model iExpr) {
-	defer func() {
-		if typeIsVoid(v.data.Type) {
-			v.data.Type.Id = juletype.Void
-			v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
-		}
-	}()
-	if processes == nil || e.has_error {
-		return
-	}
-	if len(processes) == 1 {
-		m := newExprModel(processes)
+func (e *eval) eval_op(op any) (v value, model iExpr) {
+	switch t := op.(type) {
+	case models.BinopExpr:
+		m := newExprModel(1)
 		model = m
-		v = e.process(processes[0], m)
+		v = e.process(t.Tokens, m)
 		if v.constExpr {
 			model = v.model
 		} else if v.isType {
 			e.pusherrtok(v.data.Token, "invalid_expr")
 		}
 		return
-	}
-	valProcesses := make([]any, len(processes))
-	hasError := e.has_error
-	for i, process := range processes {
-		if isOperator(process) {
-			valProcesses[i] = nil
-			continue
-		}
-		val, model := e.p.evalToks(process)
-		hasError = hasError || e.has_error || model == nil
-		valProcesses[i] = []any{val, model}
-	}
-	if hasError {
-		e.has_error = true
+	case models.Binop:
+	default:
 		return
 	}
-	v, model = e.valProcesses(valProcesses, processes)
+	bop := op.(models.Binop)
+	l, lm := e.eval_op(bop.L)
+	if e.has_error {
+		return
+	}
+	r, rm := e.eval_op(bop.R)
+	if e.has_error {
+		return
+	}
+	process := solver{
+		p: e.p,
+		op: bop.Op,
+		l: l,
+		r: r,
+	}
+	v = process.solve()
+	v.lvalue = typeIsLvalue(v.data.Type)
+	if v.constExpr {
+		model = v.model
+	} else {
+		m := newExprModel(1)
+		model = m
+		m.appendSubNode(exprNode{tokens.LPARENTHESES})
+		m.appendSubNode(lm)
+		m.appendSubNode(exprNode{" " + bop.Op.Kind + " "})
+		m.appendSubNode(rm)
+		m.appendSubNode(exprNode{tokens.RPARENTHESES})
+	}
 	return
 }
 
-func (e *eval) valProcesses(exprs []any, processes [][]lex.Token) (v value, model iExpr) {
-	switch len(exprs) {
-	case 0:
-		v.data.Type.Id = juletype.Void
-		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
+func (e *eval) eval(op any) (v value, model iExpr) {
+	defer func() {
+		if typeIsVoid(v.data.Type) {
+			v.data.Type.Id = juletype.Void
+			v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
+		} else if v.constExpr && typeIsPure(v.data.Type) && isConstExpression(v.data.Value) {
+			switch v.expr.(type) {
+			case int64:
+				dt := Type{
+					Id:   juletype.Int,
+					Kind: juletype.TypeMap[juletype.Int],
+				}
+				if integerAssignable(dt.Id, v) {
+					v.data.Type = dt
+				}
+			case uint64:
+				dt := Type{
+					Id:   juletype.UInt,
+					Kind: juletype.TypeMap[juletype.UInt],
+				}
+				if integerAssignable(dt.Id, v) {
+					v.data.Type = dt
+				}
+			}
+		}
+	}()
+	if op == nil || e.has_error {
 		return
-	case 1:
-		expr := exprs[0].([]any)
-		v, model = expr[0].(value), expr[1].(iExpr)
-		v.lvalue = typeIsLvalue(v.data.Type)
-		if v.constExpr {
-			model = v.model
-		}
-		return
 	}
-	i := e.nextOperator(processes)
-	process := solver{p: e.p}
-	process.operator = processes[i][0]
-	left := exprs[i-1].([]any)
-	leftV, leftExpr := left[0].(value), left[1].(iExpr)
-	right := exprs[i+1].([]any)
-	rightV, rightExpr := right[0].(value), right[1].(iExpr)
-	process.left = processes[i-1]
-	process.left_val = leftV
-	process.right = processes[i+1]
-	process.right_val = rightV
-	val := process.solve()
-	var expr iExpr
-	if val.constExpr {
-		expr = val.model
-	} else {
-		sexpr := serieExpr{}
-		// If processes has one more couple (see: [EXPR] [OPERATOR] [EXPR])
-		if len(processes) > 3 {
-			sexpr.exprs = make([]any, 5)
-			sexpr.exprs[0] = exprNode{tokens.LPARENTHESES}
-			sexpr.exprs[1] = leftExpr
-			sexpr.exprs[2] = exprNode{" " + process.operator.Kind + " "}
-			sexpr.exprs[3] = rightExpr
-			sexpr.exprs[4] = exprNode{tokens.RPARENTHESES}
-		} else {
-			sexpr.exprs = make([]any, 3)
-			sexpr.exprs[0] = leftExpr
-			sexpr.exprs[1] = exprNode{" " + process.operator.Kind + " "}
-			sexpr.exprs[2] = rightExpr
-		}
-		expr = sexpr
-	}
-	processes = append(processes[:i-1], append([][]lex.Token{{}}, processes[i+2:]...)...)
-	exprs = append(exprs[:i-1], append([]any{[]any{val, expr}}, exprs[i+2:]...)...)
-	return e.valProcesses(exprs, processes)
-}
-
-// nextOperator find index of priority operator and returns index of operator
-// if found, returns -1 if not.
-func (e *eval) nextOperator(processes [][]lex.Token) int {
-	prec := precedencer{}
-	for i, process := range processes {
-		switch {
-		case !isOperator(process),
-			processes[i-1] == nil && processes[i+1] == nil:
-			continue
-		}
-		switch process[0].Kind {
-		case tokens.STAR, tokens.PERCENT, tokens.SOLIDUS,
-			tokens.RSHIFT, tokens.LSHIFT, tokens.AMPER:
-			prec.set(5, i)
-		case tokens.PLUS, tokens.MINUS, tokens.VLINE, tokens.CARET:
-			prec.set(4, i)
-		case tokens.EQUALS, tokens.NOT_EQUALS, tokens.LESS,
-			tokens.LESS_EQUAL, tokens.GREAT, tokens.GREAT_EQUAL:
-			prec.set(3, i)
-		case tokens.DOUBLE_AMPER:
-			prec.set(2, i)
-		case tokens.DOUBLE_VLINE:
-			prec.set(1, i)
-		default:
-			e.pusherrtok(process[0], "invalid_operator")
-		}
-	}
-	data := prec.get()
-	if data == nil {
-		return -1
-	}
-	return data.(int)
+	return e.eval_op(op)
 }
 
 func (e *eval) single(tok lex.Token, m *exprModel) (v value, ok bool) {
@@ -254,7 +201,7 @@ func (e *eval) betweenParentheses(toks []lex.Token, m *exprModel) value {
 	if len(toks) == 0 {
 		e.pusherrtok(tk, "invalid_syntax")
 	}
-	val, model := e.toks(toks)
+	val, model := e.eval_toks(toks)
 	m.appendSubNode(model)
 	return val
 }
@@ -412,31 +359,6 @@ func (e *eval) parenthesesRange(toks []lex.Token, m *exprModel) (v value) {
 }
 
 func (e *eval) process(toks []lex.Token, m *exprModel) (v value) {
-	defer func() {
-		if typeIsVoid(v.data.Type) {
-			v.data.Type.Kind = juletype.TypeMap[juletype.Void]
-			v.constExpr = false
-		} else if v.constExpr && typeIsPure(v.data.Type) && isConstExpression(v.data.Value) {
-			switch v.expr.(type) {
-			case int64:
-				dt := Type{
-					Id:   juletype.Int,
-					Kind: juletype.TypeMap[juletype.Int],
-				}
-				if integerAssignable(dt.Id, v) {
-					v.data.Type = dt
-				}
-			case uint64:
-				dt := Type{
-					Id:   juletype.UInt,
-					Kind: juletype.TypeMap[juletype.UInt],
-				}
-				if integerAssignable(dt.Id, v) {
-					v.data.Type = dt
-				}
-			}
-		}
-	}()
 	v.constExpr = true
 	if len(toks) == 1 {
 		v, _ = e.single(toks[0], m)
@@ -552,7 +474,7 @@ end:
 }
 
 func (e *eval) castExpr(dt Type, exprToks []lex.Token, m *exprModel, errTok lex.Token) value {
-	val, model := e.toks(exprToks)
+	val, model := e.eval_toks(exprToks)
 	m.appendSubNode(e.get_cast_expr_model(dt, val.data.Type, model))
 	val = e.cast(val, dt, errTok)
 	return val
@@ -1183,7 +1105,7 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 		return
 	}
 	var model iExpr
-	v, model = e.toks(exprToks)
+	v, model = e.eval_toks(exprToks)
 	m.appendSubNode(model)
 	toks = toks[len(exprToks):] // lex.Tokenens of [...]
 	i := 0
@@ -1220,7 +1142,7 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 		return v
 	}
 	m.appendSubNode(exprNode{tokens.LBRACKET})
-	indexv, model := e.toks(toks[1 : len(toks)-1])
+	indexv, model := e.eval_toks(toks[1 : len(toks)-1])
 	m.appendSubNode(indexingExprModel(model))
 	m.appendSubNode(exprNode{tokens.RBRACKET})
 	v = e.indexing(v, indexv, errTok)
@@ -1408,7 +1330,7 @@ func (e *eval) build_array(parts [][]lex.Token, t Type, errtok lex.Token) (value
 	v.data.Type = t
 	model := sliceExpr{dataType: t}
 	for _, part := range parts {
-		partVal, expModel := e.toks(part)
+		partVal, expModel := e.eval_toks(part)
 		model.expr = append(model.expr, expModel)
 		assign_checker{
 			p:      e.p,
@@ -1427,7 +1349,7 @@ func (e *eval) build_slice_implicit(parts [][]lex.Token, errtok lex.Token) (valu
 	}
 	v := value{}
 	model := sliceExpr{}
-	partVal, expModel := e.toks(parts[0])
+	partVal, expModel := e.eval_toks(parts[0])
 	model.expr = append(model.expr, expModel)
 	model.dataType = Type{
 		Id: juletype.Slice,
@@ -1437,7 +1359,7 @@ func (e *eval) build_slice_implicit(parts [][]lex.Token, errtok lex.Token) (valu
 	*model.dataType.ComponentType = partVal.data.Type
 	v.data.Type = model.dataType
 	for _, part := range parts[1:] {
-		partVal, expModel := e.toks(part)
+		partVal, expModel := e.eval_toks(part)
 		model.expr = append(model.expr, expModel)
 		assign_checker{
 			p:      e.p,
@@ -1458,7 +1380,7 @@ func (e *eval) build_slice_explicit(parts [][]lex.Token, t Type, errtok lex.Toke
 	v.data.Type = t
 	model := sliceExpr{dataType: t}
 	for _, part := range parts {
-		partVal, expModel := e.toks(part)
+		partVal, expModel := e.eval_toks(part)
 		model.expr = append(model.expr, expModel)
 		assign_checker{
 			p:      e.p,
@@ -1505,9 +1427,9 @@ func (e *eval) buildMap(parts [][]lex.Token, t Type, errtok lex.Token) (value, i
 		colonTok := part[colon]
 		keyToks := part[:colon]
 		valToks := part[colon+1:]
-		key, keyModel := e.toks(keyToks)
+		key, keyModel := e.eval_toks(keyToks)
 		model.keyExprs = append(model.keyExprs, keyModel)
-		val, valModel := e.toks(valToks)
+		val, valModel := e.eval_toks(valToks)
 		model.valExprs = append(model.valExprs, valModel)
 		assign_checker{
 			p:      e.p,

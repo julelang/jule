@@ -2395,125 +2395,99 @@ func (b *Builder) ContinueStatement(toks []lex.Token) models.Statement {
 			}
 		}
 	}
-	return models.Statement{
-		Token: continueAST.Token,
-		Data:  continueAST,
-	}
+	return models.Statement{Token: continueAST.Token, Data:  continueAST}
 }
 
 // Expr builds AST model of expression.
 func (b *Builder) Expr(toks []lex.Token) (e models.Expr) {
-	e.Processes = b.exprProcesses(toks)
+	e.Op = b.build_expr_op(toks)
 	e.Tokens = toks
 	return
 }
 
-type exprProcessInfo struct {
-	processes        [][]lex.Token
-	part             []lex.Token
-	operator         bool
-	value            bool
-	singleOperatored bool
-	pushedError      bool
-	brace_n          int
-	toks             []lex.Token
-	i                int
+func (b *Builder) build_binop_expr(toks []lex.Token) any {
+	i := b.find_lowest_precedenced_operator(toks)
+	if i != -1 {
+		return b.build_binop(toks)
+	}
+	return models.BinopExpr{Tokens: toks}
 }
 
-func (b *Builder) exprOperatorPart(info *exprProcessInfo, tok lex.Token) {
-	if IsExprOperator(tok.Kind) {
-		info.part = append(info.part, tok)
-		return
-	}
-	if !info.operator {
-		if !info.singleOperatored && IsUnaryOperator(tok.Kind) {
-			info.part = append(info.part, tok)
-			info.singleOperatored = true
-			return
-		}
-		if IsSolidOperator(tok.Kind) {
-			b.pusherr(tok, "operator_overflow")
-		}
-	}
-	info.singleOperatored = false
-	info.operator = false
-	info.value = true
-	if info.brace_n > 0 {
-		info.part = append(info.part, tok)
-		return
-	}
-	info.processes = append(info.processes, info.part)
-	info.processes = append(info.processes, []lex.Token{tok})
-	info.part = []lex.Token{}
+func (b *Builder) build_binop(toks []lex.Token) models.Binop {
+	op := models.Binop{}
+	i := b.find_lowest_precedenced_operator(toks)
+	op.L = b.build_binop_expr(toks[:i])
+	op.R = b.build_binop_expr(toks[i+1:])
+	op.Op = toks[i]
+	return op
 }
 
-func (b *Builder) exprValuePart(info *exprProcessInfo, tok lex.Token) {
-	if info.i > 0 && info.brace_n == 0 {
-		lt := info.toks[info.i-1]
-		if (lt.Id == tokens.Id || lt.Id == tokens.Value) &&
-			(tok.Id == tokens.Id || tok.Id == tokens.Value) {
-			b.pusherr(tok, "invalid_syntax")
-			info.pushedError = true
+func eliminate_comments(toks []lex.Token) []lex.Token {
+	cutted := []lex.Token{}
+	for _, token := range toks {
+		if token.Id != tokens.Comment {
+			cutted = append(cutted, token)
 		}
 	}
-	info.part = append(info.part, tok)
-	info.operator = RequireOperatorToProcess(tok, info.i, len(info.toks))
-	info.value = false
+	return cutted
 }
 
-func (b *Builder) exprBracePart(info *exprProcessInfo, tok lex.Token) bool {
-	switch tok.Kind {
-	case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
-		if tok.Kind == tokens.LBRACKET {
-			oldIndex := info.i
-			_, ok := b.DataType(info.toks, &info.i, false, false)
-			if ok {
-				info.part = append(info.part, info.toks[oldIndex:info.i+1]...)
-				return true
+// Returns BinopExpr or Binop instance for expression Op.
+func (b *Builder) build_expr_op(toks []lex.Token) any {
+	toks = eliminate_comments(toks)
+	i := b.find_lowest_precedenced_operator(toks)
+	if i == -1 {
+		return b.build_binop_expr(toks)
+	}
+	return b.build_binop(toks)
+}
+
+// nextOperator find index of priority operator and returns index of operator
+// if found, returns -1 if not.
+func (b *Builder) find_lowest_precedenced_operator(toks []lex.Token) int {
+	prec := precedencer{}
+	brace_n := 0
+	for i, token := range toks {
+		switch {
+		case token.Id == tokens.Brace:
+			switch token.Kind {
+			case tokens.LBRACE, tokens.LPARENTHESES, tokens.LBRACKET:
+				brace_n++
+			default:
+				brace_n--
 			}
-			info.i = oldIndex
-		}
-		info.singleOperatored = false
-		info.operator = false
-		info.brace_n++
-	default:
-		info.brace_n--
-	}
-	return false
-}
-
-func (b *Builder) exprProcesses(toks []lex.Token) [][]lex.Token {
-	var info exprProcessInfo
-	info.toks = toks
-	for ; info.i < len(info.toks); info.i++ {
-		tok := info.toks[info.i]
-		switch tok.Id {
-		case tokens.Comment:
 			continue
-		case tokens.Operator:
-			b.exprOperatorPart(&info, tok)
+		case i == 0:
 			continue
-		case tokens.Brace:
-			skipStep := b.exprBracePart(&info, tok)
-			if skipStep {
-				continue
-			}
-		case tokens.Comma:
-			info.singleOperatored = false
+		case token.Id != tokens.Operator:
+			continue
+		case brace_n > 0:
+			continue
 		}
-		b.exprValuePart(&info, tok)
+		// Skip unary operator.
+		if toks[i-1].Id == tokens.Operator {
+			continue
+		}
+		switch token.Kind {
+		case tokens.STAR, tokens.PERCENT, tokens.SOLIDUS,
+			tokens.RSHIFT, tokens.LSHIFT, tokens.AMPER:
+			prec.set(5, i)
+		case tokens.PLUS, tokens.MINUS, tokens.VLINE, tokens.CARET:
+			prec.set(4, i)
+		case tokens.EQUALS, tokens.NOT_EQUALS, tokens.LESS,
+			tokens.LESS_EQUAL, tokens.GREAT, tokens.GREAT_EQUAL:
+			prec.set(3, i)
+		case tokens.DOUBLE_AMPER:
+			prec.set(2, i)
+		case tokens.DOUBLE_VLINE:
+			prec.set(1, i)
+		}
 	}
-	if len(info.part) > 0 {
-		info.processes = append(info.processes, info.part)
+	data := prec.get_lower()
+	if data == nil {
+		return -1
 	}
-	if info.value {
-		b.pusherr(info.processes[len(info.processes)-1][0], "operator_overflow")
-		info.pushedError = true
-	}
-	if info.pushedError {
-		return nil
-	}
-	return info.processes
+	return data.(int)
 }
 
 func (b *Builder) getrange(i *int, open, close string, toks *[]lex.Token) []lex.Token {

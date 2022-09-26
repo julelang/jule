@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/jule-lang/jule/ast/models"
-	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/pkg/jule"
 	"github.com/jule-lang/jule/pkg/juleapi"
 )
@@ -23,10 +22,10 @@ type exprModel struct {
 	nodes []exprBuildNode
 }
 
-func newExprModel(processes [][]lex.Token) *exprModel {
+func newExprModel(n int) *exprModel {
 	m := new(exprModel)
 	m.index = 0
-	m.nodes = make([]exprBuildNode, len(processes))
+	m.nodes = make([]exprBuildNode, n)
 	return m
 }
 
