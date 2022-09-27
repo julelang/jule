@@ -1,4 +1,4 @@
-package parser
+package transpiler
 
 import (
 	"github.com/jule-lang/jule/lex"
@@ -10,13 +10,13 @@ type unary struct {
 	token lex.Token
 	toks  []lex.Token
 	model *exprModel
-	p     *Parser
+	t     *Transpiler
 }
 
 func (u *unary) minus() value {
-	v := u.p.eval.process(u.toks, u.model)
+	v := u.t.eval.process(u.toks, u.model)
 	if !typeIsPure(v.data.Type) || !juletype.IsNumeric(v.data.Type.Id) {
-		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.MINUS)
+		u.t.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.MINUS)
 	}
 	if v.constExpr {
 		v.data.Value = tokens.MINUS + v.data.Value
@@ -34,9 +34,9 @@ func (u *unary) minus() value {
 }
 
 func (u *unary) plus() value {
-	v := u.p.eval.process(u.toks, u.model)
+	v := u.t.eval.process(u.toks, u.model)
 	if !typeIsPure(v.data.Type) || !juletype.IsNumeric(v.data.Type.Id) {
-		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.PLUS)
+		u.t.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.PLUS)
 	}
 	if v.constExpr {
 		switch t := v.expr.(type) {
@@ -53,9 +53,9 @@ func (u *unary) plus() value {
 }
 
 func (u *unary) caret() value {
-	v := u.p.eval.process(u.toks, u.model)
+	v := u.t.eval.process(u.toks, u.model)
 	if !typeIsPure(v.data.Type) || !juletype.IsInteger(v.data.Type.Id) {
-		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.CARET)
+		u.t.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.CARET)
 	}
 	if v.constExpr {
 		switch t := v.expr.(type) {
@@ -70,9 +70,9 @@ func (u *unary) caret() value {
 }
 
 func (u *unary) logicalNot() value {
-	v := u.p.eval.process(u.toks, u.model)
+	v := u.t.eval.process(u.toks, u.model)
 	if !isBoolExpr(v) {
-		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.EXCLAMATION)
+		u.t.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.EXCLAMATION)
 	} else if v.constExpr {
 		v.expr = !v.expr.(bool)
 		v.model = boolModel(v)
@@ -83,15 +83,15 @@ func (u *unary) logicalNot() value {
 }
 
 func (u *unary) star() value {
-	if !u.p.eval.unsafe_allowed() {
-		u.p.pusherrtok(u.token, "unsafe_behavior_at_out_of_unsafe_scope")
+	if !u.t.eval.unsafe_allowed() {
+		u.t.pusherrtok(u.token, "unsafe_behavior_at_out_of_unsafe_scope")
 	}
-	v := u.p.eval.process(u.toks, u.model)
+	v := u.t.eval.process(u.toks, u.model)
 	v.constExpr = false
 	v.lvalue = true
 	switch {
 	case !typeIsExplicitPtr(v.data.Type):
-		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.STAR)
+		u.t.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.STAR)
 		goto end
 	}
 	v.data.Type.Kind = v.data.Type.Kind[1:]
@@ -101,7 +101,7 @@ end:
 }
 
 func (u *unary) amper() value {
-	v := u.p.eval.process(u.toks, u.model)
+	v := u.t.eval.process(u.toks, u.model)
 	v.constExpr = false
 	v.lvalue = true
 	nodes := &u.model.nodes[u.model.index].nodes
@@ -130,7 +130,7 @@ func (u *unary) amper() value {
 		v.data.Type.Kind = tokens.STAR + un_ptr_or_ref_type(v.data.Type).Kind
 		return v
 	case !canGetPtr(v):
-		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.AMPER)
+		u.t.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.AMPER)
 		return v
 	}
 	v.data.Type.Kind = tokens.STAR + v.data.Type.Kind

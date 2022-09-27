@@ -1,4 +1,4 @@
-package parser
+package transpiler
 
 import (
 	"github.com/jule-lang/jule/ast/models"
@@ -18,7 +18,7 @@ func getParamMap(params []Param) *paramMap {
 }
 
 type pureArgParser struct {
-	p       *Parser
+	t       *Transpiler
 	pmap    *paramMap
 	f       *Func
 	args    *models.Args
@@ -51,13 +51,13 @@ func (pap *pureArgParser) pushVariadicArgs(pair *paramMapPair) {
 	var model serieExpr
 	model.exprs = append(model.exprs, exprNode{tokens.LBRACE})
 	variadiced := false
-	pap.p.parseArg(pap.f, pair, pap.args, &variadiced)
+	pap.t.parseArg(pap.f, pair, pap.args, &variadiced)
 	model.exprs = append(model.exprs, pair.arg.String())
 	once := false
 	for pap.i++; pap.i < len(pap.args.Src); pap.i++ {
 		pair.arg = &pap.args.Src[pap.i]
 		once = true
-		pap.p.parseArg(pap.f, pair, pap.args, &variadiced)
+		pap.t.parseArg(pap.f, pair, pap.args, &variadiced)
 		model.exprs = append(model.exprs, exprNode{tokens.COMMA})
 		model.exprs = append(model.exprs, pair.arg.String())
 	}
@@ -69,13 +69,13 @@ func (pap *pureArgParser) pushVariadicArgs(pair *paramMapPair) {
 	}
 	// Variadic argument must have only one expression for variadication
 	if variadiced {
-		pap.p.pusherrtok(pap.errTok, "more_args_with_variadiced")
+		pap.t.pusherrtok(pap.errTok, "more_args_with_variadiced")
 	}
 }
 
 func (pap *pureArgParser) check_param_arg(pair *paramMapPair) {
 	if pair.arg == nil && !pair.param.Variadic {
-		pap.p.pusherrtok(pap.errTok, "missing_expr_for", pair.param.Id)
+		pap.t.pusherrtok(pap.errTok, "missing_expr_for", pair.param.Id)
 	}
 }
 
@@ -83,7 +83,7 @@ func (pap *pureArgParser) check_passes_struct() {
 	if len(pap.args.Src) == 0 {
 		for _, pair := range *pap.pmap {
 			if typeIsRef(pair.param.Type) {
-				pap.p.pusherrtok(pap.errTok, "reference_field_not_initialized", pair.param.Id)
+				pap.t.pusherrtok(pap.errTok, "reference_field_not_initialized", pair.param.Id)
 			}
 		}
 		pap.pmap = nil
@@ -116,7 +116,7 @@ func (pap *pureArgParser) pushArg() {
 	if pair.param.Variadic {
 		pap.pushVariadicArgs(pair)
 	} else {
-		pap.p.parseArg(pap.f, pair, pap.args, nil)
+		pap.t.parseArg(pap.f, pair, pap.args, nil)
 	}
 }
 
@@ -132,7 +132,7 @@ func (pap *pureArgParser) parse() {
 	argCount := 0
 	for pap.i < len(pap.args.Src) {
 		if argCount >= len(pap.f.Params) {
-			pap.p.pusherrtok(pap.errTok, "argument_overflow")
+			pap.t.pusherrtok(pap.errTok, "argument_overflow")
 			return
 		}
 		argCount++
@@ -146,7 +146,7 @@ func (pap *pureArgParser) parse() {
 
 func (pap *pureArgParser) tryFuncMultiRetAsArgs() bool {
 	arg := pap.args.Src[0]
-	val, model := pap.p.evalExpr(arg.Expr, nil)
+	val, model := pap.t.evalExpr(arg.Expr, nil)
 	arg.Expr.Model = model
 	if !val.data.Type.MultiTyped {
 		return false
@@ -167,7 +167,7 @@ func (pap *pureArgParser) tryFuncMultiRetAsArgs() bool {
 	for i, param := range pap.f.Params {
 		rt := types[i]
 		val := value{data: models.Data{Type: rt}}
-		pap.p.checkArgType(&param, val, arg.Token)
+		pap.t.checkArgType(&param, val, arg.Token)
 	}
 	return true
 }

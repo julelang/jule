@@ -6,11 +6,11 @@ import (
 	"unicode"
 
 	"github.com/jule-lang/jule/ast/models"
-	"github.com/jule-lang/jule/parser"
+	"github.com/jule-lang/jule/transpiler"
 	"github.com/jule-lang/jule/pkg/juletype"
 )
 
-type Defmap = parser.DefineMap
+type Defmap = transpiler.DefineMap
 
 type generic struct {
 	Id string
@@ -85,9 +85,9 @@ func fmt_json_ttoa(t models.Type) string {
 	return t.Kind
 }
 
-func fmt_json_uses(p *parser.Parser) []use {
-	uses := make([]use, len(p.Uses))
-	for i, u := range p.Uses {
+func fmt_json_uses(t *transpiler.Transpiler) []use {
+	uses := make([]use, len(t.Uses))
+	for i, u := range t.Uses {
 		uses[i] = use{
 			Path:   u.LinkString,
 			Stdlib: u.LinkString[0] != '"',
@@ -220,15 +220,15 @@ func fmt_json_funcs(dm *Defmap) []function {
 	return funcs
 }
 
-func doc_fmt_json(p *parser.Parser) (string, error) {
+func doc_fmt_json(t *transpiler.Transpiler) (string, error) {
 	doc := document{
-		fmt_json_uses(p),
-		fmt_json_enums(p.Defines),
-		fmt_json_traits(p.Defines),
-		fmt_json_structs(p.Defines),
-		fmt_json_type_aliases(p.Defines),
-		fmt_json_globals(p.Defines),
-		fmt_json_funcs(p.Defines),
+		fmt_json_uses(t),
+		fmt_json_enums(t.Defines),
+		fmt_json_traits(t.Defines),
+		fmt_json_structs(t.Defines),
+		fmt_json_type_aliases(t.Defines),
+		fmt_json_globals(t.Defines),
+		fmt_json_funcs(t.Defines),
 	}
 	bytes, err := json.MarshalIndent(doc, "", "\t")
 	if err != nil {

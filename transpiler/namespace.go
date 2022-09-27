@@ -1,4 +1,4 @@
-package parser
+package transpiler
 
 import "github.com/jule-lang/jule/lex"
 

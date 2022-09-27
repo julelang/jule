@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/jule-lang/jule/documenter"
-	"github.com/jule-lang/jule/parser"
+	"github.com/jule-lang/jule/transpiler"
 	"github.com/jule-lang/jule/pkg/jule"
 	"github.com/jule-lang/jule/pkg/juleapi"
 	"github.com/jule-lang/jule/pkg/juleio"
@@ -97,15 +97,15 @@ func doc(cmd string) {
 	paths := strings.SplitN(cmd, " ", -1)
 	for _, path := range paths {
 		path = strings.TrimSpace(path)
-		p := compile(path, false, true, true)
-		if p == nil {
+		t := compile(path, false, true, true)
+		if t == nil {
 			continue
 		}
-		if print_logs(p) {
+		if print_logs(t) {
 			fmt.Println(jule.GetError("doc_couldnt_generated", path))
 			continue
 		}
-		docjson, err := documenter.Doc(p, fmt_json)
+		docjson, err := documenter.Doc(t, fmt_json)
 		if err != nil {
 			fmt.Println(jule.GetError("error", err.Error()))
 			continue
@@ -291,18 +291,18 @@ func load_juleset() {
 
 // print_logs prints logs and returns true
 // if logs has error, false if not.
-func print_logs(p *parser.Parser) bool {
+func print_logs(t *transpiler.Transpiler) bool {
 	var str strings.Builder
-	for _, log := range p.Warnings {
+	for _, log := range t.Warnings {
 		str.WriteString(log.String())
 		str.WriteByte('\n')
 	}
-	for _, log := range p.Errors {
+	for _, log := range t.Errors {
 		str.WriteString(log.String())
 		str.WriteByte('\n')
 	}
 	print(str.String())
-	return len(p.Errors) > 0
+	return len(t.Errors) > 0
 }
 
 func append_standard(code *string) {
@@ -343,14 +343,14 @@ func write_output(path, content string) {
 	}
 }
 
-func compile(path string, main, nolocal, justDefs bool) *parser.Parser {
+func compile(path string, main, nolocal, justDefs bool) *transpiler.Transpiler {
 	load_juleset()
-	p := parser.New(nil)
+	t := transpiler.New(nil)
 	// Check standard library.
 	inf, err := os.Stat(jule.StdlibPath)
 	if err != nil || !inf.IsDir() {
-		p.PushErr("stdlib_not_exist")
-		return p
+		t.PushErr("stdlib_not_exist")
+		return t
 	}
 	f, err := juleio.OpenJuleF(path)
 	if err != nil {
@@ -358,13 +358,13 @@ func compile(path string, main, nolocal, justDefs bool) *parser.Parser {
 		return nil
 	}
 	if !juleio.IsPassFileAnnotation(path) {
-		p.PushErr("file_not_useable")
-		return p
+		t.PushErr("file_not_useable")
+		return t
 	}
-	p.File = f
-	p.NoLocalPkg = nolocal
-	p.Parsef(main, justDefs)
-	return p
+	t.File = f
+	t.NoLocalPkg = nolocal
+	t.Parsef(main, justDefs)
+	return t
 }
 
 func exec_post_commands() {
@@ -408,14 +408,14 @@ func do_spell(cpp string) {
 
 func main() {
 	fpath := os.Args[0]
-	p := compile(fpath, true, false, false)
-	if p == nil {
+	t := compile(fpath, true, false, false)
+	if t == nil {
 		return
 	}
-	if print_logs(p) {
+	if print_logs(t) {
 		os.Exit(0)
 	}
-	cpp := p.Cpp()
+	cpp := t.Cpp()
 	append_standard(&cpp)
 	do_spell(cpp)
 }

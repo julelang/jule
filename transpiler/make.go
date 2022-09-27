@@ -1,11 +1,11 @@
-package parser
+package transpiler
 
 import (
 	"github.com/jule-lang/jule/ast/models"
 	"github.com/jule-lang/jule/lex"
 )
 
-func make_slice(p *Parser, m *exprModel, t models.Type, args *models.Args, errtok lex.Token) (v value) {
+func make_slice(p *Transpiler, m *exprModel, t models.Type, args *models.Args, errtok lex.Token) (v value) {
 	v.data.Type = t
 	v.data.Value = " "
 	if len(args.Src) < 2 {

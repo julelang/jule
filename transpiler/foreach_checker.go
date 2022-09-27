@@ -1,4 +1,4 @@
-package parser
+package transpiler
 
 import (
 	"github.com/jule-lang/jule/ast/models"
@@ -7,7 +7,7 @@ import (
 )
 
 type foreachChecker struct {
-	p       *Parser
+	p       *Transpiler
 	profile *models.IterForeach
 	val     value
 }

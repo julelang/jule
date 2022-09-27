@@ -1,4 +1,4 @@
-package parser
+package transpiler
 
 import (
 	"github.com/jule-lang/jule/ast/models"
@@ -8,7 +8,7 @@ import (
 )
 
 type retChecker struct {
-	p         *Parser
+	t         *Transpiler
 	ret_ast   *models.Ret
 	f         *Func
 	exp_model retExpr
@@ -17,11 +17,11 @@ type retChecker struct {
 
 func (rc *retChecker) pushval(last, current int, errTok lex.Token) {
 	if current-last == 0 {
-		rc.p.pusherrtok(errTok, "missing_expr")
+		rc.t.pusherrtok(errTok, "missing_expr")
 		return
 	}
 	toks := rc.ret_ast.Expr.Tokens[last:current]
-	v, model := rc.p.evalToks(toks)
+	v, model := rc.t.evalToks(toks)
 	rc.exp_model.models = append(rc.exp_model.models, model)
 	rc.values = append(rc.values, v)
 }
@@ -59,24 +59,24 @@ func (rc *retChecker) checkepxrs() {
 }
 
 func (rc *retChecker) check_for_ret_expr(v value) {
-	if rc.p.unsafe_allowed() || !lex.IsIdentifierRune(v.data.Value) {
+	if rc.t.unsafe_allowed() || !lex.IsIdentifierRune(v.data.Value) {
 		return
 	}
 	if !v.mutable && type_is_mutable(v.data.Type) {
-		rc.p.pusherrtok(rc.ret_ast.Token, "ret_with_mut_typed_non_mut")
+		rc.t.pusherrtok(rc.ret_ast.Token, "ret_with_mut_typed_non_mut")
 		return
 	}
 }
 
 func (rc *retChecker) single() {
 	if len(rc.values) > 1 {
-		rc.p.pusherrtok(rc.ret_ast.Token, "overflow_return")
+		rc.t.pusherrtok(rc.ret_ast.Token, "overflow_return")
 	}
 	v := rc.values[0]
 	rc.check_for_ret_expr(v)
 	assign_checker{
-		p:       rc.p,
-		t:       rc.f.RetType.Type,
+		t:       rc.t,
+		expr_t:       rc.f.RetType.Type,
 		v:       v,
 		errtok:  rc.ret_ast.Token,
 	}.check()
@@ -89,7 +89,7 @@ func (rc *retChecker) multi() {
 		rc.checkMultiRetAsMutliRet()
 		return
 	} else if n > len(types) {
-		rc.p.pusherrtok(rc.ret_ast.Token, "overflow_return")
+		rc.t.pusherrtok(rc.ret_ast.Token, "overflow_return")
 	}
 	for i, t := range types {
 		if i >= n {
@@ -98,8 +98,8 @@ func (rc *retChecker) multi() {
 		v := rc.values[i]
 		rc.check_for_ret_expr(v)
 		assign_checker{
-			p:       rc.p,
-			t:       t,
+			t:       rc.t,
+			expr_t:       t,
 			v:       v,
 			errtok:  rc.ret_ast.Token,
 		}.check()
@@ -118,24 +118,24 @@ func (rc *retChecker) checkExprTypes() {
 func (rc *retChecker) checkMultiRetAsMutliRet() {
 	v := rc.values[0]
 	if !v.data.Type.MultiTyped {
-		rc.p.pusherrtok(rc.ret_ast.Token, "missing_multi_return")
+		rc.t.pusherrtok(rc.ret_ast.Token, "missing_multi_return")
 		return
 	}
 	valTypes := v.data.Type.Tag.([]Type)
 	retTypes := rc.f.RetType.Type.Tag.([]Type)
 	if len(valTypes) < len(retTypes) {
-		rc.p.pusherrtok(rc.ret_ast.Token, "missing_multi_return")
+		rc.t.pusherrtok(rc.ret_ast.Token, "missing_multi_return")
 		return
 	} else if len(valTypes) < len(retTypes) {
-		rc.p.pusherrtok(rc.ret_ast.Token, "overflow_return")
+		rc.t.pusherrtok(rc.ret_ast.Token, "overflow_return")
 		return
 	}
 	for i, rt := range retTypes {
 		vt := valTypes[i]
 		val := value{data: models.Data{Type: vt}}
 		assign_checker{
-			p:       rc.p,
-			t:       rt,
+			t:       rc.t,
+			expr_t:       rt,
 			v:       val,
 			errtok:  rc.ret_ast.Token,
 		}.check()
@@ -149,7 +149,7 @@ func (rc *retChecker) retsVars() {
 				model := new(exprModel)
 				model.index = 0
 				model.nodes = make([]exprBuildNode, 1)
-				val, _ := rc.p.eval.single(v, model)
+				val, _ := rc.t.eval.single(v, model)
 				rc.exp_model.models = append(rc.exp_model.models, model)
 				rc.values = append(rc.values, val)
 				break
@@ -170,7 +170,7 @@ func (rc *retChecker) retsVars() {
 		model := new(exprModel)
 		model.index = 0
 		model.nodes = make([]exprBuildNode, 1)
-		val, _ := rc.p.eval.single(v, model)
+		val, _ := rc.t.eval.single(v, model)
 		rc.exp_model.models = append(rc.exp_model.models, model)
 		rc.values = append(rc.values, val)
 	}
@@ -181,14 +181,14 @@ func (rc *retChecker) check() {
 	n := len(rc.ret_ast.Expr.Tokens)
 	if n == 0 && !typeIsVoid(rc.f.RetType.Type) {
 		if !rc.f.RetType.AnyVar() {
-			rc.p.pusherrtok(rc.ret_ast.Token, "require_return_value")
+			rc.t.pusherrtok(rc.ret_ast.Token, "require_return_value")
 		}
 		rc.retsVars()
 		return
 	}
 	if n > 0 && typeIsVoid(rc.f.RetType.Type) {
-		rc.p.pusherrtok(rc.ret_ast.Token, "void_function_return_value")
+		rc.t.pusherrtok(rc.ret_ast.Token, "void_function_return_value")
 	}
-	rc.exp_model.vars = rc.f.RetType.Vars(rc.p.nodeBlock)
+	rc.exp_model.vars = rc.f.RetType.Vars(rc.t.nodeBlock)
 	rc.checkepxrs()
 }

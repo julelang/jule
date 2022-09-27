@@ -1,4 +1,4 @@
-package parser
+package transpiler
 
 import (
 	"fmt"
@@ -15,7 +15,7 @@ import (
 type valueEvaluator struct {
 	token lex.Token
 	model *exprModel
-	p     *Parser
+	t     *Transpiler
 }
 
 func strModel(v value) iExpr {
@@ -218,7 +218,7 @@ func (ve *valueEvaluator) varId(id string, variable *Var, global bool) (v value)
 		} else {
 			ve.model.appendSubNode(exprNode{variable.OutId()})
 		}
-		ve.p.eval.has_error = ve.p.eval.has_error || typeIsVoid(v.data.Type)
+		ve.t.eval.has_error = ve.t.eval.has_error || typeIsVoid(v.data.Type)
 	}
 	return
 }
@@ -271,7 +271,7 @@ func (ve *valueEvaluator) structId(id string, s *structure) (v value) {
 }
 
 func (ve *valueEvaluator) typeId(id string, t *TypeAlias) (_ value, _ bool) {
-	dt, ok := ve.p.realType(t.Type, true)
+	dt, ok := ve.t.realType(t.Type, true)
 	if !ok {
 		return
 	}
@@ -284,36 +284,36 @@ func (ve *valueEvaluator) typeId(id string, t *TypeAlias) (_ value, _ bool) {
 func (ve *valueEvaluator) id() (_ value, ok bool) {
 	id := ve.token.Kind
 
-	v, _ := ve.p.blockVarById(id)
+	v, _ := ve.t.blockVarById(id)
 	if v != nil {
 		return ve.varId(id, v, false), true
 	} else {
-		v, _, _ := ve.p.globalById(id)
+		v, _, _ := ve.t.globalById(id)
 		if v != nil {
 			return ve.varId(id, v, true), true
 		}
 	}
 
-	f, _, _ := ve.p.FuncById(id)
+	f, _, _ := ve.t.FuncById(id)
 	if f != nil {
 		return ve.funcId(id, f), true
 	}
 
-	e, _, _ := ve.p.enumById(id)
+	e, _, _ := ve.t.enumById(id)
 	if e != nil {
 		return ve.enumId(id, e), true
 	}
 
-	s, _, _ := ve.p.structById(id)
+	s, _, _ := ve.t.structById(id)
 	if s != nil {
 		return ve.structId(id, s), true
 	}
 
-	t, _, _ := ve.p.typeById(id)
+	t, _, _ := ve.t.typeById(id)
 	if t != nil {
 		return ve.typeId(id, t)
 	}
 
-	ve.p.eval.pusherrtok(ve.token, "id_not_exist", id)
+	ve.t.eval.pusherrtok(ve.token, "id_not_exist", id)
 	return
 }
