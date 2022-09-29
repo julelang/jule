@@ -517,6 +517,38 @@ body:
 	p.Tree = append(p.Tree, models.Object{Token: impl.Base, Data: impl})
 }
 
+// link_fn builds AST model of cpp function link.
+func (p *Parser) link_fn(toks []lex.Token) {
+	tok := toks[0]
+
+	// Catch pub not supported
+	bpub := p.pub
+
+	var link models.CppLinkFn
+	link.Token = tok
+	link.Link = new(models.Fn)
+	*link.Link = p.Func(toks[1:], false, false, true)
+	p.Tree = append(p.Tree, models.Object{Token: tok, Data: link})
+
+	p.pub = bpub
+}
+
+// link_var builds AST model of cpp variable link.
+func (p *Parser) link_var(toks []lex.Token) {
+	tok := toks[0]
+
+	// Catch pub not supported
+	bpub := p.pub
+
+	var link models.CppLinkVar
+	link.Token = tok
+	link.Link = new(models.Var)
+	*link.Link = p.Var(toks[1:], true, false)
+	p.Tree = append(p.Tree, models.Object{Token: tok, Data: link})
+
+	p.pub = bpub
+}
+
 // CppLinks builds AST model of cpp link statement.
 func (p *Parser) CppLink(toks []lex.Token) {
 	tok := toks[0]
@@ -524,15 +556,15 @@ func (p *Parser) CppLink(toks []lex.Token) {
 		p.pusherr(tok, "invalid_syntax")
 		return
 	}
-
-	// Catch pub not supported
-	bpub := p.pub
-	defer func() { p.pub = bpub }()
-	var link models.CppLink
-	link.Token = tok
-	link.Link = new(models.Fn)
-	*link.Link = p.Func(toks[1:], false, false, true)
-	p.Tree = append(p.Tree, models.Object{Token: tok, Data: link})
+	tok = toks[1]
+	switch tok.Id {
+	case tokens.Fn:
+		p.link_fn(toks)
+	case tokens.Let:
+		p.link_var(toks)
+	default:
+		p.pusherr(tok, "invalid_syntax")
+	}
 }
 
 func tokstoa(toks []lex.Token) string {
@@ -876,7 +908,7 @@ func (p *Parser) GlobalVar(toks []lex.Token) {
 		return
 	}
 	bs := blockStatement{toks: toks}
-	s := p.VarStatement(&bs)
+	s := p.VarStatement(&bs, true)
 	p.Tree = append(p.Tree, models.Object{
 		Token: s.Token,
 		Data:  s,
@@ -1419,7 +1451,7 @@ func (p *Parser) Statement(bs *blockStatement) (s models.Statement) {
 	}
 	switch tok.Id {
 	case tokens.Const, tokens.Let, tokens.Mut:
-		return p.VarStatement(bs)
+		return p.VarStatement(bs, true)
 	case tokens.Ret:
 		return p.RetStatement(bs.toks)
 	case tokens.For:
@@ -1832,8 +1864,8 @@ func (p *Parser) Var(toks []lex.Token, begin, expr bool) (v models.Var) {
 }
 
 // VarStatement builds AST model of variable declaration statement.
-func (p *Parser) VarStatement(bs *blockStatement) models.Statement {
-	v := p.Var(bs.toks, true, true)
+func (p *Parser) VarStatement(bs *blockStatement, expr bool) models.Statement {
+	v := p.Var(bs.toks, true, expr)
 	v.Owner = bs.block
 	return models.Statement{Token: v.Token, Data: v}
 }

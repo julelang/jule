@@ -39,6 +39,7 @@ var AssignOperators = [...]string{
 func IsAssign(id uint8) bool {
 	switch id {
 	case tokens.Id,
+		tokens.Cpp,
 		tokens.Let,
 		tokens.Dot,
 		tokens.Self,

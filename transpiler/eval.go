@@ -268,39 +268,6 @@ func getCallData(toks []lex.Token, m *exprModel) (data callData) {
 	return
 }
 
-func (e *eval) callCppLink(data callData, m *exprModel) (v value) {
-	v.data.Type.Id = juletype.Void
-	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
-	tok := data.expr[0]
-	data.expr = data.expr[1:] // Remove cpp keyword
-	if len(data.expr) == 0 {
-		e.pusherrtok(tok, "invalid_syntax")
-		return
-	}
-	tok = data.expr[0]
-	if tok.Id != tokens.Dot {
-		e.pusherrtok(tok, "invalid_syntax")
-		return
-	}
-	data.expr = data.expr[1:] // Remove dot keyword
-	if len(data.expr) == 0 {
-		e.pusherrtok(tok, "invalid_syntax")
-		return
-	}
-	tok = data.expr[0]
-	if tok.Id != tokens.Id {
-		e.pusherrtok(tok, "invalid_syntax")
-		return
-	}
-	link := e.t.linkById(tok.Kind)
-	if link == nil {
-		e.pusherrtok(tok, "id_not_exist", tok.Kind)
-		return
-	}
-	m.appendSubNode(exprNode{link.Link.Id})
-	return e.callFunc(link.Link, data, m)
-}
-
 func (e *eval) unsafe_allowed() bool {
 	return e.allow_unsafe || e.t.unsafe_allowed()
 }
@@ -333,8 +300,6 @@ func (e *eval) parenthesesRange(toks []lex.Token, m *exprModel) (v value) {
 		return e.betweenParentheses(data.args, m)
 	}
 	switch tok := data.expr[0]; tok.Id {
-	case tokens.Cpp:
-		return e.callCppLink(data, m)
 	case tokens.DataType, tokens.Id:
 		if len(data.expr) == 1 && len(data.generics) == 0 {
 			v, isret := e.dataTypeFunc(data.expr[0], data.args, m)
@@ -358,11 +323,45 @@ func (e *eval) parenthesesRange(toks []lex.Token, m *exprModel) (v value) {
 	return
 }
 
+func (e *eval) try_cpp_linked_var(toks []lex.Token, m *exprModel) (v value, ok bool) {
+	if toks[0].Id != tokens.Cpp {
+		return
+	} else if toks[1].Id != tokens.Dot {
+		e.pusherrtok(toks[1], "invalid_syntax")
+		return
+	}
+	tok := toks[2]
+	if tok.Id != tokens.Id {
+		e.pusherrtok(toks[2], "invalid_syntax")
+		return
+	}
+	def, def_t := e.t.linkById(tok.Kind)
+	if def_t == ' ' {
+		e.pusherrtok(tok, "id_not_exist", tok.Kind)
+		return
+	}
+	m.appendSubNode(exprNode{tok.Kind})
+	ok = true
+	switch def_t {
+	case 'f':
+		v = make_value_from_fn(def.(*models.Fn))
+	case 'v':
+		v = make_value_from_var(def.(*models.Var))
+	}
+	return
+}
+
 func (e *eval) process(toks []lex.Token, m *exprModel) (v value) {
 	v.constExpr = true
 	if len(toks) == 1 {
 		v, _ = e.single(toks[0], m)
 		return
+	} else if len(toks) == 3 {
+		ok := false
+		v, ok = e.try_cpp_linked_var(toks, m)
+		if ok {
+			return v
+		}
 	}
 	tok := toks[0]
 	switch tok.Id {

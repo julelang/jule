@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jule-lang/jule/ast/models"
 	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/lex/tokens"
 	"github.com/jule-lang/jule/pkg/juleapi"
@@ -200,17 +201,24 @@ func (ve *valueEvaluator) numeric() value {
 	return v
 }
 
+func make_value_from_var(v *Var) (val value) {
+	val.data.Value = v.Id
+	val.data.Type = v.Type
+	val.constExpr = v.Const
+	val.data.Token = v.Token
+	val.lvalue = !val.constExpr
+	val.mutable = v.Mutable
+	if val.constExpr {
+		val.expr = v.ExprTag
+		val.model = v.Expr.Model
+	}
+	return
+}
+
 func (ve *valueEvaluator) varId(id string, variable *Var, global bool) (v value) {
 	variable.Used = true
-	v.data.Value = id
-	v.data.Type = variable.Type
-	v.constExpr = variable.Const
-	v.data.Token = variable.Token
-	v.lvalue = !v.constExpr
-	v.mutable = variable.Mutable
+	v = make_value_from_var(variable)
 	if v.constExpr {
-		v.expr = variable.ExprTag
-		v.model = variable.Expr.Model
 		ve.model.appendSubNode(v.model)
 	} else {
 		if variable.Id == tokens.SELF && !typeIsRef(variable.Type) {
@@ -223,13 +231,18 @@ func (ve *valueEvaluator) varId(id string, variable *Var, global bool) (v value)
 	return
 }
 
+func make_value_from_fn(f *models.Fn) (v value) {
+	v.data.Value = f.Id
+	v.data.Type.Id = juletype.Fn
+	v.data.Type.Tag = f
+	v.data.Type.Kind = f.DataTypeString()
+	v.data.Token = f.Token
+	return
+}
+
 func (ve *valueEvaluator) funcId(id string, f *Fn) (v value) {
 	f.used = true
-	v.data.Value = id
-	v.data.Type.Id = juletype.Fn
-	v.data.Type.Tag = f.Ast
-	v.data.Type.Kind = f.Ast.DataTypeString()
-	v.data.Token = f.Ast.Token
+	v = make_value_from_fn(f.Ast)
 	ve.model.appendSubNode(exprNode{f.outId()})
 	return
 }

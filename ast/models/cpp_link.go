@@ -2,8 +2,14 @@ package models
 
 import "github.com/jule-lang/jule/lex"
 
-// CppLink is attribtue AST model.
-type CppLink struct {
+// CppLinkFn is linked function AST model.
+type CppLinkFn struct {
 	Token lex.Token
 	Link  *Fn
+}
+
+// CppLinkVar is linked variable AST model.
+type CppLinkVar struct {
+	Token lex.Token
+	Link  *Var
 }

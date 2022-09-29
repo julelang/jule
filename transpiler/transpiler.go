@@ -48,24 +48,25 @@ type waitingImpl struct {
 
 // Transpiler is transpiler of Jule code.
 type Transpiler struct {
-	attributes     []models.Attribute
-	docText        strings.Builder
-	currentIter    *models.Iter
-	currentCase    *models.Case
-	wg             sync.WaitGroup
-	rootBlock      *models.Block
-	nodeBlock      *models.Block
-	generics       []*GenericType
-	blockTypes     []*TypeAlias
-	blockVars      []*Var
-	waitingGlobals []*waitingGlobal
-	waitingImpls   []*waitingImpl
-	waitingFuncs   []*Fn
-	eval           *eval
-	cppLinks       []*models.CppLink
-	allowBuiltin   bool
-	use_mut        *sync.Mutex
-	cpp_use_mut    *sync.Mutex
+	attributes       []models.Attribute
+	docText          strings.Builder
+	currentIter      *models.Iter
+	currentCase      *models.Case
+	wg               sync.WaitGroup
+	rootBlock        *models.Block
+	nodeBlock        *models.Block
+	generics         []*GenericType
+	blockTypes       []*TypeAlias
+	blockVars        []*Var
+	waitingGlobals   []*waitingGlobal
+	waitingImpls     []*waitingImpl
+	waitingFuncs     []*Fn
+	eval             *eval
+	linked_functions []*models.Fn
+	linked_variables []*models.Var
+	allowBuiltin     bool
+	use_mut          *sync.Mutex
+	cpp_use_mut      *sync.Mutex
 
 	NoLocalPkg  bool
 	JustDefines bool
@@ -646,8 +647,10 @@ func (t *Transpiler) parseSrcTreeObj(obj models.Object) {
 		wi.file = t
 		wi.i = &obj_t
 		t.waitingImpls = append(t.waitingImpls, wi)
-	case models.CppLink:
-		t.CppLink(obj_t)
+	case models.CppLinkFn:
+		t.LinkFn(obj_t)
+	case models.CppLinkVar:
+		t.LinkVar(obj_t)
 	case models.Comment:
 		t.Comment(obj_t)
 	case models.UseDecl:
@@ -718,7 +721,8 @@ func (t *Transpiler) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 			t.pusherrs(fp.Errors...)
 			return true
 		}
-		t.cppLinks = append(t.cppLinks, fp.cppLinks...)
+		t.linked_functions = append(t.linked_functions, fp.linked_functions...)
+		t.linked_variables = append(t.linked_variables, fp.linked_variables...)
 		t.waitingFuncs = append(t.waitingFuncs, fp.waitingFuncs...)
 		t.waitingGlobals = append(t.waitingGlobals, fp.waitingGlobals...)
 		t.waitingImpls = append(t.waitingImpls, fp.waitingImpls...)
@@ -1038,12 +1042,14 @@ func (t *Transpiler) checkCppLinkAttributes(f *Func) {
 	}
 }
 
-// CppLink parses cpp link.
-func (t *Transpiler) CppLink(link models.CppLink) {
+// LinkFn parses cpp link function.
+func (t *Transpiler) LinkFn(link models.CppLinkFn) {
 	if juleapi.IsIgnoreId(link.Link.Id) {
 		t.pusherrtok(link.Token, "ignore_id")
 		return
-	} else if t.linkById(link.Link.Id) != nil {
+	}
+	_, def_t := t.linkById(link.Link.Id)
+	if def_t != ' ' {
 		t.pusherrtok(link.Token, "exist_id", link.Link.Id)
 		return
 	}
@@ -1054,7 +1060,21 @@ func (t *Transpiler) CppLink(link models.CppLink) {
 	linkf.Attributes = t.attributes
 	t.attributes = nil
 	t.checkCppLinkAttributes(linkf)
-	t.cppLinks = append(t.cppLinks, &link)
+	t.linked_functions = append(t.linked_functions, linkf)
+}
+
+// LinkVar parses cpp link function.
+func (t *Transpiler) LinkVar(link models.CppLinkVar) {
+	if juleapi.IsIgnoreId(link.Link.Id) {
+		t.pusherrtok(link.Token, "ignore_id")
+		return
+	}
+	_, def_t := t.linkById(link.Link.Id)
+	if def_t != ' ' {
+		t.pusherrtok(link.Token, "exist_id", link.Link.Id)
+		return
+	}
+	t.linked_variables = append(t.linked_variables, link.Link)
 }
 
 // Trait parses Jule trait.
@@ -1487,7 +1507,7 @@ func (t *Transpiler) Var(v Var) *Var {
 			}
 			assign_checker{
 				t:                t,
-				expr_t:                v.Type,
+				expr_t:           v.Type,
 				v:                val,
 				errtok:           v.Token,
 				not_allow_assign: typeIsRef(v.Type),
@@ -1565,13 +1585,40 @@ func (t *Transpiler) varsFromParams(f *Func) []*Var {
 	return vars
 }
 
-func (t *Transpiler) linkById(id string) *models.CppLink {
-	for _, link := range t.cppLinks {
-		if link.Link.Id == id {
+func (t *Transpiler) linkedVarById(id string) *Var {
+	for _, link := range t.linked_variables {
+		if link.Id == id {
 			return link
 		}
 	}
 	return nil
+}
+
+func (t *Transpiler) linkedFnById(id string) *models.Fn {
+	for _, link := range t.linked_functions {
+		if link.Id == id {
+			return link
+		}
+	}
+	return nil
+}
+
+// Returns link by identifier.
+//
+// Types:
+//  ' ' -> not found
+//  'f' -> function
+//  'v' -> variable
+func (t *Transpiler) linkById(id string) (any, byte) {
+	f := t.linkedFnById(id)
+	if f != nil {
+		return f, 'f'
+	}
+	v := t.linkedVarById(id)
+	if v != nil {
+		return v, 'v'
+	}
+	return nil, ' '
 }
 
 // FuncById returns function by specified id.
@@ -1737,12 +1784,26 @@ func (t *Transpiler) check() {
 	}
 }
 
-func (t *Transpiler) checkCppLinks() {
-	for _, link := range t.cppLinks {
-		if len(link.Link.Generics) == 0 {
-			t.reloadFuncTypes(link.Link)
+func (t *Transpiler) check_linked_vars() {
+	for _, link := range t.linked_variables {
+		vt, ok := t.realType(link.Type, true)
+		if ok {
+			link.Type = vt
 		}
 	}
+}
+
+func (t *Transpiler) check_linked_fns() {
+	for _, link := range t.linked_functions {
+		if len(link.Generics) == 0 {
+			t.reloadFuncTypes(link)
+		}
+	}
+}
+
+func (t *Transpiler) checkCppLinks() {
+	t.check_linked_vars()
+	t.check_linked_fns()
 }
 
 // WaitingFuncs parses Jule global functions for waiting to parsing.
