@@ -211,7 +211,7 @@ func (e *eval) dataTypeFunc(expr lex.Token, callRange []lex.Token, m *exprModel)
 	case tokens.DataType:
 		switch expr.Kind {
 		case tokens.STR:
-			m.appendSubNode(exprNode{"__julec_tostr("})
+			m.appendSubNode(exprNode{"__julec_to_str("})
 			_, vm := e.t.evalToks(callRange)
 			m.appendSubNode(vm)
 			m.appendSubNode(exprNode{tokens.RPARENTHESES})
