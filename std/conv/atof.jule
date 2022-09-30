@@ -554,7 +554,7 @@ unsafe fn atof_hex(s: str, flt: *FloatInfo, mut mantissa: u64, mut exp: int, neg
 	if mantissa>>flt.mantbits == 0 { // Denormal or zero.
 		exp = flt.bias
 	}
-	let mut err: ConvError = ConvError.NoError
+	let mut err: ConvError = ConvError.Ok
 	if exp > max_exp { // infinity and range error
 		mantissa = 1 << flt.mantbits
 		exp = max_exp + 1
@@ -576,7 +576,7 @@ unsafe fn atof32(s: str) (f: f32, mut n: int, mut err: ConvError) {
 	{
 		let (val, _n, ok) = special(s)
 		if ok {
-			ret f32(val), _n, ConvError.NoError
+			ret f32(val), _n, ConvError.Ok
 		}
 	}
 
@@ -598,13 +598,13 @@ unsafe fn atof32(s: str) (f: f32, mut n: int, mut err: ConvError) {
 		if !trunc {
 			f, ok = atof32exact(mantissa, exp, neg)
 			if ok {
-				ret f, n, ConvError.NoError
+				ret f, n, ConvError.Ok
 			}
 		}
 		f, ok = eisel_lemire32(mantissa, exp, neg)
 		if ok {
 			if !trunc {
-				ret f, n, ConvError.NoError
+				ret f, n, ConvError.Ok
 			}
 			// Even if the mantissa was truncated, we may
 			// have found the correct result. Confirm by
@@ -612,7 +612,7 @@ unsafe fn atof32(s: str) (f: f32, mut n: int, mut err: ConvError) {
 			let mut f_up: f32 = 0
 			f_up, ok = eisel_lemire32(mantissa+1, exp, neg)
 			if ok && f == f_up {
-				ret f, n, ConvError.NoError
+				ret f, n, ConvError.Ok
 			}
 		}
 	}
@@ -634,7 +634,7 @@ unsafe fn atof64(s: str) (mut f: f64, mut n: int, err: ConvError) {
 	{
 		let (val, _n, ok) = special(s)
 		if ok {
-			ret val, _n, ConvError.NoError
+			ret val, _n, ConvError.Ok
 		}
 	}
 
@@ -655,13 +655,13 @@ unsafe fn atof64(s: str) (mut f: f64, mut n: int, err: ConvError) {
 		if !trunc {
 			f, ok = atof64exact(mantissa, exp, neg)
 			if ok {
-				ret f, n, ConvError.NoError
+				ret f, n, ConvError.Ok
 			}
 		}
 		f, ok = eisel_lemire64(mantissa, exp, neg)
 		if ok {
 			if !trunc {
-				ret f, n, ConvError.NoError
+				ret f, n, ConvError.Ok
 			}
 			// Even if the mantissa was truncated, we may
 			// have found the correct result. Confirm by
@@ -669,7 +669,7 @@ unsafe fn atof64(s: str) (mut f: f64, mut n: int, err: ConvError) {
 			let mut f_up: f64 = 0
 			f_up, ok = eisel_lemire64(mantissa+1, exp, neg)
 			if ok && f == f_up {
-				ret f, n, ConvError.NoError
+				ret f, n, ConvError.Ok
 			}
 		}
 	}
@@ -721,7 +721,7 @@ unsafe fn parse_float_prefix(s: str, bit_size: int) (f64, int, ConvError) {
 // as their respective special floating point values. It ignores case when matching.
 pub fn parse_float(s: str, bit_size: int) (f64, ConvError) {
 	let (f, n, err) = unsafe{ parse_float_prefix(s, bit_size) }
-	if n != s.len && (err == ConvError.NoError || ( err != ConvError.InvalidSyntax)) {
+	if n != s.len && (err == ConvError.Ok || ( err != ConvError.InvalidSyntax)) {
 		ret 0, ConvError.InvalidSyntax
 	}
 	ret f, err
