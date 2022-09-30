@@ -6,8 +6,6 @@ use std::math
 
 let OPTIMIZE = true
 
-const FN_PARSE_FLOAT = "parse_float"
-
 //doc:
 // Returns the length of the common
 // prefix of s and prefix, with the character case of s ignored.
@@ -509,7 +507,7 @@ fn atof32exact(mantissa: u64, mut exp: int, mut neg: bool) (f: f32, ok: bool) {
 // and returns it as a f64.
 // The string s has already been parsed into a mantissa, exponent, and sign (neg==true for negative).
 // If trunc is true, trailing non-zero bits have been omitted from the mantissa.
-unsafe fn atof_hex(s: str, flt: *FloatInfo, mut mantissa: u64, mut exp: int, neg: bool, trunc: bool) (f64, Error) {
+unsafe fn atof_hex(s: str, flt: *FloatInfo, mut mantissa: u64, mut exp: int, neg: bool, trunc: bool) (f64, ConvError) {
 	let max_exp = 1<<flt.expbits + flt.bias - 2
 	let min_exp = flt.bias + 1
 	exp += int(flt.mantbits) // mantissa now implicitly divided by 2^mantbits.
@@ -556,11 +554,11 @@ unsafe fn atof_hex(s: str, flt: *FloatInfo, mut mantissa: u64, mut exp: int, neg
 	if mantissa>>flt.mantbits == 0 { // Denormal or zero.
 		exp = flt.bias
 	}
-	let mut err: Error = nil
+	let mut err: ConvError = ConvError.NoError
 	if exp > max_exp { // infinity and range error
 		mantissa = 1 << flt.mantbits
 		exp = max_exp + 1
-		err = range_error(FN_PARSE_FLOAT, s)
+		err = ConvError.OutOfRange
 	}
 
 	let mut bits = mantissa & (1<<flt.mantbits - 1)
@@ -574,18 +572,18 @@ unsafe fn atof_hex(s: str, flt: *FloatInfo, mut mantissa: u64, mut exp: int, neg
 	ret std::math::f64_from_bits(bits), err
 }
 
-unsafe fn atof32(s: str) (f: f32, mut n: int, mut err: Error) {
+unsafe fn atof32(s: str) (f: f32, mut n: int, mut err: ConvError) {
 	{
 		let (val, _n, ok) = special(s)
 		if ok {
-			ret f32(val), _n, nil
+			ret f32(val), _n, ConvError.NoError
 		}
 	}
 
 	let (mantissa, exp, neg, trunc, hex, _n, mut ok) = read_float(s)
 	n = _n
 	if !ok {
-		ret 0, n, syntax_error(FN_PARSE_FLOAT, s)
+		ret 0, n, ConvError.InvalidSyntax
 	}
 
 	if hex {
@@ -600,13 +598,13 @@ unsafe fn atof32(s: str) (f: f32, mut n: int, mut err: Error) {
 		if !trunc {
 			f, ok = atof32exact(mantissa, exp, neg)
 			if ok {
-				ret f, n, nil
+				ret f, n, ConvError.NoError
 			}
 		}
 		f, ok = eisel_lemire32(mantissa, exp, neg)
 		if ok {
 			if !trunc {
-				ret f, n, nil
+				ret f, n, ConvError.NoError
 			}
 			// Even if the mantissa was truncated, we may
 			// have found the correct result. Confirm by
@@ -614,7 +612,7 @@ unsafe fn atof32(s: str) (f: f32, mut n: int, mut err: Error) {
 			let mut f_up: f32 = 0
 			f_up, ok = eisel_lemire32(mantissa+1, exp, neg)
 			if ok && f == f_up {
-				ret f, n, nil
+				ret f, n, ConvError.NoError
 			}
 		}
 	}
@@ -622,28 +620,28 @@ unsafe fn atof32(s: str) (f: f32, mut n: int, mut err: Error) {
 	// Slow fallback.
 	let mut d = Decimal{}
 	if !d.set(s[:n]) {
-		ret 0, n, syntax_error(FN_PARSE_FLOAT, s)
+		ret 0, n, ConvError.InvalidSyntax
 	}
 	let (b, ovf) = d.float_bits(&f32_info)
 	f = std::math::f32_from_bits(u32(b))
 	if ovf {
-		err = range_error(FN_PARSE_FLOAT, s)
+		err = ConvError.OutOfRange
 	}
 	ret f, n, err
 }
 
-unsafe fn atof64(s: str) (mut f: f64, mut n: int, err: Error) {
+unsafe fn atof64(s: str) (mut f: f64, mut n: int, err: ConvError) {
 	{
 		let (val, _n, ok) = special(s)
 		if ok {
-			ret val, _n, nil
+			ret val, _n, ConvError.NoError
 		}
 	}
 
 	let (mantissa, exp, neg, trunc, hex, _n, mut ok) = read_float(s)
 	n = _n
 	if !ok {
-		ret 0, n, syntax_error(FN_PARSE_FLOAT, s)
+		ret 0, n, ConvError.InvalidSyntax
 	}
 
 	if hex {
@@ -657,13 +655,13 @@ unsafe fn atof64(s: str) (mut f: f64, mut n: int, err: Error) {
 		if !trunc {
 			f, ok = atof64exact(mantissa, exp, neg)
 			if ok {
-				ret f, n, nil
+				ret f, n, ConvError.NoError
 			}
 		}
 		f, ok = eisel_lemire64(mantissa, exp, neg)
 		if ok {
 			if !trunc {
-				ret f, n, nil
+				ret f, n, ConvError.NoError
 			}
 			// Even if the mantissa was truncated, we may
 			// have found the correct result. Confirm by
@@ -671,7 +669,7 @@ unsafe fn atof64(s: str) (mut f: f64, mut n: int, err: Error) {
 			let mut f_up: f64 = 0
 			f_up, ok = eisel_lemire64(mantissa+1, exp, neg)
 			if ok && f == f_up {
-				ret f, n, nil
+				ret f, n, ConvError.NoError
 			}
 		}
 	}
@@ -679,17 +677,17 @@ unsafe fn atof64(s: str) (mut f: f64, mut n: int, err: Error) {
 	// Slow fallback.
 	let mut d = Decimal{}
 	if !d.set(s[:n]) {
-		ret 0, n, syntax_error(FN_PARSE_FLOAT, s)
+		ret 0, n, ConvError.InvalidSyntax
 	}
 	let (b, ovf) = d.float_bits(&f64_info)
 	f = std::math::f64_from_bits(b)
 	if ovf {
-		err = range_error(FN_PARSE_FLOAT, s)
+		err = ConvError.OutOfRange
 	}
 	ret f, n, err
 }
 
-unsafe fn parse_float_prefix(s: str, bit_size: int) (f64, int, Error) {
+unsafe fn parse_float_prefix(s: str, bit_size: int) (f64, int, ConvError) {
 	if bit_size == 32 {
 		let (f, n, err) = atof32(s)
 		ret f64(f), n, err
@@ -711,21 +709,20 @@ unsafe fn parse_float_prefix(s: str, bit_size: int) (f64, int, Error) {
 // there are more bits in the hexadecimal representation than
 // will fit in the mantissa.)
 //
-// The errors that returns have concrete type *ConvError
-// and include err.Num = s.
+// The errors that returns have concrete type ConvError.
 //
-// If s is not syntactically well-formed, returns err.Err = ERROR_SYNTAX.
+// If s is not syntactically well-formed, returns err = ConvError.InvalidSyntax.
 //
 // If s is syntactically well-formed but is more than 1/2 ULP
 // away from the largest floating point number of the given size,
-// Returns f = ±inf, err.Error = ERROR_RANGE.
+// Returns f = ±inf, err = ConvError.OutOfRange.
 //
 // Recognizes the string "nan", and the (possibly signed) strings "inf" and "infinity"
 // as their respective special floating point values. It ignores case when matching.
-pub fn parse_float(s: str, bit_size: int) (f64, Error) {
+pub fn parse_float(s: str, bit_size: int) (f64, ConvError) {
 	let (f, n, err) = unsafe{ parse_float_prefix(s, bit_size) }
-	if n != s.len && (err == nil || ( (&ConvError)(err) ).err  != ERROR_SYNTAX) {
-		ret 0, syntax_error(FN_PARSE_FLOAT, s)
+	if n != s.len && (err == ConvError.NoError || ( err != ConvError.InvalidSyntax)) {
+		ret 0, ConvError.InvalidSyntax
 	}
 	ret f, err
 }

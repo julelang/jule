@@ -20,14 +20,11 @@ fn lower(c: byte) byte {
 // Is like parse_int but for unsigned numbers.
 //
 // A sign prefix is not permitted.
-pub fn parse_uint(mut s: str, mut base: int, mut bit_size: int) (u64, Error) {
-	const FN_PARSE_UINT = "parse_uint"
-
+pub fn parse_uint(mut s: str, mut base: int, mut bit_size: int) (u64, ConvError) {
 	if s == "" {
-		ret 0, syntax_error(FN_PARSE_UINT, s)
+		ret 0, ConvError.InvalidSyntax
 	}
 
-	let s0 = s
 	match {
 	case 2 <= base && base <= 36:
 		// valid base; nothing to do
@@ -51,13 +48,13 @@ pub fn parse_uint(mut s: str, mut base: int, mut bit_size: int) (u64, Error) {
 			}
 		}
 	default:
-		ret 0, base_error(FN_PARSE_UINT, s0, base)
+		ret 0, ConvError.InvalidBase
 	}
 
 	if bit_size == 0 {
 		bit_size = INT_SIZE
 	} else if bit_size < 0 || bit_size > 64 {
-		ret 0, bit_size_error(FN_PARSE_UINT, s0, bit_size)
+		ret 0, ConvError.InvalidBitSize
 	}
 
 	// Cutoff is the smallest number such that cutoff*base > MAX_UINT64.
@@ -95,28 +92,28 @@ pub fn parse_uint(mut s: str, mut base: int, mut bit_size: int) (u64, Error) {
 		case 'a' <= lower(c) && lower(c) <= 'z':
 			d = lower(c) - 'a' + 10
 		default:
-			ret 0, syntax_error(FN_PARSE_UINT, s0)
+			ret 0, ConvError.InvalidSyntax
 		}
 
 		if d >= byte(base) {
-			ret 0, syntax_error(FN_PARSE_UINT, s0)
+			ret 0, ConvError.InvalidSyntax
 		}
 
 		if n >= cutoff {
 			// n*base overflows
-			ret max_val, range_error(FN_PARSE_UINT, s0)
+			ret max_val, ConvError.OutOfRange
 		}
 		n *= u64(base)
 
 		let n1 = n + u64(d)
 		if n1 < n || n1 > max_val {
 			// n+d overflows
-			ret max_val, range_error(FN_PARSE_UINT, s0)
+			ret max_val, ConvError.OutOfRange
 		}
 		n = n1
 	}
 
-	ret n, nil
+	ret n, ConvError.NoError
 }
 
 // Interprets a string s in the given base (0, 2 to 36) and
@@ -133,22 +130,18 @@ pub fn parse_uint(mut s: str, mut base: int, mut bit_size: int) (u64, Error) {
 // correspond to int, i8, i16, i32, and i64.
 // If bit_size is below 0 or above 64, an error is returned.
 //
-// The errors that parse_int returns have concrete type *ConvError
-// and include err.Input = s. If s is empty or contains invalid
-// digits, err.Error = ERROR_SYNTAX and the returned value is 0;
-// if the value corresponding to s cannot be represented by a
-// signed integer of the given size, err.Error = ERROR_RANGE and the
-// returned value is the maximum magnitude integer of the
+// The errors that parse_int returns have concrete type ConvError.
+// If s is empty or contains invalid digits, err = ConvError.InvalidSyntax
+// and the returned value is 0; if the value corresponding to s cannot be
+// represented by a signed integer of the given size, err = ConvError.OutOfRange
+// and the returned value is the maximum magnitude integer of the
 // appropriate bit_size and sign.
-pub fn parse_int(mut s: str, base: int, mut bit_size: int) (i: i64, err: Error) {
-	const FN_PARSE_INT = "parse_int"
-
+pub fn parse_int(mut s: str, base: int, mut bit_size: int) (i: i64, err: ConvError) {
 	if s == "" {
-		ret 0, syntax_error(FN_PARSE_INT, s)
+		ret 0, ConvError.InvalidSyntax
 	}
 
 	// Pick off leading sign.
-	let s0 = s
 	let mut neg = false
 	if s[0] == '+' {
 		s = s[1:]
@@ -160,9 +153,7 @@ pub fn parse_int(mut s: str, base: int, mut bit_size: int) (i: i64, err: Error) 
 	// Convert unsigned and check range.
 	let mut un: uint = 0
 	un, err = parse_uint(s, base, bit_size)
-	if err != nil && ( (&ConvError)(err) ).err != ERROR_RANGE {
-		( (&ConvError)(err) ).func = FN_PARSE_INT
-		( (&ConvError)(err) ).input = s0
+	if err != ConvError.NoError && err != ConvError.OutOfRange {
 		ret 0, err
 	}
 
@@ -172,14 +163,14 @@ pub fn parse_int(mut s: str, base: int, mut bit_size: int) (i: i64, err: Error) 
 
 	let cutoff = u64(1 << uint(bit_size-1))
 	if !neg && un >= cutoff {
-		ret i64(cutoff - 1), range_error(FN_PARSE_INT, s0)
+		ret i64(cutoff - 1), ConvError.OutOfRange
 	}
 	if neg && un > cutoff {
-		ret -i64(cutoff), range_error(FN_PARSE_INT, s0)
+		ret -i64(cutoff), ConvError.OutOfRange
 	}
 	let mut n = i64(un)
 	if neg {
 		n = -n
 	}
-	ret n, nil
+	ret n, ConvError.NoError
 }
