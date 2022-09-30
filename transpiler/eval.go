@@ -216,12 +216,10 @@ func (e *eval) dataTypeFunc(expr lex.Token, callRange []lex.Token, m *exprModel)
 			m.appendSubNode(vm)
 			m.appendSubNode(exprNode{tokens.RPARENTHESES})
 			v.data.Type = Type{
-				Id:   juletype.Fn,
-				Kind: strDefaultFunc.DataTypeString(),
-				Tag:  strDefaultFunc,
+				Id:   juletype.Str,
+				Kind: juletype.TypeMap[juletype.Str],
 			}
 			isret = true
-
 		default:
 			dt := Type{
 				Token: expr,
