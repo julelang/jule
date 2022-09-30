@@ -181,6 +181,9 @@ func (p *Parser) buildEnumItems(toks []lex.Token) []*models.EnumItem {
 	items := make([]*models.EnumItem, 0)
 	for i := 0; i < len(toks); i++ {
 		t := toks[i]
+		if t.Id == tokens.Comment {
+			continue
+		}
 		item := new(models.EnumItem)
 		item.Token = t
 		if item.Token.Id != tokens.Id {
