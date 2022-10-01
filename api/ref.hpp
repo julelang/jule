@@ -5,7 +5,7 @@
 #ifndef __JULEC_REF_HPP
 #define __JULEC_REF_HPP
 
-#define __JULEC_REFERENCE_DELTA ( 1 )
+constexpr signed int __JULEC_REFERENCE_DELTA{ 1 };
 
 // Wrapper structure for raw pointer of JuleC.
 // This structure is the used by Jule references for reference-counting

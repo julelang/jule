@@ -6,9 +6,9 @@
 #define __JULEC_HPP
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-#ifndef _WINDOWS
-#define _WINDOWS
-#endif // #ifndef _WINDOWS
+#ifndef WINDOWS
+#define WINDOWS
+#endif // #ifndef WINDOWS
 #endif // if Windows
 
 
@@ -19,21 +19,19 @@
 #include <functional>
 #include <thread>
 #include <typeinfo>
-#ifdef _WINDOWS
+#ifdef WINDOWS
 #include <codecvt>
 #include <windows.h>
 #include <fcntl.h>
-#endif // #ifdef _WINDOWS
+#endif // #ifdef WINDOWS
 
 
-#define __JULEC_ERROR_INVALID_MEMORY \
-    ( "invalid memory address or nil pointer deference" )
-#define __JULEC_ERROR_INCOMPATIBLE_TYPE \
-    ( "incompatible type" )
-#define __JULEC_ERROR_MEMORY_ALLOCATION_FAILED \
-    ( "memory allocation failed" )
-#define __JULEC_ERROR_INDEX_OUT_OF_RANGE \
-    ( "index out of range" )
+constexpr const char *__JULEC_ERROR_INVALID_MEMORY{ "invalid memory address or nil pointer deference" };
+constexpr const char *__JULEC_ERROR_INCOMPATIBLE_TYPE{ "incompatible type" };
+constexpr const char *__JULEC_ERROR_MEMORY_ALLOCATION_FAILED{ "memory allocation failed" };
+constexpr const char *__JULEC_ERROR_INDEX_OUT_OF_RANGE{ "index out of range" };
+constexpr signed int __JULEC_EXIT_PANIC{ 2 };
+constexpr std::nullptr_t nil{ nullptr };
 #define __JULEC_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(_STREAM, _START, _LEN)   \
     (   \
         _STREAM << __JULEC_ERROR_INDEX_OUT_OF_RANGE \
@@ -50,13 +48,11 @@
                 << _INDEX   \
                 << ']'  \
     )
-#define __JULEC_EXIT_PANIC ( 2 )
 #define __JULEC_CCONCAT(_A, _B) _A ## _B
 #define __JULEC_CONCAT(_A, _B) __JULEC_CCONCAT(_A, _B)
 #define __JULEC_IDENTIFIER_PREFIX _
 #define JULEC_ID(_IDENTIFIER)   \
     __JULEC_CONCAT(__JULEC_IDENTIFIER_PREFIX, _IDENTIFIER)
-#define nil ( nullptr )
 #define __JULEC_CO(_EXPR)   \
     ( std::thread{[&](void) mutable -> void { _EXPR; }}.detach() )
 #define __JULEC_DEFER(_EXPR)    \
@@ -227,7 +223,7 @@ void __julec_terminate_handler(void) noexcept {
 }
 
 void __julec_setup_command_line_args(int argc, char *argv[]) noexcept {
-#ifdef _WINDOWS
+#ifdef WINDOWS
     const LPWSTR _cmdl{ GetCommandLineW() };
     wchar_t *_wargs{ _cmdl };
     const size_t _wargs_len{ std::wcslen(_wargs) };
@@ -250,15 +246,15 @@ void __julec_setup_command_line_args(int argc, char *argv[]) noexcept {
     __julec_args = slice<str_julet>( argc );
     for (int_julet _i{ 0 }; _i < argc; ++_i)
     { __julec_command_line_args[_i] = argv[_i]; }
-#endif // #ifdef _WINDOWS
+#endif // #ifdef WINDOWS
 }
 
 int main(int argc, char *argv[]) {
-#ifdef _WINDOWS
+#ifdef WINDOWS
     // Windows needs little magic for UTF-8
     SetConsoleOutputCP( CP_UTF8 );
     _setmode( _fileno( stdin ) , ( 0x00020000 ) );
-#endif // #ifdef _WINDOWS
+#endif // #ifdef WINDOWS
     std::set_terminate( &__julec_terminate_handler );
     __julec_setup_command_line_args( argc , argv );
 

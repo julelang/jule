@@ -14,32 +14,32 @@
 // Based on std::unicode::utf8
 //
 
-#define __JULEC_UTF8_RUNE_ERROR ( 65533 )
-#define __JULEC_UTF8_MASKX ( 63)
-#define __JULEC_UTF8_MASK2 ( 31 )
-#define __JULEC_UTF8_MASK3 ( 15 )
-#define __JULEC_UTF8_MASK4 ( 7 )
-#define __JULEC_UTF8_LOCB ( 128 )
-#define __JULEC_UTF8_HICB ( 191 )
-#define __JULEC_UTF8_XX ( 241 )
-#define __JULEC_UTF8_AS ( 240 )
-#define __JULEC_UTF8_S1 ( 2 )
-#define __JULEC_UTF8_S2 ( 19 )
-#define __JULEC_UTF8_S3 ( 3 )
-#define __JULEC_UTF8_S4 ( 35 )
-#define __JULEC_UTF8_S5 ( 52 )
-#define __JULEC_UTF8_S6 ( 4 )
-#define __JULEC_UTF8_S7 ( 68 )
-#define __JULEC_UTF8_RUNE1_MAX ( 127 )
-#define __JULEC_UTF8_RUNE2_MAX ( 2047 )
-#define __JULEC_UTF8_RUNE3_MAX ( 65535 )
-#define __JULEC_UTF8_TX ( 128 )
-#define __JULEC_UTF8_T2 ( 192 )
-#define __JULEC_UTF8_T3 ( 224 )
-#define __JULEC_UTF8_T4 ( 240 )
-#define __JULEC_UTF8_MAX_RUNE ( 1114111 )
-#define __JULEC_UTF8_SURROGATE_MIN ( 55296 )
-#define __JULEC_UTF8_SURROGATE_MAX ( 57343 )
+constexpr signed int __JULEC_UTF8_RUNE_ERROR{ 65533 };
+constexpr signed int __JULEC_UTF8_MASKX{ 63 };
+constexpr signed int __JULEC_UTF8_MASK2{ 31 };
+constexpr signed int __JULEC_UTF8_MASK3{ 15 };
+constexpr signed int __JULEC_UTF8_MASK4{ 7 };
+constexpr signed int __JULEC_UTF8_LOCB{ 128 };
+constexpr signed int __JULEC_UTF8_HICB{ 191 };
+constexpr signed int __JULEC_UTF8_XX{ 241 };
+constexpr signed int __JULEC_UTF8_AS{ 240 };
+constexpr signed int __JULEC_UTF8_S1{ 2 };
+constexpr signed int __JULEC_UTF8_S2{ 19 };
+constexpr signed int __JULEC_UTF8_S3{ 3 };
+constexpr signed int __JULEC_UTF8_S4{ 35 };
+constexpr signed int __JULEC_UTF8_S5{ 52 };
+constexpr signed int __JULEC_UTF8_S6{ 4 };
+constexpr signed int __JULEC_UTF8_S7{ 68 };
+constexpr signed int __JULEC_UTF8_RUNE1_MAX{ 127 };
+constexpr signed int __JULEC_UTF8_RUNE2_MAX{ 2047 };
+constexpr signed int __JULEC_UTF8_RUNE3_MAX{ 65535 };
+constexpr signed int __JULEC_UTF8_TX{ 128 };
+constexpr signed int __JULEC_UTF8_T2{ 192 };
+constexpr signed int __JULEC_UTF8_T3{ 224 };
+constexpr signed int __JULEC_UTF8_T4{ 240 };
+constexpr signed int __JULEC_UTF8_MAX_RUNE{ 1114111 };
+constexpr signed int __JULEC_UTF8_SURROGATE_MIN{ 55296 };
+constexpr signed int __JULEC_UTF8_SURROGATE_MAX{ 57343 };
 
 // Declarations
 
@@ -72,11 +72,11 @@ constexpr u8_julet __julec_utf8_first[256] = {
 struct __julec_utf8_accept_range{ const u8_julet _lo, _hi; };
 
 constexpr struct __julec_utf8_accept_range __julec_utf8_accept_ranges[16] = {
-    __julec_utf8_accept_range{ __JULEC_UTF8_LOCB, __JULEC_UTF8_HICB },
-    __julec_utf8_accept_range{ 0xA0, __JULEC_UTF8_HICB },
-    __julec_utf8_accept_range{ __JULEC_UTF8_LOCB, 0x9F },
-    __julec_utf8_accept_range{ 0x90, __JULEC_UTF8_HICB },
-    __julec_utf8_accept_range{ __JULEC_UTF8_LOCB, 0x8F },
+    { __JULEC_UTF8_LOCB, __JULEC_UTF8_HICB },
+    { 0xA0, __JULEC_UTF8_HICB },
+    { __JULEC_UTF8_LOCB, 0x9F },
+    { 0x90, __JULEC_UTF8_HICB },
+    { __JULEC_UTF8_LOCB, 0x8F },
 };
 
 std::tuple<i32_julet, int_julet>

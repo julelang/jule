@@ -14,12 +14,12 @@
 // Based on std::unicode::utf16
 //
 
-#define __JULEC_UTF16_REPLACEMENT_CHAR ( 65533 )
-#define __JULEC_UTF16_SURR1 ( 0xd800 )
-#define __JULEC_UTF16_SURR2 ( 0xdc00 )
-#define __JULEC_UTF16_SURR3 ( 0xe000 )
-#define __JULEC_UTF16_SURR_SELF ( 0x10000 )
-#define __JULEC_UTF16_MAX_RUNE ( 1114111 )
+constexpr signed int __JULEC_UTF16_REPLACEMENT_CHAR{ 65533 };
+constexpr signed int __JULEC_UTF16_SURR1{ 0xd800 };
+constexpr signed int __JULEC_UTF16_SURR2{ 0xdc00 };
+constexpr signed int __JULEC_UTF16_SURR3{ 0xe000 };
+constexpr signed int __JULEC_UTF16_SURR_SELF{ 0x10000 };
+constexpr signed int __JULEC_UTF16_MAX_RUNE{ 1114111 };
 
 // Declarations
 
