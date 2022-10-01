@@ -104,9 +104,6 @@ public:
     inline int_julet rfind(const str_julet &_Sub) const noexcept
     { return ( (int_julet)(this->_buffer.rfind( _Sub._buffer) ) ); }
 
-    inline const char* cstr(void) const noexcept
-    { return ( (const char*)( this->_buffer.c_str() ) ); }
-
     str_julet trim(const str_julet &_Bytes) const noexcept {
         const_iterator _it{ this->begin() };
         const const_iterator _end{ this->end() };
@@ -199,7 +196,17 @@ public:
     }
 
     inline operator const char*(void) const noexcept
-    { return ( this->cstr() ); }
+    { return ( this->operator const char *() ); }
+
+    inline operator const std::basic_string<u8_julet>(void) const noexcept
+    { return ( this->_buffer ); }
+
+    inline operator const std::basic_string<char>(void) const noexcept {
+        return (
+            std::basic_string<char>( this->_buffer.begin(),
+                                     this->_buffer.end() )
+        );
+    }
 
     operator slice<u8_julet>(void) const noexcept {
         slice<u8_julet> _slice( this->len() );
@@ -210,7 +217,7 @@ public:
 
     operator slice<i32_julet>(void) const noexcept {
         slice<i32_julet> _runes;
-        const char *_str{ this->cstr() };
+        const char *_str{ this->operator const char *() };
         for (int_julet _index{ 0 }; _index < this->len(); ) {
             i32_julet _rune;
             int_julet _n;
