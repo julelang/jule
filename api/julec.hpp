@@ -6,11 +6,16 @@
 #define __JULEC_HPP
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-#ifndef WINDOWS
 #define WINDOWS
-#endif // #ifndef WINDOWS
-#endif // if Windows
+#elif defined(__linux__) || defined(linux) || defined(__linux)
+#define LINUX
+#elif defined(__APPLE__) || defined(__MACH__)
+#define DARWIN
+#endif
 
+#if defined(LINUX) || defined(DARWIN)
+#define UNIX
+#endif
 
 #include <iostream>
 #include <cstring>
