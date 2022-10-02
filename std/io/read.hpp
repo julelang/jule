@@ -12,7 +12,7 @@ str_julet __julec_readln(void) noexcept;
 
 str_julet __julec_readln(void) noexcept {
     str_julet _input;
-#ifdef WINDOWS
+#ifdef _WINDOWS
     std::wstring _buffer;
     std::getline( std::wcin , _buffer );
     std::wcin.clear();
@@ -24,7 +24,7 @@ str_julet __julec_readln(void) noexcept {
     std::cin.clear();
     std::cin.ignore();
     _input = str_julet( _buffer.c_str() );
-#endif // #ifdef WINDOWS
+#endif // #ifdef _WINDOWS
     return ( _input );
 }
 

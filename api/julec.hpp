@@ -6,15 +6,31 @@
 #define __JULEC_HPP
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-#define WINDOWS
+#define _WINDOWS
 #elif defined(__linux__) || defined(linux) || defined(__linux)
-#define LINUX
+#define _LINUX
 #elif defined(__APPLE__) || defined(__MACH__)
-#define DARWIN
+#define _DARWIN
 #endif
 
-#if defined(LINUX) || defined(DARWIN)
-#define UNIX
+#if defined(_LINUX) || defined(_DARWIN)
+#define _UNIX
+#endif
+
+#if defined(__amd64) || defined(__amd64__) || defined(__x86_64) || defined(__x86_64__) || defined(_M_AMD64)
+#define _AMD64
+#elif defined(__arm__) || defined(__thumb__) || defined(_M_ARM) || defined(__arm)
+#define _ARM
+#elif defined(__aarch64__)
+#define _ARM64
+#elif defined(i386) || defined(__i386) || defined(__i386__) || defined(_X86_) || defined(__I86__) || defined(__386)
+#define _I386
+#endif
+
+#if defined(_AMD64) || defined(_ARM64)
+#define _64BIT
+#else
+#define _32BIT
 #endif
 
 #include <iostream>
@@ -24,11 +40,11 @@
 #include <functional>
 #include <thread>
 #include <typeinfo>
-#ifdef WINDOWS
+#ifdef _WINDOWS
 #include <codecvt>
 #include <windows.h>
 #include <fcntl.h>
-#endif // #ifdef WINDOWS
+#endif // #ifdef _WINDOWS
 
 
 constexpr const char *__JULEC_ERROR_INVALID_MEMORY{ "invalid memory address or nil pointer deference" };
@@ -228,7 +244,7 @@ void __julec_terminate_handler(void) noexcept {
 }
 
 void __julec_setup_command_line_args(int argc, char *argv[]) noexcept {
-#ifdef WINDOWS
+#ifdef _WINDOWS
     const LPWSTR _cmdl{ GetCommandLineW() };
     wchar_t *_wargs{ _cmdl };
     const size_t _wargs_len{ std::wcslen(_wargs) };
@@ -251,15 +267,15 @@ void __julec_setup_command_line_args(int argc, char *argv[]) noexcept {
     __julec_args = slice<str_julet>( argc );
     for (int_julet _i{ 0 }; _i < argc; ++_i)
     { __julec_command_line_args[_i] = argv[_i]; }
-#endif // #ifdef WINDOWS
+#endif // #ifdef _WINDOWS
 }
 
 int main(int argc, char *argv[]) {
-#ifdef WINDOWS
+#ifdef _WINDOWS
     // Windows needs little magic for UTF-8
     SetConsoleOutputCP( CP_UTF8 );
     _setmode( _fileno( stdin ) , ( 0x00020000 ) );
-#endif // #ifdef WINDOWS
+#endif // #ifdef _WINDOWS
     std::set_terminate( &__julec_terminate_handler );
     __julec_setup_command_line_args( argc , argv );
 
