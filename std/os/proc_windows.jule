@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::unicode::utf16::{encode}
+use std::sys::{utf16_from_str}
 
 use cpp "proc_windows.hpp"
 
@@ -14,7 +14,9 @@ fn __getwd() (str, ok: bool) {
 }
 
 fn __chdir(path: str) bool {
-	let mut utf16_runes = encode(([]rune)(path))
-	utf16_runes = append[u16](utf16_runes, 0)
-	ret cpp.__julec_chdir(utf16_runes)
+	let (utf16_path, ok) = utf16_from_str(path)
+	if !ok {
+		ret false
+	}
+	ret cpp.__julec_chdir(utf16_path)
 }
