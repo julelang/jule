@@ -104,3 +104,19 @@ pub fn decode(s: []u16) []rune {
 	}
 	ret a[:n]
 }
+
+// Appends the UTF-16 encoding of the Unicode code point r
+// to the end of p and returns the extended buffer. If the rune is not
+// a valid Unicode code point, it appends the encoding of U+FFFD.
+pub fn append_rune(a: []u16, r: rune) []u16 {
+	match {
+	case 0 <= r && r < SURR1, SURR3 <= r && r < SURR_SELF:
+		// normal rune
+		ret append[u16](a, u16(r))
+	case SURR_SELF <= r && r <= MAX_RUNE:
+		// needs surrogate sequence
+		let (r1, r2) = encode_rune(r)
+		ret append[u16](a, u16(r1), u16(r2))
+	}
+	ret append[u16](a, REPLACEMENT_CHAR)
+}
