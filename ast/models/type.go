@@ -283,6 +283,9 @@ func (dt *Type) TraitString() string {
 func (dt *Type) StructString() string {
 	var cpp strings.Builder
 	s := dt.Tag.(CompiledStruct)
+	if s.CppLinked() {
+		cpp.WriteString("struct ")
+	}
 	cpp.WriteString(s.OutId())
 	types := s.Generics()
 	if len(types) == 0 {

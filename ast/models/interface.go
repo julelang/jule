@@ -5,6 +5,7 @@ type CompiledStruct interface {
 	OutId() string
 	Generics() []Type
 	SetGenerics([]Type)
+	CppLinked() bool
 }
 
 // Genericable instance.

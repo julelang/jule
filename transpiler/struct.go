@@ -67,6 +67,12 @@ func (s *structure) OutId() string {
 	return juleapi.OutId(s.Ast.Id, s.Ast.Token.File)
 }
 
+// CppLinked returns cpp_linked.
+//
+// This function is should be have this function
+// for CompiledStruct interface of ast package.
+func (s *structure) CppLinked() bool { return s.cpp_linked }
+
 func (s *structure) operators() string {
 	outid := s.OutId()
 	genericsDef, genericsSerie := s.cppGenerics()

@@ -2073,7 +2073,13 @@ func (t *Transpiler) callStructConstructor(s *structure, argsToks []lex.Token, m
 	argsToks[len(argsToks)-1].Kind = tokens.RPARENTHESES
 
 	args := t.getArgs(argsToks, true)
-	m.appendSubNode(exprNode{f.RetType.String()})
+	if s.CppLinked() {
+		m.appendSubNode(exprNode{tokens.LPARENTHESES})
+		m.appendSubNode(exprNode{f.RetType.String()})
+		m.appendSubNode(exprNode{tokens.RPARENTHESES})
+	} else {
+		m.appendSubNode(exprNode{f.RetType.String()})
+	}
 	if s.cpp_linked {
 		m.appendSubNode(exprNode{tokens.LBRACE})
 	} else {
