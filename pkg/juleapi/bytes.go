@@ -126,8 +126,6 @@ func tryBtoaCommonEsq(bytes []byte) (seq byte, ok bool) {
 	return
 }
 
-func byte_seq(bytes []byte, i int) (seq []byte) { return bytes[i : i+3] }
-
 func strEsqSeq(bytes []byte, i *int) string {
 	seq, ok := tryBtoaCommonEsq(bytes[*i:])
 	*i++
@@ -146,13 +144,13 @@ func strEsqSeq(bytes []byte, i *int) string {
 		*i += 8
 		return bytesToStr([]byte(string(r)))
 	case 'x':
-		seq := "0"
-		seq += string(bytes[*i : *i+3])
+		seq := bytes[*i : *i+3]
 		*i += 2
-		return seq
+		b, _ := strconv.ParseUint(string(seq), 16, 8)
+		return sbtoa(byte(b))
 	default:
-		seq := byte_seq(bytes, *i)
-		*i += len(seq) - 1
+		seq := bytes[*i : *i+3]
+		*i += 2
 		b, _ := strconv.ParseUint(string(seq), 8, 8)
 		return sbtoa(byte(b))
 	}
