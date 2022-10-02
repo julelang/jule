@@ -100,11 +100,10 @@ func (ve *valueEvaluator) char() value {
 	content, isByte := toCharLiteral(ve.token.Kind)
 	if isByte {
 		v.data.Type.Id = juletype.U8
-		content = juleapi.ToChar(content[0])
 	} else { // rune
 		v.data.Type.Id = juletype.I32
-		content = juleapi.ToRune([]byte(content))
 	}
+	content = juleapi.ToRune([]byte(content))
 	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	v.expr, _ = strconv.ParseInt(content[2:], 16, 64)
 	v.model = exprNode{content}

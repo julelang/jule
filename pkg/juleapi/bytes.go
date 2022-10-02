@@ -27,26 +27,22 @@ func ToStr(bytes []byte) string {
 // ToRawStr returns specified literal as Jule raw-string literal for cpp.
 func ToRawStr(bytes []byte) string { return ToStr(bytes) }
 
-// ToChar returns specified literal as Jule rune literal for cpp.
-func ToChar(b byte) string { return btoa(b) }
-
 // ToRune returns specified literal as Jule rune literal for cpp.
 func ToRune(bytes []byte) string {
 	if len(bytes) == 0 {
 		return ""
-	} else if bytes[0] == '\\' && len(bytes) > 1 {
-		seq, ok := tryBtoaCommonEsq(bytes)
-		if ok {
-			return btoa(seq)
-		}
-		switch bytes[1] {
-		case 'u', 'U':
-			bytes = bytes[2:]
-			i, _ := strconv.ParseInt(string(bytes), 16, 32)
-			return "0x" + strconv.FormatInt(i, 16)
-		}
 	}
-	r, _ := utf8.DecodeRune(bytes)
+	var r rune = 0
+	if bytes[0] == '\\' && len(bytes) > 1 {
+		i := 0
+		r = rune_from_esq_seq(bytes, &i)
+	} else {
+		r, _ = utf8.DecodeRune(bytes)
+	}
+	return rtoa(r)
+}
+
+func rtoa(r rune) string {
 	return "0x" + strconv.FormatInt(int64(r), 16)
 }
 
@@ -126,34 +122,42 @@ func tryBtoaCommonEsq(bytes []byte) (seq byte, ok bool) {
 	return
 }
 
-func strEsqSeq(bytes []byte, i *int) string {
-	seq, ok := tryBtoaCommonEsq(bytes[*i:])
+func rune_from_esq_seq(bytes []byte, i *int) rune {
+	b, ok := tryBtoaCommonEsq(bytes[*i:])
 	*i++
 	if ok {
-		return sbtoa(seq)
+		return rune(b)
 	}
 	switch bytes[*i] {
 	case 'u':
 		rc, _ := strconv.ParseUint(string(bytes[*i+1:*i+5]), 16, 32)
-		r := rune(rc)
 		*i += 4
-		return bytesToStr([]byte(string(r)))
+		r := rune(rc)
+		return r
 	case 'U':
 		rc, _ := strconv.ParseUint(string(bytes[*i+1:*i+9]), 16, 32)
-		r := rune(rc)
 		*i += 8
-		return bytesToStr([]byte(string(r)))
+		r := rune(rc)
+		return r
 	case 'x':
 		seq := bytes[*i : *i+3]
 		*i += 2
 		b, _ := strconv.ParseUint(string(seq), 16, 8)
-		return sbtoa(byte(b))
+		return rune(b)
 	default:
 		seq := bytes[*i : *i+3]
 		*i += 2
 		b, _ := strconv.ParseUint(string(seq), 8, 8)
-		return sbtoa(byte(b))
+		return rune(b)
 	}
+}
+
+func strEsqSeq(bytes []byte, i *int) string {
+	r := rune_from_esq_seq(bytes, i)
+	if r <= 255 {
+		return btoa(byte(r))
+	}
+	return bytesToStr([]byte(string(r)))
 }
 
 func bytesToStr(bytes []byte) string {
