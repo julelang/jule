@@ -196,7 +196,7 @@ public:
     }
 
     inline operator const char*(void) const noexcept
-    { return ( this->operator const char *() ); }
+    { return ( (char*)(this->_buffer.c_str()) ); }
 
     inline operator const std::basic_string<u8_julet>(void) const noexcept
     { return ( this->_buffer ); }
