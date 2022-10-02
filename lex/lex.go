@@ -479,30 +479,17 @@ func bigUnicodePointEsq(txt string) string { return hexEsq(txt, 10) }
 // Pattern (RegEx): ^\\u.{4}
 func littleUnicodePointEsq(txt string) string { return hexEsq(txt, 6) }
 
-// Pattern (RegEx): ^\\jule..
+// Pattern (RegEx): ^\\x..
 func hexByteEsq(txt string) string { return hexEsq(txt, 4) }
 
-// Patter (RegEx): ^\\[0-7]{1,3}
+// Patter (RegEx): ^\\[0-7]{3}
 func byteEsq(txt string) (seq string) {
-	if len(txt) < 2 {
+	if len(txt) < 4 {
+		return
+	} else if !IsOctal(txt[1]) || !IsOctal(txt[2]) || !IsOctal(txt[3]) {
 		return
 	}
-	if !IsOctal(txt[1]) {
-		return
-	}
-	switch {
-	case len(txt) == 2:
-		seq = txt[:2]
-	case !IsOctal(txt[2]):
-		seq = txt[:2]
-	case len(txt) == 3:
-		seq = txt[:3]
-	case !IsOctal(txt[3]):
-		seq = txt[:3]
-	default:
-		seq = txt[:4]
-	}
-	return
+	return txt[:4]
 }
 
 func (l *Lex) escseq(txt string) string {

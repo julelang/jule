@@ -4,8 +4,6 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf8"
-
-	"github.com/jule-lang/jule/lex"
 )
 
 // String are generated as clean byte encoded, not string literal.
@@ -57,6 +55,9 @@ func btoa(b byte) string {
 }
 
 func sbtoa(b byte) string {
+	if b == 0 {
+		return "\\x00"
+	}
 	if b < 128 {
 		seq := decompose_common_esq(b)
 		if seq != "" {
@@ -125,23 +126,7 @@ func tryBtoaCommonEsq(bytes []byte) (seq byte, ok bool) {
 	return
 }
 
-func byteSeq(bytes []byte, i int) (seq []byte, n int) {
-	byten := len(bytes) - i
-	switch {
-	case byten == 1:
-		n = 1
-	case !lex.IsOctal(bytes[i+1]):
-		n = 1
-	case byten == 2:
-		n = 2
-	case !lex.IsOctal(bytes[i+2]):
-		n = 2
-	default:
-		n = 3
-	}
-	seq = bytes[i : i+n]
-	return
-}
+func byte_seq(bytes []byte, i int) (seq []byte) { return bytes[i : i+3] }
 
 func strEsqSeq(bytes []byte, i *int) string {
 	seq, ok := tryBtoaCommonEsq(bytes[*i:])
@@ -166,8 +151,8 @@ func strEsqSeq(bytes []byte, i *int) string {
 		*i += 2
 		return seq
 	default:
-		seq, n := byteSeq(bytes, *i)
-		*i += n - 1
+		seq := byte_seq(bytes, *i)
+		*i += len(seq) - 1
 		b, _ := strconv.ParseUint(string(seq), 8, 8)
 		return sbtoa(byte(b))
 	}
