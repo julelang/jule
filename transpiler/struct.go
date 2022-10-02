@@ -17,6 +17,7 @@ type structure struct {
 	Used        bool
 	Description string
 
+	cpp_linked  bool
 	constructor *Func
 	// Instance generics.
 	generics []Type
@@ -60,6 +61,9 @@ func (s *structure) cppGenerics() (def string, serie string) {
 // This function is should be have this function
 // for CompiledStruct interface of ast package.
 func (s *structure) OutId() string {
+	if s.cpp_linked {
+		return s.Ast.Id
+	}
 	return juleapi.OutId(s.Ast.Id, s.Ast.Token.File)
 }
 

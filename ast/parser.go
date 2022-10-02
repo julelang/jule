@@ -266,7 +266,7 @@ func (p *Parser) Comment(t lex.Token) models.Object {
 	}
 }
 
-func (p *Parser) structFields(toks []lex.Token) []*models.Var {
+func (p *Parser) structFields(toks []lex.Token, cpp_linked bool) []*models.Var {
 	var fields []*models.Var
 	i := 0
 	for i < len(toks) {
@@ -294,19 +294,19 @@ func (p *Parser) structFields(toks []lex.Token) []*models.Var {
 		v.Pub = is_pub
 		v.Mutable = is_mut
 		v.IsField = true
+		v.CppLinked = cpp_linked
 		fields = append(fields, &v)
 	}
 	return fields
 }
 
-// Struct builds AST model of structure.
-func (p *Parser) Struct(toks []lex.Token) {
+func (p *Parser) parse_struct(toks []lex.Token, cpp_linked bool) models.Struct {
 	var s models.Struct
 	s.Pub = p.pub
 	p.pub = false
 	if len(toks) < 3 {
 		p.pusherr(toks[0], "invalid_syntax")
-		return
+		return s
 	}
 	s.Token = toks[1]
 	if s.Token.Id != tokens.Id {
@@ -317,12 +317,18 @@ func (p *Parser) Struct(toks []lex.Token) {
 	bodyToks := p.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
 	if bodyToks == nil {
 		p.pusherr(s.Token, "body_not_exist")
-		return
+		return s
 	}
 	if i < len(toks) {
 		p.pusherr(toks[i], "invalid_syntax")
 	}
-	s.Fields = p.structFields(bodyToks)
+	s.Fields = p.structFields(bodyToks, cpp_linked)
+	return s
+}
+
+// Struct builds AST model of structure.
+func (p *Parser) Struct(toks []lex.Token) {
+	s := p.parse_struct(toks, false)
 	p.Tree = append(p.Tree, models.Object{Token: s.Token, Data: s})
 }
 
@@ -552,6 +558,21 @@ func (p *Parser) link_var(toks []lex.Token) {
 	p.pub = bpub
 }
 
+// link_struct builds AST model of cpp structure link.
+func (p *Parser) link_struct(toks []lex.Token) {
+	tok := toks[0]
+
+	// Catch pub not supported
+	bpub := p.pub
+
+	var link models.CppLinkStruct
+	link.Token = tok
+	link.Link = p.parse_struct(toks[1:], true)
+	p.Tree = append(p.Tree, models.Object{Token: tok, Data: link})
+
+	p.pub = bpub
+}
+
 // CppLinks builds AST model of cpp link statement.
 func (p *Parser) CppLink(toks []lex.Token) {
 	tok := toks[0]
@@ -565,6 +586,8 @@ func (p *Parser) CppLink(toks []lex.Token) {
 		p.link_fn(toks)
 	case tokens.Let:
 		p.link_var(toks)
+	case tokens.Struct:
+		p.link_struct(toks)
 	default:
 		p.pusherr(tok, "invalid_syntax")
 	}
@@ -1150,6 +1173,38 @@ func (p *Parser) datatype(t *models.Type, toks []lex.Token, i *int, arrays, err 
 			}
 			t.Id = juletype.Id
 			t.Token = tok
+			p.idDataTypePartEnd(t, &dtv, toks, i)
+			ok = true
+			goto ret
+		case tokens.Cpp:
+			if *i+1 >= len(toks) {
+				if err {
+					p.pusherr(tok, "invalid_syntax")
+				}
+				return
+			}
+			*i++
+			if toks[*i].Id != tokens.Dot {
+				if err {
+					p.pusherr(toks[*i], "invalid_syntax")
+				}
+			}
+			if *i+1 >= len(toks) {
+				if err {
+					p.pusherr(tok, "invalid_syntax")
+				}
+				return
+			}
+			*i++
+			if toks[*i].Id != tokens.Id {
+				if err {
+					p.pusherr(toks[*i], "invalid_syntax")
+				}
+			}
+			t.CppLinked = true
+			t.Id = juletype.Id
+			t.Token = toks[*i]
+			dtv.WriteString(t.Token.Kind)
 			p.idDataTypePartEnd(t, &dtv, toks, i)
 			ok = true
 			goto ret

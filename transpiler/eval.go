@@ -19,7 +19,7 @@ type value struct {
 	constExpr bool
 	lvalue    bool
 	variadic  bool
-	isType    bool
+	is_type   bool
 	mutable   bool
 }
 
@@ -55,7 +55,7 @@ func (e *eval) eval_op(op any) (v value, model iExpr) {
 		v = e.process(t.Tokens, m)
 		if v.constExpr {
 			model = v.model
-		} else if v.isType {
+		} else if v.is_type {
 			e.pusherrtok(v.data.Token, "invalid_expr")
 		}
 		return
@@ -345,6 +345,8 @@ func (e *eval) try_cpp_linked_var(toks []lex.Token, m *exprModel) (v value, ok b
 		v = make_value_from_fn(def.(*models.Fn))
 	case 'v':
 		v = make_value_from_var(def.(*models.Var))
+	case 's':
+		v = make_value_from_struct(def.(*structure))
 	}
 	return
 }
@@ -897,7 +899,7 @@ func (e *eval) enumSubId(val value, idTok lex.Token, m *exprModel) (v value) {
 	enum := val.data.Type.Tag.(*Enum)
 	v = val
 	v.lvalue = false
-	v.isType = false
+	v.is_type = false
 	item := enum.ItemById(idTok.Kind)
 	if item == nil {
 		e.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
@@ -914,7 +916,7 @@ func (e *eval) structObjSubId(val value, idTok lex.Token, m *exprModel) value {
 	parent_type := val.data.Type
 	s := val.data.Type.Tag.(*structure)
 	val.constExpr = false
-	val.isType = false
+	val.is_type = false
 	if val.data.Value == tokens.SELF {
 		nodes := &m.nodes[m.index].nodes
 		n := len(*nodes)
@@ -949,7 +951,7 @@ func (e *eval) traitObjSubId(val value, idTok lex.Token, m *exprModel) value {
 	t := val.data.Type.Tag.(*trait)
 	val.constExpr = false
 	val.lvalue = false
-	val.isType = false
+	val.is_type = false
 	val = e.xObjSubId(t.Defines, val, false, idTok, m)
 	val.constExpr = false
 	return val
@@ -1546,7 +1548,7 @@ func (e *eval) braceRange(toks []lex.Token, m *exprModel) (v value) {
 		fallthrough
 	case tokens.Fn:
 		return e.anonymousFn(toks, m)
-	case tokens.Id:
+	case tokens.Id, tokens.Cpp:
 		return e.typeId(toks, m)
 	default:
 		e.pusherrtok(exprToks[0], "invalid_syntax")

@@ -26,6 +26,7 @@ type Var struct {
 	Desc      string
 	Used      bool
 	IsField   bool
+	CppLinked bool
 }
 
 //IsLocal returns variable is into the scope or not.
@@ -39,6 +40,8 @@ func as_local_id(row, column int, id string) string {
 // OutId returns juleapi.OutId result of var.
 func (v *Var) OutId() string {
 	switch {
+	case v.CppLinked:
+		return v.Id
 	case v.Id == tokens.SELF:
 		return "self"
 	case v.IsLocal():

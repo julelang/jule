@@ -34,6 +34,7 @@ type Type struct {
 	Tag           any
 	Pure          bool
 	Generic       bool
+	CppLinked     bool
 }
 
 // Copy returns deep copy of data type.
@@ -209,6 +210,9 @@ func (dt Type) String() (s string) {
 	}
 	switch dt.Id {
 	case juletype.Id:
+		if dt.CppLinked {
+			return dt.Kind
+		}
 		if dt.Generic {
 			return juleapi.AsId(dt.Kind)
 		}

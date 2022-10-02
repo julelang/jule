@@ -64,6 +64,7 @@ type Transpiler struct {
 	eval             *eval
 	linked_functions []*models.Fn
 	linked_variables []*models.Var
+	linked_structs   []*structure
 	allowBuiltin     bool
 	use_mut          *sync.Mutex
 	cpp_use_mut      *sync.Mutex
@@ -651,6 +652,8 @@ func (t *Transpiler) parseSrcTreeObj(obj models.Object) {
 		t.LinkFn(obj_t)
 	case models.CppLinkVar:
 		t.LinkVar(obj_t)
+	case models.CppLinkStruct:
+		t.Link_struct(obj_t)
 	case models.Comment:
 		t.Comment(obj_t)
 	case models.UseDecl:
@@ -723,6 +726,7 @@ func (t *Transpiler) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 		}
 		t.linked_functions = append(t.linked_functions, fp.linked_functions...)
 		t.linked_variables = append(t.linked_variables, fp.linked_variables...)
+		t.linked_structs = append(t.linked_structs, fp.linked_structs...)
 		t.waitingFuncs = append(t.waitingFuncs, fp.waitingFuncs...)
 		t.waitingGlobals = append(t.waitingGlobals, fp.waitingGlobals...)
 		t.waitingImpls = append(t.waitingImpls, fp.waitingImpls...)
@@ -1010,26 +1014,31 @@ func (t *Transpiler) parseFields(s *structure) {
 	}
 }
 
-// Struct parses Jule structure.
-func (t *Transpiler) Struct(ast Struct) {
-	if juleapi.IsIgnoreId(ast.Id) {
-		t.pusherrtok(ast.Token, "ignore_id")
-		return
-	} else if def, _, _ := t.defById(ast.Id); def != nil {
-		t.pusherrtok(ast.Token, "exist_id", ast.Id)
-		return
-	}
+func (t *Transpiler) make_struct(model models.Struct) *structure {
 	s := new(structure)
-	t.Defines.Structs = append(t.Defines.Structs, s)
 	s.Description = t.docText.String()
 	t.docText.Reset()
-	s.Ast = ast
+	s.Ast = model
 	s.Traits = new([]*trait)
 	s.Ast.Owner = t
 	s.Ast.Generics = t.generics
 	t.generics = nil
 	s.Defines = new(DefineMap)
 	t.parseFields(s)
+	return s
+}
+
+// Struct parses Jule structure.
+func (t *Transpiler) Struct(model Struct) {
+	if juleapi.IsIgnoreId(model.Id) {
+		t.pusherrtok(model.Token, "ignore_id")
+		return
+	} else if def, _, _ := t.defById(model.Id); def != nil {
+		t.pusherrtok(model.Token, "exist_id", model.Id)
+		return
+	}
+	s := t.make_struct(model)
+	t.Defines.Structs = append(t.Defines.Structs, s)
 }
 
 func (t *Transpiler) checkCppLinkAttributes(f *Func) {
@@ -1061,6 +1070,22 @@ func (t *Transpiler) LinkFn(link models.CppLinkFn) {
 	t.attributes = nil
 	t.checkCppLinkAttributes(linkf)
 	t.linked_functions = append(t.linked_functions, linkf)
+}
+
+// Link_struct parses cpp link structure.
+func (t *Transpiler) Link_struct(link models.CppLinkStruct) {
+	if juleapi.IsIgnoreId(link.Link.Id) {
+		t.pusherrtok(link.Token, "ignore_id")
+		return
+	}
+	_, def_t := t.linkById(link.Link.Id)
+	if def_t != ' ' {
+		t.pusherrtok(link.Token, "exist_id", link.Link.Id)
+		return
+	}
+	s := t.make_struct(link.Link)
+	s.cpp_linked = true
+	t.linked_structs = append(t.linked_structs, s)
 }
 
 // LinkVar parses cpp link function.
@@ -1479,10 +1504,12 @@ func (t *Transpiler) Global(vast Var) {
 }
 
 // Var parse Jule variable.
-func (t *Transpiler) Var(v Var) *Var {
-	if juleapi.IsIgnoreId(v.Id) {
-		t.pusherrtok(v.Token, "ignore_id")
+func (t *Transpiler) Var(model Var) *Var {
+	if juleapi.IsIgnoreId(model.Id) {
+		t.pusherrtok(model.Token, "ignore_id")
 	}
+	v := new(Var)
+	*v = model
 	if v.Type.Id != juletype.Void {
 		vt, ok := t.realType(v.Type, true)
 		if ok {
@@ -1537,7 +1564,7 @@ func (t *Transpiler) Var(v Var) *Var {
 			t.eval.pusherrtok(v.Token, "expr_not_const")
 		}
 	}
-	return &v
+	return v
 }
 
 func (t *Transpiler) checkTypeParam(f *Fn) {
@@ -1585,6 +1612,15 @@ func (t *Transpiler) varsFromParams(f *Func) []*Var {
 	return vars
 }
 
+func (t *Transpiler) linked_struct_by_id(id string) *structure {
+	for _, link := range t.linked_structs {
+		if link.Ast.Id == id {
+			return link
+		}
+	}
+	return nil
+}
+
 func (t *Transpiler) linkedVarById(id string) *Var {
 	for _, link := range t.linked_variables {
 		if link.Id == id {
@@ -1609,6 +1645,7 @@ func (t *Transpiler) linkedFnById(id string) *models.Fn {
 //  ' ' -> not found
 //  'f' -> function
 //  'v' -> variable
+//  's' -> struct
 func (t *Transpiler) linkById(id string) (any, byte) {
 	f := t.linkedFnById(id)
 	if f != nil {
@@ -1617,6 +1654,10 @@ func (t *Transpiler) linkById(id string) (any, byte) {
 	v := t.linkedVarById(id)
 	if v != nil {
 		return v, 'v'
+	}
+	s := t.linked_struct_by_id(id)
+	if s != nil {
+		return s, 's'
 	}
 	return nil, ' '
 }
@@ -2022,21 +2063,31 @@ func (t *Transpiler) callStructConstructor(s *structure, argsToks []lex.Token, m
 	s = f.RetType.Type.Tag.(*structure)
 	v.data.Type = f.RetType.Type.Copy()
 	v.data.Type.Kind = s.dataTypeString()
-	v.isType = false
+	v.is_type = false
 	v.lvalue = false
 	v.constExpr = false
 	v.data.Value = s.Ast.Id
+
 	// Set braces to parentheses
 	argsToks[0].Kind = tokens.LPARENTHESES
 	argsToks[len(argsToks)-1].Kind = tokens.RPARENTHESES
+
 	args := t.getArgs(argsToks, true)
 	m.appendSubNode(exprNode{f.RetType.String()})
-	m.appendSubNode(exprNode{tokens.LPARENTHESES})
+	if s.cpp_linked {
+		m.appendSubNode(exprNode{tokens.LBRACE})
+	} else {
+		m.appendSubNode(exprNode{tokens.LPARENTHESES})
+	}
 	t.parseArgs(f, args, m, f.Token)
 	if m != nil {
 		m.appendSubNode(argsExpr{args.Src})
 	}
-	m.appendSubNode(exprNode{tokens.RPARENTHESES})
+	if s.cpp_linked {
+		m.appendSubNode(exprNode{tokens.RBRACE})
+	} else {
+		m.appendSubNode(exprNode{tokens.RPARENTHESES})
+	}
 	return v
 }
 
@@ -2060,6 +2111,7 @@ func (t *Transpiler) parseField(s *structure, f **Var, i int) {
 
 func (t *Transpiler) structConstructorInstance(as *structure) *structure {
 	s := new(structure)
+	s.cpp_linked = as.cpp_linked
 	s.Ast = as.Ast
 	s.Traits = as.Traits
 	s.constructor = new(Func)
@@ -3674,6 +3726,33 @@ func (t *Transpiler) check_type_validity(expr_t Type, errtok lex.Token) {
 	}
 }
 
+func (t *Transpiler) get_define(id string, cpp_linked bool) any {
+	var def any = nil
+	if cpp_linked {
+		def, _ = t.linkById(id)
+	} else if strings.Contains(id, tokens.DOUBLE_COLON) { // Has namespace?
+		toks := t.tokenizeDataType(id)
+		defs := t.eval.getNs(&toks)
+		if defs == nil {
+			return nil
+		}
+		i, m, def_t := defs.findById(toks[0].Kind, t.File)
+		switch def_t {
+		case 't':
+			def = m.Types[i]
+		case 's':
+			def = m.Structs[i]
+		case 'e':
+			def = m.Enums[i]
+		case 'i':
+			def = m.Traits[i]
+		}
+	} else {
+		def, _, _ = t.defById(id)
+	}
+	return def
+}
+
 func (t *Transpiler) typeSource(dt Type, err bool) (ret Type, ok bool) {
 	if dt.Kind == "" {
 		return dt, true
@@ -3704,27 +3783,7 @@ func (t *Transpiler) typeSource(dt Type, err bool) (ret Type, ok bool) {
 	case juletype.Id:
 		id, prefix := dt.KindId()
 		defer func() { ret.Kind = prefix + ret.Kind }()
-		var def any
-		if strings.Contains(id, tokens.DOUBLE_COLON) { // Has namespace?
-			toks := t.tokenizeDataType(id)
-			defs := t.eval.getNs(&toks)
-			if defs == nil {
-				return
-			}
-			i, m, def_t := defs.findById(toks[0].Kind, t.File)
-			switch def_t {
-			case 't':
-				def = m.Types[i]
-			case 's':
-				def = m.Structs[i]
-			case 'e':
-				def = m.Enums[i]
-			case 'i':
-				def = m.Traits[i]
-			}
-		} else {
-			def, _, _ = t.defById(id)
-		}
+		def := t.get_define(id, dt.CppLinked)
 		switch def := def.(type) {
 		case *TypeAlias:
 			def.Used = true

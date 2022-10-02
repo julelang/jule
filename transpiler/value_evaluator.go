@@ -255,7 +255,7 @@ func (ve *valueEvaluator) enumId(id string, e *Enum) (v value) {
 	v.data.Type.Tag = e
 	v.data.Token = e.Token
 	v.constExpr = true
-	v.isType = true
+	v.is_type = true
 	// If built-in.
 	if e.Token.Id == tokens.NA {
 		ve.model.appendSubNode(exprNode{juleapi.OutId(id, nil)})
@@ -265,15 +265,20 @@ func (ve *valueEvaluator) enumId(id string, e *Enum) (v value) {
 	return
 }
 
-func (ve *valueEvaluator) structId(id string, s *structure) (v value) {
-	s.Used = true
-	v.data.Value = id
+func make_value_from_struct(s *structure) (v value) {
+	v.data.Value = s.Ast.Id
 	v.data.Type.Id = juletype.Struct
 	v.data.Type.Tag = s
 	v.data.Type.Kind = s.Ast.Id
 	v.data.Type.Token = s.Ast.Token
 	v.data.Token = s.Ast.Token
-	v.isType = true
+	v.is_type = true
+	return
+}
+
+func (ve *valueEvaluator) structId(id string, s *structure) (v value) {
+	s.Used = true
+	v = make_value_from_struct(s)
 	// If builtin.
 	if s.Ast.Token.Id == tokens.NA {
 		ve.model.appendSubNode(exprNode{juleapi.OutId(id, nil)})

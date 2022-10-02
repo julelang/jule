@@ -56,7 +56,7 @@ func isbool(s string) bool {
 }
 
 func valIsEnumType(v value) bool {
-	return v.isType && typeIsEnum(v.data.Type)
+	return v.is_type && typeIsEnum(v.data.Type)
 }
 
 func isBoolExpr(v value) bool {
@@ -83,11 +83,11 @@ func canGetPtr(v value) bool {
 }
 
 func valIsStructIns(val value) bool {
-	return !val.isType && typeIsStruct(val.data.Type)
+	return !val.is_type && typeIsStruct(val.data.Type)
 }
 
 func valIsTraitIns(val value) bool {
-	return !val.isType && typeIsTrait(val.data.Type)
+	return !val.is_type && typeIsTrait(val.data.Type)
 }
 
 func isForeachIterExpr(val value) bool {

@@ -13,3 +13,9 @@ type CppLinkVar struct {
 	Token lex.Token
 	Link  *Var
 }
+
+// CppLinkStruct is linked structure AST model.
+type CppLinkStruct struct {
+	Token lex.Token
+	Link  Struct
+}
