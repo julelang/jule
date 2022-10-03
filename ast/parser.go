@@ -601,7 +601,7 @@ func (p *Parser) CppLink(toks []lex.Token) {
 	}
 	tok = toks[1]
 	switch tok.Id {
-	case tokens.Fn:
+	case tokens.Fn, tokens.Unsafe:
 		p.link_fn(toks)
 	case tokens.Let:
 		p.link_var(toks)
