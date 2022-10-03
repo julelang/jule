@@ -62,6 +62,7 @@ type Transpiler struct {
 	waitingImpls     []*waitingImpl
 	waitingFuncs     []*Fn
 	eval             *eval
+	linked_aliases   []*models.TypeAlias
 	linked_functions []*models.Fn
 	linked_variables []*models.Var
 	linked_structs   []*structure
@@ -654,6 +655,8 @@ func (t *Transpiler) parseSrcTreeObj(obj models.Object) {
 		t.LinkVar(obj_t)
 	case models.CppLinkStruct:
 		t.Link_struct(obj_t)
+	case models.CppLinkAlias:
+		t.Link_alias(obj_t)
 	case models.Comment:
 		t.Comment(obj_t)
 	case models.UseDecl:
@@ -724,6 +727,7 @@ func (t *Transpiler) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 			t.pusherrs(fp.Errors...)
 			return true
 		}
+		t.linked_aliases = append(t.linked_aliases, fp.linked_aliases...)
 		t.linked_functions = append(t.linked_functions, fp.linked_functions...)
 		t.linked_variables = append(t.linked_variables, fp.linked_variables...)
 		t.linked_structs = append(t.linked_structs, fp.linked_structs...)
@@ -828,19 +832,26 @@ func (t *Transpiler) Generics(generics []GenericType) {
 	}
 }
 
+func (t *Transpiler) make_type_alias(alias models.TypeAlias) *models.TypeAlias {
+	a := new(models.TypeAlias)
+	*a = alias
+	alias.Desc = t.docText.String()
+	t.docText.Reset()
+	return a
+}
+
 // Type parses Jule type define statement.
 func (t *Transpiler) Type(alias TypeAlias) {
+	if juleapi.IsIgnoreId(alias.Id) {
+		t.pusherrtok(alias.Token, "ignore_id")
+		return
+	}
 	_, tok, canshadow := t.defById(alias.Id)
 	if tok.Id != tokens.NA && !canshadow {
 		t.pusherrtok(alias.Token, "exist_id", alias.Id)
 		return
-	} else if juleapi.IsIgnoreId(alias.Id) {
-		t.pusherrtok(alias.Token, "ignore_id")
-		return
 	}
-	alias.Desc = t.docText.String()
-	t.docText.Reset()
-	t.Defines.Types = append(t.Defines.Types, &alias)
+	t.Defines.Types = append(t.Defines.Types, t.make_type_alias(alias))
 }
 
 func (t *Transpiler) parse_enum_items_str(e *Enum) {
@@ -1070,6 +1081,21 @@ func (t *Transpiler) LinkFn(link models.CppLinkFn) {
 	t.attributes = nil
 	t.checkCppLinkAttributes(linkf)
 	t.linked_functions = append(t.linked_functions, linkf)
+}
+
+// Link_alias parses cpp link structure.
+func (t *Transpiler) Link_alias(link models.CppLinkAlias) {
+	if juleapi.IsIgnoreId(link.Link.Id) {
+		t.pusherrtok(link.Token, "ignore_id")
+		return
+	}
+	_, def_t := t.linkById(link.Link.Id)
+	if def_t != ' ' {
+		t.pusherrtok(link.Token, "exist_id", link.Link.Id)
+		return
+	}
+	ta := t.make_type_alias(link.Link)
+	t.linked_aliases = append(t.linked_aliases, ta)
 }
 
 // Link_struct parses cpp link structure.
@@ -1612,6 +1638,15 @@ func (t *Transpiler) varsFromParams(f *Func) []*Var {
 	return vars
 }
 
+func (t *Transpiler) linked_alias_by_id(id string) *models.TypeAlias {
+	for _, link := range t.linked_aliases {
+		if link.Id == id {
+			return link
+		}
+	}
+	return nil
+}
+
 func (t *Transpiler) linked_struct_by_id(id string) *structure {
 	for _, link := range t.linked_structs {
 		if link.Ast.Id == id {
@@ -1646,6 +1681,7 @@ func (t *Transpiler) linkedFnById(id string) *models.Fn {
 //  'f' -> function
 //  'v' -> variable
 //  's' -> struct
+//  't' -> type alias
 func (t *Transpiler) linkById(id string) (any, byte) {
 	f := t.linkedFnById(id)
 	if f != nil {
@@ -1658,6 +1694,10 @@ func (t *Transpiler) linkById(id string) (any, byte) {
 	s := t.linked_struct_by_id(id)
 	if s != nil {
 		return s, 's'
+	}
+	ta := t.linked_alias_by_id(id)
+	if ta != nil {
+		return ta, 't'
 	}
 	return nil, ' '
 }
@@ -1825,6 +1865,12 @@ func (t *Transpiler) check() {
 	}
 }
 
+func (t *Transpiler) check_linked_aliases() {
+	for _, link := range t.linked_aliases {
+		link.Type, _ = t.realType(link.Type, true)
+	}
+}
+
 func (t *Transpiler) check_linked_vars() {
 	for _, link := range t.linked_variables {
 		vt, ok := t.realType(link.Type, true)
@@ -1843,6 +1889,7 @@ func (t *Transpiler) check_linked_fns() {
 }
 
 func (t *Transpiler) checkCppLinks() {
+	t.check_linked_aliases()
 	t.check_linked_vars()
 	t.check_linked_fns()
 }

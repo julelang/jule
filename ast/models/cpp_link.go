@@ -19,3 +19,9 @@ type CppLinkStruct struct {
 	Token lex.Token
 	Link  Struct
 }
+
+// CppLinkAlias is linked type alias AST model.
+type CppLinkAlias struct {
+	Token lex.Token
+	Link  TypeAlias
+}

@@ -347,6 +347,7 @@ func (e *eval) try_cpp_linked_var(toks []lex.Token, m *exprModel) (v value, ok b
 		v = make_value_from_var(def.(*models.Var))
 	case 's':
 		v = make_value_from_struct(def.(*structure))
+	// Cpp linkage not supports type aliases in expressions
 	}
 	return
 }

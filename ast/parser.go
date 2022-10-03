@@ -111,8 +111,8 @@ func (p *Parser) Build() {
 // Wait waits for concurrency.
 func (p *Parser) Wait() { p.wg.Wait() }
 
-// Type builds AST model of type definition statement.
-func (p *Parser) Type(toks []lex.Token) (t models.TypeAlias) {
+// TypeAlias builds AST model of type definition statement.
+func (p *Parser) TypeAlias(toks []lex.Token) (t models.TypeAlias) {
 	i := 1 // Initialize value is 1 for skip keyword.
 	if i >= len(toks) {
 		p.pusherr(toks[i-1], "invalid_syntax")
@@ -532,6 +532,7 @@ func (p *Parser) link_fn(toks []lex.Token) {
 
 	// Catch pub not supported
 	bpub := p.pub
+	p.pub = false
 
 	var link models.CppLinkFn
 	link.Token = tok
@@ -548,6 +549,7 @@ func (p *Parser) link_var(toks []lex.Token) {
 
 	// Catch pub not supported
 	bpub := p.pub
+	p.pub = false
 
 	var link models.CppLinkVar
 	link.Token = tok
@@ -564,10 +566,27 @@ func (p *Parser) link_struct(toks []lex.Token) {
 
 	// Catch pub not supported
 	bpub := p.pub
+	p.pub = false
 
 	var link models.CppLinkStruct
 	link.Token = tok
 	link.Link = p.parse_struct(toks[1:], true)
+	p.Tree = append(p.Tree, models.Object{Token: tok, Data: link})
+
+	p.pub = bpub
+}
+
+// link_type_alias builds AST model of cpp type alias link.
+func (p *Parser) link_type_alias(toks []lex.Token) {
+	tok := toks[0]
+
+	// Catch pub not supported
+	bpub := p.pub
+	p.pub = false
+
+	var link models.CppLinkAlias
+	link.Token = tok
+	link.Link = p.TypeAlias(toks[1:])
 	p.Tree = append(p.Tree, models.Object{Token: tok, Data: link})
 
 	p.pub = bpub
@@ -588,6 +607,8 @@ func (p *Parser) CppLink(toks []lex.Token) {
 		p.link_var(toks)
 	case tokens.Struct:
 		p.link_struct(toks)
+	case tokens.Type:
+		p.link_type_alias(toks)
 	default:
 		p.pusherr(tok, "invalid_syntax")
 	}
@@ -919,7 +940,7 @@ func (p *Parser) TypeOrGenerics(toks []lex.Token) models.Object {
 			}
 		}
 	}
-	t := p.Type(toks)
+	t := p.TypeAlias(toks)
 	t.Pub = p.pub
 	p.pub = false
 	return models.Object{
@@ -1533,7 +1554,7 @@ func (p *Parser) Statement(bs *blockStatement) (s models.Statement) {
 	case tokens.Fallthrough:
 		return p.Fallthrough(bs.toks)
 	case tokens.Type:
-		t := p.Type(bs.toks)
+		t := p.TypeAlias(bs.toks)
 		s.Token = t.Token
 		s.Data = t
 		return
