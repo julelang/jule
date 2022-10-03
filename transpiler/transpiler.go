@@ -568,7 +568,7 @@ func (t *Transpiler) use(ast *models.UseDecl, err *bool) {
 	// Already parsed?
 	for _, u := range used {
 		if ast.Path == u.Path {
-			t.pushUse(u, nil)
+			t.pushUse(u, ast.Selectors)
 			t.Uses = append(t.Uses, u)
 			return
 		}
