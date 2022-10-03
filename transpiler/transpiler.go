@@ -67,8 +67,6 @@ type Transpiler struct {
 	linked_variables []*models.Var
 	linked_structs   []*structure
 	allowBuiltin     bool
-	use_mut          *sync.Mutex
-	cpp_use_mut      *sync.Mutex
 
 	NoLocalPkg  bool
 	JustDefines bool
@@ -89,8 +87,6 @@ func New(f *File) *Transpiler {
 	t.Defines = new(DefineMap)
 	t.eval = new(eval)
 	t.eval.t = t
-	t.use_mut = &sync.Mutex{}
-	t.cpp_use_mut = &sync.Mutex{}
 	return t
 }
 
@@ -401,8 +397,6 @@ func (t *Transpiler) checkCppUsePath(use *models.UseDecl) bool {
 		t.pusherrtok(use.Token, "invalid_header_ext", ext)
 		return false
 	}
-	t.cpp_use_mut.Lock()
-	defer t.cpp_use_mut.Unlock()
 	err := os.Chdir(use.Token.File.Dir)
 	if err != nil {
 		t.pusherrtok(use.Token, "use_not_found", use.Path)
@@ -566,8 +560,7 @@ func (t *Transpiler) compileUse(useAST *models.UseDecl) (*use, bool) {
 	return t.compilePureUse(useAST)
 }
 
-func (t *Transpiler) use(ast *models.UseDecl, wg *sync.WaitGroup, err *bool) {
-	defer wg.Done()
+func (t *Transpiler) use(ast *models.UseDecl, err *bool) {
 	if !t.checkUsePath(ast) {
 		*err = true
 		return
@@ -585,30 +578,25 @@ func (t *Transpiler) use(ast *models.UseDecl, wg *sync.WaitGroup, err *bool) {
 	if u == nil {
 		return
 	}
-	t.use_mut.Lock()
 	// Already uses?
 	for _, pu := range t.Uses {
 		if u.Path == pu.Path {
 			t.pusherrtok(ast.Token, "already_uses")
-			goto end
+			return
 		}
 	}
 	used = append(used, u)
 	t.Uses = append(t.Uses, u)
-end:
-	t.use_mut.Unlock()
 }
 
 func (t *Transpiler) parseUses(tree *[]models.Object) bool {
-	var wg sync.WaitGroup
-	err := new(bool)
+	err := false
 	for i := range *tree {
 		obj := &(*tree)[i]
 		switch obj_t := obj.Data.(type) {
 		case models.UseDecl:
-			if !*err {
-				wg.Add(1)
-				go t.use(&obj_t, &wg, err)
+			if !err {
+				t.use(&obj_t, &err)
 			}
 			obj.Data = nil
 		case models.Comment:
@@ -619,8 +607,7 @@ func (t *Transpiler) parseUses(tree *[]models.Object) bool {
 	}
 	*tree = nil
 end:
-	wg.Wait()
-	return *err
+	return err
 }
 
 func objectIsIgnored(obj *models.Object) bool {
