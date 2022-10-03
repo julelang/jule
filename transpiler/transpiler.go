@@ -684,11 +684,9 @@ func (t *Transpiler) parseTree(tree []models.Object) (ok bool) {
 }
 
 func (t *Transpiler) checkParse() {
-	if t.NoCheck {
-		return
+	if !t.NoCheck {
+		t.check()
 	}
-	t.wg.Add(1)
-	go t.check()
 }
 
 // Special case is;
@@ -1841,7 +1839,6 @@ func (t *Transpiler) blockDefById(id string) (def any, tok lex.Token, canshadow 
 }
 
 func (t *Transpiler) check() {
-	defer t.wg.Done()
 	if t.IsMain && !t.JustDefines {
 		f, _, _ := t.Defines.funcById(jule.EntryPoint, nil)
 		if f == nil {
@@ -2337,9 +2334,11 @@ func (t *Transpiler) parseGenerics(f *Func, args *models.Args, errTok lex.Token)
 check:
 	if !t.checkGenericsQuantity(len(f.Generics), len(args.Generics), errTok) {
 		return false
+	} else {
+		owner := f.Owner.(*Transpiler)
+		owner.pushGenerics(f.Generics, args.Generics)
+		owner.reloadFuncTypes(f)
 	}
-	f.Owner.(*Transpiler).pushGenerics(f.Generics, args.Generics)
-	f.Owner.(*Transpiler).reloadFuncTypes(f)
 ok:
 	return true
 }
