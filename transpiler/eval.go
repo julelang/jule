@@ -445,6 +445,13 @@ func (e *eval) subId(toks []lex.Token, m *exprModel) (v value) {
 func (e *eval) get_cast_expr_model(t, vt Type, expr_model iExpr) iExpr {
 	var model strings.Builder
 	switch {
+	case typeIsPtr(vt) || typeIsPtr(t):
+		model.WriteString("((")
+		model.WriteString(t.String())
+		model.WriteString(")(")
+		model.WriteString(expr_model.String())
+		model.WriteString("))")
+		goto end
 	case typeIsPure(vt):
 		switch {
 		case typeIsTrait(vt):
@@ -455,13 +462,6 @@ func (e *eval) get_cast_expr_model(t, vt Type, expr_model iExpr) iExpr {
 			model.WriteString("()")
 			goto end
 		}
-	case typeIsPtr(vt):
-		model.WriteString("((")
-		model.WriteString(t.String())
-		model.WriteString(")(")
-		model.WriteString(expr_model.String())
-		model.WriteString("))")
-		goto end
 	}
 	model.WriteString("static_cast<")
 	model.WriteString(t.String())
@@ -586,6 +586,7 @@ func (e *eval) castPtr(t Type, v *value, errtok lex.Token) {
 		!juletype.IsInteger(v.data.Type.Id) {
 		e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
 	}
+	v.constExpr = false
 }
 
 func (e *eval) cast_ref(t Type, v *value, errtok lex.Token) {
