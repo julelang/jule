@@ -706,16 +706,23 @@ func (t *Transpiler) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 		fp.NoLocalPkg = true
 		fp.NoCheck = true
 		fp.Defines = t.Defines
+		
+		// Set links for exist checking
+		fp.linked_aliases = t.linked_aliases
+		fp.linked_functions = t.linked_functions
+		fp.linked_variables = t.linked_variables
+		fp.linked_structs = t.linked_structs
+
 		fp.Parsef(false, true)
 		fp.wg.Wait()
 		if len(fp.Errors) > 0 {
 			t.pusherrs(fp.Errors...)
 			return true
 		}
-		t.linked_aliases = append(t.linked_aliases, fp.linked_aliases...)
-		t.linked_functions = append(t.linked_functions, fp.linked_functions...)
-		t.linked_variables = append(t.linked_variables, fp.linked_variables...)
-		t.linked_structs = append(t.linked_structs, fp.linked_structs...)
+		t.linked_aliases = fp.linked_aliases
+		t.linked_functions = fp.linked_functions
+		t.linked_variables = fp.linked_variables
+		t.linked_structs = fp.linked_structs
 		t.waitingFuncs = append(t.waitingFuncs, fp.waitingFuncs...)
 		t.waitingGlobals = append(t.waitingGlobals, fp.waitingGlobals...)
 		t.waitingImpls = append(t.waitingImpls, fp.waitingImpls...)
