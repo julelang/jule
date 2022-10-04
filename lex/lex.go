@@ -96,7 +96,7 @@ func iskw(ln, kw string) bool {
 	if r == '_' {
 		return false
 	}
-	return unicode.IsSpace(r) ||
+	return IsSpace(byte(r)) ||
 		unicode.IsPunct(r) ||
 		!unicode.IsLetter(r)
 }
@@ -125,7 +125,7 @@ func (l *Lex) id(ln string) string {
 	var sb strings.Builder
 	for _, r := range ln {
 		if r != '_' &&
-			('0' > r || '9' < r) &&
+			!IsDecimal(byte(r)) &&
 			!unicode.IsLetter(r) {
 			break
 		}
@@ -141,7 +141,7 @@ func (l *Lex) resume() string {
 	runes := l.File.Data[l.Pos:]
 	// Skip spaces.
 	for i, r := range runes {
-		if unicode.IsSpace(r) {
+		if IsSpace(byte(r)) {
 			l.Pos++
 			switch r {
 			case '\n':
@@ -435,6 +435,15 @@ func (l *Lex) num(txt string) (literal string) {
 end:
 	l.Pos += len(literal)
 	return
+}
+
+// IsSpace reports byte is whitespace or not.
+func IsSpace(b byte) bool {
+	return b == ' ' ||
+		b == '\t' ||
+		b == '\v' ||
+		b == '\r' ||
+		b == '\n'
 }
 
 // IsDecimal reports byte is decimal sequence or not.
