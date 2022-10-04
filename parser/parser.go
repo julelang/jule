@@ -995,26 +995,30 @@ func (p *Parser) pushField(s *structure, f **Var, i int) {
 }
 
 func (p *Parser) parseFields(s *structure) {
-	s.constructor = new(Func)
-	s.constructor.Id = s.Ast.Id
-	s.constructor.Token = s.Ast.Token
-	s.constructor.Params = make([]models.Param, len(s.Ast.Fields))
-	s.constructor.RetType.Type = Type{
+	s.Defines.Globals = make([]*models.Var, len(s.Ast.Fields))
+	for i, f := range s.Ast.Fields {
+		p.pushField(s, &f, i)
+		s.Defines.Globals[i] = f
+	}
+}
+
+func make_constructor(s *structure) *models.Fn {
+	constructor := new(models.Fn)
+	constructor.Id = s.Ast.Id
+	constructor.Token = s.Ast.Token
+	constructor.Params = make([]models.Param, len(s.Ast.Fields))
+	constructor.RetType.Type = Type{
 		Id:    juletype.Struct,
 		Kind:  s.Ast.Id,
 		Token: s.Ast.Token,
 		Tag:   s,
 	}
 	if len(s.Ast.Generics) > 0 {
-		s.constructor.Generics = make([]*models.GenericType, len(s.Ast.Generics))
+		constructor.Generics = make([]*models.GenericType, len(s.Ast.Generics))
 		copy(s.constructor.Generics, s.Ast.Generics)
-		s.constructor.Combines = new([][]models.Type)
+		constructor.Combines = new([][]models.Type)
 	}
-	s.Defines.Globals = make([]*models.Var, len(s.Ast.Fields))
-	for i, f := range s.Ast.Fields {
-		p.pushField(s, &f, i)
-		s.Defines.Globals[i] = f
-	}
+	return constructor
 }
 
 func (p *Parser) make_struct(model models.Struct) *structure {
@@ -1027,7 +1031,7 @@ func (p *Parser) make_struct(model models.Struct) *structure {
 	s.Ast.Generics = p.generics
 	p.generics = nil
 	s.Defines = new(DefineMap)
-	p.parseFields(s)
+	s.constructor = make_constructor(s)
 	return s
 }
 
@@ -1843,6 +1847,7 @@ func (p *Parser) check() {
 		}
 	}
 	p.checkTypes()
+	p.parse_structs()
 	p.WaitingFuncs()
 	p.WaitingImpls()
 	p.WaitingGlobals()
@@ -1853,6 +1858,22 @@ func (p *Parser) check() {
 	if !p.JustDefines {
 		p.checkFuncs()
 		p.checkStructs()
+	}
+}
+
+func (p *Parser) parse_struct(s *structure) {
+	p.parseFields(s)
+}
+
+func (p *Parser) parse_structs() {
+	for _, s := range p.Defines.Structs {
+		p.parse_struct(s)
+	}
+}
+
+func (p *Parser) parse_linked_structs() {
+	for _, link := range p.linked_structs {
+		p.parse_struct(link)
 	}
 }
 
@@ -1881,6 +1902,7 @@ func (p *Parser) check_linked_fns() {
 
 func (p *Parser) checkCppLinks() {
 	p.check_linked_aliases()
+	p.parse_linked_structs()
 	p.check_linked_vars()
 	p.check_linked_fns()
 }
