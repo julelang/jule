@@ -1,4 +1,4 @@
-package transpiler
+package parser
 
 import (
 	"math"
@@ -77,7 +77,7 @@ func integerAssignable(dt uint8, v value) bool {
 }
 
 type assign_checker struct {
-	t                *Transpiler
+	t                *Parser
 	expr_t           Type
 	v                value
 	ignoreAny        bool

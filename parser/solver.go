@@ -1,4 +1,4 @@
-package transpiler
+package parser
 
 import (
 	"github.com/jule-lang/jule/lex"
@@ -83,7 +83,7 @@ func tonums(expr any) int64 {
 }
 
 type solver struct {
-	t  *Transpiler
+	t  *Parser
 	l  value
 	r  value
 	op lex.Token

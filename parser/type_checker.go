@@ -1,4 +1,4 @@
-package transpiler
+package parser
 
 import (
 	"github.com/jule-lang/jule/lex"
@@ -7,7 +7,7 @@ import (
 
 type type_checker struct {
 	errtok       lex.Token
-	p            *Transpiler
+	p            *Parser
 	left         Type
 	right        Type
 	error_logged bool

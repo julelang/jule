@@ -1,4 +1,4 @@
-package transpiler
+package parser
 
 import (
 	"github.com/jule-lang/jule/pkg/juleio"

@@ -1,4 +1,4 @@
-package transpiler
+package parser
 
 import (
 	"strconv"
@@ -24,7 +24,7 @@ type value struct {
 }
 
 type eval struct {
-	t            *Transpiler
+	t            *Parser
 	has_error    bool
 	type_prefix  *Type
 	allow_unsafe bool
@@ -39,7 +39,7 @@ func (e *eval) pusherrtok(tok lex.Token, err string, args ...any) {
 }
 
 func (e *eval) eval_toks(toks []lex.Token) (value, iExpr) {
-	builder := ast.Parser{}
+	builder := ast.Builder{}
 	return e.eval_expr(builder.Expr(toks))
 }
 

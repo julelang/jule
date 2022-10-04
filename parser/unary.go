@@ -1,4 +1,4 @@
-package transpiler
+package parser
 
 import (
 	"github.com/jule-lang/jule/lex"
@@ -10,7 +10,7 @@ type unary struct {
 	token lex.Token
 	toks  []lex.Token
 	model *exprModel
-	t     *Transpiler
+	t     *Parser
 }
 
 func (u *unary) minus() value {

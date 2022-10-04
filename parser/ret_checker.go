@@ -1,4 +1,4 @@
-package transpiler
+package parser
 
 import (
 	"github.com/jule-lang/jule/ast/models"
@@ -8,7 +8,7 @@ import (
 )
 
 type retChecker struct {
-	t         *Transpiler
+	t         *Parser
 	ret_ast   *models.Ret
 	f         *Func
 	exp_model retExpr

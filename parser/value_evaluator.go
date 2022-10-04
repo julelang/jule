@@ -1,4 +1,4 @@
-package transpiler
+package parser
 
 import (
 	"fmt"
@@ -16,7 +16,7 @@ import (
 type valueEvaluator struct {
 	token lex.Token
 	model *exprModel
-	t     *Transpiler
+	t     *Parser
 }
 
 func strModel(v value) iExpr {

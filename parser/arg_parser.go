@@ -1,4 +1,4 @@
-package transpiler
+package parser
 
 import (
 	"github.com/jule-lang/jule/ast/models"
@@ -18,7 +18,7 @@ func getParamMap(params []Param) *paramMap {
 }
 
 type pureArgParser struct {
-	t       *Transpiler
+	t       *Parser
 	pmap    *paramMap
 	f       *Func
 	args    *models.Args

@@ -8,7 +8,7 @@ import (
 	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/pkg/juleset"
 	"github.com/jule-lang/jule/pkg/juletype"
-	"github.com/jule-lang/jule/transpiler"
+	"github.com/jule-lang/jule/parser"
 )
 
 func fmt_meta_ttoa(t models.Type) string {
@@ -21,7 +21,7 @@ func fmt_meta_ttoa(t models.Type) string {
 	return ": " + t.Kind
 }
 
-func fmt_meta_uses(p *transpiler.Transpiler) string {
+func fmt_meta_uses(p *parser.Parser) string {
 	var meta strings.Builder
 	for _, u := range p.Uses {
 		meta.WriteString("use ")
@@ -77,7 +77,7 @@ func fmt_meta_traits(dm *Defmap) string {
 		indent := strings.Repeat(juleset.Default.Indent, juleset.Default.IndentCount)
 		for _, f := range t.Ast.Funcs {
 			meta.WriteString(indent)
-			ff := transpiler.Fn{
+			ff := parser.Fn{
 				Ast: f,
 			}
 			meta.WriteString(fmt_meta_func(&ff))
@@ -159,7 +159,7 @@ func fmt_meta_globals(dm *Defmap) string {
 	return meta.String()
 }
 
-func fmt_meta_func(f *transpiler.Fn) string {
+func fmt_meta_func(f *parser.Fn) string {
 	var meta strings.Builder
 	meta.WriteString(fmt_meta_doc_comment(f.Desc))
 	meta.WriteString(fmt_meta_attributes(f.Ast.Attributes))
@@ -203,17 +203,17 @@ func fmt_meta_funcs(dm *Defmap) string {
 	return meta.String()
 }
 
-func doc_fmt_meta(t *transpiler.Transpiler) (string, error) {
+func doc_fmt_meta(p *parser.Parser) (string, error) {
 	var meta strings.Builder
-	meta.WriteString(fmt_meta_uses(t))
+	meta.WriteString(fmt_meta_uses(p))
 	meta.WriteByte('\n')
-	meta.WriteString(fmt_meta_enums(t.Defines))
-	meta.WriteString(fmt_meta_traits(t.Defines))
-	meta.WriteString(fmt_meta_structs(t.Defines))
-	meta.WriteString(fmt_meta_type_aliases(t.Defines))
+	meta.WriteString(fmt_meta_enums(p.Defines))
+	meta.WriteString(fmt_meta_traits(p.Defines))
+	meta.WriteString(fmt_meta_structs(p.Defines))
+	meta.WriteString(fmt_meta_type_aliases(p.Defines))
 	meta.WriteByte('\n')
-	meta.WriteString(fmt_meta_funcs(t.Defines))
-	meta.WriteString(fmt_meta_globals(t.Defines))
+	meta.WriteString(fmt_meta_funcs(p.Defines))
+	meta.WriteString(fmt_meta_globals(p.Defines))
 	return meta.String(), nil
 }
 

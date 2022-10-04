@@ -1,4 +1,4 @@
-package transpiler
+package parser
 
 import (
 	"github.com/jule-lang/jule/ast/models"
@@ -6,7 +6,7 @@ import (
 	"github.com/jule-lang/jule/pkg/jule"
 )
 
-func (p *Transpiler) getFieldMap(f *Func) *paramMap {
+func (p *Parser) getFieldMap(f *Func) *paramMap {
 	pmap := new(paramMap)
 	*pmap = paramMap{}
 	s := f.RetType.Type.Tag.(*structure)
@@ -20,7 +20,7 @@ func (p *Transpiler) getFieldMap(f *Func) *paramMap {
 }
 
 type structArgParser struct {
-	t      *Transpiler
+	t      *Parser
 	fmap   *paramMap
 	f      *Func
 	args   *models.Args

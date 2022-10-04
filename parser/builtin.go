@@ -1,4 +1,4 @@
-package transpiler
+package parser
 
 import (
 	"strconv"
@@ -10,7 +10,7 @@ import (
 	"github.com/jule-lang/jule/pkg/juletype"
 )
 
-type BuiltinCaller = func(*Transpiler, *Func, callData, *exprModel) value
+type BuiltinCaller = func(*Parser, *Func, callData, *exprModel) value
 
 const maxI8 = 127
 const minI8 = -128
@@ -358,7 +358,7 @@ var make_fn = &Fn{Ast: &Func{
 var outln_fn *Fn
 
 // Parser instance for built-in generics.
-var builtinFile = &Transpiler{}
+var builtinFile = &Parser{}
 
 // Builtin definitions.
 var Builtin = &DefineMap{
@@ -690,7 +690,7 @@ func init() {
 
 // builtin
 
-func caller_out(p *Transpiler, f *Func, data callData, m *exprModel) (v value) {
+func caller_out(p *Parser, f *Func, data callData, m *exprModel) (v value) {
 	errtok := data.args[0]
 	v.data.Type = f.RetType.Type
 	// Remove parentheses
@@ -704,7 +704,7 @@ func caller_out(p *Transpiler, f *Func, data callData, m *exprModel) (v value) {
 	return v
 }
 
-func caller_make(p *Transpiler, _ *Func, data callData, m *exprModel) (v value) {
+func caller_make(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
 	errtok := data.args[0]
 	args := p.getArgs(data.args, false)
 	if len(args.Src) == 0 {
@@ -736,7 +736,7 @@ func caller_make(p *Transpiler, _ *Func, data callData, m *exprModel) (v value) 
 	return
 }
 
-func caller_new(p *Transpiler, _ *Func, data callData, m *exprModel) (v value) {
+func caller_new(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
 	errtok := data.args[0]
 	// Remove parentheses
 	data.args = data.args[1 : len(data.args)-1]
@@ -780,7 +780,7 @@ var std_mem_builtin = &DefineMap{
 	},
 }
 
-func caller_mem_size_of(p *Transpiler, _ *Func, data callData, m *exprModel) (v value) {
+func caller_mem_size_of(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
 	// Remove parentheses
 	data.args = data.args[1 : len(data.args)-1]
 	v.data.Type = Type{
@@ -808,7 +808,7 @@ func caller_mem_size_of(p *Transpiler, _ *Func, data callData, m *exprModel) (v 
 	return
 }
 
-func caller_mem_align_of(p *Transpiler, _ *Func, data callData, m *exprModel) (v value) {
+func caller_mem_align_of(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
 	// Remove parentheses
 	data.args = data.args[1 : len(data.args)-1]
 	v.data.Type = Type{
