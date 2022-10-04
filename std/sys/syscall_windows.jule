@@ -4,8 +4,14 @@
 
 use std::unicode::utf16::{append_rune}
 
+use cpp "<sys/stat.h>"
+use cpp "sys.hpp"
+
+cpp type wchar_t: u16
+cpp struct stat{}
 cpp fn GetStdHandle(stdh: uintptr) *unsafe
 cpp fn CloseHandle(stdh: *unsafe) bool
+cpp fn wstat(path: *cpp.wchar_t, handle: *cpp.stat) (err: int)
 
 pub type handle: uintptr
 
@@ -33,3 +39,11 @@ pub fn utf16_from_str(s: str) ([]u16, bool) {
 
 pub fn get_std_handle(stdh: uintptr) handle { ret handle(cpp.GetStdHandle(stdh)) }
 pub fn close_handle(stdh: handle) bool { ret cpp.CloseHandle(unsafe{ (*unsafe)(stdh) }) }
+
+pub fn stat(path: str, handle: *cpp.stat) bool {
+	let (utf16_path, ok) = utf16_from_str(path)
+	if !ok {
+		ret false
+	}
+	ret cpp.wstat(unsafe{ (*cpp.wchar_t)(&utf16_path[0]) }, handle) == 0
+}
