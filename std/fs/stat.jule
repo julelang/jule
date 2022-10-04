@@ -1,0 +1,36 @@
+// Copyright 2022 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::sys::{self, get_last_errno, S_IFDIR, S_IFREG}
+
+cpp type mode_t: uint
+
+cpp struct stat {
+	st_mode: cpp.mode_t
+}
+
+// Stat information.
+pub struct Stat {
+	pub mode: uint
+}
+
+impl Stat {
+	// Reports path is directory or not.
+	pub fn is_dir(self) bool { ret self.mode&S_IFDIR == S_IFDIR }
+
+	// Reports path is regular file or not.
+	pub fn is_reg(self) bool { ret self.mode&S_IFREG == S_IFREG }
+}
+
+pub fn stat(path: str) (s: Stat, err: FsError) {
+	let handle = cpp.stat{}
+	let ok = std::sys::stat(path, &handle)
+	if ok {
+		err = FsError.Ok
+		s.mode = handle.st_mode
+	} else {
+		err = get_fs_error_from_errno(get_last_errno())
+	}
+	ret
+}
