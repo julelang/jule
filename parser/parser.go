@@ -1549,6 +1549,10 @@ func (p *Parser) Var(model Var) *Var {
 			val, v.Expr.Model = p.evalExpr(v.Expr, &v.Type)
 		}
 	}
+	if val.data.Type.MultiTyped {
+		p.pusherrtok(model.Token, "missing_multi_assign_identifiers")
+		return v
+	}
 	if v.Type.Id != juletype.Void {
 		if v.SetterTok.Id != tokens.NA {
 			if v.Type.Size.AutoSized && v.Type.Id == juletype.Array {
