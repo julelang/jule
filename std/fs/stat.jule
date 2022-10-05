@@ -4,15 +4,21 @@
 
 use std::sys::{self, get_last_errno, S_IFDIR, S_IFREG}
 
-cpp type mode_t: uint
+cpp type _mode_t: uint
+cpp type _off_t: uint
 
 cpp struct stat {
-	st_mode: cpp.mode_t
+	st_mode: cpp._mode_t
+	st_size: cpp._off_t
 }
 
 // Stat information.
 pub struct Stat {
+	// Type and mode.
 	pub mode: uint
+
+	// Total size in bytes of regular file or symbolic link.
+	pub size: uint
 }
 
 impl Stat {
@@ -30,6 +36,7 @@ pub fn stat(path: str) (s: Stat, err: FsError) {
 	if ok {
 		err = FsError.Ok
 		s.mode = handle.st_mode
+		s.size = handle.st_size
 	} else {
 		err = get_fs_error_from_errno(get_last_errno())
 	}
