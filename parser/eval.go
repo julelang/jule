@@ -1526,6 +1526,8 @@ func (e *eval) braceRange(toks []lex.Token, m *exprModel) (v value) {
 	case len(exprToks) == 0:
 		if e.type_prefix != nil {
 			switch {
+			case typeIsMap(*e.type_prefix):
+				return e.enumerable(toks, *e.type_prefix, m)
 			case typeIsStruct(*e.type_prefix):
 				prefix := e.type_prefix
 				s := e.type_prefix.Tag.(*structure)
