@@ -83,6 +83,11 @@ func (l *Lex) checkRanges() {
 	}
 }
 
+// IsLetter reports rune is letter or not.
+func IsLetter(r rune) bool {
+	return ('a' <= r && r <= 'z') || ('A' <= r && r <= 'Z')
+}
+
 // iskw returns true if part is keyword, false if not.
 func iskw(ln, kw string) bool {
 	if !strings.HasPrefix(ln, kw) {
@@ -98,7 +103,7 @@ func iskw(ln, kw string) bool {
 	}
 	return IsSpace(byte(r)) ||
 		unicode.IsPunct(r) ||
-		!unicode.IsLetter(r)
+		!IsLetter(r)
 }
 
 // IsIdentifierRune returns true if first rune of string is allowed to
@@ -109,7 +114,7 @@ func IsIdentifierRune(s string) bool {
 	}
 	if s[0] != '_' {
 		r, _ := utf8.DecodeRuneInString(s)
-		if !unicode.IsLetter(r) {
+		if !IsLetter(r) {
 			return false
 		}
 	}
@@ -126,7 +131,7 @@ func (l *Lex) id(ln string) string {
 	for _, r := range ln {
 		if r != '_' &&
 			!IsDecimal(byte(r)) &&
-			!unicode.IsLetter(r) {
+			!IsLetter(r) {
 			break
 		}
 		sb.WriteRune(r)
