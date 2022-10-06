@@ -21,7 +21,7 @@ pub let STDOUT = get_std_handle(uintptr(STD_OUTPUT_HANDLE))
 pub let STDERR = get_std_handle(uintptr(STD_ERROR_HANDLE))
 
 // Returns the UTF-16 encoding of the UTF-8 string
-// s, with a terminating NUL added. If s contains a NUL byte at any
+// s, with a terminating NULL added. If s contains a NULL byte at any
 // location, it returns (nil, false).
 pub fn utf16_from_str(s: str) ([]u16, bool) {
 	// In the worst case all characters require two u16.
@@ -37,7 +37,7 @@ pub fn utf16_from_str(s: str) ([]u16, bool) {
 }
 
 // Returns the UTF-8 encoding of the UTF-16 sequence s,
-// with a terminating NUL removed.
+// with a terminating NULL removed.
 pub fn utf16_to_str(s: []u16) str {
 	let mut code_page = unsafe{ *(&s) }
 	for i, v in s {
@@ -47,6 +47,22 @@ pub fn utf16_to_str(s: []u16) str {
 		}
 	}
 	ret (str)(decode(code_page))
+}
+
+// Returns the UTF-8 encoding of the UTF-16 sequence s in *wchar_t form,
+// with a terminating NULL removed.
+pub fn wchar_to_str(s: *cpp.wchar_t) str {
+	let mut i = 0
+	let mut code_page: []u16 = nil
+	for {
+		let r = unsafe{ s[i] }
+		code_page = append[u16](code_page, r)
+		i += 1
+		if r == 0 {
+			ret (str)(decode(code_page))
+		}
+	}
+	ret ""
 }
 
 pub fn get_std_handle(stdh: uintptr) handle { ret handle(cpp.GetStdHandle(stdh)) }
