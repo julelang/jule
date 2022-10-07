@@ -141,8 +141,8 @@ func fmt_json_structs(dm *Defmap) []structure {
 		ss.Desc = fmt_json_doc_comment(s.Description)
 		ss.Fields = fmt_json_globals(s.Defines)
 		ss.Funcs = fmt_json_funcs(s.Defines)
-		ss.ImplementedTraits = make([]string, len(*s.Traits))
-		for i, t := range *s.Traits {
+		ss.ImplementedTraits = make([]string, len(s.Traits))
+		for i, t := range s.Traits {
 			ss.ImplementedTraits[i] = t.Ast.Id
 		}
 		structs[i] = ss

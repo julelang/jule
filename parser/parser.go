@@ -1009,13 +1009,14 @@ func (p *Parser) make_struct(model models.Struct) *structure {
 	s.Description = p.docText.String()
 	p.docText.Reset()
 	s.Ast = model
-	s.Traits = new([]*trait)
-	s.depends = new([]*structure)
+	//s.Traits = new([]*trait)
+	//s.depends = new([]*structure)
 	s.Ast.Owner = p
 	s.Ast.Generics = p.generics
 	p.generics = nil
 	s.Defines = new(DefineMap)
 	s.constructor = make_constructor(s)
+	s.origin = s
 	return s
 }
 
@@ -1158,7 +1159,7 @@ func (p *Parser) implTrait(model *models.Impl) {
 		return
 	}
 	model.Target.Tag = s
-	*s.Traits = append(*s.Traits, trait_def)
+	s.origin.Traits = append(s.origin.Traits, trait_def)
 	for _, obj := range model.Tree {
 		switch obj_t := obj.Data.(type) {
 		case models.Comment:
@@ -2154,7 +2155,7 @@ func (p *Parser) parseField(s *structure, f **Var, i int) {
 		if structure_instances_is_uses_same_base(s, ts) || ts.depended_to(s) {
 			p.pusherrtok(v.Type.Token, "illegal_cycle_in_declaration", s.Ast.Id)
 		} else {
-			*s.depends = append(*s.depends, ts)
+			s.origin.depends = append(s.origin.depends, ts)
 		}
 	}
 	if hasExpr(v.Expr) {
@@ -2167,10 +2168,9 @@ func (p *Parser) parseField(s *structure, f **Var, i int) {
 
 func (p *Parser) structConstructorInstance(as *structure) *structure {
 	s := new(structure)
+	s.origin = as
 	s.cpp_linked = as.cpp_linked
 	s.Ast = as.Ast
-	s.Traits = as.Traits
-	s.depends = as.depends
 	s.constructor = new(Func)
 	*s.constructor = *as.constructor
 	s.constructor.RetType.Type.Tag = s

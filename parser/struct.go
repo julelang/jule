@@ -12,25 +12,24 @@ import (
 
 type structure struct {
 	Ast         Struct
+	origin      *structure
+	Traits      []*trait // Implemented traits
 	Defines     *DefineMap
-	Traits      *[]*trait // Implemented traits
 	Used        bool
 	Description string
-
+	
 	cpp_linked  bool
 	constructor *Func
-	depends     *[]*structure
-	// Instance generics.
-	generics []Type
+	depends     []*structure
+	generics    []Type // Instance generics.
 }
 
 func structure_instances_is_uses_same_base(s1, s2 *structure) bool {
-	// Traits are common into all instances.
-	return s1.Traits == s2.Traits
+	return s1.origin == s2.origin
 }
 
 func (s *structure) depended_to(st *structure) bool {
-	for _, d := range *s.depends {
+	for _, d := range s.origin.depends {
 		if structure_instances_is_uses_same_base(st, d) {
 			return true
 		}
@@ -39,7 +38,7 @@ func (s *structure) depended_to(st *structure) bool {
 }
 
 func (s *structure) hasTrait(t *trait) bool {
-	for _, st := range *s.Traits {
+	for _, st := range s.origin.Traits {
 		if t == st {
 			return true
 		}
@@ -178,12 +177,12 @@ func (s *structure) cpp_destructor() string {
 }
 
 func (s *structure) cppTraits() string {
-	if len(*s.Traits) == 0 {
+	if len(s.Traits) == 0 {
 		return ""
 	}
 	var cpp strings.Builder
 	cpp.WriteString(": ")
-	for _, t := range *s.Traits {
+	for _, t := range s.Traits {
 		cpp.WriteString("public ")
 		cpp.WriteString(t.OutId())
 		cpp.WriteByte(',')

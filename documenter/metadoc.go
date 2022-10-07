@@ -114,8 +114,8 @@ func fmt_meta_structs(dm *Defmap) string {
 			meta.WriteString(fmt_meta_funcs(s.Defines))
 			meta.WriteString("}\n\n")
 		}
-		if len(*s.Traits) > 0 {
-			for _, t := range *s.Traits {
+		if len(s.Traits) > 0 {
+			for _, t := range s.Traits {
 				meta.WriteString("impl ")
 				meta.WriteString(t.Ast.Id)
 				meta.WriteString(" for ")
