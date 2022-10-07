@@ -19,6 +19,7 @@ type structure struct {
 
 	cpp_linked  bool
 	constructor *Func
+	depends     *[]*structure
 	// Instance generics.
 	generics []Type
 }
@@ -26,6 +27,15 @@ type structure struct {
 func structure_instances_is_uses_same_base(s1, s2 *structure) bool {
 	// Traits are common into all instances.
 	return s1.Traits == s2.Traits
+}
+
+func (s *structure) depended_to(st *structure) bool {
+	for _, d := range *s.depends {
+		if structure_instances_is_uses_same_base(st, d) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *structure) hasTrait(t *trait) bool {

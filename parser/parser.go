@@ -1026,6 +1026,7 @@ func (p *Parser) make_struct(model models.Struct) *structure {
 	p.docText.Reset()
 	s.Ast = model
 	s.Traits = new([]*trait)
+	s.depends = new([]*structure)
 	s.Ast.Owner = p
 	s.Ast.Generics = p.generics
 	p.generics = nil
@@ -2166,8 +2167,10 @@ func (p *Parser) parseField(s *structure, f **Var, i int) {
 	param := models.Param{Id: v.Id, Type: v.Type}
 	if !typeIsPtr(v.Type) && typeIsStruct(v.Type) {
 		ts := v.Type.Tag.(*structure)
-		if structure_instances_is_uses_same_base(s, ts) {
+		if structure_instances_is_uses_same_base(s, ts) || ts.depended_to(s) {
 			p.pusherrtok(v.Type.Token, "illegal_cycle_in_declaration", s.Ast.Id)
+		} else {
+			*s.depends = append(*s.depends, ts)
 		}
 	}
 	if hasExpr(v.Expr) {
@@ -2183,6 +2186,7 @@ func (p *Parser) structConstructorInstance(as *structure) *structure {
 	s.cpp_linked = as.cpp_linked
 	s.Ast = as.Ast
 	s.Traits = as.Traits
+	s.depends = as.depends
 	s.constructor = new(Func)
 	*s.constructor = *as.constructor
 	s.constructor.RetType.Type.Tag = s
