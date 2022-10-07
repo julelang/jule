@@ -1014,7 +1014,7 @@ func make_constructor(s *structure) *models.Fn {
 	}
 	if len(s.Ast.Generics) > 0 {
 		constructor.Generics = make([]*models.GenericType, len(s.Ast.Generics))
-		copy(s.constructor.Generics, s.Ast.Generics)
+		copy(constructor.Generics, s.Ast.Generics)
 		constructor.Combines = new([][]models.Type)
 	}
 	return constructor
