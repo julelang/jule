@@ -2,7 +2,6 @@ package models
 
 import (
 	"strings"
-	"unicode"
 
 	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/lex/tokens"
@@ -80,7 +79,7 @@ func (dt *Type) KindId() (id, prefix string) {
 	id = dt.Kind
 	runes := []rune(dt.Kind)
 	for i, r := range dt.Kind {
-		if r == '_' || unicode.IsLetter(r) {
+		if r == '_' || lex.IsLetter(r) {
 			id = string(runes[i:])
 			prefix = string(runes[:i])
 			break
@@ -98,7 +97,7 @@ func (dt *Type) KindId() (id, prefix string) {
 			i++
 			continue
 		}
-		if r != '_' && !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+		if r != '_' && !lex.IsLetter(r) && !lex.IsDecimal(byte(r)) {
 			id = string(runes[:i])
 			break
 		}

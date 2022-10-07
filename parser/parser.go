@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/jule-lang/jule/ast"
@@ -2832,7 +2831,7 @@ func (p *Parser) recoverFuncExprStatement(s *models.ExprStatement) {
 	catcher.exprs = append(catcher.exprs, handler.Params[0].OutId())
 	catcher.exprs = append(catcher.exprs, ") ")
 	r, _ := utf8.DecodeRuneInString(v.data.Value)
-	if r == '_' || unicode.IsLetter(r) { // Function source
+	if r == '_' || lex.IsLetter(r) { // Function source
 		catcher.exprs = append(catcher.exprs, "{")
 		catcher.exprs = append(catcher.exprs, handler.OutId())
 		catcher.exprs = append(catcher.exprs, "(")

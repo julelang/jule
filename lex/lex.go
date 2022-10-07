@@ -2,7 +2,6 @@ package lex
 
 import (
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/jule-lang/jule/lex/tokens"
@@ -83,6 +82,43 @@ func (l *Lex) checkRanges() {
 	}
 }
 
+// IsPunct reports rune is punctuation or not.
+func IsPunct(r rune) bool {
+	return r == '!' ||
+		r == '#' ||
+		r == '$' ||
+		r == ',' ||
+		r == '.' ||
+		r == '\'' ||
+		r == '"' ||
+		r == ':' ||
+		r == ';' ||
+		r == '<' ||
+		r == '>' ||
+		r == '=' ||
+		r == '?' ||
+		r == '-' ||
+		r == '+' ||
+		r == '*' ||
+		r == '(' ||
+		r == ')' ||
+		r == '[' ||
+		r == ']' ||
+		r == '{' ||
+		r == '}' ||
+		r == '%' ||
+		r == '&' ||
+		r == '/' ||
+		r == '\\' ||
+		r == '@' ||
+		r == '^' ||
+		r == '_' ||
+		r == '`' ||
+		r == '|' ||
+		r == '~' ||
+		r == '¦'
+}
+
 // IsLetter reports rune is letter or not.
 func IsLetter(r rune) bool {
 	return ('a' <= r && r <= 'z') || ('A' <= r && r <= 'Z')
@@ -101,9 +137,7 @@ func iskw(ln, kw string) bool {
 	if r == '_' {
 		return false
 	}
-	return IsSpace(byte(r)) ||
-		unicode.IsPunct(r) ||
-		!IsLetter(r)
+	return IsSpace(byte(r)) || IsPunct(r) || !IsLetter(r)
 }
 
 // IsIdentifierRune returns true if first rune of string is allowed to
