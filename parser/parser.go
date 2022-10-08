@@ -762,7 +762,6 @@ func (p *Parser) checkAttribute(obj models.Object) {
 	case models.Attribute, models.Comment, []GenericType:
 		return
 	}
-	p.pusherrtok(obj.Token, "attribute_not_supports")
 	p.attributes = nil
 }
 
@@ -1027,16 +1026,6 @@ func (p *Parser) Struct(model Struct) {
 	p.Defines.Structs = append(p.Defines.Structs, s)
 }
 
-func (p *Parser) checkCppLinkAttributes(f *Func) {
-	for _, attribute := range f.Attributes {
-		switch attribute.Tag {
-		case jule.Attribute_CDef:
-		default:
-			p.pusherrtok(attribute.Token, "invalid_attribute")
-		}
-	}
-}
-
 // LinkFn parses cpp link function.
 func (p *Parser) LinkFn(link models.CppLinkFn) {
 	if juleapi.IsIgnoreId(link.Link.Id) {
@@ -1054,7 +1043,6 @@ func (p *Parser) LinkFn(link models.CppLinkFn) {
 	p.generics = nil
 	linkf.Attributes = p.attributes
 	p.attributes = nil
-	p.checkCppLinkAttributes(linkf)
 	p.linked_functions = append(p.linked_functions, linkf)
 }
 
@@ -1293,12 +1281,10 @@ func (p *Parser) PushAttribute(c models.Comment) {
 		}
 	}
 	if !ok {
-		p.pusherrtok(attr.Token, "undefined_pragma")
 		return
 	}
 	for _, attr2 := range p.attributes {
 		if attr.Tag == attr2.Tag {
-			p.pusherrtok(attr.Token, "attribute_repeat")
 			return
 		}
 	}
@@ -1473,7 +1459,6 @@ func (p *Parser) Func(ast Func) {
 	setGenerics(f.Ast, p.generics)
 	p.generics = nil
 	p.checkRetVars(f)
-	p.checkFuncAttributes(f)
 	f.used = f.Ast.Id == jule.InitializerFunction
 	p.Defines.Funcs = append(p.Defines.Funcs, f)
 	p.waitingFuncs = append(p.waitingFuncs, f)
@@ -1570,12 +1555,6 @@ func (p *Parser) Var(model Var) *Var {
 		}
 	}
 	return v
-}
-
-func (p *Parser) checkFuncAttributes(f *Fn) {
-	for _, attribute := range f.Ast.Attributes {
-		p.pusherrtok(attribute.Token, "invalid_attribute")
-	}
 }
 
 func (p *Parser) varsFromParams(f *Func) []*Var {
@@ -2597,9 +2576,7 @@ func (p *Parser) checkSolidFuncSpecialCases(f *Func) {
 	if f.RetType.Type.Id != juletype.Void {
 		p.pusherrtok(f.RetType.Type.Token, "fn_have_ret", f.Id)
 	}
-	if f.Attributes != nil {
-		p.pusherrtok(f.Token, "fn_have_attributes", f.Id)
-	}
+	f.Attributes = nil
 	if f.IsUnsafe {
 		p.pusherrtok(f.Token, "fn_is_unsafe", f.Id)
 	}
