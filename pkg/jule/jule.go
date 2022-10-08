@@ -32,8 +32,7 @@ const (
 	Arch32Bit = "32bit"
 
 	// This attributes should be added to the attribute map.
-	Attribute_TypeArg = "typearg"
-	Attribute_CDef    = "cdef"
+	Attribute_CDef = "cdef"
 
 	PreprocessorDirective      = "pragma"
 	PreprocessorDirectiveEnofi = "enofi"

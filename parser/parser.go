@@ -1570,23 +1570,9 @@ func (p *Parser) Var(model Var) *Var {
 	return v
 }
 
-func (p *Parser) checkTypeParam(f *Fn) {
-	if len(f.Ast.Generics) == 0 {
-		p.pusherrtok(f.Ast.Token, "fn_must_have_generics_if_has_attribute", jule.Attribute_TypeArg)
-	}
-	if len(f.Ast.Params) != 0 {
-		p.pusherrtok(f.Ast.Token, "fn_cant_have_parameters_if_has_attribute", jule.Attribute_TypeArg)
-	}
-}
-
 func (p *Parser) checkFuncAttributes(f *Fn) {
 	for _, attribute := range f.Ast.Attributes {
-		switch attribute.Tag {
-		case jule.Attribute_TypeArg:
-			p.checkTypeParam(f)
-		default:
-			p.pusherrtok(attribute.Token, "invalid_attribute")
-		}
+		p.pusherrtok(attribute.Token, "invalid_attribute")
 	}
 }
 
@@ -2418,29 +2404,14 @@ end:
 func (p *Parser) parseFuncCallToks(f *Func, genericsToks, argsToks []lex.Token, m *exprModel) (v value) {
 	var generics []Type
 	var args *models.Args
-	if f.FindAttribute(jule.Attribute_TypeArg) != nil {
-		if len(genericsToks) > 0 {
-			p.pusherrtok(genericsToks[0], "invalid_syntax")
-			return
-		}
-		var err bool
-		generics, err = p.getGenerics(argsToks)
-		if err {
-			p.eval.has_error = true
-			return
-		}
-		args = new(models.Args)
-		args.Generics = generics
-	} else {
-		var err bool
-		generics, err = p.getGenerics(genericsToks)
-		if err {
-			p.eval.has_error = true
-			return
-		}
-		args = p.getArgs(argsToks, false)
-		args.Generics = generics
+	var err bool
+	generics, err = p.getGenerics(genericsToks)
+	if err {
+		p.eval.has_error = true
+		return
 	}
+	args = p.getArgs(argsToks, false)
+	args.Generics = generics
 	return p.parseFuncCall(f, args, m, argsToks[0])
 }
 
