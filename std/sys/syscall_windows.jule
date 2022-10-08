@@ -34,19 +34,23 @@ pub let STDOUT = get_std_handle(uintptr(STD_OUTPUT_HANDLE))
 pub let STDERR = get_std_handle(uintptr(STD_ERROR_HANDLE))
 
 // Returns the UTF-16 encoding of the UTF-8 string
-// s, with a terminating NULL added. If s contains a NULL byte at any
-// location, it returns (nil, false).
-pub fn utf16_from_str(s: str) ([]u16, bool) {
+// s, with a terminating NULL added. If s includes NULL
+// character at any location, ignores followed characters.
+pub fn utf16_from_str(s: str) []u16 {
 	// In the worst case all characters require two u16.
 	// Also account for the terminating NULL character.
 	// See: C Strings and Windows UTF16.
 
+	const NULL_TERMINATION = '\x00'
 	let mut buf: []u16 = nil
 	let runes = ([]rune)(s)
 	for _, r in runes {
+		if r == NULL_TERMINATION {
+			break
+		}
 		buf = append_rune(buf, r)
 	}
-	ret append_rune(buf, '\x00'), true
+	ret append_rune(buf, NULL_TERMINATION)
 }
 
 // Returns the UTF-8 encoding of the UTF-16 sequence s,
@@ -84,17 +88,11 @@ pub unsafe fn read_dir(mut dir: *cpp._WDIR) *cpp._wdirent { ret cpp._wreaddir(di
 pub unsafe fn close_dir(mut dir: *cpp._WDIR) int { ret cpp._wclosedir(dir) }
 
 pub fn stat(path: str, handle: *cpp.stat) (ok: bool) {
-	let (utf16_path, utf16_ok) = utf16_from_str(path)
-	if !utf16_ok {
-		ret false
-	}
+	let utf16_path = utf16_from_str(path)
 	ret cpp.wstat(unsafe { (*cpp.wchar_t)(&utf16_path[0]) }, handle) == 0
 }
 
 pub fn open_dir(path: str) *cpp._WDIR {
-	let (utf16_path, ok) = utf16_from_str(path)
-	if !ok {
-		ret nil
-	}
+	let utf16_path = utf16_from_str(path)
 	ret cpp._wopendir(unsafe { (*cpp.wchar_t)(&utf16_path[0]) })
 }
