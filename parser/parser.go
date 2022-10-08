@@ -188,9 +188,10 @@ func (p *Parser) CppTraits() string {
 	return cpp.String()
 }
 
-func cppStructs(dm *DefineMap) string {
+// CppStructs returns cpp code of structures.
+func CppStructs(structures []*structure) string {
 	var cpp strings.Builder
-	for _, s := range dm.Structs {
+	for _, s := range structures {
 		if s.Used && s.Ast.Token.Id != tokens.NA {
 			cpp.WriteString(s.String())
 			cpp.WriteString("\n\n")
@@ -199,21 +200,9 @@ func cppStructs(dm *DefineMap) string {
 	return cpp.String()
 }
 
-// CppStructs returns cpp code of structures.
-func (p *Parser) CppStructs() string {
+func cppStructPlainPrototypes(structures []*structure) string {
 	var cpp strings.Builder
-	for _, use := range used {
-		if !use.cppLink {
-			cpp.WriteString(cppStructs(use.defines))
-		}
-	}
-	cpp.WriteString(cppStructs(p.Defines))
-	return cpp.String()
-}
-
-func cppStructPlainPrototypes(dm *DefineMap) string {
-	var cpp strings.Builder
-	for _, s := range dm.Structs {
+	for _, s := range structures {
 		if s.Used && s.Ast.Token.Id != tokens.NA {
 			cpp.WriteString(s.plainPrototype())
 			cpp.WriteByte('\n')
@@ -222,9 +211,9 @@ func cppStructPlainPrototypes(dm *DefineMap) string {
 	return cpp.String()
 }
 
-func cppStructPrototypes(dm *DefineMap) string {
+func cppStructPrototypes(structures []*structure) string {
 	var cpp strings.Builder
-	for _, s := range dm.Structs {
+	for _, s := range structures {
 		if s.Used && s.Ast.Token.Id != tokens.NA {
 			cpp.WriteString(s.prototype())
 			cpp.WriteByte('\n')
@@ -245,20 +234,10 @@ func cppFuncPrototypes(dm *DefineMap) string {
 }
 
 // CppPrototypes returns cpp code of prototypes.
-func (p *Parser) CppPrototypes() string {
+func (p *Parser) CppPrototypes(structures []*structure) string {
 	var cpp strings.Builder
-	for _, use := range used {
-		if !use.cppLink {
-			cpp.WriteString(cppStructPlainPrototypes(use.defines))
-		}
-	}
-	cpp.WriteString(cppStructPlainPrototypes(p.Defines))
-	for _, use := range used {
-		if !use.cppLink {
-			cpp.WriteString(cppStructPrototypes(use.defines))
-		}
-	}
-	cpp.WriteString(cppStructPrototypes(p.Defines))
+	cpp.WriteString(cppStructPlainPrototypes(structures))
+	cpp.WriteString(cppStructPrototypes(structures))
 	for _, use := range used {
 		if !use.cppLink {
 			cpp.WriteString(cppFuncPrototypes(use.defines))
@@ -343,18 +322,31 @@ func (p *Parser) CppInitializerCaller() string {
 	return cpp.String()
 }
 
+func (p *Parser) get_all_structures() []*structure {
+	order := make([]*structure, 0, len(p.Defines.Structs))
+	order = append(order, p.Defines.Structs...)
+	for _, use := range used {
+		if !use.cppLink {
+			order = append(order, use.defines.Structs...)
+		}
+	}
+	return order
+}
+
 // Cpp returns full cpp code of parsed objects.
 func (p *Parser) Cpp() string {
+	structures := p.get_all_structures()
+	order_structures(structures)
 	var cpp strings.Builder
 	cpp.WriteString(p.CppLinks())
 	cpp.WriteByte('\n')
 	cpp.WriteString(p.CppTypes())
 	cpp.WriteByte('\n')
 	cpp.WriteString(p.CppTraits())
-	cpp.WriteString(p.CppPrototypes())
+	cpp.WriteString(p.CppPrototypes(structures))
 	cpp.WriteString("\n\n")
 	cpp.WriteString(p.CppGlobals())
-	cpp.WriteString(p.CppStructs())
+	cpp.WriteString(CppStructs(structures))
 	cpp.WriteString("\n\n")
 	cpp.WriteString(p.CppFuncs())
 	cpp.WriteString(p.CppInitializerCaller())

@@ -21,6 +21,7 @@ type structure struct {
 	cpp_linked  bool
 	constructor *Func
 	depends     []*structure
+	order       int
 	generics    []Type // Instance generics.
 }
 
@@ -369,4 +370,37 @@ func (s *structure) dataTypeString() string {
 		dts.WriteByte(']')
 	}
 	return dts.String()
+}
+
+func can_be_order(s *structure) bool {
+	for _, d := range s.origin.depends {
+		if d.origin.order < s.origin.order {
+			return false
+		}
+	}
+	return true
+}
+
+func order_structures(structures []*structure) {
+	// As far as has been tested, there is no need for this indexing.
+	/*for i, s := range structures {
+		s.order = i
+	}*/
+
+	swapped := true
+	for swapped {
+		swapped = false
+		i := 1
+		for i < len(structures) {
+			curr := &structures[i]
+			if can_be_order(*curr) {
+				(*curr).origin.order = i-1
+				prev := &structures[i-1]
+				(*prev).origin.order = i
+				*curr, *prev = *prev, *curr
+				swapped = true
+			}
+			i++
+		}
+	}
 }
