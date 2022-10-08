@@ -85,7 +85,7 @@ func New(f *File) *Parser {
 	p.allowBuiltin = true
 	p.Defines = new(DefineMap)
 	p.eval = new(eval)
-	p.eval.t = p
+	p.eval.p = p
 	return p
 }
 
@@ -461,17 +461,17 @@ func (p *Parser) pushUse(use *use, selectors []lex.Token) {
 	if ok {
 		pushDefines(use.defines, dm)
 	}
-	if len(selectors) > 0 {
+	if use.FullUse {
+		if p.Defines.side == nil {
+			p.Defines.side = new(DefineMap)
+		}
+		pushDefines(p.Defines.side, use.defines)
+	} else if len(selectors) > 0 {
 		if !p.pushSelects(use, selectors) {
 			return
 		}
 	} else if selectors != nil {
 		return
-	} else if use.FullUse {
-		if p.Defines.side == nil {
-			p.Defines.side = new(DefineMap)
-		}
-		pushDefines(p.Defines.side, use.defines)
 	}
 	ns := new(models.Namespace)
 	ns.Identifiers = strings.SplitN(use.LinkString, tokens.DOUBLE_COLON, -1)
@@ -485,6 +485,17 @@ func (p *Parser) compileCppLinkUse(useAST *models.UseDecl) (*use, bool) {
 	use.Path = useAST.Path
 	use.token = useAST.Token
 	return use, false
+}
+
+func make_use_from_ast(ast *models.UseDecl) *use {
+	use := new(use)
+	use.defines = new(DefineMap)
+	use.token = ast.Token
+	use.Path = ast.Path
+	use.LinkString = ast.LinkString
+	use.FullUse = ast.FullUse
+	use.Selectors = ast.Selectors
+	return use
 }
 
 func (p *Parser) compilePureUse(useAST *models.UseDecl) (_ *use, hassErr bool) {
@@ -508,13 +519,7 @@ func (p *Parser) compilePureUse(useAST *models.UseDecl) (_ *use, hassErr bool) {
 		}
 		psub := New(f)
 		psub.Parsef(false, false)
-		use := new(use)
-		use.defines = new(DefineMap)
-		use.token = useAST.Token
-		use.Path = useAST.Path
-		use.LinkString = useAST.LinkString
-		use.FullUse = useAST.FullUse
-		use.Selectors = useAST.Selectors
+		use := make_use_from_ast(useAST)
 		p.pusherrs(psub.Errors...)
 		p.Warnings = append(p.Warnings, psub.Warnings...)
 		pushDefines(use.defines, psub.Defines)
@@ -843,7 +848,7 @@ func (p *Parser) parse_enum_items_str(e *Enum) {
 			item.ExprTag = val.expr
 			item.Expr.Model = model
 			assign_checker{
-				t:         p,
+				p:         p,
 				expr_t:         e.Type,
 				v:         val,
 				ignoreAny: true,
@@ -893,7 +898,7 @@ func (p *Parser) parse_enum_items_integer(e *Enum) {
 			item.ExprTag = val.expr
 			item.Expr.Model = model
 			assign_checker{
-				t:         p,
+				p:         p,
 				expr_t:         e.Type,
 				v:         val,
 				ignoreAny: true,
@@ -1523,7 +1528,7 @@ func (p *Parser) Var(model Var) *Var {
 				v.Type.Size = val.data.Type.Size
 			}
 			assign_checker{
-				t:                p,
+				p:                p,
 				expr_t:           v.Type,
 				v:                val,
 				errtok:           v.Token,
@@ -1666,8 +1671,12 @@ func (p *Parser) globalById(id string) (*Var, *DefineMap, bool) {
 	return g, m, true
 }
 
-func (p *Parser) nsById(id string) *namespace {
-	return p.Defines.nsById(id)
+func (p *Parser) nsById(id string) *namespace { return p.Defines.nsById(id) }
+
+// Reports identifier is shadowed or not.
+func (p *Parser) is_shadowed(id string) bool {
+	def, _, _ := p.blockDefById(id)
+	return def != nil
 }
 
 func (p *Parser) typeById(id string) (*TypeAlias, *DefineMap, bool) {
@@ -2398,7 +2407,7 @@ func (p *Parser) parseFuncCallToks(f *Func, genericsToks, argsToks []lex.Token, 
 
 func (p *Parser) parseStructArgs(f *Func, args *models.Args, errTok lex.Token) {
 	sap := structArgParser{
-		t:      p,
+		p:      p,
 		f:      f,
 		args:   args,
 		errTok: errTok,
@@ -2408,7 +2417,7 @@ func (p *Parser) parseStructArgs(f *Func, args *models.Args, errTok lex.Token) {
 
 func (p *Parser) parsePureArgs(f *Func, args *models.Args, m *exprModel, errTok lex.Token) {
 	pap := pureArgParser{
-		t:      p,
+		p:      p,
 		f:      f,
 		args:   args,
 		errTok: errTok,
@@ -2551,7 +2560,7 @@ func (p *Parser) parseArg(f *Func, pair *paramMapPair, args *models.Args, variad
 func (p *Parser) checkArgType(param *Param, val value, errTok lex.Token) {
 	p.check_valid_init_expr(param.Mutable, val, errTok)
 	assign_checker{
-		t:      p,
+		p:      p,
 		expr_t:      param.Type,
 		v:      val,
 		errtok: errTok,
@@ -2806,7 +2815,7 @@ func (p *Parser) parseCase(c *models.Case, expr_t Type) {
 		value, model := p.evalExpr(*expr, nil)
 		expr.Model = model
 		assign_checker{
-			t:      p,
+			p:      p,
 			expr_t: expr_t,
 			v:      value,
 			errtok: expr.Tokens[0],
@@ -3114,7 +3123,7 @@ func (p *Parser) singleAssign(assign *models.Assign, l, r []value) {
 	if assign.Setter.Kind != tokens.EQUAL && !isConstExpression(right.data.Value) {
 		assign.Setter.Kind = assign.Setter.Kind[:len(assign.Setter.Kind)-1]
 		solver := solver{
-			t:         p,
+			p:         p,
 			l:  left,
 			r: right,
 			op:  assign.Setter,
@@ -3123,7 +3132,7 @@ func (p *Parser) singleAssign(assign *models.Assign, l, r []value) {
 		assign.Setter.Kind += tokens.EQUAL
 	}
 	assign_checker{
-		t:      p,
+		p:      p,
 		expr_t:      left.data.Type,
 		v:      right,
 		errtok: assign.Setter,
@@ -3186,7 +3195,7 @@ func (p *Parser) check_valid_init_expr(left_mutable bool, right value, errtok le
 		return
 	}
 	checker := assign_checker{
-		t:      p,
+		p:      p,
 		v:      right,
 		errtok: errtok,
 	}
@@ -3208,7 +3217,7 @@ func (p *Parser) multiAssign(assign *models.Assign, l, r []value) {
 			}
 			p.check_valid_init_expr(leftExpr.mutable, right, assign.Setter)
 			assign_checker{
-				t:      p,
+				p:      p,
 				expr_t:      leftExpr.data.Type,
 				v:      right,
 				errtok: assign.Setter,
@@ -3324,7 +3333,7 @@ func (p *Parser) forProfile(iter *models.Iter) {
 		val, model := p.evalExpr(profile.Condition, nil)
 		profile.Condition.Model = model
 		assign_checker{
-			t:      p,
+			p:      p,
 			expr_t:      Type{Id: juletype.Bool, Kind: juletype.TypeMap[juletype.Bool]},
 			v:      val,
 			errtok: profile.Condition.Tokens[0],
@@ -3690,7 +3699,7 @@ func (p *Parser) typeSourceIsArrayType(arr_t *Type) (ok bool) {
 		p.eval.pusherrtok(arr_t.Token, "expr_not_const")
 	}
 	assign_checker{
-		t:      p,
+		p:      p,
 		expr_t:      Type{Id: juletype.UInt, Kind: juletype.TypeMap[juletype.UInt]},
 		v:      val,
 		errtok: arr_t.Size.Expr.Tokens[0],

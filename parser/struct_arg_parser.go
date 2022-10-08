@@ -20,7 +20,7 @@ func (p *Parser) getFieldMap(f *Func) *paramMap {
 }
 
 type structArgParser struct {
-	t      *Parser
+	p      *Parser
 	fmap   *paramMap
 	f      *Func
 	args   *models.Args
@@ -51,36 +51,36 @@ func (sap *structArgParser) buildArgs() {
 func (sap *structArgParser) pushArg() {
 	defer func() { sap.i++ }()
 	if sap.arg.TargetId == "" {
-		sap.t.pusherrtok(sap.arg.Token, "argument_must_target_to_parameter")
+		sap.p.pusherrtok(sap.arg.Token, "argument_must_target_to_parameter")
 		return
 	}
 	pair, ok := (*sap.fmap)[sap.arg.TargetId]
 	if !ok {
-		sap.t.pusherrtok(sap.arg.Token, "id_not_exist", sap.arg.TargetId)
+		sap.p.pusherrtok(sap.arg.Token, "id_not_exist", sap.arg.TargetId)
 		return
 	} else if pair.arg != nil {
-		sap.t.pusherrtok(sap.arg.Token, "already_has_expr", sap.arg.TargetId)
+		sap.p.pusherrtok(sap.arg.Token, "already_has_expr", sap.arg.TargetId)
 		return
 	}
 	arg := sap.arg
 	pair.arg = &arg
-	sap.t.parseArg(sap.f, pair, sap.args, nil)
+	sap.p.parseArg(sap.f, pair, sap.args, nil)
 }
 
 func (sap *structArgParser) checkPasses() {
 	for _, pair := range *sap.fmap {
 		if pair.arg == nil {
 			if typeIsRef(pair.param.Type) {
-				sap.t.pusherrtok(sap.errTok, "reference_field_not_initialized", pair.param.Id)
+				sap.p.pusherrtok(sap.errTok, "reference_field_not_initialized", pair.param.Id)
 			} else if !paramHasDefaultArg(pair.param) {
-				sap.t.pusherrtok(sap.errTok, "missing_expr_for", pair.param.Id)
+				sap.p.pusherrtok(sap.errTok, "missing_expr_for", pair.param.Id)
 			}
 		}
 	}
 }
 
 func (sap *structArgParser) parse() {
-	sap.fmap = sap.t.getFieldMap(sap.f)
+	sap.fmap = sap.p.getFieldMap(sap.f)
 	// Check non targeteds
 	argCount := 0
 	for sap.i, sap.arg = range sap.args.Src {
@@ -88,14 +88,14 @@ func (sap *structArgParser) parse() {
 			break
 		}
 		if argCount >= len(sap.f.Params) {
-			sap.t.pusherrtok(sap.errTok, "argument_overflow")
+			sap.p.pusherrtok(sap.errTok, "argument_overflow")
 			return
 		}
 		argCount++
 		param := &sap.f.Params[sap.i]
 		arg := sap.arg
 		(*sap.fmap)[param.Id].arg = &arg
-		sap.t.parseArg(sap.f, (*sap.fmap)[param.Id], sap.args, nil)
+		sap.p.parseArg(sap.f, (*sap.fmap)[param.Id], sap.args, nil)
 	}
 	for sap.i < len(sap.args.Src) {
 		sap.arg = sap.args.Src[sap.i]

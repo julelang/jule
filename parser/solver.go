@@ -83,7 +83,7 @@ func tonums(expr any) int64 {
 }
 
 type solver struct {
-	t  *Parser
+	p  *Parser
 	l  value
 	r  value
 	op lex.Token
@@ -225,7 +225,7 @@ func (s *solver) div(v *value) {
 		if right != 0 {
 			v.expr = left / right
 		} else {
-			s.t.pusherrtok(s.op, "divide_by_zero")
+			s.p.pusherrtok(s.op, "divide_by_zero")
 			v.expr = float64(0)
 		}
 	case int64:
@@ -233,7 +233,7 @@ func (s *solver) div(v *value) {
 		if right != 0 {
 			v.expr = float64(left) / right
 		} else {
-			s.t.pusherrtok(s.op, "divide_by_zero")
+			s.p.pusherrtok(s.op, "divide_by_zero")
 			v.expr = int64(0)
 		}
 	case uint64:
@@ -241,7 +241,7 @@ func (s *solver) div(v *value) {
 		if right != 0 {
 			v.expr = float64(left) / right
 		} else {
-			s.t.pusherrtok(s.op, "divide_by_zero")
+			s.p.pusherrtok(s.op, "divide_by_zero")
 			v.expr = float64(0)
 		}
 	}
@@ -257,7 +257,7 @@ func (s *solver) mod(v *value) {
 		if right != 0 {
 			v.expr = left % right
 		} else {
-			s.t.pusherrtok(s.op, "divide_by_zero")
+			s.p.pusherrtok(s.op, "divide_by_zero")
 			v.expr = int64(0)
 		}
 	case uint64:
@@ -265,7 +265,7 @@ func (s *solver) mod(v *value) {
 		if right != 0 {
 			v.expr = left % right
 		} else {
-			s.t.pusherrtok(s.op, "divide_by_zero")
+			s.p.pusherrtok(s.op, "divide_by_zero")
 			v.expr = uint64(0)
 		}
 	}
@@ -380,8 +380,8 @@ func (s *solver) or(v *value) {
 func (s *solver) ptr() (v value) {
 	v.data.Token = s.op
 	if !s.types_are_compatible(true) {
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "incompatible_types",
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "incompatible_types",
 			s.r.data.Type.Kind, s.l.data.Type.Kind)
 		return
 	}
@@ -396,8 +396,8 @@ func (s *solver) ptr() (v value) {
 		v.data.Type.Id = juletype.Bool
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "operator_not_for_juletype", s.op.Kind, "pointer")
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "operator_not_for_juletype", s.op.Kind, "pointer")
 	}
 	return
 }
@@ -416,8 +416,8 @@ func (s *solver) str() (v value) {
 	v.data.Token = s.op
 	// Not both string?
 	if s.l.data.Type.Id != s.r.data.Type.Id {
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "incompatible_types",
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "incompatible_types",
 			s.l.data.Type.Kind, s.r.data.Type.Kind)
 		return
 	}
@@ -435,8 +435,8 @@ func (s *solver) str() (v value) {
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.noteq(&v)
 	default:
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "operator_not_for_juletype",
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "operator_not_for_juletype",
 			s.op.Kind, tokens.STR)
 	}
 	return
@@ -449,8 +449,8 @@ func (s *solver) any() (v value) {
 		v.data.Type.Id = juletype.Bool
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "operator_not_for_juletype", s.op.Kind, tokens.ANY)
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "operator_not_for_juletype", s.op.Kind, tokens.ANY)
 	}
 	return
 }
@@ -458,8 +458,8 @@ func (s *solver) any() (v value) {
 func (s *solver) bool() (v value) {
 	v.data.Token = s.op
 	if !s.types_are_compatible(true) {
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "incompatible_types",
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "incompatible_types",
 			s.r.data.Type.Kind, s.l.data.Type.Kind)
 		return
 	}
@@ -473,8 +473,8 @@ func (s *solver) bool() (v value) {
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		s.noteq(&v)
 	default:
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "operator_not_for_juletype",
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "operator_not_for_juletype",
 			s.op.Kind, tokens.BOOL)
 	}
 	return
@@ -508,8 +508,8 @@ func (s *solver) float() (v value) {
 	v.data.Token = s.op
 	if !juletype.IsNumeric(s.l.data.Type.Id) ||
 		!juletype.IsNumeric(s.r.data.Type.Id) {
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "incompatible_types",
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "incompatible_types",
 			s.r.data.Type.Kind, s.l.data.Type.Kind)
 		return
 	}
@@ -577,8 +577,8 @@ func (s *solver) float() (v value) {
 		}
 		fallthrough
 	default:
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "operator_not_for_float", s.op.Kind)
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "operator_not_for_float", s.op.Kind)
 	}
 	return
 }
@@ -587,8 +587,8 @@ func (s *solver) signed() (v value) {
 	v.data.Token = s.op
 	if !juletype.IsNumeric(s.l.data.Type.Id) ||
 		!juletype.IsNumeric(s.r.data.Type.Id) {
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "incompatible_types",
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "incompatible_types",
 			s.r.data.Type.Kind, s.l.data.Type.Kind)
 		return
 	}
@@ -669,19 +669,19 @@ func (s *solver) signed() (v value) {
 		v.data.Type.Id = juletype.U64
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		if !okForShifting(s.r) {
-			s.t.pusherrtok(s.op, "bitshift_must_unsigned")
+			s.p.pusherrtok(s.op, "bitshift_must_unsigned")
 		}
 		s.rshift(&v)
 	case tokens.LSHIFT:
 		v.data.Type.Id = juletype.U64
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		if !okForShifting(s.r) {
-			s.t.pusherrtok(s.op, "bitshift_must_unsigned")
+			s.p.pusherrtok(s.op, "bitshift_must_unsigned")
 		}
 		s.lshift(&v)
 	default:
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "operator_not_for_int", s.op.Kind)
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "operator_not_for_int", s.op.Kind)
 	}
 	return
 }
@@ -690,8 +690,8 @@ func (s *solver) unsigned() (v value) {
 	v.data.Token = s.op
 	if !juletype.IsNumeric(s.l.data.Type.Id) ||
 		!juletype.IsNumeric(s.r.data.Type.Id) {
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "incompatible_types",
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "incompatible_types",
 			s.r.data.Type.Kind, s.l.data.Type.Kind)
 		return
 	}
@@ -772,19 +772,19 @@ func (s *solver) unsigned() (v value) {
 		v.data.Type.Id = juletype.U64
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		if !okForShifting(s.r) {
-			s.t.pusherrtok(s.op, "bitshift_must_unsigned")
+			s.p.pusherrtok(s.op, "bitshift_must_unsigned")
 		}
 		s.rshift(&v)
 	case tokens.LSHIFT:
 		v.data.Type.Id = juletype.U64
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 		if !okForShifting(s.r) {
-			s.t.pusherrtok(s.op, "bitshift_must_unsigned")
+			s.p.pusherrtok(s.op, "bitshift_must_unsigned")
 		}
 		s.lshift(&v)
 	default:
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "operator_not_for_uint", s.op.Kind)
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "operator_not_for_uint", s.op.Kind)
 	}
 	return
 }
@@ -792,8 +792,8 @@ func (s *solver) unsigned() (v value) {
 func (s *solver) logical() (v value) {
 	if s.l.data.Type.Id != juletype.Bool ||
 		s.r.data.Type.Id != juletype.Bool {
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "logical_not_bool")
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "logical_not_bool")
 		return
 	}
 	v.data.Token = s.op
@@ -814,8 +814,8 @@ func (s *solver) logical() (v value) {
 func (s *solver) array() (v value) {
 	v.data.Token = s.op
 	if !s.types_are_compatible(true) {
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "incompatible_types",
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "incompatible_types",
 			s.r.data.Type.Kind, s.l.data.Type.Kind)
 		return
 	}
@@ -824,8 +824,8 @@ func (s *solver) array() (v value) {
 		v.data.Type.Id = juletype.Bool
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "operator_not_for_juletype", s.op.Kind, s.l.data.Type.Kind)
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "operator_not_for_juletype", s.op.Kind, s.l.data.Type.Kind)
 	}
 	return
 }
@@ -833,8 +833,8 @@ func (s *solver) array() (v value) {
 func (s *solver) slice() (v value) {
 	v.data.Token = s.op
 	if !s.types_are_compatible(true) {
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "incompatible_types",
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "incompatible_types",
 			s.r.data.Type.Kind, s.l.data.Type.Kind)
 		return
 	}
@@ -843,8 +843,8 @@ func (s *solver) slice() (v value) {
 		v.data.Type.Id = juletype.Bool
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "operator_not_for_juletype",
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "operator_not_for_juletype",
 			s.op.Kind, s.l.data.Type.Kind)
 	}
 	return
@@ -853,8 +853,8 @@ func (s *solver) slice() (v value) {
 func (s *solver) nil() (v value) {
 	v.data.Token = s.op
 	if !s.types_are_compatible(false) {
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "incompatible_types",
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "incompatible_types",
 			s.r.data.Type.Kind, s.l.data.Type.Kind)
 		return
 	}
@@ -872,8 +872,8 @@ func (s *solver) nil() (v value) {
 			v.expr = s.l.expr == nil && s.r.expr == nil
 		}
 	default:
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "operator_not_for_juletype",
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "operator_not_for_juletype",
 			s.op.Kind, tokens.NIL)
 	}
 	return
@@ -882,8 +882,8 @@ func (s *solver) nil() (v value) {
 func (s *solver) structure() (v value) {
 	v.data.Token = s.op
 	if s.l.data.Type.Kind != s.r.data.Type.Kind {
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "incompatible_types",
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "incompatible_types",
 			s.r.data.Type.Kind, s.l.data.Type.Kind)
 		return
 	}
@@ -892,8 +892,8 @@ func (s *solver) structure() (v value) {
 		v.data.Type.Id = juletype.Bool
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "operator_not_for_juletype",
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "operator_not_for_juletype",
 			s.op.Kind, tokens.STRUCT)
 	}
 	return
@@ -902,8 +902,8 @@ func (s *solver) structure() (v value) {
 func (s *solver) juletrait() (v value) {
 	v.data.Token = s.op
 	if !s.types_are_compatible(true) {
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "incompatible_types",
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "incompatible_types",
 			s.r.data.Type.Kind, s.l.data.Type.Kind)
 		return
 	}
@@ -912,8 +912,8 @@ func (s *solver) juletrait() (v value) {
 		v.data.Type.Id = juletype.Bool
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "operator_not_for_juletype",
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "operator_not_for_juletype",
 			s.op.Kind, tokens.TRAIT)
 	}
 	return
@@ -923,8 +923,8 @@ func (s *solver) function() (v value) {
 	v.data.Token = s.op
 	if (!typeIsPure(s.l.data.Type) || s.l.data.Type.Id != juletype.Nil) &&
 		(!typeIsPure(s.r.data.Type) || s.r.data.Type.Id != juletype.Nil) {
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "incompatible_types",
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "incompatible_types",
 			s.r.data.Type.Kind, s.l.data.Type.Kind)
 		return
 	}
@@ -936,8 +936,8 @@ func (s *solver) function() (v value) {
 		v.data.Type.Id = juletype.Bool
 		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	default:
-		s.t.eval.has_error = true
-		s.t.pusherrtok(s.op, "operator_not_for_juletype",
+		s.p.eval.has_error = true
+		s.p.pusherrtok(s.op, "operator_not_for_juletype",
 			s.op.Kind, tokens.NIL)
 	}
 	return

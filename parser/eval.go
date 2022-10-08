@@ -24,7 +24,7 @@ type value struct {
 }
 
 type eval struct {
-	t            *Parser
+	p            *Parser
 	has_error    bool
 	type_prefix  *Type
 	allow_unsafe bool
@@ -35,7 +35,7 @@ func (e *eval) pusherrtok(tok lex.Token, err string, args ...any) {
 		return
 	}
 	e.has_error = true
-	e.t.pusherrtok(tok, err, args...)
+	e.p.pusherrtok(tok, err, args...)
 }
 
 func (e *eval) eval_toks(toks []lex.Token) (value, iExpr) {
@@ -73,7 +73,7 @@ func (e *eval) eval_op(op any) (v value, model iExpr) {
 		return
 	}
 	process := solver{
-		t: e.t,
+		p: e.p,
 		op: bop.Op,
 		l: l,
 		r: r,
@@ -127,7 +127,7 @@ func (e *eval) eval(op any) (v value, model iExpr) {
 }
 
 func (e *eval) single(tok lex.Token, m *exprModel) (v value, ok bool) {
-	eval := valueEvaluator{tok, m, e.t}
+	eval := valueEvaluator{tok, m, e.p}
 	v.data.Type.Id = juletype.Void
 	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
 	v.data.Token = tok
@@ -160,7 +160,7 @@ func (e *eval) unary(toks []lex.Token, m *exprModel) value {
 	// Change "1" with length of token's value
 	// if all operators length is not 1.
 	exprToks := toks[1:]
-	processor := unary{toks[0], exprToks, m, e.t}
+	processor := unary{toks[0], exprToks, m, e.p}
 	if processor.toks == nil {
 		e.pusherrtok(processor.token, "invalid_syntax")
 		return v
@@ -212,7 +212,7 @@ func (e *eval) dataTypeFunc(expr lex.Token, callRange []lex.Token, m *exprModel)
 		switch expr.Kind {
 		case tokens.STR:
 			m.appendSubNode(exprNode{"__julec_to_str("})
-			_, vm := e.t.evalToks(callRange)
+			_, vm := e.p.evalToks(callRange)
 			m.appendSubNode(vm)
 			m.appendSubNode(exprNode{tokens.RPARENTHESES})
 			v.data.Type = Type{
@@ -230,13 +230,13 @@ func (e *eval) dataTypeFunc(expr lex.Token, callRange []lex.Token, m *exprModel)
 			v = e.castExpr(dt, callRange, m, expr)
 		}
 	case tokens.Id:
-		def, _, _ := e.t.defById(expr.Kind)
+		def, _, _ := e.p.defById(expr.Kind)
 		if def == nil {
 			break
 		}
 		switch t := def.(type) {
 		case *TypeAlias:
-			dt, ok := e.t.realType(t.Type, true)
+			dt, ok := e.p.realType(t.Type, true)
 			if !ok || typeIsStruct(dt) {
 				return
 			}
@@ -267,7 +267,7 @@ func getCallData(toks []lex.Token, m *exprModel) (data callData) {
 }
 
 func (e *eval) unsafe_allowed() bool {
-	return e.allow_unsafe || e.t.unsafe_allowed()
+	return e.allow_unsafe || e.p.unsafe_allowed()
 }
 
 func (e *eval) callFunc(f *Func, data callData, m *exprModel) value {
@@ -275,9 +275,9 @@ func (e *eval) callFunc(f *Func, data callData, m *exprModel) value {
 		e.pusherrtok(data.expr[0], "unsafe_behavior_at_out_of_unsafe_scope")
 	}
 	if f.BuiltinCaller != nil {
-		return f.BuiltinCaller.(BuiltinCaller)(e.t, f, data, m)
+		return f.BuiltinCaller.(BuiltinCaller)(e.p, f, data, m)
 	}
-	return e.t.callFunc(f, data, m)
+	return e.p.callFunc(f, data, m)
 }
 
 func (e *eval) parenthesesRange(toks []lex.Token, m *exprModel) (v value) {
@@ -333,7 +333,7 @@ func (e *eval) try_cpp_linked_var(toks []lex.Token, m *exprModel) (v value, ok b
 		e.pusherrtok(toks[2], "invalid_syntax")
 		return
 	}
-	def, def_t := e.t.linkById(tok.Kind)
+	def, def_t := e.p.linkById(tok.Kind)
 	if def_t == ' ' {
 		e.pusherrtok(tok, "id_not_exist", tok.Kind)
 		return
@@ -404,8 +404,8 @@ func (e *eval) subId(toks []lex.Token, m *exprModel) (v value) {
 		if tok.Id == tokens.DataType {
 			return e.typeSubId(tok, idTok, m)
 		} else if tok.Id == tokens.Id {
-			t, _, _ := e.t.typeById(tok.Kind)
-			if t != nil {
+			t, _, _ := e.p.typeById(tok.Kind)
+			if t != nil && !e.p.is_shadowed(tok.Kind) {
 				return e.typeSubId(t.Type.Token, idTok, m)
 			}
 		}
@@ -506,7 +506,7 @@ func (e *eval) tryCast(toks []lex.Token, m *exprModel) (v value, _ bool) {
 		if !ok {
 			return
 		}
-		dt, ok = e.t.realType(dt, false)
+		dt, ok = e.p.realType(dt, false)
 		if !ok {
 			return
 		}
@@ -521,7 +521,7 @@ func (e *eval) tryCast(toks []lex.Token, m *exprModel) (v value, _ bool) {
 		if tok.Id != tokens.Brace || tok.Kind != tokens.LPARENTHESES {
 			return
 		}
-		exprToks, ok = e.t.getrange(tokens.LPARENTHESES, tokens.RPARENTHESES, exprToks)
+		exprToks, ok = e.p.getrange(tokens.LPARENTHESES, tokens.RPARENTHESES, exprToks)
 		if !ok {
 			return
 		}
@@ -796,7 +796,7 @@ func (e *eval) typeSubId(typeTok, idTok lex.Token, m *exprModel) (v value) {
 	case tokens.F64:
 		return e.f64SubId(idTok, m)
 	}
-	e.pusherrtok(typeTok, "obj_not_support_sub_fields", typeTok.Kind)
+	e.pusherrtok(idTok, "obj_not_support_sub_fields", typeTok.Kind)
 	return
 }
 
@@ -808,13 +808,13 @@ func (e *eval) typeId(toks []lex.Token, m *exprModel) (v value) {
 	t, ok := b.DataType(toks, &i, true, true)
 	b.Wait()
 	if !ok {
-		e.t.pusherrs(b.Errors...)
+		e.p.pusherrs(b.Errors...)
 		return
 	} else if i+1 >= len(toks) {
 		e.pusherrtok(toks[0], "invalid_syntax")
 		return
 	}
-	t, ok = e.t.realType(t, true)
+	t, ok = e.p.realType(t, true)
 	if !ok {
 		return
 	}
@@ -825,7 +825,7 @@ func (e *eval) typeId(toks []lex.Token, m *exprModel) (v value) {
 			return
 		}
 		s := t.Tag.(*structure)
-		return e.t.callStructConstructor(s, toks, m)
+		return e.p.callStructConstructor(s, toks, m)
 	}
 	if toks[0].Id != tokens.Brace || toks[0].Kind != tokens.LBRACKET {
 		e.pusherrtok(toks[0], "invalid_syntax")
@@ -932,8 +932,8 @@ func (e *eval) structObjSubId(val value, idTok lex.Token, m *exprModel) value {
 		}()
 	}
 	interior_mutability := false
-	if e.t.rootBlock.Func.Receiver != nil {
-		switch t := e.t.rootBlock.Func.Receiver.Tag.(type) {
+	if e.p.rootBlock.Func.Receiver != nil {
+		switch t := e.p.rootBlock.Func.Receiver.Tag.(type) {
 		case *structure:
 			interior_mutability = structure_instances_is_uses_same_base(t, s)
 		}
@@ -942,7 +942,7 @@ func (e *eval) structObjSubId(val value, idTok lex.Token, m *exprModel) value {
 	if typeIsFunc(val.data.Type) {
 		f := val.data.Type.Tag.(*Func)
 		if f.Receiver != nil && typeIsRef(f.Receiver.Type) && !typeIsRef(parent_type) {
-			e.t.pusherrtok(idTok, "ref_method_used_with_not_ref_instance")
+			e.p.pusherrtok(idTok, "ref_method_used_with_not_ref_instance")
 		}
 	}
 	return val
@@ -964,7 +964,7 @@ type nsFind interface {
 }
 
 func (e *eval) getNs(toks *[]lex.Token) *DefineMap {
-	var prev nsFind = e.t
+	var prev nsFind = e.p
 	var ns *namespace
 	for i, tok := range *toks {
 		if (i+1)%2 != 0 {
@@ -1000,18 +1000,18 @@ func (e *eval) nsSubId(toks []lex.Token, m *exprModel) (v value) {
 	// Temporary clean of local defines
 	// Because this defines has high priority
 	// So shadows defines of namespace
-	blockTypes := e.t.blockTypes
-	blockVars := e.t.blockVars
-	e.t.blockTypes = nil
-	e.t.blockVars = nil
-	pdefs := e.t.Defines
-	e.t.Defines = defs
-	e.t.allowBuiltin = false
+	blockTypes := e.p.blockTypes
+	blockVars := e.p.blockVars
+	e.p.blockTypes = nil
+	e.p.blockVars = nil
+	pdefs := e.p.Defines
+	e.p.Defines = defs
+	e.p.allowBuiltin = false
 	v, _ = e.single(toks[0], m)
-	e.t.allowBuiltin = true
-	e.t.blockTypes = blockTypes
-	e.t.blockVars = blockVars
-	e.t.Defines = pdefs
+	e.p.allowBuiltin = true
+	e.p.blockTypes = blockTypes
+	e.p.blockVars = blockVars
+	e.p.Defines = pdefs
 	return
 }
 
@@ -1120,7 +1120,7 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 		m.appendSubNode(exprNode{".___slice("})
 		if len(leftToks) > 0 {
 			var model iExpr
-			leftv, model = e.t.evalToks(leftToks)
+			leftv, model = e.p.evalToks(leftToks)
 			m.appendSubNode(indexingExprModel(model))
 			e.checkIntegerIndexing(leftv, errTok)
 		} else {
@@ -1131,7 +1131,7 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 		if len(rightToks) > 0 {
 			m.appendSubNode(exprNode{","})
 			var model iExpr
-			rightv, model = e.t.evalToks(rightToks)
+			rightv, model = e.p.evalToks(rightToks)
 			m.appendSubNode(indexingExprModel(model))
 			e.checkIntegerIndexing(rightv, errTok)
 		}
@@ -1209,7 +1209,7 @@ func (e *eval) indexingMap(mapv, leftv value, errtok lex.Token) value {
 	keyType := types[0]
 	valType := types[1]
 	mapv.data.Type = valType
-	e.t.checkType(keyType, leftv.data.Type, false, true, errtok)
+	e.p.checkType(keyType, leftv.data.Type, false, true, errtok)
 	return mapv
 }
 
@@ -1225,7 +1225,7 @@ func (e *eval) indexingStr(strv, index value, errtok lex.Token) value {
 		i := tonums(index.expr)
 		s := strv.expr.(string)
 		if int(i) >= len(s) {
-			e.t.pusherrtok(errtok, "overflow_limits")
+			e.p.pusherrtok(errtok, "overflow_limits")
 		} else {
 			strv.expr = uint64(s[i])
 			strv.model = numericModel(strv)
@@ -1273,7 +1273,7 @@ func (e *eval) slicingStr(v, leftv, rightv value, errtok lex.Token) value {
 		right := tonums(rightv.expr)
 		s := v.expr.(string)
 		if int(right) >= len(s) {
-			e.t.pusherrtok(errtok, "overflow_limits")
+			e.p.pusherrtok(errtok, "overflow_limits")
 		}
 	}
 	if leftv.constExpr && rightv.constExpr {
@@ -1303,7 +1303,7 @@ func (e *eval) slicingStr(v, leftv, rightv value, errtok lex.Token) value {
 func (e *eval) enumerableParts(toks []lex.Token) [][]lex.Token {
 	toks = toks[1 : len(toks)-1]
 	parts, errs := ast.Parts(toks, tokens.Comma, true)
-	e.t.pusherrs(errs...)
+	e.p.pusherrs(errs...)
 	return parts
 }
 
@@ -1311,9 +1311,9 @@ func (e *eval) build_array(parts [][]lex.Token, t Type, errtok lex.Token) (value
 	if !t.Size.AutoSized {
 		n := models.Size(len(parts))
 		if n > t.Size.N {
-			e.t.pusherrtok(errtok, "overflow_limits")
+			e.p.pusherrtok(errtok, "overflow_limits")
 		} else if typeIsRef(*t.ComponentType) && n < t.Size.N {
-			e.t.pusherrtok(errtok, "reference_not_initialized")
+			e.p.pusherrtok(errtok, "reference_not_initialized")
 		}
 	} else {
 		t.Size.N = models.Size(len(parts))
@@ -1334,7 +1334,7 @@ func (e *eval) build_array(parts [][]lex.Token, t Type, errtok lex.Token) (value
 		partVal, expModel := e.eval_toks(part)
 		model.expr = append(model.expr, expModel)
 		assign_checker{
-			t:      e.t,
+			p:      e.p,
 			expr_t:      *t.ComponentType,
 			v:      partVal,
 			errtok: part[0],
@@ -1363,7 +1363,7 @@ func (e *eval) build_slice_implicit(parts [][]lex.Token, errtok lex.Token) (valu
 		partVal, expModel := e.eval_toks(part)
 		model.expr = append(model.expr, expModel)
 		assign_checker{
-			t:      e.t,
+			p:      e.p,
 			expr_t:      *model.dataType.ComponentType,
 			v:      partVal,
 			errtok: part[0],
@@ -1384,7 +1384,7 @@ func (e *eval) build_slice_explicit(parts [][]lex.Token, t Type, errtok lex.Toke
 		partVal, expModel := e.eval_toks(part)
 		model.expr = append(model.expr, expModel)
 		assign_checker{
-			t:      e.t,
+			p:      e.p,
 			expr_t:      *t.ComponentType,
 			v:      partVal,
 			errtok: part[0],
@@ -1433,13 +1433,13 @@ func (e *eval) buildMap(parts [][]lex.Token, t Type, errtok lex.Token) (value, i
 		val, valModel := e.eval_toks(valToks)
 		model.valExprs = append(model.valExprs, valModel)
 		assign_checker{
-			t:      e.t,
+			p:      e.p,
 			expr_t:      keyType,
 			v:      key,
 			errtok: colonTok,
 		}.check()
 		assign_checker{
-			t:      e.t,
+			p:      e.p,
 			expr_t:      valType,
 			v:      val,
 			errtok: colonTok,
@@ -1450,7 +1450,7 @@ func (e *eval) buildMap(parts [][]lex.Token, t Type, errtok lex.Token) (value, i
 
 func (e *eval) enumerable(exprToks []lex.Token, t Type, m *exprModel) (v value) {
 	var model iExpr
-	t, ok := e.t.realType(t, true)
+	t, ok := e.p.realType(t, true)
 	if !ok {
 		return
 	}
@@ -1475,11 +1475,11 @@ func (e *eval) anonymousFn(toks []lex.Token, m *exprModel) (v value) {
 	f := b.Func(b.Tokens, false, true, false)
 	b.Wait()
 	if len(b.Errors) > 0 {
-		e.t.pusherrs(b.Errors...)
+		e.p.pusherrs(b.Errors...)
 		return
 	}
-	e.t.checkAnonFunc(&f)
-	f.Owner = e.t
+	e.p.checkAnonFunc(&f)
+	f.Owner = e.p
 	v.data.Value = f.Id
 	v.data.Type.Tag = &f
 	v.data.Type.Id = juletype.Fn
@@ -1531,7 +1531,7 @@ func (e *eval) braceRange(toks []lex.Token, m *exprModel) (v value) {
 			case typeIsStruct(*e.type_prefix):
 				prefix := e.type_prefix
 				s := e.type_prefix.Tag.(*structure)
-				v = e.t.callStructConstructor(s, toks, m)
+				v = e.p.callStructConstructor(s, toks, m)
 				e.type_prefix = prefix
 				return
 			}
