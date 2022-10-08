@@ -5,12 +5,25 @@
 use std::unicode::utf16::{append_rune, decode}
 
 use cpp "<sys/stat.h>"
+use cpp "<dirent.h>"
 
 cpp type wchar_t: u16
+
 cpp struct stat{}
+
+//jule:typedef
+cpp struct _WDIR{}
+
+cpp struct _wdirent {
+	pub d_name: *cpp.wchar_t
+}
+
 cpp fn GetStdHandle(stdh: uintptr) *unsafe
 cpp fn CloseHandle(stdh: *unsafe) bool
 cpp fn wstat(path: *cpp.wchar_t, handle: *cpp.stat) (err: int)
+cpp fn _wopendir(path: *cpp.wchar_t) *cpp._WDIR
+cpp fn _wclosedir(mut dir: *cpp._WDIR) int
+cpp fn _wreaddir(mut dir: *cpp._WDIR) *cpp._wdirent
 
 pub type handle: uintptr
 
@@ -39,7 +52,7 @@ pub fn utf16_from_str(s: str) ([]u16, bool) {
 // Returns the UTF-8 encoding of the UTF-16 sequence s,
 // with a terminating NULL removed.
 pub fn utf16_to_str(s: []u16) str {
-	let mut code_page = unsafe{ *(&s) }
+	let mut code_page = unsafe { *(&s) }
 	for i, v in s {
 		if v == 0 {
 			code_page = code_page[0:i]
@@ -55,7 +68,7 @@ pub fn wchar_to_str(s: *cpp.wchar_t) str {
 	let mut i = 0
 	let mut code_page: []u16 = nil
 	for {
-		let r = unsafe{ s[i] }
+		let r = unsafe { s[i] }
 		code_page = append[u16](code_page, r)
 		i += 1
 		if r == 0 {
@@ -66,12 +79,22 @@ pub fn wchar_to_str(s: *cpp.wchar_t) str {
 }
 
 pub fn get_std_handle(stdh: uintptr) handle { ret handle(cpp.GetStdHandle(stdh)) }
-pub fn close_handle(stdh: handle) bool { ret cpp.CloseHandle(unsafe{ (*unsafe)(stdh) }) }
+pub fn close_handle(stdh: handle) bool { ret cpp.CloseHandle(unsafe { (*unsafe)(stdh) }) }
+pub unsafe fn read_dir(mut dir: *cpp._WDIR) *cpp._wdirent { ret cpp._wreaddir(dir) }
+pub unsafe fn close_dir(mut dir: *cpp._WDIR) int { ret cpp._wclosedir(dir) }
 
 pub fn stat(path: str, handle: *cpp.stat) (ok: bool) {
 	let (utf16_path, utf16_ok) = utf16_from_str(path)
 	if !utf16_ok {
 		ret false
 	}
-	ret cpp.wstat(unsafe{ (*cpp.wchar_t)(&utf16_path[0]) }, handle) == 0
+	ret cpp.wstat(unsafe { (*cpp.wchar_t)(&utf16_path[0]) }, handle) == 0
+}
+
+pub fn open_dir(path: str) *cpp._WDIR {
+	let (utf16_path, ok) = utf16_from_str(path)
+	if !ok {
+		ret nil
+	}
+	ret cpp._wopendir(unsafe { (*cpp.wchar_t)(&utf16_path[0]) })
 }
