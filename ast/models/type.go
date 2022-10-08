@@ -5,6 +5,7 @@ import (
 
 	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/lex/tokens"
+	"github.com/jule-lang/jule/pkg/jule"
 	"github.com/jule-lang/jule/pkg/juleapi"
 	"github.com/jule-lang/jule/pkg/juletype"
 )
@@ -282,7 +283,7 @@ func (dt *Type) TraitString() string {
 func (dt *Type) StructString() string {
 	var cpp strings.Builder
 	s := dt.Tag.(CompiledStruct)
-	if s.CppLinked() {
+	if s.CppLinked() && !Has_attribute(jule.Attribute_Typedef, s.Get_ast().Attributes) {
 		cpp.WriteString("struct ")
 	}
 	cpp.WriteString(s.OutId())

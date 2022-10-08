@@ -3,6 +3,7 @@ package jule
 // Attributes of language.
 var Attributes = [...]string{
 	0: Attribute_CDef,
+	1: Attribute_Typedef,
 }
 
 // List of supported operating systems.

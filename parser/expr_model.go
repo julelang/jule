@@ -164,7 +164,7 @@ type callExpr struct {
 
 func (ce callExpr) String() string {
 	var cpp strings.Builder
-	if ce.f.FindAttribute(jule.Attribute_CDef) == nil {
+	if !models.Has_attribute(jule.Attribute_CDef, ce.f.Attributes) {
 		cpp.WriteString(ce.generics.String())
 	}
 	cpp.WriteByte('(')

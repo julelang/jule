@@ -25,17 +25,6 @@ type Fn struct {
 	BuiltinCaller any
 }
 
-// FindAttribute returns attribute if exist, nil if not.
-func (f *Fn) FindAttribute(kind string) *Attribute {
-	for i := range f.Attributes {
-		attribute := &f.Attributes[i]
-		if attribute.Tag == kind {
-			return attribute
-		}
-	}
-	return nil
-}
-
 func (f *Fn) plainTypeString() string {
 	var s strings.Builder
 	s.WriteByte('(')

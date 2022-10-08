@@ -6,6 +6,7 @@ type CompiledStruct interface {
 	Generics() []Type
 	SetGenerics([]Type)
 	CppLinked() bool
+	Get_ast() Struct
 }
 
 // Genericable instance.

@@ -321,21 +321,23 @@ func (s structure) String() string {
 	return cpp.String()
 }
 
+// Get_ast returns ast model of type.
+//
+// This function is should be have this function
+// for Genericable & CompiledStruct interface of ast package.
+func (s *structure) Get_ast() Struct { return s.Ast }
+
 // Generics returns generics of type.
 //
 // This function is should be have this function
 // for Genericable & CompiledStruct interface of ast package.
-func (s *structure) Generics() []Type {
-	return s.generics
-}
+func (s *structure) Generics() []Type { return s.generics }
 
 // SetGenerics set generics of type.
 //
 // This function is should be have this function
 // for Genericable & CompiledStruct interface of ast package.
-func (s *structure) SetGenerics(generics []Type) {
-	s.generics = generics
-}
+func (s *structure) SetGenerics(generics []Type) { s.generics = generics }
 
 func (s *structure) selfVar(receiver *Var) *Var {
 	v := new(models.Var)
