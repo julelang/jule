@@ -5,16 +5,6 @@ import (
 	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
-// Defer is the AST model of deferred calls.
-type Defer struct {
-	Token lex.Token
-	Expr  Expr
-}
-
-func (d Defer) String() string {
-	return juleapi.ToDeferredCall(d.Expr.String())
-}
-
 // ConcurrentCall is the AST model of concurrent calls.
 type ConcurrentCall struct {
 	Token  lex.Token

@@ -2674,9 +2674,6 @@ func (p *Parser) statement(s *models.Statement, recover bool) bool {
 	case *models.Block:
 		p.checkNewBlock(data)
 		s.Data = data
-	case models.Defer:
-		p.deferredCall(&data)
-		s.Data = data
 	case models.ConcurrentCall:
 		p.concurrentCall(&data)
 		s.Data = data
@@ -3075,12 +3072,6 @@ func (p *Parser) varStatement(v *Var, noParse bool) {
 		*v = *p.Var(*v)
 	}
 	p.blockVars = append(p.blockVars, v)
-}
-
-func (p *Parser) deferredCall(d *models.Defer) {
-	m := new(exprModel)
-	m.nodes = make([]exprBuildNode, 1)
-	_, d.Expr.Model = p.evalExpr(d.Expr, nil)
 }
 
 func (p *Parser) concurrentCall(cc *models.ConcurrentCall) {

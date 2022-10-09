@@ -1544,8 +1544,6 @@ func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
 		return b.ElseBlock(bs)
 	case lex.ID_COMMENT:
 		return b.CommentStatement(bs.toks[0])
-	case lex.ID_DEFER:
-		return b.DeferStatement(bs.toks)
 	case lex.ID_CO:
 		return b.ConcurrentCallStatement(bs.toks)
 	case lex.ID_GOTO:
@@ -1953,24 +1951,6 @@ func (b *Builder) CommentStatement(tok lex.Token) (s models.Statement) {
 	s.Token = tok
 	tok.Kind = strings.TrimSpace(tok.Kind[2:])
 	s.Data = models.Comment{Content: tok.Kind}
-	return
-}
-
-// DeferStatement builds AST model of deferred call statement.
-func (b *Builder) DeferStatement(toks []lex.Token) (s models.Statement) {
-	var d models.Defer
-	d.Token = toks[0]
-	toks = toks[1:]
-	if len(toks) == 0 {
-		b.pusherr(d.Token, "missing_expr")
-		return
-	}
-	if IsFuncCall(toks) == nil {
-		b.pusherr(d.Token, "expr_not_func_call")
-	}
-	d.Expr = b.Expr(toks)
-	s.Token = d.Token
-	s.Data = d
 	return
 }
 

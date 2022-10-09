@@ -701,7 +701,6 @@ var KEYWORDS = map[string]uint8{
 	KND_ELSE:        ID_ELSE,
 	KND_USE:         ID_USE,
 	KND_PUB:         ID_PUB,
-	KND_DEFER:       ID_DEFER,
 	KND_GOTO:        ID_GOTO,
 	KND_ENUM:        ID_ENUM,
 	KND_STRUCT:      ID_STRUCT,

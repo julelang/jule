@@ -76,8 +76,6 @@ constexpr std::nullptr_t nil{ nullptr };
     __JULEC_CONCAT(__JULEC_IDENTIFIER_PREFIX, _IDENTIFIER)
 #define __JULEC_CO(_EXPR)   \
     ( std::thread{[&](void) mutable -> void { _EXPR; }}.detach() )
-#define __JULEC_DEFER(_EXPR)    \
-    defer __JULEC_CONCAT(JULEC_DEFER_, __LINE__){[&](void) -> void { _EXPR; }}
 
 
 
@@ -108,7 +106,6 @@ inline std::ostream &operator<<(std::ostream &_Stream,
 #include "str.hpp"
 #include "any.hpp"
 #include "fn.hpp"
-#include "defer.hpp"
 #include "builtin.hpp"
 #include "utf16.hpp"
 
