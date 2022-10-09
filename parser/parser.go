@@ -547,8 +547,11 @@ func (p *Parser) use(ast *models.UseDecl, err *bool) {
 	// Already parsed?
 	for _, u := range used {
 		if ast.Path == u.Path {
+			old := u.FullUse
+			u.FullUse = ast.FullUse
 			p.pushUse(u, ast.Selectors)
 			p.Uses = append(p.Uses, u)
+			u.FullUse = old
 			return
 		}
 	}
