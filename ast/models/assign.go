@@ -19,7 +19,7 @@ func (as AssignLeft) String() string {
 	case as.Var.New:
 		return as.Var.OutId()
 	case as.Ignore:
-		return juleapi.CppIgnore
+		return juleapi.CPP_IGNORE
 	}
 	return as.Expr.String()
 }
@@ -92,7 +92,7 @@ func (a *Assign) cppMultiRet() string {
 	cpp.WriteString("std::tie(")
 	for _, left := range a.Left {
 		if left.Ignore {
-			cpp.WriteString(juleapi.CppIgnore)
+			cpp.WriteString(juleapi.CPP_IGNORE)
 			cpp.WriteByte(',')
 			continue
 		}

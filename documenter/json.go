@@ -79,7 +79,7 @@ type document struct {
 }
 
 func fmt_json_ttoa(t models.Type) string {
-	if t.Kind == juletype.TypeMap[juletype.Void] {
+	if t.Kind == juletype.TYPE_MAP[juletype.VOID] {
 		return ""
 	}
 	return t.Kind

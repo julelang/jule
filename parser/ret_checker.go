@@ -3,7 +3,6 @@ package parser
 import (
 	"github.com/jule-lang/jule/ast/models"
 	"github.com/jule-lang/jule/lex"
-	"github.com/jule-lang/jule/lex/tokens"
 	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
@@ -30,15 +29,15 @@ func (rc *retChecker) checkepxrs() {
 	brace_n := 0
 	last := 0
 	for i, tok := range rc.ret_ast.Expr.Tokens {
-		if tok.Id == tokens.Brace {
+		if tok.Id == lex.ID_BRACE {
 			switch tok.Kind {
-			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
+			case lex.KND_LBRACE, lex.KND_LBRACKET, lex.KND_LPAREN:
 				brace_n++
 			default:
 				brace_n--
 			}
 		}
-		if brace_n > 0 || tok.Id != tokens.Comma {
+		if brace_n > 0 || tok.Id != lex.ID_COMMA {
 			continue
 		}
 		rc.pushval(last, i, tok)
@@ -163,7 +162,7 @@ func (rc *retChecker) retsVars() {
 		if juleapi.IsIgnoreId(v.Kind) {
 			node := exprNode{}
 			node.value = types[i].String()
-			node.value += juleapi.DefaultExpr
+			node.value += juleapi.DEFAULT_EXPR
 			rc.exp_model.models = append(rc.exp_model.models, node)
 			continue
 		}

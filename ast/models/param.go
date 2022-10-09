@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/jule-lang/jule/lex"
-	"github.com/jule-lang/jule/lex/tokens"
 	"github.com/jule-lang/jule/pkg/jule"
 	"github.com/jule-lang/jule/pkg/juleapi"
 )
@@ -23,10 +22,10 @@ type Param struct {
 func (p *Param) TypeString() string {
 	var ts strings.Builder
 	if p.Mutable {
-		ts.WriteString(tokens.MUT + " ")
+		ts.WriteString(lex.KND_MUT + " ")
 	}
 	if p.Variadic {
-		ts.WriteString(tokens.TRIPLE_DOT)
+		ts.WriteString(lex.KND_TRIPLE_DOT)
 	}
 	ts.WriteString(p.Type.Kind)
 	return ts.String()
@@ -40,7 +39,7 @@ func (p *Param) OutId() string {
 func (p Param) String() string {
 	var cpp strings.Builder
 	cpp.WriteString(p.Prototype())
-	if p.Id != "" && !juleapi.IsIgnoreId(p.Id) && p.Id != jule.Anonymous {
+	if p.Id != "" && !juleapi.IsIgnoreId(p.Id) && p.Id != jule.ANONYMOUS {
 		cpp.WriteByte(' ')
 		cpp.WriteString(p.OutId())
 	}

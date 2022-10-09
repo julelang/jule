@@ -8,23 +8,20 @@ import (
 	"github.com/jule-lang/jule/pkg/juleio"
 )
 
-// Ignore operator.
-const Ignore = "_"
+// IGNORE operator.
+const IGNORE = "_"
 
-// InitializerCaller identifier.
-const InitializerCaller = "__julec_call_package_initializers"
+// INIT_CALLER identifier.
+const INIT_CALLER = "__julec_call_package_initializers"
 
 const typeExtension = "_julet"
 
 // IsIgnoreId reports identifier is ignore or not.
-func IsIgnoreId(id string) bool {
-	return id == Ignore
-}
+func IsIgnoreId(id string) bool { return id == IGNORE }
 
 // Returns specified identifer as JuleC identifer.
-func AsId(id string) string {
-	return "_" + id // Equavalents: "JULEC_ID(" + id + ")"
-}
+// Equavalents: "JULEC_ID(" + id + ")"
+func AsId(id string) string { return "_" + id }
 
 func getPtrAsId(ptr unsafe.Pointer) string {
 	address := fmt.Sprintf("%p", ptr)
@@ -52,6 +49,4 @@ func OutId(id string, f *juleio.File) string {
 }
 
 // AsTypeId returns given identifier as output type identifier.
-func AsTypeId(id string) string {
-	return id + typeExtension
-}
+func AsTypeId(id string) string { return id + typeExtension }

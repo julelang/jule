@@ -11,7 +11,7 @@ import (
 // OpenJuleF returns Jule source file.
 func OpenJuleF(path string) (*File, error) {
 	path, _ = filepath.Abs(path)
-	if filepath.Ext(path) != jule.SrcExt {
+	if filepath.Ext(path) != jule.SRC_EXT {
 		return nil, errors.New(jule.GetError("file_not_jule", path))
 	}
 	bytes, err := os.ReadFile(path)

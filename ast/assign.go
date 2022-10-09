@@ -1,9 +1,6 @@
 package ast
 
-import (
-	"github.com/jule-lang/jule/lex"
-	"github.com/jule-lang/jule/lex/tokens"
-)
+import "github.com/jule-lang/jule/lex"
 
 // AssignInfo is the assignment information.
 type AssignInfo struct {
@@ -13,38 +10,38 @@ type AssignInfo struct {
 	Ok     bool
 }
 
-// PostfixOperators.
-var PostfixOperators = [...]string{
-	0: tokens.DOUBLE_PLUS,
-	1: tokens.DOUBLE_MINUS,
+// POSTFIX_OPS list of postfix operators.
+var POSTFIX_OPS = [...]string{
+	lex.KND_DBL_PLUS,
+	lex.KND_DBL_MINUS,
 }
 
-// AssignOperators.
-var AssignOperators = [...]string{
-	0:  tokens.EQUAL,
-	1:  tokens.PLUS_EQUAL,
-	2:  tokens.MINUS_EQUAL,
-	3:  tokens.SLASH_EQUAL,
-	4:  tokens.STAR_EQUAL,
-	5:  tokens.PERCENT_EQUAL,
-	6:  tokens.RSHIFT_EQUAL,
-	7:  tokens.LSHIFT_EQUAL,
-	8:  tokens.VLINE_EQUAL,
-	9:  tokens.AMPER_EQUAL,
-	10: tokens.CARET_EQUAL,
+// ASSING_OPS list of assign operators.
+var ASSING_OPS = [...]string{
+	lex.KND_EQ,
+	lex.KND_PLUS_EQ,
+	lex.KND_MINUS_EQ,
+	lex.KND_SLASH_EQ,
+	lex.KND_STAR_EQ,
+	lex.KND_PERCENT_EQ,
+	lex.KND_RSHIFT_EQ,
+	lex.KND_LSHIFT_EQ,
+	lex.KND_VLINE_EQ,
+	lex.KND_AMPER_EQ,
+	lex.KND_CARET_EQ,
 }
 
 // IsAssign reports given token id is allow for
 // assignment left-expression or not.
 func IsAssign(id uint8) bool {
 	switch id {
-	case tokens.Id,
-		tokens.Cpp,
-		tokens.Let,
-		tokens.Dot,
-		tokens.Self,
-		tokens.Brace,
-		tokens.Operator:
+	case lex.ID_IDENT,
+		lex.ID_CPP,
+		lex.ID_LET,
+		lex.ID_DOT,
+		lex.ID_SELF,
+		lex.ID_BRACE,
+		lex.ID_OP:
 		return true
 	}
 	return false
@@ -52,7 +49,7 @@ func IsAssign(id uint8) bool {
 
 // IsPostfixOperator reports operator kind is postfix operator or not.
 func IsPostfixOperator(kind string) bool {
-	for _, operator := range PostfixOperators {
+	for _, operator := range POSTFIX_OPS {
 		if kind == operator {
 			return true
 		}
@@ -66,7 +63,7 @@ func IsAssignOperator(kind string) bool {
 	if IsPostfixOperator(kind) {
 		return true
 	}
-	for _, operator := range AssignOperators {
+	for _, operator := range ASSING_OPS {
 		if kind == operator {
 			return true
 		}
@@ -81,9 +78,9 @@ func CheckAssignTokens(toks []lex.Token) bool {
 	}
 	brace_n := 0
 	for _, t := range toks {
-		if t.Id == tokens.Brace {
+		if t.Id == lex.ID_BRACE {
 			switch t.Kind {
-			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
+			case lex.KND_LBRACE, lex.KND_LBRACKET, lex.KND_LPAREN:
 				brace_n++
 			default:
 				brace_n--
@@ -93,7 +90,7 @@ func CheckAssignTokens(toks []lex.Token) bool {
 			return false
 		} else if brace_n > 0 {
 			continue
-		} else if t.Id == tokens.Operator && IsAssignOperator(t.Kind) {
+		} else if t.Id == lex.ID_OP && IsAssignOperator(t.Kind) {
 			return true
 		}
 	}

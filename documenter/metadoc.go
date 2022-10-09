@@ -12,7 +12,7 @@ import (
 )
 
 func fmt_meta_ttoa(t models.Type) string {
-	if t.Kind == juletype.TypeMap[juletype.Void] {
+	if t.Kind == juletype.TYPE_MAP[juletype.VOID] {
 		return ""
 	}
 	t.Pure = false
@@ -54,7 +54,7 @@ func fmt_meta_enums(dm *Defmap) string {
 		meta.WriteString(e.Id)
 		meta.WriteString(fmt_meta_ttoa(e.Type))
 		meta.WriteString(" {\n")
-		indent := strings.Repeat(juleset.Default.Indent, juleset.Default.IndentCount)
+		indent := strings.Repeat(juleset.DEFAULT.Indent, juleset.DEFAULT.IndentCount)
 		for _, item := range e.Items {
 			meta.WriteString(indent)
 			meta.WriteString(item.Id)
@@ -74,7 +74,7 @@ func fmt_meta_traits(dm *Defmap) string {
 		meta.WriteString("trait ")
 		meta.WriteString(t.Ast.Id)
 		meta.WriteString(" {\n")
-		indent := strings.Repeat(juleset.Default.Indent, juleset.Default.IndentCount)
+		indent := strings.Repeat(juleset.DEFAULT.Indent, juleset.DEFAULT.IndentCount)
 		for _, f := range t.Ast.Funcs {
 			meta.WriteString(indent)
 			ff := parser.Fn{
@@ -97,7 +97,7 @@ func fmt_meta_structs(dm *Defmap) string {
 		meta.WriteString("struct ")
 		meta.WriteString(s.Ast.Id)
 		meta.WriteString(" {\n")
-		indent := strings.Repeat(juleset.Default.Indent, juleset.Default.IndentCount)
+		indent := strings.Repeat(juleset.DEFAULT.Indent, juleset.DEFAULT.IndentCount)
 		for _, f := range s.Ast.Fields {
 			meta.WriteString(indent)
 			meta.WriteString(fmt_meta_pub_identifier(f.Pub))

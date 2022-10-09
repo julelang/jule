@@ -2,7 +2,6 @@ package ast
 
 import (
 	"github.com/jule-lang/jule/lex"
-	"github.com/jule-lang/jule/lex/tokens"
 	"github.com/jule-lang/jule/pkg/julelog"
 )
 
@@ -16,7 +15,7 @@ func Range(i *int, open, close string, toks []lex.Token) []lex.Token {
 		return nil
 	}
 	tok := toks[*i]
-	if tok.Id != tokens.Brace || tok.Kind != open {
+	if tok.Id != lex.ID_BRACE || tok.Kind != open {
 		return nil
 	}
 	*i++
@@ -24,7 +23,7 @@ func Range(i *int, open, close string, toks []lex.Token) []lex.Token {
 	start := *i
 	for ; brace_n != 0 && *i < len(toks); *i++ {
 		tok := toks[*i]
-		if tok.Id != tokens.Brace {
+		if tok.Id != lex.ID_BRACE {
 			continue
 		}
 		switch tok.Kind {
@@ -45,15 +44,15 @@ func Range(i *int, open, close string, toks []lex.Token) []lex.Token {
 func RangeLast(toks []lex.Token) (cutted, cut []lex.Token) {
 	if len(toks) == 0 {
 		return toks, nil
-	} else if toks[len(toks)-1].Id != tokens.Brace {
+	} else if toks[len(toks)-1].Id != lex.ID_BRACE {
 		return toks, nil
 	}
 	brace_n := 0
 	for i := len(toks) - 1; i >= 0; i-- {
 		tok := toks[i]
-		if tok.Id == tokens.Brace {
+		if tok.Id == lex.ID_BRACE {
 			switch tok.Kind {
-			case tokens.RBRACE, tokens.RBRACKET, tokens.RPARENTHESES:
+			case lex.KND_RBRACE, lex.KND_RBRACKET, lex.KND_RPARENT:
 				brace_n++
 				continue
 			default:
@@ -81,9 +80,9 @@ func Parts(toks []lex.Token, id uint8, exprMust bool) ([][]lex.Token, []julelog.
 	brace_n := 0
 	last := 0
 	for i, tok := range toks {
-		if tok.Id == tokens.Brace {
+		if tok.Id == lex.ID_BRACE {
 			switch tok.Kind {
-			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
+			case lex.KND_LBRACE, lex.KND_LBRACKET, lex.KND_LPAREN:
 				brace_n++
 				continue
 			default:
@@ -118,9 +117,9 @@ func SplitColon(toks []lex.Token, i *int) (rangeToks []lex.Token, colon int) {
 	start := *i
 	for ; *i < len(toks); *i++ {
 		tok := toks[*i]
-		if tok.Id == tokens.Brace {
+		if tok.Id == lex.ID_BRACE {
 			switch tok.Kind {
-			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
+			case lex.KND_LBRACE, lex.KND_LBRACKET, lex.KND_LPAREN:
 				brace_n++
 				continue
 			default:
@@ -136,7 +135,7 @@ func SplitColon(toks []lex.Token, i *int) (rangeToks []lex.Token, colon int) {
 		} else if brace_n != 1 {
 			continue
 		}
-		if colon == -1 && tok.Id == tokens.Colon {
+		if colon == -1 && tok.Id == lex.ID_COLON {
 			colon = *i - start - 1
 		}
 	}

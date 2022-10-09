@@ -40,7 +40,7 @@ func ParseBlock(b Block) string {
 		cpp.WriteString(s.String())
 	}
 	cpp.WriteByte('\n')
-	indent := strings.Repeat(jule.Set.Indent, int(Indent-1)*jule.Set.IndentCount)
+	indent := strings.Repeat(jule.SET.Indent, int(Indent-1)*jule.SET.IndentCount)
 	cpp.WriteString(indent)
 	cpp.WriteByte('}')
 	return cpp.String()
@@ -52,7 +52,7 @@ var Indent uint32 = 0
 
 // IndentString returns indent space of current block.
 func IndentString() string {
-	return strings.Repeat(jule.Set.Indent, int(Indent)*jule.Set.IndentCount)
+	return strings.Repeat(jule.SET.Indent, int(Indent)*jule.SET.IndentCount)
 }
 
 // AddIndent adds new indent to IndentString.

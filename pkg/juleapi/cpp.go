@@ -1,7 +1,7 @@
 package juleapi
 
-// CppHeaderExtensions are valid extensions of cpp headers.
-var CppHeaderExtensions = []string{
+// CPP_HEADER_EXTS are valid extensions of cpp headers.
+var CPP_HEADER_EXTS = []string{
 	".h",
 	".hpp",
 	".hxx",
@@ -10,7 +10,7 @@ var CppHeaderExtensions = []string{
 
 // IsValidHeader returns true if given extension is valid, false if not.
 func IsValidHeader(ext string) bool {
-	for _, validExt := range CppHeaderExtensions {
+	for _, validExt := range CPP_HEADER_EXTS {
 		if ext == validExt {
 			return true
 		}

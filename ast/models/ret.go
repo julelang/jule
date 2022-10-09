@@ -33,7 +33,7 @@ func (rt *RetType) Vars(owner *Block) []*Var {
 		v := new(Var)
 		v.Token = tok
 		if juleapi.IsIgnoreId(tok.Kind) {
-			v.Id = juleapi.Ignore
+			v.Id = juleapi.IGNORE
 		} else {
 			v.Id = tok.Kind
 		}

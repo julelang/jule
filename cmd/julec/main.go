@@ -22,20 +22,20 @@ import (
 	"github.com/jule-lang/jule/pkg/juleset"
 )
 
-const command_help = "help"
-const command_version = "version"
-const command_init = "init"
-const command_doc = "doc"
-const command_bug = "bug"
-const command_tool = "tool"
+const CMD_HELP = "help"
+const CMD_VERSION = "version"
+const CMD_INIT = "init"
+const CMD_DOC = "doc"
+const CMD_BUG = "bug"
+const CMD_TOOL = "tool"
 
-var helpmap = [...][2]string{
-	0: {command_help, "Show help"},
-	1: {command_version, "Show version"},
-	2: {command_init, "Initialize new project here"},
-	3: {command_doc, "Documentize Jule source code"},
-	4: {command_bug, "Start a new bug report"},
-	5: {command_tool, "Tools for effective Jule"},
+var HELP_MAP = [...][2]string{
+	{CMD_HELP, "Show help"},
+	{CMD_VERSION, "Show version"},
+	{CMD_INIT, "Initialize new project here"},
+	{CMD_DOC, "Documentize Jule source code"},
+	{CMD_BUG, "Start a new bug report"},
+	{CMD_TOOL, "Tools for effective Jule"},
 }
 
 func help(cmd string) {
@@ -43,18 +43,18 @@ func help(cmd string) {
 		println("This module can only be used as single!")
 		return
 	}
-	max := len(helpmap[0][0])
-	for _, key := range helpmap {
-		len := len(key[0])
-		if len > max {
-			max = len
+	max := len(HELP_MAP[0][0])
+	for _, k := range HELP_MAP {
+		n := len(k[0])
+		if n > max {
+			max = n
 		}
 	}
 	var sb strings.Builder
-	const space = 5 // Space of between command name and description.
-	for _, part := range helpmap {
+	const SPACE = 5 // Space of between command name and description.
+	for _, part := range HELP_MAP {
 		sb.WriteString(part[0])
-		sb.WriteString(strings.Repeat(" ", (max-len(part[0]))+space))
+		sb.WriteString(strings.Repeat(" ", (max-len(part[0]))+SPACE))
 		sb.WriteString(part[1])
 		sb.WriteByte('\n')
 	}
@@ -66,7 +66,7 @@ func version(cmd string) {
 		println("This module can only be used as single!")
 		return
 	}
-	println("julec version", jule.Version)
+	println("julec version", jule.VERSION)
 }
 
 func init_project(cmd string) {
@@ -74,12 +74,12 @@ func init_project(cmd string) {
 		println("This module can only be used as single!")
 		return
 	}
-	bytes, err := json.MarshalIndent(*juleset.Default, "", "\t")
+	bytes, err := json.MarshalIndent(*juleset.DEFAULT, "", "\t")
 	if err != nil {
 		println(err)
 		os.Exit(0)
 	}
-	err = os.WriteFile(jule.SettingsFile, bytes, 0666)
+	err = os.WriteFile(jule.SETTINGS_FILE, bytes, 0666)
 	if err != nil {
 		println(err.Error())
 		os.Exit(0)
@@ -111,28 +111,28 @@ func doc(cmd string) {
 			continue
 		}
 		// Remove SrcExt from path
-		path = path[:len(path)-len(jule.SrcExt)]
-		path = filepath.Join(jule.Set.CppOutDir, path+jule.DocExt)
+		path = path[:len(path)-len(jule.SRC_EXT)]
+		path = filepath.Join(jule.SET.CppOutDir, path+jule.DOC_EXT)
 		write_output(path, docjson)
 	}
 }
 
 func open_url(url string) error {
-	var cmd string
+	var name string
 	var args []string
 
 	switch runtime.GOOS {
 	case "windows":
-		cmd = "cmd"
+		name = "cmd"
 		args = []string{"/c", "start"}
 	case "darwin":
-		cmd = "open"
+		name = "open"
 	default:
-		cmd = "xdg-open"
+		name = "xdg-open"
 	}
 	args = append(args, url)
-	command := exec.Command(cmd, args...)
-	return command.Start()
+	cmd := exec.Command(name, args...)
+	return cmd.Start()
 }
 
 func bug(cmd string) {
@@ -161,10 +161,10 @@ func tool(cmd string) {
 	switch cmd {
 	case "distos":
 		print("supported operating systems:\n ")
-		println(list_horizontal_slice(jule.Distos))
+		println(list_horizontal_slice(jule.DISTOS))
 	case "distarch":
 		print("supported architects:\n ")
-		println(list_horizontal_slice(jule.Distarch))
+		println(list_horizontal_slice(jule.DISTARCH))
 	default:
 		println("Undefined command: " + cmd)
 	}
@@ -173,17 +173,17 @@ func tool(cmd string) {
 func process_command(namespace, cmd string) bool {
 	cmd = strings.TrimSpace(cmd)
 	switch namespace {
-	case command_help:
+	case CMD_HELP:
 		help(cmd)
-	case command_version:
+	case CMD_VERSION:
 		version(cmd)
-	case command_init:
+	case CMD_INIT:
 		init_project(cmd)
-	case command_doc:
+	case CMD_DOC:
 		doc(cmd)
-	case command_bug:
+	case CMD_BUG:
 		bug(cmd)
-	case command_tool:
+	case CMD_TOOL:
 		tool(cmd)
 	default:
 		return false
@@ -197,17 +197,17 @@ func init() {
 		println(err.Error())
 		os.Exit(0)
 	}
-	jule.WorkingPath, err = os.Getwd()
+	jule.WORKING_PATH, err = os.Getwd()
 	if err != nil {
 		println(err.Error())
 		os.Exit(0)
 	}
 	execp = filepath.Dir(execp)
-	jule.ExecPath = execp
-	jule.StdlibPath = filepath.Join(jule.ExecPath, jule.Stdlib)
-	juleapi.JuleCHeader = filepath.Join(jule.ExecPath, "api")
-	juleapi.JuleCHeader = filepath.Join(juleapi.JuleCHeader, "julec.hpp")
-	jule.LangsPath = filepath.Join(jule.ExecPath, jule.Localizations)
+	jule.EXEC_PATH = execp
+	jule.STDLIB_PATH = filepath.Join(jule.EXEC_PATH, jule.STDLIB)
+	juleapi.JULEC_HEADER = filepath.Join(jule.EXEC_PATH, "api")
+	juleapi.JULEC_HEADER = filepath.Join(juleapi.JULEC_HEADER, "julec.hpp")
+	jule.LOCALIZATION_PATH = filepath.Join(jule.EXEC_PATH, jule.LOCALIZATIONS)
 
 	// Not started with arguments.
 	// Here is "2" but "os.Args" always have one element for store working directory.
@@ -230,18 +230,18 @@ func init() {
 }
 
 func load_localization() {
-	lang := strings.TrimSpace(jule.Set.Language)
+	lang := strings.TrimSpace(jule.SET.Language)
 	if lang == "" || lang == "default" {
 		return
 	}
-	path := filepath.Join(jule.LangsPath, lang+".json")
+	path := filepath.Join(jule.LOCALIZATION_PATH, lang+".json")
 	bytes, err := os.ReadFile(path)
 	if err != nil {
 		println("Language couldn't loaded (uses default);")
 		println(err.Error())
 		return
 	}
-	err = json.Unmarshal(bytes, &jule.Errors)
+	err = json.Unmarshal(bytes, &jule.ERRORS)
 	if err != nil {
 		println("Language's errors couldn't loaded (uses default);")
 		println(err.Error())
@@ -250,16 +250,16 @@ func load_localization() {
 }
 
 func check_mode() {
-	mode := jule.Set.Mode
-	if mode != juleset.ModeTranspile && mode != juleset.ModeCompile {
+	mode := jule.SET.Mode
+	if mode != juleset.MDOE_TRANSPILE && mode != juleset.MODE_COMPILE {
 		println(jule.GetError("invalid_value_for_key", mode, "mode"))
 		os.Exit(0)
 	}
 }
 
 func check_compiler() {
-	c := jule.Set.Compiler
-	if c != jule.CompilerGCC && c != jule.CompilerClang {
+	c := jule.SET.Compiler
+	if c != jule.COMPILER_GCC && c != jule.COMPILER_CLANG {
 		println(jule.GetError("invalid_value_for_key", c, "compiler"))
 		os.Exit(0)
 	}
@@ -267,18 +267,18 @@ func check_compiler() {
 
 func load_juleset() {
 	// File check.
-	info, err := os.Stat(jule.SettingsFile)
+	info, err := os.Stat(jule.SETTINGS_FILE)
 	if err != nil || info.IsDir() {
-		jule.Set = new(juleset.Set)
-		*jule.Set = *juleset.Default
+		jule.SET = new(juleset.Set)
+		*jule.SET = *juleset.DEFAULT
 		return
 	}
-	bytes, err := os.ReadFile(jule.SettingsFile)
+	bytes, err := os.ReadFile(jule.SETTINGS_FILE)
 	if err != nil {
 		println(err.Error())
 		os.Exit(0)
 	}
-	jule.Set, err = juleset.Load(bytes)
+	jule.SET, err = juleset.Load(bytes)
 	if err != nil {
 		println("Jule settings has errors;")
 		println(err.Error())
@@ -313,12 +313,12 @@ func append_standard(code *string) {
 	var sb strings.Builder
 	sb.WriteString("// Auto generated by JuleC.\n")
 	sb.WriteString("// JuleC version: ")
-	sb.WriteString(jule.Version)
+	sb.WriteString(jule.VERSION)
 	sb.WriteByte('\n')
 	sb.WriteString("// Date: ")
 	sb.WriteString(timeStr)
 	sb.WriteString("\n\n#include \"")
-	sb.WriteString(juleapi.JuleCHeader)
+	sb.WriteString(juleapi.JULEC_HEADER)
 	sb.WriteString("\"\n\n")
 	sb.WriteString(*code)
 	*code = sb.String()
@@ -347,7 +347,7 @@ func compile(path string, main, nolocal, justDefs bool) *parser.Parser {
 	load_juleset()
 	p := parser.New(nil)
 	// Check standard library.
-	inf, err := os.Stat(jule.StdlibPath)
+	inf, err := os.Stat(jule.STDLIB_PATH)
 	if err != nil || !inf.IsDir() {
 		p.PushErr("stdlib_not_exist")
 		return p
@@ -368,7 +368,7 @@ func compile(path string, main, nolocal, justDefs bool) *parser.Parser {
 }
 
 func exec_post_commands() {
-	for _, cmd := range jule.Set.PostCommands {
+	for _, cmd := range jule.SET.PostCommands {
 		fmt.Println(">", cmd)
 		parts := strings.SplitN(cmd, " ", -1)
 		err := exec.Command(parts[0], parts[1:]...).Run()
@@ -382,16 +382,16 @@ func generate_compile_command(source_path string) (c, cmd string) {
 	var cpp strings.Builder
 	cpp.WriteString("-g -O0 ")
 	cpp.WriteString(source_path)
-	return jule.Set.CompilerPath, cpp.String()
+	return jule.SET.CompilerPath, cpp.String()
 }
 
 func do_spell(cpp string) {
 	defer exec_post_commands()
-	path := filepath.Join(jule.WorkingPath, jule.Set.CppOutDir)
-	path = filepath.Join(path, jule.Set.CppOutName)
+	path := filepath.Join(jule.WORKING_PATH, jule.SET.CppOutDir)
+	path = filepath.Join(path, jule.SET.CppOutName)
 	write_output(path, cpp)
-	switch jule.Set.Mode {
-	case juleset.ModeCompile:
+	switch jule.SET.Mode {
+	case juleset.MODE_COMPILE:
 		c, cmd := generate_compile_command(path)
 		println(c + " " + cmd)
 		command := exec.Command(c, strings.SplitN(cmd, " ", -1)...)

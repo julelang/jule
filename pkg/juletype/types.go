@@ -6,31 +6,29 @@ import (
 	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
-// IntCode is integer type code of current platform architecture.
+// INT_CODE is integer type code of current platform architecture.
 // Is equavalent to "int", but specific bit-sized integer type code.
-var IntCode uint8
+var INT_CODE uint8
 
-// UIntCode is integer type code of current platform architecture.
+// UINT_CODE is integer type code of current platform architecture.
 // Is equavalent to "uint", but specific bit-sized integer type code.
-var UIntCode uint8
+var UINT_CODE uint8
 
-// BitSize is bit size of architecture.
-var BitSize int
+// BIT_SIZE is bit size of architecture.
+var BIT_SIZE int
 
-const (
-	NumericTypeStr = "<numeric>"
-	NilTypeStr     = "<nil>"
-	VoidTypeStr    = "<void>"
-)
+const NUM_TYPE_STR = "<numeric>"
+const NIL_TYPE_STR = "<nil>"
+const VOID_TYPE_STR = "<void>"
 
 // GetRealCode returns real type code of code.
 // If types is "int" or "uint", set to bit-specific type code.
 func GetRealCode(t uint8) uint8 {
 	switch t {
-	case Int:
-		t = IntCode
-	case UInt, UIntptr:
-		t = UIntCode
+	case INT:
+		t = INT_CODE
+	case UINT, UINTPTR:
+		t = UINT_CODE
 	}
 	return t
 }
@@ -73,12 +71,12 @@ func U64GreaterThan(t uint8) bool {
 
 // F32GreaterThan reports F32 is greater or not data-type than specified type.
 func F32GreaterThan(t uint8) bool {
-	return t != Any && t != F64
+	return t != ANY && t != F64
 }
 
 // F64GreaterThan reports F64 is greater or not data-type than specified type.
 func F64GreaterThan(t uint8) bool {
-	return t != Any
+	return t != ANY
 }
 
 // TypeGreaterThan reports type one is greater than type two or not.
@@ -101,7 +99,7 @@ func TypeGreaterThan(t1, t2 uint8) bool {
 		return F32GreaterThan(t2)
 	case F64:
 		return F64GreaterThan(t2)
-	case Enum, Any:
+	case ENUM, ANY:
 		return true
 	}
 	return false
@@ -186,7 +184,7 @@ func F64CompatibleWith(t uint8) bool {
 func TypesAreCompatible(t1, t2 uint8, ignoreany bool) bool {
 	t1 = GetRealCode(t1)
 	switch t1 {
-	case Any:
+	case ANY:
 		return !ignoreany
 	case I8:
 		return I8CompatibleWith(t2)
@@ -204,16 +202,16 @@ func TypesAreCompatible(t1, t2 uint8, ignoreany bool) bool {
 		return U32CompatibleWith(t2)
 	case U64:
 		return U64CompatibleWith(t2)
-	case Bool:
-		return t2 == Bool
-	case Str:
-		return t2 == Str
+	case BOOL:
+		return t2 == BOOL
+	case STR:
+		return t2 == STR
 	case F32:
 		return F32CompatibleWith(t2)
 	case F64:
 		return F64CompatibleWith(t2)
-	case Nil:
-		return t2 == Nil
+	case NIL:
+		return t2 == NIL
 	}
 	return false
 }
@@ -242,7 +240,7 @@ func IsSignedNumeric(t uint8) bool {
 func IsSignedInteger(t uint8) bool {
 	t = GetRealCode(t)
 	switch t {
-	case I8, I16, I32, I64, Int:
+	case I8, I16, I32, I64, INT:
 		return true
 	default:
 		return false
@@ -253,7 +251,7 @@ func IsSignedInteger(t uint8) bool {
 func IsUnsignedInteger(t uint8) bool {
 	t = GetRealCode(t)
 	switch t {
-	case U8, U16, U32, U64, UInt, UIntptr:
+	case U8, U16, U32, U64, UINT, UINTPTR:
 		return true
 	default:
 		return false
@@ -262,7 +260,7 @@ func IsUnsignedInteger(t uint8) bool {
 
 // TypeFromId returns type id of specified type code.
 func TypeFromId(id string) uint8 {
-	for t, tid := range TypeMap {
+	for t, tid := range TYPE_MAP {
 		if id == tid {
 			return t
 		}
@@ -272,10 +270,10 @@ func TypeFromId(id string) uint8 {
 
 // CppId returns cpp output identifier of data-type.
 func CppId(t uint8) string {
-	if t == Void || t == Unsafe {
+	if t == VOID || t == UNSAFE {
 		return "void"
 	}
-	id := TypeMap[t]
+	id := TYPE_MAP[t]
 	if id == "" {
 		return id
 	}
@@ -290,13 +288,13 @@ func CppId(t uint8) string {
 //  DefaultValOfType(t) = "nil" if t is not have default value
 func DefaultValOfType(t uint8) string {
 	t = GetRealCode(t)
-	if IsNumeric(t) || t == Enum {
+	if IsNumeric(t) || t == ENUM {
 		return "0"
 	}
 	switch t {
-	case Bool:
+	case BOOL:
 		return "false"
-	case Str:
+	case STR:
 		return `""`
 	}
 	return "nil"
@@ -341,13 +339,13 @@ func FloatFromBits(bits uint64) uint8 {
 }
 
 func init() {
-	BitSize = strconv.IntSize
-	switch BitSize {
+	BIT_SIZE = strconv.IntSize
+	switch BIT_SIZE {
 	case 32:
-		IntCode = I32
-		UIntCode = U32
+		INT_CODE = I32
+		UINT_CODE = U32
 	case 64:
-		IntCode = I64
-		UIntCode = U64
+		INT_CODE = I64
+		UINT_CODE = U64
 	}
 }

@@ -8,7 +8,6 @@ import (
 
 	"github.com/jule-lang/jule/ast/models"
 	"github.com/jule-lang/jule/lex"
-	"github.com/jule-lang/jule/lex/tokens"
 	"github.com/jule-lang/jule/pkg/juleapi"
 	"github.com/jule-lang/jule/pkg/juletype"
 )
@@ -29,9 +28,9 @@ func strModel(v value) iExpr {
 
 func boolModel(v value) iExpr {
 	if v.expr.(bool) {
-		return exprNode{tokens.TRUE}
+		return exprNode{lex.KND_TRUE}
 	}
-	return exprNode{tokens.FALSE}
+	return exprNode{lex.KND_FALSE}
 }
 
 func getModel(v value) iExpr {
@@ -70,8 +69,8 @@ func (ve *valueEvaluator) str() value {
 	var v value
 	v.constExpr = true
 	v.data.Value = ve.token.Kind
-	v.data.Type.Id = juletype.Str
-	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
+	v.data.Type.Id = juletype.STR
+	v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
 	content := ve.token.Kind[1 : len(ve.token.Kind)-1]
 	v.expr = content
 	v.model = strModel(v)
@@ -104,7 +103,7 @@ func (ve *valueEvaluator) char() value {
 		v.data.Type.Id = juletype.I32
 	}
 	content = juleapi.ToRune([]byte(content))
-	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
+	v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
 	v.expr, _ = strconv.ParseInt(content[2:], 16, 64)
 	v.model = exprNode{content}
 	ve.model.appendSubNode(v.model)
@@ -115,9 +114,9 @@ func (ve *valueEvaluator) bool() value {
 	var v value
 	v.constExpr = true
 	v.data.Value = ve.token.Kind
-	v.data.Type.Id = juletype.Bool
-	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
-	v.expr = ve.token.Kind == tokens.TRUE
+	v.data.Type.Id = juletype.BOOL
+	v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
+	v.expr = ve.token.Kind == lex.KND_TRUE
 	v.model = boolModel(v)
 	ve.model.appendSubNode(v.model)
 	return v
@@ -127,8 +126,8 @@ func (ve *valueEvaluator) nil() value {
 	var v value
 	v.constExpr = true
 	v.data.Value = ve.token.Kind
-	v.data.Type.Id = juletype.Nil
-	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
+	v.data.Type.Id = juletype.NIL
+	v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
 	v.expr = nil
 	v.model = exprNode{ve.token.Kind}
 	ve.model.appendSubNode(v.model)
@@ -141,13 +140,13 @@ func normalize(v *value) (normalized bool) {
 		return
 	case integerAssignable(juletype.U64, *v):
 		v.data.Type.Id = juletype.U64
-		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
+		v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
 		v.expr = tonumu(v.expr)
 		bitize(v)
 		return true
 	case integerAssignable(juletype.I64, *v):
 		v.data.Type.Id = juletype.I64
-		v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
+		v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
 		v.expr = tonums(v.expr)
 		bitize(v)
 		return true
@@ -159,7 +158,7 @@ func (ve *valueEvaluator) float() value {
 	var v value
 	v.data.Value = ve.token.Kind
 	v.data.Type.Id = juletype.F64
-	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
+	v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
 	v.expr, _ = strconv.ParseFloat(v.data.Value, 64)
 	return v
 }
@@ -220,7 +219,7 @@ func (ve *valueEvaluator) varId(id string, variable *Var, global bool) (v value)
 	if v.constExpr {
 		ve.model.appendSubNode(v.model)
 	} else {
-		if variable.Id == tokens.SELF && !typeIsRef(variable.Type) {
+		if variable.Id == lex.KND_SELF && !typeIsRef(variable.Type) {
 			ve.model.appendSubNode(exprNode{"(*this)"})
 		} else {
 			ve.model.appendSubNode(exprNode{variable.OutId()})
@@ -232,7 +231,7 @@ func (ve *valueEvaluator) varId(id string, variable *Var, global bool) (v value)
 
 func make_value_from_fn(f *models.Fn) (v value) {
 	v.data.Value = f.Id
-	v.data.Type.Id = juletype.Fn
+	v.data.Type.Id = juletype.FN
 	v.data.Type.Tag = f
 	v.data.Type.Kind = f.DataTypeString()
 	v.data.Token = f.Token
@@ -249,14 +248,14 @@ func (ve *valueEvaluator) funcId(id string, f *Fn) (v value) {
 func (ve *valueEvaluator) enumId(id string, e *Enum) (v value) {
 	e.Used = true
 	v.data.Value = id
-	v.data.Type.Id = juletype.Enum
+	v.data.Type.Id = juletype.ENUM
 	v.data.Type.Kind = e.Id
 	v.data.Type.Tag = e
 	v.data.Token = e.Token
 	v.constExpr = true
 	v.is_type = true
 	// If built-in.
-	if e.Token.Id == tokens.NA {
+	if e.Token.Id == lex.ID_NA {
 		ve.model.appendSubNode(exprNode{juleapi.OutId(id, nil)})
 	} else {
 		ve.model.appendSubNode(exprNode{juleapi.OutId(id, e.Token.File)})
@@ -266,7 +265,7 @@ func (ve *valueEvaluator) enumId(id string, e *Enum) (v value) {
 
 func make_value_from_struct(s *structure) (v value) {
 	v.data.Value = s.Ast.Id
-	v.data.Type.Id = juletype.Struct
+	v.data.Type.Id = juletype.STRUCT
 	v.data.Type.Tag = s
 	v.data.Type.Kind = s.Ast.Id
 	v.data.Type.Token = s.Ast.Token
@@ -279,7 +278,7 @@ func (ve *valueEvaluator) structId(id string, s *structure) (v value) {
 	s.Used = true
 	v = make_value_from_struct(s)
 	// If builtin.
-	if s.Ast.Token.Id == tokens.NA {
+	if s.Ast.Token.Id == lex.ID_NA {
 		ve.model.appendSubNode(exprNode{juleapi.OutId(id, nil)})
 	} else {
 		ve.model.appendSubNode(exprNode{juleapi.OutId(id, s.Ast.Token.File)})

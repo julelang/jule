@@ -3,7 +3,7 @@ package parser
 import (
 	"strings"
 
-	"github.com/jule-lang/jule/lex/tokens"
+	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/pkg/jule"
 	"github.com/jule-lang/jule/pkg/juletype"
 )
@@ -18,7 +18,7 @@ func findGeneric(id string, generics []*GenericType) *GenericType {
 }
 
 func typeIsVoid(t Type) bool {
-	return t.Id == juletype.Void && !t.MultiTyped
+	return t.Id == juletype.VOID && !t.MultiTyped
 }
 
 func typeIsVariadicable(t Type) bool {
@@ -30,7 +30,7 @@ func typeIsAllowForConst(t Type) bool {
 		return false
 	}
 	switch t.Id {
-	case juletype.Str, juletype.Bool:
+	case juletype.STR, juletype.BOOL:
 		return true
 	default:
 		return juletype.IsNumeric(t.Id)
@@ -38,15 +38,15 @@ func typeIsAllowForConst(t Type) bool {
 }
 
 func typeIsStruct(dt Type) bool {
-	return dt.Id == juletype.Struct
+	return dt.Id == juletype.STRUCT
 }
 
 func typeIsTrait(dt Type) bool {
-	return dt.Id == juletype.Trait
+	return dt.Id == juletype.TRAIT
 }
 
 func typeIsEnum(dt Type) bool {
-	return dt.Id == juletype.Enum
+	return dt.Id == juletype.ENUM
 }
 
 func un_ptr_or_ref_type(t Type) Type {
@@ -93,7 +93,7 @@ func typeIsThisGeneric(generic *GenericType, t Type) bool {
 }
 
 func typeIsGeneric(generics []*GenericType, t Type) bool {
-	if t.Id != juletype.Id {
+	if t.Id != juletype.ID {
 		return false
 	}
 	for _, generic := range generics {
@@ -112,10 +112,10 @@ func typeIsExplicitPtr(t Type) bool {
 }
 
 func typeIsUnsafePtr(t Type) bool {
-	if t.Id != juletype.Unsafe {
+	if t.Id != juletype.UNSAFE {
 		return false
 	}
-	return len(t.Kind)-len(tokens.UNSAFE) == 1
+	return len(t.Kind)-len(lex.KND_UNSAFE) == 1
 }
 
 func typeIsPtr(t Type) bool {
@@ -127,24 +127,24 @@ func typeIsRef(t Type) bool {
 }
 
 func typeIsSlice(t Type) bool {
-	return t.Id == juletype.Slice && strings.HasPrefix(t.Kind, jule.Prefix_Slice)
+	return t.Id == juletype.SLICE && strings.HasPrefix(t.Kind, jule.PREFIX_SLICE)
 }
 
 func typeIsArray(t Type) bool {
-	return t.Id == juletype.Array && strings.HasPrefix(t.Kind, jule.Prefix_Array)
+	return t.Id == juletype.ARRAY && strings.HasPrefix(t.Kind, jule.PREFIX_ARRAY)
 }
 
 func typeIsMap(t Type) bool {
-	if t.Kind == "" || t.Id != juletype.Map {
+	if t.Kind == "" || t.Id != juletype.MAP {
 		return false
 	}
 	return t.Kind[0] == '[' && t.Kind[len(t.Kind)-1] == ']'
 }
 
 func typeIsFunc(t Type) bool {
-	return t.Id == juletype.Fn &&
-		(strings.HasPrefix(t.Kind, tokens.FN) ||
-			strings.HasPrefix(t.Kind, tokens.UNSAFE+" "+tokens.FN))
+	return t.Id == juletype.FN &&
+		(strings.HasPrefix(t.Kind, lex.KND_FN) ||
+			strings.HasPrefix(t.Kind, lex.KND_UNSAFE+" "+lex.KND_FN))
 }
 
 // Includes single ptr types.
@@ -174,11 +174,11 @@ func subIdAccessorOfType(t Type) string {
 	if typeIsRef(t) || typeIsPtr(t) {
 		return "->"
 	}
-	return tokens.DOT
+	return lex.KND_DOT
 }
 
 func typeIsNilCompatible(t Type) bool {
-	return t.Id == juletype.Nil ||
+	return t.Id == juletype.NIL ||
 		typeIsFunc(t) ||
 		typeIsPtr(t) ||
 		typeIsSlice(t) ||

@@ -2,14 +2,14 @@ package juleapi
 
 import "strings"
 
-// JuleCHeader is the header path of "julec.hpp"
-var JuleCHeader = ""
+// JULEC_HEADER is the header path of "julec.hpp"
+var JULEC_HEADER = ""
 
-// CppIgnore is the ignoring of cpp.
-const CppIgnore = "std::ignore"
+// CPP_IGNORE is the ignoring of cpp.
+const CPP_IGNORE = "std::ignore"
 
-// CppSelf is the self keyword equavalent of cpp.
-const CppSelf = "this"
+// SELF is the self keyword equavalent of cpp.
+const SELF = "this"
 
 // ToDeferredCall returns cpp of deferred function call expression string.
 func ToDeferredCall(expr string) string {

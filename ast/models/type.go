@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/jule-lang/jule/lex"
-	"github.com/jule-lang/jule/lex/tokens"
 	"github.com/jule-lang/jule/pkg/jule"
 	"github.com/jule-lang/jule/pkg/juleapi"
 	"github.com/jule-lang/jule/pkg/juletype"
@@ -74,7 +73,7 @@ func (dt *Type) OriginalKindId() string {
 
 // KindId returns dt.Kind's identifier.
 func (dt *Type) KindId() (id, prefix string) {
-	if dt.Id == juletype.Map || dt.Id == juletype.Fn {
+	if dt.Id == juletype.MAP || dt.Id == juletype.FN {
 		return dt.Kind, ""
 	}
 	id = dt.Kind
@@ -86,7 +85,7 @@ func (dt *Type) KindId() (id, prefix string) {
 			break
 		}
 	}
-	for _, dt := range juletype.TypeMap {
+	for _, dt := range juletype.TYPE_MAP {
 		if dt == id {
 			return
 		}
@@ -107,7 +106,7 @@ func (dt *Type) KindId() (id, prefix string) {
 }
 
 func is_necessary_type(id uint8) bool {
-	return id == juletype.Trait
+	return id == juletype.TRAIT
 }
 
 func (dt *Type) SetToOriginal() {
@@ -169,9 +168,9 @@ func (dt Type) String() (s string) {
 		return dt.MultiTypeString()
 	}
 	// Remove namespace
-	i := strings.LastIndex(dt.Kind, tokens.DOUBLE_COLON)
+	i := strings.LastIndex(dt.Kind, lex.KND_DBLCOLON)
 	if i != -1 {
-		dt.Kind = dt.Kind[i+len(tokens.DOUBLE_COLON):]
+		dt.Kind = dt.Kind[i+len(lex.KND_DBLCOLON):]
 	}
 	modifiers := dt.Modifiers()
 	// Apply modifiers.
@@ -197,11 +196,11 @@ func (dt Type) String() (s string) {
 	}()
 	dt.Kind = dt.Kind[len(modifiers):]
 	switch dt.Id {
-	case juletype.Slice:
+	case juletype.SLICE:
 		return dt.SliceString()
-	case juletype.Array:
+	case juletype.ARRAY:
 		return dt.ArrayString()
-	case juletype.Map:
+	case juletype.MAP:
 		return dt.MapString()
 	}
 	switch dt.Tag.(type) {
@@ -209,7 +208,7 @@ func (dt Type) String() (s string) {
 		return dt.StructString()
 	}
 	switch dt.Id {
-	case juletype.Id:
+	case juletype.ID:
 		if dt.CppLinked {
 			return dt.Kind
 		}
@@ -217,14 +216,14 @@ func (dt Type) String() (s string) {
 			return juleapi.AsId(dt.Kind)
 		}
 		return juleapi.OutId(dt.Kind, dt.Token.File)
-	case juletype.Enum:
+	case juletype.ENUM:
 		e := dt.Tag.(*Enum)
 		return e.Type.String()
-	case juletype.Trait:
+	case juletype.TRAIT:
 		return dt.TraitString()
-	case juletype.Struct:
+	case juletype.STRUCT:
 		return dt.StructString()
-	case juletype.Fn:
+	case juletype.FN:
 		return dt.FuncString()
 	default:
 		return juletype.CppId(dt.Id)
@@ -283,7 +282,7 @@ func (dt *Type) TraitString() string {
 func (dt *Type) StructString() string {
 	var cpp strings.Builder
 	s := dt.Tag.(CompiledStruct)
-	if s.CppLinked() && !Has_attribute(jule.Attribute_Typedef, s.Get_ast().Attributes) {
+	if s.CppLinked() && !Has_attribute(jule.ATTR_TYPEDEF, s.Get_ast().Attributes) {
 		cpp.WriteString("struct ")
 	}
 	cpp.WriteString(s.OutId())

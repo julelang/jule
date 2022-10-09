@@ -3,7 +3,6 @@ package ast
 import (
 	"github.com/jule-lang/jule/ast/models"
 	"github.com/jule-lang/jule/lex"
-	"github.com/jule-lang/jule/lex/tokens"
 )
 
 type blockStatement struct {
@@ -18,8 +17,8 @@ type blockStatement struct {
 // IsStatement reports token is
 // statement finish point or not.
 func IsStatement(current, prev lex.Token) (ok bool, withTerminator bool) {
-	ok = current.Id == tokens.SemiColon || prev.Row < current.Row
-	withTerminator = current.Id == tokens.SemiColon
+	ok = current.Id == lex.ID_SEMICOLON || prev.Row < current.Row
+	withTerminator = current.Id == lex.ID_SEMICOLON
 	return
 }
 
@@ -31,9 +30,9 @@ func NextStatementPos(toks []lex.Token, start int) (int, bool) {
 	for ; i < len(toks); i++ {
 		var isStatement, withTerminator bool
 		tok := toks[i]
-		if tok.Id == tokens.Brace {
+		if tok.Id == lex.ID_BRACE {
 			switch tok.Kind {
-			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
+			case lex.KND_LBRACE, lex.KND_LBRACKET, lex.KND_LPAREN:
 				if brace_n == 0 && i > start {
 					isStatement, withTerminator = IsStatement(tok, toks[i-1])
 					if isStatement {

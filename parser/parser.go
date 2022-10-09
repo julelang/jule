@@ -11,7 +11,6 @@ import (
 	"github.com/jule-lang/jule/ast"
 	"github.com/jule-lang/jule/ast/models"
 	"github.com/jule-lang/jule/lex"
-	"github.com/jule-lang/jule/lex/tokens"
 	"github.com/jule-lang/jule/pkg/jule"
 	"github.com/jule-lang/jule/pkg/juleapi"
 	"github.com/jule-lang/jule/pkg/juleio"
@@ -97,7 +96,7 @@ func (p *Parser) pusherrtok(tok lex.Token, key string, args ...any) {
 // pusherrtok appends new error message by token.
 func (p *Parser) pusherrmsgtok(tok lex.Token, msg string) {
 	p.Errors = append(p.Errors, julelog.CompilerLog{
-		Type:    julelog.Error,
+		Type:    julelog.ERR,
 		Row:     tok.Row,
 		Column:  tok.Column,
 		Path:    tok.File.Path(),
@@ -118,7 +117,7 @@ func (p *Parser) PushErr(key string, args ...any) {
 // pusherrmsh appends new flat error message
 func (p *Parser) pusherrmsg(msg string) {
 	p.Errors = append(p.Errors, julelog.CompilerLog{
-		Type:    julelog.FlatError,
+		Type:    julelog.FLAT_ERR,
 		Message: msg,
 	})
 }
@@ -145,7 +144,7 @@ func (p *Parser) CppLinks() string {
 func cppTypes(dm *DefineMap) string {
 	var cpp strings.Builder
 	for _, t := range dm.Types {
-		if t.Used && t.Token.Id != tokens.NA {
+		if t.Used && t.Token.Id != lex.ID_NA {
 			cpp.WriteString(t.String())
 			cpp.WriteByte('\n')
 		}
@@ -168,7 +167,7 @@ func (p *Parser) CppTypes() string {
 func cppTraits(dm *DefineMap) string {
 	var cpp strings.Builder
 	for _, t := range dm.Traits {
-		if t.Used && t.Ast.Token.Id != tokens.NA {
+		if t.Used && t.Ast.Token.Id != lex.ID_NA {
 			cpp.WriteString(t.String())
 			cpp.WriteString("\n\n")
 		}
@@ -192,7 +191,7 @@ func (p *Parser) CppTraits() string {
 func CppStructs(structures []*structure) string {
 	var cpp strings.Builder
 	for _, s := range structures {
-		if s.Used && s.Ast.Token.Id != tokens.NA {
+		if s.Used && s.Ast.Token.Id != lex.ID_NA {
 			cpp.WriteString(s.String())
 			cpp.WriteString("\n\n")
 		}
@@ -203,7 +202,7 @@ func CppStructs(structures []*structure) string {
 func cppStructPlainPrototypes(structures []*structure) string {
 	var cpp strings.Builder
 	for _, s := range structures {
-		if s.Used && s.Ast.Token.Id != tokens.NA {
+		if s.Used && s.Ast.Token.Id != lex.ID_NA {
 			cpp.WriteString(s.plainPrototype())
 			cpp.WriteByte('\n')
 		}
@@ -214,7 +213,7 @@ func cppStructPlainPrototypes(structures []*structure) string {
 func cppStructPrototypes(structures []*structure) string {
 	var cpp strings.Builder
 	for _, s := range structures {
-		if s.Used && s.Ast.Token.Id != tokens.NA {
+		if s.Used && s.Ast.Token.Id != lex.ID_NA {
 			cpp.WriteString(s.prototype())
 			cpp.WriteByte('\n')
 		}
@@ -225,7 +224,7 @@ func cppStructPrototypes(structures []*structure) string {
 func cppFuncPrototypes(dm *DefineMap) string {
 	var cpp strings.Builder
 	for _, f := range dm.Funcs {
-		if f.used && f.Ast.Token.Id != tokens.NA {
+		if f.used && f.Ast.Token.Id != lex.ID_NA {
 			cpp.WriteString(f.Prototype(""))
 			cpp.WriteByte('\n')
 		}
@@ -250,7 +249,7 @@ func (p *Parser) CppPrototypes(structures []*structure) string {
 func cppGlobals(dm *DefineMap) string {
 	var cpp strings.Builder
 	for _, g := range dm.Globals {
-		if !g.Const && g.Used && g.Token.Id != tokens.NA {
+		if !g.Const && g.Used && g.Token.Id != lex.ID_NA {
 			cpp.WriteString(g.String())
 			cpp.WriteByte('\n')
 		}
@@ -273,7 +272,7 @@ func (p *Parser) CppGlobals() string {
 func cppFuncs(dm *DefineMap) string {
 	var cpp strings.Builder
 	for _, f := range dm.Funcs {
-		if f.used && f.Ast.Token.Id != tokens.NA {
+		if f.used && f.Ast.Token.Id != lex.ID_NA {
 			cpp.WriteString(f.String())
 			cpp.WriteString("\n\n")
 		}
@@ -297,13 +296,13 @@ func (p *Parser) CppFuncs() string {
 func (p *Parser) CppInitializerCaller() string {
 	var cpp strings.Builder
 	cpp.WriteString("void ")
-	cpp.WriteString(juleapi.InitializerCaller)
+	cpp.WriteString(juleapi.INIT_CALLER)
 	cpp.WriteString("(void) {")
 	models.AddIndent()
 	indent := models.IndentString()
 	models.DoneIndent()
 	pushInit := func(defs *DefineMap) {
-		f, dm, _ := defs.funcById(jule.InitializerFunction, nil)
+		f, dm, _ := defs.funcById(jule.INIT_FN, nil)
 		if f == nil || dm != defs {
 			return
 		}
@@ -385,7 +384,7 @@ func (p *Parser) checkCppUsePath(use *models.UseDecl) bool {
 	}
 	// Set to absolute path for correct include path
 	use.Path, _ = filepath.Abs(use.Path)
-	_ = os.Chdir(jule.WorkingPath)
+	_ = os.Chdir(jule.WORKING_PATH)
 	return true
 }
 
@@ -429,7 +428,7 @@ func (p *Parser) pushSelects(use *use, selectors []lex.Token) (addNs bool) {
 		if i == -1 {
 			break
 		}
-		if id.Id == tokens.Self {
+		if id.Id == lex.ID_SELF {
 			addNs = true
 			continue
 		}
@@ -474,7 +473,7 @@ func (p *Parser) pushUse(use *use, selectors []lex.Token) {
 		return
 	}
 	ns := new(models.Namespace)
-	ns.Identifiers = strings.SplitN(use.LinkString, tokens.DOUBLE_COLON, -1)
+	ns.Identifiers = strings.SplitN(use.LinkString, lex.KND_DBLCOLON, -1)
 	src := p.pushNs(ns)
 	src.defines = use.defines
 }
@@ -508,7 +507,7 @@ func (p *Parser) compilePureUse(useAST *models.UseDecl) (_ *use, hassErr bool) {
 		name := info.Name()
 		// Skip directories.
 		if info.IsDir() ||
-			!strings.HasSuffix(name, jule.SrcExt) ||
+			!strings.HasSuffix(name, jule.SRC_EXT) ||
 			!juleio.IsPassFileAnnotation(name) {
 			continue
 		}
@@ -672,7 +671,7 @@ func (p *Parser) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 		name := info.Name()
 		// Skip directories.
 		if info.IsDir() ||
-			!strings.HasSuffix(name, jule.SrcExt) ||
+			!strings.HasSuffix(name, jule.SRC_EXT) ||
 			!juleio.IsPassFileAnnotation(name) ||
 			name == p.File.Name {
 			continue
@@ -818,7 +817,7 @@ func (p *Parser) Type(alias TypeAlias) {
 		return
 	}
 	_, tok, canshadow := p.defById(alias.Id)
-	if tok.Id != tokens.NA && !canshadow {
+	if tok.Id != lex.ID_NA && !canshadow {
 		p.pusherrtok(alias.Token, "exist_id", alias.Id)
 		return
 	}
@@ -924,7 +923,9 @@ func (p *Parser) Enum(e Enum) {
 	if juleapi.IsIgnoreId(e.Id) {
 		p.pusherrtok(e.Token, "ignore_id")
 		return
-	} else if _, tok, _ := p.defById(e.Id); tok.Id != tokens.NA {
+	}
+	_, tok, _ := p.defById(e.Id)
+	if tok.Id != lex.ID_NA {
 		p.pusherrtok(e.Token, "exist_id", e.Id)
 		return
 	}
@@ -944,7 +945,7 @@ func (p *Parser) Enum(e Enum) {
 		p.Defines.Enums = append(p.Defines.Enums, &e)
 	}()
 	switch {
-	case e.Type.Id == juletype.Str:
+	case e.Type.Id == juletype.STR:
 		p.parse_enum_items_str(&e)
 	case juletype.IsInteger(e.Type.Id):
 		p.parse_enum_items_integer(&e)
@@ -968,7 +969,7 @@ func (p *Parser) pushField(s *structure, f **Var, i int) {
 	} else {
 		p.parseNonGenericType(s.Ast.Generics, &(*f).Type)
 		param := models.Param{Id: (*f).Id, Type: (*f).Type}
-		param.Default.Model = exprNode{juleapi.DefaultExpr}
+		param.Default.Model = exprNode{juleapi.DEFAULT_EXPR}
 		s.constructor.Params[i] = param
 	}
 }
@@ -987,7 +988,7 @@ func make_constructor(s *structure) *models.Fn {
 	constructor.Token = s.Ast.Token
 	constructor.Params = make([]models.Param, len(s.Ast.Fields))
 	constructor.RetType.Type = Type{
-		Id:    juletype.Struct,
+		Id:    juletype.STRUCT,
 		Kind:  s.Ast.Id,
 		Token: s.Ast.Token,
 		Tag:   s,
@@ -1264,7 +1265,7 @@ func (p *Parser) Comment(c models.Comment) {
 	switch {
 	case preprocessor.IsPreprocessorPragma(c.Content):
 		return
-	case strings.HasPrefix(c.Content, jule.PragmaCommentPrefix):
+	case strings.HasPrefix(c.Content, jule.PRAGMA_COMMENT_PREFIX):
 		p.PushAttribute(c)
 		return
 	}
@@ -1276,10 +1277,10 @@ func (p *Parser) Comment(c models.Comment) {
 func (p *Parser) PushAttribute(c models.Comment) {
 	var attr models.Attribute
 	// Skip attribute prefix
-	attr.Tag = c.Content[len(jule.PragmaCommentPrefix):]
+	attr.Tag = c.Content[len(jule.PRAGMA_COMMENT_PREFIX):]
 	attr.Token = c.Token
 	ok := false
-	for _, kind := range jule.Attributes {
+	for _, kind := range jule.ATTRS {
 		if attr.Tag == kind {
 			ok = true
 			break
@@ -1342,7 +1343,7 @@ func (p *Parser) parseMapNonGenericType(generics []*GenericType, dt *Type) {
 }
 
 func (p *Parser) parseCommonNonGenericType(generics []*GenericType, dt *Type) {
-	if dt.Id == juletype.Id {
+	if dt.Id == juletype.ID {
 		id, prefix := dt.KindId()
 		def, _, _ := p.defById(id)
 		switch deft := def.(type) {
@@ -1352,7 +1353,7 @@ func (p *Parser) parseCommonNonGenericType(generics []*GenericType, dt *Type) {
 				deft.SetGenerics(dt.Tag.([]Type))
 			}
 			dt.Kind = prefix + deft.dataTypeString()
-			dt.Id = juletype.Struct
+			dt.Id = juletype.STRUCT
 			dt.Tag = deft
 			dt.Pure = true
 			dt.Original = nil
@@ -1392,10 +1393,10 @@ func (p *Parser) parseNonGenericType(generics []*GenericType, dt *Type) {
 		p.parseMapNonGenericType(generics, dt)
 	case typeIsArray(*dt):
 		p.parseNonGenericType(generics, dt.ComponentType)
-		dt.Kind = jule.Prefix_Array + dt.ComponentType.Kind
+		dt.Kind = jule.PREFIX_ARRAY + dt.ComponentType.Kind
 	case typeIsSlice(*dt):
 		p.parseNonGenericType(generics, dt.ComponentType)
-		dt.Kind = jule.Prefix_Slice + dt.ComponentType.Kind
+		dt.Kind = jule.PREFIX_SLICE + dt.ComponentType.Kind
 	default:
 		p.parseCommonNonGenericType(generics, dt)
 	}
@@ -1448,7 +1449,7 @@ func setGenerics(f *Func, generics []*models.GenericType) {
 // Func parse Jule function.
 func (p *Parser) Func(ast Func) {
 	_, tok, canshadow := p.defById(ast.Id)
-	if tok.Id != tokens.NA && !canshadow {
+	if tok.Id != lex.ID_NA && !canshadow {
 		p.pusherrtok(ast.Token, "exist_id", ast.Id)
 	} else if juleapi.IsIgnoreId(ast.Id) {
 		p.pusherrtok(ast.Token, "ignore_id")
@@ -1464,7 +1465,7 @@ func (p *Parser) Func(ast Func) {
 	setGenerics(f.Ast, p.generics)
 	p.generics = nil
 	p.checkRetVars(f)
-	f.used = f.Ast.Id == jule.InitializerFunction
+	f.used = f.Ast.Id == jule.INIT_FN
 	p.Defines.Funcs = append(p.Defines.Funcs, f)
 	p.waitingFuncs = append(p.waitingFuncs, f)
 }
@@ -1501,7 +1502,7 @@ func (p *Parser) Var(model Var) *Var {
 	}
 	v := new(Var)
 	*v = model
-	if v.Type.Id != juletype.Void {
+	if v.Type.Id != juletype.VOID {
 		vt, ok := p.realType(v.Type, true)
 		if ok {
 			v.Type = vt
@@ -1514,7 +1515,7 @@ func (p *Parser) Var(model Var) *Var {
 	case value:
 		val = tag_t
 	default:
-		if v.SetterTok.Id != tokens.NA {
+		if v.SetterTok.Id != lex.ID_NA {
 			val, v.Expr.Model = p.evalExpr(v.Expr, &v.Type)
 		}
 	}
@@ -1522,9 +1523,9 @@ func (p *Parser) Var(model Var) *Var {
 		p.pusherrtok(model.Token, "missing_multi_assign_identifiers")
 		return v
 	}
-	if v.Type.Id != juletype.Void {
-		if v.SetterTok.Id != tokens.NA {
-			if v.Type.Size.AutoSized && v.Type.Id == juletype.Array {
+	if v.Type.Id != juletype.VOID {
+		if v.SetterTok.Id != lex.ID_NA {
+			if v.Type.Size.AutoSized && v.Type.Id == juletype.ARRAY {
 				v.Type.Size = val.data.Type.Size
 			}
 			assign_checker{
@@ -1536,7 +1537,7 @@ func (p *Parser) Var(model Var) *Var {
 			}.check()
 		}
 	} else {
-		if v.SetterTok.Id == tokens.NA {
+		if v.SetterTok.Id == lex.ID_NA {
 			p.pusherrtok(v.Token, "missing_autotype_value")
 		} else {
 			p.eval.has_error = p.eval.has_error || val.data.Value == ""
@@ -1545,17 +1546,17 @@ func (p *Parser) Var(model Var) *Var {
 			p.checkValidityForAutoType(v.Type, v.SetterTok)
 		}
 	}
-	if !v.IsField && typeIsRef(v.Type) && v.SetterTok.Id == tokens.NA {
+	if !v.IsField && typeIsRef(v.Type) && v.SetterTok.Id == lex.ID_NA {
 		p.pusherrtok(v.Token, "reference_not_initialized")
 	}
-	if !v.IsField && v.SetterTok.Id == tokens.NA {
+	if !v.IsField && v.SetterTok.Id == lex.ID_NA {
 		p.pusherrtok(v.Token, "variable_not_initialized")
 	}
 	if v.Const {
 		v.ExprTag = val.expr
 		if !typeIsAllowForConst(v.Type) {
 			p.pusherrtok(v.Token, "invalid_type_for_const", v.Type.Kind)
-		} else if v.SetterTok.Id != tokens.NA && !validExprForConst(val) {
+		} else if v.SetterTok.Id != lex.ID_NA && !validExprForConst(val) {
 			p.eval.pusherrtok(v.Token, "expr_not_const")
 		}
 	}
@@ -1579,8 +1580,8 @@ func (p *Parser) varsFromParams(f *Func) []*Var {
 			v.Type.Original = nil
 			v.Type.ComponentType = new(models.Type)
 			*v.Type.ComponentType = param.Type
-			v.Type.Id = juletype.Slice
-			v.Type.Kind = jule.Prefix_Slice + v.Type.Kind
+			v.Type.Id = juletype.SLICE
+			v.Type.Kind = jule.PREFIX_SLICE + v.Type.Kind
 		}
 		vars[i] = v
 	}
@@ -1795,7 +1796,7 @@ func (p *Parser) blockDefById(id string) (def any, tok lex.Token, canshadow bool
 
 func (p *Parser) check() {
 	if p.IsMain && !p.JustDefines {
-		f, _, _ := p.Defines.funcById(jule.EntryPoint, nil)
+		f, _, _ := p.Defines.funcById(jule.ENTRY_POINT, nil)
 		if f == nil {
 			p.PushErr("no_entry_point")
 		} else {
@@ -1907,20 +1908,20 @@ func (p *Parser) checkParamDefaultExprWithDefault(param *Param) {
 }
 
 func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) {
-	if !paramHasDefaultArg(param) || param.Token.Id == tokens.NA {
+	if !paramHasDefaultArg(param) || param.Token.Id == lex.ID_NA {
 		return
 	}
 	// Skip default argument with default value
 	if param.Default.Model != nil {
-		if param.Default.Model.String() == juleapi.DefaultExpr {
+		if param.Default.Model.String() == juleapi.DEFAULT_EXPR {
 			p.checkParamDefaultExprWithDefault(param)
 			return
 		}
 	}
 	dt := param.Type
 	if param.Variadic {
-		dt.Id = juletype.Slice
-		dt.Kind = jule.Prefix_Slice + dt.Kind
+		dt.Id = juletype.SLICE
+		dt.Kind = jule.PREFIX_SLICE + dt.Kind
 		dt.ComponentType = new(models.Type)
 		*dt.ComponentType = param.Type
 		dt.Original = nil
@@ -2064,7 +2065,7 @@ func (p *Parser) checkStructs() {
 
 func (p *Parser) checkFuncSpecialCases(f *Func) {
 	switch f.Id {
-	case jule.EntryPoint, jule.InitializerFunction:
+	case jule.ENTRY_POINT, jule.INIT_FN:
 		p.checkSolidFuncSpecialCases(f)
 	}
 }
@@ -2086,30 +2087,30 @@ func (p *Parser) callStructConstructor(s *structure, argsToks []lex.Token, m *ex
 	v.data.Value = s.Ast.Id
 
 	// Set braces to parentheses
-	argsToks[0].Kind = tokens.LPARENTHESES
-	argsToks[len(argsToks)-1].Kind = tokens.RPARENTHESES
+	argsToks[0].Kind = lex.KND_LPAREN
+	argsToks[len(argsToks)-1].Kind = lex.KND_RPARENT
 
 	args := p.getArgs(argsToks, true)
 	if s.CppLinked() {
-		m.appendSubNode(exprNode{tokens.LPARENTHESES})
+		m.appendSubNode(exprNode{lex.KND_LPAREN})
 		m.appendSubNode(exprNode{f.RetType.String()})
-		m.appendSubNode(exprNode{tokens.RPARENTHESES})
+		m.appendSubNode(exprNode{lex.KND_RPARENT})
 	} else {
 		m.appendSubNode(exprNode{f.RetType.String()})
 	}
 	if s.cpp_linked {
-		m.appendSubNode(exprNode{tokens.LBRACE})
+		m.appendSubNode(exprNode{lex.KND_LBRACE})
 	} else {
-		m.appendSubNode(exprNode{tokens.LPARENTHESES})
+		m.appendSubNode(exprNode{lex.KND_LPAREN})
 	}
 	p.parseArgs(f, args, m, f.Token)
 	if m != nil {
 		m.appendSubNode(argsExpr{args.Src})
 	}
 	if s.cpp_linked {
-		m.appendSubNode(exprNode{tokens.RBRACE})
+		m.appendSubNode(exprNode{lex.KND_RBRACE})
 	} else {
-		m.appendSubNode(exprNode{tokens.RPARENTHESES})
+		m.appendSubNode(exprNode{lex.KND_RPARENT})
 	}
 	return v
 }
@@ -2129,7 +2130,7 @@ func (p *Parser) parseField(s *structure, f **Var, i int) {
 	if hasExpr(v.Expr) {
 		param.Default = v.Expr
 	} else {
-		param.Default.Model = exprNode{juleapi.DefaultExpr}
+		param.Default.Model = exprNode{juleapi.DEFAULT_EXPR}
 	}
 	s.constructor.Params[i] = param
 }
@@ -2170,7 +2171,7 @@ func (p *Parser) checkAnonFunc(f *Func) {
 
 // Returns nil if has error.
 func (p *Parser) getArgs(toks []lex.Token, targeting bool) *models.Args {
-	toks, _ = p.getrange(tokens.LPARENTHESES, tokens.RPARENTHESES, toks)
+	toks, _ = p.getrange(lex.KND_LPAREN, lex.KND_RPARENT, toks)
 	if toks == nil {
 		toks = make([]lex.Token, 0)
 	}
@@ -2190,7 +2191,7 @@ func (p *Parser) getGenerics(toks []lex.Token) (_ []Type, err bool) {
 	}
 	// Remove braces
 	toks = toks[1 : len(toks)-1]
-	parts, errs := ast.Parts(toks, tokens.Comma, true)
+	parts, errs := ast.Parts(toks, lex.ID_COMMA, true)
 	generics := make([]Type, len(parts))
 	p.pusherrs(errs...)
 	for i, part := range parts {
@@ -2536,7 +2537,7 @@ func (p *Parser) pushGenericByArg(f *Func, pair *paramMapPair, args *models.Args
 func (p *Parser) parseArg(f *Func, pair *paramMapPair, args *models.Args, variadiced *bool) {
 	value, model := p.evalExpr(pair.arg.Expr, &pair.param.Type)
 	pair.arg.Expr.Model = model
-	if !models.Has_attribute(jule.Attribute_CDef, f.Attributes) && !value.variadic &&
+	if !models.Has_attribute(jule.ATTR_CDEF, f.Attributes) && !value.variadic &&
 		typeIsPure(pair.param.Type) && juletype.IsNumeric(pair.param.Type.Id) {
 		pair.arg.CastType = new(Type)
 		*pair.arg.CastType = pair.param.Type.Copy()
@@ -2582,7 +2583,7 @@ func (p *Parser) checkSolidFuncSpecialCases(f *Func) {
 	if len(f.Params) > 0 {
 		p.pusherrtok(f.Token, "fn_have_parameters", f.Id)
 	}
-	if f.RetType.Type.Id != juletype.Void {
+	if f.RetType.Type.Id != juletype.VOID {
 		p.pusherrtok(f.RetType.Type.Token, "fn_have_ret", f.Id)
 	}
 	f.Attributes = nil
@@ -2791,7 +2792,7 @@ func (p *Parser) exprStatement(s *models.ExprStatement, recover bool) {
 	if s.Expr.IsNotBinop() {
 		expr := s.Expr.Op.(models.BinopExpr)
 		tok := expr.Tokens[0]
-		if tok.Id == tokens.Id && tok.Kind == recoverFunc.Ast.Id {
+		if tok.Id == lex.ID_IDENT && tok.Kind == recoverFunc.Ast.Id {
 			if ast.IsFuncCall(s.Expr.Tokens) != nil {
 				if !recover {
 					p.pusherrtok(tok, "invalid_syntax")
@@ -2839,8 +2840,8 @@ func (p *Parser) matchcase(m *models.Match) {
 		m.Expr.Model = expr_model
 		m.ExprType = value.data.Type
 	} else {
-		m.ExprType.Id = juletype.Bool
-		m.ExprType.Kind = juletype.TypeMap[m.ExprType.Id]
+		m.ExprType.Id = juletype.BOOL
+		m.ExprType.Kind = juletype.TYPE_MAP[m.ExprType.Id]
 	}
 	p.cases(m, m.ExprType)
 	if m.Default != nil {
@@ -3120,7 +3121,7 @@ func (p *Parser) singleAssign(assign *models.Assign, l, r []value) {
 		return
 	}
 	right := r[0]
-	if assign.Setter.Kind != tokens.EQUAL && !isConstExpression(right.data.Value) {
+	if assign.Setter.Kind != lex.KND_EQ && !isConstExpression(right.data.Value) {
 		assign.Setter.Kind = assign.Setter.Kind[:len(assign.Setter.Kind)-1]
 		solver := solver{
 			p:         p,
@@ -3129,7 +3130,7 @@ func (p *Parser) singleAssign(assign *models.Assign, l, r []value) {
 			op:  assign.Setter,
 		}
 		right = solver.solve()
-		assign.Setter.Kind += tokens.EQUAL
+		assign.Setter.Kind += lex.KND_EQ
 	}
 	assign_checker{
 		p:      p,
@@ -3157,7 +3158,7 @@ func (p *Parser) assignExprs(vsAST *models.Assign) (l []value, r []value) {
 				l[i] = v
 				r_type = &v.data.Type
 			} else {
-				l[i].data.Value = juleapi.Ignore
+				l[i].data.Value = juleapi.IGNORE
 			}
 		}
 		if i < len(r) {
@@ -3268,7 +3269,7 @@ func (p *Parser) assign(assign *models.Assign) {
 	case ln == 1 && !assign.Left[0].Var.New:
 		p.singleAssign(assign, l, r)
 		return
-	case assign.Setter.Kind != tokens.EQUAL:
+	case assign.Setter.Kind != lex.KND_EQ:
 		p.pusherrtok(assign.Setter, "invalid_syntax")
 		return
 	case rn == 1:
@@ -3334,7 +3335,7 @@ func (p *Parser) forProfile(iter *models.Iter) {
 		profile.Condition.Model = model
 		assign_checker{
 			p:      p,
-			expr_t:      Type{Id: juletype.Bool, Kind: juletype.TypeMap[juletype.Bool]},
+			expr_t:      Type{Id: juletype.BOOL, Kind: juletype.TYPE_MAP[juletype.BOOL]},
 			v:      val,
 			errtok: profile.Condition.Tokens[0],
 		}.check()
@@ -3505,7 +3506,7 @@ func (p *Parser) continueWithLabel(ast *models.Continue) {
 
 func (p *Parser) breakStatement(ast *models.Break) {
 	switch {
-	case ast.LabelToken.Id != tokens.NA:
+	case ast.LabelToken.Id != lex.ID_NA:
 		p.breakWithLabel(ast)
 	case p.currentCase != nil:
 		ast.Label = p.currentCase.Match.EndLabel()
@@ -3520,7 +3521,7 @@ func (p *Parser) continueStatement(ast *models.Continue) {
 	switch {
 	case p.currentIter == nil:
 		p.pusherrtok(ast.Token, "continue_at_out_of_valid_scope")
-	case ast.LoopLabel.Id != tokens.NA:
+	case ast.LoopLabel.Id != lex.ID_NA:
 		p.continueWithLabel(ast)
 	default:
 		ast.Label = p.currentIter.NextLabel()
@@ -3532,9 +3533,9 @@ func (p *Parser) checkValidityForAutoType(expr_t Type, errtok lex.Token) {
 		return
 	}
 	switch expr_t.Id {
-	case juletype.Nil:
+	case juletype.NIL:
 		p.pusherrtok(errtok, "nil_for_autotype")
-	case juletype.Void:
+	case juletype.VOID:
 		p.pusherrtok(errtok, "void_for_autotype")
 	}
 }
@@ -3566,7 +3567,7 @@ func (p *Parser) typeSourceIsAlias(dt Type, alias *TypeAlias, err bool) (Type, b
 }
 
 func (p *Parser) typeSourceIsEnum(e *Enum, tag any) (dt Type, _ bool) {
-	dt.Id = juletype.Enum
+	dt.Id = juletype.ENUM
 	dt.Kind = e.Id
 	dt.Tag = e
 	dt.Token = e.Token
@@ -3638,7 +3639,7 @@ func (p *Parser) typeSourceIsStruct(s *structure, st Type) (dt Type, _ bool) {
 		p.pusherrtok(st.Token, "has_generics")
 	}
 end:
-	dt.Id = juletype.Struct
+	dt.Id = juletype.STRUCT
 	dt.Kind = s.dataTypeString()
 	dt.Tag = s
 	dt.Token = s.Ast.Token
@@ -3650,7 +3651,7 @@ func (p *Parser) typeSourceIsTrait(trait_def *trait, tag any, errTok lex.Token) 
 		p.pusherrtok(errTok, "invalid_type_source")
 	}
 	trait_def.Used = true
-	dt.Id = juletype.Trait
+	dt.Id = juletype.TRAIT
 	dt.Kind = trait_def.Ast.Id
 	dt.Tag = trait_def
 	dt.Token = trait_def.Ast.Token
@@ -3659,18 +3660,18 @@ func (p *Parser) typeSourceIsTrait(trait_def *trait, tag any, errTok lex.Token) 
 }
 
 func (p *Parser) tokenizeDataType(id string) []lex.Token {
-	parts := strings.SplitN(id, tokens.DOUBLE_COLON, -1)
+	parts := strings.SplitN(id, lex.KND_DBLCOLON, -1)
 	var toks []lex.Token
 	for i, part := range parts {
 		toks = append(toks, lex.Token{
-			Id:   tokens.Id,
+			Id:   lex.ID_IDENT,
 			Kind: part,
 			File: p.File,
 		})
 		if i < len(parts)-1 {
 			toks = append(toks, lex.Token{
-				Id:   tokens.DoubleColon,
-				Kind: tokens.DOUBLE_COLON,
+				Id:   lex.ID_DBLCOLON,
+				Kind: lex.KND_DBLCOLON,
 				File: p.File,
 			})
 		}
@@ -3687,7 +3688,7 @@ func (p *Parser) typeSourceIsArrayType(arr_t *Type) (ok bool) {
 		return
 	}
 	modifiers := arr_t.Modifiers()
-	arr_t.Kind = modifiers + jule.Prefix_Array + arr_t.ComponentType.Kind
+	arr_t.Kind = modifiers + jule.PREFIX_ARRAY + arr_t.ComponentType.Kind
 	if arr_t.Size.AutoSized || arr_t.Size.Expr.Model != nil {
 		return
 	}
@@ -3700,7 +3701,7 @@ func (p *Parser) typeSourceIsArrayType(arr_t *Type) (ok bool) {
 	}
 	assign_checker{
 		p:      p,
-		expr_t:      Type{Id: juletype.UInt, Kind: juletype.TypeMap[juletype.UInt]},
+		expr_t:      Type{Id: juletype.UINT, Kind: juletype.TYPE_MAP[juletype.UINT]},
 		v:      val,
 		errtok: arr_t.Size.Expr.Tokens[0],
 	}.check()
@@ -3710,7 +3711,7 @@ func (p *Parser) typeSourceIsArrayType(arr_t *Type) (ok bool) {
 func (p *Parser) typeSourceIsSliceType(slc_t *Type) (ok bool) {
 	*slc_t.ComponentType, ok = p.realType(*slc_t.ComponentType, true)
 	modifiers := slc_t.Modifiers()
-	slc_t.Kind = modifiers + jule.Prefix_Slice + slc_t.ComponentType.Kind
+	slc_t.Kind = modifiers + jule.PREFIX_SLICE + slc_t.ComponentType.Kind
 	if ok && typeIsArray(*slc_t.ComponentType) { // Array into slice
 		p.pusherrtok(slc_t.Token, "invalid_type_source")
 	}
@@ -3728,8 +3729,8 @@ func (p *Parser) check_type_validity(expr_t Type, errtok lex.Token) {
 		p.pusherrtok(errtok, "invalid_type")
 		return
 	}
-	if expr_t.Id == juletype.Unsafe {
-		n := len(expr_t.Kind) - len(tokens.UNSAFE) - 1
+	if expr_t.Id == juletype.UNSAFE {
+		n := len(expr_t.Kind) - len(lex.KND_UNSAFE) - 1
 		if n < 0 || expr_t.Kind[n] != '*' {
 			p.pusherrtok(errtok, "invalid_type")
 		}
@@ -3740,7 +3741,7 @@ func (p *Parser) get_define(id string, cpp_linked bool) any {
 	var def any = nil
 	if cpp_linked {
 		def, _ = p.linkById(id)
-	} else if strings.Contains(id, tokens.DOUBLE_COLON) { // Has namespace?
+	} else if strings.Contains(id, lex.KND_DBLCOLON) { // Has namespace?
 		toks := p.tokenizeDataType(id)
 		defs := p.eval.getNs(&toks)
 		if defs == nil {
@@ -3776,21 +3777,21 @@ func (p *Parser) typeSource(dt Type, err bool) (ret Type, ok bool) {
 	switch {
 	case dt.MultiTyped:
 		return p.typeSourceOfMultiTyped(dt, err)
-	case dt.Id == juletype.Map:
+	case dt.Id == juletype.MAP:
 		return p.typeSourceIsMap(dt, err)
-	case dt.Id == juletype.Array:
+	case dt.Id == juletype.ARRAY:
 		ok = p.typeSourceIsArrayType(&dt)
 		return dt, ok
-	case dt.Id == juletype.Slice:
+	case dt.Id == juletype.SLICE:
 		ok = p.typeSourceIsSliceType(&dt)
 		return dt, ok
 	}
 	switch dt.Id {
-	case juletype.Struct:
+	case juletype.STRUCT:
 		_, prefix := dt.KindId()
 		defer func() { ret.Kind = prefix + ret.Kind }()
 		return p.typeSourceIsStruct(dt.Tag.(*structure), dt)
-	case juletype.Id:
+	case juletype.ID:
 		id, prefix := dt.KindId()
 		defer func() { ret.Kind = prefix + ret.Kind }()
 		def := p.get_define(id, dt.CppLinked)
@@ -3818,7 +3819,7 @@ func (p *Parser) typeSource(dt Type, err bool) (ret Type, ok bool) {
 			}
 			return dt, false
 		}
-	case juletype.Fn:
+	case juletype.FN:
 		return p.typeSourceIsFunc(dt, err)
 	}
 	return dt, true
@@ -3854,7 +3855,7 @@ func (p *Parser) checkType(real, check Type, ignoreAny, allow_assign bool, errTo
 		p.eval.pusherrtok(errTok, "incompatible_types", real.Kind, check.Kind)
 		return
 	}
-	if !ignoreAny && real.Id == juletype.Any {
+	if !ignoreAny && real.Id == juletype.ANY {
 		return
 	}
 	if real.MultiTyped || check.MultiTyped {
@@ -3880,8 +3881,8 @@ func (p *Parser) checkType(real, check Type, ignoreAny, allow_assign bool, errTo
 			p.pusherrtok(errTok, "incompatible_types", real.Kind, check.Kind)
 			return
 		}
-		realKind := strings.Replace(real.Kind, jule.Mark_Array, strconv.Itoa(real.Size.N), 1)
-		checkKind := strings.Replace(check.Kind, jule.Mark_Array, strconv.Itoa(check.Size.N), 1)
+		realKind := strings.Replace(real.Kind, jule.MARK_ARRAY, strconv.Itoa(real.Size.N), 1)
+		checkKind := strings.Replace(check.Kind, jule.MARK_ARRAY, strconv.Itoa(check.Size.N), 1)
 		p.pusherrtok(errTok, "incompatible_types", realKind, checkKind)
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/jule-lang/jule/lex/tokens"
 	"github.com/jule-lang/jule/pkg/jule"
 	"github.com/jule-lang/jule/pkg/juleio"
 	"github.com/jule-lang/jule/pkg/julelog"
@@ -36,7 +35,7 @@ func NewLex(f *juleio.File) *Lex {
 
 func (l *Lex) pusherr(key string, args ...any) {
 	l.Logs = append(l.Logs, julelog.CompilerLog{
-		Type:    julelog.Error,
+		Type:    julelog.ERR,
 		Row:     l.Row,
 		Column:  l.Column,
 		Path:    l.File.Path(),
@@ -46,7 +45,7 @@ func (l *Lex) pusherr(key string, args ...any) {
 
 func (l *Lex) pusherrtok(tok Token, err string) {
 	l.Logs = append(l.Logs, julelog.CompilerLog{
-		Type:    julelog.Error,
+		Type:    julelog.ERR,
 		Row:     tok.Row,
 		Column:  tok.Column,
 		Path:    l.File.Path(),
@@ -60,9 +59,9 @@ func (l *Lex) Lex() []Token {
 	l.Logs = nil
 	l.Newln()
 	for l.Pos < len(l.File.Data) {
-		tok := l.Token()
-		if tok.Id != tokens.NA {
-			toks = append(toks, tok)
+		t := l.Token()
+		if t.Id != ID_NA {
+			toks = append(toks, t)
 		}
 	}
 	l.checkRanges()
@@ -72,11 +71,11 @@ func (l *Lex) Lex() []Token {
 func (l *Lex) checkRanges() {
 	for _, t := range l.braces {
 		switch t.Kind {
-		case tokens.LPARENTHESES:
+		case KND_LPAREN:
 			l.pusherrtok(t, "wait_close_parentheses")
-		case tokens.LBRACE:
+		case KND_LBRACE:
 			l.pusherrtok(t, "wait_close_brace")
-		case tokens.LBRACKET:
+		case KND_LBRACKET:
 			l.pusherrtok(t, "wait_close_bracket")
 		}
 	}
@@ -204,14 +203,14 @@ func (l *Lex) lncomment(t *Token) {
 	for ; l.Pos < len(l.File.Data); l.Pos++ {
 		if l.File.Data[l.Pos] == '\n' {
 			if l.firstTokenOfLine {
-				t.Id = tokens.Comment
+				t.Id = ID_COMMENT
 				t.Kind = string(l.File.Data[start:l.Pos])
 			}
 			return
 		}
 	}
 	if l.firstTokenOfLine {
-		t.Id = tokens.Comment
+		t.Id = ID_COMMENT
 		t.Kind = string(l.File.Data[start:])
 	}
 }
@@ -225,7 +224,7 @@ func (l *Lex) rangecomment() {
 			continue
 		}
 		l.Column += len(string(r))
-		if strings.HasPrefix(string(l.File.Data[l.Pos:]), tokens.RANGE_COMMENT_CLOSE) {
+		if strings.HasPrefix(string(l.File.Data[l.Pos:]), KND_RNG_RCOMMENT) {
 			l.Column += 2
 			l.Pos += 2
 			return
@@ -671,54 +670,54 @@ func (l *Lex) iskw(txt, kind string, id uint8, t *Token) bool {
 }
 
 //               [keyword]id
-var keywords = map[string]uint8{
-	tokens.I8:          tokens.DataType,
-	tokens.I16:         tokens.DataType,
-	tokens.I32:         tokens.DataType,
-	tokens.I64:         tokens.DataType,
-	tokens.U8:          tokens.DataType,
-	tokens.U16:         tokens.DataType,
-	tokens.U32:         tokens.DataType,
-	tokens.U64:         tokens.DataType,
-	tokens.F32:         tokens.DataType,
-	tokens.F64:         tokens.DataType,
-	tokens.UINT:        tokens.DataType,
-	tokens.INT:         tokens.DataType,
-	tokens.UINTPTR:     tokens.DataType,
-	tokens.BOOL:        tokens.DataType,
-	tokens.STR:         tokens.DataType,
-	tokens.ANY:         tokens.DataType,
-	tokens.TRUE:        tokens.Value,
-	tokens.FALSE:       tokens.Value,
-	tokens.NIL:         tokens.Value,
-	tokens.CONST:       tokens.Const,
-	tokens.RET:         tokens.Ret,
-	tokens.TYPE:        tokens.Type,
-	tokens.FOR:         tokens.For,
-	tokens.BREAK:       tokens.Break,
-	tokens.CONTINUE:    tokens.Continue,
-	tokens.IN:          tokens.In,
-	tokens.IF:          tokens.If,
-	tokens.ELSE:        tokens.Else,
-	tokens.USE:         tokens.Use,
-	tokens.PUB:         tokens.Pub,
-	tokens.DEFER:       tokens.Defer,
-	tokens.GOTO:        tokens.Goto,
-	tokens.ENUM:        tokens.Enum,
-	tokens.STRUCT:      tokens.Struct,
-	tokens.CO:          tokens.Co,
-	tokens.MATCH:       tokens.Match,
-	tokens.CASE:        tokens.Case,
-	tokens.DEFAULT:     tokens.Default,
-	tokens.SELF:        tokens.Self,
-	tokens.TRAIT:       tokens.Trait,
-	tokens.IMPL:        tokens.Impl,
-	tokens.CPP:         tokens.Cpp,
-	tokens.FALLTHROUGH: tokens.Fallthrough,
-	tokens.FN:          tokens.Fn,
-	tokens.LET:         tokens.Let,
-	tokens.UNSAFE:      tokens.Unsafe,
-	tokens.MUT:         tokens.Mut,
+var KEYWORDS = map[string]uint8{
+	KND_I8:          ID_DT,
+	KND_I16:         ID_DT,
+	KND_I32:         ID_DT,
+	KND_I64:         ID_DT,
+	KND_U8:          ID_DT,
+	KND_U16:         ID_DT,
+	KND_U32:         ID_DT,
+	KND_U64:         ID_DT,
+	KND_F32:         ID_DT,
+	KND_F64:         ID_DT,
+	KND_UINT:        ID_DT,
+	KND_INT:         ID_DT,
+	KND_UINTPTR:     ID_DT,
+	KND_BOOL:        ID_DT,
+	KND_STR:         ID_DT,
+	KND_ANY:         ID_DT,
+	KND_TRUE:        ID_LITERAL,
+	KND_FALSE:       ID_LITERAL,
+	KND_NIL:         ID_LITERAL,
+	KND_CONST:       ID_CONST,
+	KND_RET:         ID_RET,
+	KND_TYPE:        ID_TYPE,
+	KND_ITER:         ID_ITER,
+	KND_BREAK:       ID_BREAK,
+	KND_CONTINUE:    ID_CONTINUE,
+	KND_IN:          ID_IN,
+	KND_IF:          ID_IF,
+	KND_ELSE:        ID_ELSE,
+	KND_USE:         ID_USE,
+	KND_PUB:         ID_PUB,
+	KND_DEFER:       ID_DEFER,
+	KND_GOTO:        ID_GOTO,
+	KND_ENUM:        ID_ENUM,
+	KND_STRUCT:      ID_STRUCT,
+	KND_CO:          ID_CO,
+	KND_MATCH:       ID_MATCH,
+	KND_CASE:        ID_CASE,
+	KND_DEFAULT:     ID_DEFAULT,
+	KND_SELF:        ID_SELF,
+	KND_TRAIT:       ID_TRAIT,
+	KND_IMPL:        ID_IMPL,
+	KND_CPP:         ID_CPP,
+	KND_FALLTHROUGH: ID_FALLTHROUGH,
+	KND_FN:          ID_FN,
+	KND_LET:         ID_LET,
+	KND_UNSAFE:      ID_UNSAFE,
+	KND_MUT:         ID_MUT,
 }
 
 type oppair struct {
@@ -726,49 +725,49 @@ type oppair struct {
 	id uint8
 }
 
-var basicOps = [...]oppair{
-	0:  {tokens.DOUBLE_COLON, tokens.DoubleColon},
-	1:  {tokens.COLON, tokens.Colon},
-	2:  {tokens.SEMICOLON, tokens.SemiColon},
-	3:  {tokens.COMMA, tokens.Comma},
-	4:  {tokens.TRIPLE_DOT, tokens.Operator},
-	5:  {tokens.DOT, tokens.Dot},
-	6:  {tokens.PLUS_EQUAL, tokens.Operator},
-	7:  {tokens.MINUS_EQUAL, tokens.Operator},
-	8:  {tokens.STAR_EQUAL, tokens.Operator},
-	9:  {tokens.SLASH_EQUAL, tokens.Operator},
-	10: {tokens.PERCENT_EQUAL, tokens.Operator},
-	11: {tokens.LSHIFT_EQUAL, tokens.Operator},
-	12: {tokens.RSHIFT_EQUAL, tokens.Operator},
-	13: {tokens.CARET_EQUAL, tokens.Operator},
-	14: {tokens.AMPER_EQUAL, tokens.Operator},
-	15: {tokens.VLINE_EQUAL, tokens.Operator},
-	16: {tokens.EQUALS, tokens.Operator},
-	17: {tokens.NOT_EQUALS, tokens.Operator},
-	18: {tokens.GREAT_EQUAL, tokens.Operator},
-	19: {tokens.LESS_EQUAL, tokens.Operator},
-	20: {tokens.DOUBLE_AMPER, tokens.Operator},
-	21: {tokens.DOUBLE_VLINE, tokens.Operator},
-	22: {tokens.LSHIFT, tokens.Operator},
-	23: {tokens.RSHIFT, tokens.Operator},
-	24: {tokens.DOUBLE_PLUS, tokens.Operator},
-	25: {tokens.DOUBLE_MINUS, tokens.Operator},
-	26: {tokens.PLUS, tokens.Operator},
-	27: {tokens.MINUS, tokens.Operator},
-	28: {tokens.STAR, tokens.Operator},
-	29: {tokens.SOLIDUS, tokens.Operator},
-	30: {tokens.PERCENT, tokens.Operator},
-	31: {tokens.AMPER, tokens.Operator},
-	32: {tokens.VLINE, tokens.Operator},
-	33: {tokens.CARET, tokens.Operator},
-	34: {tokens.EXCLAMATION, tokens.Operator},
-	35: {tokens.LESS, tokens.Operator},
-	36: {tokens.GREAT, tokens.Operator},
-	37: {tokens.EQUAL, tokens.Operator},
+var BASIC_OPS = [...]oppair{
+	{KND_DBLCOLON, ID_DBLCOLON},
+	{KND_COLON, ID_COLON},
+	{KND_SEMICOLON, ID_SEMICOLON},
+	{KND_COMMA, ID_COMMA},
+	{KND_TRIPLE_DOT, ID_OP},
+	{KND_DOT, ID_DOT},
+	{KND_PLUS_EQ, ID_OP},
+	{KND_MINUS_EQ, ID_OP},
+	{KND_STAR_EQ, ID_OP},
+	{KND_SLASH_EQ, ID_OP},
+	{KND_PERCENT_EQ, ID_OP},
+	{KND_LSHIFT_EQ, ID_OP},
+	{KND_RSHIFT_EQ, ID_OP},
+	{KND_CARET_EQ, ID_OP},
+	{KND_AMPER_EQ, ID_OP},
+	{KND_VLINE_EQ, ID_OP},
+	{KND_EQS, ID_OP},
+	{KND_NOT_EQ, ID_OP},
+	{KND_GREAT_EQ, ID_OP},
+	{KND_LESS_EQ, ID_OP},
+	{KND_DBL_AMPER, ID_OP},
+	{KND_DBL_VLINE, ID_OP},
+	{KND_LSHIFT, ID_OP},
+	{KND_RSHIFT, ID_OP},
+	{KND_DBL_PLUS, ID_OP},
+	{KND_DBL_MINUS, ID_OP},
+	{KND_PLUS, ID_OP},
+	{KND_MINUS, ID_OP},
+	{KND_STAR, ID_OP},
+	{KND_SOLIDUS, ID_OP},
+	{KND_PERCENT, ID_OP},
+	{KND_AMPER, ID_OP},
+	{KND_VLINE, ID_OP},
+	{KND_CARET, ID_OP},
+	{KND_EXCL, ID_OP},
+	{KND_LT, ID_OP},
+	{KND_GT, ID_OP},
+	{KND_EQ, ID_OP},
 }
 
 func (l *Lex) lexKeywords(txt string, tok *Token) bool {
-	for k, v := range keywords {
+	for k, v := range KEYWORDS {
 		if l.iskw(txt, k, v, tok) {
 			return true
 		}
@@ -777,7 +776,7 @@ func (l *Lex) lexKeywords(txt string, tok *Token) bool {
 }
 
 func (l *Lex) lexBasicOps(txt string, tok *Token) bool {
-	for _, pair := range basicOps {
+	for _, pair := range BASIC_OPS {
 		if l.isop(txt, pair.op, pair.id, tok) {
 			return true
 		}
@@ -791,7 +790,7 @@ func (l *Lex) lexIdentifier(txt string, t *Token) bool {
 		return false
 	}
 	t.Kind = lex
-	t.Id = tokens.Id
+	t.Id = ID_IDENT
 	return true
 }
 
@@ -801,7 +800,7 @@ func (l *Lex) lexNumeric(txt string, t *Token) bool {
 		return false
 	}
 	t.Kind = lex
-	t.Id = tokens.Value
+	t.Id = ID_LITERAL
 	return true
 }
 
@@ -809,7 +808,7 @@ func (l *Lex) lexNumeric(txt string, t *Token) bool {
 func (l *Lex) Token() Token {
 	defer func() { l.firstTokenOfLine = false }()
 
-	t := Token{File: l.File, Id: tokens.NA}
+	t := Token{File: l.File, Id: ID_NA}
 
 	txt := l.resume()
 	if txt == "" {
@@ -825,30 +824,30 @@ func (l *Lex) Token() Token {
 	case l.lexNumeric(txt, &t):
 	case txt[0] == '\'':
 		t.Kind = l.rune(txt)
-		t.Id = tokens.Value
+		t.Id = ID_LITERAL
 		return t
 	case txt[0] == '"' || txt[0] == '`':
 		t.Kind = l.str(txt)
-		t.Id = tokens.Value
+		t.Id = ID_LITERAL
 		return t
-	case strings.HasPrefix(txt, tokens.LINE_COMMENT):
+	case strings.HasPrefix(txt, KND_LN_COMMENT):
 		l.lncomment(&t)
 		return t
-	case strings.HasPrefix(txt, tokens.RANGE_COMMENT_OPEN):
+	case strings.HasPrefix(txt, KND_RNG_LCOMMENT):
 		l.rangecomment()
 		return t
-	case l.isop(txt, tokens.LPARENTHESES, tokens.Brace, &t):
+	case l.isop(txt, KND_LPAREN, ID_BRACE, &t):
 		l.braces = append(l.braces, t)
-	case l.isop(txt, tokens.RPARENTHESES, tokens.Brace, &t):
-		l.pushRangeClose(t, tokens.LPARENTHESES)
-	case l.isop(txt, tokens.LBRACE, tokens.Brace, &t):
+	case l.isop(txt, KND_RPARENT, ID_BRACE, &t):
+		l.pushRangeClose(t, KND_LPAREN)
+	case l.isop(txt, KND_LBRACE, ID_BRACE, &t):
 		l.braces = append(l.braces, t)
-	case l.isop(txt, tokens.RBRACE, tokens.Brace, &t):
-		l.pushRangeClose(t, tokens.LBRACE)
-	case l.isop(txt, tokens.LBRACKET, tokens.Brace, &t):
+	case l.isop(txt, KND_RBRACE, ID_BRACE, &t):
+		l.pushRangeClose(t, KND_LBRACE)
+	case l.isop(txt, KND_LBRACKET, ID_BRACE, &t):
 		l.braces = append(l.braces, t)
-	case l.isop(txt, tokens.RBRACKET, tokens.Brace, &t):
-		l.pushRangeClose(t, tokens.LBRACKET)
+	case l.isop(txt, KND_RBRACKET, ID_BRACE, &t):
+		l.pushRangeClose(t, KND_LBRACKET)
 	case
 		l.lexBasicOps(txt, &t) ||
 		l.lexKeywords(txt, &t) ||
@@ -867,12 +866,12 @@ func (l *Lex) Token() Token {
 func getCloseKindOfBrace(left string) string {
 	var right string
 	switch left {
-	case tokens.RPARENTHESES:
-		right = tokens.LPARENTHESES
-	case tokens.RBRACE:
-		right = tokens.LBRACE
-	case tokens.RBRACKET:
-		right = tokens.LBRACKET
+	case KND_RPARENT:
+		right = KND_LPAREN
+	case KND_RBRACE:
+		right = KND_LBRACE
+	case KND_RBRACKET:
+		right = KND_LBRACKET
 	}
 	return right
 }
@@ -893,11 +892,11 @@ func (l *Lex) pushRangeClose(t Token, left string) {
 	n := len(l.braces)
 	if n == 0 {
 		switch t.Kind {
-		case tokens.RBRACKET:
+		case KND_RBRACKET:
 			l.pusherrtok(t, "extra_closed_brackets")
-		case tokens.RBRACE:
+		case KND_RBRACE:
 			l.pusherrtok(t, "extra_closed_braces")
-		case tokens.RPARENTHESES:
+		case KND_RPARENT:
 			l.pusherrtok(t, "extra_closed_parentheses")
 		}
 		return
@@ -910,11 +909,11 @@ func (l *Lex) pushRangeClose(t Token, left string) {
 func (l *Lex) pushWrongOrderCloseErr(t Token) {
 	var msg string
 	switch l.braces[len(l.braces)-1].Kind {
-	case tokens.LPARENTHESES:
+	case KND_LPAREN:
 		msg = "expected_parentheses_close"
-	case tokens.LBRACE:
+	case KND_LBRACE:
 		msg = "expected_brace_close"
-	case tokens.LBRACKET:
+	case KND_LBRACKET:
 		msg = "expected_bracket_close"
 	}
 	l.pusherrtok(t, msg)

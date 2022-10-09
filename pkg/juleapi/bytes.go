@@ -42,13 +42,9 @@ func ToRune(bytes []byte) string {
 	return rtoa(r)
 }
 
-func rtoa(r rune) string {
-	return "0x" + strconv.FormatInt(int64(r), 16)
-}
+func rtoa(r rune) string { return "0x" + strconv.FormatInt(int64(r), 16) }
 
-func btoa(b byte) string {
-	return "0x" + strconv.FormatUint(uint64(b), 16)
-}
+func btoa(b byte) string { return "0x" + strconv.FormatUint(uint64(b), 16) }
 
 func sbtoa(b byte) string {
 	if b == 0 {

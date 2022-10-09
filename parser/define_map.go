@@ -159,7 +159,7 @@ func (dm *DefineMap) funcById(id string, f *File) (*Fn, *DefineMap, bool) {
 
 func (dm *DefineMap) findGlobalById(id string, f *File) (int, *DefineMap, bool) {
 	for i, g := range dm.Globals {
-		if g != nil && g.Type.Id != juletype.Void && g.Id == id {
+		if g != nil && g.Type.Id != juletype.VOID && g.Id == id {
 			if isAccessable(f, g.Token.File, g.Pub) {
 				return i, dm, false
 			}

@@ -21,13 +21,13 @@ func checkPlatform(path string) (ok bool, exist bool) {
 	ok = false
 	exist = true
 	switch path {
-	case jule.PlatformWindows:
+	case jule.OS_WINDOWS:
 		ok = runtime.GOOS == os_windows
-	case jule.PlatformDarwin:
+	case jule.OS_DARWIN:
 		ok = runtime.GOOS == os_darwin
-	case jule.PlatformLinux:
+	case jule.OS_LINUX:
 		ok = runtime.GOOS == os_linux
-	case jule.PlatformUnix:
+	case jule.OS_UNIX:
 		switch runtime.GOOS {
 		case os_darwin, os_linux:
 			ok = true
@@ -43,20 +43,20 @@ func checkArch(path string) (ok bool, exist bool) {
 	ok = false
 	exist = true
 	switch path {
-	case jule.ArchI386:
+	case jule.ARCH_I386:
 		ok = runtime.GOARCH == arch_i386
-	case jule.ArchAmd64:
+	case jule.ARCH_AMD64:
 		ok = runtime.GOARCH == arch_amd64
-	case jule.ArchArm:
+	case jule.ARCH_ARM:
 		ok = runtime.GOARCH == arch_arm
-	case jule.ArchArm64:
+	case jule.ARCH_ARM64:
 		ok = runtime.GOARCH == arch_arm64
-	case jule.Arch64Bit:
+	case jule.ARCH_64Bit:
 		switch runtime.GOARCH {
 		case arch_amd64, arch_arm64:
 			ok = true
 		}
-	case jule.Arch32Bit:
+	case jule.ARCH_32Bit:
 		switch runtime.GOARCH {
 		case arch_i386, arch_arm:
 			ok = true

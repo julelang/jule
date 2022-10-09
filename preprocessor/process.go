@@ -12,11 +12,11 @@ type Tree = []models.Object
 
 // IsPreprocessorPragma reports pragma is preprocessor pragma or not.
 func IsPreprocessorPragma(s string) bool {
-	if !strings.HasPrefix(s, jule.PragmaCommentPrefix) {
+	if !strings.HasPrefix(s, jule.PRAGMA_COMMENT_PREFIX) {
 		return false
 	}
 	switch getDirective(s) {
-	case jule.PreprocessorDirectiveEnofi:
+	case jule.PREPROCESSOR_DIRECTIVE_ENOFI:
 		return true
 	default:
 		return false
@@ -24,7 +24,7 @@ func IsPreprocessorPragma(s string) bool {
 }
 
 func getDirective(s string) string {
-	return s[len(jule.PragmaCommentPrefix):]
+	return s[len(jule.PRAGMA_COMMENT_PREFIX):]
 }
 
 // Process all preprocessor directives and commands.

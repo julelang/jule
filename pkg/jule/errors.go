@@ -3,7 +3,7 @@ package jule
 import "fmt"
 
 // Error messages.
-var Errors = map[string]string{
+var ERRORS = map[string]string{
 	`stdlib_not_exist`:                         `standard library directory not found`,
 	`file_not_useable`:                         `file is not useable for this operating system or architecture`,
 	`file_not_jule`:                            `this is not jule source file: %s`,
@@ -140,5 +140,5 @@ var Errors = map[string]string{
 
 // GetError returns error.
 func GetError(key string, args ...any) string {
-	return fmt.Sprintf(Errors[key], args...)
+	return fmt.Sprintf(ERRORS[key], args...)
 }

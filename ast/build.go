@@ -7,7 +7,6 @@ import (
 
 	"github.com/jule-lang/jule/ast/models"
 	"github.com/jule-lang/jule/lex"
-	"github.com/jule-lang/jule/lex/tokens"
 	"github.com/jule-lang/jule/pkg/jule"
 	"github.com/jule-lang/jule/pkg/juleapi"
 	"github.com/jule-lang/jule/pkg/julelog"
@@ -35,7 +34,7 @@ func NewBuilder(t []lex.Token) *Builder {
 
 func compilerErr(t lex.Token, key string, args ...any) julelog.CompilerLog {
 	return julelog.CompilerLog{
-		Type:    julelog.Error,
+		Type:    julelog.ERR,
 		Row:     t.Row,
 		Column:  t.Column,
 		Path:    t.File.Path(),
@@ -56,27 +55,27 @@ func (b *Builder) Ended() bool {
 func (b *Builder) buildNode(toks []lex.Token) {
 	t := toks[0]
 	switch t.Id {
-	case tokens.Use:
+	case lex.ID_USE:
 		b.Use(toks)
-	case tokens.Fn, tokens.Unsafe:
+	case lex.ID_FN, lex.ID_UNSAFE:
 		s := models.Statement{Token: t}
 		s.Data = b.Func(toks, false, false, false)
 		b.Tree = append(b.Tree, models.Object{Token: s.Token, Data: s})
-	case tokens.Const, tokens.Let, tokens.Mut:
+	case lex.ID_CONST, lex.ID_LET, lex.ID_MUT:
 		b.GlobalVar(toks)
-	case tokens.Type:
+	case lex.ID_TYPE:
 		b.Tree = append(b.Tree, b.TypeOrGenerics(toks))
-	case tokens.Enum:
+	case lex.ID_ENUM:
 		b.Enum(toks)
-	case tokens.Struct:
+	case lex.ID_STRUCT:
 		b.Struct(toks)
-	case tokens.Trait:
+	case lex.ID_TRAIT:
 		b.Trait(toks)
-	case tokens.Impl:
+	case lex.ID_IMPL:
 		b.Impl(toks)
-	case tokens.Cpp:
+	case lex.ID_CPP:
 		b.CppLink(toks)
-	case tokens.Comment:
+	case lex.ID_COMMENT:
 		b.Tree = append(b.Tree, b.Comment(toks[0]))
 	default:
 		b.pusherr(t, "invalid_syntax")
@@ -91,7 +90,7 @@ func (b *Builder) buildNode(toks []lex.Token) {
 func (b *Builder) Build() {
 	for b.Pos != -1 && !b.Ended() {
 		toks := b.nextBuilderStatement()
-		b.pub = toks[0].Id == tokens.Pub
+		b.pub = toks[0].Id == lex.ID_PUB
 		if b.pub {
 			if len(toks) == 1 {
 				if b.Ended() {
@@ -121,7 +120,7 @@ func (b *Builder) TypeAlias(toks []lex.Token) (t models.TypeAlias) {
 	t.Token = toks[1]
 	t.Id = t.Token.Kind
 	token := toks[i]
-	if token.Id != tokens.Id {
+	if token.Id != lex.ID_IDENT {
 		b.pusherr(token, "invalid_syntax")
 	}
 	i++
@@ -130,7 +129,7 @@ func (b *Builder) TypeAlias(toks []lex.Token) (t models.TypeAlias) {
 		return
 	}
 	token = toks[i]
-	if token.Id != tokens.Colon {
+	if token.Id != lex.ID_COLON {
 		b.pusherr(toks[i-1], "invalid_syntax")
 		return
 	}
@@ -152,9 +151,9 @@ func (b *Builder) buildEnumItemExpr(i *int, toks []lex.Token) models.Expr {
 	exprStart := *i
 	for ; *i < len(toks); *i++ {
 		t := toks[*i]
-		if t.Id == tokens.Brace {
+		if t.Id == lex.ID_BRACE {
 			switch t.Kind {
-			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
+			case lex.KND_LBRACE, lex.KND_LBRACKET, lex.KND_LPAREN:
 				brace_n++
 				continue
 			default:
@@ -164,9 +163,9 @@ func (b *Builder) buildEnumItemExpr(i *int, toks []lex.Token) models.Expr {
 		if brace_n > 0 {
 			continue
 		}
-		if t.Id == tokens.Comma || *i+1 >= len(toks) {
+		if t.Id == lex.ID_COMMA || *i+1 >= len(toks) {
 			var exprToks []lex.Token
-			if t.Id == tokens.Comma {
+			if t.Id == lex.ID_COMMA {
 				exprToks = toks[exprStart:*i]
 			} else {
 				exprToks = toks[exprStart:]
@@ -181,16 +180,16 @@ func (b *Builder) buildEnumItems(toks []lex.Token) []*models.EnumItem {
 	items := make([]*models.EnumItem, 0)
 	for i := 0; i < len(toks); i++ {
 		t := toks[i]
-		if t.Id == tokens.Comment {
+		if t.Id == lex.ID_COMMENT {
 			continue
 		}
 		item := new(models.EnumItem)
 		item.Token = t
-		if item.Token.Id != tokens.Id {
+		if item.Token.Id != lex.ID_IDENT {
 			b.pusherr(item.Token, "invalid_syntax")
 		}
 		item.Id = item.Token.Kind
-		if i+1 >= len(toks) || toks[i+1].Id == tokens.Comma {
+		if i+1 >= len(toks) || toks[i+1].Id == lex.ID_COMMA {
 			if i+1 < len(toks) {
 				i++
 			}
@@ -199,11 +198,11 @@ func (b *Builder) buildEnumItems(toks []lex.Token) []*models.EnumItem {
 		}
 		i++
 		t = toks[i]
-		if t.Id != tokens.Operator && t.Kind != tokens.EQUAL {
+		if t.Id != lex.ID_OP && t.Kind != lex.KND_EQ {
 			b.pusherr(toks[0], "invalid_syntax")
 		}
 		i++
-		if i >= len(toks) || toks[i].Id == tokens.Comma {
+		if i >= len(toks) || toks[i].Id == lex.ID_COMMA {
 			b.pusherr(toks[0], "missing_expr")
 			continue
 		}
@@ -221,12 +220,12 @@ func (b *Builder) Enum(toks []lex.Token) {
 		return
 	}
 	e.Token = toks[1]
-	if e.Token.Id != tokens.Id {
+	if e.Token.Id != lex.ID_IDENT {
 		b.pusherr(e.Token, "invalid_syntax")
 	}
 	e.Id = e.Token.Kind
 	i := 2
-	if toks[i].Id == tokens.Colon {
+	if toks[i].Id == lex.ID_COLON {
 		i++
 		if i >= len(toks) {
 			b.pusherr(toks[i-1], "invalid_syntax")
@@ -239,9 +238,9 @@ func (b *Builder) Enum(toks []lex.Token) {
 			return
 		}
 	} else {
-		e.Type = models.Type{Id: juletype.U32, Kind: tokens.U32}
+		e.Type = models.Type{Id: juletype.U32, Kind: juletype.TYPE_MAP[juletype.U32]}
 	}
-	itemToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
+	itemToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &toks)
 	if itemToks == nil {
 		b.pusherr(e.Token, "body_not_exist")
 		return
@@ -271,10 +270,10 @@ func (b *Builder) structFields(toks []lex.Token, cpp_linked bool) []*models.Var 
 	i := 0
 	for i < len(toks) {
 		var_tokens := b.skipStatement(&i, &toks)
-		if var_tokens[0].Id == tokens.Comment {
+		if var_tokens[0].Id == lex.ID_COMMENT {
 			continue
 		}
-		is_pub := var_tokens[0].Id == tokens.Pub
+		is_pub := var_tokens[0].Id == lex.ID_PUB
 		if is_pub {
 			if len(var_tokens) == 1 {
 				b.pusherr(var_tokens[0], "invalid_syntax")
@@ -282,7 +281,7 @@ func (b *Builder) structFields(toks []lex.Token, cpp_linked bool) []*models.Var 
 			}
 			var_tokens = var_tokens[1:]
 		}
-		is_mut := var_tokens[0].Id == tokens.Mut
+		is_mut := var_tokens[0].Id == lex.ID_MUT
 		if is_mut {
 			if len(var_tokens) == 1 {
 				b.pusherr(var_tokens[0], "invalid_syntax")
@@ -309,12 +308,12 @@ func (b *Builder) parse_struct(toks []lex.Token, cpp_linked bool) models.Struct 
 		return s
 	}
 	s.Token = toks[1]
-	if s.Token.Id != tokens.Id {
+	if s.Token.Id != lex.ID_IDENT {
 		b.pusherr(s.Token, "invalid_syntax")
 	}
 	s.Id = s.Token.Kind
 	i := 2
-	bodyToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
+	bodyToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &toks)
 	if bodyToks == nil {
 		b.pusherr(s.Token, "body_not_exist")
 		return s
@@ -355,12 +354,12 @@ func (b *Builder) Trait(toks []lex.Token) {
 		return
 	}
 	t.Token = toks[1]
-	if t.Token.Id != tokens.Id {
+	if t.Token.Id != lex.ID_IDENT {
 		b.pusherr(t.Token, "invalid_syntax")
 	}
 	t.Id = t.Token.Kind
 	i := 2
-	bodyToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
+	bodyToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &toks)
 	if bodyToks == nil {
 		b.pusherr(t.Token, "body_not_exist")
 		return
@@ -382,10 +381,10 @@ func (b *Builder) implTraitFuncs(impl *models.Impl, toks []lex.Token) {
 		fnToks := b.nextBuilderStatement()
 		tok := fnToks[0]
 		switch tok.Id {
-		case tokens.Comment:
+		case lex.ID_COMMENT:
 			impl.Tree = append(impl.Tree, b.Comment(tok))
 			continue
-		case tokens.Fn, tokens.Unsafe:
+		case lex.ID_FN, lex.ID_UNSAFE:
 			f := b.get_method(fnToks)
 			f.Pub = true
 			b.setup_receiver(f, impl.Target.Kind)
@@ -408,17 +407,17 @@ func (b *Builder) implStruct(impl *models.Impl, toks []lex.Token) {
 		tok := fnToks[0]
 		pub := false
 		switch tok.Id {
-		case tokens.Comment:
+		case lex.ID_COMMENT:
 			impl.Tree = append(impl.Tree, b.Comment(tok))
 			continue
-		case tokens.Type:
+		case lex.ID_TYPE:
 			impl.Tree = append(impl.Tree, models.Object{
 				Token: tok,
 				Data:  b.Generics(fnToks),
 			})
 			continue
 		}
-		if tok.Id == tokens.Pub {
+		if tok.Id == lex.ID_PUB {
 			pub = true
 			if len(fnToks) == 1 {
 				b.pusherr(fnToks[0], "invalid_syntax")
@@ -430,7 +429,7 @@ func (b *Builder) implStruct(impl *models.Impl, toks []lex.Token) {
 			}
 		}
 		switch tok.Id {
-		case tokens.Fn, tokens.Unsafe:
+		case lex.ID_FN, lex.ID_UNSAFE:
 			f := b.get_method(fnToks)
 			f.Pub = pub
 			b.setup_receiver(f, impl.Base.Kind)
@@ -444,19 +443,19 @@ func (b *Builder) implStruct(impl *models.Impl, toks []lex.Token) {
 
 func (b *Builder) get_method(toks []lex.Token) *models.Fn {
 	tok := toks[0]
-	if tok.Id == tokens.Unsafe {
+	if tok.Id == lex.ID_UNSAFE {
 		toks = toks[1:]
-		if len(toks) == 0 || toks[0].Id != tokens.Fn {
+		if len(toks) == 0 || toks[0].Id != lex.ID_FN {
 			b.pusherr(tok, "invalid_syntax")
 			return nil
 		}
-	} else if toks[0].Id != tokens.Fn {
+	} else if toks[0].Id != lex.ID_FN {
 		b.pusherr(tok, "invalid_syntax")
 		return nil
 	}
 	f := new(models.Fn)
 	*f = b.Func(toks, true, false, false)
-	f.IsUnsafe = tok.Id == tokens.Unsafe
+	f.IsUnsafe = tok.Id == lex.ID_UNSAFE
 	if f.Block != nil {
 		f.Block.IsUnsafe = f.IsUnsafe
 	}
@@ -464,7 +463,7 @@ func (b *Builder) get_method(toks []lex.Token) *models.Fn {
 }
 
 func (b *Builder) implFuncs(impl *models.Impl, toks []lex.Token) {
-	if impl.Target.Id != juletype.Void {
+	if impl.Target.Id != juletype.VOID {
 		b.implTraitFuncs(impl, toks)
 		return
 	}
@@ -479,7 +478,7 @@ func (b *Builder) Impl(toks []lex.Token) {
 		return
 	}
 	tok = toks[1]
-	if tok.Id != tokens.Id {
+	if tok.Id != lex.ID_IDENT {
 		b.pusherr(tok, "invalid_syntax")
 		return
 	}
@@ -490,8 +489,8 @@ func (b *Builder) Impl(toks []lex.Token) {
 	}
 	impl.Base = tok
 	tok = toks[2]
-	if tok.Id != tokens.For {
-		if tok.Id == tokens.Brace && tok.Kind == tokens.LBRACE {
+	if tok.Id != lex.ID_ITER {
+		if tok.Id == lex.ID_BRACE && tok.Kind == lex.KND_LBRACE {
 			toks = toks[2:]
 			goto body
 		}
@@ -503,7 +502,7 @@ func (b *Builder) Impl(toks []lex.Token) {
 		return
 	}
 	tok = toks[3]
-	if tok.Id != tokens.Id {
+	if tok.Id != lex.ID_IDENT {
 		b.pusherr(tok, "invalid_syntax")
 		return
 	}
@@ -514,7 +513,7 @@ func (b *Builder) Impl(toks []lex.Token) {
 	}
 body:
 	i := 0
-	bodyToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
+	bodyToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &toks)
 	if bodyToks == nil {
 		b.pusherr(impl.Base, "body_not_exist")
 		return
@@ -601,13 +600,13 @@ func (b *Builder) CppLink(toks []lex.Token) {
 	}
 	tok = toks[1]
 	switch tok.Id {
-	case tokens.Fn, tokens.Unsafe:
+	case lex.ID_FN, lex.ID_UNSAFE:
 		b.link_fn(toks)
-	case tokens.Let:
+	case lex.ID_LET:
 		b.link_var(toks)
-	case tokens.Struct:
+	case lex.ID_STRUCT:
 		b.link_struct(toks)
-	case tokens.Type:
+	case lex.ID_TYPE:
 		b.link_type_alias(toks)
 	default:
 		b.pusherr(tok, "invalid_syntax")
@@ -637,8 +636,8 @@ func (b *Builder) Use(toks []lex.Token) {
 
 func (b *Builder) getSelectors(toks []lex.Token) []lex.Token {
 	i := 0
-	toks = b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
-	parts, errs := Parts(toks, tokens.Comma, true)
+	toks = b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &toks)
+	parts, errs := Parts(toks, lex.ID_COMMA, true)
 	if len(errs) > 0 {
 		b.Errors = append(b.Errors, errs...)
 		return nil
@@ -649,7 +648,7 @@ func (b *Builder) getSelectors(toks []lex.Token) []lex.Token {
 			b.pusherr(part[1], "invalid_syntax")
 		}
 		tok := part[0]
-		if tok.Id != tokens.Id && tok.Id != tokens.Self {
+		if tok.Id != lex.ID_IDENT && tok.Id != lex.ID_SELF {
 			b.pusherr(tok, "invalid_syntax")
 			continue
 		}
@@ -663,7 +662,7 @@ func (b *Builder) buildUseCppDecl(use *models.UseDecl, toks []lex.Token) {
 		b.pusherr(toks[2], "invalid_syntax")
 	}
 	tok := toks[1]
-	if tok.Id != tokens.Value || (tok.Kind[0] != '`' && tok.Kind[0] != '"') {
+	if tok.Id != lex.ID_LITERAL || (tok.Kind[0] != '`' && tok.Kind[0] != '"') {
 		b.pusherr(tok, "invalid_expr")
 		return
 	}
@@ -673,15 +672,15 @@ func (b *Builder) buildUseCppDecl(use *models.UseDecl, toks []lex.Token) {
 
 func (b *Builder) buildUseDecl(use *models.UseDecl, toks []lex.Token) {
 	var path strings.Builder
-	path.WriteString(jule.StdlibPath)
+	path.WriteString(jule.STDLIB_PATH)
 	path.WriteRune(os.PathSeparator)
 	tok := toks[0]
 	isStd := false
-	if tok.Id == tokens.Cpp {
+	if tok.Id == lex.ID_CPP {
 		b.buildUseCppDecl(use, toks)
 		return
 	}
-	if tok.Id != tokens.Id || tok.Kind != "std" {
+	if tok.Id != lex.ID_IDENT || tok.Kind != "std" {
 		b.pusherr(toks[0], "invalid_syntax")
 	}
 	isStd = true
@@ -692,11 +691,11 @@ func (b *Builder) buildUseDecl(use *models.UseDecl, toks []lex.Token) {
 	toks = toks[2:]
 	tok = toks[len(toks)-1]
 	switch tok.Id {
-	case tokens.DoubleColon:
+	case lex.ID_DBLCOLON:
 		b.pusherr(tok, "invalid_syntax")
 		return
-	case tokens.Brace:
-		if tok.Kind != tokens.RBRACE {
+	case lex.ID_BRACE:
+		if tok.Kind != lex.KND_RBRACE {
 			b.pusherr(tok, "invalid_syntax")
 			return
 		}
@@ -708,7 +707,7 @@ func (b *Builder) buildUseDecl(use *models.UseDecl, toks []lex.Token) {
 			return
 		}
 		tok = toks[len(toks)-1]
-		if tok.Id != tokens.DoubleColon {
+		if tok.Id != lex.ID_DBLCOLON {
 			b.pusherr(tok, "invalid_syntax")
 			return
 		}
@@ -717,8 +716,8 @@ func (b *Builder) buildUseDecl(use *models.UseDecl, toks []lex.Token) {
 			b.pusherr(tok, "invalid_syntax")
 			return
 		}
-	case tokens.Operator:
-		if tok.Kind != tokens.STAR {
+	case lex.ID_OP:
+		if tok.Kind != lex.KND_STAR {
 			b.pusherr(tok, "invalid_syntax")
 			return
 		}
@@ -728,7 +727,7 @@ func (b *Builder) buildUseDecl(use *models.UseDecl, toks []lex.Token) {
 			return
 		}
 		tok = toks[len(toks)-1]
-		if tok.Id != tokens.DoubleColon {
+		if tok.Id != lex.ID_DBLCOLON {
 			b.pusherr(tok, "invalid_syntax")
 			return
 		}
@@ -741,13 +740,13 @@ func (b *Builder) buildUseDecl(use *models.UseDecl, toks []lex.Token) {
 	}
 	for i, tok := range toks {
 		if i%2 != 0 {
-			if tok.Id != tokens.DoubleColon {
+			if tok.Id != lex.ID_DBLCOLON {
 				b.pusherr(tok, "invalid_syntax")
 			}
 			path.WriteRune(os.PathSeparator)
 			continue
 		}
-		if tok.Id != tokens.Id {
+		if tok.Id != lex.ID_IDENT {
 			b.pusherr(tok, "invalid_syntax")
 		}
 		path.WriteString(tok.Kind)
@@ -765,7 +764,7 @@ func (b *Builder) Attribute(toks []lex.Token) (a models.Attribute) {
 	a.Token = toks[i]
 	i++
 	tag := toks[i]
-	if tag.Id != tokens.Id || a.Token.Column+1 != tag.Column {
+	if tag.Id != lex.ID_IDENT || a.Token.Column+1 != tag.Column {
 		b.pusherr(tag, "invalid_syntax")
 		return
 	}
@@ -787,18 +786,18 @@ func (b *Builder) setup_receiver(f *models.Fn, owner_id string) {
 		return
 	}
 	param := f.Params[0]
-	if param.Id != tokens.SELF {
+	if param.Id != lex.KND_SELF {
 		b.pusherr(f.Token, "missing_receiver")
 		return
 	}
 	f.Receiver = new(models.Var)
 	f.Receiver.Type = models.Type{
-		Id:   juletype.Struct,
+		Id:   juletype.STRUCT,
 		Kind: owner_id,
 	}
 	f.Receiver.Mutable = param.Mutable
 	if param.Type.Kind != "" && param.Type.Kind[0] == '&' {
-		f.Receiver.Type.Kind = tokens.AMPER + f.Receiver.Type.Kind
+		f.Receiver.Type.Kind = lex.KND_AMPER + f.Receiver.Type.Kind
 	}
 	f.Params = f.Params[1:]
 }
@@ -806,7 +805,7 @@ func (b *Builder) setup_receiver(f *models.Fn, owner_id string) {
 func (b *Builder) funcPrototype(toks []lex.Token, i *int, method, anon bool) (f models.Fn, ok bool) {
 	ok = true
 	f.Token = toks[*i]
-	if f.Token.Id == tokens.Unsafe {
+	if f.Token.Id == lex.ID_UNSAFE {
 		f.IsUnsafe = true
 		*i++
 		if *i >= len(toks) {
@@ -826,26 +825,26 @@ func (b *Builder) funcPrototype(toks []lex.Token, i *int, method, anon bool) (f 
 	f.Pub = b.pub
 	b.pub = false
 	if anon {
-		f.Id = jule.Anonymous
+		f.Id = jule.ANONYMOUS
 	} else {
 		tok := toks[*i]
-		if tok.Id != tokens.Id {
+		if tok.Id != lex.ID_IDENT {
 			b.pusherr(tok, "invalid_syntax")
 			ok = false
 		}
 		f.Id = tok.Kind
 		*i++
 	}
-	f.RetType.Type.Id = juletype.Void
-	f.RetType.Type.Kind = juletype.TypeMap[f.RetType.Type.Id]
+	f.RetType.Type.Id = juletype.VOID
+	f.RetType.Type.Kind = juletype.TYPE_MAP[f.RetType.Type.Id]
 	if *i >= len(toks) {
 		b.pusherr(f.Token, "invalid_syntax")
 		return
-	} else if toks[*i].Kind != tokens.LPARENTHESES {
+	} else if toks[*i].Kind != lex.KND_LPAREN {
 		b.pusherr(toks[*i], "missing_function_parentheses")
 		return
 	}
-	paramToks := b.getrange(i, tokens.LPARENTHESES, tokens.RPARENTHESES, &toks)
+	paramToks := b.getrange(i, lex.KND_LPAREN, lex.KND_RPARENT, &toks)
 	if len(paramToks) > 0 {
 		f.Params = b.Params(paramToks, method, false)
 	}
@@ -878,7 +877,7 @@ func (b *Builder) Func(toks []lex.Token, method, anon, prototype bool) (f models
 		toks = b.nextBuilderStatement()
 		i = 0
 	}
-	blockToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
+	blockToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &toks)
 	if blockToks != nil {
 		f.Block = b.Block(blockToks)
 		f.Block.IsUnsafe = f.IsUnsafe
@@ -898,7 +897,7 @@ func (b *Builder) generic(toks []lex.Token) models.GenericType {
 	}
 	var gt models.GenericType
 	gt.Token = toks[0]
-	if gt.Token.Id != tokens.Id {
+	if gt.Token.Id != lex.ID_IDENT {
 		b.pusherr(gt.Token, "invalid_syntax")
 	}
 	gt.Id = gt.Token.Kind
@@ -909,14 +908,14 @@ func (b *Builder) generic(toks []lex.Token) models.GenericType {
 func (b *Builder) Generics(toks []lex.Token) []models.GenericType {
 	tok := toks[0]
 	i := 1
-	genericsToks := Range(&i, tokens.LBRACKET, tokens.RBRACKET, toks)
+	genericsToks := Range(&i, lex.KND_LBRACKET, lex.KND_RBRACKET, toks)
 	if len(genericsToks) == 0 {
 		b.pusherr(tok, "missing_expr")
 		return make([]models.GenericType, 0)
 	} else if i < len(toks) {
 		b.pusherr(toks[i], "invalid_syntax")
 	}
-	parts, errs := Parts(genericsToks, tokens.Comma, true)
+	parts, errs := Parts(genericsToks, lex.ID_COMMA, true)
 	b.Errors = append(b.Errors, errs...)
 	generics := make([]models.GenericType, len(parts))
 	for i, part := range parts {
@@ -932,7 +931,7 @@ func (b *Builder) Generics(toks []lex.Token) []models.GenericType {
 func (b *Builder) TypeOrGenerics(toks []lex.Token) models.Object {
 	if len(toks) > 1 {
 		tok := toks[1]
-		if tok.Id == tokens.Brace && tok.Kind == tokens.LBRACKET {
+		if tok.Id == lex.ID_BRACE && tok.Kind == lex.KND_LBRACKET {
 			generics := b.Generics(toks)
 			return models.Object{
 				Token: tok,
@@ -967,7 +966,7 @@ func (b *Builder) build_self(toks []lex.Token) (model models.Param) {
 		return
 	}
 	i := 0
-	if toks[i].Id == tokens.Mut {
+	if toks[i].Id == lex.ID_MUT {
 		model.Mutable = true
 		i++
 		if i >= len(toks) {
@@ -975,7 +974,7 @@ func (b *Builder) build_self(toks []lex.Token) (model models.Param) {
 			return
 		}
 	}
-	if toks[i].Kind == tokens.AMPER {
+	if toks[i].Kind == lex.KND_AMPER {
 		model.Type.Kind = "&"
 		i++
 		if i >= len(toks) {
@@ -983,8 +982,8 @@ func (b *Builder) build_self(toks []lex.Token) (model models.Param) {
 			return
 		}
 	}
-	if toks[i].Id == tokens.Self {
-		model.Id = tokens.SELF
+	if toks[i].Id == lex.ID_SELF {
+		model.Id = lex.KND_SELF
 		model.Token = toks[i]
 		i++
 		if i < len(toks) {
@@ -996,7 +995,7 @@ func (b *Builder) build_self(toks []lex.Token) (model models.Param) {
 
 // Params builds AST model of function parameters.
 func (b *Builder) Params(toks []lex.Token, method, mustPure bool) []models.Param {
-	parts, errs := Parts(toks, tokens.Comma, true)
+	parts, errs := Parts(toks, lex.ID_COMMA, true)
 	b.Errors = append(b.Errors, errs...)
 	if len(parts) == 0 {
 		return nil
@@ -1004,7 +1003,7 @@ func (b *Builder) Params(toks []lex.Token, method, mustPure bool) []models.Param
 	var params []models.Param
 	if method && len(parts) > 0 {
 		param := b.build_self(parts[0])
-		if param.Id == tokens.SELF {
+		if param.Id == lex.KND_SELF {
 			params = append(params, param)
 			parts = parts[1:]
 		}
@@ -1019,17 +1018,17 @@ func (b *Builder) Params(toks []lex.Token, method, mustPure bool) []models.Param
 func (b *Builder) checkParams(params *[]models.Param) {
 	for i := range *params {
 		param := &(*params)[i]
-		if param.Id == tokens.SELF || param.Type.Token.Id != tokens.NA {
+		if param.Id == lex.KND_SELF || param.Type.Token.Id != lex.ID_NA {
 			continue
 		}
-		if param.Token.Id == tokens.NA {
+		if param.Token.Id == lex.ID_NA {
 			b.pusherr(param.Token, "missing_type")
 		} else {
 			param.Type.Token = param.Token
-			param.Type.Id = juletype.Id
+			param.Type.Id = juletype.ID
 			param.Type.Kind = param.Type.Token.Kind
 			param.Type.Original = param.Type
-			param.Id = jule.Anonymous
+			param.Id = jule.ANONYMOUS
 			param.Token = lex.Token{}
 		}
 	}
@@ -1039,9 +1038,9 @@ func (b *Builder) paramTypeBegin(param *models.Param, i *int, toks []lex.Token) 
 	for ; *i < len(toks); *i++ {
 		tok := toks[*i]
 		switch tok.Id {
-		case tokens.Operator:
+		case lex.ID_OP:
 			switch tok.Kind {
-			case tokens.TRIPLE_DOT:
+			case lex.KND_TRIPLE_DOT:
 				if param.Variadic {
 					b.pusherr(tok, "already_variadic")
 					continue
@@ -1058,7 +1057,7 @@ func (b *Builder) paramTypeBegin(param *models.Param, i *int, toks []lex.Token) 
 
 func (b *Builder) paramBodyId(param *models.Param, tok lex.Token) {
 	if juleapi.IsIgnoreId(tok.Kind) {
-		param.Id = jule.Anonymous
+		param.Id = jule.ANONYMOUS
 		return
 	}
 	param.Id = tok.Kind
@@ -1076,7 +1075,7 @@ func (b *Builder) paramBody(param *models.Param, i *int, toks []lex.Token, mustP
 		return
 	}
 	tok = toks[*i]
-	if tok.Id != tokens.Colon {
+	if tok.Id != lex.ID_COLON {
 		b.pusherr(tok, "invalid_syntax")
 		return
 	}
@@ -1102,7 +1101,7 @@ func (b *Builder) paramType(param *models.Param, toks []lex.Token, mustPure bool
 func (b *Builder) pushParam(params *[]models.Param, toks []lex.Token, mustPure bool) {
 	var param models.Param
 	param.Token = toks[0]
-	if param.Token.Id == tokens.Mut {
+	if param.Token.Id == lex.ID_MUT {
 		param.Mutable = true
 		if len(toks) == 1 {
 			b.pusherr(toks[0], "invalid_syntax")
@@ -1112,8 +1111,8 @@ func (b *Builder) pushParam(params *[]models.Param, toks []lex.Token, mustPure b
 		param.Token = toks[0]
 	}
 	// Just data type
-	if param.Token.Id != tokens.Id {
-		param.Id = jule.Anonymous
+	if param.Token.Id != lex.ID_IDENT {
+		param.Id = jule.ANONYMOUS
 		b.paramType(&param, toks, mustPure)
 	} else {
 		i := 0
@@ -1127,11 +1126,11 @@ func (b *Builder) idGenericsParts(toks []lex.Token, i *int) [][]lex.Token {
 	brace_n := 0
 	for ; *i < len(toks); *i++ {
 		tok := toks[*i]
-		if tok.Id == tokens.Brace {
+		if tok.Id == lex.ID_BRACE {
 			switch tok.Kind {
-			case tokens.LBRACKET:
+			case lex.KND_LBRACKET:
 				brace_n++
-			case tokens.RBRACKET:
+			case lex.KND_RBRACKET:
 				brace_n--
 			}
 		}
@@ -1140,7 +1139,7 @@ func (b *Builder) idGenericsParts(toks []lex.Token, i *int) [][]lex.Token {
 		}
 	}
 	toks = toks[first+1 : *i]
-	parts, errs := Parts(toks, tokens.Comma, true)
+	parts, errs := Parts(toks, lex.ID_COMMA, true)
 	b.Errors = append(b.Errors, errs...)
 	return parts
 }
@@ -1151,7 +1150,7 @@ func (b *Builder) idDataTypePartEnd(t *models.Type, dtv *strings.Builder, toks [
 	}
 	*i++
 	tok := toks[*i]
-	if tok.Id != tokens.Brace || tok.Kind != tokens.LBRACKET {
+	if tok.Id != lex.ID_BRACE || tok.Kind != lex.KND_LBRACKET {
 		*i--
 		return
 	}
@@ -1181,23 +1180,23 @@ func (b *Builder) datatype(t *models.Type, toks []lex.Token, i *int, arrays, err
 	for ; *i < len(toks); *i++ {
 		tok := toks[*i]
 		switch tok.Id {
-		case tokens.DataType:
+		case lex.ID_DT:
 			t.Token = tok
 			t.Id = juletype.TypeFromId(t.Token.Kind)
 			dtv.WriteString(t.Token.Kind)
 			ok = true
 			goto ret
-		case tokens.Id:
+		case lex.ID_IDENT:
 			dtv.WriteString(tok.Kind)
-			if *i+1 < len(toks) && toks[*i+1].Id == tokens.DoubleColon {
+			if *i+1 < len(toks) && toks[*i+1].Id == lex.ID_DBLCOLON {
 				break
 			}
-			t.Id = juletype.Id
+			t.Id = juletype.ID
 			t.Token = tok
 			b.idDataTypePartEnd(t, &dtv, toks, i)
 			ok = true
 			goto ret
-		case tokens.Cpp:
+		case lex.ID_CPP:
 			if *i+1 >= len(toks) {
 				if err {
 					b.pusherr(tok, "invalid_syntax")
@@ -1205,7 +1204,7 @@ func (b *Builder) datatype(t *models.Type, toks []lex.Token, i *int, arrays, err
 				return
 			}
 			*i++
-			if toks[*i].Id != tokens.Dot {
+			if toks[*i].Id != lex.ID_DOT {
 				if err {
 					b.pusherr(toks[*i], "invalid_syntax")
 				}
@@ -1217,32 +1216,32 @@ func (b *Builder) datatype(t *models.Type, toks []lex.Token, i *int, arrays, err
 				return
 			}
 			*i++
-			if toks[*i].Id != tokens.Id {
+			if toks[*i].Id != lex.ID_IDENT {
 				if err {
 					b.pusherr(toks[*i], "invalid_syntax")
 				}
 			}
 			t.CppLinked = true
-			t.Id = juletype.Id
+			t.Id = juletype.ID
 			t.Token = toks[*i]
 			dtv.WriteString(t.Token.Kind)
 			b.idDataTypePartEnd(t, &dtv, toks, i)
 			ok = true
 			goto ret
-		case tokens.DoubleColon:
+		case lex.ID_DBLCOLON:
 			dtv.WriteString(tok.Kind)
-		case tokens.Unsafe:
-			if *i+1 >= len(toks) || toks[*i+1].Id != tokens.Fn {
-				t.Id = juletype.Unsafe
+		case lex.ID_UNSAFE:
+			if *i+1 >= len(toks) || toks[*i+1].Id != lex.ID_FN {
+				t.Id = juletype.UNSAFE
 				t.Token = tok
 				dtv.WriteString(tok.Kind)
 				ok = true
 				goto ret
 			}
 			fallthrough
-		case tokens.Fn:
+		case lex.ID_FN:
 			t.Token = tok
-			t.Id = juletype.Fn
+			t.Id = juletype.FN
 			f, proto_ok := b.funcPrototype(toks, i, false, true)
 			if !proto_ok {
 				b.pusherr(tok, "invalid_type")
@@ -1253,9 +1252,9 @@ func (b *Builder) datatype(t *models.Type, toks []lex.Token, i *int, arrays, err
 			dtv.WriteString(f.DataTypeString())
 			ok = true
 			goto ret
-		case tokens.Operator:
+		case lex.ID_OP:
 			switch tok.Kind {
-			case tokens.STAR, tokens.AMPER, tokens.DOUBLE_AMPER:
+			case lex.KND_STAR, lex.KND_AMPER, lex.KND_DBL_AMPER:
 				dtv.WriteString(tok.Kind)
 			default:
 				if err {
@@ -1263,9 +1262,9 @@ func (b *Builder) datatype(t *models.Type, toks []lex.Token, i *int, arrays, err
 				}
 				return
 			}
-		case tokens.Brace:
+		case lex.ID_BRACE:
 			switch tok.Kind {
-			case tokens.LBRACKET:
+			case lex.KND_LBRACKET:
 				*i++
 				if *i >= len(toks) {
 					if err {
@@ -1274,11 +1273,11 @@ func (b *Builder) datatype(t *models.Type, toks []lex.Token, i *int, arrays, err
 					return
 				}
 				tok = toks[*i]
-				if tok.Id == tokens.Brace && tok.Kind == tokens.RBRACKET {
+				if tok.Id == lex.ID_BRACE && tok.Kind == lex.KND_RBRACKET {
 					arrays = false
-					dtv.WriteString(jule.Prefix_Slice)
+					dtv.WriteString(jule.PREFIX_SLICE)
 					t.ComponentType = new(models.Type)
-					t.Id = juletype.Slice
+					t.Id = juletype.SLICE
 					t.Token = tok
 					*i++
 					ok = b.datatype(t.ComponentType, toks, i, arrays, err)
@@ -1291,7 +1290,7 @@ func (b *Builder) datatype(t *models.Type, toks []lex.Token, i *int, arrays, err
 				} else {
 					ok = b.MapDataType(t, toks, i, err)
 				}
-				if t.Id == juletype.Void {
+				if t.Id == juletype.VOID {
 					if err {
 						b.pusherr(tok, "invalid_syntax")
 					}
@@ -1321,7 +1320,7 @@ ret:
 func (b *Builder) DataType(toks []lex.Token, i *int, arrays, err bool) (t models.Type, ok bool) {
 	tok := toks[*i]
 	ok = b.datatype(&t, toks, i, arrays, err)
-	if err && t.Token.Id == tokens.NA {
+	if err && t.Token.Id == lex.ID_NA {
 		b.pusherr(tok, "invalid_type")
 	}
 	return
@@ -1332,7 +1331,7 @@ func (b *Builder) arrayDataType(t *models.Type, toks []lex.Token, i *int, err bo
 	if *i+1 >= len(toks) {
 		return
 	}
-	t.Id = juletype.Array
+	t.Id = juletype.ARRAY
 	*i++
 	exprI := *i
 	t.ComponentType = new(models.Type)
@@ -1347,13 +1346,13 @@ func (b *Builder) arrayDataType(t *models.Type, toks []lex.Token, i *int, err bo
 	_, exprToks := RangeLast(toks[:exprI])
 	exprToks = exprToks[1 : len(exprToks)-1]
 	tok := exprToks[0]
-	if len(exprToks) == 1 && tok.Id == tokens.Operator && tok.Kind == tokens.TRIPLE_DOT {
+	if len(exprToks) == 1 && tok.Id == lex.ID_OP && tok.Kind == lex.KND_TRIPLE_DOT {
 		t.Size.AutoSized = true
 		t.Size.Expr.Tokens = exprToks
 	} else {
 		t.Size.Expr = b.Expr(exprToks)
 	}
-	t.Kind = jule.Prefix_Array + t.ComponentType.Kind
+	t.Kind = jule.PREFIX_ARRAY + t.ComponentType.Kind
 	return
 }
 
@@ -1377,7 +1376,7 @@ func (b *Builder) MapDataType(t *models.Type, toks []lex.Token, i *int, err bool
 func (b *Builder) mapDataType(t *models.Type, toks, typeToks []lex.Token,
 	colon int, err bool) (ok bool) {
 	defer func() { t.Original = *t }()
-	t.Id = juletype.Map
+	t.Id = juletype.MAP
 	t.Token = toks[0]
 	colonTok := toks[colon]
 	if colon == 0 || colon+1 >= len(typeToks) {
@@ -1410,15 +1409,15 @@ func (b *Builder) funcMultiTypeRet(toks []lex.Token, i *int) (t models.RetType, 
 	}
 	tok = toks[*i]
 	*i-- // For point to parenthses - ( -
-	rang := Range(i, tokens.LPARENTHESES, tokens.RPARENTHESES, toks)
+	rang := Range(i, lex.KND_LPAREN, lex.KND_RPARENT, toks)
 	params := b.Params(rang, false, true)
 	types := make([]models.Type, len(params))
 	for i, param := range params {
 		types[i] = param.Type
-		if param.Id != jule.Anonymous {
+		if param.Id != jule.ANONYMOUS {
 			param.Token.Kind = param.Id
 		} else {
-			param.Token.Kind = juleapi.Ignore
+			param.Token.Kind = juleapi.IGNORE
 		}
 		t.Identifiers = append(t.Identifiers, param.Token)
 	}
@@ -1436,22 +1435,22 @@ func (b *Builder) funcMultiTypeRet(toks []lex.Token, i *int) (t models.RetType, 
 
 // FuncRetDataType builds ret data-type of function.
 func (b *Builder) FuncRetDataType(toks []lex.Token, i *int) (t models.RetType, ok bool) {
-	t.Type.Id = juletype.Void
-	t.Type.Kind = juletype.TypeMap[t.Type.Id]
+	t.Type.Id = juletype.VOID
+	t.Type.Kind = juletype.TYPE_MAP[t.Type.Id]
 	if *i >= len(toks) {
 		return
 	}
 	tok := toks[*i]
 	switch tok.Id {
-	case tokens.Brace:
+	case lex.ID_BRACE:
 		switch tok.Kind {
-		case tokens.LPARENTHESES:
+		case lex.KND_LPAREN:
 			return b.funcMultiTypeRet(toks, i)
-		case tokens.LBRACE:
+		case lex.KND_LBRACE:
 			return
 		}
-	case tokens.Operator:
-		if tok.Kind == tokens.EQUAL {
+	case lex.ID_OP:
+		if tok.Kind == lex.KND_EQ {
 			return
 		}
 	}
@@ -1464,7 +1463,7 @@ func (b *Builder) pushStatementToBlock(bs *blockStatement) {
 		return
 	}
 	lastTok := bs.toks[len(bs.toks)-1]
-	if lastTok.Id == tokens.SemiColon {
+	if lastTok.Id == lex.ID_SEMICOLON {
 		if len(bs.toks) == 1 {
 			return
 		}
@@ -1518,7 +1517,7 @@ func (b *Builder) Block(toks []lex.Token) (block *models.Block) {
 // Statement builds AST model of statement.
 func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
 	tok := bs.toks[0]
-	if tok.Id == tokens.Id {
+	if tok.Id == lex.ID_IDENT {
 		s, ok := b.IdStatement(bs)
 		if ok {
 			return s
@@ -1529,44 +1528,44 @@ func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
 		return s
 	}
 	switch tok.Id {
-	case tokens.Const, tokens.Let, tokens.Mut:
+	case lex.ID_CONST, lex.ID_LET, lex.ID_MUT:
 		return b.VarStatement(bs, true)
-	case tokens.Ret:
+	case lex.ID_RET:
 		return b.RetStatement(bs.toks)
-	case tokens.For:
+	case lex.ID_ITER:
 		return b.IterExpr(bs)
-	case tokens.Break:
+	case lex.ID_BREAK:
 		return b.BreakStatement(bs.toks)
-	case tokens.Continue:
+	case lex.ID_CONTINUE:
 		return b.ContinueStatement(bs.toks)
-	case tokens.If:
+	case lex.ID_IF:
 		return b.IfExpr(bs)
-	case tokens.Else:
+	case lex.ID_ELSE:
 		return b.ElseBlock(bs)
-	case tokens.Comment:
+	case lex.ID_COMMENT:
 		return b.CommentStatement(bs.toks[0])
-	case tokens.Defer:
+	case lex.ID_DEFER:
 		return b.DeferStatement(bs.toks)
-	case tokens.Co:
+	case lex.ID_CO:
 		return b.ConcurrentCallStatement(bs.toks)
-	case tokens.Goto:
+	case lex.ID_GOTO:
 		return b.GotoStatement(bs.toks)
-	case tokens.Fallthrough:
+	case lex.ID_FALLTHROUGH:
 		return b.Fallthrough(bs.toks)
-	case tokens.Type:
+	case lex.ID_TYPE:
 		t := b.TypeAlias(bs.toks)
 		s.Token = t.Token
 		s.Data = t
 		return
-	case tokens.Match:
+	case lex.ID_MATCH:
 		return b.MatchCase(bs.toks)
-	case tokens.Unsafe:
-		if len(bs.toks) == 1 || bs.toks[1].Kind != tokens.LBRACE {
+	case lex.ID_UNSAFE:
+		if len(bs.toks) == 1 || bs.toks[1].Kind != lex.KND_LBRACE {
 			break
 		}
 		return b.blockStatement(bs.toks[1:], true)
-	case tokens.Brace:
-		if tok.Kind == tokens.LBRACE {
+	case lex.ID_BRACE:
+		if tok.Kind == lex.KND_LBRACE {
 			return b.blockStatement(bs.toks, false)
 		}
 	}
@@ -1580,7 +1579,7 @@ func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
 func (b *Builder) blockStatement(toks []lex.Token, is_unsafe bool) models.Statement {
 	i := 0
 	tok := toks[0]
-	toks = Range(&i, tokens.LBRACE, tokens.RBRACE, toks)
+	toks = Range(&i, lex.KND_LBRACE, lex.KND_RBRACE, toks)
 	if i < len(toks) {
 		b.pusherr(toks[i], "invalid_syntax")
 	}
@@ -1593,9 +1592,9 @@ func (b *Builder) assignInfo(toks []lex.Token) (info AssignInfo) {
 	info.Ok = true
 	brace_n := 0
 	for i, tok := range toks {
-		if tok.Id == tokens.Brace {
+		if tok.Id == lex.ID_BRACE {
 			switch tok.Kind {
-			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
+			case lex.KND_LBRACE, lex.KND_LBRACKET, lex.KND_LPAREN:
 				brace_n++
 			default:
 				brace_n--
@@ -1603,7 +1602,7 @@ func (b *Builder) assignInfo(toks []lex.Token) (info AssignInfo) {
 		}
 		if brace_n > 0 {
 			continue
-		} else if tok.Id != tokens.Operator {
+		} else if tok.Id != lex.ID_OP {
 			continue
 		} else if !IsAssignOperator(tok.Kind) {
 			continue
@@ -1633,7 +1632,7 @@ func (b *Builder) assignInfo(toks []lex.Token) (info AssignInfo) {
 
 func (b *Builder) buildAssignLeft(toks []lex.Token) (left models.AssignLeft) {
 	left.Expr.Tokens = toks
-	if left.Expr.Tokens[0].Id == tokens.Id {
+	if left.Expr.Tokens[0].Id == lex.ID_IDENT {
 		left.Var.Token = left.Expr.Tokens[0]
 		left.Var.Id = left.Var.Token.Kind
 	}
@@ -1651,7 +1650,7 @@ func (b *Builder) assignLefts(parts [][]lex.Token) []models.AssignLeft {
 }
 
 func (b *Builder) assignExprs(toks []lex.Token) []models.Expr {
-	parts, errs := Parts(toks, tokens.Comma, true)
+	parts, errs := Parts(toks, lex.ID_COMMA, true)
 	if len(errs) > 0 {
 		b.Errors = append(b.Errors, errs...)
 		return nil
@@ -1680,7 +1679,7 @@ func (b *Builder) AssignExpr(toks []lex.Token) (assign models.Assign, ok bool) {
 		return
 	}
 	switch toks[0].Id {
-	case tokens.Let:
+	case lex.ID_LET:
 		return b.letDeclAssign(toks)
 	default:
 		return b.plainAssign(toks)
@@ -1694,12 +1693,12 @@ func (b *Builder) letDeclAssign(toks []lex.Token) (assign models.Assign, ok bool
 	// Skip "let" keyword
 	toks = toks[1:]
 	tok := toks[0]
-	if tok.Id != tokens.Brace || tok.Kind != tokens.LPARENTHESES {
+	if tok.Id != lex.ID_BRACE || tok.Kind != lex.KND_LPAREN {
 		return
 	}
 	ok = true
 	var i int
-	rang := Range(&i, tokens.LPARENTHESES, tokens.RPARENTHESES, toks)
+	rang := Range(&i, lex.KND_LPAREN, lex.KND_RPARENT, toks)
 	if rang == nil {
 		b.pusherr(tok, "invalid_syntax")
 		return
@@ -1708,7 +1707,7 @@ func (b *Builder) letDeclAssign(toks []lex.Token) (assign models.Assign, ok bool
 		i++
 		assign.Right = b.assignExprs(toks[i:])
 	}
-	parts, errs := Parts(rang, tokens.Comma, true)
+	parts, errs := Parts(rang, lex.ID_COMMA, true)
 	if len(errs) > 0 {
 		b.Errors = append(b.Errors, errs...)
 		return
@@ -1719,7 +1718,7 @@ func (b *Builder) letDeclAssign(toks []lex.Token) (assign models.Assign, ok bool
 		}
 		mutable := false
 		tok := part[0]
-		if tok.Id == tokens.Mut {
+		if tok.Id == lex.ID_MUT {
 			mutable = true
 			part = part[1:]
 			if len(part) == 0 {
@@ -1743,7 +1742,7 @@ func (b *Builder) plainAssign(toks []lex.Token) (assign models.Assign, ok bool) 
 	}
 	ok = true
 	assign.Setter = info.Setter
-	parts, errs := Parts(info.Left, tokens.Comma, true)
+	parts, errs := Parts(info.Left, lex.ID_COMMA, true)
 	if len(errs) > 0 {
 		b.Errors = append(b.Errors, errs...)
 		return
@@ -1762,7 +1761,7 @@ func (b *Builder) IdStatement(bs *blockStatement) (s models.Statement, ok bool) 
 	}
 	tok := bs.toks[1]
 	switch tok.Id {
-	case tokens.Colon:
+	case lex.ID_COLON:
 		return b.LabelStatement(bs), true
 	}
 	return
@@ -1796,15 +1795,15 @@ func (b *Builder) Args(toks []lex.Token, targeting bool) *models.Args {
 	last := 0
 	brace_n := 0
 	for i, tok := range toks {
-		if tok.Id == tokens.Brace {
+		if tok.Id == lex.ID_BRACE {
 			switch tok.Kind {
-			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
+			case lex.KND_LBRACE, lex.KND_LBRACKET, lex.KND_LPAREN:
 				brace_n++
 			default:
 				brace_n--
 			}
 		}
-		if brace_n > 0 || tok.Id != tokens.Comma {
+		if brace_n > 0 || tok.Id != lex.ID_COMMA {
 			continue
 		}
 		b.pushArg(args, targeting, toks[last:i], tok)
@@ -1829,10 +1828,10 @@ func (b *Builder) pushArg(args *models.Args, targeting bool, toks []lex.Token, e
 	}
 	var arg models.Arg
 	arg.Token = toks[0]
-	if targeting && arg.Token.Id == tokens.Id {
+	if targeting && arg.Token.Id == lex.ID_IDENT {
 		if len(toks) > 1 {
 			tok := toks[1]
-			if tok.Id == tokens.Colon {
+			if tok.Id == lex.ID_COLON {
 				args.Targeted = true
 				arg.TargetId = arg.Token.Kind
 				toks = toks[2:]
@@ -1846,15 +1845,15 @@ func (b *Builder) pushArg(args *models.Args, targeting bool, toks []lex.Token, e
 func (b *Builder) varBegin(v *models.Var, i *int, toks []lex.Token) {
 	tok := toks[*i]
 	switch tok.Id {
-	case tokens.Let:
+	case lex.ID_LET:
 		// Initialize 1 for skip the let keyword
 		*i++
-		if toks[*i].Id == tokens.Mut {
+		if toks[*i].Id == lex.ID_MUT {
 			v.Mutable = true
 			// Skip the mut keyword
 			*i++
 		}
-	case tokens.Const:
+	case lex.ID_CONST:
 		*i++
 		if v.Const {
 			b.pusherr(tok, "already_const")
@@ -1876,10 +1875,10 @@ func (b *Builder) varBegin(v *models.Var, i *int, toks []lex.Token) {
 
 func (b *Builder) varTypeNExpr(v *models.Var, toks []lex.Token, i int, expr bool) {
 	tok := toks[i]
-	if tok.Id == tokens.Colon {
+	if tok.Id == lex.ID_COLON {
 		i++ // Skip type annotation operator (:)
 		if i >= len(toks) ||
-			(toks[i].Id == tokens.Operator && toks[i].Kind == tokens.EQUAL) {
+			(toks[i].Id == lex.ID_OP && toks[i].Kind == lex.KND_EQ) {
 			b.pusherr(tok, "missing_type")
 			return
 		}
@@ -1893,8 +1892,8 @@ func (b *Builder) varTypeNExpr(v *models.Var, toks []lex.Token, i int, expr bool
 			tok = toks[i]
 		}
 	}
-	if expr && tok.Id == tokens.Operator {
-		if tok.Kind != tokens.EQUAL {
+	if expr && tok.Id == lex.ID_OP {
+		if tok.Kind != lex.KND_EQ {
 			b.pusherr(tok, "invalid_syntax")
 			return
 		}
@@ -1923,13 +1922,13 @@ func (b *Builder) Var(toks []lex.Token, begin, expr bool) (v models.Var) {
 		}
 	}
 	v.Token = toks[i]
-	if v.Token.Id != tokens.Id {
+	if v.Token.Id != lex.ID_IDENT {
 		b.pusherr(v.Token, "invalid_syntax")
 		return
 	}
 	v.Id = v.Token.Kind
-	v.Type.Id = juletype.Void
-	v.Type.Kind = juletype.TypeMap[v.Type.Id]
+	v.Type.Id = juletype.VOID
+	v.Type.Kind = juletype.TYPE_MAP[v.Type.Id]
 	if i >= len(toks) {
 		return
 	}
@@ -2012,7 +2011,7 @@ func (b *Builder) GotoStatement(toks []lex.Token) (s models.Statement) {
 		b.pusherr(toks[2], "invalid_syntax")
 	}
 	idTok := toks[1]
-	if idTok.Id != tokens.Id {
+	if idTok.Id != lex.ID_IDENT {
 		b.pusherr(idTok, "invalid_syntax")
 		return
 	}
@@ -2043,7 +2042,7 @@ func (b *Builder) getWhileIterProfile(toks []lex.Token) models.IterWhile {
 }
 
 func (b *Builder) getForeachVarsToks(toks []lex.Token) [][]lex.Token {
-	vars, errs := Parts(toks, tokens.Comma, true)
+	vars, errs := Parts(toks, lex.ID_COMMA, true)
 	b.Errors = append(b.Errors, errs...)
 	return vars
 }
@@ -2053,7 +2052,7 @@ func (b *Builder) getVarProfile(toks []lex.Token) (v models.Var) {
 		return
 	}
 	v.Token = toks[0]
-	if v.Token.Id == tokens.Mut {
+	if v.Token.Id == lex.ID_MUT {
 		v.Mutable = true
 		if len(toks) == 1 {
 			b.pusherr(v.Token, "invalid_syntax")
@@ -2062,7 +2061,7 @@ func (b *Builder) getVarProfile(toks []lex.Token) (v models.Var) {
 	} else if len(toks) > 1 {
 		b.pusherr(toks[1], "invalid_syntax")
 	}
-	if v.Token.Id != tokens.Id {
+	if v.Token.Id != lex.ID_IDENT {
 		b.pusherr(v.Token, "invalid_syntax")
 		return
 	}
@@ -2081,7 +2080,7 @@ func (b *Builder) getForeachIterVars(varsToks [][]lex.Token) []models.Var {
 
 func (b *Builder) setup_foreach_explicit_vars(f *models.IterForeach, toks []lex.Token) {
 	i := 0
-	rang := Range(&i, tokens.LPARENTHESES, tokens.RPARENTHESES, toks)
+	rang := Range(&i, lex.KND_LPAREN, lex.KND_RPARENT, toks)
 	if i < len(toks) {
 		b.pusherr(f.InToken, "invalid_syntax")
 	}
@@ -2101,13 +2100,13 @@ func (b *Builder) setup_foreach_plain_vars(f *models.IterForeach, toks []lex.Tok
 	if len(vars) > 1 {
 		f.KeyB = vars[1]
 	} else {
-		f.KeyB.Id = juleapi.Ignore
+		f.KeyB.Id = juleapi.IGNORE
 	}
 }
 
 func (b *Builder) setup_foreach_vars(f *models.IterForeach, toks []lex.Token) {
-	if toks[0].Id == tokens.Brace {
-		if toks[0].Kind != tokens.LPARENTHESES {
+	if toks[0].Id == lex.ID_BRACE {
+		if toks[0].Kind != lex.KND_LPAREN {
 			b.pusherr(toks[0], "invalid_syntax")
 			return
 		}
@@ -2126,8 +2125,8 @@ func (b *Builder) getForeachIterProfile(varToks, exprToks []lex.Token, inTok lex
 	}
 	foreach.Expr = b.Expr(exprToks)
 	if len(varToks) == 0 {
-		foreach.KeyA.Id = juleapi.Ignore
-		foreach.KeyB.Id = juleapi.Ignore
+		foreach.KeyA.Id = juleapi.IGNORE
+		foreach.KeyB.Id = juleapi.IGNORE
 	} else {
 		b.setup_foreach_vars(&foreach, varToks)
 	}
@@ -2137,9 +2136,9 @@ func (b *Builder) getForeachIterProfile(varToks, exprToks []lex.Token, inTok lex
 func (b *Builder) getIterProfile(toks []lex.Token, errtok lex.Token) models.IterProfile {
 	brace_n := 0
 	for i, tok := range toks {
-		if tok.Id == tokens.Brace {
+		if tok.Id == lex.ID_BRACE {
 			switch tok.Kind {
-			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
+			case lex.KND_LBRACE, lex.KND_LBRACKET, lex.KND_LPAREN:
 				brace_n++
 				continue
 			default:
@@ -2150,7 +2149,7 @@ func (b *Builder) getIterProfile(toks []lex.Token, errtok lex.Token) models.Iter
 			continue
 		}
 		switch tok.Id {
-		case tokens.In:
+		case lex.ID_IN:
 			varToks := toks[:i]
 			exprToks := toks[i+1:]
 			return b.getForeachIterProfile(varToks, exprToks, tok)
@@ -2195,7 +2194,7 @@ func (b *Builder) forIterProfile(bs *blockStatement) (s models.Statement) {
 		profile.Next = b.forStatement(exprToks)
 	}
 	i := len(exprToks)
-	blockToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &bs.toks)
+	blockToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &bs.toks)
 	if blockToks == nil {
 		b.pusherr(iter.Token, "body_not_exist")
 		return
@@ -2221,7 +2220,7 @@ func (b *Builder) commonIterProfile(toks []lex.Token) (s models.Statement) {
 		iter.Profile = b.getIterProfile(exprToks, iter.Token)
 	}
 	i := len(exprToks)
-	blockToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
+	blockToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &toks)
 	if blockToks == nil {
 		b.pusherr(iter.Token, "body_not_exist")
 		return
@@ -2260,9 +2259,9 @@ func (b *Builder) caseexprs(toks *[]lex.Token, caseIsDefault bool) []models.Expr
 	var i int
 	var tok lex.Token
 	for i, tok = range *toks {
-		if tok.Id == tokens.Brace {
+		if tok.Id == lex.ID_BRACE {
 			switch tok.Kind {
-			case tokens.LPARENTHESES, tokens.LBRACE, tokens.LBRACKET:
+			case lex.KND_LPAREN, lex.KND_LBRACE, lex.KND_LBRACKET:
 				brace_n++
 			default:
 				brace_n--
@@ -2272,10 +2271,10 @@ func (b *Builder) caseexprs(toks *[]lex.Token, caseIsDefault bool) []models.Expr
 			continue
 		}
 		switch tok.Id {
-		case tokens.Comma:
+		case lex.ID_COMMA:
 			pushExpr((*toks)[j:i], tok)
 			j = i + 1
-		case tokens.Colon:
+		case lex.ID_COLON:
 			pushExpr((*toks)[j:i], tok)
 			*toks = (*toks)[i+1:]
 			return exprs
@@ -2289,9 +2288,9 @@ func (b *Builder) caseexprs(toks *[]lex.Token, caseIsDefault bool) []models.Expr
 func (b *Builder) caseblock(toks *[]lex.Token) *models.Block {
 	brace_n := 0
 	for i, tok := range *toks {
-		if tok.Id == tokens.Brace {
+		if tok.Id == lex.ID_BRACE {
 			switch tok.Kind {
-			case tokens.LPARENTHESES, tokens.LBRACE, tokens.LBRACKET:
+			case lex.KND_LPAREN, lex.KND_LBRACE, lex.KND_LBRACKET:
 				brace_n++
 			default:
 				brace_n--
@@ -2301,7 +2300,7 @@ func (b *Builder) caseblock(toks *[]lex.Token) *models.Block {
 			continue
 		}
 		switch tok.Id {
-		case tokens.Case, tokens.Default:
+		case lex.ID_CASE, lex.ID_DEFAULT:
 			blockToks := (*toks)[:i]
 			*toks = (*toks)[i:]
 			return b.Block(blockToks)
@@ -2316,7 +2315,7 @@ func (b *Builder) getcase(toks *[]lex.Token) models.Case {
 	var c models.Case
 	c.Token = (*toks)[0]
 	*toks = (*toks)[1:]
-	c.Exprs = b.caseexprs(toks, c.Token.Id == tokens.Default)
+	c.Exprs = b.caseexprs(toks, c.Token.Id == lex.ID_DEFAULT)
 	c.Block = b.caseblock(toks)
 	return c
 }
@@ -2327,9 +2326,9 @@ func (b *Builder) cases(toks []lex.Token) ([]models.Case, *models.Case) {
 	for len(toks) > 0 {
 		tok := toks[0]
 		switch tok.Id {
-		case tokens.Case:
+		case lex.ID_CASE:
 			cases = append(cases, b.getcase(&toks))
-		case tokens.Default:
+		case lex.ID_DEFAULT:
 			c := b.getcase(&toks)
 			c.Token = tok
 			if def == nil {
@@ -2356,7 +2355,7 @@ func (b *Builder) MatchCase(toks []lex.Token) (s models.Statement) {
 		match.Expr = b.Expr(exprToks)
 	}
 	i := len(exprToks)
-	blockToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &toks)
+	blockToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &toks)
 	if blockToks == nil {
 		b.pusherr(match.Token, "body_not_exist")
 		return
@@ -2396,13 +2395,13 @@ func (b *Builder) IfExpr(bs *blockStatement) (s models.Statement) {
 	} else {
 		i = len(exprToks)
 	}
-	blockToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &bs.toks)
+	blockToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &bs.toks)
 	if blockToks == nil {
 		b.pusherr(ifast.Token, "body_not_exist")
 		return
 	}
 	if i < len(bs.toks) {
-		if bs.toks[i].Id == tokens.Else {
+		if bs.toks[i].Id == lex.ID_ELSE {
 			bs.nextToks = bs.toks[i:]
 		} else {
 			b.pusherr(bs.toks[i], "invalid_syntax")
@@ -2430,13 +2429,13 @@ func (b *Builder) ElseIfExpr(bs *blockStatement) (s models.Statement) {
 	} else {
 		i = len(exprToks)
 	}
-	blockToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &bs.toks)
+	blockToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &bs.toks)
 	if blockToks == nil {
 		b.pusherr(elif.Token, "body_not_exist")
 		return
 	}
 	if i < len(bs.toks) {
-		if bs.toks[i].Id == tokens.Else {
+		if bs.toks[i].Id == lex.ID_ELSE {
 			bs.nextToks = bs.toks[i:]
 		} else {
 			b.pusherr(bs.toks[i], "invalid_syntax")
@@ -2449,14 +2448,14 @@ func (b *Builder) ElseIfExpr(bs *blockStatement) (s models.Statement) {
 
 // ElseBlock builds AST model of else block.
 func (b *Builder) ElseBlock(bs *blockStatement) (s models.Statement) {
-	if len(bs.toks) > 1 && bs.toks[1].Id == tokens.If {
+	if len(bs.toks) > 1 && bs.toks[1].Id == lex.ID_IF {
 		return b.ElseIfExpr(bs)
 	}
 	var elseast models.Else
 	elseast.Token = bs.toks[0]
 	bs.toks = bs.toks[1:]
 	i := 0
-	blockToks := b.getrange(&i, tokens.LBRACE, tokens.RBRACE, &bs.toks)
+	blockToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &bs.toks)
 	if blockToks == nil {
 		if i < len(bs.toks) {
 			b.pusherr(elseast.Token, "else_have_expr")
@@ -2477,7 +2476,7 @@ func (b *Builder) BreakStatement(toks []lex.Token) models.Statement {
 	var breakAST models.Break
 	breakAST.Token = toks[0]
 	if len(toks) > 1 {
-		if toks[1].Id != tokens.Id {
+		if toks[1].Id != lex.ID_IDENT {
 			b.pusherr(toks[1], "invalid_syntax")
 		} else {
 			breakAST.LabelToken = toks[1]
@@ -2497,7 +2496,7 @@ func (b *Builder) ContinueStatement(toks []lex.Token) models.Statement {
 	var continueAST models.Continue
 	continueAST.Token = toks[0]
 	if len(toks) > 1 {
-		if toks[1].Id != tokens.Id {
+		if toks[1].Id != lex.ID_IDENT {
 			b.pusherr(toks[1], "invalid_syntax")
 		} else {
 			continueAST.LoopLabel = toks[1]
@@ -2536,7 +2535,7 @@ func (b *Builder) build_binop(toks []lex.Token) models.Binop {
 func eliminate_comments(toks []lex.Token) []lex.Token {
 	cutted := []lex.Token{}
 	for _, token := range toks {
-		if token.Id != tokens.Comment {
+		if token.Id != lex.ID_COMMENT {
 			cutted = append(cutted, token)
 		}
 	}
@@ -2560,9 +2559,9 @@ func (b *Builder) find_lowest_precedenced_operator(toks []lex.Token) int {
 	brace_n := 0
 	for i, token := range toks {
 		switch {
-		case token.Id == tokens.Brace:
+		case token.Id == lex.ID_BRACE:
 			switch token.Kind {
-			case tokens.LBRACE, tokens.LPARENTHESES, tokens.LBRACKET:
+			case lex.KND_LBRACE, lex.KND_LPAREN, lex.KND_LBRACKET:
 				brace_n++
 			default:
 				brace_n--
@@ -2570,27 +2569,27 @@ func (b *Builder) find_lowest_precedenced_operator(toks []lex.Token) int {
 			continue
 		case i == 0:
 			continue
-		case token.Id != tokens.Operator:
+		case token.Id != lex.ID_OP:
 			continue
 		case brace_n > 0:
 			continue
 		}
 		// Skip unary operator.
-		if toks[i-1].Id == tokens.Operator {
+		if toks[i-1].Id == lex.ID_OP {
 			continue
 		}
 		switch token.Kind {
-		case tokens.STAR, tokens.PERCENT, tokens.SOLIDUS,
-			tokens.RSHIFT, tokens.LSHIFT, tokens.AMPER:
+		case lex.KND_STAR, lex.KND_PERCENT, lex.KND_SOLIDUS,
+			lex.KND_RSHIFT, lex.KND_LSHIFT, lex.KND_AMPER:
 			prec.set(5, i)
-		case tokens.PLUS, tokens.MINUS, tokens.VLINE, tokens.CARET:
+		case lex.KND_PLUS, lex.KND_MINUS, lex.KND_VLINE, lex.KND_CARET:
 			prec.set(4, i)
-		case tokens.EQUALS, tokens.NOT_EQUALS, tokens.LESS,
-			tokens.LESS_EQUAL, tokens.GREAT, tokens.GREAT_EQUAL:
+		case lex.KND_EQS, lex.KND_NOT_EQ, lex.KND_LT,
+			lex.KND_LESS_EQ, lex.KND_GT, lex.KND_GREAT_EQ:
 			prec.set(3, i)
-		case tokens.DOUBLE_AMPER:
+		case lex.KND_DBL_AMPER:
 			prec.set(2, i)
-		case tokens.DOUBLE_VLINE:
+		case lex.KND_DBL_VLINE:
 			prec.set(1, i)
 		}
 	}
@@ -2619,7 +2618,7 @@ func (b *Builder) skipStatement(i *int, toks *[]lex.Token) []lex.Token {
 	start := *i
 	*i, _ = NextStatementPos(*toks, start)
 	stoks := (*toks)[start:*i]
-	if stoks[len(stoks)-1].Id == tokens.SemiColon {
+	if stoks[len(stoks)-1].Id == lex.ID_SEMICOLON {
 		if len(stoks) == 1 {
 			return b.skipStatement(i, toks)
 		}

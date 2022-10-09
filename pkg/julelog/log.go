@@ -6,12 +6,10 @@ import (
 )
 
 // Log types.
-const (
-	FlatError   uint8 = 0
-	FlatWarning uint8 = 1
-	Error       uint8 = 2
-	Warning     uint8 = 3
-)
+const FLAT_ERR  uint8 = 0
+const FLAT_WARN uint8 = 1
+const ERR       uint8 = 2
+const WARN      uint8 = 3
 
 const warningMark = "<!>"
 
@@ -24,9 +22,7 @@ type CompilerLog struct {
 	Message string
 }
 
-func (clog *CompilerLog) flatError() string {
-	return clog.Message
-}
+func (clog *CompilerLog) flatError() string { return clog.Message }
 
 func (clog *CompilerLog) error() string {
 	var log strings.Builder
@@ -60,13 +56,13 @@ func (clog *CompilerLog) warning() string {
 
 func (clog CompilerLog) String() string {
 	switch clog.Type {
-	case FlatError:
+	case FLAT_ERR:
 		return clog.flatError()
-	case Error:
+	case ERR:
 		return clog.error()
-	case FlatWarning:
+	case FLAT_WARN:
 		return clog.flatWarning()
-	case Warning:
+	case WARN:
 		return clog.warning()
 	}
 	return ""

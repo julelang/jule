@@ -164,7 +164,7 @@ type callExpr struct {
 
 func (ce callExpr) String() string {
 	var cpp strings.Builder
-	if !models.Has_attribute(jule.Attribute_CDef, ce.f.Attributes) {
+	if !models.Has_attribute(jule.ATTR_CDEF, ce.f.Attributes) {
 		cpp.WriteString(ce.generics.String())
 	}
 	cpp.WriteByte('(')
@@ -210,7 +210,7 @@ func (re *retExpr) setup_one_expr_to_multi_vars() string {
 			re.ready_ignored_var_to_decl(v)
 			cpp.WriteString(v.String())
 			// To default
-			v.Id = juleapi.Ignore
+			v.Id = juleapi.IGNORE
 		}
 	}
 	cpp.WriteString("std::tie(")
@@ -220,7 +220,7 @@ func (re *retExpr) setup_one_expr_to_multi_vars() string {
 			re.ready_ignored_var_to_decl(v)
 			cpp.WriteString(v.OutId())
 			// To default
-			v.Id = juleapi.Ignore
+			v.Id = juleapi.IGNORE
 		} else {
 			cpp.WriteString(v.OutId())
 		}
@@ -267,7 +267,7 @@ func (re *retExpr) multi_with_one_expr_str() string {
 			re.ready_ignored_var_to_decl(v)
 			cpp.WriteString(v.OutId())
 			// To default
-			v.Id = juleapi.Ignore
+			v.Id = juleapi.IGNORE
 		} else {
 			cpp.WriteString(v.OutId())
 		}

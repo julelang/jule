@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/ast/models"
-	"github.com/jule-lang/jule/lex/tokens"
 	"github.com/jule-lang/jule/pkg/juleapi"
 	"github.com/jule-lang/jule/pkg/juletype"
 )
@@ -203,8 +203,8 @@ func (s *structure) plainPrototype() string {
 
 func (s *structure) self_ref_var_type() Type {
 	var t Type
-	t.Id = juletype.Struct
-	t.Kind = tokens.AMPER + s.Ast.Id
+	t.Id = juletype.STRUCT
+	t.Kind = lex.KND_AMPER + s.Ast.Id
 	t.Tag = s
 	t.Token = s.Ast.Token
 	return t
@@ -344,9 +344,9 @@ func (s *structure) selfVar(receiver *Var) *Var {
 	v.Token = s.Ast.Token
 	v.Type = receiver.Type
 	v.Type.Tag = s
-	v.Type.Id = juletype.Struct
+	v.Type.Id = juletype.STRUCT
 	v.Mutable = receiver.Mutable
-	v.Id = tokens.SELF
+	v.Id = lex.KND_SELF
 	return v
 }
 

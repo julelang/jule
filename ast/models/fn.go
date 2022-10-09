@@ -55,7 +55,7 @@ func (f *Fn) plainTypeString() string {
 			s.WriteByte(',')
 		}
 		return s.String()[:s.Len()-1] + ")"
-	} else if f.RetType.Type.Id != juletype.Void {
+	} else if f.RetType.Type.Id != juletype.VOID {
 		s.WriteString(f.RetType.Type.Kind)
 	}
 	return s.String()

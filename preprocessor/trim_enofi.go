@@ -15,7 +15,7 @@ func TrimEnofi(tree *Tree) {
 			}
 			directive := getDirective(t.Content)
 			switch directive {
-			case jule.PreprocessorDirectiveEnofi:
+			case jule.PREPROCESSOR_DIRECTIVE_ENOFI:
 				*tree = (*tree)[:i]
 				return
 			}

@@ -6,8 +6,8 @@ import (
 	"strings"
 )
 
-// MaxInt is the maximum bitsize of integer types.
-const MaxInt = 64
+// MAX_INT is the maximum bitsize of integer types.
+const MAX_INT = 64
 
 type bitChecker = func(val string, base, bit int) error
 
@@ -57,7 +57,7 @@ func BitsizeInt(x int64) uint64 {
 	case x >= math.MinInt32 && x <= math.MaxInt32:
 		return 32
 	default:
-		return MaxInt
+		return MAX_INT
 	}
 }
 
@@ -71,6 +71,6 @@ func BitsizeUInt(x uint64) uint64 {
 	case x <= math.MaxUint32:
 		return 32
 	default:
-		return MaxInt
+		return MAX_INT
 	}
 }

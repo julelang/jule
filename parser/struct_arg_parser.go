@@ -41,7 +41,7 @@ func (sap *structArgParser) buildArgs() {
 			sap.args.Src[i] = arg
 		case pair.param.Variadic:
 			model := sliceExpr{pair.param.Type, nil}
-			model.dataType.Kind = jule.Prefix_Slice + model.dataType.Kind // For slice.
+			model.dataType.Kind = jule.PREFIX_SLICE + model.dataType.Kind // For slice.
 			arg := Arg{Expr: Expr{Model: model}}
 			sap.args.Src[i] = arg
 		}

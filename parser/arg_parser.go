@@ -3,7 +3,6 @@ package parser
 import (
 	"github.com/jule-lang/jule/ast/models"
 	"github.com/jule-lang/jule/lex"
-	"github.com/jule-lang/jule/lex/tokens"
 	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
@@ -40,7 +39,7 @@ func (pap *pureArgParser) buildArgs() {
 		case pair.arg != nil:
 			pap.args.Src[i] = *pair.arg
 		case pair.param.Variadic:
-			arg := Arg{Expr: Expr{Model: exprNode{juleapi.DefaultExpr}}}
+			arg := Arg{Expr: Expr{Model: exprNode{juleapi.DEFAULT_EXPR}}}
 			pap.args.Src[i] = arg
 		}
 	}
@@ -49,7 +48,7 @@ func (pap *pureArgParser) buildArgs() {
 func (pap *pureArgParser) pushVariadicArgs(pair *paramMapPair) {
 	// Used to build initializer list for slice
 	var model serieExpr
-	model.exprs = append(model.exprs, exprNode{tokens.LBRACE})
+	model.exprs = append(model.exprs, exprNode{lex.KND_LBRACE})
 	variadiced := false
 	pap.p.parseArg(pap.f, pair, pap.args, &variadiced)
 	model.exprs = append(model.exprs, pair.arg.String())
@@ -58,10 +57,10 @@ func (pap *pureArgParser) pushVariadicArgs(pair *paramMapPair) {
 		pair.arg = &pap.args.Src[pap.i]
 		once = true
 		pap.p.parseArg(pap.f, pair, pap.args, &variadiced)
-		model.exprs = append(model.exprs, exprNode{tokens.COMMA})
+		model.exprs = append(model.exprs, exprNode{lex.KND_COMMA})
 		model.exprs = append(model.exprs, pair.arg.String())
 	}
-	model.exprs = append(model.exprs, exprNode{tokens.RBRACE})
+	model.exprs = append(model.exprs, exprNode{lex.KND_RBRACE})
 	pair.arg.CastType = nil
 	pair.arg.Expr.Model = model
 	if !once {

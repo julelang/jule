@@ -117,9 +117,9 @@ type IterForeach struct {
 
 func (f IterForeach) String(i *Iter) string {
 	switch f.ExprType.Id {
-	case juletype.Str, juletype.Slice, juletype.Array:
+	case juletype.STR, juletype.SLICE, juletype.ARRAY:
 		return f.IterationString(i, index_setter{})
-	case juletype.Map:
+	case juletype.MAP:
 		return f.IterationString(i, map_setter{})
 	}
 	return ""

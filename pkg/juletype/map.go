@@ -1,57 +1,55 @@
 package juletype
 
-import "github.com/jule-lang/jule/lex/tokens"
+import "github.com/jule-lang/jule/lex"
 
 // Data type (built-in) constants.
-const (
-	Void    uint8 = 0
-	I8      uint8 = 1
-	I16     uint8 = 2
-	I32     uint8 = 3
-	I64     uint8 = 4
-	U8      uint8 = 5
-	U16     uint8 = 6
-	U32     uint8 = 7
-	U64     uint8 = 8
-	Bool    uint8 = 9
-	Str     uint8 = 10
-	F32     uint8 = 11
-	F64     uint8 = 12
-	Any     uint8 = 13
-	Id      uint8 = 14
-	Fn      uint8 = 15
-	Nil     uint8 = 16
-	UInt    uint8 = 17
-	Int     uint8 = 18
-	Map     uint8 = 19
-	UIntptr uint8 = 20
-	Enum    uint8 = 21
-	Struct  uint8 = 22
-	Trait   uint8 = 23
-	Slice   uint8 = 24
-	Array   uint8 = 25
-	Unsafe  uint8 = 26
-)
+const VOID    uint8 = 0
+const I8      uint8 = 1
+const I16     uint8 = 2
+const I32     uint8 = 3
+const I64     uint8 = 4
+const U8      uint8 = 5
+const U16     uint8 = 6
+const U32     uint8 = 7
+const U64     uint8 = 8
+const BOOL    uint8 = 9
+const STR     uint8 = 10
+const F32     uint8 = 11
+const F64     uint8 = 12
+const ANY     uint8 = 13
+const ID      uint8 = 14
+const FN      uint8 = 15
+const NIL     uint8 = 16
+const UINT    uint8 = 17
+const INT     uint8 = 18
+const MAP     uint8 = 19
+const UINTPTR uint8 = 20
+const ENUM    uint8 = 21
+const STRUCT  uint8 = 22
+const TRAIT   uint8 = 23
+const SLICE   uint8 = 24
+const ARRAY   uint8 = 25
+const UNSAFE  uint8 = 26
 
-// TypeMap keep data type codes and kinds.
-var TypeMap = map[uint8]string{
-	Void:    VoidTypeStr,
-	Nil:     NilTypeStr,
-	I8:      tokens.I8,
-	I16:     tokens.I16,
-	I32:     tokens.I32,
-	I64:     tokens.I64,
-	U8:      tokens.U8,
-	U16:     tokens.U16,
-	U32:     tokens.U32,
-	U64:     tokens.U64,
-	Str:     tokens.STR,
-	Bool:    tokens.BOOL,
-	F32:     tokens.F32,
-	F64:     tokens.F64,
-	Any:     tokens.ANY,
-	UInt:    tokens.UINT,
-	Int:     tokens.INT,
-	UIntptr: tokens.UINTPTR,
-	Unsafe:  tokens.UNSAFE,
+// TYPE_MAP keep data type codes and kinds.
+var TYPE_MAP = map[uint8]string{
+	VOID:    VOID_TYPE_STR,
+	NIL:     NIL_TYPE_STR,
+	I8:      lex.KND_I8,
+	I16:     lex.KND_I16,
+	I32:     lex.KND_I32,
+	I64:     lex.KND_I64,
+	U8:      lex.KND_U8,
+	U16:     lex.KND_U16,
+	U32:     lex.KND_U32,
+	U64:     lex.KND_U64,
+	STR:     lex.KND_STR,
+	BOOL:    lex.KND_BOOL,
+	F32:     lex.KND_F32,
+	F64:     lex.KND_F64,
+	ANY:     lex.KND_ANY,
+	UINT:    lex.KND_UINT,
+	INT:     lex.KND_INT,
+	UINTPTR: lex.KND_UINTPTR,
+	UNSAFE:  lex.KND_UNSAFE,
 }

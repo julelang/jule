@@ -1,20 +1,20 @@
 package jule
 
-// Attributes of language.
-var Attributes = [...]string{
-	0: Attribute_CDef,
-	1: Attribute_Typedef,
+// ATTRS is list of all attributes.
+var ATTRS = [...]string{
+	0: ATTR_CDEF,
+	1: ATTR_TYPEDEF,
 }
 
 // List of supported operating systems.
-var Distos = []string{
+var DISTOS = []string{
 	"windows",
 	"linux",
 	"darwin",
 }
 
 // List of supported architects.
-var Distarch = []string{
+var DISTARCH = []string{
 	"arm",
 	"arm64",
 	"amd64",

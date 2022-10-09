@@ -48,8 +48,8 @@ func (fc *foreachChecker) checkKeyASize() {
 		return
 	}
 	a := &fc.profile.KeyA
-	a.Type.Id = juletype.Int
-	a.Type.Kind = juletype.TypeMap[a.Type.Id]
+	a.Type.Id = juletype.INT
+	a.Type.Kind = juletype.TYPE_MAP[a.Type.Id]
 }
 
 func (fc *foreachChecker) checkKeyAMapKey() {
@@ -83,7 +83,7 @@ func (fc *foreachChecker) str() {
 	}
 	runeType := Type{
 		Id:   juletype.U8,
-		Kind: juletype.TypeMap[juletype.U8],
+		Kind: juletype.TYPE_MAP[juletype.U8],
 	}
 	b := &fc.profile.KeyB
 	b.Type = runeType
@@ -97,7 +97,7 @@ func (fc *foreachChecker) check() {
 		fc.array()
 	case typeIsMap(fc.val.data.Type):
 		fc.hashmap()
-	case fc.val.data.Type.Id == juletype.Str:
+	case fc.val.data.Type.Id == juletype.STR:
 		fc.str()
 	}
 }

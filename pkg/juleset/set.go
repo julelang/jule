@@ -5,8 +5,8 @@ import (
 	"runtime"
 )
 
-const ModeTranspile = "transpile"
-const ModeCompile   = "compile"
+const MDOE_TRANSPILE = "transpile"
+const MODE_COMPILE   = "compile"
 
 type Set struct {
 	CppOutDir    string   `json:"cpp_out_dir"`
@@ -21,8 +21,8 @@ type Set struct {
 	CompilerPath string   `json:"compiler_path"`
 }
 
-// Default Set instance.
-var Default = &Set{
+// DEFAULT Set instance.
+var DEFAULT = &Set{
 	CppOutDir:    "./dist",
 	CppOutName:   "jule.cpp",
 	OutName:      "main",
@@ -37,7 +37,7 @@ var Default = &Set{
 
 // Load loads Set from json string.
 func Load(bytes []byte) (*Set, error) {
-	set := *Default
+	set := *DEFAULT
 	err := json.Unmarshal(bytes, &set)
 	if err != nil {
 		return nil, err
@@ -47,10 +47,10 @@ func Load(bytes []byte) (*Set, error) {
 
 func init() {
 	if runtime.GOOS == "windows" {
-		Default.Compiler = "gcc"
-		Default.CompilerPath = "g++"
+		DEFAULT.Compiler = "gcc"
+		DEFAULT.CompilerPath = "g++"
 	} else {
-		Default.Compiler = "clang"
-		Default.CompilerPath = "clang++"
+		DEFAULT.Compiler = "clang"
+		DEFAULT.CompilerPath = "clang++"
 	}
 }

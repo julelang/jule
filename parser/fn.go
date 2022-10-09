@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/jule-lang/jule/ast/models"
-	"github.com/jule-lang/jule/lex/tokens"
+	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
@@ -72,7 +72,7 @@ func (f *Fn) declHead(owner string) string {
 	cpp.WriteByte(' ')
 	if owner != "" {
 		cpp.WriteString(owner)
-		cpp.WriteString(tokens.DOUBLE_COLON)
+		cpp.WriteString(lex.KND_DBLCOLON)
 	}
 	cpp.WriteString(f.outId())
 	return cpp.String()

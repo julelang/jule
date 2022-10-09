@@ -7,7 +7,6 @@ import (
 	"github.com/jule-lang/jule/ast"
 	"github.com/jule-lang/jule/ast/models"
 	"github.com/jule-lang/jule/lex"
-	"github.com/jule-lang/jule/lex/tokens"
 	"github.com/jule-lang/jule/pkg/jule"
 	"github.com/jule-lang/jule/pkg/juletype"
 )
@@ -85,11 +84,11 @@ func (e *eval) eval_op(op any) (v value, model iExpr) {
 	} else {
 		m := newExprModel(1)
 		model = m
-		m.appendSubNode(exprNode{tokens.LPARENTHESES})
+		m.appendSubNode(exprNode{lex.KND_LPAREN})
 		m.appendSubNode(lm)
 		m.appendSubNode(exprNode{" " + bop.Op.Kind + " "})
 		m.appendSubNode(rm)
-		m.appendSubNode(exprNode{tokens.RPARENTHESES})
+		m.appendSubNode(exprNode{lex.KND_RPARENT})
 	}
 	return
 }
@@ -97,22 +96,22 @@ func (e *eval) eval_op(op any) (v value, model iExpr) {
 func (e *eval) eval(op any) (v value, model iExpr) {
 	defer func() {
 		if typeIsVoid(v.data.Type) {
-			v.data.Type.Id = juletype.Void
-			v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
+			v.data.Type.Id = juletype.VOID
+			v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
 		} else if v.constExpr && typeIsPure(v.data.Type) && isConstExpression(v.data.Value) {
 			switch v.expr.(type) {
 			case int64:
 				dt := Type{
-					Id:   juletype.Int,
-					Kind: juletype.TypeMap[juletype.Int],
+					Id:   juletype.INT,
+					Kind: juletype.TYPE_MAP[juletype.INT],
 				}
 				if integerAssignable(dt.Id, v) {
 					v.data.Type = dt
 				}
 			case uint64:
 				dt := Type{
-					Id:   juletype.UInt,
-					Kind: juletype.TypeMap[juletype.UInt],
+					Id:   juletype.UINT,
+					Kind: juletype.TYPE_MAP[juletype.UINT],
 				}
 				if integerAssignable(dt.Id, v) {
 					v.data.Type = dt
@@ -128,11 +127,11 @@ func (e *eval) eval(op any) (v value, model iExpr) {
 
 func (e *eval) single(tok lex.Token, m *exprModel) (v value, ok bool) {
 	eval := valueEvaluator{tok, m, e.p}
-	v.data.Type.Id = juletype.Void
-	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
+	v.data.Type.Id = juletype.VOID
+	v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
 	v.data.Token = tok
 	switch tok.Id {
-	case tokens.Value:
+	case lex.ID_LITERAL:
 		ok = true
 		switch {
 		case isstr(tok.Kind):
@@ -146,7 +145,7 @@ func (e *eval) single(tok lex.Token, m *exprModel) (v value, ok bool) {
 		default:
 			v = eval.numeric()
 		}
-	case tokens.Id, tokens.Self:
+	case lex.ID_IDENT, lex.ID_SELF:
 		v, ok = eval.id()
 	default:
 		e.pusherrtok(tok, "invalid_syntax")
@@ -166,22 +165,22 @@ func (e *eval) unary(toks []lex.Token, m *exprModel) value {
 		return v
 	}
 	switch processor.token.Kind {
-	case tokens.MINUS:
+	case lex.KND_MINUS:
 		m.appendSubNode(exprNode{processor.token.Kind})
 		v = processor.minus()
-	case tokens.PLUS:
+	case lex.KND_PLUS:
 		m.appendSubNode(exprNode{processor.token.Kind})
 		v = processor.plus()
-	case tokens.CARET:
+	case lex.KND_CARET:
 		m.appendSubNode(exprNode{"~"})
 		v = processor.caret()
-	case tokens.EXCLAMATION:
+	case lex.KND_EXCL:
 		m.appendSubNode(exprNode{processor.token.Kind})
 		v = processor.logicalNot()
-	case tokens.STAR:
+	case lex.KND_STAR:
 		m.appendSubNode(exprNode{processor.token.Kind})
 		v = processor.star()
-	case tokens.AMPER:
+	case lex.KND_AMPER:
 		m.appendSubNode(exprNode{processor.token.Kind})
 		v = processor.amper()
 	default:
@@ -193,8 +192,8 @@ func (e *eval) unary(toks []lex.Token, m *exprModel) value {
 
 func (e *eval) betweenParentheses(toks []lex.Token, m *exprModel) value {
 	// Write parentheses.
-	m.appendSubNode(exprNode{tokens.LPARENTHESES})
-	defer m.appendSubNode(exprNode{tokens.RPARENTHESES})
+	m.appendSubNode(exprNode{lex.KND_LPAREN})
+	defer m.appendSubNode(exprNode{lex.KND_RPARENT})
 
 	tk := toks[0]
 	toks = toks[1 : len(toks)-1]
@@ -208,16 +207,16 @@ func (e *eval) betweenParentheses(toks []lex.Token, m *exprModel) value {
 
 func (e *eval) dataTypeFunc(expr lex.Token, callRange []lex.Token, m *exprModel) (v value, isret bool) {
 	switch expr.Id {
-	case tokens.DataType:
+	case lex.ID_DT:
 		switch expr.Kind {
-		case tokens.STR:
+		case lex.KND_STR:
 			m.appendSubNode(exprNode{"__julec_to_str("})
 			_, vm := e.p.evalToks(callRange)
 			m.appendSubNode(vm)
-			m.appendSubNode(exprNode{tokens.RPARENTHESES})
+			m.appendSubNode(exprNode{lex.KND_RPARENT})
 			v.data.Type = Type{
-				Id:   juletype.Str,
-				Kind: juletype.TypeMap[juletype.Str],
+				Id:   juletype.STR,
+				Kind: juletype.TYPE_MAP[juletype.STR],
 			}
 			isret = true
 		default:
@@ -229,7 +228,7 @@ func (e *eval) dataTypeFunc(expr lex.Token, callRange []lex.Token, m *exprModel)
 			isret = true
 			v = e.castExpr(dt, callRange, m, expr)
 		}
-	case tokens.Id:
+	case lex.ID_IDENT:
 		def, _, _ := e.p.defById(expr.Kind)
 		if def == nil {
 			break
@@ -260,7 +259,7 @@ func getCallData(toks []lex.Token, m *exprModel) (data callData) {
 	}
 	// Below is call expression
 	tok := data.expr[len(data.expr)-1]
-	if tok.Id == tokens.Brace && tok.Kind == tokens.RBRACKET {
+	if tok.Id == lex.ID_BRACE && tok.Kind == lex.KND_RBRACKET {
 		data.expr, data.generics = ast.RangeLast(data.expr)
 	}
 	return
@@ -283,9 +282,9 @@ func (e *eval) callFunc(f *Func, data callData, m *exprModel) value {
 func (e *eval) parenthesesRange(toks []lex.Token, m *exprModel) (v value) {
 	tok := toks[0]
 	switch tok.Id {
-	case tokens.Brace:
+	case lex.ID_BRACE:
 		switch tok.Kind {
-		case tokens.LPARENTHESES:
+		case lex.KND_LPAREN:
 			val, ok := e.tryCast(toks, m)
 			if ok {
 				v = val
@@ -298,7 +297,7 @@ func (e *eval) parenthesesRange(toks []lex.Token, m *exprModel) (v value) {
 		return e.betweenParentheses(data.args, m)
 	}
 	switch tok := data.expr[0]; tok.Id {
-	case tokens.DataType, tokens.Id:
+	case lex.ID_DT, lex.ID_IDENT:
 		if len(data.expr) == 1 && len(data.generics) == 0 {
 			v, isret := e.dataTypeFunc(data.expr[0], data.args, m)
 			if isret {
@@ -322,14 +321,14 @@ func (e *eval) parenthesesRange(toks []lex.Token, m *exprModel) (v value) {
 }
 
 func (e *eval) try_cpp_linked_var(toks []lex.Token, m *exprModel) (v value, ok bool) {
-	if toks[0].Id != tokens.Cpp {
+	if toks[0].Id != lex.ID_CPP {
 		return
-	} else if toks[1].Id != tokens.Dot {
+	} else if toks[1].Id != lex.ID_DOT {
 		e.pusherrtok(toks[1], "invalid_syntax")
 		return
 	}
 	tok := toks[2]
-	if tok.Id != tokens.Id {
+	if tok.Id != lex.ID_IDENT {
 		e.pusherrtok(toks[2], "invalid_syntax")
 		return
 	}
@@ -366,22 +365,22 @@ func (e *eval) process(toks []lex.Token, m *exprModel) (v value) {
 	}
 	tok := toks[0]
 	switch tok.Id {
-	case tokens.Operator:
+	case lex.ID_OP:
 		return e.unary(toks, m)
 	}
 	tok = toks[len(toks)-1]
 	switch tok.Id {
-	case tokens.Id:
+	case lex.ID_IDENT:
 		return e.id(toks, m)
-	case tokens.Operator:
+	case lex.ID_OP:
 		return e.operatorRight(toks, m)
-	case tokens.Brace:
+	case lex.ID_BRACE:
 		switch tok.Kind {
-		case tokens.RPARENTHESES:
+		case lex.KND_RPARENT:
 			return e.parenthesesRange(toks, m)
-		case tokens.RBRACE:
+		case lex.KND_RBRACE:
 			return e.braceRange(toks, m)
-		case tokens.RBRACKET:
+		case lex.KND_RBRACKET:
 			return e.bracketRange(toks, m)
 		}
 	}
@@ -401,9 +400,9 @@ func (e *eval) subId(toks []lex.Token, m *exprModel) (v value) {
 		return
 	case 1:
 		tok := toks[0]
-		if tok.Id == tokens.DataType {
+		if tok.Id == lex.ID_DT {
 			return e.typeSubId(tok, idTok, m)
-		} else if tok.Id == tokens.Id {
+		} else if tok.Id == lex.ID_IDENT {
 			t, _, _ := e.p.typeById(tok.Kind)
 			if t != nil && !e.p.is_shadowed(tok.Kind) {
 				return e.typeSubId(t.Type.Token, idTok, m)
@@ -413,7 +412,7 @@ func (e *eval) subId(toks []lex.Token, m *exprModel) (v value) {
 	val := e.process(toks, m)
 	checkType := val.data.Type
 	if typeIsExplicitPtr(checkType) {
-		if toks[0].Id != tokens.Self && !e.unsafe_allowed() {
+		if toks[0].Id != lex.ID_SELF && !e.unsafe_allowed() {
 			e.pusherrtok(idTok, "unsafe_behavior_at_out_of_unsafe_scope")
 		}
 		checkType = un_ptr_or_ref_type(checkType)
@@ -423,7 +422,7 @@ func (e *eval) subId(toks []lex.Token, m *exprModel) (v value) {
 	switch {
 	case typeIsPure(checkType):
 		switch {
-		case checkType.Id == juletype.Str:
+		case checkType.Id == juletype.STR:
 			return e.strObjSubId(val, idTok, m)
 		case valIsEnumType(val):
 			return e.enumSubId(val, idTok, m)
@@ -484,9 +483,9 @@ func (e *eval) tryCast(toks []lex.Token, m *exprModel) (v value, _ bool) {
 	brace_n := 0
 	errTok := toks[0]
 	for i, tok := range toks {
-		if tok.Id == tokens.Brace {
+		if tok.Id == lex.ID_BRACE {
 			switch tok.Kind {
-			case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
+			case lex.KND_LBRACE, lex.KND_LBRACKET, lex.KND_LPAREN:
 				brace_n++
 				continue
 			default:
@@ -518,10 +517,10 @@ func (e *eval) tryCast(toks []lex.Token, m *exprModel) (v value, _ bool) {
 			return
 		}
 		tok = exprToks[0]
-		if tok.Id != tokens.Brace || tok.Kind != tokens.LPARENTHESES {
+		if tok.Id != lex.ID_BRACE || tok.Kind != lex.KND_LPAREN {
 			return
 		}
-		exprToks, ok = e.p.getrange(tokens.LPARENTHESES, tokens.RPARENTHESES, exprToks)
+		exprToks, ok = e.p.getrange(lex.KND_LPAREN, lex.KND_RPARENT, exprToks)
 		if !ok {
 			return
 		}
@@ -542,7 +541,7 @@ func (e *eval) cast(v value, t Type, errtok lex.Token) value {
 	case typeIsStruct(t):
 		e.castStruct(t, &v, errtok)
 	case typeIsPure(t):
-		if v.data.Type.Id == juletype.Any {
+		if v.data.Type.Id == juletype.ANY {
 			// The any type supports casting to any data type.
 			break
 		}
@@ -557,9 +556,9 @@ func (e *eval) cast(v value, t Type, errtok lex.Token) value {
 	if v.constExpr {
 		var model exprNode
 		model.value = v.data.Type.String()
-		model.value += tokens.LPARENTHESES
+		model.value += lex.KND_LPAREN
 		model.value += v.model.String()
-		model.value += tokens.RPARENTHESES
+		model.value += lex.KND_RPARENT
 		v.model = model
 	}
 	return v
@@ -600,9 +599,9 @@ func (e *eval) cast_ref(t Type, v *value, errtok lex.Token) {
 
 func (e *eval) castPure(t Type, v *value, errtok lex.Token) {
 	switch t.Id {
-	case juletype.Any:
+	case juletype.ANY:
 		return
-	case juletype.Str:
+	case juletype.STR:
 		e.castStr(v.data.Type, errtok)
 		return
 	}
@@ -621,12 +620,12 @@ func (e *eval) castStr(t Type, errtok lex.Token) {
 		return
 	}
 	if !typeIsSlice(t) {
-		e.pusherrtok(errtok, "type_not_supports_casting_to", juletype.TypeMap[juletype.Str], t.Kind)
+		e.pusherrtok(errtok, "type_not_supports_casting_to", juletype.TYPE_MAP[juletype.STR], t.Kind)
 		return
 	}
 	t = *t.ComponentType
 	if !typeIsPure(t) || (t.Id != juletype.U8 && t.Id != juletype.I32) {
-		e.pusherrtok(errtok, "type_not_supports_casting_to", juletype.TypeMap[juletype.Str], t.Kind)
+		e.pusherrtok(errtok, "type_not_supports_casting_to", juletype.TYPE_MAP[juletype.STR], t.Kind)
 	}
 }
 
@@ -646,7 +645,7 @@ func (e *eval) castInteger(t Type, v *value, errtok lex.Token) {
 		}
 	}
 	if typeIsPtr(v.data.Type) {
-		if t.Id == juletype.UIntptr {
+		if t.Id == juletype.UINTPTR {
 			return
 		} else if !e.unsafe_allowed() {
 			e.pusherrtok(errtok, "unsafe_behavior_at_out_of_unsafe_scope")
@@ -687,7 +686,7 @@ func (e *eval) castNumeric(t Type, v *value, errtok lex.Token) {
 }
 
 func (e *eval) castSlice(t, vt Type, errtok lex.Token) {
-	if !typeIsPure(vt) || vt.Id != juletype.Str {
+	if !typeIsPure(vt) || vt.Id != juletype.STR {
 		e.pusherrtok(errtok, "type_not_supports_casting_to", vt.Kind, t.Kind)
 		return
 	}
@@ -771,29 +770,29 @@ func (e *eval) f64SubId(idTok lex.Token, m *exprModel) value {
 
 func (e *eval) typeSubId(typeTok, idTok lex.Token, m *exprModel) (v value) {
 	switch typeTok.Kind {
-	case tokens.I8:
+	case lex.KND_I8:
 		return e.i8SubId(idTok, m)
-	case tokens.I16:
+	case lex.KND_I16:
 		return e.i16SubId(idTok, m)
-	case tokens.I32:
+	case lex.KND_I32:
 		return e.i32SubId(idTok, m)
-	case tokens.I64:
+	case lex.KND_I64:
 		return e.i64SubId(idTok, m)
-	case tokens.U8:
+	case lex.KND_U8:
 		return e.u8SubId(idTok, m)
-	case tokens.U16:
+	case lex.KND_U16:
 		return e.u16SubId(idTok, m)
-	case tokens.U32:
+	case lex.KND_U32:
 		return e.u32SubId(idTok, m)
-	case tokens.U64:
+	case lex.KND_U64:
 		return e.u64SubId(idTok, m)
-	case tokens.UINT:
+	case lex.KND_UINT:
 		return e.uintSubId(idTok, m)
-	case tokens.INT:
+	case lex.KND_INT:
 		return e.intSubId(idTok, m)
-	case tokens.F32:
+	case lex.KND_F32:
 		return e.f32SubId(idTok, m)
-	case tokens.F64:
+	case lex.KND_F64:
 		return e.f64SubId(idTok, m)
 	}
 	e.pusherrtok(idTok, "obj_not_support_sub_fields", typeTok.Kind)
@@ -801,8 +800,8 @@ func (e *eval) typeSubId(typeTok, idTok lex.Token, m *exprModel) (v value) {
 }
 
 func (e *eval) typeId(toks []lex.Token, m *exprModel) (v value) {
-	v.data.Type.Id = juletype.Void
-	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
+	v.data.Type.Id = juletype.VOID
+	v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
 	b := ast.NewBuilder(nil)
 	i := 0
 	t, ok := b.DataType(toks, &i, true, true)
@@ -820,14 +819,14 @@ func (e *eval) typeId(toks []lex.Token, m *exprModel) (v value) {
 	}
 	toks = toks[i+1:]
 	if typeIsPure(t) && typeIsStruct(t) {
-		if toks[0].Id != tokens.Brace || toks[0].Kind != tokens.LBRACE {
+		if toks[0].Id != lex.ID_BRACE || toks[0].Kind != lex.KND_LBRACE {
 			e.pusherrtok(toks[0], "invalid_syntax")
 			return
 		}
 		s := t.Tag.(*structure)
 		return e.p.callStructConstructor(s, toks, m)
 	}
-	if toks[0].Id != tokens.Brace || toks[0].Kind != tokens.LBRACKET {
+	if toks[0].Id != lex.ID_BRACE || toks[0].Kind != lex.KND_LBRACKET {
 		e.pusherrtok(toks[0], "invalid_syntax")
 		return
 	}
@@ -862,7 +861,7 @@ func (e *eval) xObjSubId(dm *DefineMap, val value, interior_mutability bool, idT
 	case 'f':
 		f := dm.Funcs[i]
 		f.used = true
-		v.data.Type.Id = juletype.Fn
+		v.data.Type.Id = juletype.FN
 		v.data.Type.Tag = f.Ast
 		v.data.Type.Kind = f.Ast.DataTypeString()
 		v.data.Token = f.Ast.Token
@@ -919,7 +918,7 @@ func (e *eval) structObjSubId(val value, idTok lex.Token, m *exprModel) value {
 	s := val.data.Type.Tag.(*structure)
 	val.constExpr = false
 	val.is_type = false
-	if val.data.Value == tokens.SELF {
+	if val.data.Value == lex.KND_SELF {
 		nodes := &m.nodes[m.index].nodes
 		n := len(*nodes)
 		defer func() {
@@ -968,7 +967,7 @@ func (e *eval) getNs(toks *[]lex.Token) *DefineMap {
 	var ns *namespace
 	for i, tok := range *toks {
 		if (i+1)%2 != 0 {
-			if tok.Id != tokens.Id {
+			if tok.Id != lex.ID_IDENT {
 				e.pusherrtok(tok, "invalid_syntax")
 				continue
 			}
@@ -985,7 +984,7 @@ func (e *eval) getNs(toks *[]lex.Token) *DefineMap {
 			ns = src
 			continue
 		}
-		if tok.Id != tokens.DoubleColon {
+		if tok.Id != lex.ID_DBLCOLON {
 			return ns.defines
 		}
 	}
@@ -1025,9 +1024,9 @@ func (e *eval) id(toks []lex.Token, m *exprModel) (v value) {
 	i--
 	tok = toks[i]
 	switch tok.Id {
-	case tokens.Dot:
+	case lex.ID_DOT:
 		return e.subId(toks, m)
-	case tokens.DoubleColon:
+	case lex.ID_DBLCOLON:
 		return e.nsSubId(toks, m)
 	}
 	e.pusherrtok(toks[i], "invalid_syntax")
@@ -1037,7 +1036,7 @@ func (e *eval) id(toks []lex.Token, m *exprModel) (v value) {
 func (e *eval) operatorRight(toks []lex.Token, m *exprModel) (v value) {
 	tok := toks[len(toks)-1]
 	switch tok.Kind {
-	case tokens.TRIPLE_DOT:
+	case lex.KND_TRIPLE_DOT:
 		toks = toks[:len(toks)-1]
 		return e.variadic(toks, m, tok)
 	default:
@@ -1047,14 +1046,14 @@ func (e *eval) operatorRight(toks []lex.Token, m *exprModel) (v value) {
 }
 
 func readyToVariadic(v *value) {
-	if v.data.Type.Id != juletype.Str || !typeIsPure(v.data.Type) {
+	if v.data.Type.Id != juletype.STR || !typeIsPure(v.data.Type) {
 		return
 	}
-	v.data.Type.Id = juletype.Slice
+	v.data.Type.Id = juletype.SLICE
 	v.data.Type.ComponentType = new(Type)
 	v.data.Type.ComponentType.Id = juletype.U8
-	v.data.Type.ComponentType.Kind = juletype.TypeMap[v.data.Type.Id]
-	v.data.Type.Kind = jule.Prefix_Slice + v.data.Type.ComponentType.Kind
+	v.data.Type.ComponentType.Kind = juletype.TYPE_MAP[v.data.Type.Id]
+	v.data.Type.Kind = jule.PREFIX_SLICE + v.data.Type.ComponentType.Kind
 }
 
 func (e *eval) variadic(toks []lex.Token, m *exprModel, errtok lex.Token) (v value) {
@@ -1076,9 +1075,9 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 	brace_n := 0
 	for i := len(toks) - 1; i >= 0; i-- {
 		tok := toks[i]
-		if tok.Id == tokens.Brace {
+		if tok.Id == lex.ID_BRACE {
 			switch tok.Kind {
-			case tokens.RBRACE, tokens.RBRACKET, tokens.RPARENTHESES:
+			case lex.KND_RBRACE, lex.KND_RBRACKET, lex.KND_RPARENT:
 				brace_n++
 			default:
 				brace_n--
@@ -1142,10 +1141,10 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 		}
 		return v
 	}
-	m.appendSubNode(exprNode{tokens.LBRACKET})
+	m.appendSubNode(exprNode{lex.KND_LBRACKET})
 	indexv, model := e.eval_toks(toks[1 : len(toks)-1])
 	m.appendSubNode(indexingExprModel(model))
-	m.appendSubNode(exprNode{tokens.RBRACKET})
+	m.appendSubNode(exprNode{lex.KND_RBRACKET})
 	v = e.indexing(v, indexv, errTok)
 	if !type_is_mutable(v.data.Type) {
 		v.data.Value = " "
@@ -1175,7 +1174,7 @@ func (e *eval) indexing(enumv, indexv value, errtok lex.Token) (v value) {
 		return e.indexingMap(enumv, indexv, errtok)
 	case typeIsPure(enumv.data.Type):
 		switch enumv.data.Type.Id {
-		case juletype.Str:
+		case juletype.STR:
 			return e.indexingStr(enumv, indexv, errtok)
 		}
 	}
@@ -1215,7 +1214,7 @@ func (e *eval) indexingMap(mapv, leftv value, errtok lex.Token) value {
 
 func (e *eval) indexingStr(strv, index value, errtok lex.Token) value {
 	strv.data.Type.Id = juletype.U8
-	strv.data.Type.Kind = juletype.TypeMap[strv.data.Type.Id]
+	strv.data.Type.Kind = juletype.TYPE_MAP[strv.data.Type.Id]
 	e.checkIntegerIndexing(index, errtok)
 	if !index.constExpr {
 		strv.constExpr = false
@@ -1242,7 +1241,7 @@ func (e *eval) slicing(enumv, leftv, rightv value, errtok lex.Token) (v value) {
 		return e.slicingSlice(enumv, errtok)
 	case typeIsPure(enumv.data.Type):
 		switch enumv.data.Type.Id {
-		case juletype.Str:
+		case juletype.STR:
 			return e.slicingStr(enumv, leftv, rightv, errtok)
 		}
 	}
@@ -1257,15 +1256,15 @@ func (e *eval) slicingSlice(v value, errtok lex.Token) value {
 
 func (e *eval) slicingArray(v value, errtok lex.Token) value {
 	v.lvalue = false
-	v.data.Type.Id = juletype.Slice
-	v.data.Type.Kind = jule.Prefix_Slice + v.data.Type.ComponentType.Kind
+	v.data.Type.Id = juletype.SLICE
+	v.data.Type.Kind = jule.PREFIX_SLICE + v.data.Type.ComponentType.Kind
 	return v
 }
 
 func (e *eval) slicingStr(v, leftv, rightv value, errtok lex.Token) value {
 	v.lvalue = false
-	v.data.Type.Id = juletype.Str
-	v.data.Type.Kind = juletype.TypeMap[v.data.Type.Id]
+	v.data.Type.Id = juletype.STR
+	v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
 	if !v.constExpr {
 		return v
 	}
@@ -1302,7 +1301,7 @@ func (e *eval) slicingStr(v, leftv, rightv value, errtok lex.Token) value {
 // ! IMPORTANT: lex.Tokenens is should be store enumerable parentheses.
 func (e *eval) enumerableParts(toks []lex.Token) [][]lex.Token {
 	toks = toks[1 : len(toks)-1]
-	parts, errs := ast.Parts(toks, tokens.Comma, true)
+	parts, errs := ast.Parts(toks, lex.ID_COMMA, true)
 	e.p.pusherrs(errs...)
 	return parts
 }
@@ -1319,7 +1318,7 @@ func (e *eval) build_array(parts [][]lex.Token, t Type, errtok lex.Token) (value
 		t.Size.N = models.Size(len(parts))
 		t.Size.Expr = models.Expr{
 			Model: exprNode{
-				value: juletype.CppId(juletype.UInt) + "(" + strconv.FormatUint(uint64(t.Size.N), 10) + ")",
+				value: juletype.CppId(juletype.UINT) + "(" + strconv.FormatUint(uint64(t.Size.N), 10) + ")",
 			},
 		}
 	}
@@ -1353,8 +1352,8 @@ func (e *eval) build_slice_implicit(parts [][]lex.Token, errtok lex.Token) (valu
 	partVal, expModel := e.eval_toks(parts[0])
 	model.expr = append(model.expr, expModel)
 	model.dataType = Type{
-		Id: juletype.Slice,
-		Kind: jule.Prefix_Slice + partVal.data.Type.Kind,
+		Id: juletype.SLICE,
+		Kind: jule.PREFIX_SLICE + partVal.data.Type.Kind,
 	}
 	model.dataType.ComponentType = new(Type)
 	*model.dataType.ComponentType = partVal.data.Type
@@ -1405,9 +1404,9 @@ func (e *eval) buildMap(parts [][]lex.Token, t Type, errtok lex.Token) (value, i
 		brace_n := 0
 		colon := -1
 		for i, tok := range part {
-			if tok.Id == tokens.Brace {
+			if tok.Id == lex.ID_BRACE {
 				switch tok.Kind {
-				case tokens.LBRACE, tokens.LBRACKET, tokens.LPARENTHESES:
+				case lex.KND_LBRACE, lex.KND_LBRACKET, lex.KND_LPAREN:
 					brace_n++
 				default:
 					brace_n--
@@ -1416,7 +1415,7 @@ func (e *eval) buildMap(parts [][]lex.Token, t Type, errtok lex.Token) (value, i
 			if brace_n != 0 {
 				continue
 			}
-			if tok.Id == tokens.Colon {
+			if tok.Id == lex.ID_COLON {
 				colon = i
 				break
 			}
@@ -1482,7 +1481,7 @@ func (e *eval) anonymousFn(toks []lex.Token, m *exprModel) (v value) {
 	f.Owner = e.p
 	v.data.Value = f.Id
 	v.data.Type.Tag = &f
-	v.data.Type.Id = juletype.Fn
+	v.data.Type.Id = juletype.FN
 	v.data.Type.Kind = f.DataTypeString()
 	m.appendSubNode(anonFuncExpr{&f})
 	return
@@ -1490,7 +1489,7 @@ func (e *eval) anonymousFn(toks []lex.Token, m *exprModel) (v value) {
 
 func (e *eval) unsafeEval(toks []lex.Token, m *exprModel) (v value) {
 	i := 0
-	rang := ast.Range(&i, tokens.LBRACE, tokens.RBRACE, toks)
+	rang := ast.Range(&i, lex.KND_LBRACE, lex.KND_RBRACE, toks)
 	if len(rang) == 0 {
 		e.pusherrtok(toks[0], "missing_expr")
 		return
@@ -1507,11 +1506,11 @@ func (e *eval) braceRange(toks []lex.Token, m *exprModel) (v value) {
 	brace_n := 0
 	for i := len(toks) - 1; i >= 0; i-- {
 		tok := toks[i]
-		if tok.Id != tokens.Brace {
+		if tok.Id != lex.ID_BRACE {
 			continue
 		}
 		switch tok.Kind {
-		case tokens.RBRACE, tokens.RBRACKET, tokens.RPARENTHESES:
+		case lex.KND_RBRACE, lex.KND_RBRACKET, lex.KND_RPARENT:
 			brace_n++
 		default:
 			brace_n--
@@ -1542,17 +1541,17 @@ func (e *eval) braceRange(toks []lex.Token, m *exprModel) (v value) {
 		return
 	}
 	switch exprToks[0].Id {
-	case tokens.Unsafe:
+	case lex.ID_UNSAFE:
 		if len(toks) == 0 {
 			e.pusherrtok(toks[0], "invalid_syntax")
 			return
-		} else if toks[1].Id != tokens.Fn {
+		} else if toks[1].Id != lex.ID_FN {
 			return e.unsafeEval(toks[1:], m)
 		}
 		fallthrough
-	case tokens.Fn:
+	case lex.ID_FN:
 		return e.anonymousFn(toks, m)
-	case tokens.Id, tokens.Cpp:
+	case lex.ID_IDENT, lex.ID_CPP:
 		return e.typeId(toks, m)
 	default:
 		e.pusherrtok(exprToks[0], "invalid_syntax")

@@ -1,8 +1,6 @@
 package juletype
 
-import (
-	"math"
-)
+import "math"
 
 // MinOfType returns minimum value of integer type.
 //

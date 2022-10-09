@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/jule-lang/jule/lex"
-	"github.com/jule-lang/jule/lex/tokens"
 	"github.com/jule-lang/jule/pkg/juleapi"
 )
 
@@ -42,7 +41,7 @@ func (v *Var) OutId() string {
 	switch {
 	case v.CppLinked:
 		return v.Id
-	case v.Id == tokens.SELF:
+	case v.Id == lex.KND_SELF:
 		return "self"
 	case v.IsLocal():
 		return as_local_id(v.Token.Row, v.Token.Column, v.Id)
@@ -69,7 +68,7 @@ func (v Var) String() string {
 		cpp.WriteString(" = ")
 		cpp.WriteString(v.Expr.String())
 	} else {
-		cpp.WriteString(juleapi.DefaultExpr)
+		cpp.WriteString(juleapi.DEFAULT_EXPR)
 	}
 	cpp.WriteByte(';')
 	return cpp.String()
@@ -84,7 +83,7 @@ func (v *Var) FieldString() string {
 	cpp.WriteString(v.Type.String())
 	cpp.WriteByte(' ')
 	cpp.WriteString(v.OutId())
-	cpp.WriteString(juleapi.DefaultExpr)
+	cpp.WriteString(juleapi.DEFAULT_EXPR)
 	cpp.WriteByte(';')
 	return cpp.String()
 }

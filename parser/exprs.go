@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/jule-lang/jule/ast/models"
-	"github.com/jule-lang/jule/lex/tokens"
+	"github.com/jule-lang/jule/lex"
 	"github.com/jule-lang/jule/pkg/julebits"
 	"github.com/jule-lang/jule/pkg/juletype"
 )
@@ -28,7 +28,7 @@ func indexingExprModel(i iExpr) iExpr {
 	}
 	var model strings.Builder
 	model.WriteString("static_cast<")
-	model.WriteString(juletype.CppId(juletype.Int))
+	model.WriteString(juletype.CppId(juletype.INT))
 	model.WriteString(">(")
 	model.WriteString(i.String())
 	model.WriteByte(')')
@@ -48,11 +48,11 @@ func ischar(s string) bool {
 }
 
 func isnil(s string) bool {
-	return s == tokens.NIL
+	return s == lex.KND_NIL
 }
 
 func isbool(s string) bool {
-	return s == tokens.TRUE || s == tokens.FALSE
+	return s == lex.KND_TRUE || s == lex.KND_FALSE
 }
 
 func valIsEnumType(v value) bool {
@@ -60,7 +60,7 @@ func valIsEnumType(v value) bool {
 }
 
 func isBoolExpr(v value) bool {
-	return typeIsPure(v.data.Type) && v.data.Type.Id == juletype.Bool
+	return typeIsPure(v.data.Type) && v.data.Type.Id == juletype.BOOL
 }
 
 func isfloat(s string) bool {
@@ -75,10 +75,10 @@ func canGetPtr(v value) bool {
 		return false
 	}
 	switch v.data.Type.Id {
-	case juletype.Fn, juletype.Enum:
+	case juletype.FN, juletype.ENUM:
 		return false
 	default:
-		return v.data.Token.Id == tokens.Id
+		return v.data.Token.Id == lex.ID_IDENT
 	}
 }
 
@@ -100,7 +100,7 @@ func isForeachIterExpr(val value) bool {
 		return false
 	}
 	code := val.data.Type.Id
-	return code == juletype.Str
+	return code == juletype.STR
 }
 
 func isConstNumeric(v string) bool {

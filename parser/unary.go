@@ -2,7 +2,6 @@ package parser
 
 import (
 	"github.com/jule-lang/jule/lex"
-	"github.com/jule-lang/jule/lex/tokens"
 	"github.com/jule-lang/jule/pkg/juletype"
 )
 
@@ -16,10 +15,10 @@ type unary struct {
 func (u *unary) minus() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !typeIsPure(v.data.Type) || !juletype.IsNumeric(v.data.Type.Id) {
-		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.MINUS)
+		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_MINUS)
 	}
 	if v.constExpr {
-		v.data.Value = tokens.MINUS + v.data.Value
+		v.data.Value = lex.KND_MINUS + v.data.Value
 		switch t := v.expr.(type) {
 		case float64:
 			v.expr = -t
@@ -36,7 +35,7 @@ func (u *unary) minus() value {
 func (u *unary) plus() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !typeIsPure(v.data.Type) || !juletype.IsNumeric(v.data.Type.Id) {
-		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.PLUS)
+		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_PLUS)
 	}
 	if v.constExpr {
 		switch t := v.expr.(type) {
@@ -55,7 +54,7 @@ func (u *unary) plus() value {
 func (u *unary) caret() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !typeIsPure(v.data.Type) || !juletype.IsInteger(v.data.Type.Id) {
-		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.CARET)
+		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_CARET)
 	}
 	if v.constExpr {
 		switch t := v.expr.(type) {
@@ -72,13 +71,13 @@ func (u *unary) caret() value {
 func (u *unary) logicalNot() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !isBoolExpr(v) {
-		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.EXCLAMATION)
+		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_EXCL)
 	} else if v.constExpr {
 		v.expr = !v.expr.(bool)
 		v.model = boolModel(v)
 	}
-	v.data.Type.Id = juletype.Bool
-	v.data.Type.Kind = tokens.BOOL
+	v.data.Type.Id = juletype.BOOL
+	v.data.Type.Kind = lex.KND_BOOL
 	return v
 }
 
@@ -91,7 +90,7 @@ func (u *unary) star() value {
 	v.lvalue = true
 	switch {
 	case !typeIsExplicitPtr(v.data.Type):
-		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.STAR)
+		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_STAR)
 		goto end
 	}
 	v.data.Type.Kind = v.data.Type.Kind[1:]
@@ -119,7 +118,7 @@ func (u *unary) amper() value {
 		(*nodes)[0] = alloc_model
 		last := &(*nodes)[len(*nodes)-1]
 		*last = exprNode{(*last).String() + ")"}
-		v.data.Type.Kind = tokens.AMPER + v.data.Type.Kind
+		v.data.Type.Kind = lex.KND_AMPER + v.data.Type.Kind
 		v.mutable = true
 		return v
 	case typeIsRef(v.data.Type):
@@ -127,12 +126,12 @@ func (u *unary) amper() value {
 		*nodes = nil
 		*nodes = make([]iExpr, 1)
 		(*nodes)[0] = model
-		v.data.Type.Kind = tokens.STAR + un_ptr_or_ref_type(v.data.Type).Kind
+		v.data.Type.Kind = lex.KND_STAR + un_ptr_or_ref_type(v.data.Type).Kind
 		return v
 	case !canGetPtr(v):
-		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", tokens.AMPER)
+		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_AMPER)
 		return v
 	}
-	v.data.Type.Kind = tokens.STAR + v.data.Type.Kind
+	v.data.Type.Kind = lex.KND_STAR + v.data.Type.Kind
 	return v
 }

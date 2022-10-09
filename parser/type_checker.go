@@ -26,7 +26,7 @@ func (tc *type_checker) check_ref() bool {
 }
 
 func (tc *type_checker) check_ptr() bool {
-	if tc.right.Id == juletype.Nil {
+	if tc.right.Id == juletype.NIL {
 		return true
 	} else if typeIsUnsafePtr(tc.left) {
 		return true
@@ -35,7 +35,7 @@ func (tc *type_checker) check_ptr() bool {
 }
 
 func (tc *type_checker) check_trait() bool {
-	if tc.right.Id == juletype.Nil {
+	if tc.right.Id == juletype.NIL {
 		return true
 	}
 	t := tc.left.Tag.(*trait)
@@ -97,7 +97,7 @@ func (tc *type_checker) check_struct() bool {
 }
 
 func (tc *type_checker) check_slice() bool {
-	if tc.right.Id == juletype.Nil {
+	if tc.right.Id == juletype.NIL {
 		return true
 	}
 	return tc.left.Kind == tc.right.Kind
@@ -111,7 +111,7 @@ func (tc *type_checker) check_array() bool {
 }
 
 func (tc *type_checker) check_map() bool {
-	if tc.right.Id == juletype.Nil {
+	if tc.right.Id == juletype.NIL {
 		return true
 	}
 	return tc.left.Kind == tc.right.Kind
@@ -150,13 +150,13 @@ func (tc *type_checker) check() bool {
 		}
 		return tc.check_map()
 	case typeIsNilCompatible(tc.left):
-		return tc.right.Id == juletype.Nil
+		return tc.right.Id == juletype.NIL
 	case typeIsNilCompatible(tc.right):
-		return tc.left.Id == juletype.Nil
+		return tc.left.Id == juletype.NIL
 	case typeIsEnum(tc.left), typeIsEnum(tc.right):
 		return tc.left.Id == tc.right.Id && tc.left.Kind == tc.right.Kind
 	case typeIsStruct(tc.left), typeIsStruct(tc.right):
-		if tc.right.Id == juletype.Struct {
+		if tc.right.Id == juletype.STRUCT {
 			tc.left, tc.right = tc.right, tc.left
 		}
 		return tc.check_struct()
