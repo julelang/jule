@@ -2272,8 +2272,8 @@ func (p *Parser) fn_parse_type(t *Type) bool {
 }
 
 func (p *Parser) reloadFuncTypes(f *Func) {
-	for _, param := range f.Params {
-		_ = p.fn_parse_type(&param.Type)
+	for i := range f.Params {
+		_ = p.fn_parse_type(&f.Params[i].Type)
 	}
 	if p.fn_parse_type(&f.RetType.Type) && typeIsArray(f.RetType.Type) {
 		p.pusherrtok(f.RetType.Type.Token, "invalid_type")
