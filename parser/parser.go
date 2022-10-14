@@ -1174,6 +1174,8 @@ func (p *Parser) implTrait(model *models.Impl) {
 			p.attributes = nil
 			sf.Desc = p.docText.String()
 			p.docText.Reset()
+			_ = p.checkParamDup(sf.Ast.Params)
+			p.checkRetVars(sf.Ast)
 			sf.used = true
 			if len(s.Ast.Generics) == 0 {
 				p.parseTypesNonGenerics(sf.Ast)
@@ -1223,6 +1225,8 @@ func (p *Parser) implStruct(model *models.Impl) {
 			p.attributes = nil
 			setGenerics(sf.Ast, p.generics)
 			p.generics = nil
+			_ = p.checkParamDup(sf.Ast.Params)
+			p.checkRetVars(sf.Ast)
 			for _, generic := range obj_t.Generics {
 				if findGeneric(generic.Id, s.Ast.Generics) != nil {
 					p.pusherrtok(generic.Token, "exist_id", generic.Id)
@@ -1412,22 +1416,22 @@ func (p *Parser) parseTypesNonGenerics(f *Func) {
 	p.parseNonGenericType(f.Generics, &f.RetType.Type)
 }
 
-func (p *Parser) checkRetVars(f *Fn) {
-	for i, v := range f.Ast.RetType.Identifiers {
+func (p *Parser) checkRetVars(f *Func) {
+	for i, v := range f.RetType.Identifiers {
 		if juleapi.IsIgnoreId(v.Kind) {
 			continue
 		}
-		for _, generic := range f.Ast.Generics {
+		for _, generic := range f.Generics {
 			if v.Kind == generic.Id {
 				goto exist
 			}
 		}
-		for _, param := range f.Ast.Params {
+		for _, param := range f.Params {
 			if v.Kind == param.Id {
 				goto exist
 			}
 		}
-		for j, jv := range f.Ast.RetType.Identifiers {
+		for j, jv := range f.RetType.Identifiers {
 			if j >= i {
 				break
 			}
@@ -1467,7 +1471,8 @@ func (p *Parser) Func(ast Func) {
 	p.docText.Reset()
 	setGenerics(f.Ast, p.generics)
 	p.generics = nil
-	p.checkRetVars(f)
+	p.checkRetVars(f.Ast)
+	_ = p.checkParamDup(f.Ast.Params)
 	f.used = f.Ast.Id == jule.INIT_FN
 	p.Defines.Funcs = append(p.Defines.Funcs, f)
 	p.waitingFuncs = append(p.waitingFuncs, f)
@@ -1956,7 +1961,6 @@ func (p *Parser) checkParamDup(params []models.Param) (err bool) {
 
 func (p *Parser) params(f *Func) (err bool) {
 	hasDefaultArg := false
-	err = p.checkParamDup(f.Params)
 	for i := range f.Params {
 		param := &f.Params[i]
 		err = err || p.param(f, param)
@@ -2158,6 +2162,8 @@ func (p *Parser) structConstructorInstance(as *structure) *structure {
 }
 
 func (p *Parser) checkAnonFunc(f *Func) {
+	_ = p.checkParamDup(f.Params)
+	p.checkRetVars(f)
 	p.reloadFuncTypes(f)
 	globals := p.Defines.Globals
 	blockVariables := p.blockVars
