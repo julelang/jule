@@ -717,7 +717,7 @@ func caller_make(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
 	type_tokens := args.Src[0].Expr.Tokens
 	b := ast.NewBuilder(nil)
 	i := 0
-	t, ok := b.DataType(type_tokens, &i, false, true)
+	t, ok := b.DataType(type_tokens, &i, true)
 	b.Wait()
 	if !ok {
 		p.pusherrs(b.Errors...)
@@ -745,7 +745,7 @@ func caller_new(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
 	data.args = data.args[1 : len(data.args)-1]
 	b := ast.NewBuilder(nil)
 	i := 0
-	t, ok := b.DataType(data.args, &i, true, true)
+	t, ok := b.DataType(data.args, &i, true)
 	b.Wait()
 	if !ok {
 		p.pusherrs(b.Errors...)
@@ -794,7 +794,7 @@ func caller_mem_size_of(p *Parser, _ *Func, data callData, m *exprModel) (v valu
 	node := &nodes[len(nodes)-1]
 	b := ast.NewBuilder(nil)
 	i := 0
-	t, ok := b.DataType(data.args, &i, true, true)
+	t, ok := b.DataType(data.args, &i, true)
 	b.Wait()
 	if !ok {
 		v, model := p.evalToks(data.args)
@@ -822,7 +822,7 @@ func caller_mem_align_of(p *Parser, _ *Func, data callData, m *exprModel) (v val
 	node := &nodes[len(nodes)-1]
 	b := ast.NewBuilder(nil)
 	i := 0
-	t, ok := b.DataType(data.args, &i, true, true)
+	t, ok := b.DataType(data.args, &i, true)
 	b.Wait()
 	if !ok {
 		v, model := p.evalToks(data.args)

@@ -1383,7 +1383,7 @@ tagcheck:
 			}
 		}
 	}
-	*dt, _ = p.realType(*dt, true)
+	p.fn_parse_type(dt)
 }
 
 func (p *Parser) parseNonGenericType(generics []*GenericType, dt *Type) {
@@ -2203,14 +2203,14 @@ func (p *Parser) getGenerics(toks []lex.Token) (_ []Type, err bool) {
 		}
 		b := ast.NewBuilder(nil)
 		j := 0
-		generic, _ := b.DataType(part, &j, false, true)
+		generic, _ := b.DataType(part, &j, true)
 		b.Wait()
 		if j+1 < len(part) {
 			p.pusherrtok(part[j+1], "invalid_syntax")
 		}
 		p.pusherrs(b.Errors...)
-		var ok bool
-		generics[i], ok = p.realType(generic, true)
+		generics[i] = generic
+		ok := p.fn_parse_type(&generics[i])
 		if !ok {
 			err = true
 		}
@@ -2255,11 +2255,23 @@ func (p *Parser) pushGenerics(generics []*GenericType, sources []Type) {
 	}
 }
 
-func (p *Parser) reloadFuncTypes(f *Func) {
-	for i, param := range f.Params {
-		f.Params[i].Type, _ = p.realType(param.Type, true)
+func (p *Parser) fn_parse_type(t *Type) bool {
+	pt, ok := p.realType(*t, true)
+	if ok && typeIsArray(pt) && pt.Size.AutoSized {
+		p.pusherrtok(pt.Token, "invalid_type")
+		ok = false
 	}
-	f.RetType.Type, _ = p.realType(f.RetType.Type, true)
+	*t = pt
+	return ok
+}
+
+func (p *Parser) reloadFuncTypes(f *Func) {
+	for _, param := range f.Params {
+		_ = p.fn_parse_type(&param.Type)
+	}
+	if p.fn_parse_type(&f.RetType.Type) && typeIsArray(f.RetType.Type) {
+		p.pusherrtok(f.RetType.Type.Token, "invalid_type")
+	}
 }
 
 func itsCombined(f *Func, generics []Type) bool {
@@ -3680,6 +3692,8 @@ func (p *Parser) typeSourceIsArrayType(arr_t *Type) (ok bool) {
 	*arr_t.ComponentType, ok = p.realType(*arr_t.ComponentType, true)
 	if !ok {
 		return
+	} else if typeIsArray(*arr_t.ComponentType) && arr_t.ComponentType.Size.AutoSized {
+		p.pusherrtok(arr_t.Token, "invalid_type")
 	}
 	modifiers := arr_t.Modifiers()
 	arr_t.Kind = modifiers + jule.PREFIX_ARRAY + arr_t.ComponentType.Kind
@@ -3704,11 +3718,11 @@ func (p *Parser) typeSourceIsArrayType(arr_t *Type) (ok bool) {
 
 func (p *Parser) typeSourceIsSliceType(slc_t *Type) (ok bool) {
 	*slc_t.ComponentType, ok = p.realType(*slc_t.ComponentType, true)
+	if ok && typeIsArray(*slc_t.ComponentType) && slc_t.ComponentType.Size.AutoSized {
+		p.pusherrtok(slc_t.Token, "invalid_type")
+	}
 	modifiers := slc_t.Modifiers()
 	slc_t.Kind = modifiers + jule.PREFIX_SLICE + slc_t.ComponentType.Kind
-	if ok && typeIsArray(*slc_t.ComponentType) { // Array into slice
-		p.pusherrtok(slc_t.Token, "invalid_type_source")
-	}
 	return
 }
 

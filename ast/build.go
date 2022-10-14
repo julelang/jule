@@ -138,7 +138,7 @@ func (b *Builder) TypeAlias(toks []lex.Token) (t models.TypeAlias) {
 		b.pusherr(toks[i-1], "missing_type")
 		return
 	}
-	destType, ok := b.DataType(toks, &i, true, true)
+	destType, ok := b.DataType(toks, &i, true)
 	t.Type = destType
 	if ok && i+1 < len(toks) {
 		b.pusherr(toks[i+1], "invalid_syntax")
@@ -231,7 +231,7 @@ func (b *Builder) Enum(toks []lex.Token) {
 			b.pusherr(toks[i-1], "invalid_syntax")
 			return
 		}
-		e.Type, _ = b.DataType(toks, &i, false, true)
+		e.Type, _ = b.DataType(toks, &i, true)
 		i++
 		if i >= len(toks) {
 			b.pusherr(e.Token, "body_not_exist")
@@ -508,7 +508,7 @@ func (b *Builder) Impl(toks []lex.Token) {
 	}
 	{
 		i := 0
-		impl.Target, _ = b.DataType(toks[3:4], &i, false, true)
+		impl.Target, _ = b.DataType(toks[3:4], &i, true)
 		toks = toks[4:]
 	}
 body:
@@ -1091,7 +1091,7 @@ func (b *Builder) paramType(param *models.Param, toks []lex.Token, mustPure bool
 			return
 		}
 	}
-	param.Type, _ = b.DataType(toks, &i, false, true)
+	param.Type, _ = b.DataType(toks, &i, true)
 	i++
 	if i < len(toks) {
 		b.pusherr(toks[i], "invalid_syntax")
@@ -1160,7 +1160,7 @@ func (b *Builder) idDataTypePartEnd(t *models.Type, dtv *strings.Builder, toks [
 	generics := make([]models.Type, len(parts))
 	for i, part := range parts {
 		index := 0
-		t, _ := b.DataType(part, &index, false, true)
+		t, _ := b.DataType(part, &index, true)
 		if index+1 < len(part) {
 			b.pusherr(part[index+1], "invalid_syntax")
 		}
@@ -1173,7 +1173,7 @@ func (b *Builder) idDataTypePartEnd(t *models.Type, dtv *strings.Builder, toks [
 	t.Tag = generics
 }
 
-func (b *Builder) datatype(t *models.Type, toks []lex.Token, i *int, arrays, err bool) (ok bool) {
+func (b *Builder) datatype(t *models.Type, toks []lex.Token, i *int, err bool) (ok bool) {
 	defer func() { t.Original = *t }()
 	first := *i
 	var dtv strings.Builder
@@ -1274,22 +1274,17 @@ func (b *Builder) datatype(t *models.Type, toks []lex.Token, i *int, arrays, err
 				}
 				tok = toks[*i]
 				if tok.Id == lex.ID_BRACE && tok.Kind == lex.KND_RBRACKET {
-					arrays = false
 					dtv.WriteString(jule.PREFIX_SLICE)
 					t.ComponentType = new(models.Type)
 					t.Id = juletype.SLICE
 					t.Token = tok
 					*i++
-					ok = b.datatype(t.ComponentType, toks, i, arrays, err)
+					ok = b.datatype(t.ComponentType, toks, i, err)
 					dtv.WriteString(t.ComponentType.Kind)
 					goto ret
 				}
 				*i-- // Start from bracket
-				if arrays {
-					ok = b.MapOrArrayDataType(t, toks, i, err)
-				} else {
-					ok = b.MapDataType(t, toks, i, err)
-				}
+				ok = b.MapOrArrayDataType(t, toks, i, err)
 				if t.Id == juletype.VOID {
 					if err {
 						b.pusherr(tok, "invalid_syntax")
@@ -1317,9 +1312,9 @@ ret:
 }
 
 // DataType builds AST model of data-type.
-func (b *Builder) DataType(toks []lex.Token, i *int, arrays, err bool) (t models.Type, ok bool) {
+func (b *Builder) DataType(toks []lex.Token, i *int, err bool) (t models.Type, ok bool) {
 	tok := toks[*i]
-	ok = b.datatype(&t, toks, i, arrays, err)
+	ok = b.datatype(&t, toks, i, err)
 	if err && t.Token.Id == lex.ID_NA {
 		b.pusherr(tok, "invalid_type")
 	}
@@ -1335,13 +1330,9 @@ func (b *Builder) arrayDataType(t *models.Type, toks []lex.Token, i *int, err bo
 	*i++
 	exprI := *i
 	t.ComponentType = new(models.Type)
-	ok = b.datatype(t.ComponentType, toks, i, true, err)
+	ok = b.datatype(t.ComponentType, toks, i, err)
 	if !ok {
 		return
-	}
-	if t.ComponentType.Size.AutoSized {
-		b.pusherr(t.ComponentType.Size.Expr.Tokens[0], "invalid_syntax")
-		ok = false
 	}
 	_, exprToks := RangeLast(toks[:exprI])
 	exprToks = exprToks[1 : len(exprToks)-1]
@@ -1389,9 +1380,9 @@ func (b *Builder) mapDataType(t *models.Type, toks, typeToks []lex.Token,
 	valueTypeToks := typeToks[colon+1:]
 	types := make([]models.Type, 2)
 	j := 0
-	types[0], _ = b.DataType(keyTypeToks, &j, true, err)
+	types[0], _ = b.DataType(keyTypeToks, &j, err)
 	j = 0
-	types[1], _ = b.DataType(valueTypeToks, &j, true, err)
+	types[1], _ = b.DataType(valueTypeToks, &j, err)
 	t.Tag = types
 	t.Kind = t.MapKind()
 	ok = true
@@ -1404,7 +1395,7 @@ func (b *Builder) funcMultiTypeRet(toks []lex.Token, i *int) (t models.RetType, 
 	*i++
 	if *i >= len(toks) {
 		*i--
-		t.Type, ok = b.DataType(toks, i, false, false)
+		t.Type, ok = b.DataType(toks, i, false)
 		return
 	}
 	tok = toks[*i]
@@ -1454,7 +1445,7 @@ func (b *Builder) FuncRetDataType(toks []lex.Token, i *int) (t models.RetType, o
 			return
 		}
 	}
-	t.Type, ok = b.DataType(toks, i, false, true)
+	t.Type, ok = b.DataType(toks, i, true)
 	return
 }
 
@@ -1880,7 +1871,7 @@ func (b *Builder) varTypeNExpr(v *models.Var, toks []lex.Token, i int, expr bool
 			b.pusherr(tok, "missing_type")
 			return
 		}
-		t, ok := b.DataType(toks, &i, true, false)
+		t, ok := b.DataType(toks, &i, false)
 		if ok {
 			v.Type = t
 			i++

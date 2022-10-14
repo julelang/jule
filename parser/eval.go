@@ -500,7 +500,7 @@ func (e *eval) tryCast(toks []lex.Token, m *exprModel) (v value, _ bool) {
 		b := ast.NewBuilder(nil)
 		dtindex := 0
 		typeToks := toks[1:i]
-		dt, ok := b.DataType(typeToks, &dtindex, false, false)
+		dt, ok := b.DataType(typeToks, &dtindex, false)
 		b.Wait()
 		if !ok {
 			return
@@ -804,7 +804,7 @@ func (e *eval) typeId(toks []lex.Token, m *exprModel) (v value) {
 	v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
 	b := ast.NewBuilder(nil)
 	i := 0
-	t, ok := b.DataType(toks, &i, true, true)
+	t, ok := b.DataType(toks, &i, true)
 	b.Wait()
 	if !ok {
 		e.p.pusherrs(b.Errors...)
