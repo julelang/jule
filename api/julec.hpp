@@ -261,9 +261,9 @@ void __julec_setup_command_line_args(int argc, char *argv[]) noexcept {
     _args.__push( __julec_utf16_to_utf8_str( _wargs+_old , std::wcslen( _wargs+_old ) ) );
     __julec_command_line_args = _args;
 #else
-    __julec_args = slice<str_julet>( argc );
+    __julec_command_line_args = slice<str_julet>( argc );
     for (int_julet _i{ 0 }; _i < argc; ++_i)
-    { __julec_command_line_args[_i] = argv[_i]; }
+    { __julec_command_line_args.__push( argv[_i] ); }
 #endif // #ifdef _WINDOWS
 }
 
