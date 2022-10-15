@@ -1477,7 +1477,7 @@ func (e *eval) anonymousFn(toks []lex.Token, m *exprModel) (v value) {
 		e.p.pusherrs(b.Errors...)
 		return
 	}
-	e.p.checkAnonFunc(&f)
+	e.p.check_anon_fn(&f)
 	f.Owner = e.p
 	v.data.Value = f.Id
 	v.data.Type.Tag = &f

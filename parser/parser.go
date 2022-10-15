@@ -2161,14 +2161,14 @@ func (p *Parser) structConstructorInstance(as *structure) *structure {
 	return s
 }
 
-func (p *Parser) checkAnonFunc(f *Func) {
+func (p *Parser) check_anon_fn(f *Func) {
 	_ = p.checkParamDup(f.Params)
 	p.checkRetVars(f)
 	p.reloadFuncTypes(f)
 	globals := p.Defines.Globals
 	blockVariables := p.blockVars
 	p.Defines.Globals = append(blockVariables, p.Defines.Globals...)
-	p.blockVars = p.varsFromParams(f)
+	p.blockVars = p.blockVarsOfFunc(f)
 	rootBlock := p.rootBlock
 	nodeBlock := p.nodeBlock
 	p.checkFunc(f)
