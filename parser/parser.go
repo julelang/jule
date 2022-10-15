@@ -3907,8 +3907,8 @@ func (p *Parser) evalExpr(expr Expr, prefix *models.Type) (value, iExpr) {
 	return p.eval.eval_expr(expr)
 }
 
-func (p *Parser) evalToks(toks []lex.Token) (value, iExpr) {
+func (p *Parser) evalToks(toks []lex.Token, prefix *models.Type) (value, iExpr) {
 	p.eval.has_error = false
-	p.eval.type_prefix = nil
+	p.eval.type_prefix = prefix
 	return p.eval.eval_toks(toks)
 }

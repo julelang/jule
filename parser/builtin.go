@@ -698,7 +698,7 @@ func caller_out(p *Parser, f *Func, data callData, m *exprModel) (v value) {
 	v.data.Type = f.RetType.Type
 	// Remove parentheses
 	data.args = data.args[1 : len(data.args)-1]
-	arg, model := p.evalToks(data.args)
+	arg, model := p.evalToks(data.args, nil)
 	if typeIsFunc(arg.data.Type) {
 		p.pusherrtok(errtok, "invalid_expr")
 	}
@@ -797,7 +797,7 @@ func caller_mem_size_of(p *Parser, _ *Func, data callData, m *exprModel) (v valu
 	t, ok := b.DataType(data.args, &i, true)
 	b.Wait()
 	if !ok {
-		v, model := p.evalToks(data.args)
+		v, model := p.evalToks(data.args, nil)
 		*node = exprNode{"sizeof(" + model.String() + ")"}
 		v.constExpr = false
 		return v
@@ -825,7 +825,7 @@ func caller_mem_align_of(p *Parser, _ *Func, data callData, m *exprModel) (v val
 	t, ok := b.DataType(data.args, &i, true)
 	b.Wait()
 	if !ok {
-		v, model := p.evalToks(data.args)
+		v, model := p.evalToks(data.args, nil)
 		*node = exprNode{"alignof(" + model.String() + ")"}
 		v.constExpr = false
 		return v

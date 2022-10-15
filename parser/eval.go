@@ -211,7 +211,7 @@ func (e *eval) dataTypeFunc(expr lex.Token, callRange []lex.Token, m *exprModel)
 		switch expr.Kind {
 		case lex.KND_STR:
 			m.appendSubNode(exprNode{"__julec_to_str("})
-			_, vm := e.p.evalToks(callRange)
+			_, vm := e.p.evalToks(callRange, nil)
 			m.appendSubNode(vm)
 			m.appendSubNode(exprNode{lex.KND_RPARENT})
 			v.data.Type = Type{
@@ -1119,7 +1119,7 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 		m.appendSubNode(exprNode{".___slice("})
 		if len(leftToks) > 0 {
 			var model iExpr
-			leftv, model = e.p.evalToks(leftToks)
+			leftv, model = e.p.evalToks(leftToks, nil)
 			m.appendSubNode(indexingExprModel(model))
 			e.checkIntegerIndexing(leftv, errTok)
 		} else {
@@ -1130,7 +1130,7 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 		if len(rightToks) > 0 {
 			m.appendSubNode(exprNode{","})
 			var model iExpr
-			rightv, model = e.p.evalToks(rightToks)
+			rightv, model = e.p.evalToks(rightToks, nil)
 			m.appendSubNode(indexingExprModel(model))
 			e.checkIntegerIndexing(rightv, errTok)
 		}

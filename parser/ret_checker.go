@@ -20,7 +20,17 @@ func (rc *retChecker) pushval(last, current int, errTok lex.Token) {
 		return
 	}
 	toks := rc.ret_ast.Expr.Tokens[last:current]
-	v, model := rc.t.evalToks(toks)
+	var prefix Type
+	i := len(rc.values)
+	if rc.f.RetType.Type.MultiTyped {
+		types := rc.f.RetType.Type.Tag.([]Type)
+		if i < len(types) {
+			prefix = types[i]
+		}
+	} else if i == 0 {
+		prefix = rc.f.RetType.Type
+	}
+	v, model := rc.t.evalToks(toks, &prefix)
 	rc.exp_model.models = append(rc.exp_model.models, model)
 	rc.values = append(rc.values, v)
 }
