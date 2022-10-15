@@ -384,25 +384,25 @@ func can_be_order(s *structure) bool {
 }
 
 func order_structures(structures []*structure) {
-	// As far as has been tested, there is no need for this indexing.
-	/*for i, s := range structures {
+	for i, s := range structures {
 		s.order = i
-	}*/
+	}
 
-	swapped := true
-	for swapped {
-		swapped = false
-		i := 1
-		for i < len(structures) {
-			curr := &structures[i]
+	n := len(structures)
+	for i := 1; i < n; i++ {
+		swapped := false
+		for j := 1; j < n - i; j++ {
+			curr := &structures[j]
 			if can_be_order(*curr) {
-				(*curr).origin.order = i-1
-				prev := &structures[i-1]
-				(*prev).origin.order = i
+				(*curr).origin.order = j-1
+				prev := &structures[j-1]
+				(*prev).origin.order = j
 				*curr, *prev = *prev, *curr
 				swapped = true
 			}
-			i++
+		}
+		if !swapped {
+			break
 		}
 	}
 }
