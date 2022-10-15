@@ -44,8 +44,6 @@ func ToRune(bytes []byte) string {
 
 func rtoa(r rune) string { return "0x" + strconv.FormatInt(int64(r), 16) }
 
-func btoa(b byte) string { return "0x" + strconv.FormatUint(uint64(b), 16) }
-
 func sbtoa(b byte) string {
 	if b == 0 {
 		return "\\x00"
@@ -112,7 +110,7 @@ func tryBtoaCommonEsq(bytes []byte) (seq byte, ok bool) {
 	case 't':
 		seq = '\t'
 	case 'v':
-		seq = 'v'
+		seq = '\v'
 	}
 	ok = seq != 0
 	return
@@ -151,7 +149,7 @@ func rune_from_esq_seq(bytes []byte, i *int) rune {
 func strEsqSeq(bytes []byte, i *int) string {
 	r := rune_from_esq_seq(bytes, i)
 	if r <= 255 {
-		return btoa(byte(r))
+		return sbtoa(byte(r))
 	}
 	return bytesToStr([]byte(string(r)))
 }
