@@ -389,15 +389,15 @@ func order_structures(structures []*structure) {
 	}
 
 	n := len(structures)
-	for i := 1; i < n; i++ {
+	for i := 0; i < n; i++ {
 		swapped := false
-		for j := 1; j < n - i; j++ {
+		for j := 0; j < n - i - 1; j++ {
 			curr := &structures[j]
 			if can_be_order(*curr) {
-				(*curr).origin.order = j-1
-				prev := &structures[j-1]
-				(*prev).origin.order = j
-				*curr, *prev = *prev, *curr
+				(*curr).origin.order = j+1
+				next := &structures[j+1]
+				(*next).origin.order = j
+				*curr, *next = *next, *curr
 				swapped = true
 			}
 		}
