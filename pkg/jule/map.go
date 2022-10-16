@@ -2,8 +2,8 @@ package jule
 
 // ATTRS is list of all attributes.
 var ATTRS = [...]string{
-	0: ATTR_CDEF,
-	1: ATTR_TYPEDEF,
+	ATTR_CDEF,
+	ATTR_TYPEDEF,
 }
 
 // List of supported operating systems.

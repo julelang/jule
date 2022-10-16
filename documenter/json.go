@@ -10,7 +10,7 @@ import (
 	"github.com/jule-lang/jule/pkg/juletype"
 )
 
-type Defmap = parser.DefineMap
+type Defmap = parser.Defmap
 
 type generic struct {
 	Id string

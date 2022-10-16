@@ -29,7 +29,7 @@ func newExprModel(n int) *exprModel {
 	return m
 }
 
-func (m *exprModel) appendSubNode(node iExpr) {
+func (m *exprModel) append_sub(node iExpr) {
 	nodes := &m.nodes[m.index].nodes
 	*nodes = append(*nodes, node)
 }
@@ -66,7 +66,7 @@ func (af anonFuncExpr) String() string {
 	var cpp strings.Builder
 	t := Type{
 		Token:  af.ast.Token,
-		Kind: af.ast.DataTypeString(),
+		Kind: af.ast.TypeKind(),
 		Tag:  af.ast,
 	}
 	cpp.WriteString(t.FuncString())

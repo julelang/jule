@@ -28,7 +28,7 @@ func (tc *type_checker) check_ref() bool {
 func (tc *type_checker) check_ptr() bool {
 	if tc.right.Id == juletype.NIL {
 		return true
-	} else if typeIsUnsafePtr(tc.left) {
+	} else if type_is_unsafe_ptr(tc.left) {
 		return true
 	}
 	return tc.left.Kind == tc.right.Kind
@@ -42,14 +42,14 @@ func (tc *type_checker) check_trait() bool {
 	lm := tc.left.Modifiers()
 	ref := false
 	switch {
-	case typeIsRef(tc.right):
+	case type_is_ref(tc.right):
 		ref = true
 		tc.right = un_ptr_or_ref_type(tc.right)
-		if !typeIsStruct(tc.right) {
+		if !type_is_struct(tc.right) {
 			break
 		}
 		fallthrough
-	case typeIsStruct(tc.right):
+	case type_is_struct(tc.right):
 		if lm != "" {
 			return false
 		}
@@ -67,7 +67,7 @@ func (tc *type_checker) check_trait() bool {
 			return false
 		}
 		return true
-	case typeIsTrait(tc.right):
+	case type_is_trait(tc.right):
 		return t == tc.right.Tag.(*trait) && lm == tc.right.Modifiers()
 	}
 	return false
@@ -89,7 +89,7 @@ func (tc *type_checker) check_struct() bool {
 	}
 	for i, g1 := range s1.generics {
 		g2 := s2.generics[i]
-		if !typesEquals(g1, g2) {
+		if !types_equals(g1, g2) {
 			return false
 		}
 	}
@@ -104,7 +104,7 @@ func (tc *type_checker) check_slice() bool {
 }
 
 func (tc *type_checker) check_array() bool {
-	if !typeIsArray(tc.right) {
+	if !type_is_array(tc.right) {
 		return false
 	}
 	return tc.left.Size.N == tc.right.Size.N
@@ -119,43 +119,43 @@ func (tc *type_checker) check_map() bool {
 
 func (tc *type_checker) check() bool {
 	switch {
-	case typeIsTrait(tc.left), typeIsTrait(tc.right):
-		if typeIsTrait(tc.right) {
+	case type_is_trait(tc.left), type_is_trait(tc.right):
+		if type_is_trait(tc.right) {
 			tc.left, tc.right = tc.right, tc.left
 		}
 		return tc.check_trait()
-	case typeIsRef(tc.left), typeIsRef(tc.right):
-		if typeIsRef(tc.right) {
+	case type_is_ref(tc.left), type_is_ref(tc.right):
+		if type_is_ref(tc.right) {
 			tc.left, tc.right = tc.right, tc.left
 		}
 		return tc.check_ref()
-	case typeIsPtr(tc.left), typeIsPtr(tc.right):
-		if !typeIsPtr(tc.left) && typeIsPtr(tc.right) {
+	case type_is_ptr(tc.left), type_is_ptr(tc.right):
+		if !type_is_ptr(tc.left) && type_is_ptr(tc.right) {
 			tc.left, tc.right = tc.right, tc.left
 		}
 		return tc.check_ptr()
-	case typeIsSlice(tc.left), typeIsSlice(tc.right):
-		if typeIsSlice(tc.right) {
+	case type_is_slc(tc.left), type_is_slc(tc.right):
+		if type_is_slc(tc.right) {
 			tc.left, tc.right = tc.right, tc.left
 		}
 		return tc.check_slice()
-	case typeIsArray(tc.left), typeIsArray(tc.right):
-		if typeIsArray(tc.right) {
+	case type_is_array(tc.left), type_is_array(tc.right):
+		if type_is_array(tc.right) {
 			tc.left, tc.right = tc.right, tc.left
 		}
 		return tc.check_array()
-	case typeIsMap(tc.left), typeIsMap(tc.right):
-		if typeIsMap(tc.right) {
+	case type_is_map(tc.left), type_is_map(tc.right):
+		if type_is_map(tc.right) {
 			tc.left, tc.right = tc.right, tc.left
 		}
 		return tc.check_map()
-	case typeIsNilCompatible(tc.left):
+	case type_is_nil_compatible(tc.left):
 		return tc.right.Id == juletype.NIL
-	case typeIsNilCompatible(tc.right):
+	case type_is_nil_compatible(tc.right):
 		return tc.left.Id == juletype.NIL
-	case typeIsEnum(tc.left), typeIsEnum(tc.right):
+	case type_is_enum(tc.left), type_is_enum(tc.right):
 		return tc.left.Id == tc.right.Id && tc.left.Kind == tc.right.Kind
-	case typeIsStruct(tc.left), typeIsStruct(tc.right):
+	case type_is_struct(tc.left), type_is_struct(tc.right):
 		if tc.right.Id == juletype.STRUCT {
 			tc.left, tc.right = tc.right, tc.left
 		}

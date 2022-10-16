@@ -37,19 +37,17 @@ var WEAK_OPS = [...]string{
 	lex.KND_COLON,
 }
 
-// IsUnaryOperator is returns true
-// if operator is unary or smilar to unary,
+// IsUnaryOp is returns true if operator is unary or smilar to unary,
 // returns false if not.
-func IsUnaryOperator(kind string) bool { return existOperator(kind, UNARY_OPS[:]) }
+func IsUnaryOp(kind string) bool { return existOp(kind, UNARY_OPS[:]) }
 
-// IsSolidOperator returns true operator kind is not repeatable, false if not.
-func IsSolidOperator(kind string) bool { return existOperator(kind, STRONG_OPS[:]) }
+// IsStrongOp returns true operator kind is not repeatable, false if not.
+func IsStrongOp(kind string) bool { return existOp(kind, STRONG_OPS[:]) }
 
-// IsExprOperator reports operator kind
-// is allow as expression operator or not.
-func IsExprOperator(kind string) bool { return existOperator(kind, WEAK_OPS[:]) }
+// IsExprOp reports operator kind is allow as expression operator or not.
+func IsExprOp(kind string) bool { return existOp(kind, WEAK_OPS[:]) }
 
-func existOperator(kind string, operators []string) bool {
+func existOp(kind string, operators []string) bool {
 	for _, operator := range operators {
 		if kind == operator {
 			return true

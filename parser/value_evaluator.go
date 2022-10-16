@@ -74,7 +74,7 @@ func (ve *valueEvaluator) str() value {
 	content := ve.token.Kind[1 : len(ve.token.Kind)-1]
 	v.expr = content
 	v.model = strModel(v)
-	ve.model.appendSubNode(v.model)
+	ve.model.append_sub(v.model)
 	return v
 }
 
@@ -106,7 +106,7 @@ func (ve *valueEvaluator) char() value {
 	v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
 	v.expr, _ = strconv.ParseInt(content[2:], 16, 64)
 	v.model = exprNode{content}
-	ve.model.appendSubNode(v.model)
+	ve.model.append_sub(v.model)
 	return v
 }
 
@@ -118,7 +118,7 @@ func (ve *valueEvaluator) bool() value {
 	v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
 	v.expr = ve.token.Kind == lex.KND_TRUE
 	v.model = boolModel(v)
-	ve.model.appendSubNode(v.model)
+	ve.model.append_sub(v.model)
 	return v
 }
 
@@ -130,7 +130,7 @@ func (ve *valueEvaluator) nil() value {
 	v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
 	v.expr = nil
 	v.model = exprNode{ve.token.Kind}
-	ve.model.appendSubNode(v.model)
+	ve.model.append_sub(v.model)
 	return v
 }
 
@@ -138,13 +138,13 @@ func normalize(v *value) (normalized bool) {
 	switch {
 	case !v.constExpr:
 		return
-	case integerAssignable(juletype.U64, *v):
+	case int_assignable(juletype.U64, *v):
 		v.data.Type.Id = juletype.U64
 		v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
 		v.expr = tonumu(v.expr)
 		bitize(v)
 		return true
-	case integerAssignable(juletype.I64, *v):
+	case int_assignable(juletype.I64, *v):
 		v.data.Type.Id = juletype.I64
 		v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
 		v.expr = tonums(v.expr)
@@ -195,7 +195,7 @@ func (ve *valueEvaluator) numeric() value {
 	}
 	v.constExpr = true
 	v.model = numericModel(v)
-	ve.model.appendSubNode(v.model)
+	ve.model.append_sub(v.model)
 	return v
 }
 
@@ -217,14 +217,14 @@ func (ve *valueEvaluator) varId(id string, variable *Var, global bool) (v value)
 	variable.Used = true
 	v = make_value_from_var(variable)
 	if v.constExpr {
-		ve.model.appendSubNode(v.model)
+		ve.model.append_sub(v.model)
 	} else {
-		if variable.Id == lex.KND_SELF && !typeIsRef(variable.Type) {
-			ve.model.appendSubNode(exprNode{"(*this)"})
+		if variable.Id == lex.KND_SELF && !type_is_ref(variable.Type) {
+			ve.model.append_sub(exprNode{"(*this)"})
 		} else {
-			ve.model.appendSubNode(exprNode{variable.OutId()})
+			ve.model.append_sub(exprNode{variable.OutId()})
 		}
-		ve.p.eval.has_error = ve.p.eval.has_error || typeIsVoid(v.data.Type)
+		ve.p.eval.has_error = ve.p.eval.has_error || type_is_void(v.data.Type)
 	}
 	return
 }
@@ -233,7 +233,7 @@ func make_value_from_fn(f *models.Fn) (v value) {
 	v.data.Value = f.Id
 	v.data.Type.Id = juletype.FN
 	v.data.Type.Tag = f
-	v.data.Type.Kind = f.DataTypeString()
+	v.data.Type.Kind = f.TypeKind()
 	v.data.Token = f.Token
 	return
 }
@@ -241,7 +241,7 @@ func make_value_from_fn(f *models.Fn) (v value) {
 func (ve *valueEvaluator) funcId(id string, f *Fn) (v value) {
 	f.used = true
 	v = make_value_from_fn(f.Ast)
-	ve.model.appendSubNode(exprNode{f.outId()})
+	ve.model.append_sub(exprNode{f.outId()})
 	return
 }
 
@@ -256,9 +256,9 @@ func (ve *valueEvaluator) enumId(id string, e *Enum) (v value) {
 	v.is_type = true
 	// If built-in.
 	if e.Token.Id == lex.ID_NA {
-		ve.model.appendSubNode(exprNode{juleapi.OutId(id, nil)})
+		ve.model.append_sub(exprNode{juleapi.OutId(id, nil)})
 	} else {
-		ve.model.appendSubNode(exprNode{juleapi.OutId(id, e.Token.File)})
+		ve.model.append_sub(exprNode{juleapi.OutId(id, e.Token.File)})
 	}
 	return
 }
@@ -279,9 +279,9 @@ func (ve *valueEvaluator) structId(id string, s *structure) (v value) {
 	v = make_value_from_struct(s)
 	// If builtin.
 	if s.Ast.Token.Id == lex.ID_NA {
-		ve.model.appendSubNode(exprNode{juleapi.OutId(id, nil)})
+		ve.model.append_sub(exprNode{juleapi.OutId(id, nil)})
 	} else {
-		ve.model.appendSubNode(exprNode{juleapi.OutId(id, s.Ast.Token.File)})
+		ve.model.append_sub(exprNode{juleapi.OutId(id, s.Ast.Token.File)})
 	}
 	return
 }
@@ -291,7 +291,7 @@ func (ve *valueEvaluator) typeId(id string, t *TypeAlias) (_ value, _ bool) {
 	if !ok {
 		return
 	}
-	if typeIsStruct(dt) {
+	if type_is_struct(dt) {
 		return ve.structId(id, dt.Tag.(*structure)), true
 	}
 	return

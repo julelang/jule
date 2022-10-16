@@ -14,7 +14,7 @@ type structure struct {
 	Ast         Struct
 	origin      *structure
 	Traits      []*trait // Implemented traits
-	Defines     *DefineMap
+	Defines     *Defmap
 	Used        bool
 	Description string
 	

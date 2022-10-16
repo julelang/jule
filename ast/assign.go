@@ -47,8 +47,8 @@ func IsAssign(id uint8) bool {
 	return false
 }
 
-// IsPostfixOperator reports operator kind is postfix operator or not.
-func IsPostfixOperator(kind string) bool {
+// IsPostfixOp reports operator kind is postfix operator or not.
+func IsPostfixOp(kind string) bool {
 	for _, operator := range POSTFIX_OPS {
 		if kind == operator {
 			return true
@@ -57,10 +57,10 @@ func IsPostfixOperator(kind string) bool {
 	return false
 }
 
-// IsAssignOperator reports operator kind is
+// IsAssignOp reports operator kind is
 // assignment operator or not.
-func IsAssignOperator(kind string) bool {
-	if IsPostfixOperator(kind) {
+func IsAssignOp(kind string) bool {
+	if IsPostfixOp(kind) {
 		return true
 	}
 	for _, operator := range ASSING_OPS {
@@ -90,7 +90,7 @@ func CheckAssignTokens(toks []lex.Token) bool {
 			return false
 		} else if brace_n > 0 {
 			continue
-		} else if t.Id == lex.ID_OP && IsAssignOperator(t.Kind) {
+		} else if t.Id == lex.ID_OP && IsAssignOp(t.Kind) {
 			return true
 		}
 	}

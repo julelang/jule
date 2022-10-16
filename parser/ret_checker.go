@@ -61,7 +61,7 @@ func (rc *retChecker) checkepxrs() {
 			rc.pushval(last, n, rc.ret_ast.Expr.Tokens[last-1])
 		}
 	}
-	if !typeIsVoid(rc.f.RetType.Type) {
+	if !type_is_void(rc.f.RetType.Type) {
 		rc.checkExprTypes()
 		rc.ret_ast.Expr.Model = rc.exp_model
 	}
@@ -188,14 +188,14 @@ func (rc *retChecker) retsVars() {
 
 func (rc *retChecker) check() {
 	n := len(rc.ret_ast.Expr.Tokens)
-	if n == 0 && !typeIsVoid(rc.f.RetType.Type) {
+	if n == 0 && !type_is_void(rc.f.RetType.Type) {
 		if !rc.f.RetType.AnyVar() {
 			rc.t.pusherrtok(rc.ret_ast.Token, "require_return_value")
 		}
 		rc.retsVars()
 		return
 	}
-	if n > 0 && typeIsVoid(rc.f.RetType.Type) {
+	if n > 0 && type_is_void(rc.f.RetType.Type) {
 		rc.t.pusherrtok(rc.ret_ast.Token, "void_function_return_value")
 	}
 	rc.exp_model.vars = rc.f.RetType.Vars(rc.t.nodeBlock)

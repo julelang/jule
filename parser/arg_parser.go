@@ -45,7 +45,7 @@ func (pap *pureArgParser) buildArgs() {
 	}
 }
 
-func (pap *pureArgParser) pushVariadicArgs(pair *paramMapPair) {
+func (pap *pureArgParser) push_variadic_args(pair *paramMapPair) {
 	// Used to build initializer list for slice
 	var model serieExpr
 	model.exprs = append(model.exprs, exprNode{lex.KND_LBRACE})
@@ -81,7 +81,7 @@ func (pap *pureArgParser) check_param_arg(pair *paramMapPair) {
 func (pap *pureArgParser) check_passes_struct() {
 	if len(pap.args.Src) == 0 {
 		for _, pair := range *pap.pmap {
-			if typeIsRef(pair.param.Type) {
+			if type_is_ref(pair.param.Type) {
 				pap.p.pusherrtok(pap.errTok, "reference_field_not_initialized", pair.param.Id)
 			}
 		}
@@ -113,7 +113,7 @@ func (pap *pureArgParser) pushArg() {
 	arg := pap.arg
 	pair.arg = &arg
 	if pair.param.Variadic {
-		pap.pushVariadicArgs(pair)
+		pap.push_variadic_args(pair)
 	} else {
 		pap.p.parseArg(pap.f, pair, pap.args, nil)
 	}

@@ -61,8 +61,8 @@ func (f *Fn) plainTypeString() string {
 	return s.String()
 }
 
-// DataTypeString returns data type string of function.
-func (f *Fn) DataTypeString() string {
+// TypeKind returns data type string of function.
+func (f *Fn) TypeKind() string {
 	var cpp strings.Builder
 	if f.IsUnsafe {
 		cpp.WriteString("unsafe ")

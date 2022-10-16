@@ -130,7 +130,7 @@ func paramsToCpp(params []Param) string {
 }
 
 func is_constructor(f *Func) bool {
-	if !typeIsStruct(f.RetType.Type) {
+	if !type_is_struct(f.RetType.Type) {
 		return false
 	}
 	s := f.RetType.Type.Tag.(*structure)

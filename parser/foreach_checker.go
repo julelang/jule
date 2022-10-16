@@ -91,11 +91,11 @@ func (fc *foreachChecker) str() {
 
 func (fc *foreachChecker) check() {
 	switch {
-	case typeIsSlice(fc.val.data.Type):
+	case type_is_slc(fc.val.data.Type):
 		fc.slice()
-	case typeIsArray(fc.val.data.Type):
+	case type_is_array(fc.val.data.Type):
 		fc.array()
-	case typeIsMap(fc.val.data.Type):
+	case type_is_map(fc.val.data.Type):
 		fc.hashmap()
 	case fc.val.data.Type.Id == juletype.STR:
 		fc.str()

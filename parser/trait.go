@@ -9,14 +9,14 @@ import (
 
 type trait struct {
 	Ast  *models.Trait
-	Defines *DefineMap
+	Defines *Defmap
 	Used bool
 	Desc string
 }
 
 func (t *trait) has_reference_receiver() bool {
 	for _, f := range t.Defines.Funcs {
-		if typeIsRef(f.Ast.Receiver.Type) {
+		if type_is_ref(f.Ast.Receiver.Type) {
 			return true
 		}
 	}
@@ -59,7 +59,7 @@ func (t *trait) String() string {
 		cpp.WriteString(f.Id)
 		cpp.WriteString(paramsToCpp(f.Params))
 		cpp.WriteString(" {")
-		if !typeIsVoid(f.RetType.Type) {
+		if !type_is_void(f.RetType.Type) {
 			cpp.WriteString(" return {}; ")
 		}
 		cpp.WriteString("}\n")

@@ -384,7 +384,7 @@ func (s *solver) ptr() (v value) {
 			s.r.data.Type.Kind, s.l.data.Type.Kind)
 		return
 	}
-	if !typeIsPtr(s.l.data.Type) {
+	if !type_is_ptr(s.l.data.Type) {
 		s.l, s.r = s.r, s.l
 	}
 	switch s.op.Kind {
@@ -402,10 +402,10 @@ func (s *solver) ptr() (v value) {
 }
 
 func (s *solver) enum() (v value) {
-	if typeIsEnum(s.l.data.Type) {
+	if type_is_enum(s.l.data.Type) {
 		s.l.data.Type = s.l.data.Type.Tag.(*Enum).Type
 	}
-	if typeIsEnum(s.r.data.Type) {
+	if type_is_enum(s.r.data.Type) {
 		s.r.data.Type = s.r.data.Type.Tag.(*Enum).Type
 	}
 	return s.solve()
@@ -487,14 +487,14 @@ func (s *solver) floatMod() (v value, ok bool) {
 	switch {
 	case juletype.IsSignedInteger(s.l.data.Type.Id):
 		switch {
-		case integerAssignable(juletype.I64, s.r):
+		case int_assignable(juletype.I64, s.r):
 			return s.signed(), true
-		case integerAssignable(juletype.U64, s.r):
+		case int_assignable(juletype.U64, s.r):
 			return s.unsigned(), true
 		}
 	case juletype.IsUnsignedInteger(s.l.data.Type.Id):
-		if integerAssignable(juletype.I64, s.r) ||
-			integerAssignable(juletype.U64, s.r) {
+		if int_assignable(juletype.I64, s.r) ||
+			int_assignable(juletype.U64, s.r) {
 			return s.unsigned(), true
 		}
 	}
@@ -915,8 +915,8 @@ func (s *solver) juletrait() (v value) {
 
 func (s *solver) function() (v value) {
 	v.data.Token = s.op
-	if (!typeIsPure(s.l.data.Type) || s.l.data.Type.Id != juletype.NIL) &&
-		(!typeIsPure(s.r.data.Type) || s.r.data.Type.Id != juletype.NIL) {
+	if (!type_is_pure(s.l.data.Type) || s.l.data.Type.Id != juletype.NIL) &&
+		(!type_is_pure(s.r.data.Type) || s.r.data.Type.Id != juletype.NIL) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.op, "incompatible_types",
 			s.r.data.Type.Kind, s.l.data.Type.Kind)
@@ -953,7 +953,7 @@ func (s *solver) isConstExpr() bool {
 
 func (s *solver) solve() (v value) {
 	defer func() {
-		if typeIsVoid(v.data.Type) {
+		if type_is_void(v.data.Type) {
 			v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
 		} else {
 			v.constExpr = s.isConstExpr()
@@ -968,19 +968,19 @@ func (s *solver) solve() (v value) {
 		return s.logical()
 	}
 	switch {
-	case typeIsFunc(s.l.data.Type), typeIsFunc(s.r.data.Type):
+	case type_is_fn(s.l.data.Type), type_is_fn(s.r.data.Type):
 		return s.function()
-	case typeIsArray(s.l.data.Type), typeIsArray(s.r.data.Type):
+	case type_is_array(s.l.data.Type), type_is_array(s.r.data.Type):
 		return s.array()
-	case typeIsSlice(s.l.data.Type), typeIsSlice(s.r.data.Type):
+	case type_is_slc(s.l.data.Type), type_is_slc(s.r.data.Type):
 		return s.slice()
-	case typeIsPtr(s.l.data.Type), typeIsPtr(s.r.data.Type):
+	case type_is_ptr(s.l.data.Type), type_is_ptr(s.r.data.Type):
 		return s.ptr()
-	case typeIsEnum(s.l.data.Type), typeIsEnum(s.r.data.Type):
+	case type_is_enum(s.l.data.Type), type_is_enum(s.r.data.Type):
 		return s.enum()
-	case typeIsStruct(s.l.data.Type), typeIsStruct(s.r.data.Type):
+	case type_is_struct(s.l.data.Type), type_is_struct(s.r.data.Type):
 		return s.structure()
-	case typeIsTrait(s.l.data.Type), typeIsTrait(s.r.data.Type):
+	case type_is_trait(s.l.data.Type), type_is_trait(s.r.data.Type):
 		return s.juletrait()
 	case s.l.data.Type.Id == juletype.NIL, s.r.data.Type.Id == juletype.NIL:
 		return s.nil()

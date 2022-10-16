@@ -3,7 +3,7 @@ package parser
 import "github.com/jule-lang/jule/lex"
 
 type use struct {
-	defines    *DefineMap
+	defines    *Defmap
 	token   lex.Token
 	cppLink bool
 	

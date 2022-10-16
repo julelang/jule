@@ -89,7 +89,7 @@ func (b *Builder) buildNode(toks []lex.Token) {
 // Build builds AST tree.
 func (b *Builder) Build() {
 	for b.Pos != -1 && !b.Ended() {
-		toks := b.nextBuilderStatement()
+		toks := b.nextBuilderSt()
 		b.pub = toks[0].Id == lex.ID_PUB
 		if b.pub {
 			if len(toks) == 1 {
@@ -97,7 +97,7 @@ func (b *Builder) Build() {
 					b.pusherr(toks[0], "invalid_syntax")
 					continue
 				}
-				toks = b.nextBuilderStatement()
+				toks = b.nextBuilderSt()
 			} else {
 				toks = toks[1:]
 			}
@@ -269,7 +269,7 @@ func (b *Builder) structFields(toks []lex.Token, cpp_linked bool) []*models.Var 
 	var fields []*models.Var
 	i := 0
 	for i < len(toks) {
-		var_tokens := b.skipStatement(&i, &toks)
+		var_tokens := b.skipSt(&i, &toks)
 		if var_tokens[0].Id == lex.ID_COMMENT {
 			continue
 		}
@@ -335,7 +335,7 @@ func (b *Builder) traitFuncs(toks []lex.Token, trait_id string) []*models.Fn {
 	var funcs []*models.Fn
 	i := 0
 	for i < len(toks) {
-		fnToks := b.skipStatement(&i, &toks)
+		fnToks := b.skipSt(&i, &toks)
 		f := b.Func(fnToks, true, false, true)
 		b.setup_receiver(&f, trait_id)
 		f.Pub = true
@@ -378,7 +378,7 @@ func (b *Builder) implTraitFuncs(impl *models.Impl, toks []lex.Token) {
 	b.Pos = 0
 	b.Tokens = toks
 	for b.Pos != -1 && !b.Ended() {
-		fnToks := b.nextBuilderStatement()
+		fnToks := b.nextBuilderSt()
 		tok := fnToks[0]
 		switch tok.Id {
 		case lex.ID_COMMENT:
@@ -403,7 +403,7 @@ func (b *Builder) implStruct(impl *models.Impl, toks []lex.Token) {
 	b.Pos = 0
 	b.Tokens = toks
 	for b.Pos != -1 && !b.Ended() {
-		fnToks := b.nextBuilderStatement()
+		fnToks := b.nextBuilderSt()
 		tok := fnToks[0]
 		pub := false
 		switch tok.Id {
@@ -874,7 +874,7 @@ func (b *Builder) Func(toks []lex.Token, method, anon, prototype bool) (f models
 			b.pusherr(f.Token, "body_not_exist")
 			return
 		}
-		toks = b.nextBuilderStatement()
+		toks = b.nextBuilderSt()
 		i = 0
 	}
 	blockToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &toks)
@@ -953,8 +953,8 @@ func (b *Builder) GlobalVar(toks []lex.Token) {
 	if toks == nil {
 		return
 	}
-	bs := blockStatement{toks: toks}
-	s := b.VarStatement(&bs, true)
+	bs := block_st{toks: toks}
+	s := b.VarSt(&bs, true)
 	b.Tree = append(b.Tree, models.Object{
 		Token: s.Token,
 		Data:  s,
@@ -1249,7 +1249,7 @@ func (b *Builder) datatype(t *models.Type, toks []lex.Token, i *int, err bool) (
 			}
 			*i--
 			t.Tag = &f
-			dtv.WriteString(f.DataTypeString())
+			dtv.WriteString(f.TypeKind())
 			ok = true
 			goto ret
 		case lex.ID_OP:
@@ -1449,7 +1449,7 @@ func (b *Builder) FuncRetDataType(toks []lex.Token, i *int) (t models.RetType, o
 	return
 }
 
-func (b *Builder) pushStatementToBlock(bs *blockStatement) {
+func (b *Builder) pushStToBlock(bs *block_st) {
 	if len(bs.toks) == 0 {
 		return
 	}
@@ -1460,85 +1460,85 @@ func (b *Builder) pushStatementToBlock(bs *blockStatement) {
 		}
 		bs.toks = bs.toks[:len(bs.toks)-1]
 	}
-	s := b.Statement(bs)
+	s := b.St(bs)
 	if s.Data == nil {
 		return
 	}
-	s.WithTerminator = bs.withTerminator
+	s.WithTerminator = bs.terminated
 	bs.block.Tree = append(bs.block.Tree, s)
 }
 
-func setToNextStatement(bs *blockStatement) {
+func setToNextSt(bs *block_st) {
 	*bs.srcToks = (*bs.srcToks)[bs.pos:]
-	bs.pos, bs.withTerminator = NextStatementPos(*bs.srcToks, 0)
-	if bs.withTerminator {
+	bs.pos, bs.terminated = NextStPos(*bs.srcToks, 0)
+	if bs.terminated {
 		bs.toks = (*bs.srcToks)[:bs.pos-1]
 	} else {
 		bs.toks = (*bs.srcToks)[:bs.pos]
 	}
 }
 
-func blockStatementFinished(bs *blockStatement) bool {
+func blockStFinished(bs *block_st) bool {
 	return bs.pos >= len(*bs.srcToks)
 }
 
 // Block builds AST model of statements of code block.
 func (b *Builder) Block(toks []lex.Token) (block *models.Block) {
 	block = new(models.Block)
-	var bs blockStatement
+	var bs block_st
 	bs.block = block
 	bs.srcToks = &toks
 	for {
-		setToNextStatement(&bs)
-		b.pushStatementToBlock(&bs)
+		setToNextSt(&bs)
+		b.pushStToBlock(&bs)
 	next:
 		if len(bs.nextToks) > 0 {
 			bs.toks = bs.nextToks
 			bs.nextToks = nil
-			b.pushStatementToBlock(&bs)
+			b.pushStToBlock(&bs)
 			goto next
 		}
-		if blockStatementFinished(&bs) {
+		if blockStFinished(&bs) {
 			break
 		}
 	}
 	return
 }
 
-// Statement builds AST model of statement.
-func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
+// St builds AST model of statement.
+func (b *Builder) St(bs *block_st) (s models.Statement) {
 	tok := bs.toks[0]
 	if tok.Id == lex.ID_IDENT {
-		s, ok := b.IdStatement(bs)
+		s, ok := b.IdSt(bs)
 		if ok {
 			return s
 		}
 	}
-	s, ok := b.AssignStatement(bs.toks)
+	s, ok := b.AssignSt(bs.toks)
 	if ok {
 		return s
 	}
 	switch tok.Id {
 	case lex.ID_CONST, lex.ID_LET, lex.ID_MUT:
-		return b.VarStatement(bs, true)
+		return b.VarSt(bs, true)
 	case lex.ID_RET:
-		return b.RetStatement(bs.toks)
+		return b.RetSt(bs.toks)
 	case lex.ID_ITER:
 		return b.IterExpr(bs)
 	case lex.ID_BREAK:
-		return b.BreakStatement(bs.toks)
+		return b.BreakSt(bs.toks)
 	case lex.ID_CONTINUE:
-		return b.ContinueStatement(bs.toks)
+		return b.ContinueSt(bs.toks)
 	case lex.ID_IF:
 		return b.IfExpr(bs)
 	case lex.ID_ELSE:
 		return b.ElseBlock(bs)
 	case lex.ID_COMMENT:
-		return b.CommentStatement(bs.toks[0])
+		return b.CommentSt(bs.toks[0])
 	case lex.ID_CO:
-		return b.ConcurrentCallStatement(bs.toks)
+		return b.ConcurrentCallSt(bs.toks)
 	case lex.ID_GOTO:
-		return b.GotoStatement(bs.toks)
+		return b.GotoSt(bs.toks)
 	case lex.ID_FALLTHROUGH:
 		return b.Fallthrough(bs.toks)
 	case lex.ID_TYPE:
@@ -1552,20 +1552,20 @@ func (b *Builder) Statement(bs *blockStatement) (s models.Statement) {
 		if len(bs.toks) == 1 || bs.toks[1].Kind != lex.KND_LBRACE {
 			break
 		}
-		return b.blockStatement(bs.toks[1:], true)
+		return b.blockSt(bs.toks[1:], true)
 	case lex.ID_BRACE:
 		if tok.Kind == lex.KND_LBRACE {
-			return b.blockStatement(bs.toks, false)
+			return b.blockSt(bs.toks, false)
 		}
 	}
-	if IsFuncCall(bs.toks) != nil {
-		return b.ExprStatement(bs)
+	if IsFnCall(bs.toks) != nil {
+		return b.ExprSt(bs)
 	}
 	b.pusherr(tok, "invalid_syntax")
 	return
 }
 
-func (b *Builder) blockStatement(toks []lex.Token, is_unsafe bool) models.Statement {
+func (b *Builder) blockSt(toks []lex.Token, is_unsafe bool) models.Statement {
 	i := 0
 	tok := toks[0]
 	toks = Range(&i, lex.KND_LBRACE, lex.KND_RBRACE, toks)
@@ -1593,7 +1593,7 @@ func (b *Builder) assignInfo(toks []lex.Token) (info AssignInfo) {
 			continue
 		} else if tok.Id != lex.ID_OP {
 			continue
-		} else if !IsAssignOperator(tok.Kind) {
+		} else if !IsAssignOp(tok.Kind) {
 			continue
 		}
 		info.Left = toks[:i]
@@ -1604,11 +1604,11 @@ func (b *Builder) assignInfo(toks []lex.Token) (info AssignInfo) {
 		info.Setter = tok
 		if i+1 >= len(toks) {
 			info.Right = nil
-			info.Ok = IsPostfixOperator(info.Setter.Kind)
+			info.Ok = IsPostfixOp(info.Setter.Kind)
 			break
 		}
 		info.Right = toks[i+1:]
-		if IsPostfixOperator(info.Setter.Kind) {
+		if IsPostfixOp(info.Setter.Kind) {
 			if info.Right != nil {
 				b.pusherr(info.Right[0], "invalid_syntax")
 				info.Right = nil
@@ -1619,21 +1619,21 @@ func (b *Builder) assignInfo(toks []lex.Token) (info AssignInfo) {
 	return
 }
 
-func (b *Builder) buildAssignLeft(toks []lex.Token) (left models.AssignLeft) {
-	left.Expr.Tokens = toks
-	if left.Expr.Tokens[0].Id == lex.ID_IDENT {
-		left.Var.Token = left.Expr.Tokens[0]
-		left.Var.Id = left.Var.Token.Kind
+func (b *Builder) build_assign_left(toks []lex.Token) (l models.AssignLeft) {
+	l.Expr.Tokens = toks
+	if l.Expr.Tokens[0].Id == lex.ID_IDENT {
+		l.Var.Token = l.Expr.Tokens[0]
+		l.Var.Id = l.Var.Token.Kind
 	}
-	left.Expr = b.Expr(left.Expr.Tokens)
+	l.Expr = b.Expr(l.Expr.Tokens)
 	return
 }
 
 func (b *Builder) assignLefts(parts [][]lex.Token) []models.AssignLeft {
 	var lefts []models.AssignLeft
-	for _, part := range parts {
-		left := b.buildAssignLeft(part)
-		lefts = append(lefts, left)
+	for _, p := range parts {
+		l := b.build_assign_left(p)
+		lefts = append(lefts, l)
 	}
 	return lefts
 }
@@ -1645,14 +1645,14 @@ func (b *Builder) assignExprs(toks []lex.Token) []models.Expr {
 		return nil
 	}
 	exprs := make([]models.Expr, len(parts))
-	for i, part := range parts {
-		exprs[i] = b.Expr(part)
+	for i, p := range parts {
+		exprs[i] = b.Expr(p)
 	}
 	return exprs
 }
 
-// AssignStatement builds AST model of assignment statement.
-func (b *Builder) AssignStatement(toks []lex.Token) (s models.Statement, _ bool) {
+// AssignSt builds AST model of assignment statement.
+func (b *Builder) AssignSt(toks []lex.Token) (s models.Statement, _ bool) {
 	assign, ok := b.AssignExpr(toks)
 	if !ok {
 		return
@@ -1701,25 +1701,25 @@ func (b *Builder) letDeclAssign(toks []lex.Token) (assign models.Assign, ok bool
 		b.Errors = append(b.Errors, errs...)
 		return
 	}
-	for _, part := range parts {
-		if len(part) > 2 {
-			b.pusherr(part[2], "invalid_syntax")
+	for _, p := range parts {
+		if len(p) > 2 {
+			b.pusherr(p[2], "invalid_syntax")
 		}
 		mutable := false
-		tok := part[0]
+		tok := p[0]
 		if tok.Id == lex.ID_MUT {
 			mutable = true
-			part = part[1:]
-			if len(part) == 0 {
+			p = p[1:]
+			if len(p) == 0 {
 				b.pusherr(tok, "invalid_syntax")
 				continue
 			}
 		}
-		left := b.buildAssignLeft(part)
-		left.Var.Mutable = mutable
-		left.Var.New = !juleapi.IsIgnoreId(left.Var.Id)
-		left.Var.SetterTok = assign.Setter
-		assign.Left = append(assign.Left, left)
+		l := b.build_assign_left(p)
+		l.Var.Mutable = mutable
+		l.Var.New = !juleapi.IsIgnoreId(l.Var.Id)
+		l.Var.SetterTok = assign.Setter
+		assign.Left = append(assign.Left, l)
 	}
 	return
 }
@@ -1744,7 +1744,7 @@ func (b *Builder) plainAssign(toks []lex.Token) (assign models.Assign, ok bool) 
 }
 
 // BuildReturnStatement builds AST model of return statement.
-func (b *Builder) IdStatement(bs *blockStatement) (s models.Statement, ok bool) {
+func (b *Builder) IdSt(bs *block_st) (s models.Statement, ok bool) {
 	if len(bs.toks) == 1 {
 		return
 	}
@@ -1757,7 +1757,7 @@ func (b *Builder) IdStatement(bs *blockStatement) (s models.Statement, ok bool) 
 }
 
 // LabelStatement builds AST model of label.
-func (b *Builder) LabelStatement(bs *blockStatement) models.Statement {
+func (b *Builder) LabelStatement(bs *block_st) models.Statement {
 	var l models.Label
 	l.Token = bs.toks[0]
 	l.Label = l.Token.Kind
@@ -1767,8 +1767,8 @@ func (b *Builder) LabelStatement(bs *blockStatement) models.Statement {
 	return models.Statement{Token: l.Token, Data: l}
 }
 
-// ExprStatement builds AST model of expression.
-func (b *Builder) ExprStatement(bs *blockStatement) models.Statement {
+// ExprSt builds AST model of expression.
+func (b *Builder) ExprSt(bs *block_st) models.Statement {
 	expr := models.ExprStatement{
 		Expr: b.Expr(bs.toks),
 	}
@@ -1930,22 +1930,22 @@ func (b *Builder) Var(toks []lex.Token, begin, expr bool) (v models.Var) {
 	return
 }
 
-// VarStatement builds AST model of variable declaration statement.
-func (b *Builder) VarStatement(bs *blockStatement, expr bool) models.Statement {
+// VarSt builds AST model of variable declaration statement.
+func (b *Builder) VarSt(bs *block_st, expr bool) models.Statement {
 	v := b.Var(bs.toks, true, expr)
 	v.Owner = bs.block
 	return models.Statement{Token: v.Token, Data: v}
 }
 
-// CommentStatement builds AST model of comment statement.
-func (b *Builder) CommentStatement(tok lex.Token) (s models.Statement) {
+// CommentSt builds AST model of comment statement.
+func (b *Builder) CommentSt(tok lex.Token) (s models.Statement) {
 	s.Token = tok
 	tok.Kind = strings.TrimSpace(tok.Kind[2:])
 	s.Data = models.Comment{Content: tok.Kind}
 	return
 }
 
-func (b *Builder) ConcurrentCallStatement(toks []lex.Token) (s models.Statement) {
+func (b *Builder) ConcurrentCallSt(toks []lex.Token) (s models.Statement) {
 	var cc models.ConcurrentCall
 	cc.Token = toks[0]
 	toks = toks[1:]
@@ -1953,7 +1953,7 @@ func (b *Builder) ConcurrentCallStatement(toks []lex.Token) (s models.Statement)
 		b.pusherr(cc.Token, "missing_expr")
 		return
 	}
-	if IsFuncCall(toks) == nil {
+	if IsFnCall(toks) == nil {
 		b.pusherr(cc.Token, "expr_not_func_call")
 	}
 	cc.Expr = b.Expr(toks)
@@ -1973,7 +1973,7 @@ func (b *Builder) Fallthrough(toks []lex.Token) (s models.Statement) {
 	return
 }
 
-func (b *Builder) GotoStatement(toks []lex.Token) (s models.Statement) {
+func (b *Builder) GotoSt(toks []lex.Token) (s models.Statement) {
 	s.Token = toks[0]
 	if len(toks) == 1 {
 		b.pusherr(s.Token, "missing_goto_label")
@@ -1993,8 +1993,8 @@ func (b *Builder) GotoStatement(toks []lex.Token) (s models.Statement) {
 	return
 }
 
-// RetStatement builds AST model of return statement.
-func (b *Builder) RetStatement(toks []lex.Token) models.Statement {
+// RetSt builds AST model of return statement.
+func (b *Builder) RetSt(toks []lex.Token) models.Statement {
 	var ret models.Ret
 	ret.Token = toks[0]
 	if len(toks) > 1 {
@@ -2130,7 +2130,7 @@ func (b *Builder) getIterProfile(toks []lex.Token, errtok lex.Token) models.Iter
 }
 
 func (b *Builder) forStatement(toks []lex.Token) models.Statement {
-	s := b.Statement(&blockStatement{toks: toks})
+	s := b.St(&block_st{toks: toks})
 	switch s.Data.(type) {
 	case models.ExprStatement, models.Assign, models.Var:
 	default:
@@ -2139,7 +2139,7 @@ func (b *Builder) forStatement(toks []lex.Token) models.Statement {
 	return s
 }
 
-func (b *Builder) forIterProfile(bs *blockStatement) (s models.Statement) {
+func (b *Builder) forIterProfile(bs *block_st) (s models.Statement) {
 	var iter models.Iter
 	iter.Token = bs.toks[0]
 	bs.toks = bs.toks[1:]
@@ -2147,19 +2147,19 @@ func (b *Builder) forIterProfile(bs *blockStatement) (s models.Statement) {
 	if len(bs.toks) > 0 {
 		profile.Once = b.forStatement(bs.toks)
 	}
-	if blockStatementFinished(bs) {
+	if blockStFinished(bs) {
 		b.pusherr(iter.Token, "invalid_syntax")
 		return
 	}
-	setToNextStatement(bs)
+	setToNextSt(bs)
 	if len(bs.toks) > 0 {
 		profile.Condition = b.Expr(bs.toks)
 	}
-	if blockStatementFinished(bs) {
+	if blockStFinished(bs) {
 		b.pusherr(iter.Token, "invalid_syntax")
 		return
 	}
-	setToNextStatement(bs)
+	setToNextSt(bs)
 	exprToks := BlockExpr(bs.toks)
 	if len(exprToks) > 0 {
 		profile.Next = b.forStatement(exprToks)
@@ -2203,8 +2203,8 @@ func (b *Builder) commonIterProfile(toks []lex.Token) (s models.Statement) {
 	return models.Statement{Token: iter.Token, Data: iter}
 }
 
-func (b *Builder) IterExpr(bs *blockStatement) models.Statement {
-	if bs.withTerminator {
+func (b *Builder) IterExpr(bs *block_st) models.Statement {
+	if bs.terminated {
 		return b.forIterProfile(bs)
 	}
 	return b.commonIterProfile(bs.toks)
@@ -2317,40 +2317,40 @@ func (b *Builder) cases(toks []lex.Token) ([]models.Case, *models.Case) {
 
 // MatchCase builds AST model of match-case.
 func (b *Builder) MatchCase(toks []lex.Token) (s models.Statement) {
-	match := new(models.Match)
-	match.Token = toks[0]
-	s.Token = match.Token
+	m := new(models.Match)
+	m.Token = toks[0]
+	s.Token = m.Token
 	toks = toks[1:]
 	exprToks := BlockExpr(toks)
 	if len(exprToks) > 0 {
-		match.Expr = b.Expr(exprToks)
+		m.Expr = b.Expr(exprToks)
 	}
 	i := len(exprToks)
 	blockToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &toks)
 	if blockToks == nil {
-		b.pusherr(match.Token, "body_not_exist")
+		b.pusherr(m.Token, "body_not_exist")
 		return
 	}
-	match.Cases, match.Default = b.cases(blockToks)
-	for i := range match.Cases {
-		c := &match.Cases[i]
-		c.Match = match
+	m.Cases, m.Default = b.cases(blockToks)
+	for i := range m.Cases {
+		c := &m.Cases[i]
+		c.Match = m
 		if i > 0 {
-			match.Cases[i-1].Next = c
+			m.Cases[i-1].Next = c
 		}
 	}
-	if match.Default != nil {
-		if len(match.Cases) > 0 {
-			match.Cases[len(match.Cases)-1].Next = match.Default
+	if m.Default != nil {
+		if len(m.Cases) > 0 {
+			m.Cases[len(m.Cases)-1].Next = m.Default
 		}
-		match.Default.Match = match
+		m.Default.Match = m
 	}
-	s.Data = match
+	s.Data = m
 	return
 }
 
 // IfExpr builds AST model of if expression.
-func (b *Builder) IfExpr(bs *blockStatement) (s models.Statement) {
+func (b *Builder) IfExpr(bs *block_st) (s models.Statement) {
 	var ifast models.If
 	ifast.Token = bs.toks[0]
 	bs.toks = bs.toks[1:]
@@ -2362,7 +2362,7 @@ func (b *Builder) IfExpr(bs *blockStatement) (s models.Statement) {
 			return
 		}
 		exprToks = bs.toks
-		setToNextStatement(bs)
+		setToNextSt(bs)
 	} else {
 		i = len(exprToks)
 	}
@@ -2384,7 +2384,7 @@ func (b *Builder) IfExpr(bs *blockStatement) (s models.Statement) {
 }
 
 // ElseIfEpxr builds AST model of else if expression.
-func (b *Builder) ElseIfExpr(bs *blockStatement) (s models.Statement) {
+func (b *Builder) ElseIfExpr(bs *block_st) (s models.Statement) {
 	var elif models.ElseIf
 	elif.Token = bs.toks[1]
 	bs.toks = bs.toks[2:]
@@ -2396,7 +2396,7 @@ func (b *Builder) ElseIfExpr(bs *blockStatement) (s models.Statement) {
 			return
 		}
 		exprToks = bs.toks
-		setToNextStatement(bs)
+		setToNextSt(bs)
 	} else {
 		i = len(exprToks)
 	}
@@ -2418,7 +2418,7 @@ func (b *Builder) ElseIfExpr(bs *blockStatement) (s models.Statement) {
 }
 
 // ElseBlock builds AST model of else block.
-func (b *Builder) ElseBlock(bs *blockStatement) (s models.Statement) {
+func (b *Builder) ElseBlock(bs *block_st) (s models.Statement) {
 	if len(bs.toks) > 1 && bs.toks[1].Id == lex.ID_IF {
 		return b.ElseIfExpr(bs)
 	}
@@ -2442,8 +2442,8 @@ func (b *Builder) ElseBlock(bs *blockStatement) (s models.Statement) {
 	return models.Statement{Token: elseast.Token, Data: elseast}
 }
 
-// BreakStatement builds AST model of break statement.
-func (b *Builder) BreakStatement(toks []lex.Token) models.Statement {
+// BreakSt builds AST model of break statement.
+func (b *Builder) BreakSt(toks []lex.Token) models.Statement {
 	var breakAST models.Break
 	breakAST.Token = toks[0]
 	if len(toks) > 1 {
@@ -2462,8 +2462,8 @@ func (b *Builder) BreakStatement(toks []lex.Token) models.Statement {
 	}
 }
 
-// ContinueStatement builds AST model of continue statement.
-func (b *Builder) ContinueStatement(toks []lex.Token) models.Statement {
+// ContinueSt builds AST model of continue statement.
+func (b *Builder) ContinueSt(toks []lex.Token) models.Statement {
 	var continueAST models.Continue
 	continueAST.Token = toks[0]
 	if len(toks) > 1 {
@@ -2528,10 +2528,10 @@ func (b *Builder) build_expr_op(toks []lex.Token) any {
 func (b *Builder) find_lowest_precedenced_operator(toks []lex.Token) int {
 	prec := precedencer{}
 	brace_n := 0
-	for i, token := range toks {
+	for i, tok := range toks {
 		switch {
-		case token.Id == lex.ID_BRACE:
-			switch token.Kind {
+		case tok.Id == lex.ID_BRACE:
+			switch tok.Kind {
 			case lex.KND_LBRACE, lex.KND_LPAREN, lex.KND_LBRACKET:
 				brace_n++
 			default:
@@ -2540,7 +2540,7 @@ func (b *Builder) find_lowest_precedenced_operator(toks []lex.Token) int {
 			continue
 		case i == 0:
 			continue
-		case token.Id != lex.ID_OP:
+		case tok.Id != lex.ID_OP:
 			continue
 		case brace_n > 0:
 			continue
@@ -2549,7 +2549,7 @@ func (b *Builder) find_lowest_precedenced_operator(toks []lex.Token) int {
 		if toks[i-1].Id == lex.ID_OP {
 			continue
 		}
-		switch token.Kind {
+		switch tok.Kind {
 		case lex.KND_STAR, lex.KND_PERCENT, lex.KND_SOLIDUS,
 			lex.KND_RSHIFT, lex.KND_LSHIFT, lex.KND_AMPER:
 			prec.set(5, i)
@@ -2580,24 +2580,24 @@ func (b *Builder) getrange(i *int, open, close string, toks *[]lex.Token) []lex.
 		return nil
 	}
 	*i = 0
-	*toks = b.nextBuilderStatement()
+	*toks = b.nextBuilderSt()
 	rang = Range(i, open, close, *toks)
 	return rang
 }
 
-func (b *Builder) skipStatement(i *int, toks *[]lex.Token) []lex.Token {
+func (b *Builder) skipSt(i *int, toks *[]lex.Token) []lex.Token {
 	start := *i
-	*i, _ = NextStatementPos(*toks, start)
+	*i, _ = NextStPos(*toks, start)
 	stoks := (*toks)[start:*i]
 	if stoks[len(stoks)-1].Id == lex.ID_SEMICOLON {
 		if len(stoks) == 1 {
-			return b.skipStatement(i, toks)
+			return b.skipSt(i, toks)
 		}
 		stoks = stoks[:len(stoks)-1]
 	}
 	return stoks
 }
 
-func (b *Builder) nextBuilderStatement() []lex.Token {
-	return b.skipStatement(&b.Pos, &b.Tokens)
+func (b *Builder) nextBuilderSt() []lex.Token {
+	return b.skipSt(&b.Pos, &b.Tokens)
 }

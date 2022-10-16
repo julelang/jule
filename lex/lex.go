@@ -60,6 +60,7 @@ func (l *Lex) Lex() []Token {
 	l.Newln()
 	for l.Pos < len(l.File.Data) {
 		t := l.Token()
+		l.firstTokenOfLine = false
 		if t.Id != ID_NA {
 			toks = append(toks, t)
 		}
@@ -805,8 +806,6 @@ func (l *Lex) lexNumeric(txt string, t *Token) bool {
 
 // lex.Token generates next token from resume at position.
 func (l *Lex) Token() Token {
-	defer func() { l.firstTokenOfLine = false }()
-
 	t := Token{File: l.File, Id: ID_NA}
 
 	txt := l.resume()

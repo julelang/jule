@@ -2,9 +2,9 @@ package ast
 
 import "github.com/jule-lang/jule/lex"
 
-// IsFuncCall returns function expressions without call expression
+// IsFnCall returns function expressions without call expression
 // if tokens are function call, nil if not.
-func IsFuncCall(toks []lex.Token) []lex.Token {
+func IsFnCall(toks []lex.Token) []lex.Token {
 	switch toks[0].Id {
 	case lex.ID_BRACE, lex.ID_IDENT, lex.ID_DT:
 	default:

@@ -11,7 +11,7 @@ import (
 
 func check_value_for_indexing(v value) (err_key string) {
 	switch {
-	case !typeIsPure(v.data.Type):
+	case !type_is_pure(v.data.Type):
 		return "invalid_expr"
 	case !juletype.IsInteger(v.data.Type.Id):
 		return "invalid_expr"
@@ -56,11 +56,11 @@ func isbool(s string) bool {
 }
 
 func valIsEnumType(v value) bool {
-	return v.is_type && typeIsEnum(v.data.Type)
+	return v.is_type && type_is_enum(v.data.Type)
 }
 
 func isBoolExpr(v value) bool {
-	return typeIsPure(v.data.Type) && v.data.Type.Id == juletype.BOOL
+	return type_is_pure(v.data.Type) && v.data.Type.Id == juletype.BOOL
 }
 
 func isfloat(s string) bool {
@@ -83,20 +83,20 @@ func canGetPtr(v value) bool {
 }
 
 func valIsStructIns(val value) bool {
-	return !val.is_type && typeIsStruct(val.data.Type)
+	return !val.is_type && type_is_struct(val.data.Type)
 }
 
 func valIsTraitIns(val value) bool {
-	return !val.is_type && typeIsTrait(val.data.Type)
+	return !val.is_type && type_is_trait(val.data.Type)
 }
 
 func isForeachIterExpr(val value) bool {
 	switch {
-	case typeIsSlice(val.data.Type),
-		typeIsArray(val.data.Type),
-		typeIsMap(val.data.Type):
+	case type_is_slc(val.data.Type),
+		type_is_array(val.data.Type),
+		type_is_map(val.data.Type):
 		return true
-	case !typeIsPure(val.data.Type):
+	case !type_is_pure(val.data.Type):
 		return false
 	}
 	code := val.data.Type.Id
@@ -126,7 +126,7 @@ func validExprForConst(v value) bool {
 }
 
 func okForShifting(v value) bool {
-	if !typeIsPure(v.data.Type) ||
+	if !type_is_pure(v.data.Type) ||
 		!juletype.IsInteger(v.data.Type.Id) {
 		return false
 	}

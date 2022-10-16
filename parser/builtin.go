@@ -24,7 +24,7 @@ const maxU16 = 65535
 const maxU32 = 4294967295
 const maxU64 = 18446744073709551615
 
-var i8statics = &DefineMap{
+var i8statics = &Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -49,7 +49,7 @@ var i8statics = &DefineMap{
 	},
 }
 
-var i16statics = &DefineMap{
+var i16statics = &Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -74,7 +74,7 @@ var i16statics = &DefineMap{
 	},
 }
 
-var i32statics = &DefineMap{
+var i32statics = &Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -99,7 +99,7 @@ var i32statics = &DefineMap{
 	},
 }
 
-var i64statics = &DefineMap{
+var i64statics = &Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -124,7 +124,7 @@ var i64statics = &DefineMap{
 	},
 }
 
-var u8statics = &DefineMap{
+var u8statics = &Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -139,7 +139,7 @@ var u8statics = &DefineMap{
 	},
 }
 
-var u16statics = &DefineMap{
+var u16statics = &Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -154,7 +154,7 @@ var u16statics = &DefineMap{
 	},
 }
 
-var u32statics = &DefineMap{
+var u32statics = &Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -169,7 +169,7 @@ var u32statics = &DefineMap{
 	},
 }
 
-var u64statics = &DefineMap{
+var u64statics = &Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -184,7 +184,7 @@ var u64statics = &DefineMap{
 	},
 }
 
-var uintStatics = &DefineMap{
+var uintStatics = &Defmap{
 	Globals: []*Var{
 		{
 			Pub:   true,
@@ -195,7 +195,7 @@ var uintStatics = &DefineMap{
 	},
 }
 
-var intStatics = &DefineMap{
+var intStatics = &Defmap{
 	Globals: []*Var{
 		{
 			Const: true,
@@ -215,7 +215,7 @@ const minF32 = 1.17549435082228750796873653722224568e-38
 
 var min_modelF32 = exprNode{juletype.CppId(juletype.F32) + "{1.17549435082228750796873653722224568e-38F}"}
 
-var f32statics = &DefineMap{
+var f32statics = &Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -241,7 +241,7 @@ const minF64 = 2.22507385850720138309023271733240406e-308
 
 var min_modelF64 = exprNode{juletype.CppId(juletype.F64) + "{2.22507385850720138309023271733240406e-308}"}
 
-var f64statics = &DefineMap{
+var f64statics = &Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -273,7 +273,7 @@ var errorTrait = &trait{
 	Ast: &models.Trait{
 		Id: "Error",
 	},
-	Defines: &DefineMap{
+	Defines: &Defmap{
 		Funcs: []*Fn{
 			{Ast: &models.Fn{
 				Pub:     true,
@@ -331,7 +331,7 @@ var recoverFunc = &Fn{
 				Id: "handler",
 				Type: models.Type{
 					Id:   juletype.FN,
-					Kind: errorHandlerFunc.DataTypeString(),
+					Kind: errorHandlerFunc.TypeKind(),
 					Tag:  errorHandlerFunc,
 				},
 			},
@@ -362,7 +362,7 @@ var outln_fn *Fn
 var builtinFile = &Parser{}
 
 // Builtin definitions.
-var Builtin = &DefineMap{
+var Builtin = &Defmap{
 	Types: []*models.TypeAlias{
 		{
 			Pub:  true,
@@ -445,7 +445,7 @@ var Builtin = &DefineMap{
 	},
 }
 
-var strDefines = &DefineMap{
+var strDefines = &Defmap{
 	Globals: []*Var{
 		{
 			Pub:  true,
@@ -540,7 +540,7 @@ func readyStrDefines(s value) {
 	}
 }
 
-var sliceDefines = &DefineMap{
+var sliceDefines = &Defmap{
 	Globals: []*Var{
 		{
 			Pub:  true,
@@ -558,7 +558,7 @@ var sliceDefines = &DefineMap{
 	},
 }
 
-var arrayDefines = &DefineMap{
+var arrayDefines = &Defmap{
 	Globals: []*Var{
 		{
 			Pub:  true,
@@ -576,7 +576,7 @@ var arrayDefines = &DefineMap{
 	},
 }
 
-var mapDefines = &DefineMap{
+var mapDefines = &Defmap{
 	Globals: []*Var{
 		{
 			Pub:  true,
@@ -699,10 +699,10 @@ func caller_out(p *Parser, f *Func, data callData, m *exprModel) (v value) {
 	// Remove parentheses
 	data.args = data.args[1 : len(data.args)-1]
 	arg, model := p.evalToks(data.args, nil)
-	if typeIsFunc(arg.data.Type) {
+	if type_is_fn(arg.data.Type) {
 		p.pusherrtok(errtok, "invalid_expr")
 	}
-	m.appendSubNode(exprNode{"(" + model.String() + ")"})
+	m.append_sub(exprNode{"(" + model.String() + ")"})
 	arg.constExpr = false
 	return v
 }
@@ -731,7 +731,7 @@ func caller_make(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
 		return
 	}
 	switch {
-	case typeIsSlice(t):
+	case type_is_slc(t):
 		return make_slice(p, m, t, args, errtok)
 	default:
 		p.pusherrtok(errtok, "invalid_type")
@@ -758,16 +758,16 @@ func caller_new(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
 	if !is_valid_type_for_reference(t) {
 		p.pusherrtok(errtok, "invalid_type")
 	}
-	if typeIsStruct(t) {
+	if type_is_struct(t) {
 		s := t.Tag.(*structure)
 		for _, f := range s.Defines.Globals {
-			if typeIsRef(f.Type) {
+			if type_is_ref(f.Type) {
 				p.pusherrtok(errtok, "ref_used_struct_used_at_new_fn")
 				break
 			}
 		}
 	}
-	m.appendSubNode(exprNode{"<" + t.String() + ">()"})
+	m.append_sub(exprNode{"<" + t.String() + ">()"})
 	t.Kind = "&" + t.Kind
 	v.data.Type = t
 	v.data.Value = t.Kind
@@ -776,7 +776,7 @@ func caller_new(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
 
 // std::mem
 
-var std_mem_builtin = &DefineMap{
+var std_mem_builtin = &Defmap{
 	Funcs: []*Fn{
 		{Ast: &models.Fn{Id: "size_of", BuiltinCaller: caller_mem_size_of}},
 		{Ast: &models.Fn{Id: "align_of", BuiltinCaller: caller_mem_align_of}},
@@ -839,6 +839,6 @@ func caller_mem_align_of(p *Parser, _ *Func, data callData, m *exprModel) (v val
 	return
 }
 
-var std_builtin_defines = map[string]*DefineMap{
+var std_builtin_defines = map[string]*Defmap{
 	"std::mem": std_mem_builtin,
 }

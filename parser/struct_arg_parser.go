@@ -11,7 +11,7 @@ func (p *Parser) getFieldMap(f *Func) *paramMap {
 	*pmap = paramMap{}
 	s := f.RetType.Type.Tag.(*structure)
 	for i, g := range s.Defines.Globals {
-		if isAccessable(p.File, g.Token.File, g.Pub) {
+		if is_accessable(p.File, g.Token.File, g.Pub) {
 			param := &f.Params[i]
 			(*pmap)[param.Id] = &paramMapPair{param, nil}
 		}
@@ -70,7 +70,7 @@ func (sap *structArgParser) pushArg() {
 func (sap *structArgParser) checkPasses() {
 	for _, pair := range *sap.fmap {
 		if pair.arg == nil {
-			if typeIsRef(pair.param.Type) {
+			if type_is_ref(pair.param.Type) {
 				sap.p.pusherrtok(sap.errTok, "reference_field_not_initialized", pair.param.Id)
 			} else if !paramHasDefaultArg(pair.param) {
 				sap.p.pusherrtok(sap.errTok, "missing_expr_for", pair.param.Id)
