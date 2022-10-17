@@ -22,8 +22,9 @@ type Block struct {
 
 func (b Block) String() string {
 	AddIndent()
-	defer func() { DoneIndent() }()
-	return ParseBlock(b)
+	s := ParseBlock(b)
+	DoneIndent()
+	return s
 }
 
 // ParseBlock to cpp.

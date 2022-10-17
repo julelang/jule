@@ -386,7 +386,6 @@ func generate_compile_command(source_path string) (c, cmd string) {
 }
 
 func do_spell(cpp string) {
-	defer exec_post_commands()
 	path := filepath.Join(jule.WORKING_PATH, jule.SET.CppOutDir)
 	path = filepath.Join(path, jule.SET.CppOutName)
 	write_output(path, cpp)
@@ -404,6 +403,7 @@ func do_spell(cpp string) {
 			println(err.Error())
 		}
 	}
+	exec_post_commands()
 }
 
 func main() {

@@ -947,58 +947,55 @@ func (s *solver) types_are_compatible(ignore_any bool) bool {
 	return ok
 }
 
-func (s *solver) isConstExpr() bool {
-	return s.l.constExpr && s.r.constExpr
+func (s *solver) isConstExpr() bool { return s.l.constExpr && s.r.constExpr }
+
+func (s *solver) finalize(v *value) {
+	if type_is_void(v.data.Type) {
+		v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
+	} else {
+		v.constExpr = s.isConstExpr()
+		if v.constExpr {
+			bitize(v)
+			v.model = getModel(*v)
+		}
+	}
 }
 
 func (s *solver) solve() (v value) {
-	defer func() {
-		if type_is_void(v.data.Type) {
-			v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
-		} else {
-			v.constExpr = s.isConstExpr()
-			if v.constExpr {
-				bitize(&v)
-				v.model = getModel(v)
-			}
-		}
-	}()
-	switch s.op.Kind {
-	case lex.KND_DBL_AMPER, lex.KND_DBL_VLINE:
-		return s.logical()
-	}
 	switch {
-	case type_is_fn(s.l.data.Type), type_is_fn(s.r.data.Type):
-		return s.function()
-	case type_is_array(s.l.data.Type), type_is_array(s.r.data.Type):
-		return s.array()
-	case type_is_slc(s.l.data.Type), type_is_slc(s.r.data.Type):
-		return s.slice()
-	case type_is_ptr(s.l.data.Type), type_is_ptr(s.r.data.Type):
-		return s.ptr()
-	case type_is_enum(s.l.data.Type), type_is_enum(s.r.data.Type):
-		return s.enum()
-	case type_is_struct(s.l.data.Type), type_is_struct(s.r.data.Type):
-		return s.structure()
-	case type_is_trait(s.l.data.Type), type_is_trait(s.r.data.Type):
-		return s.juletrait()
-	case s.l.data.Type.Id == juletype.NIL, s.r.data.Type.Id == juletype.NIL:
-		return s.nil()
-	case s.l.data.Type.Id == juletype.ANY, s.r.data.Type.Id == juletype.ANY:
-		return s.any()
-	case s.l.data.Type.Id == juletype.BOOL, s.r.data.Type.Id == juletype.BOOL:
-		return s.bool()
-	case s.l.data.Type.Id == juletype.STR, s.r.data.Type.Id == juletype.STR:
-		return s.str()
-	case juletype.IsFloat(s.l.data.Type.Id),
-		juletype.IsFloat(s.r.data.Type.Id):
-		return s.float()
-	case juletype.IsUnsignedInteger(s.l.data.Type.Id),
+	case s.op.Kind == lex.KND_DBL_AMPER || s.op.Kind == lex.KND_DBL_VLINE:
+		v = s.logical()
+	case type_is_fn(s.l.data.Type) || type_is_fn(s.r.data.Type):
+		v = s.function()
+	case type_is_array(s.l.data.Type) || type_is_array(s.r.data.Type):
+		v = s.array()
+	case type_is_slc(s.l.data.Type) || type_is_slc(s.r.data.Type):
+		v = s.slice()
+	case type_is_ptr(s.l.data.Type) || type_is_ptr(s.r.data.Type):
+		v = s.ptr()
+	case type_is_enum(s.l.data.Type) || type_is_enum(s.r.data.Type):
+		v = s.enum()
+	case type_is_struct(s.l.data.Type) || type_is_struct(s.r.data.Type):
+		v = s.structure()
+	case type_is_trait(s.l.data.Type) || type_is_trait(s.r.data.Type):
+		v = s.juletrait()
+	case s.l.data.Type.Id == juletype.NIL || s.r.data.Type.Id == juletype.NIL:
+		v = s.nil()
+	case s.l.data.Type.Id == juletype.ANY || s.r.data.Type.Id == juletype.ANY:
+		v = s.any()
+	case s.l.data.Type.Id == juletype.BOOL || s.r.data.Type.Id == juletype.BOOL:
+		v = s.bool()
+	case s.l.data.Type.Id == juletype.STR || s.r.data.Type.Id == juletype.STR:
+		v = s.str()
+	case juletype.IsFloat(s.l.data.Type.Id) || juletype.IsFloat(s.r.data.Type.Id):
+		v = s.float()
+	case juletype.IsUnsignedInteger(s.l.data.Type.Id) ||
 		juletype.IsUnsignedInteger(s.r.data.Type.Id):
-		return s.unsigned()
-	case juletype.IsSignedNumeric(s.l.data.Type.Id),
+		v = s.unsigned()
+	case juletype.IsSignedNumeric(s.l.data.Type.Id) ||
 		juletype.IsSignedNumeric(s.r.data.Type.Id):
-		return s.signed()
+		v = s.signed()
 	}
+	s.finalize(&v)
 	return
 }

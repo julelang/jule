@@ -113,11 +113,6 @@ func (dt *Type) SetToOriginal() {
 	if (dt.Pure && !dt.CppLinked) || dt.Original == nil {
 		return
 	}
-	tag := dt.Tag
-	switch tag.(type) {
-	case Genericable:
-		defer func() { dt.Tag = tag }()
-	}
 	kind := dt.KindWithOriginalId()
 	id := dt.Id
 	tok := dt.Token
@@ -129,6 +124,11 @@ func (dt *Type) SetToOriginal() {
 	dt.Generic = generic
 	if is_necessary_type(id) {
 		dt.Id = id
+	}
+	tag := dt.Tag
+	switch tag.(type) {
+	case Genericable:
+		dt.Tag = tag
 	}
 }
 

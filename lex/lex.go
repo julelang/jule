@@ -621,7 +621,7 @@ func (l *Lex) str(txt string) string {
 	for i := 0; i < len(txt); i++ {
 		ch := txt[i]
 		if ch == '\n' {
-			defer l.Newln()
+			l.Newln()
 			if !raw {
 				l.pusherr("missing_string_end")
 				l.Pos++

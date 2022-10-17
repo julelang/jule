@@ -1987,7 +1987,6 @@ func (p *Parser) blockVarsOfFunc(f *Func) []*Var {
 
 func (p *Parser) parsePureFunc(f *Func) (err bool) {
 	hasError := p.eval.has_error
-	defer func() { p.eval.has_error = hasError }()
 	owner := f.Owner.(*Parser)
 	err = owner.params(f)
 	if err {
@@ -2002,6 +2001,7 @@ func (p *Parser) parsePureFunc(f *Func) (err bool) {
 	}
 	owner.blockTypes = nil
 	owner.blockVars = nil
+	p.eval.has_error = hasError
 	return
 }
 
@@ -3633,7 +3633,6 @@ func (p *Parser) typeSourceIsStruct(s *structure, st Type) (dt Type, _ bool) {
 		owner := s.Ast.Owner.(*Parser)
 		blockTypes := owner.blockTypes
 		owner.blockTypes = nil
-		defer func() { owner.blockTypes = blockTypes }()
 		owner.pushGenerics(s.Ast.Generics, generics)
 		for i, f := range s.Ast.Fields {
 			owner.parseField(s, &f, i)
@@ -3655,6 +3654,7 @@ func (p *Parser) typeSourceIsStruct(s *structure, st Type) (dt Type, _ bool) {
 			p.pusherrs(owner.Errors...)
 			owner.Errors = nil
 		}
+		owner.blockTypes = blockTypes
 	} else if len(s.Ast.Generics) > 0 {
 		p.pusherrtok(st.Token, "has_generics")
 	}
@@ -3812,8 +3812,9 @@ func (p *Parser) typeSource(dt Type, err bool) (ret Type, ok bool) {
 	switch dt.Id {
 	case juletype.STRUCT:
 		_, prefix := dt.KindId()
-		defer func() { ret.Kind = prefix + ret.Kind }()
-		return p.typeSourceIsStruct(dt.Tag.(*structure), dt)
+		ret, ok = p.typeSourceIsStruct(dt.Tag.(*structure), dt)
+		ret.Kind = prefix + ret.Kind
+		return
 	case juletype.ID:
 		id, prefix := dt.KindId()
 		defer func() { ret.Kind = prefix + ret.Kind }()

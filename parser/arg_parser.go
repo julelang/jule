@@ -110,7 +110,6 @@ func (pap *pureArgParser) checkPasses() {
 }
 
 func (pap *pureArgParser) pushArg() {
-	defer func() { pap.i++ }()
 	pair := (*pap.pmap)[pap.paramId]
 	arg := pap.arg
 	pair.arg = &arg
@@ -119,6 +118,7 @@ func (pap *pureArgParser) pushArg() {
 	} else {
 		pap.p.parseArg(pap.f, pair, pap.args, nil)
 	}
+	pap.i++
 }
 
 func (pap *pureArgParser) parse() {

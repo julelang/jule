@@ -49,7 +49,7 @@ func (sap *structArgParser) buildArgs() {
 }
 
 func (sap *structArgParser) pushArg() {
-	defer func() { sap.i++ }()
+	sap.i++
 	if sap.arg.TargetId == "" {
 		sap.p.pusherrtok(sap.arg.Token, "argument_must_target_to_parameter")
 		return

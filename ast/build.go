@@ -374,7 +374,6 @@ func (b *Builder) Trait(toks []lex.Token) {
 func (b *Builder) implTraitFuncs(impl *models.Impl, toks []lex.Token) {
 	pos, btoks := b.Pos, make([]lex.Token, len(b.Tokens))
 	copy(btoks, b.Tokens)
-	defer func() { b.Pos, b.Tokens = pos, btoks }()
 	b.Pos = 0
 	b.Tokens = toks
 	for b.Pos != -1 && !b.Ended() {
@@ -394,12 +393,12 @@ func (b *Builder) implTraitFuncs(impl *models.Impl, toks []lex.Token) {
 			continue
 		}
 	}
+	b.Pos, b.Tokens = pos, btoks
 }
 
 func (b *Builder) implStruct(impl *models.Impl, toks []lex.Token) {
 	pos, btoks := b.Pos, make([]lex.Token, len(b.Tokens))
 	copy(btoks, b.Tokens)
-	defer func() { b.Pos, b.Tokens = pos, btoks }()
 	b.Pos = 0
 	b.Tokens = toks
 	for b.Pos != -1 && !b.Ended() {
@@ -439,6 +438,7 @@ func (b *Builder) implStruct(impl *models.Impl, toks []lex.Token) {
 			continue
 		}
 	}
+	b.Pos, b.Tokens = pos, btoks
 }
 
 func (b *Builder) get_method(toks []lex.Token) *models.Fn {

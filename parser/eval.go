@@ -191,10 +191,7 @@ func (e *eval) unary(toks []lex.Token, m *exprModel) value {
 }
 
 func (e *eval) betweenParentheses(toks []lex.Token, m *exprModel) value {
-	// Write parentheses.
 	m.append_sub(exprNode{lex.KND_LPAREN})
-	defer m.append_sub(exprNode{lex.KND_RPARENT})
-
 	tk := toks[0]
 	toks = toks[1 : len(toks)-1]
 	if len(toks) == 0 {
@@ -202,6 +199,7 @@ func (e *eval) betweenParentheses(toks []lex.Token, m *exprModel) value {
 	}
 	val, model := e.eval_toks(toks)
 	m.append_sub(model)
+	m.append_sub(exprNode{lex.KND_RPARENT})
 	return val
 }
 
@@ -1324,7 +1322,6 @@ func (e *eval) build_array(parts [][]lex.Token, t Type, errtok lex.Token) (value
 	}
 	old_type := e.type_prefix
 	e.type_prefix = t.ComponentType
-	defer func() { e.type_prefix = old_type }()
 	var v value
 	v.data.Value = t.Kind
 	v.data.Type = t
@@ -1339,6 +1336,7 @@ func (e *eval) build_array(parts [][]lex.Token, t Type, errtok lex.Token) (value
 			errtok: part[0],
 		}.check()
 	}
+	e.type_prefix = old_type
 	return v, model
 }
 
@@ -1375,7 +1373,6 @@ func (e *eval) build_slice_implicit(parts [][]lex.Token, errtok lex.Token) (valu
 func (e *eval) build_slice_explicit(parts [][]lex.Token, t Type, errtok lex.Token) (value, iExpr) {
 	old_type := e.type_prefix
 	e.type_prefix = t.ComponentType
-	defer func() { e.type_prefix = old_type }()
 	var v value
 	v.data.Value = t.Kind
 	v.data.Type = t
@@ -1390,6 +1387,7 @@ func (e *eval) build_slice_explicit(parts [][]lex.Token, t Type, errtok lex.Toke
 			errtok: part[0],
 		}.check()
 	}
+	e.type_prefix = old_type
 	return v, model
 }
 
@@ -1496,9 +1494,9 @@ func (e *eval) unsafeEval(toks []lex.Token, m *exprModel) (v value) {
 		return
 	}
 	old := e.allow_unsafe
-	defer func() { e.allow_unsafe = old }()
 	e.allow_unsafe = true
 	v = e.process(rang, m)
+	e.allow_unsafe = old
 	return v
 }
 
