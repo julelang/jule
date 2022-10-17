@@ -3784,6 +3784,7 @@ func (p *Parser) typeSource(dt Type, err bool) (ret Type, ok bool) {
 	}
 	original := dt.Original
 	defer func() {
+		ret.CppLinked = (original != nil && original.(Type).CppLinked) || dt.CppLinked
 		ret.Original = original
 		p.check_type_validity(ret, dt.Token)
 	}()
@@ -3841,7 +3842,10 @@ func (p *Parser) typeSource(dt Type, err bool) (ret Type, ok bool) {
 
 func (p *Parser) realType(dt Type, err bool) (ret Type, _ bool) {
 	original := dt.Original
-	defer func() { ret.Original = original }()
+	defer func() {
+		ret.CppLinked = (original != nil && original.(Type).CppLinked) || dt.CppLinked
+		ret.Original = original
+	}()
 	dt.SetToOriginal()
 	return p.typeSource(dt, err)
 }

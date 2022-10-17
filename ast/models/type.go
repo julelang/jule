@@ -110,7 +110,7 @@ func is_necessary_type(id uint8) bool {
 }
 
 func (dt *Type) SetToOriginal() {
-	if dt.Pure || dt.Original == nil {
+	if (dt.Pure && !dt.CppLinked) || dt.Original == nil {
 		return
 	}
 	tag := dt.Tag
