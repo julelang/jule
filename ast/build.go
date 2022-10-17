@@ -59,7 +59,7 @@ func (b *Builder) buildNode(toks []lex.Token) {
 		b.Use(toks)
 	case lex.ID_FN, lex.ID_UNSAFE:
 		s := models.Statement{Token: t}
-		s.Data = b.Func(toks, false, false, false)
+		s.Data = b.Fn(toks, false, false, false)
 		b.Tree = append(b.Tree, models.Object{Token: s.Token, Data: s})
 	case lex.ID_CONST, lex.ID_LET, lex.ID_MUT:
 		b.GlobalVar(toks)
@@ -336,7 +336,7 @@ func (b *Builder) traitFuncs(toks []lex.Token, trait_id string) []*models.Fn {
 	i := 0
 	for i < len(toks) {
 		fnToks := b.skipSt(&i, &toks)
-		f := b.Func(fnToks, true, false, true)
+		f := b.Fn(fnToks, true, false, true)
 		b.setup_receiver(&f, trait_id)
 		f.Pub = true
 		funcs = append(funcs, &f)
@@ -454,7 +454,7 @@ func (b *Builder) get_method(toks []lex.Token) *models.Fn {
 		return nil
 	}
 	f := new(models.Fn)
-	*f = b.Func(toks, true, false, false)
+	*f = b.Fn(toks, true, false, false)
 	f.IsUnsafe = tok.Id == lex.ID_UNSAFE
 	if f.Block != nil {
 		f.Block.IsUnsafe = f.IsUnsafe
@@ -536,7 +536,7 @@ func (b *Builder) link_fn(toks []lex.Token) {
 	var link models.CppLinkFn
 	link.Token = tok
 	link.Link = new(models.Fn)
-	*link.Link = b.Func(toks[1:], false, false, true)
+	*link.Link = b.Fn(toks[1:], false, false, true)
 	b.Tree = append(b.Tree, models.Object{Token: tok, Data: link})
 
 	b.pub = bpub
@@ -802,7 +802,7 @@ func (b *Builder) setup_receiver(f *models.Fn, owner_id string) {
 	f.Params = f.Params[1:]
 }
 
-func (b *Builder) funcPrototype(toks []lex.Token, i *int, method, anon bool) (f models.Fn, ok bool) {
+func (b *Builder) fn_prototype(toks []lex.Token, i *int, method, anon bool) (f models.Fn, ok bool) {
 	ok = true
 	f.Token = toks[*i]
 	if f.Token.Id == lex.ID_UNSAFE {
@@ -848,19 +848,19 @@ func (b *Builder) funcPrototype(toks []lex.Token, i *int, method, anon bool) (f 
 	if len(paramToks) > 0 {
 		f.Params = b.Params(paramToks, method, false)
 	}
-	t, retok := b.FuncRetDataType(toks, i)
-	if retok {
+	t, ret_ok := b.FnRetDataType(toks, i)
+	if ret_ok {
 		f.RetType = t
 		*i++
 	}
 	return
 }
 
-// Func builds AST model of function.
-func (b *Builder) Func(toks []lex.Token, method, anon, prototype bool) (f models.Fn) {
+// Fn builds AST model of function.
+func (b *Builder) Fn(toks []lex.Token, method, anon, prototype bool) (f models.Fn) {
 	var ok bool
 	i := 0
-	f, ok = b.funcPrototype(toks, &i, method, anon)
+	f, ok = b.fn_prototype(toks, &i, method, anon)
 	if prototype {
 		if i+1 < len(toks) {
 			b.pusherr(toks[i+1], "invalid_syntax")
@@ -1242,7 +1242,7 @@ func (b *Builder) datatype(t *models.Type, toks []lex.Token, i *int, err bool) (
 		case lex.ID_FN:
 			t.Token = tok
 			t.Id = juletype.FN
-			f, proto_ok := b.funcPrototype(toks, i, false, true)
+			f, proto_ok := b.fn_prototype(toks, i, false, true)
 			if !proto_ok {
 				b.pusherr(tok, "invalid_type")
 				return false
@@ -1389,7 +1389,7 @@ func (b *Builder) mapDataType(t *models.Type, toks, typeToks []lex.Token,
 	return
 }
 
-func (b *Builder) funcMultiTypeRet(toks []lex.Token, i *int) (t models.RetType, ok bool) {
+func (b *Builder) fnMultiTypeRet(toks []lex.Token, i *int) (t models.RetType, ok bool) {
 	tok := toks[*i]
 	t.Type.Kind += tok.Kind
 	*i++
@@ -1424,8 +1424,8 @@ func (b *Builder) funcMultiTypeRet(toks []lex.Token, i *int) (t models.RetType, 
 	return
 }
 
-// FuncRetDataType builds ret data-type of function.
-func (b *Builder) FuncRetDataType(toks []lex.Token, i *int) (t models.RetType, ok bool) {
+// FnRetDataType builds ret data-type of function.
+func (b *Builder) FnRetDataType(toks []lex.Token, i *int) (t models.RetType, ok bool) {
 	t.Type.Id = juletype.VOID
 	t.Type.Kind = juletype.TYPE_MAP[t.Type.Id]
 	if *i >= len(toks) {
@@ -1434,18 +1434,33 @@ func (b *Builder) FuncRetDataType(toks []lex.Token, i *int) (t models.RetType, o
 	tok := toks[*i]
 	switch tok.Id {
 	case lex.ID_BRACE:
-		switch tok.Kind {
-		case lex.KND_LPAREN:
-			return b.funcMultiTypeRet(toks, i)
-		case lex.KND_LBRACE:
+		if tok.Kind == lex.KND_LBRACE {
 			return
 		}
 	case lex.ID_OP:
 		if tok.Kind == lex.KND_EQ {
 			return
 		}
+	case lex.ID_COLON:
+		if *i+1 >= len(toks) {
+			b.pusherr(tok, "missing_type")
+			return
+		}
+		*i++
+		tok = toks[*i]
+		if tok.Id == lex.ID_BRACE {
+			switch tok.Kind {
+			case lex.KND_LPAREN:
+				return b.fnMultiTypeRet(toks, i)
+			case lex.KND_LBRACE:
+				return
+			}
+		}
+		t.Type, ok = b.DataType(toks, i, true)
+		return
 	}
-	t.Type, ok = b.DataType(toks, i, true)
+	*i++
+	b.pusherr(tok, "invalid_syntax")
 	return
 }
 

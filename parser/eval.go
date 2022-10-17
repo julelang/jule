@@ -1471,7 +1471,7 @@ func (e *eval) enumerable(exprToks []lex.Token, t Type, m *exprModel) (v value) 
 
 func (e *eval) anonymousFn(toks []lex.Token, m *exprModel) (v value) {
 	b := ast.NewBuilder(toks)
-	f := b.Func(b.Tokens, false, true, false)
+	f := b.Fn(b.Tokens, false, true, false)
 	b.Wait()
 	if len(b.Errors) > 0 {
 		e.p.pusherrs(b.Errors...)

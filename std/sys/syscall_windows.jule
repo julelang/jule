@@ -18,12 +18,12 @@ cpp struct _wdirent {
 	pub d_name: *cpp.wchar_t
 }
 
-cpp fn GetStdHandle(stdh: uintptr) *unsafe
-cpp unsafe fn CloseHandle(stdh: *unsafe) bool
-cpp unsafe fn wstat(path: *cpp.wchar_t, handle: *cpp.stat) (err: int)
-cpp unsafe fn _wopendir(path: *cpp.wchar_t) *cpp._WDIR
-cpp unsafe fn _wclosedir(mut dir: *cpp._WDIR) int
-cpp unsafe fn _wreaddir(mut dir: *cpp._WDIR) *cpp._wdirent
+cpp fn GetStdHandle(stdh: uintptr): *unsafe
+cpp unsafe fn CloseHandle(stdh: *unsafe): bool
+cpp unsafe fn wstat(path: *cpp.wchar_t, handle: *cpp.stat): (err: int)
+cpp unsafe fn _wopendir(path: *cpp.wchar_t): *cpp._WDIR
+cpp unsafe fn _wclosedir(mut dir: *cpp._WDIR): int
+cpp unsafe fn _wreaddir(mut dir: *cpp._WDIR): *cpp._wdirent
 
 pub type handle: uintptr
 
@@ -36,7 +36,7 @@ pub let STDERR = get_std_handle(uintptr(STD_ERROR_HANDLE))
 // Returns the UTF-16 encoding of the UTF-8 string
 // s, with a terminating NULL added. If s includes NULL
 // character at any location, ignores followed characters.
-pub fn utf16_from_str(s: str) []u16 {
+pub fn utf16_from_str(s: str): []u16 {
 	// In the worst case all characters require two u16.
 	// Also account for the terminating NULL character.
 	// See: C Strings and Windows UTF16.
@@ -55,7 +55,7 @@ pub fn utf16_from_str(s: str) []u16 {
 
 // Returns the UTF-8 encoding of the UTF-16 sequence s,
 // with a terminating NULL removed.
-pub fn utf16_to_str(s: []u16) str {
+pub fn utf16_to_str(s: []u16): str {
 	let mut code_page = unsafe { *(&s) }
 	for i, v in s {
 		if v == 0 {
@@ -68,7 +68,7 @@ pub fn utf16_to_str(s: []u16) str {
 
 // Returns the UTF-8 encoding of the UTF-16 sequence s in *wchar_t form,
 // with a terminating NULL removed.
-pub unsafe fn wchar_to_str(s: *cpp.wchar_t) str {
+pub unsafe fn wchar_to_str(s: *cpp.wchar_t): str {
 	let mut i = 0
 	let mut code_page: []u16 = nil
 	for {
@@ -82,17 +82,17 @@ pub unsafe fn wchar_to_str(s: *cpp.wchar_t) str {
 	ret ""
 }
 
-pub fn get_std_handle(stdh: uintptr) handle { ret handle(cpp.GetStdHandle(stdh)) }
-pub unsafe fn close_handle(stdh: handle) bool { ret cpp.CloseHandle(unsafe { (*unsafe)(stdh) }) }
-pub unsafe fn read_dir(mut dir: *cpp._WDIR) *cpp._wdirent { ret cpp._wreaddir(dir) }
-pub unsafe fn close_dir(mut dir: *cpp._WDIR) int { ret cpp._wclosedir(dir) }
+pub fn get_std_handle(stdh: uintptr): handle { ret handle(cpp.GetStdHandle(stdh)) }
+pub unsafe fn close_handle(stdh: handle): bool { ret cpp.CloseHandle(unsafe { (*unsafe)(stdh) }) }
+pub unsafe fn read_dir(mut dir: *cpp._WDIR): *cpp._wdirent { ret cpp._wreaddir(dir) }
+pub unsafe fn close_dir(mut dir: *cpp._WDIR): int { ret cpp._wclosedir(dir) }
 
-pub unsafe fn stat(path: str, handle: *cpp.stat) (ok: bool) {
+pub unsafe fn stat(path: str, handle: *cpp.stat): (ok: bool) {
 	let utf16_path = utf16_from_str(path)
 	ret cpp.wstat(unsafe { (*cpp.wchar_t)(&utf16_path[0]) }, handle) == 0
 }
 
-pub fn open_dir(path: str) *cpp._WDIR {
+pub fn open_dir(path: str): *cpp._WDIR {
 	let utf16_path = utf16_from_str(path)
 	ret unsafe { cpp._wopendir( (*cpp.wchar_t)(&utf16_path[0]) ) }
 }
