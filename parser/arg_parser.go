@@ -62,7 +62,9 @@ func (pap *pureArgParser) push_variadic_args(pair *paramMapPair) {
 	}
 	model.exprs = append(model.exprs, exprNode{lex.KND_RBRACE})
 	pair.arg.CastType = nil
-	pair.arg.Expr.Model = model
+	if !variadiced {
+		pair.arg.Expr.Model = model
+	}
 	if !once {
 		return
 	}

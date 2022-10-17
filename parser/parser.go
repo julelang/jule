@@ -2558,7 +2558,8 @@ func (p *Parser) pushGenericByArg(f *Func, pair *paramMapPair, args *models.Args
 func (p *Parser) parseArg(f *Func, pair *paramMapPair, args *models.Args, variadiced *bool) {
 	value, model := p.evalExpr(pair.arg.Expr, &pair.param.Type)
 	pair.arg.Expr.Model = model
-	if !models.Has_attribute(jule.ATTR_CDEF, f.Attributes) && !value.variadic &&
+	if !value.variadic && !pair.param.Variadic &&
+		!models.Has_attribute(jule.ATTR_CDEF, f.Attributes) &&
 		type_is_pure(pair.param.Type) && juletype.IsNumeric(pair.param.Type.Id) {
 		pair.arg.CastType = new(Type)
 		*pair.arg.CastType = pair.param.Type.Copy()
@@ -2583,7 +2584,7 @@ func (p *Parser) checkArgType(param *Param, val value, errTok lex.Token) {
 	p.check_valid_init_expr(param.Mutable, val, errTok)
 	assign_checker{
 		p:      p,
-		expr_t:      param.Type,
+		expr_t: param.Type,
 		v:      val,
 		errtok: errTok,
 	}.check()

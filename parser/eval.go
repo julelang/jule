@@ -1358,6 +1358,7 @@ func (e *eval) build_slice_implicit(parts [][]lex.Token, errtok lex.Token) (valu
 	model.dataType.ComponentType = new(Type)
 	*model.dataType.ComponentType = partVal.data.Type
 	v.data.Type = model.dataType
+	v.data.Value = model.dataType.Kind
 	for _, part := range parts[1:] {
 		partVal, expModel := e.eval_toks(part)
 		model.expr = append(model.expr, expModel)
