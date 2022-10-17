@@ -19,11 +19,11 @@ cpp struct _wdirent {
 }
 
 cpp fn GetStdHandle(stdh: uintptr) *unsafe
-cpp fn CloseHandle(stdh: *unsafe) bool
-cpp fn wstat(path: *cpp.wchar_t, handle: *cpp.stat) (err: int)
-cpp fn _wopendir(path: *cpp.wchar_t) *cpp._WDIR
-cpp fn _wclosedir(mut dir: *cpp._WDIR) int
-cpp fn _wreaddir(mut dir: *cpp._WDIR) *cpp._wdirent
+cpp unsafe fn CloseHandle(stdh: *unsafe) bool
+cpp unsafe fn wstat(path: *cpp.wchar_t, handle: *cpp.stat) (err: int)
+cpp unsafe fn _wopendir(path: *cpp.wchar_t) *cpp._WDIR
+cpp unsafe fn _wclosedir(mut dir: *cpp._WDIR) int
+cpp unsafe fn _wreaddir(mut dir: *cpp._WDIR) *cpp._wdirent
 
 pub type handle: uintptr
 
@@ -83,16 +83,16 @@ pub fn wchar_to_str(s: *cpp.wchar_t) str {
 }
 
 pub fn get_std_handle(stdh: uintptr) handle { ret handle(cpp.GetStdHandle(stdh)) }
-pub fn close_handle(stdh: handle) bool { ret cpp.CloseHandle(unsafe { (*unsafe)(stdh) }) }
+pub unsafe fn close_handle(stdh: handle) bool { ret cpp.CloseHandle(unsafe { (*unsafe)(stdh) }) }
 pub unsafe fn read_dir(mut dir: *cpp._WDIR) *cpp._wdirent { ret cpp._wreaddir(dir) }
 pub unsafe fn close_dir(mut dir: *cpp._WDIR) int { ret cpp._wclosedir(dir) }
 
-pub fn stat(path: str, handle: *cpp.stat) (ok: bool) {
+pub unsafe fn stat(path: str, handle: *cpp.stat) (ok: bool) {
 	let utf16_path = utf16_from_str(path)
 	ret cpp.wstat(unsafe { (*cpp.wchar_t)(&utf16_path[0]) }, handle) == 0
 }
 
 pub fn open_dir(path: str) *cpp._WDIR {
 	let utf16_path = utf16_from_str(path)
-	ret cpp._wopendir(unsafe { (*cpp.wchar_t)(&utf16_path[0]) })
+	ret unsafe { cpp._wopendir( (*cpp.wchar_t)(&utf16_path[0]) ) }
 }
