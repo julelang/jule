@@ -2556,7 +2556,14 @@ func (p *Parser) pushGenericByArg(f *Func, pair *paramMapPair, args *models.Args
 }
 
 func (p *Parser) parseArg(f *Func, pair *paramMapPair, args *models.Args, variadiced *bool) {
-	value, model := p.evalExpr(pair.arg.Expr, &pair.param.Type)
+	var value value
+	var model iExpr
+	if pair.param.Variadic {
+		t := variadic_to_slice_t(pair.param.Type)
+		value, model = p.evalExpr(pair.arg.Expr, &t)
+	} else {
+		value, model = p.evalExpr(pair.arg.Expr, &pair.param.Type)
+	}
 	pair.arg.Expr.Model = model
 	if !value.variadic && !pair.param.Variadic &&
 		!models.Has_attribute(jule.ATTR_CDEF, f.Attributes) &&

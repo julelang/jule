@@ -8,6 +8,15 @@ import (
 	"github.com/jule-lang/jule/pkg/juletype"
 )
 
+func variadic_to_slice_t(t Type) Type {
+	t.Original = nil
+	t.ComponentType = new(Type)
+	*t.ComponentType = t
+	t.Id = juletype.SLICE
+	t.Kind = jule.PREFIX_SLICE + t.ComponentType.Kind
+	return t
+}
+
 func find_generic(id string, generics []*GenericType) *GenericType {
 	for _, g := range generics {
 		if g.Id == id {
