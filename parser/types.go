@@ -30,10 +30,6 @@ func type_is_void(t Type) bool {
 	return t.Id == juletype.VOID && !t.MultiTyped
 }
 
-func type_is_variadicable(t Type) bool {
-	return type_is_slc(t)
-}
-
 func type_is_allow_for_const(t Type) bool {
 	if !type_is_pure(t) {
 		return false
@@ -45,6 +41,8 @@ func type_is_allow_for_const(t Type) bool {
 		return juletype.IsNumeric(t.Id)
 	}
 }
+
+func type_is_variadicable(t Type) bool { return type_is_slc(t) }
 
 func type_is_struct(dt Type) bool { return dt.Id == juletype.STRUCT }
 

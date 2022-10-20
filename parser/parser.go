@@ -1861,7 +1861,7 @@ func (p *Parser) check_linked_vars() {
 func (p *Parser) check_linked_fns() {
 	for _, link := range p.linked_functions {
 		if len(link.Generics) == 0 {
-			p.reloadFuncTypes(link)
+			p.reload_fn_types(link)
 		}
 	}
 }
@@ -1880,7 +1880,7 @@ func (p *Parser) WaitingFuncs() {
 		if len(f.Ast.Generics) > 0 {
 			owner.parseTypesNonGenerics(f.Ast)
 		} else {
-			owner.reloadFuncTypes(f.Ast)
+			owner.reload_fn_types(f.Ast)
 		}
 		if owner != p {
 			owner.wg.Wait()
@@ -2164,7 +2164,7 @@ func (p *Parser) structConstructorInstance(as *structure) *structure {
 func (p *Parser) check_anon_fn(f *Func) {
 	_ = p.checkParamDup(f.Params)
 	p.checkRetVars(f)
-	p.reloadFuncTypes(f)
+	p.reload_fn_types(f)
 	globals := p.Defines.Globals
 	blockVariables := p.blockVars
 	p.Defines.Globals = append(blockVariables, p.Defines.Globals...)
@@ -2271,11 +2271,12 @@ func (p *Parser) fn_parse_type(t *Type) bool {
 	return ok
 }
 
-func (p *Parser) reloadFuncTypes(f *Func) {
+func (p *Parser) reload_fn_types(f *Func) {
 	for i := range f.Params {
 		_ = p.fn_parse_type(&f.Params[i].Type)
 	}
-	if p.fn_parse_type(&f.RetType.Type) && type_is_array(f.RetType.Type) {
+	ok := p.fn_parse_type(&f.RetType.Type)
+	if ok && type_is_array(f.RetType.Type) {
 		p.pusherrtok(f.RetType.Type.Token, "invalid_type")
 	}
 }
@@ -2301,7 +2302,7 @@ func (p *Parser) parseGenericFunc(f *Func, generics []Type, errtok lex.Token) {
 		s := f.Receiver.Tag.(*structure)
 		owner.pushGenerics(s.Ast.Generics, s.Generics())
 	}
-	owner.reloadFuncTypes(f)
+	owner.reload_fn_types(f)
 	if f.Block == nil {
 		return
 	} else if itsCombined(f, generics) {
@@ -2334,7 +2335,7 @@ check:
 	} else {
 		owner := f.Owner.(*Parser)
 		owner.pushGenerics(f.Generics, args.Generics)
-		owner.reloadFuncTypes(f)
+		owner.reload_fn_types(f)
 	}
 ok:
 	return true
@@ -2384,7 +2385,7 @@ func (p *Parser) parseFuncCall(f *Func, args *models.Args, m *exprModel, errTok 
 				generics := s.Generics()
 				if len(generics) > 0 {
 					owner.pushGenerics(s.Ast.Generics, generics)
-					owner.reloadFuncTypes(f)
+					owner.reload_fn_types(f)
 				}
 			}
 		}
@@ -3600,7 +3601,7 @@ func (p *Parser) typeSourceIsEnum(e *Enum, tag any) (dt Type, _ bool) {
 
 func (p *Parser) typeSourceIsFunc(dt Type, err bool) (Type, bool) {
 	f := dt.Tag.(*Func)
-	p.reloadFuncTypes(f)
+	p.reload_fn_types(f)
 	dt.Kind = f.TypeKind()
 	return dt, true
 }
@@ -3642,7 +3643,7 @@ func (p *Parser) typeSourceIsStruct(s *structure, st Type) (dt Type, _ bool) {
 				if len(f.Ast.Generics) == 0 {
 					blockVars := owner.blockVars
 					blockTypes := owner.blockTypes
-					owner.reloadFuncTypes(f.Ast)
+					owner.reload_fn_types(f.Ast)
 					_ = p.parsePureFunc(f.Ast)
 					owner.blockVars = blockVars
 					owner.blockTypes = blockTypes

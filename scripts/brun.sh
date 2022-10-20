@@ -17,4 +17,3 @@ else
   echo "-----------------------------------------------------------------------"
   echo "An unexpected error occurred while compiling JuleC. Check errors above."
 fi
-

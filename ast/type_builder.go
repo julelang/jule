@@ -153,6 +153,7 @@ func (tb *type_builder) cpp_kw(tok lex.Token) (imret bool) {
 	tb.t.Token = tb.tokens[*tb.i]
 	tb.kind += tb.t.Token.Kind
 	tb.ident_end()
+	tb.ok = true
 	return false
 }
 
