@@ -30,9 +30,7 @@ func (e *Expr) IsNotBinop() bool {
 	}
 }
 
-func (e *Expr) IsEmpty() bool {
-	return e.Op == nil
-}
+func (e *Expr) IsEmpty() bool { return e.Op == nil }
 
 func (e Expr) String() string {
 	if e.Model != nil {

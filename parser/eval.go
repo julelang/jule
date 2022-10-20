@@ -42,8 +42,19 @@ func (e *eval) eval_toks(toks []lex.Token) (value, iExpr) {
 	return e.eval_expr(builder.Expr(toks))
 }
 
-func (e *eval) eval_expr(expr Expr) (value, iExpr) {
-	return e.eval(expr.Op)
+func (e *eval) eval_expr(expr Expr) (value, iExpr) { return e.eval(expr.Op) }
+
+func get_bop_model(v value, bop models.Binop, lm iExpr, rm iExpr) iExpr {
+	if v.constExpr {
+		return v.model
+	}
+	model := exprNode{}
+	model.value += lex.KND_LPAREN
+	model.value += lm.String()
+	model.value += " " + bop.Op.Kind + " "
+	model.value += rm.String()
+	model.value += lex.KND_RPARENT
+	return model
 }
 
 func (e *eval) eval_op(op any) (v value, model iExpr) {
@@ -79,17 +90,7 @@ func (e *eval) eval_op(op any) (v value, model iExpr) {
 	}
 	v = process.solve()
 	v.lvalue = type_is_lvalue(v.data.Type)
-	if v.constExpr {
-		model = v.model
-	} else {
-		m := newExprModel(1)
-		model = m
-		m.append_sub(exprNode{lex.KND_LPAREN})
-		m.append_sub(lm)
-		m.append_sub(exprNode{" " + bop.Op.Kind + " "})
-		m.append_sub(rm)
-		m.append_sub(exprNode{lex.KND_RPARENT})
-	}
+	model = get_bop_model(v, bop, lm, rm)
 	return
 }
 
