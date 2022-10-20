@@ -69,7 +69,7 @@ func (af anonFuncExpr) String() string {
 		Kind: af.ast.TypeKind(),
 		Tag:  af.ast,
 	}
-	cpp.WriteString(t.FuncString())
+	cpp.WriteString(t.FnString())
 	cpp.WriteString("([=]")
 	cpp.WriteString(paramsToCpp(af.ast.Params))
 	cpp.WriteString(" mutable -> ")

@@ -109,8 +109,26 @@ func is_necessary_type(id uint8) bool {
 	return id == juletype.TRAIT
 }
 
+func (dt *Type) set_to_original_cpp_linked() {
+	if dt.Original == nil {
+		return
+	}
+	if dt.Id == juletype.STRUCT {
+		id := dt.Id
+		tag := dt.Tag
+		*dt = dt.Original.(Type)
+		dt.Id = id
+		dt.Tag = tag
+		return
+	}
+	*dt = dt.Original.(Type)
+}
+
 func (dt *Type) SetToOriginal() {
-	if (dt.Pure && !dt.CppLinked) || dt.Original == nil {
+	if dt.CppLinked {
+		dt.set_to_original_cpp_linked()
+		return
+	} else if dt.Pure || dt.Original == nil {
 		return
 	}
 	kind := dt.KindWithOriginalId()
@@ -224,7 +242,7 @@ func (dt Type) String() (s string) {
 	case juletype.STRUCT:
 		return dt.StructString()
 	case juletype.FN:
-		return dt.FuncString()
+		return dt.FnString()
 	default:
 		return juletype.CppId(dt.Id)
 	}
@@ -299,8 +317,8 @@ func (dt *Type) StructString() string {
 	return cpp.String()[:cpp.Len()-1] + ">"
 }
 
-// FuncString returns cpp value of function DataType.
-func (dt *Type) FuncString() string {
+// FnString returns cpp value of function DataType.
+func (dt *Type) FnString() string {
 	var cpp strings.Builder
 	cpp.WriteString("fn<std::function<")
 	f := dt.Tag.(*Fn)
