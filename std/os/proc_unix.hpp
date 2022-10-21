@@ -9,6 +9,7 @@
 #define __JULEC_STD_OS_PROC_UNIX_HPP
 
 #include <limits.h>
+#include <unistd.h>
 
 // Declarations
 

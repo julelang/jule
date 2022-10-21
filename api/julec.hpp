@@ -263,7 +263,7 @@ void __julec_setup_command_line_args(int argc, char *argv[]) noexcept {
 #else
     __julec_command_line_args = slice<str_julet>( argc );
     for (int_julet _i{ 0 }; _i < argc; ++_i)
-    { __julec_command_line_args.__push( argv[_i] ); }
+    { __julec_command_line_args[_i] = argv[_i]; }
 #endif // #ifdef _WINDOWS
 }
 
