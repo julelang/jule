@@ -77,7 +77,7 @@ func IsPassFileAnnotation(p string) bool {
 	p = p[:n-len(filepath.Ext(p))]
 
 	// a1 is the second annotation.
-	// Should be architecture annotation if exist annotation 2,
+	// Should be architecture annotation if exist annotation 2 (aka a2),
 	// can operating system or architecture annotation if not.
 	a1 := ""
 	// a2 is first filter.
@@ -105,17 +105,24 @@ func IsPassFileAnnotation(p string) bool {
 	
 	if a2 == "" {
 		ok, exist := checkPlatform(a1)
-		if exist && !ok {
-			return false
+		if exist {
+			return ok
 		}
 		ok, exist = checkArch(a1)
 		return !exist || ok
 	}
 	
 	ok, exist := checkArch(a1)
-	if exist && !ok {
-		return false
+	if exist {
+		if !ok {
+			return false
+		}
+		ok, exist = checkPlatform(a2)
+		return !exist || ok
 	}
-	ok, exist = checkPlatform(a2)
+
+	// a1 is not architecture, for this reason bad couple pattern.
+	// Accept as one pattern, so a1 can be platform.
+	ok, exist = checkPlatform(a1)
 	return !exist || ok
 }
