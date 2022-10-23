@@ -870,12 +870,8 @@ func (b *Builder) Fn(toks []lex.Token, method, anon, prototype bool) (f models.F
 		return
 	}
 	if i >= len(toks) {
-		if b.Ended() {
-			b.pusherr(f.Token, "body_not_exist")
-			return
-		}
-		toks = b.nextBuilderSt()
-		i = 0
+		b.pusherr(f.Token, "body_not_exist")
+		return
 	}
 	blockToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &toks)
 	if blockToks != nil {
@@ -2153,12 +2149,7 @@ func (b *Builder) IfExpr(bs *block_st) (s models.Statement) {
 	exprToks := BlockExpr(bs.toks)
 	i := 0
 	if len(exprToks) == 0 {
-		if len(bs.toks) == 0 || bs.pos >= len(*bs.srcToks) {
-			b.pusherr(ifast.Token, "missing_expr")
-			return
-		}
-		exprToks = bs.toks
-		setToNextSt(bs)
+		b.pusherr(ifast.Token, "missing_expr")
 	} else {
 		i = len(exprToks)
 	}
@@ -2187,12 +2178,7 @@ func (b *Builder) ElseIfExpr(bs *block_st) (s models.Statement) {
 	exprToks := BlockExpr(bs.toks)
 	i := 0
 	if len(exprToks) == 0 {
-		if len(bs.toks) == 0 || bs.pos >= len(*bs.srcToks) {
-			b.pusherr(elif.Token, "missing_expr")
-			return
-		}
-		exprToks = bs.toks
-		setToNextSt(bs)
+		b.pusherr(elif.Token, "missing_expr")
 	} else {
 		i = len(exprToks)
 	}
