@@ -95,6 +95,7 @@ inline std::ostream &operator<<(std::ostream &_Stream,
 
 
 
+#include "defer.hpp"
 #include "typedef.hpp"
 #include "atomicity.hpp"
 #include "ref.hpp"

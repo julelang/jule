@@ -718,6 +718,7 @@ var KEYWORDS = map[string]uint8{
 	KND_LET:         ID_LET,
 	KND_UNSAFE:      ID_UNSAFE,
 	KND_MUT:         ID_MUT,
+	KND_DEFER:       ID_DEFER,
 }
 
 type oppair struct {

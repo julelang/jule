@@ -10,6 +10,7 @@ import (
 // Block is code block.
 type Block struct {
 	IsUnsafe bool
+	Deferred bool
 	Parent   *Block
 	SubIndex int // Index of statement in parent block
 	Tree     []Statement
@@ -22,8 +23,15 @@ type Block struct {
 
 func (b Block) String() string {
 	AddIndent()
-	s := ParseBlock(b)
+	s := ""
+	if b.Deferred {
+		s = "__JULEC_DEFER("
+	}
+	s += ParseBlock(b)
 	DoneIndent()
+	if b.Deferred {
+		s += ");"
+	}
 	return s
 }
 

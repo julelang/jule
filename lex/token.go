@@ -42,6 +42,7 @@ const ID_FN          = 35
 const ID_LET         = 36
 const ID_UNSAFE      = 37
 const ID_MUT         = 38
+const ID_DEFER       = 39
 
 // Token kinds.
 const KND_DBLCOLON     = "::"
@@ -137,6 +138,7 @@ const KND_FN          = "fn"
 const KND_LET         = "let"
 const KND_UNSAFE      = "unsafe"
 const KND_MUT         = "mut"
+const KND_DEFER       = "defer"
 
 // Token is lexer token.
 type Token struct {

@@ -1316,14 +1316,11 @@ func (b *Builder) St(bs *block_st) (s models.Statement) {
 		return
 	case lex.ID_MATCH:
 		return b.MatchCase(bs.toks)
-	case lex.ID_UNSAFE:
-		if len(bs.toks) == 1 || bs.toks[1].Kind != lex.KND_LBRACE {
-			break
-		}
-		return b.blockSt(bs.toks[1:], true)
+	case lex.ID_UNSAFE, lex.ID_DEFER:
+		return b.blockSt(bs.toks)
 	case lex.ID_BRACE:
 		if tok.Kind == lex.KND_LBRACE {
-			return b.blockSt(bs.toks, false)
+			return b.blockSt(bs.toks)
 		}
 	}
 	if IsFnCall(bs.toks) != nil {
@@ -1333,15 +1330,46 @@ func (b *Builder) St(bs *block_st) (s models.Statement) {
 	return
 }
 
-func (b *Builder) blockSt(toks []lex.Token, is_unsafe bool) models.Statement {
-	i := 0
+func (b *Builder) blockSt(toks []lex.Token) models.Statement {
+	is_unsafe := false
+	is_deferred := false
 	tok := toks[0]
+	if tok.Id == lex.ID_UNSAFE {
+		is_unsafe = true
+		toks = toks[1:]
+		if len(toks) == 0 {
+			b.pusherr(tok, "invalid_syntax")
+			return models.Statement{}
+		}
+		tok = toks[0]
+		if tok.Id == lex.ID_DEFER {
+			is_deferred = true
+			toks = toks[1:]
+			if len(toks) == 0 {
+				b.pusherr(tok, "invalid_syntax")
+				return models.Statement{}
+			}
+		}
+	} else if tok.Id == lex.ID_DEFER {
+		is_deferred = true
+		toks = toks[1:]
+		if len(toks) == 0 {
+			b.pusherr(tok, "invalid_syntax")
+			return models.Statement{}
+		}
+	}
+
+	i := 0
 	toks = Range(&i, lex.KND_LBRACE, lex.KND_RBRACE, toks)
-	if i < len(toks) {
+	if len(toks) == 0 {
+		b.pusherr(tok, "invalid_syntax")
+		return models.Statement{}
+	} else if i < len(toks) {
 		b.pusherr(toks[i], "invalid_syntax")
 	}
 	block := b.Block(toks)
 	block.IsUnsafe = is_unsafe
+	block.Deferred = is_deferred
 	return models.Statement{Token: tok, Data: block}
 }
 
