@@ -271,6 +271,7 @@ func (tb *type_builder) step() (imret bool) {
 		return
 	case lex.ID_DBLCOLON:
 		tb.kind += tok.Kind
+		return
 	case lex.ID_UNSAFE:
 		if *tb.i+1 >= len(tb.tokens) || tb.tokens[*tb.i+1].Id != lex.ID_FN {
 			tb.unsafe_kw(tok)
@@ -298,11 +299,6 @@ func (tb *type_builder) step() (imret bool) {
 		imret = true
 		return
 	}
-	if tb.err {
-		tb.b.pusherr(tb.tokens[tb.first], "invalid_type")
-		imret = true
-	}
-	return
 }
 
 func (tb *type_builder) build() bool {
