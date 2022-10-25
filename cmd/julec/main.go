@@ -352,7 +352,7 @@ func compile(path string, main, nolocal, justDefs bool) *parser.Parser {
 		p.PushErr("stdlib_not_exist")
 		return p
 	}
-	f, err := juleio.OpenJuleF(path)
+	f, err := juleio.Jopen(path)
 	if err != nil {
 		println(err.Error())
 		return nil

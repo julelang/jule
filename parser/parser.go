@@ -65,6 +65,7 @@ type Parser struct {
 	linked_variables []*models.Var
 	linked_structs   []*structure
 	allowBuiltin     bool
+	package_files    *[]*Parser
 
 	NoLocalPkg  bool
 	JustDefines bool
@@ -497,6 +498,15 @@ func make_use_from_ast(ast *models.UseDecl) *use {
 	return use
 }
 
+func (p *Parser) wrap_package() {
+	for _, fp := range *p.package_files {
+		if p == fp {
+			continue
+		}
+		pushDefines(p.Defines, fp.Defines)
+	}
+}
+
 func (p *Parser) compilePureUse(useAST *models.UseDecl) (_ *use, hassErr bool) {
 	infos, err := os.ReadDir(useAST.Path)
 	if err != nil {
@@ -511,17 +521,20 @@ func (p *Parser) compilePureUse(useAST *models.UseDecl) (_ *use, hassErr bool) {
 			!juleio.IsPassFileAnnotation(name) {
 			continue
 		}
-		f, err := juleio.OpenJuleF(filepath.Join(useAST.Path, name))
+		path := filepath.Join(useAST.Path, name)
+		f, err := juleio.Jopen(path)
 		if err != nil {
 			p.pusherrmsg(err.Error())
 			continue
 		}
 		psub := New(f)
+		psub.setup_package_files()
 		psub.Parsef(false, false)
+		psub.wrap_package()
 		use := make_use_from_ast(useAST)
+		pushDefines(use.defines, psub.Defines)
 		p.pusherrs(psub.Errors...)
 		p.Warnings = append(p.Warnings, psub.Warnings...)
-		pushDefines(use.defines, psub.Defines)
 		p.pushUse(use, useAST.Selectors)
 		if psub.Errors != nil {
 			p.pusherrtok(useAST.Token, "use_has_errors")
@@ -679,21 +692,16 @@ func (p *Parser) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 			name == p.File.Name {
 			continue
 		}
-		f, err := juleio.OpenJuleF(filepath.Join(p.File.Dir, name))
+		f, err := juleio.Jopen(filepath.Join(p.File.Dir, name))
 		if err != nil {
 			p.pusherrmsg(err.Error())
 			return true
 		}
 		fp := New(f)
+		fp.package_files = p.package_files
+		*p.package_files = append(*p.package_files, fp)
 		fp.NoLocalPkg = true
 		fp.NoCheck = true
-		fp.Defines = p.Defines
-		
-		// Set links for exist checking
-		fp.linked_aliases = p.linked_aliases
-		fp.linked_functions = p.linked_functions
-		fp.linked_variables = p.linked_variables
-		fp.linked_structs = p.linked_structs
 
 		fp.Parsef(false, true)
 		fp.wg.Wait()
@@ -701,15 +709,13 @@ func (p *Parser) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 			p.pusherrs(fp.Errors...)
 			return true
 		}
-		p.linked_aliases = fp.linked_aliases
-		p.linked_functions = fp.linked_functions
-		p.linked_variables = fp.linked_variables
-		p.linked_structs = fp.linked_structs
-		p.waitingFuncs = append(p.waitingFuncs, fp.waitingFuncs...)
-		p.waitingGlobals = append(p.waitingGlobals, fp.waitingGlobals...)
-		p.waitingImpls = append(p.waitingImpls, fp.waitingImpls...)
 	}
 	return
+}
+
+func (p *Parser) setup_package_files() {
+	p.package_files = new([]*Parser)
+	*p.package_files = append(*p.package_files, p)
 }
 
 // Parses Jule code from object tree.
@@ -717,6 +723,9 @@ func (p *Parser) Parset(tree []models.Object, main, justDefines bool) {
 	p.IsMain = main
 	p.JustDefines = justDefines
 	preprocessor.Process(&tree, !main)
+	if main {
+		p.setup_package_files()
+	}
 	if !p.parseTree(tree) {
 		return
 	}
@@ -1597,36 +1606,44 @@ func (p *Parser) varsFromParams(f *Func) []*Var {
 }
 
 func (p *Parser) linked_alias_by_id(id string) *models.TypeAlias {
-	for _, link := range p.linked_aliases {
-		if link.Id == id {
-			return link
+	for _, fp := range *p.package_files {
+		for _, link := range fp.linked_aliases {
+			if link.Id == id {
+				return link
+			}
 		}
 	}
 	return nil
 }
 
 func (p *Parser) linked_struct_by_id(id string) *structure {
-	for _, link := range p.linked_structs {
-		if link.Ast.Id == id {
-			return link
+	for _, fp := range *p.package_files {
+		for _, link := range fp.linked_structs {
+			if link.Ast.Id == id {
+				return link
+			}
 		}
 	}
 	return nil
 }
 
 func (p *Parser) linkedVarById(id string) *Var {
-	for _, link := range p.linked_variables {
-		if link.Id == id {
-			return link
+	for _, fp := range *p.package_files {
+		for _, link := range fp.linked_variables {
+			if link.Id == id {
+				return link
+			}
 		}
 	}
 	return nil
 }
 
 func (p *Parser) linkedFnById(id string) *models.Fn {
-	for _, link := range p.linked_functions {
-		if link.Id == id {
-			return link
+	for _, fp := range *p.package_files {
+		for _, link := range fp.linked_functions {
+			if link.Id == id {
+				return link
+			}
 		}
 	}
 	return nil
@@ -1672,12 +1689,23 @@ func (p *Parser) FuncById(id string) (*Fn, *Defmap, bool) {
 			return f, nil, false
 		}
 	}
-	return p.Defines.funcById(id, p.File)
+	for _, fp := range *p.package_files {
+		f, dm, can_shadow := fp.Defines.funcById(id, fp.File)
+		if f != nil {
+			return f, dm, can_shadow
+		}
+	}
+	return nil, nil, false
 }
 
 func (p *Parser) globalById(id string) (*Var, *Defmap, bool) {
-	g, m, _ := p.Defines.globalById(id, p.File)
-	return g, m, true
+	for _, fp := range *p.package_files {
+		g, dm, _ := fp.Defines.globalById(id, fp.File)
+		if g != nil {
+			return g, dm, true
+		}
+	}
+	return nil, nil, false
 }
 
 func (p *Parser) nsById(id string) *namespace { return p.Defines.nsById(id) }
@@ -1699,17 +1727,29 @@ func (p *Parser) typeById(id string) (*TypeAlias, *Defmap, bool) {
 			return alias, nil, false
 		}
 	}
-	return p.Defines.typeById(id, p.File)
+	for _, fp := range *p.package_files {
+		a, dm, can_shadow := fp.Defines.typeById(id, fp.File)
+		if a != nil {
+			return a, dm, can_shadow
+		}
+	}
+	return nil, nil, false
 }
 
 func (p *Parser) enumById(id string) (*Enum, *Defmap, bool) {
 	if p.allowBuiltin {
-		s, _, _ := Builtin.enumById(id, nil)
-		if s != nil {
-			return s, nil, false
+		e, _, _ := Builtin.enumById(id, nil)
+		if e != nil {
+			return e, nil, false
 		}
 	}
-	return p.Defines.enumById(id, p.File)
+	for _, fp := range *p.package_files {
+		e, dm, can_shadow := fp.Defines.enumById(id, fp.File)
+		if e != nil {
+			return e, dm, can_shadow
+		}
+	}
+	return nil, nil, false
 }
 
 func (p *Parser) structById(id string) (*structure, *Defmap, bool) {
@@ -1719,7 +1759,13 @@ func (p *Parser) structById(id string) (*structure, *Defmap, bool) {
 			return s, nil, false
 		}
 	}
-	return p.Defines.structById(id, p.File)
+	for _, fp := range *p.package_files {
+		s, dm, can_shadow := fp.Defines.structById(id, fp.File)
+		if s != nil {
+			return s, dm, can_shadow
+		}
+	}
+	return nil, nil, false
 }
 
 func (p *Parser) traitById(id string) (*trait, *Defmap, bool) {
@@ -1729,7 +1775,13 @@ func (p *Parser) traitById(id string) (*trait, *Defmap, bool) {
 			return trait_def, nil, false
 		}
 	}
-	return p.Defines.traitById(id, p.File)
+	for _, fp := range *p.package_files {
+		t, dm, can_shadow := fp.Defines.traitById(id, fp.File)
+		if t != nil {
+			return t, dm, can_shadow
+		}
+	}
+	return nil, nil, false
 }
 
 func (p *Parser) blockTypeById(id string) (_ *TypeAlias, can_shadow bool) {
@@ -1802,6 +1854,18 @@ func (p *Parser) blockDefById(id string) (def any, tok lex.Token, canshadow bool
 	return
 }
 
+func (p *Parser) precheck() {
+	p.checkTypes()
+	p.parse_structs()
+	p.WaitingFuncs()
+	p.WaitingImpls()
+	p.WaitingGlobals()
+	p.checkCppLinks()
+	p.waitingFuncs = nil
+	p.waitingImpls = nil
+	p.waitingGlobals = nil
+}
+
 func (p *Parser) check() {
 	if p.IsMain && !p.JustDefines {
 		f, _, _ := p.Defines.funcById(jule.ENTRY_POINT, nil)
@@ -1812,18 +1876,17 @@ func (p *Parser) check() {
 			f.used = true
 		}
 	}
-	p.checkTypes()
-	p.parse_structs()
-	p.WaitingFuncs()
-	p.WaitingImpls()
-	p.WaitingGlobals()
-	p.checkCppLinks()
-	p.waitingFuncs = nil
-	p.waitingImpls = nil
-	p.waitingGlobals = nil
+	p.precheck()
+	for _, f := range *p.package_files {
+		f.precheck()
+	}
 	if !p.JustDefines {
 		p.checkFuncs()
 		p.checkStructs()
+		for _, f := range *p.package_files {
+			f.checkFuncs()
+			f.checkStructs()
+		}
 	}
 }
 
