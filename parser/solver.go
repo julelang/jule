@@ -938,9 +938,11 @@ func (s *solver) function() (v value) {
 
 func (s *solver) types_are_compatible(ignore_any bool) bool {
 	checker := type_checker{
-		left:         s.l.data.Type,
-		right:        s.r.data.Type,
+		p:            s.p,
+		l:            s.l.data.Type,
+		r:            s.r.data.Type,
 		ignore_any:   ignore_any,
+		errtok:       s.op,
 		allow_assign: true,
 	}
 	ok := checker.check()

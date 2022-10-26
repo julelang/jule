@@ -8,56 +8,56 @@ import (
 type type_checker struct {
 	errtok       lex.Token
 	p            *Parser
-	left         Type
-	right        Type
+	l         Type
+	r        Type
 	error_logged bool
 	ignore_any   bool
 	allow_assign bool
 }
 
 func (tc *type_checker) check_ref() bool {
-	if tc.left.Kind == tc.right.Kind {
+	if tc.l.Kind == tc.r.Kind {
 		return true
 	} else if !tc.allow_assign {
 		return false
 	}
-	tc.left = un_ptr_or_ref_type(tc.left)
+	tc.l = un_ptr_or_ref_type(tc.l)
 	return tc.check()
 }
 
 func (tc *type_checker) check_ptr() bool {
-	if tc.right.Id == juletype.NIL {
+	if tc.r.Id == juletype.NIL {
 		return true
-	} else if type_is_unsafe_ptr(tc.left) {
+	} else if type_is_unsafe_ptr(tc.l) {
 		return true
 	}
-	return tc.left.Kind == tc.right.Kind
+	return tc.l.Kind == tc.r.Kind
 }
 
 func (tc *type_checker) check_trait() bool {
-	if tc.right.Id == juletype.NIL {
+	if tc.r.Id == juletype.NIL {
 		return true
 	}
-	t := tc.left.Tag.(*trait)
-	lm := tc.left.Modifiers()
+	t := tc.l.Tag.(*trait)
+	lm := tc.l.Modifiers()
 	ref := false
 	switch {
-	case type_is_ref(tc.right):
+	case type_is_ref(tc.r):
 		ref = true
-		tc.right = un_ptr_or_ref_type(tc.right)
-		if !type_is_struct(tc.right) {
+		tc.r = un_ptr_or_ref_type(tc.r)
+		if !type_is_struct(tc.r) {
 			break
 		}
 		fallthrough
-	case type_is_struct(tc.right):
+	case type_is_struct(tc.r):
 		if lm != "" {
 			return false
 		}
-		rm := tc.right.Modifiers()
+		rm := tc.r.Modifiers()
 		if rm != "" {
 			return false
 		}
-		s := tc.right.Tag.(*structure)
+		s := tc.r.Tag.(*structure)
 		if !s.hasTrait(t) {
 			return false
 		}
@@ -67,14 +67,14 @@ func (tc *type_checker) check_trait() bool {
 			return false
 		}
 		return true
-	case type_is_trait(tc.right):
-		return t == tc.right.Tag.(*trait) && lm == tc.right.Modifiers()
+	case type_is_trait(tc.r):
+		return t == tc.r.Tag.(*trait) && lm == tc.r.Modifiers()
 	}
 	return false
 }
 
 func (tc *type_checker) check_struct() bool {
-	s1, s2 := tc.left.Tag.(*structure), tc.right.Tag.(*structure)
+	s1, s2 := tc.l.Tag.(*structure), tc.r.Tag.(*structure)
 	switch {
 	case s1.Ast.Id != s2.Ast.Id,
 		s1.Ast.Token.File != s2.Ast.Token.File:
@@ -97,69 +97,69 @@ func (tc *type_checker) check_struct() bool {
 }
 
 func (tc *type_checker) check_slice() bool {
-	if tc.right.Id == juletype.NIL {
+	if tc.r.Id == juletype.NIL {
 		return true
 	}
-	return tc.left.Kind == tc.right.Kind
+	return tc.l.Kind == tc.r.Kind
 }
 
 func (tc *type_checker) check_array() bool {
-	if !type_is_array(tc.right) {
+	if !type_is_array(tc.r) {
 		return false
 	}
-	return tc.left.Size.N == tc.right.Size.N
+	return tc.l.Size.N == tc.r.Size.N
 }
 
 func (tc *type_checker) check_map() bool {
-	if tc.right.Id == juletype.NIL {
+	if tc.r.Id == juletype.NIL {
 		return true
 	}
-	return tc.left.Kind == tc.right.Kind
+	return tc.l.Kind == tc.r.Kind
 }
 
 func (tc *type_checker) check() bool {
 	switch {
-	case type_is_trait(tc.left), type_is_trait(tc.right):
-		if type_is_trait(tc.right) {
-			tc.left, tc.right = tc.right, tc.left
+	case type_is_trait(tc.l), type_is_trait(tc.r):
+		if type_is_trait(tc.r) {
+			tc.l, tc.r = tc.r, tc.l
 		}
 		return tc.check_trait()
-	case type_is_ref(tc.left), type_is_ref(tc.right):
-		if type_is_ref(tc.right) {
-			tc.left, tc.right = tc.right, tc.left
+	case type_is_ref(tc.l), type_is_ref(tc.r):
+		if type_is_ref(tc.r) {
+			tc.l, tc.r = tc.r, tc.l
 		}
 		return tc.check_ref()
-	case type_is_ptr(tc.left), type_is_ptr(tc.right):
-		if !type_is_ptr(tc.left) && type_is_ptr(tc.right) {
-			tc.left, tc.right = tc.right, tc.left
+	case type_is_ptr(tc.l), type_is_ptr(tc.r):
+		if !type_is_ptr(tc.l) && type_is_ptr(tc.r) {
+			tc.l, tc.r = tc.r, tc.l
 		}
 		return tc.check_ptr()
-	case type_is_slc(tc.left), type_is_slc(tc.right):
-		if type_is_slc(tc.right) {
-			tc.left, tc.right = tc.right, tc.left
+	case type_is_slc(tc.l), type_is_slc(tc.r):
+		if type_is_slc(tc.r) {
+			tc.l, tc.r = tc.r, tc.l
 		}
 		return tc.check_slice()
-	case type_is_array(tc.left), type_is_array(tc.right):
-		if type_is_array(tc.right) {
-			tc.left, tc.right = tc.right, tc.left
+	case type_is_array(tc.l), type_is_array(tc.r):
+		if type_is_array(tc.r) {
+			tc.l, tc.r = tc.r, tc.l
 		}
 		return tc.check_array()
-	case type_is_map(tc.left), type_is_map(tc.right):
-		if type_is_map(tc.right) {
-			tc.left, tc.right = tc.right, tc.left
+	case type_is_map(tc.l), type_is_map(tc.r):
+		if type_is_map(tc.r) {
+			tc.l, tc.r = tc.r, tc.l
 		}
 		return tc.check_map()
-	case type_is_nil_compatible(tc.left):
-		return tc.right.Id == juletype.NIL
-	case type_is_nil_compatible(tc.right):
-		return tc.left.Id == juletype.NIL
-	case type_is_enum(tc.left), type_is_enum(tc.right):
-		return tc.left.Id == tc.right.Id && tc.left.Kind == tc.right.Kind
-	case type_is_struct(tc.left), type_is_struct(tc.right):
-		if tc.right.Id == juletype.STRUCT {
-			tc.left, tc.right = tc.right, tc.left
+	case type_is_nil_compatible(tc.l):
+		return tc.r.Id == juletype.NIL
+	case type_is_nil_compatible(tc.r):
+		return tc.l.Id == juletype.NIL
+	case type_is_enum(tc.l), type_is_enum(tc.r):
+		return tc.l.Id == tc.r.Id && tc.l.Kind == tc.r.Kind
+	case type_is_struct(tc.l), type_is_struct(tc.r):
+		if tc.r.Id == juletype.STRUCT {
+			tc.l, tc.r = tc.r, tc.l
 		}
 		return tc.check_struct()
 	}
-	return juletype.TypesAreCompatible(tc.left.Id, tc.right.Id, tc.ignore_any)
+	return juletype.TypesAreCompatible(tc.l.Id, tc.r.Id, tc.ignore_any)
 }

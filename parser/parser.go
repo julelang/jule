@@ -3956,8 +3956,8 @@ func (p *Parser) check_type(real, check Type, ignoreAny, allow_assign bool, errT
 	checker := type_checker{
 		errtok:       errTok,
 		p:            p,
-		left:         real,
-		right:        check,
+		l:         real,
+		r:        check,
 		ignore_any:   ignoreAny,
 		allow_assign: allow_assign,
 	}
