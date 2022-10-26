@@ -367,17 +367,6 @@ func compile(path string, main, nolocal, justDefs bool) *parser.Parser {
 	return p
 }
 
-func exec_post_commands() {
-	for _, cmd := range jule.SET.PostCommands {
-		fmt.Println(">", cmd)
-		parts := strings.SplitN(cmd, " ", -1)
-		err := exec.Command(parts[0], parts[1:]...).Run()
-		if err != nil {
-			println(err.Error())
-		}
-	}
-}
-
 func generate_compile_command(source_path string) (c, cmd string) {
 	var cpp strings.Builder
 	cpp.WriteString("-g -O0 ")
@@ -403,7 +392,6 @@ func do_spell(cpp string) {
 			println(err.Error())
 		}
 	}
-	exec_post_commands()
 }
 
 func main() {
