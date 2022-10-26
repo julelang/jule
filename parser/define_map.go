@@ -145,11 +145,11 @@ func (dm *Defmap) findFuncById(id string, f *File) (int, *Defmap, bool) {
 	return -1, nil, false
 }
 
-// funcById returns function by specified id.
+// fnById returns function by specified id.
 //
 // Special case:
-//  funcById(id) -> nil: if function is not exist.
-func (dm *Defmap) funcById(id string, f *File) (*Fn, *Defmap, bool) {
+//  fnById(id) -> nil: if function is not exist.
+func (dm *Defmap) fnById(id string, f *File) (*Fn, *Defmap, bool) {
 	i, m, canshadow := dm.findFuncById(id, f)
 	if i == -1 {
 		return nil, nil, false

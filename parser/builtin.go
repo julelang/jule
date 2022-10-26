@@ -624,18 +624,18 @@ func readyMapDefines(mapt Type) {
 	keyt := types[0]
 	valt := types[1]
 
-	keysFunc, _, _ := mapDefines.funcById("keys", nil)
+	keysFunc, _, _ := mapDefines.fnById("keys", nil)
 	keysFunc.Ast.RetType.Type = keyt
 	keysFunc.Ast.RetType.Type.Kind = jule.PREFIX_SLICE + keysFunc.Ast.RetType.Type.Kind
 
-	valuesFunc, _, _ := mapDefines.funcById("values", nil)
+	valuesFunc, _, _ := mapDefines.fnById("values", nil)
 	valuesFunc.Ast.RetType.Type = valt
 	valuesFunc.Ast.RetType.Type.Kind = jule.PREFIX_SLICE + valuesFunc.Ast.RetType.Type.Kind
 
-	hasFunc, _, _ := mapDefines.funcById("has", nil)
+	hasFunc, _, _ := mapDefines.fnById("has", nil)
 	hasFunc.Ast.Params[0].Type = keyt
 
-	delFunc, _, _ := mapDefines.funcById("del", nil)
+	delFunc, _, _ := mapDefines.fnById("del", nil)
 	delFunc.Ast.Params[0].Type = keyt
 }
 
@@ -653,7 +653,7 @@ func init() {
 	make_fn.Ast.BuiltinCaller = caller_make
 
 	// Setup new function
-	fn_new, _, _ := Builtin.funcById("new", nil)
+	fn_new, _, _ := Builtin.fnById("new", nil)
 	fn_new.Ast.BuiltinCaller = caller_new
 
 	// Setup Error trait

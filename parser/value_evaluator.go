@@ -310,7 +310,7 @@ func (ve *valueEvaluator) id() (_ value, ok bool) {
 		}
 	}
 
-	f, _, _ := ve.p.FuncById(id)
+	f, _, _ := ve.p.FnById(id)
 	if f != nil {
 		return ve.funcId(id, f), true
 	}

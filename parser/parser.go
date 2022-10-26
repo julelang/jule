@@ -303,7 +303,7 @@ func (p *Parser) CppInitializerCaller() string {
 	indent := models.IndentString()
 	models.DoneIndent()
 	pushInit := func(defs *Defmap) {
-		f, dm, _ := defs.funcById(jule.INIT_FN, nil)
+		f, dm, _ := defs.fnById(jule.INIT_FN, nil)
 		if f == nil || dm != defs {
 			return
 		}
@@ -1195,7 +1195,7 @@ func (p *Parser) implTrait(model *models.Impl) {
 	for _, tf := range trait_def.Defines.Funcs {
 		ok := false
 		ds := tf.Ast.DefString()
-		sf, _, _ := s.Defines.funcById(tf.Ast.Id, nil)
+		sf, _, _ := s.Defines.fnById(tf.Ast.Id, nil)
 		if sf != nil {
 			ok = tf.Ast.Pub == sf.Ast.Pub && ds == sf.Ast.DefString()
 		}
@@ -1677,21 +1677,21 @@ func (p *Parser) linkById(id string) (any, byte) {
 	return nil, ' '
 }
 
-// FuncById returns function by specified id.
+// FnById returns function by specified id.
 //
 // Special case:
 //
-//	FuncById(id) -> nil: if function is not exist.
-func (p *Parser) FuncById(id string) (*Fn, *Defmap, bool) {
+//	FnById(id) -> nil: if function is not exist.
+func (p *Parser) FnById(id string) (*Fn, *Defmap, bool) {
 	if p.allowBuiltin {
-		f, _, _ := Builtin.funcById(id, nil)
+		f, _, _ := Builtin.fnById(id, nil)
 		if f != nil {
 			return f, nil, false
 		}
 	}
 	for _, fp := range *p.package_files {
-		f, dm, can_shadow := fp.Defines.funcById(id, fp.File)
-		if f != nil {
+		f, dm, can_shadow := fp.Defines.fnById(id, fp.File)
+		if f != nil && p.is_accessible_define(fp, dm) {
 			return f, dm, can_shadow
 		}
 	}
@@ -1701,7 +1701,7 @@ func (p *Parser) FuncById(id string) (*Fn, *Defmap, bool) {
 func (p *Parser) globalById(id string) (*Var, *Defmap, bool) {
 	for _, fp := range *p.package_files {
 		g, dm, _ := fp.Defines.globalById(id, fp.File)
-		if g != nil {
+		if g != nil && p.is_accessible_define(fp, dm) {
 			return g, dm, true
 		}
 	}
@@ -1714,6 +1714,34 @@ func (p *Parser) nsById(id string) *namespace { return p.Defines.nsById(id) }
 func (p *Parser) is_shadowed(id string) bool {
 	def, _, _ := p.blockDefById(id)
 	return def != nil
+}
+
+func (p *Parser) is_accessible_define(fp *Parser, dm *Defmap) bool {
+	// Description of this condition
+	// Parameters:
+	//   fp: package representer, which package is provides this define
+	//   dm: *Defmap of define
+	//
+	// For example:
+	//  Our package has a two file.
+	//  These two file uses an another package named as X.
+	//  First package file uses like: X::{A, B, C}
+	//  Second package file uses like: X::*
+	//
+	//  In this case, first package file can access all defines of X package.
+	//  For this reason, uses the condition below for ignore this case.
+	//
+	//  The Logic
+	//  The current package (p) is not equals to fp, this indicates that
+	//  p found the definition from another package file. For this reason
+	//  dm should be equals to fp.Defines because otherwise
+	//  it means a definition from outside the package. By this logic,
+	//  definitions of other package files that they have outside
+	//  of the package are ignored.
+	//
+	// If current package is equals to fp, no problem.
+	// Definition founds in p.
+	return p == fp || dm == fp.Defines
 }
 
 func (p *Parser) typeById(id string) (*TypeAlias, *Defmap, bool) {
@@ -1729,7 +1757,7 @@ func (p *Parser) typeById(id string) (*TypeAlias, *Defmap, bool) {
 	}
 	for _, fp := range *p.package_files {
 		a, dm, can_shadow := fp.Defines.typeById(id, fp.File)
-		if a != nil {
+		if a != nil && p.is_accessible_define(fp, dm) {
 			return a, dm, can_shadow
 		}
 	}
@@ -1745,7 +1773,7 @@ func (p *Parser) enumById(id string) (*Enum, *Defmap, bool) {
 	}
 	for _, fp := range *p.package_files {
 		e, dm, can_shadow := fp.Defines.enumById(id, fp.File)
-		if e != nil {
+		if e != nil && p.is_accessible_define(fp, dm) {
 			return e, dm, can_shadow
 		}
 	}
@@ -1761,7 +1789,7 @@ func (p *Parser) structById(id string) (*structure, *Defmap, bool) {
 	}
 	for _, fp := range *p.package_files {
 		s, dm, can_shadow := fp.Defines.structById(id, fp.File)
-		if s != nil {
+		if s != nil && p.is_accessible_define(fp, dm) {
 			return s, dm, can_shadow
 		}
 	}
@@ -1777,7 +1805,7 @@ func (p *Parser) traitById(id string) (*trait, *Defmap, bool) {
 	}
 	for _, fp := range *p.package_files {
 		t, dm, can_shadow := fp.Defines.traitById(id, fp.File)
-		if t != nil {
+		if t != nil && p.is_accessible_define(fp, dm) {
 			return t, dm, can_shadow
 		}
 	}
@@ -1827,7 +1855,7 @@ func (p *Parser) defById(id string) (def any, tok lex.Token, canshadow bool) {
 		return trait, trait.Ast.Token, canshadow
 	}
 	var f *Fn
-	f, _, canshadow = p.FuncById(id)
+	f, _, canshadow = p.FnById(id)
 	if f != nil {
 		return f, f.Ast.Token, canshadow
 	}
@@ -1868,7 +1896,7 @@ func (p *Parser) precheck() {
 
 func (p *Parser) check() {
 	if p.IsMain && !p.JustDefines {
-		f, _, _ := p.Defines.funcById(jule.ENTRY_POINT, nil)
+		f, _, _ := p.Defines.fnById(jule.ENTRY_POINT, nil)
 		if f == nil {
 			p.PushErr("no_entry_point")
 		} else {
@@ -1886,6 +1914,8 @@ func (p *Parser) check() {
 		for _, f := range *p.package_files {
 			f.checkFuncs()
 			f.checkStructs()
+			f.wg.Wait()
+			p.pusherrs(f.Errors...)
 		}
 	}
 }
@@ -3187,7 +3217,7 @@ func (p *Parser) assignment(left value, errtok lex.Token) bool {
 	}
 	switch left.data.Type.Tag.(type) {
 	case Func:
-		f, _, _ := p.FuncById(left.data.Token.Kind)
+		f, _, _ := p.FnById(left.data.Token.Kind)
 		if f != nil {
 			p.pusherrtok(errtok, "assign_type_not_support_value")
 			state = false
