@@ -1921,7 +1921,7 @@ func (b *Builder) getIterProfile(toks []lex.Token, errtok lex.Token) models.Iter
 	return b.getWhileIterProfile(toks)
 }
 
-func (b *Builder) forStatement(toks []lex.Token) models.Statement {
+func (b *Builder) next_st(toks []lex.Token) models.Statement {
 	s := b.St(&block_st{toks: toks})
 	switch s.Data.(type) {
 	case models.ExprStatement, models.Assign, models.Var:
@@ -1931,32 +1931,24 @@ func (b *Builder) forStatement(toks []lex.Token) models.Statement {
 	return s
 }
 
-func (b *Builder) forIterProfile(bs *block_st) (s models.Statement) {
+func (b *Builder) getWhileNextIterProfile(bs *block_st) (s models.Statement) {
 	var iter models.Iter
 	iter.Token = bs.toks[0]
 	bs.toks = bs.toks[1:]
-	var profile models.IterFor
+	profile := models.IterWhile{}
 	if len(bs.toks) > 0 {
-		profile.Once = b.forStatement(bs.toks)
+		profile.Expr = b.Expr(bs.toks)
 	}
 	if blockStFinished(bs) {
 		b.pusherr(iter.Token, "invalid_syntax")
 		return
 	}
 	setToNextSt(bs)
-	if len(bs.toks) > 0 {
-		profile.Condition = b.Expr(bs.toks)
+	st_toks := BlockExpr(bs.toks)
+	if len(st_toks) > 0 {
+		profile.Next = b.next_st(st_toks)
 	}
-	if blockStFinished(bs) {
-		b.pusherr(iter.Token, "invalid_syntax")
-		return
-	}
-	setToNextSt(bs)
-	exprToks := BlockExpr(bs.toks)
-	if len(exprToks) > 0 {
-		profile.Next = b.forStatement(exprToks)
-	}
-	i := len(exprToks)
+	i := len(st_toks)
 	blockToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &bs.toks)
 	if blockToks == nil {
 		b.pusherr(iter.Token, "body_not_exist")
@@ -1997,7 +1989,7 @@ func (b *Builder) commonIterProfile(toks []lex.Token) (s models.Statement) {
 
 func (b *Builder) IterExpr(bs *block_st) models.Statement {
 	if bs.terminated {
-		return b.forIterProfile(bs)
+		return b.getWhileNextIterProfile(bs)
 	}
 	return b.commonIterProfile(bs.toks)
 }

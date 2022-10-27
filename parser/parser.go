@@ -3413,6 +3413,9 @@ func (p *Parser) whileProfile(iter *models.Iter) {
 	if !p.eval.has_error && val.data.Value != "" && !isBoolExpr(val) {
 		p.pusherrtok(iter.Token, "iter_while_require_bool_expr")
 	}
+	if profile.Next.Data != nil {
+		_ = p.statement(&profile.Next, false)
+	}
 	p.checkNewBlock(iter.Block)
 }
 
@@ -3438,30 +3441,6 @@ func (p *Parser) foreachProfile(iter *models.Iter) {
 	p.checkNewBlockCustom(iter.Block, blockVars)
 }
 
-func (p *Parser) forProfile(iter *models.Iter) {
-	profile := iter.Profile.(models.IterFor)
-	blockVars := p.blockVars
-	if profile.Once.Data != nil {
-		_ = p.statement(&profile.Once, false)
-	}
-	if !profile.Condition.IsEmpty() {
-		val, model := p.evalExpr(profile.Condition, nil)
-		profile.Condition.Model = model
-		assign_checker{
-			p:      p,
-			expr_t:      Type{Id: juletype.BOOL, Kind: juletype.TYPE_MAP[juletype.BOOL]},
-			v:      val,
-			errtok: profile.Condition.Tokens[0],
-		}.check()
-	}
-	if profile.Next.Data != nil {
-		_ = p.statement(&profile.Next, false)
-	}
-	iter.Profile = profile
-	p.checkNewBlock(iter.Block)
-	p.blockVars = blockVars
-}
-
 func (p *Parser) iter(iter *models.Iter) {
 	oldCase := p.currentCase
 	oldIter := p.currentIter
@@ -3472,8 +3451,6 @@ func (p *Parser) iter(iter *models.Iter) {
 		p.whileProfile(iter)
 	case models.IterForeach:
 		p.foreachProfile(iter)
-	case models.IterFor:
-		p.forProfile(iter)
 	default:
 		p.checkNewBlock(iter.Block)
 	}
