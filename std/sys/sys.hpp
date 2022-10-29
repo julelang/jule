@@ -8,9 +8,9 @@
 #ifndef __JULEC_STD_SYS_SYS_HPP
 #define __JULEC_STD_SYS_SYS_HPP
 
-int_julet __julec_stat(const char *_Path, struct stat *_Stat) noexcept;
+int_jt __julec_stat(const char *_Path, struct stat *_Stat) noexcept;
 
-int_julet __julec_stat(const char *_Path, struct stat *_Stat) noexcept
+int_jt __julec_stat(const char *_Path, struct stat *_Stat) noexcept
 { return stat(_Path, _Stat); }
 
 #endif // #ifndef __JULEC_STD_SYS_SYS_HPP

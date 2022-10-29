@@ -82,7 +82,7 @@ constexpr std::nullptr_t nil{ nullptr };
 // Pre-declarations
 
 // Defined at: str.hpp
-class str_julet;
+class str_jt;
 
 // Libraries uses this function for throw panic.
 // Also it is builtin panic function.
@@ -112,14 +112,14 @@ inline std::ostream &operator<<(std::ostream &_Stream,
 
 
 
-slice<str_julet> __julec_command_line_args;
+slice_jt<str_jt> __julec_command_line_args;
 
 
 
 // Declarations
 
-inline slice<str_julet> __julec_get_command_line_args(void) noexcept;
-inline void JULEC_ID(panic)(const trait<JULEC_ID(Error)> &_Error);
+inline slice_jt<str_jt> __julec_get_command_line_args(void) noexcept;
+inline void JULEC_ID(panic)(const trait_jt<JULEC_ID(Error)> &_Error);
 template<typename Type, unsigned N, unsigned Last>
 struct tuple_ostream;
 template<typename Type, unsigned N>
@@ -128,17 +128,17 @@ template<typename... Types>
 std::ostream &operator<<(std::ostream &_Stream,
                          const std::tuple<Types...> &_Tuple);
 template<typename _Fn_t, typename _Tuple_t, size_t ..._I_t>
-inline auto tuple_as_args(const fn<_Fn_t> &_Function,
+inline auto tuple_as_args(const fn_jt<_Fn_t> &_Function,
                           const _Tuple_t _Tuple,
                           const std::index_sequence<_I_t...>);
 template<typename _Fn_t, typename _Tuple_t>
-inline auto tuple_as_args(const fn<_Fn_t> &_Function, const _Tuple_t _Tuple);
+inline auto tuple_as_args(const fn_jt<_Fn_t> &_Function, const _Tuple_t _Tuple);
 template<typename T>
-inline jule_ref<T> __julec_new_structure(T *_Ptr);
+inline ref_jt<T> __julec_new_structure(T *_Ptr);
 // Libraries uses this function for UTf-8 encoded Jule strings.
 // Also it is builtin str type constructor.
 template<typename _Obj_t>
-str_julet __julec_to_str(const _Obj_t &_Obj) noexcept;
+str_jt __julec_to_str(const _Obj_t &_Obj) noexcept;
 void __julec_terminate_handler(void) noexcept;
 // Entry point function of generated Jule code, generates by JuleC.
 void JULEC_ID(main)(void);
@@ -149,7 +149,7 @@ int main(int argc, char *argv[]);
 
 // Definitions
 
-inline slice<str_julet> __julec_get_command_line_args(void) noexcept
+inline slice_jt<str_jt> __julec_get_command_line_args(void) noexcept
 { return __julec_command_line_args; }
 
 inline std::ostream &operator<<(std::ostream &_Stream,
@@ -187,22 +187,22 @@ std::ostream &operator<<(std::ostream &_Stream,
 }
 
 template<typename _Fn_t, typename _Tuple_t, size_t ..._I_t>
-inline auto tuple_as_args(const fn<_Fn_t> &_Function,
+inline auto tuple_as_args(const fn_jt<_Fn_t> &_Function,
                           const _Tuple_t _Tuple,
                           const std::index_sequence<_I_t...>)
 { return _Function._buffer(std::get<_I_t>( _Tuple )...); }
 
 template<typename _Fn_t, typename _Tuple_t>
-inline auto tuple_as_args(const fn<_Fn_t> &_Function, const _Tuple_t _Tuple) {
+inline auto tuple_as_args(const fn_jt<_Fn_t> &_Function, const _Tuple_t _Tuple) {
     static constexpr auto _size{std::tuple_size<_Tuple_t>::value};
     return tuple_as_args( _Function, _Tuple, std::make_index_sequence<_size>{} );
 }
 
 template<typename T>
-inline jule_ref<T> __julec_new_structure(T *_Ptr) {
+inline ref_jt<T> __julec_new_structure(T *_Ptr) {
     if (!_Ptr)
     { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
-    _Ptr->self._ref = new( std::nothrow ) uint_julet;
+    _Ptr->self._ref = new( std::nothrow ) uint_jt;
     if (!_Ptr->self._ref)
     { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
     // Initialize with zero because return reference is counts 1 reference.
@@ -211,31 +211,31 @@ inline jule_ref<T> __julec_new_structure(T *_Ptr) {
 }
 
 template<typename _Obj_t>
-str_julet __julec_to_str(const _Obj_t &_Obj) noexcept {
+str_jt __julec_to_str(const _Obj_t &_Obj) noexcept {
     std::stringstream _stream;
     _stream << _Obj;
-    return ( str_julet( _stream.str() ) );
+    return ( str_jt( _stream.str() ) );
 }
 
-inline void JULEC_ID(panic)(const trait<JULEC_ID(Error)> &_Error)
+inline void JULEC_ID(panic)(const trait_jt<JULEC_ID(Error)> &_Error)
 { throw ( _Error ); }
 
 template<typename _Obj_t>
 void JULEC_ID(panic)(const _Obj_t &_Expr) {
     struct panic_error: public JULEC_ID(Error) {
-        str_julet _message;
+        str_jt _message;
 
-        str_julet error(void)
+        str_jt error(void)
         { return ( this->_message ); }
     };
     struct panic_error _error;
     _error._message = __julec_to_str ( _Expr );
-    throw ( trait<JULEC_ID(Error)> ( _error ) ) ;
+    throw ( trait_jt<JULEC_ID(Error)> ( _error ) ) ;
 }
 
 void __julec_terminate_handler(void) noexcept {
     try { std::rethrow_exception( std::current_exception() ); }
-    catch (trait<JULEC_ID(Error)> _error) {
+    catch (trait_jt<JULEC_ID(Error)> _error) {
         std::cout << "panic: " << _error.get().error() << std::endl;
         std::exit( __JULEC_EXIT_PANIC );
     }
@@ -246,9 +246,9 @@ void __julec_setup_command_line_args(int argc, char *argv[]) noexcept {
     const LPWSTR _cmdl{ GetCommandLineW() };
     wchar_t *_wargs{ _cmdl };
     const size_t _wargs_len{ std::wcslen(_wargs) };
-    slice<str_julet> _args;
-    int_julet _old{ 0 };
-    for (int_julet _i{ 0 }; _i < _wargs_len; ++_i) {
+    slice_jt<str_jt> _args;
+    int_jt _old{ 0 };
+    for (int_jt _i{ 0 }; _i < _wargs_len; ++_i) {
         const wchar_t _r{ _wargs[_i] };
         if (!std::iswspace( _r ))
         { continue; }
@@ -262,8 +262,8 @@ void __julec_setup_command_line_args(int argc, char *argv[]) noexcept {
     _args.__push( __julec_utf16_to_utf8_str( _wargs+_old , std::wcslen( _wargs+_old ) ) );
     __julec_command_line_args = _args;
 #else
-    __julec_command_line_args = slice<str_julet>( argc );
-    for (int_julet _i{ 0 }; _i < argc; ++_i)
+    __julec_command_line_args = slice<str_jt>( argc );
+    for (int_jt _i{ 0 }; _i < argc; ++_i)
     { __julec_command_line_args[_i] = argv[_i]; }
 #endif // #ifdef _WINDOWS
 }

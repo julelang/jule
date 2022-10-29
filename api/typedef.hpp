@@ -5,19 +5,19 @@
 #ifndef __JULEC_TYPEDEF_HPP
 #define __JULEC_TYPEDEF_HPP
 
-typedef std::size_t                          ( uint_julet );
-typedef std::make_signed<uint_julet>::type   ( int_julet );
-typedef signed char                          ( i8_julet );
-typedef signed short                         ( i16_julet );
-typedef signed long                          ( i32_julet );
-typedef signed long long                     ( i64_julet );
-typedef unsigned char                        ( u8_julet );
-typedef unsigned short                       ( u16_julet );
-typedef unsigned long                        ( u32_julet );
-typedef unsigned long long                   ( u64_julet );
-typedef float                                ( f32_julet );
-typedef double                               ( f64_julet );
-typedef bool                                 ( bool_julet );
-typedef std::uintptr_t                       ( uintptr_julet );
+typedef std::size_t                       ( uint_jt );
+typedef std::make_signed<uint_jt>::type   ( int_jt );
+typedef signed char                       ( i8_jt );
+typedef signed short                      ( i16_jt );
+typedef signed long                       ( i32_jt );
+typedef signed long long                  ( i64_jt );
+typedef unsigned char                     ( u8_jt );
+typedef unsigned short                    ( u16_jt );
+typedef unsigned long                     ( u32_jt );
+typedef unsigned long long                ( u64_jt );
+typedef float                             ( f32_jt );
+typedef double                            ( f64_jt );
+typedef bool                              ( bool_jt );
+typedef std::uintptr_t                    ( uintptr_jt );
 
 #endif // #ifndef __JULEC_TYPEDEF_HPP

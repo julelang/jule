@@ -13,15 +13,15 @@
 
 // Declarations
 
-std::tuple<str_julet, bool_julet> __julec_getwd() noexcept;
+std::tuple<str_jt, bool_jt> __julec_getwd() noexcept;
 
 // Definitions
 
-std::tuple<str_julet, bool_julet> __julec_getwd() noexcept {
+std::tuple<str_jt, bool_jt> __julec_getwd() noexcept {
    char _cwd [ PATH_MAX ];
    if (getcwd( _cwd , sizeof( _cwd ) ))
-   { return ( std::make_tuple<str_julet, bool_julet>( _cwd , true ) ); }
-   return ( std::make_tuple<str_julet, bool_julet>( {} , false ) );
+   { return ( std::make_tuple<str_jt, bool_jt>( _cwd , true ) ); }
+   return ( std::make_tuple<str_jt, bool_jt>( {} , false ) );
 }
 
 #endif // #ifndef __JULEC_STD_OS_PROC_UNIX_HPP

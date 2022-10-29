@@ -196,7 +196,8 @@ func (dt Type) String() (s string) {
 		var cpp strings.Builder
 		for _, r := range modifiers {
 			if r == '&' {
-				cpp.WriteString("jule_ref<")
+				cpp.WriteString(juleapi.AsTypeId("ref"))
+				cpp.WriteByte('<')
 			}
 		}
 		cpp.WriteString(s)
@@ -251,7 +252,8 @@ func (dt Type) String() (s string) {
 // SliceString returns cpp value of slice data type.
 func (dt *Type) SliceString() string {
 	var cpp strings.Builder
-	cpp.WriteString("slice<")
+	cpp.WriteString(juleapi.AsTypeId("slice"))
+	cpp.WriteByte('<')
 	dt.ComponentType.Pure = dt.Pure
 	cpp.WriteString(dt.ComponentType.String())
 	cpp.WriteByte('>')
@@ -261,7 +263,8 @@ func (dt *Type) SliceString() string {
 // ArrayString returns cpp value of map data type.
 func (dt *Type) ArrayString() string {
 	var cpp strings.Builder
-	cpp.WriteString("array<")
+	cpp.WriteString(juleapi.AsTypeId("array"))
+	cpp.WriteByte('<')
 	dt.ComponentType.Pure = dt.Pure
 	cpp.WriteString(dt.ComponentType.String())
 	cpp.WriteByte(',')
@@ -274,7 +277,8 @@ func (dt *Type) ArrayString() string {
 func (dt *Type) MapString() string {
 	var cpp strings.Builder
 	types := dt.Tag.([]Type)
-	cpp.WriteString("map<")
+	cpp.WriteString(juleapi.AsTypeId("map"))
+	cpp.WriteByte('<')
 	key := types[0]
 	key.Pure = dt.Pure
 	cpp.WriteString(key.String())
@@ -290,7 +294,8 @@ func (dt *Type) MapString() string {
 func (dt *Type) TraitString() string {
 	var cpp strings.Builder
 	id, _ := dt.KindId()
-	cpp.WriteString("trait<")
+	cpp.WriteString(juleapi.AsTypeId("trait"))
+	cpp.WriteByte('<')
 	cpp.WriteString(juleapi.OutId(id, dt.Token.File))
 	cpp.WriteByte('>')
 	return cpp.String()
@@ -320,7 +325,9 @@ func (dt *Type) StructString() string {
 // FnString returns cpp value of function DataType.
 func (dt *Type) FnString() string {
 	var cpp strings.Builder
-	cpp.WriteString("fn<std::function<")
+	cpp.WriteString(juleapi.AsTypeId("fn"))
+	cpp.WriteByte('<')
+	cpp.WriteString("<std::function<")
 	f := dt.Tag.(*Fn)
 	f.RetType.Type.Pure = dt.Pure
 	cpp.WriteString(f.RetType.String())

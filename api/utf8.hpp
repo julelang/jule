@@ -44,13 +44,13 @@ constexpr signed int __JULEC_UTF8_SURROGATE_MAX{ 57343 };
 // Declarations
 
 struct __julec_utf8_accept_range;
-std::tuple<i32_julet, int_julet>
+std::tuple<i32_jt, int_jt>
 __julec_utf8_decode_rune_str(const char *_S) noexcept;
-slice<u8_julet> __julec_utf8_rune_to_bytes(const i32_julet &_R) noexcept;
+slice_jt<u8_jt> __julec_utf8_rune_to_bytes(const i32_jt &_R) noexcept;
 
 // Definitions
 
-constexpr u8_julet __julec_utf8_first[256] = {
+constexpr u8_jt __julec_utf8_first[256] = {
     __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS,
     __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS,
     __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS, __JULEC_UTF8_AS,
@@ -69,7 +69,7 @@ constexpr u8_julet __julec_utf8_first[256] = {
     __JULEC_UTF8_S5, __JULEC_UTF8_S6, __JULEC_UTF8_S6, __JULEC_UTF8_S6, __JULEC_UTF8_S7, __JULEC_UTF8_XX, __JULEC_UTF8_XX, __JULEC_UTF8_XX, __JULEC_UTF8_XX, __JULEC_UTF8_XX, __JULEC_UTF8_XX, __JULEC_UTF8_XX, __JULEC_UTF8_XX, __JULEC_UTF8_XX, __JULEC_UTF8_XX, __JULEC_UTF8_XX,
 };
 
-struct __julec_utf8_accept_range{ const u8_julet _lo, _hi; };
+struct __julec_utf8_accept_range{ const u8_jt _lo, _hi; };
 
 constexpr struct __julec_utf8_accept_range __julec_utf8_accept_ranges[16] = {
     { __JULEC_UTF8_LOCB, __JULEC_UTF8_HICB },
@@ -79,67 +79,67 @@ constexpr struct __julec_utf8_accept_range __julec_utf8_accept_ranges[16] = {
     { __JULEC_UTF8_LOCB, 0x8F },
 };
 
-std::tuple<i32_julet, int_julet>
+std::tuple<i32_jt, int_jt>
 __julec_utf8_decode_rune_str(const char *_S) noexcept {
     const std::size_t _len{ std::strlen( _S ) };
     if (_len < 1)
     { return ( std::make_tuple( __JULEC_UTF8_RUNE_ERROR, 0 ) ); }
-    const u8_julet _s0{ static_cast<u8_julet>( _S[0] ) };
-    const u8_julet _x{ __julec_utf8_first[_s0] };
+    const u8_jt _s0{ static_cast<u8_jt>( _S[0] ) };
+    const u8_jt _x{ __julec_utf8_first[_s0] };
     if (_x >= __JULEC_UTF8_AS) {
-        const i32_julet _mask{ _x << 31 >> 31 };
-        return ( std::make_tuple( (static_cast<i32_julet>( _S[0] )&~_mask) |
+        const i32_jt _mask{ _x << 31 >> 31 };
+        return ( std::make_tuple( (static_cast<i32_jt>( _S[0] )&~_mask) |
                                   ( __JULEC_UTF8_RUNE_ERROR&_mask ), 1 ) );
     }
-    const int_julet _sz{ static_cast<int_julet>( _x & 7 ) };
+    const int_jt _sz{ static_cast<int_jt>( _x & 7 ) };
     const struct __julec_utf8_accept_range _accept{ __julec_utf8_accept_ranges[_x>>4] };
     if (_len < _sz)
     { return ( std::make_tuple( __JULEC_UTF8_RUNE_ERROR, 1 ) ); }
-    const u8_julet _s1{ static_cast<u8_julet>( _S[1] ) };
+    const u8_jt _s1{ static_cast<u8_jt>( _S[1] ) };
     if (_s1 < _accept._lo || _accept._hi < _s1)
     { return ( std::make_tuple( __JULEC_UTF8_RUNE_ERROR, 1 ) ); }
     if (_sz <= 2) {
-        return ( std::make_tuple(( static_cast<i32_julet>( _s0&__JULEC_UTF8_MASK2 )<<6) |
-                                   static_cast<i32_julet>( _s1&__JULEC_UTF8_MASKX ), 2 ) );
+        return ( std::make_tuple(( static_cast<i32_jt>( _s0&__JULEC_UTF8_MASK2 )<<6) |
+                                   static_cast<i32_jt>( _s1&__JULEC_UTF8_MASKX ), 2 ) );
     }
-    const u8_julet _s2{ static_cast<u8_julet>( _S[2] ) };
+    const u8_jt _s2{ static_cast<u8_jt>( _S[2] ) };
     if (_s2 < __JULEC_UTF8_LOCB || __JULEC_UTF8_HICB < _s2)
     { return ( std::make_tuple( __JULEC_UTF8_RUNE_ERROR, 1 ) ); }
     if (_sz <= 3) {
-        return ( std::make_tuple( (static_cast<i32_julet>( _s0&__JULEC_UTF8_MASK3 )<<12) |
-                                  (static_cast<i32_julet>( _s1&__JULEC_UTF8_MASKX )<<6) |
-                                  static_cast<i32_julet>( _s2&__JULEC_UTF8_MASKX ), 3) );
+        return ( std::make_tuple( (static_cast<i32_jt>( _s0&__JULEC_UTF8_MASK3 )<<12) |
+                                  (static_cast<i32_jt>( _s1&__JULEC_UTF8_MASKX )<<6) |
+                                  static_cast<i32_jt>( _s2&__JULEC_UTF8_MASKX ), 3) );
     }
-    const u8_julet _s3{ static_cast<u8_julet>( _S[3] ) };
+    const u8_jt _s3{ static_cast<u8_jt>( _S[3] ) };
     if (_s3 < __JULEC_UTF8_LOCB || __JULEC_UTF8_HICB < _s3)
     { return std::make_tuple( __JULEC_UTF8_RUNE_ERROR, 1 ); }
-    return ( std::make_tuple( (static_cast<i32_julet>( _s0&__JULEC_UTF8_MASK4 )<<18) |
-                              (static_cast<i32_julet>( _s1&__JULEC_UTF8_MASKX )<<12) |
-                              (static_cast<i32_julet>( _s2&__JULEC_UTF8_MASKX )<<6) |
-                              static_cast<i32_julet>( _s3&__JULEC_UTF8_MASKX ), 4) );
+    return ( std::make_tuple( (static_cast<i32_jt>( _s0&__JULEC_UTF8_MASK4 )<<18) |
+                              (static_cast<i32_jt>( _s1&__JULEC_UTF8_MASKX )<<12) |
+                              (static_cast<i32_jt>( _s2&__JULEC_UTF8_MASKX )<<6) |
+                              static_cast<i32_jt>( _s3&__JULEC_UTF8_MASKX ), 4) );
 }
 
-slice<u8_julet> __julec_utf8_rune_to_bytes(const i32_julet &_R) noexcept {
-    if (static_cast<u32_julet>( _R ) <= __JULEC_UTF8_RUNE1_MAX)
-    { return ( slice<u8_julet>( {static_cast<u8_julet>( _R )} ) ); }
-    const u32_julet _i{ static_cast<u32_julet>( _R ) };
+slice_jt<u8_jt> __julec_utf8_rune_to_bytes(const i32_jt &_R) noexcept {
+    if (static_cast<u32_jt>( _R ) <= __JULEC_UTF8_RUNE1_MAX)
+    { return ( slice_jt<u8_jt>( {static_cast<u8_jt>( _R )} ) ); }
+    const u32_jt _i{ static_cast<u32_jt>( _R ) };
     if (_i < __JULEC_UTF8_RUNE2_MAX) {
-        return ( slice<u8_julet>({ static_cast<u8_julet>( __JULEC_UTF8_T2|static_cast<u8_julet>( _R>>6 ) ),
-                                   static_cast<u8_julet>( __JULEC_UTF8_TX|(static_cast<u8_julet>( _R )&__JULEC_UTF8_MASKX) ) }) );
+        return ( slice_jt<u8_jt>({ static_cast<u8_jt>( __JULEC_UTF8_T2|static_cast<u8_jt>( _R>>6 ) ),
+                                   static_cast<u8_jt>( __JULEC_UTF8_TX|(static_cast<u8_jt>( _R )&__JULEC_UTF8_MASKX) ) }) );
     }
-    i32_julet _r{ _R };
+    i32_jt _r{ _R };
     if ( ( _i > __JULEC_UTF8_MAX_RUNE ) ||
          ( __JULEC_UTF8_SURROGATE_MIN <= _i && _i <= __JULEC_UTF8_SURROGATE_MAX) )
     { _r = __JULEC_UTF8_RUNE_ERROR; }
     if (_i <= __JULEC_UTF8_RUNE3_MAX) {
-        return ( slice<u8_julet>({ static_cast<u8_julet>( __JULEC_UTF8_T3|static_cast<u8_julet>( _r>>12 ) ),
-                                   static_cast<u8_julet>( __JULEC_UTF8_TX|(static_cast<u8_julet>( _r>>6)&__JULEC_UTF8_MASKX )),
-                                   static_cast<u8_julet>( __JULEC_UTF8_TX|(static_cast<u8_julet>( _r )&__JULEC_UTF8_MASKX) ) }) );
+        return ( slice_jt<u8_jt>({ static_cast<u8_jt>( __JULEC_UTF8_T3|static_cast<u8_jt>( _r>>12 ) ),
+                                   static_cast<u8_jt>( __JULEC_UTF8_TX|(static_cast<u8_jt>( _r>>6)&__JULEC_UTF8_MASKX )),
+                                   static_cast<u8_jt>( __JULEC_UTF8_TX|(static_cast<u8_jt>( _r )&__JULEC_UTF8_MASKX) ) }) );
     }
-    return ( slice<u8_julet>({ static_cast<u8_julet>( __JULEC_UTF8_T4|static_cast<u8_julet>( _r>>18 ) ),
-                               static_cast<u8_julet>( __JULEC_UTF8_TX|(static_cast<u8_julet>( _r>>12 )&__JULEC_UTF8_MASKX) ),
-                               static_cast<u8_julet>( __JULEC_UTF8_TX|(static_cast<u8_julet>( _r>>6 )&__JULEC_UTF8_MASKX) ),
-                               static_cast<u8_julet>( __JULEC_UTF8_TX|(static_cast<u8_julet>( _r )&__JULEC_UTF8_MASKX) ) }) );
+    return ( slice_jt<u8_jt>({ static_cast<u8_jt>( __JULEC_UTF8_T4|static_cast<u8_jt>( _r>>18 ) ),
+                               static_cast<u8_jt>( __JULEC_UTF8_TX|(static_cast<u8_jt>( _r>>12 )&__JULEC_UTF8_MASKX) ),
+                               static_cast<u8_jt>( __JULEC_UTF8_TX|(static_cast<u8_jt>( _r>>6 )&__JULEC_UTF8_MASKX) ),
+                               static_cast<u8_jt>( __JULEC_UTF8_TX|(static_cast<u8_jt>( _r )&__JULEC_UTF8_MASKX) ) }) );
 }
 
 #endif // #ifndef __JULEC_UTF8_HPP

@@ -7,35 +7,35 @@
 
 // Wrapper structure for traits.
 template<typename T>
-struct trait;
+struct trait_jt;
 
 template<typename T>
-struct trait {
+struct trait_jt {
 public:
-    jule_ref<T> _data{ nil };
+    ref_jt<T> _data{ nil };
     const char *type_id { nil };
 
-    trait<T>(void) noexcept {}
-    trait<T>(std::nullptr_t) noexcept {}
+    trait_jt<T>(void) noexcept {}
+    trait_jt<T>(std::nullptr_t) noexcept {}
 
     template<typename TT>
-    trait<T>(const TT &_Data) noexcept {
+    trait_jt<T>(const TT &_Data) noexcept {
         TT *_alloc{ new( std::nothrow ) TT };
         if (!_alloc)
         { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
         *_alloc = _Data;
-        this->_data = jule_ref<T>( (T*)( _alloc ) );
+        this->_data = ref_jt<T>( (T*)( _alloc ) );
         this->type_id = typeid( _Data ).name();
     }
 
     template<typename TT>
-    trait<T>(const jule_ref<TT> &_Ref) noexcept {
-        this->_data = jule_ref<T>( ( (T*)(_Ref._alloc) ), _Ref._ref );
+    trait_jt<T>(const ref_jt<TT> &_Ref) noexcept {
+        this->_data = ref_jt<T>( ( (T*)(_Ref._alloc) ), _Ref._ref );
         this->_data.__add_ref();
         this->type_id = typeid( _Ref ).name();
     }
 
-    trait<T>(const trait<T> &_Src) noexcept
+    trait_jt<T>(const trait_jt<T> &_Src) noexcept
     { this->operator=( _Src ); }
 
     void __dealloc(void) noexcept
@@ -51,7 +51,7 @@ public:
         return this->_data;
     }
 
-    ~trait(void) noexcept
+    ~trait_jt(void) noexcept
     { this->__dealloc(); }
 
     template<typename TT>
@@ -63,18 +63,18 @@ public:
     }
 
     template<typename TT>
-    operator jule_ref<TT>(void) noexcept {
+    operator ref_jt<TT>(void) noexcept {
         this->__must_ok();
-        if (std::strcmp( this->type_id, typeid( jule_ref<TT> ).name() ) != 0)
+        if (std::strcmp( this->type_id, typeid( ref_jt<TT> ).name() ) != 0)
         { JULEC_ID(panic)( __JULEC_ERROR_INCOMPATIBLE_TYPE ); }
         this->_data.__add_ref();
-        return ( jule_ref<TT>( (TT*)(this->_data._alloc), this->_data._ref ) );
+        return ( ref_jt<TT>( (TT*)(this->_data._alloc), this->_data._ref ) );
     }
 
     inline void operator=(const std::nullptr_t) noexcept
     { this->__dealloc(); }
 
-    inline void operator=(const trait<T> &_Src) noexcept {
+    inline void operator=(const trait_jt<T> &_Src) noexcept {
         this->__dealloc();
         if (_Src == nil)
         { return; }
@@ -82,10 +82,10 @@ public:
         this->type_id = _Src.type_id;
     }
 
-    inline bool operator==(const trait<T> &_Src) const noexcept
+    inline bool operator==(const trait_jt<T> &_Src) const noexcept
     { return ( this->_data._alloc == this->_data._alloc ); }
 
-    inline bool operator!=(const trait<T> &_Src) const noexcept
+    inline bool operator!=(const trait_jt<T> &_Src) const noexcept
     { return ( !this->operator==( _Src ) ); }
 
     inline bool operator==(std::nullptr_t) const noexcept
@@ -95,7 +95,7 @@ public:
     { return ( !this->operator==( nil ) ); }
 
     friend inline std::ostream &operator<<(std::ostream &_Stream,
-                                           const trait<T> &_Src) noexcept
+                                           const trait_jt<T> &_Src) noexcept
     { return ( _Stream << _Src._data._alloc ); }
 };
 

@@ -11,54 +11,54 @@ constexpr signed int __JULEC_REFERENCE_DELTA{ 1 };
 // This structure is the used by Jule references for reference-counting
 // and memory management.
 template<typename T>
-struct jule_ref;
+struct ref_jt;
 
 template<typename T>
-struct jule_ref {
+struct ref_jt {
     T *_alloc{ nil };
-    mutable uint_julet *_ref{ nil };
+    mutable uint_jt *_ref{ nil };
 
-    jule_ref<T>(void) noexcept: jule_ref<T>(T()) {}
+    ref_jt<T>(void) noexcept: ref_jt<T>(T()) {}
 
-    jule_ref<T>(std::nullptr_t) noexcept {}
+    ref_jt<T>(std::nullptr_t) noexcept {}
 
-    jule_ref<T>(T *_Ptr, uint_julet *_Ref) noexcept {
+    ref_jt<T>(T *_Ptr, uint_jt *_Ref) noexcept {
         this->_alloc = _Ptr;
         this->_ref = _Ref;
     }
 
-    jule_ref<T>(T *_Ptr) noexcept {
-        this->_ref = ( new( std::nothrow ) uint_julet );
+    ref_jt<T>(T *_Ptr) noexcept {
+        this->_ref = ( new( std::nothrow ) uint_jt );
         if (!this->_ref)
         { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
         *this->_ref = 1;
         this->_alloc = _Ptr;
     }
 
-    jule_ref<T>(const T &_Instance) noexcept {
+    ref_jt<T>(const T &_Instance) noexcept {
         this->_alloc = ( new( std::nothrow ) T );
         if (!this->_alloc)
         { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
-        this->_ref = ( new( std::nothrow ) uint_julet );
+        this->_ref = ( new( std::nothrow ) uint_jt );
         if (!this->_ref)
         { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
         *this->_ref = __JULEC_REFERENCE_DELTA;
         *this->_alloc = _Instance;
     }
 
-    jule_ref<T>(const jule_ref<T> &_Ref) noexcept
+    ref_jt<T>(const ref_jt<T> &_Ref) noexcept
     { this->operator=( _Ref ); }
 
-    ~jule_ref<T>(void) noexcept
+    ~ref_jt<T>(void) noexcept
     { this->__drop(); }
 
-    inline int_julet __drop_ref(void) const noexcept
+    inline int_jt __drop_ref(void) const noexcept
     { return ( __julec_atomic_add ( this->_ref, -__JULEC_REFERENCE_DELTA ) ); }
 
-    inline int_julet __add_ref(void) const noexcept
+    inline int_jt __add_ref(void) const noexcept
     { return ( __julec_atomic_add ( this->_ref, __JULEC_REFERENCE_DELTA ) ); }
 
-    inline uint_julet __get_ref_n(void) const noexcept
+    inline uint_jt __get_ref_n(void) const noexcept
     { return ( __julec_atomic_load ( this->_ref ) ); }
 
     void __drop(void) noexcept {
@@ -81,7 +81,7 @@ struct jule_ref {
     inline operator T&(void) noexcept
     { return ( *this->_alloc ); }
 
-    void operator=(const jule_ref<T> &_Ref) noexcept {
+    void operator=(const ref_jt<T> &_Ref) noexcept {
         this->__drop();
         if (_Ref._ref)
         { _Ref.__add_ref(); }
@@ -92,15 +92,15 @@ struct jule_ref {
     inline void operator=(const T &_Val) const noexcept
     { ( *this->_alloc ) = ( _Val ); }
 
-    inline bool operator==(const jule_ref<T> &_Ref) const noexcept
+    inline bool operator==(const ref_jt<T> &_Ref) const noexcept
     { return ( ( *this->_alloc ) == ( *_Ref._alloc ) ); }
 
-    inline bool operator!=(const jule_ref<T> &_Ref) const noexcept
+    inline bool operator!=(const ref_jt<T> &_Ref) const noexcept
     { return ( !this->operator==( _Ref ) ); }
 
     friend inline
     std::ostream &operator<<(std::ostream &_Stream,
-                             const jule_ref<T> &_Ref) noexcept
+                             const ref_jt<T> &_Ref) noexcept
     { return ( _Stream << _Ref.operator T() ); }
 };
 

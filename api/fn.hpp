@@ -7,15 +7,15 @@
 
 // std::function wrapper of JuleC.
 template <typename _Fn_t>
-struct fn;
+struct fn_jt;
 
 template <typename _Fn_t>
-struct fn {
+struct fn_jt {
     _Fn_t _buffer;
     
-    fn<_Fn_t>(void) noexcept {}
+    fn_jt<_Fn_t>(void) noexcept {}
 
-    fn<_Fn_t>(const _Fn_t &_Fn) noexcept
+    fn_jt<_Fn_t>(const _Fn_t &_Fn) noexcept
     { this->_buffer = _Fn; }
     
     template<typename ..._Args_t>

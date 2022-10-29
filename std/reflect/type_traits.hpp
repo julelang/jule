@@ -14,14 +14,14 @@ template<typename T1, typename T2>
 inline bool __julec_is_same(void) noexcept;
 
 template<typename T>
-inline bool __julec_any_is(const any_julet &_Src) noexcept;
+inline bool __julec_any_is(const any_jt &_Src) noexcept;
 
 template<typename T1, typename T2>
 inline bool __julec_is_same(void) noexcept
 { return std::is_same<T1, T2>::value; }
 
 template<typename T>
-inline bool __julec_any_is(const any_julet &_Src) noexcept
+inline bool __julec_any_is(const any_jt &_Src) noexcept
 { return _Src.__type_is<T>(); }
 
 #endif // #ifndef __JULEC_STD_REFLECT_TYPE_TRAITS_HPP

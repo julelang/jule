@@ -9,31 +9,31 @@
 
 // Built-in map type.
 template<typename _Key_t, typename _Value_t>
-class map;
+class map_jt;
 
 template<typename _Key_t, typename _Value_t>
-class map: public std::unordered_map<_Key_t, _Value_t> {
+class map_jt: public std::unordered_map<_Key_t, _Value_t> {
 public:
-    map<_Key_t, _Value_t>(void) noexcept {}
-    map<_Key_t, _Value_t>(const std::nullptr_t) noexcept {}
+    map_jt<_Key_t, _Value_t>(void) noexcept {}
+    map_jt<_Key_t, _Value_t>(const std::nullptr_t) noexcept {}
 
-    map<_Key_t, _Value_t>(
+    map_jt<_Key_t, _Value_t>(
         const std::initializer_list<std::pair<_Key_t, _Value_t>> _Src) noexcept {
         for (const auto _data: _Src)
         { this->insert( _data ); }
     }
 
-    slice<_Key_t> keys(void) const noexcept {
-        slice<_Key_t> _keys( this->size() );
-        uint_julet _index { 0 };
+    slice_jt<_Key_t> keys(void) const noexcept {
+        slice_jt<_Key_t> _keys( this->size() );
+        uint_jt _index { 0 };
         for (const auto &_pair: *this)
         { _keys._alloc[_index++] = _pair.first; }
         return ( _keys );
     }
 
-    slice<_Value_t> values(void) const noexcept {
-        slice<_Value_t> _keys( this->size() );
-        uint_julet _index{ 0 };
+    slice_jt<_Value_t> values(void) const noexcept {
+        slice_jt<_Value_t> _keys( this->size() );
+        uint_jt _index{ 0 };
         for (const auto &_pair: *this)
         { _keys._alloc[_index++] = _pair.second; }
         return ( _keys );
@@ -43,7 +43,7 @@ public:
     bool has(const _Key_t _Key) const noexcept
     { return ( this->find( _Key ) != this->end() ); }
 
-    inline int_julet len(void) const noexcept
+    inline int_jt len(void) const noexcept
     { return ( this->size() ); }
 
     inline void del(const _Key_t _Key) noexcept
@@ -56,9 +56,9 @@ public:
     { return ( !this->operator==( nil ) ); }
 
     friend std::ostream &operator<<(std::ostream &_Stream,
-                                    const map<_Key_t, _Value_t> &_Src) noexcept {
+                                    const map_jt<_Key_t, _Value_t> &_Src) noexcept {
         _Stream << '{';
-        uint_julet _length{ _Src.size() };
+        uint_jt _length{ _Src.size() };
         for (const auto _pair: _Src) {
             _Stream << _pair.first;
             _Stream << ':';

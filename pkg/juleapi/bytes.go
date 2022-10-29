@@ -13,7 +13,7 @@ import (
 // ToStr returns specified literal as Jule string literal for cpp.
 func ToStr(bytes []byte) string {
 	var cpp strings.Builder
-	cpp.WriteString("str_julet(")
+	cpp.WriteString("str_jt(")
 	btoa := bytesToStr(bytes)
 	if btoa != "" {
 		cpp.WriteByte('"')

@@ -14,7 +14,7 @@ const IGNORE = "_"
 // INIT_CALLER identifier.
 const INIT_CALLER = "__julec_call_package_initializers"
 
-const typeExtension = "_julet"
+const typeExtension = "_jt"
 
 // IsIgnoreId reports identifier is ignore or not.
 func IsIgnoreId(id string) bool { return id == IGNORE }

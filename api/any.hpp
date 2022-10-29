@@ -6,23 +6,23 @@
 #define __JULEC_ANY_HPP
 
 // Built-in any type.
-struct any_julet;
+struct any_jt;
 
-struct any_julet {
+struct any_jt {
 public:
-    jule_ref<void*> _data{ nil };
+    ref_jt<void*> _data{ nil };
     const char *_type_id{ nil };
 
-    any_julet(void) noexcept {}
+    any_jt(void) noexcept {}
 
     template<typename T>
-    any_julet(const T &_Expr) noexcept
+    any_jt(const T &_Expr) noexcept
     { this->operator=( _Expr ); }
 
-    any_julet(const any_julet &_Src) noexcept
+    any_jt(const any_jt &_Src) noexcept
     { this->operator=( _Src ); }
 
-    ~any_julet(void) noexcept
+    ~any_jt(void) noexcept
     { this->__dealloc(); }
 
     inline void __dealloc(void) noexcept {
@@ -67,11 +67,11 @@ public:
         { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
         *_alloc = _Expr;
         *_main_alloc = ( (void*)(_alloc) );
-        this->_data = jule_ref<void*>( _main_alloc );
+        this->_data = ref_jt<void*>( _main_alloc );
         this->_type_id = typeid(_Expr).name();
     }
 
-    void operator=(const any_julet &_Src) noexcept {
+    void operator=(const any_jt &_Src) noexcept {
         if (_Src.operator==( nil )) {
             this->operator=( nil );
             return;
@@ -102,13 +102,13 @@ public:
     bool operator!=(const T &_Expr) const noexcept
     { return ( !this->operator==( _Expr ) ); }
 
-    inline bool operator==(const any_julet &_Any) const noexcept {
+    inline bool operator==(const any_jt &_Any) const noexcept {
         if (this->operator==( nil ) && _Any.operator==( nil ))
         { return ( true ); }
         return ( std::strcmp( this->_type_id, _Any._type_id ) == 0 );
     }
 
-    inline bool operator!=(const any_julet &_Any) const noexcept
+    inline bool operator!=(const any_jt &_Any) const noexcept
     { return ( !this->operator==( _Any ) ); }
 
     inline bool operator==(std::nullptr_t) const noexcept
@@ -118,7 +118,7 @@ public:
     { return ( !this->operator==( nil ) ); }
 
     friend std::ostream &operator<<(std::ostream &_Stream,
-                                    const any_julet &_Src) noexcept {
+                                    const any_jt &_Src) noexcept {
         if (_Src.operator!=( nil ))
         { _Stream << "<any>"; }
         else
