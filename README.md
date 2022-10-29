@@ -2,7 +2,7 @@
 <p>
     <img width="150" src="https://raw.githubusercontent.com/julelang/resources/main/jule_icon.svg?sanitize=true">
 </p>
-<h2>The Jule Programming Language</h2>
+<h1>The Jule Programming Language</h1>
 
 [Website](https://julelang.github.io/website/) |
 [Documentations](https://julelang.github.io/website/pages/docs.html) |
@@ -10,16 +10,6 @@
 
 </strong>
 </div>
-
-<h2 id="key-features">Key Features</h2>
-
-+ Simplicity and maintainability
-+ Fast and scalable development
-+ Performance-critical software
-+ Memory safety
-+ Immutability by default
-+ As efficient and performance as C++
-+ High C++ interoperability
 
 <h2 id="motivation">Motivation</h2>
 
@@ -30,6 +20,21 @@ It also has a reference compiler with obsessions that encourage developers to bu
 
 <img src="./docs/images/quicksort.png"/>
 
+<h2 id="key-features">Design Principles</h2>
+
++ Simplicity and maintainability
++ Fast and scalable development
++ Performance-critical software
++ Memory safety
++ Immutability by default
++ As efficient and performance as C++
++ High C++ interoperability
+
+<h2 id="what-is-julec">What is JuleC?</h2>
+JuleC is the name of the reference compiler for the Jule programming language.
+It is the original compiler of the Jule programming language.
+The features that JuleC has is a representation of the official and must-have features of the Jule programming language.
+This is sort of a standard for the Jule programming language and represents the minimum competency that unofficial compilers should have.
 
 <h2 id="memory-safety">Memory Safety and Management</h2>
 The memory safety and the memory management is a major challenge in the C and C++ or similar programming languages.
@@ -52,12 +57,6 @@ JuleC keeps all the C++ code it uses for Jule in its <a href="https://github.com
 With the help of this API, it is very easy to write C++ codes that can be fully integrated into Jule.
 <ol></ol> <!-- for space -->
 <img src="./docs/images/cpp_interop.png"/>
-
-<h2 id="what-is-julec">What is JuleC?</h2>
-JuleC is the name of the reference compiler for the Jule programming language.
-It is the original compiler of the Jule programming language.
-The features that JuleC has is a representation of the official and must-have features of the Jule programming language.
-This is sort of a standard for the Jule programming language and represents the minimum competency that unofficial compilers should have.
 
 <h2 id="future-changes">Future Changes</h2>
 JuleC is in early development and currently iy can only be built from source.
@@ -104,13 +103,13 @@ If you are trying to use a standard or compiler that is not officially supported
 But keep in mind that since it's out of official support, it's likely that the maintainers won't take the effort to fix it.
 <br><br>
 
-[See Compiling Documentations](https://jule.dev/pages/docs.html?page=compiler-compiling) for supported compilers and C++ standards.
+[See compiling documentations](https://jule.dev/pages/docs.html?page=compiler-compiling) for supported compilers and C++ standards.
 
 <h2 id="os-support">Platform Support</h2>
 Jule supports multiple platforms.
 It supports development on i386, amd64 architectures on Windows, Linux and Darwin platforms.
 JuleC undertakes that the code and standard library it produces will be compatible with all these platforms.
-All supported platforms by JuleC are documented in the <a href="https://jule.dev/pages/docs.html?page=compiler-platform-support">Platform Support documentations</a>.
+All supported platforms by JuleC are documented in the <a href="https://jule.dev/pages/docs.html?page=compiler-platform-support">platform support documentations</a>.
 
 <h2 id="building-project">Building Project</h2>
 
