@@ -3,9 +3,9 @@ package models
 import (
 	"strings"
 
-	"github.com/jule-lang/jule/lex"
-	"github.com/jule-lang/jule/pkg/juleapi"
-	"github.com/jule-lang/jule/pkg/juletype"
+	"github.com/julelang/jule/lex"
+	"github.com/julelang/jule/pkg/juleapi"
+	"github.com/julelang/jule/pkg/juletype"
 )
 
 // Fn is function declaration AST model.

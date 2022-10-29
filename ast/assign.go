@@ -1,6 +1,6 @@
 package ast
 
-import "github.com/jule-lang/jule/lex"
+import "github.com/julelang/jule/lex"
 
 // AssignInfo is the assignment information.
 type AssignInfo struct {

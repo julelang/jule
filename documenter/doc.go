@@ -1,6 +1,6 @@
 package documenter
 
-import "github.com/jule-lang/jule/parser"
+import "github.com/julelang/jule/parser"
 
 // Doc returns documentation of code into JSON format.
 func Doc(p *parser.Parser, json bool) (string, error) {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jule-lang/jule/lex"
+	"github.com/julelang/jule/lex"
 )
 
 // Statement is statement.

@@ -1,9 +1,9 @@
 package parser
 
 import (
-	"github.com/jule-lang/jule/ast/models"
-	"github.com/jule-lang/jule/lex"
-	"github.com/jule-lang/jule/pkg/jule"
+	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/lex"
+	"github.com/julelang/jule/pkg/jule"
 )
 
 func (p *Parser) getFieldMap(f *Func) *paramMap {

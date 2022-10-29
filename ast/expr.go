@@ -1,6 +1,6 @@
 package ast
 
-import "github.com/jule-lang/jule/lex"
+import "github.com/julelang/jule/lex"
 
 // IsFnCall returns function expressions without call expression
 // if tokens are function call, nil if not.

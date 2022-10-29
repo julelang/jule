@@ -1,6 +1,6 @@
 package parser
 
-import "github.com/jule-lang/jule/lex"
+import "github.com/julelang/jule/lex"
 
 type use struct {
 	defines *Defmap

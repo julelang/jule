@@ -3,8 +3,8 @@ package preprocessor
 import (
 	"strings"
 
-	"github.com/jule-lang/jule/ast/models"
-	"github.com/jule-lang/jule/pkg/jule"
+	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/pkg/jule"
 )
 
 // Tree is the AST tree.

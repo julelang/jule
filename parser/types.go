@@ -3,9 +3,9 @@ package parser
 import (
 	"strings"
 
-	"github.com/jule-lang/jule/lex"
-	"github.com/jule-lang/jule/pkg/jule"
-	"github.com/jule-lang/jule/pkg/juletype"
+	"github.com/julelang/jule/lex"
+	"github.com/julelang/jule/pkg/jule"
+	"github.com/julelang/jule/pkg/juletype"
 )
 
 func variadic_to_slice_t(t Type) Type {

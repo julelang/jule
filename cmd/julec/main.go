@@ -14,12 +14,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jule-lang/jule/documenter"
-	"github.com/jule-lang/jule/parser"
-	"github.com/jule-lang/jule/pkg/jule"
-	"github.com/jule-lang/jule/pkg/juleapi"
-	"github.com/jule-lang/jule/pkg/juleio"
-	"github.com/jule-lang/jule/pkg/juleset"
+	"github.com/julelang/jule/documenter"
+	"github.com/julelang/jule/parser"
+	"github.com/julelang/jule/pkg/jule"
+	"github.com/julelang/jule/pkg/juleapi"
+	"github.com/julelang/jule/pkg/juleio"
+	"github.com/julelang/jule/pkg/juleset"
 )
 
 const CMD_HELP = "help"

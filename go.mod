@@ -1,3 +1,3 @@
-module github.com/jule-lang/jule
+module github.com/julelang/jule
 
 go 1.18

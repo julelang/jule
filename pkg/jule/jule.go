@@ -1,6 +1,6 @@
 package jule
 
-import "github.com/jule-lang/jule/pkg/juleset"
+import "github.com/julelang/jule/pkg/juleset"
 
 // Jule constants.
 const VERSION       = `@development_channel`

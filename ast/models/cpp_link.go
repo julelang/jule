@@ -1,6 +1,6 @@
 package models
 
-import "github.com/jule-lang/jule/lex"
+import "github.com/julelang/jule/lex"
 
 // CppLinkFn is linked function AST model.
 type CppLinkFn struct {

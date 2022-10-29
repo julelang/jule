@@ -3,7 +3,7 @@ package models
 import (
 	"strings"
 
-	"github.com/jule-lang/jule/lex"
+	"github.com/julelang/jule/lex"
 )
 
 // If is the AST model of if expression.

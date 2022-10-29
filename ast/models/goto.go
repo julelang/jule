@@ -3,7 +3,7 @@ package models
 import (
 	"strings"
 
-	"github.com/jule-lang/jule/lex"
+	"github.com/julelang/jule/lex"
 )
 
 // Labels is label slice type.

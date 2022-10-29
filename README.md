@@ -1,12 +1,12 @@
 <div align="center">
 <p>
-    <img width="150" src="https://raw.githubusercontent.com/jule-lang/resources/main/jule_icon.svg?sanitize=true">
+    <img width="150" src="https://raw.githubusercontent.com/julelang/resources/main/jule_icon.svg?sanitize=true">
 </p>
 <h2>The Jule Programming Language</h2>
 
-[Website](https://jule-lang.github.io/website/) |
-[Documentations](https://jule-lang.github.io/website/pages/docs.html) |
-[Contributing](https://jule-lang.github.io/website/pages/contributing.html)
+[Website](https://julelang.github.io/website/) |
+[Documentations](https://julelang.github.io/website/pages/docs.html) |
+[Contributing](https://julelang.github.io/website/pages/contributing.html)
 
 </strong>
 </div>
@@ -48,7 +48,7 @@ Please read the <a href="https://jule.dev/pages/docs.html?page=unsafe-jule">Unsa
 Jule is designed to be interoperable with C++.
 A C++ header file dependency can be added to the Jule code and its functions can be linked.
 It's pretty easy to write C++ code that is compatible with the Jule code compiled by the compiler.
-JuleC keeps all the C++ code it uses for Jule in its <a href="https://github.com/jule-lang/jule/tree/main/api">api</a> directory.
+JuleC keeps all the C++ code it uses for Jule in its <a href="https://github.com/julelang/jule/tree/main/api">api</a> directory.
 With the help of this API, it is very easy to write C++ codes that can be fully integrated into Jule.
 <ol></ol> <!-- for space -->
 <img src="./docs/images/cpp_interop.png"/>
@@ -61,7 +61,7 @@ This is sort of a standard for the Jule programming language and represents the 
 
 <h2 id="future-changes">Future Changes</h2>
 JuleC is in early development and currently iy can only be built from source.
-However, despite being in the early development stage, many algorithms (<a href="https://github.com/jule-lang/jule/tree/main/std">see the standard library</a>) can be successfully implemented.
+However, despite being in the early development stage, many algorithms (<a href="https://github.com/julelang/jule/tree/main/std">see the standard library</a>) can be successfully implemented.
 It is planned to rewrite the compiler with Jule after reference compiler and standard library reaches sufficient maturity.
 JuleC has or is very close to many of the things Jule was intended to have, such as memory safety, properties, structures with methods and generics.
 <br><br>
@@ -79,17 +79,17 @@ Jule's standard library only gets updates with compiler releases.
 <br><br>
 The language and standard library will continue to evolve and change in the future but JuleC will guarantee stability since its first stable release.
 Some packages of the standard library
-(<a href="https://github.com/jule-lang/jule/tree/main/std/math">std::math</a>,
-<a href="https://github.com/jule-lang/jule/tree/main/std/conv">std::conv</a>,
-<a href="https://github.com/jule-lang/jule/tree/main/std/unicode/utf8">std::unicode::utf8</a>
+(<a href="https://github.com/julelang/jule/tree/main/std/math">std::math</a>,
+<a href="https://github.com/julelang/jule/tree/main/std/conv">std::conv</a>,
+<a href="https://github.com/julelang/jule/tree/main/std/unicode/utf8">std::unicode::utf8</a>
 or etc.) are almost complete and are not expected to undergo major changes.
 
 <h2 id="documentations">Documentations</h2>
 
 All documentation about Jule and JuleC is on the website. <br>
-[See Documentations](https://jule-lang.github.io/website/pages/docs.html)
+[See Documentations](https://julelang.github.io/website/pages/docs.html)
 <br><br>
-To contribute website, documentations or something else, please use the <a href="https://github.com/jule-lang/website">website repository</a>.
+To contribute website, documentations or something else, please use the <a href="https://github.com/julelang/website">website repository</a>.
 
 <h2 id="os-support">Compiler and C++ Standard Support</h2>
 JuleC officially supports some C++ compilers.
@@ -99,7 +99,7 @@ Commits that the generated code can be compiled by C++ compilers that fully supp
 Likewise, this commit is also available for the <a href="./api">API</a> of JuleC.
 Jule's ideal C++ standard is determined by the most ideal C++ standard, fully supported by officially supported C++ compilers.
 <br><br>
-If you are getting a compiler error even though you are using the officially supported compiler and standard, please let us know with the <a href="https://github.com/jule-lang/jule/issues">Jule Issue Tracker</a>.
+If you are getting a compiler error even though you are using the officially supported compiler and standard, please let us know with the <a href="https://github.com/julelang/jule/issues">Jule Issue Tracker</a>.
 If you are trying to use a standard or compiler that is not officially supported, you can still contact us to find out about the problem.
 But keep in mind that since it's out of official support, it's likely that the maintainers won't take the effort to fix it.
 <br><br>
@@ -114,7 +114,7 @@ All supported platforms by JuleC are documented in the <a href="https://jule.dev
 
 <h2 id="building-project">Building Project</h2>
 
-> [Website documentation](https://jule-lang.github.io/website/pages/docs.html?page=getting-started-install-from-source) for install from source.
+> [Website documentation](https://julelang.github.io/website/pages/docs.html?page=getting-started-install-from-source) for install from source.
 
 There are scripts prepared for compiling of JuleC. <br>
 These scripts are written to run from the home directory.
@@ -151,24 +151,24 @@ Run the above command in your terminal, in the Jule project directory.
     <tr>
         <td>Windows</td>
         <td>
-            <a href="https://github.com/jule-lang/jule/actions/workflows/windows.yml">
-                <img src="https://github.com/jule-lang/jule/actions/workflows/windows.yml/badge.svg")>
+            <a href="https://github.com/julelang/jule/actions/workflows/windows.yml">
+                <img src="https://github.com/julelang/jule/actions/workflows/windows.yml/badge.svg")>
             </a>
         </td>
     </tr>
     <tr>
         <td>Ubuntu</td>
         <td>
-            <a href="https://github.com/jule-lang/jule/actions/workflows/ubuntu.yml">
-                <img src="https://github.com/jule-lang/jule/actions/workflows/ubuntu.yml/badge.svg")>
+            <a href="https://github.com/julelang/jule/actions/workflows/ubuntu.yml">
+                <img src="https://github.com/julelang/jule/actions/workflows/ubuntu.yml/badge.svg")>
             </a>
         </td>
     </tr>
     <tr>
         <td>Darwin</td>
         <td>
-            <a href="https://github.com/jule-lang/jule/actions/workflows/darwin.yml">
-                <img src="https://github.com/jule-lang/jule/actions/workflows/darwin.yml/badge.svg")>
+            <a href="https://github.com/julelang/jule/actions/workflows/darwin.yml">
+                <img src="https://github.com/julelang/jule/actions/workflows/darwin.yml/badge.svg")>
             </a>
         </td>
     </tr>
@@ -181,14 +181,14 @@ Thanks for you want contributing to Jule!
 Every contribution, big or small, to Jule is greatly appreciated.
 <br><br>
 The Jule project use issues for only bug reports and proposals. <br>
-To contribute, please read the contribution guidelines from <a href="https://jule-lang.github.io/website/pages/contributing.html">here</a>. <br>
-To discussions and questions, please use <a href="https://github.com/jule-lang/jule/discussions">discussions</a>.
+To contribute, please read the contribution guidelines from <a href="https://julelang.github.io/website/pages/contributing.html">here</a>. <br>
+To discussions and questions, please use <a href="https://github.com/julelang/jule/discussions">discussions</a>.
 
 <h2 id="code-of-conduct">Code of Conduct</h2>
 
-[See Code of Conduct](https://jule-lang.github.io/website/pages/code_of_conduct.html)
+[See Code of Conduct](https://julelang.github.io/website/pages/code_of_conduct.html)
 
 <h2 id="license">License</h2>
 
 The JuleC and standard library is distributed under the terms of the BSD 3-Clause license. <br>
-[See License Details](https://jule-lang.github.io/website/pages/license.html)
+[See License Details](https://julelang.github.io/website/pages/license.html)

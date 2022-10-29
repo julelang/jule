@@ -1,6 +1,6 @@
 package julebits
 
-import "github.com/jule-lang/jule/pkg/juletype"
+import "github.com/julelang/jule/pkg/juletype"
 
 // BitsizeType returns bit-size of
 // data type of specified type code.

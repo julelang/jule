@@ -4,11 +4,11 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/jule-lang/jule/ast/models"
-	"github.com/jule-lang/jule/lex"
-	"github.com/jule-lang/jule/pkg/juleset"
-	"github.com/jule-lang/jule/pkg/juletype"
-	"github.com/jule-lang/jule/parser"
+	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/lex"
+	"github.com/julelang/jule/pkg/juleset"
+	"github.com/julelang/jule/pkg/juletype"
+	"github.com/julelang/jule/parser"
 )
 
 func fmt_meta_ttoa(t models.Type) string {

@@ -4,9 +4,9 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/jule-lang/jule/lex"
-	"github.com/jule-lang/jule/pkg/julebits"
-	"github.com/jule-lang/jule/pkg/juletype"
+	"github.com/julelang/jule/lex"
+	"github.com/julelang/jule/pkg/julebits"
+	"github.com/julelang/jule/pkg/juletype"
 )
 
 func float_assignable(dt uint8, v value) bool {

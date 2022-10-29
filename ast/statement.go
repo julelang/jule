@@ -1,8 +1,8 @@
 package ast
 
 import (
-	"github.com/jule-lang/jule/ast/models"
-	"github.com/jule-lang/jule/lex"
+	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/lex"
 )
 
 type block_st struct {

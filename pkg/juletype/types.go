@@ -3,7 +3,7 @@ package juletype
 import (
 	"strconv"
 
-	"github.com/jule-lang/jule/pkg/juleapi"
+	"github.com/julelang/jule/pkg/juleapi"
 )
 
 // INT_CODE is integer type code of current platform architecture.

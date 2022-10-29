@@ -1,6 +1,6 @@
 package ast
 
-import "github.com/jule-lang/jule/lex"
+import "github.com/julelang/jule/lex"
 
 // UNARY_OPS list of unary operators.
 var UNARY_OPS = [...]string{

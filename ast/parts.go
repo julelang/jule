@@ -1,8 +1,8 @@
 package ast
 
 import (
-	"github.com/jule-lang/jule/lex"
-	"github.com/jule-lang/jule/pkg/julelog"
+	"github.com/julelang/jule/lex"
+	"github.com/julelang/jule/pkg/julelog"
 )
 
 // Range returns between of open and close braces.

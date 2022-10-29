@@ -5,9 +5,9 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/jule-lang/jule/ast/models"
-	"github.com/jule-lang/jule/parser"
-	"github.com/jule-lang/jule/pkg/juletype"
+	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/parser"
+	"github.com/julelang/jule/pkg/juletype"
 )
 
 type Defmap = parser.Defmap

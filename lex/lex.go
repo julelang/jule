@@ -4,9 +4,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/jule-lang/jule/pkg/jule"
-	"github.com/jule-lang/jule/pkg/juleio"
-	"github.com/jule-lang/jule/pkg/julelog"
+	"github.com/julelang/jule/pkg/jule"
+	"github.com/julelang/jule/pkg/juleio"
+	"github.com/julelang/jule/pkg/julelog"
 )
 
 // Lex is lexer of Jule.

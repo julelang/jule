@@ -1,6 +1,6 @@
 package models
 
-import "github.com/jule-lang/jule/lex"
+import "github.com/julelang/jule/lex"
 
 // Namespace is the AST model of namespace statements.
 type Namespace struct {

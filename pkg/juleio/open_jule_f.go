@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/jule-lang/jule/pkg/jule"
+	"github.com/julelang/jule/pkg/jule"
 )
 
 // Jopen returns Jule source file.

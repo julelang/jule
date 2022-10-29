@@ -4,7 +4,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/jule-lang/jule/pkg/jule"
+	"github.com/julelang/jule/pkg/jule"
 )
 
 // Block is code block.

@@ -1,8 +1,8 @@
 package parser
 
 import (
-	"github.com/jule-lang/jule/pkg/juleio"
-	"github.com/jule-lang/jule/pkg/juletype"
+	"github.com/julelang/jule/pkg/juleio"
+	"github.com/julelang/jule/pkg/juletype"
 )
 
 func is_accessable(finder, target *File, defIsPub bool) bool {

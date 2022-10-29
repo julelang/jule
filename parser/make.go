@@ -1,8 +1,8 @@
 package parser
 
 import (
-	"github.com/jule-lang/jule/ast/models"
-	"github.com/jule-lang/jule/lex"
+	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/lex"
 )
 
 func make_slice(p *Parser, m *exprModel, t models.Type, args *models.Args, errtok lex.Token) (v value) {

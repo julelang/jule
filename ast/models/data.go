@@ -1,6 +1,6 @@
 package models
 
-import "github.com/jule-lang/jule/lex"
+import "github.com/julelang/jule/lex"
 
 // Data is AST model of data.
 type Data struct {

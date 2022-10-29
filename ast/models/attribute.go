@@ -1,6 +1,6 @@
 package models
 
-import "github.com/jule-lang/jule/lex"
+import "github.com/julelang/jule/lex"
 
 // Attribute is attribtue AST model.
 type Attribute struct {

@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jule-lang/jule/lex"
+	"github.com/julelang/jule/lex"
 )
 
 // Break is the AST model of break statement.

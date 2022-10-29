@@ -5,7 +5,7 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/jule-lang/jule/pkg/juleio"
+	"github.com/julelang/jule/pkg/juleio"
 )
 
 // IGNORE operator.

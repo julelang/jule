@@ -3,9 +3,9 @@ package models
 import (
 	"strings"
 
-	"github.com/jule-lang/jule/lex"
-	"github.com/jule-lang/jule/pkg/jule"
-	"github.com/jule-lang/jule/pkg/juleapi"
+	"github.com/julelang/jule/lex"
+	"github.com/julelang/jule/pkg/jule"
+	"github.com/julelang/jule/pkg/juleapi"
 )
 
 // Param is function parameter AST model.

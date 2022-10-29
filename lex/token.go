@@ -1,6 +1,6 @@
 package lex
 
-import "github.com/jule-lang/jule/pkg/juleio"
+import "github.com/julelang/jule/pkg/juleio"
 
 // Token identities.
 const ID_NA          = 0

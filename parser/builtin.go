@@ -3,10 +3,10 @@ package parser
 import (
 	"strconv"
 
-	"github.com/jule-lang/jule/ast"
-	"github.com/jule-lang/jule/ast/models"
-	"github.com/jule-lang/jule/pkg/jule"
-	"github.com/jule-lang/jule/pkg/juletype"
+	"github.com/julelang/jule/ast"
+	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/pkg/jule"
+	"github.com/julelang/jule/pkg/juletype"
 )
 
 type BuiltinCaller = func(*Parser, *Func, callData, *exprModel) value

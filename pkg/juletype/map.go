@@ -1,6 +1,6 @@
 package juletype
 
-import "github.com/jule-lang/jule/lex"
+import "github.com/julelang/jule/lex"
 
 // Data type (built-in) constants.
 const VOID    uint8 = 0
