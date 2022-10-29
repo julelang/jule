@@ -667,7 +667,7 @@ func (p *Parser) parseTree(tree []models.Object) (ok bool) {
 
 func (p *Parser) checkParse() {
 	if !p.NoCheck {
-		p.check()
+		p.check_package()
 	}
 }
 
@@ -1153,7 +1153,10 @@ func (p *Parser) implTrait(model *models.Impl) {
 	}
 	trait_def.Used = true
 	sid, _ := model.Target.KindId()
-	s, _, _ := p.Defines.structById(sid, nil)
+	side := p.Defines.side
+	p.Defines.side = nil
+	s, _, _ := p.structById(model.Target.Kind)
+	p.Defines.side = side
 	if s == nil {
 		p.pusherrtok(model.Target.Token, "id_not_exist", sid)
 		return
@@ -1206,7 +1209,10 @@ func (p *Parser) implTrait(model *models.Impl) {
 }
 
 func (p *Parser) implStruct(model *models.Impl) {
-	s, _, _ := p.Defines.structById(model.Base.Kind, nil)
+	side := p.Defines.side
+	p.Defines.side = nil
+	s, _, _ := p.structById(model.Base.Kind)
+	p.Defines.side = side
 	if s == nil {
 		p.pusherrtok(model.Base, "id_not_exist", model.Base.Kind)
 		return
@@ -1882,19 +1888,31 @@ func (p *Parser) blockDefById(id string) (def any, tok lex.Token, canshadow bool
 	return
 }
 
-func (p *Parser) precheck() {
-	p.checkTypes()
-	p.parse_structs()
-	p.WaitingFuncs()
-	p.WaitingImpls()
-	p.WaitingGlobals()
-	p.checkCppLinks()
-	p.waitingFuncs = nil
-	p.waitingImpls = nil
-	p.waitingGlobals = nil
+func (p *Parser) precheck_package() {
+	p.check_aliases()
+	p.parse_package_structs()
+	p.parse_package_waiting_fns()
+	p.parse_package_waiting_impls()
+	p.parse_package_waiting_globals()
+	p.check_package_cpp_links()
 }
 
-func (p *Parser) check() {
+func (p *Parser) parse_package_defines() {
+	for _, pf := range *p.package_files {
+		pf.parse_defines()
+		if p != pf {
+			pf.wg.Wait()
+			p.pusherrs(pf.Errors...)
+		}
+	}
+}
+
+func (p *Parser) parse_defines() {
+	p.checkStructs()
+	p.checkFuncs()
+}
+
+func (p *Parser) check_package() {
 	if p.IsMain && !p.JustDefines {
 		f, _, _ := p.Defines.fnById(jule.ENTRY_POINT, nil)
 		if f == nil {
@@ -1904,19 +1922,9 @@ func (p *Parser) check() {
 			f.used = true
 		}
 	}
-	p.precheck()
-	for _, f := range *p.package_files {
-		f.precheck()
-	}
+	p.precheck_package()
 	if !p.JustDefines {
-		p.checkFuncs()
-		p.checkStructs()
-		for _, f := range *p.package_files {
-			f.checkFuncs()
-			f.checkStructs()
-			f.wg.Wait()
-			p.pusherrs(f.Errors...)
-		}
+		p.parse_package_defines()
 	}
 }
 
@@ -1924,9 +1932,59 @@ func (p *Parser) parse_struct(s *structure) {
 	p.parseFields(s)
 }
 
+func (p *Parser) parse_package_structs() {
+	for _, pf := range *p.package_files {
+		pf.parse_structs()
+		if p != pf {
+			pf.wg.Wait()
+			p.pusherrs(pf.Errors...)
+		}
+	}
+}
+
 func (p *Parser) parse_structs() {
 	for _, s := range p.Defines.Structs {
 		p.parse_struct(s)
+	}
+}
+
+func (p *Parser) parse_package_linked_structs() {
+	for _, pf := range *p.package_files {
+		pf.parse_linked_structs()
+		if p != pf {
+			pf.wg.Wait()
+			p.pusherrs(pf.Errors...)
+		}
+	}
+}
+
+func (p *Parser) check_package_linked_aliases() {
+	for _, pf := range *p.package_files {
+		pf.check_linked_aliases()
+		if p != pf {
+			pf.wg.Wait()
+			p.pusherrs(pf.Errors...)
+		}
+	}
+}
+
+func (p *Parser) check_package_linked_vars() {
+	for _, pf := range *p.package_files {
+		pf.check_linked_vars()
+		if p != pf {
+			pf.wg.Wait()
+			p.pusherrs(pf.Errors...)
+		}
+	}
+}
+
+func (p *Parser) check_package_linked_fns() {
+	for _, pf := range *p.package_files {
+		pf.check_linked_fns()
+		if p != pf {
+			pf.wg.Wait()
+			p.pusherrs(pf.Errors...)
+		}
 	}
 }
 
@@ -1959,47 +2017,76 @@ func (p *Parser) check_linked_fns() {
 	}
 }
 
-func (p *Parser) checkCppLinks() {
-	p.check_linked_aliases()
-	p.parse_linked_structs()
-	p.check_linked_vars()
-	p.check_linked_fns()
+func (p *Parser) check_package_cpp_links() {
+	p.check_package_linked_aliases()
+	p.parse_package_linked_structs()
+	p.check_package_linked_vars()
+	p.check_package_linked_fns()
 }
 
-// WaitingFuncs parses Jule global functions for waiting to parsing.
-func (p *Parser) WaitingFuncs() {
+func (p *Parser) parse_package_waiting_fns() {
+	for _, pf := range *p.package_files {
+		pf.ParseWaitingFns()
+		if p != pf {
+			pf.wg.Wait()
+			p.pusherrs(pf.Errors...)
+		}
+	}
+}
+
+// ParseWaitingFns parses Jule global functions for waiting to parsing.
+func (p *Parser) ParseWaitingFns() {
 	for _, f := range p.waitingFuncs {
-		owner := f.Ast.Owner.(*Parser)
+		owner := p // f.Ast.Owner.(*Parser) == p
 		if len(f.Ast.Generics) > 0 {
 			owner.parseTypesNonGenerics(f.Ast)
 		} else {
 			owner.reload_fn_types(f.Ast)
 		}
-		if owner != p {
-			owner.wg.Wait()
-			p.pusherrs(owner.Errors...)
-		}
 	}
+	p.waitingFuncs = nil
 }
 
-func (p *Parser) checkTypes() {
+func (p *Parser) check_aliases() {
 	for i, alias := range p.Defines.Types {
 		p.Defines.Types[i].Type, _ = p.realType(alias.Type, true)
 	}
 }
 
-// WaitingGlobals parses Jule global variables for waiting to parsing.
-func (p *Parser) WaitingGlobals() {
-	for _, g := range p.waitingGlobals {
-		*g.global = *g.file.Var(*g.global)
+func (p *Parser) parse_package_waiting_globals() {
+	for _, pf := range *p.package_files {
+		pf.ParseWaitingGlobals()
+		if p != pf {
+			pf.wg.Wait()
+			p.pusherrs(pf.Errors...)
+		}
 	}
 }
 
-// WaitingImpls parses Jule impls for waiting to parsing.
-func (p *Parser) WaitingImpls() {
-	for _, i := range p.waitingImpls {
-		i.file.Impl(i.i)
+// ParseWaitingGlobals parses Jule global variables for waiting to parsing.
+func (p *Parser) ParseWaitingGlobals() {
+	for _, g := range p.waitingGlobals {
+		*g.global = *g.file.Var(*g.global)
 	}
+	p.waitingGlobals = nil
+}
+
+func (p *Parser) parse_package_waiting_impls() {
+	for _, pf := range *p.package_files {
+		pf.ParseWaitingImpls()
+		if p != pf {
+			pf.wg.Wait()
+			p.pusherrs(pf.Errors...)
+		}
+	}
+}
+
+// ParseWaitingImpls parses Jule impls for waiting to parsing.
+func (p *Parser) ParseWaitingImpls() {
+	for _, i := range p.waitingImpls {
+		p.Impl(i.i)
+	}
+	p.waitingImpls = nil
 }
 
 func (p *Parser) checkParamDefaultExprWithDefault(param *Param) {
