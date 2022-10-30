@@ -453,7 +453,7 @@ func (e *eval) get_cast_expr_model(t, vt Type, expr_model iExpr) iExpr {
 		goto end
 	case type_is_pure(vt):
 		switch {
-		case type_is_trait(vt):
+		case type_is_trait(vt), vt.Id == juletype.ANY:
 			model.WriteString(expr_model.String())
 			model.WriteString(accessor_of_type(vt))
 			model.WriteString("operator ")
