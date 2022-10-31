@@ -34,16 +34,6 @@ type RetType = models.RetType
 
 var used []*use
 
-type waitingGlobal struct {
-	file   *Parser
-	global *Var
-}
-
-type waitingImpl struct {
-	file *Parser
-	i    *models.Impl
-}
-
 // Parser is parser of Jule code.
 type Parser struct {
 	attributes       []models.Attribute
@@ -56,9 +46,7 @@ type Parser struct {
 	generics         []*GenericType
 	blockTypes       []*TypeAlias
 	blockVars        []*Var
-	waitingGlobals   []*waitingGlobal
-	waitingImpls     []*waitingImpl
-	waitingFuncs     []*Fn
+	waitingImpls     []*models.Impl
 	eval             *eval
 	linked_aliases   []*models.TypeAlias
 	linked_functions []*models.Fn
@@ -627,10 +615,9 @@ func (p *Parser) parseSrcTreeObj(obj models.Object) {
 	case models.Trait:
 		p.Trait(obj_t)
 	case models.Impl:
-		wi := new(waitingImpl)
-		wi.file = p
-		wi.i = &obj_t
-		p.waitingImpls = append(p.waitingImpls, wi)
+		i := new(models.Impl)
+		*i = obj_t
+		p.waitingImpls = append(p.waitingImpls, i)
 	case models.CppLinkFn:
 		p.LinkFn(obj_t)
 	case models.CppLinkVar:
@@ -1490,7 +1477,6 @@ func (p *Parser) Func(ast Func) {
 	_ = p.checkParamDup(f.Ast.Params)
 	f.used = f.Ast.Id == jule.INIT_FN
 	p.Defines.Funcs = append(p.Defines.Funcs, f)
-	p.waitingFuncs = append(p.waitingFuncs, f)
 }
 
 // ParseVariable parse Jule global variable.
@@ -1500,8 +1486,8 @@ func (p *Parser) Global(vast Var) {
 		p.pusherrtok(vast.Token, "exist_id", vast.Id)
 		return
 	} else {
-		for _, g := range p.waitingGlobals {
-			if vast.Id == g.global.Id {
+		for _, g := range p.Defines.Globals {
+			if vast.Id == g.Id {
 				p.pusherrtok(vast.Token, "exist_id", vast.Id)
 				return
 			}
@@ -1511,10 +1497,6 @@ func (p *Parser) Global(vast Var) {
 	p.docText.Reset()
 	v := new(Var)
 	*v = vast
-	wg := new(waitingGlobal)
-	wg.file = p
-	wg.global = v
-	p.waitingGlobals = append(p.waitingGlobals, wg)
 	p.Defines.Globals = append(p.Defines.Globals, v)
 }
 
@@ -2036,7 +2018,7 @@ func (p *Parser) parse_package_waiting_fns() {
 
 // ParseWaitingFns parses Jule global functions for waiting to parsing.
 func (p *Parser) ParseWaitingFns() {
-	for _, f := range p.waitingFuncs {
+	for _, f := range p.Defines.Funcs {
 		owner := p // f.Ast.Owner.(*Parser) == p
 		if len(f.Ast.Generics) > 0 {
 			owner.parseTypesNonGenerics(f.Ast)
@@ -2044,7 +2026,6 @@ func (p *Parser) ParseWaitingFns() {
 			owner.reload_fn_types(f.Ast)
 		}
 	}
-	p.waitingFuncs = nil
 }
 
 func (p *Parser) check_aliases() {
@@ -2065,10 +2046,9 @@ func (p *Parser) parse_package_waiting_globals() {
 
 // ParseWaitingGlobals parses Jule global variables for waiting to parsing.
 func (p *Parser) ParseWaitingGlobals() {
-	for _, g := range p.waitingGlobals {
-		*g.global = *g.file.Var(*g.global)
+	for _, g := range p.Defines.Globals {
+		*g = *p.Var(*g)
 	}
-	p.waitingGlobals = nil
 }
 
 func (p *Parser) parse_package_waiting_impls() {
@@ -2084,7 +2064,7 @@ func (p *Parser) parse_package_waiting_impls() {
 // ParseWaitingImpls parses Jule impls for waiting to parsing.
 func (p *Parser) ParseWaitingImpls() {
 	for _, i := range p.waitingImpls {
-		p.Impl(i.i)
+		p.Impl(i)
 	}
 	p.waitingImpls = nil
 }
