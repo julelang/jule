@@ -74,6 +74,9 @@ func (tc *type_checker) check_trait() bool {
 }
 
 func (tc *type_checker) check_struct() bool {
+	if tc.r.Tag == nil {
+		return false
+	}
 	s1, s2 := tc.l.Tag.(*structure), tc.r.Tag.(*structure)
 	switch {
 	case s1.Ast.Id != s2.Ast.Id,
