@@ -350,7 +350,7 @@ func (s *structure) selfVar(receiver *Var) *Var {
 	return v
 }
 
-func (s *structure) dataTypeString() string {
+func (s *structure) as_type_kind() string {
 	var dts strings.Builder
 	dts.WriteString(s.Ast.Id)
 	if len(s.Ast.Generics) > 0 {

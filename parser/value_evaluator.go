@@ -300,32 +300,32 @@ func (ve *valueEvaluator) typeId(id string, t *TypeAlias) (_ value, _ bool) {
 func (ve *valueEvaluator) id() (_ value, ok bool) {
 	id := ve.token.Kind
 
-	v, _ := ve.p.blockVarById(id)
+	v, _ := ve.p.block_var_by_id(id)
 	if v != nil {
 		return ve.varId(id, v, false), true
 	} else {
-		v, _, _ := ve.p.globalById(id)
+		v, _, _ := ve.p.global_by_id(id)
 		if v != nil {
 			return ve.varId(id, v, true), true
 		}
 	}
 
-	f, _, _ := ve.p.FnById(id)
+	f, _, _ := ve.p.fn_by_id(id)
 	if f != nil {
 		return ve.funcId(id, f), true
 	}
 
-	e, _, _ := ve.p.enumById(id)
+	e, _, _ := ve.p.enum_by_id(id)
 	if e != nil {
 		return ve.enumId(id, e), true
 	}
 
-	s, _, _ := ve.p.structById(id)
+	s, _, _ := ve.p.struct_by_id(id)
 	if s != nil {
 		return ve.structId(id, s), true
 	}
 
-	t, _, _ := ve.p.typeById(id)
+	t, _, _ := ve.p.type_by_id(id)
 	if t != nil {
 		return ve.typeId(id, t)
 	}

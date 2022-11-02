@@ -624,18 +624,18 @@ func readyMapDefines(mapt Type) {
 	keyt := types[0]
 	valt := types[1]
 
-	keysFunc, _, _ := mapDefines.fnById("keys", nil)
+	keysFunc, _, _ := mapDefines.fn_by_id("keys", nil)
 	keysFunc.Ast.RetType.Type = keyt
 	keysFunc.Ast.RetType.Type.Kind = jule.PREFIX_SLICE + keysFunc.Ast.RetType.Type.Kind
 
-	valuesFunc, _, _ := mapDefines.fnById("values", nil)
+	valuesFunc, _, _ := mapDefines.fn_by_id("values", nil)
 	valuesFunc.Ast.RetType.Type = valt
 	valuesFunc.Ast.RetType.Type.Kind = jule.PREFIX_SLICE + valuesFunc.Ast.RetType.Type.Kind
 
-	hasFunc, _, _ := mapDefines.fnById("has", nil)
+	hasFunc, _, _ := mapDefines.fn_by_id("has", nil)
 	hasFunc.Ast.Params[0].Type = keyt
 
-	delFunc, _, _ := mapDefines.fnById("del", nil)
+	delFunc, _, _ := mapDefines.fn_by_id("del", nil)
 	delFunc.Ast.Params[0].Type = keyt
 }
 
@@ -653,7 +653,7 @@ func init() {
 	make_fn.Ast.BuiltinCaller = caller_make
 
 	// Setup new function
-	fn_new, _, _ := Builtin.fnById("new", nil)
+	fn_new, _, _ := Builtin.fn_by_id("new", nil)
 	fn_new.Ast.BuiltinCaller = caller_new
 
 	// Setup Error trait
@@ -709,7 +709,7 @@ func caller_out(p *Parser, f *Func, data callData, m *exprModel) (v value) {
 
 func caller_make(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
 	errtok := data.args[0]
-	args := p.getArgs(data.args, false)
+	args := p.get_args(data.args, false)
 	if len(args.Src) == 0 {
 		p.pusherrtok(errtok, "missing_expr")
 		return

@@ -291,7 +291,7 @@ func (p *Parser) CppInitializerCaller() string {
 	indent := models.IndentString()
 	models.DoneIndent()
 	pushInit := func(defs *Defmap) {
-		f, dm, _ := defs.fnById(jule.INIT_FN, nil)
+		f, dm, _ := defs.fn_by_id(jule.INIT_FN, nil)
 		if f == nil || dm != defs {
 			return
 		}
@@ -421,7 +421,7 @@ func (p *Parser) pushSelects(use *use, selectors []lex.Token) (addNs bool) {
 			addNs = true
 			continue
 		}
-		i, m, def_t := use.defines.findById(id.Kind, p.File)
+		i, m, def_t := use.defines.find_by_id(id.Kind, p.File)
 		if i == -1 {
 			p.pusherrtok(id, "id_not_exist", id.Kind)
 			continue
@@ -447,13 +447,13 @@ func (p *Parser) pushSelects(use *use, selectors []lex.Token) (addNs bool) {
 func (p *Parser) pushUse(use *use, selectors []lex.Token) {
 	dm, ok := std_builtin_defines[use.LinkString]
 	if ok {
-		pushDefines(use.defines, dm)
+		push_defines(use.defines, dm)
 	}
 	if use.FullUse {
 		if p.Defines.side == nil {
 			p.Defines.side = new(Defmap)
 		}
-		pushDefines(p.Defines.side, use.defines)
+		push_defines(p.Defines.side, use.defines)
 	} else if len(selectors) > 0 {
 		if !p.pushSelects(use, selectors) {
 			return
@@ -491,7 +491,7 @@ func (p *Parser) wrap_package() {
 		if p == fp {
 			continue
 		}
-		pushDefines(p.Defines, fp.Defines)
+		push_defines(p.Defines, fp.Defines)
 	}
 }
 
@@ -520,7 +520,7 @@ func (p *Parser) compilePureUse(useAST *models.UseDecl) (_ *use, hassErr bool) {
 		psub.Parsef(false, false)
 		psub.wrap_package()
 		use := make_use_from_ast(useAST)
-		pushDefines(use.defines, psub.Defines)
+		push_defines(use.defines, psub.Defines)
 		p.pusherrs(psub.Errors...)
 		p.Warnings = append(p.Warnings, psub.Warnings...)
 		p.pushUse(use, useAST.Selectors)
@@ -815,7 +815,7 @@ func (p *Parser) Type(alias TypeAlias) {
 		p.pusherrtok(alias.Token, "ignore_id")
 		return
 	}
-	_, tok, canshadow := p.defById(alias.Id)
+	_, tok, canshadow := p.defined_by_id(alias.Id)
 	if tok.Id != lex.ID_NA && !canshadow {
 		p.pusherrtok(alias.Token, "exist_id", alias.Id)
 		return
@@ -923,7 +923,7 @@ func (p *Parser) Enum(e Enum) {
 		p.pusherrtok(e.Token, "ignore_id")
 		return
 	}
-	_, tok, _ := p.defById(e.Id)
+	_, tok, _ := p.defined_by_id(e.Id)
 	if tok.Id != lex.ID_NA {
 		p.pusherrtok(e.Token, "exist_id", e.Id)
 		return
@@ -1023,7 +1023,7 @@ func (p *Parser) Struct(model Struct) {
 	if juleapi.IsIgnoreId(model.Id) {
 		p.pusherrtok(model.Token, "ignore_id")
 		return
-	} else if def, _, _ := p.defById(model.Id); def != nil {
+	} else if def, _, _ := p.defined_by_id(model.Id); def != nil {
 		p.pusherrtok(model.Token, "exist_id", model.Id)
 		return
 	}
@@ -1101,7 +1101,7 @@ func (p *Parser) Trait(model models.Trait) {
 	if juleapi.IsIgnoreId(model.Id) {
 		p.pusherrtok(model.Token, "ignore_id")
 		return
-	} else if def, _, _ := p.defById(model.Id); def != nil {
+	} else if def, _, _ := p.defined_by_id(model.Id); def != nil {
 		p.pusherrtok(model.Token, "exist_id", model.Id)
 		return
 	}
@@ -1123,7 +1123,7 @@ func (p *Parser) Trait(model models.Trait) {
 				p.pusherrtok(f.Token, "exist_id", f.Id)
 			}
 		}
-		_ = p.checkParamDup(f.Params)
+		_ = p.check_param_dup(f.Params)
 		p.parseTypesNonGenerics(f)
 		tf := new(Fn)
 		tf.Ast = f
@@ -1133,7 +1133,7 @@ func (p *Parser) Trait(model models.Trait) {
 }
 
 func (p *Parser) implTrait(model *models.Impl) {
-	trait_def, _, _ := p.traitById(model.Base.Kind)
+	trait_def, _, _ := p.trait_by_id(model.Base.Kind)
 	if trait_def == nil {
 		p.pusherrtok(model.Base, "id_not_exist", model.Base.Kind)
 		return
@@ -1142,7 +1142,7 @@ func (p *Parser) implTrait(model *models.Impl) {
 	sid, _ := model.Target.KindId()
 	side := p.Defines.side
 	p.Defines.side = nil
-	s, _, _ := p.structById(model.Target.Kind)
+	s, _, _ := p.struct_by_id(model.Target.Kind)
 	p.Defines.side = side
 	if s == nil {
 		p.pusherrtok(model.Target.Token, "id_not_exist", sid)
@@ -1159,7 +1159,7 @@ func (p *Parser) implTrait(model *models.Impl) {
 				p.pusherrtok(model.Target.Token, "trait_hasnt_id", trait_def.Ast.Id, obj_t.Id)
 				break
 			}
-			i, _, _ := s.Defines.findById(obj_t.Id, nil)
+			i, _, _ := s.Defines.find_by_id(obj_t.Id, nil)
 			if i != -1 {
 				p.pusherrtok(obj_t.Token, "exist_id", obj_t.Id)
 				continue
@@ -1173,8 +1173,8 @@ func (p *Parser) implTrait(model *models.Impl) {
 			p.attributes = nil
 			sf.Desc = p.docText.String()
 			p.docText.Reset()
-			_ = p.checkParamDup(sf.Ast.Params)
-			p.checkRetVars(sf.Ast)
+			_ = p.check_param_dup(sf.Ast.Params)
+			p.check_ret_variables(sf.Ast)
 			sf.used = true
 			if len(s.Ast.Generics) == 0 {
 				p.parseTypesNonGenerics(sf.Ast)
@@ -1185,7 +1185,7 @@ func (p *Parser) implTrait(model *models.Impl) {
 	for _, tf := range trait_def.Defines.Funcs {
 		ok := false
 		ds := tf.Ast.DefString()
-		sf, _, _ := s.Defines.fnById(tf.Ast.Id, nil)
+		sf, _, _ := s.Defines.fn_by_id(tf.Ast.Id, nil)
 		if sf != nil {
 			ok = tf.Ast.Pub == sf.Ast.Pub && ds == sf.Ast.DefString()
 		}
@@ -1198,7 +1198,7 @@ func (p *Parser) implTrait(model *models.Impl) {
 func (p *Parser) implStruct(model *models.Impl) {
 	side := p.Defines.side
 	p.Defines.side = nil
-	s, _, _ := p.structById(model.Base.Kind)
+	s, _, _ := p.struct_by_id(model.Base.Kind)
 	p.Defines.side = side
 	if s == nil {
 		p.pusherrtok(model.Base, "id_not_exist", model.Base.Kind)
@@ -1211,7 +1211,7 @@ func (p *Parser) implStruct(model *models.Impl) {
 		case models.Comment:
 			p.Comment(obj_t)
 		case *Func:
-			i, _, _ := s.Defines.findById(obj_t.Id, nil)
+			i, _, _ := s.Defines.find_by_id(obj_t.Id, nil)
 			if i != -1 {
 				p.pusherrtok(obj_t.Token, "exist_id", obj_t.Id)
 				continue
@@ -1227,8 +1227,8 @@ func (p *Parser) implStruct(model *models.Impl) {
 			p.attributes = nil
 			setGenerics(sf.Ast, p.generics)
 			p.generics = nil
-			_ = p.checkParamDup(sf.Ast.Params)
-			p.checkRetVars(sf.Ast)
+			_ = p.check_param_dup(sf.Ast.Params)
+			p.check_ret_variables(sf.Ast)
 			for _, generic := range obj_t.Generics {
 				if find_generic(generic.Id, s.Ast.Generics) != nil {
 					p.pusherrtok(generic.Token, "exist_id", generic.Id)
@@ -1256,7 +1256,7 @@ func (p *Parser) pushNs(ns *models.Namespace) *namespace {
 	var src *namespace
 	prev := p.Defines
 	for _, id := range ns.Identifiers {
-		src = prev.nsById(id)
+		src = prev.ns_by_id(id)
 		if src == nil {
 			src = new(namespace)
 			src.Id = id
@@ -1354,14 +1354,14 @@ func (p *Parser) parseMapNonGenericType(generics []*GenericType, dt *Type) {
 func (p *Parser) parseCommonNonGenericType(generics []*GenericType, dt *Type) {
 	if dt.Id == juletype.ID {
 		id, prefix := dt.KindId()
-		def, _, _ := p.defById(id)
+		def, _, _ := p.defined_by_id(id)
 		switch deft := def.(type) {
 		case *structure:
 			deft = p.structConstructorInstance(deft)
 			if dt.Tag != nil {
 				deft.SetGenerics(dt.Tag.([]Type))
 			}
-			dt.Kind = prefix + deft.dataTypeString()
+			dt.Kind = prefix + deft.as_type_kind()
 			dt.Id = juletype.STRUCT
 			dt.Tag = deft
 			dt.Pure = true
@@ -1418,7 +1418,7 @@ func (p *Parser) parseTypesNonGenerics(f *Func) {
 	p.parseNonGenericType(f.Generics, &f.RetType.Type)
 }
 
-func (p *Parser) checkRetVars(f *Func) {
+func (p *Parser) check_ret_variables(f *Func) {
 	for i, v := range f.RetType.Identifiers {
 		if juleapi.IsIgnoreId(v.Kind) {
 			continue
@@ -1457,7 +1457,7 @@ func setGenerics(f *Func, generics []*models.GenericType) {
 
 // Func parse Jule function.
 func (p *Parser) Func(ast Func) {
-	_, tok, canshadow := p.defById(ast.Id)
+	_, tok, canshadow := p.defined_by_id(ast.Id)
 	if tok.Id != lex.ID_NA && !canshadow {
 		p.pusherrtok(ast.Token, "exist_id", ast.Id)
 	} else if juleapi.IsIgnoreId(ast.Id) {
@@ -1473,15 +1473,15 @@ func (p *Parser) Func(ast Func) {
 	p.docText.Reset()
 	setGenerics(f.Ast, p.generics)
 	p.generics = nil
-	p.checkRetVars(f.Ast)
-	_ = p.checkParamDup(f.Ast.Params)
+	p.check_ret_variables(f.Ast)
+	_ = p.check_param_dup(f.Ast.Params)
 	f.used = f.Ast.Id == jule.INIT_FN
 	p.Defines.Funcs = append(p.Defines.Funcs, f)
 }
 
 // ParseVariable parse Jule global variable.
 func (p *Parser) Global(vast Var) {
-	def, _, _ := p.defById(vast.Id)
+	def, _, _ := p.defined_by_id(vast.Id)
 	if def != nil {
 		p.pusherrtok(vast.Token, "exist_id", vast.Id)
 		return
@@ -1665,20 +1665,20 @@ func (p *Parser) linkById(id string) (any, byte) {
 	return nil, ' '
 }
 
-// FnById returns function by specified id.
+// fn_by_id returns function by specified id.
 //
 // Special case:
 //
-//	FnById(id) -> nil: if function is not exist.
-func (p *Parser) FnById(id string) (*Fn, *Defmap, bool) {
+//	fn_by_id(id) -> nil: if function is not exist.
+func (p *Parser) fn_by_id(id string) (*Fn, *Defmap, bool) {
 	if p.allowBuiltin {
-		f, _, _ := Builtin.fnById(id, nil)
+		f, _, _ := Builtin.fn_by_id(id, nil)
 		if f != nil {
 			return f, nil, false
 		}
 	}
 	for _, fp := range *p.package_files {
-		f, dm, can_shadow := fp.Defines.fnById(id, fp.File)
+		f, dm, can_shadow := fp.Defines.fn_by_id(id, fp.File)
 		if f != nil && p.is_accessible_define(fp, dm) {
 			return f, dm, can_shadow
 		}
@@ -1686,9 +1686,9 @@ func (p *Parser) FnById(id string) (*Fn, *Defmap, bool) {
 	return nil, nil, false
 }
 
-func (p *Parser) globalById(id string) (*Var, *Defmap, bool) {
+func (p *Parser) global_by_id(id string) (*Var, *Defmap, bool) {
 	for _, fp := range *p.package_files {
-		g, dm, _ := fp.Defines.globalById(id, fp.File)
+		g, dm, _ := fp.Defines.global_by_id(id, fp.File)
 		if g != nil && p.is_accessible_define(fp, dm) {
 			return g, dm, true
 		}
@@ -1696,11 +1696,11 @@ func (p *Parser) globalById(id string) (*Var, *Defmap, bool) {
 	return nil, nil, false
 }
 
-func (p *Parser) nsById(id string) *namespace { return p.Defines.nsById(id) }
+func (p *Parser) ns_by_id(id string) *namespace { return p.Defines.ns_by_id(id) }
 
 // Reports identifier is shadowed or not.
 func (p *Parser) is_shadowed(id string) bool {
-	def, _, _ := p.blockDefById(id)
+	def, _, _ := p.block_define_by_id(id)
 	return def != nil
 }
 
@@ -1732,19 +1732,19 @@ func (p *Parser) is_accessible_define(fp *Parser, dm *Defmap) bool {
 	return p == fp || dm == fp.Defines
 }
 
-func (p *Parser) typeById(id string) (*TypeAlias, *Defmap, bool) {
-	alias, canshadow := p.blockTypeById(id)
+func (p *Parser) type_by_id(id string) (*TypeAlias, *Defmap, bool) {
+	alias, canshadow := p.block_type_by_id(id)
 	if alias != nil {
 		return alias, nil, canshadow
 	}
 	if p.allowBuiltin {
-		alias, _, _ = Builtin.typeById(id, nil)
+		alias, _, _ = Builtin.type_by_id(id, nil)
 		if alias != nil {
 			return alias, nil, false
 		}
 	}
 	for _, fp := range *p.package_files {
-		a, dm, can_shadow := fp.Defines.typeById(id, fp.File)
+		a, dm, can_shadow := fp.Defines.type_by_id(id, fp.File)
 		if a != nil && p.is_accessible_define(fp, dm) {
 			return a, dm, can_shadow
 		}
@@ -1752,15 +1752,15 @@ func (p *Parser) typeById(id string) (*TypeAlias, *Defmap, bool) {
 	return nil, nil, false
 }
 
-func (p *Parser) enumById(id string) (*Enum, *Defmap, bool) {
+func (p *Parser) enum_by_id(id string) (*Enum, *Defmap, bool) {
 	if p.allowBuiltin {
-		e, _, _ := Builtin.enumById(id, nil)
+		e, _, _ := Builtin.enum_by_id(id, nil)
 		if e != nil {
 			return e, nil, false
 		}
 	}
 	for _, fp := range *p.package_files {
-		e, dm, can_shadow := fp.Defines.enumById(id, fp.File)
+		e, dm, can_shadow := fp.Defines.enum_by_id(id, fp.File)
 		if e != nil && p.is_accessible_define(fp, dm) {
 			return e, dm, can_shadow
 		}
@@ -1768,15 +1768,15 @@ func (p *Parser) enumById(id string) (*Enum, *Defmap, bool) {
 	return nil, nil, false
 }
 
-func (p *Parser) structById(id string) (*structure, *Defmap, bool) {
+func (p *Parser) struct_by_id(id string) (*structure, *Defmap, bool) {
 	if p.allowBuiltin {
-		s, _, _ := Builtin.structById(id, nil)
+		s, _, _ := Builtin.struct_by_Id(id, nil)
 		if s != nil {
 			return s, nil, false
 		}
 	}
 	for _, fp := range *p.package_files {
-		s, dm, can_shadow := fp.Defines.structById(id, fp.File)
+		s, dm, can_shadow := fp.Defines.struct_by_Id(id, fp.File)
 		if s != nil && p.is_accessible_define(fp, dm) {
 			return s, dm, can_shadow
 		}
@@ -1784,15 +1784,15 @@ func (p *Parser) structById(id string) (*structure, *Defmap, bool) {
 	return nil, nil, false
 }
 
-func (p *Parser) traitById(id string) (*trait, *Defmap, bool) {
+func (p *Parser) trait_by_id(id string) (*trait, *Defmap, bool) {
 	if p.allowBuiltin {
-		trait_def, _, _ := Builtin.traitById(id, nil)
+		trait_def, _, _ := Builtin.trait_by_id(id, nil)
 		if trait_def != nil {
 			return trait_def, nil, false
 		}
 	}
 	for _, fp := range *p.package_files {
-		t, dm, can_shadow := fp.Defines.traitById(id, fp.File)
+		t, dm, can_shadow := fp.Defines.trait_by_id(id, fp.File)
 		if t != nil && p.is_accessible_define(fp, dm) {
 			return t, dm, can_shadow
 		}
@@ -1800,7 +1800,7 @@ func (p *Parser) traitById(id string) (*trait, *Defmap, bool) {
 	return nil, nil, false
 }
 
-func (p *Parser) blockTypeById(id string) (_ *TypeAlias, can_shadow bool) {
+func (p *Parser) block_type_by_id(id string) (_ *TypeAlias, can_shadow bool) {
 	for i := len(p.blockTypes) - 1; i >= 0; i-- {
 		alias := p.blockTypes[i]
 		if alias != nil && alias.Id == id {
@@ -1811,7 +1811,7 @@ func (p *Parser) blockTypeById(id string) (_ *TypeAlias, can_shadow bool) {
 
 }
 
-func (p *Parser) blockVarById(id string) (_ *Var, can_shadow bool) {
+func (p *Parser) block_var_by_id(id string) (_ *Var, can_shadow bool) {
 	for i := len(p.blockVars) - 1; i >= 0; i-- {
 		v := p.blockVars[i]
 		if v != nil && v.Id == id {
@@ -1821,49 +1821,49 @@ func (p *Parser) blockVarById(id string) (_ *Var, can_shadow bool) {
 	return nil, false
 }
 
-func (p *Parser) defById(id string) (def any, tok lex.Token, canshadow bool) {
+func (p *Parser) defined_by_id(id string) (def any, tok lex.Token, canshadow bool) {
 	var a *TypeAlias
-	a, _, canshadow = p.typeById(id)
+	a, _, canshadow = p.type_by_id(id)
 	if a != nil {
 		return a, a.Token, canshadow
 	}
 	var e *Enum
-	e, _, canshadow = p.enumById(id)
+	e, _, canshadow = p.enum_by_id(id)
 	if e != nil {
 		return e, e.Token, canshadow
 	}
 	var s *structure
-	s, _, canshadow = p.structById(id)
+	s, _, canshadow = p.struct_by_id(id)
 	if s != nil {
 		return s, s.Ast.Token, canshadow
 	}
 	var trait *trait
-	trait, _, canshadow = p.traitById(id)
+	trait, _, canshadow = p.trait_by_id(id)
 	if trait != nil {
 		return trait, trait.Ast.Token, canshadow
 	}
 	var f *Fn
-	f, _, canshadow = p.FnById(id)
+	f, _, canshadow = p.fn_by_id(id)
 	if f != nil {
 		return f, f.Ast.Token, canshadow
 	}
-	bv, canshadow := p.blockVarById(id)
+	bv, canshadow := p.block_var_by_id(id)
 	if bv != nil {
 		return bv, bv.Token, canshadow
 	}
-	g, _, _ := p.globalById(id)
+	g, _, _ := p.global_by_id(id)
 	if g != nil {
 		return g, g.Token, true
 	}
 	return
 }
 
-func (p *Parser) blockDefById(id string) (def any, tok lex.Token, canshadow bool) {
-	bv, canshadow := p.blockVarById(id)
+func (p *Parser) block_define_by_id(id string) (def any, tok lex.Token, canshadow bool) {
+	bv, canshadow := p.block_var_by_id(id)
 	if bv != nil {
 		return bv, bv.Token, canshadow
 	}
-	alias, canshadow := p.blockTypeById(id)
+	alias, canshadow := p.block_type_by_id(id)
 	if alias != nil {
 		return alias, alias.Token, canshadow
 	}
@@ -1890,13 +1890,13 @@ func (p *Parser) parse_package_defines() {
 }
 
 func (p *Parser) parse_defines() {
-	p.checkStructs()
-	p.checkFuncs()
+	p.check_structs()
+	p.check_fns()
 }
 
 func (p *Parser) check_package() {
 	if p.IsMain && !p.JustDefines {
-		f, _, _ := p.Defines.fnById(jule.ENTRY_POINT, nil)
+		f, _, _ := p.Defines.fn_by_id(jule.ENTRY_POINT, nil)
 		if f == nil {
 			p.PushErr("no_entry_point")
 		} else {
@@ -2105,7 +2105,7 @@ func (p *Parser) param(f *Func, param *Param) (err bool) {
 	return
 }
 
-func (p *Parser) checkParamDup(params []models.Param) (err bool) {
+func (p *Parser) check_param_dup(params []models.Param) (err bool) {
 	for i, param := range params {
 		for j, jparam := range params {
 			if j >= i {
@@ -2135,7 +2135,7 @@ func (p *Parser) params(f *Func) (err bool) {
 	return
 }
 
-func (p *Parser) blockVarsOfFunc(f *Func) []*Var {
+func (p *Parser) block_variables_of_fn(f *Func) []*Var {
 	vars := p.varsFromParams(f)
 	vars = append(vars, f.RetType.Vars(f.Block)...)
 	if f.Receiver != nil {
@@ -2145,15 +2145,15 @@ func (p *Parser) blockVarsOfFunc(f *Func) []*Var {
 	return vars
 }
 
-func (p *Parser) parsePureFunc(f *Func) (err bool) {
+func (p *Parser) parse_pure_fn(f *Func) (err bool) {
 	hasError := p.eval.has_error
 	owner := f.Owner.(*Parser)
 	err = owner.params(f)
 	if err {
 		return
 	}
-	owner.blockVars = owner.blockVarsOfFunc(f)
-	owner.checkFunc(f)
+	owner.blockVars = owner.block_variables_of_fn(f)
+	owner.check_fn(f)
 	if owner != p {
 		owner.wg.Wait()
 		p.pusherrs(owner.Errors...)
@@ -2165,25 +2165,25 @@ func (p *Parser) parsePureFunc(f *Func) (err bool) {
 	return
 }
 
-func (p *Parser) parseFunc(f *Fn) (err bool) {
+func (p *Parser) parse_fn(f *Fn) (err bool) {
 	if f.checked || len(f.Ast.Generics) > 0 {
 		return false
 	}
-	return p.parsePureFunc(f.Ast)
+	return p.parse_pure_fn(f.Ast)
 }
 
-func (p *Parser) checkFuncs() {
+func (p *Parser) check_fns() {
 	err := false
 	check := func(f *Fn) {
 		if len(f.Ast.Generics) > 0 {
 			return
 		}
-		p.checkFuncSpecialCases(f.Ast)
+		p.check_fn_special_cases(f.Ast)
 		if err {
 			return
 		}
 		p.blockTypes = nil
-		err = p.parseFunc(f)
+		err = p.parse_fn(f)
 		f.checked = true
 	}
 	for _, f := range p.Defines.Funcs {
@@ -2197,7 +2197,7 @@ func (p *Parser) parseStructFunc(s *structure, f *Fn) (err bool) {
 	}
 	if len(s.Ast.Generics) == 0 {
 		p.parseTypesNonGenerics(f.Ast)
-		return p.parseFunc(f)
+		return p.parse_fn(f)
 	}
 	return
 }
@@ -2217,7 +2217,7 @@ func (p *Parser) checkStruct(xs *structure) (err bool) {
 	return
 }
 
-func (p *Parser) checkStructs() {
+func (p *Parser) check_structs() {
 	err := false
 	check := func(xs *structure) {
 		if err {
@@ -2230,15 +2230,15 @@ func (p *Parser) checkStructs() {
 	}
 }
 
-func (p *Parser) checkFuncSpecialCases(f *Func) {
+func (p *Parser) check_fn_special_cases(f *Func) {
 	switch f.Id {
 	case jule.ENTRY_POINT, jule.INIT_FN:
 		p.checkSolidFuncSpecialCases(f)
 	}
 }
 
-func (p *Parser) callFunc(f *Func, data callData, m *exprModel) value {
-	v := p.parseFuncCallToks(f, data.generics, data.args, m)
+func (p *Parser) call_fn(f *Func, data callData, m *exprModel) value {
+	v := p.parse_fn_call_toks(f, data.generics, data.args, m)
 	v.lvalue = type_is_lvalue(v.data.Type)
 	return v
 }
@@ -2247,7 +2247,7 @@ func (p *Parser) callStructConstructor(s *structure, argsToks []lex.Token, m *ex
 	f := s.constructor
 	s = f.RetType.Type.Tag.(*structure)
 	v.data.Type = f.RetType.Type.Copy()
-	v.data.Type.Kind = s.dataTypeString()
+	v.data.Type.Kind = s.as_type_kind()
 	v.is_type = false
 	v.lvalue = false
 	v.constExpr = false
@@ -2257,7 +2257,7 @@ func (p *Parser) callStructConstructor(s *structure, argsToks []lex.Token, m *ex
 	argsToks[0].Kind = lex.KND_LPAREN
 	argsToks[len(argsToks)-1].Kind = lex.KND_RPARENT
 
-	args := p.getArgs(argsToks, true)
+	args := p.get_args(argsToks, true)
 	if s.CppLinked() {
 		m.append_sub(exprNode{lex.KND_LPAREN})
 		m.append_sub(exprNode{f.RetType.String()})
@@ -2294,7 +2294,7 @@ func (p *Parser) parseField(s *structure, f **Var, i int) {
 			s.origin.depends = append(s.origin.depends, ts)
 		}
 	}
-	if hasExpr(v.Expr) {
+	if has_expr(v.Expr) {
 		param.Default = v.Expr
 	} else {
 		param.Default.Model = exprNode{juleapi.DEFAULT_EXPR}
@@ -2322,16 +2322,16 @@ func (p *Parser) structConstructorInstance(as *structure) *structure {
 }
 
 func (p *Parser) check_anon_fn(f *Func) {
-	_ = p.checkParamDup(f.Params)
-	p.checkRetVars(f)
+	_ = p.check_param_dup(f.Params)
+	p.check_ret_variables(f)
 	p.reload_fn_types(f)
 	globals := p.Defines.Globals
 	blockVariables := p.blockVars
 	p.Defines.Globals = append(blockVariables, p.Defines.Globals...)
-	p.blockVars = p.blockVarsOfFunc(f)
+	p.blockVars = p.block_variables_of_fn(f)
 	rootBlock := p.rootBlock
 	nodeBlock := p.nodeBlock
-	p.checkFunc(f)
+	p.check_fn(f)
 	p.rootBlock = rootBlock
 	p.nodeBlock = nodeBlock
 	p.Defines.Globals = globals
@@ -2339,8 +2339,8 @@ func (p *Parser) check_anon_fn(f *Func) {
 }
 
 // Returns nil if has error.
-func (p *Parser) getArgs(toks []lex.Token, targeting bool) *models.Args {
-	toks, _ = p.getrange(lex.KND_LPAREN, lex.KND_RPARENT, toks)
+func (p *Parser) get_args(toks []lex.Token, targeting bool) *models.Args {
+	toks, _ = p.get_range(lex.KND_LPAREN, lex.KND_RPARENT, toks)
 	if toks == nil {
 		toks = make([]lex.Token, 0)
 	}
@@ -2354,7 +2354,7 @@ func (p *Parser) getArgs(toks []lex.Token, targeting bool) *models.Args {
 }
 
 // Should toks include brackets.
-func (p *Parser) getGenerics(toks []lex.Token) (_ []Type, err bool) {
+func (p *Parser) get_generics(toks []lex.Token) (_ []Type, err bool) {
 	if len(toks) == 0 {
 		return nil, false
 	}
@@ -2469,7 +2469,7 @@ func (p *Parser) parseGenericFunc(f *Func, generics []Type, errtok lex.Token) {
 		return
 	}
 	*f.Combines = append(*f.Combines, generics)
-	p.parsePureFunc(f)
+	p.parse_pure_fn(f)
 }
 
 func (p *Parser) parseGenerics(f *Func, args *models.Args, errTok lex.Token) bool {
@@ -2501,7 +2501,7 @@ ok:
 	return true
 }
 
-func (p *Parser) parseFuncCall(f *Func, args *models.Args, m *exprModel, errTok lex.Token) (v value) {
+func (p *Parser) parse_fn_call(f *Func, args *models.Args, m *exprModel, errTok lex.Token) (v value) {
 	args.NeedsPureType = p.rootBlock == nil || len(p.rootBlock.Func.Generics) == 0
 	if len(f.Generics) > 0 {
 		params := make([]Param, len(f.Params))
@@ -2574,18 +2574,18 @@ end:
 	return
 }
 
-func (p *Parser) parseFuncCallToks(f *Func, genericsToks, argsToks []lex.Token, m *exprModel) (v value) {
+func (p *Parser) parse_fn_call_toks(f *Func, genericsToks, argsToks []lex.Token, m *exprModel) (v value) {
 	var generics []Type
 	var args *models.Args
 	var err bool
-	generics, err = p.getGenerics(genericsToks)
+	generics, err = p.get_generics(genericsToks)
 	if err {
 		p.eval.has_error = true
 		return
 	}
-	args = p.getArgs(argsToks, false)
+	args = p.get_args(argsToks, false)
 	args.Generics = generics
-	return p.parseFuncCall(f, args, m, argsToks[0])
+	return p.parse_fn_call(f, args, m, argsToks[0])
 }
 
 func (p *Parser) parseStructArgs(f *Func, args *models.Args, errTok lex.Token) {
@@ -2617,12 +2617,12 @@ func (p *Parser) parseArgs(f *Func, args *models.Args, m *exprModel, errTok lex.
 	p.parsePureArgs(f, args, m, errTok)
 }
 
-func hasExpr(expr Expr) bool {
+func has_expr(expr Expr) bool {
 	return len(expr.Tokens) > 0 || expr.Model != nil
 }
 
 func paramHasDefaultArg(param *Param) bool {
-	return hasExpr(param.Default)
+	return has_expr(param.Default)
 }
 
 // [identifier]
@@ -2681,7 +2681,7 @@ func (p *Parser) pushGenericByCommonArg(f *Func, pair *paramMapPair, args *model
 func (p *Parser) pushGenericByType(f *Func, generic *GenericType, args *models.Args, gt Type) {
 	owner := f.Owner.(*Parser)
 	// Already added
-	alias, _ := owner.blockTypeById(generic.Id)
+	alias, _ := owner.block_type_by_id(generic.Id)
 	if alias != nil {
 		return
 	}
@@ -2758,12 +2758,12 @@ func (p *Parser) checkArgType(param *Param, val value, errTok lex.Token) {
 	}.check()
 }
 
-// getrange returns between of brackets.
+// get_range returns between of brackets.
 //
 // Special case is:
 //
-//	getrange(open, close, tokens) = nil, false if fail
-func (p *Parser) getrange(open, close string, toks []lex.Token) (_ []lex.Token, ok bool) {
+//	get_range(open, close, tokens) = nil, false if fail
+func (p *Parser) get_range(open, close string, toks []lex.Token) (_ []lex.Token, ok bool) {
 	i := 0
 	toks = ast.Range(&i, open, close, toks)
 	return toks, toks != nil
@@ -2851,7 +2851,7 @@ func (p *Parser) statement(s *models.Statement, recover bool) bool {
 	case *models.Match:
 		p.matchcase(data)
 	case TypeAlias:
-		def, _, canshadow := p.blockDefById(data.Id)
+		def, _, canshadow := p.block_define_by_id(data.Id)
 		if def != nil && !canshadow {
 			p.pusherrtok(data.Token, "exist_id", data.Id)
 			break
@@ -2937,7 +2937,7 @@ func (p *Parser) checkBlock(b *models.Block) {
 func (p *Parser) recoverFuncExprStatement(s *models.ExprStatement) {
 	errtok := s.Expr.Tokens[0]
 	callToks := s.Expr.Tokens[1:]
-	args := p.getArgs(callToks, false)
+	args := p.get_args(callToks, false)
 	handleParam := recoverFunc.Ast.Params[0]
 	if len(args.Src) == 0 {
 		p.pusherrtok(errtok, "missing_expr_for", handleParam.Id)
@@ -2984,7 +2984,7 @@ func (p *Parser) exprStatement(s *models.ExprStatement, recover bool) {
 				if !recover {
 					p.pusherrtok(tok, "invalid_syntax")
 				}
-				def, _, _ := p.defById(tok.Kind)
+				def, _, _ := p.defined_by_id(tok.Kind)
 				if def == recoverFunc {
 					p.recoverFuncExprStatement(s)
 					return
@@ -3235,7 +3235,7 @@ func (p *Parser) checkRets(f *Func) {
 	}
 }
 
-func (p *Parser) checkFunc(f *Func) {
+func (p *Parser) check_fn(f *Func) {
 	if f.Block == nil || f.Block.Tree == nil {
 		goto always
 	} else {
@@ -3253,7 +3253,7 @@ always:
 }
 
 func (p *Parser) varStatement(v *Var, noParse bool) {
-	def, _, canshadow := p.blockDefById(v.Id)
+	def, _, canshadow := p.block_define_by_id(v.Id)
 	if !canshadow && def != nil {
 		p.pusherrtok(v.Token, "exist_id", v.Id)
 		return
@@ -3284,7 +3284,7 @@ func (p *Parser) assignment(left value, errtok lex.Token) bool {
 	}
 	switch left.data.Type.Tag.(type) {
 	case Func:
-		f, _, _ := p.FnById(left.data.Token.Kind)
+		f, _, _ := p.fn_by_id(left.data.Token.Kind)
 		if f != nil {
 			p.pusherrtok(errtok, "assign_type_not_support_value")
 			state = false
@@ -3781,7 +3781,7 @@ func (p *Parser) typeSourceIsStruct(s *structure, st Type) (dt Type, _ bool) {
 					blockVars := owner.blockVars
 					blockTypes := owner.blockTypes
 					owner.reload_fn_types(f.Ast)
-					_ = p.parsePureFunc(f.Ast)
+					_ = p.parse_pure_fn(f.Ast)
 					owner.blockVars = blockVars
 					owner.blockTypes = blockTypes
 				}
@@ -3798,7 +3798,7 @@ func (p *Parser) typeSourceIsStruct(s *structure, st Type) (dt Type, _ bool) {
 	}
 end:
 	dt.Id = juletype.STRUCT
-	dt.Kind = s.dataTypeString()
+	dt.Kind = s.as_type_kind()
 	dt.Tag = s
 	dt.Token = s.Ast.Token
 	return dt, true
@@ -3907,7 +3907,7 @@ func (p *Parser) get_define(id string, cpp_linked bool) any {
 		if defs == nil {
 			return nil
 		}
-		i, m, def_t := defs.findById(toks[0].Kind, p.File)
+		i, m, def_t := defs.find_by_id(toks[0].Kind, p.File)
 		switch def_t {
 		case 't':
 			def = m.Types[i]
@@ -3919,7 +3919,7 @@ func (p *Parser) get_define(id string, cpp_linked bool) any {
 			def = m.Traits[i]
 		}
 	} else {
-		def, _, _ = p.defById(id)
+		def, _, _ = p.defined_by_id(id)
 	}
 	return def
 }
