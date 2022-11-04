@@ -603,7 +603,7 @@ func (p *Parser) parseSrcTreeObj(obj models.Object) {
 	}
 	switch obj_t := obj.Data.(type) {
 	case models.Statement:
-		p.Statement(obj_t)
+		p.St(obj_t)
 	case TypeAlias:
 		p.Type(obj_t)
 	case []GenericType:
@@ -1319,8 +1319,8 @@ func genericsToCpp(generics []*GenericType) string {
 	return cpp.String()[:cpp.Len()-1] + ">"
 }
 
-// Statement parse Jule statement.
-func (p *Parser) Statement(s models.Statement) {
+// St parse Jule statement.
+func (p *Parser) St(s models.Statement) {
 	switch data_t := s.Data.(type) {
 	case Func:
 		p.Func(data_t)
@@ -2831,22 +2831,22 @@ func (p *Parser) checkNewBlock(b *models.Block) {
 	p.checkNewBlockCustom(b, p.blockVars)
 }
 
-func (p *Parser) statement(s *models.Statement, recover bool) bool {
+func (p *Parser) st(s *models.Statement, recover bool) bool {
 	switch data := s.Data.(type) {
 	case models.ExprStatement:
-		p.exprStatement(&data, recover)
+		p.expr_st(&data, recover)
 		s.Data = data
 	case Var:
-		p.varStatement(&data, false)
+		p.var_st(&data, false)
 		s.Data = data
 	case models.Assign:
 		p.assign(&data)
 		s.Data = data
 	case models.Break:
-		p.breakStatement(&data)
+		p.break_st(&data)
 		s.Data = data
 	case models.Continue:
-		p.continueStatement(&data)
+		p.continue_st(&data)
 		s.Data = data
 	case *models.Match:
 		p.matchcase(data)
@@ -2874,7 +2874,7 @@ func (p *Parser) statement(s *models.Statement, recover bool) bool {
 	return true
 }
 
-func (p *Parser) fallthroughStatement(f *models.Fallthrough, b *models.Block, i *int) {
+func (p *Parser) fallthrough_st(f *models.Fallthrough, b *models.Block, i *int) {
 	switch {
 	case p.currentCase == nil || *i+1 < len(b.Tree):
 		p.pusherrtok(f.Token, "fallthrough_wrong_use")
@@ -2886,9 +2886,9 @@ func (p *Parser) fallthroughStatement(f *models.Fallthrough, b *models.Block, i 
 	f.Case = p.currentCase
 }
 
-func (p *Parser) checkStatement(b *models.Block, i *int) {
+func (p *Parser) check_st(b *models.Block, i *int) {
 	s := &b.Tree[*i]
-	if p.statement(s, true) {
+	if p.st(s, true) {
 		return
 	}
 	switch data := s.Data.(type) {
@@ -2898,10 +2898,10 @@ func (p *Parser) checkStatement(b *models.Block, i *int) {
 		p.iter(&data)
 		s.Data = data
 	case models.Fallthrough:
-		p.fallthroughStatement(&data, b, i)
+		p.fallthrough_st(&data, b, i)
 		s.Data = data
-	case models.If:
-		p.ifExpr(&data, i, b.Tree)
+	case models.Conditional:
+		p.conditional(&data)
 		s.Data = data
 	case models.Ret:
 		rc := retChecker{t: p, ret_ast: &data, f: b.Func}
@@ -2930,11 +2930,11 @@ func (p *Parser) checkStatement(b *models.Block, i *int) {
 
 func (p *Parser) checkBlock(b *models.Block) {
 	for i := 0; i < len(b.Tree); i++ {
-		p.checkStatement(b, &i)
+		p.check_st(b, &i)
 	}
 }
 
-func (p *Parser) recoverFuncExprStatement(s *models.ExprStatement) {
+func (p *Parser) recoverFuncExprSt(s *models.ExprStatement) {
 	errtok := s.Expr.Tokens[0]
 	callToks := s.Expr.Tokens[1:]
 	args := p.get_args(callToks, false)
@@ -2975,7 +2975,7 @@ func (p *Parser) recoverFuncExprStatement(s *models.ExprStatement) {
 	p.nodeBlock.Tree = append(p.nodeBlock.Tree, catchExpr)
 }
 
-func (p *Parser) exprStatement(s *models.ExprStatement, recover bool) {
+func (p *Parser) expr_st(s *models.ExprStatement, recover bool) {
 	if s.Expr.IsNotBinop() {
 		expr := s.Expr.Op.(models.BinopExpr)
 		tok := expr.Tokens[0]
@@ -2986,7 +2986,7 @@ func (p *Parser) exprStatement(s *models.ExprStatement, recover bool) {
 				}
 				def, _, _ := p.defined_by_id(tok.Kind)
 				if def == recoverFunc {
-					p.recoverFuncExprStatement(s)
+					p.recoverFuncExprSt(s)
 					return
 				}
 			}
@@ -3054,7 +3054,7 @@ func (p *Parser) checkLabels() {
 	}
 }
 
-func statementIsDef(s *models.Statement) bool {
+func stIsDef(s *models.Statement) bool {
 	switch t := s.Data.(type) {
 	case Var:
 		return true
@@ -3074,7 +3074,7 @@ func (p *Parser) checkSameScopeGoto(gt *models.Goto, label *models.Label) {
 	}
 	for i := label.Index; i > gt.Index; i-- {
 		s := &label.Block.Tree[i]
-		if statementIsDef(s) {
+		if stIsDef(s) {
 			p.pusherrtok(gt.Token, "goto_jumps_declarations", gt.Label)
 			break
 		}
@@ -3091,7 +3091,7 @@ parent_scopes:
 			switch {
 			case s.Token.Row >= label.Token.Row:
 				return true
-			case statementIsDef(s):
+			case stIsDef(s):
 				p.pusherrtok(gt.Token, "goto_jumps_declarations", gt.Label)
 				return false
 			}
@@ -3107,7 +3107,7 @@ func (p *Parser) checkGotoScope(gt *models.Goto, label *models.Label) {
 		switch {
 		case s.Token.Row >= label.Token.Row:
 			return
-		case statementIsDef(s):
+		case stIsDef(s):
 			p.pusherrtok(gt.Token, "goto_jumps_declarations", gt.Label)
 			return
 		}
@@ -3132,7 +3132,7 @@ func (p *Parser) checkDiffScopeGoto(gt *models.Goto, label *models.Label) {
 				return
 			}
 		}
-		if statementIsDef(s) {
+		if stIsDef(s) {
 			p.pusherrtok(gt.Token, "goto_jumps_declarations", gt.Label)
 			break
 		}
@@ -3252,7 +3252,7 @@ always:
 	p.checkRets(f)
 }
 
-func (p *Parser) varStatement(v *Var, noParse bool) {
+func (p *Parser) var_st(v *Var, noParse bool) {
 	def, _, canshadow := p.block_define_by_id(v.Id)
 	if !canshadow && def != nil {
 		p.pusherrtok(v.Token, "exist_id", v.Id)
@@ -3407,7 +3407,7 @@ func (p *Parser) multiAssign(assign *models.Assign, l, r []value) {
 			continue
 		}
 		left.Var.Tag = right
-		p.varStatement(&left.Var, false)
+		p.var_st(&left.Var, false)
 	}
 }
 
@@ -3481,7 +3481,7 @@ func (p *Parser) whileProfile(iter *models.Iter) {
 		p.pusherrtok(iter.Token, "iter_while_require_bool_expr")
 	}
 	if profile.Next.Data != nil {
-		_ = p.statement(&profile.Next, false)
+		_ = p.st(&profile.Next, false)
 	}
 	p.checkNewBlock(iter.Block)
 }
@@ -3525,44 +3525,23 @@ func (p *Parser) iter(iter *models.Iter) {
 	p.currentIter = oldIter
 }
 
-func (p *Parser) ifExpr(ifast *models.If, i *int, statements []models.Statement) {
-	val, model := p.evalExpr(ifast.Expr, nil)
-	ifast.Expr.Model = model
-	statement := statements[*i]
+func (p *Parser) conditional_node(node *models.If) {
+	val, model := p.evalExpr(node.Expr, nil)
+	node.Expr.Model = model
 	if !p.eval.has_error && val.data.Value != "" && !isBoolExpr(val) {
-		p.pusherrtok(ifast.Token, "if_require_bool_expr")
+		p.pusherrtok(node.Token, "if_require_bool_expr")
 	}
-	p.checkNewBlock(ifast.Block)
-node:
-	if statement.WithTerminator {
-		return
-	}
-	*i++
-	if *i >= len(statements) {
-		*i--
-		return
-	}
-	statement = statements[*i]
-	switch data := statement.Data.(type) {
-	case models.ElseIf:
-		val, model := p.evalExpr(data.Expr, nil)
-		data.Expr.Model = model
-		if !p.eval.has_error && val.data.Value != "" && !isBoolExpr(val) {
-			p.pusherrtok(data.Token, "if_require_bool_expr")
-		}
-		p.checkNewBlock(data.Block)
-		statements[*i].Data = data
-		goto node
-	case models.Else:
-		p.elseBlock(&data)
-		statement.Data = data
-	default:
-		*i--
-	}
+	p.checkNewBlock(node.Block)
 }
 
-func (p *Parser) elseBlock(elseast *models.Else) {
-	p.checkNewBlock(elseast.Block)
+func (p *Parser) conditional(model *models.Conditional) {
+	p.conditional_node(model.If)
+	for _, elif := range model.Elifs {
+		p.conditional_node(elif)
+	}
+	if model.Default != nil {
+		p.checkNewBlock(model.Default.Block)
+	}
 }
 
 func find_label_parent(id string, b *models.Block) *models.Label {
@@ -3662,7 +3641,7 @@ func (p *Parser) continueWithLabel(ast *models.Continue) {
 	}
 }
 
-func (p *Parser) breakStatement(ast *models.Break) {
+func (p *Parser) break_st(ast *models.Break) {
 	switch {
 	case ast.LabelToken.Id != lex.ID_NA:
 		p.breakWithLabel(ast)
@@ -3675,7 +3654,7 @@ func (p *Parser) breakStatement(ast *models.Break) {
 	}
 }
 
-func (p *Parser) continueStatement(ast *models.Continue) {
+func (p *Parser) continue_st(ast *models.Continue) {
 	switch {
 	case p.currentIter == nil:
 		p.pusherrtok(ast.Token, "continue_at_out_of_valid_scope")
@@ -3736,7 +3715,7 @@ func (p *Parser) typeSourceIsEnum(e *Enum, tag any) (dt Type, _ bool) {
 	return dt, true
 }
 
-func (p *Parser) typeSourceIsFunc(dt Type, err bool) (Type, bool) {
+func (p *Parser) typeSourceIsFn(dt Type, err bool) (Type, bool) {
 	f := dt.Tag.(*Func)
 	p.reload_fn_types(f)
 	dt.Kind = f.TypeKind()
@@ -3982,7 +3961,7 @@ func (p *Parser) typeSource(dt Type, err bool) (ret Type, ok bool) {
 			return dt, false
 		}
 	case juletype.FN:
-		return p.typeSourceIsFunc(dt, err)
+		return p.typeSourceIsFn(dt, err)
 	}
 	return dt, true
 }
