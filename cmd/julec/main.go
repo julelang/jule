@@ -88,12 +88,7 @@ func init_project(cmd string) {
 }
 
 func doc(cmd string) {
-	fmt_json := false
 	cmd = strings.TrimSpace(cmd)
-	if strings.HasPrefix(cmd, "--json") {
-		cmd = strings.TrimSpace(cmd[len("--json"):])
-		fmt_json = true
-	}
 	paths := strings.SplitN(cmd, " ", -1)
 	for _, path := range paths {
 		path = strings.TrimSpace(path)
@@ -105,7 +100,7 @@ func doc(cmd string) {
 			fmt.Println(jule.GetError("doc_couldnt_generated", path))
 			continue
 		}
-		docjson, err := documenter.Doc(p, fmt_json)
+		docjson, err := documenter.Doc(p)
 		if err != nil {
 			fmt.Println(jule.GetError("error", err.Error()))
 			continue
