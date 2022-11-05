@@ -1233,6 +1233,11 @@ func (b *Builder) pushStToBlock(bs *block_st) {
 }
 
 func setToNextSt(bs *block_st) {
+	if bs.nextToks != nil {
+		bs.toks = bs.nextToks
+		bs.nextToks = nil
+		return
+	}
 	*bs.srcToks = (*bs.srcToks)[bs.pos:]
 	bs.pos, bs.terminated = NextStPos(*bs.srcToks, 0)
 	if bs.terminated {
@@ -1243,7 +1248,7 @@ func setToNextSt(bs *block_st) {
 }
 
 func blockStFinished(bs *block_st) bool {
-	return bs.pos >= len(*bs.srcToks)
+	return bs.nextToks == nil && bs.pos >= len(*bs.srcToks)
 }
 
 // Block builds AST model of statements of code block.
@@ -1255,13 +1260,6 @@ func (b *Builder) Block(toks []lex.Token) (block *models.Block) {
 	for {
 		setToNextSt(&bs)
 		b.pushStToBlock(&bs)
-	next:
-		if len(bs.nextToks) > 0 {
-			bs.toks = bs.nextToks
-			bs.nextToks = nil
-			b.pushStToBlock(&bs)
-			goto next
-		}
 		if blockStFinished(&bs) {
 			break
 		}
@@ -1294,9 +1292,7 @@ func (b *Builder) St(bs *block_st) (s models.Statement) {
 	case lex.ID_CONTINUE:
 		return b.ContinueSt(bs.toks)
 	case lex.ID_IF:
-		return b.IfExpr(bs)
-	case lex.ID_ELSE:
-		return b.ElseBlock(bs)
+		return b.Conditional(bs)
 	case lex.ID_COMMENT:
 		return b.CommentSt(bs.toks[0])
 	case lex.ID_CO:
@@ -1543,20 +1539,23 @@ func (b *Builder) IdSt(bs *block_st) (s models.Statement, ok bool) {
 	tok := bs.toks[1]
 	switch tok.Id {
 	case lex.ID_COLON:
-		return b.LabelStatement(bs), true
+		return b.LabelSt(bs), true
 	}
 	return
 }
 
-// LabelStatement builds AST model of label.
-func (b *Builder) LabelStatement(bs *block_st) models.Statement {
+// LabelSt builds AST model of label.
+func (b *Builder) LabelSt(bs *block_st) models.Statement {
 	var l models.Label
 	l.Token = bs.toks[0]
 	l.Label = l.Token.Kind
 	if len(bs.toks) > 2 {
 		bs.nextToks = bs.toks[2:]
 	}
-	return models.Statement{Token: l.Token, Data: l}
+	return models.Statement{
+		Token: l.Token,
+		Data: l,
+	}
 }
 
 // ExprSt builds AST model of expression.
@@ -2133,22 +2132,21 @@ func (b *Builder) MatchCase(toks []lex.Token) (s models.Statement) {
 	return
 }
 
-// IfExpr builds AST model of if expression.
-func (b *Builder) IfExpr(bs *block_st) (s models.Statement) {
-	var ifast models.If
-	ifast.Token = bs.toks[0]
+func (b *Builder) if_expr(bs *block_st) *models.If {
+	model := new(models.If)
+	model.Token = bs.toks[0]
 	bs.toks = bs.toks[1:]
 	exprToks := BlockExpr(bs.toks)
 	i := 0
 	if len(exprToks) == 0 {
-		b.pusherr(ifast.Token, "missing_expr")
+		b.pusherr(model.Token, "missing_expr")
 	} else {
 		i = len(exprToks)
 	}
 	blockToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &bs.toks)
 	if blockToks == nil {
-		b.pusherr(ifast.Token, "body_not_exist")
-		return
+		b.pusherr(model.Token, "body_not_exist")
+		return nil
 	}
 	if i < len(bs.toks) {
 		if bs.toks[i].Id == lex.ID_ELSE {
@@ -2157,63 +2155,65 @@ func (b *Builder) IfExpr(bs *block_st) (s models.Statement) {
 			b.pusherr(bs.toks[i], "invalid_syntax")
 		}
 	}
-	ifast.Expr = b.Expr(exprToks)
-	ifast.Block = b.Block(blockToks)
-	return models.Statement{Token: ifast.Token, Data: ifast}
+	model.Expr = b.Expr(exprToks)
+	model.Block = b.Block(blockToks)
+	return model
 }
 
-// ElseIfEpxr builds AST model of else if expression.
-func (b *Builder) ElseIfExpr(bs *block_st) (s models.Statement) {
-	var elif models.ElseIf
-	elif.Token = bs.toks[1]
-	bs.toks = bs.toks[2:]
-	exprToks := BlockExpr(bs.toks)
-	i := 0
-	if len(exprToks) == 0 {
-		b.pusherr(elif.Token, "missing_expr")
-	} else {
-		i = len(exprToks)
-	}
-	blockToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &bs.toks)
-	if blockToks == nil {
-		b.pusherr(elif.Token, "body_not_exist")
-		return
-	}
-	if i < len(bs.toks) {
-		if bs.toks[i].Id == lex.ID_ELSE {
-			bs.nextToks = bs.toks[i:]
-		} else {
-			b.pusherr(bs.toks[i], "invalid_syntax")
-		}
-	}
-	elif.Expr = b.Expr(exprToks)
-	elif.Block = b.Block(blockToks)
-	return models.Statement{Token: elif.Token, Data: elif}
-}
-
-// ElseBlock builds AST model of else block.
-func (b *Builder) ElseBlock(bs *block_st) (s models.Statement) {
-	if len(bs.toks) > 1 && bs.toks[1].Id == lex.ID_IF {
-		return b.ElseIfExpr(bs)
-	}
-	var elseast models.Else
-	elseast.Token = bs.toks[0]
+func (b *Builder) conditional_default(bs *block_st) *models.Else {
+	model := new(models.Else)
+	model.Token = bs.toks[0]
 	bs.toks = bs.toks[1:]
 	i := 0
 	blockToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &bs.toks)
 	if blockToks == nil {
 		if i < len(bs.toks) {
-			b.pusherr(elseast.Token, "else_have_expr")
+			b.pusherr(model.Token, "else_have_expr")
 		} else {
-			b.pusherr(elseast.Token, "body_not_exist")
+			b.pusherr(model.Token, "body_not_exist")
 		}
-		return
+		return nil
 	}
 	if i < len(bs.toks) {
 		b.pusherr(bs.toks[i], "invalid_syntax")
 	}
-	elseast.Block = b.Block(blockToks)
-	return models.Statement{Token: elseast.Token, Data: elseast}
+	model.Block = b.Block(blockToks)
+	return model
+}
+
+// IfExpr builds condition tree AST model.
+func (b *Builder) Conditional(bs *block_st) (s models.Statement) {
+	s.Token = bs.toks[0]
+	var c models.Conditional
+	c.If = b.if_expr(bs)
+	if c.If == nil {
+		return
+	}
+
+node:
+	if bs.terminated {
+		goto end
+	}
+	if blockStFinished(bs) {
+		goto end
+	}
+	setToNextSt(bs)
+	if bs.toks[0].Id == lex.ID_ELSE {
+		if len(bs.toks) > 1 && bs.toks[1].Id == lex.ID_IF {
+			bs.toks = bs.toks[1:] // Remove else token
+			elif := b.if_expr(bs)
+			c.Elifs = append(c.Elifs, elif)
+			goto node
+		}
+		c.Default = b.conditional_default(bs)
+	} else {
+		// Save statement
+		bs.nextToks = bs.toks
+	}
+
+end:
+	s.Data = c
+	return
 }
 
 // BreakSt builds AST model of break statement.

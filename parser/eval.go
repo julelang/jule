@@ -228,7 +228,7 @@ func (e *eval) dataTypeFunc(expr lex.Token, callRange []lex.Token, m *exprModel)
 			v = e.castExpr(dt, callRange, m, expr)
 		}
 	case lex.ID_IDENT:
-		def, _, _ := e.p.defById(expr.Kind)
+		def, _, _ := e.p.defined_by_id(expr.Kind)
 		if def == nil {
 			break
 		}
@@ -275,7 +275,7 @@ func (e *eval) callFunc(f *Func, data callData, m *exprModel) value {
 	if f.BuiltinCaller != nil {
 		return f.BuiltinCaller.(BuiltinCaller)(e.p, f, data, m)
 	}
-	return e.p.callFunc(f, data, m)
+	return e.p.call_fn(f, data, m)
 }
 
 func (e *eval) parenthesesRange(toks []lex.Token, m *exprModel) (v value) {
@@ -402,7 +402,7 @@ func (e *eval) subId(toks []lex.Token, m *exprModel) (v value) {
 		if tok.Id == lex.ID_DT {
 			return e.typeSubId(tok, idTok, m)
 		} else if tok.Id == lex.ID_IDENT {
-			t, _, _ := e.p.typeById(tok.Kind)
+			t, _, _ := e.p.type_by_id(tok.Kind)
 			if t != nil && !e.p.is_shadowed(tok.Kind) {
 				return e.typeSubId(t.Type.Token, idTok, m)
 			}
@@ -519,7 +519,7 @@ func (e *eval) tryCast(toks []lex.Token, m *exprModel) (v value, _ bool) {
 		if tok.Id != lex.ID_BRACE || tok.Kind != lex.KND_LPAREN {
 			return
 		}
-		exprToks, ok = e.p.getrange(lex.KND_LPAREN, lex.KND_RPARENT, exprToks)
+		exprToks, ok = e.p.get_range(lex.KND_LPAREN, lex.KND_RPARENT, exprToks)
 		if !ok {
 			return
 		}
@@ -696,7 +696,7 @@ func (e *eval) castSlice(t, vt Type, errtok lex.Token) {
 }
 
 func (e *eval) juletypeSubId(dm *Defmap, idTok lex.Token, m *exprModel) (v value) {
-	i, dm, t := dm.findById(idTok.Kind, nil)
+	i, dm, t := dm.find_by_id(idTok.Kind, nil)
 	if i == -1 {
 		e.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
 		return
@@ -833,7 +833,7 @@ func (e *eval) typeId(toks []lex.Token, m *exprModel) (v value) {
 }
 
 func (e *eval) xObjSubId(dm *Defmap, val value, interior_mutability bool, idTok lex.Token, m *exprModel) (v value) {
-	i, dm, t := dm.findById(idTok.Kind, idTok.File)
+	i, dm, t := dm.find_by_id(idTok.Kind, idTok.File)
 	if i == -1 {
 		e.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
 		return
@@ -957,12 +957,12 @@ func (e *eval) traitObjSubId(val value, idTok lex.Token, m *exprModel) value {
 	return val
 }
 
-type nsFind interface {
-	nsById(string) *namespace
+type ns_find interface {
+	ns_by_id(string) *namespace
 }
 
 func (e *eval) getNs(toks *[]lex.Token) *Defmap {
-	var prev nsFind = e.p
+	var prev ns_find = e.p
 	var ns *namespace
 	for i, tok := range *toks {
 		if (i+1)%2 != 0 {
@@ -970,7 +970,7 @@ func (e *eval) getNs(toks *[]lex.Token) *Defmap {
 				e.pusherrtok(tok, "invalid_syntax")
 				continue
 			}
-			src := prev.nsById(tok.Kind)
+			src := prev.ns_by_id(tok.Kind)
 			if src == nil {
 				if ns != nil {
 					*toks = (*toks)[i:]

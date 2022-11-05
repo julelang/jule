@@ -262,7 +262,7 @@ void __julec_setup_command_line_args(int argc, char *argv[]) noexcept {
     _args.__push( __julec_utf16_to_utf8_str( _wargs+_old , std::wcslen( _wargs+_old ) ) );
     __julec_command_line_args = _args;
 #else
-    __julec_command_line_args = slice<str_jt>( argc );
+    __julec_command_line_args = slice_jt<str_jt>( argc );
     for (int_jt _i{ 0 }; _i < argc; ++_i)
     { __julec_command_line_args[_i] = argv[_i]; }
 #endif // #ifdef _WINDOWS
