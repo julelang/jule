@@ -358,6 +358,7 @@ func compile(path string, main, nolocal, justDefs bool) *parser.Parser {
 	}
 	p.File = f
 	p.NoLocalPkg = nolocal
+	p.SetupPackage()
 	p.Parsef(main, justDefs)
 	return p
 }

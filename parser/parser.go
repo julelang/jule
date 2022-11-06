@@ -516,7 +516,7 @@ func (p *Parser) compilePureUse(useAST *models.UseDecl) (_ *use, hassErr bool) {
 			continue
 		}
 		psub := New(f)
-		psub.setup_package_files()
+		psub.SetupPackage()
 		psub.Parsef(false, false)
 		psub.wrap_package()
 		use := make_use_from_ast(useAST)
@@ -700,7 +700,7 @@ func (p *Parser) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 	return
 }
 
-func (p *Parser) setup_package_files() {
+func (p *Parser) SetupPackage() {
 	p.package_files = new([]*Parser)
 	*p.package_files = append(*p.package_files, p)
 }
@@ -710,9 +710,6 @@ func (p *Parser) Parset(tree []models.Object, main, justDefines bool) {
 	p.IsMain = main
 	p.JustDefines = justDefines
 	preprocessor.Process(&tree, !main)
-	if main {
-		p.setup_package_files()
-	}
 	if !p.parseTree(tree) {
 		return
 	}
