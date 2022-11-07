@@ -3,8 +3,6 @@ package models
 import (
 	"strings"
 	"sync/atomic"
-
-	"github.com/julelang/jule/pkg/jule"
 )
 
 // Block is code block.
@@ -49,7 +47,7 @@ func ParseBlock(b Block) string {
 		cpp.WriteString(s.String())
 	}
 	cpp.WriteByte('\n')
-	indent := strings.Repeat(jule.SET.Indent, int(Indent-1)*jule.SET.IndentCount)
+	indent := strings.Repeat(Indentation, int(Indent-1))
 	cpp.WriteString(indent)
 	cpp.WriteByte('}')
 	return cpp.String()
@@ -59,15 +57,16 @@ func ParseBlock(b Block) string {
 // This should be manuplate atomic.
 var Indent uint32 = 0
 
+// Indentation.
+var Indentation = "\t"
+
 // IndentString returns indent space of current block.
 func IndentString() string {
-	return strings.Repeat(jule.SET.Indent, int(Indent)*jule.SET.IndentCount)
+	return strings.Repeat(Indentation, int(Indent))
 }
 
 // AddIndent adds new indent to IndentString.
-func AddIndent() {
-	atomic.AddUint32(&Indent, 1)
-}
+func AddIndent() { atomic.AddUint32(&Indent, 1) }
 
 // DoneIndent removes last indent from IndentString.
 func DoneIndent() {

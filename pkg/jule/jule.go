@@ -1,7 +1,5 @@
 package jule
 
-import "github.com/julelang/jule/pkg/juleset"
-
 // Jule constants.
 const VERSION       = `@development_channel`
 const SRC_EXT       = `.jule`
@@ -50,4 +48,3 @@ var LOCALIZATION_PATH string
 var STDLIB_PATH string
 var EXEC_PATH string
 var WORKING_PATH string
-var SET *juleset.Set

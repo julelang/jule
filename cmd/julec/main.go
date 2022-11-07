@@ -15,16 +15,33 @@ import (
 	"time"
 
 	"github.com/julelang/jule/documenter"
+	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/parser"
 	"github.com/julelang/jule/pkg/jule"
 	"github.com/julelang/jule/pkg/juleapi"
 	"github.com/julelang/jule/pkg/juleio"
-	"github.com/julelang/jule/pkg/juleset"
 )
+
+const mode_transpile = "transpile"
+const mode_compile = "compile"
+
+const compiler_gcc = "gcc"
+const compiler_clang = "clang"
+
+const compiler_path_gcc = "g++"
+const compiler_path_clang = "clang++"
+
+var out_dir = "./dist"
+var language = "default"
+var mode = mode_compile
+var out_name = "ir.cpp"
+
+// Sets by compiler or command-line inputs
+var compiler = ""
+var compiler_path = ""
 
 const CMD_HELP = "help"
 const CMD_VERSION = "version"
-const CMD_INIT = "init"
 const CMD_DOC = "doc"
 const CMD_BUG = "bug"
 const CMD_TOOL = "tool"
@@ -32,7 +49,6 @@ const CMD_TOOL = "tool"
 var HELP_MAP = [...][2]string{
 	{CMD_HELP, "Show help"},
 	{CMD_VERSION, "Show version"},
-	{CMD_INIT, "Initialize new project here"},
 	{CMD_DOC, "Documentize Jule source code"},
 	{CMD_BUG, "Start a new bug report"},
 	{CMD_TOOL, "Tools for effective Jule"},
@@ -69,24 +85,6 @@ func version(cmd string) {
 	println("julec version", jule.VERSION)
 }
 
-func init_project(cmd string) {
-	if cmd != "" {
-		println("This module can only be used as single!")
-		return
-	}
-	bytes, err := json.MarshalIndent(*juleset.DEFAULT, "", "\t")
-	if err != nil {
-		println(err)
-		os.Exit(0)
-	}
-	err = os.WriteFile(jule.SETTINGS_FILE, bytes, 0666)
-	if err != nil {
-		println(err.Error())
-		os.Exit(0)
-	}
-	println("Initialized project.")
-}
-
 func doc(cmd string) {
 	cmd = strings.TrimSpace(cmd)
 	paths := strings.SplitN(cmd, " ", -1)
@@ -107,7 +105,7 @@ func doc(cmd string) {
 		}
 		// Remove SrcExt from path
 		path = path[:len(path)-len(jule.SRC_EXT)]
-		path = filepath.Join(jule.SET.CppOutDir, path+jule.DOC_EXT)
+		path = filepath.Join(out_dir, path+jule.DOC_EXT)
 		write_output(path, docjson)
 	}
 }
@@ -172,8 +170,6 @@ func process_command(namespace, cmd string) bool {
 		help(cmd)
 	case CMD_VERSION:
 		version(cmd)
-	case CMD_INIT:
-		init_project(cmd)
 	case CMD_DOC:
 		doc(cmd)
 	case CMD_BUG:
@@ -225,7 +221,7 @@ func init() {
 }
 
 func load_localization() {
-	lang := strings.TrimSpace(jule.SET.Language)
+	lang := strings.TrimSpace(language)
 	if lang == "" || lang == "default" {
 		return
 	}
@@ -245,40 +241,28 @@ func load_localization() {
 }
 
 func check_mode() {
-	mode := jule.SET.Mode
-	if mode != juleset.MDOE_TRANSPILE && mode != juleset.MODE_COMPILE {
+	if mode != mode_transpile && mode != mode_compile {
 		println(jule.GetError("invalid_value_for_key", mode, "mode"))
 		os.Exit(0)
 	}
 }
 
 func check_compiler() {
-	c := jule.SET.Compiler
-	if c != jule.COMPILER_GCC && c != jule.COMPILER_CLANG {
-		println(jule.GetError("invalid_value_for_key", c, "compiler"))
+	if compiler != jule.COMPILER_GCC && compiler != jule.COMPILER_CLANG {
+		println(jule.GetError("invalid_value_for_key", compiler, "compiler"))
 		os.Exit(0)
 	}
 }
 
-func load_juleset() {
-	// File check.
-	info, err := os.Stat(jule.SETTINGS_FILE)
-	if err != nil || info.IsDir() {
-		jule.SET = new(juleset.Set)
-		*jule.SET = *juleset.DEFAULT
-		return
+func set() {
+	if runtime.GOOS == "windows" {
+		compiler = compiler_gcc
+		compiler_path = compiler_path_gcc
+	} else {
+		compiler = compiler_clang
+		compiler_path = compiler_path_clang
 	}
-	bytes, err := os.ReadFile(jule.SETTINGS_FILE)
-	if err != nil {
-		println(err.Error())
-		os.Exit(0)
-	}
-	jule.SET, err = juleset.Load(bytes)
-	if err != nil {
-		println("Jule settings has errors;")
-		println(err.Error())
-		os.Exit(0)
-	}
+
 	load_localization()
 	check_mode()
 	check_compiler()
@@ -339,7 +323,7 @@ func write_output(path, content string) {
 }
 
 func compile(path string, main, nolocal, justDefs bool) *parser.Parser {
-	load_juleset()
+	set()
 	p := parser.New(nil)
 	// Check standard library.
 	inf, err := os.Stat(jule.STDLIB_PATH)
@@ -367,18 +351,19 @@ func generate_compile_command(source_path string) (c, cmd string) {
 	var cpp strings.Builder
 	cpp.WriteString("-g -O0 ")
 	cpp.WriteString(source_path)
-	return jule.SET.CompilerPath, cpp.String()
+	return compiler_path, cpp.String()
 }
 
 func do_spell(cpp string) {
-	path := filepath.Join(jule.WORKING_PATH, jule.SET.CppOutDir)
-	path = filepath.Join(path, jule.SET.CppOutName)
+	path := filepath.Join(jule.WORKING_PATH, out_dir)
+	path = filepath.Join(path, out_name)
 	write_output(path, cpp)
-	switch jule.SET.Mode {
-	case juleset.MODE_COMPILE:
+	switch mode {
+	case mode_compile:
 		c, cmd := generate_compile_command(path)
 		println(c + " " + cmd)
-		command := exec.Command(c, strings.SplitN(cmd, " ", -1)...)
+		entries := strings.SplitN(cmd, " ", -1)
+		command := exec.Command(c, entries...)
 		err := command.Start()
 		if err != nil {
 			println(err.Error())
@@ -390,14 +375,127 @@ func do_spell(cpp string) {
 	}
 }
 
+func get_arg(i *int, runes []rune) (arg string, content string) {
+	first := *i
+	for ; *i < len(runes); *i++ {
+		r := runes[*i]
+		if r != '-' {
+			continue
+		}
+		j := *i
+		*i++
+		if *i >= len(runes) {
+			println("error: undefined syntax: " + string(runes[j:]))
+			os.Exit(0)
+		}
+		r = runes[*i]
+		if r == '-' {
+			*i++
+			if *i >= len(runes) {
+				println("error: undefined syntax: " + string(runes[j:]))
+				os.Exit(0)
+			}
+			r = runes[*i]
+		}
+		if !lex.IsIdentifierRune(string(r)) {
+			println("error: undefined syntax: " + string(runes[j:]))
+			os.Exit(0)
+		}
+		*i++
+		for ; *i < len(runes); *i++ {
+			r = runes[*i]
+			if lex.IsSpace(byte(r)) {
+				break
+			} else if !lex.IsLetter(r) && !lex.IsDecimal(byte(r)) &&
+				r != '_' && r != '-' {
+				println("error: undefined syntax: " + string(runes[j:]))
+				os.Exit(0)
+			}
+		}
+		arg = string(runes[j:*i])
+		content = string(runes[first:j])
+		return
+	}
+	content = string(runes[first:])
+	return
+}
+
+func get_arg_value(i *int, runes []rune) string {
+	first := -1
+	for ; *i < len(runes); *i++ {
+		r := runes[*i]
+		if lex.IsSpace(byte(r)) {
+			if first != -1 {
+				return string(runes[first:*i])
+			}
+			continue
+		}
+		if first == -1 {
+			first = *i
+		}
+	}
+	if first == -1 {
+		return ""
+	}
+	return string(runes[first:])
+}
+
+func parse_compiler_arg(i *int, runes []rune) {
+	value := get_arg_value(i, runes)
+	if value == "" {
+		println("error: missing argument value: -c --compiler")
+		os.Exit(0)
+	}
+	switch value {
+	case compiler_clang:
+		compiler = value
+		compiler_path = compiler_path_clang
+	case compiler_gcc:
+		compiler = value
+		compiler_path = compiler_path_gcc
+	default:
+		println("error: invalid argument value: " + value)
+		os.Exit(0)
+	}
+}
+
+func parse_arguments(cmd string) string {
+	runes := []rune(cmd)
+	cmd = ""
+	i := 0
+	for ; i < len(runes); i++ {
+		arg, content := get_arg(&i, runes)
+		cmd += content
+		switch arg {
+		case "":
+		case "-t", "--transpile":
+			mode = mode_transpile
+		case "-c", "--compile":
+			mode = mode_compile
+		case "--compiler":
+			parse_compiler_arg(&i, runes)
+		default:
+			println("error: undefined argument: " + arg)
+			os.Exit(0)
+		}
+	}
+	cmd = strings.TrimSpace(cmd)
+	return cmd
+}
+
 func main() {
-	fpath := os.Args[0]
-	t := compile(fpath, true, false, false)
+	cmd := os.Args[0]
+	cmd = parse_arguments(cmd)
+	if cmd == "" {
+		println("error: missing compile path")
+		return
+	}
+	t := compile(cmd, true, false, false)
 	if t == nil {
 		return
 	}
 	if print_logs(t) {
-		os.Exit(0)
+		return
 	}
 	cpp := t.Cpp()
 	append_standard(&cpp)

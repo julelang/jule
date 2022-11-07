@@ -6,19 +6,22 @@ import (
 	"unicode/utf8"
 )
 
-// String are generated as clean byte encoded, not string literal.
-// Because Jule's strings are UTF-8 byte encoded and some
-// C++ compilers compiles wrong C++ string literals.
+// ToStrLiteral returns string literas as given bytes.
+func ToStrLiteral(bytes []byte) string {
+	btoa := bytes_to_str(bytes)
+	if btoa != "" {
+		return `"` + btoa + `"`
+	}
+	return `""`
+}
 
 // ToStr returns specified literal as Jule string literal for cpp.
 func ToStr(bytes []byte) string {
 	var cpp strings.Builder
 	cpp.WriteString("str_jt(")
-	btoa := bytesToStr(bytes)
-	if btoa != "" {
-		cpp.WriteByte('"')
-		cpp.WriteString(btoa)
-		cpp.WriteByte('"')
+	literal := ToStrLiteral(bytes)
+	if literal != `""` {
+		cpp.WriteString(literal)
 	}
 	cpp.WriteString(")")
 	return cpp.String()
@@ -86,7 +89,7 @@ func decompose_common_esq(b byte) string {
 	}
 }
 
-func tryBtoaCommonEsq(bytes []byte) (seq byte, ok bool) {
+func try_btoa_common_esq(bytes []byte) (seq byte, ok bool) {
 	if len(bytes) < 2 || bytes[0] != '\\' {
 		return
 	}
@@ -117,7 +120,7 @@ func tryBtoaCommonEsq(bytes []byte) (seq byte, ok bool) {
 }
 
 func rune_from_esq_seq(bytes []byte, i *int) rune {
-	b, ok := tryBtoaCommonEsq(bytes[*i:])
+	b, ok := try_btoa_common_esq(bytes[*i:])
 	*i++
 	if ok {
 		return rune(b)
@@ -146,15 +149,15 @@ func rune_from_esq_seq(bytes []byte, i *int) rune {
 	}
 }
 
-func strEsqSeq(bytes []byte, i *int) string {
+func str_esq_seq(bytes []byte, i *int) string {
 	r := rune_from_esq_seq(bytes, i)
 	if r <= 255 {
 		return sbtoa(byte(r))
 	}
-	return bytesToStr([]byte(string(r)))
+	return bytes_to_str([]byte(string(r)))
 }
 
-func bytesToStr(bytes []byte) string {
+func bytes_to_str(bytes []byte) string {
 	if len(bytes) == 0 {
 		return ""
 	}
@@ -162,7 +165,7 @@ func bytesToStr(bytes []byte) string {
 	for i := 0; i < len(bytes); i++ {
 		b := bytes[i]
 		if b == '\\' {
-			seq := strEsqSeq(bytes, &i)
+			seq := str_esq_seq(bytes, &i)
 			str.WriteString(seq)
 		} else {
 			str.WriteString(sbtoa(b))
