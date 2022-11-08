@@ -54,9 +54,9 @@ var HELP_MAP = [...][2]string{
 	{CMD_TOOL, "Tools for effective Jule"},
 }
 
-func help(cmd string) {
-	if cmd != "" {
-		println("This module can only be used as single!")
+func help() {
+	if len(os.Args) > 2 {
+		println("error: invalid command: " + os.Args[2])
 		return
 	}
 	max := len(HELP_MAP[0][0])
@@ -77,18 +77,16 @@ func help(cmd string) {
 	println(sb.String()[:sb.Len()-1])
 }
 
-func version(cmd string) {
-	if cmd != "" {
-		println("This module can only be used as single!")
+func version() {
+	if len(os.Args) > 2 {
+		println("error: invalid command: " + os.Args[2])
 		return
 	}
 	println("julec version", jule.VERSION)
 }
 
-func doc(cmd string) {
-	cmd = strings.TrimSpace(cmd)
-	paths := strings.SplitN(cmd, " ", -1)
-	for _, path := range paths {
+func doc() {
+	for _, path := range os.Args[2:] {
 		path = strings.TrimSpace(path)
 		p := compile(path, false, true, true)
 		if p == nil {
@@ -128,9 +126,9 @@ func open_url(url string) error {
 	return cmd.Start()
 }
 
-func bug(cmd string) {
-	if cmd != "" {
-		println("This module can only be used as single!")
+func bug() {
+	if len(os.Args) > 2 {
+		println("error: invalid command: " + os.Args[2])
 		return
 	}
 	err := open_url("https://github.com/jule-lang/jule/issues/new?assignees=&labels=bug&template=bug-report.md&title=bug%3A+parser+generates+wrong+variable+declaration")
@@ -144,13 +142,17 @@ func list_horizontal_slice(s []string) string {
 	return lst[1 : len(lst)-1]
 }
 
-func tool(cmd string) {
-	if cmd == "" {
+func tool() {
+	if len(os.Args) == 2 {
 		println(`tool commands:
  distos     Lists all supported operating systems
  distarch   Lists all supported architects`)
 		return
+	} else if len(os.Args) > 3 {
+		println("error: invalid command: " + os.Args[3])
+		return
 	}
+	cmd := os.Args[2]
 	switch cmd {
 	case "distos":
 		print("supported operating systems:\n ")
@@ -163,19 +165,18 @@ func tool(cmd string) {
 	}
 }
 
-func process_command(namespace, cmd string) bool {
-	cmd = strings.TrimSpace(cmd)
-	switch namespace {
+func process_command() bool {
+	switch os.Args[1] {
 	case CMD_HELP:
-		help(cmd)
+		help()
 	case CMD_VERSION:
-		version(cmd)
+		version()
 	case CMD_DOC:
-		doc(cmd)
+		doc()
 	case CMD_BUG:
-		bug(cmd)
+		bug()
 	case CMD_TOOL:
-		tool(cmd)
+		tool()
 	default:
 		return false
 	}
@@ -205,17 +206,7 @@ func init() {
 	if len(os.Args) < 2 {
 		os.Exit(0)
 	}
-	var sb strings.Builder
-	for _, arg := range os.Args[1:] {
-		sb.WriteString(" " + arg)
-	}
-	os.Args[0] = sb.String()[1:]
-	arg := os.Args[0]
-	i := strings.Index(arg, " ")
-	if i == -1 {
-		i = len(arg)
-	}
-	if process_command(arg[:i], arg[i:]) {
+	if process_command() {
 		os.Exit(0)
 	}
 }
@@ -375,73 +366,60 @@ func do_spell(cpp string) {
 	}
 }
 
-func get_arg(i *int, runes []rune) (arg string, content string) {
-	first := *i
-	for ; *i < len(runes); *i++ {
-		r := runes[*i]
+func get_arg(i *int) (arg string, content string) {
+	for ; *i < len(os.Args); *i++ {
+		arg = os.Args[*i]
+		j := 0
+		runes := []rune(arg)
+		r := runes[j]
 		if r != '-' {
+			content += arg
+			arg = "" // Forget argument
 			continue
 		}
-		j := *i
-		*i++
-		if *i >= len(runes) {
-			println("error: undefined syntax: " + string(runes[j:]))
+		j++
+		if j >= len(runes) {
+			println("error: undefined syntax: " + arg)
 			os.Exit(0)
 		}
-		r = runes[*i]
+		r = runes[j]
 		if r == '-' {
-			*i++
-			if *i >= len(runes) {
-				println("error: undefined syntax: " + string(runes[j:]))
+			j++
+			if j >= len(runes) {
+				println("error: undefined syntax: " + arg)
 				os.Exit(0)
 			}
-			r = runes[*i]
+			r = runes[j]
 		}
 		if !lex.IsIdentifierRune(string(r)) {
-			println("error: undefined syntax: " + string(runes[j:]))
+			println("error: undefined syntax: " + arg)
 			os.Exit(0)
 		}
-		*i++
-		for ; *i < len(runes); *i++ {
-			r = runes[*i]
-			if lex.IsSpace(byte(r)) {
-				break
-			} else if !lex.IsLetter(r) && !lex.IsDecimal(byte(r)) &&
-				r != '_' && r != '-' {
+		j++
+		for ; j < len(runes); j++ {
+			r = runes[j]
+			if !lex.IsSpace(byte(r)) && !lex.IsLetter(r) && 
+				!lex.IsDecimal(byte(r)) && r != '_' && r != '-' {
 				println("error: undefined syntax: " + string(runes[j:]))
 				os.Exit(0)
 			}
 		}
-		arg = string(runes[j:*i])
-		content = string(runes[first:j])
-		return
+		break
 	}
-	content = string(runes[first:])
 	return
 }
 
-func get_arg_value(i *int, runes []rune) string {
-	first := -1
-	for ; *i < len(runes); *i++ {
-		r := runes[*i]
-		if lex.IsSpace(byte(r)) {
-			if first != -1 {
-				return string(runes[first:*i])
-			}
-			continue
-		}
-		if first == -1 {
-			first = *i
-		}
+func get_arg_value(i *int) string {
+	*i++ // Argument value is the next argument
+	if *i < len(os.Args) {
+		arg := os.Args[*i]
+		return arg
 	}
-	if first == -1 {
-		return ""
-	}
-	return string(runes[first:])
+	return ""
 }
 
-func parse_compiler_arg(i *int, runes []rune) {
-	value := get_arg_value(i, runes)
+func parse_compiler_arg(i *int) {
+	value := get_arg_value(i)
 	if value == "" {
 		println("error: missing argument value: -c --compiler")
 		os.Exit(0)
@@ -459,12 +437,11 @@ func parse_compiler_arg(i *int, runes []rune) {
 	}
 }
 
-func parse_arguments(cmd string) string {
-	runes := []rune(cmd)
-	cmd = ""
-	i := 0
-	for ; i < len(runes); i++ {
-		arg, content := get_arg(&i, runes)
+func parse_arguments() string {
+	cmd := ""
+	i := 1 // Start 1 because the index 0 is a path, not an argument
+	for ; i < len(os.Args); i++ {
+		arg, content := get_arg(&i)
 		cmd += content
 		switch arg {
 		case "":
@@ -473,7 +450,7 @@ func parse_arguments(cmd string) string {
 		case "-c", "--compile":
 			mode = mode_compile
 		case "--compiler":
-			parse_compiler_arg(&i, runes)
+			parse_compiler_arg(&i)
 		default:
 			println("error: undefined argument: " + arg)
 			os.Exit(0)
@@ -484,8 +461,7 @@ func parse_arguments(cmd string) string {
 }
 
 func main() {
-	cmd := os.Args[0]
-	cmd = parse_arguments(cmd)
+	cmd := parse_arguments()
 	if cmd == "" {
 		println("error: missing compile path")
 		return
