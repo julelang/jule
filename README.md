@@ -27,17 +27,17 @@ It also has a reference compiler with obsessions that encourage developers to bu
 + Performance-critical software
 + Memory safety
 + Immutability by default
-+ As efficient and performance as C++
++ As efficient and performant as C++
 + High C++ interoperability
 
 <h2 id="what-is-julec">What is JuleC?</h2>
 JuleC is the name of the reference compiler for the Jule programming language.
 It is the original compiler of the Jule programming language.
-The features that JuleC has is a representation of the official and must-have features of the Jule programming language.
+The features that JuleC has represent the official and must-have features of the Jule programming language.
 This is sort of a standard for the Jule programming language and represents the minimum competency that unofficial compilers should have.
 
 <h2 id="memory-safety">Memory Safety and Management</h2>
-The memory safety and the memory management is a major challenge in the C and C++ or similar programming languages.
+Memory safety and memory management is a major challenge in C , C++ and similar programming languages.
 Jule has a reference-based memory management design to solve these issues.
 Jule guarantees memory safety and uses reference counting for memory management.
 An account-allocation is automatically released as soon as the reference count reaches zero.
@@ -54,15 +54,15 @@ Jule is designed to be interoperable with C++.
 A C++ header file dependency can be added to the Jule code and its functions can be linked.
 It's pretty easy to write C++ code that is compatible with the Jule code compiled by the compiler.
 JuleC keeps all the C++ code it uses for Jule in its <a href="https://github.com/julelang/jule/tree/main/api">api</a> directory.
-With the help of this API, it is very easy to write C++ codes that can be fully integrated into Jule.
+With the help of this API, it is very easy to write C++ code that can be fully integrated into Jule.
 <ol></ol> <!-- for space -->
 <img src="./docs/images/cpp_interop.png"/>
 
 <h2 id="future-changes">Future Changes</h2>
-JuleC is in early development and currently iy can only be built from source.
+JuleC is in early development and currently it can only be built from source.
 However, despite being in the early development stage, many algorithms (<a href="https://github.com/julelang/jule/tree/main/std">see the standard library</a>) can be successfully implemented.
 It is planned to rewrite the compiler with Jule after reference compiler and standard library reaches sufficient maturity.
-JuleC has or is very close to many of the things Jule was intended to have, such as memory safety, properties, structures with methods and generics.
+JuleC has or is very close to having many of the things Jule was intended to have, such as memory safety, properties, structures with methods and generics.
 <br><br>
 A release is not expected until JuleC itself is developed with the Jule programming language.
 The syntax and language design of the Jule programming language has emerged and is not expected to undergo major changes.
@@ -71,7 +71,7 @@ This will be a change that will cause the official compiler's project structure 
 The reference compiler will probably use the standard library a lot.
 This will also allow developers to quickly develop tools for the language by leveraging Jule's standard library.
 <br><br>
-There is an idea to include a package manager in JuleC as well, although it doesn't have it yet.
+There is an idea to include a package manager in JuleC as well, although it doesn't have one yet.
 Jule's modern understanding of language and convenience suggests that there should be a package manager that comes with the compiler.
 This package manager will provide management of non-standard library packages developed and published by the community.
 Jule's standard library only gets updates with compiler releases.
@@ -88,7 +88,7 @@ or etc.) are almost complete and are not expected to undergo major changes.
 All documentation about Jule and JuleC is on the website. <br>
 [See Documentations](https://julelang.github.io/website/pages/docs.html)
 <br><br>
-To contribute website, documentations or something else, please use the <a href="https://github.com/julelang/website">website repository</a>.
+To contribute to the website, documentations or something else, please use the <a href="https://github.com/julelang/website">website repository</a>.
 
 <h2 id="os-support">Compiler and C++ Standard Support</h2>
 JuleC officially supports some C++ compilers.
@@ -100,7 +100,7 @@ Jule's ideal C++ standard is determined by the most ideal C++ standard, fully su
 <br><br>
 If you are getting a compiler error even though you are using the officially supported compiler and standard, please let us know with the <a href="https://github.com/julelang/jule/issues">Jule Issue Tracker</a>.
 If you are trying to use a standard or compiler that is not officially supported, you can still contact us to find out about the problem.
-But keep in mind that since it's out of official support, it's likely that the maintainers won't take the effort to fix it.
+But keep in mind that since it's out of official support, it's likely that the maintainers won't make the effort to fix it.
 <br><br>
 
 [See compiling documentations](https://jule.dev/pages/docs.html?page=compiler-compiling) for supported compilers and C++ standards.
@@ -116,10 +116,10 @@ All supported platforms by JuleC are documented in the <a href="https://jule.dev
 > [Website documentation](https://julelang.github.io/website/pages/docs.html?page=getting-started-install-from-source) for install from source.
 
 There are scripts prepared for compiling of JuleC. <br>
-These scripts are written to run from the home directory.
+These scripts are written to run from the home directory:
 
-`build` scripts used for compile. <br>
-`brun` scripts used for compile and execute if compiling is successful.
++ `build`: scripts used for compile. <br>
++ `brun`: scripts used for compile and execute if compiling is successful.
 
 [Go to scripts directory](scripts)
 
@@ -129,12 +129,12 @@ JuleC is in development with the [Go](https://github.com/golang/go) programming 
 ### Building with Go Compiler
 
 #### Windows - PowerShell
-```
+```powershell
 go build -o julec.exe -v cmd/julec/main.go
 ```
 
 #### Linux - Bash
-```
+```bash
 go build -o julec -v cmd/julec/main.go
 ```
 
@@ -180,8 +180,8 @@ Thanks for you want contributing to Jule!
 Every contribution, big or small, to Jule is greatly appreciated.
 <br><br>
 The Jule project use issues for only bug reports and proposals. <br>
-To contribute, please read the contribution guidelines from <a href="https://julelang.github.io/website/pages/contributing.html">here</a>. <br>
-To discussions and questions, please use <a href="https://github.com/julelang/jule/discussions">discussions</a>.
+To contribute, please read the [contribution guidelines](https://julelang.github.io/website/pages/contributing.htm). <br>
+To discussions and ask questions, please use [discussions](https://github.com/julelang/jule/discussions).
 
 <h2 id="code-of-conduct">Code of Conduct</h2>
 
