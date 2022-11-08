@@ -180,7 +180,7 @@ Thanks for you want contributing to Jule!
 Every contribution, big or small, to Jule is greatly appreciated.
 <br><br>
 The Jule project use issues for only bug reports and proposals. <br>
-To contribute, please read the [contribution guidelines](https://julelang.github.io/website/pages/contributing.htm). <br>
+To contribute, please read the [contribution guidelines](https://julelang.github.io/website/pages/contributing.html). <br>
 To discussions and ask questions, please use [discussions](https://github.com/julelang/jule/discussions).
 
 <h2 id="code-of-conduct">Code of Conduct</h2>
