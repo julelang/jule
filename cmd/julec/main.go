@@ -56,7 +56,7 @@ var HELP_MAP = [...][2]string{
 
 func help() {
 	if len(os.Args) > 2 {
-		println("error: invalid command: " + os.Args[2])
+		print_error_message("invalid command: " + os.Args[2])
 		return
 	}
 	max := len(HELP_MAP[0][0])
@@ -77,9 +77,17 @@ func help() {
 	println(sb.String()[:sb.Len()-1])
 }
 
+func print_error_message(msg string) { println(msg) }
+
+func exit_err(msg string) {
+	print_error_message(msg)
+	const ERROR_EXIT_CODE = 0
+	os.Exit(ERROR_EXIT_CODE)
+}
+
 func version() {
 	if len(os.Args) > 2 {
-		println("error: invalid command: " + os.Args[2])
+		print_error_message("invalid command: " + os.Args[2])
 		return
 	}
 	println("julec version", jule.VERSION)
@@ -93,12 +101,12 @@ func doc() {
 			continue
 		}
 		if print_logs(p) {
-			fmt.Println(jule.GetError("doc_couldnt_generated", path))
+			print_error_message(jule.GetError("doc_couldnt_generated", path))
 			continue
 		}
 		docjson, err := documenter.Doc(p)
 		if err != nil {
-			fmt.Println(jule.GetError("error", err.Error()))
+			print_error_message(err.Error())
 			continue
 		}
 		// Remove SrcExt from path
@@ -128,12 +136,12 @@ func open_url(url string) error {
 
 func bug() {
 	if len(os.Args) > 2 {
-		println("error: invalid command: " + os.Args[2])
+		print_error_message("invalid command: " + os.Args[2])
 		return
 	}
 	err := open_url("https://github.com/jule-lang/jule/issues/new?assignees=&labels=bug&template=bug-report.md&title=bug%3A+parser+generates+wrong+variable+declaration")
 	if err != nil {
-		fmt.Println(err.Error())
+		print_error_message(err.Error())
 	}
 }
 
@@ -149,7 +157,7 @@ func tool() {
  distarch   Lists all supported architects`)
 		return
 	} else if len(os.Args) > 3 {
-		println("error: invalid command: " + os.Args[3])
+		print_error_message("invalid command: " + os.Args[3])
 		return
 	}
 	cmd := os.Args[2]
@@ -161,7 +169,7 @@ func tool() {
 		print("supported architects:\n ")
 		println(list_horizontal_slice(jule.DISTARCH))
 	default:
-		println("Undefined command: " + cmd)
+		print_error_message("Undefined command: " + cmd)
 	}
 }
 
@@ -186,13 +194,11 @@ func process_command() bool {
 func init() {
 	execp, err := os.Executable()
 	if err != nil {
-		println(err.Error())
-		os.Exit(0)
+		exit_err(err.Error())
 	}
 	jule.WORKING_PATH, err = os.Getwd()
 	if err != nil {
-		println(err.Error())
-		os.Exit(0)
+		exit_err(err.Error())
 	}
 	execp = filepath.Dir(execp)
 	jule.EXEC_PATH = execp
@@ -298,18 +304,15 @@ func write_output(path, content string) {
 	dir := filepath.Dir(path)
 	err := os.MkdirAll(dir, 0o777)
 	if err != nil {
-		println(err.Error())
-		os.Exit(0)
+		exit_err(err.Error())
 	}
 	f, err := os.Create(path)
 	if err != nil {
-		println(err.Error())
-		os.Exit(0)
+		exit_err(err.Error())
 	}
 	_, err = f.WriteString(content)
 	if err != nil {
-		println(err.Error())
-		os.Exit(0)
+		exit_err(err.Error())
 	}
 }
 
@@ -379,29 +382,25 @@ func get_arg(i *int) (arg string, content string) {
 		}
 		j++
 		if j >= len(runes) {
-			println("error: undefined syntax: " + arg)
-			os.Exit(0)
+			exit_err("undefined syntax: " + arg)
 		}
 		r = runes[j]
 		if r == '-' {
 			j++
 			if j >= len(runes) {
-				println("error: undefined syntax: " + arg)
-				os.Exit(0)
+				exit_err("undefined syntax: " + arg)
 			}
 			r = runes[j]
 		}
 		if !lex.IsIdentifierRune(string(r)) {
-			println("error: undefined syntax: " + arg)
-			os.Exit(0)
+			exit_err("undefined syntax: " + arg)
 		}
 		j++
 		for ; j < len(runes); j++ {
 			r = runes[j]
 			if !lex.IsSpace(byte(r)) && !lex.IsLetter(r) && 
 				!lex.IsDecimal(byte(r)) && r != '_' && r != '-' {
-				println("error: undefined syntax: " + string(runes[j:]))
-				os.Exit(0)
+				exit_err("undefined syntax: " + string(runes[j:]))
 			}
 		}
 		break
@@ -421,8 +420,7 @@ func get_arg_value(i *int) string {
 func parse_compiler_arg(i *int) {
 	value := get_arg_value(i)
 	if value == "" {
-		println("error: missing argument value: -c --compiler")
-		os.Exit(0)
+		exit_err("missing argument value: -c --compiler")
 	}
 	switch value {
 	case compiler_clang:
@@ -432,8 +430,7 @@ func parse_compiler_arg(i *int) {
 		compiler = value
 		compiler_path = compiler_path_gcc
 	default:
-		println("error: invalid argument value: " + value)
-		os.Exit(0)
+		exit_err("invalid argument value: " + value)
 	}
 }
 
@@ -452,8 +449,7 @@ func parse_arguments() string {
 		case "--compiler":
 			parse_compiler_arg(&i)
 		default:
-			println("error: undefined argument: " + arg)
-			os.Exit(0)
+			exit_err("undefined argument: " + arg)
 		}
 	}
 	cmd = strings.TrimSpace(cmd)
@@ -463,8 +459,7 @@ func parse_arguments() string {
 func main() {
 	cmd := parse_arguments()
 	if cmd == "" {
-		println("error: missing compile path")
-		return
+		exit_err("missing compile path")
 	}
 	t := compile(cmd, true, false, false)
 	if t == nil {
