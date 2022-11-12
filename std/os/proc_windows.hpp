@@ -13,7 +13,7 @@
 // Declarations
 
 std::tuple<str_jt, bool_jt> __julec_getwd() noexcept;
-inline bool_jt __julec_chdir(const slice<u16_jt> &_Path) noexcept;
+inline bool_jt __julec_chdir(const slice_jt<u16_jt> &_Path) noexcept;
 
 // Definitions
 
@@ -27,7 +27,7 @@ std::tuple<str_jt, bool_jt> __julec_getwd() noexcept {
     return ( std::make_tuple<str_jt, bool_jt>( {} , false ) );
 }
 
-inline bool_jt __julec_chdir(const slice<u16_jt> &_Path) noexcept
+inline bool_jt __julec_chdir(const slice_jt<u16_jt> &_Path) noexcept
 { return ( SetCurrentDirectoryW( (const wchar_t*)(&_Path[0]) ) ); }
 
 #endif // #ifndef __JULEC_STD_OS_WINDOWS_HPP
