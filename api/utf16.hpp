@@ -70,7 +70,7 @@ slice_jt<i32_jt> __julec_utf16_decode(const slice_jt<u16_jt> &_S) noexcept {
 }
 
 str_jt __julec_utf16_to_utf8_str(const wchar_t *_WStr,
-                                    const std::size_t _Len) noexcept {
+                                 const std::size_t _Len) noexcept {
     slice_jt<u16_jt> _code_page( _Len );
     for (int_jt _i{ 0 }; _i < _Len; ++_i)
     { _code_page[_i] = static_cast<u16_jt>( _WStr[_i] ); }
@@ -120,7 +120,7 @@ slice_jt<u16_jt> encode(const slice_jt<i32_jt> &_Runes) noexcept {
             ++_n;
         }
     }
-    return ( _a.___slice(0 , _n ) );
+    return ( _a.___slice( 0 , _n ) );
 }
 
 #endif // #ifndef __JULEC_UTF16_HPP

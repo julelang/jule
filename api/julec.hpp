@@ -244,27 +244,22 @@ void __julec_terminate_handler(void) noexcept {
 void __julec_setup_command_line_args(int argc, char *argv[]) noexcept {
 #ifdef _WINDOWS
     const LPWSTR _cmdl{ GetCommandLineW() };
-    wchar_t *_wargs{ _cmdl };
-    const size_t _wargs_len{ std::wcslen(_wargs) };
-    slice_jt<str_jt> _args;
-    int_jt _old{ 0 };
-    for (int_jt _i{ 0 }; _i < _wargs_len; ++_i) {
-        const wchar_t _r{ _wargs[_i] };
-        if (!std::iswspace( _r ))
-        { continue; }
-        else if (_i+1 < _wargs_len && std::iswspace( _wargs[_i+1] ))
-        { continue; }
-        _wargs[_i] = 0;
-        wchar_t *_warg{ _wargs+_old };
-        _old = _i+1;
-        _args.__push( __julec_utf16_to_utf8_str( _warg , std::wcslen( _warg ) ) );
-    }
-    _args.__push( __julec_utf16_to_utf8_str( _wargs+_old , std::wcslen( _wargs+_old ) ) );
-    __julec_command_line_args = _args;
-#else
+    LPWSTR *_argvw{ CommandLineToArgvW( _cmdl , &argc ) };
+#endif // #ifdef _WINDOWS
+
     __julec_command_line_args = slice_jt<str_jt>( argc );
-    for (int_jt _i{ 0 }; _i < argc; ++_i)
-    { __julec_command_line_args[_i] = argv[_i]; }
+    for (int_jt _i{ 0 }; _i < argc; ++_i) {
+#ifdef _WINDOWS
+    const LPWSTR _warg{ _argvw[_i] };
+    __julec_command_line_args[_i] = __julec_utf16_to_utf8_str( _warg ,
+                                                               std::wcslen( _warg ) );
+#else
+    __julec_command_line_args[_i] = argv[_i];
+#endif // #ifdef _WINDOWS
+    }
+
+#ifdef _WINDOWS
+    LocalFree( _argvw );
 #endif // #ifdef _WINDOWS
 }
 
