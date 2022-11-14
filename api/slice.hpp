@@ -14,7 +14,8 @@ class slice_jt {
 public:
     ref_jt<_Item_t> _data{ nil };
     _Item_t *_slice{ nil };
-    uint_jt _n{ 0 };
+    uint_jt _len{ 0 };
+    uint_jt _cap{ 0 };
 
     slice_jt<_Item_t>(void) noexcept {}
     slice_jt<_Item_t>(const std::nullptr_t) noexcept {}
@@ -28,7 +29,7 @@ public:
     slice_jt<_Item_t>(const std::initializer_list<_Item_t> &_Src) noexcept {
         this->__alloc_new( _Src.size() );
         const auto _Src_begin{ _Src.begin() };
-        for (int_jt _i{ 0 }; _i < this->_n; ++_i)
+        for (int_jt _i{ 0 }; _i < this->_len; ++_i)
         { this->_data._alloc[_i] = *(_Item_t*)(_Src_begin+_i); }
     }
 
@@ -57,7 +58,8 @@ public:
         this->_data._alloc = nil;
         this->_data._ref = nil;
         this->_slice = nil;
-        this->_n = 0;
+        this->_len = 0;
+        this->_cap = 0;
     }
 
     void __alloc_new(const int_jt _N) noexcept {
@@ -66,7 +68,8 @@ public:
         if (!_alloc)
         { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
         this->_data = ref_jt<_Item_t>( _alloc );
-        this->_n = _N;
+        this->_len = _N;
+        this->_cap = _N;
         this->_slice = &_alloc[0];
     }
 
@@ -83,11 +86,11 @@ public:
 
     inline constexpr
     iterator end(void) noexcept
-    { return &this->_slice[this->_n]; }
+    { return &this->_slice[this->_len]; }
 
     inline constexpr
     const_iterator end(void) const noexcept
-    { return &this->_slice[this->_n]; }
+    { return &this->_slice[this->_len]; }
 
     inline slice_jt<_Item_t> ___slice(const int_jt &_Start,
                                       const int_jt &_End) const noexcept {
@@ -100,7 +103,8 @@ public:
         slice_jt<_Item_t> _slice;
         _slice._data = this->_data;
         _slice._slice = &this->_slice[_Start];
-        _slice._n = _End-_Start;
+        _slice._len = _End-_Start;
+        _slice._cap = this->_cap-_Start;
         return _slice;
     }
 
@@ -112,29 +116,37 @@ public:
 
     inline constexpr
     int_jt len(void) const noexcept
-    { return ( this->_n ); }
+    { return ( this->_len ); }
+
+    inline constexpr
+    int_jt cap(void) const noexcept
+    { return ( this->_cap ); }
 
     inline bool empty(void) const noexcept
-    { return ( !this->_slice || this->_n == 0 ); }
+    { return ( !this->_slice || this->_len == 0 || this->_cap == 0 ); }
 
     void __push(const _Item_t &_Item) noexcept {
-        _Item_t *_new = new(std::nothrow) _Item_t[this->_n+1];
-        if (!_new)
-        { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
-        for (int_jt _index{ 0 }; _index < this->_n; ++_index)
-        { _new[_index] = this->_data._alloc[_index]; }
-        _new[this->_n] = _Item;
-        delete[] this->_data._alloc;
-        this->_data._alloc = nil;
-        this->_data._alloc = _new;
-        this->_slice = this->_data._alloc;
-        ++this->_n;
+        if (this->_len == this->_cap) {
+            _Item_t *_new{ new(std::nothrow) _Item_t[this->_len+1] };
+            if (!_new)
+            { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
+            for (int_jt _index{ 0 }; _index < this->_len; ++_index)
+            { _new[_index] = this->_data._alloc[_index]; }
+            _new[this->_len] = _Item;
+            delete[] this->_data._alloc;
+            this->_data._alloc = nil;
+            this->_data._alloc = _new;
+            this->_slice = this->_data._alloc;
+        } else {
+            this->_slice[this->_len] = _Item;
+        }
+        ++this->_len;
     }
 
     bool operator==(const slice_jt<_Item_t> &_Src) const noexcept {
-        if (this->_n != _Src._n)
+        if (this->_len != _Src._len)
         { return false; }
-        for (int_jt _index{ 0 }; _index < this->_n; ++_index) {
+        for (int_jt _index{ 0 }; _index < this->_len; ++_index) {
             if (this->_slice[_index] != _Src._slice[_index])
             { return ( false ); }
         }
@@ -165,7 +177,8 @@ public:
 
     void operator=(const slice_jt<_Item_t> &_Src) noexcept {
         this->__dealloc();
-        this->_n = _Src._n;
+        this->_len = _Src._len;
+        this->_cap = _Src._cap;
         this->_data = _Src._data;
         this->_slice = _Src._slice;
     }
@@ -176,9 +189,9 @@ public:
     friend std::ostream &operator<<(std::ostream &_Stream,
                                     const slice_jt<_Item_t> &_Src) noexcept {
         _Stream << '[';
-        for (int_jt _index{ 0 }; _index < _Src._n;) {
+        for (int_jt _index{ 0 }; _index < _Src._len;) {
             _Stream << _Src._slice[_index++];
-            if (_index < _Src._n)
+            if (_index < _Src._len)
             { _Stream << ' '; }
         }
         _Stream << ']';

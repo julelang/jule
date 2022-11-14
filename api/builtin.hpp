@@ -19,7 +19,7 @@ int_jt JULEC_ID(copy)(const slice_jt<_Item_t> &_Dest,
                       const slice_jt<_Item_t> &_Src) noexcept;
 template<typename _Item_t>
 slice_jt<_Item_t> JULEC_ID(append)(const slice_jt<_Item_t> &_Src,
-                                const slice_jt<_Item_t> &_Components) noexcept;
+                                   const slice_jt<_Item_t> &_Components) noexcept;
 template<typename T>
 inline ref_jt<T> JULEC_ID(new)(void) noexcept;
 
@@ -57,7 +57,7 @@ int_jt JULEC_ID(copy)(const slice_jt<_Item_t> &_Dest,
 
 template<typename _Item_t>
 slice_jt<_Item_t> JULEC_ID(append)(const slice_jt<_Item_t> &_Src,
-                                const slice_jt<_Item_t> &_Components) noexcept {
+                                   const slice_jt<_Item_t> &_Components) noexcept {
     const int_jt _N{ _Src.len() + _Components.len() };
     slice_jt<_Item_t> _buffer( _N );
     JULEC_ID(copy)<_Item_t>( _buffer, _Src );
