@@ -207,6 +207,15 @@ func init() {
 	juleapi.JULEC_HEADER = filepath.Join(juleapi.JULEC_HEADER, "julec.hpp")
 	jule.LOCALIZATION_PATH = filepath.Join(jule.EXEC_PATH, jule.LOCALIZATIONS)
 
+	// Configure compiler to default by platform
+	if runtime.GOOS == "windows" {
+		compiler = compiler_gcc
+		compiler_path = compiler_path_gcc
+	} else {
+		compiler = compiler_clang
+		compiler_path = compiler_path_clang
+	}
+
 	// Not started with arguments.
 	// Here is "2" but "os.Args" always have one element for store working directory.
 	if len(os.Args) < 2 {
@@ -252,14 +261,6 @@ func check_compiler() {
 }
 
 func set() {
-	if runtime.GOOS == "windows" {
-		compiler = compiler_gcc
-		compiler_path = compiler_path_gcc
-	} else {
-		compiler = compiler_clang
-		compiler_path = compiler_path_clang
-	}
-
 	load_localization()
 	check_mode()
 	check_compiler()
@@ -369,7 +370,7 @@ func do_spell(cpp string) {
 	}
 }
 
-func get_arg(i *int) (arg string, content string) {
+func get_option(i *int) (arg string, content string) {
 	for ; *i < len(os.Args); *i++ {
 		arg = os.Args[*i]
 		j := 0
@@ -408,7 +409,7 @@ func get_arg(i *int) (arg string, content string) {
 	return
 }
 
-func get_arg_value(i *int) string {
+func get_option_value(i *int) string {
 	*i++ // Argument value is the next argument
 	if *i < len(os.Args) {
 		arg := os.Args[*i]
@@ -417,28 +418,27 @@ func get_arg_value(i *int) string {
 	return ""
 }
 
-func parse_compiler_arg(i *int) {
-	value := get_arg_value(i)
+func parse_compiler_option(i *int) {
+	value := get_option_value(i)
 	if value == "" {
-		exit_err("missing argument value: -c --compiler")
+		exit_err("missing option value: --compiler")
 	}
 	switch value {
 	case compiler_clang:
-		compiler = value
 		compiler_path = compiler_path_clang
 	case compiler_gcc:
-		compiler = value
 		compiler_path = compiler_path_gcc
 	default:
-		exit_err("invalid argument value: " + value)
+		exit_err("invalid option value for --compiler: " + value)
 	}
+	compiler = value
 }
 
-func parse_arguments() string {
+func parse_options() string {
 	cmd := ""
-	i := 1 // Start 1 because the index 0 is a path, not an argument
+	i := 1 // Start 1 because the index 0 is a path, not an command-line argument
 	for ; i < len(os.Args); i++ {
-		arg, content := get_arg(&i)
+		arg, content := get_option(&i)
 		cmd += content
 		switch arg {
 		case "":
@@ -447,9 +447,9 @@ func parse_arguments() string {
 		case "-c", "--compile":
 			mode = mode_compile
 		case "--compiler":
-			parse_compiler_arg(&i)
+			parse_compiler_option(&i)
 		default:
-			exit_err("undefined argument: " + arg)
+			exit_err("undefined option: " + arg)
 		}
 	}
 	cmd = strings.TrimSpace(cmd)
@@ -457,7 +457,7 @@ func parse_arguments() string {
 }
 
 func main() {
-	cmd := parse_arguments()
+	cmd := parse_options()
 	if cmd == "" {
 		exit_err("missing compile path")
 	}
