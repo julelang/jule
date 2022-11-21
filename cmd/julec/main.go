@@ -5,7 +5,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -231,14 +230,14 @@ func load_localization() {
 	if lang == "" || lang == "default" {
 		return
 	}
-	path := filepath.Join(jule.LOCALIZATION_PATH, lang+".json")
+	path := filepath.Join(jule.LOCALIZATION_PATH, lang+".ini")
 	bytes, err := os.ReadFile(path)
 	if err != nil {
 		println("Language couldn't loaded (uses default);")
 		println(err.Error())
 		return
 	}
-	err = json.Unmarshal(bytes, &jule.ERRORS)
+	err = jule.DecodeLocalization(string(bytes), &jule.ERRORS)
 	if err != nil {
 		println("Language's errors couldn't loaded (uses default);")
 		println(err.Error())
