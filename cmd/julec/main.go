@@ -42,14 +42,12 @@ var compiler_path = ""
 const CMD_HELP = "help"
 const CMD_VERSION = "version"
 const CMD_DOC = "doc"
-const CMD_BUG = "bug"
 const CMD_TOOL = "tool"
 
 var HELP_MAP = [...][2]string{
 	{CMD_HELP, "Show help"},
 	{CMD_VERSION, "Show version"},
 	{CMD_DOC, "Documentize Jule source code"},
-	{CMD_BUG, "Start a new bug report"},
 	{CMD_TOOL, "Tools for effective Jule"},
 }
 
@@ -133,17 +131,6 @@ func open_url(url string) error {
 	return cmd.Start()
 }
 
-func bug() {
-	if len(os.Args) > 2 {
-		print_error_message("invalid command: " + os.Args[2])
-		return
-	}
-	err := open_url("https://github.com/jule-lang/jule/issues/new?assignees=&labels=bug&template=bug-report.md&title=bug%3A+parser+generates+wrong+variable+declaration")
-	if err != nil {
-		print_error_message(err.Error())
-	}
-}
-
 func list_horizontal_slice(s []string) string {
 	lst := fmt.Sprint(s)
 	return lst[1 : len(lst)-1]
@@ -180,8 +167,6 @@ func process_command() bool {
 		version()
 	case CMD_DOC:
 		doc()
-	case CMD_BUG:
-		bug()
 	case CMD_TOOL:
 		tool()
 	default:
