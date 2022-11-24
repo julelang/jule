@@ -16,9 +16,10 @@ If you're using an older version and newer versions don't have issues to report,
 Make sure the issue you are reporting is not publicly listed. If you see it publicly on the [Jule Issue Tracker](https://github.com/julelang/jule/issues), this issue is known already.
 
 You can see all past security code names and other information in the project [security](https://github.com/orgs/julelang/projects/4).
-To make it easier, you can follow all the problems here.
-A public issue is shown as a direct issue, but if there is a non-public issue you will probably only see the codename.
-Non-public issues become public after they are fixed.
+You can check all the current/past vulnerabilities on the links above.\
+A public issue is shown as a direct issue, but if there's a non-public issue, you will probably see the codename only.
+
+Non-public issues will become public later on after they are 100% fixed.
 
 ### Classification
 
