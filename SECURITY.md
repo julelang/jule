@@ -41,10 +41,13 @@ Please send an email to security@jule.dev explaining everything you know about v
 
 ## Patch Process
 
-First of all, when a security issue is received, the validity of the issue is checked.
-If the vulnerability is valid, a codename is assigned.
-The code-named issue is listed in the project [security](https://github.com/orgs/julelang/projects/4).
+First of all, when a security issue is received, the validity of the issue is checked.\
+If the vulnerability is valid, a codename is assigned to that vulnerability.
+
+The code-named issue will be listed in the [security](https://github.com/orgs/julelang/projects/4) project.\
 Then the related problems are tried to be solved. When the problem is resolved, they are published with the closest version.
+
+If you'd like to support us with solving a security vulnerability you've found, feel free to contact us at security@jule.dev.
 
 ## Receiving Security Updates
 
