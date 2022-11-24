@@ -10,9 +10,10 @@ When there are security issues, patches for these vulnerabilities are released i
 
 ## Reporting a Vulnerability
 
-Before reporting an issue, make sure you are using the most current version of JuleC.
+Before reporting an issue, make sure you are using the most current version of JuleC.\
 If you're using an older version and newer versions don't have issues to report, it's unlikely that anything can be done about it.
-Make sure the issue you are reporting is not publicly listed, if you see it publicly on the [Jule Issue Tracker](https://github.com/julelang/jule/issues) then this issue is known.
+
+Make sure the issue you are reporting is not publicly listed. If you see it publicly on the [Jule Issue Tracker](https://github.com/julelang/jule/issues), this issue is known already.
 
 You can see all past security code names and other information in the project [security](https://github.com/orgs/julelang/projects/4).
 To make it easier, you can follow all the problems here.
