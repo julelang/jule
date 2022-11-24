@@ -5,7 +5,7 @@ This document discusses how security issues are handled and how they can be repo
 
 ## Supported Versions
 
-Jule always supports the latest version.
+Jule always supports the latest version.\
 When there are security issues, patches for these vulnerabilities are released in the form of minor versions of the main version.
 
 ## Reporting a Vulnerability
