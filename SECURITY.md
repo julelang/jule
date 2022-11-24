@@ -31,7 +31,8 @@ These issues should not be publicly tracked.
 ### Creating Security Report
 
 If you report using [Jule Issue Tracker](https://github.com/julelang/jule/issues), you should use the security report form.
-Please don't forget to share any information you have regarding the security issue.
+
+Please don't forget to share any information you have regarding the security issue.\
 Reporting all the details will be helpful in solving the problem and speeding up the process.
 
 Some security issues should not be shared publicly.
