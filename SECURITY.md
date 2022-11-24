@@ -1,6 +1,6 @@
 # Jule Security Policy
 
-The security policy of Jule.
+The security policy of Jule.\
 This document discusses how security issues are handled and how they can be reported.
 
 ## Supported Versions
