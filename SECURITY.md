@@ -15,7 +15,7 @@ If you're using an older version and newer versions don't have issues to report,
 
 Make sure the issue you are reporting is not publicly listed. If you see it publicly on the [Jule Issue Tracker](https://github.com/julelang/jule/issues), this issue is known already.
 
-You can see all past security code names and other information in the project [security](https://github.com/orgs/julelang/projects/4).
+You can see all past security codenames and other information in the project [security](https://github.com/orgs/julelang/projects/4).
 You can check all the current/past vulnerabilities on the links above.\
 A public issue is shown as a direct issue, but if there's a non-public issue, you will probably see the codename only.
 
@@ -23,7 +23,7 @@ Non-public issues will become public later on after they are 100% fixed.
 
 ### Classification
 
-+ **Risky**: They are security issues that pose a risk but that can be followed publicly and that do not have a critical impact and minor or do not create significant vulnerabilities.
++ **Moderate**: They are security issues that pose a risk but that can be followed publicly and that do not have a critical impact and minor or do not create significant vulnerabilities.
 
 + **Critical**: Critical issues are critical, high priority security issues that can disrupt the Jule ecosystem and leave all or most software in that ecosystem vulnerable.
 These issues should not be publicly tracked.
