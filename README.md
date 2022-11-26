@@ -115,63 +115,30 @@ All supported platforms by JuleC are documented in the <a href="https://jule.dev
 
 > [Website documentation](https://julelang.github.io/website/pages/docs.html?page=getting-started-install-from-source) for install from source.
 
-There are scripts prepared for compiling of JuleC. <br>
-These scripts are written to run from the home directory:
+When you enter the directory where the source code is located, you can find some compilation scripts for compiling of JuleC. <br>
+These scripts are written to run from the [src](./src) directory:
 
 + `build`: scripts used for compile. <br>
 + `brun`: scripts used for compile and execute if compiling is successful.
-
-[Go to scripts directory](scripts)
 
 JuleC aims to have a single main build file. <br>
 JuleC is in development with the [Go](https://github.com/golang/go) programming language. <br>
 
 ### Building with Go Compiler
 
-#### Windows - PowerShell
+> In main directory.
+
+#### Windows (PowerShell)
 ```powershell
-go build -o julec.exe -v cmd/julec/main.go
+go build -o julec.exe -v src\cmd\julec\main.go
 ```
 
-#### Linux - Bash
+#### Linux (Bash)
 ```bash
-go build -o julec -v cmd/julec/main.go
+go build -o julec -v src/cmd/julec/main.go
 ```
 
 Run the above command in your terminal, in the Jule project directory.
-
-<h2 id="project-build-state">Project Build State</h2>
-
-<table>
-    <tr>
-        <td><strong>Operating System</strong></td>
-        <td><strong>State</strong></td>
-    </tr>
-    <tr>
-        <td>Windows</td>
-        <td>
-            <a href="https://github.com/julelang/jule/actions/workflows/windows.yml">
-                <img src="https://github.com/julelang/jule/actions/workflows/windows.yml/badge.svg")>
-            </a>
-        </td>
-    </tr>
-    <tr>
-        <td>Ubuntu</td>
-        <td>
-            <a href="https://github.com/julelang/jule/actions/workflows/ubuntu.yml">
-                <img src="https://github.com/julelang/jule/actions/workflows/ubuntu.yml/badge.svg")>
-            </a>
-        </td>
-    </tr>
-    <tr>
-        <td>Darwin</td>
-        <td>
-            <a href="https://github.com/julelang/jule/actions/workflows/darwin.yml">
-                <img src="https://github.com/julelang/jule/actions/workflows/darwin.yml/badge.svg")>
-            </a>
-        </td>
-    </tr>
-</table>
 
 <h2 id="contributing">Contributing</h2>
 
@@ -181,7 +148,8 @@ Every contribution, big or small, to Jule is greatly appreciated.
 <br><br>
 The Jule project use issues for only bug reports and proposals. <br>
 To contribute, please read the [contribution guidelines](https://julelang.github.io/website/pages/contributing.html). <br>
-To discussions and ask questions, please use [discussions](https://github.com/julelang/jule/discussions).
+To discussions and ask questions, please use [discussions](https://github.com/julelang/jule/discussions). <br>
+Regarding security, please refer to the [security policy](SECURITY.md).
 
 <h2 id="code-of-conduct">Code of Conduct</h2>
 

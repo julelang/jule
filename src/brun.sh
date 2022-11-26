@@ -4,15 +4,14 @@
 # license that can be found in the LICENSE file.
 
 if [ -f cmd/julec/main.go ]; then
-  MAIN_FILE="cmd/julec/main.go"
+  go build -o ../bin/julec -v cmd/julec/main.go
 else
-  MAIN_FILE="../cmd/julec/main.go"
+  echo "error: working directory is not source directory"
+  exit
 fi
 
-go build -o julec -v $MAIN_FILE
-
 if [ $? -eq 0 ]; then
-  ./julec $@
+  ../bin/julec $@
 else
   echo "-----------------------------------------------------------------------"
   echo "An unexpected error occurred while compiling JuleC. Check errors above."

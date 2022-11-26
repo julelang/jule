@@ -4,16 +4,17 @@
 
 @echo off
 
-if exist .\julec.exe ( del /f julec.exe )
+if exist ..\bin\julec.exe ( del /f ..\bin\julec.exe )
 
 if exist cmd\julec\main.go (
-  go build -o julec.exe -v cmd\julec\main.go
+  go build -o ..\bin\julec.exe -v cmd\julec\main.go
 ) else (
-  go build -o julec.exe -v ..\cmd\julec\main.go
+  echo error: working directory is not source directory
+  exit /b
 )
 
-if exist .\julec.exe (
-  .\julec.exe %*
+if exist ..\bin\julec.exe (
+  ..\bin\julec.exe %*
 ) else (
   echo -----------------------------------------------------------------------
   echo An unexpected error occurred while compiling JuleC. Check errors above.

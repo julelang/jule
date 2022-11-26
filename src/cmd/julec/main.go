@@ -30,7 +30,7 @@ const compiler_clang = "clang"
 const compiler_path_gcc = "g++"
 const compiler_path_clang = "clang++"
 
-var out_dir = "./dist"
+var out_dir = "dist"
 var language = "default"
 var mode = mode_compile
 var out_name = "ir.cpp"
@@ -113,24 +113,6 @@ func doc() {
 	}
 }
 
-func open_url(url string) error {
-	var name string
-	var args []string
-
-	switch runtime.GOOS {
-	case "windows":
-		name = "cmd"
-		args = []string{"/c", "start"}
-	case "darwin":
-		name = "open"
-	default:
-		name = "xdg-open"
-	}
-	args = append(args, url)
-	cmd := exec.Command(name, args...)
-	return cmd.Start()
-}
-
 func list_horizontal_slice(s []string) string {
 	lst := fmt.Sprint(s)
 	return lst[1 : len(lst)-1]
@@ -186,10 +168,13 @@ func init() {
 	}
 	execp = filepath.Dir(execp)
 	jule.EXEC_PATH = execp
-	jule.STDLIB_PATH = filepath.Join(jule.EXEC_PATH, jule.STDLIB)
-	juleapi.JULEC_HEADER = filepath.Join(jule.EXEC_PATH, "api")
+	jule.STDLIB_PATH = filepath.Join(jule.EXEC_PATH, "..")
+	jule.STDLIB_PATH = filepath.Join(jule.STDLIB_PATH, jule.STDLIB)
+	juleapi.JULEC_HEADER = filepath.Join(jule.EXEC_PATH, "..")
+	juleapi.JULEC_HEADER = filepath.Join(juleapi.JULEC_HEADER, "api")
 	juleapi.JULEC_HEADER = filepath.Join(juleapi.JULEC_HEADER, "julec.hpp")
-	jule.LOCALIZATION_PATH = filepath.Join(jule.EXEC_PATH, jule.LOCALIZATIONS)
+	jule.LOCALIZATION_PATH = filepath.Join(jule.EXEC_PATH, "..")
+	jule.LOCALIZATION_PATH = filepath.Join(jule.LOCALIZATION_PATH, jule.LOCALIZATIONS)
 
 	// Configure compiler to default by platform
 	if runtime.GOOS == "windows" {
