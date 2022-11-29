@@ -548,6 +548,12 @@ var sliceDefines = &Defmap{
 			Type: Type{Id: juletype.INT, Kind: juletype.TYPE_MAP[juletype.INT]},
 			Tag:  "len()",
 		},
+		{
+			Pub:  true,
+			Id:   "cap",
+			Type: Type{Id: juletype.INT, Kind: juletype.TYPE_MAP[juletype.INT]},
+			Tag:  "cap()",
+		},
 	},
 	Funcs: []*Fn{
 		{Ast: &Func{
