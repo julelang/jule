@@ -140,12 +140,7 @@ inline ref_jt<T> __julec_new_structure(T *_Ptr);
 template<typename _Obj_t>
 str_jt __julec_to_str(const _Obj_t &_Obj) noexcept;
 void __julec_terminate_handler(void) noexcept;
-// Entry point function of generated Jule code, generates by JuleC.
-void JULEC_ID(main)(void);
-// Package initializer caller function, generates by JuleC.
-void __julec_call_package_initializers(void);
 void __julec_setup_command_line_args(int argc, char *argv[]) noexcept;
-int main(int argc, char *argv[]);
 
 // Definitions
 
@@ -261,21 +256,6 @@ void __julec_setup_command_line_args(int argc, char *argv[]) noexcept {
 #ifdef _WINDOWS
     LocalFree( _argvw );
 #endif // #ifdef _WINDOWS
-}
-
-int main(int argc, char *argv[]) {
-#ifdef _WINDOWS
-    // Windows needs little magic for UTF-8
-    SetConsoleOutputCP( CP_UTF8 );
-    _setmode( _fileno( stdin ) , ( 0x00020000 ) );
-#endif // #ifdef _WINDOWS
-    std::set_terminate( &__julec_terminate_handler );
-    __julec_setup_command_line_args( argc , argv );
-
-    __julec_call_package_initializers();
-    JULEC_ID( main() );
-
-    return ( EXIT_SUCCESS );
 }
 
 #endif // #ifndef __JULEC_HPP

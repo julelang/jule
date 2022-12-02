@@ -267,6 +267,22 @@ func append_standard(code *string) {
 	sb.WriteString(juleapi.JULEC_HEADER)
 	sb.WriteString("\"\n\n")
 	sb.WriteString(*code)
+	sb.WriteString(`
+
+int main(int argc, char *argv[]) {
+#ifdef _WINDOWS
+	// Windows needs little magic for UTF-8
+	SetConsoleOutputCP( CP_UTF8 );
+	_setmode( _fileno( stdin ) , ( 0x00020000 ) );
+#endif // #ifdef _WINDOWS
+	std::set_terminate( &__julec_terminate_handler );
+	__julec_setup_command_line_args( argc , argv );
+
+	__julec_call_package_initializers();
+	JULEC_ID( main() );
+		
+	return ( EXIT_SUCCESS );
+}`)
 	*code = sb.String()
 }
 
