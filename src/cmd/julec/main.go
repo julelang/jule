@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/julelang/jule/documenter"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/parser"
 	"github.com/julelang/jule/pkg/jule"
@@ -41,13 +40,11 @@ var compiler_path = ""
 
 const CMD_HELP = "help"
 const CMD_VERSION = "version"
-const CMD_DOC = "doc"
 const CMD_TOOL = "tool"
 
 var HELP_MAP = [...][2]string{
 	{CMD_HELP, "Show help"},
 	{CMD_VERSION, "Show version"},
-	{CMD_DOC, "Documentize Jule source code"},
 	{CMD_TOOL, "Tools for effective Jule"},
 }
 
@@ -90,29 +87,6 @@ func version() {
 	println("julec version", jule.VERSION)
 }
 
-func doc() {
-	for _, path := range os.Args[2:] {
-		path = strings.TrimSpace(path)
-		p := compile(path, false, true, true)
-		if p == nil {
-			continue
-		}
-		if print_logs(p) {
-			print_error_message(jule.GetError("doc_couldnt_generated", path))
-			continue
-		}
-		docjson, err := documenter.Doc(p)
-		if err != nil {
-			print_error_message(err.Error())
-			continue
-		}
-		// Remove SrcExt from path
-		path = path[:len(path)-len(jule.SRC_EXT)]
-		path = filepath.Join(out_dir, path+jule.DOC_EXT)
-		write_output(path, docjson)
-	}
-}
-
 func list_horizontal_slice(s []string) string {
 	lst := fmt.Sprint(s)
 	return lst[1 : len(lst)-1]
@@ -147,8 +121,6 @@ func process_command() bool {
 		help()
 	case CMD_VERSION:
 		version()
-	case CMD_DOC:
-		doc()
 	case CMD_TOOL:
 		tool()
 	default:
