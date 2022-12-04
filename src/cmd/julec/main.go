@@ -272,6 +272,7 @@ func write_output(path, content string) {
 	if err != nil {
 		exit_err(err.Error())
 	}
+	_ = f.Close()
 }
 
 func compile(path string, main, nolocal, justDefs bool) *parser.Parser {
