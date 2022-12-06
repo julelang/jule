@@ -1,3 +1,3 @@
 # Code of Conduct
 
-Please read the [Jule Community Code of Conduct.](https://julelang.github.io/website/pages/code_of_conduct.html)
+Please read the [Julenour Code of Conduct](https://jule.dev/pages/code_of_conduct.html).
