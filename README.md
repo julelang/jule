@@ -4,9 +4,9 @@
 </p>
 <h1>The Jule Programming Language</h1>
 
-[Website](https://julelang.github.io/website/) |
-[Documentations](https://julelang.github.io/website/pages/docs.html) |
-[Contributing](https://julelang.github.io/website/pages/contributing.html)
+[Website](https://jule.dev) |
+[Documentations](https://jule.dev/pages/docs.html) |
+[Contributing](https://jule.dev/pages/contributing.html)
 
 </strong>
 </div>
@@ -22,13 +22,13 @@ It also has a reference compiler with obsessions that encourage developers to bu
 
 <h2 id="key-features">Design Principles</h2>
 
-+ Simplicity and maintainability
-+ Fast and scalable development
-+ Performance-critical software
-+ Memory safety
-+ Immutability by default
-+ As efficient and performant as C++
-+ High C++ interoperability
+- Simplicity and maintainability
+- Fast and scalable development
+- Performance-critical software
+- Memory safety
+- Immutability by default
+- As efficient and performant as C++
+- High C++ interoperability
 
 <h2 id="what-is-julec">What is JuleC?</h2>
 JuleC is the name of the reference compiler for the Jule programming language.
@@ -115,14 +115,14 @@ All supported platforms by JuleC are documented in the <a href="https://jule.dev
 
 > [Website documentation](https://julelang.github.io/website/pages/docs.html?page=getting-started-install-from-source) for install from source.
 
-When you enter the directory where the source code is located, you can find some compilation scripts for compiling of JuleC. <br>
+When you enter the directory where the source code is located, you can find some compilation scripts for compiling of JuleC. \
 These scripts are written to run from the [src](./src) directory:
 
-+ `build`: scripts used for compile. <br>
-+ `brun`: scripts used for compile and execute if compiling is successful.
+- `build`: scripts used for compile.
+- `brun`: scripts used for compile and execute if compiling is successful.
 
-JuleC aims to have a single main build file. <br>
-JuleC is in development with the [Go](https://github.com/golang/go) programming language. <br>
+JuleC aims to have a single main build file. \
+JuleC is in development with the [Go](https://github.com/golang/go) programming language.
 
 ### Building with Go Compiler
 
@@ -142,18 +142,17 @@ Run the above command in your terminal, in the Jule project directory.
 
 <h2 id="contributing">Contributing</h2>
 
-Thanks for you want contributing to Jule!
-<br>
+Thanks for you want contributing to Jule! \
 Every contribution, big or small, to Jule is greatly appreciated.
-<br><br>
-The Jule project use issues for only bug reports and proposals. <br>
-To contribute, please read the [contribution guidelines](https://julelang.github.io/website/pages/contributing.html). <br>
-To discussions and ask questions, please use [discussions](https://github.com/julelang/jule/discussions). <br>
+
+The Jule project use issues for only bug reports and proposals. \
+To contribute, please read the [contribution guidelines](https://jule.dev/pages/contributing.html). \
+To discussions and ask questions, please use [discussions](https://github.com/julelang/jule/discussions). \
 Regarding security, please refer to the [security policy](SECURITY.md).
 
 <h2 id="code-of-conduct">Code of Conduct</h2>
 
-[See Code of Conduct](https://julelang.github.io/website/pages/code_of_conduct.html)
+[See Julenour Code of Conduct](https://jule.dev/pages/code_of_conduct.html)
 
 <h2 id="license">License</h2>
 
