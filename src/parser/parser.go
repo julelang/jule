@@ -16,7 +16,6 @@ import (
 	"github.com/julelang/jule/pkg/juleio"
 	"github.com/julelang/jule/pkg/julelog"
 	"github.com/julelang/jule/pkg/juletype"
-	"github.com/julelang/jule/preprocessor"
 )
 
 type File = juleio.File
@@ -709,7 +708,6 @@ func (p *Parser) SetupPackage() {
 func (p *Parser) Parset(tree []models.Object, main, justDefines bool) {
 	p.IsMain = main
 	p.JustDefines = justDefines
-	preprocessor.Process(&tree, !main)
 	if !p.parseTree(tree) {
 		return
 	}
@@ -1268,10 +1266,7 @@ func (p *Parser) pushNs(ns *models.Namespace) *namespace {
 
 // Comment parses Jule documentation comments line.
 func (p *Parser) Comment(c models.Comment) {
-	switch {
-	case preprocessor.IsPreprocessorPragma(c.Content):
-		return
-	case strings.HasPrefix(c.Content, jule.PRAGMA_COMMENT_PREFIX):
+	if strings.HasPrefix(c.Content, jule.PRAGMA_COMMENT_PREFIX) {
 		p.PushAttribute(c)
 		return
 	}
