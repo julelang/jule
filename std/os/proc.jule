@@ -4,8 +4,6 @@
 
 cpp fn __julec_get_command_line_args(): []str
 
-const COMMAND_LINE_ARGS_SPECIAL_CHARSET = `"'<>`
-
 // Returns an absolute path name of the current working
 // directory of the calling process.
 pub fn getwd(): (path: str, ok: bool) { ret __getwd() }
@@ -25,37 +23,10 @@ pub fn chdir(path: str): (ok: bool) { ret __chdir(path) }
 // You got nil slice if used as initialize expression to any global.
 pub let ARGS: []str = nil
 
-fn setup_command_line_args() {
-	let mut args = cpp.__julec_get_command_line_args()
-	let arg = args[0]
-	let mut start = -1
-	let mut end = -1
-	for i, b in arg {
-		if (start == -1 &&
-			!COMMAND_LINE_ARGS_SPECIAL_CHARSET.has_prefix( (str)(b) )) {
-			start = i
-		}
-		// -1 for correct reverse indexing
-		let end_index = arg.len-i-1
-		if (end == -1) {
-			let end_byte = arg[end_index]
-			if !COMMAND_LINE_ARGS_SPECIAL_CHARSET.has_prefix( (str)(end_byte) ) {
-				// +1 for include this byte
-				end = end_index + 1
-			}
-		}
-		if start != -1 && end != -1 {
-			break
-		}
-	}
-	args[0] = arg[start:end]
+fn init() {
 	unsafe {
 		// Break immutability for set parsed command-line arguments
 		let mut mut_args = &ARGS
-		*mut_args = args
+		*mut_args = cpp.__julec_get_command_line_args()
 	}
-}
-
-fn init() {
-	setup_command_line_args()
 }
