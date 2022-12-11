@@ -33,6 +33,7 @@ var out_dir = "dist"
 var language = "default"
 var mode = mode_compile
 var out_name = "ir.cpp"
+var out = ""
 
 // Sets by compiler or command-line inputs
 var compiler = ""
@@ -300,9 +301,14 @@ func compile(path string, main, nolocal, justDefs bool) *parser.Parser {
 	return p
 }
 
-func generate_compile_command(source_path string) (c, cmd string) {
+func generate_compile_command(source_path string) (c string, cmd string) {
 	var cpp strings.Builder
 	cpp.WriteString("-g -O0 ")
+	if out != "" {
+		cpp.WriteString("-o ")
+		cpp.WriteString(out)
+		cpp.WriteByte(' ')
+	}
 	cpp.WriteString(source_path)
 	return compiler_path, cpp.String()
 }
@@ -376,6 +382,14 @@ func get_option_value(i *int) string {
 	return ""
 }
 
+func parse_out_option(i *int) {
+	value := get_option_value(i)
+	if value == "" {
+		exit_err("missing option value: -o --out")
+	}
+	out = value
+}
+
 func parse_compiler_option(i *int) {
 	value := get_option_value(i)
 	if value == "" {
@@ -400,6 +414,8 @@ func parse_options() string {
 		cmd += content
 		switch arg {
 		case "":
+		case "-o", "--out":
+			parse_out_option(&i)
 		case "-t", "--transpile":
 			mode = mode_transpile
 		case "-c", "--compile":
