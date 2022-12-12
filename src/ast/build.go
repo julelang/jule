@@ -758,28 +758,6 @@ func (b *Builder) buildUseDecl(use *models.UseDecl, toks []lex.Token) {
 	use.Path = path.String()
 }
 
-// Attribute builds AST model of attribute.
-func (b *Builder) Attribute(toks []lex.Token) (a models.Attribute) {
-	i := 0
-	a.Token = toks[i]
-	i++
-	tag := toks[i]
-	if tag.Id != lex.ID_IDENT || a.Token.Column+1 != tag.Column {
-		b.pusherr(tag, "invalid_syntax")
-		return
-	}
-	a.Tag = tag.Kind
-	toks = toks[i+1:]
-	if len(toks) > 0 {
-		tok := toks[0]
-		if a.Token.Column+len(a.Tag)+1 == tok.Column {
-			b.pusherr(tok, "invalid_syntax")
-		}
-		b.Tokens = append(toks, b.Tokens...)
-	}
-	return
-}
-
 func (b *Builder) setup_receiver(f *models.Fn, owner_id string) {
 	if len(f.Params) == 0 {
 		b.pusherr(f.Token, "missing_receiver")
