@@ -6,10 +6,9 @@ import (
 )
 
 type use struct {
-	defines *models.Defmap
-	token   lex.Token
-	cppLink bool
-	
+	Defines    *models.Defmap
+	Token      lex.Token
+	CppLink    bool
 	FullUse    bool
 	Path       string
 	LinkString string

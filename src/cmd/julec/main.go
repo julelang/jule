@@ -13,11 +13,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/parser"
 	"github.com/julelang/jule/pkg/jule"
 	"github.com/julelang/jule/pkg/juleapi"
 	"github.com/julelang/jule/pkg/juleio"
+	"github.com/julelang/jule/types"
 )
 
 const mode_transpile = "transpile"
@@ -430,19 +432,303 @@ func parse_options() string {
 	return cmd
 }
 
+func gen_links(p *parser.Parser) string {
+	var cpp strings.Builder
+	for _, u := range p.Used {
+		if u.CppLink {
+			cpp.WriteString("#include ")
+			if juleio.IsStdHeaderPath(u.Path) {
+				cpp.WriteString(u.Path)
+			} else {
+				cpp.WriteByte('"')
+				cpp.WriteString(u.Path)
+				cpp.WriteByte('"')
+			}
+			cpp.WriteByte('\n')
+		}
+	}
+	return cpp.String()
+}
+
+func _gen_types(dm *models.Defmap) string {
+	var cpp strings.Builder
+	for _, t := range dm.Types {
+		if t.Used && t.Token.Id != lex.ID_NA {
+			cpp.WriteString(t.String())
+			cpp.WriteByte('\n')
+		}
+	}
+	return cpp.String()
+}
+
+func gen_types(p *parser.Parser) string {
+	var cpp strings.Builder
+	for _, u := range p.Used {
+		if !u.CppLink {
+			cpp.WriteString(_gen_types(u.Defines))
+		}
+	}
+	cpp.WriteString(_gen_types(p.Defines))
+	return cpp.String()
+}
+
+func _gen_traits(dm *models.Defmap) string {
+	var cpp strings.Builder
+	for _, t := range dm.Traits {
+		if t.Used && t.Token.Id != lex.ID_NA {
+			cpp.WriteString(gen_trait(t))
+			cpp.WriteString("\n\n")
+		}
+	}
+	return cpp.String()
+}
+
+func gen_traits(p *parser.Parser) string {
+	var cpp strings.Builder
+	for _, u := range p.Used {
+		if !u.CppLink {
+			cpp.WriteString(_gen_traits(u.Defines))
+		}
+	}
+	cpp.WriteString(_gen_traits(p.Defines))
+	return cpp.String()
+}
+
+func gen_structs(structs []*models.Struct) string {
+	var cpp strings.Builder
+	for _, s := range structs {
+		if s.Used && s.Token.Id != lex.ID_NA {
+			cpp.WriteString(s.String())
+			cpp.WriteString("\n\n")
+		}
+	}
+	return cpp.String()
+}
+
+func gen_struct_plain_prototypes(structs []*models.Struct) string {
+	var cpp strings.Builder
+	for _, s := range structs {
+		if s.Used && s.Token.Id != lex.ID_NA {
+			cpp.WriteString(s.PlainPrototype())
+			cpp.WriteByte('\n')
+		}
+	}
+	return cpp.String()
+}
+
+func gen_struct_prototypes(structs []*models.Struct) string {
+	var cpp strings.Builder
+	for _, s := range structs {
+		if s.Used && s.Token.Id != lex.ID_NA {
+			cpp.WriteString(s.Prototype())
+			cpp.WriteByte('\n')
+		}
+	}
+	return cpp.String()
+}
+
+func gen_fn_prototypes(dm *models.Defmap) string {
+	var cpp strings.Builder
+	for _, f := range dm.Funcs {
+		if f.Used && f.Token.Id != lex.ID_NA {
+			cpp.WriteString(f.Prototype(""))
+			cpp.WriteByte('\n')
+		}
+	}
+	return cpp.String()
+}
+
+func gen_prototypes(p *parser.Parser, structs []*models.Struct) string {
+	var cpp strings.Builder
+	cpp.WriteString(gen_struct_plain_prototypes(structs))
+	cpp.WriteString(gen_struct_prototypes(structs))
+	for _, u := range p.Used {
+		if !u.CppLink {
+			cpp.WriteString(gen_fn_prototypes(u.Defines))
+		}
+	}
+	cpp.WriteString(gen_fn_prototypes(p.Defines))
+	return cpp.String()
+}
+
+func _gen_globals(dm *models.Defmap) string {
+	var cpp strings.Builder
+	for _, g := range dm.Globals {
+		if !g.Const && g.Used && g.Token.Id != lex.ID_NA {
+			cpp.WriteString(g.String())
+			cpp.WriteByte('\n')
+		}
+	}
+	return cpp.String()
+}
+
+func gen_globals(p *parser.Parser) string {
+	var cpp strings.Builder
+	for _, u := range p.Used {
+		if !u.CppLink {
+			cpp.WriteString(_gen_globals(u.Defines))
+		}
+	}
+	cpp.WriteString(_gen_globals(p.Defines))
+	return cpp.String()
+}
+
+func _gen_fns(dm *models.Defmap) string {
+	var cpp strings.Builder
+	for _, f := range dm.Funcs {
+		if f.Used && f.Token.Id != lex.ID_NA {
+			cpp.WriteString(f.String())
+			cpp.WriteString("\n\n")
+		}
+	}
+	return cpp.String()
+}
+
+func gen_fns(p *parser.Parser) string {
+	var cpp strings.Builder
+	for _, u := range p.Used {
+		if !u.CppLink {
+			cpp.WriteString(_gen_fns(u.Defines))
+		}
+	}
+	cpp.WriteString(_gen_fns(p.Defines))
+	return cpp.String()
+}
+
+func gen_init_caller(p *parser.Parser) string {
+	var cpp strings.Builder
+	cpp.WriteString("void ")
+	cpp.WriteString(juleapi.INIT_CALLER)
+	cpp.WriteString("(void) {")
+	models.AddIndent()
+	indent := models.IndentString()
+	models.DoneIndent()
+	pushInit := func(defs *models.Defmap) {
+		f, dm, _ := defs.FnById(jule.INIT_FN, nil)
+		if f == nil || dm != defs {
+			return
+		}
+		cpp.WriteByte('\n')
+		cpp.WriteString(indent)
+		cpp.WriteString(f.OutId())
+		cpp.WriteString("();")
+	}
+	for _, u := range p.Used {
+		if !u.CppLink {
+			pushInit(u.Defines)
+		}
+	}
+	pushInit(p.Defines)
+	cpp.WriteString("\n}")
+	return cpp.String()
+}
+
+func get_all_structs(p *parser.Parser) []*models.Struct {
+	order := make([]*models.Struct, 0, len(p.Defines.Structs))
+	order = append(order, p.Defines.Structs...)
+	for _, u := range p.Used {
+		if !u.CppLink {
+			order = append(order, u.Defines.Structs...)
+		}
+	}
+	return order
+}
+
+func gen_trait(t *models.Trait) string {
+	var cpp strings.Builder
+	cpp.WriteString("struct ")
+	outid := t.OutId()
+	cpp.WriteString(outid)
+	cpp.WriteString(" {\n")
+	models.AddIndent()
+	is := models.IndentString()
+	cpp.WriteString(is)
+	cpp.WriteString("virtual ~")
+	cpp.WriteString(outid)
+	cpp.WriteString("(void) noexcept {}\n\n")
+	for _, f := range t.Funcs {
+		cpp.WriteString(is)
+		cpp.WriteString("virtual ")
+		cpp.WriteString(f.RetType.String())
+		cpp.WriteByte(' ')
+		cpp.WriteString(f.Id)
+		cpp.WriteString(models.ParamsToCpp(f.Params))
+		cpp.WriteString(" {")
+		if !types.IsVoid(f.RetType.Type) {
+			cpp.WriteString(" return {}; ")
+		}
+		cpp.WriteString("}\n")
+	}
+	models.DoneIndent()
+	cpp.WriteString("};")
+	return cpp.String()
+}
+
+func generate(p *parser.Parser) string {
+	structs := get_all_structs(p)
+	order_structures(structs)
+	var cpp strings.Builder
+	cpp.WriteString(gen_links(p))
+	cpp.WriteByte('\n')
+	cpp.WriteString(gen_types(p))
+	cpp.WriteByte('\n')
+	cpp.WriteString(gen_traits(p))
+	cpp.WriteString(gen_prototypes(p, structs))
+	cpp.WriteString("\n\n")
+	cpp.WriteString(gen_globals(p))
+	cpp.WriteString(gen_structs(structs))
+	cpp.WriteString("\n\n")
+	cpp.WriteString(gen_fns(p))
+	cpp.WriteString(gen_init_caller(p))
+	return cpp.String()
+}
+
+func can_be_order(s *models.Struct) bool {
+	for _, d := range s.Origin.Depends {
+		if d.Origin.Order < s.Origin.Order {
+			return false
+		}
+	}
+	return true
+}
+
+func order_structures(structures []*models.Struct) {
+	for i, s := range structures {
+		s.Order = i
+	}
+
+	n := len(structures)
+	for i := 0; i < n; i++ {
+		swapped := false
+		for j := 0; j < n - i - 1; j++ {
+			curr := &structures[j]
+			if can_be_order(*curr) {
+				(*curr).Origin.Order = j+1
+				next := &structures[j+1]
+				(*next).Origin.Order = j
+				*curr, *next = *next, *curr
+				swapped = true
+			}
+		}
+		if !swapped {
+			break
+		}
+	}
+}
+
 func main() {
 	cmd := parse_options()
 	if cmd == "" {
 		exit_err("missing compile path")
 	}
-	t := compile(cmd, true, false, false)
-	if t == nil {
+	p := compile(cmd, true, false, false)
+	if p == nil {
 		return
 	}
-	if print_logs(t) {
+	if print_logs(p) {
 		return
 	}
-	cpp := t.Cpp()
+	cpp := generate(p)
 	append_standard(&cpp)
 	do_spell(cpp)
 }

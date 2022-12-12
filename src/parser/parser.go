@@ -32,8 +32,6 @@ type Struct = models.Struct
 type GenericType = models.GenericType
 type RetType = models.RetType
 
-var used []*use
-
 // Parser is parser of Jule code.
 type Parser struct {
 	attributes       []models.Attribute
@@ -59,7 +57,8 @@ type Parser struct {
 	JustDefines bool
 	NoCheck     bool
 	IsMain      bool
-	Uses        []*use
+	Used        []*use // All used packages, deep detection
+	Uses        []*use // File uses these packages
 	Defines     *models.Defmap
 	Errors      []julelog.CompilerLog
 	Warnings    []julelog.CompilerLog
@@ -111,248 +110,14 @@ func (p *Parser) pusherrmsg(msg string) {
 	})
 }
 
-// CppLinks returns cpp code of cpp links.
-func (p *Parser) CppLinks() string {
-	var cpp strings.Builder
-	for _, use := range used {
-		if use.cppLink {
-			cpp.WriteString("#include ")
-			if is_sys_header_path(use.Path) {
-				cpp.WriteString(use.Path)
-			} else {
-				cpp.WriteByte('"')
-				cpp.WriteString(use.Path)
-				cpp.WriteByte('"')
-			}
-			cpp.WriteByte('\n')
-		}
-	}
-	return cpp.String()
-}
-
-func cppTypes(dm *models.Defmap) string {
-	var cpp strings.Builder
-	for _, t := range dm.Types {
-		if t.Used && t.Token.Id != lex.ID_NA {
-			cpp.WriteString(t.String())
-			cpp.WriteByte('\n')
-		}
-	}
-	return cpp.String()
-}
-
-// CppTypes returns cpp code of types.
-func (p *Parser) CppTypes() string {
-	var cpp strings.Builder
-	for _, use := range used {
-		if !use.cppLink {
-			cpp.WriteString(cppTypes(use.defines))
-		}
-	}
-	cpp.WriteString(cppTypes(p.Defines))
-	return cpp.String()
-}
-
-func cppTraits(dm *models.Defmap) string {
-	var cpp strings.Builder
-	for _, t := range dm.Traits {
-		if t.Used && t.Token.Id != lex.ID_NA {
-			cpp.WriteString(traitToString(t))
-			cpp.WriteString("\n\n")
-		}
-	}
-	return cpp.String()
-}
-
-// CppTraits returns cpp code of traits.
-func (p *Parser) CppTraits() string {
-	var cpp strings.Builder
-	for _, use := range used {
-		if !use.cppLink {
-			cpp.WriteString(cppTraits(use.defines))
-		}
-	}
-	cpp.WriteString(cppTraits(p.Defines))
-	return cpp.String()
-}
-
-// CppStructs returns cpp code of structures.
-func CppStructs(structures []*Struct) string {
-	var cpp strings.Builder
-	for _, s := range structures {
-		if s.Used && s.Token.Id != lex.ID_NA {
-			cpp.WriteString(s.String())
-			cpp.WriteString("\n\n")
-		}
-	}
-	return cpp.String()
-}
-
-func cppStructPlainPrototypes(structures []*Struct) string {
-	var cpp strings.Builder
-	for _, s := range structures {
-		if s.Used && s.Token.Id != lex.ID_NA {
-			cpp.WriteString(s.PlainPrototype())
-			cpp.WriteByte('\n')
-		}
-	}
-	return cpp.String()
-}
-
-func cppStructPrototypes(structures []*Struct) string {
-	var cpp strings.Builder
-	for _, s := range structures {
-		if s.Used && s.Token.Id != lex.ID_NA {
-			cpp.WriteString(s.Prototype())
-			cpp.WriteByte('\n')
-		}
-	}
-	return cpp.String()
-}
-
-func cppFuncPrototypes(dm *models.Defmap) string {
-	var cpp strings.Builder
-	for _, f := range dm.Funcs {
-		if f.Used && f.Token.Id != lex.ID_NA {
-			cpp.WriteString(f.Prototype(""))
-			cpp.WriteByte('\n')
-		}
-	}
-	return cpp.String()
-}
-
-// CppPrototypes returns cpp code of prototypes.
-func (p *Parser) CppPrototypes(structures []*Struct) string {
-	var cpp strings.Builder
-	cpp.WriteString(cppStructPlainPrototypes(structures))
-	cpp.WriteString(cppStructPrototypes(structures))
-	for _, use := range used {
-		if !use.cppLink {
-			cpp.WriteString(cppFuncPrototypes(use.defines))
-		}
-	}
-	cpp.WriteString(cppFuncPrototypes(p.Defines))
-	return cpp.String()
-}
-
-func cppGlobals(dm *models.Defmap) string {
-	var cpp strings.Builder
-	for _, g := range dm.Globals {
-		if !g.Const && g.Used && g.Token.Id != lex.ID_NA {
-			cpp.WriteString(g.String())
-			cpp.WriteByte('\n')
-		}
-	}
-	return cpp.String()
-}
-
-// CppGlobals returns cpp code of global variables.
-func (p *Parser) CppGlobals() string {
-	var cpp strings.Builder
-	for _, use := range used {
-		if !use.cppLink {
-			cpp.WriteString(cppGlobals(use.defines))
-		}
-	}
-	cpp.WriteString(cppGlobals(p.Defines))
-	return cpp.String()
-}
-
-func cppFuncs(dm *models.Defmap) string {
-	var cpp strings.Builder
-	for _, f := range dm.Funcs {
-		if f.Used && f.Token.Id != lex.ID_NA {
-			cpp.WriteString(f.String())
-			cpp.WriteString("\n\n")
-		}
-	}
-	return cpp.String()
-}
-
-// CppFuncs returns cpp code of functions.
-func (p *Parser) CppFuncs() string {
-	var cpp strings.Builder
-	for _, use := range used {
-		if !use.cppLink {
-			cpp.WriteString(cppFuncs(use.defines))
-		}
-	}
-	cpp.WriteString(cppFuncs(p.Defines))
-	return cpp.String()
-}
-
-// CppInitializerCaller returns cpp code of initializer caller.
-func (p *Parser) CppInitializerCaller() string {
-	var cpp strings.Builder
-	cpp.WriteString("void ")
-	cpp.WriteString(juleapi.INIT_CALLER)
-	cpp.WriteString("(void) {")
-	models.AddIndent()
-	indent := models.IndentString()
-	models.DoneIndent()
-	pushInit := func(defs *models.Defmap) {
-		f, dm, _ := defs.FnById(jule.INIT_FN, nil)
-		if f == nil || dm != defs {
-			return
-		}
-		cpp.WriteByte('\n')
-		cpp.WriteString(indent)
-		cpp.WriteString(f.OutId())
-		cpp.WriteString("();")
-	}
-	for _, use := range used {
-		if !use.cppLink {
-			pushInit(use.defines)
-		}
-	}
-	pushInit(p.Defines)
-	cpp.WriteString("\n}")
-	return cpp.String()
-}
-
-func (p *Parser) get_all_structures() []*Struct {
-	order := make([]*Struct, 0, len(p.Defines.Structs))
-	order = append(order, p.Defines.Structs...)
-	for _, use := range used {
-		if !use.cppLink {
-			order = append(order, use.defines.Structs...)
-		}
-	}
-	return order
-}
-
-// Cpp returns full cpp code of parsed objects.
-func (p *Parser) Cpp() string {
-	structures := p.get_all_structures()
-	order_structures(structures)
-	var cpp strings.Builder
-	cpp.WriteString(p.CppLinks())
-	cpp.WriteByte('\n')
-	cpp.WriteString(p.CppTypes())
-	cpp.WriteByte('\n')
-	cpp.WriteString(p.CppTraits())
-	cpp.WriteString(p.CppPrototypes(structures))
-	cpp.WriteString("\n\n")
-	cpp.WriteString(p.CppGlobals())
-	cpp.WriteString(CppStructs(structures))
-	cpp.WriteString("\n\n")
-	cpp.WriteString(p.CppFuncs())
-	cpp.WriteString(p.CppInitializerCaller())
-	return cpp.String()
-}
-
 func getTree(toks []lex.Token) ([]models.Object, []julelog.CompilerLog) {
 	b := ast.NewBuilder(toks)
 	b.Build()
 	return b.Tree, b.Errors
 }
 
-func is_sys_header_path(p string) bool {
-	return p[0] == '<' && p[len(p)-1] == '>'
-}
-
 func (p *Parser) checkCppUsePath(use *models.UseDecl) bool {
-	if is_sys_header_path(use.Path) {
+	if juleio.IsStdHeaderPath(use.Path) {
 		return true
 	}
 	ext := filepath.Ext(use.Path)
@@ -400,7 +165,7 @@ func (p *Parser) checkUsePath(use *models.UseDecl) bool {
 	return true
 }
 
-func (p *Parser) pushSelects(use *use, selectors []lex.Token) (addNs bool) {
+func (p *Parser) pushSelects(u *use, selectors []lex.Token) (addNs bool) {
 	if len(selectors) > 0 && p.Defines.Side == nil {
 		p.Defines.Side = new(models.Defmap)
 	}
@@ -421,7 +186,7 @@ func (p *Parser) pushSelects(use *use, selectors []lex.Token) (addNs bool) {
 			addNs = true
 			continue
 		}
-		i, m, def_t := use.defines.FindById(id.Kind, p.File)
+		i, m, def_t := u.Defines.FindById(id.Kind, p.File)
 		if i == -1 {
 			p.pusherrtok(id, "id_not_exist", id.Kind)
 			continue
@@ -447,13 +212,13 @@ func (p *Parser) pushSelects(use *use, selectors []lex.Token) (addNs bool) {
 func (p *Parser) pushUse(use *use, selectors []lex.Token) {
 	dm, ok := std_builtin_defines[use.LinkString]
 	if ok {
-		dm.PushDefines(use.defines)
+		dm.PushDefines(use.Defines)
 	}
 	if use.FullUse {
 		if p.Defines.Side == nil {
 			p.Defines.Side = new(models.Defmap)
 		}
-		use.defines.PushDefines(p.Defines.Side)
+		use.Defines.PushDefines(p.Defines.Side)
 	} else if len(selectors) > 0 {
 		if !p.pushSelects(use, selectors) {
 			return
@@ -463,26 +228,26 @@ func (p *Parser) pushUse(use *use, selectors []lex.Token) {
 	}
 	identifiers := strings.SplitN(use.LinkString, lex.KND_DBLCOLON, -1)
 	src := p.pushNs(identifiers)
-	src.Defines = use.defines
+	src.Defines = use.Defines
 }
 
-func (p *Parser) compileCppLinkUse(useAST *models.UseDecl) (*use, bool) {
-	use := new(use)
-	use.cppLink = true
-	use.Path = useAST.Path
-	use.token = useAST.Token
-	return use, false
+func (p *Parser) compileCppLinkUse(ast *models.UseDecl) (*use, bool) {
+	u := new(use)
+	u.CppLink = true
+	u.Path = ast.Path
+	u.Token = ast.Token
+	return u, false
 }
 
 func make_use_from_ast(ast *models.UseDecl) *use {
-	use := new(use)
-	use.defines = new(models.Defmap)
-	use.token = ast.Token
-	use.Path = ast.Path
-	use.LinkString = ast.LinkString
-	use.FullUse = ast.FullUse
-	use.Selectors = ast.Selectors
-	return use
+	u := new(use)
+	u.Defines = new(models.Defmap)
+	u.Token = ast.Token
+	u.Path = ast.Path
+	u.LinkString = ast.LinkString
+	u.FullUse = ast.FullUse
+	u.Selectors = ast.Selectors
+	return u
 }
 
 func (p *Parser) wrap_package() {
@@ -494,8 +259,8 @@ func (p *Parser) wrap_package() {
 	}
 }
 
-func (p *Parser) compilePureUse(useAST *models.UseDecl) (_ *use, hassErr bool) {
-	infos, err := os.ReadDir(useAST.Path)
+func (p *Parser) compilePureUse(ast *models.UseDecl) (_ *use, hassErr bool) {
+	infos, err := os.ReadDir(ast.Path)
 	if err != nil {
 		p.pusherrmsg(err.Error())
 		return nil, true
@@ -508,7 +273,7 @@ func (p *Parser) compilePureUse(useAST *models.UseDecl) (_ *use, hassErr bool) {
 			!juleio.IsPassFileAnnotation(name) {
 			continue
 		}
-		path := filepath.Join(useAST.Path, name)
+		path := filepath.Join(ast.Path, name)
 		f, err := juleio.Jopen(path)
 		if err != nil {
 			p.pusherrmsg(err.Error())
@@ -518,16 +283,16 @@ func (p *Parser) compilePureUse(useAST *models.UseDecl) (_ *use, hassErr bool) {
 		psub.SetupPackage()
 		psub.Parsef(false, false)
 		psub.wrap_package()
-		use := make_use_from_ast(useAST)
-		psub.Defines.PushDefines(use.defines)
+		u := make_use_from_ast(ast)
+		psub.Defines.PushDefines(u.Defines)
 		p.pusherrs(psub.Errors...)
 		p.Warnings = append(p.Warnings, psub.Warnings...)
-		p.pushUse(use, useAST.Selectors)
+		p.pushUse(u, ast.Selectors)
 		if psub.Errors != nil {
-			p.pusherrtok(useAST.Token, "use_has_errors")
-			return use, true
+			p.pusherrtok(ast.Token, "use_has_errors")
+			return u, true
 		}
-		return use, false
+		return u, false
 	}
 	return nil, false
 }
@@ -545,7 +310,7 @@ func (p *Parser) use(ast *models.UseDecl, err *bool) {
 		return
 	}
 	// Already parsed?
-	for _, u := range used {
+	for _, u := range p.Used {
 		if ast.Path == u.Path {
 			old := u.FullUse
 			u.FullUse = ast.FullUse
@@ -567,7 +332,7 @@ func (p *Parser) use(ast *models.UseDecl, err *bool) {
 			return
 		}
 	}
-	used = append(used, u)
+	p.Used = append(p.Used, u)
 	p.Uses = append(p.Uses, u)
 }
 
