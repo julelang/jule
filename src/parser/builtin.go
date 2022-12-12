@@ -9,7 +9,7 @@ import (
 	"github.com/julelang/jule/pkg/juletype"
 )
 
-type BuiltinCaller = func(*Parser, *Func, callData, *exprModel) value
+type BuiltinCaller = func(*Parser, *Fn, callData, *exprModel) value
 
 const maxI8 = 127
 const minI8 = -128
@@ -262,7 +262,7 @@ var f64statics = &Defmap{
 	},
 }
 
-var strDefaultFunc = Func{
+var strDefaultFunc = Fn{
 	Pub:     true,
 	Id:      "str",
 	Params:  []Param{{Id: "obj", Type: Type{Id: juletype.ANY, Kind: juletype.TYPE_MAP[juletype.ANY]}}},
@@ -275,13 +275,13 @@ var errorTrait = &trait{
 	},
 	Defines: &Defmap{
 		Funcs: []*Fn{
-			{Ast: &models.Fn{
+			{
 				Pub:     true,
 				Id:      "error",
 				RetType: models.RetType{
 					Type: Type{Id: juletype.STR, Kind: juletype.TYPE_MAP[juletype.STR]},
 				},
-			}},
+			},
 		},
 	},
 }
@@ -294,19 +294,17 @@ var errorType = Type{
 }
 
 var panicFunc = &Fn{
-	Ast: &models.Fn{
-		Pub: true,
-		Id:  "panic",
-		Params: []models.Param{
-			{
-				Id:   "error",
-				Type: Type{Id: juletype.ANY, Kind: juletype.TYPE_MAP[juletype.ANY]},
-			},
+	Pub: true,
+	Id:  "panic",
+	Params: []models.Param{
+		{
+			Id:   "error",
+			Type: Type{Id: juletype.ANY, Kind: juletype.TYPE_MAP[juletype.ANY]},
 		},
 	},
 }
 
-var errorHandlerFunc = &models.Fn{
+var errorHandlerFunc = &Fn{
 	Id: "handler",
 	Params: []models.Param{
 		{
@@ -323,23 +321,21 @@ var errorHandlerFunc = &models.Fn{
 }
 
 var recoverFunc = &Fn{
-	Ast: &models.Fn{
-		Pub: true,
-		Id:  "recover",
-		Params: []models.Param{
-			{
-				Id: "handler",
-				Type: models.Type{
-					Id:   juletype.FN,
-					Kind: errorHandlerFunc.TypeKind(),
-					Tag:  errorHandlerFunc,
-				},
+	Pub: true,
+	Id:  "recover",
+	Params: []models.Param{
+		{
+			Id: "handler",
+			Type: models.Type{
+				Id:   juletype.FN,
+				Kind: errorHandlerFunc.TypeKind(),
+				Tag:  errorHandlerFunc,
 			},
 		},
 	},
 }
 
-var out_fn = &Fn{Ast: &Func{
+var out_fn = &Fn{
 	Pub: true,
 	Id:  "out",
 	RetType: RetType{
@@ -349,12 +345,12 @@ var out_fn = &Fn{Ast: &Func{
 		Id:   "expr",
 		Type: Type{Id: juletype.ANY, Kind: juletype.TYPE_MAP[juletype.ANY]},
 	}},
-}}
+}
 
-var make_fn = &Fn{Ast: &Func{
+var make_fn = &Fn{
 	Pub: true,
 	Id:  "make",
-}}
+}
 
 var outln_fn *Fn
 
@@ -380,12 +376,12 @@ var Builtin = &Defmap{
 		panicFunc,
 		recoverFunc,
 		make_fn,
-		{Ast: &Func{
+		{
 			Pub:   true,
 			Id:    "new",
 			Owner: builtinFile,
-		}},
-		{Ast: &Func{
+		},
+		{
 			Pub:      true,
 			Id:       "copy",
 			Owner:    builtinFile,
@@ -410,8 +406,8 @@ var Builtin = &Defmap{
 					},
 				},
 			},
-		}},
-		{Ast: &Func{
+		},
+		{
 			Pub:      true,
 			Id:       "append",
 			Owner:    builtinFile,
@@ -438,7 +434,7 @@ var Builtin = &Defmap{
 					Variadic: true,
 				},
 			},
-		}},
+		},
 	},
 	Traits: []*trait{
 		errorTrait,
@@ -455,50 +451,50 @@ var strDefines = &Defmap{
 		},
 	},
 	Funcs: []*Fn{
-		{Ast: &Func{
+		{
 			Pub:     true,
 			Id:      "empty",
 			RetType: RetType{Type: Type{Id: juletype.BOOL, Kind: juletype.TYPE_MAP[juletype.BOOL]}},
-		}},
-		{Ast: &Func{
+		},
+		{
 			Pub:     true,
 			Id:      "has_prefix",
 			Params:  []Param{{Id: "sub", Type: Type{Id: juletype.STR, Kind: juletype.TYPE_MAP[juletype.STR]}}},
 			RetType: RetType{Type: Type{Id: juletype.BOOL, Kind: juletype.TYPE_MAP[juletype.BOOL]}},
-		}},
-		{Ast: &Func{
+		},
+		{
 			Pub:     true,
 			Id:      "has_suffix",
 			Params:  []Param{{Id: "sub", Type: Type{Id: juletype.STR, Kind: juletype.TYPE_MAP[juletype.STR]}}},
 			RetType: RetType{Type: Type{Id: juletype.BOOL, Kind: juletype.TYPE_MAP[juletype.BOOL]}},
-		}},
-		{Ast: &Func{
+		},
+		{
 			Pub:     true,
 			Id:      "find",
 			Params:  []Param{{Id: "sub", Type: Type{Id: juletype.STR, Kind: juletype.TYPE_MAP[juletype.STR]}}},
 			RetType: RetType{Type: Type{Id: juletype.INT, Kind: juletype.TYPE_MAP[juletype.INT]}},
-		}},
-		{Ast: &Func{
+		},
+		{
 			Pub:     true,
 			Id:      "rfind",
 			Params:  []Param{{Id: "sub", Type: Type{Id: juletype.STR, Kind: juletype.TYPE_MAP[juletype.STR]}}},
 			RetType: RetType{Type: Type{Id: juletype.INT, Kind: juletype.TYPE_MAP[juletype.INT]}},
-		}},
-		{Ast: &Func{
+		},
+		{
 			Pub:     true,
 			Id:      "trim",
 			Params:  []Param{{Id: "bytes", Type: Type{Id: juletype.STR, Kind: juletype.TYPE_MAP[juletype.STR]}}},
 			RetType: RetType{
 				Type: Type{Id: juletype.STR, Kind: juletype.TYPE_MAP[juletype.STR]},
 			},
-		}},
-		{Ast: &Func{
+		},
+		{
 			Pub:     true,
 			Id:      "rtrim",
 			Params:  []Param{{Id: "bytes", Type: Type{Id: juletype.STR, Kind: juletype.TYPE_MAP[juletype.STR]}}},
 			RetType: RetType{Type: Type{Id: juletype.STR, Kind: juletype.TYPE_MAP[juletype.STR]}},
-		}},
-		{Ast: &Func{
+		},
+		{
 			Pub: true,
 			Id:  "split",
 			Params: []Param{
@@ -509,8 +505,8 @@ var strDefines = &Defmap{
 				},
 			},
 			RetType: RetType{Type: Type{Id: juletype.STR, Kind: jule.PREFIX_SLICE + juletype.TYPE_MAP[juletype.STR]}},
-		}},
-		{Ast: &Func{
+		},
+		{
 			Pub: true,
 			Id:  "replace",
 			Params: []Param{
@@ -522,7 +518,7 @@ var strDefines = &Defmap{
 				},
 			},
 			RetType: RetType{Type: Type{Id: juletype.STR, Kind: juletype.TYPE_MAP[juletype.STR]}},
-		}},
+		},
 	},
 }
 
@@ -556,11 +552,11 @@ var sliceDefines = &Defmap{
 		},
 	},
 	Funcs: []*Fn{
-		{Ast: &Func{
+		{
 			Pub:     true,
 			Id:      "empty",
 			RetType: RetType{Type: Type{Id: juletype.BOOL, Kind: juletype.TYPE_MAP[juletype.BOOL]}},
-		}},
+		},
 	},
 }
 
@@ -574,11 +570,11 @@ var arrayDefines = &Defmap{
 		},
 	},
 	Funcs: []*Fn{
-		{Ast: &Func{
+		{
 			Pub:     true,
 			Id:      "empty",
 			RetType: RetType{Type: Type{Id: juletype.BOOL, Kind: juletype.TYPE_MAP[juletype.BOOL]}},
-		}},
+		},
 	},
 }
 
@@ -592,34 +588,34 @@ var mapDefines = &Defmap{
 		},
 	},
 	Funcs: []*Fn{
-		{Ast: &Func{
+		{
 			Pub: true,
 			Id:  "clear",
-		}},
-		{Ast: &Func{
+		},
+		{
 			Pub: true,
 			Id:  "keys",
-		}},
-		{Ast: &Func{
+		},
+		{
 			Pub: true,
 			Id:  "values",
-		}},
-		{Ast: &Func{
+		},
+		{
 			Pub:     true,
 			Id:      "empty",
 			RetType: RetType{Type: Type{Id: juletype.BOOL, Kind: juletype.TYPE_MAP[juletype.BOOL]}},
-		}},
-		{Ast: &Func{
+		},
+		{
 			Pub:     true,
 			Id:      "has",
 			Params:  []Param{{Id: "key"}},
 			RetType: RetType{Type: Type{Id: juletype.BOOL, Kind: juletype.TYPE_MAP[juletype.BOOL]}},
-		}},
-		{Ast: &Func{
+		},
+		{
 			Pub:    true,
 			Id:     "del",
 			Params: []Param{{Id: "key"}},
-		}},
+		},
 	},
 }
 
@@ -631,44 +627,44 @@ func readyMapDefines(mapt Type) {
 	valt := types[1]
 
 	keysFunc, _, _ := mapDefines.fn_by_id("keys", nil)
-	keysFunc.Ast.RetType.Type = keyt
-	keysFunc.Ast.RetType.Type.Kind = jule.PREFIX_SLICE + keysFunc.Ast.RetType.Type.Kind
+	keysFunc.RetType.Type = keyt
+	keysFunc.RetType.Type.Kind = jule.PREFIX_SLICE + keysFunc.RetType.Type.Kind
 
 	valuesFunc, _, _ := mapDefines.fn_by_id("values", nil)
-	valuesFunc.Ast.RetType.Type = valt
-	valuesFunc.Ast.RetType.Type.Kind = jule.PREFIX_SLICE + valuesFunc.Ast.RetType.Type.Kind
+	valuesFunc.RetType.Type = valt
+	valuesFunc.RetType.Type.Kind = jule.PREFIX_SLICE + valuesFunc.RetType.Type.Kind
 
 	hasFunc, _, _ := mapDefines.fn_by_id("has", nil)
-	hasFunc.Ast.Params[0].Type = keyt
+	hasFunc.Params[0].Type = keyt
 
 	delFunc, _, _ := mapDefines.fn_by_id("del", nil)
-	delFunc.Ast.Params[0].Type = keyt
+	delFunc.Params[0].Type = keyt
 }
 
 func init() {
 	// Copy out function as outln
-	out_fn.Ast.BuiltinCaller = caller_out
+	out_fn.BuiltinCaller = caller_out
 	outln_fn = new(Fn)
 	*outln_fn = *out_fn
-	outln_fn.Ast = new(models.Fn)
-	*outln_fn.Ast = *out_fn.Ast
-	outln_fn.Ast.Id = "outln"
+	outln_fn = new(models.Fn)
+	*outln_fn = *out_fn
+	outln_fn.Id = "outln"
 	Builtin.Funcs = append(Builtin.Funcs, outln_fn)
 
 	// Setup make function
-	make_fn.Ast.BuiltinCaller = caller_make
+	make_fn.BuiltinCaller = caller_make
 
 	// Setup new function
 	fn_new, _, _ := Builtin.fn_by_id("new", nil)
-	fn_new.Ast.BuiltinCaller = caller_new
+	fn_new.BuiltinCaller = caller_new
 
 	// Setup Error trait
 	receiver := new(Var)
 	receiver.Mutable = false
 	for _, f := range errorTrait.Defines.Funcs {
-		f.Ast.Receiver = receiver
-		f.Ast.Receiver.Tag = errorTrait
-		f.Ast.Owner = builtinFile
+		f.Receiver = receiver
+		f.Receiver.Tag = errorTrait
+		f.Owner = builtinFile
 	}
 
 	// Set bits of platform-dependent types
@@ -699,7 +695,7 @@ func init() {
 
 // builtin
 
-func caller_out(p *Parser, f *Func, data callData, m *exprModel) (v value) {
+func caller_out(p *Parser, f *Fn, data callData, m *exprModel) (v value) {
 	errtok := data.args[0]
 	v.data.Type = f.RetType.Type
 	// Remove parentheses
@@ -713,7 +709,7 @@ func caller_out(p *Parser, f *Func, data callData, m *exprModel) (v value) {
 	return v
 }
 
-func caller_make(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
+func caller_make(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	errtok := data.args[0]
 	args := p.get_args(data.args, false)
 	if len(args.Src) == 0 {
@@ -745,7 +741,7 @@ func caller_make(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
 	return
 }
 
-func caller_new(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
+func caller_new(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	errtok := data.args[0]
 	// Remove parentheses
 	data.args = data.args[1 : len(data.args)-1]
@@ -784,12 +780,12 @@ func caller_new(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
 
 var std_mem_builtin = &Defmap{
 	Funcs: []*Fn{
-		{Ast: &models.Fn{Id: "size_of", BuiltinCaller: caller_mem_size_of}},
-		{Ast: &models.Fn{Id: "align_of", BuiltinCaller: caller_mem_align_of}},
+		{Id: "size_of", BuiltinCaller: caller_mem_size_of},
+		{Id: "align_of", BuiltinCaller: caller_mem_align_of},
 	},
 }
 
-func caller_mem_size_of(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
+func caller_mem_size_of(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	// Remove parentheses
 	data.args = data.args[1 : len(data.args)-1]
 	v.data.Type = Type{
@@ -817,7 +813,7 @@ func caller_mem_size_of(p *Parser, _ *Func, data callData, m *exprModel) (v valu
 	return
 }
 
-func caller_mem_align_of(p *Parser, _ *Func, data callData, m *exprModel) (v value) {
+func caller_mem_align_of(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	// Remove parentheses
 	data.args = data.args[1 : len(data.args)-1]
 	v.data.Type = Type{

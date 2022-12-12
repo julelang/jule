@@ -19,7 +19,7 @@ type structure struct {
 	Description string
 	
 	cpp_linked  bool
-	constructor *Func
+	constructor *Fn
 	depends     []*structure
 	order       int
 	generics    []Type // Instance generics.
@@ -145,7 +145,7 @@ func (s *structure) cppConstructor() string {
 	var cpp strings.Builder
 	cpp.WriteString(models.IndentString())
 	cpp.WriteString(s.OutId())
-	cpp.WriteString(paramsToCpp(s.constructor.Params))
+	cpp.WriteString(models.ParamsToCpp(s.constructor.Params))
 	cpp.WriteString(" noexcept {\n")
 	models.AddIndent()
 	cpp.WriteString(models.IndentString())
@@ -193,7 +193,7 @@ func (s *structure) cppTraits() string {
 
 func (s *structure) plainPrototype() string {
 	var cpp strings.Builder
-	cpp.WriteString(genericsToCpp(s.Ast.Generics))
+	cpp.WriteString(models.GenericsToCpp(s.Ast.Generics))
 	cpp.WriteByte('\n')
 	cpp.WriteString("struct ")
 	cpp.WriteString(s.OutId())
@@ -219,7 +219,7 @@ func (s *structure) self_ref_var_str() string {
 
 func (s *structure) prototype() string {
 	var cpp strings.Builder
-	cpp.WriteString(genericsToCpp(s.Ast.Generics))
+	cpp.WriteString(models.GenericsToCpp(s.Ast.Generics))
 	cpp.WriteByte('\n')
 	cpp.WriteString("struct ")
 	outid := s.OutId()
@@ -250,7 +250,7 @@ func (s *structure) prototype() string {
 	cpp.WriteString(s.self_var_init_statement_str())
 	cpp.WriteString(" }\n\n")
 	for _, f := range s.Defines.Funcs {
-		if f.used {
+		if f.Used {
 			cpp.WriteString(models.IndentString())
 			cpp.WriteString(f.Prototype(""))
 			cpp.WriteString("\n\n")
@@ -267,9 +267,9 @@ func (s *structure) prototype() string {
 func (s *structure) decldefString() string {
 	var cpp strings.Builder
 	for _, f := range s.Defines.Funcs {
-		if f.used {
+		if f.Used {
 			cpp.WriteString(models.IndentString())
-			cpp.WriteString(f.stringOwner(s.OutId()))
+			cpp.WriteString(f.StringOwner(s.OutId()))
 			cpp.WriteString("\n\n")
 		}
 	}

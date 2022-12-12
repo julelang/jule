@@ -16,7 +16,7 @@ type trait struct {
 
 func (t *trait) has_reference_receiver() bool {
 	for _, f := range t.Defines.Funcs {
-		if type_is_ref(f.Ast.Receiver.Type) {
+		if type_is_ref(f.Receiver.Type) {
 			return true
 		}
 	}
@@ -27,7 +27,7 @@ func (t *trait) has_reference_receiver() bool {
 // Returns nil if not exist.
 func (t *trait) FindFunc(id string) *Fn {
 	for _, f := range t.Defines.Funcs {
-		if f.Ast.Id == id {
+		if f.Id == id {
 			return f
 		}
 	}
@@ -57,7 +57,7 @@ func (t *trait) String() string {
 		cpp.WriteString(f.RetType.String())
 		cpp.WriteByte(' ')
 		cpp.WriteString(f.Id)
-		cpp.WriteString(paramsToCpp(f.Params))
+		cpp.WriteString(models.ParamsToCpp(f.Params))
 		cpp.WriteString(" {")
 		if !type_is_void(f.RetType.Type) {
 			cpp.WriteString(" return {}; ")

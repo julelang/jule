@@ -9,7 +9,7 @@ import (
 type retChecker struct {
 	t         *Parser
 	ret_ast   *models.Ret
-	f         *Func
+	f         *Fn
 	exp_model retExpr
 	values    []value
 }

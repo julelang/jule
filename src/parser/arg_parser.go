@@ -19,7 +19,7 @@ func getParamMap(params []Param) *paramMap {
 type pureArgParser struct {
 	p       *Parser
 	pmap    *paramMap
-	f       *Func
+	f       *Fn
 	args    *models.Args
 	i       int
 	arg     Arg

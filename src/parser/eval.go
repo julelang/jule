@@ -268,7 +268,7 @@ func (e *eval) unsafe_allowed() bool {
 	return e.allow_unsafe || e.p.unsafe_allowed()
 }
 
-func (e *eval) callFunc(f *Func, data callData, m *exprModel) value {
+func (e *eval) callFunc(f *Fn, data callData, m *exprModel) value {
 	if !e.unsafe_allowed() && f.IsUnsafe {
 		e.pusherrtok(data.expr[0], "unsafe_behavior_at_out_of_unsafe_scope")
 	}
@@ -309,7 +309,7 @@ func (e *eval) parenthesesRange(toks []lex.Token, m *exprModel) (v value) {
 	}
 	switch {
 	case type_is_fn(v.data.Type):
-		f := v.data.Type.Tag.(*Func)
+		f := v.data.Type.Tag.(*Fn)
 		if f.Receiver != nil && f.Receiver.Mutable && !v.mutable {
 			e.pusherrtok(data.expr[len(data.expr)-1], "mutable_operation_on_immutable")
 		}
@@ -859,12 +859,12 @@ func (e *eval) xObjSubId(dm *Defmap, val value, interior_mutability bool, idTok 
 		}
 	case 'f':
 		f := dm.Funcs[i]
-		f.used = true
+		f.Used = true
 		v.data.Type.Id = juletype.FN
-		v.data.Type.Tag = f.Ast
-		v.data.Type.Kind = f.Ast.TypeKind()
-		v.data.Token = f.Ast.Token
-		m.append_sub(exprNode{f.Ast.Id})
+		v.data.Type.Tag = f
+		v.data.Type.Kind = f.TypeKind()
+		v.data.Token = f.Token
+		m.append_sub(exprNode{f.Id})
 	}
 	return
 }
@@ -938,7 +938,7 @@ func (e *eval) structObjSubId(val value, idTok lex.Token, m *exprModel) value {
 	}
 	val = e.xObjSubId(s.Defines, val, interior_mutability, idTok, m)
 	if type_is_fn(val.data.Type) {
-		f := val.data.Type.Tag.(*Func)
+		f := val.data.Type.Tag.(*Fn)
 		if f.Receiver != nil && type_is_ref(f.Receiver.Type) && !type_is_ref(parent_type) {
 			e.p.pusherrtok(idTok, "ref_method_used_with_not_ref_instance")
 		}

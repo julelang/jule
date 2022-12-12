@@ -58,7 +58,7 @@ func un_ptr_or_ref_type(t Type) Type {
 func type_has_this_generic(generic *GenericType, t Type) bool {
 	switch {
 	case type_is_fn(t):
-		f := t.Tag.(*Func)
+		f := t.Tag.(*Fn)
 		for _, p := range f.Params {
 			if type_has_this_generic(generic, p.Type) {
 				return true

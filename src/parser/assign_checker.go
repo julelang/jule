@@ -92,7 +92,7 @@ func (ac *assign_checker) has_error() bool {
 func (ac *assign_checker) check_validity() (valid bool) {
 	valid = true
 	if type_is_fn(ac.v.data.Type) {
-		f := ac.v.data.Type.Tag.(*Func)
+		f := ac.v.data.Type.Tag.(*Fn)
 		if f.Receiver != nil {
 			ac.p.pusherrtok(ac.errtok, "method_as_anonymous_fn")
 			valid = false

@@ -6,7 +6,7 @@ import (
 	"github.com/julelang/jule/pkg/jule"
 )
 
-func (p *Parser) getFieldMap(f *Func) *paramMap {
+func (p *Parser) getFieldMap(f *Fn) *paramMap {
 	pmap := new(paramMap)
 	*pmap = paramMap{}
 	s := f.RetType.Type.Tag.(*structure)
@@ -22,7 +22,7 @@ func (p *Parser) getFieldMap(f *Func) *paramMap {
 type structArgParser struct {
 	p      *Parser
 	fmap   *paramMap
-	f      *Func
+	f      *Fn
 	args   *models.Args
 	i      int
 	arg    Arg

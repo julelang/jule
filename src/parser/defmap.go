@@ -132,8 +132,8 @@ func (dm *Defmap) type_by_id(id string, f *File) (*TypeAlias, *Defmap, bool) {
 
 func (dm *Defmap) find_fn_by_id(id string, f *File) (int, *Defmap, bool) {
 	for i, fn := range dm.Funcs {
-		if fn != nil && fn.Ast.Id == id {
-			if is_accessable(f, fn.Ast.Token.File, fn.Ast.Pub) {
+		if fn != nil && fn.Id == id {
+			if is_accessable(f, fn.Token.File, fn.Pub) {
 				return i, dm, false
 			}
 		}

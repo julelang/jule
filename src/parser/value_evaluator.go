@@ -239,9 +239,9 @@ func make_value_from_fn(f *models.Fn) (v value) {
 }
 
 func (ve *valueEvaluator) funcId(id string, f *Fn) (v value) {
-	f.used = true
-	v = make_value_from_fn(f.Ast)
-	ve.model.append_sub(exprNode{f.outId()})
+	f.Used = true
+	v = make_value_from_fn(f)
+	ve.model.append_sub(exprNode{f.OutId()})
 	return
 }
 

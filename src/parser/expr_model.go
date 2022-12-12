@@ -59,7 +59,7 @@ func (node exprNode) String() string {
 }
 
 type anonFuncExpr struct {
-	ast  *Func
+	ast  *Fn
 }
 
 func (af anonFuncExpr) String() string {
@@ -71,12 +71,12 @@ func (af anonFuncExpr) String() string {
 	}
 	cpp.WriteString(t.FnString())
 	cpp.WriteString("([=]")
-	cpp.WriteString(paramsToCpp(af.ast.Params))
+	cpp.WriteString(models.ParamsToCpp(af.ast.Params))
 	cpp.WriteString(" mutable -> ")
 	cpp.WriteString(af.ast.RetType.String())
 	cpp.WriteByte(' ')
 	vars := af.ast.RetType.Vars(af.ast.Block)
-	cpp.WriteString(fnBlockToString(vars, af.ast.Block))
+	cpp.WriteString(models.FnBlockToString(vars, af.ast.Block))
 	cpp.WriteByte(')')
 	return cpp.String()
 }
@@ -157,7 +157,7 @@ func (a argsExpr) String() string {
 }
 
 type callExpr struct {
-	f        *Func
+	f        *Fn
 	generics genericsExpr
 	args     argsExpr
 }

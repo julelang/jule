@@ -21,7 +21,7 @@ import (
 type File = juleio.File
 type TypeAlias = models.TypeAlias
 type Var = models.Var
-type Func = models.Fn
+type Fn = models.Fn
 type Arg = models.Arg
 type Param = models.Param
 type Type = models.Type
@@ -212,7 +212,7 @@ func cppStructPrototypes(structures []*structure) string {
 func cppFuncPrototypes(dm *Defmap) string {
 	var cpp strings.Builder
 	for _, f := range dm.Funcs {
-		if f.used && f.Ast.Token.Id != lex.ID_NA {
+		if f.Used && f.Token.Id != lex.ID_NA {
 			cpp.WriteString(f.Prototype(""))
 			cpp.WriteByte('\n')
 		}
@@ -260,7 +260,7 @@ func (p *Parser) CppGlobals() string {
 func cppFuncs(dm *Defmap) string {
 	var cpp strings.Builder
 	for _, f := range dm.Funcs {
-		if f.used && f.Ast.Token.Id != lex.ID_NA {
+		if f.Used && f.Token.Id != lex.ID_NA {
 			cpp.WriteString(f.String())
 			cpp.WriteString("\n\n")
 		}
@@ -296,7 +296,7 @@ func (p *Parser) CppInitializerCaller() string {
 		}
 		cpp.WriteByte('\n')
 		cpp.WriteString(indent)
-		cpp.WriteString(f.outId())
+		cpp.WriteString(f.OutId())
 		cpp.WriteString("();")
 	}
 	for _, use := range used {
@@ -1120,9 +1120,7 @@ func (p *Parser) Trait(model models.Trait) {
 		}
 		_ = p.check_param_dup(f.Params)
 		p.parseTypesNonGenerics(f)
-		tf := new(Fn)
-		tf.Ast = f
-		trait.Defines.Funcs[i] = tf
+		trait.Defines.Funcs[i] = f
 	}
 	p.Defines.Traits = append(p.Defines.Traits, trait)
 }
@@ -1149,7 +1147,7 @@ func (p *Parser) implTrait(model *models.Impl) {
 		switch obj_t := obj.Data.(type) {
 		case models.Comment:
 			p.Comment(obj_t)
-		case *Func:
+		case *Fn:
 			if trait_def.FindFunc(obj_t.Id) == nil {
 				p.pusherrtok(model.Target.Token, "trait_hasnt_id", trait_def.Ast.Id, obj_t.Id)
 				break
@@ -1159,30 +1157,28 @@ func (p *Parser) implTrait(model *models.Impl) {
 				p.pusherrtok(obj_t.Token, "exist_id", obj_t.Id)
 				continue
 			}
-			sf := new(Fn)
-			sf.Ast = obj_t
-			sf.Ast.Receiver.Token = s.Ast.Token
-			sf.Ast.Receiver.Tag = s
-			sf.Ast.Attributes = p.attributes
-			sf.Ast.Owner = p
+			obj_t.Receiver.Token = s.Ast.Token
+			obj_t.Receiver.Tag = s
+			obj_t.Attributes = p.attributes
+			obj_t.Owner = p
 			p.attributes = nil
-			sf.Desc = p.docText.String()
+			obj_t.Desc = p.docText.String()
 			p.docText.Reset()
-			_ = p.check_param_dup(sf.Ast.Params)
-			p.check_ret_variables(sf.Ast)
-			sf.used = true
+			_ = p.check_param_dup(obj_t.Params)
+			p.check_ret_variables(obj_t)
+			obj_t.Used = true
 			if len(s.Ast.Generics) == 0 {
-				p.parseTypesNonGenerics(sf.Ast)
+				p.parseTypesNonGenerics(obj_t)
 			}
-			s.Defines.Funcs = append(s.Defines.Funcs, sf)
+			s.Defines.Funcs = append(s.Defines.Funcs, obj_t)
 		}
 	}
 	for _, tf := range trait_def.Defines.Funcs {
 		ok := false
-		ds := tf.Ast.DefString()
-		sf, _, _ := s.Defines.fn_by_id(tf.Ast.Id, nil)
+		ds := tf.DefString()
+		sf, _, _ := s.Defines.fn_by_id(tf.Id, nil)
 		if sf != nil {
-			ok = tf.Ast.Pub == sf.Ast.Pub && ds == sf.Ast.DefString()
+			ok = tf.Pub == sf.Pub && ds == sf.DefString()
 		}
 		if !ok {
 			p.pusherrtok(model.Target.Token, "not_impl_trait_def", trait_def.Ast.Id, ds)
@@ -1205,32 +1201,32 @@ func (p *Parser) implStruct(model *models.Impl) {
 			p.Generics(obj_t)
 		case models.Comment:
 			p.Comment(obj_t)
-		case *Func:
+		case *Fn:
 			i, _, _ := s.Defines.find_by_id(obj_t.Id, nil)
 			if i != -1 {
 				p.pusherrtok(obj_t.Token, "exist_id", obj_t.Id)
 				continue
 			}
 			sf := new(Fn)
-			sf.Ast = obj_t
-			sf.Ast.Receiver.Token = s.Ast.Token
-			sf.Ast.Receiver.Tag = s
-			sf.Ast.Attributes = p.attributes
+			*sf = *obj_t
+			sf.Receiver.Token = s.Ast.Token
+			sf.Receiver.Tag = s
+			sf.Attributes = p.attributes
 			sf.Desc = p.docText.String()
-			sf.Ast.Owner = p
+			sf.Owner = p
 			p.docText.Reset()
 			p.attributes = nil
-			setGenerics(sf.Ast, p.generics)
+			setGenerics(sf, p.generics)
 			p.generics = nil
-			_ = p.check_param_dup(sf.Ast.Params)
-			p.check_ret_variables(sf.Ast)
+			_ = p.check_param_dup(sf.Params)
+			p.check_ret_variables(sf)
 			for _, generic := range obj_t.Generics {
 				if find_generic(generic.Id, s.Ast.Generics) != nil {
 					p.pusherrtok(generic.Token, "exist_id", generic.Id)
 				}
 			}
 			if len(s.Ast.Generics) == 0 {
-				p.parseTypesNonGenerics(sf.Ast)
+				p.parseTypesNonGenerics(sf)
 			}
 			s.Defines.Funcs = append(s.Defines.Funcs, sf)
 		}
@@ -1298,23 +1294,10 @@ func (p *Parser) PushAttribute(c models.Comment) {
 	p.attributes = append(p.attributes, attr)
 }
 
-func genericsToCpp(generics []*GenericType) string {
-	if len(generics) == 0 {
-		return ""
-	}
-	var cpp strings.Builder
-	cpp.WriteString("template<")
-	for _, generic := range generics {
-		cpp.WriteString(generic.String())
-		cpp.WriteByte(',')
-	}
-	return cpp.String()[:cpp.Len()-1] + ">"
-}
-
 // St parse Jule statement.
 func (p *Parser) St(s models.Statement) {
 	switch data_t := s.Data.(type) {
-	case Func:
+	case Fn:
 		p.Func(data_t)
 	case Var:
 		p.Global(data_t)
@@ -1324,7 +1307,7 @@ func (p *Parser) St(s models.Statement) {
 }
 
 func (p *Parser) parseFuncNonGenericType(generics []*GenericType, dt *Type) {
-	f := dt.Tag.(*Func)
+	f := dt.Tag.(*Fn)
 	for i := range f.Params {
 		p.parseNonGenericType(generics, &f.Params[i].Type)
 	}
@@ -1403,14 +1386,14 @@ func (p *Parser) parseNonGenericType(generics []*GenericType, dt *Type) {
 	}
 }
 
-func (p *Parser) parseTypesNonGenerics(f *Func) {
+func (p *Parser) parseTypesNonGenerics(f *Fn) {
 	for i := range f.Params {
 		p.parseNonGenericType(f.Generics, &f.Params[i].Type)
 	}
 	p.parseNonGenericType(f.Generics, &f.RetType.Type)
 }
 
-func (p *Parser) check_ret_variables(f *Func) {
+func (p *Parser) check_ret_variables(f *Fn) {
 	for i, v := range f.RetType.Identifiers {
 		if juleapi.IsIgnoreId(v.Kind) {
 			continue
@@ -1440,7 +1423,7 @@ func (p *Parser) check_ret_variables(f *Func) {
 	}
 }
 
-func setGenerics(f *Func, generics []*models.GenericType) {
+func setGenerics(f *Fn, generics []*models.GenericType) {
 	f.Generics = generics
 	if len(f.Generics) > 0 {
 		f.Combines = new([][]models.Type)
@@ -1448,7 +1431,7 @@ func setGenerics(f *Func, generics []*models.GenericType) {
 }
 
 // Func parse Jule function.
-func (p *Parser) Func(ast Func) {
+func (p *Parser) Func(ast Fn) {
 	_, tok, canshadow := p.defined_by_id(ast.Id)
 	if tok.Id != lex.ID_NA && !canshadow {
 		p.pusherrtok(ast.Token, "exist_id", ast.Id)
@@ -1456,18 +1439,17 @@ func (p *Parser) Func(ast Func) {
 		p.pusherrtok(ast.Token, "ignore_id")
 	}
 	f := new(Fn)
-	f.Ast = new(Func)
-	*f.Ast = ast
-	f.Ast.Attributes = p.attributes
+	*f = ast
+	f.Attributes = p.attributes
 	p.attributes = nil
-	f.Ast.Owner = p
+	f.Owner = p
 	f.Desc = p.docText.String()
 	p.docText.Reset()
-	setGenerics(f.Ast, p.generics)
+	setGenerics(f, p.generics)
 	p.generics = nil
-	p.check_ret_variables(f.Ast)
-	_ = p.check_param_dup(f.Ast.Params)
-	f.used = f.Ast.Id == jule.INIT_FN
+	p.check_ret_variables(f)
+	_ = p.check_param_dup(f.Params)
+	f.Used = f.Id == jule.INIT_FN
 	p.Defines.Funcs = append(p.Defines.Funcs, f)
 }
 
@@ -1560,7 +1542,7 @@ func (p *Parser) Var(model Var) *Var {
 	return v
 }
 
-func (p *Parser) varsFromParams(f *Func) []*Var {
+func (p *Parser) varsFromParams(f *Fn) []*Var {
 	length := len(f.Params)
 	vars := make([]*Var, length)
 	for i, param := range f.Params {
@@ -1837,7 +1819,7 @@ func (p *Parser) defined_by_id(id string) (def any, tok lex.Token, canshadow boo
 	var f *Fn
 	f, _, canshadow = p.fn_by_id(id)
 	if f != nil {
-		return f, f.Ast.Token, canshadow
+		return f, f.Token, canshadow
 	}
 	bv, canshadow := p.block_var_by_id(id)
 	if bv != nil {
@@ -1892,8 +1874,8 @@ func (p *Parser) check_package() {
 		if f == nil {
 			p.PushErr("no_entry_point")
 		} else {
-			f.isEntryPoint = true
-			f.used = true
+			f.IsEntryPoint = true
+			f.Used = true
 		}
 	}
 	p.precheck_package()
@@ -2012,10 +1994,10 @@ func (p *Parser) parse_package_waiting_fns() {
 func (p *Parser) ParseWaitingFns() {
 	for _, f := range p.Defines.Funcs {
 		owner := p // f.Ast.Owner.(*Parser) == p
-		if len(f.Ast.Generics) > 0 {
-			owner.parseTypesNonGenerics(f.Ast)
+		if len(f.Generics) > 0 {
+			owner.parseTypesNonGenerics(f)
 		} else {
-			owner.reload_fn_types(f.Ast)
+			owner.reload_fn_types(f)
 		}
 	}
 }
@@ -2067,7 +2049,7 @@ func (p *Parser) checkParamDefaultExprWithDefault(param *Param) {
 	}
 }
 
-func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) {
+func (p *Parser) checkParamDefaultExpr(f *Fn, param *Param) {
 	if !paramHasDefaultArg(param) || param.Token.Id == lex.ID_NA {
 		return
 	}
@@ -2092,7 +2074,7 @@ func (p *Parser) checkParamDefaultExpr(f *Func, param *Param) {
 	p.checkArgType(param, v, param.Token)
 }
 
-func (p *Parser) param(f *Func, param *Param) (err bool) {
+func (p *Parser) param(f *Fn, param *Param) (err bool) {
 	p.checkParamDefaultExpr(f, param)
 	return
 }
@@ -2111,7 +2093,7 @@ func (p *Parser) check_param_dup(params []models.Param) (err bool) {
 	return
 }
 
-func (p *Parser) params(f *Func) (err bool) {
+func (p *Parser) params(f *Fn) (err bool) {
 	hasDefaultArg := false
 	for i := range f.Params {
 		param := &f.Params[i]
@@ -2127,7 +2109,7 @@ func (p *Parser) params(f *Func) (err bool) {
 	return
 }
 
-func (p *Parser) block_variables_of_fn(f *Func) []*Var {
+func (p *Parser) block_variables_of_fn(f *Fn) []*Var {
 	vars := p.varsFromParams(f)
 	vars = append(vars, f.RetType.Vars(f.Block)...)
 	if f.Receiver != nil {
@@ -2137,7 +2119,7 @@ func (p *Parser) block_variables_of_fn(f *Func) []*Var {
 	return vars
 }
 
-func (p *Parser) parse_pure_fn(f *Func) (err bool) {
+func (p *Parser) parse_pure_fn(f *Fn) (err bool) {
 	hasError := p.eval.has_error
 	owner := f.Owner.(*Parser)
 	err = owner.params(f)
@@ -2158,25 +2140,24 @@ func (p *Parser) parse_pure_fn(f *Func) (err bool) {
 }
 
 func (p *Parser) parse_fn(f *Fn) (err bool) {
-	if f.checked || len(f.Ast.Generics) > 0 {
+	if len(f.Generics) > 0 {
 		return false
 	}
-	return p.parse_pure_fn(f.Ast)
+	return p.parse_pure_fn(f)
 }
 
 func (p *Parser) check_fns() {
 	err := false
 	check := func(f *Fn) {
-		if len(f.Ast.Generics) > 0 {
+		if len(f.Generics) > 0 {
 			return
 		}
-		p.check_fn_special_cases(f.Ast)
+		p.check_fn_special_cases(f)
 		if err {
 			return
 		}
 		p.blockTypes = nil
 		err = p.parse_fn(f)
-		f.checked = true
 	}
 	for _, f := range p.Defines.Funcs {
 		check(f)
@@ -2184,11 +2165,11 @@ func (p *Parser) check_fns() {
 }
 
 func (p *Parser) parseStructFunc(s *structure, f *Fn) (err bool) {
-	if len(f.Ast.Generics) > 0 {
+	if len(f.Generics) > 0 {
 		return
 	}
 	if len(s.Ast.Generics) == 0 {
-		p.parseTypesNonGenerics(f.Ast)
+		p.parseTypesNonGenerics(f)
 		return p.parse_fn(f)
 	}
 	return
@@ -2196,15 +2177,11 @@ func (p *Parser) parseStructFunc(s *structure, f *Fn) (err bool) {
 
 func (p *Parser) checkStruct(xs *structure) (err bool) {
 	for _, f := range xs.Defines.Funcs {
-		if f.checked {
-			continue
-		}
 		p.blockTypes = nil
 		err = p.parseStructFunc(xs, f)
 		if err {
 			break
 		}
-		f.checked = true
 	}
 	return
 }
@@ -2222,14 +2199,14 @@ func (p *Parser) check_structs() {
 	}
 }
 
-func (p *Parser) check_fn_special_cases(f *Func) {
+func (p *Parser) check_fn_special_cases(f *Fn) {
 	switch f.Id {
 	case jule.ENTRY_POINT, jule.INIT_FN:
 		p.checkSolidFuncSpecialCases(f)
 	}
 }
 
-func (p *Parser) call_fn(f *Func, data callData, m *exprModel) value {
+func (p *Parser) call_fn(f *Fn, data callData, m *exprModel) value {
 	v := p.parse_fn_call_toks(f, data.generics, data.args, m)
 	v.lvalue = type_is_lvalue(v.data.Type)
 	return v
@@ -2299,7 +2276,7 @@ func (p *Parser) structConstructorInstance(as *structure) *structure {
 	s.origin = as
 	s.cpp_linked = as.cpp_linked
 	s.Ast = as.Ast
-	s.constructor = new(Func)
+	s.constructor = new(Fn)
 	*s.constructor = *as.constructor
 	s.constructor.RetType.Type.Tag = s
 	s.Defines = as.Defines
@@ -2307,13 +2284,13 @@ func (p *Parser) structConstructorInstance(as *structure) *structure {
 		f := &s.Defines.Funcs[i]
 		nf := new(Fn)
 		*nf = **f
-		nf.Ast.Receiver.Tag = s
+		nf.Receiver.Tag = s
 		*f = nf
 	}
 	return s
 }
 
-func (p *Parser) check_anon_fn(f *Func) {
+func (p *Parser) check_anon_fn(f *Fn) {
 	_ = p.check_param_dup(f.Params)
 	p.check_ret_variables(f)
 	p.reload_fn_types(f)
@@ -2423,7 +2400,7 @@ func (p *Parser) fn_parse_type(t *Type) bool {
 	return ok
 }
 
-func (p *Parser) reload_fn_types(f *Func) {
+func (p *Parser) reload_fn_types(f *Fn) {
 	for i := range f.Params {
 		_ = p.fn_parse_type(&f.Params[i].Type)
 	}
@@ -2433,7 +2410,7 @@ func (p *Parser) reload_fn_types(f *Func) {
 	}
 }
 
-func itsCombined(f *Func, generics []Type) bool {
+func itsCombined(f *Fn, generics []Type) bool {
 	if f.Combines == nil { // Built-in
 		return true
 	}
@@ -2448,7 +2425,7 @@ func itsCombined(f *Func, generics []Type) bool {
 	return false
 }
 
-func (p *Parser) parseGenericFunc(f *Func, generics []Type, errtok lex.Token) {
+func (p *Parser) parseGenericFunc(f *Fn, generics []Type, errtok lex.Token) {
 	owner := f.Owner.(*Parser)
 	if f.Receiver != nil {
 		s := f.Receiver.Tag.(*structure)
@@ -2464,7 +2441,7 @@ func (p *Parser) parseGenericFunc(f *Func, generics []Type, errtok lex.Token) {
 	p.parse_pure_fn(f)
 }
 
-func (p *Parser) parseGenerics(f *Func, args *models.Args, errTok lex.Token) bool {
+func (p *Parser) parseGenerics(f *Fn, args *models.Args, errTok lex.Token) bool {
 	if len(f.Generics) > 0 && len(args.Generics) == 0 {
 		for _, generic := range f.Generics {
 			ok := false
@@ -2493,7 +2470,7 @@ ok:
 	return true
 }
 
-func (p *Parser) parse_fn_call(f *Func, args *models.Args, m *exprModel, errTok lex.Token) (v value) {
+func (p *Parser) parse_fn_call(f *Fn, args *models.Args, m *exprModel, errTok lex.Token) (v value) {
 	args.NeedsPureType = p.rootBlock == nil || len(p.rootBlock.Func.Generics) == 0
 	if len(f.Generics) > 0 {
 		params := make([]Param, len(f.Params))
@@ -2566,7 +2543,7 @@ end:
 	return
 }
 
-func (p *Parser) parse_fn_call_toks(f *Func, genericsToks, argsToks []lex.Token, m *exprModel) (v value) {
+func (p *Parser) parse_fn_call_toks(f *Fn, genericsToks, argsToks []lex.Token, m *exprModel) (v value) {
 	var generics []Type
 	var args *models.Args
 	var err bool
@@ -2580,7 +2557,7 @@ func (p *Parser) parse_fn_call_toks(f *Func, genericsToks, argsToks []lex.Token,
 	return p.parse_fn_call(f, args, m, argsToks[0])
 }
 
-func (p *Parser) parseStructArgs(f *Func, args *models.Args, errTok lex.Token) {
+func (p *Parser) parseStructArgs(f *Fn, args *models.Args, errTok lex.Token) {
 	sap := structArgParser{
 		p:      p,
 		f:      f,
@@ -2590,7 +2567,7 @@ func (p *Parser) parseStructArgs(f *Func, args *models.Args, errTok lex.Token) {
 	sap.parse()
 }
 
-func (p *Parser) parsePureArgs(f *Func, args *models.Args, m *exprModel, errTok lex.Token) {
+func (p *Parser) parsePureArgs(f *Fn, args *models.Args, m *exprModel, errTok lex.Token) {
 	pap := pureArgParser{
 		p:      p,
 		f:      f,
@@ -2601,7 +2578,7 @@ func (p *Parser) parsePureArgs(f *Func, args *models.Args, m *exprModel, errTok 
 	pap.parse()
 }
 
-func (p *Parser) parseArgs(f *Func, args *models.Args, m *exprModel, errTok lex.Token) {
+func (p *Parser) parseArgs(f *Fn, args *models.Args, m *exprModel, errTok lex.Token) {
 	if args.Targeted {
 		p.parseStructArgs(f, args, errTok)
 		return
@@ -2624,9 +2601,9 @@ type paramMapPair struct {
 	arg   *Arg
 }
 
-func (p *Parser) pushGenericByFunc(f *Func, pair *paramMapPair, args *models.Args, gt Type) bool {
-	tf := gt.Tag.(*Func)
-	cf := pair.param.Type.Tag.(*Func)
+func (p *Parser) pushGenericByFunc(f *Fn, pair *paramMapPair, args *models.Args, gt Type) bool {
+	tf := gt.Tag.(*Fn)
+	cf := pair.param.Type.Tag.(*Fn)
 	if len(tf.Params) != len(cf.Params) {
 		return false
 	}
@@ -2647,7 +2624,7 @@ func (p *Parser) pushGenericByFunc(f *Func, pair *paramMapPair, args *models.Arg
 	}
 }
 
-func (p *Parser) pushGenericByMultiTyped(f *Func, pair *paramMapPair, args *models.Args, gt Type) bool {
+func (p *Parser) pushGenericByMultiTyped(f *Fn, pair *paramMapPair, args *models.Args, gt Type) bool {
 	types := gt.Tag.([]Type)
 	for _, mt := range types {
 		for _, generic := range f.Generics {
@@ -2660,7 +2637,7 @@ func (p *Parser) pushGenericByMultiTyped(f *Func, pair *paramMapPair, args *mode
 	return true
 }
 
-func (p *Parser) pushGenericByCommonArg(f *Func, pair *paramMapPair, args *models.Args, t Type) bool {
+func (p *Parser) pushGenericByCommonArg(f *Fn, pair *paramMapPair, args *models.Args, t Type) bool {
 	for _, generic := range f.Generics {
 		if type_is_this_generic(generic, pair.param.Type) {
 			p.pushGenericByType(f, generic, args, t)
@@ -2670,7 +2647,7 @@ func (p *Parser) pushGenericByCommonArg(f *Func, pair *paramMapPair, args *model
 	return false
 }
 
-func (p *Parser) pushGenericByType(f *Func, generic *GenericType, args *models.Args, gt Type) {
+func (p *Parser) pushGenericByType(f *Fn, generic *GenericType, args *models.Args, gt Type) {
 	owner := f.Owner.(*Parser)
 	// Already added
 	alias, _ := owner.block_type_by_id(generic.Id)
@@ -2683,14 +2660,14 @@ func (p *Parser) pushGenericByType(f *Func, generic *GenericType, args *models.A
 	args.Generics = append(args.Generics, gt)
 }
 
-func (p *Parser) pushGenericByComponent(f *Func, pair *paramMapPair, args *models.Args, argType Type) bool {
+func (p *Parser) pushGenericByComponent(f *Fn, pair *paramMapPair, args *models.Args, argType Type) bool {
 	for argType.ComponentType != nil {
 		argType = *argType.ComponentType
 	}
 	return p.pushGenericByCommonArg(f, pair, args, argType)
 }
 
-func (p *Parser) pushGenericByArg(f *Func, pair *paramMapPair, args *models.Args, argType Type) bool {
+func (p *Parser) pushGenericByArg(f *Fn, pair *paramMapPair, args *models.Args, argType Type) bool {
 	_, prefix := pair.param.Type.KindId()
 	_, tprefix := argType.KindId()
 	if prefix != tprefix {
@@ -2708,7 +2685,7 @@ func (p *Parser) pushGenericByArg(f *Func, pair *paramMapPair, args *models.Args
 	}
 }
 
-func (p *Parser) parseArg(f *Func, pair *paramMapPair, args *models.Args, variadiced *bool) {
+func (p *Parser) parseArg(f *Fn, pair *paramMapPair, args *models.Args, variadiced *bool) {
 	var value value
 	var model iExpr
 	if pair.param.Variadic {
@@ -2761,7 +2738,7 @@ func (p *Parser) get_range(open, close string, toks []lex.Token) (_ []lex.Token,
 	return toks, toks != nil
 }
 
-func (p *Parser) checkSolidFuncSpecialCases(f *Func) {
+func (p *Parser) checkSolidFuncSpecialCases(f *Fn) {
 	if len(f.Params) > 0 {
 		p.pusherrtok(f.Token, "fn_have_parameters", f.Id)
 	}
@@ -2930,7 +2907,7 @@ func (p *Parser) recoverFuncExprSt(s *models.ExprStatement) {
 	errtok := s.Expr.Tokens[0]
 	callToks := s.Expr.Tokens[1:]
 	args := p.get_args(callToks, false)
-	handleParam := recoverFunc.Ast.Params[0]
+	handleParam := recoverFunc.Params[0]
 	if len(args.Src) == 0 {
 		p.pusherrtok(errtok, "missing_expr_for", handleParam.Id)
 		return
@@ -2943,7 +2920,7 @@ func (p *Parser) recoverFuncExprSt(s *models.ExprStatement) {
 			handleParam.Type.Kind, v.data.Type.Kind)
 		return
 	}
-	handler := v.data.Type.Tag.(*Func)
+	handler := v.data.Type.Tag.(*Fn)
 	s.Expr.Model = exprNode{"try{\n"}
 	var catcher serieExpr
 	catcher.exprs = append(catcher.exprs, "} catch(trait<JULEC_ID(Error)> ")
@@ -2971,7 +2948,7 @@ func (p *Parser) expr_st(s *models.ExprStatement, recover bool) {
 	if s.Expr.IsNotBinop() {
 		expr := s.Expr.Op.(models.BinopExpr)
 		tok := expr.Tokens[0]
-		if tok.Id == lex.ID_IDENT && tok.Kind == recoverFunc.Ast.Id {
+		if tok.Id == lex.ID_IDENT && tok.Kind == recoverFunc.Id {
 			if ast.IsFnCall(s.Expr.Tokens) != nil {
 				if !recover {
 					p.pusherrtok(tok, "invalid_syntax")
@@ -3217,7 +3194,7 @@ func hasRet(b *models.Block) (ok bool, fall bool) {
 	return false, fall
 }
 
-func (p *Parser) checkRets(f *Func) {
+func (p *Parser) checkRets(f *Fn) {
 	ok, _ := hasRet(f.Block)
 	if ok {
 		return
@@ -3227,7 +3204,7 @@ func (p *Parser) checkRets(f *Func) {
 	}
 }
 
-func (p *Parser) check_fn(f *Func) {
+func (p *Parser) check_fn(f *Fn) {
 	if f.Block == nil || f.Block.Tree == nil {
 		goto always
 	} else {
@@ -3275,7 +3252,7 @@ func (p *Parser) assignment(left value, errtok lex.Token) bool {
 		p.pusherrtok(errtok, "assignment_to_non_mut")
 	}
 	switch left.data.Type.Tag.(type) {
-	case Func:
+	case Fn:
 		f, _, _ := p.fn_by_id(left.data.Token.Kind)
 		if f != nil {
 			p.pusherrtok(errtok, "assign_type_not_support_value")
@@ -3708,7 +3685,7 @@ func (p *Parser) typeSourceIsEnum(e *Enum, tag any) (dt Type, _ bool) {
 }
 
 func (p *Parser) typeSourceIsFn(dt Type, err bool) (Type, bool) {
-	f := dt.Tag.(*Func)
+	f := dt.Tag.(*Fn)
 	p.reload_fn_types(f)
 	dt.Kind = f.TypeKind()
 	return dt, true
@@ -3748,11 +3725,11 @@ func (p *Parser) typeSourceIsStruct(s *structure, st Type) (dt Type, _ bool) {
 		}
 		if len(s.Defines.Funcs) > 0 {
 			for _, f := range s.Defines.Funcs {
-				if len(f.Ast.Generics) == 0 {
+				if len(f.Generics) == 0 {
 					blockVars := owner.blockVars
 					blockTypes := owner.blockTypes
-					owner.reload_fn_types(f.Ast)
-					_ = p.parse_pure_fn(f.Ast)
+					owner.reload_fn_types(f)
+					_ = p.parse_pure_fn(f)
 					owner.blockVars = blockVars
 					owner.blockTypes = blockTypes
 				}
