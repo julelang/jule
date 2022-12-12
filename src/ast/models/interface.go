@@ -1,17 +1,8 @@
 package models
 
-// CompiledStruct instance.
-type CompiledStruct interface {
-	OutId() string
-	Generics() []Type
-	SetGenerics([]Type)
-	CppLinked() bool
-	Get_ast() Struct
-}
-
 // Genericable instance.
 type Genericable interface {
-	Generics() []Type
+	GetGenerics() []Type
 	SetGenerics([]Type)
 }
 

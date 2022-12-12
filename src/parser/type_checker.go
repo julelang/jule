@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/pkg/juletype"
 )
@@ -38,7 +39,7 @@ func (tc *type_checker) check_trait() bool {
 	if tc.r.Id == juletype.NIL {
 		return true
 	}
-	t := tc.l.Tag.(*trait)
+	t := tc.l.Tag.(*models.Trait)
 	lm := tc.l.Modifiers()
 	ref := false
 	switch {
@@ -57,18 +58,18 @@ func (tc *type_checker) check_trait() bool {
 		if rm != "" {
 			return false
 		}
-		s := tc.r.Tag.(*structure)
-		if !s.hasTrait(t) {
+		s := tc.r.Tag.(*models.Struct)
+		if !s.HasTrait(t) {
 			return false
 		}
-		if t.has_reference_receiver() && !ref {
+		if trait_has_reference_receiver(t) && !ref {
 			tc.error_logged = true
 			tc.p.pusherrtok(tc.errtok, "trait_has_reference_parametered_function")
 			return false
 		}
 		return true
 	case type_is_trait(tc.r):
-		return t == tc.r.Tag.(*trait) && lm == tc.r.Modifiers()
+		return t == tc.r.Tag.(*models.Trait) && lm == tc.r.Modifiers()
 	}
 	return false
 }
@@ -77,21 +78,21 @@ func (tc *type_checker) check_struct() bool {
 	if tc.r.Tag == nil {
 		return false
 	}
-	s1, s2 := tc.l.Tag.(*structure), tc.r.Tag.(*structure)
+	s1, s2 := tc.l.Tag.(*models.Struct), tc.r.Tag.(*models.Struct)
 	switch {
-	case s1.Ast.Id != s2.Ast.Id,
-		s1.Ast.Token.File != s2.Ast.Token.File:
+	case s1.Id != s2.Id,
+		s1.Token.File != s2.Token.File:
 		return false
 	}
-	if len(s1.Ast.Generics) == 0 {
+	if len(s1.Generics) == 0 {
 		return true
 	}
-	n1, n2 := len(s1.generics), len(s2.generics)
+	n1, n2 := len(s1.GetGenerics()), len(s2.GetGenerics())
 	if n1 != n2 {
 		return false
 	}
-	for i, g1 := range s1.generics {
-		g2 := s2.generics[i]
+	for i, g1 := range s1.GetGenerics() {
+		g2 := s2.GetGenerics()[i]
 		if !types_equals(g1, g2) {
 			return false
 		}

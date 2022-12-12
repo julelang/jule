@@ -4,17 +4,9 @@ import (
 	"strings"
 
 	"github.com/julelang/jule/ast/models"
-	"github.com/julelang/jule/pkg/juleapi"
 )
 
-type trait struct {
-	Ast  *models.Trait
-	Defines *Defmap
-	Used bool
-	Desc string
-}
-
-func (t *trait) has_reference_receiver() bool {
+func trait_has_reference_receiver(t *models.Trait) bool {
 	for _, f := range t.Defines.Funcs {
 		if type_is_ref(f.Receiver.Type) {
 			return true
@@ -23,23 +15,7 @@ func (t *trait) has_reference_receiver() bool {
 	return false
 }
 
-// FindFunc returns function by id.
-// Returns nil if not exist.
-func (t *trait) FindFunc(id string) *Fn {
-	for _, f := range t.Defines.Funcs {
-		if f.Id == id {
-			return f
-		}
-	}
-	return nil
-}
-
-// OutId returns juleapi.OutId result of trait.
-func (t *trait) OutId() string {
-	return juleapi.OutId(t.Ast.Id, t.Ast.Token.File)
-}
-
-func (t *trait) String() string {
+func traitToString(t *models.Trait) string {
 	var cpp strings.Builder
 	cpp.WriteString("struct ")
 	outid := t.OutId()
@@ -51,7 +27,7 @@ func (t *trait) String() string {
 	cpp.WriteString("virtual ~")
 	cpp.WriteString(outid)
 	cpp.WriteString("(void) noexcept {}\n\n")
-	for _, f := range t.Ast.Funcs {
+	for _, f := range t.Funcs {
 		cpp.WriteString(is)
 		cpp.WriteString("virtual ")
 		cpp.WriteString(f.RetType.String())

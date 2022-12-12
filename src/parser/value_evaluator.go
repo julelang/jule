@@ -263,25 +263,25 @@ func (ve *valueEvaluator) enumId(id string, e *Enum) (v value) {
 	return
 }
 
-func make_value_from_struct(s *structure) (v value) {
-	v.data.Value = s.Ast.Id
+func make_value_from_struct(s *Struct) (v value) {
+	v.data.Value = s.Id
 	v.data.Type.Id = juletype.STRUCT
 	v.data.Type.Tag = s
-	v.data.Type.Kind = s.Ast.Id
-	v.data.Type.Token = s.Ast.Token
-	v.data.Token = s.Ast.Token
+	v.data.Type.Kind = s.Id
+	v.data.Type.Token = s.Token
+	v.data.Token = s.Token
 	v.is_type = true
 	return
 }
 
-func (ve *valueEvaluator) structId(id string, s *structure) (v value) {
+func (ve *valueEvaluator) structId(id string, s *Struct) (v value) {
 	s.Used = true
 	v = make_value_from_struct(s)
 	// If builtin.
-	if s.Ast.Token.Id == lex.ID_NA {
+	if s.Token.Id == lex.ID_NA {
 		ve.model.append_sub(exprNode{juleapi.OutId(id, nil)})
 	} else {
-		ve.model.append_sub(exprNode{juleapi.OutId(id, s.Ast.Token.File)})
+		ve.model.append_sub(exprNode{juleapi.OutId(id, s.Token.File)})
 	}
 	return
 }
@@ -292,7 +292,7 @@ func (ve *valueEvaluator) typeId(id string, t *TypeAlias) (_ value, _ bool) {
 		return
 	}
 	if type_is_struct(dt) {
-		return ve.structId(id, dt.Tag.(*structure)), true
+		return ve.structId(id, dt.Tag.(*Struct)), true
 	}
 	return
 }

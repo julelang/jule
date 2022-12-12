@@ -24,7 +24,7 @@ const maxU16 = 65535
 const maxU32 = 4294967295
 const maxU64 = 18446744073709551615
 
-var i8statics = &Defmap{
+var i8statics = &models.Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -49,7 +49,7 @@ var i8statics = &Defmap{
 	},
 }
 
-var i16statics = &Defmap{
+var i16statics = &models.Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -74,7 +74,7 @@ var i16statics = &Defmap{
 	},
 }
 
-var i32statics = &Defmap{
+var i32statics = &models.Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -99,7 +99,7 @@ var i32statics = &Defmap{
 	},
 }
 
-var i64statics = &Defmap{
+var i64statics = &models.Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -124,7 +124,7 @@ var i64statics = &Defmap{
 	},
 }
 
-var u8statics = &Defmap{
+var u8statics = &models.Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -139,7 +139,7 @@ var u8statics = &Defmap{
 	},
 }
 
-var u16statics = &Defmap{
+var u16statics = &models.Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -154,7 +154,7 @@ var u16statics = &Defmap{
 	},
 }
 
-var u32statics = &Defmap{
+var u32statics = &models.Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -169,7 +169,7 @@ var u32statics = &Defmap{
 	},
 }
 
-var u64statics = &Defmap{
+var u64statics = &models.Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -184,7 +184,7 @@ var u64statics = &Defmap{
 	},
 }
 
-var uintStatics = &Defmap{
+var uintStatics = &models.Defmap{
 	Globals: []*Var{
 		{
 			Pub:   true,
@@ -195,7 +195,7 @@ var uintStatics = &Defmap{
 	},
 }
 
-var intStatics = &Defmap{
+var intStatics = &models.Defmap{
 	Globals: []*Var{
 		{
 			Const: true,
@@ -215,7 +215,7 @@ const minF32 = 1.17549435082228750796873653722224568e-38
 
 var min_modelF32 = exprNode{juletype.CppId(juletype.F32) + "{1.17549435082228750796873653722224568e-38F}"}
 
-var f32statics = &Defmap{
+var f32statics = &models.Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -241,7 +241,7 @@ const minF64 = 2.22507385850720138309023271733240406e-308
 
 var min_modelF64 = exprNode{juletype.CppId(juletype.F64) + "{2.22507385850720138309023271733240406e-308}"}
 
-var f64statics = &Defmap{
+var f64statics = &models.Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -269,11 +269,9 @@ var strDefaultFunc = Fn{
 	RetType: RetType{Type: Type{Id: juletype.STR, Kind: juletype.TYPE_MAP[juletype.STR]}},
 }
 
-var errorTrait = &trait{
-	Ast: &models.Trait{
-		Id: "Error",
-	},
-	Defines: &Defmap{
+var errorTrait = &models.Trait{
+	Id: "Error",
+	Defines: &models.Defmap{
 		Funcs: []*Fn{
 			{
 				Pub:     true,
@@ -288,7 +286,7 @@ var errorTrait = &trait{
 
 var errorType = Type{
 	Id:   juletype.TRAIT,
-	Kind: errorTrait.Ast.Id,
+	Kind: errorTrait.Id,
 	Tag:  errorTrait,
 	Pure: true,
 }
@@ -358,7 +356,7 @@ var outln_fn *Fn
 var builtinFile = &Parser{}
 
 // Builtin definitions.
-var Builtin = &Defmap{
+var Builtin = &models.Defmap{
 	Types: []*models.TypeAlias{
 		{
 			Pub:  true,
@@ -436,12 +434,12 @@ var Builtin = &Defmap{
 			},
 		},
 	},
-	Traits: []*trait{
+	Traits: []*models.Trait{
 		errorTrait,
 	},
 }
 
-var strDefines = &Defmap{
+var strDefines = &models.Defmap{
 	Globals: []*Var{
 		{
 			Pub:  true,
@@ -536,7 +534,7 @@ func readyStrDefines(s value) {
 	}
 }
 
-var sliceDefines = &Defmap{
+var sliceDefines = &models.Defmap{
 	Globals: []*Var{
 		{
 			Pub:  true,
@@ -560,7 +558,7 @@ var sliceDefines = &Defmap{
 	},
 }
 
-var arrayDefines = &Defmap{
+var arrayDefines = &models.Defmap{
 	Globals: []*Var{
 		{
 			Pub:  true,
@@ -578,7 +576,7 @@ var arrayDefines = &Defmap{
 	},
 }
 
-var mapDefines = &Defmap{
+var mapDefines = &models.Defmap{
 	Globals: []*Var{
 		{
 			Pub:  true,
@@ -626,18 +624,18 @@ func readyMapDefines(mapt Type) {
 	keyt := types[0]
 	valt := types[1]
 
-	keysFunc, _, _ := mapDefines.fn_by_id("keys", nil)
+	keysFunc, _, _ := mapDefines.FnById("keys", nil)
 	keysFunc.RetType.Type = keyt
 	keysFunc.RetType.Type.Kind = jule.PREFIX_SLICE + keysFunc.RetType.Type.Kind
 
-	valuesFunc, _, _ := mapDefines.fn_by_id("values", nil)
+	valuesFunc, _, _ := mapDefines.FnById("values", nil)
 	valuesFunc.RetType.Type = valt
 	valuesFunc.RetType.Type.Kind = jule.PREFIX_SLICE + valuesFunc.RetType.Type.Kind
 
-	hasFunc, _, _ := mapDefines.fn_by_id("has", nil)
+	hasFunc, _, _ := mapDefines.FnById("has", nil)
 	hasFunc.Params[0].Type = keyt
 
-	delFunc, _, _ := mapDefines.fn_by_id("del", nil)
+	delFunc, _, _ := mapDefines.FnById("del", nil)
 	delFunc.Params[0].Type = keyt
 }
 
@@ -655,7 +653,7 @@ func init() {
 	make_fn.BuiltinCaller = caller_make
 
 	// Setup new function
-	fn_new, _, _ := Builtin.fn_by_id("new", nil)
+	fn_new, _, _ := Builtin.FnById("new", nil)
 	fn_new.BuiltinCaller = caller_new
 
 	// Setup Error trait
@@ -761,7 +759,7 @@ func caller_new(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 		p.pusherrtok(errtok, "invalid_type")
 	}
 	if type_is_struct(t) {
-		s := t.Tag.(*structure)
+		s := t.Tag.(*models.Struct)
 		for _, f := range s.Defines.Globals {
 			if type_is_ref(f.Type) {
 				p.pusherrtok(errtok, "ref_used_struct_used_at_new_fn")
@@ -778,7 +776,7 @@ func caller_new(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 
 // std::mem
 
-var std_mem_builtin = &Defmap{
+var std_mem_builtin = &models.Defmap{
 	Funcs: []*Fn{
 		{Id: "size_of", BuiltinCaller: caller_mem_size_of},
 		{Id: "align_of", BuiltinCaller: caller_mem_align_of},
@@ -841,6 +839,6 @@ func caller_mem_align_of(p *Parser, _ *Fn, data callData, m *exprModel) (v value
 	return
 }
 
-var std_builtin_defines = map[string]*Defmap{
+var std_builtin_defines = map[string]*models.Defmap{
 	"std::mem": std_mem_builtin,
 }

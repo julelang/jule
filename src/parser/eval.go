@@ -344,7 +344,7 @@ func (e *eval) try_cpp_linked_var(toks []lex.Token, m *exprModel) (v value, ok b
 	case 'v':
 		v = make_value_from_var(def.(*models.Var))
 	case 's':
-		v = make_value_from_struct(def.(*structure))
+		v = make_value_from_struct(def.(*models.Struct))
 	// Cpp linkage not supports type aliases in expressions
 	}
 	return
@@ -568,9 +568,9 @@ func (e *eval) castStruct(t Type, v *value, errtok lex.Token) {
 		e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
 		return
 	}
-	s := t.Tag.(*structure)
-	tr := v.data.Type.Tag.(*trait)
-	if !s.hasTrait(tr) {
+	s := t.Tag.(*models.Struct)
+	tr := v.data.Type.Tag.(*models.Trait)
+	if !s.HasTrait(tr) {
 		e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
 	}
 }
@@ -695,8 +695,8 @@ func (e *eval) castSlice(t, vt Type, errtok lex.Token) {
 	}
 }
 
-func (e *eval) juletypeSubId(dm *Defmap, idTok lex.Token, m *exprModel) (v value) {
-	i, dm, t := dm.find_by_id(idTok.Kind, nil)
+func (e *eval) juletypeSubId(dm *models.Defmap, idTok lex.Token, m *exprModel) (v value) {
+	i, dm, t := dm.FindById(idTok.Kind, nil)
 	if i == -1 {
 		e.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
 		return
@@ -822,7 +822,7 @@ func (e *eval) typeId(toks []lex.Token, m *exprModel) (v value) {
 			e.pusherrtok(toks[0], "invalid_syntax")
 			return
 		}
-		s := t.Tag.(*structure)
+		s := t.Tag.(*models.Struct)
 		return e.p.callStructConstructor(s, toks, m)
 	}
 	if toks[0].Id != lex.ID_BRACE || toks[0].Kind != lex.KND_LBRACKET {
@@ -832,8 +832,8 @@ func (e *eval) typeId(toks []lex.Token, m *exprModel) (v value) {
 	return e.enumerable(toks, t, m)
 }
 
-func (e *eval) xObjSubId(dm *Defmap, val value, interior_mutability bool, idTok lex.Token, m *exprModel) (v value) {
-	i, dm, t := dm.find_by_id(idTok.Kind, idTok.File)
+func (e *eval) xObjSubId(dm *models.Defmap, val value, interior_mutability bool, idTok lex.Token, m *exprModel) (v value) {
+	i, dm, t := dm.FindById(idTok.Kind, idTok.File)
 	if i == -1 {
 		e.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
 		return
@@ -914,7 +914,7 @@ func (e *eval) enumSubId(val value, idTok lex.Token, m *exprModel) (v value) {
 
 func (e *eval) structObjSubId(val value, idTok lex.Token, m *exprModel) value {
 	parent_type := val.data.Type
-	s := val.data.Type.Tag.(*structure)
+	s := val.data.Type.Tag.(*models.Struct)
 	val.constExpr = false
 	val.is_type = false
 	if val.data.Value == lex.KND_SELF {
@@ -932,8 +932,8 @@ func (e *eval) structObjSubId(val value, idTok lex.Token, m *exprModel) value {
 	interior_mutability := false
 	if e.p.rootBlock.Func.Receiver != nil {
 		switch t := e.p.rootBlock.Func.Receiver.Tag.(type) {
-		case *structure:
-			interior_mutability = structure_instances_is_uses_same_base(t, s)
+		case *models.Struct:
+			interior_mutability = t.IsSameBase(s)
 		}
 	}
 	val = e.xObjSubId(s.Defines, val, interior_mutability, idTok, m)
@@ -948,7 +948,7 @@ func (e *eval) structObjSubId(val value, idTok lex.Token, m *exprModel) value {
 
 func (e *eval) traitObjSubId(val value, idTok lex.Token, m *exprModel) value {
 	m.append_sub(exprNode{".get()"})
-	t := val.data.Type.Tag.(*trait)
+	t := val.data.Type.Tag.(*models.Trait)
 	val.constExpr = false
 	val.lvalue = false
 	val.is_type = false
@@ -958,36 +958,36 @@ func (e *eval) traitObjSubId(val value, idTok lex.Token, m *exprModel) value {
 }
 
 type ns_find interface {
-	ns_by_id(string) *namespace
+	NsById(string) *models.Namespace
 }
 
-func (e *eval) getNs(toks *[]lex.Token) *Defmap {
+func (e *eval) getNs(toks *[]lex.Token) *models.Defmap {
 	var prev ns_find = e.p
-	var ns *namespace
+	var ns *models.Namespace
 	for i, tok := range *toks {
 		if (i+1)%2 != 0 {
 			if tok.Id != lex.ID_IDENT {
 				e.pusherrtok(tok, "invalid_syntax")
 				continue
 			}
-			src := prev.ns_by_id(tok.Kind)
+			src := prev.NsById(tok.Kind)
 			if src == nil {
 				if ns != nil {
 					*toks = (*toks)[i:]
-					return ns.defines
+					return ns.Defines
 				}
 				e.pusherrtok(tok, "namespace_not_exist", tok.Kind)
 				return nil
 			}
-			prev = src.defines
+			prev = src.Defines
 			ns = src
 			continue
 		}
 		if tok.Id != lex.ID_DBLCOLON {
-			return ns.defines
+			return ns.Defines
 		}
 	}
-	return ns.defines
+	return ns.Defines
 }
 
 func (e *eval) nsSubId(toks []lex.Token, m *exprModel) (v value) {
@@ -1529,7 +1529,7 @@ func (e *eval) braceRange(toks []lex.Token, m *exprModel) (v value) {
 				return e.enumerable(toks, *e.type_prefix, m)
 			case type_is_struct(*e.type_prefix):
 				prefix := e.type_prefix
-				s := e.type_prefix.Tag.(*structure)
+				s := e.type_prefix.Tag.(*models.Struct)
 				v = e.p.callStructConstructor(s, toks, m)
 				e.type_prefix = prefix
 				return

@@ -106,9 +106,9 @@ func (u *unary) amper() value {
 	nodes := &u.model.nodes[u.model.index].nodes
 	switch {
 	case valIsStructIns(v):
-		s := v.data.Type.Tag.(*structure)
+		s := v.data.Type.Tag.(*Struct)
 		// Is not struct literal
-		if s.Ast.Id != v.data.Value {
+		if s.Id != v.data.Value {
 			break
 		}
 		var alloc_model exprNode

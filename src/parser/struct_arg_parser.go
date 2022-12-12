@@ -9,9 +9,9 @@ import (
 func (p *Parser) getFieldMap(f *Fn) *paramMap {
 	pmap := new(paramMap)
 	*pmap = paramMap{}
-	s := f.RetType.Type.Tag.(*structure)
+	s := f.RetType.Type.Tag.(*models.Struct)
 	for i, g := range s.Defines.Globals {
-		if is_accessable(p.File, g.Token.File, g.Pub) {
+		if models.IsAccessable(p.File, g.Token.File, g.Pub) {
 			param := &f.Params[i]
 			(*pmap)[param.Id] = &paramMapPair{param, nil}
 		}

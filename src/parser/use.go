@@ -1,9 +1,12 @@
 package parser
 
-import "github.com/julelang/jule/lex"
+import (
+	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/lex"
+)
 
 type use struct {
-	defines *Defmap
+	defines *models.Defmap
 	token   lex.Token
 	cppLink bool
 	

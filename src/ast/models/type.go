@@ -223,7 +223,7 @@ func (dt Type) String() (s string) {
 		return dt.MapString()
 	}
 	switch dt.Tag.(type) {
-	case CompiledStruct:
+	case *Struct:
 		return dt.StructString()
 	}
 	switch dt.Id {
@@ -304,12 +304,12 @@ func (dt *Type) TraitString() string {
 // StructString returns cpp value of struct data type.
 func (dt *Type) StructString() string {
 	var cpp strings.Builder
-	s := dt.Tag.(CompiledStruct)
-	if s.CppLinked() && !Has_attribute(jule.ATTR_TYPEDEF, s.Get_ast().Attributes) {
+	s := dt.Tag.(*Struct)
+	if s.CppLinked && !Has_attribute(jule.ATTR_TYPEDEF, s.Attributes) {
 		cpp.WriteString("struct ")
 	}
 	cpp.WriteString(s.OutId())
-	types := s.Generics()
+	types := s.GetGenerics()
 	if len(types) == 0 {
 		return cpp.String()
 	}
