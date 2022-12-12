@@ -5,6 +5,7 @@ import (
 
 	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/pkg/jule"
 	"github.com/julelang/jule/pkg/juletype"
 	"github.com/julelang/jule/types"
@@ -733,7 +734,7 @@ func caller_make(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	}
 	switch {
 	case types.IsSlice(t):
-		return make_slice(p, m, t, args, errtok)
+		return fn_make(p, m, t, args, errtok)
 	default:
 		p.pusherrtok(errtok, "invalid_type")
 	}
@@ -842,4 +843,30 @@ func caller_mem_align_of(p *Parser, _ *Fn, data callData, m *exprModel) (v value
 
 var std_builtin_defines = map[string]*models.Defmap{
 	"std::mem": std_mem_builtin,
+}
+
+func fn_make(p *Parser, m *exprModel, t models.Type, args *models.Args, errtok lex.Token) (v value) {
+	v.data.Type = t
+	v.data.Value = " "
+	if len(args.Src) < 2 {
+		p.pusherrtok(errtok, "missing_expr_for", "len")
+		return
+	} else if len(args.Src) > 2 {
+		p.pusherrtok(errtok, "argument_overflow")
+	}
+	len_expr := args.Src[1].Expr
+	len_v, len_expr_model := p.evalExpr(len_expr, nil)
+	err_key := check_value_for_indexing(len_v)
+	if err_key != "" {
+		p.pusherrtok(errtok, err_key)
+	} else if types.IsRef(*t.ComponentType) {
+		p.pusherrtok(errtok, "reference_not_initialized")
+	}
+	// Remove function identifier from model.
+	m.nodes[m.index].nodes[0] = nil
+	m.append_sub(exprNode{t.String()})
+	m.append_sub(exprNode{"("})
+	m.append_sub(len_expr_model)
+	m.append_sub(exprNode{")"})
+	return
 }
