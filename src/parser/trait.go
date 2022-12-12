@@ -7,15 +7,6 @@ import (
 	"github.com/julelang/jule/types"
 )
 
-func trait_has_reference_receiver(t *models.Trait) bool {
-	for _, f := range t.Defines.Funcs {
-		if types.IsRef(f.Receiver.Type) {
-			return true
-		}
-	}
-	return false
-}
-
 func traitToString(t *models.Trait) string {
 	var cpp strings.Builder
 	cpp.WriteString("struct ")
