@@ -4,6 +4,7 @@ import (
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/pkg/juleapi"
+	"github.com/julelang/jule/types"
 )
 
 type retChecker struct {
@@ -61,7 +62,7 @@ func (rc *retChecker) checkepxrs() {
 			rc.pushval(last, n, rc.ret_ast.Expr.Tokens[last-1])
 		}
 	}
-	if !type_is_void(rc.f.RetType.Type) {
+	if !types.IsVoid(rc.f.RetType.Type) {
 		rc.checkExprTypes()
 		rc.ret_ast.Expr.Model = rc.exp_model
 	}
@@ -71,7 +72,7 @@ func (rc *retChecker) check_for_ret_expr(v value) {
 	if rc.t.unsafe_allowed() || !lex.IsIdentifierRune(v.data.Value) {
 		return
 	}
-	if !v.mutable && type_is_mutable(v.data.Type) {
+	if !v.mutable && types.IsMut(v.data.Type) {
 		rc.t.pusherrtok(rc.ret_ast.Token, "ret_with_mut_typed_non_mut")
 		return
 	}
@@ -188,14 +189,14 @@ func (rc *retChecker) retsVars() {
 
 func (rc *retChecker) check() {
 	n := len(rc.ret_ast.Expr.Tokens)
-	if n == 0 && !type_is_void(rc.f.RetType.Type) {
+	if n == 0 && !types.IsVoid(rc.f.RetType.Type) {
 		if !rc.f.RetType.AnyVar() {
 			rc.t.pusherrtok(rc.ret_ast.Token, "require_return_value")
 		}
 		rc.retsVars()
 		return
 	}
-	if n > 0 && type_is_void(rc.f.RetType.Type) {
+	if n > 0 && types.IsVoid(rc.f.RetType.Type) {
 		rc.t.pusherrtok(rc.ret_ast.Token, "void_function_return_value")
 	}
 	rc.exp_model.vars = rc.f.RetType.Vars(rc.t.nodeBlock)

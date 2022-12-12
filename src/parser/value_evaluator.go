@@ -10,6 +10,7 @@ import (
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/pkg/juleapi"
 	"github.com/julelang/jule/pkg/juletype"
+	"github.com/julelang/jule/types"
 )
 
 type valueEvaluator struct {
@@ -219,12 +220,12 @@ func (ve *valueEvaluator) varId(id string, variable *Var, global bool) (v value)
 	if v.constExpr {
 		ve.model.append_sub(v.model)
 	} else {
-		if variable.Id == lex.KND_SELF && !type_is_ref(variable.Type) {
+		if variable.Id == lex.KND_SELF && !types.IsRef(variable.Type) {
 			ve.model.append_sub(exprNode{"(*this)"})
 		} else {
 			ve.model.append_sub(exprNode{variable.OutId()})
 		}
-		ve.p.eval.has_error = ve.p.eval.has_error || type_is_void(v.data.Type)
+		ve.p.eval.has_error = ve.p.eval.has_error || types.IsVoid(v.data.Type)
 	}
 	return
 }
@@ -291,7 +292,7 @@ func (ve *valueEvaluator) typeId(id string, t *TypeAlias) (_ value, _ bool) {
 	if !ok {
 		return
 	}
-	if type_is_struct(dt) {
+	if types.IsStruct(dt) {
 		return ve.structId(id, dt.Tag.(*Struct)), true
 	}
 	return

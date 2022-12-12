@@ -7,6 +7,7 @@ import (
 	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
+	"github.com/julelang/jule/types"
 	"github.com/julelang/jule/pkg/jule"
 	"github.com/julelang/jule/pkg/juletype"
 )
@@ -89,17 +90,17 @@ func (e *eval) eval_op(op any) (v value, model iExpr) {
 		r: r,
 	}
 	v = process.solve()
-	v.lvalue = type_is_lvalue(v.data.Type)
+	v.lvalue = types.IsLvalue(v.data.Type)
 	model = get_bop_model(v, bop, lm, rm)
 	return
 }
 
 func (e *eval) eval(op any) (v value, model iExpr) {
 	defer func() {
-		if type_is_void(v.data.Type) {
+		if types.IsVoid(v.data.Type) {
 			v.data.Type.Id = juletype.VOID
 			v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
-		} else if v.constExpr && type_is_pure(v.data.Type) && isConstExpression(v.data.Value) {
+		} else if v.constExpr && types.IsPure(v.data.Type) && isConstExpression(v.data.Value) {
 			switch v.expr.(type) {
 			case int64:
 				dt := Type{
@@ -235,7 +236,7 @@ func (e *eval) dataTypeFunc(expr lex.Token, callRange []lex.Token, m *exprModel)
 		switch t := def.(type) {
 		case *TypeAlias:
 			dt, ok := e.p.realType(t.Type, true)
-			if !ok || type_is_struct(dt) {
+			if !ok || types.IsStruct(dt) {
 				return
 			}
 			isret = true
@@ -308,7 +309,7 @@ func (e *eval) parenthesesRange(toks []lex.Token, m *exprModel) (v value) {
 		v = e.process(data.expr, m)
 	}
 	switch {
-	case type_is_fn(v.data.Type):
+	case types.IsFn(v.data.Type):
 		f := v.data.Type.Tag.(*Fn)
 		if f.Receiver != nil && f.Receiver.Mutable && !v.mutable {
 			e.pusherrtok(data.expr[len(data.expr)-1], "mutable_operation_on_immutable")
@@ -410,16 +411,16 @@ func (e *eval) subId(toks []lex.Token, m *exprModel) (v value) {
 	}
 	val := e.process(toks, m)
 	checkType := val.data.Type
-	if type_is_explicit_ptr(checkType) {
+	if types.IsExplicitPtr(checkType) {
 		if toks[0].Id != lex.ID_SELF && !e.unsafe_allowed() {
 			e.pusherrtok(idTok, "unsafe_behavior_at_out_of_unsafe_scope")
 		}
-		checkType = un_ptr_or_ref_type(checkType)
-	} else if type_is_ref(checkType) {
-		checkType = un_ptr_or_ref_type(checkType)
+		checkType = types.DerefPtrOrRef(checkType)
+	} else if types.IsRef(checkType) {
+		checkType = types.DerefPtrOrRef(checkType)
 	}
 	switch {
-	case type_is_pure(checkType):
+	case types.IsPure(checkType):
 		switch {
 		case checkType.Id == juletype.STR:
 			return e.strObjSubId(val, idTok, m)
@@ -430,11 +431,11 @@ func (e *eval) subId(toks []lex.Token, m *exprModel) (v value) {
 		case valIsTraitIns(val):
 			return e.traitObjSubId(val, idTok, m)
 		}
-	case type_is_slc(checkType):
+	case types.IsSlice(checkType):
 		return e.sliceObjSubId(val, idTok, m)
-	case type_is_array(checkType):
+	case types.IsArray(checkType):
 		return e.arrayObjSubId(val, idTok, m)
-	case type_is_map(checkType):
+	case types.IsMap(checkType):
 		return e.mapObjSubId(val, idTok, m)
 	}
 	e.pusherrtok(dotTok, "obj_not_support_sub_fields", val.data.Type.Kind)
@@ -444,18 +445,18 @@ func (e *eval) subId(toks []lex.Token, m *exprModel) (v value) {
 func (e *eval) get_cast_expr_model(t, vt Type, expr_model iExpr) iExpr {
 	var model strings.Builder
 	switch {
-	case type_is_ptr(vt) || type_is_ptr(t):
+	case types.IsPtr(vt) || types.IsPtr(t):
 		model.WriteString("((")
 		model.WriteString(t.String())
 		model.WriteString(")(")
 		model.WriteString(expr_model.String())
 		model.WriteString("))")
 		goto end
-	case type_is_pure(vt):
+	case types.IsPure(vt):
 		switch {
-		case type_is_trait(vt), vt.Id == juletype.ANY:
+		case types.IsTrait(vt), vt.Id == juletype.ANY:
 			model.WriteString(expr_model.String())
-			model.WriteString(accessor_of_type(vt))
+			model.WriteString(types.GetAccessor(vt))
 			model.WriteString("operator ")
 			model.WriteString(t.String())
 			model.WriteString("()")
@@ -531,15 +532,15 @@ func (e *eval) tryCast(toks []lex.Token, m *exprModel) (v value, _ bool) {
 
 func (e *eval) cast(v value, t Type, errtok lex.Token) value {
 	switch {
-	case type_is_ptr(t):
+	case types.IsPtr(t):
 		e.castPtr(t, &v, errtok)
-	case type_is_ref(t):
+	case types.IsRef(t):
 		e.cast_ref(t, &v, errtok)
-	case type_is_slc(t):
+	case types.IsSlice(t):
 		e.castSlice(t, v.data.Type, errtok)
-	case type_is_struct(t):
+	case types.IsStruct(t):
 		e.castStruct(t, &v, errtok)
-	case type_is_pure(t):
+	case types.IsPure(t):
 		if v.data.Type.Id == juletype.ANY {
 			// The any type supports casting to any data type.
 			break
@@ -550,8 +551,8 @@ func (e *eval) cast(v value, t Type, errtok lex.Token) value {
 	}
 	v.data.Value = t.Kind
 	v.data.Type = t
-	v.lvalue = type_is_lvalue(t)
-	v.mutable = type_is_ref(t) || type_is_mutable(t)
+	v.lvalue = types.IsLvalue(t)
+	v.mutable = types.IsRef(t) || types.IsMut(t)
 	if v.constExpr {
 		var model exprNode
 		model.value = v.data.Type.String()
@@ -564,7 +565,7 @@ func (e *eval) cast(v value, t Type, errtok lex.Token) value {
 }
 
 func (e *eval) castStruct(t Type, v *value, errtok lex.Token) {
-	if !type_is_trait(v.data.Type) {
+	if !types.IsTrait(v.data.Type) {
 		e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
 		return
 	}
@@ -580,8 +581,8 @@ func (e *eval) castPtr(t Type, v *value, errtok lex.Token) {
 		e.pusherrtok(errtok, "unsafe_behavior_at_out_of_unsafe_scope")
 		return
 	}
-	if !type_is_ptr(v.data.Type) &&
-		!type_is_pure(v.data.Type) &&
+	if !types.IsPtr(v.data.Type) &&
+		!types.IsPure(v.data.Type) &&
 		!juletype.IsInteger(v.data.Type.Id) {
 		e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
 	}
@@ -589,7 +590,7 @@ func (e *eval) castPtr(t Type, v *value, errtok lex.Token) {
 }
 
 func (e *eval) cast_ref(t Type, v *value, errtok lex.Token) {
-	if type_is_struct(un_ptr_or_ref_type(t)) {
+	if types.IsStruct(types.DerefPtrOrRef(t)) {
 		e.castStruct(t, v, errtok)
 		return
 	}
@@ -615,15 +616,15 @@ func (e *eval) castPure(t Type, v *value, errtok lex.Token) {
 }
 
 func (e *eval) castStr(t Type, errtok lex.Token) {
-	if type_is_pure(t) || (t.Id != juletype.U8 && t.Id != juletype.I32) {
+	if types.IsPure(t) || (t.Id != juletype.U8 && t.Id != juletype.I32) {
 		return
 	}
-	if !type_is_slc(t) {
+	if !types.IsSlice(t) {
 		e.pusherrtok(errtok, "type_not_supports_casting_to", juletype.TYPE_MAP[juletype.STR], t.Kind)
 		return
 	}
 	t = *t.ComponentType
-	if !type_is_pure(t) || (t.Id != juletype.U8 && t.Id != juletype.I32) {
+	if !types.IsPure(t) || (t.Id != juletype.U8 && t.Id != juletype.I32) {
 		e.pusherrtok(errtok, "type_not_supports_casting_to", juletype.TYPE_MAP[juletype.STR], t.Kind)
 	}
 }
@@ -637,13 +638,13 @@ func (e *eval) castInteger(t Type, v *value, errtok lex.Token) {
 			v.expr = tonumu(v)
 		}
 	}
-	if type_is_enum(v.data.Type) {
+	if types.IsEnum(v.data.Type) {
 		e := v.data.Type.Tag.(*Enum)
 		if juletype.IsNumeric(e.Type.Id) {
 			return
 		}
 	}
-	if type_is_ptr(v.data.Type) {
+	if types.IsPtr(v.data.Type) {
 		if t.Id == juletype.UINTPTR {
 			return
 		} else if !e.unsafe_allowed() {
@@ -655,7 +656,7 @@ func (e *eval) castInteger(t Type, v *value, errtok lex.Token) {
 		}
 		return
 	}
-	if type_is_pure(v.data.Type) && juletype.IsNumeric(v.data.Type.Id) {
+	if types.IsPure(v.data.Type) && juletype.IsNumeric(v.data.Type.Id) {
 		return
 	}
 	e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
@@ -672,25 +673,25 @@ func (e *eval) castNumeric(t Type, v *value, errtok lex.Token) {
 			v.expr = tonumu(v)
 		}
 	}
-	if type_is_enum(v.data.Type) {
+	if types.IsEnum(v.data.Type) {
 		e := v.data.Type.Tag.(*Enum)
 		if juletype.IsNumeric(e.Type.Id) {
 			return
 		}
 	}
-	if type_is_pure(v.data.Type) && juletype.IsNumeric(v.data.Type.Id) {
+	if types.IsPure(v.data.Type) && juletype.IsNumeric(v.data.Type.Id) {
 		return
 	}
 	e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
 }
 
 func (e *eval) castSlice(t, vt Type, errtok lex.Token) {
-	if !type_is_pure(vt) || vt.Id != juletype.STR {
+	if !types.IsPure(vt) || vt.Id != juletype.STR {
 		e.pusherrtok(errtok, "type_not_supports_casting_to", vt.Kind, t.Kind)
 		return
 	}
 	t = *t.ComponentType
-	if !type_is_pure(t) || (t.Id != juletype.U8 && t.Id != juletype.I32) {
+	if !types.IsPure(t) || (t.Id != juletype.U8 && t.Id != juletype.I32) {
 		e.pusherrtok(errtok, "type_not_supports_casting_to", vt.Kind, t.Kind)
 	}
 }
@@ -817,7 +818,7 @@ func (e *eval) typeId(toks []lex.Token, m *exprModel) (v value) {
 		return
 	}
 	toks = toks[i+1:]
-	if type_is_pure(t) && type_is_struct(t) {
+	if types.IsPure(t) && types.IsStruct(t) {
 		if toks[0].Id != lex.ID_BRACE || toks[0].Kind != lex.KND_LBRACE {
 			e.pusherrtok(toks[0], "invalid_syntax")
 			return
@@ -839,13 +840,13 @@ func (e *eval) xObjSubId(dm *models.Defmap, val value, interior_mutability bool,
 		return
 	}
 	v = val
-	m.append_sub(exprNode{accessor_of_type(val.data.Type)})
+	m.append_sub(exprNode{types.GetAccessor(val.data.Type)})
 	switch t {
 	case 'g':
 		g := dm.Globals[i]
 		g.Used = true
 		v.data.Type = g.Type
-		v.lvalue = val.lvalue || type_is_lvalue(g.Type)
+		v.lvalue = val.lvalue || types.IsLvalue(g.Type)
 		v.mutable = v.mutable || (g.Mutable && interior_mutability)
 		v.constExpr = g.Const
 		if g.Const {
@@ -937,9 +938,9 @@ func (e *eval) structObjSubId(val value, idTok lex.Token, m *exprModel) value {
 		}
 	}
 	val = e.xObjSubId(s.Defines, val, interior_mutability, idTok, m)
-	if type_is_fn(val.data.Type) {
+	if types.IsFn(val.data.Type) {
 		f := val.data.Type.Tag.(*Fn)
-		if f.Receiver != nil && type_is_ref(f.Receiver.Type) && !type_is_ref(parent_type) {
+		if f.Receiver != nil && types.IsRef(f.Receiver.Type) && !types.IsRef(parent_type) {
 			e.p.pusherrtok(idTok, "ref_method_used_with_not_ref_instance")
 		}
 	}
@@ -1045,7 +1046,7 @@ func (e *eval) operatorRight(toks []lex.Token, m *exprModel) (v value) {
 }
 
 func readyToVariadic(v *value) {
-	if v.data.Type.Id != juletype.STR || !type_is_pure(v.data.Type) {
+	if v.data.Type.Id != juletype.STR || !types.IsPure(v.data.Type) {
 		return
 	}
 	v.data.Type.Id = juletype.SLICE
@@ -1058,7 +1059,7 @@ func readyToVariadic(v *value) {
 func (e *eval) variadic(toks []lex.Token, m *exprModel, errtok lex.Token) (v value) {
 	v = e.process(toks, m)
 	readyToVariadic(&v)
-	if !type_is_variadicable(v.data.Type) {
+	if !types.IsVariadicable(v.data.Type) {
 		e.pusherrtok(errtok, "variadic_with_non_variadicable", v.data.Type.Kind)
 		return
 	}
@@ -1091,7 +1092,7 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 	case len(exprToks) == 0:
 		if e.type_prefix != nil {
 			switch {
-			case type_is_array(*e.type_prefix) || type_is_slc(*e.type_prefix):
+			case types.IsArray(*e.type_prefix) || types.IsSlice(*e.type_prefix):
 				return e.enumerable(toks, *e.type_prefix, m)
 			}
 		}
@@ -1135,7 +1136,7 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 		}
 		m.append_sub(exprNode{")"})
 		v = e.slicing(v, leftv, rightv, errTok)
-		if !type_is_mutable(v.data.Type) {
+		if !types.IsMut(v.data.Type) {
 			v.data.Value = " "
 		}
 		return v
@@ -1145,7 +1146,7 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 	m.append_sub(indexingExprModel(model))
 	m.append_sub(exprNode{lex.KND_RBRACKET})
 	v = e.indexing(v, indexv, errTok)
-	if !type_is_mutable(v.data.Type) {
+	if !types.IsMut(v.data.Type) {
 		v.data.Value = " "
 	}
 	// Ignore indexed type from original
@@ -1163,15 +1164,15 @@ func (e *eval) checkIntegerIndexing(v value, errtok lex.Token) {
 
 func (e *eval) indexing(enumv, indexv value, errtok lex.Token) (v value) {
 	switch {
-	case type_is_explicit_ptr(enumv.data.Type):
+	case types.IsExplicitPtr(enumv.data.Type):
 		return e.indexing_explicit_ptr(enumv, indexv, errtok)
-	case type_is_array(enumv.data.Type):
+	case types.IsArray(enumv.data.Type):
 		return e.indexingArray(enumv, indexv, errtok)
-	case type_is_slc(enumv.data.Type):
+	case types.IsSlice(enumv.data.Type):
 		return e.indexingSlice(enumv, indexv, errtok)
-	case type_is_map(enumv.data.Type):
+	case types.IsMap(enumv.data.Type):
 		return e.indexingMap(enumv, indexv, errtok)
-	case type_is_pure(enumv.data.Type):
+	case types.IsPure(enumv.data.Type):
 		switch enumv.data.Type.Id {
 		case juletype.STR:
 			return e.indexingStr(enumv, indexv, errtok)
@@ -1191,7 +1192,7 @@ func (e *eval) indexing_explicit_ptr(ptrv, index value, errtok lex.Token) value 
 	if !e.unsafe_allowed() {
 		e.pusherrtok(errtok, "unsafe_behavior_at_out_of_unsafe_scope")
 	}
-	ptrv.data.Type = un_ptr_or_ref_type(ptrv.data.Type)
+	ptrv.data.Type = types.DerefPtrOrRef(ptrv.data.Type)
 	e.checkIntegerIndexing(index, errtok)
 	return ptrv
 }
@@ -1234,11 +1235,11 @@ func (e *eval) indexingStr(strv, index value, errtok lex.Token) value {
 
 func (e *eval) slicing(enumv, leftv, rightv value, errtok lex.Token) (v value) {
 	switch {
-	case type_is_array(enumv.data.Type):
+	case types.IsArray(enumv.data.Type):
 		return e.slicingArray(enumv, errtok)
-	case type_is_slc(enumv.data.Type):
+	case types.IsSlice(enumv.data.Type):
 		return e.slicingSlice(enumv, errtok)
-	case type_is_pure(enumv.data.Type):
+	case types.IsPure(enumv.data.Type):
 		switch enumv.data.Type.Id {
 		case juletype.STR:
 			return e.slicingStr(enumv, leftv, rightv, errtok)
@@ -1310,7 +1311,7 @@ func (e *eval) build_array(parts [][]lex.Token, t Type, errtok lex.Token) (value
 		n := models.Size(len(parts))
 		if n > t.Size.N {
 			e.p.pusherrtok(errtok, "overflow_limits")
-		} else if type_is_ref(*t.ComponentType) && n < t.Size.N {
+		} else if types.IsRef(*t.ComponentType) && n < t.Size.N {
 			e.p.pusherrtok(errtok, "reference_not_initialized")
 		}
 	} else {
@@ -1455,11 +1456,11 @@ func (e *eval) enumerable(exprToks []lex.Token, t Type, m *exprModel) (v value) 
 	}
 	errtok := exprToks[0]
 	switch {
-	case type_is_array(t):
+	case types.IsArray(t):
 		v, model = e.build_array(e.enumerableParts(exprToks), t, errtok)
-	case type_is_slc(t):
+	case types.IsSlice(t):
 		v, model = e.build_slice_explicit(e.enumerableParts(exprToks), t, errtok)
-	case type_is_map(t):
+	case types.IsMap(t):
 		v, model = e.buildMap(e.enumerableParts(exprToks), t, errtok)
 	default:
 		e.pusherrtok(errtok, "invalid_type_source")
@@ -1525,9 +1526,9 @@ func (e *eval) braceRange(toks []lex.Token, m *exprModel) (v value) {
 	case len(exprToks) == 0:
 		if e.type_prefix != nil {
 			switch {
-			case type_is_map(*e.type_prefix):
+			case types.IsMap(*e.type_prefix):
 				return e.enumerable(toks, *e.type_prefix, m)
-			case type_is_struct(*e.type_prefix):
+			case types.IsStruct(*e.type_prefix):
 				prefix := e.type_prefix
 				s := e.type_prefix.Tag.(*models.Struct)
 				v = e.p.callStructConstructor(s, toks, m)

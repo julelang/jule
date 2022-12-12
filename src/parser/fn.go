@@ -1,7 +1,9 @@
 package parser
 
+import "github.com/julelang/jule/types"
+
 func is_constructor(f *Fn) bool {
-	if !type_is_struct(f.RetType.Type) {
+	if !types.IsStruct(f.RetType.Type) {
 		return false
 	}
 	s := f.RetType.Type.Tag.(*Struct)

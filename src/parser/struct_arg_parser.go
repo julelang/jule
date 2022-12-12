@@ -3,6 +3,7 @@ package parser
 import (
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
+	"github.com/julelang/jule/types"
 	"github.com/julelang/jule/pkg/jule"
 )
 
@@ -70,7 +71,7 @@ func (sap *structArgParser) pushArg() {
 func (sap *structArgParser) checkPasses() {
 	for _, pair := range *sap.fmap {
 		if pair.arg == nil {
-			if type_is_ref(pair.param.Type) {
+			if types.IsRef(pair.param.Type) {
 				sap.p.pusherrtok(sap.errTok, "reference_field_not_initialized", pair.param.Id)
 			} else if !paramHasDefaultArg(pair.param) {
 				sap.p.pusherrtok(sap.errTok, "missing_expr_for", pair.param.Id)

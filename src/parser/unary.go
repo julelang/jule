@@ -3,6 +3,7 @@ package parser
 import (
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/pkg/juletype"
+	"github.com/julelang/jule/types"
 )
 
 type unary struct {
@@ -14,7 +15,7 @@ type unary struct {
 
 func (u *unary) minus() value {
 	v := u.p.eval.process(u.toks, u.model)
-	if !type_is_pure(v.data.Type) || !juletype.IsNumeric(v.data.Type.Id) {
+	if !types.IsPure(v.data.Type) || !juletype.IsNumeric(v.data.Type.Id) {
 		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_MINUS)
 	}
 	if v.constExpr {
@@ -34,7 +35,7 @@ func (u *unary) minus() value {
 
 func (u *unary) plus() value {
 	v := u.p.eval.process(u.toks, u.model)
-	if !type_is_pure(v.data.Type) || !juletype.IsNumeric(v.data.Type.Id) {
+	if !types.IsPure(v.data.Type) || !juletype.IsNumeric(v.data.Type.Id) {
 		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_PLUS)
 	}
 	if v.constExpr {
@@ -53,7 +54,7 @@ func (u *unary) plus() value {
 
 func (u *unary) caret() value {
 	v := u.p.eval.process(u.toks, u.model)
-	if !type_is_pure(v.data.Type) || !juletype.IsInteger(v.data.Type.Id) {
+	if !types.IsPure(v.data.Type) || !juletype.IsInteger(v.data.Type.Id) {
 		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_CARET)
 	}
 	if v.constExpr {
@@ -89,7 +90,7 @@ func (u *unary) star() value {
 	v.constExpr = false
 	v.lvalue = true
 	switch {
-	case !type_is_explicit_ptr(v.data.Type):
+	case !types.IsExplicitPtr(v.data.Type):
 		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_STAR)
 		goto end
 	}
@@ -121,12 +122,12 @@ func (u *unary) amper() value {
 		v.data.Type.Kind = lex.KND_AMPER + v.data.Type.Kind
 		v.mutable = true
 		return v
-	case type_is_ref(v.data.Type):
+	case types.IsRef(v.data.Type):
 		model := exprNode{(*nodes)[1].String() + "._alloc"}
 		*nodes = nil
 		*nodes = make([]iExpr, 1)
 		(*nodes)[0] = model
-		v.data.Type.Kind = lex.KND_STAR + un_ptr_or_ref_type(v.data.Type).Kind
+		v.data.Type.Kind = lex.KND_STAR + types.DerefPtrOrRef(v.data.Type).Kind
 		return v
 	case !canGetPtr(v):
 		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_AMPER)

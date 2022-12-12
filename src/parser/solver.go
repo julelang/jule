@@ -2,6 +2,7 @@ package parser
 
 import (
 	"github.com/julelang/jule/lex"
+	"github.com/julelang/jule/types"
 	"github.com/julelang/jule/pkg/julebits"
 	"github.com/julelang/jule/pkg/juletype"
 )
@@ -384,7 +385,7 @@ func (s *solver) ptr() (v value) {
 			s.r.data.Type.Kind, s.l.data.Type.Kind)
 		return
 	}
-	if !type_is_ptr(s.l.data.Type) {
+	if !types.IsPtr(s.l.data.Type) {
 		s.l, s.r = s.r, s.l
 	}
 	switch s.op.Kind {
@@ -402,10 +403,10 @@ func (s *solver) ptr() (v value) {
 }
 
 func (s *solver) enum() (v value) {
-	if type_is_enum(s.l.data.Type) {
+	if types.IsEnum(s.l.data.Type) {
 		s.l.data.Type = s.l.data.Type.Tag.(*Enum).Type
 	}
-	if type_is_enum(s.r.data.Type) {
+	if types.IsEnum(s.r.data.Type) {
 		s.r.data.Type = s.r.data.Type.Tag.(*Enum).Type
 	}
 	return s.solve()
@@ -915,8 +916,8 @@ func (s *solver) juletrait() (v value) {
 
 func (s *solver) function() (v value) {
 	v.data.Token = s.op
-	if (!type_is_pure(s.l.data.Type) || s.l.data.Type.Id != juletype.NIL) &&
-		(!type_is_pure(s.r.data.Type) || s.r.data.Type.Id != juletype.NIL) {
+	if (!types.IsPure(s.l.data.Type) || s.l.data.Type.Id != juletype.NIL) &&
+		(!types.IsPure(s.r.data.Type) || s.r.data.Type.Id != juletype.NIL) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.op, "incompatible_types",
 			s.r.data.Type.Kind, s.l.data.Type.Kind)
@@ -952,7 +953,7 @@ func (s *solver) types_are_compatible(ignore_any bool) bool {
 func (s *solver) isConstExpr() bool { return s.l.constExpr && s.r.constExpr }
 
 func (s *solver) finalize(v *value) {
-	if type_is_void(v.data.Type) {
+	if types.IsVoid(v.data.Type) {
 		v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
 	} else {
 		v.constExpr = s.isConstExpr()
@@ -967,19 +968,19 @@ func (s *solver) solve() (v value) {
 	switch {
 	case s.op.Kind == lex.KND_DBL_AMPER || s.op.Kind == lex.KND_DBL_VLINE:
 		v = s.logical()
-	case type_is_fn(s.l.data.Type) || type_is_fn(s.r.data.Type):
+	case types.IsFn(s.l.data.Type) || types.IsFn(s.r.data.Type):
 		v = s.function()
-	case type_is_array(s.l.data.Type) || type_is_array(s.r.data.Type):
+	case types.IsArray(s.l.data.Type) || types.IsArray(s.r.data.Type):
 		v = s.array()
-	case type_is_slc(s.l.data.Type) || type_is_slc(s.r.data.Type):
+	case types.IsSlice(s.l.data.Type) || types.IsSlice(s.r.data.Type):
 		v = s.slice()
-	case type_is_ptr(s.l.data.Type) || type_is_ptr(s.r.data.Type):
+	case types.IsPtr(s.l.data.Type) || types.IsPtr(s.r.data.Type):
 		v = s.ptr()
-	case type_is_enum(s.l.data.Type) || type_is_enum(s.r.data.Type):
+	case types.IsEnum(s.l.data.Type) || types.IsEnum(s.r.data.Type):
 		v = s.enum()
-	case type_is_struct(s.l.data.Type) || type_is_struct(s.r.data.Type):
+	case types.IsStruct(s.l.data.Type) || types.IsStruct(s.r.data.Type):
 		v = s.structure()
-	case type_is_trait(s.l.data.Type) || type_is_trait(s.r.data.Type):
+	case types.IsTrait(s.l.data.Type) || types.IsTrait(s.r.data.Type):
 		v = s.juletrait()
 	case s.l.data.Type.Id == juletype.NIL || s.r.data.Type.Id == juletype.NIL:
 		v = s.nil()

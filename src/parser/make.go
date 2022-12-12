@@ -3,6 +3,7 @@ package parser
 import (
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
+	"github.com/julelang/jule/types"
 )
 
 func make_slice(p *Parser, m *exprModel, t models.Type, args *models.Args, errtok lex.Token) (v value) {
@@ -19,7 +20,7 @@ func make_slice(p *Parser, m *exprModel, t models.Type, args *models.Args, errto
 	err_key := check_value_for_indexing(len_v)
 	if err_key != "" {
 		p.pusherrtok(errtok, err_key)
-	} else if type_is_ref(*t.ComponentType) {
+	} else if types.IsRef(*t.ComponentType) {
 		p.pusherrtok(errtok, "reference_not_initialized")
 	}
 	// Remove function identifier from model.

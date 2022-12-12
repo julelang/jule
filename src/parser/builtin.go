@@ -7,6 +7,7 @@ import (
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/pkg/jule"
 	"github.com/julelang/jule/pkg/juletype"
+	"github.com/julelang/jule/types"
 )
 
 type BuiltinCaller = func(*Parser, *Fn, callData, *exprModel) value
@@ -699,7 +700,7 @@ func caller_out(p *Parser, f *Fn, data callData, m *exprModel) (v value) {
 	// Remove parentheses
 	data.args = data.args[1 : len(data.args)-1]
 	arg, model := p.evalToks(data.args, nil)
-	if type_is_fn(arg.data.Type) {
+	if types.IsFn(arg.data.Type) {
 		p.pusherrtok(errtok, "invalid_expr")
 	}
 	m.append_sub(exprNode{"(" + model.String() + ")"})
@@ -731,7 +732,7 @@ func caller_make(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 		return
 	}
 	switch {
-	case type_is_slc(t):
+	case types.IsSlice(t):
 		return make_slice(p, m, t, args, errtok)
 	default:
 		p.pusherrtok(errtok, "invalid_type")
@@ -755,13 +756,13 @@ func caller_new(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 		p.pusherrtok(data.args[i+1], "invalid_syntax")
 	}
 	t, _ = p.realType(t, true)
-	if !is_valid_type_for_reference(t) {
+	if !types.ValidForRef(t) {
 		p.pusherrtok(errtok, "invalid_type")
 	}
-	if type_is_struct(t) {
+	if types.IsStruct(t) {
 		s := t.Tag.(*models.Struct)
 		for _, f := range s.Defines.Globals {
-			if type_is_ref(f.Type) {
+			if types.IsRef(f.Type) {
 				p.pusherrtok(errtok, "ref_used_struct_used_at_new_fn")
 				break
 			}

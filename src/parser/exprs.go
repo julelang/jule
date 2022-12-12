@@ -5,13 +5,14 @@ import (
 
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
+	"github.com/julelang/jule/types"
 	"github.com/julelang/jule/pkg/julebits"
 	"github.com/julelang/jule/pkg/juletype"
 )
 
 func check_value_for_indexing(v value) (err_key string) {
 	switch {
-	case !type_is_pure(v.data.Type):
+	case !types.IsPure(v.data.Type):
 		return "invalid_expr"
 	case !juletype.IsInteger(v.data.Type.Id):
 		return "invalid_expr"
@@ -56,11 +57,11 @@ func isbool(s string) bool {
 }
 
 func valIsEnumType(v value) bool {
-	return v.is_type && type_is_enum(v.data.Type)
+	return v.is_type && types.IsEnum(v.data.Type)
 }
 
 func isBoolExpr(v value) bool {
-	return type_is_pure(v.data.Type) && v.data.Type.Id == juletype.BOOL
+	return types.IsPure(v.data.Type) && v.data.Type.Id == juletype.BOOL
 }
 
 func isfloat(s string) bool {
@@ -83,20 +84,20 @@ func canGetPtr(v value) bool {
 }
 
 func valIsStructIns(val value) bool {
-	return !val.is_type && type_is_struct(val.data.Type)
+	return !val.is_type && types.IsStruct(val.data.Type)
 }
 
 func valIsTraitIns(val value) bool {
-	return !val.is_type && type_is_trait(val.data.Type)
+	return !val.is_type && types.IsTrait(val.data.Type)
 }
 
 func isForeachIterExpr(val value) bool {
 	switch {
-	case type_is_slc(val.data.Type),
-		type_is_array(val.data.Type),
-		type_is_map(val.data.Type):
+	case types.IsSlice(val.data.Type),
+		types.IsArray(val.data.Type),
+		types.IsMap(val.data.Type):
 		return true
-	case !type_is_pure(val.data.Type):
+	case !types.IsPure(val.data.Type):
 		return false
 	}
 	code := val.data.Type.Id
@@ -126,7 +127,7 @@ func validExprForConst(v value) bool {
 }
 
 func okForShifting(v value) bool {
-	if !type_is_pure(v.data.Type) ||
+	if !types.IsPure(v.data.Type) ||
 		!juletype.IsInteger(v.data.Type.Id) {
 		return false
 	}

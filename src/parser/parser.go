@@ -11,6 +11,7 @@ import (
 	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
+	"github.com/julelang/jule/types"
 	"github.com/julelang/jule/pkg/jule"
 	"github.com/julelang/jule/pkg/juleapi"
 	"github.com/julelang/jule/pkg/juleio"
@@ -925,7 +926,7 @@ func (p *Parser) Enum(e Enum) {
 	e.Desc = p.docText.String()
 	p.docText.Reset()
 	e.Type, _ = p.realType(e.Type, true)
-	if !type_is_pure(e.Type) {
+	if !types.IsPure(e.Type) {
 		p.pusherrtok(e.Token, "invalid_type_source")
 		return
 	}
@@ -1219,7 +1220,7 @@ func (p *Parser) implStruct(model *models.Impl) {
 			_ = p.check_param_dup(sf.Params)
 			p.check_ret_variables(sf)
 			for _, generic := range obj_t.Generics {
-				if find_generic(generic.Id, s.Generics) != nil {
+				if types.FindGeneric(generic.Id, s.Generics) != nil {
 					p.pusherrtok(generic.Token, "exist_id", generic.Id)
 				}
 			}
@@ -1233,7 +1234,7 @@ func (p *Parser) implStruct(model *models.Impl) {
 
 // Impl parses Jule impl.
 func (p *Parser) Impl(impl *models.Impl) {
-	if !type_is_void(impl.Target) {
+	if !types.IsVoid(impl.Target) {
 		p.implTrait(impl)
 		return
 	}
@@ -1341,7 +1342,7 @@ func (p *Parser) parseCommonNonGenericType(generics []*GenericType, dt *Type) {
 			goto tagcheck
 		}
 	}
-	if type_is_generic(generics, *dt) {
+	if types.IsGeneric(generics, *dt) {
 		return
 	}
 tagcheck:
@@ -1349,13 +1350,13 @@ tagcheck:
 		switch t := dt.Tag.(type) {
 		case *Struct:
 			for _, ct := range t.GetGenerics() {
-				if type_is_generic(generics, ct) {
+				if types.IsGeneric(generics, ct) {
 					return
 				}
 			}
 		case []Type:
 			for _, ct := range t {
-				if type_is_generic(generics, ct) {
+				if types.IsGeneric(generics, ct) {
 					return
 				}
 			}
@@ -1368,14 +1369,14 @@ func (p *Parser) parseNonGenericType(generics []*GenericType, dt *Type) {
 	switch {
 	case dt.MultiTyped:
 		p.parseMultiNonGenericType(generics, dt)
-	case type_is_fn(*dt):
+	case types.IsFn(*dt):
 		p.parseFuncNonGenericType(generics, dt)
-	case type_is_map(*dt):
+	case types.IsMap(*dt):
 		p.parseMapNonGenericType(generics, dt)
-	case type_is_array(*dt):
+	case types.IsArray(*dt):
 		p.parseNonGenericType(generics, dt.ComponentType)
 		dt.Kind = jule.PREFIX_ARRAY + dt.ComponentType.Kind
-	case type_is_slc(*dt):
+	case types.IsSlice(*dt):
 		p.parseNonGenericType(generics, dt.ComponentType)
 		dt.Kind = jule.PREFIX_SLICE + dt.ComponentType.Kind
 	default:
@@ -1509,7 +1510,7 @@ func (p *Parser) Var(model Var) *Var {
 				expr_t:           v.Type,
 				v:                val,
 				errtok:           v.Token,
-				not_allow_assign: type_is_ref(v.Type),
+				not_allow_assign: types.IsRef(v.Type),
 			}.check()
 		}
 	} else {
@@ -1522,7 +1523,7 @@ func (p *Parser) Var(model Var) *Var {
 			p.checkValidityForAutoType(v.Type, v.SetterTok)
 		}
 	}
-	if !v.IsField && type_is_ref(v.Type) && v.SetterTok.Id == lex.ID_NA {
+	if !v.IsField && types.IsRef(v.Type) && v.SetterTok.Id == lex.ID_NA {
 		p.pusherrtok(v.Token, "reference_not_initialized")
 	}
 	if !v.IsField && v.SetterTok.Id == lex.ID_NA {
@@ -1530,7 +1531,7 @@ func (p *Parser) Var(model Var) *Var {
 	}
 	if v.Const {
 		v.ExprTag = val.expr
-		if !type_is_allow_for_const(v.Type) {
+		if !types.IsAllowForConst(v.Type) {
 			p.pusherrtok(v.Token, "invalid_type_for_const", v.Type.Kind)
 		} else if v.SetterTok.Id != lex.ID_NA && !validExprForConst(val) {
 			p.eval.pusherrtok(v.Token, "expr_not_const")
@@ -2041,7 +2042,7 @@ func (p *Parser) ParseWaitingImpls() {
 }
 
 func (p *Parser) checkParamDefaultExprWithDefault(param *Param) {
-	if type_is_fn(param.Type) {
+	if types.IsFn(param.Type) {
 		p.pusherrtok(param.Token, "invalid_type_for_default_arg", param.Type.Kind)
 	}
 }
@@ -2205,7 +2206,7 @@ func (p *Parser) check_fn_special_cases(f *Fn) {
 
 func (p *Parser) call_fn(f *Fn, data callData, m *exprModel) value {
 	v := p.parse_fn_call_toks(f, data.generics, data.args, m)
-	v.lvalue = type_is_lvalue(v.data.Type)
+	v.lvalue = types.IsLvalue(v.data.Type)
 	return v
 }
 
@@ -2252,7 +2253,7 @@ func (p *Parser) parseField(s *Struct, f **Var, i int) {
 	*f = p.Var(**f)
 	v := *f
 	param := models.Param{Id: v.Id, Type: v.Type}
-	if !type_is_ptr(v.Type) && type_is_struct(v.Type) {
+	if !types.IsPtr(v.Type) && types.IsStruct(v.Type) {
 		ts := v.Type.Tag.(*Struct)
 		if s.IsSameBase(ts) || ts.IsDependedTo(s) {
 			p.pusherrtok(v.Type.Token, "illegal_cycle_in_declaration", s.Id)
@@ -2388,7 +2389,7 @@ func (p *Parser) pushGenerics(generics []*GenericType, sources []Type) {
 
 func (p *Parser) fn_parse_type(t *Type) bool {
 	pt, ok := p.realType(*t, true)
-	if ok && type_is_array(pt) && pt.Size.AutoSized {
+	if ok && types.IsArray(pt) && pt.Size.AutoSized {
 		p.pusherrtok(pt.Token, "invalid_type")
 		ok = false
 	}
@@ -2401,7 +2402,7 @@ func (p *Parser) reload_fn_types(f *Fn) {
 		_ = p.fn_parse_type(&f.Params[i].Type)
 	}
 	ok := p.fn_parse_type(&f.RetType.Type)
-	if ok && type_is_array(f.RetType.Type) {
+	if ok && types.IsArray(f.RetType.Type) {
 		p.pusherrtok(f.RetType.Type.Token, "invalid_type")
 	}
 }
@@ -2413,7 +2414,7 @@ func itsCombined(f *Fn, generics []Type) bool {
 	for _, combine := range *f.Combines {
 		for i, gt := range generics {
 			ct := combine[i]
-			if types_equals(gt, ct) {
+			if types.Equals(gt, ct) {
 				return true
 			}
 		}
@@ -2442,7 +2443,7 @@ func (p *Parser) parseGenerics(f *Fn, args *models.Args, errTok lex.Token) bool 
 		for _, generic := range f.Generics {
 			ok := false
 			for _, param := range f.Params {
-				if type_has_this_generic(generic, param.Type) {
+				if types.HasThisGeneric(generic, param.Type) {
 					ok = true
 					break
 				}
@@ -2621,10 +2622,10 @@ func (p *Parser) pushGenericByFunc(f *Fn, pair *paramMapPair, args *models.Args,
 }
 
 func (p *Parser) pushGenericByMultiTyped(f *Fn, pair *paramMapPair, args *models.Args, gt Type) bool {
-	types := gt.Tag.([]Type)
-	for _, mt := range types {
+	_types := gt.Tag.([]Type)
+	for _, mt := range _types {
 		for _, generic := range f.Generics {
-			if type_has_this_generic(generic, pair.param.Type) {
+			if types.HasThisGeneric(generic, pair.param.Type) {
 				p.pushGenericByType(f, generic, args, mt)
 				break
 			}
@@ -2635,7 +2636,7 @@ func (p *Parser) pushGenericByMultiTyped(f *Fn, pair *paramMapPair, args *models
 
 func (p *Parser) pushGenericByCommonArg(f *Fn, pair *paramMapPair, args *models.Args, t Type) bool {
 	for _, generic := range f.Generics {
-		if type_is_this_generic(generic, pair.param.Type) {
+		if types.IsThisGeneric(generic, pair.param.Type) {
 			p.pushGenericByType(f, generic, args, t)
 			return true
 		}
@@ -2670,11 +2671,11 @@ func (p *Parser) pushGenericByArg(f *Fn, pair *paramMapPair, args *models.Args, 
 		return false
 	}
 	switch {
-	case type_is_fn(argType):
+	case types.IsFn(argType):
 		return p.pushGenericByFunc(f, pair, args, argType)
-	case argType.MultiTyped, type_is_map(argType):
+	case argType.MultiTyped, types.IsMap(argType):
 		return p.pushGenericByMultiTyped(f, pair, args, argType)
-	case type_is_array(argType), type_is_slc(argType):
+	case types.IsArray(argType), types.IsSlice(argType):
 		return p.pushGenericByComponent(f, pair, args, argType)
 	default:
 		return p.pushGenericByCommonArg(f, pair, args, argType)
@@ -2685,7 +2686,7 @@ func (p *Parser) parseArg(f *Fn, pair *paramMapPair, args *models.Args, variadic
 	var value value
 	var model iExpr
 	if pair.param.Variadic {
-		t := variadic_to_slice_t(pair.param.Type)
+		t := types.VariadicToSlice(pair.param.Type)
 		value, model = p.evalExpr(pair.arg.Expr, &t)
 	} else {
 		value, model = p.evalExpr(pair.arg.Expr, &pair.param.Type)
@@ -2693,7 +2694,7 @@ func (p *Parser) parseArg(f *Fn, pair *paramMapPair, args *models.Args, variadic
 	pair.arg.Expr.Model = model
 	if !value.variadic && !pair.param.Variadic &&
 		!models.Has_attribute(jule.ATTR_CDEF, f.Attributes) &&
-		type_is_pure(pair.param.Type) && juletype.IsNumeric(pair.param.Type.Id) {
+		types.IsPure(pair.param.Type) && juletype.IsNumeric(pair.param.Type.Id) {
 		pair.arg.CastType = new(Type)
 		*pair.arg.CastType = pair.param.Type.Copy()
 		pair.arg.CastType.Original = nil
@@ -2703,7 +2704,7 @@ func (p *Parser) parseArg(f *Fn, pair *paramMapPair, args *models.Args, variadic
 		*variadiced = value.variadic
 	}
 	if args.DynamicGenericAnnotation &&
-		type_has_generics(f.Generics, pair.param.Type) {
+		types.HasGenerics(f.Generics, pair.param.Type) {
 		ok := p.pushGenericByArg(f, pair, args, value.data.Type)
 		if !ok {
 			p.pusherrtok(pair.arg.Token, "dynamic_type_annotation_failed")
@@ -3195,7 +3196,7 @@ func (p *Parser) checkRets(f *Fn) {
 	if ok {
 		return
 	}
-	if !type_is_void(f.RetType.Type) {
+	if !types.IsVoid(f.RetType.Type) {
 		p.pusherrtok(f.Token, "missing_ret")
 	}
 }
@@ -3337,7 +3338,7 @@ func (p *Parser) check_valid_init_expr(left_mutable bool, right value, errtok le
 	if p.unsafe_allowed() || !lex.IsIdentifierRune(right.data.Value) {
 		return
 	}
-	if left_mutable && !right.mutable && type_is_mutable(right.data.Type) {
+	if left_mutable && !right.mutable && types.IsMut(right.data.Type) {
 		p.pusherrtok(errtok, "assignment_non_mut_to_mut")
 		return
 	}
@@ -3388,17 +3389,17 @@ func (p *Parser) postfix(assign *models.Assign, l, r []value) {
 	}
 	left := l[0]
 	_ = p.assignment(left, assign.Setter)
-	if type_is_explicit_ptr(left.data.Type) {
+	if types.IsExplicitPtr(left.data.Type) {
 		if !p.unsafe_allowed() {
 			p.pusherrtok(assign.Left[0].Expr.Tokens[0], "unsafe_behavior_at_out_of_unsafe_scope")
 		}
 		return
 	}
 	checkType := left.data.Type
-	if type_is_ref(checkType) {
-		checkType = un_ptr_or_ref_type(checkType)
+	if types.IsRef(checkType) {
+		checkType = types.DerefPtrOrRef(checkType)
 	}
-	if type_is_pure(checkType) && juletype.IsNumeric(checkType.Id) {
+	if types.IsPure(checkType) && juletype.IsNumeric(checkType.Id) {
 		return
 	}
 	p.pusherrtok(assign.Setter, "operator_not_for_juletype", assign.Setter.Kind, left.data.Type.Kind)
@@ -3662,7 +3663,7 @@ func (p *Parser) typeSourceIsAlias(dt Type, alias *TypeAlias, err bool) (Type, b
 	dt.Original = original
 	dt, ok := p.typeSource(dt, err)
 	dt.Pure = false
-	if ok && old.Tag != nil && !type_is_struct(alias.Type) { // Has generics
+	if ok && old.Tag != nil && !types.IsStruct(alias.Type) { // Has generics
 		p.pusherrtok(dt.Token, "invalid_type_source")
 	}
 	return dt, ok
@@ -3788,7 +3789,7 @@ func (p *Parser) typeSourceIsArrayType(arr_t *Type) (ok bool) {
 	*arr_t.ComponentType, ok = p.realType(*arr_t.ComponentType, true)
 	if !ok {
 		return
-	} else if type_is_array(*arr_t.ComponentType) && arr_t.ComponentType.Size.AutoSized {
+	} else if types.IsArray(*arr_t.ComponentType) && arr_t.ComponentType.Size.AutoSized {
 		p.pusherrtok(arr_t.Token, "invalid_type")
 	}
 	modifiers := arr_t.Modifiers()
@@ -3814,7 +3815,7 @@ func (p *Parser) typeSourceIsArrayType(arr_t *Type) (ok bool) {
 
 func (p *Parser) typeSourceIsSliceType(slc_t *Type) (ok bool) {
 	*slc_t.ComponentType, ok = p.realType(*slc_t.ComponentType, true)
-	if ok && type_is_array(*slc_t.ComponentType) && slc_t.ComponentType.Size.AutoSized {
+	if ok && types.IsArray(*slc_t.ComponentType) && slc_t.ComponentType.Size.AutoSized {
 		p.pusherrtok(slc_t.Token, "invalid_type")
 	}
 	modifiers := slc_t.Modifiers()
@@ -3829,7 +3830,7 @@ func (p *Parser) check_type_validity(expr_t Type, errtok lex.Token) {
 		p.pusherrtok(expr_t.Token, "invalid_type")
 		return
 	}
-	if type_is_ref(expr_t) && !is_valid_type_for_reference(un_ptr_or_ref_type(expr_t)) {
+	if types.IsRef(expr_t) && !types.ValidForRef(types.DerefPtrOrRef(expr_t)) {
 		p.pusherrtok(errtok, "invalid_type")
 		return
 	}
@@ -3960,7 +3961,7 @@ func (p *Parser) checkMultiType(real, check Type, ignoreAny bool, errTok lex.Tok
 }
 
 func (p *Parser) check_type(real, check Type, ignoreAny, allow_assign bool, errTok lex.Token) {
-	if type_is_void(check) {
+	if types.IsVoid(check) {
 		p.eval.pusherrtok(errTok, "incompatible_types", real.Kind, check.Kind)
 		return
 	}
@@ -3985,8 +3986,8 @@ func (p *Parser) check_type(real, check Type, ignoreAny, allow_assign bool, errT
 	}
 	if real.Kind != check.Kind {
 		p.pusherrtok(errTok, "incompatible_types", real.Kind, check.Kind)
-	} else if type_is_array(real) || type_is_array(check) {
-		if type_is_array(real) != type_is_array(check) {
+	} else if types.IsArray(real) || types.IsArray(check) {
+		if types.IsArray(real) != types.IsArray(check) {
 			p.pusherrtok(errTok, "incompatible_types", real.Kind, check.Kind)
 			return
 		}

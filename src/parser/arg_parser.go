@@ -3,6 +3,7 @@ package parser
 import (
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
+	"github.com/julelang/jule/types"
 	"github.com/julelang/jule/pkg/juleapi"
 )
 
@@ -83,7 +84,7 @@ func (pap *pureArgParser) check_param_arg(pair *paramMapPair) {
 func (pap *pureArgParser) check_passes_struct() {
 	if len(pap.args.Src) == 0 {
 		for _, pair := range *pap.pmap {
-			if type_is_ref(pair.param.Type) {
+			if types.IsRef(pair.param.Type) {
 				pap.p.pusherrtok(pap.errTok, "reference_field_not_initialized", pair.param.Id)
 			}
 		}

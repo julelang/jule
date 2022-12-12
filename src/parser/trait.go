@@ -4,11 +4,12 @@ import (
 	"strings"
 
 	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/types"
 )
 
 func trait_has_reference_receiver(t *models.Trait) bool {
 	for _, f := range t.Defines.Funcs {
-		if type_is_ref(f.Receiver.Type) {
+		if types.IsRef(f.Receiver.Type) {
 			return true
 		}
 	}
@@ -35,7 +36,7 @@ func traitToString(t *models.Trait) string {
 		cpp.WriteString(f.Id)
 		cpp.WriteString(models.ParamsToCpp(f.Params))
 		cpp.WriteString(" {")
-		if !type_is_void(f.RetType.Type) {
+		if !types.IsVoid(f.RetType.Type) {
 			cpp.WriteString(" return {}; ")
 		}
 		cpp.WriteString("}\n")

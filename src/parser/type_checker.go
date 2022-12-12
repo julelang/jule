@@ -3,6 +3,7 @@ package parser
 import (
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
+	"github.com/julelang/jule/types"
 	"github.com/julelang/jule/pkg/juletype"
 )
 
@@ -22,14 +23,14 @@ func (tc *type_checker) check_ref() bool {
 	} else if !tc.allow_assign {
 		return false
 	}
-	tc.l = un_ptr_or_ref_type(tc.l)
+	tc.l = types.DerefPtrOrRef(tc.l)
 	return tc.check()
 }
 
 func (tc *type_checker) check_ptr() bool {
 	if tc.r.Id == juletype.NIL {
 		return true
-	} else if type_is_unsafe_ptr(tc.l) {
+	} else if types.IsUnsafePtr(tc.l) {
 		return true
 	}
 	return tc.l.Kind == tc.r.Kind
@@ -43,14 +44,14 @@ func (tc *type_checker) check_trait() bool {
 	lm := tc.l.Modifiers()
 	ref := false
 	switch {
-	case type_is_ref(tc.r):
+	case types.IsRef(tc.r):
 		ref = true
-		tc.r = un_ptr_or_ref_type(tc.r)
-		if !type_is_struct(tc.r) {
+		tc.r = types.DerefPtrOrRef(tc.r)
+		if !types.IsStruct(tc.r) {
 			break
 		}
 		fallthrough
-	case type_is_struct(tc.r):
+	case types.IsStruct(tc.r):
 		if lm != "" {
 			return false
 		}
@@ -68,7 +69,7 @@ func (tc *type_checker) check_trait() bool {
 			return false
 		}
 		return true
-	case type_is_trait(tc.r):
+	case types.IsTrait(tc.r):
 		return t == tc.r.Tag.(*models.Trait) && lm == tc.r.Modifiers()
 	}
 	return false
@@ -93,7 +94,7 @@ func (tc *type_checker) check_struct() bool {
 	}
 	for i, g1 := range s1.GetGenerics() {
 		g2 := s2.GetGenerics()[i]
-		if !types_equals(g1, g2) {
+		if !types.Equals(g1, g2) {
 			return false
 		}
 	}
@@ -108,7 +109,7 @@ func (tc *type_checker) check_slice() bool {
 }
 
 func (tc *type_checker) check_array() bool {
-	if !type_is_array(tc.r) {
+	if !types.IsArray(tc.r) {
 		return false
 	}
 	return tc.l.Size.N == tc.r.Size.N
@@ -123,43 +124,43 @@ func (tc *type_checker) check_map() bool {
 
 func (tc *type_checker) check() bool {
 	switch {
-	case type_is_trait(tc.l), type_is_trait(tc.r):
-		if type_is_trait(tc.r) {
+	case types.IsTrait(tc.l), types.IsTrait(tc.r):
+		if types.IsTrait(tc.r) {
 			tc.l, tc.r = tc.r, tc.l
 		}
 		return tc.check_trait()
-	case type_is_ref(tc.l), type_is_ref(tc.r):
-		if type_is_ref(tc.r) {
+	case types.IsRef(tc.l), types.IsRef(tc.r):
+		if types.IsRef(tc.r) {
 			tc.l, tc.r = tc.r, tc.l
 		}
 		return tc.check_ref()
-	case type_is_ptr(tc.l), type_is_ptr(tc.r):
-		if !type_is_ptr(tc.l) && type_is_ptr(tc.r) {
+	case types.IsPtr(tc.l), types.IsPtr(tc.r):
+		if !types.IsPtr(tc.l) && types.IsPtr(tc.r) {
 			tc.l, tc.r = tc.r, tc.l
 		}
 		return tc.check_ptr()
-	case type_is_slc(tc.l), type_is_slc(tc.r):
-		if type_is_slc(tc.r) {
+	case types.IsSlice(tc.l), types.IsSlice(tc.r):
+		if types.IsSlice(tc.r) {
 			tc.l, tc.r = tc.r, tc.l
 		}
 		return tc.check_slice()
-	case type_is_array(tc.l), type_is_array(tc.r):
-		if type_is_array(tc.r) {
+	case types.IsArray(tc.l), types.IsArray(tc.r):
+		if types.IsArray(tc.r) {
 			tc.l, tc.r = tc.r, tc.l
 		}
 		return tc.check_array()
-	case type_is_map(tc.l), type_is_map(tc.r):
-		if type_is_map(tc.r) {
+	case types.IsMap(tc.l), types.IsMap(tc.r):
+		if types.IsMap(tc.r) {
 			tc.l, tc.r = tc.r, tc.l
 		}
 		return tc.check_map()
-	case type_is_nil_compatible(tc.l):
+	case types.IsNilCompatible(tc.l):
 		return tc.r.Id == juletype.NIL
-	case type_is_nil_compatible(tc.r):
+	case types.IsNilCompatible(tc.r):
 		return tc.l.Id == juletype.NIL
-	case type_is_enum(tc.l), type_is_enum(tc.r):
+	case types.IsEnum(tc.l), types.IsEnum(tc.r):
 		return tc.l.Id == tc.r.Id && tc.l.Kind == tc.r.Kind
-	case type_is_struct(tc.l), type_is_struct(tc.r):
+	case types.IsStruct(tc.l), types.IsStruct(tc.r):
 		if tc.r.Id == juletype.STRUCT {
 			tc.l, tc.r = tc.r, tc.l
 		}

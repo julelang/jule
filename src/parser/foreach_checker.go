@@ -4,6 +4,7 @@ import (
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/pkg/juleapi"
 	"github.com/julelang/jule/pkg/juletype"
+	"github.com/julelang/jule/types"
 )
 
 type foreachChecker struct {
@@ -91,11 +92,11 @@ func (fc *foreachChecker) str() {
 
 func (fc *foreachChecker) check() {
 	switch {
-	case type_is_slc(fc.val.data.Type):
+	case types.IsSlice(fc.val.data.Type):
 		fc.slice()
-	case type_is_array(fc.val.data.Type):
+	case types.IsArray(fc.val.data.Type):
 		fc.array()
-	case type_is_map(fc.val.data.Type):
+	case types.IsMap(fc.val.data.Type):
 		fc.hashmap()
 	case fc.val.data.Type.Id == juletype.STR:
 		fc.str()

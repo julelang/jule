@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/julelang/jule/lex"
+	"github.com/julelang/jule/types"
 	"github.com/julelang/jule/pkg/julebits"
 	"github.com/julelang/jule/pkg/juletype"
 )
@@ -91,7 +92,7 @@ func (ac *assign_checker) has_error() bool {
 
 func (ac *assign_checker) check_validity() (valid bool) {
 	valid = true
-	if type_is_fn(ac.v.data.Type) {
+	if types.IsFn(ac.v.data.Type) {
 		f := ac.v.data.Type.Tag.(*Fn)
 		if f.Receiver != nil {
 			ac.p.pusherrtok(ac.errtok, "method_as_anonymous_fn")
@@ -105,8 +106,8 @@ func (ac *assign_checker) check_validity() (valid bool) {
 }
 
 func (ac *assign_checker) check_const() (ok bool) {
-	if !ac.v.constExpr || !type_is_pure(ac.expr_t) ||
-		!type_is_pure(ac.v.data.Type) || !juletype.IsNumeric(ac.v.data.Type.Id) {
+	if !ac.v.constExpr || !types.IsPure(ac.expr_t) ||
+		!types.IsPure(ac.v.data.Type) || !juletype.IsNumeric(ac.v.data.Type.Id) {
 		return
 	}
 	ok = true
