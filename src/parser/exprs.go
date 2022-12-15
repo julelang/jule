@@ -36,39 +36,12 @@ func indexingExprModel(i iExpr) iExpr {
 	return exprNode{model.String()}
 }
 
-func isstr(s string) bool {
-	return s != "" && (s[0] == '"' || israwstr(s))
-}
-
-func israwstr(s string) bool {
-	return s != "" && s[0] == '`'
-}
-
-func ischar(s string) bool {
-	return s != "" && s[0] == '\''
-}
-
-func isnil(s string) bool {
-	return s == lex.KND_NIL
-}
-
-func isbool(s string) bool {
-	return s == lex.KND_TRUE || s == lex.KND_FALSE
-}
-
 func valIsEnumType(v value) bool {
 	return v.is_type && types.IsEnum(v.data.Type)
 }
 
 func isBoolExpr(v value) bool {
 	return types.IsPure(v.data.Type) && v.data.Type.Id == juletype.BOOL
-}
-
-func isfloat(s string) bool {
-	if strings.HasPrefix(s, "0x") {
-		return strings.ContainsAny(s, ".pP")
-	}
-	return strings.ContainsAny(s, ".eE")
 }
 
 func canGetPtr(v value) bool {
@@ -102,17 +75,6 @@ func isForeachIterExpr(val value) bool {
 	}
 	code := val.data.Type.Id
 	return code == juletype.STR
-}
-
-func isConstNumeric(v string) bool {
-	if v == "" {
-		return false
-	}
-	return v[0] == '-' || (v[0] >= '0' && v[0] <= '9')
-}
-
-func isConstExpression(v string) bool {
-	return isConstNumeric(v) || isstr(v) || ischar(v) || isnil(v) || isbool(v)
 }
 
 func checkFloatBit(v models.Data, bit int) bool {

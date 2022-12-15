@@ -1,6 +1,10 @@
 package lex
 
-import "github.com/julelang/jule/pkg/juleio"
+import (
+	"strings"
+
+	"github.com/julelang/jule/pkg/juleio"
+)
 
 // Token identities.
 const ID_NA          = 0
@@ -147,4 +151,28 @@ type Token struct {
 	Column int
 	Kind   string
 	Id     uint8
+}
+
+func IsStr(k string) bool { return k != "" && (k[0] == '"' || IsRawStr(k)) }
+func IsRawStr(k string) bool { return k != "" && k[0] == '`' }
+func IsChar(k string) bool { return k != "" && k[0] == '\'' }
+func IsNil(k string) bool { return k == KND_NIL }
+func IsBool(k string) bool { return k == KND_TRUE || k == KND_FALSE }
+
+func IsFloat(k string) bool {
+	if strings.HasPrefix(k, "0x") {
+		return strings.ContainsAny(k, ".pP")
+	}
+	return strings.ContainsAny(k, ".eE")
+}
+
+func IsNumeric(k string) bool {
+	if k == "" {
+		return false
+	}
+	return k[0] == '-' || (k[0] >= '0' && k[0] <= '9')
+}
+
+func IsLiteral(k string) bool {
+	return IsNumeric(k) || IsStr(k) || IsChar(k) || IsNil(k) || IsBool(k)
 }

@@ -21,7 +21,7 @@ type valueEvaluator struct {
 
 func strModel(v value) iExpr {
 	content := v.expr.(string)
-	if israwstr(content) {
+	if lex.IsRawStr(content) {
 		return exprNode{juleapi.ToRawStr([]byte(content))}
 	}
 	return exprNode{juleapi.ToStr([]byte(content))}
@@ -189,7 +189,7 @@ func (ve *valueEvaluator) integer() value {
 
 func (ve *valueEvaluator) numeric() value {
 	var v value
-	if isfloat(ve.token.Kind) {
+	if lex.IsFloat(ve.token.Kind) {
 		v = ve.float()
 	} else {
 		v = ve.integer()

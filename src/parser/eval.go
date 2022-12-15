@@ -100,7 +100,7 @@ func (e *eval) eval(op any) (v value, model iExpr) {
 		if types.IsVoid(v.data.Type) {
 			v.data.Type.Id = juletype.VOID
 			v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
-		} else if v.constExpr && types.IsPure(v.data.Type) && isConstExpression(v.data.Value) {
+		} else if v.constExpr && types.IsPure(v.data.Type) && lex.IsLiteral(v.data.Value) {
 			switch v.expr.(type) {
 			case int64:
 				dt := Type{
@@ -136,13 +136,13 @@ func (e *eval) single(tok lex.Token, m *exprModel) (v value, ok bool) {
 	case lex.ID_LITERAL:
 		ok = true
 		switch {
-		case isstr(tok.Kind):
+		case lex.IsStr(tok.Kind):
 			v = eval.str()
-		case ischar(tok.Kind):
+		case lex.IsChar(tok.Kind):
 			v = eval.char()
-		case isbool(tok.Kind):
+		case lex.IsBool(tok.Kind):
 			v = eval.bool()
-		case isnil(tok.Kind):
+		case lex.IsNil(tok.Kind):
 			v = eval.nil()
 		default:
 			v = eval.numeric()

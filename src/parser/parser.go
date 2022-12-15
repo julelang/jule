@@ -3033,7 +3033,7 @@ func (p *Parser) singleAssign(assign *models.Assign, l, r []value) {
 		return
 	}
 	right := r[0]
-	if assign.Setter.Kind != lex.KND_EQ && !isConstExpression(right.data.Value) {
+	if assign.Setter.Kind != lex.KND_EQ && !lex.IsLiteral(right.data.Value) {
 		assign.Setter.Kind = assign.Setter.Kind[:len(assign.Setter.Kind)-1]
 		solver := solver{
 			p:         p,
