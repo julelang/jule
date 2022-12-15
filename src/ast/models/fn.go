@@ -78,12 +78,12 @@ func (f *Fn) TypeKind() string {
 // OutId returns juleapi.OutId result of function.
 func (f *Fn) OutId() string {
 	if f.IsEntryPoint {
-		return juleapi.OutId(f.Id, nil)
+		return juleapi.OutId(f.Id, 0)
 	}
 	if f.Receiver != nil {
 		return f.Id
 	}
-	return juleapi.OutId(f.Id, f.Token.File)
+	return juleapi.OutId(f.Id, f.Token.File.Addr())
 }
 
 // DefString returns define string of function.

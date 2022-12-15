@@ -3,9 +3,6 @@ package juleapi
 import (
 	"fmt"
 	"strings"
-	"unsafe"
-
-	"github.com/julelang/jule/pkg/juleio"
 )
 
 // IGNORE operator.
@@ -23,9 +20,8 @@ func IsIgnoreId(id string) bool { return id == IGNORE }
 // Equavalents: "JULEC_ID(" + id + ")"
 func AsId(id string) string { return "_" + id }
 
-func getPtrAsId(ptr unsafe.Pointer) string {
-	address := fmt.Sprintf("%p", ptr)
-	address = address[3:] // skip 0xc
+func getPtrAsId(ptr uintptr) string {
+	address := "fp" + fmt.Sprint(ptr)
 	for i, r := range address {
 		if r != '0' {
 			address = address[i:]
@@ -36,11 +32,10 @@ func getPtrAsId(ptr unsafe.Pointer) string {
 }
 
 // OutId returns cpp output identifier form of given identifier.
-func OutId(id string, f *juleio.File) string {
-	if f != nil {
+func OutId(id string, ptr uintptr) string {
+	if ptr != 0 {
 		var out strings.Builder
-		out.WriteByte('f')
-		out.WriteString(getPtrAsId(unsafe.Pointer(f)))
+		out.WriteString(getPtrAsId(ptr))
 		out.WriteByte('_')
 		out.WriteString(id)
 		return out.String()

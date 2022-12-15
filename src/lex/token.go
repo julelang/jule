@@ -1,10 +1,6 @@
 package lex
 
-import (
-	"strings"
-
-	"github.com/julelang/jule/pkg/juleio"
-)
+import "strings"
 
 // Token identities.
 const ID_NA          = 0
@@ -146,7 +142,7 @@ const KND_DEFER       = "defer"
 
 // Token is lexer token.
 type Token struct {
-	File   *juleio.File
+	File   *File
 	Row    int
 	Column int
 	Kind   string

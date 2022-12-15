@@ -19,7 +19,7 @@ import (
 	"github.com/julelang/jule/pkg/juletype"
 )
 
-type File = juleio.File
+type File = lex.File
 type TypeAlias = models.TypeAlias
 type Var = models.Var
 type Fn = models.Fn
@@ -66,9 +66,9 @@ type Parser struct {
 }
 
 // New returns new instance of Parser.
-func New(f *File) *Parser {
+func New(path string) *Parser {
 	p := new(Parser)
-	p.File = f
+	p.File = lex.NewFile(path)
 	p.allowBuiltin = true
 	p.Defines = new(models.Defmap)
 	p.eval = new(eval)
@@ -125,7 +125,7 @@ func (p *Parser) checkCppUsePath(use *models.UseDecl) bool {
 		p.pusherrtok(use.Token, "invalid_header_ext", ext)
 		return false
 	}
-	err := os.Chdir(use.Token.File.Dir)
+	err := os.Chdir(use.Token.File.Dir())
 	if err != nil {
 		p.pusherrtok(use.Token, "use_not_found", use.Path)
 		return false
@@ -274,12 +274,7 @@ func (p *Parser) compilePureUse(ast *models.UseDecl) (_ *use, hassErr bool) {
 			continue
 		}
 		path := filepath.Join(ast.Path, name)
-		f, err := juleio.Jopen(path)
-		if err != nil {
-			p.pusherrmsg(err.Error())
-			continue
-		}
-		psub := New(f)
+		psub := New(path)
 		psub.SetupPackage()
 		psub.Parsef(false, false)
 		psub.wrap_package()
@@ -429,7 +424,8 @@ func (p *Parser) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 	if p.File == nil {
 		return
 	}
-	infos, err := os.ReadDir(p.File.Dir)
+	dir := p.File.Dir()
+	infos, err := os.ReadDir(dir)
 	if err != nil {
 		p.pusherrmsg(err.Error())
 		return true
@@ -440,15 +436,10 @@ func (p *Parser) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 		if info.IsDir() ||
 			!strings.HasSuffix(name, jule.SRC_EXT) ||
 			!juleio.IsPassFileAnnotation(name) ||
-			name == p.File.Name {
+			name == p.File.Name() {
 			continue
 		}
-		f, err := juleio.Jopen(filepath.Join(p.File.Dir, name))
-		if err != nil {
-			p.pusherrmsg(err.Error())
-			return true
-		}
-		fp := New(f)
+		fp := New(filepath.Join(dir, name))
 		fp.package_files = p.package_files
 		*p.package_files = append(*p.package_files, fp)
 		fp.NoLocalPkg = true
@@ -497,7 +488,7 @@ func (p *Parser) Parse(toks []lex.Token, main, justDefines bool) {
 
 // Parses Jule code from file.
 func (p *Parser) Parsef(main, justDefines bool) {
-	lexer := lex.NewLex(p.File)
+	lexer := lex.New(p.File)
 	toks := lexer.Lex()
 	if lexer.Logs != nil {
 		p.pusherrs(lexer.Logs...)

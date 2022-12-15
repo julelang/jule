@@ -49,7 +49,7 @@ func (s *Struct) OutId() string {
 	if s.CppLinked {
 		return s.Id
 	}
-	return juleapi.OutId(s.Id, s.Token.File)
+	return juleapi.OutId(s.Id, s.Token.File.Addr())
 }
 
 // Generics returns generics of instance.

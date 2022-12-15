@@ -17,7 +17,7 @@ type EnumItem struct {
 
 func (ei EnumItem) String() string {
 	var cpp strings.Builder
-	cpp.WriteString(juleapi.OutId(ei.Id, ei.Token.File))
+	cpp.WriteString(juleapi.OutId(ei.Id, ei.Token.File.Addr()))
 	cpp.WriteString(" = ")
 	cpp.WriteString(ei.Expr.String())
 	return cpp.String()
@@ -47,7 +47,7 @@ func (e *Enum) ItemById(id string) *EnumItem {
 func (e Enum) String() string {
 	var cpp strings.Builder
 	cpp.WriteString("enum ")
-	cpp.WriteString(juleapi.OutId(e.Id, e.Token.File))
+	cpp.WriteString(juleapi.OutId(e.Id, e.Token.File.Addr()))
 	cpp.WriteByte(':')
 	cpp.WriteString(e.Type.String())
 	cpp.WriteString(" {\n")

@@ -257,9 +257,9 @@ func (ve *valueEvaluator) enumId(id string, e *Enum) (v value) {
 	v.is_type = true
 	// If built-in.
 	if e.Token.Id == lex.ID_NA {
-		ve.model.append_sub(exprNode{juleapi.OutId(id, nil)})
+		ve.model.append_sub(exprNode{juleapi.OutId(id, 0)})
 	} else {
-		ve.model.append_sub(exprNode{juleapi.OutId(id, e.Token.File)})
+		ve.model.append_sub(exprNode{juleapi.OutId(id, e.Token.File.Addr())})
 	}
 	return
 }
@@ -280,9 +280,9 @@ func (ve *valueEvaluator) structId(id string, s *Struct) (v value) {
 	v = make_value_from_struct(s)
 	// If builtin.
 	if s.Token.Id == lex.ID_NA {
-		ve.model.append_sub(exprNode{juleapi.OutId(id, nil)})
+		ve.model.append_sub(exprNode{juleapi.OutId(id, 0)})
 	} else {
-		ve.model.append_sub(exprNode{juleapi.OutId(id, s.Token.File)})
+		ve.model.append_sub(exprNode{juleapi.OutId(id, s.Token.File.Addr())})
 	}
 	return
 }

@@ -1,12 +1,12 @@
 package models
 
 import (
-	"github.com/julelang/jule/pkg/juleio"
+	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/pkg/juletype"
 )
 
-func IsAccessable(finder *juleio.File, target *juleio.File, defIsPub bool) bool {
-	return defIsPub || finder == nil || target == nil || finder.Dir == target.Dir
+func IsAccessable(finder *lex.File, target *lex.File, defIsPub bool) bool {
+	return defIsPub || finder == nil || target == nil || finder.Dir() == target.Dir()
 }
 
 // Defmap is definition map.
@@ -38,7 +38,7 @@ func (dm *Defmap) NsById(id string) *Namespace {
 	return dm.Namespaces[i]
 }
 
-func (dm *Defmap) FindStructById(id string, f *juleio.File) (int, *Defmap, bool) {
+func (dm *Defmap) FindStructById(id string, f *lex.File) (int, *Defmap, bool) {
 	for i, s := range dm.Structs {
 		if s != nil && s.Id == id {
 			if IsAccessable(f, s.Token.File, s.Pub) {
@@ -53,7 +53,7 @@ func (dm *Defmap) FindStructById(id string, f *juleio.File) (int, *Defmap, bool)
 	return -1, nil, false
 }
 
-func (dm *Defmap) StructById(id string, f *juleio.File) (*Struct, *Defmap, bool) {
+func (dm *Defmap) StructById(id string, f *lex.File) (*Struct, *Defmap, bool) {
 	i, m, canshadow := dm.FindStructById(id, f)
 	if i == -1 {
 		return nil, nil, false
@@ -61,7 +61,7 @@ func (dm *Defmap) StructById(id string, f *juleio.File) (*Struct, *Defmap, bool)
 	return m.Structs[i], m, canshadow
 }
 
-func (dm *Defmap) FindTraitById(id string, f *juleio.File) (int, *Defmap, bool) {
+func (dm *Defmap) FindTraitById(id string, f *lex.File) (int, *Defmap, bool) {
 	for i, t := range dm.Traits {
 		if t != nil && t.Id == id {
 			if IsAccessable(f, t.Token.File, t.Pub) {
@@ -76,7 +76,7 @@ func (dm *Defmap) FindTraitById(id string, f *juleio.File) (int, *Defmap, bool) 
 	return -1, nil, false
 }
 
-func (dm *Defmap) TraitById(id string, f *juleio.File) (*Trait, *Defmap, bool) {
+func (dm *Defmap) TraitById(id string, f *lex.File) (*Trait, *Defmap, bool) {
 	i, m, canshadow := dm.FindTraitById(id, f)
 	if i == -1 {
 		return nil, nil, false
@@ -84,7 +84,7 @@ func (dm *Defmap) TraitById(id string, f *juleio.File) (*Trait, *Defmap, bool) {
 	return m.Traits[i], m, canshadow
 }
 
-func (dm *Defmap) FindEnumById(id string, f *juleio.File) (int, *Defmap, bool) {
+func (dm *Defmap) FindEnumById(id string, f *lex.File) (int, *Defmap, bool) {
 	for i, e := range dm.Enums {
 		if e != nil && e.Id == id {
 			if IsAccessable(f, e.Token.File, e.Pub) {
@@ -99,7 +99,7 @@ func (dm *Defmap) FindEnumById(id string, f *juleio.File) (int, *Defmap, bool) {
 	return -1, nil, false
 }
 
-func (dm *Defmap) EnumById(id string, f *juleio.File) (*Enum, *Defmap, bool) {
+func (dm *Defmap) EnumById(id string, f *lex.File) (*Enum, *Defmap, bool) {
 	i, m, canshadow := dm.FindEnumById(id, f)
 	if i == -1 {
 		return nil, nil, false
@@ -107,7 +107,7 @@ func (dm *Defmap) EnumById(id string, f *juleio.File) (*Enum, *Defmap, bool) {
 	return m.Enums[i], m, canshadow
 }
 
-func (dm *Defmap) FindTypeById(id string, f *juleio.File) (int, *Defmap, bool) {
+func (dm *Defmap) FindTypeById(id string, f *lex.File) (int, *Defmap, bool) {
 	for i, t := range dm.Types {
 		if t != nil && t.Id == id {
 			if IsAccessable(f, t.Token.File, t.Pub) {
@@ -122,7 +122,7 @@ func (dm *Defmap) FindTypeById(id string, f *juleio.File) (int, *Defmap, bool) {
 	return -1, nil, false
 }
 
-func (dm *Defmap) TypeById(id string, f *juleio.File) (*TypeAlias, *Defmap, bool) {
+func (dm *Defmap) TypeById(id string, f *lex.File) (*TypeAlias, *Defmap, bool) {
 	i, m, canshadow := dm.FindTypeById(id, f)
 	if i == -1 {
 		return nil, nil, false
@@ -130,7 +130,7 @@ func (dm *Defmap) TypeById(id string, f *juleio.File) (*TypeAlias, *Defmap, bool
 	return m.Types[i], m, canshadow
 }
 
-func (dm *Defmap) FindFnById(id string, f *juleio.File) (int, *Defmap, bool) {
+func (dm *Defmap) FindFnById(id string, f *lex.File) (int, *Defmap, bool) {
 	for i, fn := range dm.Funcs {
 		if fn != nil && fn.Id == id {
 			if IsAccessable(f, fn.Token.File, fn.Pub) {
@@ -149,7 +149,7 @@ func (dm *Defmap) FindFnById(id string, f *juleio.File) (int, *Defmap, bool) {
 //
 // Special case:
 //  FnById(id) -> nil: if function is not exist.
-func (dm *Defmap) FnById(id string, f *juleio.File) (*Fn, *Defmap, bool) {
+func (dm *Defmap) FnById(id string, f *lex.File) (*Fn, *Defmap, bool) {
 	i, m, canshadow := dm.FindFnById(id, f)
 	if i == -1 {
 		return nil, nil, false
@@ -157,7 +157,7 @@ func (dm *Defmap) FnById(id string, f *juleio.File) (*Fn, *Defmap, bool) {
 	return m.Funcs[i], m, canshadow
 }
 
-func (dm *Defmap) FindGlobalById(id string, f *juleio.File) (int, *Defmap, bool) {
+func (dm *Defmap) FindGlobalById(id string, f *lex.File) (int, *Defmap, bool) {
 	for i, g := range dm.Globals {
 		if g != nil && g.Type.Id != juletype.VOID && g.Id == id {
 			if IsAccessable(f, g.Token.File, g.Pub) {
@@ -172,7 +172,7 @@ func (dm *Defmap) FindGlobalById(id string, f *juleio.File) (int, *Defmap, bool)
 	return -1, nil, false
 }
 
-func (dm *Defmap) GlobalById(id string, f *juleio.File) (*Var, *Defmap, bool) {
+func (dm *Defmap) GlobalById(id string, f *lex.File) (*Var, *Defmap, bool) {
 	i, m, canshadow := dm.FindGlobalById(id, f)
 	if i == -1 {
 		return nil, nil, false
@@ -192,8 +192,8 @@ func (dm *Defmap) GlobalById(id string, f *juleio.File) (*Var, *Defmap, bool) {
 // 's' -> struct
 // 't' -> type alias
 // 'i' -> trait
-func (dm *Defmap) FindById(id string, f *juleio.File) (int, *Defmap, byte) {
-	var finders = map[byte]func(string, *juleio.File) (int, *Defmap, bool){
+func (dm *Defmap) FindById(id string, f *lex.File) (int, *Defmap, byte) {
+	var finders = map[byte]func(string, *lex.File) (int, *Defmap, bool){
 		'g': dm.FindGlobalById,
 		'f': dm.FindFnById,
 		'e': dm.FindEnumById,

@@ -48,7 +48,7 @@ func (v *Var) OutId() string {
 	case v.IsField:
 		return "__julec_field_" + juleapi.AsId(v.Id)
 	default:
-		return juleapi.OutId(v.Id, v.Token.File)
+		return juleapi.OutId(v.Id, v.Token.File.Addr())
 	}
 }
 

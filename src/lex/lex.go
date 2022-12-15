@@ -1,30 +1,30 @@
 package lex
 
 import (
+	"os"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/julelang/jule/pkg/jule"
-	"github.com/julelang/jule/pkg/juleio"
 	"github.com/julelang/jule/pkg/julelog"
 )
 
 // Lex is lexer of Jule.
 type Lex struct {
 	firstTokenOfLine bool
+	braces           []Token
+	data             []rune
 
-	File   *juleio.File
+	File   *File
 	Pos    int
 	Column int
 	Row    int
 	// Logs are only errors
 	Logs []julelog.CompilerLog
-
-	braces []Token
 }
 
 // New Lex instance.
-func NewLex(f *juleio.File) *Lex {
+func New(f *File) *Lex {
 	l := new(Lex)
 	l.File = f
 	l.Pos = 0
@@ -53,12 +53,21 @@ func (l *Lex) pusherrtok(tok Token, err string) {
 	})
 }
 
+func (l* Lex) buff_data() {
+	bytes, err := os.ReadFile(l.File.Path())
+	if err != nil {
+		panic("buffering failed: " + err.Error())
+	}
+	l.data = []rune(string(bytes))
+}
+
 // Lex all source content.
 func (l *Lex) Lex() []Token {
+	l.buff_data()
 	var toks []Token
 	l.Logs = nil
 	l.Newln()
-	for l.Pos < len(l.File.Data) {
+	for l.Pos < len(l.data) {
 		t := l.Token()
 		l.firstTokenOfLine = false
 		if t.Id != ID_NA {
@@ -66,6 +75,7 @@ func (l *Lex) Lex() []Token {
 		}
 	}
 	l.checkRanges()
+	l.data = nil
 	return toks
 }
 
@@ -177,7 +187,7 @@ func (l *Lex) id(ln string) string {
 // resume to lex from position.
 func (l *Lex) resume() string {
 	var ln string
-	runes := l.File.Data[l.Pos:]
+	runes := l.data[l.Pos:]
 	// Skip spaces.
 	for i, r := range runes {
 		if IsSpace(byte(r)) {
@@ -201,31 +211,31 @@ func (l *Lex) resume() string {
 func (l *Lex) lncomment(t *Token) {
 	start := l.Pos
 	l.Pos += 2
-	for ; l.Pos < len(l.File.Data); l.Pos++ {
-		if l.File.Data[l.Pos] == '\n' {
+	for ; l.Pos < len(l.data); l.Pos++ {
+		if l.data[l.Pos] == '\n' {
 			if l.firstTokenOfLine {
 				t.Id = ID_COMMENT
-				t.Kind = string(l.File.Data[start:l.Pos])
+				t.Kind = string(l.data[start:l.Pos])
 			}
 			return
 		}
 	}
 	if l.firstTokenOfLine {
 		t.Id = ID_COMMENT
-		t.Kind = string(l.File.Data[start:])
+		t.Kind = string(l.data[start:])
 	}
 }
 
 func (l *Lex) rangecomment() {
 	l.Pos += 2
-	for ; l.Pos < len(l.File.Data); l.Pos++ {
-		r := l.File.Data[l.Pos]
+	for ; l.Pos < len(l.data); l.Pos++ {
+		r := l.data[l.Pos]
 		if r == '\n' {
 			l.Newln()
 			continue
 		}
 		l.Column += len(string(r))
-		if strings.HasPrefix(string(l.File.Data[l.Pos:]), KND_RNG_RCOMMENT) {
+		if strings.HasPrefix(string(l.data[l.Pos:]), KND_RNG_RCOMMENT) {
 			l.Column += 2
 			l.Pos += 2
 			return

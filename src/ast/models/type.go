@@ -234,7 +234,7 @@ func (dt Type) String() (s string) {
 		if dt.Generic {
 			return juleapi.AsId(dt.Kind)
 		}
-		return juleapi.OutId(dt.Kind, dt.Token.File)
+		return juleapi.OutId(dt.Kind, dt.Token.File.Addr())
 	case juletype.ENUM:
 		e := dt.Tag.(*Enum)
 		return e.Type.String()
@@ -296,7 +296,7 @@ func (dt *Type) TraitString() string {
 	id, _ := dt.KindId()
 	cpp.WriteString(juleapi.AsTypeId("trait"))
 	cpp.WriteByte('<')
-	cpp.WriteString(juleapi.OutId(id, dt.Token.File))
+	cpp.WriteString(juleapi.OutId(id, dt.Token.File.Addr()))
 	cpp.WriteByte('>')
 	return cpp.String()
 }

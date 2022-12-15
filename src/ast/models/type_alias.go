@@ -27,7 +27,7 @@ func (t TypeAlias) String() string {
 	if t.Generic {
 		cpp.WriteString(juleapi.AsId(t.Id))
 	} else {
-		cpp.WriteString(juleapi.OutId(t.Id, t.Token.File))
+		cpp.WriteString(juleapi.OutId(t.Id, t.Token.File.Addr()))
 	}
 	cpp.WriteByte(';')
 	return cpp.String()

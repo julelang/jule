@@ -29,5 +29,5 @@ func (t *Trait) FindFunc(id string) *Fn {
 
 // OutId returns juleapi.OutId result of trait.
 func (t *Trait) OutId() string {
-	return juleapi.OutId(t.Id, t.Token.File)
+	return juleapi.OutId(t.Id, t.Token.File.Addr())
 }

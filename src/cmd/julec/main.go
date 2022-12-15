@@ -280,23 +280,19 @@ func write_output(path, content string) {
 
 func compile(path string, main, nolocal, justDefs bool) *parser.Parser {
 	set()
-	p := parser.New(nil)
 	// Check standard library.
 	inf, err := os.Stat(jule.STDLIB_PATH)
 	if err != nil || !inf.IsDir() {
+		p := &parser.Parser{}
 		p.PushErr("stdlib_not_exist")
 		return p
 	}
-	f, err := juleio.Jopen(path)
-	if err != nil {
-		println(err.Error())
-		return nil
-	}
 	if !juleio.IsPassFileAnnotation(path) {
+		p := &parser.Parser{}
 		p.PushErr("file_not_useable")
 		return p
 	}
-	p.File = f
+	p := parser.New(path)
 	p.NoLocalPkg = nolocal
 	p.SetupPackage()
 	p.Parsef(main, justDefs)
