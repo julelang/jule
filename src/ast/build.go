@@ -6,10 +6,10 @@ import (
 	"sync"
 
 	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/pkg/jule"
 	"github.com/julelang/jule/pkg/juleapi"
-	"github.com/julelang/jule/pkg/julelog"
 	"github.com/julelang/jule/pkg/juletype"
 )
 
@@ -19,7 +19,7 @@ type Builder struct {
 	pub bool
 
 	Tree   []models.Object
-	Errors []julelog.CompilerLog
+	Errors []build.CompilerLog
 	Tokens []lex.Token
 	Pos    int
 }
@@ -32,9 +32,9 @@ func NewBuilder(t []lex.Token) *Builder {
 	return b
 }
 
-func compilerErr(t lex.Token, key string, args ...any) julelog.CompilerLog {
-	return julelog.CompilerLog{
-		Type:    julelog.ERR,
+func compilerErr(t lex.Token, key string, args ...any) build.CompilerLog {
+	return build.CompilerLog{
+		Type:    build.ERR,
 		Row:     t.Row,
 		Column:  t.Column,
 		Path:    t.File.Path(),

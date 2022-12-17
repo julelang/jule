@@ -15,7 +15,6 @@ import (
 	"github.com/julelang/jule/types"
 	"github.com/julelang/jule/pkg/jule"
 	"github.com/julelang/jule/pkg/juleapi"
-	"github.com/julelang/jule/pkg/julelog"
 	"github.com/julelang/jule/pkg/juletype"
 )
 
@@ -60,8 +59,8 @@ type Parser struct {
 	Used        []*use // All used packages, deep detection
 	Uses        []*use // File uses these packages
 	Defines     *models.Defmap
-	Errors      []julelog.CompilerLog
-	Warnings    []julelog.CompilerLog
+	Errors      []build.CompilerLog
+	Warnings    []build.CompilerLog
 	File        *File
 }
 
@@ -83,8 +82,8 @@ func (p *Parser) pusherrtok(tok lex.Token, key string, args ...any) {
 
 // pusherrtok appends new error message by token.
 func (p *Parser) pusherrmsgtok(tok lex.Token, msg string) {
-	p.Errors = append(p.Errors, julelog.CompilerLog{
-		Type:    julelog.ERR,
+	p.Errors = append(p.Errors, build.CompilerLog{
+		Type:    build.ERR,
 		Row:     tok.Row,
 		Column:  tok.Column,
 		Path:    tok.File.Path(),
@@ -93,7 +92,7 @@ func (p *Parser) pusherrmsgtok(tok lex.Token, msg string) {
 }
 
 // pusherrs appends specified errors.
-func (p *Parser) pusherrs(errs ...julelog.CompilerLog) {
+func (p *Parser) pusherrs(errs ...build.CompilerLog) {
 	p.Errors = append(p.Errors, errs...)
 }
 
@@ -104,13 +103,13 @@ func (p *Parser) PushErr(key string, args ...any) {
 
 // pusherrmsh appends new flat error message
 func (p *Parser) pusherrmsg(msg string) {
-	p.Errors = append(p.Errors, julelog.CompilerLog{
-		Type:    julelog.FLAT_ERR,
+	p.Errors = append(p.Errors, build.CompilerLog{
+		Type:    build.FLAT_ERR,
 		Message: msg,
 	})
 }
 
-func getTree(toks []lex.Token) ([]models.Object, []julelog.CompilerLog) {
+func getTree(toks []lex.Token) ([]models.Object, []build.CompilerLog) {
 	b := ast.NewBuilder(toks)
 	b.Build()
 	return b.Tree, b.Errors

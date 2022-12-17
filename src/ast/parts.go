@@ -1,8 +1,8 @@
 package ast
 
 import (
+	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
-	"github.com/julelang/jule/pkg/julelog"
 )
 
 // Range returns between of open and close braces.
@@ -71,12 +71,12 @@ func RangeLast(toks []lex.Token) (cutted, cut []lex.Token) {
 //
 // Special case is;
 //  Parts(toks) = nil if len(toks) == 0
-func Parts(toks []lex.Token, id uint8, exprMust bool) ([][]lex.Token, []julelog.CompilerLog) {
+func Parts(toks []lex.Token, id uint8, exprMust bool) ([][]lex.Token, []build.CompilerLog) {
 	if len(toks) == 0 {
 		return nil, nil
 	}
 	var parts [][]lex.Token
-	var errs []julelog.CompilerLog
+	var errs []build.CompilerLog
 	brace_n := 0
 	last := 0
 	for i, tok := range toks {

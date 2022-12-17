@@ -1,4 +1,4 @@
-package julelog
+package build
 
 import (
 	"fmt"

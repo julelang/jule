@@ -2,9 +2,9 @@ package types
 
 import (
 	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/pkg/jule"
-	"github.com/julelang/jule/pkg/julelog"
 	"github.com/julelang/jule/pkg/juletype"
 )
 
@@ -16,13 +16,13 @@ type Checker struct {
 	ErrorLogged bool
 	IgnoreAny   bool
 	AllowAssign bool
-	Errors      []julelog.CompilerLog
+	Errors      []build.CompilerLog
 }
 
 // pusherrtok appends new error by token.
 func (c *Checker) pusherrtok(tok lex.Token, key string, args ...any) {
-	c.Errors = append(c.Errors, julelog.CompilerLog{
-		Type:    julelog.ERR,
+	c.Errors = append(c.Errors, build.CompilerLog{
+		Type:    build.ERR,
 		Row:     tok.Row,
 		Column:  tok.Column,
 		Path:    tok.File.Path(),

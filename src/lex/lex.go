@@ -5,8 +5,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/pkg/jule"
-	"github.com/julelang/jule/pkg/julelog"
 )
 
 // Lex is lexer of Jule.
@@ -20,7 +20,7 @@ type Lex struct {
 	Column int
 	Row    int
 	// Logs are only errors
-	Logs []julelog.CompilerLog
+	Logs []build.CompilerLog
 }
 
 // New Lex instance.
@@ -34,8 +34,8 @@ func New(f *File) *Lex {
 }
 
 func (l *Lex) pusherr(key string, args ...any) {
-	l.Logs = append(l.Logs, julelog.CompilerLog{
-		Type:    julelog.ERR,
+	l.Logs = append(l.Logs, build.CompilerLog{
+		Type:    build.ERR,
 		Row:     l.Row,
 		Column:  l.Column,
 		Path:    l.File.Path(),
@@ -44,8 +44,8 @@ func (l *Lex) pusherr(key string, args ...any) {
 }
 
 func (l *Lex) pusherrtok(tok Token, err string) {
-	l.Logs = append(l.Logs, julelog.CompilerLog{
-		Type:    julelog.ERR,
+	l.Logs = append(l.Logs, build.CompilerLog{
+		Type:    build.ERR,
 		Row:     tok.Row,
 		Column:  tok.Column,
 		Path:    l.File.Path(),
