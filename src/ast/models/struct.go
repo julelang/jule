@@ -22,7 +22,7 @@ type Struct struct {
 	Traits      []*Trait // Implemented traits
 	Defines     *Defmap
 	Used        bool
-	Desc        string
+	Doc         string
 	CppLinked   bool
 	Constructor *Fn
 	Depends     []*Struct

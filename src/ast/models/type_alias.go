@@ -14,7 +14,7 @@ type TypeAlias struct {
 	Token   lex.Token
 	Id      string
 	Type    Type
-	Desc    string
+	Doc     string
 	Used    bool
 	Generic bool
 }

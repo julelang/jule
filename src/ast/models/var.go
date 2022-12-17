@@ -22,7 +22,7 @@ type Var struct {
 	New       bool
 	Tag       any
 	ExprTag   any
-	Desc      string
+	Doc       string
 	Used      bool
 	IsField   bool
 	CppLinked bool

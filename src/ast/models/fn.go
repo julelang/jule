@@ -25,7 +25,7 @@ type Fn struct {
 	Receiver      *Var
 	Owner         any
 	BuiltinCaller any
-	Desc          string
+	Doc           string
 }
 
 func (f *Fn) plainTypeString() string {

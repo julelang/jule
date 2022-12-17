@@ -31,7 +31,7 @@ type Enum struct {
 	Type  Type
 	Items []*EnumItem
 	Used  bool
-	Desc  string
+	Doc   string
 }
 
 // ItemById returns item by id if exist, nil if not.

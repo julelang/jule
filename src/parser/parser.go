@@ -554,7 +554,7 @@ func (p *Parser) Generics(generics []GenericType) {
 func (p *Parser) make_type_alias(alias models.TypeAlias) *models.TypeAlias {
 	a := new(models.TypeAlias)
 	*a = alias
-	alias.Desc = p.docText.String()
+	alias.Doc = p.docText.String()
 	p.docText.Reset()
 	return a
 }
@@ -678,7 +678,7 @@ func (p *Parser) Enum(e Enum) {
 		p.pusherrtok(e.Token, "exist_id", e.Id)
 		return
 	}
-	e.Desc = p.docText.String()
+	e.Doc = p.docText.String()
 	p.docText.Reset()
 	e.Type, _ = p.realType(e.Type, true)
 	if !types.IsPure(e.Type) {
@@ -753,7 +753,7 @@ func make_constructor(s *Struct) *models.Fn {
 func (p *Parser) make_struct(model models.Struct) *Struct {
 	s := new(Struct)
 	*s = model
-	s.Desc = p.docText.String()
+	s.Doc = p.docText.String()
 	p.docText.Reset()
 	//s.Traits = new([]*trait)
 	//s.depends = new([]*structure)
@@ -916,7 +916,7 @@ func (p *Parser) implTrait(model *models.Impl) {
 			obj_t.Attributes = p.attributes
 			obj_t.Owner = p
 			p.attributes = nil
-			obj_t.Desc = p.docText.String()
+			obj_t.Doc = p.docText.String()
 			p.docText.Reset()
 			_ = p.check_param_dup(obj_t.Params)
 			p.check_ret_variables(obj_t)
@@ -966,7 +966,7 @@ func (p *Parser) implStruct(model *models.Impl) {
 			sf.Receiver.Token = s.Token
 			sf.Receiver.Tag = s
 			sf.Attributes = p.attributes
-			sf.Desc = p.docText.String()
+			sf.Doc = p.docText.String()
 			sf.Owner = p
 			p.docText.Reset()
 			p.attributes = nil
@@ -1196,7 +1196,7 @@ func (p *Parser) Func(ast Fn) {
 	f.Attributes = p.attributes
 	p.attributes = nil
 	f.Owner = p
-	f.Desc = p.docText.String()
+	f.Doc = p.docText.String()
 	p.docText.Reset()
 	setGenerics(f, p.generics)
 	p.generics = nil
@@ -1220,7 +1220,7 @@ func (p *Parser) Global(vast Var) {
 			}
 		}
 	}
-	vast.Desc = p.docText.String()
+	vast.Doc = p.docText.String()
 	p.docText.Reset()
 	v := new(Var)
 	*v = vast

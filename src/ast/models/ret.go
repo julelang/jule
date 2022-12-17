@@ -13,9 +13,7 @@ type RetType struct {
 	Identifiers []lex.Token
 }
 
-func (rt RetType) String() string {
-	return rt.Type.String()
-}
+func (rt RetType) String() string { return rt.Type.String() }
 
 // AnyVar reports exist any variable or not.
 func (rt *RetType) AnyVar() bool {

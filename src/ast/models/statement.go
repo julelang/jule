@@ -14,9 +14,7 @@ type Statement struct {
 	WithTerminator bool
 }
 
-func (s Statement) String() string {
-	return fmt.Sprint(s.Data)
-}
+func (s Statement) String() string { return fmt.Sprint(s.Data) }
 
 // ExprStatement is AST model of expression statement in block.
 type ExprStatement struct {
