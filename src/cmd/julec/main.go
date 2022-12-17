@@ -13,12 +13,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/parser"
 	"github.com/julelang/jule/pkg/jule"
 	"github.com/julelang/jule/pkg/juleapi"
-	"github.com/julelang/jule/pkg/juleio"
 	"github.com/julelang/jule/types"
 )
 
@@ -287,7 +287,7 @@ func compile(path string, main, nolocal, justDefs bool) *parser.Parser {
 		p.PushErr("stdlib_not_exist")
 		return p
 	}
-	if !juleio.IsPassFileAnnotation(path) {
+	if !build.IsPassFileAnnotation(path) {
 		p := &parser.Parser{}
 		p.PushErr("file_not_useable")
 		return p
@@ -433,7 +433,7 @@ func gen_links(p *parser.Parser) string {
 	for _, u := range p.Used {
 		if u.CppLink {
 			cpp.WriteString("#include ")
-			if juleio.IsStdHeaderPath(u.Path) {
+			if build.IsStdHeaderPath(u.Path) {
 				cpp.WriteString(u.Path)
 			} else {
 				cpp.WriteByte('"')

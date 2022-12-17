@@ -10,11 +10,11 @@ import (
 
 	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
 	"github.com/julelang/jule/pkg/jule"
 	"github.com/julelang/jule/pkg/juleapi"
-	"github.com/julelang/jule/pkg/juleio"
 	"github.com/julelang/jule/pkg/julelog"
 	"github.com/julelang/jule/pkg/juletype"
 )
@@ -117,7 +117,7 @@ func getTree(toks []lex.Token) ([]models.Object, []julelog.CompilerLog) {
 }
 
 func (p *Parser) checkCppUsePath(use *models.UseDecl) bool {
-	if juleio.IsStdHeaderPath(use.Path) {
+	if build.IsStdHeaderPath(use.Path) {
 		return true
 	}
 	ext := filepath.Ext(use.Path)
@@ -270,7 +270,7 @@ func (p *Parser) compilePureUse(ast *models.UseDecl) (_ *use, hassErr bool) {
 		// Skip directories.
 		if info.IsDir() ||
 			!strings.HasSuffix(name, jule.SRC_EXT) ||
-			!juleio.IsPassFileAnnotation(name) {
+			!build.IsPassFileAnnotation(name) {
 			continue
 		}
 		path := filepath.Join(ast.Path, name)
@@ -435,7 +435,7 @@ func (p *Parser) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 		// Skip directories.
 		if info.IsDir() ||
 			!strings.HasSuffix(name, jule.SRC_EXT) ||
-			!juleio.IsPassFileAnnotation(name) ||
+			!build.IsPassFileAnnotation(name) ||
 			name == p.File.Name() {
 			continue
 		}

@@ -1,4 +1,4 @@
-package juleio
+package build
 
 import (
 	"path/filepath"
@@ -17,7 +17,7 @@ const arch_amd64 = "amd64"
 const arch_arm = "arm"
 const arch_arm64 = "arm64"
 
-func checkPlatform(path string) (ok bool, exist bool) {
+func check_os(path string) (ok bool, exist bool) {
 	ok = false
 	exist = true
 	switch path {
@@ -39,7 +39,7 @@ func checkPlatform(path string) (ok bool, exist bool) {
 	return
 }
 
-func checkArch(path string) (ok bool, exist bool) {
+func check_arch(path string) (ok bool, exist bool) {
 	ok = false
 	exist = true
 	switch path {
@@ -104,25 +104,30 @@ func IsPassFileAnnotation(p string) bool {
 
 	
 	if a2 == "" {
-		ok, exist := checkPlatform(a1)
+		ok, exist := check_os(a1)
 		if exist {
 			return ok
 		}
-		ok, exist = checkArch(a1)
+		ok, exist = check_arch(a1)
 		return !exist || ok
 	}
 	
-	ok, exist := checkArch(a1)
+	ok, exist := check_arch(a1)
 	if exist {
 		if !ok {
 			return false
 		}
-		ok, exist = checkPlatform(a2)
+		ok, exist = check_os(a2)
 		return !exist || ok
 	}
 
 	// a1 is not architecture, for this reason bad couple pattern.
 	// Accept as one pattern, so a1 can be platform.
-	ok, exist = checkPlatform(a1)
+	ok, exist = check_os(a1)
 	return !exist || ok
+}
+
+// IsStdHeaderPath reports path is C++ std library path.
+func IsStdHeaderPath(p string) bool {
+	return p[0] == '<' && p[len(p)-1] == '>'
 }
