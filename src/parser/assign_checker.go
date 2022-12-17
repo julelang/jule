@@ -6,7 +6,6 @@ import (
 
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
-	"github.com/julelang/jule/pkg/julebits"
 	"github.com/julelang/jule/pkg/juletype"
 )
 
@@ -19,7 +18,7 @@ func float_assignable(dt uint8, v value) bool {
 	case uint64:
 		v.data.Value = strconv.FormatFloat(float64(t), 'e', -1, 64)
 	}
-	return checkFloatBit(v.data, julebits.BitsizeType(dt))
+	return checkFloatBit(v.data, types.BitsizeType(dt))
 }
 
 func signedAssignable(dt uint8, v value) bool {

@@ -3,7 +3,6 @@ package parser
 import (
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
-	"github.com/julelang/jule/pkg/julebits"
 	"github.com/julelang/jule/pkg/juletype"
 )
 
@@ -35,11 +34,11 @@ func setshift(v *value, right uint64) {
 func bitize(v *value) {
 	switch t := v.expr.(type) {
 	case float64:
-		v.data.Type.Id = juletype.FloatFromBits(julebits.BitsizeFloat(t))
+		v.data.Type.Id = juletype.FloatFromBits(types.BitsizeFloat(t))
 	case int64:
-		v.data.Type.Id = juletype.IntFromBits(julebits.BitsizeInt(t))
+		v.data.Type.Id = juletype.IntFromBits(types.BitsizeInt(t))
 	case uint64:
-		v.data.Type.Id = juletype.UIntFromBits(julebits.BitsizeUInt(t))
+		v.data.Type.Id = juletype.UIntFromBits(types.BitsizeUInt(t))
 	default:
 		return
 	}

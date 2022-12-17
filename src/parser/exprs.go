@@ -6,7 +6,6 @@ import (
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
-	"github.com/julelang/jule/pkg/julebits"
 	"github.com/julelang/jule/pkg/juletype"
 )
 
@@ -81,7 +80,7 @@ func checkFloatBit(v models.Data, bit int) bool {
 	if bit == 0 {
 		return false
 	}
-	return julebits.CheckBitFloat(v.Value, bit)
+	return types.CheckBitFloat(v.Value, bit)
 }
 
 func validExprForConst(v value) bool {
