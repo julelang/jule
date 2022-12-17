@@ -19,7 +19,7 @@ type Builder struct {
 	pub bool
 
 	Tree   []models.Object
-	Errors []build.CompilerLog
+	Errors []build.Log
 	Tokens []lex.Token
 	Pos    int
 }
@@ -32,8 +32,8 @@ func NewBuilder(t []lex.Token) *Builder {
 	return b
 }
 
-func compilerErr(t lex.Token, key string, args ...any) build.CompilerLog {
-	return build.CompilerLog{
+func compilerErr(t lex.Token, key string, args ...any) build.Log {
+	return build.Log{
 		Type:    build.ERR,
 		Row:     t.Row,
 		Column:  t.Column,

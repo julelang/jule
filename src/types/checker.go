@@ -16,12 +16,12 @@ type Checker struct {
 	ErrorLogged bool
 	IgnoreAny   bool
 	AllowAssign bool
-	Errors      []build.CompilerLog
+	Errors      []build.Log
 }
 
 // pusherrtok appends new error by token.
 func (c *Checker) pusherrtok(tok lex.Token, key string, args ...any) {
-	c.Errors = append(c.Errors, build.CompilerLog{
+	c.Errors = append(c.Errors, build.Log{
 		Type:    build.ERR,
 		Row:     tok.Row,
 		Column:  tok.Column,

@@ -59,8 +59,8 @@ type Parser struct {
 	Used        []*use // All used packages, deep detection
 	Uses        []*use // File uses these packages
 	Defines     *models.Defmap
-	Errors      []build.CompilerLog
-	Warnings    []build.CompilerLog
+	Errors      []build.Log
+	Warnings    []build.Log
 	File        *File
 }
 
@@ -82,7 +82,7 @@ func (p *Parser) pusherrtok(tok lex.Token, key string, args ...any) {
 
 // pusherrtok appends new error message by token.
 func (p *Parser) pusherrmsgtok(tok lex.Token, msg string) {
-	p.Errors = append(p.Errors, build.CompilerLog{
+	p.Errors = append(p.Errors, build.Log{
 		Type:    build.ERR,
 		Row:     tok.Row,
 		Column:  tok.Column,
@@ -92,7 +92,7 @@ func (p *Parser) pusherrmsgtok(tok lex.Token, msg string) {
 }
 
 // pusherrs appends specified errors.
-func (p *Parser) pusherrs(errs ...build.CompilerLog) {
+func (p *Parser) pusherrs(errs ...build.Log) {
 	p.Errors = append(p.Errors, errs...)
 }
 
@@ -103,13 +103,13 @@ func (p *Parser) PushErr(key string, args ...any) {
 
 // pusherrmsh appends new flat error message
 func (p *Parser) pusherrmsg(msg string) {
-	p.Errors = append(p.Errors, build.CompilerLog{
+	p.Errors = append(p.Errors, build.Log{
 		Type:    build.FLAT_ERR,
 		Message: msg,
 	})
 }
 
-func getTree(toks []lex.Token) ([]models.Object, []build.CompilerLog) {
+func getTree(toks []lex.Token) ([]models.Object, []build.Log) {
 	b := ast.NewBuilder(toks)
 	b.Build()
 	return b.Tree, b.Errors

@@ -7,14 +7,10 @@ import (
 
 // Log types.
 const FLAT_ERR  uint8 = 0
-const FLAT_WARN uint8 = 1
-const ERR       uint8 = 2
-const WARN      uint8 = 3
+const ERR       uint8 = 1
 
-const warningMark = "<!>"
-
-// CompilerLog is a compiler log.
-type CompilerLog struct {
+// Log is a build log.
+type Log struct {
 	Type    uint8
 	Row     int
 	Column  int
@@ -22,48 +18,26 @@ type CompilerLog struct {
 	Message string
 }
 
-func (clog *CompilerLog) flatError() string { return clog.Message }
+func (l *Log) flat_err() string { return l.Message }
 
-func (clog *CompilerLog) error() string {
+func (l *Log) err() string {
 	var log strings.Builder
-	log.WriteString(clog.Path)
+	log.WriteString(l.Path)
 	log.WriteByte(':')
-	log.WriteString(fmt.Sprint(clog.Row))
+	log.WriteString(fmt.Sprint(l.Row))
 	log.WriteByte(':')
-	log.WriteString(fmt.Sprint(clog.Column))
+	log.WriteString(fmt.Sprint(l.Column))
 	log.WriteByte(' ')
-	log.WriteString(clog.Message)
+	log.WriteString(l.Message)
 	return log.String()
 }
 
-func (clog *CompilerLog) flatWarning() string {
-	return warningMark + " " + clog.Message
-}
-
-func (clog *CompilerLog) warning() string {
-	var log strings.Builder
-	log.WriteString(warningMark)
-	log.WriteByte(' ')
-	log.WriteString(clog.Path)
-	log.WriteByte(':')
-	log.WriteString(fmt.Sprint(clog.Row))
-	log.WriteByte(':')
-	log.WriteString(fmt.Sprint(clog.Column))
-	log.WriteByte(' ')
-	log.WriteString(clog.Message)
-	return log.String()
-}
-
-func (clog CompilerLog) String() string {
-	switch clog.Type {
+func (l Log) String() string {
+	switch l.Type {
 	case FLAT_ERR:
-		return clog.flatError()
+		return l.flat_err()
 	case ERR:
-		return clog.error()
-	case FLAT_WARN:
-		return clog.flatWarning()
-	case WARN:
-		return clog.warning()
+		return l.err()
 	}
 	return ""
 }

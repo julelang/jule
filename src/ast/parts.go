@@ -71,12 +71,12 @@ func RangeLast(toks []lex.Token) (cutted, cut []lex.Token) {
 //
 // Special case is;
 //  Parts(toks) = nil if len(toks) == 0
-func Parts(toks []lex.Token, id uint8, exprMust bool) ([][]lex.Token, []build.CompilerLog) {
+func Parts(toks []lex.Token, id uint8, exprMust bool) ([][]lex.Token, []build.Log) {
 	if len(toks) == 0 {
 		return nil, nil
 	}
 	var parts [][]lex.Token
-	var errs []build.CompilerLog
+	var errs []build.Log
 	brace_n := 0
 	last := 0
 	for i, tok := range toks {

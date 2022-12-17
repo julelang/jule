@@ -20,7 +20,7 @@ type Lex struct {
 	Column int
 	Row    int
 	// Logs are only errors
-	Logs []build.CompilerLog
+	Logs []build.Log
 }
 
 // New Lex instance.
@@ -34,7 +34,7 @@ func New(f *File) *Lex {
 }
 
 func (l *Lex) pusherr(key string, args ...any) {
-	l.Logs = append(l.Logs, build.CompilerLog{
+	l.Logs = append(l.Logs, build.Log{
 		Type:    build.ERR,
 		Row:     l.Row,
 		Column:  l.Column,
@@ -44,7 +44,7 @@ func (l *Lex) pusherr(key string, args ...any) {
 }
 
 func (l *Lex) pusherrtok(tok Token, err string) {
-	l.Logs = append(l.Logs, build.CompilerLog{
+	l.Logs = append(l.Logs, build.Log{
 		Type:    build.ERR,
 		Row:     tok.Row,
 		Column:  tok.Column,
