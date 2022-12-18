@@ -56,8 +56,8 @@ type Parser struct {
 	JustDefines bool
 	NoCheck     bool
 	IsMain      bool
-	Used        []*use // All used packages, deep detection
-	Uses        []*use // File uses these packages
+	Used        []*models.UseDecl // All used packages, deep detection
+	Uses        []*models.UseDecl // File uses these packages
 	Defines     *models.Defmap
 	Errors      []build.Log
 	Warnings    []build.Log
@@ -164,7 +164,7 @@ func (p *Parser) checkUsePath(use *models.UseDecl) bool {
 	return true
 }
 
-func (p *Parser) pushSelects(u *use, selectors []lex.Token) (addNs bool) {
+func (p *Parser) pushSelects(u *models.UseDecl, selectors []lex.Token) (addNs bool) {
 	if len(selectors) > 0 && p.Defines.Side == nil {
 		p.Defines.Side = new(models.Defmap)
 	}
@@ -194,7 +194,7 @@ func (p *Parser) pushSelects(u *use, selectors []lex.Token) (addNs bool) {
 		case 'i':
 			p.Defines.Side.Traits = append(p.Defines.Side.Traits, m.Traits[i])
 		case 'f':
-			p.Defines.Side.Funcs = append(p.Defines.Side.Funcs, m.Funcs[i])
+			p.Defines.Side.Fns = append(p.Defines.Side.Fns, m.Fns[i])
 		case 'e':
 			p.Defines.Side.Enums = append(p.Defines.Side.Enums, m.Enums[i])
 		case 'g':
@@ -208,7 +208,7 @@ func (p *Parser) pushSelects(u *use, selectors []lex.Token) (addNs bool) {
 	return
 }
 
-func (p *Parser) pushUse(use *use, selectors []lex.Token) {
+func (p *Parser) pushUse(use *models.UseDecl, selectors []lex.Token) {
 	dm, ok := std_builtin_defines[use.LinkString]
 	if ok {
 		dm.PushDefines(use.Defines)
@@ -230,16 +230,16 @@ func (p *Parser) pushUse(use *use, selectors []lex.Token) {
 	src.Defines = use.Defines
 }
 
-func (p *Parser) compileCppLinkUse(ast *models.UseDecl) (*use, bool) {
-	u := new(use)
-	u.CppLink = true
+func (p *Parser) compileCppLinkUse(ast *models.UseDecl) (*models.UseDecl, bool) {
+	u := new(models.UseDecl)
+	u.Cpp = true
 	u.Path = ast.Path
 	u.Token = ast.Token
 	return u, false
 }
 
-func make_use_from_ast(ast *models.UseDecl) *use {
-	u := new(use)
+func make_use_from_ast(ast *models.UseDecl) *models.UseDecl {
+	u := new(models.UseDecl)
 	u.Defines = new(models.Defmap)
 	u.Token = ast.Token
 	u.Path = ast.Path
@@ -258,7 +258,7 @@ func (p *Parser) wrap_package() {
 	}
 }
 
-func (p *Parser) compilePureUse(ast *models.UseDecl) (_ *use, hassErr bool) {
+func (p *Parser) compilePureUse(ast *models.UseDecl) (_ *models.UseDecl, hassErr bool) {
 	infos, err := os.ReadDir(ast.Path)
 	if err != nil {
 		p.pusherrmsg(err.Error())
@@ -291,11 +291,11 @@ func (p *Parser) compilePureUse(ast *models.UseDecl) (_ *use, hassErr bool) {
 	return nil, false
 }
 
-func (p *Parser) compileUse(useAST *models.UseDecl) (*use, bool) {
-	if useAST.Cpp {
-		return p.compileCppLinkUse(useAST)
+func (p *Parser) compileUse(ast *models.UseDecl) (*models.UseDecl, bool) {
+	if ast.Cpp {
+		return p.compileCppLinkUse(ast)
 	}
-	return p.compilePureUse(useAST)
+	return p.compilePureUse(ast)
 }
 
 func (p *Parser) use(ast *models.UseDecl, err *bool) {
@@ -314,7 +314,7 @@ func (p *Parser) use(ast *models.UseDecl, err *bool) {
 			return
 		}
 	}
-	var u *use
+	var u *models.UseDecl
 	u, *err = p.compileUse(ast)
 	if u == nil {
 		return
@@ -860,7 +860,7 @@ func (p *Parser) Trait(model models.Trait) {
 	trait.Desc = p.docText.String()
 	p.docText.Reset()
 	trait.Defines = new(models.Defmap)
-	trait.Defines.Funcs = make([]*Fn, len(model.Funcs))
+	trait.Defines.Fns = make([]*Fn, len(model.Funcs))
 	for i, f := range trait.Funcs {
 		if juleapi.IsIgnoreId(f.Id) {
 			p.pusherrtok(f.Token, "ignore_id")
@@ -874,7 +874,7 @@ func (p *Parser) Trait(model models.Trait) {
 		}
 		_ = p.check_param_dup(f.Params)
 		p.parseTypesNonGenerics(f)
-		trait.Defines.Funcs[i] = f
+		trait.Defines.Fns[i] = f
 	}
 	p.Defines.Traits = append(p.Defines.Traits, trait)
 }
@@ -924,10 +924,10 @@ func (p *Parser) implTrait(model *models.Impl) {
 			if len(s.Generics) == 0 {
 				p.parseTypesNonGenerics(obj_t)
 			}
-			s.Defines.Funcs = append(s.Defines.Funcs, obj_t)
+			s.Defines.Fns = append(s.Defines.Fns, obj_t)
 		}
 	}
-	for _, tf := range trait_def.Defines.Funcs {
+	for _, tf := range trait_def.Defines.Fns {
 		ok := false
 		ds := tf.DefString()
 		sf, _, _ := s.Defines.FnById(tf.Id, nil)
@@ -982,7 +982,7 @@ func (p *Parser) implStruct(model *models.Impl) {
 			if len(s.Generics) == 0 {
 				p.parseTypesNonGenerics(sf)
 			}
-			s.Defines.Funcs = append(s.Defines.Funcs, sf)
+			s.Defines.Fns = append(s.Defines.Fns, sf)
 		}
 	}
 }
@@ -1059,7 +1059,7 @@ func (p *Parser) St(s models.Statement) {
 	}
 }
 
-func (p *Parser) parseFuncNonGenericType(generics []*GenericType, dt *Type) {
+func (p *Parser) parseFnNonGenericType(generics []*GenericType, dt *Type) {
 	f := dt.Tag.(*Fn)
 	for i := range f.Params {
 		p.parseNonGenericType(generics, &f.Params[i].Type)
@@ -1125,7 +1125,7 @@ func (p *Parser) parseNonGenericType(generics []*GenericType, dt *Type) {
 	case dt.MultiTyped:
 		p.parseMultiNonGenericType(generics, dt)
 	case types.IsFn(*dt):
-		p.parseFuncNonGenericType(generics, dt)
+		p.parseFnNonGenericType(generics, dt)
 	case types.IsMap(*dt):
 		p.parseMapNonGenericType(generics, dt)
 	case types.IsArray(*dt):
@@ -1203,7 +1203,7 @@ func (p *Parser) Func(ast Fn) {
 	p.check_ret_variables(f)
 	_ = p.check_param_dup(f.Params)
 	f.Used = f.Id == jule.INIT_FN
-	p.Defines.Funcs = append(p.Defines.Funcs, f)
+	p.Defines.Fns = append(p.Defines.Fns, f)
 }
 
 // ParseVariable parse Jule global variable.
@@ -1745,7 +1745,7 @@ func (p *Parser) parse_package_waiting_fns() {
 
 // ParseWaitingFns parses Jule global functions for waiting to parsing.
 func (p *Parser) ParseWaitingFns() {
-	for _, f := range p.Defines.Funcs {
+	for _, f := range p.Defines.Fns {
 		owner := p // f.Ast.Owner.(*Parser) == p
 		if len(f.Generics) > 0 {
 			owner.parseTypesNonGenerics(f)
@@ -1912,7 +1912,7 @@ func (p *Parser) check_fns() {
 		p.blockTypes = nil
 		err = p.parse_fn(f)
 	}
-	for _, f := range p.Defines.Funcs {
+	for _, f := range p.Defines.Fns {
 		check(f)
 	}
 }
@@ -1929,7 +1929,7 @@ func (p *Parser) parseStructFunc(s *Struct, f *Fn) (err bool) {
 }
 
 func (p *Parser) checkStruct(xs *Struct) (err bool) {
-	for _, f := range xs.Defines.Funcs {
+	for _, f := range xs.Defines.Fns {
 		p.blockTypes = nil
 		err = p.parseStructFunc(xs, f)
 		if err {
@@ -2032,8 +2032,8 @@ func (p *Parser) structConstructorInstance(as *Struct) *Struct {
 	*s.Constructor = *as.Constructor
 	s.Constructor.RetType.Type.Tag = s
 	s.Defines = as.Defines
-	for i := range s.Defines.Funcs {
-		f := &s.Defines.Funcs[i]
+	for i := range s.Defines.Fns {
+		f := &s.Defines.Fns[i]
 		nf := new(Fn)
 		*nf = **f
 		nf.Receiver.Tag = s
@@ -2552,6 +2552,18 @@ func (p *Parser) checkNewBlock(b *models.Block) {
 	p.checkNewBlockCustom(b, p.blockVars)
 }
 
+func (p *Parser) fallthrough_st(f *models.Fallthrough, b *models.Block, i *int) {
+	switch {
+	case p.currentCase == nil || *i+1 < len(b.Tree):
+		p.pusherrtok(f.Token, "fallthrough_wrong_use")
+		return
+	case p.currentCase.Next == nil:
+		p.pusherrtok(f.Token, "fallthrough_into_final_case")
+		return
+	}
+	f.Case = p.currentCase
+}
+
 func (p *Parser) st(s *models.Statement, recover bool) bool {
 	switch data := s.Data.(type) {
 	case models.ExprStatement:
@@ -2593,18 +2605,6 @@ func (p *Parser) st(s *models.Statement, recover bool) bool {
 		return false
 	}
 	return true
-}
-
-func (p *Parser) fallthrough_st(f *models.Fallthrough, b *models.Block, i *int) {
-	switch {
-	case p.currentCase == nil || *i+1 < len(b.Tree):
-		p.pusherrtok(f.Token, "fallthrough_wrong_use")
-		return
-	case p.currentCase.Next == nil:
-		p.pusherrtok(f.Token, "fallthrough_into_final_case")
-		return
-	}
-	f.Case = p.currentCase
 }
 
 func (p *Parser) check_st(b *models.Block, i *int) {
@@ -3475,8 +3475,8 @@ func (p *Parser) typeSourceIsStruct(s *Struct, st Type) (dt Type, _ bool) {
 		for i, f := range s.Fields {
 			owner.parseField(s, &f, i)
 		}
-		if len(s.Defines.Funcs) > 0 {
-			for _, f := range s.Defines.Funcs {
+		if len(s.Defines.Fns) > 0 {
+			for _, f := range s.Defines.Fns {
 				if len(f.Generics) == 0 {
 					blockVars := owner.blockVars
 					blockTypes := owner.blockTypes

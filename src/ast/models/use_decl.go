@@ -10,4 +10,5 @@ type UseDecl struct {
 	LinkString string
 	FullUse    bool
 	Selectors  []lex.Token
+	Defines    *Defmap
 }

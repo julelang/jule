@@ -9,6 +9,4 @@ type Data struct {
 	Type  Type
 }
 
-func (d Data) String() string {
-	return d.Value
-}
+func (d Data) String() string { return d.Value }

@@ -50,7 +50,7 @@ func (c *Checker) check_ptr() bool {
 }
 
 func trait_has_reference_receiver(t *models.Trait) bool {
-	for _, f := range t.Defines.Funcs {
+	for _, f := range t.Defines.Fns {
 		if IsRef(f.Receiver.Type) {
 			return true
 		}

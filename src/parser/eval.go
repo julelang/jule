@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/julelang/jule/cmd/julec/gen"
 	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
@@ -859,7 +860,7 @@ func (e *eval) xObjSubId(dm *models.Defmap, val value, interior_mutability bool,
 			m.append_sub(exprNode{g.OutId()})
 		}
 	case 'f':
-		f := dm.Funcs[i]
+		f := dm.Fns[i]
 		f.Used = true
 		v.data.Type.Id = juletype.FN
 		v.data.Type.Tag = f
@@ -1484,7 +1485,7 @@ func (e *eval) anonymousFn(toks []lex.Token, m *exprModel) (v value) {
 	v.data.Type.Tag = &f
 	v.data.Type.Id = juletype.FN
 	v.data.Type.Kind = f.TypeKind()
-	m.append_sub(anonFuncExpr{&f})
+	m.append_sub(gen.AnonFuncExpr{Ast: &f})
 	return
 }
 

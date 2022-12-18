@@ -16,7 +16,7 @@ type Defmap struct {
 	Structs    []*Struct
 	Traits     []*Trait
 	Types      []*TypeAlias
-	Funcs      []*Fn
+	Fns        []*Fn
 	Globals    []*Var
 	Side       *Defmap
 }
@@ -131,7 +131,7 @@ func (dm *Defmap) TypeById(id string, f *lex.File) (*TypeAlias, *Defmap, bool) {
 }
 
 func (dm *Defmap) FindFnById(id string, f *lex.File) (int, *Defmap, bool) {
-	for i, fn := range dm.Funcs {
+	for i, fn := range dm.Fns {
 		if fn != nil && fn.Id == id {
 			if IsAccessable(f, fn.Token.File, fn.Pub) {
 				return i, dm, false
@@ -154,7 +154,7 @@ func (dm *Defmap) FnById(id string, f *lex.File) (*Fn, *Defmap, bool) {
 	if i == -1 {
 		return nil, nil, false
 	}
-	return m.Funcs[i], m, canshadow
+	return m.Fns[i], m, canshadow
 }
 
 func (dm *Defmap) FindGlobalById(id string, f *lex.File) (int, *Defmap, bool) {
@@ -216,5 +216,5 @@ func (dm *Defmap) PushDefines(dest *Defmap) {
 	dest.Structs = append(dest.Structs, dm.Structs...)
 	dest.Enums = append(dest.Enums, dm.Enums...)
 	dest.Globals = append(dest.Globals, dm.Globals...)
-	dest.Funcs = append(dest.Funcs, dm.Funcs...)
+	dest.Fns = append(dest.Fns, dm.Fns...)
 }

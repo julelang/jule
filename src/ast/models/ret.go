@@ -1,8 +1,6 @@
 package models
 
 import (
-	"strings"
-
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/pkg/juleapi"
 )
@@ -65,14 +63,4 @@ func (rt *RetType) Vars(owner *Block) []*Var {
 type Ret struct {
 	Token lex.Token
 	Expr  Expr
-}
-
-func (r Ret) String() string {
-	if r.Expr.Model == nil {
-		return "return;"
-	}
-	var cpp strings.Builder
-	cpp.WriteString(r.Expr.String())
-	cpp.WriteByte(';')
-	return cpp.String()
 }

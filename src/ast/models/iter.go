@@ -34,7 +34,7 @@ type Iter struct {
 	Token   lex.Token
 	Block   *Block
 	Parent  *Block
-	Profile IterProfile
+	Profile any
 }
 
 // BeginLabel returns of cpp goto label identifier of iteration begin.
@@ -64,33 +64,4 @@ func (i *Iter) NextLabel() string {
 	cpp.WriteString(strconv.Itoa(i.Token.Row))
 	cpp.WriteString(strconv.Itoa(i.Token.Column))
 	return cpp.String()
-}
-
-func (i *Iter) infinityString() string {
-	var cpp strings.Builder
-	indent := IndentString()
-	begin := i.BeginLabel()
-	cpp.WriteString(begin)
-	cpp.WriteString(":;\n")
-	cpp.WriteString(indent)
-	cpp.WriteString(i.Block.String())
-	cpp.WriteByte('\n')
-	cpp.WriteString(indent)
-	cpp.WriteString(i.NextLabel())
-	cpp.WriteString(":;\n")
-	cpp.WriteString(indent)
-	cpp.WriteString("goto ")
-	cpp.WriteString(begin)
-	cpp.WriteString(";\n")
-	cpp.WriteString(indent)
-	cpp.WriteString(i.EndLabel())
-	cpp.WriteString(":;")
-	return cpp.String()
-}
-
-func (i Iter) String() string {
-	if i.Profile == nil {
-		return i.infinityString()
-	}
-	return i.Profile.String(&i)
 }

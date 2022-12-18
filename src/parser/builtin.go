@@ -274,7 +274,7 @@ var strDefaultFunc = Fn{
 var errorTrait = &models.Trait{
 	Id: "Error",
 	Defines: &models.Defmap{
-		Funcs: []*Fn{
+		Fns: []*Fn{
 			{
 				Pub:     true,
 				Id:      "error",
@@ -371,7 +371,7 @@ var Builtin = &models.Defmap{
 			Type: Type{Id: juletype.I32, Kind: juletype.TYPE_MAP[juletype.I32]},
 		},
 	},
-	Funcs: []*Fn{
+	Fns: []*Fn{
 		out_fn,
 		panicFunc,
 		recoverFunc,
@@ -450,7 +450,7 @@ var strDefines = &models.Defmap{
 			Tag:  "len()",
 		},
 	},
-	Funcs: []*Fn{
+	Fns: []*Fn{
 		{
 			Pub:     true,
 			Id:      "empty",
@@ -551,7 +551,7 @@ var sliceDefines = &models.Defmap{
 			Tag:  "cap()",
 		},
 	},
-	Funcs: []*Fn{
+	Fns: []*Fn{
 		{
 			Pub:     true,
 			Id:      "empty",
@@ -569,7 +569,7 @@ var arrayDefines = &models.Defmap{
 			Tag:  "len()",
 		},
 	},
-	Funcs: []*Fn{
+	Fns: []*Fn{
 		{
 			Pub:     true,
 			Id:      "empty",
@@ -587,7 +587,7 @@ var mapDefines = &models.Defmap{
 			Tag:  "len()",
 		},
 	},
-	Funcs: []*Fn{
+	Fns: []*Fn{
 		{
 			Pub: true,
 			Id:  "clear",
@@ -649,7 +649,7 @@ func init() {
 	outln_fn = new(models.Fn)
 	*outln_fn = *out_fn
 	outln_fn.Id = "outln"
-	Builtin.Funcs = append(Builtin.Funcs, outln_fn)
+	Builtin.Fns = append(Builtin.Fns, outln_fn)
 
 	// Setup make function
 	make_fn.BuiltinCaller = caller_make
@@ -661,7 +661,7 @@ func init() {
 	// Setup Error trait
 	receiver := new(Var)
 	receiver.Mutable = false
-	for _, f := range errorTrait.Defines.Funcs {
+	for _, f := range errorTrait.Defines.Fns {
 		f.Receiver = receiver
 		f.Receiver.Tag = errorTrait
 		f.Owner = builtinFile
@@ -779,7 +779,7 @@ func caller_new(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 // std::mem
 
 var std_mem_builtin = &models.Defmap{
-	Funcs: []*Fn{
+	Fns: []*Fn{
 		{Id: "size_of", BuiltinCaller: caller_mem_size_of},
 		{Id: "align_of", BuiltinCaller: caller_mem_align_of},
 	},

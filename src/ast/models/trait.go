@@ -19,7 +19,7 @@ type Trait struct {
 // FindFunc returns function by id.
 // Returns nil if not exist.
 func (t *Trait) FindFunc(id string) *Fn {
-	for _, f := range t.Defines.Funcs {
+	for _, f := range t.Defines.Fns {
 		if f.Id == id {
 			return f
 		}

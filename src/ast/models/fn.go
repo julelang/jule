@@ -112,10 +112,6 @@ func (f *Fn) PrototypeParams() string {
 	return cpp.String()[:cpp.Len()-1] + ")"
 }
 
-func (f Fn) String() string {
-	return f.StringOwner("")
-}
-
 func ParamsToCpp(params []Param) string {
 	if len(params) == 0 {
 		return "(void)"
@@ -127,63 +123,4 @@ func ParamsToCpp(params []Param) string {
 		cpp.WriteByte(',')
 	}
 	return cpp.String()[:cpp.Len()-1] + ")"
-}
-
-// Head returns declaration head of function.
-func (f *Fn) Head(owner string) string {
-	var cpp strings.Builder
-	cpp.WriteString(f.DeclHead(owner))
-	cpp.WriteString(ParamsToCpp(f.Params))
-	return cpp.String()
-}
-
-// Prototype returns prototype cpp code of function.
-func (f *Fn) Prototype(owner string) string {
-	var cpp strings.Builder
-	cpp.WriteString(f.DeclHead(owner))
-	cpp.WriteString(f.PrototypeParams())
-	cpp.WriteByte(';')
-	return cpp.String()
-}
-
-func (f *Fn) DeclHead(owner string) string {
-	var cpp strings.Builder
-	cpp.WriteString(GenericsToCpp(f.Generics))
-	if cpp.Len() > 0 {
-		cpp.WriteByte('\n')
-		cpp.WriteString(IndentString())
-	}
-	if !f.IsEntryPoint {
-		cpp.WriteString("inline ")
-	}
-	cpp.WriteString(f.RetType.String())
-	cpp.WriteByte(' ')
-	if owner != "" {
-		cpp.WriteString(owner)
-		cpp.WriteString(lex.KND_DBLCOLON)
-	}
-	cpp.WriteString(f.OutId())
-	return cpp.String()
-}
-
-func (f *Fn) StringOwner(owner string) string {
-	var cpp strings.Builder
-	cpp.WriteString(f.Head(owner))
-	cpp.WriteByte(' ')
-	vars := f.RetType.Vars(f.Block)
-	cpp.WriteString(FnBlockToString(vars, f.Block))
-	return cpp.String()
-}
-
-func FnBlockToString(vars []*Var, b *Block) string {
-	var cpp strings.Builder
-	if vars != nil {
-		statements := make([]Statement, len(vars))
-		for i, v := range vars {
-			statements[i] = Statement{Token: v.Token, Data: *v}
-		}
-		b.Tree = append(statements, b.Tree...)
-	}
-	cpp.WriteString(b.String())
-	return cpp.String()
 }

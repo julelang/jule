@@ -58,29 +58,6 @@ func (node exprNode) String() string {
 	return node.value
 }
 
-type anonFuncExpr struct {
-	ast  *Fn
-}
-
-func (af anonFuncExpr) String() string {
-	var cpp strings.Builder
-	t := Type{
-		Token:  af.ast.Token,
-		Kind: af.ast.TypeKind(),
-		Tag:  af.ast,
-	}
-	cpp.WriteString(t.FnString())
-	cpp.WriteString("([=]")
-	cpp.WriteString(models.ParamsToCpp(af.ast.Params))
-	cpp.WriteString(" mutable -> ")
-	cpp.WriteString(af.ast.RetType.String())
-	cpp.WriteByte(' ')
-	vars := af.ast.RetType.Vars(af.ast.Block)
-	cpp.WriteString(models.FnBlockToString(vars, af.ast.Block))
-	cpp.WriteByte(')')
-	return cpp.String()
-}
-
 type sliceExpr struct {
 	dataType Type
 	expr     []iExpr

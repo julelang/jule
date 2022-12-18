@@ -1873,7 +1873,7 @@ func (b *Builder) getForeachIterProfile(varToks, exprToks []lex.Token, inTok lex
 	return foreach
 }
 
-func (b *Builder) getIterProfile(toks []lex.Token, errtok lex.Token) models.IterProfile {
+func (b *Builder) getIterProfile(toks []lex.Token, errtok lex.Token) any {
 	brace_n := 0
 	for i, tok := range toks {
 		if tok.Id == lex.ID_BRACE {
