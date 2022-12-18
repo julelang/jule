@@ -56,7 +56,7 @@ type Parser struct {
 	JustDefines bool
 	NoCheck     bool
 	IsMain      bool
-	Used        []*models.UseDecl // All used packages, deep detection
+	Used        *[]*models.UseDecl // All used packages, deep detection
 	Uses        []*models.UseDecl // File uses these packages
 	Defines     *models.Defmap
 	Errors      []build.Log
@@ -72,6 +72,7 @@ func New(path string) *Parser {
 	p.Defines = new(models.Defmap)
 	p.eval = new(eval)
 	p.eval.p = p
+	p.Used = new([]*models.UseDecl)
 	return p
 }
 
@@ -274,6 +275,7 @@ func (p *Parser) compilePureUse(ast *models.UseDecl) (_ *models.UseDecl, hassErr
 		}
 		path := filepath.Join(ast.Path, name)
 		psub := New(path)
+		psub.Used = p.Used
 		psub.SetupPackage()
 		psub.Parsef(false, false)
 		psub.wrap_package()
@@ -298,13 +300,13 @@ func (p *Parser) compileUse(ast *models.UseDecl) (*models.UseDecl, bool) {
 	return p.compilePureUse(ast)
 }
 
-func (p *Parser) use(ast *models.UseDecl, err *bool) {
+func (p *Parser) use_decl(ast *models.UseDecl, err *bool) {
 	if !p.checkUsePath(ast) {
 		*err = true
 		return
 	}
 	// Already parsed?
-	for _, u := range p.Used {
+	for _, u := range *p.Used {
 		if ast.Path == u.Path {
 			old := u.FullUse
 			u.FullUse = ast.FullUse
@@ -326,7 +328,7 @@ func (p *Parser) use(ast *models.UseDecl, err *bool) {
 			return
 		}
 	}
-	p.Used = append(p.Used, u)
+	*p.Used = append(*p.Used, u)
 	p.Uses = append(p.Uses, u)
 }
 
@@ -337,7 +339,7 @@ func (p *Parser) parseUses(tree *[]models.Object) bool {
 		switch obj_t := obj.Data.(type) {
 		case models.UseDecl:
 			if !err {
-				p.use(&obj_t, &err)
+				p.use_decl(&obj_t, &err)
 			}
 			obj.Data = nil
 		case models.Comment:
@@ -439,6 +441,7 @@ func (p *Parser) useLocalPackage(tree *[]models.Object) (hasErr bool) {
 			continue
 		}
 		fp := New(filepath.Join(dir, name))
+		fp.Used = p.Used
 		fp.package_files = p.package_files
 		*p.package_files = append(*p.package_files, fp)
 		fp.NoLocalPkg = true

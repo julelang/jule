@@ -937,9 +937,9 @@ func gen_fn_prototype(f *models.Fn, owner string) string {
 	return cpp.String()
 }
 
-func gen_links(used []*models.UseDecl) string {
+func gen_links(used *[]*models.UseDecl) string {
 	var cpp strings.Builder
-	for _, u := range used {
+	for _, u := range *used {
 		if u.Cpp {
 			cpp.WriteString("#include ")
 			if build.IsStdHeaderPath(u.Path) {
@@ -966,9 +966,9 @@ func _gen_types(dm *models.Defmap) string {
 	return cpp.String()
 }
 
-func gen_types(tree *models.Defmap, used []*models.UseDecl) string {
+func gen_types(tree *models.Defmap, used *[]*models.UseDecl) string {
 	var cpp strings.Builder
-	for _, u := range used {
+	for _, u := range *used {
 		if !u.Cpp {
 			cpp.WriteString(_gen_types(u.Defines))
 		}
@@ -988,9 +988,9 @@ func _gen_traits(dm *models.Defmap) string {
 	return cpp.String()
 }
 
-func gen_traits(tree *models.Defmap, used []*models.UseDecl) string {
+func gen_traits(tree *models.Defmap, used *[]*models.UseDecl) string {
 	var cpp strings.Builder
-	for _, u := range used {
+	for _, u := range *used {
 		if !u.Cpp {
 			cpp.WriteString(_gen_traits(u.Defines))
 		}
@@ -1043,11 +1043,11 @@ func gen_fn_prototypes(dm *models.Defmap) string {
 	return cpp.String()
 }
 
-func gen_prototypes(tree *models.Defmap, used []*models.UseDecl, structs []*models.Struct) string {
+func gen_prototypes(tree *models.Defmap, used *[]*models.UseDecl, structs []*models.Struct) string {
 	var cpp strings.Builder
 	cpp.WriteString(gen_struct_plain_prototypes(structs))
 	cpp.WriteString(gen_struct_prototypes(structs))
-	for _, u := range used {
+	for _, u := range *used {
 		if !u.Cpp {
 			cpp.WriteString(gen_fn_prototypes(u.Defines))
 		}
@@ -1067,9 +1067,9 @@ func _gen_globals(dm *models.Defmap) string {
 	return cpp.String()
 }
 
-func gen_globals(tree *models.Defmap, used []*models.UseDecl) string {
+func gen_globals(tree *models.Defmap, used *[]*models.UseDecl) string {
 	var cpp strings.Builder
-	for _, u := range used {
+	for _, u := range *used {
 		if !u.Cpp {
 			cpp.WriteString(_gen_globals(u.Defines))
 		}
@@ -1089,9 +1089,9 @@ func _gen_fns(dm *models.Defmap) string {
 	return cpp.String()
 }
 
-func gen_fns(tree *models.Defmap, used []*models.UseDecl) string {
+func gen_fns(tree *models.Defmap, used *[]*models.UseDecl) string {
 	var cpp strings.Builder
-	for _, u := range used {
+	for _, u := range *used {
 		if !u.Cpp {
 			cpp.WriteString(_gen_fns(u.Defines))
 		}
@@ -1100,7 +1100,7 @@ func gen_fns(tree *models.Defmap, used []*models.UseDecl) string {
 	return cpp.String()
 }
 
-func gen_init_caller(tree *models.Defmap, used []*models.UseDecl) string {
+func gen_init_caller(tree *models.Defmap, used *[]*models.UseDecl) string {
 	var cpp strings.Builder
 	cpp.WriteString("void ")
 	cpp.WriteString(juleapi.INIT_CALLER)
@@ -1116,7 +1116,7 @@ func gen_init_caller(tree *models.Defmap, used []*models.UseDecl) string {
 		cpp.WriteString(f.OutId())
 		cpp.WriteString("();")
 	}
-	for _, u := range used {
+	for _, u := range *used {
 		if !u.Cpp {
 			push_init(u.Defines)
 		}
@@ -1126,10 +1126,10 @@ func gen_init_caller(tree *models.Defmap, used []*models.UseDecl) string {
 	return cpp.String()
 }
 
-func get_all_structs(tree *models.Defmap, used []*models.UseDecl) []*models.Struct {
+func get_all_structs(tree *models.Defmap, used *[]*models.UseDecl) []*models.Struct {
 	order := make([]*models.Struct, 0, len(tree.Structs))
 	order = append(order, tree.Structs...)
-	for _, u := range used {
+	for _, u := range *used {
 		if !u.Cpp {
 			order = append(order, u.Defines.Structs...)
 		}
@@ -1166,7 +1166,7 @@ func gen_trait(t *models.Trait) string {
 }
 
 // Gen generates object code from parse tree.
-func Gen(tree *models.Defmap, used []*models.UseDecl) string {
+func Gen(tree *models.Defmap, used *[]*models.UseDecl) string {
 	structs := get_all_structs(tree, used)
 	order_structures(structs)
 	var cpp strings.Builder

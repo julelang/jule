@@ -440,9 +440,6 @@ func main() {
 		return
 	}
 	obj_code := gen.Gen(p.Defines, p.Used)
-	for _, u := range p.Used {
-		println(u.LinkString)
-	}
 	append_standard(&obj_code)
 	do_spell(obj_code)
 }
