@@ -3,9 +3,9 @@ package models
 import (
 	"strings"
 
-	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule"
-	"github.com/julelang/jule/pkg/juleapi"
+	"github.com/julelang/jule/build"
+	"github.com/julelang/jule/lex"
 )
 
 // Size is the represents data type of sizes (array or etc)
@@ -193,7 +193,7 @@ func (dt Type) String() (s string) {
 		var cpp strings.Builder
 		for _, r := range modifiers {
 			if r == '&' {
-				cpp.WriteString(juleapi.AsTypeId("ref"))
+				cpp.WriteString(build.AsTypeId("ref"))
 				cpp.WriteByte('<')
 			}
 		}
@@ -229,9 +229,9 @@ func (dt Type) String() (s string) {
 			return dt.Kind
 		}
 		if dt.Generic {
-			return juleapi.AsId(dt.Kind)
+			return build.AsId(dt.Kind)
 		}
-		return juleapi.OutId(dt.Kind, dt.Token.File.Addr())
+		return build.OutId(dt.Kind, dt.Token.File.Addr())
 	case enum_t:
 		e := dt.Tag.(*Enum)
 		return e.Type.String()
@@ -249,7 +249,7 @@ func (dt Type) String() (s string) {
 // SliceString returns cpp value of slice data type.
 func (dt *Type) SliceString() string {
 	var cpp strings.Builder
-	cpp.WriteString(juleapi.AsTypeId("slice"))
+	cpp.WriteString(build.AsTypeId("slice"))
 	cpp.WriteByte('<')
 	dt.ComponentType.Pure = dt.Pure
 	cpp.WriteString(dt.ComponentType.String())
@@ -260,7 +260,7 @@ func (dt *Type) SliceString() string {
 // ArrayString returns cpp value of map data type.
 func (dt *Type) ArrayString() string {
 	var cpp strings.Builder
-	cpp.WriteString(juleapi.AsTypeId("array"))
+	cpp.WriteString(build.AsTypeId("array"))
 	cpp.WriteByte('<')
 	dt.ComponentType.Pure = dt.Pure
 	cpp.WriteString(dt.ComponentType.String())
@@ -274,7 +274,7 @@ func (dt *Type) ArrayString() string {
 func (dt *Type) MapString() string {
 	var cpp strings.Builder
 	types := dt.Tag.([]Type)
-	cpp.WriteString(juleapi.AsTypeId("map"))
+	cpp.WriteString(build.AsTypeId("map"))
 	cpp.WriteByte('<')
 	key := types[0]
 	key.Pure = dt.Pure
@@ -291,9 +291,9 @@ func (dt *Type) MapString() string {
 func (dt *Type) TraitString() string {
 	var cpp strings.Builder
 	id, _ := dt.KindId()
-	cpp.WriteString(juleapi.AsTypeId("trait"))
+	cpp.WriteString(build.AsTypeId("trait"))
 	cpp.WriteByte('<')
-	cpp.WriteString(juleapi.OutId(id, dt.Token.File.Addr()))
+	cpp.WriteString(build.OutId(id, dt.Token.File.Addr()))
 	cpp.WriteByte('>')
 	return cpp.String()
 }
@@ -322,7 +322,7 @@ func (dt *Type) StructString() string {
 // FnString returns cpp value of function DataType.
 func (dt *Type) FnString() string {
 	var cpp strings.Builder
-	cpp.WriteString(juleapi.AsTypeId("fn"))
+	cpp.WriteString(build.AsTypeId("fn"))
 	cpp.WriteByte('<')
 	cpp.WriteString("<std::function<")
 	f := dt.Tag.(*Fn)

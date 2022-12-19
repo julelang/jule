@@ -1,26 +1,27 @@
-package juleapi
+package build
 
 import (
 	"fmt"
 	"strings"
 )
 
-// IGNORE operator.
-const IGNORE = "_"
+// CPP_IGNORE is the ignoring of cpp.
+const CPP_IGNORE = "std::ignore"
 
-// INIT_CALLER identifier.
-const INIT_CALLER = "__julec_call_package_initializers"
+// CPP_SELF is the self keyword equavalent of cpp.
+const CPP_SELF = "this"
 
-const typeExtension = "_jt"
+// CPP_DEFAULT_EXPR represents default expression for type.
+const CPP_DEFAULT_EXPR = "{}"
 
-// IsIgnoreId reports identifier is ignore or not.
-func IsIgnoreId(id string) bool { return id == IGNORE }
+// TYPE_EXTENSION is extension of data types.
+const TYPE_EXTENSION = "_jt"
 
 // Returns specified identifer as JuleC identifer.
 // Equavalents: "JULEC_ID(" + id + ")"
 func AsId(id string) string { return "_" + id }
 
-func getPtrAsId(ptr uintptr) string {
+func get_ptr_as_id(ptr uintptr) string {
 	address := "fp" + fmt.Sprint(ptr)
 	for i, r := range address {
 		if r != '0' {
@@ -35,7 +36,7 @@ func getPtrAsId(ptr uintptr) string {
 func OutId(id string, ptr uintptr) string {
 	if ptr != 0 {
 		var out strings.Builder
-		out.WriteString(getPtrAsId(ptr))
+		out.WriteString(get_ptr_as_id(ptr))
 		out.WriteByte('_')
 		out.WriteString(id)
 		return out.String()
@@ -44,4 +45,4 @@ func OutId(id string, ptr uintptr) string {
 }
 
 // AsTypeId returns given identifier as output type identifier.
-func AsTypeId(id string) string { return id + typeExtension }
+func AsTypeId(id string) string { return id + TYPE_EXTENSION }

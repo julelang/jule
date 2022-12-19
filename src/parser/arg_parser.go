@@ -2,9 +2,9 @@ package parser
 
 import (
 	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
-	"github.com/julelang/jule/pkg/juleapi"
 )
 
 func getParamMap(params []Param) *paramMap {
@@ -40,7 +40,7 @@ func (pap *pureArgParser) buildArgs() {
 		case pair.arg != nil:
 			pap.args.Src[i] = *pair.arg
 		case pair.param.Variadic:
-			arg := Arg{Expr: Expr{Model: exprNode{juleapi.DEFAULT_EXPR}}}
+			arg := Arg{Expr: Expr{Model: exprNode{build.CPP_DEFAULT_EXPR}}}
 			pap.args.Src[i] = arg
 		}
 	}

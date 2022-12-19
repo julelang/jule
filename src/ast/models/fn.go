@@ -3,8 +3,8 @@ package models
 import (
 	"strings"
 
+	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
-	"github.com/julelang/jule/pkg/juleapi"
 )
 
 // Fn is function declaration AST model.
@@ -77,12 +77,12 @@ func (f *Fn) TypeKind() string {
 // OutId returns juleapi.OutId result of function.
 func (f *Fn) OutId() string {
 	if f.IsEntryPoint {
-		return juleapi.OutId(f.Id, 0)
+		return build.OutId(f.Id, 0)
 	}
 	if f.Receiver != nil {
 		return f.Id
 	}
-	return juleapi.OutId(f.Id, f.Token.File.Addr())
+	return build.OutId(f.Id, f.Token.File.Addr())
 }
 
 // DefString returns define string of function.

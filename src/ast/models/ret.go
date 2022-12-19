@@ -1,9 +1,6 @@
 package models
 
-import (
-	"github.com/julelang/jule/lex"
-	"github.com/julelang/jule/pkg/juleapi"
-)
+import "github.com/julelang/jule/lex"
 
 // RetType is function return type AST model.
 type RetType struct {
@@ -16,7 +13,7 @@ func (rt RetType) String() string { return rt.Type.String() }
 // AnyVar reports exist any variable or not.
 func (rt *RetType) AnyVar() bool {
 	for _, tok := range rt.Identifiers {
-		if !juleapi.IsIgnoreId(tok.Kind) {
+		if !lex.IsIgnoreId(tok.Kind) {
 			return true
 		}
 	}
@@ -28,8 +25,8 @@ func (rt *RetType) Vars(owner *Block) []*Var {
 	get := func(tok lex.Token, t Type) *Var {
 		v := new(Var)
 		v.Token = tok
-		if juleapi.IsIgnoreId(tok.Kind) {
-			v.Id = juleapi.IGNORE
+		if lex.IsIgnoreId(tok.Kind) {
+			v.Id = lex.IGNORE_ID
 		} else {
 			v.Id = tok.Kind
 		}

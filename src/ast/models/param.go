@@ -3,9 +3,8 @@ package models
 import (
 	"strings"
 
-	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule"
-	"github.com/julelang/jule/pkg/juleapi"
+	"github.com/julelang/jule/lex"
 )
 
 // Param is function parameter AST model.
@@ -39,7 +38,7 @@ func (p *Param) OutId() string {
 func (p Param) String() string {
 	var cpp strings.Builder
 	cpp.WriteString(p.Prototype())
-	if p.Id != "" && !juleapi.IsIgnoreId(p.Id) && p.Id != jule.ANONYMOUS {
+	if p.Id != "" && !lex.IsIgnoreId(p.Id) && p.Id != jule.ANONYMOUS {
 		cpp.WriteByte(' ')
 		cpp.WriteString(p.OutId())
 	}

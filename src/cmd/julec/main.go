@@ -18,7 +18,6 @@ import (
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/parser"
-	"github.com/julelang/jule/pkg/juleapi"
 )
 
 const mode_transpile = "transpile"
@@ -40,14 +39,17 @@ var out = ""
 var compiler = ""
 var compiler_path = ""
 
-const CMD_HELP = "help"
-const CMD_VERSION = "version"
-const CMD_TOOL = "tool"
+// julec_header is the header path of "julec.hpp"
+var julec_header = ""
+
+const cmd_help = "help"
+const cmd_version = "version"
+const cmd_tool = "tool"
 
 var HELP_MAP = [...][2]string{
-	{CMD_HELP, "Show help"},
-	{CMD_VERSION, "Show version"},
-	{CMD_TOOL, "Tools for effective Jule"},
+	{cmd_help, "Show help"},
+	{cmd_version, "Show version"},
+	{cmd_tool, "Tools for effective Jule"},
 }
 
 func help() {
@@ -119,11 +121,11 @@ func tool() {
 
 func process_command() bool {
 	switch os.Args[1] {
-	case CMD_HELP:
+	case cmd_help:
 		help()
-	case CMD_VERSION:
+	case cmd_version:
 		version()
-	case CMD_TOOL:
+	case cmd_tool:
 		tool()
 	default:
 		return false
@@ -144,9 +146,9 @@ func init() {
 	jule.EXEC_PATH = execp
 	jule.STDLIB_PATH = filepath.Join(jule.EXEC_PATH, "..")
 	jule.STDLIB_PATH = filepath.Join(jule.STDLIB_PATH, jule.STDLIB)
-	juleapi.JULEC_HEADER = filepath.Join(jule.EXEC_PATH, "..")
-	juleapi.JULEC_HEADER = filepath.Join(juleapi.JULEC_HEADER, "api")
-	juleapi.JULEC_HEADER = filepath.Join(juleapi.JULEC_HEADER, "julec.hpp")
+	julec_header = filepath.Join(jule.EXEC_PATH, "..")
+	julec_header = filepath.Join(julec_header, "api")
+	julec_header = filepath.Join(julec_header, "julec.hpp")
 	jule.LOCALIZATION_PATH = filepath.Join(jule.EXEC_PATH, "..")
 	jule.LOCALIZATION_PATH = filepath.Join(jule.LOCALIZATION_PATH, jule.LOCALIZATIONS)
 
@@ -238,7 +240,7 @@ func append_standard(obj_code *string) {
 	sb.WriteString("// Date: ")
 	sb.WriteString(timeStr)
 	sb.WriteString("\n\n#include \"")
-	sb.WriteString(juleapi.JULEC_HEADER)
+	sb.WriteString(julec_header)
 	sb.WriteString("\"\n\n")
 	sb.WriteString(*obj_code)
 	sb.WriteString(`

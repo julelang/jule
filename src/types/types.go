@@ -5,9 +5,9 @@ import (
 	"strings"
 
 	"github.com/julelang/jule"
+	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
-	"github.com/julelang/jule/pkg/juleapi"
 )
 
 // INT_CODE is integer type code of current platform architecture.
@@ -174,7 +174,7 @@ func CppId(t uint8) string {
 	if id == "" {
 		return id
 	}
-	id = juleapi.AsTypeId(id)
+	id = build.AsTypeId(id)
 	return id
 }
 

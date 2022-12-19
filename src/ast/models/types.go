@@ -1,8 +1,8 @@
 package models
 
 import (
+	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
-	"github.com/julelang/jule/pkg/juleapi"
 )
 
 // Necessary defines to remove "types" package dependency
@@ -71,6 +71,6 @@ func cpp_id(t uint8) string {
 	if id == "" {
 		return id
 	}
-	id = juleapi.AsTypeId(id)
+	id = build.AsTypeId(id)
 	return id
 }

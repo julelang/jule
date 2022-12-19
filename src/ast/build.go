@@ -10,7 +10,6 @@ import (
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
 	"github.com/julelang/jule"
-	"github.com/julelang/jule/pkg/juleapi"
 )
 
 // Builder is builds AST tree.
@@ -1030,7 +1029,7 @@ func (b *Builder) paramTypeBegin(param *models.Param, i *int, toks []lex.Token) 
 }
 
 func (b *Builder) paramBodyId(param *models.Param, tok lex.Token) {
-	if juleapi.IsIgnoreId(tok.Kind) {
+	if lex.IsIgnoreId(tok.Kind) {
 		param.Id = jule.ANONYMOUS
 		return
 	}
@@ -1135,7 +1134,7 @@ func (b *Builder) fnMultiTypeRet(toks []lex.Token, i *int) (t models.RetType, ok
 		if param.Id != jule.ANONYMOUS {
 			param.Token.Kind = param.Id
 		} else {
-			param.Token.Kind = juleapi.IGNORE
+			param.Token.Kind = lex.IGNORE_ID
 		}
 		t.Identifiers = append(t.Identifiers, param.Token)
 	}
@@ -1483,7 +1482,7 @@ func (b *Builder) letDeclAssign(toks []lex.Token) (assign models.Assign, ok bool
 		}
 		l := b.build_assign_left(p)
 		l.Var.Mutable = mutable
-		l.Var.New = !juleapi.IsIgnoreId(l.Var.Id)
+		l.Var.New = !lex.IsIgnoreId(l.Var.Id)
 		l.Var.SetterTok = assign.Setter
 		assign.Left = append(assign.Left, l)
 	}
@@ -1840,7 +1839,7 @@ func (b *Builder) setup_foreach_plain_vars(f *models.IterForeach, toks []lex.Tok
 	if len(vars) > 1 {
 		f.KeyB = vars[1]
 	} else {
-		f.KeyB.Id = juleapi.IGNORE
+		f.KeyB.Id = lex.IGNORE_ID
 	}
 }
 
@@ -1865,8 +1864,8 @@ func (b *Builder) getForeachIterProfile(varToks, exprToks []lex.Token, inTok lex
 	}
 	foreach.Expr = b.Expr(exprToks)
 	if len(varToks) == 0 {
-		foreach.KeyA.Id = juleapi.IGNORE
-		foreach.KeyB.Id = juleapi.IGNORE
+		foreach.KeyA.Id = lex.IGNORE_ID
+		foreach.KeyB.Id = lex.IGNORE_ID
 	} else {
 		b.setup_foreach_vars(&foreach, varToks)
 	}

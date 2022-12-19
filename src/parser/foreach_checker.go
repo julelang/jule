@@ -2,7 +2,7 @@ package parser
 
 import (
 	"github.com/julelang/jule/ast/models"
-	"github.com/julelang/jule/pkg/juleapi"
+	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
 )
 
@@ -14,7 +14,7 @@ type foreachChecker struct {
 
 func (fc *foreachChecker) array() {
 	fc.checkKeyASize()
-	if juleapi.IsIgnoreId(fc.profile.KeyB.Id) {
+	if lex.IsIgnoreId(fc.profile.KeyB.Id) {
 		return
 	}
 	componentType := *fc.profile.ExprType.ComponentType
@@ -27,7 +27,7 @@ func (fc *foreachChecker) array() {
 
 func (fc *foreachChecker) slice() {
 	fc.checkKeyASize()
-	if juleapi.IsIgnoreId(fc.profile.KeyB.Id) {
+	if lex.IsIgnoreId(fc.profile.KeyB.Id) {
 		return
 	}
 	componentType := *fc.profile.ExprType.ComponentType
@@ -44,7 +44,7 @@ func (fc *foreachChecker) hashmap() {
 }
 
 func (fc *foreachChecker) checkKeyASize() {
-	if juleapi.IsIgnoreId(fc.profile.KeyA.Id) {
+	if lex.IsIgnoreId(fc.profile.KeyA.Id) {
 		return
 	}
 	a := &fc.profile.KeyA
@@ -53,7 +53,7 @@ func (fc *foreachChecker) checkKeyASize() {
 }
 
 func (fc *foreachChecker) checkKeyAMapKey() {
-	if juleapi.IsIgnoreId(fc.profile.KeyA.Id) {
+	if lex.IsIgnoreId(fc.profile.KeyA.Id) {
 		return
 	}
 	keyType := fc.val.data.Type.Tag.([]Type)[0]
@@ -65,7 +65,7 @@ func (fc *foreachChecker) checkKeyAMapKey() {
 }
 
 func (fc *foreachChecker) checkKeyBMapVal() {
-	if juleapi.IsIgnoreId(fc.profile.KeyB.Id) {
+	if lex.IsIgnoreId(fc.profile.KeyB.Id) {
 		return
 	}
 	valType := fc.val.data.Type.Tag.([]Type)[1]
@@ -78,7 +78,7 @@ func (fc *foreachChecker) checkKeyBMapVal() {
 
 func (fc *foreachChecker) str() {
 	fc.checkKeyASize()
-	if juleapi.IsIgnoreId(fc.profile.KeyB.Id) {
+	if lex.IsIgnoreId(fc.profile.KeyB.Id) {
 		return
 	}
 	runeType := Type{

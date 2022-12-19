@@ -1,4 +1,4 @@
-package juleapi
+package parser
 
 import (
 	"strconv"
@@ -6,32 +6,23 @@ import (
 	"unicode/utf8"
 )
 
-// ToStrLiteral returns string literas as given bytes.
+// ToStrLiteral returns specified literal as Jule string literal for cpp.
 func ToStrLiteral(bytes []byte) string {
-	btoa := bytes_to_str(bytes)
-	if btoa != "" {
-		return `"` + btoa + `"`
-	}
-	return `""`
-}
-
-// ToStr returns specified literal as Jule string literal for cpp.
-func ToStr(bytes []byte) string {
 	var cpp strings.Builder
 	cpp.WriteString("str_jt(")
-	literal := ToStrLiteral(bytes)
-	if literal != `""` {
-		cpp.WriteString(literal)
-	}
+	btoa := bytes_to_str(bytes)
+	cpp.WriteByte('"')
+	cpp.WriteString(btoa)
+	cpp.WriteByte('"')
 	cpp.WriteString(")")
 	return cpp.String()
 }
 
-// ToRawStr returns specified literal as Jule raw-string literal for cpp.
-func ToRawStr(bytes []byte) string { return ToStr(bytes) }
+// ToRawStrLiteral returns specified literal as Jule raw-string literal for cpp.
+func ToRawStrLiteral(bytes []byte) string { return ToStrLiteral(bytes) }
 
-// ToRune returns specified literal as Jule rune literal for cpp.
-func ToRune(bytes []byte) string {
+// ToRuneLiteral returns specified literal as Jule rune literal for cpp.
+func ToRuneLiteral(bytes []byte) string {
 	if len(bytes) == 0 {
 		return ""
 	}

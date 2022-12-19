@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule"
-	"github.com/julelang/jule/pkg/juleapi"
+	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/lex"
 )
 
 type iExpr interface {
@@ -158,7 +158,7 @@ type retExpr struct {
 func (re *retExpr) get_model(i int) string {
 	if len(re.vars) > 0 {
 		v := re.vars[i]
-		if juleapi.IsIgnoreId(v.Id) {
+		if lex.IsIgnoreId(v.Id) {
 			return re.models[i].String()
 		}
 		return v.OutId()
@@ -182,22 +182,22 @@ func (re *retExpr) ready_ignored_var_to_decl(v *Var) {
 func (re *retExpr) setup_one_expr_to_multi_vars() string {
 	var cpp strings.Builder
 	for _, v := range re.vars {
-		if juleapi.IsIgnoreId(v.Id) {
+		if lex.IsIgnoreId(v.Id) {
 			// This assignment effects to original variable instance.
 			re.ready_ignored_var_to_decl(v)
 			cpp.WriteString(v.String())
 			// To default
-			v.Id = juleapi.IGNORE
+			v.Id = lex.IGNORE_ID
 		}
 	}
 	cpp.WriteString("std::tie(")
 	for _, v := range re.vars {
-		if juleapi.IsIgnoreId(v.Id) {
+		if lex.IsIgnoreId(v.Id) {
 			// This assignment effects to original variable instance.
 			re.ready_ignored_var_to_decl(v)
 			cpp.WriteString(v.OutId())
 			// To default
-			v.Id = juleapi.IGNORE
+			v.Id = lex.IGNORE_ID
 		} else {
 			cpp.WriteString(v.OutId())
 		}
@@ -217,7 +217,7 @@ func (re *retExpr) setup_one_expr_to_multi_vars() string {
 func (re *retExpr) setup_plain_vars() string {
 	var cpp strings.Builder
 	for i, v := range re.vars {
-		if juleapi.IsIgnoreId(v.Id) {
+		if lex.IsIgnoreId(v.Id) {
 			continue
 		}
 		cpp.WriteString(v.OutId())
@@ -239,12 +239,12 @@ func (re *retExpr) multi_with_one_expr_str() string {
 	var cpp strings.Builder
 	cpp.WriteString("std::make_tuple(")
 	for _, v := range re.vars {
-		if juleapi.IsIgnoreId(v.Id) {
+		if lex.IsIgnoreId(v.Id) {
 			// This assignment effects to original variable instance.
 			re.ready_ignored_var_to_decl(v)
 			cpp.WriteString(v.OutId())
 			// To default
-			v.Id = juleapi.IGNORE
+			v.Id = lex.IGNORE_ID
 		} else {
 			cpp.WriteString(v.OutId())
 		}

@@ -140,6 +140,8 @@ const KND_UNSAFE      = "unsafe"
 const KND_MUT         = "mut"
 const KND_DEFER       = "defer"
 
+const IGNORE_ID = "_"
+
 // Token is lexer token.
 type Token struct {
 	File   *File
@@ -172,3 +174,6 @@ func IsNumeric(k string) bool {
 func IsLiteral(k string) bool {
 	return IsNumeric(k) || IsStr(k) || IsChar(k) || IsNil(k) || IsBool(k)
 }
+
+// IsIgnoreId reports identifier is ignore or not.
+func IsIgnoreId(id string) bool { return id == IGNORE_ID }

@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
-	"github.com/julelang/jule/pkg/juleapi"
 	"github.com/julelang/jule/types"
 )
 
@@ -21,9 +21,9 @@ type valueEvaluator struct {
 func strModel(v value) iExpr {
 	content := v.expr.(string)
 	if lex.IsRawStr(content) {
-		return exprNode{juleapi.ToRawStr([]byte(content))}
+		return exprNode{ToRawStrLiteral([]byte(content))}
 	}
-	return exprNode{juleapi.ToStr([]byte(content))}
+	return exprNode{ToStrLiteral([]byte(content))}
 }
 
 func boolModel(v value) iExpr {
@@ -102,7 +102,7 @@ func (ve *valueEvaluator) char() value {
 	} else { // rune
 		v.data.Type.Id = types.I32
 	}
-	content = juleapi.ToRune([]byte(content))
+	content = ToRuneLiteral([]byte(content))
 	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
 	v.expr, _ = strconv.ParseInt(content[2:], 16, 64)
 	v.model = exprNode{content}
@@ -256,9 +256,9 @@ func (ve *valueEvaluator) enumId(id string, e *Enum) (v value) {
 	v.is_type = true
 	// If built-in.
 	if e.Token.Id == lex.ID_NA {
-		ve.model.append_sub(exprNode{juleapi.OutId(id, 0)})
+		ve.model.append_sub(exprNode{build.OutId(id, 0)})
 	} else {
-		ve.model.append_sub(exprNode{juleapi.OutId(id, e.Token.File.Addr())})
+		ve.model.append_sub(exprNode{build.OutId(id, e.Token.File.Addr())})
 	}
 	return
 }
@@ -279,9 +279,9 @@ func (ve *valueEvaluator) structId(id string, s *Struct) (v value) {
 	v = make_value_from_struct(s)
 	// If builtin.
 	if s.Token.Id == lex.ID_NA {
-		ve.model.append_sub(exprNode{juleapi.OutId(id, 0)})
+		ve.model.append_sub(exprNode{build.OutId(id, 0)})
 	} else {
-		ve.model.append_sub(exprNode{juleapi.OutId(id, s.Token.File.Addr())})
+		ve.model.append_sub(exprNode{build.OutId(id, s.Token.File.Addr())})
 	}
 	return
 }

@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
-	"github.com/julelang/jule/pkg/juleapi"
 )
 
 // Var is variable declaration AST model.
@@ -33,7 +33,7 @@ func (v *Var) IsLocal() bool { return v.Owner != nil }
 
 func as_local_id(row, column int, id string) string {
 	id = strconv.Itoa(row) + strconv.Itoa(column) + "_" + id
-	return juleapi.AsId(id)
+	return build.AsId(id)
 }
 
 // OutId returns juleapi.OutId result of var.
@@ -46,14 +46,14 @@ func (v *Var) OutId() string {
 	case v.IsLocal():
 		return as_local_id(v.Token.Row, v.Token.Column, v.Id)
 	case v.IsField:
-		return "__julec_field_" + juleapi.AsId(v.Id)
+		return "__julec_field_" + build.AsId(v.Id)
 	default:
-		return juleapi.OutId(v.Id, v.Token.File.Addr())
+		return build.OutId(v.Id, v.Token.File.Addr())
 	}
 }
 
 func (v Var) String() string {
-	if juleapi.IsIgnoreId(v.Id) {
+	if lex.IsIgnoreId(v.Id) {
 		return ""
 	}
 	if v.Const {
@@ -68,7 +68,7 @@ func (v Var) String() string {
 		cpp.WriteString(" = ")
 		cpp.WriteString(v.Expr.String())
 	} else {
-		cpp.WriteString(juleapi.DEFAULT_EXPR)
+		cpp.WriteString(build.CPP_DEFAULT_EXPR)
 	}
 	cpp.WriteByte(';')
 	return cpp.String()
@@ -83,7 +83,7 @@ func (v *Var) FieldString() string {
 	cpp.WriteString(v.Type.String())
 	cpp.WriteByte(' ')
 	cpp.WriteString(v.OutId())
-	cpp.WriteString(juleapi.DEFAULT_EXPR)
+	cpp.WriteString(build.CPP_DEFAULT_EXPR)
 	cpp.WriteByte(';')
 	return cpp.String()
 }

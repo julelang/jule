@@ -1,8 +1,8 @@
 package models
 
 import (
+	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
-	"github.com/julelang/jule/pkg/juleapi"
 )
 
 // Trait is the AST model of traits.
@@ -29,5 +29,5 @@ func (t *Trait) FindFunc(id string) *Fn {
 
 // OutId returns juleapi.OutId result of trait.
 func (t *Trait) OutId() string {
-	return juleapi.OutId(t.Id, t.Token.File.Addr())
+	return build.OutId(t.Id, t.Token.File.Addr())
 }

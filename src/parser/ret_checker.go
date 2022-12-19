@@ -2,8 +2,8 @@ package parser
 
 import (
 	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
-	"github.com/julelang/jule/pkg/juleapi"
 	"github.com/julelang/jule/types"
 )
 
@@ -155,7 +155,7 @@ func (rc *retChecker) checkMultiRetAsMutliRet() {
 func (rc *retChecker) retsVars() {
 	if !rc.f.RetType.Type.MultiTyped {
 		for _, v := range rc.f.RetType.Identifiers {
-			if !juleapi.IsIgnoreId(v.Kind) {
+			if !lex.IsIgnoreId(v.Kind) {
 				model := new(exprModel)
 				model.index = 0
 				model.nodes = make([]exprBuildNode, 1)
@@ -170,10 +170,10 @@ func (rc *retChecker) retsVars() {
 	}
 	types := rc.f.RetType.Type.Tag.([]Type)
 	for i, v := range rc.f.RetType.Identifiers {
-		if juleapi.IsIgnoreId(v.Kind) {
+		if lex.IsIgnoreId(v.Kind) {
 			node := exprNode{}
 			node.value = types[i].String()
-			node.value += juleapi.DEFAULT_EXPR
+			node.value += build.CPP_DEFAULT_EXPR
 			rc.exp_model.models = append(rc.exp_model.models, node)
 			continue
 		}

@@ -9,7 +9,6 @@ import (
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
-	"github.com/julelang/jule/pkg/juleapi"
 	"github.com/julelang/jule/types"
 )
 
@@ -19,6 +18,9 @@ var indent uint32 = 0
 
 // indentation string.
 var indentation = "\t"
+
+// init_caller represents initializer caller function identifier.
+const init_caller = "__julec_call_package_initializers"
 
 // Returns indent space of current block.
 func indent_string() string {
@@ -38,7 +40,7 @@ func gen_assign_left(as *models.AssignLeft) string {
 	case as.Var.New:
 		return as.Var.OutId()
 	case as.Ignore:
-		return juleapi.CPP_IGNORE
+		return build.CPP_IGNORE
 	}
 	return as.Expr.String()
 }
@@ -52,7 +54,7 @@ func gen_single_assign(a *models.Assign) string {
 	}
 	var cpp strings.Builder
 	if len(left.Expr.Tokens) != 1 ||
-		!juleapi.IsIgnoreId(left.Expr.Tokens[0].Kind) {
+		!lex.IsIgnoreId(left.Expr.Tokens[0].Kind) {
 		cpp.WriteString(gen_assign_left(&left))
 		cpp.WriteString(a.Setter.Kind)
 	}
@@ -104,7 +106,7 @@ func gen_assign_multi_ret(a *models.Assign) string {
 	for i := range a.Left {
 		left := &a.Left[i]
 		if left.Ignore {
-			cpp.WriteString(juleapi.CPP_IGNORE)
+			cpp.WriteString(build.CPP_IGNORE)
 			cpp.WriteByte(',')
 			continue
 		}
@@ -190,7 +192,11 @@ func gen_parse_block(b *models.Block) string {
 }
 
 func gen_concurrent_call(cc *models.ConcurrentCall) string {
-	return juleapi.ToConcurrentCall(cc.Expr.String())
+	var cpp strings.Builder
+	cpp.WriteString("__JULEC_CO(")
+	cpp.WriteString(cc.Expr.String())
+	cpp.WriteString(");")
+	return cpp.String()
 }
 
 func gen_if(i *models.If) string {
@@ -292,7 +298,7 @@ type index_setter struct {}
 func (index_setter) setup_vars(key_a *models.Var, key_b *models.Var) string {
 	var cpp strings.Builder
 	indent := indent_string()
-	if !juleapi.IsIgnoreId(key_a.Id) {
+	if !lex.IsIgnoreId(key_a.Id) {
 		if key_a.New {
 			cpp.WriteString(key_a.String())
 			cpp.WriteByte(' ')
@@ -301,7 +307,7 @@ func (index_setter) setup_vars(key_a *models.Var, key_b *models.Var) string {
 		cpp.WriteString(" = 0;\n")
 		cpp.WriteString(indent)
 	}
-	if !juleapi.IsIgnoreId(key_b.Id) {
+	if !lex.IsIgnoreId(key_b.Id) {
 		if key_b.New {
 			cpp.WriteString(key_b.String())
 			cpp.WriteByte(' ')
@@ -319,12 +325,12 @@ func (index_setter) next_steps(key_a *models.Var, key_b *models.Var, begin strin
 	cpp.WriteString("++__julec_foreach_begin;\n")
 	cpp.WriteString(indent)
 	cpp.WriteString("if (__julec_foreach_begin != __julec_foreach_end) { ")
-	if !juleapi.IsIgnoreId(key_a.Id) {
+	if !lex.IsIgnoreId(key_a.Id) {
 		cpp.WriteString("++")
 		cpp.WriteString(key_a.OutId())
 		cpp.WriteString("; ")
 	}
-	if !juleapi.IsIgnoreId(key_b.Id) {
+	if !lex.IsIgnoreId(key_b.Id) {
 		cpp.WriteString(key_b.OutId())
 		cpp.WriteString(" = *__julec_foreach_begin; ")
 	}
@@ -339,7 +345,7 @@ type map_setter struct {}
 func (map_setter) setup_vars(key_a *models.Var, key_b *models.Var) string {
 	var cpp strings.Builder
 	indent := indent_string()
-	if !juleapi.IsIgnoreId(key_a.Id) {
+	if !lex.IsIgnoreId(key_a.Id) {
 		if key_a.New {
 			cpp.WriteString(key_a.String())
 			cpp.WriteByte(' ')
@@ -348,7 +354,7 @@ func (map_setter) setup_vars(key_a *models.Var, key_b *models.Var) string {
 		cpp.WriteString(" = __julec_foreach_begin->first;\n")
 		cpp.WriteString(indent)
 	}
-	if !juleapi.IsIgnoreId(key_b.Id) {
+	if !lex.IsIgnoreId(key_b.Id) {
 		if key_b.New {
 			cpp.WriteString(key_b.String())
 			cpp.WriteByte(' ')
@@ -366,11 +372,11 @@ func (map_setter) next_steps(key_a *models.Var, key_b *models.Var, begin string)
 	cpp.WriteString("++__julec_foreach_begin;\n")
 	cpp.WriteString(indent)
 	cpp.WriteString("if (__julec_foreach_begin != __julec_foreach_end) { ")
-	if !juleapi.IsIgnoreId(key_a.Id) {
+	if !lex.IsIgnoreId(key_a.Id) {
 		cpp.WriteString(key_a.OutId())
 		cpp.WriteString(" = __julec_foreach_begin->first; ")
 	}
-	if !juleapi.IsIgnoreId(key_b.Id) {
+	if !lex.IsIgnoreId(key_b.Id) {
 		cpp.WriteString(key_b.OutId())
 		cpp.WriteString(" = __julec_foreach_begin->second; ")
 	}
@@ -453,9 +459,9 @@ func gen_type_alias(t *models.TypeAlias) string {
 	cpp.WriteString(t.Type.String())
 	cpp.WriteByte(' ')
 	if t.Generic {
-		cpp.WriteString(juleapi.AsId(t.Id))
+		cpp.WriteString(build.AsId(t.Id))
 	} else {
-		cpp.WriteString(juleapi.OutId(t.Id, t.Token.File.Addr()))
+		cpp.WriteString(build.OutId(t.Id, t.Token.File.Addr()))
 	}
 	cpp.WriteByte(';')
 	return cpp.String()
@@ -1102,7 +1108,7 @@ func gen_fns(tree *models.Defmap, used *[]*models.UseDecl) string {
 func gen_init_caller(tree *models.Defmap, used *[]*models.UseDecl) string {
 	var cpp strings.Builder
 	cpp.WriteString("void ")
-	cpp.WriteString(juleapi.INIT_CALLER)
+	cpp.WriteString(init_caller)
 	cpp.WriteString("(void) {")
 	indent := "\t"
 	push_init := func(defs *models.Defmap) {

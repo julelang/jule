@@ -14,7 +14,6 @@ import (
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
 	"github.com/julelang/jule"
-	"github.com/julelang/jule/pkg/juleapi"
 )
 
 type File = lex.File
@@ -120,7 +119,7 @@ func (p *Parser) checkCppUsePath(use *models.UseDecl) bool {
 		return true
 	}
 	ext := filepath.Ext(use.Path)
-	if !juleapi.IsValidHeader(ext) {
+	if !build.IsValidHeader(ext) {
 		p.pusherrtok(use.Token, "invalid_header_ext", ext)
 		return false
 	}
@@ -535,7 +534,7 @@ func (p *Parser) checkGenerics(obj models.Object) {
 // Generics parses generics.
 func (p *Parser) Generics(generics []GenericType) {
 	for i, generic := range generics {
-		if juleapi.IsIgnoreId(generic.Id) {
+		if lex.IsIgnoreId(generic.Id) {
 			p.pusherrtok(generic.Token, "ignore_id")
 			continue
 		}
@@ -563,7 +562,7 @@ func (p *Parser) make_type_alias(alias models.TypeAlias) *models.TypeAlias {
 
 // Type parses Jule type define statement.
 func (p *Parser) Type(alias TypeAlias) {
-	if juleapi.IsIgnoreId(alias.Id) {
+	if lex.IsIgnoreId(alias.Id) {
 		p.pusherrtok(alias.Token, "ignore_id")
 		return
 	}
@@ -577,7 +576,7 @@ func (p *Parser) Type(alias TypeAlias) {
 
 func (p *Parser) parse_enum_items_str(e *Enum) {
 	for _, item := range e.Items {
-		if juleapi.IsIgnoreId(item.Id) {
+		if lex.IsIgnoreId(item.Id) {
 			p.pusherrtok(item.Token, "ignore_id")
 		} else {
 			for _, checkItem := range e.Items {
@@ -627,7 +626,7 @@ func (p *Parser) parse_enum_items_integer(e *Enum) {
 		} else {
 			max--
 		}
-		if juleapi.IsIgnoreId(item.Id) {
+		if lex.IsIgnoreId(item.Id) {
 			p.pusherrtok(item.Token, "ignore_id")
 		} else {
 			for _, checkItem := range e.Items {
@@ -671,7 +670,7 @@ func (p *Parser) parse_enum_items_integer(e *Enum) {
 
 // Enum parses Jule enumerator statement.
 func (p *Parser) Enum(e Enum) {
-	if juleapi.IsIgnoreId(e.Id) {
+	if lex.IsIgnoreId(e.Id) {
 		p.pusherrtok(e.Token, "ignore_id")
 		return
 	}
@@ -720,7 +719,7 @@ func (p *Parser) pushField(s *Struct, f **Var, i int) {
 	} else {
 		p.parseNonGenericType(s.Generics, &(*f).Type)
 		param := models.Param{Id: (*f).Id, Type: (*f).Type}
-		param.Default.Model = exprNode{juleapi.DEFAULT_EXPR}
+		param.Default.Model = exprNode{build.CPP_DEFAULT_EXPR}
 		s.Constructor.Params[i] = param
 	}
 }
@@ -772,7 +771,7 @@ func (p *Parser) make_struct(model models.Struct) *Struct {
 
 // Struct parses Jule structure.
 func (p *Parser) Struct(model Struct) {
-	if juleapi.IsIgnoreId(model.Id) {
+	if lex.IsIgnoreId(model.Id) {
 		p.pusherrtok(model.Token, "ignore_id")
 		return
 	} else if def, _, _ := p.defined_by_id(model.Id); def != nil {
@@ -785,7 +784,7 @@ func (p *Parser) Struct(model Struct) {
 
 // LinkFn parses cpp link function.
 func (p *Parser) LinkFn(link models.CppLinkFn) {
-	if juleapi.IsIgnoreId(link.Link.Id) {
+	if lex.IsIgnoreId(link.Link.Id) {
 		p.pusherrtok(link.Token, "ignore_id")
 		return
 	}
@@ -805,7 +804,7 @@ func (p *Parser) LinkFn(link models.CppLinkFn) {
 
 // Link_alias parses cpp link structure.
 func (p *Parser) Link_alias(link models.CppLinkAlias) {
-	if juleapi.IsIgnoreId(link.Link.Id) {
+	if lex.IsIgnoreId(link.Link.Id) {
 		p.pusherrtok(link.Token, "ignore_id")
 		return
 	}
@@ -820,7 +819,7 @@ func (p *Parser) Link_alias(link models.CppLinkAlias) {
 
 // Link_struct parses cpp link structure.
 func (p *Parser) Link_struct(link models.CppLinkStruct) {
-	if juleapi.IsIgnoreId(link.Link.Id) {
+	if lex.IsIgnoreId(link.Link.Id) {
 		p.pusherrtok(link.Token, "ignore_id")
 		return
 	}
@@ -836,7 +835,7 @@ func (p *Parser) Link_struct(link models.CppLinkStruct) {
 
 // LinkVar parses cpp link function.
 func (p *Parser) LinkVar(link models.CppLinkVar) {
-	if juleapi.IsIgnoreId(link.Link.Id) {
+	if lex.IsIgnoreId(link.Link.Id) {
 		p.pusherrtok(link.Token, "ignore_id")
 		return
 	}
@@ -850,7 +849,7 @@ func (p *Parser) LinkVar(link models.CppLinkVar) {
 
 // Trait parses Jule trait.
 func (p *Parser) Trait(model models.Trait) {
-	if juleapi.IsIgnoreId(model.Id) {
+	if lex.IsIgnoreId(model.Id) {
 		p.pusherrtok(model.Token, "ignore_id")
 		return
 	} else if def, _, _ := p.defined_by_id(model.Id); def != nil {
@@ -864,7 +863,7 @@ func (p *Parser) Trait(model models.Trait) {
 	trait.Defines = new(models.Defmap)
 	trait.Defines.Fns = make([]*Fn, len(model.Funcs))
 	for i, f := range trait.Funcs {
-		if juleapi.IsIgnoreId(f.Id) {
+		if lex.IsIgnoreId(f.Id) {
 			p.pusherrtok(f.Token, "ignore_id")
 		}
 		for j, jf := range trait.Funcs {
@@ -1150,7 +1149,7 @@ func (p *Parser) parseTypesNonGenerics(f *Fn) {
 
 func (p *Parser) check_ret_variables(f *Fn) {
 	for i, v := range f.RetType.Identifiers {
-		if juleapi.IsIgnoreId(v.Kind) {
+		if lex.IsIgnoreId(v.Kind) {
 			continue
 		}
 		for _, generic := range f.Generics {
@@ -1190,7 +1189,7 @@ func (p *Parser) Func(ast Fn) {
 	_, tok, canshadow := p.defined_by_id(ast.Id)
 	if tok.Id != lex.ID_NA && !canshadow {
 		p.pusherrtok(ast.Token, "exist_id", ast.Id)
-	} else if juleapi.IsIgnoreId(ast.Id) {
+	} else if lex.IsIgnoreId(ast.Id) {
 		p.pusherrtok(ast.Token, "ignore_id")
 	}
 	f := new(Fn)
@@ -1231,7 +1230,7 @@ func (p *Parser) Global(vast Var) {
 
 // Var parse Jule variable.
 func (p *Parser) Var(model Var) *Var {
-	if juleapi.IsIgnoreId(model.Id) {
+	if lex.IsIgnoreId(model.Id) {
 		p.pusherrtok(model.Token, "ignore_id")
 	}
 	v := new(Var)
@@ -1810,7 +1809,7 @@ func (p *Parser) checkParamDefaultExpr(f *Fn, param *Param) {
 	}
 	// Skip default argument with default value
 	if param.Default.Model != nil {
-		if param.Default.Model.String() == juleapi.DEFAULT_EXPR {
+		if param.Default.Model.String() == build.CPP_DEFAULT_EXPR {
 			p.checkParamDefaultExprWithDefault(param)
 			return
 		}
@@ -2021,7 +2020,7 @@ func (p *Parser) parseField(s *Struct, f **Var, i int) {
 	if has_expr(v.Expr) {
 		param.Default = v.Expr
 	} else {
-		param.Default.Model = exprNode{juleapi.DEFAULT_EXPR}
+		param.Default.Model = exprNode{build.CPP_DEFAULT_EXPR}
 	}
 	s.Constructor.Params[i] = param
 }
@@ -2590,7 +2589,7 @@ func (p *Parser) st(s *models.Statement, recover bool) bool {
 		if def != nil && !canshadow {
 			p.pusherrtok(data.Token, "exist_id", data.Id)
 			break
-		} else if juleapi.IsIgnoreId(data.Id) {
+		} else if lex.IsIgnoreId(data.Id) {
 			p.pusherrtok(data.Token, "ignore_id")
 			break
 		}
@@ -3019,7 +3018,7 @@ func (p *Parser) assignment(left value, errtok lex.Token) bool {
 func (p *Parser) singleAssign(assign *models.Assign, l, r []value) {
 	left := l[0]
 	switch {
-	case juleapi.IsIgnoreId(left.data.Value):
+	case lex.IsIgnoreId(left.data.Value):
 		return
 	case !p.assignment(left, assign.Setter):
 		return
@@ -3056,13 +3055,13 @@ func (p *Parser) assignExprs(vsAST *models.Assign) (l []value, r []value) {
 		if i < len(l) {
 			left := &vsAST.Left[i]
 			if !left.Var.New && !(len(left.Expr.Tokens) == 1 &&
-				juleapi.IsIgnoreId(left.Expr.Tokens[0].Kind)) {
+				lex.IsIgnoreId(left.Expr.Tokens[0].Kind)) {
 				v, model := p.evalExpr(left.Expr, nil)
 				left.Expr.Model = model
 				l[i] = v
 				r_type = &v.data.Type
 			} else {
-				l[i].data.Value = juleapi.IGNORE
+				l[i].data.Value = lex.IGNORE_ID
 			}
 		}
 		if i < len(r) {
@@ -3110,7 +3109,7 @@ func (p *Parser) check_valid_init_expr(left_mutable bool, right value, errtok le
 func (p *Parser) multiAssign(assign *models.Assign, l, r []value) {
 	for i := range assign.Left {
 		left := &assign.Left[i]
-		left.Ignore = juleapi.IsIgnoreId(left.Var.Id)
+		left.Ignore = lex.IsIgnoreId(left.Var.Id)
 		right := r[i]
 		if !left.Var.New {
 			if left.Ignore {
@@ -3222,10 +3221,10 @@ func (p *Parser) foreachProfile(iter *models.Iter) {
 	}
 	iter.Profile = profile
 	blockVars := p.blockVars
-	if !juleapi.IsIgnoreId(profile.KeyA.Id) {
+	if !lex.IsIgnoreId(profile.KeyA.Id) {
 		p.blockVars = append(p.blockVars, &profile.KeyA)
 	}
-	if !juleapi.IsIgnoreId(profile.KeyB.Id) {
+	if !lex.IsIgnoreId(profile.KeyB.Id) {
 		p.blockVars = append(p.blockVars, &profile.KeyB)
 	}
 	p.checkNewBlockCustom(iter.Block, blockVars)

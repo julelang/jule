@@ -3,8 +3,8 @@ package models
 import (
 	"strings"
 
+	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
-	"github.com/julelang/jule/pkg/juleapi"
 )
 
 // Struct is the AST model of structures.
@@ -29,9 +29,7 @@ type Struct struct {
 	generics    []Type // Instance generics.
 }
 
-func (s *Struct) IsSameBase(s2 *Struct) bool {
-	return s.Origin == s2.Origin
-}
+func (s *Struct) IsSameBase(s2 *Struct) bool { return s.Origin == s2.Origin }
 
 func (s *Struct) IsDependedTo(s2 *Struct) bool {
 	for _, d := range s.Origin.Depends {
@@ -47,7 +45,7 @@ func (s *Struct) OutId() string {
 	if s.CppLinked {
 		return s.Id
 	}
-	return juleapi.OutId(s.Id, s.Token.File.Addr())
+	return build.OutId(s.Id, s.Token.File.Addr())
 }
 
 // Generics returns generics of instance.
