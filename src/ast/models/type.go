@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/julelang/jule/lex"
-	"github.com/julelang/jule/pkg/jule"
+	"github.com/julelang/jule"
 	"github.com/julelang/jule/pkg/juleapi"
 )
 

@@ -6,7 +6,7 @@ import (
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
-	"github.com/julelang/jule/pkg/jule"
+	"github.com/julelang/jule"
 )
 
 type type_builder struct {

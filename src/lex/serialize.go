@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"unsafe"
 
-	"github.com/julelang/jule/pkg/jule"
+	"github.com/julelang/jule"
 )
 
 // File instance of fs.

@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/julelang/jule/pkg/jule"
+	"github.com/julelang/jule"
 )
 
 const os_windows = "windows"

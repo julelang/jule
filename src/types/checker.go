@@ -1,10 +1,10 @@
 package types
 
 import (
+	"github.com/julelang/jule"
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
-	"github.com/julelang/jule/pkg/jule"
 )
 
 // I8CompatibleWith reports i8 is compatible or not with data-type specified type.

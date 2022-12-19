@@ -6,7 +6,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/julelang/jule/build"
-	"github.com/julelang/jule/pkg/jule"
+	"github.com/julelang/jule"
 )
 
 // Lex is lexer of Jule.

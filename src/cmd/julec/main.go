@@ -12,12 +12,12 @@ import (
 	"runtime"
 	"strings"
 	"time"
-
+	
+	"github.com/julelang/jule"
 	"github.com/julelang/jule/cmd/julec/gen"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/parser"
-	"github.com/julelang/jule/pkg/jule"
 	"github.com/julelang/jule/pkg/juleapi"
 )
 
