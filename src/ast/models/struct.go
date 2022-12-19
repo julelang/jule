@@ -5,7 +5,6 @@ import (
 
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/pkg/juleapi"
-	"github.com/julelang/jule/pkg/juletype"
 )
 
 // Struct is the AST model of structures.
@@ -68,7 +67,7 @@ func (s *Struct) SelfVar(receiver *Var) *Var {
 	v.Token = s.Token
 	v.Type = receiver.Type
 	v.Type.Tag = s
-	v.Type.Id = juletype.STRUCT
+	v.Type.Id = struct_t
 	v.Mutable = receiver.Mutable
 	v.Id = lex.KND_SELF
 	return v
@@ -109,7 +108,7 @@ func (s *Struct) HasTrait(t *Trait) bool {
 
 func (s *Struct) GetSelfRefVarType() Type {
 	var t Type
-	t.Id = juletype.STRUCT
+	t.Id = struct_t
 	t.Kind = lex.KND_AMPER + s.Id
 	t.Tag = s
 	t.Token = s.Token

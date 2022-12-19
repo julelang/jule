@@ -2,7 +2,6 @@ package parser
 
 import (
 	"github.com/julelang/jule/lex"
-	"github.com/julelang/jule/pkg/juletype"
 	"github.com/julelang/jule/types"
 )
 
@@ -15,7 +14,7 @@ type unary struct {
 
 func (u *unary) minus() value {
 	v := u.p.eval.process(u.toks, u.model)
-	if !types.IsPure(v.data.Type) || !juletype.IsNumeric(v.data.Type.Id) {
+	if !types.IsPure(v.data.Type) || !types.IsNumeric(v.data.Type.Id) {
 		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_MINUS)
 	}
 	if v.constExpr {
@@ -35,7 +34,7 @@ func (u *unary) minus() value {
 
 func (u *unary) plus() value {
 	v := u.p.eval.process(u.toks, u.model)
-	if !types.IsPure(v.data.Type) || !juletype.IsNumeric(v.data.Type.Id) {
+	if !types.IsPure(v.data.Type) || !types.IsNumeric(v.data.Type.Id) {
 		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_PLUS)
 	}
 	if v.constExpr {
@@ -54,7 +53,7 @@ func (u *unary) plus() value {
 
 func (u *unary) caret() value {
 	v := u.p.eval.process(u.toks, u.model)
-	if !types.IsPure(v.data.Type) || !juletype.IsInteger(v.data.Type.Id) {
+	if !types.IsPure(v.data.Type) || !types.IsInteger(v.data.Type.Id) {
 		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_CARET)
 	}
 	if v.constExpr {
@@ -77,7 +76,7 @@ func (u *unary) logicalNot() value {
 		v.expr = !v.expr.(bool)
 		v.model = boolModel(v)
 	}
-	v.data.Type.Id = juletype.BOOL
+	v.data.Type.Id = types.BOOL
 	v.data.Type.Kind = lex.KND_BOOL
 	return v
 }

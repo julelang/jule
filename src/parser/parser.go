@@ -15,7 +15,6 @@ import (
 	"github.com/julelang/jule/types"
 	"github.com/julelang/jule/pkg/jule"
 	"github.com/julelang/jule/pkg/juleapi"
-	"github.com/julelang/jule/pkg/juletype"
 )
 
 type File = lex.File
@@ -621,7 +620,7 @@ func (p *Parser) parse_enum_items_str(e *Enum) {
 }
 
 func (p *Parser) parse_enum_items_integer(e *Enum) {
-	max := juletype.MaxOfType(e.Type.Id)
+	max := types.MaxOfType(e.Type.Id)
 	for i, item := range e.Items {
 		if max == 0 {
 			p.pusherrtok(item.Token, "overflow_limits")
@@ -697,9 +696,9 @@ func (p *Parser) Enum(e Enum) {
 		p.Defines.Enums = append(p.Defines.Enums, &e)
 	}()
 	switch {
-	case e.Type.Id == juletype.STR:
+	case e.Type.Id == types.STR:
 		p.parse_enum_items_str(&e)
-	case juletype.IsInteger(e.Type.Id):
+	case types.IsInteger(e.Type.Id):
 		p.parse_enum_items_integer(&e)
 	default:
 		p.pusherrtok(e.Token, "invalid_type_source")
@@ -740,7 +739,7 @@ func make_constructor(s *Struct) *models.Fn {
 	constructor.Token = s.Token
 	constructor.Params = make([]models.Param, len(s.Fields))
 	constructor.RetType.Type = Type{
-		Id:    juletype.STRUCT,
+		Id:    types.STRUCT,
 		Kind:  s.Id,
 		Token: s.Token,
 		Tag:   s,
@@ -1083,7 +1082,7 @@ func (p *Parser) parseMapNonGenericType(generics []*GenericType, dt *Type) {
 }
 
 func (p *Parser) parseCommonNonGenericType(generics []*GenericType, dt *Type) {
-	if dt.Id == juletype.ID {
+	if dt.Id == types.ID {
 		id, prefix := dt.KindId()
 		def, _, _ := p.defined_by_id(id)
 		switch deft := def.(type) {
@@ -1093,7 +1092,7 @@ func (p *Parser) parseCommonNonGenericType(generics []*GenericType, dt *Type) {
 				deft.SetGenerics(dt.Tag.([]Type))
 			}
 			dt.Kind = prefix + deft.AsTypeKind()
-			dt.Id = juletype.STRUCT
+			dt.Id = types.STRUCT
 			dt.Tag = deft
 			dt.Pure = true
 			dt.Original = nil
@@ -1237,7 +1236,7 @@ func (p *Parser) Var(model Var) *Var {
 	}
 	v := new(Var)
 	*v = model
-	if v.Type.Id != juletype.VOID {
+	if v.Type.Id != types.VOID {
 		vt, ok := p.realType(v.Type, true)
 		if ok {
 			v.Type = vt
@@ -1258,9 +1257,9 @@ func (p *Parser) Var(model Var) *Var {
 		p.pusherrtok(model.Token, "missing_multi_assign_identifiers")
 		return v
 	}
-	if v.Type.Id != juletype.VOID {
+	if v.Type.Id != types.VOID {
 		if v.SetterTok.Id != lex.ID_NA {
-			if v.Type.Size.AutoSized && v.Type.Id == juletype.ARRAY {
+			if v.Type.Size.AutoSized && v.Type.Id == types.ARRAY {
 				v.Type.Size = val.data.Type.Size
 			}
 			assign_checker{
@@ -1315,7 +1314,7 @@ func (p *Parser) varsFromParams(f *Fn) []*Var {
 			v.Type.Original = nil
 			v.Type.ComponentType = new(models.Type)
 			*v.Type.ComponentType = param.Type
-			v.Type.Id = juletype.SLICE
+			v.Type.Id = types.SLICE
 			v.Type.Kind = jule.PREFIX_SLICE + v.Type.Kind
 		}
 		vars[i] = v
@@ -1818,7 +1817,7 @@ func (p *Parser) checkParamDefaultExpr(f *Fn, param *Param) {
 	}
 	dt := param.Type
 	if param.Variadic {
-		dt.Id = juletype.SLICE
+		dt.Id = types.SLICE
 		dt.Kind = jule.PREFIX_SLICE + dt.Kind
 		dt.ComponentType = new(models.Type)
 		*dt.ComponentType = param.Type
@@ -2452,7 +2451,7 @@ func (p *Parser) parseArg(f *Fn, pair *paramMapPair, args *models.Args, variadic
 	pair.arg.Expr.Model = model
 	if !value.variadic && !pair.param.Variadic &&
 		!models.Has_attribute(jule.ATTR_CDEF, f.Attributes) &&
-		types.IsPure(pair.param.Type) && juletype.IsNumeric(pair.param.Type.Id) {
+		types.IsPure(pair.param.Type) && types.IsNumeric(pair.param.Type.Id) {
 		pair.arg.CastType = new(Type)
 		*pair.arg.CastType = pair.param.Type.Copy()
 		pair.arg.CastType.Original = nil
@@ -2497,7 +2496,7 @@ func (p *Parser) checkSolidFuncSpecialCases(f *Fn) {
 	if len(f.Params) > 0 {
 		p.pusherrtok(f.Token, "fn_have_parameters", f.Id)
 	}
-	if f.RetType.Type.Id != juletype.VOID {
+	if f.RetType.Type.Id != types.VOID {
 		p.pusherrtok(f.RetType.Type.Token, "fn_have_ret", f.Id)
 	}
 	f.Attributes = nil
@@ -2751,8 +2750,8 @@ func (p *Parser) matchcase(m *models.Match) {
 		m.Expr.Model = expr_model
 		m.ExprType = value.data.Type
 	} else {
-		m.ExprType.Id = juletype.BOOL
-		m.ExprType.Kind = juletype.TYPE_MAP[m.ExprType.Id]
+		m.ExprType.Id = types.BOOL
+		m.ExprType.Kind = types.TYPE_MAP[m.ExprType.Id]
 	}
 	p.cases(m, m.ExprType)
 	if m.Default != nil {
@@ -3157,7 +3156,7 @@ func (p *Parser) postfix(assign *models.Assign, l, r []value) {
 	if types.IsRef(checkType) {
 		checkType = types.DerefPtrOrRef(checkType)
 	}
-	if types.IsPure(checkType) && juletype.IsNumeric(checkType.Id) {
+	if types.IsPure(checkType) && types.IsNumeric(checkType.Id) {
 		return
 	}
 	p.pusherrtok(assign.Setter, "operator_not_for_juletype", assign.Setter.Kind, left.data.Type.Kind)
@@ -3394,9 +3393,9 @@ func (p *Parser) checkValidityForAutoType(expr_t Type, errtok lex.Token) {
 		return
 	}
 	switch expr_t.Id {
-	case juletype.NIL:
+	case types.NIL:
 		p.pusherrtok(errtok, "nil_for_autotype")
-	case juletype.VOID:
+	case types.VOID:
 		p.pusherrtok(errtok, "void_for_autotype")
 	}
 }
@@ -3428,7 +3427,7 @@ func (p *Parser) typeSourceIsAlias(dt Type, alias *TypeAlias, err bool) (Type, b
 }
 
 func (p *Parser) typeSourceIsEnum(e *Enum, tag any) (dt Type, _ bool) {
-	dt.Id = juletype.ENUM
+	dt.Id = types.ENUM
 	dt.Kind = e.Id
 	dt.Tag = e
 	dt.Token = e.Token
@@ -3500,7 +3499,7 @@ func (p *Parser) typeSourceIsStruct(s *Struct, st Type) (dt Type, _ bool) {
 		p.pusherrtok(st.Token, "has_generics")
 	}
 end:
-	dt.Id = juletype.STRUCT
+	dt.Id = types.STRUCT
 	dt.Kind = s.AsTypeKind()
 	dt.Tag = s
 	dt.Token = s.Token
@@ -3512,7 +3511,7 @@ func (p *Parser) typeSourceIsTrait(trait_def *models.Trait, tag any, errTok lex.
 		p.pusherrtok(errTok, "invalid_type_source")
 	}
 	trait_def.Used = true
-	dt.Id = juletype.TRAIT
+	dt.Id = types.TRAIT
 	dt.Kind = trait_def.Id
 	dt.Tag = trait_def
 	dt.Token = trait_def.Token
@@ -3564,7 +3563,7 @@ func (p *Parser) typeSourceIsArrayType(arr_t *Type) (ok bool) {
 	}
 	assign_checker{
 		p:      p,
-		expr_t:      Type{Id: juletype.UINT, Kind: juletype.TYPE_MAP[juletype.UINT]},
+		expr_t:      Type{Id: types.UINT, Kind: types.TYPE_MAP[types.UINT]},
 		v:      val,
 		errtok: arr_t.Size.Expr.Tokens[0],
 	}.check()
@@ -3592,7 +3591,7 @@ func (p *Parser) check_type_validity(expr_t Type, errtok lex.Token) {
 		p.pusherrtok(errtok, "invalid_type")
 		return
 	}
-	if expr_t.Id == juletype.UNSAFE {
+	if expr_t.Id == types.UNSAFE {
 		n := len(expr_t.Kind) - len(lex.KND_UNSAFE) - 1
 		if n < 0 || expr_t.Kind[n] != '*' {
 			p.pusherrtok(errtok, "invalid_type")
@@ -3641,22 +3640,22 @@ func (p *Parser) typeSource(dt Type, err bool) (ret Type, ok bool) {
 	switch {
 	case dt.MultiTyped:
 		return p.typeSourceOfMultiTyped(dt, err)
-	case dt.Id == juletype.MAP:
+	case dt.Id == types.MAP:
 		return p.typeSourceIsMap(dt, err)
-	case dt.Id == juletype.ARRAY:
+	case dt.Id == types.ARRAY:
 		ok = p.typeSourceIsArrayType(&dt)
 		return dt, ok
-	case dt.Id == juletype.SLICE:
+	case dt.Id == types.SLICE:
 		ok = p.typeSourceIsSliceType(&dt)
 		return dt, ok
 	}
 	switch dt.Id {
-	case juletype.STRUCT:
+	case types.STRUCT:
 		_, prefix := dt.KindId()
 		ret, ok = p.typeSourceIsStruct(dt.Tag.(*Struct), dt)
 		ret.Kind = prefix + ret.Kind
 		return
-	case juletype.ID:
+	case types.ID:
 		id, prefix := dt.KindId()
 		defer func() { ret.Kind = prefix + ret.Kind }()
 		def := p.get_define(id, dt.CppLinked)
@@ -3684,7 +3683,7 @@ func (p *Parser) typeSource(dt Type, err bool) (ret Type, ok bool) {
 			}
 			return dt, false
 		}
-	case juletype.FN:
+	case types.FN:
 		return p.typeSourceIsFn(dt, err)
 	}
 	return dt, true
@@ -3723,7 +3722,7 @@ func (p *Parser) check_type(real, check Type, ignoreAny, allow_assign bool, errT
 		p.eval.pusherrtok(errTok, "incompatible_types", real.Kind, check.Kind)
 		return
 	}
-	if !ignoreAny && real.Id == juletype.ANY {
+	if !ignoreAny && real.Id == types.ANY {
 		return
 	}
 	if real.MultiTyped || check.MultiTyped {

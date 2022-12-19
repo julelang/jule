@@ -5,8 +5,118 @@ import (
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/pkg/jule"
-	"github.com/julelang/jule/pkg/juletype"
 )
+
+// I8CompatibleWith reports i8 is compatible or not with data-type specified type.
+func I8CompatibleWith(t uint8) bool {
+	t = GetRealCode(t)
+	return t == I8
+}
+
+// I16CompatibleWith reports i16 is compatible or not with data-type specified type.
+func I16CompatibleWith(t uint8) bool {
+	t = GetRealCode(t)
+	return t == I8 || t == I16 || t == U8
+}
+
+// I32CompatibleWith reports i32 is compatible or not with data-type specified type.
+func I32CompatibleWith(t uint8) bool {
+	t = GetRealCode(t)
+	return t == I8 || t == I16 || t == I32 || t == U8 || t == U16
+}
+
+// I64CompatibleWith reports i64 is compatible or not with data-type specified type.
+func I64CompatibleWith(t uint8) bool {
+	t = GetRealCode(t)
+	switch t {
+	case I8, I16, I32, I64, U8, U16, U32:
+		return true
+	default:
+		return false
+	}
+}
+
+// U8CompatibleWith reports u8 is compatible or not with data-type specified type.
+func U8CompatibleWith(t uint8) bool {
+	t = GetRealCode(t)
+	return t == U8
+}
+
+// U16CompatibleWith reports u16 is compatible or not with data-type specified type.
+func U16CompatibleWith(t uint8) bool {
+	t = GetRealCode(t)
+	return t == U8 || t == U16
+}
+
+// U32CompatibleWith reports u32 is compatible or not with data-type specified type.
+func U32CompatibleWith(t uint8) bool {
+	t = GetRealCode(t)
+	return t == U8 || t == U16 || t == U32
+}
+
+// U16CompatibleWith reports u64 is compatible or not with data-type specified type.
+func U64CompatibleWith(t uint8) bool {
+	t = GetRealCode(t)
+	return t == U8 || t == U16 || t == U32 || t == U64
+}
+
+// F32CompatibleWith reports f32 is compatible or not with data-type specified type.
+func F32CompatibleWith(t uint8) bool {
+	t = GetRealCode(t)
+	switch t {
+	case F32, I8, I16, I32, I64, U8, U16, U32, U64:
+		return true
+	default:
+		return false
+	}
+}
+
+// F64CompatibleWith reports f64 is compatible or not with data-type specified type.
+func F64CompatibleWith(t uint8) bool {
+	t = GetRealCode(t)
+	switch t {
+	case F64, F32, I8, I16, I32, I64, U8, U16, U32, U64:
+		return true
+	default:
+		return false
+	}
+}
+
+// TypeAreCompatible reports type one and type two is compatible or not.
+func TypesAreCompatible(t1, t2 uint8, ignoreany bool) bool {
+	t1 = GetRealCode(t1)
+	switch t1 {
+	case ANY:
+		return !ignoreany
+	case I8:
+		return I8CompatibleWith(t2)
+	case I16:
+		return I16CompatibleWith(t2)
+	case I32:
+		return I32CompatibleWith(t2)
+	case I64:
+		return I64CompatibleWith(t2)
+	case U8:
+		return U8CompatibleWith(t2)
+	case U16:
+		return U16CompatibleWith(t2)
+	case U32:
+		return U32CompatibleWith(t2)
+	case U64:
+		return U64CompatibleWith(t2)
+	case BOOL:
+		return t2 == BOOL
+	case STR:
+		return t2 == STR
+	case F32:
+		return F32CompatibleWith(t2)
+	case F64:
+		return F64CompatibleWith(t2)
+	case NIL:
+		return t2 == NIL
+	}
+	return false
+}
 
 // Checker is type checker.
 type Checker struct {
@@ -41,7 +151,7 @@ func (c *Checker) check_ref() bool {
 }
 
 func (c *Checker) check_ptr() bool {
-	if c.R.Id == juletype.NIL {
+	if c.R.Id == NIL {
 		return true
 	} else if IsUnsafePtr(c.L) {
 		return true
@@ -59,7 +169,7 @@ func trait_has_reference_receiver(t *models.Trait) bool {
 }
 
 func (c *Checker) check_trait() bool {
-	if c.R.Id == juletype.NIL {
+	if c.R.Id == NIL {
 		return true
 	}
 	t := c.L.Tag.(*models.Trait)
@@ -124,7 +234,7 @@ func (c *Checker) check_struct() bool {
 }
 
 func (c *Checker) check_slice() bool {
-	if c.R.Id == juletype.NIL {
+	if c.R.Id == NIL {
 		return true
 	}
 	return c.L.Kind == c.R.Kind
@@ -138,7 +248,7 @@ func (c *Checker) check_array() bool {
 }
 
 func (c *Checker) check_map() bool {
-	if c.R.Id == juletype.NIL {
+	if c.R.Id == NIL {
 		return true
 	}
 	return c.L.Kind == c.R.Kind
@@ -178,16 +288,16 @@ func (c *Checker) Check() bool {
 		}
 		return c.check_map()
 	case IsNilCompatible(c.L):
-		return c.R.Id == juletype.NIL
+		return c.R.Id == NIL
 	case IsNilCompatible(c.R):
-		return c.L.Id == juletype.NIL
+		return c.L.Id == NIL
 	case IsEnum(c.L), IsEnum(c.R):
 		return c.L.Id == c.R.Id && c.L.Kind == c.R.Kind
 	case IsStruct(c.L), IsStruct(c.R):
-		if c.R.Id == juletype.STRUCT {
+		if c.R.Id == STRUCT {
 			c.L, c.R = c.R, c.L
 		}
 		return c.check_struct()
 	}
-	return juletype.TypesAreCompatible(c.L.Id, c.R.Id, c.IgnoreAny)
+	return TypesAreCompatible(c.L.Id, c.R.Id, c.IgnoreAny)
 }

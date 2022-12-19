@@ -10,7 +10,6 @@ import (
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/pkg/jule"
 	"github.com/julelang/jule/pkg/juleapi"
-	"github.com/julelang/jule/pkg/juletype"
 	"github.com/julelang/jule/types"
 )
 
@@ -383,9 +382,9 @@ func (map_setter) next_steps(key_a *models.Var, key_b *models.Var, begin string)
 
 func gen_iter_foreach(f *models.IterForeach, i *models.Iter) string {
 	switch f.ExprType.Id {
-	case juletype.STR, juletype.SLICE, juletype.ARRAY:
+	case types.STR, types.SLICE, types.ARRAY:
 		return gen_foreach_iter(f, i, index_setter{})
-	case juletype.MAP:
+	case types.MAP:
 		return gen_foreach_iter(f, i, map_setter{})
 	}
 	return ""

@@ -7,7 +7,6 @@ import (
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/pkg/jule"
-	"github.com/julelang/jule/pkg/juletype"
 	"github.com/julelang/jule/types"
 )
 
@@ -32,20 +31,20 @@ var i8statics = &models.Defmap{
 			Pub:     true,
 			Const:   true,
 			Id:      "max",
-			Type:    Type{Id: juletype.I8, Kind: juletype.TYPE_MAP[juletype.I8]},
+			Type:    Type{Id: types.I8, Kind: types.TYPE_MAP[types.I8]},
 			ExprTag: int64(maxI8),
 			Expr: models.Expr{
-				Model: exprNode{juletype.CppId(juletype.I8) + "{" + strconv.FormatInt(maxI8, 10) + "}"},
+				Model: exprNode{types.CppId(types.I8) + "{" + strconv.FormatInt(maxI8, 10) + "}"},
 			},
 		},
 		{
 			Pub:     true,
 			Const:   true,
 			Id:      "min",
-			Type:    Type{Id: juletype.I8, Kind: juletype.TYPE_MAP[juletype.I8]},
+			Type:    Type{Id: types.I8, Kind: types.TYPE_MAP[types.I8]},
 			ExprTag: int64(minI8),
 			Expr: models.Expr{
-				Model: exprNode{juletype.CppId(juletype.I8) + "{" + strconv.FormatInt(minI8, 10) + "}"},
+				Model: exprNode{types.CppId(types.I8) + "{" + strconv.FormatInt(minI8, 10) + "}"},
 			},
 		},
 	},
@@ -57,20 +56,20 @@ var i16statics = &models.Defmap{
 			Pub:     true,
 			Const:   true,
 			Id:      "max",
-			Type:    Type{Id: juletype.I16, Kind: juletype.TYPE_MAP[juletype.I16]},
+			Type:    Type{Id: types.I16, Kind: types.TYPE_MAP[types.I16]},
 			ExprTag: int64(maxI16),
 			Expr: models.Expr{
-				Model: exprNode{juletype.CppId(juletype.I16) + "{" + strconv.FormatInt(maxI16, 10) + "}"},
+				Model: exprNode{types.CppId(types.I16) + "{" + strconv.FormatInt(maxI16, 10) + "}"},
 			},
 		},
 		{
 			Pub:     true,
 			Const:   true,
 			Id:      "min",
-			Type:    Type{Id: juletype.I16, Kind: juletype.TYPE_MAP[juletype.I16]},
+			Type:    Type{Id: types.I16, Kind: types.TYPE_MAP[types.I16]},
 			ExprTag: int64(minI16),
 			Expr: models.Expr{
-				Model: exprNode{juletype.CppId(juletype.I16) + "{" + strconv.FormatInt(minI16, 10) + "}"},
+				Model: exprNode{types.CppId(types.I16) + "{" + strconv.FormatInt(minI16, 10) + "}"},
 			},
 		},
 	},
@@ -82,20 +81,20 @@ var i32statics = &models.Defmap{
 			Pub:     true,
 			Const:   true,
 			Id:      "max",
-			Type:    Type{Id: juletype.I32, Kind: juletype.TYPE_MAP[juletype.I32]},
+			Type:    Type{Id: types.I32, Kind: types.TYPE_MAP[types.I32]},
 			ExprTag: int64(maxI32),
 			Expr: models.Expr{
-				Model: exprNode{juletype.CppId(juletype.I32) + "{" + strconv.FormatInt(maxI32, 10) + "}"},
+				Model: exprNode{types.CppId(types.I32) + "{" + strconv.FormatInt(maxI32, 10) + "}"},
 			},
 		},
 		{
 			Pub:     true,
 			Const:   true,
 			Id:      "min",
-			Type:    Type{Id: juletype.I32, Kind: juletype.TYPE_MAP[juletype.I32]},
+			Type:    Type{Id: types.I32, Kind: types.TYPE_MAP[types.I32]},
 			ExprTag: int64(minI32),
 			Expr: models.Expr{
-				Model: exprNode{juletype.CppId(juletype.I32) + "{" + strconv.FormatInt(minI32, 10) + "}"},
+				Model: exprNode{types.CppId(types.I32) + "{" + strconv.FormatInt(minI32, 10) + "}"},
 			},
 		},
 	},
@@ -107,20 +106,20 @@ var i64statics = &models.Defmap{
 			Pub:     true,
 			Const:   true,
 			Id:      "max",
-			Type:    Type{Id: juletype.I64, Kind: juletype.TYPE_MAP[juletype.I64]},
+			Type:    Type{Id: types.I64, Kind: types.TYPE_MAP[types.I64]},
 			ExprTag: int64(maxI64),
 			Expr: models.Expr{
-				Model: exprNode{juletype.CppId(juletype.I64) + "{" + strconv.FormatInt(maxI64, 10) + "LL}"},
+				Model: exprNode{types.CppId(types.I64) + "{" + strconv.FormatInt(maxI64, 10) + "LL}"},
 			},
 		},
 		{
 			Pub:     true,
 			Const:   true,
 			Id:      "min",
-			Type:    Type{Id: juletype.I64, Kind: juletype.TYPE_MAP[juletype.I64]},
+			Type:    Type{Id: types.I64, Kind: types.TYPE_MAP[types.I64]},
 			ExprTag: int64(minI64),
 			Expr: models.Expr{
-				Model: exprNode{juletype.CppId(juletype.I64) + "{" + strconv.FormatInt(minI64, 10) + "LL}"},
+				Model: exprNode{types.CppId(types.I64) + "{" + strconv.FormatInt(minI64, 10) + "LL}"},
 			},
 		},
 	},
@@ -132,10 +131,10 @@ var u8statics = &models.Defmap{
 			Pub:     true,
 			Const:   true,
 			Id:      "max",
-			Type:    Type{Id: juletype.U8, Kind: juletype.TYPE_MAP[juletype.U8]},
+			Type:    Type{Id: types.U8, Kind: types.TYPE_MAP[types.U8]},
 			ExprTag: uint64(maxU8),
 			Expr: models.Expr{
-				Model: exprNode{juletype.CppId(juletype.U8) + "{" + strconv.FormatUint(maxU8, 10) + "}"},
+				Model: exprNode{types.CppId(types.U8) + "{" + strconv.FormatUint(maxU8, 10) + "}"},
 			},
 		},
 	},
@@ -147,10 +146,10 @@ var u16statics = &models.Defmap{
 			Pub:     true,
 			Const:   true,
 			Id:      "max",
-			Type:    Type{Id: juletype.U16, Kind: juletype.TYPE_MAP[juletype.U16]},
+			Type:    Type{Id: types.U16, Kind: types.TYPE_MAP[types.U16]},
 			ExprTag: uint64(maxU16),
 			Expr: models.Expr{
-				Model: exprNode{juletype.CppId(juletype.U16) + "{" + strconv.FormatUint(maxU16, 10) + "}"},
+				Model: exprNode{types.CppId(types.U16) + "{" + strconv.FormatUint(maxU16, 10) + "}"},
 			},
 		},
 	},
@@ -162,10 +161,10 @@ var u32statics = &models.Defmap{
 			Pub:     true,
 			Const:   true,
 			Id:      "max",
-			Type:    Type{Id: juletype.U32, Kind: juletype.TYPE_MAP[juletype.U32]},
+			Type:    Type{Id: types.U32, Kind: types.TYPE_MAP[types.U32]},
 			ExprTag: uint64(maxU32),
 			Expr: models.Expr{
-				Model: exprNode{juletype.CppId(juletype.U32) + "{" + strconv.FormatUint(maxU32, 10) + "}"},
+				Model: exprNode{types.CppId(types.U32) + "{" + strconv.FormatUint(maxU32, 10) + "}"},
 			},
 		},
 	},
@@ -177,10 +176,10 @@ var u64statics = &models.Defmap{
 			Pub:     true,
 			Const:   true,
 			Id:      "max",
-			Type:    Type{Id: juletype.U64, Kind: juletype.TYPE_MAP[juletype.U64]},
+			Type:    Type{Id: types.U64, Kind: types.TYPE_MAP[types.U64]},
 			ExprTag: uint64(maxU64),
 			Expr: models.Expr{
-				Model: exprNode{juletype.CppId(juletype.U64) + "{" + strconv.FormatUint(maxU64, 10) + "ULL}"},
+				Model: exprNode{types.CppId(types.U64) + "{" + strconv.FormatUint(maxU64, 10) + "ULL}"},
 			},
 		},
 	},
@@ -192,7 +191,7 @@ var uintStatics = &models.Defmap{
 			Pub:   true,
 			Const: true,
 			Id:    "max",
-			Type:  Type{Id: juletype.UINT, Kind: juletype.TYPE_MAP[juletype.UINT]},
+			Type:  Type{Id: types.UINT, Kind: types.TYPE_MAP[types.UINT]},
 		},
 	},
 }
@@ -202,12 +201,12 @@ var intStatics = &models.Defmap{
 		{
 			Const: true,
 			Id:    "max",
-			Type:  Type{Id: juletype.INT, Kind: juletype.TYPE_MAP[juletype.INT]},
+			Type:  Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
 		},
 		{
 			Const: true,
 			Id:    "min",
-			Type:  Type{Id: juletype.INT, Kind: juletype.TYPE_MAP[juletype.INT]},
+			Type:  Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
 		},
 	},
 }
@@ -215,7 +214,7 @@ var intStatics = &models.Defmap{
 const maxF32 = 0x1p127 * (1 + (1 - 0x1p-23))
 const minF32 = 1.17549435082228750796873653722224568e-38
 
-var min_modelF32 = exprNode{juletype.CppId(juletype.F32) + "{1.17549435082228750796873653722224568e-38F}"}
+var min_modelF32 = exprNode{types.CppId(types.F32) + "{1.17549435082228750796873653722224568e-38F}"}
 
 var f32statics = &models.Defmap{
 	Globals: []*Var{
@@ -223,7 +222,7 @@ var f32statics = &models.Defmap{
 			Pub:     true,
 			Const:   true,
 			Id:      "max",
-			Type:    Type{Id: juletype.F32, Kind: juletype.TYPE_MAP[juletype.F32]},
+			Type:    Type{Id: types.F32, Kind: types.TYPE_MAP[types.F32]},
 			ExprTag: float64(maxF32),
 			Expr:    models.Expr{Model: exprNode{strconv.FormatFloat(maxF32, 'e', -1, 32) + "F"}},
 		},
@@ -231,7 +230,7 @@ var f32statics = &models.Defmap{
 			Pub:     true,
 			Const:   true,
 			Id:      "min",
-			Type:    Type{Id: juletype.F32, Kind: juletype.TYPE_MAP[juletype.F32]},
+			Type:    Type{Id: types.F32, Kind: types.TYPE_MAP[types.F32]},
 			ExprTag: float64(minF32),
 			Expr:    models.Expr{Model: min_modelF32},
 		},
@@ -241,7 +240,7 @@ var f32statics = &models.Defmap{
 const maxF64 = 0x1p1023 * (1 + (1 - 0x1p-52))
 const minF64 = 2.22507385850720138309023271733240406e-308
 
-var min_modelF64 = exprNode{juletype.CppId(juletype.F64) + "{2.22507385850720138309023271733240406e-308}"}
+var min_modelF64 = exprNode{types.CppId(types.F64) + "{2.22507385850720138309023271733240406e-308}"}
 
 var f64statics = &models.Defmap{
 	Globals: []*Var{
@@ -249,7 +248,7 @@ var f64statics = &models.Defmap{
 			Pub:     true,
 			Const:   true,
 			Id:      "max",
-			Type:    Type{Id: juletype.F64, Kind: juletype.TYPE_MAP[juletype.F64]},
+			Type:    Type{Id: types.F64, Kind: types.TYPE_MAP[types.F64]},
 			ExprTag: float64(maxF64),
 			Expr:    models.Expr{Model: exprNode{strconv.FormatFloat(maxF64, 'e', -1, 64)}},
 		},
@@ -257,7 +256,7 @@ var f64statics = &models.Defmap{
 			Pub:     true,
 			Const:   true,
 			Id:      "min",
-			Type:    Type{Id: juletype.F64, Kind: juletype.TYPE_MAP[juletype.F64]},
+			Type:    Type{Id: types.F64, Kind: types.TYPE_MAP[types.F64]},
 			ExprTag: float64(minF64),
 			Expr:    models.Expr{Model: min_modelF64},
 		},
@@ -267,8 +266,8 @@ var f64statics = &models.Defmap{
 var strDefaultFunc = Fn{
 	Pub:     true,
 	Id:      "str",
-	Params:  []Param{{Id: "obj", Type: Type{Id: juletype.ANY, Kind: juletype.TYPE_MAP[juletype.ANY]}}},
-	RetType: RetType{Type: Type{Id: juletype.STR, Kind: juletype.TYPE_MAP[juletype.STR]}},
+	Params:  []Param{{Id: "obj", Type: Type{Id: types.ANY, Kind: types.TYPE_MAP[types.ANY]}}},
+	RetType: RetType{Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}},
 }
 
 var errorTrait = &models.Trait{
@@ -279,7 +278,7 @@ var errorTrait = &models.Trait{
 				Pub:     true,
 				Id:      "error",
 				RetType: models.RetType{
-					Type: Type{Id: juletype.STR, Kind: juletype.TYPE_MAP[juletype.STR]},
+					Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]},
 				},
 			},
 		},
@@ -287,7 +286,7 @@ var errorTrait = &models.Trait{
 }
 
 var errorType = Type{
-	Id:   juletype.TRAIT,
+	Id:   types.TRAIT,
 	Kind: errorTrait.Id,
 	Tag:  errorTrait,
 	Pure: true,
@@ -299,7 +298,7 @@ var panicFunc = &Fn{
 	Params: []models.Param{
 		{
 			Id:   "error",
-			Type: Type{Id: juletype.ANY, Kind: juletype.TYPE_MAP[juletype.ANY]},
+			Type: Type{Id: types.ANY, Kind: types.TYPE_MAP[types.ANY]},
 		},
 	},
 }
@@ -314,8 +313,8 @@ var errorHandlerFunc = &Fn{
 	},
 	RetType: models.RetType{
 		Type: models.Type{
-			Id:   juletype.VOID,
-			Kind: juletype.TYPE_MAP[juletype.VOID],
+			Id:   types.VOID,
+			Kind: types.TYPE_MAP[types.VOID],
 		},
 	},
 }
@@ -327,7 +326,7 @@ var recoverFunc = &Fn{
 		{
 			Id: "handler",
 			Type: models.Type{
-				Id:   juletype.FN,
+				Id:   types.FN,
 				Kind: errorHandlerFunc.TypeKind(),
 				Tag:  errorHandlerFunc,
 			},
@@ -339,11 +338,11 @@ var out_fn = &Fn{
 	Pub: true,
 	Id:  "out",
 	RetType: RetType{
-		Type: Type{Id: juletype.VOID, Kind: juletype.TYPE_MAP[juletype.VOID]},
+		Type: Type{Id: types.VOID, Kind: types.TYPE_MAP[types.VOID]},
 	},
 	Params: []Param{{
 		Id:   "expr",
-		Type: Type{Id: juletype.ANY, Kind: juletype.TYPE_MAP[juletype.ANY]},
+		Type: Type{Id: types.ANY, Kind: types.TYPE_MAP[types.ANY]},
 	}},
 }
 
@@ -363,12 +362,12 @@ var Builtin = &models.Defmap{
 		{
 			Pub:  true,
 			Id:   "byte",
-			Type: Type{Id: juletype.U8, Kind: juletype.TYPE_MAP[juletype.U8]},
+			Type: Type{Id: types.U8, Kind: types.TYPE_MAP[types.U8]},
 		},
 		{
 			Pub:  true,
 			Id:   "rune",
-			Type: Type{Id: juletype.I32, Kind: juletype.TYPE_MAP[juletype.I32]},
+			Type: Type{Id: types.I32, Kind: types.TYPE_MAP[types.I32]},
 		},
 	},
 	Fns: []*Fn{
@@ -386,23 +385,23 @@ var Builtin = &models.Defmap{
 			Id:       "copy",
 			Owner:    builtinFile,
 			Generics: []*GenericType{{Id: "Item"}},
-			RetType:  models.RetType{Type: Type{Id: juletype.INT, Kind: juletype.TYPE_MAP[juletype.INT]}},
+			RetType:  models.RetType{Type: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]}},
 			Params: []models.Param{
 				{
 					Mutable: true,
 					Id:      "dest",
 					Type: Type{
-						Id:            juletype.SLICE,
+						Id:            types.SLICE,
 						Kind:          jule.PREFIX_SLICE + "Item",
-						ComponentType: &Type{Id: juletype.ID, Kind: "Item"},
+						ComponentType: &Type{Id: types.ID, Kind: "Item"},
 					},
 				},
 				{
 					Id: "src",
 					Type: Type{
-						Id:            juletype.SLICE,
+						Id:            types.SLICE,
 						Kind:          jule.PREFIX_SLICE + "Item",
-						ComponentType: &Type{Id: juletype.ID, Kind: "Item"},
+						ComponentType: &Type{Id: types.ID, Kind: "Item"},
 					},
 				},
 			},
@@ -414,23 +413,23 @@ var Builtin = &models.Defmap{
 			Generics: []*GenericType{{Id: "Item"}},
 			RetType: models.RetType{
 				Type: Type{
-					Id:            juletype.SLICE,
+					Id:            types.SLICE,
 					Kind:          jule.PREFIX_SLICE + "Item",
-					ComponentType: &Type{Id: juletype.ID, Kind: "Item"},
+					ComponentType: &Type{Id: types.ID, Kind: "Item"},
 				},
 			},
 			Params: []models.Param{
 				{
 					Id: "src",
 					Type: Type{
-						Id:            juletype.SLICE,
+						Id:            types.SLICE,
 						Kind:          jule.PREFIX_SLICE + "Item",
-						ComponentType: &Type{Id: juletype.ID, Kind: "Item"},
+						ComponentType: &Type{Id: types.ID, Kind: "Item"},
 					},
 				},
 				{
 					Id:       "components",
-					Type:     Type{Id: juletype.ID, Kind: "Item"},
+					Type:     Type{Id: types.ID, Kind: "Item"},
 					Variadic: true,
 				},
 			},
@@ -446,7 +445,7 @@ var strDefines = &models.Defmap{
 		{
 			Pub:  true,
 			Id:   "len",
-			Type: Type{Id: juletype.INT, Kind: juletype.TYPE_MAP[juletype.INT]},
+			Type: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
 			Tag:  "len()",
 		},
 	},
@@ -454,70 +453,70 @@ var strDefines = &models.Defmap{
 		{
 			Pub:     true,
 			Id:      "empty",
-			RetType: RetType{Type: Type{Id: juletype.BOOL, Kind: juletype.TYPE_MAP[juletype.BOOL]}},
+			RetType: RetType{Type: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
 		},
 		{
 			Pub:     true,
 			Id:      "has_prefix",
-			Params:  []Param{{Id: "sub", Type: Type{Id: juletype.STR, Kind: juletype.TYPE_MAP[juletype.STR]}}},
-			RetType: RetType{Type: Type{Id: juletype.BOOL, Kind: juletype.TYPE_MAP[juletype.BOOL]}},
+			Params:  []Param{{Id: "sub", Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}}},
+			RetType: RetType{Type: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
 		},
 		{
 			Pub:     true,
 			Id:      "has_suffix",
-			Params:  []Param{{Id: "sub", Type: Type{Id: juletype.STR, Kind: juletype.TYPE_MAP[juletype.STR]}}},
-			RetType: RetType{Type: Type{Id: juletype.BOOL, Kind: juletype.TYPE_MAP[juletype.BOOL]}},
+			Params:  []Param{{Id: "sub", Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}}},
+			RetType: RetType{Type: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
 		},
 		{
 			Pub:     true,
 			Id:      "find",
-			Params:  []Param{{Id: "sub", Type: Type{Id: juletype.STR, Kind: juletype.TYPE_MAP[juletype.STR]}}},
-			RetType: RetType{Type: Type{Id: juletype.INT, Kind: juletype.TYPE_MAP[juletype.INT]}},
+			Params:  []Param{{Id: "sub", Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}}},
+			RetType: RetType{Type: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]}},
 		},
 		{
 			Pub:     true,
 			Id:      "rfind",
-			Params:  []Param{{Id: "sub", Type: Type{Id: juletype.STR, Kind: juletype.TYPE_MAP[juletype.STR]}}},
-			RetType: RetType{Type: Type{Id: juletype.INT, Kind: juletype.TYPE_MAP[juletype.INT]}},
+			Params:  []Param{{Id: "sub", Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}}},
+			RetType: RetType{Type: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]}},
 		},
 		{
 			Pub:     true,
 			Id:      "trim",
-			Params:  []Param{{Id: "bytes", Type: Type{Id: juletype.STR, Kind: juletype.TYPE_MAP[juletype.STR]}}},
+			Params:  []Param{{Id: "bytes", Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}}},
 			RetType: RetType{
-				Type: Type{Id: juletype.STR, Kind: juletype.TYPE_MAP[juletype.STR]},
+				Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]},
 			},
 		},
 		{
 			Pub:     true,
 			Id:      "rtrim",
-			Params:  []Param{{Id: "bytes", Type: Type{Id: juletype.STR, Kind: juletype.TYPE_MAP[juletype.STR]}}},
-			RetType: RetType{Type: Type{Id: juletype.STR, Kind: juletype.TYPE_MAP[juletype.STR]}},
+			Params:  []Param{{Id: "bytes", Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}}},
+			RetType: RetType{Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}},
 		},
 		{
 			Pub: true,
 			Id:  "split",
 			Params: []Param{
-				{Id: "sub", Type: Type{Id: juletype.STR, Kind: juletype.TYPE_MAP[juletype.STR]}},
+				{Id: "sub", Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}},
 				{
 					Id:   "n",
-					Type: Type{Id: juletype.INT, Kind: juletype.TYPE_MAP[juletype.INT]},
+					Type: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
 				},
 			},
-			RetType: RetType{Type: Type{Id: juletype.STR, Kind: jule.PREFIX_SLICE + juletype.TYPE_MAP[juletype.STR]}},
+			RetType: RetType{Type: Type{Id: types.STR, Kind: jule.PREFIX_SLICE + types.TYPE_MAP[types.STR]}},
 		},
 		{
 			Pub: true,
 			Id:  "replace",
 			Params: []Param{
-				{Id: "sub", Type: Type{Id: juletype.STR, Kind: juletype.TYPE_MAP[juletype.STR]}},
-				{Id: "new", Type: Type{Id: juletype.STR, Kind: juletype.TYPE_MAP[juletype.STR]}},
+				{Id: "sub", Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}},
+				{Id: "new", Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}},
 				{
 					Id:   "n",
-					Type: Type{Id: juletype.INT, Kind: juletype.TYPE_MAP[juletype.INT]},
+					Type: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
 				},
 			},
-			RetType: RetType{Type: Type{Id: juletype.STR, Kind: juletype.TYPE_MAP[juletype.STR]}},
+			RetType: RetType{Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}},
 		},
 	},
 }
@@ -541,13 +540,13 @@ var sliceDefines = &models.Defmap{
 		{
 			Pub:  true,
 			Id:   "len",
-			Type: Type{Id: juletype.INT, Kind: juletype.TYPE_MAP[juletype.INT]},
+			Type: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
 			Tag:  "len()",
 		},
 		{
 			Pub:  true,
 			Id:   "cap",
-			Type: Type{Id: juletype.INT, Kind: juletype.TYPE_MAP[juletype.INT]},
+			Type: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
 			Tag:  "cap()",
 		},
 	},
@@ -555,7 +554,7 @@ var sliceDefines = &models.Defmap{
 		{
 			Pub:     true,
 			Id:      "empty",
-			RetType: RetType{Type: Type{Id: juletype.BOOL, Kind: juletype.TYPE_MAP[juletype.BOOL]}},
+			RetType: RetType{Type: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
 		},
 	},
 }
@@ -565,7 +564,7 @@ var arrayDefines = &models.Defmap{
 		{
 			Pub:  true,
 			Id:   "len",
-			Type: Type{Id: juletype.INT, Kind: juletype.TYPE_MAP[juletype.INT]},
+			Type: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
 			Tag:  "len()",
 		},
 	},
@@ -573,7 +572,7 @@ var arrayDefines = &models.Defmap{
 		{
 			Pub:     true,
 			Id:      "empty",
-			RetType: RetType{Type: Type{Id: juletype.BOOL, Kind: juletype.TYPE_MAP[juletype.BOOL]}},
+			RetType: RetType{Type: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
 		},
 	},
 }
@@ -583,7 +582,7 @@ var mapDefines = &models.Defmap{
 		{
 			Pub:  true,
 			Id:   "len",
-			Type: Type{Id: juletype.INT, Kind: juletype.TYPE_MAP[juletype.INT]},
+			Type: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
 			Tag:  "len()",
 		},
 	},
@@ -603,13 +602,13 @@ var mapDefines = &models.Defmap{
 		{
 			Pub:     true,
 			Id:      "empty",
-			RetType: RetType{Type: Type{Id: juletype.BOOL, Kind: juletype.TYPE_MAP[juletype.BOOL]}},
+			RetType: RetType{Type: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
 		},
 		{
 			Pub:     true,
 			Id:      "has",
 			Params:  []Param{{Id: "key"}},
-			RetType: RetType{Type: Type{Id: juletype.BOOL, Kind: juletype.TYPE_MAP[juletype.BOOL]}},
+			RetType: RetType{Type: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
 		},
 		{
 			Pub:    true,
@@ -671,7 +670,7 @@ func init() {
 	intMax := intStatics.Globals[0]
 	intMin := intStatics.Globals[1]
 	uintMax := uintStatics.Globals[0]
-	switch juletype.BIT_SIZE {
+	switch types.BIT_SIZE {
 	case 32:
 		intMax.Expr = i32statics.Globals[0].Expr
 		intMax.ExprTag = i32statics.Globals[0].ExprTag
@@ -789,8 +788,8 @@ func caller_mem_size_of(p *Parser, _ *Fn, data callData, m *exprModel) (v value)
 	// Remove parentheses
 	data.args = data.args[1 : len(data.args)-1]
 	v.data.Type = Type{
-		Id:   juletype.UINT,
-		Kind: juletype.TYPE_MAP[juletype.UINT],
+		Id:   types.UINT,
+		Kind: types.TYPE_MAP[types.UINT],
 	}
 	nodes := m.nodes[m.index].nodes
 	node := &nodes[len(nodes)-1]
@@ -817,8 +816,8 @@ func caller_mem_align_of(p *Parser, _ *Fn, data callData, m *exprModel) (v value
 	// Remove parentheses
 	data.args = data.args[1 : len(data.args)-1]
 	v.data.Type = Type{
-		Id:   juletype.UINT,
-		Kind: juletype.TYPE_MAP[juletype.UINT],
+		Id:   types.UINT,
+		Kind: types.TYPE_MAP[types.UINT],
 	}
 	nodes := m.nodes[m.index].nodes
 	node := &nodes[len(nodes)-1]

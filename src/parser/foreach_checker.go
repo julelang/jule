@@ -3,7 +3,6 @@ package parser
 import (
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/pkg/juleapi"
-	"github.com/julelang/jule/pkg/juletype"
 	"github.com/julelang/jule/types"
 )
 
@@ -49,8 +48,8 @@ func (fc *foreachChecker) checkKeyASize() {
 		return
 	}
 	a := &fc.profile.KeyA
-	a.Type.Id = juletype.INT
-	a.Type.Kind = juletype.TYPE_MAP[a.Type.Id]
+	a.Type.Id = types.INT
+	a.Type.Kind = types.TYPE_MAP[a.Type.Id]
 }
 
 func (fc *foreachChecker) checkKeyAMapKey() {
@@ -83,8 +82,8 @@ func (fc *foreachChecker) str() {
 		return
 	}
 	runeType := Type{
-		Id:   juletype.U8,
-		Kind: juletype.TYPE_MAP[juletype.U8],
+		Id:   types.U8,
+		Kind: types.TYPE_MAP[types.U8],
 	}
 	b := &fc.profile.KeyB
 	b.Type = runeType
@@ -98,7 +97,7 @@ func (fc *foreachChecker) check() {
 		fc.array()
 	case types.IsMap(fc.val.data.Type):
 		fc.hashmap()
-	case fc.val.data.Type.Id == juletype.STR:
+	case fc.val.data.Type.Id == types.STR:
 		fc.str()
 	}
 }

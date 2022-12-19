@@ -5,7 +5,6 @@ import (
 
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/pkg/juleapi"
-	"github.com/julelang/jule/pkg/juletype"
 )
 
 // Fn is function declaration AST model.
@@ -58,7 +57,7 @@ func (f *Fn) plainTypeString() string {
 			s.WriteByte(',')
 		}
 		return s.String()[:s.Len()-1] + ")"
-	} else if f.RetType.Type.Id != juletype.VOID {
+	} else if f.RetType.Type.Id != void_t {
 		s.WriteString(f.RetType.Type.Kind)
 	}
 	return s.String()

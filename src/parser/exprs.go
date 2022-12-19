@@ -6,14 +6,13 @@ import (
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
-	"github.com/julelang/jule/pkg/juletype"
 )
 
 func check_value_for_indexing(v value) (err_key string) {
 	switch {
 	case !types.IsPure(v.data.Type):
 		return "invalid_expr"
-	case !juletype.IsInteger(v.data.Type.Id):
+	case !types.IsInteger(v.data.Type.Id):
 		return "invalid_expr"
 	case v.constExpr && tonums(v.expr) < 0:
 		return "overflow_limits"
@@ -28,7 +27,7 @@ func indexingExprModel(i iExpr) iExpr {
 	}
 	var model strings.Builder
 	model.WriteString("static_cast<")
-	model.WriteString(juletype.CppId(juletype.INT))
+	model.WriteString(types.CppId(types.INT))
 	model.WriteString(">(")
 	model.WriteString(i.String())
 	model.WriteByte(')')
@@ -40,7 +39,7 @@ func valIsEnumType(v value) bool {
 }
 
 func isBoolExpr(v value) bool {
-	return types.IsPure(v.data.Type) && v.data.Type.Id == juletype.BOOL
+	return types.IsPure(v.data.Type) && v.data.Type.Id == types.BOOL
 }
 
 func canGetPtr(v value) bool {
@@ -48,7 +47,7 @@ func canGetPtr(v value) bool {
 		return false
 	}
 	switch v.data.Type.Id {
-	case juletype.FN, juletype.ENUM:
+	case types.FN, types.ENUM:
 		return false
 	default:
 		return v.data.Token.Id == lex.ID_IDENT
@@ -73,7 +72,7 @@ func isForeachIterExpr(val value) bool {
 		return false
 	}
 	code := val.data.Type.Id
-	return code == juletype.STR
+	return code == types.STR
 }
 
 func checkFloatBit(v models.Data, bit int) bool {
@@ -89,7 +88,7 @@ func validExprForConst(v value) bool {
 
 func okForShifting(v value) bool {
 	if !types.IsPure(v.data.Type) ||
-		!juletype.IsInteger(v.data.Type.Id) {
+		!types.IsInteger(v.data.Type.Id) {
 		return false
 	}
 	if !v.constExpr {

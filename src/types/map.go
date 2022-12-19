@@ -1,4 +1,4 @@
-package juletype
+package types
 
 import "github.com/julelang/jule/lex"
 

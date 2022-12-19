@@ -1,9 +1,6 @@
 package models
 
-import (
-	"github.com/julelang/jule/lex"
-	"github.com/julelang/jule/pkg/juletype"
-)
+import "github.com/julelang/jule/lex"
 
 func IsAccessable(finder *lex.File, target *lex.File, defIsPub bool) bool {
 	return defIsPub || finder == nil || target == nil || finder.Dir() == target.Dir()
@@ -159,7 +156,7 @@ func (dm *Defmap) FnById(id string, f *lex.File) (*Fn, *Defmap, bool) {
 
 func (dm *Defmap) FindGlobalById(id string, f *lex.File) (int, *Defmap, bool) {
 	for i, g := range dm.Globals {
-		if g != nil && g.Type.Id != juletype.VOID && g.Id == id {
+		if g != nil && g.Type.Id != void_t && g.Id == id {
 			if IsAccessable(f, g.Token.File, g.Pub) {
 				return i, dm, false
 			}

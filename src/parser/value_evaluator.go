@@ -9,7 +9,6 @@ import (
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/pkg/juleapi"
-	"github.com/julelang/jule/pkg/juletype"
 	"github.com/julelang/jule/types"
 )
 
@@ -57,9 +56,9 @@ func numericModel(v value) iExpr {
 		switch {
 		case normalize(&v):
 			return numericModel(v)
-		case v.data.Type.Id == juletype.F32:
+		case v.data.Type.Id == types.F32:
 			return exprNode{fmt.Sprint(t) + "f"}
-		case v.data.Type.Id == juletype.F64:
+		case v.data.Type.Id == types.F64:
 			return exprNode{fmt.Sprint(t)}
 		}
 	}
@@ -70,8 +69,8 @@ func (ve *valueEvaluator) str() value {
 	var v value
 	v.constExpr = true
 	v.data.Value = ve.token.Kind
-	v.data.Type.Id = juletype.STR
-	v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
+	v.data.Type.Id = types.STR
+	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
 	content := ve.token.Kind[1 : len(ve.token.Kind)-1]
 	v.expr = content
 	v.model = strModel(v)
@@ -99,12 +98,12 @@ func (ve *valueEvaluator) char() value {
 	v.data.Value = ve.token.Kind
 	content, isByte := toCharLiteral(ve.token.Kind)
 	if isByte {
-		v.data.Type.Id = juletype.U8
+		v.data.Type.Id = types.U8
 	} else { // rune
-		v.data.Type.Id = juletype.I32
+		v.data.Type.Id = types.I32
 	}
 	content = juleapi.ToRune([]byte(content))
-	v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
+	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
 	v.expr, _ = strconv.ParseInt(content[2:], 16, 64)
 	v.model = exprNode{content}
 	ve.model.append_sub(v.model)
@@ -115,8 +114,8 @@ func (ve *valueEvaluator) bool() value {
 	var v value
 	v.constExpr = true
 	v.data.Value = ve.token.Kind
-	v.data.Type.Id = juletype.BOOL
-	v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
+	v.data.Type.Id = types.BOOL
+	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
 	v.expr = ve.token.Kind == lex.KND_TRUE
 	v.model = boolModel(v)
 	ve.model.append_sub(v.model)
@@ -127,8 +126,8 @@ func (ve *valueEvaluator) nil() value {
 	var v value
 	v.constExpr = true
 	v.data.Value = ve.token.Kind
-	v.data.Type.Id = juletype.NIL
-	v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
+	v.data.Type.Id = types.NIL
+	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
 	v.expr = nil
 	v.model = exprNode{ve.token.Kind}
 	ve.model.append_sub(v.model)
@@ -139,15 +138,15 @@ func normalize(v *value) (normalized bool) {
 	switch {
 	case !v.constExpr:
 		return
-	case int_assignable(juletype.U64, *v):
-		v.data.Type.Id = juletype.U64
-		v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
+	case int_assignable(types.U64, *v):
+		v.data.Type.Id = types.U64
+		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
 		v.expr = tonumu(v.expr)
 		bitize(v)
 		return true
-	case int_assignable(juletype.I64, *v):
-		v.data.Type.Id = juletype.I64
-		v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
+	case int_assignable(types.I64, *v):
+		v.data.Type.Id = types.I64
+		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
 		v.expr = tonums(v.expr)
 		bitize(v)
 		return true
@@ -158,8 +157,8 @@ func normalize(v *value) (normalized bool) {
 func (ve *valueEvaluator) float() value {
 	var v value
 	v.data.Value = ve.token.Kind
-	v.data.Type.Id = juletype.F64
-	v.data.Type.Kind = juletype.TYPE_MAP[v.data.Type.Id]
+	v.data.Type.Id = types.F64
+	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
 	v.expr, _ = strconv.ParseFloat(v.data.Value, 64)
 	return v
 }
@@ -232,7 +231,7 @@ func (ve *valueEvaluator) varId(id string, variable *Var, global bool) (v value)
 
 func make_value_from_fn(f *models.Fn) (v value) {
 	v.data.Value = f.Id
-	v.data.Type.Id = juletype.FN
+	v.data.Type.Id = types.FN
 	v.data.Type.Tag = f
 	v.data.Type.Kind = f.TypeKind()
 	v.data.Token = f.Token
@@ -249,7 +248,7 @@ func (ve *valueEvaluator) funcId(id string, f *Fn) (v value) {
 func (ve *valueEvaluator) enumId(id string, e *Enum) (v value) {
 	e.Used = true
 	v.data.Value = id
-	v.data.Type.Id = juletype.ENUM
+	v.data.Type.Id = types.ENUM
 	v.data.Type.Kind = e.Id
 	v.data.Type.Tag = e
 	v.data.Token = e.Token
@@ -266,7 +265,7 @@ func (ve *valueEvaluator) enumId(id string, e *Enum) (v value) {
 
 func make_value_from_struct(s *Struct) (v value) {
 	v.data.Value = s.Id
-	v.data.Type.Id = juletype.STRUCT
+	v.data.Type.Id = types.STRUCT
 	v.data.Type.Tag = s
 	v.data.Type.Kind = s.Id
 	v.data.Type.Token = s.Token

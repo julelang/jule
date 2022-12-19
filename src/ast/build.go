@@ -8,9 +8,9 @@ import (
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
+	"github.com/julelang/jule/types"
 	"github.com/julelang/jule/pkg/jule"
 	"github.com/julelang/jule/pkg/juleapi"
-	"github.com/julelang/jule/pkg/juletype"
 )
 
 // Builder is builds AST tree.
@@ -238,7 +238,7 @@ func (b *Builder) Enum(toks []lex.Token) {
 			return
 		}
 	} else {
-		e.Type = models.Type{Id: juletype.U32, Kind: juletype.TYPE_MAP[juletype.U32]}
+		e.Type = models.Type{Id: types.U32, Kind: types.TYPE_MAP[types.U32]}
 	}
 	itemToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &toks)
 	if itemToks == nil {
@@ -463,7 +463,7 @@ func (b *Builder) get_method(toks []lex.Token) *models.Fn {
 }
 
 func (b *Builder) implFuncs(impl *models.Impl, toks []lex.Token) {
-	if impl.Target.Id != juletype.VOID {
+	if impl.Target.Id != types.VOID {
 		b.implTraitFuncs(impl, toks)
 		return
 	}
@@ -770,7 +770,7 @@ func (b *Builder) setup_receiver(f *models.Fn, owner_id string) {
 	}
 	f.Receiver = new(models.Var)
 	f.Receiver.Type = models.Type{
-		Id:   juletype.STRUCT,
+		Id:   types.STRUCT,
 		Kind: owner_id,
 	}
 	f.Receiver.Mutable = param.Mutable
@@ -813,8 +813,8 @@ func (b *Builder) fn_prototype(toks []lex.Token, i *int, method, anon bool) (f m
 		f.Id = tok.Kind
 		*i++
 	}
-	f.RetType.Type.Id = juletype.VOID
-	f.RetType.Type.Kind = juletype.TYPE_MAP[f.RetType.Type.Id]
+	f.RetType.Type.Id = types.VOID
+	f.RetType.Type.Kind = types.TYPE_MAP[f.RetType.Type.Id]
 	if *i >= len(toks) {
 		b.pusherr(f.Token, "invalid_syntax")
 		return
@@ -999,7 +999,7 @@ func (b *Builder) checkParams(params *[]models.Param) {
 			b.pusherr(param.Token, "missing_type")
 		} else {
 			param.Type.Token = param.Token
-			param.Type.Id = juletype.ID
+			param.Type.Id = types.ID
 			param.Type.Kind = param.Type.Token.Kind
 			param.Type.Original = param.Type
 			param.Id = jule.ANONYMOUS
@@ -1153,8 +1153,8 @@ func (b *Builder) fnMultiTypeRet(toks []lex.Token, i *int) (t models.RetType, ok
 
 // FnRetDataType builds ret data-type of function.
 func (b *Builder) FnRetDataType(toks []lex.Token, i *int) (t models.RetType, ok bool) {
-	t.Type.Id = juletype.VOID
-	t.Type.Kind = juletype.TYPE_MAP[t.Type.Id]
+	t.Type.Id = types.VOID
+	t.Type.Kind = types.TYPE_MAP[t.Type.Id]
 	if *i >= len(toks) {
 		return
 	}
@@ -1685,8 +1685,8 @@ func (b *Builder) Var(toks []lex.Token, begin, expr bool) (v models.Var) {
 		return
 	}
 	v.Id = v.Token.Kind
-	v.Type.Id = juletype.VOID
-	v.Type.Kind = juletype.TYPE_MAP[v.Type.Id]
+	v.Type.Id = types.VOID
+	v.Type.Kind = types.TYPE_MAP[v.Type.Id]
 	if i >= len(toks) {
 		return
 	}

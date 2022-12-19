@@ -6,7 +6,6 @@ import (
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/pkg/jule"
 	"github.com/julelang/jule/pkg/juleapi"
-	"github.com/julelang/jule/pkg/juletype"
 )
 
 // Size is the represents data type of sizes (array or etc)
@@ -73,7 +72,7 @@ func (dt *Type) OriginalKindId() string {
 
 // KindId returns dt.Kind's identifier.
 func (dt *Type) KindId() (id, prefix string) {
-	if dt.Id == juletype.MAP || dt.Id == juletype.FN {
+	if dt.Id == map_t || dt.Id == fn_t {
 		return dt.Kind, ""
 	}
 	id = dt.Kind
@@ -85,7 +84,7 @@ func (dt *Type) KindId() (id, prefix string) {
 			break
 		}
 	}
-	for _, dt := range juletype.TYPE_MAP {
+	for _, dt := range type_map {
 		if dt == id {
 			return
 		}
@@ -105,15 +104,13 @@ func (dt *Type) KindId() (id, prefix string) {
 	return
 }
 
-func is_necessary_type(id uint8) bool {
-	return id == juletype.TRAIT
-}
+func is_necessary_type(id uint8) bool { return id == trait_t }
 
 func (dt *Type) set_to_original_cpp_linked() {
 	if dt.Original == nil {
 		return
 	}
-	if dt.Id == juletype.STRUCT {
+	if dt.Id == struct_t {
 		id := dt.Id
 		tag := dt.Tag
 		*dt = dt.Original.(Type)
@@ -215,11 +212,11 @@ func (dt Type) String() (s string) {
 	}()
 	dt.Kind = dt.Kind[len(modifiers):]
 	switch dt.Id {
-	case juletype.SLICE:
+	case slice_t:
 		return dt.SliceString()
-	case juletype.ARRAY:
+	case array_t:
 		return dt.ArrayString()
-	case juletype.MAP:
+	case map_t:
 		return dt.MapString()
 	}
 	switch dt.Tag.(type) {
@@ -227,7 +224,7 @@ func (dt Type) String() (s string) {
 		return dt.StructString()
 	}
 	switch dt.Id {
-	case juletype.ID:
+	case id_t:
 		if dt.CppLinked {
 			return dt.Kind
 		}
@@ -235,17 +232,17 @@ func (dt Type) String() (s string) {
 			return juleapi.AsId(dt.Kind)
 		}
 		return juleapi.OutId(dt.Kind, dt.Token.File.Addr())
-	case juletype.ENUM:
+	case enum_t:
 		e := dt.Tag.(*Enum)
 		return e.Type.String()
-	case juletype.TRAIT:
+	case trait_t:
 		return dt.TraitString()
-	case juletype.STRUCT:
+	case struct_t:
 		return dt.StructString()
-	case juletype.FN:
+	case fn_t:
 		return dt.FnString()
 	default:
-		return juletype.CppId(dt.Id)
+		return cpp_id(dt.Id)
 	}
 }
 

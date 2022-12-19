@@ -5,8 +5,8 @@ import (
 
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
+	"github.com/julelang/jule/types"
 	"github.com/julelang/jule/pkg/jule"
-	"github.com/julelang/jule/pkg/juletype"
 )
 
 type type_builder struct {
@@ -22,13 +22,13 @@ type type_builder struct {
 
 func (tb *type_builder) dt(tok lex.Token) {
 	tb.t.Token = tok
-	tb.t.Id = juletype.TypeFromId(tb.t.Token.Kind)
+	tb.t.Id = types.TypeFromId(tb.t.Token.Kind)
 	tb.kind += tb.t.Token.Kind
 	tb.ok = true
 }
 
 func (tb *type_builder) unsafe_kw(tok lex.Token) {
-	tb.t.Id = juletype.UNSAFE
+	tb.t.Id = types.UNSAFE
 	tb.t.Token = tok
 	tb.kind += tok.Kind
 	tb.ok = true
@@ -49,7 +49,7 @@ func (tb *type_builder) op(tok lex.Token) (imret bool) {
 
 func (tb *type_builder) function(tok lex.Token) {
 	tb.t.Token = tok
-	tb.t.Id = juletype.FN
+	tb.t.Id = types.FN
 	f, proto_ok := tb.b.fn_prototype(tb.tokens, tb.i, false, true)
 	if !proto_ok {
 		tb.b.pusherr(tok, "invalid_type")
@@ -66,7 +66,7 @@ func (tb *type_builder) ident(tok lex.Token) {
 	if *tb.i+1 < len(tb.tokens) && tb.tokens[*tb.i+1].Id == lex.ID_DBLCOLON {
 		return
 	}
-	tb.t.Id = juletype.ID
+	tb.t.Id = types.ID
 	tb.t.Token = tok
 	tb.ident_end()
 	tb.ok = true
@@ -149,7 +149,7 @@ func (tb *type_builder) cpp_kw(tok lex.Token) (imret bool) {
 		}
 	}
 	tb.t.CppLinked = true
-	tb.t.Id = juletype.ID
+	tb.t.Id = types.ID
 	tb.t.Token = tb.tokens[*tb.i]
 	tb.kind += tb.t.Token.Kind
 	tb.ident_end()
@@ -169,7 +169,7 @@ func (tb *type_builder) enumerable(tok lex.Token) (imret bool) {
 	if tok.Id == lex.ID_BRACE && tok.Kind == lex.KND_RBRACKET {
 		tb.kind += jule.PREFIX_SLICE
 		tb.t.ComponentType = new(models.Type)
-		tb.t.Id = juletype.SLICE
+		tb.t.Id = types.SLICE
 		tb.t.Token = tok
 		*tb.i++
 		if *tb.i >= len(tb.tokens) {
@@ -184,7 +184,7 @@ func (tb *type_builder) enumerable(tok lex.Token) (imret bool) {
 	}
 	*tb.i-- // Start from bracket
 	tb.ok = tb.map_or_array()
-	if tb.t.Id == juletype.VOID {
+	if tb.t.Id == types.VOID {
 		if tb.err {
 			tb.b.pusherr(tok, "invalid_syntax")
 		}
@@ -199,7 +199,7 @@ func (tb *type_builder) array() (ok bool) {
 	if *tb.i+1 >= len(tb.tokens) {
 		return
 	}
-	tb.t.Id = juletype.ARRAY
+	tb.t.Id = types.ARRAY
 	*tb.i++
 	exprI := *tb.i
 	tb.t.ComponentType = new(models.Type)
@@ -235,7 +235,7 @@ func (tb *type_builder) map_t() (ok bool) {
 		return
 	}
 	defer func() { tb.t.Original = *tb.t }()
-	tb.t.Id = juletype.MAP
+	tb.t.Id = types.MAP
 	tb.t.Token = tb.tokens[0]
 	colonTok := tb.tokens[colon]
 	if colon == 0 || colon+1 >= len(typeToks) {

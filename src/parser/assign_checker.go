@@ -6,7 +6,6 @@ import (
 
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
-	"github.com/julelang/jule/pkg/juletype"
 )
 
 func float_assignable(dt uint8, v value) bool {
@@ -22,8 +21,8 @@ func float_assignable(dt uint8, v value) bool {
 }
 
 func signedAssignable(dt uint8, v value) bool {
-	min := juletype.MinOfType(dt)
-	max := int64(juletype.MaxOfType(dt))
+	min := types.MinOfType(dt)
+	max := int64(types.MaxOfType(dt))
 	switch t := v.expr.(type) {
 	case float64:
 		i, frac := math.Modf(t)
@@ -42,7 +41,7 @@ func signedAssignable(dt uint8, v value) bool {
 }
 
 func unsignedAssignable(dt uint8, v value) bool {
-	max := juletype.MaxOfType(dt)
+	max := types.MaxOfType(dt)
 	switch t := v.expr.(type) {
 	case float64:
 		if t < 0 {
@@ -68,9 +67,9 @@ func unsignedAssignable(dt uint8, v value) bool {
 
 func int_assignable(dt uint8, v value) bool {
 	switch {
-	case juletype.IsSignedInteger(dt):
+	case types.IsSignedInteger(dt):
 		return signedAssignable(dt, v)
-	case juletype.IsUnsignedInteger(dt):
+	case types.IsUnsignedInteger(dt):
 		return unsignedAssignable(dt, v)
 	}
 	return false
@@ -106,17 +105,17 @@ func (ac *assign_checker) check_validity() (valid bool) {
 
 func (ac *assign_checker) check_const() (ok bool) {
 	if !ac.v.constExpr || !types.IsPure(ac.expr_t) ||
-		!types.IsPure(ac.v.data.Type) || !juletype.IsNumeric(ac.v.data.Type.Id) {
+		!types.IsPure(ac.v.data.Type) || !types.IsNumeric(ac.v.data.Type.Id) {
 		return
 	}
 	ok = true
 	switch {
-	case juletype.IsFloat(ac.expr_t.Id):
+	case types.IsFloat(ac.expr_t.Id):
 		if !float_assignable(ac.expr_t.Id, ac.v) {
 			ac.p.pusherrtok(ac.errtok, "overflow_limits")
 			ok = false
 		}
-	case juletype.IsInteger(ac.expr_t.Id):
+	case types.IsInteger(ac.expr_t.Id):
 		if !int_assignable(ac.expr_t.Id, ac.v) {
 			ac.p.pusherrtok(ac.errtok, "overflow_limits")
 			ok = false
