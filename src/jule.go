@@ -3,12 +3,10 @@ package jule
 // Jule constants.
 const VERSION       = `@development_channel`
 const SRC_EXT       = `.jule`
-const DOC_EXT       = SRC_EXT + "doc"
 const SETTINGS_FILE = "jule.set"
 const API           = "api"
 const STDLIB        = "std"
 const LOCALIZATIONS = "localization"
-
 const ENTRY_POINT = "main"
 const INIT_FN     = "init"
 
