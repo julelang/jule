@@ -26,7 +26,7 @@ type Struct struct {
 	Depends     []*Struct
 	Order       int
 
-	generics    []Type // Instance generics.
+	_generics []Type // Instance generics.
 }
 
 func (s *Struct) IsSameBase(s2 *Struct) bool { return s.Origin == s2.Origin }
@@ -52,13 +52,13 @@ func (s *Struct) OutId() string {
 //
 // This function is should be have this function
 // for Genericable interface of ast package.
-func (s *Struct) GetGenerics() []Type { return s.generics }
+func (s *Struct) GetGenerics() []Type { return s._generics }
 
 // SetGenerics set generics of instance.
 //
 // This function is should be have this function
 // for Genericable interface of ast package.
-func (s *Struct) SetGenerics(generics []Type) { s.generics = generics }
+func (s *Struct) SetGenerics(generics []Type) { s._generics = generics }
 
 func (s *Struct) SelfVar(receiver *Var) *Var {
 	v := new(Var)
@@ -78,7 +78,7 @@ func (s *Struct) AsTypeKind() string {
 		dts.WriteByte('[')
 		var gs strings.Builder
 		// Instance
-		if len(s.generics) > 0 {
+		if len(s._generics) > 0 {
 			for _, generic := range s.GetGenerics() {
 				gs.WriteString(generic.Kind)
 				gs.WriteByte(',')
