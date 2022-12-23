@@ -33,9 +33,6 @@ const ARCH_32Bit = "32bit"
 const ATTR_CDEF    = "cdef"
 const ATTR_TYPEDEF = "typedef"
 
-const PREPROCESSOR_DIRECTIVE      = "pragma"
-const PREPROCESSOR_DIRECTIVE_ENOFI = "enofi"
-
 const MARK_ARRAY = "..."
 
 const PREFIX_SLICE = "[]"
