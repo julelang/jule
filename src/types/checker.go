@@ -135,7 +135,7 @@ func (c *Checker) pusherrtok(tok lex.Token, key string, args ...any) {
 		Row:     tok.Row,
 		Column:  tok.Column,
 		Path:    tok.File.Path(),
-		Message: build.GetError(key, args...),
+		Message: build.Errorf(key, args...),
 	})
 }
 

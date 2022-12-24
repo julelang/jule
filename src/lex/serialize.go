@@ -17,7 +17,7 @@ type File struct {
 func NewFile(path string) *File {
 	abs, _ := filepath.Abs(path)
 	if filepath.Ext(abs) != jule.SRC_EXT {
-		panic(build.GetError("file_not_jule", path))
+		panic(build.Errorf("file_not_jule", path))
 	}
 	return &File{path}
 }

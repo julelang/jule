@@ -138,7 +138,7 @@ var ERRORS = map[string]string{
 	`trait_has_reference_parametered_function`: `trait has reference receiver parameter used method, cannot assign non-reference instance`,
 }
 
-// GetError returns error.
-func GetError(key string, args ...any) string {
+// Errorf returns error.
+func Errorf(key string, args ...any) string {
 	return fmt.Sprintf(ERRORS[key], args...)
 }

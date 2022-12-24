@@ -76,7 +76,7 @@ func New(path string) *Parser {
 
 // pusherrtok appends new error by token.
 func (p *Parser) pusherrtok(tok lex.Token, key string, args ...any) {
-	p.pusherrmsgtok(tok, build.GetError(key, args...))
+	p.pusherrmsgtok(tok, build.Errorf(key, args...))
 }
 
 // pusherrtok appends new error message by token.
@@ -97,7 +97,7 @@ func (p *Parser) pusherrs(errs ...build.Log) {
 
 // PushErr appends new error.
 func (p *Parser) PushErr(key string, args ...any) {
-	p.pusherrmsg(build.GetError(key, args...))
+	p.pusherrmsg(build.Errorf(key, args...))
 }
 
 // pusherrmsh appends new flat error message

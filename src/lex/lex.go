@@ -38,7 +38,7 @@ func (l *Lex) pusherr(key string, args ...any) {
 		Row:     l.Row,
 		Column:  l.Column,
 		Path:    l.File.Path(),
-		Message: build.GetError(key, args...),
+		Message: build.Errorf(key, args...),
 	})
 }
 
@@ -48,7 +48,7 @@ func (l *Lex) pusherrtok(tok Token, err string) {
 		Row:     tok.Row,
 		Column:  tok.Column,
 		Path:    l.File.Path(),
-		Message: build.GetError(err),
+		Message: build.Errorf(err),
 	})
 }
 

@@ -193,14 +193,14 @@ func load_localization() {
 
 func check_mode() {
 	if mode != mode_transpile && mode != mode_compile {
-		println(build.GetError("invalid_value_for_key", mode, "mode"))
+		println(build.Errorf("invalid_value_for_key", mode, "mode"))
 		os.Exit(0)
 	}
 }
 
 func check_compiler() {
 	if compiler != jule.COMPILER_GCC && compiler != jule.COMPILER_CLANG {
-		println(build.GetError("invalid_value_for_key", compiler, "compiler"))
+		println(build.Errorf("invalid_value_for_key", compiler, "compiler"))
 		os.Exit(0)
 	}
 }
