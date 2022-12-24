@@ -5,11 +5,11 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/julelang/jule"
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
-	"github.com/julelang/jule"
 )
 
 // Builder is builds AST tree.
@@ -37,7 +37,7 @@ func compilerErr(t lex.Token, key string, args ...any) build.Log {
 		Row:     t.Row,
 		Column:  t.Column,
 		Path:    t.File.Path(),
-		Message: jule.GetError(key, args...),
+		Message: build.GetError(key, args...),
 	}
 }
 

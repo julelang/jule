@@ -183,7 +183,7 @@ func load_localization() {
 		println(err.Error())
 		return
 	}
-	err = jule.DecodeLocalization(string(bytes), &jule.ERRORS)
+	err = jule.DecodeLocalization(string(bytes), &build.ERRORS)
 	if err != nil {
 		println("Language's errors couldn't loaded (uses default);")
 		println(err.Error())
@@ -193,14 +193,14 @@ func load_localization() {
 
 func check_mode() {
 	if mode != mode_transpile && mode != mode_compile {
-		println(jule.GetError("invalid_value_for_key", mode, "mode"))
+		println(build.GetError("invalid_value_for_key", mode, "mode"))
 		os.Exit(0)
 	}
 }
 
 func check_compiler() {
 	if compiler != jule.COMPILER_GCC && compiler != jule.COMPILER_CLANG {
-		println(jule.GetError("invalid_value_for_key", compiler, "compiler"))
+		println(build.GetError("invalid_value_for_key", compiler, "compiler"))
 		os.Exit(0)
 	}
 }

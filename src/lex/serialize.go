@@ -5,6 +5,7 @@ import (
 	"unsafe"
 
 	"github.com/julelang/jule"
+	"github.com/julelang/jule/build"
 )
 
 // File instance of fs.
@@ -16,7 +17,7 @@ type File struct {
 func NewFile(path string) *File {
 	abs, _ := filepath.Abs(path)
 	if filepath.Ext(abs) != jule.SRC_EXT {
-		panic(jule.GetError("file_not_jule", path))
+		panic(build.GetError("file_not_jule", path))
 	}
 	return &File{path}
 }

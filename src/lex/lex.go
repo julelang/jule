@@ -6,7 +6,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/julelang/jule/build"
-	"github.com/julelang/jule"
 )
 
 // Lex is lexer of Jule.
@@ -39,7 +38,7 @@ func (l *Lex) pusherr(key string, args ...any) {
 		Row:     l.Row,
 		Column:  l.Column,
 		Path:    l.File.Path(),
-		Message: jule.GetError(key, args...),
+		Message: build.GetError(key, args...),
 	})
 }
 
@@ -49,7 +48,7 @@ func (l *Lex) pusherrtok(tok Token, err string) {
 		Row:     tok.Row,
 		Column:  tok.Column,
 		Path:    l.File.Path(),
-		Message: jule.GetError(err),
+		Message: build.GetError(err),
 	})
 }
 

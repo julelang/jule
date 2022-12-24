@@ -1,7 +1,6 @@
 package types
 
 import (
-	"github.com/julelang/jule"
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
@@ -136,7 +135,7 @@ func (c *Checker) pusherrtok(tok lex.Token, key string, args ...any) {
 		Row:     tok.Row,
 		Column:  tok.Column,
 		Path:    tok.File.Path(),
-		Message: jule.GetError(key, args...),
+		Message: build.GetError(key, args...),
 	})
 }
 
