@@ -4,32 +4,30 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-
-	"github.com/julelang/jule"
 )
 
-const os_windows = "windows"
-const os_darwin = "darwin"
-const os_linux = "linux"
+const goos_windows = "windows"
+const goos_darwin = "darwin"
+const goos_linux = "linux"
 
-const arch_i386 = "386"
-const arch_amd64 = "amd64"
-const arch_arm = "arm"
-const arch_arm64 = "arm64"
+const goarch_i386 = "386"
+const goarch_amd64 = "amd64"
+const goarch_arm = "arm"
+const goarch_arm64 = "arm64"
 
 func check_os(path string) (ok bool, exist bool) {
 	ok = false
 	exist = true
 	switch path {
-	case jule.OS_WINDOWS:
-		ok = runtime.GOOS == os_windows
-	case jule.OS_DARWIN:
-		ok = runtime.GOOS == os_darwin
-	case jule.OS_LINUX:
-		ok = runtime.GOOS == os_linux
-	case jule.OS_UNIX:
+	case OS_WINDOWS:
+		ok = runtime.GOOS == goos_windows
+	case OS_DARWIN:
+		ok = runtime.GOOS == goos_darwin
+	case OS_LINUX:
+		ok = runtime.GOOS == goos_linux
+	case OS_UNIX:
 		switch runtime.GOOS {
-		case os_darwin, os_linux:
+		case goos_darwin, goos_linux:
 			ok = true
 		}
 	default:
@@ -43,22 +41,22 @@ func check_arch(path string) (ok bool, exist bool) {
 	ok = false
 	exist = true
 	switch path {
-	case jule.ARCH_I386:
-		ok = runtime.GOARCH == arch_i386
-	case jule.ARCH_AMD64:
-		ok = runtime.GOARCH == arch_amd64
-	case jule.ARCH_ARM:
-		ok = runtime.GOARCH == arch_arm
-	case jule.ARCH_ARM64:
-		ok = runtime.GOARCH == arch_arm64
-	case jule.ARCH_64Bit:
+	case ARCH_I386:
+		ok = runtime.GOARCH == goarch_i386
+	case ARCH_AMD64:
+		ok = runtime.GOARCH == goarch_amd64
+	case ARCH_ARM:
+		ok = runtime.GOARCH == goarch_arm
+	case ARCH_ARM64:
+		ok = runtime.GOARCH == goarch_arm64
+	case ARCH_64Bit:
 		switch runtime.GOARCH {
-		case arch_amd64, arch_arm64:
+		case goarch_amd64, goarch_arm64:
 			ok = true
 		}
-	case jule.ARCH_32Bit:
+	case ARCH_32Bit:
 		switch runtime.GOARCH {
-		case arch_i386, arch_arm:
+		case goarch_i386, goarch_arm:
 			ok = true
 		}
 	default:

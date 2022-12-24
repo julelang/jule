@@ -110,10 +110,10 @@ func tool() {
 	switch cmd {
 	case "distos":
 		print("supported operating systems:\n ")
-		println(list_horizontal_slice(jule.DISTOS))
+		println(list_horizontal_slice(build.DISTOS))
 	case "distarch":
 		print("supported architects:\n ")
-		println(list_horizontal_slice(jule.DISTARCH))
+		println(list_horizontal_slice(build.DISTARCH))
 	default:
 		print_error_message("Undefined command: " + cmd)
 	}
