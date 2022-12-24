@@ -12,7 +12,7 @@ import (
 	"runtime"
 	"strings"
 	"time"
-	
+
 	"github.com/julelang/jule"
 	"github.com/julelang/jule/cmd/julec/gen"
 	"github.com/julelang/jule/build"
@@ -30,7 +30,6 @@ const compiler_path_gcc = "g++"
 const compiler_path_clang = "clang++"
 
 var out_dir = "dist"
-var language = "default"
 var mode = mode_compile
 var out_name = "ir.cpp"
 var out = ""
@@ -171,26 +170,6 @@ func init() {
 	}
 }
 
-func load_localization() {
-	lang := strings.TrimSpace(language)
-	if lang == "" || lang == "default" {
-		return
-	}
-	path := filepath.Join(jule.LOCALIZATION_PATH, lang+".ini")
-	bytes, err := os.ReadFile(path)
-	if err != nil {
-		println("Language couldn't loaded (uses default);")
-		println(err.Error())
-		return
-	}
-	err = jule.DecodeLocalization(string(bytes), &build.ERRORS)
-	if err != nil {
-		println("Language's errors couldn't loaded (uses default);")
-		println(err.Error())
-		return
-	}
-}
-
 func check_mode() {
 	if mode != mode_transpile && mode != mode_compile {
 		println(build.Errorf("invalid_value_for_key", mode, "mode"))
@@ -206,7 +185,6 @@ func check_compiler() {
 }
 
 func set() {
-	load_localization()
 	check_mode()
 	check_compiler()
 }
