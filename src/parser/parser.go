@@ -229,23 +229,14 @@ func (p *Parser) pushUse(use *models.UseDecl, selectors []lex.Token) {
 	src.Defines = use.Defines
 }
 
-func (p *Parser) compileCppLinkUse(ast *models.UseDecl) (*models.UseDecl, bool) {
-	u := new(models.UseDecl)
-	u.Cpp = true
-	u.Path = ast.Path
-	u.Token = ast.Token
-	return u, false
+func (p *Parser) compileCppLinkUse(ast *models.UseDecl) *models.UseDecl {
+	ast.Cpp = true
+	return ast
 }
 
 func make_use_from_ast(ast *models.UseDecl) *models.UseDecl {
-	u := new(models.UseDecl)
-	u.Defines = new(models.Defmap)
-	u.Token = ast.Token
-	u.Path = ast.Path
-	u.LinkString = ast.LinkString
-	u.FullUse = ast.FullUse
-	u.Selectors = ast.Selectors
-	return u
+	ast.Defines = new(models.Defmap)
+	return ast
 }
 
 func (p *Parser) wrap_package() {
@@ -293,7 +284,7 @@ func (p *Parser) compilePureUse(ast *models.UseDecl) (_ *models.UseDecl, hassErr
 
 func (p *Parser) compileUse(ast *models.UseDecl) (*models.UseDecl, bool) {
 	if ast.Cpp {
-		return p.compileCppLinkUse(ast)
+		return p.compileCppLinkUse(ast), false
 	}
 	return p.compilePureUse(ast)
 }
