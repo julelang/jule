@@ -4,6 +4,9 @@
 </p>
 <h1>The Jule Programming Language</h1>
 
+This repository is the main source tree of Jule. \
+It contains the reference compiler, API and standard library.
+
 [Website](https://jule.dev) |
 [Documentations](https://jule.dev/pages/docs.html) |
 [Contributing](https://jule.dev/pages/contributing.html)
@@ -13,21 +16,37 @@
 
 <h2 id="motivation">Motivation</h2>
 
-Jule is a statically typed compiled programming language designed for system development, building maintainable and reliable software.
-The purpose of Jule is to keep functionality high while maintaining a simple form and readability.
-It guarantees memory safety and does not contain undefined behavior.
-It also has a reference compiler with obsessions that encourage developers to build safe software.
+> **Warning** \
+> [JuleC](#what-is-julec) is still under pre development. Therefore, design changes and the like may occur in the language. \
+> Some commits may not be fully honored due to some compiler/API errors. \
+> Please report it with the [Jule Issue Tracker](https://github.com/julelang/jule/issues) if you come across something like this.
+
+Our motivation is to create a safe and fast programming language option that focused on system programming.
+A safer, more modern and readable option than C.
+However, we do not want to stray too far from C, C is a language that excels in systems programming.
+Since Jule is transpiled to C++ code, it can have very high interoperability with C++.
+Due to its interoperability with C++, it also offers a great deal of support for C.
+
+Jule designed for maintainable and reliable software development.
+Guarantees memory safety and committed not contain undefined behavior, has a reference compiler with obsessions that encourage developers to build safe software.
+It offers fully integrated Jule-C++ development with API and interoperability.
 
 <img src="./docs/images/quicksort.png"/>
 
 <h2 id="key-features">Design Principles</h2>
+
+Jule is develops within the framework of certain design principles.
+These principles often follow the motivation for the emergence of Jule.
+Our aim is to present a design and implementation that meets these principles in the most balanced way.
+
+### Our Design Principles
 
 - Simplicity and maintainability
 - Fast and scalable development
 - Performance-critical software
 - Memory safety
 - Immutability by default
-- As efficient and performant as C++
+- Efficient and performant
 - High C++ interoperability
 
 <h2 id="what-is-julec">What is JuleC?</h2>
@@ -54,7 +73,7 @@ Jule is designed to be interoperable with C++.
 A C++ header file dependency can be added to the Jule code and its functions can be linked.
 It's pretty easy to write C++ code that is compatible with the Jule code compiled by the compiler.
 JuleC keeps all the C++ code it uses for Jule in its <a href="https://github.com/julelang/jule/tree/main/api">api</a> directory.
-With the help of this API, it is very easy to write C++ code that can be fully integrated into Jule.
+This API makes it possible and easy to write C++ code that can be fully integrated into Jule.
 <ol></ol> <!-- for space -->
 <img src="./docs/images/cpp_interop.png"/>
 
