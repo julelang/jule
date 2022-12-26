@@ -419,6 +419,7 @@ func main() {
 	if print_logs(p) {
 		return
 	}
+	p.WrapPackage()
 	obj_code := gen.Gen(p.Defines, p.Used)
 	append_standard(&obj_code)
 	do_spell(obj_code)

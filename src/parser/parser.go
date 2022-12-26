@@ -239,7 +239,9 @@ func make_use_from_ast(ast *models.UseDecl) *models.UseDecl {
 	return ast
 }
 
-func (p *Parser) wrap_package() {
+// WrapPackage wraps all package on this Parser instance.
+// This package includes all definitions of all package.
+func (p *Parser) WrapPackage() {
 	for _, fp := range *p.package_files {
 		if p == fp {
 			continue
@@ -267,7 +269,7 @@ func (p *Parser) compilePureUse(ast *models.UseDecl) (_ *models.UseDecl, hassErr
 		psub.Used = p.Used
 		psub.SetupPackage()
 		psub.Parsef(false, false)
-		psub.wrap_package()
+		psub.WrapPackage()
 		u := make_use_from_ast(ast)
 		psub.Defines.PushDefines(u.Defines)
 		p.pusherrs(psub.Errors...)
