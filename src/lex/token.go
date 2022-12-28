@@ -1,6 +1,9 @@
 package lex
 
-import "strings"
+import (
+	"strings"
+	"unicode/utf8"
+)
 
 // Token identities.
 const ID_NA          = 0
@@ -142,6 +145,50 @@ const KND_DEFER       = "defer"
 
 const IGNORE_ID = "_"
 
+var Punctuations = [...]rune{
+	'!',
+	'#',
+	'$',
+	',',
+	'.',
+	'\'',
+	'"',
+	':',
+	';',
+	'<',
+	'>',
+	'=',
+	'?',
+	'-',
+	'+',
+	'*',
+	'(',
+	')',
+	'[',
+	']',
+	'{',
+	'}',
+	'%',
+	'&',
+	'/',
+	'\\',
+	'@',
+	'^',
+	'_',
+	'`',
+	'|',
+	'~',
+	'¦',
+}
+
+var Spaces = [...]rune{
+	' ',
+	'\t',
+	'\v',
+	'\r',
+	'\n',
+}
+
 // Token is lexer token.
 type Token struct {
 	File   *File
@@ -177,3 +224,61 @@ func IsLiteral(k string) bool {
 
 // IsIgnoreId reports identifier is ignore or not.
 func IsIgnoreId(id string) bool { return id == IGNORE_ID }
+
+func rune_exist(r rune, runes []rune) bool {
+	for _, cr := range runes {
+		if r == cr {
+			return true
+		}
+	}
+	return false
+}
+
+// IsPunct reports rune is punctuation or not.
+func IsPunct(r rune) bool { return rune_exist(r, Punctuations[:]) }
+
+// IsSpace reports byte is whitespace or not.
+func IsSpace(r rune) bool { return rune_exist(r, Spaces[:]) }
+
+// IsLetter reports rune is letter or not.
+func IsLetter(r rune) bool {
+	return ('a' <= r && r <= 'z') || ('A' <= r && r <= 'Z')
+}
+
+// IsIdentifierRune returns true if first rune of string is allowed to
+// first char for identifiers, false if not.
+func IsIdentifierRune(s string) bool {
+	if s == "" {
+		return false
+	}
+	if s[0] != '_' {
+		r, _ := utf8.DecodeRuneInString(s)
+		if !IsLetter(r) {
+			return false
+		}
+	}
+	return true
+}
+
+// IsDecimal reports byte is decimal sequence or not.
+func IsDecimal(b byte) bool { return '0' <= b && b <= '9' }
+
+// IsBinary reports byte is binary sequence or not.
+func IsBinary(b byte) bool { return b == '0' || b == '1' }
+
+// IsOctal reports byte is octal sequence or not.
+func IsOctal(b byte) bool { return '0' <= b && b <= '7' }
+
+// IsHex reports byte is hexadecimal sequence or not.
+func IsHex(b byte) bool {
+	switch {
+	case '0' <= b && b <= '9':
+		return true
+	case 'a' <= b && b <= 'f':
+		return true
+	case 'A' <= b && b <= 'F':
+		return true
+	default:
+		return false
+	}
+}

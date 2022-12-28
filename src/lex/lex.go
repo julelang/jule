@@ -91,48 +91,6 @@ func (l *Lex) checkRanges() {
 	}
 }
 
-// IsPunct reports rune is punctuation or not.
-func IsPunct(r rune) bool {
-	return r == '!' ||
-		r == '#' ||
-		r == '$' ||
-		r == ',' ||
-		r == '.' ||
-		r == '\'' ||
-		r == '"' ||
-		r == ':' ||
-		r == ';' ||
-		r == '<' ||
-		r == '>' ||
-		r == '=' ||
-		r == '?' ||
-		r == '-' ||
-		r == '+' ||
-		r == '*' ||
-		r == '(' ||
-		r == ')' ||
-		r == '[' ||
-		r == ']' ||
-		r == '{' ||
-		r == '}' ||
-		r == '%' ||
-		r == '&' ||
-		r == '/' ||
-		r == '\\' ||
-		r == '@' ||
-		r == '^' ||
-		r == '_' ||
-		r == '`' ||
-		r == '|' ||
-		r == '~' ||
-		r == '¦'
-}
-
-// IsLetter reports rune is letter or not.
-func IsLetter(r rune) bool {
-	return ('a' <= r && r <= 'z') || ('A' <= r && r <= 'Z')
-}
-
 // iskw returns true if part is keyword, false if not.
 func iskw(ln, kw string) bool {
 	if !strings.HasPrefix(ln, kw) {
@@ -146,22 +104,7 @@ func iskw(ln, kw string) bool {
 	if r == '_' {
 		return false
 	}
-	return IsSpace(byte(r)) || IsPunct(r) || !IsLetter(r)
-}
-
-// IsIdentifierRune returns true if first rune of string is allowed to
-// first char for identifiers, false if not.
-func IsIdentifierRune(s string) bool {
-	if s == "" {
-		return false
-	}
-	if s[0] != '_' {
-		r, _ := utf8.DecodeRuneInString(s)
-		if !IsLetter(r) {
-			return false
-		}
-	}
-	return true
+	return IsSpace(r) || IsPunct(r) || !IsLetter(r)
 }
 
 // id returns identifer if next token is identifer,
@@ -189,7 +132,7 @@ func (l *Lex) resume() string {
 	runes := l.data[l.Pos:]
 	// Skip spaces.
 	for i, r := range runes {
-		if IsSpace(byte(r)) {
+		if IsSpace(r) {
 			l.Pos++
 			switch r {
 			case '\n':
@@ -268,9 +211,7 @@ func float_fmt_e(txt string, i int) (literal string) {
 	return txt[:i]
 }
 
-func float_fmt_p(txt string, i int) string {
-	return float_fmt_e(txt, i)
-}
+func float_fmt_p(txt string, i int) string { return float_fmt_e(txt, i) }
 
 func float_fmt_dotnp(txt string, i int) string {
 	if txt[i] != '.' {
@@ -483,37 +424,6 @@ func (l *Lex) num(txt string) (literal string) {
 end:
 	l.Pos += len(literal)
 	return
-}
-
-// IsSpace reports byte is whitespace or not.
-func IsSpace(b byte) bool {
-	return b == ' ' ||
-		b == '\t' ||
-		b == '\v' ||
-		b == '\r' ||
-		b == '\n'
-}
-
-// IsDecimal reports byte is decimal sequence or not.
-func IsDecimal(b byte) bool { return '0' <= b && b <= '9' }
-
-// IsBinary reports byte is binary sequence or not.
-func IsBinary(b byte) bool { return b == '0' || b == '1' }
-
-// IsOctal reports byte is octal sequence or not.
-func IsOctal(b byte) bool { return '0' <= b && b <= '7' }
-
-// IsHex reports byte is hexadecimal sequence or not.
-func IsHex(b byte) bool {
-	switch {
-	case '0' <= b && b <= '9':
-		return true
-	case 'a' <= b && b <= 'f':
-		return true
-	case 'A' <= b && b <= 'F':
-		return true
-	}
-	return false
 }
 
 func hexEsq(txt string, n int) (seq string) {

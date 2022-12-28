@@ -340,7 +340,7 @@ func get_option(i *int) (arg string, content string) {
 		j++
 		for ; j < len(runes); j++ {
 			r = runes[j]
-			if !lex.IsSpace(byte(r)) && !lex.IsLetter(r) && 
+			if !lex.IsSpace(r) && !lex.IsLetter(r) && 
 				!lex.IsDecimal(byte(r)) && r != '_' && r != '-' {
 				exit_err("undefined syntax: " + string(runes[j:]))
 			}
