@@ -1,6 +1,6 @@
 <div align="center">
 <p>
-    <img width="150" src="https://raw.githubusercontent.com/julelang/resources/main/jule_icon.svg?sanitize=true">
+    <img width="150" src="https://raw.githubusercontent.com/julelang/resources/master/jule_icon.svg?sanitize=true">
 </p>
 <h1>The Jule Programming Language</h1>
 
@@ -72,14 +72,14 @@ Please read the <a href="https://jule.dev/pages/docs.html?page=unsafe-jule">Unsa
 Jule is designed to be interoperable with C++.
 A C++ header file dependency can be added to the Jule code and its functions can be linked.
 It's pretty easy to write C++ code that is compatible with the Jule code compiled by the compiler.
-JuleC keeps all the C++ code it uses for Jule in its <a href="https://github.com/julelang/jule/tree/main/api">api</a> directory.
+JuleC keeps all the C++ code it uses for Jule in its <a href="https://github.com/julelang/jule/tree/master/api">api</a> directory.
 This API makes it possible and easy to write C++ code that can be fully integrated into Jule.
 <ol></ol> <!-- for space -->
 <img src="./docs/images/cpp_interop.png"/>
 
 <h2 id="future-changes">Future Changes</h2>
 JuleC is in early development and currently it can only be built from source.
-However, despite being in the early development stage, many algorithms (<a href="https://github.com/julelang/jule/tree/main/std">see the standard library</a>) can be successfully implemented.
+However, despite being in the early development stage, many algorithms (<a href="https://github.com/julelang/jule/tree/master/std">see the standard library</a>) can be successfully implemented.
 It is planned to rewrite the compiler with Jule after reference compiler and standard library reaches sufficient maturity.
 JuleC has or is very close to having many of the things Jule was intended to have, such as memory safety, properties, structures with methods and generics.
 <br><br>
@@ -97,9 +97,9 @@ Jule's standard library only gets updates with compiler releases.
 <br><br>
 The language and standard library will continue to evolve and change in the future but JuleC will guarantee stability since its first stable release.
 Some packages of the standard library
-(<a href="https://github.com/julelang/jule/tree/main/std/math">std::math</a>,
-<a href="https://github.com/julelang/jule/tree/main/std/conv">std::conv</a>,
-<a href="https://github.com/julelang/jule/tree/main/std/unicode/utf8">std::unicode::utf8</a>
+(<a href="https://github.com/julelang/jule/tree/master/std/math">std::math</a>,
+<a href="https://github.com/julelang/jule/tree/master/std/conv">std::conv</a>,
+<a href="https://github.com/julelang/jule/tree/master/std/unicode/utf8">std::unicode::utf8</a>
 or etc.) are almost complete and are not expected to undergo major changes.
 
 <h2 id="documentations">Documentations</h2>
