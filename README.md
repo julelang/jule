@@ -46,7 +46,7 @@ Our aim is to present a design and implementation that meets these principles in
 - Performance-critical software
 - Memory safety
 - Immutability by default
-- Efficient and performant
+- Efficiency and performance
 - High C++ interoperability
 
 <h2 id="what-is-julec">What is JuleC?</h2>
