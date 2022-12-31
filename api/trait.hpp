@@ -51,8 +51,7 @@ public:
         return this->_data;
     }
 
-    ~trait_jt(void) noexcept
-    { this->__dealloc(); }
+    ~trait_jt(void) noexcept {}
 
     template<typename TT>
     operator TT(void) noexcept {
