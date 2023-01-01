@@ -4,9 +4,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/julelang/jule/cmd/julec/gen"
 	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/cmd/julec/gen"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
 )
@@ -83,10 +83,10 @@ func (e *eval) eval_op(op any) (v value, model iExpr) {
 		return
 	}
 	process := solver{
-		p: e.p,
+		p:  e.p,
 		op: bop.Op,
-		l: l,
-		r: r,
+		l:  l,
+		r:  r,
 	}
 	v = process.solve()
 	v.lvalue = types.IsLvalue(v.data.Type)
@@ -345,7 +345,7 @@ func (e *eval) try_cpp_linked_var(toks []lex.Token, m *exprModel) (v value, ok b
 		v = make_value_from_var(def.(*models.Var))
 	case 's':
 		v = make_value_from_struct(def.(*models.Struct))
-	// Cpp linkage not supports type aliases in expressions
+		// Cpp linkage not supports type aliases in expressions
 	}
 	return
 }
@@ -1332,7 +1332,7 @@ func (e *eval) build_array(parts [][]lex.Token, t Type, errtok lex.Token) (value
 		model.expr = append(model.expr, expModel)
 		assign_checker{
 			p:      e.p,
-			expr_t:      *t.ComponentType,
+			expr_t: *t.ComponentType,
 			v:      partVal,
 			errtok: part[0],
 		}.check()
@@ -1351,7 +1351,7 @@ func (e *eval) build_slice_implicit(parts [][]lex.Token, errtok lex.Token) (valu
 	partVal, expModel := e.eval_toks(parts[0])
 	model.expr = append(model.expr, expModel)
 	model.dataType = Type{
-		Id: types.SLICE,
+		Id:   types.SLICE,
 		Kind: lex.PREFIX_SLICE + partVal.data.Type.Kind,
 	}
 	model.dataType.ComponentType = new(Type)
@@ -1363,7 +1363,7 @@ func (e *eval) build_slice_implicit(parts [][]lex.Token, errtok lex.Token) (valu
 		model.expr = append(model.expr, expModel)
 		assign_checker{
 			p:      e.p,
-			expr_t:      *model.dataType.ComponentType,
+			expr_t: *model.dataType.ComponentType,
 			v:      partVal,
 			errtok: part[0],
 		}.check()
@@ -1383,7 +1383,7 @@ func (e *eval) build_slice_explicit(parts [][]lex.Token, t Type, errtok lex.Toke
 		model.expr = append(model.expr, expModel)
 		assign_checker{
 			p:      e.p,
-			expr_t:      *t.ComponentType,
+			expr_t: *t.ComponentType,
 			v:      partVal,
 			errtok: part[0],
 		}.check()
@@ -1433,13 +1433,13 @@ func (e *eval) buildMap(parts [][]lex.Token, t Type, errtok lex.Token) (value, i
 		model.valExprs = append(model.valExprs, valModel)
 		assign_checker{
 			p:      e.p,
-			expr_t:      keyType,
+			expr_t: keyType,
 			v:      key,
 			errtok: colonTok,
 		}.check()
 		assign_checker{
 			p:      e.p,
-			expr_t:      valType,
+			expr_t: valType,
 			v:      val,
 			errtok: colonTok,
 		}.check()

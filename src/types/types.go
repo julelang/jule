@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 )
 
@@ -281,9 +281,9 @@ func IsAllowForConst(t Type) bool {
 }
 
 func IsVariadicable(t Type) bool { return IsSlice(t) }
-func IsStruct(t Type) bool { return t.Id == STRUCT }
-func IsTrait(t Type) bool { return t.Id == TRAIT }
-func IsEnum(t Type) bool { return t.Id == ENUM }
+func IsStruct(t Type) bool       { return t.Id == STRUCT }
+func IsTrait(t Type) bool        { return t.Id == TRAIT }
+func IsEnum(t Type) bool         { return t.Id == ENUM }
 
 func DerefPtrOrRef(t Type) Type {
 	t.Kind = t.Kind[1:]

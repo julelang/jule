@@ -8,12 +8,12 @@ import (
 	"sync"
 	"unicode/utf8"
 
+	"github.com/julelang/jule"
 	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
-	"github.com/julelang/jule"
 )
 
 type File = lex.File
@@ -55,7 +55,7 @@ type Parser struct {
 	NoCheck     bool
 	IsMain      bool
 	Used        *[]*models.UseDecl // All used packages, deep detection
-	Uses        []*models.UseDecl // File uses these packages
+	Uses        []*models.UseDecl  // File uses these packages
 	Defines     *models.Defmap
 	Errors      []build.Log
 	Warnings    []build.Log
@@ -591,7 +591,7 @@ func (p *Parser) parse_enum_items_str(e *Enum) {
 			item.Expr.Model = model
 			assign_checker{
 				p:         p,
-				expr_t:         e.Type,
+				expr_t:    e.Type,
 				v:         val,
 				ignoreAny: true,
 				errtok:    item.Token,
@@ -641,7 +641,7 @@ func (p *Parser) parse_enum_items_integer(e *Enum) {
 			item.Expr.Model = model
 			assign_checker{
 				p:         p,
-				expr_t:         e.Type,
+				expr_t:    e.Type,
 				v:         val,
 				ignoreAny: true,
 				errtok:    item.Token,
@@ -3020,17 +3020,17 @@ func (p *Parser) singleAssign(assign *models.Assign, l, r []value) {
 	if assign.Setter.Kind != lex.KND_EQ && !lex.IsLiteral(right.data.Value) {
 		assign.Setter.Kind = assign.Setter.Kind[:len(assign.Setter.Kind)-1]
 		solver := solver{
-			p:         p,
+			p:  p,
 			l:  left,
-			r: right,
-			op:  assign.Setter,
+			r:  right,
+			op: assign.Setter,
 		}
 		right = solver.solve()
 		assign.Setter.Kind += lex.KND_EQ
 	}
 	assign_checker{
 		p:      p,
-		expr_t:      left.data.Type,
+		expr_t: left.data.Type,
 		v:      right,
 		errtok: assign.Setter,
 	}.check()
@@ -3115,7 +3115,7 @@ func (p *Parser) multiAssign(assign *models.Assign, l, r []value) {
 			p.check_valid_init_expr(leftExpr.mutable, right, assign.Setter)
 			assign_checker{
 				p:      p,
-				expr_t:      leftExpr.data.Type,
+				expr_t: leftExpr.data.Type,
 				v:      right,
 				errtok: assign.Setter,
 			}.check()
@@ -3555,7 +3555,7 @@ func (p *Parser) typeSourceIsArrayType(arr_t *Type) (ok bool) {
 	}
 	assign_checker{
 		p:      p,
-		expr_t:      Type{Id: types.UINT, Kind: types.TYPE_MAP[types.UINT]},
+		expr_t: Type{Id: types.UINT, Kind: types.TYPE_MAP[types.UINT]},
 		v:      val,
 		errtok: arr_t.Size.Expr.Tokens[0],
 	}.check()

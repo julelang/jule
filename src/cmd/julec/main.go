@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/julelang/jule"
-	"github.com/julelang/jule/cmd/julec/gen"
 	"github.com/julelang/jule/build"
+	"github.com/julelang/jule/cmd/julec/gen"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/parser"
 )
@@ -332,7 +332,7 @@ func get_option(i *int) (arg string, content string) {
 		j++
 		for ; j < len(runes); j++ {
 			r = runes[j]
-			if !lex.IsSpace(r) && !lex.IsLetter(r) && 
+			if !lex.IsSpace(r) && !lex.IsLetter(r) &&
 				!lex.IsDecimal(byte(r)) && r != '_' && r != '-' {
 				exit_err("undefined syntax: " + string(runes[j:]))
 			}

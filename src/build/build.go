@@ -7,7 +7,7 @@ import (
 )
 
 // This attributes should be added to the attribute map.
-const ATTR_CDEF    = "cdef"
+const ATTR_CDEF = "cdef"
 const ATTR_TYPEDEF = "typedef"
 
 // ATTRS is list of all attributes.
@@ -110,7 +110,6 @@ func IsPassFileAnnotation(p string) bool {
 		a2 = p[i+1:]
 	}
 
-	
 	if a2 == "" {
 		ok, exist := check_os(a1)
 		if exist {
@@ -119,7 +118,7 @@ func IsPassFileAnnotation(p string) bool {
 		ok, exist = check_arch(a1)
 		return !exist || ok
 	}
-	
+
 	ok, exist := check_arch(a1)
 	if exist {
 		if !ok {

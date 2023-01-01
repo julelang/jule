@@ -85,10 +85,10 @@ func (rc *retChecker) single() {
 	v := rc.values[0]
 	rc.check_for_ret_expr(v)
 	assign_checker{
-		p:       rc.t,
-		expr_t:       rc.f.RetType.Type,
-		v:       v,
-		errtok:  rc.ret_ast.Token,
+		p:      rc.t,
+		expr_t: rc.f.RetType.Type,
+		v:      v,
+		errtok: rc.ret_ast.Token,
 	}.check()
 }
 
@@ -108,10 +108,10 @@ func (rc *retChecker) multi() {
 		v := rc.values[i]
 		rc.check_for_ret_expr(v)
 		assign_checker{
-			p:       rc.t,
-			expr_t:       t,
-			v:       v,
-			errtok:  rc.ret_ast.Token,
+			p:      rc.t,
+			expr_t: t,
+			v:      v,
+			errtok: rc.ret_ast.Token,
 		}.check()
 	}
 }
@@ -144,10 +144,10 @@ func (rc *retChecker) checkMultiRetAsMutliRet() {
 		vt := valTypes[i]
 		val := value{data: models.Data{Type: vt}}
 		assign_checker{
-			p:       rc.t,
-			expr_t:       rt,
-			v:       val,
-			errtok:  rc.ret_ast.Token,
+			p:      rc.t,
+			expr_t: rt,
+			v:      val,
+			errtok: rc.ret_ast.Token,
 		}.check()
 	}
 }

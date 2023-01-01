@@ -95,7 +95,7 @@ func (tb *type_builder) ident_end() {
 		genericsStr.WriteByte(',')
 		generics[i] = t
 	}
-	tb.kind +=  genericsStr.String()[:genericsStr.Len()-1] + "]"
+	tb.kind += genericsStr.String()[:genericsStr.Len()-1] + "]"
 	tb.t.Tag = generics
 }
 

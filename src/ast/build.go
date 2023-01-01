@@ -1531,7 +1531,7 @@ func (b *Builder) LabelSt(bs *block_st) models.Statement {
 	}
 	return models.Statement{
 		Token: l.Token,
-		Data: l,
+		Data:  l,
 	}
 }
 
@@ -2227,7 +2227,7 @@ func (b *Builder) ContinueSt(toks []lex.Token) models.Statement {
 			}
 		}
 	}
-	return models.Statement{Token: continueAST.Token, Data:  continueAST}
+	return models.Statement{Token: continueAST.Token, Data: continueAST}
 }
 
 // Expr builds AST model of expression.

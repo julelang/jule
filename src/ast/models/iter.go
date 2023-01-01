@@ -19,7 +19,7 @@ func (b Break) String() string {
 }
 
 // Continue is the AST model of break statement.
-type Continue struct{
+type Continue struct {
 	Token     lex.Token
 	LoopLabel lex.Token
 	Label     string

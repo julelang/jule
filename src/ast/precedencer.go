@@ -18,7 +18,7 @@ func (p *precedencer) set(level uint, expr any) {
 }
 
 func (p *precedencer) get_lower() any {
-	for i := len(p.pairs)-1; i >= 0; i-- {
+	for i := len(p.pairs) - 1; i >= 0; i-- {
 		data := p.pairs[i][1]
 		if data != nil {
 			return data

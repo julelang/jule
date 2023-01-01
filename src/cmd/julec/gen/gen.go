@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
-	
+
 	"github.com/julelang/jule"
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/build"
@@ -293,7 +293,7 @@ type foreach_setter interface {
 	next_steps(ket_a *models.Var, key_b *models.Var, begin string) string
 }
 
-type index_setter struct {}
+type index_setter struct{}
 
 func (index_setter) setup_vars(key_a *models.Var, key_b *models.Var) string {
 	var cpp strings.Builder
@@ -340,7 +340,7 @@ func (index_setter) next_steps(key_a *models.Var, key_b *models.Var, begin strin
 	return cpp.String()
 }
 
-type map_setter struct {}
+type map_setter struct{}
 
 func (map_setter) setup_vars(key_a *models.Var, key_b *models.Var) string {
 	var cpp strings.Builder
@@ -1207,10 +1207,10 @@ func order_structures(structures []*models.Struct) {
 	n := len(structures)
 	for i := 0; i < n; i++ {
 		swapped := false
-		for j := 0; j < n - i - 1; j++ {
+		for j := 0; j < n-i-1; j++ {
 			curr := &structures[j]
 			if can_be_order(*curr) {
-				(*curr).Origin.Order = j+1
+				(*curr).Origin.Order = j + 1
 				next := &structures[j+1]
 				(*next).Origin.Order = j
 				*curr, *next = *next, *curr

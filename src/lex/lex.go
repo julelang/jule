@@ -52,7 +52,7 @@ func (l *Lex) pusherrtok(tok Token, err string) {
 	})
 }
 
-func (l* Lex) buff_data() {
+func (l *Lex) buff_data() {
 	bytes, err := os.ReadFile(l.File.Path())
 	if err != nil {
 		panic("buffering failed: " + err.Error())
@@ -613,7 +613,7 @@ var KEYWORDS = map[string]uint8{
 	KND_CONST:       ID_CONST,
 	KND_RET:         ID_RET,
 	KND_TYPE:        ID_TYPE,
-	KND_ITER:         ID_ITER,
+	KND_ITER:        ID_ITER,
 	KND_BREAK:       ID_BREAK,
 	KND_CONTINUE:    ID_CONTINUE,
 	KND_IN:          ID_IN,
@@ -768,8 +768,8 @@ func (l *Lex) Token() Token {
 		l.pushRangeClose(t, KND_LBRACKET)
 	case
 		l.lexBasicOps(txt, &t) ||
-		l.lexKeywords(txt, &t) ||
-		l.lexIdentifier(txt, &t):
+			l.lexKeywords(txt, &t) ||
+			l.lexIdentifier(txt, &t):
 	default:
 		r, sz := utf8.DecodeRuneInString(txt)
 		l.pusherr("invalid_token", r)

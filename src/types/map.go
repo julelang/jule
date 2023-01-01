@@ -3,33 +3,33 @@ package types
 import "github.com/julelang/jule/lex"
 
 // Data type (built-in) constants.
-const VOID    uint8 = 0
-const I8      uint8 = 1
-const I16     uint8 = 2
-const I32     uint8 = 3
-const I64     uint8 = 4
-const U8      uint8 = 5
-const U16     uint8 = 6
-const U32     uint8 = 7
-const U64     uint8 = 8
-const BOOL    uint8 = 9
-const STR     uint8 = 10
-const F32     uint8 = 11
-const F64     uint8 = 12
-const ANY     uint8 = 13
-const ID      uint8 = 14
-const FN      uint8 = 15
-const NIL     uint8 = 16
-const UINT    uint8 = 17
-const INT     uint8 = 18
-const MAP     uint8 = 19
+const VOID uint8 = 0
+const I8 uint8 = 1
+const I16 uint8 = 2
+const I32 uint8 = 3
+const I64 uint8 = 4
+const U8 uint8 = 5
+const U16 uint8 = 6
+const U32 uint8 = 7
+const U64 uint8 = 8
+const BOOL uint8 = 9
+const STR uint8 = 10
+const F32 uint8 = 11
+const F64 uint8 = 12
+const ANY uint8 = 13
+const ID uint8 = 14
+const FN uint8 = 15
+const NIL uint8 = 16
+const UINT uint8 = 17
+const INT uint8 = 18
+const MAP uint8 = 19
 const UINTPTR uint8 = 20
-const ENUM    uint8 = 21
-const STRUCT  uint8 = 22
-const TRAIT   uint8 = 23
-const SLICE   uint8 = 24
-const ARRAY   uint8 = 25
-const UNSAFE  uint8 = 26
+const ENUM uint8 = 21
+const STRUCT uint8 = 22
+const TRAIT uint8 = 23
+const SLICE uint8 = 24
+const ARRAY uint8 = 25
+const UNSAFE uint8 = 26
 
 // TYPE_MAP keep data type codes and kinds.
 var TYPE_MAP = map[uint8]string{

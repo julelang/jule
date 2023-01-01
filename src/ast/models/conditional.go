@@ -17,7 +17,7 @@ type Else struct {
 
 // Condition tree.
 type Conditional struct {
-	If    *If
-	Elifs []*If
-	Default  *Else
+	If      *If
+	Elifs   []*If
+	Default *Else
 }

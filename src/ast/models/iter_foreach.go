@@ -6,7 +6,7 @@ import "github.com/julelang/jule/lex"
 type IterForeach struct {
 	KeyA     Var
 	KeyB     Var
-	InToken    lex.Token
+	InToken  lex.Token
 	Expr     Expr
 	ExprType Type
 }

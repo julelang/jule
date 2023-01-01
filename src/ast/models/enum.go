@@ -13,7 +13,7 @@ type EnumItem struct {
 // Enum is the AST model of enumerator statements.
 type Enum struct {
 	Pub   bool
-	Token   lex.Token
+	Token lex.Token
 	Id    string
 	Type  Type
 	Items []*EnumItem

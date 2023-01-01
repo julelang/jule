@@ -274,8 +274,8 @@ var errorTrait = &models.Trait{
 	Defines: &models.Defmap{
 		Fns: []*Fn{
 			{
-				Pub:     true,
-				Id:      "error",
+				Pub: true,
+				Id:  "error",
 				RetType: models.RetType{
 					Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]},
 				},
@@ -479,9 +479,9 @@ var strDefines = &models.Defmap{
 			RetType: RetType{Type: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]}},
 		},
 		{
-			Pub:     true,
-			Id:      "trim",
-			Params:  []Param{{Id: "bytes", Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}}},
+			Pub:    true,
+			Id:     "trim",
+			Params: []Param{{Id: "bytes", Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}}},
 			RetType: RetType{
 				Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]},
 			},

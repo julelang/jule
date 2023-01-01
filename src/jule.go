@@ -6,12 +6,12 @@ import (
 )
 
 // Jule constants.
-const VERSION       = `@master`
-const SRC_EXT       = `.jule`
-const API           = "api"
-const STDLIB        = "std"
-const ENTRY_POINT   = "main"
-const INIT_FN       = "init"
+const VERSION = `@master`
+const SRC_EXT = `.jule`
+const API = "api"
+const STDLIB = "std"
+const ENTRY_POINT = "main"
+const INIT_FN = "init"
 
 // Environment Variables.
 var LOCALIZATION_PATH string
