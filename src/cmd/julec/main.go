@@ -258,6 +258,12 @@ func compile(path string, main, nolocal, justDefs bool) *parser.Parser {
 		return p
 	}
 	p := parser.New(path)
+	if !p.File.IsJule() {
+		exit_err(build.Errorf("file_not_jule", path))
+	}
+	if !p.File.IsOk() {
+		exit_err("path is not exist or inaccessible: " + path)
+	}
 	p.NoLocalPkg = nolocal
 	p.SetupPackage()
 	p.Parsef(main, justDefs)

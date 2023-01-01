@@ -1,11 +1,11 @@
 package lex
 
 import (
+	"os"
 	"path/filepath"
 	"unsafe"
 
 	"github.com/julelang/jule"
-	"github.com/julelang/jule/build"
 )
 
 // File instance of fs.
@@ -14,12 +14,19 @@ type File struct {
 }
 
 // NewFile returns new File points to Jule file.
-func NewFile(path string) *File {
-	abs, _ := filepath.Abs(path)
-	if filepath.Ext(abs) != jule.SRC_EXT {
-		panic(build.Errorf("file_not_jule", path))
-	}
-	return &File{path}
+func NewFile(path string) *File { return &File{path} }
+
+// IsJule reports file path is Jule source code.
+// Returns false if error occur.
+func (f *File) IsJule() bool {
+	abs, err := filepath.Abs(f._path)
+	return err == nil && filepath.Ext(abs) == jule.SRC_EXT
+}
+
+// IsOk reports file path is exist and accessible or not.
+func (f *File) IsOk() bool {
+	_, err := os.Stat(f._path)
+	return err == nil
 }
 
 // Path returns full path.
