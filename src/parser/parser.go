@@ -1009,7 +1009,7 @@ func (p *Parser) pushNs(identifiers []string) *models.Namespace {
 
 // Comment parses Jule documentation comments line.
 func (p *Parser) Comment(c models.Comment) {
-	if strings.HasPrefix(c.Content, jule.PRAGMA_COMMENT_PREFIX) {
+	if strings.HasPrefix(c.Content, lex.PRAGMA_COMMENT_PREFIX) {
 		p.PushAttribute(c)
 		return
 	}
@@ -1021,10 +1021,10 @@ func (p *Parser) Comment(c models.Comment) {
 func (p *Parser) PushAttribute(c models.Comment) {
 	var attr models.Attribute
 	// Skip attribute prefix
-	attr.Tag = c.Content[len(jule.PRAGMA_COMMENT_PREFIX):]
+	attr.Tag = c.Content[len(lex.PRAGMA_COMMENT_PREFIX):]
 	attr.Token = c.Token
 	ok := false
-	for _, kind := range jule.ATTRS {
+	for _, kind := range build.ATTRS {
 		if attr.Tag == kind {
 			ok = true
 			break
@@ -1124,10 +1124,10 @@ func (p *Parser) parseNonGenericType(generics []*GenericType, dt *Type) {
 		p.parseMapNonGenericType(generics, dt)
 	case types.IsArray(*dt):
 		p.parseNonGenericType(generics, dt.ComponentType)
-		dt.Kind = jule.PREFIX_ARRAY + dt.ComponentType.Kind
+		dt.Kind = lex.PREFIX_ARRAY + dt.ComponentType.Kind
 	case types.IsSlice(*dt):
 		p.parseNonGenericType(generics, dt.ComponentType)
-		dt.Kind = jule.PREFIX_SLICE + dt.ComponentType.Kind
+		dt.Kind = lex.PREFIX_SLICE + dt.ComponentType.Kind
 	default:
 		p.parseCommonNonGenericType(generics, dt)
 	}
@@ -1307,7 +1307,7 @@ func (p *Parser) varsFromParams(f *Fn) []*Var {
 			v.Type.ComponentType = new(models.Type)
 			*v.Type.ComponentType = param.Type
 			v.Type.Id = types.SLICE
-			v.Type.Kind = jule.PREFIX_SLICE + v.Type.Kind
+			v.Type.Kind = lex.PREFIX_SLICE + v.Type.Kind
 		}
 		vars[i] = v
 	}
@@ -1810,7 +1810,7 @@ func (p *Parser) checkParamDefaultExpr(f *Fn, param *Param) {
 	dt := param.Type
 	if param.Variadic {
 		dt.Id = types.SLICE
-		dt.Kind = jule.PREFIX_SLICE + dt.Kind
+		dt.Kind = lex.PREFIX_SLICE + dt.Kind
 		dt.ComponentType = new(models.Type)
 		*dt.ComponentType = param.Type
 		dt.Original = nil
@@ -2442,7 +2442,7 @@ func (p *Parser) parseArg(f *Fn, pair *paramMapPair, args *models.Args, variadic
 	}
 	pair.arg.Expr.Model = model
 	if !value.variadic && !pair.param.Variadic &&
-		!models.Has_attribute(jule.ATTR_CDEF, f.Attributes) &&
+		!models.Has_attribute(build.ATTR_CDEF, f.Attributes) &&
 		types.IsPure(pair.param.Type) && types.IsNumeric(pair.param.Type.Id) {
 		pair.arg.CastType = new(Type)
 		*pair.arg.CastType = pair.param.Type.Copy()
@@ -3542,7 +3542,7 @@ func (p *Parser) typeSourceIsArrayType(arr_t *Type) (ok bool) {
 		p.pusherrtok(arr_t.Token, "invalid_type")
 	}
 	modifiers := arr_t.Modifiers()
-	arr_t.Kind = modifiers + jule.PREFIX_ARRAY + arr_t.ComponentType.Kind
+	arr_t.Kind = modifiers + lex.PREFIX_ARRAY + arr_t.ComponentType.Kind
 	if arr_t.Size.AutoSized || arr_t.Size.Expr.Model != nil {
 		return
 	}
@@ -3568,7 +3568,7 @@ func (p *Parser) typeSourceIsSliceType(slc_t *Type) (ok bool) {
 		p.pusherrtok(slc_t.Token, "invalid_type")
 	}
 	modifiers := slc_t.Modifiers()
-	slc_t.Kind = modifiers + jule.PREFIX_SLICE + slc_t.ComponentType.Kind
+	slc_t.Kind = modifiers + lex.PREFIX_SLICE + slc_t.ComponentType.Kind
 	return
 }
 
@@ -3740,8 +3740,8 @@ func (p *Parser) check_type(real, check Type, ignoreAny, allow_assign bool, errT
 			p.pusherrtok(errTok, "incompatible_types", real.Kind, check.Kind)
 			return
 		}
-		realKind := strings.Replace(real.Kind, jule.MARK_ARRAY, strconv.Itoa(real.Size.N), 1)
-		checkKind := strings.Replace(check.Kind, jule.MARK_ARRAY, strconv.Itoa(check.Size.N), 1)
+		realKind := strings.Replace(real.Kind, lex.MARK_ARRAY, strconv.Itoa(real.Size.N), 1)
+		checkKind := strings.Replace(check.Kind, lex.MARK_ARRAY, strconv.Itoa(check.Size.N), 1)
 		p.pusherrtok(errTok, "incompatible_types", realKind, checkKind)
 	}
 }

@@ -6,6 +6,16 @@ import (
 	"strings"
 )
 
+// This attributes should be added to the attribute map.
+const ATTR_CDEF    = "cdef"
+const ATTR_TYPEDEF = "typedef"
+
+// ATTRS is list of all attributes.
+var ATTRS = [...]string{
+	ATTR_CDEF,
+	ATTR_TYPEDEF,
+}
+
 const goos_windows = "windows"
 const goos_darwin = "darwin"
 const goos_linux = "linux"

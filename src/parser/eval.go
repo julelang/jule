@@ -9,7 +9,6 @@ import (
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
-	"github.com/julelang/jule"
 )
 
 type value struct {
@@ -1053,7 +1052,7 @@ func readyToVariadic(v *value) {
 	v.data.Type.ComponentType = new(Type)
 	v.data.Type.ComponentType.Id = types.U8
 	v.data.Type.ComponentType.Kind = types.TYPE_MAP[v.data.Type.Id]
-	v.data.Type.Kind = jule.PREFIX_SLICE + v.data.Type.ComponentType.Kind
+	v.data.Type.Kind = lex.PREFIX_SLICE + v.data.Type.ComponentType.Kind
 }
 
 func (e *eval) variadic(toks []lex.Token, m *exprModel, errtok lex.Token) (v value) {
@@ -1257,7 +1256,7 @@ func (e *eval) slicingSlice(v value, errtok lex.Token) value {
 func (e *eval) slicingArray(v value, errtok lex.Token) value {
 	v.lvalue = false
 	v.data.Type.Id = types.SLICE
-	v.data.Type.Kind = jule.PREFIX_SLICE + v.data.Type.ComponentType.Kind
+	v.data.Type.Kind = lex.PREFIX_SLICE + v.data.Type.ComponentType.Kind
 	return v
 }
 
@@ -1353,7 +1352,7 @@ func (e *eval) build_slice_implicit(parts [][]lex.Token, errtok lex.Token) (valu
 	model.expr = append(model.expr, expModel)
 	model.dataType = Type{
 		Id: types.SLICE,
-		Kind: jule.PREFIX_SLICE + partVal.data.Type.Kind,
+		Kind: lex.PREFIX_SLICE + partVal.data.Type.Kind,
 	}
 	model.dataType.ComponentType = new(Type)
 	*model.dataType.ComponentType = partVal.data.Type

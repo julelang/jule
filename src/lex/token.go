@@ -143,7 +143,15 @@ const KND_UNSAFE      = "unsafe"
 const KND_MUT         = "mut"
 const KND_DEFER       = "defer"
 
-const IGNORE_ID = "_"
+const IGNORE_ID    = "_"
+const ANONYMOUS_ID = "<anonymous>"
+
+const COMMENT_PRAGMA_SEP    = ":"
+const PRAGMA_COMMENT_PREFIX = "jule" + COMMENT_PRAGMA_SEP
+
+const MARK_ARRAY   = "..."
+const PREFIX_SLICE = "[]"
+const PREFIX_ARRAY = "[" + MARK_ARRAY + "]"
 
 var Punctuations = [...]rune{
 	'!',

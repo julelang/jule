@@ -4,7 +4,6 @@ import (
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
-	"github.com/julelang/jule"
 )
 
 func (p *Parser) getFieldMap(f *Fn) *paramMap {
@@ -42,7 +41,7 @@ func (sap *structArgParser) buildArgs() {
 			sap.args.Src[i] = arg
 		case pair.param.Variadic:
 			model := sliceExpr{pair.param.Type, nil}
-			model.dataType.Kind = jule.PREFIX_SLICE + model.dataType.Kind // For slice.
+			model.dataType.Kind = lex.PREFIX_SLICE + model.dataType.Kind // For slice.
 			arg := Arg{Expr: Expr{Model: model}}
 			sap.args.Src[i] = arg
 		}

@@ -3,7 +3,6 @@ package models
 import (
 	"strings"
 
-	"github.com/julelang/jule"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 )
@@ -302,7 +301,7 @@ func (dt *Type) TraitString() string {
 func (dt *Type) StructString() string {
 	var cpp strings.Builder
 	s := dt.Tag.(*Struct)
-	if s.CppLinked && !Has_attribute(jule.ATTR_TYPEDEF, s.Attributes) {
+	if s.CppLinked && !Has_attribute(build.ATTR_TYPEDEF, s.Attributes) {
 		cpp.WriteString("struct ")
 	}
 	cpp.WriteString(s.OutId())

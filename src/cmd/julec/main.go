@@ -133,23 +133,9 @@ func process_command() bool {
 }
 
 func init() {
-	execp, err := os.Executable()
-	if err != nil {
-		exit_err(err.Error())
-	}
-	jule.WORKING_PATH, err = os.Getwd()
-	if err != nil {
-		exit_err(err.Error())
-	}
-	execp = filepath.Dir(execp)
-	jule.EXEC_PATH = execp
-	jule.STDLIB_PATH = filepath.Join(jule.EXEC_PATH, "..")
-	jule.STDLIB_PATH = filepath.Join(jule.STDLIB_PATH, jule.STDLIB)
 	julec_header = filepath.Join(jule.EXEC_PATH, "..")
 	julec_header = filepath.Join(julec_header, "api")
 	julec_header = filepath.Join(julec_header, "julec.hpp")
-	jule.LOCALIZATION_PATH = filepath.Join(jule.EXEC_PATH, "..")
-	jule.LOCALIZATION_PATH = filepath.Join(jule.LOCALIZATION_PATH, jule.LOCALIZATIONS)
 
 	// Configure compiler to default by platform
 	if runtime.GOOS == "windows" {
@@ -178,7 +164,7 @@ func check_mode() {
 }
 
 func check_compiler() {
-	if compiler != jule.COMPILER_GCC && compiler != jule.COMPILER_CLANG {
+	if compiler != compiler_gcc && compiler != compiler_clang {
 		println(build.Errorf("invalid_value_for_key", compiler, "compiler"))
 		os.Exit(0)
 	}

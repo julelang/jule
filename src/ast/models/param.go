@@ -3,7 +3,6 @@ package models
 import (
 	"strings"
 
-	"github.com/julelang/jule"
 	"github.com/julelang/jule/lex"
 )
 
@@ -38,7 +37,7 @@ func (p *Param) OutId() string {
 func (p Param) String() string {
 	var cpp strings.Builder
 	cpp.WriteString(p.Prototype())
-	if p.Id != "" && !lex.IsIgnoreId(p.Id) && p.Id != jule.ANONYMOUS {
+	if p.Id != "" && !lex.IsIgnoreId(p.Id) && p.Id != lex.ANONYMOUS_ID {
 		cpp.WriteByte(' ')
 		cpp.WriteString(p.OutId())
 	}

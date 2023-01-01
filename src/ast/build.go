@@ -802,7 +802,7 @@ func (b *Builder) fn_prototype(toks []lex.Token, i *int, method, anon bool) (f m
 	f.Pub = b.pub
 	b.pub = false
 	if anon {
-		f.Id = jule.ANONYMOUS
+		f.Id = lex.ANONYMOUS_ID
 	} else {
 		tok := toks[*i]
 		if tok.Id != lex.ID_IDENT {
@@ -1001,7 +1001,7 @@ func (b *Builder) checkParams(params *[]models.Param) {
 			param.Type.Id = types.ID
 			param.Type.Kind = param.Type.Token.Kind
 			param.Type.Original = param.Type
-			param.Id = jule.ANONYMOUS
+			param.Id = lex.ANONYMOUS_ID
 			param.Token = lex.Token{}
 		}
 	}
@@ -1030,7 +1030,7 @@ func (b *Builder) paramTypeBegin(param *models.Param, i *int, toks []lex.Token) 
 
 func (b *Builder) paramBodyId(param *models.Param, tok lex.Token) {
 	if lex.IsIgnoreId(tok.Kind) {
-		param.Id = jule.ANONYMOUS
+		param.Id = lex.ANONYMOUS_ID
 		return
 	}
 	param.Id = tok.Kind
@@ -1085,7 +1085,7 @@ func (b *Builder) pushParam(params *[]models.Param, toks []lex.Token, mustPure b
 	}
 	// Just data type
 	if param.Token.Id != lex.ID_IDENT {
-		param.Id = jule.ANONYMOUS
+		param.Id = lex.ANONYMOUS_ID
 		b.paramType(&param, toks, mustPure)
 	} else {
 		i := 0
@@ -1131,7 +1131,7 @@ func (b *Builder) fnMultiTypeRet(toks []lex.Token, i *int) (t models.RetType, ok
 	types := make([]models.Type, len(params))
 	for i, param := range params {
 		types[i] = param.Type
-		if param.Id != jule.ANONYMOUS {
+		if param.Id != lex.ANONYMOUS_ID {
 			param.Token.Kind = param.Id
 		} else {
 			param.Token.Kind = lex.IGNORE_ID

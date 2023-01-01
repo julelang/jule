@@ -6,7 +6,6 @@ import (
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
-	"github.com/julelang/jule"
 )
 
 type type_builder struct {
@@ -167,7 +166,7 @@ func (tb *type_builder) enumerable(tok lex.Token) (imret bool) {
 	}
 	tok = tb.tokens[*tb.i]
 	if tok.Id == lex.ID_BRACE && tok.Kind == lex.KND_RBRACKET {
-		tb.kind += jule.PREFIX_SLICE
+		tb.kind += lex.PREFIX_SLICE
 		tb.t.ComponentType = new(models.Type)
 		tb.t.Id = types.SLICE
 		tb.t.Token = tok
@@ -216,7 +215,7 @@ func (tb *type_builder) array() (ok bool) {
 	} else {
 		tb.t.Size.Expr = tb.b.Expr(exprToks)
 	}
-	tb.kind = tb.kind + jule.PREFIX_ARRAY + tb.t.ComponentType.Kind
+	tb.kind = tb.kind + lex.PREFIX_ARRAY + tb.t.ComponentType.Kind
 	return
 }
 

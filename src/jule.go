@@ -1,34 +1,40 @@
 package jule
 
+import (
+	"os"
+	"path/filepath"
+)
+
 // Jule constants.
-const VERSION       = `@development_channel`
+const VERSION       = `@master`
 const SRC_EXT       = `.jule`
-const SETTINGS_FILE = "jule.set"
 const API           = "api"
 const STDLIB        = "std"
-const LOCALIZATIONS = "localization"
-const ENTRY_POINT = "main"
-const INIT_FN     = "init"
-
-const ANONYMOUS = "<anonymous>"
-
-const COMMENT_PRAGMA_SEP    = ":"
-const PRAGMA_COMMENT_PREFIX = "jule" + COMMENT_PRAGMA_SEP
-
-// This attributes should be added to the attribute map.
-const ATTR_CDEF    = "cdef"
-const ATTR_TYPEDEF = "typedef"
-
-const MARK_ARRAY = "..."
-
-const PREFIX_SLICE = "[]"
-const PREFIX_ARRAY = "[" + MARK_ARRAY + "]"
-
-const COMPILER_GCC   = "gcc"
-const COMPILER_CLANG = "clang"
+const ENTRY_POINT   = "main"
+const INIT_FN       = "init"
 
 // Environment Variables.
 var LOCALIZATION_PATH string
 var STDLIB_PATH string
 var EXEC_PATH string
 var WORKING_PATH string
+
+func exit_err(msg string) {
+	println(msg)
+	const ERROR_EXIT_CODE = 0
+	os.Exit(ERROR_EXIT_CODE)
+}
+
+func init() {
+	path, err := os.Executable()
+	if err != nil {
+		exit_err(err.Error())
+	}
+	WORKING_PATH, err = os.Getwd()
+	if err != nil {
+		exit_err(err.Error())
+	}
+	EXEC_PATH = filepath.Dir(path)
+	path = filepath.Join(EXEC_PATH, "..") // Go to parent directory
+	STDLIB_PATH = filepath.Join(path, STDLIB)
+}

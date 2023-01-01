@@ -4,7 +4,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/julelang/jule"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
@@ -252,7 +251,7 @@ func VariadicToSlice(t Type) Type {
 	t.ComponentType = new(Type)
 	*t.ComponentType = t
 	t.Id = SLICE
-	t.Kind = jule.PREFIX_SLICE + t.ComponentType.Kind
+	t.Kind = lex.PREFIX_SLICE + t.ComponentType.Kind
 	return t
 }
 
@@ -364,11 +363,11 @@ func IsRef(t Type) bool {
 }
 
 func IsSlice(t Type) bool {
-	return t.Id == SLICE && strings.HasPrefix(t.Kind, jule.PREFIX_SLICE)
+	return t.Id == SLICE && strings.HasPrefix(t.Kind, lex.PREFIX_SLICE)
 }
 
 func IsArray(t Type) bool {
-	return t.Id == ARRAY && strings.HasPrefix(t.Kind, jule.PREFIX_ARRAY)
+	return t.Id == ARRAY && strings.HasPrefix(t.Kind, lex.PREFIX_ARRAY)
 }
 
 func IsMap(t Type) bool {

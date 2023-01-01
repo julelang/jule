@@ -6,7 +6,6 @@ import (
 	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
-	"github.com/julelang/jule"
 	"github.com/julelang/jule/types"
 )
 
@@ -392,7 +391,7 @@ var Builtin = &models.Defmap{
 					Id:      "dest",
 					Type: Type{
 						Id:            types.SLICE,
-						Kind:          jule.PREFIX_SLICE + "Item",
+						Kind:          lex.PREFIX_SLICE + "Item",
 						ComponentType: &Type{Id: types.ID, Kind: "Item"},
 					},
 				},
@@ -400,7 +399,7 @@ var Builtin = &models.Defmap{
 					Id: "src",
 					Type: Type{
 						Id:            types.SLICE,
-						Kind:          jule.PREFIX_SLICE + "Item",
+						Kind:          lex.PREFIX_SLICE + "Item",
 						ComponentType: &Type{Id: types.ID, Kind: "Item"},
 					},
 				},
@@ -414,7 +413,7 @@ var Builtin = &models.Defmap{
 			RetType: models.RetType{
 				Type: Type{
 					Id:            types.SLICE,
-					Kind:          jule.PREFIX_SLICE + "Item",
+					Kind:          lex.PREFIX_SLICE + "Item",
 					ComponentType: &Type{Id: types.ID, Kind: "Item"},
 				},
 			},
@@ -423,7 +422,7 @@ var Builtin = &models.Defmap{
 					Id: "src",
 					Type: Type{
 						Id:            types.SLICE,
-						Kind:          jule.PREFIX_SLICE + "Item",
+						Kind:          lex.PREFIX_SLICE + "Item",
 						ComponentType: &Type{Id: types.ID, Kind: "Item"},
 					},
 				},
@@ -503,7 +502,7 @@ var strDefines = &models.Defmap{
 					Type: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
 				},
 			},
-			RetType: RetType{Type: Type{Id: types.STR, Kind: jule.PREFIX_SLICE + types.TYPE_MAP[types.STR]}},
+			RetType: RetType{Type: Type{Id: types.STR, Kind: lex.PREFIX_SLICE + types.TYPE_MAP[types.STR]}},
 		},
 		{
 			Pub: true,
@@ -627,11 +626,11 @@ func readyMapDefines(mapt Type) {
 
 	keysFunc, _, _ := mapDefines.FnById("keys", nil)
 	keysFunc.RetType.Type = keyt
-	keysFunc.RetType.Type.Kind = jule.PREFIX_SLICE + keysFunc.RetType.Type.Kind
+	keysFunc.RetType.Type.Kind = lex.PREFIX_SLICE + keysFunc.RetType.Type.Kind
 
 	valuesFunc, _, _ := mapDefines.FnById("values", nil)
 	valuesFunc.RetType.Type = valt
-	valuesFunc.RetType.Type.Kind = jule.PREFIX_SLICE + valuesFunc.RetType.Type.Kind
+	valuesFunc.RetType.Type.Kind = lex.PREFIX_SLICE + valuesFunc.RetType.Type.Kind
 
 	hasFunc, _, _ := mapDefines.FnById("has", nil)
 	hasFunc.Params[0].Type = keyt
