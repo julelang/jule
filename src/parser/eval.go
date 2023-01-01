@@ -127,7 +127,7 @@ func (e *eval) eval(op any) (v value, model iExpr) {
 }
 
 func (e *eval) single(tok lex.Token, m *exprModel) (v value, ok bool) {
-	eval := valueEvaluator{tok, m, e.p}
+	eval := literal_eval{tok, m, e.p}
 	v.data.Type.Id = types.VOID
 	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
 	v.data.Token = tok
@@ -138,7 +138,7 @@ func (e *eval) single(tok lex.Token, m *exprModel) (v value, ok bool) {
 		case lex.IsStr(tok.Kind):
 			v = eval.str()
 		case lex.IsChar(tok.Kind):
-			v = eval.char()
+			v = eval.rune()
 		case lex.IsBool(tok.Kind):
 			v = eval.bool()
 		case lex.IsNil(tok.Kind):

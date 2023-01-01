@@ -12,7 +12,7 @@ import (
 	"github.com/julelang/jule/types"
 )
 
-type valueEvaluator struct {
+type literal_eval struct {
 	token lex.Token
 	model *exprModel
 	p     *Parser
@@ -65,7 +65,7 @@ func numericModel(v value) iExpr {
 	return nil
 }
 
-func (ve *valueEvaluator) str() value {
+func (ve *literal_eval) str() value {
 	var v value
 	v.constExpr = true
 	v.data.Value = ve.token.Kind
@@ -78,7 +78,7 @@ func (ve *valueEvaluator) str() value {
 	return v
 }
 
-func toCharLiteral(kind string) (string, bool) {
+func toByteLiteral(kind string) (string, bool) {
 	kind = kind[1 : len(kind)-1]
 	isByte := false
 	switch {
@@ -92,11 +92,11 @@ func toCharLiteral(kind string) (string, bool) {
 	return kind, isByte
 }
 
-func (ve *valueEvaluator) char() value {
+func (ve *literal_eval) rune() value {
 	var v value
 	v.constExpr = true
 	v.data.Value = ve.token.Kind
-	content, isByte := toCharLiteral(ve.token.Kind)
+	content, isByte := toByteLiteral(ve.token.Kind)
 	if isByte {
 		v.data.Type.Id = types.U8
 	} else { // rune
@@ -110,7 +110,7 @@ func (ve *valueEvaluator) char() value {
 	return v
 }
 
-func (ve *valueEvaluator) bool() value {
+func (ve *literal_eval) bool() value {
 	var v value
 	v.constExpr = true
 	v.data.Value = ve.token.Kind
@@ -122,7 +122,7 @@ func (ve *valueEvaluator) bool() value {
 	return v
 }
 
-func (ve *valueEvaluator) nil() value {
+func (ve *literal_eval) nil() value {
 	var v value
 	v.constExpr = true
 	v.data.Value = ve.token.Kind
@@ -154,7 +154,7 @@ func normalize(v *value) (normalized bool) {
 	return
 }
 
-func (ve *valueEvaluator) float() value {
+func (ve *literal_eval) float() value {
 	var v value
 	v.data.Value = ve.token.Kind
 	v.data.Type.Id = types.F64
@@ -163,7 +163,7 @@ func (ve *valueEvaluator) float() value {
 	return v
 }
 
-func (ve *valueEvaluator) integer() value {
+func (ve *literal_eval) integer() value {
 	var v value
 	v.data.Value = ve.token.Kind
 	var bigint big.Int
@@ -186,7 +186,7 @@ func (ve *valueEvaluator) integer() value {
 	return v
 }
 
-func (ve *valueEvaluator) numeric() value {
+func (ve *literal_eval) numeric() value {
 	var v value
 	if lex.IsFloat(ve.token.Kind) {
 		v = ve.float()
@@ -213,7 +213,7 @@ func make_value_from_var(v *Var) (val value) {
 	return
 }
 
-func (ve *valueEvaluator) varId(id string, variable *Var, global bool) (v value) {
+func (ve *literal_eval) var_id(id string, variable *Var, global bool) (v value) {
 	variable.Used = true
 	v = make_value_from_var(variable)
 	if v.constExpr {
@@ -238,14 +238,14 @@ func make_value_from_fn(f *models.Fn) (v value) {
 	return
 }
 
-func (ve *valueEvaluator) funcId(id string, f *Fn) (v value) {
+func (ve *literal_eval) fn_id(id string, f *Fn) (v value) {
 	f.Used = true
 	v = make_value_from_fn(f)
 	ve.model.append_sub(exprNode{f.OutId()})
 	return
 }
 
-func (ve *valueEvaluator) enumId(id string, e *Enum) (v value) {
+func (ve *literal_eval) enumId(id string, e *Enum) (v value) {
 	e.Used = true
 	v.data.Value = id
 	v.data.Type.Id = types.ENUM
@@ -274,7 +274,7 @@ func make_value_from_struct(s *Struct) (v value) {
 	return
 }
 
-func (ve *valueEvaluator) structId(id string, s *Struct) (v value) {
+func (ve *literal_eval) struct_id(id string, s *Struct) (v value) {
 	s.Used = true
 	v = make_value_from_struct(s)
 	// If builtin.
@@ -286,33 +286,33 @@ func (ve *valueEvaluator) structId(id string, s *Struct) (v value) {
 	return
 }
 
-func (ve *valueEvaluator) typeId(id string, t *TypeAlias) (_ value, _ bool) {
+func (ve *literal_eval) type_id(id string, t *TypeAlias) (_ value, _ bool) {
 	dt, ok := ve.p.realType(t.Type, true)
 	if !ok {
 		return
 	}
 	if types.IsStruct(dt) {
-		return ve.structId(id, dt.Tag.(*Struct)), true
+		return ve.struct_id(id, dt.Tag.(*Struct)), true
 	}
 	return
 }
 
-func (ve *valueEvaluator) id() (_ value, ok bool) {
+func (ve *literal_eval) id() (_ value, ok bool) {
 	id := ve.token.Kind
 
 	v, _ := ve.p.block_var_by_id(id)
 	if v != nil {
-		return ve.varId(id, v, false), true
+		return ve.var_id(id, v, false), true
 	} else {
 		v, _, _ := ve.p.global_by_id(id)
 		if v != nil {
-			return ve.varId(id, v, true), true
+			return ve.var_id(id, v, true), true
 		}
 	}
 
 	f, _, _ := ve.p.fn_by_id(id)
 	if f != nil {
-		return ve.funcId(id, f), true
+		return ve.fn_id(id, f), true
 	}
 
 	e, _, _ := ve.p.enum_by_id(id)
@@ -322,12 +322,12 @@ func (ve *valueEvaluator) id() (_ value, ok bool) {
 
 	s, _, _ := ve.p.struct_by_id(id)
 	if s != nil {
-		return ve.structId(id, s), true
+		return ve.struct_id(id, s), true
 	}
 
 	t, _, _ := ve.p.type_by_id(id)
 	if t != nil {
-		return ve.typeId(id, t)
+		return ve.type_id(id, t)
 	}
 
 	ve.p.eval.pusherrtok(ve.token, "id_not_exist", id)
