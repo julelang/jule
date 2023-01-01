@@ -15,10 +15,10 @@ type Log struct {
 	Row     int
 	Column  int
 	Path    string
-	Message string
+	Text string
 }
 
-func (l *Log) flat_err() string { return l.Message }
+func (l *Log) flat_err() string { return l.Text }
 
 func (l *Log) err() string {
 	var log strings.Builder
@@ -28,7 +28,7 @@ func (l *Log) err() string {
 	log.WriteByte(':')
 	log.WriteString(fmt.Sprint(l.Column))
 	log.WriteByte(' ')
-	log.WriteString(l.Message)
+	log.WriteString(l.Text)
 	return log.String()
 }
 

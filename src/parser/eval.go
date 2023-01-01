@@ -11,14 +11,14 @@ import (
 )
 
 type value struct {
-	data      ast.Data
-	model     iExpr
-	expr      any
-	constExpr bool
-	lvalue    bool
-	variadic  bool
-	is_type   bool
-	mutable   bool
+	data     ast.Data
+	model    iExpr
+	expr     any
+	constant bool
+	lvalue   bool
+	variadic bool
+	is_type  bool
+	mutable  bool
 }
 
 type eval struct {
@@ -44,7 +44,7 @@ func (e *eval) eval_toks(toks []lex.Token) (value, iExpr) {
 func (e *eval) eval_expr(expr Expr) (value, iExpr) { return e.eval(expr.Op) }
 
 func get_bop_model(v value, bop ast.Binop, lm iExpr, rm iExpr) iExpr {
-	if v.constExpr {
+	if v.constant {
 		return v.model
 	}
 	model := exprNode{}
@@ -62,7 +62,7 @@ func (e *eval) eval_op(op any) (v value, model iExpr) {
 		m := newExprModel(1)
 		model = m
 		v = e.process(t.Tokens, m)
-		if v.constExpr {
+		if v.constant {
 			model = v.model
 		} else if v.is_type {
 			e.pusherrtok(v.data.Token, "invalid_expr")
@@ -98,7 +98,7 @@ func (e *eval) eval(op any) (v value, model iExpr) {
 		if types.IsVoid(v.data.Type) {
 			v.data.Type.Id = types.VOID
 			v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
-		} else if v.constExpr && types.IsPure(v.data.Type) && lex.IsLiteral(v.data.Value) {
+		} else if v.constant && types.IsPure(v.data.Type) && lex.IsLiteral(v.data.Value) {
 			switch v.expr.(type) {
 			case int64:
 				dt := Type{
@@ -350,7 +350,7 @@ func (e *eval) try_cpp_linked_var(toks []lex.Token, m *exprModel) (v value, ok b
 }
 
 func (e *eval) process(toks []lex.Token, m *exprModel) (v value) {
-	v.constExpr = true
+	v.constant = true
 	if len(toks) == 1 {
 		v, _ = e.single(toks[0], m)
 		return
@@ -551,7 +551,7 @@ func (e *eval) cast(v value, t Type, errtok lex.Token) value {
 	v.data.Type = t
 	v.lvalue = types.IsLvalue(t)
 	v.mutable = types.IsRef(t) || types.IsMut(t)
-	if v.constExpr {
+	if v.constant {
 		var model exprNode
 		model.value = v.data.Type.String()
 		model.value += lex.KND_LPAREN
@@ -584,7 +584,7 @@ func (e *eval) castPtr(t Type, v *value, errtok lex.Token) {
 		!types.IsInteger(v.data.Type.Id) {
 		e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
 	}
-	v.constExpr = false
+	v.constant = false
 }
 
 func (e *eval) cast_ref(t Type, v *value, errtok lex.Token) {
@@ -628,7 +628,7 @@ func (e *eval) castStr(t Type, errtok lex.Token) {
 }
 
 func (e *eval) castInteger(t Type, v *value, errtok lex.Token) {
-	if v.constExpr {
+	if v.constant {
 		switch {
 		case types.IsSignedInteger(t.Id):
 			v.expr = tonums(v)
@@ -661,7 +661,7 @@ func (e *eval) castInteger(t Type, v *value, errtok lex.Token) {
 }
 
 func (e *eval) castNumeric(t Type, v *value, errtok lex.Token) {
-	if v.constExpr {
+	if v.constant {
 		switch {
 		case types.IsFloat(t.Id):
 			v.expr = tonumf(v)
@@ -706,8 +706,8 @@ func (e *eval) juletypeSubId(dm *ast.Defmap, idTok lex.Token, m *exprModel) (v v
 	case 'g':
 		g := dm.Globals[i]
 		v.data.Type = g.Type
-		v.constExpr = g.Const
-		if v.constExpr {
+		v.constant = g.Const
+		if v.constant {
 			v.expr = g.ExprTag
 			v.model = g.Expr.Model
 			m.append_sub(v.model)
@@ -846,7 +846,7 @@ func (e *eval) xObjSubId(dm *ast.Defmap, val value, interior_mutability bool, id
 		v.data.Type = g.Type
 		v.lvalue = val.lvalue || types.IsLvalue(g.Type)
 		v.mutable = v.mutable || (g.Mutable && interior_mutability)
-		v.constExpr = g.Const
+		v.constant = g.Const
 		if g.Const {
 			v.expr = g.ExprTag
 			v.model = g.Expr.Model
@@ -914,7 +914,7 @@ func (e *eval) enumSubId(val value, idTok lex.Token, m *exprModel) (v value) {
 func (e *eval) structObjSubId(val value, idTok lex.Token, m *exprModel) value {
 	parent_type := val.data.Type
 	s := val.data.Type.Tag.(*ast.Struct)
-	val.constExpr = false
+	val.constant = false
 	val.is_type = false
 	if val.data.Value == lex.KND_SELF {
 		nodes := &m.nodes[m.index].nodes
@@ -948,11 +948,11 @@ func (e *eval) structObjSubId(val value, idTok lex.Token, m *exprModel) value {
 func (e *eval) traitObjSubId(val value, idTok lex.Token, m *exprModel) value {
 	m.append_sub(exprNode{".get()"})
 	t := val.data.Type.Tag.(*ast.Trait)
-	val.constExpr = false
+	val.constant = false
 	val.lvalue = false
 	val.is_type = false
 	val = e.xObjSubId(t.Defines, val, false, idTok, m)
-	val.constExpr = false
+	val.constant = false
 	return val
 }
 
@@ -1063,7 +1063,7 @@ func (e *eval) variadic(toks []lex.Token, m *exprModel, errtok lex.Token) (v val
 	}
 	v.data.Type = *v.data.Type.ComponentType
 	v.variadic = true
-	v.constExpr = false
+	v.constant = false
 	return
 }
 
@@ -1110,8 +1110,8 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 	if toks, colon := ast.SplitColon(toks, &i); colon != -1 {
 		i = 0
 		var leftv, rightv value
-		leftv.constExpr = true
-		rightv.constExpr = true
+		leftv.constant = true
+		rightv.constant = true
 		leftToks := toks[:colon]
 		rightToks := toks[colon+1:]
 		m.append_sub(exprNode{".___slice("})
@@ -1214,11 +1214,11 @@ func (e *eval) indexingStr(strv, index value, errtok lex.Token) value {
 	strv.data.Type.Id = types.U8
 	strv.data.Type.Kind = types.TYPE_MAP[strv.data.Type.Id]
 	e.checkIntegerIndexing(index, errtok)
-	if !index.constExpr {
-		strv.constExpr = false
+	if !index.constant {
+		strv.constant = false
 		return strv
 	}
-	if strv.constExpr {
+	if strv.constant {
 		i := tonums(index.expr)
 		s := strv.expr.(string)
 		if int(i) >= len(s) {
@@ -1263,17 +1263,17 @@ func (e *eval) slicingStr(v, leftv, rightv value, errtok lex.Token) value {
 	v.lvalue = false
 	v.data.Type.Id = types.STR
 	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
-	if !v.constExpr {
+	if !v.constant {
 		return v
 	}
-	if rightv.constExpr {
+	if rightv.constant {
 		right := tonums(rightv.expr)
 		s := v.expr.(string)
 		if int(right) >= len(s) {
 			e.p.pusherrtok(errtok, "overflow_limits")
 		}
 	}
-	if leftv.constExpr && rightv.constExpr {
+	if leftv.constant && rightv.constant {
 		left := tonums(leftv.expr)
 		if left < 0 {
 			return v
@@ -1291,7 +1291,7 @@ func (e *eval) slicingStr(v, leftv, rightv value, errtok lex.Token) value {
 		v.expr = s[left:right]
 		v.model = strModel(v)
 	} else {
-		v.constExpr = false
+		v.constant = false
 	}
 	return v
 }

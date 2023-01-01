@@ -19,7 +19,7 @@ func (af AnonFuncExpr) String() string {
 	}
 	cpp.WriteString(t.FnString())
 	cpp.WriteString("([=]")
-	cpp.WriteString(ast.ParamsToCpp(af.Ast.Params))
+	cpp.WriteString(gen_params(af.Ast.Params))
 	cpp.WriteString(" mutable -> ")
 	cpp.WriteString(af.Ast.RetType.String())
 	cpp.WriteByte(' ')

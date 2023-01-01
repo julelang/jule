@@ -14,7 +14,7 @@ func check_value_for_indexing(v value) (err_key string) {
 		return "invalid_expr"
 	case !types.IsInteger(v.data.Type.Id):
 		return "invalid_expr"
-	case v.constExpr && tonums(v.expr) < 0:
+	case v.constant && tonums(v.expr) < 0:
 		return "overflow_limits"
 	default:
 		return ""
@@ -43,7 +43,7 @@ func isBoolExpr(v value) bool {
 }
 
 func canGetPtr(v value) bool {
-	if !v.lvalue || v.constExpr {
+	if !v.lvalue || v.constant {
 		return false
 	}
 	switch v.data.Type.Id {
@@ -83,7 +83,7 @@ func checkFloatBit(v ast.Data, bit int) bool {
 }
 
 func validExprForConst(v value) bool {
-	return v.constExpr
+	return v.constant
 }
 
 func okForShifting(v value) bool {
@@ -91,7 +91,7 @@ func okForShifting(v value) bool {
 		!types.IsInteger(v.data.Type.Id) {
 		return false
 	}
-	if !v.constExpr {
+	if !v.constant {
 		return true
 	}
 	switch t := v.expr.(type) {

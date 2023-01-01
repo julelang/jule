@@ -523,7 +523,7 @@ var strDefines = &ast.Defmap{
 // Because some definitions is responsive for str data types.
 func readyStrDefines(s value) {
 	lenVar := strDefines.Globals[0]
-	lenVar.Const = s.constExpr
+	lenVar.Const = s.constant
 	if lenVar.Const {
 		lenVar.ExprTag = int64(len(s.expr.(string)))
 		lenVar.Expr.Model = getModel(value{
@@ -702,7 +702,7 @@ func caller_out(p *Parser, f *Fn, data callData, m *exprModel) (v value) {
 		p.pusherrtok(errtok, "invalid_expr")
 	}
 	m.append_sub(exprNode{"(" + model.String() + ")"})
-	arg.constExpr = false
+	arg.constant = false
 	return v
 }
 
@@ -798,7 +798,7 @@ func caller_mem_size_of(p *Parser, _ *Fn, data callData, m *exprModel) (v value)
 	if !ok {
 		v, model := p.evalToks(data.args, nil)
 		*node = exprNode{"sizeof(" + model.String() + ")"}
-		v.constExpr = false
+		v.constant = false
 		return v
 	}
 	if i+1 < len(data.args) {
@@ -826,7 +826,7 @@ func caller_mem_align_of(p *Parser, _ *Fn, data callData, m *exprModel) (v value
 	if !ok {
 		v, model := p.evalToks(data.args, nil)
 		*node = exprNode{"alignof(" + model.String() + ")"}
-		v.constExpr = false
+		v.constant = false
 		return v
 	}
 	if i+1 < len(data.args) {

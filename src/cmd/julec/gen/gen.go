@@ -35,6 +35,32 @@ func done_indent() {
 	atomic.SwapUint32(&indent, atomic.LoadUint32(&indent)-1)
 }
 
+func gen_params(params []ast.Param) string {
+	if len(params) == 0 {
+		return "(void)"
+	}
+	var cpp strings.Builder
+	cpp.WriteByte('(')
+	for _, p := range params {
+		cpp.WriteString(p.String())
+		cpp.WriteByte(',')
+	}
+	return cpp.String()[:cpp.Len()-1] + ")"
+}
+
+func gen_generics(generics []*ast.GenericType) string {
+	if len(generics) == 0 {
+		return ""
+	}
+	var cpp strings.Builder
+	cpp.WriteString("template<")
+	for _, g := range generics {
+		cpp.WriteString(g.String())
+		cpp.WriteByte(',')
+	}
+	return cpp.String()[:cpp.Len()-1] + ">"
+}
+
 func gen_assign_left(as *ast.AssignLeft) string {
 	switch {
 	case as.Var.New:
@@ -774,7 +800,7 @@ func gen_struct_constructor(s *ast.Struct) string {
 	var cpp strings.Builder
 	cpp.WriteString(indent_string())
 	cpp.WriteString(s.OutId())
-	cpp.WriteString(ast.ParamsToCpp(s.Constructor.Params))
+	cpp.WriteString(gen_params(s.Constructor.Params))
 	cpp.WriteString(" noexcept {\n")
 	add_indent()
 	cpp.WriteString(indent_string())
@@ -808,7 +834,7 @@ func gen_struct_destructor(s *ast.Struct) string {
 
 func gen_struct_prototype(s *ast.Struct) string {
 	var cpp strings.Builder
-	cpp.WriteString(ast.GenericsToCpp(s.Generics))
+	cpp.WriteString(gen_generics(s.Generics))
 	cpp.WriteByte('\n')
 	cpp.WriteString("struct ")
 	outid := s.OutId()
@@ -855,7 +881,7 @@ func gen_struct_prototype(s *ast.Struct) string {
 
 func gen_struct_plain_prototype(s *ast.Struct) string {
 	var cpp strings.Builder
-	cpp.WriteString(ast.GenericsToCpp(s.Generics))
+	cpp.WriteString(gen_generics(s.Generics))
 	cpp.WriteByte('\n')
 	cpp.WriteString("struct ")
 	cpp.WriteString(s.OutId())
@@ -885,7 +911,7 @@ func gen_struct(s *ast.Struct) string {
 
 func gen_fn_decl_head(f *ast.Fn, owner string) string {
 	var cpp strings.Builder
-	cpp.WriteString(ast.GenericsToCpp(f.Generics))
+	cpp.WriteString(gen_generics(f.Generics))
 	if cpp.Len() > 0 {
 		cpp.WriteByte('\n')
 		cpp.WriteString(indent_string())
@@ -906,7 +932,7 @@ func gen_fn_decl_head(f *ast.Fn, owner string) string {
 func gen_fn_head(f *ast.Fn, owner string) string {
 	var cpp strings.Builder
 	cpp.WriteString(gen_fn_decl_head(f, owner))
-	cpp.WriteString(ast.ParamsToCpp(f.Params))
+	cpp.WriteString(gen_params(f.Params))
 	return cpp.String()
 }
 
@@ -1159,7 +1185,7 @@ func gen_trait(t *ast.Trait) string {
 		cpp.WriteString(f.RetType.String())
 		cpp.WriteByte(' ')
 		cpp.WriteString(f.Id)
-		cpp.WriteString(ast.ParamsToCpp(f.Params))
+		cpp.WriteString(gen_params(f.Params))
 		cpp.WriteString(" {")
 		if !types.IsVoid(f.RetType.Type) {
 			cpp.WriteString(" return {}; ")

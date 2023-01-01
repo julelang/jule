@@ -11,7 +11,7 @@ func compilerErr(t lex.Token, key string, args ...any) build.Log {
 		Row:     t.Row,
 		Column:  t.Column,
 		Path:    t.File.Path(),
-		Message: build.Errorf(key, args...),
+		Text: build.Errorf(key, args...),
 	}
 }
 

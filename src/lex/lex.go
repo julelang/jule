@@ -32,24 +32,22 @@ func New(f *File) *Lex {
 	return l
 }
 
-func (l *Lex) pusherr(key string, args ...any) {
-	l.Logs = append(l.Logs, build.Log{
-		Type:    build.ERR,
-		Row:     l.Row,
-		Column:  l.Column,
-		Path:    l.File.Path(),
-		Message: build.Errorf(key, args...),
-	})
+func mkerr(row int, col int, f *File, key string, args ...any) build.Log {
+	return build.Log{
+		Type:   build.ERR,
+		Row:    row,
+		Column: col,
+		Path:   f.Path(),
+		Text:   build.Errorf(key, args...),
+	}
 }
 
-func (l *Lex) pusherrtok(tok Token, err string) {
-	l.Logs = append(l.Logs, build.Log{
-		Type:    build.ERR,
-		Row:     tok.Row,
-		Column:  tok.Column,
-		Path:    l.File.Path(),
-		Message: build.Errorf(err),
-	})
+func (l *Lex) pusherr(key string, args ...any) {
+	l.Logs = append(l.Logs, mkerr(l.Row, l.Column, l.File, key, args...))
+}
+
+func (l *Lex) pusherrtok(tok Token, key string) {
+	l.Logs = append(l.Logs, mkerr(tok.Row, tok.Column, l.File, key))
 }
 
 func (l *Lex) buff_data() {

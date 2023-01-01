@@ -67,7 +67,7 @@ func numericModel(v value) iExpr {
 
 func (ve *literal_eval) str() value {
 	var v value
-	v.constExpr = true
+	v.constant = true
 	v.data.Value = ve.token.Kind
 	v.data.Type.Id = types.STR
 	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
@@ -94,7 +94,7 @@ func toByteLiteral(kind string) (string, bool) {
 
 func (ve *literal_eval) rune() value {
 	var v value
-	v.constExpr = true
+	v.constant = true
 	v.data.Value = ve.token.Kind
 	content, isByte := toByteLiteral(ve.token.Kind)
 	if isByte {
@@ -112,7 +112,7 @@ func (ve *literal_eval) rune() value {
 
 func (ve *literal_eval) bool() value {
 	var v value
-	v.constExpr = true
+	v.constant = true
 	v.data.Value = ve.token.Kind
 	v.data.Type.Id = types.BOOL
 	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
@@ -124,7 +124,7 @@ func (ve *literal_eval) bool() value {
 
 func (ve *literal_eval) nil() value {
 	var v value
-	v.constExpr = true
+	v.constant = true
 	v.data.Value = ve.token.Kind
 	v.data.Type.Id = types.NIL
 	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
@@ -136,7 +136,7 @@ func (ve *literal_eval) nil() value {
 
 func normalize(v *value) (normalized bool) {
 	switch {
-	case !v.constExpr:
+	case !v.constant:
 		return
 	case int_assignable(types.U64, *v):
 		v.data.Type.Id = types.U64
@@ -193,7 +193,7 @@ func (ve *literal_eval) numeric() value {
 	} else {
 		v = ve.integer()
 	}
-	v.constExpr = true
+	v.constant = true
 	v.model = numericModel(v)
 	ve.model.append_sub(v.model)
 	return v
@@ -202,11 +202,11 @@ func (ve *literal_eval) numeric() value {
 func make_value_from_var(v *Var) (val value) {
 	val.data.Value = v.Id
 	val.data.Type = v.Type
-	val.constExpr = v.Const
+	val.constant = v.Const
 	val.data.Token = v.Token
-	val.lvalue = !val.constExpr
+	val.lvalue = !val.constant
 	val.mutable = v.Mutable
-	if val.constExpr {
+	if val.constant {
 		val.expr = v.ExprTag
 		val.model = v.Expr.Model
 	}
@@ -216,7 +216,7 @@ func make_value_from_var(v *Var) (val value) {
 func (ve *literal_eval) var_id(id string, variable *Var, global bool) (v value) {
 	variable.Used = true
 	v = make_value_from_var(variable)
-	if v.constExpr {
+	if v.constant {
 		ve.model.append_sub(v.model)
 	} else {
 		if variable.Id == lex.KND_SELF && !types.IsRef(variable.Type) {
@@ -252,7 +252,7 @@ func (ve *literal_eval) enumId(id string, e *Enum) (v value) {
 	v.data.Type.Kind = e.Id
 	v.data.Type.Tag = e
 	v.data.Token = e.Token
-	v.constExpr = true
+	v.constant = true
 	v.is_type = true
 	// If built-in.
 	if e.Token.Id == lex.ID_NA {

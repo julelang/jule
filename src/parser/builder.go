@@ -20,7 +20,7 @@ func compilerErr(t lex.Token, key string, args ...any) build.Log {
 		Row:     t.Row,
 		Column:  t.Column,
 		Path:    t.File.Path(),
-		Message: build.Errorf(key, args...),
+		Text: build.Errorf(key, args...),
 	}
 }
 
@@ -37,7 +37,7 @@ type builder struct {
 	wg  sync.WaitGroup
 	pub bool
 
-	Tree   []ast.Object
+	Tree   []ast.Node
 	Errors []build.Log
 	Tokens []lex.Token
 	Pos    int
@@ -68,7 +68,7 @@ func (b *builder) buildNode(toks []lex.Token) {
 	case lex.ID_FN, lex.ID_UNSAFE:
 		s := ast.Statement{Token: t}
 		s.Data = b.Fn(toks, false, false, false)
-		b.Tree = append(b.Tree, ast.Object{Token: s.Token, Data: s})
+		b.Tree = append(b.Tree, ast.Node{Token: s.Token, Data: s})
 	case lex.ID_CONST, lex.ID_LET, lex.ID_MUT:
 		b.GlobalVar(toks)
 	case lex.ID_TYPE:
@@ -258,13 +258,13 @@ func (b *builder) Enum(toks []lex.Token) {
 	e.Pub = b.pub
 	b.pub = false
 	e.Items = b.buildEnumItems(itemToks)
-	b.Tree = append(b.Tree, ast.Object{Token: e.Token, Data: e})
+	b.Tree = append(b.Tree, ast.Node{Token: e.Token, Data: e})
 }
 
 // Comment builds AST model of comment.
-func (b *builder) Comment(t lex.Token) ast.Object {
+func (b *builder) Comment(t lex.Token) ast.Node {
 	t.Kind = strings.TrimSpace(t.Kind[2:])
-	return ast.Object{
+	return ast.Node{
 		Token: t,
 		Data: ast.Comment{
 			Token:   t,
@@ -336,7 +336,7 @@ func (b *builder) parse_struct(toks []lex.Token, cpp_linked bool) ast.Struct {
 // Struct builds AST model of structure.
 func (b *builder) Struct(toks []lex.Token) {
 	s := b.parse_struct(toks, false)
-	b.Tree = append(b.Tree, ast.Object{Token: s.Token, Data: s})
+	b.Tree = append(b.Tree, ast.Node{Token: s.Token, Data: s})
 }
 
 func (b *builder) traitFuncs(toks []lex.Token, trait_id string) []*ast.Fn {
@@ -376,7 +376,7 @@ func (b *builder) Trait(toks []lex.Token) {
 		b.pusherr(toks[i], "invalid_syntax")
 	}
 	t.Funcs = b.traitFuncs(bodyToks, t.Id)
-	b.Tree = append(b.Tree, ast.Object{Token: t.Token, Data: t})
+	b.Tree = append(b.Tree, ast.Node{Token: t.Token, Data: t})
 }
 
 func (b *builder) implTraitFuncs(impl *ast.Impl, toks []lex.Token) {
@@ -395,7 +395,7 @@ func (b *builder) implTraitFuncs(impl *ast.Impl, toks []lex.Token) {
 			f := b.get_method(fnToks)
 			f.Pub = true
 			b.setup_receiver(f, impl.Target.Kind)
-			impl.Tree = append(impl.Tree, ast.Object{Token: f.Token, Data: f})
+			impl.Tree = append(impl.Tree, ast.Node{Token: f.Token, Data: f})
 		default:
 			b.pusherr(tok, "invalid_syntax")
 			continue
@@ -418,7 +418,7 @@ func (b *builder) implStruct(impl *ast.Impl, toks []lex.Token) {
 			impl.Tree = append(impl.Tree, b.Comment(tok))
 			continue
 		case lex.ID_TYPE:
-			impl.Tree = append(impl.Tree, ast.Object{
+			impl.Tree = append(impl.Tree, ast.Node{
 				Token: tok,
 				Data:  b.Generics(fnToks),
 			})
@@ -440,7 +440,7 @@ func (b *builder) implStruct(impl *ast.Impl, toks []lex.Token) {
 			f := b.get_method(fnToks)
 			f.Pub = pub
 			b.setup_receiver(f, impl.Base.Kind)
-			impl.Tree = append(impl.Tree, ast.Object{Token: f.Token, Data: f})
+			impl.Tree = append(impl.Tree, ast.Node{Token: f.Token, Data: f})
 		default:
 			b.pusherr(tok, "invalid_syntax")
 			continue
@@ -530,7 +530,7 @@ body:
 		b.pusherr(toks[i], "invalid_syntax")
 	}
 	b.implFuncs(&impl, bodyToks)
-	b.Tree = append(b.Tree, ast.Object{Token: impl.Base, Data: impl})
+	b.Tree = append(b.Tree, ast.Node{Token: impl.Base, Data: impl})
 }
 
 // link_fn builds AST model of cpp function link.
@@ -545,7 +545,7 @@ func (b *builder) link_fn(toks []lex.Token) {
 	link.Token = tok
 	link.Link = new(ast.Fn)
 	*link.Link = b.Fn(toks[1:], false, false, true)
-	b.Tree = append(b.Tree, ast.Object{Token: tok, Data: link})
+	b.Tree = append(b.Tree, ast.Node{Token: tok, Data: link})
 
 	b.pub = bpub
 }
@@ -562,7 +562,7 @@ func (b *builder) link_var(toks []lex.Token) {
 	link.Token = tok
 	link.Link = new(ast.Var)
 	*link.Link = b.Var(toks[1:], true, false)
-	b.Tree = append(b.Tree, ast.Object{Token: tok, Data: link})
+	b.Tree = append(b.Tree, ast.Node{Token: tok, Data: link})
 
 	b.pub = bpub
 }
@@ -578,7 +578,7 @@ func (b *builder) link_struct(toks []lex.Token) {
 	var link ast.CppLinkStruct
 	link.Token = tok
 	link.Link = b.parse_struct(toks[1:], true)
-	b.Tree = append(b.Tree, ast.Object{Token: tok, Data: link})
+	b.Tree = append(b.Tree, ast.Node{Token: tok, Data: link})
 
 	b.pub = bpub
 }
@@ -594,7 +594,7 @@ func (b *builder) link_type_alias(toks []lex.Token) {
 	var link ast.CppLinkAlias
 	link.Token = tok
 	link.Link = b.TypeAlias(toks[1:])
-	b.Tree = append(b.Tree, ast.Object{Token: tok, Data: link})
+	b.Tree = append(b.Tree, ast.Node{Token: tok, Data: link})
 
 	b.pub = bpub
 }
@@ -639,7 +639,7 @@ func (b *builder) Use(toks []lex.Token) {
 	}
 	toks = toks[1:]
 	b.buildUseDecl(&use, toks)
-	b.Tree = append(b.Tree, ast.Object{Token: use.Token, Data: use})
+	b.Tree = append(b.Tree, ast.Node{Token: use.Token, Data: use})
 }
 
 func (b *builder) getSelectors(toks []lex.Token) []lex.Token {
@@ -910,12 +910,12 @@ func (b *builder) Generics(toks []lex.Token) []ast.GenericType {
 }
 
 // TypeOrGenerics builds type alias or generics type declaration.
-func (b *builder) TypeOrGenerics(toks []lex.Token) ast.Object {
+func (b *builder) TypeOrGenerics(toks []lex.Token) ast.Node {
 	if len(toks) > 1 {
 		tok := toks[1]
 		if tok.Id == lex.ID_BRACE && tok.Kind == lex.KND_LBRACKET {
 			generics := b.Generics(toks)
-			return ast.Object{
+			return ast.Node{
 				Token: tok,
 				Data:  generics,
 			}
@@ -924,7 +924,7 @@ func (b *builder) TypeOrGenerics(toks []lex.Token) ast.Object {
 	t := b.TypeAlias(toks)
 	t.Pub = b.pub
 	b.pub = false
-	return ast.Object{
+	return ast.Node{
 		Token: t.Token,
 		Data:  t,
 	}
@@ -937,7 +937,7 @@ func (b *builder) GlobalVar(toks []lex.Token) {
 	}
 	bs := block_st{toks: toks}
 	s := b.VarSt(&bs, true)
-	b.Tree = append(b.Tree, ast.Object{
+	b.Tree = append(b.Tree, ast.Node{
 		Token: s.Token,
 		Data:  s,
 	})

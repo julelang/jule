@@ -104,7 +104,7 @@ func (ac *assign_checker) check_validity() (valid bool) {
 }
 
 func (ac *assign_checker) check_const() (ok bool) {
-	if !ac.v.constExpr || !types.IsPure(ac.expr_t) ||
+	if !ac.v.constant || !types.IsPure(ac.expr_t) ||
 		!types.IsPure(ac.v.data.Type) || !types.IsNumeric(ac.v.data.Type.Id) {
 		return
 	}

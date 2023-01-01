@@ -31,7 +31,7 @@ type RetType = ast.RetType
 // Parser is parser of Jule code.
 type Parser struct {
 	attributes       []ast.Attribute
-	docText          strings.Builder
+	doc_text          strings.Builder
 	currentIter      *ast.Iter
 	currentCase      *ast.Case
 	wg               sync.WaitGroup
@@ -57,7 +57,6 @@ type Parser struct {
 	Uses        []*ast.UseDecl  // File uses these packages
 	Defines     *ast.Defmap
 	Errors      []build.Log
-	Warnings    []build.Log
 	File        *File
 }
 
@@ -81,11 +80,11 @@ func (p *Parser) pusherrtok(tok lex.Token, key string, args ...any) {
 // pusherrtok appends new error message by token.
 func (p *Parser) pusherrmsgtok(tok lex.Token, msg string) {
 	p.Errors = append(p.Errors, build.Log{
-		Type:    build.ERR,
-		Row:     tok.Row,
-		Column:  tok.Column,
-		Path:    tok.File.Path(),
-		Message: msg,
+		Type:   build.ERR,
+		Row:    tok.Row,
+		Column: tok.Column,
+		Path:   tok.File.Path(),
+		Text:   msg,
 	})
 }
 
@@ -102,12 +101,12 @@ func (p *Parser) PushErr(key string, args ...any) {
 // pusherrmsh appends new flat error message
 func (p *Parser) pusherrmsg(msg string) {
 	p.Errors = append(p.Errors, build.Log{
-		Type:    build.FLAT_ERR,
-		Message: msg,
+		Type: build.FLAT_ERR,
+		Text: msg,
 	})
 }
 
-func getTree(toks []lex.Token) ([]ast.Object, []build.Log) {
+func get_tree(toks []lex.Token) ([]ast.Node, []build.Log) {
 	r := new_builder(toks)
 	r.Build()
 	return r.Tree, r.Errors
@@ -272,7 +271,6 @@ func (p *Parser) compilePureUse(ast *ast.UseDecl) (_ *ast.UseDecl, hassErr bool)
 		u := make_use_from_ast(ast)
 		psub.Defines.PushDefines(u.Defines)
 		p.pusherrs(psub.Errors...)
-		p.Warnings = append(p.Warnings, psub.Warnings...)
 		p.pushUse(u, ast.Selectors)
 		if psub.Errors != nil {
 			p.pusherrtok(ast.Token, "use_has_errors")
@@ -322,16 +320,16 @@ func (p *Parser) use_decl(decl *ast.UseDecl, err *bool) {
 	p.Uses = append(p.Uses, u)
 }
 
-func (p *Parser) parseUses(tree *[]ast.Object) bool {
+func (p *Parser) parseUses(tree *[]ast.Node) bool {
 	err := false
 	for i := range *tree {
-		obj := &(*tree)[i]
-		switch obj_t := obj.Data.(type) {
+		node := &(*tree)[i]
+		switch node_t := node.Data.(type) {
 		case ast.UseDecl:
 			if !err {
-				p.use_decl(&obj_t, &err)
+				p.use_decl(&node_t, &err)
 			}
-			obj.Data = nil
+			node.Data = nil
 		case ast.Comment:
 			// Ignore beginning comments.
 		default:
@@ -343,58 +341,56 @@ end:
 	return err
 }
 
-func objectIsIgnored(obj *ast.Object) bool {
-	return obj.Data == nil
-}
+func node_is_ignored(node *ast.Node) bool { return node.Data == nil }
 
-func (p *Parser) parseSrcTreeObj(obj ast.Object) {
-	if objectIsIgnored(&obj) {
+func (p *Parser) parseSrcTreeNode(node ast.Node) {
+	if node_is_ignored(&node) {
 		return
 	}
-	switch obj_t := obj.Data.(type) {
+	switch node_t := node.Data.(type) {
 	case ast.Statement:
-		p.St(obj_t)
+		p.St(node_t)
 	case TypeAlias:
-		p.Type(obj_t)
+		p.Type(node_t)
 	case []GenericType:
-		p.Generics(obj_t)
+		p.Generics(node_t)
 	case Enum:
-		p.Enum(obj_t)
+		p.Enum(node_t)
 	case Struct:
-		p.Struct(obj_t)
+		p.Struct(node_t)
 	case ast.Trait:
-		p.Trait(obj_t)
+		p.Trait(node_t)
 	case ast.Impl:
 		i := new(ast.Impl)
-		*i = obj_t
+		*i = node_t
 		p.waitingImpls = append(p.waitingImpls, i)
 	case ast.CppLinkFn:
-		p.LinkFn(obj_t)
+		p.LinkFn(node_t)
 	case ast.CppLinkVar:
-		p.LinkVar(obj_t)
+		p.LinkVar(node_t)
 	case ast.CppLinkStruct:
-		p.Link_struct(obj_t)
+		p.Link_struct(node_t)
 	case ast.CppLinkAlias:
-		p.Link_alias(obj_t)
+		p.Link_alias(node_t)
 	case ast.Comment:
-		p.Comment(obj_t)
+		p.Comment(node_t)
 	case ast.UseDecl:
-		p.pusherrtok(obj.Token, "use_at_content")
+		p.pusherrtok(node.Token, "use_at_content")
 	default:
-		p.pusherrtok(obj.Token, "invalid_syntax")
+		p.pusherrtok(node.Token, "invalid_syntax")
 	}
 }
 
-func (p *Parser) parseSrcTree(tree []ast.Object) {
-	for _, obj := range tree {
-		p.parseSrcTreeObj(obj)
-		p.checkDoc(obj)
-		p.checkAttribute(obj)
-		p.checkGenerics(obj)
+func (p *Parser) parseSrcTree(tree []ast.Node) {
+	for _, node := range tree {
+		p.parseSrcTreeNode(node)
+		p.checkDoc(node)
+		p.checkAttribute(node)
+		p.checkGenerics(node)
 	}
 }
 
-func (p *Parser) parseTree(tree []ast.Object) (ok bool) {
+func (p *Parser) parseTree(tree []ast.Node) (ok bool) {
 	if p.parseUses(&tree) {
 		return false
 	}
@@ -411,7 +407,7 @@ func (p *Parser) checkParse() {
 // Special case is;
 //
 //	p.useLocalPackage() -> nothing if p.File is nil
-func (p *Parser) useLocalPackage(tree *[]ast.Object) (hasErr bool) {
+func (p *Parser) useLocalPackage(tree *[]ast.Node) (hasErr bool) {
 	if p.File == nil {
 		return
 	}
@@ -452,8 +448,8 @@ func (p *Parser) SetupPackage() {
 	*p.package_files = append(*p.package_files, p)
 }
 
-// Parses Jule code from object tree.
-func (p *Parser) Parset(tree []ast.Object, main, justDefines bool) {
+// Parses Jule code from AST.
+func (p *Parser) Parset(tree []ast.Node, main, justDefines bool) {
 	p.IsMain = main
 	p.JustDefines = justDefines
 	if !p.parseTree(tree) {
@@ -469,8 +465,8 @@ func (p *Parser) Parset(tree []ast.Object, main, justDefines bool) {
 }
 
 // Parses Jule code from tokens.
-func (p *Parser) Parse(toks []lex.Token, main, justDefines bool) {
-	tree, errors := getTree(toks)
+func (p *Parser) Parse(toks []lex.Token, main bool, justDefines bool) {
+	tree, errors := get_tree(toks)
 	if len(errors) > 0 {
 		p.pusherrs(errors...)
 		return
@@ -479,67 +475,67 @@ func (p *Parser) Parse(toks []lex.Token, main, justDefines bool) {
 }
 
 // Parses Jule code from file.
-func (p *Parser) Parsef(main, justDefines bool) {
+func (p *Parser) Parsef(main, just_defs bool) {
 	lexer := lex.New(p.File)
 	toks := lexer.Lex()
 	if lexer.Logs != nil {
 		p.pusherrs(lexer.Logs...)
 		return
 	}
-	p.Parse(toks, main, justDefines)
+	p.Parse(toks, main, just_defs)
 }
 
-func (p *Parser) checkDoc(obj ast.Object) {
-	if p.docText.Len() == 0 {
+func (p *Parser) checkDoc(node ast.Node) {
+	if p.doc_text.Len() == 0 {
 		return
 	}
-	switch obj.Data.(type) {
+	switch node.Data.(type) {
 	case ast.Comment, ast.Attribute, []GenericType:
 		return
 	}
-	p.docText.Reset()
+	p.doc_text.Reset()
 }
 
-func (p *Parser) checkAttribute(obj ast.Object) {
+func (p *Parser) checkAttribute(node ast.Node) {
 	if p.attributes == nil {
 		return
 	}
-	switch obj.Data.(type) {
+	switch node.Data.(type) {
 	case ast.Attribute, ast.Comment, []GenericType:
 		return
 	}
 	p.attributes = nil
 }
 
-func (p *Parser) checkGenerics(obj ast.Object) {
+func (p *Parser) checkGenerics(node ast.Node) {
 	if p.generics == nil {
 		return
 	}
-	switch obj.Data.(type) {
+	switch node.Data.(type) {
 	case ast.Attribute, ast.Comment, []GenericType:
 		return
 	}
-	p.pusherrtok(obj.Token, "generics_not_supports")
+	p.pusherrtok(node.Token, "generics_not_supports")
 	p.generics = nil
 }
 
 // Generics parses generics.
 func (p *Parser) Generics(generics []GenericType) {
-	for i, generic := range generics {
-		if lex.IsIgnoreId(generic.Id) {
-			p.pusherrtok(generic.Token, "ignore_id")
+	for i, gen := range generics {
+		if lex.IsIgnoreId(gen.Id) {
+			p.pusherrtok(gen.Token, "ignore_id")
 			continue
 		}
-		for j, cgeneric := range generics {
+		for j, cgen := range generics {
 			if j >= i {
 				break
-			} else if generic.Id == cgeneric.Id {
-				p.pusherrtok(generic.Token, "exist_id", generic.Id)
+			} else if gen.Id == cgen.Id {
+				p.pusherrtok(gen.Token, "exist_id", gen.Id)
 				break
 			}
 		}
 		g := new(GenericType)
-		*g = generic
+		*g = gen
 		p.generics = append(p.generics, g)
 	}
 }
@@ -547,8 +543,8 @@ func (p *Parser) Generics(generics []GenericType) {
 func (p *Parser) make_type_alias(alias ast.TypeAlias) *ast.TypeAlias {
 	a := new(ast.TypeAlias)
 	*a = alias
-	alias.Doc = p.docText.String()
-	p.docText.Reset()
+	alias.Doc = p.doc_text.String()
+	p.doc_text.Reset()
 	return a
 }
 
@@ -583,7 +579,7 @@ func (p *Parser) parse_enum_items_str(e *Enum) {
 		}
 		if item.Expr.Tokens != nil {
 			val, model := p.evalExpr(item.Expr, nil)
-			if !val.constExpr && !p.eval.has_error {
+			if !val.constant && !p.eval.has_error {
 				p.pusherrtok(item.Expr.Tokens[0], "expr_not_const")
 			}
 			item.ExprTag = val.expr
@@ -596,7 +592,7 @@ func (p *Parser) parse_enum_items_str(e *Enum) {
 				errtok:    item.Token,
 			}.check()
 		} else {
-			expr := value{constExpr: true, expr: item.Id}
+			expr := value{constant: true, expr: item.Id}
 			item.ExprTag = expr.expr
 			item.Expr.Model = strModel(expr)
 		}
@@ -633,7 +629,7 @@ func (p *Parser) parse_enum_items_integer(e *Enum) {
 		}
 		if item.Expr.Tokens != nil {
 			val, model := p.evalExpr(item.Expr, nil)
-			if !val.constExpr && !p.eval.has_error {
+			if !val.constant && !p.eval.has_error {
 				p.pusherrtok(item.Expr.Tokens[0], "expr_not_const")
 			}
 			item.ExprTag = val.expr
@@ -671,8 +667,8 @@ func (p *Parser) Enum(e Enum) {
 		p.pusherrtok(e.Token, "exist_id", e.Id)
 		return
 	}
-	e.Doc = p.docText.String()
-	p.docText.Reset()
+	e.Doc = p.doc_text.String()
+	p.doc_text.Reset()
 	e.Type, _ = p.realType(e.Type, true)
 	if !types.IsPure(e.Type) {
 		p.pusherrtok(e.Token, "invalid_type_source")
@@ -746,8 +742,8 @@ func make_constructor(s *Struct) *ast.Fn {
 func (p *Parser) make_struct(model ast.Struct) *Struct {
 	s := new(Struct)
 	*s = model
-	s.Doc = p.docText.String()
-	p.docText.Reset()
+	s.Doc = p.doc_text.String()
+	p.doc_text.Reset()
 	//s.Traits = new([]*trait)
 	//s.depends = new([]*structure)
 	s.Owner = p
@@ -850,8 +846,8 @@ func (p *Parser) Trait(model ast.Trait) {
 	}
 	trait := new(ast.Trait)
 	*trait = model
-	trait.Desc = p.docText.String()
-	p.docText.Reset()
+	trait.Desc = p.doc_text.String()
+	p.doc_text.Reset()
 	trait.Defines = new(ast.Defmap)
 	trait.Defines.Fns = make([]*Fn, len(model.Funcs))
 	for i, f := range trait.Funcs {
@@ -890,34 +886,34 @@ func (p *Parser) implTrait(model *ast.Impl) {
 	}
 	model.Target.Tag = s
 	s.Origin.Traits = append(s.Origin.Traits, trait_def)
-	for _, obj := range model.Tree {
-		switch obj_t := obj.Data.(type) {
+	for _, node := range model.Tree {
+		switch node_t := node.Data.(type) {
 		case ast.Comment:
-			p.Comment(obj_t)
+			p.Comment(node_t)
 		case *Fn:
-			if trait_def.FindFunc(obj_t.Id) == nil {
-				p.pusherrtok(model.Target.Token, "trait_hasnt_id", trait_def.Id, obj_t.Id)
+			if trait_def.FindFunc(node_t.Id) == nil {
+				p.pusherrtok(model.Target.Token, "trait_hasnt_id", trait_def.Id, node_t.Id)
 				break
 			}
-			i, _, _ := s.Defines.FindById(obj_t.Id, nil)
+			i, _, _ := s.Defines.FindById(node_t.Id, nil)
 			if i != -1 {
-				p.pusherrtok(obj_t.Token, "exist_id", obj_t.Id)
+				p.pusherrtok(node_t.Token, "exist_id", node_t.Id)
 				continue
 			}
-			obj_t.Receiver.Token = s.Token
-			obj_t.Receiver.Tag = s
-			obj_t.Attributes = p.attributes
-			obj_t.Owner = p
+			node_t.Receiver.Token = s.Token
+			node_t.Receiver.Tag = s
+			node_t.Attributes = p.attributes
+			node_t.Owner = p
 			p.attributes = nil
-			obj_t.Doc = p.docText.String()
-			p.docText.Reset()
-			_ = p.check_param_dup(obj_t.Params)
-			p.check_ret_variables(obj_t)
-			obj_t.Used = true
+			node_t.Doc = p.doc_text.String()
+			p.doc_text.Reset()
+			_ = p.check_param_dup(node_t.Params)
+			p.check_ret_variables(node_t)
+			node_t.Used = true
 			if len(s.Generics) == 0 {
-				p.parseTypesNonGenerics(obj_t)
+				p.parseTypesNonGenerics(node_t)
 			}
-			s.Defines.Fns = append(s.Defines.Fns, obj_t)
+			s.Defines.Fns = append(s.Defines.Fns, node_t)
 		}
 	}
 	for _, tf := range trait_def.Defines.Fns {
@@ -942,32 +938,32 @@ func (p *Parser) implStruct(model *ast.Impl) {
 		p.pusherrtok(model.Base, "id_not_exist", model.Base.Kind)
 		return
 	}
-	for _, obj := range model.Tree {
-		switch obj_t := obj.Data.(type) {
+	for _, node := range model.Tree {
+		switch node_t := node.Data.(type) {
 		case []GenericType:
-			p.Generics(obj_t)
+			p.Generics(node_t)
 		case ast.Comment:
-			p.Comment(obj_t)
+			p.Comment(node_t)
 		case *Fn:
-			i, _, _ := s.Defines.FindById(obj_t.Id, nil)
+			i, _, _ := s.Defines.FindById(node_t.Id, nil)
 			if i != -1 {
-				p.pusherrtok(obj_t.Token, "exist_id", obj_t.Id)
+				p.pusherrtok(node_t.Token, "exist_id", node_t.Id)
 				continue
 			}
 			sf := new(Fn)
-			*sf = *obj_t
+			*sf = *node_t
 			sf.Receiver.Token = s.Token
 			sf.Receiver.Tag = s
 			sf.Attributes = p.attributes
-			sf.Doc = p.docText.String()
+			sf.Doc = p.doc_text.String()
 			sf.Owner = p
-			p.docText.Reset()
+			p.doc_text.Reset()
 			p.attributes = nil
 			setGenerics(sf, p.generics)
 			p.generics = nil
 			_ = p.check_param_dup(sf.Params)
 			p.check_ret_variables(sf)
-			for _, generic := range obj_t.Generics {
+			for _, generic := range node_t.Generics {
 				if types.FindGeneric(generic.Id, s.Generics) != nil {
 					p.pusherrtok(generic.Token, "exist_id", generic.Id)
 				}
@@ -1012,8 +1008,8 @@ func (p *Parser) Comment(c ast.Comment) {
 		p.PushAttribute(c)
 		return
 	}
-	p.docText.WriteString(c.Content)
-	p.docText.WriteByte('\n')
+	p.doc_text.WriteString(c.Content)
+	p.doc_text.WriteByte('\n')
 }
 
 // PushAttribute process and appends to attribute list.
@@ -1189,8 +1185,8 @@ func (p *Parser) Func(ast Fn) {
 	f.Attributes = p.attributes
 	p.attributes = nil
 	f.Owner = p
-	f.Doc = p.docText.String()
-	p.docText.Reset()
+	f.Doc = p.doc_text.String()
+	p.doc_text.Reset()
 	setGenerics(f, p.generics)
 	p.generics = nil
 	p.check_ret_variables(f)
@@ -1213,8 +1209,8 @@ func (p *Parser) Global(vast Var) {
 			}
 		}
 	}
-	vast.Doc = p.docText.String()
-	p.docText.Reset()
+	vast.Doc = p.doc_text.String()
+	p.doc_text.Reset()
 	v := new(Var)
 	*v = vast
 	p.Defines.Globals = append(p.Defines.Globals, v)
@@ -1965,7 +1961,7 @@ func (p *Parser) callStructConstructor(s *Struct, argsToks []lex.Token, m *exprM
 	v.data.Type.Kind = s.AsTypeKind()
 	v.is_type = false
 	v.lvalue = false
-	v.constExpr = false
+	v.constant = false
 	v.data.Value = s.Id
 
 	// Set braces to parentheses
@@ -2622,21 +2618,21 @@ func (p *Parser) check_st(b *ast.Block, i *int) {
 		rc.check()
 		s.Data = data
 	case ast.Goto:
-		obj := new(ast.Goto)
-		*obj = data
-		obj.Index = *i
-		obj.Block = b
-		*b.Gotos = append(*b.Gotos, obj)
+		node := new(ast.Goto)
+		*node = data
+		node.Index = *i
+		node.Block = b
+		*b.Gotos = append(*b.Gotos, node)
 	case ast.Label:
 		if find_label_parent(data.Label, b) != nil {
 			p.pusherrtok(data.Token, "label_exist", data.Label)
 			break
 		}
-		obj := new(ast.Label)
-		*obj = data
-		obj.Index = *i
-		obj.Block = b
-		*b.Labels = append(*b.Labels, obj)
+		node := new(ast.Label)
+		*node = data
+		node.Index = *i
+		node.Block = b
+		*b.Labels = append(*b.Labels, node)
 	default:
 		p.pusherrtok(s.Token, "invalid_syntax")
 	}
@@ -2990,7 +2986,7 @@ func (p *Parser) assignment(left value, errtok lex.Token) bool {
 		p.eval.pusherrtok(errtok, "assign_require_lvalue")
 		state = false
 	}
-	if left.constExpr {
+	if left.constant {
 		p.pusherrtok(errtok, "assign_const")
 		state = false
 	} else if !left.mutable {
@@ -3303,11 +3299,11 @@ func (p *Parser) breakWithLabel(brk *ast.Break) {
 	}
 	label.Used = true
 	for i := label.Index + 1; i < len(label.Block.Tree); i++ {
-		obj := &label.Block.Tree[i]
-		if obj.Data == nil {
+		node := &label.Block.Tree[i]
+		if node.Data == nil {
 			continue
 		}
-		switch data := obj.Data.(type) {
+		switch data := node.Data.(type) {
 		case ast.Comment:
 			continue
 		case *ast.Match:
@@ -3338,11 +3334,11 @@ func (p *Parser) continueWithLabel(cont *ast.Continue) {
 	}
 	label.Used = true
 	for i := label.Index + 1; i < len(label.Block.Tree); i++ {
-		obj := &label.Block.Tree[i]
-		if obj.Data == nil {
+		node := &label.Block.Tree[i]
+		if node.Data == nil {
 			continue
 		}
-		switch data := obj.Data.(type) {
+		switch data := node.Data.(type) {
 		case ast.Comment:
 			continue
 		case ast.Iter:
@@ -3547,7 +3543,7 @@ func (p *Parser) typeSourceIsArrayType(arr_t *Type) (ok bool) {
 	}
 	val, model := p.evalExpr(arr_t.Size.Expr, nil)
 	arr_t.Size.Expr.Model = model
-	if val.constExpr {
+	if val.constant {
 		arr_t.Size.N = ast.Size(tonumu(val.expr))
 	} else {
 		p.eval.pusherrtok(arr_t.Token, "expr_not_const")

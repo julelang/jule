@@ -232,6 +232,14 @@ type Fn struct {
 	Doc           string
 }
 
+func (f *Fn) IsConstructor() bool {
+	if f.RetType.Type.Id != struct_t {
+		return false
+	}
+	s := f.RetType.Type.Tag.(*Struct)
+	return s.Id == f.Id
+}
+
 func (f *Fn) plainTypeString() string {
 	var s strings.Builder
 	s.WriteByte('(')
@@ -316,19 +324,6 @@ func (f *Fn) PrototypeParams() string {
 	return cpp.String()[:cpp.Len()-1] + ")"
 }
 
-func ParamsToCpp(params []Param) string {
-	if len(params) == 0 {
-		return "(void)"
-	}
-	var cpp strings.Builder
-	cpp.WriteByte('(')
-	for _, p := range params {
-		cpp.WriteString(p.String())
-		cpp.WriteByte(',')
-	}
-	return cpp.String()[:cpp.Len()-1] + ")"
-}
-
 // GenericType is the AST model of generic data-type.
 type GenericType struct {
 	Token lex.Token
@@ -340,19 +335,6 @@ func (gt GenericType) String() string {
 	cpp.WriteString("typename ")
 	cpp.WriteString(build.AsId(gt.Id))
 	return cpp.String()
-}
-
-func GenericsToCpp(generics []*GenericType) string {
-	if len(generics) == 0 {
-		return ""
-	}
-	var cpp strings.Builder
-	cpp.WriteString("template<")
-	for _, g := range generics {
-		cpp.WriteString(g.String())
-		cpp.WriteByte(',')
-	}
-	return cpp.String()[:cpp.Len()-1] + ">"
 }
 
 // Labels is label slice type.
@@ -394,7 +376,7 @@ func (gt Goto) String() string {
 type Impl struct {
 	Base   lex.Token
 	Target Type
-	Tree   []Object
+	Tree   []Node
 }
 
 // Genericable instance.
@@ -536,12 +518,11 @@ func (m *Match) EndLabel() string {
 type Namespace struct {
 	Token   lex.Token
 	Id      string
-	Tree    []Object
 	Defines *Defmap
 }
 
-// Object is an element of AST.
-type Object struct {
+// Node is an element of AST.
+type Node struct {
 	Token lex.Token
 	Data  any
 }

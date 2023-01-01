@@ -17,7 +17,7 @@ func (u *unary) minus() value {
 	if !types.IsPure(v.data.Type) || !types.IsNumeric(v.data.Type.Id) {
 		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_MINUS)
 	}
-	if v.constExpr {
+	if v.constant {
 		v.data.Value = lex.KND_MINUS + v.data.Value
 		switch t := v.expr.(type) {
 		case float64:
@@ -37,7 +37,7 @@ func (u *unary) plus() value {
 	if !types.IsPure(v.data.Type) || !types.IsNumeric(v.data.Type.Id) {
 		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_PLUS)
 	}
-	if v.constExpr {
+	if v.constant {
 		switch t := v.expr.(type) {
 		case float64:
 			v.expr = +t
@@ -56,7 +56,7 @@ func (u *unary) caret() value {
 	if !types.IsPure(v.data.Type) || !types.IsInteger(v.data.Type.Id) {
 		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_CARET)
 	}
-	if v.constExpr {
+	if v.constant {
 		switch t := v.expr.(type) {
 		case int64:
 			v.expr = ^t
@@ -72,7 +72,7 @@ func (u *unary) logicalNot() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !isBoolExpr(v) {
 		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_EXCL)
-	} else if v.constExpr {
+	} else if v.constant {
 		v.expr = !v.expr.(bool)
 		v.model = boolModel(v)
 	}
@@ -86,7 +86,7 @@ func (u *unary) star() value {
 		u.p.pusherrtok(u.token, "unsafe_behavior_at_out_of_unsafe_scope")
 	}
 	v := u.p.eval.process(u.toks, u.model)
-	v.constExpr = false
+	v.constant = false
 	v.lvalue = true
 	switch {
 	case !types.IsExplicitPtr(v.data.Type):
@@ -101,7 +101,7 @@ end:
 
 func (u *unary) amper() value {
 	v := u.p.eval.process(u.toks, u.model)
-	v.constExpr = false
+	v.constant = false
 	v.lvalue = true
 	nodes := &u.model.nodes[u.model.index].nodes
 	switch {

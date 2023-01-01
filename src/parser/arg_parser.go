@@ -103,7 +103,7 @@ func (pap *pureArgParser) check_passes_fn() {
 }
 
 func (pap *pureArgParser) checkPasses() {
-	if is_constructor(pap.f) {
+	if pap.f.IsConstructor() {
 		pap.check_passes_struct()
 		return
 	}

@@ -948,14 +948,14 @@ func (s *solver) types_are_compatible(ignore_any bool) bool {
 	return ok
 }
 
-func (s *solver) isConstExpr() bool { return s.l.constExpr && s.r.constExpr }
+func (s *solver) isConstExpr() bool { return s.l.constant && s.r.constant }
 
 func (s *solver) finalize(v *value) {
 	if types.IsVoid(v.data.Type) {
 		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
 	} else {
-		v.constExpr = s.isConstExpr()
-		if v.constExpr {
+		v.constant = s.isConstExpr()
+		if v.constant {
 			bitize(v)
 			v.model = getModel(*v)
 		}

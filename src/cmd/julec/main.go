@@ -179,10 +179,6 @@ func set() {
 // if logs has error, false if not.
 func print_logs(p *parser.Parser) bool {
 	var str strings.Builder
-	for _, l := range p.Warnings {
-		str.WriteString(l.String())
-		str.WriteByte('\n')
-	}
 	for _, l := range p.Errors {
 		str.WriteString(l.String())
 		str.WriteByte('\n')
