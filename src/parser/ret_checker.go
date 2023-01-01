@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
@@ -9,7 +9,7 @@ import (
 
 type retChecker struct {
 	t         *Parser
-	ret_ast   *models.Ret
+	ret_ast   *ast.Ret
 	f         *Fn
 	exp_model retExpr
 	values    []value
@@ -142,7 +142,7 @@ func (rc *retChecker) checkMultiRetAsMutliRet() {
 	}
 	for i, rt := range retTypes {
 		vt := valTypes[i]
-		val := value{data: models.Data{Type: vt}}
+		val := value{data: ast.Data{Type: vt}}
 		assign_checker{
 			p:      rc.t,
 			expr_t: rt,

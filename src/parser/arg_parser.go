@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
@@ -21,7 +21,7 @@ type pureArgParser struct {
 	p       *Parser
 	pmap    *paramMap
 	f       *Fn
-	args    *models.Args
+	args    *ast.Args
 	i       int
 	arg     Arg
 	errTok  lex.Token
@@ -168,7 +168,7 @@ func (pap *pureArgParser) tryFuncMultiRetAsArgs() bool {
 	}
 	for i, param := range pap.f.Params {
 		rt := types[i]
-		val := value{data: models.Data{Type: rt}}
+		val := value{data: ast.Data{Type: rt}}
 		pap.p.checkArgType(&param, val, arg.Token)
 	}
 	return true

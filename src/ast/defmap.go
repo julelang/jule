@@ -1,4 +1,4 @@
-package models
+package ast
 
 import "github.com/julelang/jule/lex"
 

@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
@@ -229,7 +229,7 @@ func (ve *literal_eval) var_id(id string, variable *Var, global bool) (v value) 
 	return
 }
 
-func make_value_from_fn(f *models.Fn) (v value) {
+func make_value_from_fn(f *ast.Fn) (v value) {
 	v.data.Value = f.Id
 	v.data.Type.Id = types.FN
 	v.data.Type.Tag = f

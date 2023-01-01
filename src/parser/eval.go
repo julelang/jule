@@ -5,14 +5,13 @@ import (
 	"strings"
 
 	"github.com/julelang/jule/ast"
-	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/cmd/julec/gen"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
 )
 
 type value struct {
-	data      models.Data
+	data      ast.Data
 	model     iExpr
 	expr      any
 	constExpr bool
@@ -44,7 +43,7 @@ func (e *eval) eval_toks(toks []lex.Token) (value, iExpr) {
 
 func (e *eval) eval_expr(expr Expr) (value, iExpr) { return e.eval(expr.Op) }
 
-func get_bop_model(v value, bop models.Binop, lm iExpr, rm iExpr) iExpr {
+func get_bop_model(v value, bop ast.Binop, lm iExpr, rm iExpr) iExpr {
 	if v.constExpr {
 		return v.model
 	}
@@ -59,7 +58,7 @@ func get_bop_model(v value, bop models.Binop, lm iExpr, rm iExpr) iExpr {
 
 func (e *eval) eval_op(op any) (v value, model iExpr) {
 	switch t := op.(type) {
-	case models.BinopExpr:
+	case ast.BinopExpr:
 		m := newExprModel(1)
 		model = m
 		v = e.process(t.Tokens, m)
@@ -69,11 +68,11 @@ func (e *eval) eval_op(op any) (v value, model iExpr) {
 			e.pusherrtok(v.data.Token, "invalid_expr")
 		}
 		return
-	case models.Binop:
+	case ast.Binop:
 	default:
 		return
 	}
-	bop := op.(models.Binop)
+	bop := op.(ast.Binop)
 	l, lm := e.eval_op(bop.L)
 	if e.has_error {
 		return
@@ -340,11 +339,11 @@ func (e *eval) try_cpp_linked_var(toks []lex.Token, m *exprModel) (v value, ok b
 	ok = true
 	switch def_t {
 	case 'f':
-		v = make_value_from_fn(def.(*models.Fn))
+		v = make_value_from_fn(def.(*ast.Fn))
 	case 'v':
-		v = make_value_from_var(def.(*models.Var))
+		v = make_value_from_var(def.(*ast.Var))
 	case 's':
-		v = make_value_from_struct(def.(*models.Struct))
+		v = make_value_from_struct(def.(*ast.Struct))
 		// Cpp linkage not supports type aliases in expressions
 	}
 	return
@@ -568,8 +567,8 @@ func (e *eval) castStruct(t Type, v *value, errtok lex.Token) {
 		e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
 		return
 	}
-	s := t.Tag.(*models.Struct)
-	tr := v.data.Type.Tag.(*models.Trait)
+	s := t.Tag.(*ast.Struct)
+	tr := v.data.Type.Tag.(*ast.Trait)
 	if !s.HasTrait(tr) {
 		e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
 	}
@@ -695,7 +694,7 @@ func (e *eval) castSlice(t, vt Type, errtok lex.Token) {
 	}
 }
 
-func (e *eval) juletypeSubId(dm *models.Defmap, idTok lex.Token, m *exprModel) (v value) {
+func (e *eval) juletypeSubId(dm *ast.Defmap, idTok lex.Token, m *exprModel) (v value) {
 	i, dm, t := dm.FindById(idTok.Kind, nil)
 	if i == -1 {
 		e.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
@@ -822,7 +821,7 @@ func (e *eval) typeId(toks []lex.Token, m *exprModel) (v value) {
 			e.pusherrtok(toks[0], "invalid_syntax")
 			return
 		}
-		s := t.Tag.(*models.Struct)
+		s := t.Tag.(*ast.Struct)
 		return e.p.callStructConstructor(s, toks, m)
 	}
 	if toks[0].Id != lex.ID_BRACE || toks[0].Kind != lex.KND_LBRACKET {
@@ -832,7 +831,7 @@ func (e *eval) typeId(toks []lex.Token, m *exprModel) (v value) {
 	return e.enumerable(toks, t, m)
 }
 
-func (e *eval) xObjSubId(dm *models.Defmap, val value, interior_mutability bool, idTok lex.Token, m *exprModel) (v value) {
+func (e *eval) xObjSubId(dm *ast.Defmap, val value, interior_mutability bool, idTok lex.Token, m *exprModel) (v value) {
 	i, dm, t := dm.FindById(idTok.Kind, idTok.File)
 	if i == -1 {
 		e.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
@@ -914,7 +913,7 @@ func (e *eval) enumSubId(val value, idTok lex.Token, m *exprModel) (v value) {
 
 func (e *eval) structObjSubId(val value, idTok lex.Token, m *exprModel) value {
 	parent_type := val.data.Type
-	s := val.data.Type.Tag.(*models.Struct)
+	s := val.data.Type.Tag.(*ast.Struct)
 	val.constExpr = false
 	val.is_type = false
 	if val.data.Value == lex.KND_SELF {
@@ -932,7 +931,7 @@ func (e *eval) structObjSubId(val value, idTok lex.Token, m *exprModel) value {
 	interior_mutability := false
 	if e.p.rootBlock.Func.Receiver != nil {
 		switch t := e.p.rootBlock.Func.Receiver.Tag.(type) {
-		case *models.Struct:
+		case *ast.Struct:
 			interior_mutability = t.IsSameBase(s)
 		}
 	}
@@ -948,7 +947,7 @@ func (e *eval) structObjSubId(val value, idTok lex.Token, m *exprModel) value {
 
 func (e *eval) traitObjSubId(val value, idTok lex.Token, m *exprModel) value {
 	m.append_sub(exprNode{".get()"})
-	t := val.data.Type.Tag.(*models.Trait)
+	t := val.data.Type.Tag.(*ast.Trait)
 	val.constExpr = false
 	val.lvalue = false
 	val.is_type = false
@@ -958,12 +957,12 @@ func (e *eval) traitObjSubId(val value, idTok lex.Token, m *exprModel) value {
 }
 
 type ns_find interface {
-	NsById(string) *models.Namespace
+	NsById(string) *ast.Namespace
 }
 
-func (e *eval) getNs(toks *[]lex.Token) *models.Defmap {
+func (e *eval) getNs(toks *[]lex.Token) *ast.Defmap {
 	var prev ns_find = e.p
-	var ns *models.Namespace
+	var ns *ast.Namespace
 	for i, tok := range *toks {
 		if (i+1)%2 != 0 {
 			if tok.Id != lex.ID_IDENT {
@@ -1307,15 +1306,15 @@ func (e *eval) enumerableParts(toks []lex.Token) [][]lex.Token {
 
 func (e *eval) build_array(parts [][]lex.Token, t Type, errtok lex.Token) (value, iExpr) {
 	if !t.Size.AutoSized {
-		n := models.Size(len(parts))
+		n := ast.Size(len(parts))
 		if n > t.Size.N {
 			e.p.pusherrtok(errtok, "overflow_limits")
 		} else if types.IsRef(*t.ComponentType) && n < t.Size.N {
 			e.p.pusherrtok(errtok, "reference_not_initialized")
 		}
 	} else {
-		t.Size.N = models.Size(len(parts))
-		t.Size.Expr = models.Expr{
+		t.Size.N = ast.Size(len(parts))
+		t.Size.Expr = ast.Expr{
 			Model: exprNode{
 				value: types.CppId(types.UINT) + "(" + strconv.FormatUint(uint64(t.Size.N), 10) + ")",
 			},
@@ -1529,7 +1528,7 @@ func (e *eval) braceRange(toks []lex.Token, m *exprModel) (v value) {
 				return e.enumerable(toks, *e.type_prefix, m)
 			case types.IsStruct(*e.type_prefix):
 				prefix := e.type_prefix
-				s := e.type_prefix.Tag.(*models.Struct)
+				s := e.type_prefix.Tag.(*ast.Struct)
 				v = e.p.callStructConstructor(s, toks, m)
 				e.type_prefix = prefix
 				return

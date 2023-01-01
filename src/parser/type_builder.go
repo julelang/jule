@@ -4,14 +4,13 @@ import (
 	"strings"
 
 	"github.com/julelang/jule/ast"
-	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
 )
 
 type type_builder struct {
 	r      *builder
-	t      *models.Type
+	t      *ast.Type
 	tokens []lex.Token
 	i      *int
 	err    bool
@@ -85,7 +84,7 @@ func (tb *type_builder) ident_end() {
 	tb.kind += "["
 	var genericsStr strings.Builder
 	parts := tb.ident_generics()
-	generics := make([]models.Type, len(parts))
+	generics := make([]ast.Type, len(parts))
 	for i, part := range parts {
 		index := 0
 		t, _ := tb.r.DataType(part, &index, true)
@@ -168,7 +167,7 @@ func (tb *type_builder) enumerable(tok lex.Token) (imret bool) {
 	tok = tb.tokens[*tb.i]
 	if tok.Id == lex.ID_BRACE && tok.Kind == lex.KND_RBRACKET {
 		tb.kind += lex.PREFIX_SLICE
-		tb.t.ComponentType = new(models.Type)
+		tb.t.ComponentType = new(ast.Type)
 		tb.t.Id = types.SLICE
 		tb.t.Token = tok
 		*tb.i++
@@ -202,7 +201,7 @@ func (tb *type_builder) array() (ok bool) {
 	tb.t.Id = types.ARRAY
 	*tb.i++
 	exprI := *tb.i
-	tb.t.ComponentType = new(models.Type)
+	tb.t.ComponentType = new(ast.Type)
 	ok = tb.r.datatype(tb.t.ComponentType, tb.tokens, tb.i, tb.err)
 	if !ok {
 		return
@@ -246,7 +245,7 @@ func (tb *type_builder) map_t() (ok bool) {
 	}
 	keyTypeToks := typeToks[:colon]
 	valueTypeToks := typeToks[colon+1:]
-	types := make([]models.Type, 2)
+	types := make([]ast.Type, 2)
 	j := 0
 	types[0], _ = tb.r.DataType(keyTypeToks, &j, tb.err)
 	j = 0

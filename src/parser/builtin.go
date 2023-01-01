@@ -3,7 +3,7 @@ package parser
 import (
 	"strconv"
 
-	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
 )
@@ -23,7 +23,7 @@ const maxU16 = 65535
 const maxU32 = 4294967295
 const maxU64 = 18446744073709551615
 
-var i8statics = &models.Defmap{
+var i8statics = &ast.Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -31,7 +31,7 @@ var i8statics = &models.Defmap{
 			Id:      "max",
 			Type:    Type{Id: types.I8, Kind: types.TYPE_MAP[types.I8]},
 			ExprTag: int64(maxI8),
-			Expr: models.Expr{
+			Expr: ast.Expr{
 				Model: exprNode{types.CppId(types.I8) + "{" + strconv.FormatInt(maxI8, 10) + "}"},
 			},
 		},
@@ -41,14 +41,14 @@ var i8statics = &models.Defmap{
 			Id:      "min",
 			Type:    Type{Id: types.I8, Kind: types.TYPE_MAP[types.I8]},
 			ExprTag: int64(minI8),
-			Expr: models.Expr{
+			Expr: ast.Expr{
 				Model: exprNode{types.CppId(types.I8) + "{" + strconv.FormatInt(minI8, 10) + "}"},
 			},
 		},
 	},
 }
 
-var i16statics = &models.Defmap{
+var i16statics = &ast.Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -56,7 +56,7 @@ var i16statics = &models.Defmap{
 			Id:      "max",
 			Type:    Type{Id: types.I16, Kind: types.TYPE_MAP[types.I16]},
 			ExprTag: int64(maxI16),
-			Expr: models.Expr{
+			Expr: ast.Expr{
 				Model: exprNode{types.CppId(types.I16) + "{" + strconv.FormatInt(maxI16, 10) + "}"},
 			},
 		},
@@ -66,14 +66,14 @@ var i16statics = &models.Defmap{
 			Id:      "min",
 			Type:    Type{Id: types.I16, Kind: types.TYPE_MAP[types.I16]},
 			ExprTag: int64(minI16),
-			Expr: models.Expr{
+			Expr: ast.Expr{
 				Model: exprNode{types.CppId(types.I16) + "{" + strconv.FormatInt(minI16, 10) + "}"},
 			},
 		},
 	},
 }
 
-var i32statics = &models.Defmap{
+var i32statics = &ast.Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -81,7 +81,7 @@ var i32statics = &models.Defmap{
 			Id:      "max",
 			Type:    Type{Id: types.I32, Kind: types.TYPE_MAP[types.I32]},
 			ExprTag: int64(maxI32),
-			Expr: models.Expr{
+			Expr: ast.Expr{
 				Model: exprNode{types.CppId(types.I32) + "{" + strconv.FormatInt(maxI32, 10) + "}"},
 			},
 		},
@@ -91,14 +91,14 @@ var i32statics = &models.Defmap{
 			Id:      "min",
 			Type:    Type{Id: types.I32, Kind: types.TYPE_MAP[types.I32]},
 			ExprTag: int64(minI32),
-			Expr: models.Expr{
+			Expr: ast.Expr{
 				Model: exprNode{types.CppId(types.I32) + "{" + strconv.FormatInt(minI32, 10) + "}"},
 			},
 		},
 	},
 }
 
-var i64statics = &models.Defmap{
+var i64statics = &ast.Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -106,7 +106,7 @@ var i64statics = &models.Defmap{
 			Id:      "max",
 			Type:    Type{Id: types.I64, Kind: types.TYPE_MAP[types.I64]},
 			ExprTag: int64(maxI64),
-			Expr: models.Expr{
+			Expr: ast.Expr{
 				Model: exprNode{types.CppId(types.I64) + "{" + strconv.FormatInt(maxI64, 10) + "LL}"},
 			},
 		},
@@ -116,14 +116,14 @@ var i64statics = &models.Defmap{
 			Id:      "min",
 			Type:    Type{Id: types.I64, Kind: types.TYPE_MAP[types.I64]},
 			ExprTag: int64(minI64),
-			Expr: models.Expr{
+			Expr: ast.Expr{
 				Model: exprNode{types.CppId(types.I64) + "{" + strconv.FormatInt(minI64, 10) + "LL}"},
 			},
 		},
 	},
 }
 
-var u8statics = &models.Defmap{
+var u8statics = &ast.Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -131,14 +131,14 @@ var u8statics = &models.Defmap{
 			Id:      "max",
 			Type:    Type{Id: types.U8, Kind: types.TYPE_MAP[types.U8]},
 			ExprTag: uint64(maxU8),
-			Expr: models.Expr{
+			Expr: ast.Expr{
 				Model: exprNode{types.CppId(types.U8) + "{" + strconv.FormatUint(maxU8, 10) + "}"},
 			},
 		},
 	},
 }
 
-var u16statics = &models.Defmap{
+var u16statics = &ast.Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -146,14 +146,14 @@ var u16statics = &models.Defmap{
 			Id:      "max",
 			Type:    Type{Id: types.U16, Kind: types.TYPE_MAP[types.U16]},
 			ExprTag: uint64(maxU16),
-			Expr: models.Expr{
+			Expr: ast.Expr{
 				Model: exprNode{types.CppId(types.U16) + "{" + strconv.FormatUint(maxU16, 10) + "}"},
 			},
 		},
 	},
 }
 
-var u32statics = &models.Defmap{
+var u32statics = &ast.Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -161,14 +161,14 @@ var u32statics = &models.Defmap{
 			Id:      "max",
 			Type:    Type{Id: types.U32, Kind: types.TYPE_MAP[types.U32]},
 			ExprTag: uint64(maxU32),
-			Expr: models.Expr{
+			Expr: ast.Expr{
 				Model: exprNode{types.CppId(types.U32) + "{" + strconv.FormatUint(maxU32, 10) + "}"},
 			},
 		},
 	},
 }
 
-var u64statics = &models.Defmap{
+var u64statics = &ast.Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -176,14 +176,14 @@ var u64statics = &models.Defmap{
 			Id:      "max",
 			Type:    Type{Id: types.U64, Kind: types.TYPE_MAP[types.U64]},
 			ExprTag: uint64(maxU64),
-			Expr: models.Expr{
+			Expr: ast.Expr{
 				Model: exprNode{types.CppId(types.U64) + "{" + strconv.FormatUint(maxU64, 10) + "ULL}"},
 			},
 		},
 	},
 }
 
-var uintStatics = &models.Defmap{
+var uintStatics = &ast.Defmap{
 	Globals: []*Var{
 		{
 			Pub:   true,
@@ -194,7 +194,7 @@ var uintStatics = &models.Defmap{
 	},
 }
 
-var intStatics = &models.Defmap{
+var intStatics = &ast.Defmap{
 	Globals: []*Var{
 		{
 			Const: true,
@@ -214,7 +214,7 @@ const minF32 = 1.17549435082228750796873653722224568e-38
 
 var min_modelF32 = exprNode{types.CppId(types.F32) + "{1.17549435082228750796873653722224568e-38F}"}
 
-var f32statics = &models.Defmap{
+var f32statics = &ast.Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -222,7 +222,7 @@ var f32statics = &models.Defmap{
 			Id:      "max",
 			Type:    Type{Id: types.F32, Kind: types.TYPE_MAP[types.F32]},
 			ExprTag: float64(maxF32),
-			Expr:    models.Expr{Model: exprNode{strconv.FormatFloat(maxF32, 'e', -1, 32) + "F"}},
+			Expr:    ast.Expr{Model: exprNode{strconv.FormatFloat(maxF32, 'e', -1, 32) + "F"}},
 		},
 		{
 			Pub:     true,
@@ -230,7 +230,7 @@ var f32statics = &models.Defmap{
 			Id:      "min",
 			Type:    Type{Id: types.F32, Kind: types.TYPE_MAP[types.F32]},
 			ExprTag: float64(minF32),
-			Expr:    models.Expr{Model: min_modelF32},
+			Expr:    ast.Expr{Model: min_modelF32},
 		},
 	},
 }
@@ -240,7 +240,7 @@ const minF64 = 2.22507385850720138309023271733240406e-308
 
 var min_modelF64 = exprNode{types.CppId(types.F64) + "{2.22507385850720138309023271733240406e-308}"}
 
-var f64statics = &models.Defmap{
+var f64statics = &ast.Defmap{
 	Globals: []*Var{
 		{
 			Pub:     true,
@@ -248,7 +248,7 @@ var f64statics = &models.Defmap{
 			Id:      "max",
 			Type:    Type{Id: types.F64, Kind: types.TYPE_MAP[types.F64]},
 			ExprTag: float64(maxF64),
-			Expr:    models.Expr{Model: exprNode{strconv.FormatFloat(maxF64, 'e', -1, 64)}},
+			Expr:    ast.Expr{Model: exprNode{strconv.FormatFloat(maxF64, 'e', -1, 64)}},
 		},
 		{
 			Pub:     true,
@@ -256,7 +256,7 @@ var f64statics = &models.Defmap{
 			Id:      "min",
 			Type:    Type{Id: types.F64, Kind: types.TYPE_MAP[types.F64]},
 			ExprTag: float64(minF64),
-			Expr:    models.Expr{Model: min_modelF64},
+			Expr:    ast.Expr{Model: min_modelF64},
 		},
 	},
 }
@@ -268,14 +268,14 @@ var strDefaultFunc = Fn{
 	RetType: RetType{Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}},
 }
 
-var errorTrait = &models.Trait{
+var errorTrait = &ast.Trait{
 	Id: "Error",
-	Defines: &models.Defmap{
+	Defines: &ast.Defmap{
 		Fns: []*Fn{
 			{
 				Pub: true,
 				Id:  "error",
-				RetType: models.RetType{
+				RetType: ast.RetType{
 					Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]},
 				},
 			},
@@ -293,7 +293,7 @@ var errorType = Type{
 var panicFunc = &Fn{
 	Pub: true,
 	Id:  "panic",
-	Params: []models.Param{
+	Params: []ast.Param{
 		{
 			Id:   "error",
 			Type: Type{Id: types.ANY, Kind: types.TYPE_MAP[types.ANY]},
@@ -303,14 +303,14 @@ var panicFunc = &Fn{
 
 var errorHandlerFunc = &Fn{
 	Id: "handler",
-	Params: []models.Param{
+	Params: []ast.Param{
 		{
 			Id:   "error",
 			Type: errorType,
 		},
 	},
-	RetType: models.RetType{
-		Type: models.Type{
+	RetType: ast.RetType{
+		Type: ast.Type{
 			Id:   types.VOID,
 			Kind: types.TYPE_MAP[types.VOID],
 		},
@@ -320,10 +320,10 @@ var errorHandlerFunc = &Fn{
 var recoverFunc = &Fn{
 	Pub: true,
 	Id:  "recover",
-	Params: []models.Param{
+	Params: []ast.Param{
 		{
 			Id: "handler",
-			Type: models.Type{
+			Type: ast.Type{
 				Id:   types.FN,
 				Kind: errorHandlerFunc.TypeKind(),
 				Tag:  errorHandlerFunc,
@@ -355,8 +355,8 @@ var outln_fn *Fn
 var builtinFile = &Parser{}
 
 // Builtin definitions.
-var Builtin = &models.Defmap{
-	Types: []*models.TypeAlias{
+var Builtin = &ast.Defmap{
+	Types: []*ast.TypeAlias{
 		{
 			Pub:  true,
 			Id:   "byte",
@@ -383,8 +383,8 @@ var Builtin = &models.Defmap{
 			Id:       "copy",
 			Owner:    builtinFile,
 			Generics: []*GenericType{{Id: "Item"}},
-			RetType:  models.RetType{Type: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]}},
-			Params: []models.Param{
+			RetType:  ast.RetType{Type: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]}},
+			Params: []ast.Param{
 				{
 					Mutable: true,
 					Id:      "dest",
@@ -409,14 +409,14 @@ var Builtin = &models.Defmap{
 			Id:       "append",
 			Owner:    builtinFile,
 			Generics: []*GenericType{{Id: "Item"}},
-			RetType: models.RetType{
+			RetType: ast.RetType{
 				Type: Type{
 					Id:            types.SLICE,
 					Kind:          lex.PREFIX_SLICE + "Item",
 					ComponentType: &Type{Id: types.ID, Kind: "Item"},
 				},
 			},
-			Params: []models.Param{
+			Params: []ast.Param{
 				{
 					Id: "src",
 					Type: Type{
@@ -433,12 +433,12 @@ var Builtin = &models.Defmap{
 			},
 		},
 	},
-	Traits: []*models.Trait{
+	Traits: []*ast.Trait{
 		errorTrait,
 	},
 }
 
-var strDefines = &models.Defmap{
+var strDefines = &ast.Defmap{
 	Globals: []*Var{
 		{
 			Pub:  true,
@@ -528,12 +528,12 @@ func readyStrDefines(s value) {
 		lenVar.ExprTag = int64(len(s.expr.(string)))
 		lenVar.Expr.Model = getModel(value{
 			expr: lenVar.ExprTag,
-			data: models.Data{Type: lenVar.Type},
+			data: ast.Data{Type: lenVar.Type},
 		})
 	}
 }
 
-var sliceDefines = &models.Defmap{
+var sliceDefines = &ast.Defmap{
 	Globals: []*Var{
 		{
 			Pub:  true,
@@ -557,7 +557,7 @@ var sliceDefines = &models.Defmap{
 	},
 }
 
-var arrayDefines = &models.Defmap{
+var arrayDefines = &ast.Defmap{
 	Globals: []*Var{
 		{
 			Pub:  true,
@@ -575,7 +575,7 @@ var arrayDefines = &models.Defmap{
 	},
 }
 
-var mapDefines = &models.Defmap{
+var mapDefines = &ast.Defmap{
 	Globals: []*Var{
 		{
 			Pub:  true,
@@ -643,7 +643,7 @@ func init() {
 	out_fn.BuiltinCaller = caller_out
 	outln_fn = new(Fn)
 	*outln_fn = *out_fn
-	outln_fn = new(models.Fn)
+	outln_fn = new(ast.Fn)
 	*outln_fn = *out_fn
 	outln_fn.Id = "outln"
 	Builtin.Fns = append(Builtin.Fns, outln_fn)
@@ -758,7 +758,7 @@ func caller_new(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 		p.pusherrtok(errtok, "invalid_type")
 	}
 	if types.IsStruct(t) {
-		s := t.Tag.(*models.Struct)
+		s := t.Tag.(*ast.Struct)
 		for _, f := range s.Defines.Globals {
 			if types.IsRef(f.Type) {
 				p.pusherrtok(errtok, "ref_used_struct_used_at_new_fn")
@@ -775,7 +775,7 @@ func caller_new(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 
 // std::mem
 
-var std_mem_builtin = &models.Defmap{
+var std_mem_builtin = &ast.Defmap{
 	Fns: []*Fn{
 		{Id: "size_of", BuiltinCaller: caller_mem_size_of},
 		{Id: "align_of", BuiltinCaller: caller_mem_align_of},
@@ -838,11 +838,11 @@ func caller_mem_align_of(p *Parser, _ *Fn, data callData, m *exprModel) (v value
 	return
 }
 
-var std_builtin_defines = map[string]*models.Defmap{
+var std_builtin_defines = map[string]*ast.Defmap{
 	"std::mem": std_mem_builtin,
 }
 
-func fn_make(p *Parser, m *exprModel, t models.Type, args *models.Args, errtok lex.Token) (v value) {
+func fn_make(p *Parser, m *exprModel, t ast.Type, args *ast.Args, errtok lex.Token) (v value) {
 	v.data.Type = t
 	v.data.Value = " "
 	if len(args.Src) < 2 {

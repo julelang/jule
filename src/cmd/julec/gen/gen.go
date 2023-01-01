@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 
 	"github.com/julelang/jule"
-	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
@@ -35,7 +35,7 @@ func done_indent() {
 	atomic.SwapUint32(&indent, atomic.LoadUint32(&indent)-1)
 }
 
-func gen_assign_left(as *models.AssignLeft) string {
+func gen_assign_left(as *ast.AssignLeft) string {
 	switch {
 	case as.Var.New:
 		return as.Var.OutId()
@@ -45,7 +45,7 @@ func gen_assign_left(as *models.AssignLeft) string {
 	return as.Expr.String()
 }
 
-func gen_single_assign(a *models.Assign) string {
+func gen_single_assign(a *ast.Assign) string {
 	left := a.Left[0]
 	if left.Var.New {
 		left.Var.Expr = a.Right[0]
@@ -62,7 +62,7 @@ func gen_single_assign(a *models.Assign) string {
 	return cpp.String()
 }
 
-func assign_has_left(a *models.Assign) bool {
+func assign_has_left(a *ast.Assign) bool {
 	for _, s := range a.Left {
 		if !s.Ignore {
 			return true
@@ -71,7 +71,7 @@ func assign_has_left(a *models.Assign) bool {
 	return false
 }
 
-func gen_multiple_assign(a *models.Assign) string {
+func gen_multiple_assign(a *ast.Assign) string {
 	var cpp strings.Builder
 	if !assign_has_left(a) {
 		for _, right := range a.Right {
@@ -99,7 +99,7 @@ func gen_multiple_assign(a *models.Assign) string {
 	return cpp.String()
 }
 
-func gen_assign_multi_ret(a *models.Assign) string {
+func gen_assign_multi_ret(a *ast.Assign) string {
 	var cpp strings.Builder
 	cpp.WriteString(gen_assign_new_defines(a))
 	cpp.WriteString("std::tie(")
@@ -122,7 +122,7 @@ func gen_assign_multi_ret(a *models.Assign) string {
 	return cpp.String()
 }
 
-func gen_assign_new_defines(a *models.Assign) string {
+func gen_assign_new_defines(a *ast.Assign) string {
 	var cpp strings.Builder
 	for _, left := range a.Left {
 		if left.Ignore || !left.Var.New {
@@ -133,14 +133,14 @@ func gen_assign_new_defines(a *models.Assign) string {
 	return cpp.String()
 }
 
-func gen_assign_postfix(a *models.Assign) string {
+func gen_assign_postfix(a *ast.Assign) string {
 	var cpp strings.Builder
 	cpp.WriteString(a.Left[0].Expr.String())
 	cpp.WriteString(a.Setter.Kind)
 	return cpp.String()
 }
 
-func gen_assign(a *models.Assign) string {
+func gen_assign(a *ast.Assign) string {
 	var cpp strings.Builder
 	switch {
 	case len(a.Right) == 0:
@@ -158,7 +158,7 @@ func gen_assign(a *models.Assign) string {
 	return cpp.String()
 }
 
-func gen_block(b *models.Block) string {
+func gen_block(b *ast.Block) string {
 	add_indent()
 	s := ""
 	if b.Deferred {
@@ -172,7 +172,7 @@ func gen_block(b *models.Block) string {
 	return s
 }
 
-func gen_parse_block(b *models.Block) string {
+func gen_parse_block(b *ast.Block) string {
 	// Space count per indent.
 	var cpp strings.Builder
 	cpp.WriteByte('{')
@@ -191,7 +191,7 @@ func gen_parse_block(b *models.Block) string {
 	return cpp.String()
 }
 
-func gen_concurrent_call(cc *models.ConcurrentCall) string {
+func gen_concurrent_call(cc *ast.ConcurrentCall) string {
 	var cpp strings.Builder
 	cpp.WriteString("__JULEC_CO(")
 	cpp.WriteString(cc.Expr.String())
@@ -199,7 +199,7 @@ func gen_concurrent_call(cc *models.ConcurrentCall) string {
 	return cpp.String()
 }
 
-func gen_if(i *models.If) string {
+func gen_if(i *ast.If) string {
 	var cpp strings.Builder
 	cpp.WriteString("if (")
 	cpp.WriteString(i.Expr.String())
@@ -208,14 +208,14 @@ func gen_if(i *models.If) string {
 	return cpp.String()
 }
 
-func gen_else(e *models.Else) string {
+func gen_else(e *ast.Else) string {
 	var cpp strings.Builder
 	cpp.WriteString("else ")
 	cpp.WriteString(gen_block(e.Block))
 	return cpp.String()
 }
 
-func gen_conditional(c *models.Conditional) string {
+func gen_conditional(c *ast.Conditional) string {
 	var cpp strings.Builder
 	cpp.WriteString(gen_if(c.If))
 	for _, elif := range c.Elifs {
@@ -229,7 +229,7 @@ func gen_conditional(c *models.Conditional) string {
 	return cpp.String()
 }
 
-func gen_iter_while(w *models.IterWhile, i *models.Iter) string {
+func gen_iter_while(w *ast.IterWhile, i *ast.Iter) string {
 	var cpp strings.Builder
 	indent := indent_string()
 	begin := i.BeginLabel()
@@ -266,7 +266,7 @@ func gen_iter_while(w *models.IterWhile, i *models.Iter) string {
 	return cpp.String()
 }
 
-func gen_iter_inf(i *models.Iter) string {
+func gen_iter_inf(i *ast.Iter) string {
 	var cpp strings.Builder
 	indent := indent_string()
 	begin := i.BeginLabel()
@@ -289,13 +289,13 @@ func gen_iter_inf(i *models.Iter) string {
 }
 
 type foreach_setter interface {
-	setup_vars(key_a *models.Var, key_b *models.Var) string
-	next_steps(ket_a *models.Var, key_b *models.Var, begin string) string
+	setup_vars(key_a *ast.Var, key_b *ast.Var) string
+	next_steps(ket_a *ast.Var, key_b *ast.Var, begin string) string
 }
 
 type index_setter struct{}
 
-func (index_setter) setup_vars(key_a *models.Var, key_b *models.Var) string {
+func (index_setter) setup_vars(key_a *ast.Var, key_b *ast.Var) string {
 	var cpp strings.Builder
 	indent := indent_string()
 	if !lex.IsIgnoreId(key_a.Id) {
@@ -319,7 +319,7 @@ func (index_setter) setup_vars(key_a *models.Var, key_b *models.Var) string {
 	return cpp.String()
 }
 
-func (index_setter) next_steps(key_a *models.Var, key_b *models.Var, begin string) string {
+func (index_setter) next_steps(key_a *ast.Var, key_b *ast.Var, begin string) string {
 	var cpp strings.Builder
 	indent := indent_string()
 	cpp.WriteString("++__julec_foreach_begin;\n")
@@ -342,7 +342,7 @@ func (index_setter) next_steps(key_a *models.Var, key_b *models.Var, begin strin
 
 type map_setter struct{}
 
-func (map_setter) setup_vars(key_a *models.Var, key_b *models.Var) string {
+func (map_setter) setup_vars(key_a *ast.Var, key_b *ast.Var) string {
 	var cpp strings.Builder
 	indent := indent_string()
 	if !lex.IsIgnoreId(key_a.Id) {
@@ -366,7 +366,7 @@ func (map_setter) setup_vars(key_a *models.Var, key_b *models.Var) string {
 	return cpp.String()
 }
 
-func (map_setter) next_steps(key_a *models.Var, key_b *models.Var, begin string) string {
+func (map_setter) next_steps(key_a *ast.Var, key_b *ast.Var, begin string) string {
 	var cpp strings.Builder
 	indent := indent_string()
 	cpp.WriteString("++__julec_foreach_begin;\n")
@@ -386,7 +386,7 @@ func (map_setter) next_steps(key_a *models.Var, key_b *models.Var, begin string)
 	return cpp.String()
 }
 
-func gen_iter_foreach(f *models.IterForeach, i *models.Iter) string {
+func gen_iter_foreach(f *ast.IterForeach, i *ast.Iter) string {
 	switch f.ExprType.Id {
 	case types.STR, types.SLICE, types.ARRAY:
 		return gen_foreach_iter(f, i, index_setter{})
@@ -396,7 +396,7 @@ func gen_iter_foreach(f *models.IterForeach, i *models.Iter) string {
 	return ""
 }
 
-func gen_foreach_iter(f *models.IterForeach, i *models.Iter, setter foreach_setter) string {
+func gen_foreach_iter(f *ast.IterForeach, i *ast.Iter, setter foreach_setter) string {
 	var cpp strings.Builder
 	cpp.WriteString("{\n")
 	add_indent()
@@ -439,21 +439,21 @@ func gen_foreach_iter(f *models.IterForeach, i *models.Iter, setter foreach_sett
 	return cpp.String()
 }
 
-func gen_iter(i *models.Iter) string {
+func gen_iter(i *ast.Iter) string {
 	if i.Profile == nil {
 		return gen_iter_inf(i)
 	}
 	switch t := i.Profile.(type) {
-	case models.IterForeach:
+	case ast.IterForeach:
 		return gen_iter_foreach(&t, i)
-	case models.IterWhile:
+	case ast.IterWhile:
 		return gen_iter_while(&t, i)
 	default:
 		return ""
 	}
 }
 
-func gen_type_alias(t *models.TypeAlias) string {
+func gen_type_alias(t *ast.TypeAlias) string {
 	var cpp strings.Builder
 	cpp.WriteString("typedef ")
 	cpp.WriteString(t.Type.String())
@@ -467,53 +467,53 @@ func gen_type_alias(t *models.TypeAlias) string {
 	return cpp.String()
 }
 
-func gen_st(s *models.Statement) string {
+func gen_st(s *ast.Statement) string {
 	switch t := s.Data.(type) {
-	case models.ExprStatement:
+	case ast.ExprStatement:
 		return gen_expr_st(&t)
-	case models.Var:
+	case ast.Var:
 		return t.String()
-	case models.Assign:
+	case ast.Assign:
 		return gen_assign(&t)
-	case models.Break:
+	case ast.Break:
 		return t.String()
-	case models.Continue:
+	case ast.Continue:
 		return t.String()
-	case *models.Match:
+	case *ast.Match:
 		return gen_match(t)
-	case models.TypeAlias:
+	case ast.TypeAlias:
 		return gen_type_alias(&t)
-	case *models.Block:
+	case *ast.Block:
 		return gen_block(t)
-	case models.ConcurrentCall:
+	case ast.ConcurrentCall:
 		return gen_concurrent_call(&t)
-	case models.Comment:
+	case ast.Comment:
 		return t.String()
-	case models.Iter:
+	case ast.Iter:
 		return gen_iter(&t)
-	case models.Fallthrough:
+	case ast.Fallthrough:
 		return gen_fallthrough(&t)
-	case models.Conditional:
+	case ast.Conditional:
 		return gen_conditional(&t)
-	case models.Ret:
+	case ast.Ret:
 		return gen_ret_st(&t)
-	case models.Goto:
+	case ast.Goto:
 		return t.String()
-	case models.Label:
+	case ast.Label:
 		return t.String()
 	default:
 		return ""
 	}
 }
 
-func gen_expr_st(be *models.ExprStatement) string {
+func gen_expr_st(be *ast.ExprStatement) string {
 	var cpp strings.Builder
 	cpp.WriteString(be.Expr.String())
 	cpp.WriteByte(';')
 	return cpp.String()
 }
 
-func gen_ret_st(r *models.Ret) string {
+func gen_ret_st(r *ast.Ret) string {
 	if r.Expr.Model == nil {
 		return "return;"
 	}
@@ -523,7 +523,7 @@ func gen_ret_st(r *models.Ret) string {
 	return cpp.String()
 }
 
-func gen_fallthrough(f *models.Fallthrough) string {
+func gen_fallthrough(f *ast.Fallthrough) string {
 	var cpp strings.Builder
 	cpp.WriteString("goto ")
 	cpp.WriteString(f.Case.Next.BeginLabel())
@@ -531,7 +531,7 @@ func gen_fallthrough(f *models.Fallthrough) string {
 	return cpp.String()
 }
 
-func gen_case(c *models.Case, matchExpr string) string {
+func gen_case(c *ast.Case, matchExpr string) string {
 	endlabel := c.EndLabel()
 	var cpp strings.Builder
 	if len(c.Exprs) > 0 {
@@ -569,7 +569,7 @@ func gen_case(c *models.Case, matchExpr string) string {
 	return cpp.String()
 }
 
-func gen_match_expr(m *models.Match) string {
+func gen_match_expr(m *ast.Match) string {
 	if len(m.Cases) == 0 {
 		if m.Default != nil {
 			return gen_case(m.Default, "")
@@ -603,7 +603,7 @@ func gen_match_expr(m *models.Match) string {
 	return cpp.String()
 }
 
-func gen_match_bool(m *models.Match) string {
+func gen_match_bool(m *ast.Match) string {
 	var cpp strings.Builder
 	if len(m.Cases) > 0 {
 		cpp.WriteString(gen_case(&m.Cases[0], ""))
@@ -621,7 +621,7 @@ func gen_match_bool(m *models.Match) string {
 	return cpp.String()
 }
 
-func gen_match(m *models.Match) string {
+func gen_match(m *ast.Match) string {
 	var cpp strings.Builder
 	if m.Expr.Model != nil {
 		cpp.WriteString(gen_match_expr(m))
@@ -635,7 +635,7 @@ func gen_match(m *models.Match) string {
 	return cpp.String()
 }
 
-func gen_struct_ostream(s *models.Struct) string {
+func gen_struct_ostream(s *ast.Struct) string {
 	var cpp strings.Builder
 	genericsDef, genericsSerie := gen_struct_generics(s)
 	cpp.WriteString(indent_string())
@@ -672,7 +672,7 @@ func gen_struct_ostream(s *models.Struct) string {
 	return cpp.String()
 }
 
-func gen_struct_generics(s *models.Struct) (def string, serie string) {
+func gen_struct_generics(s *ast.Struct) (def string, serie string) {
 	if len(s.Generics) == 0 {
 		return "", ""
 	}
@@ -691,7 +691,7 @@ func gen_struct_generics(s *models.Struct) (def string, serie string) {
 	return cppDef.String(), serie
 }
 
-func gen_struct_operators(s *models.Struct) string {
+func gen_struct_operators(s *ast.Struct) string {
 	outid := s.OutId()
 	genericsDef, genericsSerie := gen_struct_generics(s)
 	var cpp strings.Builder
@@ -741,7 +741,7 @@ func gen_struct_operators(s *models.Struct) string {
 	return cpp.String()
 }
 
-func gen_struct_traits(s *models.Struct) string {
+func gen_struct_traits(s *ast.Struct) string {
 	if len(s.Traits) == 0 {
 		return ""
 	}
@@ -755,14 +755,14 @@ func gen_struct_traits(s *models.Struct) string {
 	return cpp.String()[:cpp.Len()-1]
 }
 
-func gen_struct_self_var(s *models.Struct) string {
+func gen_struct_self_var(s *ast.Struct) string {
 	var cpp strings.Builder
 	cpp.WriteString(s.GetSelfRefVarType().String())
 	cpp.WriteString(" self{ nil };")
 	return cpp.String()
 }
 
-func gen_struct_self_var_init_st(s *models.Struct) string {
+func gen_struct_self_var_init_st(s *ast.Struct) string {
 	var cpp strings.Builder
 	cpp.WriteString("this->self = ")
 	cpp.WriteString(s.GetSelfRefVarType().String())
@@ -770,11 +770,11 @@ func gen_struct_self_var_init_st(s *models.Struct) string {
 	return cpp.String()
 }
 
-func gen_struct_constructor(s *models.Struct) string {
+func gen_struct_constructor(s *ast.Struct) string {
 	var cpp strings.Builder
 	cpp.WriteString(indent_string())
 	cpp.WriteString(s.OutId())
-	cpp.WriteString(models.ParamsToCpp(s.Constructor.Params))
+	cpp.WriteString(ast.ParamsToCpp(s.Constructor.Params))
 	cpp.WriteString(" noexcept {\n")
 	add_indent()
 	cpp.WriteString(indent_string())
@@ -798,7 +798,7 @@ func gen_struct_constructor(s *models.Struct) string {
 	return cpp.String()
 }
 
-func gen_struct_destructor(s *models.Struct) string {
+func gen_struct_destructor(s *ast.Struct) string {
 	var cpp strings.Builder
 	cpp.WriteByte('~')
 	cpp.WriteString(s.OutId())
@@ -806,9 +806,9 @@ func gen_struct_destructor(s *models.Struct) string {
 	return cpp.String()
 }
 
-func gen_struct_prototype(s *models.Struct) string {
+func gen_struct_prototype(s *ast.Struct) string {
 	var cpp strings.Builder
-	cpp.WriteString(models.GenericsToCpp(s.Generics))
+	cpp.WriteString(ast.GenericsToCpp(s.Generics))
 	cpp.WriteByte('\n')
 	cpp.WriteString("struct ")
 	outid := s.OutId()
@@ -853,9 +853,9 @@ func gen_struct_prototype(s *models.Struct) string {
 	return cpp.String()
 }
 
-func gen_struct_plain_prototype(s *models.Struct) string {
+func gen_struct_plain_prototype(s *ast.Struct) string {
 	var cpp strings.Builder
-	cpp.WriteString(models.GenericsToCpp(s.Generics))
+	cpp.WriteString(ast.GenericsToCpp(s.Generics))
 	cpp.WriteByte('\n')
 	cpp.WriteString("struct ")
 	cpp.WriteString(s.OutId())
@@ -863,7 +863,7 @@ func gen_struct_plain_prototype(s *models.Struct) string {
 	return cpp.String()
 }
 
-func gen_struct_decl(s *models.Struct) string {
+func gen_struct_decl(s *ast.Struct) string {
 	var cpp strings.Builder
 	for _, f := range s.Defines.Fns {
 		if f.Used {
@@ -875,7 +875,7 @@ func gen_struct_decl(s *models.Struct) string {
 	return cpp.String()
 }
 
-func gen_struct(s *models.Struct) string {
+func gen_struct(s *ast.Struct) string {
 	var cpp strings.Builder
 	cpp.WriteString(gen_struct_decl(s))
 	cpp.WriteString("\n\n")
@@ -883,9 +883,9 @@ func gen_struct(s *models.Struct) string {
 	return cpp.String()
 }
 
-func gen_fn_decl_head(f *models.Fn, owner string) string {
+func gen_fn_decl_head(f *ast.Fn, owner string) string {
 	var cpp strings.Builder
-	cpp.WriteString(models.GenericsToCpp(f.Generics))
+	cpp.WriteString(ast.GenericsToCpp(f.Generics))
 	if cpp.Len() > 0 {
 		cpp.WriteByte('\n')
 		cpp.WriteString(indent_string())
@@ -903,14 +903,14 @@ func gen_fn_decl_head(f *models.Fn, owner string) string {
 	return cpp.String()
 }
 
-func gen_fn_head(f *models.Fn, owner string) string {
+func gen_fn_head(f *ast.Fn, owner string) string {
 	var cpp strings.Builder
 	cpp.WriteString(gen_fn_decl_head(f, owner))
-	cpp.WriteString(models.ParamsToCpp(f.Params))
+	cpp.WriteString(ast.ParamsToCpp(f.Params))
 	return cpp.String()
 }
 
-func gen_fn_owner(f *models.Fn, owner string) string {
+func gen_fn_owner(f *ast.Fn, owner string) string {
 	var cpp strings.Builder
 	cpp.WriteString(gen_fn_head(f, owner))
 	cpp.WriteByte(' ')
@@ -919,12 +919,12 @@ func gen_fn_owner(f *models.Fn, owner string) string {
 	return cpp.String()
 }
 
-func gen_fn_block(vars []*models.Var, b *models.Block) string {
+func gen_fn_block(vars []*ast.Var, b *ast.Block) string {
 	var cpp strings.Builder
 	if vars != nil {
-		statements := make([]models.Statement, len(vars))
+		statements := make([]ast.Statement, len(vars))
 		for i, v := range vars {
-			statements[i] = models.Statement{Token: v.Token, Data: *v}
+			statements[i] = ast.Statement{Token: v.Token, Data: *v}
 		}
 		b.Tree = append(statements, b.Tree...)
 	}
@@ -932,9 +932,9 @@ func gen_fn_block(vars []*models.Var, b *models.Block) string {
 	return cpp.String()
 }
 
-func gen_fn(f *models.Fn) string { return gen_fn_owner(f, "") }
+func gen_fn(f *ast.Fn) string { return gen_fn_owner(f, "") }
 
-func gen_fn_prototype(f *models.Fn, owner string) string {
+func gen_fn_prototype(f *ast.Fn, owner string) string {
 	var cpp strings.Builder
 	cpp.WriteString(gen_fn_decl_head(f, owner))
 	cpp.WriteString(f.PrototypeParams())
@@ -942,7 +942,7 @@ func gen_fn_prototype(f *models.Fn, owner string) string {
 	return cpp.String()
 }
 
-func gen_links(used *[]*models.UseDecl) string {
+func gen_links(used *[]*ast.UseDecl) string {
 	var cpp strings.Builder
 	for _, u := range *used {
 		if u.Cpp {
@@ -960,7 +960,7 @@ func gen_links(used *[]*models.UseDecl) string {
 	return cpp.String()
 }
 
-func _gen_types(dm *models.Defmap) string {
+func _gen_types(dm *ast.Defmap) string {
 	var cpp strings.Builder
 	for _, t := range dm.Types {
 		if t.Used && t.Token.Id != lex.ID_NA {
@@ -971,7 +971,7 @@ func _gen_types(dm *models.Defmap) string {
 	return cpp.String()
 }
 
-func gen_types(tree *models.Defmap, used *[]*models.UseDecl) string {
+func gen_types(tree *ast.Defmap, used *[]*ast.UseDecl) string {
 	var cpp strings.Builder
 	for _, u := range *used {
 		if !u.Cpp {
@@ -982,7 +982,7 @@ func gen_types(tree *models.Defmap, used *[]*models.UseDecl) string {
 	return cpp.String()
 }
 
-func _gen_traits(dm *models.Defmap) string {
+func _gen_traits(dm *ast.Defmap) string {
 	var cpp strings.Builder
 	for _, t := range dm.Traits {
 		if t.Used && t.Token.Id != lex.ID_NA {
@@ -993,7 +993,7 @@ func _gen_traits(dm *models.Defmap) string {
 	return cpp.String()
 }
 
-func gen_traits(tree *models.Defmap, used *[]*models.UseDecl) string {
+func gen_traits(tree *ast.Defmap, used *[]*ast.UseDecl) string {
 	var cpp strings.Builder
 	for _, u := range *used {
 		if !u.Cpp {
@@ -1004,7 +1004,7 @@ func gen_traits(tree *models.Defmap, used *[]*models.UseDecl) string {
 	return cpp.String()
 }
 
-func gen_structs(structs []*models.Struct) string {
+func gen_structs(structs []*ast.Struct) string {
 	var cpp strings.Builder
 	for _, s := range structs {
 		if s.Used && s.Token.Id != lex.ID_NA {
@@ -1015,7 +1015,7 @@ func gen_structs(structs []*models.Struct) string {
 	return cpp.String()
 }
 
-func gen_struct_plain_prototypes(structs []*models.Struct) string {
+func gen_struct_plain_prototypes(structs []*ast.Struct) string {
 	var cpp strings.Builder
 	for _, s := range structs {
 		if s.Used && s.Token.Id != lex.ID_NA {
@@ -1026,7 +1026,7 @@ func gen_struct_plain_prototypes(structs []*models.Struct) string {
 	return cpp.String()
 }
 
-func gen_struct_prototypes(structs []*models.Struct) string {
+func gen_struct_prototypes(structs []*ast.Struct) string {
 	var cpp strings.Builder
 	for _, s := range structs {
 		if s.Used && s.Token.Id != lex.ID_NA {
@@ -1037,7 +1037,7 @@ func gen_struct_prototypes(structs []*models.Struct) string {
 	return cpp.String()
 }
 
-func gen_fn_prototypes(dm *models.Defmap) string {
+func gen_fn_prototypes(dm *ast.Defmap) string {
 	var cpp strings.Builder
 	for _, f := range dm.Fns {
 		if f.Used && f.Token.Id != lex.ID_NA {
@@ -1048,7 +1048,7 @@ func gen_fn_prototypes(dm *models.Defmap) string {
 	return cpp.String()
 }
 
-func gen_prototypes(tree *models.Defmap, used *[]*models.UseDecl, structs []*models.Struct) string {
+func gen_prototypes(tree *ast.Defmap, used *[]*ast.UseDecl, structs []*ast.Struct) string {
 	var cpp strings.Builder
 	cpp.WriteString(gen_struct_plain_prototypes(structs))
 	cpp.WriteString(gen_struct_prototypes(structs))
@@ -1061,7 +1061,7 @@ func gen_prototypes(tree *models.Defmap, used *[]*models.UseDecl, structs []*mod
 	return cpp.String()
 }
 
-func _gen_globals(dm *models.Defmap) string {
+func _gen_globals(dm *ast.Defmap) string {
 	var cpp strings.Builder
 	for _, g := range dm.Globals {
 		if !g.Const && g.Used && g.Token.Id != lex.ID_NA {
@@ -1072,7 +1072,7 @@ func _gen_globals(dm *models.Defmap) string {
 	return cpp.String()
 }
 
-func gen_globals(tree *models.Defmap, used *[]*models.UseDecl) string {
+func gen_globals(tree *ast.Defmap, used *[]*ast.UseDecl) string {
 	var cpp strings.Builder
 	for _, u := range *used {
 		if !u.Cpp {
@@ -1083,7 +1083,7 @@ func gen_globals(tree *models.Defmap, used *[]*models.UseDecl) string {
 	return cpp.String()
 }
 
-func _gen_fns(dm *models.Defmap) string {
+func _gen_fns(dm *ast.Defmap) string {
 	var cpp strings.Builder
 	for _, f := range dm.Fns {
 		if f.Used && f.Token.Id != lex.ID_NA {
@@ -1094,7 +1094,7 @@ func _gen_fns(dm *models.Defmap) string {
 	return cpp.String()
 }
 
-func gen_fns(tree *models.Defmap, used *[]*models.UseDecl) string {
+func gen_fns(tree *ast.Defmap, used *[]*ast.UseDecl) string {
 	var cpp strings.Builder
 	for _, u := range *used {
 		if !u.Cpp {
@@ -1105,13 +1105,13 @@ func gen_fns(tree *models.Defmap, used *[]*models.UseDecl) string {
 	return cpp.String()
 }
 
-func gen_init_caller(tree *models.Defmap, used *[]*models.UseDecl) string {
+func gen_init_caller(tree *ast.Defmap, used *[]*ast.UseDecl) string {
 	var cpp strings.Builder
 	cpp.WriteString("void ")
 	cpp.WriteString(init_caller)
 	cpp.WriteString("(void) {")
 	indent := "\t"
-	push_init := func(defs *models.Defmap) {
+	push_init := func(defs *ast.Defmap) {
 		f, dm, _ := defs.FnById(jule.INIT_FN, nil)
 		if f == nil || dm != defs {
 			return
@@ -1131,8 +1131,8 @@ func gen_init_caller(tree *models.Defmap, used *[]*models.UseDecl) string {
 	return cpp.String()
 }
 
-func get_all_structs(tree *models.Defmap, used *[]*models.UseDecl) []*models.Struct {
-	order := make([]*models.Struct, 0, len(tree.Structs))
+func get_all_structs(tree *ast.Defmap, used *[]*ast.UseDecl) []*ast.Struct {
+	order := make([]*ast.Struct, 0, len(tree.Structs))
 	order = append(order, tree.Structs...)
 	for _, u := range *used {
 		if !u.Cpp {
@@ -1142,7 +1142,7 @@ func get_all_structs(tree *models.Defmap, used *[]*models.UseDecl) []*models.Str
 	return order
 }
 
-func gen_trait(t *models.Trait) string {
+func gen_trait(t *ast.Trait) string {
 	var cpp strings.Builder
 	cpp.WriteString("struct ")
 	outid := t.OutId()
@@ -1159,7 +1159,7 @@ func gen_trait(t *models.Trait) string {
 		cpp.WriteString(f.RetType.String())
 		cpp.WriteByte(' ')
 		cpp.WriteString(f.Id)
-		cpp.WriteString(models.ParamsToCpp(f.Params))
+		cpp.WriteString(ast.ParamsToCpp(f.Params))
 		cpp.WriteString(" {")
 		if !types.IsVoid(f.RetType.Type) {
 			cpp.WriteString(" return {}; ")
@@ -1171,7 +1171,7 @@ func gen_trait(t *models.Trait) string {
 }
 
 // Gen generates object code from parse tree.
-func Gen(tree *models.Defmap, used *[]*models.UseDecl) string {
+func Gen(tree *ast.Defmap, used *[]*ast.UseDecl) string {
 	structs := get_all_structs(tree, used)
 	order_structures(structs)
 	var cpp strings.Builder
@@ -1190,7 +1190,7 @@ func Gen(tree *models.Defmap, used *[]*models.UseDecl) string {
 	return cpp.String()
 }
 
-func can_be_order(s *models.Struct) bool {
+func can_be_order(s *ast.Struct) bool {
 	for _, d := range s.Origin.Depends {
 		if d.Origin.Order < s.Origin.Order {
 			return false
@@ -1199,7 +1199,7 @@ func can_be_order(s *models.Struct) bool {
 	return true
 }
 
-func order_structures(structures []*models.Struct) {
+func order_structures(structures []*ast.Struct) {
 	for i, s := range structures {
 		s.Order = i
 	}

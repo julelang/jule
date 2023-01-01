@@ -3,7 +3,7 @@ package parser
 import (
 	"strings"
 
-	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
 )
@@ -75,7 +75,7 @@ func isForeachIterExpr(val value) bool {
 	return code == types.STR
 }
 
-func checkFloatBit(v models.Data, bit int) bool {
+func checkFloatBit(v ast.Data, bit int) bool {
 	if bit == 0 {
 		return false
 	}

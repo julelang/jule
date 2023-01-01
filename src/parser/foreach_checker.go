@@ -1,14 +1,14 @@
 package parser
 
 import (
-	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
 )
 
 type foreachChecker struct {
 	p       *Parser
-	profile *models.IterForeach
+	profile *ast.IterForeach
 	val     value
 }
 

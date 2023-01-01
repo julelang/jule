@@ -10,43 +10,42 @@ import (
 
 	"github.com/julelang/jule"
 	"github.com/julelang/jule/ast"
-	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
 )
 
 type File = lex.File
-type TypeAlias = models.TypeAlias
-type Var = models.Var
-type Fn = models.Fn
-type Arg = models.Arg
-type Param = models.Param
-type Type = models.Type
-type Expr = models.Expr
-type Enum = models.Enum
-type Struct = models.Struct
-type GenericType = models.GenericType
-type RetType = models.RetType
+type TypeAlias = ast.TypeAlias
+type Var = ast.Var
+type Fn = ast.Fn
+type Arg = ast.Arg
+type Param = ast.Param
+type Type = ast.Type
+type Expr = ast.Expr
+type Enum = ast.Enum
+type Struct = ast.Struct
+type GenericType = ast.GenericType
+type RetType = ast.RetType
 
 // Parser is parser of Jule code.
 type Parser struct {
-	attributes       []models.Attribute
+	attributes       []ast.Attribute
 	docText          strings.Builder
-	currentIter      *models.Iter
-	currentCase      *models.Case
+	currentIter      *ast.Iter
+	currentCase      *ast.Case
 	wg               sync.WaitGroup
-	rootBlock        *models.Block
-	nodeBlock        *models.Block
+	rootBlock        *ast.Block
+	nodeBlock        *ast.Block
 	generics         []*GenericType
 	blockTypes       []*TypeAlias
 	blockVars        []*Var
-	waitingImpls     []*models.Impl
+	waitingImpls     []*ast.Impl
 	eval             *eval
-	linked_aliases   []*models.TypeAlias
-	linked_functions []*models.Fn
-	linked_variables []*models.Var
-	linked_structs   []*models.Struct
+	linked_aliases   []*ast.TypeAlias
+	linked_functions []*ast.Fn
+	linked_variables []*ast.Var
+	linked_structs   []*ast.Struct
 	allowBuiltin     bool
 	package_files    *[]*Parser
 
@@ -54,9 +53,9 @@ type Parser struct {
 	JustDefines bool
 	NoCheck     bool
 	IsMain      bool
-	Used        *[]*models.UseDecl // All used packages, deep detection
-	Uses        []*models.UseDecl  // File uses these packages
-	Defines     *models.Defmap
+	Used        *[]*ast.UseDecl // All used packages, deep detection
+	Uses        []*ast.UseDecl  // File uses these packages
+	Defines     *ast.Defmap
 	Errors      []build.Log
 	Warnings    []build.Log
 	File        *File
@@ -67,10 +66,10 @@ func New(path string) *Parser {
 	p := new(Parser)
 	p.File = lex.NewFile(path)
 	p.allowBuiltin = true
-	p.Defines = new(models.Defmap)
+	p.Defines = new(ast.Defmap)
 	p.eval = new(eval)
 	p.eval.p = p
-	p.Used = new([]*models.UseDecl)
+	p.Used = new([]*ast.UseDecl)
 	return p
 }
 
@@ -108,13 +107,13 @@ func (p *Parser) pusherrmsg(msg string) {
 	})
 }
 
-func getTree(toks []lex.Token) ([]models.Object, []build.Log) {
+func getTree(toks []lex.Token) ([]ast.Object, []build.Log) {
 	r := new_builder(toks)
 	r.Build()
 	return r.Tree, r.Errors
 }
 
-func (p *Parser) checkCppUsePath(use *models.UseDecl) bool {
+func (p *Parser) checkCppUsePath(use *ast.UseDecl) bool {
 	if build.IsStdHeaderPath(use.Path) {
 		return true
 	}
@@ -140,7 +139,7 @@ func (p *Parser) checkCppUsePath(use *models.UseDecl) bool {
 	return true
 }
 
-func (p *Parser) checkPureUsePath(use *models.UseDecl) bool {
+func (p *Parser) checkPureUsePath(use *ast.UseDecl) bool {
 	info, err := os.Stat(use.Path)
 	// Exist?
 	if err != nil || !info.IsDir() {
@@ -150,7 +149,7 @@ func (p *Parser) checkPureUsePath(use *models.UseDecl) bool {
 	return true
 }
 
-func (p *Parser) checkUsePath(use *models.UseDecl) bool {
+func (p *Parser) checkUsePath(use *ast.UseDecl) bool {
 	if use.Cpp {
 		if !p.checkCppUsePath(use) {
 			return false
@@ -163,9 +162,9 @@ func (p *Parser) checkUsePath(use *models.UseDecl) bool {
 	return true
 }
 
-func (p *Parser) pushSelects(u *models.UseDecl, selectors []lex.Token) (addNs bool) {
+func (p *Parser) pushSelects(u *ast.UseDecl, selectors []lex.Token) (addNs bool) {
 	if len(selectors) > 0 && p.Defines.Side == nil {
-		p.Defines.Side = new(models.Defmap)
+		p.Defines.Side = new(ast.Defmap)
 	}
 	for i, id := range selectors {
 		for j, jid := range selectors {
@@ -207,14 +206,14 @@ func (p *Parser) pushSelects(u *models.UseDecl, selectors []lex.Token) (addNs bo
 	return
 }
 
-func (p *Parser) pushUse(use *models.UseDecl, selectors []lex.Token) {
+func (p *Parser) pushUse(use *ast.UseDecl, selectors []lex.Token) {
 	dm, ok := std_builtin_defines[use.LinkString]
 	if ok {
 		dm.PushDefines(use.Defines)
 	}
 	if use.FullUse {
 		if p.Defines.Side == nil {
-			p.Defines.Side = new(models.Defmap)
+			p.Defines.Side = new(ast.Defmap)
 		}
 		use.Defines.PushDefines(p.Defines.Side)
 	} else if len(selectors) > 0 {
@@ -229,14 +228,14 @@ func (p *Parser) pushUse(use *models.UseDecl, selectors []lex.Token) {
 	src.Defines = use.Defines
 }
 
-func (p *Parser) compileCppLinkUse(ast *models.UseDecl) *models.UseDecl {
+func (p *Parser) compileCppLinkUse(ast *ast.UseDecl) *ast.UseDecl {
 	ast.Cpp = true
 	return ast
 }
 
-func make_use_from_ast(ast *models.UseDecl) *models.UseDecl {
-	ast.Defines = new(models.Defmap)
-	return ast
+func make_use_from_ast(decl *ast.UseDecl) *ast.UseDecl {
+	decl.Defines = new(ast.Defmap)
+	return decl
 }
 
 // WrapPackage wraps all package on this Parser instance.
@@ -250,7 +249,7 @@ func (p *Parser) WrapPackage() {
 	}
 }
 
-func (p *Parser) compilePureUse(ast *models.UseDecl) (_ *models.UseDecl, hassErr bool) {
+func (p *Parser) compilePureUse(ast *ast.UseDecl) (_ *ast.UseDecl, hassErr bool) {
 	infos, err := os.ReadDir(ast.Path)
 	if err != nil {
 		p.pusherrmsg(err.Error())
@@ -284,38 +283,38 @@ func (p *Parser) compilePureUse(ast *models.UseDecl) (_ *models.UseDecl, hassErr
 	return nil, false
 }
 
-func (p *Parser) compileUse(ast *models.UseDecl) (*models.UseDecl, bool) {
+func (p *Parser) compileUse(ast *ast.UseDecl) (*ast.UseDecl, bool) {
 	if ast.Cpp {
 		return p.compileCppLinkUse(ast), false
 	}
 	return p.compilePureUse(ast)
 }
 
-func (p *Parser) use_decl(ast *models.UseDecl, err *bool) {
-	if !p.checkUsePath(ast) {
+func (p *Parser) use_decl(decl *ast.UseDecl, err *bool) {
+	if !p.checkUsePath(decl) {
 		*err = true
 		return
 	}
 	// Already parsed?
 	for _, u := range *p.Used {
-		if ast.Path == u.Path {
+		if decl.Path == u.Path {
 			old := u.FullUse
-			u.FullUse = ast.FullUse
-			p.pushUse(u, ast.Selectors)
+			u.FullUse = decl.FullUse
+			p.pushUse(u, decl.Selectors)
 			p.Uses = append(p.Uses, u)
 			u.FullUse = old
 			return
 		}
 	}
-	var u *models.UseDecl
-	u, *err = p.compileUse(ast)
+	var u *ast.UseDecl
+	u, *err = p.compileUse(decl)
 	if u == nil {
 		return
 	}
 	// Already uses?
 	for _, pu := range p.Uses {
 		if u.Path == pu.Path {
-			p.pusherrtok(ast.Token, "already_uses")
+			p.pusherrtok(decl.Token, "already_uses")
 			return
 		}
 	}
@@ -323,17 +322,17 @@ func (p *Parser) use_decl(ast *models.UseDecl, err *bool) {
 	p.Uses = append(p.Uses, u)
 }
 
-func (p *Parser) parseUses(tree *[]models.Object) bool {
+func (p *Parser) parseUses(tree *[]ast.Object) bool {
 	err := false
 	for i := range *tree {
 		obj := &(*tree)[i]
 		switch obj_t := obj.Data.(type) {
-		case models.UseDecl:
+		case ast.UseDecl:
 			if !err {
 				p.use_decl(&obj_t, &err)
 			}
 			obj.Data = nil
-		case models.Comment:
+		case ast.Comment:
 			// Ignore beginning comments.
 		default:
 			goto end
@@ -344,16 +343,16 @@ end:
 	return err
 }
 
-func objectIsIgnored(obj *models.Object) bool {
+func objectIsIgnored(obj *ast.Object) bool {
 	return obj.Data == nil
 }
 
-func (p *Parser) parseSrcTreeObj(obj models.Object) {
+func (p *Parser) parseSrcTreeObj(obj ast.Object) {
 	if objectIsIgnored(&obj) {
 		return
 	}
 	switch obj_t := obj.Data.(type) {
-	case models.Statement:
+	case ast.Statement:
 		p.St(obj_t)
 	case TypeAlias:
 		p.Type(obj_t)
@@ -363,30 +362,30 @@ func (p *Parser) parseSrcTreeObj(obj models.Object) {
 		p.Enum(obj_t)
 	case Struct:
 		p.Struct(obj_t)
-	case models.Trait:
+	case ast.Trait:
 		p.Trait(obj_t)
-	case models.Impl:
-		i := new(models.Impl)
+	case ast.Impl:
+		i := new(ast.Impl)
 		*i = obj_t
 		p.waitingImpls = append(p.waitingImpls, i)
-	case models.CppLinkFn:
+	case ast.CppLinkFn:
 		p.LinkFn(obj_t)
-	case models.CppLinkVar:
+	case ast.CppLinkVar:
 		p.LinkVar(obj_t)
-	case models.CppLinkStruct:
+	case ast.CppLinkStruct:
 		p.Link_struct(obj_t)
-	case models.CppLinkAlias:
+	case ast.CppLinkAlias:
 		p.Link_alias(obj_t)
-	case models.Comment:
+	case ast.Comment:
 		p.Comment(obj_t)
-	case models.UseDecl:
+	case ast.UseDecl:
 		p.pusherrtok(obj.Token, "use_at_content")
 	default:
 		p.pusherrtok(obj.Token, "invalid_syntax")
 	}
 }
 
-func (p *Parser) parseSrcTree(tree []models.Object) {
+func (p *Parser) parseSrcTree(tree []ast.Object) {
 	for _, obj := range tree {
 		p.parseSrcTreeObj(obj)
 		p.checkDoc(obj)
@@ -395,7 +394,7 @@ func (p *Parser) parseSrcTree(tree []models.Object) {
 	}
 }
 
-func (p *Parser) parseTree(tree []models.Object) (ok bool) {
+func (p *Parser) parseTree(tree []ast.Object) (ok bool) {
 	if p.parseUses(&tree) {
 		return false
 	}
@@ -412,7 +411,7 @@ func (p *Parser) checkParse() {
 // Special case is;
 //
 //	p.useLocalPackage() -> nothing if p.File is nil
-func (p *Parser) useLocalPackage(tree *[]models.Object) (hasErr bool) {
+func (p *Parser) useLocalPackage(tree *[]ast.Object) (hasErr bool) {
 	if p.File == nil {
 		return
 	}
@@ -454,7 +453,7 @@ func (p *Parser) SetupPackage() {
 }
 
 // Parses Jule code from object tree.
-func (p *Parser) Parset(tree []models.Object, main, justDefines bool) {
+func (p *Parser) Parset(tree []ast.Object, main, justDefines bool) {
 	p.IsMain = main
 	p.JustDefines = justDefines
 	if !p.parseTree(tree) {
@@ -490,34 +489,34 @@ func (p *Parser) Parsef(main, justDefines bool) {
 	p.Parse(toks, main, justDefines)
 }
 
-func (p *Parser) checkDoc(obj models.Object) {
+func (p *Parser) checkDoc(obj ast.Object) {
 	if p.docText.Len() == 0 {
 		return
 	}
 	switch obj.Data.(type) {
-	case models.Comment, models.Attribute, []GenericType:
+	case ast.Comment, ast.Attribute, []GenericType:
 		return
 	}
 	p.docText.Reset()
 }
 
-func (p *Parser) checkAttribute(obj models.Object) {
+func (p *Parser) checkAttribute(obj ast.Object) {
 	if p.attributes == nil {
 		return
 	}
 	switch obj.Data.(type) {
-	case models.Attribute, models.Comment, []GenericType:
+	case ast.Attribute, ast.Comment, []GenericType:
 		return
 	}
 	p.attributes = nil
 }
 
-func (p *Parser) checkGenerics(obj models.Object) {
+func (p *Parser) checkGenerics(obj ast.Object) {
 	if p.generics == nil {
 		return
 	}
 	switch obj.Data.(type) {
-	case models.Attribute, models.Comment, []GenericType:
+	case ast.Attribute, ast.Comment, []GenericType:
 		return
 	}
 	p.pusherrtok(obj.Token, "generics_not_supports")
@@ -545,8 +544,8 @@ func (p *Parser) Generics(generics []GenericType) {
 	}
 }
 
-func (p *Parser) make_type_alias(alias models.TypeAlias) *models.TypeAlias {
-	a := new(models.TypeAlias)
+func (p *Parser) make_type_alias(alias ast.TypeAlias) *ast.TypeAlias {
+	a := new(ast.TypeAlias)
 	*a = alias
 	alias.Doc = p.docText.String()
 	p.docText.Reset()
@@ -681,7 +680,7 @@ func (p *Parser) Enum(e Enum) {
 	}
 	pdefs := p.Defines
 	puses := p.Uses
-	p.Defines = new(models.Defmap)
+	p.Defines = new(ast.Defmap)
 	defer func() {
 		p.Defines = pdefs
 		p.Uses = puses
@@ -711,25 +710,25 @@ func (p *Parser) pushField(s *Struct, f **Var, i int) {
 		p.parseField(s, f, i)
 	} else {
 		p.parseNonGenericType(s.Generics, &(*f).Type)
-		param := models.Param{Id: (*f).Id, Type: (*f).Type}
+		param := ast.Param{Id: (*f).Id, Type: (*f).Type}
 		param.Default.Model = exprNode{build.CPP_DEFAULT_EXPR}
 		s.Constructor.Params[i] = param
 	}
 }
 
 func (p *Parser) parseFields(s *Struct) {
-	s.Defines.Globals = make([]*models.Var, len(s.Fields))
+	s.Defines.Globals = make([]*ast.Var, len(s.Fields))
 	for i, f := range s.Fields {
 		p.pushField(s, &f, i)
 		s.Defines.Globals[i] = f
 	}
 }
 
-func make_constructor(s *Struct) *models.Fn {
-	constructor := new(models.Fn)
+func make_constructor(s *Struct) *ast.Fn {
+	constructor := new(ast.Fn)
 	constructor.Id = s.Id
 	constructor.Token = s.Token
-	constructor.Params = make([]models.Param, len(s.Fields))
+	constructor.Params = make([]ast.Param, len(s.Fields))
 	constructor.RetType.Type = Type{
 		Id:    types.STRUCT,
 		Kind:  s.Id,
@@ -737,14 +736,14 @@ func make_constructor(s *Struct) *models.Fn {
 		Tag:   s,
 	}
 	if len(s.Generics) > 0 {
-		constructor.Generics = make([]*models.GenericType, len(s.Generics))
+		constructor.Generics = make([]*ast.GenericType, len(s.Generics))
 		copy(constructor.Generics, s.Generics)
-		constructor.Combines = new([][]models.Type)
+		constructor.Combines = new([][]ast.Type)
 	}
 	return constructor
 }
 
-func (p *Parser) make_struct(model models.Struct) *Struct {
+func (p *Parser) make_struct(model ast.Struct) *Struct {
 	s := new(Struct)
 	*s = model
 	s.Doc = p.docText.String()
@@ -756,7 +755,7 @@ func (p *Parser) make_struct(model models.Struct) *Struct {
 	p.generics = nil
 	s.Attributes = p.attributes
 	p.attributes = nil
-	s.Defines = new(models.Defmap)
+	s.Defines = new(ast.Defmap)
 	s.Constructor = make_constructor(s)
 	s.Origin = s
 	return s
@@ -776,7 +775,7 @@ func (p *Parser) Struct(model Struct) {
 }
 
 // LinkFn parses cpp link function.
-func (p *Parser) LinkFn(link models.CppLinkFn) {
+func (p *Parser) LinkFn(link ast.CppLinkFn) {
 	if lex.IsIgnoreId(link.Link.Id) {
 		p.pusherrtok(link.Token, "ignore_id")
 		return
@@ -796,7 +795,7 @@ func (p *Parser) LinkFn(link models.CppLinkFn) {
 }
 
 // Link_alias parses cpp link structure.
-func (p *Parser) Link_alias(link models.CppLinkAlias) {
+func (p *Parser) Link_alias(link ast.CppLinkAlias) {
 	if lex.IsIgnoreId(link.Link.Id) {
 		p.pusherrtok(link.Token, "ignore_id")
 		return
@@ -811,7 +810,7 @@ func (p *Parser) Link_alias(link models.CppLinkAlias) {
 }
 
 // Link_struct parses cpp link structure.
-func (p *Parser) Link_struct(link models.CppLinkStruct) {
+func (p *Parser) Link_struct(link ast.CppLinkStruct) {
 	if lex.IsIgnoreId(link.Link.Id) {
 		p.pusherrtok(link.Token, "ignore_id")
 		return
@@ -827,7 +826,7 @@ func (p *Parser) Link_struct(link models.CppLinkStruct) {
 }
 
 // LinkVar parses cpp link function.
-func (p *Parser) LinkVar(link models.CppLinkVar) {
+func (p *Parser) LinkVar(link ast.CppLinkVar) {
 	if lex.IsIgnoreId(link.Link.Id) {
 		p.pusherrtok(link.Token, "ignore_id")
 		return
@@ -841,7 +840,7 @@ func (p *Parser) LinkVar(link models.CppLinkVar) {
 }
 
 // Trait parses Jule trait.
-func (p *Parser) Trait(model models.Trait) {
+func (p *Parser) Trait(model ast.Trait) {
 	if lex.IsIgnoreId(model.Id) {
 		p.pusherrtok(model.Token, "ignore_id")
 		return
@@ -849,11 +848,11 @@ func (p *Parser) Trait(model models.Trait) {
 		p.pusherrtok(model.Token, "exist_id", model.Id)
 		return
 	}
-	trait := new(models.Trait)
+	trait := new(ast.Trait)
 	*trait = model
 	trait.Desc = p.docText.String()
 	p.docText.Reset()
-	trait.Defines = new(models.Defmap)
+	trait.Defines = new(ast.Defmap)
 	trait.Defines.Fns = make([]*Fn, len(model.Funcs))
 	for i, f := range trait.Funcs {
 		if lex.IsIgnoreId(f.Id) {
@@ -873,7 +872,7 @@ func (p *Parser) Trait(model models.Trait) {
 	p.Defines.Traits = append(p.Defines.Traits, trait)
 }
 
-func (p *Parser) implTrait(model *models.Impl) {
+func (p *Parser) implTrait(model *ast.Impl) {
 	trait_def, _, _ := p.trait_by_id(model.Base.Kind)
 	if trait_def == nil {
 		p.pusherrtok(model.Base, "id_not_exist", model.Base.Kind)
@@ -893,7 +892,7 @@ func (p *Parser) implTrait(model *models.Impl) {
 	s.Origin.Traits = append(s.Origin.Traits, trait_def)
 	for _, obj := range model.Tree {
 		switch obj_t := obj.Data.(type) {
-		case models.Comment:
+		case ast.Comment:
 			p.Comment(obj_t)
 		case *Fn:
 			if trait_def.FindFunc(obj_t.Id) == nil {
@@ -934,7 +933,7 @@ func (p *Parser) implTrait(model *models.Impl) {
 	}
 }
 
-func (p *Parser) implStruct(model *models.Impl) {
+func (p *Parser) implStruct(model *ast.Impl) {
 	side := p.Defines.Side
 	p.Defines.Side = nil
 	s, _, _ := p.struct_by_id(model.Base.Kind)
@@ -947,7 +946,7 @@ func (p *Parser) implStruct(model *models.Impl) {
 		switch obj_t := obj.Data.(type) {
 		case []GenericType:
 			p.Generics(obj_t)
-		case models.Comment:
+		case ast.Comment:
 			p.Comment(obj_t)
 		case *Fn:
 			i, _, _ := s.Defines.FindById(obj_t.Id, nil)
@@ -982,7 +981,7 @@ func (p *Parser) implStruct(model *models.Impl) {
 }
 
 // Impl parses Jule impl.
-func (p *Parser) Impl(impl *models.Impl) {
+func (p *Parser) Impl(impl *ast.Impl) {
 	if !types.IsVoid(impl.Target) {
 		p.implTrait(impl)
 		return
@@ -991,15 +990,15 @@ func (p *Parser) Impl(impl *models.Impl) {
 }
 
 // pushNS pushes namespace to defmap and returns leaf namespace.
-func (p *Parser) pushNs(identifiers []string) *models.Namespace {
-	var src *models.Namespace
+func (p *Parser) pushNs(identifiers []string) *ast.Namespace {
+	var src *ast.Namespace
 	prev := p.Defines
 	for _, id := range identifiers {
 		src = prev.NsById(id)
 		if src == nil {
-			src = new(models.Namespace)
+			src = new(ast.Namespace)
 			src.Id = id
-			src.Defines = new(models.Defmap)
+			src.Defines = new(ast.Defmap)
 			prev.Namespaces = append(prev.Namespaces, src)
 		}
 		prev = src.Defines
@@ -1008,7 +1007,7 @@ func (p *Parser) pushNs(identifiers []string) *models.Namespace {
 }
 
 // Comment parses Jule documentation comments line.
-func (p *Parser) Comment(c models.Comment) {
+func (p *Parser) Comment(c ast.Comment) {
 	if strings.HasPrefix(c.Content, lex.PRAGMA_COMMENT_PREFIX) {
 		p.PushAttribute(c)
 		return
@@ -1018,8 +1017,8 @@ func (p *Parser) Comment(c models.Comment) {
 }
 
 // PushAttribute process and appends to attribute list.
-func (p *Parser) PushAttribute(c models.Comment) {
-	var attr models.Attribute
+func (p *Parser) PushAttribute(c ast.Comment) {
+	var attr ast.Attribute
 	// Skip attribute prefix
 	attr.Tag = c.Content[len(lex.PRAGMA_COMMENT_PREFIX):]
 	attr.Token = c.Token
@@ -1042,7 +1041,7 @@ func (p *Parser) PushAttribute(c models.Comment) {
 }
 
 // St parse Jule statement.
-func (p *Parser) St(s models.Statement) {
+func (p *Parser) St(s ast.Statement) {
 	switch data_t := s.Data.(type) {
 	case Fn:
 		p.Func(data_t)
@@ -1170,10 +1169,10 @@ func (p *Parser) check_ret_variables(f *Fn) {
 	}
 }
 
-func setGenerics(f *Fn, generics []*models.GenericType) {
+func setGenerics(f *Fn, generics []*ast.GenericType) {
 	f.Generics = generics
 	if len(f.Generics) > 0 {
-		f.Combines = new([][]models.Type)
+		f.Combines = new([][]ast.Type)
 	}
 }
 
@@ -1233,7 +1232,7 @@ func (p *Parser) Var(model Var) *Var {
 		if ok {
 			v.Type = vt
 		} else {
-			v.Type = models.Type{}
+			v.Type = ast.Type{}
 		}
 	}
 	var val value
@@ -1293,7 +1292,7 @@ func (p *Parser) varsFromParams(f *Fn) []*Var {
 	length := len(f.Params)
 	vars := make([]*Var, length)
 	for i, param := range f.Params {
-		v := new(models.Var)
+		v := new(ast.Var)
 		v.Owner = f.Block
 		v.Mutable = param.Mutable
 		v.Id = param.Id
@@ -1304,7 +1303,7 @@ func (p *Parser) varsFromParams(f *Fn) []*Var {
 				p.pusherrtok(param.Token, "variadic_parameter_not_last")
 			}
 			v.Type.Original = nil
-			v.Type.ComponentType = new(models.Type)
+			v.Type.ComponentType = new(ast.Type)
 			*v.Type.ComponentType = param.Type
 			v.Type.Id = types.SLICE
 			v.Type.Kind = lex.PREFIX_SLICE + v.Type.Kind
@@ -1314,7 +1313,7 @@ func (p *Parser) varsFromParams(f *Fn) []*Var {
 	return vars
 }
 
-func (p *Parser) linked_alias_by_id(id string) *models.TypeAlias {
+func (p *Parser) linked_alias_by_id(id string) *ast.TypeAlias {
 	for _, fp := range *p.package_files {
 		for _, link := range fp.linked_aliases {
 			if link.Id == id {
@@ -1347,7 +1346,7 @@ func (p *Parser) linkedVarById(id string) *Var {
 	return nil
 }
 
-func (p *Parser) linkedFnById(id string) *models.Fn {
+func (p *Parser) linkedFnById(id string) *ast.Fn {
 	for _, fp := range *p.package_files {
 		for _, link := range fp.linked_functions {
 			if link.Id == id {
@@ -1391,7 +1390,7 @@ func (p *Parser) linkById(id string) (any, byte) {
 // Special case:
 //
 //	fn_by_id(id) -> nil: if function is not exist.
-func (p *Parser) fn_by_id(id string) (*Fn, *models.Defmap, bool) {
+func (p *Parser) fn_by_id(id string) (*Fn, *ast.Defmap, bool) {
 	if p.allowBuiltin {
 		f, _, _ := Builtin.FnById(id, nil)
 		if f != nil {
@@ -1407,7 +1406,7 @@ func (p *Parser) fn_by_id(id string) (*Fn, *models.Defmap, bool) {
 	return nil, nil, false
 }
 
-func (p *Parser) global_by_id(id string) (*Var, *models.Defmap, bool) {
+func (p *Parser) global_by_id(id string) (*Var, *ast.Defmap, bool) {
 	for _, fp := range *p.package_files {
 		g, dm, _ := fp.Defines.GlobalById(id, fp.File)
 		if g != nil && p.is_accessible_define(fp, dm) {
@@ -1417,7 +1416,7 @@ func (p *Parser) global_by_id(id string) (*Var, *models.Defmap, bool) {
 	return nil, nil, false
 }
 
-func (p *Parser) NsById(id string) *models.Namespace { return p.Defines.NsById(id) }
+func (p *Parser) NsById(id string) *ast.Namespace { return p.Defines.NsById(id) }
 
 // Reports identifier is shadowed or not.
 func (p *Parser) is_shadowed(id string) bool {
@@ -1425,7 +1424,7 @@ func (p *Parser) is_shadowed(id string) bool {
 	return def != nil
 }
 
-func (p *Parser) is_accessible_define(fp *Parser, dm *models.Defmap) bool {
+func (p *Parser) is_accessible_define(fp *Parser, dm *ast.Defmap) bool {
 	// Description of this condition
 	// Parameters:
 	//   fp: package representer, which package is provides this define
@@ -1453,7 +1452,7 @@ func (p *Parser) is_accessible_define(fp *Parser, dm *models.Defmap) bool {
 	return p == fp || dm == fp.Defines
 }
 
-func (p *Parser) type_by_id(id string) (*TypeAlias, *models.Defmap, bool) {
+func (p *Parser) type_by_id(id string) (*TypeAlias, *ast.Defmap, bool) {
 	alias, canshadow := p.block_type_by_id(id)
 	if alias != nil {
 		return alias, nil, canshadow
@@ -1473,7 +1472,7 @@ func (p *Parser) type_by_id(id string) (*TypeAlias, *models.Defmap, bool) {
 	return nil, nil, false
 }
 
-func (p *Parser) enum_by_id(id string) (*Enum, *models.Defmap, bool) {
+func (p *Parser) enum_by_id(id string) (*Enum, *ast.Defmap, bool) {
 	if p.allowBuiltin {
 		e, _, _ := Builtin.EnumById(id, nil)
 		if e != nil {
@@ -1489,7 +1488,7 @@ func (p *Parser) enum_by_id(id string) (*Enum, *models.Defmap, bool) {
 	return nil, nil, false
 }
 
-func (p *Parser) struct_by_id(id string) (*Struct, *models.Defmap, bool) {
+func (p *Parser) struct_by_id(id string) (*Struct, *ast.Defmap, bool) {
 	if p.allowBuiltin {
 		s, _, _ := Builtin.StructById(id, nil)
 		if s != nil {
@@ -1505,7 +1504,7 @@ func (p *Parser) struct_by_id(id string) (*Struct, *models.Defmap, bool) {
 	return nil, nil, false
 }
 
-func (p *Parser) trait_by_id(id string) (*models.Trait, *models.Defmap, bool) {
+func (p *Parser) trait_by_id(id string) (*ast.Trait, *ast.Defmap, bool) {
 	if p.allowBuiltin {
 		trait_def, _, _ := Builtin.TraitById(id, nil)
 		if trait_def != nil {
@@ -1558,7 +1557,7 @@ func (p *Parser) defined_by_id(id string) (def any, tok lex.Token, canshadow boo
 	if s != nil {
 		return s, s.Token, canshadow
 	}
-	var trait *models.Trait
+	var trait *ast.Trait
 	trait, _, canshadow = p.trait_by_id(id)
 	if trait != nil {
 		return trait, trait.Token, canshadow
@@ -1811,7 +1810,7 @@ func (p *Parser) checkParamDefaultExpr(f *Fn, param *Param) {
 	if param.Variadic {
 		dt.Id = types.SLICE
 		dt.Kind = lex.PREFIX_SLICE + dt.Kind
-		dt.ComponentType = new(models.Type)
+		dt.ComponentType = new(ast.Type)
 		*dt.ComponentType = param.Type
 		dt.Original = nil
 		dt.Pure = true
@@ -1826,7 +1825,7 @@ func (p *Parser) param(f *Fn, param *Param) (err bool) {
 	return
 }
 
-func (p *Parser) check_param_dup(params []models.Param) (err bool) {
+func (p *Parser) check_param_dup(params []ast.Param) (err bool) {
 	for i, param := range params {
 		for j, jparam := range params {
 			if j >= i {
@@ -2001,7 +2000,7 @@ func (p *Parser) callStructConstructor(s *Struct, argsToks []lex.Token, m *exprM
 func (p *Parser) parseField(s *Struct, f **Var, i int) {
 	*f = p.Var(**f)
 	v := *f
-	param := models.Param{Id: v.Id, Type: v.Type}
+	param := ast.Param{Id: v.Id, Type: v.Type}
 	if !types.IsPtr(v.Type) && types.IsStruct(v.Type) {
 		ts := v.Type.Tag.(*Struct)
 		if s.IsSameBase(ts) || ts.IsDependedTo(s) {
@@ -2054,7 +2053,7 @@ func (p *Parser) check_anon_fn(f *Fn) {
 }
 
 // Returns nil if has error.
-func (p *Parser) get_args(toks []lex.Token, targeting bool) *models.Args {
+func (p *Parser) get_args(toks []lex.Token, targeting bool) *ast.Args {
 	toks, _ = p.get_range(lex.KND_LPAREN, lex.KND_RPARENT, toks)
 	if toks == nil {
 		toks = make([]lex.Token, 0)
@@ -2187,7 +2186,7 @@ func (p *Parser) parseGenericFunc(f *Fn, generics []Type, errtok lex.Token) {
 	p.parse_pure_fn(f)
 }
 
-func (p *Parser) parseGenerics(f *Fn, args *models.Args, errTok lex.Token) bool {
+func (p *Parser) parseGenerics(f *Fn, args *ast.Args, errTok lex.Token) bool {
 	if len(f.Generics) > 0 && len(args.Generics) == 0 {
 		for _, generic := range f.Generics {
 			ok := false
@@ -2216,7 +2215,7 @@ ok:
 	return true
 }
 
-func (p *Parser) parse_fn_call(f *Fn, args *models.Args, m *exprModel, errTok lex.Token) (v value) {
+func (p *Parser) parse_fn_call(f *Fn, args *ast.Args, m *exprModel, errTok lex.Token) (v value) {
 	args.NeedsPureType = p.rootBlock == nil || len(p.rootBlock.Func.Generics) == 0
 	if len(f.Generics) > 0 {
 		params := make([]Param, len(f.Params))
@@ -2291,7 +2290,7 @@ end:
 
 func (p *Parser) parse_fn_call_toks(f *Fn, genericsToks, argsToks []lex.Token, m *exprModel) (v value) {
 	var generics []Type
-	var args *models.Args
+	var args *ast.Args
 	var err bool
 	generics, err = p.get_generics(genericsToks)
 	if err {
@@ -2303,7 +2302,7 @@ func (p *Parser) parse_fn_call_toks(f *Fn, genericsToks, argsToks []lex.Token, m
 	return p.parse_fn_call(f, args, m, argsToks[0])
 }
 
-func (p *Parser) parseStructArgs(f *Fn, args *models.Args, errTok lex.Token) {
+func (p *Parser) parseStructArgs(f *Fn, args *ast.Args, errTok lex.Token) {
 	sap := structArgParser{
 		p:      p,
 		f:      f,
@@ -2313,7 +2312,7 @@ func (p *Parser) parseStructArgs(f *Fn, args *models.Args, errTok lex.Token) {
 	sap.parse()
 }
 
-func (p *Parser) parsePureArgs(f *Fn, args *models.Args, m *exprModel, errTok lex.Token) {
+func (p *Parser) parsePureArgs(f *Fn, args *ast.Args, m *exprModel, errTok lex.Token) {
 	pap := pureArgParser{
 		p:      p,
 		f:      f,
@@ -2324,7 +2323,7 @@ func (p *Parser) parsePureArgs(f *Fn, args *models.Args, m *exprModel, errTok le
 	pap.parse()
 }
 
-func (p *Parser) parseArgs(f *Fn, args *models.Args, m *exprModel, errTok lex.Token) {
+func (p *Parser) parseArgs(f *Fn, args *ast.Args, m *exprModel, errTok lex.Token) {
 	if args.Targeted {
 		p.parseStructArgs(f, args, errTok)
 		return
@@ -2347,7 +2346,7 @@ type paramMapPair struct {
 	arg   *Arg
 }
 
-func (p *Parser) pushGenericByFunc(f *Fn, pair *paramMapPair, args *models.Args, gt Type) bool {
+func (p *Parser) pushGenericByFunc(f *Fn, pair *paramMapPair, args *ast.Args, gt Type) bool {
 	tf := gt.Tag.(*Fn)
 	cf := pair.param.Type.Tag.(*Fn)
 	if len(tf.Params) != len(cf.Params) {
@@ -2363,14 +2362,14 @@ func (p *Parser) pushGenericByFunc(f *Fn, pair *paramMapPair, args *models.Args,
 	}
 	{
 		pair := *pair
-		pair.param = &models.Param{
+		pair.param = &ast.Param{
 			Type: cf.RetType.Type,
 		}
 		return p.pushGenericByArg(f, &pair, args, tf.RetType.Type)
 	}
 }
 
-func (p *Parser) pushGenericByMultiTyped(f *Fn, pair *paramMapPair, args *models.Args, gt Type) bool {
+func (p *Parser) pushGenericByMultiTyped(f *Fn, pair *paramMapPair, args *ast.Args, gt Type) bool {
 	_types := gt.Tag.([]Type)
 	for _, mt := range _types {
 		for _, generic := range f.Generics {
@@ -2383,7 +2382,7 @@ func (p *Parser) pushGenericByMultiTyped(f *Fn, pair *paramMapPair, args *models
 	return true
 }
 
-func (p *Parser) pushGenericByCommonArg(f *Fn, pair *paramMapPair, args *models.Args, t Type) bool {
+func (p *Parser) pushGenericByCommonArg(f *Fn, pair *paramMapPair, args *ast.Args, t Type) bool {
 	for _, generic := range f.Generics {
 		if types.IsThisGeneric(generic, pair.param.Type) {
 			p.pushGenericByType(f, generic, args, t)
@@ -2393,7 +2392,7 @@ func (p *Parser) pushGenericByCommonArg(f *Fn, pair *paramMapPair, args *models.
 	return false
 }
 
-func (p *Parser) pushGenericByType(f *Fn, generic *GenericType, args *models.Args, gt Type) {
+func (p *Parser) pushGenericByType(f *Fn, generic *GenericType, args *ast.Args, gt Type) {
 	owner := f.Owner.(*Parser)
 	// Already added
 	alias, _ := owner.block_type_by_id(generic.Id)
@@ -2406,14 +2405,14 @@ func (p *Parser) pushGenericByType(f *Fn, generic *GenericType, args *models.Arg
 	args.Generics = append(args.Generics, gt)
 }
 
-func (p *Parser) pushGenericByComponent(f *Fn, pair *paramMapPair, args *models.Args, argType Type) bool {
+func (p *Parser) pushGenericByComponent(f *Fn, pair *paramMapPair, args *ast.Args, argType Type) bool {
 	for argType.ComponentType != nil {
 		argType = *argType.ComponentType
 	}
 	return p.pushGenericByCommonArg(f, pair, args, argType)
 }
 
-func (p *Parser) pushGenericByArg(f *Fn, pair *paramMapPair, args *models.Args, argType Type) bool {
+func (p *Parser) pushGenericByArg(f *Fn, pair *paramMapPair, args *ast.Args, argType Type) bool {
 	_, prefix := pair.param.Type.KindId()
 	_, tprefix := argType.KindId()
 	if prefix != tprefix {
@@ -2431,7 +2430,7 @@ func (p *Parser) pushGenericByArg(f *Fn, pair *paramMapPair, args *models.Args, 
 	}
 }
 
-func (p *Parser) parseArg(f *Fn, pair *paramMapPair, args *models.Args, variadiced *bool) {
+func (p *Parser) parseArg(f *Fn, pair *paramMapPair, args *ast.Args, variadiced *bool) {
 	var value value
 	var model iExpr
 	if pair.param.Variadic {
@@ -2442,7 +2441,7 @@ func (p *Parser) parseArg(f *Fn, pair *paramMapPair, args *models.Args, variadic
 	}
 	pair.arg.Expr.Model = model
 	if !value.variadic && !pair.param.Variadic &&
-		!models.Has_attribute(build.ATTR_CDEF, f.Attributes) &&
+		!ast.Has_attribute(build.ATTR_CDEF, f.Attributes) &&
 		types.IsPure(pair.param.Type) && types.IsNumeric(pair.param.Type.Id) {
 		pair.arg.CastType = new(Type)
 		*pair.arg.CastType = pair.param.Type.Copy()
@@ -2497,9 +2496,9 @@ func (p *Parser) checkSolidFuncSpecialCases(f *Fn) {
 	}
 }
 
-func (p *Parser) checkNewBlockCustom(b *models.Block, oldBlockVars []*Var) {
-	b.Gotos = new(models.Gotos)
-	b.Labels = new(models.Labels)
+func (p *Parser) checkNewBlockCustom(b *ast.Block, oldBlockVars []*Var) {
+	b.Gotos = new(ast.Gotos)
+	b.Labels = new(ast.Labels)
 	if p.rootBlock == nil {
 		p.rootBlock = b
 		p.nodeBlock = b
@@ -2542,11 +2541,11 @@ func (p *Parser) checkNewBlockCustom(b *models.Block, oldBlockVars []*Var) {
 	p.blockTypes = blockTypes
 }
 
-func (p *Parser) checkNewBlock(b *models.Block) {
+func (p *Parser) checkNewBlock(b *ast.Block) {
 	p.checkNewBlockCustom(b, p.blockVars)
 }
 
-func (p *Parser) fallthrough_st(f *models.Fallthrough, b *models.Block, i *int) {
+func (p *Parser) fallthrough_st(f *ast.Fallthrough, b *ast.Block, i *int) {
 	switch {
 	case p.currentCase == nil || *i+1 < len(b.Tree):
 		p.pusherrtok(f.Token, "fallthrough_wrong_use")
@@ -2558,24 +2557,24 @@ func (p *Parser) fallthrough_st(f *models.Fallthrough, b *models.Block, i *int) 
 	f.Case = p.currentCase
 }
 
-func (p *Parser) st(s *models.Statement, recover bool) bool {
+func (p *Parser) st(s *ast.Statement, recover bool) bool {
 	switch data := s.Data.(type) {
-	case models.ExprStatement:
+	case ast.ExprStatement:
 		p.expr_st(&data, recover)
 		s.Data = data
 	case Var:
 		p.var_st(&data, false)
 		s.Data = data
-	case models.Assign:
+	case ast.Assign:
 		p.assign(&data)
 		s.Data = data
-	case models.Break:
+	case ast.Break:
 		p.break_st(&data)
 		s.Data = data
-	case models.Continue:
+	case ast.Continue:
 		p.continue_st(&data)
 		s.Data = data
-	case *models.Match:
+	case *ast.Match:
 		p.matchcase(data)
 	case TypeAlias:
 		def, _, canshadow := p.block_define_by_id(data.Id)
@@ -2588,52 +2587,52 @@ func (p *Parser) st(s *models.Statement, recover bool) bool {
 		}
 		data.Type, _ = p.realType(data.Type, true)
 		p.blockTypes = append(p.blockTypes, &data)
-	case *models.Block:
+	case *ast.Block:
 		p.checkNewBlock(data)
 		s.Data = data
-	case models.ConcurrentCall:
+	case ast.ConcurrentCall:
 		p.concurrentCall(&data)
 		s.Data = data
-	case models.Comment:
+	case ast.Comment:
 	default:
 		return false
 	}
 	return true
 }
 
-func (p *Parser) check_st(b *models.Block, i *int) {
+func (p *Parser) check_st(b *ast.Block, i *int) {
 	s := &b.Tree[*i]
 	if p.st(s, true) {
 		return
 	}
 	switch data := s.Data.(type) {
-	case models.Iter:
+	case ast.Iter:
 		data.Parent = b
 		s.Data = data
 		p.iter(&data)
 		s.Data = data
-	case models.Fallthrough:
+	case ast.Fallthrough:
 		p.fallthrough_st(&data, b, i)
 		s.Data = data
-	case models.Conditional:
+	case ast.Conditional:
 		p.conditional(&data)
 		s.Data = data
-	case models.Ret:
+	case ast.Ret:
 		rc := retChecker{t: p, ret_ast: &data, f: b.Func}
 		rc.check()
 		s.Data = data
-	case models.Goto:
-		obj := new(models.Goto)
+	case ast.Goto:
+		obj := new(ast.Goto)
 		*obj = data
 		obj.Index = *i
 		obj.Block = b
 		*b.Gotos = append(*b.Gotos, obj)
-	case models.Label:
+	case ast.Label:
 		if find_label_parent(data.Label, b) != nil {
 			p.pusherrtok(data.Token, "label_exist", data.Label)
 			break
 		}
-		obj := new(models.Label)
+		obj := new(ast.Label)
 		*obj = data
 		obj.Index = *i
 		obj.Block = b
@@ -2643,13 +2642,13 @@ func (p *Parser) check_st(b *models.Block, i *int) {
 	}
 }
 
-func (p *Parser) checkBlock(b *models.Block) {
+func (p *Parser) checkBlock(b *ast.Block) {
 	for i := 0; i < len(b.Tree); i++ {
 		p.check_st(b, &i)
 	}
 }
 
-func (p *Parser) recoverFuncExprSt(s *models.ExprStatement) {
+func (p *Parser) recoverFuncExprSt(s *ast.ExprStatement) {
 	errtok := s.Expr.Tokens[0]
 	callToks := s.Expr.Tokens[1:]
 	args := p.get_args(callToks, false)
@@ -2682,17 +2681,17 @@ func (p *Parser) recoverFuncExprSt(s *models.ExprStatement) {
 	} else {
 		catcher.exprs = append(catcher.exprs, handler.Block)
 	}
-	catchExpr := models.Statement{
-		Data: models.ExprStatement{
-			Expr: models.Expr{Model: catcher},
+	catchExpr := ast.Statement{
+		Data: ast.ExprStatement{
+			Expr: ast.Expr{Model: catcher},
 		},
 	}
 	p.nodeBlock.Tree = append(p.nodeBlock.Tree, catchExpr)
 }
 
-func (p *Parser) expr_st(s *models.ExprStatement, recover bool) {
+func (p *Parser) expr_st(s *ast.ExprStatement, recover bool) {
 	if s.Expr.IsNotBinop() {
-		expr := s.Expr.Op.(models.BinopExpr)
+		expr := s.Expr.Op.(ast.BinopExpr)
 		tok := expr.Tokens[0]
 		if tok.Id == lex.ID_IDENT && tok.Kind == recoverFunc.Id {
 			if ast.IsFnCall(s.Expr.Tokens) != nil {
@@ -2712,7 +2711,7 @@ func (p *Parser) expr_st(s *models.ExprStatement, recover bool) {
 	}
 }
 
-func (p *Parser) parseCase(c *models.Case, expr_t Type) {
+func (p *Parser) parseCase(c *ast.Case, expr_t Type) {
 	for i := range c.Exprs {
 		expr := &c.Exprs[i]
 		value, model := p.evalExpr(*expr, nil)
@@ -2730,13 +2729,13 @@ func (p *Parser) parseCase(c *models.Case, expr_t Type) {
 	p.currentCase = oldCase
 }
 
-func (p *Parser) cases(m *models.Match, expr_t Type) {
+func (p *Parser) cases(m *ast.Match, expr_t Type) {
 	for i := range m.Cases {
 		p.parseCase(&m.Cases[i], expr_t)
 	}
 }
 
-func (p *Parser) matchcase(m *models.Match) {
+func (p *Parser) matchcase(m *ast.Match) {
 	if !m.Expr.IsEmpty() {
 		value, expr_model := p.evalExpr(m.Expr, nil)
 		m.Expr.Model = expr_model
@@ -2751,7 +2750,7 @@ func (p *Parser) matchcase(m *models.Match) {
 	}
 }
 
-func find_label(id string, b *models.Block) *models.Label {
+func find_label(id string, b *ast.Block) *ast.Label {
 	for _, label := range *b.Labels {
 		if label.Label == id {
 			return label
@@ -2769,11 +2768,11 @@ func (p *Parser) checkLabels() {
 	}
 }
 
-func stIsDef(s *models.Statement) bool {
+func stIsDef(s *ast.Statement) bool {
 	switch t := s.Data.(type) {
 	case Var:
 		return true
-	case models.Assign:
+	case ast.Assign:
 		for _, selector := range t.Left {
 			if selector.Var.New {
 				return true
@@ -2783,7 +2782,7 @@ func stIsDef(s *models.Statement) bool {
 	return false
 }
 
-func (p *Parser) checkSameScopeGoto(gt *models.Goto, label *models.Label) {
+func (p *Parser) checkSameScopeGoto(gt *ast.Goto, label *ast.Label) {
 	if label.Index < gt.Index { // Label at above.
 		return
 	}
@@ -2796,7 +2795,7 @@ func (p *Parser) checkSameScopeGoto(gt *models.Goto, label *models.Label) {
 	}
 }
 
-func (p *Parser) checkLabelParents(gt *models.Goto, label *models.Label) bool {
+func (p *Parser) checkLabelParents(gt *ast.Goto, label *ast.Label) bool {
 	block := label.Block
 parent_scopes:
 	if block.Parent != nil && block.Parent != gt.Block {
@@ -2816,7 +2815,7 @@ parent_scopes:
 	return true
 }
 
-func (p *Parser) checkGotoScope(gt *models.Goto, label *models.Label) {
+func (p *Parser) checkGotoScope(gt *ast.Goto, label *ast.Label) {
 	for i := gt.Index; i < len(gt.Block.Tree); i++ {
 		s := &gt.Block.Tree[i]
 		switch {
@@ -2829,7 +2828,7 @@ func (p *Parser) checkGotoScope(gt *models.Goto, label *models.Label) {
 	}
 }
 
-func (p *Parser) checkDiffScopeGoto(gt *models.Goto, label *models.Label) {
+func (p *Parser) checkDiffScopeGoto(gt *ast.Goto, label *ast.Label) {
 	switch {
 	case label.Block.SubIndex > 0 && gt.Block.SubIndex == 0:
 		if !p.checkLabelParents(gt, label) {
@@ -2842,7 +2841,7 @@ func (p *Parser) checkDiffScopeGoto(gt *models.Goto, label *models.Label) {
 	for i := label.Index - 1; i >= 0; i-- {
 		s := &block.Tree[i]
 		switch s.Data.(type) {
-		case models.Block:
+		case ast.Block:
 			if s.Token.Row <= gt.Token.Row {
 				return
 			}
@@ -2860,7 +2859,7 @@ func (p *Parser) checkDiffScopeGoto(gt *models.Goto, label *models.Label) {
 	}
 }
 
-func (p *Parser) checkGoto(gt *models.Goto, label *models.Label) {
+func (p *Parser) checkGoto(gt *ast.Goto, label *ast.Label) {
 	switch {
 	case gt.Block == label.Block:
 		p.checkSameScopeGoto(gt, label)
@@ -2886,7 +2885,7 @@ func (p *Parser) checkLabelNGoto() {
 	p.checkLabels()
 }
 
-func matchHasRet(m *models.Match) (ok bool) {
+func matchHasRet(m *ast.Match) (ok bool) {
 	if m.Default == nil {
 		return
 	}
@@ -2916,22 +2915,22 @@ func matchHasRet(m *models.Match) (ok bool) {
 	return ok
 }
 
-func hasRet(b *models.Block) (ok bool, fall bool) {
+func hasRet(b *ast.Block) (ok bool, fall bool) {
 	if b == nil {
 		return false, false
 	}
 	for _, s := range b.Tree {
 		switch t := s.Data.(type) {
-		case *models.Block:
+		case *ast.Block:
 			ok, fall = hasRet(t)
 			if ok {
 				return true, fall
 			}
-		case models.Fallthrough:
+		case ast.Fallthrough:
 			fall = true
-		case models.Ret:
+		case ast.Ret:
 			return true, fall
-		case *models.Match:
+		case *ast.Match:
 			if matchHasRet(t) {
 				return true, false
 			}
@@ -2979,7 +2978,7 @@ func (p *Parser) var_st(v *Var, noParse bool) {
 	p.blockVars = append(p.blockVars, v)
 }
 
-func (p *Parser) concurrentCall(cc *models.ConcurrentCall) {
+func (p *Parser) concurrentCall(cc *ast.ConcurrentCall) {
 	m := new(exprModel)
 	m.nodes = make([]exprBuildNode, 1)
 	_, cc.Expr.Model = p.evalExpr(cc.Expr, nil)
@@ -3008,7 +3007,7 @@ func (p *Parser) assignment(left value, errtok lex.Token) bool {
 	return state
 }
 
-func (p *Parser) singleAssign(assign *models.Assign, l, r []value) {
+func (p *Parser) singleAssign(assign *ast.Assign, l, r []value) {
 	left := l[0]
 	switch {
 	case lex.IsIgnoreId(left.data.Value):
@@ -3036,7 +3035,7 @@ func (p *Parser) singleAssign(assign *models.Assign, l, r []value) {
 	}.check()
 }
 
-func (p *Parser) assignExprs(vsAST *models.Assign) (l []value, r []value) {
+func (p *Parser) assignExprs(vsAST *ast.Assign) (l []value, r []value) {
 	l = make([]value, len(vsAST.Left))
 	r = make([]value, len(vsAST.Right))
 	n := len(l)
@@ -3067,7 +3066,7 @@ func (p *Parser) assignExprs(vsAST *models.Assign) (l []value, r []value) {
 	return
 }
 
-func (p *Parser) funcMultiAssign(vsAST *models.Assign, l, r []value) {
+func (p *Parser) funcMultiAssign(vsAST *ast.Assign, l, r []value) {
 	types := r[0].data.Type.Tag.([]Type)
 	if len(types) > len(vsAST.Left) {
 		p.pusherrtok(vsAST.Setter, "missing_multi_assign_identifiers")
@@ -3078,7 +3077,7 @@ func (p *Parser) funcMultiAssign(vsAST *models.Assign, l, r []value) {
 	}
 	rights := make([]value, len(types))
 	for i, t := range types {
-		rights[i] = value{data: models.Data{Token: t.Token, Type: t}}
+		rights[i] = value{data: ast.Data{Token: t.Token, Type: t}}
 	}
 	p.multiAssign(vsAST, l, rights)
 }
@@ -3099,7 +3098,7 @@ func (p *Parser) check_valid_init_expr(left_mutable bool, right value, errtok le
 	_ = checker.check_validity()
 }
 
-func (p *Parser) multiAssign(assign *models.Assign, l, r []value) {
+func (p *Parser) multiAssign(assign *ast.Assign, l, r []value) {
 	for i := range assign.Left {
 		left := &assign.Left[i]
 		left.Ignore = lex.IsIgnoreId(left.Var.Id)
@@ -3131,7 +3130,7 @@ func (p *Parser) unsafe_allowed() bool {
 		(p.nodeBlock != nil && p.nodeBlock.IsUnsafe)
 }
 
-func (p *Parser) postfix(assign *models.Assign, l, r []value) {
+func (p *Parser) postfix(assign *ast.Assign, l, r []value) {
 	if len(r) > 0 {
 		p.pusherrtok(assign.Setter, "invalid_syntax")
 		return
@@ -3154,7 +3153,7 @@ func (p *Parser) postfix(assign *models.Assign, l, r []value) {
 	p.pusherrtok(assign.Setter, "operator_not_for_juletype", assign.Setter.Kind, left.data.Type.Kind)
 }
 
-func (p *Parser) assign(assign *models.Assign) {
+func (p *Parser) assign(assign *ast.Assign) {
 	ln := len(assign.Left)
 	rn := len(assign.Right)
 	l, r := p.assignExprs(assign)
@@ -3187,8 +3186,8 @@ func (p *Parser) assign(assign *models.Assign) {
 	p.multiAssign(assign, l, r)
 }
 
-func (p *Parser) whileProfile(iter *models.Iter) {
-	profile := iter.Profile.(models.IterWhile)
+func (p *Parser) whileProfile(iter *ast.Iter) {
+	profile := iter.Profile.(ast.IterWhile)
 	val, model := p.evalExpr(profile.Expr, nil)
 	profile.Expr.Model = model
 	iter.Profile = profile
@@ -3201,8 +3200,8 @@ func (p *Parser) whileProfile(iter *models.Iter) {
 	p.checkNewBlock(iter.Block)
 }
 
-func (p *Parser) foreachProfile(iter *models.Iter) {
-	profile := iter.Profile.(models.IterForeach)
+func (p *Parser) foreachProfile(iter *ast.Iter) {
+	profile := iter.Profile.(ast.IterForeach)
 	val, model := p.evalExpr(profile.Expr, nil)
 	profile.Expr.Model = model
 	profile.ExprType = val.data.Type
@@ -3223,15 +3222,15 @@ func (p *Parser) foreachProfile(iter *models.Iter) {
 	p.checkNewBlockCustom(iter.Block, blockVars)
 }
 
-func (p *Parser) iter(iter *models.Iter) {
+func (p *Parser) iter(iter *ast.Iter) {
 	oldCase := p.currentCase
 	oldIter := p.currentIter
 	p.currentCase = nil
 	p.currentIter = iter
 	switch iter.Profile.(type) {
-	case models.IterWhile:
+	case ast.IterWhile:
 		p.whileProfile(iter)
-	case models.IterForeach:
+	case ast.IterForeach:
 		p.foreachProfile(iter)
 	default:
 		p.checkNewBlock(iter.Block)
@@ -3240,7 +3239,7 @@ func (p *Parser) iter(iter *models.Iter) {
 	p.currentIter = oldIter
 }
 
-func (p *Parser) conditional_node(node *models.If) {
+func (p *Parser) conditional_node(node *ast.If) {
 	val, model := p.evalExpr(node.Expr, nil)
 	node.Expr.Model = model
 	if !p.eval.has_error && val.data.Value != "" && !isBoolExpr(val) {
@@ -3249,7 +3248,7 @@ func (p *Parser) conditional_node(node *models.If) {
 	p.checkNewBlock(node.Block)
 }
 
-func (p *Parser) conditional(model *models.Conditional) {
+func (p *Parser) conditional(model *ast.Conditional) {
 	p.conditional_node(model.If)
 	for _, elif := range model.Elifs {
 		p.conditional_node(elif)
@@ -3259,7 +3258,7 @@ func (p *Parser) conditional(model *models.Conditional) {
 	}
 }
 
-func find_label_parent(id string, b *models.Block) *models.Label {
+func find_label_parent(id string, b *ast.Block) *ast.Label {
 	label := find_label(id, b)
 	for label == nil {
 		if b.Parent == nil {
@@ -3271,35 +3270,35 @@ func find_label_parent(id string, b *models.Block) *models.Label {
 	return label
 }
 
-func (p *Parser) breakWithLabel(ast *models.Break) {
+func (p *Parser) breakWithLabel(brk *ast.Break) {
 	if p.currentIter == nil && p.currentCase == nil {
-		p.pusherrtok(ast.Token, "break_at_out_of_valid_scope")
+		p.pusherrtok(brk.Token, "break_at_out_of_valid_scope")
 		return
 	}
-	var label *models.Label
+	var label *ast.Label
 	switch {
 	case p.currentCase != nil && p.currentIter != nil:
 		if p.currentCase.Block.Parent.SubIndex < p.currentIter.Parent.SubIndex {
-			label = find_label_parent(ast.LabelToken.Kind, p.currentIter.Parent)
+			label = find_label_parent(brk.LabelToken.Kind, p.currentIter.Parent)
 			if label == nil {
-				label = find_label_parent(ast.LabelToken.Kind, p.currentCase.Block.Parent)
+				label = find_label_parent(brk.LabelToken.Kind, p.currentCase.Block.Parent)
 			}
 		} else {
-			label = find_label_parent(ast.LabelToken.Kind, p.currentCase.Block.Parent)
+			label = find_label_parent(brk.LabelToken.Kind, p.currentCase.Block.Parent)
 			if label == nil {
-				label = find_label_parent(ast.LabelToken.Kind, p.currentIter.Parent)
+				label = find_label_parent(brk.LabelToken.Kind, p.currentIter.Parent)
 			}
 		}
 	case p.currentCase != nil:
-		label = find_label_parent(ast.LabelToken.Kind, p.currentCase.Block.Parent)
+		label = find_label_parent(brk.LabelToken.Kind, p.currentCase.Block.Parent)
 	case p.currentIter != nil:
-		label = find_label_parent(ast.LabelToken.Kind, p.currentIter.Parent)
+		label = find_label_parent(brk.LabelToken.Kind, p.currentIter.Parent)
 	}
 	if label == nil {
-		p.pusherrtok(ast.LabelToken, "label_not_exist", ast.LabelToken.Kind)
+		p.pusherrtok(brk.LabelToken, "label_not_exist", brk.LabelToken.Kind)
 		return
 	} else if label.Index+1 >= len(label.Block.Tree) {
-		p.pusherrtok(ast.LabelToken, "invalid_label")
+		p.pusherrtok(brk.LabelToken, "invalid_label")
 		return
 	}
 	label.Used = true
@@ -3309,32 +3308,32 @@ func (p *Parser) breakWithLabel(ast *models.Break) {
 			continue
 		}
 		switch data := obj.Data.(type) {
-		case models.Comment:
+		case ast.Comment:
 			continue
-		case *models.Match:
+		case *ast.Match:
 			label.Used = true
-			ast.Label = data.EndLabel()
-		case models.Iter:
+			brk.Label = data.EndLabel()
+		case ast.Iter:
 			label.Used = true
-			ast.Label = data.EndLabel()
+			brk.Label = data.EndLabel()
 		default:
-			p.pusherrtok(ast.LabelToken, "invalid_label")
+			p.pusherrtok(brk.LabelToken, "invalid_label")
 		}
 		break
 	}
 }
 
-func (p *Parser) continueWithLabel(ast *models.Continue) {
+func (p *Parser) continueWithLabel(cont *ast.Continue) {
 	if p.currentIter == nil {
-		p.pusherrtok(ast.Token, "continue_at_out_of_valid_scope")
+		p.pusherrtok(cont.Token, "continue_at_out_of_valid_scope")
 		return
 	}
-	label := find_label_parent(ast.LoopLabel.Kind, p.currentIter.Parent)
+	label := find_label_parent(cont.LoopLabel.Kind, p.currentIter.Parent)
 	if label == nil {
-		p.pusherrtok(ast.LoopLabel, "label_not_exist", ast.LoopLabel.Kind)
+		p.pusherrtok(cont.LoopLabel, "label_not_exist", cont.LoopLabel.Kind)
 		return
 	} else if label.Index+1 >= len(label.Block.Tree) {
-		p.pusherrtok(ast.LoopLabel, "invalid_label")
+		p.pusherrtok(cont.LoopLabel, "invalid_label")
 		return
 	}
 	label.Used = true
@@ -3344,19 +3343,19 @@ func (p *Parser) continueWithLabel(ast *models.Continue) {
 			continue
 		}
 		switch data := obj.Data.(type) {
-		case models.Comment:
+		case ast.Comment:
 			continue
-		case models.Iter:
+		case ast.Iter:
 			label.Used = true
-			ast.Label = data.NextLabel()
+			cont.Label = data.NextLabel()
 		default:
-			p.pusherrtok(ast.LoopLabel, "invalid_label")
+			p.pusherrtok(cont.LoopLabel, "invalid_label")
 		}
 		break
 	}
 }
 
-func (p *Parser) break_st(ast *models.Break) {
+func (p *Parser) break_st(ast *ast.Break) {
 	switch {
 	case ast.LabelToken.Id != lex.ID_NA:
 		p.breakWithLabel(ast)
@@ -3369,7 +3368,7 @@ func (p *Parser) break_st(ast *models.Break) {
 	}
 }
 
-func (p *Parser) continue_st(ast *models.Continue) {
+func (p *Parser) continue_st(ast *ast.Continue) {
 	switch {
 	case p.currentIter == nil:
 		p.pusherrtok(ast.Token, "continue_at_out_of_valid_scope")
@@ -3498,7 +3497,7 @@ end:
 	return dt, true
 }
 
-func (p *Parser) typeSourceIsTrait(trait_def *models.Trait, tag any, errTok lex.Token) (dt Type, _ bool) {
+func (p *Parser) typeSourceIsTrait(trait_def *ast.Trait, tag any, errTok lex.Token) (dt Type, _ bool) {
 	if tag != nil {
 		p.pusherrtok(errTok, "invalid_type_source")
 	}
@@ -3549,7 +3548,7 @@ func (p *Parser) typeSourceIsArrayType(arr_t *Type) (ok bool) {
 	val, model := p.evalExpr(arr_t.Size.Expr, nil)
 	arr_t.Size.Expr.Model = model
 	if val.constExpr {
-		arr_t.Size.N = models.Size(tonumu(val.expr))
+		arr_t.Size.N = ast.Size(tonumu(val.expr))
 	} else {
 		p.eval.pusherrtok(arr_t.Token, "expr_not_const")
 	}
@@ -3662,11 +3661,11 @@ func (p *Parser) typeSource(dt Type, err bool) (ret Type, ok bool) {
 			def.Used = true
 			def = p.structConstructorInstance(def)
 			switch tagt := dt.Tag.(type) {
-			case []models.Type:
+			case []ast.Type:
 				def.SetGenerics(tagt)
 			}
 			return p.typeSourceIsStruct(def, dt)
-		case *models.Trait:
+		case *ast.Trait:
 			def.Used = true
 			return p.typeSourceIsTrait(def, dt.Tag, dt.Token)
 		default:
@@ -3746,13 +3745,13 @@ func (p *Parser) check_type(real, check Type, ignoreAny, allow_assign bool, errT
 	}
 }
 
-func (p *Parser) evalExpr(expr Expr, prefix *models.Type) (value, iExpr) {
+func (p *Parser) evalExpr(expr Expr, prefix *ast.Type) (value, iExpr) {
 	p.eval.has_error = false
 	p.eval.type_prefix = prefix
 	return p.eval.eval_expr(expr)
 }
 
-func (p *Parser) evalToks(toks []lex.Token, prefix *models.Type) (value, iExpr) {
+func (p *Parser) evalToks(toks []lex.Token, prefix *ast.Type) (value, iExpr) {
 	p.eval.has_error = false
 	p.eval.type_prefix = prefix
 	return p.eval.eval_toks(toks)

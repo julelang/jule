@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
 )
@@ -9,9 +9,9 @@ import (
 func (p *Parser) getFieldMap(f *Fn) *paramMap {
 	pmap := new(paramMap)
 	*pmap = paramMap{}
-	s := f.RetType.Type.Tag.(*models.Struct)
+	s := f.RetType.Type.Tag.(*ast.Struct)
 	for i, g := range s.Defines.Globals {
-		if models.IsAccessable(p.File, g.Token.File, g.Pub) {
+		if ast.IsAccessable(p.File, g.Token.File, g.Pub) {
 			param := &f.Params[i]
 			(*pmap)[param.Id] = &paramMapPair{param, nil}
 		}
@@ -23,14 +23,14 @@ type structArgParser struct {
 	p      *Parser
 	fmap   *paramMap
 	f      *Fn
-	args   *models.Args
+	args   *ast.Args
 	i      int
 	arg    Arg
 	errTok lex.Token
 }
 
 func (sap *structArgParser) buildArgs() {
-	sap.args.Src = make([]models.Arg, len(*sap.fmap))
+	sap.args.Src = make([]ast.Arg, len(*sap.fmap))
 	for i, p := range sap.f.Params {
 		pair := (*sap.fmap)[p.Id]
 		switch {

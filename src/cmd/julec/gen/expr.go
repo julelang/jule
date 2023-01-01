@@ -3,23 +3,23 @@ package gen
 import (
 	"strings"
 
-	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/ast"
 )
 
 type AnonFuncExpr struct {
-	Ast *models.Fn
+	Ast *ast.Fn
 }
 
 func (af AnonFuncExpr) String() string {
 	var cpp strings.Builder
-	t := models.Type{
+	t := ast.Type{
 		Token: af.Ast.Token,
 		Kind:  af.Ast.TypeKind(),
 		Tag:   af.Ast,
 	}
 	cpp.WriteString(t.FnString())
 	cpp.WriteString("([=]")
-	cpp.WriteString(models.ParamsToCpp(af.Ast.Params))
+	cpp.WriteString(ast.ParamsToCpp(af.Ast.Params))
 	cpp.WriteString(" mutable -> ")
 	cpp.WriteString(af.Ast.RetType.String())
 	cpp.WriteByte(' ')

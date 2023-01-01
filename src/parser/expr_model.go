@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 )
@@ -118,7 +118,7 @@ func (ge genericsExpr) String() string {
 }
 
 type argsExpr struct {
-	args []models.Arg
+	args []ast.Arg
 }
 
 func (a argsExpr) String() string {
@@ -141,7 +141,7 @@ type callExpr struct {
 
 func (ce callExpr) String() string {
 	var cpp strings.Builder
-	if !models.Has_attribute(build.ATTR_CDEF, ce.f.Attributes) {
+	if !ast.Has_attribute(build.ATTR_CDEF, ce.f.Attributes) {
 		cpp.WriteString(ce.generics.String())
 	}
 	cpp.WriteByte('(')

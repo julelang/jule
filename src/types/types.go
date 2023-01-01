@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 )
@@ -24,9 +24,9 @@ const NUM_TYPE_STR = "<numeric>"
 const NIL_TYPE_STR = "<nil>"
 const VOID_TYPE_STR = "<void>"
 
-type Type = models.Type
-type GenericType = models.GenericType
-type Fn = models.Fn
+type Type = ast.Type
+type GenericType = ast.GenericType
+type Fn = ast.Fn
 
 // GetRealCode returns real type code of code.
 // If types is "int" or "uint", set to bit-specific type code.

@@ -1,7 +1,7 @@
 package types
 
 import (
-	"github.com/julelang/jule/ast/models"
+	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 )
@@ -158,7 +158,7 @@ func (c *Checker) check_ptr() bool {
 	return c.L.Kind == c.R.Kind
 }
 
-func trait_has_reference_receiver(t *models.Trait) bool {
+func trait_has_reference_receiver(t *ast.Trait) bool {
 	for _, f := range t.Defines.Fns {
 		if IsRef(f.Receiver.Type) {
 			return true
@@ -171,7 +171,7 @@ func (c *Checker) check_trait() bool {
 	if c.R.Id == NIL {
 		return true
 	}
-	t := c.L.Tag.(*models.Trait)
+	t := c.L.Tag.(*ast.Trait)
 	lm := c.L.Modifiers()
 	ref := false
 	switch {
@@ -190,7 +190,7 @@ func (c *Checker) check_trait() bool {
 		if rm != "" {
 			return false
 		}
-		s := c.R.Tag.(*models.Struct)
+		s := c.R.Tag.(*ast.Struct)
 		if !s.HasTrait(t) {
 			return false
 		}
@@ -201,7 +201,7 @@ func (c *Checker) check_trait() bool {
 		}
 		return true
 	case IsTrait(c.R):
-		return t == c.R.Tag.(*models.Trait) && lm == c.R.Modifiers()
+		return t == c.R.Tag.(*ast.Trait) && lm == c.R.Modifiers()
 	}
 	return false
 }
@@ -210,7 +210,7 @@ func (c *Checker) check_struct() bool {
 	if c.R.Tag == nil {
 		return false
 	}
-	s1, s2 := c.L.Tag.(*models.Struct), c.R.Tag.(*models.Struct)
+	s1, s2 := c.L.Tag.(*ast.Struct), c.R.Tag.(*ast.Struct)
 	switch {
 	case s1.Id != s2.Id,
 		s1.Token.File != s2.Token.File:
