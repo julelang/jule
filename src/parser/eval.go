@@ -38,8 +38,8 @@ func (e *eval) pusherrtok(tok lex.Token, err string, args ...any) {
 }
 
 func (e *eval) eval_toks(toks []lex.Token) (value, iExpr) {
-	builder := ast.Builder{}
-	return e.eval_expr(builder.Expr(toks))
+	resolver := builder{}
+	return e.eval_expr(resolver.Expr(toks))
 }
 
 func (e *eval) eval_expr(expr Expr) (value, iExpr) { return e.eval(expr.Op) }
@@ -496,11 +496,11 @@ func (e *eval) tryCast(toks []lex.Token, m *exprModel) (v value, _ bool) {
 		} else if i+1 == len(toks) {
 			return
 		}
-		b := ast.NewBuilder(nil)
+		r := new_builder(nil)
 		dtindex := 0
 		typeToks := toks[1:i]
-		dt, ok := b.DataType(typeToks, &dtindex, false)
-		b.Wait()
+		dt, ok := r.DataType(typeToks, &dtindex, false)
+		r.Wait()
 		if !ok {
 			return
 		}
@@ -801,12 +801,12 @@ func (e *eval) typeSubId(typeTok, idTok lex.Token, m *exprModel) (v value) {
 func (e *eval) typeId(toks []lex.Token, m *exprModel) (v value) {
 	v.data.Type.Id = types.VOID
 	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
-	b := ast.NewBuilder(nil)
+	r := new_builder(nil)
 	i := 0
-	t, ok := b.DataType(toks, &i, true)
-	b.Wait()
+	t, ok := r.DataType(toks, &i, true)
+	r.Wait()
 	if !ok {
-		e.p.pusherrs(b.Errors...)
+		e.p.pusherrs(r.Errors...)
 		return
 	} else if i+1 >= len(toks) {
 		e.pusherrtok(toks[0], "invalid_syntax")
@@ -1470,11 +1470,11 @@ func (e *eval) enumerable(exprToks []lex.Token, t Type, m *exprModel) (v value) 
 }
 
 func (e *eval) anonymousFn(toks []lex.Token, m *exprModel) (v value) {
-	b := ast.NewBuilder(toks)
-	f := b.Fn(b.Tokens, false, true, false)
-	b.Wait()
-	if len(b.Errors) > 0 {
-		e.p.pusherrs(b.Errors...)
+	r := new_builder(toks)
+	f := r.Fn(r.Tokens, false, true, false)
+	r.Wait()
+	if len(r.Errors) > 0 {
+		e.p.pusherrs(r.Errors...)
 		return
 	}
 	e.p.check_anon_fn(&f)

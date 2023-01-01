@@ -1,18 +1,6 @@
 package ast
 
-import (
-	"github.com/julelang/jule/ast/models"
-	"github.com/julelang/jule/lex"
-)
-
-type block_st struct {
-	pos        int
-	block      *models.Block
-	srcToks    *[]lex.Token
-	toks       []lex.Token
-	nextToks   []lex.Token
-	terminated bool
-}
+import "github.com/julelang/jule/lex"
 
 // IsSt reports token is statement finish point or not.
 func IsSt(current, prev lex.Token) (ok bool, terminated bool) {

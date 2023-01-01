@@ -3,7 +3,6 @@ package parser
 import (
 	"strconv"
 
-	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
@@ -715,12 +714,12 @@ func caller_make(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 		return
 	}
 	type_tokens := args.Src[0].Expr.Tokens
-	b := ast.NewBuilder(nil)
+	r := new_builder(nil)
 	i := 0
-	t, ok := b.DataType(type_tokens, &i, true)
-	b.Wait()
+	t, ok := r.DataType(type_tokens, &i, true)
+	r.Wait()
 	if !ok {
-		p.pusherrs(b.Errors...)
+		p.pusherrs(r.Errors...)
 		return
 	}
 	if i+1 < len(type_tokens) {
@@ -743,12 +742,12 @@ func caller_new(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	errtok := data.args[0]
 	// Remove parentheses
 	data.args = data.args[1 : len(data.args)-1]
-	b := ast.NewBuilder(nil)
+	r := new_builder(nil)
 	i := 0
-	t, ok := b.DataType(data.args, &i, true)
-	b.Wait()
+	t, ok := r.DataType(data.args, &i, true)
+	r.Wait()
 	if !ok {
-		p.pusherrs(b.Errors...)
+		p.pusherrs(r.Errors...)
 		return
 	}
 	if i+1 < len(data.args) {
@@ -792,10 +791,10 @@ func caller_mem_size_of(p *Parser, _ *Fn, data callData, m *exprModel) (v value)
 	}
 	nodes := m.nodes[m.index].nodes
 	node := &nodes[len(nodes)-1]
-	b := ast.NewBuilder(nil)
+	r := new_builder(nil)
 	i := 0
-	t, ok := b.DataType(data.args, &i, true)
-	b.Wait()
+	t, ok := r.DataType(data.args, &i, true)
+	r.Wait()
 	if !ok {
 		v, model := p.evalToks(data.args, nil)
 		*node = exprNode{"sizeof(" + model.String() + ")"}
@@ -805,7 +804,7 @@ func caller_mem_size_of(p *Parser, _ *Fn, data callData, m *exprModel) (v value)
 	if i+1 < len(data.args) {
 		p.pusherrtok(data.args[i+1], "invalid_syntax")
 	}
-	p.pusherrs(b.Errors...)
+	p.pusherrs(r.Errors...)
 	t, _ = p.realType(t, true)
 	*node = exprNode{"sizeof(" + t.String() + ")"}
 	return
@@ -820,10 +819,10 @@ func caller_mem_align_of(p *Parser, _ *Fn, data callData, m *exprModel) (v value
 	}
 	nodes := m.nodes[m.index].nodes
 	node := &nodes[len(nodes)-1]
-	b := ast.NewBuilder(nil)
+	r := new_builder(nil)
 	i := 0
-	t, ok := b.DataType(data.args, &i, true)
-	b.Wait()
+	t, ok := r.DataType(data.args, &i, true)
+	r.Wait()
 	if !ok {
 		v, model := p.evalToks(data.args, nil)
 		*node = exprNode{"alignof(" + model.String() + ")"}
@@ -833,7 +832,7 @@ func caller_mem_align_of(p *Parser, _ *Fn, data callData, m *exprModel) (v value
 	if i+1 < len(data.args) {
 		p.pusherrtok(data.args[i+1], "invalid_syntax")
 	}
-	p.pusherrs(b.Errors...)
+	p.pusherrs(r.Errors...)
 	t, _ = p.realType(t, true)
 	*node = exprNode{"alignof(" + t.String() + ")"}
 	return

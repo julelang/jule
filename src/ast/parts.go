@@ -5,6 +5,16 @@ import (
 	"github.com/julelang/jule/lex"
 )
 
+func compilerErr(t lex.Token, key string, args ...any) build.Log {
+	return build.Log{
+		Type:    build.ERR,
+		Row:     t.Row,
+		Column:  t.Column,
+		Path:    t.File.Path(),
+		Message: build.Errorf(key, args...),
+	}
+}
+
 // Range returns between of open and close braces.
 //
 // Special case is:

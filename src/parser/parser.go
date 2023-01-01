@@ -109,9 +109,9 @@ func (p *Parser) pusherrmsg(msg string) {
 }
 
 func getTree(toks []lex.Token) ([]models.Object, []build.Log) {
-	b := ast.NewBuilder(toks)
-	b.Build()
-	return b.Tree, b.Errors
+	r := new_builder(toks)
+	r.Build()
+	return r.Tree, r.Errors
 }
 
 func (p *Parser) checkCppUsePath(use *models.UseDecl) bool {
@@ -2059,10 +2059,10 @@ func (p *Parser) get_args(toks []lex.Token, targeting bool) *models.Args {
 	if toks == nil {
 		toks = make([]lex.Token, 0)
 	}
-	b := new(ast.Builder)
-	args := b.Args(toks, targeting)
-	if len(b.Errors) > 0 {
-		p.pusherrs(b.Errors...)
+	r := new(builder)
+	args := r.Args(toks, targeting)
+	if len(r.Errors) > 0 {
+		p.pusherrs(r.Errors...)
 		args = nil
 	}
 	return args
@@ -2082,14 +2082,14 @@ func (p *Parser) get_generics(toks []lex.Token) (_ []Type, err bool) {
 		if len(part) == 0 {
 			continue
 		}
-		b := ast.NewBuilder(nil)
+		r := new_builder(nil)
 		j := 0
-		generic, _ := b.DataType(part, &j, true)
-		b.Wait()
+		generic, _ := r.DataType(part, &j, true)
+		r.Wait()
 		if j+1 < len(part) {
 			p.pusherrtok(part[j+1], "invalid_syntax")
 		}
-		p.pusherrs(b.Errors...)
+		p.pusherrs(r.Errors...)
 		generics[i] = generic
 		ok := p.fn_parse_type(&generics[i])
 		if !ok {

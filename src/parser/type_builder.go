@@ -1,15 +1,16 @@
-package ast
+package parser
 
 import (
 	"strings"
 
+	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/ast/models"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
 )
 
 type type_builder struct {
-	b      *Builder
+	r      *builder
 	t      *models.Type
 	tokens []lex.Token
 	i      *int
@@ -39,7 +40,7 @@ func (tb *type_builder) op(tok lex.Token) (imret bool) {
 		tb.kind += tok.Kind
 	default:
 		if tb.err {
-			tb.b.pusherr(tok, "invalid_syntax")
+			tb.r.pusherr(tok, "invalid_syntax")
 		}
 		return true
 	}
@@ -49,9 +50,9 @@ func (tb *type_builder) op(tok lex.Token) (imret bool) {
 func (tb *type_builder) function(tok lex.Token) {
 	tb.t.Token = tok
 	tb.t.Id = types.FN
-	f, proto_ok := tb.b.fn_prototype(tb.tokens, tb.i, false, true)
+	f, proto_ok := tb.r.fn_prototype(tb.tokens, tb.i, false, true)
 	if !proto_ok {
-		tb.b.pusherr(tok, "invalid_type")
+		tb.r.pusherr(tok, "invalid_type")
 		return
 	}
 	*tb.i--
@@ -87,9 +88,9 @@ func (tb *type_builder) ident_end() {
 	generics := make([]models.Type, len(parts))
 	for i, part := range parts {
 		index := 0
-		t, _ := tb.b.DataType(part, &index, true)
+		t, _ := tb.r.DataType(part, &index, true)
 		if index+1 < len(part) {
-			tb.b.pusherr(part[index+1], "invalid_syntax")
+			tb.r.pusherr(part[index+1], "invalid_syntax")
 		}
 		genericsStr.WriteString(t.String())
 		genericsStr.WriteByte(',')
@@ -117,34 +118,34 @@ func (tb *type_builder) ident_generics() [][]lex.Token {
 		}
 	}
 	tokens := tb.tokens[first+1 : *tb.i]
-	parts, errs := Parts(tokens, lex.ID_COMMA, true)
-	tb.b.Errors = append(tb.b.Errors, errs...)
+	parts, errs := ast.Parts(tokens, lex.ID_COMMA, true)
+	tb.r.Errors = append(tb.r.Errors, errs...)
 	return parts
 }
 
 func (tb *type_builder) cpp_kw(tok lex.Token) (imret bool) {
 	if *tb.i+1 >= len(tb.tokens) {
 		if tb.err {
-			tb.b.pusherr(tok, "invalid_syntax")
+			tb.r.pusherr(tok, "invalid_syntax")
 		}
 		return true
 	}
 	*tb.i++
 	if tb.tokens[*tb.i].Id != lex.ID_DOT {
 		if tb.err {
-			tb.b.pusherr(tb.tokens[*tb.i], "invalid_syntax")
+			tb.r.pusherr(tb.tokens[*tb.i], "invalid_syntax")
 		}
 	}
 	if *tb.i+1 >= len(tb.tokens) {
 		if tb.err {
-			tb.b.pusherr(tok, "invalid_syntax")
+			tb.r.pusherr(tok, "invalid_syntax")
 		}
 		return true
 	}
 	*tb.i++
 	if tb.tokens[*tb.i].Id != lex.ID_IDENT {
 		if tb.err {
-			tb.b.pusherr(tb.tokens[*tb.i], "invalid_syntax")
+			tb.r.pusherr(tb.tokens[*tb.i], "invalid_syntax")
 		}
 	}
 	tb.t.CppLinked = true
@@ -160,7 +161,7 @@ func (tb *type_builder) enumerable(tok lex.Token) (imret bool) {
 	*tb.i++
 	if *tb.i >= len(tb.tokens) {
 		if tb.err {
-			tb.b.pusherr(tok, "invalid_syntax")
+			tb.r.pusherr(tok, "invalid_syntax")
 		}
 		return
 	}
@@ -173,11 +174,11 @@ func (tb *type_builder) enumerable(tok lex.Token) (imret bool) {
 		*tb.i++
 		if *tb.i >= len(tb.tokens) {
 			if tb.err {
-				tb.b.pusherr(tok, "invalid_syntax")
+				tb.r.pusherr(tok, "invalid_syntax")
 			}
 			return
 		}
-		*tb.t.ComponentType, tb.ok = tb.b.DataType(tb.tokens, tb.i, tb.err)
+		*tb.t.ComponentType, tb.ok = tb.r.DataType(tb.tokens, tb.i, tb.err)
 		tb.kind += tb.t.ComponentType.Kind
 		return false
 	}
@@ -185,7 +186,7 @@ func (tb *type_builder) enumerable(tok lex.Token) (imret bool) {
 	tb.ok = tb.map_or_array()
 	if tb.t.Id == types.VOID {
 		if tb.err {
-			tb.b.pusherr(tok, "invalid_syntax")
+			tb.r.pusherr(tok, "invalid_syntax")
 		}
 		return true
 	}
@@ -202,18 +203,18 @@ func (tb *type_builder) array() (ok bool) {
 	*tb.i++
 	exprI := *tb.i
 	tb.t.ComponentType = new(models.Type)
-	ok = tb.b.datatype(tb.t.ComponentType, tb.tokens, tb.i, tb.err)
+	ok = tb.r.datatype(tb.t.ComponentType, tb.tokens, tb.i, tb.err)
 	if !ok {
 		return
 	}
-	_, exprToks := RangeLast(tb.tokens[:exprI])
+	_, exprToks := ast.RangeLast(tb.tokens[:exprI])
 	exprToks = exprToks[1 : len(exprToks)-1]
 	tok := exprToks[0]
 	if len(exprToks) == 1 && tok.Id == lex.ID_OP && tok.Kind == lex.KND_TRIPLE_DOT {
 		tb.t.Size.AutoSized = true
 		tb.t.Size.Expr.Tokens = exprToks
 	} else {
-		tb.t.Size.Expr = tb.b.Expr(exprToks)
+		tb.t.Size.Expr = tb.r.Expr(exprToks)
 	}
 	tb.kind = tb.kind + lex.PREFIX_ARRAY + tb.t.ComponentType.Kind
 	return
@@ -229,7 +230,7 @@ func (tb *type_builder) map_or_array() (ok bool) {
 
 // MapDataType builds map data-type.
 func (tb *type_builder) map_t() (ok bool) {
-	typeToks, colon := SplitColon(tb.tokens, tb.i)
+	typeToks, colon := ast.SplitColon(tb.tokens, tb.i)
 	if typeToks == nil || colon == -1 {
 		return
 	}
@@ -239,7 +240,7 @@ func (tb *type_builder) map_t() (ok bool) {
 	colonTok := tb.tokens[colon]
 	if colon == 0 || colon+1 >= len(typeToks) {
 		if tb.err {
-			tb.b.pusherr(colonTok, "missing_expr")
+			tb.r.pusherr(colonTok, "missing_expr")
 		}
 		return
 	}
@@ -247,9 +248,9 @@ func (tb *type_builder) map_t() (ok bool) {
 	valueTypeToks := typeToks[colon+1:]
 	types := make([]models.Type, 2)
 	j := 0
-	types[0], _ = tb.b.DataType(keyTypeToks, &j, tb.err)
+	types[0], _ = tb.r.DataType(keyTypeToks, &j, tb.err)
 	j = 0
-	types[1], _ = tb.b.DataType(valueTypeToks, &j, tb.err)
+	types[1], _ = tb.r.DataType(valueTypeToks, &j, tb.err)
 	tb.t.Tag = types
 	tb.kind = tb.kind + tb.t.MapKind()
 	ok = true
@@ -293,7 +294,7 @@ func (tb *type_builder) step() (imret bool) {
 		return
 	default:
 		if tb.err {
-			tb.b.pusherr(tok, "invalid_syntax")
+			tb.r.pusherr(tok, "invalid_syntax")
 		}
 		imret = true
 		return
