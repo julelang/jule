@@ -204,7 +204,6 @@ func append_standard(obj_code *string) {
 	sb.WriteString("\"\n\n")
 	sb.WriteString(*obj_code)
 	sb.WriteString(`
-
 int main(int argc, char *argv[]) {
 #ifdef _WINDOWS
 	// Windows needs little magic for UTF-8
@@ -213,7 +212,6 @@ int main(int argc, char *argv[]) {
 #endif // #ifdef _WINDOWS
 	std::set_terminate( &__julec_terminate_handler );
 	__julec_setup_command_line_args( argc , argv );
-
 	__julec_call_package_initializers();
 	JULEC_ID( main() );
 		
@@ -266,9 +264,9 @@ func compile(path string, main, nolocal, justDefs bool) *parser.Parser {
 	return p
 }
 
-func generate_compile_command(source_path string) (c string, cmd string) {
+func gen_compile_cmd(source_path string) (c string, cmd string) {
 	var cpp strings.Builder
-	cpp.WriteString("-g -O0 ")
+	cpp.WriteString("-g -O0 -Wno-narrowing ")
 	if out != "" {
 		cpp.WriteString("-o ")
 		cpp.WriteString(out)
@@ -284,7 +282,7 @@ func do_spell(cpp string) {
 	write_output(path, cpp)
 	switch mode {
 	case mode_compile:
-		c, cmd := generate_compile_command(path)
+		c, cmd := gen_compile_cmd(path)
 		println(c + " " + cmd)
 		entries := strings.SplitN(cmd, " ", -1)
 		command := exec.Command(c, entries...)
