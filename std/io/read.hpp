@@ -21,8 +21,8 @@ str_jt __julec_readln(void) noexcept {
 #else
     std::string _buffer;
     std::getline( std::cin , _buffer );
-    std::cin.clear();
-    std::cin.ignore();
+    //std::cin.clear();
+    //std::cin.ignore();
     _input = str_jt( _buffer.c_str() );
 #endif // #ifdef _WINDOWS
     return ( _input );
