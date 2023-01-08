@@ -64,7 +64,7 @@ public:
 
     inline str_jt ___slice(const int_jt &_Start,
                               const int_jt &_End) const noexcept {
-        if (_Start < 0 || _End < 0 || _Start > _End) {
+        if (_Start < 0 || _End < 0 || _Start > _End || _End > this->len()) {
             std::stringstream _sstream;
             __JULEC_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(
                 _sstream, _Start, _End );
