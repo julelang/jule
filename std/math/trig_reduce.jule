@@ -35,7 +35,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // ====================================================
 
-use std::math::bits
+use std::math::bits::{add64, mul64, leading_zeros64}
 
 // Is the maximum value of x where the reduction using PI/4
 // in 3 f64 parts still gives accurate results. This threshold
@@ -76,16 +76,16 @@ fn trig_reduce(mut x: f64): (j: u64, z: f64) {
 	let z1 = (mPi4[digit+1] << bitshift) | (mPi4[digit+2] >> (64 - bitshift))
 	let z2 = (mPi4[digit+2] << bitshift) | (mPi4[digit+3] >> (64 - bitshift))
 	// Multiply mantissa by the digits and extract the upper two digits (hi, lo).
-	let (z2hi, _) = std::math::bits::mul64(z2, ix)
-	let (z1hi, z1lo) = std::math::bits::mul64(z1, ix)
+	let (z2hi, _) = mul64(z2, ix)
+	let (z1hi, z1lo) = mul64(z1, ix)
 	let z0lo = z0 * ix
-	let (lo, c) = std::math::bits::add64(z1lo, z2hi, 0)
-	let (mut hi, _) = std::math::bits::add64(z0lo, z1hi, c)
+	let (lo, c) = add64(z1lo, z2hi, 0)
+	let (mut hi, _) = add64(z0lo, z1hi, c)
 	// The top 3 bits are j.
 	j = hi >> 61
 	// Extract the fraction and find its magnitude.
 	hi = hi<<3 | lo>>61
-	let lz = uint(std::math::bits::leading_zeros64(hi))
+	let lz = uint(leading_zeros64(hi))
 	let e = u64(BIAS - (lz + 1))
 	// Clear implicit mantissa bit and shift into place.
 	hi = (hi << (lz + 1)) | (lo >> (64 - (lz + 1)))

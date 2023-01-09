@@ -35,7 +35,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // ====================================================
 
-use std::math::bits
+use std::math::bits::{add64, sub64, mul64, leading_zeros64}
 
 fn zero(x: u64): u64 {
 	if x == 0 {
@@ -103,9 +103,9 @@ fn shrcompress(u1: u64, u2: u64, n: uint): (r1: f64, r2: u64) {
 }
 
 fn lz(u1: u64, u2: u64): (l: i32) {
-	l = i32(std::math::bits::leading_zeros64(u1))
+	l = i32(leading_zeros64(u1))
 	if l == 64 {
-		l += i32(std::math::bits::leading_zeros64(u2))
+		l += i32(leading_zeros64(u2))
 	}
 	ret l
 }
@@ -120,7 +120,7 @@ fn split(b: u64): (sign: u32, exp: i32, mantissa: u64) {
 
 	if exp == 0 {
 		// Normalize value if subnormal.
-		let shift = uint(std::math::bits::leading_zeros64(mantissa) - 11)
+		let shift = uint(leading_zeros64(mantissa) - 11)
 		mantissa <<= shift
 		exp = 1 - i32(shift)
 	} else {
@@ -158,7 +158,7 @@ pub fn fma(x: f64, y: f64, z: f64): f64 {
 	// pm1:pm2 is the double-word mantissa for the product p.
 	// Shift left to leave top bit in product. Effectively
 	// shifts the 106-bit product to the left by 21.
-	let (mut pm1, mut pm2) = std::math::bits::mul64(xm<<10, ym<<11)
+	let (mut pm1, mut pm2) = mul64(xm<<10, ym<<11)
 	let (mut zm1, mut zm2) = zm<<10, u64(0)
 	let mut ps = xs ^ ys // product sign
 
@@ -180,14 +180,14 @@ pub fn fma(x: f64, y: f64, z: f64): f64 {
 	let mut c: u64 = 0
 	if ps == zs {
 		// Adding (pm1:pm2) + (zm1:zm2)
-		pm2, c = std::math::bits::add64(pm2, zm2, 0)
-		pm1, _ = std::math::bits::add64(pm1, zm1, c)
+		pm2, c = add64(pm2, zm2, 0)
+		pm1, _ = add64(pm1, zm1, c)
 		pe -= i32(^pm1 >> 63)
 		pm1, m = shrcompress(pm1, pm2, uint(64+pm1>>63))
 	} else {
 		// Subtracting (pm1:pm2) - (zm1:zm2)
-		pm2, c = std::math::bits::sub64(pm2, zm2, 0)
-		pm1, _ = std::math::bits::sub64(pm1, zm1, c)
+		pm2, c = sub64(pm2, zm2, 0)
+		pm1, _ = sub64(pm1, zm1, c)
 		let nz = lz(pm1, pm2)
 		pe -= nz
 		m, pm2 = shl(pm1, pm2, uint(nz-1))

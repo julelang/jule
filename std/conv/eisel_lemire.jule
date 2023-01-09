@@ -35,8 +35,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // ====================================================
 
-use std::math
-use std::math::bits
+use std::math::{f32_from_bits, f64_from_bits}
+use std::math::bits::{leading_zeros64, mul64}
 
 fn eisel_lemire64(mut man: u64, exp10: int, neg: bool): (f: f64, ok: bool) {
 	// The terse comments in this function body refer to sections of the
@@ -45,7 +45,7 @@ fn eisel_lemire64(mut man: u64, exp10: int, neg: bool): (f: f64, ok: bool) {
 	// Exp10 Range.
 	if man == 0 {
 		if neg {
-			f = std::math::f64_from_bits(0x8000000000000000) // Negative zero.
+			f = f64_from_bits(0x8000000000000000) // Negative zero.
 		}
 		ret f, true
 	}
@@ -54,17 +54,17 @@ fn eisel_lemire64(mut man: u64, exp10: int, neg: bool): (f: f64, ok: bool) {
 	}
 
 	// Normalization.
-	let clz = std::math::bits::leading_zeros64(man)
+	let clz = leading_zeros64(man)
 	man <<= uint(clz)
 	const F64_EXPONENT_BIAS = 1023
 	let mut ret_exp2 = u64(217706*exp10>>16+64+F64_EXPONENT_BIAS) - u64(clz)
 
 	// Multiplication.
-	let (mut x_hi, mut x_lo) = std::math::bits::mul64(man, detailed_pows_of_ten[exp10-detailed_pows_of_ten_min_exp10][1])
+	let (mut x_hi, mut x_lo) = mul64(man, detailed_pows_of_ten[exp10-detailed_pows_of_ten_min_exp10][1])
 
 	// Wider Approximation.
 	if x_hi&0x1FF == 0x1FF && x_lo+man < man {
-		let (y_hi, y_lo) = std::math::bits::mul64(man, detailed_pows_of_ten[exp10-detailed_pows_of_ten_min_exp10][0])
+		let (y_hi, y_lo) = mul64(man, detailed_pows_of_ten[exp10-detailed_pows_of_ten_min_exp10][0])
 		let (mut merged_hi, merged_lo) = x_hi, x_lo+y_hi
 		if merged_lo < x_lo {
 			merged_hi++
@@ -104,7 +104,7 @@ fn eisel_lemire64(mut man: u64, exp10: int, neg: bool): (f: f64, ok: bool) {
 	if neg {
 		ret_bits |= 0x8000000000000000
 	}
-	ret std::math::f64_from_bits(ret_bits), true
+	ret f64_from_bits(ret_bits), true
 }
 
 fn eisel_lemire32(mut man: u64, exp10: int, neg: bool): (f: f32, ok: bool) {
@@ -120,7 +120,7 @@ fn eisel_lemire32(mut man: u64, exp10: int, neg: bool): (f: f32, ok: bool) {
 	// Exp10 Range.
 	if man == 0 {
 		if neg {
-			f = std::math::f32_from_bits(0x80000000) // Negative zero.
+			f = f32_from_bits(0x80000000) // Negative zero.
 		}
 		ret f, true
 	}
@@ -129,17 +129,17 @@ fn eisel_lemire32(mut man: u64, exp10: int, neg: bool): (f: f32, ok: bool) {
 	}
 
 	// Normalization.
-	let clz = std::math::bits::leading_zeros64(man)
+	let clz = leading_zeros64(man)
 	man <<= uint(clz)
 	const F32_EXPONENT_BIAS = 127
 	let mut ret_exp2 = u64(217706*exp10>>16+64+F32_EXPONENT_BIAS) - u64(clz)
 
 	// Multiplication.
-	let (mut x_hi, mut x_lo) = std::math::bits::mul64(man, detailed_pows_of_ten[exp10-detailed_pows_of_ten_min_exp10][1])
+	let (mut x_hi, mut x_lo) = mul64(man, detailed_pows_of_ten[exp10-detailed_pows_of_ten_min_exp10][1])
 
 	// Wider Approximation.
 	if x_hi&0x3FFFFFFFFF == 0x3FFFFFFFFF && x_lo+man < man {
-		let (y_hi, y_lo) = std::math::bits::mul64(man, detailed_pows_of_ten[exp10-detailed_pows_of_ten_min_exp10][0])
+		let (y_hi, y_lo) = mul64(man, detailed_pows_of_ten[exp10-detailed_pows_of_ten_min_exp10][0])
 		let (mut merged_hi, merged_lo) = x_hi, x_lo+y_hi
 		if merged_lo < x_lo {
 			merged_hi++
@@ -179,7 +179,7 @@ fn eisel_lemire32(mut man: u64, exp10: int, neg: bool): (f: f32, ok: bool) {
 	if neg {
 		ret_bits |= 0x80000000
 	}
-	ret std::math::f32_from_bits(u32(ret_bits)), true
+	ret f32_from_bits(u32(ret_bits)), true
 }
 
 // detailed_pows_of_ten{min,max}exp10 is the power of 10 represented by the
