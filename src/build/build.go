@@ -95,7 +95,13 @@ func IsPassFileAnnotation(p string) bool {
 	// Annotation 1
 	i := strings.LastIndexByte(p, '_')
 	if i == -1 {
-		return true
+		// Check file name directly if not exist any _ character.
+		ok, exist := check_os(p)
+		if exist {
+			return ok
+		}
+		ok, exist = check_arch(p)
+		return !exist || ok
 	}
 	if i+1 >= n {
 		return true
