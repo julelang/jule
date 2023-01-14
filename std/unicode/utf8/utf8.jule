@@ -351,20 +351,13 @@ pub fn decode_last_rune_str(s: str): (r: rune, size: int) {
 // It returns -1 if the rune is not a valid value to encode in UTF-8.
 pub fn rune_len(r: rune): int {
 	match {
-	case r < 0:
-		ret -1
-	case r <= RUNE1_MAX:
-		ret 1
-	case r <= RUNE2_MAX:
-		ret 2
-	case SURROGATE_MIN <= r && r <= SURROGATE_MAX:
-		ret -1
-	case r <= RUNE3_MAX:
-		ret 3
-	case r <= MAX_RUNE:
-		ret 4
-	default:
-		ret -1
+	| r < 0:                                    ret -1
+	| r <= RUNE1_MAX:                           ret 1
+	| r <= RUNE2_MAX:                           ret 2
+	| SURROGATE_MIN <= r && r <= SURROGATE_MAX: ret -1
+	| r <= RUNE3_MAX:                           ret 3
+	| r <= MAX_RUNE:                            ret 4
+	|:                                          ret -1
 	}
 }
 
@@ -375,22 +368,22 @@ pub fn encode_rune(mut p: []byte, mut r: rune): int {
 	// Negative values are erroneous. Making it unsigned addresses the problem.
 	let i = u32(r)
 	match {
-	case i <= RUNE1_MAX:
+	| i <= RUNE1_MAX:
 		p[0] = byte(r)
 		ret 1
-	case i <= RUNE2_MAX:
+	| i <= RUNE2_MAX:
 		p[0] = T2 | byte(r>>6)
 		p[1] = TX | byte(r)&MASKX
 		ret 2
-	case i > MAX_RUNE, SURROGATE_MIN <= i && i <= SURROGATE_MAX:
+	| i > MAX_RUNE | SURROGATE_MIN <= i && i <= SURROGATE_MAX:
 		r = RUNE_ERROR
 		fallthrough
-	case i <= RUNE3_MAX:
+	| i <= RUNE3_MAX:
 		p[0] = T3 | byte(r>>12)
 		p[1] = TX | byte(r>>6)&MASKX
 		p[2] = TX | byte(r)&MASKX
 		ret 3
-	default:
+	|:
 		p[0] = T4 | byte(r>>18)
 		p[1] = TX | byte(r>>12)&MASKX
 		p[2] = TX | byte(r>>6)&MASKX
@@ -413,14 +406,14 @@ fn append_rune_non_ascii(p: []byte, mut r: rune): []byte {
 	// Negative values are erroneous. Making it unsigned addresses the problem.
 	let i = u32(r)
 	match {
-	case i <= RUNE2_MAX:
+	| i <= RUNE2_MAX:
 		ret append[byte](p, T2|byte(r>>6), TX|byte(r)&MASKX)
-	case i > MAX_RUNE, SURROGATE_MIN <= i && i <= SURROGATE_MAX:
+	| i > MAX_RUNE | SURROGATE_MIN <= i && i <= SURROGATE_MAX:
 		r = RUNE_ERROR
 		fallthrough
-	case i <= RUNE3_MAX:
+	| i <= RUNE3_MAX:
 		ret append[byte](p, T3|byte(r>>12), TX|byte(r>>6)&MASKX, TX|byte(r)&MASKX)
-	default:
+	|:
 		ret append[byte](p, T4|byte(r>>18), TX|byte(r>>12)&MASKX, TX|byte(r>>6)&MASKX, TX|byte(r)&MASKX)
 	}
 }
@@ -626,11 +619,8 @@ pub fn valid_str(mut s: str): bool {
 // Code points that are out of range or a surrogate half are illegal.
 pub fn valid_rune(r: rune): bool {
 	match {
-	case 0 <= r && r < SURROGATE_MIN:
-		ret true
-	case SURROGATE_MAX < r && r <= MAX_RUNE:
-		ret true
-	default:
-		ret false
+	| 0 <= r && r < SURROGATE_MIN:        ret true
+	| SURROGATE_MAX < r && r <= MAX_RUNE: ret true
+	|:                                    ret false
 	}
 }

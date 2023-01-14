@@ -83,13 +83,13 @@ unsafe fn generic_ftoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_
 	let mut bits: u64 = 0
 	let mut flt: *FloatInfo = nil
 	match bit_size {
-	case 32:
+	| 32:
 		bits = u64(f32_bits(f32(val)))
 		flt = &f32_info
-	case 64:
+	| 64:
 		bits = f64_bits(val)
 		flt = &f64_info
-	default:
+	|:
 		panic("std::conv: illegal bit_size")
 	}
 
@@ -98,22 +98,22 @@ unsafe fn generic_ftoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_
 	let mut mant = bits & (u64(1)<<flt.mantbits - 1)
 
 	match exp {
-	case 1<<flt.expbits - 1:
+	| 1<<flt.expbits - 1:
 		// +inf, nan
 		let mut s: str = ""
 		match {
-		case mant != 0:
+		| mant != 0:
 			s = "nan"
-		case neg:
+		| neg:
 			s = "-inf"
-		default:
+		|:
 			s = "+inf"
 		}
 		ret append[byte](dst, s...)
-	case 0:
+	| 0:
 		// denormalized
 		exp++
-	default:
+	|:
 		// add implicit top bit
 		mant |= u64(1) << flt.mantbits
 	}
@@ -143,25 +143,25 @@ unsafe fn generic_ftoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_
 		ok = true
 		// Precision for shortest representation mode.
 		match fmt {
-		case 'e', 'E':
+		| 'e' | 'E':
 			prec = max(digs.nd-1, 0)
-		case 'f':
+		| 'f':
 			prec = max(digs.nd-digs.dp, 0)
-		case 'g', 'G':
+		| 'g' | 'G':
 			prec = digs.nd
 		}
 	} else if fmt != 'f' {
 		// Fixed number of digits.
 		let mut digits = prec
 		match fmt {
-		case 'e', 'E':
+		| 'e' | 'E':
 			digits++
-		case 'g', 'G':
+		| 'g' | 'G':
 			if prec == 0 {
 				prec = 1
 			}
 			digits = prec
-		default:
+		|:
 			// Invalid mode.
 			digits = 1
 		}
@@ -195,21 +195,21 @@ unsafe fn big_ftoa(mut dst: []byte, mut prec: int, fmt: byte, neg: bool,
 		digs = DecimalSlice{d: d.d[:], nd: d.nd, dp: d.dp}
 		// Precision for shortest representation mode.
 		match fmt {
-		case 'e', 'E':
+		| 'e' | 'E':
 			prec = digs.nd - 1
-		case 'f':
+		| 'f':
 			prec = max(digs.nd-digs.dp, 0)
-		case 'g', 'G':
+		| 'g' | 'G':
 			prec = digs.nd
 		}
 	} else {
 		// Round appropriately.
 		match fmt {
-		case 'e', 'E':
+		| 'e' | 'E':
 			d.round(prec + 1)
-		case 'f':
+		| 'f':
 			d.round(d.dp + prec)
-		case 'g', 'G':
+		| 'g' | 'G':
 			if prec == 0 {
 				prec = 1
 			}
@@ -223,11 +223,11 @@ unsafe fn big_ftoa(mut dst: []byte, mut prec: int, fmt: byte, neg: bool,
 fn fmt_digits(mut dst: []byte, shortest: bool, neg: bool,
 			digs: DecimalSlice, mut prec: int, fmt: byte): []byte {
 	match fmt {
-	case 'e', 'E':
+	| 'e' | 'E':
 		ret fmt_e(dst, neg, digs, prec, fmt)
-	case 'f':
+	| 'f':
 		ret fmt_f(dst, neg, digs, prec)
-	case 'g', 'G':
+	| 'g' | 'G':
 		// trailing fractional zeros in 'e' form will be trimmed.
 		let mut eprec = prec
 		if eprec > digs.nd && digs.nd >= digs.dp {
@@ -360,17 +360,17 @@ unsafe fn round_shortest(mut d: *Decimal, mant: u64, exp: int, flt: *FloatInfo) 
 		let okdown = l != m || inclusive && li+1 == lower.nd
 
 		match {
-		case upperdelta == 0 && m+1 < u:
+		| upperdelta == 0 && m+1 < u:
 			// Example:
 			// m = 12345xxx
 			// u = 12347xxx
 			upperdelta = 2
-		case upperdelta == 0 && m != u:
+		| upperdelta == 0 && m != u:
 			// Example:
 			// m = 12345xxx
 			// u = 12346xxx
 			upperdelta = 1
-		case upperdelta == 1 && (m != '9' || u != '0'):
+		| upperdelta == 1 && (m != '9' || u != '0'):
 			// Example:
 			// m = 1234598x
 			// u = 1234600x
@@ -383,13 +383,13 @@ unsafe fn round_shortest(mut d: *Decimal, mant: u64, exp: int, flt: *FloatInfo) 
 		// If it's okay to do either, then round to the nearest one.
 		// If it's okay to do only one, do it.
 		match {
-		case okdown && okup:
+		| okdown && okup:
 			d.round(mi + 1)
 			ret
-		case okdown:
+		| okdown:
 			d.round_down(mi + 1)
 			ret
-		case okup:
+		| okup:
 			d.round_up(mi + 1)
 			ret
 		}
@@ -440,11 +440,11 @@ fn fmt_e(mut dst: []byte, neg: bool, d: DecimalSlice, prec: int, fmt: byte): []b
 
 	// dd or ddd
 	match {
-	case exp < 10:
+	| exp < 10:
 		dst = append[byte](dst, '0', byte(exp)+'0')
-	case exp < 100:
+	| exp < 100:
 		dst = append[byte](dst, byte(exp/10)+'0', byte(exp%10)+'0')
-	default:
+	|:
 		dst = append[byte](dst, byte(exp/100)+'0', byte(exp/10)%10+'0', byte(exp%10)+'0')
 	}
 
@@ -580,11 +580,11 @@ unsafe fn fmt_x(mut dst: []byte, prec: int, fmt: byte, neg: bool,
 
 	// dd or ddd or dddd
 	match {
-	case exp < 100:
+	| exp < 100:
 		dst = append[byte](dst, byte(exp/10)+'0', byte(exp%10)+'0')
-	case exp < 1000:
+	| exp < 1000:
 		dst = append[byte](dst, byte(exp/100)+'0', byte((exp/10)%10)+'0', byte(exp%10)+'0')
-	default:
+	|:
 		dst = append[byte](dst, byte(exp/1000)+'0', byte(exp/100)%10+'0', byte((exp/10)%10)+'0', byte(exp%10)+'0')
 	}
 	ret dst

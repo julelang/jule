@@ -1218,7 +1218,15 @@ func (b *builder) pushStToBlock(bs *block_st) {
 	bs.block.Tree = append(bs.block.Tree, s)
 }
 
-func setToNextSt(bs *block_st) {
+func get_next_st(toks []lex.Token) []lex.Token {
+	pos, terminated := ast.NextStPos(toks, 0)
+	if terminated {
+		return toks[:pos-1]
+	}
+	return toks[:pos]
+}
+
+func set_to_next_st(bs *block_st) {
 	if bs.nextToks != nil {
 		bs.toks = bs.nextToks
 		bs.nextToks = nil
@@ -1244,7 +1252,7 @@ func (b *builder) Block(toks []lex.Token) (block *ast.Block) {
 	bs.block = block
 	bs.srcToks = &toks
 	for {
-		setToNextSt(&bs)
+		set_to_next_st(&bs)
 		b.pushStToBlock(&bs)
 		if blockStFinished(&bs) {
 			break
@@ -1928,7 +1936,7 @@ func (b *builder) getWhileNextIterProfile(bs *block_st) (s ast.Statement) {
 		b.pusherr(iter.Token, "invalid_syntax")
 		return
 	}
-	setToNextSt(bs)
+	set_to_next_st(bs)
 	st_toks := ast.BlockExpr(bs.toks)
 	if len(st_toks) > 0 {
 		profile.Next = b.next_st(st_toks)
@@ -1979,20 +1987,13 @@ func (b *builder) IterExpr(bs *block_st) ast.Statement {
 	return b.commonIterProfile(bs.toks)
 }
 
-func (b *builder) caseexprs(toks *[]lex.Token, caseIsDefault bool) []ast.Expr {
+func (b *builder) caseexprs(toks *[]lex.Token) []ast.Expr {
 	var exprs []ast.Expr
-	pushExpr := func(toks []lex.Token, tok lex.Token) {
-		if caseIsDefault {
-			if len(toks) > 0 {
-				b.pusherr(tok, "invalid_syntax")
-			}
-			return
-		}
+	push_expr := func(toks []lex.Token, tok lex.Token) {
 		if len(toks) > 0 {
 			exprs = append(exprs, b.Expr(toks))
 			return
 		}
-		b.pusherr(tok, "missing_expr")
 	}
 	brace_n := 0
 	j := 0
@@ -2010,12 +2011,12 @@ func (b *builder) caseexprs(toks *[]lex.Token, caseIsDefault bool) []ast.Expr {
 		} else if brace_n != 0 {
 			continue
 		}
-		switch tok.Id {
-		case lex.ID_COMMA:
-			pushExpr((*toks)[j:i], tok)
+		switch {
+		case tok.Id == lex.ID_OP && tok.Kind == lex.KND_VLINE:
+			push_expr((*toks)[j:i], tok)
 			j = i + 1
-		case lex.ID_COLON:
-			pushExpr((*toks)[j:i], tok)
+		case tok.Id == lex.ID_COLON:
+			push_expr((*toks)[j:i], tok)
 			*toks = (*toks)[i+1:]
 			return exprs
 		}
@@ -2026,38 +2027,33 @@ func (b *builder) caseexprs(toks *[]lex.Token, caseIsDefault bool) []ast.Expr {
 }
 
 func (b *builder) caseblock(toks *[]lex.Token) *ast.Block {
-	brace_n := 0
-	for i, tok := range *toks {
-		if tok.Id == lex.ID_BRACE {
-			switch tok.Kind {
-			case lex.KND_LPAREN, lex.KND_LBRACE, lex.KND_LBRACKET:
-				brace_n++
-			default:
-				brace_n--
-			}
-			continue
-		} else if brace_n != 0 {
+	var block_toks []lex.Token
+	for {
+		next := get_next_st((*toks)[len(block_toks):])
+		if len(next) == 0 {
+			break
+		}
+		tok := next[0]
+		if tok.Id != lex.ID_OP || tok.Kind != lex.KND_VLINE {
+			block_toks = append(block_toks, next...)
 			continue
 		}
-		switch tok.Id {
-		case lex.ID_CASE, lex.ID_DEFAULT:
-			blockToks := (*toks)[:i]
-			*toks = (*toks)[i:]
-			return b.Block(blockToks)
-		}
+		*toks = (*toks)[len(block_toks):]
+		return b.Block(block_toks)
 	}
-	block := b.Block(*toks)
+	block := b.Block(block_toks)
 	*toks = nil
 	return block
 }
 
-func (b *builder) getcase(toks *[]lex.Token) ast.Case {
+func (b *builder) getcase(toks *[]lex.Token) (ast.Case, bool) {
 	var c ast.Case
 	c.Token = (*toks)[0]
 	*toks = (*toks)[1:]
-	c.Exprs = b.caseexprs(toks, c.Token.Id == lex.ID_DEFAULT)
+	c.Exprs = b.caseexprs(toks)
 	c.Block = b.caseblock(toks)
-	return c
+	is_default := len(c.Exprs) == 0
+	return c, is_default
 }
 
 func (b *builder) cases(toks []lex.Token) ([]ast.Case, *ast.Case) {
@@ -2065,20 +2061,21 @@ func (b *builder) cases(toks []lex.Token) ([]ast.Case, *ast.Case) {
 	var def *ast.Case
 	for len(toks) > 0 {
 		tok := toks[0]
-		switch tok.Id {
-		case lex.ID_CASE:
-			cases = append(cases, b.getcase(&toks))
-		case lex.ID_DEFAULT:
-			c := b.getcase(&toks)
+		if tok.Id != lex.ID_OP || tok.Kind != lex.KND_VLINE {
+			b.pusherr(tok, "invalid_syntax")
+			break
+		}
+		c, is_default := b.getcase(&toks)
+		if is_default {
 			c.Token = tok
 			if def == nil {
 				def = new(ast.Case)
 				*def = c
-				break
+			} else {
+				b.pusherr(tok, "invalid_syntax")
 			}
-			fallthrough
-		default:
-			b.pusherr(tok, "invalid_syntax")
+		} else {
+			cases = append(cases, c)
 		}
 	}
 	return cases, def
@@ -2183,7 +2180,7 @@ node:
 	if blockStFinished(bs) {
 		goto end
 	}
-	setToNextSt(bs)
+	set_to_next_st(bs)
 	if bs.toks[0].Id == lex.ID_ELSE {
 		if len(bs.toks) > 1 && bs.toks[1].Id == lex.ID_IF {
 			bs.toks = bs.toks[1:] // Remove else token

@@ -57,28 +57,28 @@ pub fn parse_uint(mut s: str, mut base: int, mut bit_size: int): (u64, ConvError
 	}
 
 	match {
-	case 2 <= base && base <= 36:
+	| 2 <= base && base <= 36:
 		// valid base; nothing to do
-	case base == 0:
+	| base == 0:
 		// Look for octal, hex prefix.
 		base = 10
 		if s[0] == '0' {
 			match {
-			case s.len >= 3 && lower(s[1]) == 'b':
+			| s.len >= 3 && lower(s[1]) == 'b':
 				base = 2
 				s = s[2:]
-			case s.len >= 3 && lower(s[1]) == 'o':
+			| s.len >= 3 && lower(s[1]) == 'o':
 				base = 8
 				s = s[2:]
-			case s.len >= 3 && lower(s[1]) == 'x':
+			| s.len >= 3 && lower(s[1]) == 'x':
 				base = 16
 				s = s[2:]
-			default:
+			|:
 				base = 8
 				s = s[1:]
 			}
 		}
-	default:
+	|:
 		ret 0, ConvError.InvalidBase
 	}
 
@@ -92,20 +92,15 @@ pub fn parse_uint(mut s: str, mut base: int, mut bit_size: int): (u64, ConvError
 	// Use compile-time constants for common cases.
 	let mut cutoff: u64 = 0
 	match base {
-	case 10:
-		cutoff = MAX_UINT64/10 + 1
-	case 16:
-		cutoff = MAX_UINT64/16 + 1
-	default:
-		cutoff = MAX_UINT64/u64(base) + 1
+	| 10: cutoff = MAX_UINT64/10 + 1
+	| 16: cutoff = MAX_UINT64/16 + 1
+	|:    cutoff = MAX_UINT64/u64(base) + 1
 	}
 
 	let mut max_val: u64 = 0
 	match bit_size {
-	case 32:
-		max_val = u32.max
-	case 64:
-		max_val = u64.max
+	| 32: max_val = u32.max
+	| 64: max_val = u64.max
 	}
 	/*
 	let mut prec = 1
@@ -118,11 +113,11 @@ pub fn parse_uint(mut s: str, mut base: int, mut bit_size: int): (u64, ConvError
 	for _, c in s {
 		let mut d: byte = 0
 		match {
-		case '0' <= c && c <= '9':
+		| '0' <= c && c <= '9':
 			d = c - '0'
-		case 'a' <= lower(c) && lower(c) <= 'z':
+		| 'a' <= lower(c) && lower(c) <= 'z':
 			d = lower(c) - 'a' + 10
-		default:
+		|:
 			ret 0, ConvError.InvalidSyntax
 		}
 

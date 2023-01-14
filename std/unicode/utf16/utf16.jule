@@ -95,17 +95,17 @@ pub fn encode(s: []rune): []u16 {
 	n = 0
 	for _, v in s {
 		match {
-		case 0 <= v && v < SURR1, SURR3 <= v && v < SURR_SELF:
+		| 0 <= v && v < SURR1 | SURR3 <= v && v < SURR_SELF:
 			// normal rune
 			a[n] = u16(v)
 			n++
-		case SURR_SELF <= v && v <= MAX_RUNE:
+		| SURR_SELF <= v && v <= MAX_RUNE:
 			// needs surrogate sequence
 			let (r1, r2) = encode_rune(v)
 			a[n] = u16(r1)
 			a[n+1] = u16(r2)
 			n += 2
-		default:
+		|:
 			a[n] = u16(REPLACEMENT_CHAR)
 			n++
 		}
@@ -122,15 +122,15 @@ pub fn decode(s: []u16): []rune {
 	for i < s.len; i++ {
 		let r = s[i]
 		match {
-		case r < SURR1 || SURR3 <= r:
+		| r < SURR1 | SURR3 <= r:
 			// normal rune
 			a[n] = rune(r)
-		case (SURR1 <= r && r < SURR2 && i+1 < s.len &&
-				SURR2 <= s[i+1] && s[i+1] < SURR3):
+		| (SURR1 <= r && r < SURR2 && i+1 < s.len &&
+			SURR2 <= s[i+1] && s[i+1] < SURR3):
 			// valid surrogate sequence
 			a[n] = decode_rune(rune(r), rune(s[i+1]))
 			i++
-		default:
+		|:
 			// invalid surrogate sequence
 			a[n] = REPLACEMENT_CHAR
 		}
@@ -144,10 +144,10 @@ pub fn decode(s: []u16): []rune {
 // a valid Unicode code point, it appends the encoding of U+FFFD.
 pub fn append_rune(a: []u16, r: rune): []u16 {
 	match {
-	case 0 <= r && r < SURR1, SURR3 <= r && r < SURR_SELF:
+	| 0 <= r && r < SURR1 | SURR3 <= r && r < SURR_SELF:
 		// normal rune
 		ret append[u16](a, u16(r))
-	case SURR_SELF <= r && r <= MAX_RUNE:
+	| SURR_SELF <= r && r <= MAX_RUNE:
 		// needs surrogate sequence
 		let (r1, r2) = encode_rune(r)
 		ret append[u16](a, u16(r1), u16(r2))

@@ -588,7 +588,7 @@ func (l *Lex) iskw(txt, kind string, id uint8, t *Token) bool {
 }
 
 //               [keyword]id
-var KEYWORDS = map[string]uint8{
+var keywords = map[string]uint8{
 	KND_I8:          ID_DT,
 	KND_I16:         ID_DT,
 	KND_I32:         ID_DT,
@@ -624,8 +624,6 @@ var KEYWORDS = map[string]uint8{
 	KND_STRUCT:      ID_STRUCT,
 	KND_CO:          ID_CO,
 	KND_MATCH:       ID_MATCH,
-	KND_CASE:        ID_CASE,
-	KND_DEFAULT:     ID_DEFAULT,
 	KND_SELF:        ID_SELF,
 	KND_TRAIT:       ID_TRAIT,
 	KND_IMPL:        ID_IMPL,
@@ -643,7 +641,7 @@ type oppair struct {
 	id uint8
 }
 
-var BASIC_OPS = [...]oppair{
+var basic_ops = [...]oppair{
 	{KND_DBLCOLON, ID_DBLCOLON},
 	{KND_COLON, ID_COLON},
 	{KND_SEMICOLON, ID_SEMICOLON},
@@ -685,7 +683,7 @@ var BASIC_OPS = [...]oppair{
 }
 
 func (l *Lex) lexKeywords(txt string, tok *Token) bool {
-	for k, v := range KEYWORDS {
+	for k, v := range keywords {
 		if l.iskw(txt, k, v, tok) {
 			return true
 		}
@@ -694,7 +692,7 @@ func (l *Lex) lexKeywords(txt string, tok *Token) bool {
 }
 
 func (l *Lex) lexBasicOps(txt string, tok *Token) bool {
-	for _, pair := range BASIC_OPS {
+	for _, pair := range basic_ops {
 		if l.isop(txt, pair.op, pair.id, tok) {
 			return true
 		}

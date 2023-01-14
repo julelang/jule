@@ -74,14 +74,14 @@ fn special(mut s: str): (f: f64, n: int, ok: bool) {
 	let mut sign = 1
 	let mut nsign = 0
 	match s[0] {
-	case '+', '-':
+	| '+' | '-':
 		if s[0] == '-' {
 			sign = -1
 		}
 		nsign = 1
 		s = s[1:]
 		fallthrough
-	case 'i', 'I':
+	| 'i' | 'I':
 		let mut case_n = common_prefix_len_ignore_case(s, "infinity")
 		// Anything longer than "inf" is ok, but if we
 		// don't have "infinity", only consume "inf".
@@ -91,7 +91,7 @@ fn special(mut s: str): (f: f64, n: int, ok: bool) {
 		if case_n == 3 || case_n == 8 {
 			ret inf(sign), nsign + n, true
 		}
-	case 'n', 'N':
+	| 'n' | 'N':
 		if common_prefix_len_ignore_case(s, "nan") == 3 {
 			ret nan(), 3, true
 		}
@@ -109,9 +109,9 @@ fn read_float(s: str): (mantissa: u64, exp: int, neg: bool,
 		ret
 	}
 	match {
-	case s[i] == '+':
+	| s[i] == '+':
 		i++
-	case s[i] == '-':
+	| s[i] == '-':
 		neg = true
 		i++
 	}
@@ -135,14 +135,14 @@ fn read_float(s: str): (mantissa: u64, exp: int, neg: bool,
 	for i < s.len; i++ {
 		let c = s[i]
 		match true {
-		case c == '.':
+		| c == '.':
 			if sawdot {
 				goto loop_end
 			}
 			sawdot = true
 			dp = nd
 			continue
-		case '0' <= c && c <= '9':
+		| '0' <= c && c <= '9':
 			sawdigits = true
 			if c == '0' && nd == 0 { // ignore leading zeros
 				dp--
@@ -157,7 +157,7 @@ fn read_float(s: str): (mantissa: u64, exp: int, neg: bool,
 				trunc = true
 			}
 			continue
-		case base == 16 && 'a' <= lower(c) && lower(c) <= 'f':
+		| base == 16 && 'a' <= lower(c) && lower(c) <= 'f':
 			sawdigits = true
 			nd++
 			if nd_mant < max_mant_digits {
@@ -238,9 +238,9 @@ impl Decimal {
 			ret
 		}
 		match {
-		case s[i] == '+':
+		| s[i] == '+':
 			i++
-		case s[i] == '-':
+		| s[i] == '-':
 			self.neg = true
 			i++
 		}
@@ -250,14 +250,14 @@ impl Decimal {
 		let mut sawdigits = false
 		for i < s.len; i++ {
 			match {
-			case s[i] == '.':
+			| s[i] == '.':
 				if sawdot {
 					ret
 				}
 				sawdot = true
 				self.dp = self.nd
 				continue
-			case '0' <= s[i] && s[i] <= '9':
+			| '0' <= s[i] && s[i] <= '9':
 				sawdigits = true
 				if s[i] == '0' && self.nd == 0 { // ignore leading zeros
 					self.dp--
@@ -441,12 +441,12 @@ fn atof64_exact(mantissa: u64, mut exp: int, neg: bool): (f: f64, ok: bool) {
 		f = -f
 	}
 	match {
-	case exp == 0:
+	| exp == 0:
 		// an integer.
 		ret f, true
 	// Exact integers are <= 10^15.
 	// Exact powers of ten are <= 10^22.
-	case exp > 0 && exp <= 15+22: // int * 10^k
+	| exp > 0 && exp <= 15+22: // int * 10^k
 		// If exponent is big but number of digits is not,
 		// can move a few zeros into the integer part.
 		if exp > 22 {
@@ -458,7 +458,7 @@ fn atof64_exact(mantissa: u64, mut exp: int, neg: bool): (f: f64, ok: bool) {
 			ret
 		}
 		ret f * f64_pow10[exp], true
-	case exp < 0 && exp >= -22: // int / 10^k
+	| exp < 0 && exp >= -22: // int / 10^k
 		ret f / f64_pow10[-exp], true
 	}
 	ret
@@ -480,12 +480,12 @@ fn atof64exact(mantissa: u64, mut exp: int, neg: bool): (f: f64, ok: bool) {
 		f = -f
 	}
 	match {
-	case exp == 0:
+	| exp == 0:
 		// an integer.
 		ret f, true
 	// Exact integers are <= 10^15.
 	// Exact powers of ten are <= 10^22.
-	case exp > 0 && exp <= 15+22: // int * 10^k
+	| exp > 0 && exp <= 15+22: // int * 10^k
 		// If exponent is big but number of digits is not,
 		// can move a few zeros into the integer part.
 		if exp > 22 {
@@ -497,7 +497,7 @@ fn atof64exact(mantissa: u64, mut exp: int, neg: bool): (f: f64, ok: bool) {
 			ret
 		}
 		ret f * f64_pow10[exp], true
-	case exp < 0 && exp >= -22: // int / 10^k
+	| exp < 0 && exp >= -22: // int / 10^k
 		ret f / f64_pow10[-exp], true
 	}
 	ret
@@ -514,11 +514,11 @@ fn atof32exact(mantissa: u64, mut exp: int, mut neg: bool): (f: f32, ok: bool) {
 		f = -f
 	}
 	match {
-	case exp == 0:
+	| exp == 0:
 		ret f, true
 	// Exact integers are <= 10^7.
 	// Exact powers of ten are <= 10^10.
-	case exp > 0 && exp <= 7+10: // int * 10^k
+	| exp > 0 && exp <= 7+10: // int * 10^k
 		// If exponent is big but number of digits is not,
 		// can move a few zeros into the integer part.
 		if exp > 10 {
@@ -530,7 +530,7 @@ fn atof32exact(mantissa: u64, mut exp: int, mut neg: bool): (f: f32, ok: bool) {
 			ret
 		}
 		ret f * f32_pow10[exp], true
-	case exp < 0 && exp >= -10: // int / 10^k
+	| exp < 0 && exp >= -10: // int / 10^k
 		ret f / f32_pow10[-exp], true
 	}
 	ret
