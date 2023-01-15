@@ -67,6 +67,11 @@ Safe Jule performs bounds checking and nil (aka null) checking.
 It is committed to no undefined behavior.
 Unsafe behaviors are encouraged to be done deliberately with unsafe scopes.
 Please read the <a href="https://jule.dev/pages/docs.html?page=unsafe-jule">Unsafe Jule documentations</a> for more information about of Unsafe Jule.
+<br><br>
+
+> **Note** \
+> Jule also has different memory management methods. \
+> For example, the ``std::memory::c`` standard library provides C-like memory management.
 
 <h2 id="cpp-interoperability">C++ Interoperability</h2>
 Jule is designed to be interoperable with C++.
@@ -132,8 +137,9 @@ All supported platforms by JuleC are documented in the <a href="https://jule.dev
 
 <h2 id="building-project">Building Project</h2>
 
+> **Note** \
 > [Website documentation](https://julelang.github.io/website/pages/docs.html?page=getting-started-install-from-source) for install from source.
-
+ 
 When you enter the directory where the source code is located, you can find some compilation scripts for compiling of JuleC. \
 These scripts are written to run from the [src](./src) directory:
 
@@ -145,7 +151,7 @@ JuleC is in development with the [Go](https://github.com/golang/go) programming 
 
 ### Building with Go Compiler
 
-> In main directory.
+In main directory.
 
 #### Windows (PowerShell)
 ```powershell
