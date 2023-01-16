@@ -628,7 +628,7 @@ var keywords = map[string]uint8{
 	KND_TRAIT:       ID_TRAIT,
 	KND_IMPL:        ID_IMPL,
 	KND_CPP:         ID_CPP,
-	KND_FALLTHROUGH: ID_FALLTHROUGH,
+	KND_FALL: ID_FALL,
 	KND_FN:          ID_FN,
 	KND_LET:         ID_LET,
 	KND_UNSAFE:      ID_UNSAFE,

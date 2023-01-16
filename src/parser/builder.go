@@ -1293,7 +1293,7 @@ func (b *builder) St(bs *block_st) (s ast.Statement) {
 		return b.ConcurrentCallSt(bs.toks)
 	case lex.ID_GOTO:
 		return b.GotoSt(bs.toks)
-	case lex.ID_FALLTHROUGH:
+	case lex.ID_FALL:
 		return b.Fallthrough(bs.toks)
 	case lex.ID_TYPE:
 		t := b.TypeAlias(bs.toks)
