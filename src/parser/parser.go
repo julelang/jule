@@ -2080,7 +2080,6 @@ func (p *Parser) get_generics(toks []lex.Token) (_ []Type, err bool) {
 		r := new_builder(nil)
 		j := 0
 		generic, _ := r.DataType(part, &j, true)
-		r.Wait()
 		if j+1 < len(part) {
 			p.pusherrtok(part[j+1], "invalid_syntax")
 		}

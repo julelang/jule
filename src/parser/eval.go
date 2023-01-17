@@ -499,7 +499,6 @@ func (e *eval) tryCast(toks []lex.Token, m *exprModel) (v value, _ bool) {
 		dtindex := 0
 		typeToks := toks[1:i]
 		dt, ok := r.DataType(typeToks, &dtindex, false)
-		r.Wait()
 		if !ok {
 			return
 		}
@@ -803,7 +802,6 @@ func (e *eval) typeId(toks []lex.Token, m *exprModel) (v value) {
 	r := new_builder(nil)
 	i := 0
 	t, ok := r.DataType(toks, &i, true)
-	r.Wait()
 	if !ok {
 		e.p.pusherrs(r.Errors...)
 		return
@@ -1471,7 +1469,6 @@ func (e *eval) enumerable(exprToks []lex.Token, t Type, m *exprModel) (v value) 
 func (e *eval) anonymousFn(toks []lex.Token, m *exprModel) (v value) {
 	r := new_builder(toks)
 	f := r.Fn(r.Tokens, false, true, false)
-	r.Wait()
 	if len(r.Errors) > 0 {
 		e.p.pusherrs(r.Errors...)
 		return

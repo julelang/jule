@@ -5,7 +5,6 @@ package parser
 import (
 	"os"
 	"strings"
-	"sync"
 
 	"github.com/julelang/jule"
 	"github.com/julelang/jule/ast"
@@ -34,7 +33,6 @@ type block_st struct {
 }
 
 type builder struct {
-	wg  sync.WaitGroup
 	pub bool
 
 	Tree   []ast.Node
@@ -112,11 +110,7 @@ func (b *builder) Build() {
 		}
 		b.buildNode(toks)
 	}
-	b.Wait()
 }
-
-// Wait waits for concurrency.
-func (b *builder) Wait() { b.wg.Wait() }
 
 // TypeAlias builds AST model of type definition statement.
 func (b *builder) TypeAlias(toks []lex.Token) (t ast.TypeAlias) {
