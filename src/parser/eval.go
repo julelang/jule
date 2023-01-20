@@ -12,7 +12,7 @@ import (
 
 type value struct {
 	data     ast.Data
-	model    iExpr
+	model    ast.ExprModel
 	expr     any
 	constant bool
 	lvalue   bool
@@ -36,14 +36,14 @@ func (e *eval) pusherrtok(tok lex.Token, err string, args ...any) {
 	e.p.pusherrtok(tok, err, args...)
 }
 
-func (e *eval) eval_toks(toks []lex.Token) (value, iExpr) {
+func (e *eval) eval_toks(toks []lex.Token) (value, ast.ExprModel) {
 	resolver := builder{}
 	return e.eval_expr(resolver.Expr(toks))
 }
 
-func (e *eval) eval_expr(expr Expr) (value, iExpr) { return e.eval(expr.Op) }
+func (e *eval) eval_expr(expr Expr) (value, ast.ExprModel) { return e.eval(expr.Op) }
 
-func get_bop_model(v value, bop ast.Binop, lm iExpr, rm iExpr) iExpr {
+func get_bop_model(v value, bop ast.Binop, lm ast.ExprModel, rm ast.ExprModel) ast.ExprModel {
 	if v.constant {
 		return v.model
 	}
@@ -56,7 +56,7 @@ func get_bop_model(v value, bop ast.Binop, lm iExpr, rm iExpr) iExpr {
 	return model
 }
 
-func (e *eval) eval_op(op any) (v value, model iExpr) {
+func (e *eval) eval_op(op any) (v value, model ast.ExprModel) {
 	switch t := op.(type) {
 	case ast.BinopExpr:
 		m := newExprModel(1)
@@ -93,7 +93,7 @@ func (e *eval) eval_op(op any) (v value, model iExpr) {
 	return
 }
 
-func (e *eval) eval(op any) (v value, model iExpr) {
+func (e *eval) eval(op any) (v value, model ast.ExprModel) {
 	defer func() {
 		if types.IsVoid(v.data.Type) {
 			v.data.Type.Id = types.VOID
@@ -440,20 +440,20 @@ func (e *eval) subId(toks []lex.Token, m *exprModel) (v value) {
 	return
 }
 
-func (e *eval) get_cast_expr_model(t, vt Type, expr_model iExpr) iExpr {
+func (e *eval) get_cast_expr_model(t, vt Type, expr ast.ExprModel) ast.ExprModel {
 	var model strings.Builder
 	switch {
 	case types.IsPtr(vt) || types.IsPtr(t):
 		model.WriteString("((")
 		model.WriteString(t.String())
 		model.WriteString(")(")
-		model.WriteString(expr_model.String())
+		model.WriteString(expr.String())
 		model.WriteString("))")
 		goto end
 	case types.IsPure(vt):
 		switch {
 		case types.IsTrait(vt), vt.Id == types.ANY:
-			model.WriteString(expr_model.String())
+			model.WriteString(expr.String())
 			model.WriteString(types.GetAccessor(vt))
 			model.WriteString("operator ")
 			model.WriteString(t.String())
@@ -464,7 +464,7 @@ func (e *eval) get_cast_expr_model(t, vt Type, expr_model iExpr) iExpr {
 	model.WriteString("static_cast<")
 	model.WriteString(t.String())
 	model.WriteString(">(")
-	model.WriteString(expr_model.String())
+	model.WriteString(expr.String())
 	model.WriteByte(')')
 end:
 	return exprNode{model.String()}
@@ -920,10 +920,10 @@ func (e *eval) structObjSubId(val value, idTok lex.Token, m *exprModel) value {
 		defer func() {
 			// Save unary
 			if ast.IsUnaryOp((*nodes)[0].String()) {
-				*nodes = append([]iExpr{(*nodes)[0], exprNode{"this->"}}, (*nodes)[n+1:]...)
+				*nodes = append([]ast.ExprModel{(*nodes)[0], exprNode{"this->"}}, (*nodes)[n+1:]...)
 				return
 			}
-			*nodes = append([]iExpr{exprNode{"this->"}}, (*nodes)[n+1:]...)
+			*nodes = append([]ast.ExprModel{exprNode{"this->"}}, (*nodes)[n+1:]...)
 		}()
 	}
 	interior_mutability := false
@@ -1092,7 +1092,7 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 				return e.enumerable(toks, *e.type_prefix, m)
 			}
 		}
-		var model iExpr
+		var model ast.ExprModel
 		v, model = e.build_slice_implicit(e.enumerableParts(toks), toks[0])
 		m.append_sub(model)
 		return v
@@ -1100,7 +1100,7 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 		e.pusherrtok(errTok, "invalid_syntax")
 		return
 	}
-	var model iExpr
+	var model ast.ExprModel
 	v, model = e.eval_toks(exprToks)
 	m.append_sub(model)
 	toks = toks[len(exprToks):] // lex.Tokenens of [...]
@@ -1114,7 +1114,7 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 		rightToks := toks[colon+1:]
 		m.append_sub(exprNode{".___slice("})
 		if len(leftToks) > 0 {
-			var model iExpr
+			var model ast.ExprModel
 			leftv, model = e.p.evalToks(leftToks, nil)
 			m.append_sub(indexingExprModel(model))
 			e.checkIntegerIndexing(leftv, errTok)
@@ -1125,7 +1125,7 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 		}
 		if len(rightToks) > 0 {
 			m.append_sub(exprNode{","})
-			var model iExpr
+			var model ast.ExprModel
 			rightv, model = e.p.evalToks(rightToks, nil)
 			m.append_sub(indexingExprModel(model))
 			e.checkIntegerIndexing(rightv, errTok)
@@ -1302,7 +1302,7 @@ func (e *eval) enumerableParts(toks []lex.Token) [][]lex.Token {
 	return parts
 }
 
-func (e *eval) build_array(parts [][]lex.Token, t Type, errtok lex.Token) (value, iExpr) {
+func (e *eval) build_array(parts [][]lex.Token, t Type, errtok lex.Token) (value, ast.ExprModel) {
 	if !t.Size.AutoSized {
 		n := ast.Size(len(parts))
 		if n > t.Size.N {
@@ -1338,7 +1338,7 @@ func (e *eval) build_array(parts [][]lex.Token, t Type, errtok lex.Token) (value
 	return v, model
 }
 
-func (e *eval) build_slice_implicit(parts [][]lex.Token, errtok lex.Token) (value, iExpr) {
+func (e *eval) build_slice_implicit(parts [][]lex.Token, errtok lex.Token) (value, ast.ExprModel) {
 	if len(parts) == 0 {
 		e.pusherrtok(errtok, "dynamic_type_annotation_failed")
 		return value{}, nil
@@ -1368,7 +1368,7 @@ func (e *eval) build_slice_implicit(parts [][]lex.Token, errtok lex.Token) (valu
 	return v, model
 }
 
-func (e *eval) build_slice_explicit(parts [][]lex.Token, t Type, errtok lex.Token) (value, iExpr) {
+func (e *eval) build_slice_explicit(parts [][]lex.Token, t Type, errtok lex.Token) (value, ast.ExprModel) {
 	old_type := e.type_prefix
 	e.type_prefix = t.ComponentType
 	var v value
@@ -1389,7 +1389,7 @@ func (e *eval) build_slice_explicit(parts [][]lex.Token, t Type, errtok lex.Toke
 	return v, model
 }
 
-func (e *eval) buildMap(parts [][]lex.Token, t Type, errtok lex.Token) (value, iExpr) {
+func (e *eval) buildMap(parts [][]lex.Token, t Type, errtok lex.Token) (value, ast.ExprModel) {
 	var v value
 	v.data.Value = t.Kind
 	v.data.Type = t
@@ -1445,7 +1445,7 @@ func (e *eval) buildMap(parts [][]lex.Token, t Type, errtok lex.Token) (value, i
 }
 
 func (e *eval) enumerable(exprToks []lex.Token, t Type, m *exprModel) (v value) {
-	var model iExpr
+	var model ast.ExprModel
 	t, ok := e.p.realType(t, true)
 	if !ok {
 		return

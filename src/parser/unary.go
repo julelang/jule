@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
 )
@@ -124,7 +125,7 @@ func (u *unary) amper() value {
 	case types.IsRef(v.data.Type):
 		model := exprNode{(*nodes)[1].String() + "._alloc"}
 		*nodes = nil
-		*nodes = make([]iExpr, 1)
+		*nodes = make([]ast.ExprModel, 1)
 		(*nodes)[0] = model
 		v.data.Type.Kind = lex.KND_STAR + types.DerefPtrOrRef(v.data.Type).Kind
 		return v

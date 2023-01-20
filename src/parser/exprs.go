@@ -21,7 +21,7 @@ func check_value_for_indexing(v value) (err_key string) {
 	}
 }
 
-func indexingExprModel(i iExpr) iExpr {
+func indexingExprModel(i ast.ExprModel) ast.ExprModel {
 	if i == nil {
 		return i
 	}

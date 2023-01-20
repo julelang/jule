@@ -191,7 +191,7 @@ type Binop struct {
 type Expr struct {
 	Tokens []lex.Token
 	Op     any
-	Model  IExprModel
+	Model  ExprModel
 }
 
 func (e *Expr) IsNotBinop() bool {
@@ -385,8 +385,8 @@ type Genericable interface {
 	SetGenerics([]Type)
 }
 
-// IExprModel for special expression model to cpp string.
-type IExprModel interface {
+// ExprModel for special expression model to cpp string.
+type ExprModel interface {
 	String() string
 }
 

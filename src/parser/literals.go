@@ -18,7 +18,7 @@ type literal_eval struct {
 	p     *Parser
 }
 
-func strModel(v value) iExpr {
+func strModel(v value) ast.ExprModel {
 	content := v.expr.(string)
 	if lex.IsRawStr(content) {
 		return exprNode{ToRawStrLiteral([]byte(content))}
@@ -26,14 +26,14 @@ func strModel(v value) iExpr {
 	return exprNode{ToStrLiteral([]byte(content))}
 }
 
-func boolModel(v value) iExpr {
+func boolModel(v value) ast.ExprModel {
 	if v.expr.(bool) {
 		return exprNode{lex.KND_TRUE}
 	}
 	return exprNode{lex.KND_FALSE}
 }
 
-func getModel(v value) iExpr {
+func getModel(v value) ast.ExprModel {
 	switch v.expr.(type) {
 	case string:
 		return strModel(v)
@@ -44,7 +44,7 @@ func getModel(v value) iExpr {
 	}
 }
 
-func numericModel(v value) iExpr {
+func numericModel(v value) ast.ExprModel {
 	switch t := v.expr.(type) {
 	case uint64:
 		fmt := strconv.FormatUint(t, 10)

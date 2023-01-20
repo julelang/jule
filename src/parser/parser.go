@@ -2427,7 +2427,7 @@ func (p *Parser) pushGenericByArg(f *Fn, pair *paramMapPair, args *ast.Args, arg
 
 func (p *Parser) parseArg(f *Fn, pair *paramMapPair, args *ast.Args, variadiced *bool) {
 	var value value
-	var model iExpr
+	var model ast.ExprModel
 	if pair.param.Variadic {
 		t := types.VariadicToSlice(pair.param.Type)
 		value, model = p.evalExpr(pair.arg.Expr, &t)
@@ -3740,13 +3740,13 @@ func (p *Parser) check_type(real, check Type, ignoreAny, allow_assign bool, errT
 	}
 }
 
-func (p *Parser) evalExpr(expr Expr, prefix *ast.Type) (value, iExpr) {
+func (p *Parser) evalExpr(expr Expr, prefix *ast.Type) (value, ast.ExprModel) {
 	p.eval.has_error = false
 	p.eval.type_prefix = prefix
 	return p.eval.eval_expr(expr)
 }
 
-func (p *Parser) evalToks(toks []lex.Token, prefix *ast.Type) (value, iExpr) {
+func (p *Parser) evalToks(toks []lex.Token, prefix *ast.Type) (value, ast.ExprModel) {
 	p.eval.has_error = false
 	p.eval.type_prefix = prefix
 	return p.eval.eval_toks(toks)

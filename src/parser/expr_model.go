@@ -9,12 +9,8 @@ import (
 	"github.com/julelang/jule/lex"
 )
 
-type iExpr interface {
-	String() string
-}
-
 type exprBuildNode struct {
-	nodes []iExpr
+	nodes []ast.ExprModel
 }
 
 type exprModel struct {
@@ -29,7 +25,7 @@ func newExprModel(n int) *exprModel {
 	return m
 }
 
-func (m *exprModel) append_sub(node iExpr) {
+func (m *exprModel) append_sub(node ast.ExprModel) {
 	nodes := &m.nodes[m.index].nodes
 	*nodes = append(*nodes, node)
 }
@@ -60,7 +56,7 @@ func (node exprNode) String() string {
 
 type sliceExpr struct {
 	dataType Type
-	expr     []iExpr
+	expr     []ast.ExprModel
 }
 
 func (a sliceExpr) String() string {
@@ -80,8 +76,8 @@ func (a sliceExpr) String() string {
 
 type mapExpr struct {
 	dataType Type
-	keyExprs []iExpr
-	valExprs []iExpr
+	keyExprs []ast.ExprModel
+	valExprs []ast.ExprModel
 }
 
 func (m mapExpr) String() string {
@@ -152,7 +148,7 @@ func (ce callExpr) String() string {
 
 type retExpr struct {
 	vars   []*Var
-	models []iExpr
+	models []ast.ExprModel
 }
 
 func (re *retExpr) get_model(i int) string {
