@@ -1906,7 +1906,7 @@ func (p *Parser) check_fns() {
 	}
 }
 
-func (p *Parser) parseStructFunc(s *Struct, f *Fn) (err bool) {
+func (p *Parser) parse_struct_fn(s *Struct, f *Fn) (err bool) {
 	if len(f.Generics) > 0 {
 		return
 	}
@@ -1920,7 +1920,7 @@ func (p *Parser) parseStructFunc(s *Struct, f *Fn) (err bool) {
 func (p *Parser) checkStruct(xs *Struct) (err bool) {
 	for _, f := range xs.Defines.Fns {
 		p.blockTypes = nil
-		err = p.parseStructFunc(xs, f)
+		err = p.parse_struct_fn(xs, f)
 		if err {
 			break
 		}
@@ -2011,6 +2011,7 @@ func (p *Parser) parseField(s *Struct, f **Var, i int) {
 		param.Default.Model = exprNode{build.CPP_DEFAULT_EXPR}
 	}
 	s.Constructor.Params[i] = param
+	s.Defines.Globals[i] = v
 }
 
 func (p *Parser) structConstructorInstance(as *Struct) *Struct {
