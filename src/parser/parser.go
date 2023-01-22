@@ -929,6 +929,20 @@ func (p *Parser) implTrait(model *ast.Impl) {
 	}
 }
 
+func (p *Parser) addImplGenerics(s *ast.Struct, types []GenericType) {
+	if len(s.Generics) > 0 {
+		for _, t := range types {
+			for _, g := range s.Generics {
+				// Implemented structure has this generic in this identifier.
+				if t.Id == g.Id {
+					p.pusherrtok(t.Token, "exist_id", t.Id)
+				}
+			}
+		}
+	}
+	p.Generics(types)
+}
+
 func (p *Parser) implStruct(model *ast.Impl) {
 	side := p.Defines.Side
 	p.Defines.Side = nil
@@ -941,7 +955,7 @@ func (p *Parser) implStruct(model *ast.Impl) {
 	for _, node := range model.Tree {
 		switch node_t := node.Data.(type) {
 		case []GenericType:
-			p.Generics(node_t)
+			p.addImplGenerics(s, node_t)
 		case ast.Comment:
 			p.Comment(node_t)
 		case *Fn:
