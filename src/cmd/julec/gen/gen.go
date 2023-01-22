@@ -1,7 +1,6 @@
 package gen
 
 import (
-	"strconv"
 	"strings"
 	"sync/atomic"
 
@@ -663,7 +662,7 @@ func gen_match(m *ast.Match) string {
 
 func gen_struct_ostream(s *ast.Struct) string {
 	var cpp strings.Builder
-	genericsDef, genericsSerie := gen_struct_generics(s)
+	genericsDef, genericsSerie := gen_struct_generics(s.Generics)
 	cpp.WriteString(indent_string())
 	if l, _ := cpp.WriteString(genericsDef); l > 0 {
 		cpp.WriteString(indent_string())
@@ -698,33 +697,30 @@ func gen_struct_ostream(s *ast.Struct) string {
 	return cpp.String()
 }
 
-func gen_struct_generics(s *ast.Struct) (def string, serie string) {
-	if len(s.Generics) == 0 {
+func gen_struct_generics(generics []*ast.GenericType) (def string, serie string) {
+	if len(generics) == 0 {
 		return "", ""
 	}
 	var cppDef strings.Builder
-	cppDef.WriteString("template<typename ")
+	cppDef.WriteString("template<")
 	var cppSerie strings.Builder
 	cppSerie.WriteByte('<')
-	for i := range s.Generics {
-		cppSerie.WriteByte('T')
-		cppSerie.WriteString(strconv.Itoa(i))
+	for _, g := range generics {
+		cppDef.WriteString(g.String())
+		cppDef.WriteByte(',')
+		cppSerie.WriteString(g.OutId())
 		cppSerie.WriteByte(',')
 	}
 	serie = cppSerie.String()[:cppSerie.Len()-1] + ">"
-	cppDef.WriteString(serie[1:])
-	cppDef.WriteByte('\n')
-	return cppDef.String(), serie
+	def = cppDef.String()[:cppDef.Len()-1] + ">\n"
+	return
 }
 
 func gen_struct_operators(s *ast.Struct) string {
 	outid := s.OutId()
-	genericsDef, genericsSerie := gen_struct_generics(s)
+	_, genericsSerie := gen_struct_generics(s.Generics)
 	var cpp strings.Builder
 	cpp.WriteString(indent_string())
-	if l, _ := cpp.WriteString(genericsDef); l > 0 {
-		cpp.WriteString(indent_string())
-	}
 	cpp.WriteString("inline bool operator==(const ")
 	cpp.WriteString(outid)
 	cpp.WriteString(genericsSerie)
@@ -757,9 +753,6 @@ func gen_struct_operators(s *ast.Struct) string {
 	}
 	cpp.WriteString("\n\n")
 	cpp.WriteString(indent_string())
-	if l, _ := cpp.WriteString(genericsDef); l > 0 {
-		cpp.WriteString(indent_string())
-	}
 	cpp.WriteString("inline bool operator!=(const ")
 	cpp.WriteString(outid)
 	cpp.WriteString(genericsSerie)
@@ -867,7 +860,7 @@ func gen_struct_prototype(s *ast.Struct) string {
 	for _, f := range s.Defines.Fns {
 		if f.Used {
 			cpp.WriteString(indent_string())
-			cpp.WriteString(gen_fn_prototype(f, ""))
+			cpp.WriteString(gen_fn_prototype(f, nil))
 			cpp.WriteString("\n\n")
 		}
 	}
@@ -889,12 +882,12 @@ func gen_struct_plain_prototype(s *ast.Struct) string {
 	return cpp.String()
 }
 
-func gen_struct_decl(s *ast.Struct) string {
+func gen_struct_fn_defs(s *ast.Struct) string {
 	var cpp strings.Builder
 	for _, f := range s.Defines.Fns {
 		if f.Used {
 			cpp.WriteString(indent_string())
-			cpp.WriteString(gen_fn_owner(f, s.OutId()))
+			cpp.WriteString(gen_fn_owner(f, s))
 			cpp.WriteString("\n\n")
 		}
 	}
@@ -903,15 +896,19 @@ func gen_struct_decl(s *ast.Struct) string {
 
 func gen_struct(s *ast.Struct) string {
 	var cpp strings.Builder
-	cpp.WriteString(gen_struct_decl(s))
+	cpp.WriteString(gen_struct_fn_defs(s))
 	cpp.WriteString("\n\n")
 	cpp.WriteString(gen_struct_ostream(s))
 	return cpp.String()
 }
 
-func gen_fn_decl_head(f *ast.Fn, owner string) string {
+func gen_fn_decl_head(f *ast.Fn, owner *ast.Struct) string {
 	var cpp strings.Builder
-	cpp.WriteString(gen_generics(f.Generics))
+	generics := f.Generics
+	if owner != nil {
+		generics = append(generics, owner.Generics...)
+	}
+	cpp.WriteString(gen_generics(generics))
 	if cpp.Len() > 0 {
 		cpp.WriteByte('\n')
 		cpp.WriteString(indent_string())
@@ -921,22 +918,24 @@ func gen_fn_decl_head(f *ast.Fn, owner string) string {
 	}
 	cpp.WriteString(f.RetType.String())
 	cpp.WriteByte(' ')
-	if owner != "" {
-		cpp.WriteString(owner)
+	if owner != nil {
+		_, serie := gen_struct_generics(owner.Generics)
+		cpp.WriteString(owner.OutId())
+		cpp.WriteString(serie)
 		cpp.WriteString(lex.KND_DBLCOLON)
 	}
 	cpp.WriteString(f.OutId())
 	return cpp.String()
 }
 
-func gen_fn_head(f *ast.Fn, owner string) string {
+func gen_fn_head(f *ast.Fn, owner *ast.Struct) string {
 	var cpp strings.Builder
 	cpp.WriteString(gen_fn_decl_head(f, owner))
 	cpp.WriteString(gen_params(f.Params))
 	return cpp.String()
 }
 
-func gen_fn_owner(f *ast.Fn, owner string) string {
+func gen_fn_owner(f *ast.Fn, owner *ast.Struct) string {
 	var cpp strings.Builder
 	cpp.WriteString(gen_fn_head(f, owner))
 	cpp.WriteByte(' ')
@@ -958,9 +957,9 @@ func gen_fn_block(vars []*ast.Var, b *ast.Block) string {
 	return cpp.String()
 }
 
-func gen_fn(f *ast.Fn) string { return gen_fn_owner(f, "") }
+func gen_fn(f *ast.Fn) string { return gen_fn_owner(f, nil) }
 
-func gen_fn_prototype(f *ast.Fn, owner string) string {
+func gen_fn_prototype(f *ast.Fn, owner *ast.Struct) string {
 	var cpp strings.Builder
 	cpp.WriteString(gen_fn_decl_head(f, owner))
 	cpp.WriteString(f.PrototypeParams())
@@ -1067,7 +1066,7 @@ func gen_fn_prototypes(dm *ast.Defmap) string {
 	var cpp strings.Builder
 	for _, f := range dm.Fns {
 		if f.Used && f.Token.Id != lex.ID_NA {
-			cpp.WriteString(gen_fn_prototype(f, ""))
+			cpp.WriteString(gen_fn_prototype(f, nil))
 			cpp.WriteByte('\n')
 		}
 	}

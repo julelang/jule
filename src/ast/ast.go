@@ -330,10 +330,14 @@ type GenericType struct {
 	Id    string
 }
 
+func (gt *GenericType) OutId() string {
+	return build.AsId(gt.Id)
+}
+
 func (gt GenericType) String() string {
 	var cpp strings.Builder
 	cpp.WriteString("typename ")
-	cpp.WriteString(build.AsId(gt.Id))
+	cpp.WriteString(gt.OutId())
 	return cpp.String()
 }
 
