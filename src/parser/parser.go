@@ -2227,6 +2227,21 @@ ok:
 
 func (p *Parser) parse_fn_call(f *Fn, args *ast.Args, m *exprModel, errTok lex.Token) (v value) {
 	args.NeedsPureType = p.rootBlock == nil || len(p.rootBlock.Func.Generics) == 0
+	_ = p.checkGenericsQuantity(len(f.Generics), len(args.Generics), errTok)
+	if f.Receiver != nil {
+		switch f.Receiver.Tag.(type) {
+		case *Struct:
+			owner := f.Owner.(*Parser)
+			s := f.Receiver.Tag.(*Struct)
+			generics := s.GetGenerics()
+			if len(generics) > 0 {
+				owner.pushGenerics(s.Generics, generics)
+				if len(f.Generics) == 0 {
+					owner.reload_fn_types(f)
+				}
+			}
+		}
+	}
 	if len(f.Generics) > 0 {
 		params := make([]Param, len(f.Params))
 		for i := range params {
@@ -2258,20 +2273,6 @@ func (p *Parser) parse_fn_call(f *Fn, args *ast.Args, m *exprModel, errTok lex.T
 		}()
 		if !p.parseGenerics(f, args, errTok) {
 			return
-		}
-	} else {
-		_ = p.checkGenericsQuantity(len(f.Generics), len(args.Generics), errTok)
-		if f.Receiver != nil {
-			switch f.Receiver.Tag.(type) {
-			case *Struct:
-				owner := f.Owner.(*Parser)
-				s := f.Receiver.Tag.(*Struct)
-				generics := s.GetGenerics()
-				if len(generics) > 0 {
-					owner.pushGenerics(s.Generics, generics)
-					owner.reload_fn_types(f)
-				}
-			}
 		}
 	}
 	if args == nil {
