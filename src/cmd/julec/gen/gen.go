@@ -718,12 +718,12 @@ func gen_struct_generics(generics []*ast.GenericType) (def string, serie string)
 
 func gen_struct_operators(s *ast.Struct) string {
 	outid := s.OutId()
-	_, genericsSerie := gen_struct_generics(s.Generics)
+	_, generics_serie := gen_struct_generics(s.Generics)
 	var cpp strings.Builder
 	cpp.WriteString(indent_string())
 	cpp.WriteString("inline bool operator==(const ")
 	cpp.WriteString(outid)
-	cpp.WriteString(genericsSerie)
+	cpp.WriteString(generics_serie)
 	cpp.WriteString(" &_Src) {")
 	if len(s.Defines.Globals) > 0 {
 		add_indent()
@@ -755,7 +755,7 @@ func gen_struct_operators(s *ast.Struct) string {
 	cpp.WriteString(indent_string())
 	cpp.WriteString("inline bool operator!=(const ")
 	cpp.WriteString(outid)
-	cpp.WriteString(genericsSerie)
+	cpp.WriteString(generics_serie)
 	cpp.WriteString(" &_Src) { return !this->operator==(_Src); }")
 	return cpp.String()
 }
@@ -904,12 +904,15 @@ func gen_struct(s *ast.Struct) string {
 
 func gen_fn_decl_head(f *ast.Fn, owner *ast.Struct) string {
 	var cpp strings.Builder
-	generics := f.Generics
 	if owner != nil {
-		generics = append(generics, owner.Generics...)
+		n, _ := cpp.WriteString(gen_generics(owner.Generics))
+		if n > 0 {
+			cpp.WriteByte('\n')
+			cpp.WriteString(indent_string())
+		}
 	}
-	cpp.WriteString(gen_generics(generics))
-	if cpp.Len() > 0 {
+	n, _ := cpp.WriteString(gen_generics(f.Generics))
+	if n > 0 {
 		cpp.WriteByte('\n')
 		cpp.WriteString(indent_string())
 	}
