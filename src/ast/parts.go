@@ -20,7 +20,7 @@ func compilerErr(t lex.Token, key string, args ...any) build.Log {
 // Special case is:
 //  Range(i, open, close, toks) = nil if *i > len(toks)
 //  Range(i, open, close, toks) = bil if (toks[i*]) Id != tokens.Brace && Kind != open
-func Range(i *int, open, close string, toks []lex.Token) []lex.Token {
+func Range(i *int, open string, close string, toks []lex.Token) []lex.Token {
 	if *i >= len(toks) {
 		return nil
 	}
@@ -29,18 +29,18 @@ func Range(i *int, open, close string, toks []lex.Token) []lex.Token {
 		return nil
 	}
 	*i++
-	brace_n := 1
+	n := 1
 	start := *i
-	for ; brace_n != 0 && *i < len(toks); *i++ {
+	for ; n != 0 && *i < len(toks); *i++ {
 		tok := toks[*i]
 		if tok.Id != lex.ID_BRACE {
 			continue
 		}
 		switch tok.Kind {
 		case open:
-			brace_n++
+			n++
 		case close:
-			brace_n--
+			n--
 		}
 	}
 	return toks[start : *i-1]

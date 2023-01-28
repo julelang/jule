@@ -65,16 +65,16 @@ func (b *builder) buildNode(toks []lex.Token) {
 		b.Use(toks)
 	case lex.ID_FN, lex.ID_UNSAFE:
 		s := ast.Statement{Token: t}
-		s.Data = b.Fn(toks, false, false, false)
+		s.Data = b.Func(toks, false, false, false)
 		b.Tree = append(b.Tree, ast.Node{Token: s.Token, Data: s})
 	case lex.ID_CONST, lex.ID_LET, lex.ID_MUT:
 		b.GlobalVar(toks)
 	case lex.ID_TYPE:
-		b.Tree = append(b.Tree, b.TypeOrGenerics(toks))
+		b.Tree = append(b.Tree, b.GlobalTypeAlias(toks))
 	case lex.ID_ENUM:
 		b.Enum(toks)
 	case lex.ID_STRUCT:
-		b.Struct(toks)
+		b.Structure(toks)
 	case lex.ID_TRAIT:
 		b.Trait(toks)
 	case lex.ID_IMPL:
@@ -95,7 +95,7 @@ func (b *builder) buildNode(toks []lex.Token) {
 // Build builds AST tree.
 func (b *builder) Build() {
 	for b.Pos != -1 && !b.Ended() {
-		toks := b.nextBuilderSt()
+		toks := b.next_builder_st()
 		b.pub = toks[0].Id == lex.ID_PUB
 		if b.pub {
 			if len(toks) == 1 {
@@ -103,7 +103,7 @@ func (b *builder) Build() {
 					b.pusherr(toks[0], "invalid_syntax")
 					continue
 				}
-				toks = b.nextBuilderSt()
+				toks = b.next_builder_st()
 			} else {
 				toks = toks[1:]
 			}
@@ -271,7 +271,7 @@ func (b *builder) structFields(toks []lex.Token, cpp_linked bool) []*ast.Var {
 	var fields []*ast.Var
 	i := 0
 	for i < len(toks) {
-		var_tokens := b.skipSt(&i, &toks)
+		var_tokens := b.skip_st(&i, &toks)
 		if var_tokens[0].Id == lex.ID_COMMENT {
 			continue
 		}
@@ -301,7 +301,7 @@ func (b *builder) structFields(toks []lex.Token, cpp_linked bool) []*ast.Var {
 	return fields
 }
 
-func (b *builder) parse_struct(toks []lex.Token, cpp_linked bool) ast.Struct {
+func (b *builder) build_struct(toks []lex.Token, cpp_linked bool) ast.Struct {
 	var s ast.Struct
 	s.Pub = b.pub
 	b.pub = false
@@ -309,41 +309,60 @@ func (b *builder) parse_struct(toks []lex.Token, cpp_linked bool) ast.Struct {
 		b.pusherr(toks[0], "invalid_syntax")
 		return s
 	}
-	s.Token = toks[1]
+
+	i := 1
+	s.Token = toks[i]
 	if s.Token.Id != lex.ID_IDENT {
 		b.pusherr(s.Token, "invalid_syntax")
 	}
+	i++
+	if i >= len(toks) {
+		b.pusherr(toks[i], "invalid_syntax")
+		return s
+	}
 	s.Id = s.Token.Kind
-	i := 2
-	bodyToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &toks)
-	if bodyToks == nil {
+
+	generics_toks := ast.Range(&i, lex.KND_LBRACKET, lex.KND_RBRACKET, toks)
+	if generics_toks != nil {
+		s.Generics = b.Generics(generics_toks)
+	}
+	if i >= len(toks) {
+		b.pusherr(toks[i], "invalid_syntax")
+		return s
+	}
+
+	body_toks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &toks)
+	if body_toks == nil {
 		b.pusherr(s.Token, "body_not_exist")
 		return s
 	}
 	if i < len(toks) {
 		b.pusherr(toks[i], "invalid_syntax")
 	}
-	s.Fields = b.structFields(bodyToks, cpp_linked)
+	s.Fields = b.structFields(body_toks, cpp_linked)
 	return s
 }
 
-// Struct builds AST model of structure.
-func (b *builder) Struct(toks []lex.Token) {
-	s := b.parse_struct(toks, false)
+// Structure builds AST model of structure.
+func (b *builder) Structure(toks []lex.Token) {
+	s := b.build_struct(toks, false)
 	b.Tree = append(b.Tree, ast.Node{Token: s.Token, Data: s})
 }
 
-func (b *builder) traitFuncs(toks []lex.Token, trait_id string) []*ast.Fn {
-	var funcs []*ast.Fn
+func (b *builder) traitFns(toks []lex.Token, trait_id string) []*ast.Fn {
+	var fns []*ast.Fn
 	i := 0
 	for i < len(toks) {
-		fnToks := b.skipSt(&i, &toks)
-		f := b.Fn(fnToks, true, false, true)
+		fnToks := b.skip_st(&i, &toks)
+		f := b.Func(fnToks, true, false, true)
+		if len(f.Generics) > 0 {
+			b.pusherr(f.Token, "generics_not_supports")
+		}
 		b.setup_receiver(&f, trait_id)
 		f.Pub = true
-		funcs = append(funcs, &f)
+		fns = append(fns, &f)
 	}
-	return funcs
+	return fns
 }
 
 // Trait builds AST model of trait.
@@ -369,17 +388,17 @@ func (b *builder) Trait(toks []lex.Token) {
 	if i < len(toks) {
 		b.pusherr(toks[i], "invalid_syntax")
 	}
-	t.Funcs = b.traitFuncs(bodyToks, t.Id)
+	t.Funcs = b.traitFns(bodyToks, t.Id)
 	b.Tree = append(b.Tree, ast.Node{Token: t.Token, Data: t})
 }
 
-func (b *builder) implTraitFuncs(impl *ast.Impl, toks []lex.Token) {
+func (b *builder) implTraitFns(impl *ast.Impl, toks []lex.Token) {
 	pos, btoks := b.Pos, make([]lex.Token, len(b.Tokens))
 	copy(btoks, b.Tokens)
 	b.Pos = 0
 	b.Tokens = toks
 	for b.Pos != -1 && !b.Ended() {
-		fnToks := b.nextBuilderSt()
+		fnToks := b.next_builder_st()
 		tok := fnToks[0]
 		switch tok.Id {
 		case lex.ID_COMMENT:
@@ -404,18 +423,12 @@ func (b *builder) implStruct(impl *ast.Impl, toks []lex.Token) {
 	b.Pos = 0
 	b.Tokens = toks
 	for b.Pos != -1 && !b.Ended() {
-		fnToks := b.nextBuilderSt()
+		fnToks := b.next_builder_st()
 		tok := fnToks[0]
 		pub := false
 		switch tok.Id {
 		case lex.ID_COMMENT:
 			impl.Tree = append(impl.Tree, b.Comment(tok))
-			continue
-		case lex.ID_TYPE:
-			impl.Tree = append(impl.Tree, ast.Node{
-				Token: tok,
-				Data:  b.Generics(fnToks),
-			})
 			continue
 		}
 		if tok.Id == lex.ID_PUB {
@@ -456,7 +469,7 @@ func (b *builder) get_method(toks []lex.Token) *ast.Fn {
 		return nil
 	}
 	f := new(ast.Fn)
-	*f = b.Fn(toks, true, false, false)
+	*f = b.Func(toks, true, false, false)
 	f.IsUnsafe = tok.Id == lex.ID_UNSAFE
 	if f.Block != nil {
 		f.Block.IsUnsafe = f.IsUnsafe
@@ -466,7 +479,7 @@ func (b *builder) get_method(toks []lex.Token) *ast.Fn {
 
 func (b *builder) implFuncs(impl *ast.Impl, toks []lex.Token) {
 	if impl.Target.Id != types.VOID {
-		b.implTraitFuncs(impl, toks)
+		b.implTraitFns(impl, toks)
 		return
 	}
 	b.implStruct(impl, toks)
@@ -538,7 +551,7 @@ func (b *builder) link_fn(toks []lex.Token) {
 	var link ast.CppLinkFn
 	link.Token = tok
 	link.Link = new(ast.Fn)
-	*link.Link = b.Fn(toks[1:], false, false, true)
+	*link.Link = b.Func(toks[1:], false, false, true)
 	b.Tree = append(b.Tree, ast.Node{Token: tok, Data: link})
 
 	b.pub = bpub
@@ -571,7 +584,7 @@ func (b *builder) link_struct(toks []lex.Token) {
 
 	var link ast.CppLinkStruct
 	link.Token = tok
-	link.Link = b.parse_struct(toks[1:], true)
+	link.Link = b.build_struct(toks[1:], true)
 	b.Tree = append(b.Tree, ast.Node{Token: tok, Data: link})
 
 	b.pub = bpub
@@ -815,19 +828,31 @@ func (b *builder) fn_prototype(toks []lex.Token, i *int, method, anon bool) (f a
 		f.Id = tok.Kind
 		*i++
 	}
+
 	f.RetType.Type.Id = types.VOID
 	f.RetType.Type.Kind = types.TYPE_MAP[f.RetType.Type.Id]
 	if *i >= len(toks) {
 		b.pusherr(f.Token, "invalid_syntax")
 		return
-	} else if toks[*i].Kind != lex.KND_LPAREN {
+	}
+
+	generics_toks := ast.Range(i, lex.KND_LBRACKET, lex.KND_RBRACKET, toks)
+	if generics_toks != nil {
+		f.Generics = b.Generics(generics_toks)
+		if len(f.Generics) > 0 {
+			f.Combines = new([][]ast.Type)
+		}
+	}
+
+	if toks[*i].Kind != lex.KND_LPAREN {
 		b.pusherr(toks[*i], "missing_function_parentheses")
 		return
 	}
-	paramToks := b.getrange(i, lex.KND_LPAREN, lex.KND_RPARENT, &toks)
-	if len(paramToks) > 0 {
-		f.Params = b.Params(paramToks, method, false)
+	params_toks := b.getrange(i, lex.KND_LPAREN, lex.KND_RPARENT, &toks)
+	if len(params_toks) > 0 {
+		f.Params = b.Params(params_toks, method, false)
 	}
+
 	t, ret_ok := b.FnRetDataType(toks, i)
 	if ret_ok {
 		f.RetType = t
@@ -836,8 +861,8 @@ func (b *builder) fn_prototype(toks []lex.Token, i *int, method, anon bool) (f a
 	return
 }
 
-// Fn builds AST model of function.
-func (b *builder) Fn(toks []lex.Token, method, anon, prototype bool) (f ast.Fn) {
+// Func builds AST model of function.
+func (b *builder) Func(toks []lex.Token, method, anon, prototype bool) (f ast.Fn) {
 	var ok bool
 	i := 0
 	f, ok = b.fn_prototype(toks, &i, method, anon)
@@ -853,9 +878,9 @@ func (b *builder) Fn(toks []lex.Token, method, anon, prototype bool) (f ast.Fn) 
 		b.pusherr(f.Token, "body_not_exist")
 		return
 	}
-	blockToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &toks)
-	if blockToks != nil {
-		f.Block = b.Block(blockToks)
+	block_toks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &toks)
+	if block_toks != nil {
+		f.Block = b.Block(block_toks)
 		f.Block.IsUnsafe = f.IsUnsafe
 		if i < len(toks) {
 			b.pusherr(toks[i], "invalid_syntax")
@@ -867,11 +892,11 @@ func (b *builder) Fn(toks []lex.Token, method, anon, prototype bool) (f ast.Fn) 
 	return
 }
 
-func (b *builder) generic(toks []lex.Token) ast.GenericType {
+func (b *builder) generic(toks []lex.Token) *ast.GenericType {
 	if len(toks) > 1 {
 		b.pusherr(toks[1], "invalid_syntax")
 	}
-	var gt ast.GenericType
+	gt := new(ast.GenericType)
 	gt.Token = toks[0]
 	if gt.Token.Id != lex.ID_IDENT {
 		b.pusherr(gt.Token, "invalid_syntax")
@@ -881,19 +906,15 @@ func (b *builder) generic(toks []lex.Token) ast.GenericType {
 }
 
 // Generic builds generic type.
-func (b *builder) Generics(toks []lex.Token) []ast.GenericType {
+func (b *builder) Generics(toks []lex.Token) []*ast.GenericType {
 	tok := toks[0]
-	i := 1
-	genericsToks := ast.Range(&i, lex.KND_LBRACKET, lex.KND_RBRACKET, toks)
-	if len(genericsToks) == 0 {
+	if len(toks) == 0 {
 		b.pusherr(tok, "missing_expr")
-		return make([]ast.GenericType, 0)
-	} else if i < len(toks) {
-		b.pusherr(toks[i], "invalid_syntax")
+		return nil
 	}
-	parts, errs := ast.Parts(genericsToks, lex.ID_COMMA, true)
+	parts, errs := ast.Parts(toks, lex.ID_COMMA, true)
 	b.Errors = append(b.Errors, errs...)
-	generics := make([]ast.GenericType, len(parts))
+	generics := make([]*ast.GenericType, len(parts))
 	for i, part := range parts {
 		if len(parts) == 0 {
 			continue
@@ -903,25 +924,12 @@ func (b *builder) Generics(toks []lex.Token) []ast.GenericType {
 	return generics
 }
 
-// TypeOrGenerics builds type alias or generics type declaration.
-func (b *builder) TypeOrGenerics(toks []lex.Token) ast.Node {
-	if len(toks) > 1 {
-		tok := toks[1]
-		if tok.Id == lex.ID_BRACE && tok.Kind == lex.KND_LBRACKET {
-			generics := b.Generics(toks)
-			return ast.Node{
-				Token: tok,
-				Data:  generics,
-			}
-		}
-	}
+// GlobalTypeAlias builds global type alias.
+func (b *builder) GlobalTypeAlias(toks []lex.Token) ast.Node {
 	t := b.TypeAlias(toks)
 	t.Pub = b.pub
 	b.pub = false
-	return ast.Node{
-		Token: t.Token,
-		Data:  t,
-	}
+	return ast.Node{Token: t.Token, Data: t}
 }
 
 // GlobalVar builds AST model of global variable.
@@ -2331,24 +2339,24 @@ func (b *builder) getrange(i *int, open, close string, toks *[]lex.Token) []lex.
 		return nil
 	}
 	*i = 0
-	*toks = b.nextBuilderSt()
+	*toks = b.next_builder_st()
 	rang = ast.Range(i, open, close, *toks)
 	return rang
 }
 
-func (b *builder) skipSt(i *int, toks *[]lex.Token) []lex.Token {
+func (b *builder) skip_st(i *int, toks *[]lex.Token) []lex.Token {
 	start := *i
 	*i, _ = ast.NextStPos(*toks, start)
 	stoks := (*toks)[start:*i]
 	if stoks[len(stoks)-1].Id == lex.ID_SEMICOLON {
 		if len(stoks) == 1 {
-			return b.skipSt(i, toks)
+			return b.skip_st(i, toks)
 		}
 		stoks = stoks[:len(stoks)-1]
 	}
 	return stoks
 }
 
-func (b *builder) nextBuilderSt() []lex.Token {
-	return b.skipSt(&b.Pos, &b.Tokens)
+func (b *builder) next_builder_st() []lex.Token {
+	return b.skip_st(&b.Pos, &b.Tokens)
 }

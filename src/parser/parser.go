@@ -37,7 +37,6 @@ type Parser struct {
 	wg               sync.WaitGroup
 	rootBlock        *ast.Block
 	nodeBlock        *ast.Block
-	generics         []*GenericType
 	blockTypes       []*TypeAlias
 	blockVars        []*Var
 	waitingImpls     []*ast.Impl
@@ -352,8 +351,6 @@ func (p *Parser) parseSrcTreeNode(node ast.Node) {
 		p.St(node_t)
 	case TypeAlias:
 		p.Type(node_t)
-	case []GenericType:
-		p.Generics(node_t)
 	case Enum:
 		p.Enum(node_t)
 	case Struct:
@@ -386,7 +383,6 @@ func (p *Parser) parseSrcTree(tree []ast.Node) {
 		p.parseSrcTreeNode(node)
 		p.checkDoc(node)
 		p.checkAttribute(node)
-		p.checkGenerics(node)
 	}
 }
 
@@ -507,36 +503,20 @@ func (p *Parser) checkAttribute(node ast.Node) {
 	p.attributes = nil
 }
 
-func (p *Parser) checkGenerics(node ast.Node) {
-	if p.generics == nil {
-		return
-	}
-	switch node.Data.(type) {
-	case ast.Attribute, ast.Comment, []GenericType:
-		return
-	}
-	p.pusherrtok(node.Token, "generics_not_supports")
-	p.generics = nil
-}
-
-// Generics parses generics.
-func (p *Parser) Generics(generics []GenericType) {
-	for i, gen := range generics {
-		if lex.IsIgnoreId(gen.Id) {
-			p.pusherrtok(gen.Token, "ignore_id")
+func (p *Parser) check_generics(types []*GenericType) {
+	for i, t := range types {
+		if lex.IsIgnoreId(t.Id) {
+			p.pusherrtok(t.Token, "ignore_id")
 			continue
 		}
-		for j, cgen := range generics {
+		for j, ct := range types {
 			if j >= i {
 				break
-			} else if gen.Id == cgen.Id {
-				p.pusherrtok(gen.Token, "exist_id", gen.Id)
+			} else if t.Id == ct.Id {
+				p.pusherrtok(t.Token, "exist_id", t.Id)
 				break
 			}
 		}
-		g := new(GenericType)
-		*g = gen
-		p.generics = append(p.generics, g)
 	}
 }
 
@@ -747,13 +727,12 @@ func (p *Parser) make_struct(model ast.Struct) *Struct {
 	//s.Traits = new([]*trait)
 	//s.depends = new([]*structure)
 	s.Owner = p
-	s.Generics = p.generics
-	p.generics = nil
 	s.Attributes = p.attributes
 	p.attributes = nil
 	s.Defines = new(ast.Defmap)
 	s.Constructor = make_constructor(s)
 	s.Origin = s
+	p.check_generics(s.Generics)
 	return s
 }
 
@@ -783,10 +762,9 @@ func (p *Parser) LinkFn(link ast.CppLinkFn) {
 	}
 	linkf := link.Link
 	linkf.Owner = p
-	setGenerics(linkf, p.generics)
-	p.generics = nil
 	linkf.Attributes = p.attributes
 	p.attributes = nil
+	p.check_generics(linkf.Generics)
 	p.linked_functions = append(p.linked_functions, linkf)
 }
 
@@ -929,7 +907,7 @@ func (p *Parser) implTrait(model *ast.Impl) {
 	}
 }
 
-func (p *Parser) addImplGenerics(s *ast.Struct, types []GenericType) {
+func (p *Parser) check_impl_generics(s *ast.Struct, types []*GenericType) {
 	if len(s.Generics) > 0 {
 		for _, t := range types {
 			for _, g := range s.Generics {
@@ -940,7 +918,7 @@ func (p *Parser) addImplGenerics(s *ast.Struct, types []GenericType) {
 			}
 		}
 	}
-	p.Generics(types)
+	p.check_generics(types)
 }
 
 func (p *Parser) implStruct(model *ast.Impl) {
@@ -954,8 +932,6 @@ func (p *Parser) implStruct(model *ast.Impl) {
 	}
 	for _, node := range model.Tree {
 		switch node_t := node.Data.(type) {
-		case []GenericType:
-			p.addImplGenerics(s, node_t)
 		case ast.Comment:
 			p.Comment(node_t)
 		case *Fn:
@@ -973,10 +949,9 @@ func (p *Parser) implStruct(model *ast.Impl) {
 			sf.Owner = p
 			p.doc_text.Reset()
 			p.attributes = nil
-			setGenerics(sf, p.generics)
-			p.generics = nil
 			_ = p.check_param_dup(sf.Params)
 			p.check_ret_variables(sf)
+			p.check_impl_generics(s, sf.Generics)
 			for _, generic := range node_t.Generics {
 				if types.FindGeneric(generic.Id, s.Generics) != nil {
 					p.pusherrtok(generic.Token, "exist_id", generic.Id)
@@ -1179,13 +1154,6 @@ func (p *Parser) check_ret_variables(f *Fn) {
 	}
 }
 
-func setGenerics(f *Fn, generics []*ast.GenericType) {
-	f.Generics = generics
-	if len(f.Generics) > 0 {
-		f.Combines = new([][]ast.Type)
-	}
-}
-
 // Func parse Jule function.
 func (p *Parser) Func(ast Fn) {
 	_, tok, canshadow := p.defined_by_id(ast.Id)
@@ -1201,8 +1169,7 @@ func (p *Parser) Func(ast Fn) {
 	f.Owner = p
 	f.Doc = p.doc_text.String()
 	p.doc_text.Reset()
-	setGenerics(f, p.generics)
-	p.generics = nil
+	p.check_generics(ast.Generics)
 	p.check_ret_variables(f)
 	_ = p.check_param_dup(f.Params)
 	f.Used = f.Id == jule.INIT_FN

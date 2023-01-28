@@ -242,6 +242,16 @@ func (f *Fn) IsConstructor() bool {
 
 func (f *Fn) plainTypeString() string {
 	var s strings.Builder
+	if len(f.Generics) > 0 {
+		s.WriteByte('[')
+		for i, t := range f.Generics {
+			s.WriteString(t.Id)
+			if i+1 < len(f.Generics) {
+				s.WriteByte(',')
+			}
+		}
+		s.WriteByte(']')
+	}
 	s.WriteByte('(')
 	n := len(f.Params)
 	if f.Receiver != nil {
