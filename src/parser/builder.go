@@ -355,9 +355,6 @@ func (b *builder) traitFns(toks []lex.Token, trait_id string) []*ast.Fn {
 	for i < len(toks) {
 		fnToks := b.skip_st(&i, &toks)
 		f := b.Func(fnToks, true, false, true)
-		if len(f.Generics) > 0 {
-			b.pusherr(f.Token, "generics_not_supports")
-		}
 		b.setup_receiver(&f, trait_id)
 		f.Pub = true
 		fns = append(fns, &f)

@@ -95,7 +95,6 @@ var ERRORS = map[string]string{
 	`more_args_with_variadiced`:                `variadic argument can't use with more argument`,
 	`type_not_supports_casting`:                `%s data-type not supports casting`,
 	`type_not_supports_casting_to`:             `%s data-type not supports casting to %s data-type`,
-	`generics_not_supports`:                    `generics is not supports by define`,
 	`use_at_content`:                           `use declaration must be start of source code`,
 	`use_not_found`:                            `used directory path not found/access: %s`,
 	`use_has_errors`:                           `used package has errors`,
