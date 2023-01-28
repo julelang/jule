@@ -3409,6 +3409,10 @@ func (p *Parser) typeSourceIsEnum(e *Enum, tag any) (dt Type, _ bool) {
 
 func (p *Parser) typeSourceIsFn(dt Type, err bool) (Type, bool) {
 	f := dt.Tag.(*Fn)
+	if len(f.Generics) > 0 {
+		p.pusherrtok(dt.Token, "genericed_fn_as_anonymous_fn")
+		return dt, false
+	}
 	p.reload_fn_types(f)
 	dt.Kind = f.TypeKind()
 	return dt, true
