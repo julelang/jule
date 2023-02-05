@@ -205,10 +205,6 @@ func (p *Parser) pushSelects(u *ast.UseDecl, selectors []lex.Token) (addNs bool)
 }
 
 func (p *Parser) pushUse(use *ast.UseDecl, selectors []lex.Token) {
-	dm, ok := std_builtin_defines[use.LinkString]
-	if ok {
-		dm.PushDefines(use.Defines)
-	}
 	if use.FullUse {
 		if p.Defines.Side == nil {
 			p.Defines.Side = new(ast.Defmap)
@@ -264,6 +260,10 @@ func (p *Parser) compilePureUse(ast *ast.UseDecl) (_ *ast.UseDecl, hassErr bool)
 		path := filepath.Join(ast.Path, name)
 		psub := New(path)
 		psub.Used = p.Used
+		dm, ok := std_builtin_defines[ast.LinkString]
+		if ok {
+			dm.PushDefines(psub.Defines)
+		}
 		psub.SetupPackage()
 		psub.Parsef(false, false)
 		psub.WrapPackage()
@@ -1872,7 +1872,7 @@ func (p *Parser) parse_fn(f *Fn) (err bool) {
 func (p *Parser) check_fns() {
 	err := false
 	check := func(f *Fn) {
-		if len(f.Generics) > 0 {
+		if f.BuiltinCaller != nil || len(f.Generics) > 0 {
 			return
 		}
 		p.check_fn_special_cases(f)

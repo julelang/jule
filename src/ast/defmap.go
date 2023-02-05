@@ -207,6 +207,7 @@ func (dm *Defmap) FindById(id string, f *lex.File) (int, *Defmap, byte) {
 	return -1, nil, ' '
 }
 
+// PushDefines pushes defines to destination Defmap.
 func (dm *Defmap) PushDefines(dest *Defmap) {
 	dest.Types = append(dest.Types, dm.Types...)
 	dest.Traits = append(dest.Traits, dm.Traits...)
