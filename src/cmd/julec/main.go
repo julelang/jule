@@ -204,6 +204,7 @@ func append_standard(obj_code *string) {
 	sb.WriteString("\"\n\n")
 	sb.WriteString(*obj_code)
 	sb.WriteString(`
+
 int main(int argc, char *argv[]) {
 #ifdef _WINDOWS
 	// Windows needs little magic for UTF-8
@@ -213,7 +214,7 @@ int main(int argc, char *argv[]) {
 	std::set_terminate( &__julec_terminate_handler );
 	__julec_setup_command_line_args( argc , argv );
 	__julec_call_package_initializers();
-	JULEC_ID( main() );
+	JULEC_ID( main )();
 		
 	return ( EXIT_SUCCESS );
 }`)
