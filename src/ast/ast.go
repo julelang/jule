@@ -583,7 +583,8 @@ func (p Param) String() string {
 func (p *Param) Prototype() string {
 	var cpp strings.Builder
 	if p.Variadic {
-		cpp.WriteString("slice<")
+		cpp.WriteString(build.AsTypeId("slice"))
+		cpp.WriteByte('<')
 		cpp.WriteString(p.Type.String())
 		cpp.WriteByte('>')
 	} else {

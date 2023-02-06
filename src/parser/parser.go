@@ -1279,11 +1279,7 @@ func (p *Parser) varsFromParams(f *Fn) []*Var {
 			if length-i > 1 {
 				p.pusherrtok(param.Token, "variadic_parameter_not_last")
 			}
-			v.Type.Original = nil
-			v.Type.ComponentType = new(ast.Type)
-			*v.Type.ComponentType = param.Type
-			v.Type.Id = types.SLICE
-			v.Type.Kind = lex.PREFIX_SLICE + v.Type.Kind
+			v.Type = types.VariadicToSlice(param.Type)
 		}
 		vars[i] = v
 	}
@@ -1782,15 +1778,6 @@ func (p *Parser) checkParamDefaultExpr(f *Fn, param *Param) {
 			p.checkParamDefaultExprWithDefault(param)
 			return
 		}
-	}
-	dt := param.Type
-	if param.Variadic {
-		dt.Id = types.SLICE
-		dt.Kind = lex.PREFIX_SLICE + dt.Kind
-		dt.ComponentType = new(ast.Type)
-		*dt.ComponentType = param.Type
-		dt.Original = nil
-		dt.Pure = true
 	}
 	v, model := p.evalExpr(param.Default, nil)
 	param.Default.Model = model
