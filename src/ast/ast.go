@@ -1126,7 +1126,7 @@ func (dt *Type) FnString() string {
 	var cpp strings.Builder
 	cpp.WriteString(build.AsTypeId("fn"))
 	cpp.WriteByte('<')
-	cpp.WriteString("<std::function<")
+	cpp.WriteString("std::function<")
 	f := dt.Tag.(*Fn)
 	f.RetType.Type.Pure = dt.Pure
 	cpp.WriteString(f.RetType.String())
