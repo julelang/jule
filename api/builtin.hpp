@@ -41,6 +41,9 @@ struct JULEC_ID(Error) {
     virtual str_jt error(void) { return {}; }
 
     virtual ~JULEC_ID(Error)(void) noexcept {}
+
+    bool operator==(const JULEC_ID( Error ) &_Src) { return false; }
+    bool operator!=(const JULEC_ID( Error ) &_Src) { return !this->operator==(_Src); }
 };
 
 template<typename _Item_t>

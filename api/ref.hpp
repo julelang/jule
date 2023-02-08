@@ -15,12 +15,13 @@ struct ref_jt;
 
 template<typename T>
 struct ref_jt {
-    T *_alloc{ nil };
+    mutable T *_alloc{ nil };
     mutable uint_jt *_ref{ nil };
 
-    ref_jt<T>(void) noexcept: ref_jt<T>(T()) {}
+    ref_jt<T>(const std::nullptr_t) noexcept {}
 
-    ref_jt<T>(std::nullptr_t) noexcept {}
+    ref_jt<T>(const ref_jt<T> &_Ref) noexcept
+    { this->operator=( _Ref ); }
 
     ref_jt<T>(T *_Ptr, uint_jt *_Ref) noexcept {
         this->_alloc = _Ptr;
@@ -46,9 +47,6 @@ struct ref_jt {
         *this->_alloc = _Instance;
     }
 
-    ref_jt<T>(const ref_jt<T> &_Ref) noexcept
-    { this->operator=( _Ref ); }
-
     ~ref_jt<T>(void) noexcept
     { this->__drop(); }
 
@@ -61,7 +59,7 @@ struct ref_jt {
     inline uint_jt __get_ref_n(void) const noexcept
     { return ( __julec_atomic_load ( this->_ref ) ); }
 
-    void __drop(void) noexcept {
+    void __drop(void) const noexcept {
         if (!this->_ref)
         { return; }
         if ( ( this->__drop_ref() ) != __JULEC_REFERENCE_DELTA )
@@ -75,11 +73,20 @@ struct ref_jt {
     inline T *operator->(void) noexcept
     { return ( this->_alloc ); }
 
-    inline operator T(void) const noexcept
-    { return ( *this->_alloc ); }
+    inline operator T(void) const noexcept {
+        this->__must_ok();
+        return ( *this->_alloc );
+    }
 
-    inline operator T&(void) noexcept
-    { return ( *this->_alloc ); }
+    inline operator T&(void) noexcept {
+        this->__must_ok();
+        return ( *this->_alloc );
+    }
+
+    inline void __must_ok(void) const noexcept {
+        if (this->operator==( nil ))
+        { JULEC_ID(panic)( __JULEC_ERROR_INVALID_MEMORY ); }
+    }
 
     void operator=(const ref_jt<T> &_Ref) noexcept {
         this->__drop();
@@ -89,19 +96,39 @@ struct ref_jt {
         this->_alloc = _Ref._alloc;
     }
 
-    inline void operator=(const T &_Val) const noexcept
-    { ( *this->_alloc ) = ( _Val ); }
+    inline void operator=(const T &_Val) const noexcept {
+        this->__must_ok();
+        ( *this->_alloc ) = ( _Val );
+    }
 
-    inline bool operator==(const ref_jt<T> &_Ref) const noexcept
-    { return ( ( *this->_alloc ) == ( *_Ref._alloc ) ); }
+    inline bool operator==(const T &_Val) const noexcept
+    { return ( this->_alloc == nil ? false : *this->_alloc == _Val ); }
+
+    inline bool operator!=(const T &_Val) const noexcept
+    { return ( !this->operator==( _Val ) ); }
+
+    inline bool operator==(const ref_jt<T> &_Ref) const noexcept {
+        if ( this->_alloc == nil ) { return _Ref._alloc == nil; }
+        if ( _Ref._alloc == nil ) { return false; }
+        return ( ( *this->_alloc ) == ( *_Ref._alloc ) );
+    }
 
     inline bool operator!=(const ref_jt<T> &_Ref) const noexcept
     { return ( !this->operator==( _Ref ) ); }
 
+    inline bool operator==(const std::nullptr_t) const noexcept
+    { return ( this->_alloc == nil ); }
+
+    inline bool operator!=(const std::nullptr_t) const noexcept
+    { return ( !this->operator==( nullptr ) ); }
+
     friend inline
     std::ostream &operator<<(std::ostream &_Stream,
-                             const ref_jt<T> &_Ref) noexcept
-    { return ( _Stream << _Ref.operator T() ); }
+                             const ref_jt<T> &_Ref) noexcept {
+        if ( _Ref == nil ) { _Stream << "nil"; }
+        else { _Stream << _Ref.operator T(); }
+        return ( _Stream );
+    }
 };
 
 #endif // #ifndef __JULEC_REF_HPP
