@@ -394,12 +394,7 @@ func IsPure(t Type) bool {
 }
 
 func ValidForRef(t Type) bool {
-	return !(IsTrait(t) ||
-		IsEnum(t) ||
-		IsPtr(t) ||
-		IsRef(t) ||
-		IsSlice(t) ||
-		IsArray(t))
+	return !(IsEnum(t) || IsPtr(t) || IsRef(t) || IsArray(t))
 }
 
 func IsMut(t Type) bool {
