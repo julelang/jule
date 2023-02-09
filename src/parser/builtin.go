@@ -344,10 +344,9 @@ var out_fn = &Fn{
 	}},
 }
 
-var make_fn = &Fn{
-	Pub: true,
-	Id:  "make",
-}
+var make_fn = &Fn{Pub: true, Id: "make"}
+var drop_fn = &Fn{Pub: true, Id: "drop"}
+var real_fn = &Fn{Pub: true, Id: "real"}
 
 var outln_fn *Fn
 
@@ -373,6 +372,8 @@ var Builtin = &ast.Defmap{
 		panicFunc,
 		recoverFunc,
 		make_fn,
+		drop_fn,
+		real_fn,
 		{
 			Pub:   true,
 			Id:    "new",
@@ -651,6 +652,10 @@ func init() {
 	// Setup make function
 	make_fn.BuiltinCaller = caller_make
 
+	// Setup reference functions
+	drop_fn.BuiltinCaller = caller_drop
+	real_fn.BuiltinCaller = caller_real
+
 	// Setup new function
 	fn_new, _, _ := Builtin.FnById("new", nil)
 	fn_new.BuiltinCaller = caller_new
@@ -735,6 +740,56 @@ func caller_make(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 		p.pusherrtok(errtok, "invalid_type")
 	}
 	return
+}
+
+func caller_drop(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
+	errtok := data.args[0]
+	args := p.get_args(data.args, false)
+	if len(args.Src) < 1 {
+		p.pusherrtok(errtok, "missing_expr_for", "ref")
+		return
+	} else if len(args.Src) > 1 {
+		p.pusherrtok(errtok, "argument_overflow")
+	}
+	ref_expr := args.Src[0].Expr
+	ref_v, ref_expr_model := p.evalExpr(ref_expr, nil)
+	if (!types.IsRef(ref_v.data.Type)) {
+		p.pusherrtok(errtok, "invalid_type")
+		return
+	}
+	v.data.Type.Id = types.VOID
+	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+	v.data.Value = " "
+	m.nodes[m.index].nodes[0] = nil
+	m.append_sub(exprNode{"("})
+	m.append_sub(ref_expr_model)
+	m.append_sub(exprNode{").drop()"})
+	return v
+}
+
+func caller_real(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
+	errtok := data.args[0]
+	args := p.get_args(data.args, false)
+	if len(args.Src) < 1 {
+		p.pusherrtok(errtok, "missing_expr_for", "ref")
+		return
+	} else if len(args.Src) > 1 {
+		p.pusherrtok(errtok, "argument_overflow")
+	}
+	ref_expr := args.Src[0].Expr
+	ref_v, ref_expr_model := p.evalExpr(ref_expr, nil)
+	if (!types.IsRef(ref_v.data.Type)) {
+		p.pusherrtok(errtok, "invalid_type")
+		return
+	}
+	v.data.Type.Id = types.VOID
+	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+	v.data.Value = " "
+	m.nodes[m.index].nodes[0] = nil
+	m.append_sub(exprNode{"("})
+	m.append_sub(ref_expr_model)
+	m.append_sub(exprNode{").drop()"})
+	return v
 }
 
 func caller_new(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {

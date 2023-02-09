@@ -12,7 +12,7 @@ struct trait_jt;
 template<typename T>
 struct trait_jt {
 public:
-    ref_jt<T> _data{ nil };
+    ref_jt<T> _data{};
     const char *type_id { nil };
 
     trait_jt<T>(void) noexcept {}
@@ -24,7 +24,7 @@ public:
         if (!_alloc)
         { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
         *_alloc = _Data;
-        this->_data = ref_jt<T>( (T*)( _alloc ) );
+        this->_data = ref_jt<T>::make( (T*)( _alloc ) );
         this->type_id = typeid( _Data ).name();
     }
 
@@ -39,7 +39,7 @@ public:
     { this->operator=( _Src ); }
 
     void __dealloc(void) noexcept
-    { this->_data.__drop(); }
+    { this->_data.drop(); }
 
     inline void __must_ok(void) noexcept {
         if (this->operator==( nil ))

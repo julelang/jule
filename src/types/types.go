@@ -414,8 +414,7 @@ func IsNilCompatible(t Type) bool {
 		IsPtr(t) ||
 		IsSlice(t) ||
 		IsTrait(t) ||
-		IsMap(t) ||
-		IsRef(t)
+		IsMap(t)
 }
 
 func IsLvalue(t Type) bool {

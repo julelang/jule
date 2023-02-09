@@ -10,7 +10,7 @@ struct any_jt;
 
 struct any_jt {
 public:
-    ref_jt<void*> _data{ nil };
+    ref_jt<void*> _data{};
     const char *_type_id{ nil };
 
     any_jt(void) noexcept {}
@@ -67,7 +67,7 @@ public:
         { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
         *_alloc = _Expr;
         *_main_alloc = ( (void*)(_alloc) );
-        this->_data = ref_jt<void*>( _main_alloc );
+        this->_data = ref_jt<void*>::make( _main_alloc );
         this->_type_id = typeid(_Expr).name();
     }
 

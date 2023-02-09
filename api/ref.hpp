@@ -18,37 +18,43 @@ struct ref_jt {
     mutable T *_alloc{ nil };
     mutable uint_jt *_ref{ nil };
 
-    ref_jt<T>(const std::nullptr_t) noexcept {}
+    static ref_jt<T> make(T *_Ptr, uint_jt *_Ref) noexcept {
+        ref_jt<T> _buffer;
+        _buffer._alloc = _Ptr;
+        _buffer._ref = _Ref;
+        return ( _buffer );
+    }
 
-    ref_jt<T>(const ref_jt<T> &_Ref) noexcept
+    static ref_jt<T> make(T *_Ptr) noexcept {
+        ref_jt<T> _buffer;
+        _buffer._ref = ( new( std::nothrow ) uint_jt );
+        if (!_buffer._ref)
+        { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
+        *_buffer._ref = 1;
+        _buffer._alloc = _Ptr;
+        return ( _buffer );
+    }
+
+    static ref_jt<T> make(const T &_Instance) noexcept {
+        ref_jt<T> _buffer;
+        _buffer._alloc = ( new( std::nothrow ) T );
+        if (!_buffer._alloc)
+        { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
+        _buffer._ref = ( new( std::nothrow ) uint_jt );
+        if (!_buffer._ref)
+        { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
+        *_buffer._ref = __JULEC_REFERENCE_DELTA;
+        *_buffer._alloc = _Instance;
+        return ( _buffer );
+    }
+
+    ref_jt<T>(void) noexcept {}
+
+    ref_jt<T> (const ref_jt<T> &_Ref) noexcept
     { this->operator=( _Ref ); }
 
-    ref_jt<T>(T *_Ptr, uint_jt *_Ref) noexcept {
-        this->_alloc = _Ptr;
-        this->_ref = _Ref;
-    }
-
-    ref_jt<T>(T *_Ptr) noexcept {
-        this->_ref = ( new( std::nothrow ) uint_jt );
-        if (!this->_ref)
-        { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
-        *this->_ref = 1;
-        this->_alloc = _Ptr;
-    }
-
-    ref_jt<T>(const T &_Instance) noexcept {
-        this->_alloc = ( new( std::nothrow ) T );
-        if (!this->_alloc)
-        { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
-        this->_ref = ( new( std::nothrow ) uint_jt );
-        if (!this->_ref)
-        { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
-        *this->_ref = __JULEC_REFERENCE_DELTA;
-        *this->_alloc = _Instance;
-    }
-
     ~ref_jt<T>(void) noexcept
-    { this->__drop(); }
+    { this->drop(); }
 
     inline int_jt __drop_ref(void) const noexcept
     { return ( __julec_atomic_add ( this->_ref, -__JULEC_REFERENCE_DELTA ) ); }
@@ -59,16 +65,24 @@ struct ref_jt {
     inline uint_jt __get_ref_n(void) const noexcept
     { return ( __julec_atomic_load ( this->_ref ) ); }
 
-    void __drop(void) const noexcept {
-        if (!this->_ref)
-        { return; }
-        if ( ( this->__drop_ref() ) != __JULEC_REFERENCE_DELTA )
-        { return; }
+    void drop(void) const noexcept {
+        if (!this->_ref) {
+            this->_alloc = nil;
+            return;
+        }
+        if ( ( this->__drop_ref() ) != __JULEC_REFERENCE_DELTA ) {
+            this->_ref = nil;
+            this->_alloc = nil;
+            return;
+        }
         delete this->_ref;
         this->_ref = nil;
         delete this->_alloc;
         this->_alloc = nil;
     }
+
+    inline bool real() const noexcept
+    { return ( this->_alloc != nil ); }
 
     inline T *operator->(void) noexcept
     { return ( this->_alloc ); }
@@ -84,12 +98,12 @@ struct ref_jt {
     }
 
     inline void __must_ok(void) const noexcept {
-        if (this->operator==( nil ))
+        if ( !this->real() )
         { JULEC_ID(panic)( __JULEC_ERROR_INVALID_MEMORY ); }
     }
 
     void operator=(const ref_jt<T> &_Ref) noexcept {
-        this->__drop();
+        this->drop();
         if (_Ref._ref)
         { _Ref.__add_ref(); }
         this->_ref = _Ref._ref;
@@ -115,12 +129,6 @@ struct ref_jt {
 
     inline bool operator!=(const ref_jt<T> &_Ref) const noexcept
     { return ( !this->operator==( _Ref ) ); }
-
-    inline bool operator==(const std::nullptr_t) const noexcept
-    { return ( this->_alloc == nil ); }
-
-    inline bool operator!=(const std::nullptr_t) const noexcept
-    { return ( !this->operator==( nullptr ) ); }
 
     friend inline
     std::ostream &operator<<(std::ostream &_Stream,

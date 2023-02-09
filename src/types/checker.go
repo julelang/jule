@@ -140,9 +140,7 @@ func (c *Checker) pusherrtok(tok lex.Token, key string, args ...any) {
 }
 
 func (c *Checker) check_ref() bool {
-	if (c.R.Id == NIL) {
-		return true
-	} else if c.L.Kind == c.R.Kind {
+	if c.L.Kind == c.R.Kind {
 		return true
 	} else if !c.AllowAssign {
 		return false

@@ -74,7 +74,7 @@ inline ref_jt<T> JULEC_ID(new)(void) noexcept {
     T *_alloc{ new( std::nothrow ) T };
     if (!_alloc)
     { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED) ; }
-    return ( ref_jt<T>( _alloc ) );
+    return ( ref_jt<T>::make( _alloc ) );
 }
 
 #endif // #ifndef __JULEC_BUILTIN_HPP

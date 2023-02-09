@@ -12,7 +12,7 @@ class slice_jt;
 template<typename _Item_t>
 class slice_jt {
 public:
-    ref_jt<_Item_t> _data{ nil };
+    ref_jt<_Item_t> _data{};
     _Item_t *_slice{ nil };
     uint_jt _len{ 0 };
     uint_jt _cap{ 0 };
@@ -38,7 +38,7 @@ public:
 
     inline void __check(void) const noexcept {
         if(this->operator==( nil ))
-        { JULEC_ID(panic)(__JULEC_ERROR_INVALID_MEMORY); }
+        { JULEC_ID(panic)( __JULEC_ERROR_INVALID_MEMORY ); }
     }
 
     void __dealloc(void) noexcept {
@@ -50,7 +50,7 @@ public:
         //   if this is method called from destructor, reference count setted to
         //   negative integer but reference count is unsigned, for this reason
         //   allocation is not deallocated.
-        if (( this->_data.__get_ref_n() ) != __JULEC_REFERENCE_DELTA)
+        if ( ( this->_data.__get_ref_n() ) != __JULEC_REFERENCE_DELTA )
         { return; }
         delete this->_data._ref;
         this->_data._ref = nil;
@@ -64,10 +64,10 @@ public:
 
     void __alloc_new(const int_jt _N) noexcept {
         this->__dealloc();
-        _Item_t *_alloc{ new( std::nothrow ) _Item_t[_N]{_Item_t()} };
+        _Item_t *_alloc{ new( std::nothrow ) _Item_t[_N]{ _Item_t() } };
         if (!_alloc)
-        { JULEC_ID(panic)(__JULEC_ERROR_MEMORY_ALLOCATION_FAILED); }
-        this->_data = ref_jt<_Item_t>( _alloc );
+        { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
+        this->_data = ref_jt<_Item_t>::make( _alloc );
         this->_len = _N;
         this->_cap = _N;
         this->_slice = &_alloc[0];
@@ -169,8 +169,8 @@ public:
         this->__check();
         if (this->empty() || _Index < 0 || this->len() <= _Index) {
             std::stringstream _sstream;
-            __JULEC_WRITE_ERROR_INDEX_OUT_OF_RANGE(_sstream, _Index);
-            JULEC_ID(panic)(_sstream.str().c_str());
+            __JULEC_WRITE_ERROR_INDEX_OUT_OF_RANGE( _sstream , _Index );
+            JULEC_ID(panic)( _sstream.str().c_str() );
         }
         return this->_slice[_Index];
     }
