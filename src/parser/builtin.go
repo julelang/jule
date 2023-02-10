@@ -347,6 +347,7 @@ var out_fn = &Fn{
 var make_fn = &Fn{Pub: true, Id: "make"}
 var drop_fn = &Fn{Pub: true, Id: "drop"}
 var real_fn = &Fn{Pub: true, Id: "real"}
+var new_fn = &Fn{Pub: true, Id: "new"}
 
 var outln_fn *Fn
 
@@ -374,11 +375,7 @@ var Builtin = &ast.Defmap{
 		make_fn,
 		drop_fn,
 		real_fn,
-		{
-			Pub:   true,
-			Id:    "new",
-			Owner: builtinFile,
-		},
+		new_fn,
 		{
 			Pub:      true,
 			Id:       "copy",
@@ -653,12 +650,9 @@ func init() {
 	make_fn.BuiltinCaller = caller_make
 
 	// Setup reference functions
+	new_fn.BuiltinCaller = caller_new
 	drop_fn.BuiltinCaller = caller_drop
 	real_fn.BuiltinCaller = caller_real
-
-	// Setup new function
-	fn_new, _, _ := Builtin.FnById("new", nil)
-	fn_new.BuiltinCaller = caller_new
 
 	// Setup Error trait
 	receiver := new(Var)
@@ -794,17 +788,23 @@ func caller_real(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 
 func caller_new(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	errtok := data.args[0]
+	args := p.get_args(data.args, false)
+	if len(args.Src) < 1 {
+		p.pusherrtok(errtok, "missing_expr_for", "type")
+		return
+	} else if len(args.Src) > 2 {
+		p.pusherrtok(errtok, "argument_overflow")
+	}
 	// Remove parentheses
-	data.args = data.args[1 : len(data.args)-1]
 	r := new_builder(nil)
 	i := 0
-	t, ok := r.DataType(data.args, &i, true)
+	t, ok := r.DataType(args.Src[0].Expr.Tokens, &i, true)
 	if !ok {
 		p.pusherrs(r.Errors...)
 		return
 	}
-	if i+1 < len(data.args) {
-		p.pusherrtok(data.args[i+1], "invalid_syntax")
+	if i+1 < len(args.Src[0].Expr.Tokens) {
+		p.pusherrtok(args.Src[0].Expr.Tokens[i+1], "invalid_syntax")
 	}
 	t, _ = p.realType(t, true)
 	if !types.ValidForRef(t) {
@@ -819,7 +819,16 @@ func caller_new(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 			}
 		}
 	}
-	m.append_sub(exprNode{"<" + t.String() + ">()"})
+	if len(args.Src) == 1 {
+		m.append_sub(exprNode{"<" + t.String() + ">()"})
+	} else {
+		data_expr := args.Src[1].Expr
+		data_v, data_expr_model := p.evalExpr(data_expr, nil)
+		p.check_type(t, data_v.data.Type, false, true, errtok)
+		m.append_sub(exprNode{"<" + t.String() + ">("})
+		m.append_sub(data_expr_model)
+		m.append_sub(exprNode{")"})
+	}
 	t.Kind = "&" + t.Kind
 	v.data.Type = t
 	v.data.Value = t.Kind

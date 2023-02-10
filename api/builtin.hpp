@@ -22,6 +22,8 @@ slice_jt<_Item_t> JULEC_ID(append)(const slice_jt<_Item_t> &_Src,
                                    const slice_jt<_Item_t> &_Components) noexcept;
 template<typename T>
 inline ref_jt<T> JULEC_ID(new)(void) noexcept;
+template<typename T>
+inline ref_jt<T> JULEC_ID(new)(const T &_Expr) noexcept;
 
 // Definitions
 
@@ -70,11 +72,11 @@ slice_jt<_Item_t> JULEC_ID(append)(const slice_jt<_Item_t> &_Src,
 }
 
 template<typename T>
-inline ref_jt<T> JULEC_ID(new)(void) noexcept {
-    T *_alloc{ new( std::nothrow ) T };
-    if (!_alloc)
-    { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED) ; }
-    return ( ref_jt<T>::make( _alloc ) );
-}
+inline ref_jt<T> JULEC_ID(new)(void) noexcept
+{ return ( ref_jt<T>() ); }
+
+template<typename T>
+inline ref_jt<T> JULEC_ID(new)(const T &_Expr) noexcept
+{ return ( ref_jt<T>::make( _Expr ) ); }
 
 #endif // #ifndef __JULEC_BUILTIN_HPP
