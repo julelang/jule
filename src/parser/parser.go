@@ -1248,9 +1248,6 @@ func (p *Parser) Var(model Var) *Var {
 			p.checkValidityForAutoType(v.Type, v.SetterTok)
 		}
 	}
-	if !v.IsField && types.IsRef(v.Type) && v.SetterTok.Id == lex.ID_NA {
-		p.pusherrtok(v.Token, "reference_not_initialized")
-	}
 	if !v.IsField && v.SetterTok.Id == lex.ID_NA {
 		p.pusherrtok(v.Token, "variable_not_initialized")
 	}

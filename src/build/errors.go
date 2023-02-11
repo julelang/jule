@@ -123,7 +123,6 @@ var ERRORS = map[string]string{
 	`fallthrough_into_final_case`:              `fallthrough cannot useable at final case`,
 	`unsafe_behavior_at_out_of_unsafe_scope`:   `unsafe behaviors cannot available out of unsafe scopes`,
 	`variable_not_initialized`:                 `variables must initialize explicitly at declaration`,
-	`reference_not_initialized`:                `references must always initialize explicitly`,
 	`ref_method_used_with_not_ref_instance`:    `reference method cannot use with non-reference instance`,
 	`method_as_anonymous_fn`:                   `methods cannot use as anonymous function`,
 	`genericed_fn_as_anonymous_fn`:             `genericed functions cannot use as anonymous function`,

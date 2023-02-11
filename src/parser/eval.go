@@ -1307,8 +1307,6 @@ func (e *eval) build_array(parts [][]lex.Token, t Type, errtok lex.Token) (value
 		n := ast.Size(len(parts))
 		if n > t.Size.N {
 			e.p.pusherrtok(errtok, "overflow_limits")
-		} else if types.IsRef(*t.ComponentType) && n < t.Size.N {
-			e.p.pusherrtok(errtok, "reference_not_initialized")
 		}
 	} else {
 		t.Size.N = ast.Size(len(parts))
