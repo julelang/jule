@@ -10,9 +10,9 @@ import (
 
 func check_value_for_indexing(v value) (err_key string) {
 	switch {
-	case !types.IsPure(v.data.Type):
+	case !types.IsPure(v.data.DataType):
 		return "invalid_expr"
-	case !types.IsInteger(v.data.Type.Id):
+	case !types.IsInteger(v.data.DataType.Id):
 		return "invalid_expr"
 	case v.constant && tonums(v.expr) < 0:
 		return "overflow_limits"
@@ -35,18 +35,18 @@ func indexingExprModel(i ast.ExprModel) ast.ExprModel {
 }
 
 func valIsEnumType(v value) bool {
-	return v.is_type && types.IsEnum(v.data.Type)
+	return v.is_type && types.IsEnum(v.data.DataType)
 }
 
 func isBoolExpr(v value) bool {
-	return types.IsPure(v.data.Type) && v.data.Type.Id == types.BOOL
+	return types.IsPure(v.data.DataType) && v.data.DataType.Id == types.BOOL
 }
 
 func canGetPtr(v value) bool {
 	if !v.lvalue || v.constant {
 		return false
 	}
-	switch v.data.Type.Id {
+	switch v.data.DataType.Id {
 	case types.FN, types.ENUM:
 		return false
 	default:
@@ -55,23 +55,23 @@ func canGetPtr(v value) bool {
 }
 
 func valIsStructIns(val value) bool {
-	return !val.is_type && types.IsStruct(val.data.Type)
+	return !val.is_type && types.IsStruct(val.data.DataType)
 }
 
 func valIsTraitIns(val value) bool {
-	return !val.is_type && types.IsTrait(val.data.Type)
+	return !val.is_type && types.IsTrait(val.data.DataType)
 }
 
 func isForeachIterExpr(val value) bool {
 	switch {
-	case types.IsSlice(val.data.Type),
-		types.IsArray(val.data.Type),
-		types.IsMap(val.data.Type):
+	case types.IsSlice(val.data.DataType),
+		types.IsArray(val.data.DataType),
+		types.IsMap(val.data.DataType):
 		return true
-	case !types.IsPure(val.data.Type):
+	case !types.IsPure(val.data.DataType):
 		return false
 	}
-	code := val.data.Type.Id
+	code := val.data.DataType.Id
 	return code == types.STR
 }
 
@@ -87,8 +87,8 @@ func validExprForConst(v value) bool {
 }
 
 func okForShifting(v value) bool {
-	if !types.IsPure(v.data.Type) ||
-		!types.IsInteger(v.data.Type.Id) {
+	if !types.IsPure(v.data.DataType) ||
+		!types.IsInteger(v.data.DataType.Id) {
 		return false
 	}
 	if !v.constant {

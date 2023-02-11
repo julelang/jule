@@ -139,9 +139,9 @@ type CppLinkAlias struct {
 
 // Data is AST model of data.
 type Data struct {
-	Token lex.Token
-	Value string
-	Type  Type
+	Token    lex.Token
+	Value    string
+	DataType Type
 }
 
 func (d Data) String() string { return d.Value }
@@ -156,13 +156,13 @@ type EnumItem struct {
 
 // Enum is the AST model of enumerator statements.
 type Enum struct {
-	Pub   bool
-	Token lex.Token
-	Id    string
-	Type  Type
-	Items []*EnumItem
-	Used  bool
-	Doc   string
+	Pub      bool
+	Token    lex.Token
+	Id       string
+	DataType Type
+	Items    []*EnumItem
+	Used     bool
+	Doc      string
 }
 
 // ItemById returns item by id if exist, nil if not.
@@ -214,7 +214,7 @@ func (e Expr) String() string {
 
 // Fn is function declaration AST model.
 type Fn struct {
-	Pub           bool
+	Public        bool
 	IsUnsafe      bool
 	IsEntryPoint  bool
 	Used          bool
@@ -233,10 +233,10 @@ type Fn struct {
 }
 
 func (f *Fn) IsConstructor() bool {
-	if f.RetType.Type.Id != struct_t {
+	if f.RetType.DataType.Id != struct_t {
 		return false
 	}
-	s := f.RetType.Type.Tag.(*Struct)
+	s := f.RetType.DataType.Tag.(*Struct)
 	return s.Id == f.Id
 }
 
@@ -273,15 +273,15 @@ func (f *Fn) plainTypeString() string {
 		s.WriteString(cppStr)
 	}
 	s.WriteByte(')')
-	if f.RetType.Type.MultiTyped {
+	if f.RetType.DataType.MultiTyped {
 		s.WriteByte('(')
-		for _, t := range f.RetType.Type.Tag.([]Type) {
+		for _, t := range f.RetType.DataType.Tag.([]Type) {
 			s.WriteString(t.Kind)
 			s.WriteByte(',')
 		}
 		return s.String()[:s.Len()-1] + ")"
-	} else if f.RetType.Type.Id != void_t {
-		s.WriteString(f.RetType.Type.Kind)
+	} else if f.RetType.DataType.Id != void_t {
+		s.WriteString(f.RetType.DataType.Kind)
 	}
 	return s.String()
 }
@@ -547,7 +547,7 @@ type Param struct {
 	Id       string
 	Variadic bool
 	Mutable  bool
-	Type     Type
+	DataType Type
 	Default  Expr
 }
 
@@ -560,7 +560,7 @@ func (p *Param) TypeString() string {
 	if p.Variadic {
 		ts.WriteString(lex.KND_TRIPLE_DOT)
 	}
-	ts.WriteString(p.Type.Kind)
+	ts.WriteString(p.DataType.Kind)
 	return ts.String()
 }
 
@@ -585,21 +585,21 @@ func (p *Param) Prototype() string {
 	if p.Variadic {
 		cpp.WriteString(build.AsTypeId("slice"))
 		cpp.WriteByte('<')
-		cpp.WriteString(p.Type.String())
+		cpp.WriteString(p.DataType.String())
 		cpp.WriteByte('>')
 	} else {
-		cpp.WriteString(p.Type.String())
+		cpp.WriteString(p.DataType.String())
 	}
 	return cpp.String()
 }
 
 // RetType is function return type AST model.
 type RetType struct {
-	Type        Type
+	DataType    Type
 	Identifiers []lex.Token
 }
 
-func (rt RetType) String() string { return rt.Type.String() }
+func (rt RetType) String() string { return rt.DataType.String() }
 
 // AnyVar reports exist any variable or not.
 func (rt *RetType) AnyVar() bool {
@@ -621,14 +621,14 @@ func (rt *RetType) Vars(owner *Block) []*Var {
 		} else {
 			v.Id = tok.Kind
 		}
-		v.Type = t
+		v.DataType = t
 		v.Owner = owner
 		v.Mutable = true
 		return v
 	}
-	if !rt.Type.MultiTyped {
+	if !rt.DataType.MultiTyped {
 		if len(rt.Identifiers) > 0 {
-			v := get(rt.Identifiers[0], rt.Type)
+			v := get(rt.Identifiers[0], rt.DataType)
 			if v == nil {
 				return nil
 			}
@@ -637,7 +637,7 @@ func (rt *RetType) Vars(owner *Block) []*Var {
 		return nil
 	}
 	var vars []*Var
-	types := rt.Type.Tag.([]Type)
+	types := rt.DataType.Tag.([]Type)
 	for i, tok := range rt.Identifiers {
 		v := get(tok, types[i])
 		if v != nil {
@@ -721,9 +721,9 @@ func (s *Struct) SetGenerics(generics []Type) { s._generics = generics }
 func (s *Struct) SelfVar(receiver *Var) *Var {
 	v := new(Var)
 	v.Token = s.Token
-	v.Type = receiver.Type
-	v.Type.Tag = s
-	v.Type.Id = struct_t
+	v.DataType = receiver.DataType
+	v.DataType.Tag = s
+	v.DataType.Id = struct_t
 	v.Mutable = receiver.Mutable
 	v.Id = lex.KND_SELF
 	return v
@@ -800,14 +800,14 @@ func (t *Trait) OutId() string {
 
 // TypeAlias is type alias declaration.
 type TypeAlias struct {
-	Owner   *Block
-	Pub     bool
-	Token   lex.Token
-	Id      string
-	Type    Type
-	Doc     string
-	Used    bool
-	Generic bool
+	Owner      *Block
+	Pub        bool
+	Token      lex.Token
+	Id         string
+	TargetType Type
+	Doc        string
+	Used       bool
+	Generic    bool
 }
 
 // Size is the represents data type of sizes (array or etc)
@@ -1036,7 +1036,7 @@ func (dt Type) String() (s string) {
 		return build.OutId(dt.Kind, dt.Token.File.Addr())
 	case enum_t:
 		e := dt.Tag.(*Enum)
-		return e.Type.String()
+		return e.DataType.String()
 	case trait_t:
 		return dt.TraitString()
 	case struct_t:
@@ -1128,12 +1128,12 @@ func (dt *Type) FnString() string {
 	cpp.WriteByte('<')
 	cpp.WriteString("std::function<")
 	f := dt.Tag.(*Fn)
-	f.RetType.Type.Pure = dt.Pure
+	f.RetType.DataType.Pure = dt.Pure
 	cpp.WriteString(f.RetType.String())
 	cpp.WriteByte('(')
 	if len(f.Params) > 0 {
 		for _, param := range f.Params {
-			param.Type.Pure = dt.Pure
+			param.DataType.Pure = dt.Pure
 			cpp.WriteString(param.Prototype())
 			cpp.WriteByte(',')
 		}
@@ -1188,14 +1188,14 @@ type UseDecl struct {
 // Var is variable declaration AST model.
 type Var struct {
 	Owner     *Block
-	Pub       bool
+	Public    bool
 	Mutable   bool
 	Token     lex.Token
 	SetterTok lex.Token
 	Id        string
-	Type      Type
+	DataType  Type
 	Expr      Expr
-	Const     bool
+	Constant  bool
 	New       bool
 	Tag       any
 	ExprTag   any
@@ -1233,11 +1233,11 @@ func (v Var) String() string {
 	if lex.IsIgnoreId(v.Id) {
 		return ""
 	}
-	if v.Const {
+	if v.Constant {
 		return ""
 	}
 	var cpp strings.Builder
-	cpp.WriteString(v.Type.String())
+	cpp.WriteString(v.DataType.String())
 	cpp.WriteByte(' ')
 	cpp.WriteString(v.OutId())
 	expr := v.Expr.String()
@@ -1254,10 +1254,10 @@ func (v Var) String() string {
 // FieldString returns variable as cpp struct field.
 func (v *Var) FieldString() string {
 	var cpp strings.Builder
-	if v.Const {
+	if v.Constant {
 		cpp.WriteString("const ")
 	}
-	cpp.WriteString(v.Type.String())
+	cpp.WriteString(v.DataType.String())
 	cpp.WriteByte(' ')
 	cpp.WriteString(v.OutId())
 	cpp.WriteString(build.CPP_DEFAULT_EXPR)
@@ -1271,7 +1271,7 @@ func (v *Var) ReceiverTypeString() string {
 	if v.Mutable {
 		s.WriteString("mut ")
 	}
-	if v.Type.Kind != "" && v.Type.Kind[0] == '&' {
+	if v.DataType.Kind != "" && v.DataType.Kind[0] == '&' {
 		s.WriteByte('&')
 	}
 	s.WriteString("self")

@@ -56,9 +56,9 @@ func numericModel(v value) ast.ExprModel {
 		switch {
 		case normalize(&v):
 			return numericModel(v)
-		case v.data.Type.Id == types.F32:
+		case v.data.DataType.Id == types.F32:
 			return exprNode{fmt.Sprint(t) + "f"}
-		case v.data.Type.Id == types.F64:
+		case v.data.DataType.Id == types.F64:
 			return exprNode{fmt.Sprint(t)}
 		}
 	}
@@ -69,8 +69,8 @@ func (ve *literal_eval) str() value {
 	var v value
 	v.constant = true
 	v.data.Value = ve.token.Kind
-	v.data.Type.Id = types.STR
-	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+	v.data.DataType.Id = types.STR
+	v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	content := ve.token.Kind[1 : len(ve.token.Kind)-1]
 	v.expr = content
 	v.model = strModel(v)
@@ -98,12 +98,12 @@ func (ve *literal_eval) rune() value {
 	v.data.Value = ve.token.Kind
 	content, isByte := toByteLiteral(ve.token.Kind)
 	if isByte {
-		v.data.Type.Id = types.U8
+		v.data.DataType.Id = types.U8
 	} else { // rune
-		v.data.Type.Id = types.I32
+		v.data.DataType.Id = types.I32
 	}
 	content = ToRuneLiteral([]byte(content))
-	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+	v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	v.expr, _ = strconv.ParseInt(content[2:], 16, 64)
 	v.model = exprNode{content}
 	ve.model.append_sub(v.model)
@@ -114,8 +114,8 @@ func (ve *literal_eval) bool() value {
 	var v value
 	v.constant = true
 	v.data.Value = ve.token.Kind
-	v.data.Type.Id = types.BOOL
-	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+	v.data.DataType.Id = types.BOOL
+	v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	v.expr = ve.token.Kind == lex.KND_TRUE
 	v.model = boolModel(v)
 	ve.model.append_sub(v.model)
@@ -126,8 +126,8 @@ func (ve *literal_eval) nil() value {
 	var v value
 	v.constant = true
 	v.data.Value = ve.token.Kind
-	v.data.Type.Id = types.NIL
-	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+	v.data.DataType.Id = types.NIL
+	v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	v.expr = nil
 	v.model = exprNode{ve.token.Kind}
 	ve.model.append_sub(v.model)
@@ -139,14 +139,14 @@ func normalize(v *value) (normalized bool) {
 	case !v.constant:
 		return
 	case int_assignable(types.U64, *v):
-		v.data.Type.Id = types.U64
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.U64
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		v.expr = tonumu(v.expr)
 		bitize(v)
 		return true
 	case int_assignable(types.I64, *v):
-		v.data.Type.Id = types.I64
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.I64
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		v.expr = tonums(v.expr)
 		bitize(v)
 		return true
@@ -157,8 +157,8 @@ func normalize(v *value) (normalized bool) {
 func (ve *literal_eval) float() value {
 	var v value
 	v.data.Value = ve.token.Kind
-	v.data.Type.Id = types.F64
-	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+	v.data.DataType.Id = types.F64
+	v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	v.expr, _ = strconv.ParseFloat(v.data.Value, 64)
 	return v
 }
@@ -201,8 +201,8 @@ func (ve *literal_eval) numeric() value {
 
 func make_value_from_var(v *Var) (val value) {
 	val.data.Value = v.Id
-	val.data.Type = v.Type
-	val.constant = v.Const
+	val.data.DataType = v.DataType
+	val.constant = v.Constant
 	val.data.Token = v.Token
 	val.lvalue = !val.constant
 	val.mutable = v.Mutable
@@ -219,21 +219,21 @@ func (ve *literal_eval) var_id(id string, variable *Var, global bool) (v value) 
 	if v.constant {
 		ve.model.append_sub(v.model)
 	} else {
-		if variable.Id == lex.KND_SELF && !types.IsRef(variable.Type) {
+		if variable.Id == lex.KND_SELF && !types.IsRef(variable.DataType) {
 			ve.model.append_sub(exprNode{"(*this)"})
 		} else {
 			ve.model.append_sub(exprNode{variable.OutId()})
 		}
-		ve.p.eval.has_error = ve.p.eval.has_error || types.IsVoid(v.data.Type)
+		ve.p.eval.has_error = ve.p.eval.has_error || types.IsVoid(v.data.DataType)
 	}
 	return
 }
 
 func make_value_from_fn(f *ast.Fn) (v value) {
 	v.data.Value = f.Id
-	v.data.Type.Id = types.FN
-	v.data.Type.Tag = f
-	v.data.Type.Kind = f.TypeKind()
+	v.data.DataType.Id = types.FN
+	v.data.DataType.Tag = f
+	v.data.DataType.Kind = f.TypeKind()
 	v.data.Token = f.Token
 	return
 }
@@ -248,9 +248,9 @@ func (ve *literal_eval) fn_id(id string, f *Fn) (v value) {
 func (ve *literal_eval) enumId(id string, e *Enum) (v value) {
 	e.Used = true
 	v.data.Value = id
-	v.data.Type.Id = types.ENUM
-	v.data.Type.Kind = e.Id
-	v.data.Type.Tag = e
+	v.data.DataType.Id = types.ENUM
+	v.data.DataType.Kind = e.Id
+	v.data.DataType.Tag = e
 	v.data.Token = e.Token
 	v.constant = true
 	v.is_type = true
@@ -265,10 +265,10 @@ func (ve *literal_eval) enumId(id string, e *Enum) (v value) {
 
 func make_value_from_struct(s *Struct) (v value) {
 	v.data.Value = s.Id
-	v.data.Type.Id = types.STRUCT
-	v.data.Type.Tag = s
-	v.data.Type.Kind = s.Id
-	v.data.Type.Token = s.Token
+	v.data.DataType.Id = types.STRUCT
+	v.data.DataType.Tag = s
+	v.data.DataType.Kind = s.Id
+	v.data.DataType.Token = s.Token
 	v.data.Token = s.Token
 	v.is_type = true
 	return
@@ -287,7 +287,7 @@ func (ve *literal_eval) struct_id(id string, s *Struct) (v value) {
 }
 
 func (ve *literal_eval) type_id(id string, t *TypeAlias) (_ value, _ bool) {
-	dt, ok := ve.p.realType(t.Type, true)
+	dt, ok := ve.p.realType(t.TargetType, true)
 	if !ok {
 		return
 	}

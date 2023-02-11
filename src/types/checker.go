@@ -131,11 +131,11 @@ type Checker struct {
 // pusherrtok appends new error by token.
 func (c *Checker) pusherrtok(tok lex.Token, key string, args ...any) {
 	c.Errors = append(c.Errors, build.Log{
-		Type:    build.ERR,
-		Row:     tok.Row,
-		Column:  tok.Column,
-		Path:    tok.File.Path(),
-		Text: build.Errorf(key, args...),
+		Type:   build.ERR,
+		Row:    tok.Row,
+		Column: tok.Column,
+		Path:   tok.File.Path(),
+		Text:   build.Errorf(key, args...),
 	})
 }
 
@@ -160,7 +160,7 @@ func (c *Checker) check_ptr() bool {
 
 func trait_has_reference_receiver(t *ast.Trait) bool {
 	for _, f := range t.Defines.Fns {
-		if IsRef(f.Receiver.Type) {
+		if IsRef(f.Receiver.DataType) {
 			return true
 		}
 	}

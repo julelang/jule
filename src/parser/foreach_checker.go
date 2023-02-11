@@ -19,9 +19,9 @@ func (fc *foreachChecker) array() {
 	}
 	componentType := *fc.profile.ExprType.ComponentType
 	b := &fc.profile.KeyB
-	b.Type = componentType
+	b.DataType = componentType
 	val := fc.val
-	val.data.Type = componentType
+	val.data.DataType = componentType
 	fc.p.check_valid_init_expr(b.Mutable, val, fc.profile.InToken)
 }
 
@@ -32,9 +32,9 @@ func (fc *foreachChecker) slice() {
 	}
 	componentType := *fc.profile.ExprType.ComponentType
 	b := &fc.profile.KeyB
-	b.Type = componentType
+	b.DataType = componentType
 	val := fc.val
-	val.data.Type = componentType
+	val.data.DataType = componentType
 	fc.p.check_valid_init_expr(b.Mutable, val, fc.profile.InToken)
 }
 
@@ -48,19 +48,19 @@ func (fc *foreachChecker) checkKeyASize() {
 		return
 	}
 	a := &fc.profile.KeyA
-	a.Type.Id = types.INT
-	a.Type.Kind = types.TYPE_MAP[a.Type.Id]
+	a.DataType.Id = types.INT
+	a.DataType.Kind = types.TYPE_MAP[a.DataType.Id]
 }
 
 func (fc *foreachChecker) checkKeyAMapKey() {
 	if lex.IsIgnoreId(fc.profile.KeyA.Id) {
 		return
 	}
-	keyType := fc.val.data.Type.Tag.([]Type)[0]
+	keyType := fc.val.data.DataType.Tag.([]Type)[0]
 	a := &fc.profile.KeyA
-	a.Type = keyType
+	a.DataType = keyType
 	val := fc.val
-	val.data.Type = keyType
+	val.data.DataType = keyType
 	fc.p.check_valid_init_expr(a.Mutable, val, fc.profile.InToken)
 }
 
@@ -68,11 +68,11 @@ func (fc *foreachChecker) checkKeyBMapVal() {
 	if lex.IsIgnoreId(fc.profile.KeyB.Id) {
 		return
 	}
-	valType := fc.val.data.Type.Tag.([]Type)[1]
+	valType := fc.val.data.DataType.Tag.([]Type)[1]
 	b := &fc.profile.KeyB
-	b.Type = valType
+	b.DataType = valType
 	val := fc.val
-	val.data.Type = valType
+	val.data.DataType = valType
 	fc.p.check_valid_init_expr(b.Mutable, val, fc.profile.InToken)
 }
 
@@ -86,18 +86,18 @@ func (fc *foreachChecker) str() {
 		Kind: types.TYPE_MAP[types.U8],
 	}
 	b := &fc.profile.KeyB
-	b.Type = runeType
+	b.DataType = runeType
 }
 
 func (fc *foreachChecker) check() {
 	switch {
-	case types.IsSlice(fc.val.data.Type):
+	case types.IsSlice(fc.val.data.DataType):
 		fc.slice()
-	case types.IsArray(fc.val.data.Type):
+	case types.IsArray(fc.val.data.DataType):
 		fc.array()
-	case types.IsMap(fc.val.data.Type):
+	case types.IsMap(fc.val.data.DataType):
 		fc.hashmap()
-	case fc.val.data.Type.Id == types.STR:
+	case fc.val.data.DataType.Id == types.STR:
 		fc.str()
 	}
 }

@@ -31,7 +31,7 @@ type RetType = ast.RetType
 // Parser is parser of Jule code.
 type Parser struct {
 	attributes       []ast.Attribute
-	doc_text          strings.Builder
+	doc_text         strings.Builder
 	currentIter      *ast.Iter
 	currentCase      *ast.Case
 	wg               sync.WaitGroup
@@ -566,7 +566,7 @@ func (p *Parser) parse_enum_items_str(e *Enum) {
 			item.Expr.Model = model
 			assign_checker{
 				p:         p,
-				expr_t:    e.Type,
+				expr_t:    e.DataType,
 				v:         val,
 				ignoreAny: true,
 				errtok:    item.Token,
@@ -577,17 +577,17 @@ func (p *Parser) parse_enum_items_str(e *Enum) {
 			item.Expr.Model = strModel(expr)
 		}
 		itemVar := new(Var)
-		itemVar.Const = true
+		itemVar.Constant = true
 		itemVar.ExprTag = item.ExprTag
 		itemVar.Id = item.Id
-		itemVar.Type = e.Type
+		itemVar.DataType = e.DataType
 		itemVar.Token = e.Token
 		p.Defines.Globals = append(p.Defines.Globals, itemVar)
 	}
 }
 
 func (p *Parser) parse_enum_items_integer(e *Enum) {
-	max := types.MaxOfType(e.Type.Id)
+	max := types.MaxOfType(e.DataType.Id)
 	for i, item := range e.Items {
 		if max == 0 {
 			p.pusherrtok(item.Token, "overflow_limits")
@@ -616,7 +616,7 @@ func (p *Parser) parse_enum_items_integer(e *Enum) {
 			item.Expr.Model = model
 			assign_checker{
 				p:         p,
-				expr_t:    e.Type,
+				expr_t:    e.DataType,
 				v:         val,
 				ignoreAny: true,
 				errtok:    item.Token,
@@ -627,10 +627,10 @@ func (p *Parser) parse_enum_items_integer(e *Enum) {
 			item.Expr.Model = exprNode{strconv.FormatUint(expr, 16)}
 		}
 		itemVar := new(Var)
-		itemVar.Const = true
+		itemVar.Constant = true
 		itemVar.ExprTag = item.ExprTag
 		itemVar.Id = item.Id
-		itemVar.Type = e.Type
+		itemVar.DataType = e.DataType
 		itemVar.Token = e.Token
 		p.Defines.Globals = append(p.Defines.Globals, itemVar)
 	}
@@ -649,8 +649,8 @@ func (p *Parser) Enum(e Enum) {
 	}
 	e.Doc = p.doc_text.String()
 	p.doc_text.Reset()
-	e.Type, _ = p.realType(e.Type, true)
-	if !types.IsPure(e.Type) {
+	e.DataType, _ = p.realType(e.DataType, true)
+	if !types.IsPure(e.DataType) {
 		p.pusherrtok(e.Token, "invalid_type_source")
 		return
 	}
@@ -663,9 +663,9 @@ func (p *Parser) Enum(e Enum) {
 		p.Defines.Enums = append(p.Defines.Enums, &e)
 	}()
 	switch {
-	case e.Type.Id == types.STR:
+	case e.DataType.Id == types.STR:
 		p.parse_enum_items_str(&e)
-	case types.IsInteger(e.Type.Id):
+	case types.IsInteger(e.DataType.Id):
 		p.parse_enum_items_integer(&e)
 	default:
 		p.pusherrtok(e.Token, "invalid_type_source")
@@ -685,8 +685,8 @@ func (p *Parser) pushField(s *Struct, f **Var, i int) {
 	if len(s.Generics) == 0 {
 		p.parseField(s, f, i)
 	} else {
-		p.parseNonGenericType(s.Generics, &(*f).Type)
-		param := ast.Param{Id: (*f).Id, Type: (*f).Type}
+		p.parseNonGenericType(s.Generics, &(*f).DataType)
+		param := ast.Param{Id: (*f).Id, DataType: (*f).DataType}
 		param.Default.Model = exprNode{build.CPP_DEFAULT_EXPR}
 		s.Constructor.Params[i] = param
 	}
@@ -705,7 +705,7 @@ func make_constructor(s *Struct) *ast.Fn {
 	constructor.Id = s.Id
 	constructor.Token = s.Token
 	constructor.Params = make([]ast.Param, len(s.Fields))
-	constructor.RetType.Type = Type{
+	constructor.RetType.DataType = Type{
 		Id:    types.STRUCT,
 		Kind:  s.Id,
 		Token: s.Token,
@@ -899,7 +899,7 @@ func (p *Parser) implTrait(model *ast.Impl) {
 		ds := tf.DefString()
 		sf, _, _ := s.Defines.FnById(tf.Id, nil)
 		if sf != nil {
-			ok = tf.Pub == sf.Pub && ds == sf.DefString()
+			ok = tf.Public == sf.Public && ds == sf.DefString()
 		}
 		if !ok {
 			p.pusherrtok(model.Target.Token, "not_impl_trait_def", trait_def.Id, ds)
@@ -1040,9 +1040,9 @@ func (p *Parser) St(s ast.Statement) {
 func (p *Parser) parseFnNonGenericType(generics []*GenericType, dt *Type) {
 	f := dt.Tag.(*Fn)
 	for i := range f.Params {
-		p.parseNonGenericType(generics, &f.Params[i].Type)
+		p.parseNonGenericType(generics, &f.Params[i].DataType)
 	}
-	p.parseNonGenericType(generics, &f.RetType.Type)
+	p.parseNonGenericType(generics, &f.RetType.DataType)
 }
 
 func (p *Parser) parseMultiNonGenericType(generics []*GenericType, dt *Type) {
@@ -1119,9 +1119,9 @@ func (p *Parser) parseNonGenericType(generics []*GenericType, dt *Type) {
 
 func (p *Parser) parseTypesNonGenerics(f *Fn) {
 	for i := range f.Params {
-		p.parseNonGenericType(f.Generics, &f.Params[i].Type)
+		p.parseNonGenericType(f.Generics, &f.Params[i].DataType)
 	}
-	p.parseNonGenericType(f.Generics, &f.RetType.Type)
+	p.parseNonGenericType(f.Generics, &f.RetType.DataType)
 }
 
 func (p *Parser) check_ret_variables(f *Fn) {
@@ -1204,12 +1204,12 @@ func (p *Parser) Var(model Var) *Var {
 	}
 	v := new(Var)
 	*v = model
-	if v.Type.Id != types.VOID {
-		vt, ok := p.realType(v.Type, true)
+	if v.DataType.Id != types.VOID {
+		vt, ok := p.realType(v.DataType, true)
 		if ok {
-			v.Type = vt
+			v.DataType = vt
 		} else {
-			v.Type = ast.Type{}
+			v.DataType = ast.Type{}
 		}
 	}
 	var val value
@@ -1218,24 +1218,24 @@ func (p *Parser) Var(model Var) *Var {
 		val = tag_t
 	default:
 		if v.SetterTok.Id != lex.ID_NA {
-			val, v.Expr.Model = p.evalExpr(v.Expr, &v.Type)
+			val, v.Expr.Model = p.evalExpr(v.Expr, &v.DataType)
 		}
 	}
-	if val.data.Type.MultiTyped {
+	if val.data.DataType.MultiTyped {
 		p.pusherrtok(model.Token, "missing_multi_assign_identifiers")
 		return v
 	}
-	if v.Type.Id != types.VOID {
+	if v.DataType.Id != types.VOID {
 		if v.SetterTok.Id != lex.ID_NA {
-			if v.Type.Size.AutoSized && v.Type.Id == types.ARRAY {
-				v.Type.Size = val.data.Type.Size
+			if v.DataType.Size.AutoSized && v.DataType.Id == types.ARRAY {
+				v.DataType.Size = val.data.DataType.Size
 			}
 			assign_checker{
 				p:                p,
-				expr_t:           v.Type,
+				expr_t:           v.DataType,
 				v:                val,
 				errtok:           v.Token,
-				not_allow_assign: types.IsRef(v.Type),
+				not_allow_assign: types.IsRef(v.DataType),
 			}.check()
 		}
 	} else {
@@ -1243,18 +1243,18 @@ func (p *Parser) Var(model Var) *Var {
 			p.pusherrtok(v.Token, "missing_autotype_value")
 		} else {
 			p.eval.has_error = p.eval.has_error || val.data.Value == ""
-			v.Type = val.data.Type
+			v.DataType = val.data.DataType
 			p.check_valid_init_expr(v.Mutable, val, v.SetterTok)
-			p.checkValidityForAutoType(v.Type, v.SetterTok)
+			p.checkValidityForAutoType(v.DataType, v.SetterTok)
 		}
 	}
 	if !v.IsField && v.SetterTok.Id == lex.ID_NA {
 		p.pusherrtok(v.Token, "variable_not_initialized")
 	}
-	if v.Const {
+	if v.Constant {
 		v.ExprTag = val.expr
-		if !types.IsAllowForConst(v.Type) {
-			p.pusherrtok(v.Token, "invalid_type_for_const", v.Type.Kind)
+		if !types.IsAllowForConst(v.DataType) {
+			p.pusherrtok(v.Token, "invalid_type_for_const", v.DataType.Kind)
 		} else if v.SetterTok.Id != lex.ID_NA && !validExprForConst(val) {
 			p.eval.pusherrtok(v.Token, "expr_not_const")
 		}
@@ -1271,12 +1271,12 @@ func (p *Parser) varsFromParams(f *Fn) []*Var {
 		v.Mutable = param.Mutable
 		v.Id = param.Id
 		v.Token = param.Token
-		v.Type = param.Type
+		v.DataType = param.DataType
 		if param.Variadic {
 			if length-i > 1 {
 				p.pusherrtok(param.Token, "variadic_parameter_not_last")
 			}
-			v.Type = types.VariadicToSlice(param.Type)
+			v.DataType = types.VariadicToSlice(param.DataType)
 		}
 		vars[i] = v
 	}
@@ -1668,15 +1668,15 @@ func (p *Parser) parse_linked_structs() {
 
 func (p *Parser) check_linked_aliases() {
 	for _, link := range p.linked_aliases {
-		link.Type, _ = p.realType(link.Type, true)
+		link.TargetType, _ = p.realType(link.TargetType, true)
 	}
 }
 
 func (p *Parser) check_linked_vars() {
 	for _, link := range p.linked_variables {
-		vt, ok := p.realType(link.Type, true)
+		vt, ok := p.realType(link.DataType, true)
 		if ok {
-			link.Type = vt
+			link.DataType = vt
 		}
 	}
 }
@@ -1720,7 +1720,7 @@ func (p *Parser) ParseWaitingFns() {
 
 func (p *Parser) check_aliases() {
 	for i, alias := range p.Defines.Types {
-		p.Defines.Types[i].Type, _ = p.realType(alias.Type, true)
+		p.Defines.Types[i].TargetType, _ = p.realType(alias.TargetType, true)
 	}
 }
 
@@ -1760,8 +1760,8 @@ func (p *Parser) ParseWaitingImpls() {
 }
 
 func (p *Parser) checkParamDefaultExprWithDefault(param *Param) {
-	if types.IsFn(param.Type) {
-		p.pusherrtok(param.Token, "invalid_type_for_default_arg", param.Type.Kind)
+	if types.IsFn(param.DataType) {
+		p.pusherrtok(param.Token, "invalid_type_for_default_arg", param.DataType.Kind)
 	}
 }
 
@@ -1915,15 +1915,15 @@ func (p *Parser) check_fn_special_cases(f *Fn) {
 
 func (p *Parser) call_fn(f *Fn, data callData, m *exprModel) value {
 	v := p.parse_fn_call_toks(f, data.generics, data.args, m)
-	v.lvalue = types.IsLvalue(v.data.Type)
+	v.lvalue = types.IsLvalue(v.data.DataType)
 	return v
 }
 
 func (p *Parser) callStructConstructor(s *Struct, argsToks []lex.Token, m *exprModel) (v value) {
 	f := s.Constructor
-	s = f.RetType.Type.Tag.(*Struct)
-	v.data.Type = f.RetType.Type.Copy()
-	v.data.Type.Kind = s.AsTypeKind()
+	s = f.RetType.DataType.Tag.(*Struct)
+	v.data.DataType = f.RetType.DataType.Copy()
+	v.data.DataType.Kind = s.AsTypeKind()
 	v.is_type = false
 	v.lvalue = false
 	v.constant = false
@@ -1961,11 +1961,11 @@ func (p *Parser) callStructConstructor(s *Struct, argsToks []lex.Token, m *exprM
 func (p *Parser) parseField(s *Struct, f **Var, i int) {
 	*f = p.Var(**f)
 	v := *f
-	param := ast.Param{Id: v.Id, Type: v.Type}
-	if !types.IsPtr(v.Type) && types.IsStruct(v.Type) {
-		ts := v.Type.Tag.(*Struct)
+	param := ast.Param{Id: v.Id, DataType: v.DataType}
+	if !types.IsPtr(v.DataType) && types.IsStruct(v.DataType) {
+		ts := v.DataType.Tag.(*Struct)
 		if s.IsSameBase(ts) || ts.IsDependedTo(s) {
-			p.pusherrtok(v.Type.Token, "illegal_cycle_in_declaration", s.Id)
+			p.pusherrtok(v.DataType.Token, "illegal_cycle_in_declaration", s.Id)
 		} else {
 			s.Origin.Depends = append(s.Origin.Depends, ts)
 		}
@@ -1985,7 +1985,7 @@ func (p *Parser) structConstructorInstance(as *Struct) *Struct {
 	s.Origin = as
 	s.Constructor = new(Fn)
 	*s.Constructor = *as.Constructor
-	s.Constructor.RetType.Type.Tag = s
+	s.Constructor.RetType.DataType.Tag = s
 	s.Defines = as.Defines
 	for i := range s.Defines.Fns {
 		f := &s.Defines.Fns[i]
@@ -2081,11 +2081,11 @@ func (p *Parser) checkGenericsQuantity(required, given int, errTok lex.Token) bo
 
 func (p *Parser) pushGeneric(generic *GenericType, source Type) {
 	alias := &TypeAlias{
-		Id:      generic.Id,
-		Token:   generic.Token,
-		Type:    source,
-		Used:    true,
-		Generic: true,
+		Id:         generic.Id,
+		Token:      generic.Token,
+		TargetType: source,
+		Used:       true,
+		Generic:    true,
 	}
 	p.blockTypes = append(p.blockTypes, alias)
 }
@@ -2108,11 +2108,11 @@ func (p *Parser) fn_parse_type(t *Type) bool {
 
 func (p *Parser) reload_fn_types(f *Fn) {
 	for i := range f.Params {
-		_ = p.fn_parse_type(&f.Params[i].Type)
+		_ = p.fn_parse_type(&f.Params[i].DataType)
 	}
-	ok := p.fn_parse_type(&f.RetType.Type)
-	if ok && types.IsArray(f.RetType.Type) {
-		p.pusherrtok(f.RetType.Type.Token, "invalid_type")
+	ok := p.fn_parse_type(&f.RetType.DataType)
+	if ok && types.IsArray(f.RetType.DataType) {
+		p.pusherrtok(f.RetType.DataType.Token, "invalid_type")
 	}
 }
 
@@ -2152,7 +2152,7 @@ func (p *Parser) parseGenerics(f *Fn, args *ast.Args, errTok lex.Token) bool {
 		for _, generic := range f.Generics {
 			ok := false
 			for _, param := range f.Params {
-				if types.HasThisGeneric(generic, param.Type) {
+				if types.HasThisGeneric(generic, param.DataType) {
 					ok = true
 					break
 				}
@@ -2199,9 +2199,9 @@ func (p *Parser) parse_fn_call(f *Fn, args *ast.Args, m *exprModel, errTok lex.T
 			param := &params[i]
 			fparam := &f.Params[i]
 			*param = *fparam
-			param.Type = fparam.Type.Copy()
+			param.DataType = fparam.DataType.Copy()
 		}
-		retType := f.RetType.Type.Copy()
+		retType := f.RetType.DataType.Copy()
 		owner := f.Owner.(*Parser)
 		rootBlock := owner.rootBlock
 		nodeBlock := owner.nodeBlock
@@ -2215,12 +2215,12 @@ func (p *Parser) parse_fn_call(f *Fn, args *ast.Args, m *exprModel, errTok lex.T
 
 			// Remember generics
 			for i := range params {
-				params[i].Type.Generic = f.Params[i].Type.Generic
+				params[i].DataType.Generic = f.Params[i].DataType.Generic
 			}
-			retType.Generic = f.RetType.Type.Generic
+			retType.Generic = f.RetType.DataType.Generic
 
 			f.Params = params
-			f.RetType.Type = retType
+			f.RetType.DataType = retType
 		}()
 		if !p.parseGenerics(f, args, errTok) {
 			return
@@ -2242,10 +2242,10 @@ func (p *Parser) parse_fn_call(f *Fn, args *ast.Args, m *exprModel, errTok lex.T
 	}
 end:
 	v.data.Value = " "
-	v.data.Type = f.RetType.Type.Copy()
+	v.data.DataType = f.RetType.DataType.Copy()
 	if args.NeedsPureType {
-		v.data.Type.Pure = true
-		v.data.Type.Original = nil
+		v.data.DataType.Pure = true
+		v.data.DataType.Original = nil
 	}
 	return
 }
@@ -2310,14 +2310,14 @@ type paramMapPair struct {
 
 func (p *Parser) pushGenericByFunc(f *Fn, pair *paramMapPair, args *ast.Args, gt Type) bool {
 	tf := gt.Tag.(*Fn)
-	cf := pair.param.Type.Tag.(*Fn)
+	cf := pair.param.DataType.Tag.(*Fn)
 	if len(tf.Params) != len(cf.Params) {
 		return false
 	}
 	for i, param := range tf.Params {
 		pair := *pair
 		pair.param = &cf.Params[i]
-		ok := p.pushGenericByArg(f, &pair, args, param.Type)
+		ok := p.pushGenericByArg(f, &pair, args, param.DataType)
 		if !ok {
 			return ok
 		}
@@ -2325,9 +2325,9 @@ func (p *Parser) pushGenericByFunc(f *Fn, pair *paramMapPair, args *ast.Args, gt
 	{
 		pair := *pair
 		pair.param = &ast.Param{
-			Type: cf.RetType.Type,
+			DataType: cf.RetType.DataType,
 		}
-		return p.pushGenericByArg(f, &pair, args, tf.RetType.Type)
+		return p.pushGenericByArg(f, &pair, args, tf.RetType.DataType)
 	}
 }
 
@@ -2335,7 +2335,7 @@ func (p *Parser) pushGenericByMultiTyped(f *Fn, pair *paramMapPair, args *ast.Ar
 	_types := gt.Tag.([]Type)
 	for _, mt := range _types {
 		for _, generic := range f.Generics {
-			if types.HasThisGeneric(generic, pair.param.Type) {
+			if types.HasThisGeneric(generic, pair.param.DataType) {
 				p.pushGenericByType(f, generic, args, mt)
 				break
 			}
@@ -2346,7 +2346,7 @@ func (p *Parser) pushGenericByMultiTyped(f *Fn, pair *paramMapPair, args *ast.Ar
 
 func (p *Parser) pushGenericByCommonArg(f *Fn, pair *paramMapPair, args *ast.Args, t Type) bool {
 	for _, generic := range f.Generics {
-		if types.IsThisGeneric(generic, pair.param.Type) {
+		if types.IsThisGeneric(generic, pair.param.DataType) {
 			p.pushGenericByType(f, generic, args, t)
 			return true
 		}
@@ -2375,7 +2375,7 @@ func (p *Parser) pushGenericByComponent(f *Fn, pair *paramMapPair, args *ast.Arg
 }
 
 func (p *Parser) pushGenericByArg(f *Fn, pair *paramMapPair, args *ast.Args, argType Type) bool {
-	_, prefix := pair.param.Type.KindId()
+	_, prefix := pair.param.DataType.KindId()
 	_, tprefix := argType.KindId()
 	if prefix != tprefix {
 		return false
@@ -2396,17 +2396,17 @@ func (p *Parser) parseArg(f *Fn, pair *paramMapPair, args *ast.Args, variadiced 
 	var value value
 	var model ast.ExprModel
 	if pair.param.Variadic {
-		t := types.VariadicToSlice(pair.param.Type)
+		t := types.VariadicToSlice(pair.param.DataType)
 		value, model = p.evalExpr(pair.arg.Expr, &t)
 	} else {
-		value, model = p.evalExpr(pair.arg.Expr, &pair.param.Type)
+		value, model = p.evalExpr(pair.arg.Expr, &pair.param.DataType)
 	}
 	pair.arg.Expr.Model = model
 	if !value.variadic && !pair.param.Variadic &&
 		!ast.Has_attribute(build.ATTR_CDEF, f.Attributes) &&
-		types.IsPure(pair.param.Type) && types.IsNumeric(pair.param.Type.Id) {
+		types.IsPure(pair.param.DataType) && types.IsNumeric(pair.param.DataType.Id) {
 		pair.arg.CastType = new(Type)
-		*pair.arg.CastType = pair.param.Type.Copy()
+		*pair.arg.CastType = pair.param.DataType.Copy()
 		pair.arg.CastType.Original = nil
 		pair.arg.CastType.Pure = true
 	}
@@ -2414,8 +2414,8 @@ func (p *Parser) parseArg(f *Fn, pair *paramMapPair, args *ast.Args, variadiced 
 		*variadiced = value.variadic
 	}
 	if args.DynamicGenericAnnotation &&
-		types.HasGenerics(f.Generics, pair.param.Type) {
-		ok := p.pushGenericByArg(f, pair, args, value.data.Type)
+		types.HasGenerics(f.Generics, pair.param.DataType) {
+		ok := p.pushGenericByArg(f, pair, args, value.data.DataType)
 		if !ok {
 			p.pusherrtok(pair.arg.Token, "dynamic_type_annotation_failed")
 		}
@@ -2428,7 +2428,7 @@ func (p *Parser) checkArgType(param *Param, val value, errTok lex.Token) {
 	p.check_valid_init_expr(param.Mutable, val, errTok)
 	assign_checker{
 		p:      p,
-		expr_t: param.Type,
+		expr_t: param.DataType,
 		v:      val,
 		errtok: errTok,
 	}.check()
@@ -2449,8 +2449,8 @@ func (p *Parser) checkSolidFuncSpecialCases(f *Fn) {
 	if len(f.Params) > 0 {
 		p.pusherrtok(f.Token, "fn_have_parameters", f.Id)
 	}
-	if f.RetType.Type.Id != types.VOID {
-		p.pusherrtok(f.RetType.Type.Token, "fn_have_ret", f.Id)
+	if f.RetType.DataType.Id != types.VOID {
+		p.pusherrtok(f.RetType.DataType.Token, "fn_have_ret", f.Id)
 	}
 	f.Attributes = nil
 	if f.IsUnsafe {
@@ -2547,7 +2547,7 @@ func (p *Parser) st(s *ast.Statement, recover bool) bool {
 			p.pusherrtok(data.Token, "ignore_id")
 			break
 		}
-		data.Type, _ = p.realType(data.Type, true)
+		data.TargetType, _ = p.realType(data.TargetType, true)
 		p.blockTypes = append(p.blockTypes, &data)
 	case *ast.Block:
 		p.checkNewBlock(data)
@@ -2622,12 +2622,12 @@ func (p *Parser) recoverFuncExprSt(s *ast.ExprStatement) {
 		p.pusherrtok(errtok, "argument_overflow")
 	}
 	v, _ := p.evalExpr(args.Src[0].Expr, nil)
-	if v.data.Type.Kind != handleParam.Type.Kind {
+	if v.data.DataType.Kind != handleParam.DataType.Kind {
 		p.eval.pusherrtok(errtok, "incompatible_types",
-			handleParam.Type.Kind, v.data.Type.Kind)
+			handleParam.DataType.Kind, v.data.DataType.Kind)
 		return
 	}
-	handler := v.data.Type.Tag.(*Fn)
+	handler := v.data.DataType.Tag.(*Fn)
 	s.Expr.Model = exprNode{"try{\n"}
 	var catcher serieExpr
 	catcher.exprs = append(catcher.exprs, "} catch(trait<JULEC_ID(Error)> ")
@@ -2701,7 +2701,7 @@ func (p *Parser) matchcase(m *ast.Match) {
 	if !m.Expr.IsEmpty() {
 		value, expr_model := p.evalExpr(m.Expr, nil)
 		m.Expr.Model = expr_model
-		m.ExprType = value.data.Type
+		m.ExprType = value.data.DataType
 	} else {
 		m.ExprType.Id = types.BOOL
 		m.ExprType.Kind = types.TYPE_MAP[m.ExprType.Id]
@@ -2906,7 +2906,7 @@ func (p *Parser) checkRets(f *Fn) {
 	if ok {
 		return
 	}
-	if !types.IsVoid(f.RetType.Type) {
+	if !types.IsVoid(f.RetType.DataType) {
 		p.pusherrtok(f.Token, "missing_ret")
 	}
 }
@@ -2958,7 +2958,7 @@ func (p *Parser) assignment(left value, errtok lex.Token) bool {
 	} else if !left.mutable {
 		p.pusherrtok(errtok, "assignment_to_non_mut")
 	}
-	switch left.data.Type.Tag.(type) {
+	switch left.data.DataType.Tag.(type) {
 	case Fn:
 		f, _, _ := p.fn_by_id(left.data.Token.Kind)
 		if f != nil {
@@ -2991,7 +2991,7 @@ func (p *Parser) singleAssign(assign *ast.Assign, l, r []value) {
 	}
 	assign_checker{
 		p:      p,
-		expr_t: left.data.Type,
+		expr_t: left.data.DataType,
 		v:      right,
 		errtok: assign.Setter,
 	}.check()
@@ -3013,7 +3013,7 @@ func (p *Parser) assignExprs(vsAST *ast.Assign) (l []value, r []value) {
 				v, model := p.evalExpr(left.Expr, nil)
 				left.Expr.Model = model
 				l[i] = v
-				r_type = &v.data.Type
+				r_type = &v.data.DataType
 			} else {
 				l[i].data.Value = lex.IGNORE_ID
 			}
@@ -3029,7 +3029,7 @@ func (p *Parser) assignExprs(vsAST *ast.Assign) (l []value, r []value) {
 }
 
 func (p *Parser) funcMultiAssign(vsAST *ast.Assign, l, r []value) {
-	types := r[0].data.Type.Tag.([]Type)
+	types := r[0].data.DataType.Tag.([]Type)
 	if len(types) > len(vsAST.Left) {
 		p.pusherrtok(vsAST.Setter, "missing_multi_assign_identifiers")
 		return
@@ -3039,7 +3039,7 @@ func (p *Parser) funcMultiAssign(vsAST *ast.Assign, l, r []value) {
 	}
 	rights := make([]value, len(types))
 	for i, t := range types {
-		rights[i] = value{data: ast.Data{Token: t.Token, Type: t}}
+		rights[i] = value{data: ast.Data{Token: t.Token, DataType: t}}
 	}
 	p.multiAssign(vsAST, l, rights)
 }
@@ -3048,7 +3048,7 @@ func (p *Parser) check_valid_init_expr(left_mutable bool, right value, errtok le
 	if p.unsafe_allowed() || !lex.IsIdentifierRune(right.data.Value) {
 		return
 	}
-	if left_mutable && !right.mutable && types.IsMut(right.data.Type) {
+	if left_mutable && !right.mutable && types.IsMut(right.data.DataType) {
 		p.pusherrtok(errtok, "assignment_non_mut_to_mut")
 		return
 	}
@@ -3076,7 +3076,7 @@ func (p *Parser) multiAssign(assign *ast.Assign, l, r []value) {
 			p.check_valid_init_expr(leftExpr.mutable, right, assign.Setter)
 			assign_checker{
 				p:      p,
-				expr_t: leftExpr.data.Type,
+				expr_t: leftExpr.data.DataType,
 				v:      right,
 				errtok: assign.Setter,
 			}.check()
@@ -3099,20 +3099,20 @@ func (p *Parser) postfix(assign *ast.Assign, l, r []value) {
 	}
 	left := l[0]
 	_ = p.assignment(left, assign.Setter)
-	if types.IsExplicitPtr(left.data.Type) {
+	if types.IsExplicitPtr(left.data.DataType) {
 		if !p.unsafe_allowed() {
 			p.pusherrtok(assign.Left[0].Expr.Tokens[0], "unsafe_behavior_at_out_of_unsafe_scope")
 		}
 		return
 	}
-	checkType := left.data.Type
+	checkType := left.data.DataType
 	if types.IsRef(checkType) {
 		checkType = types.DerefPtrOrRef(checkType)
 	}
 	if types.IsPure(checkType) && types.IsNumeric(checkType.Id) {
 		return
 	}
-	p.pusherrtok(assign.Setter, "operator_not_for_juletype", assign.Setter.Kind, left.data.Type.Kind)
+	p.pusherrtok(assign.Setter, "operator_not_for_juletype", assign.Setter.Kind, left.data.DataType.Kind)
 }
 
 func (p *Parser) assign(assign *ast.Assign) {
@@ -3131,7 +3131,7 @@ func (p *Parser) assign(assign *ast.Assign) {
 		return
 	case rn == 1:
 		right := r[0]
-		if right.data.Type.MultiTyped {
+		if right.data.DataType.MultiTyped {
 			assign.MultipleRet = true
 			p.funcMultiAssign(assign, l, r)
 			return
@@ -3166,7 +3166,7 @@ func (p *Parser) foreachProfile(iter *ast.Iter) {
 	profile := iter.Profile.(ast.IterForeach)
 	val, model := p.evalExpr(profile.Expr, nil)
 	profile.Expr.Model = model
-	profile.ExprType = val.data.Type
+	profile.ExprType = val.data.DataType
 	if !p.eval.has_error && val.data.Value != "" && !isForeachIterExpr(val) {
 		p.pusherrtok(iter.Token, "iter_foreach_require_enumerable_expr")
 	} else {
@@ -3367,13 +3367,13 @@ func (p *Parser) typeSourceOfMultiTyped(dt Type, err bool) (Type, bool) {
 func (p *Parser) typeSourceIsAlias(dt Type, alias *TypeAlias, err bool) (Type, bool) {
 	original := dt.Original
 	old := dt
-	dt = alias.Type
+	dt = alias.TargetType
 	dt.Token = alias.Token
 	dt.Generic = alias.Generic
 	dt.Original = original
 	dt, ok := p.typeSource(dt, err)
 	dt.Pure = false
-	if ok && old.Tag != nil && !types.IsStruct(alias.Type) { // Has generics
+	if ok && old.Tag != nil && !types.IsStruct(alias.TargetType) { // Has generics
 		p.pusherrtok(dt.Token, "invalid_type_source")
 	}
 	return dt, ok

@@ -481,7 +481,7 @@ func gen_iter(i *ast.Iter) string {
 func gen_type_alias(t *ast.TypeAlias) string {
 	var cpp strings.Builder
 	cpp.WriteString("typedef ")
-	cpp.WriteString(t.Type.String())
+	cpp.WriteString(t.TargetType.String())
 	cpp.WriteByte(' ')
 	if t.Generic {
 		cpp.WriteString(build.AsId(t.Id))
@@ -1092,7 +1092,7 @@ func gen_prototypes(tree *ast.Defmap, used *[]*ast.UseDecl, structs []*ast.Struc
 func _gen_globals(dm *ast.Defmap) string {
 	var cpp strings.Builder
 	for _, g := range dm.Globals {
-		if !g.Const && g.Used && g.Token.Id != lex.ID_NA {
+		if !g.Constant && g.Used && g.Token.Id != lex.ID_NA {
 			cpp.WriteString(g.String())
 			cpp.WriteByte('\n')
 		}
@@ -1189,7 +1189,7 @@ func gen_trait(t *ast.Trait) string {
 		cpp.WriteString(f.Id)
 		cpp.WriteString(gen_params(f.Params))
 		cpp.WriteString(" {")
-		if !types.IsVoid(f.RetType.Type) {
+		if !types.IsVoid(f.RetType.DataType) {
 			cpp.WriteString(" return {}; ")
 		}
 		cpp.WriteString("}\n")

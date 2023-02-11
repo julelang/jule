@@ -15,7 +15,7 @@ type unary struct {
 
 func (u *unary) minus() value {
 	v := u.p.eval.process(u.toks, u.model)
-	if !types.IsPure(v.data.Type) || !types.IsNumeric(v.data.Type.Id) {
+	if !types.IsPure(v.data.DataType) || !types.IsNumeric(v.data.DataType.Id) {
 		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_MINUS)
 	}
 	if v.constant {
@@ -35,7 +35,7 @@ func (u *unary) minus() value {
 
 func (u *unary) plus() value {
 	v := u.p.eval.process(u.toks, u.model)
-	if !types.IsPure(v.data.Type) || !types.IsNumeric(v.data.Type.Id) {
+	if !types.IsPure(v.data.DataType) || !types.IsNumeric(v.data.DataType.Id) {
 		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_PLUS)
 	}
 	if v.constant {
@@ -54,7 +54,7 @@ func (u *unary) plus() value {
 
 func (u *unary) caret() value {
 	v := u.p.eval.process(u.toks, u.model)
-	if !types.IsPure(v.data.Type) || !types.IsInteger(v.data.Type.Id) {
+	if !types.IsPure(v.data.DataType) || !types.IsInteger(v.data.DataType.Id) {
 		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_CARET)
 	}
 	if v.constant {
@@ -77,8 +77,8 @@ func (u *unary) logicalNot() value {
 		v.expr = !v.expr.(bool)
 		v.model = boolModel(v)
 	}
-	v.data.Type.Id = types.BOOL
-	v.data.Type.Kind = lex.KND_BOOL
+	v.data.DataType.Id = types.BOOL
+	v.data.DataType.Kind = lex.KND_BOOL
 	return v
 }
 
@@ -90,11 +90,11 @@ func (u *unary) star() value {
 	v.constant = false
 	v.lvalue = true
 	switch {
-	case !types.IsExplicitPtr(v.data.Type):
+	case !types.IsExplicitPtr(v.data.DataType):
 		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_STAR)
 		goto end
 	}
-	v.data.Type.Kind = v.data.Type.Kind[1:]
+	v.data.DataType.Kind = v.data.DataType.Kind[1:]
 end:
 	v.data.Value = " "
 	return v
@@ -107,7 +107,7 @@ func (u *unary) amper() value {
 	nodes := &u.model.nodes[u.model.index].nodes
 	switch {
 	case valIsStructIns(v):
-		s := v.data.Type.Tag.(*Struct)
+		s := v.data.DataType.Tag.(*Struct)
 		// Is not struct literal
 		if s.Id != v.data.Value {
 			break
@@ -119,20 +119,20 @@ func (u *unary) amper() value {
 		(*nodes)[0] = alloc_model
 		last := &(*nodes)[len(*nodes)-1]
 		*last = exprNode{(*last).String() + ")"}
-		v.data.Type.Kind = lex.KND_AMPER + v.data.Type.Kind
+		v.data.DataType.Kind = lex.KND_AMPER + v.data.DataType.Kind
 		v.mutable = true
 		return v
-	case types.IsRef(v.data.Type):
+	case types.IsRef(v.data.DataType):
 		model := exprNode{(*nodes)[1].String() + "._alloc"}
 		*nodes = nil
 		*nodes = make([]ast.ExprModel, 1)
 		(*nodes)[0] = model
-		v.data.Type.Kind = lex.KND_STAR + types.DerefPtrOrRef(v.data.Type).Kind
+		v.data.DataType.Kind = lex.KND_STAR + types.DerefPtrOrRef(v.data.DataType).Kind
 		return v
 	case !canGetPtr(v):
 		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_AMPER)
 		return v
 	}
-	v.data.Type.Kind = lex.KND_STAR + v.data.Type.Kind
+	v.data.DataType.Kind = lex.KND_STAR + v.data.DataType.Kind
 	return v
 }

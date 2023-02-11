@@ -11,11 +11,11 @@ const ERR uint8 = 1
 
 // Log is a build log.
 type Log struct {
-	Type    uint8
-	Row     int
-	Column  int
-	Path    string
-	Text string
+	Type   uint8
+	Row    int
+	Column int
+	Path   string
+	Text   string
 }
 
 func (l *Log) flat_err() string { return l.Text }

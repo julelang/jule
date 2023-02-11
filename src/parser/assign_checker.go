@@ -90,8 +90,8 @@ func (ac *assign_checker) has_error() bool {
 
 func (ac *assign_checker) check_validity() (valid bool) {
 	valid = true
-	if types.IsFn(ac.v.data.Type) {
-		f := ac.v.data.Type.Tag.(*Fn)
+	if types.IsFn(ac.v.data.DataType) {
+		f := ac.v.data.DataType.Tag.(*Fn)
 		if f.Receiver != nil {
 			ac.p.pusherrtok(ac.errtok, "method_as_anonymous_fn")
 			valid = false
@@ -105,7 +105,7 @@ func (ac *assign_checker) check_validity() (valid bool) {
 
 func (ac *assign_checker) check_const() (ok bool) {
 	if !ac.v.constant || !types.IsPure(ac.expr_t) ||
-		!types.IsPure(ac.v.data.Type) || !types.IsNumeric(ac.v.data.Type.Id) {
+		!types.IsPure(ac.v.data.DataType) || !types.IsNumeric(ac.v.data.DataType.Id) {
 		return
 	}
 	ok = true
@@ -134,5 +134,5 @@ func (ac assign_checker) check() {
 	} else if ac.check_const() {
 		return
 	}
-	ac.p.check_type(ac.expr_t, ac.v.data.Type, ac.ignoreAny, !ac.not_allow_assign, ac.errtok)
+	ac.p.check_type(ac.expr_t, ac.v.data.DataType, ac.ignoreAny, !ac.not_allow_assign, ac.errtok)
 }

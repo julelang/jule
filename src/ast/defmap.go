@@ -130,7 +130,7 @@ func (dm *Defmap) TypeById(id string, f *lex.File) (*TypeAlias, *Defmap, bool) {
 func (dm *Defmap) FindFnById(id string, f *lex.File) (int, *Defmap, bool) {
 	for i, fn := range dm.Fns {
 		if fn != nil && fn.Id == id {
-			if IsAccessable(f, fn.Token.File, fn.Pub) {
+			if IsAccessable(f, fn.Token.File, fn.Public) {
 				return i, dm, false
 			}
 		}
@@ -156,8 +156,8 @@ func (dm *Defmap) FnById(id string, f *lex.File) (*Fn, *Defmap, bool) {
 
 func (dm *Defmap) FindGlobalById(id string, f *lex.File) (int, *Defmap, bool) {
 	for i, g := range dm.Globals {
-		if g != nil && g.Type.Id != void_t && g.Id == id {
-			if IsAccessable(f, g.Token.File, g.Pub) {
+		if g != nil && g.DataType.Id != void_t && g.Id == id {
+			if IsAccessable(f, g.Token.File, g.Public) {
 				return i, dm, false
 			}
 		}

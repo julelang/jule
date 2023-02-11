@@ -15,11 +15,11 @@ import (
 
 func compilerErr(t lex.Token, key string, args ...any) build.Log {
 	return build.Log{
-		Type:    build.ERR,
-		Row:     t.Row,
-		Column:  t.Column,
-		Path:    t.File.Path(),
-		Text: build.Errorf(key, args...),
+		Type:   build.ERR,
+		Row:    t.Row,
+		Column: t.Column,
+		Path:   t.File.Path(),
+		Text:   build.Errorf(key, args...),
 	}
 }
 
@@ -33,7 +33,7 @@ type block_st struct {
 }
 
 type builder struct {
-	pub bool
+	public bool
 
 	Tree   []ast.Node
 	Errors []build.Log
@@ -87,7 +87,7 @@ func (b *builder) buildNode(toks []lex.Token) {
 		b.pusherr(t, "invalid_syntax")
 		return
 	}
-	if b.pub {
+	if b.public {
 		b.pusherr(t, "def_not_support_pub")
 	}
 }
@@ -96,8 +96,8 @@ func (b *builder) buildNode(toks []lex.Token) {
 func (b *builder) Build() {
 	for b.Pos != -1 && !b.Ended() {
 		toks := b.next_builder_st()
-		b.pub = toks[0].Id == lex.ID_PUB
-		if b.pub {
+		b.public = toks[0].Id == lex.ID_PUB
+		if b.public {
 			if len(toks) == 1 {
 				if b.Ended() {
 					b.pusherr(toks[0], "invalid_syntax")
@@ -141,7 +141,7 @@ func (b *builder) TypeAlias(toks []lex.Token) (t ast.TypeAlias) {
 		return
 	}
 	destType, ok := b.DataType(toks, &i, true)
-	t.Type = destType
+	t.TargetType = destType
 	if ok && i+1 < len(toks) {
 		b.pusherr(toks[i+1], "invalid_syntax")
 	}
@@ -233,14 +233,14 @@ func (b *builder) Enum(toks []lex.Token) {
 			b.pusherr(toks[i-1], "invalid_syntax")
 			return
 		}
-		e.Type, _ = b.DataType(toks, &i, true)
+		e.DataType, _ = b.DataType(toks, &i, true)
 		i++
 		if i >= len(toks) {
 			b.pusherr(e.Token, "body_not_exist")
 			return
 		}
 	} else {
-		e.Type = ast.Type{Id: types.U32, Kind: types.TYPE_MAP[types.U32]}
+		e.DataType = ast.Type{Id: types.U32, Kind: types.TYPE_MAP[types.U32]}
 	}
 	itemToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &toks)
 	if itemToks == nil {
@@ -249,8 +249,8 @@ func (b *builder) Enum(toks []lex.Token) {
 	} else if i < len(toks) {
 		b.pusherr(toks[i], "invalid_syntax")
 	}
-	e.Pub = b.pub
-	b.pub = false
+	e.Pub = b.public
+	b.public = false
 	e.Items = b.buildEnumItems(itemToks)
 	b.Tree = append(b.Tree, ast.Node{Token: e.Token, Data: e})
 }
@@ -292,7 +292,7 @@ func (b *builder) structFields(toks []lex.Token, cpp_linked bool) []*ast.Var {
 			var_tokens = var_tokens[1:]
 		}
 		v := b.Var(var_tokens, false, false)
-		v.Pub = is_pub
+		v.Public = is_pub
 		v.Mutable = is_mut
 		v.IsField = true
 		v.CppLinked = cpp_linked
@@ -303,8 +303,8 @@ func (b *builder) structFields(toks []lex.Token, cpp_linked bool) []*ast.Var {
 
 func (b *builder) build_struct(toks []lex.Token, cpp_linked bool) ast.Struct {
 	var s ast.Struct
-	s.Pub = b.pub
-	b.pub = false
+	s.Pub = b.public
+	b.public = false
 	if len(toks) < 3 {
 		b.pusherr(toks[0], "invalid_syntax")
 		return s
@@ -356,7 +356,7 @@ func (b *builder) traitFns(toks []lex.Token, trait_id string) []*ast.Fn {
 		fnToks := b.skip_st(&i, &toks)
 		f := b.Func(fnToks, true, false, true)
 		b.setup_receiver(&f, trait_id)
-		f.Pub = true
+		f.Public = true
 		fns = append(fns, &f)
 	}
 	return fns
@@ -365,8 +365,8 @@ func (b *builder) traitFns(toks []lex.Token, trait_id string) []*ast.Fn {
 // Trait builds AST model of trait.
 func (b *builder) Trait(toks []lex.Token) {
 	var t ast.Trait
-	t.Pub = b.pub
-	b.pub = false
+	t.Pub = b.public
+	b.public = false
 	if len(toks) < 3 {
 		b.pusherr(toks[0], "invalid_syntax")
 		return
@@ -403,7 +403,7 @@ func (b *builder) implTraitFns(impl *ast.Impl, toks []lex.Token) {
 			continue
 		case lex.ID_FN, lex.ID_UNSAFE:
 			f := b.get_method(fnToks)
-			f.Pub = true
+			f.Public = true
 			b.setup_receiver(f, impl.Target.Kind)
 			impl.Tree = append(impl.Tree, ast.Node{Token: f.Token, Data: f})
 		default:
@@ -442,7 +442,7 @@ func (b *builder) implStruct(impl *ast.Impl, toks []lex.Token) {
 		switch tok.Id {
 		case lex.ID_FN, lex.ID_UNSAFE:
 			f := b.get_method(fnToks)
-			f.Pub = pub
+			f.Public = pub
 			b.setup_receiver(f, impl.Base.Kind)
 			impl.Tree = append(impl.Tree, ast.Node{Token: f.Token, Data: f})
 		default:
@@ -542,8 +542,8 @@ func (b *builder) link_fn(toks []lex.Token) {
 	tok := toks[0]
 
 	// Catch pub not supported
-	bpub := b.pub
-	b.pub = false
+	bpub := b.public
+	b.public = false
 
 	var link ast.CppLinkFn
 	link.Token = tok
@@ -551,7 +551,7 @@ func (b *builder) link_fn(toks []lex.Token) {
 	*link.Link = b.Func(toks[1:], false, false, true)
 	b.Tree = append(b.Tree, ast.Node{Token: tok, Data: link})
 
-	b.pub = bpub
+	b.public = bpub
 }
 
 // link_var builds AST model of cpp variable link.
@@ -559,8 +559,8 @@ func (b *builder) link_var(toks []lex.Token) {
 	tok := toks[0]
 
 	// Catch pub not supported
-	bpub := b.pub
-	b.pub = false
+	bpub := b.public
+	b.public = false
 
 	var link ast.CppLinkVar
 	link.Token = tok
@@ -568,7 +568,7 @@ func (b *builder) link_var(toks []lex.Token) {
 	*link.Link = b.Var(toks[1:], true, false)
 	b.Tree = append(b.Tree, ast.Node{Token: tok, Data: link})
 
-	b.pub = bpub
+	b.public = bpub
 }
 
 // link_struct builds AST model of cpp structure link.
@@ -576,15 +576,15 @@ func (b *builder) link_struct(toks []lex.Token) {
 	tok := toks[0]
 
 	// Catch pub not supported
-	bpub := b.pub
-	b.pub = false
+	bpub := b.public
+	b.public = false
 
 	var link ast.CppLinkStruct
 	link.Token = tok
 	link.Link = b.build_struct(toks[1:], true)
 	b.Tree = append(b.Tree, ast.Node{Token: tok, Data: link})
 
-	b.pub = bpub
+	b.public = bpub
 }
 
 // link_type_alias builds AST model of cpp type alias link.
@@ -592,15 +592,15 @@ func (b *builder) link_type_alias(toks []lex.Token) {
 	tok := toks[0]
 
 	// Catch pub not supported
-	bpub := b.pub
-	b.pub = false
+	bpub := b.public
+	b.public = false
 
 	var link ast.CppLinkAlias
 	link.Token = tok
 	link.Link = b.TypeAlias(toks[1:])
 	b.Tree = append(b.Tree, ast.Node{Token: tok, Data: link})
 
-	b.pub = bpub
+	b.public = bpub
 }
 
 // CppLinks builds AST model of cpp link statement.
@@ -781,13 +781,13 @@ func (b *builder) setup_receiver(f *ast.Fn, owner_id string) {
 		return
 	}
 	f.Receiver = new(ast.Var)
-	f.Receiver.Type = ast.Type{
+	f.Receiver.DataType = ast.Type{
 		Id:   types.STRUCT,
 		Kind: owner_id,
 	}
 	f.Receiver.Mutable = param.Mutable
-	if param.Type.Kind != "" && param.Type.Kind[0] == '&' {
-		f.Receiver.Type.Kind = lex.KND_AMPER + f.Receiver.Type.Kind
+	if param.DataType.Kind != "" && param.DataType.Kind[0] == '&' {
+		f.Receiver.DataType.Kind = lex.KND_AMPER + f.Receiver.DataType.Kind
 	}
 	f.Params = f.Params[1:]
 }
@@ -812,8 +812,8 @@ func (b *builder) fn_prototype(toks []lex.Token, i *int, method, anon bool) (f a
 		ok = false
 		return
 	}
-	f.Pub = b.pub
-	b.pub = false
+	f.Public = b.public
+	b.public = false
 	if anon {
 		f.Id = lex.ANONYMOUS_ID
 	} else {
@@ -826,8 +826,8 @@ func (b *builder) fn_prototype(toks []lex.Token, i *int, method, anon bool) (f a
 		*i++
 	}
 
-	f.RetType.Type.Id = types.VOID
-	f.RetType.Type.Kind = types.TYPE_MAP[f.RetType.Type.Id]
+	f.RetType.DataType.Id = types.VOID
+	f.RetType.DataType.Kind = types.TYPE_MAP[f.RetType.DataType.Id]
 	if *i >= len(toks) {
 		b.pusherr(f.Token, "invalid_syntax")
 		return
@@ -924,8 +924,8 @@ func (b *builder) Generics(toks []lex.Token) []*ast.GenericType {
 // GlobalTypeAlias builds global type alias.
 func (b *builder) GlobalTypeAlias(toks []lex.Token) ast.Node {
 	t := b.TypeAlias(toks)
-	t.Pub = b.pub
-	b.pub = false
+	t.Pub = b.public
+	b.public = false
 	return ast.Node{Token: t.Token, Data: t}
 }
 
@@ -956,7 +956,7 @@ func (b *builder) build_self(toks []lex.Token) (model ast.Param) {
 		}
 	}
 	if toks[i].Kind == lex.KND_AMPER {
-		model.Type.Kind = "&"
+		model.DataType.Kind = "&"
 		i++
 		if i >= len(toks) {
 			b.pusherr(toks[i-1], "invalid_syntax")
@@ -999,16 +999,16 @@ func (b *builder) Params(toks []lex.Token, method, mustPure bool) []ast.Param {
 func (b *builder) checkParams(params *[]ast.Param) {
 	for i := range *params {
 		param := &(*params)[i]
-		if param.Id == lex.KND_SELF || param.Type.Token.Id != lex.ID_NA {
+		if param.Id == lex.KND_SELF || param.DataType.Token.Id != lex.ID_NA {
 			continue
 		}
 		if param.Token.Id == lex.ID_NA {
 			b.pusherr(param.Token, "missing_type")
 		} else {
-			param.Type.Token = param.Token
-			param.Type.Id = types.ID
-			param.Type.Kind = param.Type.Token.Kind
-			param.Type.Original = param.Type
+			param.DataType.Token = param.Token
+			param.DataType.Id = types.ID
+			param.DataType.Kind = param.DataType.Token.Kind
+			param.DataType.Original = param.DataType
 			param.Id = lex.ANONYMOUS_ID
 			param.Token = lex.Token{}
 		}
@@ -1072,7 +1072,7 @@ func (b *builder) paramType(param *ast.Param, toks []lex.Token, mustPure bool) {
 			return
 		}
 	}
-	param.Type, _ = b.DataType(toks, &i, true)
+	param.DataType, _ = b.DataType(toks, &i, true)
 	i++
 	if i < len(toks) {
 		b.pusherr(toks[i], "invalid_syntax")
@@ -1125,11 +1125,11 @@ func (b *builder) DataType(toks []lex.Token, i *int, err bool) (t ast.Type, ok b
 
 func (b *builder) fnMultiTypeRet(toks []lex.Token, i *int) (t ast.RetType, ok bool) {
 	tok := toks[*i]
-	t.Type.Kind += tok.Kind
+	t.DataType.Kind += tok.Kind
 	*i++
 	if *i >= len(toks) {
 		*i--
-		t.Type, ok = b.DataType(toks, i, false)
+		t.DataType, ok = b.DataType(toks, i, false)
 		return
 	}
 	tok = toks[*i]
@@ -1138,7 +1138,7 @@ func (b *builder) fnMultiTypeRet(toks []lex.Token, i *int) (t ast.RetType, ok bo
 	params := b.Params(rang, false, true)
 	types := make([]ast.Type, len(params))
 	for i, param := range params {
-		types[i] = param.Type
+		types[i] = param.DataType
 		if param.Id != lex.ANONYMOUS_ID {
 			param.Token.Kind = param.Id
 		} else {
@@ -1147,10 +1147,10 @@ func (b *builder) fnMultiTypeRet(toks []lex.Token, i *int) (t ast.RetType, ok bo
 		t.Identifiers = append(t.Identifiers, param.Token)
 	}
 	if len(types) > 1 {
-		t.Type.MultiTyped = true
-		t.Type.Tag = types
+		t.DataType.MultiTyped = true
+		t.DataType.Tag = types
 	} else {
-		t.Type = types[0]
+		t.DataType = types[0]
 	}
 	// Decrament for correct block parsing
 	*i--
@@ -1160,8 +1160,8 @@ func (b *builder) fnMultiTypeRet(toks []lex.Token, i *int) (t ast.RetType, ok bo
 
 // FnRetDataType builds ret data-type of function.
 func (b *builder) FnRetDataType(toks []lex.Token, i *int) (t ast.RetType, ok bool) {
-	t.Type.Id = types.VOID
-	t.Type.Kind = types.TYPE_MAP[t.Type.Id]
+	t.DataType.Id = types.VOID
+	t.DataType.Kind = types.TYPE_MAP[t.DataType.Id]
 	if *i >= len(toks) {
 		return
 	}
@@ -1190,7 +1190,7 @@ func (b *builder) FnRetDataType(toks []lex.Token, i *int) (t ast.RetType, ok boo
 				return
 			}
 		}
-		t.Type, ok = b.DataType(toks, i, true)
+		t.DataType, ok = b.DataType(toks, i, true)
 		return
 	}
 	*i++
@@ -1628,11 +1628,11 @@ func (b *builder) varBegin(v *ast.Var, i *int, toks []lex.Token) {
 		}
 	case lex.ID_CONST:
 		*i++
-		if v.Const {
+		if v.Constant {
 			b.pusherr(tok, "already_const")
 			break
 		}
-		v.Const = true
+		v.Constant = true
 		if !v.Mutable {
 			break
 		}
@@ -1657,7 +1657,7 @@ func (b *builder) varTypeNExpr(v *ast.Var, toks []lex.Token, i int, expr bool) {
 		}
 		t, ok := b.DataType(toks, &i, false)
 		if ok {
-			v.Type = t
+			v.DataType = t
 			i++
 			if i >= len(toks) {
 				return
@@ -1684,8 +1684,8 @@ func (b *builder) varTypeNExpr(v *ast.Var, toks []lex.Token, i int, expr bool) {
 
 // Var builds AST model of variable statement.
 func (b *builder) Var(toks []lex.Token, begin, expr bool) (v ast.Var) {
-	v.Pub = b.pub
-	b.pub = false
+	v.Public = b.public
+	b.public = false
 	i := 0
 	v.Token = toks[i]
 	if begin {
@@ -1700,8 +1700,8 @@ func (b *builder) Var(toks []lex.Token, begin, expr bool) (v ast.Var) {
 		return
 	}
 	v.Id = v.Token.Kind
-	v.Type.Id = types.VOID
-	v.Type.Kind = types.TYPE_MAP[v.Type.Id]
+	v.DataType.Id = types.VOID
+	v.DataType.Kind = types.TYPE_MAP[v.DataType.Id]
 	if i >= len(toks) {
 		return
 	}

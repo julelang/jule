@@ -8,40 +8,40 @@ import (
 func setshift(v *value, right uint64) {
 	switch {
 	case right <= 6:
-		v.data.Type.Id = types.I8
+		v.data.DataType.Id = types.I8
 	case right <= 7:
-		v.data.Type.Id = types.U8
+		v.data.DataType.Id = types.U8
 	case right <= 14:
-		v.data.Type.Id = types.I16
+		v.data.DataType.Id = types.I16
 	case right <= 15:
-		v.data.Type.Id = types.U16
+		v.data.DataType.Id = types.U16
 	case right <= 30:
-		v.data.Type.Id = types.I32
+		v.data.DataType.Id = types.I32
 	case right <= 31:
-		v.data.Type.Id = types.U32
+		v.data.DataType.Id = types.U32
 	case right <= 62:
-		v.data.Type.Id = types.I64
+		v.data.DataType.Id = types.I64
 	case right <= 63:
-		v.data.Type.Id = types.U64
+		v.data.DataType.Id = types.U64
 	case right <= 127:
-		v.data.Type.Id = types.F32
+		v.data.DataType.Id = types.F32
 	default:
-		v.data.Type.Id = types.F64
+		v.data.DataType.Id = types.F64
 	}
 }
 
 func bitize(v *value) {
 	switch t := v.expr.(type) {
 	case float64:
-		v.data.Type.Id = types.FloatFromBits(types.BitsizeFloat(t))
+		v.data.DataType.Id = types.FloatFromBits(types.BitsizeFloat(t))
 	case int64:
-		v.data.Type.Id = types.IntFromBits(types.BitsizeInt(t))
+		v.data.DataType.Id = types.IntFromBits(types.BitsizeInt(t))
 	case uint64:
-		v.data.Type.Id = types.UIntFromBits(types.BitsizeUInt(t))
+		v.data.DataType.Id = types.UIntFromBits(types.BitsizeUInt(t))
 	default:
 		return
 	}
-	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+	v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 }
 
 func tonumf(expr any) float64 {
@@ -380,19 +380,19 @@ func (s *solver) ptr() (v value) {
 	if !s.types_are_compatible(true) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.op, "incompatible_types",
-			s.r.data.Type.Kind, s.l.data.Type.Kind)
+			s.r.data.DataType.Kind, s.l.data.DataType.Kind)
 		return
 	}
-	if !types.IsPtr(s.l.data.Type) {
+	if !types.IsPtr(s.l.data.DataType) {
 		s.l, s.r = s.r, s.l
 	}
 	switch s.op.Kind {
 	case lex.KND_PLUS, lex.KND_MINUS:
-		v.data.Type = s.l.data.Type
+		v.data.DataType = s.l.data.DataType
 	case lex.KND_EQS, lex.KND_NOT_EQ, lex.KND_LT, lex.KND_GT,
 		lex.KND_GREAT_EQ, lex.KND_LESS_EQ:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	default:
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.op, "operator_not_for_juletype", s.op.Kind, "pointer")
@@ -401,11 +401,11 @@ func (s *solver) ptr() (v value) {
 }
 
 func (s *solver) enum() (v value) {
-	if types.IsEnum(s.l.data.Type) {
-		s.l.data.Type = s.l.data.Type.Tag.(*Enum).Type
+	if types.IsEnum(s.l.data.DataType) {
+		s.l.data.DataType = s.l.data.DataType.Tag.(*Enum).DataType
 	}
-	if types.IsEnum(s.r.data.Type) {
-		s.r.data.Type = s.r.data.Type.Tag.(*Enum).Type
+	if types.IsEnum(s.r.data.DataType) {
+		s.r.data.DataType = s.r.data.DataType.Tag.(*Enum).DataType
 	}
 	return s.solve()
 }
@@ -413,24 +413,24 @@ func (s *solver) enum() (v value) {
 func (s *solver) str() (v value) {
 	v.data.Token = s.op
 	// Not both string?
-	if s.l.data.Type.Id != s.r.data.Type.Id {
+	if s.l.data.DataType.Id != s.r.data.DataType.Id {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.op, "incompatible_types",
-			s.l.data.Type.Kind, s.r.data.Type.Kind)
+			s.l.data.DataType.Kind, s.r.data.DataType.Kind)
 		return
 	}
 	switch s.op.Kind {
 	case lex.KND_PLUS:
-		v.data.Type.Id = types.STR
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.STR
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		s.add(&v)
 	case lex.KND_EQS:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		s.eq(&v)
 	case lex.KND_NOT_EQ:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		s.noteq(&v)
 	default:
 		s.p.eval.has_error = true
@@ -443,8 +443,8 @@ func (s *solver) any() (v value) {
 	v.data.Token = s.op
 	switch s.op.Kind {
 	case lex.KND_EQS, lex.KND_NOT_EQ:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	default:
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.op, "operator_not_for_juletype", s.op.Kind, lex.KND_ANY)
@@ -457,17 +457,17 @@ func (s *solver) bool() (v value) {
 	if !s.types_are_compatible(true) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.op, "incompatible_types",
-			s.r.data.Type.Kind, s.l.data.Type.Kind)
+			s.r.data.DataType.Kind, s.l.data.DataType.Kind)
 		return
 	}
 	switch s.op.Kind {
 	case lex.KND_EQS:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		s.eq(&v)
 	case lex.KND_NOT_EQ:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		s.noteq(&v)
 	default:
 		s.p.eval.has_error = true
@@ -477,21 +477,21 @@ func (s *solver) bool() (v value) {
 }
 
 func (s *solver) floatMod() (v value, ok bool) {
-	if !types.IsInteger(s.l.data.Type.Id) {
-		if !types.IsInteger(s.r.data.Type.Id) {
+	if !types.IsInteger(s.l.data.DataType.Id) {
+		if !types.IsInteger(s.r.data.DataType.Id) {
 			return
 		}
 		s.l, s.r = s.r, s.l
 	}
 	switch {
-	case types.IsSignedInteger(s.l.data.Type.Id):
+	case types.IsSignedInteger(s.l.data.DataType.Id):
 		switch {
 		case int_assignable(types.I64, s.r):
 			return s.signed(), true
 		case int_assignable(types.U64, s.r):
 			return s.unsigned(), true
 		}
-	case types.IsUnsignedInteger(s.l.data.Type.Id):
+	case types.IsUnsignedInteger(s.l.data.DataType.Id):
 		if int_assignable(types.I64, s.r) ||
 			int_assignable(types.U64, s.r) {
 			return s.unsigned(), true
@@ -502,67 +502,67 @@ func (s *solver) floatMod() (v value, ok bool) {
 
 func (s *solver) float() (v value) {
 	v.data.Token = s.op
-	if !types.IsNumeric(s.l.data.Type.Id) ||
-		!types.IsNumeric(s.r.data.Type.Id) {
+	if !types.IsNumeric(s.l.data.DataType.Id) ||
+		!types.IsNumeric(s.r.data.DataType.Id) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.op, "incompatible_types",
-			s.r.data.Type.Kind, s.l.data.Type.Kind)
+			s.r.data.DataType.Kind, s.l.data.DataType.Kind)
 		return
 	}
 	switch s.op.Kind {
 	case lex.KND_EQS:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		s.eq(&v)
 	case lex.KND_NOT_EQ:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		s.noteq(&v)
 	case lex.KND_LT:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		s.lt(&v)
 	case lex.KND_GT:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		s.gt(&v)
 	case lex.KND_GREAT_EQ:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		s.gteq(&v)
 	case lex.KND_LESS_EQ:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		s.lteq(&v)
 	case lex.KND_PLUS:
-		v.data.Type = s.l.data.Type
-		if types.TypeGreaterThan(s.r.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.r.data.Type
+		v.data.DataType = s.l.data.DataType
+		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
+			v.data.DataType = s.r.data.DataType
 		}
 		s.add(&v)
 	case lex.KND_MINUS:
-		v.data.Type = s.l.data.Type
-		if types.TypeGreaterThan(s.r.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.r.data.Type
+		v.data.DataType = s.l.data.DataType
+		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
+			v.data.DataType = s.r.data.DataType
 		}
 		s.sub(&v)
 	case lex.KND_STAR:
-		v.data.Type = s.l.data.Type
-		if types.TypeGreaterThan(s.r.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.r.data.Type
+		v.data.DataType = s.l.data.DataType
+		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
+			v.data.DataType = s.r.data.DataType
 		}
 		s.mul(&v)
 	case lex.KND_SOLIDUS:
 		// Ignore float if expression has integer
-		if types.IsInteger(s.l.data.Type.Id) && types.IsInteger(s.r.data.Type.Id) {
-		} else if types.IsInteger(s.l.data.Type.Id) {
-			s.r.data.Type = s.l.data.Type
-		} else if types.IsInteger(s.r.data.Type.Id) {
-			s.l.data.Type = s.r.data.Type
+		if types.IsInteger(s.l.data.DataType.Id) && types.IsInteger(s.r.data.DataType.Id) {
+		} else if types.IsInteger(s.l.data.DataType.Id) {
+			s.r.data.DataType = s.l.data.DataType
+		} else if types.IsInteger(s.r.data.DataType.Id) {
+			s.l.data.DataType = s.r.data.DataType
 		}
-		v.data.Type = s.l.data.Type
-		if types.TypeGreaterThan(s.r.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.r.data.Type
+		v.data.DataType = s.l.data.DataType
+		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
+			v.data.DataType = s.r.data.DataType
 		}
 		s.div(&v)
 	case lex.KND_PERCENT:
@@ -581,96 +581,96 @@ func (s *solver) float() (v value) {
 
 func (s *solver) signed() (v value) {
 	v.data.Token = s.op
-	if !types.IsNumeric(s.l.data.Type.Id) ||
-		!types.IsNumeric(s.r.data.Type.Id) {
+	if !types.IsNumeric(s.l.data.DataType.Id) ||
+		!types.IsNumeric(s.r.data.DataType.Id) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.op, "incompatible_types",
-			s.r.data.Type.Kind, s.l.data.Type.Kind)
+			s.r.data.DataType.Kind, s.l.data.DataType.Kind)
 		return
 	}
 	switch s.op.Kind {
 	case lex.KND_EQS:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		s.eq(&v)
 	case lex.KND_NOT_EQ:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		s.noteq(&v)
 	case lex.KND_LT:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		s.lt(&v)
 	case lex.KND_GT:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		s.gt(&v)
 	case lex.KND_GREAT_EQ:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		s.gteq(&v)
 	case lex.KND_LESS_EQ:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		s.lteq(&v)
 	case lex.KND_PLUS:
-		v.data.Type = s.l.data.Type
-		if types.TypeGreaterThan(s.r.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.r.data.Type
+		v.data.DataType = s.l.data.DataType
+		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
+			v.data.DataType = s.r.data.DataType
 		}
 		s.add(&v)
 	case lex.KND_MINUS:
-		v.data.Type = s.l.data.Type
-		if types.TypeGreaterThan(s.r.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.r.data.Type
+		v.data.DataType = s.l.data.DataType
+		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
+			v.data.DataType = s.r.data.DataType
 		}
 		s.sub(&v)
 	case lex.KND_STAR:
-		v.data.Type = s.l.data.Type
-		if types.TypeGreaterThan(s.r.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.r.data.Type
+		v.data.DataType = s.l.data.DataType
+		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
+			v.data.DataType = s.r.data.DataType
 		}
 		s.mul(&v)
 	case lex.KND_SOLIDUS:
-		v.data.Type = s.l.data.Type
-		if types.TypeGreaterThan(s.r.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.r.data.Type
+		v.data.DataType = s.l.data.DataType
+		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
+			v.data.DataType = s.r.data.DataType
 		}
 		s.div(&v)
 	case lex.KND_PERCENT:
-		v.data.Type = s.l.data.Type
-		if types.TypeGreaterThan(s.r.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.r.data.Type
+		v.data.DataType = s.l.data.DataType
+		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
+			v.data.DataType = s.r.data.DataType
 		}
 		s.mod(&v)
 	case lex.KND_AMPER:
-		v.data.Type = s.l.data.Type
-		if types.TypeGreaterThan(s.r.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.r.data.Type
+		v.data.DataType = s.l.data.DataType
+		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
+			v.data.DataType = s.r.data.DataType
 		}
 		s.bitwiseAnd(&v)
 	case lex.KND_VLINE:
-		v.data.Type = s.l.data.Type
-		if types.TypeGreaterThan(s.r.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.r.data.Type
+		v.data.DataType = s.l.data.DataType
+		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
+			v.data.DataType = s.r.data.DataType
 		}
 		s.bitwiseOr(&v)
 	case lex.KND_CARET:
-		v.data.Type = s.l.data.Type
-		if types.TypeGreaterThan(s.r.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.r.data.Type
+		v.data.DataType = s.l.data.DataType
+		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
+			v.data.DataType = s.r.data.DataType
 		}
 		s.bitwiseXor(&v)
 	case lex.KND_RSHIFT:
-		v.data.Type.Id = types.U64
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.U64
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		if !okForShifting(s.r) {
 			s.p.pusherrtok(s.op, "bitshift_must_unsigned")
 		}
 		s.rshift(&v)
 	case lex.KND_LSHIFT:
-		v.data.Type.Id = types.U64
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.U64
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		if !okForShifting(s.r) {
 			s.p.pusherrtok(s.op, "bitshift_must_unsigned")
 		}
@@ -684,96 +684,96 @@ func (s *solver) signed() (v value) {
 
 func (s *solver) unsigned() (v value) {
 	v.data.Token = s.op
-	if !types.IsNumeric(s.l.data.Type.Id) ||
-		!types.IsNumeric(s.r.data.Type.Id) {
+	if !types.IsNumeric(s.l.data.DataType.Id) ||
+		!types.IsNumeric(s.r.data.DataType.Id) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.op, "incompatible_types",
-			s.r.data.Type.Kind, s.l.data.Type.Kind)
+			s.r.data.DataType.Kind, s.l.data.DataType.Kind)
 		return
 	}
 	switch s.op.Kind {
 	case lex.KND_EQS:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		s.eq(&v)
 	case lex.KND_NOT_EQ:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		s.noteq(&v)
 	case lex.KND_LT:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		s.lt(&v)
 	case lex.KND_GT:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		s.gt(&v)
 	case lex.KND_GREAT_EQ:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		s.gteq(&v)
 	case lex.KND_LESS_EQ:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		s.lteq(&v)
 	case lex.KND_PLUS:
-		v.data.Type = s.l.data.Type
-		if types.TypeGreaterThan(s.r.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.r.data.Type
+		v.data.DataType = s.l.data.DataType
+		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
+			v.data.DataType = s.r.data.DataType
 		}
 		s.add(&v)
 	case lex.KND_MINUS:
-		v.data.Type = s.l.data.Type
-		if types.TypeGreaterThan(s.r.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.r.data.Type
+		v.data.DataType = s.l.data.DataType
+		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
+			v.data.DataType = s.r.data.DataType
 		}
 		s.sub(&v)
 	case lex.KND_STAR:
-		v.data.Type = s.l.data.Type
-		if types.TypeGreaterThan(s.r.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.r.data.Type
+		v.data.DataType = s.l.data.DataType
+		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
+			v.data.DataType = s.r.data.DataType
 		}
 		s.mul(&v)
 	case lex.KND_SOLIDUS:
-		v.data.Type = s.l.data.Type
-		if types.TypeGreaterThan(s.r.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.r.data.Type
+		v.data.DataType = s.l.data.DataType
+		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
+			v.data.DataType = s.r.data.DataType
 		}
 		s.div(&v)
 	case lex.KND_PERCENT:
-		v.data.Type = s.l.data.Type
-		if types.TypeGreaterThan(s.r.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.r.data.Type
+		v.data.DataType = s.l.data.DataType
+		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
+			v.data.DataType = s.r.data.DataType
 		}
 		s.mod(&v)
 	case lex.KND_AMPER:
-		v.data.Type = s.l.data.Type
-		if types.TypeGreaterThan(s.r.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.r.data.Type
+		v.data.DataType = s.l.data.DataType
+		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
+			v.data.DataType = s.r.data.DataType
 		}
 		s.bitwiseAnd(&v)
 	case lex.KND_VLINE:
-		v.data.Type = s.l.data.Type
-		if types.TypeGreaterThan(s.r.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.r.data.Type
+		v.data.DataType = s.l.data.DataType
+		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
+			v.data.DataType = s.r.data.DataType
 		}
 		s.bitwiseOr(&v)
 	case lex.KND_CARET:
-		v.data.Type = s.l.data.Type
-		if types.TypeGreaterThan(s.r.data.Type.Id, v.data.Type.Id) {
-			v.data.Type = s.r.data.Type
+		v.data.DataType = s.l.data.DataType
+		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
+			v.data.DataType = s.r.data.DataType
 		}
 		s.bitwiseXor(&v)
 	case lex.KND_RSHIFT:
-		v.data.Type.Id = types.U64
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.U64
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		if !okForShifting(s.r) {
 			s.p.pusherrtok(s.op, "bitshift_must_unsigned")
 		}
 		s.rshift(&v)
 	case lex.KND_LSHIFT:
-		v.data.Type.Id = types.U64
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.U64
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		if !okForShifting(s.r) {
 			s.p.pusherrtok(s.op, "bitshift_must_unsigned")
 		}
@@ -786,15 +786,15 @@ func (s *solver) unsigned() (v value) {
 }
 
 func (s *solver) logical() (v value) {
-	if s.l.data.Type.Id != types.BOOL ||
-		s.r.data.Type.Id != types.BOOL {
+	if s.l.data.DataType.Id != types.BOOL ||
+		s.r.data.DataType.Id != types.BOOL {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.op, "logical_not_bool")
 		return
 	}
 	v.data.Token = s.op
-	v.data.Type.Id = types.BOOL
-	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+	v.data.DataType.Id = types.BOOL
+	v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	if !s.isConstExpr() {
 		return
 	}
@@ -812,16 +812,16 @@ func (s *solver) array() (v value) {
 	if !s.types_are_compatible(true) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.op, "incompatible_types",
-			s.r.data.Type.Kind, s.l.data.Type.Kind)
+			s.r.data.DataType.Kind, s.l.data.DataType.Kind)
 		return
 	}
 	switch s.op.Kind {
 	case lex.KND_EQS, lex.KND_NOT_EQ:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	default:
 		s.p.eval.has_error = true
-		s.p.pusherrtok(s.op, "operator_not_for_juletype", s.op.Kind, s.l.data.Type.Kind)
+		s.p.pusherrtok(s.op, "operator_not_for_juletype", s.op.Kind, s.l.data.DataType.Kind)
 	}
 	return
 }
@@ -831,17 +831,17 @@ func (s *solver) slice() (v value) {
 	if !s.types_are_compatible(true) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.op, "incompatible_types",
-			s.r.data.Type.Kind, s.l.data.Type.Kind)
+			s.r.data.DataType.Kind, s.l.data.DataType.Kind)
 		return
 	}
 	switch s.op.Kind {
 	case lex.KND_EQS, lex.KND_NOT_EQ:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	default:
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.op, "operator_not_for_juletype",
-			s.op.Kind, s.l.data.Type.Kind)
+			s.op.Kind, s.l.data.DataType.Kind)
 	}
 	return
 }
@@ -851,19 +851,19 @@ func (s *solver) nil() (v value) {
 	if !s.types_are_compatible(false) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.op, "incompatible_types",
-			s.r.data.Type.Kind, s.l.data.Type.Kind)
+			s.r.data.DataType.Kind, s.l.data.DataType.Kind)
 		return
 	}
 	switch s.op.Kind {
 	case lex.KND_NOT_EQ:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		if s.isConstExpr() {
 			v.expr = s.l.expr != nil && s.r.expr != nil
 		}
 	case lex.KND_EQS:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 		if s.isConstExpr() {
 			v.expr = s.l.expr == nil && s.r.expr == nil
 		}
@@ -876,16 +876,16 @@ func (s *solver) nil() (v value) {
 
 func (s *solver) structure() (v value) {
 	v.data.Token = s.op
-	if s.l.data.Type.Kind != s.r.data.Type.Kind {
+	if s.l.data.DataType.Kind != s.r.data.DataType.Kind {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.op, "incompatible_types",
-			s.r.data.Type.Kind, s.l.data.Type.Kind)
+			s.r.data.DataType.Kind, s.l.data.DataType.Kind)
 		return
 	}
 	switch s.op.Kind {
 	case lex.KND_NOT_EQ, lex.KND_EQS:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	default:
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.op, "operator_not_for_juletype", s.op.Kind, lex.KND_STRUCT)
@@ -898,13 +898,13 @@ func (s *solver) juletrait() (v value) {
 	if !s.types_are_compatible(true) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.op, "incompatible_types",
-			s.r.data.Type.Kind, s.l.data.Type.Kind)
+			s.r.data.DataType.Kind, s.l.data.DataType.Kind)
 		return
 	}
 	switch s.op.Kind {
 	case lex.KND_NOT_EQ, lex.KND_EQS:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	default:
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.op, "operator_not_for_juletype", s.op.Kind, lex.KND_TRAIT)
@@ -914,20 +914,20 @@ func (s *solver) juletrait() (v value) {
 
 func (s *solver) function() (v value) {
 	v.data.Token = s.op
-	if (!types.IsPure(s.l.data.Type) || s.l.data.Type.Id != types.NIL) &&
-		(!types.IsPure(s.r.data.Type) || s.r.data.Type.Id != types.NIL) {
+	if (!types.IsPure(s.l.data.DataType) || s.l.data.DataType.Id != types.NIL) &&
+		(!types.IsPure(s.r.data.DataType) || s.r.data.DataType.Id != types.NIL) {
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.op, "incompatible_types",
-			s.r.data.Type.Kind, s.l.data.Type.Kind)
+			s.r.data.DataType.Kind, s.l.data.DataType.Kind)
 		return
 	}
 	switch s.op.Kind {
 	case lex.KND_NOT_EQ:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	case lex.KND_EQS:
-		v.data.Type.Id = types.BOOL
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+		v.data.DataType.Id = types.BOOL
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	default:
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.op, "operator_not_for_juletype", s.op.Kind, lex.KND_NIL)
@@ -937,8 +937,8 @@ func (s *solver) function() (v value) {
 
 func (s *solver) types_are_compatible(ignore_any bool) bool {
 	checker := types.Checker{
-		L:           s.l.data.Type,
-		R:           s.r.data.Type,
+		L:           s.l.data.DataType,
+		R:           s.r.data.DataType,
 		IgnoreAny:   ignore_any,
 		ErrTok:      s.op,
 		AllowAssign: true,
@@ -955,8 +955,8 @@ func (s *solver) finalize(v *value) {
 		// If there is not error, set v.data.Value to space for ignore eval errors.
 		v.data.Value = " "
 	}
-	if types.IsVoid(v.data.Type) {
-		v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+	if types.IsVoid(v.data.DataType) {
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	} else {
 		v.constant = s.isConstExpr()
 		if v.constant {
@@ -970,35 +970,35 @@ func (s *solver) solve() (v value) {
 	switch {
 	case s.op.Kind == lex.KND_DBL_AMPER || s.op.Kind == lex.KND_DBL_VLINE:
 		v = s.logical()
-	case types.IsFn(s.l.data.Type) || types.IsFn(s.r.data.Type):
+	case types.IsFn(s.l.data.DataType) || types.IsFn(s.r.data.DataType):
 		v = s.function()
-	case types.IsArray(s.l.data.Type) || types.IsArray(s.r.data.Type):
+	case types.IsArray(s.l.data.DataType) || types.IsArray(s.r.data.DataType):
 		v = s.array()
-	case types.IsSlice(s.l.data.Type) || types.IsSlice(s.r.data.Type):
+	case types.IsSlice(s.l.data.DataType) || types.IsSlice(s.r.data.DataType):
 		v = s.slice()
-	case types.IsPtr(s.l.data.Type) || types.IsPtr(s.r.data.Type):
+	case types.IsPtr(s.l.data.DataType) || types.IsPtr(s.r.data.DataType):
 		v = s.ptr()
-	case types.IsEnum(s.l.data.Type) || types.IsEnum(s.r.data.Type):
+	case types.IsEnum(s.l.data.DataType) || types.IsEnum(s.r.data.DataType):
 		v = s.enum()
-	case types.IsStruct(s.l.data.Type) || types.IsStruct(s.r.data.Type):
+	case types.IsStruct(s.l.data.DataType) || types.IsStruct(s.r.data.DataType):
 		v = s.structure()
-	case types.IsTrait(s.l.data.Type) || types.IsTrait(s.r.data.Type):
+	case types.IsTrait(s.l.data.DataType) || types.IsTrait(s.r.data.DataType):
 		v = s.juletrait()
-	case s.l.data.Type.Id == types.NIL || s.r.data.Type.Id == types.NIL:
+	case s.l.data.DataType.Id == types.NIL || s.r.data.DataType.Id == types.NIL:
 		v = s.nil()
-	case s.l.data.Type.Id == types.ANY || s.r.data.Type.Id == types.ANY:
+	case s.l.data.DataType.Id == types.ANY || s.r.data.DataType.Id == types.ANY:
 		v = s.any()
-	case s.l.data.Type.Id == types.BOOL || s.r.data.Type.Id == types.BOOL:
+	case s.l.data.DataType.Id == types.BOOL || s.r.data.DataType.Id == types.BOOL:
 		v = s.bool()
-	case s.l.data.Type.Id == types.STR || s.r.data.Type.Id == types.STR:
+	case s.l.data.DataType.Id == types.STR || s.r.data.DataType.Id == types.STR:
 		v = s.str()
-	case types.IsFloat(s.l.data.Type.Id) || types.IsFloat(s.r.data.Type.Id):
+	case types.IsFloat(s.l.data.DataType.Id) || types.IsFloat(s.r.data.DataType.Id):
 		v = s.float()
-	case types.IsUnsignedInteger(s.l.data.Type.Id) ||
-		types.IsUnsignedInteger(s.r.data.Type.Id):
+	case types.IsUnsignedInteger(s.l.data.DataType.Id) ||
+		types.IsUnsignedInteger(s.r.data.DataType.Id):
 		v = s.unsigned()
-	case types.IsSignedNumeric(s.l.data.Type.Id) ||
-		types.IsSignedNumeric(s.r.data.Type.Id):
+	case types.IsSignedNumeric(s.l.data.DataType.Id) ||
+		types.IsSignedNumeric(s.r.data.DataType.Id):
 		v = s.signed()
 	}
 	s.finalize(&v)

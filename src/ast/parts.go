@@ -7,11 +7,11 @@ import (
 
 func compilerErr(t lex.Token, key string, args ...any) build.Log {
 	return build.Log{
-		Type:    build.ERR,
-		Row:     t.Row,
-		Column:  t.Column,
-		Path:    t.File.Path(),
-		Text: build.Errorf(key, args...),
+		Type:   build.ERR,
+		Row:    t.Row,
+		Column: t.Column,
+		Path:   t.File.Path(),
+		Text:   build.Errorf(key, args...),
 	}
 }
 

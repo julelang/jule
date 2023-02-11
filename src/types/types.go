@@ -295,11 +295,11 @@ func HasThisGeneric(generic *GenericType, t Type) bool {
 	case IsFn(t):
 		f := t.Tag.(*Fn)
 		for _, p := range f.Params {
-			if HasThisGeneric(generic, p.Type) {
+			if HasThisGeneric(generic, p.DataType) {
 				return true
 			}
 		}
-		return HasThisGeneric(generic, f.RetType.Type)
+		return HasThisGeneric(generic, f.RetType.DataType)
 	case t.MultiTyped, IsMap(t):
 		types := t.Tag.([]Type)
 		for _, t := range types {

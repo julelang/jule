@@ -88,17 +88,17 @@ func (e *eval) eval_op(op any) (v value, model ast.ExprModel) {
 		r:  r,
 	}
 	v = process.solve()
-	v.lvalue = types.IsLvalue(v.data.Type)
+	v.lvalue = types.IsLvalue(v.data.DataType)
 	model = get_bop_model(v, bop, lm, rm)
 	return
 }
 
 func (e *eval) eval(op any) (v value, model ast.ExprModel) {
 	defer func() {
-		if types.IsVoid(v.data.Type) {
-			v.data.Type.Id = types.VOID
-			v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
-		} else if v.constant && types.IsPure(v.data.Type) && lex.IsLiteral(v.data.Value) {
+		if types.IsVoid(v.data.DataType) {
+			v.data.DataType.Id = types.VOID
+			v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
+		} else if v.constant && types.IsPure(v.data.DataType) && lex.IsLiteral(v.data.Value) {
 			switch v.expr.(type) {
 			case int64:
 				dt := Type{
@@ -106,7 +106,7 @@ func (e *eval) eval(op any) (v value, model ast.ExprModel) {
 					Kind: types.TYPE_MAP[types.INT],
 				}
 				if int_assignable(dt.Id, v) {
-					v.data.Type = dt
+					v.data.DataType = dt
 				}
 			case uint64:
 				dt := Type{
@@ -114,7 +114,7 @@ func (e *eval) eval(op any) (v value, model ast.ExprModel) {
 					Kind: types.TYPE_MAP[types.UINT],
 				}
 				if int_assignable(dt.Id, v) {
-					v.data.Type = dt
+					v.data.DataType = dt
 				}
 			}
 		}
@@ -127,8 +127,8 @@ func (e *eval) eval(op any) (v value, model ast.ExprModel) {
 
 func (e *eval) single(tok lex.Token, m *exprModel) (v value, ok bool) {
 	eval := literal_eval{tok, m, e.p}
-	v.data.Type.Id = types.VOID
-	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+	v.data.DataType.Id = types.VOID
+	v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	v.data.Token = tok
 	switch tok.Id {
 	case lex.ID_LITERAL:
@@ -212,7 +212,7 @@ func (e *eval) dataTypeFunc(expr lex.Token, callRange []lex.Token, m *exprModel)
 			_, vm := e.p.evalToks(callRange, nil)
 			m.append_sub(vm)
 			m.append_sub(exprNode{lex.KND_RPARENT})
-			v.data.Type = Type{
+			v.data.DataType = Type{
 				Id:   types.STR,
 				Kind: types.TYPE_MAP[types.STR],
 			}
@@ -233,7 +233,7 @@ func (e *eval) dataTypeFunc(expr lex.Token, callRange []lex.Token, m *exprModel)
 		}
 		switch t := def.(type) {
 		case *TypeAlias:
-			dt, ok := e.p.realType(t.Type, true)
+			dt, ok := e.p.realType(t.TargetType, true)
 			if !ok || types.IsStruct(dt) {
 				return
 			}
@@ -307,8 +307,8 @@ func (e *eval) parenthesesRange(toks []lex.Token, m *exprModel) (v value) {
 		v = e.process(data.expr, m)
 	}
 	switch {
-	case types.IsFn(v.data.Type):
-		f := v.data.Type.Tag.(*Fn)
+	case types.IsFn(v.data.DataType):
+		f := v.data.DataType.Tag.(*Fn)
 		if f.Receiver != nil && f.Receiver.Mutable && !v.mutable {
 			e.pusherrtok(data.expr[len(data.expr)-1], "mutable_operation_on_immutable")
 		}
@@ -403,12 +403,12 @@ func (e *eval) subId(toks []lex.Token, m *exprModel) (v value) {
 		} else if tok.Id == lex.ID_IDENT {
 			t, _, _ := e.p.type_by_id(tok.Kind)
 			if t != nil && !e.p.is_shadowed(tok.Kind) {
-				return e.typeSubId(t.Type.Token, idTok, m)
+				return e.typeSubId(t.TargetType.Token, idTok, m)
 			}
 		}
 	}
 	val := e.process(toks, m)
-	checkType := val.data.Type
+	checkType := val.data.DataType
 	if types.IsExplicitPtr(checkType) {
 		if toks[0].Id != lex.ID_SELF && !e.unsafe_allowed() {
 			e.pusherrtok(idTok, "unsafe_behavior_at_out_of_unsafe_scope")
@@ -436,7 +436,7 @@ func (e *eval) subId(toks []lex.Token, m *exprModel) (v value) {
 	case types.IsMap(checkType):
 		return e.mapObjSubId(val, idTok, m)
 	}
-	e.pusherrtok(dotTok, "obj_not_support_sub_fields", val.data.Type.Kind)
+	e.pusherrtok(dotTok, "obj_not_support_sub_fields", val.data.DataType.Kind)
 	return
 }
 
@@ -472,7 +472,7 @@ end:
 
 func (e *eval) castExpr(dt Type, exprToks []lex.Token, m *exprModel, errTok lex.Token) value {
 	val, model := e.eval_toks(exprToks)
-	m.append_sub(e.get_cast_expr_model(dt, val.data.Type, model))
+	m.append_sub(e.get_cast_expr_model(dt, val.data.DataType, model))
 	val = e.cast(val, dt, errTok)
 	return val
 }
@@ -534,11 +534,11 @@ func (e *eval) cast(v value, t Type, errtok lex.Token) value {
 	case types.IsRef(t):
 		e.cast_ref(t, &v, errtok)
 	case types.IsSlice(t):
-		e.castSlice(t, v.data.Type, errtok)
+		e.castSlice(t, v.data.DataType, errtok)
 	case types.IsStruct(t):
 		e.castStruct(t, &v, errtok)
 	case types.IsPure(t):
-		if v.data.Type.Id == types.ANY {
+		if v.data.DataType.Id == types.ANY {
 			// The any type supports casting to any data type.
 			break
 		}
@@ -547,12 +547,12 @@ func (e *eval) cast(v value, t Type, errtok lex.Token) value {
 		e.pusherrtok(errtok, "type_not_supports_casting", t.Kind)
 	}
 	v.data.Value = t.Kind
-	v.data.Type = t
+	v.data.DataType = t
 	v.lvalue = types.IsLvalue(t)
 	v.mutable = types.IsRef(t) || types.IsMut(t)
 	if v.constant {
 		var model exprNode
-		model.value = v.data.Type.String()
+		model.value = v.data.DataType.String()
 		model.value += lex.KND_LPAREN
 		model.value += v.model.String()
 		model.value += lex.KND_RPARENT
@@ -562,14 +562,14 @@ func (e *eval) cast(v value, t Type, errtok lex.Token) value {
 }
 
 func (e *eval) castStruct(t Type, v *value, errtok lex.Token) {
-	if !types.IsTrait(v.data.Type) {
-		e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
+	if !types.IsTrait(v.data.DataType) {
+		e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.DataType.Kind, t.Kind)
 		return
 	}
 	s := t.Tag.(*ast.Struct)
-	tr := v.data.Type.Tag.(*ast.Trait)
+	tr := v.data.DataType.Tag.(*ast.Trait)
 	if !s.HasTrait(tr) {
-		e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
+		e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.DataType.Kind, t.Kind)
 	}
 }
 
@@ -578,10 +578,10 @@ func (e *eval) castPtr(t Type, v *value, errtok lex.Token) {
 		e.pusherrtok(errtok, "unsafe_behavior_at_out_of_unsafe_scope")
 		return
 	}
-	if !types.IsPtr(v.data.Type) &&
-		!types.IsPure(v.data.Type) &&
-		!types.IsInteger(v.data.Type.Id) {
-		e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
+	if !types.IsPtr(v.data.DataType) &&
+		!types.IsPure(v.data.DataType) &&
+		!types.IsInteger(v.data.DataType.Id) {
+		e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.DataType.Kind, t.Kind)
 	}
 	v.constant = false
 }
@@ -591,7 +591,7 @@ func (e *eval) cast_ref(t Type, v *value, errtok lex.Token) {
 		e.castStruct(t, v, errtok)
 		return
 	}
-	e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
+	e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.DataType.Kind, t.Kind)
 }
 
 func (e *eval) castPure(t Type, v *value, errtok lex.Token) {
@@ -599,7 +599,7 @@ func (e *eval) castPure(t Type, v *value, errtok lex.Token) {
 	case types.ANY:
 		return
 	case types.STR:
-		e.castStr(v.data.Type, errtok)
+		e.castStr(v.data.DataType, errtok)
 		return
 	}
 	switch {
@@ -635,13 +635,13 @@ func (e *eval) castInteger(t Type, v *value, errtok lex.Token) {
 			v.expr = tonumu(v)
 		}
 	}
-	if types.IsEnum(v.data.Type) {
-		e := v.data.Type.Tag.(*Enum)
-		if types.IsNumeric(e.Type.Id) {
+	if types.IsEnum(v.data.DataType) {
+		e := v.data.DataType.Tag.(*Enum)
+		if types.IsNumeric(e.DataType.Id) {
 			return
 		}
 	}
-	if types.IsPtr(v.data.Type) {
+	if types.IsPtr(v.data.DataType) {
 		if t.Id == types.UINTPTR {
 			return
 		} else if !e.unsafe_allowed() {
@@ -649,14 +649,14 @@ func (e *eval) castInteger(t Type, v *value, errtok lex.Token) {
 			return
 		} else if t.Id != types.I32 && t.Id != types.I64 &&
 			t.Id != types.U16 && t.Id != types.U32 && t.Id != types.U64 {
-			e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
+			e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.DataType.Kind, t.Kind)
 		}
 		return
 	}
-	if types.IsPure(v.data.Type) && types.IsNumeric(v.data.Type.Id) {
+	if types.IsPure(v.data.DataType) && types.IsNumeric(v.data.DataType.Id) {
 		return
 	}
-	e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
+	e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.DataType.Kind, t.Kind)
 }
 
 func (e *eval) castNumeric(t Type, v *value, errtok lex.Token) {
@@ -670,16 +670,16 @@ func (e *eval) castNumeric(t Type, v *value, errtok lex.Token) {
 			v.expr = tonumu(v)
 		}
 	}
-	if types.IsEnum(v.data.Type) {
-		e := v.data.Type.Tag.(*Enum)
-		if types.IsNumeric(e.Type.Id) {
+	if types.IsEnum(v.data.DataType) {
+		e := v.data.DataType.Tag.(*Enum)
+		if types.IsNumeric(e.DataType.Id) {
 			return
 		}
 	}
-	if types.IsPure(v.data.Type) && types.IsNumeric(v.data.Type.Id) {
+	if types.IsPure(v.data.DataType) && types.IsNumeric(v.data.DataType.Id) {
 		return
 	}
-	e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.Type.Kind, t.Kind)
+	e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.DataType.Kind, t.Kind)
 }
 
 func (e *eval) castSlice(t, vt Type, errtok lex.Token) {
@@ -704,8 +704,8 @@ func (e *eval) juletypeSubId(dm *ast.Defmap, idTok lex.Token, m *exprModel) (v v
 	switch t {
 	case 'g':
 		g := dm.Globals[i]
-		v.data.Type = g.Type
-		v.constant = g.Const
+		v.data.DataType = g.DataType
+		v.constant = g.Constant
 		if v.constant {
 			v.expr = g.ExprTag
 			v.model = g.Expr.Model
@@ -797,8 +797,8 @@ func (e *eval) typeSubId(typeTok, idTok lex.Token, m *exprModel) (v value) {
 }
 
 func (e *eval) typeId(toks []lex.Token, m *exprModel) (v value) {
-	v.data.Type.Id = types.VOID
-	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+	v.data.DataType.Id = types.VOID
+	v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	r := new_builder(nil)
 	i := 0
 	t, ok := r.DataType(toks, &i, true)
@@ -836,16 +836,16 @@ func (e *eval) xObjSubId(dm *ast.Defmap, val value, interior_mutability bool, id
 		return
 	}
 	v = val
-	m.append_sub(exprNode{types.GetAccessor(val.data.Type)})
+	m.append_sub(exprNode{types.GetAccessor(val.data.DataType)})
 	switch t {
 	case 'g':
 		g := dm.Globals[i]
 		g.Used = true
-		v.data.Type = g.Type
-		v.lvalue = val.lvalue || types.IsLvalue(g.Type)
+		v.data.DataType = g.DataType
+		v.lvalue = val.lvalue || types.IsLvalue(g.DataType)
 		v.mutable = v.mutable || (g.Mutable && interior_mutability)
-		v.constant = g.Const
-		if g.Const {
+		v.constant = g.Constant
+		if g.Constant {
 			v.expr = g.ExprTag
 			v.model = g.Expr.Model
 		}
@@ -857,9 +857,9 @@ func (e *eval) xObjSubId(dm *ast.Defmap, val value, interior_mutability bool, id
 	case 'f':
 		f := dm.Fns[i]
 		f.Used = true
-		v.data.Type.Id = types.FN
-		v.data.Type.Tag = f
-		v.data.Type.Kind = f.TypeKind()
+		v.data.DataType.Id = types.FN
+		v.data.DataType.Tag = f
+		v.data.DataType.Kind = f.TypeKind()
 		v.data.Token = f.Token
 		m.append_sub(exprNode{f.Id})
 	}
@@ -886,14 +886,14 @@ func (e *eval) arrayObjSubId(val value, idTok lex.Token, m *exprModel) value {
 }
 
 func (e *eval) mapObjSubId(val value, idTok lex.Token, m *exprModel) value {
-	readyMapDefines(val.data.Type)
+	readyMapDefines(val.data.DataType)
 	v := e.xObjSubId(mapDefines, val, false, idTok, m)
 	v.lvalue = false
 	return v
 }
 
 func (e *eval) enumSubId(val value, idTok lex.Token, m *exprModel) (v value) {
-	enum := val.data.Type.Tag.(*Enum)
+	enum := val.data.DataType.Tag.(*Enum)
 	v = val
 	v.lvalue = false
 	v.is_type = false
@@ -910,8 +910,8 @@ func (e *eval) enumSubId(val value, idTok lex.Token, m *exprModel) (v value) {
 }
 
 func (e *eval) structObjSubId(val value, idTok lex.Token, m *exprModel) value {
-	parent_type := val.data.Type
-	s := val.data.Type.Tag.(*ast.Struct)
+	parent_type := val.data.DataType
+	s := val.data.DataType.Tag.(*ast.Struct)
 	val.constant = false
 	val.is_type = false
 	if val.data.Value == lex.KND_SELF {
@@ -934,9 +934,9 @@ func (e *eval) structObjSubId(val value, idTok lex.Token, m *exprModel) value {
 		}
 	}
 	val = e.xObjSubId(s.Defines, val, interior_mutability, idTok, m)
-	if types.IsFn(val.data.Type) {
-		f := val.data.Type.Tag.(*Fn)
-		if f.Receiver != nil && types.IsRef(f.Receiver.Type) && !types.IsRef(parent_type) {
+	if types.IsFn(val.data.DataType) {
+		f := val.data.DataType.Tag.(*Fn)
+		if f.Receiver != nil && types.IsRef(f.Receiver.DataType) && !types.IsRef(parent_type) {
 			e.p.pusherrtok(idTok, "ref_method_used_with_not_ref_instance")
 		}
 	}
@@ -945,7 +945,7 @@ func (e *eval) structObjSubId(val value, idTok lex.Token, m *exprModel) value {
 
 func (e *eval) traitObjSubId(val value, idTok lex.Token, m *exprModel) value {
 	m.append_sub(exprNode{".get()"})
-	t := val.data.Type.Tag.(*ast.Trait)
+	t := val.data.DataType.Tag.(*ast.Trait)
 	val.constant = false
 	val.lvalue = false
 	val.is_type = false
@@ -1042,24 +1042,24 @@ func (e *eval) operatorRight(toks []lex.Token, m *exprModel) (v value) {
 }
 
 func readyToVariadic(v *value) {
-	if v.data.Type.Id != types.STR || !types.IsPure(v.data.Type) {
+	if v.data.DataType.Id != types.STR || !types.IsPure(v.data.DataType) {
 		return
 	}
-	v.data.Type.Id = types.SLICE
-	v.data.Type.ComponentType = new(Type)
-	v.data.Type.ComponentType.Id = types.U8
-	v.data.Type.ComponentType.Kind = types.TYPE_MAP[v.data.Type.Id]
-	v.data.Type.Kind = lex.PREFIX_SLICE + v.data.Type.ComponentType.Kind
+	v.data.DataType.Id = types.SLICE
+	v.data.DataType.ComponentType = new(Type)
+	v.data.DataType.ComponentType.Id = types.U8
+	v.data.DataType.ComponentType.Kind = types.TYPE_MAP[v.data.DataType.Id]
+	v.data.DataType.Kind = lex.PREFIX_SLICE + v.data.DataType.ComponentType.Kind
 }
 
 func (e *eval) variadic(toks []lex.Token, m *exprModel, errtok lex.Token) (v value) {
 	v = e.process(toks, m)
 	readyToVariadic(&v)
-	if !types.IsVariadicable(v.data.Type) {
-		e.pusherrtok(errtok, "variadic_with_non_variadicable", v.data.Type.Kind)
+	if !types.IsVariadicable(v.data.DataType) {
+		e.pusherrtok(errtok, "variadic_with_non_variadicable", v.data.DataType.Kind)
 		return
 	}
-	v.data.Type = *v.data.Type.ComponentType
+	v.data.DataType = *v.data.DataType.ComponentType
 	v.variadic = true
 	v.constant = false
 	return
@@ -1132,7 +1132,7 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 		}
 		m.append_sub(exprNode{")"})
 		v = e.slicing(v, leftv, rightv, errTok)
-		if !types.IsMut(v.data.Type) {
+		if !types.IsMut(v.data.DataType) {
 			v.data.Value = " "
 		}
 		return v
@@ -1142,12 +1142,12 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 	m.append_sub(indexingExprModel(model))
 	m.append_sub(exprNode{lex.KND_RBRACKET})
 	v = e.indexing(v, indexv, errTok)
-	if !types.IsMut(v.data.Type) {
+	if !types.IsMut(v.data.DataType) {
 		v.data.Value = " "
 	}
 	// Ignore indexed type from original
-	v.data.Type.Pure = true
-	v.data.Type.Original = nil
+	v.data.DataType.Pure = true
+	v.data.DataType.Original = nil
 	return v
 }
 
@@ -1160,26 +1160,26 @@ func (e *eval) checkIntegerIndexing(v value, errtok lex.Token) {
 
 func (e *eval) indexing(enumv, indexv value, errtok lex.Token) (v value) {
 	switch {
-	case types.IsExplicitPtr(enumv.data.Type):
+	case types.IsExplicitPtr(enumv.data.DataType):
 		return e.indexing_explicit_ptr(enumv, indexv, errtok)
-	case types.IsArray(enumv.data.Type):
+	case types.IsArray(enumv.data.DataType):
 		return e.indexingArray(enumv, indexv, errtok)
-	case types.IsSlice(enumv.data.Type):
+	case types.IsSlice(enumv.data.DataType):
 		return e.indexingSlice(enumv, indexv, errtok)
-	case types.IsMap(enumv.data.Type):
+	case types.IsMap(enumv.data.DataType):
 		return e.indexingMap(enumv, indexv, errtok)
-	case types.IsPure(enumv.data.Type):
-		switch enumv.data.Type.Id {
+	case types.IsPure(enumv.data.DataType):
+		switch enumv.data.DataType.Id {
 		case types.STR:
 			return e.indexingStr(enumv, indexv, errtok)
 		}
 	}
-	e.pusherrtok(errtok, "not_supports_indexing", enumv.data.Type.Kind)
+	e.pusherrtok(errtok, "not_supports_indexing", enumv.data.DataType.Kind)
 	return
 }
 
 func (e *eval) indexingSlice(slicev, index value, errtok lex.Token) value {
-	slicev.data.Type = *slicev.data.Type.ComponentType
+	slicev.data.DataType = *slicev.data.DataType.ComponentType
 	e.checkIntegerIndexing(index, errtok)
 	return slicev
 }
@@ -1188,29 +1188,29 @@ func (e *eval) indexing_explicit_ptr(ptrv, index value, errtok lex.Token) value 
 	if !e.unsafe_allowed() {
 		e.pusherrtok(errtok, "unsafe_behavior_at_out_of_unsafe_scope")
 	}
-	ptrv.data.Type = types.DerefPtrOrRef(ptrv.data.Type)
+	ptrv.data.DataType = types.DerefPtrOrRef(ptrv.data.DataType)
 	e.checkIntegerIndexing(index, errtok)
 	return ptrv
 }
 
 func (e *eval) indexingArray(arrv, index value, errtok lex.Token) value {
-	arrv.data.Type = *arrv.data.Type.ComponentType
+	arrv.data.DataType = *arrv.data.DataType.ComponentType
 	e.checkIntegerIndexing(index, errtok)
 	return arrv
 }
 
 func (e *eval) indexingMap(mapv, leftv value, errtok lex.Token) value {
-	types := mapv.data.Type.Tag.([]Type)
+	types := mapv.data.DataType.Tag.([]Type)
 	keyType := types[0]
 	valType := types[1]
-	mapv.data.Type = valType
-	e.p.check_type(keyType, leftv.data.Type, false, true, errtok)
+	mapv.data.DataType = valType
+	e.p.check_type(keyType, leftv.data.DataType, false, true, errtok)
 	return mapv
 }
 
 func (e *eval) indexingStr(strv, index value, errtok lex.Token) value {
-	strv.data.Type.Id = types.U8
-	strv.data.Type.Kind = types.TYPE_MAP[strv.data.Type.Id]
+	strv.data.DataType.Id = types.U8
+	strv.data.DataType.Kind = types.TYPE_MAP[strv.data.DataType.Id]
 	e.checkIntegerIndexing(index, errtok)
 	if !index.constant {
 		strv.constant = false
@@ -1231,17 +1231,17 @@ func (e *eval) indexingStr(strv, index value, errtok lex.Token) value {
 
 func (e *eval) slicing(enumv, leftv, rightv value, errtok lex.Token) (v value) {
 	switch {
-	case types.IsArray(enumv.data.Type):
+	case types.IsArray(enumv.data.DataType):
 		return e.slicingArray(enumv, errtok)
-	case types.IsSlice(enumv.data.Type):
+	case types.IsSlice(enumv.data.DataType):
 		return e.slicingSlice(enumv, errtok)
-	case types.IsPure(enumv.data.Type):
-		switch enumv.data.Type.Id {
+	case types.IsPure(enumv.data.DataType):
+		switch enumv.data.DataType.Id {
 		case types.STR:
 			return e.slicingStr(enumv, leftv, rightv, errtok)
 		}
 	}
-	e.pusherrtok(errtok, "not_supports_slicing", enumv.data.Type.Kind)
+	e.pusherrtok(errtok, "not_supports_slicing", enumv.data.DataType.Kind)
 	return
 }
 
@@ -1252,15 +1252,15 @@ func (e *eval) slicingSlice(v value, errtok lex.Token) value {
 
 func (e *eval) slicingArray(v value, errtok lex.Token) value {
 	v.lvalue = false
-	v.data.Type.Id = types.SLICE
-	v.data.Type.Kind = lex.PREFIX_SLICE + v.data.Type.ComponentType.Kind
+	v.data.DataType.Id = types.SLICE
+	v.data.DataType.Kind = lex.PREFIX_SLICE + v.data.DataType.ComponentType.Kind
 	return v
 }
 
 func (e *eval) slicingStr(v, leftv, rightv value, errtok lex.Token) value {
 	v.lvalue = false
-	v.data.Type.Id = types.STR
-	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+	v.data.DataType.Id = types.STR
+	v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	if !v.constant {
 		return v
 	}
@@ -1320,7 +1320,7 @@ func (e *eval) build_array(parts [][]lex.Token, t Type, errtok lex.Token) (value
 	e.type_prefix = t.ComponentType
 	var v value
 	v.data.Value = t.Kind
-	v.data.Type = t
+	v.data.DataType = t
 	model := sliceExpr{dataType: t}
 	for _, part := range parts {
 		partVal, expModel := e.eval_toks(part)
@@ -1347,11 +1347,11 @@ func (e *eval) build_slice_implicit(parts [][]lex.Token, errtok lex.Token) (valu
 	model.expr = append(model.expr, expModel)
 	model.dataType = Type{
 		Id:   types.SLICE,
-		Kind: lex.PREFIX_SLICE + partVal.data.Type.Kind,
+		Kind: lex.PREFIX_SLICE + partVal.data.DataType.Kind,
 	}
 	model.dataType.ComponentType = new(Type)
-	*model.dataType.ComponentType = partVal.data.Type
-	v.data.Type = model.dataType
+	*model.dataType.ComponentType = partVal.data.DataType
+	v.data.DataType = model.dataType
 	v.data.Value = model.dataType.Kind
 	for _, part := range parts[1:] {
 		partVal, expModel := e.eval_toks(part)
@@ -1371,7 +1371,7 @@ func (e *eval) build_slice_explicit(parts [][]lex.Token, t Type, errtok lex.Toke
 	e.type_prefix = t.ComponentType
 	var v value
 	v.data.Value = t.Kind
-	v.data.Type = t
+	v.data.DataType = t
 	model := sliceExpr{dataType: t}
 	for _, part := range parts {
 		partVal, expModel := e.eval_toks(part)
@@ -1390,7 +1390,7 @@ func (e *eval) build_slice_explicit(parts [][]lex.Token, t Type, errtok lex.Toke
 func (e *eval) buildMap(parts [][]lex.Token, t Type, errtok lex.Token) (value, ast.ExprModel) {
 	var v value
 	v.data.Value = t.Kind
-	v.data.Type = t
+	v.data.DataType = t
 	model := mapExpr{dataType: t}
 	types := t.Tag.([]Type)
 	keyType := types[0]
@@ -1474,9 +1474,9 @@ func (e *eval) anonymousFn(toks []lex.Token, m *exprModel) (v value) {
 	e.p.check_anon_fn(&f)
 	f.Owner = e.p
 	v.data.Value = f.Id
-	v.data.Type.Tag = &f
-	v.data.Type.Id = types.FN
-	v.data.Type.Kind = f.TypeKind()
+	v.data.DataType.Tag = &f
+	v.data.DataType.Id = types.FN
+	v.data.DataType.Kind = f.TypeKind()
 	m.append_sub(gen.AnonFuncExpr{Ast: &f})
 	return
 }

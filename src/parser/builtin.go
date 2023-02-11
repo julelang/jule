@@ -26,21 +26,21 @@ const maxU64 = 18446744073709551615
 var i8statics = &ast.Defmap{
 	Globals: []*Var{
 		{
-			Pub:     true,
-			Const:   true,
-			Id:      "max",
-			Type:    Type{Id: types.I8, Kind: types.TYPE_MAP[types.I8]},
-			ExprTag: int64(maxI8),
+			Public:   true,
+			Constant: true,
+			Id:       "max",
+			DataType: Type{Id: types.I8, Kind: types.TYPE_MAP[types.I8]},
+			ExprTag:  int64(maxI8),
 			Expr: ast.Expr{
 				Model: exprNode{types.CppId(types.I8) + "{" + strconv.FormatInt(maxI8, 10) + "}"},
 			},
 		},
 		{
-			Pub:     true,
-			Const:   true,
-			Id:      "min",
-			Type:    Type{Id: types.I8, Kind: types.TYPE_MAP[types.I8]},
-			ExprTag: int64(minI8),
+			Public:   true,
+			Constant: true,
+			Id:       "min",
+			DataType: Type{Id: types.I8, Kind: types.TYPE_MAP[types.I8]},
+			ExprTag:  int64(minI8),
 			Expr: ast.Expr{
 				Model: exprNode{types.CppId(types.I8) + "{" + strconv.FormatInt(minI8, 10) + "}"},
 			},
@@ -51,21 +51,21 @@ var i8statics = &ast.Defmap{
 var i16statics = &ast.Defmap{
 	Globals: []*Var{
 		{
-			Pub:     true,
-			Const:   true,
-			Id:      "max",
-			Type:    Type{Id: types.I16, Kind: types.TYPE_MAP[types.I16]},
-			ExprTag: int64(maxI16),
+			Public:   true,
+			Constant: true,
+			Id:       "max",
+			DataType: Type{Id: types.I16, Kind: types.TYPE_MAP[types.I16]},
+			ExprTag:  int64(maxI16),
 			Expr: ast.Expr{
 				Model: exprNode{types.CppId(types.I16) + "{" + strconv.FormatInt(maxI16, 10) + "}"},
 			},
 		},
 		{
-			Pub:     true,
-			Const:   true,
-			Id:      "min",
-			Type:    Type{Id: types.I16, Kind: types.TYPE_MAP[types.I16]},
-			ExprTag: int64(minI16),
+			Public:   true,
+			Constant: true,
+			Id:       "min",
+			DataType: Type{Id: types.I16, Kind: types.TYPE_MAP[types.I16]},
+			ExprTag:  int64(minI16),
 			Expr: ast.Expr{
 				Model: exprNode{types.CppId(types.I16) + "{" + strconv.FormatInt(minI16, 10) + "}"},
 			},
@@ -76,21 +76,21 @@ var i16statics = &ast.Defmap{
 var i32statics = &ast.Defmap{
 	Globals: []*Var{
 		{
-			Pub:     true,
-			Const:   true,
-			Id:      "max",
-			Type:    Type{Id: types.I32, Kind: types.TYPE_MAP[types.I32]},
-			ExprTag: int64(maxI32),
+			Public:   true,
+			Constant: true,
+			Id:       "max",
+			DataType: Type{Id: types.I32, Kind: types.TYPE_MAP[types.I32]},
+			ExprTag:  int64(maxI32),
 			Expr: ast.Expr{
 				Model: exprNode{types.CppId(types.I32) + "{" + strconv.FormatInt(maxI32, 10) + "}"},
 			},
 		},
 		{
-			Pub:     true,
-			Const:   true,
-			Id:      "min",
-			Type:    Type{Id: types.I32, Kind: types.TYPE_MAP[types.I32]},
-			ExprTag: int64(minI32),
+			Public:   true,
+			Constant: true,
+			Id:       "min",
+			DataType: Type{Id: types.I32, Kind: types.TYPE_MAP[types.I32]},
+			ExprTag:  int64(minI32),
 			Expr: ast.Expr{
 				Model: exprNode{types.CppId(types.I32) + "{" + strconv.FormatInt(minI32, 10) + "}"},
 			},
@@ -101,21 +101,21 @@ var i32statics = &ast.Defmap{
 var i64statics = &ast.Defmap{
 	Globals: []*Var{
 		{
-			Pub:     true,
-			Const:   true,
-			Id:      "max",
-			Type:    Type{Id: types.I64, Kind: types.TYPE_MAP[types.I64]},
-			ExprTag: int64(maxI64),
+			Public:   true,
+			Constant: true,
+			Id:       "max",
+			DataType: Type{Id: types.I64, Kind: types.TYPE_MAP[types.I64]},
+			ExprTag:  int64(maxI64),
 			Expr: ast.Expr{
 				Model: exprNode{types.CppId(types.I64) + "{" + strconv.FormatInt(maxI64, 10) + "LL}"},
 			},
 		},
 		{
-			Pub:     true,
-			Const:   true,
-			Id:      "min",
-			Type:    Type{Id: types.I64, Kind: types.TYPE_MAP[types.I64]},
-			ExprTag: int64(minI64),
+			Public:   true,
+			Constant: true,
+			Id:       "min",
+			DataType: Type{Id: types.I64, Kind: types.TYPE_MAP[types.I64]},
+			ExprTag:  int64(minI64),
 			Expr: ast.Expr{
 				Model: exprNode{types.CppId(types.I64) + "{" + strconv.FormatInt(minI64, 10) + "LL}"},
 			},
@@ -126,11 +126,11 @@ var i64statics = &ast.Defmap{
 var u8statics = &ast.Defmap{
 	Globals: []*Var{
 		{
-			Pub:     true,
-			Const:   true,
-			Id:      "max",
-			Type:    Type{Id: types.U8, Kind: types.TYPE_MAP[types.U8]},
-			ExprTag: uint64(maxU8),
+			Public:   true,
+			Constant: true,
+			Id:       "max",
+			DataType: Type{Id: types.U8, Kind: types.TYPE_MAP[types.U8]},
+			ExprTag:  uint64(maxU8),
 			Expr: ast.Expr{
 				Model: exprNode{types.CppId(types.U8) + "{" + strconv.FormatUint(maxU8, 10) + "}"},
 			},
@@ -141,11 +141,11 @@ var u8statics = &ast.Defmap{
 var u16statics = &ast.Defmap{
 	Globals: []*Var{
 		{
-			Pub:     true,
-			Const:   true,
-			Id:      "max",
-			Type:    Type{Id: types.U16, Kind: types.TYPE_MAP[types.U16]},
-			ExprTag: uint64(maxU16),
+			Public:   true,
+			Constant: true,
+			Id:       "max",
+			DataType: Type{Id: types.U16, Kind: types.TYPE_MAP[types.U16]},
+			ExprTag:  uint64(maxU16),
 			Expr: ast.Expr{
 				Model: exprNode{types.CppId(types.U16) + "{" + strconv.FormatUint(maxU16, 10) + "}"},
 			},
@@ -156,11 +156,11 @@ var u16statics = &ast.Defmap{
 var u32statics = &ast.Defmap{
 	Globals: []*Var{
 		{
-			Pub:     true,
-			Const:   true,
-			Id:      "max",
-			Type:    Type{Id: types.U32, Kind: types.TYPE_MAP[types.U32]},
-			ExprTag: uint64(maxU32),
+			Public:   true,
+			Constant: true,
+			Id:       "max",
+			DataType: Type{Id: types.U32, Kind: types.TYPE_MAP[types.U32]},
+			ExprTag:  uint64(maxU32),
 			Expr: ast.Expr{
 				Model: exprNode{types.CppId(types.U32) + "{" + strconv.FormatUint(maxU32, 10) + "}"},
 			},
@@ -171,11 +171,11 @@ var u32statics = &ast.Defmap{
 var u64statics = &ast.Defmap{
 	Globals: []*Var{
 		{
-			Pub:     true,
-			Const:   true,
-			Id:      "max",
-			Type:    Type{Id: types.U64, Kind: types.TYPE_MAP[types.U64]},
-			ExprTag: uint64(maxU64),
+			Public:   true,
+			Constant: true,
+			Id:       "max",
+			DataType: Type{Id: types.U64, Kind: types.TYPE_MAP[types.U64]},
+			ExprTag:  uint64(maxU64),
 			Expr: ast.Expr{
 				Model: exprNode{types.CppId(types.U64) + "{" + strconv.FormatUint(maxU64, 10) + "ULL}"},
 			},
@@ -186,10 +186,10 @@ var u64statics = &ast.Defmap{
 var uintStatics = &ast.Defmap{
 	Globals: []*Var{
 		{
-			Pub:   true,
-			Const: true,
-			Id:    "max",
-			Type:  Type{Id: types.UINT, Kind: types.TYPE_MAP[types.UINT]},
+			Public:   true,
+			Constant: true,
+			Id:       "max",
+			DataType: Type{Id: types.UINT, Kind: types.TYPE_MAP[types.UINT]},
 		},
 	},
 }
@@ -197,14 +197,14 @@ var uintStatics = &ast.Defmap{
 var intStatics = &ast.Defmap{
 	Globals: []*Var{
 		{
-			Const: true,
-			Id:    "max",
-			Type:  Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
+			Constant: true,
+			Id:       "max",
+			DataType: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
 		},
 		{
-			Const: true,
-			Id:    "min",
-			Type:  Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
+			Constant: true,
+			Id:       "min",
+			DataType: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
 		},
 	},
 }
@@ -217,20 +217,20 @@ var min_modelF32 = exprNode{types.CppId(types.F32) + "{1.17549435082228750796873
 var f32statics = &ast.Defmap{
 	Globals: []*Var{
 		{
-			Pub:     true,
-			Const:   true,
-			Id:      "max",
-			Type:    Type{Id: types.F32, Kind: types.TYPE_MAP[types.F32]},
-			ExprTag: float64(maxF32),
-			Expr:    ast.Expr{Model: exprNode{strconv.FormatFloat(maxF32, 'e', -1, 32) + "F"}},
+			Public:   true,
+			Constant: true,
+			Id:       "max",
+			DataType: Type{Id: types.F32, Kind: types.TYPE_MAP[types.F32]},
+			ExprTag:  float64(maxF32),
+			Expr:     ast.Expr{Model: exprNode{strconv.FormatFloat(maxF32, 'e', -1, 32) + "F"}},
 		},
 		{
-			Pub:     true,
-			Const:   true,
-			Id:      "min",
-			Type:    Type{Id: types.F32, Kind: types.TYPE_MAP[types.F32]},
-			ExprTag: float64(minF32),
-			Expr:    ast.Expr{Model: min_modelF32},
+			Public:   true,
+			Constant: true,
+			Id:       "min",
+			DataType: Type{Id: types.F32, Kind: types.TYPE_MAP[types.F32]},
+			ExprTag:  float64(minF32),
+			Expr:     ast.Expr{Model: min_modelF32},
 		},
 	},
 }
@@ -243,29 +243,22 @@ var min_modelF64 = exprNode{types.CppId(types.F64) + "{2.22507385850720138309023
 var f64statics = &ast.Defmap{
 	Globals: []*Var{
 		{
-			Pub:     true,
-			Const:   true,
-			Id:      "max",
-			Type:    Type{Id: types.F64, Kind: types.TYPE_MAP[types.F64]},
-			ExprTag: float64(maxF64),
-			Expr:    ast.Expr{Model: exprNode{strconv.FormatFloat(maxF64, 'e', -1, 64)}},
+			Public:   true,
+			Constant: true,
+			Id:       "max",
+			DataType: Type{Id: types.F64, Kind: types.TYPE_MAP[types.F64]},
+			ExprTag:  float64(maxF64),
+			Expr:     ast.Expr{Model: exprNode{strconv.FormatFloat(maxF64, 'e', -1, 64)}},
 		},
 		{
-			Pub:     true,
-			Const:   true,
-			Id:      "min",
-			Type:    Type{Id: types.F64, Kind: types.TYPE_MAP[types.F64]},
-			ExprTag: float64(minF64),
-			Expr:    ast.Expr{Model: min_modelF64},
+			Public:   true,
+			Constant: true,
+			Id:       "min",
+			DataType: Type{Id: types.F64, Kind: types.TYPE_MAP[types.F64]},
+			ExprTag:  float64(minF64),
+			Expr:     ast.Expr{Model: min_modelF64},
 		},
 	},
-}
-
-var strDefaultFunc = Fn{
-	Pub:     true,
-	Id:      "str",
-	Params:  []Param{{Id: "obj", Type: Type{Id: types.ANY, Kind: types.TYPE_MAP[types.ANY]}}},
-	RetType: RetType{Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}},
 }
 
 var errorTrait = &ast.Trait{
@@ -273,10 +266,10 @@ var errorTrait = &ast.Trait{
 	Defines: &ast.Defmap{
 		Fns: []*Fn{
 			{
-				Pub: true,
-				Id:  "error",
+				Public: true,
+				Id:     "error",
 				RetType: ast.RetType{
-					Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]},
+					DataType: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]},
 				},
 			},
 		},
@@ -291,12 +284,12 @@ var errorType = Type{
 }
 
 var panicFunc = &Fn{
-	Pub: true,
-	Id:  "panic",
+	Public: true,
+	Id:     "panic",
 	Params: []ast.Param{
 		{
-			Id:   "error",
-			Type: Type{Id: types.ANY, Kind: types.TYPE_MAP[types.ANY]},
+			Id:       "error",
+			DataType: Type{Id: types.ANY, Kind: types.TYPE_MAP[types.ANY]},
 		},
 	},
 }
@@ -305,12 +298,12 @@ var errorHandlerFunc = &Fn{
 	Id: "handler",
 	Params: []ast.Param{
 		{
-			Id:   "error",
-			Type: errorType,
+			Id:       "error",
+			DataType: errorType,
 		},
 	},
 	RetType: ast.RetType{
-		Type: ast.Type{
+		DataType: ast.Type{
 			Id:   types.VOID,
 			Kind: types.TYPE_MAP[types.VOID],
 		},
@@ -318,12 +311,12 @@ var errorHandlerFunc = &Fn{
 }
 
 var recoverFunc = &Fn{
-	Pub: true,
-	Id:  "recover",
+	Public: true,
+	Id:     "recover",
 	Params: []ast.Param{
 		{
 			Id: "handler",
-			Type: ast.Type{
+			DataType: ast.Type{
 				Id:   types.FN,
 				Kind: errorHandlerFunc.TypeKind(),
 				Tag:  errorHandlerFunc,
@@ -333,21 +326,21 @@ var recoverFunc = &Fn{
 }
 
 var out_fn = &Fn{
-	Pub: true,
-	Id:  "out",
+	Public: true,
+	Id:     "out",
 	RetType: RetType{
-		Type: Type{Id: types.VOID, Kind: types.TYPE_MAP[types.VOID]},
+		DataType: Type{Id: types.VOID, Kind: types.TYPE_MAP[types.VOID]},
 	},
 	Params: []Param{{
-		Id:   "expr",
-		Type: Type{Id: types.ANY, Kind: types.TYPE_MAP[types.ANY]},
+		Id:       "expr",
+		DataType: Type{Id: types.ANY, Kind: types.TYPE_MAP[types.ANY]},
 	}},
 }
 
-var make_fn = &Fn{Pub: true, Id: "make"}
-var drop_fn = &Fn{Pub: true, Id: "drop"}
-var real_fn = &Fn{Pub: true, Id: "real"}
-var new_fn = &Fn{Pub: true, Id: "new"}
+var make_fn = &Fn{Public: true, Id: "make"}
+var drop_fn = &Fn{Public: true, Id: "drop"}
+var real_fn = &Fn{Public: true, Id: "real"}
+var new_fn = &Fn{Public: true, Id: "new"}
 
 var outln_fn *Fn
 
@@ -358,14 +351,14 @@ var builtinFile = &Parser{}
 var Builtin = &ast.Defmap{
 	Types: []*ast.TypeAlias{
 		{
-			Pub:  true,
-			Id:   "byte",
-			Type: Type{Id: types.U8, Kind: types.TYPE_MAP[types.U8]},
+			Pub:        true,
+			Id:         "byte",
+			TargetType: Type{Id: types.U8, Kind: types.TYPE_MAP[types.U8]},
 		},
 		{
-			Pub:  true,
-			Id:   "rune",
-			Type: Type{Id: types.I32, Kind: types.TYPE_MAP[types.I32]},
+			Pub:        true,
+			Id:         "rune",
+			TargetType: Type{Id: types.I32, Kind: types.TYPE_MAP[types.I32]},
 		},
 	},
 	Fns: []*Fn{
@@ -377,16 +370,16 @@ var Builtin = &ast.Defmap{
 		real_fn,
 		new_fn,
 		{
-			Pub:      true,
+			Public:   true,
 			Id:       "copy",
 			Owner:    builtinFile,
 			Generics: []*GenericType{{Id: "Item"}},
-			RetType:  ast.RetType{Type: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]}},
+			RetType:  ast.RetType{DataType: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]}},
 			Params: []ast.Param{
 				{
 					Mutable: true,
 					Id:      "dest",
-					Type: Type{
+					DataType: Type{
 						Id:            types.SLICE,
 						Kind:          lex.PREFIX_SLICE + "Item",
 						ComponentType: &Type{Id: types.ID, Kind: "Item"},
@@ -394,7 +387,7 @@ var Builtin = &ast.Defmap{
 				},
 				{
 					Id: "src",
-					Type: Type{
+					DataType: Type{
 						Id:            types.SLICE,
 						Kind:          lex.PREFIX_SLICE + "Item",
 						ComponentType: &Type{Id: types.ID, Kind: "Item"},
@@ -403,12 +396,12 @@ var Builtin = &ast.Defmap{
 			},
 		},
 		{
-			Pub:      true,
+			Public:   true,
 			Id:       "append",
 			Owner:    builtinFile,
 			Generics: []*GenericType{{Id: "Item"}},
 			RetType: ast.RetType{
-				Type: Type{
+				DataType: Type{
 					Id:            types.SLICE,
 					Kind:          lex.PREFIX_SLICE + "Item",
 					ComponentType: &Type{Id: types.ID, Kind: "Item"},
@@ -417,7 +410,7 @@ var Builtin = &ast.Defmap{
 			Params: []ast.Param{
 				{
 					Id: "src",
-					Type: Type{
+					DataType: Type{
 						Id:            types.SLICE,
 						Kind:          lex.PREFIX_SLICE + "Item",
 						ComponentType: &Type{Id: types.ID, Kind: "Item"},
@@ -425,7 +418,7 @@ var Builtin = &ast.Defmap{
 				},
 				{
 					Id:       "components",
-					Type:     Type{Id: types.ID, Kind: "Item"},
+					DataType: Type{Id: types.ID, Kind: "Item"},
 					Variadic: true,
 				},
 			},
@@ -439,80 +432,80 @@ var Builtin = &ast.Defmap{
 var strDefines = &ast.Defmap{
 	Globals: []*Var{
 		{
-			Pub:  true,
-			Id:   "len",
-			Type: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
-			Tag:  "len()",
+			Public:   true,
+			Id:       "len",
+			DataType: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
+			Tag:      "len()",
 		},
 	},
 	Fns: []*Fn{
 		{
-			Pub:     true,
+			Public:  true,
 			Id:      "empty",
-			RetType: RetType{Type: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
+			RetType: RetType{DataType: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
 		},
 		{
-			Pub:     true,
+			Public:  true,
 			Id:      "has_prefix",
-			Params:  []Param{{Id: "sub", Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}}},
-			RetType: RetType{Type: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
+			Params:  []Param{{Id: "sub", DataType: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}}},
+			RetType: RetType{DataType: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
 		},
 		{
-			Pub:     true,
+			Public:  true,
 			Id:      "has_suffix",
-			Params:  []Param{{Id: "sub", Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}}},
-			RetType: RetType{Type: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
+			Params:  []Param{{Id: "sub", DataType: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}}},
+			RetType: RetType{DataType: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
 		},
 		{
-			Pub:     true,
+			Public:  true,
 			Id:      "find",
-			Params:  []Param{{Id: "sub", Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}}},
-			RetType: RetType{Type: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]}},
+			Params:  []Param{{Id: "sub", DataType: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}}},
+			RetType: RetType{DataType: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]}},
 		},
 		{
-			Pub:     true,
+			Public:  true,
 			Id:      "rfind",
-			Params:  []Param{{Id: "sub", Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}}},
-			RetType: RetType{Type: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]}},
+			Params:  []Param{{Id: "sub", DataType: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}}},
+			RetType: RetType{DataType: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]}},
 		},
 		{
-			Pub:    true,
+			Public: true,
 			Id:     "trim",
-			Params: []Param{{Id: "bytes", Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}}},
+			Params: []Param{{Id: "bytes", DataType: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}}},
 			RetType: RetType{
-				Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]},
+				DataType: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]},
 			},
 		},
 		{
-			Pub:     true,
+			Public:  true,
 			Id:      "rtrim",
-			Params:  []Param{{Id: "bytes", Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}}},
-			RetType: RetType{Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}},
+			Params:  []Param{{Id: "bytes", DataType: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}}},
+			RetType: RetType{DataType: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}},
 		},
 		{
-			Pub: true,
-			Id:  "split",
+			Public: true,
+			Id:     "split",
 			Params: []Param{
-				{Id: "sub", Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}},
+				{Id: "sub", DataType: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}},
 				{
-					Id:   "n",
-					Type: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
+					Id:       "n",
+					DataType: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
 				},
 			},
-			RetType: RetType{Type: Type{Id: types.STR, Kind: lex.PREFIX_SLICE + types.TYPE_MAP[types.STR]}},
+			RetType: RetType{DataType: Type{Id: types.STR, Kind: lex.PREFIX_SLICE + types.TYPE_MAP[types.STR]}},
 		},
 		{
-			Pub: true,
-			Id:  "replace",
+			Public: true,
+			Id:     "replace",
 			Params: []Param{
-				{Id: "sub", Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}},
-				{Id: "new", Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}},
+				{Id: "sub", DataType: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}},
+				{Id: "new", DataType: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}},
 				{
-					Id:   "n",
-					Type: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
+					Id:       "n",
+					DataType: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
 				},
 			},
-			RetType: RetType{Type: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}},
+			RetType: RetType{DataType: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}},
 		},
 	},
 }
@@ -521,12 +514,12 @@ var strDefines = &ast.Defmap{
 // Because some definitions is responsive for str data types.
 func readyStrDefines(s value) {
 	lenVar := strDefines.Globals[0]
-	lenVar.Const = s.constant
-	if lenVar.Const {
+	lenVar.Constant = s.constant
+	if lenVar.Constant {
 		lenVar.ExprTag = int64(len(s.expr.(string)))
 		lenVar.Expr.Model = getModel(value{
 			expr: lenVar.ExprTag,
-			data: ast.Data{Type: lenVar.Type},
+			data: ast.Data{DataType: lenVar.DataType},
 		})
 	}
 }
@@ -534,23 +527,23 @@ func readyStrDefines(s value) {
 var sliceDefines = &ast.Defmap{
 	Globals: []*Var{
 		{
-			Pub:  true,
-			Id:   "len",
-			Type: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
-			Tag:  "len()",
+			Public:   true,
+			Id:       "len",
+			DataType: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
+			Tag:      "len()",
 		},
 		{
-			Pub:  true,
-			Id:   "cap",
-			Type: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
-			Tag:  "cap()",
+			Public:   true,
+			Id:       "cap",
+			DataType: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
+			Tag:      "cap()",
 		},
 	},
 	Fns: []*Fn{
 		{
-			Pub:     true,
+			Public:  true,
 			Id:      "empty",
-			RetType: RetType{Type: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
+			RetType: RetType{DataType: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
 		},
 	},
 }
@@ -558,17 +551,17 @@ var sliceDefines = &ast.Defmap{
 var arrayDefines = &ast.Defmap{
 	Globals: []*Var{
 		{
-			Pub:  true,
-			Id:   "len",
-			Type: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
-			Tag:  "len()",
+			Public:   true,
+			Id:       "len",
+			DataType: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
+			Tag:      "len()",
 		},
 	},
 	Fns: []*Fn{
 		{
-			Pub:     true,
+			Public:  true,
 			Id:      "empty",
-			RetType: RetType{Type: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
+			RetType: RetType{DataType: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
 		},
 	},
 }
@@ -576,38 +569,38 @@ var arrayDefines = &ast.Defmap{
 var mapDefines = &ast.Defmap{
 	Globals: []*Var{
 		{
-			Pub:  true,
-			Id:   "len",
-			Type: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
-			Tag:  "len()",
+			Public:   true,
+			Id:       "len",
+			DataType: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
+			Tag:      "len()",
 		},
 	},
 	Fns: []*Fn{
 		{
-			Pub: true,
-			Id:  "clear",
+			Public: true,
+			Id:     "clear",
 		},
 		{
-			Pub: true,
-			Id:  "keys",
+			Public: true,
+			Id:     "keys",
 		},
 		{
-			Pub: true,
-			Id:  "values",
+			Public: true,
+			Id:     "values",
 		},
 		{
-			Pub:     true,
+			Public:  true,
 			Id:      "empty",
-			RetType: RetType{Type: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
+			RetType: RetType{DataType: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
 		},
 		{
-			Pub:     true,
+			Public:  true,
 			Id:      "has",
 			Params:  []Param{{Id: "key"}},
-			RetType: RetType{Type: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
+			RetType: RetType{DataType: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
 		},
 		{
-			Pub:    true,
+			Public: true,
 			Id:     "del",
 			Params: []Param{{Id: "key"}},
 		},
@@ -622,18 +615,18 @@ func readyMapDefines(mapt Type) {
 	valt := types[1]
 
 	keysFunc, _, _ := mapDefines.FnById("keys", nil)
-	keysFunc.RetType.Type = keyt
-	keysFunc.RetType.Type.Kind = lex.PREFIX_SLICE + keysFunc.RetType.Type.Kind
+	keysFunc.RetType.DataType = keyt
+	keysFunc.RetType.DataType.Kind = lex.PREFIX_SLICE + keysFunc.RetType.DataType.Kind
 
 	valuesFunc, _, _ := mapDefines.FnById("values", nil)
-	valuesFunc.RetType.Type = valt
-	valuesFunc.RetType.Type.Kind = lex.PREFIX_SLICE + valuesFunc.RetType.Type.Kind
+	valuesFunc.RetType.DataType = valt
+	valuesFunc.RetType.DataType.Kind = lex.PREFIX_SLICE + valuesFunc.RetType.DataType.Kind
 
 	hasFunc, _, _ := mapDefines.FnById("has", nil)
-	hasFunc.Params[0].Type = keyt
+	hasFunc.Params[0].DataType = keyt
 
 	delFunc, _, _ := mapDefines.FnById("del", nil)
-	delFunc.Params[0].Type = keyt
+	delFunc.Params[0].DataType = keyt
 }
 
 func init() {
@@ -693,11 +686,11 @@ func init() {
 
 func caller_out(p *Parser, f *Fn, data callData, m *exprModel) (v value) {
 	errtok := data.args[0]
-	v.data.Type = f.RetType.Type
+	v.data.DataType = f.RetType.DataType
 	// Remove parentheses
 	data.args = data.args[1 : len(data.args)-1]
 	arg, model := p.evalToks(data.args, nil)
-	if types.IsFn(arg.data.Type) {
+	if types.IsFn(arg.data.DataType) {
 		p.pusherrtok(errtok, "invalid_expr")
 	}
 	m.append_sub(exprNode{"(" + model.String() + ")"})
@@ -747,12 +740,12 @@ func caller_drop(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	}
 	ref_expr := args.Src[0].Expr
 	ref_v, ref_expr_model := p.evalExpr(ref_expr, nil)
-	if (!types.IsRef(ref_v.data.Type)) {
+	if !types.IsRef(ref_v.data.DataType) {
 		p.pusherrtok(errtok, "invalid_type")
 		return
 	}
-	v.data.Type.Id = types.VOID
-	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+	v.data.DataType.Id = types.VOID
+	v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	v.data.Value = " "
 	m.nodes[m.index].nodes[0] = nil
 	m.append_sub(exprNode{"("})
@@ -772,12 +765,12 @@ func caller_real(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	}
 	ref_expr := args.Src[0].Expr
 	ref_v, ref_expr_model := p.evalExpr(ref_expr, nil)
-	if (!types.IsRef(ref_v.data.Type)) {
+	if !types.IsRef(ref_v.data.DataType) {
 		p.pusherrtok(errtok, "invalid_type")
 		return
 	}
-	v.data.Type.Id = types.VOID
-	v.data.Type.Kind = types.TYPE_MAP[v.data.Type.Id]
+	v.data.DataType.Id = types.VOID
+	v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	v.data.Value = " "
 	m.nodes[m.index].nodes[0] = nil
 	m.append_sub(exprNode{"("})
@@ -813,7 +806,7 @@ func caller_new(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	if types.IsStruct(t) {
 		s := t.Tag.(*ast.Struct)
 		for _, f := range s.Defines.Globals {
-			if types.IsRef(f.Type) {
+			if types.IsRef(f.DataType) {
 				p.pusherrtok(errtok, "ref_used_struct_used_at_new_fn")
 				break
 			}
@@ -824,13 +817,13 @@ func caller_new(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	} else {
 		data_expr := args.Src[1].Expr
 		data_v, data_expr_model := p.evalExpr(data_expr, nil)
-		p.check_type(t, data_v.data.Type, false, true, errtok)
+		p.check_type(t, data_v.data.DataType, false, true, errtok)
 		m.append_sub(exprNode{"<" + t.String() + ">("})
 		m.append_sub(data_expr_model)
 		m.append_sub(exprNode{")"})
 	}
 	t.Kind = "&" + t.Kind
-	v.data.Type = t
+	v.data.DataType = t
 	v.data.Value = t.Kind
 	return
 }
@@ -847,7 +840,7 @@ var std_mem_builtin = &ast.Defmap{
 func caller_mem_size_of(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	// Remove parentheses
 	data.args = data.args[1 : len(data.args)-1]
-	v.data.Type = Type{
+	v.data.DataType = Type{
 		Id:   types.UINT,
 		Kind: types.TYPE_MAP[types.UINT],
 	}
@@ -874,7 +867,7 @@ func caller_mem_size_of(p *Parser, _ *Fn, data callData, m *exprModel) (v value)
 func caller_mem_align_of(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	// Remove parentheses
 	data.args = data.args[1 : len(data.args)-1]
-	v.data.Type = Type{
+	v.data.DataType = Type{
 		Id:   types.UINT,
 		Kind: types.TYPE_MAP[types.UINT],
 	}
@@ -903,7 +896,7 @@ var std_builtin_defines = map[string]*ast.Defmap{
 }
 
 func fn_make(p *Parser, m *exprModel, t ast.Type, args *ast.Args, errtok lex.Token) (v value) {
-	v.data.Type = t
+	v.data.DataType = t
 	v.data.Value = " "
 	if len(args.Src) < 2 {
 		p.pusherrtok(errtok, "missing_expr_for", "len")

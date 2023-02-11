@@ -84,7 +84,7 @@ func (pap *pureArgParser) check_param_arg(pair *paramMapPair) {
 func (pap *pureArgParser) check_passes_struct() {
 	if len(pap.args.Src) == 0 {
 		for _, pair := range *pap.pmap {
-			if types.IsRef(pair.param.Type) {
+			if types.IsRef(pair.param.DataType) {
 				pap.p.pusherrtok(pap.errTok, "reference_field_not_initialized", pair.param.Id)
 			}
 		}
@@ -150,10 +150,10 @@ func (pap *pureArgParser) tryFuncMultiRetAsArgs() bool {
 	arg := pap.args.Src[0]
 	val, model := pap.p.evalExpr(arg.Expr, nil)
 	arg.Expr.Model = model
-	if !val.data.Type.MultiTyped {
+	if !val.data.DataType.MultiTyped {
 		return false
 	}
-	types := val.data.Type.Tag.([]Type)
+	types := val.data.DataType.Tag.([]Type)
 	if len(types) < len(pap.f.Params) {
 		return false
 	} else if len(types) > len(pap.f.Params) {
@@ -168,7 +168,7 @@ func (pap *pureArgParser) tryFuncMultiRetAsArgs() bool {
 	}
 	for i, param := range pap.f.Params {
 		rt := types[i]
-		val := value{data: ast.Data{Type: rt}}
+		val := value{data: ast.Data{DataType: rt}}
 		pap.p.checkArgType(&param, val, arg.Token)
 	}
 	return true

@@ -23,13 +23,13 @@ func (rc *retChecker) pushval(last, current int, errTok lex.Token) {
 	toks := rc.ret_ast.Expr.Tokens[last:current]
 	var prefix Type
 	i := len(rc.values)
-	if rc.f.RetType.Type.MultiTyped {
-		types := rc.f.RetType.Type.Tag.([]Type)
+	if rc.f.RetType.DataType.MultiTyped {
+		types := rc.f.RetType.DataType.Tag.([]Type)
 		if i < len(types) {
 			prefix = types[i]
 		}
 	} else if i == 0 {
-		prefix = rc.f.RetType.Type
+		prefix = rc.f.RetType.DataType
 	}
 	v, model := rc.t.evalToks(toks, &prefix)
 	rc.exp_model.models = append(rc.exp_model.models, model)
@@ -62,7 +62,7 @@ func (rc *retChecker) checkepxrs() {
 			rc.pushval(last, n, rc.ret_ast.Expr.Tokens[last-1])
 		}
 	}
-	if !types.IsVoid(rc.f.RetType.Type) {
+	if !types.IsVoid(rc.f.RetType.DataType) {
 		rc.checkExprTypes()
 		rc.ret_ast.Expr.Model = rc.exp_model
 	}
@@ -72,7 +72,7 @@ func (rc *retChecker) check_for_ret_expr(v value) {
 	if rc.t.unsafe_allowed() || !lex.IsIdentifierRune(v.data.Value) {
 		return
 	}
-	if !v.mutable && types.IsMut(v.data.Type) {
+	if !v.mutable && types.IsMut(v.data.DataType) {
 		rc.t.pusherrtok(rc.ret_ast.Token, "ret_with_mut_typed_non_mut")
 		return
 	}
@@ -86,14 +86,14 @@ func (rc *retChecker) single() {
 	rc.check_for_ret_expr(v)
 	assign_checker{
 		p:      rc.t,
-		expr_t: rc.f.RetType.Type,
+		expr_t: rc.f.RetType.DataType,
 		v:      v,
 		errtok: rc.ret_ast.Token,
 	}.check()
 }
 
 func (rc *retChecker) multi() {
-	types := rc.f.RetType.Type.Tag.([]Type)
+	types := rc.f.RetType.DataType.Tag.([]Type)
 	n := len(rc.values)
 	if n == 1 {
 		rc.checkMultiRetAsMutliRet()
@@ -117,7 +117,7 @@ func (rc *retChecker) multi() {
 }
 
 func (rc *retChecker) checkExprTypes() {
-	if !rc.f.RetType.Type.MultiTyped { // Single return
+	if !rc.f.RetType.DataType.MultiTyped { // Single return
 		rc.single()
 		return
 	}
@@ -127,12 +127,12 @@ func (rc *retChecker) checkExprTypes() {
 
 func (rc *retChecker) checkMultiRetAsMutliRet() {
 	v := rc.values[0]
-	if !v.data.Type.MultiTyped {
+	if !v.data.DataType.MultiTyped {
 		rc.t.pusherrtok(rc.ret_ast.Token, "missing_multi_return")
 		return
 	}
-	valTypes := v.data.Type.Tag.([]Type)
-	retTypes := rc.f.RetType.Type.Tag.([]Type)
+	valTypes := v.data.DataType.Tag.([]Type)
+	retTypes := rc.f.RetType.DataType.Tag.([]Type)
 	if len(valTypes) < len(retTypes) {
 		rc.t.pusherrtok(rc.ret_ast.Token, "missing_multi_return")
 		return
@@ -142,7 +142,7 @@ func (rc *retChecker) checkMultiRetAsMutliRet() {
 	}
 	for i, rt := range retTypes {
 		vt := valTypes[i]
-		val := value{data: ast.Data{Type: vt}}
+		val := value{data: ast.Data{DataType: vt}}
 		assign_checker{
 			p:      rc.t,
 			expr_t: rt,
@@ -153,7 +153,7 @@ func (rc *retChecker) checkMultiRetAsMutliRet() {
 }
 
 func (rc *retChecker) retsVars() {
-	if !rc.f.RetType.Type.MultiTyped {
+	if !rc.f.RetType.DataType.MultiTyped {
 		for _, v := range rc.f.RetType.Identifiers {
 			if !lex.IsIgnoreId(v.Kind) {
 				model := new(exprModel)
@@ -168,7 +168,7 @@ func (rc *retChecker) retsVars() {
 		rc.ret_ast.Expr.Model = rc.exp_model
 		return
 	}
-	types := rc.f.RetType.Type.Tag.([]Type)
+	types := rc.f.RetType.DataType.Tag.([]Type)
 	for i, v := range rc.f.RetType.Identifiers {
 		if lex.IsIgnoreId(v.Kind) {
 			node := exprNode{}
@@ -189,14 +189,14 @@ func (rc *retChecker) retsVars() {
 
 func (rc *retChecker) check() {
 	n := len(rc.ret_ast.Expr.Tokens)
-	if n == 0 && !types.IsVoid(rc.f.RetType.Type) {
+	if n == 0 && !types.IsVoid(rc.f.RetType.DataType) {
 		if !rc.f.RetType.AnyVar() {
 			rc.t.pusherrtok(rc.ret_ast.Token, "require_return_value")
 		}
 		rc.retsVars()
 		return
 	}
-	if n > 0 && types.IsVoid(rc.f.RetType.Type) {
+	if n > 0 && types.IsVoid(rc.f.RetType.DataType) {
 		rc.t.pusherrtok(rc.ret_ast.Token, "void_function_return_value")
 	}
 	rc.exp_model.vars = rc.f.RetType.Vars(rc.t.nodeBlock)

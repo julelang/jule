@@ -9,9 +9,9 @@ import (
 func (p *Parser) getFieldMap(f *Fn) *paramMap {
 	pmap := new(paramMap)
 	*pmap = paramMap{}
-	s := f.RetType.Type.Tag.(*ast.Struct)
+	s := f.RetType.DataType.Tag.(*ast.Struct)
 	for i, g := range s.Defines.Globals {
-		if ast.IsAccessable(p.File, g.Token.File, g.Pub) {
+		if ast.IsAccessable(p.File, g.Token.File, g.Public) {
 			param := &f.Params[i]
 			(*pmap)[param.Id] = &paramMapPair{param, nil}
 		}
@@ -40,7 +40,7 @@ func (sap *structArgParser) buildArgs() {
 			arg := Arg{Expr: pair.param.Default}
 			sap.args.Src[i] = arg
 		case pair.param.Variadic:
-			model := sliceExpr{pair.param.Type, nil}
+			model := sliceExpr{pair.param.DataType, nil}
 			model.dataType.Kind = lex.PREFIX_SLICE + model.dataType.Kind // For slice.
 			arg := Arg{Expr: Expr{Model: model}}
 			sap.args.Src[i] = arg
@@ -70,7 +70,7 @@ func (sap *structArgParser) pushArg() {
 func (sap *structArgParser) checkPasses() {
 	for _, pair := range *sap.fmap {
 		if pair.arg == nil {
-			if types.IsRef(pair.param.Type) {
+			if types.IsRef(pair.param.DataType) {
 				sap.p.pusherrtok(sap.errTok, "reference_field_not_initialized", pair.param.Id)
 			} else if !paramHasDefaultArg(pair.param) {
 				sap.p.pusherrtok(sap.errTok, "missing_expr_for", pair.param.Id)
