@@ -775,7 +775,7 @@ func caller_real(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	m.nodes[m.index].nodes[0] = nil
 	m.append_sub(exprNode{"("})
 	m.append_sub(ref_expr_model)
-	m.append_sub(exprNode{").drop()"})
+	m.append_sub(exprNode{").real()"})
 	return v
 }
 
