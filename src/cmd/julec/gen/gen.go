@@ -777,7 +777,7 @@ func gen_struct_traits(s *ast.Struct) string {
 func gen_struct_self_var(s *ast.Struct) string {
 	var cpp strings.Builder
 	cpp.WriteString(s.GetSelfRefVarType().String())
-	cpp.WriteString(" self{ nil };")
+	cpp.WriteString(" self{};")
 	return cpp.String()
 }
 
@@ -785,7 +785,7 @@ func gen_struct_self_var_init_st(s *ast.Struct) string {
 	var cpp strings.Builder
 	cpp.WriteString("this->self = ")
 	cpp.WriteString(s.GetSelfRefVarType().String())
-	cpp.WriteString("(this, nil);")
+	cpp.WriteString("::make(this, nil);")
 	return cpp.String()
 }
 
