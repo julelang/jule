@@ -951,10 +951,6 @@ func (s *solver) types_are_compatible(ignore_any bool) bool {
 func (s *solver) isConstExpr() bool { return s.l.constant && s.r.constant }
 
 func (s *solver) finalize(v *value) {
-	if !s.p.eval.has_error {
-		// If there is not error, set v.data.Value to space for ignore eval errors.
-		v.data.Value = " "
-	}
 	if types.IsVoid(v.data.DataType) {
 		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	} else {

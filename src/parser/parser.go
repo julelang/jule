@@ -271,7 +271,7 @@ func (p *Parser) compilePureUse(ast *ast.UseDecl) (_ *ast.UseDecl, hassErr bool)
 		psub.Defines.PushDefines(u.Defines)
 		p.pusherrs(psub.Errors...)
 		p.pushUse(u, ast.Selectors)
-		if psub.Errors != nil {
+		if len(psub.Errors) > 0 {
 			p.pusherrtok(ast.Token, "use_has_errors")
 			return u, true
 		}
@@ -305,7 +305,7 @@ func (p *Parser) use_decl(decl *ast.UseDecl, err *bool) {
 	}
 	var u *ast.UseDecl
 	u, *err = p.compileUse(decl)
-	if u == nil {
+	if u == nil || *err {
 		return
 	}
 	// Already uses?
@@ -319,25 +319,24 @@ func (p *Parser) use_decl(decl *ast.UseDecl, err *bool) {
 	p.Uses = append(p.Uses, u)
 }
 
-func (p *Parser) parseUses(tree *[]ast.Node) bool {
-	err := false
+func (p *Parser) parseUses(tree *[]ast.Node) (err bool) {
 	for i := range *tree {
 		node := &(*tree)[i]
 		switch node_t := node.Data.(type) {
 		case ast.UseDecl:
-			if !err {
-				p.use_decl(&node_t, &err)
+			p.use_decl(&node_t, &err)
+			if (err) {
+				return
 			}
 			node.Data = nil
 		case ast.Comment:
 			// Ignore beginning comments.
 		default:
-			goto end
+			return
 		}
 	}
 	*tree = nil
-end:
-	return err
+	return
 }
 
 func node_is_ignored(node *ast.Node) bool { return node.Data == nil }
