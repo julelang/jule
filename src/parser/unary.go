@@ -106,6 +106,13 @@ func (u *unary) amper() value {
 	v.lvalue = true
 	nodes := &u.model.nodes[u.model.index].nodes
 	switch {
+	case types.IsRef(v.data.DataType):
+		model := exprNode{(*nodes)[1].String() + "._alloc"}
+		*nodes = nil
+		*nodes = make([]ast.ExprModel, 1)
+		(*nodes)[0] = model
+		v.data.DataType.Kind = lex.KND_STAR + types.DerefPtrOrRef(v.data.DataType).Kind
+		return v
 	case valIsStructIns(v):
 		s := v.data.DataType.Tag.(*Struct)
 		// Is not struct literal
@@ -121,13 +128,6 @@ func (u *unary) amper() value {
 		*last = exprNode{(*last).String() + ")"}
 		v.data.DataType.Kind = lex.KND_AMPER + v.data.DataType.Kind
 		v.mutable = true
-		return v
-	case types.IsRef(v.data.DataType):
-		model := exprNode{(*nodes)[1].String() + "._alloc"}
-		*nodes = nil
-		*nodes = make([]ast.ExprModel, 1)
-		(*nodes)[0] = model
-		v.data.DataType.Kind = lex.KND_STAR + types.DerefPtrOrRef(v.data.DataType).Kind
 		return v
 	case !canGetPtr(v):
 		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_AMPER)
