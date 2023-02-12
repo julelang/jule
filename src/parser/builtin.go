@@ -755,6 +755,9 @@ func caller_drop(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 }
 
 func caller_real(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
+	v.data.DataType.Id = types.BOOL
+	v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
+
 	errtok := data.args[0]
 	args := p.get_args(data.args, false)
 	if len(args.Src) < 1 {
@@ -769,8 +772,6 @@ func caller_real(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 		p.pusherrtok(errtok, "invalid_type")
 		return
 	}
-	v.data.DataType.Id = types.VOID
-	v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	v.data.Value = " "
 	m.nodes[m.index].nodes[0] = nil
 	m.append_sub(exprNode{"("})
