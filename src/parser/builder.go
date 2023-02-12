@@ -236,6 +236,7 @@ func (b *builder) Enum(toks []lex.Token) {
 		e.DataType, _ = b.DataType(toks, &i, true)
 		i++
 		if i >= len(toks) {
+			b.stop()
 			b.pusherr(e.Token, "body_not_exist")
 			return
 		}
@@ -244,6 +245,7 @@ func (b *builder) Enum(toks []lex.Token) {
 	}
 	itemToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &toks)
 	if itemToks == nil {
+		b.stop()
 		b.pusherr(e.Token, "body_not_exist")
 		return
 	} else if i < len(toks) {
@@ -333,6 +335,7 @@ func (b *builder) build_struct(toks []lex.Token, cpp_linked bool) ast.Struct {
 
 	body_toks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &toks)
 	if body_toks == nil {
+		b.stop()
 		b.pusherr(s.Token, "body_not_exist")
 		return s
 	}
@@ -379,6 +382,7 @@ func (b *builder) Trait(toks []lex.Token) {
 	i := 2
 	bodyToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &toks)
 	if bodyToks == nil {
+		b.stop()
 		b.pusherr(t.Token, "body_not_exist")
 		return
 	}
@@ -527,6 +531,7 @@ body:
 	i := 0
 	bodyToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &toks)
 	if bodyToks == nil {
+		b.stop()
 		b.pusherr(impl.Base, "body_not_exist")
 		return
 	}
@@ -858,6 +863,9 @@ func (b *builder) fn_prototype(toks []lex.Token, i *int, method, anon bool) (f a
 	return
 }
 
+// stop stops ast building at next iteration.
+func (b *builder) stop() { b.Pos = -1 }
+
 // Func builds AST model of function.
 func (b *builder) Func(toks []lex.Token, method, anon, prototype bool) (f ast.Fn) {
 	var ok bool
@@ -872,6 +880,7 @@ func (b *builder) Func(toks []lex.Token, method, anon, prototype bool) (f ast.Fn
 		return
 	}
 	if i >= len(toks) {
+		b.stop()
 		b.pusherr(f.Token, "body_not_exist")
 		return
 	}
@@ -883,6 +892,7 @@ func (b *builder) Func(toks []lex.Token, method, anon, prototype bool) (f ast.Fn
 			b.pusherr(toks[i], "invalid_syntax")
 		}
 	} else {
+		b.stop()
 		b.pusherr(f.Token, "body_not_exist")
 		b.Tokens = append(toks, b.Tokens...)
 	}
@@ -1943,6 +1953,7 @@ func (b *builder) getWhileNextIterProfile(bs *block_st) (s ast.Statement) {
 	i := len(st_toks)
 	blockToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &bs.toks)
 	if blockToks == nil {
+		b.stop()
 		b.pusherr(iter.Token, "body_not_exist")
 		return
 	}
@@ -1959,6 +1970,7 @@ func (b *builder) commonIterProfile(toks []lex.Token) (s ast.Statement) {
 	iter.Token = toks[0]
 	toks = toks[1:]
 	if len(toks) == 0 {
+		b.stop()
 		b.pusherr(iter.Token, "body_not_exist")
 		return
 	}
@@ -1969,6 +1981,7 @@ func (b *builder) commonIterProfile(toks []lex.Token) (s ast.Statement) {
 	i := len(exprToks)
 	blockToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &toks)
 	if blockToks == nil {
+		b.stop()
 		b.pusherr(iter.Token, "body_not_exist")
 		return
 	}
@@ -2093,6 +2106,7 @@ func (b *builder) MatchCase(toks []lex.Token) (s ast.Statement) {
 	i := len(exprToks)
 	blockToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &toks)
 	if blockToks == nil {
+		b.stop()
 		b.pusherr(m.Token, "body_not_exist")
 		return
 	}
@@ -2127,6 +2141,7 @@ func (b *builder) if_expr(bs *block_st) *ast.If {
 	}
 	blockToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &bs.toks)
 	if blockToks == nil {
+		b.stop()
 		b.pusherr(model.Token, "body_not_exist")
 		return nil
 	}
@@ -2152,6 +2167,7 @@ func (b *builder) conditional_default(bs *block_st) *ast.Else {
 		if i < len(bs.toks) {
 			b.pusherr(model.Token, "else_have_expr")
 		} else {
+			b.stop()
 			b.pusherr(model.Token, "body_not_exist")
 		}
 		return nil

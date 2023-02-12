@@ -180,8 +180,9 @@ func CppId(t uint8) string {
 // DefaultValOfType returns default value of specified type.
 //
 // Special case is:
-//  DefaultValOfType(t) = "nil" if t is invalid
-//  DefaultValOfType(t) = "nil" if t is not have default value
+//
+//	DefaultValOfType(t) = "nil" if t is invalid
+//	DefaultValOfType(t) = "nil" if t is not have default value
 func DefaultValOfType(t uint8) string {
 	t = GetRealCode(t)
 	if IsNumeric(t) || t == ENUM {

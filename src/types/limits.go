@@ -5,8 +5,9 @@ import "math"
 // MinOfType returns minimum value of integer type.
 //
 // Special case is;
-//  MinOfType(id) -> returns 0 if type id is not integer type.
-//  MinOfType(id) -> returns 0 if type id is not supported.
+//
+//	MinOfType(id) -> returns 0 if type id is not integer type.
+//	MinOfType(id) -> returns 0 if type id is not supported.
 func MinOfType(id uint8) int64 {
 	if !IsInteger(id) {
 		return 0
@@ -28,8 +29,9 @@ func MinOfType(id uint8) int64 {
 // MaxOfType returns maximum value of integer type.
 //
 // Special case is;
-//  MaxOfType(id) -> returns 0 if type id is not integer type.
-//  MaxOfType(id) -> returns 0 if type id is not supported.
+//
+//	MaxOfType(id) -> returns 0 if type id is not integer type.
+//	MaxOfType(id) -> returns 0 if type id is not supported.
 func MaxOfType(id uint8) uint64 {
 	if !IsInteger(id) {
 		return 0

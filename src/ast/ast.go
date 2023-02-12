@@ -1205,7 +1205,7 @@ type Var struct {
 	CppLinked bool
 }
 
-//IsLocal returns variable is into the scope or not.
+// IsLocal returns variable is into the scope or not.
 func (v *Var) IsLocal() bool { return v.Owner != nil }
 
 func as_local_id(row, column int, id string) string {

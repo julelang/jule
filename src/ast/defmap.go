@@ -145,7 +145,8 @@ func (dm *Defmap) FindFnById(id string, f *lex.File) (int, *Defmap, bool) {
 // FnById returns function by specified id.
 //
 // Special case:
-//  FnById(id) -> nil: if function is not exist.
+//
+//	FnById(id) -> nil: if function is not exist.
 func (dm *Defmap) FnById(id string, f *lex.File) (*Fn, *Defmap, bool) {
 	i, m, canshadow := dm.FindFnById(id, f)
 	if i == -1 {
@@ -180,7 +181,8 @@ func (dm *Defmap) GlobalById(id string, f *lex.File) (*Var, *Defmap, bool) {
 // FindById returns index of definition with type if exist.
 //
 // Special case is;
-//  FindById(id) -> -1, ' ' if id is not exist
+//
+//	FindById(id) -> -1, ' ' if id is not exist
 //
 // Types;
 // 'g' -> global

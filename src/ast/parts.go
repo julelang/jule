@@ -18,8 +18,9 @@ func compilerErr(t lex.Token, key string, args ...any) build.Log {
 // Range returns between of open and close braces.
 //
 // Special case is:
-//  Range(i, open, close, toks) = nil if *i > len(toks)
-//  Range(i, open, close, toks) = bil if (toks[i*]) Id != tokens.Brace && Kind != open
+//
+//	Range(i, open, close, toks) = nil if *i > len(toks)
+//	Range(i, open, close, toks) = bil if (toks[i*]) Id != tokens.Brace && Kind != open
 func Range(i *int, open string, close string, toks []lex.Token) []lex.Token {
 	if *i >= len(toks) {
 		return nil
@@ -49,8 +50,9 @@ func Range(i *int, open string, close string, toks []lex.Token) []lex.Token {
 // RangeLast returns last range from tokens.
 //
 // Special cases are;
-//  RangeLast(toks) = toks, nil if len(toks) == 0
-//  RangeLast(toks) = toks, nil if toks is not has range at last
+//
+//	RangeLast(toks) = toks, nil if len(toks) == 0
+//	RangeLast(toks) = toks, nil if toks is not has range at last
 func RangeLast(toks []lex.Token) (cutted, cut []lex.Token) {
 	if len(toks) == 0 {
 		return toks, nil
@@ -80,7 +82,8 @@ func RangeLast(toks []lex.Token) (cutted, cut []lex.Token) {
 // It's skips parentheses ranges.
 //
 // Special case is;
-//  Parts(toks) = nil if len(toks) == 0
+//
+//	Parts(toks) = nil if len(toks) == 0
 func Parts(toks []lex.Token, id uint8, exprMust bool) ([][]lex.Token, []build.Log) {
 	if len(toks) == 0 {
 		return nil, nil

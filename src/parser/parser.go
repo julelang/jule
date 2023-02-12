@@ -266,15 +266,16 @@ func (p *Parser) compilePureUse(ast *ast.UseDecl) (_ *ast.UseDecl, hassErr bool)
 		}
 		psub.SetupPackage()
 		psub.Parsef(false, false)
+		if len(psub.Errors) > 0 {
+			p.pusherrs(psub.Errors...)
+			p.pusherrtok(ast.Token, "use_has_errors")
+			return nil, true
+		}
 		psub.WrapPackage()
 		u := make_use_from_ast(ast)
 		psub.Defines.PushDefines(u.Defines)
 		p.pusherrs(psub.Errors...)
 		p.pushUse(u, ast.Selectors)
-		if len(psub.Errors) > 0 {
-			p.pusherrtok(ast.Token, "use_has_errors")
-			return u, true
-		}
 		return u, false
 	}
 	return nil, false
@@ -325,7 +326,7 @@ func (p *Parser) parseUses(tree *[]ast.Node) (err bool) {
 		switch node_t := node.Data.(type) {
 		case ast.UseDecl:
 			p.use_decl(&node_t, &err)
-			if (err) {
+			if err {
 				return
 			}
 			node.Data = nil
@@ -1329,11 +1330,12 @@ func (p *Parser) linkedFnById(id string) *ast.Fn {
 // Returns link by identifier.
 //
 // Types:
-//  ' ' -> not found
-//  'f' -> function
-//  'v' -> variable
-//  's' -> struct
-//  't' -> type alias
+//
+//	' ' -> not found
+//	'f' -> function
+//	'v' -> variable
+//	's' -> struct
+//	't' -> type alias
 func (p *Parser) linkById(id string) (any, byte) {
 	f := p.linkedFnById(id)
 	if f != nil {

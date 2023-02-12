@@ -587,7 +587,7 @@ func (l *Lex) iskw(txt, kind string, id uint8, t *Token) bool {
 	return true
 }
 
-//               [keyword]id
+// [keyword]id
 var keywords = map[string]uint8{
 	KND_I8:       ID_DT,
 	KND_I16:      ID_DT,
