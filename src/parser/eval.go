@@ -925,6 +925,9 @@ func (e *eval) structObjSubId(val value, idTok lex.Token, m *exprModel) value {
 			}
 			*nodes = append([]ast.ExprModel{exprNode{"this->"}}, (*nodes)[n+1:]...)
 		}()
+
+		// Remove "self" from value for correct algorithm.
+		val.data.Value = ""
 	}
 	interior_mutability := false
 	if e.p.rootBlock.Func.Receiver != nil {
