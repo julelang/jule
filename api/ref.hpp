@@ -133,7 +133,7 @@ struct ref_jt {
     friend inline
     std::ostream &operator<<(std::ostream &_Stream,
                              const ref_jt<T> &_Ref) noexcept {
-        if ( _Ref == nil ) { _Stream << "nil"; }
+        if ( !_Ref.real() ) { _Stream << "nil"; }
         else { _Stream << _Ref.operator T(); }
         return ( _Stream );
     }
