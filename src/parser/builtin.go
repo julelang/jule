@@ -747,10 +747,9 @@ func caller_drop(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	v.data.DataType.Id = types.VOID
 	v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	v.data.Value = " "
-	m.nodes[m.index].nodes = nil
 	m.append_sub(exprNode{"("})
 	m.append_sub(ref_expr_model)
-	m.append_sub(exprNode{").drop()"})
+	m.append_sub(exprNode{")"})
 	return v
 }
 
@@ -773,10 +772,9 @@ func caller_real(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 		return
 	}
 	v.data.Value = " "
-	m.nodes[m.index].nodes = nil
 	m.append_sub(exprNode{"("})
 	m.append_sub(ref_expr_model)
-	m.append_sub(exprNode{").real()"})
+	m.append_sub(exprNode{")"})
 	return v
 }
 

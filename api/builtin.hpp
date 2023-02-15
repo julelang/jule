@@ -24,6 +24,10 @@ template<typename T>
 inline ref_jt<T> JULEC_ID(new)(void) noexcept;
 template<typename T>
 inline ref_jt<T> JULEC_ID(new)(const T &_Expr) noexcept;
+template<typename T>
+inline void JULEC_ID(drop)(T &_Obj) noexcept;
+template<typename T>
+inline bool JULEC_ID(real)(T &_Obj) noexcept;
 
 // Definitions
 
@@ -78,5 +82,13 @@ inline ref_jt<T> JULEC_ID(new)(void) noexcept
 template<typename T>
 inline ref_jt<T> JULEC_ID(new)(const T &_Expr) noexcept
 { return ( ref_jt<T>::make( _Expr ) ); }
+
+template<typename T>
+inline void JULEC_ID(drop)(T &_Obj) noexcept
+{ _Obj.drop(); }
+
+template<typename T>
+inline bool JULEC_ID(real)(T &_Obj) noexcept
+{ return ( _Obj.real() ); }
 
 #endif // #ifndef __JULEC_BUILTIN_HPP
