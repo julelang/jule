@@ -42,24 +42,28 @@ public:
     }
 
     void __dealloc(void) noexcept {
-        if (!this->_data._ref)
-        { return; }
+        this->_len = 0;
+        this->_cap = 0;
+        if (!this->_data._ref) {
+            this->_data._alloc = nil;
+            return;
+        }
         // Use __JULEC_REFERENCE_DELTA, DON'T USE __drop_ref METHOD BECAUSE
         // jule_ref does automatically this.
         // If not in this case:
         //   if this is method called from destructor, reference count setted to
         //   negative integer but reference count is unsigned, for this reason
         //   allocation is not deallocated.
-        if ( ( this->_data.__get_ref_n() ) != __JULEC_REFERENCE_DELTA )
-        { return; }
+        if ( ( this->_data.__get_ref_n() ) != __JULEC_REFERENCE_DELTA ) {
+            this->_data._alloc = nil;
+            return;
+        }
         delete this->_data._ref;
         this->_data._ref = nil;
         delete[] this->_data._alloc;
         this->_data._alloc = nil;
         this->_data._ref = nil;
         this->_slice = nil;
-        this->_len = 0;
-        this->_cap = 0;
     }
 
     void __alloc_new(const int_jt _N) noexcept {
@@ -137,6 +141,7 @@ public:
             this->_data._alloc = nil;
             this->_data._alloc = _new;
             this->_slice = this->_data._alloc;
+            ++this->_cap;
         } else {
             this->_slice[this->_len] = _Item;
         }
@@ -177,6 +182,8 @@ public:
 
     void operator=(const slice_jt<_Item_t> &_Src) noexcept {
         this->__dealloc();
+        if ( _Src.operator==(nil) )
+        { return; }
         this->_len = _Src._len;
         this->_cap = _Src._cap;
         this->_data = _Src._data;
@@ -188,6 +195,8 @@ public:
 
     friend std::ostream &operator<<(std::ostream &_Stream,
                                     const slice_jt<_Item_t> &_Src) noexcept {
+        if (_Src.empty())
+        { return ( _Stream << "[]" ); }
         _Stream << '[';
         for (int_jt _index{ 0 }; _index < _Src._len;) {
             _Stream << _Src._slice[_index++];

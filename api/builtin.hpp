@@ -55,7 +55,8 @@ struct JULEC_ID(Error) {
 template<typename _Item_t>
 int_jt JULEC_ID(copy)(const slice_jt<_Item_t> &_Dest,
                       const slice_jt<_Item_t> &_Src) noexcept {
-    if (_Dest.empty() || _Src.empty()) { return 0; }
+    if (_Dest.empty() || _Src.empty())
+    { return 0; }
     int_jt _len = ( _Dest.len() > _Src.len() ) ? _Src.len()
                     : ( _Src.len() > _Dest.len() ) ? _Dest.len()
                     : _Src.len();

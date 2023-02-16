@@ -140,7 +140,7 @@ public:
     }
 
     slice_jt<str_jt> split(const str_jt &_Sub,
-                              const i64_jt &_N) const noexcept {
+                           const i64_jt &_N) const noexcept {
         slice_jt<str_jt> _parts;
         if (_N == 0)
         { return ( _parts ); }
@@ -173,8 +173,8 @@ public:
     }
 
     str_jt replace(const str_jt &_Sub,
-                      const str_jt &_New,
-                      const i64_jt &_N) const noexcept {
+                   const str_jt &_New,
+                   const i64_jt &_N) const noexcept {
         if (_N == 0) { return ( *this ); }
         std::basic_string<u8_jt> _s(this->_buffer);
         uint_jt start_pos{ 0 };
@@ -192,11 +192,11 @@ public:
                 { break; }
             }
         }
-        return ( str_jt(_s) );
+        return ( str_jt( _s ) );
     }
 
     inline operator const char*(void) const noexcept
-    { return ( (char*)(this->_buffer.c_str()) ); }
+    { return ( (char*)( this->_buffer.c_str() ) ); }
 
     inline operator const std::basic_string<u8_jt>(void) const noexcept
     { return ( this->_buffer ); }
@@ -216,7 +216,7 @@ public:
     }
 
     operator slice_jt<i32_jt>(void) const noexcept {
-        slice_jt<i32_jt> _runes;
+        slice_jt<i32_jt> _runes{};
         const char *_str{ this->operator const char *() };
         for (int_jt _index{ 0 }; _index < this->len(); ) {
             i32_jt _rune;
