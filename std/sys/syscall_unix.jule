@@ -2,12 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use cpp "<sys/stat.h>"
 use cpp "<dirent.h>"
-
-use cpp "sys.hpp"
-
-cpp struct stat{}
 
 //jule:typedef
 cpp struct DIR{}
@@ -27,10 +22,77 @@ pub let STDIN  = uintptr(0)
 pub let STDOUT = uintptr(1)
 pub let STDERR = uintptr(2)
 
-pub fn open_dir(path: str): *cpp.DIR { ret cpp.opendir(path) }
-pub unsafe fn read_dir(mut dir: *cpp.DIR): *cpp.dirent { ret cpp.readdir(dir) }
-pub unsafe fn close_dir(mut dir: *cpp.DIR): int { ret cpp.closedir(dir) }
+// Wrapper for C's DIR.
+pub struct Dir {
+	handle: *cpp.DIR
+}
 
-pub unsafe fn stat(path: str, handle: *cpp.stat): (ok: bool) {
-	ret cpp.__julec_stat(path, handle) == 0
+impl Dir {
+	// Returns handle as uintptr.
+	pub fn addr(self): uintptr {
+		ret uintptr(self.handle)
+	}
+
+	// Calls C's closedir function with handle.
+	// Returns 0 if handle is nil.
+	pub fn close(mut self): int {
+		if self.addr() == 0 {
+			ret 0
+		}
+		ret unsafe { cpp.closedir(self.handle) }
+	}
+
+	// Calls C's readdir function with handle and returns Dirent.
+	// Returns nil reference if handle is nil or readdir returns nil.
+	pub fn read(mut self): (dirent: &Dirent) {
+		if self.addr() != 0 {
+			let mut handle = unsafe { cpp.readdir(self.handle) }
+			if handle != nil {
+				dirent = &Dirent{handle: handle}
+			}
+		}
+		ret
+	}
+}
+
+// Wrapper for C's dirent.
+pub struct Dirent {
+	handle: *cpp.dirent
+}
+
+impl Dirent {
+	// Returns handle as uintptr.
+	pub fn addr(self): uintptr {
+		ret uintptr(self.handle)
+	}
+
+	// Returns d_name field of handle as string.
+	// Returns empty string if handle is nil.
+	pub fn name(self): str {
+		if self.addr() == 0 {
+			ret ""
+		}
+		ret unsafe { self.handle.d_name }
+	}
+}
+
+// Returns nil reference if error occurs.
+pub fn stat(path: str): (stat: &Stat) {
+	let mut handle = cpp.stat{}
+	if (unsafe { cpp.__julec_stat(path, &handle) } == 0) {
+		stat = &Stat{
+			st_mode: handle.st_mode,
+			st_size: handle.st_size,
+		}
+	}
+	ret
+}
+
+// Returns nil reference if error occurs.
+pub fn open_dir(path: str): &Dir {
+	let mut handle = unsafe { cpp.opendir(path) }
+	if handle == nil {
+		ret new(Dir)
+	}
+	ret &Dir{handle: handle}
 }

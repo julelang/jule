@@ -4,12 +4,9 @@
 
 use std::unicode::utf16::{append_rune, decode}
 
-use cpp "<sys/stat.h>"
 use cpp "<dirent.h>"
 
 cpp type wchar_t: u16
-
-cpp struct stat{}
 
 //jule:typedef
 cpp struct _WDIR{}
@@ -32,6 +29,60 @@ pub const INVALID_HANDLE = ^handle(0)
 pub let STDIN  = get_std_handle(uintptr(STD_INPUT_HANDLE))
 pub let STDOUT = get_std_handle(uintptr(STD_OUTPUT_HANDLE))
 pub let STDERR = get_std_handle(uintptr(STD_ERROR_HANDLE))
+
+// Wrapper for C's _WDIR.
+pub struct Dir {
+	handle: *cpp._WDIR
+}
+
+impl Dir {
+	// Returns handle as uintptr.
+	pub fn addr(self): uintptr {
+		ret uintptr(self.handle)
+	}
+
+	// Calls C's _wclosedir function with handle.
+	// Returns 0 if handle is nil.
+	pub fn close(mut self): int {
+		if self.addr() == 0 {
+			ret 0
+		}
+		ret unsafe { cpp._wclosedir(self.handle) }
+	}
+
+	// Calls C's _wreaddir function with handle and returns Dirent.
+	// Returns nil reference if handle is nil or _wreaddir returns nil.
+	pub fn read(mut self): (dirent: &Dirent) {
+		if self.addr() != 0 {
+			let mut handle = unsafe { cpp._wreaddir(self.handle) }
+			if handle != nil {
+				dirent = &Dirent{handle: handle}
+			}
+		}
+		ret
+	}
+}
+
+// Wrapper for C's _wdirent.
+pub struct Dirent {
+	handle: *cpp._wdirent
+}
+
+impl Dirent {
+	// Returns handle as uintptr.
+	pub fn addr(self): uintptr {
+		ret uintptr(self.handle)
+	}
+
+	// Returns d_name field of handle as string.
+	// Returns empty string if handle is nil.
+	pub fn name(self): str {
+		if self.addr() == 0 {
+			ret ""
+		}
+		ret unsafe { wchar_to_str(self.handle.d_name) }
+	}
+}
 
 // Returns the UTF-16 encoding of the UTF-8 string
 // s, with a terminating NULL added. If s includes NULL
@@ -68,7 +119,7 @@ pub fn utf16_to_str(s: []u16): str {
 
 // Returns the UTF-8 encoding of the UTF-16 sequence s in *wchar_t form,
 // with a terminating NULL removed.
-pub unsafe fn wchar_to_str(s: *cpp.wchar_t): str {
+unsafe fn wchar_to_str(s: *cpp.wchar_t): str {
 	let mut i = 0
 	let mut code_page: []u16 = nil
 	for {
@@ -84,15 +135,26 @@ pub unsafe fn wchar_to_str(s: *cpp.wchar_t): str {
 
 pub fn get_std_handle(stdh: uintptr): handle { ret handle(cpp.GetStdHandle(stdh)) }
 pub unsafe fn close_handle(stdh: handle): bool { ret cpp.CloseHandle(unsafe { (*unsafe)(stdh) }) }
-pub unsafe fn read_dir(mut dir: *cpp._WDIR): *cpp._wdirent { ret cpp._wreaddir(dir) }
-pub unsafe fn close_dir(mut dir: *cpp._WDIR): int { ret cpp._wclosedir(dir) }
 
-pub unsafe fn stat(path: str, handle: *cpp.stat): (ok: bool) {
+// Returns nil reference if error occurs.
+pub fn stat(path: str): (stat: &Stat) {
 	let utf16_path = utf16_from_str(path)
-	ret cpp.wstat(unsafe { (*cpp.wchar_t)(&utf16_path[0]) }, handle) == 0
+	let mut handle = cpp.stat{}
+	if (unsafe { cpp.wstat((*cpp.wchar_t)(&utf16_path[0]), &handle) } == 0) {
+		stat = &Stat{
+			st_mode: handle.st_mode,
+			st_size: handle.st_size,
+		}
+	}
+	ret
 }
 
-pub fn open_dir(path: str): *cpp._WDIR {
+// Returns nil reference if error occurs.
+pub fn open_dir(path: str): &Dir {
 	let utf16_path = utf16_from_str(path)
-	ret unsafe { cpp._wopendir( (*cpp.wchar_t)(&utf16_path[0]) ) }
+	let mut handle = unsafe { cpp._wopendir( (*cpp.wchar_t)(&utf16_path[0]) ) }
+	if handle == nil {
+		ret new(Dir)
+	}
+	ret &Dir{handle: handle}
 }
