@@ -441,11 +441,6 @@ var strDefines = &ast.Defmap{
 	Fns: []*Fn{
 		{
 			Public:  true,
-			Id:      "empty",
-			RetType: RetType{DataType: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
-		},
-		{
-			Public:  true,
 			Id:      "has_prefix",
 			Params:  []Param{{Id: "sub", DataType: Type{Id: types.STR, Kind: types.TYPE_MAP[types.STR]}}},
 			RetType: RetType{DataType: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
@@ -539,13 +534,6 @@ var sliceDefines = &ast.Defmap{
 			Tag:      "cap()",
 		},
 	},
-	Fns: []*Fn{
-		{
-			Public:  true,
-			Id:      "empty",
-			RetType: RetType{DataType: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
-		},
-	},
 }
 
 var arrayDefines = &ast.Defmap{
@@ -555,13 +543,6 @@ var arrayDefines = &ast.Defmap{
 			Id:       "len",
 			DataType: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
 			Tag:      "len()",
-		},
-	},
-	Fns: []*Fn{
-		{
-			Public:  true,
-			Id:      "empty",
-			RetType: RetType{DataType: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
 		},
 	},
 }
@@ -587,11 +568,6 @@ var mapDefines = &ast.Defmap{
 		{
 			Public: true,
 			Id:     "values",
-		},
-		{
-			Public:  true,
-			Id:      "empty",
-			RetType: RetType{DataType: Type{Id: types.BOOL, Kind: types.TYPE_MAP[types.BOOL]}},
 		},
 		{
 			Public:  true,
