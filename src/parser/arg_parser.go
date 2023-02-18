@@ -161,7 +161,7 @@ func (pap *pureArgParser) tryFuncMultiRetAsArgs() bool {
 	}
 	if pap.m != nil {
 		fname := pap.m.nodes[pap.m.index].nodes[0]
-		pap.m.nodes[pap.m.index].nodes[0] = exprNode{"tuple_as_args"}
+		pap.m.nodes[pap.m.index].nodes[0] = exprNode{"__julec_tuple_as_args"}
 		pap.args.Src = make([]Arg, 2)
 		pap.args.Src[0] = Arg{Expr: Expr{Model: fname}}
 		pap.args.Src[1] = arg

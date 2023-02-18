@@ -9,11 +9,11 @@
 
 struct defer_base {
 public:
-    std::function<void(void)> _scope;
+    std::function<void(void)> __scope;
     defer_base(const std::function<void(void)> &_Fn) noexcept
-    { this->_scope = _Fn; }
+    { this->__scope = _Fn; }
     ~defer_base(void) noexcept
-    { this->_scope(); }
+    { this->__scope(); }
 };
 
 #define __JULEC_DEFER(_BLOCK) \

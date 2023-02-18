@@ -127,12 +127,13 @@ struct tuple_ostream<Type, N, N>;
 template<typename... Types>
 std::ostream &operator<<(std::ostream &_Stream,
                          const std::tuple<Types...> &_Tuple);
-template<typename _Fn_t, typename _Tuple_t, size_t ..._I_t>
-inline auto tuple_as_args(const fn_jt<_Fn_t> &_Function,
-                          const _Tuple_t _Tuple,
-                          const std::index_sequence<_I_t...>);
-template<typename _Fn_t, typename _Tuple_t>
-inline auto tuple_as_args(const fn_jt<_Fn_t> &_Function, const _Tuple_t _Tuple);
+template<typename _Function_t, typename _Tuple_t, size_t ..._I_t>
+inline auto __julec_tuple_as_args(const fn_jt<_Function_t> &_Function,
+                                  const _Tuple_t _Tuple,
+                                  const std::index_sequence<_I_t...>);
+template<typename _Function_t, typename _Tuple_t>
+inline auto __julec_tuple_as_args(const fn_jt<_Function_t> &_Function,
+                                  const _Tuple_t _Tuple);
 template<typename T>
 inline ref_jt<T> __julec_new_structure(T *_Ptr);
 // Libraries uses this function for UTf-8 encoded Jule strings.
@@ -159,7 +160,7 @@ inline std::ostream &operator<<(std::ostream &_Stream,
 
 template<typename Type, unsigned N, unsigned Last>
 struct tuple_ostream {
-    static void arrow(std::ostream &_Stream, const Type &_Type) {
+    static void __arrow(std::ostream &_Stream, const Type &_Type) {
         _Stream << std::get<N>(_Type) << ", ";
         tuple_ostream<Type, N + 1, Last>::arrow(_Stream, _Type);
     }
@@ -167,7 +168,7 @@ struct tuple_ostream {
 
 template<typename Type, unsigned N>
 struct tuple_ostream<Type, N, N> {
-    static void arrow(std::ostream &_Stream, const Type &_Type)
+    static void __arrow(std::ostream &_Stream, const Type &_Type)
     { _Stream << std::get<N>( _Type ); }
 };
 
@@ -176,32 +177,35 @@ std::ostream &operator<<(std::ostream &_Stream,
                          const std::tuple<Types...> &_Tuple) {
     _Stream << '(';
     tuple_ostream<std::tuple<Types...>, 0,
-        sizeof...( Types )-1>::arrow( _Stream, _Tuple );
+        sizeof...( Types )-1>::__arrow( _Stream, _Tuple );
     _Stream << ')';
     return _Stream;
 }
 
-template<typename _Fn_t, typename _Tuple_t, size_t ..._I_t>
-inline auto tuple_as_args(const fn_jt<_Fn_t> &_Function,
-                          const _Tuple_t _Tuple,
-                          const std::index_sequence<_I_t...>)
-{ return _Function._buffer(std::get<_I_t>( _Tuple )...); }
+template<typename _Function_t, typename _Tuple_t, size_t ..._I_t>
+inline auto __julec_tuple_as_args(const fn_jt<_Function_t> &_Function,
+                                  const _Tuple_t _Tuple,
+                                  const std::index_sequence<_I_t...>)
+{ return _Function.__buffer(std::get<_I_t>( _Tuple )...); }
 
-template<typename _Fn_t, typename _Tuple_t>
-inline auto tuple_as_args(const fn_jt<_Fn_t> &_Function, const _Tuple_t _Tuple) {
-    static constexpr auto _size{std::tuple_size<_Tuple_t>::value};
-    return tuple_as_args( _Function, _Tuple, std::make_index_sequence<_size>{} );
+template<typename _Function_t, typename _Tuple_t>
+inline auto __julec_tuple_as_args(const fn_jt<_Function_t> &_Function,
+                                  const _Tuple_t _Tuple) {
+    static constexpr auto _size{ std::tuple_size<_Tuple_t>::value };
+    return __julec_tuple_as_args( _Function,
+                                  _Tuple,
+                                  std::make_index_sequence<_size>{} );
 }
 
 template<typename T>
 inline ref_jt<T> __julec_new_structure(T *_Ptr) {
     if (!_Ptr)
     { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
-    _Ptr->self._ref = new( std::nothrow ) uint_jt;
-    if (!_Ptr->self._ref)
+    _Ptr->self.__ref = new( std::nothrow ) uint_jt;
+    if (!_Ptr->self.__ref)
     { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
     // Initialize with zero because return reference is counts 1 reference.
-    *_Ptr->self._ref = 0; // ( __JULEC_REFERENCE_DELTA - __JULEC_REFERENCE_DELTA );
+    *_Ptr->self.__ref = 0; // ( __JULEC_REFERENCE_DELTA - __JULEC_REFERENCE_DELTA );
     return ( _Ptr->self );
 }
 
@@ -218,20 +222,20 @@ inline void JULEC_ID(panic)(const trait_jt<JULEC_ID(Error)> &_Error)
 template<typename _Obj_t>
 void JULEC_ID(panic)(const _Obj_t &_Expr) {
     struct panic_error: public JULEC_ID(Error) {
-        str_jt _message;
+        str_jt __message;
 
-        str_jt error(void)
-        { return ( this->_message ); }
+        str_jt _error(void)
+        { return ( this->__message ); }
     };
     struct panic_error _error;
-    _error._message = __julec_to_str ( _Expr );
+    _error.__message = __julec_to_str ( _Expr );
     throw ( trait_jt<JULEC_ID(Error)> ( _error ) ) ;
 }
 
 void __julec_terminate_handler(void) noexcept {
     try { std::rethrow_exception( std::current_exception() ); }
     catch (trait_jt<JULEC_ID(Error)> _error) {
-        std::cout << "panic: " << _error.get().error() << std::endl;
+        std::cout << "panic: " << _error._get()._error() << std::endl;
         std::exit( __JULEC_EXIT_PANIC );
     }
 }

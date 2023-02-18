@@ -821,7 +821,7 @@ func gen_struct_destructor(s *ast.Struct) string {
 	var cpp strings.Builder
 	cpp.WriteByte('~')
 	cpp.WriteString(s.OutId())
-	cpp.WriteString("(void) noexcept { /* heap allocations managed by traits or references */ this->self._ref = nil; }")
+	cpp.WriteString("(void) noexcept { /* heap allocations managed by traits or references */ this->self.__ref = nil; }")
 	return cpp.String()
 }
 

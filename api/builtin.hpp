@@ -44,35 +44,35 @@ inline void JULEC_ID(outln)(const _Obj_t &_Obj) noexcept {
 }
 
 struct JULEC_ID(Error) {
-    virtual str_jt error(void) { return {}; }
+    virtual str_jt _error(void) { return {}; }
 
     virtual ~JULEC_ID(Error)(void) noexcept {}
 
     bool operator==(const JULEC_ID( Error ) &_Src) { return false; }
-    bool operator!=(const JULEC_ID( Error ) &_Src) { return !this->operator==(_Src); }
+    bool operator!=(const JULEC_ID( Error ) &_Src) { return !this->operator==( _Src ); }
 };
 
 template<typename _Item_t>
 int_jt JULEC_ID(copy)(const slice_jt<_Item_t> &_Dest,
                       const slice_jt<_Item_t> &_Src) noexcept {
-    if (_Dest.empty() || _Src.empty())
+    if (_Dest._empty() || _Src._empty())
     { return 0; }
-    int_jt _len = ( _Dest.len() > _Src.len() ) ? _Src.len()
-                    : ( _Src.len() > _Dest.len() ) ? _Dest.len()
-                    : _Src.len();
+    int_jt _len = ( _Dest._len() > _Src._len() ) ? _Src._len()
+                    : ( _Src._len() > _Dest._len() ) ? _Dest._len()
+                    : _Src._len();
     for (int_jt _index{ 0 }; _index < _len; ++_index)
-    { _Dest._slice[_index] = _Src._slice[_index]; }
+    { _Dest.__slice[_index] = _Src.__slice[_index]; }
     return ( _len );
 }
 
 template<typename _Item_t>
 slice_jt<_Item_t> JULEC_ID(append)(const slice_jt<_Item_t> &_Src,
                                    const slice_jt<_Item_t> &_Components) noexcept {
-    const int_jt _N{ _Src.len() + _Components.len() };
+    const int_jt _N{ _Src._len() + _Components._len() };
     slice_jt<_Item_t> _buffer( _N );
     JULEC_ID(copy)<_Item_t>( _buffer, _Src );
-    for (int_jt _index{ 0 }; _index < _Components.len(); ++_index)
-    { _buffer[_Src.len()+_index] = _Components._slice[_index]; }
+    for (int_jt _index{ 0 }; _index < _Components._len(); ++_index)
+    { _buffer[_Src._len()+_index] = _Components.__slice[_index]; }
     return ( _buffer );
 }
 
@@ -86,10 +86,10 @@ inline ref_jt<T> JULEC_ID(new)(const T &_Expr) noexcept
 
 template<typename T>
 inline void JULEC_ID(drop)(T &_Obj) noexcept
-{ _Obj.drop(); }
+{ _Obj._drop(); }
 
 template<typename T>
 inline bool JULEC_ID(real)(T &_Obj) noexcept
-{ return ( _Obj.real() ); }
+{ return ( _Obj._real() ); }
 
 #endif // #ifndef __JULEC_BUILTIN_HPP

@@ -47,15 +47,15 @@ __julec_utf16_decode_rune(const i32_jt _R1, const i32_jt _R2) noexcept {
 }
 
 slice_jt<i32_jt> __julec_utf16_decode(const slice_jt<u16_jt> &_S) noexcept {
-    slice_jt<i32_jt> _a( _S.len() );
+    slice_jt<i32_jt> _a( _S._len() );
     int_jt _n{ 0 };
-    for (int_jt _i{ 0 }; _i < _S.len(); ++_i) {
+    for (int_jt _i{ 0 }; _i < _S._len(); ++_i) {
         u16_jt _r{ _S[_i] };
         if (_r < __JULEC_UTF16_SURR1 || __JULEC_UTF16_SURR3 <= _r)
         { _a[_n] = static_cast<i32_jt>( _r ); }
         else if (__JULEC_UTF16_SURR1 <= _r &&
             _r < __JULEC_UTF16_SURR2 &&
-            _i+1 < _S.len() &&
+            _i+1 < _S._len() &&
             __JULEC_UTF16_SURR2 <= _S[_i+1] &&
             _S[_i+1] < __JULEC_UTF16_SURR3) {
             _a[_n] = __julec_utf16_decode_rune( static_cast<i32_jt>( _r ),
@@ -91,7 +91,7 @@ __julec_utf16_encode_rune(i32_jt _R) noexcept {
 }
 
 slice_jt<u16_jt> encode(const slice_jt<i32_jt> &_Runes) noexcept {
-    int_jt _n{ _Runes.len() };
+    int_jt _n{ _Runes._len() };
     for (const i32_jt _v: _Runes) {
         if ( _v >= __JULEC_UTF16_SURR_SELF )
         { ++_n; }

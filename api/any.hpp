@@ -10,8 +10,8 @@ struct any_jt;
 
 struct any_jt {
 public:
-    ref_jt<void*> _data{};
-    const char *_type_id{ nil };
+    ref_jt<void*> __data{};
+    const char *__type_id{ nil };
 
     any_jt(void) noexcept {}
 
@@ -26,9 +26,9 @@ public:
     { this->__dealloc(); }
 
     inline void __dealloc(void) noexcept {
-        this->_type_id = nil;
-        if (!this->_data._ref) {
-            this->_data._alloc = nil;
+        this->__type_id = nil;
+        if (!this->__data.__ref) {
+            this->__data.__alloc = nil;
             return;
         }
         // Use __JULEC_REFERENCE_DELTA, DON'T USE __drop_ref METHOD BECAUSE
@@ -37,14 +37,14 @@ public:
         //   if this is method called from destructor, reference count setted to
         //   negative integer but reference count is unsigned, for this reason
         //   allocation is not deallocated.
-        if ( ( this->_data.__get_ref_n() ) != __JULEC_REFERENCE_DELTA )
+        if ( ( this->__data.__get_ref_n() ) != __JULEC_REFERENCE_DELTA )
         { return; }
-        delete this->_data._ref;
-        this->_data._ref = nil;
-        std::free( *this->_data._alloc );
-        *this->_data._alloc = nil;
-        std::free( this->_data._alloc );
-        this->_data._alloc = nil;
+        delete this->__data.__ref;
+        this->__data.__ref = nil;
+        std::free( *this->__data.__alloc );
+        *this->__data.__alloc = nil;
+        std::free( this->__data.__alloc );
+        this->__data.__alloc = nil;
     }
 
     template<typename T>
@@ -53,7 +53,7 @@ public:
         { return ( false ); }
         if (this->operator==( nil ))
         { return ( false ); }
-        return std::strcmp( this->_type_id, typeid(T).name() ) == 0;
+        return std::strcmp( this->__type_id, typeid(T).name() ) == 0;
     }
 
     template<typename T>
@@ -67,8 +67,8 @@ public:
         { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
         *_alloc = _Expr;
         *_main_alloc = ( (void*)(_alloc) );
-        this->_data = ref_jt<void*>::make( _main_alloc );
-        this->_type_id = typeid(_Expr).name();
+        this->__data = ref_jt<void*>::make( _main_alloc );
+        this->__type_id = typeid(_Expr).name();
     }
 
     void operator=(const any_jt &_Src) noexcept {
@@ -77,8 +77,8 @@ public:
             return;
         }
         this->__dealloc();
-        this->_data = _Src._data;
-        this ->_type_id = _Src._type_id;
+        this->__data = _Src.__data;
+        this ->__type_id = _Src.__type_id;
     }
 
     inline void operator=(const std::nullptr_t) noexcept
@@ -90,7 +90,7 @@ public:
         { JULEC_ID(panic)( __JULEC_ERROR_INVALID_MEMORY ); }
         if (!this->__type_is<T>())
         { JULEC_ID(panic)( __JULEC_ERROR_INCOMPATIBLE_TYPE ); }
-        return ( *( (T*)( *this->_data._alloc ) ) );
+        return ( *( (T*)( *this->__data.__alloc ) ) );
     }
 
     template<typename T>
@@ -105,14 +105,14 @@ public:
     inline bool operator==(const any_jt &_Any) const noexcept {
         if (this->operator==( nil ) && _Any.operator==( nil ))
         { return ( true ); }
-        return ( std::strcmp( this->_type_id, _Any._type_id ) == 0 );
+        return ( std::strcmp( this->__type_id, _Any.__type_id ) == 0 );
     }
 
     inline bool operator!=(const any_jt &_Any) const noexcept
     { return ( !this->operator==( _Any ) ); }
 
     inline bool operator==(std::nullptr_t) const noexcept
-    { return ( !this->_data._alloc ); }
+    { return ( !this->__data.__alloc ); }
 
     inline bool operator!=(std::nullptr_t) const noexcept
     { return ( !this->operator==( nil ) ); }

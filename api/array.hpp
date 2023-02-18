@@ -63,11 +63,11 @@ public:
     { return this->___slice( 0, this->len() ); }
 
     inline constexpr
-    int_jt len(void) const noexcept
+    int_jt _len(void) const noexcept
     { return ( _N ); }
 
     inline constexpr
-    bool empty(void) const noexcept
+    bool _empty(void) const noexcept
     { return ( _N == 0 ); }
 
     inline constexpr
@@ -79,7 +79,7 @@ public:
     { return ( !this->operator==( _Src ) ); }
 
     _Item_t &operator[](const int_jt &_Index) {
-        if (this->empty() || _Index < 0 || this->len() <= _Index) {
+        if (this->_empty() || _Index < 0 || this->_len() <= _Index) {
             std::stringstream _sstream;
             __JULEC_WRITE_ERROR_INDEX_OUT_OF_RANGE( _sstream , _Index );
             JULEC_ID(panic)( _sstream.str().c_str() );
@@ -90,9 +90,9 @@ public:
     friend std::ostream &operator<<(std::ostream &_Stream,
                                     const array_jt<_Item_t, _N> &_Src) noexcept {
         _Stream << '[';
-        for (int_jt _index{0}; _index < _Src.len();) {
+        for (int_jt _index{0}; _index < _Src._len();) {
             _Stream << _Src._buffer[_index++];
-            if (_index < _Src.len())
+            if (_index < _Src._len())
             { _Stream << " "; }
         }
         _Stream << ']';

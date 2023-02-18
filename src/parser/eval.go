@@ -861,7 +861,7 @@ func (e *eval) xObjSubId(dm *ast.Defmap, val value, interior_mutability bool, id
 		v.data.DataType.Tag = f
 		v.data.DataType.Kind = f.TypeKind()
 		v.data.Token = f.Token
-		m.append_sub(exprNode{f.Id})
+		m.append_sub(exprNode{f.OutId()})
 	}
 	return
 }
@@ -947,7 +947,7 @@ func (e *eval) structObjSubId(val value, idTok lex.Token, m *exprModel) value {
 }
 
 func (e *eval) traitObjSubId(val value, idTok lex.Token, m *exprModel) value {
-	m.append_sub(exprNode{".get()"})
+	m.append_sub(exprNode{"._get()"})
 	t := val.data.DataType.Tag.(*ast.Trait)
 	val.constant = false
 	val.lvalue = false

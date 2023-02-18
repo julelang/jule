@@ -435,7 +435,7 @@ var strDefines = &ast.Defmap{
 			Public:   true,
 			Id:       "len",
 			DataType: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
-			Tag:      "len()",
+			Tag:      "_len()",
 		},
 	},
 	Fns: []*Fn{
@@ -525,13 +525,13 @@ var sliceDefines = &ast.Defmap{
 			Public:   true,
 			Id:       "len",
 			DataType: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
-			Tag:      "len()",
+			Tag:      "_len()",
 		},
 		{
 			Public:   true,
 			Id:       "cap",
 			DataType: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
-			Tag:      "cap()",
+			Tag:      "_cap()",
 		},
 	},
 }
@@ -542,7 +542,7 @@ var arrayDefines = &ast.Defmap{
 			Public:   true,
 			Id:       "len",
 			DataType: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
-			Tag:      "len()",
+			Tag:      "_len()",
 		},
 	},
 }
@@ -553,7 +553,7 @@ var mapDefines = &ast.Defmap{
 			Public:   true,
 			Id:       "len",
 			DataType: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
-			Tag:      "len()",
+			Tag:      "_len()",
 		},
 	},
 	Fns: []*Fn{

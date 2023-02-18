@@ -12,10 +12,10 @@ class slice_jt;
 template<typename _Item_t>
 class slice_jt {
 public:
-    ref_jt<_Item_t> _data{};
-    _Item_t *_slice{ nil };
-    uint_jt _len{ 0 };
-    uint_jt _cap{ 0 };
+    ref_jt<_Item_t> __data{};
+    _Item_t *__slice{ nil };
+    uint_jt __len{ 0 };
+    uint_jt __cap{ 0 };
 
     slice_jt<_Item_t>(void) noexcept {}
     slice_jt<_Item_t>(const std::nullptr_t) noexcept {}
@@ -29,8 +29,8 @@ public:
     slice_jt<_Item_t>(const std::initializer_list<_Item_t> &_Src) noexcept {
         this->__alloc_new( _Src.size() );
         const auto _Src_begin{ _Src.begin() };
-        for (int_jt _i{ 0 }; _i < this->_len; ++_i)
-        { this->_data._alloc[_i] = *(_Item_t*)(_Src_begin+_i); }
+        for (int_jt _i{ 0 }; _i < this->__len; ++_i)
+        { this->__data.__alloc[_i] = *(_Item_t*)(_Src_begin+_i); }
     }
 
     ~slice_jt<_Item_t>(void) noexcept
@@ -42,10 +42,10 @@ public:
     }
 
     void __dealloc(void) noexcept {
-        this->_len = 0;
-        this->_cap = 0;
-        if (!this->_data._ref) {
-            this->_data._alloc = nil;
+        this->__len = 0;
+        this->__cap = 0;
+        if (!this->__data.__ref) {
+            this->__data.__alloc = nil;
             return;
         }
         // Use __JULEC_REFERENCE_DELTA, DON'T USE __drop_ref METHOD BECAUSE
@@ -54,16 +54,16 @@ public:
         //   if this is method called from destructor, reference count setted to
         //   negative integer but reference count is unsigned, for this reason
         //   allocation is not deallocated.
-        if ( ( this->_data.__get_ref_n() ) != __JULEC_REFERENCE_DELTA ) {
-            this->_data._alloc = nil;
+        if ( ( this->__data.__get_ref_n() ) != __JULEC_REFERENCE_DELTA ) {
+            this->__data.__alloc = nil;
             return;
         }
-        delete this->_data._ref;
-        this->_data._ref = nil;
-        delete[] this->_data._alloc;
-        this->_data._alloc = nil;
-        this->_data._ref = nil;
-        this->_slice = nil;
+        delete this->__data.__ref;
+        this->__data.__ref = nil;
+        delete[] this->__data.__alloc;
+        this->__data.__alloc = nil;
+        this->__data.__ref = nil;
+        this->__slice = nil;
     }
 
     void __alloc_new(const int_jt _N) noexcept {
@@ -71,10 +71,10 @@ public:
         _Item_t *_alloc{ new( std::nothrow ) _Item_t[_N]{ _Item_t() } };
         if (!_alloc)
         { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
-        this->_data = ref_jt<_Item_t>::make( _alloc );
-        this->_len = _N;
-        this->_cap = _N;
-        this->_slice = &_alloc[0];
+        this->__data = ref_jt<_Item_t>::make( _alloc );
+        this->__len = _N;
+        this->__cap = _N;
+        this->__slice = &_alloc[0];
     }
 
     typedef _Item_t       *iterator;
@@ -82,77 +82,77 @@ public:
 
     inline constexpr
     iterator begin(void) noexcept
-    { return &this->_slice[0]; }
+    { return &this->__slice[0]; }
 
     inline constexpr
     const_iterator begin(void) const noexcept
-    { return &this->_slice[0]; }
+    { return &this->__slice[0]; }
 
     inline constexpr
     iterator end(void) noexcept
-    { return &this->_slice[this->_len]; }
+    { return &this->__slice[this->__len]; }
 
     inline constexpr
     const_iterator end(void) const noexcept
-    { return &this->_slice[this->_len]; }
+    { return &this->__slice[this->__len]; }
 
     inline slice_jt<_Item_t> ___slice(const int_jt &_Start,
                                       const int_jt &_End) const noexcept {
         this->__check();
-        if (_Start < 0 || _End < 0 || _Start > _End || _End > this->cap()) {
+        if (_Start < 0 || _End < 0 || _Start > _End || _End > this->_cap()) {
             std::stringstream _sstream;
             __JULEC_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(_sstream, _Start, _End);
             JULEC_ID(panic)(_sstream.str().c_str());
         } else if (_Start == _End) { return slice_jt<_Item_t>(); }
         slice_jt<_Item_t> _slice;
-        _slice._data = this->_data;
-        _slice._slice = &this->_slice[_Start];
-        _slice._len = _End-_Start;
-        _slice._cap = this->_cap-_Start;
+        _slice.__data = this->__data;
+        _slice.__slice = &this->__slice[_Start];
+        _slice.__len = _End-_Start;
+        _slice.__cap = this->__cap-_Start;
         return _slice;
     }
 
     inline slice_jt<_Item_t> ___slice(const int_jt &_Start) const noexcept
-    { return this->___slice( _Start , this->len() ); }
+    { return this->___slice( _Start , this->_len() ); }
 
     inline slice_jt<_Item_t> ___slice(void) const noexcept
-    { return this->___slice( 0 , this->len() ); }
+    { return this->___slice( 0 , this->_len() ); }
 
     inline constexpr
-    int_jt len(void) const noexcept
-    { return ( this->_len ); }
+    int_jt _len(void) const noexcept
+    { return ( this->__len ); }
 
     inline constexpr
-    int_jt cap(void) const noexcept
-    { return ( this->_cap ); }
+    int_jt _cap(void) const noexcept
+    { return ( this->__cap ); }
 
-    inline bool empty(void) const noexcept
-    { return ( !this->_slice || this->_len == 0 || this->_cap == 0 ); }
+    inline bool _empty(void) const noexcept
+    { return ( !this->__slice || this->__len == 0 || this->__cap == 0 ); }
 
     void __push(const _Item_t &_Item) noexcept {
-        if (this->_len == this->_cap) {
-            _Item_t *_new{ new(std::nothrow) _Item_t[this->_len+1] };
+        if (this->__len == this->__cap) {
+            _Item_t *_new{ new(std::nothrow) _Item_t[this->__len+1] };
             if (!_new)
             { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
-            for (int_jt _index{ 0 }; _index < this->_len; ++_index)
-            { _new[_index] = this->_data._alloc[_index]; }
-            _new[this->_len] = _Item;
-            delete[] this->_data._alloc;
-            this->_data._alloc = nil;
-            this->_data._alloc = _new;
-            this->_slice = this->_data._alloc;
-            ++this->_cap;
+            for (int_jt _index{ 0 }; _index < this->__len; ++_index)
+            { _new[_index] = this->__data.__alloc[_index]; }
+            _new[this->__len] = _Item;
+            delete[] this->__data.__alloc;
+            this->__data.__alloc = nil;
+            this->__data.__alloc = _new;
+            this->__slice = this->__data.__alloc;
+            ++this->__cap;
         } else {
-            this->_slice[this->_len] = _Item;
+            this->__slice[this->__len] = _Item;
         }
-        ++this->_len;
+        ++this->__len;
     }
 
     bool operator==(const slice_jt<_Item_t> &_Src) const noexcept {
-        if (this->_len != _Src._len)
+        if (this->__len != _Src.__len)
         { return false; }
-        for (int_jt _index{ 0 }; _index < this->_len; ++_index) {
-            if (this->_slice[_index] != _Src._slice[_index])
+        for (int_jt _index{ 0 }; _index < this->__len; ++_index) {
+            if (this->__slice[_index] != _Src.__slice[_index])
             { return ( false ); }
         }
         return ( true );
@@ -164,7 +164,7 @@ public:
 
     inline constexpr
     bool operator==(const std::nullptr_t) const noexcept
-    { return !this->_slice; }
+    { return !this->__slice; }
 
     inline constexpr
     bool operator!=(const std::nullptr_t) const noexcept
@@ -172,22 +172,22 @@ public:
 
     _Item_t &operator[](const int_jt &_Index) const {
         this->__check();
-        if (this->empty() || _Index < 0 || this->len() <= _Index) {
+        if (this->_empty() || _Index < 0 || this->_len() <= _Index) {
             std::stringstream _sstream;
             __JULEC_WRITE_ERROR_INDEX_OUT_OF_RANGE( _sstream , _Index );
             JULEC_ID(panic)( _sstream.str().c_str() );
         }
-        return this->_slice[_Index];
+        return this->__slice[_Index];
     }
 
     void operator=(const slice_jt<_Item_t> &_Src) noexcept {
         this->__dealloc();
-        if ( _Src.operator==(nil) )
+        if ( _Src.operator==( nil ) )
         { return; }
-        this->_len = _Src._len;
-        this->_cap = _Src._cap;
-        this->_data = _Src._data;
-        this->_slice = _Src._slice;
+        this->__len = _Src.__len;
+        this->__cap = _Src.__cap;
+        this->__data = _Src.__data;
+        this->__slice = _Src.__slice;
     }
 
     void operator=(const std::nullptr_t) noexcept
@@ -195,12 +195,12 @@ public:
 
     friend std::ostream &operator<<(std::ostream &_Stream,
                                     const slice_jt<_Item_t> &_Src) noexcept {
-        if (_Src.empty())
+        if (_Src._empty())
         { return ( _Stream << "[]" ); }
         _Stream << '[';
-        for (int_jt _index{ 0 }; _index < _Src._len;) {
-            _Stream << _Src._slice[_index++];
-            if (_index < _Src._len)
+        for (int_jt _index{ 0 }; _index < _Src.__len;) {
+            _Stream << _Src.__slice[_index++];
+            if (_index < _Src.__len)
             { _Stream << ' '; }
         }
         _Stream << ']';

@@ -6,33 +6,33 @@
 #define __JULEC_FN_HPP
 
 // std::function wrapper of JuleC.
-template <typename _Fn_t>
+template <typename _Function_t>
 struct fn_jt;
 
-template <typename _Fn_t>
+template <typename _Function_t>
 struct fn_jt {
-    _Fn_t _buffer;
+    _Function_t __buffer;
     
-    fn_jt<_Fn_t>(void) noexcept {}
+    fn_jt<_Function_t>(void) noexcept {}
 
-    fn_jt<_Fn_t>(const _Fn_t &_Fn) noexcept
-    { this->_buffer = _Fn; }
+    fn_jt<_Function_t>(const _Function_t &_Function) noexcept
+    { this->__buffer = _Function; }
     
-    template<typename ..._Args_t>
-    auto operator()(_Args_t... _Args) noexcept {
-        if (this->_buffer == nil)
+    template<typename ..._Arguments_t>
+    auto operator()(_Arguments_t... _Arguments) noexcept {
+        if (this->__buffer == nil)
         { JULEC_ID(panic)( __JULEC_ERROR_INVALID_MEMORY ); }
-        return ( this->_buffer(_Args...) );
+        return ( this->__buffer( _Arguments... ) );
     }
 
     inline void operator=(std::nullptr_t) noexcept
-    { this->_buffer = nil; }
+    { this->__buffer = nil; }
 
-    inline void operator=(const _Fn_t &_Func) noexcept
-    { this->_buffer = _Func; }
+    inline void operator=(const _Function_t &_Function) noexcept
+    { this->__buffer = _Function; }
 
     inline bool operator==(std::nullptr_t) const noexcept
-    { return ( this->_buffer == nil ); }
+    { return ( this->__buffer == nil ); }
 
     inline bool operator!=(std::nullptr_t) const noexcept
     { return ( !this->operator==( nil ) ); }

@@ -23,7 +23,7 @@ public:
         { this->insert( _data ); }
     }
 
-    slice_jt<_Key_t> keys(void) const noexcept {
+    slice_jt<_Key_t> _keys(void) const noexcept {
         slice_jt<_Key_t> _keys( this->size() );
         uint_jt _index { 0 };
         for (const auto &_pair: *this)
@@ -31,7 +31,7 @@ public:
         return ( _keys );
     }
 
-    slice_jt<_Value_t> values(void) const noexcept {
+    slice_jt<_Value_t> _values(void) const noexcept {
         slice_jt<_Value_t> _keys( this->size() );
         uint_jt _index{ 0 };
         for (const auto &_pair: *this)
@@ -40,13 +40,13 @@ public:
     }
 
     inline constexpr
-    bool has(const _Key_t _Key) const noexcept
+    bool _has(const _Key_t _Key) const noexcept
     { return ( this->find( _Key ) != this->end() ); }
 
-    inline int_jt len(void) const noexcept
+    inline int_jt _len(void) const noexcept
     { return ( this->size() ); }
 
-    inline void del(const _Key_t _Key) noexcept
+    inline void _del(const _Key_t _Key) noexcept
     { this->erase( _Key ); }
 
     inline bool operator==(const std::nullptr_t) const noexcept
