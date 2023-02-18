@@ -880,6 +880,7 @@ func (e *eval) sliceObjSubId(val value, idTok lex.Token, m *exprModel) value {
 }
 
 func (e *eval) arrayObjSubId(val value, idTok lex.Token, m *exprModel) value {
+	readyArrayDefines(val)
 	v := e.xObjSubId(arrayDefines, val, false, idTok, m)
 	v.lvalue = false
 	return v

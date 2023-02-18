@@ -540,11 +540,19 @@ var arrayDefines = &ast.Defmap{
 	Globals: []*Var{
 		{
 			Public:   true,
+			Constant: true,
 			Id:       "len",
 			DataType: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]},
-			Tag:      "_len()",
 		},
 	},
+}
+
+// Use this at before use arrayDefines if necessary.
+// Because some definitions is responsive for array data types.
+func readyArrayDefines(s value) {
+	lenVar := arrayDefines.Globals[0]
+	lenVar.ExprTag = int64(s.data.DataType.Size.N)
+	lenVar.Expr = s.data.DataType.Size.Expr
 }
 
 var mapDefines = &ast.Defmap{
