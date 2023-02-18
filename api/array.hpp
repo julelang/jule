@@ -41,7 +41,7 @@ public:
 
     inline slice_jt<_Item_t> ___slice(const int_jt &_Start,
                                     const int_jt &_End) const noexcept {
-        if (_Start < 0 || _End < 0 || _Start > _End || _End > this->len()) {
+        if (_Start < 0 || _End < 0 || _Start > _End || _End > this->_len()) {
             std::stringstream _sstream;
             __JULEC_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(
                 _sstream, _Start, _End );
@@ -57,10 +57,10 @@ public:
     }
 
     inline slice_jt<_Item_t> ___slice(const int_jt &_Start) const noexcept
-    { return this->___slice( _Start, this->len() ); }
+    { return this->___slice( _Start, this->_len() ); }
 
     inline slice_jt<_Item_t> ___slice(void) const noexcept
-    { return this->___slice( 0, this->len() ); }
+    { return this->___slice( 0, this->_len() ); }
 
     inline constexpr
     int_jt _len(void) const noexcept

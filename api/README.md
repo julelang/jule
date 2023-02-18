@@ -8,6 +8,7 @@ Main header is includes full api.
 
 ## Naming Conventions
 
+- All built-in defines named with `JULEC_ID` directive
 - All defines uses snake_case
 - All variables, and parameters starts with `_` prefix
 - All functions starts with `__julec_` prefix
