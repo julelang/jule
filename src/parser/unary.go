@@ -119,13 +119,19 @@ func (u *unary) amper() value {
 		if s.Id != v.data.Value {
 			break
 		}
-		var alloc_model exprNode
-		alloc_model.value = "__julec_new_structure<"
-		alloc_model.value += s.OutId()
-		alloc_model.value += ">(new( std::nothrow ) "
-		(*nodes)[0] = alloc_model
-		last := &(*nodes)[len(*nodes)-1]
-		*last = exprNode{(*last).String() + ")"}
+		if s.CppLinked {
+			(*nodes)[0] = exprNode{"(new( std::nothrow ) "}
+			last := &(*nodes)[len(*nodes)-1]
+			*last = exprNode{(*last).String() + ")"}
+		} else {
+			var alloc_model exprNode
+			alloc_model.value = "__julec_new_structure<"
+			alloc_model.value += s.OutId()
+			alloc_model.value += ">(new( std::nothrow ) "
+			(*nodes)[0] = alloc_model
+			last := &(*nodes)[len(*nodes)-1]
+			*last = exprNode{(*last).String() + ")"}
+		}
 		v.data.DataType.Kind = lex.KND_AMPER + v.data.DataType.Kind
 		v.mutable = true
 		return v
