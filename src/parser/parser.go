@@ -2132,19 +2132,20 @@ func itsCombined(f *Fn, generics []Type) bool {
 	return false
 }
 
-func (p *Parser) parseGenericFunc(f *Fn, generics []Type, errtok lex.Token) {
+func (p *Parser) parseGenericFn(f *Fn, args *ast.Args, errtok lex.Token) {
 	owner := f.Owner.(*Parser)
 	if f.Receiver != nil {
 		s := f.Receiver.Tag.(*Struct)
 		owner.pushGenerics(s.Generics, s.GetGenerics())
 	}
 	owner.reload_fn_types(f)
+	
 	if f.Block == nil {
 		return
-	} else if itsCombined(f, generics) {
+	} else if itsCombined(f, args.Generics) {
 		return
 	}
-	*f.Combines = append(*f.Combines, generics)
+	*f.Combines = append(*f.Combines, args.Generics)
 	p.parse_pure_fn(f)
 }
 
@@ -2231,7 +2232,7 @@ func (p *Parser) parse_fn_call(f *Fn, args *ast.Args, m *exprModel, errTok lex.T
 	}
 	p.parseArgs(f, args, m, errTok)
 	if len(args.Generics) > 0 {
-		p.parseGenericFunc(f, args.Generics, errTok)
+		p.parseGenericFn(f, args, errTok)
 	}
 	if m != nil {
 		m.append_sub(callExpr{
@@ -2308,6 +2309,12 @@ type paramMapPair struct {
 	arg   *Arg
 }
 
+func find_generic_alias(f *Fn, g *ast.GenericType) *ast.TypeAlias {
+	owner := f.Owner.(*Parser)
+	alias, _ := owner.block_type_by_id(g.Id)
+	return alias
+}
+
 func (p *Parser) pushGenericByFunc(f *Fn, pair *paramMapPair, args *ast.Args, gt Type) bool {
 	tf := gt.Tag.(*Fn)
 	cf := pair.param.DataType.Tag.(*Fn)
@@ -2331,14 +2338,62 @@ func (p *Parser) pushGenericByFunc(f *Fn, pair *paramMapPair, args *ast.Args, gt
 	}
 }
 
+func (p *Parser) pushGenericByMap(f *Fn, pair *paramMapPair, args *ast.Args, gt Type) bool {
+	if !types.IsMap(pair.param.DataType) {
+		return false
+	}
+	arg_types := gt.Tag.([]Type)
+	param_types := pair.param.DataType.Tag.([]Type)
+	check := func(offset int) bool {
+		for _, generic := range f.Generics {
+			if !types.HasThisGeneric(generic, param_types[offset]) {
+				continue
+			}
+			alias := find_generic_alias(f, generic)
+			if alias == nil {
+				pt := pair.param.DataType
+				pair.param.DataType = param_types[offset]
+				s := p.pushGenericByArg(f, pair, args, arg_types[offset])
+				pair.param.DataType = pt
+				return s
+			} else {
+				v := value{}
+				v.data.Value = " "
+				v.data.DataType = arg_types[offset]
+				pt := pair.param.DataType
+				pair.param.DataType = alias.TargetType
+				p.checkArgType(pair.param, v, pair.arg.Token)
+				pair.param.DataType = pt
+			}
+			return true
+		}
+		return false
+	}
+	return check(0) && check(1)
+}
+
 func (p *Parser) pushGenericByMultiTyped(f *Fn, pair *paramMapPair, args *ast.Args, gt Type) bool {
 	_types := gt.Tag.([]Type)
 	for _, mt := range _types {
 		for _, generic := range f.Generics {
-			if types.HasThisGeneric(generic, pair.param.DataType) {
-				p.pushGenericByType(f, generic, args, mt)
-				break
+			if !types.HasThisGeneric(generic, pair.param.DataType) {
+				continue
 			}
+			alias := find_generic_alias(f, generic)
+			if alias == nil {
+				if !p.pushGenericByArg(f, pair, args, mt) {
+					return false
+				}
+			} else {
+				v := value{}
+				v.data.Value = " "
+				v.data.DataType = mt
+				pt := pair.param.DataType
+				pair.param.DataType = alias.TargetType
+				p.checkArgType(pair.param, v, pair.arg.Token)
+				pair.param.DataType = pt
+			}
+			break
 		}
 	}
 	return true
@@ -2346,21 +2401,27 @@ func (p *Parser) pushGenericByMultiTyped(f *Fn, pair *paramMapPair, args *ast.Ar
 
 func (p *Parser) pushGenericByCommonArg(f *Fn, pair *paramMapPair, args *ast.Args, t Type) bool {
 	for _, generic := range f.Generics {
-		if types.IsThisGeneric(generic, pair.param.DataType) {
-			p.pushGenericByType(f, generic, args, t)
-			return true
+		if !types.IsThisGeneric(generic, pair.param.DataType) {
+			continue
 		}
+		alias := find_generic_alias(f, generic)
+		if alias == nil {
+			p.pushGenericByType(f, generic, args, t)
+		} else {
+			v := value{}
+			v.data.Value = " "
+			v.data.DataType = t
+			pt := pair.param.DataType
+			pair.param.DataType = alias.TargetType
+			p.checkArgType(pair.param, v, pair.arg.Token)
+			pair.param.DataType = pt
+		}
+		return true
 	}
 	return false
 }
 
 func (p *Parser) pushGenericByType(f *Fn, generic *GenericType, args *ast.Args, gt Type) {
-	owner := f.Owner.(*Parser)
-	// Already added
-	alias, _ := owner.block_type_by_id(generic.Id)
-	if alias != nil {
-		return
-	}
 	id, _ := gt.KindId()
 	gt.Kind = id
 	f.Owner.(*Parser).pushGeneric(generic, gt)
@@ -2378,13 +2439,15 @@ func (p *Parser) pushGenericByArg(f *Fn, pair *paramMapPair, args *ast.Args, arg
 	_, prefix := pair.param.DataType.KindId()
 	_, tprefix := argType.KindId()
 	if prefix != tprefix {
-		return false
+		return p.pushGenericByCommonArg(f, pair, args, argType)
 	}
 	switch {
 	case types.IsFn(argType):
 		return p.pushGenericByFunc(f, pair, args, argType)
-	case argType.MultiTyped, types.IsMap(argType):
+	case argType.MultiTyped:
 		return p.pushGenericByMultiTyped(f, pair, args, argType)
+	case types.IsMap(argType):
+		return p.pushGenericByMap(f, pair, args, argType)
 	case types.IsArray(argType), types.IsSlice(argType):
 		return p.pushGenericByComponent(f, pair, args, argType)
 	default:
@@ -2392,17 +2455,8 @@ func (p *Parser) pushGenericByArg(f *Fn, pair *paramMapPair, args *ast.Args, arg
 	}
 }
 
-func (p *Parser) parseArg(f *Fn, pair *paramMapPair, args *ast.Args, variadiced *bool) {
-	var value value
-	var model ast.ExprModel
-	if pair.param.Variadic {
-		t := types.VariadicToSlice(pair.param.DataType)
-		value, model = p.evalExpr(pair.arg.Expr, &t)
-	} else {
-		value, model = p.evalExpr(pair.arg.Expr, &pair.param.DataType)
-	}
-	pair.arg.Expr.Model = model
-	if !value.variadic && !pair.param.Variadic &&
+func (p *Parser) check_arg(f *Fn, pair *paramMapPair, args *ast.Args, variadiced *bool, v value) {
+	if !v.variadic && !pair.param.Variadic &&
 		!ast.Has_attribute(build.ATTR_CDEF, f.Attributes) &&
 		types.IsPure(pair.param.DataType) && types.IsNumeric(pair.param.DataType.Id) {
 		pair.arg.CastType = new(Type)
@@ -2411,17 +2465,30 @@ func (p *Parser) parseArg(f *Fn, pair *paramMapPair, args *ast.Args, variadiced 
 		pair.arg.CastType.Pure = true
 	}
 	if variadiced != nil && !*variadiced {
-		*variadiced = value.variadic
+		*variadiced = v.variadic
 	}
 	if args.DynamicGenericAnnotation &&
 		types.HasGenerics(f.Generics, pair.param.DataType) {
-		ok := p.pushGenericByArg(f, pair, args, value.data.DataType)
+		ok := p.pushGenericByArg(f, pair, args, v.data.DataType)
 		if !ok {
 			p.pusherrtok(pair.arg.Token, "dynamic_type_annotation_failed")
 		}
 		return
 	}
-	p.checkArgType(pair.param, value, pair.arg.Token)
+	p.checkArgType(pair.param, v, pair.arg.Token)
+}
+
+func (p *Parser) parseArg(f *Fn, pair *paramMapPair, args *ast.Args, variadiced *bool) {
+	var v value
+	var model ast.ExprModel
+	if pair.param.Variadic {
+		t := types.VariadicToSlice(pair.param.DataType)
+		v, model = p.evalExpr(pair.arg.Expr, &t)
+	} else {
+		v, model = p.evalExpr(pair.arg.Expr, &pair.param.DataType)
+	}
+	pair.arg.Expr.Model = model
+	p.check_arg(f, pair, args, variadiced, v)
 }
 
 func (p *Parser) checkArgType(param *Param, val value, errTok lex.Token) {

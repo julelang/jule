@@ -166,9 +166,15 @@ func (pap *pureArgParser) tryFuncMultiRetAsArgs() bool {
 		pap.args.Src[0] = Arg{Expr: Expr{Model: fname}}
 		pap.args.Src[1] = arg
 	}
+	pair := &paramMapPair{
+		param: nil,
+		arg: &arg,
+	}
 	for i, param := range pap.f.Params {
+		pair.param = &param
 		rt := types[i]
 		val := value{data: ast.Data{DataType: rt}}
+		pap.p.check_arg(pap.f, pair, pap.args, nil, val)
 		pap.p.checkArgType(&param, val, arg.Token)
 	}
 	return true

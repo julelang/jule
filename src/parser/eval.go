@@ -93,7 +93,24 @@ func (e *eval) eval_op(op any) (v value, model ast.ExprModel) {
 	return
 }
 
+func is_invalid_prefix_type(t *Type) bool {
+	switch {
+	case t.Id == types.ID:
+		return true
+	case types.IsSlice(*t):
+		return is_invalid_prefix_type(t.ComponentType)
+	case types.IsMap(*t):
+		types := t.Tag.([]Type)
+		return is_invalid_prefix_type(&types[0]) || is_invalid_prefix_type(&types[1])
+	}
+	return false
+}
+
 func (e *eval) eval(op any) (v value, model ast.ExprModel) {
+	if e.type_prefix != nil && is_invalid_prefix_type(e.type_prefix) {
+		e.type_prefix = nil
+	}
+
 	defer func() {
 		if types.IsVoid(v.data.DataType) {
 			v.data.DataType.Id = types.VOID
