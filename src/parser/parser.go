@@ -2132,14 +2132,22 @@ func itsCombined(f *Fn, generics []Type) bool {
 	return false
 }
 
-func (p *Parser) parseGenericFn(f *Fn, args *ast.Args, errtok lex.Token) {
+func ready_to_parse_generic_fn(f *Fn) {
 	owner := f.Owner.(*Parser)
 	if f.Receiver != nil {
 		s := f.Receiver.Tag.(*Struct)
 		owner.pushGenerics(s.Generics, s.GetGenerics())
 	}
 	owner.reload_fn_types(f)
-	
+}
+
+func (p *Parser) parseGenericFn(f *Fn, args *ast.Args, errtok lex.Token) {
+	// Ignore this step if multi ret as args, because
+	// already parsed by argument parser.
+	if !is_multi_ret_as_args(f, len(args.Src)) {
+		ready_to_parse_generic_fn(f)
+	}
+
 	if f.Block == nil {
 		return
 	} else if itsCombined(f, args.Generics) {
@@ -2235,11 +2243,15 @@ func (p *Parser) parse_fn_call(f *Fn, args *ast.Args, m *exprModel, errTok lex.T
 		p.parseGenericFn(f, args, errTok)
 	}
 	if m != nil {
-		m.append_sub(callExpr{
-			generics: genericsExpr{args.Generics},
-			args:     argsExpr{args.Src},
-			f:        f,
-		})
+		model := callExpr{
+			args: argsExpr{args.Src},
+			f:    f,
+		}
+		// Ignore generics if multi ret uses as args.
+		if !is_multi_ret_as_args(f, len(args.Src)) {
+			model.generics = genericsExpr{args.Generics}
+		}
+		m.append_sub(model)
 	}
 end:
 	v.data.Value = " "

@@ -297,6 +297,28 @@ func (f *Fn) plainTypeString() string {
 	return s.String()
 }
 
+// CppKind returns cpp data type kind string of function.
+func (f *Fn) CppKind(pure bool) string {
+	f.RetType.DataType.Pure = pure
+	var cpp strings.Builder
+	cpp.WriteString(f.RetType.String())
+	cpp.WriteByte('(')
+	if len(f.Params) > 0 {
+		for _, param := range f.Params {
+			param.DataType.Pure = pure
+			cpp.WriteString(param.Prototype())
+			cpp.WriteByte(',')
+		}
+		cppStr := cpp.String()[:cpp.Len()-1]
+		cpp.Reset()
+		cpp.WriteString(cppStr)
+	} else {
+		cpp.WriteString("void")
+	}
+	cpp.WriteByte(')')
+	return cpp.String()
+}
+
 // TypeKind returns data type string of function.
 func (f *Fn) TypeKind() string {
 	var cpp strings.Builder
@@ -1132,35 +1154,13 @@ func (dt *Type) StructString() string {
 	return cpp.String()[:cpp.Len()-1] + ">"
 }
 
-// FnCppKind returns cpp type kind of functipn DataType.
-func (dt *Type) FnCppKind() string {
-	var cpp strings.Builder
-	f := dt.Tag.(*Fn)
-	f.RetType.DataType.Pure = dt.Pure
-	cpp.WriteString(f.RetType.String())
-	cpp.WriteByte('(')
-	if len(f.Params) > 0 {
-		for _, param := range f.Params {
-			param.DataType.Pure = dt.Pure
-			cpp.WriteString(param.Prototype())
-			cpp.WriteByte(',')
-		}
-		cppStr := cpp.String()[:cpp.Len()-1]
-		cpp.Reset()
-		cpp.WriteString(cppStr)
-	} else {
-		cpp.WriteString("void")
-	}
-	cpp.WriteByte(')')
-	return cpp.String()
-}
-
 // FnString returns cpp value of function DataType.
 func (dt *Type) FnString() string {
 	var cpp strings.Builder
 	cpp.WriteString(build.AsTypeId("fn"))
 	cpp.WriteByte('<')
-	cpp.WriteString(dt.FnCppKind())
+	f := dt.Tag.(*Fn)
+	cpp.WriteString(f.CppKind(dt.Pure))
 	cpp.WriteByte('>')
 	return cpp.String()
 }

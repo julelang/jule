@@ -17,6 +17,9 @@ struct fn_jt {
 
     fn_jt<_Function_t>(const std::function<_Function_t> &_Function) noexcept
     { this->__buffer = _Function; }
+
+    fn_jt<_Function_t>(const _Function_t &_Function) noexcept
+    { this->__buffer = _Function; }
     
     template<typename ..._Arguments_t>
     auto operator()(_Arguments_t... _Arguments) noexcept {
@@ -29,6 +32,9 @@ struct fn_jt {
     { this->__buffer = nil; }
 
     inline void operator=(const std::function<_Function_t> &_Function) noexcept
+    { this->__buffer = _Function; }
+
+    inline void operator=(const _Function_t &_Function) noexcept
     { this->__buffer = _Function; }
 
     inline bool operator==(std::nullptr_t) const noexcept

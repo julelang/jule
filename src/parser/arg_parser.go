@@ -122,12 +122,14 @@ func (pap *pureArgParser) pushArg() {
 	pap.i++
 }
 
+func is_multi_ret_as_args(f *Fn, nargs int) bool {
+	return nargs < len(f.Params) && nargs == 1
+}
+
 func (pap *pureArgParser) parse() {
-	if len(pap.args.Src) < len(pap.f.Params) {
-		if len(pap.args.Src) == 1 {
-			if pap.tryFuncMultiRetAsArgs() {
-				return
-			}
+	if is_multi_ret_as_args(pap.f, len(pap.args.Src)) {
+		if pap.tryFuncMultiRetAsArgs() {
+			return
 		}
 	}
 	pap.pmap = getParamMap(pap.f.Params)
@@ -159,16 +161,9 @@ func (pap *pureArgParser) tryFuncMultiRetAsArgs() bool {
 	} else if len(types) > len(pap.f.Params) {
 		return false
 	}
-	if pap.m != nil {
-		fname := pap.m.nodes[pap.m.index].nodes[0]
-		pap.m.nodes[pap.m.index].nodes[0] = exprNode{"__julec_tuple_as_args"}
-		pap.args.Src = make([]Arg, 2)
-		pap.args.Src[0] = Arg{Expr: Expr{Model: fname}}
-		pap.args.Src[1] = arg
-	}
 	pair := &paramMapPair{
 		param: nil,
-		arg: &arg,
+		arg:   &arg,
 	}
 	for i, param := range pap.f.Params {
 		pair.param = &param
@@ -176,6 +171,17 @@ func (pap *pureArgParser) tryFuncMultiRetAsArgs() bool {
 		val := value{data: ast.Data{DataType: rt}}
 		pap.p.check_arg(pap.f, pair, pap.args, nil, val)
 		pap.p.checkArgType(&param, val, arg.Token)
+	}
+	if pap.m != nil {
+		ready_to_parse_generic_fn(pap.f)
+		model := exprNode{"__julec_tuple_as_args<"}
+		model.value += pap.f.CppKind(true)
+		model.value += ">"
+		fname := pap.m.nodes[pap.m.index].nodes[0]
+		pap.m.nodes[pap.m.index].nodes[0] = model
+		arg.CastType = nil
+		arg.Expr.Model = exprNode{fname.String() + "," + arg.Expr.String()}
+		pap.args.Src[0] = arg
 	}
 	return true
 }

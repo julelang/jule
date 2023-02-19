@@ -186,7 +186,7 @@ template<typename _Function_t, typename _Tuple_t, size_t ..._I_t>
 inline auto __julec_tuple_as_args(const fn_jt<_Function_t> &_Function,
                                   const _Tuple_t _Tuple,
                                   const std::index_sequence<_I_t...>)
-{ return _Function.__buffer(std::get<_I_t>( _Tuple )...); }
+{ return _Function.__buffer( std::get<_I_t>( _Tuple )... ); }
 
 template<typename _Function_t, typename _Tuple_t>
 inline auto __julec_tuple_as_args(const fn_jt<_Function_t> &_Function,
