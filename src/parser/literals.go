@@ -48,10 +48,13 @@ func numericModel(v value) ast.ExprModel {
 	switch t := v.expr.(type) {
 	case uint64:
 		fmt := strconv.FormatUint(t, 10)
-		return exprNode{fmt + "LLU"}
+		if t > 9223372036854775807 {
+			return exprNode{fmt + "LLU"}
+		}
+		return exprNode{fmt}
 	case int64:
 		fmt := strconv.FormatInt(t, 10)
-		return exprNode{fmt + "LL"}
+		return exprNode{fmt}
 	case float64:
 		switch {
 		case normalize(&v):
