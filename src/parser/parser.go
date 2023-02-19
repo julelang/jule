@@ -2159,10 +2159,10 @@ func (p *Parser) parseGenericFn(f *Fn, args *ast.Args, errtok lex.Token) {
 
 func (p *Parser) parseGenerics(f *Fn, args *ast.Args, errTok lex.Token) bool {
 	if len(f.Generics) > 0 && len(args.Generics) == 0 {
-		for _, generic := range f.Generics {
+		for _, g := range f.Generics {
 			ok := false
 			for _, param := range f.Params {
-				if types.HasThisGeneric(generic, param.DataType) {
+				if types.HasThisGeneric(g, param.DataType) {
 					ok = true
 					break
 				}
@@ -2172,6 +2172,11 @@ func (p *Parser) parseGenerics(f *Fn, args *ast.Args, errTok lex.Token) bool {
 			}
 		}
 		args.DynamicGenericAnnotation = true
+		// Append empty types to generics for ordering.
+		i := 0
+		for ; i < len(f.Generics); i++ {
+			args.Generics = append(args.Generics, Type{})
+		}
 		goto ok
 	}
 check:
@@ -2357,11 +2362,11 @@ func (p *Parser) pushGenericByMap(f *Fn, pair *paramMapPair, args *ast.Args, gt 
 	arg_types := gt.Tag.([]Type)
 	param_types := pair.param.DataType.Tag.([]Type)
 	check := func(offset int) bool {
-		for _, generic := range f.Generics {
-			if !types.HasThisGeneric(generic, param_types[offset]) {
+		for _, g := range f.Generics {
+			if !types.HasThisGeneric(g, param_types[offset]) {
 				continue
 			}
-			alias := find_generic_alias(f, generic)
+			alias := find_generic_alias(f, g)
 			if alias == nil {
 				pt := pair.param.DataType
 				pair.param.DataType = param_types[offset]
@@ -2387,11 +2392,11 @@ func (p *Parser) pushGenericByMap(f *Fn, pair *paramMapPair, args *ast.Args, gt 
 func (p *Parser) pushGenericByMultiTyped(f *Fn, pair *paramMapPair, args *ast.Args, gt Type) bool {
 	_types := gt.Tag.([]Type)
 	for _, mt := range _types {
-		for _, generic := range f.Generics {
-			if !types.HasThisGeneric(generic, pair.param.DataType) {
+		for _, g := range f.Generics {
+			if !types.HasThisGeneric(g, pair.param.DataType) {
 				continue
 			}
-			alias := find_generic_alias(f, generic)
+			alias := find_generic_alias(f, g)
 			if alias == nil {
 				if !p.pushGenericByArg(f, pair, args, mt) {
 					return false
@@ -2412,13 +2417,13 @@ func (p *Parser) pushGenericByMultiTyped(f *Fn, pair *paramMapPair, args *ast.Ar
 }
 
 func (p *Parser) pushGenericByCommonArg(f *Fn, pair *paramMapPair, args *ast.Args, t Type) bool {
-	for _, generic := range f.Generics {
-		if !types.IsThisGeneric(generic, pair.param.DataType) {
+	for i, g := range f.Generics {
+		if !types.IsThisGeneric(g, pair.param.DataType) {
 			continue
 		}
-		alias := find_generic_alias(f, generic)
+		alias := find_generic_alias(f, g)
 		if alias == nil {
-			p.pushGenericByType(f, generic, args, t)
+			p.pushGenericByType(f, g, i, args, t)
 		} else {
 			v := value{}
 			v.data.Value = " "
@@ -2433,11 +2438,13 @@ func (p *Parser) pushGenericByCommonArg(f *Fn, pair *paramMapPair, args *ast.Arg
 	return false
 }
 
-func (p *Parser) pushGenericByType(f *Fn, generic *GenericType, args *ast.Args, gt Type) {
+func (p *Parser) pushGenericByType(f *Fn, g *GenericType, pos int, args *ast.Args, gt Type) {
 	id, _ := gt.KindId()
 	gt.Kind = id
-	f.Owner.(*Parser).pushGeneric(generic, gt)
-	args.Generics = append(args.Generics, gt)
+	f.Owner.(*Parser).pushGeneric(g, gt)
+
+	// Add by order.
+	args.Generics[pos] = gt
 }
 
 func (p *Parser) pushGenericByComponent(f *Fn, pair *paramMapPair, args *ast.Args, argType Type) bool {

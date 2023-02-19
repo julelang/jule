@@ -97,17 +97,17 @@ func (m mapExpr) String() string {
 }
 
 type genericsExpr struct {
-	types []Type
+	exprs []Type
 }
 
 func (ge genericsExpr) String() string {
-	if len(ge.types) == 0 {
+	if len(ge.exprs) == 0 {
 		return ""
 	}
 	var cpp strings.Builder
 	cpp.WriteByte('<')
-	for _, generic := range ge.types {
-		cpp.WriteString(generic.String())
+	for _, g := range ge.exprs {
+		cpp.WriteString(g.String())
 		cpp.WriteByte(',')
 	}
 	return cpp.String()[:cpp.Len()-1] + ">"
