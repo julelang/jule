@@ -2179,7 +2179,6 @@ ok:
 
 func (p *Parser) parse_fn_call(f *Fn, args *ast.Args, m *exprModel, errTok lex.Token) (v value) {
 	args.NeedsPureType = p.rootBlock == nil || len(p.rootBlock.Func.Generics) == 0
-	_ = p.checkGenericsQuantity(len(f.Generics), len(args.Generics), errTok)
 	if f.Receiver != nil {
 		switch f.Receiver.Tag.(type) {
 		case *Struct:
