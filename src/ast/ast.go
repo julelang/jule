@@ -1132,12 +1132,9 @@ func (dt *Type) StructString() string {
 	return cpp.String()[:cpp.Len()-1] + ">"
 }
 
-// FnString returns cpp value of function DataType.
-func (dt *Type) FnString() string {
+// FnCppKind returns cpp type kind of functipn DataType.
+func (dt *Type) FnCppKind() string {
 	var cpp strings.Builder
-	cpp.WriteString(build.AsTypeId("fn"))
-	cpp.WriteByte('<')
-	cpp.WriteString("std::function<")
 	f := dt.Tag.(*Fn)
 	f.RetType.DataType.Pure = dt.Pure
 	cpp.WriteString(f.RetType.String())
@@ -1154,7 +1151,17 @@ func (dt *Type) FnString() string {
 	} else {
 		cpp.WriteString("void")
 	}
-	cpp.WriteString(")>>")
+	cpp.WriteByte(')')
+	return cpp.String()
+}
+
+// FnString returns cpp value of function DataType.
+func (dt *Type) FnString() string {
+	var cpp strings.Builder
+	cpp.WriteString(build.AsTypeId("fn"))
+	cpp.WriteByte('<')
+	cpp.WriteString(dt.FnCppKind())
+	cpp.WriteByte('>')
 	return cpp.String()
 }
 
