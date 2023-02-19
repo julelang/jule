@@ -45,6 +45,13 @@ func (sap *structArgParser) buildArgs() {
 			arg := Arg{Expr: Expr{Model: model}}
 			sap.args.Src[i] = arg
 		}
+		rec := sap.f.RetType.DataType.Tag.(*ast.Struct)
+		arg := &sap.args.Src[i]
+		if rec.CppLinked {
+			arg.TargetId = pair.param.Id
+		} else {
+			arg.TargetId = "" // Disable argument targeting for constructor method
+		}
 	}
 }
 

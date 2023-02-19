@@ -17,10 +17,21 @@ type Arg struct {
 }
 
 func (a Arg) String() string {
-	if a.CastType != nil {
-		return "static_cast<" + a.CastType.String() + ">(" + a.Expr.String() + ")"
+	var cpp strings.Builder
+	if a.TargetId != "" {
+		cpp.WriteString(a.TargetId)
+		cpp.WriteString(": ")
 	}
-	return a.Expr.String()
+	if a.CastType != nil {
+		cpp.WriteString("static_cast<")
+		cpp.WriteString(a.CastType.String())
+		cpp.WriteString(">(")
+		cpp.WriteString(a.Expr.String())
+		cpp.WriteByte(')')
+	} else {
+		cpp.WriteString(a.Expr.String())
+	}
+	return cpp.String()
 }
 
 // Argument base.
