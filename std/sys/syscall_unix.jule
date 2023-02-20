@@ -18,6 +18,7 @@ cpp fn opendir(path: str): *cpp.DIR
 cpp unsafe fn closedir(mut dir: *cpp.DIR): int
 cpp unsafe fn readdir(mut dir: *cpp.DIR): *cpp.dirent
 cpp fn fopen(path: str, mode: str): *cpp.FILE
+cpp fn open(path: str, flag: int, mode: int): int
 
 pub let STDIN  = uintptr(0)
 pub let STDOUT = uintptr(1)
@@ -93,7 +94,7 @@ pub fn stat(path: str): (stat: &Stat) {
 // Calls C's opendir function.
 // Returns nil reference if error occurs.
 pub fn open_dir(path: str): &Dir {
-	let mut handle = unsafe { cpp.opendir(path) }
+	let mut handle = cpp.opendir(path)
 	if handle == nil {
 		ret new(Dir)
 	}
@@ -104,9 +105,14 @@ pub fn open_dir(path: str): &Dir {
 // Returns nil reference if error occurs.
 // or C's fopen function returns nil pointer.
 pub fn fopen(path: str, mode: str): &File {
-	let handle = unsafe { cpp.fopen(path, mode) }
+	let handle = cpp.fopen(path, mode)
 	if handle == nil {
 		ret new(File)
 	}
 	ret &File{handle: handle}
+}
+
+// Wrapper for C's open function.
+pub fn open(path: str, flag: int, mode: int): int {
+	ret cpp.open(path, flag, mode)
 }

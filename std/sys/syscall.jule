@@ -20,6 +20,11 @@ cpp unsafe fn fseek(mut f: *cpp.FILE, offset: u64, origin: int): int
 cpp unsafe fn fread(dest: *unsafe, element_size: uint, count: uint, mut f: *cpp.FILE): uint
 cpp unsafe fn ftell(mut f: *cpp.FILE): u64
 cpp unsafe fn fclose(mut f: *cpp.FILE): int
+cpp fn lseek(handle: int, offset: i64, origin: int): i64
+cpp fn tell(handle: int): i64
+cpp unsafe fn read(handle: int, dest: *unsafe, n: uint): int
+cpp fn close(handle: int): int
+cpp unsafe fn write(handle: int, buff: *unsafe, n: uint): int
 
 // Wrapper for C's stat.
 pub struct Stat {
@@ -38,7 +43,7 @@ impl File {
 
 	// Calls C's fread function with handle.
 	// Returns 0 if handle is nil.
-	pub fn fread(mut self, buffer: []byte, count: uint): uint {
+	pub fn fread(mut self, mut buffer: []byte, count: uint): uint {
 		if self.handle == nil {
 			ret 0
 		}
@@ -73,4 +78,25 @@ impl File {
 		self.handle = nil
 		ret code
 	}
+}
+
+// Wrapper for C's lseek function.
+pub fn lseek(handle: int, offset: i64, origin: int): i64 {
+	ret cpp.lseek(handle, offset, origin)
+}
+
+// Wrapper for C's tell function.
+pub fn tell(handle: int): i64 { ret cpp.tell(handle) }
+
+// Wrapper for C's read function.
+pub fn read(handle: int, mut buff: []byte): int {
+	ret unsafe { cpp.read(handle, &buff[0], uint(buff.len)) }
+}
+
+// Wrapper for C's close function.
+pub fn close(handle: int): int { ret cpp.close(handle) }
+
+// Wraooer for C's write function.
+pub fn write(handle: int, buff: []byte): int {
+	ret unsafe { cpp.write(handle, &buff[0], uint(buff.len)) }
 }

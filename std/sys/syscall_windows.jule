@@ -21,7 +21,8 @@ cpp unsafe fn wstat(path: *cpp.wchar_t, handle: *cpp.stat): (err: int)
 cpp unsafe fn _wopendir(path: *cpp.wchar_t): *cpp._WDIR
 cpp unsafe fn _wclosedir(mut dir: *cpp._WDIR): int
 cpp unsafe fn _wreaddir(mut dir: *cpp._WDIR): *cpp._wdirent
-cpp fn _wfopen(path: *cpp.wchar_t, mode: *cpp.wchar_t): *cpp.FILE
+cpp unsafe fn _wfopen(path: *cpp.wchar_t, mode: *cpp.wchar_t): *cpp.FILE
+cpp unsafe fn _wopen(path: *cpp.wchar_t, flag: int, mode: int): int
 
 pub type handle: uintptr
 
@@ -176,4 +177,10 @@ pub fn fopen(path: str, mode: str): &File {
 		ret new(File)
 	}
 	ret &File{handle: handle}
+}
+
+// Wrapper for C's _wopen function.
+pub fn open(path: str, flag: int, mode: int): int {
+	let utf16_path = utf16_from_str(path)
+	ret unsafe { cpp._wopen((*cpp.wchar_t)(&utf16_path[0]), flag, mode) }
 }
