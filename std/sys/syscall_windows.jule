@@ -21,7 +21,6 @@ cpp unsafe fn wstat(path: *cpp.wchar_t, handle: *cpp.stat): (err: int)
 cpp unsafe fn _wopendir(path: *cpp.wchar_t): *cpp._WDIR
 cpp unsafe fn _wclosedir(mut dir: *cpp._WDIR): int
 cpp unsafe fn _wreaddir(mut dir: *cpp._WDIR): *cpp._wdirent
-cpp unsafe fn _wfopen(path: *cpp.wchar_t, mode: *cpp.wchar_t): *cpp.FILE
 cpp unsafe fn _wopen(path: *cpp.wchar_t, flag: int, mode: int): int
 
 pub type handle: uintptr
@@ -78,7 +77,7 @@ impl Dirent {
 
 	// Returns d_name field of handle as string.
 	// Returns empty string if handle is nil.
-	pub fn d_name(self): str {
+	pub fn name(self): str {
 		if self.addr() == 0 {
 			ret ""
 		}
@@ -161,22 +160,6 @@ pub fn open_dir(path: str): &Dir {
 		ret new(Dir)
 	}
 	ret &Dir{handle: handle}
-}
-
-// Calls C's _wfopen function.
-// Returns nil reference if error occurs.
-// or C's _wfopen function returns nil pointer.
-pub fn fopen(path: str, mode: str): &File {
-	let utf16_path = utf16_from_str(path)
-	let utf16_mode = utf16_from_str(mode)
-	let handle = unsafe {
-		cpp._wfopen((*cpp.wchar_t)(&utf16_path[0]),
-					(*cpp.wchar_t)(&utf16_mode[0]))
-	}
-	if handle == nil {
-		ret new(File)
-	}
-	ret &File{handle: handle}
 }
 
 // Wrapper for C's _wopen function.

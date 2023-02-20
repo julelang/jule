@@ -17,7 +17,6 @@ cpp unsafe fn __julec_stat(path: str, handle: *cpp.stat): (err: int)
 cpp fn opendir(path: str): *cpp.DIR
 cpp unsafe fn closedir(mut dir: *cpp.DIR): int
 cpp unsafe fn readdir(mut dir: *cpp.DIR): *cpp.dirent
-cpp fn fopen(path: str, mode: str): *cpp.FILE
 cpp fn open(path: str, flag: int, mode: int): int
 
 pub let STDIN  = uintptr(0)
@@ -70,7 +69,7 @@ impl Dirent {
 
 	// Returns d_name field of handle as string.
 	// Returns empty string if handle is nil.
-	pub fn d_name(self): str {
+	pub fn name(self): str {
 		if self.addr() == 0 {
 			ret ""
 		}
@@ -99,17 +98,6 @@ pub fn open_dir(path: str): &Dir {
 		ret new(Dir)
 	}
 	ret &Dir{handle: handle}
-}
-
-// Calls C's fopen function.
-// Returns nil reference if error occurs.
-// or C's fopen function returns nil pointer.
-pub fn fopen(path: str, mode: str): &File {
-	let handle = cpp.fopen(path, mode)
-	if handle == nil {
-		ret new(File)
-	}
-	ret &File{handle: handle}
 }
 
 // Wrapper for C's open function.
