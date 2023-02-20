@@ -11,14 +11,15 @@ import (
 )
 
 type value struct {
-	data     ast.Data
-	model    ast.ExprModel
-	expr     any
-	constant bool
-	lvalue   bool
-	variadic bool
-	is_type  bool
-	mutable  bool
+	data      ast.Data
+	model     ast.ExprModel
+	expr      any
+	constant  bool
+	lvalue    bool
+	variadic  bool
+	is_type   bool
+	mutable   bool
+	cast_type *Type
 }
 
 type eval struct {
@@ -106,6 +107,13 @@ func is_invalid_prefix_type(t *Type) bool {
 	return false
 }
 
+func add_casting_to_model(v value, model ast.ExprModel) ast.ExprModel {
+	if v.cast_type == nil {
+		return exprNode{model.String()}
+	}
+	return get_cast_expr_model(*v.cast_type, v.data.DataType, model)
+}
+
 func (e *eval) eval(op any) (v value, model ast.ExprModel) {
 	if e.type_prefix != nil && is_invalid_prefix_type(e.type_prefix) {
 		e.type_prefix = nil
@@ -134,6 +142,9 @@ func (e *eval) eval(op any) (v value, model ast.ExprModel) {
 					v.data.DataType = dt
 				}
 			}
+		}
+		if v.cast_type != nil {
+			model = add_casting_to_model(v, model)
 		}
 	}()
 	if op == nil || e.has_error {
@@ -181,6 +192,8 @@ func (e *eval) unary(toks []lex.Token, m *exprModel) value {
 		e.pusherrtok(processor.token, "invalid_syntax")
 		return v
 	}
+	m.nodes[m.index].nodes = nil
+	m.append_sub(add_casting_to_model(v, m))
 	switch processor.token.Kind {
 	case lex.KND_MINUS:
 		m.append_sub(exprNode{processor.token.Kind})
@@ -457,7 +470,7 @@ func (e *eval) subId(toks []lex.Token, m *exprModel) (v value) {
 	return
 }
 
-func (e *eval) get_cast_expr_model(t, vt Type, expr ast.ExprModel) ast.ExprModel {
+func get_cast_expr_model(t, vt Type, expr ast.ExprModel) ast.ExprModel {
 	var model strings.Builder
 	switch {
 	case types.IsPtr(vt) || types.IsPtr(t):
@@ -489,8 +502,14 @@ end:
 
 func (e *eval) castExpr(dt Type, exprToks []lex.Token, m *exprModel, errTok lex.Token) value {
 	val, model := e.eval_toks(exprToks)
-	m.append_sub(e.get_cast_expr_model(dt, val.data.DataType, model))
+	m.append_sub(get_cast_expr_model(dt, val.data.DataType, model))
 	val = e.cast(val, dt, errTok)
+	if types.IsPure(val.data.DataType) && types.IsNumeric(val.data.DataType.Id) {
+		val.cast_type = new(Type)
+		*val.cast_type = dt.Copy()
+		val.cast_type.Original = nil
+		val.cast_type.Pure = true
+	}
 	return val
 }
 

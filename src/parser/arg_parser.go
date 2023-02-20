@@ -62,7 +62,6 @@ func (pap *pureArgParser) push_variadic_args(pair *paramMapPair) {
 		model.exprs = append(model.exprs, pair.arg.String())
 	}
 	model.exprs = append(model.exprs, exprNode{lex.KND_RBRACE})
-	pair.arg.CastType = nil
 	if !variadiced {
 		pair.arg.Expr.Model = model
 	}
@@ -179,7 +178,6 @@ func (pap *pureArgParser) tryFuncMultiRetAsArgs() bool {
 		model.value += ">"
 		fname := pap.m.nodes[pap.m.index].nodes[0]
 		pap.m.nodes[pap.m.index].nodes[0] = model
-		arg.CastType = nil
 		arg.Expr.Model = exprNode{fname.String() + "," + arg.Expr.String()}
 		pap.args.Src[0] = arg
 	}

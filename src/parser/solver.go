@@ -960,6 +960,12 @@ func (s *solver) finalize(v *value) {
 			v.model = getModel(*v)
 		}
 	}
+
+	if s.l.cast_type != nil && s.r.cast_type == nil {
+		v.cast_type = s.l.cast_type
+	} else if s.r.cast_type != nil && s.l.cast_type == nil {
+		v.cast_type = s.r.cast_type
+	}
 }
 
 func (s *solver) solve() (v value) {

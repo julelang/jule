@@ -13,7 +13,6 @@ type Arg struct {
 	Token    lex.Token
 	TargetId string
 	Expr     Expr
-	CastType *Type
 }
 
 func (a Arg) String() string {
@@ -22,15 +21,7 @@ func (a Arg) String() string {
 		cpp.WriteString(a.TargetId)
 		cpp.WriteString(": ")
 	}
-	if a.CastType != nil {
-		cpp.WriteString("static_cast<")
-		cpp.WriteString(a.CastType.String())
-		cpp.WriteString(">(")
-		cpp.WriteString(a.Expr.String())
-		cpp.WriteByte(')')
-	} else {
-		cpp.WriteString(a.Expr.String())
-	}
+	cpp.WriteString(a.Expr.String())
 	return cpp.String()
 }
 

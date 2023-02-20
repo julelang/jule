@@ -2475,14 +2475,6 @@ func (p *Parser) pushGenericByArg(f *Fn, pair *paramMapPair, args *ast.Args, arg
 }
 
 func (p *Parser) check_arg(f *Fn, pair *paramMapPair, args *ast.Args, variadiced *bool, v value) {
-	if !v.variadic && !pair.param.Variadic &&
-		!ast.Has_attribute(build.ATTR_CDEF, f.Attributes) &&
-		types.IsPure(pair.param.DataType) && types.IsNumeric(pair.param.DataType.Id) {
-		pair.arg.CastType = new(Type)
-		*pair.arg.CastType = pair.param.DataType.Copy()
-		pair.arg.CastType.Original = nil
-		pair.arg.CastType.Pure = true
-	}
 	if variadiced != nil && !*variadiced {
 		*variadiced = v.variadic
 	}
