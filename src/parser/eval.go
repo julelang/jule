@@ -107,11 +107,11 @@ func is_invalid_prefix_type(t *Type) bool {
 	return false
 }
 
-func add_casting_to_model(v value, model ast.ExprModel) ast.ExprModel {
+func add_casting_to_model(v value, m ast.ExprModel) ast.ExprModel {
 	if v.cast_type == nil {
-		return exprNode{model.String()}
+		return exprNode{m.String()}
 	}
-	return get_cast_expr_model(*v.cast_type, v.data.DataType, model)
+	return get_cast_expr_model(*v.cast_type, v.data.DataType, m)
 }
 
 func (e *eval) eval(op any) (v value, model ast.ExprModel) {
@@ -192,8 +192,9 @@ func (e *eval) unary(toks []lex.Token, m *exprModel) value {
 		e.pusherrtok(processor.token, "invalid_syntax")
 		return v
 	}
-	m.nodes[m.index].nodes = nil
-	m.append_sub(add_casting_to_model(v, m))
+
+	// NOTICE: The first expression model must be unary operator!
+
 	switch processor.token.Kind {
 	case lex.KND_MINUS:
 		m.append_sub(exprNode{processor.token.Kind})
@@ -217,6 +218,9 @@ func (e *eval) unary(toks []lex.Token, m *exprModel) value {
 		e.pusherrtok(processor.token, "invalid_syntax")
 	}
 	v.data.Token = processor.token
+	model := add_casting_to_model(v, m)
+	m.nodes[m.index].nodes = nil
+	m.append_sub(model)
 	return v
 }
 
