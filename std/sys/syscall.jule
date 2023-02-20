@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use cpp "<cstdio>"
 use cpp "<sys/stat.h>"
 
 cpp type _mode_t: uint
@@ -12,8 +13,64 @@ cpp struct stat{
 	st_size: cpp._off_t
 }
 
+//jule:typedef
+cpp struct FILE{}
+
+cpp unsafe fn fseek(mut f: *cpp.FILE, offset: u64, origin: int): int
+cpp unsafe fn fread(dest: *unsafe, element_size: uint, count: uint, mut f: *cpp.FILE): uint
+cpp unsafe fn ftell(mut f: *cpp.FILE): u64
+cpp unsafe fn fclose(mut f: *cpp.FILE): int
+
 // Wrapper for C's stat.
 pub struct Stat {
 	pub st_mode: uint
 	pub st_size: uint
+}
+
+// Wrapper for C's file.
+pub struct File {
+	handle: *cpp.FILE
+}
+
+impl File {
+	// Returns handle as uintptr.
+	pub fn addr(self): uintptr { ret uintptr(self.handle) }
+
+	// Calls C's fread function with handle.
+	// Returns 0 if handle is nil.
+	pub fn fread(mut self, buffer: []byte, count: uint): uint {
+		if self.handle == nil {
+			ret 0
+		}
+		ret unsafe { cpp.fread(&buffer[0], (uint)(buffer.len), count, self.handle) }
+	}
+
+	// Calls C's fseek function with handle.
+	// Returns 0 if handle is nil.
+	pub fn fseek(mut self, offset: u64, origin: int): int {
+		if self.handle == nil {
+			ret 0
+		}
+		ret unsafe { cpp.fseek(self.handle, offset, origin) }
+	}
+
+	// Calls C's ftell function with handle.
+	// Returns 0 if handle is nil.
+	pub fn ftell(mut self): u64 {
+		if self.handle == nil {
+			ret 0
+		}
+		ret unsafe { cpp.ftell(self.handle) }
+	}
+
+	// Calls C's fclose function with handle.
+	// Returns 0 if handle is nil.
+	pub fn fclose(mut self): int {
+		if self.handle == nil {
+			ret 0
+		}
+		let code = unsafe { cpp.fclose(self.handle) }
+		self.handle = nil
+		ret code
+	}
 }
