@@ -24,7 +24,13 @@ use std::sys::{
 	ENXIO,
 	EROFS,
 	EAGAIN,
-	ETXTBSY
+	ETXTBSY,
+	EFBIG,
+	EPIPE,
+	ERANGE,
+	ESPIPE,
+	ENOBUFS,
+	EBADMSG
 }
 
 // File system error codes.
@@ -45,12 +51,18 @@ pub enum FsError {
 	Signal,             // A signal was caught during
 	SyncIO,             // The implementation does not support synchronized I/O for this file
 	IsDir,              // The named file is a directory and flag includes O_WRONLY or O_RDWR
-	UnableStream,       // The patyh argument names a STREAMS-based file and the system is unable to allocate a STREAM
+	UnableStream,       // The path argument names a STREAMS-based file and the system is unable to allocate a STREAM
 	NoSpace,            // There is no space on the drive
 	NoResponse,         // Divice did not respond
 	ReadOnly,           // Read-only filesystem
 	Retry,              // Resource temporarily unavailable
 	Busy,               // File is busy
+	Big,                // File too large
+	Pipe,               // Broken pipe
+	Range,              // Input is outside the range
+	Seek,               // Illegal seek
+	Buffer,             // No buffer space available
+	BadMessage,         // Not a data message
 }
 
 // Returns last filesystem error by errno.
@@ -78,6 +90,12 @@ fn get_last_fs_error(): FsError {
 	| EROFS:        ret FsError.ReadOnly
 	| EAGAIN:       ret FsError.Retry
 	| ETXTBSY:      ret FsError.Busy
+	| EFBIG:        ret FsError.Big
+	| EPIPE:        ret FsError.Pipe
+	| ERANGE:       ret FsError.Range
+	| ESPIPE:       ret FsError.Seek
+	| ENOBUFS:      ret FsError.Buffer
+	| EBADMSG:      ret FsError.BadMessage
 	|:              ret FsError.Ok
 	}
 }
