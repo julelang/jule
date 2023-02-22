@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 use std::sys::{
-	errno,
+	get_last_errno,
 	EACCES,
 	EIO,
 	ELOOP,
@@ -53,7 +53,9 @@ pub enum FsError {
 	Busy,               // File is busy
 }
 
-fn get_fs_error_from_errno(err: errno): FsError {
+// Returns last filesystem error by errno.
+fn get_last_fs_error(): FsError {
+	let err = get_last_errno()
 	match err {
 	| EACCES:       ret FsError.Denied
 	| EIO:          ret FsError.IO
@@ -68,7 +70,7 @@ fn get_fs_error_from_errno(err: errno): FsError {
 	| ENOMEM:       ret FsError.InsufficientMemory
 	| EEXIST:       ret FsError.Exist
 	| EINTR:        ret FsError.Signal
-	| EINVAL:       ret FsError.SnycIO
+	| EINVAL:       ret FsError.SyncIO
 	| EISDIR:       ret FsError.IsDir
 	| ENOSR:        ret FsError.UnableStream
 	| ENOSPC:       ret FsError.NoSpace
