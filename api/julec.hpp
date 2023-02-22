@@ -140,6 +140,12 @@ inline ref_jt<T> __julec_new_structure(T *_Ptr);
 // Also it is builtin str type constructor.
 template<typename _Obj_t>
 str_jt __julec_to_str(const _Obj_t &_Obj) noexcept;
+// Returns the UTF-16 encoding of the UTF-8 string
+// s, with a terminating NULL added. If s includes NULL
+// character at any location, ignores followed characters.
+//
+// Based on std::sys
+slice_jt<u16_jt> __julec_utf16_from_str(const str_jt &_Str) noexcept;
 void __julec_terminate_handler(void) noexcept;
 void __julec_setup_command_line_args(int argc, char *argv[]) noexcept;
 
@@ -216,6 +222,18 @@ str_jt __julec_to_str(const _Obj_t &_Obj) noexcept {
     return ( str_jt( _stream.str() ) );
 }
 
+slice_jt<u16_jt> __julec_utf16_from_str(const str_jt &_Str) noexcept {
+    constexpr char _NULL_TERMINATION = '\x00';
+    slice_jt<u16_jt> _buff{ nil };
+    slice_jt<i32_jt> _runes{ _Str.operator slice_jt<i32_jt>() };
+    for (const i32_jt &_R: _runes) {
+        if (_R == _NULL_TERMINATION)
+        { break; }
+        _buff = __julec_utf16_append_rune( _buff , _R );
+    }
+    return __julec_utf16_append_rune( _buff , _NULL_TERMINATION );
+}
+
 inline void JULEC_ID(panic)(const trait_jt<JULEC_ID(Error)> &_Error)
 { throw ( _Error ); }
 
@@ -235,7 +253,7 @@ void JULEC_ID(panic)(const _Obj_t &_Expr) {
 void __julec_terminate_handler(void) noexcept {
     try { std::rethrow_exception( std::current_exception() ); }
     catch (trait_jt<JULEC_ID(Error)> _error) {
-        std::cout << "panic: " << _error._get()._error() << std::endl;
+        JULEC_ID(outln)<str_jt>( str_jt( "panic: " ) + _error._get()._error() );
         std::exit( __JULEC_EXIT_PANIC );
     }
 }

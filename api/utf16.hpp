@@ -30,7 +30,8 @@ str_jt __julec_utf16_to_utf8_str(const wchar_t *_WStr,
                                     const std::size_t _Len) noexcept;
 std::tuple<i32_jt, i32_jt>
 __julec_utf16_encode_rune(i32_jt _R) noexcept;
-slice_jt<u16_jt> encode(const slice_jt<i32_jt> &_Runes) noexcept;
+slice_jt<u16_jt> __julec_utf16_encode(const slice_jt<i32_jt> &_Runes) noexcept;
+slice_jt<u16_jt> __julec_utf16_append_rune(slice_jt<u16_jt> &_A, const i32_jt &_R) noexcept;
 
 // Definitions
 
@@ -90,7 +91,7 @@ __julec_utf16_encode_rune(i32_jt _R) noexcept {
     );
 }
 
-slice_jt<u16_jt> encode(const slice_jt<i32_jt> &_Runes) noexcept {
+slice_jt<u16_jt> __julec_utf16_encode(const slice_jt<i32_jt> &_Runes) noexcept {
     int_jt _n{ _Runes._len() };
     for (const i32_jt _v: _Runes) {
         if ( _v >= __JULEC_UTF16_SURR_SELF )
@@ -121,6 +122,22 @@ slice_jt<u16_jt> encode(const slice_jt<i32_jt> &_Runes) noexcept {
         }
     }
     return ( _a.___slice( 0 , _n ) );
+}
+
+slice_jt<u16_jt> __julec_utf16_append_rune(slice_jt<u16_jt> &_A, const i32_jt &_R) noexcept {
+    if (0 <= _R && _R < __JULEC_UTF16_SURR1 | __JULEC_UTF16_SURR3 <= _R && _R < __JULEC_UTF16_SURR_SELF) {
+        _A.__push( static_cast<u16_jt>( _R ) );
+        return ( _A );
+    } else if (__JULEC_UTF16_SURR_SELF <= _R && _R <= __JULEC_UTF16_MAX_RUNE) {
+        i32_jt _r1;
+        i32_jt _r2;
+        std::tie( _r1 , _r2 ) = __julec_utf16_encode_rune( _R );
+        _A.__push( static_cast<u16_jt>( _r1 ) );
+        _A.__push( static_cast<u16_jt>( _r2 ) );
+        return ( _A );
+    }
+    _A.__push( __JULEC_UTF16_REPLACEMENT_CHAR );
+    return ( _A );
 }
 
 #endif // #ifndef __JULEC_UTF16_HPP

@@ -9,6 +9,15 @@ typedef u8_jt   ( JULEC_ID(byte) ); // builtin: type byte: u8
 typedef i32_jt  ( JULEC_ID(rune) ); // builtin: type rune: i32
 
 // Declarations
+
+// Defines at julec.hpp:
+
+template<typename _Obj_t>
+str_jt __julec_to_str(const _Obj_t &_Obj) noexcept;
+slice_jt<u16_jt> __julec_utf16_from_str(const str_jt &_Str) noexcept;
+
+// ------------------------
+
 template<typename _Obj_t>
 inline void JULEC_ID(out)(const _Obj_t &_Obj) noexcept;
 template<typename _Obj_t>
@@ -34,8 +43,16 @@ inline bool JULEC_ID(real)(T &_Obj) noexcept;
 /* Panic function defined at main header */
 
 template<typename _Obj_t>
-inline void JULEC_ID(out)(const _Obj_t &_Obj) noexcept
-{ std::cout << _Obj; }
+inline void JULEC_ID(out)(const _Obj_t &_Obj) noexcept {
+#ifdef _WINDOWS
+    const str_jt _str{ __julec_to_str<_Obj_t>( _Obj ) };
+    const slice_jt<u16_jt> _utf16_str{ __julec_utf16_from_str( _str ) };
+    HANDLE _handle{ GetStdHandle( STD_OUTPUT_HANDLE ) };
+    WriteConsoleW( _handle , &_utf16_str[0] , _utf16_str._len() , nullptr , nullptr );
+#else
+    std::cout << _Obj;
+#endif
+}
 
 template<typename _Obj_t>
 inline void JULEC_ID(outln)(const _Obj_t &_Obj) noexcept {
