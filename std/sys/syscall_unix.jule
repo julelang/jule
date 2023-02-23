@@ -5,6 +5,8 @@
 use cpp "<dirent.h>"
 use cpp "syscall_unix.hpp"
 
+cpp type char: i8
+
 //jule:typedef
 cpp struct DIR{}
 
@@ -20,6 +22,7 @@ cpp fn opendir(path: str): *cpp.DIR
 cpp unsafe fn closedir(mut dir: *cpp.DIR): int
 cpp unsafe fn readdir(mut dir: *cpp.DIR): *cpp.dirent
 cpp fn open(path: str, flag: int, mode: int): int
+cpp unsafe fn getcwd(buff: *cpp.char, bufflen: uint): *cpp.char
 
 pub let STDIN  = uintptr(0)
 pub let STDOUT = uintptr(1)
@@ -105,4 +108,10 @@ pub fn open_dir(path: str): &Dir {
 // Wrapper for C's open function.
 pub fn open(path: str, flag: int, mode: int): int {
 	ret cpp.open(path, flag, mode)
+}
+
+// Reads current working directory into buff.
+// Returns pointer to buff if success, nil pointer if error occurs.
+pub unsafe fn getcwd(buff: *byte, bufflen: uint): *byte {
+	ret (*byte)(cpp.getcwd((*cpp.char)(buff), bufflen))
 }
