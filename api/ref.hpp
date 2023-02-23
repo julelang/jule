@@ -84,8 +84,10 @@ struct ref_jt {
     inline bool _real() const noexcept
     { return ( this->__alloc != nil ); }
 
-    inline T *operator->(void) noexcept
-    { return ( this->__alloc ); }
+    inline T *operator->(void) noexcept {
+        this->__must_ok();
+        return ( this->__alloc );
+    }
 
     inline operator T(void) const noexcept {
         this->__must_ok();
