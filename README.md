@@ -151,16 +151,16 @@ JuleC is in development with the [Go](https://github.com/golang/go) programming 
 
 ### Building with Go Compiler
 
-In main directory.
+In `src` directory.
 
 #### Windows (PowerShell)
 ```powershell
-go build -o julec.exe -v src\cmd\julec\main.go
+go build -o julec.exe -v cmd\julec\main.go
 ```
 
 #### Linux (Bash)
 ```bash
-go build -o julec -v src/cmd/julec/main.go
+go build -o julec -v cmd/julec/main.go
 ```
 
 Run the above command in your terminal, in the Jule project directory.
