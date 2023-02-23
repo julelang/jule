@@ -1562,7 +1562,7 @@ func (p *Parser) block_define_by_id(id string) (def any, tok lex.Token, canshado
 }
 
 func (p *Parser) precheck_package() {
-	p.check_aliases()
+	p.parse_package_aliases()
 	p.parse_package_structs()
 	p.parse_package_waiting_fns()
 	p.parse_package_waiting_impls()
@@ -1690,11 +1690,27 @@ func (p *Parser) check_linked_fns() {
 	}
 }
 
+func (p *Parser) parse_aliases() {
+	for i, alias := range p.Defines.Types {
+		p.Defines.Types[i].TargetType, _ = p.realType(alias.TargetType, true)
+	}
+}
+
 func (p *Parser) check_package_cpp_links() {
 	p.check_package_linked_aliases()
 	p.parse_package_linked_structs()
 	p.check_package_linked_vars()
 	p.check_package_linked_fns()
+}
+
+func (p *Parser) parse_package_aliases() {
+	for _, pf := range *p.package_files {
+		pf.parse_aliases()
+		if p != pf {
+			pf.wg.Wait()
+			p.pusherrs(pf.Errors...)
+		}
+	}
 }
 
 func (p *Parser) parse_package_waiting_fns() {
@@ -1716,12 +1732,6 @@ func (p *Parser) ParseWaitingFns() {
 		} else {
 			owner.reload_fn_types(f)
 		}
-	}
-}
-
-func (p *Parser) check_aliases() {
-	for i, alias := range p.Defines.Types {
-		p.Defines.Types[i].TargetType, _ = p.realType(alias.TargetType, true)
 	}
 }
 
