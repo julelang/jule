@@ -163,7 +163,7 @@ go build -o julec.exe -v cmd\julec\main.go
 go build -o julec -v cmd/julec/main.go
 ```
 
-Run the above command in your terminal, in the Jule project directory.
+Run the above command in your terminal, in the `src` directory of Jule project.
 
 <h2 id="contributing">Contributing</h2>
 
