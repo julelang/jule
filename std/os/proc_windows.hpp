@@ -10,6 +10,8 @@
 
 #include <limits.h>
 
+#include <windows.h>
+
 // Declarations
 
 std::tuple<str_jt, bool_jt> __julec_getwd() noexcept;
