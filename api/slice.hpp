@@ -27,6 +27,9 @@ public:
     { this->operator=( _Src ); }
 
     slice_jt<_Item_t>(const std::initializer_list<_Item_t> &_Src) noexcept {
+        if ( _Src.size() == 0 )
+        { return; }
+
         this->__alloc_new( _Src.size() );
         const auto _Src_begin{ _Src.begin() };
         for (int_jt _i{ 0 }; _i < this->__len; ++_i)
