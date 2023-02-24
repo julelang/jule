@@ -45,7 +45,7 @@ constexpr signed int __JULEC_UTF8_SURROGATE_MAX{ 57343 };
 
 struct __julec_utf8_accept_range;
 std::tuple<i32_jt, int_jt>
-__julec_utf8_decode_rune_str(const char *_S) noexcept;
+__julec_utf8_decode_rune_str(const char *_S, const int_jt &_Len) noexcept;
 slice_jt<u8_jt> __julec_utf8_rune_to_bytes(const i32_jt &_R) noexcept;
 
 // Definitions
@@ -80,9 +80,8 @@ constexpr struct __julec_utf8_accept_range __julec_utf8_accept_ranges[16] = {
 };
 
 std::tuple<i32_jt, int_jt>
-__julec_utf8_decode_rune_str(const char *_S) noexcept {
-    const std::size_t _len{ std::strlen( _S ) };
-    if (_len < 1)
+__julec_utf8_decode_rune_str(const char *_S, const int_jt &_Len) noexcept {
+    if (_Len < 1)
     { return ( std::make_tuple( __JULEC_UTF8_RUNE_ERROR, 0 ) ); }
     const u8_jt _s0{ static_cast<u8_jt>( _S[0] ) };
     const u8_jt _x{ __julec_utf8_first[_s0] };
@@ -93,7 +92,7 @@ __julec_utf8_decode_rune_str(const char *_S) noexcept {
     }
     const int_jt _sz{ static_cast<int_jt>( _x & 7 ) };
     const struct __julec_utf8_accept_range _accept{ __julec_utf8_accept_ranges[_x>>4] };
-    if (_len < _sz)
+    if (_Len < _sz)
     { return ( std::make_tuple( __JULEC_UTF8_RUNE_ERROR, 1 ) ); }
     const u8_jt _s1{ static_cast<u8_jt>( _S[1] ) };
     if (_s1 < _accept._lo || _accept._hi < _s1)

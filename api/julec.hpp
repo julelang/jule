@@ -140,6 +140,7 @@ inline ref_jt<T> __julec_new_structure(T *_Ptr);
 // Also it is builtin str type constructor.
 template<typename _Obj_t>
 str_jt __julec_to_str(const _Obj_t &_Obj) noexcept;
+str_jt __julec_to_str(const str_jt &_Obj) noexcept;
 // Returns the UTF-16 encoding of the UTF-8 string
 // s, with a terminating NULL added. If s includes NULL
 // character at any location, ignores followed characters.
@@ -221,6 +222,9 @@ str_jt __julec_to_str(const _Obj_t &_Obj) noexcept {
     _stream << _Obj;
     return ( str_jt( _stream.str() ) );
 }
+
+str_jt __julec_to_str(const str_jt &_Obj) noexcept
+{ return ( _Obj ); }
 
 slice_jt<u16_jt> __julec_utf16_from_str(const str_jt &_Str) noexcept {
     constexpr char _NULL_TERMINATION = '\x00';

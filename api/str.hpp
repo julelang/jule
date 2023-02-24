@@ -221,7 +221,8 @@ public:
         for (int_jt _index{ 0 }; _index < this->_len(); ) {
             i32_jt _rune;
             int_jt _n;
-            std::tie( _rune, _n ) = __julec_utf8_decode_rune_str( _str+_index );
+            std::tie( _rune, _n ) = __julec_utf8_decode_rune_str( _str+_index ,
+                                                                  this->_len()-_index );
             _index += _n;
             _runes.__push( _rune );
         }
