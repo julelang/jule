@@ -1,0 +1,25 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::sys::{self, wstat, utf16_from_str}
+
+// Returns a Stat describing the path.
+// Returns nil reference if error occurs.
+//
+// Possible errors: Denied IO Loop LongPath NotExist NotDir Overflow
+pub fn stat(path: str): (s: &Stat, err: FsError) {
+	let utf16_path = utf16_from_str(path)
+	let mut handle = std::sys::Stat{}
+	let code = unsafe { wstat(&utf16_path[0], &handle) }
+	if code != -1 {
+		err = FsError.Ok
+		s = &Stat{
+			mode: handle.st_mode,
+			size: handle.st_size,
+		}
+	} else {
+		err = get_last_fs_error()
+	}
+	ret
+}

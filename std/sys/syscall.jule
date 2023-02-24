@@ -8,9 +8,9 @@ use cpp "<sys/stat.h>"
 cpp type _mode_t: uint
 cpp type _off_t: uint
 
-cpp struct stat{
-	st_mode: cpp._mode_t
-	st_size: cpp._off_t
+cpp struct stat {
+	pub st_mode: cpp._mode_t
+	pub st_size: cpp._off_t
 }
 
 cpp fn lseek(handle: int, offset: i64, origin: int): i64
@@ -18,11 +18,8 @@ cpp unsafe fn read(handle: int, dest: *unsafe, n: uint): int
 cpp fn close(handle: int): int
 cpp unsafe fn write(handle: int, buff: *unsafe, n: uint): int
 
-// Wrapper for C's stat.
-pub struct Stat {
-	pub st_mode: uint
-	pub st_size: uint
-}
+// C's stat.
+pub type Stat: cpp.stat
 
 // Wrapper for C's lseek function.
 pub fn seek(handle: int, offset: i64, origin: int): i64 {
@@ -30,14 +27,14 @@ pub fn seek(handle: int, offset: i64, origin: int): i64 {
 }
 
 // Wrapper for C's read function.
-pub fn read(handle: int, mut buff: []byte): int {
-	ret unsafe { cpp.read(handle, &buff[0], uint(buff.len)) }
+pub unsafe fn read(handle: int, mut buff: *unsafe, n: uint): int {
+	ret cpp.read(handle, buff, n)
 }
 
 // Wrapper for C's close function.
 pub fn close(handle: int): int { ret cpp.close(handle) }
 
 // Wrapper for C's write function.
-pub fn write(handle: int, buff: []byte): int {
-	ret unsafe { cpp.write(handle, &buff[0], uint(buff.len)) }
+pub unsafe fn write(handle: int, buff: *unsafe, n: uint): int {
+	ret cpp.write(handle, buff, n)
 }

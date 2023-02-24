@@ -17,7 +17,7 @@ cpp struct _wdirent {
 
 cpp fn GetStdHandle(stdh: uintptr): *unsafe
 cpp unsafe fn CloseHandle(stdh: *unsafe): bool
-cpp unsafe fn wstat(path: *cpp.wchar_t, handle: *cpp.stat): (err: int)
+cpp unsafe fn wstat(path: *cpp.wchar_t, mut handle: *cpp.stat): int
 cpp unsafe fn _wopendir(path: *cpp.wchar_t): *cpp._WDIR
 cpp unsafe fn _wclosedir(mut dir: *cpp._WDIR): int
 cpp unsafe fn _wreaddir(mut dir: *cpp._WDIR): *cpp._wdirent
@@ -26,6 +26,12 @@ cpp fn GetLastError(): u32
 cpp unsafe fn GetCurrentDirectoryW(bufflen: u32, buff: *cpp.wchar_t): u32
 cpp unsafe fn SetCurrentDirectoryW(path: *cpp.wchar_t): bool
 
+// C's _WDIR.
+pub type Wdir: cpp._WDIR
+
+// C's _wdirent.
+pub type Wdirent: cpp._wdirent
+
 pub type handle: uintptr
 
 pub const INVALID_HANDLE = ^handle(0)
@@ -33,60 +39,6 @@ pub const INVALID_HANDLE = ^handle(0)
 pub let STDIN  = get_std_handle(uintptr(STD_INPUT_HANDLE))
 pub let STDOUT = get_std_handle(uintptr(STD_OUTPUT_HANDLE))
 pub let STDERR = get_std_handle(uintptr(STD_ERROR_HANDLE))
-
-// Wrapper for C's _WDIR.
-pub struct Dir {
-	handle: *cpp._WDIR
-}
-
-impl Dir {
-	// Returns handle as uintptr.
-	pub fn addr(self): uintptr {
-		ret uintptr(self.handle)
-	}
-
-	// Calls C's _wclosedir function with handle.
-	// Returns 0 if handle is nil.
-	pub fn close(mut self): int {
-		if self.addr() == 0 {
-			ret 0
-		}
-		ret unsafe { cpp._wclosedir(self.handle) }
-	}
-
-	// Calls C's _wreaddir function with handle and returns Dirent.
-	// Returns nil reference if handle is nil or _wreaddir returns nil.
-	pub fn read(mut self): (dirent: &Dirent) {
-		if self.addr() != 0 {
-			let mut handle = unsafe { cpp._wreaddir(self.handle) }
-			if handle != nil {
-				dirent = &Dirent{handle: handle}
-			}
-		}
-		ret
-	}
-}
-
-// Wrapper for C's _wdirent.
-pub struct Dirent {
-	handle: *cpp._wdirent
-}
-
-impl Dirent {
-	// Returns handle as uintptr.
-	pub fn addr(self): uintptr {
-		ret uintptr(self.handle)
-	}
-
-	// Returns d_name field of handle as string.
-	// Returns empty string if handle is nil.
-	pub fn name(self): str {
-		if self.addr() == 0 {
-			ret ""
-		}
-		ret unsafe { wchar_to_str(self.handle.d_name) }
-	}
-}
 
 // Returns the UTF-16 encoding of the UTF-8 string
 // s, with a terminating NULL added. If s includes NULL
@@ -109,8 +61,12 @@ pub fn utf16_from_str(s: str): []u16 {
 }
 
 // Returns the UTF-8 encoding of the UTF-16 sequence s,
-// with a terminating NULL removed.
+// with a terminating NULL removed. Returns empty string
+// if s is nil.
 pub fn utf16_to_str(s: []u16): str {
+	if s == nil {
+		ret ""
+	}
 	let mut code_page = unsafe { *(&s) }
 	for i, v in s {
 		if v == 0 {
@@ -121,15 +77,20 @@ pub fn utf16_to_str(s: []u16): str {
 	ret (str)(decode(code_page))
 }
 
-// Returns the UTF-8 encoding of the UTF-16 sequence s in *wchar_t form,
-// with a terminating NULL removed.
-unsafe fn wchar_to_str(s: *cpp.wchar_t): str {
-	let mut i = 0
+// Returns the UTF-8 encoding of the UTF-16 sequence s in *u16 form,
+// with a terminating NULL removed. Returns empty string if s is nil.
+pub unsafe fn u16_ptr_to_str(s: *cpp.wchar_t): str {
+	// Use cpp.wchar_t for compability.
+
+	if s == nil {
+		ret ""
+	}
+
 	let mut code_page: []u16 = nil
-	for {
-		let r = unsafe { s[i] }
+	let mut i = 0
+	for ; i++ {
+		let r = (u16)(s[i])
 		code_page = append[u16](code_page, r)
-		i += 1
 		if r == 0 {
 			ret (str)(decode(code_page))
 		}
@@ -141,40 +102,17 @@ pub fn get_std_handle(stdh: uintptr): handle { ret handle(cpp.GetStdHandle(stdh)
 pub unsafe fn close_handle(stdh: handle): bool { ret cpp.CloseHandle(unsafe { (*unsafe)(stdh) }) }
 
 // Calls C's wstat function.
-// Returns nil reference if error occurs.
-pub fn stat(path: str): (stat: &Stat) {
-	let utf16_path = utf16_from_str(path)
-	let mut handle = cpp.stat{}
-	if (unsafe { cpp.wstat((*cpp.wchar_t)(&utf16_path[0]), &handle) } == 0) {
-		stat = &Stat{
-			st_mode: handle.st_mode,
-			st_size: handle.st_size,
-		}
-	}
-	ret
-}
-
-// Calls C's _wopendir function.
-// Returns nil reference if error occurs.
-pub fn open_dir(path: str): &Dir {
-	let utf16_path = utf16_from_str(path)
-	let mut handle = unsafe { cpp._wopendir((*cpp.wchar_t)(&utf16_path[0])) }
-	if handle == nil {
-		ret new(Dir)
-	}
-	ret &Dir{handle: handle}
+pub unsafe fn wstat(path: *u16, mut stat: *Stat): int {
+	ret cpp.wstat((*cpp.wchar_t)(path), stat)
 }
 
 // Wrapper for C's _wopen function.
-pub fn open(path: str, flag: int, mode: int): int {
-	let utf16_path = utf16_from_str(path)
-	ret unsafe { cpp._wopen((*cpp.wchar_t)(&utf16_path[0]), flag, mode) }
+pub unsafe fn _wopen(path: *u16, flag: int, mode: int): int {
+	ret cpp._wopen((*cpp.wchar_t)(&path[0]), flag, mode)
 }
 
 // Returns last Windows error.
-pub fn get_last_error(): u32 {
-	ret cpp.GetLastError()
-}
+pub fn get_last_error(): u32 { ret cpp.GetLastError() }
 
 // Reads working directory into buff and returns readed
 // rune count of current process. Returns 0 if fail.
@@ -187,3 +125,12 @@ pub unsafe fn get_current_directory(bufflen: u32, mut buff: *u16): u32 {
 pub unsafe fn set_current_directory(path: *u16): bool {
 	ret cpp.SetCurrentDirectoryW((*cpp.wchar_t)(path))
 }
+
+// Calls C's _wopendir function.
+pub unsafe fn _wopendir(path: *u16): *Wdir { ret cpp._wopendir((*cpp.wchar_t)(path)) }
+
+// Calls C's _wreaddir function.
+pub unsafe fn _wreaddir(mut dir: *Wdir): *Wdirent { ret cpp._wreaddir(dir) }
+
+// Calls C's _wclosedir function.
+pub unsafe fn _wclosedir(mut dir: *Wdir): int { ret cpp._wclosedir(dir) }

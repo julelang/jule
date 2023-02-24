@@ -1,0 +1,37 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::sys::{
+	utf16_from_str,
+	u16_ptr_to_str,
+	_wopendir,
+	_wreaddir,
+	_wclosedir
+}
+
+// Reads the named directory and returs all its directory entries can read.
+// Returns nil if no any dirent or error occurs.
+//
+// Possible errors:
+//  Denied InvalidDescriptor PerProcessLimit SystemWideLimit
+//  NotExist InsufficientMemory NotDir
+pub fn read_dir(path: str): ([]Dirent, FsError) {
+	let utf16_path = utf16_from_str(path)
+	let mut dir = unsafe { _wopendir(&utf16_path[0]) }
+	if dir == nil {
+		ret nil, get_last_fs_error()
+	}
+	let mut dirents: []Dirent = nil
+	for {
+		let dirent = unsafe { _wreaddir(dir) }
+		if dirent == nil {
+			break
+		}
+		dirents = append[Dirent](dirents, Dirent{
+			name: unsafe { u16_ptr_to_str(dirent.d_name) },
+		})
+	}
+	_ = unsafe { _wclosedir(dir) }
+	ret dirents, FsError.Ok
+}
