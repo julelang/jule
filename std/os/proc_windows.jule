@@ -2,18 +2,24 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::sys::{utf16_from_str}
-
-use cpp "proc_windows.hpp"
-
-cpp fn __julec_getwd(): (str, bool)
-cpp fn __julec_chdir(path: []u16): bool
+use std::sys::{
+	MAX_PATH,
+	utf16_from_str,
+	u16_ptr_to_str,
+	get_current_directory,
+	set_current_directory
+}
 
 fn __getwd(): (str, ok: bool) {
-	ret cpp.__julec_getwd()
+	let mut buff: [MAX_PATH + 1]u16 = []
+	let n = unsafe { get_current_directory(buff.len, &buff[0]) }
+	if n == 0 {
+		ret "", false
+	}
+	ret unsafe { u16_ptr_to_str(&buff[0]) }, true
 }
 
 fn __chdir(path: str): bool {
 	let utf16_path = utf16_from_str(path)
-	ret cpp.__julec_chdir(utf16_path)
+	ret unsafe { set_current_directory(&utf16_path[0]) }
 }

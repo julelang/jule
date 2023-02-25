@@ -2,15 +2,18 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use cpp "proc_unix.hpp"
+use std::sys::{self, PATH_MAX, getcwd}
 
-cpp fn __julec_getwd(): (str, bool)
 cpp fn chdir(path: str): int
 
 fn __getwd(): (str, bool) {
-	ret cpp.__julec_getwd()
+	let mut buff = make([]byte, PATH_MAX)
+	if (unsafe { getcwd(&buff[0], PATH_MAX) }) == nil {
+		ret "", false
+	}
+	ret (str)(buff), true
 }
 
 fn __chdir(path: str): bool {
-	ret cpp.chdir(path) == 0
+	ret unsafe { std::sys::chdir(&path[0]) } == 0
 }
