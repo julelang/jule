@@ -6,14 +6,21 @@ use std::sys::{self, PATH_MAX, getcwd}
 
 cpp fn chdir(path: str): int
 
+// Possible errors:
+//  Denied
 fn __getwd(): (str, bool) {
-	let mut buff = make([]byte, PATH_MAX)
+	let mut buff = make([]byte, PATH_MAX )
 	if (unsafe { getcwd(&buff[0], PATH_MAX) }) == nil {
 		ret "", false
 	}
 	ret (str)(buff), true
 }
 
-fn __chdir(path: str): bool {
-	ret unsafe { std::sys::chdir(&path[0]) } == 0
+// Possible errors:
+//  Denied IO Loop LongPath NotExist NotDir InsufficientMemory
+fn __chdir(path: str): OsError {
+	if (unsafe { std::sys::chdir(&path[0]) }) == 0 {
+		ret OsError.Ok
+	}
+	ret get_last_os_error()
 }
