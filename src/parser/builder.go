@@ -2321,20 +2321,7 @@ func (b *builder) find_lowest_precedenced_operator(toks []lex.Token) int {
 		if toks[i-1].Id == lex.ID_OP {
 			continue
 		}
-		switch tok.Kind {
-		case lex.KND_STAR, lex.KND_PERCENT, lex.KND_SOLIDUS,
-			lex.KND_RSHIFT, lex.KND_LSHIFT, lex.KND_AMPER:
-			prec.set(5, i)
-		case lex.KND_PLUS, lex.KND_MINUS, lex.KND_VLINE, lex.KND_CARET:
-			prec.set(4, i)
-		case lex.KND_EQS, lex.KND_NOT_EQ, lex.KND_LT,
-			lex.KND_LESS_EQ, lex.KND_GT, lex.KND_GREAT_EQ:
-			prec.set(3, i)
-		case lex.KND_DBL_AMPER:
-			prec.set(2, i)
-		case lex.KND_DBL_VLINE:
-			prec.set(1, i)
-		}
+		prec.set(tok.Precedence(), i)
 	}
 	data := prec.get_lower()
 	if data == nil {

@@ -4,9 +4,9 @@ type precedencer struct {
 	pairs [][]any
 }
 
-func (p *precedencer) set(level uint, expr any) {
+func (p *precedencer) set(level int, expr any) {
 	for i, pair := range p.pairs {
-		pair_level := pair[0].(uint)
+		pair_level := pair[0].(int)
 		if level > pair_level {
 			first := p.pairs[:i]
 			appended := append([][]any{{level, expr}}, p.pairs[i:]...)

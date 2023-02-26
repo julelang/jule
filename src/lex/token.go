@@ -202,6 +202,30 @@ type Token struct {
 	Id     uint8
 }
 
+// Precedence returns operator precedence of token.
+// Returns -1 if token is not operator or invalid operator for operator precedence.
+func (t *Token) Precedence() int {
+	if t.Id != ID_OP {
+		return -1
+	}
+	switch t.Kind {
+	case KND_STAR, KND_PERCENT, KND_SOLIDUS,
+		KND_RSHIFT, KND_LSHIFT, KND_AMPER:
+		return 5
+	case KND_PLUS, KND_MINUS, KND_VLINE, KND_CARET:
+		return 4
+	case KND_EQS, KND_NOT_EQ, KND_LT,
+		KND_LESS_EQ, KND_GT, KND_GREAT_EQ:
+		return 3
+	case KND_DBL_AMPER:
+		return 2
+	case KND_DBL_VLINE:
+		return 1
+	default:
+		return -1
+	}
+}
+
 func IsStr(k string) bool    { return k != "" && (k[0] == '"' || IsRawStr(k)) }
 func IsRawStr(k string) bool { return k != "" && k[0] == '`' }
 func IsChar(k string) bool   { return k != "" && k[0] == '\'' }
