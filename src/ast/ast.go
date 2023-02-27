@@ -502,7 +502,7 @@ func (i *Iter) NextLabel() string {
 	return cpp.String()
 }
 
-type Fallthrough struct {
+type Fall struct {
 	Token lex.Token
 	Case  *Case
 }

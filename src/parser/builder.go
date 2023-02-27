@@ -1761,7 +1761,7 @@ func (b *builder) Fallthrough(toks []lex.Token) (s ast.Statement) {
 	if len(toks) > 1 {
 		b.pusherr(toks[1], "invalid_syntax")
 	}
-	s.Data = ast.Fallthrough{
+	s.Data = ast.Fall{
 		Token: s.Token,
 	}
 	return

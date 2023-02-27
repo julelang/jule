@@ -516,7 +516,7 @@ func gen_st(s *ast.Statement) string {
 		return t.String()
 	case ast.Iter:
 		return gen_iter(&t)
-	case ast.Fallthrough:
+	case ast.Fall:
 		return gen_fallthrough(&t)
 	case ast.Conditional:
 		return gen_conditional(&t)
@@ -548,7 +548,7 @@ func gen_ret_st(r *ast.Ret) string {
 	return cpp.String()
 }
 
-func gen_fallthrough(f *ast.Fallthrough) string {
+func gen_fallthrough(f *ast.Fall) string {
 	var cpp strings.Builder
 	cpp.WriteString("goto ")
 	cpp.WriteString(f.Case.Next.BeginLabel())

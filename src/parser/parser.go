@@ -2599,7 +2599,7 @@ func (p *Parser) checkNewBlock(b *ast.Block) {
 	p.checkNewBlockCustom(b, p.blockVars)
 }
 
-func (p *Parser) fallthrough_st(f *ast.Fallthrough, b *ast.Block, i *int) {
+func (p *Parser) fallthrough_st(f *ast.Fall, b *ast.Block, i *int) {
 	switch {
 	case p.currentCase == nil || *i+1 < len(b.Tree):
 		p.pusherrtok(f.Token, "fallthrough_wrong_use")
@@ -2665,7 +2665,7 @@ func (p *Parser) check_st(b *ast.Block, i *int) {
 		s.Data = data
 		p.iter(&data)
 		s.Data = data
-	case ast.Fallthrough:
+	case ast.Fall:
 		p.fallthrough_st(&data, b, i)
 		s.Data = data
 	case ast.Conditional:
@@ -2939,15 +2939,15 @@ func (p *Parser) checkLabelNGoto() {
 	p.checkLabels()
 }
 
-func matchHasRet(m *ast.Match) (ok bool) {
+func match_has_ret(m *ast.Match) (ok bool) {
 	if m.Default == nil {
-		return
+		return false
 	}
 	ok = true
 	fall := false
 	for _, c := range m.Cases {
 		falled := fall
-		ok, fall = hasRet(c.Block)
+		ok, fall = has_ret(c.Block)
 		if falled && !ok && !fall {
 			return false
 		}
@@ -2965,27 +2965,46 @@ func matchHasRet(m *ast.Match) (ok bool) {
 		}
 		fall = false
 	}
-	ok, _ = hasRet(m.Default.Block)
+	ok, _ = has_ret(m.Default.Block)
 	return ok
 }
 
-func hasRet(b *ast.Block) (ok bool, fall bool) {
+func conditional_has_ret(c *ast.Conditional) (ok bool) {
+	if c.Default == nil {
+		return false
+	}
+	ok = true
+	for _, elif := range c.Elifs {
+		ok, _ = has_ret(elif.Block)
+		if !ok {
+			return false
+		}
+	}
+	ok, _ = has_ret(c.Default.Block)
+	return ok
+}
+
+func has_ret(b *ast.Block) (ok bool, fall bool) {
 	if b == nil {
 		return false, false
 	}
 	for _, s := range b.Tree {
 		switch t := s.Data.(type) {
 		case *ast.Block:
-			ok, fall = hasRet(t)
+			ok, fall = has_ret(t)
 			if ok {
 				return true, fall
 			}
-		case ast.Fallthrough:
+		case ast.Fall:
 			fall = true
 		case ast.Ret:
 			return true, fall
 		case *ast.Match:
-			if matchHasRet(t) {
+			if match_has_ret(t) {
+				return true, false
+			}
+		case ast.Conditional:
+			if conditional_has_ret(&t) {
 				return true, false
 			}
 		}
@@ -2994,7 +3013,7 @@ func hasRet(b *ast.Block) (ok bool, fall bool) {
 }
 
 func (p *Parser) checkRets(f *Fn) {
-	ok, _ := hasRet(f.Block)
+	ok, _ := has_ret(f.Block)
 	if ok {
 		return
 	}
