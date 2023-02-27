@@ -21,7 +21,7 @@ public:
     slice_jt<_Item_t>(const std::nullptr_t) noexcept {}
 
     slice_jt<_Item_t>(const uint_jt &_N) noexcept {
-        const _n{ _N < 0 ? 0 : _N };
+        const uint_jt _n{ _N < 0 ? 0 : _N };
         if ( _n == 0 )
         { return; }
         this->__alloc_new( _n );
