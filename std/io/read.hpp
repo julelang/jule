@@ -15,14 +15,14 @@ str_jt __julec_readln(void) noexcept {
 #ifdef _WINDOWS
     std::wstring _buffer;
     std::getline( std::wcin , _buffer );
-    std::wcin.clear();
-    std::wcin.ignore();
+    // std::wcin.clear();
+    // std::wcin.ignore();
     _input = str_jt( __julec_utf16_to_utf8_str( &_buffer[0] , _buffer.length() ) );
 #else
     std::string _buffer;
     std::getline( std::cin , _buffer );
-    //std::cin.clear();
-    //std::cin.ignore();
+    // std::cin.clear();
+    // std::cin.ignore();
     _input = str_jt( _buffer.c_str() );
 #endif // #ifdef _WINDOWS
     return ( _input );
