@@ -73,15 +73,18 @@ func (e *eval) eval_op(op any) (v value, model ast.ExprModel) {
 	default:
 		return
 	}
+
 	bop := op.(ast.Binop)
 	l, lm := e.eval_op(bop.L)
 	if e.has_error {
 		return
 	}
+
 	r, rm := e.eval_op(bop.R)
 	if e.has_error {
 		return
 	}
+
 	process := solver{
 		p:  e.p,
 		op: bop.Op,
@@ -147,9 +150,11 @@ func (e *eval) eval(op any) (v value, model ast.ExprModel) {
 			model = add_casting_to_model(v, model)
 		}
 	}()
+
 	if op == nil || e.has_error {
 		return
 	}
+
 	return e.eval_op(op)
 }
 

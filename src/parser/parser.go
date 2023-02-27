@@ -1276,7 +1276,7 @@ func (p *Parser) varsFromParams(f *Fn) []*Var {
 			if length-i > 1 {
 				p.pusherrtok(param.Token, "variadic_parameter_not_last")
 			}
-			v.DataType = types.VariadicToSlice(param.DataType)
+			v.DataType = types.ToSlice(param.DataType)
 		}
 		vars[i] = v
 	}
@@ -2503,7 +2503,7 @@ func (p *Parser) parseArg(f *Fn, pair *paramMapPair, args *ast.Args, variadiced 
 	var v value
 	var model ast.ExprModel
 	if pair.param.Variadic {
-		t := types.VariadicToSlice(pair.param.DataType)
+		t := types.ToSlice(pair.param.DataType)
 		v, model = p.evalExpr(pair.arg.Expr, &t)
 	} else {
 		v, model = p.evalExpr(pair.arg.Expr, &pair.param.DataType)

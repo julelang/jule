@@ -247,7 +247,7 @@ func init() {
 	}
 }
 
-func VariadicToSlice(t Type) Type {
+func ToSlice(t Type) Type {
 	t.Original = nil
 	t.ComponentType = new(Type)
 	*t.ComponentType = t
