@@ -566,7 +566,7 @@ func (p *Parser) parse_enum_items_str(e *Enum) {
 			item.Expr.Model = model
 			assign_checker{
 				p:         p,
-				expr_t:    e.DataType,
+				t:    e.DataType,
 				v:         val,
 				ignoreAny: true,
 				errtok:    item.Token,
@@ -616,7 +616,7 @@ func (p *Parser) parse_enum_items_integer(e *Enum) {
 			item.Expr.Model = model
 			assign_checker{
 				p:         p,
-				expr_t:    e.DataType,
+				t:    e.DataType,
 				v:         val,
 				ignoreAny: true,
 				errtok:    item.Token,
@@ -1232,7 +1232,7 @@ func (p *Parser) Var(model Var) *Var {
 			}
 			assign_checker{
 				p:                p,
-				expr_t:           v.DataType,
+				t:           v.DataType,
 				v:                val,
 				errtok:           v.Token,
 				not_allow_assign: types.IsRef(v.DataType),
@@ -2512,14 +2512,18 @@ func (p *Parser) parseArg(f *Fn, pair *paramMapPair, args *ast.Args, variadiced 
 	p.check_arg(f, pair, args, variadiced, v)
 }
 
-func (p *Parser) checkArgType(param *Param, val value, errTok lex.Token) {
-	p.check_valid_init_expr(param.Mutable, val, errTok)
+func (p *Parser) check_assign_type(real Type, val value, errTok lex.Token) {
 	assign_checker{
 		p:      p,
-		expr_t: param.DataType,
+		t: real,
 		v:      val,
 		errtok: errTok,
 	}.check()
+}
+
+func (p *Parser) checkArgType(param *Param, val value, errTok lex.Token) {
+	p.check_valid_init_expr(param.Mutable, val, errTok)
+	p.check_assign_type(param.DataType, val, errTok)
 }
 
 // get_range returns between of brackets.
@@ -2768,7 +2772,7 @@ func (p *Parser) parseCase(c *ast.Case, expr_t Type) {
 		expr.Model = model
 		assign_checker{
 			p:      p,
-			expr_t: expr_t,
+			t: expr_t,
 			v:      value,
 			errtok: expr.Tokens[0],
 		}.check()
@@ -3079,7 +3083,7 @@ func (p *Parser) singleAssign(assign *ast.Assign, l, r []value) {
 	}
 	assign_checker{
 		p:      p,
-		expr_t: left.data.DataType,
+		t: left.data.DataType,
 		v:      right,
 		errtok: assign.Setter,
 	}.check()
@@ -3164,7 +3168,7 @@ func (p *Parser) multiAssign(assign *ast.Assign, l, r []value) {
 			p.check_valid_init_expr(leftExpr.mutable, right, assign.Setter)
 			assign_checker{
 				p:      p,
-				expr_t: leftExpr.data.DataType,
+				t: leftExpr.data.DataType,
 				v:      right,
 				errtok: assign.Setter,
 			}.check()
@@ -3608,7 +3612,7 @@ func (p *Parser) typeSourceIsArrayType(arr_t *Type) (ok bool) {
 	}
 	assign_checker{
 		p:      p,
-		expr_t: Type{Id: types.UINT, Kind: types.TYPE_MAP[types.UINT]},
+		t: Type{Id: types.UINT, Kind: types.TYPE_MAP[types.UINT]},
 		v:      val,
 		errtok: arr_t.Size.Expr.Tokens[0],
 	}.check()

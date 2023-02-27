@@ -1368,7 +1368,7 @@ func (e *eval) build_array(parts [][]lex.Token, t Type, errtok lex.Token) (value
 		model.expr = append(model.expr, expModel)
 		assign_checker{
 			p:      e.p,
-			expr_t: *t.ComponentType,
+			t: *t.ComponentType,
 			v:      partVal,
 			errtok: part[0],
 		}.check()
@@ -1399,7 +1399,7 @@ func (e *eval) build_slice_implicit(parts [][]lex.Token, errtok lex.Token) (valu
 		model.expr = append(model.expr, expModel)
 		assign_checker{
 			p:      e.p,
-			expr_t: *model.dataType.ComponentType,
+			t: *model.dataType.ComponentType,
 			v:      partVal,
 			errtok: part[0],
 		}.check()
@@ -1419,7 +1419,7 @@ func (e *eval) build_slice_explicit(parts [][]lex.Token, t Type, errtok lex.Toke
 		model.expr = append(model.expr, expModel)
 		assign_checker{
 			p:      e.p,
-			expr_t: *t.ComponentType,
+			t: *t.ComponentType,
 			v:      partVal,
 			errtok: part[0],
 		}.check()
@@ -1469,13 +1469,13 @@ func (e *eval) buildMap(parts [][]lex.Token, t Type, errtok lex.Token) (value, a
 		model.valExprs = append(model.valExprs, valModel)
 		assign_checker{
 			p:      e.p,
-			expr_t: keyType,
+			t: keyType,
 			v:      key,
 			errtok: colonTok,
 		}.check()
 		assign_checker{
 			p:      e.p,
-			expr_t: valType,
+			t: valType,
 			v:      val,
 			errtok: colonTok,
 		}.check()

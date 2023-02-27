@@ -338,9 +338,11 @@ var out_fn = &Fn{
 }
 
 var make_fn = &Fn{Public: true, Id: "make"}
+var copy_fn = &Fn{Public: true, Id: "copy"}
+var append_fn = &Fn{Public: true, Id: "append"}
+var new_fn = &Fn{Public: true, Id: "new"}
 var drop_fn = &Fn{Public: true, Id: "drop"}
 var real_fn = &Fn{Public: true, Id: "real"}
-var new_fn = &Fn{Public: true, Id: "new"}
 
 var outln_fn *Fn
 
@@ -365,64 +367,12 @@ var Builtin = &ast.Defmap{
 		out_fn,
 		panicFunc,
 		recoverFunc,
-		make_fn,
+		new_fn,
 		drop_fn,
 		real_fn,
-		new_fn,
-		{
-			Public:   true,
-			Id:       "copy",
-			Owner:    builtinFile,
-			Generics: []*GenericType{{Id: "Item"}},
-			RetType:  ast.RetType{DataType: Type{Id: types.INT, Kind: types.TYPE_MAP[types.INT]}},
-			Params: []ast.Param{
-				{
-					Mutable: true,
-					Id:      "dest",
-					DataType: Type{
-						Id:            types.SLICE,
-						Kind:          lex.PREFIX_SLICE + "Item",
-						ComponentType: &Type{Id: types.ID, Kind: "Item"},
-					},
-				},
-				{
-					Id: "src",
-					DataType: Type{
-						Id:            types.SLICE,
-						Kind:          lex.PREFIX_SLICE + "Item",
-						ComponentType: &Type{Id: types.ID, Kind: "Item"},
-					},
-				},
-			},
-		},
-		{
-			Public:   true,
-			Id:       "append",
-			Owner:    builtinFile,
-			Generics: []*GenericType{{Id: "Item"}},
-			RetType: ast.RetType{
-				DataType: Type{
-					Id:            types.SLICE,
-					Kind:          lex.PREFIX_SLICE + "Item",
-					ComponentType: &Type{Id: types.ID, Kind: "Item"},
-				},
-			},
-			Params: []ast.Param{
-				{
-					Id: "src",
-					DataType: Type{
-						Id:            types.SLICE,
-						Kind:          lex.PREFIX_SLICE + "Item",
-						ComponentType: &Type{Id: types.ID, Kind: "Item"},
-					},
-				},
-				{
-					Id:       "components",
-					DataType: Type{Id: types.ID, Kind: "Item"},
-					Variadic: true,
-				},
-			},
-		},
+		make_fn,
+		copy_fn,
+		append_fn,
 	},
 	Traits: []*ast.Trait{
 		errorTrait,
@@ -623,8 +573,10 @@ func init() {
 	outln_fn.Id = "outln"
 	Builtin.Fns = append(Builtin.Fns, outln_fn)
 
-	// Setup make function
+	// Setup make, copy, and append functions
 	make_fn.BuiltinCaller = caller_make
+	copy_fn.BuiltinCaller = caller_copy
+	append_fn.BuiltinCaller = caller_append
 
 	// Setup reference functions
 	new_fn.BuiltinCaller = caller_new
@@ -711,6 +663,85 @@ func caller_make(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 		p.pusherrtok(errtok, "invalid_type")
 	}
 	return
+}
+
+func caller_copy(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
+	v.data.DataType.Id = types.INT
+	v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
+	v.data.Value = " "
+
+	errtok := data.args[0]
+	args := p.get_args(data.args, false)
+	if len(args.Src) < 1 {
+		p.pusherrtok(errtok, "missing_expr_for", "dest")
+		return
+	} else if len(args.Src) < 2 {
+		p.pusherrtok(errtok, "missing_expr_for", "src")
+		return
+	} else if len(args.Src) > 2 {
+		p.pusherrtok(errtok, "argument_overflow")
+	}
+
+	dest_expr := args.Src[0].Expr
+	dest_v, dest_expr_model := p.evalExpr(dest_expr, nil)
+	if !types.IsSlice(dest_v.data.DataType) {
+		p.pusherrtok(errtok, "invalid_type")
+		return
+	}
+
+	src_expr := args.Src[1].Expr
+	src_v, src_expr_model := p.evalExpr(src_expr, nil)
+
+	if !types.Equals(dest_v.data.DataType, src_v.data.DataType) {
+		p.pusherrtok(errtok, "incompatible_types", dest_v.data.DataType.Kind, src_v.data.DataType.Kind)
+		return
+	}
+
+	m.append_sub(exprNode{"("})
+	m.append_sub(dest_expr_model)
+	m.append_sub(exprNode{","})
+	m.append_sub(src_expr_model)
+	m.append_sub(exprNode{")"})
+	return v
+}
+
+func caller_append(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
+	errtok := data.args[0]
+	args := p.get_args(data.args, false)
+	if len(args.Src) < 1 {
+		p.pusherrtok(errtok, "missing_expr_for", "src")
+		return
+	} else if len(args.Src) < 2 {
+		p.pusherrtok(errtok, "missing_expr_for", "values")
+		return
+	}
+
+	src_expr := args.Src[0].Expr
+	src_v, src_expr_model := p.evalExpr(src_expr, nil)
+	if !types.IsSlice(src_v.data.DataType) {
+		p.pusherrtok(errtok, "invalid_type")
+		return
+	}
+	t := src_v.data.DataType.ComponentType
+	v.data.DataType = src_v.data.DataType.Copy()
+	v.data.Value = " "
+	
+	m.append_sub(exprNode{"("})
+	m.append_sub(src_expr_model)
+	m.append_sub(exprNode{",{"})
+	
+	for _, arg := range args.Src[1:] {
+		arg_expr := arg.Expr
+		arg_v, arg_expr_model := p.evalExpr(arg_expr, nil)
+
+		p.check_assign_type(*t, arg_v, errtok)
+		
+		m.append_sub(arg_expr_model)
+		m.append_sub(exprNode{","})
+	}
+	
+	m.append_sub(exprNode{"})"})
+	return v
 }
 
 func caller_drop(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {

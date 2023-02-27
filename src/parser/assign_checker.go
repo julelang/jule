@@ -77,7 +77,7 @@ func int_assignable(dt uint8, v value) bool {
 
 type assign_checker struct {
 	p                *Parser
-	expr_t           Type
+	t                Type
 	v                value
 	ignoreAny        bool
 	not_allow_assign bool
@@ -104,19 +104,19 @@ func (ac *assign_checker) check_validity() (valid bool) {
 }
 
 func (ac *assign_checker) check_const() (ok bool) {
-	if !ac.v.constant || !types.IsPure(ac.expr_t) ||
+	if !ac.v.constant || !types.IsPure(ac.t) ||
 		!types.IsPure(ac.v.data.DataType) || !types.IsNumeric(ac.v.data.DataType.Id) {
 		return
 	}
 	ok = true
 	switch {
-	case types.IsFloat(ac.expr_t.Id):
-		if !float_assignable(ac.expr_t.Id, ac.v) {
+	case types.IsFloat(ac.t.Id):
+		if !float_assignable(ac.t.Id, ac.v) {
 			ac.p.pusherrtok(ac.errtok, "overflow_limits")
 			ok = false
 		}
-	case types.IsInteger(ac.expr_t.Id):
-		if !int_assignable(ac.expr_t.Id, ac.v) {
+	case types.IsInteger(ac.t.Id):
+		if !int_assignable(ac.t.Id, ac.v) {
 			ac.p.pusherrtok(ac.errtok, "overflow_limits")
 			ok = false
 		}
@@ -134,5 +134,5 @@ func (ac assign_checker) check() {
 	} else if ac.check_const() {
 		return
 	}
-	ac.p.check_type(ac.expr_t, ac.v.data.DataType, ac.ignoreAny, !ac.not_allow_assign, ac.errtok)
+	ac.p.check_type(ac.t, ac.v.data.DataType, ac.ignoreAny, !ac.not_allow_assign, ac.errtok)
 }

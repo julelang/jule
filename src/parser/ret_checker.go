@@ -86,7 +86,7 @@ func (rc *retChecker) single() {
 	rc.check_for_ret_expr(v)
 	assign_checker{
 		p:      rc.t,
-		expr_t: rc.f.RetType.DataType,
+		t: rc.f.RetType.DataType,
 		v:      v,
 		errtok: rc.ret_ast.Token,
 	}.check()
@@ -109,7 +109,7 @@ func (rc *retChecker) multi() {
 		rc.check_for_ret_expr(v)
 		assign_checker{
 			p:      rc.t,
-			expr_t: t,
+			t: t,
 			v:      v,
 			errtok: rc.ret_ast.Token,
 		}.check()
@@ -145,7 +145,7 @@ func (rc *retChecker) checkMultiRetAsMutliRet() {
 		val := value{data: ast.Data{DataType: vt}}
 		assign_checker{
 			p:      rc.t,
-			expr_t: rt,
+			t: rt,
 			v:      val,
 			errtok: rc.ret_ast.Token,
 		}.check()
