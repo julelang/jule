@@ -924,11 +924,26 @@ func fn_make(p *Parser, m *exprModel, t ast.Type, args *ast.Args, errtok lex.Tok
 	if err_key != "" {
 		p.pusherrtok(errtok, err_key)
 	}
+
+	write_model := true
+	// Ignore 0 size for correct parsing.
+	// Size 0, should accept as nil slice.
+	if len_v.constant {
+		switch len_v.expr.(type) {
+		case float64:
+			write_model = len_v.expr.(float64) != 0
+		case int64:
+			write_model = len_v.expr.(int64) != 0
+		}
+	}
+
 	// Remove function identifier from model.
 	m.nodes[m.index].nodes[0] = nil
 	m.append_sub(exprNode{t.String()})
 	m.append_sub(exprNode{"("})
-	m.append_sub(len_expr_model)
+	if write_model {
+		m.append_sub(len_expr_model)
+	}
 	m.append_sub(exprNode{")"})
 	return
 }

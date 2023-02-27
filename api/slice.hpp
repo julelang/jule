@@ -20,8 +20,12 @@ public:
     slice_jt<_Item_t>(void) noexcept {}
     slice_jt<_Item_t>(const std::nullptr_t) noexcept {}
 
-    slice_jt<_Item_t>(const uint_jt &_N) noexcept
-    { this->__alloc_new( _N < 0 ? 0 : _N ); }
+    slice_jt<_Item_t>(const uint_jt &_N) noexcept {
+        const _n{ _N < 0 ? 0 : _N };
+        if ( _n == 0 )
+        { return; }
+        this->__alloc_new( _n );
+    }
 
     slice_jt<_Item_t>(const slice_jt<_Item_t>& _Src) noexcept
     { this->operator=( _Src ); }
