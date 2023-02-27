@@ -693,8 +693,22 @@ func caller_copy(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	src_v, src_expr_model := p.evalExpr(src_expr, nil)
 
 	if !types.Equals(dest_v.data.DataType, src_v.data.DataType) {
-		p.pusherrtok(errtok, "incompatible_types", dest_v.data.DataType.Kind, src_v.data.DataType.Kind)
-		return
+		t := dest_v.data.DataType.ComponentType
+		if !types.IsPure(*t) || t.Id != types.U8 {
+			p.pusherrtok(errtok, "incompatible_types", t.Kind, src_v.data.DataType.Kind)
+			return
+		}
+		
+		if !types.IsPure(src_v.data.DataType) || src_v.data.DataType.Id != types.STR {
+			p.pusherrtok(errtok, "incompatible_types", t.Kind, src_v.data.DataType.Kind)
+			return
+		}
+
+		// Add element type as generic type for correct parsing.
+		// If you don't this, C++ compiler will gives error.
+		m.append_sub(exprNode{"<"})
+		m.append_sub(exprNode{t.String()})
+		m.append_sub(exprNode{">"})
 	}
 
 	m.append_sub(exprNode{"("})
