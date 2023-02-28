@@ -21,9 +21,21 @@ var indentation = "\t"
 // init_caller represents initializer caller function identifier.
 const init_caller = "__julec_call_package_initializers"
 
+func repeat(sub string, n uint32) string {
+	if n == 0 {
+		return ""
+	}
+	s := sub
+	n--
+	for ; n > 0; n-- {
+		s += sub
+	}
+	return s
+}
+
 // Returns indent space of current block.
 func indent_string() string {
-	return strings.Repeat(indentation, int(indent))
+	return repeat(indentation, indent)
 }
 
 // Adds new indent to indent_string.
@@ -210,7 +222,7 @@ func gen_parse_block(b *ast.Block) string {
 		cpp.WriteString(gen_st(&s))
 	}
 	cpp.WriteByte('\n')
-	indent := strings.Repeat(indentation, int(indent-1))
+	indent := repeat(indentation, indent-1)
 	cpp.WriteString(indent)
 	cpp.WriteByte('}')
 	return cpp.String()
