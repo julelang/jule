@@ -52,14 +52,14 @@ func (pap *pureArgParser) push_variadic_args(pair *paramMapPair) {
 	model.exprs = append(model.exprs, exprNode{lex.KND_LBRACE})
 	variadiced := false
 	pap.p.parseArg(pap.f, pair, pap.args, &variadiced)
-	model.exprs = append(model.exprs, pair.arg.String())
+	model.exprs = append(model.exprs, exprNode{pair.arg.String()})
 	once := false
 	for pap.i++; pap.i < len(pap.args.Src); pap.i++ {
 		pair.arg = &pap.args.Src[pap.i]
 		once = true
 		pap.p.parseArg(pap.f, pair, pap.args, &variadiced)
 		model.exprs = append(model.exprs, exprNode{lex.KND_COMMA})
-		model.exprs = append(model.exprs, pair.arg.String())
+		model.exprs = append(model.exprs, exprNode{pair.arg.String()})
 	}
 	model.exprs = append(model.exprs, exprNode{lex.KND_RBRACE})
 	if !variadiced {

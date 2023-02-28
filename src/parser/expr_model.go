@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/julelang/jule/ast"
@@ -283,13 +282,13 @@ func (re retExpr) String() string {
 }
 
 type serieExpr struct {
-	exprs []any
+	exprs []ast.ExprModel
 }
 
 func (se serieExpr) String() string {
 	var exprs strings.Builder
 	for _, expr := range se.exprs {
-		exprs.WriteString(fmt.Sprint(expr))
+		exprs.WriteString(expr.String())
 	}
 	return exprs.String()
 }
