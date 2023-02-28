@@ -1,7 +1,7 @@
 package build
 
 import (
-	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -22,7 +22,7 @@ const TYPE_EXTENSION = "_jt"
 func AsId(id string) string { return "_" + id }
 
 func get_ptr_as_id(ptr uintptr) string {
-	address := "fp" + fmt.Sprint(ptr)
+	address := "_" + strconv.FormatUint(uint64(ptr), 16)
 	for i, r := range address {
 		if r != '0' {
 			address = address[i:]

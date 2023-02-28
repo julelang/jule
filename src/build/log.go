@@ -1,7 +1,7 @@
 package build
 
 import (
-	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -24,9 +24,9 @@ func (l *Log) err() string {
 	var log strings.Builder
 	log.WriteString(l.Path)
 	log.WriteByte(':')
-	log.WriteString(fmt.Sprint(l.Row))
+	log.WriteString(strconv.Itoa(l.Row))
 	log.WriteByte(':')
-	log.WriteString(fmt.Sprint(l.Column))
+	log.WriteString(strconv.Itoa(l.Column))
 	log.WriteByte(' ')
 	log.WriteString(l.Text)
 	return log.String()
