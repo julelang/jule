@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -59,9 +58,9 @@ func numericModel(v value) ast.ExprModel {
 		case normalize(&v):
 			return numericModel(v)
 		case v.data.DataType.Id == types.F32:
-			return exprNode{fmt.Sprint(t) + "f"}
+			return exprNode{strconv.FormatFloat(t, 'e', -1, 32) + "f"}
 		case v.data.DataType.Id == types.F64:
-			return exprNode{fmt.Sprint(t)}
+			return exprNode{strconv.FormatFloat(t, 'e', -1, 64)}
 		}
 	}
 	return nil
