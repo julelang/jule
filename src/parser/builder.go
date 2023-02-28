@@ -2040,21 +2040,22 @@ func (b *builder) caseexprs(toks *[]lex.Token) []ast.Expr {
 }
 
 func (b *builder) caseblock(toks *[]lex.Token) *ast.Block {
-	var block_toks []lex.Token
+	n := 0
 	for {
-		next := get_next_st((*toks)[len(block_toks):])
+		next := get_next_st((*toks)[n:])
 		if len(next) == 0 {
 			break
 		}
 		tok := next[0]
 		if tok.Id != lex.ID_OP || tok.Kind != lex.KND_VLINE {
-			block_toks = append(block_toks, next...)
+			n += len(next)
 			continue
 		}
-		*toks = (*toks)[len(block_toks):]
-		return b.Block(block_toks)
+		block := b.Block((*toks)[:n])
+		*toks = (*toks)[n:]
+		return block
 	}
-	block := b.Block(block_toks)
+	block := b.Block(*toks)
 	*toks = nil
 	return block
 }
@@ -2188,12 +2189,8 @@ func (b *builder) Conditional(bs *block_st) (s ast.St) {
 	if c.If == nil {
 		return
 	}
-
 node:
-	if bs.terminated {
-		goto end
-	}
-	if blockStFinished(bs) {
+	if bs.terminated || blockStFinished(bs) {
 		goto end
 	}
 	set_to_next_st(bs)
@@ -2209,7 +2206,6 @@ node:
 		// Save statement
 		bs.nextToks = bs.toks
 	}
-
 end:
 	s.Data = c
 	return
