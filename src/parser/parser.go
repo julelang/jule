@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"unicode/utf8"
 
 	"github.com/julelang/jule"
 	"github.com/julelang/jule/ast"
@@ -347,7 +346,7 @@ func (p *Parser) parseSrcTreeNode(node ast.Node) {
 		return
 	}
 	switch node_t := node.Data.(type) {
-	case ast.Statement:
+	case ast.St:
 		p.St(node_t)
 	case TypeAlias:
 		p.Type(node_t)
@@ -1026,7 +1025,7 @@ func (p *Parser) PushAttribute(c ast.Comment) {
 }
 
 // St parse Jule statement.
-func (p *Parser) St(s ast.Statement) {
+func (p *Parser) St(s ast.St) {
 	switch data_t := s.Data.(type) {
 	case Fn:
 		p.Func(data_t)
@@ -2611,11 +2610,17 @@ func (p *Parser) fallthrough_st(f *ast.Fall, b *ast.Block, i *int) {
 	f.Case = p.currentCase
 }
 
-func (p *Parser) st(s *ast.Statement, recover bool) bool {
+// The "i" parameter used by recover function calls.
+// If you pass "false" to the "recover" function, you can pass nil pointer.
+// It's safe.
+func (p *Parser) common_st(s *ast.St, i *int, recover bool) bool {
 	switch data := s.Data.(type) {
-	case ast.ExprStatement:
-		p.expr_st(&data, recover)
-		s.Data = data
+	case ast.ExprSt:
+		is_recover := p.expr_st(&data, i, recover)
+		// Don't set data if expression statement is recover function call.
+		if !is_recover {
+			s.Data = data
+		}
 	case Var:
 		p.var_st(&data, false)
 		s.Data = data
@@ -2656,7 +2661,7 @@ func (p *Parser) st(s *ast.Statement, recover bool) bool {
 
 func (p *Parser) check_st(b *ast.Block, i *int) {
 	s := &b.Tree[*i]
-	if p.st(s, true) {
+	if p.common_st(s, i, true) {
 		return
 	}
 	switch data := s.Data.(type) {
@@ -2702,7 +2707,7 @@ func (p *Parser) checkBlock(b *ast.Block) {
 	}
 }
 
-func (p *Parser) recoverFuncExprSt(s *ast.ExprStatement) {
+func (p *Parser) recover_fn_expr_st(s *ast.ExprSt, i *int) {
 	errtok := s.Expr.Tokens[0]
 	callToks := s.Expr.Tokens[1:]
 	args := p.get_args(callToks, false)
@@ -2719,31 +2724,20 @@ func (p *Parser) recoverFuncExprSt(s *ast.ExprStatement) {
 			handleParam.DataType.Kind, v.data.DataType.Kind)
 		return
 	}
-	handler := v.data.DataType.Tag.(*Fn)
-	s.Expr.Model = exprNode{"try{\n"}
-	var catcher serieExpr
-	catcher.exprs = append(catcher.exprs, "} catch(trait<JULEC_ID(Error)> ")
-	catcher.exprs = append(catcher.exprs, handler.Params[0].OutId())
-	catcher.exprs = append(catcher.exprs, ") ")
-	r, _ := utf8.DecodeRuneInString(v.data.Value)
-	if r == '_' || lex.IsLetter(r) { // Function source
-		catcher.exprs = append(catcher.exprs, "{")
-		catcher.exprs = append(catcher.exprs, handler.OutId())
-		catcher.exprs = append(catcher.exprs, "(")
-		catcher.exprs = append(catcher.exprs, handler.Params[0].OutId())
-		catcher.exprs = append(catcher.exprs, "); }")
-	} else {
-		catcher.exprs = append(catcher.exprs, handler.Block)
-	}
-	catchExpr := ast.Statement{
-		Data: ast.ExprStatement{
-			Expr: ast.Expr{Model: catcher},
-		},
-	}
-	p.nodeBlock.Tree = append(p.nodeBlock.Tree, catchExpr)
+	rc := ast.RecoverCall{}
+	// Use "*i+1" because this expression is recover function call.
+	// And we will set this statement as RecoverCall node.
+	rc.Try = block_from_tree(p.nodeBlock.Tree[*i+1:])
+	p.checkNewBlock(rc.Try)
+	rc.Handler = v.data.DataType.Tag.(*Fn)
+	p.nodeBlock.Tree[*i].Data = rc
+
+	// Remove following statements.
+	// Because these statements moved into RecoverCall node.
+	p.nodeBlock.Tree = p.nodeBlock.Tree[:*i+1]
 }
 
-func (p *Parser) expr_st(s *ast.ExprStatement, recover bool) {
+func (p *Parser) expr_st(s *ast.ExprSt, i *int, recover bool) (is_recover bool) {
 	if s.Expr.IsNotBinop() {
 		expr := s.Expr.Op.(ast.BinopExpr)
 		tok := expr.Tokens[0]
@@ -2754,8 +2748,8 @@ func (p *Parser) expr_st(s *ast.ExprStatement, recover bool) {
 				}
 				def, _, _ := p.defined_by_id(tok.Kind)
 				if def == recoverFunc {
-					p.recoverFuncExprSt(s)
-					return
+					p.recover_fn_expr_st(s, i)
+					return true
 				}
 			}
 		}
@@ -2763,6 +2757,7 @@ func (p *Parser) expr_st(s *ast.ExprStatement, recover bool) {
 	if s.Expr.Model == nil {
 		_, s.Expr.Model = p.evalExpr(s.Expr, nil)
 	}
+	return
 }
 
 func (p *Parser) parseCase(c *ast.Case, expr_t Type) {
@@ -2822,7 +2817,7 @@ func (p *Parser) checkLabels() {
 	}
 }
 
-func stIsDef(s *ast.Statement) bool {
+func stIsDef(s *ast.St) bool {
 	switch t := s.Data.(type) {
 	case Var:
 		return true
@@ -2999,6 +2994,11 @@ func has_ret(b *ast.Block) (ok bool, fall bool) {
 			fall = true
 		case ast.Ret:
 			return true, fall
+		case ast.RecoverCall:
+			ok, fall = has_ret(t.Try)
+			if ok {
+				return true, fall
+			}
 		case *ast.Match:
 			if match_has_ret(t) {
 				return true, false
@@ -3268,7 +3268,11 @@ func (p *Parser) whileProfile(iter *ast.Iter) {
 		p.pusherrtok(iter.Token, "iter_while_require_bool_expr")
 	}
 	if profile.Next.Data != nil {
-		_ = p.st(&profile.Next, false)
+		// Send nil pointer for i.
+		// This is safe.
+		// i used by recover function, but we not use recover function calls.
+		// The "recover" parameter is false
+		_ = p.common_st(&profile.Next, nil, false)
 	}
 	p.checkNewBlock(iter.Block)
 }

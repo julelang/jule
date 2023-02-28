@@ -64,7 +64,7 @@ func (b *builder) buildNode(toks []lex.Token) {
 	case lex.ID_USE:
 		b.Use(toks)
 	case lex.ID_FN, lex.ID_UNSAFE:
-		s := ast.Statement{Token: t}
+		s := ast.St{Token: t}
 		s.Data = b.Func(toks, false, false, false)
 		b.Tree = append(b.Tree, ast.Node{Token: s.Token, Data: s})
 	case lex.ID_CONST, lex.ID_LET, lex.ID_MUT:
@@ -1254,6 +1254,12 @@ func blockStFinished(bs *block_st) bool {
 	return bs.nextToks == nil && bs.pos >= len(*bs.srcToks)
 }
 
+func block_from_tree(tree []ast.St) *ast.Block {
+	block := new(ast.Block)
+	block.Tree = tree
+	return block
+}
+
 // Block builds AST model of statements of code block.
 func (b *builder) Block(toks []lex.Token) (block *ast.Block) {
 	block = new(ast.Block)
@@ -1271,7 +1277,7 @@ func (b *builder) Block(toks []lex.Token) (block *ast.Block) {
 }
 
 // St builds AST model of statement.
-func (b *builder) St(bs *block_st) (s ast.Statement) {
+func (b *builder) St(bs *block_st) (s ast.St) {
 	tok := bs.toks[0]
 	if tok.Id == lex.ID_IDENT {
 		s, ok := b.IdSt(bs)
@@ -1325,7 +1331,7 @@ func (b *builder) St(bs *block_st) (s ast.Statement) {
 	return
 }
 
-func (b *builder) blockSt(toks []lex.Token) ast.Statement {
+func (b *builder) blockSt(toks []lex.Token) ast.St {
 	is_unsafe := false
 	is_deferred := false
 	tok := toks[0]
@@ -1334,7 +1340,7 @@ func (b *builder) blockSt(toks []lex.Token) ast.Statement {
 		toks = toks[1:]
 		if len(toks) == 0 {
 			b.pusherr(tok, "invalid_syntax")
-			return ast.Statement{}
+			return ast.St{}
 		}
 		tok = toks[0]
 		if tok.Id == lex.ID_DEFER {
@@ -1342,7 +1348,7 @@ func (b *builder) blockSt(toks []lex.Token) ast.Statement {
 			toks = toks[1:]
 			if len(toks) == 0 {
 				b.pusherr(tok, "invalid_syntax")
-				return ast.Statement{}
+				return ast.St{}
 			}
 		}
 	} else if tok.Id == lex.ID_DEFER {
@@ -1350,7 +1356,7 @@ func (b *builder) blockSt(toks []lex.Token) ast.Statement {
 		toks = toks[1:]
 		if len(toks) == 0 {
 			b.pusherr(tok, "invalid_syntax")
-			return ast.Statement{}
+			return ast.St{}
 		}
 	}
 
@@ -1358,14 +1364,14 @@ func (b *builder) blockSt(toks []lex.Token) ast.Statement {
 	toks = ast.Range(&i, lex.KND_LBRACE, lex.KND_RBRACE, toks)
 	if len(toks) == 0 {
 		b.pusherr(tok, "invalid_syntax")
-		return ast.Statement{}
+		return ast.St{}
 	} else if i < len(toks) {
 		b.pusherr(toks[i], "invalid_syntax")
 	}
 	block := b.Block(toks)
 	block.IsUnsafe = is_unsafe
 	block.Deferred = is_deferred
-	return ast.Statement{Token: tok, Data: block}
+	return ast.St{Token: tok, Data: block}
 }
 
 func (b *builder) assignInfo(toks []lex.Token) (info ast.AssignInfo) {
@@ -1443,7 +1449,7 @@ func (b *builder) assignExprs(toks []lex.Token) []ast.Expr {
 }
 
 // AssignSt builds AST model of assignment statement.
-func (b *builder) AssignSt(toks []lex.Token) (s ast.Statement, _ bool) {
+func (b *builder) AssignSt(toks []lex.Token) (s ast.St, _ bool) {
 	assign, ok := b.AssignExpr(toks)
 	if !ok {
 		return
@@ -1535,7 +1541,7 @@ func (b *builder) plainAssign(toks []lex.Token) (assign ast.Assign, ok bool) {
 }
 
 // BuildReturnStatement builds AST model of return statement.
-func (b *builder) IdSt(bs *block_st) (s ast.Statement, ok bool) {
+func (b *builder) IdSt(bs *block_st) (s ast.St, ok bool) {
 	if len(bs.toks) == 1 {
 		return
 	}
@@ -1548,28 +1554,23 @@ func (b *builder) IdSt(bs *block_st) (s ast.Statement, ok bool) {
 }
 
 // LabelSt builds AST model of label.
-func (b *builder) LabelSt(bs *block_st) ast.Statement {
+func (b *builder) LabelSt(bs *block_st) ast.St {
 	var l ast.Label
 	l.Token = bs.toks[0]
 	l.Label = l.Token.Kind
 	if len(bs.toks) > 2 {
 		bs.nextToks = bs.toks[2:]
 	}
-	return ast.Statement{
+	return ast.St{
 		Token: l.Token,
 		Data:  l,
 	}
 }
 
 // ExprSt builds AST model of expression.
-func (b *builder) ExprSt(bs *block_st) ast.Statement {
-	expr := ast.ExprStatement{
-		Expr: b.Expr(bs.toks),
-	}
-	return ast.Statement{
-		Token: bs.toks[0],
-		Data:  expr,
-	}
+func (b *builder) ExprSt(bs *block_st) ast.St {
+	st := ast.ExprSt{Expr: b.Expr(bs.toks)}
+	return ast.St{Token: bs.toks[0], Data: st}
 }
 
 // Args builds AST model of arguments.
@@ -1725,21 +1726,21 @@ func (b *builder) Var(toks []lex.Token, begin, expr bool) (v ast.Var) {
 }
 
 // VarSt builds AST model of variable declaration statement.
-func (b *builder) VarSt(bs *block_st, expr bool) ast.Statement {
+func (b *builder) VarSt(bs *block_st, expr bool) ast.St {
 	v := b.Var(bs.toks, true, expr)
 	v.Owner = bs.block
-	return ast.Statement{Token: v.Token, Data: v}
+	return ast.St{Token: v.Token, Data: v}
 }
 
 // CommentSt builds AST model of comment statement.
-func (b *builder) CommentSt(tok lex.Token) (s ast.Statement) {
+func (b *builder) CommentSt(tok lex.Token) (s ast.St) {
 	s.Token = tok
 	tok.Kind = strings.TrimSpace(tok.Kind[2:])
 	s.Data = ast.Comment{Content: tok.Kind}
 	return
 }
 
-func (b *builder) ConcurrentCallSt(toks []lex.Token) (s ast.Statement) {
+func (b *builder) ConcurrentCallSt(toks []lex.Token) (s ast.St) {
 	var cc ast.ConcurrentCall
 	cc.Token = toks[0]
 	toks = toks[1:]
@@ -1756,7 +1757,7 @@ func (b *builder) ConcurrentCallSt(toks []lex.Token) (s ast.Statement) {
 	return
 }
 
-func (b *builder) Fallthrough(toks []lex.Token) (s ast.Statement) {
+func (b *builder) Fallthrough(toks []lex.Token) (s ast.St) {
 	s.Token = toks[0]
 	if len(toks) > 1 {
 		b.pusherr(toks[1], "invalid_syntax")
@@ -1767,7 +1768,7 @@ func (b *builder) Fallthrough(toks []lex.Token) (s ast.Statement) {
 	return
 }
 
-func (b *builder) GotoSt(toks []lex.Token) (s ast.Statement) {
+func (b *builder) GotoSt(toks []lex.Token) (s ast.St) {
 	s.Token = toks[0]
 	if len(toks) == 1 {
 		b.pusherr(s.Token, "missing_goto_label")
@@ -1788,13 +1789,13 @@ func (b *builder) GotoSt(toks []lex.Token) (s ast.Statement) {
 }
 
 // RetSt builds AST model of return statement.
-func (b *builder) RetSt(toks []lex.Token) ast.Statement {
+func (b *builder) RetSt(toks []lex.Token) ast.St {
 	var ret ast.Ret
 	ret.Token = toks[0]
 	if len(toks) > 1 {
 		ret.Expr = b.Expr(toks[1:])
 	}
-	return ast.Statement{
+	return ast.St{
 		Token: ret.Token,
 		Data:  ret,
 	}
@@ -1923,17 +1924,17 @@ func (b *builder) getIterProfile(toks []lex.Token, errtok lex.Token) any {
 	return b.getWhileIterProfile(toks)
 }
 
-func (b *builder) next_st(toks []lex.Token) ast.Statement {
+func (b *builder) next_st(toks []lex.Token) ast.St {
 	s := b.St(&block_st{toks: toks})
 	switch s.Data.(type) {
-	case ast.ExprStatement, ast.Assign, ast.Var:
+	case ast.ExprSt, ast.Assign, ast.Var:
 	default:
 		b.pusherr(toks[0], "invalid_syntax")
 	}
 	return s
 }
 
-func (b *builder) getWhileNextIterProfile(bs *block_st) (s ast.Statement) {
+func (b *builder) getWhileNextIterProfile(bs *block_st) (s ast.St) {
 	var iter ast.Iter
 	iter.Token = bs.toks[0]
 	bs.toks = bs.toks[1:]
@@ -1962,10 +1963,10 @@ func (b *builder) getWhileNextIterProfile(bs *block_st) (s ast.Statement) {
 	}
 	iter.Block = b.Block(blockToks)
 	iter.Profile = profile
-	return ast.Statement{Token: iter.Token, Data: iter}
+	return ast.St{Token: iter.Token, Data: iter}
 }
 
-func (b *builder) commonIterProfile(toks []lex.Token) (s ast.Statement) {
+func (b *builder) commonIterProfile(toks []lex.Token) (s ast.St) {
 	var iter ast.Iter
 	iter.Token = toks[0]
 	toks = toks[1:]
@@ -1989,10 +1990,10 @@ func (b *builder) commonIterProfile(toks []lex.Token) (s ast.Statement) {
 		b.pusherr(toks[i], "invalid_syntax")
 	}
 	iter.Block = b.Block(blockToks)
-	return ast.Statement{Token: iter.Token, Data: iter}
+	return ast.St{Token: iter.Token, Data: iter}
 }
 
-func (b *builder) IterExpr(bs *block_st) ast.Statement {
+func (b *builder) IterExpr(bs *block_st) ast.St {
 	if bs.terminated {
 		return b.getWhileNextIterProfile(bs)
 	}
@@ -2094,7 +2095,7 @@ func (b *builder) cases(toks []lex.Token) ([]ast.Case, *ast.Case) {
 }
 
 // MatchCase builds AST model of match-case.
-func (b *builder) MatchCase(toks []lex.Token) (s ast.Statement) {
+func (b *builder) MatchCase(toks []lex.Token) (s ast.St) {
 	m := new(ast.Match)
 	m.Token = toks[0]
 	s.Token = m.Token
@@ -2180,7 +2181,7 @@ func (b *builder) conditional_default(bs *block_st) *ast.Else {
 }
 
 // IfExpr builds condition tree AST model.
-func (b *builder) Conditional(bs *block_st) (s ast.Statement) {
+func (b *builder) Conditional(bs *block_st) (s ast.St) {
 	s.Token = bs.toks[0]
 	var c ast.Conditional
 	c.If = b.if_expr(bs)
@@ -2215,7 +2216,7 @@ end:
 }
 
 // BreakSt builds AST model of break statement.
-func (b *builder) BreakSt(toks []lex.Token) ast.Statement {
+func (b *builder) BreakSt(toks []lex.Token) ast.St {
 	var breakAST ast.Break
 	breakAST.Token = toks[0]
 	if len(toks) > 1 {
@@ -2228,14 +2229,14 @@ func (b *builder) BreakSt(toks []lex.Token) ast.Statement {
 			}
 		}
 	}
-	return ast.Statement{
+	return ast.St{
 		Token: breakAST.Token,
 		Data:  breakAST,
 	}
 }
 
 // ContinueSt builds AST model of continue statement.
-func (b *builder) ContinueSt(toks []lex.Token) ast.Statement {
+func (b *builder) ContinueSt(toks []lex.Token) ast.St {
 	var continueAST ast.Continue
 	continueAST.Token = toks[0]
 	if len(toks) > 1 {
@@ -2248,7 +2249,7 @@ func (b *builder) ContinueSt(toks []lex.Token) ast.Statement {
 			}
 		}
 	}
-	return ast.Statement{Token: continueAST.Token, Data: continueAST}
+	return ast.St{Token: continueAST.Token, Data: continueAST}
 }
 
 // Expr builds AST model of expression.

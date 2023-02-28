@@ -253,6 +253,9 @@ func IsLiteral(k string) bool {
 // IsIgnoreId reports identifier is ignore or not.
 func IsIgnoreId(id string) bool { return id == IGNORE_ID }
 
+// IsAnonymousId reports whether identifier is anonymous.
+func IsAnonymousId(id string) bool { return id == ANONYMOUS_ID }
+
 func rune_exist(r rune, runes []rune) bool {
 	for _, cr := range runes {
 		if r == cr {

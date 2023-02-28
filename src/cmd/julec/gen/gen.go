@@ -492,9 +492,9 @@ func gen_type_alias(t *ast.TypeAlias) string {
 	return cpp.String()
 }
 
-func gen_st(s *ast.Statement) string {
+func gen_st(s *ast.St) string {
 	switch t := s.Data.(type) {
-	case ast.ExprStatement:
+	case ast.ExprSt:
 		return gen_expr_st(&t)
 	case ast.Var:
 		return t.String()
@@ -526,14 +526,49 @@ func gen_st(s *ast.Statement) string {
 		return t.String()
 	case ast.Label:
 		return t.String()
+	case ast.RecoverCall:
+		return gen_recover_call(&t)
 	default:
 		return ""
 	}
 }
 
-func gen_expr_st(be *ast.ExprStatement) string {
+func gen_recover_call(rc *ast.RecoverCall) string {
 	var cpp strings.Builder
-	cpp.WriteString(be.Expr.String())
+	cpp.WriteString("try ")
+	cpp.WriteString(gen_block(rc.Try))
+	cpp.WriteString("catch(")
+	cpp.WriteString(build.AsTypeId("trait"))
+	cpp.WriteString("<JULEC_ID(Error)> ")
+	handler_param := rc.Handler.Params[0]
+	if lex.IsAnonymousId(rc.Handler.Id) {
+		// Anonymous function.
+		// Parse body as catch block.
+		//
+		// NOTICE:
+		//  If passed anonymous function from variable, field, or something
+		//  like that, parses block. Not calls variable, fields or whatever.
+
+		if !lex.IsIgnoreId(handler_param.Id) && !lex.IsAnonymousId(handler_param.Id) {
+			cpp.WriteString(handler_param.OutId())
+		}
+		cpp.WriteString(") ")
+
+		cpp.WriteString(gen_block(rc.Handler.Block))
+	} else {
+		// Passed defined function.
+		// Therefore, call passed function with error.
+
+		cpp.WriteString("_Error ) {")
+		cpp.WriteString(rc.Handler.OutId())
+		cpp.WriteString("( _Error ); }")
+	}
+	return cpp.String()
+}
+
+func gen_expr_st(st *ast.ExprSt) string {
+	var cpp strings.Builder
+	cpp.WriteString(st.Expr.String())
 	cpp.WriteByte(';')
 	return cpp.String()
 }
@@ -950,9 +985,9 @@ func gen_fn_owner(f *ast.Fn, owner *ast.Struct) string {
 func gen_fn_block(vars []*ast.Var, b *ast.Block) string {
 	var cpp strings.Builder
 	if vars != nil {
-		statements := make([]ast.Statement, len(vars))
+		statements := make([]ast.St, len(vars))
 		for i, v := range vars {
-			statements[i] = ast.Statement{Token: v.Token, Data: *v}
+			statements[i] = ast.St{Token: v.Token, Data: *v}
 		}
 		b.Tree = append(statements, b.Tree...)
 	}

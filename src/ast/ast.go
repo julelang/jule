@@ -67,13 +67,19 @@ func Has_attribute(kind string, attributes []Attribute) bool {
 	return false
 }
 
+// RecoverCall is recover function call.
+type RecoverCall struct {
+	Try         *Block
+	Handler     *Fn
+}
+
 // Block is code block.
 type Block struct {
 	IsUnsafe bool
 	Deferred bool
 	Parent   *Block
 	SubIndex int // Index of statement in parent block
-	Tree     []Statement
+	Tree     []St
 	Func     *Fn
 
 	// If block is the root block, has all labels and gotos of all sub blocks.
@@ -440,7 +446,7 @@ type IterForeach struct {
 // IterWhile is while iteration profile.
 type IterWhile struct {
 	Expr Expr
-	Next Statement
+	Next St
 }
 
 // Break is the AST model of break statement.
@@ -677,15 +683,15 @@ type Ret struct {
 	Expr  Expr
 }
 
-// Statement is statement.
-type Statement struct {
+// St is statement.
+type St struct {
 	Token          lex.Token
 	Data           any
 	WithTerminator bool
 }
 
-// ExprStatement is AST model of expression statement in block.
-type ExprStatement struct {
+// ExprSt is AST model of expression statement in block.
+type ExprSt struct {
 	Expr Expr
 }
 
