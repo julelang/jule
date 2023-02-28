@@ -2,7 +2,6 @@ package parser
 
 import (
 	"fmt"
-	"math/big"
 	"strconv"
 	"strings"
 
@@ -167,24 +166,38 @@ func (ve *literal_eval) float() value {
 }
 
 func (ve *literal_eval) integer() value {
+	data := ve.token.Kind
+
 	var v value
-	v.data.Value = ve.token.Kind
-	var bigint big.Int
+	v.data.Value = data
+
+	base := 0
 	switch {
-	case strings.HasPrefix(ve.token.Kind, "0x"):
-		_, _ = bigint.SetString(ve.token.Kind[2:], 16)
-	case strings.HasPrefix(ve.token.Kind, "0b"):
-		_, _ = bigint.SetString(ve.token.Kind[2:], 2)
-	case ve.token.Kind[0] == '0':
-		_, _ = bigint.SetString(ve.token.Kind[1:], 8)
+	case strings.HasPrefix(data, "0x"):
+		data = data[2:]
+		base = 16
+	case strings.HasPrefix(data, "0b"):
+		data = data[2:]
+		base = 2
+	case data[0] == '0' && len(data) > 1:
+		data = ve.token.Kind[1:]
+		base = 8
 	default:
-		_, _ = bigint.SetString(ve.token.Kind, 10)
+		base = 10
 	}
-	if bigint.IsInt64() {
-		v.expr = bigint.Int64()
+
+	is_neg := data[0] == '-'
+	if is_neg {
+		v.expr, _ = strconv.ParseInt(data, base, 64)
 	} else {
-		v.expr = bigint.Uint64()
+		expr, err := strconv.ParseInt(data, base, 64)
+		if err == nil {
+			v.expr = expr
+		} else {
+			v.expr, _ = strconv.ParseUint(data, base, 64)
+		}
 	}
+
 	bitize(&v)
 	return v
 }
