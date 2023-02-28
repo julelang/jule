@@ -2576,7 +2576,7 @@ func (p *Parser) checkNewBlockCustom(b *ast.Block, oldBlockVars []*Var) {
 		}()
 	}
 	blockTypes := p.blockTypes
-	p.checkBlock(b)
+	p.checkNodeBlock()
 
 	vars := p.blockVars[len(oldBlockVars):]
 	aliases := p.blockTypes[len(blockTypes):]
@@ -2598,9 +2598,9 @@ func (p *Parser) checkNewBlock(b *ast.Block) {
 	p.checkNewBlockCustom(b, p.blockVars)
 }
 
-func (p *Parser) fallthrough_st(f *ast.Fall, b *ast.Block, i *int) {
+func (p *Parser) fall_st(f *ast.Fall, i *int) {
 	switch {
-	case p.currentCase == nil || *i+1 < len(b.Tree):
+	case p.currentCase == nil || *i+1 < len(p.nodeBlock.Tree):
 		p.pusherrtok(f.Token, "fallthrough_wrong_use")
 		return
 	case p.currentCase.Next == nil:
@@ -2659,51 +2659,54 @@ func (p *Parser) common_st(s *ast.St, i *int, recover bool) bool {
 	return true
 }
 
-func (p *Parser) check_st(b *ast.Block, i *int) {
-	s := &b.Tree[*i]
+// Checks statement.
+// Based on p.nodeBlock field.
+func (p *Parser) check_st(i *int) {
+	s := &p.nodeBlock.Tree[*i]
 	if p.common_st(s, i, true) {
 		return
 	}
 	switch data := s.Data.(type) {
 	case ast.Iter:
-		data.Parent = b
+		data.Parent = p.nodeBlock
 		s.Data = data
 		p.iter(&data)
 		s.Data = data
 	case ast.Fall:
-		p.fallthrough_st(&data, b, i)
+		p.fall_st(&data, i)
 		s.Data = data
 	case ast.Conditional:
 		p.conditional(&data)
 		s.Data = data
 	case ast.Ret:
-		rc := retChecker{t: p, ret_ast: &data, f: b.Func}
+		rc := retChecker{t: p, ret_ast: &data, f: p.nodeBlock.Func}
 		rc.check()
 		s.Data = data
 	case ast.Goto:
 		node := new(ast.Goto)
 		*node = data
 		node.Index = *i
-		node.Block = b
-		*b.Gotos = append(*b.Gotos, node)
+		node.Block = p.nodeBlock
+		*p.nodeBlock.Gotos = append(*p.nodeBlock.Gotos, node)
 	case ast.Label:
-		if find_label_parent(data.Label, b) != nil {
+		if find_label_parent(data.Label, p.nodeBlock) != nil {
 			p.pusherrtok(data.Token, "label_exist", data.Label)
 			break
 		}
 		node := new(ast.Label)
 		*node = data
 		node.Index = *i
-		node.Block = b
-		*b.Labels = append(*b.Labels, node)
+		node.Block = p.nodeBlock
+		*p.nodeBlock.Labels = append(*p.nodeBlock.Labels, node)
 	default:
 		p.pusherrtok(s.Token, "invalid_syntax")
 	}
 }
 
-func (p *Parser) checkBlock(b *ast.Block) {
-	for i := 0; i < len(b.Tree); i++ {
-		p.check_st(b, &i)
+// Check p.nodeBlock
+func (p *Parser) checkNodeBlock() {
+	for i := 0; i < len(p.nodeBlock.Tree); i++ {
+		p.check_st(&i)
 	}
 }
 
