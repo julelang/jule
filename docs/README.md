@@ -1,5 +1,5 @@
 # Jule Documentations
 
-Jule documentations is shared via official website.
+Jule documentations is shared via official website as manual.
 
-[Go to Documentations](https://julelang.github.io/website/pages/docs.html)
+[Go to Jule Manual](https://julelang.github.io/website/pages/manual.html)
