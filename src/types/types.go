@@ -177,26 +177,6 @@ func CppId(t uint8) string {
 	return id
 }
 
-// DefaultValOfType returns default value of specified type.
-//
-// Special case is:
-//
-//	DefaultValOfType(t) = "nil" if t is invalid
-//	DefaultValOfType(t) = "nil" if t is not have default value
-func DefaultValOfType(t uint8) string {
-	t = GetRealCode(t)
-	if IsNumeric(t) || t == ENUM {
-		return "0"
-	}
-	switch t {
-	case BOOL:
-		return "false"
-	case STR:
-		return `""`
-	}
-	return "nil"
-}
-
 // IntFromBits returns type code by bits.
 func IntFromBits(bits uint64) uint8 {
 	switch bits {
