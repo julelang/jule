@@ -2093,7 +2093,10 @@ func (p *Parser) checkGenericsQuantity(required, given int, errTok lex.Token) bo
 	}
 }
 
-func (p *Parser) pushGeneric(generic *GenericType, source Type) {
+func (p *Parser) pushGeneric(generic *GenericType, source Type, errtok lex.Token) {
+	if types.IsEnum(source) {
+		p.pusherrtok(errtok, "enum_not_supports_as_generic")
+	}
 	alias := &TypeAlias{
 		Id:         generic.Id,
 		Token:      generic.Token,
@@ -2104,9 +2107,9 @@ func (p *Parser) pushGeneric(generic *GenericType, source Type) {
 	p.blockTypes = append(p.blockTypes, alias)
 }
 
-func (p *Parser) pushGenerics(generics []*GenericType, sources []Type) {
+func (p *Parser) pushGenerics(generics []*GenericType, sources []Type, errtok lex.Token) {
 	for i, generic := range generics {
-		p.pushGeneric(generic, sources[i])
+		p.pushGeneric(generic, sources[i], errtok)
 	}
 }
 
@@ -2149,7 +2152,7 @@ func ready_to_parse_generic_fn(f *Fn) {
 	owner := f.Owner.(*Parser)
 	if f.Receiver != nil {
 		s := f.Receiver.Tag.(*Struct)
-		owner.pushGenerics(s.Generics, s.GetGenerics())
+		owner.pushGenerics(s.Generics, s.GetGenerics(), f.Token)
 	}
 	owner.reload_fn_types(f)
 }
@@ -2197,7 +2200,7 @@ check:
 		return false
 	} else {
 		owner := f.Owner.(*Parser)
-		owner.pushGenerics(f.Generics, args.Generics)
+		owner.pushGenerics(f.Generics, args.Generics, errTok)
 		owner.reload_fn_types(f)
 	}
 ok:
@@ -2213,7 +2216,7 @@ func (p *Parser) parse_fn_call(f *Fn, args *ast.Args, m *exprModel, errTok lex.T
 			s := f.Receiver.Tag.(*Struct)
 			generics := s.GetGenerics()
 			if len(generics) > 0 {
-				owner.pushGenerics(s.Generics, generics)
+				owner.pushGenerics(s.Generics, generics, errTok)
 				if len(f.Generics) == 0 {
 					owner.reload_fn_types(f)
 				}
@@ -2454,7 +2457,7 @@ func (p *Parser) pushGenericByCommonArg(f *Fn, pair *paramMapPair, args *ast.Arg
 func (p *Parser) pushGenericByType(f *Fn, g *GenericType, pos int, args *ast.Args, gt Type) {
 	id, _ := gt.KindId()
 	gt.Kind = id
-	f.Owner.(*Parser).pushGeneric(g, gt)
+	f.Owner.(*Parser).pushGeneric(g, gt, f.Token)
 
 	// Add by order.
 	args.Generics[pos] = gt
@@ -3552,7 +3555,7 @@ func (p *Parser) typeSourceIsStruct(s *Struct, st Type) (dt Type, _ bool) {
 		owner := s.Owner.(*Parser)
 		blockTypes := owner.blockTypes
 		owner.blockTypes = nil
-		owner.pushGenerics(s.Generics, generics)
+		owner.pushGenerics(s.Generics, generics, st.Token)
 		for i, f := range s.Fields {
 			owner.parseField(s, &f, i)
 		}
