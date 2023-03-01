@@ -1987,7 +1987,7 @@ func (p *Parser) parseField(s *Struct, f **Var, i int) {
 	if has_expr(v.Expr) {
 		param.Default = v.Expr
 	} else {
-		param.Default.Model = exprNode{build.CPP_DEFAULT_EXPR}
+		param.Default.Model = exprNode{v.DataType.InitValue()}
 	}
 	s.Constructor.Params[i] = param
 	s.Defines.Globals[i] = v

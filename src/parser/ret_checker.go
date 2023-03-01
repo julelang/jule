@@ -2,7 +2,6 @@ package parser
 
 import (
 	"github.com/julelang/jule/ast"
-	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
 )
@@ -173,7 +172,7 @@ func (rc *retChecker) retsVars() {
 		if lex.IsIgnoreId(v.Kind) {
 			node := exprNode{}
 			node.value = types[i].String()
-			node.value += build.CPP_DEFAULT_EXPR
+			node.value += types[i].InitValue()
 			rc.exp_model.models = append(rc.exp_model.models, node)
 			continue
 		}

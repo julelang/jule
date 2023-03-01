@@ -867,6 +867,15 @@ type Type struct {
 	CppLinked     bool
 }
 
+// InitValue returns initial expression of type.
+// Returns build.CPP_DEFAULT_EXPR if not supported.
+func (t *Type) InitValue() string {
+	if t.Id != enum_t {
+		return build.CPP_DEFAULT_EXPR
+	}
+	return "{" + t.Tag.(*Enum).Items[0].Expr.String() + "}"
+}
+
 // Copy returns deep copy of data type.
 func (dt *Type) Copy() Type {
 	copy := *dt
@@ -1260,7 +1269,7 @@ func (v Var) String() string {
 		cpp.WriteString(" = ")
 		cpp.WriteString(v.Expr.String())
 	} else {
-		cpp.WriteString(build.CPP_DEFAULT_EXPR)
+		cpp.WriteString(v.DataType.InitValue())
 	}
 	cpp.WriteByte(';')
 	return cpp.String()
@@ -1275,7 +1284,7 @@ func (v *Var) FieldString() string {
 	cpp.WriteString(v.DataType.String())
 	cpp.WriteByte(' ')
 	cpp.WriteString(v.OutId())
-	cpp.WriteString(build.CPP_DEFAULT_EXPR)
+	cpp.WriteString(v.DataType.InitValue())
 	cpp.WriteByte(';')
 	return cpp.String()
 }
