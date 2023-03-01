@@ -1248,7 +1248,7 @@ func gen_trait(t *ast.Trait) string {
 // Gen generates object code from parse tree.
 func Gen(tree *ast.Defmap, used *[]*ast.UseDecl) string {
 	structs := get_all_structs(tree, used)
-	order_structures(structs)
+	types.OrderStructures(structs)
 	var cpp strings.Builder
 	cpp.WriteString(gen_links(used))
 	cpp.WriteByte('\n')
@@ -1263,37 +1263,4 @@ func Gen(tree *ast.Defmap, used *[]*ast.UseDecl) string {
 	cpp.WriteString(gen_fns(tree, used))
 	cpp.WriteString(gen_init_caller(tree, used))
 	return cpp.String()
-}
-
-func can_be_order(s *ast.Struct) bool {
-	for _, d := range s.Origin.Depends {
-		if d.Origin.Order > s.Origin.Order {
-			return true
-		}
-	}
-	return false
-}
-
-func order_structures(structures []*ast.Struct) {
-	for i, s := range structures {
-		s.Order = i
-	}
-
-	n := len(structures)
-	for i := 0; i < n; i++ {
-		swapped := false
-		for j := 0; j < n-i-1; j++ {
-			curr := &structures[j]
-			if can_be_order(*curr) {
-				(*curr).Origin.Order = j + 1
-				next := &structures[j+1]
-				(*next).Origin.Order = j
-				*curr, *next = *next, *curr
-				swapped = true
-			}
-		}
-		if !swapped {
-			break
-		}
-	}
 }

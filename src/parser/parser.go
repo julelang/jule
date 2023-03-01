@@ -1619,6 +1619,9 @@ func (p *Parser) parse_package_structs() {
 }
 
 func (p *Parser) parse_structs() {
+	// Order structures by their dependencies for correct parsing.
+	types.OrderStructures(p.Defines.Structs)
+
 	for _, s := range p.Defines.Structs {
 		p.parse_struct(s)
 	}
