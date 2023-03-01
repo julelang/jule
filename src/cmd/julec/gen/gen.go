@@ -1267,11 +1267,11 @@ func Gen(tree *ast.Defmap, used *[]*ast.UseDecl) string {
 
 func can_be_order(s *ast.Struct) bool {
 	for _, d := range s.Origin.Depends {
-		if d.Origin.Order < s.Origin.Order {
-			return false
+		if d.Origin.Order > s.Origin.Order {
+			return true
 		}
 	}
-	return true
+	return false
 }
 
 func order_structures(structures []*ast.Struct) {
