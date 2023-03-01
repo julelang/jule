@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use std::fs::path::{join}
 use std::sys::{
 	utf16_from_str,
 	u16_ptr_to_str,
@@ -16,22 +17,30 @@ use std::sys::{
 // Possible errors:
 //  Denied InvalidDescriptor PerProcessLimit SystemWideLimit
 //  NotExist InsufficientMemory NotDir
-pub fn read_dir(path: str): ([]Dirent, FsError) {
+pub fn read_dir(path: str): (dirents: []Dirent, err: FsError) {
 	let utf16_path = utf16_from_str(path)
 	let mut dir = unsafe { _wopendir(&utf16_path[0]) }
 	if dir == nil {
-		ret nil, get_last_fs_error()
+		err = get_last_fs_error()
+		ret
 	}
-	let mut dirents: []Dirent = nil
 	for {
 		let dirent = unsafe { _wreaddir(dir) }
 		if dirent == nil {
 			break
 		}
+		let name = unsafe { u16_ptr_to_str((*u16)(dirent.d_name)) }
+		let (stat, serr) = stat(join(path, name))
+		if serr != FsError.Ok {
+			err = serr
+			dirents = nil
+			break
+		}
 		dirents = append[Dirent](dirents, Dirent{
-			name: unsafe { u16_ptr_to_str((*u16)(dirent.d_name)) },
+			name: name,
+			stat: stat,
 		})
 	}
 	_ = unsafe { _wclosedir(dir) }
-	ret dirents, FsError.Ok
+	ret
 }

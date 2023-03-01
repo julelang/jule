@@ -2,7 +2,13 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::sys::{opendir}
+use std::fs::path::{join}
+use std::sys::{
+	byte_ptr_to_str,
+	opendir,
+	readdir,
+	closedir
+}
 
 // Reads the named directory and returs all its directory entries can read.
 // Returns nil if no any dirent or error occurs.
@@ -10,21 +16,29 @@ use std::sys::{opendir}
 // Possible errors:
 //  Denied InvalidDescriptor PerProcessLimit SystemWideLimit
 //  NotExist InsufficientMemory NotDir
-pub fn read_dir(path: str): ([]Dirent, FsError) {
-	let mut stream = unsafe { opendir(&path[0]) }
-	if !real(stream) {
-		ret nil, get_last_fs_error()
+pub fn read_dir(path: str): (dirents: []Dirent, err: FsError) {
+	let mut dir = unsafe { opendir(&path[0]) }
+	if dir == nil {
+		err = get_last_fs_error()
+		ret
 	}
-	let mut dirents: []Dirent = nil
 	for {
-		let dirent = stream.read()
-		if !real(dirent) {
+		let dirent = unsafe { readdir(dir) }
+		if dirent == nil {
+			break
+		}
+		let name = unsafe { byte_ptr_to_str(dirent.d_name) }
+		let (stat, serr) = stat(join(path, name))
+		if serr != FsError.Ok {
+			err = serr
+			dirents = nil
 			break
 		}
 		dirents = append[Dirent](dirents, Dirent{
-			name: dirent.name(),
+			name: name,
+			stat: stat,
 		})
 	}
-	_ = stream.close()
-	ret dirents, FsError.Ok
+	_ = unsafe { closedir(dir) }
+	ret
 }
