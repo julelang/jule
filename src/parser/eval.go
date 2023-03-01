@@ -49,10 +49,17 @@ func get_bop_model(v value, bop ast.Binop, lm ast.ExprModel, rm ast.ExprModel) a
 		return v.model
 	}
 	model := exprNode{}
-	model.value += lex.KND_LPAREN
-	model.value += lm.String()
-	model.value += " " + bop.Op.Kind + " "
-	model.value += rm.String()
+	if bop.Op.Kind == lex.KND_SOLIDUS {
+		model.value += "__julec_div("
+		model.value += lm.String()
+		model.value += ","
+		model.value += rm.String()
+	} else {
+		model.value += lex.KND_LPAREN
+		model.value += lm.String()
+		model.value += " " + bop.Op.Kind + " "
+		model.value += rm.String()
+	}
 	model.value += lex.KND_RPARENT
 	return model
 }

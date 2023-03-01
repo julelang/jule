@@ -21,7 +21,7 @@ var ASSING_OPS = [...]string{
 	lex.KND_EQ,
 	lex.KND_PLUS_EQ,
 	lex.KND_MINUS_EQ,
-	lex.KND_SLASH_EQ,
+	lex.KND_SOLIDUS_EQ,
 	lex.KND_STAR_EQ,
 	lex.KND_PERCENT_EQ,
 	lex.KND_RSHIFT_EQ,

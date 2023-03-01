@@ -651,7 +651,7 @@ var basic_ops = [...]oppair{
 	{KND_PLUS_EQ, ID_OP},
 	{KND_MINUS_EQ, ID_OP},
 	{KND_STAR_EQ, ID_OP},
-	{KND_SLASH_EQ, ID_OP},
+	{KND_SOLIDUS_EQ, ID_OP},
 	{KND_PERCENT_EQ, ID_OP},
 	{KND_LSHIFT_EQ, ID_OP},
 	{KND_RSHIFT_EQ, ID_OP},

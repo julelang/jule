@@ -51,6 +51,7 @@ constexpr const char *__JULEC_ERROR_INVALID_MEMORY{ "invalid memory address or n
 constexpr const char *__JULEC_ERROR_INCOMPATIBLE_TYPE{ "incompatible type" };
 constexpr const char *__JULEC_ERROR_MEMORY_ALLOCATION_FAILED{ "memory allocation failed" };
 constexpr const char *__JULEC_ERROR_INDEX_OUT_OF_RANGE{ "index out of range" };
+constexpr const char *__JULEC_ERROR_DIVIDE_BY_ZERO{ "divide by zero" };
 constexpr signed int __JULEC_EXIT_PANIC{ 2 };
 constexpr std::nullptr_t nil{ nullptr };
 #define __JULEC_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(_STREAM, _START, _LEN)   \
@@ -118,6 +119,9 @@ slice_jt<str_jt> __julec_command_line_args;
 
 // Declarations
 
+template<typename _T, typename _Denominator_t>
+inline auto __julec_div(const _T &_X,
+                        const _Denominator_t &_Denominator) noexcept;
 inline slice_jt<str_jt> __julec_get_command_line_args(void) noexcept;
 inline void JULEC_ID(panic)(const trait_jt<JULEC_ID(Error)> &_Error);
 template<typename Type, unsigned N, unsigned Last>
@@ -151,6 +155,14 @@ void __julec_terminate_handler(void) noexcept;
 void __julec_setup_command_line_args(int argc, char *argv[]) noexcept;
 
 // Definitions
+
+template<typename _T, typename _Denominator_t>
+inline auto __julec_div(const _T &_X,
+                        const _Denominator_t &_Denominator) noexcept {
+    if ( _Denominator == 0 )
+    { JULEC_ID(panic)( __JULEC_ERROR_DIVIDE_BY_ZERO ); }
+    return ( _X / _Denominator );
+}
 
 inline slice_jt<str_jt> __julec_get_command_line_args(void) noexcept
 { return __julec_command_line_args; }
