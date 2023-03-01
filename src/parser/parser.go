@@ -350,7 +350,7 @@ func (p *Parser) parseSrcTreeNode(node ast.Node) {
 		p.St(node_t)
 	case TypeAlias:
 		p.Type(node_t)
-	case Enum:
+	case *Enum:
 		p.Enum(node_t)
 	case Struct:
 		p.Struct(node_t)
@@ -565,7 +565,7 @@ func (p *Parser) parse_enum_items_str(e *Enum) {
 			item.Expr.Model = model
 			assign_checker{
 				p:         p,
-				t:    e.DataType,
+				t:         e.DataType,
 				v:         val,
 				ignoreAny: true,
 				errtok:    item.Token,
@@ -636,7 +636,7 @@ func (p *Parser) parse_enum_items_integer(e *Enum) {
 }
 
 // Enum parses Jule enumerator statement.
-func (p *Parser) Enum(e Enum) {
+func (p *Parser) Enum(e *Enum) {
 	if lex.IsIgnoreId(e.Id) {
 		p.pusherrtok(e.Token, "ignore_id")
 		return
@@ -653,19 +653,23 @@ func (p *Parser) Enum(e Enum) {
 		p.pusherrtok(e.Token, "invalid_type_source")
 		return
 	}
+	p.Defines.Enums = append(p.Defines.Enums, e)
+	if len(e.Items) == 0 {
+		p.pusherrtok(e.Token, "enum_have_not_field", e.Id)
+		return
+	}
 	pdefs := p.Defines
 	puses := p.Uses
 	p.Defines = new(ast.Defmap)
 	defer func() {
 		p.Defines = pdefs
 		p.Uses = puses
-		p.Defines.Enums = append(p.Defines.Enums, &e)
 	}()
 	switch {
 	case e.DataType.Id == types.STR:
-		p.parse_enum_items_str(&e)
+		p.parse_enum_items_str(e)
 	case types.IsInteger(e.DataType.Id):
-		p.parse_enum_items_integer(&e)
+		p.parse_enum_items_integer(e)
 	default:
 		p.pusherrtok(e.Token, "invalid_type_source")
 	}

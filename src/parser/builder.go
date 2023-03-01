@@ -216,11 +216,11 @@ func (b *builder) buildEnumItems(toks []lex.Token) []*ast.EnumItem {
 
 // Enum builds AST model of enumerator statement.
 func (b *builder) Enum(toks []lex.Token) {
-	var e ast.Enum
 	if len(toks) < 2 || len(toks) < 3 {
 		b.pusherr(toks[0], "invalid_syntax")
 		return
 	}
+	e := &ast.Enum{}
 	e.Token = toks[1]
 	if e.Token.Id != lex.ID_IDENT {
 		b.pusherr(e.Token, "invalid_syntax")

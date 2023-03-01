@@ -134,6 +134,7 @@ var ERRORS = map[string]string{
 	`ret_with_mut_typed_non_mut`:               `mutable typed return expressions should be mutable`,
 	`mutable_operation_on_immutable`:           `mutable operation cannot used with immutable define`,
 	`trait_has_reference_parametered_function`: `trait has reference receiver parameter used method, cannot assign non-reference instance`,
+	`enum_have_not_field`:                      `enum have not any field: @`,
 }
 
 // Errorf returns error.
