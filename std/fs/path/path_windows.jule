@@ -1,0 +1,186 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// The Jule code is a modified version of the original Go code from
+// https://github.com/golang/go/blob/go1.20.1/src/path/filepath/path_windows.go and came with this notice.
+//
+// ====================================================
+// Copyright (c) 2009 The Go Authors. All rights reserved.
+// 
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+// 
+//    * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//    * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//    * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+// 
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// ====================================================
+
+use std::sys::{get_full_path_name, utf16_from_str, utf16_to_str}
+
+fn is_slash(c: u8): bool { ret c == '\\' || c == '/' }
+
+fn to_upper(c: byte): byte {
+	if 'a' <= c && c <= 'z' {
+		ret c - ('a' - 'A')
+	}
+	ret c
+}
+
+// Reports whether the path is absolute.
+pub fn is_abs(mut path: str): bool {
+	let l = volume_name_len(path)
+	if l == 0 {
+		ret false
+	}
+	// If the volume name starts with a double slash, this is an absolute path.
+	if is_slash(path[0]) && is_slash(path[1]) {
+		ret true
+	}
+	path = path[l:]
+	if path == "" {
+		ret false
+	}
+	ret is_slash(path[0])
+}
+
+// Returns length of the leading volume name on Windows.
+// It returns 0 elsewhere.
+//
+// See: https://learn.microsoft.com/en-us/dotnet/standard/io/file-path-formats
+fn volume_name_len(path: str): int {
+	if path.len < 2 {
+		ret 0
+	}
+	// with drive letter
+	let c = path[0]
+	if path[1] == ':' && ('a' <= c && c <= 'z' || 'A' <= c && c <= 'Z') {
+		ret 2
+	}
+	// UNC and DOS device paths start with two slashes.
+	if !is_slash(path[0]) || !is_slash(path[1]) {
+		ret 0
+	}
+	let (p1, mut rest, _) = cut_path(path[2:])
+	let mut p2 = ""
+	let mut ok = false
+	p2, rest, ok = cut_path(rest)
+	if !ok {
+		ret path.len
+	}
+	if p1 != "." && p1 != "?" {
+		// This is a UNC path: \\${HOST}\${SHARE}\
+		ret path.len - rest.len - 1
+	}
+	// This is a DOS device path.
+	if p2.len == 3 && to_upper(p2[0]) == 'U' && to_upper(p2[1]) == 'N' && to_upper(p2[2]) == 'C' {
+		// This is a DOS device path that links to a UNC: \\.\UNC\${HOST}\${SHARE}\
+		_, rest, _ = cut_path(rest)  // host
+		_, rest, ok = cut_path(rest) // share
+		if !ok {
+			ret path.len
+		}
+	}
+	ret path.len - rest.len - 1
+}
+
+// Slices path around the first path separator.
+fn cut_path(path: str): (before: str, after: str, found: bool) {
+	for i in path {
+		if is_slash(path[i]) {
+			ret path[:i], path[i+1:], true
+		}
+	}
+	ret path, "", false
+}
+
+fn full_path(name: str): (path: str, ok: bool) {
+	let utf16_name = utf16_from_str(name)
+	let p = &utf16_name[0]
+	let mut n: u32 = 100
+	for {
+		let mut buff = make([]u16, n)
+		n = unsafe { get_full_path_name(p, u32(buff.len), &buff[0], nil) }
+		if n == 0 {
+			ret "", false
+		}
+		if n <= u32(buff.len) {
+			ret utf16_to_str(buff[:n]), true
+		}
+	}
+	ret "", false
+}
+
+fn __abs(mut path: str): (str, ok: bool) {
+	if path == "" {
+		// full_path returns an error on empty path, because it's not a valid path.
+		// To implement Abs behavior of returning working directory on empty string input,
+		// special-case empty path by changing it to "." path. See golang.org/issue/24441.
+		path = "."
+	}
+	path, ok = full_path(path)
+	if !ok {
+		ret "", false
+	}
+	ret clean(path), true
+}
+
+fn __join(elem: []str): str {
+	let mut s = ""
+	let mut last_char: byte = 0
+	for (_, mut e) in elem {
+		match {
+		| s.len == 0:
+			// Add the first non-empty path element unchanged.
+		| is_slash(last_char):
+			// If the path ends in a slash, strip any leading slashes from the next
+			// path element to avoid creating a UNC path (any path starting with "\\")
+			// from non-UNC elements.
+			//
+			// The correct behavior for join when the first element is an incomplete UNC
+			// path (for example, "\\") is underspecified. We currently join subsequent
+			// elements so join("\\", "host", "share") produces "\\host\share".
+			for e.len > 0 && is_slash(e[0]) {
+				e = e[1:]
+			}
+		| last_char == ':':
+			// If the path ends in a colon, keep the path relative to the current directory
+			// on a drive and don't add a separator. Preserve leading slashes in the next
+			// path element, which may make the path absolute.
+			//
+			//  join(`C:`, `f`) = `C:f`
+			//  join(`C:`, `\f`) = `C:\f`
+		|:
+			// In all other cases, add a separator between elements.
+			s += "\\"
+			last_char = '\\'
+		}
+		if e.len > 0 {
+			s += e
+			last_char = e[e.len-1]
+		}
+	}
+	if s.len == 0 {
+		ret ""
+	}
+	ret clean(s)
+}

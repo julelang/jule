@@ -1,0 +1,83 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// The Jule code is a modified version of the original Go code from
+// https://github.com/golang/go/blob/go1.20.1/src/path/filepath/path_unix.go and came with this notice.
+//
+// ====================================================
+// Copyright (c) 2009 The Go Authors. All rights reserved.
+// 
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+// 
+//    * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//    * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//    * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+// 
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// ====================================================
+
+use std::os::{getwd, OsError}
+
+// Reports whether the path is absolute.
+pub fn is_abs(path: str): bool { ret path.has_prefix("/") }
+
+// Returns length of the leading volume name on Windows.
+// It returns 0 elsewhere.
+fn volume_name_len(path: str): int { ret 0 }
+
+fn __abs(path: str) (str, ok: bool) {
+	if is_abs(path) {
+		ret clean(path), true
+	}
+	let (wd, err) = getwd()
+	if err != OsError.Ok {
+		ret "", false
+	}
+	ret __join(wd, path), true
+}
+
+fn str_join(elems: []str, sep: str): str {
+	match elems.len {
+	| 0: ret ""
+	| 1: ret elems[0]
+	}
+	let mut n = sep.len * (elems.len - 1)
+	let mut i = 0
+	for i < elems.len; i++ {
+		n += elems[i].len
+	}
+
+	let mut s = elems[0]
+	for _, elem in elems[1:] {
+		s += sep + elem
+	}
+	ret s
+}
+
+fn __join(elem: []str) str {
+	for i, e in elem {
+		if e != "" {
+			ret clean(str_join(elem[i:], str(SEPARATOR)))
+		}
+	}
+	ret ""
+}
