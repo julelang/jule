@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+#ifndef __JULEC_SIGNAL_HPP
+#define __JULEC_SIGNAL_HPP
+
 #include <csignal>
 
 #define __JULEC_SIG constexpr int
@@ -196,3 +199,5 @@ void __julec_set_sig_handler(void(*_Handler)(int _Sig)) noexcept {
 
 #endif // #if defined(_WINDOWS)
 }
+
+#endif // #ifndef __JULEC_SIGNAL_HPP
