@@ -95,7 +95,7 @@ inline std::ostream &operator<<(std::ostream &_Stream,
                                 const unsigned char _U8) noexcept;
 
 
-
+#include "signal.hpp"
 #include "defer.hpp"
 #include "typedef.hpp"
 #include "atomicity.hpp"
