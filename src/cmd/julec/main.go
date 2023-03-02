@@ -207,6 +207,7 @@ func append_standard(obj_code *string) {
 
 int main(int argc, char *argv[]) {
 	std::set_terminate( &__julec_terminate_handler );
+	__julec_set_sig_handler( __julec_signal_handler );
 	__julec_setup_command_line_args( argc , argv );
 	__julec_call_package_initializers();
 	JULEC_ID( main )();
