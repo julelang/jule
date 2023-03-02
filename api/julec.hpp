@@ -152,6 +152,7 @@ str_jt __julec_to_str(const str_jt &_Obj) noexcept;
 // Based on std::sys
 slice_jt<u16_jt> __julec_utf16_from_str(const str_jt &_Str) noexcept;
 void __julec_terminate_handler(void) noexcept;
+void __julec_signal_handler(int _Signal) noexcept;
 void __julec_setup_command_line_args(int argc, char *argv[]) noexcept;
 
 // Definitions
@@ -272,6 +273,11 @@ void __julec_terminate_handler(void) noexcept {
         JULEC_ID(outln)<str_jt>( str_jt( "panic: " ) + _error._get()._error() );
         std::exit( __JULEC_EXIT_PANIC );
     }
+}
+
+void __julec_signal_handler(int _Signal) noexcept {
+    JULEC_ID(out)<str_jt>( "program terminated with signal: " );
+    JULEC_ID(outln)<int>( _Signal );
 }
 
 void __julec_setup_command_line_args(int argc, char *argv[]) noexcept {
