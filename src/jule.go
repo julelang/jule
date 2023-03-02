@@ -7,7 +7,7 @@ import (
 
 // Jule constants.
 const VERSION = `@master`
-const SRC_EXT = `.jule`
+const EXT = `.jule`
 const API = "api"
 const STDLIB = "std"
 const ENTRY_POINT = "main"

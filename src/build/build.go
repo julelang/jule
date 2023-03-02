@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/julelang/jule"
 )
 
 // This attributes should be added to the attribute map.
@@ -161,4 +163,11 @@ func IsValidHeader(ext string) bool {
 		}
 	}
 	return false
+}
+
+// IsJule reports whether file path is Jule source code.
+// Returns false if error occur.
+func IsJule(path string) bool {
+	abs, err := filepath.Abs(path)
+	return err == nil && filepath.Ext(abs) == jule.EXT
 }

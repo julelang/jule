@@ -234,7 +234,7 @@ func write_output(path, content string) {
 	_ = f.Close()
 }
 
-func compile(path string, main, nolocal, justDefs bool) *parser.Parser {
+func compile(path string) *parser.Parser {
 	set()
 	// Check standard library.
 	inf, err := os.Stat(jule.STDLIB_PATH)
@@ -248,16 +248,19 @@ func compile(path string, main, nolocal, justDefs bool) *parser.Parser {
 		p.PushErr("file_not_useable")
 		return p
 	}
-	p := parser.New(path)
-	if !p.File.IsJule() {
-		exit_err(build.Errorf("file_not_jule", path))
+	p, err_msg := parser.ParsePackage(path, false)
+	if err_msg != "" {
+		exit_err(err_msg)
 	}
-	if !p.File.IsOk() {
-		exit_err("path is not exist or inaccessible: " + path)
+
+	f, _, _ := p.Defines.FnById(jule.ENTRY_POINT, nil)
+	if f == nil {
+		p.PushErr("no_entry_point")
+	} else {
+		f.IsEntryPoint = true
+		f.Used = true
 	}
-	p.NoLocalPkg = nolocal
-	p.SetupPackage()
-	p.Parsef(main, justDefs)
+
 	return p
 }
 
@@ -395,10 +398,12 @@ func main() {
 	if cmd == "" {
 		exit_err("missing compile path")
 	}
-	p := compile(cmd, true, false, false)
+
+	p := compile(cmd)
 	if p == nil {
 		return
 	}
+
 	if print_logs(p) {
 		return
 	}

@@ -8,7 +8,7 @@ import (
 	"github.com/julelang/jule/types"
 )
 
-type BuiltinCaller = func(*Parser, *Fn, callData, *exprModel) value
+type builtin_caller = func(*Parser, *Fn, callData, *exprModel) value
 
 const maxI8 = 127
 const minI8 = -128

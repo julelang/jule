@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -46,11 +47,10 @@ type Parser struct {
 	linked_structs   []*ast.Struct
 	allowBuiltin     bool
 	package_files    *[]*Parser
+	not_package      bool
 
-	NoLocalPkg  bool
 	JustDefines bool
 	NoCheck     bool
-	IsMain      bool
 	Used        *[]*ast.UseDecl // All used packages, deep detection
 	Uses        []*ast.UseDecl  // File uses these packages
 	Defines     *ast.Defmap
@@ -58,8 +58,99 @@ type Parser struct {
 	File        *File
 }
 
-// New returns new instance of Parser.
-func New(path string) *Parser {
+func (p *Parser) parse_file() {
+	lexer := lex.New(p.File)
+	toks := lexer.Lex()
+	if lexer.Logs != nil {
+		p.pusherrs(lexer.Logs...)
+		return
+	}
+
+	tree, errors := get_tree(toks)
+	if len(errors) > 0 {
+		p.pusherrs(errors...)
+		return
+	}
+
+	if !p.parseTree(tree) {
+		return
+	}
+
+	p.checkParse()
+	p.wg.Wait()
+}
+
+func ParseFile(path string, just_defines bool) (*Parser, string) {
+	if !build.IsJule(path) {
+		return nil, build.Errorf("file_not_jule", path)
+	}
+
+	p := new_parser(path)
+	if !p.File.IsOk() {
+		return nil, "path is not exist or inaccessible: " + path
+	}
+
+	p.not_package = true
+	p.parse_file()
+
+	return p, ""
+}
+
+func (p *Parser) link_package(dirents []fs.DirEntry) {
+	dir := filepath.Dir(p.File.Path())
+	for _, info := range dirents {
+		name := info.Name()
+		// Skip directories.
+		if info.IsDir() ||
+			!strings.HasSuffix(name, jule.EXT) ||
+			!build.IsPassFileAnnotation(name) {
+			continue
+		}
+		fp := new_parser(filepath.Join(dir, name))
+		fp.Used = p.Used
+		fp.package_files = p.package_files
+		*p.package_files = append(*p.package_files, fp)
+		fp.NoCheck = true
+		fp.JustDefines = true
+
+		fp.parse_file()
+		fp.wg.Wait()
+		if len(fp.Errors) > 0 {
+			p.pusherrs(fp.Errors...)
+			return
+		}
+	}
+}
+
+func ParsePackage(path string, just_defines bool) (*Parser, string) {
+	dirents, err := os.ReadDir(path)
+	if err != nil {
+		return nil, err.Error()
+	}
+	for i, dirent := range dirents {
+		name := dirent.Name()
+		// Skip directories.
+		if dirent.IsDir() ||
+			!strings.HasSuffix(name, jule.EXT) ||
+			!build.IsPassFileAnnotation(name) {
+			continue
+		}
+		p := new_parser(filepath.Join(path, name))
+		p.setup_package()
+
+		// Skip [0 - (i+1)] dirents because this is the first valid source code.
+		// And skip this dirent, already parsed.
+		dirents = dirents[i+1:]
+		p.link_package(dirents)
+		p.parse_file()
+		p.WrapPackage()
+
+		return p, ""
+	}
+	return nil, "there is no jule source code"
+}
+
+func new_parser(path string) *Parser {
 	p := new(Parser)
 	p.File = lex.NewFile(path)
 	p.allowBuiltin = true
@@ -68,6 +159,11 @@ func New(path string) *Parser {
 	p.eval.p = p
 	p.Used = new([]*ast.UseDecl)
 	return p
+}
+
+func (p *Parser) setup_package() {
+	p.package_files = new([]*Parser)
+	*p.package_files = append(*p.package_files, p)
 }
 
 // pusherrtok appends new error by token.
@@ -243,38 +339,46 @@ func (p *Parser) WrapPackage() {
 }
 
 func (p *Parser) compilePureUse(ast *ast.UseDecl) (_ *ast.UseDecl, hassErr bool) {
-	infos, err := os.ReadDir(ast.Path)
+	dirents, err := os.ReadDir(ast.Path)
 	if err != nil {
 		p.pusherrmsg(err.Error())
 		return nil, true
 	}
-	for _, info := range infos {
-		name := info.Name()
+	for i, dirent := range dirents {
+		name := dirent.Name()
 		// Skip directories.
-		if info.IsDir() ||
-			!strings.HasSuffix(name, jule.SRC_EXT) ||
+		if dirent.IsDir() ||
+			!strings.HasSuffix(name, jule.EXT) ||
 			!build.IsPassFileAnnotation(name) {
 			continue
 		}
 		path := filepath.Join(ast.Path, name)
-		psub := New(path)
+		psub := new_parser(path)
+		psub.setup_package()
 		psub.Used = p.Used
 		dm, ok := std_builtin_defines[ast.LinkString]
 		if ok {
 			dm.PushDefines(psub.Defines)
 		}
-		psub.SetupPackage()
-		psub.Parsef(false, false)
+
+		// Skip [0 - (i+1)] dirents because this is the first valid source code.
+		// And skip this dirent, already parsed.
+		dirents = dirents[i+1:]
+		psub.link_package(dirents)
 		if len(psub.Errors) > 0 {
 			p.pusherrs(psub.Errors...)
 			p.pusherrtok(ast.Token, "use_has_errors")
 			return nil, true
 		}
+
+		psub.parse_file()
 		psub.WrapPackage()
+
 		u := make_use_from_ast(ast)
 		psub.Defines.PushDefines(u.Defines)
 		p.pusherrs(psub.Errors...)
 		p.pushUse(u, ast.Selectors)
+
 		return u, false
 	}
 	return nil, false
@@ -397,87 +501,6 @@ func (p *Parser) checkParse() {
 	if !p.NoCheck {
 		p.check_package()
 	}
-}
-
-// Special case is;
-//
-//	p.useLocalPackage() -> nothing if p.File is nil
-func (p *Parser) useLocalPackage(tree *[]ast.Node) (hasErr bool) {
-	if p.File == nil {
-		return
-	}
-	dir := p.File.Dir()
-	infos, err := os.ReadDir(dir)
-	if err != nil {
-		p.pusherrmsg(err.Error())
-		return true
-	}
-	for _, info := range infos {
-		name := info.Name()
-		// Skip directories.
-		if info.IsDir() ||
-			!strings.HasSuffix(name, jule.SRC_EXT) ||
-			!build.IsPassFileAnnotation(name) ||
-			name == p.File.Name() {
-			continue
-		}
-		fp := New(filepath.Join(dir, name))
-		fp.Used = p.Used
-		fp.package_files = p.package_files
-		*p.package_files = append(*p.package_files, fp)
-		fp.NoLocalPkg = true
-		fp.NoCheck = true
-
-		fp.Parsef(false, true)
-		fp.wg.Wait()
-		if len(fp.Errors) > 0 {
-			p.pusherrs(fp.Errors...)
-			return true
-		}
-	}
-	return
-}
-
-func (p *Parser) SetupPackage() {
-	p.package_files = new([]*Parser)
-	*p.package_files = append(*p.package_files, p)
-}
-
-// Parses Jule code from AST.
-func (p *Parser) Parset(tree []ast.Node, main, justDefines bool) {
-	p.IsMain = main
-	p.JustDefines = justDefines
-	if !p.parseTree(tree) {
-		return
-	}
-	if !p.NoLocalPkg {
-		if p.useLocalPackage(&tree) {
-			return
-		}
-	}
-	p.checkParse()
-	p.wg.Wait()
-}
-
-// Parses Jule code from tokens.
-func (p *Parser) Parse(toks []lex.Token, main bool, justDefines bool) {
-	tree, errors := get_tree(toks)
-	if len(errors) > 0 {
-		p.pusherrs(errors...)
-		return
-	}
-	p.Parset(tree, main, justDefines)
-}
-
-// Parses Jule code from file.
-func (p *Parser) Parsef(main, just_defs bool) {
-	lexer := lex.New(p.File)
-	toks := lexer.Lex()
-	if lexer.Logs != nil {
-		p.pusherrs(lexer.Logs...)
-		return
-	}
-	p.Parse(toks, main, just_defs)
 }
 
 func (p *Parser) checkDoc(node ast.Node) {
@@ -1589,15 +1612,6 @@ func (p *Parser) parse_defines() {
 }
 
 func (p *Parser) check_package() {
-	if p.IsMain && !p.JustDefines {
-		f, _, _ := p.Defines.FnById(jule.ENTRY_POINT, nil)
-		if f == nil {
-			p.PushErr("no_entry_point")
-		} else {
-			f.IsEntryPoint = true
-			f.Used = true
-		}
-	}
 	p.precheck_package()
 	if !p.JustDefines {
 		p.parse_package_defines()

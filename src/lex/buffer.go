@@ -4,8 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"unsafe"
-
-	"github.com/julelang/jule"
 )
 
 // File instance of fs.
@@ -15,13 +13,6 @@ type File struct {
 
 // NewFile returns new File points to Jule file.
 func NewFile(path string) *File { return &File{path} }
-
-// IsJule reports file path is Jule source code.
-// Returns false if error occur.
-func (f *File) IsJule() bool {
-	abs, err := filepath.Abs(f._path)
-	return err == nil && filepath.Ext(abs) == jule.SRC_EXT
-}
 
 // IsOk reports file path is exist and accessible or not.
 func (f *File) IsOk() bool {
