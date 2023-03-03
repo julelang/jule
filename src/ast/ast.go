@@ -333,7 +333,7 @@ func (f *Fn) OutId() string {
 		return build.OutId(f.Id, 0)
 	}
 	if f.Receiver != nil {
-		return "_" + f.Id
+		return "_method_" + f.Id
 	}
 	return build.OutId(f.Id, f.Token.File.Addr())
 }
@@ -1247,7 +1247,7 @@ func (v *Var) OutId() string {
 	case v.IsLocal():
 		return as_local_id(v.Token.Row, v.Token.Column, v.Id)
 	case v.IsField:
-		return "_" + v.Id
+		return "_field_" + v.Id
 	default:
 		return build.OutId(v.Id, v.Token.File.Addr())
 	}
