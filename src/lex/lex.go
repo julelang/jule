@@ -10,9 +10,9 @@ import (
 
 // Lex is lexer of Jule.
 type Lex struct {
-	firstTokenOfLine bool
-	braces           []Token
-	data             []rune
+	first_token_of_line bool
+	ranges              []Token
+	data                []rune
 
 	File   *File
 	Pos    int
@@ -28,11 +28,11 @@ func New(f *File) *Lex {
 	l.File = f
 	l.Pos = 0
 	l.Row = -1 // For true row
-	l.Newln()
+	l.NewLine()
 	return l
 }
 
-func mkerr(row int, col int, f *File, key string, args ...any) build.Log {
+func make_err(row int, col int, f *File, key string, args ...any) build.Log {
 	return build.Log{
 		Type:   build.ERR,
 		Row:    row,
@@ -42,12 +42,12 @@ func mkerr(row int, col int, f *File, key string, args ...any) build.Log {
 	}
 }
 
-func (l *Lex) pusherr(key string, args ...any) {
-	l.Logs = append(l.Logs, mkerr(l.Row, l.Column, l.File, key, args...))
+func (l *Lex) push_err(key string, args ...any) {
+	l.Logs = append(l.Logs, make_err(l.Row, l.Column, l.File, key, args...))
 }
 
-func (l *Lex) pusherrtok(tok Token, key string) {
-	l.Logs = append(l.Logs, mkerr(tok.Row, tok.Column, l.File, key))
+func (l *Lex) push_err_tok(tok Token, key string) {
+	l.Logs = append(l.Logs, make_err(tok.Row, tok.Column, l.File, key))
 }
 
 func (l *Lex) buff_data() {
@@ -63,34 +63,34 @@ func (l *Lex) Lex() []Token {
 	l.buff_data()
 	var toks []Token
 	l.Logs = nil
-	l.Newln()
+	l.NewLine()
 	for l.Pos < len(l.data) {
 		t := l.Token()
-		l.firstTokenOfLine = false
+		l.first_token_of_line = false
 		if t.Id != ID_NA {
 			toks = append(toks, t)
 		}
 	}
-	l.checkRanges()
+	l.check_ranges()
 	l.data = nil
 	return toks
 }
 
-func (l *Lex) checkRanges() {
-	for _, t := range l.braces {
+func (l *Lex) check_ranges() {
+	for _, t := range l.ranges {
 		switch t.Kind {
 		case KND_LPAREN:
-			l.pusherrtok(t, "wait_close_parentheses")
+			l.push_err_tok(t, "wait_close_parentheses")
 		case KND_LBRACE:
-			l.pusherrtok(t, "wait_close_brace")
+			l.push_err_tok(t, "wait_close_brace")
 		case KND_LBRACKET:
-			l.pusherrtok(t, "wait_close_bracket")
+			l.push_err_tok(t, "wait_close_bracket")
 		}
 	}
 }
 
-// iskw returns true if part is keyword, false if not.
-func iskw(ln, kw string) bool {
+// is_kw returns true if part is keyword, false if not.
+func is_kw(ln, kw string) bool {
 	if !strings.HasPrefix(ln, kw) {
 		return false
 	}
@@ -134,7 +134,7 @@ func (l *Lex) resume() string {
 			l.Pos++
 			switch r {
 			case '\n':
-				l.Newln()
+				l.NewLine()
 			case '\t':
 				l.Column += 4
 			default:
@@ -148,30 +148,30 @@ func (l *Lex) resume() string {
 	return ln
 }
 
-func (l *Lex) lncomment(t *Token) {
+func (l *Lex) lex_line_comment(t *Token) {
 	start := l.Pos
 	l.Pos += 2
 	for ; l.Pos < len(l.data); l.Pos++ {
 		if l.data[l.Pos] == '\n' {
-			if l.firstTokenOfLine {
+			if l.first_token_of_line {
 				t.Id = ID_COMMENT
 				t.Kind = string(l.data[start:l.Pos])
 			}
 			return
 		}
 	}
-	if l.firstTokenOfLine {
+	if l.first_token_of_line {
 		t.Id = ID_COMMENT
 		t.Kind = string(l.data[start:])
 	}
 }
 
-func (l *Lex) rangecomment() {
+func (l *Lex) lex_range_comment() {
 	l.Pos += 2
 	for ; l.Pos < len(l.data); l.Pos++ {
 		r := l.data[l.Pos]
 		if r == '\n' {
-			l.Newln()
+			l.NewLine()
 			continue
 		}
 		l.Column += len(string(r))
@@ -181,7 +181,7 @@ func (l *Lex) rangecomment() {
 			return
 		}
 	}
-	l.pusherr("missing_block_comment")
+	l.push_err("missing_block_comment")
 }
 
 func float_fmt_e(txt string, i int) (literal string) {
@@ -242,7 +242,7 @@ func float_fmt_dotp(txt string, i int) string {
 	return float_fmt_e(txt, i)
 }
 
-func floatNum(txt string, i int) (literal string) {
+func float_num(txt string, i int) (literal string) {
 	i++ // Skip dot
 	for ; i < len(txt); i++ {
 		b := txt[i]
@@ -258,14 +258,14 @@ func floatNum(txt string, i int) (literal string) {
 	return txt[:i]
 }
 
-func commonNum(txt string) (literal string) {
+func common_num(txt string) (literal string) {
 	i := 0
 loop:
 	for ; i < len(txt); i++ {
 		b := txt[i]
 		switch {
 		case b == '.':
-			return floatNum(txt, i)
+			return float_num(txt, i)
 		case is_float_fmt_e(b, i):
 			return float_fmt_e(txt, i)
 		case !IsDecimal(b):
@@ -278,7 +278,7 @@ loop:
 	return txt[:i]
 }
 
-func binaryNum(txt string) (literal string) {
+func binary_num(txt string) (literal string) {
 	if !strings.HasPrefix(txt, "0b") {
 		return ""
 	}
@@ -350,7 +350,7 @@ func is_float_fmt_dotfp(txt string, i int) bool {
 	}
 }
 
-func octalNum(txt string) (literal string) {
+func octal_num(txt string) (literal string) {
 	if txt[0] != '0' {
 		return ""
 	}
@@ -373,7 +373,7 @@ func octalNum(txt string) (literal string) {
 	return txt[:i]
 }
 
-func hexNum(txt string) (literal string) {
+func hex_num(txt string) (literal string) {
 	if len(txt) < 3 {
 		return
 	} else if txt[0] != '0' || (txt[1] != 'x' && txt[1] != 'X') {
@@ -406,25 +406,25 @@ loop:
 // num returns literal if next token is numeric,
 // returns empty string if not.
 func (l *Lex) num(txt string) (literal string) {
-	literal = hexNum(txt)
+	literal = hex_num(txt)
 	if literal != "" {
 		goto end
 	}
-	literal = octalNum(txt)
+	literal = octal_num(txt)
 	if literal != "" {
 		goto end
 	}
-	literal = binaryNum(txt)
+	literal = binary_num(txt)
 	if literal != "" {
 		goto end
 	}
-	literal = commonNum(txt)
+	literal = common_num(txt)
 end:
 	l.Pos += len(literal)
 	return
 }
 
-func hexEsq(txt string, n int) (seq string) {
+func hex_esq(txt string, n int) (seq string) {
 	if len(txt) < n {
 		return
 	}
@@ -439,16 +439,16 @@ func hexEsq(txt string, n int) (seq string) {
 }
 
 // Pattern (RegEx): ^\\U.{8}
-func bigUnicodePointEsq(txt string) string { return hexEsq(txt, 10) }
+func big_unicode_point_esq(txt string) string { return hex_esq(txt, 10) }
 
 // Pattern (RegEx): ^\\u.{4}
-func littleUnicodePointEsq(txt string) string { return hexEsq(txt, 6) }
+func little_unicode_point_esq(txt string) string { return hex_esq(txt, 6) }
 
 // Pattern (RegEx): ^\\x..
-func hexByteEsq(txt string) string { return hexEsq(txt, 4) }
+func hex_byte_esq(txt string) string { return hex_esq(txt, 4) }
 
 // Patter (RegEx): ^\\[0-7]{3}
-func byteEsq(txt string) (seq string) {
+func byte_esq(txt string) (seq string) {
 	if len(txt) < 4 {
 		return
 	} else if !IsOctal(txt[1]) || !IsOctal(txt[2]) || !IsOctal(txt[3]) {
@@ -467,25 +467,25 @@ func (l *Lex) escseq(txt string) string {
 		l.Pos += 2
 		return txt[:2]
 	case 'U':
-		seq = bigUnicodePointEsq(txt)
+		seq = big_unicode_point_esq(txt)
 	case 'u':
-		seq = littleUnicodePointEsq(txt)
+		seq = little_unicode_point_esq(txt)
 	case 'x':
-		seq = hexByteEsq(txt)
+		seq = hex_byte_esq(txt)
 	default:
-		seq = byteEsq(txt)
+		seq = byte_esq(txt)
 	}
 end:
 	if seq == "" {
 		l.Pos++
-		l.pusherr("invalid_escape_sequence")
+		l.push_err("invalid_escape_sequence")
 		return ""
 	}
 	l.Pos += len(seq)
 	return seq
 }
 
-func (l *Lex) getrune(txt string, raw bool) string {
+func (l *Lex) get_rune(txt string, raw bool) string {
 	if !raw && txt[0] == '\\' {
 		return l.escseq(txt)
 	}
@@ -494,7 +494,7 @@ func (l *Lex) getrune(txt string, raw bool) string {
 	return string(r)
 }
 
-func (l *Lex) rune(txt string) string {
+func (l *Lex) lex_rune(txt string) string {
 	var sb strings.Builder
 	sb.WriteByte('\'')
 	l.Column++
@@ -502,12 +502,12 @@ func (l *Lex) rune(txt string) string {
 	n := 0
 	for i := 0; i < len(txt); i++ {
 		if txt[i] == '\n' {
-			l.pusherr("missing_rune_end")
+			l.push_err("missing_rune_end")
 			l.Pos++
-			l.Newln()
+			l.NewLine()
 			return ""
 		}
-		r := l.getrune(txt[i:], false)
+		r := l.get_rune(txt[i:], false)
 		sb.WriteString(r)
 		length := len(r)
 		l.Column += length
@@ -521,14 +521,14 @@ func (l *Lex) rune(txt string) string {
 		n++
 	}
 	if n == 0 {
-		l.pusherr("rune_empty")
+		l.push_err("rune_empty")
 	} else if n > 1 {
-		l.pusherr("rune_overflow")
+		l.push_err("rune_overflow")
 	}
 	return sb.String()
 }
 
-func (l *Lex) str(txt string) string {
+func (l *Lex) lex_str(txt string) string {
 	var sb strings.Builder
 	mark := txt[0]
 	raw := mark == '`'
@@ -538,14 +538,14 @@ func (l *Lex) str(txt string) string {
 	for i := 0; i < len(txt); i++ {
 		ch := txt[i]
 		if ch == '\n' {
-			l.Newln()
+			l.NewLine()
 			if !raw {
-				l.pusherr("missing_string_end")
+				l.push_err("missing_string_end")
 				l.Pos++
 				return ""
 			}
 		}
-		r := l.getrune(txt[i:], raw)
+		r := l.get_rune(txt[i:], raw)
 		sb.WriteString(r)
 		n := len(r)
 		l.Column += n
@@ -560,14 +560,14 @@ func (l *Lex) str(txt string) string {
 	return sb.String()
 }
 
-// Newln sets ready lexer to a new line lexing.
-func (l *Lex) Newln() {
-	l.firstTokenOfLine = true
+// NewLine sets ready lexer to a new line lexing.
+func (l *Lex) NewLine() {
+	l.first_token_of_line = true
 	l.Row++
 	l.Column = 1
 }
 
-func (l *Lex) isop(txt, kind string, id uint8, t *Token) bool {
+func (l *Lex) is_op(txt, kind string, id uint8, t *Token) bool {
 	if !strings.HasPrefix(txt, kind) {
 		return false
 	}
@@ -577,8 +577,8 @@ func (l *Lex) isop(txt, kind string, id uint8, t *Token) bool {
 	return true
 }
 
-func (l *Lex) iskw(txt, kind string, id uint8, t *Token) bool {
-	if !iskw(txt, kind) {
+func (l *Lex) is_kw(txt, kind string, id uint8, t *Token) bool {
+	if !is_kw(txt, kind) {
 		return false
 	}
 	t.Kind = kind
@@ -682,25 +682,25 @@ var basic_ops = [...]oppair{
 	{KND_EQ, ID_OP},
 }
 
-func (l *Lex) lexKeywords(txt string, tok *Token) bool {
+func (l *Lex) lex_kws(txt string, tok *Token) bool {
 	for k, v := range keywords {
-		if l.iskw(txt, k, v, tok) {
+		if l.is_kw(txt, k, v, tok) {
 			return true
 		}
 	}
 	return false
 }
 
-func (l *Lex) lexBasicOps(txt string, tok *Token) bool {
+func (l *Lex) lex_basic_ops(txt string, tok *Token) bool {
 	for _, pair := range basic_ops {
-		if l.isop(txt, pair.op, pair.id, tok) {
+		if l.is_op(txt, pair.op, pair.id, tok) {
 			return true
 		}
 	}
 	return false
 }
 
-func (l *Lex) lexIdentifier(txt string, t *Token) bool {
+func (l *Lex) lex_id(txt string, t *Token) bool {
 	lex := l.id(txt)
 	if lex == "" {
 		return false
@@ -710,7 +710,7 @@ func (l *Lex) lexIdentifier(txt string, t *Token) bool {
 	return true
 }
 
-func (l *Lex) lexNumeric(txt string, t *Token) bool {
+func (l *Lex) lex_num(txt string, t *Token) bool {
 	lex := l.num(txt)
 	if lex == "" {
 		return false
@@ -735,40 +735,37 @@ func (l *Lex) Token() Token {
 
 	//* lex.Tokenenize
 	switch {
-	case l.lexNumeric(txt, &t):
+	case l.lex_num(txt, &t):
 	case txt[0] == '\'':
-		t.Kind = l.rune(txt)
+		t.Kind = l.lex_rune(txt)
 		t.Id = ID_LITERAL
 		return t
 	case txt[0] == '"' || txt[0] == '`':
-		t.Kind = l.str(txt)
+		t.Kind = l.lex_str(txt)
 		t.Id = ID_LITERAL
 		return t
 	case strings.HasPrefix(txt, KND_LN_COMMENT):
-		l.lncomment(&t)
+		l.lex_line_comment(&t)
 		return t
 	case strings.HasPrefix(txt, KND_RNG_LCOMMENT):
-		l.rangecomment()
+		l.lex_range_comment()
 		return t
-	case l.isop(txt, KND_LPAREN, ID_BRACE, &t):
-		l.braces = append(l.braces, t)
-	case l.isop(txt, KND_RPARENT, ID_BRACE, &t):
-		l.pushRangeClose(t, KND_LPAREN)
-	case l.isop(txt, KND_LBRACE, ID_BRACE, &t):
-		l.braces = append(l.braces, t)
-	case l.isop(txt, KND_RBRACE, ID_BRACE, &t):
-		l.pushRangeClose(t, KND_LBRACE)
-	case l.isop(txt, KND_LBRACKET, ID_BRACE, &t):
-		l.braces = append(l.braces, t)
-	case l.isop(txt, KND_RBRACKET, ID_BRACE, &t):
-		l.pushRangeClose(t, KND_LBRACKET)
-	case
-		l.lexBasicOps(txt, &t) ||
-			l.lexKeywords(txt, &t) ||
-			l.lexIdentifier(txt, &t):
+	case l.is_op(txt, KND_LPAREN, ID_BRACE, &t):
+		l.ranges = append(l.ranges, t)
+	case l.is_op(txt, KND_RPARENT, ID_BRACE, &t):
+		l.push_range_close(t, KND_LPAREN)
+	case l.is_op(txt, KND_LBRACE, ID_BRACE, &t):
+		l.ranges = append(l.ranges, t)
+	case l.is_op(txt, KND_RBRACE, ID_BRACE, &t):
+		l.push_range_close(t, KND_LBRACE)
+	case l.is_op(txt, KND_LBRACKET, ID_BRACE, &t):
+		l.ranges = append(l.ranges, t)
+	case l.is_op(txt, KND_RBRACKET, ID_BRACE, &t):
+		l.push_range_close(t, KND_LBRACKET)
+	case l.lex_basic_ops(txt, &t) || l.lex_kws(txt, &t) || l.lex_id(txt, &t):
 	default:
 		r, sz := utf8.DecodeRuneInString(txt)
-		l.pusherr("invalid_token", r)
+		l.push_err("invalid_token", r)
 		l.Column += sz
 		l.Pos++
 		return t
@@ -777,7 +774,7 @@ func (l *Lex) Token() Token {
 	return t
 }
 
-func getCloseKindOfBrace(left string) string {
+func get_close_kind_of_brace(left string) string {
 	var right string
 	switch left {
 	case KND_RPARENT:
@@ -790,39 +787,39 @@ func getCloseKindOfBrace(left string) string {
 	return right
 }
 
-func (l *Lex) rmrange(i int, kind string) {
-	close := getCloseKindOfBrace(kind)
+func (l *Lex) remove_range(i int, kind string) {
+	close := get_close_kind_of_brace(kind)
 	for ; i >= 0; i-- {
-		tok := l.braces[i]
+		tok := l.ranges[i]
 		if tok.Kind != close {
 			continue
 		}
-		l.braces = append(l.braces[:i], l.braces[i+1:]...)
+		l.ranges = append(l.ranges[:i], l.ranges[i+1:]...)
 		break
 	}
 }
 
-func (l *Lex) pushRangeClose(t Token, left string) {
-	n := len(l.braces)
+func (l *Lex) push_range_close(t Token, left string) {
+	n := len(l.ranges)
 	if n == 0 {
 		switch t.Kind {
 		case KND_RBRACKET:
-			l.pusherrtok(t, "extra_closed_brackets")
+			l.push_err_tok(t, "extra_closed_brackets")
 		case KND_RBRACE:
-			l.pusherrtok(t, "extra_closed_braces")
+			l.push_err_tok(t, "extra_closed_braces")
 		case KND_RPARENT:
-			l.pusherrtok(t, "extra_closed_parentheses")
+			l.push_err_tok(t, "extra_closed_parentheses")
 		}
 		return
-	} else if l.braces[n-1].Kind != left {
-		l.pushWrongOrderCloseErr(t)
+	} else if l.ranges[n-1].Kind != left {
+		l.push_wrong_order_close_err(t)
 	}
-	l.rmrange(n-1, t.Kind)
+	l.remove_range(n-1, t.Kind)
 }
 
-func (l *Lex) pushWrongOrderCloseErr(t Token) {
+func (l *Lex) push_wrong_order_close_err(t Token) {
 	var msg string
-	switch l.braces[len(l.braces)-1].Kind {
+	switch l.ranges[len(l.ranges)-1].Kind {
 	case KND_LPAREN:
 		msg = "expected_parentheses_close"
 	case KND_LBRACE:
@@ -830,5 +827,5 @@ func (l *Lex) pushWrongOrderCloseErr(t Token) {
 	case KND_LBRACKET:
 		msg = "expected_bracket_close"
 	}
-	l.pusherrtok(t, msg)
+	l.push_err_tok(t, msg)
 }

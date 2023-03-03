@@ -149,7 +149,7 @@ const MARK_ARRAY = "..."
 const PREFIX_SLICE = "[]"
 const PREFIX_ARRAY = "[" + MARK_ARRAY + "]"
 
-var Punctuations = [...]rune{
+var PUNCTS = [...]rune{
 	'!',
 	'#',
 	'$',
@@ -185,7 +185,7 @@ var Punctuations = [...]rune{
 	'¦',
 }
 
-var Spaces = [...]rune{
+var SPACES = [...]rune{
 	' ',
 	'\t',
 	'\v',
@@ -202,9 +202,9 @@ type Token struct {
 	Id     uint8
 }
 
-// Precedence returns operator precedence of token.
+// Prec returns operator precedence of token.
 // Returns -1 if token is not operator or invalid operator for operator precedence.
-func (t *Token) Precedence() int {
+func (t *Token) Prec() int {
 	if t.Id != ID_OP {
 		return -1
 	}
@@ -239,7 +239,7 @@ func IsFloat(k string) bool {
 	return strings.ContainsAny(k, ".eE")
 }
 
-func IsNumeric(k string) bool {
+func IsNum(k string) bool {
 	if k == "" {
 		return false
 	}
@@ -247,7 +247,7 @@ func IsNumeric(k string) bool {
 }
 
 func IsLiteral(k string) bool {
-	return IsNumeric(k) || IsStr(k) || IsChar(k) || IsNil(k) || IsBool(k)
+	return IsNum(k) || IsStr(k) || IsChar(k) || IsNil(k) || IsBool(k)
 }
 
 // IsIgnoreId reports identifier is ignore or not.
@@ -266,10 +266,10 @@ func rune_exist(r rune, runes []rune) bool {
 }
 
 // IsPunct reports rune is punctuation or not.
-func IsPunct(r rune) bool { return rune_exist(r, Punctuations[:]) }
+func IsPunct(r rune) bool { return rune_exist(r, PUNCTS[:]) }
 
 // IsSpace reports byte is whitespace or not.
-func IsSpace(r rune) bool { return rune_exist(r, Spaces[:]) }
+func IsSpace(r rune) bool { return rune_exist(r, SPACES[:]) }
 
 // IsLetter reports rune is letter or not.
 func IsLetter(r rune) bool {

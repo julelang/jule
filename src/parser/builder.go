@@ -2318,7 +2318,7 @@ func (b *builder) find_lowest_precedenced_operator(toks []lex.Token) int {
 		if toks[i-1].Id == lex.ID_OP {
 			continue
 		}
-		p := tok.Precedence()
+		p := tok.Prec()
 		if p != -1 {
 			prec.set(p, i)
 		}
