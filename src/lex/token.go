@@ -232,11 +232,21 @@ func IsChar(k string) bool   { return k != "" && k[0] == '\'' }
 func IsNil(k string) bool    { return k == KND_NIL }
 func IsBool(k string) bool   { return k == KND_TRUE || k == KND_FALSE }
 
+func contains_any(s string, bytes string) bool {
+	for _, b := range bytes {
+		i := strings.Index(s, string(b))
+		if i >= 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func IsFloat(k string) bool {
 	if strings.HasPrefix(k, "0x") {
-		return strings.ContainsAny(k, ".pP")
+		return contains_any(k, ".pP")
 	}
-	return strings.ContainsAny(k, ".eE")
+	return contains_any(k, ".eE")
 }
 
 func IsNum(k string) bool {
