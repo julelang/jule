@@ -18,30 +18,18 @@ var ATTRS = [...]string{
 	ATTR_TYPEDEF,
 }
 
-const goos_windows = "windows"
-const goos_darwin = "darwin"
-const goos_linux = "linux"
-
-const goarch_i386 = "386"
-const goarch_amd64 = "amd64"
-const goarch_arm = "arm"
-const goarch_arm64 = "arm64"
-
-func check_os(path string) (ok bool, exist bool) {
+func check_os(arg string) (ok bool, exist bool) {
 	ok = false
 	exist = true
-	switch path {
+	switch arg {
 	case OS_WINDOWS:
-		ok = runtime.GOOS == goos_windows
+		ok = IsWindows(runtime.GOOS)
 	case OS_DARWIN:
-		ok = runtime.GOOS == goos_darwin
+		ok = IsDarwin(runtime.GOOS)
 	case OS_LINUX:
-		ok = runtime.GOOS == goos_linux
+		ok = IsLinux(runtime.GOOS)
 	case OS_UNIX:
-		switch runtime.GOOS {
-		case goos_darwin, goos_linux:
-			ok = true
-		}
+		ok = IsUnix(runtime.GOOS)
 	default:
 		ok = true
 		exist = false
@@ -49,28 +37,22 @@ func check_os(path string) (ok bool, exist bool) {
 	return
 }
 
-func check_arch(path string) (ok bool, exist bool) {
+func check_arch(arg string) (ok bool, exist bool) {
 	ok = false
 	exist = true
-	switch path {
+	switch arg {
 	case ARCH_I386:
-		ok = runtime.GOARCH == goarch_i386
+		ok = IsI386(runtime.GOARCH)
 	case ARCH_AMD64:
-		ok = runtime.GOARCH == goarch_amd64
+		ok = IsAmd64(runtime.GOARCH)
 	case ARCH_ARM:
-		ok = runtime.GOARCH == goarch_arm
+		ok = IsArm(runtime.GOARCH)
 	case ARCH_ARM64:
-		ok = runtime.GOARCH == goarch_arm64
+		ok = IsArm64(runtime.GOARCH)
 	case ARCH_64Bit:
-		switch runtime.GOARCH {
-		case goarch_amd64, goarch_arm64:
-			ok = true
-		}
+		ok = IsX64(runtime.GOARCH)
 	case ARCH_32Bit:
-		switch runtime.GOARCH {
-		case goarch_i386, goarch_arm:
-			ok = true
-		}
+		ok = IsX32(runtime.GOARCH)
 	default:
 		ok = true
 		exist = false

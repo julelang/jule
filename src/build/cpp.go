@@ -14,8 +14,8 @@ const CPP_SELF = "this"
 // CPP_DEFAULT_EXPR represents default expression for type.
 const CPP_DEFAULT_EXPR = "{}"
 
-// TYPE_EXTENSION is extension of data types.
-const TYPE_EXTENSION = "_jt"
+// TYPE_EXT is extension of data types.
+const TYPE_EXT = "_jt"
 
 // Returns specified identifer as JuleC identifer.
 // Equavalents: "JULEC_ID(" + id + ")"
@@ -45,4 +45,4 @@ func OutId(id string, ptr uintptr) string {
 }
 
 // AsTypeId returns given identifier as output type identifier.
-func AsTypeId(id string) string { return id + TYPE_EXTENSION }
+func AsTypeId(id string) string { return id + TYPE_EXT }
