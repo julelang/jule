@@ -107,7 +107,7 @@ func (u *unary) amper() value {
 	nodes := &u.model.nodes[u.model.index].nodes
 	switch {
 	case types.IsRef(v.data.DataType):
-		model := exprNode{(*nodes)[1].String() + "._alloc"}
+		model := exprNode{(*nodes)[1].String() + ".__alloc"}
 		*nodes = nil
 		*nodes = make([]ast.ExprModel, 1)
 		(*nodes)[0] = model
