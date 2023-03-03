@@ -270,7 +270,7 @@ func (e *eval) dataTypeFunc(expr lex.Token, callRange []lex.Token, m *exprModel)
 				Kind:  expr.Kind,
 			}
 			isret = true
-			v = e.castExpr(dt, callRange, m, expr)
+			v = e.cast_expr(dt, callRange, m, expr)
 		}
 	case lex.ID_IDENT:
 		def, _, _ := e.p.defined_by_id(expr.Kind)
@@ -284,7 +284,7 @@ func (e *eval) dataTypeFunc(expr lex.Token, callRange []lex.Token, m *exprModel)
 				return
 			}
 			isret = true
-			v = e.castExpr(dt, callRange, m, expr)
+			v = e.cast_expr(dt, callRange, m, expr)
 		}
 	}
 	return
@@ -516,7 +516,7 @@ end:
 	return exprNode{model.String()}
 }
 
-func (e *eval) castExpr(dt Type, exprToks []lex.Token, m *exprModel, errTok lex.Token) value {
+func (e *eval) cast_expr(dt Type, exprToks []lex.Token, m *exprModel, errTok lex.Token) value {
 	val, model := e.eval_toks(exprToks)
 	m.append_sub(get_cast_expr_model(dt, val.data.DataType, model))
 	val = e.cast(val, dt, errTok)
@@ -573,7 +573,7 @@ func (e *eval) tryCast(toks []lex.Token, m *exprModel) (v value, _ bool) {
 		if !ok {
 			return
 		}
-		val := e.castExpr(dt, exprToks, m, errTok)
+		val := e.cast_expr(dt, exprToks, m, errTok)
 		return val, true
 	}
 	return
@@ -582,19 +582,19 @@ func (e *eval) tryCast(toks []lex.Token, m *exprModel) (v value, _ bool) {
 func (e *eval) cast(v value, t Type, errtok lex.Token) value {
 	switch {
 	case types.IsPtr(t):
-		e.castPtr(t, &v, errtok)
+		e.cast_ptr(t, &v, errtok)
 	case types.IsRef(t):
 		e.cast_ref(t, &v, errtok)
 	case types.IsSlice(t):
-		e.castSlice(t, v.data.DataType, errtok)
+		e.cast_slice(t, v.data.DataType, errtok)
 	case types.IsStruct(t):
-		e.castStruct(t, &v, errtok)
+		e.cast_struct(t, &v, errtok)
 	case types.IsPure(t):
 		if v.data.DataType.Id == types.ANY {
 			// The any type supports casting to any data type.
 			break
 		}
-		e.castPure(t, &v, errtok)
+		e.cast_pure(t, &v, errtok)
 	default:
 		e.pusherrtok(errtok, "type_not_supports_casting", t.Kind)
 	}
@@ -613,7 +613,7 @@ func (e *eval) cast(v value, t Type, errtok lex.Token) value {
 	return v
 }
 
-func (e *eval) castStruct(t Type, v *value, errtok lex.Token) {
+func (e *eval) cast_struct(t Type, v *value, errtok lex.Token) {
 	if !types.IsTrait(v.data.DataType) {
 		e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.DataType.Kind, t.Kind)
 		return
@@ -625,7 +625,7 @@ func (e *eval) castStruct(t Type, v *value, errtok lex.Token) {
 	}
 }
 
-func (e *eval) castPtr(t Type, v *value, errtok lex.Token) {
+func (e *eval) cast_ptr(t Type, v *value, errtok lex.Token) {
 	if !e.unsafe_allowed() {
 		e.pusherrtok(errtok, "unsafe_behavior_at_out_of_unsafe_scope")
 		return
@@ -640,31 +640,38 @@ func (e *eval) castPtr(t Type, v *value, errtok lex.Token) {
 
 func (e *eval) cast_ref(t Type, v *value, errtok lex.Token) {
 	if types.IsStruct(types.DerefPtrOrRef(t)) {
-		e.castStruct(t, v, errtok)
+		e.cast_struct(t, v, errtok)
 		return
 	}
 	e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.DataType.Kind, t.Kind)
 }
 
-func (e *eval) castPure(t Type, v *value, errtok lex.Token) {
+func (e *eval) cast_pure(t Type, v *value, errtok lex.Token) {
 	switch t.Id {
 	case types.ANY:
 		return
 	case types.STR:
-		e.castStr(v.data.DataType, errtok)
+		e.cast_str(v.data.DataType, errtok)
 		return
 	}
 	switch {
 	case types.IsInteger(t.Id):
-		e.castInteger(t, v, errtok)
+		e.cast_int(t, v, errtok)
 	case types.IsNumeric(t.Id):
-		e.castNumeric(t, v, errtok)
+		e.cast_num(t, v, errtok)
 	default:
 		e.pusherrtok(errtok, "type_not_supports_casting", t.Kind)
 	}
 }
 
-func (e *eval) castStr(t Type, errtok lex.Token) {
+func (e *eval) cast_str(t Type, errtok lex.Token) {
+	if types.IsPure(t) {
+		if t.Id != types.U8 && t.Id != types.I32 {
+			e.pusherrtok(errtok, "type_not_supports_casting_to", types.TYPE_MAP[types.STR], t.Kind)
+		}
+		return
+	}
+
 	if !types.IsSlice(t) {
 		e.pusherrtok(errtok, "type_not_supports_casting_to", types.TYPE_MAP[types.STR], t.Kind)
 		return
@@ -675,7 +682,7 @@ func (e *eval) castStr(t Type, errtok lex.Token) {
 	}
 }
 
-func (e *eval) castInteger(t Type, v *value, errtok lex.Token) {
+func (e *eval) cast_int(t Type, v *value, errtok lex.Token) {
 	if v.constant {
 		switch {
 		case types.IsSignedInteger(t.Id):
@@ -708,7 +715,7 @@ func (e *eval) castInteger(t Type, v *value, errtok lex.Token) {
 	e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.DataType.Kind, t.Kind)
 }
 
-func (e *eval) castNumeric(t Type, v *value, errtok lex.Token) {
+func (e *eval) cast_num(t Type, v *value, errtok lex.Token) {
 	if v.constant {
 		switch {
 		case types.IsFloat(t.Id):
@@ -731,7 +738,7 @@ func (e *eval) castNumeric(t Type, v *value, errtok lex.Token) {
 	e.pusherrtok(errtok, "type_not_supports_casting_to", v.data.DataType.Kind, t.Kind)
 }
 
-func (e *eval) castSlice(t, vt Type, errtok lex.Token) {
+func (e *eval) cast_slice(t, vt Type, errtok lex.Token) {
 	if !types.IsPure(vt) || vt.Id != types.STR {
 		e.pusherrtok(errtok, "type_not_supports_casting_to", vt.Kind, t.Kind)
 		return
@@ -1517,7 +1524,7 @@ func (e *eval) enumerable(exprToks []lex.Token, t Type, m *exprModel) (v value) 
 	return
 }
 
-func (e *eval) anonymousFn(toks []lex.Token, m *exprModel) (v value) {
+func (e *eval) anon_fn(toks []lex.Token, m *exprModel) (v value) {
 	r := new_builder(toks)
 	f := r.Func(r.Tokens, false, true, false)
 	if len(r.Errors) > 0 {
@@ -1534,7 +1541,7 @@ func (e *eval) anonymousFn(toks []lex.Token, m *exprModel) (v value) {
 	return
 }
 
-func (e *eval) unsafeEval(toks []lex.Token, m *exprModel) (v value) {
+func (e *eval) unsafe_eval(toks []lex.Token, m *exprModel) (v value) {
 	i := 0
 	rang := ast.Range(&i, lex.KND_LBRACE, lex.KND_RBRACE, toks)
 	if len(rang) == 0 {
@@ -1593,11 +1600,11 @@ func (e *eval) braceRange(toks []lex.Token, m *exprModel) (v value) {
 			e.pusherrtok(toks[0], "invalid_syntax")
 			return
 		} else if toks[1].Id != lex.ID_FN {
-			return e.unsafeEval(toks[1:], m)
+			return e.unsafe_eval(toks[1:], m)
 		}
 		fallthrough
 	case lex.ID_FN:
-		return e.anonymousFn(toks, m)
+		return e.anon_fn(toks, m)
 	case lex.ID_IDENT, lex.ID_CPP:
 		return e.typeId(toks, m)
 	default:
