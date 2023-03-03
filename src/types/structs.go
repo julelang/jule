@@ -6,10 +6,10 @@ import "github.com/julelang/jule/ast"
 func IsStructOrdered(s *ast.Struct) bool {
 	for _, d := range s.Origin.Depends {
 		if d.Origin.Order > s.Origin.Order {
-			return true
+			return false
 		}
 	}
-	return false
+	return true
 }
 
 // OrderStructures orders structures by their dependencies.
