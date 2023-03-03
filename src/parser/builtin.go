@@ -683,14 +683,14 @@ func caller_copy(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	}
 
 	dest_expr := args.Src[0].Expr
-	dest_v, dest_expr_model := p.evalExpr(dest_expr, nil)
+	dest_v, dest_expr_model := p.eval_expr(dest_expr, nil)
 	if !types.IsSlice(dest_v.data.DataType) {
 		p.pusherrtok(errtok, "invalid_type")
 		return
 	}
 
 	src_expr := args.Src[1].Expr
-	src_v, src_expr_model := p.evalExpr(src_expr, nil)
+	src_v, src_expr_model := p.eval_expr(src_expr, nil)
 
 	if !types.Equals(dest_v.data.DataType, src_v.data.DataType) {
 		t := dest_v.data.DataType.ComponentType
@@ -731,7 +731,7 @@ func caller_append(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	}
 
 	src_expr := args.Src[0].Expr
-	src_v, src_expr_model := p.evalExpr(src_expr, nil)
+	src_v, src_expr_model := p.eval_expr(src_expr, nil)
 	if !types.IsSlice(src_v.data.DataType) {
 		p.pusherrtok(errtok, "invalid_type")
 		return
@@ -746,7 +746,7 @@ func caller_append(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	
 	for _, arg := range args.Src[1:] {
 		arg_expr := arg.Expr
-		arg_v, arg_expr_model := p.evalExpr(arg_expr, nil)
+		arg_v, arg_expr_model := p.eval_expr(arg_expr, nil)
 
 		p.check_assign_type(*t, arg_v, errtok)
 		
@@ -768,7 +768,7 @@ func caller_drop(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 		p.pusherrtok(errtok, "argument_overflow")
 	}
 	ref_expr := args.Src[0].Expr
-	ref_v, ref_expr_model := p.evalExpr(ref_expr, nil)
+	ref_v, ref_expr_model := p.eval_expr(ref_expr, nil)
 	if !types.IsRef(ref_v.data.DataType) {
 		p.pusherrtok(errtok, "invalid_type")
 		return
@@ -795,7 +795,7 @@ func caller_real(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 		p.pusherrtok(errtok, "argument_overflow")
 	}
 	ref_expr := args.Src[0].Expr
-	ref_v, ref_expr_model := p.evalExpr(ref_expr, nil)
+	ref_v, ref_expr_model := p.eval_expr(ref_expr, nil)
 	if !types.IsRef(ref_v.data.DataType) {
 		p.pusherrtok(errtok, "invalid_type")
 		return
@@ -844,7 +844,7 @@ func caller_new(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 		m.append_sub(exprNode{"<" + t.String() + ">()"})
 	} else {
 		data_expr := args.Src[1].Expr
-		data_v, data_expr_model := p.evalExpr(data_expr, nil)
+		data_v, data_expr_model := p.eval_expr(data_expr, nil)
 		p.check_type(t, data_v.data.DataType, false, true, errtok)
 		m.append_sub(exprNode{"<" + t.String() + ">("})
 		m.append_sub(data_expr_model)
@@ -933,7 +933,7 @@ func fn_make(p *Parser, m *exprModel, t ast.Type, args *ast.Args, errtok lex.Tok
 		p.pusherrtok(errtok, "argument_overflow")
 	}
 	len_expr := args.Src[1].Expr
-	len_v, len_expr_model := p.evalExpr(len_expr, nil)
+	len_v, len_expr_model := p.eval_expr(len_expr, nil)
 	err_key := check_value_for_indexing(len_v)
 	if err_key != "" {
 		p.pusherrtok(errtok, err_key)

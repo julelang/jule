@@ -149,7 +149,7 @@ func (pap *pureArgParser) parse() {
 
 func (pap *pureArgParser) tryFuncMultiRetAsArgs() bool {
 	arg := pap.args.Src[0]
-	val, model := pap.p.evalExpr(arg.Expr, nil)
+	val, model := pap.p.eval_expr(arg.Expr, nil)
 	arg.Expr.Model = model
 	if !val.data.DataType.MultiTyped {
 		return false
