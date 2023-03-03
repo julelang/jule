@@ -1056,16 +1056,16 @@ func (e *eval) nsSubId(toks []lex.Token, m *exprModel) (v value) {
 	// Because this defines has high priority
 	// So shadows defines of namespace
 	blockTypes := e.p.blockTypes
-	blockVars := e.p.blockVars
+	blockVars := e.p.block_vars
 	e.p.blockTypes = nil
-	e.p.blockVars = nil
+	e.p.block_vars = nil
 	pdefs := e.p.Defines
 	e.p.Defines = defs
 	e.p.allowBuiltin = false
 	v, _ = e.single(toks[0], m)
 	e.p.allowBuiltin = true
 	e.p.blockTypes = blockTypes
-	e.p.blockVars = blockVars
+	e.p.block_vars = blockVars
 	e.p.Defines = pdefs
 	return
 }

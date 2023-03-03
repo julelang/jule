@@ -38,7 +38,7 @@ type Parser struct {
 	rootBlock        *ast.Block
 	nodeBlock        *ast.Block
 	blockTypes       []*TypeAlias
-	blockVars        []*Var
+	block_vars        []*Var
 	waitingImpls     []*ast.Impl
 	eval             *eval
 	linked_aliases   []*ast.TypeAlias
@@ -709,7 +709,7 @@ func (p *Parser) pushField(s *Struct, f **Var, i int) {
 		}
 	}
 	if len(s.Generics) == 0 {
-		p.parseField(s, f, i)
+		p.parse_field(s, f, i)
 	} else {
 		p.parseNonGenericType(s.Generics, &(*f).DataType)
 		param := ast.Param{Id: (*f).Id, DataType: (*f).DataType}
@@ -1055,9 +1055,9 @@ func (p *Parser) PushAttribute(c ast.Comment) {
 func (p *Parser) St(s ast.St) {
 	switch data_t := s.Data.(type) {
 	case Fn:
-		p.Func(data_t)
+		p.function(data_t)
 	case Var:
-		p.Global(data_t)
+		p.global(data_t)
 	default:
 		p.pusherrtok(s.Token, "invalid_syntax")
 	}
@@ -1180,8 +1180,8 @@ func (p *Parser) check_ret_variables(f *Fn) {
 	}
 }
 
-// Func parse Jule function.
-func (p *Parser) Func(ast Fn) {
+// function parse Jule function.
+func (p *Parser) function(ast Fn) {
 	_, tok, canshadow := p.defined_by_id(ast.Id)
 	if tok.Id != lex.ID_NA && !canshadow {
 		p.pusherrtok(ast.Token, "exist_id", ast.Id)
@@ -1203,7 +1203,7 @@ func (p *Parser) Func(ast Fn) {
 }
 
 // ParseVariable parse Jule global variable.
-func (p *Parser) Global(vast Var) {
+func (p *Parser) global(vast Var) {
 	def, _, _ := p.defined_by_id(vast.Id)
 	if def != nil {
 		p.pusherrtok(vast.Token, "exist_id", vast.Id)
@@ -1223,8 +1223,8 @@ func (p *Parser) Global(vast Var) {
 	p.Defines.Globals = append(p.Defines.Globals, v)
 }
 
-// Var parse Jule variable.
-func (p *Parser) Var(model Var) *Var {
+// variable parse Jule variable.
+func (p *Parser) variable(model Var) *Var {
 	if lex.IsIgnoreId(model.Id) {
 		p.pusherrtok(model.Token, "ignore_id")
 	}
@@ -1529,8 +1529,8 @@ func (p *Parser) block_type_by_id(id string) (_ *TypeAlias, can_shadow bool) {
 }
 
 func (p *Parser) block_var_by_id(id string) (_ *Var, can_shadow bool) {
-	for i := len(p.blockVars) - 1; i >= 0; i-- {
-		v := p.blockVars[i]
+	for i := len(p.block_vars) - 1; i >= 0; i-- {
+		v := p.block_vars[i]
 		if v != nil && v.Id == id {
 			return v, v.Owner != p.nodeBlock
 		}
@@ -1768,7 +1768,7 @@ func (p *Parser) parse_package_waiting_globals() {
 // ParseWaitingGlobals parses Jule global variables for waiting to parsing.
 func (p *Parser) ParseWaitingGlobals() {
 	for _, g := range p.Defines.Globals {
-		*g = *p.Var(*g)
+		*g = *p.variable(*g)
 	}
 }
 
@@ -1864,7 +1864,7 @@ func (p *Parser) parse_pure_fn(f *Fn) (err bool) {
 	if err {
 		return
 	}
-	owner.blockVars = owner.block_variables_of_fn(f)
+	owner.block_vars = owner.block_variables_of_fn(f)
 	owner.check_fn(f)
 	if owner != p {
 		owner.wg.Wait()
@@ -1872,7 +1872,7 @@ func (p *Parser) parse_pure_fn(f *Fn) (err bool) {
 		owner.Errors = nil
 	}
 	owner.blockTypes = nil
-	owner.blockVars = nil
+	owner.block_vars = nil
 	p.eval.has_error = hasError
 	return
 }
@@ -1989,8 +1989,8 @@ func (p *Parser) callStructConstructor(s *Struct, argsToks []lex.Token, m *exprM
 	return v
 }
 
-func (p *Parser) parseField(s *Struct, f **Var, i int) {
-	*f = p.Var(**f)
+func (p *Parser) parse_field(s *Struct, f **Var, i int) {
+	*f = p.variable(**f)
 	v := *f
 	param := ast.Param{Id: v.Id, DataType: v.DataType}
 	if !types.IsPtr(v.DataType) && types.IsStruct(v.DataType) {
@@ -2033,16 +2033,16 @@ func (p *Parser) check_anon_fn(f *Fn) {
 	p.check_ret_variables(f)
 	p.reload_fn_types(f)
 	globals := p.Defines.Globals
-	blockVariables := p.blockVars
+	blockVariables := p.block_vars
 	p.Defines.Globals = append(blockVariables, p.Defines.Globals...)
-	p.blockVars = p.block_variables_of_fn(f)
+	p.block_vars = p.block_variables_of_fn(f)
 	rootBlock := p.rootBlock
 	nodeBlock := p.nodeBlock
 	p.check_fn(f)
 	p.rootBlock = rootBlock
 	p.nodeBlock = nodeBlock
 	p.Defines.Globals = globals
-	p.blockVars = blockVariables
+	p.block_vars = blockVariables
 }
 
 // Returns nil if has error.
@@ -2252,12 +2252,12 @@ func (p *Parser) parse_fn_call(f *Fn, args *ast.Args, m *exprModel, errTok lex.T
 		owner := f.Owner.(*Parser)
 		rootBlock := owner.rootBlock
 		nodeBlock := owner.nodeBlock
-		blockVars := owner.blockVars
+		blockVars := owner.block_vars
 		blockTypes := owner.blockTypes
 		defer func() {
 			owner.rootBlock = rootBlock
 			owner.nodeBlock = nodeBlock
-			owner.blockVars = blockVars
+			owner.block_vars = blockVars
 			owner.blockTypes = blockTypes
 
 			// Remember generics
@@ -2602,7 +2602,7 @@ func (p *Parser) checkNewBlockCustom(b *ast.Block, oldBlockVars []*Var) {
 	blockTypes := p.blockTypes
 	p.checkNodeBlock()
 
-	vars := p.blockVars[len(oldBlockVars):]
+	vars := p.block_vars[len(oldBlockVars):]
 	aliases := p.blockTypes[len(blockTypes):]
 	for _, v := range vars {
 		if !v.Used {
@@ -2614,12 +2614,12 @@ func (p *Parser) checkNewBlockCustom(b *ast.Block, oldBlockVars []*Var) {
 			p.pusherrtok(a.Token, "declared_but_not_used", a.Id)
 		}
 	}
-	p.blockVars = oldBlockVars
+	p.block_vars = oldBlockVars
 	p.blockTypes = blockTypes
 }
 
 func (p *Parser) checkNewBlock(b *ast.Block) {
-	p.checkNewBlockCustom(b, p.blockVars)
+	p.checkNewBlockCustom(b, p.block_vars)
 }
 
 func (p *Parser) fall_st(f *ast.Fall, i *int) {
@@ -2646,7 +2646,7 @@ func (p *Parser) common_st(s *ast.St, i *int, recover bool) bool {
 			s.Data = data
 		}
 	case Var:
-		p.var_st(&data, false)
+		p.var_st(&data)
 		s.Data = data
 	case ast.Assign:
 		p.assign(&data)
@@ -3066,16 +3066,15 @@ always:
 	p.checkRets(f)
 }
 
-func (p *Parser) var_st(v *Var, noParse bool) {
+func (p *Parser) var_st(v *Var) {
 	def, _, canshadow := p.block_define_by_id(v.Id)
 	if !canshadow && def != nil {
 		p.pusherrtok(v.Token, "exist_id", v.Id)
 		return
 	}
-	if !noParse {
-		*v = *p.Var(*v)
-	}
-	p.blockVars = append(p.blockVars, v)
+	*v = *p.variable(*v)
+	v.Owner = p.nodeBlock
+	p.block_vars = append(p.block_vars, v)
 }
 
 func (p *Parser) concurrentCall(cc *ast.ConcurrentCall) {
@@ -3084,7 +3083,7 @@ func (p *Parser) concurrentCall(cc *ast.ConcurrentCall) {
 	_, cc.Expr.Model = p.evalExpr(cc.Expr, nil)
 }
 
-func (p *Parser) assignment(left value, errtok lex.Token) bool {
+func (p *Parser) check_assign(left value, errtok lex.Token) bool {
 	state := true
 	if !left.lvalue {
 		p.eval.pusherrtok(errtok, "assign_require_lvalue")
@@ -3107,12 +3106,12 @@ func (p *Parser) assignment(left value, errtok lex.Token) bool {
 	return state
 }
 
-func (p *Parser) singleAssign(assign *ast.Assign, l, r []value) {
+func (p *Parser) single_assign(assign *ast.Assign, l, r []value) {
 	left := l[0]
 	switch {
 	case lex.IsIgnoreId(left.data.Value):
 		return
-	case !p.assignment(left, assign.Setter):
+	case !p.check_assign(left, assign.Setter):
 		return
 	}
 	right := r[0]
@@ -3135,7 +3134,7 @@ func (p *Parser) singleAssign(assign *ast.Assign, l, r []value) {
 	}.check()
 }
 
-func (p *Parser) assignExprs(vsAST *ast.Assign) (l []value, r []value) {
+func (p *Parser) assign_exprs(vsAST *ast.Assign) (l []value, r []value) {
 	l = make([]value, len(vsAST.Left))
 	r = make([]value, len(vsAST.Right))
 	n := len(l)
@@ -3179,7 +3178,7 @@ func (p *Parser) funcMultiAssign(vsAST *ast.Assign, l, r []value) {
 	for i, t := range types {
 		rights[i] = value{data: ast.Data{Token: t.Token, DataType: t}}
 	}
-	p.multiAssign(vsAST, l, rights)
+	p.multi_assign(vsAST, l, rights)
 }
 
 func (p *Parser) check_valid_init_expr(left_mutable bool, right value, errtok lex.Token) {
@@ -3198,30 +3197,32 @@ func (p *Parser) check_valid_init_expr(left_mutable bool, right value, errtok le
 	_ = checker.check_validity()
 }
 
-func (p *Parser) multiAssign(assign *ast.Assign, l, r []value) {
+func (p *Parser) multi_assign(assign *ast.Assign, l, r []value) {
 	for i := range assign.Left {
 		left := &assign.Left[i]
 		left.Ignore = lex.IsIgnoreId(left.Var.Id)
 		right := r[i]
-		if !left.Var.New {
-			if left.Ignore {
-				continue
-			}
-			leftExpr := l[i]
-			if !p.assignment(leftExpr, assign.Setter) {
-				return
-			}
-			p.check_valid_init_expr(leftExpr.mutable, right, assign.Setter)
-			assign_checker{
-				p:      p,
-				t: leftExpr.data.DataType,
-				v:      right,
-				errtok: assign.Setter,
-			}.check()
+
+		if left.Var.New {
+			left.Var.Tag = right
+			p.var_st(&left.Var)
 			continue
 		}
-		left.Var.Tag = right
-		p.var_st(&left.Var, false)
+
+		if left.Ignore {
+			continue
+		}
+		leftExpr := l[i]
+		if !p.check_assign(leftExpr, assign.Setter) {
+			return
+		}
+		p.check_valid_init_expr(leftExpr.mutable, right, assign.Setter)
+		assign_checker{
+			p:      p,
+			t: leftExpr.data.DataType,
+			v:      right,
+			errtok: assign.Setter,
+		}.check()
 	}
 }
 
@@ -3236,7 +3237,7 @@ func (p *Parser) postfix(assign *ast.Assign, l, r []value) {
 		return
 	}
 	left := l[0]
-	_ = p.assignment(left, assign.Setter)
+	_ = p.check_assign(left, assign.Setter)
 	if types.IsExplicitPtr(left.data.DataType) {
 		if !p.unsafe_allowed() {
 			p.pusherrtok(assign.Left[0].Expr.Tokens[0], "unsafe_behavior_at_out_of_unsafe_scope")
@@ -3256,13 +3257,13 @@ func (p *Parser) postfix(assign *ast.Assign, l, r []value) {
 func (p *Parser) assign(assign *ast.Assign) {
 	ln := len(assign.Left)
 	rn := len(assign.Right)
-	l, r := p.assignExprs(assign)
+	l, r := p.assign_exprs(assign)
 	switch {
 	case rn == 0 && ast.IsPostfixOp(assign.Setter.Kind):
 		p.postfix(assign, l, r)
 		return
 	case ln == 1 && !assign.Left[0].Var.New:
-		p.singleAssign(assign, l, r)
+		p.single_assign(assign, l, r)
 		return
 	case assign.Setter.Kind != lex.KND_EQ:
 		p.pusherrtok(assign.Setter, "invalid_syntax")
@@ -3283,7 +3284,7 @@ func (p *Parser) assign(assign *ast.Assign) {
 		p.pusherrtok(assign.Setter, "missing_multi_assign_identifiers")
 		return
 	}
-	p.multiAssign(assign, l, r)
+	p.multi_assign(assign, l, r)
 }
 
 func (p *Parser) whileProfile(iter *ast.Iter) {
@@ -3316,12 +3317,12 @@ func (p *Parser) foreachProfile(iter *ast.Iter) {
 		fc.check()
 	}
 	iter.Profile = profile
-	blockVars := p.blockVars
+	blockVars := p.block_vars
 	if !lex.IsIgnoreId(profile.KeyA.Id) {
-		p.blockVars = append(p.blockVars, &profile.KeyA)
+		p.block_vars = append(p.block_vars, &profile.KeyA)
 	}
 	if !lex.IsIgnoreId(profile.KeyB.Id) {
-		p.blockVars = append(p.blockVars, &profile.KeyB)
+		p.block_vars = append(p.block_vars, &profile.KeyB)
 	}
 	p.checkNewBlockCustom(iter.Block, blockVars)
 }
@@ -3574,16 +3575,16 @@ func (p *Parser) typeSourceIsStruct(s *Struct, st Type) (dt Type, _ bool) {
 		owner.blockTypes = nil
 		owner.pushGenerics(s.Generics, generics, st.Token)
 		for i, f := range s.Fields {
-			owner.parseField(s, &f, i)
+			owner.parse_field(s, &f, i)
 		}
 		if len(s.Defines.Fns) > 0 {
 			for _, f := range s.Defines.Fns {
 				if len(f.Generics) == 0 {
-					blockVars := owner.blockVars
+					blockVars := owner.block_vars
 					blockTypes := owner.blockTypes
 					owner.reload_fn_types(f)
 					_ = p.parse_pure_fn(f)
-					owner.blockVars = blockVars
+					owner.block_vars = blockVars
 					owner.blockTypes = blockTypes
 				}
 			}
