@@ -1499,22 +1499,23 @@ func (b *builder) letDeclAssign(toks []lex.Token) (assign ast.Assign, ok bool) {
 		return
 	}
 	for _, p := range parts {
-		if len(p) > 2 {
-			b.pusherr(p[2], "invalid_syntax")
-		}
 		mutable := false
 		tok := p[0]
 		if tok.Id == lex.ID_MUT {
 			mutable = true
 			p = p[1:]
-			if len(p) == 0 {
+			if len(p) != 1 {
 				b.pusherr(tok, "invalid_syntax")
 				continue
 			}
 		}
+		if p[0].Id != lex.ID_IDENT && p[0].Id != lex.ID_BRACE && p[0].Kind != lex.KND_LPAREN {
+			b.pusherr(tok, "invalid_syntax")
+			continue
+		}
 		l := b.build_assign_left(p)
 		l.Var.Mutable = mutable
-		l.Var.New = !lex.IsIgnoreId(l.Var.Id)
+		l.Var.New = l.Var.Id != "" && !lex.IsIgnoreId(l.Var.Id)
 		l.Var.SetterTok = assign.Setter
 		assign.Left = append(assign.Left, l)
 	}
