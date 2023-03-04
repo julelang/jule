@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/julelang/jule/ast"
-	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
 )
 
@@ -50,7 +49,7 @@ func canGetPtr(v value) bool {
 	case types.FN, types.ENUM:
 		return false
 	default:
-		return v.data.Token.Id == lex.ID_IDENT
+		return true
 	}
 }
 
