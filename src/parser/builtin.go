@@ -739,6 +739,8 @@ func caller_append(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	t := src_v.data.DataType.ComponentType
 	v.data.DataType = src_v.data.DataType.Copy()
 	v.data.Value = " "
+	// Set mutable to true because return types must be mutable all time.
+	v.mutable = true
 	
 	m.append_sub(exprNode{"("})
 	m.append_sub(src_expr_model)
@@ -853,6 +855,8 @@ func caller_new(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	t.Kind = "&" + t.Kind
 	v.data.DataType = t
 	v.data.Value = t.Kind
+	// Set mutable to true because return types must be mutable all time.
+	v.mutable = true
 	return
 }
 
@@ -926,6 +930,8 @@ var std_builtin_defines = map[string]*ast.Defmap{
 func fn_make(p *Parser, m *exprModel, t ast.Type, args *ast.Args, errtok lex.Token) (v value) {
 	v.data.DataType = t
 	v.data.Value = " "
+	// Set mutable to true because return types must be mutable all time.
+	v.mutable = true
 	if len(args.Src) < 2 {
 		p.pusherrtok(errtok, "missing_expr_for", "len")
 		return

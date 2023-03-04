@@ -104,6 +104,7 @@ func (u *unary) amper() value {
 	v := u.p.eval.process(u.toks, u.model)
 	v.constant = false
 	v.lvalue = true
+	v.mutable = true
 	nodes := &u.model.nodes[u.model.index].nodes
 	switch {
 	case types.IsRef(v.data.DataType):
@@ -133,7 +134,6 @@ func (u *unary) amper() value {
 			*last = exprNode{(*last).String() + ")"}
 		}
 		v.data.DataType.Kind = lex.KND_AMPER + v.data.DataType.Kind
-		v.mutable = true
 		return v
 	case !canGetPtr(v):
 		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_AMPER)

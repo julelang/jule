@@ -2292,6 +2292,8 @@ func (p *Parser) parse_fn_call(f *Fn, args *ast.Args, m *exprModel, errTok lex.T
 		m.append_sub(model)
 	}
 end:
+	// Set mutable to true because return types must be mutable all time.
+	v.mutable = true
 	v.data.Value = " "
 	v.data.DataType = f.RetType.DataType.Copy()
 	if args.NeedsPureType {
