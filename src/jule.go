@@ -26,7 +26,7 @@ func exit_err(msg string) {
 }
 
 func init() {
-	path, err := os.Executable()
+	path, err := filepath.Abs(os.Args[0])
 	if err != nil {
 		exit_err(err.Error())
 	}
