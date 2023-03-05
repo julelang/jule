@@ -20,8 +20,11 @@ func check_value_for_indexing(v value) (err_key string) {
 	}
 }
 
-func indexingExprModel(i ast.ExprModel) ast.ExprModel {
+func indexingExprModel(v value, i ast.ExprModel) ast.ExprModel {
 	if i == nil {
+		return i
+	}
+	if v.constant {
 		return i
 	}
 	var model strings.Builder

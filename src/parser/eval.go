@@ -1179,7 +1179,7 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 		if len(leftToks) > 0 {
 			var model ast.ExprModel
 			leftv, model = e.p.evalToks(leftToks, nil)
-			m.append_sub(indexingExprModel(model))
+			m.append_sub(indexingExprModel(leftv, model))
 			e.checkIntegerIndexing(leftv, errTok)
 		} else {
 			leftv.expr = int64(0)
@@ -1190,7 +1190,7 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 			m.append_sub(exprNode{","})
 			var model ast.ExprModel
 			rightv, model = e.p.evalToks(rightToks, nil)
-			m.append_sub(indexingExprModel(model))
+			m.append_sub(indexingExprModel(rightv, model))
 			e.checkIntegerIndexing(rightv, errTok)
 		}
 		m.append_sub(exprNode{")"})
@@ -1202,7 +1202,7 @@ func (e *eval) bracketRange(toks []lex.Token, m *exprModel) (v value) {
 	}
 	m.append_sub(exprNode{lex.KND_LBRACKET})
 	indexv, model := e.eval_toks(toks[1 : len(toks)-1])
-	m.append_sub(indexingExprModel(model))
+	m.append_sub(indexingExprModel(indexv, model))
 	m.append_sub(exprNode{lex.KND_RBRACKET})
 	v = e.indexing(v, indexv, errTok)
 	if !types.IsMut(v.data.DataType) {
