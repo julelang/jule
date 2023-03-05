@@ -31,17 +31,23 @@ func setshift(v *value, right uint64) {
 }
 
 func bitize(v *value) {
+	id := types.VOID
 	switch t := v.expr.(type) {
 	case float64:
-		v.data.DataType.Id = types.FloatFromBits(types.BitsizeFloat(t))
+		id = types.FloatFromBits(types.BitsizeFloat(t))
 	case int64:
-		v.data.DataType.Id = types.IntFromBits(types.BitsizeInt(t))
+		id = types.IntFromBits(types.BitsizeInt(t))
 	case uint64:
-		v.data.DataType.Id = types.UIntFromBits(types.BitsizeUInt(t))
+		id = types.UIntFromBits(types.BitsizeUInt(t))
 	default:
 		return
 	}
-	v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
+
+	// Save rune types.
+	if !lex.IsRune(v.data.Value) {
+		v.data.DataType.Id = id
+		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
+	}
 }
 
 func tonumf(expr any) float64 {
@@ -87,8 +93,15 @@ type solver struct {
 	op lex.Token
 }
 
+func (s *solver) value_is_rune() bool {
+	if !lex.IsRune(s.l.data.Value) || !lex.IsRune(s.r.data.Value) {
+		return false
+	}
+	return true
+}
+
 func (s *solver) eq(v *value) {
-	if !s.isConstExpr() {
+	if !s.is_const_expr() {
 		return
 	}
 	switch left := s.l.expr.(type) {
@@ -106,7 +119,7 @@ func (s *solver) eq(v *value) {
 }
 
 func (s *solver) noteq(v *value) {
-	if !s.isConstExpr() {
+	if !s.is_const_expr() {
 		return
 	}
 	s.eq(v)
@@ -114,7 +127,7 @@ func (s *solver) noteq(v *value) {
 }
 
 func (s *solver) lt(v *value) {
-	if !s.isConstExpr() {
+	if !s.is_const_expr() {
 		return
 	}
 	switch left := s.l.expr.(type) {
@@ -128,7 +141,7 @@ func (s *solver) lt(v *value) {
 }
 
 func (s *solver) gt(v *value) {
-	if !s.isConstExpr() {
+	if !s.is_const_expr() {
 		return
 	}
 	switch left := s.l.expr.(type) {
@@ -142,7 +155,7 @@ func (s *solver) gt(v *value) {
 }
 
 func (s *solver) lteq(v *value) {
-	if !s.isConstExpr() {
+	if !s.is_const_expr() {
 		return
 	}
 	switch left := s.l.expr.(type) {
@@ -156,7 +169,7 @@ func (s *solver) lteq(v *value) {
 }
 
 func (s *solver) gteq(v *value) {
-	if !s.isConstExpr() {
+	if !s.is_const_expr() {
 		return
 	}
 	switch left := s.l.expr.(type) {
@@ -170,7 +183,7 @@ func (s *solver) gteq(v *value) {
 }
 
 func (s *solver) add(v *value) {
-	if !s.isConstExpr() {
+	if !s.is_const_expr() {
 		return
 	}
 	switch left := s.l.expr.(type) {
@@ -186,7 +199,7 @@ func (s *solver) add(v *value) {
 }
 
 func (s *solver) sub(v *value) {
-	if !s.isConstExpr() {
+	if !s.is_const_expr() {
 		return
 	}
 	switch left := s.l.expr.(type) {
@@ -200,7 +213,7 @@ func (s *solver) sub(v *value) {
 }
 
 func (s *solver) mul(v *value) {
-	if !s.isConstExpr() {
+	if !s.is_const_expr() {
 		return
 	}
 	switch left := s.l.expr.(type) {
@@ -214,7 +227,7 @@ func (s *solver) mul(v *value) {
 }
 
 func (s *solver) div(v *value) {
-	if !s.isConstExpr() {
+	if !s.is_const_expr() {
 		return
 	}
 	switch left := s.l.expr.(type) {
@@ -246,7 +259,7 @@ func (s *solver) div(v *value) {
 }
 
 func (s *solver) mod(v *value) {
-	if !s.isConstExpr() {
+	if !s.is_const_expr() {
 		return
 	}
 	switch left := s.l.expr.(type) {
@@ -270,7 +283,7 @@ func (s *solver) mod(v *value) {
 }
 
 func (s *solver) bitwiseAnd(v *value) {
-	if !s.isConstExpr() {
+	if !s.is_const_expr() {
 		return
 	}
 	switch left := s.l.expr.(type) {
@@ -282,7 +295,7 @@ func (s *solver) bitwiseAnd(v *value) {
 }
 
 func (s *solver) bitwiseOr(v *value) {
-	if !s.isConstExpr() {
+	if !s.is_const_expr() {
 		return
 	}
 	switch left := s.l.expr.(type) {
@@ -294,7 +307,7 @@ func (s *solver) bitwiseOr(v *value) {
 }
 
 func (s *solver) bitwiseXor(v *value) {
-	if !s.isConstExpr() {
+	if !s.is_const_expr() {
 		return
 	}
 	switch left := s.l.expr.(type) {
@@ -313,7 +326,7 @@ func (s *solver) urshift(v *value) {
 }
 
 func (s *solver) rshift(v *value) {
-	if !s.isConstExpr() {
+	if !s.is_const_expr() {
 		return
 	}
 	switch left := s.l.expr.(type) {
@@ -338,7 +351,7 @@ func (s *solver) ulshift(v *value) {
 }
 
 func (s *solver) lshift(v *value) {
-	if !s.isConstExpr() {
+	if !s.is_const_expr() {
 		return
 	}
 	switch left := s.l.expr.(type) {
@@ -356,7 +369,7 @@ func (s *solver) lshift(v *value) {
 }
 
 func (s *solver) and(v *value) {
-	if !s.isConstExpr() {
+	if !s.is_const_expr() {
 		return
 	}
 	switch left := s.l.expr.(type) {
@@ -366,7 +379,7 @@ func (s *solver) and(v *value) {
 }
 
 func (s *solver) or(v *value) {
-	if !s.isConstExpr() {
+	if !s.is_const_expr() {
 		return
 	}
 	switch left := s.l.expr.(type) {
@@ -795,7 +808,7 @@ func (s *solver) logical() (v value) {
 	v.data.Token = s.op
 	v.data.DataType.Id = types.BOOL
 	v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
-	if !s.isConstExpr() {
+	if !s.is_const_expr() {
 		return
 	}
 	switch s.op.Kind {
@@ -858,13 +871,13 @@ func (s *solver) nil() (v value) {
 	case lex.KND_NOT_EQ:
 		v.data.DataType.Id = types.BOOL
 		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
-		if s.isConstExpr() {
+		if s.is_const_expr() {
 			v.expr = s.l.expr != nil && s.r.expr != nil
 		}
 	case lex.KND_EQS:
 		v.data.DataType.Id = types.BOOL
 		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
-		if s.isConstExpr() {
+		if s.is_const_expr() {
 			v.expr = s.l.expr == nil && s.r.expr == nil
 		}
 	default:
@@ -948,16 +961,20 @@ func (s *solver) types_are_compatible(ignore_any bool) bool {
 	return ok
 }
 
-func (s *solver) isConstExpr() bool { return s.l.constant && s.r.constant }
+func (s *solver) is_const_expr() bool { return s.l.constant && s.r.constant }
 
 func (s *solver) finalize(v *value) {
 	if types.IsVoid(v.data.DataType) {
 		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	} else {
-		v.constant = s.isConstExpr()
+		v.constant = s.is_const_expr()
 		if v.constant {
+			if s.value_is_rune() {
+				// Save rune literal.
+				v.data.Value = "'" + string(rune(v.expr.(int64))) + "'"
+			}
 			bitize(v)
-			v.model = getModel(*v)
+			v.model = get_const_expr_model(*v)
 		}
 	}
 

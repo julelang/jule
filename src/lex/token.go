@@ -228,7 +228,7 @@ func (t *Token) Prec() int {
 
 func IsStr(k string) bool    { return k != "" && (k[0] == '"' || IsRawStr(k)) }
 func IsRawStr(k string) bool { return k != "" && k[0] == '`' }
-func IsChar(k string) bool   { return k != "" && k[0] == '\'' }
+func IsRune(k string) bool   { return k != "" && k[0] == '\'' }
 func IsNil(k string) bool    { return k == KND_NIL }
 func IsBool(k string) bool   { return k == KND_TRUE || k == KND_FALSE }
 
@@ -257,7 +257,7 @@ func IsNum(k string) bool {
 }
 
 func IsLiteral(k string) bool {
-	return IsNum(k) || IsStr(k) || IsChar(k) || IsNil(k) || IsBool(k)
+	return IsNum(k) || IsStr(k) || IsRune(k) || IsNil(k) || IsBool(k)
 }
 
 // IsIgnoreId reports identifier is ignore or not.

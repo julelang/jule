@@ -114,7 +114,7 @@ func (u *unary) amper() value {
 		(*nodes)[0] = model
 		v.data.DataType.Kind = lex.KND_STAR + types.DerefPtrOrRef(v.data.DataType).Kind
 		return v
-	case valIsStructIns(v):
+	case val_is_struct_ins(v):
 		s := v.data.DataType.Tag.(*Struct)
 		// Is not struct literal
 		if s.Id != v.data.Value {
@@ -135,7 +135,7 @@ func (u *unary) amper() value {
 		}
 		v.data.DataType.Kind = lex.KND_AMPER + v.data.DataType.Kind
 		return v
-	case !canGetPtr(v):
+	case !can_get_ptr(v):
 		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_AMPER)
 		return v
 	}

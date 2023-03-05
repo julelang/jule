@@ -133,7 +133,7 @@ func (e *eval) eval(op any) (v value, model ast.ExprModel) {
 		if types.IsVoid(v.data.DataType) {
 			v.data.DataType.Id = types.VOID
 			v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
-		} else if v.constant && types.IsPure(v.data.DataType) && lex.IsLiteral(v.data.Value) {
+		} else if v.constant && types.IsPure(v.data.DataType) && lex.IsLiteral(v.data.Value) && !lex.IsRune(v.data.Value) {
 			switch v.expr.(type) {
 			case int64:
 				dt := Type{
@@ -176,7 +176,7 @@ func (e *eval) single(tok lex.Token, m *exprModel) (v value, ok bool) {
 		switch {
 		case lex.IsStr(tok.Kind):
 			v = eval.str()
-		case lex.IsChar(tok.Kind):
+		case lex.IsRune(tok.Kind):
 			v = eval.rune()
 		case lex.IsBool(tok.Kind):
 			v = eval.bool()
@@ -470,9 +470,9 @@ func (e *eval) subId(toks []lex.Token, m *exprModel) (v value) {
 			return e.strObjSubId(val, idTok, m)
 		case valIsEnumType(val):
 			return e.enumSubId(val, idTok, m)
-		case valIsStructIns(val):
+		case val_is_struct_ins(val):
 			return e.structObjSubId(val, idTok, m)
-		case valIsTraitIns(val):
+		case val_is_trait_ins(val):
 			return e.traitObjSubId(val, idTok, m)
 		}
 	case types.IsSlice(checkType):
@@ -959,7 +959,7 @@ func (e *eval) enumSubId(val value, idTok lex.Token, m *exprModel) (v value) {
 		e.pusherrtok(idTok, "obj_have_not_id", idTok.Kind)
 	} else {
 		v.expr = item.ExprTag
-		v.model = getModel(v)
+		v.model = get_const_expr_model(v)
 	}
 	nodes := m.nodes[m.index]
 	nodes.nodes[len(nodes.nodes)-1] = v.model

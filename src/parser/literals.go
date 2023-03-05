@@ -31,7 +31,7 @@ func boolModel(v value) ast.ExprModel {
 	return exprNode{lex.KND_FALSE}
 }
 
-func getModel(v value) ast.ExprModel {
+func get_const_expr_model(v value) ast.ExprModel {
 	switch v.expr.(type) {
 	case string:
 		return strModel(v)

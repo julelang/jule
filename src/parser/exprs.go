@@ -41,7 +41,7 @@ func isBoolExpr(v value) bool {
 	return types.IsPure(v.data.DataType) && v.data.DataType.Id == types.BOOL
 }
 
-func canGetPtr(v value) bool {
+func can_get_ptr(v value) bool {
 	if !v.lvalue || v.constant {
 		return false
 	}
@@ -53,11 +53,11 @@ func canGetPtr(v value) bool {
 	}
 }
 
-func valIsStructIns(val value) bool {
+func val_is_struct_ins(val value) bool {
 	return !val.is_type && types.IsStruct(val.data.DataType)
 }
 
-func valIsTraitIns(val value) bool {
+func val_is_trait_ins(val value) bool {
 	return !val.is_type && types.IsTrait(val.data.DataType)
 }
 
@@ -74,7 +74,7 @@ func isForeachIterExpr(val value) bool {
 	return code == types.STR
 }
 
-func checkFloatBit(v ast.Data, bit int) bool {
+func check_float_bit(v ast.Data, bit int) bool {
 	if bit == 0 {
 		return false
 	}

@@ -17,10 +17,10 @@ func float_assignable(dt uint8, v value) bool {
 	case uint64:
 		v.data.Value = strconv.FormatFloat(float64(t), 'e', -1, 64)
 	}
-	return checkFloatBit(v.data, types.BitsizeType(dt))
+	return check_float_bit(v.data, types.BitsizeType(dt))
 }
 
-func signedAssignable(dt uint8, v value) bool {
+func signed_assignable(dt uint8, v value) bool {
 	min := types.MinOfType(dt)
 	max := int64(types.MaxOfType(dt))
 	switch t := v.expr.(type) {
@@ -40,7 +40,7 @@ func signedAssignable(dt uint8, v value) bool {
 	return false
 }
 
-func unsignedAssignable(dt uint8, v value) bool {
+func unsigned_assignable(dt uint8, v value) bool {
 	max := types.MaxOfType(dt)
 	switch t := v.expr.(type) {
 	case float64:
@@ -68,9 +68,9 @@ func unsignedAssignable(dt uint8, v value) bool {
 func int_assignable(dt uint8, v value) bool {
 	switch {
 	case types.IsSignedInteger(dt):
-		return signedAssignable(dt, v)
+		return signed_assignable(dt, v)
 	case types.IsUnsignedInteger(dt):
-		return unsignedAssignable(dt, v)
+		return unsigned_assignable(dt, v)
 	}
 	return false
 }

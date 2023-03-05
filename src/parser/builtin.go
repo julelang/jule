@@ -462,7 +462,7 @@ func readyStrDefines(s value) {
 	lenVar.Constant = s.constant
 	if lenVar.Constant {
 		lenVar.ExprTag = int64(len(s.expr.(string)))
-		lenVar.Expr.Model = getModel(value{
+		lenVar.Expr.Model = get_const_expr_model(value{
 			expr: lenVar.ExprTag,
 			data: ast.Data{DataType: lenVar.DataType},
 		})
