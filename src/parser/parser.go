@@ -2706,7 +2706,7 @@ func (p *Parser) check_st(i *int) {
 		p.conditional(&data)
 		s.Data = data
 	case ast.Ret:
-		rc := retChecker{t: p, ret_ast: &data, f: p.nodeBlock.Func}
+		rc := ret_checker{p: p, ret_ast: &data, f: p.nodeBlock.Func}
 		rc.check()
 		s.Data = data
 	case ast.Goto:
