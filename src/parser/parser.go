@@ -46,7 +46,7 @@ type Parser struct {
 	linked_variables []*ast.Var
 	linked_structs   []*ast.Struct
 	allowBuiltin     bool
-	package_files    *[]*Parser
+	package_files    *[]*Parser // This field should be not nil.
 	not_package      bool
 
 	JustDefines bool
@@ -91,6 +91,7 @@ func ParseFile(path string, just_defines bool) (*Parser, string) {
 	}
 
 	p.not_package = true
+	p.setup_package()
 	p.parse_file()
 
 	return p, ""

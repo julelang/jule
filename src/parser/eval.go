@@ -1057,13 +1057,16 @@ func (e *eval) nsSubId(toks []lex.Token, m *exprModel) (v value) {
 	// So shadows defines of namespace
 	blockTypes := e.p.blockTypes
 	blockVars := e.p.block_vars
+	package_files := e.p.package_files
 	e.p.blockTypes = nil
 	e.p.block_vars = nil
+	e.p.setup_package() // Create new package
 	pdefs := e.p.Defines
 	e.p.Defines = defs
 	e.p.allowBuiltin = false
 	v, _ = e.single(toks[0], m)
 	e.p.allowBuiltin = true
+	e.p.package_files = package_files
 	e.p.blockTypes = blockTypes
 	e.p.block_vars = blockVars
 	e.p.Defines = pdefs
