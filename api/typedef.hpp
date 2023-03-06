@@ -5,19 +5,28 @@
 #ifndef __JULEC_TYPEDEF_HPP
 #define __JULEC_TYPEDEF_HPP
 
-typedef std::size_t                       ( uint_jt );
-typedef std::make_signed<uint_jt>::type   ( int_jt );
+// All primitive types:
+
+#if defined(_32BIT) // 32-bit
+typedef unsigned long int                 ( uint_jt );
+typedef signed long int                   ( int_jt );
+typedef unsigned long int                 ( uintptr_jt );
+#else // 64-bit
+typedef unsigned long long int            ( uint_jt );
+typedef signed long long int              ( int_jt );
+typedef unsigned long long int            ( uintptr_jt );
+#endif // #if defined(_32BIT)
+
 typedef signed char                       ( i8_jt );
-typedef signed short                      ( i16_jt );
-typedef signed long                       ( i32_jt );
-typedef signed long long                  ( i64_jt );
+typedef signed short int                  ( i16_jt );
+typedef signed long int                   ( i32_jt );
+typedef signed long long int              ( i64_jt );
 typedef unsigned char                     ( u8_jt );
-typedef unsigned short                    ( u16_jt );
-typedef unsigned long                     ( u32_jt );
-typedef unsigned long long                ( u64_jt );
+typedef unsigned short int                ( u16_jt );
+typedef unsigned long int                 ( u32_jt );
+typedef unsigned long long int            ( u64_jt );
 typedef float                             ( f32_jt );
 typedef double                            ( f64_jt );
 typedef bool                              ( bool_jt );
-typedef std::uintptr_t                    ( uintptr_jt );
 
 #endif // #ifndef __JULEC_TYPEDEF_HPP
