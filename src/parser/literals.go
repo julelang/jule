@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -46,13 +47,16 @@ func get_num_model(v value) ast.ExprModel {
 	switch t := v.expr.(type) {
 	case uint64:
 		fmt := strconv.FormatUint(t, 10)
-		if t > 9223372036854775807 {
+		if build.IsX64(runtime.GOARCH) {
 			return exprNode{fmt + "LLU"}
 		}
-		return exprNode{fmt}
+		return exprNode{fmt + "LU"}
 	case int64:
 		fmt := strconv.FormatInt(t, 10)
-		return exprNode{fmt}
+		if build.IsX64(runtime.GOARCH) {
+			return exprNode{fmt + "LL"}
+		}
+		return exprNode{fmt + "L"}
 	case float64:
 		switch {
 		case normalize(&v):
