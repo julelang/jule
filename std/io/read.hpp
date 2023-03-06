@@ -17,7 +17,8 @@ str_jt __julec_readln(void) noexcept {
     std::getline( std::wcin , _buffer );
     // std::wcin.clear();
     // std::wcin.ignore();
-    _input = str_jt( __julec_utf16_to_utf8_str( &_buffer[0] , _buffer.length() ) );
+    if ( _buffer.length() > 0 )
+    { _input = str_jt( __julec_utf16_to_utf8_str( &_buffer[0] , _buffer.length() ) ); }
 #else
     std::string _buffer;
     std::getline( std::cin , _buffer );
