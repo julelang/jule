@@ -276,6 +276,10 @@ void __julec_terminate_handler(void) noexcept {
 }
 
 void __julec_signal_handler(int _Signal) noexcept {
+    // Ignore the interrupt signal.
+    if ( _Signal == __JULEC_SIGINT )
+    { return; }
+
     JULEC_ID(out)<str_jt>( "program terminated with signal: " );
     JULEC_ID(outln)<int>( _Signal );
 }
