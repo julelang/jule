@@ -695,7 +695,7 @@ func gen_match_bool(m *ast.Match) string {
 
 func gen_match(m *ast.Match) string {
 	var cpp strings.Builder
-	if m.Expr.Model != nil {
+	if !m.TypeMatch && m.Expr.Model != nil {
 		cpp.WriteString(gen_match_expr(m))
 	} else {
 		cpp.WriteString(gen_match_bool(m))

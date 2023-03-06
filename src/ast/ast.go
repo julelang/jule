@@ -542,11 +542,12 @@ func (c *Case) EndLabel() string {
 
 // Match the AST model of match-case.
 type Match struct {
-	Token    lex.Token
-	Expr     Expr
-	ExprType Type
-	Default  *Case
-	Cases    []Case
+	Token     lex.Token
+	Expr      Expr
+	ExprType  Type
+	Default   *Case
+	TypeMatch bool
+	Cases     []Case
 }
 
 // EndLabel returns of cpp goto label identifier of end.

@@ -136,6 +136,7 @@ var ERRORS = map[string]string{
 	`trait_has_reference_parametered_function`: `trait has reference receiver parameter used method, cannot assign non-reference instance`,
 	`enum_have_not_field`:                      `enum have not any field: @`,
 	`enum_not_supports_as_generic`:             `enum types not supported as generic type`,
+	`duplicate_match_type`:                     `type is already checked: @`,
 }
 
 // Errorf returns error.

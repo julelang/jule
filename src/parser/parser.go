@@ -2790,17 +2790,47 @@ func (p *Parser) expr_st(s *ast.ExprSt, i *int, recover bool) (is_recover bool) 
 	return
 }
 
-func (p *Parser) parseCase(c *ast.Case, expr_t Type) {
+func (p *Parser) count_match_type(m *ast.Match, t Type) int {
+	n := 0
+loop:
+	for _, c := range m.Cases {
+		for _, expr := range c.Exprs {
+			// Break loop because this expression is not parsed yet.
+			// So, parsed cases finished.
+			if expr.Model == nil {
+				break loop
+			}
+
+			if types.Equals(t, expr.Op.(Type)) {
+				n++
+			}
+		}
+	}
+	return n
+}
+
+func (p *Parser) parseCase(m *ast.Match, c *ast.Case) {
 	for i := range c.Exprs {
 		expr := &c.Exprs[i]
-		value, model := p.eval_expr(*expr, nil)
-		expr.Model = model
-		assign_checker{
-			p:      p,
-			t:      expr_t,
-			v:      value,
-			errtok: expr.Tokens[0],
-		}.check()
+		switch expr.Op.(type) {
+		case Type:
+			t, _ := p.realType(expr.Op.(Type), true)
+			expr.Op = t
+			// Match with type.
+			expr.Model = exprNode{m.Expr.String() + ".__type_is<" + t.String() + ">()"}
+			if p.count_match_type(m, t) > 1 {
+				p.pusherrtok(c.Token, "duplicate_match_type", t.Kind)
+			}
+		default:
+			value, model := p.eval_expr(*expr, nil)
+			expr.Model = model
+			assign_checker{
+				p:      p,
+				t:      m.ExprType,
+				v:      value,
+				errtok: expr.Tokens[0],
+			}.check()
+		}
 	}
 	oldCase := p.currentCase
 	p.currentCase = c
@@ -2808,9 +2838,9 @@ func (p *Parser) parseCase(c *ast.Case, expr_t Type) {
 	p.currentCase = oldCase
 }
 
-func (p *Parser) cases(m *ast.Match, expr_t Type) {
+func (p *Parser) cases(m *ast.Match) {
 	for i := range m.Cases {
-		p.parseCase(&m.Cases[i], expr_t)
+		p.parseCase(m, &m.Cases[i])
 	}
 }
 
@@ -2823,9 +2853,9 @@ func (p *Parser) matchcase(m *ast.Match) {
 		m.ExprType.Id = types.BOOL
 		m.ExprType.Kind = types.TYPE_MAP[m.ExprType.Id]
 	}
-	p.cases(m, m.ExprType)
+	p.cases(m)
 	if m.Default != nil {
-		p.parseCase(m.Default, m.ExprType)
+		p.parseCase(m, m.Default)
 	}
 }
 

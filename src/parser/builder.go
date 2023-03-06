@@ -2001,12 +2001,26 @@ func (b *builder) IterExpr(bs *block_st) ast.St {
 	return b.commonIterProfile(bs.toks)
 }
 
-func (b *builder) caseexprs(toks *[]lex.Token) []ast.Expr {
+func (b *builder) caseexprs(toks *[]lex.Token, type_match bool) []ast.Expr {
 	var exprs []ast.Expr
 	push_expr := func(toks []lex.Token, tok lex.Token) {
 		if len(toks) > 0 {
+			if type_match {
+				i := 0
+				t, ok := b.DataType(toks, &i, true)
+				if ok {
+					exprs = append(exprs, ast.Expr{
+						Tokens: toks,
+						Op:     t,
+					})
+				}
+				i++
+				if i < len(toks) {
+					b.pusherr(toks[i], "invalid_syntax")
+				}
+				return
+			}
 			exprs = append(exprs, b.Expr(toks))
-			return
 		}
 	}
 	brace_n := 0
@@ -2061,17 +2075,17 @@ func (b *builder) caseblock(toks *[]lex.Token) *ast.Block {
 	return block
 }
 
-func (b *builder) getcase(toks *[]lex.Token) (ast.Case, bool) {
+func (b *builder) getcase(toks *[]lex.Token, type_match bool) (ast.Case, bool) {
 	var c ast.Case
 	c.Token = (*toks)[0]
 	*toks = (*toks)[1:]
-	c.Exprs = b.caseexprs(toks)
+	c.Exprs = b.caseexprs(toks, type_match)
 	c.Block = b.caseblock(toks)
 	is_default := len(c.Exprs) == 0
 	return c, is_default
 }
 
-func (b *builder) cases(toks []lex.Token) ([]ast.Case, *ast.Case) {
+func (b *builder) cases(toks []lex.Token, type_match bool) ([]ast.Case, *ast.Case) {
 	var cases []ast.Case
 	var def *ast.Case
 	for len(toks) > 0 {
@@ -2080,7 +2094,7 @@ func (b *builder) cases(toks []lex.Token) ([]ast.Case, *ast.Case) {
 			b.pusherr(tok, "invalid_syntax")
 			break
 		}
-		c, is_default := b.getcase(&toks)
+		c, is_default := b.getcase(&toks, type_match)
 		if is_default {
 			c.Token = tok
 			if def == nil {
@@ -2102,18 +2116,29 @@ func (b *builder) MatchCase(toks []lex.Token) (s ast.St) {
 	m.Token = toks[0]
 	s.Token = m.Token
 	toks = toks[1:]
+	
+	if len(toks) > 0 && toks[0].Id == lex.ID_TYPE {
+		m.TypeMatch = true
+		toks = toks[1:] // Skip "type" keyword
+	}
+
 	exprToks := ast.GetBlockExpr(toks)
 	if len(exprToks) > 0 {
 		m.Expr = b.Expr(exprToks)
+	} else if m.TypeMatch {
+		b.pusherr(m.Token, "missing_expr")
 	}
+	
 	i := len(exprToks)
-	blockToks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &toks)
-	if blockToks == nil {
+	block_toks := b.getrange(&i, lex.KND_LBRACE, lex.KND_RBRACE, &toks)
+	if block_toks == nil {
 		b.stop()
 		b.pusherr(m.Token, "body_not_exist")
 		return
 	}
-	m.Cases, m.Default = b.cases(blockToks)
+	
+	m.Cases, m.Default = b.cases(block_toks, m.TypeMatch)
+
 	for i := range m.Cases {
 		c := &m.Cases[i]
 		c.Match = m
@@ -2127,6 +2152,7 @@ func (b *builder) MatchCase(toks []lex.Token) (s ast.St) {
 		}
 		m.Default.Match = m
 	}
+
 	s.Data = m
 	return
 }
