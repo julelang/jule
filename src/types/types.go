@@ -20,8 +20,10 @@ var UINT_CODE uint8
 // BIT_SIZE is bit size of architecture.
 var BIT_SIZE int
 
-const NUM_TYPE_STR = "<numeric>"
+// Kind of nil type.
 const NIL_TYPE_STR = "<nil>"
+
+// Kind of void type.
 const VOID_TYPE_STR = "<void>"
 
 type Type = ast.Type
@@ -266,7 +268,8 @@ func IsStruct(t Type) bool       { return t.Id == STRUCT }
 func IsTrait(t Type) bool        { return t.Id == TRAIT }
 func IsEnum(t Type) bool         { return t.Id == ENUM }
 
-func DerefPtrOrRef(t Type) Type {
+// Returns dereferenced pointer or reference type.
+func Elem(t Type) Type {
 	t.Kind = t.Kind[1:]
 	return t
 }

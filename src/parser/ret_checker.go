@@ -14,7 +14,7 @@ type ret_checker struct {
 	values    []value
 }
 
-func (rc *ret_checker) pushval(last, current int, errTok lex.Token) {
+func (rc *ret_checker) push_val(last int, current int, errTok lex.Token) {
 	if current-last == 0 {
 		rc.p.pusherrtok(errTok, "missing_expr")
 		return
@@ -50,15 +50,15 @@ func (rc *ret_checker) check_expressions() {
 		if brace_n > 0 || tok.Id != lex.ID_COMMA {
 			continue
 		}
-		rc.pushval(last, i, tok)
+		rc.push_val(last, i, tok)
 		last = i + 1
 	}
 	n := len(rc.ret_ast.Expr.Tokens)
 	if last < n {
 		if last == 0 {
-			rc.pushval(0, n, rc.ret_ast.Token)
+			rc.push_val(0, n, rc.ret_ast.Token)
 		} else {
-			rc.pushval(last, n, rc.ret_ast.Expr.Tokens[last-1])
+			rc.push_val(last, n, rc.ret_ast.Expr.Tokens[last-1])
 		}
 	}
 	if !types.IsVoid(rc.f.RetType.DataType) {
@@ -85,7 +85,7 @@ func (rc *ret_checker) single() {
 	rc.check_for_ret_expr(v)
 	assign_checker{
 		p:      rc.p,
-		t: rc.f.RetType.DataType,
+		t:      rc.f.RetType.DataType,
 		v:      v,
 		errtok: rc.ret_ast.Token,
 	}.check()
@@ -95,7 +95,7 @@ func (rc *ret_checker) multi() {
 	types := rc.f.RetType.DataType.Tag.([]Type)
 	n := len(rc.values)
 	if n == 1 {
-		rc.checkMultiRetAsMutliRet()
+		rc.check_multi_ret_as_mutli_ret()
 		return
 	} else if n > len(types) {
 		rc.p.pusherrtok(rc.ret_ast.Token, "overflow_return")
@@ -108,7 +108,7 @@ func (rc *ret_checker) multi() {
 		rc.check_for_ret_expr(v)
 		assign_checker{
 			p:      rc.p,
-			t: t,
+			t:      t,
 			v:      v,
 			errtok: rc.ret_ast.Token,
 		}.check()
@@ -124,7 +124,7 @@ func (rc *ret_checker) check_type_safety() {
 	rc.multi()
 }
 
-func (rc *ret_checker) checkMultiRetAsMutliRet() {
+func (rc *ret_checker) check_multi_ret_as_mutli_ret() {
 	v := rc.values[0]
 	if !v.data.DataType.MultiTyped {
 		rc.p.pusherrtok(rc.ret_ast.Token, "missing_multi_return")
@@ -154,13 +154,13 @@ func (rc *ret_checker) checkMultiRetAsMutliRet() {
 	}
 }
 
-func (rc *ret_checker) retsVars() {
+func (rc *ret_checker) rets_vars() {
 	if !rc.f.RetType.DataType.MultiTyped {
 		for _, v := range rc.f.RetType.Identifiers {
 			if !lex.IsIgnoreId(v.Kind) {
-				model := new(exprModel)
+				model := new(expr_model)
 				model.index = 0
-				model.nodes = make([]exprBuildNode, 1)
+				model.nodes = make([]expr_build_node, 1)
 				val, _ := rc.p.eval.single(v, model)
 				rc.exp_model.models = append(rc.exp_model.models, model)
 				rc.values = append(rc.values, val)
@@ -179,9 +179,9 @@ func (rc *ret_checker) retsVars() {
 			rc.exp_model.models = append(rc.exp_model.models, node)
 			continue
 		}
-		model := new(exprModel)
+		model := new(expr_model)
 		model.index = 0
-		model.nodes = make([]exprBuildNode, 1)
+		model.nodes = make([]expr_build_node, 1)
 		val, _ := rc.p.eval.single(v, model)
 		rc.exp_model.models = append(rc.exp_model.models, model)
 		rc.values = append(rc.values, val)
@@ -195,7 +195,7 @@ func (rc *ret_checker) check() {
 		if !rc.f.RetType.AnyVar() {
 			rc.p.pusherrtok(rc.ret_ast.Token, "require_return_value")
 		}
-		rc.retsVars()
+		rc.rets_vars()
 		return
 	}
 	if n > 0 && types.IsVoid(rc.f.RetType.DataType) {

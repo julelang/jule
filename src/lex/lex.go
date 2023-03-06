@@ -424,7 +424,7 @@ end:
 	return
 }
 
-func hex_esq(txt string, n int) (seq string) {
+func hex_escape(txt string, n int) (seq string) {
 	if len(txt) < n {
 		return
 	}
@@ -439,16 +439,16 @@ func hex_esq(txt string, n int) (seq string) {
 }
 
 // Pattern (RegEx): ^\\U.{8}
-func big_unicode_point_esq(txt string) string { return hex_esq(txt, 10) }
+func big_unicode_point_escape(txt string) string { return hex_escape(txt, 10) }
 
 // Pattern (RegEx): ^\\u.{4}
-func little_unicode_point_esq(txt string) string { return hex_esq(txt, 6) }
+func little_unicode_point_escape(txt string) string { return hex_escape(txt, 6) }
 
 // Pattern (RegEx): ^\\x..
-func hex_byte_esq(txt string) string { return hex_esq(txt, 4) }
+func hex_byte_escape(txt string) string { return hex_escape(txt, 4) }
 
 // Patter (RegEx): ^\\[0-7]{3}
-func byte_esq(txt string) (seq string) {
+func byte_escape(txt string) (seq string) {
 	if len(txt) < 4 {
 		return
 	} else if !IsOctal(txt[1]) || !IsOctal(txt[2]) || !IsOctal(txt[3]) {
@@ -457,7 +457,7 @@ func byte_esq(txt string) (seq string) {
 	return txt[:4]
 }
 
-func (l *Lex) escseq(txt string) string {
+func (l *Lex) escape_seq(txt string) string {
 	seq := ""
 	if len(txt) < 2 {
 		goto end
@@ -467,13 +467,13 @@ func (l *Lex) escseq(txt string) string {
 		l.Pos += 2
 		return txt[:2]
 	case 'U':
-		seq = big_unicode_point_esq(txt)
+		seq = big_unicode_point_escape(txt)
 	case 'u':
-		seq = little_unicode_point_esq(txt)
+		seq = little_unicode_point_escape(txt)
 	case 'x':
-		seq = hex_byte_esq(txt)
+		seq = hex_byte_escape(txt)
 	default:
-		seq = byte_esq(txt)
+		seq = byte_escape(txt)
 	}
 end:
 	if seq == "" {
@@ -487,7 +487,7 @@ end:
 
 func (l *Lex) get_rune(txt string, raw bool) string {
 	if !raw && txt[0] == '\\' {
-		return l.escseq(txt)
+		return l.escape_seq(txt)
 	}
 	r, _ := utf8.DecodeRuneInString(txt)
 	l.Pos++

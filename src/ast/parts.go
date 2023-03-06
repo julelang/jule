@@ -5,7 +5,7 @@ import (
 	"github.com/julelang/jule/lex"
 )
 
-func compilerErr(t lex.Token, key string, args ...any) build.Log {
+func compiler_err(t lex.Token, key string, args ...any) build.Log {
 	return build.Log{
 		Type:   build.ERR,
 		Row:    t.Row,
@@ -107,7 +107,7 @@ func Parts(toks []lex.Token, id uint8, exprMust bool) ([][]lex.Token, []build.Lo
 		}
 		if tok.Id == id {
 			if exprMust && i-last <= 0 {
-				errs = append(errs, compilerErr(tok, "missing_expr"))
+				errs = append(errs, compiler_err(tok, "missing_expr"))
 			}
 			parts = append(parts, toks[last:i])
 			last = i + 1

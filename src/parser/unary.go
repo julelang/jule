@@ -9,14 +9,14 @@ import (
 type unary struct {
 	token lex.Token
 	toks  []lex.Token
-	model *exprModel
+	model *expr_model
 	p     *Parser
 }
 
 func (u *unary) minus() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !types.IsPure(v.data.DataType) || !types.IsNumeric(v.data.DataType.Id) {
-		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_MINUS)
+		u.p.eval.push_err_tok(u.token, "invalid_expr_unary_operator", lex.KND_MINUS)
 	}
 	if v.constant {
 		v.data.Value = lex.KND_MINUS + v.data.Value
@@ -28,7 +28,7 @@ func (u *unary) minus() value {
 		case uint64:
 			v.expr = -t
 		}
-		v.model = numericModel(v)
+		v.model = get_num_model(v)
 	}
 	return v
 }
@@ -36,7 +36,7 @@ func (u *unary) minus() value {
 func (u *unary) plus() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !types.IsPure(v.data.DataType) || !types.IsNumeric(v.data.DataType.Id) {
-		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_PLUS)
+		u.p.eval.push_err_tok(u.token, "invalid_expr_unary_operator", lex.KND_PLUS)
 	}
 	if v.constant {
 		switch t := v.expr.(type) {
@@ -47,7 +47,7 @@ func (u *unary) plus() value {
 		case uint64:
 			v.expr = +t
 		}
-		v.model = numericModel(v)
+		v.model = get_num_model(v)
 	}
 	return v
 }
@@ -55,7 +55,7 @@ func (u *unary) plus() value {
 func (u *unary) caret() value {
 	v := u.p.eval.process(u.toks, u.model)
 	if !types.IsPure(v.data.DataType) || !types.IsInteger(v.data.DataType.Id) {
-		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_CARET)
+		u.p.eval.push_err_tok(u.token, "invalid_expr_unary_operator", lex.KND_CARET)
 	}
 	if v.constant {
 		switch t := v.expr.(type) {
@@ -64,18 +64,18 @@ func (u *unary) caret() value {
 		case uint64:
 			v.expr = ^t
 		}
-		v.model = numericModel(v)
+		v.model = get_num_model(v)
 	}
 	return v
 }
 
-func (u *unary) logicalNot() value {
+func (u *unary) logical_not() value {
 	v := u.p.eval.process(u.toks, u.model)
-	if !isBoolExpr(v) {
-		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_EXCL)
+	if !is_bool_expr(v) {
+		u.p.eval.push_err_tok(u.token, "invalid_expr_unary_operator", lex.KND_EXCL)
 	} else if v.constant {
 		v.expr = !v.expr.(bool)
-		v.model = boolModel(v)
+		v.model = get_bool_model(v)
 	}
 	v.data.DataType.Id = types.BOOL
 	v.data.DataType.Kind = lex.KND_BOOL
@@ -91,7 +91,7 @@ func (u *unary) star() value {
 	v.lvalue = true
 	switch {
 	case !types.IsExplicitPtr(v.data.DataType):
-		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_STAR)
+		u.p.eval.push_err_tok(u.token, "invalid_expr_unary_operator", lex.KND_STAR)
 		goto end
 	}
 	v.data.DataType.Kind = v.data.DataType.Kind[1:]
@@ -112,9 +112,9 @@ func (u *unary) amper() value {
 		*nodes = nil
 		*nodes = make([]ast.ExprModel, 1)
 		(*nodes)[0] = model
-		v.data.DataType.Kind = lex.KND_STAR + types.DerefPtrOrRef(v.data.DataType).Kind
+		v.data.DataType.Kind = lex.KND_STAR + types.Elem(v.data.DataType).Kind
 		return v
-	case val_is_struct_ins(v):
+	case is_struct_ins(v):
 		s := v.data.DataType.Tag.(*Struct)
 		// Is not struct literal
 		if s.Id != v.data.Value {
@@ -136,7 +136,7 @@ func (u *unary) amper() value {
 		v.data.DataType.Kind = lex.KND_AMPER + v.data.DataType.Kind
 		return v
 	case !can_get_ptr(v):
-		u.p.eval.pusherrtok(u.token, "invalid_expr_unary_operator", lex.KND_AMPER)
+		u.p.eval.push_err_tok(u.token, "invalid_expr_unary_operator", lex.KND_AMPER)
 		return v
 	}
 	v.data.DataType.Kind = lex.KND_STAR + v.data.DataType.Kind

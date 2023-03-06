@@ -38,7 +38,7 @@ type Parser struct {
 	rootBlock        *ast.Block
 	nodeBlock        *ast.Block
 	blockTypes       []*TypeAlias
-	block_vars        []*Var
+	block_vars       []*Var
 	waitingImpls     []*ast.Impl
 	eval             *eval
 	linked_aliases   []*ast.TypeAlias
@@ -597,7 +597,7 @@ func (p *Parser) parse_enum_items_str(e *Enum) {
 		} else {
 			expr := value{constant: true, expr: item.Id}
 			item.ExprTag = expr.expr
-			item.Expr.Model = strModel(expr)
+			item.Expr.Model = get_str_model(expr)
 		}
 		itemVar := new(Var)
 		itemVar.Constant = true
@@ -639,7 +639,7 @@ func (p *Parser) parse_enum_items_integer(e *Enum) {
 			item.Expr.Model = model
 			assign_checker{
 				p:         p,
-				t:    e.DataType,
+				t:         e.DataType,
 				v:         val,
 				ignoreAny: true,
 				errtok:    item.Token,
@@ -923,10 +923,10 @@ func (p *Parser) implTrait(model *ast.Impl) {
 	}
 	for _, tf := range trait_def.Defines.Fns {
 		ok := false
-		ds := tf.DefString()
+		ds := tf.DefineString()
 		sf, _, _ := s.Defines.FnById(tf.Id, nil)
 		if sf != nil {
-			ok = tf.Public == sf.Public && ds == sf.DefString()
+			ok = tf.Public == sf.Public && ds == sf.DefineString()
 		}
 		if !ok {
 			p.pusherrtok(model.Target.Token, "not_impl_trait_def", trait_def.Id, ds)
@@ -1259,7 +1259,7 @@ func (p *Parser) variable(model Var) *Var {
 			}
 			assign_checker{
 				p:                p,
-				t:           v.DataType,
+				t:                v.DataType,
 				v:                val,
 				errtok:           v.Token,
 				not_allow_assign: types.IsRef(v.DataType),
@@ -1282,8 +1282,8 @@ func (p *Parser) variable(model Var) *Var {
 		v.ExprTag = val.expr
 		if !types.IsAllowForConst(v.DataType) {
 			p.pusherrtok(v.Token, "invalid_type_for_const", v.DataType.Kind)
-		} else if v.SetterTok.Id != lex.ID_NA && !validExprForConst(val) {
-			p.eval.pusherrtok(v.Token, "expr_not_const")
+		} else if v.SetterTok.Id != lex.ID_NA && !is_valid_for_const(val) {
+			p.eval.push_err_tok(v.Token, "expr_not_const")
 		}
 	}
 	return v
@@ -1945,13 +1945,13 @@ func (p *Parser) check_fn_special_cases(f *Fn) {
 	}
 }
 
-func (p *Parser) call_fn(f *Fn, data callData, m *exprModel) value {
+func (p *Parser) call_fn(f *Fn, data call_data, m *expr_model) value {
 	v := p.parse_fn_call_toks(f, data.generics, data.args, m)
 	v.lvalue = types.IsLvalue(v.data.DataType)
 	return v
 }
 
-func (p *Parser) callStructConstructor(s *Struct, argsToks []lex.Token, m *exprModel) (v value) {
+func (p *Parser) callStructConstructor(s *Struct, argsToks []lex.Token, m *expr_model) (v value) {
 	f := s.Constructor
 	s = f.RetType.DataType.Tag.(*Struct)
 	v.data.DataType = f.RetType.DataType.Copy()
@@ -2225,7 +2225,7 @@ ok:
 	return true
 }
 
-func (p *Parser) parse_fn_call(f *Fn, args *ast.Args, m *exprModel, errTok lex.Token) (v value) {
+func (p *Parser) parse_fn_call(f *Fn, args *ast.Args, m *expr_model, errTok lex.Token) (v value) {
 	args.NeedsPureType = p.rootBlock == nil || len(p.rootBlock.Func.Generics) == 0
 	if f.Receiver != nil {
 		switch f.Receiver.Tag.(type) {
@@ -2304,7 +2304,7 @@ end:
 	return
 }
 
-func (p *Parser) parse_fn_call_toks(f *Fn, genericsToks, argsToks []lex.Token, m *exprModel) (v value) {
+func (p *Parser) parse_fn_call_toks(f *Fn, genericsToks, argsToks []lex.Token, m *expr_model) (v value) {
 	var generics []Type
 	var args *ast.Args
 	var err bool
@@ -2328,7 +2328,7 @@ func (p *Parser) parseStructArgs(f *Fn, args *ast.Args, errTok lex.Token) {
 	sap.parse()
 }
 
-func (p *Parser) parsePureArgs(f *Fn, args *ast.Args, m *exprModel, errTok lex.Token) {
+func (p *Parser) parsePureArgs(f *Fn, args *ast.Args, m *expr_model, errTok lex.Token) {
 	pap := pureArgParser{
 		p:      p,
 		f:      f,
@@ -2339,7 +2339,7 @@ func (p *Parser) parsePureArgs(f *Fn, args *ast.Args, m *exprModel, errTok lex.T
 	pap.parse()
 }
 
-func (p *Parser) parseArgs(f *Fn, args *ast.Args, m *exprModel, errTok lex.Token) {
+func (p *Parser) parseArgs(f *Fn, args *ast.Args, m *expr_model, errTok lex.Token) {
 	if args.Targeted {
 		p.parseStructArgs(f, args, errTok)
 		return
@@ -2525,7 +2525,7 @@ func (p *Parser) check_arg(f *Fn, pair *paramMapPair, args *ast.Args, variadiced
 	p.checkArgType(pair.param, v, pair.arg.Token)
 }
 
-func (p *Parser) parseArg(f *Fn, pair *paramMapPair, args *ast.Args, variadiced *bool) {
+func (p *Parser) parse_arg(f *Fn, pair *paramMapPair, args *ast.Args, variadiced *bool) {
 	var v value
 	var model ast.ExprModel
 	if pair.param.Variadic {
@@ -2541,7 +2541,7 @@ func (p *Parser) parseArg(f *Fn, pair *paramMapPair, args *ast.Args, variadiced 
 func (p *Parser) check_assign_type(real Type, val value, errTok lex.Token) {
 	assign_checker{
 		p:      p,
-		t: real,
+		t:      real,
 		v:      val,
 		errtok: errTok,
 	}.check()
@@ -2750,7 +2750,7 @@ func (p *Parser) recover_fn_expr_st(s *ast.ExprSt, i *int) {
 	}
 	v, _ := p.eval_expr(args.Src[0].Expr, nil)
 	if v.data.DataType.Kind != handleParam.DataType.Kind {
-		p.eval.pusherrtok(errtok, "incompatible_types",
+		p.eval.push_err_tok(errtok, "incompatible_types",
 			handleParam.DataType.Kind, v.data.DataType.Kind)
 		return
 	}
@@ -2797,7 +2797,7 @@ func (p *Parser) parseCase(c *ast.Case, expr_t Type) {
 		expr.Model = model
 		assign_checker{
 			p:      p,
-			t: expr_t,
+			t:      expr_t,
 			v:      value,
 			errtok: expr.Tokens[0],
 		}.check()
@@ -3081,15 +3081,15 @@ func (p *Parser) var_st(v *Var) {
 }
 
 func (p *Parser) concurrent_call(cc *ast.ConcurrentCall) {
-	m := new(exprModel)
-	m.nodes = make([]exprBuildNode, 1)
+	m := new(expr_model)
+	m.nodes = make([]expr_build_node, 1)
 	_, cc.Expr.Model = p.eval_expr(cc.Expr, nil)
 }
 
 func (p *Parser) check_assign(left value, errtok lex.Token) bool {
 	state := true
 	if !left.lvalue {
-		p.eval.pusherrtok(errtok, "assign_require_lvalue")
+		p.eval.push_err_tok(errtok, "assign_require_lvalue")
 		state = false
 	}
 	if left.constant {
@@ -3131,7 +3131,7 @@ func (p *Parser) single_assign(assign *ast.Assign, l, r []value) {
 	}
 	assign_checker{
 		p:      p,
-		t: left.data.DataType,
+		t:      left.data.DataType,
 		v:      right,
 		errtok: assign.Setter,
 	}.check()
@@ -3156,8 +3156,8 @@ func (p *Parser) assign_exprs(ast *ast.Assign) (l []value, r []value) {
 				r_type = &v.data.DataType
 			}
 
-			if (!left.Var.New &&
-				!(len(left.Expr.Tokens) == 1 && lex.IsIgnoreId(left.Expr.Tokens[0].Kind))) {
+			if !left.Var.New &&
+				!(len(left.Expr.Tokens) == 1 && lex.IsIgnoreId(left.Expr.Tokens[0].Kind)) {
 				set_existing()
 			} else {
 				def, _, canshadow := p.block_define_by_id(left.Var.Id)
@@ -3236,7 +3236,7 @@ func (p *Parser) multi_assign(assign *ast.Assign, l []value, r []value) {
 		p.check_valid_init_expr(leftExpr.mutable, right, assign.Setter)
 		assign_checker{
 			p:      p,
-			t: leftExpr.data.DataType,
+			t:      leftExpr.data.DataType,
 			v:      right,
 			errtok: assign.Setter,
 		}.check()
@@ -3263,7 +3263,7 @@ func (p *Parser) postfix(assign *ast.Assign, l, r []value) {
 	}
 	checkType := left.data.DataType
 	if types.IsRef(checkType) {
-		checkType = types.DerefPtrOrRef(checkType)
+		checkType = types.Elem(checkType)
 	}
 	if types.IsPure(checkType) && types.IsNumeric(checkType.Id) {
 		return
@@ -3309,7 +3309,7 @@ func (p *Parser) whileProfile(iter *ast.Iter) {
 	val, model := p.eval_expr(profile.Expr, nil)
 	profile.Expr.Model = model
 	iter.Profile = profile
-	if !p.eval.has_error && val.data.Value != "" && !isBoolExpr(val) {
+	if !p.eval.has_error && val.data.Value != "" && !is_bool_expr(val) {
 		p.pusherrtok(iter.Token, "iter_while_require_bool_expr")
 	}
 	if profile.Next.Data != nil {
@@ -3327,7 +3327,7 @@ func (p *Parser) foreachProfile(iter *ast.Iter) {
 	val, model := p.eval_expr(profile.Expr, nil)
 	profile.Expr.Model = model
 	profile.ExprType = val.data.DataType
-	if !p.eval.has_error && val.data.Value != "" && !isForeachIterExpr(val) {
+	if !p.eval.has_error && val.data.Value != "" && !is_foreach_iter_expr(val) {
 		p.pusherrtok(iter.Token, "iter_foreach_require_enumerable_expr")
 	} else {
 		fc := foreachChecker{p, &profile, val}
@@ -3364,7 +3364,7 @@ func (p *Parser) iter(iter *ast.Iter) {
 func (p *Parser) conditional_node(node *ast.If) {
 	val, model := p.eval_expr(node.Expr, nil)
 	node.Expr.Model = model
-	if !p.eval.has_error && val.data.Value != "" && !isBoolExpr(val) {
+	if !p.eval.has_error && val.data.Value != "" && !is_bool_expr(val) {
 		p.pusherrtok(node.Token, "if_require_bool_expr")
 	}
 	p.checkNewBlock(node.Block)
@@ -3674,13 +3674,13 @@ func (p *Parser) typeSourceIsArrayType(arr_t *Type) (ok bool) {
 	val, model := p.eval_expr(arr_t.Size.Expr, nil)
 	arr_t.Size.Expr.Model = model
 	if val.constant {
-		arr_t.Size.N = ast.Size(tonumu(val.expr))
+		arr_t.Size.N = ast.Size(to_num_unsigned(val.expr))
 	} else {
-		p.eval.pusherrtok(arr_t.Token, "expr_not_const")
+		p.eval.push_err_tok(arr_t.Token, "expr_not_const")
 	}
 	assign_checker{
 		p:      p,
-		t: Type{Id: types.UINT, Kind: types.TYPE_MAP[types.UINT]},
+		t:      Type{Id: types.UINT, Kind: types.TYPE_MAP[types.UINT]},
 		v:      val,
 		errtok: arr_t.Size.Expr.Tokens[0],
 	}.check()
@@ -3704,7 +3704,7 @@ func (p *Parser) check_type_validity(expr_t Type, errtok lex.Token) {
 		p.pusherrtok(expr_t.Token, "invalid_type")
 		return
 	}
-	if types.IsRef(expr_t) && !types.ValidForRef(types.DerefPtrOrRef(expr_t)) {
+	if types.IsRef(expr_t) && !types.ValidForRef(types.Elem(expr_t)) {
 		p.pusherrtok(errtok, "invalid_type")
 		return
 	}
@@ -3722,7 +3722,7 @@ func (p *Parser) get_define(id string, cpp_linked bool) any {
 		def, _ = p.linkById(id)
 	} else if strings.Contains(id, lex.KND_DBLCOLON) { // Has namespace?
 		toks := p.tokenizeDataType(id)
-		defs := p.eval.getNs(&toks)
+		defs := p.eval.get_ns(&toks)
 		if defs == nil {
 			return nil
 		}
@@ -3836,7 +3836,7 @@ func (p *Parser) checkMultiType(real, check Type, ignoreAny bool, errTok lex.Tok
 
 func (p *Parser) check_type(real, check Type, ignoreAny, allow_assign bool, errTok lex.Token) {
 	if types.IsVoid(check) {
-		p.eval.pusherrtok(errTok, "incompatible_types", real.Kind, check.Kind)
+		p.eval.push_err_tok(errTok, "incompatible_types", real.Kind, check.Kind)
 		return
 	}
 	if !ignoreAny && real.Id == types.ANY {

@@ -8,7 +8,7 @@ import (
 	"github.com/julelang/jule/types"
 )
 
-type builtin_caller = func(*Parser, *Fn, callData, *exprModel) value
+type builtin_caller = func(*Parser, *Fn, call_data, *expr_model) value
 
 const maxI8 = 127
 const minI8 = -128
@@ -620,7 +620,7 @@ func init() {
 
 // builtin
 
-func caller_out(p *Parser, f *Fn, data callData, m *exprModel) (v value) {
+func caller_out(p *Parser, f *Fn, data call_data, m *expr_model) (v value) {
 	errtok := data.args[0]
 	v.data.DataType = f.RetType.DataType
 	// Remove parentheses
@@ -634,7 +634,7 @@ func caller_out(p *Parser, f *Fn, data callData, m *exprModel) (v value) {
 	return v
 }
 
-func caller_make(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
+func caller_make(p *Parser, _ *Fn, data call_data, m *expr_model) (v value) {
 	errtok := data.args[0]
 	args := p.get_args(data.args, false)
 	if len(args.Src) == 0 {
@@ -665,7 +665,7 @@ func caller_make(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	return
 }
 
-func caller_copy(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
+func caller_copy(p *Parser, _ *Fn, data call_data, m *expr_model) (v value) {
 	v.data.DataType.Id = types.INT
 	v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	v.data.Value = " "
@@ -698,7 +698,7 @@ func caller_copy(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 			p.pusherrtok(errtok, "incompatible_types", t.Kind, src_v.data.DataType.Kind)
 			return
 		}
-		
+
 		if !types.IsPure(src_v.data.DataType) || src_v.data.DataType.Id != types.STR {
 			p.pusherrtok(errtok, "incompatible_types", t.Kind, src_v.data.DataType.Kind)
 			return
@@ -719,7 +719,7 @@ func caller_copy(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	return v
 }
 
-func caller_append(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
+func caller_append(p *Parser, _ *Fn, data call_data, m *expr_model) (v value) {
 	errtok := data.args[0]
 	args := p.get_args(data.args, false)
 	if len(args.Src) < 1 {
@@ -741,26 +741,26 @@ func caller_append(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	v.data.Value = " "
 	// Set mutable to true because return types must be mutable all time.
 	v.mutable = true
-	
+
 	m.append_sub(exprNode{"("})
 	m.append_sub(src_expr_model)
 	m.append_sub(exprNode{",{"})
-	
+
 	for _, arg := range args.Src[1:] {
 		arg_expr := arg.Expr
 		arg_v, arg_expr_model := p.eval_expr(arg_expr, nil)
 
 		p.check_assign_type(*t, arg_v, errtok)
-		
+
 		m.append_sub(arg_expr_model)
 		m.append_sub(exprNode{","})
 	}
-	
+
 	m.append_sub(exprNode{"})"})
 	return v
 }
 
-func caller_drop(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
+func caller_drop(p *Parser, _ *Fn, data call_data, m *expr_model) (v value) {
 	errtok := data.args[0]
 	args := p.get_args(data.args, false)
 	if len(args.Src) < 1 {
@@ -784,7 +784,7 @@ func caller_drop(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	return v
 }
 
-func caller_real(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
+func caller_real(p *Parser, _ *Fn, data call_data, m *expr_model) (v value) {
 	v.data.DataType.Id = types.BOOL
 	v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 
@@ -809,7 +809,7 @@ func caller_real(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
 	return v
 }
 
-func caller_new(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
+func caller_new(p *Parser, _ *Fn, data call_data, m *expr_model) (v value) {
 	errtok := data.args[0]
 	args := p.get_args(data.args, false)
 	if len(args.Src) < 1 {
@@ -869,7 +869,7 @@ var std_mem_builtin = &ast.Defmap{
 	},
 }
 
-func caller_mem_size_of(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
+func caller_mem_size_of(p *Parser, _ *Fn, data call_data, m *expr_model) (v value) {
 	// Remove parentheses
 	data.args = data.args[1 : len(data.args)-1]
 	v.data.DataType = Type{
@@ -896,7 +896,7 @@ func caller_mem_size_of(p *Parser, _ *Fn, data callData, m *exprModel) (v value)
 	return
 }
 
-func caller_mem_align_of(p *Parser, _ *Fn, data callData, m *exprModel) (v value) {
+func caller_mem_align_of(p *Parser, _ *Fn, data call_data, m *expr_model) (v value) {
 	// Remove parentheses
 	data.args = data.args[1 : len(data.args)-1]
 	v.data.DataType = Type{
@@ -927,7 +927,7 @@ var std_builtin_defines = map[string]*ast.Defmap{
 	"std::mem": std_mem_builtin,
 }
 
-func fn_make(p *Parser, m *exprModel, t ast.Type, args *ast.Args, errtok lex.Token) (v value) {
+func fn_make(p *Parser, m *expr_model, t ast.Type, args *ast.Args, errtok lex.Token) (v value) {
 	v.data.DataType = t
 	v.data.Value = " "
 	// Set mutable to true because return types must be mutable all time.

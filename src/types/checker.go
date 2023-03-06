@@ -128,8 +128,8 @@ type Checker struct {
 	Errors      []build.Log
 }
 
-// pusherrtok appends new error by token.
-func (c *Checker) pusherrtok(tok lex.Token, key string, args ...any) {
+// push_err_tok appends new error by token.
+func (c *Checker) push_err_tok(tok lex.Token, key string, args ...any) {
 	c.Errors = append(c.Errors, build.Log{
 		Type:   build.ERR,
 		Row:    tok.Row,
@@ -145,7 +145,7 @@ func (c *Checker) check_ref() bool {
 	} else if !c.AllowAssign {
 		return false
 	}
-	c.L = DerefPtrOrRef(c.L)
+	c.L = Elem(c.L)
 	return c.Check()
 }
 
@@ -177,7 +177,7 @@ func (c *Checker) check_trait() bool {
 	switch {
 	case IsRef(c.R):
 		ref = true
-		c.R = DerefPtrOrRef(c.R)
+		c.R = Elem(c.R)
 		if !IsStruct(c.R) {
 			break
 		}
@@ -196,7 +196,7 @@ func (c *Checker) check_trait() bool {
 		}
 		if trait_has_reference_receiver(t) && !ref {
 			c.ErrorLogged = true
-			c.pusherrtok(c.ErrTok, "trait_has_reference_parametered_function")
+			c.push_err_tok(c.ErrTok, "trait_has_reference_parametered_function")
 			return false
 		}
 		return true

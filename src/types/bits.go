@@ -44,7 +44,7 @@ func BitsizeFloat(x float64) uint64 {
 // MAX_INT is the maximum bitsize of integer types.
 const MAX_INT = 64
 
-type bitChecker = func(v string, base int, bit int) error
+type bit_checker = func(v string, base int, bit int) error
 
 // CheckBitInt reports integer is compatible this bit-size or not.
 func CheckBitInt(v string, bit int) bool {
@@ -63,7 +63,7 @@ func CheckBitUInt(v string, bit int) bool {
 	})
 }
 
-func check_bit(v string, bit int, checker bitChecker) bool {
+func check_bit(v string, bit int, checker bit_checker) bool {
 	var err error
 	switch {
 	case v == "":

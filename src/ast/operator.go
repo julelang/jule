@@ -39,15 +39,15 @@ var WEAK_OPS = [...]string{
 
 // IsUnaryOp is returns true if operator is unary or smilar to unary,
 // returns false if not.
-func IsUnaryOp(kind string) bool { return existOp(kind, UNARY_OPS[:]) }
+func IsUnaryOp(kind string) bool { return exist_op(kind, UNARY_OPS[:]) }
 
 // IsStrongOp returns true operator kind is not repeatable, false if not.
-func IsStrongOp(kind string) bool { return existOp(kind, STRONG_OPS[:]) }
+func IsStrongOp(kind string) bool { return exist_op(kind, STRONG_OPS[:]) }
 
 // IsExprOp reports operator kind is allow as expression operator or not.
-func IsExprOp(kind string) bool { return existOp(kind, WEAK_OPS[:]) }
+func IsExprOp(kind string) bool { return exist_op(kind, WEAK_OPS[:]) }
 
-func existOp(kind string, operators []string) bool {
+func exist_op(kind string, operators []string) bool {
 	for _, operator := range operators {
 		if kind == operator {
 			return true

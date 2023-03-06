@@ -12,11 +12,11 @@ import (
 
 type literal_eval struct {
 	token lex.Token
-	model *exprModel
+	model *expr_model
 	p     *Parser
 }
 
-func strModel(v value) ast.ExprModel {
+func get_str_model(v value) ast.ExprModel {
 	content := v.expr.(string)
 	if lex.IsRawStr(content) {
 		return exprNode{ToRawStrLiteral([]byte(content))}
@@ -24,7 +24,7 @@ func strModel(v value) ast.ExprModel {
 	return exprNode{ToStrLiteral([]byte(content))}
 }
 
-func boolModel(v value) ast.ExprModel {
+func get_bool_model(v value) ast.ExprModel {
 	if v.expr.(bool) {
 		return exprNode{lex.KND_TRUE}
 	}
@@ -34,15 +34,15 @@ func boolModel(v value) ast.ExprModel {
 func get_const_expr_model(v value) ast.ExprModel {
 	switch v.expr.(type) {
 	case string:
-		return strModel(v)
+		return get_str_model(v)
 	case bool:
-		return boolModel(v)
+		return get_bool_model(v)
 	default:
-		return numericModel(v)
+		return get_num_model(v)
 	}
 }
 
-func numericModel(v value) ast.ExprModel {
+func get_num_model(v value) ast.ExprModel {
 	switch t := v.expr.(type) {
 	case uint64:
 		fmt := strconv.FormatUint(t, 10)
@@ -56,7 +56,7 @@ func numericModel(v value) ast.ExprModel {
 	case float64:
 		switch {
 		case normalize(&v):
-			return numericModel(v)
+			return get_num_model(v)
 		case v.data.DataType.Id == types.F32:
 			return exprNode{strconv.FormatFloat(t, 'e', -1, 32) + "f"}
 		case v.data.DataType.Id == types.F64:
@@ -74,12 +74,12 @@ func (ve *literal_eval) str() value {
 	v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	content := ve.token.Kind[1 : len(ve.token.Kind)-1]
 	v.expr = content
-	v.model = strModel(v)
+	v.model = get_str_model(v)
 	ve.model.append_sub(v.model)
 	return v
 }
 
-func toByteLiteral(kind string) (string, bool) {
+func to_byte_literal(kind string) (string, bool) {
 	kind = kind[1 : len(kind)-1]
 	isByte := false
 	switch {
@@ -97,7 +97,7 @@ func (ve *literal_eval) rune() value {
 	var v value
 	v.constant = true
 	v.data.Value = ve.token.Kind
-	content, isByte := toByteLiteral(ve.token.Kind)
+	content, isByte := to_byte_literal(ve.token.Kind)
 	if isByte {
 		v.data.DataType.Id = types.U8
 	} else { // rune
@@ -118,7 +118,7 @@ func (ve *literal_eval) bool() value {
 	v.data.DataType.Id = types.BOOL
 	v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	v.expr = ve.token.Kind == lex.KND_TRUE
-	v.model = boolModel(v)
+	v.model = get_bool_model(v)
 	ve.model.append_sub(v.model)
 	return v
 }
@@ -142,14 +142,14 @@ func normalize(v *value) (normalized bool) {
 	case int_assignable(types.U64, *v):
 		v.data.DataType.Id = types.U64
 		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
-		v.expr = tonumu(v.expr)
-		bitize(v)
+		v.expr = to_num_unsigned(v.expr)
+		normalize_bitsize(v)
 		return true
 	case int_assignable(types.I64, *v):
 		v.data.DataType.Id = types.I64
 		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
-		v.expr = tonums(v.expr)
-		bitize(v)
+		v.expr = to_num_signed(v.expr)
+		normalize_bitsize(v)
 		return true
 	}
 	return
@@ -197,7 +197,7 @@ func (ve *literal_eval) integer() value {
 		}
 	}
 
-	bitize(&v)
+	normalize_bitsize(&v)
 	return v
 }
 
@@ -209,7 +209,7 @@ func (ve *literal_eval) numeric() value {
 		v = ve.integer()
 	}
 	v.constant = true
-	v.model = numericModel(v)
+	v.model = get_num_model(v)
 	ve.model.append_sub(v.model)
 	return v
 }
@@ -260,7 +260,7 @@ func (ve *literal_eval) fn_id(id string, f *Fn) (v value) {
 	return
 }
 
-func (ve *literal_eval) enumId(id string, e *Enum) (v value) {
+func (ve *literal_eval) enum_id(id string, e *Enum) (v value) {
 	e.Used = true
 	v.data.Value = id
 	v.data.DataType.Id = types.ENUM
@@ -332,7 +332,7 @@ func (ve *literal_eval) id() (_ value, ok bool) {
 
 	e, _, _ := ve.p.enum_by_id(id)
 	if e != nil {
-		return ve.enumId(id, e), true
+		return ve.enum_id(id, e), true
 	}
 
 	s, _, _ := ve.p.struct_by_id(id)
@@ -345,6 +345,6 @@ func (ve *literal_eval) id() (_ value, ok bool) {
 		return ve.type_id(id, t)
 	}
 
-	ve.p.eval.pusherrtok(ve.token, "id_not_exist", id)
+	ve.p.eval.push_err_tok(ve.token, "id_not_exist", id)
 	return
 }

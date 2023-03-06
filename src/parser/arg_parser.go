@@ -7,7 +7,7 @@ import (
 	"github.com/julelang/jule/types"
 )
 
-func getParamMap(params []Param) *paramMap {
+func get_param_map(params []Param) *paramMap {
 	pmap := new(paramMap)
 	*pmap = make(paramMap, len(params))
 	for i := range params {
@@ -25,11 +25,11 @@ type pureArgParser struct {
 	i       int
 	arg     Arg
 	errTok  lex.Token
-	m       *exprModel
+	m       *expr_model
 	paramId string
 }
 
-func (pap *pureArgParser) buildArgs() {
+func (pap *pureArgParser) build_args() {
 	if pap.pmap == nil {
 		return
 	}
@@ -51,13 +51,13 @@ func (pap *pureArgParser) push_variadic_args(pair *paramMapPair) {
 	var model serieExpr
 	model.exprs = append(model.exprs, exprNode{lex.KND_LBRACE})
 	variadiced := false
-	pap.p.parseArg(pap.f, pair, pap.args, &variadiced)
+	pap.p.parse_arg(pap.f, pair, pap.args, &variadiced)
 	model.exprs = append(model.exprs, exprNode{pair.arg.String()})
 	once := false
 	for pap.i++; pap.i < len(pap.args.Src); pap.i++ {
 		pair.arg = &pap.args.Src[pap.i]
 		once = true
-		pap.p.parseArg(pap.f, pair, pap.args, &variadiced)
+		pap.p.parse_arg(pap.f, pair, pap.args, &variadiced)
 		model.exprs = append(model.exprs, exprNode{lex.KND_COMMA})
 		model.exprs = append(model.exprs, exprNode{pair.arg.String()})
 	}
@@ -101,7 +101,7 @@ func (pap *pureArgParser) check_passes_fn() {
 	}
 }
 
-func (pap *pureArgParser) checkPasses() {
+func (pap *pureArgParser) check_passes() {
 	if pap.f.IsConstructor() {
 		pap.check_passes_struct()
 		return
@@ -109,14 +109,14 @@ func (pap *pureArgParser) checkPasses() {
 	pap.check_passes_fn()
 }
 
-func (pap *pureArgParser) pushArg() {
+func (pap *pureArgParser) push_arg() {
 	pair := (*pap.pmap)[pap.paramId]
 	arg := pap.arg
 	pair.arg = &arg
 	if pair.param.Variadic {
 		pap.push_variadic_args(pair)
 	} else {
-		pap.p.parseArg(pap.f, pair, pap.args, nil)
+		pap.p.parse_arg(pap.f, pair, pap.args, nil)
 	}
 	pap.i++
 }
@@ -127,11 +127,11 @@ func is_multi_ret_as_args(f *Fn, nargs int) bool {
 
 func (pap *pureArgParser) parse() {
 	if is_multi_ret_as_args(pap.f, len(pap.args.Src)) {
-		if pap.tryFuncMultiRetAsArgs() {
+		if pap.try_fn_multi_ret_as_args() {
 			return
 		}
 	}
-	pap.pmap = getParamMap(pap.f.Params)
+	pap.pmap = get_param_map(pap.f.Params)
 	argCount := 0
 	for pap.i < len(pap.args.Src) {
 		if argCount >= len(pap.f.Params) {
@@ -141,13 +141,13 @@ func (pap *pureArgParser) parse() {
 		argCount++
 		pap.arg = pap.args.Src[pap.i]
 		pap.paramId = pap.f.Params[pap.i].Id
-		pap.pushArg()
+		pap.push_arg()
 	}
-	pap.checkPasses()
-	pap.buildArgs()
+	pap.check_passes()
+	pap.build_args()
 }
 
-func (pap *pureArgParser) tryFuncMultiRetAsArgs() bool {
+func (pap *pureArgParser) try_fn_multi_ret_as_args() bool {
 	arg := pap.args.Src[0]
 	val, model := pap.p.eval_expr(arg.Expr, nil)
 	arg.Expr.Model = model

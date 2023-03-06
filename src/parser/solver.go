@@ -5,7 +5,7 @@ import (
 	"github.com/julelang/jule/types"
 )
 
-func setshift(v *value, right uint64) {
+func assign_shift(v *value, right uint64) {
 	switch {
 	case right <= 6:
 		v.data.DataType.Id = types.I8
@@ -30,7 +30,7 @@ func setshift(v *value, right uint64) {
 	}
 }
 
-func bitize(v *value) {
+func normalize_bitsize(v *value) {
 	id := types.VOID
 	switch t := v.expr.(type) {
 	case float64:
@@ -50,7 +50,7 @@ func bitize(v *value) {
 	}
 }
 
-func tonumf(expr any) float64 {
+func to_num_float(expr any) float64 {
 	switch t := expr.(type) {
 	case float64:
 		return t
@@ -62,7 +62,7 @@ func tonumf(expr any) float64 {
 	return 0
 }
 
-func tonumu(expr any) uint64 {
+func to_num_unsigned(expr any) uint64 {
 	switch t := expr.(type) {
 	case float64:
 		return uint64(t)
@@ -74,7 +74,7 @@ func tonumu(expr any) uint64 {
 	return 0
 }
 
-func tonums(expr any) int64 {
+func to_num_signed(expr any) int64 {
 	switch t := expr.(type) {
 	case float64:
 		return int64(t)
@@ -110,15 +110,15 @@ func (s *solver) eq(v *value) {
 	case string:
 		v.expr = left == s.r.expr.(string)
 	case float64:
-		v.expr = left == tonumf(s.r.expr)
+		v.expr = left == to_num_float(s.r.expr)
 	case int64:
-		v.expr = left == tonums(s.r.expr)
+		v.expr = left == to_num_signed(s.r.expr)
 	case uint64:
-		v.expr = left == tonumu(s.r.expr)
+		v.expr = left == to_num_unsigned(s.r.expr)
 	}
 }
 
-func (s *solver) noteq(v *value) {
+func (s *solver) not_eq(v *value) {
 	if !s.is_const_expr() {
 		return
 	}
@@ -132,11 +132,11 @@ func (s *solver) lt(v *value) {
 	}
 	switch left := s.l.expr.(type) {
 	case float64:
-		v.expr = left < tonumf(s.r.expr)
+		v.expr = left < to_num_float(s.r.expr)
 	case int64:
-		v.expr = left < tonums(s.r.expr)
+		v.expr = left < to_num_signed(s.r.expr)
 	case uint64:
-		v.expr = left < tonumu(s.r.expr)
+		v.expr = left < to_num_unsigned(s.r.expr)
 	}
 }
 
@@ -146,39 +146,39 @@ func (s *solver) gt(v *value) {
 	}
 	switch left := s.l.expr.(type) {
 	case float64:
-		v.expr = left > tonumf(s.r.expr)
+		v.expr = left > to_num_float(s.r.expr)
 	case int64:
-		v.expr = left > tonums(s.r.expr)
+		v.expr = left > to_num_signed(s.r.expr)
 	case uint64:
-		v.expr = left > tonumu(s.r.expr)
+		v.expr = left > to_num_unsigned(s.r.expr)
 	}
 }
 
-func (s *solver) lteq(v *value) {
+func (s *solver) lt_eq(v *value) {
 	if !s.is_const_expr() {
 		return
 	}
 	switch left := s.l.expr.(type) {
 	case float64:
-		v.expr = left <= tonumf(s.r.expr)
+		v.expr = left <= to_num_float(s.r.expr)
 	case int64:
-		v.expr = left <= tonums(s.r.expr)
+		v.expr = left <= to_num_signed(s.r.expr)
 	case uint64:
-		v.expr = left <= tonumu(s.r.expr)
+		v.expr = left <= to_num_unsigned(s.r.expr)
 	}
 }
 
-func (s *solver) gteq(v *value) {
+func (s *solver) gt_eq(v *value) {
 	if !s.is_const_expr() {
 		return
 	}
 	switch left := s.l.expr.(type) {
 	case float64:
-		v.expr = left >= tonumf(s.r.expr)
+		v.expr = left >= to_num_float(s.r.expr)
 	case int64:
-		v.expr = left >= tonums(s.r.expr)
+		v.expr = left >= to_num_signed(s.r.expr)
 	case uint64:
-		v.expr = left >= tonumu(s.r.expr)
+		v.expr = left >= to_num_unsigned(s.r.expr)
 	}
 }
 
@@ -190,11 +190,11 @@ func (s *solver) add(v *value) {
 	case string:
 		v.expr = left + s.r.expr.(string)
 	case float64:
-		v.expr = left + tonumf(s.r.expr)
+		v.expr = left + to_num_float(s.r.expr)
 	case int64:
-		v.expr = int64(left + tonums(s.r.expr))
+		v.expr = int64(left + to_num_signed(s.r.expr))
 	case uint64:
-		v.expr = uint64(left + tonumu(s.r.expr))
+		v.expr = uint64(left + to_num_unsigned(s.r.expr))
 	}
 }
 
@@ -204,11 +204,11 @@ func (s *solver) sub(v *value) {
 	}
 	switch left := s.l.expr.(type) {
 	case float64:
-		v.expr = left - tonumf(s.r.expr)
+		v.expr = left - to_num_float(s.r.expr)
 	case int64:
-		v.expr = int64(left - tonums(s.r.expr))
+		v.expr = int64(left - to_num_signed(s.r.expr))
 	case uint64:
-		v.expr = uint64(left - tonumu(s.r.expr))
+		v.expr = uint64(left - to_num_unsigned(s.r.expr))
 	}
 }
 
@@ -218,11 +218,11 @@ func (s *solver) mul(v *value) {
 	}
 	switch left := s.l.expr.(type) {
 	case float64:
-		v.expr = left * tonumf(s.r.expr)
+		v.expr = left * to_num_float(s.r.expr)
 	case int64:
-		v.expr = int64(left * tonums(s.r.expr))
+		v.expr = int64(left * to_num_signed(s.r.expr))
 	case uint64:
-		v.expr = uint64(left * tonumu(s.r.expr))
+		v.expr = uint64(left * to_num_unsigned(s.r.expr))
 	}
 }
 
@@ -232,7 +232,7 @@ func (s *solver) div(v *value) {
 	}
 	switch left := s.l.expr.(type) {
 	case float64:
-		right := tonumf(s.r.expr)
+		right := to_num_float(s.r.expr)
 		if right != 0 {
 			v.expr = left / right
 		} else {
@@ -240,7 +240,7 @@ func (s *solver) div(v *value) {
 			v.expr = float64(0)
 		}
 	case int64:
-		right := tonumf(s.r.expr)
+		right := to_num_float(s.r.expr)
 		if right != 0 {
 			v.expr = float64(left) / right
 		} else {
@@ -248,7 +248,7 @@ func (s *solver) div(v *value) {
 			v.expr = int64(0)
 		}
 	case uint64:
-		right := tonumf(s.r.expr)
+		right := to_num_float(s.r.expr)
 		if right != 0 {
 			v.expr = float64(left) / right
 		} else {
@@ -264,7 +264,7 @@ func (s *solver) mod(v *value) {
 	}
 	switch left := s.l.expr.(type) {
 	case int64:
-		right := tonums(s.r.expr)
+		right := to_num_signed(s.r.expr)
 		if right != 0 {
 			v.expr = left % right
 		} else {
@@ -272,7 +272,7 @@ func (s *solver) mod(v *value) {
 			v.expr = int64(0)
 		}
 	case uint64:
-		right := tonumu(s.r.expr)
+		right := to_num_unsigned(s.r.expr)
 		if right != 0 {
 			v.expr = left % right
 		} else {
@@ -282,89 +282,89 @@ func (s *solver) mod(v *value) {
 	}
 }
 
-func (s *solver) bitwiseAnd(v *value) {
+func (s *solver) bitwise_and(v *value) {
 	if !s.is_const_expr() {
 		return
 	}
 	switch left := s.l.expr.(type) {
 	case int64:
-		v.expr = left & tonums(s.r.expr)
+		v.expr = left & to_num_signed(s.r.expr)
 	case uint64:
-		v.expr = left & tonumu(s.r.expr)
+		v.expr = left & to_num_unsigned(s.r.expr)
 	}
 }
 
-func (s *solver) bitwiseOr(v *value) {
+func (s *solver) bitwise_or(v *value) {
 	if !s.is_const_expr() {
 		return
 	}
 	switch left := s.l.expr.(type) {
 	case int64:
-		v.expr = left | tonums(s.r.expr)
+		v.expr = left | to_num_signed(s.r.expr)
 	case uint64:
-		v.expr = left | tonumu(s.r.expr)
+		v.expr = left | to_num_unsigned(s.r.expr)
 	}
 }
 
-func (s *solver) bitwiseXor(v *value) {
+func (s *solver) bitwise_xor(v *value) {
 	if !s.is_const_expr() {
 		return
 	}
 	switch left := s.l.expr.(type) {
 	case int64:
-		v.expr = left ^ tonums(s.r.expr)
+		v.expr = left ^ to_num_signed(s.r.expr)
 	case uint64:
-		v.expr = left ^ tonumu(s.r.expr)
+		v.expr = left ^ to_num_unsigned(s.r.expr)
 	}
 }
 
-func (s *solver) urshift(v *value) {
-	left := tonumu(s.l.expr)
-	right := tonumu(s.r.expr)
+func (s *solver) right_shift_unsigned(v *value) {
+	left := to_num_unsigned(s.l.expr)
+	right := to_num_unsigned(s.r.expr)
 	v.expr = left >> right
-	setshift(v, right)
+	assign_shift(v, right)
 }
 
-func (s *solver) rshift(v *value) {
+func (s *solver) right_shift(v *value) {
 	if !s.is_const_expr() {
 		return
 	}
 	switch left := s.l.expr.(type) {
 	case int64:
 		if left < 0 {
-			right := tonumu(s.r.expr)
+			right := to_num_unsigned(s.r.expr)
 			v.expr = left >> right
-			setshift(v, right)
+			assign_shift(v, right)
 		} else {
-			s.urshift(v)
+			s.right_shift_unsigned(v)
 		}
 	case uint64:
-		s.urshift(v)
+		s.right_shift_unsigned(v)
 	}
 }
 
-func (s *solver) ulshift(v *value) {
-	left := tonumu(s.l.expr)
-	right := tonumu(s.r.expr)
+func (s *solver) left_shift_unsigned(v *value) {
+	left := to_num_unsigned(s.l.expr)
+	right := to_num_unsigned(s.r.expr)
 	v.expr = left << right
-	setshift(v, right)
+	assign_shift(v, right)
 }
 
-func (s *solver) lshift(v *value) {
+func (s *solver) left_shift(v *value) {
 	if !s.is_const_expr() {
 		return
 	}
 	switch left := s.l.expr.(type) {
 	case int64:
 		if left < 0 {
-			right := tonumu(s.r.expr)
+			right := to_num_unsigned(s.r.expr)
 			v.expr = left << right
-			setshift(v, right)
+			assign_shift(v, right)
 		} else {
-			s.ulshift(v)
+			s.left_shift_unsigned(v)
 		}
 	case uint64:
-		s.ulshift(v)
+		s.left_shift_unsigned(v)
 	}
 }
 
@@ -444,7 +444,7 @@ func (s *solver) str() (v value) {
 	case lex.KND_NOT_EQ:
 		v.data.DataType.Id = types.BOOL
 		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
-		s.noteq(&v)
+		s.not_eq(&v)
 	default:
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.op, "operator_not_for_juletype", s.op.Kind, lex.KND_STR)
@@ -481,7 +481,7 @@ func (s *solver) bool() (v value) {
 	case lex.KND_NOT_EQ:
 		v.data.DataType.Id = types.BOOL
 		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
-		s.noteq(&v)
+		s.not_eq(&v)
 	default:
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.op, "operator_not_for_juletype", s.op.Kind, lex.KND_BOOL)
@@ -489,7 +489,7 @@ func (s *solver) bool() (v value) {
 	return
 }
 
-func (s *solver) floatMod() (v value, ok bool) {
+func (s *solver) float_mod() (v value, ok bool) {
 	if !types.IsInteger(s.l.data.DataType.Id) {
 		if !types.IsInteger(s.r.data.DataType.Id) {
 			return
@@ -530,7 +530,7 @@ func (s *solver) float() (v value) {
 	case lex.KND_NOT_EQ:
 		v.data.DataType.Id = types.BOOL
 		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
-		s.noteq(&v)
+		s.not_eq(&v)
 	case lex.KND_LT:
 		v.data.DataType.Id = types.BOOL
 		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
@@ -542,11 +542,11 @@ func (s *solver) float() (v value) {
 	case lex.KND_GREAT_EQ:
 		v.data.DataType.Id = types.BOOL
 		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
-		s.gteq(&v)
+		s.gt_eq(&v)
 	case lex.KND_LESS_EQ:
 		v.data.DataType.Id = types.BOOL
 		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
-		s.lteq(&v)
+		s.lt_eq(&v)
 	case lex.KND_PLUS:
 		v.data.DataType = s.l.data.DataType
 		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
@@ -580,7 +580,7 @@ func (s *solver) float() (v value) {
 		s.div(&v)
 	case lex.KND_PERCENT:
 		var ok bool
-		v, ok = s.floatMod()
+		v, ok = s.float_mod()
 		if ok {
 			break
 		}
@@ -609,7 +609,7 @@ func (s *solver) signed() (v value) {
 	case lex.KND_NOT_EQ:
 		v.data.DataType.Id = types.BOOL
 		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
-		s.noteq(&v)
+		s.not_eq(&v)
 	case lex.KND_LT:
 		v.data.DataType.Id = types.BOOL
 		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
@@ -621,11 +621,11 @@ func (s *solver) signed() (v value) {
 	case lex.KND_GREAT_EQ:
 		v.data.DataType.Id = types.BOOL
 		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
-		s.gteq(&v)
+		s.gt_eq(&v)
 	case lex.KND_LESS_EQ:
 		v.data.DataType.Id = types.BOOL
 		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
-		s.lteq(&v)
+		s.lt_eq(&v)
 	case lex.KND_PLUS:
 		v.data.DataType = s.l.data.DataType
 		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
@@ -661,33 +661,33 @@ func (s *solver) signed() (v value) {
 		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
 			v.data.DataType = s.r.data.DataType
 		}
-		s.bitwiseAnd(&v)
+		s.bitwise_and(&v)
 	case lex.KND_VLINE:
 		v.data.DataType = s.l.data.DataType
 		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
 			v.data.DataType = s.r.data.DataType
 		}
-		s.bitwiseOr(&v)
+		s.bitwise_or(&v)
 	case lex.KND_CARET:
 		v.data.DataType = s.l.data.DataType
 		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
 			v.data.DataType = s.r.data.DataType
 		}
-		s.bitwiseXor(&v)
+		s.bitwise_xor(&v)
 	case lex.KND_RSHIFT:
 		v.data.DataType.Id = types.U64
 		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
-		if !okForShifting(s.r) {
+		if !is_ok_for_shifting(s.r) {
 			s.p.pusherrtok(s.op, "bitshift_must_unsigned")
 		}
-		s.rshift(&v)
+		s.right_shift(&v)
 	case lex.KND_LSHIFT:
 		v.data.DataType.Id = types.U64
 		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
-		if !okForShifting(s.r) {
+		if !is_ok_for_shifting(s.r) {
 			s.p.pusherrtok(s.op, "bitshift_must_unsigned")
 		}
-		s.lshift(&v)
+		s.left_shift(&v)
 	default:
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.op, "operator_not_for_int", s.op.Kind)
@@ -712,7 +712,7 @@ func (s *solver) unsigned() (v value) {
 	case lex.KND_NOT_EQ:
 		v.data.DataType.Id = types.BOOL
 		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
-		s.noteq(&v)
+		s.not_eq(&v)
 	case lex.KND_LT:
 		v.data.DataType.Id = types.BOOL
 		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
@@ -724,11 +724,11 @@ func (s *solver) unsigned() (v value) {
 	case lex.KND_GREAT_EQ:
 		v.data.DataType.Id = types.BOOL
 		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
-		s.gteq(&v)
+		s.gt_eq(&v)
 	case lex.KND_LESS_EQ:
 		v.data.DataType.Id = types.BOOL
 		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
-		s.lteq(&v)
+		s.lt_eq(&v)
 	case lex.KND_PLUS:
 		v.data.DataType = s.l.data.DataType
 		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
@@ -764,33 +764,33 @@ func (s *solver) unsigned() (v value) {
 		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
 			v.data.DataType = s.r.data.DataType
 		}
-		s.bitwiseAnd(&v)
+		s.bitwise_and(&v)
 	case lex.KND_VLINE:
 		v.data.DataType = s.l.data.DataType
 		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
 			v.data.DataType = s.r.data.DataType
 		}
-		s.bitwiseOr(&v)
+		s.bitwise_or(&v)
 	case lex.KND_CARET:
 		v.data.DataType = s.l.data.DataType
 		if types.TypeGreaterThan(s.r.data.DataType.Id, v.data.DataType.Id) {
 			v.data.DataType = s.r.data.DataType
 		}
-		s.bitwiseXor(&v)
+		s.bitwise_xor(&v)
 	case lex.KND_RSHIFT:
 		v.data.DataType.Id = types.U64
 		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
-		if !okForShifting(s.r) {
+		if !is_ok_for_shifting(s.r) {
 			s.p.pusherrtok(s.op, "bitshift_must_unsigned")
 		}
-		s.rshift(&v)
+		s.right_shift(&v)
 	case lex.KND_LSHIFT:
 		v.data.DataType.Id = types.U64
 		v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
-		if !okForShifting(s.r) {
+		if !is_ok_for_shifting(s.r) {
 			s.p.pusherrtok(s.op, "bitshift_must_unsigned")
 		}
-		s.lshift(&v)
+		s.left_shift(&v)
 	default:
 		s.p.eval.has_error = true
 		s.p.pusherrtok(s.op, "operator_not_for_uint", s.op.Kind)
@@ -906,7 +906,7 @@ func (s *solver) structure() (v value) {
 	return
 }
 
-func (s *solver) juletrait() (v value) {
+func (s *solver) traitv() (v value) {
 	v.data.Token = s.op
 	if !s.types_are_compatible(true) {
 		s.p.eval.has_error = true
@@ -925,7 +925,7 @@ func (s *solver) juletrait() (v value) {
 	return
 }
 
-func (s *solver) function() (v value) {
+func (s *solver) fnv() (v value) {
 	v.data.Token = s.op
 	if (!types.IsPure(s.l.data.DataType) || s.l.data.DataType.Id != types.NIL) &&
 		(!types.IsPure(s.r.data.DataType) || s.r.data.DataType.Id != types.NIL) {
@@ -973,7 +973,7 @@ func (s *solver) finalize(v *value) {
 				// Save rune literal.
 				v.data.Value = "'" + string(rune(v.expr.(int64))) + "'"
 			}
-			bitize(v)
+			normalize_bitsize(v)
 			v.model = get_const_expr_model(*v)
 		}
 	}
@@ -990,7 +990,7 @@ func (s *solver) solve() (v value) {
 	case s.op.Kind == lex.KND_DBL_AMPER || s.op.Kind == lex.KND_DBL_VLINE:
 		v = s.logical()
 	case types.IsFn(s.l.data.DataType) || types.IsFn(s.r.data.DataType):
-		v = s.function()
+		v = s.fnv()
 	case types.IsArray(s.l.data.DataType) || types.IsArray(s.r.data.DataType):
 		v = s.array()
 	case types.IsSlice(s.l.data.DataType) || types.IsSlice(s.r.data.DataType):
@@ -1002,7 +1002,7 @@ func (s *solver) solve() (v value) {
 	case types.IsStruct(s.l.data.DataType) || types.IsStruct(s.r.data.DataType):
 		v = s.structure()
 	case types.IsTrait(s.l.data.DataType) || types.IsTrait(s.r.data.DataType):
-		v = s.juletrait()
+		v = s.traitv()
 	case s.l.data.DataType.Id == types.NIL || s.r.data.DataType.Id == types.NIL:
 		v = s.nil()
 	case s.l.data.DataType.Id == types.ANY || s.r.data.DataType.Id == types.ANY:

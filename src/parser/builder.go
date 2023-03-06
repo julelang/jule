@@ -1948,7 +1948,7 @@ func (b *builder) getWhileNextIterProfile(bs *block_st) (s ast.St) {
 		return
 	}
 	set_to_next_st(bs)
-	st_toks := ast.BlockExpr(bs.toks)
+	st_toks := ast.GetBlockExpr(bs.toks)
 	if len(st_toks) > 0 {
 		profile.Next = b.next_st(st_toks)
 	}
@@ -1976,7 +1976,7 @@ func (b *builder) commonIterProfile(toks []lex.Token) (s ast.St) {
 		b.pusherr(iter.Token, "body_not_exist")
 		return
 	}
-	exprToks := ast.BlockExpr(toks)
+	exprToks := ast.GetBlockExpr(toks)
 	if len(exprToks) > 0 {
 		iter.Profile = b.getIterProfile(exprToks, iter.Token)
 	}
@@ -2102,7 +2102,7 @@ func (b *builder) MatchCase(toks []lex.Token) (s ast.St) {
 	m.Token = toks[0]
 	s.Token = m.Token
 	toks = toks[1:]
-	exprToks := ast.BlockExpr(toks)
+	exprToks := ast.GetBlockExpr(toks)
 	if len(exprToks) > 0 {
 		m.Expr = b.Expr(exprToks)
 	}
@@ -2135,7 +2135,7 @@ func (b *builder) if_expr(bs *block_st) *ast.If {
 	model := new(ast.If)
 	model.Token = bs.toks[0]
 	bs.toks = bs.toks[1:]
-	exprToks := ast.BlockExpr(bs.toks)
+	exprToks := ast.GetBlockExpr(bs.toks)
 	i := 0
 	if len(exprToks) == 0 {
 		b.pusherr(model.Token, "missing_expr")

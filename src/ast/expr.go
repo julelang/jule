@@ -37,8 +37,8 @@ func IsFnCall(toks []lex.Token) []lex.Token {
 	return nil
 }
 
-// BlockExpr returns expression tokens comes before block if exist, nil if not.
-func BlockExpr(toks []lex.Token) (expr []lex.Token) {
+// GetBlockExpr returns expression tokens comes before block if exist, nil if not.
+func GetBlockExpr(toks []lex.Token) (expr []lex.Token) {
 	brace_n := 0
 	for i, tok := range toks {
 		if tok.Id == lex.ID_BRACE {

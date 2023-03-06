@@ -6,7 +6,7 @@ import (
 	"github.com/julelang/jule/types"
 )
 
-func (p *Parser) getFieldMap(f *Fn) *paramMap {
+func (p *Parser) get_field_map(f *Fn) *paramMap {
 	pmap := new(paramMap)
 	*pmap = paramMap{}
 	s := f.RetType.DataType.Tag.(*ast.Struct)
@@ -29,7 +29,7 @@ type structArgParser struct {
 	errTok lex.Token
 }
 
-func (sap *structArgParser) buildArgs() {
+func (sap *structArgParser) build_args() {
 	sap.args.Src = make([]ast.Arg, len(*sap.fmap))
 	for i, p := range sap.f.Params {
 		pair := (*sap.fmap)[p.Id]
@@ -55,7 +55,7 @@ func (sap *structArgParser) buildArgs() {
 	}
 }
 
-func (sap *structArgParser) pushArg() {
+func (sap *structArgParser) push_arg() {
 	sap.i++
 	if sap.arg.TargetId == "" {
 		sap.p.pusherrtok(sap.arg.Token, "argument_must_target_to_parameter")
@@ -71,10 +71,10 @@ func (sap *structArgParser) pushArg() {
 	}
 	arg := sap.arg
 	pair.arg = &arg
-	sap.p.parseArg(sap.f, pair, sap.args, nil)
+	sap.p.parse_arg(sap.f, pair, sap.args, nil)
 }
 
-func (sap *structArgParser) checkPasses() {
+func (sap *structArgParser) check_passes() {
 	for _, pair := range *sap.fmap {
 		if pair.arg == nil {
 			if types.IsRef(pair.param.DataType) {
@@ -87,7 +87,7 @@ func (sap *structArgParser) checkPasses() {
 }
 
 func (sap *structArgParser) parse() {
-	sap.fmap = sap.p.getFieldMap(sap.f)
+	sap.fmap = sap.p.get_field_map(sap.f)
 	// Check non targeteds
 	argCount := 0
 	for sap.i, sap.arg = range sap.args.Src {
@@ -102,12 +102,12 @@ func (sap *structArgParser) parse() {
 		param := &sap.f.Params[sap.i]
 		arg := sap.arg
 		(*sap.fmap)[param.Id].arg = &arg
-		sap.p.parseArg(sap.f, (*sap.fmap)[param.Id], sap.args, nil)
+		sap.p.parse_arg(sap.f, (*sap.fmap)[param.Id], sap.args, nil)
 	}
 	for sap.i < len(sap.args.Src) {
 		sap.arg = sap.args.Src[sap.i]
-		sap.pushArg()
+		sap.push_arg()
 	}
-	sap.checkPasses()
-	sap.buildArgs()
+	sap.check_passes()
+	sap.build_args()
 }

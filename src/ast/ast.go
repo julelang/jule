@@ -56,8 +56,8 @@ type Attribute struct {
 	Tag   string
 }
 
-// Has_attribute returns true attribute if exist, false if not.
-func Has_attribute(kind string, attributes []Attribute) bool {
+// HasAttribute returns true attribute if exist, false if not.
+func HasAttribute(kind string, attributes []Attribute) bool {
 	for i := range attributes {
 		attribute := attributes[i]
 		if attribute.Tag == kind {
@@ -69,8 +69,8 @@ func Has_attribute(kind string, attributes []Attribute) bool {
 
 // RecoverCall is recover function call.
 type RecoverCall struct {
-	Try         *Block
-	Handler     *Fn
+	Try     *Block
+	Handler *Fn
 }
 
 // Block is code block.
@@ -248,7 +248,7 @@ func (f *Fn) IsConstructor() bool {
 	return s.Id == f.Id
 }
 
-func (f *Fn) plainTypeString() string {
+func (f *Fn) plain_type_kind() string {
 	var s strings.Builder
 	if len(f.Generics) > 0 {
 		s.WriteByte('[')
@@ -323,7 +323,7 @@ func (f *Fn) TypeKind() string {
 		cpp.WriteString("unsafe ")
 	}
 	cpp.WriteString("fn")
-	cpp.WriteString(f.plainTypeString())
+	cpp.WriteString(f.plain_type_kind())
 	return cpp.String()
 }
 
@@ -338,15 +338,15 @@ func (f *Fn) OutId() string {
 	return build.OutId(f.Id, f.Token.File.Addr())
 }
 
-// DefString returns define string of function.
-func (f *Fn) DefString() string {
+// DefineString returns define string of function.
+func (f *Fn) DefineString() string {
 	var s strings.Builder
 	if f.IsUnsafe {
 		s.WriteString("unsafe ")
 	}
 	s.WriteString("fn ")
 	s.WriteString(f.Id)
-	s.WriteString(f.plainTypeString())
+	s.WriteString(f.plain_type_kind())
 	return s.String()
 }
 
@@ -553,8 +553,8 @@ type Match struct {
 func (m *Match) EndLabel() string {
 	var cpp strings.Builder
 	cpp.WriteString("match_end_")
-	cpp.WriteString(strconv.FormatInt(int64(m.Token.Row), 10))
-	cpp.WriteString(strconv.FormatInt(int64(m.Token.Column), 10))
+	cpp.WriteString(strconv.Itoa(m.Token.Row))
+	cpp.WriteString(strconv.Itoa(m.Token.Column))
 	return cpp.String()
 }
 
@@ -1021,7 +1021,7 @@ func (dt *Type) References() string {
 func (dt Type) String() (s string) {
 	dt.SetToOriginal()
 	if dt.MultiTyped {
-		return dt.MultiTypeString()
+		return dt.multi_type_str()
 	}
 	// Remove namespace
 	i := strings.LastIndex(dt.Kind, lex.KND_DBLCOLON)
@@ -1054,15 +1054,15 @@ func (dt Type) String() (s string) {
 	dt.Kind = dt.Kind[len(modifiers):]
 	switch dt.Id {
 	case slice_t:
-		return dt.SliceString()
+		return dt.slice_str()
 	case array_t:
-		return dt.ArrayString()
+		return dt.array_str()
 	case map_t:
-		return dt.MapString()
+		return dt.map_str()
 	}
 	switch dt.Tag.(type) {
 	case *Struct:
-		return dt.StructString()
+		return dt.struct_str()
 	}
 	switch dt.Id {
 	case id_t:
@@ -1077,9 +1077,9 @@ func (dt Type) String() (s string) {
 		e := dt.Tag.(*Enum)
 		return e.DataType.String()
 	case trait_t:
-		return dt.TraitString()
+		return dt.trait_str()
 	case struct_t:
-		return dt.StructString()
+		return dt.struct_str()
 	case fn_t:
 		return dt.FnString()
 	default:
@@ -1087,8 +1087,8 @@ func (dt Type) String() (s string) {
 	}
 }
 
-// SliceString returns cpp value of slice data type.
-func (dt *Type) SliceString() string {
+// slice_str returns cpp value of slice data type.
+func (dt *Type) slice_str() string {
 	var cpp strings.Builder
 	cpp.WriteString(build.AsTypeId("slice"))
 	cpp.WriteByte('<')
@@ -1098,8 +1098,8 @@ func (dt *Type) SliceString() string {
 	return cpp.String()
 }
 
-// ArrayString returns cpp value of map data type.
-func (dt *Type) ArrayString() string {
+// array_str returns cpp value of map data type.
+func (dt *Type) array_str() string {
 	var cpp strings.Builder
 	cpp.WriteString(build.AsTypeId("array"))
 	cpp.WriteByte('<')
@@ -1111,8 +1111,8 @@ func (dt *Type) ArrayString() string {
 	return cpp.String()
 }
 
-// MapString returns cpp value of map data type.
-func (dt *Type) MapString() string {
+// map_str returns cpp value of map data type.
+func (dt *Type) map_str() string {
 	var cpp strings.Builder
 	types := dt.Tag.([]Type)
 	cpp.WriteString(build.AsTypeId("map"))
@@ -1128,8 +1128,8 @@ func (dt *Type) MapString() string {
 	return cpp.String()
 }
 
-// TraitString returns cpp value of trait data type.
-func (dt *Type) TraitString() string {
+// trait_str returns cpp value of trait data type.
+func (dt *Type) trait_str() string {
 	var cpp strings.Builder
 	id, _ := dt.KindId()
 	cpp.WriteString(build.AsTypeId("trait"))
@@ -1139,11 +1139,11 @@ func (dt *Type) TraitString() string {
 	return cpp.String()
 }
 
-// StructString returns cpp value of struct data type.
-func (dt *Type) StructString() string {
+// struct_str returns cpp value of struct data type.
+func (dt *Type) struct_str() string {
 	var cpp strings.Builder
 	s := dt.Tag.(*Struct)
-	if s.CppLinked && !Has_attribute(build.ATTR_TYPEDEF, s.Attributes) {
+	if s.CppLinked && !HasAttribute(build.ATTR_TYPEDEF, s.Attributes) {
 		cpp.WriteString("struct ")
 	}
 	cpp.WriteString(s.OutId())
@@ -1161,6 +1161,7 @@ func (dt *Type) StructString() string {
 }
 
 // FnString returns cpp value of function DataType.
+// Panics if type is not fn.
 func (dt *Type) FnString() string {
 	var cpp strings.Builder
 	cpp.WriteString(build.AsTypeId("fn"))
@@ -1171,8 +1172,8 @@ func (dt *Type) FnString() string {
 	return cpp.String()
 }
 
-// MultiTypeString returns cpp value of muli-typed DataType.
-func (dt *Type) MultiTypeString() string {
+// multi_type_str returns cpp value of muli-typed DataType.
+func (dt *Type) multi_type_str() string {
 	var cpp strings.Builder
 	cpp.WriteString("std::tuple<")
 	types := dt.Tag.([]Type)
@@ -1187,6 +1188,7 @@ func (dt *Type) MultiTypeString() string {
 }
 
 // MapKind returns data type kind string of map data type.
+// Panics if type is not map.
 func (dt *Type) MapKind() string {
 	types := dt.Tag.([]Type)
 	var kind strings.Builder

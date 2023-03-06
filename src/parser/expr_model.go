@@ -8,28 +8,28 @@ import (
 	"github.com/julelang/jule/lex"
 )
 
-type exprBuildNode struct {
+type expr_build_node struct {
 	nodes []ast.ExprModel
 }
 
-type exprModel struct {
+type expr_model struct {
 	index int
-	nodes []exprBuildNode
+	nodes []expr_build_node
 }
 
-func newExprModel(n int) *exprModel {
-	m := new(exprModel)
+func new_expr_model(n int) *expr_model {
+	m := new(expr_model)
 	m.index = 0
-	m.nodes = make([]exprBuildNode, n)
+	m.nodes = make([]expr_build_node, n)
 	return m
 }
 
-func (m *exprModel) append_sub(node ast.ExprModel) {
+func (m *expr_model) append_sub(node ast.ExprModel) {
 	nodes := &m.nodes[m.index].nodes
 	*nodes = append(*nodes, node)
 }
 
-func (m exprModel) String() string {
+func (m expr_model) String() string {
 	var expr strings.Builder
 	for _, node := range m.nodes {
 		for _, node := range node.nodes {
@@ -41,7 +41,7 @@ func (m exprModel) String() string {
 	return expr.String()
 }
 
-func (m *exprModel) Expr() Expr {
+func (m *expr_model) Expr() Expr {
 	return Expr{Model: m}
 }
 
@@ -136,7 +136,7 @@ type callExpr struct {
 
 func (ce callExpr) String() string {
 	var cpp strings.Builder
-	if !ast.Has_attribute(build.ATTR_CDEF, ce.f.Attributes) {
+	if !ast.HasAttribute(build.ATTR_CDEF, ce.f.Attributes) {
 		cpp.WriteString(ce.generics.String())
 	}
 	cpp.WriteByte('(')
@@ -248,7 +248,7 @@ func (re *retExpr) multi_with_one_expr_str() string {
 	return cpp.String()[:cpp.Len()-1] + ")"
 }
 
-func (re *retExpr) multiRetString() string {
+func (re *retExpr) multi_ret() string {
 	var cpp strings.Builder
 	cpp.WriteString("std::make_tuple(")
 	for i := range re.models {
@@ -258,7 +258,7 @@ func (re *retExpr) multiRetString() string {
 	return cpp.String()[:cpp.Len()-1] + ")"
 }
 
-func (re *retExpr) singleRetString() string {
+func (re *retExpr) single_ret() string {
 	var cpp strings.Builder
 	cpp.WriteString(re.get_model(0))
 	return cpp.String()
@@ -274,9 +274,9 @@ func (re retExpr) String() string {
 	case re.is_one_expr_for_multi_ret():
 		cpp.WriteString(re.multi_with_one_expr_str())
 	case len(re.models) > 1:
-		cpp.WriteString(re.multiRetString())
+		cpp.WriteString(re.multi_ret())
 	default:
-		cpp.WriteString(re.singleRetString())
+		cpp.WriteString(re.single_ret())
 	}
 	return cpp.String()
 }

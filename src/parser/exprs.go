@@ -13,14 +13,14 @@ func check_value_for_indexing(v value) (err_key string) {
 		return "invalid_expr"
 	case !types.IsInteger(v.data.DataType.Id):
 		return "invalid_expr"
-	case v.constant && tonums(v.expr) < 0:
+	case v.constant && to_num_signed(v.expr) < 0:
 		return "overflow_limits"
 	default:
 		return ""
 	}
 }
 
-func indexingExprModel(v value, i ast.ExprModel) ast.ExprModel {
+func get_indexing_expr_model(v value, i ast.ExprModel) ast.ExprModel {
 	if i == nil {
 		return i
 	}
@@ -36,11 +36,11 @@ func indexingExprModel(v value, i ast.ExprModel) ast.ExprModel {
 	return exprNode{model.String()}
 }
 
-func valIsEnumType(v value) bool {
+func is_enum_type(v value) bool {
 	return v.is_type && types.IsEnum(v.data.DataType)
 }
 
-func isBoolExpr(v value) bool {
+func is_bool_expr(v value) bool {
 	return types.IsPure(v.data.DataType) && v.data.DataType.Id == types.BOOL
 }
 
@@ -56,15 +56,15 @@ func can_get_ptr(v value) bool {
 	}
 }
 
-func val_is_struct_ins(val value) bool {
+func is_struct_ins(val value) bool {
 	return !val.is_type && types.IsStruct(val.data.DataType)
 }
 
-func val_is_trait_ins(val value) bool {
+func is_trait_ins(val value) bool {
 	return !val.is_type && types.IsTrait(val.data.DataType)
 }
 
-func isForeachIterExpr(val value) bool {
+func is_foreach_iter_expr(val value) bool {
 	switch {
 	case types.IsSlice(val.data.DataType),
 		types.IsArray(val.data.DataType),
@@ -84,11 +84,11 @@ func check_float_bit(v ast.Data, bit int) bool {
 	return types.CheckBitFloat(v.Value, bit)
 }
 
-func validExprForConst(v value) bool {
+func is_valid_for_const(v value) bool {
 	return v.constant
 }
 
-func okForShifting(v value) bool {
+func is_ok_for_shifting(v value) bool {
 	if !types.IsPure(v.data.DataType) ||
 		!types.IsInteger(v.data.DataType.Id) {
 		return false

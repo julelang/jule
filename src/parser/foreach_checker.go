@@ -13,7 +13,7 @@ type foreachChecker struct {
 }
 
 func (fc *foreachChecker) array() {
-	fc.checkKeyASize()
+	fc.check_size_key()
 	if lex.IsIgnoreId(fc.profile.KeyB.Id) {
 		return
 	}
@@ -26,7 +26,7 @@ func (fc *foreachChecker) array() {
 }
 
 func (fc *foreachChecker) slice() {
-	fc.checkKeyASize()
+	fc.check_size_key()
 	if lex.IsIgnoreId(fc.profile.KeyB.Id) {
 		return
 	}
@@ -39,11 +39,11 @@ func (fc *foreachChecker) slice() {
 }
 
 func (fc *foreachChecker) hashmap() {
-	fc.checkKeyAMapKey()
-	fc.checkKeyBMapVal()
+	fc.check_map_key_a()
+	fc.check_map_key_b()
 }
 
-func (fc *foreachChecker) checkKeyASize() {
+func (fc *foreachChecker) check_size_key() {
 	if lex.IsIgnoreId(fc.profile.KeyA.Id) {
 		return
 	}
@@ -52,7 +52,7 @@ func (fc *foreachChecker) checkKeyASize() {
 	a.DataType.Kind = types.TYPE_MAP[a.DataType.Id]
 }
 
-func (fc *foreachChecker) checkKeyAMapKey() {
+func (fc *foreachChecker) check_map_key_a() {
 	if lex.IsIgnoreId(fc.profile.KeyA.Id) {
 		return
 	}
@@ -64,7 +64,7 @@ func (fc *foreachChecker) checkKeyAMapKey() {
 	fc.p.check_valid_init_expr(a.Mutable, val, fc.profile.InToken)
 }
 
-func (fc *foreachChecker) checkKeyBMapVal() {
+func (fc *foreachChecker) check_map_key_b() {
 	if lex.IsIgnoreId(fc.profile.KeyB.Id) {
 		return
 	}
@@ -77,7 +77,7 @@ func (fc *foreachChecker) checkKeyBMapVal() {
 }
 
 func (fc *foreachChecker) str() {
-	fc.checkKeyASize()
+	fc.check_size_key()
 	if lex.IsIgnoreId(fc.profile.KeyB.Id) {
 		return
 	}
