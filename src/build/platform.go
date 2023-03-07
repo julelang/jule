@@ -19,7 +19,7 @@ var DISTOS = []string{
 	OS_DARWIN,
 }
 
-// List of supported architects.
+// List of supported architectures.
 var DISTARCH = []string{
 	ARCH_ARM,
 	ARCH_ARM64,
