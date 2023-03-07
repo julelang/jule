@@ -122,7 +122,8 @@ func Parts(toks []lex.Token, id uint8, exprMust bool) ([][]lex.Token, []build.Lo
 }
 
 // SplitColon returns colon index and range tokens.
-// Starts at i.
+// Starts search at i.
+// Returns -1 if not found.
 func SplitColon(toks []lex.Token, i *int) (rangeToks []lex.Token, colon int) {
 	rangeToks = nil
 	colon = -1
