@@ -238,7 +238,7 @@ public:
         return ( this->__buffer[_Index] );
     }
 
-    inline u8_jt operator[](const uint_jt &_Index) const
+    inline u8_jt operator[](const int_jt &_Index) const
     { return ( (*this).__buffer[_Index] ); }
 
     inline void operator+=(const str_jt &_Str) noexcept

@@ -93,6 +93,11 @@ inline std::ostream &operator<<(std::ostream &_Stream,
                                 const signed char _I8) noexcept;
 inline std::ostream &operator<<(std::ostream &_Stream,
                                 const unsigned char _U8) noexcept;
+// Libraries uses this function for UTf-8 encoded Jule strings.
+// Also it is builtin str type constructor.
+template<typename _Obj_t>
+str_jt __julec_to_str(const _Obj_t &_Obj) noexcept;
+str_jt __julec_to_str(const str_jt &_Obj) noexcept;
 
 
 #include "signal.hpp"
@@ -103,11 +108,11 @@ inline std::ostream &operator<<(std::ostream &_Stream,
 #include "trait.hpp"
 #include "slice.hpp"
 #include "array.hpp"
-#include "map.hpp"
+#include "fn.hpp"
 #include "utf8.hpp"
 #include "str.hpp"
+#include "map.hpp"
 #include "any.hpp"
-#include "fn.hpp"
 #include "builtin.hpp"
 #include "utf16.hpp"
 
@@ -140,11 +145,6 @@ inline auto __julec_tuple_as_args(const fn_jt<_Function_t> &_Function,
                                   const _Tuple_t _Tuple);
 template<typename T>
 inline ref_jt<T> __julec_new_structure(T *_Ptr);
-// Libraries uses this function for UTf-8 encoded Jule strings.
-// Also it is builtin str type constructor.
-template<typename _Obj_t>
-str_jt __julec_to_str(const _Obj_t &_Obj) noexcept;
-str_jt __julec_to_str(const str_jt &_Obj) noexcept;
 // Returns the UTF-16 encoding of the UTF-8 string
 // s, with a terminating NULL added. If s includes NULL
 // character at any location, ignores followed characters.
