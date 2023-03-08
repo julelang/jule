@@ -31,6 +31,7 @@ func (f *File) Name() string { return filepath.Base(f._path) }
 func (f *File) Addr() uintptr { return uintptr(unsafe.Pointer(f)) }
 
 // Returns tokens.
+// Copies into new slice.
 func (f *File) Tokens() []Token {
 	if f.tokens == nil {
 		return nil

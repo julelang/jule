@@ -809,9 +809,9 @@ func (l *lex) push_wrong_order_close_err(t Token) {
 // Lex source code into fileset.
 // Returns nil if f is nil.
 // Returns nil slice for errors if no any error.
-func Lex(f *File, text string) ([]Token, []build.Log) {
+func Lex(f *File, text string) []build.Log {
 	if f == nil {
-		return nil, nil
+		return nil
 	}
 
 	lex := lex{
@@ -825,7 +825,9 @@ func Lex(f *File, text string) ([]Token, []build.Log) {
 	tokens := lex.lex()
 	
 	if len(lex.errors) > 0 {
-		return nil, lex.errors
+		return lex.errors
 	}
-	return tokens, nil
+
+	f.tokens = tokens
+	return nil
 }

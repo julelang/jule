@@ -143,7 +143,7 @@ const IGNORE_ID = "_"
 const ANONYMOUS_ID = "<anonymous>"
 
 const COMMENT_PRAGMA_SEP = ":"
-const PRAGMA_COMMENT_PREFIX = "jule" + COMMENT_PRAGMA_SEP
+const DIRECTIVE_COMMENT_PREFIX = "jule" + COMMENT_PRAGMA_SEP
 
 const MARK_ARRAY = "..."
 const PREFIX_SLICE = "[]"

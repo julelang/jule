@@ -14,6 +14,7 @@ import (
 	"github.com/julelang/jule"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
+	"github.com/julelang/jule/parser"
 )
 
 const compiler_gcc = "gcc"
@@ -149,10 +150,20 @@ func read_buff(path string) []byte {
 func main() {
 	f := lex.NewFileSet(os.Args[1])
 	text := (string)(read_buff(f.Path()))
-	tokens, errors := lex.Lex(f, text)
+
+	errors := lex.Lex(f, text)
 	if errors != nil {
 		fmt.Println(errors)
 		return
 	}
-	fmt.Println(tokens)
+
+	finf := parser.ParseFile(f)
+	if finf.Errors != nil {
+		fmt.Println(finf.Errors)
+		return
+	}
+
+	for _, node := range finf.Tree {
+		fmt.Println(node)
+	}
 }
