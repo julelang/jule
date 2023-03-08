@@ -6,13 +6,11 @@ import (
 	"unsafe"
 )
 
-// File instance of fs.
+// Fileset for lexing.
 type File struct {
-	_path string
+	_path  string
+	tokens []Token
 }
-
-// NewFile returns new File points to Jule file.
-func NewFile(path string) *File { return &File{path} }
 
 // IsOk reports file path is exist and accessible or not.
 func (f *File) IsOk() bool {
@@ -31,3 +29,21 @@ func (f *File) Name() string { return filepath.Base(f._path) }
 
 // Addr returns uintptr(unsafe.Pointer(f)).
 func (f *File) Addr() uintptr { return uintptr(unsafe.Pointer(f)) }
+
+// Returns tokens.
+func (f *File) Tokens() []Token {
+	if f.tokens == nil {
+		return nil
+	}
+	tokens := make([]Token, len(f.tokens))
+	_ = copy(tokens, f.tokens)
+	return tokens
+}
+
+// NewFileSet returns new File points to Jule file.
+func NewFileSet(path string) *File {
+	return &File{
+		_path:  path,
+		tokens: nil,
+	}
+}

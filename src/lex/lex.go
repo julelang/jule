@@ -1,35 +1,116 @@
 package lex
 
 import (
-	"os"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/julelang/jule/build"
 )
 
-// Lex is lexer of Jule.
-type Lex struct {
+// [keyword]id
+var keywords = map[string]uint8{
+	KND_I8:       ID_DT,
+	KND_I16:      ID_DT,
+	KND_I32:      ID_DT,
+	KND_I64:      ID_DT,
+	KND_U8:       ID_DT,
+	KND_U16:      ID_DT,
+	KND_U32:      ID_DT,
+	KND_U64:      ID_DT,
+	KND_F32:      ID_DT,
+	KND_F64:      ID_DT,
+	KND_UINT:     ID_DT,
+	KND_INT:      ID_DT,
+	KND_UINTPTR:  ID_DT,
+	KND_BOOL:     ID_DT,
+	KND_STR:      ID_DT,
+	KND_ANY:      ID_DT,
+	KND_TRUE:     ID_LITERAL,
+	KND_FALSE:    ID_LITERAL,
+	KND_NIL:      ID_LITERAL,
+	KND_CONST:    ID_CONST,
+	KND_RET:      ID_RET,
+	KND_TYPE:     ID_TYPE,
+	KND_ITER:     ID_ITER,
+	KND_BREAK:    ID_BREAK,
+	KND_CONTINUE: ID_CONTINUE,
+	KND_IN:       ID_IN,
+	KND_IF:       ID_IF,
+	KND_ELSE:     ID_ELSE,
+	KND_USE:      ID_USE,
+	KND_PUB:      ID_PUB,
+	KND_GOTO:     ID_GOTO,
+	KND_ENUM:     ID_ENUM,
+	KND_STRUCT:   ID_STRUCT,
+	KND_CO:       ID_CO,
+	KND_MATCH:    ID_MATCH,
+	KND_SELF:     ID_SELF,
+	KND_TRAIT:    ID_TRAIT,
+	KND_IMPL:     ID_IMPL,
+	KND_CPP:      ID_CPP,
+	KND_FALL:     ID_FALL,
+	KND_FN:       ID_FN,
+	KND_LET:      ID_LET,
+	KND_UNSAFE:   ID_UNSAFE,
+	KND_MUT:      ID_MUT,
+	KND_DEFER:    ID_DEFER,
+}
+
+type oppair struct {
+	op string
+	id uint8
+}
+
+var basic_ops = [...]oppair{
+	{KND_DBLCOLON, ID_DBLCOLON},
+	{KND_COLON, ID_COLON},
+	{KND_SEMICOLON, ID_SEMICOLON},
+	{KND_COMMA, ID_COMMA},
+	{KND_TRIPLE_DOT, ID_OP},
+	{KND_DOT, ID_DOT},
+	{KND_PLUS_EQ, ID_OP},
+	{KND_MINUS_EQ, ID_OP},
+	{KND_STAR_EQ, ID_OP},
+	{KND_SOLIDUS_EQ, ID_OP},
+	{KND_PERCENT_EQ, ID_OP},
+	{KND_LSHIFT_EQ, ID_OP},
+	{KND_RSHIFT_EQ, ID_OP},
+	{KND_CARET_EQ, ID_OP},
+	{KND_AMPER_EQ, ID_OP},
+	{KND_VLINE_EQ, ID_OP},
+	{KND_EQS, ID_OP},
+	{KND_NOT_EQ, ID_OP},
+	{KND_GREAT_EQ, ID_OP},
+	{KND_LESS_EQ, ID_OP},
+	{KND_DBL_AMPER, ID_OP},
+	{KND_DBL_VLINE, ID_OP},
+	{KND_LSHIFT, ID_OP},
+	{KND_RSHIFT, ID_OP},
+	{KND_DBL_PLUS, ID_OP},
+	{KND_DBL_MINUS, ID_OP},
+	{KND_PLUS, ID_OP},
+	{KND_MINUS, ID_OP},
+	{KND_STAR, ID_OP},
+	{KND_SOLIDUS, ID_OP},
+	{KND_PERCENT, ID_OP},
+	{KND_AMPER, ID_OP},
+	{KND_VLINE, ID_OP},
+	{KND_CARET, ID_OP},
+	{KND_EXCL, ID_OP},
+	{KND_LT, ID_OP},
+	{KND_GT, ID_OP},
+	{KND_EQ, ID_OP},
+}
+
+type lex struct {
 	first_token_of_line bool
 	ranges              []Token
 	data                []rune
-
-	File   *File
-	Pos    int
-	Column int
-	Row    int
-	// Logs are only errors
-	Logs []build.Log
-}
-
-// New Lex instance.
-func New(f *File) *Lex {
-	l := new(Lex)
-	l.File = f
-	l.Pos = 0
-	l.Row = -1 // For true row
-	l.NewLine()
-	return l
+	file                *File
+	pos                 int
+	column              int
+	row                 int
+	errors              []build.Log
 }
 
 func make_err(row int, col int, f *File, key string, args ...any) build.Log {
@@ -42,29 +123,20 @@ func make_err(row int, col int, f *File, key string, args ...any) build.Log {
 	}
 }
 
-func (l *Lex) push_err(key string, args ...any) {
-	l.Logs = append(l.Logs, make_err(l.Row, l.Column, l.File, key, args...))
+func (l *lex) push_err(key string, args ...any) {
+	l.errors = append(l.errors, make_err(l.row, l.column, l.file, key, args...))
 }
 
-func (l *Lex) push_err_tok(tok Token, key string) {
-	l.Logs = append(l.Logs, make_err(tok.Row, tok.Column, l.File, key))
-}
-
-func (l *Lex) buff_data() {
-	bytes, err := os.ReadFile(l.File.Path())
-	if err != nil {
-		panic("buffering failed: " + err.Error())
-	}
-	l.data = []rune(string(bytes))
+func (l *lex) push_err_tok(tok Token, key string) {
+	l.errors = append(l.errors, make_err(tok.Row, tok.Column, l.file, key))
 }
 
 // Lex all source content.
-func (l *Lex) Lex() []Token {
-	l.buff_data()
+func (l *lex) lex() []Token {
 	var toks []Token
-	l.Logs = nil
-	l.NewLine()
-	for l.Pos < len(l.data) {
+	l.errors = nil
+	l.new_line()
+	for l.pos < len(l.data) {
 		t := l.Token()
 		l.first_token_of_line = false
 		if t.Id != ID_NA {
@@ -76,7 +148,7 @@ func (l *Lex) Lex() []Token {
 	return toks
 }
 
-func (l *Lex) check_ranges() {
+func (l *lex) check_ranges() {
 	for _, t := range l.ranges {
 		switch t.Kind {
 		case KND_LPAREN:
@@ -107,7 +179,7 @@ func is_kw(ln, kw string) bool {
 
 // id returns identifer if next token is identifer,
 // returns empty string if not.
-func (l *Lex) id(ln string) string {
+func (l *lex) id(ln string) string {
 	if !IsIdentifierRune(ln) {
 		return ""
 	}
@@ -119,26 +191,26 @@ func (l *Lex) id(ln string) string {
 			break
 		}
 		sb.WriteRune(r)
-		l.Pos++
+		l.pos++
 	}
 	return sb.String()
 }
 
 // resume to lex from position.
-func (l *Lex) resume() string {
+func (l *lex) resume() string {
 	var ln string
-	runes := l.data[l.Pos:]
+	runes := l.data[l.pos:]
 	// Skip spaces.
 	for i, r := range runes {
 		if IsSpace(r) {
-			l.Pos++
+			l.pos++
 			switch r {
 			case '\n':
-				l.NewLine()
+				l.new_line()
 			case '\t':
-				l.Column += 4
+				l.column += 4
 			default:
-				l.Column++
+				l.column++
 			}
 			continue
 		}
@@ -148,14 +220,14 @@ func (l *Lex) resume() string {
 	return ln
 }
 
-func (l *Lex) lex_line_comment(t *Token) {
-	start := l.Pos
-	l.Pos += 2
-	for ; l.Pos < len(l.data); l.Pos++ {
-		if l.data[l.Pos] == '\n' {
+func (l *lex) lex_line_comment(t *Token) {
+	start := l.pos
+	l.pos += 2
+	for ; l.pos < len(l.data); l.pos++ {
+		if l.data[l.pos] == '\n' {
 			if l.first_token_of_line {
 				t.Id = ID_COMMENT
-				t.Kind = string(l.data[start:l.Pos])
+				t.Kind = string(l.data[start:l.pos])
 			}
 			return
 		}
@@ -166,18 +238,18 @@ func (l *Lex) lex_line_comment(t *Token) {
 	}
 }
 
-func (l *Lex) lex_range_comment() {
-	l.Pos += 2
-	for ; l.Pos < len(l.data); l.Pos++ {
-		r := l.data[l.Pos]
+func (l *lex) lex_range_comment() {
+	l.pos += 2
+	for ; l.pos < len(l.data); l.pos++ {
+		r := l.data[l.pos]
 		if r == '\n' {
-			l.NewLine()
+			l.new_line()
 			continue
 		}
-		l.Column += len(string(r))
-		if strings.HasPrefix(string(l.data[l.Pos:]), KND_RNG_RCOMMENT) {
-			l.Column += 2
-			l.Pos += 2
+		l.column += len(string(r))
+		if strings.HasPrefix(string(l.data[l.pos:]), KND_RNG_RCOMMENT) {
+			l.column += 2
+			l.pos += 2
 			return
 		}
 	}
@@ -405,7 +477,7 @@ loop:
 
 // num returns literal if next token is numeric,
 // returns empty string if not.
-func (l *Lex) num(txt string) (literal string) {
+func (l *lex) num(txt string) (literal string) {
 	literal = hex_num(txt)
 	if literal != "" {
 		goto end
@@ -420,7 +492,7 @@ func (l *Lex) num(txt string) (literal string) {
 	}
 	literal = common_num(txt)
 end:
-	l.Pos += len(literal)
+	l.pos += len(literal)
 	return
 }
 
@@ -457,14 +529,14 @@ func byte_escape(txt string) (seq string) {
 	return txt[:4]
 }
 
-func (l *Lex) escape_seq(txt string) string {
+func (l *lex) escape_seq(txt string) string {
 	seq := ""
 	if len(txt) < 2 {
 		goto end
 	}
 	switch txt[1] {
 	case '\\', '\'', '"', 'a', 'b', 'f', 'n', 'r', 't', 'v':
-		l.Pos += 2
+		l.pos += 2
 		return txt[:2]
 	case 'U':
 		seq = big_unicode_point_escape(txt)
@@ -477,42 +549,42 @@ func (l *Lex) escape_seq(txt string) string {
 	}
 end:
 	if seq == "" {
-		l.Pos++
+		l.pos++
 		l.push_err("invalid_escape_sequence")
 		return ""
 	}
-	l.Pos += len(seq)
+	l.pos += len(seq)
 	return seq
 }
 
-func (l *Lex) get_rune(txt string, raw bool) string {
+func (l *lex) get_rune(txt string, raw bool) string {
 	if !raw && txt[0] == '\\' {
 		return l.escape_seq(txt)
 	}
 	r, _ := utf8.DecodeRuneInString(txt)
-	l.Pos++
+	l.pos++
 	return string(r)
 }
 
-func (l *Lex) lex_rune(txt string) string {
+func (l *lex) lex_rune(txt string) string {
 	var sb strings.Builder
 	sb.WriteByte('\'')
-	l.Column++
+	l.column++
 	txt = txt[1:]
 	n := 0
 	for i := 0; i < len(txt); i++ {
 		if txt[i] == '\n' {
 			l.push_err("missing_rune_end")
-			l.Pos++
-			l.NewLine()
+			l.pos++
+			l.new_line()
 			return ""
 		}
 		r := l.get_rune(txt[i:], false)
 		sb.WriteString(r)
 		length := len(r)
-		l.Column += length
+		l.column += length
 		if r == "'" {
-			l.Pos++
+			l.pos++
 			break
 		}
 		if length > 1 {
@@ -528,29 +600,29 @@ func (l *Lex) lex_rune(txt string) string {
 	return sb.String()
 }
 
-func (l *Lex) lex_str(txt string) string {
+func (l *lex) lex_str(txt string) string {
 	var sb strings.Builder
 	mark := txt[0]
 	raw := mark == '`'
 	sb.WriteByte(mark)
-	l.Column++
+	l.column++
 	txt = txt[1:]
 	for i := 0; i < len(txt); i++ {
 		ch := txt[i]
 		if ch == '\n' {
-			l.NewLine()
+			l.new_line()
 			if !raw {
 				l.push_err("missing_string_end")
-				l.Pos++
+				l.pos++
 				return ""
 			}
 		}
 		r := l.get_rune(txt[i:], raw)
 		sb.WriteString(r)
 		n := len(r)
-		l.Column += n
+		l.column += n
 		if ch == mark {
-			l.Pos++
+			l.pos++
 			break
 		}
 		if n > 1 {
@@ -560,129 +632,33 @@ func (l *Lex) lex_str(txt string) string {
 	return sb.String()
 }
 
-// NewLine sets ready lexer to a new line lexing.
-func (l *Lex) NewLine() {
+func (l *lex) new_line() {
 	l.first_token_of_line = true
-	l.Row++
-	l.Column = 1
+	l.row++
+	l.column = 1
 }
 
-func (l *Lex) is_op(txt, kind string, id uint8, t *Token) bool {
+func (l *lex) is_op(txt, kind string, id uint8, t *Token) bool {
 	if !strings.HasPrefix(txt, kind) {
 		return false
 	}
 	t.Kind = kind
 	t.Id = id
-	l.Pos += len([]rune(kind))
+	l.pos += len([]rune(kind))
 	return true
 }
 
-func (l *Lex) is_kw(txt, kind string, id uint8, t *Token) bool {
+func (l *lex) is_kw(txt, kind string, id uint8, t *Token) bool {
 	if !is_kw(txt, kind) {
 		return false
 	}
 	t.Kind = kind
 	t.Id = id
-	l.Pos += len([]rune(kind))
+	l.pos += len([]rune(kind))
 	return true
 }
 
-// [keyword]id
-var keywords = map[string]uint8{
-	KND_I8:       ID_DT,
-	KND_I16:      ID_DT,
-	KND_I32:      ID_DT,
-	KND_I64:      ID_DT,
-	KND_U8:       ID_DT,
-	KND_U16:      ID_DT,
-	KND_U32:      ID_DT,
-	KND_U64:      ID_DT,
-	KND_F32:      ID_DT,
-	KND_F64:      ID_DT,
-	KND_UINT:     ID_DT,
-	KND_INT:      ID_DT,
-	KND_UINTPTR:  ID_DT,
-	KND_BOOL:     ID_DT,
-	KND_STR:      ID_DT,
-	KND_ANY:      ID_DT,
-	KND_TRUE:     ID_LITERAL,
-	KND_FALSE:    ID_LITERAL,
-	KND_NIL:      ID_LITERAL,
-	KND_CONST:    ID_CONST,
-	KND_RET:      ID_RET,
-	KND_TYPE:     ID_TYPE,
-	KND_ITER:     ID_ITER,
-	KND_BREAK:    ID_BREAK,
-	KND_CONTINUE: ID_CONTINUE,
-	KND_IN:       ID_IN,
-	KND_IF:       ID_IF,
-	KND_ELSE:     ID_ELSE,
-	KND_USE:      ID_USE,
-	KND_PUB:      ID_PUB,
-	KND_GOTO:     ID_GOTO,
-	KND_ENUM:     ID_ENUM,
-	KND_STRUCT:   ID_STRUCT,
-	KND_CO:       ID_CO,
-	KND_MATCH:    ID_MATCH,
-	KND_SELF:     ID_SELF,
-	KND_TRAIT:    ID_TRAIT,
-	KND_IMPL:     ID_IMPL,
-	KND_CPP:      ID_CPP,
-	KND_FALL:     ID_FALL,
-	KND_FN:       ID_FN,
-	KND_LET:      ID_LET,
-	KND_UNSAFE:   ID_UNSAFE,
-	KND_MUT:      ID_MUT,
-	KND_DEFER:    ID_DEFER,
-}
-
-type oppair struct {
-	op string
-	id uint8
-}
-
-var basic_ops = [...]oppair{
-	{KND_DBLCOLON, ID_DBLCOLON},
-	{KND_COLON, ID_COLON},
-	{KND_SEMICOLON, ID_SEMICOLON},
-	{KND_COMMA, ID_COMMA},
-	{KND_TRIPLE_DOT, ID_OP},
-	{KND_DOT, ID_DOT},
-	{KND_PLUS_EQ, ID_OP},
-	{KND_MINUS_EQ, ID_OP},
-	{KND_STAR_EQ, ID_OP},
-	{KND_SOLIDUS_EQ, ID_OP},
-	{KND_PERCENT_EQ, ID_OP},
-	{KND_LSHIFT_EQ, ID_OP},
-	{KND_RSHIFT_EQ, ID_OP},
-	{KND_CARET_EQ, ID_OP},
-	{KND_AMPER_EQ, ID_OP},
-	{KND_VLINE_EQ, ID_OP},
-	{KND_EQS, ID_OP},
-	{KND_NOT_EQ, ID_OP},
-	{KND_GREAT_EQ, ID_OP},
-	{KND_LESS_EQ, ID_OP},
-	{KND_DBL_AMPER, ID_OP},
-	{KND_DBL_VLINE, ID_OP},
-	{KND_LSHIFT, ID_OP},
-	{KND_RSHIFT, ID_OP},
-	{KND_DBL_PLUS, ID_OP},
-	{KND_DBL_MINUS, ID_OP},
-	{KND_PLUS, ID_OP},
-	{KND_MINUS, ID_OP},
-	{KND_STAR, ID_OP},
-	{KND_SOLIDUS, ID_OP},
-	{KND_PERCENT, ID_OP},
-	{KND_AMPER, ID_OP},
-	{KND_VLINE, ID_OP},
-	{KND_CARET, ID_OP},
-	{KND_EXCL, ID_OP},
-	{KND_LT, ID_OP},
-	{KND_GT, ID_OP},
-	{KND_EQ, ID_OP},
-}
-
-func (l *Lex) lex_kws(txt string, tok *Token) bool {
+func (l *lex) lex_kws(txt string, tok *Token) bool {
 	for k, v := range keywords {
 		if l.is_kw(txt, k, v, tok) {
 			return true
@@ -691,7 +667,7 @@ func (l *Lex) lex_kws(txt string, tok *Token) bool {
 	return false
 }
 
-func (l *Lex) lex_basic_ops(txt string, tok *Token) bool {
+func (l *lex) lex_basic_ops(txt string, tok *Token) bool {
 	for _, pair := range basic_ops {
 		if l.is_op(txt, pair.op, pair.id, tok) {
 			return true
@@ -700,7 +676,7 @@ func (l *Lex) lex_basic_ops(txt string, tok *Token) bool {
 	return false
 }
 
-func (l *Lex) lex_id(txt string, t *Token) bool {
+func (l *lex) lex_id(txt string, t *Token) bool {
 	lex := l.id(txt)
 	if lex == "" {
 		return false
@@ -710,7 +686,7 @@ func (l *Lex) lex_id(txt string, t *Token) bool {
 	return true
 }
 
-func (l *Lex) lex_num(txt string, t *Token) bool {
+func (l *lex) lex_num(txt string, t *Token) bool {
 	lex := l.num(txt)
 	if lex == "" {
 		return false
@@ -721,8 +697,8 @@ func (l *Lex) lex_num(txt string, t *Token) bool {
 }
 
 // lex.Token generates next token from resume at position.
-func (l *Lex) Token() Token {
-	t := Token{File: l.File, Id: ID_NA}
+func (l *lex) Token() Token {
+	t := Token{File: l.file, Id: ID_NA}
 
 	txt := l.resume()
 	if txt == "" {
@@ -730,8 +706,8 @@ func (l *Lex) Token() Token {
 	}
 
 	// Set token values.
-	t.Column = l.Column
-	t.Row = l.Row
+	t.Column = l.column
+	t.Row = l.row
 
 	//* lex.Tokenenize
 	switch {
@@ -766,11 +742,11 @@ func (l *Lex) Token() Token {
 	default:
 		r, sz := utf8.DecodeRuneInString(txt)
 		l.push_err("invalid_token", r)
-		l.Column += sz
-		l.Pos++
+		l.column += sz
+		l.pos++
 		return t
 	}
-	l.Column += len(t.Kind)
+	l.column += len(t.Kind)
 	return t
 }
 
@@ -787,7 +763,7 @@ func get_close_kind_of_brace(left string) string {
 	return right
 }
 
-func (l *Lex) remove_range(i int, kind string) {
+func (l *lex) remove_range(i int, kind string) {
 	close := get_close_kind_of_brace(kind)
 	for ; i >= 0; i-- {
 		tok := l.ranges[i]
@@ -799,7 +775,7 @@ func (l *Lex) remove_range(i int, kind string) {
 	}
 }
 
-func (l *Lex) push_range_close(t Token, left string) {
+func (l *lex) push_range_close(t Token, left string) {
 	n := len(l.ranges)
 	if n == 0 {
 		switch t.Kind {
@@ -817,7 +793,7 @@ func (l *Lex) push_range_close(t Token, left string) {
 	l.remove_range(n-1, t.Kind)
 }
 
-func (l *Lex) push_wrong_order_close_err(t Token) {
+func (l *lex) push_wrong_order_close_err(t Token) {
 	var msg string
 	switch l.ranges[len(l.ranges)-1].Kind {
 	case KND_LPAREN:
@@ -828,4 +804,28 @@ func (l *Lex) push_wrong_order_close_err(t Token) {
 		msg = "expected_bracket_close"
 	}
 	l.push_err_tok(t, msg)
+}
+
+// Lex source code into fileset.
+// Returns nil if f is nil.
+// Returns nil slice for errors if no any error.
+func Lex(f *File, text string) ([]Token, []build.Log) {
+	if f == nil {
+		return nil, nil
+	}
+
+	lex := lex{
+		file: f,
+		pos:  0,
+		row:  -1, // For true row
+		data: ([]rune)(text),
+	}
+	
+	lex.new_line()
+	tokens := lex.lex()
+	
+	if len(lex.errors) > 0 {
+		return nil, lex.errors
+	}
+	return tokens, nil
 }

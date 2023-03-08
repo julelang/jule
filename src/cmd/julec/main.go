@@ -13,6 +13,7 @@ import (
 
 	"github.com/julelang/jule"
 	"github.com/julelang/jule/build"
+	"github.com/julelang/jule/lex"
 )
 
 const compiler_gcc = "gcc"
@@ -137,5 +138,21 @@ func init() {
 	}
 }
 
+func read_buff(path string) []byte {
+	bytes, err := os.ReadFile(path)
+	if err != nil {
+		panic("buffering failed: " + err.Error())
+	}
+	return bytes
+}
+
 func main() {
+	f := lex.NewFileSet(os.Args[1])
+	text := (string)(read_buff(f.Path()))
+	tokens, errors := lex.Lex(f, text)
+	if errors != nil {
+		fmt.Println(errors)
+		return
+	}
+	fmt.Println(tokens)
 }
