@@ -29,8 +29,6 @@ type GenericType = ast.GenericType
 type RetType = ast.RetType
 
 type Analyzer struct {
-	attributes       []ast.Attribute
-	doc_text         strings.Builder
 	currentIter      *ast.Iter
 	currentCase      *ast.Case
 	wg               sync.WaitGroup
@@ -417,7 +415,7 @@ func (p *Analyzer) parseSrcTreeNode(node ast.Node) {
 	case ast.CppLinkAlias:
 		p.Link_alias(node_t)
 	case ast.Comment:
-		p.Comment(node_t)
+		// Ignore
 	case ast.UseDecl:
 		p.pusherrtok(node.Token, "use_at_content")
 	default:
@@ -428,8 +426,6 @@ func (p *Analyzer) parseSrcTreeNode(node ast.Node) {
 func (p *Analyzer) parseSrcTree(tree []ast.Node) {
 	for _, node := range tree {
 		p.parseSrcTreeNode(node)
-		p.checkDoc(node)
-		p.checkAttribute(node)
 	}
 }
 
@@ -443,28 +439,6 @@ func (p *Analyzer) parseTree(tree []ast.Node) (ok bool) {
 
 func (p *Analyzer) checkParse() {
 	p.check_package()
-}
-
-func (p *Analyzer) checkDoc(node ast.Node) {
-	if p.doc_text.Len() == 0 {
-		return
-	}
-	switch node.Data.(type) {
-	case ast.Comment, ast.Attribute, []GenericType:
-		return
-	}
-	p.doc_text.Reset()
-}
-
-func (p *Analyzer) checkAttribute(node ast.Node) {
-	if p.attributes == nil {
-		return
-	}
-	switch node.Data.(type) {
-	case ast.Attribute, ast.Comment, []GenericType:
-		return
-	}
-	p.attributes = nil
 }
 
 func (p *Analyzer) check_generics(types []*GenericType) {
@@ -487,8 +461,6 @@ func (p *Analyzer) check_generics(types []*GenericType) {
 func (p *Analyzer) make_type_alias(alias ast.TypeAlias) *ast.TypeAlias {
 	a := new(ast.TypeAlias)
 	*a = alias
-	alias.Doc = p.doc_text.String()
-	p.doc_text.Reset()
 	return a
 }
 
@@ -611,8 +583,6 @@ func (p *Analyzer) Enum(e *Enum) {
 		p.pusherrtok(e.Token, "exist_id", e.Id)
 		return
 	}
-	e.Doc = p.doc_text.String()
-	p.doc_text.Reset()
 	e.DataType, _ = p.realType(e.DataType, true)
 	if !types.IsPure(e.DataType) {
 		p.pusherrtok(e.Token, "invalid_type_source")
@@ -690,13 +660,9 @@ func make_constructor(s *Struct) *ast.Fn {
 func (p *Analyzer) make_struct(model ast.Struct) *Struct {
 	s := new(Struct)
 	*s = model
-	s.Doc = p.doc_text.String()
-	p.doc_text.Reset()
 	//s.Traits = new([]*trait)
 	//s.depends = new([]*structure)
 	s.Owner = p
-	s.Attributes = p.attributes
-	p.attributes = nil
 	s.Defines = new(ast.Defmap)
 	s.Constructor = make_constructor(s)
 	s.Origin = s
@@ -730,8 +696,6 @@ func (p *Analyzer) LinkFn(link ast.CppLinkFn) {
 	}
 	linkf := link.Link
 	linkf.Owner = p
-	linkf.Attributes = p.attributes
-	p.attributes = nil
 	p.check_generics(linkf.Generics)
 	p.linked_functions = append(p.linked_functions, linkf)
 }
@@ -792,15 +756,13 @@ func (p *Analyzer) Trait(model ast.Trait) {
 	}
 	trait := new(ast.Trait)
 	*trait = model
-	trait.Desc = p.doc_text.String()
-	p.doc_text.Reset()
 	trait.Defines = new(ast.Defmap)
-	trait.Defines.Fns = make([]*Fn, len(model.Funcs))
-	for i, f := range trait.Funcs {
+	trait.Defines.Fns = make([]*Fn, len(model.Fns))
+	for i, f := range trait.Fns {
 		if lex.IsIgnoreId(f.Id) {
 			p.pusherrtok(f.Token, "ignore_id")
 		}
-		for j, jf := range trait.Funcs {
+		for j, jf := range trait.Fns {
 			if j >= i {
 				break
 			} else if f.Id == jf.Id {
@@ -835,7 +797,7 @@ func (p *Analyzer) implTrait(model *ast.Impl) {
 	for _, node := range model.Tree {
 		switch node_t := node.Data.(type) {
 		case ast.Comment:
-			p.Comment(node_t)
+			// Ignore
 		case *Fn:
 			if trait_def.FindFunc(node_t.Id) == nil {
 				p.pusherrtok(model.Target.Token, "trait_hasnt_id", trait_def.Id, node_t.Id)
@@ -848,11 +810,7 @@ func (p *Analyzer) implTrait(model *ast.Impl) {
 			}
 			node_t.Receiver.Token = s.Token
 			node_t.Receiver.Tag = s
-			node_t.Attributes = p.attributes
 			node_t.Owner = p
-			p.attributes = nil
-			node_t.Doc = p.doc_text.String()
-			p.doc_text.Reset()
 			_ = p.check_param_dup(node_t.Params)
 			p.check_ret_variables(node_t)
 			node_t.Used = true
@@ -901,7 +859,7 @@ func (p *Analyzer) implStruct(model *ast.Impl) {
 	for _, node := range model.Tree {
 		switch node_t := node.Data.(type) {
 		case ast.Comment:
-			p.Comment(node_t)
+			// Ignore
 		case *Fn:
 			i, _, _ := s.Defines.FindById(node_t.Id, nil)
 			if i != -1 {
@@ -912,11 +870,7 @@ func (p *Analyzer) implStruct(model *ast.Impl) {
 			*sf = *node_t
 			sf.Receiver.Token = s.Token
 			sf.Receiver.Tag = s
-			sf.Attributes = p.attributes
-			sf.Doc = p.doc_text.String()
 			sf.Owner = p
-			p.doc_text.Reset()
-			p.attributes = nil
 			_ = p.check_param_dup(sf.Params)
 			p.check_ret_variables(sf)
 			p.check_impl_generics(s, sf.Generics)
@@ -957,40 +911,6 @@ func (p *Analyzer) pushNs(identifiers []string) *ast.Namespace {
 		prev = src.Defines
 	}
 	return src
-}
-
-// Comment parses Jule documentation comments line.
-func (p *Analyzer) Comment(c ast.Comment) {
-	if strings.HasPrefix(c.Content, lex.PRAGMA_COMMENT_PREFIX) {
-		p.PushAttribute(c)
-		return
-	}
-	p.doc_text.WriteString(c.Content)
-	p.doc_text.WriteByte('\n')
-}
-
-// PushAttribute process and appends to attribute list.
-func (p *Analyzer) PushAttribute(c ast.Comment) {
-	var attr ast.Attribute
-	// Skip attribute prefix
-	attr.Tag = c.Content[len(lex.PRAGMA_COMMENT_PREFIX):]
-	attr.Token = c.Token
-	ok := false
-	for _, kind := range build.ATTRS {
-		if attr.Tag == kind {
-			ok = true
-			break
-		}
-	}
-	if !ok {
-		return
-	}
-	for _, attr2 := range p.attributes {
-		if attr.Tag == attr2.Tag {
-			return
-		}
-	}
-	p.attributes = append(p.attributes, attr)
 }
 
 // St parse Jule statement.
@@ -1132,11 +1052,7 @@ func (p *Analyzer) function(ast Fn) {
 	}
 	f := new(Fn)
 	*f = ast
-	f.Attributes = p.attributes
-	p.attributes = nil
 	f.Owner = p
-	f.Doc = p.doc_text.String()
-	p.doc_text.Reset()
 	p.check_generics(ast.Generics)
 	p.check_ret_variables(f)
 	_ = p.check_param_dup(f.Params)
@@ -1158,8 +1074,6 @@ func (p *Analyzer) global(vast Var) {
 			}
 		}
 	}
-	vast.Doc = p.doc_text.String()
-	p.doc_text.Reset()
 	v := new(Var)
 	*v = vast
 	p.Defines.Globals = append(p.Defines.Globals, v)
@@ -2619,6 +2533,7 @@ func (p *Analyzer) common_st(s *ast.St, i *int, recover bool) bool {
 		p.concurrent_call(&data)
 		s.Data = data
 	case ast.Comment:
+		// Ignore
 	default:
 		return false
 	}

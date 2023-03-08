@@ -354,12 +354,12 @@ var builtinFile = &Analyzer{}
 var Builtin = &ast.Defmap{
 	Types: []*ast.TypeAlias{
 		{
-			Pub:        true,
+			Public:        true,
 			Id:         "byte",
 			TargetType: Type{Id: types.U8, Kind: types.TYPE_MAP[types.U8]},
 		},
 		{
-			Pub:        true,
+			Public:        true,
 			Id:         "rune",
 			TargetType: Type{Id: types.I32, Kind: types.TYPE_MAP[types.I32]},
 		},

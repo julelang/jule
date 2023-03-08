@@ -1228,7 +1228,7 @@ func gen_trait(t *ast.Trait) string {
 	cpp.WriteString("virtual ~")
 	cpp.WriteString(outid)
 	cpp.WriteString("(void) noexcept {}\n\n")
-	for _, f := range t.Funcs {
+	for _, f := range t.Fns {
 		cpp.WriteString(is)
 		cpp.WriteString("virtual ")
 		cpp.WriteString(f.RetType.String())

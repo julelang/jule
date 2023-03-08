@@ -33,11 +33,13 @@ type block_st struct {
 }
 
 type parser struct {
-	public bool
-	pos    int
-	tree   []ast.Node
-	errors []build.Log
-	tokens []lex.Token
+	attributes    []ast.Attribute
+	comment_group *ast.CommentGroup
+	public        bool
+	pos           int
+	tree          []ast.Node
+	errors        []build.Log
+	tokens        []lex.Token
 }
 
 func new_parser(tokens []lex.Token) *parser {
@@ -64,7 +66,12 @@ func (p *parser) build_node(toks []lex.Token) {
 		p.build_use(toks)
 	case lex.ID_FN, lex.ID_UNSAFE:
 		s := ast.St{Token: t}
-		s.Data = p.build_fn(toks, false, false, false)
+		f := p.build_fn(toks, false, false, false)
+		f.Attributes = p.attributes
+		p.attributes = nil
+		f.Doc = p.comment_group
+		p.comment_group = nil
+		s.Data = f
 		p.tree = append(p.tree, ast.Node{Token: s.Token, Data: s})
 	case lex.ID_CONST, lex.ID_LET, lex.ID_MUT:
 		p.build_global_var(toks)
@@ -89,6 +96,31 @@ func (p *parser) build_node(toks []lex.Token) {
 	if p.public {
 		p.push_err(t, "def_not_support_pub")
 	}
+	last_node := p.tree[len(p.tree)-1]
+	p.check_doc(last_node)
+	p.check_attribute(last_node)
+}
+
+func (p *parser) check_doc(node ast.Node) {
+	if p.comment_group == nil {
+		return
+	}
+	switch node.Data.(type) {
+	case ast.Comment, ast.Attribute, []ast.GenericType:
+		return
+	}
+	p.comment_group = nil
+}
+
+func (p *parser) check_attribute(node ast.Node) {
+	if p.attributes == nil {
+		return
+	}
+	switch node.Data.(type) {
+	case ast.Attribute, ast.Comment, []ast.GenericType:
+		return
+	}
+	p.attributes = nil
 }
 
 // build builds AST tree.
@@ -113,6 +145,9 @@ func (p *parser) build() {
 
 // type_alias builds AST model of type definition statement.
 func (p *parser) type_alias(toks []lex.Token) (t ast.TypeAlias) {
+	t.Doc = p.comment_group
+	p.comment_group = nil
+	
 	i := 1 // Initialize value is 1 for skip keyword.
 	if i >= len(toks) {
 		p.push_err(toks[i-1], "invalid_syntax")
@@ -221,6 +256,8 @@ func (p *parser) build_enum(toks []lex.Token) {
 	}
 	e := &ast.Enum{}
 	e.Token = toks[1]
+	e.Doc = p.comment_group
+	p.comment_group = nil
 	if e.Token.Id != lex.ID_IDENT {
 		p.push_err(e.Token, "invalid_syntax")
 	}
@@ -250,15 +287,28 @@ func (p *parser) build_enum(toks []lex.Token) {
 	} else if i < len(toks) {
 		p.push_err(toks[i], "invalid_syntax")
 	}
-	e.Pub = p.public
+	e.Public = p.public
 	p.public = false
 	e.Items = p.build_enum_items(itemToks)
 	p.tree = append(p.tree, ast.Node{Token: e.Token, Data: e})
 }
 
 // comment builds AST model of comment.
-func (p *parser) comment(t lex.Token) ast.Node {
+func (p *parser) comment(t lex.Token) ast.Node {	
 	t.Kind = strings.TrimSpace(t.Kind[2:])
+
+	if strings.HasPrefix(t.Kind, lex.PRAGMA_COMMENT_PREFIX) {
+		p.push_attribute(t)
+	} else {
+		if p.comment_group == nil {
+			p.comment_group = &ast.CommentGroup{}
+		}
+		p.comment_group.Comments = append(p.comment_group.Comments, &ast.Comment{
+			Token:   t,
+			Content: t.Kind,
+		})
+	}
+
 	return ast.Node{
 		Token: t,
 		Data: ast.Comment{
@@ -266,6 +316,29 @@ func (p *parser) comment(t lex.Token) ast.Node {
 			Content: t.Kind,
 		},
 	}
+}
+
+func (p *parser) push_attribute(t lex.Token) {
+	var attr ast.Attribute
+	// Skip attribute prefix
+	attr.Tag = t.Kind[len(lex.PRAGMA_COMMENT_PREFIX):]
+	attr.Token = t
+	ok := false
+	for _, kind := range build.ATTRS {
+		if attr.Tag == kind {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return
+	}
+	for _, attr2 := range p.attributes {
+		if attr.Tag == attr2.Tag {
+			return
+		}
+	}
+	p.attributes = append(p.attributes, attr)
 }
 
 func (p *parser) struct_fields(toks []lex.Token, cpp_linked bool) []*ast.Var {
@@ -304,8 +377,12 @@ func (p *parser) struct_fields(toks []lex.Token, cpp_linked bool) []*ast.Var {
 
 func (p *parser) build_struct(toks []lex.Token, cpp_linked bool) ast.Struct {
 	var s ast.Struct
-	s.Pub = p.public
+	s.Public = p.public
 	p.public = false
+	s.Doc = p.comment_group
+	p.comment_group = nil
+	s.Attributes = p.attributes
+	p.attributes = nil
 	if len(toks) < 3 {
 		p.push_err(toks[0], "invalid_syntax")
 		return s
@@ -366,8 +443,10 @@ func (p *parser) trait_fns(toks []lex.Token, trait_id string) []*ast.Fn {
 // build_trait builds AST model of trait.
 func (p *parser) build_trait(toks []lex.Token) {
 	var t ast.Trait
-	t.Pub = p.public
+	t.Public = p.public
 	p.public = false
+	t.Doc = p.comment_group
+	p.comment_group = nil
 	if len(toks) < 3 {
 		p.push_err(toks[0], "invalid_syntax")
 		return
@@ -387,7 +466,7 @@ func (p *parser) build_trait(toks []lex.Token) {
 	if i < len(toks) {
 		p.push_err(toks[i], "invalid_syntax")
 	}
-	t.Funcs = p.trait_fns(bodyToks, t.Id)
+	t.Fns = p.trait_fns(bodyToks, t.Id)
 	p.tree = append(p.tree, ast.Node{Token: t.Token, Data: t})
 }
 
@@ -406,6 +485,10 @@ func (p *parser) impl_trait_fns(impl *ast.Impl, toks []lex.Token) {
 		case lex.ID_FN, lex.ID_UNSAFE:
 			f := p.get_method(fnToks)
 			f.Public = true
+			f.Doc = p.comment_group
+			p.comment_group = nil
+			f.Attributes = p.attributes
+			p.attributes = nil
 			p.setup_receiver(f, impl.Target.Kind)
 			impl.Tree = append(impl.Tree, ast.Node{Token: f.Token, Data: f})
 		default:
@@ -445,6 +528,10 @@ func (p *parser) impl_struct(impl *ast.Impl, toks []lex.Token) {
 		case lex.ID_FN, lex.ID_UNSAFE:
 			f := p.get_method(fnToks)
 			f.Public = pub
+			f.Attributes = p.attributes
+			p.attributes = nil
+			f.Doc = p.comment_group
+			p.comment_group = nil
 			p.setup_receiver(f, impl.Base.Kind)
 			impl.Tree = append(impl.Tree, ast.Node{Token: f.Token, Data: f})
 		default:
@@ -552,6 +639,8 @@ func (p *parser) link_fn(toks []lex.Token) {
 	link.Token = tok
 	link.Link = new(ast.Fn)
 	*link.Link = p.build_fn(toks[1:], false, false, true)
+	link.Link.Attributes = p.attributes
+	p.attributes = nil
 	p.tree = append(p.tree, ast.Node{Token: tok, Data: link})
 
 	p.public = bpub
@@ -931,7 +1020,7 @@ func (p *parser) build_generics(toks []lex.Token) []*ast.GenericType {
 // build_global_type_alias builds global type alias.
 func (p *parser) build_global_type_alias(toks []lex.Token) ast.Node {
 	t := p.type_alias(toks)
-	t.Pub = p.public
+	t.Public = p.public
 	p.public = false
 	return ast.Node{Token: t.Token, Data: t}
 }
@@ -943,6 +1032,10 @@ func (p *parser) build_global_var(toks []lex.Token) {
 	}
 	bs := block_st{toks: toks}
 	s := p.build_var_st(&bs, true)
+	v := s.Data.(ast.Var)
+	v.Doc = p.comment_group
+	p.comment_group = nil
+	s.Data = v
 	p.tree = append(p.tree, ast.Node{
 		Token: s.Token,
 		Data:  s,

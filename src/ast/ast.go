@@ -8,6 +8,11 @@ import (
 	"github.com/julelang/jule/lex"
 )
 
+// CommentGroup is group for AST model of comments.
+type CommentGroup struct {
+	Comments []*Comment
+}
+
 // Arg is AST model of argument.
 type Arg struct {
 	Token    lex.Token
@@ -164,13 +169,13 @@ type EnumItem struct {
 
 // Enum is the AST model of enumerator statements.
 type Enum struct {
-	Pub      bool
+	Public      bool
 	Token    lex.Token
 	Id       string
 	DataType Type
 	Items    []*EnumItem
 	Used     bool
-	Doc      string
+	Doc      *CommentGroup
 }
 
 // ItemById returns item by id if exist, nil if not.
@@ -237,7 +242,7 @@ type Fn struct {
 	Receiver      *Var
 	Owner         any
 	BuiltinCaller any
-	Doc           string
+	Doc           *CommentGroup
 }
 
 func (f *Fn) IsConstructor() bool {
@@ -700,7 +705,7 @@ type ExprSt struct {
 type Struct struct {
 	Token       lex.Token
 	Id          string
-	Pub         bool
+	Public         bool
 	Fields      []*Var
 	Attributes  []Attribute
 	Generics    []*GenericType
@@ -709,7 +714,7 @@ type Struct struct {
 	Traits      []*Trait // Implemented traits
 	Defines     *Defmap
 	Used        bool
-	Doc         string
+	Doc         *CommentGroup
 	CppLinked   bool
 	Constructor *Fn
 	Depends     []*Struct
@@ -804,12 +809,12 @@ func (s *Struct) GetSelfRefVarType() Type {
 
 // Trait is the AST model of traits.
 type Trait struct {
-	Pub     bool
+	Public     bool
 	Token   lex.Token
 	Id      string
-	Desc    string
+	Doc    *CommentGroup
 	Used    bool
-	Funcs   []*Fn
+	Fns   []*Fn
 	Defines *Defmap
 }
 
@@ -832,11 +837,11 @@ func (t *Trait) OutId() string {
 // TypeAlias is type alias declaration.
 type TypeAlias struct {
 	Owner      *Block
-	Pub        bool
+	Public        bool
 	Token      lex.Token
 	Id         string
 	TargetType Type
-	Doc        string
+	Doc        *CommentGroup
 	Used       bool
 	Generic    bool
 }
@@ -1226,7 +1231,7 @@ type Var struct {
 	New       bool
 	Tag       any
 	ExprTag   any
-	Doc       string
+	Doc       *CommentGroup
 	Used      bool
 	IsField   bool
 	CppLinked bool

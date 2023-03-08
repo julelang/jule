@@ -38,7 +38,7 @@ func (dm *Defmap) NsById(id string) *Namespace {
 func (dm *Defmap) FindStructById(id string, f *lex.File) (int, *Defmap, bool) {
 	for i, s := range dm.Structs {
 		if s != nil && s.Id == id {
-			if IsAccessable(f, s.Token.File, s.Pub) {
+			if IsAccessable(f, s.Token.File, s.Public) {
 				return i, dm, false
 			}
 		}
@@ -61,7 +61,7 @@ func (dm *Defmap) StructById(id string, f *lex.File) (*Struct, *Defmap, bool) {
 func (dm *Defmap) FindTraitById(id string, f *lex.File) (int, *Defmap, bool) {
 	for i, t := range dm.Traits {
 		if t != nil && t.Id == id {
-			if IsAccessable(f, t.Token.File, t.Pub) {
+			if IsAccessable(f, t.Token.File, t.Public) {
 				return i, dm, false
 			}
 		}
@@ -84,7 +84,7 @@ func (dm *Defmap) TraitById(id string, f *lex.File) (*Trait, *Defmap, bool) {
 func (dm *Defmap) FindEnumById(id string, f *lex.File) (int, *Defmap, bool) {
 	for i, e := range dm.Enums {
 		if e != nil && e.Id == id {
-			if IsAccessable(f, e.Token.File, e.Pub) {
+			if IsAccessable(f, e.Token.File, e.Public) {
 				return i, dm, false
 			}
 		}
@@ -107,7 +107,7 @@ func (dm *Defmap) EnumById(id string, f *lex.File) (*Enum, *Defmap, bool) {
 func (dm *Defmap) FindTypeById(id string, f *lex.File) (int, *Defmap, bool) {
 	for i, t := range dm.Types {
 		if t != nil && t.Id == id {
-			if IsAccessable(f, t.Token.File, t.Pub) {
+			if IsAccessable(f, t.Token.File, t.Public) {
 				return i, dm, false
 			}
 		}
