@@ -1,14 +1,15 @@
-package parser
+package analysis
 
 import (
 	"strconv"
 
 	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/lex"
+	"github.com/julelang/jule/parser"
 	"github.com/julelang/jule/types"
 )
 
-type builtin_caller = func(*Parser, *Fn, call_data, *expr_model) value
+type builtin_caller = func(*Analyzer, *Fn, call_data, *expr_model) value
 
 const maxI8 = 127
 const minI8 = -128
@@ -347,7 +348,7 @@ var real_fn = &Fn{Public: true, Id: "real"}
 var outln_fn *Fn
 
 // Parser instance for built-in generics.
-var builtinFile = &Parser{}
+var builtinFile = &Analyzer{}
 
 // Builtin definitions.
 var Builtin = &ast.Defmap{
@@ -620,7 +621,7 @@ func init() {
 
 // builtin
 
-func caller_out(p *Parser, f *Fn, data call_data, m *expr_model) (v value) {
+func caller_out(p *Analyzer, f *Fn, data call_data, m *expr_model) (v value) {
 	errtok := data.args[0]
 	v.data.DataType = f.RetType.DataType
 	// Remove parentheses
@@ -634,7 +635,7 @@ func caller_out(p *Parser, f *Fn, data call_data, m *expr_model) (v value) {
 	return v
 }
 
-func caller_make(p *Parser, _ *Fn, data call_data, m *expr_model) (v value) {
+func caller_make(p *Analyzer, _ *Fn, data call_data, m *expr_model) (v value) {
 	errtok := data.args[0]
 	args := p.get_args(data.args, false)
 	if len(args.Src) == 0 {
@@ -642,17 +643,16 @@ func caller_make(p *Parser, _ *Fn, data call_data, m *expr_model) (v value) {
 		return
 	}
 	type_tokens := args.Src[0].Expr.Tokens
-	r := new_builder(nil)
 	i := 0
-	t, ok := r.DataType(type_tokens, &i, true)
-	if !ok {
-		p.pusherrs(r.Errors...)
+	t, errors := parser.BuildType(type_tokens, &i)
+	if len(errors) > 0 {
+		p.pusherrs(errors...)
 		return
 	}
 	if i+1 < len(type_tokens) {
 		p.pusherrtok(type_tokens[i+1], "invalid_syntax")
 	}
-	t, ok = p.realType(t, true)
+	t, ok := p.realType(t, true)
 	if !ok {
 		return
 	}
@@ -665,7 +665,7 @@ func caller_make(p *Parser, _ *Fn, data call_data, m *expr_model) (v value) {
 	return
 }
 
-func caller_copy(p *Parser, _ *Fn, data call_data, m *expr_model) (v value) {
+func caller_copy(p *Analyzer, _ *Fn, data call_data, m *expr_model) (v value) {
 	v.data.DataType.Id = types.INT
 	v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 	v.data.Value = " "
@@ -719,7 +719,7 @@ func caller_copy(p *Parser, _ *Fn, data call_data, m *expr_model) (v value) {
 	return v
 }
 
-func caller_append(p *Parser, _ *Fn, data call_data, m *expr_model) (v value) {
+func caller_append(p *Analyzer, _ *Fn, data call_data, m *expr_model) (v value) {
 	errtok := data.args[0]
 	args := p.get_args(data.args, false)
 	if len(args.Src) < 1 {
@@ -760,7 +760,7 @@ func caller_append(p *Parser, _ *Fn, data call_data, m *expr_model) (v value) {
 	return v
 }
 
-func caller_drop(p *Parser, _ *Fn, data call_data, m *expr_model) (v value) {
+func caller_drop(p *Analyzer, _ *Fn, data call_data, m *expr_model) (v value) {
 	errtok := data.args[0]
 	args := p.get_args(data.args, false)
 	if len(args.Src) < 1 {
@@ -784,7 +784,7 @@ func caller_drop(p *Parser, _ *Fn, data call_data, m *expr_model) (v value) {
 	return v
 }
 
-func caller_real(p *Parser, _ *Fn, data call_data, m *expr_model) (v value) {
+func caller_real(p *Analyzer, _ *Fn, data call_data, m *expr_model) (v value) {
 	v.data.DataType.Id = types.BOOL
 	v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
 
@@ -809,7 +809,7 @@ func caller_real(p *Parser, _ *Fn, data call_data, m *expr_model) (v value) {
 	return v
 }
 
-func caller_new(p *Parser, _ *Fn, data call_data, m *expr_model) (v value) {
+func caller_new(p *Analyzer, _ *Fn, data call_data, m *expr_model) (v value) {
 	errtok := data.args[0]
 	args := p.get_args(data.args, false)
 	if len(args.Src) < 1 {
@@ -819,11 +819,10 @@ func caller_new(p *Parser, _ *Fn, data call_data, m *expr_model) (v value) {
 		p.pusherrtok(errtok, "argument_overflow")
 	}
 	// Remove parentheses
-	r := new_builder(nil)
 	i := 0
-	t, ok := r.DataType(args.Src[0].Expr.Tokens, &i, true)
-	if !ok {
-		p.pusherrs(r.Errors...)
+	t, errors := parser.BuildType(args.Src[0].Expr.Tokens, &i)
+	if len(errors) > 0 {
+		p.pusherrs(errors...)
 		return
 	}
 	if i+1 < len(args.Src[0].Expr.Tokens) {
@@ -869,7 +868,7 @@ var std_mem_builtin = &ast.Defmap{
 	},
 }
 
-func caller_mem_size_of(p *Parser, _ *Fn, data call_data, m *expr_model) (v value) {
+func caller_mem_size_of(p *Analyzer, _ *Fn, data call_data, m *expr_model) (v value) {
 	// Remove parentheses
 	data.args = data.args[1 : len(data.args)-1]
 	v.data.DataType = Type{
@@ -878,10 +877,9 @@ func caller_mem_size_of(p *Parser, _ *Fn, data call_data, m *expr_model) (v valu
 	}
 	nodes := m.nodes[m.index].nodes
 	node := &nodes[len(nodes)-1]
-	r := new_builder(nil)
 	i := 0
-	t, ok := r.DataType(data.args, &i, true)
-	if !ok {
+	t, errors := parser.BuildType(data.args, &i)
+	if len(errors) > 0 {
 		v, model := p.evalToks(data.args, nil)
 		*node = exprNode{"sizeof(" + model.String() + ")"}
 		v.constant = false
@@ -890,13 +888,13 @@ func caller_mem_size_of(p *Parser, _ *Fn, data call_data, m *expr_model) (v valu
 	if i+1 < len(data.args) {
 		p.pusherrtok(data.args[i+1], "invalid_syntax")
 	}
-	p.pusherrs(r.Errors...)
+	p.pusherrs(errors...)
 	t, _ = p.realType(t, true)
 	*node = exprNode{"sizeof(" + t.String() + ")"}
 	return
 }
 
-func caller_mem_align_of(p *Parser, _ *Fn, data call_data, m *expr_model) (v value) {
+func caller_mem_align_of(p *Analyzer, _ *Fn, data call_data, m *expr_model) (v value) {
 	// Remove parentheses
 	data.args = data.args[1 : len(data.args)-1]
 	v.data.DataType = Type{
@@ -905,10 +903,9 @@ func caller_mem_align_of(p *Parser, _ *Fn, data call_data, m *expr_model) (v val
 	}
 	nodes := m.nodes[m.index].nodes
 	node := &nodes[len(nodes)-1]
-	r := new_builder(nil)
 	i := 0
-	t, ok := r.DataType(data.args, &i, true)
-	if !ok {
+	t, errors := parser.BuildType(data.args, &i)
+	if len(errors) > 0 {
 		v, model := p.evalToks(data.args, nil)
 		*node = exprNode{"alignof(" + model.String() + ")"}
 		v.constant = false
@@ -917,7 +914,7 @@ func caller_mem_align_of(p *Parser, _ *Fn, data call_data, m *expr_model) (v val
 	if i+1 < len(data.args) {
 		p.pusherrtok(data.args[i+1], "invalid_syntax")
 	}
-	p.pusherrs(r.Errors...)
+	p.pusherrs(errors...)
 	t, _ = p.realType(t, true)
 	*node = exprNode{"alignof(" + t.String() + ")"}
 	return
@@ -927,7 +924,7 @@ var std_builtin_defines = map[string]*ast.Defmap{
 	"std::mem": std_mem_builtin,
 }
 
-func fn_make(p *Parser, m *expr_model, t ast.Type, args *ast.Args, errtok lex.Token) (v value) {
+func fn_make(p *Analyzer, m *expr_model, t ast.Type, args *ast.Args, errtok lex.Token) (v value) {
 	v.data.DataType = t
 	v.data.Value = " "
 	// Set mutable to true because return types must be mutable all time.

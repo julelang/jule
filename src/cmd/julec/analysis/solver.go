@@ -1,4 +1,4 @@
-package parser
+package analysis
 
 import (
 	"github.com/julelang/jule/lex"
@@ -87,7 +87,7 @@ func to_num_signed(expr any) int64 {
 }
 
 type solver struct {
-	p  *Parser
+	p  *Analyzer
 	l  value
 	r  value
 	op lex.Token

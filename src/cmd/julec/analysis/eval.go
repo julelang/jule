@@ -1,4 +1,4 @@
-package parser
+package analysis
 
 import (
 	"strconv"
@@ -7,6 +7,7 @@ import (
 	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/cmd/julec/gen"
 	"github.com/julelang/jule/lex"
+	"github.com/julelang/jule/parser"
 	"github.com/julelang/jule/types"
 )
 
@@ -23,7 +24,7 @@ type value struct {
 }
 
 type eval struct {
-	p            *Parser
+	p            *Analyzer
 	has_error    bool
 	type_prefix  *Type
 	allow_unsafe bool
@@ -38,8 +39,7 @@ func (e *eval) push_err_tok(tok lex.Token, err string, args ...any) {
 }
 
 func (e *eval) eval_toks(toks []lex.Token) (value, ast.ExprModel) {
-	resolver := builder{}
-	return e.eval_expr(resolver.Expr(toks))
+	return e.eval_expr(parser.BuildExpr(toks))
 }
 
 func (e *eval) eval_expr(expr Expr) (value, ast.ExprModel) { return e.eval(expr.Op) }
@@ -547,14 +547,13 @@ func (e *eval) try_cast(toks []lex.Token, m *expr_model) (v value, _ bool) {
 		} else if i+1 == len(toks) {
 			return
 		}
-		r := new_builder(nil)
 		dtindex := 0
 		typeToks := toks[1:i]
-		dt, ok := r.DataType(typeToks, &dtindex, false)
-		if !ok {
+		dt, errors := parser.BuildType(typeToks, &dtindex)
+		if len(errors) > 0 {
 			return
 		}
-		dt, ok = e.p.realType(dt, false)
+		dt, ok := e.p.realType(dt, false)
 		if !ok {
 			return
 		}
@@ -844,17 +843,16 @@ func (e *eval) type_sub_id(type_tok, id_tok lex.Token, m *expr_model) (v value) 
 func (e *eval) type_id(toks []lex.Token, m *expr_model) (v value) {
 	v.data.DataType.Id = types.VOID
 	v.data.DataType.Kind = types.TYPE_MAP[v.data.DataType.Id]
-	r := new_builder(nil)
 	i := 0
-	t, ok := r.DataType(toks, &i, true)
-	if !ok {
-		e.p.pusherrs(r.Errors...)
+	t, errors := parser.BuildType(toks, &i)
+	if len(errors) > 0 {
+		e.p.pusherrs(errors...)
 		return
 	} else if i+1 >= len(toks) {
 		e.push_err_tok(toks[0], "invalid_syntax")
 		return
 	}
-	t, ok = e.p.realType(t, true)
+	t, ok := e.p.realType(t, true)
 	if !ok {
 		return
 	}
@@ -1538,10 +1536,9 @@ func (e *eval) enumerable(exprToks []lex.Token, t Type, m *expr_model) (v value)
 }
 
 func (e *eval) anon_fn(toks []lex.Token, m *expr_model) (v value) {
-	r := new_builder(toks)
-	f := r.Func(r.Tokens, false, true, false)
-	if len(r.Errors) > 0 {
-		e.p.pusherrs(r.Errors...)
+	f, errors := parser.BuildFn(toks, false, true, false)
+	if len(errors) > 0 {
+		e.p.pusherrs(errors...)
 		return
 	}
 	e.p.check_anon_fn(&f)

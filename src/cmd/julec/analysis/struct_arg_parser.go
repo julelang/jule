@@ -1,4 +1,4 @@
-package parser
+package analysis
 
 import (
 	"github.com/julelang/jule/ast"
@@ -6,7 +6,7 @@ import (
 	"github.com/julelang/jule/types"
 )
 
-func (p *Parser) get_field_map(f *Fn) *paramMap {
+func (p *Analyzer) get_field_map(f *Fn) *paramMap {
 	pmap := new(paramMap)
 	*pmap = paramMap{}
 	s := f.RetType.DataType.Tag.(*ast.Struct)
@@ -20,7 +20,7 @@ func (p *Parser) get_field_map(f *Fn) *paramMap {
 }
 
 type structArgParser struct {
-	p      *Parser
+	p      *Analyzer
 	fmap   *paramMap
 	f      *Fn
 	args   *ast.Args

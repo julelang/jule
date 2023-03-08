@@ -1,4 +1,4 @@
-package parser
+package analysis
 
 import (
 	"runtime"
@@ -14,7 +14,7 @@ import (
 type literal_eval struct {
 	token lex.Token
 	model *expr_model
-	p     *Parser
+	p     *Analyzer
 }
 
 func get_str_model(v value) ast.ExprModel {

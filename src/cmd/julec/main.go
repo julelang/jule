@@ -15,6 +15,7 @@ import (
 
 	"github.com/julelang/jule"
 	"github.com/julelang/jule/build"
+	"github.com/julelang/jule/cmd/julec/analysis"
 	"github.com/julelang/jule/cmd/julec/gen"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/parser"
@@ -177,7 +178,7 @@ func set() {
 
 // print_logs prints logs and returns true
 // if logs has error, false if not.
-func print_logs(p *parser.Parser) bool {
+func print_logs(p *analysis.Analyzer) bool {
 	var str strings.Builder
 	for _, l := range p.Errors {
 		str.WriteString(l.String())
@@ -234,31 +235,35 @@ func write_output(path, content string) {
 	_ = f.Close()
 }
 
-func compile(path string) *parser.Parser {
+func compile(path string) *analysis.Analyzer {
 	set()
 	// Check standard library.
 	inf, err := os.Stat(jule.STDLIB_PATH)
 	if err != nil || !inf.IsDir() {
-		p := &parser.Parser{}
+		p := &analysis.Analyzer{}
 		p.PushErr("stdlib_not_exist")
 		return p
 	}
 	if !build.IsPassFileAnnotation(path) {
-		p := &parser.Parser{}
+		p := &analysis.Analyzer{}
 		p.PushErr("file_not_useable")
 		return p
 	}
-	p, err_msg := parser.ParsePackage(path, false)
+
+	pinf, err_msg := parser.ParsePackage(path)
 	if err_msg != "" {
 		exit_err(err_msg)
 	}
 
-	f, _, _ := p.Defines.FnById(jule.ENTRY_POINT, nil)
-	if f == nil {
-		p.PushErr("no_entry_point")
-	} else {
-		f.IsEntryPoint = true
-		f.Used = true
+	p := analysis.AnalyzePackage(pinf)
+	if len(p.Errors) == 0 {
+		f, _, _ := p.Defines.FnById(jule.ENTRY_POINT, nil)
+		if f == nil {
+			p.PushErr("no_entry_point")
+		} else {
+			f.IsEntryPoint = true
+			f.Used = true
+		}
 	}
 
 	return p

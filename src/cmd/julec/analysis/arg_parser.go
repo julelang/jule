@@ -1,4 +1,4 @@
-package parser
+package analysis
 
 import (
 	"github.com/julelang/jule/ast"
@@ -18,7 +18,7 @@ func get_param_map(params []Param) *paramMap {
 }
 
 type pureArgParser struct {
-	p       *Parser
+	p       *Analyzer
 	pmap    *paramMap
 	f       *Fn
 	args    *ast.Args

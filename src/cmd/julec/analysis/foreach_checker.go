@@ -1,4 +1,4 @@
-package parser
+package analysis
 
 import (
 	"github.com/julelang/jule/ast"
@@ -7,7 +7,7 @@ import (
 )
 
 type foreachChecker struct {
-	p       *Parser
+	p       *Analyzer
 	profile *ast.IterForeach
 	val     value
 }

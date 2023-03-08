@@ -1,4 +1,4 @@
-package parser
+package analysis
 
 import (
 	"github.com/julelang/jule/ast"
@@ -10,7 +10,7 @@ type unary struct {
 	token lex.Token
 	toks  []lex.Token
 	model *expr_model
-	p     *Parser
+	p     *Analyzer
 }
 
 func (u *unary) minus() value {

@@ -1,4 +1,4 @@
-package parser
+package analysis
 
 import (
 	"math"
@@ -76,7 +76,7 @@ func int_assignable(dt uint8, v value) bool {
 }
 
 type assign_checker struct {
-	p                *Parser
+	p                *Analyzer
 	t                Type
 	v                value
 	ignoreAny        bool

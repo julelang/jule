@@ -1,4 +1,4 @@
-package parser
+package analysis
 
 import (
 	"github.com/julelang/jule/ast"
@@ -7,7 +7,7 @@ import (
 )
 
 type ret_checker struct {
-	p         *Parser
+	p         *Analyzer
 	ret_ast   *ast.Ret
 	f         *Fn
 	exp_model retExpr
