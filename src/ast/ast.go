@@ -211,3 +211,23 @@ type ContSt struct {
 	Token lex.Token
 	Label lex.Token
 }
+
+// If condition.
+type If struct {
+	Token lex.Token
+	Expr  *Expr
+	Scope *Scope
+}
+
+// Else condition.
+type Else struct {
+	Token lex.Token
+	Scope *Scope
+}
+
+// Condition chain.
+type Conditional struct {
+	If      *If
+	Elifs   []*If
+	Default *Else
+}

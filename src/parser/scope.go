@@ -372,6 +372,83 @@ func (sp *scope_parser) build_cont_st(tokens []lex.Token) ast.NodeData {
 	return cont
 }
 
+func (sp *scope_parser) build_if(tokens *[]lex.Token) *ast.If {
+	model := &ast.If{
+		Token: (*tokens)[0],
+	}
+	*tokens = (*tokens)[1:]
+	expr_tokens := get_block_expr(*tokens)
+	i := 0
+	if len(expr_tokens) == 0 {
+		sp.push_err(model.Token, "missing_expr")
+	} else {
+		i = len(expr_tokens)
+	}
+	scope_tokens := lex.Range(&i, lex.KND_LBRACE, lex.KND_RBRACE, *tokens)
+	if scope_tokens == nil {
+		sp.stop()
+		sp.push_err(model.Token, "body_not_exist")
+		return nil
+	}
+	if i < len(*tokens) {
+		if (*tokens)[i].Id == lex.ID_ELSE {
+			*tokens = (*tokens)[i:]
+		} else {
+			sp.push_err((*tokens)[i], "invalid_syntax")
+			*tokens = nil
+		}
+	}
+	model.Expr = sp.p.build_expr(expr_tokens)
+	model.Scope = sp.build_scope(scope_tokens)
+	return model
+}
+
+func (sp *scope_parser) build_else(tokens []lex.Token) *ast.Else {
+	els := &ast.Else{
+		Token: tokens[0],
+	}
+	tokens = tokens[1:] // Remove "else" keyword.
+	i := 0
+	scope_tokens := lex.Range(&i, lex.KND_LBRACE, lex.KND_RBRACE, tokens)
+	if scope_tokens == nil {
+		if i < len(tokens) {
+			sp.push_err(els.Token, "else_have_expr")
+		} else {
+			sp.stop()
+			sp.push_err(els.Token, "body_not_exist")
+		}
+		return nil
+	}
+	if i < len(tokens) {
+		sp.push_err(tokens[i], "invalid_syntax")
+	}
+	els.Scope = sp.build_scope(scope_tokens)
+	return els
+}
+
+func (sp *scope_parser) build_if_else_chain(tokens []lex.Token) ast.NodeData {
+	chain := &ast.Conditional{
+		If: sp.build_if(&tokens),
+	}
+	if chain.If == nil {
+		return nil
+	}
+	for tokens != nil {
+		if tokens[0].Id != lex.ID_ELSE {
+			break
+		}
+		if len(tokens) > 1 && tokens[1].Id == lex.ID_IF {
+			tokens = tokens[1:] // Remove else token
+			elif := sp.build_if(&tokens)
+			chain.Elifs = append(chain.Elifs, elif)
+			continue
+		}
+		chain.Default = sp.build_else(tokens)
+		break
+	}
+	return chain
+}
+
 func (sp *scope_parser) build_st(st *st) ast.NodeData {
 	token := st.tokens[0]
 	switch token.Id {
@@ -389,6 +466,9 @@ func (sp *scope_parser) build_st(st *st) ast.NodeData {
 
 	case lex.ID_CONTINUE:
 		return sp.build_cont_st(st.tokens)
+
+	case lex.ID_IF:
+		return sp.build_if_else_chain(st.tokens)
 	}
 	sp.push_err(token, "invalid_syntax")
 	return nil
