@@ -815,6 +815,9 @@ func (p *parser) build_node_data(tokens []lex.Token) ast.NodeData {
 		c := build_comment(token)
 		p.process_comment(c)
 		return c
+	
+	case lex.ID_TYPE:
+		return p.build_type_alias(tokens)
 
 	default:
 		p.push_err(token, "invalid_syntax")
