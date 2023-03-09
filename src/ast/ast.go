@@ -146,6 +146,11 @@ type GotoSt struct {
 	Label lex.Token
 }
 
+// Fall statement AST.
+type FallSt struct {
+	Token lex.Token
+}
+
 // Scope AST.
 type Scope struct {
 	Parent     *Scope // nil if scope is root

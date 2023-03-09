@@ -538,6 +538,16 @@ func (sp *scope_parser) build_goto_st(tokens []lex.Token) ast.NodeData {
 	return gt
 }
 
+func (sp *scope_parser) build_fall_st(tokens []lex.Token) ast.NodeData {
+	fll := &ast.FallSt{
+		Token: tokens[0],
+	}
+	if len(tokens) > 1 {
+		sp.push_err(tokens[1], "invalid_syntax")
+	}
+	return fll
+}
+
 func (sp *scope_parser) build_st(st *st) ast.NodeData {
 	token := st.tokens[0]
 	switch token.Id {
@@ -570,6 +580,9 @@ func (sp *scope_parser) build_st(st *st) ast.NodeData {
 
 	case lex.ID_GOTO:
 		return sp.build_goto_st(st.tokens)
+
+	case lex.ID_FALL:
+		return sp.build_fall_st(st.tokens)
 	}
 	sp.push_err(token, "invalid_syntax")
 	return nil
