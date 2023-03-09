@@ -153,11 +153,13 @@ type FnDecl struct {
 
 // Variable declaration AST.
 type VarDecl struct {
-	Scope    *Scope    // nil for global scopes
-	Token    lex.Token
-	Ident    string
-	IsMut    bool
-	IsConst  bool
-	DataType *Type
-	Expr     *Expr
+	Scope       *Scope    // nil for global scopes
+	Token       lex.Token
+	Ident       string
+	IsPub       bool
+	IsMut       bool
+	IsConst     bool
+	DocComments *CommentGroup
+	DataType    *Type
+	Expr        *Expr
 }

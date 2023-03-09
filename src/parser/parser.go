@@ -597,13 +597,11 @@ func (p *parser) build_fn(tokens []lex.Token, method bool, anon bool, prototype 
 func (p *parser) build_node_data(st []lex.Token) ast.NodeData {
 	token := st[0]
 	switch token.Id {
+	case lex.ID_CONST, lex.ID_LET, lex.ID_MUT:
+		return p.build_var(st)
+
 	case lex.ID_FN, lex.ID_UNSAFE:
-		f := p.build_fn(st, false, false, false)
-		f.Directives = p.directives
-		p.directives = nil
-		f.DocComments = p.comment_group
-		p.comment_group = nil
-		return f
+		return p.build_fn(st, false, false, false)
 	
 	case lex.ID_COMMENT:
 		// Push first token because this is full text comment.
@@ -641,11 +639,25 @@ func (p *parser) check_directive(node ast.Node) {
 	}
 }
 
-func (p *parser) apply_pub(node *ast.Node) {
+func (p *parser) apply_meta(node *ast.Node, is_pub bool) {
 	switch node.Data.(type) {
+	case *ast.VarDecl:
+		v := node.Data.(*ast.VarDecl)
+		v.IsPub = is_pub
+		is_pub = false
+		v.DocComments = p.comment_group
+		p.comment_group = nil
+
 	case *ast.FnDecl:
-		node.Data.(*ast.FnDecl).IsPub = true
-	default:
+		f := node.Data.(*ast.FnDecl)
+		f.IsPub = is_pub
+		is_pub = false
+		f.Directives = p.directives
+		p.directives = nil
+		f.DocComments = p.comment_group
+		p.comment_group = nil
+	}
+	if is_pub {
 		p.push_err(node.Token, "def_not_support_pub")
 	}
 }
@@ -677,10 +689,7 @@ func (p *parser) append_node(st []lex.Token) {
 		return
 	}
 
-	if is_pub {
-		p.apply_pub(&node)
-	}
-
+	p.apply_meta(&node, is_pub)
 	p.check_comment_group(node)
 	p.check_directive(node)
 	p.tree = append(p.tree, node)
