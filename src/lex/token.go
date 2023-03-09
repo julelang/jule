@@ -3,13 +3,15 @@ package lex
 import (
 	"strings"
 	"unicode/utf8"
+
+	"github.com/julelang/jule/build"
 )
 
 // Token identities.
 const ID_NA = 0
 const ID_DT = 1
 const ID_IDENT = 2
-const ID_BRACE = 3
+const ID_RANGE = 3
 const ID_RET = 4
 const ID_SEMICOLON = 5
 const ID_LITERAL = 6
@@ -322,4 +324,86 @@ func IsHex(b byte) bool {
 	default:
 		return false
 	}
+}
+
+// Returns between of open and close ranges.
+// Starts selection at *i.
+// Moves one *i for each selected token.
+//
+// Special case is:
+//  Range(i, open, close, tokens) = nil if i == nil
+//  Range(i, open, close, tokens) = nil if *i > len(tokens)
+//  Range(i, open, close, tokens) = nil if tokens[i*].Id != ID_RANGE
+//  Range(i, open, close, tokens) = nil if tokens[i*].Kind != open
+func Range(i *int, open string, close string, tokens []Token) []Token {
+	if i == nil || *i >= len(tokens) {
+		return nil
+	}
+	tok := tokens[*i]
+	if tok.Id != ID_RANGE || tok.Kind != open {
+		return nil
+	}
+	*i++
+	n := 1
+	start := *i
+	for ; n != 0 && *i < len(tokens); *i++ {
+		tok := tokens[*i]
+		if tok.Id != ID_RANGE {
+			continue
+		}
+		switch tok.Kind {
+		case open:
+			n++
+		case close:
+			n--
+		}
+	}
+	return tokens[start : *i-1]
+}
+
+// Returns parts separated by given token identifier.
+// It's skips parentheses ranges.
+// Logs missing_expr if expr_must == true and not exist any expression for part.
+//
+// Special case is;
+// Parts(toks) = nil if len(toks) == 0
+func Parts(tokens []Token, id uint8, expr_must bool) ([][]Token, []build.Log) {
+	if len(tokens) == 0 {
+		return nil, nil
+	}
+
+	var parts [][]Token
+	var errors []build.Log
+
+	brace_n := 0
+	last := 0
+	for i, token := range tokens {
+		if token.Id == ID_RANGE {
+			switch token.Kind {
+			case KND_LBRACE, KND_LBRACKET, KND_LPAREN:
+				brace_n++
+				continue
+			default:
+				brace_n--
+			}
+		}
+		if brace_n > 0 {
+			continue
+		}
+		if token.Id == id {
+			if expr_must && i-last <= 0 {
+				errors = append(errors, make_err(token.Row, token.Column, token.File, "missing_expr"))
+			}
+			parts = append(parts, tokens[last:i])
+			last = i + 1
+		}
+	}
+
+	if last < len(tokens) {
+		parts = append(parts, tokens[last:])
+	} else if !expr_must {
+		parts = append(parts, []Token{})
+	}
+
+	return parts, errors
 }

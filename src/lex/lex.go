@@ -726,17 +726,17 @@ func (l *lex) Token() Token {
 	case strings.HasPrefix(txt, KND_RNG_LCOMMENT):
 		l.lex_range_comment()
 		return t
-	case l.is_op(txt, KND_LPAREN, ID_BRACE, &t):
+	case l.is_op(txt, KND_LPAREN, ID_RANGE, &t):
 		l.ranges = append(l.ranges, t)
-	case l.is_op(txt, KND_RPARENT, ID_BRACE, &t):
+	case l.is_op(txt, KND_RPARENT, ID_RANGE, &t):
 		l.push_range_close(t, KND_LPAREN)
-	case l.is_op(txt, KND_LBRACE, ID_BRACE, &t):
+	case l.is_op(txt, KND_LBRACE, ID_RANGE, &t):
 		l.ranges = append(l.ranges, t)
-	case l.is_op(txt, KND_RBRACE, ID_BRACE, &t):
+	case l.is_op(txt, KND_RBRACE, ID_RANGE, &t):
 		l.push_range_close(t, KND_LBRACE)
-	case l.is_op(txt, KND_LBRACKET, ID_BRACE, &t):
+	case l.is_op(txt, KND_LBRACKET, ID_RANGE, &t):
 		l.ranges = append(l.ranges, t)
-	case l.is_op(txt, KND_RBRACKET, ID_BRACE, &t):
+	case l.is_op(txt, KND_RBRACKET, ID_RANGE, &t):
 		l.push_range_close(t, KND_LBRACKET)
 	case l.lex_basic_ops(txt, &t) || l.lex_kws(txt, &t) || l.lex_id(txt, &t):
 	default:
