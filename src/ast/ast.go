@@ -71,15 +71,18 @@ func (t *Type) IsStr() bool { return t.is_primitive(lex.KND_STR) }
 func (t *Type) IsAny() bool { return t.is_primitive(lex.KND_ANY) }
 func (t *Type) IsVoid() bool { return t.Kind == nil && t.Token.Id == lex.ID_NA }
 
+// Identifier type.
 type IdentType struct {
 	Ident string
 }
 
+// Reference type.
 type RefType struct {
 	Elem *Type
 }
 
-type MultiRetType struct {
+// Tuple type.
+type TupleType struct {
 	Types []*Type
 }
 
@@ -98,12 +101,12 @@ func (rtk *RefType) As_text() string {
 	}
 	return rtk.Elem.As_text()
 }
-func (mtk *MultiRetType) As_text() string {
+func (tt *TupleType) As_text() string {
 	kind := "("
 	i := 0
-	for ; i < len(mtk.Types); i++ {
-		kind += mtk.Types[i].As_text()
-		if i+1 < len(mtk.Types) {
+	for ; i < len(tt.Types); i++ {
+		kind += tt.Types[i].As_text()
+		if i+1 < len(tt.Types) {
 			kind += ","
 		}
 	}

@@ -155,7 +155,7 @@ func (p *parser) build_type_alias(tokens []lex.Token) *ast.TypeAliasDecl {
 	}
 	t, ok := p.build_type(tokens, &i, true)
 	tad.Kind = t
-	if ok && i+1 < len(tokens) {
+	if ok && i < len(tokens) {
 		p.push_err(tokens[i+1], "invalid_syntax")
 	}
 	return tad
@@ -214,7 +214,6 @@ func (p *parser) build_var_type_and_expr(v *ast.VarDecl, tokens []lex.Token) {
 		t, ok := p.build_type(tokens, &i, false)
 		if ok {
 			v.Kind = t
-			i++
 			if i >= len(tokens) {
 				return
 			}
@@ -398,7 +397,6 @@ func (p *parser) build_param_type(param *ast.Param, tokens []lex.Token, must_pur
 		}
 	}
 	param.Kind, _ = p.build_type(tokens, &i, true)
-	i++
 	if i < len(tokens) {
 		p.push_err(tokens[i], "invalid_syntax")
 	}
@@ -532,14 +530,16 @@ func (p *parser) build_multi_ret_type(tokens []lex.Token, i *int) (t *ast.RetTyp
 	}
 
 	if len(types) > 1 {
-		t.Kind.Token = tokens[0]
-		t.Kind.Kind = &ast.MultiRetType{Types: types}
+		t.Kind = &ast.Type{
+			Token: tokens[0],
+			Kind:  &ast.TupleType{
+				Types: types,
+			},
+		}
 	} else {
 		t.Kind = types[0]
 	}
 
-	// Decrament for correct block parsing
-	*i--
 	ok = true
 	return
 }
@@ -641,7 +641,6 @@ func (p *parser) build_fn_prototype(tokens []lex.Token, i *int, method bool, ano
 	t, ret_ok := p.build_ret_type(tokens, i)
 	if ret_ok {
 		f.RetType = t
-		*i++
 	}
 
 	return f
@@ -651,7 +650,7 @@ func (p *parser) build_fn(tokens []lex.Token, method bool, anon bool, prototype 
 	i := 0
 	f := p.build_fn_prototype(tokens, &i, method, anon)
 	if prototype {
-		if i+1 < len(tokens) {
+		if i < len(tokens) {
 			p.push_err(tokens[i+1], "invalid_syntax")
 		}
 		return nil
@@ -962,13 +961,19 @@ func (p *parser) apply_meta(node *ast.Node, is_pub bool) {
 	switch node.Data.(type) {
 	case *ast.VarDecl:
 		v := node.Data.(*ast.VarDecl)
+		if v == nil {
+			return
+		}
 		v.IsPub = is_pub
-		is_pub = false
 		v.DocComments = p.comment_group
+		is_pub = false
 		p.comment_group = nil
 
 	case *ast.FnDecl:
 		f := node.Data.(*ast.FnDecl)
+		if f == nil {
+			return
+		}
 		f.IsPub = is_pub
 		is_pub = false
 		f.Directives = p.directives
@@ -978,6 +983,9 @@ func (p *parser) apply_meta(node *ast.Node, is_pub bool) {
 
 	case *ast.TypeAliasDecl:
 		tad := node.Data.(*ast.TypeAliasDecl)
+		if tad == nil {
+			return
+		}
 		tad.IsPub = is_pub
 		is_pub = false
 		tad.DocComments = p.comment_group
@@ -985,6 +993,9 @@ func (p *parser) apply_meta(node *ast.Node, is_pub bool) {
 
 	case *ast.EnumDecl:
 		ed := node.Data.(*ast.EnumDecl)
+		if ed == nil {
+			return
+		}
 		ed.DocComments = p.comment_group
 		p.comment_group = nil
 		ed.IsPub = is_pub
