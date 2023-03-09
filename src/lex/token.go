@@ -361,6 +361,37 @@ func Range(i *int, open string, close string, tokens []Token) []Token {
 	return tokens[start : *i-1]
 }
 
+// RangeLast returns last range from tokens.
+// Returns tokens without range tokens and range tokens.
+//
+// Special cases are;
+//  RangeLast(toks) = toks, nil if len(toks) == 0
+//  RangeLast(toks) = toks, nil if toks is not has range at last
+func RangeLast(tokens []Token) (cutted []Token, cut []Token) {
+	if len(tokens) == 0 {
+		return tokens, nil
+	} else if tokens[len(tokens)-1].Id != ID_RANGE {
+		return tokens, nil
+	}
+	brace_n := 0
+	for i := len(tokens) - 1; i >= 0; i-- {
+		token := tokens[i]
+		if token.Id == ID_RANGE {
+			switch token.Kind {
+			case KND_RBRACE, KND_RBRACKET, KND_RPARENT:
+				brace_n++
+				continue
+			default:
+				brace_n--
+			}
+		}
+		if brace_n == 0 {
+			return tokens[:i], tokens[i:]
+		}
+	}
+	return tokens, nil
+}
+
 // Returns parts separated by given token identifier.
 // It's skips parentheses ranges.
 // Logs missing_expr if expr_must == true and not exist any expression for part.

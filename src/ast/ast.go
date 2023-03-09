@@ -122,7 +122,16 @@ type ExprData = any // Type of AST Expr's data.
 // Expression AST.
 type Expr struct {
 	Token lex.Token
-	Data  ExprData
+	Kind  ExprData
+}
+
+// Function call expression kind.
+type FnCallExpr struct {
+	Token    lex.Token
+	Expr     *Expr
+	Generics []*Type
+	Args     []*Expr
+	IsCo     bool
 }
 
 // Generic type AST.

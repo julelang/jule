@@ -1,6 +1,8 @@
 package parser
 
-import "github.com/julelang/jule/lex"
+import (
+	"github.com/julelang/jule/lex"
+)
 
 // Returns function expressions without call expression
 // if tokens are function call, nil if not.
@@ -36,6 +38,27 @@ func is_fn_call(tokens []lex.Token) []lex.Token {
 		}
 	}
 	return nil
+}
+
+type call_data struct {
+	expr_tokens     []lex.Token
+	args_tokens     []lex.Token
+	generics_tokens []lex.Token
+}
+
+func get_call_data(tokens []lex.Token) *call_data {
+	data := &call_data{}
+	data.expr_tokens, data.args_tokens = lex.RangeLast(tokens)
+	if len(data.expr_tokens) == 0 {
+		return data
+	}
+
+	// Below is call expression
+	token := data.expr_tokens[len(data.expr_tokens)-1]
+	if token.Id == lex.ID_RANGE && token.Kind == lex.KND_RBRACKET {
+		data.expr_tokens, data.generics_tokens = lex.RangeLast(data.expr_tokens)
+	}
+	return data
 }
 
 // Returns expression tokens comes before block if exist, nil if not.

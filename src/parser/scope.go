@@ -453,6 +453,72 @@ func (sp *scope_parser) build_comment_st(token lex.Token) ast.NodeData {
 	return build_comment(token)
 }
 
+// Tokens should include brackets.
+func (sp *scope_parser) build_call_generics(tokens []lex.Token) []*ast.Type {
+	if len(tokens) == 0 {
+		return nil
+	}
+
+	tokens = tokens[1 : len(tokens)-1] // Remove braces
+	parts, errs := lex.Parts(tokens, lex.ID_COMMA, true)
+	generics := make([]*ast.Type, len(parts))
+	sp.p.errors = append(sp.p.errors, errs...)
+	for i, part := range parts {
+		if len(part) == 0 {
+			continue
+		}
+		j := 0
+		generic, _ := sp.p.build_type(part, &j, true)
+		if j+1 < len(part) {
+			sp.push_err(part[j+1], "invalid_syntax")
+		}
+		generics[i] = generic
+	}
+
+	return generics
+}
+
+func (sp *scope_parser) build_args(tokens []lex.Token) []*ast.Expr {
+	i := 0
+	tokens = lex.Range(&i, lex.KND_LPAREN, lex.KND_RPARENT, tokens)
+	if tokens == nil {
+		tokens = make([]lex.Token, 0)
+	}
+	args := sp.p.build_args(tokens)
+	return args
+}
+
+func (sp *scope_parser) build_call_st(tokens []lex.Token) ast.NodeData {
+	cc := &ast.FnCallExpr{
+		Token: tokens[0],
+	}
+	if len(tokens) == 0 {
+		sp.push_err(cc.Token, "missing_expr")
+		return nil
+	}
+	if is_fn_call(tokens) == nil {
+		sp.push_err(cc.Token, "expr_not_func_call")
+	}
+
+	data := get_call_data(tokens)
+	if len(data.expr_tokens) == 0 {
+		sp.push_err(cc.Token, "missing_expr")
+		return nil
+	}
+
+	cc.Expr = sp.p.build_expr(data.expr_tokens)
+	cc.Generics = sp.build_call_generics(data.generics_tokens)
+	cc.Args = sp.build_args(data.args_tokens)
+
+	return cc
+}
+
+func (sp *scope_parser) build_co_call_st(tokens []lex.Token) ast.NodeData {
+	cc := sp.build_call_st(tokens)
+	cc.(*ast.FnCallExpr).IsCo = true
+	return cc
+}
+
 func (sp *scope_parser) build_st(st *st) ast.NodeData {
 	token := st.tokens[0]
 	switch token.Id {
@@ -479,6 +545,9 @@ func (sp *scope_parser) build_st(st *st) ast.NodeData {
 		// Comments are just single-line.
 		// Range comments not accepts by lexer.
 		return sp.build_comment_st(token)
+
+	case lex.ID_CO:
+		return sp.build_co_call_st(st.tokens)
 	}
 	sp.push_err(token, "invalid_syntax")
 	return nil
