@@ -1079,6 +1079,15 @@ func (p *parser) build_cpp_link_var(tokens []lex.Token) *ast.VarDecl {
 	return v
 }
 
+func (p *parser) build_cpp_link_struct(tokens []lex.Token) *ast.StructDecl {
+	tokens = tokens[1:] // Remove "cpp" keyword.
+	s := p.build_struct_decl(tokens)
+	if s != nil {
+		s.CppLinked = true
+	}
+	return s
+}
+
 func (p *parser) build_cpp_link(tokens []lex.Token) ast.NodeData {
 	token := tokens[0]
 	if len(tokens) == 1 {
@@ -1092,7 +1101,7 @@ func (p *parser) build_cpp_link(tokens []lex.Token) ast.NodeData {
 	case lex.ID_LET:
 		return p.build_cpp_link_var(tokens)
 	case lex.ID_STRUCT:
-		//return p.build_cpp_link_struct(tokens)
+		return p.build_cpp_link_struct(tokens)
 	case lex.ID_TYPE:
 		// return p.build_cpp_link_type_alias(tokens)
 	default:
