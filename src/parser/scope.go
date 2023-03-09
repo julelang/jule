@@ -114,6 +114,11 @@ func (sp *scope_parser) finished() bool { return sp.pos >= len(sp.stms) }
 func (sp *scope_parser) is_last_st() bool { return sp.pos+1 >= len(sp.stms) }
 func (sp *scope_parser) push_err(token lex.Token, key string) { sp.p.push_err(token, key) }
 
+func (sp *scope_parser) insert_as_next(tokens []lex.Token) {
+    sp.stms = append(sp.stms[:sp.pos+1], sp.stms[sp.pos:]...)
+    sp.stms[sp.pos+1] = &st{tokens: tokens}
+}
+
 func (sp *scope_parser) next() *st {
 	sp.pos++
 	return sp.stms[sp.pos]
@@ -740,8 +745,42 @@ func (sp *scope_parser) build_scope_st(tokens []lex.Token) *ast.Scope {
 	return scope
 }
 
+func (sp *scope_parser) build_label_st(tokens []lex.Token) *ast.LabelSt {
+	lbl := &ast.LabelSt{
+		Token: tokens[0],
+		Ident: tokens[0].Kind,
+	}
+
+	// Save followed statement
+	if len(tokens) > 2 {
+		tokens = tokens[2:] // Remove goto keyword and label
+		sp.insert_as_next(tokens)
+	}
+
+	return lbl
+}
+
+func (sp *scope_parser) build_id_st(tokens []lex.Token) (_ ast.NodeData, ok bool) {
+	if len(tokens) == 1 {
+		return
+	}
+	token := tokens[1]
+	switch token.Id {
+	case lex.ID_COLON:
+		return sp.build_label_st(tokens), true
+	}
+	return
+}
+
 func (sp *scope_parser) build_st(st *st) ast.NodeData {
 	token := st.tokens[0]
+	if token.Id == lex.ID_IDENT {
+		s, ok := sp.build_id_st(st.tokens)
+		if ok {
+			return s
+		}
+	}
+
 	switch token.Id {
 	case lex.ID_CONST, lex.ID_LET, lex.ID_MUT:
 		return sp.build_var_st(st.tokens)

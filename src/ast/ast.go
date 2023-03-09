@@ -140,6 +140,12 @@ type Generic struct {
 	Ident string
 }
 
+// Label statement AST.
+type LabelSt struct {
+	Token lex.Token
+	Ident string
+}
+
 // Goto statement AST.
 type GotoSt struct {
 	Token lex.Token
