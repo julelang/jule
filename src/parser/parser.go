@@ -1057,6 +1057,13 @@ func (p *parser) build_trait_decl(tokens []lex.Token) *ast.TraitDecl {
 	return t
 }
 
+func (p *parser) build_cpp_link_fn(tokens []lex.Token) *ast.FnDecl {
+	tokens = tokens[1:] // Remove "cpp" keyword.
+	f := p.build_fn(tokens, false, false, true)
+	f.CppLinked = true
+	return f
+}
+
 func (p *parser) build_cpp_link(tokens []lex.Token) ast.NodeData {
 	token := tokens[0]
 	if len(tokens) == 1 {
@@ -1066,7 +1073,7 @@ func (p *parser) build_cpp_link(tokens []lex.Token) ast.NodeData {
 	token = tokens[1]
 	switch token.Id {
 	case lex.ID_FN, lex.ID_UNSAFE:
-		//return p.build_cpp_link_fn(tokens)
+		return p.build_cpp_link_fn(tokens)
 	case lex.ID_LET:
 		//return p.build_cpp_link_var(tokens)
 	case lex.ID_STRUCT:

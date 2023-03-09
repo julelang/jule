@@ -202,6 +202,7 @@ type FnDecl struct {
 	Token       lex.Token
 	IsUnsafe    bool
 	IsPub       bool
+	CppLinked   bool
 	Ident       string
 	Directives  []*Directive
 	DocComments *CommentGroup
@@ -216,6 +217,7 @@ type VarDecl struct {
 	Scope       *Scope    // nil for global scopes
 	Token       lex.Token
 	Ident       string
+	CppLinked   bool
 	IsPub       bool
 	IsMut       bool
 	IsConst     bool
@@ -293,6 +295,7 @@ type Conditional struct {
 // Type alias declration AST.
 type TypeAliasDecl struct {
 	IsPub       bool
+	CppLinked   bool
 	Token       lex.Token
 	Ident       string
 	Kind        *Type
@@ -358,7 +361,7 @@ type StructDecl struct {
 	Ident       string
 	Fields      []*Field
 	IsPub       bool
-	Cpp         bool
+	CppLinked   bool
 	Directives  []*Directive
 	DocComments *CommentGroup
 	Generics    []*Generic
