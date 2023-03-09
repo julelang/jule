@@ -260,3 +260,12 @@ type Conditional struct {
 	Elifs   []*If
 	Default *Else
 }
+
+// Type alias declration AST.
+type TypeAliasDecl struct {
+	IsPub       bool
+	Token       lex.Token
+	Ident       string
+	Kind        *Type
+	DocComments *CommentGroup
+}

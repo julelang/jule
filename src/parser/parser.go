@@ -116,6 +116,43 @@ func (p *parser) build_expr(tokens []lex.Token) *ast.Expr {
 	return &ast.Expr{}
 }
 
+func (p *parser) build_type_alias(tokens []lex.Token) *ast.TypeAliasDecl {
+	i := 1 // Initialize value is 1 for skip keyword.
+	if i >= len(tokens) {
+		p.push_err(tokens[i-1], "invalid_syntax")
+		return nil
+	}
+	tad := &ast.TypeAliasDecl{
+		Token: tokens[1],
+		Ident: tokens[1].Kind,
+	}
+	token := tokens[i]
+	if token.Id != lex.ID_IDENT {
+		p.push_err(token, "invalid_syntax")
+	}
+	i++
+	if i >= len(tokens) {
+		p.push_err(tokens[i-1], "invalid_syntax")
+		return tad
+	}
+	token = tokens[i]
+	if token.Id != lex.ID_COLON {
+		p.push_err(tokens[i-1], "invalid_syntax")
+		return tad
+	}
+	i++
+	if i >= len(tokens) {
+		p.push_err(tokens[i-1], "missing_type")
+		return tad
+	}
+	t, ok := p.build_type(tokens, &i, true)
+	tad.Kind = t
+	if ok && i+1 < len(tokens) {
+		p.push_err(tokens[i+1], "invalid_syntax")
+	}
+	return tad
+}
+
 func (p *parser) push_arg(args *[]*ast.Expr, tokens []lex.Token, err_token lex.Token) {
 	if len(tokens) == 0 {
 		p.push_err(err_token, "invalid_syntax")
@@ -697,6 +734,13 @@ func (p *parser) apply_meta(node *ast.Node, is_pub bool) {
 		f.Directives = p.directives
 		p.directives = nil
 		f.DocComments = p.comment_group
+		p.comment_group = nil
+
+	case *ast.TypeAliasDecl:
+		tad := node.Data.(*ast.TypeAliasDecl)
+		tad.IsPub = is_pub
+		is_pub = false
+		tad.DocComments = p.comment_group
 		p.comment_group = nil
 	}
 	if is_pub {
