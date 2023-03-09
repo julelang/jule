@@ -364,6 +364,7 @@ type StructDecl struct {
 	Generics    []*Generic
 }
 
+// Trait declaration AST.
 type TraitDecl struct {
 	Token       lex.Token
 	Ident       string
@@ -371,3 +372,15 @@ type TraitDecl struct {
 	DocComments *CommentGroup
 	Methods     []*FnDecl
 }
+
+// Implementation AST.
+type Impl struct {
+	Base    lex.Token
+	Dest    lex.Token
+	Methods []*FnDecl
+}
+
+// Reports whether implementation type is trait to structure.
+func (i *Impl) IsTraitImpl() bool { return i.Dest.Id != lex.ID_NA }
+// Reports whether implementation type is append to destination structure.
+func (i *Impl) IsStructImpl() bool { return i.Dest.Id == lex.ID_NA }

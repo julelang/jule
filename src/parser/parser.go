@@ -1079,6 +1079,137 @@ func (p *parser) build_cpp_link(tokens []lex.Token) ast.NodeData {
 	return nil
 }
 
+func (p *parser) get_method(tokens []lex.Token) *ast.FnDecl {
+	token := tokens[0]
+	if token.Id == lex.ID_UNSAFE {
+		if len(tokens) == 1 || tokens[1].Id != lex.ID_FN {
+			p.push_err(token, "invalid_syntax")
+			return nil
+		}
+	} else if tokens[0].Id != lex.ID_FN {
+		p.push_err(token, "invalid_syntax")
+		return nil
+	}
+	return p.build_fn(tokens, true, false, false)
+}
+
+func (p *parser) parse_impl_trait(ipl *ast.Impl, tokens []lex.Token) {
+	stms := split_stms(tokens)
+	for _, st := range stms {
+		tokens := st.tokens
+		token := tokens[0]
+		switch token.Id {
+		case lex.ID_COMMENT:
+			// Ignore
+			continue
+		case lex.ID_FN, lex.ID_UNSAFE:
+			f := p.get_method(tokens)
+			f.IsPub = true
+			p.check_method_receiver(f)
+			ipl.Methods = append(ipl.Methods, f)
+		default:
+			p.push_err(token, "invalid_syntax")
+			continue
+		}
+	}
+}
+
+func (p *parser) parse_impl_struct(ipl *ast.Impl, tokens []lex.Token) {
+	stms := split_stms(tokens)
+	for _, st := range stms {
+		tokens := st.tokens
+		token := tokens[0]
+		is_pub := false
+		switch token.Id {
+		case lex.ID_COMMENT:
+			// Ignore
+			continue
+		case lex.ID_PUB:
+			is_pub = true
+			if len(tokens) == 1 {
+				p.push_err(tokens[0], "invalid_syntax")
+				continue
+			}
+			tokens = tokens[1:]
+			if len(tokens) > 0 {
+				token = tokens[0]
+			}
+		}
+
+		switch token.Id {
+		case lex.ID_FN, lex.ID_UNSAFE:
+			f := p.get_method(tokens)
+			f.IsPub = is_pub
+			p.check_method_receiver(f)
+			ipl.Methods = append(ipl.Methods, f)
+		default:
+			p.push_err(token, "invalid_syntax")
+			continue
+		}
+	}
+}
+
+func (p *parser) parse_impl_body(ipl *ast.Impl, tokens []lex.Token) {
+	if ipl.IsTraitImpl() {
+		p.parse_impl_trait(ipl, tokens)
+		return
+	}
+	p.parse_impl_struct(ipl, tokens)
+}
+
+func (p *parser) build_impl(tokens []lex.Token) *ast.Impl {
+	token := tokens[0]
+	if len(tokens) < 2 {
+		p.push_err(token, "invalid_syntax")
+		return nil
+	}
+	token = tokens[1]
+	if token.Id != lex.ID_IDENT {
+		p.push_err(token, "invalid_syntax")
+		return nil
+	}
+	if len(tokens) < 3 {
+		p.push_err(token, "invalid_syntax")
+		return nil
+	}
+	ipl := &ast.Impl{
+		Base: token,
+	}
+	token = tokens[2]
+	if token.Id != lex.ID_ITER {
+		if token.Id == lex.ID_RANGE && token.Kind == lex.KND_LBRACE {
+			tokens = tokens[2:]  // Remove prefix tokens.
+			goto body
+		}
+		p.push_err(token, "invalid_syntax")
+		return nil
+	}
+	if len(tokens) < 4 {
+		p.push_err(token, "invalid_syntax")
+		return nil
+	}
+	token = tokens[3]
+	if token.Id != lex.ID_IDENT {
+		p.push_err(token, "invalid_syntax")
+		return nil
+	}
+	ipl.Dest = token
+	tokens = tokens[4:] // Remove prefix tokens.
+body:
+	i := 0
+	body_tokens := lex.Range(&i, lex.KND_LBRACE, lex.KND_RBRACE, tokens)
+	if body_tokens == nil {
+		p.stop()
+		p.push_err(ipl.Base, "body_not_exist")
+		return nil
+	}
+	if i < len(tokens) {
+		p.push_err(tokens[i], "invalid_syntax")
+	}
+	p.parse_impl_body(ipl, body_tokens)
+	return ipl
+}
+
 func (p *parser) build_node_data(tokens []lex.Token) ast.NodeData {
 	token := tokens[0]
 	switch token.Id {
@@ -1102,6 +1233,9 @@ func (p *parser) build_node_data(tokens []lex.Token) ast.NodeData {
 	
 	case lex.ID_TRAIT:
 		return p.build_trait_decl(tokens)
+
+	case lex.ID_IMPL:
+		return p.build_impl(tokens)
 
 	case lex.ID_CPP:
 		return p.build_cpp_link(tokens)
