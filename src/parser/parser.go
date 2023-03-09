@@ -283,9 +283,10 @@ func (p *parser) build_var_begin(v *ast.VarDecl, i *int, tokens []lex.Token) {
 }
 
 func (p *parser) build_var(tokens []lex.Token) *ast.VarDecl {
-	v := &ast.VarDecl{}
 	i := 0
-	v.Token = tokens[i]
+	v := &ast.VarDecl{
+		Token: tokens[i],
+	}
 	p.build_var_begin(v, &i, tokens)
 	if i >= len(tokens) {
 		return nil
@@ -1060,8 +1061,22 @@ func (p *parser) build_trait_decl(tokens []lex.Token) *ast.TraitDecl {
 func (p *parser) build_cpp_link_fn(tokens []lex.Token) *ast.FnDecl {
 	tokens = tokens[1:] // Remove "cpp" keyword.
 	f := p.build_fn(tokens, false, false, true)
-	f.CppLinked = true
+	if f != nil {
+		f.CppLinked = true
+	}
 	return f
+}
+
+func (p *parser) build_cpp_link_var(tokens []lex.Token) *ast.VarDecl {
+	tokens = tokens[1:] // Remove "cpp" keyword.
+	v := p.build_var(tokens)
+	if v != nil {
+		v.CppLinked = true
+		if v.Expr != nil {
+			p.push_err(v.Token, "invalid_syntax")
+		}
+	}
+	return v
 }
 
 func (p *parser) build_cpp_link(tokens []lex.Token) ast.NodeData {
@@ -1075,7 +1090,7 @@ func (p *parser) build_cpp_link(tokens []lex.Token) ast.NodeData {
 	case lex.ID_FN, lex.ID_UNSAFE:
 		return p.build_cpp_link_fn(tokens)
 	case lex.ID_LET:
-		//return p.build_cpp_link_var(tokens)
+		return p.build_cpp_link_var(tokens)
 	case lex.ID_STRUCT:
 		//return p.build_cpp_link_struct(tokens)
 	case lex.ID_TYPE:
