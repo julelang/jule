@@ -163,3 +163,9 @@ type VarDecl struct {
 	DataType    *Type
 	Expr        *Expr
 }
+
+// Return statement AST.
+type RetSt struct {
+	Token lex.Token
+	Expr  *Expr
+}

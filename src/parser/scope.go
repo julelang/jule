@@ -102,11 +102,25 @@ func (sp *scope_parser) build_var_st(tokens []lex.Token) ast.NodeData {
 	return v
 }
 
+func (sp *scope_parser) build_ret_st(tokens []lex.Token) ast.NodeData {
+	st := &ast.RetSt{
+		Token: tokens[0],
+	}
+	if len(tokens) > 1 {
+		tokens = tokens[1:] // Remove ret keyword.
+		st.Expr = sp.p.build_expr(tokens)
+	}
+	return st
+}
+
 func (sp *scope_parser) build_st(tokens []lex.Token) ast.NodeData {
 	token := tokens[0]
 	switch token.Id {
 	case lex.ID_CONST, lex.ID_LET, lex.ID_MUT:
 		return sp.build_var_st(tokens)
+
+	case lex.ID_RET:
+		return sp.build_ret_st(tokens)
 	}
 	sp.push_err(token, "invalid_syntax")
 	return nil
