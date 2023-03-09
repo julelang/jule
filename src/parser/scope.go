@@ -5,6 +5,10 @@ import (
 	"github.com/julelang/jule/lex"
 )
 
+func new_scope() *ast.Scope {
+	return &ast.Scope{}
+}
+
 // Reports whether token is statement finish point.
 func is_st(current lex.Token, prev lex.Token) (ok bool, terminated bool) {
 	ok = current.Id == lex.ID_SEMICOLON || prev.Row < current.Row
@@ -63,26 +67,36 @@ func next_st_pos(tokens []lex.Token, start int) (int, bool) {
 
 // Returns current statement tokens.
 // Starts selection at *i.
-func skip_st(i *int, tokens []lex.Token) []lex.Token {
+func skip_st(i *int, tokens []lex.Token) ([]lex.Token, bool) {
 	start := *i
-	*i, _ = next_st_pos(tokens, start)
+	terminated := false
+	*i, terminated = next_st_pos(tokens, start)
 	st_tokens := tokens[start:*i]
-	if st_tokens[len(st_tokens)-1].Id == lex.ID_SEMICOLON {
+	if terminated {
 		if len(st_tokens) == 1 {
 			return skip_st(i, tokens)
 		}
 		// -1 for eliminate statement terminator.
 		st_tokens = st_tokens[:len(st_tokens)-1]
 	}
-	return st_tokens
+	return st_tokens, terminated
+}
+
+type st struct {
+	tokens     []lex.Token
+	terminated bool
 }
 
 // Splits all statements.
-func split_stms(tokens []lex.Token) [][]lex.Token {
-	var stms [][]lex.Token = nil
+func split_stms(tokens []lex.Token) []*st {
+	var stms []*st = nil
 	pos := 0
 	for pos < len(tokens) {
-		stms = append(stms, skip_st(&pos, tokens))
+		tokens, terminated := skip_st(&pos, tokens)
+		stms = append(stms, &st{
+			tokens:     tokens,
+			terminated: terminated,
+		})
 	}
 	return stms
 }
@@ -90,10 +104,29 @@ func split_stms(tokens []lex.Token) [][]lex.Token {
 type scope_parser struct {
 	p    *parser
 	s    *ast.Scope
+	stms []*st
+	pos  int
 }
 
-func (sp *scope_parser) push_err(token lex.Token, key string) {
-	sp.p.push_err(token, key)
+func (sp *scope_parser) stop() { sp.pos = -1 }
+func (sp *scope_parser) stopped() bool { return sp.pos == -1 }
+func (sp *scope_parser) finished() bool { return sp.pos >= len(sp.stms) }
+func (sp *scope_parser) is_last_st() bool { return sp.pos+1 >= len(sp.stms) }
+func (sp *scope_parser) push_err(token lex.Token, key string) { sp.p.push_err(token, key) }
+
+func (sp *scope_parser) next() *st {
+	sp.pos++
+	return sp.stms[sp.pos]
+}
+
+func (sp *scope_parser) build_scope(tokens []lex.Token) *ast.Scope {
+	s := new_scope()
+	s.Parent = sp.s
+	ssp := scope_parser{
+		p: sp.p,
+	}
+	ssp.build(tokens, s)
+	return s
 }
 
 func (sp *scope_parser) build_var_st(tokens []lex.Token) ast.NodeData {
@@ -113,27 +146,231 @@ func (sp *scope_parser) build_ret_st(tokens []lex.Token) ast.NodeData {
 	return st
 }
 
-func (sp *scope_parser) build_st(tokens []lex.Token) ast.NodeData {
-	token := tokens[0]
+func (sp *scope_parser) build_while_next_iter(s *st) ast.NodeData {
+	it := &ast.Iter{
+		Token: s.tokens[0],
+	}
+	tokens := s.tokens[1:] // Skip "iter" keyword.
+	kind := &ast.WhileNextKind{}
+	if len(tokens) > 0 {
+		kind.Expr = sp.p.build_expr(tokens)
+	}
+	if sp.is_last_st() {
+		sp.push_err(it.Token, "invalid_syntax")
+		return nil
+	}
+	s = sp.next()
+	st_tokens := get_block_expr(s.tokens)
+	if len(st_tokens) > 0 {
+		s := &st{
+			terminated: s.terminated,
+			tokens:     st_tokens,
+		}
+		kind.Next = sp.build_st(s)
+	}
+	i := len(st_tokens)
+	block_tokens := lex.Range(&i, lex.KND_LBRACE, lex.KND_RBRACE, tokens)
+	if block_tokens == nil {
+		sp.stop()
+		sp.push_err(it.Token, "body_not_exist")
+		return nil
+	}
+	if i < len(tokens) {
+		sp.push_err(tokens[i], "invalid_syntax")
+	}
+	it.Scope = sp.build_scope(block_tokens)
+	it.Kind = kind
+	return it
+}
+
+func (sp *scope_parser) build_while_iter_kind(tokens []lex.Token) *ast.WhileKind {
+	return &ast.WhileKind{
+		Expr: sp.p.build_expr(tokens),
+	}
+}
+
+func (sp *scope_parser) get_range_kind_keys_tokens(toks []lex.Token) [][]lex.Token {
+	vars, errs := lex.Parts(toks, lex.ID_COMMA, true)
+	sp.p.errors = append(sp.p.errors, errs...)
+	return vars
+}
+
+func (sp *scope_parser) build_range_kind_key(tokens []lex.Token) *ast.VarDecl {
+	if len(tokens) == 0 {
+		return nil
+	}
+	key := &ast.VarDecl{
+		Token: tokens[0],
+	}
+	if key.Token.Id == lex.ID_MUT {
+		key.IsMut = true
+		if len(tokens) == 1 {
+			sp.push_err(key.Token, "invalid_syntax")
+		}
+		key.Token = tokens[1]
+	} else if len(tokens) > 1 {
+		sp.push_err(tokens[1], "invalid_syntax")
+	}
+	if key.Token.Id != lex.ID_IDENT {
+		sp.push_err(key.Token, "invalid_syntax")
+		return nil
+	}
+	key.Ident = key.Token.Kind
+	return key
+}
+
+func (sp *scope_parser) build_range_kind_keys(parts [][]lex.Token) []*ast.VarDecl {
+	var keys []*ast.VarDecl
+	for _, tokens := range parts {
+		keys = append(keys, sp.build_range_kind_key(tokens))
+	}
+	return keys
+}
+
+func (sp *scope_parser) setup_range_kind_keys_plain(rng *ast.RangeKind, tokens []lex.Token) {
+	key_tokens := sp.get_range_kind_keys_tokens(tokens)
+	if len(key_tokens) == 0 {
+		return
+	}
+	if len(key_tokens) > 2 {
+		sp.push_err(rng.InToken, "much_foreach_vars")
+	}
+	keys := sp.build_range_kind_keys(key_tokens)
+	rng.KeyA = keys[0]
+	if len(keys) > 1 {
+		rng.KeyB = keys[1]
+	}
+}
+
+func (sp *scope_parser) setup_range_kind_keys_explicit(rng *ast.RangeKind, tokens []lex.Token) {
+	i := 0
+	rang := lex.Range(&i, lex.KND_LPAREN, lex.KND_RPARENT, tokens)
+	if i < len(tokens) {
+		sp.push_err(rng.InToken, "invalid_syntax")
+	}
+	sp.setup_range_kind_keys_plain(rng, rang)
+}
+
+func (sp *scope_parser) setup_range_kind_keys(rng *ast.RangeKind, tokens []lex.Token) {
+	if tokens[0].Id == lex.ID_RANGE {
+		if tokens[0].Kind != lex.KND_LPAREN {
+			sp.push_err(tokens[0], "invalid_syntax")
+			return
+		}
+		sp.setup_range_kind_keys_explicit(rng, tokens)
+		return
+	}
+	sp.setup_range_kind_keys_plain(rng, tokens)
+}
+
+func (sp *scope_parser) build_range_iter_kind(var_tokens []lex.Token, expr_tokens []lex.Token, in_token lex.Token) *ast.RangeKind {
+	rng := &ast.RangeKind{
+		InToken: in_token,
+	}
+	if len(expr_tokens) == 0 {
+		sp.push_err(rng.InToken, "missing_expr")
+		return rng
+	}
+	rng.Expr = sp.p.build_expr(expr_tokens)
+	if len(var_tokens) > 0 {
+		sp.setup_range_kind_keys(rng, var_tokens)
+	}
+	return rng
+}
+
+func (sp *scope_parser) build_common_iter_kind(tokens []lex.Token, err_tok lex.Token) ast.IterKind {
+	brace_n := 0
+	for i, tok := range tokens {
+		if tok.Id == lex.ID_RANGE {
+			switch tok.Kind {
+			case lex.KND_LBRACE, lex.KND_LBRACKET, lex.KND_LPAREN:
+				brace_n++
+				continue
+			default:
+				brace_n--
+			}
+		}
+		if brace_n != 0 {
+			continue
+		}
+		switch tok.Id {
+		case lex.ID_IN:
+			decl_tokens := tokens[:i]
+			expr_tokens := tokens[i+1:]
+			return sp.build_range_iter_kind(decl_tokens, expr_tokens, tok)
+		}
+	}
+	return sp.build_while_iter_kind(tokens)
+}
+
+func (sp *scope_parser) build_common_iter(tokens []lex.Token) ast.NodeData {
+	it := &ast.Iter{
+		Token: tokens[0],
+	}
+	tokens = tokens[1:] // Skip "iter" keyword.
+	if len(tokens) == 0 {
+		sp.stop()
+		sp.push_err(it.Token, "body_not_exist")
+		return nil
+	}
+	expr_tokens := get_block_expr(tokens)
+	if len(expr_tokens) > 0 {
+		it.Kind = sp.build_common_iter_kind(expr_tokens, it.Token)
+	}
+	i := len(expr_tokens)
+	scope_tokens := lex.Range(&i, lex.KND_LBRACE, lex.KND_RBRACE, tokens)
+	if scope_tokens == nil {
+		sp.stop()
+		sp.push_err(it.Token, "body_not_exist")
+		return nil
+	}
+	if i < len(tokens) {
+		sp.push_err(tokens[i], "invalid_syntax")
+	}
+	it.Scope = sp.build_scope(scope_tokens)
+	return it
+}
+
+func (sp *scope_parser) buid_iter_st(st *st) ast.NodeData {
+	if st.terminated {
+		return sp.build_while_next_iter(st)
+	}
+	return sp.build_common_iter(st.tokens)
+}
+
+func (sp *scope_parser) build_st(st *st) ast.NodeData {
+	token := st.tokens[0]
 	switch token.Id {
 	case lex.ID_CONST, lex.ID_LET, lex.ID_MUT:
-		return sp.build_var_st(tokens)
+		return sp.build_var_st(st.tokens)
 
 	case lex.ID_RET:
-		return sp.build_ret_st(tokens)
+		return sp.build_ret_st(st.tokens)
+
+	case lex.ID_ITER:
+		return sp.buid_iter_st(st)
 	}
 	sp.push_err(token, "invalid_syntax")
 	return nil
 }
 
-func (sp *scope_parser) build(tokens []lex.Token) *ast.Scope {
-	stms := split_stms(tokens)
-	sp.s = &ast.Scope{}
-	for _, st := range stms {
+func (sp *scope_parser) build(tokens []lex.Token, s *ast.Scope) {
+	if s == nil {
+		return
+	}
+
+	sp.stms = split_stms(tokens)
+	sp.pos = -1 // sp.next() first increase position
+	sp.s = s
+	for !sp.is_last_st() && !sp.finished() {
+		st := sp.next()
 		data := sp.build_st(st)
 		if data != nil {
 			sp.s.Tree = append(sp.s.Tree, data)
 		}
+
+		if sp.stopped() {
+			break
+		}
 	}
-	return sp.s
 }

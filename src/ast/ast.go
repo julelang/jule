@@ -3,7 +3,6 @@ package ast
 import "github.com/julelang/jule/lex"
 
 type NodeData = any // Type of AST Node's data.
-type ExprData = any // Type of AST Expr's data.
 
 // AST Node.
 type Node struct {
@@ -109,6 +108,8 @@ type RetType struct {
 	Idents []lex.Token
 }
 
+type ExprData = any // Type of AST Expr's data.
+
 // Expression AST.
 type Expr struct {
 	Token lex.Token
@@ -123,6 +124,7 @@ type Generic struct {
 
 // Scope AST.
 type Scope struct {
+	Parent     *Scope // nil if scope is root
 	IsUnsafe   bool
 	IsDeferred bool
 	Tree       []NodeData
@@ -168,4 +170,32 @@ type VarDecl struct {
 type RetSt struct {
 	Token lex.Token
 	Expr  *Expr
+}
+
+type IterKind = any // Type of AST Iter's kind.
+
+// Iteration.
+type Iter struct {
+	Token lex.Token
+	Kind  IterKind
+	Scope *Scope
+}
+
+// While iteration kind.
+type WhileKind struct {
+	Expr *Expr
+}
+
+// Range iteration kind.
+type RangeKind struct {
+	InToken lex.Token // Token of "in" keyword
+	Expr    *Expr
+	KeyA    *VarDecl  // first key of range
+	KeyB    *VarDecl  // second key of range
+}
+
+// While-next iteration kind.
+type WhileNextKind struct {
+	Expr *Expr
+	Next NodeData
 }

@@ -85,10 +85,12 @@ func (p *parser) build_comment(token lex.Token) ast.NodeData {
 }
 
 func (p *parser) build_scope(tokens []lex.Token) *ast.Scope {
+	s := new_scope()
 	sp := scope_parser{
 		p: p,
 	}
-	return sp.build(tokens)
+	sp.build(tokens, s)
+	return s
 }
 
 func (p *parser) __build_type(tokens []lex.Token, i *int, err bool) (*ast.Type, bool) {
@@ -698,7 +700,7 @@ func (p *parser) append_node(st []lex.Token) {
 func (p *parser) parse() {
 	stms := split_stms(p.file.Tokens())
 	for _, st := range stms {
-		p.append_node(st)
+		p.append_node(st.tokens)
 
 		if p.stopped() {
 			break
