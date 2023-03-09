@@ -137,6 +137,9 @@ var ERRORS = map[string]string{
 	`enum_have_not_field`:                      `enum have not any field: @`,
 	`enum_not_supports_as_generic`:             `enum types not supported as generic type`,
 	`duplicate_match_type`:                     `type is already checked: @`,
+	`cpp_linked_variable_has_expr`:             `cpp linked variables cannot have expression`,
+	`cpp_linked_variable_is_const`:             `cpp linked variables cannot constant`,
+	`const_var_not_have_expr`:                  `constant variable must have expression`,
 }
 
 // Errorf returns error.

@@ -211,7 +211,7 @@ func (p *parser) build_var_type_and_expr(v *ast.VarDecl, tokens []lex.Token) {
 			p.push_err(tok, "missing_type")
 			return
 		}
-		t, ok := p.build_type(tokens, &i, false)
+		t, ok := p.build_type(tokens, &i, true)
 		if ok {
 			v.Kind = t
 			if i >= len(tokens) {
@@ -293,8 +293,13 @@ func (p *parser) build_var(tokens []lex.Token) *ast.VarDecl {
 	}
 	tokens = tokens[i:]
 	p.build_var_common(v, tokens)
-	if v.Kind.IsVoid() && v.Expr == nil {
-		p.push_err(v.Token, "missing_type")
+	if v.Expr == nil {
+		if v.Kind.IsVoid() {
+			p.push_err(v.Token, "missing_type")
+		}
+		if v.IsConst {
+			p.push_err(v.Token, "const_var_not_have_expr")
+		}
 	}
 	return v
 }
@@ -1073,7 +1078,10 @@ func (p *parser) build_cpp_link_var(tokens []lex.Token) *ast.VarDecl {
 	if v != nil {
 		v.CppLinked = true
 		if v.Expr != nil {
-			p.push_err(v.Token, "invalid_syntax")
+			p.push_err(v.Token, "cpp_linked_variable_has_expr")
+		}
+		if v.IsConst {
+			p.push_err(v.Token, "cpp_linked_variable_is_const")
 		}
 	}
 	return v
@@ -1107,7 +1115,7 @@ func (p *parser) build_cpp_link(tokens []lex.Token) ast.NodeData {
 	switch token.Id {
 	case lex.ID_FN, lex.ID_UNSAFE:
 		return p.build_cpp_link_fn(tokens)
-	case lex.ID_LET:
+	case lex.ID_CONST, lex.ID_LET:
 		return p.build_cpp_link_var(tokens)
 	case lex.ID_STRUCT:
 		return p.build_cpp_link_struct(tokens)
