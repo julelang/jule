@@ -355,6 +355,23 @@ func (sp *scope_parser) build_break_st(tokens []lex.Token) ast.NodeData {
 	return brk
 }
 
+func (sp *scope_parser) build_cont_st(tokens []lex.Token) ast.NodeData {
+	cont := &ast.ContSt{
+		Token: tokens[0],
+	}
+	if len(tokens) > 1 {
+		if tokens[1].Id != lex.ID_IDENT {
+			sp.push_err(tokens[1], "invalid_syntax")
+		} else {
+			cont.Label = tokens[1]
+			if len(tokens) > 2 {
+				sp.push_err(tokens[1], "invalid_syntax")
+			}
+		}
+	}
+	return cont
+}
+
 func (sp *scope_parser) build_st(st *st) ast.NodeData {
 	token := st.tokens[0]
 	switch token.Id {
@@ -369,6 +386,9 @@ func (sp *scope_parser) build_st(st *st) ast.NodeData {
 
 	case lex.ID_BREAK:
 		return sp.build_break_st(st.tokens)
+
+	case lex.ID_CONTINUE:
+		return sp.build_cont_st(st.tokens)
 	}
 	sp.push_err(token, "invalid_syntax")
 	return nil

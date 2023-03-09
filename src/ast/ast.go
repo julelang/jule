@@ -205,3 +205,9 @@ type BreakSt struct {
 	Token lex.Token
 	Label lex.Token
 }
+
+// Continue statement AST.
+type ContSt struct {
+	Token lex.Token
+	Label lex.Token
+}
