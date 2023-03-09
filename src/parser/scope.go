@@ -90,12 +90,36 @@ func split_stms(tokens []lex.Token) [][]lex.Token {
 type scope_parser struct {
 	p    *parser
 	s    *ast.Scope
-	stms [][]lex.Token
+}
+
+func (sp *scope_parser) push_err(token lex.Token, key string) {
+	sp.p.push_err(token, key)
+}
+
+func (sp *scope_parser) build_var_st(tokens []lex.Token) ast.NodeData {
+	v := sp.p.build_var(tokens)
+	v.Scope = sp.s
+	return v
+}
+
+func (sp *scope_parser) build_st(tokens []lex.Token) ast.NodeData {
+	token := tokens[0]
+	switch token.Id {
+	case lex.ID_CONST, lex.ID_LET, lex.ID_MUT:
+		return sp.build_var_st(tokens)
+	}
+	sp.push_err(token, "invalid_syntax")
+	return nil
 }
 
 func (sp *scope_parser) build(tokens []lex.Token) *ast.Scope {
-	sp.stms = split_stms(tokens)
+	stms := split_stms(tokens)
 	sp.s = &ast.Scope{}
-	// TODO: implement here
+	for _, st := range stms {
+		data := sp.build_st(st)
+		if data != nil {
+			sp.s.Tree = append(sp.s.Tree, data)
+		}
+	}
 	return sp.s
 }

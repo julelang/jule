@@ -3,6 +3,7 @@ package ast
 import "github.com/julelang/jule/lex"
 
 type NodeData = any // Type of AST Node's data.
+type ExprData = any // Type of AST Expr's data.
 
 // AST Node.
 type Node struct {
@@ -108,6 +109,12 @@ type RetType struct {
 	Idents []lex.Token
 }
 
+// Expression AST.
+type Expr struct {
+	Token lex.Token
+	Data  ExprData
+}
+
 // Generic type AST.
 type Generic struct {
 	Token lex.Token
@@ -142,4 +149,15 @@ type FnDecl struct {
 	Generics    []*Generic
 	RetType     *RetType
 	Params      []*Param
+}
+
+// Variable declaration AST.
+type VarDecl struct {
+	Scope    *Scope    // nil for global scopes
+	Token    lex.Token
+	Ident    string
+	IsMut    bool
+	IsConst  bool
+	DataType *Type
+	Expr     *Expr
 }

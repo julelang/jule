@@ -5,6 +5,8 @@ import (
 	"github.com/julelang/jule/lex"
 )
 
+func get_void_type() *ast.Type { return &ast.Type{} }
+
 type type_builder struct {
 	p        *parser
 	tokens   []lex.Token
@@ -47,7 +49,10 @@ func (tb *type_builder) step() *ast.Type {
 func (tb *type_builder) build() (*ast.Type, bool) {
 	root := tb.step()
 	if root == nil {
-		return &ast.Type{}, false
+		return get_void_type(), false
+	}
+	if tb.finished {
+		return root, true
 	}
 
 	node := &root.Kind
@@ -55,7 +60,7 @@ func (tb *type_builder) build() (*ast.Type, bool) {
 	for ; *tb.i < len(tb.tokens); *tb.i++ {
 		*node = tb.step()
 		if *node == nil {
-			return &ast.Type{}, false
+			return get_void_type(), false
 		} else if tb.finished {
 			break
 		}

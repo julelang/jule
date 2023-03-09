@@ -111,6 +111,109 @@ func (p *parser) build_type(tokens []lex.Token, i *int, err bool) (*ast.Type, bo
 	return t, ok
 }
 
+func (p *parser) build_expr(tokens []lex.Token) *ast.Expr {
+	// TODO: implement here
+	return &ast.Expr{}
+}
+
+func (p *parser) build_var_type_and_expr(v *ast.VarDecl, tokens []lex.Token) {
+	i := 0
+	tok := tokens[i]
+	if tok.Id == lex.ID_COLON {
+		i++ // Skip type annotation operator (:)
+		if i >= len(tokens) ||
+		(tokens[i].Id == lex.ID_OP && tokens[i].Kind == lex.KND_EQ) {
+			p.push_err(tok, "missing_type")
+			return
+		}
+		t, ok := p.build_type(tokens, &i, false)
+		if ok {
+			v.DataType = t
+			i++
+			if i >= len(tokens) {
+				return
+			}
+			tok = tokens[i]
+		}
+	}
+
+	if tok.Id == lex.ID_OP {
+		if tok.Kind != lex.KND_EQ {
+			p.push_err(tok, "invalid_syntax")
+			return
+		}
+		expr_tokens := tokens[i+1:]
+		if len(expr_tokens) == 0 {
+			p.push_err(tok, "missing_expr")
+			return
+		}
+		v.Expr = p.build_expr(expr_tokens)
+	} else {
+		p.push_err(tok, "invalid_syntax")
+	}
+}
+
+func (p *parser) build_var_common(v *ast.VarDecl, tokens []lex.Token) {
+	v.Token = tokens[0]
+	if v.Token.Id != lex.ID_IDENT {
+		p.push_err(v.Token, "invalid_syntax")
+		return
+	}
+	v.Ident = v.Token.Kind
+	v.DataType = get_void_type()
+	if len(tokens) > 1 {
+		tokens = tokens[1:] // Remove identifier.
+		p.build_var_type_and_expr(v, tokens)
+	}
+}
+
+func (p *parser) build_var_begin(v *ast.VarDecl, i *int, tokens []lex.Token) {
+	tok := tokens[*i]
+	switch tok.Id {
+	case lex.ID_LET:
+		// Initialize 1 for skip the let keyword
+		*i++
+		if tokens[*i].Id == lex.ID_MUT {
+			v.IsMut = true
+			// Skip the mut keyword
+			*i++
+		}
+	case lex.ID_CONST:
+		*i++
+		if v.IsConst {
+			p.push_err(tok, "already_const")
+			break
+		}
+		v.IsConst = true
+		if !v.IsMut {
+			break
+		}
+		fallthrough
+	default:
+		p.push_err(tok, "invalid_syntax")
+		return
+	}
+	if *i >= len(tokens) {
+		p.push_err(tok, "invalid_syntax")
+	}
+}
+
+func (p *parser) build_var(tokens []lex.Token) *ast.VarDecl {
+	v := &ast.VarDecl{}
+	i := 0
+	v.Token = tokens[i]
+	p.build_var_begin(v, &i, tokens)
+	if i >= len(tokens) {
+		return nil
+	}
+	tokens = tokens[i:]
+	p.build_var_common(v, tokens)
+	if v.DataType.IsVoid() && v.Expr == nil {
+		p.push_err(v.Token, "missing_type")
+	}
+	return v
+}
+
 func (p *parser) build_generic(tokens []lex.Token) *ast.Generic {
 	if len(tokens) > 1 {
 		p.push_err(tokens[1], "invalid_syntax")
