@@ -591,6 +591,11 @@ func (sp *scope_parser) build_st(st *st) ast.NodeData {
 
 	case lex.ID_TYPE:
 		return sp.build_type_alias_st(st.tokens)
+	
+	default:
+		if is_fn_call(st.tokens) != nil {
+			return sp.build_call_st(st.tokens)
+		}
 	}
 	sp.push_err(token, "invalid_syntax")
 	return nil
