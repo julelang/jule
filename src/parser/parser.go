@@ -351,7 +351,7 @@ func (p *parser) build_self_param(tokens []lex.Token) *ast.Param {
 	}
 
 	if tokens[i].Kind == lex.KND_AMPER {
-		param.Kind.Kind = &ast.RefType{}
+		param.Ident = lex.KND_AMPER
 		i++
 		if i >= len(tokens) {
 			p.push_err(tokens[i-1], "invalid_syntax")
@@ -360,7 +360,7 @@ func (p *parser) build_self_param(tokens []lex.Token) *ast.Param {
 	}
 
 	if tokens[i].Id == lex.ID_SELF {
-		param.Ident = lex.KND_SELF
+		param.Ident += lex.KND_SELF
 		param.Token = tokens[i]
 		i++
 		if i < len(tokens) {
@@ -462,7 +462,7 @@ func (p *parser) build_param(tokens []lex.Token, must_pure bool) *ast.Param {
 
 func (p *parser) check_params(params []*ast.Param) {
 	for _, param := range params {
-		if param.Ident == lex.KND_SELF || param.Kind != nil {
+		if param.IsSelf() || param.Kind != nil {
 			continue
 		}
 		if param.Token.Id == lex.ID_NA {
@@ -488,7 +488,7 @@ func (p *parser) build_params(tokens []lex.Token, method bool, must_pure bool) [
 	var params []*ast.Param
 	if method && len(parts) > 0 {
 		param := p.build_self_param(parts[0])
-		if param.Ident == lex.KND_SELF {
+		if param != nil && param.IsSelf() {
 			params = append(params, param)
 			parts = parts[1:]
 		}
@@ -653,7 +653,7 @@ func (p *parser) build_fn(tokens []lex.Token, method bool, anon bool, prototype 
 		if i < len(tokens) {
 			p.push_err(tokens[i+1], "invalid_syntax")
 		}
-		return nil
+		return f
 	} else if f == nil {
 		return nil
 	}
@@ -1004,6 +1004,59 @@ func (p *parser) build_struct_decl(tokens []lex.Token) *ast.StructDecl {
 	return s
 }
 
+func (p *parser) check_method_receiver(f *ast.FnDecl) {
+	if len(f.Params) == 0 {
+		p.push_err(f.Token, "missing_receiver")
+		return
+	}
+	param := f.Params[0]
+	if !param.IsSelf() {
+		p.push_err(f.Token, "missing_receiver")
+		return
+	}
+}
+
+func (p *parser) build_trait_methods(tokens []lex.Token) []*ast.FnDecl {
+	var methods []*ast.FnDecl
+	stms := split_stms(tokens)
+	for _, st := range stms {
+		tokens := st.tokens
+		f := p.build_fn(tokens, true, false, true)
+		if f != nil {
+			p.check_method_receiver(f)
+			f.IsPub = true
+			methods = append(methods, f)
+		}
+	}
+	return methods
+}
+
+func (p *parser) build_trait_decl(tokens []lex.Token) *ast.TraitDecl {
+	if len(tokens) < 3 {
+		p.push_err(tokens[0], "invalid_syntax")
+		return nil
+	}
+	t := &ast.TraitDecl{
+		Token: tokens[1],
+	}
+	if t.Token.Id != lex.ID_IDENT {
+		p.push_err(t.Token, "invalid_syntax")
+	}
+	t.Ident = t.Token.Kind
+	i := 2
+	body_tokens := lex.Range(&i, lex.KND_LBRACE, lex.KND_RBRACE, tokens)
+	if body_tokens == nil {
+		p.stop()
+		p.push_err(t.Token, "body_not_exist")
+		return nil
+	}
+	if i < len(tokens) {
+		p.push_err(tokens[i], "invalid_syntax")
+	}
+	t.Methods = p.build_trait_methods(body_tokens)
+	return t
+}
+
 func (p *parser) build_cpp_link(tokens []lex.Token) ast.NodeData {
 	token := tokens[0]
 	if len(tokens) == 1 {
@@ -1046,6 +1099,9 @@ func (p *parser) build_node_data(tokens []lex.Token) ast.NodeData {
 
 	case lex.ID_STRUCT:
 		return p.build_struct_decl(tokens)
+	
+	case lex.ID_TRAIT:
+		return p.build_trait_decl(tokens)
 
 	case lex.ID_CPP:
 		return p.build_cpp_link(tokens)
@@ -1142,6 +1198,16 @@ func (p *parser) apply_meta(node *ast.Node, is_pub bool) {
 		sd.DocComments = p.comment_group
 		p.comment_group = nil
 		sd.IsPub = is_pub
+		is_pub = false
+
+	case *ast.TraitDecl:
+		td := node.Data.(*ast.TraitDecl)
+		if td == nil {
+			return
+		}
+		td.DocComments = p.comment_group
+		p.comment_group = nil
+		td.IsPub = is_pub
 		is_pub = false
 	}
 	if is_pub {

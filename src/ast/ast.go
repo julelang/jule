@@ -192,6 +192,11 @@ type Param struct {
 	Ident      string
 }
 
+// Reports whether parameter is self (receiver) parameter.
+func (p *Param) IsSelf() bool { return strings.HasSuffix(p.Ident, lex.KND_SELF) }
+// Reports whether self (receiver) parameter is reference.
+func (p *Param) IsRef() bool { return p.Ident != "" && p.Ident[0] == '&'}
+
 // Function declaration AST.
 type FnDecl struct {
 	Token       lex.Token
@@ -357,4 +362,12 @@ type StructDecl struct {
 	Directives  []*Directive
 	DocComments *CommentGroup
 	Generics    []*Generic
+}
+
+type TraitDecl struct {
+	Token       lex.Token
+	Ident       string
+	IsPub       bool
+	DocComments *CommentGroup
+	Methods     []*FnDecl
 }
