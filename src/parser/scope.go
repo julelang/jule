@@ -772,6 +772,155 @@ func (sp *scope_parser) build_id_st(tokens []lex.Token) (_ ast.NodeData, ok bool
 	return
 }
 
+func (sp *scope_parser) build_assign_info(tokens []lex.Token) *assign_info {
+	info:= &assign_info{
+		ok: true,
+	}
+	brace_n := 0
+	for i, token := range tokens {
+		if token.Id == lex.ID_RANGE {
+			switch token.Kind {
+			case lex.KND_LBRACE, lex.KND_LBRACKET, lex.KND_LPAREN:
+				brace_n++
+			default:
+				brace_n--
+			}
+		}
+		if brace_n > 0 {
+			continue
+		} else if token.Id != lex.ID_OP {
+			continue
+		} else if !is_assign_op(token.Kind) {
+			continue
+		}
+		info.l = tokens[:i]
+		if len(info.l) == 0 {
+			info.ok = false
+		}
+		info.setter = token
+		if i+1 >= len(tokens) {
+			info.r = nil
+			info.ok = is_postfix_op(info.setter.Kind)
+			break
+		}
+		info.r = tokens[i+1:]
+		if is_postfix_op(info.setter.Kind) {
+			if len(info.r) > 0 {
+				sp.push_err(info.r[0], "invalid_syntax")
+				info.r = nil
+			}
+		}
+		break
+	}
+	return info
+}
+
+func (sp *scope_parser) build_assign_l(tokens []lex.Token) *ast.AssignLeft {
+	l := &ast.AssignLeft{
+		Token: tokens[0],
+	}
+	if tokens[0].Id == lex.ID_IDENT {
+		l.Ident = l.Token.Kind
+	}
+	l.Expr = sp.p.build_expr(tokens)
+	return l
+}
+
+func (sp *scope_parser) build_assign_ls(parts [][]lex.Token) []*ast.AssignLeft {
+	var lefts []*ast.AssignLeft
+	for _, part := range parts {
+		l := sp.build_assign_l(part)
+		lefts = append(lefts, l)
+	}
+	return lefts
+}
+
+func (sp *scope_parser) build_plain_assign(tokens []lex.Token) (_ *ast.AssignSt, ok bool) {
+	info := sp.build_assign_info(tokens)
+	if !info.ok {
+		return
+	}
+	ok = true
+	assign := &ast.AssignSt{
+		Setter: info.setter,
+	}
+	parts, errs := lex.Parts(info.l, lex.ID_COMMA, true)
+	if len(errs) > 0 {
+		sp.p.errors = append(sp.p.errors, errs...)
+		return nil, false
+	}
+	assign.L = sp.build_assign_ls(parts)
+	if info.r != nil {
+		assign.R = sp.p.build_expr(info.r)
+	}
+	return
+}
+
+func (sp *scope_parser) build_decl_assign(tokens []lex.Token) (_ *ast.AssignSt, ok bool) {
+	if len(tokens) < 1 {
+		return
+	}
+
+	tokens = tokens[1:] // Skip "let" keyword
+	token := tokens[0]
+	if token.Id != lex.ID_RANGE || token.Kind != lex.KND_LPAREN {
+		return
+	}
+	ok = true
+
+	assign := &ast.AssignSt{}
+
+	var i int
+	rang := lex.Range(&i, lex.KND_LPAREN, lex.KND_RPARENT, tokens)
+	if rang == nil {
+		sp.push_err(token, "invalid_syntax")
+		return
+	} else if i+1 < len(tokens) {
+		assign.Setter = tokens[i]
+		i++
+		assign.R = sp.p.build_expr(tokens[i:])
+	}
+
+	// Lefts
+	parts, errs := lex.Parts(rang, lex.ID_COMMA, true)
+	if len(errs) > 0 {
+		sp.p.errors = append(sp.p.errors, errs...)
+		return
+	}
+	for _, part := range parts {
+		is_mut := false
+		token := part[0]
+		if token.Id == lex.ID_MUT {
+			is_mut = true
+			part = part[1:]
+			if len(part) != 1 {
+				sp.push_err(token, "invalid_syntax")
+				continue
+			}
+		}
+		if part[0].Id != lex.ID_IDENT && part[0].Id != lex.ID_RANGE && part[0].Kind != lex.KND_LPAREN {
+			sp.push_err(token, "invalid_syntax")
+			continue
+		}
+		l := sp.build_assign_l(part)
+		l.IsMut = is_mut
+		assign.L = append(assign.L, l)
+	}
+	return
+}
+
+func (sp *scope_parser) build_assign_st(tokens []lex.Token) (*ast.AssignSt, bool) {
+	if !check_assign_tokens(tokens) {
+		return nil, false
+	}
+	switch tokens[0].Id {
+	case lex.ID_LET:
+		return sp.build_decl_assign(tokens)
+	default:
+		return sp.build_plain_assign(tokens)
+	}
+}
+
 func (sp *scope_parser) build_st(st *st) ast.NodeData {
 	token := st.tokens[0]
 	if token.Id == lex.ID_IDENT {
@@ -779,6 +928,11 @@ func (sp *scope_parser) build_st(st *st) ast.NodeData {
 		if ok {
 			return s
 		}
+	}
+
+	s, ok := sp.build_assign_st(st.tokens)
+	if ok {
+		return s
 	}
 
 	switch token.Id {

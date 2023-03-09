@@ -157,6 +157,21 @@ type FallSt struct {
 	Token lex.Token
 }
 
+// Left expression of assign statement.
+type AssignLeft struct {
+	Token lex.Token
+	IsMut bool
+	Ident string
+	Expr  *Expr
+}
+
+// Assign statement.
+type AssignSt struct {
+	Setter lex.Token
+	L      []*AssignLeft
+	R      *Expr
+}
+
 // Scope AST.
 type Scope struct {
 	Parent     *Scope // nil if scope is root
