@@ -1,6 +1,10 @@
 package ast
 
-import "github.com/julelang/jule/lex"
+import (
+	"strings"
+
+	"github.com/julelang/jule/lex"
+)
 
 type NodeData = any // Type of AST Node's data.
 
@@ -17,8 +21,13 @@ type CommentGroup struct {
 
 // AST model of just comment lines.
 type Comment struct {
-	Token   lex.Token
-	Text string
+	Token lex.Token
+	Text  string
+}
+
+// Reports whether comment is directive.
+func (c *Comment) IsDirective() bool {
+	return strings.HasPrefix(c.Text, lex.DIRECTIVE_COMMENT_PREFIX)
 }
 
 // Directive AST.

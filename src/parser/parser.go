@@ -18,6 +18,15 @@ func compiler_err(token lex.Token, key string, args ...any) build.Log {
 	}
 }
 
+func build_comment(token lex.Token) *ast.Comment {
+	// Remove slashes and trim spaces.
+	token.Kind = strings.TrimSpace(token.Kind[2:])
+	return &ast.Comment{
+		Token: token,
+		Text:  token.Kind,
+	}
+}
+
 type parser struct {
 	file          *lex.File
 	directives    []*ast.Directive
@@ -34,10 +43,10 @@ func (p *parser) push_err(token lex.Token, key string, args ...any) {
 	p.errors = append(p.errors, compiler_err(token, key, args...))
 }
 
-func (p *parser) push_directive(token lex.Token) {
+func (p *parser) push_directive(c *ast.Comment) {
 	d := &ast.Directive{
-		Token: token,
-		Tag:   token.Kind[len(lex.DIRECTIVE_COMMENT_PREFIX):], // Remove directive prefix
+		Token: c.Token,
+		Tag:   c.Token.Kind[len(lex.DIRECTIVE_COMMENT_PREFIX):], // Remove directive prefix
 	}
 
 	// Don't append if directive kind is invalid.
@@ -62,26 +71,15 @@ func (p *parser) push_directive(token lex.Token) {
 	p.directives = append(p.directives, d)
 }
 
-func (p *parser) build_comment(token lex.Token) ast.NodeData {
-	// Remove slashes and trim spaces.
-	token.Kind = strings.TrimSpace(token.Kind[2:])
-
-	if strings.HasPrefix(token.Kind, lex.DIRECTIVE_COMMENT_PREFIX) {
-		p.push_directive(token)
-	} else {
-		if p.comment_group == nil {
-			p.comment_group = &ast.CommentGroup{}
-		}
-		p.comment_group.Comments = append(p.comment_group.Comments, &ast.Comment{
-			Token: token,
-			Text:  token.Kind,
-		})
+func (p *parser) process_comment(c *ast.Comment) {
+	if c.IsDirective() {
+		p.push_directive(c)
+		return
 	}
-
-	return &ast.Comment{
-		Token: token,
-		Text:  token.Kind,
+	if p.comment_group == nil {
+		p.comment_group = &ast.CommentGroup{}
 	}
+	p.comment_group.Comments = append(p.comment_group.Comments, c)
 }
 
 func (p *parser) build_scope(tokens []lex.Token) *ast.Scope {
@@ -609,7 +607,9 @@ func (p *parser) build_node_data(st []lex.Token) ast.NodeData {
 		// Push first token because this is full text comment.
 		// Comments are just single-line.
 		// Range comments not accepts by lexer.
-		return p.build_comment(token)
+		c := build_comment(token)
+		p.process_comment(c)
+		return c
 
 	default:
 		p.push_err(token, "invalid_syntax")

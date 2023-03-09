@@ -449,6 +449,10 @@ func (sp *scope_parser) build_if_else_chain(tokens []lex.Token) ast.NodeData {
 	return chain
 }
 
+func (sp *scope_parser) build_comment_st(token lex.Token) ast.NodeData {
+	return build_comment(token)
+}
+
 func (sp *scope_parser) build_st(st *st) ast.NodeData {
 	token := st.tokens[0]
 	switch token.Id {
@@ -469,6 +473,12 @@ func (sp *scope_parser) build_st(st *st) ast.NodeData {
 
 	case lex.ID_IF:
 		return sp.build_if_else_chain(st.tokens)
+
+	case lex.ID_COMMENT:
+		// Push first token because this is full text comment.
+		// Comments are just single-line.
+		// Range comments not accepts by lexer.
+		return sp.build_comment_st(token)
 	}
 	sp.push_err(token, "invalid_syntax")
 	return nil
