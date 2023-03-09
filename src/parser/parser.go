@@ -27,6 +27,14 @@ func build_comment(token lex.Token) *ast.Comment {
 	}
 }
 
+func tokstoa(tokens []lex.Token) string {
+	s := ""
+	for _, token := range tokens {
+		s += token.Kind
+	}
+	return s
+}
+
 type parser struct {
 	file          *lex.File
 	directives    []*ast.Directive
@@ -671,14 +679,134 @@ func (p *parser) build_fn(tokens []lex.Token, method bool, anon bool, prototype 
 	return f
 }
 
-func (p *parser) build_node_data(st []lex.Token) ast.NodeData {
-	token := st[0]
-	switch token.Id {
-	case lex.ID_CONST, lex.ID_LET, lex.ID_MUT:
-		return p.build_var(st)
+func (p *parser) get_use_decl_selectors(tokens []lex.Token) []lex.Token {
+	i := 0
+	tokens = lex.Range(&i, lex.KND_LBRACE, lex.KND_RBRACE, tokens)
+	parts, errs := lex.Parts(tokens, lex.ID_COMMA, true)
+	if len(errs) > 0 {
+		p.errors = append(p.errors, errs...)
+		return nil
+	}
+	selectors := make([]lex.Token, len(parts))
+	for i, part := range parts {
+		if len(part) > 1 {
+			p.push_err(part[1], "invalid_syntax")
+		}
+		tok := part[0]
+		if tok.Id != lex.ID_IDENT && tok.Id != lex.ID_SELF {
+			p.push_err(tok, "invalid_syntax")
+			continue
+		}
+		selectors[i] = tok
+	}
+	return selectors
+}
 
+func (p *parser) build_use_cpp_decl(decl *ast.UseDecl, tokens []lex.Token) {
+	if len(tokens) > 2 {
+		p.push_err(tokens[2], "invalid_syntax")
+	}
+	token := tokens[1]
+	if token.Id != lex.ID_LITERAL || (token.Kind[0] != '`' && token.Kind[0] != '"') {
+		p.push_err(token, "invalid_expr")
+		return
+	}
+	decl.Cpp = true
+	decl.LinkString = token.Kind[1 : len(token.Kind)-1]
+}
+
+func (p *parser) parse_use_decl(decl *ast.UseDecl, tokens []lex.Token) {
+	tok := tokens[0]
+	if tok.Id == lex.ID_CPP {
+		p.build_use_cpp_decl(decl, tokens)
+		return
+	}
+	if tok.Id != lex.ID_IDENT || tok.Kind != "std" {
+		p.push_err(tokens[0], "invalid_syntax")
+	}
+	if len(tokens) < 3 {
+		p.push_err(tok, "invalid_syntax")
+		return
+	}
+	tokens = tokens[2:]
+	tok = tokens[len(tokens)-1]
+	switch tok.Id {
+	case lex.ID_DBLCOLON:
+		p.push_err(tok, "invalid_syntax")
+		return
+
+	case lex.ID_RANGE:
+		if tok.Kind != lex.KND_RBRACE {
+			p.push_err(tok, "invalid_syntax")
+			return
+		}
+		var selectors []lex.Token
+		tokens, selectors = lex.RangeLast(tokens)
+		decl.Selected = p.get_use_decl_selectors(selectors)
+		if len(tokens) == 0 {
+			p.push_err(tok, "invalid_syntax")
+			return
+		}
+		tok = tokens[len(tokens)-1]
+		if tok.Id != lex.ID_DBLCOLON {
+			p.push_err(tok, "invalid_syntax")
+			return
+		}
+		tokens = tokens[:len(tokens)-1]
+		if len(tokens) == 0 {
+			p.push_err(tok, "invalid_syntax")
+			return
+		}
+
+	case lex.ID_OP:
+		if tok.Kind != lex.KND_STAR {
+			p.push_err(tok, "invalid_syntax")
+			return
+		}
+		tokens = tokens[:len(tokens)-1]
+		if len(tokens) == 0 {
+			p.push_err(tok, "invalid_syntax")
+			return
+		}
+		tok = tokens[len(tokens)-1]
+		if tok.Id != lex.ID_DBLCOLON {
+			p.push_err(tok, "invalid_syntax")
+			return
+		}
+		tokens = tokens[:len(tokens)-1]
+		if len(tokens) == 0 {
+			p.push_err(tok, "invalid_syntax")
+			return
+		}
+		decl.FullUse = true
+	}
+	decl.LinkString = "std:: " + tokstoa(tokens)
+}
+
+func (p *parser) build_use_decl(tokens []lex.Token) *ast.UseDecl {
+	decl := &ast.UseDecl{
+		Token: tokens[0],
+	}
+	if len(tokens) < 2 {
+		p.push_err(decl.Token, "missing_use_path")
+		return nil
+	}
+	tokens = tokens[1:] // Skip "use" keyword.
+	p.parse_use_decl(decl, tokens)
+	return decl
+}
+
+func (p *parser) build_node_data(tokens []lex.Token) ast.NodeData {
+	token := tokens[0]
+	switch token.Id {
+	case lex.ID_USE:
+		return p.build_use_decl(tokens)
+		
 	case lex.ID_FN, lex.ID_UNSAFE:
-		return p.build_fn(st, false, false, false)
+		return p.build_fn(tokens, false, false, false)
+
+	case lex.ID_CONST, lex.ID_LET, lex.ID_MUT:
+		return p.build_var(tokens)
 	
 	case lex.ID_COMMENT:
 		// Push first token because this is full text comment.

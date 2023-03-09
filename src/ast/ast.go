@@ -308,3 +308,12 @@ type MatchCase struct {
 	Cases     []*Case
 	Default   *Else
 }
+
+// Use declaration statement AST.
+type UseDecl struct {
+	Token      lex.Token
+	LinkString string      // Use declaration path string
+	FullUse    bool
+	Selected   []lex.Token
+	Cpp        bool
+}
