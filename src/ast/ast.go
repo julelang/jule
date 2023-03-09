@@ -269,3 +269,21 @@ type TypeAliasDecl struct {
 	Kind        *Type
 	DocComments *CommentGroup
 }
+
+// Case of match-case.
+type Case struct {
+	Token lex.Token
+	// Holds expression.
+	// Expressions holds *Type if If type matching.
+	Exprs []*Expr
+	Scope *Scope
+}
+
+// Match-Case AST.
+type MatchCase struct {
+	Token     lex.Token
+	TypeMatch bool
+	Expr      *Expr
+	Cases     []*Case
+	Default   *Else
+}

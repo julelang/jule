@@ -553,6 +553,150 @@ func (sp *scope_parser) build_type_alias_st(tokens []lex.Token) ast.NodeData {
 	return tad
 }
 
+func (sp *scope_parser) build_case_exprs(tokens *[]lex.Token, type_match bool) []*ast.Expr {
+	var exprs []*ast.Expr
+	push_expr := func(tokens []lex.Token, token lex.Token) {
+		if len(tokens) > 0 {
+			if type_match {
+				i := 0
+				t, ok := sp.p.build_type(tokens, &i, true)
+				if ok {
+					exprs = append(exprs, &ast.Expr{
+						Token: token,
+						Kind:  t,
+					})
+				}
+				i++
+				if i < len(tokens) {
+					sp.push_err(tokens[i], "invalid_syntax")
+				}
+				return
+			}
+			exprs = append(exprs, sp.p.build_expr(tokens))
+		}
+	}
+
+	brace_n := 0
+	j := 0
+	var i int
+	var tok lex.Token
+	for i, tok = range *tokens {
+		if tok.Id == lex.ID_RANGE {
+			switch tok.Kind {
+			case lex.KND_LPAREN, lex.KND_LBRACE, lex.KND_LBRACKET:
+				brace_n++
+			default:
+				brace_n--
+			}
+			continue
+		} else if brace_n != 0 {
+			continue
+		}
+		switch {
+		case tok.Id == lex.ID_OP && tok.Kind == lex.KND_VLINE:
+			push_expr((*tokens)[j:i], tok)
+			j = i + 1
+		case tok.Id == lex.ID_COLON:
+			push_expr((*tokens)[j:i], tok)
+			*tokens = (*tokens)[i+1:]
+			return exprs
+		}
+	}
+	sp.push_err((*tokens)[0], "invalid_syntax")
+	*tokens = nil
+	return nil
+}
+
+func (sp *scope_parser) build_case_scope(tokens *[]lex.Token) *ast.Scope {
+	n := 0
+	for {
+		i := 0
+		next, _ := skip_st(&i, (*tokens)[n:])
+		if len( next) == 0 {
+			break
+		}
+		tok := next[0]
+		if tok.Id != lex.ID_OP || tok.Kind != lex.KND_VLINE {
+			n += len(next)
+			continue
+		}
+		scope := sp.build_scope((*tokens)[:n])
+		*tokens = (*tokens)[n:]
+		return scope
+	}
+	scope := sp.build_scope(*tokens)
+	*tokens = nil
+	return scope
+}
+
+func (sp *scope_parser) build_case(tokens *[]lex.Token, type_match bool) (*ast.Case, bool) {
+	c := &ast.Case{
+		Token: (*tokens)[0], 
+	}
+	*tokens = (*tokens)[1:] // Remove case prefix.
+	c.Exprs = sp.build_case_exprs(tokens, type_match)
+	c.Scope = sp.build_case_scope(tokens)
+	is_default := len(c.Exprs) == 0
+	return c, is_default
+}
+
+func (sp *scope_parser) build_cases(tokens []lex.Token, type_match bool) ([]*ast.Case, *ast.Else) {
+	var cases []*ast.Case
+	var def *ast.Else
+	for len(tokens) > 0 {
+		tok := tokens[0]
+		if tok.Id != lex.ID_OP || tok.Kind != lex.KND_VLINE {
+			sp.push_err(tok, "invalid_syntax")
+			break
+		}
+		c, is_default := sp.build_case(&tokens, type_match)
+		if is_default {
+			c.Token = tok
+			if def == nil {
+				def = &ast.Else{
+					Token: c.Token,
+					Scope: c.Scope,
+				}
+			} else {
+				sp.push_err(tok, "invalid_syntax")
+			}
+		} else {
+			cases = append(cases, c)
+		}
+	}
+	return cases, def
+}
+
+func (sp *scope_parser) build_match_case(tokens []lex.Token) *ast.MatchCase {
+	m := &ast.MatchCase{
+		Token: tokens[0],
+	}
+	tokens = tokens[1:] // Remove "match" keyword.
+	
+	if len(tokens) > 0 && tokens[0].Id == lex.ID_TYPE {
+		m.TypeMatch = true
+		tokens = tokens[1:] // Skip "type" keyword
+	}
+
+	expr_tokens := get_block_expr(tokens)
+	if len(expr_tokens) > 0 {
+		m.Expr = sp.p.build_expr(expr_tokens)
+	} else if m.TypeMatch {
+		sp.push_err(m.Token, "missing_expr")
+	}
+	
+	i := len(expr_tokens)
+	block_toks := lex.Range(&i, lex.KND_LBRACE, lex.KND_RBRACE, tokens)
+	if block_toks == nil {
+		sp.stop()
+		sp.push_err(m.Token, "body_not_exist")
+		return nil
+	}
+	
+	m.Cases, m.Default = sp.build_cases(block_toks, m.TypeMatch)
+	return m
+}
+
 func (sp *scope_parser) build_st(st *st) ast.NodeData {
 	token := st.tokens[0]
 	switch token.Id {
@@ -591,6 +735,9 @@ func (sp *scope_parser) build_st(st *st) ast.NodeData {
 
 	case lex.ID_TYPE:
 		return sp.build_type_alias_st(st.tokens)
+
+	case lex.ID_MATCH:
+		return sp.build_match_case(st.tokens)
 	
 	default:
 		if is_fn_call(st.tokens) != nil {
