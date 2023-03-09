@@ -697,6 +697,49 @@ func (sp *scope_parser) build_match_case(tokens []lex.Token) *ast.MatchCase {
 	return m
 }
 
+func (sp *scope_parser) build_scope_st(tokens []lex.Token) *ast.Scope {
+	is_unsafe := false
+	is_deferred := false
+	token := tokens[0]
+	if token.Id == lex.ID_UNSAFE {
+		is_unsafe = true
+		tokens = tokens[1:]
+		if len(tokens) == 0 {
+			sp.push_err(token, "invalid_syntax")
+			return nil
+		}
+		token = tokens[0]
+		if token.Id == lex.ID_DEFER {
+			is_deferred = true
+			tokens = tokens[1:]
+			if len(tokens) == 0 {
+				sp.push_err(token, "invalid_syntax")
+				return nil
+			}
+		}
+	} else if token.Id == lex.ID_DEFER {
+		is_deferred = true
+		tokens = tokens[1:]
+		if len(tokens) == 0 {
+			sp.push_err(token, "invalid_syntax")
+			return nil
+		}
+	}
+
+	i := 0
+	tokens = lex.Range(&i, lex.KND_LBRACE, lex.KND_RBRACE, tokens)
+	if len(tokens) == 0 {
+		sp.push_err(token, "invalid_syntax")
+		return nil
+	} else if i < len(tokens) {
+		sp.push_err(tokens[i], "invalid_syntax")
+	}
+	scope := sp.build_scope(tokens)
+	scope.IsUnsafe = is_unsafe
+	scope.IsDeferred = is_deferred
+	return scope
+}
+
 func (sp *scope_parser) build_st(st *st) ast.NodeData {
 	token := st.tokens[0]
 	switch token.Id {
@@ -738,6 +781,14 @@ func (sp *scope_parser) build_st(st *st) ast.NodeData {
 
 	case lex.ID_MATCH:
 		return sp.build_match_case(st.tokens)
+
+	case lex.ID_UNSAFE, lex.ID_DEFER:
+		return sp.build_scope_st(st.tokens)
+	
+	case lex.ID_RANGE:
+		if token.Kind == lex.KND_LBRACE {
+			return sp.build_scope_st(st.tokens)
+		}
 	
 	default:
 		if is_fn_call(st.tokens) != nil {
