@@ -140,6 +140,12 @@ type Generic struct {
 	Ident string
 }
 
+// Goto statement AST.
+type GotoSt struct {
+	Token lex.Token
+	Label lex.Token
+}
+
 // Scope AST.
 type Scope struct {
 	Parent     *Scope // nil if scope is root

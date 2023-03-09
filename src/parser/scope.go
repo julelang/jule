@@ -519,6 +519,25 @@ func (sp *scope_parser) build_co_call_st(tokens []lex.Token) ast.NodeData {
 	return cc
 }
 
+func (sp *scope_parser) build_goto_st(tokens []lex.Token) ast.NodeData {
+	gt := &ast.GotoSt{
+		Token: tokens[0],
+	}
+	if len(tokens) == 1 {
+		sp.push_err(gt.Token, "missing_goto_label")
+		return nil
+	} else if len(tokens) > 2 {
+		sp.push_err(tokens[2], "invalid_syntax")
+	}
+	ident_token := tokens[1]
+	if ident_token.Id != lex.ID_IDENT {
+		sp.push_err(ident_token, "invalid_syntax")
+		return gt
+	}
+	gt.Label = ident_token
+	return gt
+}
+
 func (sp *scope_parser) build_st(st *st) ast.NodeData {
 	token := st.tokens[0]
 	switch token.Id {
@@ -548,6 +567,9 @@ func (sp *scope_parser) build_st(st *st) ast.NodeData {
 
 	case lex.ID_CO:
 		return sp.build_co_call_st(st.tokens)
+
+	case lex.ID_GOTO:
+		return sp.build_goto_st(st.tokens)
 	}
 	sp.push_err(token, "invalid_syntax")
 	return nil
