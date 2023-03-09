@@ -199,3 +199,9 @@ type WhileNextKind struct {
 	Expr *Expr
 	Next NodeData
 }
+
+// Break statement AST.
+type BreakSt struct {
+	Token lex.Token
+	Label lex.Token
+}
