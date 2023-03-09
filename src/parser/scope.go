@@ -475,7 +475,7 @@ func (sp *scope_parser) build_call_generics(tokens []lex.Token) []*ast.Type {
 		j := 0
 		generic, _ := sp.p.build_type(part, &j, true)
 		if j < len(part) {
-			sp.push_err(part[j+1], "invalid_syntax")
+			sp.push_err(part[j], "invalid_syntax")
 		}
 		generics[i] = generic
 	}

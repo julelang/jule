@@ -156,7 +156,7 @@ func (p *parser) build_type_alias(tokens []lex.Token) *ast.TypeAliasDecl {
 	t, ok := p.build_type(tokens, &i, true)
 	tad.Kind = t
 	if ok && i < len(tokens) {
-		p.push_err(tokens[i+1], "invalid_syntax")
+		p.push_err(tokens[i], "invalid_syntax")
 	}
 	return tad
 }
@@ -901,6 +901,131 @@ func (p *parser) build_enum_decl(tokens []lex.Token) *ast.EnumDecl {
 	return e
 }
 
+func (p *parser) build_field(tokens []lex.Token) *ast.Field {
+	f := &ast.Field{}
+
+	f.IsPub = tokens[0].Id == lex.ID_PUB
+	if f.IsPub {
+		if len(tokens) == 1 {
+			p.push_err(tokens[0], "invalid_syntax")
+			return nil
+		}
+		tokens = tokens[1:]
+	}
+
+	f.InteriorMut = tokens[0].Id == lex.ID_MUT
+	if f.InteriorMut {
+		if len(tokens) == 1 {
+			p.push_err(tokens[0], "invalid_syntax")
+			return nil
+		}
+		tokens = tokens[1:]
+	}
+
+	f.Token = tokens[0]
+	if f.Token.Id != lex.ID_IDENT {
+		p.push_err(f.Token, "invalid_syntax")
+		return nil
+	}
+	f.Ident = f.Token.Kind
+
+	if len(tokens) == 1 {
+		p.push_err(tokens[0], "missing_type")
+		return nil
+	} else if tokens[1].Id != lex.ID_COLON {
+		p.push_err(tokens[1], "missing_type")
+		return nil
+	}
+
+	tokens = tokens[2:] // Remove identifier and colon tokens.
+	i := 0
+	f.Kind, _ = p.build_type(tokens, &i, true)
+	if i < len(tokens) {
+		p.push_err(tokens[i], "invalid_syntax")
+		return nil
+	}
+
+	return f
+}
+
+func (p *parser) build_struct_decl_fields(tokens []lex.Token) []*ast.Field {
+	var fields []*ast.Field
+	stms := split_stms(tokens)
+	for _, st := range stms {
+		tokens := st.tokens
+		if tokens[0].Id == lex.ID_COMMENT {
+			continue
+		}
+		f := p.build_field(tokens)
+		fields = append(fields, f)
+	}
+	return fields
+}
+
+func (p *parser) build_struct_decl(tokens []lex.Token) *ast.StructDecl {
+	if len(tokens) < 3 {
+		p.push_err(tokens[0], "invalid_syntax")
+		return nil
+	}
+	
+	i := 1
+	s := &ast.StructDecl{
+		Token: tokens[i],
+	}
+	if s.Token.Id != lex.ID_IDENT {
+		p.push_err(s.Token, "invalid_syntax")
+	}
+	i++
+	if i >= len(tokens) {
+		p.push_err(tokens[i], "invalid_syntax")
+		return s
+	}
+	s.Ident = s.Token.Kind
+
+	generics_tokens := lex.Range(&i, lex.KND_LBRACKET, lex.KND_RBRACKET, tokens)
+	if generics_tokens != nil {
+		s.Generics = p.build_generics(generics_tokens)
+	}
+	if i >= len(tokens) {
+		p.push_err(tokens[i], "invalid_syntax")
+		return s
+	}
+
+	body_tokens := lex.Range(&i, lex.KND_LBRACE, lex.KND_RBRACE, tokens)
+	if body_tokens == nil {
+		p.stop()
+		p.push_err(s.Token, "body_not_exist")
+		return s
+	}
+	if i < len(tokens) {
+		p.push_err(tokens[i], "invalid_syntax")
+	}
+	s.Fields = p.build_struct_decl_fields(body_tokens)
+	return s
+}
+
+func (p *parser) build_cpp_link(tokens []lex.Token) ast.NodeData {
+	token := tokens[0]
+	if len(tokens) == 1 {
+		p.push_err(token, "invalid_syntax")
+		return nil
+	}
+	token = tokens[1]
+	switch token.Id {
+	case lex.ID_FN, lex.ID_UNSAFE:
+		//return p.build_cpp_link_fn(tokens)
+	case lex.ID_LET:
+		//return p.build_cpp_link_var(tokens)
+	case lex.ID_STRUCT:
+		//return p.build_cpp_link_struct(tokens)
+	case lex.ID_TYPE:
+		// return p.build_cpp_link_type_alias(tokens)
+	default:
+		p.push_err(token, "invalid_syntax")
+	}
+	return nil
+}
+
 func (p *parser) build_node_data(tokens []lex.Token) ast.NodeData {
 	token := tokens[0]
 	switch token.Id {
@@ -913,6 +1038,18 @@ func (p *parser) build_node_data(tokens []lex.Token) ast.NodeData {
 	case lex.ID_CONST, lex.ID_LET, lex.ID_MUT:
 		return p.build_var(tokens)
 	
+	case lex.ID_TYPE:
+		return p.build_type_alias(tokens)
+
+	case lex.ID_ENUM:
+		return p.build_enum_decl(tokens)
+
+	case lex.ID_STRUCT:
+		return p.build_struct_decl(tokens)
+
+	case lex.ID_CPP:
+		return p.build_cpp_link(tokens)
+
 	case lex.ID_COMMENT:
 		// Push first token because this is full text comment.
 		// Comments are just single-line.
@@ -920,12 +1057,6 @@ func (p *parser) build_node_data(tokens []lex.Token) ast.NodeData {
 		c := build_comment(token)
 		p.process_comment(c)
 		return c
-	
-	case lex.ID_TYPE:
-		return p.build_type_alias(tokens)
-
-	case lex.ID_ENUM:
-		return p.build_enum_decl(tokens)
 
 	default:
 		p.push_err(token, "invalid_syntax")
@@ -999,6 +1130,18 @@ func (p *parser) apply_meta(node *ast.Node, is_pub bool) {
 		ed.DocComments = p.comment_group
 		p.comment_group = nil
 		ed.IsPub = is_pub
+		is_pub = false
+
+	case *ast.StructDecl:
+		sd := node.Data.(*ast.StructDecl)
+		if sd == nil {
+			return
+		}
+		sd.Directives = p.directives
+		p.directives = nil
+		sd.DocComments = p.comment_group
+		p.comment_group = nil
+		sd.IsPub = is_pub
 		is_pub = false
 	}
 	if is_pub {

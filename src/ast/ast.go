@@ -337,3 +337,24 @@ type EnumDecl struct {
 	Items       []*EnumItem
 	DocComments *CommentGroup
 }
+
+// Field AST.
+type Field struct {
+	Token       lex.Token
+	IsPub       bool
+	InteriorMut bool
+	Ident       string
+	Kind        *Type
+}
+
+// Structure declaration AST.
+type StructDecl struct {
+	Token       lex.Token
+	Ident       string
+	Fields      []*Field
+	IsPub       bool
+	Cpp         bool
+	Directives  []*Directive
+	DocComments *CommentGroup
+	Generics    []*Generic
+}
