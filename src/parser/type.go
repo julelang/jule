@@ -5,7 +5,16 @@ import (
 	"github.com/julelang/jule/lex"
 )
 
-func get_void_type() *ast.Type { return &ast.Type{} }
+func build_primitive_type(kind string) *ast.Type {
+	return &ast.Type{
+		Token: lex.Token{
+			Id:   lex.ID_DT,
+			Kind: kind,
+		},
+	}
+}
+func build_void_type() *ast.Type { return &ast.Type{} }
+func build_u32_type() *ast.Type { return build_primitive_type(lex.KND_U32) }
 
 type type_builder struct {
 	p        *parser
@@ -28,6 +37,7 @@ func (tb *type_builder) build_primitive() *ast.Type {
 		Kind:  nil,
 	}
 	*tb.i++
+	tb.finished = true
 	return t
 }
 
@@ -49,7 +59,7 @@ func (tb *type_builder) step() *ast.Type {
 func (tb *type_builder) build() (*ast.Type, bool) {
 	root := tb.step()
 	if root == nil {
-		return get_void_type(), false
+		return build_void_type(), false
 	}
 	if tb.finished {
 		return root, true
@@ -60,7 +70,7 @@ func (tb *type_builder) build() (*ast.Type, bool) {
 	for ; *tb.i < len(tb.tokens); *tb.i++ {
 		*node = tb.step()
 		if *node == nil {
-			return get_void_type(), false
+			return build_void_type(), false
 		} else if tb.finished {
 			break
 		}

@@ -213,7 +213,7 @@ func (p *parser) build_var_type_and_expr(v *ast.VarDecl, tokens []lex.Token) {
 		}
 		t, ok := p.build_type(tokens, &i, false)
 		if ok {
-			v.DataType = t
+			v.Kind = t
 			i++
 			if i >= len(tokens) {
 				return
@@ -245,7 +245,7 @@ func (p *parser) build_var_common(v *ast.VarDecl, tokens []lex.Token) {
 		return
 	}
 	v.Ident = v.Token.Kind
-	v.DataType = get_void_type()
+	v.Kind = build_void_type()
 	if len(tokens) > 1 {
 		tokens = tokens[1:] // Remove identifier.
 		p.build_var_type_and_expr(v, tokens)
@@ -293,7 +293,7 @@ func (p *parser) build_var(tokens []lex.Token) *ast.VarDecl {
 	}
 	tokens = tokens[i:]
 	p.build_var_common(v, tokens)
-	if v.DataType.IsVoid() && v.Expr == nil {
+	if v.Kind.IsVoid() && v.Expr == nil {
 		p.push_err(v.Token, "missing_type")
 	}
 	return v
@@ -352,7 +352,7 @@ func (p *parser) build_self_param(tokens []lex.Token) *ast.Param {
 	}
 
 	if tokens[i].Kind == lex.KND_AMPER {
-		param.DataType.Kind = &ast.RefType{}
+		param.Kind.Kind = &ast.RefType{}
 		i++
 		if i >= len(tokens) {
 			p.push_err(tokens[i-1], "invalid_syntax")
@@ -397,7 +397,7 @@ func (p *parser) build_param_type(param *ast.Param, tokens []lex.Token, must_pur
 			return
 		}
 	}
-	param.DataType, _ = p.build_type(tokens, &i, true)
+	param.Kind, _ = p.build_type(tokens, &i, true)
 	i++
 	if i < len(tokens) {
 		p.push_err(tokens[i], "invalid_syntax")
@@ -464,13 +464,13 @@ func (p *parser) build_param(tokens []lex.Token, must_pure bool) *ast.Param {
 
 func (p *parser) check_params(params []*ast.Param) {
 	for _, param := range params {
-		if param.Ident == lex.KND_SELF || param.DataType != nil {
+		if param.Ident == lex.KND_SELF || param.Kind != nil {
 			continue
 		}
 		if param.Token.Id == lex.ID_NA {
 			p.push_err(param.Token, "missing_type")
 		} else {
-			param.DataType = &ast.Type{
+			param.Kind = &ast.Type{
 				Token: param.Token,
 				Kind:   &ast.IdentType{Ident: param.Token.Kind},
 			}
@@ -522,7 +522,7 @@ func (p *parser) build_multi_ret_type(tokens []lex.Token, i *int) (t *ast.RetTyp
 
 	types := make([]*ast.Type, len(params))
 	for i, param := range params {
-		types[i] = param.DataType
+		types[i] = param.Kind
 		if param.Ident != lex.ANONYMOUS_ID {
 			param.Token.Kind = param.Ident
 		} else {
@@ -796,6 +796,112 @@ func (p *parser) build_use_decl(tokens []lex.Token) *ast.UseDecl {
 	return decl
 }
 
+func (p *parser) build_enum_item_expr(i *int, tokens []lex.Token) *ast.Expr {
+	brace_n := 0
+	expr_start := *i
+	for ; *i < len(tokens); *i++ {
+		t := tokens[*i]
+		if t.Id == lex.ID_RANGE {
+			switch t.Kind {
+			case lex.KND_LBRACE, lex.KND_LBRACKET, lex.KND_LPAREN:
+				brace_n++
+				continue
+			default:
+				brace_n--
+			}
+		}
+		if brace_n > 0 {
+			continue
+		}
+		if t.Id == lex.ID_COMMA || *i+1 >= len(tokens) {
+			var expr_tokens []lex.Token
+			if t.Id == lex.ID_COMMA {
+				expr_tokens = tokens[expr_start:*i]
+			} else {
+				expr_tokens = tokens[expr_start:]
+			}
+			return p.build_expr(expr_tokens)
+		}
+	}
+	return nil
+}
+
+func (p *parser) build_enum_items(tokens []lex.Token) []*ast.EnumItem {
+	items := make([]*ast.EnumItem, 0)
+	for i := 0; i < len(tokens); i++ {
+		t := tokens[i]
+		if t.Id == lex.ID_COMMENT {
+			continue
+		}
+		item := new(ast.EnumItem)
+		item.Token = t
+		if item.Token.Id != lex.ID_IDENT {
+			p.push_err(item.Token, "invalid_syntax")
+		}
+		item.Ident = item.Token.Kind
+		if i+1 >= len(tokens) || tokens[i+1].Id == lex.ID_COMMA {
+			if i+1 < len(tokens) {
+				i++
+			}
+			items = append(items, item)
+			continue
+		}
+		i++
+		t = tokens[i]
+		if t.Id != lex.ID_OP && t.Kind != lex.KND_EQ {
+			p.push_err(tokens[0], "invalid_syntax")
+		}
+		i++
+		if i >= len(tokens) || tokens[i].Id == lex.ID_COMMA {
+			p.push_err(tokens[0], "missing_expr")
+			continue
+		}
+		item.Expr = p.build_enum_item_expr(&i, tokens)
+		items = append(items, item)
+	}
+	return items
+}
+
+func (p *parser) build_enum_decl(tokens []lex.Token) *ast.EnumDecl {
+	if len(tokens) < 2 || len(tokens) < 3 {
+		p.push_err(tokens[0], "invalid_syntax")
+		return nil
+	}
+	e := &ast.EnumDecl{
+		Token: tokens[1],
+	}
+	if e.Token.Id != lex.ID_IDENT {
+		p.push_err(e.Token, "invalid_syntax")
+	}
+	e.Ident = e.Token.Kind
+	i := 2
+	if tokens[i].Id == lex.ID_COLON {
+		i++
+		if i >= len(tokens) {
+			p.push_err(tokens[i-1], "invalid_syntax")
+			return e
+		}
+		e.Kind, _ = p.build_type(tokens, &i, true)
+		if i >= len(tokens) {
+			p.stop()
+			p.push_err(e.Token, "body_not_exist")
+			return e
+		}
+	} else {
+		e.Kind = build_u32_type()
+	}
+	item_tokens := lex.Range(&i, lex.KND_LBRACE, lex.KND_RBRACE, tokens)
+	if item_tokens == nil {
+		p.stop()
+		p.push_err(e.Token, "body_not_exist")
+		return e
+	} else if i < len(tokens) {
+		p.push_err(tokens[i], "invalid_syntax")
+	}
+	e.Items = p.build_enum_items(item_tokens)
+	return e
+}
+
 func (p *parser) build_node_data(tokens []lex.Token) ast.NodeData {
 	token := tokens[0]
 	switch token.Id {
@@ -818,6 +924,9 @@ func (p *parser) build_node_data(tokens []lex.Token) ast.NodeData {
 	
 	case lex.ID_TYPE:
 		return p.build_type_alias(tokens)
+
+	case lex.ID_ENUM:
+		return p.build_enum_decl(tokens)
 
 	default:
 		p.push_err(token, "invalid_syntax")
@@ -873,6 +982,13 @@ func (p *parser) apply_meta(node *ast.Node, is_pub bool) {
 		is_pub = false
 		tad.DocComments = p.comment_group
 		p.comment_group = nil
+
+	case *ast.EnumDecl:
+		ed := node.Data.(*ast.EnumDecl)
+		ed.DocComments = p.comment_group
+		p.comment_group = nil
+		ed.IsPub = is_pub
+		is_pub = false
 	}
 	if is_pub {
 		p.push_err(node.Token, "def_not_support_pub")

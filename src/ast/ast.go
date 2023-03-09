@@ -185,7 +185,7 @@ type Param struct {
 	Token      lex.Token
 	IsMut      bool
 	IsVariadic bool
-	DataType   *Type
+	Kind       *Type
 	Ident      string
 }
 
@@ -212,7 +212,7 @@ type VarDecl struct {
 	IsMut       bool
 	IsConst     bool
 	DocComments *CommentGroup
-	DataType    *Type
+	Kind        *Type
 	Expr        *Expr
 }
 
@@ -316,4 +316,21 @@ type UseDecl struct {
 	FullUse    bool
 	Selected   []lex.Token
 	Cpp        bool
+}
+
+// Enum item.
+type EnumItem struct {
+	Token lex.Token
+	Ident string
+	Expr *Expr
+}
+
+// Enum declaration AST.
+type EnumDecl struct {
+	Token       lex.Token
+	IsPub       bool
+	Ident       string
+	Kind        *Type
+	Items       []*EnumItem
+	DocComments *CommentGroup
 }
