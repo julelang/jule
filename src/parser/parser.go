@@ -91,7 +91,7 @@ func (p *parser) build_scope(tokens []lex.Token) *ast.Scope {
 	return sp.build(tokens)
 }
 
-func (p *parser) __build_type(tokens []lex.Token, i *int, err bool) *ast.Type {
+func (p *parser) __build_type(tokens []lex.Token, i *int, err bool) (*ast.Type, bool) {
 	tb := type_builder{
 		p:      p,
 		tokens: tokens,
@@ -102,13 +102,13 @@ func (p *parser) __build_type(tokens []lex.Token, i *int, err bool) *ast.Type {
 }
 
 // build_type builds AST model of data-type.
-func (p *parser) build_type(tokens []lex.Token, i *int, err bool) *ast.Type {
+func (p *parser) build_type(tokens []lex.Token, i *int, err bool) (*ast.Type, bool) {
 	token := tokens[*i]
-	t := p.__build_type(tokens, i, err)
-	if err && t.Token.Id == lex.ID_NA {
+	t, ok := p.__build_type(tokens, i, err)
+	if err && !ok {
 		p.push_err(token, "invalid_type")
 	}
-	return t
+	return t, ok
 }
 
 func (p *parser) build_generic(tokens []lex.Token) *ast.Generic {
@@ -201,15 +201,15 @@ func (p *parser) param_type_begin(param *ast.Param, i *int, tokens []lex.Token) 
 	}
 }
 
-func (p *parser) param_type(param *ast.Param, tokens []lex.Token, mustPure bool) {
+func (p *parser) build_param_type(param *ast.Param, tokens []lex.Token, must_pure bool) {
 	i := 0
-	if !mustPure {
+	if !must_pure {
 		p.param_type_begin(param, &i, tokens)
 		if i >= len(tokens) {
 			return
 		}
 	}
-	param.DataType = p.build_type(tokens, &i, true)
+	param.DataType, _ = p.build_type(tokens, &i, true)
 	i++
 	if i < len(tokens) {
 		p.push_err(tokens[i], "invalid_syntax")
@@ -224,7 +224,7 @@ func (p *parser) param_body_id(param *ast.Param, token lex.Token) {
 	param.Ident = token.Kind
 }
 
-func (p *parser) param_body(param *ast.Param, i *int, tokens []lex.Token, must_pure bool) {
+func (p *parser) build_param_body(param *ast.Param, i *int, tokens []lex.Token, must_pure bool) {
 	p.param_body_id(param, tokens[*i])
 	tok := tokens[*i]
 	// +1 for skip identifier token
@@ -243,10 +243,10 @@ func (p *parser) param_body(param *ast.Param, i *int, tokens []lex.Token, must_p
 	}
 
 	tokens = tokens[*i+1:] // Skip colon
-	p.param_type(param, tokens, must_pure)
+	p.build_param_type(param, tokens, must_pure)
 }
 
-func (p *parser) push_param(params *[]*ast.Param, tokens []lex.Token, mustPure bool) {
+func (p *parser) build_param(tokens []lex.Token, must_pure bool) *ast.Param {
 	param := &ast.Param{
 		Token: tokens[0],
 	}
@@ -256,7 +256,7 @@ func (p *parser) push_param(params *[]*ast.Param, tokens []lex.Token, mustPure b
 		param.IsMut = true
 		if len(tokens) == 1 {
 			p.push_err(tokens[0], "invalid_syntax")
-			return
+			return nil
 		}
 		tokens = tokens[1:]
 		param.Token = tokens[0]
@@ -265,26 +265,27 @@ func (p *parser) push_param(params *[]*ast.Param, tokens []lex.Token, mustPure b
 	if param.Token.Id != lex.ID_IDENT {
 		// Just data type
 		param.Ident = lex.ANONYMOUS_ID
-		p.param_type(param, tokens, mustPure)
+		p.build_param_type(param, tokens, must_pure)
 	} else {
 		i := 0
-		p.param_body(param, &i, tokens, mustPure)
+		p.build_param_body(param, &i, tokens, must_pure)
 	}
 
-	*params = append(*params, param)
+	return param
 }
 
-func (p *parser) check_params(params *[]*ast.Param) {
-	for i := range *params {
-		param := (*params)[i]
-		if param.Ident == lex.KND_SELF || param.DataType.Token.Id != lex.ID_NA {
+func (p *parser) check_params(params []*ast.Param) {
+	for _, param := range params {
+		if param.Ident == lex.KND_SELF || param.DataType != nil {
 			continue
 		}
 		if param.Token.Id == lex.ID_NA {
 			p.push_err(param.Token, "missing_type")
 		} else {
-			param.DataType.Token = param.Token
-			param.DataType.Kind = &ast.IdentType{Ident: param.Token.Kind}
+			param.DataType = &ast.Type{
+				Token: param.Token,
+				Kind:   &ast.IdentType{Ident: param.Token.Kind},
+			}
 			param.Ident = lex.ANONYMOUS_ID
 			param.Token = lex.Token{}
 		}
@@ -308,10 +309,13 @@ func (p *parser) build_params(tokens []lex.Token, method bool, must_pure bool) [
 	}
 
 	for _, part := range parts {
-		p.push_param(&params, part, must_pure)
+		param := p.build_param(part, must_pure)
+		if param != nil {
+			params = append(params, param)
+		}
 	}
 
-	p.check_params(&params)
+	p.check_params(params)
 	return params
 }
 
@@ -320,8 +324,7 @@ func (p *parser) build_multi_ret_type(tokens []lex.Token, i *int) (t *ast.RetTyp
 	*i++
 	if *i >= len(tokens) {
 		*i--
-		t.Kind = p.build_type(tokens, i, false)
-		ok = t.Kind != nil
+		t.Kind, ok = p.build_type(tokens, i, false)
 		return
 	}
 
@@ -384,8 +387,7 @@ func (p *parser) build_ret_type(tokens []lex.Token, i *int) (t *ast.RetType, ok 
 				return
 			}
 		}
-		t.Kind = p.build_type(tokens, i, true)
-		ok = t.Kind != nil
+		t.Kind, ok = p.build_type(tokens, i, true)
 		return
 	}
 	*i++

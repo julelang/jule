@@ -21,10 +21,12 @@ func (tb *type_builder) push_err(token lex.Token, key string) {
 }
 
 func (tb *type_builder) build_primitive() *ast.Type {
-	return &ast.Type{
+	t := &ast.Type{
 		Token: tb.tokens[*tb.i],
 		Kind:  nil,
 	}
+	*tb.i++
+	return t
 }
 
 func (tb *type_builder) step() *ast.Type {
@@ -34,17 +36,18 @@ func (tb *type_builder) step() *ast.Type {
 		return tb.build_primitive()
 	// TODO: implement other types
 	default:
+		*tb.i++
 		tb.push_err(token, "invalid_syntax")
 		return nil
 	}
 }
 
 // Builds type.
-// Returns nil if error occurs.
-func (tb *type_builder) build() *ast.Type {
+// Returns void if error occurs.
+func (tb *type_builder) build() (*ast.Type, bool) {
 	root := tb.step()
 	if root == nil {
-		return nil
+		return &ast.Type{}, false
 	}
 
 	node := &root.Kind
@@ -52,10 +55,10 @@ func (tb *type_builder) build() *ast.Type {
 	for ; *tb.i < len(tb.tokens); *tb.i++ {
 		*node = tb.step()
 		if *node == nil {
-			return nil
+			return &ast.Type{}, false
 		} else if tb.finished {
 			break
 		}
 	}
-	return root
+	return root, true
 }
