@@ -161,13 +161,22 @@ func (tb *type_builder) build_ptr() *ast.Type {
 	}
 
 	*tb.i++
+	if tb.tokens[*tb.i].Id == lex.ID_UNSAFE {
+		*tb.i++
+		return &ast.Type{
+			Token: token,
+			Kind:  &ast.PtrType{
+				Elem: nil, // Set Elem as nil for unsafe pointer (*unsafe) type.
+			},
+		}
+	}
+
 	elem := tb.step()
 	if elem == nil {
 		return nil
 	} else if elem.IsRef() {
 		tb.push_err(token, "ptr_points_ref")
 	}
-
 	return &ast.Type{
 		Token: token,
 		Kind:  &ast.PtrType{
@@ -189,6 +198,8 @@ func (tb *type_builder) build_ref() *ast.Type {
 		return nil
 	} else if elem.IsPtr() {
 		tb.push_err(token, "ref_refs_ptr")
+	} else if elem.IsArray() {
+		tb.push_err(token, "ref_refs_array")
 	}
 
 	return &ast.Type{

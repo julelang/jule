@@ -90,6 +90,28 @@ func (t *Type) IsPtr() bool {
 		return false
 	}
 }
+func (t *Type) IsSlice() bool {
+	if t.Kind == nil {
+		return true
+	}
+	switch t.Kind.(type) {
+	case *SliceType:
+		return true
+	default:
+		return false
+	}
+}
+func (t *Type) IsArray() bool {
+	if t.Kind == nil {
+		return true
+	}
+	switch t.Kind.(type) {
+	case *ArrayType:
+		return true
+	default:
+		return false
+	}
+}
 
 // Identifier type.
 type IdentType struct {

@@ -142,6 +142,7 @@ var ERRORS = map[string]string{
 	`const_var_not_have_expr`:                  `constant variable must have expression`,
 	`ref_refs_ref`:                             `references cannot reference to another reference`,
 	`ref_refs_ptr`:                             `references cannot reference to pointer`,
+	`ref_refs_array`:                           `references cannot reference to array`,
 	`ptr_points_ref`:                           `pointers cannot point to reference`,
 }
 
