@@ -307,6 +307,14 @@ type KeyValPair struct {
 	Colon lex.Token
 }
 
+// Slice initiating expression.
+type SliceExpr struct {
+	Elems []ExprData
+}
+
+// Reports whether slice is empty.
+func (se *SliceExpr) IsEmpty() bool { return len(se.Elems) == 0 }
+
 // Generic type AST.
 type Generic struct {
 	Token lex.Token

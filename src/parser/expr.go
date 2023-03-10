@@ -197,24 +197,24 @@ func build_ident_expr(token lex.Token) *ast.IdentExpr {
 	}
 }
 
-func get_brace_range_expr_tokens(tokens []lex.Token) ([]lex.Token, int) {
+func get_range_expr_tokens(tokens []lex.Token) ([]lex.Token, int) {
 	range_n := 0
 	i := len(tokens) - 1
 	for ; i >= 0; i-- {
 		tok := tokens[i]
-		if tok.Id != lex.ID_RANGE {
-			continue
+		if tok.Id == lex.ID_RANGE {
+			switch tok.Kind {
+			case lex.KND_RBRACE, lex.KND_RBRACKET, lex.KND_RPARENT:
+				range_n++
+	
+			default:
+				range_n--
+			}
 		}
-		switch tok.Kind {
-		case lex.KND_RBRACE, lex.KND_RBRACKET, lex.KND_RPARENT:
-			range_n++
-		default:
-			range_n--
+
+		if range_n == 0 {
+			return tokens[:i], range_n
 		}
-		if range_n != 0 {
-			continue
-		}
-		return tokens[:i], range_n
 	}
 	return nil, range_n
 }
@@ -709,7 +709,7 @@ func (ep *expr_builder) build_brace_literal(tokens []lex.Token) *ast.BraceLit {
 }
 
 func (ep *expr_builder) build_brace_range(tokens []lex.Token) ast.ExprData {
-	expr_tokens, range_n := get_brace_range_expr_tokens(tokens)
+	expr_tokens, range_n := get_range_expr_tokens(tokens)
 
 	switch {
 	case len(expr_tokens) == 0:
@@ -734,6 +734,45 @@ func (ep *expr_builder) build_brace_range(tokens []lex.Token) ast.ExprData {
 		ep.push_err(expr_tokens[0], "invalid_syntax")
 		return nil
 	}
+}
+
+// Tokens is should be store enumerable range tokens.
+func (ep *expr_builder) get_enumerable_parts(tokens []lex.Token) [][]lex.Token {
+	tokens = tokens[1 : len(tokens)-1] // Remove range tokens.
+	parts, errors := lex.Parts(tokens, lex.ID_COMMA, true)
+	ep.p.errors = append(ep.p.errors, errors...)
+	return parts
+}
+
+func (ep *expr_builder) build_slice(tokens []lex.Token) *ast.SliceExpr {
+	parts := ep.get_enumerable_parts(tokens)
+	if len(parts) == 0 {
+		return nil
+	}
+
+	slc := &ast.SliceExpr{
+		Elems: make([]ast.ExprData, len(parts)),
+	}
+	for i, part := range parts {
+		slc.Elems[i] = ep.build_from_tokens(part)
+	}
+
+	return slc
+}
+
+func (ep *expr_builder) build_bracket_range(tokens []lex.Token) ast.ExprData {
+	error_token := tokens[0]
+	expr_tokens, range_n := get_range_expr_tokens(tokens)
+
+	switch {
+	case len(expr_tokens) == 0:
+		return ep.build_slice(tokens)
+	case len(expr_tokens) == 0 || range_n > 0:
+		ep.push_err(error_token, "invalid_syntax")
+		return nil
+	}
+
+	return nil
 }
 
 func (ep *expr_builder) build_data(tokens []lex.Token) ast.ExprData {
@@ -768,7 +807,9 @@ func (ep *expr_builder) build_data(tokens []lex.Token) ast.ExprData {
 
 		case lex.KND_RBRACE:
 			return ep.build_brace_range(tokens)
-		// TODO: implement other nodes
+		
+		case lex.KND_RBRACKET:
+			return ep.build_bracket_range(tokens)
 		}
 	}
 
