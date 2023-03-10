@@ -206,6 +206,12 @@ type LitExpr struct {
 	Value string
 }
 
+// Unsafe expression.
+type UnsafeExpr struct {
+	Token lex.Token // Token of unsafe keyword.
+	Expr  ExprData
+}
+
 // Reports whether literal is nil value.
 func (le *LitExpr) IsNil() bool { return le.Value == lex.KND_NIL }
 

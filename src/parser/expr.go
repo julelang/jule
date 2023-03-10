@@ -201,6 +201,28 @@ func build_ident_expr(token lex.Token) *ast.IdentExpr {
 	}
 }
 
+func get_brace_range_expr_tokens(tokens []lex.Token) []lex.Token {
+	brace_n := 0
+	i := len(tokens) - 1
+	for ; i >= 0; i-- {
+		tok := tokens[i]
+		if tok.Id != lex.ID_RANGE {
+			continue
+		}
+		switch tok.Kind {
+		case lex.KND_RBRACE, lex.KND_RBRACKET, lex.KND_RPARENT:
+			brace_n++
+		default:
+			brace_n--
+		}
+		if brace_n != 0 {
+			continue
+		}
+		return tokens[:i]
+	}
+	return nil
+}
+
 type expr_builder struct {
 	p *parser
 }
@@ -526,6 +548,42 @@ func (ep *expr_builder) build_parentheses_range(tokens []lex.Token) ast.ExprData
 	return ep.build_fn_call(token, data)
 }
 
+func (ep *expr_builder) build_unsafe_expr(tokens []lex.Token) *ast.UnsafeExpr {
+	token := tokens[0]
+	tokens = tokens[1:] // Remove unsafe keyword.
+	i := 0
+	range_tokens := lex.Range(&i, lex.KND_LBRACE, lex.KND_RBRACE, tokens)
+	if len(range_tokens) == 0 {
+		ep.push_err(tokens[0], "missing_expr")
+		return nil
+	}
+	return &ast.UnsafeExpr{
+		Token: token,
+		Expr:  ep.build_from_tokens(range_tokens),
+	}
+}
+
+func (ep *expr_builder) build_unsafe(tokens []lex.Token) ast.ExprData {
+	if len(tokens) == 0 {
+		ep.push_err(tokens[0], "invalid_syntax")
+		return nil
+	}
+	switch tokens[1].Id {
+	default:
+		return ep.build_unsafe_expr(tokens)
+	}
+}
+
+func (ep *expr_builder) build_brace_range(tokens []lex.Token) ast.ExprData {
+	expr_tokens := get_brace_range_expr_tokens(tokens)
+	switch expr_tokens[0].Id {
+	case lex.ID_UNSAFE:
+		return ep.build_unsafe(tokens)
+	}
+	ep.push_err(expr_tokens[0], "invalid_syntax")
+	return nil
+}
+
 func (ep *expr_builder) build_data(tokens []lex.Token) ast.ExprData {
 	switch len(tokens) {
 	case 1:
@@ -555,6 +613,9 @@ func (ep *expr_builder) build_data(tokens []lex.Token) ast.ExprData {
 		switch token.Kind {
 		case lex.KND_RPARENT:
 			return ep.build_parentheses_range(tokens)
+
+		case lex.KND_RBRACE:
+			return ep.build_brace_range(tokens)
 		// TODO: implement other nodes
 		}
 	}
