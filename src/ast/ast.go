@@ -182,6 +182,19 @@ type Expr struct {
 	Kind  ExprData
 }
 
+// Reports whether expression kind is function call.
+func (e *Expr) IsFnCall() bool {
+	if e.Kind == nil {
+		return false
+	}
+	switch e.Kind.(type) {
+	case *FnCallExpr:
+		return true
+	default:
+		return false
+	}
+}
+
 // Tuple expression.
 type TupleExpr struct {
 	Expr []ExprData

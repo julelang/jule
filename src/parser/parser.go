@@ -162,46 +162,6 @@ func (p *parser) build_type_alias_decl(tokens []lex.Token) *ast.TypeAliasDecl {
 	return tad
 }
 
-func (p *parser) push_arg(args *[]*ast.Expr, tokens []lex.Token, err_token lex.Token) {
-	if len(tokens) == 0 {
-		p.push_err(err_token, "invalid_syntax")
-		return
-	}
-	*args = append(*args, p.build_expr(tokens))
-}
-
-func (p *parser) build_args(tokens []lex.Token) ([]*ast.Expr) {
-	var args []*ast.Expr
-
-	last := 0
-	brace_n := 0
-	for i, token := range tokens {
-		if token.Id == lex.ID_RANGE {
-			switch token.Kind {
-			case lex.KND_LBRACE, lex.KND_LBRACKET, lex.KND_LPAREN:
-				brace_n++
-			default:
-				brace_n--
-			}
-		}
-		if brace_n > 0 || token.Id != lex.ID_COMMA {
-			continue
-		}
-		p.push_arg(&args, tokens[last:i], token)
-		last = i + 1
-	}
-	if last < len(tokens) {
-		if last == 0 {
-			if len(tokens) > 0 {
-				p.push_arg(&args, tokens[last:], tokens[last])
-			}
-		} else {
-			p.push_arg(&args, tokens[last:], tokens[last-1])
-		}
-	}
-	return args
-}
-
 func (p *parser) build_var_type_and_expr(v *ast.VarDecl, tokens []lex.Token) {
 	i := 0
 	tok := tokens[i]

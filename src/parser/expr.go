@@ -421,6 +421,87 @@ func (ep *expr_builder) try_build_cast(tokens []lex.Token) *ast.CastExpr {
 	return nil
 }
 
+func (ep *expr_builder) push_arg(args *[]*ast.Expr, tokens []lex.Token, err_token lex.Token) {
+	if len(tokens) == 0 {
+		ep.push_err(err_token, "invalid_syntax")
+		return
+	}
+	*args = append(*args, ep.build_from_tokens(tokens))
+}
+
+func (ep *expr_builder) build_args(tokens []lex.Token) []*ast.Expr {
+	// No argument.
+	if len(tokens) < 2 {
+		return nil
+	}
+
+	var args []*ast.Expr
+	last := 0
+	range_n := 0
+	tokens = tokens[1 : len(tokens)-1] // Remove parentheses.
+	for i, token := range tokens {
+		if token.Id == lex.ID_RANGE {
+			switch token.Kind {
+			case lex.KND_LBRACE, lex.KND_LBRACKET, lex.KND_LPAREN:
+				range_n++
+			default:
+				range_n--
+			}
+		}
+		if range_n > 0 || token.Id != lex.ID_COMMA {
+			continue
+		}
+		ep.push_arg(&args, tokens[last:i], token)
+		last = i + 1
+	}
+
+	if last < len(tokens) {
+		if last == 0 {
+			if len(tokens) > 0 {
+				ep.push_arg(&args, tokens[last:], tokens[last])
+			}
+		} else {
+			ep.push_arg(&args, tokens[last:], tokens[last-1])
+		}
+	}
+
+	return args
+}
+
+// Tokens should include brackets.
+func (ep *expr_builder) build_call_generics(tokens []lex.Token) []*ast.Type {
+	if len(tokens) == 0 {
+		return nil
+	}
+
+	tokens = tokens[1 : len(tokens)-1] // Remove brackets.
+	parts, errs := lex.Parts(tokens, lex.ID_COMMA, true)
+	generics := make([]*ast.Type, len(parts))
+	ep.p.errors = append(ep.p.errors, errs...)
+	for i, part := range parts {
+		if len(part) == 0 {
+			continue
+		}
+		j := 0
+		generic, _ := ep.p.build_type(part, &j, true)
+		if j < len(part) {
+			ep.push_err(part[j], "invalid_syntax")
+		}
+		generics[i] = generic
+	}
+
+	return generics
+}
+
+func (ep *expr_builder) build_fn_call(token lex.Token, data *call_data) *ast.FnCallExpr {
+	return &ast.FnCallExpr{
+		Token:    token,
+		Expr:     ep.build_from_tokens(data.expr_tokens),
+		Generics: ep.build_call_generics(data.generics_tokens),
+		Args:     ep.build_args(data.args_tokens),
+	}
+}
+
 func (ep *expr_builder) build_parentheses_range(tokens []lex.Token) ast.ExprData {
 	token := tokens[0]
 	switch token.Id {
@@ -437,11 +518,12 @@ func (ep *expr_builder) build_parentheses_range(tokens []lex.Token) ast.ExprData
 	data := get_call_data(tokens)
 
 	// Expression is parentheses group if data.expr_tokens is zero.
-	// data.args_tokens holds tokens of parentheses range.
+	// data.args_tokens holds tokens of parentheses range (include parentheses).
 	if len(data.expr_tokens) == 0 {
 		return ep.build_between_parentheses(data.args_tokens)
 	}
-	return nil
+
+	return ep.build_fn_call(token, data)
 }
 
 func (ep *expr_builder) build_data(tokens []lex.Token) ast.ExprData {
