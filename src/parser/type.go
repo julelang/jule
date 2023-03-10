@@ -180,7 +180,7 @@ func (tb *type_builder) build_ptr() *ast.Type {
 	return &ast.Type{
 		Token: token,
 		Kind:  &ast.PtrType{
-			Elem: elem.Kind,
+			Elem: elem,
 		},
 	}
 }
@@ -205,7 +205,7 @@ func (tb *type_builder) build_ref() *ast.Type {
 	return &ast.Type{
 		Token: token,
 		Kind:  &ast.RefType{
-			Elem: elem.Kind,
+			Elem: elem,
 		},
 	}
 }
@@ -236,7 +236,7 @@ func (tb *type_builder) build_slice() *ast.Type {
 	return &ast.Type{
 		Token: token,
 		Kind:  &ast.SliceType{
-			Elem: elem.Kind,
+			Elem: elem,
 		},
 	}
 }

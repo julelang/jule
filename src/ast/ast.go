@@ -126,9 +126,9 @@ type NamespaceType struct {
 	Kind   *IdentType // Type of identifier.
 }
 
-type RefType struct { Elem TypeKind }   // Reference type.
-type PtrType struct { Elem TypeKind }   // Pointer type.
-type SliceType struct { Elem TypeKind } // Slice type.
+type RefType struct { Elem *Type }   // Reference type.
+type PtrType struct { Elem *Type }   // Pointer type.
+type SliceType struct { Elem *Type } // Slice type.
 type TupleType struct { Types []*Type } // Tuple type.
 type FnType struct { Decl *FnDecl }     // Function type.
 
@@ -137,7 +137,7 @@ func (pt *PtrType) IsUnsafe() bool { return pt.Elem == nil }
 
 // Array type.
 type ArrayType struct {
-	Elem TypeKind
+	Elem *Type
 	Size *Expr
 }
 
