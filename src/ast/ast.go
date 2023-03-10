@@ -27,7 +27,7 @@ type Comment struct {
 
 // Reports whether comment is directive.
 func (c *Comment) IsDirective() bool {
-	return strings.HasPrefix(c.Text, lex.DIRECTIVE_COMMENT_PREFIX)
+	return strings.HasPrefix(c.Text, lex.DIRECTIVE_PREFIX)
 }
 
 // Directive AST.
@@ -51,23 +51,41 @@ func (t *Type) is_primitive(kind string) bool {
 	}
 	return t.Token.Id == lex.ID_DT && t.Token.Kind == kind
 }
+// Reports whether type is primitive i8.
 func (t *Type) IsI8() bool { return t.is_primitive(lex.KND_I8) }
+// Reports whether type is primitive i16.
 func (t *Type) IsI16() bool { return t.is_primitive(lex.KND_I16) }
+// Reports whether type is primitive i32.
 func (t *Type) IsI32() bool { return t.is_primitive(lex.KND_I32) }
+// Reports whether type is primitive i64.
 func (t *Type) IsI64() bool { return t.is_primitive(lex.KND_I64) }
+// Reports whether type is primitive u8.
 func (t *Type) IsU8() bool { return t.is_primitive(lex.KND_U8) }
+// Reports whether type is primitive u16.
 func (t *Type) IsU16() bool { return t.is_primitive(lex.KND_U16) }
+// Reports whether type is primitive u32.
 func (t *Type) IsU32() bool { return t.is_primitive(lex.KND_U32) }
+// Reports whether type is primitive u64.
 func (t *Type) IsU64() bool { return t.is_primitive(lex.KND_U64) }
+// Reports whether type is primitive f32.
 func (t *Type) IsF32() bool { return t.is_primitive(lex.KND_F32) }
+// Reports whether type is primitive f64.
 func (t *Type) IsF64() bool { return t.is_primitive(lex.KND_F64) }
+// Reports whether type is primitive int.
 func (t *Type) IsInt() bool { return t.is_primitive(lex.KND_INT) }
+// Reports whether type is primitive uint.
 func (t *Type) IsUint() bool { return t.is_primitive(lex.KND_UINT) }
+// Reports whether type is primitive uintptr.
 func (t *Type) IsUintptr() bool { return t.is_primitive(lex.KND_UINTPTR) }
+// Reports whether type is primitive bool.
 func (t *Type) IsBool() bool { return t.is_primitive(lex.KND_BOOL) }
+// Reports whether type is primitive str.
 func (t *Type) IsStr() bool { return t.is_primitive(lex.KND_STR) }
+// Reports whether type is primitive any.
 func (t *Type) IsAny() bool { return t.is_primitive(lex.KND_ANY) }
+// Reports whether type is void.
 func (t *Type) IsVoid() bool { return t.Kind == nil && t.Token.Id == lex.ID_NA }
+// Reports whether type is reference.
 func (t *Type) IsRef() bool {
 	if t.Kind == nil {
 		return true
@@ -79,6 +97,7 @@ func (t *Type) IsRef() bool {
 		return false
 	}
 }
+// Reports whether type is pointer.
 func (t *Type) IsPtr() bool {
 	if t.Kind == nil {
 		return true
@@ -90,6 +109,7 @@ func (t *Type) IsPtr() bool {
 		return false
 	}
 }
+// Reports whether type is slice.
 func (t *Type) IsSlice() bool {
 	if t.Kind == nil {
 		return true
@@ -101,6 +121,7 @@ func (t *Type) IsSlice() bool {
 		return false
 	}
 }
+// Reports whether type is array.
 func (t *Type) IsArray() bool {
 	if t.Kind == nil {
 		return true

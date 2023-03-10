@@ -131,7 +131,7 @@ func (l *lex) push_err_tok(tok Token, key string) {
 	l.errors = append(l.errors, make_err(tok.Row, tok.Column, l.file, key))
 }
 
-// Lex all source content.
+// lexs all source content.
 func (l *lex) lex() []Token {
 	var toks []Token
 	l.errors = nil
@@ -180,7 +180,7 @@ func is_kw(ln, kw string) bool {
 // id returns identifer if next token is identifer,
 // returns empty string if not.
 func (l *lex) id(ln string) string {
-	if !IsIdentifierRune(ln) {
+	if !IsIdentRune(ln) {
 		return ""
 	}
 	var sb strings.Builder

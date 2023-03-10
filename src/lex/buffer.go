@@ -12,22 +12,22 @@ type File struct {
 	tokens []Token
 }
 
-// IsOk reports file path is exist and accessible or not.
+// Reports whether file path is exist and accessible.
 func (f *File) IsOk() bool {
 	_, err := os.Stat(f._path)
 	return err == nil
 }
 
-// Path returns full path.
+// Returns path.
 func (f *File) Path() string { return f._path }
 
-// Dir returns directory.
+// Returns directory of file's path.
 func (f *File) Dir() string { return filepath.Dir(f._path) }
 
-// Name returns filename.
+// Returns filename.
 func (f *File) Name() string { return filepath.Base(f._path) }
 
-// Addr returns uintptr(unsafe.Pointer(f)).
+// Returns self as uintptr.
 func (f *File) Addr() uintptr { return uintptr(unsafe.Pointer(f)) }
 
 // Returns tokens.
@@ -41,7 +41,7 @@ func (f *File) Tokens() []Token {
 	return tokens
 }
 
-// NewFileSet returns new File points to Jule file.
+// Returns new File points to Jule file.
 func NewFileSet(path string) *File {
 	return &File{
 		_path:  path,

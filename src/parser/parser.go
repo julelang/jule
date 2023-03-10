@@ -61,7 +61,7 @@ func (p *parser) build_expr(tokens []lex.Token) *ast.Expr {
 func (p *parser) push_directive(c *ast.Comment) {
 	d := &ast.Directive{
 		Token: c.Token,
-		Tag:   c.Token.Kind[len(lex.DIRECTIVE_COMMENT_PREFIX):], // Remove directive prefix
+		Tag:   c.Token.Kind[len(lex.DIRECTIVE_PREFIX):], // Remove directive prefix
 	}
 
 	// Don't append if directive kind is invalid.
@@ -411,8 +411,8 @@ func (p *parser) build_param_type(param *ast.Param, tokens []lex.Token, must_pur
 }
 
 func (p *parser) param_body_id(param *ast.Param, token lex.Token) {
-	if lex.IsIgnoreId(token.Kind) {
-		param.Ident = lex.ANONYMOUS_ID
+	if lex.IsIgnoreIdent(token.Kind) {
+		param.Ident = lex.ANON_IDENT
 		return
 	}
 	param.Ident = token.Kind
@@ -458,7 +458,7 @@ func (p *parser) build_param(tokens []lex.Token, must_pure bool) *ast.Param {
 
 	if param.Token.Id != lex.ID_IDENT {
 		// Just data type
-		param.Ident = lex.ANONYMOUS_ID
+		param.Ident = lex.ANON_IDENT
 		p.build_param_type(param, tokens, must_pure)
 	} else {
 		i := 0
@@ -480,7 +480,7 @@ func (p *parser) check_params(params []*ast.Param) {
 				Token: param.Token,
 				Kind:   &ast.IdentType{Ident: param.Token.Kind},
 			}
-			param.Ident = lex.ANONYMOUS_ID
+			param.Ident = lex.ANON_IDENT
 			param.Token = lex.Token{}
 		}
 	}
@@ -529,10 +529,10 @@ func (p *parser) build_multi_ret_type(tokens []lex.Token, i *int) (t *ast.RetTyp
 	types := make([]*ast.Type, len(params))
 	for i, param := range params {
 		types[i] = param.Kind
-		if param.Ident != lex.ANONYMOUS_ID {
+		if param.Ident != lex.ANON_IDENT {
 			param.Token.Kind = param.Ident
 		} else {
-			param.Token.Kind = lex.IGNORE_ID
+			param.Token.Kind = lex.IGNORE_IDENT
 		}
 		t.Idents = append(t.Idents, param.Token)
 	}
@@ -615,7 +615,7 @@ func (p *parser) build_fn_prototype(tokens []lex.Token, i *int, method bool, ano
 	}
 
 	if anon {
-		f.Ident = lex.ANONYMOUS_ID
+		f.Ident = lex.ANON_IDENT
 	} else {
 		tok := tokens[*i]
 		if tok.Id != lex.ID_IDENT {
