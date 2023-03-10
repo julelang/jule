@@ -563,12 +563,20 @@ func (ep *expr_builder) build_unsafe_expr(tokens []lex.Token) *ast.UnsafeExpr {
 	}
 }
 
+func (ep *expr_builder) build_anon_fn(tokens []lex.Token) *ast.FnDecl {
+	return ep.p.build_fn(tokens, false, true, false)
+}
+
 func (ep *expr_builder) build_unsafe(tokens []lex.Token) ast.ExprData {
 	if len(tokens) == 0 {
 		ep.push_err(tokens[0], "invalid_syntax")
 		return nil
 	}
 	switch tokens[1].Id {
+	case lex.ID_FN:
+		// Unsafe anonymous function.
+		return ep.build_anon_fn(tokens)
+
 	default:
 		return ep.build_unsafe_expr(tokens)
 	}
@@ -579,9 +587,14 @@ func (ep *expr_builder) build_brace_range(tokens []lex.Token) ast.ExprData {
 	switch expr_tokens[0].Id {
 	case lex.ID_UNSAFE:
 		return ep.build_unsafe(tokens)
+	
+	case lex.ID_FN:
+		return ep.build_anon_fn(tokens)
+
+	default:
+		ep.push_err(expr_tokens[0], "invalid_syntax")
+		return nil
 	}
-	ep.push_err(expr_tokens[0], "invalid_syntax")
-	return nil
 }
 
 func (ep *expr_builder) build_data(tokens []lex.Token) ast.ExprData {

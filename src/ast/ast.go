@@ -337,6 +337,7 @@ func (p *Param) IsSelf() bool { return strings.HasSuffix(p.Ident, lex.KND_SELF) 
 func (p *Param) IsRef() bool { return p.Ident != "" && p.Ident[0] == '&'}
 
 // Function declaration AST.
+// Also represents anonymous function expression.
 type FnDecl struct {
 	Token       lex.Token
 	IsUnsafe    bool
