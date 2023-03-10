@@ -140,6 +140,9 @@ var ERRORS = map[string]string{
 	`cpp_linked_variable_has_expr`:             `cpp linked variables cannot have expression`,
 	`cpp_linked_variable_is_const`:             `cpp linked variables cannot constant`,
 	`const_var_not_have_expr`:                  `constant variable must have expression`,
+	`ref_refs_ref`:                             `references cannot reference to another reference`,
+	`ref_refs_ptr`:                             `references cannot reference to pointer`,
+	`ptr_points_ref`:                           `pointers cannot point to reference`,
 }
 
 // Errorf returns error.

@@ -82,3 +82,37 @@ func get_block_expr(tokens []lex.Token) []lex.Token {
 	}
 	return nil
 }
+
+// Returns colon index and range tokens.
+// Returns nil slice and -1 if not found.
+// Starts search at *i.
+func split_colon(tokens []lex.Token, i *int) (range_tokens []lex.Token, colon int) {
+	colon = -1
+	range_n := 0
+	start := *i
+	for ; *i < len(tokens); *i++ {
+		token := tokens[*i]
+		if token.Id == lex.ID_RANGE {
+			switch token.Kind {
+			case lex.KND_LBRACE, lex.KND_LBRACKET, lex.KND_LPAREN:
+				range_n++
+				continue
+			default:
+				range_n--
+			}
+		}
+		if range_n == 0 {
+			if start+1 > *i {
+				return
+			}
+			range_tokens = tokens[start+1 : *i]
+			break
+		} else if range_n != 1 {
+			continue
+		}
+		if colon == -1 && token.Id == lex.ID_COLON {
+			colon = *i - start - 1
+		}
+	}
+	return
+}

@@ -37,9 +37,7 @@ type Directive struct {
 }
 
 // Kind type of data types.
-type TypeKind interface {
-	As_text() string
-}
+type TypeKind = any
 
 // Type AST.
 type Type struct {
@@ -70,48 +68,61 @@ func (t *Type) IsBool() bool { return t.is_primitive(lex.KND_BOOL) }
 func (t *Type) IsStr() bool { return t.is_primitive(lex.KND_STR) }
 func (t *Type) IsAny() bool { return t.is_primitive(lex.KND_ANY) }
 func (t *Type) IsVoid() bool { return t.Kind == nil && t.Token.Id == lex.ID_NA }
+func (t *Type) IsRef() bool {
+	if t.Kind == nil {
+		return true
+	}
+	switch t.Kind.(type) {
+	case *RefType:
+		return true
+	default:
+		return false
+	}
+}
+func (t *Type) IsPtr() bool {
+	if t.Kind == nil {
+		return true
+	}
+	switch t.Kind.(type) {
+	case *PtrType:
+		return true
+	default:
+		return false
+	}
+}
 
 // Identifier type.
 type IdentType struct {
-	Ident string
+	Ident     string
+	CppLinked bool
+	Generics  []*Type
 }
 
-// Reference type.
-type RefType struct {
-	Elem *Type
+// Namespace chain type.
+type NamespaceType struct {
+	Idents []string   // Namespace chain.
+	Kind   *IdentType // Type of identifier.
 }
 
-// Tuple type.
-type TupleType struct {
-	Types []*Type
+type RefType struct { Elem TypeKind }   // Reference type.
+type PtrType struct { Elem TypeKind }   // Pointer type.
+type SliceType struct { Elem TypeKind } // Slice type.
+type TupleType struct { Types []*Type } // Tuple type.
+type FnType struct { Decl *FnDecl }     // Function type.
+
+// Reports whether pointer is unsafe pointer (*unsafe).
+func (pt *PtrType) IsUnsafe() bool { return pt.Elem == nil }
+
+// Array type.
+type ArrayType struct {
+	Elem TypeKind
+	Size *Expr
 }
 
-// Returns type kind as text.
-// Returns empty string kind is nil.
-func (t *Type) As_text() string {
-	if t.Kind == nil {
-		return ""
-	}
-	return t.Kind.As_text()
-}
-func (itk *IdentType) As_text() string { return itk.Ident }
-func (rtk *RefType) As_text() string {
-	if rtk.Elem == nil {
-		return ""
-	}
-	return rtk.Elem.As_text()
-}
-func (tt *TupleType) As_text() string {
-	kind := "("
-	i := 0
-	for ; i < len(tt.Types); i++ {
-		kind += tt.Types[i].As_text()
-		if i+1 < len(tt.Types) {
-			kind += ","
-		}
-	}
-	kind += ")"
-	return kind
+// Map type.
+type MapType struct {
+	Key *Type
+	Val *Type
 }
 
 // Return type AST model.

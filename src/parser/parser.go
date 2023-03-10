@@ -124,7 +124,7 @@ func (p *parser) build_expr(tokens []lex.Token) *ast.Expr {
 	return &ast.Expr{}
 }
 
-func (p *parser) build_type_alias(tokens []lex.Token) *ast.TypeAliasDecl {
+func (p *parser) build_type_alias_decl(tokens []lex.Token) *ast.TypeAliasDecl {
 	i := 1 // Skip "type" keyword.
 	if i >= len(tokens) {
 		p.push_err(tokens[i-1], "invalid_syntax")
@@ -1098,7 +1098,7 @@ func (p *parser) build_cpp_link_struct(tokens []lex.Token) *ast.StructDecl {
 
 func (p *parser) build_cpp_link_type_alias(tokens []lex.Token) *ast.TypeAliasDecl {
 	tokens = tokens[1:] // Remove "cpp" keyword.
-	t := p.build_type_alias(tokens)
+	t := p.build_type_alias_decl(tokens)
 	if t != nil {
 		t.CppLinked = true
 	}
@@ -1271,7 +1271,7 @@ func (p *parser) build_node_data(tokens []lex.Token) ast.NodeData {
 		return p.build_var(tokens)
 	
 	case lex.ID_TYPE:
-		return p.build_type_alias(tokens)
+		return p.build_type_alias_decl(tokens)
 
 	case lex.ID_ENUM:
 		return p.build_enum_decl(tokens)
