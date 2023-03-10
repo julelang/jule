@@ -276,6 +276,21 @@ type FnCallExpr struct {
 	IsCo     bool
 }
 
+// Field-Expression pair.
+type FieldExprPair struct {
+	Field lex.Token // Field identifier token.
+	Expr  ExprData
+}
+
+// Reports whether pair targeted field.
+func (fep *FieldExprPair) IsTargeted() bool { return fep.Field.Id != lex.ID_NA }
+
+// Struct literal instiating expression.
+type StructLit struct {
+	Kind  *Type
+	Pairs []*FieldExprPair
+}
+
 // Generic type AST.
 type Generic struct {
 	Token lex.Token
