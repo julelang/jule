@@ -291,6 +291,22 @@ type StructLit struct {
 	Pairs []*FieldExprPair
 }
 
+// Anonymous brace instiating expression.
+// Empty braces ( {} ).
+type BraceLit struct {
+	Exprs []ExprData
+}
+
+// Reports literal is empty ( {} ).
+func (bl *BraceLit) IsEmpty() bool { return len(bl.Exprs) == 0 }
+
+// Key-value pair expression.
+type KeyValPair struct {
+	Key   ExprData
+	Val   ExprData
+	Colon lex.Token
+}
+
 // Generic type AST.
 type Generic struct {
 	Token lex.Token

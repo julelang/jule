@@ -16,6 +16,40 @@ func build_primitive_type(kind string) *ast.Type {
 func build_void_type() *ast.Type { return &ast.Type{} }
 func build_u32_type() *ast.Type { return build_primitive_type(lex.KND_U32) }
 
+// Returns colon index and range tokens.
+// Returns nil slice and -1 if not found.
+// Starts search at *i.
+func split_map_range(tokens []lex.Token, i *int) (range_tokens []lex.Token, colon int) {
+	colon = -1
+	range_n := 0
+	start := *i
+	for ; *i < len(tokens); *i++ {
+		token := tokens[*i]
+		if token.Id == lex.ID_RANGE {
+			switch token.Kind {
+			case lex.KND_LBRACE, lex.KND_LBRACKET, lex.KND_LPAREN:
+				range_n++
+				continue
+			default:
+				range_n--
+			}
+		}
+		if range_n == 0 {
+			if start+1 > *i {
+				return
+			}
+			range_tokens = tokens[start+1 : *i]
+			break
+		} else if range_n != 1 {
+			continue
+		}
+		if colon == -1 && token.Id == lex.ID_COLON {
+			colon = *i - start - 1
+		}
+	}
+	return
+}
+
 type type_builder struct {
 	p        *parser
 	tokens   []lex.Token
@@ -285,11 +319,13 @@ func (tb *type_builder) build_map(colon int, tokens []lex.Token) *ast.Type {
 	key_tokens := tokens[:colon]
 	val_tokens := tokens[colon+1:]
 	mapt := &ast.MapType{}
-	
+
 	j := 0
 	keyt, ok := tb.p.build_type(key_tokens, &j, tb.err)
 	if !ok {
 		return nil
+	} else if j < len(key_tokens) {
+		tb.push_err(key_tokens[j], "invalid_syntax")
 	}
 	mapt.Key = keyt
 
@@ -297,6 +333,8 @@ func (tb *type_builder) build_map(colon int, tokens []lex.Token) *ast.Type {
 	valt, ok := tb.p.build_type(val_tokens, &j, tb.err)
 	if !ok {
 		return nil
+	}  else if j < len(val_tokens) {
+		tb.push_err(val_tokens[j], "invalid_syntax")
 	}
 	mapt.Key = valt
 
@@ -317,14 +355,14 @@ func (tb *type_builder) build_enumerable() *ast.Type {
 	if token.Id == lex.ID_RANGE && token.Kind == lex.KND_RBRACKET {
 		return tb.build_slice()
 	}
-	
+
 	*tb.i-- // Point to left bracket for range parsing of split_colon.
-	type_tokens, colon := split_colon(tb.tokens, tb.i)
+	map_tokens, colon := split_map_range(tb.tokens, tb.i)
 	*tb.i++
-	if type_tokens == nil || colon == -1 {
+	if colon == -1 {
 		return tb.build_array()
 	}
-	return tb.build_map(colon, type_tokens)
+	return tb.build_map(colon, map_tokens)
 }
 
 func (tb *type_builder) step() *ast.Type {

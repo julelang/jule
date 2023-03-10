@@ -386,6 +386,7 @@ func IsHex(b byte) bool {
 // Returns between of open and close ranges.
 // Starts selection at *i.
 // Moves one *i for each selected token.
+// *i points to close range token after selection.
 //
 // Special case is:
 //  Range(i, open, close, tokens) = nil if i == nil
@@ -396,25 +397,27 @@ func Range(i *int, open string, close string, tokens []Token) []Token {
 	if i == nil || *i >= len(tokens) {
 		return nil
 	}
+
 	tok := tokens[*i]
 	if tok.Id != ID_RANGE || tok.Kind != open {
 		return nil
 	}
+
 	*i++
-	n := 1
+	range_n := 1
 	start := *i
-	for ; n != 0 && *i < len(tokens); *i++ {
-		tok := tokens[*i]
-		if tok.Id != ID_RANGE {
-			continue
-		}
-		switch tok.Kind {
-		case open:
-			n++
-		case close:
-			n--
+	for ; range_n != 0 && *i < len(tokens); *i++ {
+		token := tokens[*i]
+		if token.Id == ID_RANGE {
+			switch token.Kind {
+			case open:
+				range_n++
+			case close:
+				range_n--
+			}
 		}
 	}
+
 	return tokens[start : *i-1]
 }
 

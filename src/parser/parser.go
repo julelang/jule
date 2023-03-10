@@ -482,8 +482,8 @@ func (p *parser) build_multi_ret_type(tokens []lex.Token, i *int) (t *ast.RetTyp
 	}
 
 	*i-- // For point to parenthses - ( -
-	rang := lex.Range(i, lex.KND_LPAREN, lex.KND_RPARENT, tokens)
-	params := p.build_params(rang, false, true)
+	range_tokens := lex.Range(i, lex.KND_LPAREN, lex.KND_RPARENT, tokens)
+	params := p.build_params(range_tokens, false, true)
 
 	types := make([]*ast.Type, len(params))
 	for i, param := range params {

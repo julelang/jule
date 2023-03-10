@@ -84,38 +84,34 @@ func get_block_expr(tokens []lex.Token) []lex.Token {
 	return nil
 }
 
-// Returns colon index and range tokens.
+// Returns colon index, left range and right range tokens..
 // Returns nil slice and -1 if not found.
 // Starts search at *i.
-func split_colon(tokens []lex.Token, i *int) (range_tokens []lex.Token, colon int) {
-	colon = -1
+// Increases once *i for each selection.
+// *i points to close range token after selection.
+func split_colon(tokens []lex.Token) ([]lex.Token, []lex.Token) {
 	range_n := 0
-	start := *i
-	for ; *i < len(tokens); *i++ {
-		token := tokens[*i]
-		if token.Id == lex.ID_RANGE {
+	for i, token := range tokens {
+		switch token.Id {
+		case lex.ID_RANGE:
 			switch token.Kind {
 			case lex.KND_LBRACE, lex.KND_LBRACKET, lex.KND_LPAREN:
 				range_n++
 				continue
+
 			default:
 				range_n--
 			}
-		}
-		if range_n == 0 {
-			if start+1 > *i {
-				return
+		
+		case lex.ID_COLON:
+			if range_n < 1 {
+				l := tokens[:i]
+				r := tokens[i+1:]
+				return l, r
 			}
-			range_tokens = tokens[start+1 : *i]
-			break
-		} else if range_n != 1 {
-			continue
-		}
-		if colon == -1 && token.Id == lex.ID_COLON {
-			colon = *i - start - 1
 		}
 	}
-	return
+	return nil, nil
 }
 
 type precedencer struct {
@@ -582,42 +578,26 @@ func (ep *expr_builder) build_unsafe(tokens []lex.Token) ast.ExprData {
 	}
 }
 
-func (ep *expr_builder) build_brace_literal(tokens []lex.Token) ast.ExprData {
-	// TODO: Implement here.
-	return nil
-}
-
-func (ep *expr_builder) push_field_expr_pair(pairs *[]*ast.FieldExprPair, tokens []lex.Token, err_token lex.Token) {
-	if len(tokens) == 0 {
-		ep.push_err(err_token, "invalid_syntax")
-		return
-	}
-	
-	pair := &ast.FieldExprPair{}
-	token := tokens[0]
-	if token.Id == lex.ID_IDENT {
-		if len(tokens) > 1 {
-			token := tokens[1]
-			if token.Id == lex.ID_COLON {
-				pair.Field = tokens[0]
-				tokens = tokens[2:] // Remove field identifier and colon tokens.
-			}
-		}
-	}
-	pair.Expr = ep.build_from_tokens(tokens)
-	*pairs = append(*pairs, pair)
-}
-
-func (ep *expr_builder) build_field_expr_pairs(tokens []lex.Token) []*ast.FieldExprPair {
-	// No argument.
+// Tokens should include brace tokens.
+func (ep *expr_builder) get_brace_range_literal_expr_parts(tokens []lex.Token) ([][]lex.Token) {
+	// No part.
 	if len(tokens) < 2 {
 		return nil
 	}
 
-	var pairts []*ast.FieldExprPair
+	var parts [][]lex.Token
+
+	push := func(part []lex.Token, error_token lex.Token) {
+		if len(part) == 0 {
+			ep.push_err(error_token, "invalid_syntax")
+			return
+		}
+		parts = append(parts, part)
+	}
+
 	last := 0
 	range_n := 0
-	tokens = tokens[1 : len(tokens)-1] // Remove braces.
+	tokens = tokens[1 : len(tokens)-1] // Remove parentheses.
 	for i, token := range tokens {
 		if token.Id == lex.ID_RANGE {
 			switch token.Kind {
@@ -630,21 +610,50 @@ func (ep *expr_builder) build_field_expr_pairs(tokens []lex.Token) []*ast.FieldE
 		if range_n > 0 || token.Id != lex.ID_COMMA {
 			continue
 		}
-		ep.push_field_expr_pair(&pairts, tokens[last:i], token)
+		push(tokens[last:i], token)
 		last = i + 1
 	}
 
 	if last < len(tokens) {
 		if last == 0 {
 			if len(tokens) > 0 {
-				ep.push_field_expr_pair(&pairts, tokens[last:], tokens[last])
+				push(tokens[last:], tokens[last])
 			}
 		} else {
-			ep.push_field_expr_pair(&pairts, tokens[last:], tokens[last-1])
+			push(tokens[last:], tokens[last-1])
 		}
 	}
 
-	return pairts
+	return parts
+}
+
+func (ep *expr_builder) build_field_expr_pair(tokens []lex.Token) *ast.FieldExprPair {
+	pair := &ast.FieldExprPair{}
+	token := tokens[0]
+	if token.Id == lex.ID_IDENT {
+		if len(tokens) > 1 {
+			token := tokens[1]
+			if token.Id == lex.ID_COLON {
+				pair.Field = tokens[0]
+				tokens = tokens[2:] // Remove field identifier and colon tokens.
+			}
+		}
+	}
+	pair.Expr = ep.build_from_tokens(tokens)
+	return pair
+}
+
+func (ep *expr_builder) build_field_expr_pairs(tokens []lex.Token) []*ast.FieldExprPair {
+	parts := ep.get_brace_range_literal_expr_parts(tokens)
+	if len(parts) == 0 {
+		return nil
+	}
+
+	pairs := make([]*ast.FieldExprPair, len(parts))
+	for i, part := range parts {
+		pairs[i] = ep.build_field_expr_pair(part)
+	}
+	return pairs
 }
 
 func (ep *expr_builder) build_typed_struct_literal(tokens []lex.Token) *ast.StructLit {
@@ -668,6 +677,35 @@ func (ep *expr_builder) build_typed_struct_literal(tokens []lex.Token) *ast.Stru
 		Kind:  t,
 		Pairs: ep.build_field_expr_pairs(tokens),
 	}
+}
+
+func (ep *expr_builder) build_brace_lit_part(tokens []lex.Token) ast.ExprData {
+	l, r := split_colon(tokens)
+	// If left is not nil, colon token found.
+	if l != nil {
+		println("pair")
+		return &ast.KeyValPair{
+			Key: ep.build_from_tokens(l),
+			Val: ep.build_from_tokens(r),
+		}
+	}
+	println("non-pair")
+	return ep.build_from_tokens(tokens)
+}
+
+func (ep *expr_builder) build_brace_literal(tokens []lex.Token) *ast.BraceLit {
+	parts := ep.get_brace_range_literal_expr_parts(tokens)
+	if parts == nil {
+		return &ast.BraceLit{Exprs: nil}
+	}
+
+	lit := &ast.BraceLit{
+		Exprs: make([]ast.ExprData, len(parts)),
+	}
+	for i, part := range parts {
+		lit.Exprs[i] = ep.build_brace_lit_part(part)
+	}
+	return lit
 }
 
 func (ep *expr_builder) build_brace_range(tokens []lex.Token) ast.ExprData {
