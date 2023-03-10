@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"github.com/julelang/jule/ast"
+	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 )
 
@@ -115,4 +117,166 @@ func split_colon(tokens []lex.Token, i *int) (range_tokens []lex.Token, colon in
 		}
 	}
 	return
+}
+
+type precedencer struct {
+	pairs [][]any
+}
+
+func (p *precedencer) set(level int, expr any) {
+	for i, pair := range p.pairs {
+		pair_level := pair[0].(int)
+		if level > pair_level {
+			first := p.pairs[:i]
+			appended := append([][]any{{level, expr}}, p.pairs[i:]...)
+			p.pairs = append(first, appended...)
+			return
+		}
+	}
+	p.pairs = append(p.pairs, []any{level, expr})
+}
+
+func (p *precedencer) get_lower() any {
+	for i := len(p.pairs) - 1; i >= 0; i-- {
+		data := p.pairs[i][1]
+		if data != nil {
+			return data
+		}
+	}
+	return nil
+}
+
+func eliminate_comments(tokens []lex.Token) []lex.Token {
+	cutted := []lex.Token{}
+	for _, token := range tokens {
+		if token.Id != lex.ID_COMMENT {
+			cutted = append(cutted, token)
+		}
+	}
+	return cutted
+}
+
+// Finds index of priority operator and returns index of operator
+// if found, returns -1 if not.
+func find_lowest_prec_op(tokens []lex.Token) int {
+	prec := precedencer{}
+	brace_n := 0
+	for i, token := range tokens {
+		switch {
+		case token.Id == lex.ID_RANGE:
+			switch token.Kind {
+			case lex.KND_LBRACE, lex.KND_LPAREN, lex.KND_LBRACKET:
+				brace_n++
+			default:
+				brace_n--
+			}
+			continue
+		case i == 0:
+			continue
+		case token.Id != lex.ID_OP:
+			continue
+		case brace_n > 0:
+			continue
+		}
+		// Skip unary operator.
+		if tokens[i-1].Id == lex.ID_OP {
+			continue
+		}
+		p := token.Prec()
+		if p != -1 {
+			prec.set(p, i)
+		}
+	}
+	data := prec.get_lower()
+	if data == nil {
+		return -1
+	}
+	return data.(int)
+}
+
+type expr_builder struct {
+	errors []build.Log
+}
+
+func (ep *expr_builder) push_err(token lex.Token, key string, args ...any) {
+	ep.errors = append(ep.errors, compiler_err(token, key, args...))
+}
+
+func (ep *expr_builder) build_tuple(parts [][]lex.Token) *ast.TupleExpr {
+	tuple := &ast.TupleExpr{
+		Expr: make([]ast.ExprData, len(parts)),
+	}
+	for i, part := range parts {
+		tuple.Expr[i] = ep.build(part)
+	}
+	return tuple
+}
+
+func (ep *expr_builder) build_nil_lit(token lex.Token) *ast.LitExpr {
+	return &ast.LitExpr{Token: token}
+}
+
+func (ep *expr_builder) build_lit(token lex.Token) *ast.LitExpr {
+	return &ast.LitExpr{
+		Token: token,
+		Value: token.Kind,
+	}
+}
+
+func (ep *expr_builder) build_single(token lex.Token) ast.ExprData {
+	switch token.Id {
+	case lex.ID_LIT:
+		return ep.build_lit(token)
+
+	default:
+		ep.push_err(token, "invalid_syntax")
+		return nil
+	}
+}
+
+func (ep *expr_builder) build_data(tokens []lex.Token) ast.ExprData {
+	if len(tokens) == 1 {
+		return ep.build_single(tokens[0])
+	}
+
+	// TODO: implement other nodes
+	return nil
+}
+
+func (ep *expr_builder) build_binop(tokens []lex.Token, i int) *ast.BinopExpr {
+	return &ast.BinopExpr{
+		L:  ep.build(tokens[:i]),
+		R:  ep.build(tokens[i+1:]),
+		Op: tokens[i],
+	}
+}
+
+func (ep *expr_builder) build(tokens []lex.Token) ast.ExprData {
+	i := find_lowest_prec_op(tokens)
+	if i == -1 {
+		return ep.build_data(tokens)
+	}
+	return ep.build_binop(tokens, i)
+}
+
+func (ep *expr_builder) build_kind(tokens []lex.Token) ast.ExprData {
+	parts, errors := lex.Parts(tokens, lex.ID_COMMA, true)
+	if errors != nil {
+		ep.errors = append(ep.errors, errors...)
+		return nil
+	} else if len(parts) > 1 {
+		return ep.build_tuple(parts)
+	}
+	return ep.build(tokens)
+}
+
+func (ep *expr_builder) build_from_tokens(tokens []lex.Token) *ast.Expr {
+	tokens = eliminate_comments(tokens)
+	if len(tokens) == 0 {
+		return nil
+	}
+	return &ast.Expr{
+		Token: tokens[0],
+		Kind:  ep.build_kind(tokens),
+	}
 }

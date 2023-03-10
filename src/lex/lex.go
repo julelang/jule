@@ -25,9 +25,9 @@ var keywords = map[string]uint8{
 	KND_BOOL:     ID_DT,
 	KND_STR:      ID_DT,
 	KND_ANY:      ID_DT,
-	KND_TRUE:     ID_LITERAL,
-	KND_FALSE:    ID_LITERAL,
-	KND_NIL:      ID_LITERAL,
+	KND_TRUE:     ID_LIT,
+	KND_FALSE:    ID_LIT,
+	KND_NIL:      ID_LIT,
 	KND_CONST:    ID_CONST,
 	KND_RET:      ID_RET,
 	KND_TYPE:     ID_TYPE,
@@ -692,7 +692,7 @@ func (l *lex) lex_num(txt string, t *Token) bool {
 		return false
 	}
 	t.Kind = lex
-	t.Id = ID_LITERAL
+	t.Id = ID_LIT
 	return true
 }
 
@@ -714,11 +714,11 @@ func (l *lex) Token() Token {
 	case l.lex_num(txt, &t):
 	case txt[0] == '\'':
 		t.Kind = l.lex_rune(txt)
-		t.Id = ID_LITERAL
+		t.Id = ID_LIT
 		return t
 	case txt[0] == '"' || txt[0] == '`':
 		t.Kind = l.lex_str(txt)
-		t.Id = ID_LITERAL
+		t.Id = ID_LIT
 		return t
 	case strings.HasPrefix(txt, KND_LN_COMMENT):
 		l.lex_line_comment(&t)

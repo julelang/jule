@@ -161,6 +161,27 @@ type Expr struct {
 	Kind  ExprData
 }
 
+// Tuple expression.
+type TupleExpr struct {
+	Expr []ExprData
+}
+
+// Literal expression.
+type LitExpr struct {
+	Token lex.Token
+	Value string
+}
+
+// Reports whether literal is nil value.
+func (le *LitExpr) IsNil() bool { return le.Value == lex.KND_NIL }
+
+// Binary operation.
+type BinopExpr struct {
+	L  ExprData
+	R  ExprData
+	Op lex.Token
+}
+
 // Function call expression kind.
 type FnCallExpr struct {
 	Token    lex.Token

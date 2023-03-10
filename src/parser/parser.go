@@ -51,6 +51,15 @@ func (p *parser) push_err(token lex.Token, key string, args ...any) {
 	p.errors = append(p.errors, compiler_err(token, key, args...))
 }
 
+func (p *parser) build_expr(tokens []lex.Token) *ast.Expr {
+	ep := expr_builder{}
+	expr := ep.build_from_tokens(tokens)
+	if expr == nil {
+		p.errors = append(p.errors, ep.errors...)
+	}
+	return expr
+}
+
 func (p *parser) push_directive(c *ast.Comment) {
 	d := &ast.Directive{
 		Token: c.Token,
@@ -117,11 +126,6 @@ func (p *parser) build_type(tokens []lex.Token, i *int, err bool) (*ast.Type, bo
 		p.push_err(token, "invalid_type")
 	}
 	return t, ok
-}
-
-func (p *parser) build_expr(tokens []lex.Token) *ast.Expr {
-	// TODO: implement here
-	return &ast.Expr{}
 }
 
 func (p *parser) build_type_alias_decl(tokens []lex.Token) *ast.TypeAliasDecl {
@@ -712,7 +716,7 @@ func (p *parser) build_use_cpp_decl(decl *ast.UseDecl, tokens []lex.Token) {
 		p.push_err(tokens[2], "invalid_syntax")
 	}
 	token := tokens[1]
-	if token.Id != lex.ID_LITERAL || (token.Kind[0] != '`' && token.Kind[0] != '"') {
+	if token.Id != lex.ID_LIT || (token.Kind[0] != '`' && token.Kind[0] != '"') {
 		p.push_err(token, "invalid_expr")
 		return
 	}

@@ -14,7 +14,7 @@ const ID_IDENT = 2
 const ID_RANGE = 3
 const ID_RET = 4
 const ID_SEMICOLON = 5
-const ID_LITERAL = 6
+const ID_LIT = 6
 const ID_OP = 7
 const ID_COMMA = 8
 const ID_CONST = 9
@@ -403,22 +403,22 @@ func Parts(tokens []Token, id uint8, expr_must bool) ([][]Token, []build.Log) {
 		return nil, nil
 	}
 
-	var parts [][]Token
-	var errors []build.Log
+	var parts [][]Token = nil
+	var errors []build.Log = nil
 
-	brace_n := 0
+	range_n := 0
 	last := 0
 	for i, token := range tokens {
 		if token.Id == ID_RANGE {
 			switch token.Kind {
 			case KND_LBRACE, KND_LBRACKET, KND_LPAREN:
-				brace_n++
+				range_n++
 				continue
 			default:
-				brace_n--
+				range_n--
 			}
 		}
-		if brace_n > 0 {
+		if range_n > 0 {
 			continue
 		}
 		if token.Id == id {
