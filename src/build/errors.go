@@ -144,6 +144,8 @@ var ERRORS = map[string]string{
 	`ref_refs_ptr`:                             `references cannot reference to pointer`,
 	`ref_refs_array`:                           `references cannot reference to array`,
 	`ptr_points_ref`:                           `pointers cannot point to reference`,
+	`missing_expr_for_unary`:                   `missing expression for unary operator`,
+	`invalid_op_for_unary`:                     `invalid_operator_for_unary: @`,
 }
 
 // Errorf returns error.

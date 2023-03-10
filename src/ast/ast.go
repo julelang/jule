@@ -185,6 +185,12 @@ type IdentExpr struct {
 // Reports whether identifier is self keyword.
 func (ie *IdentExpr) IsSelf() bool { return ie.Ident == lex.KND_SELF }
 
+// Unary expression.
+type UnaryExpr struct {
+	Op   lex.Token
+	Expr ExprData
+}
+
 // Binary operation.
 type BinopExpr struct {
 	L  ExprData

@@ -258,6 +258,27 @@ func (ep *expr_builder) build_cpp_linked_ident(tokens []lex.Token) *ast.IdentExp
 	return expr
 }
 
+func (ep *expr_builder) build_unary(tokens []lex.Token) *ast.UnaryExpr {
+	op := tokens[0]
+	if len(tokens) == 1 {
+		ep.push_err(op, "missing_expr_for_unary")
+		return nil
+	} else if !lex.IsUnaryOp(op.Kind) {
+		ep.push_err(op, "invalid_op_for_unary", op.Kind)
+		return nil
+	}
+
+	// Length is 1 cause all length of operator tokens is 1.
+	// Change "1" with length of token's value
+	// if all operators length is not 1.
+	tokens = tokens[1:]
+
+	return &ast.UnaryExpr{
+		Op:   op,
+		Expr: ep.build(tokens),
+	}
+}
+
 func (ep *expr_builder) build_data(tokens []lex.Token) ast.ExprData {
 	switch len(tokens) {
 	case 1:
@@ -266,6 +287,12 @@ func (ep *expr_builder) build_data(tokens []lex.Token) ast.ExprData {
 		if tokens[0].Id == lex.ID_CPP {
 			return ep.build_cpp_linked_ident(tokens)
 		}
+	}
+
+	token := tokens[0]
+	switch token.Id {
+	case lex.ID_OP:
+		return ep.build_unary(tokens)
 	}
 
 	// TODO: implement other nodes

@@ -195,6 +195,60 @@ var SPACES = [...]rune{
 	'\n',
 }
 
+// UNARY_OPS list of unary operators.
+var UNARY_OPS = [...]string{
+	KND_MINUS,
+	KND_PLUS,
+	KND_CARET,
+	KND_EXCL,
+	KND_STAR,
+	KND_AMPER,
+}
+
+// STRONG_OPS list of strong operators.
+// These operators are strong, can't used as part of expression.
+var STRONG_OPS = [...]string{
+	KND_PLUS,
+	KND_MINUS,
+	KND_STAR,
+	KND_SOLIDUS,
+	KND_PERCENT,
+	KND_AMPER,
+	KND_VLINE,
+	KND_CARET,
+	KND_LT,
+	KND_GT,
+	KND_EXCL,
+	KND_DBL_AMPER,
+	KND_DBL_VLINE,
+}
+
+// WEAK_OPS list of weak operators.
+// These operators are weak, can used as part of expression.
+var WEAK_OPS = [...]string{
+	KND_TRIPLE_DOT,
+	KND_COLON,
+}
+
+func exist_op(kind string, operators []string) bool {
+	for _, operator := range operators {
+		if kind == operator {
+			return true
+		}
+	}
+	return false
+}
+
+// IsUnaryOp is returns true if operator is unary or smilar to unary,
+// returns false if not.
+func IsUnaryOp(kind string) bool { return exist_op(kind, UNARY_OPS[:]) }
+
+// IsStrongOp returns true operator kind is not repeatable, false if not.
+func IsStrongOp(kind string) bool { return exist_op(kind, STRONG_OPS[:]) }
+
+// IsExprOp reports operator kind is allow as expression operator or not.
+func IsExprOp(kind string) bool { return exist_op(kind, WEAK_OPS[:]) }
+
 // Token is lexer token.
 type Token struct {
 	File   *File

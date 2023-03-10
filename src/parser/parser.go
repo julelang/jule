@@ -54,9 +54,7 @@ func (p *parser) push_err(token lex.Token, key string, args ...any) {
 func (p *parser) build_expr(tokens []lex.Token) *ast.Expr {
 	ep := expr_builder{}
 	expr := ep.build_from_tokens(tokens)
-	if expr == nil {
-		p.errors = append(p.errors, ep.errors...)
-	}
+	p.errors = append(p.errors, ep.errors...)
 	return expr
 }
 
