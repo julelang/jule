@@ -333,6 +333,26 @@ func (ep *expr_builder) build_sub_ident(tokens []lex.Token) ast.ExprData {
 	}
 }
 
+func (ep *expr_builder) build_variadic(tokens []lex.Token) *ast.VariadicExpr {
+	token := tokens[len(tokens)-1] // Variadic operator token.
+	tokens = tokens[:len(tokens)-1] // Remove variadic operator token.
+	return &ast.VariadicExpr{
+		Token: token,
+		Expr:  ep.build(tokens),
+	}
+}
+
+func (ep *expr_builder) build_op_right(tokens []lex.Token) ast.ExprData {
+	token := tokens[len(tokens)-1]
+	switch token.Kind {
+	case lex.KND_TRIPLE_DOT:
+		return ep.build_variadic(tokens)
+	default:
+		ep.push_err(token, "invalid_syntax")
+		return nil
+	}
+}
+
 func (ep *expr_builder) build_data(tokens []lex.Token) ast.ExprData {
 	switch len(tokens) {
 	case 1:
@@ -353,6 +373,9 @@ func (ep *expr_builder) build_data(tokens []lex.Token) ast.ExprData {
 	switch token.Id {
 	case lex.ID_IDENT:
 		return ep.build_sub_ident(tokens)
+	
+	case lex.ID_OP:
+		return ep.build_op_right(tokens)
 	// TODO: implement other nodes
 	}
 

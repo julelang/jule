@@ -196,6 +196,12 @@ type TypeExpr struct {
 	Token lex.Token // Token of type.
 }
 
+// Variadiced expression.
+type VariadicExpr struct {
+	Token lex.Token
+	Expr ExprData
+}
+
 // Namespace identifier selection expression.
 type NsSelectionExpr struct {
 	Ns    []lex.Token // Tokens of selected namespace identifier chain.
