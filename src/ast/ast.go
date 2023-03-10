@@ -223,6 +223,12 @@ type VariadicExpr struct {
 	Expr  ExprData
 }
 
+// Casting expression.
+type CastExpr struct {
+	Kind *Type
+	Expr ExprData
+}
+
 // Namespace identifier selection expression.
 type NsSelectionExpr struct {
 	Ns    []lex.Token // Tokens of selected namespace identifier chain.

@@ -2,7 +2,6 @@ package parser
 
 import (
 	"github.com/julelang/jule/ast"
-	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 )
 
@@ -203,11 +202,11 @@ func build_ident_expr(token lex.Token) *ast.IdentExpr {
 }
 
 type expr_builder struct {
-	errors []build.Log
+	p *parser
 }
 
 func (ep *expr_builder) push_err(token lex.Token, key string, args ...any) {
-	ep.errors = append(ep.errors, compiler_err(token, key, args...))
+	ep.p.push_err(token, key, args...)
 }
 
 func (ep *expr_builder) build_tuple(parts [][]lex.Token) *ast.TupleExpr {
@@ -364,7 +363,77 @@ func (ep *expr_builder) build_between_parentheses(tokens []lex.Token) ast.ExprDa
 	return ep.build(tokens)
 }
 
+func (ep *expr_builder) try_build_cast(tokens []lex.Token) *ast.CastExpr {
+	range_n := 0
+	error_token := tokens[0]
+	for i, token := range tokens {
+		if token.Id == lex.ID_RANGE {
+			switch token.Kind {
+			case lex.KND_LBRACE, lex.KND_LBRACKET, lex.KND_LPAREN:
+				range_n++
+				continue
+			default:
+				range_n--
+			}
+		}
+		if range_n > 0 {
+			continue
+		} else if i+1 == len(tokens) {
+			return nil
+		}
+
+		type_index := 0
+		type_tokens := tokens[1:i]
+		expr_tokens := tokens[i+1:]
+
+		if len(expr_tokens) == 0 {
+			// Expression is parentheses group.
+			return nil
+		}
+
+		token = expr_tokens[0]
+		if token.Id != lex.ID_RANGE || token.Kind != lex.KND_LPAREN {
+			return nil
+		}
+
+		cast := &ast.CastExpr{}
+
+		// Expression tokens just parentheses.
+		if len(expr_tokens) == 2 {
+			ep.push_err(error_token, "missing_expr")
+		}
+
+		t, ok := ep.p.build_type(type_tokens, &type_index, true)
+		if ok && type_index < len(type_tokens) {
+			ep.push_err(type_tokens[type_index], "invalid_syntax")
+		} else if !ok {
+			return cast
+		}
+		cast.Kind = t
+
+		expr_tokens = lex.Range(&i, lex.KND_LPAREN, lex.KND_RPARENT, expr_tokens)
+		if len(expr_tokens) == 0 {
+			return cast
+		}
+		cast.Expr = ep.build(expr_tokens)
+		return cast
+	}
+	return nil
+}
+
 func (ep *expr_builder) build_parentheses_range(tokens []lex.Token) ast.ExprData {
+	token := tokens[0]
+	switch token.Id {
+	case lex.ID_RANGE:
+		switch token.Kind {
+		case lex.KND_LPAREN:
+			expr := ep.try_build_cast(tokens)
+			if expr != nil {
+				return expr
+			}
+		}
+	}
+
 	data := get_call_data(tokens)
 
 	// Expression is parentheses group if data.expr_tokens is zero.
@@ -431,7 +500,7 @@ func (ep *expr_builder) build(tokens []lex.Token) ast.ExprData {
 func (ep *expr_builder) build_kind(tokens []lex.Token) ast.ExprData {
 	parts, errors := lex.Parts(tokens, lex.ID_COMMA, true)
 	if errors != nil {
-		ep.errors = append(ep.errors, errors...)
+		ep.p.errors = append(ep.p.errors, errors...)
 		return nil
 	} else if len(parts) > 1 {
 		return ep.build_tuple(parts)

@@ -357,7 +357,7 @@ func (tb *type_builder) step() *ast.Type {
 
 // Builds type.
 // Returns void if error occurs.
-func (tb *type_builder) build() (*ast.Type, bool) {
+func (tb *type_builder) build() (_ *ast.Type, ok bool) {
 	root := tb.step()
 	if root == nil {
 		return build_void_type(), false
