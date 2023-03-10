@@ -417,6 +417,7 @@ func Range(i *int, open string, close string, tokens []Token) []Token {
 
 // RangeLast returns last range from tokens.
 // Returns tokens without range tokens and range tokens.
+// Range tokens includes left and right range tokens.
 //
 // Special cases are;
 //  RangeLast(toks) = toks, nil if len(toks) == 0

@@ -199,7 +199,7 @@ type TypeExpr struct {
 // Variadiced expression.
 type VariadicExpr struct {
 	Token lex.Token
-	Expr ExprData
+	Expr  ExprData
 }
 
 // Namespace identifier selection expression.

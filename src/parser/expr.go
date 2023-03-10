@@ -347,16 +347,39 @@ func (ep *expr_builder) build_op_right(tokens []lex.Token) ast.ExprData {
 	switch token.Kind {
 	case lex.KND_TRIPLE_DOT:
 		return ep.build_variadic(tokens)
+
 	default:
 		ep.push_err(token, "invalid_syntax")
 		return nil
 	}
 }
 
+func (ep *expr_builder) build_between_parentheses(tokens []lex.Token) ast.ExprData {
+	token := tokens[0]
+	tokens = tokens[1 : len(tokens)-1] // Remove parentheses.
+	if len(tokens) == 0 {
+		ep.push_err(token, "missing_expr")
+		return nil
+	}
+	return ep.build(tokens)
+}
+
+func (ep *expr_builder) build_parentheses_range(tokens []lex.Token) ast.ExprData {
+	data := get_call_data(tokens)
+
+	// Expression is parentheses group if data.expr_tokens is zero.
+	// data.args_tokens holds tokens of parentheses range.
+	if len(data.expr_tokens) == 0 {
+		return ep.build_between_parentheses(data.args_tokens)
+	}
+	return nil
+}
+
 func (ep *expr_builder) build_data(tokens []lex.Token) ast.ExprData {
 	switch len(tokens) {
 	case 1:
 		return ep.build_single(tokens[0])
+
 	case 3:
 		if tokens[0].Id == lex.ID_CPP {
 			return ep.build_cpp_linked_ident(tokens)
@@ -376,7 +399,13 @@ func (ep *expr_builder) build_data(tokens []lex.Token) ast.ExprData {
 	
 	case lex.ID_OP:
 		return ep.build_op_right(tokens)
-	// TODO: implement other nodes
+
+	case lex.ID_RANGE:
+		switch token.Kind {
+		case lex.KND_RPARENT:
+			return ep.build_parentheses_range(tokens)
+		// TODO: implement other nodes
+		}
 	}
 
 	ep.push_err(tokens[0], "invalid_syntax")
