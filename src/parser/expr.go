@@ -769,6 +769,25 @@ func (ep *expr_builder) build_indexing(expr_tokens []lex.Token,
 	}
 }
 
+func (ep *expr_builder) build_slicing(expr_tokens []lex.Token,
+	slicing_tokens []lex.Token, colon int, error_token lex.Token) *ast.SlicingExpr {
+	slc := &ast.SlicingExpr{
+		Expr: ep.build_from_tokens(expr_tokens),
+	}
+	
+	start_expr_tokens := slicing_tokens[:colon]
+	if len(start_expr_tokens) > 0 {
+		slc.Start = ep.build_from_tokens(start_expr_tokens)
+	}
+
+	to_expr_tokens := slicing_tokens[colon+1:]
+	if len(to_expr_tokens) > 0 {
+		slc.To = ep.build_from_tokens(to_expr_tokens)
+	}
+
+	return slc
+}
+
 func (ep *expr_builder) build_bracket_range(tokens []lex.Token) ast.ExprData {
 	error_token := tokens[0]
 	expr_tokens, range_n := get_range_expr_tokens(tokens)
@@ -785,6 +804,15 @@ func (ep *expr_builder) build_bracket_range(tokens []lex.Token) ast.ExprData {
 	// Holds only indexing tokens.
 	// Includes brackets.
 	tokens = tokens[len(expr_tokens):]
+
+	// Use split_map_range because same thing.
+	// Map types like: [KEY:VALUE]
+	// Slicing expressions like: [START:TO]
+	i := 0
+	slicing_tokens, colon := split_map_range(tokens, &i)
+	if colon != -1 {
+		return ep.build_slicing(expr_tokens, slicing_tokens, colon, error_token)
+	}
 
 	return ep.build_indexing(expr_tokens, tokens, error_token)
 }

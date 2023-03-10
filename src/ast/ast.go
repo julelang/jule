@@ -322,6 +322,13 @@ type IndexingExpr struct {
 	Index ExprData // Index value expression.
 }
 
+// Slicing expression.
+type SlicingExpr struct {
+	Expr  ExprData // Value expression to slicing.
+	Start ExprData // Start index value expression.
+	To    ExprData // To index value expression.
+}
+
 // Generic type AST.
 type Generic struct {
 	Token lex.Token
