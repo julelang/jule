@@ -1224,7 +1224,7 @@ func (p *parser) build_impl(tokens []lex.Token) *ast.Impl {
 		Base: token,
 	}
 	token = tokens[2]
-	if token.Id != lex.ID_ITER {
+	if token.Id != lex.ID_FOR {
 		if token.Id == lex.ID_RANGE && token.Kind == lex.KND_LBRACE {
 			tokens = tokens[2:]  // Remove prefix tokens.
 			goto body

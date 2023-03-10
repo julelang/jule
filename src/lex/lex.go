@@ -31,7 +31,7 @@ var keywords = map[string]uint8{
 	KND_CONST:    ID_CONST,
 	KND_RET:      ID_RET,
 	KND_TYPE:     ID_TYPE,
-	KND_ITER:     ID_ITER,
+	KND_ITER:     ID_FOR,
 	KND_BREAK:    ID_BREAK,
 	KND_CONTINUE: ID_CONTINUE,
 	KND_IN:       ID_IN,

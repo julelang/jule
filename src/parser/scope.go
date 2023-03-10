@@ -164,8 +164,8 @@ func (sp *scope_parser) build_while_next_iter(s *st) ast.NodeData {
 		sp.push_err(it.Token, "invalid_syntax")
 		return nil
 	}
-	s = sp.next()
-	st_tokens := get_block_expr(s.tokens)
+	tokens = sp.next().tokens
+	st_tokens := get_block_expr(tokens)
 	if len(st_tokens) > 0 {
 		s := &st{
 			terminated: s.terminated,
@@ -941,7 +941,7 @@ func (sp *scope_parser) build_st(st *st) ast.NodeData {
 	case lex.ID_RET:
 		return sp.build_ret_st(st.tokens)
 
-	case lex.ID_ITER:
+	case lex.ID_FOR:
 		return sp.buid_iter_st(st)
 
 	case lex.ID_BREAK:
