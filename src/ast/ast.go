@@ -175,6 +175,16 @@ type LitExpr struct {
 // Reports whether literal is nil value.
 func (le *LitExpr) IsNil() bool { return le.Value == lex.KND_NIL }
 
+// Identifier expression.
+type IdentExpr struct {
+	Token     lex.Token
+	Ident     string
+	CppLinked bool
+}
+
+// Reports whether identifier is self keyword.
+func (ie *IdentExpr) IsSelf() bool { return ie.Ident == lex.KND_SELF }
+
 // Binary operation.
 type BinopExpr struct {
 	L  ExprData

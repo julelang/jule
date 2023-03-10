@@ -194,6 +194,14 @@ func find_lowest_prec_op(tokens []lex.Token) int {
 	return data.(int)
 }
 
+func build_ident_expr(token lex.Token) *ast.IdentExpr {
+	return &ast.IdentExpr{
+		Token:     token,
+		Ident:     token.Kind,
+		CppLinked: false,
+	}
+}
+
 type expr_builder struct {
 	errors []build.Log
 }
@@ -212,10 +220,6 @@ func (ep *expr_builder) build_tuple(parts [][]lex.Token) *ast.TupleExpr {
 	return tuple
 }
 
-func (ep *expr_builder) build_nil_lit(token lex.Token) *ast.LitExpr {
-	return &ast.LitExpr{Token: token}
-}
-
 func (ep *expr_builder) build_lit(token lex.Token) *ast.LitExpr {
 	return &ast.LitExpr{
 		Token: token,
@@ -228,15 +232,40 @@ func (ep *expr_builder) build_single(token lex.Token) ast.ExprData {
 	case lex.ID_LIT:
 		return ep.build_lit(token)
 
+	case lex.ID_IDENT, lex.ID_SELF:
+		return build_ident_expr(token)
+
 	default:
 		ep.push_err(token, "invalid_syntax")
 		return nil
 	}
 }
 
+func (ep *expr_builder) build_cpp_linked_ident(tokens []lex.Token) *ast.IdentExpr {
+	if tokens[0].Id != lex.ID_CPP {
+		return nil
+	} else if tokens[1].Id != lex.ID_DOT {
+		ep.push_err(tokens[1], "invalid_syntax")
+		return nil
+	}
+	token := tokens[2]
+	if token.Id != lex.ID_IDENT {
+		ep.push_err(tokens[2], "invalid_syntax")
+		return nil
+	}
+	expr := build_ident_expr(token)
+	expr.CppLinked = true
+	return expr
+}
+
 func (ep *expr_builder) build_data(tokens []lex.Token) ast.ExprData {
-	if len(tokens) == 1 {
+	switch len(tokens) {
+	case 1:
 		return ep.build_single(tokens[0])
+	case 3:
+		if tokens[0].Id == lex.ID_CPP {
+			return ep.build_cpp_linked_ident(tokens)
+		}
 	}
 
 	// TODO: implement other nodes
