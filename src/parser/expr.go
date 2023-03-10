@@ -227,6 +227,10 @@ func (ep *expr_builder) build_lit(token lex.Token) *ast.LitExpr {
 	}
 }
 
+func (ep *expr_builder) build_primitive_type(token lex.Token) *ast.TypeExpr {
+	return &ast.TypeExpr{Token: token}
+}
+
 func (ep *expr_builder) build_single(token lex.Token) ast.ExprData {
 	switch token.Id {
 	case lex.ID_LIT:
@@ -234,6 +238,9 @@ func (ep *expr_builder) build_single(token lex.Token) ast.ExprData {
 
 	case lex.ID_IDENT, lex.ID_SELF:
 		return build_ident_expr(token)
+
+	case lex.ID_DT:
+		return ep.build_primitive_type(token)
 
 	default:
 		ep.push_err(token, "invalid_syntax")
@@ -279,6 +286,53 @@ func (ep *expr_builder) build_unary(tokens []lex.Token) *ast.UnaryExpr {
 	}
 }
 
+func (ep *expr_builder) build_obj_sub_ident(tokens []lex.Token) *ast.SubIdentExpr {
+	i := len(tokens) - 1
+	ident_token := tokens[i]
+	i-- // Set offset to delimiter token.
+	tokens = tokens[:i] // Remove dot token and selected identifier token.
+	if len(tokens) == 0 {
+		ep.push_err(ident_token, "invalid_syntax")
+		return nil
+	}
+	return &ast.SubIdentExpr{
+		Ident: ident_token,
+		Expr:  ep.build(tokens),
+	}
+}
+
+func (ep *expr_builder) build_ns_sub_ident(tokens []lex.Token) *ast.NsSelectionExpr {
+	ns := &ast.NsSelectionExpr{}
+	for i, token := range tokens {
+		if i%2 == 0 {
+			if token.Id != lex.ID_IDENT {
+				ep.push_err(token, "invalid_syntax")
+			}
+			ns.Ns = append(ns.Ns, token)
+		} else if token.Id != lex.ID_DBLCOLON {
+			ep.push_err(token, "invalid_syntax")
+		}
+	}
+	ns.Ident = ns.Ns[len(ns.Ns)-1]
+	ns.Ns = ns.Ns[:len(ns.Ns)-1]
+	return ns
+}
+
+func (ep *expr_builder) build_sub_ident(tokens []lex.Token) ast.ExprData {
+	i := len(tokens) - 1
+	i-- // Set offset to delimiter token.
+	token := tokens[i]
+	switch token.Id {
+	case lex.ID_DOT:
+		return ep.build_obj_sub_ident(tokens)
+	case lex.ID_DBLCOLON:
+		return ep.build_ns_sub_ident(tokens)
+	default:
+		ep.push_err(token, "invalid_syntax")
+		return nil
+	}
+}
+
 func (ep *expr_builder) build_data(tokens []lex.Token) ast.ExprData {
 	switch len(tokens) {
 	case 1:
@@ -295,7 +349,14 @@ func (ep *expr_builder) build_data(tokens []lex.Token) ast.ExprData {
 		return ep.build_unary(tokens)
 	}
 
+	token = tokens[len(tokens)-1]
+	switch token.Id {
+	case lex.ID_IDENT:
+		return ep.build_sub_ident(tokens)
 	// TODO: implement other nodes
+	}
+
+	ep.push_err(tokens[0], "invalid_syntax")
 	return nil
 }
 

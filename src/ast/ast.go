@@ -191,6 +191,23 @@ type UnaryExpr struct {
 	Expr ExprData
 }
 
+// Primitive type expression.
+type TypeExpr struct {
+	Token lex.Token // Token of type.
+}
+
+// Namespace identifier selection expression.
+type NsSelectionExpr struct {
+	Ns    []lex.Token // Tokens of selected namespace identifier chain.
+	Ident lex.Token   // Token of selected identifier.
+}
+
+// Object sub identifier selection expression.
+type SubIdentExpr struct {
+	Expr  ExprData  // Selected object.
+	Ident lex.Token // TOken of selected identifier.
+}
+
 // Binary operation.
 type BinopExpr struct {
 	L  ExprData
