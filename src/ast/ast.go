@@ -308,12 +308,19 @@ type KeyValPair struct {
 }
 
 // Slice initiating expression.
+// Also represents array initiating expression.
 type SliceExpr struct {
 	Elems []ExprData
 }
 
 // Reports whether slice is empty.
 func (se *SliceExpr) IsEmpty() bool { return len(se.Elems) == 0 }
+
+// Indexing expression.
+type IndexingExpr struct {
+	Expr  ExprData // Value expression to indexing.
+	Index ExprData // Index value expression.
+}
 
 // Generic type AST.
 type Generic struct {

@@ -760,6 +760,15 @@ func (ep *expr_builder) build_slice(tokens []lex.Token) *ast.SliceExpr {
 	return slc
 }
 
+func (ep *expr_builder) build_indexing(expr_tokens []lex.Token,
+	tokens []lex.Token, error_token lex.Token) *ast.IndexingExpr {
+	tokens = tokens[1 : len(tokens)-1] // Remove brackets.
+	return &ast.IndexingExpr{
+		Expr:  ep.build_from_tokens(expr_tokens),
+		Index: ep.build_from_tokens(tokens),
+	}
+}
+
 func (ep *expr_builder) build_bracket_range(tokens []lex.Token) ast.ExprData {
 	error_token := tokens[0]
 	expr_tokens, range_n := get_range_expr_tokens(tokens)
@@ -772,7 +781,12 @@ func (ep *expr_builder) build_bracket_range(tokens []lex.Token) ast.ExprData {
 		return nil
 	}
 
-	return nil
+	// Remove expression tokens.
+	// Holds only indexing tokens.
+	// Includes brackets.
+	tokens = tokens[len(expr_tokens):]
+
+	return ep.build_indexing(expr_tokens, tokens, error_token)
 }
 
 func (ep *expr_builder) build_data(tokens []lex.Token) ast.ExprData {
