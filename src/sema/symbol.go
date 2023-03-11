@@ -10,6 +10,62 @@ import (
 	"github.com/julelang/jule/lex"
 )
 
+func build_type_alias(decl *ast.TypeAliasDecl) *TypeAlias {
+	return &TypeAlias{
+		Public:       decl.Public,
+		Cpp_linked:   decl.Cpp_linked,
+		Token:        decl.Token,
+		Ident:        decl.Ident,
+		Kind:         decl.Kind,
+		Doc_comments: decl.Doc_comments,
+	}
+}
+
+func build_field(decl *ast.FieldDecl) *Field {
+	return &Field{
+		Token:   decl.Token,
+		Public:  decl.Public,
+		Mutable: decl.Mutable,
+		Ident:   decl.Ident,
+		Kind:    decl.Kind,
+	}
+}
+
+func build_fields(decls []*ast.FieldDecl) []*Field {
+	fields := make([]*Field, len(decls))
+	for i, decl := range decls {
+		fields[i] = build_field(decl)
+	}
+	return fields
+}
+
+func build_struct(decl *ast.StructDecl) *Struct {
+	return &Struct{
+		Token:        decl.Token,
+		Ident:        decl.Ident,
+		Fields:       build_fields(decl.Fields),
+		Public:       decl.Public,
+		Cpp_linked:   decl.Cpp_linked,
+		Directives:   decl.Directives,
+		Doc_comments: decl.Doc_comments,
+		Generics:     decl.Generics,
+	}
+}
+
+func build_var(decl *ast.VarDecl) *Var {
+	return &Var{
+		Scope:        decl.Scope,
+		Token:        decl.Token,
+		Ident:        decl.Ident,
+		Cpp_linked:   decl.Cpp_linked,
+		Constant:     decl.Constant,
+		Mutable:      decl.Mutable,
+		Public:       decl.Public,
+		Doc_comments: decl.Doc_comments,
+		Kind:         decl.Kind,
+	}
+}
+
 // Symbol table builder.
 type _SymbolBuilder struct {
 	pwd      string
@@ -136,7 +192,7 @@ func (s *_SymbolBuilder) build_package(decl *ast.UseDecl) *Package {
 
 func (s *_SymbolBuilder) check_duplicate_use_decl(pkg *Package, error_token lex.Token) (ok bool) {
 	// Find package by path to detect cpp header imports.
-	lpkg := s.table.Find_pkg_by_path(pkg.Path)
+	lpkg := s.table.Find_package_by_path(pkg.Path)
 	if lpkg == nil {
 		return true
 	}
@@ -186,7 +242,7 @@ func (s *_SymbolBuilder) import_use_decl(decl *ast.UseDecl) *Package {
 	}
 
 	ok = s.import_package(pkg, decl.Token)
-	s.table.Pkgs = append(s.table.Pkgs, pkg)
+	s.table.Packages = append(s.table.Packages, pkg)
 	if ok {
 		return pkg
 	}
@@ -204,39 +260,18 @@ func (s *_SymbolBuilder) import_use_decls() {
 	}
 }
 
-func (s *_SymbolBuilder) build_type_alias(decl *ast.TypeAliasDecl) *TypeAlias {
-	return &TypeAlias{
-		Public:       decl.Public,
-		Cpp_linked:   decl.Cpp_linked,
-		Token:        decl.Token,
-		Ident:        decl.Ident,
-		Kind:         decl.Kind,
-		Doc_comments: decl.Doc_comments,
-	}
-}
-
-func (s *_SymbolBuilder) build_var(decl *ast.VarDecl) *Var {
-	return &Var{
-		Scope:        decl.Scope,
-		Token:        decl.Token,
-		Ident:        decl.Ident,
-		Cpp_linked:   decl.Cpp_linked,
-		Constant:     decl.Constant,
-		Mutable:      decl.Mutable,
-		Public:       decl.Public,
-		Doc_comments: decl.Doc_comments,
-		Kind:         decl.Kind,
-	}
-}
-
 func (s *_SymbolBuilder) append_decl(decl ast.Node) {
 	switch decl.Data.(type) {
 	case *ast.TypeAliasDecl:
-		ta := s.build_type_alias(decl.Data.(*ast.TypeAliasDecl))
+		ta := build_type_alias(decl.Data.(*ast.TypeAliasDecl))
 		s.table.Type_aliases = append(s.table.Type_aliases, ta)
 
+	case *ast.StructDecl:
+		srct := build_struct(decl.Data.(*ast.StructDecl))
+		s.table.Structs = append(s.table.Structs, srct)
+
 	case *ast.VarDecl:
-		v := s.build_var(decl.Data.(*ast.VarDecl))
+		v := build_var(decl.Data.(*ast.VarDecl))
 		s.table.Vars = append(s.table.Vars, v)
 
 	default:
