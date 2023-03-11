@@ -52,6 +52,22 @@ func build_struct(decl *ast.StructDecl) *Struct {
 	}
 }
 
+func build_fn(decl *ast.FnDecl) *Fn {
+	return &Fn{
+		Token:        decl.Token,
+		Unsafety:     decl.Unsafety,
+		Public:       decl.Public,
+		Cpp_linked:   decl.Cpp_linked,
+		Ident:        decl.Ident,
+		Directives:   decl.Directives,
+		Doc_comments: decl.Doc_comments,
+		Scope:        decl.Scope,
+		Generics:     decl.Generics,
+		Result:       decl.Result,
+		Params:       decl.Params,
+	}
+}
+
 func build_var(decl *ast.VarDecl) *Var {
 	return &Var{
 		Scope:        decl.Scope,
@@ -269,6 +285,10 @@ func (s *_SymbolBuilder) append_decl(decl ast.Node) {
 	case *ast.StructDecl:
 		srct := build_struct(decl.Data.(*ast.StructDecl))
 		s.table.Structs = append(s.table.Structs, srct)
+
+	case *ast.FnDecl:
+		f := build_fn(decl.Data.(*ast.FnDecl))
+		s.table.Funcs = append(s.table.Funcs, f)
 
 	case *ast.VarDecl:
 		v := build_var(decl.Data.(*ast.VarDecl))

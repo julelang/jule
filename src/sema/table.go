@@ -7,6 +7,7 @@ type SymbolTable struct {
 	Vars         []*Var       // Variables.
 	Type_aliases []*TypeAlias // Type aliases.
 	Structs      []*Struct    // Structures.
+	Funcs        []*Fn        // Functions.
 }
 
 // Returns package by identifier.
