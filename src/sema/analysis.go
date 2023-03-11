@@ -9,6 +9,7 @@ import (
 
 // Semantic analysis information.
 type SemaInfo struct {
+	Table  *SymbolTable
 	Errors []build.Log
 }
 
@@ -46,6 +47,9 @@ func Analyze(pwd string, pstd string, ast *ast.Ast) *SemaInfo {
 
 	sinf := &SemaInfo{
 		Errors: sema.errors,
+	}
+	if sinf.Errors == nil {
+		sinf.Table = sema.table
 	}
 	return sinf
 }

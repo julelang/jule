@@ -193,7 +193,7 @@ func build_ident_expr(token lex.Token) *ast.IdentExpr {
 	return &ast.IdentExpr{
 		Token:     token,
 		Ident:     token.Kind,
-		CppLinked: false,
+		Cpp_linked: false,
 	}
 }
 
@@ -278,7 +278,7 @@ func (ep *_ExprBuilder) build_cpp_linked_ident(tokens []lex.Token) *ast.IdentExp
 		return nil
 	}
 	expr := build_ident_expr(token)
-	expr.CppLinked = true
+	expr.Cpp_linked = true
 	return expr
 }
 

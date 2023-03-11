@@ -169,7 +169,7 @@ func (tb *_TypeBuilder) build_cpp_link() *ast.Type {
 	}
 	*tb.i += 2 // Skip cpp keyword and dot token.
 	t := tb.build_ident()
-	t.Kind.(*ast.IdentType).CppLinked = true
+	t.Kind.(*ast.IdentType).Cpp_linked = true
 	return t
 }
 

@@ -79,7 +79,7 @@ var ERRORS = map[string]string{
 	`already_const`:                            `define is already constant`,
 	`already_variadic`:                         `define is already variadic`,
 	`already_reference`:                        `define is already reference`,
-	`already_uses`:                             `path is already uses`,
+	`duplicate_use_decl`:                       `duplicate use declaration: @`,
 	`ignore_id`:                                `ignore operator cannot use as identifier`,
 	`overflow_multi_assign_identifiers`:        `overflow multi assignment identifers`,
 	`overflow_return`:                          `overflow return expressions`,

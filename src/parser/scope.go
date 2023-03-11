@@ -208,7 +208,7 @@ func (sp *_ScopeParser) build_range_kind_key(tokens []lex.Token) *ast.VarDecl {
 		Token: tokens[0],
 	}
 	if key.Token.Id == lex.ID_MUT {
-		key.IsMut = true
+		key.Mutable = true
 		if len(tokens) == 1 {
 			sp.push_err(key.Token, "invalid_syntax")
 		}
@@ -238,12 +238,12 @@ func (sp *_ScopeParser) setup_range_kind_keys_plain(rng *ast.RangeKind, tokens [
 		return
 	}
 	if len(key_tokens) > 2 {
-		sp.push_err(rng.InToken, "much_foreach_vars")
+		sp.push_err(rng.In_token, "much_foreach_vars")
 	}
 	keys := sp.build_range_kind_keys(key_tokens)
-	rng.KeyA = keys[0]
+	rng.Key_a = keys[0]
 	if len(keys) > 1 {
-		rng.KeyB = keys[1]
+		rng.Key_b = keys[1]
 	}
 }
 
@@ -251,7 +251,7 @@ func (sp *_ScopeParser) setup_range_kind_keys_explicit(rng *ast.RangeKind, token
 	i := 0
 	rang := lex.Range(&i, lex.KND_LPAREN, lex.KND_RPARENT, tokens)
 	if i < len(tokens) {
-		sp.push_err(rng.InToken, "invalid_syntax")
+		sp.push_err(rng.In_token, "invalid_syntax")
 	}
 	sp.setup_range_kind_keys_plain(rng, rang)
 }
@@ -270,10 +270,10 @@ func (sp *_ScopeParser) setup_range_kind_keys(rng *ast.RangeKind, tokens []lex.T
 
 func (sp *_ScopeParser) build_range_iter_kind(var_tokens []lex.Token, expr_tokens []lex.Token, in_token lex.Token) *ast.RangeKind {
 	rng := &ast.RangeKind{
-		InToken: in_token,
+		In_token: in_token,
 	}
 	if len(expr_tokens) == 0 {
-		sp.push_err(rng.InToken, "missing_expr")
+		sp.push_err(rng.In_token, "missing_expr")
 		return rng
 	}
 	rng.Expr = sp.p.build_expr(expr_tokens)
@@ -472,7 +472,7 @@ func (sp *_ScopeParser) build_call_st(tokens []lex.Token) ast.NodeData {
 
 func (sp *_ScopeParser) build_co_call_st(tokens []lex.Token) ast.NodeData {
 	cc := sp.build_call_st(tokens)
-	cc.(*ast.FnCallExpr).IsCo = true
+	cc.(*ast.FnCallExpr).Concurrent = true
 	return cc
 }
 
@@ -630,14 +630,14 @@ func (sp *_ScopeParser) build_match_case(tokens []lex.Token) *ast.MatchCase {
 	tokens = tokens[1:] // Remove "match" keyword.
 	
 	if len(tokens) > 0 && tokens[0].Id == lex.ID_TYPE {
-		m.TypeMatch = true
+		m.Type_match = true
 		tokens = tokens[1:] // Skip "type" keyword
 	}
 
 	expr_tokens := get_block_expr(tokens)
 	if len(expr_tokens) > 0 {
 		m.Expr = sp.p.build_expr(expr_tokens)
-	} else if m.TypeMatch {
+	} else if m.Type_match {
 		sp.push_err(m.Token, "missing_expr")
 	}
 	
@@ -649,7 +649,7 @@ func (sp *_ScopeParser) build_match_case(tokens []lex.Token) *ast.MatchCase {
 		return nil
 	}
 	
-	m.Cases, m.Default = sp.build_cases(block_toks, m.TypeMatch)
+	m.Cases, m.Default = sp.build_cases(block_toks, m.Type_match)
 	return m
 }
 
@@ -691,8 +691,8 @@ func (sp *_ScopeParser) build_scope_st(tokens []lex.Token) *ast.Scope {
 		sp.push_err(tokens[i], "invalid_syntax")
 	}
 	scope := sp.build_scope(tokens)
-	scope.IsUnsafe = is_unsafe
-	scope.IsDeferred = is_deferred
+	scope.Unsafety = is_unsafe
+	scope.Deferred = is_deferred
 	return scope
 }
 
@@ -854,7 +854,7 @@ func (sp *_ScopeParser) build_decl_assign(tokens []lex.Token) (_ *ast.AssignSt, 
 			continue
 		}
 		l := sp.build_assign_l(part)
-		l.IsMut = is_mut
+		l.Mutable = is_mut
 		assign.L = append(assign.L, l)
 	}
 	return
@@ -955,7 +955,7 @@ func (sp *_ScopeParser) build(tokens []lex.Token, s *ast.Scope) {
 		st := sp.next()
 		data := sp.build_st(st)
 		if data != nil {
-			sp.s.Stms = append(sp.s.Stms, data)
+			sp.s.Stmts = append(sp.s.Stmts, data)
 		}
 
 		if sp.stopped() {

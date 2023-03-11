@@ -218,18 +218,18 @@ func (p *_Parser) build_var_begin(v *ast.VarDecl, i *int, tokens []lex.Token) {
 		// Initialize 1 for skip the let keyword
 		*i++
 		if tokens[*i].Id == lex.ID_MUT {
-			v.IsMut = true
+			v.Mutable = true
 			// Skip the mut keyword
 			*i++
 		}
 	case lex.ID_CONST:
 		*i++
-		if v.IsConst {
+		if v.Constant {
 			p.push_err(tok, "already_const")
 			break
 		}
-		v.IsConst = true
-		if !v.IsMut {
+		v.Constant = true
+		if !v.Mutable {
 			break
 		}
 		fallthrough
@@ -257,7 +257,7 @@ func (p *_Parser) build_var(tokens []lex.Token) *ast.VarDecl {
 		if v.Kind.Is_void() {
 			p.push_err(v.Token, "missing_type")
 		}
-		if v.IsConst {
+		if v.Constant {
 			p.push_err(v.Token, "const_var_not_have_expr")
 		}
 	}
@@ -308,7 +308,7 @@ func (p *_Parser) build_self_param(tokens []lex.Token) *ast.Param {
 	// Detects mut keyword.
 	i := 0
 	if tokens[i].Id == lex.ID_MUT {
-		param.IsMut = true
+		param.Mutable = true
 		i++
 		if i >= len(tokens) {
 			p.push_err(tokens[i-1], "invalid_syntax")
@@ -346,11 +346,11 @@ func (p *_Parser) param_type_begin(param *ast.Param, i *int, tokens []lex.Token)
 			return
 		}
 
-		if param.IsVariadic {
+		if param.Variadic {
 			p.push_err(token, "already_variadic")
 			continue
 		}
-		param.IsVariadic = true
+		param.Variadic = true
 	}
 }
 
@@ -405,7 +405,7 @@ func (p *_Parser) build_param(tokens []lex.Token, must_pure bool) *ast.Param {
 
 	// Detects mut keyword.
 	if param.Token.Id == lex.ID_MUT {
-		param.IsMut = true
+		param.Mutable = true
 		if len(tokens) == 1 {
 			p.push_err(tokens[0], "invalid_syntax")
 			return nil
@@ -556,7 +556,7 @@ func (p *_Parser) build_fn_prototype(tokens []lex.Token, i *int, method bool, an
 
 	// Detect unsafe keyword.
 	if f.Token.Id == lex.ID_UNSAFE {
-		f.IsUnsafe = true
+		f.Unsafety = true
 		*i++
 		if *i >= len(tokens) {
 			p.push_err(f.Token, "invalid_syntax")
@@ -606,7 +606,7 @@ func (p *_Parser) build_fn_prototype(tokens []lex.Token, i *int, method bool, an
 
 	t, ret_ok := p.build_ret_type(tokens, i)
 	if ret_ok {
-		f.RetType = t
+		f.Result = t
 	}
 
 	return f
@@ -632,7 +632,7 @@ func (p *_Parser) build_fn(tokens []lex.Token, method bool, anon bool, prototype
 	block_tokens := lex.Range(&i, lex.KND_LBRACE, lex.KND_RBRACE, tokens)
 	if block_tokens != nil {
 		f.Scope = p.build_scope(block_tokens)
-		f.Scope.IsUnsafe = f.IsUnsafe
+		f.Scope.Unsafety = f.Unsafety
 		if i < len(tokens) {
 			p.push_err(tokens[i], "invalid_syntax")
 		}
@@ -677,7 +677,7 @@ func (p *_Parser) build_cpp_use_decl(decl *ast.UseDecl, tokens []lex.Token) {
 		return
 	}
 	decl.Cpp = true
-	decl.LinkString = token.Kind[1 : len(token.Kind)-1]
+	decl.Link_path = token.Kind[1 : len(token.Kind)-1]
 }
 
 func (p *_Parser) build_std_use_decl(decl *ast.UseDecl, tokens []lex.Token) {
@@ -739,9 +739,9 @@ func (p *_Parser) build_std_use_decl(decl *ast.UseDecl, tokens []lex.Token) {
 			p.push_err(token, "invalid_syntax")
 			return
 		}
-		decl.FullUse = true
+		decl.Full = true
 	}
-	decl.LinkString = "std::" + tokstoa(tokens)
+	decl.Link_path = "std::" + tokstoa(tokens)
 }
 
 func (p *_Parser) parse_use_decl(decl *ast.UseDecl, tokens []lex.Token) {
@@ -879,8 +879,8 @@ func (p *_Parser) build_enum_decl(tokens []lex.Token) *ast.EnumDecl {
 func (p *_Parser) build_field(tokens []lex.Token) *ast.FieldDecl {
 	f := &ast.FieldDecl{}
 
-	f.IsPub = tokens[0].Id == lex.ID_PUB
-	if f.IsPub {
+	f.Public = tokens[0].Id == lex.ID_PUB
+	if f.Public {
 		if len(tokens) == 1 {
 			p.push_err(tokens[0], "invalid_syntax")
 			return nil
@@ -888,8 +888,8 @@ func (p *_Parser) build_field(tokens []lex.Token) *ast.FieldDecl {
 		tokens = tokens[1:]
 	}
 
-	f.InteriorMut = tokens[0].Id == lex.ID_MUT
-	if f.InteriorMut {
+	f.Mutable = tokens[0].Id == lex.ID_MUT
+	if f.Mutable {
 		if len(tokens) == 1 {
 			p.push_err(tokens[0], "invalid_syntax")
 			return nil
@@ -999,7 +999,7 @@ func (p *_Parser) build_trait_methods(tokens []lex.Token) []*ast.FnDecl {
 		f := p.build_fn(tokens, true, false, true)
 		if f != nil {
 			p.check_method_receiver(f)
-			f.IsPub = true
+			f.Public = true
 			methods = append(methods, f)
 		}
 	}
@@ -1036,7 +1036,7 @@ func (p *_Parser) build_cpp_link_fn(tokens []lex.Token) *ast.FnDecl {
 	tokens = tokens[1:] // Remove "cpp" keyword.
 	f := p.build_fn(tokens, false, false, true)
 	if f != nil {
-		f.CppLinked = true
+		f.Cpp_linked = true
 	}
 	return f
 }
@@ -1045,11 +1045,11 @@ func (p *_Parser) build_cpp_link_var(tokens []lex.Token) *ast.VarDecl {
 	tokens = tokens[1:] // Remove "cpp" keyword.
 	v := p.build_var(tokens)
 	if v != nil {
-		v.CppLinked = true
+		v.Cpp_linked = true
 		if v.Expr != nil {
 			p.push_err(v.Token, "cpp_linked_variable_has_expr")
 		}
-		if v.IsConst {
+		if v.Constant {
 			p.push_err(v.Token, "cpp_linked_variable_is_const")
 		}
 	}
@@ -1060,7 +1060,7 @@ func (p *_Parser) build_cpp_link_struct(tokens []lex.Token) *ast.StructDecl {
 	tokens = tokens[1:] // Remove "cpp" keyword.
 	s := p.build_struct_decl(tokens)
 	if s != nil {
-		s.CppLinked = true
+		s.Cpp_linked = true
 	}
 	return s
 }
@@ -1069,7 +1069,7 @@ func (p *_Parser) build_cpp_link_type_alias(tokens []lex.Token) *ast.TypeAliasDe
 	tokens = tokens[1:] // Remove "cpp" keyword.
 	t := p.build_type_alias_decl(tokens)
 	if t != nil {
-		t.CppLinked = true
+		t.Cpp_linked = true
 	}
 	return t
 }
@@ -1121,7 +1121,7 @@ func (p *_Parser) parse_impl_trait(ipl *ast.Impl, tokens []lex.Token) {
 			continue
 		case lex.ID_FN, lex.ID_UNSAFE:
 			f := p.get_method(tokens)
-			f.IsPub = true
+			f.Public = true
 			p.check_method_receiver(f)
 			ipl.Methods = append(ipl.Methods, f)
 		default:
@@ -1156,7 +1156,7 @@ func (p *_Parser) parse_impl_struct(ipl *ast.Impl, tokens []lex.Token) {
 		switch token.Id {
 		case lex.ID_FN, lex.ID_UNSAFE:
 			f := p.get_method(tokens)
-			f.IsPub = is_pub
+			f.Public = is_pub
 			p.check_method_receiver(f)
 			ipl.Methods = append(ipl.Methods, f)
 		default:
@@ -1302,8 +1302,8 @@ func (p *_Parser) apply_meta(node ast.Node, is_pub bool) {
 		if v == nil {
 			return
 		}
-		v.IsPub = is_pub
-		v.DocComments = p.comment_group
+		v.Public = is_pub
+		v.Doc_comments = p.comment_group
 		is_pub = false
 		p.comment_group = nil
 
@@ -1312,11 +1312,11 @@ func (p *_Parser) apply_meta(node ast.Node, is_pub bool) {
 		if f == nil {
 			return
 		}
-		f.IsPub = is_pub
+		f.Public = is_pub
 		is_pub = false
 		f.Directives = p.directives
 		p.directives = nil
-		f.DocComments = p.comment_group
+		f.Doc_comments = p.comment_group
 		p.comment_group = nil
 
 	case *ast.TypeAliasDecl:
@@ -1324,9 +1324,9 @@ func (p *_Parser) apply_meta(node ast.Node, is_pub bool) {
 		if tad == nil {
 			return
 		}
-		tad.IsPub = is_pub
+		tad.Public = is_pub
 		is_pub = false
-		tad.DocComments = p.comment_group
+		tad.Doc_comments = p.comment_group
 		p.comment_group = nil
 
 	case *ast.EnumDecl:
@@ -1334,9 +1334,9 @@ func (p *_Parser) apply_meta(node ast.Node, is_pub bool) {
 		if ed == nil {
 			return
 		}
-		ed.DocComments = p.comment_group
+		ed.Doc_comments = p.comment_group
 		p.comment_group = nil
-		ed.IsPub = is_pub
+		ed.Public = is_pub
 		is_pub = false
 
 	case *ast.StructDecl:
@@ -1346,9 +1346,9 @@ func (p *_Parser) apply_meta(node ast.Node, is_pub bool) {
 		}
 		sd.Directives = p.directives
 		p.directives = nil
-		sd.DocComments = p.comment_group
+		sd.Doc_comments = p.comment_group
 		p.comment_group = nil
-		sd.IsPub = is_pub
+		sd.Public = is_pub
 		is_pub = false
 
 	case *ast.TraitDecl:
@@ -1356,9 +1356,9 @@ func (p *_Parser) apply_meta(node ast.Node, is_pub bool) {
 		if td == nil {
 			return
 		}
-		td.DocComments = p.comment_group
+		td.Doc_comments = p.comment_group
 		p.comment_group = nil
-		td.IsPub = is_pub
+		td.Public = is_pub
 		is_pub = false
 	}
 	if is_pub {

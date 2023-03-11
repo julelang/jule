@@ -185,9 +185,9 @@ func (t *Type) Is_array() bool {
 
 // Identifier type.
 type IdentType struct {
-	Ident     string
-	CppLinked bool
-	Generics  []*Type
+	Ident      string
+	Cpp_linked bool
+	Generics   []*Type
 }
 
 // Namespace chain type.
@@ -266,9 +266,9 @@ func (le *LitExpr) Is_nil() bool { return le.Value == lex.KND_NIL }
 
 // Identifier expression.
 type IdentExpr struct {
-	Token     lex.Token
-	Ident     string
-	CppLinked bool
+	Token      lex.Token
+	Ident      string
+	Cpp_linked bool
 }
 
 // Reports whether identifier is self keyword.
@@ -318,11 +318,11 @@ type BinopExpr struct {
 
 // Function call expression kind.
 type FnCallExpr struct {
-	Token    lex.Token
-	Expr     *Expr
-	Generics []*Type
-	Args     []*Expr
-	IsCo     bool
+	Token      lex.Token
+	Expr       *Expr
+	Generics   []*Type
+	Args       []*Expr
+	Concurrent bool
 }
 
 // Field-Expression pair.
@@ -403,10 +403,10 @@ type FallSt struct {
 
 // Left expression of assign statement.
 type AssignLeft struct {
-	Token lex.Token
-	IsMut bool
-	Ident string
-	Expr  *Expr
+	Token   lex.Token
+	Mutable bool
+	Ident   string
+	Expr    *Expr
 }
 
 // Assign statement.
@@ -418,19 +418,19 @@ type AssignSt struct {
 
 // Scope.
 type Scope struct {
-	Parent     *Scope     // Nil if scope is root.
-	IsUnsafe   bool
-	IsDeferred bool
-	Stms       []NodeData // Statements.
+	Parent   *Scope     // Nil if scope is root.
+	Unsafety bool
+	Deferred bool
+	Stmts    []NodeData // Statements.
 }
 
 // Param.
 type Param struct {
-	Token      lex.Token
-	IsMut      bool
-	IsVariadic bool
-	Kind       *Type
-	Ident      string
+	Token    lex.Token
+	Mutable  bool
+	Variadic bool
+	Kind     *Type
+	Ident    string
 }
 
 // Reports whether parameter is self (receiver) parameter.
@@ -441,31 +441,31 @@ func (p *Param) Is_ref() bool { return p.Ident != "" && p.Ident[0] == '&'}
 // Function declaration.
 // Also represents anonymous function expression.
 type FnDecl struct {
-	Token       lex.Token
-	IsUnsafe    bool
-	IsPub       bool
-	CppLinked   bool
-	Ident       string
-	Directives  []*Directive
-	DocComments *CommentGroup
-	Scope       *Scope
-	Generics    []*Generic
-	RetType     *RetType
-	Params      []*Param
+	Token        lex.Token
+	Unsafety     bool
+	Public       bool
+	Cpp_linked   bool
+	Ident        string
+	Directives   []*Directive
+	Doc_comments *CommentGroup
+	Scope        *Scope
+	Generics     []*Generic
+	Result       *RetType
+	Params       []*Param
 }
 
 // Variable declaration.
 type VarDecl struct {
-	Scope       *Scope    // nil for global scopes
-	Token       lex.Token
-	Ident       string
-	CppLinked   bool
-	IsPub       bool
-	IsMut       bool
-	IsConst     bool
-	DocComments *CommentGroup
-	Kind        *Type
-	Expr        *Expr
+	Scope        *Scope    // nil for global scopes
+	Token        lex.Token
+	Ident        string
+	Cpp_linked   bool
+	Public       bool
+	Mutable      bool
+	Constant     bool
+	Doc_comments *CommentGroup
+	Kind         *Type
+	Expr         *Expr
 }
 
 // Return statement.
@@ -490,10 +490,10 @@ type WhileKind struct {
 
 // Range iteration kind.
 type RangeKind struct {
-	InToken lex.Token // Token of "in" keyword
-	Expr    *Expr
-	KeyA    *VarDecl  // first key of range
-	KeyB    *VarDecl  // second key of range
+	In_token lex.Token // Token of "in" keyword
+	Expr     *Expr
+	Key_a    *VarDecl  // first key of range
+	Key_b    *VarDecl  // second key of range
 }
 
 // While-next iteration kind.
@@ -536,40 +536,41 @@ type Conditional struct {
 
 // Type alias declration.
 type TypeAliasDecl struct {
-	IsPub       bool
-	CppLinked   bool
-	Token       lex.Token
-	Ident       string
-	Kind        *Type
-	DocComments *CommentGroup
+	Public       bool
+	Cpp_linked   bool
+	Token        lex.Token
+	Ident        string
+	Kind         *Type
+	Doc_comments *CommentGroup
 }
 
 // Case of match-case.
 type Case struct {
 	Token lex.Token
+	Scope *Scope
+
 	// Holds expression.
 	// Expressions holds *Type if If type matching.
 	Exprs []*Expr
-	Scope *Scope
 }
 
 // Match-Case.
 type MatchCase struct {
-	Token     lex.Token
-	TypeMatch bool
-	Expr      *Expr
-	Cases     []*Case
-	Default   *Else
+	Token      lex.Token
+	Type_match bool
+	Expr       *Expr
+	Cases      []*Case
+	Default    *Else
 }
 
 // Use declaration statement.
 type UseDecl struct {
-	Token      lex.Token
-	LinkString string      // Use declaration path string
-	FullUse    bool
-	Selected   []lex.Token
-	Cpp        bool
-	Std        bool
+	Token     lex.Token
+	Link_path string      // Use declaration path string.
+	Full      bool        // Full implicit import.
+	Selected  []lex.Token
+	Cpp       bool        // Cpp header use declaration.
+	Std       bool        // Standard package use declaration.
 }
 
 // Enum item.
@@ -581,42 +582,42 @@ type EnumItem struct {
 
 // Enum declaration.
 type EnumDecl struct {
-	Token       lex.Token
-	IsPub       bool
-	Ident       string
-	Kind        *Type
-	Items       []*EnumItem
-	DocComments *CommentGroup
+	Token        lex.Token
+	Public       bool
+	Ident        string
+	Kind         *Type
+	Items        []*EnumItem
+	Doc_comments *CommentGroup
 }
 
 // Field declaration.
 type FieldDecl struct {
-	Token       lex.Token
-	IsPub       bool
-	InteriorMut bool
-	Ident       string
-	Kind        *Type
+	Token   lex.Token
+	Public  bool
+	Mutable bool       // Interior mutability.
+	Ident   string
+	Kind    *Type
 }
 
 // Structure declaration.
 type StructDecl struct {
-	Token       lex.Token
-	Ident       string
-	Fields      []*FieldDecl
-	IsPub       bool
-	CppLinked   bool
-	Directives  []*Directive
-	DocComments *CommentGroup
-	Generics    []*Generic
+	Token        lex.Token
+	Ident        string
+	Fields       []*FieldDecl
+	Public       bool
+	Cpp_linked   bool
+	Directives   []*Directive
+	Doc_comments *CommentGroup
+	Generics     []*Generic
 }
 
 // Trait declaration.
 type TraitDecl struct {
-	Token       lex.Token
-	Ident       string
-	IsPub       bool
-	DocComments *CommentGroup
-	Methods     []*FnDecl
+	Token        lex.Token
+	Ident        string
+	Public       bool
+	Doc_comments *CommentGroup
+	Methods      []*FnDecl
 }
 
 // Implementation.
