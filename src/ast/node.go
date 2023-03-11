@@ -89,6 +89,7 @@ type Directive struct {
 type TypeKind = any
 
 // Type.
+// Also represents type expression.
 type Type struct {
 	Token lex.Token
 	Kind  TypeKind
@@ -278,11 +279,6 @@ func (ie *IdentExpr) Is_self() bool { return ie.Ident == lex.KND_SELF }
 type UnaryExpr struct {
 	Op   lex.Token
 	Expr ExprData
-}
-
-// Primitive type expression.
-type TypeExpr struct {
-	Token lex.Token // Token of type.
 }
 
 // Variadiced expression.

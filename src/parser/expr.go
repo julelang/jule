@@ -244,8 +244,8 @@ func (ep *_ExprBuilder) build_lit(token lex.Token) *ast.LitExpr {
 	}
 }
 
-func (ep *_ExprBuilder) build_primitive_type(token lex.Token) *ast.TypeExpr {
-	return &ast.TypeExpr{Token: token}
+func (ep *_ExprBuilder) build_primitive_type(token lex.Token) *ast.Type {
+	return build_primitive_type(token.Kind)
 }
 
 func (ep *_ExprBuilder) build_single(token lex.Token) ast.ExprData {
@@ -335,6 +335,20 @@ func (ep *_ExprBuilder) build_ns_sub_ident(tokens []lex.Token) *ast.NsSelectionE
 	return ns
 }
 
+func (ep *_ExprBuilder) build_type(tokens []lex.Token) *ast.Type {
+	i := 0
+	t, ok := ep.p.build_type(tokens, &i, false)
+	if !ok {
+		ep.push_err(tokens[0], "invalid_syntax")
+		return nil
+	}
+
+	if i < len(tokens) {
+		ep.push_err(tokens[i], "invalid_syntax")
+	}
+	return t
+}
+
 func (ep *_ExprBuilder) build_sub_ident(tokens []lex.Token) ast.ExprData {
 	i := len(tokens) - 1
 	i-- // Set offset to delimiter token.
@@ -342,12 +356,19 @@ func (ep *_ExprBuilder) build_sub_ident(tokens []lex.Token) ast.ExprData {
 	switch token.Id {
 	case lex.ID_DOT:
 		return ep.build_obj_sub_ident(tokens)
+
 	case lex.ID_DBLCOLON:
 		return ep.build_ns_sub_ident(tokens)
-	default:
-		ep.push_err(token, "invalid_syntax")
-		return nil
+
+	case lex.ID_RANGE:
+		// Catch slice, and array types.
+		if token.Kind == lex.KND_RBRACKET {
+			return ep.build_type(tokens)
+		}
 	}
+
+	ep.push_err(token, "invalid_syntax")
+	return nil
 }
 
 func (ep *_ExprBuilder) build_variadic(tokens []lex.Token) *ast.VariadicExpr {
@@ -838,6 +859,10 @@ func (ep *_ExprBuilder) build_data(tokens []lex.Token) ast.ExprData {
 	switch token.Id {
 	case lex.ID_IDENT:
 		return ep.build_sub_ident(tokens)
+
+	case lex.ID_DT:
+		// Catch slice, and array types.
+		return ep.build_type(tokens)
 	
 	case lex.ID_OP:
 		return ep.build_op_right(tokens)
