@@ -21,6 +21,12 @@ import (
 	"github.com/julelang/jule/sema"
 )
 
+// Environment Variables.
+var LOCALIZATION_PATH string
+var STDLIB_PATH string
+var EXEC_PATH string
+var WORKING_PATH string
+
 const COMPILER_GCC = "gcc"
 const COMPILER_CLANG = "clang"
 
@@ -119,8 +125,26 @@ func process_command() bool {
 	return true
 }
 
+func exit_err(msg string) {
+	println(msg)
+	const ERROR_EXIT_CODE = 0
+	os.Exit(ERROR_EXIT_CODE)
+}
+
 func init() {
-	JULEC_HEADER = filepath.Join(jule.EXEC_PATH, "..")
+	path, err := os.Executable()
+	if err != nil {
+		exit_err(err.Error())
+	}
+	WORKING_PATH, err = os.Getwd()
+	if err != nil {
+		exit_err(err.Error())
+	}
+	EXEC_PATH = filepath.Dir(path)
+	path = filepath.Join(EXEC_PATH, "..") // Go to parent directory
+	STDLIB_PATH = filepath.Join(path, jule.STDLIB)
+
+	JULEC_HEADER = filepath.Join(EXEC_PATH, "..")
 	JULEC_HEADER = filepath.Join(JULEC_HEADER, "api")
 	JULEC_HEADER = filepath.Join(JULEC_HEADER, "julec.hpp")
 
@@ -138,6 +162,7 @@ func init() {
 	if len(os.Args) < 2 {
 		os.Exit(0)
 	}
+
 	if process_command() {
 		os.Exit(0)
 	}
@@ -167,7 +192,7 @@ func main() {
 		return
 	}
 
-	sinf := sema.Analyze(jule.WORKING_PATH, jule.STDLIB_PATH, finf.Ast)
+	sinf := sema.Analyze(WORKING_PATH, STDLIB_PATH, finf.Ast)
 	if sinf.Errors != nil {
 		fmt.Println(sinf.Errors)
 		return
