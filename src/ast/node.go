@@ -569,6 +569,7 @@ type UseDecl struct {
 	FullUse    bool
 	Selected   []lex.Token
 	Cpp        bool
+	Std        bool
 }
 
 // Enum item.

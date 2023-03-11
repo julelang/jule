@@ -667,7 +667,7 @@ func (p *_Parser) get_use_decl_selectors(tokens []lex.Token) []lex.Token {
 	return selectors
 }
 
-func (p *_Parser) build_use_cpp_decl(decl *ast.UseDecl, tokens []lex.Token) {
+func (p *_Parser) build_cpp_use_decl(decl *ast.UseDecl, tokens []lex.Token) {
 	if len(tokens) > 2 {
 		p.push_err(tokens[2], "invalid_syntax")
 	}
@@ -680,72 +680,81 @@ func (p *_Parser) build_use_cpp_decl(decl *ast.UseDecl, tokens []lex.Token) {
 	decl.LinkString = token.Kind[1 : len(token.Kind)-1]
 }
 
-func (p *_Parser) parse_use_decl(decl *ast.UseDecl, tokens []lex.Token) {
-	tok := tokens[0]
-	if tok.Id == lex.ID_CPP {
-		p.build_use_cpp_decl(decl, tokens)
-		return
-	}
-	if tok.Id != lex.ID_IDENT || tok.Kind != "std" {
-		p.push_err(tokens[0], "invalid_syntax")
-	}
+func (p *_Parser) build_std_use_decl(decl *ast.UseDecl, tokens []lex.Token) {
+	decl.Std = true
+
+	token := tokens[0]
 	if len(tokens) < 3 {
-		p.push_err(tok, "invalid_syntax")
+		p.push_err(token, "invalid_syntax")
 		return
 	}
+
 	tokens = tokens[2:]
-	tok = tokens[len(tokens)-1]
-	switch tok.Id {
+	token = tokens[len(tokens)-1]
+	switch token.Id {
 	case lex.ID_DBLCOLON:
-		p.push_err(tok, "invalid_syntax")
+		p.push_err(token, "invalid_syntax")
 		return
 
 	case lex.ID_RANGE:
-		if tok.Kind != lex.KND_RBRACE {
-			p.push_err(tok, "invalid_syntax")
+		if token.Kind != lex.KND_RBRACE {
+			p.push_err(token, "invalid_syntax")
 			return
 		}
 		var selectors []lex.Token
 		tokens, selectors = lex.Range_last(tokens)
 		decl.Selected = p.get_use_decl_selectors(selectors)
 		if len(tokens) == 0 {
-			p.push_err(tok, "invalid_syntax")
+			p.push_err(token, "invalid_syntax")
 			return
 		}
-		tok = tokens[len(tokens)-1]
-		if tok.Id != lex.ID_DBLCOLON {
-			p.push_err(tok, "invalid_syntax")
+		token = tokens[len(tokens)-1]
+		if token.Id != lex.ID_DBLCOLON {
+			p.push_err(token, "invalid_syntax")
 			return
 		}
 		tokens = tokens[:len(tokens)-1]
 		if len(tokens) == 0 {
-			p.push_err(tok, "invalid_syntax")
+			p.push_err(token, "invalid_syntax")
 			return
 		}
 
 	case lex.ID_OP:
-		if tok.Kind != lex.KND_STAR {
-			p.push_err(tok, "invalid_syntax")
+		if token.Kind != lex.KND_STAR {
+			p.push_err(token, "invalid_syntax")
 			return
 		}
 		tokens = tokens[:len(tokens)-1]
 		if len(tokens) == 0 {
-			p.push_err(tok, "invalid_syntax")
+			p.push_err(token, "invalid_syntax")
 			return
 		}
-		tok = tokens[len(tokens)-1]
-		if tok.Id != lex.ID_DBLCOLON {
-			p.push_err(tok, "invalid_syntax")
+		token = tokens[len(tokens)-1]
+		if token.Id != lex.ID_DBLCOLON {
+			p.push_err(token, "invalid_syntax")
 			return
 		}
 		tokens = tokens[:len(tokens)-1]
 		if len(tokens) == 0 {
-			p.push_err(tok, "invalid_syntax")
+			p.push_err(token, "invalid_syntax")
 			return
 		}
 		decl.FullUse = true
 	}
-	decl.LinkString = "std:: " + tokstoa(tokens)
+	decl.LinkString = "std::" + tokstoa(tokens)
+}
+
+func (p *_Parser) parse_use_decl(decl *ast.UseDecl, tokens []lex.Token) {
+	token := tokens[0]
+	if token.Id == lex.ID_CPP {
+		p.build_cpp_use_decl(decl, tokens)
+		return
+	}
+	if token.Id != lex.ID_IDENT || token.Kind != "std" {
+		p.push_err(token, "invalid_syntax")
+		return
+	}
+	p.build_std_use_decl(decl, tokens)
 }
 
 func (p *_Parser) build_use_decl(tokens []lex.Token) *ast.UseDecl {

@@ -18,6 +18,7 @@ import (
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/parser"
+	"github.com/julelang/jule/sema"
 )
 
 const COMPILER_GCC = "gcc"
@@ -166,7 +167,9 @@ func main() {
 		return
 	}
 
-	fmt.Println(finf.Ast.UseDecls)
-	fmt.Println(finf.Ast.Decls)
-	fmt.Println(finf.Ast.Impls)
+	sinf := sema.Analyze(jule.WORKING_PATH, jule.STDLIB_PATH, finf.Ast)
+	if sinf.Errors != nil {
+		fmt.Println(sinf.Errors)
+		return
+	}
 }

@@ -136,7 +136,7 @@ func Is_std_header_path(p string) bool {
 }
 
 // Reports whether C++ header extension is valid.
-func Is_valid_header(ext string) bool {
+func Is_valid_header_ext(ext string) bool {
 	for _, valid_ext := range CPP_HEADER_EXTS {
 		if ext == valid_ext {
 			return true

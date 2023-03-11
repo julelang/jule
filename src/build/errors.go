@@ -147,6 +147,7 @@ var ERRORS = map[string]string{
 	`missing_expr_for_unary`:                   `missing expression for unary operator`,
 	`invalid_op_for_unary`:                     `invalid_operator_for_unary: @`,
 	`use_decl_at_body`:                         `use declarations must declared before other declarations`,
+	`pwd_cannot_set`:                           `current working directory cannot set`,
 }
 
 // Returns formatted error message by key and args.
