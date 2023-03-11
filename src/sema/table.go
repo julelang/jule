@@ -8,6 +8,7 @@ type SymbolTable struct {
 	Type_aliases []*TypeAlias // Type aliases.
 	Structs      []*Struct    // Structures.
 	Funcs        []*Fn        // Functions.
+	Traits       []*Trait     // Traits.
 }
 
 // Returns package by identifier.

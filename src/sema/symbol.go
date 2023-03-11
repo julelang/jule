@@ -68,6 +68,24 @@ func build_fn(decl *ast.FnDecl) *Fn {
 	}
 }
 
+func build_methods(decls []*ast.FnDecl) []*Fn {
+	methods := make([]*Fn, len(decls))
+	for i, decl := range decls {
+		methods[i] = build_fn(decl)
+	}
+	return methods
+}
+
+func build_trait(decl *ast.TraitDecl) *Trait {
+	return &Trait{
+		Token:        decl.Token,
+		Ident:        decl.Ident,
+		Public:       decl.Public,
+		Doc_comments: decl.Doc_comments,
+		Methods:      build_methods(decl.Methods),
+	}
+}
+
 func build_var(decl *ast.VarDecl) *Var {
 	return &Var{
 		Scope:        decl.Scope,
@@ -289,6 +307,10 @@ func (s *_SymbolBuilder) append_decl(decl ast.Node) {
 	case *ast.FnDecl:
 		f := build_fn(decl.Data.(*ast.FnDecl))
 		s.table.Funcs = append(s.table.Funcs, f)
+
+	case *ast.TraitDecl:
+		t := build_trait(decl.Data.(*ast.TraitDecl))
+		s.table.Traits = append(s.table.Traits, t)
 
 	case *ast.VarDecl:
 		v := build_var(decl.Data.(*ast.VarDecl))
