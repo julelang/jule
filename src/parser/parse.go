@@ -8,8 +8,7 @@ import (
 
 // FileInfo stores information about file parsing.
 type FileInfo struct {
-	File   *lex.File
-	Tree   []ast.Node
+	Ast    *ast.Ast
 	Errors []build.Log
 }
 
@@ -25,15 +24,10 @@ func Parse_file(f *lex.File) *FileInfo {
 		return nil
 	}
 
-	finf := &FileInfo{
-		File: f,
-	}
-
-	tree, errors := parse_fileset(f)
-	if errors != nil {
-		finf.Errors = errors
-	} else {
-		finf.Tree = tree
+	finf := &FileInfo{}
+	finf.Ast, finf.Errors = parse_fileset(f)
+	if finf.Errors != nil {
+		finf.Ast = nil
 	}
 
 	return finf
@@ -60,10 +54,8 @@ func Parse_package(filesets []*lex.File) *PackageInfo {
 	return pinf
 }
 
-func parse_fileset(f *lex.File) ([]ast.Node, []build.Log) {
-	p := _Parser{
-		file: f,
-	}
-	p.parse()
-	return p.tree, p.errors
+func parse_fileset(f *lex.File) (*ast.Ast, []build.Log) {
+	p := _Parser{}
+	p.parse(f)
+	return p.ast, p.errors
 }

@@ -36,15 +36,14 @@ func tokstoa(tokens []lex.Token) string {
 }
 
 type _Parser struct {
-	file          *lex.File
+	ast           *ast.Ast
 	directives    []*ast.Directive
 	comment_group *ast.CommentGroup
-	tree          []ast.Node
 	errors        []build.Log
 }
 
-func (p *_Parser) stop() { p.file = nil }
-func (p *_Parser) stopped() bool { return p.file == nil }
+func (p *_Parser) stop() { p.ast = nil }
+func (p *_Parser) stopped() bool { return p.ast == nil }
 
 // Appends error by specified token, key and args.
 func (p *_Parser) push_err(token lex.Token, key string, args ...any) {
@@ -868,8 +867,8 @@ func (p *_Parser) build_enum_decl(tokens []lex.Token) *ast.EnumDecl {
 	return e
 }
 
-func (p *_Parser) build_field(tokens []lex.Token) *ast.Field {
-	f := &ast.Field{}
+func (p *_Parser) build_field(tokens []lex.Token) *ast.FieldDecl {
+	f := &ast.FieldDecl{}
 
 	f.IsPub = tokens[0].Id == lex.ID_PUB
 	if f.IsPub {
@@ -915,8 +914,8 @@ func (p *_Parser) build_field(tokens []lex.Token) *ast.Field {
 	return f
 }
 
-func (p *_Parser) build_struct_decl_fields(tokens []lex.Token) []*ast.Field {
-	var fields []*ast.Field
+func (p *_Parser) build_struct_decl_fields(tokens []lex.Token) []*ast.FieldDecl {
+	var fields []*ast.FieldDecl
 	stms := split_stms(tokens)
 	for _, st := range stms {
 		tokens := st.tokens
@@ -1359,24 +1358,6 @@ func (p *_Parser) apply_meta(node ast.Node, is_pub bool) {
 }
 
 func (p *_Parser) check_use_decl(node ast.Node) {
-	// This algorithm checks if use declarations are used
-	// after a different declaration. "node" represents the last
-	// parsed node, but not yet in p.tree. Therefore, the last p.tree
-	// element represents the node before the last parsed node.
-	//
-	// At least three nodes must be parsed for the condition to be met.
-	//   - The first node can be anything and this is valid.
-	//   - The second node is a possible declaration.
-	// If the third node is a use declaration then an error should be
-	// caught according to the previous declaration.
-	//
-	// Condition is p.tree is less than 2.
-	// But actually this is like "len(p.tree) < 3".
-	// This is because the last node is not in p.tree as described.
-	if len(p.tree) < 2 {
-		return
-	}
-
 	switch node.Data.(type) {
 	case *ast.UseDecl:
 		// Ignore.
@@ -1384,13 +1365,37 @@ func (p *_Parser) check_use_decl(node ast.Node) {
 		return
 	}
 
-	last := p.tree[len(p.tree)-1]
-	switch last.Data.(type) {
-	case *ast.UseDecl, *ast.Comment:
-		// Ignore.
-	default:
+	if len(p.ast.Decls) > 0 {
 		p.push_err(node.Token, "use_decl_at_body")
 	}
+}
+
+func (p *_Parser) parse_node(st []lex.Token) ast.Node {
+	node := ast.Node{
+		Token: st[0],
+	}
+
+	// Detect pub keyword.
+	is_pub := false
+	if node.Token.Id == lex.ID_PUB {
+		is_pub = true
+		st = st[1:]
+		if len(st) == 0 {
+			p.push_err(node.Token, "invalid_syntax")
+			return node
+		}
+	}
+
+	node.Data = p.build_node_data(st)
+	if node.Data == nil {
+		return node
+	}
+
+	p.apply_meta(node, is_pub)
+	p.check_comment_group(node)
+	p.check_directive(node)
+	p.check_use_decl(node)
+	return node
 }
 
 func (p *_Parser) append_node(st []lex.Token) {
@@ -1398,37 +1403,31 @@ func (p *_Parser) append_node(st []lex.Token) {
 		return
 	}
 
-	token := st[0]
-
-	// Detect pub keyword.
-	is_pub := false
-	if token.Id == lex.ID_PUB {
-		is_pub = true
-		st = st[1:]
-		if len(st) == 0 {
-			p.push_err(token, "invalid_syntax")
-			return
-		}
-	}
-
-	node := ast.Node{
-		Token: st[0],
-		Data:  p.build_node_data(st),
-	}
-
+	node := p.parse_node(st)
 	if node.Data == nil {
 		return
 	}
 
-	p.apply_meta(node, is_pub)
-	p.check_comment_group(node)
-	p.check_directive(node)
-	p.check_use_decl(node)
-	p.tree = append(p.tree, node)
+	switch {
+	case node.Is_use_decl():
+		p.ast.UseDecls = append(p.ast.UseDecls, node.Data.(*ast.UseDecl))
+	case node.Is_decl():
+		// Use declarations eliminated.
+		p.ast.Decls = append(p.ast.Decls, node)
+	case node.Is_comment():
+		// Global scope is not appends *CommentGroup.
+		c := node.Data.(*ast.Comment)
+		p.ast.Comments = append(p.ast.Comments, c)
+	case node.Is_impl():
+		p.ast.Impls = append(p.ast.Impls, node.Data.(*ast.Impl))
+	}
 }
 
-func (p *_Parser) parse() {
-	stms := split_stms(p.file.Tokens())
+func (p *_Parser) parse(f *lex.File) {
+	p.ast = &ast.Ast{
+		File: f,
+	}
+	stms := split_stms(f.Tokens())
 	for _, st := range stms {
 		p.append_node(st.tokens)
 

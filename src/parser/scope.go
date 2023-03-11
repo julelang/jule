@@ -955,7 +955,7 @@ func (sp *_ScopeParser) build(tokens []lex.Token, s *ast.Scope) {
 		st := sp.next()
 		data := sp.build_st(st)
 		if data != nil {
-			sp.s.Tree = append(sp.s.Tree, data)
+			sp.s.Stms = append(sp.s.Stms, data)
 		}
 
 		if sp.stopped() {

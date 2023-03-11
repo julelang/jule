@@ -166,7 +166,7 @@ func main() {
 		return
 	}
 
-	for _, node := range finf.Tree {
-		fmt.Println(node)
-	}
+	fmt.Println(finf.Ast.UseDecls)
+	fmt.Println(finf.Ast.Decls)
+	fmt.Println(finf.Ast.Impls)
 }
