@@ -64,17 +64,20 @@ func (s *_SymbolBuilder) check_cpp_use_decl_path(decl *ast.UseDecl) (ok bool) {
 }
 
 func (s *_SymbolBuilder) build_cpp_header_package(decl *ast.UseDecl) *Package {
+	path := decl.Link_path
+
 	if !build.Is_std_header_path(decl.Link_path) {
 		ok := s.check_cpp_use_decl_path(decl)
 		if !ok {
 			return nil
 		}
-	}
 
-	// Set to absolute path for correct include path
-	path, err := filepath.Abs(decl.Link_path)
-	if err != nil {
-		s.push_err(decl.Token, "use_not_found", decl.Link_path)
+		// Set to absolute path for correct include path.
+		var err error
+		path, err = filepath.Abs(decl.Link_path)
+		if err != nil {
+			s.push_err(decl.Token, "use_not_found", decl.Link_path)
+		}
 	}
 
 	return &Package{
@@ -141,6 +144,10 @@ func (s *_SymbolBuilder) check_duplicate_use_decl(pkg *Package, error_token lex.
 }
 
 func (s *_SymbolBuilder) import_package(pkg *Package, error_token lex.Token) (ok bool) {
+	if pkg.Cpp {
+		return true
+	}
+
 	asts, errors := s.importer.Import_package(pkg.Path)
 	if len(errors) > 0 {
 		s.errors = append(s.errors, errors...)
