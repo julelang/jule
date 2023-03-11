@@ -26,7 +26,7 @@ type Comment struct {
 }
 
 // Reports whether comment is directive.
-func (c *Comment) IsDirective() bool {
+func (c *Comment) Is_directive() bool {
 	return strings.HasPrefix(c.Text, lex.DIRECTIVE_PREFIX)
 }
 
@@ -52,41 +52,41 @@ func (t *Type) is_primitive(kind string) bool {
 	return t.Token.Id == lex.ID_DT && t.Token.Kind == kind
 }
 // Reports whether type is primitive i8.
-func (t *Type) IsI8() bool { return t.is_primitive(lex.KND_I8) }
+func (t *Type) Is_i8() bool { return t.is_primitive(lex.KND_I8) }
 // Reports whether type is primitive i16.
-func (t *Type) IsI16() bool { return t.is_primitive(lex.KND_I16) }
+func (t *Type) Is_i16() bool { return t.is_primitive(lex.KND_I16) }
 // Reports whether type is primitive i32.
-func (t *Type) IsI32() bool { return t.is_primitive(lex.KND_I32) }
+func (t *Type) Is_i32() bool { return t.is_primitive(lex.KND_I32) }
 // Reports whether type is primitive i64.
-func (t *Type) IsI64() bool { return t.is_primitive(lex.KND_I64) }
+func (t *Type) Is_i64() bool { return t.is_primitive(lex.KND_I64) }
 // Reports whether type is primitive u8.
-func (t *Type) IsU8() bool { return t.is_primitive(lex.KND_U8) }
+func (t *Type) Is_u8() bool { return t.is_primitive(lex.KND_U8) }
 // Reports whether type is primitive u16.
-func (t *Type) IsU16() bool { return t.is_primitive(lex.KND_U16) }
+func (t *Type) Is_u16() bool { return t.is_primitive(lex.KND_U16) }
 // Reports whether type is primitive u32.
-func (t *Type) IsU32() bool { return t.is_primitive(lex.KND_U32) }
+func (t *Type) Is_u32() bool { return t.is_primitive(lex.KND_U32) }
 // Reports whether type is primitive u64.
-func (t *Type) IsU64() bool { return t.is_primitive(lex.KND_U64) }
+func (t *Type) Is_u64() bool { return t.is_primitive(lex.KND_U64) }
 // Reports whether type is primitive f32.
-func (t *Type) IsF32() bool { return t.is_primitive(lex.KND_F32) }
+func (t *Type) Is_f32() bool { return t.is_primitive(lex.KND_F32) }
 // Reports whether type is primitive f64.
-func (t *Type) IsF64() bool { return t.is_primitive(lex.KND_F64) }
+func (t *Type) Is_f64() bool { return t.is_primitive(lex.KND_F64) }
 // Reports whether type is primitive int.
-func (t *Type) IsInt() bool { return t.is_primitive(lex.KND_INT) }
+func (t *Type) Is_int() bool { return t.is_primitive(lex.KND_INT) }
 // Reports whether type is primitive uint.
-func (t *Type) IsUint() bool { return t.is_primitive(lex.KND_UINT) }
+func (t *Type) Is_uint() bool { return t.is_primitive(lex.KND_UINT) }
 // Reports whether type is primitive uintptr.
-func (t *Type) IsUintptr() bool { return t.is_primitive(lex.KND_UINTPTR) }
+func (t *Type) Is_uintptr() bool { return t.is_primitive(lex.KND_UINTPTR) }
 // Reports whether type is primitive bool.
-func (t *Type) IsBool() bool { return t.is_primitive(lex.KND_BOOL) }
+func (t *Type) Is_bool() bool { return t.is_primitive(lex.KND_BOOL) }
 // Reports whether type is primitive str.
-func (t *Type) IsStr() bool { return t.is_primitive(lex.KND_STR) }
+func (t *Type) Is_str() bool { return t.is_primitive(lex.KND_STR) }
 // Reports whether type is primitive any.
-func (t *Type) IsAny() bool { return t.is_primitive(lex.KND_ANY) }
+func (t *Type) Is_any() bool { return t.is_primitive(lex.KND_ANY) }
 // Reports whether type is void.
-func (t *Type) IsVoid() bool { return t.Kind == nil && t.Token.Id == lex.ID_NA }
+func (t *Type) Is_void() bool { return t.Kind == nil && t.Token.Id == lex.ID_NA }
 // Reports whether type is reference.
-func (t *Type) IsRef() bool {
+func (t *Type) Is_ref() bool {
 	if t.Kind == nil {
 		return true
 	}
@@ -98,7 +98,7 @@ func (t *Type) IsRef() bool {
 	}
 }
 // Reports whether type is pointer.
-func (t *Type) IsPtr() bool {
+func (t *Type) Is_ptr() bool {
 	if t.Kind == nil {
 		return true
 	}
@@ -110,7 +110,7 @@ func (t *Type) IsPtr() bool {
 	}
 }
 // Reports whether type is slice.
-func (t *Type) IsSlice() bool {
+func (t *Type) Is_slice() bool {
 	if t.Kind == nil {
 		return true
 	}
@@ -122,7 +122,7 @@ func (t *Type) IsSlice() bool {
 	}
 }
 // Reports whether type is array.
-func (t *Type) IsArray() bool {
+func (t *Type) Is_array() bool {
 	if t.Kind == nil {
 		return true
 	}
@@ -147,14 +147,14 @@ type NamespaceType struct {
 	Kind   *IdentType // Type of identifier.
 }
 
-type RefType struct { Elem *Type }   // Reference type.
-type PtrType struct { Elem *Type }   // Pointer type.
-type SliceType struct { Elem *Type } // Slice type.
+type RefType struct { Elem *Type }      // Reference type.
+type PtrType struct { Elem *Type }      // Pointer type.
+type SliceType struct { Elem *Type }    // Slice type.
 type TupleType struct { Types []*Type } // Tuple type.
 type FnType struct { Decl *FnDecl }     // Function type.
 
 // Reports whether pointer is unsafe pointer (*unsafe).
-func (pt *PtrType) IsUnsafe() bool { return pt.Elem == nil }
+func (pt *PtrType) Is_unsafe() bool { return pt.Elem == nil }
 
 // Array type.
 type ArrayType struct {
@@ -183,7 +183,7 @@ type Expr struct {
 }
 
 // Reports whether expression kind is function call.
-func (e *Expr) IsFnCall() bool {
+func (e *Expr) Is_fn_call() bool {
 	if e.Kind == nil {
 		return false
 	}
@@ -213,7 +213,7 @@ type UnsafeExpr struct {
 }
 
 // Reports whether literal is nil value.
-func (le *LitExpr) IsNil() bool { return le.Value == lex.KND_NIL }
+func (le *LitExpr) Is_nil() bool { return le.Value == lex.KND_NIL }
 
 // Identifier expression.
 type IdentExpr struct {
@@ -223,7 +223,7 @@ type IdentExpr struct {
 }
 
 // Reports whether identifier is self keyword.
-func (ie *IdentExpr) IsSelf() bool { return ie.Ident == lex.KND_SELF }
+func (ie *IdentExpr) Is_self() bool { return ie.Ident == lex.KND_SELF }
 
 // Unary expression.
 type UnaryExpr struct {
@@ -283,7 +283,7 @@ type FieldExprPair struct {
 }
 
 // Reports whether pair targeted field.
-func (fep *FieldExprPair) IsTargeted() bool { return fep.Field.Id != lex.ID_NA }
+func (fep *FieldExprPair) Is_targeted() bool { return fep.Field.Id != lex.ID_NA }
 
 // Struct literal instiating expression.
 type StructLit struct {
@@ -298,7 +298,7 @@ type BraceLit struct {
 }
 
 // Reports literal is empty ( {} ).
-func (bl *BraceLit) IsEmpty() bool { return len(bl.Exprs) == 0 }
+func (bl *BraceLit) Is_empty() bool { return len(bl.Exprs) == 0 }
 
 // Key-value pair expression.
 type KeyValPair struct {
@@ -314,7 +314,7 @@ type SliceExpr struct {
 }
 
 // Reports whether slice is empty.
-func (se *SliceExpr) IsEmpty() bool { return len(se.Elems) == 0 }
+func (se *SliceExpr) Is_empty() bool { return len(se.Elems) == 0 }
 
 // Indexing expression.
 type IndexingExpr struct {
@@ -385,9 +385,9 @@ type Param struct {
 }
 
 // Reports whether parameter is self (receiver) parameter.
-func (p *Param) IsSelf() bool { return strings.HasSuffix(p.Ident, lex.KND_SELF) }
+func (p *Param) Is_self() bool { return strings.HasSuffix(p.Ident, lex.KND_SELF) }
 // Reports whether self (receiver) parameter is reference.
-func (p *Param) IsRef() bool { return p.Ident != "" && p.Ident[0] == '&'}
+func (p *Param) Is_ref() bool { return p.Ident != "" && p.Ident[0] == '&'}
 
 // Function declaration AST.
 // Also represents anonymous function expression.
@@ -577,6 +577,6 @@ type Impl struct {
 }
 
 // Reports whether implementation type is trait to structure.
-func (i *Impl) IsTraitImpl() bool { return i.Dest.Id != lex.ID_NA }
+func (i *Impl) Is_trait_impl() bool { return i.Dest.Id != lex.ID_NA }
 // Reports whether implementation type is append to destination structure.
-func (i *Impl) IsStructImpl() bool { return i.Dest.Id == lex.ID_NA }
+func (i *Impl) Is_struct_impl() bool { return i.Dest.Id == lex.ID_NA }

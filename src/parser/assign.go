@@ -3,7 +3,7 @@ package parser
 import "github.com/julelang/jule/lex"
 
 // Assignment information.
-type assign_info struct {
+type _AssignInfo struct {
 	l      []lex.Token
 	r      []lex.Token
 	setter lex.Token
@@ -11,13 +11,13 @@ type assign_info struct {
 }
 
 // List of postfix operators.
-var POSTFIX_OPS = [...]string{
+var _POSTFIX_OPS = [...]string{
 	lex.KND_DBL_PLUS,
 	lex.KND_DBL_MINUS,
 }
 
 // List of assign operators.
-var ASSING_OPS = [...]string{
+var _ASSING_OPS = [...]string{
 	lex.KND_EQ,
 	lex.KND_PLUS_EQ,
 	lex.KND_MINUS_EQ,
@@ -49,7 +49,7 @@ func is_assign(id uint8) bool {
 
 // Rreports whether operator kind is postfix operator.
 func is_postfix_op(kind string) bool {
-	for _, operator := range POSTFIX_OPS {
+	for _, operator := range _POSTFIX_OPS {
 		if kind == operator {
 			return true
 		}
@@ -62,7 +62,7 @@ func is_assign_op(kind string) bool {
 	if is_postfix_op(kind) {
 		return true
 	}
-	for _, operator := range ASSING_OPS {
+	for _, operator := range _ASSING_OPS {
 		if kind == operator {
 			return true
 		}

@@ -20,7 +20,7 @@ type PackageInfo struct {
 
 // Parses fileset's tokens and builds AST.
 // Returns nil if f is nil.
-func ParseFile(f *lex.File) *FileInfo {
+func Parse_file(f *lex.File) *FileInfo {
 	if f == nil {
 		return nil
 	}
@@ -42,7 +42,7 @@ func ParseFile(f *lex.File) *FileInfo {
 // Parses fileset's tokens and builds AST.
 // Returns nil if filesets is nil.
 // Skip fileset if nil.
-func ParsePackage(filesets []*lex.File) *PackageInfo {
+func Parse_package(filesets []*lex.File) *PackageInfo {
 	if filesets == nil {
 		return nil
 	}
@@ -53,7 +53,7 @@ func ParsePackage(filesets []*lex.File) *PackageInfo {
 			continue
 		}
 
-		finfo := ParseFile(f)
+		finfo := Parse_file(f)
 		pinf.Files = append(pinf.Files, finfo)
 	}
 
@@ -61,7 +61,7 @@ func ParsePackage(filesets []*lex.File) *PackageInfo {
 }
 
 func parse_fileset(f *lex.File) ([]ast.Node, []build.Log) {
-	p := parser{
+	p := _Parser{
 		file: f,
 	}
 	p.parse()

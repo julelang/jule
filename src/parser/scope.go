@@ -82,18 +82,18 @@ func skip_st(i *int, tokens []lex.Token) ([]lex.Token, bool) {
 	return st_tokens, terminated
 }
 
-type st struct {
+type _Stmt struct {
 	tokens     []lex.Token
 	terminated bool
 }
 
 // Splits all statements.
-func split_stms(tokens []lex.Token) []*st {
-	var stms []*st = nil
+func split_stms(tokens []lex.Token) []*_Stmt {
+	var stms []*_Stmt = nil
 	pos := 0
 	for pos < len(tokens) {
 		tokens, terminated := skip_st(&pos, tokens)
-		stms = append(stms, &st{
+		stms = append(stms, &_Stmt{
 			tokens:     tokens,
 			terminated: terminated,
 		})
@@ -101,46 +101,46 @@ func split_stms(tokens []lex.Token) []*st {
 	return stms
 }
 
-type scope_parser struct {
-	p    *parser
+type _ScopeParser struct {
+	p    *_Parser
 	s    *ast.Scope
-	stms []*st
+	stms []*_Stmt
 	pos  int
 }
 
-func (sp *scope_parser) stop() { sp.pos = -1 }
-func (sp *scope_parser) stopped() bool { return sp.pos == -1 }
-func (sp *scope_parser) finished() bool { return sp.pos >= len(sp.stms) }
-func (sp *scope_parser) is_last_st() bool { return sp.pos+1 >= len(sp.stms) }
-func (sp *scope_parser) push_err(token lex.Token, key string) { sp.p.push_err(token, key) }
+func (sp *_ScopeParser) stop() { sp.pos = -1 }
+func (sp *_ScopeParser) stopped() bool { return sp.pos == -1 }
+func (sp *_ScopeParser) finished() bool { return sp.pos >= len(sp.stms) }
+func (sp *_ScopeParser) is_last_st() bool { return sp.pos+1 >= len(sp.stms) }
+func (sp *_ScopeParser) push_err(token lex.Token, key string) { sp.p.push_err(token, key) }
 
-func (sp *scope_parser) insert_as_next(tokens []lex.Token) {
+func (sp *_ScopeParser) insert_as_next(tokens []lex.Token) {
     sp.stms = append(sp.stms[:sp.pos+1], sp.stms[sp.pos:]...)
-    sp.stms[sp.pos+1] = &st{tokens: tokens}
+    sp.stms[sp.pos+1] = &_Stmt{tokens: tokens}
 }
 
-func (sp *scope_parser) next() *st {
+func (sp *_ScopeParser) next() *_Stmt {
 	sp.pos++
 	return sp.stms[sp.pos]
 }
 
-func (sp *scope_parser) build_scope(tokens []lex.Token) *ast.Scope {
+func (sp *_ScopeParser) build_scope(tokens []lex.Token) *ast.Scope {
 	s := new_scope()
 	s.Parent = sp.s
-	ssp := scope_parser{
+	ssp := _ScopeParser{
 		p: sp.p,
 	}
 	ssp.build(tokens, s)
 	return s
 }
 
-func (sp *scope_parser) build_var_st(tokens []lex.Token) ast.NodeData {
+func (sp *_ScopeParser) build_var_st(tokens []lex.Token) ast.NodeData {
 	v := sp.p.build_var(tokens)
 	v.Scope = sp.s
 	return v
 }
 
-func (sp *scope_parser) build_ret_st(tokens []lex.Token) ast.NodeData {
+func (sp *_ScopeParser) build_ret_st(tokens []lex.Token) ast.NodeData {
 	st := &ast.RetSt{
 		Token: tokens[0],
 	}
@@ -151,7 +151,7 @@ func (sp *scope_parser) build_ret_st(tokens []lex.Token) ast.NodeData {
 	return st
 }
 
-func (sp *scope_parser) build_while_next_iter(s *st) ast.NodeData {
+func (sp *_ScopeParser) build_while_next_iter(s *_Stmt) ast.NodeData {
 	it := &ast.Iter{
 		Token: s.tokens[0],
 	}
@@ -167,7 +167,7 @@ func (sp *scope_parser) build_while_next_iter(s *st) ast.NodeData {
 	tokens = sp.next().tokens
 	st_tokens := get_block_expr(tokens)
 	if len(st_tokens) > 0 {
-		s := &st{
+		s := &_Stmt{
 			terminated: s.terminated,
 			tokens:     st_tokens,
 		}
@@ -188,19 +188,19 @@ func (sp *scope_parser) build_while_next_iter(s *st) ast.NodeData {
 	return it
 }
 
-func (sp *scope_parser) build_while_iter_kind(tokens []lex.Token) *ast.WhileKind {
+func (sp *_ScopeParser) build_while_iter_kind(tokens []lex.Token) *ast.WhileKind {
 	return &ast.WhileKind{
 		Expr: sp.p.build_expr(tokens),
 	}
 }
 
-func (sp *scope_parser) get_range_kind_keys_tokens(toks []lex.Token) [][]lex.Token {
+func (sp *_ScopeParser) get_range_kind_keys_tokens(toks []lex.Token) [][]lex.Token {
 	vars, errs := lex.Parts(toks, lex.ID_COMMA, true)
 	sp.p.errors = append(sp.p.errors, errs...)
 	return vars
 }
 
-func (sp *scope_parser) build_range_kind_key(tokens []lex.Token) *ast.VarDecl {
+func (sp *_ScopeParser) build_range_kind_key(tokens []lex.Token) *ast.VarDecl {
 	if len(tokens) == 0 {
 		return nil
 	}
@@ -224,7 +224,7 @@ func (sp *scope_parser) build_range_kind_key(tokens []lex.Token) *ast.VarDecl {
 	return key
 }
 
-func (sp *scope_parser) build_range_kind_keys(parts [][]lex.Token) []*ast.VarDecl {
+func (sp *_ScopeParser) build_range_kind_keys(parts [][]lex.Token) []*ast.VarDecl {
 	var keys []*ast.VarDecl
 	for _, tokens := range parts {
 		keys = append(keys, sp.build_range_kind_key(tokens))
@@ -232,7 +232,7 @@ func (sp *scope_parser) build_range_kind_keys(parts [][]lex.Token) []*ast.VarDec
 	return keys
 }
 
-func (sp *scope_parser) setup_range_kind_keys_plain(rng *ast.RangeKind, tokens []lex.Token) {
+func (sp *_ScopeParser) setup_range_kind_keys_plain(rng *ast.RangeKind, tokens []lex.Token) {
 	key_tokens := sp.get_range_kind_keys_tokens(tokens)
 	if len(key_tokens) == 0 {
 		return
@@ -247,7 +247,7 @@ func (sp *scope_parser) setup_range_kind_keys_plain(rng *ast.RangeKind, tokens [
 	}
 }
 
-func (sp *scope_parser) setup_range_kind_keys_explicit(rng *ast.RangeKind, tokens []lex.Token) {
+func (sp *_ScopeParser) setup_range_kind_keys_explicit(rng *ast.RangeKind, tokens []lex.Token) {
 	i := 0
 	rang := lex.Range(&i, lex.KND_LPAREN, lex.KND_RPARENT, tokens)
 	if i < len(tokens) {
@@ -256,7 +256,7 @@ func (sp *scope_parser) setup_range_kind_keys_explicit(rng *ast.RangeKind, token
 	sp.setup_range_kind_keys_plain(rng, rang)
 }
 
-func (sp *scope_parser) setup_range_kind_keys(rng *ast.RangeKind, tokens []lex.Token) {
+func (sp *_ScopeParser) setup_range_kind_keys(rng *ast.RangeKind, tokens []lex.Token) {
 	if tokens[0].Id == lex.ID_RANGE {
 		if tokens[0].Kind != lex.KND_LPAREN {
 			sp.push_err(tokens[0], "invalid_syntax")
@@ -268,7 +268,7 @@ func (sp *scope_parser) setup_range_kind_keys(rng *ast.RangeKind, tokens []lex.T
 	sp.setup_range_kind_keys_plain(rng, tokens)
 }
 
-func (sp *scope_parser) build_range_iter_kind(var_tokens []lex.Token, expr_tokens []lex.Token, in_token lex.Token) *ast.RangeKind {
+func (sp *_ScopeParser) build_range_iter_kind(var_tokens []lex.Token, expr_tokens []lex.Token, in_token lex.Token) *ast.RangeKind {
 	rng := &ast.RangeKind{
 		InToken: in_token,
 	}
@@ -283,7 +283,7 @@ func (sp *scope_parser) build_range_iter_kind(var_tokens []lex.Token, expr_token
 	return rng
 }
 
-func (sp *scope_parser) build_common_iter_kind(tokens []lex.Token, err_tok lex.Token) ast.IterKind {
+func (sp *_ScopeParser) build_common_iter_kind(tokens []lex.Token, err_tok lex.Token) ast.IterKind {
 	brace_n := 0
 	for i, tok := range tokens {
 		if tok.Id == lex.ID_RANGE {
@@ -308,7 +308,7 @@ func (sp *scope_parser) build_common_iter_kind(tokens []lex.Token, err_tok lex.T
 	return sp.build_while_iter_kind(tokens)
 }
 
-func (sp *scope_parser) build_common_iter(tokens []lex.Token) ast.NodeData {
+func (sp *_ScopeParser) build_common_iter(tokens []lex.Token) ast.NodeData {
 	it := &ast.Iter{
 		Token: tokens[0],
 	}
@@ -336,14 +336,14 @@ func (sp *scope_parser) build_common_iter(tokens []lex.Token) ast.NodeData {
 	return it
 }
 
-func (sp *scope_parser) buid_iter_st(st *st) ast.NodeData {
+func (sp *_ScopeParser) buid_iter_st(st *_Stmt) ast.NodeData {
 	if st.terminated {
 		return sp.build_while_next_iter(st)
 	}
 	return sp.build_common_iter(st.tokens)
 }
 
-func (sp *scope_parser) build_break_st(tokens []lex.Token) ast.NodeData {
+func (sp *_ScopeParser) build_break_st(tokens []lex.Token) ast.NodeData {
 	brk := &ast.BreakSt{
 		Token: tokens[0],
 	}
@@ -360,7 +360,7 @@ func (sp *scope_parser) build_break_st(tokens []lex.Token) ast.NodeData {
 	return brk
 }
 
-func (sp *scope_parser) build_cont_st(tokens []lex.Token) ast.NodeData {
+func (sp *_ScopeParser) build_cont_st(tokens []lex.Token) ast.NodeData {
 	cont := &ast.ContSt{
 		Token: tokens[0],
 	}
@@ -377,7 +377,7 @@ func (sp *scope_parser) build_cont_st(tokens []lex.Token) ast.NodeData {
 	return cont
 }
 
-func (sp *scope_parser) build_if(tokens *[]lex.Token) *ast.If {
+func (sp *_ScopeParser) build_if(tokens *[]lex.Token) *ast.If {
 	model := &ast.If{
 		Token: (*tokens)[0],
 	}
@@ -408,7 +408,7 @@ func (sp *scope_parser) build_if(tokens *[]lex.Token) *ast.If {
 	return model
 }
 
-func (sp *scope_parser) build_else(tokens []lex.Token) *ast.Else {
+func (sp *_ScopeParser) build_else(tokens []lex.Token) *ast.Else {
 	els := &ast.Else{
 		Token: tokens[0],
 	}
@@ -431,7 +431,7 @@ func (sp *scope_parser) build_else(tokens []lex.Token) *ast.Else {
 	return els
 }
 
-func (sp *scope_parser) build_if_else_chain(tokens []lex.Token) ast.NodeData {
+func (sp *_ScopeParser) build_if_else_chain(tokens []lex.Token) ast.NodeData {
 	chain := &ast.Conditional{
 		If: sp.build_if(&tokens),
 	}
@@ -454,29 +454,29 @@ func (sp *scope_parser) build_if_else_chain(tokens []lex.Token) ast.NodeData {
 	return chain
 }
 
-func (sp *scope_parser) build_comment_st(token lex.Token) ast.NodeData {
+func (sp *_ScopeParser) build_comment_st(token lex.Token) ast.NodeData {
 	return build_comment(token)
 }
 
-func (sp *scope_parser) build_call_st(tokens []lex.Token) ast.NodeData {
+func (sp *_ScopeParser) build_call_st(tokens []lex.Token) ast.NodeData {
 	token := tokens[0]
 	if is_fn_call(tokens) == nil {
 		sp.push_err(token, "expr_not_func_call")
 	}
 	expr := sp.p.build_expr(tokens)
-	if !expr.IsFnCall() {
+	if !expr.Is_fn_call() {
 		sp.push_err(token, "invalid_syntax")
 	}
 	return expr
 }
 
-func (sp *scope_parser) build_co_call_st(tokens []lex.Token) ast.NodeData {
+func (sp *_ScopeParser) build_co_call_st(tokens []lex.Token) ast.NodeData {
 	cc := sp.build_call_st(tokens)
 	cc.(*ast.FnCallExpr).IsCo = true
 	return cc
 }
 
-func (sp *scope_parser) build_goto_st(tokens []lex.Token) ast.NodeData {
+func (sp *_ScopeParser) build_goto_st(tokens []lex.Token) ast.NodeData {
 	gt := &ast.GotoSt{
 		Token: tokens[0],
 	}
@@ -495,7 +495,7 @@ func (sp *scope_parser) build_goto_st(tokens []lex.Token) ast.NodeData {
 	return gt
 }
 
-func (sp *scope_parser) build_fall_st(tokens []lex.Token) ast.NodeData {
+func (sp *_ScopeParser) build_fall_st(tokens []lex.Token) ast.NodeData {
 	fll := &ast.FallSt{
 		Token: tokens[0],
 	}
@@ -505,12 +505,12 @@ func (sp *scope_parser) build_fall_st(tokens []lex.Token) ast.NodeData {
 	return fll
 }
 
-func (sp *scope_parser) build_type_alias_st(tokens []lex.Token) ast.NodeData {
+func (sp *_ScopeParser) build_type_alias_st(tokens []lex.Token) ast.NodeData {
 	tad := sp.p.build_type_alias_decl(tokens)
 	return tad
 }
 
-func (sp *scope_parser) build_case_exprs(tokens *[]lex.Token, type_match bool) []*ast.Expr {
+func (sp *_ScopeParser) build_case_exprs(tokens *[]lex.Token, type_match bool) []*ast.Expr {
 	var exprs []*ast.Expr
 	push_expr := func(tokens []lex.Token, token lex.Token) {
 		if len(tokens) > 0 {
@@ -563,7 +563,7 @@ func (sp *scope_parser) build_case_exprs(tokens *[]lex.Token, type_match bool) [
 	return nil
 }
 
-func (sp *scope_parser) build_case_scope(tokens *[]lex.Token) *ast.Scope {
+func (sp *_ScopeParser) build_case_scope(tokens *[]lex.Token) *ast.Scope {
 	n := 0
 	for {
 		i := 0
@@ -585,7 +585,7 @@ func (sp *scope_parser) build_case_scope(tokens *[]lex.Token) *ast.Scope {
 	return scope
 }
 
-func (sp *scope_parser) build_case(tokens *[]lex.Token, type_match bool) (*ast.Case, bool) {
+func (sp *_ScopeParser) build_case(tokens *[]lex.Token, type_match bool) (*ast.Case, bool) {
 	c := &ast.Case{
 		Token: (*tokens)[0], 
 	}
@@ -596,7 +596,7 @@ func (sp *scope_parser) build_case(tokens *[]lex.Token, type_match bool) (*ast.C
 	return c, is_default
 }
 
-func (sp *scope_parser) build_cases(tokens []lex.Token, type_match bool) ([]*ast.Case, *ast.Else) {
+func (sp *_ScopeParser) build_cases(tokens []lex.Token, type_match bool) ([]*ast.Case, *ast.Else) {
 	var cases []*ast.Case
 	var def *ast.Else
 	for len(tokens) > 0 {
@@ -623,7 +623,7 @@ func (sp *scope_parser) build_cases(tokens []lex.Token, type_match bool) ([]*ast
 	return cases, def
 }
 
-func (sp *scope_parser) build_match_case(tokens []lex.Token) *ast.MatchCase {
+func (sp *_ScopeParser) build_match_case(tokens []lex.Token) *ast.MatchCase {
 	m := &ast.MatchCase{
 		Token: tokens[0],
 	}
@@ -653,7 +653,7 @@ func (sp *scope_parser) build_match_case(tokens []lex.Token) *ast.MatchCase {
 	return m
 }
 
-func (sp *scope_parser) build_scope_st(tokens []lex.Token) *ast.Scope {
+func (sp *_ScopeParser) build_scope_st(tokens []lex.Token) *ast.Scope {
 	is_unsafe := false
 	is_deferred := false
 	token := tokens[0]
@@ -696,7 +696,7 @@ func (sp *scope_parser) build_scope_st(tokens []lex.Token) *ast.Scope {
 	return scope
 }
 
-func (sp *scope_parser) build_label_st(tokens []lex.Token) *ast.LabelSt {
+func (sp *_ScopeParser) build_label_st(tokens []lex.Token) *ast.LabelSt {
 	lbl := &ast.LabelSt{
 		Token: tokens[0],
 		Ident: tokens[0].Kind,
@@ -711,7 +711,7 @@ func (sp *scope_parser) build_label_st(tokens []lex.Token) *ast.LabelSt {
 	return lbl
 }
 
-func (sp *scope_parser) build_id_st(tokens []lex.Token) (_ ast.NodeData, ok bool) {
+func (sp *_ScopeParser) build_id_st(tokens []lex.Token) (_ ast.NodeData, ok bool) {
 	if len(tokens) == 1 {
 		return
 	}
@@ -723,8 +723,8 @@ func (sp *scope_parser) build_id_st(tokens []lex.Token) (_ ast.NodeData, ok bool
 	return
 }
 
-func (sp *scope_parser) build_assign_info(tokens []lex.Token) *assign_info {
-	info:= &assign_info{
+func (sp *_ScopeParser) build_assign_info(tokens []lex.Token) *_AssignInfo {
+	info:= &_AssignInfo{
 		ok: true,
 	}
 	brace_n := 0
@@ -766,7 +766,7 @@ func (sp *scope_parser) build_assign_info(tokens []lex.Token) *assign_info {
 	return info
 }
 
-func (sp *scope_parser) build_assign_l(tokens []lex.Token) *ast.AssignLeft {
+func (sp *_ScopeParser) build_assign_l(tokens []lex.Token) *ast.AssignLeft {
 	l := &ast.AssignLeft{
 		Token: tokens[0],
 	}
@@ -777,7 +777,7 @@ func (sp *scope_parser) build_assign_l(tokens []lex.Token) *ast.AssignLeft {
 	return l
 }
 
-func (sp *scope_parser) build_assign_ls(parts [][]lex.Token) []*ast.AssignLeft {
+func (sp *_ScopeParser) build_assign_ls(parts [][]lex.Token) []*ast.AssignLeft {
 	var lefts []*ast.AssignLeft
 	for _, part := range parts {
 		l := sp.build_assign_l(part)
@@ -786,7 +786,7 @@ func (sp *scope_parser) build_assign_ls(parts [][]lex.Token) []*ast.AssignLeft {
 	return lefts
 }
 
-func (sp *scope_parser) build_plain_assign(tokens []lex.Token) (_ *ast.AssignSt, ok bool) {
+func (sp *_ScopeParser) build_plain_assign(tokens []lex.Token) (_ *ast.AssignSt, ok bool) {
 	info := sp.build_assign_info(tokens)
 	if !info.ok {
 		return
@@ -807,7 +807,7 @@ func (sp *scope_parser) build_plain_assign(tokens []lex.Token) (_ *ast.AssignSt,
 	return
 }
 
-func (sp *scope_parser) build_decl_assign(tokens []lex.Token) (_ *ast.AssignSt, ok bool) {
+func (sp *_ScopeParser) build_decl_assign(tokens []lex.Token) (_ *ast.AssignSt, ok bool) {
 	if len(tokens) < 1 {
 		return
 	}
@@ -860,7 +860,7 @@ func (sp *scope_parser) build_decl_assign(tokens []lex.Token) (_ *ast.AssignSt, 
 	return
 }
 
-func (sp *scope_parser) build_assign_st(tokens []lex.Token) (*ast.AssignSt, bool) {
+func (sp *_ScopeParser) build_assign_st(tokens []lex.Token) (*ast.AssignSt, bool) {
 	if !check_assign_tokens(tokens) {
 		return nil, false
 	}
@@ -872,7 +872,7 @@ func (sp *scope_parser) build_assign_st(tokens []lex.Token) (*ast.AssignSt, bool
 	}
 }
 
-func (sp *scope_parser) build_st(st *st) ast.NodeData {
+func (sp *_ScopeParser) build_st(st *_Stmt) ast.NodeData {
 	token := st.tokens[0]
 	if token.Id == lex.ID_IDENT {
 		s, ok := sp.build_id_st(st.tokens)
@@ -943,7 +943,7 @@ func (sp *scope_parser) build_st(st *st) ast.NodeData {
 	return nil
 }
 
-func (sp *scope_parser) build(tokens []lex.Token, s *ast.Scope) {
+func (sp *_ScopeParser) build(tokens []lex.Token, s *ast.Scope) {
 	if s == nil {
 		return
 	}

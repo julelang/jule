@@ -41,15 +41,15 @@ func is_fn_call(tokens []lex.Token) []lex.Token {
 	return nil
 }
 
-type call_data struct {
+type _CallData struct {
 	expr_tokens     []lex.Token
 	args_tokens     []lex.Token
 	generics_tokens []lex.Token
 }
 
-func get_call_data(tokens []lex.Token) *call_data {
-	data := &call_data{}
-	data.expr_tokens, data.args_tokens = lex.RangeLast(tokens)
+func get_call_data(tokens []lex.Token) *_CallData {
+	data := &_CallData{}
+	data.expr_tokens, data.args_tokens = lex.Range_last(tokens)
 	if len(data.expr_tokens) == 0 {
 		return data
 	}
@@ -57,7 +57,7 @@ func get_call_data(tokens []lex.Token) *call_data {
 	// Below is call expression
 	token := data.expr_tokens[len(data.expr_tokens)-1]
 	if token.Id == lex.ID_RANGE && token.Kind == lex.KND_RBRACKET {
-		data.expr_tokens, data.generics_tokens = lex.RangeLast(data.expr_tokens)
+		data.expr_tokens, data.generics_tokens = lex.Range_last(data.expr_tokens)
 	}
 	return data
 }
@@ -114,11 +114,11 @@ func split_colon(tokens []lex.Token) ([]lex.Token, []lex.Token) {
 	return nil, nil
 }
 
-type precedencer struct {
+type _Precedencer struct {
 	pairs [][]any
 }
 
-func (p *precedencer) set(level int, expr any) {
+func (p *_Precedencer) set(level int, expr any) {
 	for i, pair := range p.pairs {
 		pair_level := pair[0].(int)
 		if level > pair_level {
@@ -131,7 +131,7 @@ func (p *precedencer) set(level int, expr any) {
 	p.pairs = append(p.pairs, []any{level, expr})
 }
 
-func (p *precedencer) get_lower() any {
+func (p *_Precedencer) get_lower() any {
 	for i := len(p.pairs) - 1; i >= 0; i-- {
 		data := p.pairs[i][1]
 		if data != nil {
@@ -154,7 +154,7 @@ func eliminate_comments(tokens []lex.Token) []lex.Token {
 // Finds index of priority operator and returns index of operator
 // if found, returns -1 if not.
 func find_lowest_prec_op(tokens []lex.Token) int {
-	prec := precedencer{}
+	prec := _Precedencer{}
 	brace_n := 0
 	for i, token := range tokens {
 		switch {
@@ -219,15 +219,15 @@ func get_range_expr_tokens(tokens []lex.Token) ([]lex.Token, int) {
 	return nil, range_n
 }
 
-type expr_builder struct {
-	p *parser
+type _ExprBuilder struct {
+	p *_Parser
 }
 
-func (ep *expr_builder) push_err(token lex.Token, key string, args ...any) {
+func (ep *_ExprBuilder) push_err(token lex.Token, key string, args ...any) {
 	ep.p.push_err(token, key, args...)
 }
 
-func (ep *expr_builder) build_tuple(parts [][]lex.Token) *ast.TupleExpr {
+func (ep *_ExprBuilder) build_tuple(parts [][]lex.Token) *ast.TupleExpr {
 	tuple := &ast.TupleExpr{
 		Expr: make([]ast.ExprData, len(parts)),
 	}
@@ -237,18 +237,18 @@ func (ep *expr_builder) build_tuple(parts [][]lex.Token) *ast.TupleExpr {
 	return tuple
 }
 
-func (ep *expr_builder) build_lit(token lex.Token) *ast.LitExpr {
+func (ep *_ExprBuilder) build_lit(token lex.Token) *ast.LitExpr {
 	return &ast.LitExpr{
 		Token: token,
 		Value: token.Kind,
 	}
 }
 
-func (ep *expr_builder) build_primitive_type(token lex.Token) *ast.TypeExpr {
+func (ep *_ExprBuilder) build_primitive_type(token lex.Token) *ast.TypeExpr {
 	return &ast.TypeExpr{Token: token}
 }
 
-func (ep *expr_builder) build_single(token lex.Token) ast.ExprData {
+func (ep *_ExprBuilder) build_single(token lex.Token) ast.ExprData {
 	switch token.Id {
 	case lex.ID_LIT:
 		return ep.build_lit(token)
@@ -265,7 +265,7 @@ func (ep *expr_builder) build_single(token lex.Token) ast.ExprData {
 	}
 }
 
-func (ep *expr_builder) build_cpp_linked_ident(tokens []lex.Token) *ast.IdentExpr {
+func (ep *_ExprBuilder) build_cpp_linked_ident(tokens []lex.Token) *ast.IdentExpr {
 	if tokens[0].Id != lex.ID_CPP {
 		return nil
 	} else if tokens[1].Id != lex.ID_DOT {
@@ -282,12 +282,12 @@ func (ep *expr_builder) build_cpp_linked_ident(tokens []lex.Token) *ast.IdentExp
 	return expr
 }
 
-func (ep *expr_builder) build_unary(tokens []lex.Token) *ast.UnaryExpr {
+func (ep *_ExprBuilder) build_unary(tokens []lex.Token) *ast.UnaryExpr {
 	op := tokens[0]
 	if len(tokens) == 1 {
 		ep.push_err(op, "missing_expr_for_unary")
 		return nil
-	} else if !lex.IsUnaryOp(op.Kind) {
+	} else if !lex.Is_unary_op(op.Kind) {
 		ep.push_err(op, "invalid_op_for_unary", op.Kind)
 		return nil
 	}
@@ -303,7 +303,7 @@ func (ep *expr_builder) build_unary(tokens []lex.Token) *ast.UnaryExpr {
 	}
 }
 
-func (ep *expr_builder) build_obj_sub_ident(tokens []lex.Token) *ast.SubIdentExpr {
+func (ep *_ExprBuilder) build_obj_sub_ident(tokens []lex.Token) *ast.SubIdentExpr {
 	i := len(tokens) - 1
 	ident_token := tokens[i]
 	i-- // Set offset to delimiter token.
@@ -318,7 +318,7 @@ func (ep *expr_builder) build_obj_sub_ident(tokens []lex.Token) *ast.SubIdentExp
 	}
 }
 
-func (ep *expr_builder) build_ns_sub_ident(tokens []lex.Token) *ast.NsSelectionExpr {
+func (ep *_ExprBuilder) build_ns_sub_ident(tokens []lex.Token) *ast.NsSelectionExpr {
 	ns := &ast.NsSelectionExpr{}
 	for i, token := range tokens {
 		if i%2 == 0 {
@@ -335,7 +335,7 @@ func (ep *expr_builder) build_ns_sub_ident(tokens []lex.Token) *ast.NsSelectionE
 	return ns
 }
 
-func (ep *expr_builder) build_sub_ident(tokens []lex.Token) ast.ExprData {
+func (ep *_ExprBuilder) build_sub_ident(tokens []lex.Token) ast.ExprData {
 	i := len(tokens) - 1
 	i-- // Set offset to delimiter token.
 	token := tokens[i]
@@ -350,7 +350,7 @@ func (ep *expr_builder) build_sub_ident(tokens []lex.Token) ast.ExprData {
 	}
 }
 
-func (ep *expr_builder) build_variadic(tokens []lex.Token) *ast.VariadicExpr {
+func (ep *_ExprBuilder) build_variadic(tokens []lex.Token) *ast.VariadicExpr {
 	token := tokens[len(tokens)-1] // Variadic operator token.
 	tokens = tokens[:len(tokens)-1] // Remove variadic operator token.
 	return &ast.VariadicExpr{
@@ -359,7 +359,7 @@ func (ep *expr_builder) build_variadic(tokens []lex.Token) *ast.VariadicExpr {
 	}
 }
 
-func (ep *expr_builder) build_op_right(tokens []lex.Token) ast.ExprData {
+func (ep *_ExprBuilder) build_op_right(tokens []lex.Token) ast.ExprData {
 	token := tokens[len(tokens)-1]
 	switch token.Kind {
 	case lex.KND_TRIPLE_DOT:
@@ -371,7 +371,7 @@ func (ep *expr_builder) build_op_right(tokens []lex.Token) ast.ExprData {
 	}
 }
 
-func (ep *expr_builder) build_between_parentheses(tokens []lex.Token) ast.ExprData {
+func (ep *_ExprBuilder) build_between_parentheses(tokens []lex.Token) ast.ExprData {
 	token := tokens[0]
 	tokens = tokens[1 : len(tokens)-1] // Remove parentheses.
 	if len(tokens) == 0 {
@@ -381,7 +381,7 @@ func (ep *expr_builder) build_between_parentheses(tokens []lex.Token) ast.ExprDa
 	return ep.build(tokens)
 }
 
-func (ep *expr_builder) try_build_cast(tokens []lex.Token) *ast.CastExpr {
+func (ep *_ExprBuilder) try_build_cast(tokens []lex.Token) *ast.CastExpr {
 	range_n := 0
 	error_token := tokens[0]
 	for i, token := range tokens {
@@ -439,7 +439,7 @@ func (ep *expr_builder) try_build_cast(tokens []lex.Token) *ast.CastExpr {
 	return nil
 }
 
-func (ep *expr_builder) push_arg(args *[]*ast.Expr, tokens []lex.Token, err_token lex.Token) {
+func (ep *_ExprBuilder) push_arg(args *[]*ast.Expr, tokens []lex.Token, err_token lex.Token) {
 	if len(tokens) == 0 {
 		ep.push_err(err_token, "invalid_syntax")
 		return
@@ -447,7 +447,7 @@ func (ep *expr_builder) push_arg(args *[]*ast.Expr, tokens []lex.Token, err_toke
 	*args = append(*args, ep.build_from_tokens(tokens))
 }
 
-func (ep *expr_builder) build_args(tokens []lex.Token) []*ast.Expr {
+func (ep *_ExprBuilder) build_args(tokens []lex.Token) []*ast.Expr {
 	// No argument.
 	if len(tokens) < 2 {
 		return nil
@@ -487,7 +487,7 @@ func (ep *expr_builder) build_args(tokens []lex.Token) []*ast.Expr {
 }
 
 // Tokens should include brackets.
-func (ep *expr_builder) build_call_generics(tokens []lex.Token) []*ast.Type {
+func (ep *_ExprBuilder) build_call_generics(tokens []lex.Token) []*ast.Type {
 	if len(tokens) == 0 {
 		return nil
 	}
@@ -511,7 +511,7 @@ func (ep *expr_builder) build_call_generics(tokens []lex.Token) []*ast.Type {
 	return generics
 }
 
-func (ep *expr_builder) build_fn_call(token lex.Token, data *call_data) *ast.FnCallExpr {
+func (ep *_ExprBuilder) build_fn_call(token lex.Token, data *_CallData) *ast.FnCallExpr {
 	return &ast.FnCallExpr{
 		Token:    token,
 		Expr:     ep.build_from_tokens(data.expr_tokens),
@@ -520,7 +520,7 @@ func (ep *expr_builder) build_fn_call(token lex.Token, data *call_data) *ast.FnC
 	}
 }
 
-func (ep *expr_builder) build_parentheses_range(tokens []lex.Token) ast.ExprData {
+func (ep *_ExprBuilder) build_parentheses_range(tokens []lex.Token) ast.ExprData {
 	token := tokens[0]
 	switch token.Id {
 	case lex.ID_RANGE:
@@ -544,7 +544,7 @@ func (ep *expr_builder) build_parentheses_range(tokens []lex.Token) ast.ExprData
 	return ep.build_fn_call(token, data)
 }
 
-func (ep *expr_builder) build_unsafe_expr(tokens []lex.Token) *ast.UnsafeExpr {
+func (ep *_ExprBuilder) build_unsafe_expr(tokens []lex.Token) *ast.UnsafeExpr {
 	token := tokens[0]
 	tokens = tokens[1:] // Remove unsafe keyword.
 	i := 0
@@ -559,11 +559,11 @@ func (ep *expr_builder) build_unsafe_expr(tokens []lex.Token) *ast.UnsafeExpr {
 	}
 }
 
-func (ep *expr_builder) build_anon_fn(tokens []lex.Token) *ast.FnDecl {
+func (ep *_ExprBuilder) build_anon_fn(tokens []lex.Token) *ast.FnDecl {
 	return ep.p.build_fn(tokens, false, true, false)
 }
 
-func (ep *expr_builder) build_unsafe(tokens []lex.Token) ast.ExprData {
+func (ep *_ExprBuilder) build_unsafe(tokens []lex.Token) ast.ExprData {
 	if len(tokens) == 0 {
 		ep.push_err(tokens[0], "invalid_syntax")
 		return nil
@@ -579,7 +579,7 @@ func (ep *expr_builder) build_unsafe(tokens []lex.Token) ast.ExprData {
 }
 
 // Tokens should include brace tokens.
-func (ep *expr_builder) get_brace_range_literal_expr_parts(tokens []lex.Token) ([][]lex.Token) {
+func (ep *_ExprBuilder) get_brace_range_literal_expr_parts(tokens []lex.Token) ([][]lex.Token) {
 	// No part.
 	if len(tokens) < 2 {
 		return nil
@@ -627,7 +627,7 @@ func (ep *expr_builder) get_brace_range_literal_expr_parts(tokens []lex.Token) (
 	return parts
 }
 
-func (ep *expr_builder) build_field_expr_pair(tokens []lex.Token) *ast.FieldExprPair {
+func (ep *_ExprBuilder) build_field_expr_pair(tokens []lex.Token) *ast.FieldExprPair {
 	pair := &ast.FieldExprPair{}
 	token := tokens[0]
 	if token.Id == lex.ID_IDENT {
@@ -643,7 +643,7 @@ func (ep *expr_builder) build_field_expr_pair(tokens []lex.Token) *ast.FieldExpr
 	return pair
 }
 
-func (ep *expr_builder) build_field_expr_pairs(tokens []lex.Token) []*ast.FieldExprPair {
+func (ep *_ExprBuilder) build_field_expr_pairs(tokens []lex.Token) []*ast.FieldExprPair {
 	parts := ep.get_brace_range_literal_expr_parts(tokens)
 	if len(parts) == 0 {
 		return nil
@@ -656,7 +656,7 @@ func (ep *expr_builder) build_field_expr_pairs(tokens []lex.Token) []*ast.FieldE
 	return pairs
 }
 
-func (ep *expr_builder) build_typed_struct_literal(tokens []lex.Token) *ast.StructLit {
+func (ep *_ExprBuilder) build_typed_struct_literal(tokens []lex.Token) *ast.StructLit {
 	i := 0
 	t, ok := ep.p.build_type(tokens, &i, true)
 	if !ok {
@@ -679,7 +679,7 @@ func (ep *expr_builder) build_typed_struct_literal(tokens []lex.Token) *ast.Stru
 	}
 }
 
-func (ep *expr_builder) build_brace_lit_part(tokens []lex.Token) ast.ExprData {
+func (ep *_ExprBuilder) build_brace_lit_part(tokens []lex.Token) ast.ExprData {
 	l, r := split_colon(tokens)
 	// If left is not nil, colon token found.
 	if l != nil {
@@ -693,7 +693,7 @@ func (ep *expr_builder) build_brace_lit_part(tokens []lex.Token) ast.ExprData {
 	return ep.build_from_tokens(tokens)
 }
 
-func (ep *expr_builder) build_brace_literal(tokens []lex.Token) *ast.BraceLit {
+func (ep *_ExprBuilder) build_brace_literal(tokens []lex.Token) *ast.BraceLit {
 	parts := ep.get_brace_range_literal_expr_parts(tokens)
 	if parts == nil {
 		return &ast.BraceLit{Exprs: nil}
@@ -708,7 +708,7 @@ func (ep *expr_builder) build_brace_literal(tokens []lex.Token) *ast.BraceLit {
 	return lit
 }
 
-func (ep *expr_builder) build_brace_range(tokens []lex.Token) ast.ExprData {
+func (ep *_ExprBuilder) build_brace_range(tokens []lex.Token) ast.ExprData {
 	expr_tokens, range_n := get_range_expr_tokens(tokens)
 
 	switch {
@@ -737,14 +737,14 @@ func (ep *expr_builder) build_brace_range(tokens []lex.Token) ast.ExprData {
 }
 
 // Tokens is should be store enumerable range tokens.
-func (ep *expr_builder) get_enumerable_parts(tokens []lex.Token) [][]lex.Token {
+func (ep *_ExprBuilder) get_enumerable_parts(tokens []lex.Token) [][]lex.Token {
 	tokens = tokens[1 : len(tokens)-1] // Remove range tokens.
 	parts, errors := lex.Parts(tokens, lex.ID_COMMA, true)
 	ep.p.errors = append(ep.p.errors, errors...)
 	return parts
 }
 
-func (ep *expr_builder) build_slice(tokens []lex.Token) *ast.SliceExpr {
+func (ep *_ExprBuilder) build_slice(tokens []lex.Token) *ast.SliceExpr {
 	parts := ep.get_enumerable_parts(tokens)
 	if len(parts) == 0 {
 		return nil
@@ -760,7 +760,7 @@ func (ep *expr_builder) build_slice(tokens []lex.Token) *ast.SliceExpr {
 	return slc
 }
 
-func (ep *expr_builder) build_indexing(expr_tokens []lex.Token,
+func (ep *_ExprBuilder) build_indexing(expr_tokens []lex.Token,
 	tokens []lex.Token, error_token lex.Token) *ast.IndexingExpr {
 	tokens = tokens[1 : len(tokens)-1] // Remove brackets.
 	return &ast.IndexingExpr{
@@ -769,7 +769,7 @@ func (ep *expr_builder) build_indexing(expr_tokens []lex.Token,
 	}
 }
 
-func (ep *expr_builder) build_slicing(expr_tokens []lex.Token,
+func (ep *_ExprBuilder) build_slicing(expr_tokens []lex.Token,
 	slicing_tokens []lex.Token, colon int, error_token lex.Token) *ast.SlicingExpr {
 	slc := &ast.SlicingExpr{
 		Expr: ep.build_from_tokens(expr_tokens),
@@ -788,7 +788,7 @@ func (ep *expr_builder) build_slicing(expr_tokens []lex.Token,
 	return slc
 }
 
-func (ep *expr_builder) build_bracket_range(tokens []lex.Token) ast.ExprData {
+func (ep *_ExprBuilder) build_bracket_range(tokens []lex.Token) ast.ExprData {
 	error_token := tokens[0]
 	expr_tokens, range_n := get_range_expr_tokens(tokens)
 
@@ -817,7 +817,7 @@ func (ep *expr_builder) build_bracket_range(tokens []lex.Token) ast.ExprData {
 	return ep.build_indexing(expr_tokens, tokens, error_token)
 }
 
-func (ep *expr_builder) build_data(tokens []lex.Token) ast.ExprData {
+func (ep *_ExprBuilder) build_data(tokens []lex.Token) ast.ExprData {
 	switch len(tokens) {
 	case 1:
 		return ep.build_single(tokens[0])
@@ -859,7 +859,7 @@ func (ep *expr_builder) build_data(tokens []lex.Token) ast.ExprData {
 	return nil
 }
 
-func (ep *expr_builder) build_binop(tokens []lex.Token, i int) *ast.BinopExpr {
+func (ep *_ExprBuilder) build_binop(tokens []lex.Token, i int) *ast.BinopExpr {
 	return &ast.BinopExpr{
 		L:  ep.build(tokens[:i]),
 		R:  ep.build(tokens[i+1:]),
@@ -867,7 +867,7 @@ func (ep *expr_builder) build_binop(tokens []lex.Token, i int) *ast.BinopExpr {
 	}
 }
 
-func (ep *expr_builder) build(tokens []lex.Token) ast.ExprData {
+func (ep *_ExprBuilder) build(tokens []lex.Token) ast.ExprData {
 	i := find_lowest_prec_op(tokens)
 	if i == -1 {
 		return ep.build_data(tokens)
@@ -875,7 +875,7 @@ func (ep *expr_builder) build(tokens []lex.Token) ast.ExprData {
 	return ep.build_binop(tokens, i)
 }
 
-func (ep *expr_builder) build_kind(tokens []lex.Token) ast.ExprData {
+func (ep *_ExprBuilder) build_kind(tokens []lex.Token) ast.ExprData {
 	parts, errors := lex.Parts(tokens, lex.ID_COMMA, true)
 	if errors != nil {
 		ep.p.errors = append(ep.p.errors, errors...)
@@ -886,7 +886,7 @@ func (ep *expr_builder) build_kind(tokens []lex.Token) ast.ExprData {
 	return ep.build(tokens)
 }
 
-func (ep *expr_builder) build_from_tokens(tokens []lex.Token) *ast.Expr {
+func (ep *_ExprBuilder) build_from_tokens(tokens []lex.Token) *ast.Expr {
 	tokens = eliminate_comments(tokens)
 	if len(tokens) == 0 {
 		return nil

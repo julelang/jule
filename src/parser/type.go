@@ -50,20 +50,20 @@ func split_map_range(tokens []lex.Token, i *int) (range_tokens []lex.Token, colo
 	return
 }
 
-type type_builder struct {
-	p        *parser
+type _TypeBuilder struct {
+	p        *_Parser
 	tokens   []lex.Token
 	i        *int
 	err      bool
 }
 
-func (tb *type_builder) push_err(token lex.Token, key string) {
+func (tb *_TypeBuilder) push_err(token lex.Token, key string) {
 	if tb.err {
 		tb.p.push_err(token, key)
 	}
 }
 
-func (tb *type_builder) build_primitive() *ast.Type {
+func (tb *_TypeBuilder) build_primitive() *ast.Type {
 	t := &ast.Type{
 		Token: tb.tokens[*tb.i],
 		Kind:  nil,
@@ -72,7 +72,7 @@ func (tb *type_builder) build_primitive() *ast.Type {
 	return t
 }
 
-func (tb *type_builder) build_namespace() *ast.Type {
+func (tb *_TypeBuilder) build_namespace() *ast.Type {
 	t := &ast.Type{
 		Token: tb.tokens[*tb.i],
 	}
@@ -98,7 +98,7 @@ func (tb *type_builder) build_namespace() *ast.Type {
 	return t
 }
 
-func (tb *type_builder) build_generics() []*ast.Type {
+func (tb *_TypeBuilder) build_generics() []*ast.Type {
 	if *tb.i >= len(tb.tokens) {
 		return nil
 	}
@@ -120,7 +120,7 @@ func (tb *type_builder) build_generics() []*ast.Type {
 	return types
 }
 
-func (tb *type_builder) ident_generics() [][]lex.Token {
+func (tb *_TypeBuilder) ident_generics() [][]lex.Token {
 	first := *tb.i
 	range_n := 0
 	for ; *tb.i < len(tb.tokens); *tb.i++ {
@@ -146,7 +146,7 @@ func (tb *type_builder) ident_generics() [][]lex.Token {
 	return parts
 }
 
-func (tb *type_builder) build_ident() *ast.Type {
+func (tb *_TypeBuilder) build_ident() *ast.Type {
 	if *tb.i+1 < len(tb.tokens) && tb.tokens[*tb.i+1].Id == lex.ID_DBLCOLON {
 		return tb.build_namespace()
 	}
@@ -162,7 +162,7 @@ func (tb *type_builder) build_ident() *ast.Type {
 	return t
 }
 
-func (tb *type_builder) build_cpp_link() *ast.Type {
+func (tb *_TypeBuilder) build_cpp_link() *ast.Type {
 	if *tb.i+1 >= len(tb.tokens) || tb.tokens[*tb.i+1].Id != lex.ID_DOT {
 		tb.push_err(tb.tokens[*tb.i], "invalid_syntax")
 		return nil
@@ -173,7 +173,7 @@ func (tb *type_builder) build_cpp_link() *ast.Type {
 	return t
 }
 
-func (tb *type_builder) build_fn() *ast.Type {
+func (tb *_TypeBuilder) build_fn() *ast.Type {
 	token := tb.tokens[*tb.i]
 	f := tb.p.build_fn_prototype(tb.tokens, tb.i, false, true)
 	if f == nil {
@@ -187,7 +187,7 @@ func (tb *type_builder) build_fn() *ast.Type {
 	}
 }
 
-func (tb *type_builder) build_ptr() *ast.Type {
+func (tb *_TypeBuilder) build_ptr() *ast.Type {
 	token := tb.tokens[*tb.i]
 	if *tb.i+1 >= len(tb.tokens) {
 		tb.push_err(token, "invalid_syntax")
@@ -208,7 +208,7 @@ func (tb *type_builder) build_ptr() *ast.Type {
 	elem := tb.step()
 	if elem == nil {
 		return nil
-	} else if elem.IsRef() {
+	} else if elem.Is_ref() {
 		tb.push_err(token, "ptr_points_ref")
 	}
 	return &ast.Type{
@@ -219,7 +219,7 @@ func (tb *type_builder) build_ptr() *ast.Type {
 	}
 }
 
-func (tb *type_builder) build_ref() *ast.Type {
+func (tb *_TypeBuilder) build_ref() *ast.Type {
 	token := tb.tokens[*tb.i]
 	if *tb.i+1 >= len(tb.tokens) {
 		tb.push_err(token, "invalid_syntax")
@@ -230,9 +230,9 @@ func (tb *type_builder) build_ref() *ast.Type {
 	elem := tb.step()
 	if elem == nil {
 		return nil
-	} else if elem.IsPtr() {
+	} else if elem.Is_ptr() {
 		tb.push_err(token, "ref_refs_ptr")
-	} else if elem.IsArray() {
+	} else if elem.Is_array() {
 		tb.push_err(token, "ref_refs_array")
 	}
 
@@ -244,7 +244,7 @@ func (tb *type_builder) build_ref() *ast.Type {
 	}
 }
 
-func (tb *type_builder) build_op() *ast.Type {
+func (tb *_TypeBuilder) build_op() *ast.Type {
 	token := tb.tokens[*tb.i]
 	switch token.Kind {
 	case lex.KND_STAR:
@@ -260,7 +260,7 @@ func (tb *type_builder) build_op() *ast.Type {
 	return nil
 }
 
-func (tb *type_builder) build_slice() *ast.Type {
+func (tb *_TypeBuilder) build_slice() *ast.Type {
 	token := tb.tokens[*tb.i]
 	*tb.i++ // skip right bracket
 	elem := tb.step()
@@ -275,7 +275,7 @@ func (tb *type_builder) build_slice() *ast.Type {
 	}
 }
 
-func (tb *type_builder) build_array() *ast.Type {
+func (tb *_TypeBuilder) build_array() *ast.Type {
 	// *tb.i points to element type of array.
 	// Brackets places at ... < *tb.i offset.
 
@@ -295,7 +295,7 @@ func (tb *type_builder) build_array() *ast.Type {
 		Elem: elem,
 	}
 
-	_, expr_tokens := lex.RangeLast(tb.tokens[:expr_delta])
+	_, expr_tokens := lex.Range_last(tb.tokens[:expr_delta])
 	expr_tokens = expr_tokens[1 : len(expr_tokens)-1] // Remove brackets.
 	token := expr_tokens[0]
 	if len(expr_tokens) == 1 && token.Id == lex.ID_OP && token.Kind == lex.KND_TRIPLE_DOT {
@@ -310,7 +310,7 @@ func (tb *type_builder) build_array() *ast.Type {
 	}
 }
 
-func (tb *type_builder) build_map(colon int, tokens []lex.Token) *ast.Type {
+func (tb *_TypeBuilder) build_map(colon int, tokens []lex.Token) *ast.Type {
 	colon_token := tb.tokens[colon]
 	if colon == 0 || colon+1 >= len(tokens) {
 		tb.push_err(colon_token, "missing_type")
@@ -344,7 +344,7 @@ func (tb *type_builder) build_map(colon int, tokens []lex.Token) *ast.Type {
 	}
 }
 
-func (tb *type_builder) build_enumerable() *ast.Type {
+func (tb *_TypeBuilder) build_enumerable() *ast.Type {
 	token := tb.tokens[*tb.i]
 	if *tb.i+2 >= len(tb.tokens) || token.Id != lex.ID_RANGE || token.Kind != lex.KND_LBRACKET {
 		tb.push_err(token, "invalid_syntax")
@@ -365,7 +365,7 @@ func (tb *type_builder) build_enumerable() *ast.Type {
 	return tb.build_map(colon, map_tokens)
 }
 
-func (tb *type_builder) step() *ast.Type {
+func (tb *_TypeBuilder) step() *ast.Type {
 	token := tb.tokens[*tb.i]
 	switch token.Id {
 	case lex.ID_DT:
@@ -395,7 +395,7 @@ func (tb *type_builder) step() *ast.Type {
 
 // Builds type.
 // Returns void if error occurs.
-func (tb *type_builder) build() (_ *ast.Type, ok bool) {
+func (tb *_TypeBuilder) build() (_ *ast.Type, ok bool) {
 	root := tb.step()
 	if root == nil {
 		return build_void_type(), false

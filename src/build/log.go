@@ -6,8 +6,8 @@ import (
 )
 
 // Log types.
-const FLAT_ERR = 0
-const ERR = 1
+const FLAT_ERR = 0 // Just text.
+const ERR = 1      // Column, row, path and text.
 
 // Log is a build log.
 type Log struct {

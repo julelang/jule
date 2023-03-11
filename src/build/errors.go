@@ -149,7 +149,7 @@ var ERRORS = map[string]string{
 	`use_decl_at_body`:                         `use declarations must declared before other declarations`,
 }
 
-// Errorf returns error.
+// Returns formatted error message by key and args.
 func Errorf(key string, args ...any) string {
 	fmt := ERRORS[key]
 	return apply_fmt(fmt, args...)

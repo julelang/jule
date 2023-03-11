@@ -241,11 +241,11 @@ func exist_op(kind string, operators []string) bool {
 }
 
 // Reports whether kind is unary operator.
-func IsUnaryOp(kind string) bool { return exist_op(kind, UNARY_OPS[:]) }
+func Is_unary_op(kind string) bool { return exist_op(kind, UNARY_OPS[:]) }
 // Reports whether kind is binary operator.
-func IsBinOp(kind string) bool { return exist_op(kind, BIN_OPS[:]) }
+func Is_bin_op(kind string) bool { return exist_op(kind, BIN_OPS[:]) }
 // Reports whether kind is weak operator.
-func IsWeakOp(kind string) bool { return exist_op(kind, WEAK_OPS[:]) }
+func Is_weak_op(kind string) bool { return exist_op(kind, WEAK_OPS[:]) }
 
 // Token is lexer token.
 type Token struct {
@@ -281,16 +281,16 @@ func (t *Token) Prec() int {
 }
 
 // Reports whether kind is string literal.
-func IsStr(k string) bool { return k != "" && (k[0] == '"' || IsRawStr(k)) }
+func Is_str(k string) bool { return k != "" && (k[0] == '"' || Is_raw_str(k)) }
 // Reports whether kind is raw string literal.
-func IsRawStr(k string) bool { return k != "" && k[0] == '`' }
+func Is_raw_str(k string) bool { return k != "" && k[0] == '`' }
 // Reports whether kind is rune literal.
 // Literal value can be byte or rune.
-func IsRune(k string) bool { return k != "" && k[0] == '\'' }
+func Is_rune(k string) bool { return k != "" && k[0] == '\'' }
 // Reports whether kind is nil literal.
-func IsNil(k string) bool { return k == KND_NIL }
+func Is_nil(k string) bool { return k == KND_NIL }
 // Reports whether kind is boolean literal.
-func IsBool(k string) bool { return k == KND_TRUE || k == KND_FALSE }
+func Is_bool(k string) bool { return k == KND_TRUE || k == KND_FALSE }
 
 func contains_any(s string, bytes string) bool {
 	for _, b := range bytes {
@@ -303,7 +303,7 @@ func contains_any(s string, bytes string) bool {
 }
 
 // Reports whether kind is float.
-func IsFloat(k string) bool {
+func Is_float(k string) bool {
 	if strings.HasPrefix(k, "0x") {
 		return contains_any(k, ".pP")
 	}
@@ -311,7 +311,7 @@ func IsFloat(k string) bool {
 }
 
 // Reports whether kind is numeric.
-func IsNum(k string) bool {
+func Is_num(k string) bool {
 	if k == "" {
 		return false
 	}
@@ -319,14 +319,14 @@ func IsNum(k string) bool {
 }
 
 // Reports whether kind is literal.
-func IsLiteral(k string) bool {
-	return IsNum(k) || IsStr(k) || IsRune(k) || IsNil(k) || IsBool(k)
+func Is_lit(k string) bool {
+	return Is_num(k) || Is_str(k) || Is_rune(k) || Is_nil(k) || Is_bool(k)
 }
 
 // Reports whether identifier is ignore.
-func IsIgnoreIdent(ident string) bool { return ident == IGNORE_IDENT }
+func Is_ignore_ident(ident string) bool { return ident == IGNORE_IDENT }
 // Reports whether identifier is anonymous.
-func IsAnonIdent(ident string) bool { return ident == ANON_IDENT }
+func Is_anon_ident(ident string) bool { return ident == ANON_IDENT }
 
 func rune_exist(r rune, runes []rune) bool {
 	for _, cr := range runes {
@@ -338,24 +338,24 @@ func rune_exist(r rune, runes []rune) bool {
 }
 
 // Reports whether rune is punctuation.
-func IsPunct(r rune) bool { return rune_exist(r, PUNCTS[:]) }
+func Is_punct(r rune) bool { return rune_exist(r, PUNCTS[:]) }
 // Reports wheter byte is whitespace.
-func IsSpace(r rune) bool { return rune_exist(r, SPACES[:]) }
+func Is_space(r rune) bool { return rune_exist(r, SPACES[:]) }
 
 // Reports whether rune is letter.
-func IsLetter(r rune) bool {
+func Is_letter(r rune) bool {
 	return ('a' <= r && r <= 'z') || ('A' <= r && r <= 'Z')
 }
 
 // Reports whether firs rune of string is allowed
 // to first rune for identifier.
-func IsIdentRune(s string) bool {
+func Is_ident_rune(s string) bool {
 	if s == "" {
 		return false
 	}
 	if s[0] != '_' {
 		r, _ := utf8.DecodeRuneInString(s)
-		if !IsLetter(r) {
+		if !Is_letter(r) {
 			return false
 		}
 	}
@@ -363,14 +363,14 @@ func IsIdentRune(s string) bool {
 }
 
 // Reports whether byte is decimal sequence.
-func IsDecimal(b byte) bool { return '0' <= b && b <= '9' }
+func Is_decimal(b byte) bool { return '0' <= b && b <= '9' }
 // Reports whether byte is binary sequence.
-func IsBinary(b byte) bool { return b == '0' || b == '1' }
+func Is_binary(b byte) bool { return b == '0' || b == '1' }
 // Reports whether byte is octal sequence.
-func IsOctal(b byte) bool { return '0' <= b && b <= '7' }
+func Is_octal(b byte) bool { return '0' <= b && b <= '7' }
 
 // Reports whether byte is hexadecimal sequence.
-func IsHex(b byte) bool {
+func Is_hex(b byte) bool {
 	switch {
 	case '0' <= b && b <= '9':
 		return true
@@ -421,14 +421,14 @@ func Range(i *int, open string, close string, tokens []Token) []Token {
 	return tokens[start : *i-1]
 }
 
-// RangeLast returns last range from tokens.
+// Range_last returns last range from tokens.
 // Returns tokens without range tokens and range tokens.
 // Range tokens includes left and right range tokens.
 //
 // Special cases are;
-//  RangeLast(toks) = toks, nil if len(toks) == 0
-//  RangeLast(toks) = toks, nil if toks is not has range at last
-func RangeLast(tokens []Token) (cutted []Token, cut []Token) {
+//  Range_last(toks) = toks, nil if len(toks) == 0
+//  Range_last(toks) = toks, nil if toks is not has range at last
+func Range_last(tokens []Token) (cutted []Token, cut []Token) {
 	if len(tokens) == 0 {
 		return tokens, nil
 	} else if tokens[len(tokens)-1].Id != ID_RANGE {

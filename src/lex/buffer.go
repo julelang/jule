@@ -13,7 +13,7 @@ type File struct {
 }
 
 // Reports whether file path is exist and accessible.
-func (f *File) IsOk() bool {
+func (f *File) Is_ok() bool {
 	_, err := os.Stat(f._path)
 	return err == nil
 }
@@ -42,7 +42,7 @@ func (f *File) Tokens() []Token {
 }
 
 // Returns new File points to Jule file.
-func NewFileSet(path string) *File {
+func New_file_set(path string) *File {
 	return &File{
 		_path:  path,
 		tokens: nil,

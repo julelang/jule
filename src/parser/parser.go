@@ -35,7 +35,7 @@ func tokstoa(tokens []lex.Token) string {
 	return s
 }
 
-type parser struct {
+type _Parser struct {
 	file          *lex.File
 	directives    []*ast.Directive
 	comment_group *ast.CommentGroup
@@ -43,21 +43,21 @@ type parser struct {
 	errors        []build.Log
 }
 
-func (p *parser) stop() { p.file = nil }
-func (p *parser) stopped() bool { return p.file == nil }
+func (p *_Parser) stop() { p.file = nil }
+func (p *_Parser) stopped() bool { return p.file == nil }
 
 // Appends error by specified token, key and args.
-func (p *parser) push_err(token lex.Token, key string, args ...any) {
+func (p *_Parser) push_err(token lex.Token, key string, args ...any) {
 	p.errors = append(p.errors, compiler_err(token, key, args...))
 }
 
-func (p *parser) build_expr(tokens []lex.Token) *ast.Expr {
-	ep := expr_builder{p: p}
+func (p *_Parser) build_expr(tokens []lex.Token) *ast.Expr {
+	ep := _ExprBuilder{p: p}
 	expr := ep.build_from_tokens(tokens)
 	return expr
 }
 
-func (p *parser) push_directive(c *ast.Comment) {
+func (p *_Parser) push_directive(c *ast.Comment) {
 	d := &ast.Directive{
 		Token: c.Token,
 		Tag:   c.Token.Kind[len(lex.DIRECTIVE_PREFIX):], // Remove directive prefix
@@ -65,7 +65,7 @@ func (p *parser) push_directive(c *ast.Comment) {
 
 	// Don't append if directive kind is invalid.
 	ok := false
-	for _, kind := range build.ATTRS {
+	for _, kind := range build.DIRECTIVES {
 		if d.Tag == kind {
 			ok = true
 			break
@@ -85,8 +85,8 @@ func (p *parser) push_directive(c *ast.Comment) {
 	p.directives = append(p.directives, d)
 }
 
-func (p *parser) process_comment(c *ast.Comment) {
-	if c.IsDirective() {
+func (p *_Parser) process_comment(c *ast.Comment) {
+	if c.Is_directive() {
 		p.push_directive(c)
 		return
 	}
@@ -96,17 +96,17 @@ func (p *parser) process_comment(c *ast.Comment) {
 	p.comment_group.Comments = append(p.comment_group.Comments, c)
 }
 
-func (p *parser) build_scope(tokens []lex.Token) *ast.Scope {
+func (p *_Parser) build_scope(tokens []lex.Token) *ast.Scope {
 	s := new_scope()
-	sp := scope_parser{
+	sp := _ScopeParser{
 		p: p,
 	}
 	sp.build(tokens, s)
 	return s
 }
 
-func (p *parser) __build_type(tokens []lex.Token, i *int, err bool) (*ast.Type, bool) {
-	tb := type_builder{
+func (p *_Parser) __build_type(tokens []lex.Token, i *int, err bool) (*ast.Type, bool) {
+	tb := _TypeBuilder{
 		p:      p,
 		tokens: tokens,
 		i:      i,
@@ -116,7 +116,7 @@ func (p *parser) __build_type(tokens []lex.Token, i *int, err bool) (*ast.Type, 
 }
 
 // build_type builds AST model of data-type.
-func (p *parser) build_type(tokens []lex.Token, i *int, err bool) (*ast.Type, bool) {
+func (p *_Parser) build_type(tokens []lex.Token, i *int, err bool) (*ast.Type, bool) {
 	token := tokens[*i]
 	t, ok := p.__build_type(tokens, i, err)
 	if err && !ok {
@@ -125,7 +125,7 @@ func (p *parser) build_type(tokens []lex.Token, i *int, err bool) (*ast.Type, bo
 	return t, ok
 }
 
-func (p *parser) build_type_alias_decl(tokens []lex.Token) *ast.TypeAliasDecl {
+func (p *_Parser) build_type_alias_decl(tokens []lex.Token) *ast.TypeAliasDecl {
 	i := 1 // Skip "type" keyword.
 	if i >= len(tokens) {
 		p.push_err(tokens[i-1], "invalid_syntax")
@@ -162,7 +162,7 @@ func (p *parser) build_type_alias_decl(tokens []lex.Token) *ast.TypeAliasDecl {
 	return tad
 }
 
-func (p *parser) build_var_type_and_expr(v *ast.VarDecl, tokens []lex.Token) {
+func (p *_Parser) build_var_type_and_expr(v *ast.VarDecl, tokens []lex.Token) {
 	i := 0
 	tok := tokens[i]
 	if tok.Id == lex.ID_COLON {
@@ -198,7 +198,7 @@ func (p *parser) build_var_type_and_expr(v *ast.VarDecl, tokens []lex.Token) {
 	}
 }
 
-func (p *parser) build_var_common(v *ast.VarDecl, tokens []lex.Token) {
+func (p *_Parser) build_var_common(v *ast.VarDecl, tokens []lex.Token) {
 	v.Token = tokens[0]
 	if v.Token.Id != lex.ID_IDENT {
 		p.push_err(v.Token, "invalid_syntax")
@@ -212,7 +212,7 @@ func (p *parser) build_var_common(v *ast.VarDecl, tokens []lex.Token) {
 	}
 }
 
-func (p *parser) build_var_begin(v *ast.VarDecl, i *int, tokens []lex.Token) {
+func (p *_Parser) build_var_begin(v *ast.VarDecl, i *int, tokens []lex.Token) {
 	tok := tokens[*i]
 	switch tok.Id {
 	case lex.ID_LET:
@@ -243,7 +243,7 @@ func (p *parser) build_var_begin(v *ast.VarDecl, i *int, tokens []lex.Token) {
 	}
 }
 
-func (p *parser) build_var(tokens []lex.Token) *ast.VarDecl {
+func (p *_Parser) build_var(tokens []lex.Token) *ast.VarDecl {
 	i := 0
 	v := &ast.VarDecl{
 		Token: tokens[i],
@@ -255,7 +255,7 @@ func (p *parser) build_var(tokens []lex.Token) *ast.VarDecl {
 	tokens = tokens[i:]
 	p.build_var_common(v, tokens)
 	if v.Expr == nil {
-		if v.Kind.IsVoid() {
+		if v.Kind.Is_void() {
 			p.push_err(v.Token, "missing_type")
 		}
 		if v.IsConst {
@@ -265,7 +265,7 @@ func (p *parser) build_var(tokens []lex.Token) *ast.VarDecl {
 	return v
 }
 
-func (p *parser) build_generic(tokens []lex.Token) *ast.Generic {
+func (p *_Parser) build_generic(tokens []lex.Token) *ast.Generic {
 	if len(tokens) > 1 {
 		p.push_err(tokens[1], "invalid_syntax")
 	}
@@ -279,7 +279,7 @@ func (p *parser) build_generic(tokens []lex.Token) *ast.Generic {
 	return g
 }
 
-func (p *parser) build_generics(tokens []lex.Token) []*ast.Generic {
+func (p *_Parser) build_generics(tokens []lex.Token) []*ast.Generic {
 	token := tokens[0]
 	if len(tokens) == 0 {
 		p.push_err(token, "missing_expr")
@@ -299,7 +299,7 @@ func (p *parser) build_generics(tokens []lex.Token) []*ast.Generic {
 	return generics
 }
 
-func (p *parser) build_self_param(tokens []lex.Token) *ast.Param {
+func (p *_Parser) build_self_param(tokens []lex.Token) *ast.Param {
 	if len(tokens) == 0 {
 		return nil
 	}
@@ -338,7 +338,7 @@ func (p *parser) build_self_param(tokens []lex.Token) *ast.Param {
 	return param
 }
 
-func (p *parser) param_type_begin(param *ast.Param, i *int, tokens []lex.Token) {
+func (p *_Parser) param_type_begin(param *ast.Param, i *int, tokens []lex.Token) {
 	for ; *i < len(tokens); *i++ {
 		token := tokens[*i]
 		if token.Id != lex.ID_OP {
@@ -355,7 +355,7 @@ func (p *parser) param_type_begin(param *ast.Param, i *int, tokens []lex.Token) 
 	}
 }
 
-func (p *parser) build_param_type(param *ast.Param, tokens []lex.Token, must_pure bool) {
+func (p *_Parser) build_param_type(param *ast.Param, tokens []lex.Token, must_pure bool) {
 	i := 0
 	if !must_pure {
 		p.param_type_begin(param, &i, tokens)
@@ -369,15 +369,15 @@ func (p *parser) build_param_type(param *ast.Param, tokens []lex.Token, must_pur
 	}
 }
 
-func (p *parser) param_body_id(param *ast.Param, token lex.Token) {
-	if lex.IsIgnoreIdent(token.Kind) {
+func (p *_Parser) param_body_id(param *ast.Param, token lex.Token) {
+	if lex.Is_ignore_ident(token.Kind) {
 		param.Ident = lex.ANON_IDENT
 		return
 	}
 	param.Ident = token.Kind
 }
 
-func (p *parser) build_param_body(param *ast.Param, i *int, tokens []lex.Token, must_pure bool) {
+func (p *_Parser) build_param_body(param *ast.Param, i *int, tokens []lex.Token, must_pure bool) {
 	p.param_body_id(param, tokens[*i])
 	tok := tokens[*i]
 	// +1 for skip identifier token
@@ -399,7 +399,7 @@ func (p *parser) build_param_body(param *ast.Param, i *int, tokens []lex.Token, 
 	p.build_param_type(param, tokens, must_pure)
 }
 
-func (p *parser) build_param(tokens []lex.Token, must_pure bool) *ast.Param {
+func (p *_Parser) build_param(tokens []lex.Token, must_pure bool) *ast.Param {
 	param := &ast.Param{
 		Token: tokens[0],
 	}
@@ -427,9 +427,9 @@ func (p *parser) build_param(tokens []lex.Token, must_pure bool) *ast.Param {
 	return param
 }
 
-func (p *parser) check_params(params []*ast.Param) {
+func (p *_Parser) check_params(params []*ast.Param) {
 	for _, param := range params {
-		if param.IsSelf() || param.Kind != nil {
+		if param.Is_self() || param.Kind != nil {
 			continue
 		}
 		if param.Token.Id == lex.ID_NA {
@@ -445,7 +445,7 @@ func (p *parser) check_params(params []*ast.Param) {
 	}
 }
 
-func (p *parser) build_params(tokens []lex.Token, method bool, must_pure bool) []*ast.Param {
+func (p *_Parser) build_params(tokens []lex.Token, method bool, must_pure bool) []*ast.Param {
 	parts, errs := lex.Parts(tokens, lex.ID_COMMA, true)
 	p.errors = append(p.errors, errs...)
 	if len(parts) == 0 {
@@ -455,7 +455,7 @@ func (p *parser) build_params(tokens []lex.Token, method bool, must_pure bool) [
 	var params []*ast.Param
 	if method && len(parts) > 0 {
 		param := p.build_self_param(parts[0])
-		if param != nil && param.IsSelf() {
+		if param != nil && param.Is_self() {
 			params = append(params, param)
 			parts = parts[1:]
 		}
@@ -472,7 +472,7 @@ func (p *parser) build_params(tokens []lex.Token, method bool, must_pure bool) [
 	return params
 }
 
-func (p *parser) build_multi_ret_type(tokens []lex.Token, i *int) (t *ast.RetType, ok bool) {
+func (p *_Parser) build_multi_ret_type(tokens []lex.Token, i *int) (t *ast.RetType, ok bool) {
 	t = &ast.RetType{}
 	*i++
 	if *i >= len(tokens) {
@@ -511,7 +511,7 @@ func (p *parser) build_multi_ret_type(tokens []lex.Token, i *int) (t *ast.RetTyp
 	return
 }
 
-func (p *parser) build_ret_type(tokens []lex.Token, i *int) (t *ast.RetType, ok bool) {
+func (p *_Parser) build_ret_type(tokens []lex.Token, i *int) (t *ast.RetType, ok bool) {
 	if *i >= len(tokens) {
 		return nil, false
 	}
@@ -550,7 +550,7 @@ func (p *parser) build_ret_type(tokens []lex.Token, i *int) (t *ast.RetType, ok 
 	return
 }
 
-func (p *parser) build_fn_prototype(tokens []lex.Token, i *int, method bool, anon bool) *ast.FnDecl {
+func (p *_Parser) build_fn_prototype(tokens []lex.Token, i *int, method bool, anon bool) *ast.FnDecl {
 	f := &ast.FnDecl{
 		Token: tokens[*i],
 	}
@@ -613,7 +613,7 @@ func (p *parser) build_fn_prototype(tokens []lex.Token, i *int, method bool, ano
 	return f
 }
 
-func (p *parser) build_fn(tokens []lex.Token, method bool, anon bool, prototype bool) *ast.FnDecl {
+func (p *_Parser) build_fn(tokens []lex.Token, method bool, anon bool, prototype bool) *ast.FnDecl {
 	i := 0
 	f := p.build_fn_prototype(tokens, &i, method, anon)
 	if prototype {
@@ -645,7 +645,7 @@ func (p *parser) build_fn(tokens []lex.Token, method bool, anon bool, prototype 
 	return f
 }
 
-func (p *parser) get_use_decl_selectors(tokens []lex.Token) []lex.Token {
+func (p *_Parser) get_use_decl_selectors(tokens []lex.Token) []lex.Token {
 	i := 0
 	tokens = lex.Range(&i, lex.KND_LBRACE, lex.KND_RBRACE, tokens)
 	parts, errs := lex.Parts(tokens, lex.ID_COMMA, true)
@@ -668,7 +668,7 @@ func (p *parser) get_use_decl_selectors(tokens []lex.Token) []lex.Token {
 	return selectors
 }
 
-func (p *parser) build_use_cpp_decl(decl *ast.UseDecl, tokens []lex.Token) {
+func (p *_Parser) build_use_cpp_decl(decl *ast.UseDecl, tokens []lex.Token) {
 	if len(tokens) > 2 {
 		p.push_err(tokens[2], "invalid_syntax")
 	}
@@ -681,7 +681,7 @@ func (p *parser) build_use_cpp_decl(decl *ast.UseDecl, tokens []lex.Token) {
 	decl.LinkString = token.Kind[1 : len(token.Kind)-1]
 }
 
-func (p *parser) parse_use_decl(decl *ast.UseDecl, tokens []lex.Token) {
+func (p *_Parser) parse_use_decl(decl *ast.UseDecl, tokens []lex.Token) {
 	tok := tokens[0]
 	if tok.Id == lex.ID_CPP {
 		p.build_use_cpp_decl(decl, tokens)
@@ -707,7 +707,7 @@ func (p *parser) parse_use_decl(decl *ast.UseDecl, tokens []lex.Token) {
 			return
 		}
 		var selectors []lex.Token
-		tokens, selectors = lex.RangeLast(tokens)
+		tokens, selectors = lex.Range_last(tokens)
 		decl.Selected = p.get_use_decl_selectors(selectors)
 		if len(tokens) == 0 {
 			p.push_err(tok, "invalid_syntax")
@@ -749,7 +749,7 @@ func (p *parser) parse_use_decl(decl *ast.UseDecl, tokens []lex.Token) {
 	decl.LinkString = "std:: " + tokstoa(tokens)
 }
 
-func (p *parser) build_use_decl(tokens []lex.Token) *ast.UseDecl {
+func (p *_Parser) build_use_decl(tokens []lex.Token) *ast.UseDecl {
 	decl := &ast.UseDecl{
 		Token: tokens[0],
 	}
@@ -762,7 +762,7 @@ func (p *parser) build_use_decl(tokens []lex.Token) *ast.UseDecl {
 	return decl
 }
 
-func (p *parser) build_enum_item_expr(i *int, tokens []lex.Token) *ast.Expr {
+func (p *_Parser) build_enum_item_expr(i *int, tokens []lex.Token) *ast.Expr {
 	brace_n := 0
 	expr_start := *i
 	for ; *i < len(tokens); *i++ {
@@ -792,7 +792,7 @@ func (p *parser) build_enum_item_expr(i *int, tokens []lex.Token) *ast.Expr {
 	return nil
 }
 
-func (p *parser) build_enum_items(tokens []lex.Token) []*ast.EnumItem {
+func (p *_Parser) build_enum_items(tokens []lex.Token) []*ast.EnumItem {
 	items := make([]*ast.EnumItem, 0)
 	for i := 0; i < len(tokens); i++ {
 		t := tokens[i]
@@ -828,7 +828,7 @@ func (p *parser) build_enum_items(tokens []lex.Token) []*ast.EnumItem {
 	return items
 }
 
-func (p *parser) build_enum_decl(tokens []lex.Token) *ast.EnumDecl {
+func (p *_Parser) build_enum_decl(tokens []lex.Token) *ast.EnumDecl {
 	if len(tokens) < 2 || len(tokens) < 3 {
 		p.push_err(tokens[0], "invalid_syntax")
 		return nil
@@ -868,7 +868,7 @@ func (p *parser) build_enum_decl(tokens []lex.Token) *ast.EnumDecl {
 	return e
 }
 
-func (p *parser) build_field(tokens []lex.Token) *ast.Field {
+func (p *_Parser) build_field(tokens []lex.Token) *ast.Field {
 	f := &ast.Field{}
 
 	f.IsPub = tokens[0].Id == lex.ID_PUB
@@ -915,7 +915,7 @@ func (p *parser) build_field(tokens []lex.Token) *ast.Field {
 	return f
 }
 
-func (p *parser) build_struct_decl_fields(tokens []lex.Token) []*ast.Field {
+func (p *_Parser) build_struct_decl_fields(tokens []lex.Token) []*ast.Field {
 	var fields []*ast.Field
 	stms := split_stms(tokens)
 	for _, st := range stms {
@@ -929,7 +929,7 @@ func (p *parser) build_struct_decl_fields(tokens []lex.Token) []*ast.Field {
 	return fields
 }
 
-func (p *parser) build_struct_decl(tokens []lex.Token) *ast.StructDecl {
+func (p *_Parser) build_struct_decl(tokens []lex.Token) *ast.StructDecl {
 	if len(tokens) < 3 {
 		p.push_err(tokens[0], "invalid_syntax")
 		return nil
@@ -971,19 +971,19 @@ func (p *parser) build_struct_decl(tokens []lex.Token) *ast.StructDecl {
 	return s
 }
 
-func (p *parser) check_method_receiver(f *ast.FnDecl) {
+func (p *_Parser) check_method_receiver(f *ast.FnDecl) {
 	if len(f.Params) == 0 {
 		p.push_err(f.Token, "missing_receiver")
 		return
 	}
 	param := f.Params[0]
-	if !param.IsSelf() {
+	if !param.Is_self() {
 		p.push_err(f.Token, "missing_receiver")
 		return
 	}
 }
 
-func (p *parser) build_trait_methods(tokens []lex.Token) []*ast.FnDecl {
+func (p *_Parser) build_trait_methods(tokens []lex.Token) []*ast.FnDecl {
 	var methods []*ast.FnDecl
 	stms := split_stms(tokens)
 	for _, st := range stms {
@@ -998,7 +998,7 @@ func (p *parser) build_trait_methods(tokens []lex.Token) []*ast.FnDecl {
 	return methods
 }
 
-func (p *parser) build_trait_decl(tokens []lex.Token) *ast.TraitDecl {
+func (p *_Parser) build_trait_decl(tokens []lex.Token) *ast.TraitDecl {
 	if len(tokens) < 3 {
 		p.push_err(tokens[0], "invalid_syntax")
 		return nil
@@ -1024,7 +1024,7 @@ func (p *parser) build_trait_decl(tokens []lex.Token) *ast.TraitDecl {
 	return t
 }
 
-func (p *parser) build_cpp_link_fn(tokens []lex.Token) *ast.FnDecl {
+func (p *_Parser) build_cpp_link_fn(tokens []lex.Token) *ast.FnDecl {
 	tokens = tokens[1:] // Remove "cpp" keyword.
 	f := p.build_fn(tokens, false, false, true)
 	if f != nil {
@@ -1033,7 +1033,7 @@ func (p *parser) build_cpp_link_fn(tokens []lex.Token) *ast.FnDecl {
 	return f
 }
 
-func (p *parser) build_cpp_link_var(tokens []lex.Token) *ast.VarDecl {
+func (p *_Parser) build_cpp_link_var(tokens []lex.Token) *ast.VarDecl {
 	tokens = tokens[1:] // Remove "cpp" keyword.
 	v := p.build_var(tokens)
 	if v != nil {
@@ -1048,7 +1048,7 @@ func (p *parser) build_cpp_link_var(tokens []lex.Token) *ast.VarDecl {
 	return v
 }
 
-func (p *parser) build_cpp_link_struct(tokens []lex.Token) *ast.StructDecl {
+func (p *_Parser) build_cpp_link_struct(tokens []lex.Token) *ast.StructDecl {
 	tokens = tokens[1:] // Remove "cpp" keyword.
 	s := p.build_struct_decl(tokens)
 	if s != nil {
@@ -1057,7 +1057,7 @@ func (p *parser) build_cpp_link_struct(tokens []lex.Token) *ast.StructDecl {
 	return s
 }
 
-func (p *parser) build_cpp_link_type_alias(tokens []lex.Token) *ast.TypeAliasDecl {
+func (p *_Parser) build_cpp_link_type_alias(tokens []lex.Token) *ast.TypeAliasDecl {
 	tokens = tokens[1:] // Remove "cpp" keyword.
 	t := p.build_type_alias_decl(tokens)
 	if t != nil {
@@ -1066,7 +1066,7 @@ func (p *parser) build_cpp_link_type_alias(tokens []lex.Token) *ast.TypeAliasDec
 	return t
 }
 
-func (p *parser) build_cpp_link(tokens []lex.Token) ast.NodeData {
+func (p *_Parser) build_cpp_link(tokens []lex.Token) ast.NodeData {
 	token := tokens[0]
 	if len(tokens) == 1 {
 		p.push_err(token, "invalid_syntax")
@@ -1088,7 +1088,7 @@ func (p *parser) build_cpp_link(tokens []lex.Token) ast.NodeData {
 	return nil
 }
 
-func (p *parser) get_method(tokens []lex.Token) *ast.FnDecl {
+func (p *_Parser) get_method(tokens []lex.Token) *ast.FnDecl {
 	token := tokens[0]
 	if token.Id == lex.ID_UNSAFE {
 		if len(tokens) == 1 || tokens[1].Id != lex.ID_FN {
@@ -1102,7 +1102,7 @@ func (p *parser) get_method(tokens []lex.Token) *ast.FnDecl {
 	return p.build_fn(tokens, true, false, false)
 }
 
-func (p *parser) parse_impl_trait(ipl *ast.Impl, tokens []lex.Token) {
+func (p *_Parser) parse_impl_trait(ipl *ast.Impl, tokens []lex.Token) {
 	stms := split_stms(tokens)
 	for _, st := range stms {
 		tokens := st.tokens
@@ -1123,7 +1123,7 @@ func (p *parser) parse_impl_trait(ipl *ast.Impl, tokens []lex.Token) {
 	}
 }
 
-func (p *parser) parse_impl_struct(ipl *ast.Impl, tokens []lex.Token) {
+func (p *_Parser) parse_impl_struct(ipl *ast.Impl, tokens []lex.Token) {
 	stms := split_stms(tokens)
 	for _, st := range stms {
 		tokens := st.tokens
@@ -1158,15 +1158,15 @@ func (p *parser) parse_impl_struct(ipl *ast.Impl, tokens []lex.Token) {
 	}
 }
 
-func (p *parser) parse_impl_body(ipl *ast.Impl, tokens []lex.Token) {
-	if ipl.IsTraitImpl() {
+func (p *_Parser) parse_impl_body(ipl *ast.Impl, tokens []lex.Token) {
+	if ipl.Is_trait_impl() {
 		p.parse_impl_trait(ipl, tokens)
 		return
 	}
 	p.parse_impl_struct(ipl, tokens)
 }
 
-func (p *parser) build_impl(tokens []lex.Token) *ast.Impl {
+func (p *_Parser) build_impl(tokens []lex.Token) *ast.Impl {
 	token := tokens[0]
 	if len(tokens) < 2 {
 		p.push_err(token, "invalid_syntax")
@@ -1219,7 +1219,7 @@ body:
 	return ipl
 }
 
-func (p *parser) build_node_data(tokens []lex.Token) ast.NodeData {
+func (p *_Parser) build_node_data(tokens []lex.Token) ast.NodeData {
 	token := tokens[0]
 	switch token.Id {
 	case lex.ID_USE:
@@ -1263,7 +1263,7 @@ func (p *parser) build_node_data(tokens []lex.Token) ast.NodeData {
 	}
 }
 
-func (p *parser) check_comment_group(node ast.Node) {
+func (p *_Parser) check_comment_group(node ast.Node) {
 	if p.comment_group == nil {
 		return
 	}
@@ -1275,7 +1275,7 @@ func (p *parser) check_comment_group(node ast.Node) {
 	}
 }
 
-func (p *parser) check_directive(node ast.Node) {
+func (p *_Parser) check_directive(node ast.Node) {
 	if p.directives == nil {
 		return
 	}
@@ -1287,7 +1287,7 @@ func (p *parser) check_directive(node ast.Node) {
 	}
 }
 
-func (p *parser) apply_meta(node ast.Node, is_pub bool) {
+func (p *_Parser) apply_meta(node ast.Node, is_pub bool) {
 	switch node.Data.(type) {
 	case *ast.VarDecl:
 		v := node.Data.(*ast.VarDecl)
@@ -1358,7 +1358,7 @@ func (p *parser) apply_meta(node ast.Node, is_pub bool) {
 	}
 }
 
-func (p *parser) check_use_decl(node ast.Node) {
+func (p *_Parser) check_use_decl(node ast.Node) {
 	// This algorithm checks if use declarations are used
 	// after a different declaration. "node" represents the last
 	// parsed node, but not yet in p.tree. Therefore, the last p.tree
@@ -1393,7 +1393,7 @@ func (p *parser) check_use_decl(node ast.Node) {
 	}
 }
 
-func (p *parser) append_node(st []lex.Token) {
+func (p *_Parser) append_node(st []lex.Token) {
 	if len(st) == 0 {
 		return
 	}
@@ -1427,7 +1427,7 @@ func (p *parser) append_node(st []lex.Token) {
 	p.tree = append(p.tree, node)
 }
 
-func (p *parser) parse() {
+func (p *_Parser) parse() {
 	stms := split_stms(p.file.Tokens())
 	for _, st := range stms {
 		p.append_node(st.tokens)

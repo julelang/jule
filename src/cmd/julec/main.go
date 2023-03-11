@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+// This is the main package of JuleC.
+// Naming conventions fully same with Jule.
+
 package main
 
 import (
@@ -17,27 +20,27 @@ import (
 	"github.com/julelang/jule/parser"
 )
 
-const compiler_gcc = "gcc"
-const compiler_clang = "clang"
+const COMPILER_GCC = "gcc"
+const COMPILER_CLANG = "clang"
 
-const compiler_path_gcc = "g++"
-const compiler_path_clang = "clang++"
+const COMPILER_PATH_GCC = "g++"
+const COMPILER_PATH_CLANG = "clang++"
 
-// Sets by compiler or command-line inputs
-var compiler = ""
-var compiler_path = ""
+// Sets by COMPILER or command-line inputs
+var COMPILER = ""
+var COMPILER_PATH = ""
 
-// julec_header is the header path of "julec.hpp"
-var julec_header = ""
+// JULEC_HEADER is the header path of "julec.hpp"
+var JULEC_HEADER = ""
 
-const cmd_help = "help"
-const cmd_version = "version"
-const cmd_tool = "tool"
+const CMD_HELP = "help"
+const CMD_VERSION = "version"
+const CMD_TOOL = "tool"
 
 var HELP_MAP = [...][2]string{
-	{cmd_help, "Show help"},
-	{cmd_version, "Show version"},
-	{cmd_tool, "Tools for effective Jule"},
+	{CMD_HELP,    "Show help"},
+	{CMD_VERSION, "Show version"},
+	{CMD_TOOL,    "Tools for effective Jule"},
 }
 
 func help() {
@@ -103,11 +106,11 @@ func tool() {
 
 func process_command() bool {
 	switch os.Args[1] {
-	case cmd_help:
+	case CMD_HELP:
 		help()
-	case cmd_version:
+	case CMD_VERSION:
 		version()
-	case cmd_tool:
+	case CMD_TOOL:
 		tool()
 	default:
 		return false
@@ -116,17 +119,17 @@ func process_command() bool {
 }
 
 func init() {
-	julec_header = filepath.Join(jule.EXEC_PATH, "..")
-	julec_header = filepath.Join(julec_header, "api")
-	julec_header = filepath.Join(julec_header, "julec.hpp")
+	JULEC_HEADER = filepath.Join(jule.EXEC_PATH, "..")
+	JULEC_HEADER = filepath.Join(JULEC_HEADER, "api")
+	JULEC_HEADER = filepath.Join(JULEC_HEADER, "julec.hpp")
 
 	// Configure compiler to default by platform
 	if runtime.GOOS == "windows" {
-		compiler = compiler_gcc
-		compiler_path = compiler_path_gcc
+		COMPILER = COMPILER_GCC
+		COMPILER_PATH = COMPILER_PATH_GCC
 	} else {
-		compiler = compiler_clang
-		compiler_path = compiler_path_clang
+		COMPILER = COMPILER_CLANG
+		COMPILER_PATH = COMPILER_PATH_CLANG
 	}
 
 	// Not started with arguments.
@@ -148,7 +151,7 @@ func read_buff(path string) []byte {
 }
 
 func main() {
-	f := lex.NewFileSet(os.Args[1])
+	f := lex.New_file_set(os.Args[1])
 	text := (string)(read_buff(f.Path()))
 
 	errors := lex.Lex(f, text)
@@ -157,7 +160,7 @@ func main() {
 		return
 	}
 
-	finf := parser.ParseFile(f)
+	finf := parser.Parse_file(f)
 	if finf.Errors != nil {
 		fmt.Println(finf.Errors)
 		return
