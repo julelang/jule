@@ -9,6 +9,7 @@ type SymbolTable struct {
 	Structs      []*Struct    // Structures.
 	Funcs        []*Fn        // Functions.
 	Traits       []*Trait     // Traits.
+	Enums        []*Enum      // Enums.
 }
 
 // Returns package by identifier.

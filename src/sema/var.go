@@ -16,4 +16,5 @@ type Var struct {
 	Public       bool
 	Doc_comments *ast.CommentGroup
 	Kind         *ast.Type
+	Expr         *ast.Expr
 }

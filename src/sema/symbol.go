@@ -86,6 +86,33 @@ func build_trait(decl *ast.TraitDecl) *Trait {
 	}
 }
 
+func build_enum_item(decl *ast.EnumItem) *EnumItem {
+	return &EnumItem{
+		Token: decl.Token,
+		Ident: decl.Ident,
+		Expr:  decl.Expr,
+	}
+}
+
+func build_enum_items(decls []*ast.EnumItem) []*EnumItem {
+	items := make([]*EnumItem, len(decls))
+	for i, decl := range decls {
+		items[i] = build_enum_item(decl)
+	}
+	return items
+}
+
+func build_enum(decl *ast.EnumDecl) *Enum {
+	return &Enum{
+		Token:        decl.Token,
+		Public:       decl.Public,
+		Ident:        decl.Ident,
+		Kind:         decl.Kind,
+		Items:        build_enum_items(decl.Items),
+		Doc_comments: decl.Doc_comments,
+	}
+}
+
 func build_var(decl *ast.VarDecl) *Var {
 	return &Var{
 		Scope:        decl.Scope,
@@ -97,6 +124,7 @@ func build_var(decl *ast.VarDecl) *Var {
 		Public:       decl.Public,
 		Doc_comments: decl.Doc_comments,
 		Kind:         decl.Kind,
+		Expr:         decl.Expr,
 	}
 }
 
@@ -315,6 +343,10 @@ func (s *_SymbolBuilder) append_decl(decl ast.Node) {
 	case *ast.VarDecl:
 		v := build_var(decl.Data.(*ast.VarDecl))
 		s.table.Vars = append(s.table.Vars, v)
+
+	case *ast.EnumDecl:
+		e := build_enum(decl.Data.(*ast.EnumDecl))
+		s.table.Enums = append(s.table.Enums, e)
 
 	default:
 		s.push_err(decl.Token, "invalid_syntax")
