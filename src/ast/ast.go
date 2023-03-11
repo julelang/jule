@@ -15,7 +15,6 @@ type Ast struct {
 	//  *StructDecl
 	//  *TraitDecl
 	//  *TypeAliasDecl
-	//  *UseDecl
 	//  *VarDecl
 	Decls []Node
 }

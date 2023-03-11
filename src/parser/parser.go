@@ -1420,15 +1420,21 @@ func (p *_Parser) append_node(st []lex.Token) {
 	switch {
 	case node.Is_use_decl():
 		p.ast.UseDecls = append(p.ast.UseDecls, node.Data.(*ast.UseDecl))
+
 	case node.Is_decl():
 		// Use declarations eliminated.
 		p.ast.Decls = append(p.ast.Decls, node)
+
 	case node.Is_comment():
 		// Global scope is not appends *CommentGroup.
 		c := node.Data.(*ast.Comment)
 		p.ast.Comments = append(p.ast.Comments, c)
+
 	case node.Is_impl():
 		p.ast.Impls = append(p.ast.Impls, node.Data.(*ast.Impl))
+	
+	default:
+		p.push_err(node.Token, "invalid_syntax")
 	}
 }
 
