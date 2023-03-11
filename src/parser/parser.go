@@ -1287,7 +1287,7 @@ func (p *parser) check_directive(node ast.Node) {
 	}
 }
 
-func (p *parser) apply_meta(node *ast.Node, is_pub bool) {
+func (p *parser) apply_meta(node ast.Node, is_pub bool) {
 	switch node.Data.(type) {
 	case *ast.VarDecl:
 		v := node.Data.(*ast.VarDecl)
@@ -1358,6 +1358,41 @@ func (p *parser) apply_meta(node *ast.Node, is_pub bool) {
 	}
 }
 
+func (p *parser) check_use_decl(node ast.Node) {
+	// This algorithm checks if use declarations are used
+	// after a different declaration. "node" represents the last
+	// parsed node, but not yet in p.tree. Therefore, the last p.tree
+	// element represents the node before the last parsed node.
+	//
+	// At least three nodes must be parsed for the condition to be met.
+	//   - The first node can be anything and this is valid.
+	//   - The second node is a possible declaration.
+	// If the third node is a use declaration then an error should be
+	// caught according to the previous declaration.
+	//
+	// Condition is p.tree is less than 2.
+	// But actually this is like "len(p.tree) < 3".
+	// This is because the last node is not in p.tree as described.
+	if len(p.tree) < 2 {
+		return
+	}
+
+	switch node.Data.(type) {
+	case *ast.UseDecl:
+		// Ignore.
+	default:
+		return
+	}
+
+	last := p.tree[len(p.tree)-1]
+	switch last.Data.(type) {
+	case *ast.UseDecl, *ast.Comment:
+		// Ignore.
+	default:
+		p.push_err(node.Token, "use_decl_at_body")
+	}
+}
+
 func (p *parser) append_node(st []lex.Token) {
 	if len(st) == 0 {
 		return
@@ -1385,9 +1420,10 @@ func (p *parser) append_node(st []lex.Token) {
 		return
 	}
 
-	p.apply_meta(&node, is_pub)
+	p.apply_meta(node, is_pub)
 	p.check_comment_group(node)
 	p.check_directive(node)
+	p.check_use_decl(node)
 	p.tree = append(p.tree, node)
 }
 

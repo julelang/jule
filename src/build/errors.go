@@ -146,6 +146,7 @@ var ERRORS = map[string]string{
 	`ptr_points_ref`:                           `pointers cannot point to reference`,
 	`missing_expr_for_unary`:                   `missing expression for unary operator`,
 	`invalid_op_for_unary`:                     `invalid_operator_for_unary: @`,
+	`use_decl_at_body`:                         `use declarations must declared before other declarations`,
 }
 
 // Errorf returns error.
