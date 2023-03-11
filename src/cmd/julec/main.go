@@ -9,6 +9,7 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -184,16 +185,13 @@ func flat_compiler_err(text string) build.Log {
 	}
 }
 
-type Importer struct {}
-
-func (i *Importer) Import_package(path string) ([]*ast.Ast, []build.Log) {
+func read_package_dirents(path string) (_ []fs.DirEntry, err_msg string) {
 	dirents, err := os.ReadDir(path)
 	if err != nil {
-		errors := []build.Log{flat_compiler_err(err.Error())}
-		return nil, errors
+		return nil, "connot read package directory: " + path
 	}
 
-	var asts []*ast.Ast
+	var passed_dirents []fs.DirEntry
 	for _, dirent := range dirents {
 		name := dirent.Name()
 
@@ -204,8 +202,31 @@ func (i *Importer) Import_package(path string) ([]*ast.Ast, []build.Log) {
 			continue
 		}
 
-		path := filepath.Join(path, name)
-		finfo := parser.Parse_file(lex.New_file_set(path))
+		passed_dirents = append(passed_dirents, dirent)
+	}
+
+	return passed_dirents, ""
+}
+
+type Importer struct {}
+
+func (i *Importer) Import_package(path string) ([]*ast.Ast, []build.Log) {
+	dirents, err_msg := read_package_dirents(path)
+	if err_msg != "" {
+		errors := []build.Log{flat_compiler_err(err_msg)}
+		return nil, errors
+	}
+
+	var asts []*ast.Ast
+	for _, dirent := range dirents {
+		path := filepath.Join(path, dirent.Name())
+		file := lex.New_file_set(path)
+		errors := lex.Lex(file, string(read_buff(file.Path())))
+		if len(errors) > 0 {
+			return nil, errors
+		}
+
+		finfo := parser.Parse_file(file)
 		if len(finfo.Errors) > 0 {
 			return nil, finfo.Errors
 		}
@@ -219,24 +240,14 @@ func (i *Importer) Import_package(path string) ([]*ast.Ast, []build.Log) {
 func (i *Importer) Imported(pkg *sema.Package) {}
 
 func main() {
-	f := lex.New_file_set(os.Args[1])
-	text := (string)(read_buff(f.Path()))
-
-	errors := lex.Lex(f, text)
+	importer := &Importer{}
+	files, errors := importer.Import_package(os.Args[1])
 	if errors != nil {
 		fmt.Println(errors)
 		return
 	}
 
-	finf := parser.Parse_file(f)
-	if finf.Errors != nil {
-		fmt.Println(finf.Errors)
-		return
-	}
-
-	importer := &Importer{}
-
-	_, errors = sema.Analyze_file(WORKING_PATH, STDLIB_PATH, finf.Ast, importer)
+	_, errors = sema.Analyze_package(WORKING_PATH, STDLIB_PATH, files, importer)
 	if errors != nil {
 		fmt.Println(errors)
 		return
