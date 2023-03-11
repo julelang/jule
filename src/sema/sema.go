@@ -9,7 +9,7 @@ import (
 // Accepts tables as files of package.
 type _Sema struct {
 	errors   []build.Log
-	tables   []*SymbolTable
+	files   []*SymbolTable
 }
 
 func (s *_Sema) push_err(token lex.Token, key string, args ...any) {
@@ -34,7 +34,7 @@ func (s *_Sema) check_import(pkg *Package) {
 }
 
 func (s *_Sema) check_imports() {
-	for _, file := range s.tables {
+	for _, file := range s.files {
 		for _, pkg := range file.Packages {
 			s.check_import(pkg)
 
@@ -47,8 +47,28 @@ func (s *_Sema) check_imports() {
 	}
 }
 
-func (s *_Sema) check(tables []*SymbolTable) {
-	s.tables = tables
+func (s *_Sema) check_type_alias(ta *TypeAlias) {
+	if lex.Is_ignore_ident(ta.Ident) {
+		s.push_err(ta.Token, "ignore_id")
+		return
+	}
+}
+
+func (s *_Sema) check_package_type_aliases(files []*SymbolTable) {
+	for _, file := range files {
+		for _, ta := range file.Type_aliases {
+			s.check_type_alias(ta)
+			
+			// Break checking if type alias has error.
+			if len(s.errors) > 0 {
+				return
+			}
+		}
+	}
+}
+
+func (s *_Sema) check(files []*SymbolTable) {
+	s.files = files
 	
 	s.check_imports()
 	// Break checking if imports has error.
@@ -56,5 +76,5 @@ func (s *_Sema) check(tables []*SymbolTable) {
 		return
 	}
 
-
+	s.check_package_type_aliases(s.files)
 }

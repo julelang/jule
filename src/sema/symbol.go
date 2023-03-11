@@ -302,6 +302,7 @@ func (s *_SymbolBuilder) import_package(pkg *Package) (ok bool) {
 		pkg.Files = append(pkg.Files, table)
 	}
 
+	// TODO: Add identifier selections.
 	// TODO: Add package's built-in defines to symbol table.
 
 	return true

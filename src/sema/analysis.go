@@ -42,7 +42,7 @@ func analyze_package(pwd string, pstd string, files []*ast.Ast,
 		return nil, sema.errors
 	}
 
-	return sema.tables, nil
+	return sema.files, nil
 }
 
 // Builds symbol table of package's ASTs.
