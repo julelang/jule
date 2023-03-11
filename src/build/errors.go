@@ -97,7 +97,7 @@ var ERRORS = map[string]string{
 	`type_not_supports_casting_to`:             `@ data-type not supports casting to @ data-type`,
 	`use_at_content`:                           `use declaration must be start of source code`,
 	`use_not_found`:                            `used directory path not found/access: @`,
-	`use_has_errors`:                           `used package has errors`,
+	`used_package_has_errors`:                  `used package has errors: @`,
 	`def_not_support_pub`:                      `define is not supports pub modifier`,
 	`obj_not_support_sub_fields`:               `object is not supports sub fields: @`,
 	`obj_have_not_id`:                          `object is not have sub field in this identifier: @`,

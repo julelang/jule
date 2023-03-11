@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/julelang/jule"
+	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/parser"
@@ -176,6 +177,47 @@ func read_buff(path string) []byte {
 	return bytes
 }
 
+func flat_compiler_err(text string) build.Log {
+	return build.Log{
+		Type:   build.FLAT_ERR,
+		Text:   text,
+	}
+}
+
+type Importer struct {}
+
+func (i *Importer) Import_package(path string) ([]*ast.Ast, []build.Log) {
+	dirents, err := os.ReadDir(path)
+	if err != nil {
+		errors := []build.Log{flat_compiler_err(err.Error())}
+		return nil, errors
+	}
+
+	var asts []*ast.Ast
+	for _, dirent := range dirents {
+		name := dirent.Name()
+
+		// Skip directories, non-jule files, and file annotation fails.
+		if dirent.IsDir() ||
+			!strings.HasSuffix(name, jule.EXT) ||
+			!build.Is_pass_file_annotation(name) {
+			continue
+		}
+
+		path := filepath.Join(path, name)
+		finfo := parser.Parse_file(lex.New_file_set(path))
+		if len(finfo.Errors) > 0 {
+			return nil, finfo.Errors
+		}
+
+		asts = append(asts, finfo.Ast)
+	}
+
+	return asts, nil
+}
+
+func (i *Importer) Imported(pkg *sema.Package) {}
+
 func main() {
 	f := lex.New_file_set(os.Args[1])
 	text := (string)(read_buff(f.Path()))
@@ -192,9 +234,11 @@ func main() {
 		return
 	}
 
-	sinf := sema.Analyze(WORKING_PATH, STDLIB_PATH, finf.Ast)
-	if sinf.Errors != nil {
-		fmt.Println(sinf.Errors)
+	importer := &Importer{}
+
+	_, errors = sema.Analyze_file(WORKING_PATH, STDLIB_PATH, finf.Ast, importer)
+	if errors != nil {
+		fmt.Println(errors)
 		return
 	}
 }
