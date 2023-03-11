@@ -11,7 +11,6 @@ import (
 )
 
 // Symbol table builder.
-// Build only symbol structures, not process meta-datas.
 type _SymbolBuilder struct {
 	pwd      string
 	pstd     string
@@ -205,6 +204,17 @@ func (s *_SymbolBuilder) import_use_decls() {
 	}
 }
 
+func (s *_SymbolBuilder) build_type_alias(decl *ast.TypeAliasDecl) *TypeAlias {
+	return &TypeAlias{
+		Public:       decl.Public,
+		Cpp_linked:   decl.Cpp_linked,
+		Token:        decl.Token,
+		Ident:        decl.Ident,
+		Kind:         decl.Kind,
+		Doc_comments: decl.Doc_comments,
+	}
+}
+
 func (s *_SymbolBuilder) build_var(decl *ast.VarDecl) *Var {
 	return &Var{
 		Scope:        decl.Scope,
@@ -221,6 +231,10 @@ func (s *_SymbolBuilder) build_var(decl *ast.VarDecl) *Var {
 
 func (s *_SymbolBuilder) append_decl(decl ast.Node) {
 	switch decl.Data.(type) {
+	case *ast.TypeAliasDecl:
+		ta := s.build_type_alias(decl.Data.(*ast.TypeAliasDecl))
+		s.table.Type_aliases = append(s.table.Type_aliases, ta)
+
 	case *ast.VarDecl:
 		v := s.build_var(decl.Data.(*ast.VarDecl))
 		s.table.Vars = append(s.table.Vars, v)

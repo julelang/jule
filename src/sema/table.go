@@ -3,8 +3,9 @@ package sema
 // Symbol table.
 // Builds by semantic analyzer.
 type SymbolTable struct {
-	Pkgs []*Package // Imported packages.
-	Vars []*Var     // Variables.
+	Pkgs         []*Package   // Imported packages.
+	Vars         []*Var       // Variables.
+	Type_aliases []*TypeAlias // Type aliases.
 }
 
 // Returns package by identifier.
