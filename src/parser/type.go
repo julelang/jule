@@ -64,10 +64,7 @@ func (tb *_TypeBuilder) push_err(token lex.Token, key string) {
 }
 
 func (tb *_TypeBuilder) build_primitive() *ast.Type {
-	t := &ast.Type{
-		Token: tb.tokens[*tb.i],
-		Kind:  nil,
-	}
+	t := build_primitive_type(tb.tokens[*tb.i].Kind)
 	*tb.i++
 	return t
 }
@@ -129,6 +126,7 @@ func (tb *_TypeBuilder) ident_generics() [][]lex.Token {
 			switch token.Kind {
 			case lex.KND_LBRACKET:
 				range_n++
+
 			case lex.KND_RBRACKET:
 				range_n--
 			}
@@ -150,16 +148,17 @@ func (tb *_TypeBuilder) build_ident() *ast.Type {
 	if *tb.i+1 < len(tb.tokens) && tb.tokens[*tb.i+1].Id == lex.ID_DBLCOLON {
 		return tb.build_namespace()
 	}
-	t := &ast.Type{
-		Token: tb.tokens[*tb.i],
-	}
+	token := tb.tokens[*tb.i]
 	it := &ast.IdentType{
-		Ident: t.Token.Kind,
+		Ident:      token.Kind,
+		Cpp_linked: false,
 	}
 	*tb.i++
 	it.Generics = tb.build_generics()
-	t.Kind = it
-	return t
+	return &ast.Type{
+		Token: token,
+		Kind:  it,
+	}
 }
 
 func (tb *_TypeBuilder) build_cpp_link() *ast.Type {

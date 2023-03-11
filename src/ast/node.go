@@ -138,7 +138,7 @@ func (t *Type) Is_void() bool { return t.Kind == nil && t.Token.Id == lex.ID_NA 
 // Reports whether type is reference.
 func (t *Type) Is_ref() bool {
 	if t.Kind == nil {
-		return true
+		return false
 	}
 	switch t.Kind.(type) {
 	case *RefType:
@@ -150,7 +150,7 @@ func (t *Type) Is_ref() bool {
 // Reports whether type is pointer.
 func (t *Type) Is_ptr() bool {
 	if t.Kind == nil {
-		return true
+		return false
 	}
 	switch t.Kind.(type) {
 	case *PtrType:
