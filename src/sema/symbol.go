@@ -10,14 +10,26 @@ import (
 	"github.com/julelang/jule/lex"
 )
 
+func build_doc(cg *ast.CommentGroup) string {
+	if cg == nil {
+		return ""
+	}
+	doc := ""
+	for _, c := range cg.Comments {
+		doc += c.Text
+		doc += " "    // Write space for each newline.
+	}
+	return doc
+}
+
 func build_type_alias(decl *ast.TypeAliasDecl) *TypeAlias {
 	return &TypeAlias{
-		Public:       decl.Public,
-		Cpp_linked:   decl.Cpp_linked,
-		Token:        decl.Token,
-		Ident:        decl.Ident,
-		Kind:         decl.Kind,
-		Doc_comments: decl.Doc_comments,
+		Public:     decl.Public,
+		Cpp_linked: decl.Cpp_linked,
+		Token:      decl.Token,
+		Ident:      decl.Ident,
+		Kind:       decl.Kind,
+		Doc:        build_doc(decl.Doc_comments),
 	}
 }
 
@@ -47,24 +59,24 @@ func build_struct(decl *ast.StructDecl) *Struct {
 		Public:       decl.Public,
 		Cpp_linked:   decl.Cpp_linked,
 		Directives:   decl.Directives,
-		Doc_comments: decl.Doc_comments,
+		Doc:          build_doc(decl.Doc_comments),
 		Generics:     decl.Generics,
 	}
 }
 
 func build_fn(decl *ast.FnDecl) *Fn {
 	return &Fn{
-		Token:        decl.Token,
-		Unsafety:     decl.Unsafety,
-		Public:       decl.Public,
-		Cpp_linked:   decl.Cpp_linked,
-		Ident:        decl.Ident,
-		Directives:   decl.Directives,
-		Doc_comments: decl.Doc_comments,
-		Scope:        decl.Scope,
-		Generics:     decl.Generics,
-		Result:       decl.Result,
-		Params:       decl.Params,
+		Token:      decl.Token,
+		Unsafety:   decl.Unsafety,
+		Public:     decl.Public,
+		Cpp_linked: decl.Cpp_linked,
+		Ident:      decl.Ident,
+		Directives: decl.Directives,
+		Doc:        build_doc(decl.Doc_comments),
+		Scope:      decl.Scope,
+		Generics:   decl.Generics,
+		Result:     decl.Result,
+		Params:     decl.Params,
 	}
 }
 
@@ -78,11 +90,11 @@ func build_methods(decls []*ast.FnDecl) []*Fn {
 
 func build_trait(decl *ast.TraitDecl) *Trait {
 	return &Trait{
-		Token:        decl.Token,
-		Ident:        decl.Ident,
-		Public:       decl.Public,
-		Doc_comments: decl.Doc_comments,
-		Methods:      build_methods(decl.Methods),
+		Token:   decl.Token,
+		Ident:   decl.Ident,
+		Public:  decl.Public,
+		Doc:     build_doc(decl.Doc_comments),
+		Methods: build_methods(decl.Methods),
 	}
 }
 
@@ -104,27 +116,27 @@ func build_enum_items(decls []*ast.EnumItem) []*EnumItem {
 
 func build_enum(decl *ast.EnumDecl) *Enum {
 	return &Enum{
-		Token:        decl.Token,
-		Public:       decl.Public,
-		Ident:        decl.Ident,
-		Kind:         decl.Kind,
-		Items:        build_enum_items(decl.Items),
-		Doc_comments: decl.Doc_comments,
+		Token:  decl.Token,
+		Public: decl.Public,
+		Ident:  decl.Ident,
+		Kind:   decl.Kind,
+		Items:  build_enum_items(decl.Items),
+		Doc:    build_doc(decl.Doc_comments),
 	}
 }
 
 func build_var(decl *ast.VarDecl) *Var {
 	return &Var{
-		Scope:        decl.Scope,
-		Token:        decl.Token,
-		Ident:        decl.Ident,
-		Cpp_linked:   decl.Cpp_linked,
-		Constant:     decl.Constant,
-		Mutable:      decl.Mutable,
-		Public:       decl.Public,
-		Doc_comments: decl.Doc_comments,
-		Kind:         decl.Kind,
-		Expr:         decl.Expr,
+		Scope:      decl.Scope,
+		Token:      decl.Token,
+		Ident:      decl.Ident,
+		Cpp_linked: decl.Cpp_linked,
+		Constant:   decl.Constant,
+		Mutable:    decl.Mutable,
+		Public:     decl.Public,
+		Doc:        build_doc(decl.Doc_comments),
+		Kind:       decl.Kind,
+		Expr:       decl.Expr,
 	}
 }
 

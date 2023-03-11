@@ -16,12 +16,12 @@ type Field struct {
 
 // Structure.
 type Struct struct {
-	Token        lex.Token
-	Ident        string
-	Fields       []*Field
-	Public       bool
-	Cpp_linked   bool
-	Directives   []*ast.Directive
-	Doc_comments *ast.CommentGroup
-	Generics     []*ast.Generic
+	Token      lex.Token
+	Ident      string
+	Fields     []*Field
+	Public     bool
+	Cpp_linked bool
+	Directives []*ast.Directive
+	Doc        string
+	Generics   []*ast.Generic
 }

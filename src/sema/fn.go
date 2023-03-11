@@ -7,15 +7,15 @@ import (
 
 // Function.
 type Fn struct {
-	Token        lex.Token
-	Unsafety     bool
-	Public       bool
-	Cpp_linked   bool
-	Ident        string
-	Directives   []*ast.Directive
-	Doc_comments *ast.CommentGroup
-	Scope        *ast.Scope
-	Generics     []*ast.Generic
-	Result       *ast.RetType
-	Params       []*ast.Param
+	Token      lex.Token
+	Unsafety   bool
+	Public     bool
+	Cpp_linked bool
+	Ident      string
+	Directives []*ast.Directive
+	Doc        string
+	Scope      *ast.Scope
+	Generics   []*ast.Generic
+	Result     *ast.RetType
+	Params     []*ast.Param
 }

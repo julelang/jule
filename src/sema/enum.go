@@ -14,10 +14,10 @@ type EnumItem struct {
 
 // Enum.
 type Enum struct {
-	Token        lex.Token
-	Public       bool
-	Ident        string
-	Kind         *ast.Type
-	Items        []*EnumItem
-	Doc_comments *ast.CommentGroup
+	Token  lex.Token
+	Public bool
+	Ident  string
+	Kind   *ast.Type
+	Items  []*EnumItem
+	Doc    string
 }
