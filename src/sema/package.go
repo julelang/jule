@@ -3,6 +3,7 @@ package sema
 import (
 	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/build"
+	"github.com/julelang/jule/lex"
 )
 
 // Importer.
@@ -20,6 +21,9 @@ type Importer interface {
 // Package.
 // Represents imported package by use declaration.
 type Package struct {
+	// Use declaration token.
+	Token lex.Token
+
 	// Absolute path.
 	Path string
 
@@ -38,5 +42,5 @@ type Package struct {
 
 	// Symbol table for each package's file.
 	// Nil if package is cpp header.
-	Tables []*SymbolTable
+	Files []*SymbolTable
 }

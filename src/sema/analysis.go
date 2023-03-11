@@ -37,7 +37,7 @@ func analyze_package(pwd string, pstd string, files []*ast.Ast,
 	}
 
 	sema := _Sema{}
-	sema.analyze(tables)
+	sema.check(tables)
 	if len(sema.errors) > 0 {
 		return nil, sema.errors
 	}

@@ -214,12 +214,13 @@ func (s *_SymbolBuilder) build_cpp_header_package(decl *ast.UseDecl) *Package {
 	}
 
 	return &Package{
+		Token:     decl.Token,
 		Path:      path,
 		Link_path: decl.Link_path,
 		Ident:     "",    // Cpp headers haven't identifiers.
 		Cpp:       true,
 		Std:       false,
-		Tables:    nil,   // Cpp headers haven't symbol table.
+		Files:     nil,   // Cpp headers haven't symbol table.
 	}
 }
 
@@ -244,12 +245,13 @@ func (s *_SymbolBuilder) build_std_package(decl *ast.UseDecl) *Package {
 	ident := decl.Link_path[strings.LastIndex(decl.Link_path, lex.KND_DBLCOLON)+1:]
 
 	return &Package{
+		Token:     decl.Token,
 		Path:      path,
 		Link_path: decl.Link_path,
 		Ident:     ident,
 		Cpp:       false,
 		Std:       true,
-		Tables:    nil,              // Appends by import algorithm.
+		Files:     nil,             // Appends by import algorithm.
 	}
 }
 
@@ -266,17 +268,17 @@ func (s *_SymbolBuilder) build_package(decl *ast.UseDecl) *Package {
 	}
 }
 
-func (s *_SymbolBuilder) check_duplicate_use_decl(pkg *Package, error_token lex.Token) (ok bool) {
+func (s *_SymbolBuilder) check_duplicate_use_decl(pkg *Package) (ok bool) {
 	// Find package by path to detect cpp header imports.
 	lpkg := s.table.Find_package_by_path(pkg.Path)
 	if lpkg == nil {
 		return true
 	}
-	s.push_err(error_token, "duplicate_use_decl", pkg.Link_path)
+	s.push_err(pkg.Token, "duplicate_use_decl", pkg.Link_path)
 	return false
 }
 
-func (s *_SymbolBuilder) import_package(pkg *Package, error_token lex.Token) (ok bool) {
+func (s *_SymbolBuilder) import_package(pkg *Package) (ok bool) {
 	if pkg.Cpp {
 		return true
 	}
@@ -293,11 +295,11 @@ func (s *_SymbolBuilder) import_package(pkg *Package, error_token lex.Token) (ok
 		// Break import if file has error(s).
 		if len(errors) > 0 {
 			s.errors = append(s.errors, errors...)
-			s.push_err(error_token, "used_package_has_errors", pkg.Link_path)
+			s.push_err(pkg.Token, "used_package_has_errors", pkg.Link_path)
 			return false
 		}
 
-		pkg.Tables = append(pkg.Tables, table)
+		pkg.Files = append(pkg.Files, table)
 	}
 
 	// TODO: Add package's built-in defines to symbol table.
@@ -312,12 +314,12 @@ func (s *_SymbolBuilder) import_use_decl(decl *ast.UseDecl) *Package {
 		return nil
 	}
 
-	ok := s.check_duplicate_use_decl(pkg, decl.Token)
+	ok := s.check_duplicate_use_decl(pkg)
 	if !ok {
 		return nil
 	}
 
-	ok = s.import_package(pkg, decl.Token)
+	ok = s.import_package(pkg)
 	s.table.Packages = append(s.table.Packages, pkg)
 	if ok {
 		return pkg
