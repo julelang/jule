@@ -10,6 +10,8 @@ import (
 	"github.com/julelang/jule/lex"
 )
 
+// Symbol table builder.
+// Build only symbol structures, not process meta-datas.
 type _SymbolBuilder struct {
 	pwd      string
 	pstd     string
@@ -135,7 +137,7 @@ func (s *_SymbolBuilder) build_package(decl *ast.UseDecl) *Package {
 
 func (s *_SymbolBuilder) check_duplicate_use_decl(pkg *Package, error_token lex.Token) (ok bool) {
 	// Find package by path to detect cpp header imports.
-	lpkg := s.table.Find_package_by_path(pkg.Path)
+	lpkg := s.table.Find_pkg_by_path(pkg.Path)
 	if lpkg == nil {
 		return true
 	}
@@ -167,6 +169,8 @@ func (s *_SymbolBuilder) import_package(pkg *Package, error_token lex.Token) (ok
 		pkg.Tables = append(pkg.Tables, table)
 	}
 
+	// TODO: Add package's built-in defines to symbol table.
+
 	return true
 }
 
@@ -183,7 +187,7 @@ func (s *_SymbolBuilder) import_use_decl(decl *ast.UseDecl) *Package {
 	}
 
 	ok = s.import_package(pkg, decl.Token)
-	s.table.Packages = append(s.table.Packages, pkg)
+	s.table.Pkgs = append(s.table.Pkgs, pkg)
 	if ok {
 		return pkg
 	}
@@ -201,11 +205,48 @@ func (s *_SymbolBuilder) import_use_decls() {
 	}
 }
 
+func (s *_SymbolBuilder) build_var(decl *ast.VarDecl) *Var {
+	return &Var{
+		Scope:        decl.Scope,
+		Token:        decl.Token,
+		Ident:        decl.Ident,
+		Cpp_linked:   decl.Cpp_linked,
+		Constant:     decl.Constant,
+		Mutable:      decl.Mutable,
+		Public:       decl.Public,
+		Doc_comments: decl.Doc_comments,
+		Kind:         decl.Kind,
+	}
+}
+
+func (s *_SymbolBuilder) append_decl(decl ast.Node) {
+	switch decl.Data.(type) {
+	case *ast.VarDecl:
+		v := s.build_var(decl.Data.(*ast.VarDecl))
+		s.table.Vars = append(s.table.Vars, v)
+
+	default:
+		s.push_err(decl.Token, "invalid_syntax")
+	}
+}
+
+func (s *_SymbolBuilder) append_decls() {
+	for _, decl := range s.ast.Decls {
+		s.append_decl(decl)
+	}
+}
+
 func (s *_SymbolBuilder) build() {
 	s.table = &SymbolTable{}
+	
 	s.import_use_decls()
-
 	// Break analysis if use declarations has error.
+	if len(s.errors) > 0 {
+		return
+	}
+
+	s.append_decls()
+	// Break analysis if declarations has error.
 	if len(s.errors) > 0 {
 		return
 	}
