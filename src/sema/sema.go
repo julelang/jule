@@ -9,12 +9,17 @@ import (
 	"github.com/julelang/jule/lex"
 )
 
+// Sema must implement Lookup.
+
 // Semantic analyzer for tables.
 // Accepts tables as files of package.
 type _Sema struct {
-	errors   []build.Log
-	files   []*SymbolTable
+	errors []build.Log
+	files  []*SymbolTable // Package files.
+	file   *SymbolTable   // Current package file.
 }
+
+func (s *_Sema) set_current_file(f *SymbolTable) { s.file = f }
 
 func (s *_Sema) push_err(token lex.Token, key string, args ...any) {
 	s.errors = append(s.errors, build.Log{
@@ -24,6 +29,164 @@ func (s *_Sema) push_err(token lex.Token, key string, args ...any) {
 		Path:   token.File.Path(),
 		Text:   build.Errorf(key, args...),
 	})
+}
+
+// Reports whether define is accessible in the current package.
+func (s *_Sema) is_accessible_define(public bool, token lex.Token) bool {
+	return public || s.file.File.Dir() == token.File.Dir()
+}
+
+// Returns package by identifier.
+// Returns nil if not exist any package in this identifier.
+//
+// Lookups:
+//  - Current file's imported packages.
+func (s *_Sema) find_package(ident string) *Package {
+	return s.file.find_package(ident)
+}
+
+// Returns variable by identifier and cpp linked state.
+// Returns nil if not exist any variable in this identifier.
+//
+// Lookups:
+//  - Package file's symbol table.
+//  - Current file's public denifes of imported packages.
+func (s *_Sema) find_var(ident string, cpp_linked bool) *Var {
+	// Lookup package files.
+	v := find_var_in_package(s.files, ident, cpp_linked)
+	if v != nil {
+		return v
+	}
+
+	// Lookup current file's public denifes of imported packages.
+	for _, pkg := range s.file.Packages {
+		v := pkg.find_var(ident, cpp_linked)
+		if v != nil && s.is_accessible_define(v.Public, v.Token) {
+			return v
+		}
+	}
+
+	return nil
+}
+
+// Returns type alias by identifier and cpp linked state.
+// Returns nil if not exist any type alias in this identifier.
+//
+// Lookups:
+//  - Package file's symbol table.
+//  - Current file's public denifes of imported packages.
+func (s *_Sema) find_type_alias(ident string, cpp_linked bool) *TypeAlias {
+	// Lookup package files.
+	ta := find_type_alias_in_package(s.files, ident, cpp_linked)
+	if ta != nil {
+		return ta
+	}
+
+	// Lookup current file's public denifes of imported packages.
+	for _, pkg := range s.file.Packages {
+		ta := pkg.find_type_alias(ident, cpp_linked)
+		if ta != nil && s.is_accessible_define(ta.Public, ta.Token) {
+			return ta
+		}
+	}
+
+	return nil
+}
+
+// Returns struct by identifier and cpp linked state.
+// Returns nil if not exist any struct in this identifier.
+//
+// Lookups:
+//  - Package file's symbol table.
+//  - Current file's public denifes of imported packages.
+func (s *_Sema) find__struct(ident string, cpp_linked bool) *Struct {
+	// Lookup package files.
+	strct := find_struct_in_package(s.files, ident, cpp_linked)
+	if strct != nil {
+		return strct
+	}
+
+	// Lookup current file's public denifes of imported packages.
+	for _, pkg := range s.file.Packages {
+		strct := pkg.find_struct(ident, cpp_linked)
+		if strct != nil && s.is_accessible_define(strct.Public, strct.Token) {
+			return strct
+		}
+	}
+
+	return nil
+}
+
+// Returns function by identifier and cpp linked state.
+// Returns nil if not exist any function in this identifier.
+//
+// Lookups:
+//  - Package file's symbol table.
+//  - Current file's public denifes of imported packages.
+func (s *_Sema) find_fn(ident string, cpp_linked bool) *Fn {
+	// Lookup package files.
+	f := find_fn_in_package(s.files, ident, cpp_linked)
+	if f != nil {
+		return f
+	}
+
+	// Lookup current file's public denifes of imported packages.
+	for _, pkg := range s.file.Packages {
+		f := pkg.find_fn(ident, cpp_linked)
+		if f != nil && s.is_accessible_define(f.Public, f.Token) {
+			return f
+		}
+	}
+
+	return nil
+}
+
+// Returns trait by identifier.
+// Returns nil if not exist any trait in this identifier.
+//
+// Lookups:
+//  - Package file's symbol table.
+//  - Current file's public denifes of imported packages.
+func (s *_Sema) find_trait(ident string) *Trait {
+	// Lookup package files.
+	t := find_trait_in_package(s.files, ident)
+	if t != nil {
+		return t
+	}
+
+	// Lookup current file's public denifes of imported packages.
+	for _, pkg := range s.file.Packages {
+		t := pkg.find_trait(ident)
+		if t != nil && s.is_accessible_define(t.Public, t.Token) {
+			return t
+		}
+	}
+
+	return nil
+}
+
+// Returns enum by identifier.
+// Returns nil if not exist any enum in this identifier.
+//
+// Lookups:
+//  - Package file's symbol table.
+//  - Current file's public denifes of imported packages.
+func (s *_Sema) find_enums(ident string) *Enum {
+	// Lookup package files.
+	e := find_enum_in_package(s.files, ident)
+	if e != nil {
+		return e
+	}
+
+	// Lookup current file's public denifes of imported packages.
+	for _, pkg := range s.file.Packages {
+		e := pkg.find_enum(ident)
+		if e != nil && s.is_accessible_define(e.Public, e.Token) {
+			return e
+		}
+	}
+
+	return nil
 }
 
 func (s *_Sema) check_import(pkg *Package) {
@@ -56,17 +219,38 @@ func (s *_Sema) check_type_alias(ta *TypeAlias) {
 		s.push_err(ta.Token, "ignore_id")
 		return
 	}
+
+	// TODO: Detect cycles.
 }
 
-func (s *_Sema) check_package_type_aliases(files []*SymbolTable) {
-	for _, file := range files {
-		for _, ta := range file.Type_aliases {
-			s.check_type_alias(ta)
-			
-			// Break checking if type alias has error.
-			if len(s.errors) > 0 {
-				return
-			}
+// Checks current package file's type aliases.
+func (s *_Sema) check_type_aliases() (ok bool) {
+	for _, ta := range s.file.Type_aliases {
+		s.check_type_alias(ta)
+		
+		// Break checking if type alias has error.
+		if len(s.errors) > 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// Checks current package file.
+// Reports whether checking is success.
+func (s *_Sema) check_file() (ok bool) {
+	ok = s.check_type_aliases()
+	return ok
+}
+
+// Checks all package files.
+// Breaks checking if checked file failed.
+func (s *_Sema) check_package_files() {
+	for _, f := range s.files {
+		s.set_current_file(f)
+		ok := s.check_file()
+		if !ok {
+			return
 		}
 	}
 }
@@ -80,5 +264,5 @@ func (s *_Sema) check(files []*SymbolTable) {
 		return
 	}
 
-	s.check_package_type_aliases(s.files)
+	s.check_package_files()
 }

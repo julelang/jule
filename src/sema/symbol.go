@@ -274,7 +274,7 @@ func (s *_SymbolBuilder) build_package(decl *ast.UseDecl) *Package {
 
 func (s *_SymbolBuilder) check_duplicate_use_decl(pkg *Package) (ok bool) {
 	// Find package by path to detect cpp header imports.
-	lpkg := s.table.Find_package_by_path(pkg.Path)
+	lpkg := s.table.find_package_by_path(pkg.Path)
 	if lpkg == nil {
 		return true
 	}
@@ -381,7 +381,9 @@ func (s *_SymbolBuilder) append_decls() {
 }
 
 func (s *_SymbolBuilder) build() {
-	s.table = &SymbolTable{}
+	s.table = &SymbolTable{
+		File: s.ast.File,
+	}
 	
 	s.import_use_decls()
 	// Break analysis if use declarations has error.
