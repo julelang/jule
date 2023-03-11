@@ -18,4 +18,8 @@ type Fn struct {
 	Generics   []*ast.Generic
 	Result     *ast.RetType
 	Params     []*ast.Param
+
+	// Type combinations of generic function.
+	// Nil or len() = 0 if never invoked.
+	Combines [][]*ast.Type
 }

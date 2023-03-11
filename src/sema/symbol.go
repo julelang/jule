@@ -141,6 +141,8 @@ func build_var(decl *ast.VarDecl) *Var {
 }
 
 // Symbol table builder.
+// Just builds symbols, not analyze metadatas
+// like struct's implemented traits.
 type _SymbolBuilder struct {
 	pwd      string
 	pstd     string
@@ -385,7 +387,4 @@ func (s *_SymbolBuilder) build() {
 	if len(s.errors) > 0 {
 		return
 	}
-
-	// TODO: Implement here.
-	//       Here is place of symbol build algorithm.
 }

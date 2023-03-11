@@ -24,4 +24,5 @@ type Struct struct {
 	Directives []*ast.Directive
 	Doc        string
 	Generics   []*ast.Generic
+	Implements []*Trait
 }
