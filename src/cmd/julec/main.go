@@ -239,17 +239,23 @@ func (i *Importer) Import_package(path string) ([]*ast.Ast, []build.Log) {
 
 func (i *Importer) Imported(pkg *sema.Package) {}
 
+func print_errors(errors []build.Log) {
+	for _, log := range errors {
+		println(log.String())
+	}
+}
+
 func main() {
 	importer := &Importer{}
 	files, errors := importer.Import_package(os.Args[1])
 	if len(errors) > 0 {
-		fmt.Println(errors)
+		print_errors(errors)
 		return
 	}
 
 	_, errors = sema.Analyze_package(WORKING_PATH, STDLIB_PATH, files, importer)
 	if len(errors) > 0 {
-		fmt.Println(errors)
+		print_errors(errors)
 		return
 	}
 }

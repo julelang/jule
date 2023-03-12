@@ -17,7 +17,7 @@ type TypeAlias struct {
 	Ident      string
 	Kind       *Type
 	Doc        string
-	Refers     []*ast.IdentType
+	Refers     []*ast.IdentType // Referred identifiers.
 }
 
 // Type's kind's type.
@@ -139,6 +139,11 @@ func build_link_path_by_tokens(tokens []lex.Token) string {
 	return s
 }
 
+type _Referencer struct {
+	ident  string
+	refers *[]*ast.IdentType
+}
+
 // Checks type and builds result as kind.
 // Removes kind if error occurs,
 // so type is not reports true for checked state.
@@ -150,6 +155,10 @@ type _TypeChecker struct {
 	// Uses Lookup for:
 	//  - Lookup symbol tables.
 	lookup _Lookup
+
+	// If this is not nil, appends referred ident types.
+	// Also used as checker owner.
+	referencer *_Referencer
 
 	error_token lex.Token
 }
@@ -192,6 +201,42 @@ func (tc *_TypeChecker) build_prim(decl *ast.IdentType) *Prim {
 	}
 }
 
+func (tc *_TypeChecker) from_type_alias(decl *ast.IdentType, ta *TypeAlias) *TypeKind {
+	if tc.referencer != nil {
+		// Check illegal cycle for itself.
+		// Because refers's owner is ta.
+		if tc.referencer.refers == &ta.Refers {
+			tc.push_err(ta.Token, "illegal_cycle_refers_itself", ta.Ident)
+			return nil
+		}
+
+		// Check cross illegal cycle.
+		ok := true
+		for _, rta := range *tc.referencer.refers {
+			if rta == decl {
+				tc.push_err(ta.Token, "illegal_cross_cycle", tc.referencer.ident, ta.Ident)
+				ok = false
+			}
+		}
+
+		if !ok {
+			return nil
+		}
+
+		// TODO: Make sure this algorithm detects
+		//       structure fields's illegal cycle.
+		*tc.referencer.refers = append(*tc.referencer.refers, decl)
+	}
+
+	// Build kind if not builded already.
+	ok := tc.s.check_type_alias_kind(ta)
+	if !ok {
+		return nil
+	}
+
+	return ta.Kind.Kind
+}
+
 func (tc *_TypeChecker) get_def(decl *ast.IdentType) any {
 	if !decl.Cpp_linked {
 		e := tc.lookup.find_enum(decl.Ident)
@@ -225,8 +270,7 @@ func (tc *_TypeChecker) get_def(decl *ast.IdentType) any {
 			tc.push_err(decl.Token, "type_not_supports_generics", decl.Ident)
 			return nil
 		}
-		// TODO: Detect cycles.
-		return ta.Kind.Kind
+		return tc.from_type_alias(decl, ta)
 	}
 
 	tc.push_err(decl.Token, "ident_not_exist", decl.Ident)
@@ -373,13 +417,13 @@ func (tc *_TypeChecker) build_tuple(decl *ast.TupleType) *Tuple {
 
 func (tc *_TypeChecker) check_fn_types(f *Fn) (ok bool) {
 	for _, p := range f.Params {
-		ok := tc.s.check_type(p.Kind)
+		ok := tc.s.check_type_with_refers(p.Kind, tc.referencer)
 		if !ok {
 			return false
 		}
 	}
 	if !f.Is_void() {
-		return tc.s.check_type(f.Result.Kind)
+		return tc.s.check_type_with_refers(f.Result.Kind, tc.referencer)
 	}
 	return true
 }

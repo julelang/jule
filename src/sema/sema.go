@@ -29,7 +29,6 @@ func compiler_err(token lex.Token, key string, args ...any) build.Log {
 // Semantic analyzer for tables.
 // Accepts tables as files of package.
 type _Sema struct {
-	pstd   string
 	errors []build.Log
 	files  []*SymbolTable // Package files.
 	file   *SymbolTable   // Current package file.
@@ -246,18 +245,37 @@ func (s *_Sema) check_imports() {
 	}
 }
 
-// Checks type and builds result as kind.
+// Checks type, builds result as kind and collect referred type aliases.
 // Skips already checked types.
-func (s *_Sema) check_type(t *Type) (ok bool) {
+func (s *_Sema) check_type_with_refers(t *Type, referencer *_Referencer) (ok bool) {
 	if t.checked() {
-		return
+		return true
 	}
 	tc := _TypeChecker{
-		s:      s,
-		lookup: s,
+		s:          s,
+		lookup:     s,
+		referencer: referencer,
 	}
 	tc.check(t)
 	return t.checked()
+}
+
+// Checks type and builds result as kind.
+// Skips already checked types.
+func (s *_Sema) check_type(t *Type) (ok bool) {
+	return s.check_type_with_refers(t, nil)
+}
+
+func (s *_Sema) check_type_alias_kind(ta *TypeAlias) (ok bool) {
+	ok = s.check_type_with_refers(ta.Kind, &_Referencer{
+		ident:  ta.Ident,
+		refers: &ta.Refers,
+	})
+	if ok && ta.Kind.Kind.Arr() != nil && ta.Kind.Kind.Arr().Auto {
+		s.push_err(ta.Kind.Decl.Token, "array_auto_sized")
+		ok = false
+	}
+	return
 }
 
 func (s *_Sema) check_type_alias(ta *TypeAlias) {
@@ -266,11 +284,7 @@ func (s *_Sema) check_type_alias(ta *TypeAlias) {
 	} else if s.is_duplicated_ident(_uintptr(ta), ta.Ident, ta.Cpp_linked) {
 		s.push_err(ta.Token, "duplicated_ident", ta.Ident)
 	}
-	ok := s.check_type(ta.Kind)
-	if ok && ta.Kind.Kind.Arr() != nil && ta.Kind.Kind.Arr().Auto {
-		s.push_err(ta.Kind.Decl.Token, "array_auto_sized")
-		return
-	}
+	s.check_type_alias_kind(ta)
 }
 
 // Checks current package file's type aliases.
