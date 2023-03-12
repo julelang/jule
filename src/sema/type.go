@@ -94,6 +94,8 @@ func (p *Prim) Is_any() bool { return p.kind == lex.KND_ANY }
 type Ref struct { Elem *TypeKind }
 // Pointer type.
 type Ptr struct { Elem *TypeKind }
+// Slice type.
+type Slc struct { Elem *TypeKind }
 
 // Checks type and builds result as kind.
 // Removes kind if error occurs,
@@ -114,8 +116,8 @@ func (tc *_TypeChecker) push_err(token lex.Token, key string, args ...any) {
 	tc.s.push_err(token, key, args...)
 }
 
-func (tc *_TypeChecker) build_prim(kind *ast.IdentType) *Prim {
-	switch kind.Ident {
+func (tc *_TypeChecker) build_prim(decl *ast.IdentType) *Prim {
+	switch decl.Ident {
 	case lex.KND_I8,
 		lex.KND_I16,
 		lex.KND_I32,
@@ -138,19 +140,26 @@ func (tc *_TypeChecker) build_prim(kind *ast.IdentType) *Prim {
 		return nil 
 	}
 
-	if len(kind.Generics) > 0 {
-		tc.push_err(kind.Token, "type_not_supports_generics", kind.Ident)
+	if len(decl.Generics) > 0 {
+		tc.push_err(decl.Token, "type_not_supports_generics", decl.Ident)
 	}
 
 	return &Prim{
-		kind: kind.Ident,
+		kind: decl.Ident,
 	}
 }
 
-func (tc *_TypeChecker) build_ident_kind(it *ast.IdentType) any {
+func (tc *_TypeChecker) build_ident_kind(decl *ast.IdentType) any {
+	// TODO:
+	//  - Implement traits.
+	//  - Implement enums.
+	//  - Implement functions.
+	//  - Implement structures.
+	//  - Implement type aliases.
+	//  - Implement cpp-linked defines.
 	switch {
-	case it.Is_prim():
-		return tc.build_prim(it)
+	case decl.Is_prim():
+		return tc.build_prim(decl)
 	
 	default:
 		tc.push_err(tc.error_token, "invalid_type")
@@ -158,8 +167,8 @@ func (tc *_TypeChecker) build_ident_kind(it *ast.IdentType) any {
 	}
 }
 
-func (tc *_TypeChecker) build_ref(kind *ast.RefType) *Ref {
-	elem := tc.check_decl(kind.Elem)
+func (tc *_TypeChecker) build_ref(decl *ast.RefType) *Ref {
+	elem := tc.check_decl(decl.Elem)
 
 	// TODO: check cases:
 	//         - ref_refs_array
@@ -183,8 +192,8 @@ func (tc *_TypeChecker) build_ref(kind *ast.RefType) *Ref {
 	}
 }
 
-func (tc *_TypeChecker) build_ptr(kind *ast.PtrType) *Ptr {
-	elem := tc.check_decl(kind.Elem)
+func (tc *_TypeChecker) build_ptr(decl *ast.PtrType) *Ptr {
+	elem := tc.check_decl(decl.Elem)
 
 	// Check special cases.
 	switch {
@@ -201,8 +210,28 @@ func (tc *_TypeChecker) build_ptr(kind *ast.PtrType) *Ptr {
 	}
 }
 
+func (tc *_TypeChecker) build_slice(decl *ast.SliceType) *Slc {
+	elem := tc.check_decl(decl.Elem)
+
+	// TODO: check cases:
+	//         - Elem is Array with auto-sized is invalid element
+	// Check special cases.
+	switch {
+	case elem == nil:
+		return nil
+	}
+
+	return &Slc{
+		Elem: elem,
+	}
+}
+
 func (tc *_TypeChecker) build_kind(decl_kind ast.TypeDeclKind) *TypeKind {
 	var kind any = nil
+
+	// TODO:
+	//  - Implement arrays.
+	//  - Implement maps.
 	switch decl_kind.(type) {
 	case *ast.IdentType:
 		kind = tc.build_ident_kind(decl_kind.(*ast.IdentType))
@@ -212,6 +241,9 @@ func (tc *_TypeChecker) build_kind(decl_kind ast.TypeDeclKind) *TypeKind {
 
 	case *ast.PtrType:
 		kind = tc.build_ptr(decl_kind.(*ast.PtrType))
+
+	case *ast.SliceType:
+		kind = tc.build_slice(decl_kind.(*ast.SliceType))
 
 	default:
 		tc.push_err(tc.error_token, "invalid_type")
