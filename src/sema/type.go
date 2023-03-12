@@ -22,12 +22,21 @@ type TypeAlias struct {
 
 // Type's kind's type.
 type TypeKind struct { kind any }
-
-// Returns reference type is kind is reference, nil if not.
+// Returns reference type if kind is reference, nil if not.
 func (tk *TypeKind) Ref() *Ref {
 	switch tk.kind.(type) {
 	case *Ref:
 		return tk.kind.(*Ref)
+
+	default:
+		return nil
+	}
+}
+// Returns pointer type if kind is pointer, nil if not.
+func (tk *TypeKind) Ptr() *Ptr {
+	switch tk.kind.(type) {
+	case *Ptr:
+		return tk.kind.(*Ptr)
 
 	default:
 		return nil
@@ -151,15 +160,23 @@ func (tc *_TypeChecker) build_ident_kind(it *ast.IdentType) any {
 
 func (tc *_TypeChecker) build_ref(kind *ast.RefType) *Ref {
 	elem := tc.check_decl(kind.Elem)
-	if elem == nil {
-		return nil
-	}
 
 	// TODO: check cases:
-	//         - ref_refs_ref
-	//         - ref_refs_ptr
 	//         - ref_refs_array
 	//         - ref_refs_enum
+	// Check special cases.
+	switch {
+	case elem == nil:
+		return nil
+
+	case elem.Ref() != nil:
+		tc.push_err(tc.error_token, "ref_refs_ref")
+		return nil
+
+	case elem.Ptr() != nil:
+		tc.push_err(tc.error_token, "ref_refs_ptr")
+		return nil
+	}
 
 	return &Ref{
 		Elem: elem,
