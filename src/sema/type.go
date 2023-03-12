@@ -149,6 +149,7 @@ func (tc *_TypeChecker) build_prim(decl *ast.IdentType) *Prim {
 
 	if len(decl.Generics) > 0 {
 		tc.push_err(decl.Token, "type_not_supports_generics", decl.Ident)
+		return nil
 	}
 
 	return &Prim{
@@ -156,21 +157,66 @@ func (tc *_TypeChecker) build_prim(decl *ast.IdentType) *Prim {
 	}
 }
 
-func (tc *_TypeChecker) build_ident_kind(decl *ast.IdentType) any {
-	// TODO:
-	//  - Implement traits.
-	//  - Implement enums.
-	//  - Implement functions.
-	//  - Implement structures.
-	//  - Implement type aliases.
-	//  - Implement cpp-linked defines.
+func (tc *_TypeChecker) get_def(decl *ast.IdentType) any {
+	e := tc.lookup.find_enum(decl.Ident)
+	if e != nil {
+		if len(decl.Generics) > 0 {
+			tc.push_err(decl.Token, "type_not_supports_generics", decl.Ident)
+			return nil
+		}
+		return e
+	}
+
+	t := tc.lookup.find_trait(decl.Ident)
+	if t != nil {
+		if len(decl.Generics) > 0 {
+			tc.push_err(decl.Token, "type_not_supports_generics", decl.Ident)
+			return nil
+		}
+		return t
+	}
+
+	if !decl.Cpp_linked {
+		tc.push_err(decl.Token, "ident_not_exist", decl.Ident)
+		return nil
+	}
+
+	f := tc.lookup.find_fn(decl.Ident, decl.Cpp_linked)
+	if f != nil {
+		if len(f.Generics) > 0 {
+			tc.push_err(decl.Token, "genericed_fn_as_anonymous_fn")
+			return nil
+		}
+		return t
+	}
+
+	s := tc.lookup.find_struct(decl.Ident, decl.Cpp_linked)
+	if s != nil {
+		// TODO: Implement generics and generate a struct instance for.
+		return s
+	}
+
+	ta := tc.lookup.find_type_alias(decl.Ident, decl.Cpp_linked)
+	if ta != nil {
+		if len(decl.Generics) > 0 {
+			tc.push_err(decl.Token, "type_not_supports_generics", decl.Ident)
+			return nil
+		}
+		// TODO: Detect cycles.
+		return ta.Kind.Kind
+	}
+
+	tc.push_err(decl.Token, "ident_not_exist", decl.Ident)
+	return nil
+}
+
+func (tc *_TypeChecker) build_ident(decl *ast.IdentType) any {
 	switch {
 	case decl.Is_prim():
 		return tc.build_prim(decl)
 	
 	default:
-		tc.push_err(tc.error_token, "invalid_type")
-		return nil
+		return tc.get_def(decl)
 	}
 }
 
@@ -272,7 +318,10 @@ func (tc *_TypeChecker) check_fn_types(f *Fn) (ok bool) {
 			return false
 		}
 	}
-	return tc.s.check_type(f.Result.Kind)
+	if !f.Is_void() {
+		return tc.s.check_type(f.Result.Kind)
+	}
+	return true
 }
 
 func (tc *_TypeChecker) build_fn(decl *ast.FnDecl) *Fn {
@@ -289,14 +338,15 @@ func (tc *_TypeChecker) build_fn(decl *ast.FnDecl) *Fn {
 	return f
 }
 
-func (tc *_TypeChecker) build_kind(decl_kind ast.TypeDeclKind) *TypeKind {
+func (tc *_TypeChecker) build(decl_kind ast.TypeDeclKind) *TypeKind {
 	var kind any = nil
 
 	// TODO:
 	//  - Implement arrays.
+	//  - Implement namespaces.
 	switch decl_kind.(type) {
 	case *ast.IdentType:
-		kind = tc.build_ident_kind(decl_kind.(*ast.IdentType))
+		kind = tc.build_ident(decl_kind.(*ast.IdentType))
 
 	case *ast.RefType:
 		kind = tc.build_ref(decl_kind.(*ast.RefType))
@@ -334,14 +384,12 @@ func (tc *_TypeChecker) check_decl(decl *ast.TypeDecl) *TypeKind {
 	error_token := tc.error_token
 
 	tc.error_token = decl.Token
-	kind := tc.build_kind(decl.Kind)
+	kind := tc.build(decl.Kind)
 	tc.error_token = error_token
 	return kind
 }
 
 func (tc *_TypeChecker) check(t *Type) {
-	// TODO: Detect cycles.
-	// TODO: Check type validity.
 	kind := tc.check_decl(t.Decl)
 	if kind == nil {
 		t.remove_kind()

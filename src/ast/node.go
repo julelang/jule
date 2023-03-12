@@ -146,13 +146,11 @@ type MapType struct {
 }
 
 // Return type.
+// Kind and Idents is nil for void type.
 type RetType struct {
 	Kind   *TypeDecl
 	Idents []lex.Token
 }
-
-// Reports whether return type is void.
-func (rt *RetType) Is_void() bool { return rt.Kind == nil }
 
 type ExprData = any // Type of Expr's data.
 

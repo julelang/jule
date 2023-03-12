@@ -507,10 +507,10 @@ func (p *_Parser) build_multi_ret_type(tokens []lex.Token, i *int) (t *ast.RetTy
 }
 
 func (p *_Parser) build_ret_type(tokens []lex.Token, i *int) (t *ast.RetType, ok bool) {
-	if *i >= len(tokens) {
-		return nil, false
-	}
 	t = &ast.RetType{}
+	if *i >= len(tokens) {
+		return
+	}
 
 	token := tokens[*i]
 	switch token.Id {
@@ -600,9 +600,7 @@ func (p *_Parser) build_fn_prototype(tokens []lex.Token, i *int, method bool, an
 		f.Params = p.build_params(params_toks, method, false)
 	}
 
-	t, _ := p.build_ret_type(tokens, i)
-	f.Result = t
-
+	f.Result, _ = p.build_ret_type(tokens, i)
 	return f
 }
 

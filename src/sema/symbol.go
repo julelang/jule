@@ -27,6 +27,9 @@ func build_doc(cg *ast.CommentGroup) string {
 }
 
 func build_type(t *ast.TypeDecl) *Type {
+	if t == nil {
+		return nil
+	}
 	return &Type{
 		Decl:  t,
 		Kind: nil,
@@ -94,6 +97,9 @@ func build_params(decls []*ast.Param) []*Param {
 }
 
 func build_ret_type(decl *ast.RetType) *RetType {
+	if decl.Idents == nil && decl.Kind == nil {
+		return nil // Void type.
+	}
 	return &RetType{
 		Kind:   build_type(decl.Kind),
 		Idents: decl.Idents,

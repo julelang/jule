@@ -42,3 +42,6 @@ type Fn struct {
 	// Nil or len() = 0 if never invoked.
 	Combines [][]*Type
 }
+
+// Reports whether return type is void.
+func (f *Fn) Is_void() bool { return f.Result == nil }

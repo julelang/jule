@@ -29,7 +29,7 @@ var ERRORS = map[string]string{
 	`operator_not_for_float`:                   `@ operator is not defined for float type(s)`,
 	`operator_not_for_int`:                     `@ operator is not defined for integer type(s)`,
 	`operator_not_for_uint`:                    `@ operator is not defined for unsigned integer type(s)`,
-	`id_not_exist`:                             `identifier is not exist: @`,
+	`ident_not_exist`:                          `identifier is not exist: @`,
 	`not_function_call`:                        `value is not function`,
 	`argument_overflow`:                        `argument overflow`,
 	`fn_have_ret`:                              `@ function cannot have return type`,

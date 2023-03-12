@@ -120,7 +120,7 @@ func (s *_Sema) find_type_alias(ident string, cpp_linked bool) *TypeAlias {
 // Lookups:
 //  - Package file's symbol table.
 //  - Current file's public denifes of imported packages.
-func (s *_Sema) find__struct(ident string, cpp_linked bool) *Struct {
+func (s *_Sema) find_struct(ident string, cpp_linked bool) *Struct {
 	// Lookup package files.
 	strct := find_struct_in_package(s.files, ident, cpp_linked)
 	if strct != nil {
@@ -192,7 +192,7 @@ func (s *_Sema) find_trait(ident string) *Trait {
 // Lookups:
 //  - Package file's symbol table.
 //  - Current file's public denifes of imported packages.
-func (s *_Sema) find_enums(ident string) *Enum {
+func (s *_Sema) find_enum(ident string) *Enum {
 	// Lookup package files.
 	e := find_enum_in_package(s.files, ident)
 	if e != nil {
