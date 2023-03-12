@@ -108,3 +108,50 @@ func (st *SymbolTable) find_enum(ident string) *Enum {
 	}
 	return nil
 }
+
+// Reports this identifier duplicated in symbol table.
+// The "self" parameter represents address of exception identifier.
+// If founded identifier address equals to self, will be skipped.
+func (st *SymbolTable) is_duplicated_ident(self uintptr, ident string, cpp_linked bool) bool {
+	for _, v := range st.Vars {
+		if _uintptr(v) != self && v.Ident == ident && v.Cpp_linked == cpp_linked {
+			return true
+		}
+	}
+
+	for _, ta := range st.Type_aliases {
+		if _uintptr(ta) != self && ta.Ident == ident && ta.Cpp_linked == cpp_linked {
+			return true
+		}
+	}
+
+	for _, s := range st.Structs {
+		if _uintptr(s) != self && s.Ident == ident && s.Cpp_linked == cpp_linked {
+			return true
+		}
+	}
+
+	for _, f := range st.Funcs {
+		if _uintptr(f) != self && f.Ident == ident && f.Cpp_linked == cpp_linked {
+			return true
+		}
+	}
+
+	if cpp_linked {
+		return false
+	}
+
+	for _, t := range st.Traits {
+		if _uintptr(t) != self && t.Ident == ident {
+			return true
+		}
+	}
+
+	for _, e := range st.Enums {
+		if _uintptr(e) != self && e.Ident == ident {
+			return true
+		}
+	}
+
+	return false
+}

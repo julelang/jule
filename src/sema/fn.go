@@ -9,6 +9,21 @@ import (
 	"github.com/julelang/jule/lex"
 )
 
+// Return type.
+type RetType struct {
+	Kind   *Type
+	Idents []lex.Token
+}
+
+// Parameter.
+type Param struct {
+	Token    lex.Token
+	Mutable  bool
+	Variadic bool
+	Kind     *Type
+	Ident    string
+}
+
 // Function.
 type Fn struct {
 	Token      lex.Token
@@ -20,10 +35,10 @@ type Fn struct {
 	Doc        string
 	Scope      *ast.Scope
 	Generics   []*ast.Generic
-	Result     *ast.RetType
-	Params     []*ast.Param
+	Result     *RetType
+	Params     []*Param
 
 	// Type combinations of generic function.
 	// Nil or len() = 0 if never invoked.
-	Combines [][]*ast.Type
+	Combines [][]*Type
 }

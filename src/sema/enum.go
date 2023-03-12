@@ -21,7 +21,7 @@ type Enum struct {
 	Token  lex.Token
 	Public bool
 	Ident  string
-	Kind   *ast.Type
+	Kind   *Type
 	Items  []*EnumItem
 	Doc    string
 }

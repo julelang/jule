@@ -26,13 +26,20 @@ func build_doc(cg *ast.CommentGroup) string {
 	return doc
 }
 
+func build_type(t *ast.Type) *Type {
+	return &Type{
+		Ast:  t,
+		Kind: nil,
+	}
+}
+
 func build_type_alias(decl *ast.TypeAliasDecl) *TypeAlias {
 	return &TypeAlias{
 		Public:     decl.Public,
 		Cpp_linked: decl.Cpp_linked,
 		Token:      decl.Token,
 		Ident:      decl.Ident,
-		Kind:       decl.Kind,
+		Kind:       build_type(decl.Kind),
 		Doc:        build_doc(decl.Doc_comments),
 	}
 }
@@ -43,7 +50,7 @@ func build_field(decl *ast.FieldDecl) *Field {
 		Public:  decl.Public,
 		Mutable: decl.Mutable,
 		Ident:   decl.Ident,
-		Kind:    decl.Kind,
+		Kind:    build_type(decl.Kind),
 	}
 }
 
@@ -68,6 +75,31 @@ func build_struct(decl *ast.StructDecl) *Struct {
 	}
 }
 
+func build_param(decl *ast.Param) *Param {
+	return &Param{
+		Token:    decl.Token,
+		Mutable:  decl.Mutable,
+		Variadic: decl.Variadic,
+		Kind:     build_type(decl.Kind),
+		Ident:    decl.Ident,
+	}
+}
+
+func build_params(decls []*ast.Param) []*Param {
+	params := make([]*Param, len(decls))
+	for i, decl := range decls {
+		params[i] = build_param(decl)
+	}
+	return params
+}
+
+func build_ret_type(decl *ast.RetType) *RetType {
+	return &RetType{
+		Kind:   build_type(decl.Kind),
+		Idents: decl.Idents,
+	}
+}
+
 func build_fn(decl *ast.FnDecl) *Fn {
 	return &Fn{
 		Token:      decl.Token,
@@ -79,8 +111,8 @@ func build_fn(decl *ast.FnDecl) *Fn {
 		Doc:        build_doc(decl.Doc_comments),
 		Scope:      decl.Scope,
 		Generics:   decl.Generics,
-		Result:     decl.Result,
-		Params:     decl.Params,
+		Result:     build_ret_type(decl.Result),
+		Params:     build_params(decl.Params),
 	}
 }
 
@@ -123,7 +155,7 @@ func build_enum(decl *ast.EnumDecl) *Enum {
 		Token:  decl.Token,
 		Public: decl.Public,
 		Ident:  decl.Ident,
-		Kind:   decl.Kind,
+		Kind:   build_type(decl.Kind),
 		Items:  build_enum_items(decl.Items),
 		Doc:    build_doc(decl.Doc_comments),
 	}
@@ -139,7 +171,7 @@ func build_var(decl *ast.VarDecl) *Var {
 		Mutable:    decl.Mutable,
 		Public:     decl.Public,
 		Doc:        build_doc(decl.Doc_comments),
-		Kind:       decl.Kind,
+		Kind:       build_type(decl.Kind),
 		Expr:       decl.Expr,
 	}
 }

@@ -44,57 +44,12 @@ func (s *_Sema) is_accessible_define(public bool, token lex.Token) bool {
 // Reports this identifier duplicated in package's global scope.
 // The "self" parameter represents address of exception identifier.
 // If founded identifier address equals to self, will be skipped.
-func (s *_Sema) is_duplicate_identifier(self uintptr, ident string, cpp_linked bool) bool {
-	is_duplicated := func(f *SymbolTable) bool {
-		for _, v := range f.Vars {
-			if _uintptr(v) != self && v.Ident == ident && v.Cpp_linked == cpp_linked {
-				return true
-			}
-		}
-
-		for _, ta := range f.Type_aliases {
-			if _uintptr(ta) != self && ta.Ident == ident && ta.Cpp_linked == cpp_linked {
-				return true
-			}
-		}
-
-		for _, s := range f.Structs {
-			if _uintptr(s) != self && s.Ident == ident && s.Cpp_linked == cpp_linked {
-				return true
-			}
-		}
-
-		for _, f := range f.Funcs {
-			if _uintptr(f) != self && f.Ident == ident && f.Cpp_linked == cpp_linked {
-				return true
-			}
-		}
-
-		if cpp_linked {
-			return false
-		}
-
-		for _, t := range f.Traits {
-			if _uintptr(t) != self && t.Ident == ident {
-				return true
-			}
-		}
-
-		for _, e := range f.Enums {
-			if _uintptr(e) != self && e.Ident == ident {
-				return true
-			}
-		}
-
-		return false
-	}
-
+func (s *_Sema) is_duplicated_ident(self uintptr, ident string, cpp_linked bool) bool {
 	for _, f := range s.files {
-		if is_duplicated(f) {
+		if f.is_duplicated_ident(self, ident, cpp_linked) {
 			return true
 		}
 	}
-
 	return false
 }
 
@@ -279,7 +234,7 @@ func (s *_Sema) check_imports() {
 func (s *_Sema) check_type_alias(ta *TypeAlias) {
 	if lex.Is_ignore_ident(ta.Ident) {
 		s.push_err(ta.Token, "ignore_ident")
-	} else if s.is_duplicate_identifier(_uintptr(ta), ta.Ident, ta.Cpp_linked) {
+	} else if s.is_duplicated_ident(_uintptr(ta), ta.Ident, ta.Cpp_linked) {
 		s.push_err(ta.Token, "duplicated_ident", ta.Ident)
 	}
 

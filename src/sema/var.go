@@ -19,6 +19,6 @@ type Var struct {
 	Mutable    bool
 	Public     bool
 	Doc        string
-	Kind       *ast.Type
+	Kind       *Type
 	Expr       *ast.Expr
 }
