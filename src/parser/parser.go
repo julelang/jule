@@ -1408,7 +1408,7 @@ func (p *_Parser) append_node(st []lex.Token) {
 	}
 
 	node := p.parse_node(st)
-	if node.Data == nil {
+	if node.Data == nil || p.stopped() {
 		return
 	}
 

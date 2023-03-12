@@ -430,6 +430,122 @@ func (s *_Sema) check_structs() (ok bool) {
 	return true
 }
 
+func (s *_Sema) check_fn_params_dup(f *Fn) (ok bool) {
+	ok = true
+check:
+	for i, p := range f.Params {
+		// Lookup in generics.
+		for _, g := range f.Generics {
+			if p.Ident == g.Ident {
+				ok = false
+				s.push_err(p.Token, "duplicated_ident", p.Ident)
+				continue check
+			}
+		}
+
+	params_lookup:
+		for j, jp := range f.Params {
+			switch {
+			case j >= i:
+				// Skip current and following parameters.
+				break params_lookup
+
+			case lex.Is_anon_ident(p.Ident) || lex.Is_anon_ident(jp.Ident):
+				// Skip anonymous parameters.
+				break params_lookup
+
+			case p.Ident == jp.Ident:
+				ok = false
+				s.push_err(p.Token, "duplicated_ident", p.Ident)
+				continue check
+			}
+		}
+	}
+	return
+}
+
+func (s *_Sema) check_fn_result(f *Fn) (ok bool) {
+	ok = true
+	
+	if f.Is_void() {
+		return
+	}
+
+	// Check duplications.
+	for i, v := range f.Result.Idents {
+		if lex.Is_ignore_ident(v.Kind) {
+			continue // Skip anonymous return variables.
+		}
+
+		// Lookup in generics.
+		for _, g := range f.Generics {
+			if v.Kind == g.Ident {
+				goto exist
+			}
+		}
+
+		// Lookup in parameters.
+		for _, p := range f.Params {
+			if v.Kind == p.Ident {
+				goto exist
+			}
+		}
+
+		// Lookup in return identifiers.
+	itself_lookup:
+		for j, jv := range f.Result.Idents {
+			switch {
+			case j >= i:
+				// Skip current and following identifiers.
+				break itself_lookup
+
+			case jv.Kind == v.Kind:
+				goto exist
+			}
+		}
+		continue
+	exist:
+		s.push_err(v, "duplicated_ident", v.Kind)
+		ok = false
+	}
+
+	return
+}
+
+func (s *_Sema) check_fn(f *Fn) {
+	if lex.Is_ignore_ident(f.Ident) {
+		s.push_err(f.Token, "ignore_ident")
+	} else if s.is_duplicated_ident(_uintptr(f), f.Ident, false) {
+		s.push_err(f.Token, "duplicated_ident", f.Ident)
+	}
+
+	switch {
+	case !s.check_generics(f.Generics):
+		return
+
+	case !s.check_fn_params_dup(f):
+		return
+
+	case !s.check_fn_result(f):
+		return
+	}
+
+	// TODO: Check scope if function not has any generic type.
+}
+
+// Checks current package file's functions.
+func (s *_Sema) check_funcs() (ok bool) {
+	for _, f := range s.file.Funcs {
+		s.check_fn(f)
+		
+		// Break checking if type alias has error.
+		if len(s.errors) > 0 {
+			return false
+		}
+	}
+	return true
+}
+
 // Checks current package file.
 // Reports whether checking is success.
 func (s *_Sema) check_file() (ok bool) {
@@ -445,6 +561,9 @@ func (s *_Sema) check_file() (ok bool) {
 		return false
 
 	case !s.check_structs():
+		return false
+
+	case !s.check_funcs():
 		return false
 
 	default:
