@@ -32,11 +32,15 @@ func (st *SymbolTable) find_package(ident string) *Package {
 	return nil
 }
 
-// Returns package by path.
-// Returns nil if not exist any package in this path.
-func (st *SymbolTable) find_package_by_path(path string) *Package {
+// Returns package by selector.
+// Returns nil if selector returns false for all packages.
+// Returns nil if selector is nil.
+func (st *SymbolTable) select_package(selector func(*Package) bool) *Package {
+	if selector == nil {
+		return nil
+	}
 	for _, pkg := range st.Packages {
-		if pkg.Path == path {
+		if selector(pkg) {
 			return pkg
 		}
 	}

@@ -2,6 +2,7 @@ package sema
 
 type _Lookup interface {
 	find_package(ident string) *Package
+	select_package(selector func(*Package) bool) *Package
 	find_var(ident string, cpp_linked bool) *Var
 	find_type_alias(ident string, cpp_linked bool) *TypeAlias
 	find_struct(ident string, cpp_linked bool) *Struct

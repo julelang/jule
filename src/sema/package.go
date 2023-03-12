@@ -129,6 +129,9 @@ type Package struct {
 // Returns nil always.
 func (p *Package) find_package() *Package { return nil }
 
+// Returns always nil.
+func (p *Package) select_package(func(*Package) bool) *Package { return nil }
+
 // Returns variable by identifier and cpp linked state.
 // Returns nil if not exist any variable in this identifier.
 func (p *Package) find_var(ident string, cpp_linked bool) *Var {

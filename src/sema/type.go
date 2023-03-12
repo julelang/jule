@@ -130,6 +130,15 @@ type Arr struct {
 	Elem *TypeKind
 }
 
+func build_link_path_by_tokens(tokens []lex.Token) string {
+	s := tokens[0].Kind
+	for _, token := range tokens[1:] {
+		s += lex.KND_DBLCOLON
+		s += token.Kind
+	}
+	return s
+}
+
 // Checks type and builds result as kind.
 // Removes kind if error occurs,
 // so type is not reports true for checked state.
@@ -184,36 +193,24 @@ func (tc *_TypeChecker) build_prim(decl *ast.IdentType) *Prim {
 }
 
 func (tc *_TypeChecker) get_def(decl *ast.IdentType) any {
-	e := tc.lookup.find_enum(decl.Ident)
-	if e != nil {
-		if len(decl.Generics) > 0 {
-			tc.push_err(decl.Token, "type_not_supports_generics", decl.Ident)
-			return nil
-		}
-		return e
-	}
-
-	t := tc.lookup.find_trait(decl.Ident)
-	if t != nil {
-		if len(decl.Generics) > 0 {
-			tc.push_err(decl.Token, "type_not_supports_generics", decl.Ident)
-			return nil
-		}
-		return t
-	}
-
 	if !decl.Cpp_linked {
-		tc.push_err(decl.Token, "ident_not_exist", decl.Ident)
-		return nil
-	}
-
-	f := tc.lookup.find_fn(decl.Ident, decl.Cpp_linked)
-	if f != nil {
-		if len(f.Generics) > 0 {
-			tc.push_err(decl.Token, "genericed_fn_as_anonymous_fn")
-			return nil
+		e := tc.lookup.find_enum(decl.Ident)
+		if e != nil {
+			if len(decl.Generics) > 0 {
+				tc.push_err(decl.Token, "type_not_supports_generics", decl.Ident)
+				return nil
+			}
+			return e
 		}
-		return t
+
+		t := tc.lookup.find_trait(decl.Ident)
+		if t != nil {
+			if len(decl.Generics) > 0 {
+				tc.push_err(decl.Token, "type_not_supports_generics", decl.Ident)
+				return nil
+			}
+			return t
+		}
 	}
 
 	s := tc.lookup.find_struct(decl.Ident, decl.Cpp_linked)
@@ -401,11 +398,31 @@ func (tc *_TypeChecker) build_fn(decl *ast.FnDecl) *Fn {
 	return f
 }
 
+func (tc *_TypeChecker) build_by_std_namespace(decl *ast.NamespaceType) any {
+	path := build_link_path_by_tokens(decl.Idents)
+	pkg := tc.lookup.select_package(func(pkg *Package) bool {
+		return pkg.Std && pkg.Link_path == path
+	})
+	if pkg == nil {
+		tc.push_err(decl.Idents[0], "namespace_not_exist", path)
+		return nil
+	}
+	return tc.build_ident(decl.Kind)
+}
+
+func (tc *_TypeChecker) build_by_namespace(decl *ast.NamespaceType) any {
+	token := decl.Idents[0]
+	if token.Kind == "std" {
+		return tc.build_by_std_namespace(decl)
+	}
+
+	tc.push_err(token, "ident_not_exist", token.Kind)
+	return nil
+}
+
 func (tc *_TypeChecker) build(decl_kind ast.TypeDeclKind) *TypeKind {
 	var kind any = nil
 
-	// TODO:
-	//  - Implement namespaces.
 	switch decl_kind.(type) {
 	case *ast.IdentType:
 		kind = tc.build_ident(decl_kind.(*ast.IdentType))
@@ -430,6 +447,9 @@ func (tc *_TypeChecker) build(decl_kind ast.TypeDeclKind) *TypeKind {
 
 	case *ast.FnDecl:
 		kind = tc.build_fn(decl_kind.(*ast.FnDecl))
+
+	case *ast.NamespaceType:
+		kind = tc.build_by_namespace(decl_kind.(*ast.NamespaceType))
 
 	default:
 		tc.push_err(tc.error_token, "invalid_type")

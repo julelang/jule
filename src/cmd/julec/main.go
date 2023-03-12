@@ -242,13 +242,13 @@ func (i *Importer) Imported(pkg *sema.Package) {}
 func main() {
 	importer := &Importer{}
 	files, errors := importer.Import_package(os.Args[1])
-	if errors != nil {
+	if len(errors) > 0 {
 		fmt.Println(errors)
 		return
 	}
 
 	_, errors = sema.Analyze_package(WORKING_PATH, STDLIB_PATH, files, importer)
-	if errors != nil {
+	if len(errors) > 0 {
 		fmt.Println(errors)
 		return
 	}

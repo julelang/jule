@@ -89,12 +89,15 @@ func (tb *_TypeBuilder) build_namespace() *ast.TypeDecl {
 			if token.Id != lex.ID_IDENT {
 				tb.push_err(token, "invalid_syntax")
 			}
-			nst.Idents = append(nst.Idents, token.Kind)
+			nst.Idents = append(nst.Idents, token)
 		} else if token.Id != lex.ID_DBLCOLON {
 			break
 		}
 		n++
 	}
+
+	// Remove selected identifier token.
+	nst.Idents = nst.Idents[:len(nst.Idents)-1]
 
 	*tb.i-- // Set offset to last identifier.
 	nst.Kind = tb.build_ident().Kind.(*ast.IdentType)

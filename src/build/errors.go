@@ -114,7 +114,6 @@ var ERRORS = map[string]string{
 	`fn_not_has_parameter`:                     `function is not has parameter in this identifier: @`,
 	`already_has_expr`:                         `@ already has expression`,
 	`argument_must_target_to_parameter`:        `argument must target to parameter`,
-	`namespace_not_exist`:                      `namespace is not exist in this identifier: @`,
 	`overflow_limits`:                          `overflow the limit of data-type`,
 	`generics_overflow`:                        `overflow generics`,
 	`has_generics`:                             `define has generics`,
@@ -156,6 +155,7 @@ var ERRORS = map[string]string{
 	`use_decl_at_body`:                         `use declarations must declared before other declarations`,
 	`pwd_cannot_set`:                           `current working directory cannot set`,
 	`array_auto_sized`:                         `array must have explicit size`,
+	`namespace_not_exist`:                      `namespace not exist: @`,
 }
 
 // Returns formatted error message by key and args.

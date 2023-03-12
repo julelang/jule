@@ -29,6 +29,7 @@ func compiler_err(token lex.Token, key string, args ...any) build.Log {
 // Semantic analyzer for tables.
 // Accepts tables as files of package.
 type _Sema struct {
+	pstd   string
 	errors []build.Log
 	files  []*SymbolTable // Package files.
 	file   *SymbolTable   // Current package file.
@@ -64,6 +65,16 @@ func (s *_Sema) is_duplicated_ident(self uintptr, ident string, cpp_linked bool)
 //  - Current file's imported packages.
 func (s *_Sema) find_package(ident string) *Package {
 	return s.file.find_package(ident)
+}
+
+// Returns package by selector.
+// Returns nil if selector returns false for all packages.
+// Returns nil if selector is nil.
+//
+// Lookups:
+//  - Current file's imported packages.
+func (s *_Sema) select_package(selector func(*Package) bool) *Package {
+	return s.file.select_package(selector)
 }
 
 // Returns variable by identifier and cpp linked state.
@@ -296,7 +307,6 @@ func (s *_Sema) check_package_files() {
 
 func (s *_Sema) check(files []*SymbolTable) {
 	s.files = files
-	
 	s.check_imports()
 	// Break checking if imports has error.
 	if len(s.errors) > 0 {

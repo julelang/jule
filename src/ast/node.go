@@ -121,8 +121,8 @@ func (it *IdentType) Is_prim() bool { return it.Token.Id == lex.ID_PRIM }
 
 // Namespace chain type.
 type NamespaceType struct {
-	Idents []string   // Namespace chain.
-	Kind   *IdentType // Type of identifier.
+	Idents []lex.Token // Namespace chain with identifier tokens.
+	Kind   *IdentType  // Type of identifier.
 }
 
 type RefType struct { Elem *TypeDecl }      // Reference type.
