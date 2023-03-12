@@ -14,6 +14,16 @@ import (
 // In Jule: (uintptr)(PTR)
 func _uintptr[T any](t *T) uintptr { return uintptr(unsafe.Pointer(t)) }
 
+func compiler_err(token lex.Token, key string, args ...any) build.Log {
+	return build.Log{
+		Type:   build.ERR,
+		Row:    token.Row,
+		Column: token.Column,
+		Path:   token.File.Path(),
+		Text:   build.Errorf(key, args...),
+	}
+}
+
 // Sema must implement Lookup.
 
 // Semantic analyzer for tables.
@@ -27,13 +37,7 @@ type _Sema struct {
 func (s *_Sema) set_current_file(f *SymbolTable) { s.file = f }
 
 func (s *_Sema) push_err(token lex.Token, key string, args ...any) {
-	s.errors = append(s.errors, build.Log{
-		Type:   build.ERR,
-		Row:    token.Row,
-		Column: token.Column,
-		Path:   token.File.Path(),
-		Text:   build.Errorf(key, args...),
-	})
+	s.errors = append(s.errors, compiler_err(token, key, args...))
 }
 
 // Reports whether define is accessible in the current package.
@@ -231,15 +235,27 @@ func (s *_Sema) check_imports() {
 	}
 }
 
+// Checks type and builds result as kind.
+// Skips already checked types.
+func (s *_Sema) check_type(t *Type) (ok bool) {
+	if t.checked() {
+		return
+	}
+	tc := _TypeChecker{
+		s:      s,
+		lookup: s,
+	}
+	tc.check(t)
+	return t.checked()
+}
+
 func (s *_Sema) check_type_alias(ta *TypeAlias) {
 	if lex.Is_ignore_ident(ta.Ident) {
 		s.push_err(ta.Token, "ignore_ident")
 	} else if s.is_duplicated_ident(_uintptr(ta), ta.Ident, ta.Cpp_linked) {
 		s.push_err(ta.Token, "duplicated_ident", ta.Ident)
 	}
-
-	// TODO: Detect cycles.
-	// TODO: Check type validity.
+	s.check_type(ta.Kind)
 }
 
 // Checks current package file's type aliases.

@@ -13,7 +13,7 @@ import (
 
 // Token identities.
 const ID_NA = 0
-const ID_DT = 1
+const ID_PRIM = 1
 const ID_IDENT = 2
 const ID_RANGE = 3
 const ID_RET = 4

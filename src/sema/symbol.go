@@ -26,9 +26,9 @@ func build_doc(cg *ast.CommentGroup) string {
 	return doc
 }
 
-func build_type(t *ast.Type) *Type {
+func build_type(t *ast.TypeDecl) *Type {
 	return &Type{
-		Ast:  t,
+		Decl:  t,
 		Kind: nil,
 	}
 }

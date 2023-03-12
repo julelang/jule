@@ -13,7 +13,7 @@ import (
 // if tokens are function call, nil if not.
 func is_fn_call(tokens []lex.Token) []lex.Token {
 	switch tokens[0].Id {
-	case lex.ID_RANGE, lex.ID_IDENT, lex.ID_DT:
+	case lex.ID_RANGE, lex.ID_IDENT, lex.ID_PRIM:
 		// Ignore.
 	default:
 		tok := tokens[len(tokens)-1]
@@ -248,8 +248,8 @@ func (ep *_ExprBuilder) build_lit(token lex.Token) *ast.LitExpr {
 	}
 }
 
-func (ep *_ExprBuilder) build_primitive_type(token lex.Token) *ast.Type {
-	return build_primitive_type(token.Kind)
+func (ep *_ExprBuilder) build_primitive_type(token lex.Token) *ast.TypeDecl {
+	return build_prim_type(token)
 }
 
 func (ep *_ExprBuilder) build_single(token lex.Token) ast.ExprData {
@@ -260,7 +260,7 @@ func (ep *_ExprBuilder) build_single(token lex.Token) ast.ExprData {
 	case lex.ID_IDENT, lex.ID_SELF:
 		return build_ident_expr(token)
 
-	case lex.ID_DT:
+	case lex.ID_PRIM:
 		return ep.build_primitive_type(token)
 
 	default:
@@ -339,7 +339,7 @@ func (ep *_ExprBuilder) build_ns_sub_ident(tokens []lex.Token) *ast.NsSelectionE
 	return ns
 }
 
-func (ep *_ExprBuilder) build_type(tokens []lex.Token) *ast.Type {
+func (ep *_ExprBuilder) build_type(tokens []lex.Token) *ast.TypeDecl {
 	i := 0
 	t, ok := ep.p.build_type(tokens, &i, false)
 	if !ok {
@@ -512,14 +512,14 @@ func (ep *_ExprBuilder) build_args(tokens []lex.Token) []*ast.Expr {
 }
 
 // Tokens should include brackets.
-func (ep *_ExprBuilder) build_call_generics(tokens []lex.Token) []*ast.Type {
+func (ep *_ExprBuilder) build_call_generics(tokens []lex.Token) []*ast.TypeDecl {
 	if len(tokens) == 0 {
 		return nil
 	}
 
 	tokens = tokens[1 : len(tokens)-1] // Remove brackets.
 	parts, errs := lex.Parts(tokens, lex.ID_COMMA, true)
-	generics := make([]*ast.Type, len(parts))
+	generics := make([]*ast.TypeDecl, len(parts))
 	ep.p.errors = append(ep.p.errors, errs...)
 	for i, part := range parts {
 		if len(part) == 0 {
@@ -864,7 +864,7 @@ func (ep *_ExprBuilder) build_data(tokens []lex.Token) ast.ExprData {
 	case lex.ID_IDENT:
 		return ep.build_sub_ident(tokens)
 
-	case lex.ID_DT:
+	case lex.ID_PRIM:
 		// Catch slice, and array types.
 		return ep.build_type(tokens)
 	

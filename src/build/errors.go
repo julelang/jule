@@ -119,6 +119,7 @@ var ERRORS = map[string]string{
 	`generics_overflow`:                        `overflow generics`,
 	`has_generics`:                             `define has generics`,
 	`not_has_generics`:                         `define not has generics`,
+	`type_not_supports_generics`:               `@ type not supports generics`,
 	`divide_by_zero`:                           `divide by zero`,
 	`trait_have_not_ident`:                     `@ trait is have not this identifier: @`,
 	`not_impl_trait_def`:                       `not implemented @ trait's @ define`,

@@ -108,7 +108,7 @@ func (p *_Parser) build_scope(tokens []lex.Token) *ast.Scope {
 	return s
 }
 
-func (p *_Parser) __build_type(tokens []lex.Token, i *int, err bool) (*ast.Type, bool) {
+func (p *_Parser) __build_type(tokens []lex.Token, i *int, err bool) (*ast.TypeDecl, bool) {
 	tb := _TypeBuilder{
 		p:      p,
 		tokens: tokens,
@@ -119,7 +119,7 @@ func (p *_Parser) __build_type(tokens []lex.Token, i *int, err bool) (*ast.Type,
 }
 
 // build_type builds AST model of data-type.
-func (p *_Parser) build_type(tokens []lex.Token, i *int, err bool) (*ast.Type, bool) {
+func (p *_Parser) build_type(tokens []lex.Token, i *int, err bool) (*ast.TypeDecl, bool) {
 	token := tokens[*i]
 	t, ok := p.__build_type(tokens, i, err)
 	if err && !ok {
@@ -257,14 +257,6 @@ func (p *_Parser) build_var(tokens []lex.Token) *ast.VarDecl {
 	}
 	tokens = tokens[i:]
 	p.build_var_common(v, tokens)
-	if v.Expr == nil {
-		if v.Kind.Is_void() {
-			p.push_err(v.Token, "missing_type")
-		}
-		if v.Constant {
-			p.push_err(v.Token, "const_var_not_have_expr")
-		}
-	}
 	return v
 }
 
@@ -438,7 +430,7 @@ func (p *_Parser) check_params(params []*ast.Param) {
 		if param.Token.Id == lex.ID_NA {
 			p.push_err(param.Token, "missing_type")
 		} else {
-			param.Kind = &ast.Type{
+			param.Kind = &ast.TypeDecl{
 				Token: param.Token,
 				Kind:   &ast.IdentType{Ident: param.Token.Kind},
 			}
@@ -488,7 +480,7 @@ func (p *_Parser) build_multi_ret_type(tokens []lex.Token, i *int) (t *ast.RetTy
 	range_tokens := lex.Range(i, lex.KND_LPAREN, lex.KND_RPARENT, tokens)
 	params := p.build_params(range_tokens, false, true)
 
-	types := make([]*ast.Type, len(params))
+	types := make([]*ast.TypeDecl, len(params))
 	for i, param := range params {
 		types[i] = param.Kind
 		if param.Ident != lex.ANON_IDENT {
@@ -500,7 +492,7 @@ func (p *_Parser) build_multi_ret_type(tokens []lex.Token, i *int) (t *ast.RetTy
 	}
 
 	if len(types) > 1 {
-		t.Kind = &ast.Type{
+		t.Kind = &ast.TypeDecl{
 			Token: tokens[0],
 			Kind:  &ast.TupleType{
 				Types: types,
@@ -608,10 +600,8 @@ func (p *_Parser) build_fn_prototype(tokens []lex.Token, i *int, method bool, an
 		f.Params = p.build_params(params_toks, method, false)
 	}
 
-	t, ret_ok := p.build_ret_type(tokens, i)
-	if ret_ok {
-		f.Result = t
-	}
+	t, _ := p.build_ret_type(tokens, i)
+	f.Result = t
 
 	return f
 }
@@ -866,7 +856,7 @@ func (p *_Parser) build_enum_decl(tokens []lex.Token) *ast.EnumDecl {
 			return e
 		}
 	} else {
-		e.Kind = build_u32_type()
+		e.Kind = nil
 	}
 	item_tokens := lex.Range(&i, lex.KND_LBRACE, lex.KND_RBRACE, tokens)
 	if item_tokens == nil {
