@@ -368,66 +368,21 @@ func (s *_Sema) check_generics(generics []*ast.Generic) (ok bool) {
 		}
 
 		// Check duplications.
+	duplication_lookup:
 		for j, ct := range generics {
-			if j >= i {
-				break // Skip current and following generics.
-			} else if g.Ident == ct.Ident {
+			switch {
+			case j >= i:
+				// Skip current and following generics.
+				break duplication_lookup
+
+			case g.Ident == ct.Ident:
 				s.push_err(g.Token, "duplicated_ident", g.Ident)
 				ok = false
-				break
+				break duplication_lookup
 			}
 		}
 	}
 	return
-}
-
-func (s *_Sema) check_trait(t *Trait) {
-	if lex.Is_ignore_ident(t.Ident) {
-		s.push_err(t.Token, "ignore_ident")
-	} else if s.is_duplicated_ident(_uintptr(t), t.Ident, false) {
-		s.push_err(t.Token, "duplicated_ident", t.Ident)
-	}
-
-	// TODO: Check methods.
-}
-
-// Checks current package file's traits.
-func (s *_Sema) check_traits() (ok bool) {
-	for _, t := range s.file.Traits {
-		s.check_trait(t)
-		
-		// Break checking if type alias has error.
-		if len(s.errors) > 0 {
-			return false
-		}
-	}
-	return true
-}
-
-func (s *_Sema) check_struct(strct *Struct) {
-	if lex.Is_ignore_ident(strct.Ident) {
-		s.push_err(strct.Token, "ignore_ident")
-	} else if s.is_duplicated_ident(_uintptr(strct), strct.Ident, false) {
-		s.push_err(strct.Token, "duplicated_ident", strct.Ident)
-	}
-
-	ok := s.check_generics(strct.Generics)
-	if !ok {
-		return
-	}
-}
-
-// Checks current package file's structures.
-func (s *_Sema) check_structs() (ok bool) {
-	for _, strct := range s.file.Structs {
-		s.check_struct(strct)
-		
-		// Break checking if type alias has error.
-		if len(s.errors) > 0 {
-			return false
-		}
-	}
-	return true
 }
 
 func (s *_Sema) check_fn_params_dup(f *Fn) (ok bool) {
@@ -464,7 +419,7 @@ check:
 	return
 }
 
-func (s *_Sema) check_fn_result(f *Fn) (ok bool) {
+func (s *_Sema) check_fn_result_dup(f *Fn) (ok bool) {
 	ok = true
 	
 	if f.Is_void() {
@@ -512,6 +467,117 @@ func (s *_Sema) check_fn_result(f *Fn) (ok bool) {
 	return
 }
 
+// Checks generics, parameters and return type.
+// Not checks scope, and other things.
+func (s *_Sema) check_fn_prototype(f *Fn) (ok bool) {
+	// TODO:
+	//  - Check return type.
+	//  |- Check parameter types.
+	//  |- Build non-generic types if function has generic types.
+	switch {
+	case !s.check_generics(f.Generics):
+		return false
+
+	case !s.check_fn_params_dup(f):
+		return false
+
+	case !s.check_fn_result_dup(f):
+		return false
+
+	default:
+		return true
+	}
+}
+
+func (s *_Sema) check_trait_method(f *Fn) {
+	if lex.Is_ignore_ident(f.Ident) {
+		s.push_err(f.Token, "ignore_ident")
+	}
+
+	s.check_fn_prototype(f)
+}
+
+func (s *_Sema) check_trait_methods(t *Trait) {
+	for i, f := range t.Methods {
+		s.check_trait_method(f)
+		
+		// Break checking if type alias has error.
+		if len(s.errors) > 0 {
+			return
+		}
+
+		// Check duplications.
+	duplicate_lookup:
+		for j, jf := range t.Methods {
+			// NOTE:
+			//  Ignore identifier checking is unnecessary here.
+			//  Because ignore identifiers logs error.
+			//  Errors breaks checking, so here is unreachable code for
+			//  ignore identified methods.
+			switch {
+			case j >= i:
+				// Skip current and following methods.
+				break duplicate_lookup
+			
+			case f.Ident == jf.Ident:
+				s.push_err(f.Token, "duplicated_ident", f.Ident)
+				break duplicate_lookup
+			}
+		}
+	}
+}
+
+func (s *_Sema) check_trait(t *Trait) {
+	if lex.Is_ignore_ident(t.Ident) {
+		s.push_err(t.Token, "ignore_ident")
+	} else if s.is_duplicated_ident(_uintptr(t), t.Ident, false) {
+		s.push_err(t.Token, "duplicated_ident", t.Ident)
+	}
+
+	s.check_trait_methods(t)
+}
+
+// Checks current package file's traits.
+func (s *_Sema) check_traits() (ok bool) {
+	for _, t := range s.file.Traits {
+		s.check_trait(t)
+		
+		// Break checking if type alias has error.
+		if len(s.errors) > 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func (s *_Sema) check_struct(strct *Struct) {
+	if lex.Is_ignore_ident(strct.Ident) {
+		s.push_err(strct.Token, "ignore_ident")
+	} else if s.is_duplicated_ident(_uintptr(strct), strct.Ident, false) {
+		s.push_err(strct.Token, "duplicated_ident", strct.Ident)
+	}
+
+	ok := s.check_generics(strct.Generics)
+	if !ok {
+		return
+	}
+
+	// TODO: Check fields and methods if not have any generic type.
+}
+
+// Checks current package file's structures.
+func (s *_Sema) check_structs() (ok bool) {
+	for _, strct := range s.file.Structs {
+		s.check_struct(strct)
+		
+		// Break checking if type alias has error.
+		if len(s.errors) > 0 {
+			return false
+		}
+	}
+	return true
+}
+
 func (s *_Sema) check_fn(f *Fn) {
 	if lex.Is_ignore_ident(f.Ident) {
 		s.push_err(f.Token, "ignore_ident")
@@ -519,14 +585,8 @@ func (s *_Sema) check_fn(f *Fn) {
 		s.push_err(f.Token, "duplicated_ident", f.Ident)
 	}
 
-	switch {
-	case !s.check_generics(f.Generics):
-		return
-
-	case !s.check_fn_params_dup(f):
-		return
-
-	case !s.check_fn_result(f):
+	ok := s.check_fn_prototype(f)
+	if !ok {
 		return
 	}
 
