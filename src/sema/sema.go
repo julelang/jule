@@ -381,6 +381,29 @@ func (s *_Sema) check_generics(generics []*ast.Generic) (ok bool) {
 	return
 }
 
+func (s *_Sema) check_trait(t *Trait) {
+	if lex.Is_ignore_ident(t.Ident) {
+		s.push_err(t.Token, "ignore_ident")
+	} else if s.is_duplicated_ident(_uintptr(t), t.Ident, false) {
+		s.push_err(t.Token, "duplicated_ident", t.Ident)
+	}
+
+	// TODO: Check methods.
+}
+
+// Checks current package file's traits.
+func (s *_Sema) check_traits() (ok bool) {
+	for _, t := range s.file.Traits {
+		s.check_trait(t)
+		
+		// Break checking if type alias has error.
+		if len(s.errors) > 0 {
+			return false
+		}
+	}
+	return true
+}
+
 func (s *_Sema) check_struct(strct *Struct) {
 	if lex.Is_ignore_ident(strct.Ident) {
 		s.push_err(strct.Token, "ignore_ident")
@@ -416,6 +439,9 @@ func (s *_Sema) check_file() (ok bool) {
 		return false
 
 	case !s.check_enums():
+		return false
+
+	case !s.check_traits():
 		return false
 
 	case !s.check_structs():

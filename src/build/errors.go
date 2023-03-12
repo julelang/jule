@@ -84,7 +84,7 @@ var ERRORS = map[string]string{
 	`already_variadic`:                         `define is already variadic`,
 	`already_reference`:                        `define is already reference`,
 	`duplicate_use_decl`:                       `duplicate use declaration: @`,
-	`ignore_ident`:                             `ignore operator cannot use as identifier`,
+	`ignore_ident`:                             `ignore operator cannot use as identifier for this declaration`,
 	`overflow_multi_assign_idents`:             `overflow multi assignment identifers`,
 	`overflow_return`:                          `overflow return expressions`,
 	`break_at_out_of_valid_scope`:              `break keyword is cannot used at out of iteration and match cases`,
