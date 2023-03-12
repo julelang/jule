@@ -21,12 +21,14 @@ type TypeAlias struct {
 }
 
 // Type's kind's type.
-type TypeKind = any
+type TypeKind struct {
+	Kind any
+}
 
 // Type.
 type Type struct {
 	Decl *ast.TypeDecl // Never changed by semantic analyzer.
-	Kind TypeKind
+	Kind *TypeKind
 }
 
 // Reports whether type is checked already.
@@ -36,39 +38,42 @@ func (t *Type) checked() bool { return t.Kind != nil }
 func (t *Type) remove_kind() { t.Kind = nil }
 
 // Primitive type.
-type PrimType struct { kind string }
+type Prim struct { kind string }
 // Reports whether type is primitive i8.
-func (pt *PrimType) Is_i8() bool { return pt.kind == lex.KND_I8 }
+func (p *Prim) Is_i8() bool { return p.kind == lex.KND_I8 }
 // Reports whether type is primitive i16.
-func (pt *PrimType) Is_i16() bool { return pt.kind == lex.KND_I16 }
+func (p *Prim) Is_i16() bool { return p.kind == lex.KND_I16 }
 // Reports whether type is primitive i32.
-func (pt *PrimType) Is_i32() bool { return pt.kind == lex.KND_I32 }
+func (p *Prim) Is_i32() bool { return p.kind == lex.KND_I32 }
 // Reports whether type is primitive i64.
-func (pt *PrimType) Is_i64() bool { return pt.kind == lex.KND_I64 }
+func (p *Prim) Is_i64() bool { return p.kind == lex.KND_I64 }
 // Reports whether type is primitive u8.
-func (pt *PrimType) Is_u8() bool { return pt.kind == lex.KND_U8 }
+func (p *Prim) Is_u8() bool { return p.kind == lex.KND_U8 }
 // Reports whether type is primitive u16.
-func (pt *PrimType) Is_u16() bool { return pt.kind == lex.KND_U16 }
+func (p *Prim) Is_u16() bool { return p.kind == lex.KND_U16 }
 // Reports whether type is primitive u32.
-func (pt *PrimType) Is_u32() bool { return pt.kind == lex.KND_U32 }
+func (p *Prim) Is_u32() bool { return p.kind == lex.KND_U32 }
 // Reports whether type is primitive u64.
-func (pt *PrimType) Is_u64() bool { return pt.kind == lex.KND_U64 }
+func (p *Prim) Is_u64() bool { return p.kind == lex.KND_U64 }
 // Reports whether type is primitive f32.
-func (pt *PrimType) Is_f32() bool { return pt.kind == lex.KND_F32 }
+func (p *Prim) Is_f32() bool { return p.kind == lex.KND_F32 }
 // Reports whether type is primitive f64.
-func (pt *PrimType) Is_f64() bool { return pt.kind == lex.KND_F64 }
+func (p *Prim) Is_f64() bool { return p.kind == lex.KND_F64 }
 // Reports whether type is primitive int.
-func (pt *PrimType) Is_int() bool { return pt.kind == lex.KND_INT }
+func (p *Prim) Is_int() bool { return p.kind == lex.KND_INT }
 // Reports whether type is primitive uint.
-func (pt *PrimType) Is_uint() bool { return pt.kind == lex.KND_UINT }
+func (p *Prim) Is_uint() bool { return p.kind == lex.KND_UINT }
 // Reports whether type is primitive uintptr.
-func (pt *PrimType) Is_uintptr() bool { return pt.kind == lex.KND_UINTPTR }
+func (p *Prim) Is_uintptr() bool { return p.kind == lex.KND_UINTPTR }
 // Reports whether type is primitive bool.
-func (pt *PrimType) Is_bool() bool { return pt.kind == lex.KND_BOOL }
+func (p *Prim) Is_bool() bool { return p.kind == lex.KND_BOOL }
 // Reports whether type is primitive str.
-func (pt *PrimType) Is_str() bool { return pt.kind == lex.KND_STR }
+func (p *Prim) Is_str() bool { return p.kind == lex.KND_STR }
 // Reports whether type is primitive any.
-func (pt *PrimType) Is_any() bool { return pt.kind == lex.KND_ANY }
+func (p *Prim) Is_any() bool { return p.kind == lex.KND_ANY }
+
+// Reference type.
+type Ref struct { Elem *TypeKind }
 
 // Checks type and builds result as kind.
 // Removes kind if error occurs,
@@ -89,7 +94,7 @@ func (tc *_TypeChecker) push_err(token lex.Token, key string, args ...any) {
 	tc.s.push_err(token, key, args...)
 }
 
-func (tc *_TypeChecker) build_prim(kind *ast.IdentType) *PrimType {
+func (tc *_TypeChecker) build_prim(kind *ast.IdentType) *Prim {
 	switch kind.Ident {
 	case lex.KND_I8,
 		lex.KND_I16,
@@ -117,22 +122,42 @@ func (tc *_TypeChecker) build_prim(kind *ast.IdentType) *PrimType {
 		tc.push_err(kind.Token, "type_not_supports_generics", kind.Ident)
 	}
 
-	return &PrimType{
+	return &Prim{
 		kind: kind.Ident,
 	}
 }
 
-func (tc *_TypeChecker) build_ident_kind(kind *ast.IdentType) TypeKind {
+func (tc *_TypeChecker) build_ident_kind(kind *ast.IdentType) *TypeKind {
 	if kind.IsPrim() {
-		return tc.build_prim(kind)
+		return &TypeKind{Kind: tc.build_prim(kind)}
 	}
 	return nil
 }
 
-func (tc *_TypeChecker) build_kind(kind ast.TypeDeclKind) TypeKind {
+func (tc *_TypeChecker) build_ref(kind *ast.RefType) *Ref {
+	elem := tc.check_decl(kind.Elem)
+	if elem == nil {
+		return nil
+	}
+
+	// TODO: check cases:
+	//         - ref_refs_ref
+	//         - ref_refs_ptr
+	//         - ref_refs_array
+	//         - ref_refs_enum
+
+	return &Ref{
+		Elem: elem,
+	}
+}
+
+func (tc *_TypeChecker) build_kind(kind ast.TypeDeclKind) *TypeKind {
 	switch kind.(type) {
 	case *ast.IdentType:
 		return tc.build_ident_kind(kind.(*ast.IdentType))
+
+	case *ast.RefType:
+		return &TypeKind{Kind: tc.build_ref(kind.(*ast.RefType))}
 
 	default:
 		tc.push_err(tc.error_token, "invalid_type")
@@ -140,12 +165,20 @@ func (tc *_TypeChecker) build_kind(kind ast.TypeDeclKind) TypeKind {
 	}
 }
 
-func (tc *_TypeChecker) check(t *Type) {
-	tc.error_token = t.Decl.Token
+func (tc *_TypeChecker) check_decl(decl *ast.TypeDecl) *TypeKind {
+	// Save current token.
+	error_token := tc.error_token
 
+	tc.error_token = decl.Token
+	kind := tc.build_kind(decl.Kind)
+	tc.error_token = error_token
+	return kind
+}
+
+func (tc *_TypeChecker) check(t *Type) {
 	// TODO: Detect cycles.
 	// TODO: Check type validity.
-	kind := tc.build_kind(t.Decl.Kind)
+	kind := tc.check_decl(t.Decl)
 	if kind == nil {
 		t.remove_kind()
 		return
