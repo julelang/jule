@@ -263,7 +263,7 @@ func (tb *_TypeBuilder) build_op() *ast.TypeDecl {
 	return nil
 }
 
-func (tb *_TypeBuilder) build_slice() *ast.TypeDecl {
+func (tb *_TypeBuilder) build_slc() *ast.TypeDecl {
 	token := tb.tokens[*tb.i]
 	*tb.i++ // skip right bracket
 	elem := tb.step()
@@ -278,7 +278,7 @@ func (tb *_TypeBuilder) build_slice() *ast.TypeDecl {
 	}
 }
 
-func (tb *_TypeBuilder) build_array() *ast.TypeDecl {
+func (tb *_TypeBuilder) build_arr() *ast.TypeDecl {
 	// *tb.i points to element type of array.
 	// Brackets places at ... < *tb.i offset.
 
@@ -294,7 +294,7 @@ func (tb *_TypeBuilder) build_array() *ast.TypeDecl {
 		return nil
 	}
 
-	arrt := &ast.ArrayType{
+	arrt := &ast.ArrType{
 		Elem: elem,
 	}
 
@@ -356,14 +356,14 @@ func (tb *_TypeBuilder) build_enumerable() *ast.TypeDecl {
 	*tb.i++
 	token = tb.tokens[*tb.i]
 	if token.Id == lex.ID_RANGE && token.Kind == lex.KND_RBRACKET {
-		return tb.build_slice()
+		return tb.build_slc()
 	}
 
 	*tb.i-- // Point to left bracket for range parsing of split_colon.
 	map_tokens, colon := split_map_range(tb.tokens, tb.i)
 	*tb.i++
 	if colon == -1 {
-		return tb.build_array()
+		return tb.build_arr()
 	}
 	return tb.build_map(colon, map_tokens)
 }

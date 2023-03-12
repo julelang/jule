@@ -52,6 +52,16 @@ func (tk *TypeKind) Enm() *Enum {
 		return nil
 	}
 }
+// Returns array type if kind is array, nil if not.
+func (tk *TypeKind) Arr() *Arr {
+	switch tk.kind.(type) {
+	case *Arr:
+		return tk.kind.(*Arr)
+
+	default:
+		return nil
+	}
+}
 
 // Type.
 type Type struct {
@@ -112,6 +122,12 @@ type Tuple struct { Types []*TypeKind }
 type Map struct {
 	Key *TypeKind
 	Val *TypeKind
+}
+// Array type.
+type Arr struct {
+	Auto bool       // Auto-sized array.
+	N    int
+	Elem *TypeKind
 }
 
 // Checks type and builds result as kind.
@@ -233,8 +249,6 @@ func (tc *_TypeChecker) build_ident(decl *ast.IdentType) any {
 func (tc *_TypeChecker) build_ref(decl *ast.RefType) *Ref {
 	elem := tc.check_decl(decl.Elem)
 
-	// TODO: check cases:
-	//         - ref_refs_array
 	// Check special cases.
 	switch {
 	case elem == nil:
@@ -250,6 +264,10 @@ func (tc *_TypeChecker) build_ref(decl *ast.RefType) *Ref {
 
 	case elem.Enm() != nil:
 		tc.push_err(tc.error_token, "ref_refs_enum")
+		return nil
+
+	case elem.Arr() != nil:
+		tc.push_err(tc.error_token, "ref_refs_array")
 		return nil
 	}
 
@@ -273,6 +291,10 @@ func (tc *_TypeChecker) build_ptr(decl *ast.PtrType) *Ptr {
 	case elem.Enm() != nil:
 		tc.push_err(tc.error_token, "ptr_points_enum")
 		return nil
+
+	case elem.Arr() != nil && elem.Arr().Auto:
+		tc.push_err(decl.Elem.Token, "array_auto_sized")
+		return nil
 	}
 
 	return &Ptr{
@@ -280,18 +302,42 @@ func (tc *_TypeChecker) build_ptr(decl *ast.PtrType) *Ptr {
 	}
 }
 
-func (tc *_TypeChecker) build_slice(decl *ast.SlcType) *Slc {
+func (tc *_TypeChecker) build_slc(decl *ast.SlcType) *Slc {
 	elem := tc.check_decl(decl.Elem)
 
-	// TODO: check cases:
-	//         - Elem is Array with auto-sized is invalid element
 	// Check special cases.
 	switch {
 	case elem == nil:
 		return nil
+	
+	case elem.Arr() != nil && elem.Arr().Auto:
+		tc.push_err(decl.Elem.Token, "array_auto_sized")
+		return nil
 	}
 
 	return &Slc{
+		Elem: elem,
+	}
+}
+
+func (tc *_TypeChecker) build_arr(decl *ast.ArrType) *Arr {
+	// TODO: Check size expression.
+
+	elem := tc.check_decl(decl.Elem)
+
+	// Check special cases.
+	switch {
+	case elem == nil:
+		return nil
+	
+	case elem.Arr() != nil && elem.Arr().Auto:
+		tc.push_err(decl.Elem.Token, "array_auto_sized")
+		return nil
+	}
+
+	return &Arr{
+		Auto: decl.Auto_sized(),
+		N:    0,
 		Elem: elem,
 	}
 }
@@ -359,7 +405,6 @@ func (tc *_TypeChecker) build(decl_kind ast.TypeDeclKind) *TypeKind {
 	var kind any = nil
 
 	// TODO:
-	//  - Implement arrays.
 	//  - Implement namespaces.
 	switch decl_kind.(type) {
 	case *ast.IdentType:
@@ -372,7 +417,10 @@ func (tc *_TypeChecker) build(decl_kind ast.TypeDeclKind) *TypeKind {
 		kind = tc.build_ptr(decl_kind.(*ast.PtrType))
 
 	case *ast.SlcType:
-		kind = tc.build_slice(decl_kind.(*ast.SlcType))
+		kind = tc.build_slc(decl_kind.(*ast.SlcType))
+
+	case *ast.ArrType:
+		kind = tc.build_arr(decl_kind.(*ast.ArrType))
 
 	case *ast.MapType:
 		kind = tc.build_map(decl_kind.(*ast.MapType))

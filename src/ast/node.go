@@ -134,10 +134,14 @@ type TupleType struct { Types []*TypeDecl } // Tuple type.
 func (pt *PtrType) Is_unsafe() bool { return pt.Elem == nil }
 
 // Array type.
-type ArrayType struct {
+// Size epxression is nil for auto-sized array.
+type ArrType struct {
 	Elem *TypeDecl
 	Size *Expr
 }
+
+// Reports whether array is auto-sized.
+func (at *ArrType) Auto_sized() bool { return at.Size == nil }
 
 // Map type.
 type MapType struct {

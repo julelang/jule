@@ -255,7 +255,11 @@ func (s *_Sema) check_type_alias(ta *TypeAlias) {
 	} else if s.is_duplicated_ident(_uintptr(ta), ta.Ident, ta.Cpp_linked) {
 		s.push_err(ta.Token, "duplicated_ident", ta.Ident)
 	}
-	s.check_type(ta.Kind)
+	ok := s.check_type(ta.Kind)
+	if ok && ta.Kind.Kind.Arr() != nil && ta.Kind.Kind.Arr().Auto {
+		s.push_err(ta.Kind.Decl.Token, "array_auto_sized")
+		return
+	}
 }
 
 // Checks current package file's type aliases.
