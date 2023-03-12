@@ -96,6 +96,8 @@ type Ref struct { Elem *TypeKind }
 type Ptr struct { Elem *TypeKind }
 // Slice type.
 type Slc struct { Elem *TypeKind }
+// Tuple type.
+type Tuple struct { Types []*TypeKind }
 // Map type.
 type Map struct {
 	Key *TypeKind
@@ -248,12 +250,26 @@ func (tc *_TypeChecker) build_map(decl *ast.MapType) *Map {
 	}
 }
 
+func (tc *_TypeChecker) build_tuple(decl *ast.TupleType) *Tuple {
+	types := make([]*TypeKind, len(decl.Types))
+	for i, t := range decl.Types {
+		kind := tc.check_decl(t)
+		if kind == nil {
+			return nil
+		}
+		types[i] = kind
+	}
+
+	return &Tuple{
+		Types: types,
+	}
+}
+
 func (tc *_TypeChecker) build_kind(decl_kind ast.TypeDeclKind) *TypeKind {
 	var kind any = nil
 
 	// TODO:
 	//  - Implement arrays.
-	//  - Implement tuples.
 	//  - Implement functions.
 	switch decl_kind.(type) {
 	case *ast.IdentType:
@@ -270,6 +286,9 @@ func (tc *_TypeChecker) build_kind(decl_kind ast.TypeDeclKind) *TypeKind {
 
 	case *ast.MapType:
 		kind = tc.build_map(decl_kind.(*ast.MapType))
+
+	case *ast.TupleType:
+		kind = tc.build_tuple(decl_kind.(*ast.TupleType))
 
 	default:
 		tc.push_err(tc.error_token, "invalid_type")
