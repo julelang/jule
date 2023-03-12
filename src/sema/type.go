@@ -42,6 +42,16 @@ func (tk *TypeKind) Ptr() *Ptr {
 		return nil
 	}
 }
+// Returns enum type if kind is enum, nil if not.
+func (tk *TypeKind) Enm() *Enum {
+	switch tk.kind.(type) {
+	case *Enum:
+		return tk.kind.(*Enum)
+
+	default:
+		return nil
+	}
+}
 
 // Type.
 type Type struct {
@@ -225,7 +235,6 @@ func (tc *_TypeChecker) build_ref(decl *ast.RefType) *Ref {
 
 	// TODO: check cases:
 	//         - ref_refs_array
-	//         - ref_refs_enum
 	// Check special cases.
 	switch {
 	case elem == nil:
@@ -237,6 +246,10 @@ func (tc *_TypeChecker) build_ref(decl *ast.RefType) *Ref {
 
 	case elem.Ptr() != nil:
 		tc.push_err(tc.error_token, "ref_refs_ptr")
+		return nil
+
+	case elem.Enm() != nil:
+		tc.push_err(tc.error_token, "ref_refs_enum")
 		return nil
 	}
 
@@ -255,6 +268,10 @@ func (tc *_TypeChecker) build_ptr(decl *ast.PtrType) *Ptr {
 
 	case elem.Ref() != nil:
 		tc.push_err(tc.error_token, "ptr_points_ref")
+		return nil
+	
+	case elem.Enm() != nil:
+		tc.push_err(tc.error_token, "ptr_points_enum")
 		return nil
 	}
 
