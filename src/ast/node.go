@@ -114,7 +114,7 @@ type IdentType struct {
 }
 
 // Reports whether identifier is primitive type.
-func (it *IdentType) IsPrim() bool { return it.Token.Id == lex.ID_PRIM }
+func (it *IdentType) Is_prim() bool { return it.Token.Id == lex.ID_PRIM }
 
 // Namespace chain type.
 type NamespaceType struct {

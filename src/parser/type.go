@@ -15,6 +15,7 @@ func build_prim_type(token lex.Token) *ast.TypeDecl {
 	return &ast.TypeDecl{
 		Token: token,
 		Kind: &ast.IdentType{
+			Token:      token,
 			Ident:      token.Kind,
 			Cpp_linked: false,
 			Generics:   nil,
@@ -156,6 +157,7 @@ func (tb *_TypeBuilder) build_ident() *ast.TypeDecl {
 	}
 	token := tb.tokens[*tb.i]
 	it := &ast.IdentType{
+		Token:      token,
 		Ident:      token.Kind,
 		Cpp_linked: false,
 	}
@@ -249,11 +251,14 @@ func (tb *_TypeBuilder) build_op() *ast.TypeDecl {
 	switch token.Kind {
 	case lex.KND_STAR:
 		return tb.build_ptr()
+
 	case lex.KND_AMPER:
 		return tb.build_ref()
+
 	case lex.KND_DBL_AMPER:
 		tb.push_err(token, "ref_refs_ref")
 		return tb.build_ref() // Skip tokens and many type error
+
 	default:
 		tb.push_err(token, "invalid_syntax")
 	}

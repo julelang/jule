@@ -21,8 +21,17 @@ type TypeAlias struct {
 }
 
 // Type's kind's type.
-type TypeKind struct {
-	Kind any
+type TypeKind struct { kind any }
+
+// Returns reference type is kind is reference, nil if not.
+func (tk *TypeKind) Ref() *Ref {
+	switch tk.kind.(type) {
+	case *Ref:
+		return tk.kind.(*Ref)
+
+	default:
+		return nil
+	}
 }
 
 // Type.
@@ -74,6 +83,8 @@ func (p *Prim) Is_any() bool { return p.kind == lex.KND_ANY }
 
 // Reference type.
 type Ref struct { Elem *TypeKind }
+// Pointer type.
+type Ptr struct { Elem *TypeKind }
 
 // Checks type and builds result as kind.
 // Removes kind if error occurs,
@@ -127,11 +138,15 @@ func (tc *_TypeChecker) build_prim(kind *ast.IdentType) *Prim {
 	}
 }
 
-func (tc *_TypeChecker) build_ident_kind(kind *ast.IdentType) *TypeKind {
-	if kind.IsPrim() {
-		return &TypeKind{Kind: tc.build_prim(kind)}
+func (tc *_TypeChecker) build_ident_kind(it *ast.IdentType) any {
+	switch {
+	case it.Is_prim():
+		return tc.build_prim(it)
+	
+	default:
+		tc.push_err(tc.error_token, "invalid_type")
+		return nil
 	}
-	return nil
 }
 
 func (tc *_TypeChecker) build_ref(kind *ast.RefType) *Ref {
@@ -151,17 +166,46 @@ func (tc *_TypeChecker) build_ref(kind *ast.RefType) *Ref {
 	}
 }
 
-func (tc *_TypeChecker) build_kind(kind ast.TypeDeclKind) *TypeKind {
-	switch kind.(type) {
+func (tc *_TypeChecker) build_ptr(kind *ast.PtrType) *Ptr {
+	elem := tc.check_decl(kind.Elem)
+
+	// Check special cases.
+	switch {
+	case elem == nil:
+		return nil
+
+	case elem.Ref() != nil:
+		tc.push_err(tc.error_token, "ptr_points_ref")
+		return nil
+	}
+
+	return &Ptr{
+		Elem: elem,
+	}
+}
+
+func (tc *_TypeChecker) build_kind(decl_kind ast.TypeDeclKind) *TypeKind {
+	var kind any = nil
+	switch decl_kind.(type) {
 	case *ast.IdentType:
-		return tc.build_ident_kind(kind.(*ast.IdentType))
+		kind = tc.build_ident_kind(decl_kind.(*ast.IdentType))
 
 	case *ast.RefType:
-		return &TypeKind{Kind: tc.build_ref(kind.(*ast.RefType))}
+		kind = tc.build_ref(decl_kind.(*ast.RefType))
+
+	case *ast.PtrType:
+		kind = tc.build_ptr(decl_kind.(*ast.PtrType))
 
 	default:
 		tc.push_err(tc.error_token, "invalid_type")
 		return nil
+	}
+
+	if kind == nil {
+		return nil
+	}
+	return &TypeKind{
+		kind: kind,
 	}
 }
 
