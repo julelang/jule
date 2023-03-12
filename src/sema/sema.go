@@ -7,6 +7,7 @@ package sema
 import (
 	"unsafe"
 
+	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
@@ -357,22 +358,72 @@ func (s *_Sema) check_enums() (ok bool) {
 	return true
 }
 
+func (s *_Sema) check_generics(generics []*ast.Generic) (ok bool) {
+	ok = true
+	for i, g := range generics {
+		if lex.Is_ignore_ident(g.Ident) {
+			s.push_err(g.Token, "ignore_ident")
+			ok = false
+			continue
+		}
+
+		// Check duplications.
+		for j, ct := range generics {
+			if j >= i {
+				break // Skip current and following generics.
+			} else if g.Ident == ct.Ident {
+				s.push_err(g.Token, "duplicated_ident", g.Ident)
+				ok = false
+				break
+			}
+		}
+	}
+	return
+}
+
+func (s *_Sema) check_struct(strct *Struct) {
+	if lex.Is_ignore_ident(strct.Ident) {
+		s.push_err(strct.Token, "ignore_ident")
+	} else if s.is_duplicated_ident(_uintptr(strct), strct.Ident, false) {
+		s.push_err(strct.Token, "duplicated_ident", strct.Ident)
+	}
+
+	ok := s.check_generics(strct.Generics)
+	if !ok {
+		return
+	}
+}
+
+// Checks current package file's structures.
+func (s *_Sema) check_structs() (ok bool) {
+	for _, strct := range s.file.Structs {
+		s.check_struct(strct)
+		
+		// Break checking if type alias has error.
+		if len(s.errors) > 0 {
+			return false
+		}
+	}
+	return true
+}
+
 // Checks current package file.
 // Reports whether checking is success.
 func (s *_Sema) check_file() (ok bool) {
-	ok = s.check_type_aliases()
-	if !ok {
-		return false
-	}
-
-	ok = s.check_enums()
-	if !ok {
-		return false
-	}
-
 	// TODO: Implement other declarations.
+	switch {
+	case !s.check_type_aliases():
+		return false
 
-	return true
+	case !s.check_enums():
+		return false
+
+	case !s.check_structs():
+		return false
+
+	default:
+		return true
+	}
 }
 
 // Checks all package files.
