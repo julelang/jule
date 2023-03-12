@@ -432,7 +432,10 @@ func (p *_Parser) check_params(params []*ast.Param) {
 		} else {
 			param.Kind = &ast.TypeDecl{
 				Token: param.Token,
-				Kind:   &ast.IdentType{Ident: param.Token.Kind},
+				Kind:   &ast.IdentType{
+					Token: param.Token,
+					Ident: param.Token.Kind,
+				},
 			}
 			param.Ident = lex.ANON_IDENT
 			param.Token = lex.Token{}

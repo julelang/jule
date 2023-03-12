@@ -24,4 +24,5 @@ type Enum struct {
 	Kind   *Type
 	Items  []*EnumItem
 	Doc    string
+	Refers []*ast.IdentType // Referred identifiers.
 }

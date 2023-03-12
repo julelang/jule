@@ -22,6 +22,16 @@ type TypeAlias struct {
 
 // Type's kind's type.
 type TypeKind struct { kind any }
+// Returns primitive type if kind is primitive type, nil if not.
+func (tk *TypeKind) Prim() *Prim {
+	switch tk.kind.(type) {
+	case *Prim:
+		return tk.kind.(*Prim)
+
+	default:
+		return nil
+	}
+}
 // Returns reference type if kind is reference, nil if not.
 func (tk *TypeKind) Ref() *Ref {
 	switch tk.kind.(type) {
@@ -77,6 +87,8 @@ func (t *Type) remove_kind() { t.Kind = nil }
 
 // Primitive type.
 type Prim struct { kind string }
+// Returns kind.
+func (p *Prim) Kind() string { return p.kind }
 // Reports whether type is primitive i8.
 func (p *Prim) Is_i8() bool { return p.kind == lex.KND_I8 }
 // Reports whether type is primitive i16.
@@ -201,35 +213,52 @@ func (tc *_TypeChecker) build_prim(decl *ast.IdentType) *Prim {
 	}
 }
 
+// Checks illegal cycles.
+// Appends reference to reference if there is no illegal cycle.
+// Returns true if tc.referencer is nil.
+// Returns true if refers is nil.
+func (tc *_TypeChecker) check_illegal_cycles(decl *ast.IdentType, refers *[]*ast.IdentType) (ok bool) {
+	if tc.referencer == nil || refers == nil {
+		return true
+	}
+
+	// Check illegal cycle for itself.
+	// Because refers's owner is ta.
+	if tc.referencer.refers == refers {
+		tc.push_err(decl.Token, "illegal_cycle_refers_itself", tc.referencer.ident)
+		return false
+	}
+
+	// Check cross illegal cycle.
+	ok = true
+	for _, r := range *refers {
+		if r.Ident == tc.referencer.ident {
+			tc.push_err(decl.Token, "illegal_cross_cycle", tc.referencer.ident, decl.Ident)
+			ok = false
+		}
+	}
+
+	if !ok {
+		return false
+	}
+
+	*tc.referencer.refers = append(*tc.referencer.refers, decl)
+	return true
+}
+
 func (tc *_TypeChecker) from_type_alias(decl *ast.IdentType, ta *TypeAlias) *TypeKind {
-	if tc.referencer != nil {
-		// Check illegal cycle for itself.
-		// Because refers's owner is ta.
-		if tc.referencer.refers == &ta.Refers {
-			tc.push_err(ta.Token, "illegal_cycle_refers_itself", ta.Ident)
-			return nil
-		}
+	if len(decl.Generics) > 0 {
+		tc.push_err(decl.Token, "type_not_supports_generics", decl.Ident)
+		return nil
+	}
 
-		// Check cross illegal cycle.
-		ok := true
-		for _, rta := range *tc.referencer.refers {
-			if rta == decl {
-				tc.push_err(ta.Token, "illegal_cross_cycle", tc.referencer.ident, ta.Ident)
-				ok = false
-			}
-		}
-
-		if !ok {
-			return nil
-		}
-
-		// TODO: Make sure this algorithm detects
-		//       structure fields's illegal cycle.
-		*tc.referencer.refers = append(*tc.referencer.refers, decl)
+	ok := tc.check_illegal_cycles(decl, &ta.Refers)
+	if !ok {
+		return nil
 	}
 
 	// Build kind if not builded already.
-	ok := tc.s.check_type_alias_kind(ta)
+	ok = tc.s.check_type_alias_kind(ta)
 	if !ok {
 		return nil
 	}
@@ -237,15 +266,25 @@ func (tc *_TypeChecker) from_type_alias(decl *ast.IdentType, ta *TypeAlias) *Typ
 	return ta.Kind.Kind
 }
 
+func (tc *_TypeChecker) from_enum(decl *ast.IdentType, e *Enum) *Enum {
+	if len(decl.Generics) > 0 {
+		tc.push_err(decl.Token, "type_not_supports_generics", decl.Ident)
+		return nil
+	}
+
+	ok := tc.check_illegal_cycles(decl, &e.Refers)
+	if !ok {
+		return nil
+	}
+
+	return e
+}
+
 func (tc *_TypeChecker) get_def(decl *ast.IdentType) any {
 	if !decl.Cpp_linked {
 		e := tc.lookup.find_enum(decl.Ident)
 		if e != nil {
-			if len(decl.Generics) > 0 {
-				tc.push_err(decl.Token, "type_not_supports_generics", decl.Ident)
-				return nil
-			}
-			return e
+			return tc.from_enum(decl, e)
 		}
 
 		t := tc.lookup.find_trait(decl.Ident)
@@ -266,10 +305,6 @@ func (tc *_TypeChecker) get_def(decl *ast.IdentType) any {
 
 	ta := tc.lookup.find_type_alias(decl.Ident, decl.Cpp_linked)
 	if ta != nil {
-		if len(decl.Generics) > 0 {
-			tc.push_err(decl.Token, "type_not_supports_generics", decl.Ident)
-			return nil
-		}
 		return tc.from_type_alias(decl, ta)
 	}
 
@@ -519,6 +554,10 @@ func (tc *_TypeChecker) check_decl(decl *ast.TypeDecl) *TypeKind {
 }
 
 func (tc *_TypeChecker) check(t *Type) {
+	if t.Decl == nil {
+		return
+	}
+
 	kind := tc.check_decl(t.Decl)
 	if kind == nil {
 		t.remove_kind()

@@ -9,6 +9,7 @@ import (
 
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
+	"github.com/julelang/jule/types"
 )
 
 // In Jule: (uintptr)(PTR)
@@ -300,11 +301,78 @@ func (s *_Sema) check_type_aliases() (ok bool) {
 	return true
 }
 
+func (s *_Sema) check_enum(e *Enum) {
+	if lex.Is_ignore_ident(e.Ident) {
+		s.push_err(e.Token, "ignore_ident")
+	} else if s.is_duplicated_ident(_uintptr(e), e.Ident, false) {
+		s.push_err(e.Token, "duplicated_ident", e.Ident)
+	}
+
+	if e.Kind != nil {
+		if !s.check_type_with_refers(e.Kind, &_Referencer{
+			ident:  e.Ident,
+			refers: &e.Refers,
+		}) {
+			return
+		}
+	} else {
+		// Set to default type.
+		e.Kind = &Type{
+			Decl: nil,
+			Kind: &TypeKind{
+				kind: &Prim{kind: lex.KND_I32},
+			},
+		}
+	}
+
+	t := e.Kind.Kind.Prim()
+	if t == nil {
+		s.push_err(e.Token, "invalid_type_source")
+		return
+	}
+
+	// Check items.
+	switch {
+	case t.Is_str():
+		// TODO: Implement here.
+
+	case types.Is_int(t.Kind()):
+		// TODO: Implement here.
+
+	default:
+		s.push_err(e.Token, "invalid_type_source")
+	}
+}
+
+// Checks current package file's enums.
+func (s *_Sema) check_enums() (ok bool) {
+	for _, e := range s.file.Enums {
+		s.check_enum(e)
+		
+		// Break checking if type alias has error.
+		if len(s.errors) > 0 {
+			return false
+		}
+	}
+	return true
+}
+
 // Checks current package file.
 // Reports whether checking is success.
 func (s *_Sema) check_file() (ok bool) {
 	ok = s.check_type_aliases()
-	return ok
+	if !ok {
+		return false
+	}
+
+	ok = s.check_enums()
+	if !ok {
+		return false
+	}
+
+	// TODO: Implement other declarations.
+
+	return true
 }
 
 // Checks all package files.
