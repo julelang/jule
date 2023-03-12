@@ -188,9 +188,7 @@ func (tb *_TypeBuilder) build_fn() *ast.TypeDecl {
 	}
 	return &ast.TypeDecl{
 		Token: token,
-		Kind:  &ast.FnType{
-			Decl: f,
-		},
+		Kind:  f,
 	}
 }
 
@@ -274,7 +272,7 @@ func (tb *_TypeBuilder) build_slice() *ast.TypeDecl {
 	}
 	return &ast.TypeDecl{
 		Token: token,
-		Kind:  &ast.SliceType{
+		Kind:  &ast.SlcType{
 			Elem: elem,
 		},
 	}

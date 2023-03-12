@@ -100,6 +100,9 @@ type TypeDeclKind = any
 //  - Represented by IdentType.
 //  - Token's identity is data type.
 //  - Primitive type kind is Ident.
+//
+// For function types:
+//  - Function types represented by *FnDecl.
 type TypeDecl struct {
 	Token lex.Token
 	Kind  TypeDeclKind
@@ -124,9 +127,8 @@ type NamespaceType struct {
 
 type RefType struct { Elem *TypeDecl }      // Reference type.
 type PtrType struct { Elem *TypeDecl }      // Pointer type.
-type SliceType struct { Elem *TypeDecl }    // Slice type.
+type SlcType struct { Elem *TypeDecl }      // Slice type.
 type TupleType struct { Types []*TypeDecl } // Tuple type.
-type FnType struct { Decl *FnDecl }     // Function type.
 
 // Reports whether pointer is unsafe pointer (*unsafe).
 func (pt *PtrType) Is_unsafe() bool { return pt.Elem == nil }

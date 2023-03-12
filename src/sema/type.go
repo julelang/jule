@@ -217,7 +217,7 @@ func (tc *_TypeChecker) build_ptr(decl *ast.PtrType) *Ptr {
 	}
 }
 
-func (tc *_TypeChecker) build_slice(decl *ast.SliceType) *Slc {
+func (tc *_TypeChecker) build_slice(decl *ast.SlcType) *Slc {
 	elem := tc.check_decl(decl.Elem)
 
 	// TODO: check cases:
@@ -265,12 +265,35 @@ func (tc *_TypeChecker) build_tuple(decl *ast.TupleType) *Tuple {
 	}
 }
 
+func (tc *_TypeChecker) check_fn_types(f *Fn) (ok bool) {
+	for _, p := range f.Params {
+		ok := tc.s.check_type(p.Kind)
+		if !ok {
+			return false
+		}
+	}
+	return tc.s.check_type(f.Result.Kind)
+}
+
+func (tc *_TypeChecker) build_fn(decl *ast.FnDecl) *Fn {
+	if len(decl.Generics) > 0 {
+		tc.push_err(decl.Token, "genericed_fn_as_anonymous_fn")
+		return nil
+	}
+
+	f := build_fn(decl)
+	ok := tc.check_fn_types(f)
+	if !ok {
+		return nil
+	}
+	return f
+}
+
 func (tc *_TypeChecker) build_kind(decl_kind ast.TypeDeclKind) *TypeKind {
 	var kind any = nil
 
 	// TODO:
 	//  - Implement arrays.
-	//  - Implement functions.
 	switch decl_kind.(type) {
 	case *ast.IdentType:
 		kind = tc.build_ident_kind(decl_kind.(*ast.IdentType))
@@ -281,14 +304,17 @@ func (tc *_TypeChecker) build_kind(decl_kind ast.TypeDeclKind) *TypeKind {
 	case *ast.PtrType:
 		kind = tc.build_ptr(decl_kind.(*ast.PtrType))
 
-	case *ast.SliceType:
-		kind = tc.build_slice(decl_kind.(*ast.SliceType))
+	case *ast.SlcType:
+		kind = tc.build_slice(decl_kind.(*ast.SlcType))
 
 	case *ast.MapType:
 		kind = tc.build_map(decl_kind.(*ast.MapType))
 
 	case *ast.TupleType:
 		kind = tc.build_tuple(decl_kind.(*ast.TupleType))
+
+	case *ast.FnDecl:
+		kind = tc.build_fn(decl_kind.(*ast.FnDecl))
 
 	default:
 		tc.push_err(tc.error_token, "invalid_type")
