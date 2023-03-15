@@ -1114,11 +1114,15 @@ func (p *_Parser) parse_impl_trait(ipl *ast.Impl, tokens []lex.Token) {
 		case lex.ID_COMMENT:
 			// Ignore.
 			continue
+
 		case lex.ID_FN, lex.ID_UNSAFE:
 			f := p.get_method(tokens)
-			f.Public = true
-			p.check_method_receiver(f)
-			ipl.Methods = append(ipl.Methods, f)
+			if f != nil {
+				f.Public = true
+				p.check_method_receiver(f)
+				ipl.Methods = append(ipl.Methods, f)
+			}
+
 		default:
 			p.push_err(token, "invalid_syntax")
 			continue
@@ -1136,6 +1140,7 @@ func (p *_Parser) parse_impl_struct(ipl *ast.Impl, tokens []lex.Token) {
 		case lex.ID_COMMENT:
 			// Ignore.
 			continue
+
 		case lex.ID_PUB:
 			is_pub = true
 			if len(tokens) == 1 {
@@ -1151,9 +1156,12 @@ func (p *_Parser) parse_impl_struct(ipl *ast.Impl, tokens []lex.Token) {
 		switch token.Id {
 		case lex.ID_FN, lex.ID_UNSAFE:
 			f := p.get_method(tokens)
-			f.Public = is_pub
-			p.check_method_receiver(f)
-			ipl.Methods = append(ipl.Methods, f)
+			if f != nil {
+				f.Public = is_pub
+				p.check_method_receiver(f)
+				ipl.Methods = append(ipl.Methods, f)
+			}
+
 		default:
 			p.push_err(token, "invalid_syntax")
 			continue
