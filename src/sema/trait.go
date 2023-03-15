@@ -16,3 +16,14 @@ type Trait struct {
 	Doc     string
 	Methods []*Fn
 }
+
+// Returns method by identifier.
+// Returns nil if not exist any method in this identifier.
+func (t *Trait) Find_method(ident string) *Fn {
+	for _, f := range t.Methods {
+		if f.Ident == ident {
+			return f
+		}
+	}
+	return nil
+}

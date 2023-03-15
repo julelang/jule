@@ -1112,7 +1112,7 @@ func (p *_Parser) parse_impl_trait(ipl *ast.Impl, tokens []lex.Token) {
 		token := tokens[0]
 		switch token.Id {
 		case lex.ID_COMMENT:
-			// Ignore
+			// Ignore.
 			continue
 		case lex.ID_FN, lex.ID_UNSAFE:
 			f := p.get_method(tokens)
@@ -1134,7 +1134,7 @@ func (p *_Parser) parse_impl_struct(ipl *ast.Impl, tokens []lex.Token) {
 		is_pub := false
 		switch token.Id {
 		case lex.ID_COMMENT:
-			// Ignore
+			// Ignore.
 			continue
 		case lex.ID_PUB:
 			is_pub = true
@@ -1190,6 +1190,11 @@ func (p *_Parser) build_impl(tokens []lex.Token) *ast.Impl {
 	token = tokens[2]
 	if token.Id != lex.ID_FOR {
 		if token.Id == lex.ID_RANGE && token.Kind == lex.KND_LBRACE {
+			// This implementation is single.
+			// Just implements to destination.
+			// Therefore, swap Base and Dest tokens.
+			ipl.Base, ipl.Dest = ipl.Dest, ipl.Base
+
 			tokens = tokens[2:]  // Remove prefix tokens.
 			goto body
 		}

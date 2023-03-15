@@ -118,9 +118,9 @@ var ERRORS = map[string]string{
 	`generics_overflow`:                        `overflow generics`,
 	`has_generics`:                             `define has generics`,
 	`not_has_generics`:                         `define not has generics`,
-	`type_not_supports_generics`:               `@ type not supports generics`,
+	`type_not_supports_generics`:               `type @ not supports generics`,
 	`divide_by_zero`:                           `divide by zero`,
-	`trait_have_not_ident`:                     `@ trait is have not this identifier: @`,
+	`trait_have_not_ident`:                     `trait @ have not any define in this identifier: @`,
 	`not_impl_trait_def`:                       `not implemented @ trait's @ define`,
 	`dynamic_type_annotation_failed`:           `dynamic type annotation failed`,
 	`fallthrough_wrong_use`:                    `fallthrough keyword can only useable at end of the case scopes`,
@@ -157,6 +157,9 @@ var ERRORS = map[string]string{
 	`pwd_cannot_set`:                           `current working directory cannot set`,
 	`array_auto_sized`:                         `array must have explicit size`,
 	`namespace_not_exist`:                      `namespace not exist: @`,
+	`impl_base_not_exist`:                      `any valid base definition is not exist in this identifier: @`,
+	`impl_dest_not_exist`:                      `any valid destination definition is not exist in this identifier: @`,
+	`struct_already_have_ident`:                `struct @ already have a define in this identifier: @`,
 }
 
 // Returns formatted error message by key and args.

@@ -553,12 +553,20 @@ type TraitDecl struct {
 
 // Implementation.
 type Impl struct {
+	// This token available for these cases:
+	//  - Implementation trait to structure, represents trait's token.
 	Base    lex.Token
+
+	// This token available for these cases:
+	//  - Implementation trait to structure, represents structure's token.
+	//  - Implementation to structure, represents structure's token.
 	Dest    lex.Token
+
+	// Given methods to implement.
 	Methods []*FnDecl
 }
 
 // Reports whether implementation type is trait to structure.
-func (i *Impl) Is_trait_impl() bool { return i.Dest.Id != lex.ID_NA }
+func (ipl *Impl) Is_trait_impl() bool { return ipl.Base.Id != lex.ID_NA }
 // Reports whether implementation type is append to destination structure.
-func (i *Impl) Is_struct_impl() bool { return i.Dest.Id == lex.ID_NA }
+func (ipl *Impl) Is_struct_impl() bool { return ipl.Base.Id == lex.ID_NA }

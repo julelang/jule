@@ -182,6 +182,14 @@ func build_var(decl *ast.VarDecl) *Var {
 	}
 }
 
+func build_impl(decl *ast.Impl) *Impl {
+	return &Impl{
+		Base:    decl.Base,
+		Dest:    decl.Dest,
+		Methods: build_methods(decl.Methods),
+	}
+}
+
 // Symbol table builder.
 // Just builds symbols, not analyze metadatas
 // like struct's implemented traits.
@@ -420,6 +428,13 @@ func (s *_SymbolBuilder) append_decls() {
 	}
 }
 
+func (s *_SymbolBuilder) append_impls() {
+	s.table.Impls = make([]*Impl, len(s.ast.Impls))
+	for i, decl := range s.ast.Impls {
+		s.table.Impls[i] = build_impl(decl)
+	}
+}
+
 func (s *_SymbolBuilder) build() {
 	s.table = &SymbolTable{
 		File: s.ast.File,
@@ -436,4 +451,6 @@ func (s *_SymbolBuilder) build() {
 	if len(s.errors) > 0 {
 		return
 	}
+
+	s.append_impls()
 }

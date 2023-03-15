@@ -38,10 +38,18 @@ type Fn struct {
 	Result     *RetType
 	Params     []*Param
 
-	// Type combinations of generic function.
-	// Nil or len() = 0 if never invoked.
+	// Function instances for each unique type combination of function call.
+	// Nil if function is never used.
 	Combines [][]*Type
 }
 
 // Reports whether return type is void.
 func (f *Fn) Is_void() bool { return f.Result == nil }
+
+// Function instance.
+type FnIns struct {
+	Decl   *Fn
+	Params []*TypeKind
+	Result *TypeKind
+	Scope  *ast.Scope
+}

@@ -541,13 +541,98 @@ func (s *_Sema) check_trait(t *Trait) {
 func (s *_Sema) check_traits() (ok bool) {
 	for _, t := range s.file.Traits {
 		s.check_trait(t)
-		
+
 		// Break checking if type alias has error.
 		if len(s.errors) > 0 {
 			return false
 		}
 	}
 	return true
+}
+
+func (s *_Sema) check_trait_impl_methods(base *Trait, ipl *Impl) (ok bool) {
+	ok = true
+	for _, f := range ipl.Methods {
+		if base.Find_method(f.Ident) == nil {
+			s.push_err(f.Token, "trait_have_not_ident", base.Ident, f.Ident)
+			ok = false
+		}
+	}
+	return
+}
+
+func (s *_Sema) impl_to_struct(dest *Struct, ipl *Impl) (ok bool) {
+	ok = true
+	for _, f := range ipl.Methods {
+		if dest.Find_method(f.Ident) != nil {
+			s.push_err(f.Token, "struct_already_have_ident", dest.Ident, f.Ident)
+			ok = false
+			continue
+		}
+
+		dest.Methods = append(dest.Methods, f)
+	}
+	return
+}
+
+// Implement trait to destination.
+func (s *_Sema) impl_trait(decl *Impl) {
+	base := s.find_trait(decl.Base.Kind)
+	if base == nil {
+		s.push_err(decl.Base, "impl_base_not_exist", decl.Base.Kind)
+		return
+	}
+
+	// Cpp-link state always false because cpp-linked
+	// definitions haven't support implementations.
+	const CPP_LINKED = false
+
+	dest := s.find_struct(decl.Dest.Kind, CPP_LINKED)
+	if dest == nil {
+		s.push_err(decl.Dest, "impl_dest_not_exist", decl.Dest.Kind)
+		return
+	}
+
+	dest.Implements = append(dest.Implements, base)
+
+	switch  {
+	case !s.check_trait_impl_methods(base, decl):
+		return
+
+	case !s.impl_to_struct(dest, decl):
+		return
+	}
+
+	// TODO: Check structure implements trait correctly.
+}
+
+// Implement implementation.
+func (s *_Sema) impl_impl(decl *Impl) {
+	switch {
+	case decl.Is_trait_impl():
+		s.impl_trait(decl)
+
+	case decl.Is_struct_impl():
+		// TODO: Implement here.
+	}
+}
+
+// Implement implementations.
+func (s *_Sema) impl_impls() (ok bool) {
+	for _, decl := range s.file.Impls {
+		s.impl_impl(decl)
+
+		// Break checking if type alias has error.
+		if len(s.errors) > 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// Checks current package file's traits.
+func (s *_Sema) check_impls() (ok bool) {
+	return s.impl_impls()
 }
 
 func (s *_Sema) check_struct(strct *Struct) {
@@ -620,10 +705,13 @@ func (s *_Sema) check_file() (ok bool) {
 	case !s.check_traits():
 		return false
 
-	case !s.check_structs():
+	case !s.impl_impls():
 		return false
 
 	case !s.check_funcs():
+		return false
+
+	case !s.check_structs():
 		return false
 
 	default:

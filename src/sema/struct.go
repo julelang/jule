@@ -23,10 +23,34 @@ type Struct struct {
 	Token      lex.Token
 	Ident      string
 	Fields     []*Field
+	Methods    []*Fn
 	Public     bool
 	Cpp_linked bool
 	Directives []*ast.Directive
 	Doc        string
 	Generics   []*ast.Generic
 	Implements []*Trait
+}
+
+// Returns method by identifier.
+// Returns nil if not exist any method in this identifier.
+func (s *Struct) Find_method(ident string) *Fn {
+	for _, f := range s.Methods {
+		if f.Ident == ident {
+			return f
+		}
+	}
+	return nil
+}
+
+// Field structure.
+type FieldIns struct {
+	Decl *Field
+	Kind *TypeKind
+}
+
+// Strucutre instance.
+type StructIns struct {
+	Decl   *Struct
+	Fields []*FieldIns
 }

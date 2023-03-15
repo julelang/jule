@@ -19,6 +19,7 @@ type SymbolTable struct {
 	Funcs        []*Fn        // Functions.
 	Traits       []*Trait     // Traits.
 	Enums        []*Enum      // Enums.
+	Impls        []*Impl      // Implementations.
 }
 
 // Returns package by identifier.
