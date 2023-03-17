@@ -1,6 +1,9 @@
 package sema
 
 import (
+	"strconv"
+	"strings"
+
 	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/constant/lit"
 	"github.com/julelang/jule/lex"
@@ -37,6 +40,25 @@ func build_void_data() *Data {
 type Value struct {
 	Expr *ast.Expr
 	Data *Data
+}
+
+func kind_by_bitsize(expr any) string {
+	switch expr.(type) {
+	case float64:
+		x := expr.(float64)
+		return types.Float_from_bits(types.Bitsize_of_float(x))
+
+	case int64:
+		x := expr.(int64)
+		return types.Int_from_bits(types.Bitsize_of_int(x))
+
+	case uint64:
+		x := expr.(uint64)
+		return types.Uint_from_bits(types.Bitsize_of_uint(x))
+
+	default:
+		return ""
+	}
 }
 
 // Evaluator.
@@ -120,8 +142,48 @@ func (e *_Eval) lit_float(l *ast.LitExpr) *Data {
 }
 
 func (e *_Eval) lit_int(l *ast.LitExpr) *Data {
-	// TODO: Implement here.
-	return nil
+	data := l.Value
+	base := 0
+
+	switch {
+	case strings.HasPrefix(data, "0x"): // Hexadecimal
+		data = data[2:]
+		base = 0b00010000
+
+		case strings.HasPrefix(data, "0b"): // Binary
+		data = data[2:]
+		base = 0b10
+
+	case data[0] == '0' && len(data) > 1: // Octal
+		data = data[1:]
+		base = 0b1000
+
+	default: // Decimal
+		base = 0b1010
+	}
+
+	is_neg := data[0] == '-'
+	var value any = nil
+	const BIT_SIZE = 0b01000000
+	if is_neg {
+		value, _ = strconv.ParseInt(data, base, BIT_SIZE)
+	} else {
+		temp_value, err := strconv.ParseInt(data, base, BIT_SIZE)
+		if err == nil {
+			value = temp_value
+		} else {
+			value, _ = strconv.ParseUint(data, base, BIT_SIZE)
+		}
+	}
+
+	return &Data{
+		Lvalue:   false,
+		Mutable:  false,
+		Constant: true,
+		Kind:     &TypeKind{
+			kind: build_prim_type(kind_by_bitsize(value)),
+		},
+	}
 }
 
 func (e *_Eval) lit_num(l *ast.LitExpr) *Data {
