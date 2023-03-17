@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+// This file reserved for types, type kinds and type build algorithms.
+// This file haven't type compatibility checking algorithm or something else.
+
 package sema
 
 import (
@@ -151,6 +154,12 @@ func build_link_path_by_tokens(tokens []lex.Token) string {
 	return s
 }
 
+func build_prim_type(kind string) *Prim {
+	return &Prim{
+		kind: kind,
+	}
+}
+
 type _Referencer struct {
 	ident  string
 	refers *[]*ast.IdentType
@@ -208,9 +217,7 @@ func (tc *_TypeChecker) build_prim(decl *ast.IdentType) *Prim {
 		return nil
 	}
 
-	return &Prim{
-		kind: decl.Ident,
-	}
+	return build_prim_type(decl.Ident)
 }
 
 // Checks illegal cycles.

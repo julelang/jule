@@ -156,11 +156,31 @@ type RetType struct {
 	Idents []lex.Token
 }
 
-type ExprData = any // Type of Expr's data.
+// Type of Expr's data.
+type ExprData = any
 
 // Expression.
 type Expr struct {
 	Token lex.Token
+
+	// Possible types:
+	//  - *TupleExpr
+	//  - *LitExpr
+	//  - *Type
+	//  - *IdentExpr
+	//  - *UnaryExpr
+	//  - *SubIdentExpr
+	//  - *NsSelectionExpr
+	//  - *VariadicExpr
+	//  - *CastExpr
+	//  - *FnCallExpr
+	//  - *StructLit
+	//  - *BraceLit
+	//  - *SlicingExpr
+	//  - *BinopExpr
+	//  - *UnsafeExpr
+	//  - *KeyValPair
+	//  - *IndexingExpr
 	Kind  ExprData
 }
 

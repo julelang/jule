@@ -268,6 +268,15 @@ func (s *_Sema) check_type(t *TypeSymbol) (ok bool) {
 	return s.check_type_with_refers(t, nil)
 }
 
+// Evaluates expression with Eval and returns result.
+func (s *_Sema) eval(expr *ast.Expr) *Data {
+	e := _Eval{
+		s:      s,
+		lookup: s,
+	}
+	return e.eval(expr)
+}
+
 func (s *_Sema) check_type_alias_decl_kind(ta *TypeAlias) (ok bool) {
 	ok = s.check_type_with_refers(ta.Kind, &_Referencer{
 		ident:  ta.Ident,
@@ -289,7 +298,7 @@ func (s *_Sema) check_type_alias_decl(ta *TypeAlias) {
 	s.check_type_alias_decl_kind(ta)
 }
 
-// Checks current package file's type aliases.
+// Checks current package file's type alias declarations.
 func (s *_Sema) check_type_alias_decls() (ok bool) {
 	for _, ta := range s.file.Type_aliases {
 		s.check_type_alias_decl(ta)
@@ -345,7 +354,7 @@ func (s *_Sema) check_enum_decl(e *Enum) {
 	}
 }
 
-// Checks current package file's enums.
+// Checks current package file's enum declarations.
 func (s *_Sema) check_enum_decls() (ok bool) {
 	for _, e := range s.file.Enums {
 		s.check_enum_decl(e)
@@ -537,7 +546,7 @@ func (s *_Sema) check_trait_decl(t *Trait) {
 	s.check_trait_decl_methods(t)
 }
 
-// Checks current package file's traits.
+// Checks current package file's trait declarations.
 func (s *_Sema) check_trait_decls() (ok bool) {
 	for _, t := range s.file.Traits {
 		s.check_trait_decl(t)
@@ -637,12 +646,12 @@ func (s *_Sema) check_global_decl(decl *Var) {
 		s.push_err(decl.Token, "duplicated_ident", decl.Ident)
 	}
 
-	if decl.Expr == nil {
+	if decl.Value == nil {
 		s.push_err(decl.Token, "variable_not_initialized")
 	}
 
 	if decl.Is_auto_typed() {
-		if decl.Expr == nil {
+		if decl.Value == nil {
 			s.push_err(decl.Token, "missing_autotype_value")
 		}
 	} else {
@@ -650,7 +659,7 @@ func (s *_Sema) check_global_decl(decl *Var) {
 	}
 }
 
-// Checks current package file's global variables.
+// Checks current package file's global variable declarations.
 func (s *_Sema) check_global_decls() (ok bool) {
 	for _, decl := range s.file.Vars {
 		s.check_global_decl(decl)
@@ -678,7 +687,7 @@ func (s *_Sema) check_struct_decl(strct *Struct) {
 	// TODO: Check fields and methods if not have any generic type.
 }
 
-// Checks current package file's structures.
+// Checks current package file's structure declarations.
 func (s *_Sema) check_struct_decls() (ok bool) {
 	for _, strct := range s.file.Structs {
 		s.check_struct_decl(strct)
@@ -706,7 +715,7 @@ func (s *_Sema) check_fn_decl(f *Fn) {
 	// TODO: Check scope if function not has any generic type.
 }
 
-// Checks current package file's functions.
+// Checks current package file's function declarations.
 func (s *_Sema) check_fn_decls() (ok bool) {
 	for _, f := range s.file.Funcs {
 		s.check_fn_decl(f)
@@ -761,11 +770,38 @@ func (s *_Sema) check_package_decls() {
 	}
 }
 
+func (s *_Sema) check_type_global(decl *Var) {
+	data := s.eval(decl.Value.Expr)
+	if decl.Is_auto_typed() {
+		// Build new TypeSymbol because
+		// auto-type symbols are nil.
+		decl.Kind = &TypeSymbol{Kind: data.Kind}
+	} else {
+		// TODO: Check type compatibility.
+	}
+}
+
+// Checks types of current package file's global variables.
+func (s *_Sema) check_global_types() (ok bool) {
+	for _, decl := range s.file.Vars {
+		s.check_type_global(decl)
+
+		// Break checking if type alias has error.
+		if len(s.errors) > 0 {
+			return false
+		}
+	}
+	return true
+}
+
 // Checks all types of current package file.
 // Reports whether checking is success.
 func (s *_Sema) check_file_types() (ok bool) {
 	// TODO: Implement other declarations.
 	switch {
+	case !s.check_global_types():
+		return false
+
 	default:
 		return true
 	}

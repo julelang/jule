@@ -20,7 +20,7 @@ type Var struct {
 	Public     bool
 	Doc        string
 	Kind       *TypeSymbol
-	Expr       *Value
+	Value      *Value
 }
 
 // Reports whether variable is auto-typed.

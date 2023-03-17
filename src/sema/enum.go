@@ -13,7 +13,7 @@ import (
 type EnumItem struct {
 	Token lex.Token
 	Ident string
-	Expr  *Value
+	Value *Value
 }
 
 // Enum.

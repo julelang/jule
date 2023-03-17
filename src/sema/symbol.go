@@ -153,7 +153,7 @@ func build_enum_item(decl *ast.EnumItem) *EnumItem {
 	return &EnumItem{
 		Token: decl.Token,
 		Ident: decl.Ident,
-		Expr:  build_expr(decl.Expr),
+		Value: build_expr(decl.Expr),
 	}
 }
 
@@ -187,7 +187,7 @@ func build_var(decl *ast.VarDecl) *Var {
 		Public:     decl.Public,
 		Doc:        build_doc(decl.Doc_comments),
 		Kind:       build_type(decl.Kind),
-		Expr:       build_expr(decl.Expr),
+		Value:      build_expr(decl.Expr),
 	}
 }
 
