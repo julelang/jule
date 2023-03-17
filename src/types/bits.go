@@ -32,13 +32,97 @@ func Real_type_kind(kind string) string {
 	}
 }
 
+// Returns kind's bit-size.
+// Returns -1 if kind is not numeric.
+func Bitsize_of(k string) int {
+	switch k {
+	case lex.KND_I8, lex.KND_U8:
+		return 0b1000
+
+	case lex.KND_I16, lex.KND_U16:
+		return 0b00010000
+
+	case lex.KND_I32, lex.KND_U32, lex.KND_F32:
+		return 0b00100000
+
+	case lex.KND_I64, lex.KND_U64, lex.KND_F64:
+		return 0b01000000
+
+	case lex.KND_UINT, lex.KND_INT:
+		return BIT_SIZE
+
+	default:
+		return -1
+	}
+}
+
+// Returns signed integer kind by bit-size.
+// Possible bit-sizes are: 8, 16, 32, and 64.
+// Returns empty string if bits is invalid.
+func Int_from_bits(bits uint64) string {
+	switch bits {
+	case 0b1000:
+		return lex.KND_I8
+
+	case 0b00010000:
+		return lex.KND_I16
+
+	case 0b00100000:
+		return lex.KND_I32
+
+	case 0b01000000:
+		return lex.KND_I64
+
+	default:
+		return ""
+	}
+}
+
+// Returns unsigned integer kind by bit-size.
+// Possible bit-sizes are: 8, 16, 32, and 64.
+// Returns empty string if bits is invalid.
+func Uint_from_bits(bits uint64) string {
+	switch bits {
+	case 0b1000:
+		return lex.KND_U8
+
+	case 0b00010000:
+		return lex.KND_U16
+
+	case 0b00100000:
+		return lex.KND_U32
+
+	case 0b01000000:
+		return lex.KND_U64
+
+	default:
+		return ""
+	}
+}
+
+// Returns floating-point kind by bit-size.
+// Possible bit-sizes are: 32, and 64.
+// Returns empty string if bits is invalid.
+func Float_from_bits(bits uint64) string {
+	switch bits {
+	case 0b00100000:
+		return lex.KND_F32
+
+	case 0b01000000:
+		return lex.KND_F64
+
+	default:
+		return ""
+	}
+}
+
 func init() {
 	switch BIT_SIZE {
-	case 32:
+	case 0b00100000:
 		INT_KIND = lex.KND_I32
 		UINT_KIND = lex.KND_U32
 
-	case 64:
+	case 0b01000000:
 		INT_KIND = lex.KND_I64
 		UINT_KIND = lex.KND_U64
 	}
