@@ -240,6 +240,11 @@ func (e *_Eval) get_def(ident *ast.IdentExpr) any {
 		}
 	}
 
+	v := e.lookup.find_var(ident.Ident, ident.Cpp_linked)
+	if v != nil {
+		return v
+	}
+
 	s := e.lookup.find_struct(ident.Ident, ident.Cpp_linked)
 	if s != nil {
 		return s
@@ -247,7 +252,7 @@ func (e *_Eval) get_def(ident *ast.IdentExpr) any {
 
 	ta := e.lookup.find_type_alias(ident.Ident, ident.Cpp_linked)
 	if ta != nil {
-		return e
+		return ta
 	}
 
 	return nil
@@ -299,6 +304,21 @@ func (e *_Eval) eval_var(v *Var) *Data {
 	}
 }
 
+func (e *_Eval) eval_type_alias(ta *TypeAlias, error_token lex.Token) *Data {
+	kind := ta.Kind.Kind.kind
+	switch kind.(type) {
+	case *Struct:
+		return e.eval_struct(kind.(*Struct))
+
+	case *Enum:
+		return e.eval_enum(kind.(*Enum))
+
+	default:
+		e.push_err(error_token, "invalid_expr")
+		return nil
+	}
+}
+
 func (e *_Eval) eval_ident(ident *ast.IdentExpr) *Data {
 	def := e.get_def(ident)
 	switch def.(type) {
@@ -313,6 +333,9 @@ func (e *_Eval) eval_ident(ident *ast.IdentExpr) *Data {
 
 	case *Fn:
 		return e.eval_fn(def.(*Fn))
+
+	case *TypeAlias:
+		return e.eval_type_alias(def.(*TypeAlias), ident.Token)
 
 	default:
 		e.push_err(ident.Token, "ident_not_exist", ident.Ident)
@@ -337,5 +360,13 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 // Returns value data of evaluated expression.
 // Returns nil if error occurs.
 func (e *_Eval) eval(expr *ast.Expr) *Data {
-	return e.eval_expr_kind(expr.Kind)
+	data := e.eval_expr_kind(expr.Kind)
+	switch {
+	case data.Decl:
+		e.push_err(expr.Token, "invalid_expr")
+		return nil
+
+	default:
+		return data
+	}
 }
