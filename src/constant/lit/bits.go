@@ -3,6 +3,8 @@ package lit
 import (
 	"strconv"
 	"strings"
+
+	"github.com/julelang/jule/types"
 )
 
 type bit_checker = func(v string, base int, bit int) bool
@@ -58,7 +60,7 @@ func Check_bit_float(val string, bit int) bool {
 //  - 64 for 64-bit
 func Bitsize_of_float(x float64) uint64 {
 	switch {
-	case MIN_F32 <= x && x <= MAX_F32:
+	case types.MIN_F32 <= x && x <= types.MAX_F32:
 		return 0b00100000
 
 	default:
@@ -75,13 +77,13 @@ func Bitsize_of_float(x float64) uint64 {
 //  - 64 for 64-bit
 func Bitsize_of_int(x int64) uint64 {
 	switch {
-	case MIN_I8 <= x && x <= MAX_I8:
+	case types.MIN_I8 <= x && x <= types.MAX_I8:
 		return 0b1000
 
-	case MIN_I16 <= x && x <= MAX_I16:
+	case types.MIN_I16 <= x && x <= types.MAX_I16:
 		return 0b00010000
 
-	case MIN_I32 <= x && x <= MAX_I32:
+	case types.MIN_I32 <= x && x <= types.MAX_I32:
 		return 0b00100000
 
 	default:
@@ -98,13 +100,13 @@ func Bitsize_of_int(x int64) uint64 {
 //  - 64 for 64-bit
 func Bitsize_of_uint(x uint64) uint64 {
 	switch {
-	case x <= MAX_U8:
+	case x <= types.MAX_U8:
 		return 0b1000
 
-	case x <= MAX_U16:
+	case x <= types.MAX_U16:
 		return 0b00010000
 
-	case x <= MAX_U32:
+	case x <= types.MAX_U32:
 		return 0b00100000
 
 	default:

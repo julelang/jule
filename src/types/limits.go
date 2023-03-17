@@ -1,4 +1,4 @@
-package lit
+package types
 
 // Maximum positive value of 32-bit floating-points.
 const MAX_F32 = 0x1p127 * (1 + (1 - 0x1p-23))
