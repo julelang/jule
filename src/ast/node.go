@@ -30,7 +30,7 @@ func (n *Node) Is_decl() bool {
 			*FieldDecl,
 			*UseDecl,
 			*VarDecl,
-			*TypeDecl:
+			*Type:
 		return true
 
 	default:
@@ -93,7 +93,7 @@ type Directive struct {
 // Kind type of type declarations.
 type TypeDeclKind = any
 
-// TypeDecl declaration.
+// Type declaration.
 // Also represents type expression.
 //
 // For primitive types:
@@ -103,7 +103,7 @@ type TypeDeclKind = any
 //
 // For function types:
 //  - Function types represented by *FnDecl.
-type TypeDecl struct {
+type Type struct {
 	Token lex.Token
 	Kind  TypeDeclKind
 }
@@ -113,7 +113,7 @@ type IdentType struct {
 	Token      lex.Token
 	Ident      string
 	Cpp_linked bool
-	Generics   []*TypeDecl
+	Generics   []*Type
 }
 
 // Reports whether identifier is primitive type.
@@ -125,10 +125,10 @@ type NamespaceType struct {
 	Kind   *IdentType  // Type of identifier.
 }
 
-type RefType struct { Elem *TypeDecl }      // Reference type.
-type PtrType struct { Elem *TypeDecl }      // Pointer type.
-type SlcType struct { Elem *TypeDecl }      // Slice type.
-type TupleType struct { Types []*TypeDecl } // Tuple type.
+type RefType struct { Elem *Type }      // Reference type.
+type PtrType struct { Elem *Type }      // Pointer type.
+type SlcType struct { Elem *Type }      // Slice type.
+type TupleType struct { Types []*Type } // Tuple type.
 
 // Reports whether pointer is unsafe pointer (*unsafe).
 func (pt *PtrType) Is_unsafe() bool { return pt.Elem == nil }
@@ -136,7 +136,7 @@ func (pt *PtrType) Is_unsafe() bool { return pt.Elem == nil }
 // Array type.
 // Size epxression is nil for auto-sized array.
 type ArrType struct {
-	Elem *TypeDecl
+	Elem *Type
 	Size *Expr
 }
 
@@ -145,14 +145,14 @@ func (at *ArrType) Auto_sized() bool { return at.Size == nil }
 
 // Map type.
 type MapType struct {
-	Key *TypeDecl
-	Val *TypeDecl
+	Key *Type
+	Val *Type
 }
 
 // Return type.
 // Kind and Idents is nil for void type.
 type RetType struct {
-	Kind   *TypeDecl
+	Kind   *Type
 	Idents []lex.Token
 }
 
@@ -221,7 +221,7 @@ type VariadicExpr struct {
 
 // Casting expression.
 type CastExpr struct {
-	Kind *TypeDecl
+	Kind *Type
 	Expr ExprData
 }
 
@@ -248,7 +248,7 @@ type BinopExpr struct {
 type FnCallExpr struct {
 	Token      lex.Token
 	Expr       *Expr
-	Generics   []*TypeDecl
+	Generics   []*Type
 	Args       []*Expr
 	Concurrent bool
 }
@@ -264,7 +264,7 @@ func (fep *FieldExprPair) Is_targeted() bool { return fep.Field.Id != lex.ID_NA 
 
 // Struct literal instiating expression.
 type StructLit struct {
-	Kind  *TypeDecl
+	Kind  *Type
 	Pairs []*FieldExprPair
 }
 
@@ -357,7 +357,7 @@ type Param struct {
 	Token    lex.Token
 	Mutable  bool
 	Variadic bool
-	Kind     *TypeDecl
+	Kind     *Type
 	Ident    string
 }
 
@@ -392,7 +392,7 @@ type VarDecl struct {
 	Mutable      bool
 	Constant     bool
 	Doc_comments *CommentGroup
-	Kind         *TypeDecl     // nil for auto-typed
+	Kind         *Type     // nil for auto-typed
 	Expr         *Expr
 }
 
@@ -468,7 +468,7 @@ type TypeAliasDecl struct {
 	Cpp_linked   bool
 	Token        lex.Token
 	Ident        string
-	Kind         *TypeDecl
+	Kind         *Type
 	Doc_comments *CommentGroup
 }
 
@@ -513,7 +513,7 @@ type EnumDecl struct {
 	Token        lex.Token
 	Public       bool
 	Ident        string
-	Kind         *TypeDecl
+	Kind         *Type
 	Items        []*EnumItem
 	Doc_comments *CommentGroup
 }
@@ -527,7 +527,7 @@ type FieldDecl struct {
 	Public  bool
 	Mutable bool       // Interior mutability.
 	Ident   string
-	Kind    *TypeDecl
+	Kind    *Type
 }
 
 // Structure declaration.

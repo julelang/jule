@@ -248,7 +248,7 @@ func (ep *_ExprBuilder) build_lit(token lex.Token) *ast.LitExpr {
 	}
 }
 
-func (ep *_ExprBuilder) build_primitive_type(token lex.Token) *ast.TypeDecl {
+func (ep *_ExprBuilder) build_primitive_type(token lex.Token) *ast.Type {
 	return build_prim_type(token)
 }
 
@@ -339,7 +339,7 @@ func (ep *_ExprBuilder) build_ns_sub_ident(tokens []lex.Token) *ast.NsSelectionE
 	return ns
 }
 
-func (ep *_ExprBuilder) build_type(tokens []lex.Token) *ast.TypeDecl {
+func (ep *_ExprBuilder) build_type(tokens []lex.Token) *ast.Type {
 	i := 0
 	t, ok := ep.p.build_type(tokens, &i, false)
 	if !ok {
@@ -512,14 +512,14 @@ func (ep *_ExprBuilder) build_args(tokens []lex.Token) []*ast.Expr {
 }
 
 // Tokens should include brackets.
-func (ep *_ExprBuilder) build_call_generics(tokens []lex.Token) []*ast.TypeDecl {
+func (ep *_ExprBuilder) build_call_generics(tokens []lex.Token) []*ast.Type {
 	if len(tokens) == 0 {
 		return nil
 	}
 
 	tokens = tokens[1 : len(tokens)-1] // Remove brackets.
 	parts, errs := lex.Parts(tokens, lex.ID_COMMA, true)
-	generics := make([]*ast.TypeDecl, len(parts))
+	generics := make([]*ast.Type, len(parts))
 	ep.p.errors = append(ep.p.errors, errs...)
 	for i, part := range parts {
 		if len(part) == 0 {

@@ -15,7 +15,7 @@ type Field struct {
 	Public  bool
 	Mutable bool      // Interior mutability.
 	Ident   string
-	Kind    *Type
+	Kind    *TypeSymbol
 }
 
 // Structure.

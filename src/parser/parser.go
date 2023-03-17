@@ -108,7 +108,7 @@ func (p *_Parser) build_scope(tokens []lex.Token) *ast.Scope {
 	return s
 }
 
-func (p *_Parser) __build_type(tokens []lex.Token, i *int, err bool) (*ast.TypeDecl, bool) {
+func (p *_Parser) __build_type(tokens []lex.Token, i *int, err bool) (*ast.Type, bool) {
 	tb := _TypeBuilder{
 		p:      p,
 		tokens: tokens,
@@ -119,7 +119,7 @@ func (p *_Parser) __build_type(tokens []lex.Token, i *int, err bool) (*ast.TypeD
 }
 
 // build_type builds AST model of data-type.
-func (p *_Parser) build_type(tokens []lex.Token, i *int, err bool) (*ast.TypeDecl, bool) {
+func (p *_Parser) build_type(tokens []lex.Token, i *int, err bool) (*ast.Type, bool) {
 	token := tokens[*i]
 	t, ok := p.__build_type(tokens, i, err)
 	if err && !ok {
@@ -430,7 +430,7 @@ func (p *_Parser) check_params(params []*ast.Param) {
 		if param.Token.Id == lex.ID_NA {
 			p.push_err(param.Token, "missing_type")
 		} else {
-			param.Kind = &ast.TypeDecl{
+			param.Kind = &ast.Type{
 				Token: param.Token,
 				Kind:   &ast.IdentType{
 					Token: param.Token,
@@ -483,7 +483,7 @@ func (p *_Parser) build_multi_ret_type(tokens []lex.Token, i *int) (t *ast.RetTy
 	range_tokens := lex.Range(i, lex.KND_LPAREN, lex.KND_RPARENT, tokens)
 	params := p.build_params(range_tokens, false, true)
 
-	types := make([]*ast.TypeDecl, len(params))
+	types := make([]*ast.Type, len(params))
 	for i, param := range params {
 		types[i] = param.Kind
 		if param.Ident != lex.ANON_IDENT {
@@ -495,7 +495,7 @@ func (p *_Parser) build_multi_ret_type(tokens []lex.Token, i *int) (t *ast.RetTy
 	}
 
 	if len(types) > 1 {
-		t.Kind = &ast.TypeDecl{
+		t.Kind = &ast.Type{
 			Token: tokens[0],
 			Kind:  &ast.TupleType{
 				Types: types,

@@ -19,8 +19,8 @@ type Var struct {
 	Mutable    bool
 	Public     bool
 	Doc        string
-	Kind       *Type
-	Expr       *ast.Expr
+	Kind       *TypeSymbol
+	Expr       *Value
 }
 
 // Reports whether variable is auto-typed.

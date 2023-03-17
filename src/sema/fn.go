@@ -11,7 +11,7 @@ import (
 
 // Return type.
 type RetType struct {
-	Kind   *Type
+	Kind   *TypeSymbol
 	Idents []lex.Token
 }
 
@@ -20,7 +20,7 @@ type Param struct {
 	Token    lex.Token
 	Mutable  bool
 	Variadic bool
-	Kind     *Type
+	Kind     *TypeSymbol
 	Ident    string
 }
 
@@ -40,7 +40,7 @@ type Fn struct {
 
 	// Function instances for each unique type combination of function call.
 	// Nil if function is never used.
-	Combines [][]*Type
+	Combines [][]*TypeSymbol
 }
 
 // Reports whether return type is void.

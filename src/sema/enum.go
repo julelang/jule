@@ -13,7 +13,7 @@ import (
 type EnumItem struct {
 	Token lex.Token
 	Ident string
-	Expr *ast.Expr
+	Expr  *Value
 }
 
 // Enum.
@@ -21,7 +21,7 @@ type Enum struct {
 	Token  lex.Token
 	Public bool
 	Ident  string
-	Kind   *Type
+	Kind   *TypeSymbol
 	Items  []*EnumItem
 	Doc    string
 	Refers []*ast.IdentType // Referred identifiers.

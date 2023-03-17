@@ -26,13 +26,22 @@ func build_doc(cg *ast.CommentGroup) string {
 	return doc
 }
 
-func build_type(t *ast.TypeDecl) *Type {
+func build_type(t *ast.Type) *TypeSymbol {
 	if t == nil {
 		return nil
 	}
-	return &Type{
+	return &TypeSymbol{
 		Decl:  t,
 		Kind: nil,
+	}
+}
+
+func build_expr(expr *ast.Expr) *Value {
+	if expr == nil {
+		return nil
+	}
+	return &Value{
+		Expr: expr,
 	}
 }
 
@@ -144,7 +153,7 @@ func build_enum_item(decl *ast.EnumItem) *EnumItem {
 	return &EnumItem{
 		Token: decl.Token,
 		Ident: decl.Ident,
-		Expr:  decl.Expr,
+		Expr:  build_expr(decl.Expr),
 	}
 }
 
@@ -178,7 +187,7 @@ func build_var(decl *ast.VarDecl) *Var {
 		Public:     decl.Public,
 		Doc:        build_doc(decl.Doc_comments),
 		Kind:       build_type(decl.Kind),
-		Expr:       decl.Expr,
+		Expr:       build_expr(decl.Expr),
 	}
 }
 

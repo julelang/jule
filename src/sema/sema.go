@@ -249,7 +249,7 @@ func (s *_Sema) check_imports() {
 
 // Checks type, builds result as kind and collect referred type aliases.
 // Skips already checked types.
-func (s *_Sema) check_type_with_refers(t *Type, referencer *_Referencer) (ok bool) {
+func (s *_Sema) check_type_with_refers(t *TypeSymbol, referencer *_Referencer) (ok bool) {
 	if t.checked() {
 		return true
 	}
@@ -264,7 +264,7 @@ func (s *_Sema) check_type_with_refers(t *Type, referencer *_Referencer) (ok boo
 
 // Checks type and builds result as kind.
 // Skips already checked types.
-func (s *_Sema) check_type(t *Type) (ok bool) {
+func (s *_Sema) check_type(t *TypeSymbol) (ok bool) {
 	return s.check_type_with_refers(t, nil)
 }
 
@@ -318,7 +318,7 @@ func (s *_Sema) check_enum_decl(e *Enum) {
 		}
 	} else {
 		// Set to default type.
-		e.Kind = &Type{
+		e.Kind = &TypeSymbol{
 			Decl: nil,
 			Kind: &TypeKind{
 				kind: &Prim{kind: lex.KND_I32},

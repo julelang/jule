@@ -15,7 +15,7 @@ type TypeAlias struct {
 	Cpp_linked bool
 	Token      lex.Token
 	Ident      string
-	Kind       *Type
+	Kind       *TypeSymbol
 	Doc        string
 	Refers     []*ast.IdentType // Referred identifiers.
 }
@@ -74,16 +74,16 @@ func (tk *TypeKind) Arr() *Arr {
 }
 
 // Type.
-type Type struct {
-	Decl *ast.TypeDecl // Never changed by semantic analyzer.
+type TypeSymbol struct {
+	Decl *ast.Type // Never changed by semantic analyzer.
 	Kind *TypeKind
 }
 
 // Reports whether type is checked already.
-func (t *Type) checked() bool { return t.Kind != nil }
+func (ts *TypeSymbol) checked() bool { return ts.Kind != nil }
 // Removes kind and ready to check.
 // checked() reports false after this function.
-func (t *Type) remove_kind() { t.Kind = nil }
+func (ts *TypeSymbol) remove_kind() { ts.Kind = nil }
 
 // Primitive type.
 type Prim struct { kind string }
@@ -543,7 +543,7 @@ func (tc *_TypeChecker) build(decl_kind ast.TypeDeclKind) *TypeKind {
 	}
 }
 
-func (tc *_TypeChecker) check_decl(decl *ast.TypeDecl) *TypeKind {
+func (tc *_TypeChecker) check_decl(decl *ast.Type) *TypeKind {
 	// Save current token.
 	error_token := tc.error_token
 
@@ -553,7 +553,7 @@ func (tc *_TypeChecker) check_decl(decl *ast.TypeDecl) *TypeKind {
 	return kind
 }
 
-func (tc *_TypeChecker) check(t *Type) {
+func (tc *_TypeChecker) check(t *TypeSymbol) {
 	if t.Decl == nil {
 		return
 	}
