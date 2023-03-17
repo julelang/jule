@@ -263,10 +263,22 @@ func (e *_Eval) eval_enum(enm *Enum) *Data {
 	return &Data{
 		Lvalue:   false,
 		Mutable:  false,
-		Constant: true,
-		Decl:     false,
+		Constant: false,
+		Decl:     true,
 		Kind:     &TypeKind{
 			kind: enm,
+		},
+	}
+}
+
+func (e *_Eval) eval_struct(s *Struct) *Data {
+	return &Data{
+		Lvalue:   false,
+		Mutable:  false,
+		Constant: false,
+		Decl:     true,
+		Kind:     &TypeKind{
+			kind: s,
 		},
 	}
 }
@@ -276,6 +288,9 @@ func (e *_Eval) eval_ident(ident *ast.IdentExpr) *Data {
 	switch def.(type) {
 	case *Enum:
 		return e.eval_enum(def.(*Enum))
+
+	case *Struct:
+		return e.eval_struct(def.(*Struct))
 
 	default:
 		e.push_err(ident.Token, "ident_not_exist", ident.Ident)
