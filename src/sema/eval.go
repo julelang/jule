@@ -2,6 +2,7 @@ package sema
 
 import (
 	"github.com/julelang/jule/ast"
+	"github.com/julelang/jule/constant/lit"
 	"github.com/julelang/jule/lex"
 )
 
@@ -80,6 +81,30 @@ func (e *_Eval) lit_bool(lit *ast.LitExpr) *Data {
 	}
 }
 
+func (e *_Eval) lit_rune(l *ast.LitExpr) *Data {
+	const BYTE_KIND = lex.KND_U8
+	const RUNE_KIND = lex.KND_I32
+	
+	data := &Data{
+		Lvalue:   false,
+		Mutable:  false,
+		Constant: true,
+	}
+
+	_, is_byte := lit.Is_byte_lit(l.Value)
+	if is_byte {
+		data.Kind = &TypeKind{
+			kind: build_prim_type(BYTE_KIND),
+		}
+	} else {
+		data.Kind = &TypeKind{
+			kind: build_prim_type(RUNE_KIND),
+		}
+	}
+
+	return data
+}
+
 func (e *_Eval) eval_lit(lit *ast.LitExpr) *Data {
 	switch {
 	case lit.Is_nil():
@@ -90,6 +115,9 @@ func (e *_Eval) eval_lit(lit *ast.LitExpr) *Data {
 
 	case lex.Is_bool(lit.Value):
 		return e.lit_bool(lit)
+
+	case lex.Is_rune(lit.Value):
+		return e.lit_rune(lit)
 
 	default:
 		return nil
