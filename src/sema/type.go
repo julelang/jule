@@ -10,6 +10,7 @@ package sema
 import (
 	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/lex"
+	"github.com/julelang/jule/types"
 )
 
 // Type alias.
@@ -93,37 +94,37 @@ type Prim struct { kind string }
 // Returns kind.
 func (p *Prim) Kind() string { return p.kind }
 // Reports whether type is primitive i8.
-func (p *Prim) Is_i8() bool { return p.kind == lex.KND_I8 }
+func (p *Prim) Is_i8() bool { return p.kind == types.TypeKind_I8 }
 // Reports whether type is primitive i16.
-func (p *Prim) Is_i16() bool { return p.kind == lex.KND_I16 }
+func (p *Prim) Is_i16() bool { return p.kind == types.TypeKind_I16 }
 // Reports whether type is primitive i32.
-func (p *Prim) Is_i32() bool { return p.kind == lex.KND_I32 }
+func (p *Prim) Is_i32() bool { return p.kind == types.TypeKind_I32 }
 // Reports whether type is primitive i64.
-func (p *Prim) Is_i64() bool { return p.kind == lex.KND_I64 }
+func (p *Prim) Is_i64() bool { return p.kind == types.TypeKind_I64 }
 // Reports whether type is primitive u8.
-func (p *Prim) Is_u8() bool { return p.kind == lex.KND_U8 }
+func (p *Prim) Is_u8() bool { return p.kind == types.TypeKind_U8 }
 // Reports whether type is primitive u16.
-func (p *Prim) Is_u16() bool { return p.kind == lex.KND_U16 }
+func (p *Prim) Is_u16() bool { return p.kind == types.TypeKind_U16 }
 // Reports whether type is primitive u32.
-func (p *Prim) Is_u32() bool { return p.kind == lex.KND_U32 }
+func (p *Prim) Is_u32() bool { return p.kind == types.TypeKind_U32 }
 // Reports whether type is primitive u64.
-func (p *Prim) Is_u64() bool { return p.kind == lex.KND_U64 }
+func (p *Prim) Is_u64() bool { return p.kind == types.TypeKind_U64 }
 // Reports whether type is primitive f32.
-func (p *Prim) Is_f32() bool { return p.kind == lex.KND_F32 }
+func (p *Prim) Is_f32() bool { return p.kind == types.TypeKind_F32 }
 // Reports whether type is primitive f64.
-func (p *Prim) Is_f64() bool { return p.kind == lex.KND_F64 }
+func (p *Prim) Is_f64() bool { return p.kind == types.TypeKind_F64 }
 // Reports whether type is primitive int.
-func (p *Prim) Is_int() bool { return p.kind == lex.KND_INT }
+func (p *Prim) Is_int() bool { return p.kind == types.TypeKind_INT }
 // Reports whether type is primitive uint.
-func (p *Prim) Is_uint() bool { return p.kind == lex.KND_UINT }
+func (p *Prim) Is_uint() bool { return p.kind == types.TypeKind_UINT }
 // Reports whether type is primitive uintptr.
-func (p *Prim) Is_uintptr() bool { return p.kind == lex.KND_UINTPTR }
+func (p *Prim) Is_uintptr() bool { return p.kind == types.TypeKind_UINTPTR }
 // Reports whether type is primitive bool.
-func (p *Prim) Is_bool() bool { return p.kind == lex.KND_BOOL }
+func (p *Prim) Is_bool() bool { return p.kind == types.TypeKind_BOOL }
 // Reports whether type is primitive str.
-func (p *Prim) Is_str() bool { return p.kind == lex.KND_STR }
+func (p *Prim) Is_str() bool { return p.kind == types.TypeKind_STR }
 // Reports whether type is primitive any.
-func (p *Prim) Is_any() bool { return p.kind == lex.KND_ANY }
+func (p *Prim) Is_any() bool { return p.kind == types.TypeKind_ANY }
 
 // Reference type.
 type Ref struct { Elem *TypeKind }

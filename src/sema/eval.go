@@ -4,6 +4,7 @@ import (
 	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/constant/lit"
 	"github.com/julelang/jule/lex"
+	"github.com/julelang/jule/types"
 )
 
 // Value data.
@@ -65,7 +66,7 @@ func (e *_Eval) lit_str(lit *ast.LitExpr) *Data {
 		Mutable:  false,
 		Constant: true,
 		Kind:     &TypeKind{
-			kind: build_prim_type(lex.KND_STR),
+			kind: build_prim_type(types.TypeKind_STR),
 		},
 	}
 }
@@ -76,14 +77,14 @@ func (e *_Eval) lit_bool(lit *ast.LitExpr) *Data {
 		Mutable:  false,
 		Constant: true,
 		Kind:     &TypeKind{
-			kind: build_prim_type(lex.KND_BOOL),
+			kind: build_prim_type(types.TypeKind_BOOL),
 		},
 	}
 }
 
 func (e *_Eval) lit_rune(l *ast.LitExpr) *Data {
-	const BYTE_KIND = lex.KND_U8
-	const RUNE_KIND = lex.KND_I32
+	const BYTE_KIND = types.TypeKind_U8
+	const RUNE_KIND = types.TypeKind_I32
 	
 	data := &Data{
 		Lvalue:   false,
@@ -106,7 +107,7 @@ func (e *_Eval) lit_rune(l *ast.LitExpr) *Data {
 }
 
 func (e *_Eval) lit_float(l *ast.LitExpr) *Data {
-	const FLOAT_KIND = lex.KND_F64
+	const FLOAT_KIND = types.TypeKind_F64
 
 	return &Data{
 		Lvalue:   false,
