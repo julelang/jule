@@ -38,9 +38,9 @@ const TypeKind_STR = "str"
 const TypeKind_ANY = "any"
 
 // Reports whether kind is signed integer.
-func Is_sig_int(kind string) bool {
-	kind = Real_type_kind(kind)
-	switch kind {
+func Is_sig_int(k string) bool {
+	k = Real_kind_of(k)
+	switch k {
 	case TypeKind_I8, TypeKind_I16, TypeKind_I32, TypeKind_I64:
 		return true
 
@@ -50,9 +50,9 @@ func Is_sig_int(kind string) bool {
 }
 
 // Reports kind is unsigned integer.
-func Is_unsig_int(kind string) bool {
-	kind = Real_type_kind(kind)
-	switch kind {
+func Is_unsig_int(k string) bool {
+	k = Real_kind_of(k)
+	switch k {
 	case TypeKind_U8, TypeKind_U16, TypeKind_U32, TypeKind_U64:
 		return true
 
@@ -62,21 +62,21 @@ func Is_unsig_int(kind string) bool {
 }
 
 // Reports whether kind is signed/unsigned integer.
-func Is_int(kind string) bool {
-	return Is_sig_int(kind) || Is_unsig_int(kind)
+func Is_int(k string) bool {
+	return Is_sig_int(k) || Is_unsig_int(k)
 }
 
 // Reports whether kind is float.
-func Is_float(kind string) bool {
-	return kind == TypeKind_F32 || kind == TypeKind_F64
+func Is_float(k string) bool {
+	return k == TypeKind_F32 || k == TypeKind_F64
 }
 
 // Reports whether kind is numeric.
-func Is_num(kind string) bool {
-	return Is_int(kind) || Is_float(kind)
+func Is_num(k string) bool {
+	return Is_int(k) || Is_float(k)
 }
 
 // Reports whether kind is signed numeric.
-func Is_sig_num(kind string) bool {
-	return Is_sig_int(kind) || Is_float(kind)
+func Is_sig_num(k string) bool {
+	return Is_sig_int(k) || Is_float(k)
 }

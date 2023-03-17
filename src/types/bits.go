@@ -17,7 +17,7 @@ var SYS_UINT string
 // Returns kind's bit-specific kind if bit-specific like int, uint, and uintptr.
 // Returns kind if not bit-specific.
 // Bit-size is determined by runtime.
-func Real_type_kind(kind string) string {
+func Real_kind_of(kind string) string {
 	switch kind {
 	case TypeKind_INT:
 		return SYS_INT

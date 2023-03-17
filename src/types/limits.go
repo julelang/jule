@@ -35,3 +35,71 @@ const MAX_U16 = 65535
 const MAX_U32 = 4294967295
 // Maximum value of 64-bit unsigned integers.
 const MAX_U64 = 18446744073709551615
+
+// Returns minimum value of signed/unsigned integer and floating-point kinds.
+// Returns 0 if kind is invalid.
+func Min_of(k string) float64 {
+	k = Real_kind_of(k)
+	switch k {
+	case TypeKind_I8:
+		return MIN_I8
+
+	case TypeKind_I16:
+		return MIN_I16
+
+	case TypeKind_I32:
+		return MIN_I32
+
+	case TypeKind_I64:
+		return MIN_I64
+
+	case TypeKind_F32:
+		return MIN_F32
+
+	case TypeKind_F64:
+		return MIN_F64
+
+	default:
+		return 0
+	}
+}
+
+// Returns minimum value of signed/unsigned integer and floating-point kinds.
+// Returns 0 if kind is invalid.
+func Max_of(k string) float64 {
+	k = Real_kind_of(k)
+	switch k {
+	case TypeKind_I8:
+		return MAX_I8
+
+	case TypeKind_I16:
+		return MAX_I16
+
+	case TypeKind_I32:
+		return MAX_I32
+
+	case TypeKind_I64:
+		return MAX_I64
+
+	case TypeKind_U8:
+		return MAX_U8
+
+	case TypeKind_U16:
+		return MAX_U16
+
+	case TypeKind_U32:
+		return MAX_U32
+
+	case TypeKind_U64:
+		return MAX_U64
+
+	case TypeKind_F32:
+		return MAX_F32
+
+	case TypeKind_F64:
+		return MAX_F64
+
+	default:
+		return 0
+	}
+}
