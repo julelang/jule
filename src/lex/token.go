@@ -319,7 +319,8 @@ func Is_num(k string) bool {
 	if k == "" {
 		return false
 	}
-	return k[0] == '-' || (k[0] >= '0' && k[0] <= '9')
+	b := k[0]
+	return b == '.' || ('0' <= b && b <= '9')
 }
 
 // Reports whether kind is literal.

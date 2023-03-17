@@ -105,6 +105,34 @@ func (e *_Eval) lit_rune(l *ast.LitExpr) *Data {
 	return data
 }
 
+func (e *_Eval) lit_float(l *ast.LitExpr) *Data {
+	const FLOAT_KIND = lex.KND_F64
+
+	return &Data{
+		Lvalue:   false,
+		Mutable:  false,
+		Constant: true,
+		Kind:     &TypeKind{
+			kind: build_prim_type(FLOAT_KIND),
+		},
+	}
+}
+
+func (e *_Eval) lit_int(l *ast.LitExpr) *Data {
+	// TODO: Implement here.
+	return nil
+}
+
+func (e *_Eval) lit_num(l *ast.LitExpr) *Data {
+	switch {
+	case lex.Is_float(l.Value):
+		return e.lit_float(l)
+
+	default:
+		return e.lit_int(l)
+	}
+}
+
 func (e *_Eval) eval_lit(lit *ast.LitExpr) *Data {
 	switch {
 	case lit.Is_nil():
@@ -118,6 +146,9 @@ func (e *_Eval) eval_lit(lit *ast.LitExpr) *Data {
 
 	case lex.Is_rune(lit.Value):
 		return e.lit_rune(lit)
+
+	case lex.Is_num(lit.Value):
+		return e.lit_num(lit)
 
 	default:
 		return nil
