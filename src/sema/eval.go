@@ -370,6 +370,15 @@ func (e *_Eval) eval_unary_caret(d *Data) *Data {
 	return d
 }
 
+func (e *_Eval) eval_unary_excl(d *Data) *Data {
+	t := d.Kind.Prim()
+	if t == nil || !t.Is_bool() {
+		return nil
+	}
+	// TODO: Eval constants.
+	return d
+}
+
 func (e *_Eval) eval_unary(u *ast.UnaryExpr) *Data {
 	data := e.eval_expr_kind(u.Expr)
 	if data == nil {
@@ -387,7 +396,7 @@ func (e *_Eval) eval_unary(u *ast.UnaryExpr) *Data {
 		data = e.eval_unary_caret(data)
 
 	case lex.KND_EXCL:
-		// TODO: Implement here.
+		data = e.eval_unary_excl(data)
 
 	case lex.KND_STAR:
 		// TODO: Implement here.
