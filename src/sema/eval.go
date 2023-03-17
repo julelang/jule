@@ -12,9 +12,15 @@ import (
 
 // Value data.
 type Data struct {
-	Kind    *TypeKind
-	Mutable bool
-	Lvalue  bool
+	Kind     *TypeKind
+	Mutable  bool
+	Lvalue   bool
+
+	// True if kind is declaration such as:
+	//  - *Enum
+	//  - *Struct
+	//  - *Trait
+	Decl     bool
 
 	// This field is reminder.
 	// Will write to every constant processing points.
@@ -30,7 +36,11 @@ func (d *Data) Is_void() bool { return d.Kind != nil && d.Kind.kind == nil }
 
 func build_void_data() *Data {
 	return &Data{
-		Kind: &TypeKind{
+		Mutable:  false,
+		Lvalue:   false,
+		Decl:     false,
+		Constant: false,
+		Kind:     &TypeKind{
 			kind: nil,
 		},
 	}
@@ -67,6 +77,10 @@ type _Eval struct {
 	lookup _Lookup
 }
 
+func (e *_Eval) push_err(token lex.Token, key string, args ...any) {
+	e.s.errors = append(e.s.errors, compiler_err(token, key, args...))
+}
+
 // TODO: Implement here.
 // Reports whether evaluation in unsafe scope.
 func (e *_Eval) is_unsafe() bool { return false }
@@ -78,6 +92,7 @@ func (e *_Eval) lit_nil() *Data {
 		Lvalue:   false,
 		Mutable:  false,
 		Constant: true,
+		Decl:     false,
 		Kind:     nil,
 	}
 }
@@ -87,6 +102,7 @@ func (e *_Eval) lit_str(lit *ast.LitExpr) *Data {
 		Lvalue:   false,
 		Mutable:  false,
 		Constant: true,
+		Decl:     false,
 		Kind:     &TypeKind{
 			kind: build_prim_type(types.TypeKind_STR),
 		},
@@ -98,6 +114,7 @@ func (e *_Eval) lit_bool(lit *ast.LitExpr) *Data {
 		Lvalue:   false,
 		Mutable:  false,
 		Constant: true,
+		Decl:     false,
 		Kind:     &TypeKind{
 			kind: build_prim_type(types.TypeKind_BOOL),
 		},
@@ -112,6 +129,7 @@ func (e *_Eval) lit_rune(l *ast.LitExpr) *Data {
 		Lvalue:   false,
 		Mutable:  false,
 		Constant: true,
+		Decl:     false,
 	}
 
 	_, is_byte := lit.Is_byte_lit(l.Value)
@@ -135,6 +153,7 @@ func (e *_Eval) lit_float(l *ast.LitExpr) *Data {
 		Lvalue:   false,
 		Mutable:  false,
 		Constant: true,
+		Decl:     false,
 		Kind:     &TypeKind{
 			kind: build_prim_type(FLOAT_KIND),
 		},
@@ -162,24 +181,20 @@ func (e *_Eval) lit_int(l *ast.LitExpr) *Data {
 		base = 0b1010
 	}
 
-	is_neg := data[0] == '-'
 	var value any = nil
 	const BIT_SIZE = 0b01000000
-	if is_neg {
-		value, _ = strconv.ParseInt(data, base, BIT_SIZE)
+	temp_value, err := strconv.ParseInt(data, base, BIT_SIZE)
+	if err == nil {
+		value = temp_value
 	} else {
-		temp_value, err := strconv.ParseInt(data, base, BIT_SIZE)
-		if err == nil {
-			value = temp_value
-		} else {
-			value, _ = strconv.ParseUint(data, base, BIT_SIZE)
-		}
+		value, _ = strconv.ParseUint(data, base, BIT_SIZE)
 	}
 
 	return &Data{
 		Lvalue:   false,
 		Mutable:  false,
 		Constant: true,
+		Decl:     false,
 		Kind:     &TypeKind{
 			kind: build_prim_type(kind_by_bitsize(value)),
 		},
@@ -218,11 +233,64 @@ func (e *_Eval) eval_lit(lit *ast.LitExpr) *Data {
 	}
 }
 
+func (e *_Eval) get_def(ident *ast.IdentExpr) any {
+	if !ident.Cpp_linked {
+		enm := e.lookup.find_enum(ident.Ident)
+		if enm != nil {
+			return enm
+		}
+
+		t := e.lookup.find_trait(ident.Ident)
+		if t != nil {
+			return t
+		}
+	}
+
+	s := e.lookup.find_struct(ident.Ident, ident.Cpp_linked)
+	if s != nil {
+		return s
+	}
+
+	ta := e.lookup.find_type_alias(ident.Ident, ident.Cpp_linked)
+	if ta != nil {
+		return e
+	}
+
+	return nil
+}
+
+func (e *_Eval) eval_enum(enm *Enum) *Data {
+	return &Data{
+		Lvalue:   false,
+		Mutable:  false,
+		Constant: true,
+		Decl:     false,
+		Kind:     &TypeKind{
+			kind: enm,
+		},
+	}
+}
+
+func (e *_Eval) eval_ident(ident *ast.IdentExpr) *Data {
+	def := e.get_def(ident)
+	switch def.(type) {
+	case *Enum:
+		return e.eval_enum(def.(*Enum))
+
+	default:
+		e.push_err(ident.Token, "ident_not_exist", ident.Ident)
+		return nil
+	}
+}
+
 func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 	// TODO: Implement other types.
 	switch kind.(type) {
 	case *ast.LitExpr:
 		return e.eval_lit(kind.(*ast.LitExpr))
+
+	case *ast.IdentExpr:
+		return e.eval_ident(kind.(*ast.IdentExpr))
 
 	default:
 		return nil
