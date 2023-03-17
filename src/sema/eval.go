@@ -39,8 +39,19 @@ func (e *_Eval) lit_str(lit *ast.LitExpr) *Data {
 	}
 }
 
+func (e *_Eval) lit_nil() *Data {
+	// Return new Data with nil kind.
+	// Nil kind represents "nil" literal.
+	return &Data{
+		Kind: nil,
+	}
+}
+
 func (e *_Eval) eval_lit(lit *ast.LitExpr) *Data {
 	switch {
+	case lit.Is_nil():
+		return e.lit_nil()
+
 	case lex.Is_str(lit.Value):
 		return e.lit_str(lit)
 
