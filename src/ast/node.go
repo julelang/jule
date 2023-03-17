@@ -392,7 +392,7 @@ type VarDecl struct {
 	Mutable      bool
 	Constant     bool
 	Doc_comments *CommentGroup
-	Kind         *TypeDecl
+	Kind         *TypeDecl     // nil for auto-typed
 	Expr         *Expr
 }
 

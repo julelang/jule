@@ -22,3 +22,6 @@ type Var struct {
 	Kind       *Type
 	Expr       *ast.Expr
 }
+
+// Reports whether variable is auto-typed.
+func (v *Var) Is_auto_typed() bool { return v.Kind == nil || v.Kind.Decl == nil }

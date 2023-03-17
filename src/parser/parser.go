@@ -208,7 +208,7 @@ func (p *_Parser) build_var_common(v *ast.VarDecl, tokens []lex.Token) {
 		return
 	}
 	v.Ident = v.Token.Kind
-	v.Kind = build_void_type()
+	v.Kind = nil // For auto-type.
 	if len(tokens) > 1 {
 		tokens = tokens[1:] // Remove identifier.
 		p.build_var_type_and_expr(v, tokens)

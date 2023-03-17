@@ -630,9 +630,38 @@ func (s *_Sema) impl_impls() (ok bool) {
 	return true
 }
 
-// Checks current package file's traits.
-func (s *_Sema) check_impls() (ok bool) {
-	return s.impl_impls()
+func (s *_Sema) check_global(decl *Var) {
+	if lex.Is_ignore_ident(decl.Ident) {
+		s.push_err(decl.Token, "ignore_ident")
+	} else if s.is_duplicated_ident(_uintptr(decl), decl.Ident, false) {
+		s.push_err(decl.Token, "duplicated_ident", decl.Ident)
+	}
+
+	if decl.Expr == nil {
+		s.push_err(decl.Token, "variable_not_initialized")
+	}
+
+	if decl.Is_auto_typed() {
+		// TODO: Check expression and determine type.
+	} else {
+		ok := s.check_type(decl.Kind)
+		if !ok {
+			return
+		}
+	}
+}
+
+// Checks current package file's global variables.
+func (s *_Sema) check_globals() (ok bool) {
+	for _, decl := range s.file.Vars {
+		s.check_global(decl)
+
+		// Break checking if type alias has error.
+		if len(s.errors) > 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *_Sema) check_struct(strct *Struct) {
@@ -706,6 +735,9 @@ func (s *_Sema) check_file() (ok bool) {
 		return false
 
 	case !s.impl_impls():
+		return false
+
+	case !s.check_globals():
 		return false
 
 	case !s.check_funcs():
