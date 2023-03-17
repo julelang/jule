@@ -770,12 +770,28 @@ func (s *_Sema) check_package_decls() {
 	}
 }
 
+func (s *_Sema) check_data_for_auto_type(d *Data, err_token lex.Token) {
+	switch {
+	case d.Is_nil():
+		s.push_err(err_token, "nil_for_autotype")
+
+	case d.Is_void():
+		s.push_err(err_token, "void_for_autotype")
+	}
+}
+
 func (s *_Sema) check_type_global(decl *Var) {
 	data := s.eval(decl.Value.Expr)
+	if data == nil {
+		return // Skip checks if error ocurrs.
+	}
+
 	if decl.Is_auto_typed() {
 		// Build new TypeSymbol because
 		// auto-type symbols are nil.
 		decl.Kind = &TypeSymbol{Kind: data.Kind}
+		s.check_data_for_auto_type(data, decl.Value.Expr.Token)
+		// TODO: Check assignment validity.
 	} else {
 		// TODO: Check type compatibility.
 	}

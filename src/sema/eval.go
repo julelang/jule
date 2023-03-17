@@ -7,11 +7,29 @@ import (
 
 // Value data.
 type Data struct {
-	Kind *TypeKind
+	Kind    *TypeKind
+	Mutable bool
+	Lvalue  bool
+
+	// This field is reminder.
+	// Will write to every constant processing points.
+	// Changed after add constant evaluation support.
+	// So, reminder flag for constants.
+	Constant bool
 }
 
 // Reports whether Data is nil literal.
 func (d *Data) Is_nil() bool { return d.Kind == nil }
+// Reports whether Data is void.
+func (d *Data) Is_void() bool { return d.Kind != nil && d.Kind.kind == nil }
+
+func build_void_data() *Data {
+	return &Data{
+		Kind: &TypeKind{
+			kind: nil,
+		},
+	}
+}
 
 // Value.
 type Value struct {
@@ -29,21 +47,36 @@ type _Eval struct {
 // Reports whether evaluation in unsafe scope.
 func (e *_Eval) is_unsafe() bool { return false }
 
-func (e *_Eval) lit_str(lit *ast.LitExpr) *Data {
-	s := lit.Value[1:len(lit.Value)-1] // Remove string quotes.
-
-	return &Data{
-		Kind: &TypeKind{
-			kind: build_prim_type(s),
-		},
-	}
-}
-
 func (e *_Eval) lit_nil() *Data {
 	// Return new Data with nil kind.
 	// Nil kind represents "nil" literal.
 	return &Data{
-		Kind: nil,
+		Lvalue:   false,
+		Mutable:  false,
+		Constant: true,
+		Kind:     nil,
+	}
+}
+
+func (e *_Eval) lit_str(lit *ast.LitExpr) *Data {
+	return &Data{
+		Lvalue:   false,
+		Mutable:  false,
+		Constant: true,
+		Kind:     &TypeKind{
+			kind: build_prim_type(lex.KND_STR),
+		},
+	}
+}
+
+func (e *_Eval) lit_bool(lit *ast.LitExpr) *Data {
+	return &Data{
+		Lvalue:   false,
+		Mutable:  false,
+		Constant: true,
+		Kind:     &TypeKind{
+			kind: build_prim_type(lex.KND_BOOL),
+		},
 	}
 }
 
@@ -54,6 +87,9 @@ func (e *_Eval) eval_lit(lit *ast.LitExpr) *Data {
 
 	case lex.Is_str(lit.Value):
 		return e.lit_str(lit)
+
+	case lex.Is_bool(lit.Value):
+		return e.lit_bool(lit)
 
 	default:
 		return nil
