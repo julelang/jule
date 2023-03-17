@@ -19,7 +19,6 @@ type Data struct {
 	// True if kind is declaration such as:
 	//  - *Enum
 	//  - *Struct
-	//  - *Trait
 	Decl     bool
 
 	// This field is reminder.
@@ -283,6 +282,18 @@ func (e *_Eval) eval_struct(s *Struct) *Data {
 	}
 }
 
+func (e *_Eval) eval_fn(f *Fn) *Data {
+	return &Data{
+		Lvalue:   false,
+		Mutable:  false,
+		Constant: false,
+		Decl:     false,
+		Kind:     &TypeKind{
+			kind: f,
+		},
+	}
+}
+
 func (e *_Eval) eval_ident(ident *ast.IdentExpr) *Data {
 	def := e.get_def(ident)
 	switch def.(type) {
@@ -291,6 +302,9 @@ func (e *_Eval) eval_ident(ident *ast.IdentExpr) *Data {
 
 	case *Struct:
 		return e.eval_struct(def.(*Struct))
+
+	case *Fn:
+		return e.eval_fn(def.(*Fn))
 
 	default:
 		e.push_err(ident.Token, "ident_not_exist", ident.Ident)
