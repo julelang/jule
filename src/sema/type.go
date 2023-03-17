@@ -258,7 +258,7 @@ func (tc *_TypeChecker) from_type_alias(decl *ast.IdentType, ta *TypeAlias) *Typ
 	}
 
 	// Build kind if not builded already.
-	ok = tc.s.check_type_alias_kind(ta)
+	ok = tc.s.check_type_alias_decl_kind(ta)
 	if !ok {
 		return nil
 	}

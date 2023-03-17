@@ -268,7 +268,7 @@ func (s *_Sema) check_type(t *Type) (ok bool) {
 	return s.check_type_with_refers(t, nil)
 }
 
-func (s *_Sema) check_type_alias_kind(ta *TypeAlias) (ok bool) {
+func (s *_Sema) check_type_alias_decl_kind(ta *TypeAlias) (ok bool) {
 	ok = s.check_type_with_refers(ta.Kind, &_Referencer{
 		ident:  ta.Ident,
 		refers: &ta.Refers,
@@ -280,19 +280,19 @@ func (s *_Sema) check_type_alias_kind(ta *TypeAlias) (ok bool) {
 	return
 }
 
-func (s *_Sema) check_type_alias(ta *TypeAlias) {
+func (s *_Sema) check_type_alias_decl(ta *TypeAlias) {
 	if lex.Is_ignore_ident(ta.Ident) {
 		s.push_err(ta.Token, "ignore_ident")
 	} else if s.is_duplicated_ident(_uintptr(ta), ta.Ident, ta.Cpp_linked) {
 		s.push_err(ta.Token, "duplicated_ident", ta.Ident)
 	}
-	s.check_type_alias_kind(ta)
+	s.check_type_alias_decl_kind(ta)
 }
 
 // Checks current package file's type aliases.
-func (s *_Sema) check_type_aliases() (ok bool) {
+func (s *_Sema) check_type_alias_decls() (ok bool) {
 	for _, ta := range s.file.Type_aliases {
-		s.check_type_alias(ta)
+		s.check_type_alias_decl(ta)
 		
 		// Break checking if type alias has error.
 		if len(s.errors) > 0 {
@@ -302,7 +302,7 @@ func (s *_Sema) check_type_aliases() (ok bool) {
 	return true
 }
 
-func (s *_Sema) check_enum(e *Enum) {
+func (s *_Sema) check_enum_decl(e *Enum) {
 	if lex.Is_ignore_ident(e.Ident) {
 		s.push_err(e.Token, "ignore_ident")
 	} else if s.is_duplicated_ident(_uintptr(e), e.Ident, false) {
@@ -346,9 +346,9 @@ func (s *_Sema) check_enum(e *Enum) {
 }
 
 // Checks current package file's enums.
-func (s *_Sema) check_enums() (ok bool) {
+func (s *_Sema) check_enum_decls() (ok bool) {
 	for _, e := range s.file.Enums {
-		s.check_enum(e)
+		s.check_enum_decl(e)
 		
 		// Break checking if type alias has error.
 		if len(s.errors) > 0 {
@@ -358,7 +358,7 @@ func (s *_Sema) check_enums() (ok bool) {
 	return true
 }
 
-func (s *_Sema) check_generics(generics []*ast.Generic) (ok bool) {
+func (s *_Sema) check_decl_generics(generics []*ast.Generic) (ok bool) {
 	ok = true
 	for i, g := range generics {
 		if lex.Is_ignore_ident(g.Ident) {
@@ -385,7 +385,7 @@ func (s *_Sema) check_generics(generics []*ast.Generic) (ok bool) {
 	return
 }
 
-func (s *_Sema) check_fn_params_dup(f *Fn) (ok bool) {
+func (s *_Sema) check_fn_decl_params_dup(f *Fn) (ok bool) {
 	ok = true
 check:
 	for i, p := range f.Params {
@@ -419,7 +419,7 @@ check:
 	return
 }
 
-func (s *_Sema) check_fn_result_dup(f *Fn) (ok bool) {
+func (s *_Sema) check_fn_decl_result_dup(f *Fn) (ok bool) {
 	ok = true
 	
 	if f.Is_void() {
@@ -469,19 +469,19 @@ func (s *_Sema) check_fn_result_dup(f *Fn) (ok bool) {
 
 // Checks generics, parameters and return type.
 // Not checks scope, and other things.
-func (s *_Sema) check_fn_prototype(f *Fn) (ok bool) {
+func (s *_Sema) check_fn_decl_prototype(f *Fn) (ok bool) {
 	// TODO:
 	//  - Check return type.
 	//  |- Check parameter types.
 	//  |- Build non-generic types if function has generic types.
 	switch {
-	case !s.check_generics(f.Generics):
+	case !s.check_decl_generics(f.Generics):
 		return false
 
-	case !s.check_fn_params_dup(f):
+	case !s.check_fn_decl_params_dup(f):
 		return false
 
-	case !s.check_fn_result_dup(f):
+	case !s.check_fn_decl_result_dup(f):
 		return false
 
 	default:
@@ -489,17 +489,17 @@ func (s *_Sema) check_fn_prototype(f *Fn) (ok bool) {
 	}
 }
 
-func (s *_Sema) check_trait_method(f *Fn) {
+func (s *_Sema) check_trait_decl_method(f *Fn) {
 	if lex.Is_ignore_ident(f.Ident) {
 		s.push_err(f.Token, "ignore_ident")
 	}
 
-	s.check_fn_prototype(f)
+	s.check_fn_decl_prototype(f)
 }
 
-func (s *_Sema) check_trait_methods(t *Trait) {
+func (s *_Sema) check_trait_decl_methods(t *Trait) {
 	for i, f := range t.Methods {
-		s.check_trait_method(f)
+		s.check_trait_decl_method(f)
 		
 		// Break checking if type alias has error.
 		if len(s.errors) > 0 {
@@ -527,20 +527,20 @@ func (s *_Sema) check_trait_methods(t *Trait) {
 	}
 }
 
-func (s *_Sema) check_trait(t *Trait) {
+func (s *_Sema) check_trait_decl(t *Trait) {
 	if lex.Is_ignore_ident(t.Ident) {
 		s.push_err(t.Token, "ignore_ident")
 	} else if s.is_duplicated_ident(_uintptr(t), t.Ident, false) {
 		s.push_err(t.Token, "duplicated_ident", t.Ident)
 	}
 
-	s.check_trait_methods(t)
+	s.check_trait_decl_methods(t)
 }
 
 // Checks current package file's traits.
-func (s *_Sema) check_traits() (ok bool) {
+func (s *_Sema) check_trait_decls() (ok bool) {
 	for _, t := range s.file.Traits {
-		s.check_trait(t)
+		s.check_trait_decl(t)
 
 		// Break checking if type alias has error.
 		if len(s.errors) > 0 {
@@ -630,7 +630,7 @@ func (s *_Sema) impl_impls() (ok bool) {
 	return true
 }
 
-func (s *_Sema) check_global(decl *Var) {
+func (s *_Sema) check_global_decl(decl *Var) {
 	if lex.Is_ignore_ident(decl.Ident) {
 		s.push_err(decl.Token, "ignore_ident")
 	} else if s.is_duplicated_ident(_uintptr(decl), decl.Ident, false) {
@@ -642,19 +642,18 @@ func (s *_Sema) check_global(decl *Var) {
 	}
 
 	if decl.Is_auto_typed() {
-		// TODO: Check expression and determine type.
-	} else {
-		ok := s.check_type(decl.Kind)
-		if !ok {
-			return
+		if decl.Expr == nil {
+			s.push_err(decl.Token, "missing_autotype_value")
 		}
+	} else {
+		_ = s.check_type(decl.Kind)
 	}
 }
 
 // Checks current package file's global variables.
-func (s *_Sema) check_globals() (ok bool) {
+func (s *_Sema) check_global_decls() (ok bool) {
 	for _, decl := range s.file.Vars {
-		s.check_global(decl)
+		s.check_global_decl(decl)
 
 		// Break checking if type alias has error.
 		if len(s.errors) > 0 {
@@ -664,14 +663,14 @@ func (s *_Sema) check_globals() (ok bool) {
 	return true
 }
 
-func (s *_Sema) check_struct(strct *Struct) {
+func (s *_Sema) check_struct_decl(strct *Struct) {
 	if lex.Is_ignore_ident(strct.Ident) {
 		s.push_err(strct.Token, "ignore_ident")
 	} else if s.is_duplicated_ident(_uintptr(strct), strct.Ident, false) {
 		s.push_err(strct.Token, "duplicated_ident", strct.Ident)
 	}
 
-	ok := s.check_generics(strct.Generics)
+	ok := s.check_decl_generics(strct.Generics)
 	if !ok {
 		return
 	}
@@ -680,9 +679,9 @@ func (s *_Sema) check_struct(strct *Struct) {
 }
 
 // Checks current package file's structures.
-func (s *_Sema) check_structs() (ok bool) {
+func (s *_Sema) check_struct_decls() (ok bool) {
 	for _, strct := range s.file.Structs {
-		s.check_struct(strct)
+		s.check_struct_decl(strct)
 		
 		// Break checking if type alias has error.
 		if len(s.errors) > 0 {
@@ -692,14 +691,14 @@ func (s *_Sema) check_structs() (ok bool) {
 	return true
 }
 
-func (s *_Sema) check_fn(f *Fn) {
+func (s *_Sema) check_fn_decl(f *Fn) {
 	if lex.Is_ignore_ident(f.Ident) {
 		s.push_err(f.Token, "ignore_ident")
 	} else if s.is_duplicated_ident(_uintptr(f), f.Ident, false) {
 		s.push_err(f.Token, "duplicated_ident", f.Ident)
 	}
 
-	ok := s.check_fn_prototype(f)
+	ok := s.check_fn_decl_prototype(f)
 	if !ok {
 		return
 	}
@@ -708,9 +707,9 @@ func (s *_Sema) check_fn(f *Fn) {
 }
 
 // Checks current package file's functions.
-func (s *_Sema) check_funcs() (ok bool) {
+func (s *_Sema) check_fn_decls() (ok bool) {
 	for _, f := range s.file.Funcs {
-		s.check_fn(f)
+		s.check_fn_decl(f)
 		
 		// Break checking if type alias has error.
 		if len(s.errors) > 0 {
@@ -720,30 +719,29 @@ func (s *_Sema) check_funcs() (ok bool) {
 	return true
 }
 
-// Checks current package file.
+// Checks all declarations of current package file.
 // Reports whether checking is success.
-func (s *_Sema) check_file() (ok bool) {
-	// TODO: Implement other declarations.
+func (s *_Sema) check_file_decls() (ok bool) {
 	switch {
-	case !s.check_type_aliases():
+	case !s.check_type_alias_decls():
 		return false
 
-	case !s.check_enums():
+	case !s.check_enum_decls():
 		return false
 
-	case !s.check_traits():
+	case !s.check_trait_decls():
 		return false
 
 	case !s.impl_impls():
 		return false
 
-	case !s.check_globals():
+	case !s.check_global_decls():
 		return false
 
-	case !s.check_funcs():
+	case !s.check_fn_decls():
 		return false
 
-	case !s.check_structs():
+	case !s.check_struct_decls():
 		return false
 
 	default:
@@ -751,12 +749,34 @@ func (s *_Sema) check_file() (ok bool) {
 	}
 }
 
-// Checks all package files.
+// Checks declarations of all package files.
 // Breaks checking if checked file failed.
-func (s *_Sema) check_package_files() {
+func (s *_Sema) check_package_decls() {
 	for _, f := range s.files {
 		s.set_current_file(f)
-		ok := s.check_file()
+		ok := s.check_file_decls()
+		if !ok {
+			return
+		}
+	}
+}
+
+// Checks all types of current package file.
+// Reports whether checking is success.
+func (s *_Sema) check_file_types() (ok bool) {
+	// TODO: Implement other declarations.
+	switch {
+	default:
+		return true
+	}
+}
+
+// Checks all types of all package files.
+// Breaks checking if checked file failed.
+func (s *_Sema) check_package_types() {
+	for _, f := range s.files {
+		s.set_current_file(f)
+		ok := s.check_file_types()
 		if !ok {
 			return
 		}
@@ -771,5 +791,11 @@ func (s *_Sema) check(files []*SymbolTable) {
 		return
 	}
 
-	s.check_package_files()
+	s.check_package_decls()
+	// Break checking if imports has error.
+	if len(s.errors) > 0 {
+		return
+	}
+
+	s.check_package_types()
 }
