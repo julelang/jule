@@ -238,11 +238,6 @@ func (e *_Eval) get_def(ident *ast.IdentExpr) any {
 		if enm != nil {
 			return enm
 		}
-
-		t := e.lookup.find_trait(ident.Ident)
-		if t != nil {
-			return t
-		}
 	}
 
 	s := e.lookup.find_struct(ident.Ident, ident.Cpp_linked)
@@ -294,9 +289,22 @@ func (e *_Eval) eval_fn(f *Fn) *Data {
 	}
 }
 
+func (e *_Eval) eval_var(v *Var) *Data {
+	return &Data{
+		Lvalue:   !v.Constant,
+		Mutable:  v.Mutable,
+		Constant: v.Constant,
+		Decl:     false,
+		Kind:     v.Kind.Kind,
+	}
+}
+
 func (e *_Eval) eval_ident(ident *ast.IdentExpr) *Data {
 	def := e.get_def(ident)
 	switch def.(type) {
+	case *Var:
+		return e.eval_var(def.(*Var))
+
 	case *Enum:
 		return e.eval_enum(def.(*Enum))
 
