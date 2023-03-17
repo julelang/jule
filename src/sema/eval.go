@@ -343,6 +343,51 @@ func (e *_Eval) eval_ident(ident *ast.IdentExpr) *Data {
 	}
 }
 
+func (e *_Eval) eval_unary_minus(d *Data) *Data {
+	t := d.Kind.Prim()
+	if t == nil || !types.Is_num(t.Kind()) {
+		return nil
+	}
+	// TODO: Eval constants.
+	return d
+}
+
+func (e *_Eval) eval_unary(u *ast.UnaryExpr) *Data {
+	data := e.eval_expr_kind(u.Expr)
+	if data == nil {
+		return nil
+	}
+
+	switch u.Op.Kind {
+	case lex.KND_MINUS:
+		data = e.eval_unary_minus(data)
+
+	case lex.KND_PLUS:
+		// TODO: Implement here.
+
+	case lex.KND_CARET:
+		// TODO: Implement here.
+
+	case lex.KND_EXCL:
+		// TODO: Implement here.
+
+	case lex.KND_STAR:
+		// TODO: Implement here.
+
+	case lex.KND_AMPER:
+		// TODO: Implement here.
+
+	default:
+		data = nil
+	}
+
+	if data == nil {
+		e.push_err(u.Op, "invalid_expr_unary_operator", u.Op.Kind)
+	}
+
+	return data
+}
+
 func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 	// TODO: Implement other types.
 	switch kind.(type) {
@@ -351,6 +396,9 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 
 	case *ast.IdentExpr:
 		return e.eval_ident(kind.(*ast.IdentExpr))
+
+	case *ast.UnaryExpr:
+		return e.eval_unary(kind.(*ast.UnaryExpr))
 
 	default:
 		return nil
