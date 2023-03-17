@@ -352,6 +352,15 @@ func (e *_Eval) eval_unary_minus(d *Data) *Data {
 	return d
 }
 
+func (e *_Eval) eval_unary_plus(d *Data) *Data {
+	t := d.Kind.Prim()
+	if t == nil || !types.Is_num(t.Kind()) {
+		return nil
+	}
+	// TODO: Eval constants.
+	return d
+}
+
 func (e *_Eval) eval_unary(u *ast.UnaryExpr) *Data {
 	data := e.eval_expr_kind(u.Expr)
 	if data == nil {
@@ -363,7 +372,7 @@ func (e *_Eval) eval_unary(u *ast.UnaryExpr) *Data {
 		data = e.eval_unary_minus(data)
 
 	case lex.KND_PLUS:
-		// TODO: Implement here.
+		data = e.eval_unary_plus(data)
 
 	case lex.KND_CARET:
 		// TODO: Implement here.
