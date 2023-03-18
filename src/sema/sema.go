@@ -59,6 +59,29 @@ func (s *_Sema) is_duplicated_ident(self uintptr, ident string, cpp_linked bool)
 	return false
 }
 
+func (s *_Sema) check_generic_quantity(required int, given int, error_token lex.Token) (ok bool) {
+	switch {
+	case required == 0 && given > 0:
+		s.push_err(error_token, "not_has_generics")
+		return false
+
+	case required > 0 && given == 0:
+		s.push_err(error_token, "has_generics")
+		return false
+
+	case required < given:
+		s.push_err(error_token, "generics_overflow")
+		return false
+
+	case required > given:
+		s.push_err(error_token, "missing_generics")
+		return false
+
+	default:
+		return true
+	}
+}
+
 // Returns package by identifier.
 // Returns nil if not exist any package in this identifier.
 //

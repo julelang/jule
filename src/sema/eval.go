@@ -1006,6 +1006,32 @@ func (e *_Eval) eval_ns_selection(s *ast.NsSelectionExpr) *Data {
 	return d
 }
 
+func (e *_Eval) eval_struct_lit(lit *ast.StructLit) *Data {
+	t := build_type(lit.Kind)
+	ok := e.s.check_type(t)
+	if !ok {
+		return nil
+	}
+
+	s := t.Kind.Strct()
+	if s == nil {
+		e.push_err(lit.Kind.Token, "invalid_syntax")
+		return nil
+	}
+
+	ok = e.s.check_generic_quantity(len(s.Decl.Generics), len(s.Generics), lit.Kind.Token)
+	if !ok {
+		return nil
+	}
+
+	// TODO: Check pairs.
+
+	return &Data{
+		Mutable: true,
+		Kind:    t.Kind,
+	}
+}
+
 func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 	// TODO: Implement other types.
 	switch kind.(type) {
@@ -1038,6 +1064,9 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 
 	case *ast.NsSelectionExpr:
 		return e.eval_ns_selection(kind.(*ast.NsSelectionExpr))
+
+	case *ast.StructLit:
+		return e.eval_struct_lit(kind.(*ast.StructLit))
 
 	default:
 		return nil

@@ -433,7 +433,13 @@ func (tc *_TypeChecker) from_struct(decl *ast.IdentType, s *Struct) *StructIns {
 	}
 
 	// TODO: Implement generics and generate a struct instance for.
-	return s.instance()
+	ins := s.instance()
+	ins.Generics = make([]*TypeKind, len(decl.Generics))
+	for i, g := range decl.Generics {
+		ins.Generics[i] = tc.build(g.Kind)
+	}
+
+	return ins
 }
 
 func (tc *_TypeChecker) get_def(decl *ast.IdentType) _Kind {
