@@ -457,10 +457,8 @@ func (ep *_ExprBuilder) try_build_cast(tokens []lex.Token) *ast.CastExpr {
 		}
 		cast.Kind = t
 
+		i = 0
 		expr_tokens = lex.Range(&i, lex.KND_LPAREN, lex.KND_RPARENT, expr_tokens)
-		if len(expr_tokens) == 0 {
-			return cast
-		}
 		cast.Expr = ep.build(expr_tokens)
 		return cast
 	}

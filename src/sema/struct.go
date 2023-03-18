@@ -43,6 +43,16 @@ func (s *Struct) Find_method(ident string) *Fn {
 	return nil
 }
 
+// Reports whether structure implements given trait.
+func (s *Struct) Is_implements(t *Trait) bool {
+	for _, it := range s.Implements {
+		if t == it {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Struct) instance() *StructIns {
 	return &StructIns{Decl: s}
 }

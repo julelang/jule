@@ -104,6 +104,26 @@ func (tk *TypeKind) Func() *FnIns {
 		return nil
 	}
 }
+// Returns struct type if kind is structure, nil if not.
+func (tk *TypeKind) Strct() *StructIns {
+	switch tk.kind.(type) {
+	case *StructIns:
+		return tk.kind.(*StructIns)
+
+	default:
+		return nil
+	}
+}
+// Returns trait type if kind is trait, nil if not.
+func (tk *TypeKind) Trt() *Trait {
+	switch tk.kind.(type) {
+	case *Trait:
+		return tk.kind.(*Trait)
+
+	default:
+		return nil
+	}
+}
 // Returns map type if kind is map, nil if not.
 func (tk *TypeKind) Map() *Map {
 	switch tk.kind.(type) {
@@ -242,6 +262,14 @@ func can_get_ptr(d *Data) bool {
 	default:
 		return true
 	}
+}
+
+func is_lvalue(t *TypeKind) bool {
+	return t.Ref() != nil || t.Ptr() != nil || t.Slc() != nil || t.Map() != nil
+}
+
+func is_mut(t *TypeKind) bool {
+	return t.Slc() != nil || t.Ptr() != nil || t.Ref() != nil
 }
 
 func is_variadicable(tk *TypeKind) bool { return tk.Slc() != nil }

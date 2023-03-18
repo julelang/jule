@@ -778,6 +778,182 @@ func (e *_Eval) eval_slicing(s *ast.SlicingExpr) *Data {
 	return d
 }
 
+func (e *_Eval) cast_ptr(t *TypeKind, d *Data, error_token lex.Token) {
+	if !e.is_unsafe() {
+		e.push_err(error_token, "unsafe_behavior_at_out_of_unsafe_scope")
+		return
+	}
+
+	prim := d.Kind.Prim()
+	if d.Kind.Ptr() == nil && (prim == nil || !types.Is_int(prim.To_str())) {
+		e.push_err(error_token, "type_not_supports_casting_to", d.Kind.To_str(), t.To_str())
+	}
+
+	d.Constant = false
+}
+
+func (e *_Eval) cast_struct(t *TypeKind, d *Data, error_token lex.Token) {
+	tr := d.Kind.Trt()
+	if tr == nil {
+		e.push_err(error_token, "type_not_supports_casting_to", d.Kind.To_str(), t.To_str())
+		return
+	}
+
+	s := t.Strct()
+	if !s.Decl.Is_implements(tr) {
+		e.push_err(error_token, "type_not_supports_casting_to", d.Kind.To_str(), t.To_str())
+	}
+}
+
+func (e *_Eval) cast_ref(t *TypeKind, d *Data, error_token lex.Token) {
+	ref := t.Ref()
+	if ref.Elem.Strct() != nil {
+		e.cast_struct(t, d, error_token)
+		return
+	}
+
+	e.push_err(error_token, "type_not_supports_casting_to", d.Kind.To_str(), t.To_str())
+}
+
+func (e *_Eval) cast_slc(t *TypeKind, d *Data, error_token lex.Token) {
+	if d.Kind.Prim() == nil || !d.Kind.Prim().Is_str() {
+		e.push_err(error_token, "type_not_supports_casting_to", d.Kind.To_str(), t.To_str())
+		return
+	}
+
+	t = t.Slc().Elem
+	prim := t.Prim()
+	if prim == nil || (!prim.Is_u8() && !prim.Is_i32()) {
+		e.push_err(error_token, "type_not_supports_casting_to", d.Kind.To_str(), t.To_str())
+	}
+}
+
+func (e *_Eval) cast_str(d *Data, error_token lex.Token) {
+	if d.Kind.Prim() != nil {
+		prim := d.Kind.Prim()
+		if !prim.Is_u8() && !prim.Is_i32() {
+			e.push_err(error_token, "type_not_supports_casting_to", types.TypeKind_STR, d.Kind.To_str())
+		}
+		return
+	}
+
+	if d.Kind.Slc() == nil {
+		e.push_err(error_token, "type_not_supports_casting_to", types.TypeKind_STR, d.Kind.To_str())
+		return
+	}
+
+	t := d.Kind.Slc().Elem
+	prim := t.Prim()
+	if prim == nil || (!prim.Is_u8() && !prim.Is_i32()) {
+		e.push_err(error_token, "type_not_supports_casting_to", types.TypeKind_STR, d.Kind.To_str())
+	}
+}
+
+func (e *_Eval) cast_int(t *TypeKind, d *Data, error_token lex.Token) {
+	// TODO: Eval constant casting.
+
+	if d.Kind.Enm() != nil {
+		e := d.Kind.Enm()
+		if types.Is_num(e.Kind.Kind.To_str()) {
+			return
+		}
+	}
+
+	if d.Kind.Ptr() != nil {
+		prim := t.Prim()
+		if prim.Is_uintptr() {
+			// Ignore case.
+		} else if !e.is_unsafe() {
+			e.push_err(error_token, "unsafe_behavior_at_out_of_unsafe_scope")
+		} else if !prim.Is_i32() && !prim.Is_i64() && !prim.Is_u16() && !prim.Is_u32() && !prim.Is_u64() {
+			e.push_err(error_token, "type_not_supports_casting_to", d.Kind.To_str(), t.To_str())
+		}
+		return
+	}
+
+	prim := d.Kind.Prim()
+	if prim != nil && types.Is_num(prim.To_str()) {
+		return
+	}
+
+	e.push_err(error_token, "type_not_supports_casting_to", d.Kind.To_str(), t.To_str())
+}
+
+func (e *_Eval) cast_num(t *TypeKind, d *Data, error_token lex.Token) {
+	// TODO: Eval constant casting.
+
+	if d.Kind.Enm() != nil {
+		e := d.Kind.Enm()
+		if types.Is_num(e.Kind.Kind.To_str()) {
+			return
+		}
+	}
+
+	prim := d.Kind.Prim()
+	if prim != nil && types.Is_num(prim.To_str()) {
+		return
+	}
+
+	e.push_err(error_token, "type_not_supports_casting_to", d.Kind.To_str(), t.To_str())
+}
+
+func (e *_Eval) cast_prim(t *TypeKind, d *Data, error_token lex.Token) {
+	prim := t.Prim()
+	switch {
+	case prim.Is_any():
+		// The any type supports casting to any data type.
+
+	case prim.Is_str():
+		e.cast_str(d, error_token)
+
+	case types.Is_int(prim.To_str()):
+		e.cast_int(t, d, error_token)
+
+	case types.Is_num(prim.To_str()):
+		e.cast_num(t, d, error_token)
+
+	default:
+		e.push_err(error_token, "type_not_supports_casting", t.To_str())
+	}
+}
+
+func (e *_Eval) eval_cast(c *ast.CastExpr) *Data {
+	t := build_type(c.Kind)
+	ok := e.s.check_type(t)
+	if !ok {
+		return nil
+	}
+	
+	d := e.eval_expr_kind(c.Expr)
+	if d == nil {
+		return nil
+	}
+
+	switch {
+	case t.Kind.Ptr() != nil:
+		e.cast_ptr(t.Kind, d, c.Kind.Token)
+
+	case t.Kind.Ref() != nil:
+		e.cast_ref(t.Kind, d, c.Kind.Token)
+
+	case t.Kind.Slc() != nil:
+		e.cast_slc(t.Kind, d, c.Kind.Token)
+
+	case t.Kind.Strct() != nil:
+		e.cast_struct(t.Kind, d, c.Kind.Token)
+
+	case t.Kind.Prim() != nil:
+		e.cast_prim(t.Kind, d, c.Kind.Token)
+
+	default:
+		e.push_err(c.Kind.Token, "type_not_supports_casting", t.Kind.To_str())
+	}
+
+	d.Lvalue = is_lvalue(t.Kind)
+	d.Mutable = is_mut(t.Kind)
+	return d
+}
+
 func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 	// TODO: Implement other types.
 	switch kind.(type) {
@@ -804,6 +980,9 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 
 	case *ast.SlicingExpr:
 		return e.eval_slicing(kind.(*ast.SlicingExpr))
+
+	case *ast.CastExpr:
+		return e.eval_cast(kind.(*ast.CastExpr))
 
 	default:
 		return nil
