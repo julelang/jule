@@ -34,6 +34,7 @@ func is_fn_call(tokens []lex.Token) []lex.Token {
 			switch tok.Kind {
 			case lex.KND_RPARENT:
 				brace_n++
+
 			case lex.KND_LPAREN:
 				brace_n--
 			}
@@ -78,8 +79,10 @@ func get_block_expr(tokens []lex.Token) []lex.Token {
 					break
 				}
 				return tokens[:i]
+
 			case lex.KND_LBRACKET, lex.KND_LPAREN:
 				brace_n++
+
 			default:
 				brace_n--
 			}
@@ -580,7 +583,7 @@ func (ep *_ExprBuilder) build_unsafe_expr(tokens []lex.Token) *ast.UnsafeExpr {
 	}
 	return &ast.UnsafeExpr{
 		Token: token,
-		Expr:  ep.build_from_tokens(range_tokens),
+		Expr:  ep.build_from_tokens(range_tokens).Kind,
 	}
 }
 
@@ -664,7 +667,7 @@ func (ep *_ExprBuilder) build_field_expr_pair(tokens []lex.Token) *ast.FieldExpr
 			}
 		}
 	}
-	pair.Expr = ep.build_from_tokens(tokens)
+	pair.Expr = ep.build_from_tokens(tokens).Kind
 	return pair
 }
 
@@ -710,12 +713,12 @@ func (ep *_ExprBuilder) build_brace_lit_part(tokens []lex.Token) ast.ExprData {
 	if l != nil {
 		println("pair")
 		return &ast.KeyValPair{
-			Key: ep.build_from_tokens(l),
-			Val: ep.build_from_tokens(r),
+			Key: ep.build_from_tokens(l).Kind,
+			Val: ep.build_from_tokens(r).Kind,
 		}
 	}
 	println("non-pair")
-	return ep.build_from_tokens(tokens)
+	return ep.build_from_tokens(tokens).Kind
 }
 
 func (ep *_ExprBuilder) build_brace_literal(tokens []lex.Token) *ast.BraceLit {
@@ -780,7 +783,7 @@ func (ep *_ExprBuilder) build_slice(tokens []lex.Token) *ast.SliceExpr {
 		Elems: make([]ast.ExprData, len(parts)),
 	}
 	for i, p := range parts {
-		slc.Elems[i] = ep.build_from_tokens(p)
+		slc.Elems[i] = ep.build_from_tokens(p).Kind
 	}
 
 	return slc
@@ -790,25 +793,26 @@ func (ep *_ExprBuilder) build_indexing(expr_tokens []lex.Token,
 	tokens []lex.Token, error_token lex.Token) *ast.IndexingExpr {
 	tokens = tokens[1 : len(tokens)-1] // Remove brackets.
 	return &ast.IndexingExpr{
-		Expr:  ep.build_from_tokens(expr_tokens),
-		Index: ep.build_from_tokens(tokens),
+		Token: error_token,
+		Expr:  ep.build_from_tokens(expr_tokens).Kind,
+		Index: ep.build_from_tokens(tokens).Kind,
 	}
 }
 
 func (ep *_ExprBuilder) build_slicing(expr_tokens []lex.Token,
 	slicing_tokens []lex.Token, colon int, error_token lex.Token) *ast.SlicingExpr {
 	slc := &ast.SlicingExpr{
-		Expr: ep.build_from_tokens(expr_tokens),
+		Expr:  ep.build_from_tokens(expr_tokens).Kind,
 	}
 	
 	start_expr_tokens := slicing_tokens[:colon]
 	if len(start_expr_tokens) > 0 {
-		slc.Start = ep.build_from_tokens(start_expr_tokens)
+		slc.Start = ep.build_from_tokens(start_expr_tokens).Kind
 	}
 
 	to_expr_tokens := slicing_tokens[colon+1:]
 	if len(to_expr_tokens) > 0 {
-		slc.To = ep.build_from_tokens(to_expr_tokens)
+		slc.To = ep.build_from_tokens(to_expr_tokens).Kind
 	}
 
 	return slc
@@ -839,7 +843,6 @@ func (ep *_ExprBuilder) build_bracket_range(tokens []lex.Token) ast.ExprData {
 	if colon != -1 {
 		return ep.build_slicing(expr_tokens, slicing_tokens, colon, error_token)
 	}
-
 	return ep.build_indexing(expr_tokens, tokens, error_token)
 }
 

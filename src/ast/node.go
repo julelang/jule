@@ -317,6 +317,7 @@ func (se *SliceExpr) Is_empty() bool { return len(se.Elems) == 0 }
 
 // Indexing expression.
 type IndexingExpr struct {
+	Token lex.Token
 	Expr  ExprData // Value expression to indexing.
 	Index ExprData // Index value expression.
 }

@@ -104,6 +104,16 @@ func (tk *TypeKind) Func() *Fn {
 		return nil
 	}
 }
+// Returns map type if kind is map, nil if not.
+func (tk *TypeKind) Map() *Map {
+	switch tk.kind.(type) {
+	case *Map:
+		return tk.kind.(*Map)
+
+	default:
+		return nil
+	}
+}
 
 // Type.
 type TypeSymbol struct {

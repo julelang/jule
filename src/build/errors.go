@@ -160,6 +160,7 @@ var ERRORS = map[string]string{
 	`impl_base_not_exist`:                      `any valid base definition is not exist in this identifier: @`,
 	`impl_dest_not_exist`:                      `any valid destination definition is not exist in this identifier: @`,
 	`struct_already_have_ident`:                `struct @ already have a define in this identifier: @`,
+	`unsafe_ptr_indexing`:                      `unsafe pointers not supports indexing`,
 }
 
 // Returns formatted error message by key and args.

@@ -789,6 +789,7 @@ func (s *_Sema) check_data_for_auto_type(d *Data, err_token lex.Token) {
 }
 
 func (s *_Sema) check_type_global(decl *Var) {
+	// TODO: Check illegal cycles.
 	data := s.evalp(decl.Value.Expr, decl.Kind)
 	if data == nil {
 		return // Skip checks if error ocurrs.

@@ -71,6 +71,22 @@ func kind_by_bitsize(expr any) string {
 	}
 }
 
+func check_data_for_integer_indexing(d *Data) (err_key string) {
+	switch {
+	case d.Kind.Prim() == nil:
+		return "invalid_expr"
+
+	case !types.Is_int(d.Kind.Prim().To_str()):
+		return "invalid_expr"
+
+	case d.Constant && false /* TODO: Check negative constants */:
+		return "overflow_limits"
+
+	default:
+		return ""
+	}
+}
+
 // Evaluator.
 type _Eval struct {
 	s        *_Sema  // Used for error logging.
@@ -566,6 +582,114 @@ func (e *_Eval) eval_slice_expr(s *ast.SliceExpr) *Data {
 	return d
 }
 
+func (e *_Eval) check_integer_indexing_by_data(d *Data, token lex.Token) {
+	err_key := check_data_for_integer_indexing(d)
+	if err_key != "" {
+		e.push_err(token, err_key)
+	}
+}
+
+func (e *_Eval) check_integer_indexing(i *ast.IndexingExpr) {
+	d := e.eval_expr_kind(i.Index)
+	if d != nil {
+		e.check_integer_indexing_by_data(d, i.Token)
+	}
+}
+
+func (e *_Eval) indexing_ptr(d *Data, i *ast.IndexingExpr) {
+	ptr := d.Kind.Ptr()
+	switch {
+	case ptr.Is_unsafe():
+		e.push_err(i.Token, "unsafe_ptr_indexing")
+
+	case !e.is_unsafe():
+		e.push_err(i.Token, "unsafe_behavior_at_out_of_unsafe_scope")
+	}
+
+	d.Kind = ptr.Elem
+	e.check_integer_indexing(i)
+}
+
+func (e *_Eval) indexing_arr(d *Data, i *ast.IndexingExpr) {
+	arr := d.Kind.Arr()
+	d.Kind = arr.Elem
+	e.check_integer_indexing(i)
+}
+
+func (e *_Eval) indexing_slc(d *Data, i *ast.IndexingExpr) {
+	slc := d.Kind.Slc()
+	d.Kind = slc.Elem
+	e.check_integer_indexing(i)
+}
+
+func (e *_Eval) indexing_map(d *Data, i *ast.IndexingExpr) {
+	m := d.Kind.Map()
+	d.Kind = m.Val
+	
+	// TODO: Check element type compatibility.
+}
+
+func (e *_Eval) indexing_str(d *Data, i *ast.IndexingExpr) {
+	const BYTE_KIND = types.TypeKind_U8
+	d.Kind.kind = build_prim_type(BYTE_KIND)
+	
+	index := e.eval_expr_kind(i.Index)
+	if index == nil {
+		return
+	}
+
+	e.check_integer_indexing_by_data(index, i.Token)
+
+	if !index.Constant {
+		d.Constant = false
+		return
+	}
+
+	if d.Constant {
+		// TODO: Eval constant byte.
+	}
+}
+
+func (e *_Eval) to_indexing(d *Data, i *ast.IndexingExpr) {
+	switch {
+	case d.Kind.Ptr() != nil:
+		e.indexing_ptr(d, i)
+		return
+
+	case d.Kind.Arr() != nil:
+		e.indexing_arr(d, i)
+		return
+
+	case d.Kind.Slc() != nil:
+		e.indexing_slc(d, i)
+		return
+
+	case d.Kind.Map() != nil:
+		e.indexing_map(d, i)
+		return
+
+	case d.Kind.Prim() != nil:
+		prim := d.Kind.Prim()
+		switch {
+		case prim.Is_str():
+			e.indexing_str(d, i)
+			return
+		}
+	}
+
+	e.push_err(i.Token, "not_supports_indexing", d.Kind.To_str())
+}
+
+func (e *_Eval) eval_indexing(i *ast.IndexingExpr) *Data {
+	d := e.eval_expr_kind(i.Expr)
+	if d == nil {
+		return nil
+	}
+
+	e.to_indexing(d, i)
+	return d
+}
+
 func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 	// TODO: Implement other types.
 	switch kind.(type) {
@@ -586,6 +710,9 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 
 	case *ast.SliceExpr:
 		return e.eval_slice_expr(kind.(*ast.SliceExpr))
+
+	case *ast.IndexingExpr:
+		return e.eval_indexing(kind.(*ast.IndexingExpr))
 
 	default:
 		return nil
