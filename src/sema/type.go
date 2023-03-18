@@ -76,6 +76,16 @@ func (tk *TypeKind) Arr() *Arr {
 		return nil
 	}
 }
+// Returns array type if kind is function, nil if not.
+func (tk *TypeKind) Func() *Fn {
+	switch tk.kind.(type) {
+	case *Fn:
+		return tk.kind.(*Fn)
+
+	default:
+		return nil
+	}
+}
 
 // Type.
 type TypeSymbol struct {
@@ -149,6 +159,20 @@ type Ptr struct { Elem *TypeKind }
 
 // Reports whether pointer is unsafe pointer (*unsafe).
 func (p *Ptr) Is_unsafe() bool { return p.Elem == nil }
+
+func can_get_ptr(d *Data) bool {
+	if !d.Lvalue || d.Constant {
+		return false
+	}
+
+	switch {
+	case d.Kind.Func() != nil || d.Kind.Enm() != nil:
+		return false
+
+	default:
+		return true
+	}
+}
 
 func build_link_path_by_tokens(tokens []lex.Token) string {
 	s := tokens[0].Kind

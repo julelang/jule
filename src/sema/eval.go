@@ -349,6 +349,7 @@ func (e *_Eval) eval_unary_minus(d *Data) *Data {
 		return nil
 	}
 	// TODO: Eval constants.
+	// TODO: Check out d.Lvalue should be false?
 	return d
 }
 
@@ -358,6 +359,7 @@ func (e *_Eval) eval_unary_plus(d *Data) *Data {
 		return nil
 	}
 	// TODO: Eval constants.
+	// TODO: Check out d.Lvalue should be false?
 	return d
 }
 
@@ -367,6 +369,7 @@ func (e *_Eval) eval_unary_caret(d *Data) *Data {
 		return nil
 	}
 	// TODO: Eval constants.
+	// TODO: Check out d.Lvalue should be false?
 	return d
 }
 
@@ -376,6 +379,7 @@ func (e *_Eval) eval_unary_excl(d *Data) *Data {
 		return nil
 	}
 	// TODO: Eval constants.
+	// TODO: Check out d.Lvalue should be false?
 	return d
 }
 
@@ -388,7 +392,26 @@ func (e *_Eval) eval_unary_star(d *Data, op lex.Token) *Data {
 	if t == nil || t.Is_unsafe() {
 		return nil
 	}
-	// TODO: Eval constants.
+	d.Constant = false
+	d.Lvalue = true
+	return d
+}
+
+func (e *_Eval) eval_unary_amper(d *Data) *Data {
+	switch {
+	case d.Kind.Ref() != nil:
+		// Ok
+
+	case !can_get_ptr(d):
+		d = nil
+	}
+
+	if d != nil {
+		d.Constant = false
+		d.Lvalue = true
+		d.Mutable = true
+	}
+
 	return d
 }
 
@@ -415,7 +438,7 @@ func (e *_Eval) eval_unary(u *ast.UnaryExpr) *Data {
 		data = e.eval_unary_star(data, u.Op)
 
 	case lex.KND_AMPER:
-		// TODO: Implement here.
+		data = e.eval_unary_amper(data)
 
 	default:
 		data = nil
