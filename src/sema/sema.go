@@ -269,12 +269,16 @@ func (s *_Sema) check_type(t *TypeSymbol) (ok bool) {
 }
 
 // Evaluates expression with type prefixed Eval and returns result.
-func (s *_Sema) evalp(expr *ast.Expr, p *TypeKind) *Data {
+func (s *_Sema) evalp(expr *ast.Expr, p *TypeSymbol) *Data {
 	e := _Eval{
 		s:      s,
 		lookup: s,
-		prefix: p,
 	}
+
+	if p != nil {
+		e.prefix = p.Kind
+	}
+
 	return e.eval(expr)
 }
 
@@ -785,7 +789,7 @@ func (s *_Sema) check_data_for_auto_type(d *Data, err_token lex.Token) {
 }
 
 func (s *_Sema) check_type_global(decl *Var) {
-	data := s.evalp(decl.Value.Expr, decl.Kind.Kind)
+	data := s.evalp(decl.Value.Expr, decl.Kind)
 	if data == nil {
 		return // Skip checks if error ocurrs.
 	}

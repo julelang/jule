@@ -72,18 +72,18 @@ func kind_by_bitsize(expr any) string {
 
 // Evaluator.
 type _Eval struct {
-	s      *_Sema  // Used for error logging.
-	lookup _Lookup
-	prefix *TypeKind
+	s        *_Sema  // Used for error logging.
+	lookup   _Lookup
+	prefix   *TypeKind
+	unsafety bool
 }
 
 func (e *_Eval) push_err(token lex.Token, key string, args ...any) {
 	e.s.errors = append(e.s.errors, compiler_err(token, key, args...))
 }
 
-// TODO: Implement here.
 // Reports whether evaluation in unsafe scope.
-func (e *_Eval) is_unsafe() bool { return false }
+func (e *_Eval) is_unsafe() bool { return e.unsafety }
 
 func (e *_Eval) lit_nil() *Data {
 	// Return new Data with nil kind.
@@ -466,6 +466,17 @@ func (e *_Eval) eval_variadic(v *ast.VariadicExpr) *Data {
 	return d
 }
 
+func (e *_Eval) eval_unsafe(u *ast.UnsafeExpr) *Data {
+	unsafety := e.unsafety
+	e.unsafety = true
+
+	d := e.eval_expr_kind(u.Expr)
+
+	e.unsafety = unsafety
+
+	return d
+}
+
 func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 	// TODO: Implement other types.
 	switch kind.(type) {
@@ -480,6 +491,9 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 
 	case *ast.VariadicExpr:
 		return e.eval_variadic(kind.(*ast.VariadicExpr))
+
+	case *ast.UnsafeExpr:
+		return e.eval_unsafe(kind.(*ast.UnsafeExpr))
 
 	default:
 		return nil
