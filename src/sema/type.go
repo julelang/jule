@@ -128,8 +128,6 @@ func (p *Prim) Is_any() bool { return p.kind == types.TypeKind_ANY }
 
 // Reference type.
 type Ref struct { Elem *TypeKind }
-// Pointer type.
-type Ptr struct { Elem *TypeKind }
 // Slice type.
 type Slc struct { Elem *TypeKind }
 // Tuple type.
@@ -145,6 +143,12 @@ type Arr struct {
 	N    int
 	Elem *TypeKind
 }
+
+// Pointer type.
+type Ptr struct { Elem *TypeKind }
+
+// Reports whether pointer is unsafe pointer (*unsafe).
+func (p *Ptr) Is_unsafe() bool { return p.Elem == nil }
 
 func build_link_path_by_tokens(tokens []lex.Token) string {
 	s := tokens[0].Kind

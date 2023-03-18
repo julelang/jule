@@ -379,6 +379,19 @@ func (e *_Eval) eval_unary_excl(d *Data) *Data {
 	return d
 }
 
+func (e *_Eval) eval_unary_star(d *Data, op lex.Token) *Data {
+	if !e.is_unsafe() {
+		e.push_err(op, "unsafe_behavior_at_out_of_unsafe_scope")
+	}
+
+	t := d.Kind.Ptr()
+	if t == nil || t.Is_unsafe() {
+		return nil
+	}
+	// TODO: Eval constants.
+	return d
+}
+
 func (e *_Eval) eval_unary(u *ast.UnaryExpr) *Data {
 	data := e.eval_expr_kind(u.Expr)
 	if data == nil {
@@ -399,7 +412,7 @@ func (e *_Eval) eval_unary(u *ast.UnaryExpr) *Data {
 		data = e.eval_unary_excl(data)
 
 	case lex.KND_STAR:
-		// TODO: Implement here.
+		data = e.eval_unary_star(data, u.Op)
 
 	case lex.KND_AMPER:
 		// TODO: Implement here.
