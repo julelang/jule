@@ -383,6 +383,11 @@ func (tc *_TypeChecker) check_illegal_cycles(decl *ast.IdentType, refers *[]*ast
 }
 
 func (tc *_TypeChecker) from_type_alias(decl *ast.IdentType, ta *TypeAlias) *TypeKind {
+	if !tc.s.is_accessible_define(ta.Public, ta.Token) {
+		tc.push_err(decl.Token, "ident_not_exist", decl.Ident)
+		return nil
+	}
+
 	if len(decl.Generics) > 0 {
 		tc.push_err(decl.Token, "type_not_supports_generics", decl.Ident)
 		return nil
@@ -403,6 +408,11 @@ func (tc *_TypeChecker) from_type_alias(decl *ast.IdentType, ta *TypeAlias) *Typ
 }
 
 func (tc *_TypeChecker) from_enum(decl *ast.IdentType, e *Enum) *Enum {
+	if !tc.s.is_accessible_define(e.Public, e.Token) {
+		tc.push_err(decl.Token, "ident_not_exist", decl.Ident)
+		return nil
+	}
+
 	if len(decl.Generics) > 0 {
 		tc.push_err(decl.Token, "type_not_supports_generics", decl.Ident)
 		return nil
@@ -416,7 +426,12 @@ func (tc *_TypeChecker) from_enum(decl *ast.IdentType, e *Enum) *Enum {
 	return e
 }
 
-func (tc *_TypeChecker) from_struct(s *Struct) *StructIns {
+func (tc *_TypeChecker) from_struct(decl *ast.IdentType, s *Struct) *StructIns {
+	if !tc.s.is_accessible_define(s.Public, s.Token) {
+		tc.push_err(decl.Token, "ident_not_exist", decl.Ident)
+		return nil
+	}
+
 	// TODO: Implement generics and generate a struct instance for.
 	return s.instance()
 }
@@ -430,6 +445,11 @@ func (tc *_TypeChecker) get_def(decl *ast.IdentType) _Kind {
 
 		t := tc.lookup.find_trait(decl.Ident)
 		if t != nil {
+			if !tc.s.is_accessible_define(t.Public, t.Token) {
+				tc.push_err(decl.Token, "ident_not_exist", decl.Ident)
+				return nil
+			}
+
 			if len(decl.Generics) > 0 {
 				tc.push_err(decl.Token, "type_not_supports_generics", decl.Ident)
 				return nil
@@ -440,7 +460,7 @@ func (tc *_TypeChecker) get_def(decl *ast.IdentType) _Kind {
 
 	s := tc.lookup.find_struct(decl.Ident, decl.Cpp_linked)
 	if s != nil {
-		return tc.from_struct(s)
+		return tc.from_struct(decl, s)
 	}
 
 	ta := tc.lookup.find_type_alias(decl.Ident, decl.Cpp_linked)
@@ -633,7 +653,15 @@ func (tc *_TypeChecker) build_by_std_namespace(decl *ast.NamespaceType) _Kind {
 		tc.push_err(decl.Idents[0], "namespace_not_exist", path)
 		return nil
 	}
-	return tc.build_ident(decl.Kind)
+
+	lookup := tc.lookup
+	tc.lookup = pkg
+
+	kind := tc.build_ident(decl.Kind)
+
+	tc.lookup = lookup
+
+	return kind
 }
 
 func (tc *_TypeChecker) build_by_namespace(decl *ast.NamespaceType) _Kind {
