@@ -288,7 +288,7 @@ func (e *_Eval) eval_enum(enm *Enum) *Data {
 	}
 }
 
-func (e *_Eval) eval_struct(s *Struct) *Data {
+func (e *_Eval) eval_struct(s *StructIns) *Data {
 	return &Data{
 		Lvalue:   false,
 		Mutable:  false,
@@ -307,7 +307,7 @@ func (e *_Eval) eval_fn(f *Fn) *Data {
 		Constant: false,
 		Decl:     false,
 		Kind:     &TypeKind{
-			kind: f,
+			kind: f.instance(),
 		},
 	}
 }
@@ -325,8 +325,8 @@ func (e *_Eval) eval_var(v *Var) *Data {
 func (e *_Eval) eval_type_alias(ta *TypeAlias, error_token lex.Token) *Data {
 	kind := ta.Kind.Kind.kind
 	switch kind.(type) {
-	case *Struct:
-		return e.eval_struct(kind.(*Struct))
+	case *StructIns:
+		return e.eval_struct(kind.(*StructIns))
 
 	case *Enum:
 		return e.eval_enum(kind.(*Enum))
@@ -347,7 +347,7 @@ func (e *_Eval) eval_ident(ident *ast.IdentExpr) *Data {
 		return e.eval_enum(def.(*Enum))
 
 	case *Struct:
-		return e.eval_struct(def.(*Struct))
+		return e.eval_struct(def.(*Struct).instance())
 
 	case *Fn:
 		return e.eval_fn(def.(*Fn))

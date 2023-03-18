@@ -95,10 +95,10 @@ func (tk *TypeKind) Slc() *Slc {
 	}
 }
 // Returns fn type if kind is function, nil if not.
-func (tk *TypeKind) Func() *Fn {
+func (tk *TypeKind) Func() *FnIns {
 	switch tk.kind.(type) {
-	case *Fn:
-		return tk.kind.(*Fn)
+	case *FnIns:
+		return tk.kind.(*FnIns)
 
 	default:
 		return nil
@@ -388,6 +388,11 @@ func (tc *_TypeChecker) from_enum(decl *ast.IdentType, e *Enum) *Enum {
 	return e
 }
 
+func (tc *_TypeChecker) from_struct(s *Struct) *StructIns {
+	// TODO: Implement generics and generate a struct instance for.
+	return s.instance()
+}
+
 func (tc *_TypeChecker) get_def(decl *ast.IdentType) _Kind {
 	if !decl.Cpp_linked {
 		e := tc.lookup.find_enum(decl.Ident)
@@ -407,8 +412,7 @@ func (tc *_TypeChecker) get_def(decl *ast.IdentType) _Kind {
 
 	s := tc.lookup.find_struct(decl.Ident, decl.Cpp_linked)
 	if s != nil {
-		// TODO: Implement generics and generate a struct instance for.
-		return s
+		return tc.from_struct(s)
 	}
 
 	ta := tc.lookup.find_type_alias(decl.Ident, decl.Cpp_linked)
@@ -575,7 +579,7 @@ func (tc *_TypeChecker) check_fn_types(f *Fn) (ok bool) {
 	return true
 }
 
-func (tc *_TypeChecker) build_fn(decl *ast.FnDecl) *Fn {
+func (tc *_TypeChecker) build_fn(decl *ast.FnDecl) *FnIns {
 	if len(decl.Generics) > 0 {
 		tc.push_err(decl.Token, "genericed_fn_as_anonymous_fn")
 		return nil
@@ -586,7 +590,10 @@ func (tc *_TypeChecker) build_fn(decl *ast.FnDecl) *Fn {
 	if !ok {
 		return nil
 	}
-	return f
+
+	// TODO: Check instance of anonymous function.
+
+	return f.instance()
 }
 
 func (tc *_TypeChecker) build_by_std_namespace(decl *ast.NamespaceType) _Kind {

@@ -54,21 +54,37 @@ type Fn struct {
 
 	// Function instances for each unique type combination of function call.
 	// Nil if function is never used.
-	Combines [][]*TypeSymbol
+	Combines   []*FnIns
+}
+
+// Reports whether return type is void.
+func (f *Fn) Is_void() bool { return f.Result == nil }
+
+func (f *Fn) instance() *FnIns {
+	return &FnIns{Decl: f}
+}
+
+// Function instance.
+type FnIns struct {
+	Decl     *Fn
+	Generics []*TypeKind
+	Params   []*TypeKind
+	Result   *TypeKind
+	Scope    *ast.Scope
 }
 
 // Implement: Kind
 // Returns Fn's type kind as string.
-func (f Fn) To_str() string {
+func (f FnIns) To_str() string {
 	s := ""
-	if f.Unsafety {
+	if f.Decl.Unsafety {
 		s += "unsafe "
 	}
 	s += "fn"
 	if len(f.Generics) > 0 {
 		s += "["
 		for i, t := range f.Generics {
-			s += t.Ident
+			s += t.To_str()
 			if i+1 < len(f.Generics) {
 				s += ","
 			}
@@ -85,19 +101,8 @@ func (f Fn) To_str() string {
 		s = s[:len(s)-1] // Remove comma.
 	}
 	s += ")"
-	if !f.Is_void() {
-		s += f.Result.Kind.Kind.To_str()
+	if !f.Decl.Is_void() {
+		s += f.Result.To_str()
 	}
 	return s
-}
-
-// Reports whether return type is void.
-func (f *Fn) Is_void() bool { return f.Result == nil }
-
-// Function instance.
-type FnIns struct {
-	Decl   *Fn
-	Params []*TypeKind
-	Result *TypeKind
-	Scope  *ast.Scope
 }

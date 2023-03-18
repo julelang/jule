@@ -32,23 +32,6 @@ type Struct struct {
 	Implements []*Trait
 }
 
-// Implement: Kind
-// Returns Struct's type kind as string.
-func (s Struct) To_str() string {
-	kind := ""
-	kind += s.Ident
-	if len(s.Generics) > 0 {
-		kind += "["
-		for _, g := range s.Generics {
-			kind += g.Ident
-			kind += ","
-		}
-		kind = kind[:len(kind)-1] // Remove comma.
-		kind += "]"
-	}
-	return kind
-}
-
 // Returns method by identifier.
 // Returns nil if not exist any method in this identifier.
 func (s *Struct) Find_method(ident string) *Fn {
@@ -60,6 +43,10 @@ func (s *Struct) Find_method(ident string) *Fn {
 	return nil
 }
 
+func (s *Struct) instance() *StructIns {
+	return &StructIns{Decl: s}
+}
+
 // Field structure.
 type FieldIns struct {
 	Decl *Field
@@ -68,6 +55,24 @@ type FieldIns struct {
 
 // Strucutre instance.
 type StructIns struct {
-	Decl   *Struct
-	Fields []*FieldIns
+	Decl     *Struct
+	Generics []*TypeKind
+	Fields   []*FieldIns
+}
+
+// Implement: Kind
+// Returns Struct's type kind as string.
+func (s StructIns) To_str() string {
+	kind := ""
+	kind += s.Decl.Ident
+	if len(s.Generics) > 0 {
+		kind += "["
+		for _, g := range s.Generics {
+			kind += g.To_str()
+			kind += ","
+		}
+		kind = kind[:len(kind)-1] // Remove comma.
+		kind += "]"
+	}
+	return kind
 }
