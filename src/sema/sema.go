@@ -28,6 +28,8 @@ func compiler_err(token lex.Token, key string, args ...any) build.Log {
 
 // Sema must implement Lookup.
 
+// TODO: Implement built-in definitions.
+
 // Semantic analyzer for tables.
 // Accepts tables as files of package.
 type _Sema struct {
@@ -307,6 +309,36 @@ func (s *_Sema) evalp(expr *ast.Expr, p *TypeSymbol) *Data {
 
 // Evaluates expression with Eval and returns result.
 func (s *_Sema) eval(expr *ast.Expr) *Data { return s.evalp(expr, nil) }
+
+func (s *_Sema) check_type_compatibility(dest *TypeKind, src *TypeKind, error_token lex.Token) {
+	dest_kind := dest.To_str()
+	src_kind := src.To_str()
+	if src == nil {
+		s.push_err(error_token, "incompatible_types", dest_kind, src_kind)
+		return
+	}
+
+	if dest.Prim() != nil && dest.Prim().Is_any() {
+		return
+	}
+
+	tcc := _TypeCompatibilityChecker{
+		s:           s,
+		error_token: error_token,
+		dest:        dest,
+		src:         src,
+	}
+	ok := tcc.check()
+	if ok {
+		return
+	}
+
+	if dest_kind == src_kind {
+		return
+	}
+
+	s.push_err(error_token, "incompatible_types", dest_kind, src_kind)
+}
 
 func (s *_Sema) check_struct_ins(ins *StructIns, error_token lex.Token) (ok bool) {
 	// TODO: Skip checking if already parsed instance.
