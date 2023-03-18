@@ -220,7 +220,7 @@ func (le *LitExpr) Is_nil() bool { return le.Value == lex.KND_NIL }
 
 // Identifier expression.
 type IdentExpr struct {
-	Token      lex.Token
+	Token      lex.Token // Token of identifier.
 	Ident      string
 	Cpp_linked bool
 }

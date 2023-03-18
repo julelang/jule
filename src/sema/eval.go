@@ -250,25 +250,25 @@ func (e *_Eval) eval_lit(lit *ast.LitExpr) *Data {
 	}
 }
 
-func (e *_Eval) get_def(ident *ast.IdentExpr) any {
-	if !ident.Cpp_linked {
-		enm := e.lookup.find_enum(ident.Ident)
+func (e *_Eval) get_def(ident string, cpp_linked bool) any {
+	if !cpp_linked {
+		enm := e.lookup.find_enum(ident)
 		if enm != nil {
 			return enm
 		}
 	}
 
-	v := e.lookup.find_var(ident.Ident, ident.Cpp_linked)
+	v := e.lookup.find_var(ident, cpp_linked)
 	if v != nil {
 		return v
 	}
 
-	s := e.lookup.find_struct(ident.Ident, ident.Cpp_linked)
+	s := e.lookup.find_struct(ident, cpp_linked)
 	if s != nil {
 		return s
 	}
 
-	ta := e.lookup.find_type_alias(ident.Ident, ident.Cpp_linked)
+	ta := e.lookup.find_type_alias(ident, cpp_linked)
 	if ta != nil {
 		return ta
 	}
@@ -276,7 +276,12 @@ func (e *_Eval) get_def(ident *ast.IdentExpr) any {
 	return nil
 }
 
-func (e *_Eval) eval_enum(enm *Enum) *Data {
+func (e *_Eval) eval_enum(enm *Enum, error_token lex.Token) *Data {
+	if !e.s.is_accessible_define(enm.Public, enm.Token) {
+		e.push_err(error_token, "ident_not_exist", enm.Ident)
+		return nil
+	}
+
 	return &Data{
 		Lvalue:   false,
 		Mutable:  false,
@@ -288,7 +293,12 @@ func (e *_Eval) eval_enum(enm *Enum) *Data {
 	}
 }
 
-func (e *_Eval) eval_struct(s *StructIns) *Data {
+func (e *_Eval) eval_struct(s *StructIns, error_token lex.Token) *Data {
+	if !e.s.is_accessible_define(s.Decl.Public, s.Decl.Token) {
+		e.push_err(error_token, "ident_not_exist", s.Decl.Ident)
+		return nil
+	}
+
 	return &Data{
 		Lvalue:   false,
 		Mutable:  false,
@@ -300,7 +310,12 @@ func (e *_Eval) eval_struct(s *StructIns) *Data {
 	}
 }
 
-func (e *_Eval) eval_fn(f *Fn) *Data {
+func (e *_Eval) eval_fn(f *Fn, error_token lex.Token) *Data {
+	if !e.s.is_accessible_define(f.Public, f.Token) {
+		e.push_err(error_token, "ident_not_exist", f.Ident)
+		return nil
+	}
+
 	return &Data{
 		Lvalue:   false,
 		Mutable:  false,
@@ -312,7 +327,12 @@ func (e *_Eval) eval_fn(f *Fn) *Data {
 	}
 }
 
-func (e *_Eval) eval_var(v *Var) *Data {
+func (e *_Eval) eval_var(v *Var, error_token lex.Token) *Data {
+	if !e.s.is_accessible_define(v.Public, v.Token) {
+		e.push_err(error_token, "ident_not_exist", v.Ident)
+		return nil
+	}
+
 	return &Data{
 		Lvalue:   !v.Constant,
 		Mutable:  v.Mutable,
@@ -323,13 +343,18 @@ func (e *_Eval) eval_var(v *Var) *Data {
 }
 
 func (e *_Eval) eval_type_alias(ta *TypeAlias, error_token lex.Token) *Data {
+	if !e.s.is_accessible_define(ta.Public, ta.Token) {
+		e.push_err(error_token, "ident_not_exist", ta.Ident)
+		return nil
+	}
+
 	kind := ta.Kind.Kind.kind
 	switch kind.(type) {
 	case *StructIns:
-		return e.eval_struct(kind.(*StructIns))
+		return e.eval_struct(kind.(*StructIns), error_token)
 
 	case *Enum:
-		return e.eval_enum(kind.(*Enum))
+		return e.eval_enum(kind.(*Enum), error_token)
 
 	default:
 		e.push_err(error_token, "invalid_expr")
@@ -337,28 +362,32 @@ func (e *_Eval) eval_type_alias(ta *TypeAlias, error_token lex.Token) *Data {
 	}
 }
 
-func (e *_Eval) eval_ident(ident *ast.IdentExpr) *Data {
-	def := e.get_def(ident)
+func (e *_Eval) eval_def(def any, ident lex.Token) *Data {
 	switch def.(type) {
 	case *Var:
-		return e.eval_var(def.(*Var))
+		return e.eval_var(def.(*Var), ident)
 
 	case *Enum:
-		return e.eval_enum(def.(*Enum))
+		return e.eval_enum(def.(*Enum), ident)
 
 	case *Struct:
-		return e.eval_struct(def.(*Struct).instance())
+		return e.eval_struct(def.(*Struct).instance(), ident)
 
 	case *Fn:
-		return e.eval_fn(def.(*Fn))
+		return e.eval_fn(def.(*Fn), ident)
 
 	case *TypeAlias:
-		return e.eval_type_alias(def.(*TypeAlias), ident.Token)
+		return e.eval_type_alias(def.(*TypeAlias), ident)
 
 	default:
-		e.push_err(ident.Token, "ident_not_exist", ident.Ident)
+		e.push_err(ident, "ident_not_exist", ident.Kind)
 		return nil
 	}
+}
+
+func (e *_Eval) eval_ident(ident *ast.IdentExpr) *Data {
+	def := e.get_def(ident.Ident, ident.Cpp_linked)
+	return e.eval_def(def, ident.Token)
 }
 
 func (e *_Eval) eval_unary_minus(d *Data) *Data {
@@ -954,6 +983,29 @@ func (e *_Eval) eval_cast(c *ast.CastExpr) *Data {
 	return d
 }
 
+func (e *_Eval) eval_ns_selection(s *ast.NsSelectionExpr) *Data {
+	path := build_link_path_by_tokens(s.Ns)
+	pkg := e.lookup.select_package(func(p *Package) bool {
+		return p.Link_path == path
+	})
+
+	if pkg == nil {
+		e.push_err(s.Ident, "namespace_not_exist", s.Ident.Kind)
+		return nil
+	}
+
+	lookup := e.lookup
+	e.lookup = pkg
+
+	const CPP_LINKED = false
+	def := e.get_def(s.Ident.Kind, CPP_LINKED)
+	d := e.eval_def(def, s.Ident)
+
+	e.lookup = lookup
+
+	return d
+}
+
 func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 	// TODO: Implement other types.
 	switch kind.(type) {
@@ -983,6 +1035,9 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 
 	case *ast.CastExpr:
 		return e.eval_cast(kind.(*ast.CastExpr))
+
+	case *ast.NsSelectionExpr:
+		return e.eval_ns_selection(kind.(*ast.NsSelectionExpr))
 
 	default:
 		return nil

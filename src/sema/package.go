@@ -127,7 +127,7 @@ type Package struct {
 }
 
 // Returns nil always.
-func (p *Package) find_package() *Package { return nil }
+func (p *Package) find_package(string) *Package { return nil }
 
 // Returns always nil.
 func (p *Package) select_package(func(*Package) bool) *Package { return nil }
