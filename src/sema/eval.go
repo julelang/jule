@@ -512,6 +512,25 @@ func (e *_Eval) eval_arr(s *ast.SliceExpr) *Data {
 	}
 }
 
+func (e *_Eval) eval_exp_slc(s *ast.SliceExpr, elem_type *TypeKind) *Data {
+	slc := &Slc{
+		Elem: elem_type,
+	}
+
+	for _, elem := range s.Elems {
+		d := e.eval_expr_kind(elem)
+		if d == nil {
+			continue
+		}
+
+		// TODO: Check type compatibility with Slc's elem type.
+	}
+
+	return &Data{
+		Kind: &TypeKind{kind: slc},
+	}
+}
+
 func (e *_Eval) eval_slice_expr(s *ast.SliceExpr) *Data {
 	if e.prefix != nil {
 		switch {
@@ -519,18 +538,32 @@ func (e *_Eval) eval_slice_expr(s *ast.SliceExpr) *Data {
 			return e.eval_arr(s)
 
 		case e.prefix.Slc() != nil:
-			// TODO: Eval explicit slice.
-			return nil
+			pt := e.prefix.Slc()
+			return e.eval_exp_slc(s, pt.Elem)
 		}
 	}
 
 	prefix := e.prefix
 	e.prefix = nil
 
-	// TODO: Eval implicit slice.
+	if len(s.Elems) == 0 {
+		e.push_err(s.Token, "dynamic_type_annotation_failed")
+		return nil
+	}
+
+	first_elem := e.eval_expr_kind(s.Elems[0])
+	if first_elem == nil {
+		return nil
+	}
+
+	// Remove first element.
+	// First element always compatible with element type
+	// because first element determines to Slc's element type.
+	s.Elems = s.Elems[1:]
+	d := e.eval_exp_slc(s, first_elem.Kind)
 
 	e.prefix = prefix
-	return nil
+	return d
 }
 
 func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
