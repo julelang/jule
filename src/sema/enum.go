@@ -26,3 +26,7 @@ type Enum struct {
 	Doc    string
 	Refers []*ast.IdentType // Referred identifiers.
 }
+
+// Implement: Kind
+// Returns Enum's identifier.
+func (e Enum) To_str() string { return e.Ident }

@@ -74,6 +74,7 @@ func kind_by_bitsize(expr any) string {
 type _Eval struct {
 	s      *_Sema  // Used for error logging.
 	lookup _Lookup
+	prefix *TypeKind
 }
 
 func (e *_Eval) push_err(token lex.Token, key string, args ...any) {
@@ -345,7 +346,7 @@ func (e *_Eval) eval_ident(ident *ast.IdentExpr) *Data {
 
 func (e *_Eval) eval_unary_minus(d *Data) *Data {
 	t := d.Kind.Prim()
-	if t == nil || !types.Is_num(t.Kind()) {
+	if t == nil || !types.Is_num(t.To_str()) {
 		return nil
 	}
 	// TODO: Eval constants.
@@ -355,7 +356,7 @@ func (e *_Eval) eval_unary_minus(d *Data) *Data {
 
 func (e *_Eval) eval_unary_plus(d *Data) *Data {
 	t := d.Kind.Prim()
-	if t == nil || !types.Is_num(t.Kind()) {
+	if t == nil || !types.Is_num(t.To_str()) {
 		return nil
 	}
 	// TODO: Eval constants.
@@ -365,7 +366,7 @@ func (e *_Eval) eval_unary_plus(d *Data) *Data {
 
 func (e *_Eval) eval_unary_caret(d *Data) *Data {
 	t := d.Kind.Prim()
-	if t == nil || !types.Is_int(t.Kind()) {
+	if t == nil || !types.Is_int(t.To_str()) {
 		return nil
 	}
 	// TODO: Eval constants.
@@ -451,6 +452,20 @@ func (e *_Eval) eval_unary(u *ast.UnaryExpr) *Data {
 	return data
 }
 
+func (e *_Eval) eval_variadic(v *ast.VariadicExpr) *Data {
+	d := e.eval_expr_kind(v.Expr)
+	if d == nil {
+		return nil
+	}
+
+	if !is_variadicable(d.Kind) {
+		e.push_err(v.Token, "variadic_with_non_variadicable", d.Kind.To_str())
+		return nil
+	}
+
+	return d
+}
+
 func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 	// TODO: Implement other types.
 	switch kind.(type) {
@@ -462,6 +477,9 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 
 	case *ast.UnaryExpr:
 		return e.eval_unary(kind.(*ast.UnaryExpr))
+
+	case *ast.VariadicExpr:
+		return e.eval_variadic(kind.(*ast.VariadicExpr))
 
 	default:
 		return nil

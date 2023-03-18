@@ -17,6 +17,10 @@ type Trait struct {
 	Methods []*Fn
 }
 
+// Implement: Kind
+// Returns Trait's identifier.
+func (t Trait) To_str() string { return t.Ident }
+
 // Returns method by identifier.
 // Returns nil if not exist any method in this identifier.
 func (t *Trait) Find_method(ident string) *Fn {

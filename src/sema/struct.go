@@ -32,6 +32,23 @@ type Struct struct {
 	Implements []*Trait
 }
 
+// Implement: Kind
+// Returns Struct's type kind as string.
+func (s Struct) To_str() string {
+	kind := ""
+	kind += s.Ident
+	if len(s.Generics) > 0 {
+		kind += "["
+		for _, g := range s.Generics {
+			kind += g.Ident
+			kind += ","
+		}
+		kind = kind[:len(kind)-1] // Remove comma.
+		kind += "]"
+	}
+	return kind
+}
+
 // Returns method by identifier.
 // Returns nil if not exist any method in this identifier.
 func (s *Struct) Find_method(ident string) *Fn {

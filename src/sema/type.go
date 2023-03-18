@@ -8,6 +8,8 @@
 package sema
 
 import (
+	"strconv"
+
 	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
@@ -24,8 +26,14 @@ type TypeAlias struct {
 	Refers     []*ast.IdentType // Referred identifiers.
 }
 
+type _Kind interface {
+	To_str() string
+}
+
 // Type's kind's type.
-type TypeKind struct { kind any }
+type TypeKind struct { kind _Kind }
+// Returns kind as string.
+func (tk TypeKind) To_str() string { return tk.kind.To_str() }
 // Returns primitive type if kind is primitive type, nil if not.
 func (tk *TypeKind) Prim() *Prim {
 	switch tk.kind.(type) {
@@ -76,7 +84,17 @@ func (tk *TypeKind) Arr() *Arr {
 		return nil
 	}
 }
-// Returns array type if kind is function, nil if not.
+// Returns slice type if kind is slice, nil if not.
+func (tk *TypeKind) Slc() *Slc {
+	switch tk.kind.(type) {
+	case *Slc:
+		return tk.kind.(*Slc)
+
+	default:
+		return nil
+	}
+}
+// Returns fn type if kind is function, nil if not.
 func (tk *TypeKind) Func() *Fn {
 	switch tk.kind.(type) {
 	case *Fn:
@@ -102,7 +120,7 @@ func (ts *TypeSymbol) remove_kind() { ts.Kind = nil }
 // Primitive type.
 type Prim struct { kind string }
 // Returns kind.
-func (p *Prim) Kind() string { return p.kind }
+func (p Prim) To_str() string { return p.kind }
 // Reports whether type is primitive i8.
 func (p *Prim) Is_i8() bool { return p.kind == types.TypeKind_I8 }
 // Reports whether type is primitive i16.
@@ -138,25 +156,67 @@ func (p *Prim) Is_any() bool { return p.kind == types.TypeKind_ANY }
 
 // Reference type.
 type Ref struct { Elem *TypeKind }
+// Returns reference kind as string.
+func (r Ref) To_str() string { return "&" + r.Elem.To_str() }
+
 // Slice type.
 type Slc struct { Elem *TypeKind }
+// Returns slice kind as string.
+func (s Slc) To_str() string { return "[]" + s.Elem.To_str() }
+
 // Tuple type.
 type Tuple struct { Types []*TypeKind }
+// Returns tuple kind as string.
+func (t Tuple) To_str() string {
+	s := "("
+	s += t.Types[0].To_str()
+	for _, t := range t.Types[1:] {
+		s += ","
+		s += t.To_str()
+	}
+	s += ")"
+	return s
+}
+
 // Map type.
 type Map struct {
 	Key *TypeKind
 	Val *TypeKind
 }
+// Returns map kind as string.
+func (m Map) To_str() string {
+	s := "["
+	s += m.Key.To_str()
+	s += ":"
+	s += m.Val.To_str()
+	s += "]"
+	return s
+}
+
 // Array type.
 type Arr struct {
 	Auto bool       // Auto-sized array.
 	N    int
 	Elem *TypeKind
 }
+// Returns array kind as string.
+func (a Arr) To_str() string {
+	s := "["
+	s += strconv.Itoa(a.N)
+	s += "]"
+	s += a.Elem.To_str()
+	return s
+}
 
 // Pointer type.
 type Ptr struct { Elem *TypeKind }
-
+// Returns pointer kind as string.
+func (p Ptr) To_str() string {
+	if p.Is_unsafe() {
+		return "*unsafe"
+	}
+	return "*" + p.Elem.To_str()
+}
 // Reports whether pointer is unsafe pointer (*unsafe).
 func (p *Ptr) Is_unsafe() bool { return p.Elem == nil }
 
@@ -173,6 +233,8 @@ func can_get_ptr(d *Data) bool {
 		return true
 	}
 }
+
+func is_variadicable(tk *TypeKind) bool { return tk.Slc() != nil }
 
 func build_link_path_by_tokens(tokens []lex.Token) string {
 	s := tokens[0].Kind
@@ -316,7 +378,7 @@ func (tc *_TypeChecker) from_enum(decl *ast.IdentType, e *Enum) *Enum {
 	return e
 }
 
-func (tc *_TypeChecker) get_def(decl *ast.IdentType) any {
+func (tc *_TypeChecker) get_def(decl *ast.IdentType) _Kind {
 	if !decl.Cpp_linked {
 		e := tc.lookup.find_enum(decl.Ident)
 		if e != nil {
@@ -348,7 +410,7 @@ func (tc *_TypeChecker) get_def(decl *ast.IdentType) any {
 	return nil
 }
 
-func (tc *_TypeChecker) build_ident(decl *ast.IdentType) any {
+func (tc *_TypeChecker) build_ident(decl *ast.IdentType) _Kind {
 	switch {
 	case decl.Is_prim():
 		return tc.build_prim(decl)
@@ -513,7 +575,7 @@ func (tc *_TypeChecker) build_fn(decl *ast.FnDecl) *Fn {
 	return f
 }
 
-func (tc *_TypeChecker) build_by_std_namespace(decl *ast.NamespaceType) any {
+func (tc *_TypeChecker) build_by_std_namespace(decl *ast.NamespaceType) _Kind {
 	path := build_link_path_by_tokens(decl.Idents)
 	pkg := tc.lookup.select_package(func(pkg *Package) bool {
 		return pkg.Std && pkg.Link_path == path
@@ -525,7 +587,7 @@ func (tc *_TypeChecker) build_by_std_namespace(decl *ast.NamespaceType) any {
 	return tc.build_ident(decl.Kind)
 }
 
-func (tc *_TypeChecker) build_by_namespace(decl *ast.NamespaceType) any {
+func (tc *_TypeChecker) build_by_namespace(decl *ast.NamespaceType) _Kind {
 	token := decl.Idents[0]
 	if token.Kind == "std" {
 		return tc.build_by_std_namespace(decl)
@@ -536,7 +598,7 @@ func (tc *_TypeChecker) build_by_namespace(decl *ast.NamespaceType) any {
 }
 
 func (tc *_TypeChecker) build(decl_kind ast.TypeDeclKind) *TypeKind {
-	var kind any = nil
+	var kind _Kind = nil
 
 	switch decl_kind.(type) {
 	case *ast.IdentType:

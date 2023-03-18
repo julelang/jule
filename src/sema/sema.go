@@ -268,14 +268,18 @@ func (s *_Sema) check_type(t *TypeSymbol) (ok bool) {
 	return s.check_type_with_refers(t, nil)
 }
 
-// Evaluates expression with Eval and returns result.
-func (s *_Sema) eval(expr *ast.Expr) *Data {
+// Evaluates expression with type prefixed Eval and returns result.
+func (s *_Sema) evalp(expr *ast.Expr, p *TypeKind) *Data {
 	e := _Eval{
 		s:      s,
 		lookup: s,
+		prefix: p,
 	}
 	return e.eval(expr)
 }
+
+// Evaluates expression with Eval and returns result.
+func (s *_Sema) eval(expr *ast.Expr) *Data { return s.evalp(expr, nil) }
 
 func (s *_Sema) check_type_alias_decl_kind(ta *TypeAlias) (ok bool) {
 	ok = s.check_type_with_refers(ta.Kind, &_Referencer{
@@ -346,7 +350,7 @@ func (s *_Sema) check_enum_decl(e *Enum) {
 	case t.Is_str():
 		// TODO: Implement here.
 
-	case types.Is_int(t.Kind()):
+	case types.Is_int(t.To_str()):
 		// TODO: Implement here.
 
 	default:
@@ -781,7 +785,7 @@ func (s *_Sema) check_data_for_auto_type(d *Data, err_token lex.Token) {
 }
 
 func (s *_Sema) check_type_global(decl *Var) {
-	data := s.eval(decl.Value.Expr)
+	data := s.evalp(decl.Value.Expr, decl.Kind.Kind)
 	if data == nil {
 		return // Skip checks if error ocurrs.
 	}

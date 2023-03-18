@@ -24,6 +24,20 @@ type Param struct {
 	Ident    string
 }
 
+// Implement: Kind
+// Returns Param's type kind as string.
+func (p Param) To_str() string {
+	s := ""
+	if p.Mutable {
+		s += lex.KND_MUT + " "
+	}
+	if p.Variadic {
+		s += lex.KND_TRIPLE_DOT
+	}
+	s += p.Kind.Kind.To_str()
+	return s
+}
+
 // Function.
 type Fn struct {
 	Token      lex.Token
@@ -41,6 +55,40 @@ type Fn struct {
 	// Function instances for each unique type combination of function call.
 	// Nil if function is never used.
 	Combines [][]*TypeSymbol
+}
+
+// Implement: Kind
+// Returns Fn's type kind as string.
+func (f Fn) To_str() string {
+	s := ""
+	if f.Unsafety {
+		s += "unsafe "
+	}
+	s += "fn"
+	if len(f.Generics) > 0 {
+		s += "["
+		for i, t := range f.Generics {
+			s += t.Ident
+			if i+1 < len(f.Generics) {
+				s += ","
+			}
+		}
+		s += "]"
+	}
+	s += "("
+	n := len(f.Params)
+	if n > 0 {
+		for _, p := range f.Params {
+			s += p.To_str()
+			s += ","
+		}
+		s = s[:len(s)-1] // Remove comma.
+	}
+	s += ")"
+	if !f.Is_void() {
+		s += f.Result.Kind.Kind.To_str()
+	}
+	return s
 }
 
 // Reports whether return type is void.
