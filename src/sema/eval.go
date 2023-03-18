@@ -692,6 +692,92 @@ func (e *_Eval) eval_indexing(i *ast.IndexingExpr) *Data {
 	return d
 }
 
+func (e *_Eval) eval_slicing_exprs(s *ast.SlicingExpr) (*Data, *Data) {
+	var l *Data = nil
+	var r *Data = nil
+
+	if s.Start != nil {
+		l = e.eval_expr_kind(s.Start)
+		if l != nil {
+			e.check_integer_indexing_by_data(l, s.Token)
+		}
+	} else {
+		l = &Data{
+			Constant: true,
+			Kind: &TypeKind{kind: build_prim_type(types.SYS_INT)},
+		}
+	}
+
+	if s.To != nil {
+		r = e.eval_expr_kind(s.To)
+		if r != nil {
+			e.check_integer_indexing_by_data(r, s.Token)
+		}
+	}
+
+	return l, r
+}
+
+func (e *_Eval) slicing_arr(d *Data, s *ast.SlicingExpr) {
+	_, _ = e.eval_slicing_exprs(s)
+
+	d.Lvalue = false
+	d.Kind.kind = &Slc{Elem: d.Kind.Slc().Elem}
+}
+
+func (e *_Eval) slicing_slc(d *Data, s *ast.SlicingExpr) {
+	_, _ = e.eval_slicing_exprs(s)
+
+	d.Lvalue = false
+}
+
+func (e *_Eval) slicing_str(d *Data, s *ast.SlicingExpr) {
+	d.Lvalue = false
+	if !d.Constant {
+		return
+	}
+
+	l, r := e.eval_slicing_exprs(s)
+	if l == nil {
+		return
+	}
+	_ = r // Ignore compiler error.
+
+	// TODO: Eval constant string slicing.
+}
+
+func (e *_Eval) check_slicing(d *Data, s *ast.SlicingExpr) {
+	switch {
+	case d.Kind.Arr() != nil:
+		e.slicing_arr(d, s)
+		return
+
+	case d.Kind.Slc() != nil:
+		e.slicing_slc(d, s)
+		return
+
+	case d.Kind.Prim() != nil:
+		prim := d.Kind.Prim()
+		switch {
+		case prim.Is_str():
+			e.slicing_str(d, s)
+			return
+		}
+	}
+
+	e.push_err(s.Token, "not_supports_slicing", d.Kind.To_str())
+}
+
+func (e *_Eval) eval_slicing(s *ast.SlicingExpr) *Data {
+	d := e.eval_expr_kind(s.Expr)
+	if d == nil {
+		return nil
+	}
+
+	e.check_slicing(d, s)
+	return d
+}
+
 func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 	// TODO: Implement other types.
 	switch kind.(type) {
@@ -715,6 +801,9 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 
 	case *ast.IndexingExpr:
 		return e.eval_indexing(kind.(*ast.IndexingExpr))
+
+	case *ast.SlicingExpr:
+		return e.eval_slicing(kind.(*ast.SlicingExpr))
 
 	default:
 		return nil

@@ -324,6 +324,7 @@ type IndexingExpr struct {
 
 // Slicing expression.
 type SlicingExpr struct {
+	Token lex.Token
 	Expr  ExprData // Value expression to slicing.
 	Start ExprData // Start index value expression.
 	To    ExprData // To index value expression.

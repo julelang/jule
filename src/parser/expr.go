@@ -802,9 +802,10 @@ func (ep *_ExprBuilder) build_indexing(expr_tokens []lex.Token,
 func (ep *_ExprBuilder) build_slicing(expr_tokens []lex.Token,
 	slicing_tokens []lex.Token, colon int, error_token lex.Token) *ast.SlicingExpr {
 	slc := &ast.SlicingExpr{
+		Token: error_token,
 		Expr:  ep.build_from_tokens(expr_tokens).Kind,
 	}
-	
+
 	start_expr_tokens := slicing_tokens[:colon]
 	if len(start_expr_tokens) > 0 {
 		slc.Start = ep.build_from_tokens(start_expr_tokens).Kind
