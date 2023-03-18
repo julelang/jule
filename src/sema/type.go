@@ -461,24 +461,28 @@ func (tc *_TypeChecker) build_ref(decl *ast.RefType) *Ref {
 }
 
 func (tc *_TypeChecker) build_ptr(decl *ast.PtrType) *Ptr {
-	elem := tc.check_decl(decl.Elem)
+	var elem *TypeKind = nil
 
-	// Check special cases.
-	switch {
-	case elem == nil:
-		return nil
+	if !decl.Is_unsafe() {
+		elem = tc.check_decl(decl.Elem)
 
-	case elem.Ref() != nil:
-		tc.push_err(tc.error_token, "ptr_points_ref")
-		return nil
+		// Check special cases.
+		switch {
+		case elem == nil:
+			return nil
+
+		case elem.Ref() != nil:
+			tc.push_err(tc.error_token, "ptr_points_ref")
+			return nil
 	
-	case elem.Enm() != nil:
-		tc.push_err(tc.error_token, "ptr_points_enum")
-		return nil
+		case elem.Enm() != nil:
+			tc.push_err(tc.error_token, "ptr_points_enum")
+			return nil
 
-	case elem.Arr() != nil && elem.Arr().Auto:
-		tc.push_err(decl.Elem.Token, "array_auto_sized")
-		return nil
+		case elem.Arr() != nil && elem.Arr().Auto:
+			tc.push_err(decl.Elem.Token, "array_auto_sized")
+			return nil
+		}
 	}
 
 	return &Ptr{

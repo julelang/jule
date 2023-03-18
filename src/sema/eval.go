@@ -597,17 +597,19 @@ func (e *_Eval) check_integer_indexing(i *ast.IndexingExpr) {
 }
 
 func (e *_Eval) indexing_ptr(d *Data, i *ast.IndexingExpr) {
+	e.check_integer_indexing(i)
+
 	ptr := d.Kind.Ptr()
 	switch {
 	case ptr.Is_unsafe():
 		e.push_err(i.Token, "unsafe_ptr_indexing")
+		return
 
 	case !e.is_unsafe():
 		e.push_err(i.Token, "unsafe_behavior_at_out_of_unsafe_scope")
 	}
 
 	d.Kind = ptr.Elem
-	e.check_integer_indexing(i)
 }
 
 func (e *_Eval) indexing_arr(d *Data, i *ast.IndexingExpr) {
