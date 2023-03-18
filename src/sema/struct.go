@@ -13,13 +13,25 @@ import (
 type Field struct {
 	Token   lex.Token
 	Public  bool
-	Mutable bool      // Interior mutability.
+	Mutable bool         // Interior mutability.
 	Ident   string
 	Kind    *TypeSymbol
 }
 
+func (f *Field) instance() *FieldIns {
+	return &FieldIns{
+		Decl:  f,
+		Kind: nil,
+	}
+}
+
 // Structure.
 type Struct struct {
+	// Used for type parsing.
+	// Used declaration's owner for instance type checking.
+	owner      *_Sema
+
+	Refers     []*ast.IdentType // Referred identifiers.
 	Token      lex.Token
 	Ident      string
 	Fields     []*Field
@@ -30,6 +42,26 @@ type Struct struct {
 	Doc        string
 	Generics   []*ast.Generic
 	Implements []*Trait
+
+	// Structure instances for each unique type combination of structure.
+	// Nil if structure is never used.
+	Instances  []*StructIns
+}
+
+func (s *Struct) append_instance(ins *StructIns) {
+	// Skip already created instance for just one unique combination.
+	if len(s.Generics) == 0 && len(s.Instances) == 1 {
+		return
+	}
+
+	for _, ains := range s.Instances {
+		for i, ag := range ains.Generics {
+			if ag.To_str() != ins.Generics[i].To_str() {
+				s.Instances = append(s.Instances, ins)
+				return
+			}
+		}
+	}
 }
 
 // Returns method by identifier.
@@ -54,7 +86,26 @@ func (s *Struct) Is_implements(t *Trait) bool {
 }
 
 func (s *Struct) instance() *StructIns {
-	return &StructIns{Decl: s}
+	// Returns already created instance for just one unique combination.
+	if len(s.Generics) == 0 && len(s.Instances) == 1 {
+		return s.Instances[0]
+	}
+
+	ins := &StructIns{
+		Decl:    s,
+		Fields:  make([]*FieldIns, len(s.Fields)),
+		Methods: make([]*FnIns, len(s.Methods)),
+	}
+
+	for i, f := range s.Fields {
+		ins.Fields[i] = f.instance()
+	}
+
+	for i, f := range s.Methods {
+		ins.Methods[i] = f.instance()
+	}
+
+	return ins
 }
 
 // Field structure.
@@ -68,6 +119,7 @@ type StructIns struct {
 	Decl     *Struct
 	Generics []*TypeKind
 	Fields   []*FieldIns
+	Methods  []*FnIns
 }
 
 // Implement: Kind

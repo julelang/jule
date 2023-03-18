@@ -308,6 +308,34 @@ func (s *_Sema) evalp(expr *ast.Expr, p *TypeSymbol) *Data {
 // Evaluates expression with Eval and returns result.
 func (s *_Sema) eval(expr *ast.Expr) *Data { return s.evalp(expr, nil) }
 
+func (s *_Sema) check_struct_ins(ins *StructIns, error_token lex.Token) (ok bool) {
+	// TODO: Skip checking if already parsed instance.
+
+	ok = s.check_generic_quantity(len(ins.Decl.Generics), len(ins.Generics), error_token)
+	if !ok {
+		return false
+	}
+
+	// Check field types.
+	for _, f := range ins.Fields {
+		symbol := TypeSymbol{Decl: f.Decl.Kind.Decl}
+		ok := ins.Decl.owner.check_type_with_refers(&symbol, &_Referencer{
+			ident:  ins.Decl.Ident,
+			refers: &ins.Decl.Refers,
+		})
+		s.errors = append(s.errors, ins.Decl.owner.errors...)
+		if !ok {
+			return false
+		}
+
+		f.Kind = symbol.Kind
+	}
+
+	// TODO: Check methods if declaration comes out of package.
+
+	return true
+}
+
 func (s *_Sema) check_type_alias_decl_kind(ta *TypeAlias) (ok bool) {
 	ok = s.check_type_with_refers(ta.Kind, &_Referencer{
 		ident:  ta.Ident,

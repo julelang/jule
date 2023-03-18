@@ -432,13 +432,23 @@ func (tc *_TypeChecker) from_struct(decl *ast.IdentType, s *Struct) *StructIns {
 		return nil
 	}
 
-	// TODO: Implement generics and generate a struct instance for.
+	ok := tc.check_illegal_cycles(decl, &s.Refers)
+	if !ok {
+		return nil
+	}
+
 	ins := s.instance()
 	ins.Generics = make([]*TypeKind, len(decl.Generics))
 	for i, g := range decl.Generics {
 		ins.Generics[i] = tc.build(g.Kind)
 	}
 
+	ok = tc.s.check_struct_ins(ins, decl.Token)
+	if !ok {
+		return nil
+	}
+
+	s.append_instance(ins)
 	return ins
 }
 

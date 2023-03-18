@@ -1024,6 +1024,8 @@ func (e *_Eval) eval_struct_lit(lit *ast.StructLit) *Data {
 		return nil
 	}
 
+	// NOTE: Instance already checked if generic quantity passes.
+
 	// TODO: Check pairs.
 
 	return &Data{
