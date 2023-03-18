@@ -12,20 +12,21 @@ import (
 
 // Value data.
 type Data struct {
-	Kind     *TypeKind
-	Mutable  bool
-	Lvalue   bool
+	Kind       *TypeKind
+	Mutable    bool
+	Lvalue     bool
+	Variadiced bool
 
 	// True if kind is declaration such as:
 	//  - *Enum
 	//  - *Struct
-	Decl     bool
+	Decl       bool
 
 	// This field is reminder.
 	// Will write to every constant processing points.
 	// Changed after add constant evaluation support.
 	// So, reminder flag for constants.
-	Constant bool
+	Constant   bool
 }
 
 // Reports whether Data is nil literal.
@@ -463,6 +464,7 @@ func (e *_Eval) eval_variadic(v *ast.VariadicExpr) *Data {
 		return nil
 	}
 
+	d.Variadiced = true
 	return d
 }
 
@@ -475,6 +477,60 @@ func (e *_Eval) eval_unsafe(u *ast.UnsafeExpr) *Data {
 	e.unsafety = unsafety
 
 	return d
+}
+
+func (e *_Eval) eval_arr(s *ast.SliceExpr) *Data {
+	// Arrays always has type prefixes.
+	pt := e.prefix.Arr()
+
+	arr := &Arr{
+		Auto: false,
+		N:    0,
+		Elem: pt.Elem,
+	}
+
+	if pt.Auto {
+		arr.N = len(s.Elems)
+	} else {
+		arr.N = len(s.Elems)
+		if arr.N > pt.N {
+			e.push_err(s.Token, "overflow_limits")
+		}
+	}
+
+	for _, elem := range s.Elems {
+		d := e.eval_expr_kind(elem)
+		if d == nil {
+			continue
+		}
+
+		// TODO: Check type compatibility with Arr's elem type.
+	}
+
+	return &Data{
+		Kind: &TypeKind{kind: arr},
+	}
+}
+
+func (e *_Eval) eval_slice_expr(s *ast.SliceExpr) *Data {
+	if e.prefix != nil {
+		switch {
+		case e.prefix.Arr() != nil:
+			return e.eval_arr(s)
+
+		case e.prefix.Slc() != nil:
+			// TODO: Eval explicit slice.
+			return nil
+		}
+	}
+
+	prefix := e.prefix
+	e.prefix = nil
+
+	// TODO: Eval implicit slice.
+
+	e.prefix = prefix
+	return nil
 }
 
 func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
@@ -494,6 +550,9 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 
 	case *ast.UnsafeExpr:
 		return e.eval_unsafe(kind.(*ast.UnsafeExpr))
+
+	case *ast.SliceExpr:
+		return e.eval_slice_expr(kind.(*ast.SliceExpr))
 
 	default:
 		return nil

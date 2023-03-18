@@ -177,6 +177,7 @@ type Expr struct {
 	//  - *StructLit
 	//  - *BraceLit
 	//  - *SlicingExpr
+	//  - *SliceExpr
 	//  - *BinopExpr
 	//  - *UnsafeExpr
 	//  - *KeyValPair
@@ -307,6 +308,7 @@ type KeyValPair struct {
 // Slice initiating expression.
 // Also represents array initiating expression.
 type SliceExpr struct {
+	Token lex.Token
 	Elems []ExprData
 }
 

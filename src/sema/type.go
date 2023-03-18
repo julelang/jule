@@ -495,7 +495,7 @@ func (tc *_TypeChecker) build_slc(decl *ast.SlcType) *Slc {
 }
 
 func (tc *_TypeChecker) build_arr(decl *ast.ArrType) *Arr {
-	// TODO: Check size expression.
+	// TODO: Eval and check size expression.
 
 	elem := tc.check_decl(decl.Elem)
 
