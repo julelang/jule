@@ -786,3 +786,16 @@ func (tc *_TypeChecker) check(t *TypeSymbol) {
 	}
 	t.Kind = kind
 }
+
+type _FnCallArgChecker struct {
+	s                  *_Sema
+	args               []*ast.Expr
+	error_token        lex.Token
+	f                  *FnIns
+	dynamic_annotation bool
+}
+
+func (fcac *_FnCallArgChecker) check() (ok bool) {
+	// TODO: Implement here.
+	return true
+}

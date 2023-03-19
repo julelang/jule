@@ -293,6 +293,16 @@ func (s *_Sema) check_type(t *TypeSymbol) (ok bool) {
 	return s.check_type_with_refers(t, nil)
 }
 
+// Builds type.
+// Returns nil if error occur or failed.
+func (s *_Sema) build_type(t *ast.Type) *TypeKind {
+	tc := _TypeChecker{
+		s:          s,
+		lookup:     s,
+	}
+	return tc.check_decl(t)
+}
+
 // Evaluates expression with type prefixed Eval and returns result.
 func (s *_Sema) evalp(expr *ast.Expr, p *TypeSymbol) *Data {
 	e := _Eval{
@@ -404,6 +414,22 @@ func (s *_Sema) method_with_non_generic_type_kind(st *Struct, f *Fn) *FnIns {
 		ins.Result = s.build_non_generic_type_kind(f.Result.Kind.Decl, generics)
 	}
 	return ins
+}
+
+func (s *_Sema) reload_fn_ins_types(f *FnIns) (ok bool) {
+	for _, p := range f.Params {
+		if !p.Decl.Is_self() {
+			p.Kind = s.build_type(p.Decl.Kind.Decl)
+			ok = p.Kind != nil && ok
+		}
+	}
+
+	if !f.Decl.Is_void() {
+		f.Result = s.build_type(f.Decl.Result.Kind.Decl)
+		ok = f.Result != nil && ok
+	}
+
+	return ok
 }
 
 func (s *_Sema) check_validity_for_init_expr(left_mut bool, d *Data, error_token lex.Token) {

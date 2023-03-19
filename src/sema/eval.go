@@ -1126,10 +1126,23 @@ func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
 	if !ok {
 		return nil
 	}
-	_ = dynamic_annotation // Ignore compiler error.
 
-	// TODO: Apply generics.
-	// TODO: Check arguments.
+	if !dynamic_annotation {
+		e.s.reload_fn_ins_types(f)
+	}
+
+	fcac := _FnCallArgChecker{
+		s:                  e.s,
+		f:                  f,
+		args:               fc.Args,
+		dynamic_annotation: dynamic_annotation,
+		error_token:        fc.Token,
+	}
+	ok = fcac.check()
+	if !ok {
+		return nil
+	}
+
 	f.Decl.append_instance(f)
 
 	d.Lvalue = is_lvalue(d.Kind)
