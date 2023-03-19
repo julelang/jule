@@ -33,3 +33,14 @@ type Enum struct {
 // Implement: Kind
 // Returns Enum's identifier.
 func (e Enum) To_str() string { return e.Ident }
+
+// Returns item by identifier.
+// Returns nil if not exist any item in this identifier.
+func (e *Enum) Find_item(ident string) *EnumItem {
+	for _, item := range e.Items {
+		if item.Ident == ident {
+			return item
+		}
+	}
+	return nil
+}

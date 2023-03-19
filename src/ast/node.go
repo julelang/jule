@@ -180,7 +180,6 @@ type Expr struct {
 	//  - *SliceExpr
 	//  - *BinopExpr
 	//  - *UnsafeExpr
-	//  - *KeyValPair
 	//  - *IndexingExpr
 	Kind  ExprData
 }
@@ -254,8 +253,9 @@ type NsSelectionExpr struct {
 
 // Object sub identifier selection expression.
 type SubIdentExpr struct {
-	Expr  ExprData  // Selected object.
-	Ident lex.Token // TOken of selected identifier.
+	Is_self bool      // True if root selector is "self" keyword.
+	Expr    ExprData  // Selected object.
+	Ident   lex.Token // TOken of selected identifier.
 }
 
 // Binary operation.

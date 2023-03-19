@@ -1152,6 +1152,54 @@ func (e *_Eval) eval_fn_call(fc *ast.FnCallExpr) *Data {
 	return e.call_fn(fc, d)
 }
 
+func (e *_Eval) eval_enum_sub_ident(enm *Enum, ident lex.Token) *Data {
+	// TODO: Eval constant.
+	d := &Data{
+		Lvalue:   false,
+		Decl:     false,
+		Mutable:  false,
+		Constant: true,
+		Kind:     enm.Kind.Kind,
+	}
+	item := enm.Find_item(ident.Kind)
+	if item == nil {
+		e.push_err(ident, "obj_have_not_ident", ident.Kind)
+	}
+	return d
+}
+
+func (e *_Eval) eval_sub_ident(si *ast.SubIdentExpr) *Data {
+	// TODO: Implement built-in primitive type constants.
+
+	d := e.eval_expr_kind(si.Expr)
+	if d == nil {
+		return nil
+	}
+
+	kind := d.Kind
+	if d.Kind.Ptr() != nil {
+		ptr := d.Kind.Ptr()
+		if !ptr.Is_unsafe() {
+			if !si.Is_self && !e.is_unsafe() {
+				e.push_err(si.Ident, "unsafe_behavior_at_out_of_unsafe_scope")
+			}
+			kind = d.Kind.Ptr().Elem
+		}
+	} else if d.Kind.Ref() != nil {
+		kind = d.Kind.Ref().Elem
+	}
+
+	// TODO: Implement support for other types.
+	switch {
+	case kind.Enm() != nil:
+		return e.eval_enum_sub_ident(kind.Enm(), si.Ident)
+
+	default:
+		e.push_err(si.Ident, "obj_not_support_sub_fields", d.Kind.To_str())
+		return nil
+	}
+}
+
 func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 	// TODO: Implement other types.
 	switch kind.(type) {
@@ -1193,6 +1241,9 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 
 	case *ast.FnCallExpr:
 		return e.eval_fn_call(kind.(*ast.FnCallExpr))
+
+	case *ast.SubIdentExpr:
+		return e.eval_sub_ident(kind.(*ast.SubIdentExpr))
 
 	default:
 		return nil
