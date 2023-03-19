@@ -16,6 +16,9 @@ type EnumItem struct {
 	Value *Value
 }
 
+// Reports whether item has auto expression.
+func (ei *EnumItem) Auto_expr() bool { return ei.Value.Expr == nil }
+
 // Enum.
 type Enum struct {
 	Token  lex.Token

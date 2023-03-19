@@ -529,8 +529,11 @@ type UseDecl struct {
 type EnumItem struct {
 	Token lex.Token
 	Ident string
-	Expr *Expr
+	Expr *Expr   // Nil for auto expression.
 }
+
+// Reports whether item has auto expression.
+func (ei *EnumItem) Auto_expr() bool { return ei.Expr == nil }
 
 // Enum declaration.
 type EnumDecl struct {

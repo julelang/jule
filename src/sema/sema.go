@@ -433,6 +433,25 @@ func (s *_Sema) check_enum_items_dup(e *Enum) {
 	}
 }
 
+func (s *_Sema) check_enum_items_str(e *Enum) {
+	for _, item := range e.Items {
+		if item.Auto_expr() {
+			// TODO: Set auto-constant value.
+		} else {
+			d := s.eval(item.Value.Expr)
+			if d == nil {
+				continue
+			}
+
+			if !d.Constant {
+				s.push_err(item.Value.Expr.Token, "expr_not_const")
+			}
+
+			s.check_assign_type(e.Kind.Kind, d, item.Token, false)
+		}
+	}
+}
+
 func (s *_Sema) check_enum_decl(e *Enum) {
 	if lex.Is_ignore_ident(e.Ident) {
 		s.push_err(e.Token, "ignore_ident")
@@ -468,7 +487,7 @@ func (s *_Sema) check_enum_decl(e *Enum) {
 	// Check items.
 	switch {
 	case t.Is_str():
-		// TODO: Implement here.
+		s.check_enum_items_str(e)
 
 	case types.Is_int(t.To_str()):
 		// TODO: Implement here.
