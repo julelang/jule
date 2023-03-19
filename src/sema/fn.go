@@ -26,24 +26,17 @@ type Param struct {
 	Ident    string
 }
 
+func (p *Param) instance() *ParamIns {
+	return &ParamIns{
+		Decl: p,
+		Kind: nil,
+	}
+}
+
 // Reports whether parameter is self (receiver) parameter.
 func (p *Param) Is_self() bool { return strings.HasSuffix(p.Ident, lex.KND_SELF) }
 // Reports whether self (receiver) parameter is reference.
 func (p *Param) Is_ref() bool { return p.Ident != "" && p.Ident[0] == '&'}
-
-// Implement: Kind
-// Returns Param's type kind as string.
-func (p Param) To_str() string {
-	s := ""
-	if p.Mutable {
-		s += lex.KND_MUT + " "
-	}
-	if p.Variadic {
-		s += lex.KND_TRIPLE_DOT
-	}
-	s += p.Kind.Kind.To_str()
-	return s
-}
 
 // Function.
 type Fn struct {
@@ -69,13 +62,27 @@ func (f *Fn) Is_void() bool { return f.Result == nil }
 // Reports whether function is method.
 func (f *Fn) Is_method() bool { return len(f.Params) > 0 && f.Params[0].Is_self() }
 
+// Force to new instance.
+func (f *Fn) instance_force() *FnIns {
+	ins := &FnIns{
+		Decl: f,
+	}
+
+	ins.Params = make([]*ParamIns, len(f.Params))
+	for i, p := range f.Params {
+		ins.Params[i] = p.instance()
+	}
+
+	return ins
+}
+
 func (f *Fn) instance() *FnIns {
 	// Returns already created instance for just one unique combination.
 	if len(f.Generics) == 0 && len(f.Combines) == 1 {
 		return f.Combines[0]
 	}
 
-	return &FnIns{Decl: f}
+	return f.instance_force()
 }
 
 func (f *Fn) append_instance(ins *FnIns) {
@@ -94,11 +101,40 @@ func (f *Fn) append_instance(ins *FnIns) {
 	}
 }
 
+// Parameter instance.
+type ParamIns struct {
+	Decl *Param
+	Kind *TypeKind
+}
+
+// Implement: Kind
+// Returns ParamIns's type kind as string.
+func (p ParamIns) To_str() string {
+	s := ""
+	if p.Decl.Mutable {
+		s += lex.KND_MUT + " "
+	}
+
+	if p.Decl.Is_self() {
+		if p.Decl.Is_ref() {
+			s += "&"
+		}
+		s += "self"
+		return s
+	}
+
+	if p.Decl.Variadic {
+		s += lex.KND_TRIPLE_DOT
+	}
+	s += p.Kind.To_str()
+	return s
+}
+
 // Function instance.
 type FnIns struct {
 	Decl     *Fn
 	Generics []*TypeKind
-	Params   []*TypeKind
+	Params   []*ParamIns
 	Result   *TypeKind
 	Scope    *ast.Scope
 }
@@ -111,6 +147,7 @@ func (f FnIns) To_str() string {
 		s += "unsafe "
 	}
 	s += "fn"
+
 	if len(f.Generics) > 0 {
 		s += "["
 		for i, t := range f.Generics {
@@ -120,7 +157,17 @@ func (f FnIns) To_str() string {
 			}
 		}
 		s += "]"
+	} else if len(f.Decl.Generics) > 0 { // Use Decl's generic if not parsed yet.
+		s += "["
+		for i, t := range f.Decl.Generics {
+			s += t.Ident
+			if i+1 < len(f.Decl.Generics) {
+				s += ","
+			}
+		}
+		s += "]"
 	}
+
 	s += "("
 	n := len(f.Params)
 	if n > 0 {

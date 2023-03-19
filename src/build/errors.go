@@ -121,7 +121,7 @@ var ERRORS = map[string]string{
 	`type_not_supports_generics`:               `type @ not supports generics`,
 	`divide_by_zero`:                           `divide by zero`,
 	`trait_have_not_ident`:                     `trait @ have not any define in this identifier: @`,
-	`not_impl_trait_def`:                       `not implemented @ trait's @ define`,
+	`not_impl_trait_def`:                       `trait @ derived but not implemented trait's @ define`,
 	`dynamic_type_annotation_failed`:           `dynamic type annotation failed`,
 	`fallthrough_wrong_use`:                    `fallthrough keyword can only useable at end of the case scopes`,
 	`fallthrough_into_final_case`:              `fallthrough cannot useable at final case`,

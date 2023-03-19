@@ -354,6 +354,39 @@ func (s *_Sema) check_type_compatibility(dest *TypeKind, src *TypeKind, error_to
 	}
 }
 
+// Builds non-generic types but skips generic types.
+// Builds generic identifiers as primitive type.
+//
+// Useful:
+//  - For non-generic type parsed string type kinds.
+//  - For illegal cycle checking.
+func (s *_Sema) build_non_generic_type_kind(ast *ast.Type, generics []*ast.Generic) *TypeKind {
+	ignore_idents := make([]string, len(generics))
+	for i, g := range generics {
+		ignore_idents[i] = g.Ident
+	}
+
+	tc := _TypeChecker{
+		s:             s,
+		lookup:        s,
+		ignore_idents: ignore_idents,
+	}
+	return tc.check_decl(ast)
+}
+
+func (s *_Sema) fn_with_non_generic_type_kind(f *Fn) *FnIns {
+	ins := f.instance_force()
+	for _, p := range ins.Params {
+		if !p.Decl.Is_self() {
+			p.Kind = s.build_non_generic_type_kind(p.Decl.Kind.Decl, f.Generics)
+		}
+	}
+	if !f.Is_void() {
+		ins.Result = s.build_non_generic_type_kind(f.Result.Kind.Decl, f.Generics)
+	}
+	return ins
+}
+
 func (s *_Sema) check_validity_for_init_expr(left_mut bool, d *Data, error_token lex.Token) {
 	if d.Lvalue && left_mut && !d.Mutable && is_mut(d.Kind) {
 		s.push_err(error_token, "assignment_non_mut_to_mut")
@@ -791,8 +824,6 @@ func (s *_Sema) impl_trait(decl *Impl) {
 	case !s.impl_to_struct(dest, decl):
 		return
 	}
-
-	// TODO: Check structure implements trait correctly.
 }
 
 // Implement implementation.
@@ -852,6 +883,33 @@ func (s *_Sema) check_global_decls() (ok bool) {
 	return true
 }
 
+func (s *_Sema) check_struct_trait_impl(strct *Struct, trt *Trait) (ok bool) {
+	for _, tf := range trt.Methods {
+		exist := false
+		ds := s.fn_with_non_generic_type_kind(tf).To_str()
+		sf := strct.Find_method(tf.Ident)
+		if sf != nil {
+			exist = (
+				tf.Public == sf.Public &&
+				tf.Ident == sf.Ident &&
+				ds == s.fn_with_non_generic_type_kind(sf).To_str())
+		}
+		if !exist {
+			s.push_err(strct.Token, "not_impl_trait_def", trt.Ident, ds)
+			ok = false
+		}
+	}
+	return
+}
+
+func (s *_Sema) check_struct_impls(strct *Struct) (ok bool) {
+	ok = true
+	for _, trt := range strct.Implements {
+		ok = s.check_struct_trait_impl(strct, trt) && ok
+	}
+	return ok
+}
+
 func (s *_Sema) check_struct_decl(strct *Struct) {
 	if lex.Is_ignore_ident(strct.Ident) {
 		s.push_err(strct.Token, "ignore_ident")
@@ -861,8 +919,11 @@ func (s *_Sema) check_struct_decl(strct *Struct) {
 
 	strct.owner = s
 
-	ok := s.check_decl_generics(strct.Generics)
-	if !ok {
+	switch {
+	case !s.check_decl_generics(strct.Generics):
+		return
+
+	case !s.check_struct_impls(strct):
 		return
 	}
 

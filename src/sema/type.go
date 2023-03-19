@@ -327,6 +327,10 @@ type _TypeChecker struct {
 	referencer *_Referencer
 
 	error_token lex.Token
+
+	// This identifiers ignored and
+	// appends as primitive type.
+	ignore_idents []string
 }
 
 func (tc *_TypeChecker) push_err(token lex.Token, key string, args ...any) {
@@ -469,6 +473,12 @@ func (tc *_TypeChecker) from_struct(decl *ast.IdentType, s *Struct) *StructIns {
 }
 
 func (tc *_TypeChecker) get_def(decl *ast.IdentType) _Kind {
+	for _, ig := range tc.ignore_idents {
+		if ig == decl.Ident {
+			return build_prim_type(ig)
+		}
+	}
+
 	if !decl.Cpp_linked {
 		e := tc.lookup.find_enum(decl.Ident)
 		if e != nil {
