@@ -547,7 +547,7 @@ func (e *_Eval) eval_arr(s *ast.SliceExpr) *Data {
 			continue
 		}
 
-		// TODO: Check type compatibility with Arr's elem type.
+		e.s.check_assign_type(arr.Elem, d, s.Token, true)
 	}
 
 	return &Data{
@@ -566,7 +566,7 @@ func (e *_Eval) eval_exp_slc(s *ast.SliceExpr, elem_type *TypeKind) *Data {
 			continue
 		}
 
-		// TODO: Check type compatibility with Slc's elem type.
+		e.s.check_assign_type(slc.Elem, d, s.Token, true)
 	}
 
 	return &Data{

@@ -310,13 +310,24 @@ func (s *_Sema) evalp(expr *ast.Expr, p *TypeSymbol) *Data {
 // Evaluates expression with Eval and returns result.
 func (s *_Sema) eval(expr *ast.Expr) *Data { return s.evalp(expr, nil) }
 
-func (s *_Sema) check_type_compatibility(dest *TypeKind, src *TypeKind, error_token lex.Token) {
+func (s *_Sema) check_assign_type(dest *TypeKind, d *Data, error_token lex.Token, deref bool) {
+	atc := _AssignTypeChecker{
+		s:           s,
+		error_token: error_token,
+		dest:        dest,
+		d:           d,
+		deref:       deref,
+	}
+	atc.check()
+}
+
+func (s *_Sema) check_type_compatibility(dest *TypeKind, src *TypeKind, error_token lex.Token, deref bool) {
 	dest_kind := dest.To_str()
-	src_kind := src.To_str()
 	if src == nil {
-		s.push_err(error_token, "incompatible_types", dest_kind, src_kind)
+		s.push_err(error_token, "incompatible_types", dest_kind, "<untyped>")
 		return
 	}
+	src_kind := src.To_str()
 
 	if dest.Prim() != nil && dest.Prim().Is_any() {
 		return
@@ -327,6 +338,7 @@ func (s *_Sema) check_type_compatibility(dest *TypeKind, src *TypeKind, error_to
 		error_token: error_token,
 		dest:        dest,
 		src:         src,
+		deref:       deref,
 	}
 	ok := tcc.check()
 
@@ -887,7 +899,15 @@ func (s *_Sema) check_type_global(decl *Var) {
 		s.check_data_for_auto_type(data, decl.Value.Expr.Token)
 		// TODO: Check assignment validity.
 	} else {
-		// TODO: Check type compatibility.
+		arr := decl.Kind.Kind.Arr()
+		if arr != nil && arr.Auto {
+			data_arr := data.Kind.Arr()
+			if data_arr != nil {
+				arr.N = data_arr.N
+			}
+		}
+
+		s.check_assign_type(decl.Kind.Kind, data, decl.Value.Expr.Token, false)
 	}
 }
 

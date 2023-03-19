@@ -22,6 +22,9 @@ type _TypeCompatibilityChecker struct {
 	dest        *TypeKind
 	src         *TypeKind
 	error_token lex.Token
+
+	// References uses elem's type itself if true.
+	deref       bool
 }
 
 func (tcc *_TypeCompatibilityChecker) push_err(key string, args ...any) {
@@ -68,6 +71,8 @@ func (tcc *_TypeCompatibilityChecker) check_trait() (ok bool) {
 func (tcc *_TypeCompatibilityChecker) check_ref() (ok bool) {
 	if tcc.dest.To_str() == tcc.src.To_str() {
 		return true
+	} else if !tcc.deref {
+		return false
 	}
 	tcc.src = tcc.src.Ref().Elem
 	return tcc.check()
@@ -167,5 +172,49 @@ func (tcc *_TypeCompatibilityChecker) check() (ok bool) {
 
 	default:
 		return types.Types_are_compatible(tcc.dest.To_str(), tcc.src.To_str())
+	}
+}
+
+// Checks value and type compatibility for assignment.
+type _AssignTypeChecker struct {
+	s           *_Sema    // Used for error logging and type checking.
+	dest        *TypeKind
+	d           *Data
+	error_token lex.Token
+	deref       bool     // Same as TypeCompatibilityChecker.deref field.
+}
+
+func (tcc *_AssignTypeChecker) push_err(key string, args ...any) {
+	tcc.s.push_err(tcc.error_token, key, args...)
+}
+
+func (atc *_AssignTypeChecker) check_validity() (valid bool) {
+	valid = true
+	if atc.d.Kind.Func() != nil {
+		f := atc.d.Kind.Func()
+		if f.Decl.Is_method() {
+			atc.push_err("method_as_anonymous_fn")
+			valid = false
+		} else if len(f.Decl.Generics) > 0 {
+			atc.push_err("genericed_fn_as_anonymous_fn")
+			valid = false
+		}
+	}
+	return
+}
+
+func (atc *_AssignTypeChecker) check() {
+	// TODO: Check constants.
+	switch {
+	case atc.d == nil:
+		// Skip Data is nil.
+		return
+
+	case !atc.check_validity():
+		// Data is invalid and error(s) logged about it.
+		return
+	
+	default:
+		atc.s.check_type_compatibility(atc.dest, atc.d.Kind, atc.error_token, atc.deref)
 	}
 }
