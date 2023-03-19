@@ -5,6 +5,7 @@
 package sema
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/julelang/jule/ast"
@@ -159,8 +160,8 @@ func (f FnIns) To_str() string {
 		s += "]"
 	} else if len(f.Decl.Generics) > 0 { // Use Decl's generic if not parsed yet.
 		s += "["
-		for i, t := range f.Decl.Generics {
-			s += t.Ident
+		for i := range f.Decl.Generics {
+			s += "T" + strconv.Itoa(i)
 			if i+1 < len(f.Decl.Generics) {
 				s += ","
 			}

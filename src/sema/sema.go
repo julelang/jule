@@ -903,17 +903,13 @@ func (s *_Sema) check_global_decls() (ok bool) {
 func (s *_Sema) check_struct_trait_impl(strct *Struct, trt *Trait) (ok bool) {
 	for _, tf := range trt.Methods {
 		exist := false
-
-		// Use tf.instance because already parsed.
-		ds := tf.instance().To_str()
-
+		ds := s.fn_with_non_generic_type_kind(tf).To_str()
 		sf := strct.Find_method(tf.Ident)
 		if sf != nil {
-			// Use sf.instance because already parsed.
 			exist = (
 				tf.Public == sf.Public &&
 				tf.Ident == sf.Ident &&
-				ds == sf.instance().To_str())
+				ds == s.fn_with_non_generic_type_kind(sf).To_str())
 		}
 		if !exist {
 			s.push_err(strct.Token, "not_impl_trait_def", trt.Ident, ds)
@@ -932,6 +928,7 @@ func (s *_Sema) check_struct_impls(strct *Struct) (ok bool) {
 }
 
 func (s *_Sema) check_struct_fields(st *Struct) (ok bool) {
+	ok = true
 	for _, f := range st.Fields {
 		f.Kind.Kind = s.build_non_generic_type_kind(f.Kind.Decl, st.Generics)
 		ok = f.Kind.Kind != nil && ok
@@ -961,11 +958,10 @@ func (s *_Sema) check_struct_decl(strct *Struct) {
 	}
 
 	strct.owner = s
-
 	switch {
 	case !s.check_decl_generics(strct.Generics):
 		return
-
+		
 	case !s.check_struct_fields(strct):
 		return
 
