@@ -499,7 +499,7 @@ func (s *_Sema) check_enum_decl(e *Enum) {
 		e.Kind = &TypeSymbol{
 			Decl: nil,
 			Kind: &TypeKind{
-				kind: &Prim{kind: lex.KND_I32},
+				kind: &Prim{kind: types.TypeKind_I32},
 			},
 		}
 	}
