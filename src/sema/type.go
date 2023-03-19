@@ -141,6 +141,16 @@ func (tk *TypeKind) Map() *Map {
 		return nil
 	}
 }
+// Returns tuple type if kind is tuple, nil if not.
+func (tk *TypeKind) Tup() *Tuple {
+	switch tk.kind.(type) {
+	case *Tuple:
+		return tk.kind.(*Tuple)
+
+	default:
+		return nil
+	}
+}
 
 // Type.
 type TypeSymbol struct {

@@ -339,6 +339,12 @@ func (s *_Sema) check_type_compatibility(dest *TypeKind, src *TypeKind, error_to
 	}
 	src_kind := src.To_str()
 
+	// Tuple to single type, always fails.
+	if src.Tup() != nil {
+		s.push_err(error_token, "incompatible_types", dest_kind, src_kind)
+		return
+	}
+
 	if dest.Prim() != nil && dest.Prim().Is_any() {
 		return
 	}

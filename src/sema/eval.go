@@ -1265,6 +1265,28 @@ func (e *_Eval) eval_sub_ident(si *ast.SubIdentExpr) *Data {
 	return nil
 }
 
+func (e *_Eval) eval_tuple(tup *ast.TupleExpr) *Data {
+	tup_t := &Tuple{}
+	tup_t.Types = make([]*TypeKind, len(tup.Expr))
+	ok := true
+	for i, expr := range tup.Expr {
+		d := e.eval_expr_kind(expr)
+		if d == nil {
+			ok = false
+			continue
+		}
+		tup_t.Types[i] = d.Kind
+	}
+
+	if !ok {
+		return nil
+	}
+
+	return &Data{
+		Kind: &TypeKind{kind: tup_t},
+	}
+}
+
 func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 	// TODO: Implement other types.
 	switch kind.(type) {
@@ -1309,6 +1331,9 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 
 	case *ast.SubIdentExpr:
 		return e.eval_sub_ident(kind.(*ast.SubIdentExpr))
+
+	case *ast.TupleExpr:
+		return e.eval_tuple(kind.(*ast.TupleExpr))
 
 	default:
 		return nil

@@ -188,9 +188,11 @@ func (tcc *_AssignTypeChecker) push_err(key string, args ...any) {
 	tcc.s.push_err(tcc.error_token, key, args...)
 }
 
-func (atc *_AssignTypeChecker) check_validity() (valid bool) {
-	valid = true
-	if atc.d.Kind.Func() != nil {
+func (atc *_AssignTypeChecker) check_validity() bool {
+	valid := true
+
+	switch {
+	case atc.d.Kind.Func() != nil:
 		f := atc.d.Kind.Func()
 		if f.Decl.Is_method() {
 			atc.push_err("method_as_anonymous_fn")
@@ -199,8 +201,13 @@ func (atc *_AssignTypeChecker) check_validity() (valid bool) {
 			atc.push_err("genericed_fn_as_anonymous_fn")
 			valid = false
 		}
+
+	case atc.d.Kind.Tup() != nil:
+		atc.push_err("tuple_assign_to_single")
+		valid = false
 	}
-	return
+
+	return valid
 }
 
 func (atc *_AssignTypeChecker) check() {

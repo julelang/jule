@@ -162,6 +162,7 @@ var ERRORS = map[string]string{
 	`struct_already_have_ident`:                `struct @ already have a define in this identifier: @`,
 	`unsafe_ptr_indexing`:                      `unsafe pointers not supports indexing`,
 	`method_has_generic_with_same_ident`:       `methods cannot have same generic identifier with owner same time`,
+	`tuple_assign_to_single`:                   `tuples cannot assign to single define in same time`,
 }
 
 // Returns formatted error message by key and args.
