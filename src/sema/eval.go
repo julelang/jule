@@ -1129,7 +1129,7 @@ func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
 	f.Decl.append_instance(f)
 
 	d.Lvalue = is_lvalue(d.Kind)
-	return d
+	return nil
 }
 
 func (e *_Eval) eval_fn_call(fc *ast.FnCallExpr) *Data {
@@ -1168,6 +1168,22 @@ func (e *_Eval) eval_enum_sub_ident(enm *Enum, ident lex.Token) *Data {
 	return d
 }
 
+func (e *_Eval) eval_trait_sub_ident(trt *Trait, ident lex.Token) *Data {
+	f := trt.Find_method(ident.Kind)
+	if f == nil {
+		e.push_err(ident, "obj_have_not_ident", ident.Kind)
+		return nil
+	}
+
+	return &Data{
+		Lvalue:   false,
+		Decl:     false,
+		Mutable:  false,
+		Constant: true,
+		Kind:     &TypeKind{f.instance()},
+	}
+}
+
 func (e *_Eval) eval_sub_ident(si *ast.SubIdentExpr) *Data {
 	// TODO: Implement built-in primitive type constants.
 
@@ -1193,6 +1209,9 @@ func (e *_Eval) eval_sub_ident(si *ast.SubIdentExpr) *Data {
 	switch {
 	case kind.Enm() != nil:
 		return e.eval_enum_sub_ident(kind.Enm(), si.Ident)
+	
+	case kind.Trt() != nil:
+		return e.eval_trait_sub_ident(kind.Trt(), si.Ident)
 
 	default:
 		e.push_err(si.Ident, "obj_not_support_sub_fields", d.Kind.To_str())
