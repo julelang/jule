@@ -355,7 +355,7 @@ func (s *_Sema) check_type_compatibility(dest *TypeKind, src *TypeKind, error_to
 }
 
 func (s *_Sema) check_validity_for_init_expr(left_mut bool, d *Data, error_token lex.Token) {
-	if left_mut && !d.Mutable && is_mut(d.Kind) {
+	if d.Lvalue && left_mut && !d.Mutable && is_mut(d.Kind) {
 		s.push_err(error_token, "assignment_non_mut_to_mut")
 		return
 	}
@@ -969,6 +969,7 @@ func (s *_Sema) check_type_global(decl *Var) {
 		// Build new TypeSymbol because
 		// auto-type symbols are nil.
 		decl.Kind = &TypeSymbol{Kind: data.Kind}
+
 		s.check_data_for_auto_type(data, decl.Value.Expr.Token)
 		s.check_validity_for_init_expr(decl.Mutable, data, decl.Value.Expr.Token)
 	} else {

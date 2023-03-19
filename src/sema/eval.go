@@ -1037,7 +1037,7 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 	switch kind.(type) {
 	case *ast.LitExpr:
 		return e.eval_lit(kind.(*ast.LitExpr))
-
+		
 	case *ast.IdentExpr:
 		return e.eval_ident(kind.(*ast.IdentExpr))
 
@@ -1076,16 +1076,16 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 // Returns value data of evaluated expression.
 // Returns nil if error occurs.
 func (e *_Eval) eval(expr *ast.Expr) *Data {
-	data := e.eval_expr_kind(expr.Kind)
+	d := e.eval_expr_kind(expr.Kind)
 	switch {
-	case data == nil:
+	case d == nil:
 		return nil
 
-	case data.Decl:
+	case d.Decl:
 		e.push_err(expr.Token, "invalid_expr")
 		return nil
 
 	default:
-		return data
+		return d
 	}
 }
