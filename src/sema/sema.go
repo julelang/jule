@@ -826,6 +826,23 @@ func (s *_Sema) impl_trait(decl *Impl) {
 	}
 }
 
+func (s *_Sema) impl_struct(decl *Impl) {
+	// Cpp-link state always false because cpp-linked
+	// definitions haven't support implementations.
+	const CPP_LINKED = false
+
+	dest := s.find_struct(decl.Dest.Kind, CPP_LINKED)
+	if dest == nil {
+		s.push_err(decl.Base, "impl_dest_not_exist", decl.Base.Kind)
+		return
+	}
+
+	switch  {
+	case !s.impl_to_struct(dest, decl):
+		return
+	}
+}
+
 // Implement implementation.
 func (s *_Sema) impl_impl(decl *Impl) {
 	switch {
@@ -833,7 +850,7 @@ func (s *_Sema) impl_impl(decl *Impl) {
 		s.impl_trait(decl)
 
 	case decl.Is_struct_impl():
-		// TODO: Implement here.
+		s.impl_struct(decl)
 	}
 }
 
@@ -886,13 +903,17 @@ func (s *_Sema) check_global_decls() (ok bool) {
 func (s *_Sema) check_struct_trait_impl(strct *Struct, trt *Trait) (ok bool) {
 	for _, tf := range trt.Methods {
 		exist := false
-		ds := s.fn_with_non_generic_type_kind(tf).To_str()
+
+		// Use tf.instance because already parsed.
+		ds := tf.instance().To_str()
+
 		sf := strct.Find_method(tf.Ident)
 		if sf != nil {
+			// Use sf.instance because already parsed.
 			exist = (
 				tf.Public == sf.Public &&
 				tf.Ident == sf.Ident &&
-				ds == s.fn_with_non_generic_type_kind(sf).To_str())
+				ds == sf.instance().To_str())
 		}
 		if !exist {
 			s.push_err(strct.Token, "not_impl_trait_def", trt.Ident, ds)
@@ -927,6 +948,11 @@ func (s *_Sema) check_struct_fields(st *Struct) (ok bool) {
 	return ok
 }
 
+func (s *_Sema) check_struct_methods(st *Struct) (ok bool) {
+	// TODO: Implement here.
+	return true
+}
+
 func (s *_Sema) check_struct_decl(strct *Struct) {
 	if lex.Is_ignore_ident(strct.Ident) {
 		s.push_err(strct.Token, "ignore_ident")
@@ -943,11 +969,12 @@ func (s *_Sema) check_struct_decl(strct *Struct) {
 	case !s.check_struct_fields(strct):
 		return
 
+	case !s.check_struct_methods(strct):
+		return
+
 	case !s.check_struct_impls(strct):
 		return
 	}
-
-	// TODO: Methods if not have any generic type.
 }
 
 // Checks current package file's structure declarations.
