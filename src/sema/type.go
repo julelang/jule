@@ -33,7 +33,12 @@ type _Kind interface {
 // Type's kind's type.
 type TypeKind struct { kind _Kind }
 // Returns kind as string.
-func (tk TypeKind) To_str() string { return tk.kind.To_str() }
+func (tk TypeKind) To_str() string {
+	if tk.Is_nil() {
+		return "nil"
+	}
+	return tk.kind.To_str()
+}
 // Reports whether kind is "nil".
 func (tk *TypeKind) Is_nil() bool { return tk.kind == nil }
 // Returns primitive type if kind is primitive type, nil if not.

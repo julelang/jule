@@ -771,15 +771,16 @@ func (ep *_ExprBuilder) get_enumerable_parts(tokens []lex.Token) [][]lex.Token {
 }
 
 func (ep *_ExprBuilder) build_slice(tokens []lex.Token) *ast.SliceExpr {
-	parts := ep.get_enumerable_parts(tokens)
-	if len(parts) == 0 {
-		return nil
-	}
-
 	slc := &ast.SliceExpr{
 		Token: tokens[0],
-		Elems: make([]ast.ExprData, len(parts)),
 	}
+
+	parts := ep.get_enumerable_parts(tokens)
+	if len(parts) == 0 {
+		return slc
+	}
+
+	slc.Elems = make([]ast.ExprData, len(parts))
 	for i, p := range parts {
 		slc.Elems[i] = ep.build_from_tokens(p).Kind
 	}
