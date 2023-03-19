@@ -342,7 +342,7 @@ func (tb *_TypeBuilder) build_map(colon int, tokens []lex.Token) *ast.Type {
 	}  else if j < len(val_tokens) {
 		tb.push_err(val_tokens[j], "invalid_syntax")
 	}
-	mapt.Key = valt
+	mapt.Val = valt
 
 	return &ast.Type{
 		Token: colon_token,

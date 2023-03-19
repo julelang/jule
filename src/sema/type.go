@@ -620,8 +620,8 @@ func (tc *_TypeChecker) build_map(decl *ast.MapType) *Map {
 		return nil
 	}
 
-	val := tc.check_decl(decl.Key)
-	if key == nil {
+	val := tc.check_decl(decl.Val)
+	if val == nil {
 		return nil
 	}
 

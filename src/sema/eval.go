@@ -653,9 +653,14 @@ func (e *_Eval) indexing_slc(d *Data, i *ast.IndexingExpr) {
 
 func (e *_Eval) indexing_map(d *Data, i *ast.IndexingExpr) {
 	m := d.Kind.Map()
+
+	key := e.eval_expr_kind(i.Index)
+	if key == nil {
+		return
+	}
+	e.s.check_type_compatibility(m.Key, key.Kind, i.Token, true)
+
 	d.Kind = m.Val
-	
-	// TODO: Check element type compatibility.
 }
 
 func (e *_Eval) indexing_str(d *Data, i *ast.IndexingExpr) {
