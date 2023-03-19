@@ -127,7 +127,9 @@ func (p ParamIns) To_str() string {
 	if p.Decl.Variadic {
 		s += lex.KND_TRIPLE_DOT
 	}
-	s += p.Kind.To_str()
+	if p.Kind != nil {
+		s += p.Kind.To_str()
+	}
 	return s
 }
 
