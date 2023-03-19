@@ -359,7 +359,7 @@ func (s *_Sema) check_type_compatibility(dest *TypeKind, src *TypeKind, error_to
 //
 // Useful:
 //  - For non-generic type parsed string type kinds.
-//  - For illegal cycle checking.
+//  - For checking non-generic types.
 func (s *_Sema) build_non_generic_type_kind(ast *ast.Type, generics []*ast.Generic) *TypeKind {
 	ignore_idents := make([]string, len(generics))
 	for i, g := range generics {
@@ -910,6 +910,23 @@ func (s *_Sema) check_struct_impls(strct *Struct) (ok bool) {
 	return ok
 }
 
+func (s *_Sema) check_struct_fields(st *Struct) (ok bool) {
+	for _, f := range st.Fields {
+		f.Kind.Kind = s.build_non_generic_type_kind(f.Kind.Decl, st.Generics)
+		ok = f.Kind.Kind != nil && ok
+
+		for _, cf := range st.Fields {
+			if f == cf {
+				break
+			} else if f.Ident == cf.Ident {
+				s.push_err(f.Token, "duplicated_ident", f.Ident)
+				ok = false
+			}
+		}
+	}
+	return ok
+}
+
 func (s *_Sema) check_struct_decl(strct *Struct) {
 	if lex.Is_ignore_ident(strct.Ident) {
 		s.push_err(strct.Token, "ignore_ident")
@@ -923,11 +940,14 @@ func (s *_Sema) check_struct_decl(strct *Struct) {
 	case !s.check_decl_generics(strct.Generics):
 		return
 
+	case !s.check_struct_fields(strct):
+		return
+
 	case !s.check_struct_impls(strct):
 		return
 	}
 
-	// TODO: Check fields and methods if not have any generic type.
+	// TODO: Methods if not have any generic type.
 }
 
 // Checks current package file's structure declarations.
