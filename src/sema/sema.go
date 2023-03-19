@@ -382,7 +382,9 @@ func (s *_Sema) check_struct_ins(ins *StructIns, error_token lex.Token) (ok bool
 			ident:  ins.Decl.Ident,
 			refers: &ins.Decl.Refers,
 		})
-		s.errors = append(s.errors, ins.Decl.owner.errors...)
+		if s != ins.Decl.owner && len(ins.Decl.owner.errors) > 0 {
+			s.errors = append(s.errors, ins.Decl.owner.errors...)
+		}
 		if !ok {
 			return false
 		}
@@ -856,6 +858,8 @@ func (s *_Sema) check_struct_decl(strct *Struct) {
 	} else if s.is_duplicated_ident(_uintptr(strct), strct.Ident, false) {
 		s.push_err(strct.Token, "duplicated_ident", strct.Ident)
 	}
+
+	strct.owner = s
 
 	ok := s.check_decl_generics(strct.Generics)
 	if !ok {

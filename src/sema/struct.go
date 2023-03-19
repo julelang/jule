@@ -142,3 +142,25 @@ func (s StructIns) To_str() string {
 	}
 	return kind
 }
+
+// Returns method by identifier.
+// Returns nil if not exist any method in this identifier.
+func (s *StructIns) Find_method(ident string) *FnIns {
+	for _, f := range s.Methods {
+		if f.Decl.Ident == ident {
+			return f
+		}
+	}
+	return nil
+}
+
+// Returns field by identifier.
+// Returns nil if not exist any field in this identifier.
+func (s *StructIns) Find_field(ident string) *FieldIns {
+	for _, f := range s.Fields {
+		if f.Decl.Ident == ident {
+			return f
+		}
+	}
+	return nil
+}

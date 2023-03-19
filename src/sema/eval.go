@@ -1019,6 +1019,10 @@ func (e *_Eval) eval_ns_selection(s *ast.NsSelectionExpr) *Data {
 	return d
 }
 
+func (e *_Eval) is_instanced_struct(s *StructIns) bool {
+	return len(s.Decl.Generics) == len(s.Generics)
+}
+
 func (e *_Eval) eval_struct_lit(lit *ast.StructLit) *Data {
 	t := build_type(lit.Kind)
 	ok := e.s.check_type(t)
@@ -1184,6 +1188,30 @@ func (e *_Eval) eval_trait_sub_ident(trt *Trait, ident lex.Token) *Data {
 	}
 }
 
+func (e *_Eval) eval_struct_sub_ident(d *Data, si *ast.SubIdentExpr, ref bool) *Data {
+	s := d.Kind.Strct()
+
+	// TODO: Apply interior mutability.
+	f := s.Find_field(si.Ident.Kind)
+	if f != nil {
+		d.Kind = f.Kind
+		return d
+	}
+
+	m := s.Find_method(si.Ident.Kind)
+	if m == nil {
+		e.push_err(si.Ident, "obj_have_not_ident", si.Ident.Kind)
+		return nil
+	}
+
+	if m.Decl.Params[0].Is_ref() && !ref {
+		e.push_err(si.Ident, "ref_method_used_with_not_ref_instance")
+	}
+
+	d.Kind = m.Result
+	return d
+}
+
 func (e *_Eval) eval_sub_ident(si *ast.SubIdentExpr) *Data {
 	// TODO: Implement built-in primitive type constants.
 
@@ -1212,11 +1240,16 @@ func (e *_Eval) eval_sub_ident(si *ast.SubIdentExpr) *Data {
 	
 	case kind.Trt() != nil:
 		return e.eval_trait_sub_ident(kind.Trt(), si.Ident)
-
-	default:
-		e.push_err(si.Ident, "obj_not_support_sub_fields", d.Kind.To_str())
-		return nil
+	
+	case kind.Strct() != nil:
+		s := kind.Strct()
+		if e.is_instanced_struct(s) {
+			used_reference_elem := kind != d.Kind
+			return e.eval_struct_sub_ident(d, si, used_reference_elem)
+		}
 	}
+	e.push_err(si.Ident, "obj_not_support_sub_fields", d.Kind.To_str())
+	return nil
 }
 
 func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
