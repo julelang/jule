@@ -161,6 +161,7 @@ var ERRORS = map[string]string{
 	`impl_dest_not_exist`:                      `any valid destination definition is not exist in this identifier: @`,
 	`struct_already_have_ident`:                `struct @ already have a define in this identifier: @`,
 	`unsafe_ptr_indexing`:                      `unsafe pointers not supports indexing`,
+	`method_has_generic_with_same_ident`:       `methods cannot have same generic identifier with owner same time`,
 }
 
 // Returns formatted error message by key and args.

@@ -792,6 +792,17 @@ func (s *_Sema) impl_to_struct(dest *Struct, ipl *Impl) (ok bool) {
 			continue
 		}
 
+		if len(dest.Generics) > 0 && len(f.Generics) > 0 {
+			for _, fg := range f.Generics {
+				for _, dg := range dest.Generics {
+					if fg.Ident == dg.Ident {
+						s.push_err(fg.Token, "method_has_generic_with_same_ident")
+						ok = false
+					}
+				}
+			}
+		}
+
 		dest.Methods = append(dest.Methods, f)
 	}
 	return
@@ -945,11 +956,6 @@ func (s *_Sema) check_struct_fields(st *Struct) (ok bool) {
 	return ok
 }
 
-func (s *_Sema) check_struct_methods(st *Struct) (ok bool) {
-	// TODO: Implement here.
-	return true
-}
-
 func (s *_Sema) check_struct_decl(strct *Struct) {
 	if lex.Is_ignore_ident(strct.Ident) {
 		s.push_err(strct.Token, "ignore_ident")
@@ -963,9 +969,6 @@ func (s *_Sema) check_struct_decl(strct *Struct) {
 		return
 		
 	case !s.check_struct_fields(strct):
-		return
-
-	case !s.check_struct_methods(strct):
 		return
 
 	case !s.check_struct_impls(strct):
