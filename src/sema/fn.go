@@ -5,6 +5,8 @@
 package sema
 
 import (
+	"strings"
+
 	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/lex"
 )
@@ -23,6 +25,11 @@ type Param struct {
 	Kind     *TypeSymbol
 	Ident    string
 }
+
+// Reports whether parameter is self (receiver) parameter.
+func (p *Param) Is_self() bool { return strings.HasSuffix(p.Ident, lex.KND_SELF) }
+// Reports whether self (receiver) parameter is reference.
+func (p *Param) Is_ref() bool { return p.Ident != "" && p.Ident[0] == '&'}
 
 // Implement: Kind
 // Returns Param's type kind as string.

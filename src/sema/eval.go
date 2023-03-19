@@ -30,9 +30,9 @@ type Data struct {
 }
 
 // Reports whether Data is nil literal.
-func (d *Data) Is_nil() bool { return d.Kind == nil }
+func (d *Data) Is_nil() bool { return d.Kind.Is_nil() }
 // Reports whether Data is void.
-func (d *Data) Is_void() bool { return d.Kind != nil && d.Kind.kind == nil }
+func (d *Data) Is_void() bool { return d.Kind == nil }
 
 func build_void_data() *Data {
 	return &Data{
@@ -40,9 +40,7 @@ func build_void_data() *Data {
 		Lvalue:   false,
 		Decl:     false,
 		Constant: false,
-		Kind:     &TypeKind{
-			kind: nil,
-		},
+		Kind:     nil,
 	}
 }
 
@@ -110,7 +108,7 @@ func (e *_Eval) lit_nil() *Data {
 		Mutable:  false,
 		Constant: true,
 		Decl:     false,
-		Kind:     nil,
+		Kind:     &TypeKind{kind: nil},
 	}
 }
 

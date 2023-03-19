@@ -329,15 +329,17 @@ func (s *_Sema) check_type_compatibility(dest *TypeKind, src *TypeKind, error_to
 		src:         src,
 	}
 	ok := tcc.check()
-	if ok {
-		return
-	}
 
-	if dest_kind == src_kind {
-		return
-	}
+	switch {
+	case ok:
+		// Ok.
 
-	s.push_err(error_token, "incompatible_types", dest_kind, src_kind)
+	case dest_kind == src_kind:
+		// Ok.
+
+	default:
+		s.push_err(error_token, "incompatible_types", dest_kind, src_kind)
+	}
 }
 
 func (s *_Sema) check_struct_ins(ins *StructIns, error_token lex.Token) (ok bool) {

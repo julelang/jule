@@ -34,6 +34,8 @@ type _Kind interface {
 type TypeKind struct { kind _Kind }
 // Returns kind as string.
 func (tk TypeKind) To_str() string { return tk.kind.To_str() }
+// Reports whether kind is "nil".
+func (tk *TypeKind) Is_nil() bool { return tk.kind == nil }
 // Returns primitive type if kind is primitive type, nil if not.
 func (tk *TypeKind) Prim() *Prim {
 	switch tk.kind.(type) {
@@ -270,6 +272,15 @@ func is_lvalue(t *TypeKind) bool {
 
 func is_mut(t *TypeKind) bool {
 	return t.Slc() != nil || t.Ptr() != nil || t.Ref() != nil
+}
+
+func is_nil_compatible(t *TypeKind) bool {
+	return (t.Is_nil() ||
+		t.Func() != nil ||
+		t.Ptr() != nil ||
+		t.Slc() != nil ||
+		t.Trt() != nil ||
+		t.Map() != nil)
 }
 
 func is_variadicable(tk *TypeKind) bool { return tk.Slc() != nil }
