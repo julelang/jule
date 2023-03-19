@@ -360,10 +360,14 @@ func (s *_Sema) check_type_compatibility(dest *TypeKind, src *TypeKind, error_to
 // Useful:
 //  - For non-generic type parsed string type kinds.
 //  - For checking non-generic types.
-func (s *_Sema) build_non_generic_type_kind(ast *ast.Type, generics []*ast.Generic) *TypeKind {
-	ignore_idents := make([]string, len(generics))
-	for i, g := range generics {
-		ignore_idents[i] = g.Ident
+func (s *_Sema) build_non_generic_type_kind(ast *ast.Type, generics [][]*ast.Generic) *TypeKind {
+	ignore_idents := make([][]string, len(generics))
+	for i, grp := range generics {
+		part := make([]string, len(grp))
+		for j, g := range grp {
+			part[j] = g.Ident
+		}
+		ignore_idents[i] = part
 	}
 
 	tc := _TypeChecker{
@@ -375,14 +379,29 @@ func (s *_Sema) build_non_generic_type_kind(ast *ast.Type, generics []*ast.Gener
 }
 
 func (s *_Sema) fn_with_non_generic_type_kind(f *Fn) *FnIns {
+	generics := [][]*ast.Generic{f.Generics}
 	ins := f.instance_force()
 	for _, p := range ins.Params {
 		if !p.Decl.Is_self() {
-			p.Kind = s.build_non_generic_type_kind(p.Decl.Kind.Decl, f.Generics)
+			p.Kind = s.build_non_generic_type_kind(p.Decl.Kind.Decl, generics)
 		}
 	}
 	if !f.Is_void() {
-		ins.Result = s.build_non_generic_type_kind(f.Result.Kind.Decl, f.Generics)
+		ins.Result = s.build_non_generic_type_kind(f.Result.Kind.Decl, generics)
+	}
+	return ins
+}
+
+func (s *_Sema) method_with_non_generic_type_kind(st *Struct, f *Fn) *FnIns {
+	generics := [][]*ast.Generic{f.Generics, st.Generics}
+	ins := f.instance_force()
+	for _, p := range ins.Params {
+		if !p.Decl.Is_self() {
+			p.Kind = s.build_non_generic_type_kind(p.Decl.Kind.Decl, generics)
+		}
+	}
+	if !f.Is_void() {
+		ins.Result = s.build_non_generic_type_kind(f.Result.Kind.Decl, generics)
 	}
 	return ins
 }
@@ -920,7 +939,7 @@ func (s *_Sema) check_struct_trait_impl(strct *Struct, trt *Trait) (ok bool) {
 			exist = (
 				tf.Public == sf.Public &&
 				tf.Ident == sf.Ident &&
-				ds == s.fn_with_non_generic_type_kind(sf).To_str())
+				ds == s.method_with_non_generic_type_kind(strct, sf).To_str())
 		}
 		if !exist {
 			s.push_err(strct.Token, "not_impl_trait_def", trt.Ident, ds)
@@ -940,8 +959,9 @@ func (s *_Sema) check_struct_impls(strct *Struct) (ok bool) {
 
 func (s *_Sema) check_struct_fields(st *Struct) (ok bool) {
 	ok = true
+	generics := [][]*ast.Generic{st.Generics}
 	for _, f := range st.Fields {
-		f.Kind.Kind = s.build_non_generic_type_kind(f.Kind.Decl, st.Generics)
+		f.Kind.Kind = s.build_non_generic_type_kind(f.Kind.Decl, generics)
 		ok = f.Kind.Kind != nil && ok
 
 		for _, cf := range st.Fields {

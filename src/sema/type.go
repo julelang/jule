@@ -330,7 +330,9 @@ type _TypeChecker struct {
 
 	// This identifiers ignored and
 	// appends as primitive type.
-	ignore_idents []string
+	//
+	// Each dimension 2 array accepted as identifier group.
+	ignore_idents [][]string
 }
 
 func (tc *_TypeChecker) push_err(token lex.Token, key string, args ...any) {
@@ -473,9 +475,11 @@ func (tc *_TypeChecker) from_struct(decl *ast.IdentType, s *Struct) *StructIns {
 }
 
 func (tc *_TypeChecker) get_def(decl *ast.IdentType) _Kind {
-	for i, ig := range tc.ignore_idents {
-		if ig == decl.Ident {
-			return build_prim_type("T" + strconv.Itoa(i))
+	for i, g := range tc.ignore_idents {
+		for j, ig := range g {
+			if ig == decl.Ident {
+				return build_prim_type("T" + strconv.Itoa(i) + strconv.Itoa(j))
+			}
 		}
 	}
 
