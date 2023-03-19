@@ -951,6 +951,36 @@ func (e *_Eval) cast_prim(t *TypeKind, d *Data, error_token lex.Token) {
 	}
 }
 
+func (e *_Eval) eval_cast_by_type_n_data(t *TypeKind, d *Data, error_token lex.Token) *Data {
+	switch {
+	case t.Ptr() != nil:
+		e.cast_ptr(t, d, error_token)
+
+	case t.Ref() != nil:
+		e.cast_ref(t, d, error_token)
+
+	case t.Slc() != nil:
+		e.cast_slc(t, d, error_token)
+
+	case t.Strct() != nil:
+		e.cast_struct(t, d, error_token)
+
+	case t.Prim() != nil:
+		e.cast_prim(t, d, error_token)
+
+	default:
+		e.push_err(error_token, "type_not_supports_casting", t.To_str())
+		d = nil
+	}
+
+	if d != nil {
+		d.Lvalue = is_lvalue(t)
+		d.Mutable = is_mut(t)
+		d.Decl = false
+	}
+	return d
+}
+
 func (e *_Eval) eval_cast(c *ast.CastExpr) *Data {
 	t := build_type(c.Kind)
 	ok := e.s.check_type(t)
@@ -963,29 +993,7 @@ func (e *_Eval) eval_cast(c *ast.CastExpr) *Data {
 		return nil
 	}
 
-	switch {
-	case t.Kind.Ptr() != nil:
-		e.cast_ptr(t.Kind, d, c.Kind.Token)
-
-	case t.Kind.Ref() != nil:
-		e.cast_ref(t.Kind, d, c.Kind.Token)
-
-	case t.Kind.Slc() != nil:
-		e.cast_slc(t.Kind, d, c.Kind.Token)
-
-	case t.Kind.Strct() != nil:
-		e.cast_struct(t.Kind, d, c.Kind.Token)
-
-	case t.Kind.Prim() != nil:
-		e.cast_prim(t.Kind, d, c.Kind.Token)
-
-	default:
-		e.push_err(c.Kind.Token, "type_not_supports_casting", t.Kind.To_str())
-	}
-
-	d.Lvalue = is_lvalue(t.Kind)
-	d.Mutable = is_mut(t.Kind)
-	return d
+	return e.eval_cast_by_type_n_data(t.Kind, d, c.Kind.Token)
 }
 
 func (e *_Eval) eval_ns_selection(s *ast.NsSelectionExpr) *Data {
@@ -1052,6 +1060,50 @@ func (e *_Eval) eval_type(t *ast.Type) *Data {
 	}
 }
 
+func (e *_Eval) call_type_fn(fc *ast.FnCallExpr, d *Data) *Data {
+	if len(fc.Generics) > 0 {
+		e.push_err(fc.Token, "type_not_supports_generics", d.Kind.To_str())
+	} else if len(fc.Args) < 1 {
+		e.push_err(fc.Token, "missing_expr_for", "v")
+	} else if len(fc.Args) > 1 {
+		e.push_err(fc.Args[1].Token, "argument_overflow")
+	}
+
+	if len(fc.Args) > 0 {
+		arg := e.eval_expr_kind(fc.Args[0].Kind)
+
+		// Skip strings beceause string constructor
+		// takes any type.
+		prim := d.Kind.Prim()
+		if prim != nil && prim.Is_str() {
+			goto _ret
+		}
+
+		if arg != nil {
+			_ = e.eval_cast_by_type_n_data(d.Kind, arg, fc.Args[0].Token)
+		}
+	}
+
+_ret:
+	d.Decl = false
+	return d
+}
+
+func (e *_Eval) eval_fn_call(fc *ast.FnCallExpr) *Data {
+	d := e.eval_expr_kind(fc.Expr.Kind)
+	if d == nil {
+		return nil
+	}
+
+	if d.Decl {
+		if d.Kind.Prim() != nil {
+			return e.call_type_fn(fc, d)
+		}
+	}
+
+	return nil
+}
+
 func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 	// TODO: Implement other types.
 	switch kind.(type) {
@@ -1090,6 +1142,9 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 	
 	case *ast.Type:
 		return e.eval_type(kind.(*ast.Type))
+
+	case *ast.FnCallExpr:
+		return e.eval_fn_call(kind.(*ast.FnCallExpr))
 
 	default:
 		return nil
