@@ -70,7 +70,28 @@ func (f *Fn) Is_void() bool { return f.Result == nil }
 func (f *Fn) Is_method() bool { return len(f.Params) > 0 && f.Params[0].Is_self() }
 
 func (f *Fn) instance() *FnIns {
+	// Returns already created instance for just one unique combination.
+	if len(f.Generics) == 0 && len(f.Combines) == 1 {
+		return f.Combines[0]
+	}
+
 	return &FnIns{Decl: f}
+}
+
+func (f *Fn) append_instance(ins *FnIns) {
+	// Skip already created instance for just one unique combination.
+	if len(f.Generics) == 0 && len(f.Combines) == 1 {
+		return
+	}
+
+	for _, ains := range f.Combines {
+		for i, ag := range ains.Generics {
+			if ag.To_str() != ins.Generics[i].To_str() {
+				f.Combines = append(f.Combines, ins)
+				return
+			}
+		}
+	}
 }
 
 // Function instance.

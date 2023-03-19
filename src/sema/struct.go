@@ -48,6 +48,29 @@ type Struct struct {
 	Instances  []*StructIns
 }
 
+func (s *Struct) instance() *StructIns {
+	// Returns already created instance for just one unique combination.
+	if len(s.Generics) == 0 && len(s.Instances) == 1 {
+		return s.Instances[0]
+	}
+
+	ins := &StructIns{
+		Decl:    s,
+		Fields:  make([]*FieldIns, len(s.Fields)),
+		Methods: make([]*FnIns, len(s.Methods)),
+	}
+
+	for i, f := range s.Fields {
+		ins.Fields[i] = f.instance()
+	}
+
+	for i, f := range s.Methods {
+		ins.Methods[i] = f.instance()
+	}
+
+	return ins
+}
+
 func (s *Struct) append_instance(ins *StructIns) {
 	// Skip already created instance for just one unique combination.
 	if len(s.Generics) == 0 && len(s.Instances) == 1 {
@@ -57,6 +80,10 @@ func (s *Struct) append_instance(ins *StructIns) {
 	for _, ains := range s.Instances {
 		for i, ag := range ains.Generics {
 			if ag.To_str() != ins.Generics[i].To_str() {
+				for _, f := range ins.Methods {
+					f.Decl.append_instance(f)
+				}
+
 				s.Instances = append(s.Instances, ins)
 				return
 			}
@@ -83,29 +110,6 @@ func (s *Struct) Is_implements(t *Trait) bool {
 		}
 	}
 	return false
-}
-
-func (s *Struct) instance() *StructIns {
-	// Returns already created instance for just one unique combination.
-	if len(s.Generics) == 0 && len(s.Instances) == 1 {
-		return s.Instances[0]
-	}
-
-	ins := &StructIns{
-		Decl:    s,
-		Fields:  make([]*FieldIns, len(s.Fields)),
-		Methods: make([]*FnIns, len(s.Methods)),
-	}
-
-	for i, f := range s.Fields {
-		ins.Fields[i] = f.instance()
-	}
-
-	for i, f := range s.Methods {
-		ins.Methods[i] = f.instance()
-	}
-
-	return ins
 }
 
 // Field structure.

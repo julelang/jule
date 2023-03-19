@@ -20,6 +20,8 @@ type Data struct {
 	// True if kind is declaration such as:
 	//  - *Enum
 	//  - *Struct
+	//  - int type
+	//  - bool type
 	Decl       bool
 
 	// This field is reminder.
@@ -1037,6 +1039,19 @@ func (e *_Eval) eval_struct_lit(lit *ast.StructLit) *Data {
 	}
 }
 
+func (e *_Eval) eval_type(t *ast.Type) *Data {
+	tk := build_type(t)
+	ok := e.s.check_type(tk)
+	if !ok {
+		return nil
+	}
+
+	return &Data{
+		Decl: true,
+		Kind: tk.Kind,
+	}
+}
+
 func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 	// TODO: Implement other types.
 	switch kind.(type) {
@@ -1072,6 +1087,9 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 
 	case *ast.StructLit:
 		return e.eval_struct_lit(kind.(*ast.StructLit))
+	
+	case *ast.Type:
+		return e.eval_type(kind.(*ast.Type))
 
 	default:
 		return nil
