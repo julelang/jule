@@ -416,12 +416,31 @@ func (s *_Sema) check_type_alias_decls() (ok bool) {
 	return true
 }
 
+func (s *_Sema) check_enum_items_dup(e *Enum) {
+	for _, item := range e.Items {
+		if lex.Is_ignore_ident(item.Ident) {
+			s.push_err(item.Token, "ignore_ident")
+		} else {
+			for _, citem := range e.Items {
+				if item == citem {
+					break
+				} else if item.Ident == citem.Ident {
+					s.push_err(item.Token, "duplicated_ident", item.Ident)
+					break
+				}
+			}
+		}
+	}
+}
+
 func (s *_Sema) check_enum_decl(e *Enum) {
 	if lex.Is_ignore_ident(e.Ident) {
 		s.push_err(e.Token, "ignore_ident")
 	} else if s.is_duplicated_ident(_uintptr(e), e.Ident, false) {
 		s.push_err(e.Token, "duplicated_ident", e.Ident)
 	}
+
+	s.check_enum_items_dup(e)
 
 	if e.Kind != nil {
 		if !s.check_type_with_refers(e.Kind, &_Referencer{
@@ -584,10 +603,6 @@ func (s *_Sema) check_fn_decl_result_dup(f *Fn) (ok bool) {
 // Checks generics, parameters and return type.
 // Not checks scope, and other things.
 func (s *_Sema) check_fn_decl_prototype(f *Fn) (ok bool) {
-	// TODO:
-	//  - Check return type.
-	//  |- Check parameter types.
-	//  |- Build non-generic types if function has generic types.
 	switch {
 	case !s.check_decl_generics(f.Generics):
 		return false
