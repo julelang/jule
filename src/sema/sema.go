@@ -354,6 +354,19 @@ func (s *_Sema) check_type_compatibility(dest *TypeKind, src *TypeKind, error_to
 	}
 }
 
+func (s *_Sema) check_validity_for_init_expr(left_mut bool, d *Data, error_token lex.Token) {
+	if left_mut && !d.Mutable && is_mut(d.Kind) {
+		s.push_err(error_token, "assignment_non_mut_to_mut")
+		return
+	}
+	atc := _AssignTypeChecker{
+		s:           s,
+		d:           d,
+		error_token: error_token,
+	}
+	_ = atc.check_validity()
+}
+
 func (s *_Sema) check_struct_ins(ins *StructIns, error_token lex.Token) (ok bool) {
 	// TODO: Skip checking if already parsed instance.
 
@@ -957,7 +970,7 @@ func (s *_Sema) check_type_global(decl *Var) {
 		// auto-type symbols are nil.
 		decl.Kind = &TypeSymbol{Kind: data.Kind}
 		s.check_data_for_auto_type(data, decl.Value.Expr.Token)
-		// TODO: Check assignment validity.
+		s.check_validity_for_init_expr(decl.Mutable, data, decl.Value.Expr.Token)
 	} else {
 		arr := decl.Kind.Kind.Arr()
 		if arr != nil && arr.Auto {
