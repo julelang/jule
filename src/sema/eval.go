@@ -1089,6 +1089,49 @@ _ret:
 	return d
 }
 
+func (e *_Eval) check_fn_call_generics(f *FnIns,
+	fc *ast.FnCallExpr) (ok bool, dynamic_annotation bool) {
+	switch {
+	case len(f.Generics) > 0 && len(fc.Generics) == 0:
+		dynamic_annotation = true
+		// Append empty types to generics for ordering.
+		i := 0
+		for ; i < len(f.Generics); i++ {
+			f.Generics = append(f.Generics, &TypeKind{})
+		}
+		return true, true
+
+	case !e.s.check_generic_quantity(len(f.Generics), len(fc.Generics), fc.Token):
+		return false, false
+
+	default:
+		return true, false
+	}
+}
+
+func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
+	f := d.Kind.Func()
+	if !d.Mutable && f.Decl.Is_method() && f.Decl.Params[0].Mutable {
+		e.push_err(fc.Token, "mutable_operation_on_immutable")
+	} else if !e.is_unsafe() && f.Decl.Unsafety {
+		e.push_err(fc.Token, "unsafe_behavior_at_out_of_unsafe_scope")
+	}
+
+	// TODO: Check dynamic annotation fails.
+	ok, dynamic_annotation := e.check_fn_call_generics(f, fc)
+	if !ok {
+		return nil
+	}
+	_ = dynamic_annotation // Ignore compiler error.
+
+	// TODO: Apply generics.
+	// TODO: Check arguments.
+	f.Decl.append_instance(f)
+
+	d.Lvalue = is_lvalue(d.Kind)
+	return d
+}
+
 func (e *_Eval) eval_fn_call(fc *ast.FnCallExpr) *Data {
 	d := e.eval_expr_kind(fc.Expr.Kind)
 	if d == nil {
@@ -1101,7 +1144,12 @@ func (e *_Eval) eval_fn_call(fc *ast.FnCallExpr) *Data {
 		}
 	}
 
-	return nil
+	if d.Kind.Func() == nil {
+		e.push_err(fc.Token, "invalid_syntax")
+		return nil
+	}
+
+	return e.call_fn(fc, d)
 }
 
 func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
