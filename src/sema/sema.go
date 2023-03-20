@@ -293,14 +293,20 @@ func (s *_Sema) check_type(t *TypeSymbol) (ok bool) {
 	return s.check_type_with_refers(t, nil)
 }
 
-// Builds type.
+// Builds type with type aliases for generics.
 // Returns nil if error occur or failed.
-func (s *_Sema) build_type(t *ast.Type) *TypeKind {
+func (s *_Sema) build_type_with_generics(t *ast.Type, generics []*TypeAlias) *TypeKind {
 	tc := _TypeChecker{
-		s:          s,
-		lookup:     s,
+		s:            s,
+		lookup:       s,
+		use_generics: generics,
 	}
 	return tc.check_decl(t)
+}
+
+// Same as s.build_type_with_generics but not uses any generics.
+func (s *_Sema) build_type(t *ast.Type) *TypeKind {
+	return s.build_type_with_generics(t, nil)
 }
 
 // Evaluates expression with type prefixed Eval and returns result.
@@ -376,30 +382,21 @@ func (s *_Sema) check_type_compatibility(dest *TypeKind, src *TypeKind, error_to
 // Useful:
 //  - For non-generic type parsed string type kinds.
 //  - For checking non-generic types.
-func (s *_Sema) build_non_generic_type_kind(ast *ast.Type, generics [][]*ast.Generic) *TypeKind {
-	ignore_idents := make([][]string, len(generics))
-	for i, grp := range generics {
-		part := make([]string, len(grp))
-		for j, g := range grp {
-			part[j] = g.Ident
-		}
-		ignore_idents[i] = part
-	}
-
+func (s *_Sema) build_non_generic_type_kind(ast *ast.Type, generics []*ast.Generic) *TypeKind {
 	tc := _TypeChecker{
-		s:             s,
-		lookup:        s,
-		ignore_idents: ignore_idents,
+		s:               s,
+		lookup:          s,
+		ignore_generics: generics,
 	}
 	return tc.check_decl(ast)
 }
 
 func (s *_Sema) build_fn_non_generic_type_kinds(f *FnIns) {
-	var generics [][]*ast.Generic
+	var generics []*ast.Generic
 	if f.Decl.Is_method() {
-		generics = [][]*ast.Generic{f.Decl.Generics, f.Decl.Owner.Generics}
+		generics = append(f.Decl.Generics, f.Decl.Owner.Generics...)
 	} else {
-		generics = [][]*ast.Generic{f.Decl.Generics}
+		generics = f.Decl.Generics
 	}
 
 	for _, p := range f.Params {
@@ -419,7 +416,7 @@ func (s *_Sema) fn_with_non_generic_type_kind(f *Fn) *FnIns {
 }
 
 func (s *_Sema) method_with_non_generic_type_kind(st *Struct, f *Fn) *FnIns {
-	generics := [][]*ast.Generic{f.Generics, st.Generics}
+	generics := append(f.Generics, st.Generics...)
 	ins := f.instance_force()
 	for _, p := range ins.Params {
 		if !p.Decl.Is_self() {
@@ -433,15 +430,26 @@ func (s *_Sema) method_with_non_generic_type_kind(st *Struct, f *Fn) *FnIns {
 }
 
 func (s *_Sema) reload_fn_ins_types(f *FnIns) (ok bool) {
+	generics := make([]*TypeAlias, len(f.Generics))
+	for i, g := range f.Generics {
+		generics[i] = &TypeAlias{
+			Ident: f.Decl.Generics[i].Ident,
+			Kind:  &TypeSymbol{
+				Kind: g,
+			},
+		}
+	}
+
+	ok = true
 	for _, p := range f.Params {
 		if !p.Decl.Is_self() {
-			p.Kind = s.build_type(p.Decl.Kind.Decl)
+			p.Kind = s.build_type_with_generics(p.Decl.Kind.Decl, generics)
 			ok = p.Kind != nil && ok
 		}
 	}
 
 	if !f.Decl.Is_void() {
-		f.Result = s.build_type(f.Decl.Result.Kind.Decl)
+		f.Result = s.build_type_with_generics(f.Decl.Result.Kind.Decl, generics)
 		ok = f.Result != nil && ok
 	}
 
@@ -1003,9 +1011,8 @@ func (s *_Sema) check_struct_impls(strct *Struct) (ok bool) {
 
 func (s *_Sema) check_struct_fields(st *Struct) (ok bool) {
 	ok = true
-	generics := [][]*ast.Generic{st.Generics}
 	for _, f := range st.Fields {
-		f.Kind.Kind = s.build_non_generic_type_kind(f.Kind.Decl, generics)
+		f.Kind.Kind = s.build_non_generic_type_kind(f.Kind.Decl, st.Generics)
 		ok = f.Kind.Kind != nil && ok
 
 		for _, cf := range st.Fields {

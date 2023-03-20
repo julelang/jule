@@ -347,7 +347,10 @@ type _TypeChecker struct {
 	// appends as primitive type.
 	//
 	// Each dimension 2 array accepted as identifier group.
-	ignore_idents [][]string
+	ignore_generics []*ast.Generic
+
+	// This generics used as type alias for real kind.
+	use_generics    []*TypeAlias
 }
 
 func (tc *_TypeChecker) push_err(token lex.Token, key string, args ...any) {
@@ -490,11 +493,15 @@ func (tc *_TypeChecker) from_struct(decl *ast.IdentType, s *Struct) *StructIns {
 }
 
 func (tc *_TypeChecker) get_def(decl *ast.IdentType) _Kind {
-	for i, g := range tc.ignore_idents {
-		for j, ig := range g {
-			if ig == decl.Ident {
-				return build_prim_type("T" + strconv.Itoa(i) + strconv.Itoa(j))
-			}
+	for _, g := range tc.ignore_generics {
+		if g.Ident == decl.Ident {
+			return build_prim_type(g.Ident)
+		}
+	}
+
+	for _, g := range tc.use_generics {
+		if g.Ident == decl.Ident {
+			return g.Kind.Kind
 		}
 	}
 

@@ -227,6 +227,58 @@ func (atc *_AssignTypeChecker) check() {
 	}
 }
 
+type _DynamicTypeAnnotation struct {
+	e           *_Eval
+	f           *FnIns
+	p           *ParamIns
+	a           *Data
+	error_token lex.Token
+
+	generics  []*ast.Generic
+}
+
+func (dta *_DynamicTypeAnnotation) push_generic(k *TypeKind, i int) {
+	if k.Enm() != nil {
+		dta.e.push_err(dta.error_token, "enum_not_supports_as_generic")
+	}
+	dta.f.Generics[i] = k
+}
+
+func (dta *_DynamicTypeAnnotation) annotate_prim(k *TypeKind) (ok bool) {
+	kind := dta.p.Kind.To_str()
+	for i, g := range dta.generics {
+		if kind != g.Ident {
+			continue
+		}
+
+		t := &dta.f.Generics[i]
+		if t == nil {
+			dta.push_generic(k, i)
+		}
+		dta.p.Kind = k
+		return true
+	}
+
+	return false
+}
+
+func (dta *_DynamicTypeAnnotation) annotate_kind(k *TypeKind) (ok bool) {
+	// TODO: Implement other types.
+	switch {
+	case k.Prim() != nil:
+		return dta.annotate_prim(k)
+
+	default:
+		return false
+	}
+}
+
+func (dta *_DynamicTypeAnnotation) annotate() (ok bool) {
+	dta.generics = dta.f.Decl.Generics
+
+	return dta.annotate_kind(dta.a.Kind)
+}
+
 type _FnCallArgChecker struct {
 	e                  *_Eval
 	args               []*ast.Expr
@@ -281,7 +333,20 @@ func (fcac *_FnCallArgChecker) check_counts(params []*ParamIns) (ok bool) {
 }
 
 func (fcac *_FnCallArgChecker) check_arg(p *ParamIns, arg *Data, error_token lex.Token) (ok bool) {
-	// TODO: Apply dynamic type annotation.
+	if fcac.dynamic_annotation {
+		dta := _DynamicTypeAnnotation{
+			e:           fcac.e,
+			f:           fcac.f,
+			p:           p,
+			a:           arg,
+			error_token: error_token,
+		}
+		ok = dta.annotate()
+		if !ok {
+			fcac.push_err_token(error_token, "dynamic_type_annotation_failed")
+			return false
+		}
+	}
 
 	fcac.e.s.check_validity_for_init_expr(p.Decl.Mutable, arg, error_token)
 	fcac.e.s.check_assign_type(p.Kind, arg, error_token, false)
@@ -366,6 +431,16 @@ iter:
 	return ok
 }
 
+func (fcac *_FnCallArgChecker) check_dynamic_type_annotation() (ok bool) {
+	for _, g := range fcac.f.Generics {
+		if g == nil {
+			fcac.push_err("dynamic_type_annotation_failed")
+			return false
+		}
+	}
+	return true
+}
+
 func (fcac *_FnCallArgChecker) check() (ok bool) {
 	params := fcac.get_params()
 
@@ -382,6 +457,9 @@ func (fcac *_FnCallArgChecker) check() (ok bool) {
 	}
 
 	ok = fcac.check_args(params)
+	if fcac.dynamic_annotation {
+		ok = fcac.check_dynamic_type_annotation()
+	}
 
 	return ok
 }

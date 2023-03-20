@@ -1099,19 +1099,27 @@ _ret:
 func (e *_Eval) check_fn_call_generics(f *FnIns,
 	fc *ast.FnCallExpr) (ok bool, dynamic_annotation bool) {
 	switch {
-	case len(f.Generics) > 0 && len(fc.Generics) == 0:
+	case len(f.Decl.Generics) > 0 && len(fc.Generics) == 0 && len(f.Params) > 0:
 		dynamic_annotation = true
-		// Append empty types to generics for ordering.
-		i := 0
-		for ; i < len(f.Generics); i++ {
-			f.Generics = append(f.Generics, &TypeKind{})
-		}
+		// Make empty types to generics for ordering.
+		f.Generics = make([]*TypeKind, len(f.Decl.Generics))
 		return true, true
 
-	case !e.s.check_generic_quantity(len(f.Generics), len(fc.Generics), fc.Token):
+	case !e.s.check_generic_quantity(len(f.Decl.Generics), len(fc.Generics), fc.Token):
 		return false, false
 
 	default:
+		// Build real kinds of generic types.
+		f.Generics = make([]*TypeKind, len(f.Decl.Generics))
+		for i, g := range fc.Generics {
+			k := build_type(g)
+			ok := e.s.check_type(k)
+			if !ok {
+				return false, false
+			}
+			f.Generics[i] = k.Kind
+		}
+
 		return true, false
 	}
 }
@@ -1124,18 +1132,19 @@ func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
 		e.push_err(fc.Token, "unsafe_behavior_at_out_of_unsafe_scope")
 	}
 
-	// TODO: Check dynamic annotation fails.
 	ok, dynamic_annotation := e.check_fn_call_generics(f, fc)
 	if !ok {
 		return nil
 	}
 
 	if !dynamic_annotation {
-		e.s.reload_fn_ins_types(f)
+		ok = e.s.reload_fn_ins_types(f)
+		if !ok {
+			return nil
+		}
 	} else {
 		e.s.build_fn_non_generic_type_kinds(f)
 	}
-
 	fcac := _FnCallArgChecker{
 		e:                  e,
 		f:                  f,
