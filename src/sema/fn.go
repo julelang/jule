@@ -52,6 +52,7 @@ type Fn struct {
 	Generics   []*ast.Generic
 	Result     *RetType
 	Params     []*Param
+	Owner      *Struct
 
 	// Function instances for each unique type combination of function call.
 	// Nil if function is never used.
@@ -61,7 +62,7 @@ type Fn struct {
 // Reports whether return type is void.
 func (f *Fn) Is_void() bool { return f.Result == nil }
 // Reports whether function is method.
-func (f *Fn) Is_method() bool { return len(f.Params) > 0 && f.Params[0].Is_self() }
+func (f *Fn) Is_method() bool { return f.Owner != nil }
 
 // Force to new instance.
 func (f *Fn) instance_force() *FnIns {

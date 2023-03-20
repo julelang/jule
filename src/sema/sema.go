@@ -394,17 +394,27 @@ func (s *_Sema) build_non_generic_type_kind(ast *ast.Type, generics [][]*ast.Gen
 	return tc.check_decl(ast)
 }
 
-func (s *_Sema) fn_with_non_generic_type_kind(f *Fn) *FnIns {
-	generics := [][]*ast.Generic{f.Generics}
-	ins := f.instance_force()
-	for _, p := range ins.Params {
+func (s *_Sema) build_fn_non_generic_type_kinds(f *FnIns) {
+	var generics [][]*ast.Generic
+	if f.Decl.Is_method() {
+		generics = [][]*ast.Generic{f.Decl.Generics, f.Decl.Owner.Generics}
+	} else {
+		generics = [][]*ast.Generic{f.Decl.Generics}
+	}
+
+	for _, p := range f.Params {
 		if !p.Decl.Is_self() {
 			p.Kind = s.build_non_generic_type_kind(p.Decl.Kind.Decl, generics)
 		}
 	}
-	if !f.Is_void() {
-		ins.Result = s.build_non_generic_type_kind(f.Result.Kind.Decl, generics)
+	if !f.Decl.Is_void() {
+		f.Result = s.build_non_generic_type_kind(f.Decl.Result.Kind.Decl, generics)
 	}
+}
+
+func (s *_Sema) fn_with_non_generic_type_kind(f *Fn) *FnIns {
+	ins := f.instance_force()
+	s.build_fn_non_generic_type_kinds(ins)
 	return ins
 }
 
@@ -462,12 +472,12 @@ func (s *_Sema) check_struct_ins(ins *StructIns, error_token lex.Token) (ok bool
 	// Check field types.
 	for _, f := range ins.Fields {
 		symbol := TypeSymbol{Decl: f.Decl.Kind.Decl}
-		ok := ins.Decl.owner.check_type_with_refers(&symbol, &_Referencer{
+		ok := ins.Decl.sema.check_type_with_refers(&symbol, &_Referencer{
 			ident:  ins.Decl.Ident,
 			refers: &ins.Decl.Refers,
 		})
-		if s != ins.Decl.owner && len(ins.Decl.owner.errors) > 0 {
-			s.errors = append(s.errors, ins.Decl.owner.errors...)
+		if s != ins.Decl.sema && len(ins.Decl.sema.errors) > 0 {
+			s.errors = append(s.errors, ins.Decl.sema.errors...)
 		}
 		if !ok {
 			return false
@@ -854,6 +864,7 @@ func (s *_Sema) impl_to_struct(dest *Struct, ipl *Impl) (ok bool) {
 			}
 		}
 
+		f.Owner = dest
 		dest.Methods = append(dest.Methods, f)
 	}
 	return
@@ -907,6 +918,7 @@ func (s *_Sema) impl_struct(decl *Impl) {
 
 // Implement implementation.
 func (s *_Sema) impl_impl(decl *Impl) {
+	// TODO: Illegal implementation from out of package.
 	switch {
 	case decl.Is_trait_impl():
 		s.impl_trait(decl)
@@ -1015,7 +1027,7 @@ func (s *_Sema) check_struct_decl(strct *Struct) {
 		s.push_err(strct.Token, "duplicated_ident", strct.Ident)
 	}
 
-	strct.owner = s
+	strct.sema = s
 	switch {
 	case !s.check_decl_generics(strct.Generics):
 		return

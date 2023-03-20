@@ -28,8 +28,8 @@ func (f *Field) instance() *FieldIns {
 // Structure.
 type Struct struct {
 	// Used for type parsing.
-	// Used declaration's owner for instance type checking.
-	owner      *_Sema
+	// Used declaration'sema sema for instance type checking.
+	sema       *_Sema
 
 	Refers     []*ast.IdentType // Referred identifiers.
 	Token      lex.Token

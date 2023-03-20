@@ -235,17 +235,28 @@ type _FnCallArgChecker struct {
 	dynamic_annotation bool
 }
 
+func (fcac *_FnCallArgChecker) push_err_token(token lex.Token, key string, args ...any) {
+	fcac.e.s.push_err(token, key, args...)
+}
+
 func (fcac *_FnCallArgChecker) push_err(key string, args ...any) {
-	fcac.e.s.push_err(fcac.error_token, key, args...)
+	fcac.push_err_token(fcac.error_token, key, args...)
 }
 
-func (fcac *_FnCallArgChecker) tuple_as_params() bool {
-	return len(fcac.f.Params) > 1 && len(fcac.args) == 1
+func (fcac *_FnCallArgChecker) get_params() []*ParamIns {
+	if fcac.f.Decl.Is_method() {
+		return fcac.f.Params[1:] // Remove receiver parameter.
+	}
+	return fcac.f.Params
 }
 
-func (fcac *_FnCallArgChecker) check_counts() (ok bool) {
-	n := len(fcac.f.Params)
-	if fcac.f.Params[len(fcac.f.Params)-1].Decl.Variadic {
+func (fcac *_FnCallArgChecker) tuple_as_params(params []*ParamIns) bool {
+	return len(params) > 1 && len(fcac.args) == 1
+}
+
+func (fcac *_FnCallArgChecker) check_counts(params []*ParamIns) (ok bool) {
+	n := len(params)
+	if n > 0 && params[n-1].Decl.Variadic {
 		n--
 	}
 
@@ -254,14 +265,14 @@ func (fcac *_FnCallArgChecker) check_counts() (ok bool) {
 	case diff <= 0:
 		return true
 
-	case diff > len(fcac.f.Params):
+	case diff > len(params):
 		fcac.push_err("argument_overflow")
 		return false
 	}
 
 	idents := ""
 	for ; diff > 0; diff-- {
-		idents += ", " + fcac.f.Params[n-diff].Decl.Ident
+		idents += ", " + params[n-diff].Decl.Ident
 	}
 	idents = idents[2:] // Remove first separator.
 	fcac.push_err("missing_expr_for", idents)
@@ -277,7 +288,7 @@ func (fcac *_FnCallArgChecker) check_arg(p *ParamIns, arg *Data, error_token lex
 	return true
 }
 
-func (fcac *_FnCallArgChecker) try_tuple_as_params() (ok bool) {
+func (fcac *_FnCallArgChecker) try_tuple_as_params(params []*ParamIns) (ok bool) {
 	d := fcac.e.eval_expr_kind(fcac.args[0].Kind)
 	if d == nil {
 		return false
@@ -288,12 +299,12 @@ func (fcac *_FnCallArgChecker) try_tuple_as_params() (ok bool) {
 		return false
 	}
 
-	if len(tup.Types) != len(fcac.f.Params) {
+	if len(tup.Types) != len(params) {
 		return false
 	}
 
 	for i, arg := range tup.Types {
-		param := fcac.f.Params[i]
+		param := params[i]
 		d := Data{Kind: arg}
 		ok = fcac.check_arg(param, &d, fcac.args[0].Token) && ok
 	}
@@ -335,11 +346,11 @@ func (fcac *_FnCallArgChecker) push_variadic(p *ParamIns, i int) (ok bool) {
 	return ok
 }
 
-func (fcac *_FnCallArgChecker) check_args() (ok bool) {
+func (fcac *_FnCallArgChecker) check_args(params []*ParamIns) (ok bool) {
 	i := 0
 iter:
-	for i < len(fcac.f.Params) {
-		p := fcac.f.Params[i]
+	for i < len(params) {
+		p := params[i]
 		switch {
 		case p.Decl.Variadic:
 			// Variadiced parameters always last.
@@ -356,19 +367,21 @@ iter:
 }
 
 func (fcac *_FnCallArgChecker) check() (ok bool) {
-	if fcac.tuple_as_params() {
-		ok = fcac.try_tuple_as_params()
+	params := fcac.get_params()
+
+	if fcac.tuple_as_params(params) {
+		ok = fcac.try_tuple_as_params(params)
 		if ok {
 			return true
 		}
 	}
 
-	ok = fcac.check_counts()
+	ok = fcac.check_counts(params)
 	if !ok {
 		return false
 	}
 
-	ok = fcac.check_args()
+	ok = fcac.check_args(params)
 
-	return true
+	return ok
 }

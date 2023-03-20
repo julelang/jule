@@ -1132,6 +1132,8 @@ func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
 
 	if !dynamic_annotation {
 		e.s.reload_fn_ins_types(f)
+	} else {
+		e.s.build_fn_non_generic_type_kinds(f)
 	}
 
 	fcac := _FnCallArgChecker{
@@ -1229,7 +1231,7 @@ func (e *_Eval) eval_struct_sub_ident(d *Data, si *ast.SubIdentExpr, ref bool) *
 		e.push_err(si.Ident, "ref_method_used_with_not_ref_instance")
 	}
 
-	d.Kind = m.Result
+	d.Kind.kind = m
 	return d
 }
 
