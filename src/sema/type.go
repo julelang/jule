@@ -41,6 +41,11 @@ func (tk TypeKind) To_str() string {
 }
 // Reports whether kind is "nil".
 func (tk *TypeKind) Is_nil() bool { return tk.kind == nil }
+// Reports whether kind is "void".
+func (tk *TypeKind) Is_void() bool {
+	prim := tk.Prim()
+	return prim != nil && prim.To_str() == "void"
+}
 // Returns primitive type if kind is primitive type, nil if not.
 func (tk *TypeKind) Prim() *Prim {
 	switch tk.kind.(type) {
@@ -795,17 +800,4 @@ func (tc *_TypeChecker) check(t *TypeSymbol) {
 		return
 	}
 	t.Kind = kind
-}
-
-type _FnCallArgChecker struct {
-	s                  *_Sema
-	args               []*ast.Expr
-	error_token        lex.Token
-	f                  *FnIns
-	dynamic_annotation bool
-}
-
-func (fcac *_FnCallArgChecker) check() (ok bool) {
-	// TODO: Implement here.
-	return true
 }

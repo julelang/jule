@@ -1,6 +1,7 @@
 package sema
 
 import (
+	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
 )
@@ -224,4 +225,150 @@ func (atc *_AssignTypeChecker) check() {
 	default:
 		atc.s.check_type_compatibility(atc.dest, atc.d.Kind, atc.error_token, atc.deref)
 	}
+}
+
+type _FnCallArgChecker struct {
+	e                  *_Eval
+	args               []*ast.Expr
+	error_token        lex.Token
+	f                  *FnIns
+	dynamic_annotation bool
+}
+
+func (fcac *_FnCallArgChecker) push_err(key string, args ...any) {
+	fcac.e.s.push_err(fcac.error_token, key, args...)
+}
+
+func (fcac *_FnCallArgChecker) tuple_as_params() bool {
+	return len(fcac.f.Params) > 1 && len(fcac.args) == 1
+}
+
+func (fcac *_FnCallArgChecker) check_counts() (ok bool) {
+	n := len(fcac.f.Params)
+	if fcac.f.Params[len(fcac.f.Params)-1].Decl.Variadic {
+		n--
+	}
+
+	diff := n - len(fcac.args)
+	switch {
+	case diff <= 0:
+		return true
+
+	case diff > len(fcac.f.Params):
+		fcac.push_err("argument_overflow")
+		return false
+	}
+
+	idents := ""
+	for ; diff > 0; diff-- {
+		idents += ", " + fcac.f.Params[n-diff].Decl.Ident
+	}
+	idents = idents[2:] // Remove first separator.
+	fcac.push_err("missing_expr_for", idents)
+
+	return false
+}
+
+func (fcac *_FnCallArgChecker) check_arg(p *ParamIns, arg *Data, error_token lex.Token) (ok bool) {
+	// TODO: Apply dynamic type annotation.
+
+	fcac.e.s.check_validity_for_init_expr(p.Decl.Mutable, arg, error_token)
+	fcac.e.s.check_assign_type(p.Kind, arg, error_token, false)
+	return true
+}
+
+func (fcac *_FnCallArgChecker) try_tuple_as_params() (ok bool) {
+	d := fcac.e.eval_expr_kind(fcac.args[0].Kind)
+	if d == nil {
+		return false
+	}
+
+	tup := d.Kind.Tup()
+	if tup == nil {
+		return false
+	}
+
+	if len(tup.Types) != len(fcac.f.Params) {
+		return false
+	}
+
+	for i, arg := range tup.Types {
+		param := fcac.f.Params[i]
+		d := Data{Kind: arg}
+		ok = fcac.check_arg(param, &d, fcac.args[0].Token) && ok
+	}
+
+	return ok
+}
+
+func (fcac *_FnCallArgChecker) push(p *ParamIns, arg *ast.Expr) (ok bool) {
+	d := fcac.e.eval_expr_kind(arg.Kind)
+	if d == nil {
+		return false
+	}
+	return fcac.check_arg(p, d, arg.Token)
+}
+
+func (fcac *_FnCallArgChecker) push_variadic(p *ParamIns, i int) (ok bool) {
+	variadiced := false
+	more := i+1 < len(fcac.args)
+	for ; i < len(fcac.args); i++ {
+		arg := fcac.args[i]
+		d := fcac.e.eval_expr_kind(arg.Kind)
+		if d == nil {
+			ok = false
+			continue
+		}
+
+		if d.Variadiced {
+			variadiced = true
+			d.Kind = d.Kind.Slc().Elem
+		}
+
+		ok = fcac.check_arg(p, d, arg.Token) && ok
+	}
+
+	if variadiced && more {
+		fcac.push_err("more_args_with_variadiced")
+	}
+
+	return ok
+}
+
+func (fcac *_FnCallArgChecker) check_args() (ok bool) {
+	i := 0
+iter:
+	for i < len(fcac.f.Params) {
+		p := fcac.f.Params[i]
+		switch {
+		case p.Decl.Variadic:
+			// Variadiced parameters always last.
+			ok = fcac.push_variadic(p, i) && ok
+			break iter
+
+		default:
+			ok = fcac.push(p, fcac.args[i]) && ok
+			i++
+		}
+	}
+
+	return ok
+}
+
+func (fcac *_FnCallArgChecker) check() (ok bool) {
+	if fcac.tuple_as_params() {
+		ok = fcac.try_tuple_as_params()
+		if ok {
+			return true
+		}
+	}
+
+	ok = fcac.check_counts()
+	if !ok {
+		return false
+	}
+
+	ok = fcac.check_args()
+
+	return true
 }

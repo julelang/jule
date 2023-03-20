@@ -779,7 +779,7 @@ func (ep *_ExprBuilder) build_slice(tokens []lex.Token) *ast.SliceExpr {
 	if len(parts) == 0 {
 		return slc
 	}
-
+	
 	slc.Elems = make([]ast.ExprData, len(parts))
 	for i, p := range parts {
 		slc.Elems[i] = ep.build_from_tokens(p).Kind

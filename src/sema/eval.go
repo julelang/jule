@@ -34,7 +34,7 @@ type Data struct {
 // Reports whether Data is nil literal.
 func (d *Data) Is_nil() bool { return d.Kind.Is_nil() }
 // Reports whether Data is void.
-func (d *Data) Is_void() bool { return d.Kind == nil }
+func (d *Data) Is_void() bool { return d.Kind.Is_void() }
 
 func build_void_data() *Data {
 	return &Data{
@@ -42,7 +42,9 @@ func build_void_data() *Data {
 		Lvalue:   false,
 		Decl:     false,
 		Constant: false,
-		Kind:     nil,
+		Kind:     &TypeKind{
+			kind: build_prim_type("void"),
+		},
 	}
 }
 
@@ -261,6 +263,11 @@ func (e *_Eval) get_def(ident string, cpp_linked bool) any {
 	v := e.lookup.find_var(ident, cpp_linked)
 	if v != nil {
 		return v
+	}
+
+	f := e.lookup.find_fn(ident, cpp_linked)
+	if f != nil {
+		return f
 	}
 
 	s := e.lookup.find_struct(ident, cpp_linked)
@@ -601,10 +608,6 @@ func (e *_Eval) eval_slice_expr(s *ast.SliceExpr) *Data {
 		return nil
 	}
 
-	// Remove first element.
-	// First element always compatible with element type
-	// because first element determines to Slc's element type.
-	s.Elems = s.Elems[1:]
 	d := e.eval_exp_slc(s, first_elem.Kind)
 
 	e.prefix = prefix
@@ -1132,21 +1135,26 @@ func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
 	}
 
 	fcac := _FnCallArgChecker{
-		s:                  e.s,
+		e:                  e,
 		f:                  f,
 		args:               fc.Args,
 		dynamic_annotation: dynamic_annotation,
 		error_token:        fc.Token,
 	}
 	ok = fcac.check()
-	if !ok {
+	if !ok && dynamic_annotation {
 		return nil
 	}
 
 	f.Decl.append_instance(f)
 
-	d.Lvalue = is_lvalue(d.Kind)
-	return nil
+	if !f.Decl.Is_void() {
+		d.Kind = f.Result
+		d.Lvalue = is_lvalue(f.Result)
+	} else {
+		d = build_void_data()
+	}
+	return d
 }
 
 func (e *_Eval) eval_fn_call(fc *ast.FnCallExpr) *Data {
@@ -1263,6 +1271,25 @@ func (e *_Eval) eval_sub_ident(si *ast.SubIdentExpr) *Data {
 	}
 	e.push_err(si.Ident, "obj_not_support_sub_fields", d.Kind.To_str())
 	return nil
+}
+
+func (e *_Eval) eval_tuple_data(tup *ast.TupleExpr) []*Data {
+	datas := make([]*Data, len(tup.Expr))
+	ok := true
+	for i, expr := range tup.Expr {
+		d := e.eval_expr_kind(expr)
+		if d == nil {
+			ok = false
+			continue
+		}
+		datas[i] = d
+	}
+
+	if !ok {
+		return nil
+	}
+
+	return datas
 }
 
 func (e *_Eval) eval_tuple(tup *ast.TupleExpr) *Data {
