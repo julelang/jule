@@ -1314,8 +1314,61 @@ func (e *_Eval) eval_tuple(tup *ast.TupleExpr) *Data {
 	}
 }
 
+func (e *_Eval) eval_map(m *Map, lit *ast.BraceLit) *Data {
+	for _, expr := range lit.Exprs {
+		switch expr.(type) {
+		case *ast.KeyValPair:
+			// Ok.
+
+		default:
+			e.push_err(lit.Token, "invalid_syntax")
+			return nil
+		}
+
+		pair := expr.(*ast.KeyValPair)
+
+		key := e.eval_expr_kind(pair.Key)
+		if key == nil {
+			return nil
+		}
+
+		val := e.eval_expr_kind(pair.Val)
+		if val == nil {
+			return nil
+		}
+
+		e.s.check_assign_type(m.Key, key, pair.Colon, true)
+		e.s.check_assign_type(m.Val, val, pair.Colon, true)
+	}
+
+	return &Data{
+		Mutable:    true,
+		Lvalue:     false,
+		Variadiced: false,
+		Constant:   false,
+		Decl:       false,
+		Kind:       &TypeKind{kind: m},
+	}
+}
+
+func (e *_Eval) eval_brace_lit(lit *ast.BraceLit) *Data {
+	// TODO: Add support for structure prefix.
+	switch {
+	case e.prefix == nil:
+		e.push_err(lit.Token, "invalid_syntax")
+		return nil
+
+	case e.prefix.Map() != nil:
+		return e.eval_map(e.prefix.Map(), lit)
+	
+	default:
+		e.push_err(lit.Token, "invalid_syntax")
+		return nil
+	}
+}
+
 func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
-	// TODO: Implement other types.
+	// TODO: Implement binary operation.
 	switch kind.(type) {
 	case *ast.LitExpr:
 		return e.eval_lit(kind.(*ast.LitExpr))
@@ -1361,6 +1414,9 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 
 	case *ast.TupleExpr:
 		return e.eval_tuple(kind.(*ast.TupleExpr))
+
+	case *ast.BraceLit:
+		return e.eval_brace_lit(kind.(*ast.BraceLit))
 
 	default:
 		return nil

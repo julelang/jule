@@ -292,6 +292,7 @@ type StructLit struct {
 // Anonymous brace instiating expression.
 // Empty braces ( {} ).
 type BraceLit struct {
+	Token lex.Token
 	Exprs []ExprData
 }
 

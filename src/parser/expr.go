@@ -709,28 +709,30 @@ func (ep *_ExprBuilder) build_brace_lit_part(tokens []lex.Token) ast.ExprData {
 	l, r := split_colon(tokens)
 	// If left is not nil, colon token found.
 	if l != nil {
-		println("pair")
 		return &ast.KeyValPair{
-			Key: ep.build_from_tokens(l).Kind,
-			Val: ep.build_from_tokens(r).Kind,
+			Colon: tokens[len(l)],
+			Key:   ep.build_from_tokens(l).Kind,
+			Val:   ep.build_from_tokens(r).Kind,
 		}
 	}
-	println("non-pair")
 	return ep.build_from_tokens(tokens).Kind
 }
 
 func (ep *_ExprBuilder) build_brace_literal(tokens []lex.Token) *ast.BraceLit {
-	parts := ep.get_brace_range_literal_expr_parts(tokens)
-	if parts == nil {
-		return &ast.BraceLit{Exprs: nil}
+	lit := &ast.BraceLit{
+		Token: tokens[0],
 	}
 
-	lit := &ast.BraceLit{
-		Exprs: make([]ast.ExprData, len(parts)),
+	parts := ep.get_brace_range_literal_expr_parts(tokens)
+	if parts == nil {
+		return lit
 	}
+
+	lit.Exprs = make([]ast.ExprData, len(parts))
 	for i, part := range parts {
 		lit.Exprs[i] = ep.build_brace_lit_part(part)
 	}
+
 	return lit
 }
 
