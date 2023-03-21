@@ -268,9 +268,27 @@ func (dta *_DynamicTypeAnnotation) annotate_slc(k *TypeKind) (ok bool) {
 	if pslc == nil {
 		return false
 	}
+
 	slc := k.Slc()
 	dta.k = &pslc.Elem
 	return dta.annotate_kind(slc.Elem)
+}
+
+func (dta *_DynamicTypeAnnotation) annotate_map(k *TypeKind) (ok bool) {
+	pmap := (*dta.k).Map()
+	if pmap == nil {
+		return false
+	}
+
+	m := k.Map()
+	check := func(k **TypeKind, ck *TypeKind) (ok bool) {
+		old := dta.k
+		dta.k = k
+		ok = dta.annotate_kind(ck)
+		dta.k = old
+		return ok
+	}
+	return check(&pmap.Key, m.Key) && check(&pmap.Val, m.Val)
 }
 
 func (dta *_DynamicTypeAnnotation) annotate_kind(k *TypeKind) (ok bool) {
@@ -281,6 +299,9 @@ func (dta *_DynamicTypeAnnotation) annotate_kind(k *TypeKind) (ok bool) {
 
 	case k.Slc() != nil:
 		return dta.annotate_slc(k)
+
+	case k.Map() != nil:
+		return dta.annotate_map(k)
 
 	default:
 		return false
