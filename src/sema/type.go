@@ -493,9 +493,10 @@ func (tc *_TypeChecker) from_struct(decl *ast.IdentType, s *Struct) *StructIns {
 }
 
 func (tc *_TypeChecker) get_def(decl *ast.IdentType) _Kind {
-	for _, g := range tc.ignore_generics {
+	// Follows to_trait_kind_str functions's representation.
+	for i, g := range tc.ignore_generics {
 		if g.Ident == decl.Ident {
-			return build_prim_type(g.Ident)
+			return build_prim_type(strconv.Itoa(i))
 		}
 	}
 

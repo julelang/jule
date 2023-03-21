@@ -5,6 +5,8 @@
 package sema
 
 import (
+	"strconv"
+
 	"github.com/julelang/jule/lex"
 )
 
@@ -30,4 +32,42 @@ func (t *Trait) Find_method(ident string) *Fn {
 		}
 	}
 	return nil
+}
+
+// Returns function declaration text for trait checking.
+// Returns special representation of function.
+func to_trait_kind_str(f *FnIns) string {
+	s := ""
+	if f.Decl.Public {
+		s += "p"
+	}
+	if f.Decl.Unsafety {
+		s += "u"
+	}
+	s += "f&"
+	s += f.Decl.Ident
+	s += "#"
+
+	if len(f.Generics) > 0 {
+		for i := range f.Generics {
+			s += strconv.Itoa(i)
+		}
+	} else if len(f.Decl.Generics) > 0 { // Use Decl's generic if not parsed yet.
+		for i := range f.Decl.Generics {
+			s += strconv.Itoa(i)
+		}
+	}
+
+	s += "?"
+	n := len(f.Params)
+	if n > 0 {
+		for _, p := range f.Params {
+			s += p.To_str()
+		}
+	}
+	s += "="
+	if !f.Decl.Is_void() {
+		s += f.Result.To_str()
+	}
+	return s
 }

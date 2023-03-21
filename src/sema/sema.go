@@ -985,16 +985,15 @@ func (s *_Sema) check_global_decls() (ok bool) {
 func (s *_Sema) check_struct_trait_impl(strct *Struct, trt *Trait) (ok bool) {
 	for _, tf := range trt.Methods {
 		exist := false
-		ds := s.fn_with_non_generic_type_kind(tf).To_str()
+		ds := s.fn_with_non_generic_type_kind(tf)
 		sf := strct.Find_method(tf.Ident)
 		if sf != nil {
-			exist = (
-				tf.Public == sf.Public &&
-				tf.Ident == sf.Ident &&
-				ds == s.method_with_non_generic_type_kind(strct, sf).To_str())
+			ds_k := to_trait_kind_str(ds)
+			sf_k := to_trait_kind_str(s.fn_with_non_generic_type_kind(sf))
+			exist = ds_k == sf_k
 		}
 		if !exist {
-			s.push_err(strct.Token, "not_impl_trait_def", trt.Ident, ds)
+			s.push_err(strct.Token, "not_impl_trait_def", trt.Ident, ds.Decl.Ident)
 			ok = false
 		}
 	}
