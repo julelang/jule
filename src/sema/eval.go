@@ -1125,7 +1125,7 @@ func (e *_Eval) check_fn_call_generics(f *FnIns,
 }
 
 func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
-	f := d.Kind.Func()
+	f := d.Kind.Fnc()
 	if !d.Mutable && f.Decl.Is_method() && f.Decl.Params[0].Mutable {
 		e.push_err(fc.Token, "mutable_operation_on_immutable")
 	} else if !e.is_unsafe() && f.Decl.Unsafety {
@@ -1158,13 +1158,21 @@ func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
 	}
 
 	f.Decl.append_instance(f)
-
-	if !f.Decl.Is_void() {
-		d.Kind = f.Result
-		d.Lvalue = is_lvalue(f.Result)
-	} else {
-		d = build_void_data()
+	
+	if f.Decl.Is_void() {
+		return build_void_data()
 	}
+
+	if dynamic_annotation {
+		ok = e.s.reload_fn_ins_types(f)
+		if !ok {
+			return nil
+		}
+	}
+
+	d.Kind = f.Result
+	d.Lvalue = is_lvalue(f.Result)
+
 	return d
 }
 
@@ -1180,7 +1188,7 @@ func (e *_Eval) eval_fn_call(fc *ast.FnCallExpr) *Data {
 		}
 	}
 
-	if d.Kind.Func() == nil {
+	if d.Kind.Fnc() == nil {
 		e.push_err(fc.Token, "invalid_syntax")
 		return nil
 	}
@@ -1378,6 +1386,20 @@ func (e *_Eval) eval_brace_lit(lit *ast.BraceLit) *Data {
 	}
 }
 
+func (e *_Eval) eval_anon_fn(decl *ast.FnDecl) *Data {
+	tc := _TypeChecker{
+		s:      e.s,
+		lookup: e.lookup,
+	}
+	ins := tc.build_fn(decl)
+
+	// TODO: Check scope.
+
+	return &Data{
+		Kind: &TypeKind{kind: ins},
+	}
+}
+
 func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 	// TODO: Implement binary operation.
 	switch kind.(type) {
@@ -1428,6 +1450,9 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 
 	case *ast.BraceLit:
 		return e.eval_brace_lit(kind.(*ast.BraceLit))
+
+	case *ast.FnDecl:
+		return e.eval_anon_fn(kind.(*ast.FnDecl))
 
 	default:
 		return nil

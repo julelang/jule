@@ -193,8 +193,8 @@ func (atc *_AssignTypeChecker) check_validity() bool {
 	valid := true
 
 	switch {
-	case atc.d.Kind.Func() != nil:
-		f := atc.d.Kind.Func()
+	case atc.d.Kind.Fnc() != nil:
+		f := atc.d.Kind.Fnc()
 		if f.Decl.Is_method() {
 			atc.push_err("method_as_anonymous_fn")
 			valid = false
@@ -234,8 +234,7 @@ type _DynamicTypeAnnotation struct {
 	a           *Data
 	error_token lex.Token
 	
-	generics  []*ast.Generic
-	k         **TypeKind
+	k           **TypeKind
 }
 
 func (dta *_DynamicTypeAnnotation) push_generic(k *TypeKind, i int) {
@@ -247,14 +246,20 @@ func (dta *_DynamicTypeAnnotation) push_generic(k *TypeKind, i int) {
 
 func (dta *_DynamicTypeAnnotation) annotate_prim(k *TypeKind) (ok bool) {
 	kind := (*dta.k).To_str()
-	for i, g := range dta.generics {
+	for i, g := range dta.f.Decl.Generics {
 		if kind != g.Ident {
 			continue
 		}
 
-		t := &dta.f.Generics[i]
-		if t == nil {
+		t := dta.f.Generics[i]
+		switch {
+		case t == nil:
 			dta.push_generic(k, i)
+
+		case t.To_str() != k.To_str():
+			// Generic already pushed but generic type and current kind
+			// is different, so incopatible.
+			return false
 		}
 		*dta.k = k
 		return true
@@ -291,8 +296,38 @@ func (dta *_DynamicTypeAnnotation) annotate_map(k *TypeKind) (ok bool) {
 	return check(&pmap.Key, m.Key) && check(&pmap.Val, m.Val)
 }
 
+func (dta *_DynamicTypeAnnotation) annotate_fn(k *TypeKind) (ok bool) {
+	pf := (*dta.k).Fnc()
+	if pf == nil {
+		return false
+	}
+	f := k.Fnc()
+	switch {
+	case len(pf.Params) != len(f.Params):
+		return false
+
+	case pf.Decl.Is_void() != f.Decl.Is_void():
+		return false
+	}
+
+	ok = true
+	old := dta.k
+	for i, fp := range f.Params {
+		pfp := pf.Params[i]
+		dta.k = &pfp.Kind
+		ok = dta.annotate_kind(fp.Kind) && ok
+	}
+
+	if !pf.Decl.Is_void() {
+		dta.k = &pf.Result
+		ok = dta.annotate_kind(f.Result) && ok
+	}
+
+	dta.k = old
+	return ok
+}
+
 func (dta *_DynamicTypeAnnotation) annotate_kind(k *TypeKind) (ok bool) {
-	// TODO: Implement other types.
 	switch {
 	case k.Prim() != nil:
 		return dta.annotate_prim(k)
@@ -303,13 +338,15 @@ func (dta *_DynamicTypeAnnotation) annotate_kind(k *TypeKind) (ok bool) {
 	case k.Map() != nil:
 		return dta.annotate_map(k)
 
+	case k.Fnc() != nil:
+		return dta.annotate_fn(k)
+
 	default:
 		return false
 	}
 }
 
 func (dta *_DynamicTypeAnnotation) annotate() (ok bool) {
-	dta.generics = dta.f.Decl.Generics
 	dta.k = &dta.p.Kind
 
 	return dta.annotate_kind(dta.a.Kind)
@@ -422,6 +459,7 @@ func (fcac *_FnCallArgChecker) push(p *ParamIns, arg *ast.Expr) (ok bool) {
 }
 
 func (fcac *_FnCallArgChecker) push_variadic(p *ParamIns, i int) (ok bool) {
+	ok = true
 	variadiced := false
 	more := i+1 < len(fcac.args)
 	for ; i < len(fcac.args); i++ {
@@ -448,15 +486,15 @@ func (fcac *_FnCallArgChecker) push_variadic(p *ParamIns, i int) (ok bool) {
 }
 
 func (fcac *_FnCallArgChecker) check_args(params []*ParamIns) (ok bool) {
+	ok = true
 	i := 0
 iter:
 	for i < len(params) {
 		p := params[i]
 		switch {
 		case p.Decl.Variadic:
-			// Variadiced parameters always last.
 			ok = fcac.push_variadic(p, i) && ok
-			break iter
+			break iter // Variadiced parameters always last.
 
 		default:
 			ok = fcac.push(p, fcac.args[i]) && ok

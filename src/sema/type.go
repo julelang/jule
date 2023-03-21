@@ -107,7 +107,7 @@ func (tk *TypeKind) Slc() *Slc {
 	}
 }
 // Returns fn type if kind is function, nil if not.
-func (tk *TypeKind) Func() *FnIns {
+func (tk *TypeKind) Fnc() *FnIns {
 	switch tk.kind.(type) {
 	case *FnIns:
 		return tk.kind.(*FnIns)
@@ -278,7 +278,7 @@ func can_get_ptr(d *Data) bool {
 	}
 
 	switch {
-	case d.Kind.Func() != nil || d.Kind.Enm() != nil:
+	case d.Kind.Fnc() != nil || d.Kind.Enm() != nil:
 		return false
 
 	default:
@@ -296,7 +296,7 @@ func is_mut(t *TypeKind) bool {
 
 func is_nil_compatible(t *TypeKind) bool {
 	return (t.Is_nil() ||
-		t.Func() != nil ||
+		t.Fnc() != nil ||
 		t.Ptr() != nil ||
 		t.Slc() != nil ||
 		t.Trt() != nil ||
@@ -690,16 +690,20 @@ func (tc *_TypeChecker) build_tuple(decl *ast.TupleType) *Tuple {
 	}
 }
 
-func (tc *_TypeChecker) check_fn_types(f *Fn) (ok bool) {
+func (tc *_TypeChecker) check_fn_types(f *FnIns) (ok bool) {
 	for _, p := range f.Params {
-		ok := tc.s.check_type_with_refers(p.Kind, tc.referencer)
+		p.Kind = tc.build(p.Decl.Kind.Decl.Kind)
+		ok = p.Kind != nil
 		if !ok {
 			return false
 		}
 	}
-	if !f.Is_void() {
-		return tc.s.check_type_with_refers(f.Result.Kind, tc.referencer)
+
+	if !f.Decl.Is_void() {
+		f.Result = tc.build(f.Decl.Result.Kind.Decl.Kind)
+		return f.Result != nil
 	}
+
 	return true
 }
 
@@ -710,14 +714,14 @@ func (tc *_TypeChecker) build_fn(decl *ast.FnDecl) *FnIns {
 	}
 
 	f := build_fn(decl)
-	ok := tc.check_fn_types(f)
+	ins := f.instance_force()
+
+	ok := tc.check_fn_types(ins)
 	if !ok {
 		return nil
 	}
 
-	// TODO: Check instance of anonymous function.
-
-	return f.instance()
+	return ins
 }
 
 func (tc *_TypeChecker) build_by_std_namespace(decl *ast.NamespaceType) _Kind {

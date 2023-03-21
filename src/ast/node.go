@@ -181,6 +181,7 @@ type Expr struct {
 	//  - *BinopExpr
 	//  - *UnsafeExpr
 	//  - *IndexingExpr
+	//  - *FnDecl
 	Kind  ExprData
 }
 
