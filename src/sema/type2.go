@@ -233,8 +233,9 @@ type _DynamicTypeAnnotation struct {
 	p           *ParamIns
 	a           *Data
 	error_token lex.Token
-
+	
 	generics  []*ast.Generic
+	k         **TypeKind
 }
 
 func (dta *_DynamicTypeAnnotation) push_generic(k *TypeKind, i int) {
@@ -245,7 +246,7 @@ func (dta *_DynamicTypeAnnotation) push_generic(k *TypeKind, i int) {
 }
 
 func (dta *_DynamicTypeAnnotation) annotate_prim(k *TypeKind) (ok bool) {
-	kind := dta.p.Kind.To_str()
+	kind := (*dta.k).To_str()
 	for i, g := range dta.generics {
 		if kind != g.Ident {
 			continue
@@ -255,11 +256,21 @@ func (dta *_DynamicTypeAnnotation) annotate_prim(k *TypeKind) (ok bool) {
 		if t == nil {
 			dta.push_generic(k, i)
 		}
-		dta.p.Kind = k
+		*dta.k = k
 		return true
 	}
 
 	return false
+}
+
+func (dta *_DynamicTypeAnnotation) annotate_slc(k *TypeKind) (ok bool) {
+	pslc := (*dta.k).Slc()
+	if pslc == nil {
+		return false
+	}
+	slc := k.Slc()
+	dta.k = &pslc.Elem
+	return dta.annotate_kind(slc.Elem)
 }
 
 func (dta *_DynamicTypeAnnotation) annotate_kind(k *TypeKind) (ok bool) {
@@ -268,6 +279,9 @@ func (dta *_DynamicTypeAnnotation) annotate_kind(k *TypeKind) (ok bool) {
 	case k.Prim() != nil:
 		return dta.annotate_prim(k)
 
+	case k.Slc() != nil:
+		return dta.annotate_slc(k)
+
 	default:
 		return false
 	}
@@ -275,6 +289,7 @@ func (dta *_DynamicTypeAnnotation) annotate_kind(k *TypeKind) (ok bool) {
 
 func (dta *_DynamicTypeAnnotation) annotate() (ok bool) {
 	dta.generics = dta.f.Decl.Generics
+	dta.k = &dta.p.Kind
 
 	return dta.annotate_kind(dta.a.Kind)
 }
@@ -457,7 +472,7 @@ func (fcac *_FnCallArgChecker) check() (ok bool) {
 	}
 
 	ok = fcac.check_args(params)
-	if fcac.dynamic_annotation {
+	if ok && fcac.dynamic_annotation {
 		ok = fcac.check_dynamic_type_annotation()
 	}
 

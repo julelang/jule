@@ -1143,7 +1143,7 @@ func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
 			return nil
 		}
 	} else {
-		e.s.build_fn_non_generic_type_kinds(f)
+		e.s.build_fn_non_generic_type_kinds(f, false)
 	}
 	fcac := _FnCallArgChecker{
 		e:                  e,

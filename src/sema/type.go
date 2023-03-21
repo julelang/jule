@@ -349,6 +349,10 @@ type _TypeChecker struct {
 	// Each dimension 2 array accepted as identifier group.
 	ignore_generics []*ast.Generic
 
+	// Ignores with trait check pattern.
+	// Uses to_trait_kind_str's representation.
+	ignore_with_trait_pattern bool
+
 	// This generics used as type alias for real kind.
 	use_generics    []*TypeAlias
 }
@@ -493,10 +497,13 @@ func (tc *_TypeChecker) from_struct(decl *ast.IdentType, s *Struct) *StructIns {
 }
 
 func (tc *_TypeChecker) get_def(decl *ast.IdentType) _Kind {
-	// Follows to_trait_kind_str functions's representation.
 	for i, g := range tc.ignore_generics {
 		if g.Ident == decl.Ident {
-			return build_prim_type(strconv.Itoa(i))
+			if tc.ignore_with_trait_pattern {
+				return build_prim_type(strconv.Itoa(i))
+			} else {
+				return build_prim_type(g.Ident)
+			}
 		}
 	}
 
