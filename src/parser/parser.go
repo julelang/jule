@@ -99,7 +99,7 @@ func (p *_Parser) process_comment(c *ast.Comment) {
 	p.comment_group.Comments = append(p.comment_group.Comments, c)
 }
 
-func (p *_Parser) build_scope(tokens []lex.Token) *ast.Scope {
+func (p *_Parser) build_scope(tokens []lex.Token) *ast.ScopeTree {
 	s := new_scope()
 	sp := _ScopeParser{
 		p: p,

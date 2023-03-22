@@ -11,7 +11,7 @@ import (
 
 // Variable.
 type Var struct {
-	Scope      *ast.Scope
+	Scope      *ast.ScopeTree
 	Token      lex.Token
 	Ident      string
 	Cpp_linked bool

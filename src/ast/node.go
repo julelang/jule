@@ -370,9 +370,9 @@ type AssignSt struct {
 	R      *Expr
 }
 
-// Scope.
-type Scope struct {
-	Parent   *Scope     // Nil if scope is root.
+// ScopeTree.
+type ScopeTree struct {
+	Parent   *ScopeTree // Nil if scope is root.
 	Unsafety bool
 	Deferred bool
 	Stmts    []NodeData // Statements.
@@ -402,7 +402,7 @@ type FnDecl struct {
 	Ident        string
 	Directives   []*Directive
 	Doc_comments *CommentGroup
-	Scope        *Scope
+	Scope        *ScopeTree
 	Generics     []*Generic
 	Result       *RetType
 	Params       []*Param
@@ -410,7 +410,7 @@ type FnDecl struct {
 
 // Variable declaration.
 type VarDecl struct {
-	Scope        *Scope    // nil for global scopes
+	Scope        *ScopeTree    // nil for global scopes
 	Token        lex.Token
 	Ident        string
 	Cpp_linked   bool
@@ -434,7 +434,7 @@ type IterKind = any // Type of Iter's kind.
 type Iter struct {
 	Token lex.Token
 	Kind  IterKind
-	Scope *Scope
+	Scope *ScopeTree
 }
 
 // While iteration kind.
@@ -472,13 +472,13 @@ type ContSt struct {
 type If struct {
 	Token lex.Token
 	Expr  *Expr
-	Scope *Scope
+	Scope *ScopeTree
 }
 
 // Else condition.
 type Else struct {
 	Token lex.Token
-	Scope *Scope
+	Scope *ScopeTree
 }
 
 // Condition chain.
@@ -501,7 +501,7 @@ type TypeAliasDecl struct {
 // Case of match-case.
 type Case struct {
 	Token lex.Token
-	Scope *Scope
+	Scope *ScopeTree
 
 	// Holds expression.
 	// Expressions holds *Type if If type matching.

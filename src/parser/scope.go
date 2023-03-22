@@ -9,8 +9,8 @@ import (
 	"github.com/julelang/jule/lex"
 )
 
-func new_scope() *ast.Scope {
-	return &ast.Scope{}
+func new_scope() *ast.ScopeTree {
+	return &ast.ScopeTree{}
 }
 
 // Reports whether token is statement finish point.
@@ -107,7 +107,7 @@ func split_stms(tokens []lex.Token) []*_Stmt {
 
 type _ScopeParser struct {
 	p    *_Parser
-	s    *ast.Scope
+	s    *ast.ScopeTree
 	stms []*_Stmt
 	pos  int
 }
@@ -128,7 +128,7 @@ func (sp *_ScopeParser) next() *_Stmt {
 	return sp.stms[sp.pos]
 }
 
-func (sp *_ScopeParser) build_scope(tokens []lex.Token) *ast.Scope {
+func (sp *_ScopeParser) build_scope(tokens []lex.Token) *ast.ScopeTree {
 	s := new_scope()
 	s.Parent = sp.s
 	ssp := _ScopeParser{
@@ -567,7 +567,7 @@ func (sp *_ScopeParser) build_case_exprs(tokens *[]lex.Token, type_match bool) [
 	return nil
 }
 
-func (sp *_ScopeParser) build_case_scope(tokens *[]lex.Token) *ast.Scope {
+func (sp *_ScopeParser) build_case_scope(tokens *[]lex.Token) *ast.ScopeTree {
 	n := 0
 	for {
 		i := 0
@@ -657,7 +657,7 @@ func (sp *_ScopeParser) build_match_case(tokens []lex.Token) *ast.MatchCase {
 	return m
 }
 
-func (sp *_ScopeParser) build_scope_st(tokens []lex.Token) *ast.Scope {
+func (sp *_ScopeParser) build_scope_st(tokens []lex.Token) *ast.ScopeTree {
 	is_unsafe := false
 	is_deferred := false
 	token := tokens[0]
@@ -947,7 +947,7 @@ func (sp *_ScopeParser) build_st(st *_Stmt) ast.NodeData {
 	return nil
 }
 
-func (sp *_ScopeParser) build(tokens []lex.Token, s *ast.Scope) {
+func (sp *_ScopeParser) build(tokens []lex.Token, s *ast.ScopeTree) {
 	if s == nil {
 		return
 	}

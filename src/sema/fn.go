@@ -47,7 +47,7 @@ type Fn struct {
 	Ident      string
 	Directives []*ast.Directive
 	Doc        string
-	Scope      *ast.Scope
+	Scope      *ast.ScopeTree
 	Generics   []*ast.Generic
 	Result     *RetType
 	Params     []*Param
@@ -139,7 +139,7 @@ type FnIns struct {
 	Generics []*TypeKind
 	Params   []*ParamIns
 	Result   *TypeKind
-	Scope    *ast.Scope
+	Scope    *Scope
 }
 
 // Implement: Kind
