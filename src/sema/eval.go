@@ -1296,25 +1296,6 @@ func (e *_Eval) eval_sub_ident(si *ast.SubIdentExpr) *Data {
 	return nil
 }
 
-func (e *_Eval) eval_tuple_data(tup *ast.TupleExpr) []*Data {
-	datas := make([]*Data, len(tup.Expr))
-	ok := true
-	for i, expr := range tup.Expr {
-		d := e.eval_expr_kind(expr)
-		if d == nil {
-			ok = false
-			continue
-		}
-		datas[i] = d
-	}
-
-	if !ok {
-		return nil
-	}
-
-	return datas
-}
-
 func (e *_Eval) eval_tuple(tup *ast.TupleExpr) *Data {
 	tup_t := &Tuple{}
 	tup_t.Types = make([]*TypeKind, len(tup.Expr))
@@ -1404,8 +1385,14 @@ func (e *_Eval) eval_anon_fn(decl *ast.FnDecl) *Data {
 	}
 }
 
+func (e *_Eval) eval_binop(op *ast.BinopExpr) *Data {
+	bs := _BinopSolver{
+		e: e,
+	}
+	return bs.solve(op)
+}
+
 func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
-	// TODO: Implement binary operation.
 	switch kind.(type) {
 	case *ast.LitExpr:
 		return e.eval_lit(kind.(*ast.LitExpr))
@@ -1458,6 +1445,9 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 	case *ast.FnDecl:
 		return e.eval_anon_fn(kind.(*ast.FnDecl))
 
+	case *ast.BinopExpr:
+		return e.eval_binop(kind.(*ast.BinopExpr))
+
 	default:
 		return nil
 	}
@@ -1478,4 +1468,60 @@ func (e *_Eval) eval(expr *ast.Expr) *Data {
 	default:
 		return d
 	}
+}
+
+type _BinopSolver struct {
+	e  *_Eval
+	l  *Data
+	r  *Data
+	op lex.Token
+}
+
+func (bs *_BinopSolver) eval_any() *Data {
+	switch bs.op.Kind {
+	case lex.KND_EQS, lex.KND_NOT_EQ:
+		return &Data{
+			Kind: &TypeKind{
+				kind: build_prim_type(types.TypeKind_BOOL),
+			},
+		}
+
+	default:
+		bs.e.push_err(bs.op, "operator_not_for_juletype", bs.op.Kind, types.TypeKind_ANY)
+		return nil
+	}
+}
+
+func (bs *_BinopSolver) eval_prim() *Data {
+	prim := bs.l.Kind.Prim()
+	switch {
+	case prim.Is_any():
+		return bs.eval_any()
+	}
+	return nil
+}
+
+func (bs *_BinopSolver) eval() *Data {
+	switch {
+	case bs.l.Kind.Prim() != nil:
+		return bs.eval_prim()
+
+	default:
+		return nil
+	}
+}
+
+func (bs *_BinopSolver) solve(op *ast.BinopExpr) *Data {
+	bs.l = bs.e.eval_expr_kind(op.L)
+	if bs.l == nil {
+		return nil
+	}
+
+	bs.r = bs.e.eval_expr_kind(op.R)
+	if bs.r == nil {
+		return nil
+	}
+
+	bs.op = op.Op
+	return bs.eval()
 }
