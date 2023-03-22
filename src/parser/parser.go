@@ -530,13 +530,16 @@ func (p *_Parser) build_ret_type(tokens []lex.Token, i *int) (t *ast.RetType, ok
 			p.push_err(token, "missing_type")
 			return
 		}
+
 		*i++
 		token = tokens[*i]
 		if token.Id == lex.ID_RANGE {
 			switch token.Kind {
 			case lex.KND_LPAREN:
 				return p.build_multi_ret_type(tokens, i)
+
 			case lex.KND_LBRACE:
+				p.push_err(token, "missing_type")
 				return
 			}
 		}
