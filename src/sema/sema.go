@@ -479,21 +479,41 @@ func (s *_Sema) check_struct_ins(ins *StructIns, error_token lex.Token) (ok bool
 		return false
 	}
 
+	referencer := &_Referencer{
+		ident:  ins.Decl.Ident,
+		refers: &ins.Decl.Refers,
+	}
+
+	generics := make([]*TypeAlias, len(ins.Generics))
+	for i, g := range ins.Generics {
+		generics[i] = &TypeAlias{
+			Ident: ins.Decl.Generics[i].Ident,
+			Kind:  &TypeSymbol{
+				Kind: g,
+			},
+		}
+	}
+
 	// Check field types.
 	for _, f := range ins.Fields {
-		symbol := TypeSymbol{Decl: f.Decl.Kind.Decl}
-		ok := ins.Decl.sema.check_type_with_refers(&symbol, &_Referencer{
-			ident:  ins.Decl.Ident,
-			refers: &ins.Decl.Refers,
-		})
+		tc := _TypeChecker{
+			s:            s,
+			lookup:       s,
+			referencer:   referencer,
+			use_generics: generics,
+		}
+		kind := tc.check_decl(f.Decl.Kind.Decl)
+		ok := kind != nil
+
 		if s != ins.Decl.sema && len(ins.Decl.sema.errors) > 0 {
 			s.errors = append(s.errors, ins.Decl.sema.errors...)
 		}
+
 		if !ok {
 			return false
 		}
 
-		f.Kind = symbol.Kind
+		f.Kind = kind
 	}
 
 	// TODO: Check methods if declaration comes out of package.

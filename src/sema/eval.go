@@ -1043,10 +1043,14 @@ func (e *_Eval) eval_struct_lit(lit *ast.StructLit) *Data {
 	if !ok {
 		return nil
 	}
+	// NOTE: Instance already checked (just fields) if generic quantity passes.
 
-	// NOTE: Instance already checked if generic quantity passes.
-
-	// TODO: Check pairs.
+	slc := _StructLitChecker{
+		e:           e,
+		error_token: lit.Kind.Token,
+		s:           s,
+	}
+	slc.check_by_pairs(lit.Pairs)
 
 	return &Data{
 		Mutable: true,

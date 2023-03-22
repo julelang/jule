@@ -537,3 +537,48 @@ func (fcac *_FnCallArgChecker) check() (ok bool) {
 
 	return ok
 }
+
+type _StructLitChecker struct {
+	e           *_Eval
+	error_token lex.Token
+	s           *StructIns
+}
+
+func (slc *_StructLitChecker) push_err(token lex.Token, key string, args ...any) {
+	slc.e.push_err(token, key, args...)
+}
+
+func (slc *_StructLitChecker) check_match(f *FieldIns, d *Data, error_token lex.Token) {
+	slc.e.s.check_validity_for_init_expr(f.Decl.Mutable, d, error_token)
+	slc.e.s.check_assign_type(f.Kind, d, error_token, false)
+}
+
+func (slc *_StructLitChecker) check_by_pairs(pairs []*ast.FieldExprPair) {
+	for _, pair := range pairs {
+		// Check existing.
+		f := slc.s.Find_field(pair.Field.Kind)
+		if f == nil {
+			slc.push_err(pair.Field, "ident_not_exist", pair.Field.Kind)
+			continue
+		}
+
+		// Check duplications.
+	dup_lookup:
+		for _, dpair := range pairs {
+			switch {
+			case pair == dpair:
+				break dup_lookup
+
+			case pair.Field.Kind == dpair.Field.Kind:
+				slc.push_err(pair.Field, "already_has_expr", pair.Field.Kind)
+				break dup_lookup
+			}
+		}
+
+		d := slc.e.eval_expr_kind(pair.Expr)
+		if d == nil {
+			continue
+		}
+		slc.check_match(f, d, pair.Field)
+	}
+}

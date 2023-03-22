@@ -475,16 +475,24 @@ func (tc *_TypeChecker) from_struct(decl *ast.IdentType, s *Struct) *StructIns {
 		tc.push_err(decl.Token, "ident_not_exist", decl.Ident)
 		return nil
 	}
-
 	ok := tc.check_illegal_cycles(decl, &s.Refers)
 	if !ok {
 		return nil
 	}
-
+	
 	ins := s.instance()
 	ins.Generics = make([]*TypeKind, len(decl.Generics))
 	for i, g := range decl.Generics {
-		ins.Generics[i] = tc.build(g.Kind)
+		kind := tc.build(g.Kind)
+		if kind == nil {
+			ok = false
+			continue
+		}
+		ins.Generics[i] = kind
+	}
+
+	if !ok {
+		return nil
 	}
 
 	ok = tc.s.check_struct_ins(ins, decl.Token)
