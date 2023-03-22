@@ -287,7 +287,7 @@ func (fep *FieldExprPair) Is_targeted() bool { return fep.Field.Id != lex.ID_NA 
 // Struct literal instiating expression.
 type StructLit struct {
 	Kind  *Type
-	Pairs []*FieldExprPair
+	Exprs []ExprData  // Possible types: *FieldExprPair, and other expressions.
 }
 
 // Anonymous brace instiating expression.

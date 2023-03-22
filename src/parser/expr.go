@@ -605,7 +605,7 @@ func (ep *_ExprBuilder) build_unsafe(tokens []lex.Token) ast.ExprData {
 }
 
 // Tokens should include brace tokens.
-func (ep *_ExprBuilder) get_brace_range_literal_expr_parts(tokens []lex.Token) ([][]lex.Token) {
+func (ep *_ExprBuilder) get_brace_range_lit_expr_parts(tokens []lex.Token) ([][]lex.Token) {
 	// No part.
 	if len(tokens) < 2 {
 		return nil
@@ -654,30 +654,36 @@ func (ep *_ExprBuilder) get_brace_range_literal_expr_parts(tokens []lex.Token) (
 }
 
 func (ep *_ExprBuilder) build_field_expr_pair(tokens []lex.Token) *ast.FieldExprPair {
-	pair := &ast.FieldExprPair{}
+	pair := &ast.FieldExprPair{
+		Field: tokens[0],
+	}
+	tokens = tokens[2:] // Remove field identifier and colon tokens.
+	pair.Expr = ep.build_from_tokens(tokens).Kind
+	return pair
+}
+
+func (ep *_ExprBuilder) build_struct_lit_expr(tokens []lex.Token) ast.ExprData {
 	token := tokens[0]
 	if token.Id == lex.ID_IDENT {
 		if len(tokens) > 1 {
 			token := tokens[1]
 			if token.Id == lex.ID_COLON {
-				pair.Field = tokens[0]
-				tokens = tokens[2:] // Remove field identifier and colon tokens.
+				return ep.build_field_expr_pair(tokens)
 			}
 		}
 	}
-	pair.Expr = ep.build_from_tokens(tokens).Kind
-	return pair
+	return ep.build_from_tokens(tokens)
 }
 
-func (ep *_ExprBuilder) build_field_expr_pairs(tokens []lex.Token) []*ast.FieldExprPair {
-	parts := ep.get_brace_range_literal_expr_parts(tokens)
+func (ep *_ExprBuilder) build_struct_lit_exprs(tokens []lex.Token) []ast.ExprData {
+	parts := ep.get_brace_range_lit_expr_parts(tokens)
 	if len(parts) == 0 {
 		return nil
 	}
 
-	pairs := make([]*ast.FieldExprPair, len(parts))
+	pairs := make([]ast.ExprData, len(parts))
 	for i, part := range parts {
-		pairs[i] = ep.build_field_expr_pair(part)
+		pairs[i] = ep.build_struct_lit_expr(part)
 	}
 	return pairs
 }
@@ -701,7 +707,7 @@ func (ep *_ExprBuilder) build_typed_struct_literal(tokens []lex.Token) *ast.Stru
 
 	return &ast.StructLit{
 		Kind:  t,
-		Pairs: ep.build_field_expr_pairs(tokens),
+		Exprs: ep.build_struct_lit_exprs(tokens),
 	}
 }
 
@@ -723,7 +729,7 @@ func (ep *_ExprBuilder) build_brace_literal(tokens []lex.Token) *ast.BraceLit {
 		Token: tokens[0],
 	}
 
-	parts := ep.get_brace_range_literal_expr_parts(tokens)
+	parts := ep.get_brace_range_lit_expr_parts(tokens)
 	if parts == nil {
 		return lit
 	}

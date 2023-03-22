@@ -553,32 +553,88 @@ func (slc *_StructLitChecker) check_match(f *FieldIns, d *Data, error_token lex.
 	slc.e.s.check_assign_type(f.Kind, d, error_token, false)
 }
 
-func (slc *_StructLitChecker) check_by_pairs(pairs []*ast.FieldExprPair) {
-	for _, pair := range pairs {
-		// Check existing.
-		f := slc.s.Find_field(pair.Field.Kind)
-		if f == nil {
-			slc.push_err(pair.Field, "ident_not_exist", pair.Field.Kind)
-			continue
-		}
+func (slc *_StructLitChecker) check_pair(pair *ast.FieldExprPair, exprs []ast.ExprData) {
+	// Check existing.
+	f := slc.s.Find_field(pair.Field.Kind)
+	if f == nil {
+		slc.push_err(pair.Field, "ident_not_exist", pair.Field.Kind)
+		return
+	}
 
-		// Check duplications.
-	dup_lookup:
-		for _, dpair := range pairs {
+	// Check duplications.
+dup_lookup:
+	for _, expr := range exprs {
+		switch expr.(type) {
+		case *ast.FieldExprPair:
+			dpair := expr.(*ast.FieldExprPair)
 			switch {
 			case pair == dpair:
 				break dup_lookup
-
+	
 			case pair.Field.Kind == dpair.Field.Kind:
 				slc.push_err(pair.Field, "already_has_expr", pair.Field.Kind)
 				break dup_lookup
 			}
 		}
+	}
 
-		d := slc.e.eval_expr_kind(pair.Expr)
-		if d == nil {
-			continue
+	d := slc.e.eval_expr_kind(pair.Expr)
+	if d == nil {
+		return
+	}
+	slc.check_match(f, d, pair.Field)
+}
+
+func (slc *_StructLitChecker) check(exprs []ast.ExprData) {
+	if len(exprs) == 0 {
+		return
+	}
+
+	paired := false
+	for i, expr := range exprs {
+		switch expr.(type) {
+		case *ast.FieldExprPair:
+			pair := expr.(*ast.FieldExprPair)
+			if i > 0 && !paired {
+				slc.push_err(pair.Field, "invalid_syntax")
+			}
+			paired = true
+			slc.check_pair(pair, exprs)
+
+		case *ast.Expr:
+			e := expr.(*ast.Expr)
+			if paired {
+				slc.push_err(e.Token, "argument_must_target_to_field")
+			}
+			if i >= len(slc.s.Fields) {
+				slc.push_err(e.Token, "argument_overflow")
+				continue
+			}
+
+			d := slc.e.eval_expr_kind(e.Kind)
+			if d == nil {
+				continue
+			}
+
+			field := slc.s.Fields[i]
+			slc.check_match(field, d, e.Token)
 		}
-		slc.check_match(f, d, pair.Field)
+	}
+
+	// Check missing arguments for fields.
+	if !paired {
+		n := len(slc.s.Fields)
+		diff := n - len(exprs)
+		switch {
+		case diff <= 0:
+			return
+		}
+	
+		idents := ""
+		for ; diff > 0; diff-- {
+			idents += ", " + slc.s.Fields[n-diff].Decl.Ident
+		}
+		idents = idents[2:] // Remove first separator.
+		slc.push_err(slc.error_token, "missing_expr_for", idents)
 	}
 }

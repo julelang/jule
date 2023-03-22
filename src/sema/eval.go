@@ -1050,7 +1050,7 @@ func (e *_Eval) eval_struct_lit(lit *ast.StructLit) *Data {
 		error_token: lit.Kind.Token,
 		s:           s,
 	}
-	slc.check_by_pairs(lit.Pairs)
+	slc.check(lit.Exprs)
 
 	return &Data{
 		Mutable: true,

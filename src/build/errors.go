@@ -113,7 +113,7 @@ var ERRORS = map[string]string{
 	`goto_jumps_declarations`:                  `goto @ jumps over declaration(s)`,
 	`fn_not_has_parameter`:                     `function is not has parameter in this identifier: @`,
 	`already_has_expr`:                         `@ already has expression`,
-	`argument_must_target_to_parameter`:        `argument must target to parameter`,
+	`argument_must_target_to_field`:            `argument must target to field`,
 	`overflow_limits`:                          `overflow the limit of data-type`,
 	`generics_overflow`:                        `overflow generics`,
 	`has_generics`:                             `define has generics`,
