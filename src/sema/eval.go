@@ -1477,6 +1477,17 @@ type _BinopSolver struct {
 	op lex.Token
 }
 
+func (bs *_BinopSolver) check_type_compatibility() bool {
+	tcc := _TypeCompatibilityChecker{
+		s:           bs.e.s,
+		error_token: bs.op,
+		dest:        bs.l.Kind,
+		src:         bs.r.Kind,
+		deref:       true,
+	}
+	return tcc.check()
+}
+
 func (bs *_BinopSolver) eval_nil() *Data {
 	if !is_nil_compatible(bs.r.Kind) {
 		bs.e.push_err(bs.op, "incompatible_types", lex.KND_NIL, bs.r.Kind.To_str())
@@ -1494,6 +1505,31 @@ func (bs *_BinopSolver) eval_nil() *Data {
 
 	default:
 		bs.e.push_err(bs.op, "operator_not_for_juletype", bs.op.Kind, lex.KND_NIL)
+		return nil
+	}
+}
+
+func (bs *_BinopSolver) eval_ptr() *Data {
+	if !bs.check_type_compatibility() {
+		bs.e.push_err(bs.op, "incompatible_types", bs.l.Kind.To_str(), bs.r.Kind.To_str())
+		return nil
+	}
+
+	switch bs.op.Kind {
+	case lex.KND_EQS,
+		lex.KND_NOT_EQ,
+		lex.KND_LT,
+		lex.KND_GT,
+		lex.KND_LESS_EQ,
+		lex.KND_GREAT_EQ:
+		return &Data{
+			Kind: &TypeKind{
+				kind: build_prim_type(types.TypeKind_BOOL),
+			},
+		}
+
+	default:
+		bs.e.push_err(bs.op, "operator_not_for_juletype", bs.op.Kind, bs.l.Kind.To_str())
 		return nil
 	}
 }
@@ -1539,6 +1575,9 @@ func (bs *_BinopSolver) eval() *Data {
 
 	case bs.l.Kind.Is_nil():
 		return bs.eval_nil()
+
+	case bs.l.Kind.Ptr() != nil:
+		return bs.eval_ptr()
 
 	case bs.l.Kind.Prim() != nil:
 		return bs.eval_prim()
