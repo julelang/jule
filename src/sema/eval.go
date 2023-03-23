@@ -1687,12 +1687,16 @@ func (bs *_BinopSolver) eval() *Data {
 
 	case bs.l.Kind.Fnc() != nil:
 		return bs.eval_fn()
+		
+	case bs.l.Kind.Trt() != nil || bs.r.Kind.Trt() != nil:
+		if bs.r.Kind.Trt() != nil {
+			bs.l, bs.r = bs.r, bs.l
+		}
+		return bs.eval_trait()
 
 	case bs.l.Kind.Strct() != nil:
 		return bs.eval_struct()
 
-	case bs.l.Kind.Trt() != nil:
-		return bs.eval_trait()
 
 	case bs.l.Kind.Prim() != nil:
 		return bs.eval_prim()
