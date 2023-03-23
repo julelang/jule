@@ -1534,6 +1534,26 @@ func (bs *_BinopSolver) eval_ptr() *Data {
 	}
 }
 
+func (bs *_BinopSolver) eval_arr() *Data {
+	if !bs.check_type_compatibility() {
+		bs.e.push_err(bs.op, "incompatible_types", bs.l.Kind.To_str(), bs.r.Kind.To_str())
+		return nil
+	}
+
+	switch bs.op.Kind {
+	case lex.KND_EQS, lex.KND_NOT_EQ:
+		return &Data{
+			Kind: &TypeKind{
+				kind: build_prim_type(types.TypeKind_BOOL),
+			},
+		}
+
+	default:
+		bs.e.push_err(bs.op, "operator_not_for_juletype", bs.op.Kind, bs.l.Kind.To_str())
+		return nil
+	}
+}
+
 func (bs *_BinopSolver) eval_any() *Data {
 	switch bs.op.Kind {
 	case lex.KND_EQS, lex.KND_NOT_EQ:
@@ -1578,6 +1598,9 @@ func (bs *_BinopSolver) eval() *Data {
 
 	case bs.l.Kind.Ptr() != nil:
 		return bs.eval_ptr()
+
+	case bs.l.Kind.Arr() != nil:
+		return bs.eval_arr()
 
 	case bs.l.Kind.Prim() != nil:
 		return bs.eval_prim()
