@@ -1665,6 +1665,54 @@ func (bs *_BinopSolver) eval_bool() *Data {
 	}
 }
 
+func (bs *_BinopSolver) eval_float() *Data {
+	rk := bs.r.Kind.To_str()
+	if !types.Is_num(rk) {
+		bs.e.push_err(bs.op, "incompatible_types", bs.l.Kind.To_str(), rk)
+		return nil
+	}
+
+	// TODO: Eval constants.
+
+	// Logicals.
+	switch bs.op.Kind {
+	case lex.KND_EQS,
+		lex.KND_NOT_EQ,
+		lex.KND_LT,
+		lex.KND_GT,
+		lex.KND_GREAT_EQ,
+		lex.KND_LESS_EQ:
+		return &Data{
+			Kind: &TypeKind{
+				kind: build_prim_type(types.TypeKind_BOOL),
+			},
+		}
+	}
+
+	// Arithmetics.
+	switch bs.op.Kind {
+	case lex.KND_PLUS,
+		lex.KND_MINUS,
+		lex.KND_STAR,
+		lex.KND_SOLIDUS:
+		if types.Is_greater(rk, bs.l.Kind.To_str()) {
+			bs.l.Kind = bs.r.Kind
+		}
+		return bs.l
+
+	case lex.KND_PERCENT:
+		if !types.Is_int(rk) {
+			bs.e.push_err(bs.op, "incompatible_types", bs.l.Kind.To_str(), rk)
+			return nil
+		}
+		return bs.r
+
+	default:
+		bs.e.push_err(bs.op, "operator_not_for_float", bs.op.Kind)
+		return nil
+	}
+}
+
 func (bs *_BinopSolver) eval_prim() *Data {
 	prim := bs.l.Kind.Prim()
 	switch {
@@ -1673,6 +1721,22 @@ func (bs *_BinopSolver) eval_prim() *Data {
 	
 	case prim.Is_bool():
 		return bs.eval_bool()
+	}
+
+	rprim := bs.r.Kind.Prim()
+	if rprim == nil {
+		bs.e.push_err(bs.op, "incompatible_types", prim.To_str(), bs.r.Kind.To_str())
+		return nil
+	}
+
+	lk := prim.To_str()
+	rk := rprim.To_str()
+	switch {
+	case types.Is_float(lk) || types.Is_float(rk):
+		if types.Is_float(rk) {
+			bs.l, bs.r = bs.r, bs.l
+		}
+		return bs.eval_float()
 
 	default:
 		return nil

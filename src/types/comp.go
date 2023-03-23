@@ -144,3 +144,86 @@ func Types_are_compatible(k1 string, k2 string) bool {
 		return false
 	}
 }
+
+// Reports whether i16 is greater than given kind.
+func Is_i16_greater(k string) bool {
+	k = Real_kind_of(k)
+	return k == TypeKind_U8
+}
+
+// Reports whether i32 is greater than given kind.
+func Is_i32_greater(k string) bool {
+	k = Real_kind_of(k)
+	return k == TypeKind_I8 || k == TypeKind_I16
+}
+
+// Reports whether i64 is greater than given kind.
+func Is_i64_greater(k string) bool {
+	k = Real_kind_of(k)
+	return k == TypeKind_I8 || k == TypeKind_I16 || k == TypeKind_I32
+}
+
+// Reports whether u16 is greater than given kind.
+func Is_u16_greater(k string) bool {
+	k = Real_kind_of(k)
+	return k == TypeKind_U8
+}
+
+// Reports whether u32 is greater than given kind.
+func Is_u32_greater(k string) bool {
+	k = Real_kind_of(k)
+	return k == TypeKind_U8 || k == TypeKind_U16
+}
+
+// Reports whether u64 is greater than given kind.
+func Is_u64_greater(k string) bool {
+	k = Real_kind_of(k)
+	return k == TypeKind_U8 || k == TypeKind_U16 || k == TypeKind_U32
+}
+
+// Reports whether f32 is greater than given kind.
+func Is_f32_greater(k string) bool {
+	return k != TypeKind_F64
+}
+
+// Reports whether f64 is greater than given kind.
+func Is_f64_greater(k string) bool {
+	return true
+}
+
+// Reports whether k1 kind greater than k2 kind.
+func Is_greater(k1 string, k2 string) bool {
+	k1 = Real_kind_of(k1)
+
+	switch k1 {
+	case TypeKind_I16:
+		return Is_i16_greater(k2)
+
+	case TypeKind_I32:
+		return Is_i32_greater(k2)
+
+	case TypeKind_I64:
+		return Is_i64_greater(k2)
+
+	case TypeKind_U16:
+		return Is_u16_greater(k2)
+
+	case TypeKind_U32:
+		return Is_u32_greater(k2)
+
+	case TypeKind_U64:
+		return Is_u64_greater(k2)
+
+	case TypeKind_F32:
+		return Is_f32_greater(k2)
+
+	case TypeKind_F64:
+		return Is_f64_greater(k2)
+
+	case TypeKind_ANY:
+		return true
+
+	default:
+		return false
+	}
+}
