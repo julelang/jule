@@ -340,7 +340,7 @@ type _TypeChecker struct {
 
 	// Uses Lookup for:
 	//  - Lookup symbol tables.
-	lookup _Lookup
+	lookup Lookup
 
 	// If this is not nil, appends referred ident types.
 	// Also used as checker owner.
@@ -527,12 +527,12 @@ func (tc *_TypeChecker) get_def(decl *ast.IdentType) _Kind {
 	}
 
 	if !decl.Cpp_linked {
-		e := tc.lookup.find_enum(decl.Ident)
+		e := tc.lookup.Find_enum(decl.Ident)
 		if e != nil {
 			return tc.from_enum(decl, e)
 		}
 
-		t := tc.lookup.find_trait(decl.Ident)
+		t := tc.lookup.Find_trait(decl.Ident)
 		if t != nil {
 			if !tc.s.is_accessible_define(t.Public, t.Token) {
 				tc.push_err(decl.Token, "ident_not_exist", decl.Ident)
@@ -547,12 +547,12 @@ func (tc *_TypeChecker) get_def(decl *ast.IdentType) _Kind {
 		}
 	}
 
-	s := tc.lookup.find_struct(decl.Ident, decl.Cpp_linked)
+	s := tc.lookup.Find_struct(decl.Ident, decl.Cpp_linked)
 	if s != nil {
 		return tc.from_struct(decl, s)
 	}
 
-	ta := tc.lookup.find_type_alias(decl.Ident, decl.Cpp_linked)
+	ta := tc.lookup.Find_type_alias(decl.Ident, decl.Cpp_linked)
 	if ta != nil {
 		return tc.from_type_alias(decl, ta)
 	}
@@ -739,7 +739,7 @@ func (tc *_TypeChecker) build_fn(decl *ast.FnDecl) *FnIns {
 
 func (tc *_TypeChecker) build_by_std_namespace(decl *ast.NamespaceType) _Kind {
 	path := build_link_path_by_tokens(decl.Idents)
-	pkg := tc.lookup.select_package(func(pkg *Package) bool {
+	pkg := tc.lookup.Select_package(func(pkg *Package) bool {
 		return pkg.Std && pkg.Link_path == path
 	})
 	if pkg == nil {

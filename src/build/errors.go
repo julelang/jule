@@ -163,6 +163,7 @@ var ERRORS = map[string]string{
 	`unsafe_ptr_indexing`:                      `unsafe pointers not supports indexing`,
 	`method_has_generic_with_same_ident`:       `methods cannot have same generic identifier with owner same time`,
 	`tuple_assign_to_single`:                   `tuples cannot assign to single define in same time`,
+	`missing_compile_path`:                     `missing compile path`,
 }
 
 // Returns formatted error message by key and args.
@@ -175,10 +176,13 @@ func arg_to_str(arg any) string {
 	switch t := arg.(type) {
 	case string:
 		return t
+
 	case byte:
 		return string(t)
+
 	case rune:
 		return string(t)
+
 	default:
 		return "<fmt?>"
 	}

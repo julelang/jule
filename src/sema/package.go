@@ -27,7 +27,7 @@ type Importer interface {
 func find_var_in_package(files []*SymbolTable,
 	ident string, cpp_linked bool) *Var {
 	for _, f := range files {
-		v := f.find_var(ident, cpp_linked)
+		v := f.Find_var(ident, cpp_linked)
 		if v != nil {
 			return v
 		}
@@ -40,7 +40,7 @@ func find_var_in_package(files []*SymbolTable,
 func find_type_alias_in_package(files []*SymbolTable,
 	ident string, cpp_linked bool) *TypeAlias {
 	for _, f := range files {
-		ta := f.find_type_alias(ident, cpp_linked)
+		ta := f.Find_type_alias(ident, cpp_linked)
 		if ta != nil {
 			return ta
 		}
@@ -53,7 +53,7 @@ func find_type_alias_in_package(files []*SymbolTable,
 func find_struct_in_package(files []*SymbolTable,
 	ident string, cpp_linked bool) *Struct {
 	for _, f := range files {
-		s := f.find_struct(ident, cpp_linked)
+		s := f.Find_struct(ident, cpp_linked)
 		if s != nil {
 			return s
 		}
@@ -65,7 +65,7 @@ func find_struct_in_package(files []*SymbolTable,
 // Returns nil if not exist any function in this identifier.
 func find_fn_in_package(files []*SymbolTable, ident string, cpp_linked bool) *Fn {
 	for _, f := range files {
-		f := f.find_fn(ident, cpp_linked)
+		f := f.Find_fn(ident, cpp_linked)
 		if f != nil {
 			return f
 		}
@@ -77,7 +77,7 @@ func find_fn_in_package(files []*SymbolTable, ident string, cpp_linked bool) *Fn
 // Returns nil if not exist any trait in this identifier.
 func find_trait_in_package(files []*SymbolTable, ident string) *Trait {
 	for _, f := range files {
-		t := f.find_trait(ident)
+		t := f.Find_trait(ident)
 		if t != nil {
 			return t
 		}
@@ -127,43 +127,43 @@ type Package struct {
 }
 
 // Returns nil always.
-func (p *Package) find_package(string) *Package { return nil }
+func (p *Package) Find_package(string) *Package { return nil }
 
 // Returns always nil.
-func (p *Package) select_package(func(*Package) bool) *Package { return nil }
+func (p *Package) Select_package(func(*Package) bool) *Package { return nil }
 
 // Returns variable by identifier and cpp linked state.
 // Returns nil if not exist any variable in this identifier.
-func (p *Package) find_var(ident string, cpp_linked bool) *Var {
+func (p *Package) Find_var(ident string, cpp_linked bool) *Var {
 	return find_var_in_package(p.Files, ident, cpp_linked)
 }
 
 // Returns type alias by identifier and cpp linked state.
 // Returns nil if not exist any type alias in this identifier.
-func (p *Package) find_type_alias(ident string, cpp_linked bool) *TypeAlias {
+func (p *Package) Find_type_alias(ident string, cpp_linked bool) *TypeAlias {
 	return find_type_alias_in_package(p.Files, ident, cpp_linked)
 }
 
 // Returns struct by identifier and cpp linked state.
 // Returns nil if not exist any struct in this identifier.
-func (p *Package) find_struct(ident string, cpp_linked bool) *Struct {
+func (p *Package) Find_struct(ident string, cpp_linked bool) *Struct {
 	return find_struct_in_package(p.Files, ident, cpp_linked)
 }
 
 // Returns function by identifier and cpp linked state.
 // Returns nil if not exist any function in this identifier.
-func (p *Package) find_fn(ident string, cpp_linked bool) *Fn {
+func (p *Package) Find_fn(ident string, cpp_linked bool) *Fn {
 	return find_fn_in_package(p.Files, ident, cpp_linked)
 }
 
 // Returns trait by identifier.
 // Returns nil if not exist any trait in this identifier.
-func (p *Package) find_trait(ident string) *Trait {
+func (p *Package) Find_trait(ident string) *Trait {
 	return find_trait_in_package(p.Files, ident)
 }
 
 // Returns enum by identifier.
 // Returns nil if not exist any enum in this identifier.
-func (p *Package) find_enum(ident string) *Enum {
+func (p *Package) Find_enum(ident string) *Enum {
 	return find_enum_in_package(p.Files, ident)
 }

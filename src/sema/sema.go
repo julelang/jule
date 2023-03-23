@@ -89,8 +89,8 @@ func (s *_Sema) check_generic_quantity(required int, given int, error_token lex.
 //
 // Lookups:
 //  - Current file's imported packages.
-func (s *_Sema) find_package(ident string) *Package {
-	return s.file.find_package(ident)
+func (s *_Sema) Find_package(ident string) *Package {
+	return s.file.Find_package(ident)
 }
 
 // Returns package by selector.
@@ -99,8 +99,8 @@ func (s *_Sema) find_package(ident string) *Package {
 //
 // Lookups:
 //  - Current file's imported packages.
-func (s *_Sema) select_package(selector func(*Package) bool) *Package {
-	return s.file.select_package(selector)
+func (s *_Sema) Select_package(selector func(*Package) bool) *Package {
+	return s.file.Select_package(selector)
 }
 
 // Returns variable by identifier and cpp linked state.
@@ -109,7 +109,7 @@ func (s *_Sema) select_package(selector func(*Package) bool) *Package {
 // Lookups:
 //  - Package file's symbol table.
 //  - Current file's public denifes of imported packages.
-func (s *_Sema) find_var(ident string, cpp_linked bool) *Var {
+func (s *_Sema) Find_var(ident string, cpp_linked bool) *Var {
 	// Lookup package files.
 	v := find_var_in_package(s.files, ident, cpp_linked)
 	if v != nil {
@@ -118,7 +118,7 @@ func (s *_Sema) find_var(ident string, cpp_linked bool) *Var {
 
 	// Lookup current file's public denifes of imported packages.
 	for _, pkg := range s.file.Packages {
-		v := pkg.find_var(ident, cpp_linked)
+		v := pkg.Find_var(ident, cpp_linked)
 		if v != nil && s.is_accessible_define(v.Public, v.Token) {
 			return v
 		}
@@ -133,7 +133,7 @@ func (s *_Sema) find_var(ident string, cpp_linked bool) *Var {
 // Lookups:
 //  - Package file's symbol table.
 //  - Current file's public denifes of imported packages.
-func (s *_Sema) find_type_alias(ident string, cpp_linked bool) *TypeAlias {
+func (s *_Sema) Find_type_alias(ident string, cpp_linked bool) *TypeAlias {
 	// Lookup package files.
 	ta := find_type_alias_in_package(s.files, ident, cpp_linked)
 	if ta != nil {
@@ -142,7 +142,7 @@ func (s *_Sema) find_type_alias(ident string, cpp_linked bool) *TypeAlias {
 
 	// Lookup current file's public denifes of imported packages.
 	for _, pkg := range s.file.Packages {
-		ta := pkg.find_type_alias(ident, cpp_linked)
+		ta := pkg.Find_type_alias(ident, cpp_linked)
 		if ta != nil && s.is_accessible_define(ta.Public, ta.Token) {
 			return ta
 		}
@@ -157,7 +157,7 @@ func (s *_Sema) find_type_alias(ident string, cpp_linked bool) *TypeAlias {
 // Lookups:
 //  - Package file's symbol table.
 //  - Current file's public denifes of imported packages.
-func (s *_Sema) find_struct(ident string, cpp_linked bool) *Struct {
+func (s *_Sema) Find_struct(ident string, cpp_linked bool) *Struct {
 	// Lookup package files.
 	strct := find_struct_in_package(s.files, ident, cpp_linked)
 	if strct != nil {
@@ -166,7 +166,7 @@ func (s *_Sema) find_struct(ident string, cpp_linked bool) *Struct {
 
 	// Lookup current file's public denifes of imported packages.
 	for _, pkg := range s.file.Packages {
-		strct := pkg.find_struct(ident, cpp_linked)
+		strct := pkg.Find_struct(ident, cpp_linked)
 		if strct != nil && s.is_accessible_define(strct.Public, strct.Token) {
 			return strct
 		}
@@ -181,7 +181,7 @@ func (s *_Sema) find_struct(ident string, cpp_linked bool) *Struct {
 // Lookups:
 //  - Package file's symbol table.
 //  - Current file's public denifes of imported packages.
-func (s *_Sema) find_fn(ident string, cpp_linked bool) *Fn {
+func (s *_Sema) Find_fn(ident string, cpp_linked bool) *Fn {
 	// Lookup package files.
 	f := find_fn_in_package(s.files, ident, cpp_linked)
 	if f != nil {
@@ -190,7 +190,7 @@ func (s *_Sema) find_fn(ident string, cpp_linked bool) *Fn {
 
 	// Lookup current file's public denifes of imported packages.
 	for _, pkg := range s.file.Packages {
-		f := pkg.find_fn(ident, cpp_linked)
+		f := pkg.Find_fn(ident, cpp_linked)
 		if f != nil && s.is_accessible_define(f.Public, f.Token) {
 			return f
 		}
@@ -205,7 +205,7 @@ func (s *_Sema) find_fn(ident string, cpp_linked bool) *Fn {
 // Lookups:
 //  - Package file's symbol table.
 //  - Current file's public denifes of imported packages.
-func (s *_Sema) find_trait(ident string) *Trait {
+func (s *_Sema) Find_trait(ident string) *Trait {
 	// Lookup package files.
 	t := find_trait_in_package(s.files, ident)
 	if t != nil {
@@ -214,7 +214,7 @@ func (s *_Sema) find_trait(ident string) *Trait {
 
 	// Lookup current file's public denifes of imported packages.
 	for _, pkg := range s.file.Packages {
-		t := pkg.find_trait(ident)
+		t := pkg.Find_trait(ident)
 		if t != nil && s.is_accessible_define(t.Public, t.Token) {
 			return t
 		}
@@ -229,7 +229,7 @@ func (s *_Sema) find_trait(ident string) *Trait {
 // Lookups:
 //  - Package file's symbol table.
 //  - Current file's public denifes of imported packages.
-func (s *_Sema) find_enum(ident string) *Enum {
+func (s *_Sema) Find_enum(ident string) *Enum {
 	// Lookup package files.
 	e := find_enum_in_package(s.files, ident)
 	if e != nil {
@@ -238,7 +238,7 @@ func (s *_Sema) find_enum(ident string) *Enum {
 
 	// Lookup current file's public denifes of imported packages.
 	for _, pkg := range s.file.Packages {
-		e := pkg.find_enum(ident)
+		e := pkg.Find_enum(ident)
 		if e != nil && s.is_accessible_define(e.Public, e.Token) {
 			return e
 		}
@@ -902,7 +902,7 @@ func (s *_Sema) impl_to_struct(dest *Struct, ipl *Impl) (ok bool) {
 
 // Implement trait to destination.
 func (s *_Sema) impl_trait(decl *Impl) {
-	base := s.find_trait(decl.Base.Kind)
+	base := s.Find_trait(decl.Base.Kind)
 	if base == nil {
 		s.push_err(decl.Base, "impl_base_not_exist", decl.Base.Kind)
 		return
@@ -912,7 +912,7 @@ func (s *_Sema) impl_trait(decl *Impl) {
 	// definitions haven't support implementations.
 	const CPP_LINKED = false
 
-	dest := s.find_struct(decl.Dest.Kind, CPP_LINKED)
+	dest := s.Find_struct(decl.Dest.Kind, CPP_LINKED)
 	if dest == nil {
 		s.push_err(decl.Dest, "impl_dest_not_exist", decl.Dest.Kind)
 		return
@@ -934,7 +934,7 @@ func (s *_Sema) impl_struct(decl *Impl) {
 	// definitions haven't support implementations.
 	const CPP_LINKED = false
 
-	dest := s.find_struct(decl.Dest.Kind, CPP_LINKED)
+	dest := s.Find_struct(decl.Dest.Kind, CPP_LINKED)
 	if dest == nil {
 		s.push_err(decl.Base, "impl_dest_not_exist", decl.Base.Kind)
 		return

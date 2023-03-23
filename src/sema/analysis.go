@@ -29,7 +29,7 @@ func build_symbols(pwd string, pstd string, ast *ast.Ast,
 }
 
 func analyze_package(pwd string, pstd string, files []*ast.Ast,
-	importer Importer) ([]*SymbolTable, []build.Log){
+	importer Importer) (*Package, []build.Log){
 	// Build symbol tables of files.
 	tables := make([]*SymbolTable, len(files))
 	for i, f := range files {
@@ -46,7 +46,11 @@ func analyze_package(pwd string, pstd string, files []*ast.Ast,
 		return nil, sema.errors
 	}
 
-	return sema.files, nil
+	pkg := &Package{
+		Files: sema.files,
+	}
+
+	return pkg, nil
 }
 
 // Builds symbol table of package's ASTs.
@@ -65,7 +69,7 @@ func analyze_package(pwd string, pstd string, files []*ast.Ast,
 //  - You can pass nil to importer, but panics if importer is nil and
 //    semantic analyzer used nil importer.
 func Analyze_package(pwd string, pstd string, files []*ast.Ast,
-	importer Importer) ([]*SymbolTable, []build.Log) {
+	importer Importer) (*Package, []build.Log) {
 	if len(files) == 0 {
 		return nil, nil
 	}
@@ -101,13 +105,13 @@ func Analyze_package(pwd string, pstd string, files []*ast.Ast,
 func Analyze_file(pwd string, pstd string, f *ast.Ast,
 	importer Importer) (*SymbolTable, []build.Log) {
 	files := []*ast.Ast{f}
-	tables, errors := Analyze_package(pwd, pstd, files, importer)
+	pkg, errors := Analyze_package(pwd, pstd, files, importer)
 	if len(errors) > 0 {
 		return nil, errors
 	}
 
 	// Select first table, because package has only one file.
 	// We give just one file.
-	table := tables[0]
+	table := pkg.Files[0]
 	return table, nil
 }

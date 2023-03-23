@@ -334,7 +334,7 @@ func (s *_SymbolBuilder) build_package(decl *ast.UseDecl) *Package {
 
 func (s *_SymbolBuilder) check_duplicate_use_decl(pkg *Package) (ok bool) {
 	// Find package by path to detect cpp header imports.
-	lpkg := s.table.select_package(func(spkg *Package) bool {
+	lpkg := s.table.Select_package(func(spkg *Package) bool {
 		return pkg.Path == spkg.Path
 	})
 	if lpkg == nil {
@@ -389,6 +389,7 @@ func (s *_SymbolBuilder) import_use_decl(decl *ast.UseDecl) *Package {
 	ok = s.import_package(pkg)
 	s.table.Packages = append(s.table.Packages, pkg)
 	if ok {
+		s.importer.Imported(pkg)
 		return pkg
 	}
 	return nil

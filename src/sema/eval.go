@@ -92,7 +92,7 @@ func check_data_for_integer_indexing(d *Data) (err_key string) {
 // Evaluator.
 type _Eval struct {
 	s        *_Sema  // Used for error logging.
-	lookup   _Lookup
+	lookup   Lookup
 	prefix   *TypeKind
 	unsafety bool
 }
@@ -254,28 +254,28 @@ func (e *_Eval) eval_lit(lit *ast.LitExpr) *Data {
 
 func (e *_Eval) get_def(ident string, cpp_linked bool) any {
 	if !cpp_linked {
-		enm := e.lookup.find_enum(ident)
+		enm := e.lookup.Find_enum(ident)
 		if enm != nil {
 			return enm
 		}
 	}
 
-	v := e.lookup.find_var(ident, cpp_linked)
+	v := e.lookup.Find_var(ident, cpp_linked)
 	if v != nil {
 		return v
 	}
 
-	f := e.lookup.find_fn(ident, cpp_linked)
+	f := e.lookup.Find_fn(ident, cpp_linked)
 	if f != nil {
 		return f
 	}
 
-	s := e.lookup.find_struct(ident, cpp_linked)
+	s := e.lookup.Find_struct(ident, cpp_linked)
 	if s != nil {
 		return s
 	}
 
-	ta := e.lookup.find_type_alias(ident, cpp_linked)
+	ta := e.lookup.Find_type_alias(ident, cpp_linked)
 	if ta != nil {
 		return ta
 	}
@@ -1001,7 +1001,7 @@ func (e *_Eval) eval_cast(c *ast.CastExpr) *Data {
 
 func (e *_Eval) eval_ns_selection(s *ast.NsSelectionExpr) *Data {
 	path := build_link_path_by_tokens(s.Ns)
-	pkg := e.lookup.select_package(func(p *Package) bool {
+	pkg := e.lookup.Select_package(func(p *Package) bool {
 		return p.Link_path == path
 	})
 
