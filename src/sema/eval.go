@@ -1525,6 +1525,13 @@ func (bs *_BinopSolver) eval_prim() *Data {
 }
 
 func (bs *_BinopSolver) eval() *Data {
+	if bs.l.Kind.Enm() != nil {
+		bs.l.Kind = bs.l.Kind.Enm().Kind.Kind
+	}
+	if bs.r.Kind.Enm() != nil {
+		bs.r.Kind = bs.r.Kind.Enm().Kind.Kind
+	}
+
 	switch {
 	case bs.l.Kind.Is_void():
 		bs.e.push_err(bs.op, "operator_not_for_juletype", bs.op.Kind, "void")
