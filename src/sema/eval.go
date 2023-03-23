@@ -1649,11 +1649,30 @@ func (bs *_BinopSolver) eval_any() *Data {
 	}
 }
 
+func (bs *_BinopSolver) eval_bool() *Data {
+	if !bs.check_type_compatibility() {
+		bs.e.push_err(bs.op, "incompatible_types", bs.l.Kind.To_str(), bs.r.Kind.To_str())
+		return nil
+	}
+
+	switch bs.op.Kind {
+	case lex.KND_EQS, lex.KND_NOT_EQ, lex.KND_DBL_AMPER, lex.KND_DBL_VLINE:
+		return bs.l
+
+	default:
+		bs.e.push_err(bs.op, "operator_not_for_juletype", bs.op.Kind, bs.l.Kind.To_str())
+		return nil
+	}
+}
+
 func (bs *_BinopSolver) eval_prim() *Data {
 	prim := bs.l.Kind.Prim()
 	switch {
 	case prim.Is_any():
 		return bs.eval_any()
+	
+	case prim.Is_bool():
+		return bs.eval_bool()
 
 	default:
 		return nil
