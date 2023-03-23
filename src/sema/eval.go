@@ -1477,6 +1477,27 @@ type _BinopSolver struct {
 	op lex.Token
 }
 
+func (bs *_BinopSolver) eval_nil() *Data {
+	if !is_nil_compatible(bs.r.Kind) {
+		bs.e.push_err(bs.op, "incompatible_types", lex.KND_NIL, bs.r.Kind.To_str())
+		return nil
+	}
+	
+	// TODO: Eval constants.
+	switch bs.op.Kind {
+	case lex.KND_EQS, lex.KND_NOT_EQ:
+		return &Data{
+			Kind: &TypeKind{
+				kind: build_prim_type(types.TypeKind_BOOL),
+			},
+		}
+
+	default:
+		bs.e.push_err(bs.op, "operator_not_for_juletype", bs.op.Kind, lex.KND_NIL)
+		return nil
+	}
+}
+
 func (bs *_BinopSolver) eval_any() *Data {
 	switch bs.op.Kind {
 	case lex.KND_EQS, lex.KND_NOT_EQ:
@@ -1497,12 +1518,21 @@ func (bs *_BinopSolver) eval_prim() *Data {
 	switch {
 	case prim.Is_any():
 		return bs.eval_any()
+
+	default:
+		return nil
 	}
-	return nil
 }
 
 func (bs *_BinopSolver) eval() *Data {
 	switch {
+	case bs.l.Kind.Is_void():
+		bs.e.push_err(bs.op, "operator_not_for_juletype", bs.op.Kind, "void")
+		return nil
+
+	case bs.l.Kind.Is_nil():
+		return bs.eval_nil()
+
 	case bs.l.Kind.Prim() != nil:
 		return bs.eval_prim()
 

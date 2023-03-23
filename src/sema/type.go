@@ -295,6 +295,11 @@ func is_mut(t *TypeKind) bool {
 }
 
 func is_nil_compatible(t *TypeKind) bool {
+	prim := t.Prim()
+	if prim != nil && prim.Is_any() {
+		return true
+	}
+
 	return (t.Is_nil() ||
 		t.Fnc() != nil ||
 		t.Ptr() != nil ||
