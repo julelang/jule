@@ -1470,6 +1470,18 @@ func (e *_Eval) eval(expr *ast.Expr) *Data {
 	}
 }
 
+func is_ok_for_shifting(d *Data) bool {
+	prim := d.Kind.Prim()
+	if prim == nil || !types.Is_int(prim.To_str()) {
+		return false
+	} else if !d.Constant {
+		return true
+	}
+
+	// TODO: Check constants.
+	return true
+}
+
 type _BinopSolver struct {
 	e  *_Eval
 	l  *Data
@@ -1737,6 +1749,59 @@ func (bs *_BinopSolver) eval_float() *Data {
 	}
 }
 
+func (bs *_BinopSolver) eval_unsig_int() *Data {
+	rk := bs.r.Kind.To_str()
+	if !types.Is_num(rk) {
+		bs.e.push_err(bs.op, "incompatible_types", bs.l.Kind.To_str(), rk)
+		return nil
+	}
+
+		// TODO: Eval constants.
+
+	// Logicals.
+	switch bs.op.Kind {
+	case lex.KND_EQS,
+		lex.KND_NOT_EQ,
+		lex.KND_LT,
+		lex.KND_GT,
+		lex.KND_GREAT_EQ,
+		lex.KND_LESS_EQ:
+		return &Data{
+			Kind: &TypeKind{
+				kind: build_prim_type(types.TypeKind_BOOL),
+			},
+		}
+	}
+
+	// Arithmetics.
+	switch bs.op.Kind {
+	case lex.KND_PLUS,
+		lex.KND_MINUS,
+		lex.KND_STAR,
+		lex.KND_SOLIDUS,
+		lex.KND_PERCENT,
+		lex.KND_AMPER,
+		lex.KND_VLINE,
+		lex.KND_CARET:
+		if types.Is_greater(rk, bs.l.Kind.To_str()) {
+			bs.l.Kind = bs.r.Kind
+		}
+		return bs.l
+
+	case lex.KND_LSHIFT, lex.KND_RSHIFT:
+		if !is_ok_for_shifting(bs.r) {
+			bs.e.push_err(bs.op, "bitshift_must_unsigned")
+			return nil
+		}
+		bs.l.Kind.kind = build_prim_type(types.TypeKind_U64)
+		return bs.l
+
+	default:
+		bs.e.push_err(bs.op, "operator_not_for_float", bs.op.Kind)
+		return nil
+	}
+}
+
 func (bs *_BinopSolver) eval_prim() *Data {
 	prim := bs.l.Kind.Prim()
 	switch {
@@ -1764,6 +1829,12 @@ func (bs *_BinopSolver) eval_prim() *Data {
 			bs.l, bs.r = bs.r, bs.l
 		}
 		return bs.eval_float()
+
+	case types.Is_unsig_int(lk) || types.Is_unsig_int(rk):
+		if types.Is_unsig_int(rk) {
+			bs.l, bs.r = bs.r, bs.l
+		}
+		return bs.eval_unsig_int()
 
 	default:
 		return nil
