@@ -251,12 +251,8 @@ func (i *Importer) Import_package(path string) ([]*ast.Ast, []build.Log) {
 }
 
 func (i *Importer) Imported(pkg *sema.Package) {
-	if pkg.Cpp {
-		return
-	}
-
 	for _, p := range i.all_packages {
-		if p.Link_path == pkg.Link_path {
+		if p.Cpp == pkg.Cpp && p.Link_path == pkg.Link_path {
 			return
 		}
 	}
