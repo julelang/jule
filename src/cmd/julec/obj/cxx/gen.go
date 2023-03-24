@@ -16,6 +16,9 @@ const CPP_SELF = "this"
 // Represents default expression for type.
 const CPP_DEFAULT_EXPR = "{}"
 
+// C++ statement terminator.
+const CPP_ST_TERM = ";"
+
 // Extension of Jule data types.
 const TYPE_EXT = "_jt"
 
@@ -85,9 +88,50 @@ func gen_links(used []*sema.Package) string {
 	return obj
 }
 
+// Generates C++ code of type aliase.
+func gen_type_alias(ta *sema.TypeAlias) string {
+	obj := "typedef "
+	obj += ta.Kind.Kind.To_str()
+	obj += " "
+	obj += as_out_ident(ta.Ident, ta.Token.File.Addr())
+	obj += CPP_ST_TERM
+	return obj
+}
+
+// Generates C++ code of SymbolTable's all type aliases.
+func gen_type_aliases_tbl(tbl *sema.SymbolTable) string {
+	obj := ""
+	for _, ta := range tbl.Type_aliases {
+		if !ta.Cpp_linked {
+			obj += gen_type_alias(ta) + "\n"
+		}
+	}
+	return obj
+}
+
+// Generates C++ code of package's all type aliases.
+func gen_type_aliases_pkg(pkg *sema.Package) string {
+	obj := ""
+	for _, tbl := range pkg.Files {
+		obj += gen_type_aliases_tbl(tbl)
+	}
+	return obj
+}
+
+// Generates C++ code of all type aliases.
+func gen_type_aliases(pkg *sema.Package, used []*sema.Package) string {
+	obj := ""
+	for _, pkg := range used {
+		obj += gen_type_aliases_pkg(pkg)
+	}
+	obj += gen_type_aliases_pkg(pkg)
+	return obj
+}
+
 // Generates C++ codes from SymbolTables.
 func Gen(pkg *sema.Package, used []*sema.Package) string {
 	obj := ""
-	obj += gen_links(used)
+	obj += gen_links(used) + "\n"
+	obj += gen_type_aliases(pkg, used)
 	return obj
 }
