@@ -5,6 +5,7 @@ import (
 
 	"github.com/julelang/jule"
 	"github.com/julelang/jule/build"
+	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/sema"
 )
 
@@ -59,6 +60,17 @@ func as_out_ident(ident string, ptr uintptr) string {
 	return as_ident(ident)
 }
 
+// Returns cpp output local identifier form of fiven identifier.
+//
+// Parameters:
+//  - row:   Row of definition.
+//  - col:   Column of definition.
+//  - ident: Identifier of definition.
+func as_local_ident(row int, col int, ident string) string {
+	ident = strconv.Itoa(row) + strconv.Itoa(col) + "_" + ident
+	return as_ident(ident)
+}
+
 // Returns output identifier of function.
 func fn_out_ident(f *sema.Fn) string {
 	switch {
@@ -71,6 +83,16 @@ func fn_out_ident(f *sema.Fn) string {
 	default:
 		return as_out_ident(f.Ident, f.Token.File.Addr())
 	}
+}
+
+// Returns output identifier of trait.
+func trait_out_ident(t *sema.Trait) string {
+	return as_out_ident(t.Ident, t.Token.File.Addr())
+}
+
+// Returns output identifier of parameter.
+func param_out_ident(p *sema.Param) string {
+	return as_local_ident(p.Token.Row, p.Token.Column, p.Ident)
 }
 
 // Returns indention string by INDENT.
@@ -140,9 +162,123 @@ func gen_type_aliases_pkg(pkg *sema.Package) string {
 func gen_type_aliases(pkg *sema.Package, used []*sema.Package) string {
 	obj := ""
 	for _, pkg := range used {
-		obj += gen_type_aliases_pkg(pkg)
+		if !pkg.Cpp {
+			obj += gen_type_aliases_pkg(pkg)
+		}
 	}
 	obj += gen_type_aliases_pkg(pkg)
+	return obj
+}
+
+// Generates C++ code of TypeKind.
+func gen_type_kind(k *sema.TypeKind) string {
+	// TODO: Implement here.
+	return "TypeKind"
+}
+
+// Generates C++ code of function's result type.
+func gen_fn_result(f *sema.Fn) string {
+	if f.Is_void() {
+		return "void"
+	}
+	return gen_type_kind(f.Result.Kind.Kind)
+}
+
+// Generates C++ prototype code of parameter.
+func gen_param_prototype(p *sema.Param) string {
+	obj := ""
+	if p.Variadic {
+		obj += as_jt("slice")
+		obj += "<"
+		obj += gen_type_kind(p.Kind.Kind)
+		obj += ">"
+	} else {
+		obj += gen_type_kind(p.Kind.Kind)
+	}
+	return obj
+}
+
+// Generates C++ code of parameter.
+func gen_param(p *sema.Param) string {
+	obj := gen_param_prototype(p)
+	if p.Ident != "" && !lex.Is_ignore_ident(p.Ident) && !lex.Is_anon_ident(p.Ident) {
+		obj += " " + param_out_ident(p)
+	}
+	return obj
+}
+
+// Generates C++ code of parameters.
+func gen_params(params []*sema.Param) string {
+	if len(params) == 0 {
+		return "(void)"
+	}
+
+	obj := "("
+	for _, p := range params {
+		obj += gen_param(p) + ","
+	}
+
+	// Remove comma.
+	obj = obj[:len(obj)-1]
+	return obj + ")"
+}
+
+// Generates C++ code of trait.
+func gen_trait(t *sema.Trait) string {
+	const INDENTION = "\t"
+	outid := trait_out_ident(t)
+
+	obj := "struct "
+	obj += outid
+	obj += " {\n"
+	obj += INDENTION
+	obj += "virtual ~"
+	obj += outid
+	obj += "(void) noexcept {}\n\n"
+	for _, f := range t.Methods {
+		obj += INDENTION
+		obj += "virtual "
+		obj += gen_fn_result(f)
+		obj += " "
+		obj += f.Ident
+		obj += gen_params(f.Params)
+		obj += " {"
+		if !f.Is_void() {
+			obj += " return {}; "
+		}
+		obj += "}\n"
+	}
+	obj += "};"
+	return obj
+}
+
+// Generates C++ code of SymbolTable's all traits.
+func gen_traits_tbl(tbl *sema.SymbolTable) string {
+	obj := ""
+	for _, t := range tbl.Traits {
+		obj += gen_trait(t) + "\n\n"
+	}
+	return obj
+}
+
+// Generates C++ code of package's all traits.
+func gen_traits_pkg(pkg *sema.Package) string {
+	obj := ""
+	for _, tbl := range pkg.Files {
+		obj += gen_traits_tbl(tbl)
+	}
+	return obj
+}
+
+// Generates C++ code of all traits.
+func gen_traits(pkg *sema.Package, used []*sema.Package) string {
+	obj := ""
+	for _, pkg := range used {
+		if !pkg.Cpp {
+			obj += gen_traits_pkg(pkg)
+		}
+	}
+	obj += gen_traits_pkg(pkg)
 	return obj
 }
 
@@ -180,6 +316,7 @@ func Gen(pkg *sema.Package, used []*sema.Package) string {
 	obj := ""
 	obj += gen_links(used) + "\n"
 	obj += gen_type_aliases(pkg, used) + "\n"
+	obj += gen_traits(pkg, used) + "\n"
 	obj += gen_init_caller(pkg, used) + "\n"
 	return obj
 }
