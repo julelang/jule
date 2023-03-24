@@ -3,6 +3,7 @@ package cxx
 import (
 	"strconv"
 
+	"github.com/julelang/jule"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/sema"
 )
@@ -21,6 +22,9 @@ const CPP_ST_TERM = ";"
 
 // Extension of Jule data types.
 const TYPE_EXT = "_jt"
+
+// Identifier of initialize function caller function.
+const INIT_CALLER_IDENT = "__julec_call_initializers"
 
 // Current indention count.
 var INDENT = 0
@@ -53,6 +57,20 @@ func as_out_ident(ident string, ptr uintptr) string {
 		return get_ptr_as_id(ptr) + "_" + ident
 	}
 	return as_ident(ident)
+}
+
+// Returns output identifier of function.
+func fn_out_ident(f *sema.Fn) string {
+	switch {
+	case f.Ident == jule.ENTRY_POINT:
+		return as_ident(f.Ident)
+
+	case f.Is_method():
+		return "_method_" + f.Ident
+
+	default:
+		return as_out_ident(f.Ident, f.Token.File.Addr())
+	}
 }
 
 // Returns indention string by INDENT.
@@ -128,10 +146,40 @@ func gen_type_aliases(pkg *sema.Package, used []*sema.Package) string {
 	return obj
 }
 
+// Generated C++ code of all initializer functions.
+func gen_init_caller(pkg *sema.Package, used []*sema.Package) string {
+	const INDENTION = "\t"
+
+	obj := "void "
+	obj += INIT_CALLER_IDENT
+	obj += "(void) {"
+
+	push_init := func(pkg *sema.Package) {
+		const CPP_LINKED = false
+		f := pkg.Find_fn(jule.INIT_FN, CPP_LINKED)
+		if f == nil {
+			return
+		}
+
+		obj += "\n" + INDENTION + fn_out_ident(f) + "();"
+	}
+
+	for _, u := range used {
+		if !u.Cpp {
+			push_init(u)
+		}
+	}
+	push_init(pkg)
+
+	obj += "\n}"
+	return obj
+}
+
 // Generates C++ codes from SymbolTables.
 func Gen(pkg *sema.Package, used []*sema.Package) string {
 	obj := ""
 	obj += gen_links(used) + "\n"
-	obj += gen_type_aliases(pkg, used)
+	obj += gen_type_aliases(pkg, used) + "\n"
+	obj += gen_init_caller(pkg, used) + "\n"
 	return obj
 }
