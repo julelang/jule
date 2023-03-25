@@ -784,6 +784,31 @@ func (s *_Sema) check_fn_decl_result_dup(f *Fn) (ok bool) {
 	return
 }
 
+func (s *_Sema) check_fn_decl_types(f *Fn) (ok bool) {
+	ok = true
+
+	generics := f.Generics
+	if f.Owner != nil {
+		generics = append(generics, f.Owner.Generics...)
+	}
+
+	for _, p := range f.Params {
+		if !p.Is_self() {
+			kind := s.build_non_generic_type_kind(p.Kind.Decl, generics, false)
+			ok = kind != nil && ok
+			p.Kind.Kind = kind
+		}
+	}
+
+	if !f.Is_void() {
+		kind := s.build_non_generic_type_kind(f.Result.Kind.Decl, generics, false)
+		ok = kind != nil && ok
+		f.Result.Kind.Kind = kind
+	}
+
+	return ok
+}
+
 // Checks generics, parameters and return type.
 // Not checks scope, and other things.
 func (s *_Sema) check_fn_decl_prototype(f *Fn) (ok bool) {
@@ -795,6 +820,9 @@ func (s *_Sema) check_fn_decl_prototype(f *Fn) (ok bool) {
 		return false
 
 	case !s.check_fn_decl_result_dup(f):
+		return false
+
+	case !s.check_fn_decl_types(f):
 		return false
 
 	default:

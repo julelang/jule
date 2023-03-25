@@ -130,13 +130,19 @@ func gen_param(p *sema.Param) string {
 
 // Generates C++ code of parameters.
 func gen_params(params []*sema.Param) string {
-	if len(params) == 0 {
+	switch {
+	case len(params) == 0:
+		return "(void)"
+	
+	case len(params) == 1 && params[0].Is_self():
 		return "(void)"
 	}
 
 	obj := "("
 	for _, p := range params {
-		obj += gen_param(p) + ","
+		if !p.Is_self() {
+			obj += gen_param(p) + ","
+		}
 	}
 
 	// Remove comma.
