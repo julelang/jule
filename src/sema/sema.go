@@ -841,7 +841,7 @@ func (s *_Sema) check_trait_decl_method(f *Fn) {
 func (s *_Sema) check_trait_decl_methods(t *Trait) {
 	for i, f := range t.Methods {
 		s.check_trait_decl_method(f)
-		
+
 		// Break checking if type alias has error.
 		if len(s.errors) > 0 {
 			return
