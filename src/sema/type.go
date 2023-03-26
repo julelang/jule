@@ -328,7 +328,10 @@ func build_prim_type(kind string) *Prim {
 type _Referencer struct {
 	ident  string
 	refers *[]*ast.IdentType
+	strct  *Struct
 }
+
+func (r *_Referencer) is_struct_mode() bool { return r.strct != nil }
 
 // Checks type and builds result as kind.
 // Removes kind if error occurs,
@@ -359,7 +362,11 @@ type _TypeChecker struct {
 	ignore_with_trait_pattern bool
 
 	// This generics used as type alias for real kind.
-	use_generics    []*TypeAlias
+	use_generics []*TypeAlias
+
+	// Current checked type is not plain type.
+	// Type is pointer, reference, slice or similar.
+	not_plain bool
 }
 
 func (tc *_TypeChecker) push_err(token lex.Token, key string, args ...any) {
@@ -431,6 +438,47 @@ func (tc *_TypeChecker) check_illegal_cycles(decl *ast.IdentType, refers *[]*ast
 	return true
 }
 
+// Checks structure illegal cycles.
+// Appends depend to depends if there is no illegal cycle.
+// Returns true if tc.referencer is nil.
+// Returns true if tc.referencer.is_struct_mode() is false.
+// Returns true if tc.not_plain is true.
+func (tc *_TypeChecker) check_struct_illegal_cycles(decl *ast.IdentType, s *Struct) (ok bool) {
+	switch {
+	case tc.referencer == nil:
+		return true
+
+	case !tc.referencer.is_struct_mode():
+		return true
+
+	case tc.not_plain:
+		return true
+	}
+
+	// Check illegal cycle for itself.
+	// Because refers's owner is ta.
+	if tc.referencer.strct == s {
+		tc.push_err(decl.Token, "illegal_cycle_refers_itself", tc.referencer.ident)
+		return false
+	}
+
+	// Check cross illegal cycle.
+	ok = true
+	for _, d := range s.Depends {
+		if d.Ident == tc.referencer.ident {
+			tc.push_err(decl.Token, "illegal_cross_cycle", tc.referencer.ident, decl.Ident)
+			ok = false
+		}
+	}
+
+	if !ok {
+		return false
+	}
+
+	tc.referencer.strct.Depends = append(tc.referencer.strct.Depends, s)
+	return true
+}
+
 func (tc *_TypeChecker) from_type_alias(decl *ast.IdentType, ta *TypeAlias) *TypeKind {
 	if !tc.s.is_accessible_define(ta.Public, ta.Token) {
 		tc.push_err(decl.Token, "ident_not_exist", decl.Ident)
@@ -475,18 +523,79 @@ func (tc *_TypeChecker) from_enum(decl *ast.IdentType, e *Enum) *Enum {
 	return e
 }
 
+func (tc *_TypeChecker) check_struct_ins(ins *StructIns, error_token lex.Token) (ok bool) {
+	// TODO: Skip checking if already parsed instance.
+
+	ok = tc.s.check_generic_quantity(len(ins.Decl.Generics), len(ins.Generics), error_token)
+	if !ok {
+		return false
+	}
+
+	if tc.referencer != nil && tc.referencer.strct == ins.Decl {
+		// Break algorithm cycle.
+		return true
+	} else if ins.Decl.sema != nil && len(ins.Decl.Generics) == 0 {
+		// Break algorithm cycle.
+		return true
+	}
+
+	referencer := &_Referencer{
+		ident: ins.Decl.Ident,
+		strct: ins.Decl,
+	}
+
+	generics := make([]*TypeAlias, len(ins.Generics))
+	for i, g := range ins.Generics {
+		generics[i] = &TypeAlias{
+			Ident: ins.Decl.Generics[i].Ident,
+			Kind:  &TypeSymbol{
+				Kind: g,
+			},
+		}
+	}
+
+	// Check field types.
+	for _, f := range ins.Fields {
+		tc := _TypeChecker{
+			s:            tc.s,
+			lookup:       tc.s,
+			referencer:   referencer,
+			use_generics: generics,
+		}
+		kind := tc.check_decl(f.Decl.Kind.Decl)
+		ok := kind != nil
+
+		if ins.Decl.sema != nil && tc.s != ins.Decl.sema && len(ins.Decl.sema.errors) > 0 {
+			tc.s.errors = append(tc.s.errors, ins.Decl.sema.errors...)
+		}
+
+		if !ok {
+			return false
+		}
+
+		f.Kind = kind
+	}
+
+	// TODO: Check methods if declaration comes out of package.
+
+	return true
+}
+
 func (tc *_TypeChecker) from_struct(decl *ast.IdentType, s *Struct) *StructIns {
 	if !tc.s.is_accessible_define(s.Public, s.Token) {
 		tc.push_err(decl.Token, "ident_not_exist", decl.Ident)
 		return nil
 	}
-	ok := tc.check_illegal_cycles(decl, &s.Refers)
+
+	ok := tc.check_struct_illegal_cycles(decl, s)
 	if !ok {
 		return nil
 	}
-	
+
 	ins := s.instance()
 	ins.Generics = make([]*TypeKind, len(decl.Generics))
+	referencer := tc.referencer
+	tc.referencer = nil
 	for i, g := range decl.Generics {
 		kind := tc.build(g.Kind)
 		if kind == nil {
@@ -496,11 +605,13 @@ func (tc *_TypeChecker) from_struct(decl *ast.IdentType, s *Struct) *StructIns {
 		ins.Generics[i] = kind
 	}
 
+	tc.referencer = referencer
+
 	if !ok {
 		return nil
 	}
 
-	ok = tc.s.check_struct_ins(ins, decl.Token)
+	ok = tc.check_struct_ins(ins, decl.Token)
 	if !ok {
 		return nil
 	}
@@ -522,6 +633,11 @@ func (tc *_TypeChecker) get_def(decl *ast.IdentType) _Kind {
 
 	for _, g := range tc.use_generics {
 		if g.Ident == decl.Ident {
+			st := g.Kind.Kind.Strct()
+			ok := tc.check_struct_illegal_cycles(decl, st.Decl)
+			if !ok {
+				return nil
+			}
 			return g.Kind.Kind
 		}
 	}
@@ -602,6 +718,10 @@ func (tc *_TypeChecker) build_ref(decl *ast.RefType) *Ref {
 }
 
 func (tc *_TypeChecker) build_ptr(decl *ast.PtrType) *Ptr {
+	not_plain := tc.not_plain
+	tc.not_plain = true
+	defer func() { tc.not_plain = not_plain }()
+
 	var elem *TypeKind = nil
 
 	if !decl.Is_unsafe() {
@@ -818,6 +938,7 @@ func (tc *_TypeChecker) check_decl(decl *ast.Type) *TypeKind {
 	tc.error_token = decl.Token
 	kind := tc.build(decl.Kind)
 	tc.error_token = error_token
+
 	return kind
 }
 

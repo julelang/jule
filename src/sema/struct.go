@@ -31,7 +31,11 @@ type Struct struct {
 	// Used declaration'sema sema for instance type checking.
 	sema       *_Sema
 
-	Refers     []*ast.IdentType // Referred identifiers.
+	// This structure depended to these structures.
+	// Only stores plain identifier references such as A, B, and MyStruct.
+	// Not includes non-pain identifier references such as *A, &B, and []MyStruct.
+	Depends    []*Struct
+
 	Token      lex.Token
 	Ident      string
 	Fields     []*Field

@@ -417,20 +417,6 @@ func (s *_Sema) get_trait_check_fn_kind(f *Fn) string {
 	return to_trait_kind_str(ins)
 }
 
-func (s *_Sema) method_with_non_generic_type_kind(st *Struct, f *Fn) *FnIns {
-	generics := append(f.Generics, st.Generics...)
-	ins := f.instance_force()
-	for _, p := range ins.Params {
-		if !p.Decl.Is_self() {
-			p.Kind = s.build_non_generic_type_kind(p.Decl.Kind.Decl, generics, false)
-		}
-	}
-	if !f.Is_void() {
-		ins.Result = s.build_non_generic_type_kind(f.Result.Kind.Decl, generics, false)
-	}
-	return ins
-}
-
 func (s *_Sema) reload_fn_ins_types(f *FnIns) (ok bool) {
 	generics := make([]*TypeAlias, len(f.Generics))
 	for i, g := range f.Generics {
@@ -469,56 +455,6 @@ func (s *_Sema) check_validity_for_init_expr(left_mut bool, d *Data, error_token
 		error_token: error_token,
 	}
 	_ = atc.check_validity()
-}
-
-func (s *_Sema) check_struct_ins(ins *StructIns, error_token lex.Token) (ok bool) {
-	// TODO: Skip checking if already parsed instance.
-
-	ok = s.check_generic_quantity(len(ins.Decl.Generics), len(ins.Generics), error_token)
-	if !ok {
-		return false
-	}
-
-	referencer := &_Referencer{
-		ident:  ins.Decl.Ident,
-		refers: &ins.Decl.Refers,
-	}
-
-	generics := make([]*TypeAlias, len(ins.Generics))
-	for i, g := range ins.Generics {
-		generics[i] = &TypeAlias{
-			Ident: ins.Decl.Generics[i].Ident,
-			Kind:  &TypeSymbol{
-				Kind: g,
-			},
-		}
-	}
-
-	// Check field types.
-	for _, f := range ins.Fields {
-		tc := _TypeChecker{
-			s:            s,
-			lookup:       s,
-			referencer:   referencer,
-			use_generics: generics,
-		}
-		kind := tc.check_decl(f.Decl.Kind.Decl)
-		ok := kind != nil
-
-		if s != ins.Decl.sema && len(ins.Decl.sema.errors) > 0 {
-			s.errors = append(s.errors, ins.Decl.sema.errors...)
-		}
-
-		if !ok {
-			return false
-		}
-
-		f.Kind = kind
-	}
-
-	// TODO: Check methods if declaration comes out of package.
-
-	return true
 }
 
 func (s *_Sema) check_type_alias_decl_kind(ta *TypeAlias) (ok bool) {
@@ -1061,8 +997,17 @@ func (s *_Sema) check_struct_impls(strct *Struct) (ok bool) {
 
 func (s *_Sema) check_struct_fields(st *Struct) (ok bool) {
 	ok = true
+	tc := _TypeChecker{
+		s:               s,
+		lookup:          s,
+		ignore_generics: st.Generics,
+		referencer:      &_Referencer{
+			ident: st.Ident,
+			strct: st,
+		},
+	}
 	for _, f := range st.Fields {
-		f.Kind.Kind = s.build_non_generic_type_kind(f.Kind.Decl, st.Generics, false)
+		f.Kind.Kind = tc.check_decl(f.Kind.Decl)
 		ok = f.Kind.Kind != nil && ok
 
 		for _, cf := range st.Fields {
