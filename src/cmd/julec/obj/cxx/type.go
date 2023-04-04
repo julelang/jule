@@ -1,6 +1,8 @@
 package cxx
 
 import (
+	"strconv"
+
 	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/sema"
@@ -96,6 +98,14 @@ func gen_struct_kind(s *sema.StructIns) string {
 	return rep
 }
 
+// Generates C++ code of Arr TypeKind.
+func gen_array_kind(a *sema.Arr) string {
+	arr := as_jt("array")
+	elem := gen_type_kind(a.Elem)
+	size := strconv.Itoa(a.N)
+	return arr + "<" + elem + "," + size + ">"
+}
+
 // Generates C++ code of TypeKind.
 func gen_type_kind(k *sema.TypeKind) string {
 	switch {
@@ -125,6 +135,9 @@ func gen_type_kind(k *sema.TypeKind) string {
 
 	case k.Strct() != nil:
 		return gen_struct_kind(k.Strct())
+
+	case k.Arr() != nil:
+		return gen_array_kind(k.Arr())
 
 	default:
 		return "[<undefined_type_kind>]"
