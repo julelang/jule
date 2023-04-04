@@ -37,6 +37,13 @@ func gen_enum_kind(e *sema.Enum) string {
 	return gen_type_kind(e.Kind.Kind)
 }
 
+// Generates C++ code of Slice TypeKind.
+func gen_slice_kind(s *sema.Slc) string {
+	elem := gen_type_kind(s.Elem)
+	slc := as_jt("slice")
+	return slc + "<" + elem + ">"
+}
+
 // Generates C++ code of TypeKind.
 func gen_type_kind(k *sema.TypeKind) string {
 	switch {
@@ -54,6 +61,9 @@ func gen_type_kind(k *sema.TypeKind) string {
 
 	case k.Enm() != nil:
 		return gen_enum_kind(k.Enm())
+
+	case k.Slc() != nil:
+		return gen_slice_kind(k.Slc())
 
 	default:
 		return "[<undefined_type_kind>]"
