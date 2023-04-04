@@ -17,6 +17,13 @@ func gen_tuple_kind(t *sema.Tuple) string {
 	return obj + ">"
 }
 
+// Generates C++ code of Ref TypeKind.
+func gen_ref_kind(r *sema.Ref) string {
+	elem := gen_type_kind(r.Elem)
+	ref := as_jt("ref")
+	return ref + "<" + elem + ">"
+}
+
 // Generates C++ code of TypeKind.
 func gen_type_kind(k *sema.TypeKind) string {
 	switch {
@@ -25,6 +32,9 @@ func gen_type_kind(k *sema.TypeKind) string {
 
 	case k.Tup() != nil:
 		return gen_tuple_kind(k.Tup())
+
+	case k.Ref() != nil:
+		return gen_ref_kind(k.Ref())
 
 	default:
 		return "[<undefined_type_kind>]"

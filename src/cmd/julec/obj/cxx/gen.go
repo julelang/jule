@@ -58,7 +58,7 @@ func gen_links(used []*sema.Package) string {
 // Generates C++ code of type aliase.
 func gen_type_alias(ta *sema.TypeAlias) string {
 	obj := "typedef "
-	obj += ta.Kind.Kind.To_str()
+	obj += gen_type_kind(ta.Kind.Kind)
 	obj += " "
 	obj += as_out_ident(ta.Ident, ta.Token.File.Addr())
 	obj += CPP_ST_TERM
