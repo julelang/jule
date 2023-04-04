@@ -4,7 +4,7 @@ import "github.com/julelang/jule/sema"
 
 // Generates C++ code of Prim TypeKind.
 func gen_prim_kind(p *sema.Prim) string {
-	return p.To_str()
+	return as_jt(p.To_str())
 }
 
 // Generates C++ code of Tupe TypeKind.
@@ -32,6 +32,11 @@ func gen_ptr_kind(p *sema.Ptr) string {
 	return elem + CPP_POINTER_MARK
 }
 
+// Generates C++ code of Enum TypeKind.
+func gen_enum_kind(e *sema.Enum) string {
+	return gen_type_kind(e.Kind.Kind)
+}
+
 // Generates C++ code of TypeKind.
 func gen_type_kind(k *sema.TypeKind) string {
 	switch {
@@ -46,6 +51,9 @@ func gen_type_kind(k *sema.TypeKind) string {
 	
 	case k.Ptr() != nil:
 		return gen_ptr_kind(k.Ptr())
+
+	case k.Enm() != nil:
+		return gen_enum_kind(k.Enm())
 
 	default:
 		return "[<undefined_type_kind>]"
