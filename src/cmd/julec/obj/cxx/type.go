@@ -24,6 +24,14 @@ func gen_ref_kind(r *sema.Ref) string {
 	return ref + "<" + elem + ">"
 }
 
+// Generates C++ code of Ptr TypeKind.
+func gen_ptr_kind(p *sema.Ptr) string {
+	const CPP_POINTER_MARK = "*"
+
+	elem := gen_type_kind(p.Elem)
+	return elem + CPP_POINTER_MARK
+}
+
 // Generates C++ code of TypeKind.
 func gen_type_kind(k *sema.TypeKind) string {
 	switch {
@@ -35,6 +43,9 @@ func gen_type_kind(k *sema.TypeKind) string {
 
 	case k.Ref() != nil:
 		return gen_ref_kind(k.Ref())
+	
+	case k.Ptr() != nil:
+		return gen_ptr_kind(k.Ptr())
 
 	default:
 		return "[<undefined_type_kind>]"
