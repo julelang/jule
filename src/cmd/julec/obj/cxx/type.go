@@ -52,6 +52,13 @@ func gen_map_kind(m *sema.Map) string {
 	return _map + "<" + key + "," + val + ">"
 }
 
+// Generates C++ code of Trait TypeKind.
+func gen_trait_kind(t *sema.Trait) string {
+	trt := as_jt("trait")
+	ident := as_out_ident(t.Ident, t.Token.File.Addr())
+	return trt + "<" + ident + ">"
+}
+
 // Generates C++ code of TypeKind.
 func gen_type_kind(k *sema.TypeKind) string {
 	switch {
@@ -75,6 +82,9 @@ func gen_type_kind(k *sema.TypeKind) string {
 
 	case k.Map() != nil:
 		return gen_map_kind(k.Map())
+
+	case k.Trt() != nil:
+		return gen_trait_kind(k.Trt())
 
 	default:
 		return "[<undefined_type_kind>]"
