@@ -106,6 +106,31 @@ func gen_array_kind(a *sema.Arr) string {
 	return arr + "<" + elem + "," + size + ">"
 }
 
+func gen_fn_anon_decl(f *sema.FnIns) string {
+	decl := gen_fn_ins_result(f)
+
+	decl += "("
+	if len(f.Params) > 0 {
+		for _, param := range f.Params {
+			decl += gen_param_ins_prototype(param)
+			decl += ","
+		}
+		decl = decl[:len(decl)-1] // Remove last comma.
+	} else {
+		decl += "void"
+	}
+	decl += ")"
+
+	return decl
+}
+
+// Generates C++ code of Fn TypeKind.
+func gen_fn_kind(f *sema.FnIns) string {
+	fnc := as_jt("fn")
+	decl := gen_fn_anon_decl(f)
+	return fnc + "<" + decl + ">"
+}
+
 // Generates C++ code of TypeKind.
 func gen_type_kind(k *sema.TypeKind) string {
 	switch {
@@ -139,7 +164,10 @@ func gen_type_kind(k *sema.TypeKind) string {
 	case k.Arr() != nil:
 		return gen_array_kind(k.Arr())
 
+	case k.Fnc() != nil:
+		return gen_fn_kind(k.Fnc())
+
 	default:
-		return "[<undefined_type_kind>]"
+		return "[<unimplemented_type_kind>]"
 	}
 }

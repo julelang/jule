@@ -105,6 +105,14 @@ func gen_fn_result(f *sema.Fn) string {
 	return gen_type_kind(f.Result.Kind.Kind)
 }
 
+// Generates C++ code of function instance's result type.
+func gen_fn_ins_result(f *sema.FnIns) string {
+	if f.Decl.Is_void() {
+		return "void"
+	}
+	return gen_type_kind(f.Result)
+}
+
 // Generates C++ prototype code of parameter.
 func gen_param_prototype(p *sema.Param) string {
 	obj := ""
@@ -115,6 +123,20 @@ func gen_param_prototype(p *sema.Param) string {
 		obj += ">"
 	} else {
 		obj += gen_type_kind(p.Kind.Kind)
+	}
+	return obj
+}
+
+// Generates C++ prototype code of parameter instance.
+func gen_param_ins_prototype(p *sema.ParamIns) string {
+	obj := ""
+	if p.Decl.Variadic {
+		obj += as_jt("slice")
+		obj += "<"
+		obj += gen_type_kind(p.Kind)
+		obj += ">"
+	} else {
+		obj += gen_type_kind(p.Kind)
 	}
 	return obj
 }
