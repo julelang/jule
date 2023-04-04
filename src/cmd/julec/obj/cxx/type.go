@@ -1,6 +1,20 @@
 package cxx
 
-import "github.com/julelang/jule/sema"
+import (
+	"github.com/julelang/jule/ast"
+	"github.com/julelang/jule/build"
+	"github.com/julelang/jule/sema"
+)
+
+// Reports wherher tag is exist in directives.
+func has_directive(directives []*ast.Directive, tag string) bool {
+	for _, dr := range directives {
+		if dr.Tag == tag {
+			return true
+		}
+	}
+	return false
+}
 
 // Generates C++ code of Prim TypeKind.
 func gen_prim_kind(p *sema.Prim) string {
@@ -59,6 +73,29 @@ func gen_trait_kind(t *sema.Trait) string {
 	return trt + "<" + ident + ">"
 }
 
+// Generates C++ code of Struct TypeKind.
+func gen_struct_kind(s *sema.StructIns) string {
+	rep := ""
+	if s.Decl.Cpp_linked && !has_directive(s.Decl.Directives, build.DIRECTIVE_TYPEDEF) {
+		rep += "struct "
+	}
+
+	rep += as_out_ident(s.Decl.Ident, s.Decl.Token.File.Addr())
+	if len(s.Generics) == 0 {
+		return rep
+	}
+
+	rep += "<"
+	for _, g := range s.Generics {
+		rep += gen_type_kind(g)
+		rep += ","
+	}
+	rep = rep[:len(rep)-1] // Remove last comma.
+	rep += ">"
+
+	return rep
+}
+
 // Generates C++ code of TypeKind.
 func gen_type_kind(k *sema.TypeKind) string {
 	switch {
@@ -85,6 +122,9 @@ func gen_type_kind(k *sema.TypeKind) string {
 
 	case k.Trt() != nil:
 		return gen_trait_kind(k.Trt())
+
+	case k.Strct() != nil:
+		return gen_struct_kind(k.Strct())
 
 	default:
 		return "[<undefined_type_kind>]"
