@@ -260,8 +260,35 @@ func gen_init_caller(pkg *sema.Package, used []*sema.Package) string {
 	return obj
 }
 
+// Returns all structures of main package and used pakcages.
+// Ignores cpp-linked declarations.
+func get_all_structures(pkg *sema.Package, used []*sema.Package) []*sema.Struct {
+	buffer := []*sema.Struct{}
+
+	append_structs := func(p *sema.Package) {
+		for _, f := range p.Files {
+			for _, s := range f.Structs {
+				if !s.Cpp_linked {
+					buffer = append(buffer, s)
+				}
+			}
+		}
+	}
+
+	append_structs(pkg)
+
+	for _, p := range used {
+		append_structs(p)
+	}
+
+	return buffer
+}
+
 // Generates C++ codes from SymbolTables.
 func Gen(pkg *sema.Package, used []*sema.Package) string {
+	structs := get_all_structures(pkg, used)
+	order_structures(structs)
+
 	obj := ""
 	obj += gen_links(used) + "\n"
 	obj += gen_type_aliases(pkg, used) + "\n"
