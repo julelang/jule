@@ -2,6 +2,7 @@ package cxx
 
 import (
 	"github.com/julelang/jule"
+	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/sema"
@@ -34,6 +35,30 @@ func indent() string {
 		s += INDENT_KIND
 	}
 	return s
+}
+
+// Returns all structures of main package and used pakcages.
+// Ignores cpp-linked declarations.
+func get_all_structures(pkg *sema.Package, used []*sema.Package) []*sema.Struct {
+	buffer := []*sema.Struct{}
+
+	append_structs := func(p *sema.Package) {
+		for _, f := range p.Files {
+			for _, s := range f.Structs {
+				if !s.Cpp_linked {
+					buffer = append(buffer, s)
+				}
+			}
+		}
+	}
+
+	append_structs(pkg)
+
+	for _, p := range used {
+		append_structs(p)
+	}
+
+	return buffer
 }
 
 // Generates all C/C++ include directives.
@@ -231,6 +256,72 @@ func gen_traits(pkg *sema.Package, used []*sema.Package) string {
 	return obj
 }
 
+// Generates C++ declaration code of generic.
+func gen_generic_decl(g *ast.Generic) string {
+	obj := "typename "
+	obj += generic_decl_out_ident(g)
+	return obj
+}
+
+// Generates C++ declaration code of all generics.
+func gen_generic_decls(generics []*ast.Generic) string {
+	if len(generics) == 0 {
+		return ""
+	}
+
+	obj := "template<"
+	for _, g := range generics {
+		obj += gen_generic_decl(g) + ","
+	}
+
+	obj = obj[:len(obj)-1] // Remove last comma.
+	obj += ">"
+	return obj
+}
+
+// Generates C++ plain-prototype code of structure.
+func gen_struct_plain_prototype(s *sema.Struct) string {
+	obj := ""
+	obj += gen_generic_decls(s.Generics)
+	obj += "\nstruct "
+	obj += struct_out_ident(s)
+	obj += CPP_ST_TERM
+	return obj
+}
+
+// Generates C++ plain-prototype code of all structures.
+func gen_struct_plain_prototypes(structs []*sema.Struct) string {
+	obj := ""
+	for _, s := range structs {
+		if !s.Cpp_linked && s.Token.Id != lex.ID_NA {
+			obj += gen_struct_plain_prototype(s) + "\n"
+		}
+	}
+	return obj
+}
+
+// Generates C++ code of all can-be-prototyped declarations.
+func gen_prototypes(pkg *sema.Package, used []*sema.Package, structs []*sema.Struct) string {
+	obj := ""
+
+	obj += gen_struct_plain_prototypes(structs)
+	/*
+	TODO: Implement here:
+
+
+	obj += gen_struct_prototypes(structs)
+
+	for _, p := range used {
+		if !p.Cpp {
+			obj += gen_fn_prototypes(p)
+		}
+	}
+	obj += gen_fn_prototypes(pkg)
+	*/
+
+	return obj
+}
+
 // Generated C++ code of all initializer functions.
 func gen_init_caller(pkg *sema.Package, used []*sema.Package) string {
 	const INDENTION = "\t"
@@ -260,30 +351,6 @@ func gen_init_caller(pkg *sema.Package, used []*sema.Package) string {
 	return obj
 }
 
-// Returns all structures of main package and used pakcages.
-// Ignores cpp-linked declarations.
-func get_all_structures(pkg *sema.Package, used []*sema.Package) []*sema.Struct {
-	buffer := []*sema.Struct{}
-
-	append_structs := func(p *sema.Package) {
-		for _, f := range p.Files {
-			for _, s := range f.Structs {
-				if !s.Cpp_linked {
-					buffer = append(buffer, s)
-				}
-			}
-		}
-	}
-
-	append_structs(pkg)
-
-	for _, p := range used {
-		append_structs(p)
-	}
-
-	return buffer
-}
-
 // Generates C++ codes from SymbolTables.
 func Gen(pkg *sema.Package, used []*sema.Package) string {
 	structs := get_all_structures(pkg, used)
@@ -293,6 +360,7 @@ func Gen(pkg *sema.Package, used []*sema.Package) string {
 	obj += gen_links(used) + "\n"
 	obj += gen_type_aliases(pkg, used) + "\n"
 	obj += gen_traits(pkg, used) + "\n"
+	obj += gen_prototypes(pkg, used, structs) + "\n\n"
 	obj += gen_init_caller(pkg, used) + "\n"
 	return obj
 }

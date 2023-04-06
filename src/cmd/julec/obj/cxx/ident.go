@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/julelang/jule"
+	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/sema"
 )
 
@@ -77,4 +78,17 @@ func trait_out_ident(t *sema.Trait) string {
 // Returns output identifier of parameter.
 func param_out_ident(p *sema.Param) string {
 	return as_local_ident(p.Token.Row, p.Token.Column, p.Ident)
+}
+
+// Returns output identifier of structure.
+func struct_out_ident(s *sema.Struct) string {
+	if s.Cpp_linked {
+		return s.Ident
+	}
+	return as_out_ident(s.Ident, s.Token.File.Addr())
+}
+
+// Returns output identifier of generic type declaration.
+func generic_decl_out_ident(g *ast.Generic) string {
+	return as_ident(g.Ident)
 }
