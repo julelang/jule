@@ -1130,6 +1130,7 @@ func (e *_Eval) check_fn_call_generics(f *FnIns,
 
 func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
 	f := d.Kind.Fnc()
+
 	if !d.Mutable && f.Decl.Is_method() && f.Decl.Params[0].Mutable {
 		e.push_err(fc.Token, "mutable_operation_on_immutable")
 	} else if !e.is_unsafe() && f.Decl.Unsafety {

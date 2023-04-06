@@ -634,11 +634,13 @@ func (tc *_TypeChecker) get_def(decl *ast.IdentType) _Kind {
 	for _, g := range tc.use_generics {
 		if g.Ident == decl.Ident {
 			st := g.Kind.Kind.Strct()
-			ok := tc.check_struct_illegal_cycles(decl, st.Decl)
-			if !ok {
-				return nil
+			if st != nil {
+				ok := tc.check_struct_illegal_cycles(decl, st.Decl)
+				if !ok {
+					return nil
+				}
 			}
-			return g.Kind.Kind
+			return g.Kind.Kind.kind
 		}
 	}
 

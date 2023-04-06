@@ -7,6 +7,7 @@ package sema
 import (
 	"strings"
 
+	"github.com/julelang/jule"
 	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/lex"
 )
@@ -62,6 +63,25 @@ type Fn struct {
 func (f *Fn) Is_void() bool { return f.Result == nil }
 // Reports whether function is method.
 func (f *Fn) Is_method() bool { return f.Owner != nil }
+// Reports whether function is entry point.
+func (f *Fn) Is_entry_point() bool { return f.Ident == jule.ENTRY_POINT }
+
+// Reports whether any parameter uses generic types.
+func (f *Fn) Parameters_uses_generics() bool {
+	if len(f.Generics) == 0 {
+		return false
+	}
+
+	for _, p := range f.Params {
+		pk := p.Kind.Kind.To_str()
+		for _, g := range f.Generics {
+			if strings.Contains(pk, g.Ident) {
+				return true
+			}
+		}
+	}
+	return false
+}
 
 // Force to new instance.
 func (f *Fn) instance_force() *FnIns {
@@ -87,8 +107,20 @@ func (f *Fn) instance() *FnIns {
 }
 
 func (f *Fn) append_instance(ins *FnIns) {
-	// Skip already created instance for just one unique combination.
-	if len(f.Generics) == 0 && len(f.Combines) == 1 {
+	if len(f.Generics) == 0 {
+		// Skip already created instance for just one unique combination.
+		if len(f.Combines) == 1 {
+			return
+		}
+		f.Combines = append(f.Combines, ins)
+	}
+	
+	if len(f.Combines) == 0 {
+		f.Combines = append(f.Combines, ins)
+		return
+	}
+
+	if !f.Parameters_uses_generics() {
 		return
 	}
 

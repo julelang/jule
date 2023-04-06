@@ -197,6 +197,28 @@ func gen_params(params []*sema.Param) string {
 	return obj + ")"
 }
 
+// Generates C++ declaration code of parameters.
+func gen_params_prototypes(params []*sema.ParamIns) string {
+	switch {
+	case len(params) == 0:
+		return "(void)"
+	
+	case len(params) == 1 && params[0].Decl.Is_self():
+		return "(void)"
+	}
+
+	obj := "("
+	for _, p := range params {
+		if !p.Decl.Is_self() {
+			obj += gen_param_ins_prototype(p) + ","
+		}
+	}
+
+	// Remove comma.
+	obj = obj[:len(obj)-1]
+	return obj + ")"
+}
+
 // Generates C++ code of trait.
 func gen_trait(t *sema.Trait) string {
 	const INDENTION = "\t"
@@ -300,6 +322,88 @@ func gen_struct_plain_prototypes(structs []*sema.Struct) string {
 	return obj
 }
 
+// Generates C++ code of structure generics.
+// Returns declaration and definition code.
+func gen_struct_generics(generics []*ast.Generic) (decl string, def string) {
+	if len(generics) == 0 {
+		return "", ""
+	}
+
+	decl = "template<"
+	def = "<"
+
+	for _, g := range generics {
+		decl += gen_generic_decl(g)
+		decl += ","
+
+		def += generic_decl_out_ident(g)
+		def += ","
+	}
+
+	decl = decl[:len(decl)-1] // Remove last comma.
+	decl += ">\n"
+
+	def = def[:len(def)-1] // Remove last comma.
+	def += ">"
+	return
+}
+
+func gen_fn_decl_head(f *sema.FnIns) string {
+	obj := ""
+
+	if f.Decl.Owner != nil {
+		generics := gen_generic_decls(f.Decl.Owner.Generics)
+		if generics != "" {
+			obj += generics
+			obj += "\n" + indent()
+		}
+	}
+
+	generics := gen_generic_decls(f.Decl.Generics)
+	if generics != "" {
+		obj += generics
+		obj += "\n" + indent()
+	}
+
+	if !f.Decl.Is_entry_point() {
+		obj += "inline "
+	}
+	obj += gen_fn_ins_result(f) + " "
+
+	if f.Decl.Owner != nil {
+		_, def := gen_struct_generics(f.Decl.Owner.Generics)
+		obj += struct_out_ident(f.Decl.Owner)
+		obj += def + lex.KND_DBLCOLON
+	}
+	obj += fn_out_ident(f.Decl)
+	return obj
+}
+
+// Generates C++ declaration code of function's combinations.
+func gen_fn_prototype(f *sema.Fn) string {
+	obj := ""
+	println(f.Ident, len(f.Combines))
+	for _, c := range f.Combines {
+		obj += gen_fn_decl_head(c)
+		obj += gen_params_prototypes(c.Params)
+		obj += CPP_ST_TERM + "\n"
+	}
+	return obj
+}
+
+// Generates C++ declaration code of all functions.
+func gen_fn_prototypes(pkg *sema.Package) string {
+	obj := ""
+	for _, file := range pkg.Files {
+		for _, f := range file.Funcs {
+			if !f.Cpp_linked && f.Token.Id != lex.ID_NA {
+				obj += gen_fn_prototype(f)
+			}
+		}
+	}
+	return obj
+}
+
 // Generates C++ code of all can-be-prototyped declarations.
 func gen_prototypes(pkg *sema.Package, used []*sema.Package, structs []*sema.Struct) string {
 	obj := ""
@@ -311,13 +415,14 @@ func gen_prototypes(pkg *sema.Package, used []*sema.Package, structs []*sema.Str
 
 	obj += gen_struct_prototypes(structs)
 
+	*/
+
 	for _, p := range used {
 		if !p.Cpp {
 			obj += gen_fn_prototypes(p)
 		}
 	}
 	obj += gen_fn_prototypes(pkg)
-	*/
 
 	return obj
 }
