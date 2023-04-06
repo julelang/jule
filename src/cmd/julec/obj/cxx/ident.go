@@ -92,3 +92,8 @@ func struct_out_ident(s *sema.Struct) string {
 func generic_decl_out_ident(g *ast.Generic) string {
 	return as_ident(g.Ident)
 }
+
+// Returns output identifier of field.
+func field_out_ident(f *sema.Field) string {
+	return as_out_ident(f.Ident, f.Token.File.Addr())
+}

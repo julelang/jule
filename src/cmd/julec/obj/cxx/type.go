@@ -33,11 +33,16 @@ func gen_tuple_kind(t *sema.Tuple) string {
 	return obj + ">"
 }
 
+// Returns C++ code of reference type with element type.
+func as_ref_kind(elem string) string {
+	ref := as_jt("ref")
+	return ref + "<" + elem + ">"
+}
+
 // Generates C++ code of Ref TypeKind.
 func gen_ref_kind(r *sema.Ref) string {
 	elem := gen_type_kind(r.Elem)
-	ref := as_jt("ref")
-	return ref + "<" + elem + ">"
+	return as_ref_kind(elem)
 }
 
 // Generates C++ code of Ptr TypeKind.
@@ -76,7 +81,30 @@ func gen_trait_kind(t *sema.Trait) string {
 }
 
 // Generates C++ code of Struct TypeKind.
-func gen_struct_kind(s *sema.StructIns) string {
+func gen_struct_kind(s *sema.Struct) string {
+	rep := ""
+	if s.Cpp_linked && !has_directive(s.Directives, build.DIRECTIVE_TYPEDEF) {
+		rep += "struct "
+	}
+
+	rep += as_out_ident(s.Ident, s.Token.File.Addr())
+	if len(s.Generics) == 0 {
+		return rep
+	}
+
+	rep += "<"
+	for _, g := range s.Generics {
+		rep += gen_generic_decl(g)
+		rep += ","
+	}
+	rep = rep[:len(rep)-1] // Remove last comma.
+	rep += ">"
+
+	return rep
+}
+
+// Generates C++ code of Struct instance TypeKind.
+func gen_struct_kind_ins(s *sema.StructIns) string {
 	rep := ""
 	if s.Decl.Cpp_linked && !has_directive(s.Decl.Directives, build.DIRECTIVE_TYPEDEF) {
 		rep += "struct "
@@ -159,7 +187,7 @@ func gen_type_kind(k *sema.TypeKind) string {
 		return gen_trait_kind(k.Trt())
 
 	case k.Strct() != nil:
-		return gen_struct_kind(k.Strct())
+		return gen_struct_kind_ins(k.Strct())
 
 	case k.Arr() != nil:
 		return gen_array_kind(k.Arr())

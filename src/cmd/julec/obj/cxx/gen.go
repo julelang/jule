@@ -8,20 +8,19 @@ import (
 	"github.com/julelang/jule/sema"
 )
 
-// Ignore expression for std::tie function.
-const CPP_IGNORE = "std::ignore"
-
 // The self keyword equavalent of generated cpp.
 const CPP_SELF = "this"
-
-// Represents default expression for type.
-const CPP_DEFAULT_EXPR = "{}"
 
 // C++ statement terminator.
 const CPP_ST_TERM = ";"
 
 // Current indention count.
 var INDENT = 0
+
+// Increase indentation.
+func add_indent() { INDENT++ }
+// Decrase indentation.
+func done_indent() { INDENT-- }
 
 // Returns indention string by INDENT.
 func indent() string {
@@ -31,7 +30,7 @@ func indent() string {
 	}
 
 	s := ""
-	for i := 0; i < INDENT; i-- {
+	for i := 0; i < INDENT; i++ {
 		s += INDENT_KIND
 	}
 	return s
@@ -348,6 +347,196 @@ func gen_struct_generics(generics []*ast.Generic) (decl string, def string) {
 	return
 }
 
+// Generates C++ derive code of structure's implemented traits.
+func gen_struct_traits(s *sema.Struct) string {
+	if len(s.Implements) == 0 {
+		return ""
+	}
+
+	obj := ": "
+	for _, i := range s.Implements {
+		obj += "public "
+		obj += trait_out_ident(i)
+		obj += ","
+	}
+	obj = obj[:len(obj)-1] // Remove last comma.
+	return obj
+}
+
+func gen_struct_self_field_type_kind(s *sema.Struct) string {
+	return as_ref_kind(gen_struct_kind(s))
+}
+
+// Generates C++ field declaration code of structure's self field.
+func gen_struct_self_field(s *sema.Struct) string {
+	obj := gen_struct_self_field_type_kind(s)
+	obj += " self{};"
+	return obj
+}
+
+// Generates C++ declaration code of field.
+func gen_field_decl(f *sema.Field) string {
+	obj := gen_type_kind(f.Kind.Kind) + " "
+	obj += field_out_ident(f)
+	obj += get_init_expr(f.Kind.Kind)
+	obj += CPP_ST_TERM
+	return obj
+}
+
+func gen_struct_self_field_init_st(s *sema.Struct) string {
+	obj := "this->self = "
+	obj += gen_struct_self_field_type_kind(s)
+	obj += "::make(this, nil);"
+	return obj
+}
+
+func gen_struct_constructor(s *sema.Struct) string {
+	obj := indent()
+	obj += struct_out_ident(s)
+
+	if len(s.Fields) > 0 {
+		for _, f := range s.Fields {
+			obj += "__param_" + f.Ident + ","
+		}
+		obj = obj[:len(obj)-1] // Remove last comma.
+	}
+
+	obj += " noexcept {\n"
+	add_indent()
+	obj += indent()
+	obj += gen_struct_self_field_init_st(s)
+	obj += "\n"
+
+	if len(s.Fields) > 0 {
+		for _, f := range s.Fields {
+			obj += "\n"
+			obj += indent()
+			obj += "this->"
+			obj += field_out_ident(f)
+			obj += " = "
+			obj += "__param_" + f.Ident
+			obj += CPP_ST_TERM
+		}
+	}
+
+	done_indent()
+	obj += "\n" + indent() + "}"
+	return obj
+}
+
+func gen_struct_destructor(s *sema.Struct) string {
+	obj := "~"
+	obj += struct_out_ident(s)
+	obj += "(void) noexcept { /* heap allocations managed by traits or references */ this->self.__ref = nil; }"
+	return obj
+}
+
+func gen_struct_operators(s *sema.Struct) string {
+	out_ident := struct_out_ident(s)
+	_, def := gen_struct_generics(s.Generics)
+	obj := ""
+
+	obj += indent()
+	obj += "inline bool operator==(const "
+	obj += out_ident
+	obj += def
+	obj += " &_Src) {"
+	if len(s.Fields) > 0 {
+		add_indent()
+		obj += "\n"
+		obj += indent()
+		obj += "return "
+		add_indent()
+		for _, f := range s.Fields {
+			obj += "\n"
+			obj += indent()
+			obj += "this->"
+			f_ident := field_out_ident(f)
+			obj += f_ident
+			obj += " == _Src."
+			obj += f_ident
+			obj += " &&"
+		}
+		done_indent()
+		obj = obj[:len(obj)-3] // Remove last suffix " &&"
+		obj += ";\n"
+		done_indent()
+		obj += indent()
+		obj += "}"
+	} else {
+		obj += " return true; }"
+	}
+	obj += "\n\n"
+	obj += indent()
+	obj += "inline bool operator!=(const "
+	obj += out_ident
+	obj += def
+	obj += " &_Src) { return !this->operator==(_Src); }"
+	return obj
+}
+
+// Generates C++ declaration code of structure.
+func gen_struct_prototype(s *sema.Struct) string {
+	obj := gen_generic_decls(s.Generics) + "\n"
+	obj += "struct "
+	out_ident := struct_out_ident(s)
+	obj += out_ident
+	obj += gen_struct_traits(s)
+	obj += " {\n"
+
+	add_indent()
+	obj += indent()
+	obj += gen_struct_self_field(s)
+	obj += "\n\n"
+	if len(s.Fields) > 0 {
+		for _, f := range s.Fields {
+			obj += indent()
+			obj += gen_field_decl(f)
+			obj += "\n"
+		}
+		obj += "\n\n"
+		obj += indent()
+		obj += gen_struct_constructor(s)
+		obj += "\n\n"
+	}
+
+	obj += indent()
+	obj += gen_struct_destructor(s)
+	obj += "\n\n"
+
+	obj += indent()
+	obj += out_ident
+	obj += "(void) noexcept { "
+	obj += gen_struct_self_field_init_st(s)
+	obj += " }\n\n"
+
+	for _, f := range s.Methods {
+		obj += indent()
+		f.Owner = nil // Ignore structure identifier prefix.
+		obj += gen_fn_prototype(f)
+		f.Owner = s
+		obj += "\n\n"
+	}
+
+	obj += gen_struct_operators(s)
+	obj += "\n"
+
+	done_indent()
+	obj += indent() + "};"
+	return obj
+}
+
+// Generates C++ declaration code of all structures.
+func gen_struct_prototypes(structs []*sema.Struct) string {
+	obj := ""
+	for _, s := range structs {
+		if !s.Cpp_linked && s.Token.Id != lex.ID_NA {
+			obj += gen_struct_prototype(s) + "\n"
+		}
+	}
+	return obj
+}
+
 func gen_fn_decl_head(f *sema.FnIns) string {
 	obj := ""
 
@@ -382,7 +571,6 @@ func gen_fn_decl_head(f *sema.FnIns) string {
 // Generates C++ declaration code of function's combinations.
 func gen_fn_prototype(f *sema.Fn) string {
 	obj := ""
-	println(f.Ident, len(f.Combines))
 	for _, c := range f.Combines {
 		obj += gen_fn_decl_head(c)
 		obj += gen_params_prototypes(c.Params)
@@ -409,13 +597,7 @@ func gen_prototypes(pkg *sema.Package, used []*sema.Package, structs []*sema.Str
 	obj := ""
 
 	obj += gen_struct_plain_prototypes(structs)
-	/*
-	TODO: Implement here:
-
-
 	obj += gen_struct_prototypes(structs)
-
-	*/
 
 	for _, p := range used {
 		if !p.Cpp {
