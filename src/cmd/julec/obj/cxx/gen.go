@@ -609,6 +609,54 @@ func gen_prototypes(pkg *sema.Package, used []*sema.Package, structs []*sema.Str
 	return obj
 }
 
+// Generates C++ code of variable.
+func gen_var(v *sema.Var) string {
+	if lex.Is_ignore_ident(v.Ident) {
+		return ""
+	}
+	if v.Constant {
+		return ""
+	}
+
+	obj := gen_type_kind(v.Kind.Kind) + " "
+	obj += var_out_ident(v)
+	if v.Value.Expr != nil {
+		obj += " = "
+		obj += gen_expr(v.Value)
+	} else {
+		obj += get_init_expr(v.Kind.Kind)
+	}
+	obj += CPP_ST_TERM
+	return obj
+}
+
+// Generates C++ code of all globals of package.
+func gen_pkg_globals(p *sema.Package) string {
+	obj := ""
+	for _, f := range p.Files {
+		for _, v := range f.Vars {
+			if !v.Constant && v.Token.Id != lex.ID_NA {
+				obj += gen_var(v) + "\n"
+			}
+		}
+	}
+	return obj
+}
+
+// Generates C++ code of all globals.
+func gen_globals(pkg *sema.Package, used []*sema.Package) string {
+	obj := ""
+
+	for _, p := range used {
+		if !p.Cpp {
+			obj += gen_pkg_globals(p)
+		}
+	}
+	obj += gen_pkg_globals(pkg)
+
+	return obj
+}
+
 // Generated C++ code of all initializer functions.
 func gen_init_caller(pkg *sema.Package, used []*sema.Package) string {
 	const INDENTION = "\t"
@@ -648,6 +696,7 @@ func Gen(pkg *sema.Package, used []*sema.Package) string {
 	obj += gen_type_aliases(pkg, used) + "\n"
 	obj += gen_traits(pkg, used) + "\n"
 	obj += gen_prototypes(pkg, used, structs) + "\n\n"
+	obj += gen_globals(pkg, used) + "\n"
 	obj += gen_init_caller(pkg, used) + "\n"
 	return obj
 }

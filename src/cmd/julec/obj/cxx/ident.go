@@ -5,6 +5,7 @@ import (
 
 	"github.com/julelang/jule"
 	"github.com/julelang/jule/ast"
+	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/sema"
 )
 
@@ -95,5 +96,22 @@ func generic_decl_out_ident(g *ast.Generic) string {
 
 // Returns output identifier of field.
 func field_out_ident(f *sema.Field) string {
-	return as_out_ident(f.Ident, f.Token.File.Addr())
+	return "_field_" + f.Ident
+}
+
+// Returns output identifier of variable.
+func var_out_ident(v *sema.Var) string {
+	switch {
+	case v.Cpp_linked:
+		return v.Ident
+
+	case v.Ident == lex.KND_SELF:
+		return "self"
+
+	case v.Scope != nil:
+		return as_local_ident(v.Token.Row, v.Token.Column, v.Ident)
+
+	default:
+		return as_out_ident(v.Ident, v.Token.File.Addr())
+	}
 }
