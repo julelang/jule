@@ -657,6 +657,45 @@ func gen_globals(pkg *sema.Package, used []*sema.Package) string {
 	return obj
 }
 
+// Generates C++ code of function.
+func gen_fn(f *sema.Fn) string {
+	obj := ""
+	for _, c := range f.Combines {
+		obj += gen_fn_decl_head(c)
+		obj += gen_params_prototypes(c.Params) + " "
+		// TODO: Add return variables to root scope.
+		obj += gen_scope(c.Scope)
+	}
+	return obj
+}
+
+// Generates C++ code of all functions of package.
+func gen_pkg_fns(p *sema.Package) string {
+	obj := ""
+	for _, f := range p.Files {
+		for _, f := range f.Funcs {
+			if !f.Cpp_linked && f.Token.Id != lex.ID_NA {
+				obj += gen_fn(f) + "\n\n"
+			}
+		}
+	}
+	return obj
+}
+
+// Generates C++ code of all functions.
+func gen_fns(pkg *sema.Package, used []*sema.Package) string {
+	obj := ""
+
+	for _, p := range used {
+		if !p.Cpp {
+			obj += gen_pkg_fns(p)
+		}
+	}
+	obj += gen_pkg_fns(pkg)
+
+	return obj
+}
+
 // Generated C++ code of all initializer functions.
 func gen_init_caller(pkg *sema.Package, used []*sema.Package) string {
 	const INDENTION = "\t"
@@ -697,6 +736,7 @@ func Gen(pkg *sema.Package, used []*sema.Package) string {
 	obj += gen_traits(pkg, used) + "\n"
 	obj += gen_prototypes(pkg, used, structs) + "\n\n"
 	obj += gen_globals(pkg, used) + "\n"
+	obj += gen_fns(pkg, used) + "\n"
 	obj += gen_init_caller(pkg, used) + "\n"
 	return obj
 }
