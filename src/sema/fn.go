@@ -80,6 +80,23 @@ func (f *Fn) Parameters_uses_generics() bool {
 			}
 		}
 	}
+
+	return false
+}
+
+// Reports whether result type uses generic types.
+func (f *Fn) Result_uses_generics() bool {
+	if f.Is_void() {
+		return false
+	}
+	
+	rk := f.Result.Kind.Kind.To_str()
+	for _, g := range f.Generics {
+		if strings.Contains(rk, g.Ident) {
+			return true
+		}
+	}
+
 	return false
 }
 
@@ -120,7 +137,7 @@ func (f *Fn) append_instance(ins *FnIns) {
 		return
 	}
 
-	if !f.Parameters_uses_generics() {
+	if !f.Parameters_uses_generics() && f.Result_uses_generics() {
 		return
 	}
 
