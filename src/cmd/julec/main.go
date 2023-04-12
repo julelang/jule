@@ -371,7 +371,7 @@ func compile(path string) (*sema.Package, *Importer) {
 func gen_compile_cmd(source_path string) (string, string) {
 	compiler := COMPILER_PATH
 
-	cmd := "-g -O0 -Wno-narrowing "
+	cmd := "-g -O0 -Wno-narrowing --std=c++14 "
 	if OUT != "" {
 		cmd += "-o " + OUT + " "
 	}
@@ -458,12 +458,11 @@ func parse_out_option(i *int) {
 }
 
 func parse_compiler_option(i *int) {
-	value := get_option_value(i)
-	if value == "" {
-		exit_err("missing option value: --compiler")
-	}
-
+	value := get_option_value(i)	
 	switch value {
+	case "":
+		exit_err("missing option value: --compiler")
+
 	case COMPILER_CLANG:
 		COMPILER_PATH = COMPILER_PATH_CLANG
 
