@@ -220,9 +220,7 @@ func (c *Const) Are_same_types(x Const) bool {
 //
 
 // Reports whether c and x are equals.
-//
-// Special cases:
-//  Eqs(x) = false if c.Are_same_types(x) returns false
+// Returns false if type is not supported.
 func (c *Const) Eqs(x Const) bool {
 	switch {
 	case c.Is_nil():
@@ -242,6 +240,29 @@ func (c *Const) Eqs(x Const) bool {
 
 	case c.Is_f64():
 		return c.Read_f64() == x.As_f64()
+
+	default:
+		return false
+	}
+}
+
+// Reports whether c less than x.
+// Returns false if type is unsupported by operation.
+//
+// Supported types are:
+//  - 64-bit signed integer
+//  - 64-bit unsigned integer
+//  - 64-bit floating-point
+func (c *Const) Lt(x Const) bool {
+	switch {
+	case c.Is_i64():
+		return c.Read_i64() < x.As_i64()
+
+	case c.Is_u64():
+		return c.Read_u64() < x.As_u64()
+
+	case c.Is_f64():
+		return c.Read_f64() < x.As_f64()
 
 	default:
 		return false
