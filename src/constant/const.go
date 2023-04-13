@@ -73,6 +73,60 @@ func (c *Const) Read_f64() float64 {
 	return c.data.(float64)
 }
 
+// Reads data as 64-bit signed integer.
+// Returns 0 if data is string, bool or which is not numeric.
+func (c *Const) As_i64() int64 {
+	switch c.data.(type) {
+	case int64:
+		return c.data.(int64)
+
+	case uint64:
+		return int64(c.data.(uint64))
+
+	case float64:
+		return int64(c.data.(float64))
+
+	default:
+		return 0
+	}
+}
+
+// Reads data as 64-bit unsigned integer.
+// Returns 0 if data is string, bool or which is not numeric.
+func (c *Const) As_u64() uint64 {
+	switch c.data.(type) {
+	case uint64:
+		return c.data.(uint64)
+
+	case int64:
+		return uint64(c.data.(int64))
+
+	case float64:
+		return uint64(c.data.(float64))
+
+	default:
+		return 0
+	}
+}
+
+// Reads data as 64-bit floating-point.
+// Returns 0 if data is string, bool or which is not numeric.
+func (c *Const) As_f64() float64 {
+	switch c.data.(type) {
+	case float64:
+		return c.data.(float64)
+
+	case int64:
+		return float64(c.data.(int64))
+
+	case uint64:
+		return float64(c.data.(uint64))
+
+	default:
+		return 0
+	}
+}
+
 //
 // Types
 //
