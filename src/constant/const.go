@@ -268,3 +268,26 @@ func (c *Const) Lt(x Const) bool {
 		return false
 	}
 }
+
+// Reports whether c greater than x.
+// Returns false if type is unsupported by operation.
+//
+// Supported types are:
+//  - 64-bit signed integer
+//  - 64-bit unsigned integer
+//  - 64-bit floating-point
+func (c *Const) Gt(x Const) bool {
+	switch {
+	case c.Is_i64():
+		return c.Read_i64() > x.As_i64()
+
+	case c.Is_u64():
+		return c.Read_u64() > x.As_u64()
+
+	case c.Is_f64():
+		return c.Read_f64() > x.As_f64()
+
+	default:
+		return false
+	}
+}
