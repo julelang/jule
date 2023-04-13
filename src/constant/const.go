@@ -93,6 +93,21 @@ func (c *Const) Are_same_types(x Const) bool {
 	case c.Is_i64() == x.Is_i64():
 		return true
 
+	case c.Is_u64() == x.Is_u64():
+		return true
+
+	case c.Is_f64() == x.Is_f64():
+		return true
+
+	case c.Is_bool() == x.Is_bool():
+		return true
+
+	case c.Is_str() == x.Is_str():
+		return true
+
+	case c.Is_nil() == x.Is_nil():
+		return true
+
 	default:
 		return false
 	}
