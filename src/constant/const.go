@@ -214,3 +214,36 @@ func (c *Const) Are_same_types(x Const) bool {
 		return false
 	}
 }
+
+//
+// Comparison
+//
+
+// Reports whether c and x are equals.
+//
+// Special cases:
+//  Eqs(x) = false if c.Are_same_types(x) returns false
+func (c *Const) Eqs(x Const) bool {
+	switch {
+	case c.Is_nil():
+		return x.Is_nil()
+
+	case c.Is_bool():
+		return x.Is_bool() && c.Read_bool() == x.Read_bool()
+
+	case c.Is_str():
+		return x.Is_str() && c.Read_str() == x.Read_str()
+
+	case c.Is_i64():
+		return c.Read_i64() == x.As_i64()
+
+	case c.Is_u64():
+		return c.Read_u64() == x.As_u64()
+
+	case c.Is_f64():
+		return c.Read_f64() == x.As_f64()
+
+	default:
+		return false
+	}
+}
