@@ -24,6 +24,54 @@ func New_f64(x float64) *Const { return &Const{data: x} }
 // Returns new constant value instance with nil.
 func New_nil() *Const { return &Const{data: nil} }
 
+//
+// Read
+//
+
+// Reads 64-bit signed integer data.
+// Returns 0 if data is not 64-bit signed integer.
+func (c *Const) Read_i64(x int64) int64 {
+	if !c.Is_i64() {
+		return 0
+	}
+	return c.data.(int64)
+}
+
+// Reads 64-bit unsigned integer data.
+// Returns 0 if data is not 64-bit unsigned integer.
+func (c *Const) Read_u64(x uint32) uint64 {
+	if !c.Is_u64() {
+		return 0
+	}
+	return c.data.(uint64)
+}
+
+// Reads boolean data.
+// Returns false if data is not boolean.
+func (c *Const) Read_bool(x bool) bool {
+	if !c.Is_bool() {
+		return false
+	}
+	return c.data.(bool)
+}
+
+// Reads string data.
+// Returns empty string if data is not string.
+func (c *Const) Read_str(x string) string {
+	if !c.Is_str() {
+		return ""
+	}
+	return c.data.(string)
+}
+
+// Reads 64-bit floating-point data.
+// Returns 0 if data is not 64-bit floating-point.
+func (c *Const) Read_f64(x float64) float64 {
+	if !c.Is_f64() {
+		return 0
+	}
+	return c.data.(float64)
+}
 
 //
 // Types
