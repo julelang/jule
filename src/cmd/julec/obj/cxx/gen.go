@@ -391,17 +391,20 @@ func gen_struct_self_field_init_st(s *sema.Struct) string {
 }
 
 func gen_struct_constructor(s *sema.Struct) string {
-	obj := indent()
-	obj += struct_out_ident(s)
+	obj := struct_out_ident(s)
 
+	obj += "("
 	if len(s.Fields) > 0 {
 		for _, f := range s.Fields {
-			obj += "__param_" + f.Ident + ","
+			obj += gen_type_kind(f.Kind.Kind)
+			obj += " __param_" + f.Ident + ", "
 		}
-		obj = obj[:len(obj)-1] // Remove last comma.
+		obj = obj[:len(obj)-2] // Remove last comma.
+	} else {
+		obj += "void"
 	}
 
-	obj += " noexcept {\n"
+	obj += ") noexcept {\n"
 	add_indent()
 	obj += indent()
 	obj += gen_struct_self_field_init_st(s)
@@ -682,6 +685,79 @@ func gen_pkg_fns(p *sema.Package) string {
 	return obj
 }
 
+// Generates C++ code of structure's methods.
+func gen_struct_method_defs(s *sema.Struct) string {
+	obj := ""
+	for _, f := range s.Methods {
+		obj += indent()
+		obj += gen_fn(f)
+		obj += "\n\n"
+	}
+	return obj
+}
+
+// Generates C++ code of structure's ostream.
+func gen_struct_ostream(s *sema.Struct) string {
+	obj := ""
+	generics_decl, generics_def := gen_struct_generics(s.Generics)
+	obj += indent()
+	if generics_decl != "" {
+		obj += generics_decl + "\n"
+		obj += indent()
+	}
+	obj += "std::ostream &operator<<(std::ostream &_Stream, const "
+	obj += struct_out_ident(s)
+	obj += generics_def
+	obj += " &_Src) {\n"
+	add_indent()
+	obj += indent()
+	obj += `_Stream << "`
+	obj += struct_out_ident(s)
+	obj += "{\";\n"
+
+	for i, field := range s.Fields {
+		obj += indent()
+		obj += `_Stream << "`
+		obj += field.Ident
+		obj += `:" << _Src.`
+		obj += field_out_ident(field)
+		if i+1 < len(s.Fields) {
+			obj += " << \", \""
+		}
+		obj += ";\n"
+	}
+
+	obj += indent()
+	obj += "_Stream << \"}\";\n"
+	obj += indent()
+	obj += "return _Stream;\n"
+	done_indent()
+	obj += indent()
+	obj += "}"
+	return obj
+}
+
+// Generates C++ code of structure definition.
+func gen_struct(s *sema.Struct) string {
+	obj := ""
+	obj += gen_struct_method_defs(s)
+	obj += "\n\n"
+	obj += gen_struct_ostream(s)
+	return obj
+}
+
+// Generates C++ code of all structures.
+func gen_structs(structs []*sema.Struct) string {
+	obj := ""
+	for _, s := range structs {
+		if !s.Cpp_linked && s.Token.Id != lex.ID_NA {
+			obj += gen_struct(s)
+			obj += "\n\n"
+		}
+	}
+	return obj
+}
+
 // Generates C++ code of all functions.
 func gen_fns(pkg *sema.Package, used []*sema.Package) string {
 	obj := ""
@@ -736,6 +812,7 @@ func Gen(pkg *sema.Package, used []*sema.Package) string {
 	obj += gen_traits(pkg, used) + "\n"
 	obj += gen_prototypes(pkg, used, structs) + "\n\n"
 	obj += gen_globals(pkg, used) + "\n"
+	obj += gen_structs(structs)
 	obj += gen_fns(pkg, used) + "\n"
 	obj += gen_init_caller(pkg, used) + "\n"
 	return obj

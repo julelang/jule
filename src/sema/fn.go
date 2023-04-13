@@ -88,8 +88,10 @@ func (f *Fn) Parameters_uses_generics() bool {
 func (f *Fn) Result_uses_generics() bool {
 	if f.Is_void() {
 		return false
+	} else if f.Result.Kind == nil || f.Result.Kind.Kind == nil {
+		return false
 	}
-	
+
 	rk := f.Result.Kind.Kind.To_str()
 	for _, g := range f.Generics {
 		if strings.Contains(rk, g.Ident) {
