@@ -30,7 +30,7 @@ func New_nil() *Const { return &Const{data: nil} }
 
 // Reads 64-bit signed integer data.
 // Returns 0 if data is not 64-bit signed integer.
-func (c *Const) Read_i64(x int64) int64 {
+func (c *Const) Read_i64() int64 {
 	if !c.Is_i64() {
 		return 0
 	}
@@ -39,7 +39,7 @@ func (c *Const) Read_i64(x int64) int64 {
 
 // Reads 64-bit unsigned integer data.
 // Returns 0 if data is not 64-bit unsigned integer.
-func (c *Const) Read_u64(x uint32) uint64 {
+func (c *Const) Read_u64() uint64 {
 	if !c.Is_u64() {
 		return 0
 	}
@@ -48,7 +48,7 @@ func (c *Const) Read_u64(x uint32) uint64 {
 
 // Reads boolean data.
 // Returns false if data is not boolean.
-func (c *Const) Read_bool(x bool) bool {
+func (c *Const) Read_bool() bool {
 	if !c.Is_bool() {
 		return false
 	}
@@ -57,7 +57,7 @@ func (c *Const) Read_bool(x bool) bool {
 
 // Reads string data.
 // Returns empty string if data is not string.
-func (c *Const) Read_str(x string) string {
+func (c *Const) Read_str() string {
 	if !c.Is_str() {
 		return ""
 	}
@@ -66,7 +66,7 @@ func (c *Const) Read_str(x string) string {
 
 // Reads 64-bit floating-point data.
 // Returns 0 if data is not 64-bit floating-point.
-func (c *Const) Read_f64(x float64) float64 {
+func (c *Const) Read_f64() float64 {
 	if !c.Is_f64() {
 		return 0
 	}
