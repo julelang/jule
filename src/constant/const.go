@@ -380,3 +380,35 @@ func (c *Const) Mul(x Const) bool {
 	}
 	return true
 }
+
+// Divides x's value to c's value.
+// Reports whether operation is success.
+// Reports false if divided-by-zero.
+func (c *Const) Div(x Const) bool {
+	switch {
+	case c.Is_f64():
+		l := x.As_f64()
+		if l == 0 {
+			return false
+		}
+		c.Set_f64(c.Read_f64() / l)
+
+	case c.Is_i64():
+		l := x.As_i64()
+		if l == 0 {
+			return false
+		}
+		c.Set_i64(c.Read_i64() / l)
+
+	case c.Is_u64():
+		l := x.As_u64()
+		if l == 0 {
+			return false
+		}
+		c.Set_u64(c.Read_u64() / l)
+
+	default:
+		return false
+	}
+	return true
+}
