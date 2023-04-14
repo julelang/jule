@@ -10,7 +10,7 @@ type Const struct {
 func New_i64(x int64) *Const { return &Const{data: x} }
 
 // Returns new constant value instance from 64-bit unsigned integer.
-func New_u64(x uint32) *Const { return &Const{data: x} }
+func New_u64(x uint64) *Const { return &Const{data: x} }
 
 // Returns new constant value instance from boolean.
 func New_bool(x bool) *Const { return &Const{data: x} }
@@ -135,7 +135,7 @@ func (c *Const) As_f64() float64 {
 func (c *Const) Set_i64(x int64) { c.data = x }
 
 // Sets constant value from 64-bit unsigned integer.
-func (c *Const) Set_u64(x uint32) { c.data = x }
+func (c *Const) Set_u64(x uint64) { c.data = x }
 
 // Sets constant value from boolean.
 func (c *Const) Set_bool(x bool) { c.data = x }
@@ -312,4 +312,33 @@ func (c *Const) Gt(x Const) bool {
 	default:
 		return false
 	}
+}
+
+//
+// Ops
+//
+
+// Adds x's value to c's value.
+// Reports whether operation is success.
+func (c *Const) Add(x Const) bool {
+	switch {
+	case c.Is_str():
+		if x.Is_str() {
+			return false
+		}
+		c.Set_str(c.Read_str() + x.Read_str())
+
+	case c.Is_f64():
+		c.Set_f64(c.Read_f64() + x.As_f64())
+
+	case c.Is_i64():
+		c.Set_i64(c.Read_i64() + x.As_i64())
+
+	case c.Is_u64():
+		c.Set_u64(c.Read_u64() + x.As_u64())
+
+	default:
+		return false
+	}
+	return true
 }
