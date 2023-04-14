@@ -128,6 +128,28 @@ func (c *Const) As_f64() float64 {
 }
 
 //
+// Set
+//
+
+// Sets constant value from 64-bit signed integer.
+func (c *Const) Set_i64(x int64) { c.data = x }
+
+// Sets constant value from 64-bit unsigned integer.
+func (c *Const) Set_u64(x uint32) { c.data = x }
+
+// Sets constant value from boolean.
+func (c *Const) Set_bool(x bool) { c.data = x }
+
+// Sets constant value from string.
+func (c *Const) Set_str(x string) { c.data = x }
+
+// Sets constant value from 64-bit floating-point.
+func (c *Const) Set_f64(x float64) { c.data = x }
+
+// Sets constant value to nil.
+func (c *Const) Set_nil() { c.data = nil }
+
+//
 // Types
 //
 
