@@ -361,3 +361,22 @@ func (c *Const) Sub(x Const) bool {
 	}
 	return true
 }
+
+// Multiplies x's value to c's value.
+// Reports whether operation is success.
+func (c *Const) Mul(x Const) bool {
+	switch {
+	case c.Is_f64():
+		c.Set_f64(c.Read_f64() * x.As_f64())
+
+	case c.Is_i64():
+		c.Set_i64(c.Read_i64() * x.As_i64())
+
+	case c.Is_u64():
+		c.Set_u64(c.Read_u64() * x.As_u64())
+
+	default:
+		return false
+	}
+	return true
+}
