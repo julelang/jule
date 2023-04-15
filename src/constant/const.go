@@ -245,8 +245,20 @@ func (c *Const) Are_same_types(x Const) bool {
 // Returns false if type is not supported.
 func (c *Const) And(x Const) bool {
 	switch {
-	case c.Is_bool():
-		return x.Is_bool() && c.Read_bool() && x.Read_bool()
+	case c.Is_bool() && x.Is_bool():
+		return c.Read_bool() && x.Read_bool()
+
+	default:
+		return false
+	}
+}
+
+// Reports whether c or x is true.
+// Returns false if type is not supported.
+func (c *Const) Or(x Const) bool {
+	switch {
+	case c.Is_bool() && x.Is_bool():
+		return c.Read_bool() ||  x.Read_bool()
 
 	default:
 		return false
@@ -475,6 +487,22 @@ func (c *Const) Bitwise_or(x Const) bool {
 
 	case c.Is_u64():
 		c.Set_u64(c.Read_u64() | x.As_u64())
+
+	default:
+		return false
+	}
+	return true
+}
+
+// Bitwise xor x's value to c's value.
+// Reports whether operation is success.
+func (c *Const) Xor(x Const) bool {
+	switch {
+	case c.Is_i64():
+		c.Set_i64(c.Read_i64() ^ x.As_i64())
+
+	case c.Is_u64():
+		c.Set_u64(c.Read_u64() ^ x.As_u64())
 
 	default:
 		return false
