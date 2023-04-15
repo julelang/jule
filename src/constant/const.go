@@ -238,8 +238,20 @@ func (c *Const) Are_same_types(x Const) bool {
 }
 
 //
-// Comparison
+// Logical
 //
+
+// Reports whether c and x are true.
+// Returns false if type is not supported.
+func (c *Const) And(x Const) bool {
+	switch {
+	case c.Is_bool():
+		return x.Is_bool() && c.Read_bool() && x.Read_bool()
+
+	default:
+		return false
+	}
+}
 
 // Reports whether c and x are equals.
 // Returns false if type is not supported.
