@@ -453,3 +453,19 @@ func (c *Const) Bitwise_and(x Const) bool {
 	}
 	return true
 }
+
+// Bitwise or x's value to c's value.
+// Reports whether operation is success.
+func (c *Const) Bitwise_or(x Const) bool {
+	switch {
+	case c.Is_i64():
+		c.Set_i64(c.Read_i64() | x.As_i64())
+
+	case c.Is_u64():
+		c.Set_u64(c.Read_u64() | x.As_u64())
+
+	default:
+		return false
+	}
+	return true
+}
