@@ -418,18 +418,18 @@ func (c *Const) Div(x Const) bool {
 		c.Set_f64(c.Read_f64() / l)
 
 	case c.Is_i64():
-		l := x.As_i64()
+		l := x.As_f64()
 		if l == 0 {
 			return false
 		}
-		c.Set_i64(c.Read_i64() / l)
+		c.Set_f64(c.As_f64() / l)
 
 	case c.Is_u64():
-		l := x.As_u64()
+		l := x.As_f64()
 		if l == 0 {
 			return false
 		}
-		c.Set_u64(c.Read_u64() / l)
+		c.Set_f64(c.As_f64() / l)
 
 	default:
 		return false

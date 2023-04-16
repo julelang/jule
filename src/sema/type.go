@@ -273,7 +273,7 @@ func (p Ptr) To_str() string {
 func (p *Ptr) Is_unsafe() bool { return p.Elem == nil }
 
 func can_get_ptr(d *Data) bool {
-	if !d.Lvalue || d.Constant {
+	if !d.Lvalue || d.Is_const() {
 		return false
 	}
 

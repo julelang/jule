@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/julelang/jule/ast"
+	"github.com/julelang/jule/constant"
 	"github.com/julelang/jule/constant/lit"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
@@ -24,24 +25,23 @@ type Data struct {
 	//  - bool type
 	Decl       bool
 
-	// This field is reminder.
-	// Will write to every constant processing points.
-	// Changed after add constant evaluation support.
-	// So, reminder flag for constants.
-	Constant   bool
+	// Constant expression data.
+	Constant   *constant.Const
 }
 
 // Reports whether Data is nil literal.
 func (d *Data) Is_nil() bool { return d.Kind.Is_nil() }
 // Reports whether Data is void.
 func (d *Data) Is_void() bool { return d.Kind.Is_void() }
+// Reports whether Data is constant expression.
+func (d *Data) Is_const() bool { return d.Constant != nil }
 
 func build_void_data() *Data {
 	return &Data{
 		Mutable:  false,
 		Lvalue:   false,
 		Decl:     false,
-		Constant: false,
+		Constant: nil,
 		Kind:     &TypeKind{
 			kind: build_prim_type("void"),
 		},
@@ -81,7 +81,7 @@ func check_data_for_integer_indexing(d *Data) (err_key string) {
 	case !types.Is_int(d.Kind.Prim().To_str()):
 		return "invalid_expr"
 
-	case d.Constant && false /* TODO: Check negative constants */:
+	case d.Is_const() && d.Constant.As_i64() < 0:
 		return "overflow_limits"
 
 	default:
@@ -110,7 +110,7 @@ func (e *_Eval) lit_nil() *Data {
 	return &Data{
 		Lvalue:   false,
 		Mutable:  false,
-		Constant: true,
+		Constant: constant.New_nil(),
 		Decl:     false,
 		Kind:     &TypeKind{kind: nil},
 	}
@@ -120,7 +120,7 @@ func (e *_Eval) lit_str(lit *ast.LitExpr) *Data {
 	return &Data{
 		Lvalue:   false,
 		Mutable:  false,
-		Constant: true,
+		Constant: constant.New_str(lit.Value[1:len(lit.Value)-1]),
 		Decl:     false,
 		Kind:     &TypeKind{
 			kind: build_prim_type(types.TypeKind_STR),
@@ -132,7 +132,7 @@ func (e *_Eval) lit_bool(lit *ast.LitExpr) *Data {
 	return &Data{
 		Lvalue:   false,
 		Mutable:  false,
-		Constant: true,
+		Constant: constant.New_bool(lit.Value == lex.KND_TRUE),
 		Decl:     false,
 		Kind:     &TypeKind{
 			kind: build_prim_type(types.TypeKind_BOOL),
@@ -144,10 +144,14 @@ func (e *_Eval) lit_rune(l *ast.LitExpr) *Data {
 	const BYTE_KIND = types.TypeKind_U8
 	const RUNE_KIND = types.TypeKind_I32
 	
+	rs := lit.To_rune([]byte(l.Value))
+	rs = rs[2:] // Skip hexadecimal prefix.
+	r, _ := strconv.ParseInt(rs, 16, 64)
+
 	data := &Data{
 		Lvalue:   false,
 		Mutable:  false,
-		Constant: true,
+		Constant: constant.New_i64(r),
 		Decl:     false,
 	}
 
@@ -168,10 +172,12 @@ func (e *_Eval) lit_rune(l *ast.LitExpr) *Data {
 func (e *_Eval) lit_float(l *ast.LitExpr) *Data {
 	const FLOAT_KIND = types.TypeKind_F64
 
+	f, _ := strconv.ParseFloat(l.Value, 64)
+
 	return &Data{
 		Lvalue:   false,
 		Mutable:  false,
-		Constant: true,
+		Constant: constant.New_f64(f),
 		Decl:     false,
 		Kind:     &TypeKind{
 			kind: build_prim_type(FLOAT_KIND),
@@ -180,44 +186,52 @@ func (e *_Eval) lit_float(l *ast.LitExpr) *Data {
 }
 
 func (e *_Eval) lit_int(l *ast.LitExpr) *Data {
-	data := l.Value
+	lit := l.Value
 	base := 0
 
 	switch {
-	case strings.HasPrefix(data, "0x"): // Hexadecimal
-		data = data[2:]
+	case strings.HasPrefix(lit, "0x"): // Hexadecimal
+		lit = lit[2:]
 		base = 0b00010000
 
-		case strings.HasPrefix(data, "0b"): // Binary
-		data = data[2:]
+		case strings.HasPrefix(lit, "0b"): // Binary
+		lit = lit[2:]
 		base = 0b10
 
-	case data[0] == '0' && len(data) > 1: // Octal
-		data = data[1:]
+	case lit[0] == '0' && len(lit) > 1: // Octal
+		lit = lit[1:]
 		base = 0b1000
 
 	default: // Decimal
 		base = 0b1010
 	}
 
-	var value any = nil
-	const BIT_SIZE = 0b01000000
-	temp_value, err := strconv.ParseInt(data, base, BIT_SIZE)
-	if err == nil {
-		value = temp_value
-	} else {
-		value, _ = strconv.ParseUint(data, base, BIT_SIZE)
+
+	data := &Data{
+		Lvalue:  false,
+		Mutable: false,
+		Decl:    false,
 	}
 
-	return &Data{
-		Lvalue:   false,
-		Mutable:  false,
-		Constant: true,
-		Decl:     false,
-		Kind:     &TypeKind{
-			kind: build_prim_type(kind_by_bitsize(value)),
-		},
+	var value any = nil
+	const BIT_SIZE = 0b01000000
+	sig, err := strconv.ParseInt(lit, base, BIT_SIZE)
+	if err == nil {
+		value = sig
+		data.Constant = constant.New_i64(sig)
+	} else {
+		unsig, _ := strconv.ParseUint(lit, base, BIT_SIZE)
+		data.Constant = constant.New_u64(unsig)
+		value = unsig
 	}
+
+	data.Kind = &TypeKind{
+		kind: build_prim_type(kind_by_bitsize(value)),
+	}
+
+	// TODO: Implement normalization.
+
+	return data
 }
 
 func (e *_Eval) lit_num(l *ast.LitExpr) *Data {
@@ -292,7 +306,7 @@ func (e *_Eval) eval_enum(enm *Enum, error_token lex.Token) *Data {
 	return &Data{
 		Lvalue:   false,
 		Mutable:  false,
-		Constant: false,
+		Constant: nil,
 		Decl:     true,
 		Kind:     &TypeKind{
 			kind: enm,
@@ -309,7 +323,7 @@ func (e *_Eval) eval_struct(s *StructIns, error_token lex.Token) *Data {
 	return &Data{
 		Lvalue:   false,
 		Mutable:  false,
-		Constant: false,
+		Constant: nil,
 		Decl:     true,
 		Kind:     &TypeKind{
 			kind: s,
@@ -326,7 +340,7 @@ func (e *_Eval) eval_fn(f *Fn, error_token lex.Token) *Data {
 	return &Data{
 		Lvalue:   false,
 		Mutable:  false,
-		Constant: false,
+		Constant: nil,
 		Decl:     false,
 		Kind:     &TypeKind{
 			kind: f.instance(),
@@ -343,7 +357,7 @@ func (e *_Eval) eval_var(v *Var, error_token lex.Token) *Data {
 	return &Data{
 		Lvalue:   !v.Constant,
 		Mutable:  v.Mutable,
-		Constant: v.Constant,
+		Constant: v.Value.Data.Constant,
 		Decl:     false,
 		Kind:     v.Kind.Kind,
 	}
@@ -402,8 +416,21 @@ func (e *_Eval) eval_unary_minus(d *Data) *Data {
 	if t == nil || !types.Is_num(t.To_str()) {
 		return nil
 	}
-	// TODO: Eval constants.
-	// TODO: Check out d.Lvalue should be false?
+	
+	if d.Is_const() {
+		switch {
+		case d.Constant.Is_f64():
+			d.Constant.Set_f64(-d.Constant.Read_f64())
+
+		case d.Constant.Is_i64():
+			d.Constant.Set_i64(-d.Constant.Read_i64())
+
+		case d.Constant.Is_u64():
+			d.Constant.Set_u64(-d.Constant.Read_u64())
+		}
+	}
+
+	d.Lvalue = false
 	return d
 }
 
@@ -412,8 +439,21 @@ func (e *_Eval) eval_unary_plus(d *Data) *Data {
 	if t == nil || !types.Is_num(t.To_str()) {
 		return nil
 	}
-	// TODO: Eval constants.
-	// TODO: Check out d.Lvalue should be false?
+	
+	if d.Is_const() {
+		switch {
+		case d.Constant.Is_f64():
+			d.Constant.Set_f64(+d.Constant.Read_f64())
+
+		case d.Constant.Is_i64():
+			d.Constant.Set_i64(+d.Constant.Read_i64())
+
+		case d.Constant.Is_u64():
+			d.Constant.Set_u64(+d.Constant.Read_u64())
+		}
+	}
+	
+	d.Lvalue = false
 	return d
 }
 
@@ -422,8 +462,18 @@ func (e *_Eval) eval_unary_caret(d *Data) *Data {
 	if t == nil || !types.Is_int(t.To_str()) {
 		return nil
 	}
-	// TODO: Eval constants.
-	// TODO: Check out d.Lvalue should be false?
+	
+	if d.Is_const() {
+		switch {
+		case d.Constant.Is_i64():
+			d.Constant.Set_i64(^d.Constant.Read_i64())
+
+		case d.Constant.Is_u64():
+			d.Constant.Set_u64(^d.Constant.Read_u64())
+		}
+	}
+	
+	d.Lvalue = false
 	return d
 }
 
@@ -432,8 +482,15 @@ func (e *_Eval) eval_unary_excl(d *Data) *Data {
 	if t == nil || !t.Is_bool() {
 		return nil
 	}
-	// TODO: Eval constants.
-	// TODO: Check out d.Lvalue should be false?
+	
+	if d.Is_const() {
+		switch {
+		case d.Constant.Is_bool():
+			d.Constant.Set_bool(!d.Constant.Read_bool())
+		}
+	}
+	
+	d.Lvalue = false
 	return d
 }
 
@@ -446,7 +503,7 @@ func (e *_Eval) eval_unary_star(d *Data, op lex.Token) *Data {
 	if t == nil || t.Is_unsafe() {
 		return nil
 	}
-	d.Constant = false
+	d.Constant = nil
 	d.Lvalue = true
 	return d
 }
@@ -461,7 +518,7 @@ func (e *_Eval) eval_unary_amper(d *Data) *Data {
 	}
 
 	if d != nil {
-		d.Constant = false
+		d.Constant = nil
 		d.Lvalue = true
 		d.Mutable = true
 	}
@@ -679,13 +736,20 @@ func (e *_Eval) indexing_str(d *Data, i *ast.IndexingExpr) {
 
 	e.check_integer_indexing_by_data(index, i.Token)
 
-	if !index.Constant {
-		d.Constant = false
+	if !index.Is_const() {
+		d.Constant = nil
 		return
 	}
 
-	if d.Constant {
-		// TODO: Eval constant byte.
+	if d.Is_const() {
+		error_token := i.Token
+		i := index.Constant.As_i64()
+		s := d.Constant.Read_str()
+		if int(i) >= len(s) {
+			e.push_err(error_token, "overflow_limits")
+		} else {
+			d.Constant.Set_u64(uint64(s[i]))
+		}
 	}
 }
 
@@ -740,7 +804,7 @@ func (e *_Eval) eval_slicing_exprs(s *ast.SlicingExpr) (*Data, *Data) {
 		}
 	} else {
 		l = &Data{
-			Constant: true,
+			Constant: constant.New_i64(0),
 			Kind: &TypeKind{kind: build_prim_type(types.SYS_INT)},
 		}
 	}
@@ -770,7 +834,7 @@ func (e *_Eval) slicing_slc(d *Data, s *ast.SlicingExpr) {
 
 func (e *_Eval) slicing_str(d *Data, s *ast.SlicingExpr) {
 	d.Lvalue = false
-	if !d.Constant {
+	if !d.Is_const() {
 		return
 	}
 
@@ -778,9 +842,28 @@ func (e *_Eval) slicing_str(d *Data, s *ast.SlicingExpr) {
 	if l == nil {
 		return
 	}
-	_ = r // Ignore compiler error.
+	
+	if l.Is_const() && r.Is_const() {
+		left := l.Constant.As_i64()
+		if left < 0 {
+			return
+		}
 
-	// TODO: Eval constant string slicing.
+		s := d.Constant.Read_str()
+		var right int64
+		if r == nil {
+			right = int64(len(s))
+		} else {
+			right = r.Constant.As_i64()
+		}
+
+		if left > right {
+			return
+		}
+		d.Constant.Set_str(s[left:right])
+	} else {
+		d.Constant = nil
+	}
 }
 
 func (e *_Eval) check_slicing(d *Data, s *ast.SlicingExpr) {
@@ -826,7 +909,7 @@ func (e *_Eval) cast_ptr(t *TypeKind, d *Data, error_token lex.Token) {
 		e.push_err(error_token, "type_not_supports_casting_to", d.Kind.To_str(), t.To_str())
 	}
 
-	d.Constant = false
+	d.Constant = nil
 }
 
 func (e *_Eval) cast_struct(t *TypeKind, d *Data, error_token lex.Token) {
@@ -887,7 +970,16 @@ func (e *_Eval) cast_str(d *Data, error_token lex.Token) {
 }
 
 func (e *_Eval) cast_int(t *TypeKind, d *Data, error_token lex.Token) {
-	// TODO: Eval constant casting.
+	if d.Is_const() {
+		prim := d.Kind.Prim()
+		switch {
+		case types.Is_sig_int(prim.kind):
+			d.Constant.Set_i64(d.Constant.As_i64())
+
+		case types.Is_unsig_int(prim.kind):
+			d.Constant.Set_u64(d.Constant.As_u64())
+		}
+	}
 
 	if d.Kind.Enm() != nil {
 		e := d.Kind.Enm()
@@ -917,7 +1009,19 @@ func (e *_Eval) cast_int(t *TypeKind, d *Data, error_token lex.Token) {
 }
 
 func (e *_Eval) cast_num(t *TypeKind, d *Data, error_token lex.Token) {
-	// TODO: Eval constant casting.
+	if d.Is_const() {
+		prim := d.Kind.Prim()
+		switch {
+		case types.Is_float(prim.kind):
+			d.Constant.Set_f64(d.Constant.As_f64())
+
+		case types.Is_sig_int(prim.kind):
+			d.Constant.Set_i64(d.Constant.As_i64())
+
+		case types.Is_unsig_int(prim.kind):
+			d.Constant.Set_u64(d.Constant.As_u64())
+		}
+	}
 
 	if d.Kind.Enm() != nil {
 		e := d.Kind.Enm()
@@ -1202,18 +1306,20 @@ func (e *_Eval) eval_fn_call(fc *ast.FnCallExpr) *Data {
 }
 
 func (e *_Eval) eval_enum_sub_ident(enm *Enum, ident lex.Token) *Data {
-	// TODO: Eval constant.
 	d := &Data{
 		Lvalue:   false,
 		Decl:     false,
 		Mutable:  false,
-		Constant: true,
 		Kind:     enm.Kind.Kind,
 	}
+
 	item := enm.Find_item(ident.Kind)
 	if item == nil {
 		e.push_err(ident, "obj_have_not_ident", ident.Kind)
+	} else {
+		d.Constant = item.Value.Data.Constant
 	}
+
 	return d
 }
 
@@ -1228,7 +1334,7 @@ func (e *_Eval) eval_trait_sub_ident(trt *Trait, ident lex.Token) *Data {
 		Lvalue:   false,
 		Decl:     false,
 		Mutable:  false,
-		Constant: true,
+		Constant: nil,
 		Kind:     &TypeKind{f.instance()},
 	}
 }
@@ -1350,7 +1456,7 @@ func (e *_Eval) eval_map(m *Map, lit *ast.BraceLit) *Data {
 		Mutable:    true,
 		Lvalue:     false,
 		Variadiced: false,
-		Constant:   false,
+		Constant:   nil,
 		Decl:       false,
 		Kind:       &TypeKind{kind: m},
 	}
@@ -1475,12 +1581,20 @@ func is_ok_for_shifting(d *Data) bool {
 	prim := d.Kind.Prim()
 	if prim == nil || !types.Is_int(prim.To_str()) {
 		return false
-	} else if !d.Constant {
+	} else if !d.Is_const() {
 		return true
 	}
 
-	// TODO: Check constants.
-	return true
+	switch {
+	case d.Constant.Is_i64():
+		return d.Constant.Read_i64() >= 0
+
+	case d.Constant.Is_u64():
+		return true
+
+	default:
+		return false
+	}
 }
 
 type _BinopSolver struct {
@@ -1506,8 +1620,7 @@ func (bs *_BinopSolver) eval_nil() *Data {
 		bs.e.push_err(bs.op, "incompatible_types", lex.KND_NIL, bs.r.Kind.To_str())
 		return nil
 	}
-	
-	// TODO: Eval constants.
+
 	switch bs.op.Kind {
 	case lex.KND_EQS, lex.KND_NOT_EQ:
 		return &Data{
@@ -1709,8 +1822,6 @@ func (bs *_BinopSolver) eval_float() *Data {
 		return nil
 	}
 
-	// TODO: Eval constants.
-
 	// Logicals.
 	switch bs.op.Kind {
 	case lex.KND_EQS,
@@ -1756,8 +1867,6 @@ func (bs *_BinopSolver) eval_unsig_int() *Data {
 		bs.e.push_err(bs.op, "incompatible_types", bs.l.Kind.To_str(), rk)
 		return nil
 	}
-
-		// TODO: Eval constants.
 
 	// Logicals.
 	switch bs.op.Kind {
@@ -1809,8 +1918,6 @@ func (bs *_BinopSolver) eval_sig_int() *Data {
 		bs.e.push_err(bs.op, "incompatible_types", bs.l.Kind.To_str(), rk)
 		return nil
 	}
-
-		// TODO: Eval constants.
 
 	// Logicals.
 	switch bs.op.Kind {
@@ -1947,17 +2054,104 @@ func (bs *_BinopSolver) eval() *Data {
 	}
 }
 
+func (bs *_BinopSolver) solve_const(d *Data) {
+	switch {
+	case d == nil:
+		return
+		
+	case !bs.l.Is_const() || !bs.r.Is_const():
+		return
+	}
+
+	switch bs.op.Kind {
+	case lex.KND_EQS:
+		d.Constant = constant.New_bool(bs.l.Constant.Eqs(*bs.r.Constant))
+
+	case lex.KND_NOT_EQ:
+		d.Constant = constant.New_bool(!bs.l.Constant.Eqs(*bs.r.Constant))
+
+	case lex.KND_DBLCOLON:
+		d.Constant = constant.New_bool(bs.l.Constant.Or(*bs.r.Constant))
+
+	case lex.KND_DBL_AMPER:
+		d.Constant = constant.New_bool(bs.l.Constant.And(*bs.r.Constant))
+
+	case lex.KND_GT:
+		d.Constant = constant.New_bool(bs.l.Constant.Gt(*bs.r.Constant))
+
+	case lex.KND_LT:
+		d.Constant = constant.New_bool(bs.l.Constant.Lt(*bs.r.Constant))
+
+	case lex.KND_GREAT_EQ:
+		d.Constant = constant.New_bool(bs.l.Constant.Gt(*bs.r.Constant) || bs.l.Constant.Eqs(*bs.r.Constant))
+
+	case lex.KND_LESS_EQ:
+		d.Constant = constant.New_bool(bs.l.Constant.Lt(*bs.r.Constant) || bs.l.Constant.Eqs(*bs.r.Constant))
+
+	case lex.KND_PLUS:
+		_ = bs.l.Constant.Add(*bs.r.Constant)
+		d.Constant = bs.l.Constant
+
+	case lex.KND_MINUS:
+		_ = bs.l.Constant.Sub(*bs.r.Constant)
+		d.Constant = bs.l.Constant
+
+	case lex.KND_STAR:
+		_ = bs.l.Constant.Mul(*bs.r.Constant)
+		d.Constant = bs.l.Constant
+
+	case lex.KND_SOLIDUS:
+		ok := bs.l.Constant.Div(*bs.r.Constant)
+		if !ok && bs.r.Constant.As_f64() == 0 {
+			bs.e.push_err(bs.op, "divide_by_zero")
+		}
+		d.Constant = bs.l.Constant
+
+	case lex.KND_PERCENT:
+		ok := bs.l.Constant.Mod(*bs.r.Constant)
+		if !ok && bs.r.Constant.As_f64() == 0 {
+			bs.e.push_err(bs.op, "divide_by_zero")
+		}
+		d.Constant = bs.l.Constant
+
+	case lex.KND_COLON:
+		_ = bs.l.Constant.Bitwise_or(*bs.r.Constant)
+		d.Constant = bs.l.Constant
+
+	case lex.KND_AMPER:
+		_ = bs.l.Constant.Bitwise_and(*bs.r.Constant)
+		d.Constant = bs.l.Constant
+
+	case lex.KND_CARET:
+		_ = bs.l.Constant.Xor(*bs.r.Constant)
+		d.Constant = bs.l.Constant
+
+	case lex.KND_LSHIFT:
+		_ = bs.l.Constant.Lshift(*bs.r.Constant)
+		d.Constant = bs.l.Constant
+
+	case lex.KND_RSHIFT:
+		_ = bs.l.Constant.Rshift(*bs.r.Constant)
+		d.Constant = bs.l.Constant
+	}
+}
+
 func (bs *_BinopSolver) solve(op *ast.BinopExpr) *Data {
-	bs.l = bs.e.eval_expr_kind(op.L)
-	if bs.l == nil {
+	l := bs.e.eval_expr_kind(op.L)
+	if l == nil {
 		return nil
 	}
 
-	bs.r = bs.e.eval_expr_kind(op.R)
-	if bs.r == nil {
+	r := bs.e.eval_expr_kind(op.R)
+	if r == nil {
 		return nil
 	}
 
 	bs.op = op.Op
-	return bs.eval()
+
+	bs.l, bs.r = l, r
+	data := bs.eval()
+	bs.l, bs.r = l, r // Save normal order
+	bs.solve_const(data)
+	return data
 }

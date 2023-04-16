@@ -9,6 +9,7 @@ import (
 
 	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/build"
+	"github.com/julelang/jule/constant"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
 )
@@ -511,14 +512,18 @@ func (s *_Sema) check_enum_items_dup(e *Enum) {
 func (s *_Sema) check_enum_items_str(e *Enum) {
 	for _, item := range e.Items {
 		if item.Auto_expr() {
-			// TODO: Set auto-constant value.
+			item.Value = &Value{
+				Data: &Data{
+					Constant: constant.New_str(item.Ident),
+				},
+			}
 		} else {
 			d := s.eval(item.Value.Expr)
 			if d == nil {
 				continue
 			}
 
-			if !d.Constant {
+			if !d.Is_const() {
 				s.push_err(item.Value.Expr.Token, "expr_not_const")
 			}
 
@@ -528,8 +533,8 @@ func (s *_Sema) check_enum_items_str(e *Enum) {
 }
 
 func (s *_Sema) check_enum_items_int(e *Enum) {
-	max := types.Max_of(e.Kind.Kind.Prim().To_str())
-	for _, item := range e.Items {
+	max := uint64(types.Max_of(e.Kind.Kind.Prim().To_str()))
+	for i, item := range e.Items {
 		if max == 0 {
 			s.push_err(item.Token, "overflow_limits")
 		} else {
@@ -537,14 +542,18 @@ func (s *_Sema) check_enum_items_int(e *Enum) {
 		}
 
 		if item.Auto_expr() {
-			// TODO: Set auto-constant value.
+			item.Value = &Value{
+				Data: &Data{
+					Constant: constant.New_u64(max - (max - uint64(i))),
+				},
+			}
 		} else {
 			d := s.eval(item.Value.Expr)
 			if d == nil {
 				continue
 			}
 
-			if !d.Constant {
+			if !d.Is_const() {
 				s.push_err(item.Value.Expr.Token, "expr_not_const")
 			}
 
@@ -1137,28 +1146,28 @@ func (s *_Sema) check_data_for_auto_type(d *Data, err_token lex.Token) {
 
 func (s *_Sema) check_type_global(decl *Var) {
 	// TODO: Check illegal cycles.
-	data := s.evalp(decl.Value.Expr, decl.Kind)
-	if data == nil {
+	decl.Value.Data = s.evalp(decl.Value.Expr, decl.Kind)
+	if decl.Value.Data == nil {
 		return // Skip checks if error ocurrs.
 	}
 
 	if decl.Is_auto_typed() {
 		// Build new TypeSymbol because
 		// auto-type symbols are nil.
-		decl.Kind = &TypeSymbol{Kind: data.Kind}
+		decl.Kind = &TypeSymbol{Kind: decl.Value.Data.Kind}
 
-		s.check_data_for_auto_type(data, decl.Value.Expr.Token)
-		s.check_validity_for_init_expr(decl.Mutable, data, decl.Value.Expr.Token)
+		s.check_data_for_auto_type(decl.Value.Data, decl.Value.Expr.Token)
+		s.check_validity_for_init_expr(decl.Mutable, decl.Value.Data, decl.Value.Expr.Token)
 	} else {
 		arr := decl.Kind.Kind.Arr()
 		if arr != nil && arr.Auto {
-			data_arr := data.Kind.Arr()
+			data_arr := decl.Value.Data.Kind.Arr()
 			if data_arr != nil {
 				arr.N = data_arr.N
 			}
 		}
 
-		s.check_assign_type(decl.Kind.Kind, data, decl.Value.Expr.Token, false)
+		s.check_assign_type(decl.Kind.Kind, decl.Value.Data, decl.Value.Expr.Token, false)
 	}
 }
 
