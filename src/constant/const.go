@@ -408,6 +408,9 @@ func (c *Const) Mul(x Const) bool {
 // Divides x's value to c's value.
 // Reports whether operation is success.
 // Reports false if divided-by-zero.
+//
+// NOTICE
+//  This operation makes constant value is floating-point.
 func (c *Const) Div(x Const) bool {
 	switch {
 	case c.Is_f64():

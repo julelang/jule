@@ -2136,6 +2136,40 @@ func (bs *_BinopSolver) solve_const(d *Data) {
 	}
 }
 
+func (bs *_BinopSolver) normalize_bitsize(d *Data) {
+	if !d.Is_const() {
+		return
+	}
+
+	var kind string
+	switch {
+	case d.Constant.Is_f64():
+		x := d.Constant.Read_f64()
+		kind = types.Float_from_bits(types.Bitsize_of_float(x))
+	
+	case d.Constant.Is_i64():
+		x := d.Constant.Read_i64()
+		kind = types.Int_from_bits(types.Bitsize_of_int(x))
+	
+	case d.Constant.Is_u64():
+		x := d.Constant.Read_u64()
+		kind = types.Uint_from_bits(types.Bitsize_of_uint(x))
+	
+	default:
+		return
+	}
+
+	d.Kind.kind = build_prim_type(kind)
+}
+
+func (bs *_BinopSolver) post_const(d *Data) {
+	if d == nil || !d.Is_const() {
+		return
+	}
+
+	bs.normalize_bitsize(d)
+}
+
 func (bs *_BinopSolver) solve(op *ast.BinopExpr) *Data {
 	l := bs.e.eval_expr_kind(op.L)
 	if l == nil {
@@ -2152,6 +2186,10 @@ func (bs *_BinopSolver) solve(op *ast.BinopExpr) *Data {
 	bs.l, bs.r = l, r
 	data := bs.eval()
 	bs.l, bs.r = l, r // Save normal order
+	
 	bs.solve_const(data)
+	bs.post_const(data)
+	
+	
 	return data
 }
