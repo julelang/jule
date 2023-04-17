@@ -563,6 +563,8 @@ func (s *_Sema) check_enum_items_int(e *Enum) {
 }
 
 func (s *_Sema) check_enum_decl(e *Enum) {
+	e.Sema = s
+
 	if lex.Is_ignore_ident(e.Ident) {
 		s.push_err(e.Token, "ignore_ident")
 	} else if s.is_duplicated_ident(_uintptr(e), e.Ident, false) {
@@ -945,6 +947,8 @@ func (s *_Sema) impl_impls() (ok bool) {
 }
 
 func (s *_Sema) check_global_decl(decl *Var) {
+	decl.Sema = s
+
 	if lex.Is_ignore_ident(decl.Ident) {
 		s.push_err(decl.Token, "ignore_ident")
 	} else if s.is_duplicated_ident(_uintptr(decl), decl.Ident, false) {

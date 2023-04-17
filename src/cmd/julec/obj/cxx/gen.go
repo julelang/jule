@@ -625,7 +625,7 @@ func gen_var(v *sema.Var) string {
 	obj += var_out_ident(v)
 	if v.Value.Expr != nil {
 		obj += " = "
-		obj += gen_expr(v.Value)
+		obj += gen_expr(v.Value, v.Sema)
 	} else {
 		obj += get_init_expr(v.Kind.Kind)
 	}

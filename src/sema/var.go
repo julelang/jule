@@ -11,6 +11,7 @@ import (
 
 // Variable.
 type Var struct {
+	Sema       Lookup // Semantic Analyzer.
 	Scope      *ast.ScopeTree
 	Token      lex.Token
 	Ident      string

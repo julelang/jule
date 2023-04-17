@@ -21,6 +21,7 @@ func (ei *EnumItem) Auto_expr() bool { return ei.Value.Expr == nil }
 
 // Enum.
 type Enum struct {
+	Sema   Lookup // Semantic Analyzer.
 	Token  lex.Token
 	Public bool
 	Ident  string
