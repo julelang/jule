@@ -37,13 +37,21 @@ func get_bool_model(c *constant.Const) string {
 
 func get_nil_model() string { return "nil" }
 
-func get_f64_model(d *sema.Data) string {
+func get_f32_model(c *constant.Const) string {
+	return strconv.FormatFloat(c.Read_f64(), 'e', -1, 32) + "f"
+}
+
+func get_f64_model(c *constant.Const) string {
+	return strconv.FormatFloat(c.Read_f64(), 'e', -1, 64)
+}
+
+func get_float_model(d *sema.Data) string {
 	switch {
 	case d.Kind.Prim().Is_f32():
-		return strconv.FormatFloat(d.Constant.Read_f64(), 'e', -1, 32) + "f"
+		return get_f32_model(d.Constant)
 
 	default: // 64-bit
-		return strconv.FormatFloat(d.Constant.Read_f64(), 'e', -1, 64)
+		return get_f64_model(d.Constant)
 	}
 }
 
@@ -72,7 +80,7 @@ func gen_const_expr(d *sema.Data) string {
 		return get_bool_model(d.Constant)
 
 	case d.Constant.Is_f64():
-		return get_f64_model(d)
+		return get_float_model(d)
 
 	case d.Constant.Is_i64():
 		return get_i64_model(d.Constant)
@@ -81,6 +89,31 @@ func gen_const_expr(d *sema.Data) string {
 		return get_u64_model(d.Constant)
 
 	case d.Constant.Is_nil():
+		return get_nil_model()
+
+	default:
+		return "" // Here is should be unreachable code.
+	}
+}
+
+func gen_const_expr_model(m *constant.Const) string {
+	switch {
+	case m.Is_str():
+		return get_str_model(m)
+
+	case m.Is_bool():
+		return get_bool_model(m)
+
+	case m.Is_f64():
+		return get_f64_model(m)
+
+	case m.Is_i64():
+		return get_i64_model(m)
+
+	case m.Is_u64():
+		return get_u64_model(m)
+
+	case m.Is_nil():
 		return get_nil_model()
 
 	default:
@@ -122,6 +155,9 @@ func gen_fn_expr_model(m *sema.Fn) string {
 
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
+	case *constant.Const:
+		return gen_const_expr_model(m.(*constant.Const))
+
 	case *sema.Var:
 		return gen_var_expr_model(m.(*sema.Var))
 
@@ -136,12 +172,11 @@ func gen_expr_model(m sema.ExprModel) string {
 	}
 }
 
-func gen_expr(d *sema.Value) string {
-	if d.Data.Is_const() {
-		return gen_const_expr(d.Data)
+func gen_expr(v *sema.Value) string {
+	if v.Data.Is_const() {
+		return gen_const_expr(v.Data)
 	}
-
-	return gen_expr_model(d.Data.Model)
+	return gen_expr_model(v.Data.Model)
 }
 
 func get_init_expr(t *sema.TypeKind) string {

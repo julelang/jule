@@ -109,36 +109,43 @@ func (e *_Eval) is_unsafe() bool { return e.unsafety }
 func (e *_Eval) lit_nil() *Data {
 	// Return new Data with nil kind.
 	// Nil kind represents "nil" literal.
+
+	constant := constant.New_nil()
 	return &Data{
 		Lvalue:   false,
 		Mutable:  false,
-		Constant: constant.New_nil(),
+		Constant: constant,
 		Decl:     false,
 		Kind:     &TypeKind{kind: nil},
+		Model:    constant,
 	}
 }
 
 func (e *_Eval) lit_str(lit *ast.LitExpr) *Data {
+	constant := constant.New_str(lit.Value[1:len(lit.Value)-1])
 	return &Data{
 		Lvalue:   false,
 		Mutable:  false,
-		Constant: constant.New_str(lit.Value[1:len(lit.Value)-1]),
+		Constant: constant,
 		Decl:     false,
 		Kind:     &TypeKind{
 			kind: build_prim_type(types.TypeKind_STR),
 		},
+		Model:    constant,
 	}
 }
 
 func (e *_Eval) lit_bool(lit *ast.LitExpr) *Data {
+	constant := constant.New_bool(lit.Value == lex.KND_TRUE)
 	return &Data{
 		Lvalue:   false,
 		Mutable:  false,
-		Constant: constant.New_bool(lit.Value == lex.KND_TRUE),
+		Constant: constant,
 		Decl:     false,
 		Kind:     &TypeKind{
 			kind: build_prim_type(types.TypeKind_BOOL),
 		},
+		Model:    constant,
 	}
 }
 
@@ -168,6 +175,7 @@ func (e *_Eval) lit_rune(l *ast.LitExpr) *Data {
 		}
 	}
 
+	data.Model = data.Constant
 	return data
 }
 
@@ -175,15 +183,17 @@ func (e *_Eval) lit_float(l *ast.LitExpr) *Data {
 	const FLOAT_KIND = types.TypeKind_F64
 
 	f, _ := strconv.ParseFloat(l.Value, 64)
+	constant := constant.New_f64(f)
 
 	return &Data{
 		Lvalue:   false,
 		Mutable:  false,
-		Constant: constant.New_f64(f),
+		Constant: constant,
 		Decl:     false,
 		Kind:     &TypeKind{
 			kind: build_prim_type(FLOAT_KIND),
 		},
+		Model:    constant,
 	}
 }
 
@@ -233,6 +243,7 @@ func (e *_Eval) lit_int(l *ast.LitExpr) *Data {
 
 	// TODO: Implement normalization.
 
+	data.Model = data.Constant
 	return data
 }
 
