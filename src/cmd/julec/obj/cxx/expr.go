@@ -88,12 +88,42 @@ func gen_const_expr(d *sema.Data) string {
 	}
 }
 
-func gen_expr(d *sema.Value, lkp sema.Lookup) string {
+func gen_binop_expr_model(m *sema.BinopExprModel) string {
+	switch m.Op {
+	case lex.KND_SOLIDUS:
+		obj := "__julec_div("
+		obj += gen_expr_model(m.L)
+		obj += ","
+		obj += gen_expr_model(m.R)
+		obj += ")"
+		return obj
+
+	default:
+		obj := "("
+		obj += gen_expr_model(m.L)
+		obj += m.Op
+		obj += gen_expr_model(m.R)
+		obj += ")"
+		return obj
+	}
+}
+
+func gen_expr_model(m sema.ExprModel) string {
+	switch m.(type) {
+	case *sema.BinopExprModel:
+		return gen_binop_expr_model(m.(*sema.BinopExprModel))
+
+	default:
+		return "<unimplemented_expression_model>"
+	}
+}
+
+func gen_expr(d *sema.Value) string {
 	if d.Data.Is_const() {
 		return gen_const_expr(d.Data)
 	}
 
-	return ""
+	return gen_expr_model(d.Data.Model)
 }
 
 func get_init_expr(t *sema.TypeKind) string {
@@ -101,5 +131,5 @@ func get_init_expr(t *sema.TypeKind) string {
 	if enm == nil {
 		return CPP_DEFAULT_EXPR
 	}
-	return "{" + gen_expr(enm.Items[0].Value, enm.Sema) + "}"
+	return "{" + gen_expr(enm.Items[0].Value) + "}"
 }

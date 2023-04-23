@@ -17,6 +17,7 @@ type Data struct {
 	Mutable    bool
 	Lvalue     bool
 	Variadiced bool
+	Model      ExprModel
 
 	// True if kind is declaration such as:
 	//  - *Enum
@@ -50,8 +51,8 @@ func build_void_data() *Data {
 
 // Value.
 type Value struct {
-	Expr *ast.Expr
-	Data *Data
+	Expr  *ast.Expr
+	Data  *Data
 }
 
 func kind_by_bitsize(expr any) string {
@@ -95,6 +96,7 @@ type _Eval struct {
 	lookup   Lookup
 	prefix   *TypeKind
 	unsafety bool
+	model    ExprModel
 }
 
 func (e *_Eval) push_err(token lex.Token, key string, args ...any) {
@@ -2190,6 +2192,11 @@ func (bs *_BinopSolver) solve(op *ast.BinopExpr) *Data {
 	bs.solve_const(data)
 	bs.post_const(data)
 	
+	data.Model = &BinopExprModel{
+		L: l.Model,
+		R: r.Model,
+		Op: op.Op.Kind,
+	}
 	
 	return data
 }
