@@ -330,6 +330,7 @@ func (e *_Eval) eval_struct(s *StructIns, error_token lex.Token) *Data {
 		Kind:     &TypeKind{
 			kind: s,
 		},
+		Model:    s,
 	}
 }
 
@@ -347,6 +348,7 @@ func (e *_Eval) eval_fn(f *Fn, error_token lex.Token) *Data {
 		Kind:     &TypeKind{
 			kind: f.instance(),
 		},
+		Model:    f,
 	}
 }
 
@@ -362,6 +364,7 @@ func (e *_Eval) eval_var(v *Var, error_token lex.Token) *Data {
 		Constant: v.Value.Data.Constant,
 		Decl:     false,
 		Kind:     v.Kind.Kind,
+		Model:    v,
 	}
 }
 

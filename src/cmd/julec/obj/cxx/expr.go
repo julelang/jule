@@ -108,8 +108,26 @@ func gen_binop_expr_model(m *sema.BinopExprModel) string {
 	}
 }
 
+func gen_var_expr_model(m *sema.Var) string {
+	return var_out_ident(m)
+}
+
+func gen_struct_expr_model(m *sema.Struct) string {
+	return struct_out_ident(m)
+}
+
+func gen_fn_expr_model(m *sema.Fn) string {
+	return fn_out_ident(m)
+}
+
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
+	case *sema.Var:
+		return gen_var_expr_model(m.(*sema.Var))
+
+	case *sema.Struct:
+		return gen_struct_expr_model(m.(*sema.Struct))
+
 	case *sema.BinopExprModel:
 		return gen_binop_expr_model(m.(*sema.BinopExprModel))
 
