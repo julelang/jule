@@ -153,6 +153,16 @@ func gen_fn_expr_model(m *sema.Fn) string {
 	return fn_out_ident(m)
 }
 
+func gen_unary_expr_model(m *sema.UnaryExprModel) string {
+	switch m.Op {
+	case lex.KND_CARET:
+		return "~" + gen_expr_model(m.Expr)
+
+	default:
+		return m.Op + gen_expr_model(m.Expr)
+	}
+}
+
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
 	case *constant.Const:
@@ -166,6 +176,9 @@ func gen_expr_model(m sema.ExprModel) string {
 
 	case *sema.BinopExprModel:
 		return gen_binop_expr_model(m.(*sema.BinopExprModel))
+
+	case *sema.UnaryExprModel:
+		return gen_unary_expr_model(m.(*sema.UnaryExprModel))
 
 	default:
 		return "<unimplemented_expression_model>"

@@ -9,3 +9,9 @@ type BinopExprModel struct {
 	R  ExprModel
 	Op string
 }
+
+// Unary operation expression model.
+type UnaryExprModel struct {
+	Expr ExprModel
+	Op   string
+}

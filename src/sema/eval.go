@@ -447,6 +447,10 @@ func (e *_Eval) eval_unary_minus(d *Data) *Data {
 	}
 
 	d.Lvalue = false
+	d.Model = &UnaryExprModel{
+		Expr: d.Model,
+		Op:   lex.KND_MINUS,
+	}
 	return d
 }
 
@@ -470,6 +474,10 @@ func (e *_Eval) eval_unary_plus(d *Data) *Data {
 	}
 	
 	d.Lvalue = false
+	d.Model = &UnaryExprModel{
+		Expr: d.Model,
+		Op:   lex.KND_PLUS,
+	}
 	return d
 }
 
@@ -490,6 +498,10 @@ func (e *_Eval) eval_unary_caret(d *Data) *Data {
 	}
 	
 	d.Lvalue = false
+	d.Model = &UnaryExprModel{
+		Expr: d.Model,
+		Op:   lex.KND_CARET,
+	}
 	return d
 }
 
@@ -507,6 +519,10 @@ func (e *_Eval) eval_unary_excl(d *Data) *Data {
 	}
 	
 	d.Lvalue = false
+	d.Model = &UnaryExprModel{
+		Expr: d.Model,
+		Op:   lex.KND_EXCL,
+	}
 	return d
 }
 
@@ -521,6 +537,10 @@ func (e *_Eval) eval_unary_star(d *Data, op lex.Token) *Data {
 	}
 	d.Constant = nil
 	d.Lvalue = true
+	d.Model = &UnaryExprModel{
+		Expr: d.Model,
+		Op:   lex.KND_STAR,
+	}
 	return d
 }
 
