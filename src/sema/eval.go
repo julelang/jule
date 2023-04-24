@@ -545,12 +545,28 @@ func (e *_Eval) eval_unary_star(d *Data, op lex.Token) *Data {
 }
 
 func (e *_Eval) eval_unary_amper(d *Data) *Data {
-	switch {
-	case d.Kind.Ref() != nil:
-		// Ok
+	switch d.Model.(type) {
+	case *StructLit:
+		d.Model = &AllocStructLit{
+			Lit: d.Model.(*StructLit),
+		}
 
-	case !can_get_ptr(d):
-		d = nil
+	default:
+		switch {
+		case d.Kind.Ref() != nil:
+			d.Model = &GetRefPtrExprModel{
+				Expr: d.Model,
+			}
+
+		case can_get_ptr(d):
+			d.Model = &UnaryExprModel{
+				Expr: d.Model,
+				Op:   lex.KND_AMPER,
+			}
+
+		default:
+			d = nil
+		}
 	}
 
 	if d != nil {
@@ -1195,6 +1211,9 @@ func (e *_Eval) eval_struct_lit(lit *ast.StructLit) *Data {
 	return &Data{
 		Mutable: true,
 		Kind:    t.Kind,
+		Model:   &StructLit{
+			Strct: s,
+		},
 	}
 }
 

@@ -163,6 +163,22 @@ func gen_unary_expr_model(m *sema.UnaryExprModel) string {
 	}
 }
 
+func gen_get_ref_ptr_expr_model(m *sema.GetRefPtrExprModel) string {
+	return "(" + gen_expr_model(m.Expr) + ").__alloc"
+}
+
+func gen_struct_lit(m *sema.StructLit) string {
+	// TODO: Implement here.
+	obj := ""
+	return obj
+}
+
+func gen_alloc_struct_lit(m *sema.AllocStructLit) string {
+	// TODO: Implement here.
+	obj := ""
+	return obj
+}
+
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
 	case *constant.Const:
@@ -179,6 +195,15 @@ func gen_expr_model(m sema.ExprModel) string {
 
 	case *sema.UnaryExprModel:
 		return gen_unary_expr_model(m.(*sema.UnaryExprModel))
+
+	case *sema.GetRefPtrExprModel:
+		return gen_get_ref_ptr_expr_model(m.(*sema.GetRefPtrExprModel))
+
+	case *sema.StructLit:
+		return gen_struct_lit(m.(*sema.StructLit))
+
+	case *sema.AllocStructLit:
+		return gen_alloc_struct_lit(m.(*sema.AllocStructLit))
 
 	default:
 		return "<unimplemented_expression_model>"
