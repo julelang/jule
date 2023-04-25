@@ -20,8 +20,8 @@ type Field struct {
 
 func (f *Field) instance() *FieldIns {
 	return &FieldIns{
-		Decl:  f,
-		Kind: nil,
+		Decl: f,
+		Kind: f.Kind.Kind,
 	}
 }
 
