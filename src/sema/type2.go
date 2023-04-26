@@ -233,7 +233,6 @@ type _DynamicTypeAnnotation struct {
 	p           *ParamIns
 	a           *Data
 	error_token lex.Token
-	
 	k           **TypeKind
 }
 
@@ -542,13 +541,18 @@ type _StructLitChecker struct {
 	e           *_Eval
 	error_token lex.Token
 	s           *StructIns
+	args        []*StructArgExprModel
 }
 
 func (slc *_StructLitChecker) push_err(token lex.Token, key string, args ...any) {
 	slc.e.push_err(token, key, args...)
 }
 
-func (slc *_StructLitChecker) check_match(f *FieldIns, d *Data, error_token lex.Token) {
+func (slc *_StructLitChecker) push_match(f *FieldIns, d *Data, error_token lex.Token) {
+	slc.args = append(slc.args, &StructArgExprModel{
+		Field: f,
+		Expr:  d.Model,
+	})
 	slc.e.s.check_validity_for_init_expr(f.Decl.Mutable, d, error_token)
 	slc.e.s.check_assign_type(f.Kind, d, error_token, false)
 }
@@ -582,7 +586,7 @@ dup_lookup:
 	if d == nil {
 		return
 	}
-	slc.check_match(f, d, pair.Field)
+	slc.push_match(f, d, pair.Field)
 }
 
 func (slc *_StructLitChecker) check(exprs []ast.ExprData) {
@@ -617,7 +621,7 @@ func (slc *_StructLitChecker) check(exprs []ast.ExprData) {
 			}
 
 			field := slc.s.Fields[i]
-			slc.check_match(field, d, e.Token)
+			slc.push_match(field, d, e.Token)
 		}
 	}
 

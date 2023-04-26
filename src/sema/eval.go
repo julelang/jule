@@ -546,9 +546,9 @@ func (e *_Eval) eval_unary_star(d *Data, op lex.Token) *Data {
 
 func (e *_Eval) eval_unary_amper(d *Data) *Data {
 	switch d.Model.(type) {
-	case *StructLit:
-		d.Model = &AllocStructLit{
-			Lit: d.Model.(*StructLit),
+	case *StructLitExprModel:
+		d.Model = &AllocStructLitExprModel{
+			Lit: d.Model.(*StructLitExprModel),
 		}
 
 	default:
@@ -1211,8 +1211,9 @@ func (e *_Eval) eval_struct_lit(lit *ast.StructLit) *Data {
 	return &Data{
 		Mutable: true,
 		Kind:    t.Kind,
-		Model:   &StructLit{
+		Model:   &StructLitExprModel{
 			Strct: s,
+			Args:  slc.args,
 		},
 	}
 }

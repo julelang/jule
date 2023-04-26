@@ -22,13 +22,21 @@ type GetRefPtrExprModel struct {
 	Expr ExprModel
 }
 
+// Structure field argument expression model for constructors.
+// For example: &MyStruct{10, false, "-"}
+type StructArgExprModel struct {
+	Field *FieldIns
+	Expr  ExprModel
+}
+
 // Structure literal.
-type StructLit struct {
+type StructLitExprModel struct {
 	Strct *StructIns
+	Args  []*StructArgExprModel
 }
 
 // Heap allocated structure litral expression.
 // For example: &MyStruct{}
-type AllocStructLit struct {
-	Lit *StructLit
+type AllocStructLitExprModel struct {
+	Lit *StructLitExprModel
 }

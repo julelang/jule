@@ -167,15 +167,30 @@ func gen_get_ref_ptr_expr_model(m *sema.GetRefPtrExprModel) string {
 	return "(" + gen_expr_model(m.Expr) + ").__alloc"
 }
 
-func gen_struct_lit(m *sema.StructLit) string {
-	// TODO: Implement here.
-	obj := ""
+func gen_struct_lit(m *sema.StructLitExprModel) string {
+	obj := struct_out_ident(m.Strct.Decl)
+	obj += "("
+	if len(m.Args) > 0 {
+		for _, f := range m.Strct.Fields {
+			for _, arg := range m.Args {
+				if arg.Field == f {
+					obj += gen_expr_model(arg.Expr) + ","
+					break;
+				}
+			}
+		}
+		obj = obj[:len(obj)-1] // Remove last comma.
+	}
+	obj += ")"
 	return obj
 }
 
-func gen_alloc_struct_lit(m *sema.AllocStructLit) string {
-	// TODO: Implement here.
-	obj := ""
+func gen_alloc_struct_lit(m *sema.AllocStructLitExprModel) string {
+	obj := "__julec_new_structure<"
+	obj += struct_out_ident(m.Lit.Strct.Decl)
+	obj += ">(new( std::nothrow ) ";
+	obj += gen_struct_lit(m.Lit)
+	obj += ")"
 	return obj
 }
 
@@ -199,11 +214,11 @@ func gen_expr_model(m sema.ExprModel) string {
 	case *sema.GetRefPtrExprModel:
 		return gen_get_ref_ptr_expr_model(m.(*sema.GetRefPtrExprModel))
 
-	case *sema.StructLit:
-		return gen_struct_lit(m.(*sema.StructLit))
+	case *sema.StructLitExprModel:
+		return gen_struct_lit(m.(*sema.StructLitExprModel))
 
-	case *sema.AllocStructLit:
-		return gen_alloc_struct_lit(m.(*sema.AllocStructLit))
+	case *sema.AllocStructLitExprModel:
+		return gen_alloc_struct_lit(m.(*sema.AllocStructLitExprModel))
 
 	default:
 		return "<unimplemented_expression_model>"
