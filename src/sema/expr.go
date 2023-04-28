@@ -40,3 +40,11 @@ type StructLitExprModel struct {
 type AllocStructLitExprModel struct {
 	Lit *StructLitExprModel
 }
+
+// Casting expression model.
+// For example: (int)(my_float)
+type CastingExprModel struct {
+	Expr     ExprModel
+	Kind     *TypeKind
+	ExprKind *TypeKind
+}

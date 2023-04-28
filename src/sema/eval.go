@@ -1136,6 +1136,11 @@ func (e *_Eval) eval_cast_by_type_n_data(t *TypeKind, d *Data, error_token lex.T
 		d.Lvalue = is_lvalue(t)
 		d.Mutable = is_mut(t)
 		d.Decl = false
+		d.Model = &CastingExprModel{
+			Kind:     t,
+			Expr:     d.Model,
+			ExprKind: d.Kind,
+		}
 	}
 	return d
 }

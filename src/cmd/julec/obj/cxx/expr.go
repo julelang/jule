@@ -17,6 +17,13 @@ const CPP_IGNORE = "std::ignore"
 // Represents default expression for type.
 const CPP_DEFAULT_EXPR = "{}"
 
+func get_accessor(t *sema.TypeKind) string {
+	if t.Ref() != nil || t.Ptr() != nil {
+		return "->"
+	}
+	return lex.KND_DOT
+}
+
 func get_str_model(c *constant.Const) string {
 	content := c.Read_str()
 	s := ""
@@ -167,7 +174,7 @@ func gen_get_ref_ptr_expr_model(m *sema.GetRefPtrExprModel) string {
 	return "(" + gen_expr_model(m.Expr) + ").__alloc"
 }
 
-func gen_struct_lit(m *sema.StructLitExprModel) string {
+func gen_struct_lit_expr_model(m *sema.StructLitExprModel) string {
 	obj := struct_out_ident(m.Strct.Decl)
 	obj += "("
 	if len(m.Args) > 0 {
@@ -185,11 +192,39 @@ func gen_struct_lit(m *sema.StructLitExprModel) string {
 	return obj
 }
 
-func gen_alloc_struct_lit(m *sema.AllocStructLitExprModel) string {
+func gen_alloc_struct_lit_expr_model(m *sema.AllocStructLitExprModel) string {
 	obj := "__julec_new_structure<"
 	obj += struct_out_ident(m.Lit.Strct.Decl)
 	obj += ">(new( std::nothrow ) ";
-	obj += gen_struct_lit(m.Lit)
+	obj += gen_struct_lit_expr_model(m.Lit)
+	obj += ")"
+	return obj
+}
+
+func gen_casting_expr_model(m *sema.CastingExprModel) string {
+	obj := ""
+	switch {
+	case m.ExprKind.Ptr() != nil || m.Kind.Ptr() != nil:
+		obj += "(("
+		obj += gen_type_kind(m.Kind)
+		obj += ")("
+		obj += gen_expr_model(m.Expr)
+		obj += "))"
+		return obj
+
+	case m.ExprKind.Trt() != nil || (m.ExprKind.Prim() != nil && m.ExprKind.Prim().Is_any()):
+		obj += gen_expr_model(m.Expr)
+		obj += get_accessor(m.ExprKind)
+		obj += "operator "
+		obj += gen_type_kind(m.Kind)
+		obj += "()"
+		return obj
+	}
+
+	obj += "static_cast<"
+	obj += gen_type_kind(m.Kind)
+	obj += ">("
+	obj += gen_expr_model(m.Expr)
 	obj += ")"
 	return obj
 }
@@ -215,10 +250,13 @@ func gen_expr_model(m sema.ExprModel) string {
 		return gen_get_ref_ptr_expr_model(m.(*sema.GetRefPtrExprModel))
 
 	case *sema.StructLitExprModel:
-		return gen_struct_lit(m.(*sema.StructLitExprModel))
+		return gen_struct_lit_expr_model(m.(*sema.StructLitExprModel))
 
 	case *sema.AllocStructLitExprModel:
-		return gen_alloc_struct_lit(m.(*sema.AllocStructLitExprModel))
+		return gen_alloc_struct_lit_expr_model(m.(*sema.AllocStructLitExprModel))
+
+	case *sema.CastingExprModel:
+		return gen_casting_expr_model(m.(*sema.CastingExprModel))
 
 	default:
 		return "<unimplemented_expression_model>"
