@@ -1141,6 +1141,7 @@ func (e *_Eval) eval_cast_by_type_n_data(t *TypeKind, d *Data, error_token lex.T
 			Expr:     d.Model,
 			ExprKind: d.Kind,
 		}
+		d.Kind = t
 	}
 	return d
 }
