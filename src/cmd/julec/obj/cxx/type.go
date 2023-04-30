@@ -58,11 +58,15 @@ func gen_enum_kind(e *sema.Enum) string {
 	return gen_type_kind(e.Kind.Kind)
 }
 
+func as_slice_kind(elem *sema.TypeKind) string {
+	elem_s := gen_type_kind(elem)
+	slc := as_jt("slice")
+	return slc + "<" + elem_s + ">"
+}
+
 // Generates C++ code of Slc TypeKind.
 func gen_slice_kind(s *sema.Slc) string {
-	elem := gen_type_kind(s.Elem)
-	slc := as_jt("slice")
-	return slc + "<" + elem + ">"
+	return as_slice_kind(s.Elem)
 }
 
 // Generates C++ code of Map TypeKind.

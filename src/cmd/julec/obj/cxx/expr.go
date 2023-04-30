@@ -264,6 +264,14 @@ func gen_fn_call_expr_model(m *sema.FnCallExprModel) string {
 	return obj
 }
 
+func gen_slice_expr_model(m *sema.SliceExprModel) string {
+	obj := as_slice_kind(m.Elem_kind)
+	obj += "({"
+	obj += gen_arg_expr_models(m.Elems)
+	obj += "})"
+	return obj
+}
+
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
 	case *constant.Const:
@@ -295,6 +303,9 @@ func gen_expr_model(m sema.ExprModel) string {
 
 	case *sema.FnCallExprModel:
 		return gen_fn_call_expr_model(m.(*sema.FnCallExprModel))
+
+	case *sema.SliceExprModel:
+		return gen_slice_expr_model(m.(*sema.SliceExprModel))
 
 	default:
 		return "<unimplemented_expression_model>"

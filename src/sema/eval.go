@@ -678,17 +678,24 @@ func (e *_Eval) eval_exp_slc(s *ast.SliceExpr, elem_type *TypeKind) *Data {
 		Elem: elem_type,
 	}
 
-	for _, elem := range s.Elems {
+	model := &SliceExprModel{
+		Elem_kind:  elem_type,
+		Elems: make([]ExprModel, len(s.Elems)),
+	}
+
+	for i, elem := range s.Elems {
 		d := e.eval_expr_kind(elem)
 		if d == nil {
 			continue
 		}
 
 		e.s.check_assign_type(slc.Elem, d, s.Token, true)
+		model.Elems[i] = d.Model
 	}
 
 	return &Data{
-		Kind: &TypeKind{kind: slc},
+		Kind:  &TypeKind{kind: slc},
+		Model: model,
 	}
 }
 

@@ -54,3 +54,10 @@ type FnCallExprModel struct {
 	Func *FnIns
 	Args []ExprModel
 }
+
+// Slice expression model.
+// For example: [1, 2, 3, 4, 5, 6, 8, 9, 10]
+type SliceExprModel struct {
+	Elem_kind  *TypeKind
+	Elems []ExprModel
+}
