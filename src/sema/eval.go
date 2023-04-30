@@ -1331,18 +1331,23 @@ func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
 	f.Decl.append_instance(f)
 	
 	if f.Decl.Is_void() {
-		return build_void_data()
-	}
-
-	if dynamic_annotation {
-		ok = e.s.reload_fn_ins_types(f)
-		if !ok {
-			return nil
+		d = build_void_data()
+	} else {
+		if dynamic_annotation {
+			ok = e.s.reload_fn_ins_types(f)
+			if !ok {
+				return nil
+			}
 		}
+
+		d.Kind = f.Result
+		d.Lvalue = is_lvalue(f.Result)
 	}
 
-	d.Kind = f.Result
-	d.Lvalue = is_lvalue(f.Result)
+	d.Model = &FnCallExprModel{
+		Func: f,
+		Args: fcac.arg_models,
+	}
 
 	return d
 }

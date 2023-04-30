@@ -48,3 +48,9 @@ type CastingExprModel struct {
 	Kind     *TypeKind
 	ExprKind *TypeKind
 }
+
+// Function call expression model.
+type FnCallExprModel struct {
+	Func *FnIns
+	Args []ExprModel
+}

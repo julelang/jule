@@ -357,6 +357,7 @@ type _FnCallArgChecker struct {
 	error_token        lex.Token
 	f                  *FnIns
 	dynamic_annotation bool
+	arg_models         []ExprModel
 }
 
 func (fcac *_FnCallArgChecker) push_err_token(token lex.Token, key string, args ...any) {
@@ -454,6 +455,7 @@ func (fcac *_FnCallArgChecker) push(p *ParamIns, arg *ast.Expr) (ok bool) {
 	if d == nil {
 		return false
 	}
+	fcac.arg_models = append(fcac.arg_models, d.Model)
 	return fcac.check_arg(p, d, arg.Token)
 }
 

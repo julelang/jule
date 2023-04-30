@@ -229,6 +229,41 @@ func gen_casting_expr_model(m *sema.CastingExprModel) string {
 	return obj
 }
 
+func gen_generic_type_kinds(kinds []*sema.TypeKind) string {
+	obj := ""
+	for _, kind := range kinds {
+		obj += gen_type_kind(kind) + ","
+	}
+	obj = obj[:len(obj)-1] // Remove last comma.
+	return obj
+}
+
+func gen_arg_expr_models(models []sema.ExprModel) string {
+	if len(models) == 0 {
+		return ""
+	}
+
+	obj := ""
+	for _, m := range models {
+		obj += gen_expr_model(m) + ","
+	}
+	obj = obj[:len(obj)-1] // Remove last comma.
+	return obj
+}
+
+func gen_fn_call_expr_model(m *sema.FnCallExprModel) string {
+	obj := fn_out_ident(m.Func.Decl)
+	if len(m.Func.Generics) > 0 {
+		obj += "<"
+		obj += gen_generic_type_kinds(m.Func.Generics)
+		obj += ">"
+	}
+	obj += "("
+	obj += gen_arg_expr_models(m.Args)
+	obj += ")"
+	return obj
+}
+
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
 	case *constant.Const:
@@ -257,6 +292,9 @@ func gen_expr_model(m sema.ExprModel) string {
 
 	case *sema.CastingExprModel:
 		return gen_casting_expr_model(m.(*sema.CastingExprModel))
+
+	case *sema.FnCallExprModel:
+		return gen_fn_call_expr_model(m.(*sema.FnCallExprModel))
 
 	default:
 		return "<unimplemented_expression_model>"
