@@ -463,6 +463,10 @@ func (fcac *_FnCallArgChecker) push_variadic(p *ParamIns, i int) (ok bool) {
 	ok = true
 	variadiced := false
 	more := i+1 < len(fcac.args)
+	model := &SliceExprModel{
+		Elem_kind: p.Kind,
+	}
+
 	for ; i < len(fcac.args); i++ {
 		arg := fcac.args[i]
 		d := fcac.e.eval_expr_kind(arg.Kind)
@@ -474,6 +478,10 @@ func (fcac *_FnCallArgChecker) push_variadic(p *ParamIns, i int) (ok bool) {
 		if d.Variadiced {
 			variadiced = true
 			d.Kind = d.Kind.Slc().Elem
+			model = d.Model.(*SliceExprModel)
+			model.Elem_kind = p.Kind
+		} else {
+			model.Elems = append(model.Elems, d.Model)
 		}
 
 		ok = fcac.check_arg(p, d, arg.Token) && ok
@@ -483,6 +491,7 @@ func (fcac *_FnCallArgChecker) push_variadic(p *ParamIns, i int) (ok bool) {
 		fcac.push_err("more_args_with_variadiced")
 	}
 
+	fcac.arg_models = append(fcac.arg_models, model)
 	return ok
 }
 
