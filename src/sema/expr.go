@@ -61,3 +61,10 @@ type SliceExprModel struct {
 	Elem_kind  *TypeKind
 	Elems []ExprModel
 }
+
+// Indexing expression model.
+// For example: my_slice[my_index]
+type IndexigExprModel struct {
+	Expr  ExprModel
+	Index ExprModel
+}

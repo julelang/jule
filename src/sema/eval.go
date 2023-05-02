@@ -76,6 +76,9 @@ func kind_by_bitsize(expr any) string {
 
 func check_data_for_integer_indexing(d *Data) (err_key string) {
 	switch {
+	case d == nil:
+		return ""
+
 	case d.Kind.Prim() == nil:
 		return "invalid_expr"
 
@@ -737,15 +740,8 @@ func (e *_Eval) check_integer_indexing_by_data(d *Data, token lex.Token) {
 	}
 }
 
-func (e *_Eval) check_integer_indexing(i *ast.IndexingExpr) {
-	d := e.eval_expr_kind(i.Index)
-	if d != nil {
-		e.check_integer_indexing_by_data(d, i.Token)
-	}
-}
-
-func (e *_Eval) indexing_ptr(d *Data, i *ast.IndexingExpr) {
-	e.check_integer_indexing(i)
+func (e *_Eval) indexing_ptr(d *Data, index *Data, i *ast.IndexingExpr) {
+	e.check_integer_indexing_by_data(index, i.Token)
 
 	ptr := d.Kind.Ptr()
 	switch {
@@ -760,35 +756,33 @@ func (e *_Eval) indexing_ptr(d *Data, i *ast.IndexingExpr) {
 	d.Kind = ptr.Elem
 }
 
-func (e *_Eval) indexing_arr(d *Data, i *ast.IndexingExpr) {
+func (e *_Eval) indexing_arr(d *Data, index *Data, i *ast.IndexingExpr) {
 	arr := d.Kind.Arr()
 	d.Kind = arr.Elem
-	e.check_integer_indexing(i)
+	e.check_integer_indexing_by_data(index, i.Token)
 }
 
-func (e *_Eval) indexing_slc(d *Data, i *ast.IndexingExpr) {
+func (e *_Eval) indexing_slc(d *Data, index *Data, i *ast.IndexingExpr) {
 	slc := d.Kind.Slc()
 	d.Kind = slc.Elem
-	e.check_integer_indexing(i)
+	e.check_integer_indexing_by_data(index, i.Token)
 }
 
-func (e *_Eval) indexing_map(d *Data, i *ast.IndexingExpr) {
-	m := d.Kind.Map()
-
-	key := e.eval_expr_kind(i.Index)
-	if key == nil {
+func (e *_Eval) indexing_map(d *Data, index *Data, i *ast.IndexingExpr) {
+	if index == nil {
 		return
 	}
-	e.s.check_type_compatibility(m.Key, key.Kind, i.Token, true)
+
+	m := d.Kind.Map()
+	e.s.check_type_compatibility(m.Key, index.Kind, i.Token, true)
 
 	d.Kind = m.Val
 }
 
-func (e *_Eval) indexing_str(d *Data, i *ast.IndexingExpr) {
+func (e *_Eval) indexing_str(d *Data, index *Data, i *ast.IndexingExpr) {
 	const BYTE_KIND = types.TypeKind_U8
 	d.Kind.kind = build_prim_type(BYTE_KIND)
-	
-	index := e.eval_expr_kind(i.Index)
+
 	if index == nil {
 		return
 	}
@@ -812,29 +806,29 @@ func (e *_Eval) indexing_str(d *Data, i *ast.IndexingExpr) {
 	}
 }
 
-func (e *_Eval) to_indexing(d *Data, i *ast.IndexingExpr) {
+func (e *_Eval) to_indexing(d *Data, index *Data, i *ast.IndexingExpr) {
 	switch {
 	case d.Kind.Ptr() != nil:
-		e.indexing_ptr(d, i)
+		e.indexing_ptr(d, index, i)
 		return
 
 	case d.Kind.Arr() != nil:
-		e.indexing_arr(d, i)
+		e.indexing_arr(d, index, i)
 		return
 
 	case d.Kind.Slc() != nil:
-		e.indexing_slc(d, i)
+		e.indexing_slc(d, index, i)
 		return
 
 	case d.Kind.Map() != nil:
-		e.indexing_map(d, i)
+		e.indexing_map(d, index, i)
 		return
 
 	case d.Kind.Prim() != nil:
 		prim := d.Kind.Prim()
 		switch {
 		case prim.Is_str():
-			e.indexing_str(d, i)
+			e.indexing_str(d, index, i)
 			return
 		}
 	}
@@ -848,7 +842,21 @@ func (e *_Eval) eval_indexing(i *ast.IndexingExpr) *Data {
 		return nil
 	}
 
-	e.to_indexing(d, i)
+	expr_model := d.Model
+	index := e.eval_expr_kind(i.Index)
+	e.to_indexing(d, index, i)
+
+	if index != nil {
+		if d.Is_const() {
+			d.Model = d.Constant
+		} else {
+			d.Model = &IndexigExprModel{
+				Expr:  expr_model,
+				Index: index.Model,
+			}
+		}
+	}
+
 	return d
 }
 

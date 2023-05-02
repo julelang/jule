@@ -272,6 +272,14 @@ func gen_slice_expr_model(m *sema.SliceExprModel) string {
 	return obj
 }
 
+func gen_indexing_expr_model(m *sema.IndexigExprModel) string {
+	obj := gen_expr_model(m.Expr)
+	obj += "["
+	obj += gen_expr_model(m.Index)
+	obj += "]"
+	return obj
+}
+
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
 	case *constant.Const:
@@ -306,6 +314,9 @@ func gen_expr_model(m sema.ExprModel) string {
 
 	case *sema.SliceExprModel:
 		return gen_slice_expr_model(m.(*sema.SliceExprModel))
+
+	case *sema.IndexigExprModel:
+		return gen_indexing_expr_model(m.(*sema.IndexigExprModel))
 
 	default:
 		return "<unimplemented_expression_model>"
