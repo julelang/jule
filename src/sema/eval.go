@@ -99,7 +99,6 @@ type _Eval struct {
 	lookup   Lookup
 	prefix   *TypeKind
 	unsafety bool
-	model    ExprModel
 }
 
 func (e *_Eval) push_err(token lex.Token, key string, args ...any) {
@@ -108,6 +107,17 @@ func (e *_Eval) push_err(token lex.Token, key string, args ...any) {
 
 // Reports whether evaluation in unsafe scope.
 func (e *_Eval) is_unsafe() bool { return e.unsafety }
+
+// Reports whether evaluated expression is in global scope.
+func (e *_Eval) is_global() bool {
+	switch e.lookup.(type) {
+	case *_Sema:
+		return true
+
+	default:
+		return false
+	}
+}
 
 func (e *_Eval) lit_nil() *Data {
 	// Return new Data with nil kind.
@@ -1570,7 +1580,11 @@ func (e *_Eval) eval_anon_fn(decl *ast.FnDecl) *Data {
 	// TODO: Check scope.
 
 	return &Data{
-		Kind: &TypeKind{kind: ins},
+		Kind:  &TypeKind{kind: ins},
+		Model: &AnonFnExprModel{
+			Func:   ins,
+			Global: e.is_global(),
+		},
 	}
 }
 

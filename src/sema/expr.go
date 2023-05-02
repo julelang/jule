@@ -68,3 +68,9 @@ type IndexigExprModel struct {
 	Expr  ExprModel
 	Index ExprModel
 }
+
+// Anonymous function expression model.
+type AnonFnExprModel struct {
+	Func   *FnIns
+	Global bool
+}

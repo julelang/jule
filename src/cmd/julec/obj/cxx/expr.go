@@ -280,6 +280,22 @@ func gen_indexing_expr_model(m *sema.IndexigExprModel) string {
 	return obj
 }
 
+func gen_anon_fn_expr_model(m *sema.AnonFnExprModel) string {
+	obj := gen_fn_kind(m.Func)
+	if m.Global {
+		obj += "([]"
+	} else {
+		obj += "([&]"
+	}
+	obj += gen_params_ins(m.Func.Params)
+	obj += " mutable -> "
+	obj += gen_fn_ins_result(m.Func)
+	obj += " "
+	obj += gen_fn_scope(m.Func)
+	obj += ")"
+	return obj
+}
+
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
 	case *constant.Const:
@@ -317,6 +333,9 @@ func gen_expr_model(m sema.ExprModel) string {
 
 	case *sema.IndexigExprModel:
 		return gen_indexing_expr_model(m.(*sema.IndexigExprModel))
+
+	case *sema.AnonFnExprModel:
+		return gen_anon_fn_expr_model(m.(*sema.AnonFnExprModel))
 
 	default:
 		return "<unimplemented_expression_model>"

@@ -151,6 +151,14 @@ func gen_param_prototype(p *sema.Param) string {
 	return obj
 }
 
+// Generates C++ code of parameter instance.
+func gen_param_ins(p *sema.ParamIns) string {
+	obj := gen_param_ins_prototype(p)
+	obj += " "
+	obj += param_out_ident(p.Decl)
+	return obj
+}
+
 // Generates C++ prototype code of parameter instance.
 func gen_param_ins_prototype(p *sema.ParamIns) string {
 	obj := ""
@@ -188,6 +196,27 @@ func gen_params(params []*sema.Param) string {
 	for _, p := range params {
 		if !p.Is_self() {
 			obj += gen_param(p) + ","
+		}
+	}
+
+	// Remove comma.
+	obj = obj[:len(obj)-1]
+	return obj + ")"
+}
+
+func gen_params_ins(params []*sema.ParamIns) string {
+	switch {
+	case len(params) == 0:
+		return "(void)"
+	
+	case len(params) == 1 && params[0].Decl.Is_self():
+		return "(void)"
+	}
+
+	obj := "("
+	for _, p := range params {
+		if !p.Decl.Is_self() {
+			obj += gen_param_ins(p) + ","
 		}
 	}
 
@@ -665,9 +694,8 @@ func gen_fn(f *sema.Fn) string {
 	obj := ""
 	for _, c := range f.Combines {
 		obj += gen_fn_decl_head(c)
-		obj += gen_params_prototypes(c.Params) + " "
-		// TODO: Add return variables to root scope.
-		obj += gen_scope(c.Scope)
+		obj += gen_params_ins(c.Params) + " "
+		obj += gen_fn_scope(c)
 	}
 	return obj
 }
