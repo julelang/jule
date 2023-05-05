@@ -88,3 +88,16 @@ type MapExprModel struct {
 	Val_kind *TypeKind
 	Entries  []*KeyValPairExprModel
 }
+
+// Slicing expression model.
+// For example: my_slice[2:len(my_slice)-5]
+type SlicingExprModel struct {
+	// Expression to slicing.
+	Expr ExprModel
+	// Left index expression.
+	// Zero integer if expression have not left index.
+	L    ExprModel
+	// Right index expression.
+	// Nil if expression have not right index.
+	R    ExprModel
+}

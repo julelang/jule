@@ -870,6 +870,10 @@ func (e *_Eval) eval_indexing(i *ast.IndexingExpr) *Data {
 	return d
 }
 
+// Returns left and right index values.
+// Returns zero integer expression if slicing have not left index.
+// So, left index always represents an expression.
+// Left data is nil if expression eval failed.
 func (e *_Eval) eval_slicing_exprs(s *ast.SlicingExpr) (*Data, *Data) {
 	var l *Data = nil
 	var r *Data = nil
@@ -878,45 +882,41 @@ func (e *_Eval) eval_slicing_exprs(s *ast.SlicingExpr) (*Data, *Data) {
 		l = e.eval_expr_kind(s.Start)
 		if l != nil {
 			e.check_integer_indexing_by_data(l, s.Token)
+		} else {
+			return nil, nil
 		}
 	} else {
 		l = &Data{
 			Constant: constant.New_i64(0),
 			Kind: &TypeKind{kind: build_prim_type(types.SYS_INT)},
 		}
+		l.Model = l.Constant
 	}
 
 	if s.To != nil {
 		r = e.eval_expr_kind(s.To)
 		if r != nil {
 			e.check_integer_indexing_by_data(r, s.Token)
+		} else {
+			return nil, nil
 		}
 	}
 
 	return l, r
 }
 
-func (e *_Eval) slicing_arr(d *Data, s *ast.SlicingExpr) {
-	_, _ = e.eval_slicing_exprs(s)
-
+func (e *_Eval) slicing_arr(d *Data) {
 	d.Lvalue = false
 	d.Kind.kind = &Slc{Elem: d.Kind.Slc().Elem}
 }
 
-func (e *_Eval) slicing_slc(d *Data, s *ast.SlicingExpr) {
-	_, _ = e.eval_slicing_exprs(s)
-
+func (e *_Eval) slicing_slc(d *Data) {
 	d.Lvalue = false
 }
 
-func (e *_Eval) slicing_str(d *Data, s *ast.SlicingExpr) {
+func (e *_Eval) slicing_str(d *Data, l *Data, r *Data) {
 	d.Lvalue = false
 	if !d.Is_const() {
-		return
-	}
-
-	l, r := e.eval_slicing_exprs(s)
-	if l == nil {
 		return
 	}
 	
@@ -943,21 +943,21 @@ func (e *_Eval) slicing_str(d *Data, s *ast.SlicingExpr) {
 	}
 }
 
-func (e *_Eval) check_slicing(d *Data, s *ast.SlicingExpr) {
+func (e *_Eval) check_slicing(d *Data, l *Data, r *Data, s *ast.SlicingExpr) {
 	switch {
 	case d.Kind.Arr() != nil:
-		e.slicing_arr(d, s)
+		e.slicing_arr(d)
 		return
 
 	case d.Kind.Slc() != nil:
-		e.slicing_slc(d, s)
+		e.slicing_slc(d)
 		return
 
 	case d.Kind.Prim() != nil:
 		prim := d.Kind.Prim()
 		switch {
 		case prim.Is_str():
-			e.slicing_str(d, s)
+			e.slicing_str(d, l, r)
 			return
 		}
 	}
@@ -971,7 +971,23 @@ func (e *_Eval) eval_slicing(s *ast.SlicingExpr) *Data {
 		return nil
 	}
 
-	e.check_slicing(d, s)
+	l, r := e.eval_slicing_exprs(s)
+	if l == nil {
+		return d
+	}
+
+	e.check_slicing(d, l, r, s)
+
+	model := &SlicingExprModel{
+		Expr: d.Model,
+		L:    l.Model,
+	}
+
+	if r != nil {
+		model.R = r.Model
+	}
+
+	d.Model = model
 	return d
 }
 

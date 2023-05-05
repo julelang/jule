@@ -317,6 +317,18 @@ func gen_map_expr_model(m *sema.MapExprModel) string {
 	return obj
 }
 
+func gen_slicing_expr_model(m *sema.SlicingExprModel) string {
+	obj := gen_expr_model(m.Expr)
+	obj += ".___slice("
+	obj += gen_expr_model(m.L)
+	if m.R != nil {
+		obj += ","
+		obj += gen_expr_model(m.R)
+	}
+	obj += ")"
+	return obj
+}
+
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
 	case *constant.Const:
@@ -360,6 +372,9 @@ func gen_expr_model(m sema.ExprModel) string {
 
 	case *sema.MapExprModel:
 		return gen_map_expr_model(m.(*sema.MapExprModel))
+
+	case *sema.SlicingExprModel:
+		return gen_slicing_expr_model(m.(*sema.SlicingExprModel))
 
 	default:
 		return "<unimplemented_expression_model>"
