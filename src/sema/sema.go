@@ -517,6 +517,7 @@ func (s *_Sema) check_enum_items_str(e *Enum) {
 					Constant: constant.New_str(item.Ident),
 				},
 			}
+			item.Value.Data.Model = item.Value.Data.Constant
 		} else {
 			d := s.eval(item.Value.Expr)
 			if d == nil {
@@ -528,6 +529,7 @@ func (s *_Sema) check_enum_items_str(e *Enum) {
 			}
 
 			s.check_assign_type(e.Kind.Kind, d, item.Token, false)
+			item.Value.Data = d
 		}
 	}
 }
@@ -547,6 +549,7 @@ func (s *_Sema) check_enum_items_int(e *Enum) {
 					Constant: constant.New_u64(max - (max - uint64(i))),
 				},
 			}
+			item.Value.Data.Model = item.Value.Data.Constant
 		} else {
 			d := s.eval(item.Value.Expr)
 			if d == nil {
@@ -558,6 +561,7 @@ func (s *_Sema) check_enum_items_int(e *Enum) {
 			}
 
 			s.check_assign_type(e.Kind.Kind, d, item.Token, false)
+			item.Value.Data = d
 		}
 	}
 }
