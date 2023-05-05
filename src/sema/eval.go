@@ -1518,6 +1518,11 @@ func (e *_Eval) eval_tuple(tup *ast.TupleExpr) *Data {
 }
 
 func (e *_Eval) eval_map(m *Map, lit *ast.BraceLit) *Data {
+	model := &MapExprModel{
+		Key_kind: m.Key,
+		Val_kind: m.Val,
+	}
+
 	for _, expr := range lit.Exprs {
 		switch expr.(type) {
 		case *ast.KeyValPair:
@@ -1542,6 +1547,11 @@ func (e *_Eval) eval_map(m *Map, lit *ast.BraceLit) *Data {
 
 		e.s.check_assign_type(m.Key, key, pair.Colon, true)
 		e.s.check_assign_type(m.Val, val, pair.Colon, true)
+
+		model.Entries = append(model.Entries, &KeyValPairExprModel{
+			Key: key.Model,
+			Val: val.Model,
+		})
 	}
 
 	return &Data{
@@ -1551,6 +1561,7 @@ func (e *_Eval) eval_map(m *Map, lit *ast.BraceLit) *Data {
 		Constant:   nil,
 		Decl:       false,
 		Kind:       &TypeKind{kind: m},
+		Model:      model,
 	}
 }
 

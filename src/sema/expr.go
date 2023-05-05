@@ -74,3 +74,17 @@ type AnonFnExprModel struct {
 	Func   *FnIns
 	Global bool
 }
+
+// Key-value expression pair model.
+type KeyValPairExprModel struct {
+	Key ExprModel
+	Val ExprModel
+}
+
+// Map expression model.
+// For example; {0: false, 1: true}
+type MapExprModel struct {
+	Key_kind *TypeKind
+	Val_kind *TypeKind
+	Entries  []*KeyValPairExprModel
+}

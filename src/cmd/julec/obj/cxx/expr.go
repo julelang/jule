@@ -296,6 +296,27 @@ func gen_anon_fn_expr_model(m *sema.AnonFnExprModel) string {
 	return obj
 }
 
+func gen_map_expr_model(m *sema.MapExprModel) string {
+	obj := as_jt("map")
+	obj += "<"
+	obj += gen_type_kind(m.Key_kind)
+	obj += ","
+	obj += gen_type_kind(m.Val_kind)
+	obj += ">({"
+	for _, pair := range m.Entries {
+		pairObj := "{"
+		pairObj += gen_expr_model(pair.Key)
+		pairObj += ","
+		pairObj += gen_expr_model(pair.Val)
+		pairObj += "}"
+		obj += pairObj
+		obj += ","
+	}
+	obj = obj[:len(obj)-1] // Remove last comma.
+	obj += "})"
+	return obj
+}
+
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
 	case *constant.Const:
@@ -336,6 +357,9 @@ func gen_expr_model(m sema.ExprModel) string {
 
 	case *sema.AnonFnExprModel:
 		return gen_anon_fn_expr_model(m.(*sema.AnonFnExprModel))
+
+	case *sema.MapExprModel:
+		return gen_map_expr_model(m.(*sema.MapExprModel))
 
 	default:
 		return "<unimplemented_expression_model>"
