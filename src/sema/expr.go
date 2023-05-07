@@ -52,6 +52,7 @@ type CastingExprModel struct {
 // Function call expression model.
 type FnCallExprModel struct {
 	Func *FnIns
+	Expr ExprModel
 	Args []ExprModel
 }
 
@@ -100,4 +101,11 @@ type SlicingExprModel struct {
 	// Right index expression.
 	// Nil if expression have not right index.
 	R    ExprModel
+}
+
+// Trait sub-ident expression model.
+// For example: my_trait.my_sub_ident
+type TraitSubIdentExprModel struct {
+	Expr  ExprModel
+	Ident string
 }

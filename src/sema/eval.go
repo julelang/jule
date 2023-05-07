@@ -1387,6 +1387,7 @@ func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
 
 	d.Model = &FnCallExprModel{
 		Func: f,
+		Expr: d.Model,
 		Args: fcac.arg_models,
 	}
 
@@ -1432,7 +1433,7 @@ func (e *_Eval) eval_enum_sub_ident(enm *Enum, ident lex.Token) *Data {
 	return d
 }
 
-func (e *_Eval) eval_trait_sub_ident(trt *Trait, ident lex.Token) *Data {
+func (e *_Eval) eval_trait_sub_ident(d *Data, trt *Trait, ident lex.Token) *Data {
 	f := trt.Find_method(ident.Kind)
 	if f == nil {
 		e.push_err(ident, "obj_have_not_ident", ident.Kind)
@@ -1445,6 +1446,10 @@ func (e *_Eval) eval_trait_sub_ident(trt *Trait, ident lex.Token) *Data {
 		Mutable:  false,
 		Constant: nil,
 		Kind:     &TypeKind{f.instance()},
+		Model:    &TraitSubIdentExprModel{
+			Expr:  d.Model,
+			Ident: ident.Kind,
+		},
 	}
 }
 
@@ -1499,7 +1504,7 @@ func (e *_Eval) eval_sub_ident(si *ast.SubIdentExpr) *Data {
 		return e.eval_enum_sub_ident(kind.Enm(), si.Ident)
 	
 	case kind.Trt() != nil:
-		return e.eval_trait_sub_ident(kind.Trt(), si.Ident)
+		return e.eval_trait_sub_ident(d, kind.Trt(), si.Ident)
 	
 	case kind.Strct() != nil:
 		s := kind.Strct()

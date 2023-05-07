@@ -252,7 +252,7 @@ func gen_arg_expr_models(models []sema.ExprModel) string {
 }
 
 func gen_fn_call_expr_model(m *sema.FnCallExprModel) string {
-	obj := fn_out_ident(m.Func.Decl)
+	obj := gen_expr_model(m.Expr)
 	if len(m.Func.Generics) > 0 {
 		obj += "<"
 		obj += gen_generic_type_kinds(m.Func.Generics)
@@ -329,6 +329,13 @@ func gen_slicing_expr_model(m *sema.SlicingExprModel) string {
 	return obj
 }
 
+func gen_trait_sub_ident_expr_model(m *sema.TraitSubIdentExprModel) string {
+	obj := gen_expr_model(m.Expr)
+	obj += "._get()."
+	obj += m.Ident
+	return obj
+}
+
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
 	case *constant.Const:
@@ -375,6 +382,9 @@ func gen_expr_model(m sema.ExprModel) string {
 
 	case *sema.SlicingExprModel:
 		return gen_slicing_expr_model(m.(*sema.SlicingExprModel))
+
+	case *sema.TraitSubIdentExprModel:
+		return gen_trait_sub_ident_expr_model(m.(*sema.TraitSubIdentExprModel))
 
 	default:
 		return "<unimplemented_expression_model>"
