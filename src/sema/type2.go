@@ -385,6 +385,10 @@ func (fcac *_FnCallArgChecker) check_counts(params []*ParamIns) (ok bool) {
 		n--
 	}
 
+	if n > 0 && params[0].Decl.Is_self() {
+		n--
+	}
+
 	diff := n - len(fcac.args)
 	switch {
 	case diff <= 0:
@@ -502,14 +506,17 @@ iter:
 	for i < len(params) {
 		p := params[i]
 		switch {
+		case p.Decl.Is_self():
+			// Ignore self.
+
 		case p.Decl.Variadic:
 			ok = fcac.push_variadic(p, i) && ok
 			break iter // Variadiced parameters always last.
 
 		default:
 			ok = fcac.push(p, fcac.args[i]) && ok
-			i++
 		}
+		i++
 	}
 
 	return ok
