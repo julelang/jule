@@ -336,6 +336,17 @@ func gen_trait_sub_ident_expr_model(m *sema.TraitSubIdentExprModel) string {
 	return obj
 }
 
+func gen_struct_sub_ident_expr_model(m *sema.StrctSubIdentExprModel) string {
+	obj := gen_expr_model(m.Expr)
+	obj += get_accessor(m.ExprKind)
+	if m.Field != nil {
+		obj += field_out_ident(m.Field.Decl)
+	} else {
+		obj += fn_out_ident(m.Method.Decl)
+	}
+	return obj
+}
+
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
 	case *constant.Const:
@@ -385,6 +396,9 @@ func gen_expr_model(m sema.ExprModel) string {
 
 	case *sema.TraitSubIdentExprModel:
 		return gen_trait_sub_ident_expr_model(m.(*sema.TraitSubIdentExprModel))
+
+	case *sema.StrctSubIdentExprModel:
+		return gen_struct_sub_ident_expr_model(m.(*sema.StrctSubIdentExprModel))
 
 	default:
 		return "<unimplemented_expression_model>"

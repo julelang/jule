@@ -1459,6 +1459,11 @@ func (e *_Eval) eval_struct_sub_ident(d *Data, si *ast.SubIdentExpr, ref bool) *
 	// TODO: Apply interior mutability.
 	f := s.Find_field(si.Ident.Kind)
 	if f != nil {
+		d.Model = &StrctSubIdentExprModel{
+			ExprKind: d.Kind,
+			Expr:     d.Model,
+			Field:    f,
+		}
 		d.Kind = f.Kind
 		return d
 	}
@@ -1473,6 +1478,11 @@ func (e *_Eval) eval_struct_sub_ident(d *Data, si *ast.SubIdentExpr, ref bool) *
 		e.push_err(si.Ident, "ref_method_used_with_not_ref_instance")
 	}
 
+	d.Model = &StrctSubIdentExprModel{
+		ExprKind: d.Kind,
+		Expr:     d.Model,
+		Method:   m,
+	}
 	d.Kind.kind = m
 	return d
 }

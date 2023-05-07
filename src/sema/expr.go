@@ -109,3 +109,12 @@ type TraitSubIdentExprModel struct {
 	Expr  ExprModel
 	Ident string
 }
+
+// Structure sub-ident expression model.
+// For example: my_struct.my_sub_ident
+type StrctSubIdentExprModel struct {
+	Expr     ExprModel
+	ExprKind *TypeKind
+	Method   *FnIns
+	Field    *FieldIns
+}
