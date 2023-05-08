@@ -63,6 +63,9 @@ func fn_out_ident(f *sema.Fn) string {
 	case f.Ident == jule.ENTRY_POINT:
 		return as_ident(f.Ident)
 
+	case f.Owner != nil:
+		return "_method_" + f.Ident
+
 	default:
 		return as_out_ident(f.Ident, f.Token.File.Addr())
 	}

@@ -263,7 +263,7 @@ func gen_trait(t *sema.Trait) string {
 		obj += INDENTION
 		obj += "virtual "
 		obj += gen_fn_result(f)
-		obj += " "
+		obj += " _method_"
 		obj += f.Ident
 		obj += gen_params(f.Params)
 		obj += " {"
@@ -544,9 +544,7 @@ func gen_struct_prototype(s *sema.Struct) string {
 
 	for _, f := range s.Methods {
 		obj += indent()
-		f.Owner = nil // Ignore structure identifier prefix.
-		obj += gen_fn_prototype(f)
-		f.Owner = s
+		obj += gen_fn_prototype(f, true)
 		obj += "\n\n"
 	}
 
@@ -569,10 +567,10 @@ func gen_struct_prototypes(structs []*sema.Struct) string {
 	return obj
 }
 
-func gen_fn_decl_head(f *sema.FnIns) string {
+func gen_fn_decl_head(f *sema.FnIns, method bool) string {
 	obj := ""
 
-	if f.Decl.Owner != nil {
+	if !method && f.Decl.Owner != nil {
 		generics := gen_generic_decls(f.Decl.Owner.Generics)
 		if generics != "" {
 			obj += generics
@@ -601,10 +599,10 @@ func gen_fn_decl_head(f *sema.FnIns) string {
 }
 
 // Generates C++ declaration code of function's combinations.
-func gen_fn_prototype(f *sema.Fn) string {
+func gen_fn_prototype(f *sema.Fn, method bool) string {
 	obj := ""
 	for _, c := range f.Combines {
-		obj += gen_fn_decl_head(c)
+		obj += gen_fn_decl_head(c, method)
 		obj += gen_params_prototypes(c.Params)
 		obj += CPP_ST_TERM + "\n"
 	}
@@ -617,7 +615,7 @@ func gen_fn_prototypes(pkg *sema.Package) string {
 	for _, file := range pkg.Files {
 		for _, f := range file.Funcs {
 			if !f.Cpp_linked && f.Token.Id != lex.ID_NA {
-				obj += gen_fn_prototype(f)
+				obj += gen_fn_prototype(f, false)
 			}
 		}
 	}
@@ -693,7 +691,7 @@ func gen_globals(pkg *sema.Package, used []*sema.Package) string {
 func gen_fn(f *sema.Fn) string {
 	obj := ""
 	for _, c := range f.Combines {
-		obj += gen_fn_decl_head(c)
+		obj += gen_fn_decl_head(c, false)
 		obj += gen_params_ins(c.Params) + " "
 		obj += gen_fn_scope(c)
 	}
