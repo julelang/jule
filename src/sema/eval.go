@@ -393,16 +393,11 @@ func (e *_Eval) check_illegal_cycles(v *Var, decl_token lex.Token) (ok bool) {
 	}
 
 	// Check cross illegal cycle.
-	ok = true
 	for _, d := range v.Depends {
 		if d == e.owner {
 			e.push_err(decl_token, "illegal_cross_cycle", e.owner.Ident, decl_token.Kind)
-			ok = false
+			return false
 		}
-	}
-
-	if !ok {
-		return false
 	}
 
 	e.owner.Depends = append(e.owner.Depends, v)

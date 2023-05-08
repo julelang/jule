@@ -4,10 +4,7 @@
 
 package sema
 
-import (
-	"github.com/julelang/jule/ast"
-	"github.com/julelang/jule/lex"
-)
+import "github.com/julelang/jule/lex"
 
 // Enum item.
 type EnumItem struct {
@@ -27,7 +24,7 @@ type Enum struct {
 	Kind   *TypeSymbol
 	Items  []*EnumItem
 	Doc    string
-	Refers []*ast.IdentType // Referred identifiers.
+	Refers []uintptr // Addresses of referred identifiers.
 }
 
 // Implement: Kind

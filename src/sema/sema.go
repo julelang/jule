@@ -468,6 +468,7 @@ func (s *_Sema) check_validity_for_init_expr(left_mut bool, d *Data, error_token
 func (s *_Sema) check_type_alias_decl_kind(ta *TypeAlias) (ok bool) {
 	ok = s.check_type_with_refers(ta.Kind, &_Referencer{
 		ident:  ta.Ident,
+		owner:  _uintptr(ta),
 		refers: &ta.Refers,
 	})
 	if ok && ta.Kind.Kind.Arr() != nil && ta.Kind.Kind.Arr().Auto {
@@ -585,6 +586,7 @@ func (s *_Sema) check_enum_decl(e *Enum) {
 	if e.Kind != nil {
 		if !s.check_type_with_refers(e.Kind, &_Referencer{
 			ident:  e.Ident,
+			owner: _uintptr(e),
 			refers: &e.Refers,
 		}) {
 			return

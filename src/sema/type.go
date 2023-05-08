@@ -23,7 +23,7 @@ type TypeAlias struct {
 	Ident      string
 	Kind       *TypeSymbol
 	Doc        string
-	Refers     []*ast.IdentType // Referred identifiers.
+	Refers     []uintptr // Addresses of referred identifiers.
 }
 
 type _Kind interface {
@@ -327,7 +327,8 @@ func build_prim_type(kind string) *Prim {
 
 type _Referencer struct {
 	ident  string
-	refers *[]*ast.IdentType
+	owner  uintptr
+	refers *[]uintptr
 	strct  *Struct
 }
 
@@ -409,7 +410,7 @@ func (tc *_TypeChecker) build_prim(decl *ast.IdentType) *Prim {
 // Appends reference to reference if there is no illegal cycle.
 // Returns true if tc.referencer is nil.
 // Returns true if refers is nil.
-func (tc *_TypeChecker) check_illegal_cycles(decl *ast.IdentType, refers *[]*ast.IdentType) (ok bool) {
+func (tc *_TypeChecker) check_illegal_cycles(decl uintptr, refers *[]uintptr, decl_token lex.Token) (ok bool) {
 	if tc.referencer == nil || refers == nil {
 		return true
 	}
@@ -417,21 +418,16 @@ func (tc *_TypeChecker) check_illegal_cycles(decl *ast.IdentType, refers *[]*ast
 	// Check illegal cycle for itself.
 	// Because refers's owner is ta.
 	if tc.referencer.refers == refers {
-		tc.push_err(decl.Token, "illegal_cycle_refers_itself", tc.referencer.ident)
+		tc.push_err(decl_token, "illegal_cycle_refers_itself", tc.referencer.ident)
 		return false
 	}
 
 	// Check cross illegal cycle.
-	ok = true
 	for _, r := range *refers {
-		if r.Ident == tc.referencer.ident {
-			tc.push_err(decl.Token, "illegal_cross_cycle", tc.referencer.ident, decl.Ident)
-			ok = false
+		if r == tc.referencer.owner {
+			tc.push_err(decl_token, "illegal_cross_cycle", tc.referencer.ident, decl_token.Kind)
+			return false
 		}
-	}
-
-	if !ok {
-		return false
 	}
 
 	*tc.referencer.refers = append(*tc.referencer.refers, decl)
@@ -463,16 +459,11 @@ func (tc *_TypeChecker) check_struct_illegal_cycles(decl *ast.IdentType, s *Stru
 	}
 
 	// Check cross illegal cycle.
-	ok = true
 	for _, d := range s.Depends {
-		if d.Ident == tc.referencer.ident {
+		if d == tc.referencer.strct {
 			tc.push_err(decl.Token, "illegal_cross_cycle", tc.referencer.ident, decl.Ident)
-			ok = false
+			return false
 		}
-	}
-
-	if !ok {
-		return false
 	}
 
 	tc.referencer.strct.Depends = append(tc.referencer.strct.Depends, s)
@@ -490,7 +481,7 @@ func (tc *_TypeChecker) from_type_alias(decl *ast.IdentType, ta *TypeAlias) *Typ
 		return nil
 	}
 
-	ok := tc.check_illegal_cycles(decl, &ta.Refers)
+	ok := tc.check_illegal_cycles(_uintptr(ta), &ta.Refers, decl.Token)
 	if !ok {
 		return nil
 	}
@@ -515,7 +506,7 @@ func (tc *_TypeChecker) from_enum(decl *ast.IdentType, e *Enum) *Enum {
 		return nil
 	}
 
-	ok := tc.check_illegal_cycles(decl, &e.Refers)
+	ok := tc.check_illegal_cycles(_uintptr(e), &e.Refers, decl.Token)
 	if !ok {
 		return nil
 	}
