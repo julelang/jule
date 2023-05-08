@@ -21,6 +21,10 @@ type Var struct {
 	Doc        string
 	Kind       *TypeSymbol
 	Value      *Value
+
+	// This variable depended to these variables for initialization expression.
+	// Nil if not global variable.
+	Depends    []*Var
 }
 
 // Reports whether variable is auto-typed.

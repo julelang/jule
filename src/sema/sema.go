@@ -311,10 +311,12 @@ func (s *_Sema) build_type(t *ast.Type) *TypeKind {
 }
 
 // Evaluates expression with type prefixed Eval and returns result.
-func (s *_Sema) evalp(expr *ast.Expr, p *TypeSymbol) *Data {
+// Checks variable dependencies if exist.
+func (s *_Sema) evalpd(expr *ast.Expr, p *TypeSymbol, owner *Var) *Data {
 	e := _Eval{
 		s:      s,
 		lookup: s,
+		owner:  owner,
 	}
 
 	if p != nil {
@@ -322,6 +324,11 @@ func (s *_Sema) evalp(expr *ast.Expr, p *TypeSymbol) *Data {
 	}
 
 	return e.eval(expr)
+}
+
+// Evaluates expression with type prefixed Eval and returns result.
+func (s *_Sema) evalp(expr *ast.Expr, p *TypeSymbol) *Data {
+	return s.evalpd(expr, p, nil)
 }
 
 // Evaluates expression with Eval and returns result.
@@ -1149,8 +1156,7 @@ func (s *_Sema) check_data_for_auto_type(d *Data, err_token lex.Token) {
 }
 
 func (s *_Sema) check_type_global(decl *Var) {
-	// TODO: Check illegal cycles.
-	decl.Value.Data = s.evalp(decl.Value.Expr, decl.Kind)
+	decl.Value.Data = s.evalpd(decl.Value.Expr, decl.Kind, decl)
 	if decl.Value.Data == nil {
 		return // Skip checks if error ocurrs.
 	}
@@ -1183,10 +1189,12 @@ func (s *_Sema) check_type_global(decl *Var) {
 func (s *_Sema) check_global_types() (ok bool) {
 	for _, decl := range s.file.Vars {
 		s.check_type_global(decl)
+	}
 
-		// Break checking if type alias has error.
-		if len(s.errors) > 0 {
-			return false
+	// Re-check depended.
+	for _, decl := range s.file.Vars {
+		if decl.Value.Data == nil && len(decl.Depends) > 0 {
+			s.check_type_global(decl)
 		}
 	}
 	return true

@@ -99,6 +99,7 @@ type _Eval struct {
 	lookup   Lookup
 	prefix   *TypeKind
 	unsafety bool
+	owner    *Var
 }
 
 func (e *_Eval) push_err(token lex.Token, key string, args ...any) {
@@ -376,20 +377,63 @@ func (e *_Eval) eval_fn(f *Fn, error_token lex.Token) *Data {
 	}
 }
 
+// Checks owner illegal cycles.
+// Appends depend to depends if there is no illegal cycle.
+// Returns true if e.owner is nil.
+func (e *_Eval) check_illegal_cycles(v *Var, decl_token lex.Token) (ok bool) {
+	if e.owner == nil {
+		return true
+	}
+
+	// Check illegal cycle for itself.
+	// Because refers's owner is ta.
+	if e.owner == v {
+		e.push_err(e.owner.Token, "illegal_cycle_refers_itself", e.owner.Ident)
+		return false
+	}
+
+	// Check cross illegal cycle.
+	ok = true
+	for _, d := range v.Depends {
+		if d == e.owner {
+			e.push_err(decl_token, "illegal_cross_cycle", e.owner.Ident, decl_token.Kind)
+			ok = false
+		}
+	}
+
+	if !ok {
+		return false
+	}
+
+	e.owner.Depends = append(e.owner.Depends, v)
+	return true
+}
+
 func (e *_Eval) eval_var(v *Var, error_token lex.Token) *Data {
 	if !e.s.is_accessible_define(v.Public, v.Token) {
 		e.push_err(error_token, "ident_not_exist", v.Ident)
 		return nil
 	}
 
-	return &Data{
+	ok := e.check_illegal_cycles(v, error_token)
+	if !ok {
+		return nil
+	}
+
+	if v.Value.Data == nil {
+		return nil
+	}
+
+	d := &Data{
 		Lvalue:   !v.Constant,
 		Mutable:  v.Mutable,
-		Constant: v.Value.Data.Constant,
 		Decl:     false,
+		Constant: v.Value.Data.Constant,
 		Kind:     v.Kind.Kind,
 		Model:    v,
 	}
+
+	return d
 }
 
 func (e *_Eval) eval_type_alias(ta *TypeAlias, error_token lex.Token) *Data {
@@ -2329,10 +2373,12 @@ func (bs *_BinopSolver) solve(op *ast.BinopExpr) *Data {
 	bs.solve_const(data)
 	bs.post_const(data)
 	
-	data.Model = &BinopExprModel{
-		L: l.Model,
-		R: r.Model,
-		Op: op.Op.Kind,
+	if data != nil {
+		data.Model = &BinopExprModel{
+			L: l.Model,
+			R: r.Model,
+			Op: op.Op.Kind,
+		}
 	}
 	
 	return data
