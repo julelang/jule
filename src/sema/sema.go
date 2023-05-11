@@ -964,7 +964,7 @@ func (s *_Sema) check_global_decl(decl *Var) {
 		s.push_err(decl.Token, "duplicated_ident", decl.Ident)
 	}
 
-	if decl.Value == nil {
+	if decl.Value == nil || decl.Value.Expr == nil {
 		s.push_err(decl.Token, "variable_not_initialized")
 	}
 
