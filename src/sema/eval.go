@@ -1554,6 +1554,23 @@ func (e *_Eval) eval_slice_sub_ident(d *Data, ident lex.Token) *Data {
 	}
 }
 
+func (e *_Eval) eval_array_sub_ident(d *Data, ident lex.Token) *Data {
+	switch ident.Kind {
+	case "len":
+		c := constant.New_i64(int64(d.Kind.Arr().N))
+		return &Data{
+			Constant: c,
+			Mutable:  false,
+			Kind:     &TypeKind{kind: build_prim_type(types.SYS_INT)},
+			Model:    c,
+		}
+
+	default:
+		e.push_err(ident, "obj_have_not_ident", ident.Kind)
+		return nil
+	}
+}
+
 func (e *_Eval) eval_sub_ident(si *ast.SubIdentExpr) *Data {
 	// TODO: Implement built-in primitive type constants.
 
@@ -1592,6 +1609,9 @@ func (e *_Eval) eval_sub_ident(si *ast.SubIdentExpr) *Data {
 
 	case kind.Slc() != nil:
 		return e.eval_slice_sub_ident(d, si.Ident)
+
+	case kind.Arr() != nil:
+		return e.eval_array_sub_ident(d, si.Ident)
 	}
 	e.push_err(si.Ident, "obj_not_support_sub_fields", d.Kind.To_str())
 	return nil
