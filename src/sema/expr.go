@@ -119,6 +119,12 @@ type StrctSubIdentExprModel struct {
 	Field    *FieldIns
 }
 
+// Array expression model.
+type ArrayExprModel struct {
+	Kind *Arr
+	Elems []ExprModel
+}
+
 // Common sub-ident expression model.
 type CommonSubIdentExprModel struct {
 	Expr  ExprModel

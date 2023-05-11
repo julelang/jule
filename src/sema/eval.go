@@ -708,20 +708,29 @@ func (e *_Eval) eval_arr(s *ast.SliceExpr) *Data {
 		arr.N = len(s.Elems)
 		if arr.N > pt.N {
 			e.push_err(s.Token, "overflow_limits")
+		} else if arr.N < pt.N {
+			arr.N = pt.N
 		}
 	}
 
-	for _, elem := range s.Elems {
+	model := &ArrayExprModel{
+		Kind:  arr,
+		Elems: make([]ExprModel, len(s.Elems)),
+	}
+
+	for i, elem := range s.Elems {
 		d := e.eval_expr_kind(elem)
 		if d == nil {
 			continue
 		}
 
 		e.s.check_assign_type(arr.Elem, d, s.Token, true)
+		model.Elems[i] = d.Model
 	}
 
 	return &Data{
-		Kind: &TypeKind{kind: arr},
+		Kind:  &TypeKind{kind: arr},
+		Model: model,
 	}
 }
 

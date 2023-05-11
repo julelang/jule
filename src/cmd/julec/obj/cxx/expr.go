@@ -354,6 +354,14 @@ func gen_common_sub_ident_expr_model(m *sema.CommonSubIdentExprModel) string {
 	return obj
 }
 
+func gen_array_expr_model(m *sema.ArrayExprModel) string {
+	obj := gen_array_kind(m.Kind)
+	obj += "({"
+	obj += gen_arg_expr_models(m.Elems)
+	obj += "})"
+	return obj
+}
+
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
 	case *constant.Const:
@@ -388,6 +396,9 @@ func gen_expr_model(m sema.ExprModel) string {
 
 	case *sema.SliceExprModel:
 		return gen_slice_expr_model(m.(*sema.SliceExprModel))
+
+	case *sema.ArrayExprModel:
+		return gen_array_expr_model(m.(*sema.ArrayExprModel))
 
 	case *sema.IndexigExprModel:
 		return gen_indexing_expr_model(m.(*sema.IndexigExprModel))
