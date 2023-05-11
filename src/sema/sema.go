@@ -1176,10 +1176,14 @@ func (s *_Sema) check_type_global(decl *Var) {
 		s.check_validity_for_init_expr(decl.Mutable, decl.Value.Data, decl.Value.Expr.Token)
 	} else {
 		arr := decl.Kind.Kind.Arr()
-		if arr != nil && arr.Auto {
-			data_arr := decl.Value.Data.Kind.Arr()
-			if data_arr != nil {
-				arr.N = data_arr.N
+		data_arr := decl.Value.Data.Kind.Arr()
+		if arr != nil && data_arr != nil {
+			if arr.Auto {
+				if data_arr != nil {
+					arr.N = data_arr.N
+				}
+			} else if data_arr.N < arr.N {
+				return
 			}
 		}
 
