@@ -193,6 +193,9 @@ type FnIns struct {
 	Scope    *Scope
 }
 
+// Reports whether instance is built-in.
+func (f *FnIns) Is_builtin() bool { return f.Decl == nil || f.Scope == nil }
+
 // Implement: Kind
 // Returns Fn's type kind as string.
 func (f FnIns) To_str() string {

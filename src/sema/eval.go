@@ -1385,6 +1385,34 @@ func (e *_Eval) check_fn_call_generics(f *FnIns,
 
 func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
 	f := d.Kind.Fnc()
+	if f.Is_builtin() {
+		fcac := _FnCallArgChecker{
+			e:                  e,
+			f:                  f,
+			args:               fc.Args,
+			dynamic_annotation: false,
+			error_token:        fc.Token,
+		}
+		_ = fcac.check()
+
+		model := &FnCallExprModel{
+			Func: f,
+			Expr: d.Model,
+			Args: fcac.arg_models,
+		}
+
+		if f.Result == nil {
+			d = build_void_data()
+		} else {
+			d = &Data{
+				Kind: f.Result,
+			}
+		}
+
+		d.Model = model
+
+		return d
+	}
 
 	if !d.Mutable && f.Decl.Is_method() && f.Decl.Params[0].Mutable {
 		e.push_err(fc.Token, "mutable_operation_on_immutable")
@@ -1580,6 +1608,114 @@ func (e *_Eval) eval_array_sub_ident(d *Data, ident lex.Token) *Data {
 	}
 }
 
+func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
+	switch ident.Kind {
+	case "len":
+		return &Data{
+			Mutable: false,
+			Kind:    &TypeKind{kind: build_prim_type(types.SYS_INT)},
+			Model:   &CommonSubIdentExprModel{
+				Expr:  d.Model,
+				Ident: "_len()",
+			},
+		}
+
+	case "clear":
+		return &Data{
+			Kind: &TypeKind{
+				kind:  &FnIns{},
+			},
+			Model: &CommonSubIdentExprModel{
+				Expr:  d.Model,
+				Ident: "_clear",
+			},
+		}
+
+	case "keys":
+		m := d.Kind.Map()
+		return &Data{
+			Kind: &TypeKind{
+				kind: &FnIns{
+					Result: &TypeKind{
+						kind: &Slc{
+							Elem: m.Key,
+						},
+					},
+				},
+			},
+			Model: &CommonSubIdentExprModel{
+				Expr:  d.Model,
+				Ident: "_keys",
+			},
+		}
+
+	case "values":
+		m := d.Kind.Map()
+		return &Data{
+			Kind: &TypeKind{
+				kind: &FnIns{
+					Result: &TypeKind{
+						kind: &Slc{
+							Elem: m.Val,
+						},
+					},
+				},
+			},
+			Model: &CommonSubIdentExprModel{
+				Expr:  d.Model,
+				Ident: "_values",
+			},
+		}
+
+	case "has":
+		m := d.Kind.Map()
+		return &Data{
+			Kind: &TypeKind{
+				kind: &FnIns{
+					Params: []*ParamIns{
+						{
+							Decl: &Param{
+								Ident: "key",
+							},
+							Kind: m.Key,
+						},
+					},
+					Result: &TypeKind{kind: build_prim_type(types.TypeKind_BOOL)},
+				},
+			},
+			Model: &CommonSubIdentExprModel{
+				Expr:  d.Model,
+				Ident: "_has",
+			},
+		}
+
+	case "del":
+		m := d.Kind.Map()
+		return &Data{
+			Kind: &TypeKind{
+				kind: &FnIns{
+					Params: []*ParamIns{
+						{
+							Decl: &Param{
+								Ident: "key",
+							},
+							Kind: m.Key,
+						},
+					},
+				},
+			},
+			Model: &CommonSubIdentExprModel{
+				Expr:  d.Model,
+				Ident: "_del",
+			},
+		}
+
+	default:
+		e.push_err(ident, "obj_have_not_ident", ident.Kind)
+		return nil
+	}
+}
+
 func (e *_Eval) eval_sub_ident(si *ast.SubIdentExpr) *Data {
 	// TODO: Implement built-in primitive type constants.
 
@@ -1621,6 +1757,9 @@ func (e *_Eval) eval_sub_ident(si *ast.SubIdentExpr) *Data {
 
 	case kind.Arr() != nil:
 		return e.eval_array_sub_ident(d, si.Ident)
+
+	case kind.Map() != nil:
+		return e.eval_map_sub_ident(d, si.Ident)
 	}
 	e.push_err(si.Ident, "obj_not_support_sub_fields", d.Kind.To_str())
 	return nil

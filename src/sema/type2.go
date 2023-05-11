@@ -195,7 +195,10 @@ func (atc *_AssignTypeChecker) check_validity() bool {
 	switch {
 	case atc.d.Kind.Fnc() != nil:
 		f := atc.d.Kind.Fnc()
-		if f.Decl.Is_method() {
+		if f.Is_builtin() {
+			atc.push_err("builtin_as_anonymous_fn")
+			valid = false
+		} else if f.Decl.Is_method() {
 			atc.push_err("method_as_anonymous_fn")
 			valid = false
 		} else if len(f.Decl.Generics) > 0 {
@@ -369,7 +372,7 @@ func (fcac *_FnCallArgChecker) push_err(key string, args ...any) {
 }
 
 func (fcac *_FnCallArgChecker) get_params() []*ParamIns {
-	if fcac.f.Decl.Is_method() {
+	if !fcac.f.Is_builtin() && fcac.f.Decl.Is_method() {
 		return fcac.f.Params[1:] // Remove receiver parameter.
 	}
 	return fcac.f.Params
