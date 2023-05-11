@@ -38,3 +38,40 @@ func order_structures(structs []*sema.Struct) {
 		}
 	}
 }
+
+// Reports whether variable in correct order by dependencies.
+func is_var_ordered(vars []*sema.Var, v *sema.Var) bool {
+	for _, d := range v.Depends {
+		for _, vv := range vars {
+			if vv == v {
+				return false
+			} else if vv == d {
+				break
+			}
+		}
+	}
+
+	return true
+}
+
+// Orders variables by their dependencies.
+// Variable's dependencies always comes first itself.
+func order_variables(vars []*sema.Var) {
+	n := len(vars)
+	for i := 0; i < n; i++ {
+		swapped := false
+
+		for j := 0; j < n-i-1; j++ {
+			curr := &vars[j]
+			if !is_var_ordered(vars, *curr) {
+				next := &vars[j+1]
+				*curr, *next = *next, *curr
+				swapped = true
+			}
+		}
+
+		if !swapped {
+			break
+		}
+	}
+}

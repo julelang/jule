@@ -17,6 +17,11 @@ const CPP_ST_TERM = ";"
 // Current indention count.
 var INDENT = 0
 
+type _OrderedDecls struct {
+	structs []*sema.Struct
+	globals []*sema.Var
+}
+
 // Increase indentation.
 func add_indent() { INDENT++ }
 // Decrase indentation.
@@ -55,6 +60,30 @@ func get_all_structures(pkg *sema.Package, used []*sema.Package) []*sema.Struct 
 
 	for _, p := range used {
 		append_structs(p)
+	}
+
+	return buffer
+}
+
+// Returns all variables of main package and used pakcages.
+// Ignores cpp-linked declarations.
+func get_all_variables(pkg *sema.Package, used []*sema.Package) []*sema.Var {
+	buffer := []*sema.Var{}
+
+	append_vars := func(p *sema.Package) {
+		for _, f := range p.Files {
+			for _, v := range f.Vars {
+				if !v.Cpp_linked {
+					buffer = append(buffer, v)
+				}
+			}
+		}
+	}
+
+	append_vars(pkg)
+
+	for _, p := range used {
+		append_vars(p)
 	}
 
 	return buffer
@@ -660,29 +689,15 @@ func gen_var(v *sema.Var) string {
 	return obj
 }
 
-// Generates C++ code of all globals of package.
-func gen_pkg_globals(p *sema.Package) string {
-	obj := ""
-	for _, f := range p.Files {
-		for _, v := range f.Vars {
-			if !v.Constant && v.Token.Id != lex.ID_NA {
-				obj += gen_var(v) + "\n"
-			}
-		}
-	}
-	return obj
-}
-
 // Generates C++ code of all globals.
-func gen_globals(pkg *sema.Package, used []*sema.Package) string {
+func gen_globals(globals []*sema.Var) string {
 	obj := ""
 
-	for _, p := range used {
-		if !p.Cpp {
-			obj += gen_pkg_globals(p)
+	for _, v := range globals {
+		if !v.Constant && v.Token.Id != lex.ID_NA {
+			obj += gen_var(v) + "\n"
 		}
 	}
-	obj += gen_pkg_globals(pkg)
 
 	return obj
 }
@@ -829,16 +844,20 @@ func gen_init_caller(pkg *sema.Package, used []*sema.Package) string {
 
 // Generates C++ codes from SymbolTables.
 func Gen(pkg *sema.Package, used []*sema.Package) string {
-	structs := get_all_structures(pkg, used)
-	order_structures(structs)
+	od := &_OrderedDecls{}
+	od.structs = get_all_structures(pkg, used)
+	order_structures(od.structs)
+
+	od.globals = get_all_variables(pkg, used)
+	order_variables(od.globals)
 
 	obj := ""
 	obj += gen_links(used) + "\n"
 	obj += gen_type_aliases(pkg, used) + "\n"
 	obj += gen_traits(pkg, used) + "\n"
-	obj += gen_prototypes(pkg, used, structs) + "\n\n"
-	obj += gen_globals(pkg, used) + "\n"
-	obj += gen_structs(structs)
+	obj += gen_prototypes(pkg, used, od.structs) + "\n\n"
+	obj += gen_globals(od.globals) + "\n"
+	obj += gen_structs(od.structs)
 	obj += gen_fns(pkg, used) + "\n"
 	obj += gen_init_caller(pkg, used) + "\n"
 	return obj
