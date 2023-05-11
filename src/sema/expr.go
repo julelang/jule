@@ -118,3 +118,9 @@ type StrctSubIdentExprModel struct {
 	Method   *FnIns
 	Field    *FieldIns
 }
+
+// Common sub-ident expression model.
+type CommonSubIdentExprModel struct {
+	Expr  ExprModel
+	Ident string
+}

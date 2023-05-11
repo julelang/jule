@@ -347,6 +347,13 @@ func gen_struct_sub_ident_expr_model(m *sema.StrctSubIdentExprModel) string {
 	return obj
 }
 
+func gen_common_sub_ident_expr_model(m *sema.CommonSubIdentExprModel) string {
+	obj := gen_expr_model(m.Expr)
+	obj += "."
+	obj += m.Ident
+	return obj
+}
+
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
 	case *constant.Const:
@@ -399,6 +406,9 @@ func gen_expr_model(m sema.ExprModel) string {
 
 	case *sema.StrctSubIdentExprModel:
 		return gen_struct_sub_ident_expr_model(m.(*sema.StrctSubIdentExprModel))
+
+	case *sema.CommonSubIdentExprModel:
+		return gen_common_sub_ident_expr_model(m.(*sema.CommonSubIdentExprModel))
 
 	default:
 		return "<unimplemented_expression_model>"
