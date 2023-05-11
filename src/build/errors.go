@@ -164,6 +164,8 @@ var ERRORS = map[string]string{
 	`method_has_generic_with_same_ident`:       `methods cannot have same generic identifier with owner same time`,
 	`tuple_assign_to_single`:                   `tuples cannot assign to single define in same time`,
 	`missing_compile_path`:                     `missing compile path`,
+	`array_size_is_not_int`:                    `array size must be integer`,
+	`array_size_is_negative`:                   `array size must be positive integer`,
 }
 
 // Returns formatted error message by key and args.
