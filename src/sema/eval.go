@@ -1716,14 +1716,54 @@ func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
 	}
 }
 
-func (e *_Eval) eval_sub_ident(si *ast.SubIdentExpr) *Data {
-	// TODO: Implement built-in primitive type constants.
+func (e *_Eval) eval_int_type_sub_ident(si *ast.SubIdentExpr) *Data {
+	switch si.Ident.Kind {
+	case "max":
+		c := constant.New_i64(int64(types.Max_of(types.TypeKind_INT)))
+		return &Data{
+			Constant: c,
+			Model:    c,
+			Kind:     &TypeKind{kind: build_prim_type(types.TypeKind_INT)},
+		}
 
-	d := e.eval_expr_kind(si.Expr)
-	if d == nil {
+	case "min":
+		c := constant.New_i64(int64(types.Min_of(types.TypeKind_INT)))
+		return &Data{
+			Constant: c,
+			Model:    c,
+			Kind:     &TypeKind{kind: build_prim_type(types.TypeKind_INT)},
+		}
+
+	default:
+		e.push_err(si.Ident, "type_have_not_ident", types.TypeKind_INT, si.Ident.Kind)
 		return nil
 	}
+}
 
+func (e *_Eval) eval_prim_type_sub_ident(p *Prim, si *ast.SubIdentExpr) *Data {
+	kind := p.To_str()
+	switch kind {
+	case types.TypeKind_INT:
+		return e.eval_int_type_sub_ident(si)
+
+	default:
+		e.push_err(si.Ident, "type_have_not_ident", kind, si.Ident.Kind)
+		return nil
+	}
+}
+
+func (e *_Eval) eval_type_sub_ident(d *Data, si *ast.SubIdentExpr) *Data {
+	switch {
+	case d.Kind.Prim() != nil:
+		return e.eval_prim_type_sub_ident(d.Kind.Prim(), si)
+
+	default:
+		e.push_err(si.Ident, "type_not_support_sub_fields", d.Kind.To_str())
+		return nil
+	}
+}
+
+func (e *_Eval) eval_obj_sub_ident(d *Data, si *ast.SubIdentExpr) *Data {
 	kind := d.Kind
 	if d.Kind.Ptr() != nil {
 		ptr := d.Kind.Ptr()
@@ -1737,7 +1777,6 @@ func (e *_Eval) eval_sub_ident(si *ast.SubIdentExpr) *Data {
 		kind = d.Kind.Ref().Elem
 	}
 
-	// TODO: Implement support for other types.
 	switch {
 	case kind.Enm() != nil:
 		return e.eval_enum_sub_ident(kind.Enm(), si.Ident)
@@ -1761,8 +1800,22 @@ func (e *_Eval) eval_sub_ident(si *ast.SubIdentExpr) *Data {
 	case kind.Map() != nil:
 		return e.eval_map_sub_ident(d, si.Ident)
 	}
+
 	e.push_err(si.Ident, "obj_not_support_sub_fields", d.Kind.To_str())
 	return nil
+}
+
+func (e *_Eval) eval_sub_ident(si *ast.SubIdentExpr) *Data {
+	d := e.eval_expr_kind(si.Expr)
+	if d == nil {
+		return nil
+	}
+
+	if d.Decl {
+		return e.eval_type_sub_ident(d, si)
+	}
+
+	return e.eval_obj_sub_ident(d, si)
 }
 
 func (e *_Eval) eval_tuple(tup *ast.TupleExpr) *Data {
