@@ -1812,6 +1812,33 @@ func (e *_Eval) eval_i16_type_sub_ident(si *ast.SubIdentExpr) *Data {
 	}
 }
 
+func (e *_Eval) eval_i32_type_sub_ident(si *ast.SubIdentExpr) *Data {
+	const kind = types.TypeKind_I32
+	const min = types.MIN_I32
+	const max = types.MAX_I32
+	switch si.Ident.Kind {
+	case "max":
+		c := constant.New_i64(min)
+		return &Data{
+			Constant: c,
+			Model:    c,
+			Kind:     &TypeKind{kind: build_prim_type(kind)},
+		}
+
+	case "min":
+		c := constant.New_i64(max)
+		return &Data{
+			Constant: c,
+			Model:    c,
+			Kind:     &TypeKind{kind: build_prim_type(kind)},
+		}
+
+	default:
+		e.push_err(si.Ident, "type_have_not_ident", kind, si.Ident.Kind)
+		return nil
+	}
+}
+
 func (e *_Eval) eval_prim_type_sub_ident(p *Prim, si *ast.SubIdentExpr) *Data {
 	kind := p.To_str()
 	switch kind {
@@ -1826,6 +1853,9 @@ func (e *_Eval) eval_prim_type_sub_ident(p *Prim, si *ast.SubIdentExpr) *Data {
 
 	case types.TypeKind_I16:
 		return e.eval_i16_type_sub_ident(si)
+
+	case types.TypeKind_I32:
+		return e.eval_i32_type_sub_ident(si)
 
 	default:
 		e.push_err(si.Ident, "type_have_not_ident", kind, si.Ident.Kind)
