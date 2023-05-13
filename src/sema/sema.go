@@ -1088,8 +1088,6 @@ func (s *_Sema) check_fn_decl(f *Fn) {
 	if !ok {
 		return
 	}
-
-	// TODO: Check scope if function not has any generic type.
 }
 
 // Checks current package file's function declarations.
@@ -1190,7 +1188,7 @@ func (s *_Sema) check_type_global(decl *Var) {
 }
 
 // Checks types of current package file's global variables.
-func (s *_Sema) check_global_types() (ok bool) {
+func (s *_Sema) check_global_types() {
 	for _, decl := range s.file.Vars {
 		s.check_type_global(decl)
 	}
@@ -1201,20 +1199,41 @@ func (s *_Sema) check_global_types() (ok bool) {
 			s.check_type_global(decl)
 		}
 	}
+}
+
+func (s *_Sema) check_fn_ins(f *FnIns) {
+	sc := new_scope_checker(s)
+	sc.check(f.Decl.Scope, f.Scope)
+}
+
+func (s *_Sema) check_type_fn(f *Fn) {
+	if len(f.Instances) == 0 {
+		if len(f.Generics) > 0 {
+			return
+		}
+
+		f.Instances = append(f.Instances, f.instance())
+	}
+
+	for _, ins := range f.Instances {
+		s.check_fn_ins(ins)
+	}
+}
+
+// Checks types of current package file's functions.
+func (s *_Sema) check_fn_types() (ok bool) {
+	for _, decl := range s.file.Funcs {
+		s.check_type_fn(decl)
+	}
 	return true
 }
 
 // Checks all types of current package file.
 // Reports whether checking is success.
-func (s *_Sema) check_file_types() (ok bool) {
+func (s *_Sema) check_file_types() {
 	// TODO: Implement other declarations.
-	switch {
-	case !s.check_global_types():
-		return false
-
-	default:
-		return true
-	}
+	s.check_global_types()
+	s.check_fn_types()
 }
 
 // Checks all types of all package files.
@@ -1222,10 +1241,7 @@ func (s *_Sema) check_file_types() (ok bool) {
 func (s *_Sema) check_package_types() {
 	for _, f := range s.files {
 		s.set_current_file(f)
-		ok := s.check_file_types()
-		if !ok {
-			return
-		}
+		s.check_file_types()
 	}
 }
 

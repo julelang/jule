@@ -1410,7 +1410,6 @@ func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
 		}
 
 		d.Model = model
-
 		return d
 	}
 

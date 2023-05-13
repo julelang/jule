@@ -630,7 +630,7 @@ func gen_fn_decl_head(f *sema.FnIns, method bool) string {
 // Generates C++ declaration code of function's combinations.
 func gen_fn_prototype(f *sema.Fn, method bool) string {
 	obj := ""
-	for _, c := range f.Combines {
+	for _, c := range f.Instances {
 		obj += gen_fn_decl_head(c, method)
 		obj += gen_params_prototypes(c.Params)
 		obj += CPP_ST_TERM + "\n"
@@ -705,7 +705,7 @@ func gen_globals(globals []*sema.Var) string {
 // Generates C++ code of function.
 func gen_fn(f *sema.Fn) string {
 	obj := ""
-	for _, c := range f.Combines {
+	for _, c := range f.Instances {
 		obj += gen_fn_decl_head(c, false)
 		obj += gen_params_ins(c.Params) + " "
 		obj += gen_fn_scope(c)

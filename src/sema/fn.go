@@ -56,7 +56,7 @@ type Fn struct {
 
 	// Function instances for each unique type combination of function call.
 	// Nil if function is never used.
-	Combines   []*FnIns
+	Instances   []*FnIns
 }
 
 // Reports whether return type is void.
@@ -105,7 +105,8 @@ func (f *Fn) Result_uses_generics() bool {
 // Force to new instance.
 func (f *Fn) instance_force() *FnIns {
 	ins := &FnIns{
-		Decl: f,
+		Decl:  f,
+		Scope: &Scope{},
 	}
 
 	ins.Params = make([]*ParamIns, len(f.Params))
@@ -118,8 +119,8 @@ func (f *Fn) instance_force() *FnIns {
 
 func (f *Fn) instance() *FnIns {
 	// Returns already created instance for just one unique combination.
-	if len(f.Generics) == 0 && len(f.Combines) == 1 {
-		return f.Combines[0]
+	if len(f.Generics) == 0 && len(f.Instances) == 1 {
+		return f.Instances[0]
 	}
 
 	return f.instance_force()
@@ -128,14 +129,14 @@ func (f *Fn) instance() *FnIns {
 func (f *Fn) append_instance(ins *FnIns) {
 	if len(f.Generics) == 0 {
 		// Skip already created instance for just one unique combination.
-		if len(f.Combines) == 1 {
+		if len(f.Instances) == 1 {
 			return
 		}
-		f.Combines = append(f.Combines, ins)
+		f.Instances = append(f.Instances, ins)
 	}
 	
-	if len(f.Combines) == 0 {
-		f.Combines = append(f.Combines, ins)
+	if len(f.Instances) == 0 {
+		f.Instances = append(f.Instances, ins)
 		return
 	}
 
@@ -143,10 +144,10 @@ func (f *Fn) append_instance(ins *FnIns) {
 		return
 	}
 
-	for _, ains := range f.Combines {
+	for _, ains := range f.Instances {
 		for i, ag := range ains.Generics {
 			if ag.To_str() != ins.Generics[i].To_str() {
-				f.Combines = append(f.Combines, ins)
+				f.Instances = append(f.Instances, ins)
 				return
 			}
 		}
