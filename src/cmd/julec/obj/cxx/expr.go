@@ -362,6 +362,10 @@ func gen_array_expr_model(m *sema.ArrayExprModel) string {
 	return obj
 }
 
+func gen_fn_ins_expr_model(m *sema.FnIns) string {
+	return fn_out_ident(m.Decl)
+}
+
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
 	case *constant.Const:
@@ -372,6 +376,9 @@ func gen_expr_model(m sema.ExprModel) string {
 
 	case *sema.Struct:
 		return gen_struct_expr_model(m.(*sema.Struct))
+
+	case *sema.FnIns:
+		return gen_fn_ins_expr_model(m.(*sema.FnIns))
 
 	case *sema.BinopExprModel:
 		return gen_binop_expr_model(m.(*sema.BinopExprModel))

@@ -365,15 +365,16 @@ func (e *_Eval) eval_fn(f *Fn, error_token lex.Token) *Data {
 		return nil
 	}
 
+	ins := f.instance()
 	return &Data{
 		Lvalue:   false,
 		Mutable:  false,
 		Constant: nil,
 		Decl:     false,
 		Kind:     &TypeKind{
-			kind: f.instance(),
+			kind: ins,
 		},
-		Model:    f,
+		Model:    ins,
 	}
 }
 

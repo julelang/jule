@@ -114,6 +114,9 @@ func (f *Fn) instance_force() *FnIns {
 		ins.Params[i] = p.instance()
 	}
 
+	if ins.Decl.Result != nil {
+		ins.Result = ins.Decl.Result.Kind.Kind
+	}
 	return ins
 }
 
