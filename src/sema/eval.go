@@ -1238,7 +1238,7 @@ func (e *_Eval) eval_cast_by_type_n_data(t *TypeKind, d *Data, error_token lex.T
 
 func (e *_Eval) eval_cast(c *ast.CastExpr) *Data {
 	t := build_type(c.Kind)
-	ok := e.s.check_type(t)
+	ok := e.s.check_type(t, e.lookup)
 	if !ok {
 		return nil
 	}
@@ -1280,7 +1280,7 @@ func (e *_Eval) is_instanced_struct(s *StructIns) bool {
 
 func (e *_Eval) eval_struct_lit(lit *ast.StructLit) *Data {
 	t := build_type(lit.Kind)
-	ok := e.s.check_type(t)
+	ok := e.s.check_type(t, e.lookup)
 	if !ok {
 		return nil
 	}
@@ -1316,7 +1316,7 @@ func (e *_Eval) eval_struct_lit(lit *ast.StructLit) *Data {
 
 func (e *_Eval) eval_type(t *ast.Type) *Data {
 	tk := build_type(t)
-	ok := e.s.check_type(tk)
+	ok := e.s.check_type(tk, e.lookup)
 	if !ok {
 		return nil
 	}
@@ -1373,7 +1373,7 @@ func (e *_Eval) check_fn_call_generics(f *FnIns,
 		f.Generics = make([]*TypeKind, len(f.Decl.Generics))
 		for i, g := range fc.Generics {
 			k := build_type(g)
-			ok := e.s.check_type(k)
+			ok := e.s.check_type(k, e.lookup)
 			if !ok {
 				return false, false
 			}

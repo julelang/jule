@@ -275,13 +275,13 @@ func (s *_Sema) check_imports() {
 
 // Checks type, builds result as kind and collect referred type aliases.
 // Skips already checked types.
-func (s *_Sema) check_type_with_refers(t *TypeSymbol, referencer *_Referencer) (ok bool) {
+func (s *_Sema) check_type_with_refers(t *TypeSymbol, l Lookup, referencer *_Referencer) (ok bool) {
 	if t.checked() {
 		return true
 	}
 	tc := _TypeChecker{
 		s:          s,
-		lookup:     s,
+		lookup:     l,
 		referencer: referencer,
 	}
 	tc.check(t)
@@ -290,8 +290,8 @@ func (s *_Sema) check_type_with_refers(t *TypeSymbol, referencer *_Referencer) (
 
 // Checks type and builds result as kind.
 // Skips already checked types.
-func (s *_Sema) check_type(t *TypeSymbol) (ok bool) {
-	return s.check_type_with_refers(t, nil)
+func (s *_Sema) check_type(t *TypeSymbol, l Lookup) (ok bool) {
+	return s.check_type_with_refers(t, l, nil)
 }
 
 // Builds type with type aliases for generics.
@@ -465,8 +465,8 @@ func (s *_Sema) check_validity_for_init_expr(left_mut bool, d *Data, error_token
 	_ = atc.check_validity()
 }
 
-func (s *_Sema) check_type_alias_decl_kind(ta *TypeAlias) (ok bool) {
-	ok = s.check_type_with_refers(ta.Kind, &_Referencer{
+func (s *_Sema) check_type_alias_decl_kind(ta *TypeAlias, l Lookup) (ok bool) {
+	ok = s.check_type_with_refers(ta.Kind, l, &_Referencer{
 		ident:  ta.Ident,
 		owner:  _uintptr(ta),
 		refers: &ta.Refers,
@@ -478,19 +478,25 @@ func (s *_Sema) check_type_alias_decl_kind(ta *TypeAlias) (ok bool) {
 	return
 }
 
-func (s *_Sema) check_type_alias_decl(ta *TypeAlias) {
+func (s *_Sema) check_type_alias_decl(ta *TypeAlias, l Lookup) {
 	if lex.Is_ignore_ident(ta.Ident) {
 		s.push_err(ta.Token, "ignore_ident")
-	} else if s.is_duplicated_ident(_uintptr(ta), ta.Ident, ta.Cpp_linked) {
+	}
+	s.check_type_alias_decl_kind(ta, l)
+}
+
+// Checks type alias declaration with duplicated identifiers.
+func (s *_Sema) check_type_alias_decl_dup(ta *TypeAlias) {
+	if s.is_duplicated_ident(_uintptr(ta), ta.Ident, ta.Cpp_linked) {
 		s.push_err(ta.Token, "duplicated_ident", ta.Ident)
 	}
-	s.check_type_alias_decl_kind(ta)
+	s.check_type_alias_decl_kind(ta, s)
 }
 
 // Checks current package file's type alias declarations.
 func (s *_Sema) check_type_alias_decls() (ok bool) {
 	for _, ta := range s.file.Type_aliases {
-		s.check_type_alias_decl(ta)
+		s.check_type_alias_decl_dup(ta)
 		
 		// Break checking if type alias has error.
 		if len(s.errors) > 0 {
@@ -584,7 +590,7 @@ func (s *_Sema) check_enum_decl(e *Enum) {
 	s.check_enum_items_dup(e)
 
 	if e.Kind != nil {
-		if !s.check_type_with_refers(e.Kind, &_Referencer{
+		if !s.check_type_with_refers(e.Kind, s, &_Referencer{
 			ident:  e.Ident,
 			owner: _uintptr(e),
 			refers: &e.Refers,
@@ -959,7 +965,7 @@ func (s *_Sema) impl_impls() (ok bool) {
 
 // Checks variable declaration.
 // No checks duplicated identifiers.
-func (s *_Sema) check_var_decl(decl *Var) {
+func (s *_Sema) check_var_decl(decl *Var, l Lookup) {
 	if lex.Is_ignore_ident(decl.Ident) {
 		s.push_err(decl.Token, "ignore_ident")
 	}
@@ -973,7 +979,7 @@ func (s *_Sema) check_var_decl(decl *Var) {
 			s.push_err(decl.Token, "missing_autotype_value")
 		}
 	} else {
-		_ = s.check_type(decl.Kind)
+		_ = s.check_type(decl.Kind, l)
 	}
 }
 
@@ -983,7 +989,7 @@ func (s *_Sema) check_var_decl_dup(decl *Var) {
 	if s.is_duplicated_ident(_uintptr(decl), decl.Ident, false) {
 		s.push_err(decl.Token, "duplicated_ident", decl.Ident)
 	}
-	s.check_var_decl(decl)
+	s.check_var_decl(decl, s)
 }
 
 // Checks current package file's global variable declarations.

@@ -8,6 +8,9 @@ func gen_st(st sema.St) string {
 	case *sema.Var:
 		return gen_var(st.(*sema.Var))
 
+	case *sema.TypeAlias:
+		return gen_type_alias(st.(*sema.TypeAlias))
+
 	default:
 		return "<unimplemented stmt>"
 	}

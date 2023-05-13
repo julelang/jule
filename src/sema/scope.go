@@ -149,16 +149,31 @@ func (sc *_ScopeChecker) check_var_decl(decl *ast.VarDecl) {
 	if sc.is_duplicated_ident(_uintptr(v), v.Ident) {
 		sc.s.push_err(v.Token, "duplicated_ident", v.Ident)
 	}
-	sc.s.check_var_decl(v)
+	sc.s.check_var_decl(v, sc)
 	sc.s.check_type_var(v)
+	
 	sc.table.Vars = append(sc.table.Vars, v)
 	sc.scope.Stmts = append(sc.scope.Stmts, v)
+}
+
+func (sc *_ScopeChecker) check_type_alias_decl(decl *ast.TypeAliasDecl) {
+	ta := build_type_alias(decl)
+	if sc.is_duplicated_ident(_uintptr(ta), ta.Ident) {
+		sc.s.push_err(ta.Token, "duplicated_ident", ta.Ident)
+	}
+	sc.s.check_type_alias_decl(ta, sc)
+
+	sc.table.Type_aliases = append(sc.table.Type_aliases, ta)
+	sc.scope.Stmts = append(sc.scope.Stmts, ta)
 }
 
 func (sc *_ScopeChecker) check_node(node ast.NodeData) {
 	switch node.(type) {
 	case *ast.VarDecl:
 		sc.check_var_decl(node.(*ast.VarDecl))
+
+	case *ast.TypeAliasDecl:
+		sc.check_type_alias_decl(node.(*ast.TypeAliasDecl))
 
 	default:
 		println("error <unimplemented scope node>")
