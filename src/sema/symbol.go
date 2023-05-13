@@ -52,6 +52,7 @@ func build_expr(expr *ast.Expr) *Value {
 
 func build_type_alias(decl *ast.TypeAliasDecl) *TypeAlias {
 	return &TypeAlias{
+		Scope:      decl.Scope,
 		Public:     decl.Public,
 		Cpp_linked: decl.Cpp_linked,
 		Token:      decl.Token,

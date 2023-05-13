@@ -957,11 +957,11 @@ func (s *_Sema) impl_impls() (ok bool) {
 	return true
 }
 
-func (s *_Sema) check_global_decl(decl *Var) {
+// Checks variable declaration.
+// No checks duplicated identifiers.
+func (s *_Sema) check_var_decl(decl *Var) {
 	if lex.Is_ignore_ident(decl.Ident) {
 		s.push_err(decl.Token, "ignore_ident")
-	} else if s.is_duplicated_ident(_uintptr(decl), decl.Ident, false) {
-		s.push_err(decl.Token, "duplicated_ident", decl.Ident)
 	}
 
 	if decl.Value == nil || decl.Value.Expr == nil {
@@ -977,10 +977,19 @@ func (s *_Sema) check_global_decl(decl *Var) {
 	}
 }
 
+// Checks variable declaration.
+// Checks duplicated identifiers by Sema.
+func (s *_Sema) check_var_decl_dup(decl *Var) {
+	if s.is_duplicated_ident(_uintptr(decl), decl.Ident, false) {
+		s.push_err(decl.Token, "duplicated_ident", decl.Ident)
+	}
+	s.check_var_decl(decl)
+}
+
 // Checks current package file's global variable declarations.
 func (s *_Sema) check_global_decls() (ok bool) {
 	for _, decl := range s.file.Vars {
-		s.check_global_decl(decl)
+		s.check_var_decl_dup(decl)
 
 		// Break checking if type alias has error.
 		if len(s.errors) > 0 {
@@ -1155,7 +1164,7 @@ func (s *_Sema) check_data_for_auto_type(d *Data, err_token lex.Token) {
 	}
 }
 
-func (s *_Sema) check_type_global(decl *Var) {
+func (s *_Sema) check_type_var(decl *Var) {
 	decl.Value.Data = s.evalpd(decl.Value.Expr, decl.Kind, decl)
 	if decl.Value.Data == nil {
 		return // Skip checks if error ocurrs.
@@ -1190,13 +1199,13 @@ func (s *_Sema) check_type_global(decl *Var) {
 // Checks types of current package file's global variables.
 func (s *_Sema) check_global_types() {
 	for _, decl := range s.file.Vars {
-		s.check_type_global(decl)
+		s.check_type_var(decl)
 	}
 
 	// Re-check depended.
 	for _, decl := range s.file.Vars {
 		if decl.Value.Data == nil && len(decl.Depends) > 0 {
-			s.check_type_global(decl)
+			s.check_type_var(decl)
 		}
 	}
 }

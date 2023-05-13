@@ -490,6 +490,7 @@ type Conditional struct {
 
 // Type alias declration.
 type TypeAliasDecl struct {
+	Scope        *ScopeTree
 	Public       bool
 	Cpp_linked   bool
 	Token        lex.Token

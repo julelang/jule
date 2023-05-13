@@ -127,14 +127,60 @@ func (sc *_ScopeChecker) Find_enum(ident string) *Enum {
 	return sc.s.Find_enum(ident)
 }
 
+// Reports this identifier duplicated in scope.
+// The "self" parameter represents address of exception identifier.
+// If founded identifier address equals to self, will be skipped.
+func (sc *_ScopeChecker) is_duplicated_ident(self uintptr, ident string) bool {
+	v := sc.Find_var(ident, false)
+	if v != nil && _uintptr(v) != self && v.Scope == sc.tree {
+		return true
+	}
+
+	ta := sc.Find_type_alias(ident, false)
+	if ta != nil && _uintptr(ta) != self && ta.Scope == sc.tree {
+		return true
+	}
+
+	return false
+}
+
+func (sc *_ScopeChecker) check_var_decl(decl *ast.VarDecl) {
+	v := build_var(decl)
+	if sc.is_duplicated_ident(_uintptr(v), v.Ident) {
+		sc.s.push_err(v.Token, "duplicated_ident", v.Ident)
+	}
+	sc.s.check_var_decl(v)
+	sc.s.check_type_var(v)
+	sc.table.Vars = append(sc.table.Vars, v)
+	sc.scope.Stmts = append(sc.scope.Stmts, v)
+}
+
+func (sc *_ScopeChecker) check_node(node ast.NodeData) {
+	switch node.(type) {
+	case *ast.VarDecl:
+		sc.check_var_decl(node.(*ast.VarDecl))
+
+	default:
+		println("error <unimplemented scope node>")
+	}
+}
+
+func (sc *_ScopeChecker) check_tree() {
+	for _, node := range sc.tree.Stmts {
+		sc.check_node(node)
+	}
+}
+
 // Checks scope tree.
 func (sc *_ScopeChecker) check(tree *ast.ScopeTree, s *Scope) {
 	sc.tree = tree
 	sc.scope = s
+	sc.check_tree()
 }
 
 func new_scope_checker(s *_Sema) *_ScopeChecker {
 	return &_ScopeChecker{
-		s: s,
+		s:     s,
+		table: &SymbolTable{},
 	}
 }

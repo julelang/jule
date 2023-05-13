@@ -511,6 +511,7 @@ func (sp *_ScopeParser) build_fall_st(tokens []lex.Token) ast.NodeData {
 
 func (sp *_ScopeParser) build_type_alias_st(tokens []lex.Token) ast.NodeData {
 	tad := sp.p.build_type_alias_decl(tokens)
+	tad.Scope = sp.s
 	return tad
 }
 

@@ -17,6 +17,7 @@ import (
 
 // Type alias.
 type TypeAlias struct {
+	Scope      *ast.ScopeTree
 	Public     bool
 	Cpp_linked bool
 	Token      lex.Token
