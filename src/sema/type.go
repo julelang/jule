@@ -471,7 +471,7 @@ func (tc *_TypeChecker) check_struct_illegal_cycles(decl *ast.IdentType, s *Stru
 	return true
 }
 
-func (tc *_TypeChecker) from_type_alias(decl *ast.IdentType, ta *TypeAlias) *TypeKind {
+func (tc *_TypeChecker) from_type_alias(decl *ast.IdentType, ta *TypeAlias) _Kind {
 	if !tc.s.is_accessible_define(ta.Public, ta.Token) {
 		tc.push_err(decl.Token, "ident_not_exist", decl.Ident)
 		return nil
@@ -493,7 +493,7 @@ func (tc *_TypeChecker) from_type_alias(decl *ast.IdentType, ta *TypeAlias) *Typ
 		return nil
 	}
 
-	return ta.Kind.Kind
+	return ta.Kind.Kind.kind
 }
 
 func (tc *_TypeChecker) from_enum(decl *ast.IdentType, e *Enum) *Enum {
