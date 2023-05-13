@@ -689,7 +689,7 @@ func (sp *_ScopeParser) build_scope_st(tokens []lex.Token) *ast.ScopeTree {
 
 	i := 0
 	tokens = lex.Range(&i, lex.KND_LBRACE, lex.KND_RBRACE, tokens)
-	if len(tokens) == 0 {
+	if tokens == nil {
 		sp.push_err(token, "invalid_syntax")
 		return nil
 	} else if i < len(tokens) {

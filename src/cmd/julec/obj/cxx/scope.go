@@ -5,6 +5,9 @@ import "github.com/julelang/jule/sema"
 // Generates C++ code of statement.
 func gen_st(st sema.St) string {
 	switch st.(type) {
+	case *sema.Scope:
+		return gen_scope(st.(*sema.Scope))
+
 	case *sema.Var:
 		return gen_var(st.(*sema.Var))
 

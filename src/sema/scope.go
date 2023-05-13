@@ -167,8 +167,23 @@ func (sc *_ScopeChecker) check_type_alias_decl(decl *ast.TypeAliasDecl) {
 	sc.scope.Stmts = append(sc.scope.Stmts, ta)
 }
 
+func (sc *_ScopeChecker) check_sub_scope(tree *ast.ScopeTree) {
+	s := &Scope{
+		Parent: sc.scope,
+	}
+
+	ssc := new_scope_checker(sc.s)
+	ssc.parent = sc
+	ssc.check(tree, s)
+
+	sc.scope.Stmts = append(sc.scope.Stmts, s)
+}
+
 func (sc *_ScopeChecker) check_node(node ast.NodeData) {
 	switch node.(type) {
+	case *ast.ScopeTree:
+		sc.check_sub_scope(node.(*ast.ScopeTree))
+
 	case *ast.VarDecl:
 		sc.check_var_decl(node.(*ast.VarDecl))
 
