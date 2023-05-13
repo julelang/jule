@@ -203,8 +203,12 @@ func (sc *_ScopeChecker) check_tree() {
 
 // Checks scope tree.
 func (sc *_ScopeChecker) check(tree *ast.ScopeTree, s *Scope) {
+	s.Deferred = tree.Deferred
+	s.Unsafety = tree.Unsafety
+
 	sc.tree = tree
 	sc.scope = s
+
 	sc.check_tree()
 }
 

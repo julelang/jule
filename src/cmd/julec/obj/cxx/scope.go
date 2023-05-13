@@ -33,6 +33,11 @@ func gen_scope(s *sema.Scope) string {
 	done_indent()
 	obj += indent()
 	obj += "}"
+	
+	if s.Deferred {
+		obj = "__JULEC_DEFER(" + obj + ");"
+	}
+
 	return obj
 }
 
