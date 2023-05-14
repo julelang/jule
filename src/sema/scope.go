@@ -190,6 +190,10 @@ func (sc *_ScopeChecker) check_node(node ast.NodeData) {
 	case *ast.TypeAliasDecl:
 		sc.check_type_alias_decl(node.(*ast.TypeAliasDecl))
 
+	case *ast.Comment:
+		// Skip.
+		break
+
 	default:
 		println("error <unimplemented scope node>")
 	}
