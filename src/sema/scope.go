@@ -31,13 +31,20 @@ type Conditional struct {
 	Default *Else
 }
 
+// While iteration.
+type WhileIter struct {
+	Expr  ExprModel
+	Scope *Scope
+}
+
 // Scope checker.
 type _ScopeChecker struct {
-	s      *_Sema
-	parent *_ScopeChecker
-	table  *SymbolTable
-	scope  *Scope
-	tree   *ast.ScopeTree
+	s       *_Sema
+	parent  *_ScopeChecker
+	table   *SymbolTable
+	scope   *Scope
+	tree    *ast.ScopeTree
+	is_iter bool
 }
 
 // Returns package by identifier.
@@ -185,20 +192,24 @@ func (sc *_ScopeChecker) check_type_alias_decl(decl *ast.TypeAliasDecl) {
 	sc.scope.Stmts = append(sc.scope.Stmts, ta)
 }
 
-func (sc *_ScopeChecker) check_another_scope(tree *ast.ScopeTree) *Scope {
+func (sc *_ScopeChecker) check_child_sc(tree *ast.ScopeTree, ssc *_ScopeChecker) *Scope {
 	s := &Scope{
 		Parent: sc.scope,
 	}
 
-	ssc := new_scope_checker(sc.s)
 	ssc.parent = sc
 	ssc.check(tree, s)
 
 	return s
 }
 
-func (sc *_ScopeChecker) check_sub_scope(tree *ast.ScopeTree) {
-	s := sc.check_another_scope(tree)
+func (sc *_ScopeChecker) check_child(tree *ast.ScopeTree) *Scope {
+	ssc := new_scope_checker(sc.s)
+	return sc.check_child_sc(tree, ssc)
+}
+
+func (sc *_ScopeChecker) check_anon_scope(tree *ast.ScopeTree) {
+	s := sc.check_child(tree)
 	sc.scope.Stmts = append(sc.scope.Stmts, s)
 }
 
@@ -212,7 +223,7 @@ func (sc *_ScopeChecker) check_expr(expr *ast.Expr) {
 }
 
 func (sc *_ScopeChecker) check_if(i *ast.If) *If {
-	s := sc.check_another_scope(i.Scope)
+	s := sc.check_child(i.Scope)
 
 	d := sc.s.eval(i.Expr, sc)
 	if d == nil {
@@ -237,7 +248,7 @@ func (sc *_ScopeChecker) check_if(i *ast.If) *If {
 }
 
 func (sc *_ScopeChecker) check_else(e *ast.Else) *Else {
-	s := sc.check_another_scope(e.Scope)
+	s := sc.check_child(e.Scope)
 	return &Else{
 		Scope: s,
 	}
@@ -258,6 +269,49 @@ func (sc *_ScopeChecker) check_conditional(conditional *ast.Conditional) {
 	sc.scope.Stmts = append(sc.scope.Stmts, c)
 }
 
+func (sc *_ScopeChecker) check_iter_scope(tree *ast.ScopeTree) *Scope {
+	ssc := new_scope_checker(sc.s)
+	ssc.is_iter = true
+	return sc.check_child_sc(tree, ssc)
+}
+
+func (sc *_ScopeChecker) check_while_iter(it *ast.Iter) {
+	kind := &WhileIter{}
+
+	kind.Scope = sc.check_iter_scope(it.Scope)
+
+	wh := it.Kind.(*ast.WhileKind)
+	d := sc.s.eval(wh.Expr, sc)
+	if d == nil {
+		return
+	}
+
+	prim := d.Kind.Prim()
+	if prim == nil {
+		sc.s.push_err(it.Token, "iter_while_require_bool_expr")
+		return
+	}
+
+	if !prim.Is_bool() {
+		sc.s.push_err(it.Token, "iter_while_require_bool_expr")
+		return
+	}
+
+	kind.Expr = d.Model
+
+	sc.scope.Stmts = append(sc.scope.Stmts, kind)
+}
+
+func (sc *_ScopeChecker) check_iter(it *ast.Iter) {
+	switch it.Kind.(type) {
+	case *ast.WhileKind:
+		sc.check_while_iter(it)
+
+	default:
+		println("error <unimplemented iteration kind>")
+	}
+}
+
 func (sc *_ScopeChecker) check_node(node ast.NodeData) {
 	switch node.(type) {
 	case *ast.Comment:
@@ -265,7 +319,7 @@ func (sc *_ScopeChecker) check_node(node ast.NodeData) {
 		break
 
 	case *ast.ScopeTree:
-		sc.check_sub_scope(node.(*ast.ScopeTree))
+		sc.check_anon_scope(node.(*ast.ScopeTree))
 
 	case *ast.VarDecl:
 		sc.check_var_decl(node.(*ast.VarDecl))
@@ -278,6 +332,9 @@ func (sc *_ScopeChecker) check_node(node ast.NodeData) {
 
 	case *ast.Conditional:
 		sc.check_conditional(node.(*ast.Conditional))
+
+	case *ast.Iter:
+		sc.check_iter(node.(*ast.Iter))
 
 	default:
 		println("error <unimplemented scope node>")

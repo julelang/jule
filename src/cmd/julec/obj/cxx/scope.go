@@ -1,6 +1,13 @@
 package cxx
 
-import "github.com/julelang/jule/sema"
+import (
+	"unsafe"
+
+	"github.com/julelang/jule/sema"
+)
+
+// In Jule: (uintptr)(PTR)
+func _uintptr[T any](t *T) uintptr { return uintptr(unsafe.Pointer(t)) }
 
 func gen_if(i *sema.If) string {
 	obj := "if ("
@@ -26,6 +33,31 @@ func gen_conditional(c *sema.Conditional) string {
 	return obj
 }
 
+func gen_while_iter(w *sema.WhileIter) string {
+	begin := iter_begin_label_ident(_uintptr(w))
+	end := iter_end_label_ident(_uintptr(w))
+	next := iter_next_label_ident(_uintptr(w))
+
+	obj := begin + ":;\n"
+	obj += indent()
+	obj += "if (!("
+	obj += gen_expr_model(w.Expr)
+	obj += ")) { goto "
+	obj += end
+	obj += "; }\n"
+	obj += indent()
+	obj += gen_scope(w.Scope)
+	obj += "\n"
+	obj += indent()
+	obj += next + ":;\n"
+	obj += indent()
+	obj += "goto " + begin + ";\n"
+	obj += indent()
+	obj += end + ":;"
+
+	return obj
+}
+
 // Generates C++ code of statement.
 func gen_st(st sema.St) string {
 	switch st.(type) {
@@ -43,6 +75,9 @@ func gen_st(st sema.St) string {
 
 	case *sema.Conditional:
 		return gen_conditional(st.(*sema.Conditional))
+
+	case *sema.WhileIter:
+		return gen_while_iter(st.(*sema.WhileIter))
 
 	default:
 		return "<unimplemented stmt>"

@@ -115,3 +115,18 @@ func var_out_ident(v *sema.Var) string {
 		return as_out_ident(v.Ident, v.Token.File.Addr())
 	}
 }
+
+// Returns begin label identifier of iteration.
+func iter_begin_label_ident(it uintptr) string {
+	return "_iter_begin_" + strconv.Itoa(int(it))
+}
+
+// Returns end label identifier of iteration.
+func iter_end_label_ident(it uintptr) string {
+	return "_iter_end_" + strconv.Itoa(int(it))
+}
+
+// Returns next label identifier of iteration.
+func iter_next_label_ident(it uintptr) string {
+	return "_iter_next_" + strconv.Itoa(int(it))
+}
