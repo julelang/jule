@@ -52,6 +52,7 @@ type CastingExprModel struct {
 // Function call expression model.
 type FnCallExprModel struct {
 	Func *FnIns
+	IsCo bool
 	Expr ExprModel
 	Args []ExprModel
 }

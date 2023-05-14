@@ -475,8 +475,9 @@ func (sp *_ScopeParser) build_call_st(tokens []lex.Token) ast.NodeData {
 }
 
 func (sp *_ScopeParser) build_co_call_st(tokens []lex.Token) ast.NodeData {
+	tokens = tokens[1:] // Skip "co" token.
 	cc := sp.build_call_st(tokens)
-	cc.(*ast.FnCallExpr).Concurrent = true
+	cc.(*ast.Expr).Kind.(*ast.FnCallExpr).Concurrent = true
 	return cc
 }
 

@@ -190,6 +190,10 @@ func (sc *_ScopeChecker) check_expr(expr *ast.Expr) {
 
 func (sc *_ScopeChecker) check_node(node ast.NodeData) {
 	switch node.(type) {
+	case *ast.Comment:
+		// Ignore.
+		break
+
 	case *ast.ScopeTree:
 		sc.check_sub_scope(node.(*ast.ScopeTree))
 
@@ -198,10 +202,6 @@ func (sc *_ScopeChecker) check_node(node ast.NodeData) {
 
 	case *ast.TypeAliasDecl:
 		sc.check_type_alias_decl(node.(*ast.TypeAliasDecl))
-
-	case *ast.Comment:
-		// Skip.
-		break
 
 	case *ast.Expr:
 		sc.check_expr(node.(*ast.Expr))

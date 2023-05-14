@@ -1398,6 +1398,7 @@ func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
 
 		model := &FnCallExprModel{
 			Func: f,
+			IsCo: fc.Concurrent,
 			Expr: d.Model,
 			Args: fcac.arg_models,
 		}
@@ -1465,6 +1466,7 @@ func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
 
 	d.Model = &FnCallExprModel{
 		Func: f,
+		IsCo: fc.Concurrent,
 		Expr: call_model,
 		Args: fcac.arg_models,
 	}

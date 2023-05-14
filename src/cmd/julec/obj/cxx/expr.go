@@ -261,6 +261,11 @@ func gen_fn_call_expr_model(m *sema.FnCallExprModel) string {
 	obj += "("
 	obj += gen_arg_expr_models(m.Args)
 	obj += ")"
+
+	if m.IsCo {
+		obj = "__JULEC_CO(" + obj + ")"
+	}
+
 	return obj
 }
 
