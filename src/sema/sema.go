@@ -312,10 +312,10 @@ func (s *_Sema) build_type(t *ast.Type) *TypeKind {
 
 // Evaluates expression with type prefixed Eval and returns result.
 // Checks variable dependencies if exist.
-func (s *_Sema) evalpd(expr *ast.Expr, p *TypeSymbol, owner *Var) *Data {
+func (s *_Sema) evalpd(expr *ast.Expr, l Lookup, p *TypeSymbol, owner *Var) *Data {
 	e := _Eval{
 		s:      s,
-		lookup: s,
+		lookup: l,
 		owner:  owner,
 	}
 
@@ -327,12 +327,12 @@ func (s *_Sema) evalpd(expr *ast.Expr, p *TypeSymbol, owner *Var) *Data {
 }
 
 // Evaluates expression with type prefixed Eval and returns result.
-func (s *_Sema) evalp(expr *ast.Expr, p *TypeSymbol) *Data {
-	return s.evalpd(expr, p, nil)
+func (s *_Sema) evalp(expr *ast.Expr, l Lookup, p *TypeSymbol) *Data {
+	return s.evalpd(expr, l, p, nil)
 }
 
 // Evaluates expression with Eval and returns result.
-func (s *_Sema) eval(expr *ast.Expr) *Data { return s.evalp(expr, nil) }
+func (s *_Sema) eval(expr *ast.Expr, l Lookup) *Data { return s.evalp(expr, l, nil) }
 
 func (s *_Sema) check_assign_type(dest *TypeKind, d *Data, error_token lex.Token, deref bool) {
 	atc := _AssignTypeChecker{
@@ -533,7 +533,7 @@ func (s *_Sema) check_enum_items_str(e *Enum) {
 			}
 			item.Value.Data.Model = item.Value.Data.Constant
 		} else {
-			d := s.eval(item.Value.Expr)
+			d := s.eval(item.Value.Expr, s)
 			if d == nil {
 				continue
 			}
@@ -565,7 +565,7 @@ func (s *_Sema) check_enum_items_int(e *Enum) {
 			}
 			item.Value.Data.Model = item.Value.Data.Constant
 		} else {
-			d := s.eval(item.Value.Expr)
+			d := s.eval(item.Value.Expr, s)
 			if d == nil {
 				continue
 			}
@@ -1170,8 +1170,8 @@ func (s *_Sema) check_data_for_auto_type(d *Data, err_token lex.Token) {
 	}
 }
 
-func (s *_Sema) check_type_var(decl *Var) {
-	decl.Value.Data = s.evalpd(decl.Value.Expr, decl.Kind, decl)
+func (s *_Sema) check_type_var(decl *Var, l Lookup) {
+	decl.Value.Data = s.evalpd(decl.Value.Expr, l, decl.Kind, decl)
 	if decl.Value.Data == nil {
 		return // Skip checks if error ocurrs.
 	}
@@ -1205,13 +1205,13 @@ func (s *_Sema) check_type_var(decl *Var) {
 // Checks types of current package file's global variables.
 func (s *_Sema) check_global_types() {
 	for _, decl := range s.file.Vars {
-		s.check_type_var(decl)
+		s.check_type_var(decl, s)
 	}
 
 	// Re-check depended.
 	for _, decl := range s.file.Vars {
 		if decl.Value.Data == nil && len(decl.Depends) > 0 {
-			s.check_type_var(decl)
+			s.check_type_var(decl, s)
 		}
 	}
 }

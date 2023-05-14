@@ -764,7 +764,7 @@ func (tc *_TypeChecker) build_slc(decl *ast.SlcType) *Slc {
 }
 
 func (tc *_TypeChecker) build_arr(decl *ast.ArrType) *Arr {
-	size := tc.s.eval(decl.Size)
+	size := tc.s.eval(decl.Size, tc.lookup)
 	if size == nil {
 		return nil
 	}

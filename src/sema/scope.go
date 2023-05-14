@@ -168,7 +168,7 @@ func (sc *_ScopeChecker) check_var_decl(decl *ast.VarDecl) {
 		sc.s.push_err(v.Token, "duplicated_ident", v.Ident)
 	}
 	sc.s.check_var_decl(v, sc)
-	sc.s.check_type_var(v)
+	sc.s.check_type_var(v, sc)
 	
 	sc.table.Vars = append(sc.table.Vars, v)
 	sc.scope.Stmts = append(sc.scope.Stmts, v)
@@ -203,7 +203,7 @@ func (sc *_ScopeChecker) check_sub_scope(tree *ast.ScopeTree) {
 }
 
 func (sc *_ScopeChecker) check_expr(expr *ast.Expr) {
-	d := sc.s.eval(expr)
+	d := sc.s.eval(expr, sc)
 	if d == nil {
 		return
 	}
@@ -214,7 +214,7 @@ func (sc *_ScopeChecker) check_expr(expr *ast.Expr) {
 func (sc *_ScopeChecker) check_if(i *ast.If) *If {
 	s := sc.check_another_scope(i.Scope)
 
-	d := sc.s.eval(i.Expr)
+	d := sc.s.eval(i.Expr, sc)
 	if d == nil {
 		return nil
 	}
