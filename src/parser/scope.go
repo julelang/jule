@@ -242,7 +242,7 @@ func (sp *_ScopeParser) setup_range_kind_keys_plain(rng *ast.RangeKind, tokens [
 		return
 	}
 	if len(key_tokens) > 2 {
-		sp.push_err(rng.In_token, "much_foreach_vars")
+		sp.push_err(rng.In_token, "much_range_vars")
 	}
 	keys := sp.build_range_kind_keys(key_tokens)
 	rng.Key_a = keys[0]

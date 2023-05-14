@@ -42,14 +42,22 @@ type WhileIter struct {
 	Scope *Scope
 }
 
+// Range iteration.
+type RangeIter struct {
+	Expr  *Data
+	Scope *Scope
+	Key_a *Var
+	Key_b *Var
+}
+
 // Scope checker.
 type _ScopeChecker struct {
-	s       *_Sema
-	parent  *_ScopeChecker
-	table   *SymbolTable
-	scope   *Scope
-	tree    *ast.ScopeTree
-	is_iter bool
+	s      *_Sema
+	parent *_ScopeChecker
+	table  *SymbolTable
+	scope  *Scope
+	tree   *ast.ScopeTree
+	it     uintptr
 }
 
 // Returns package by identifier.
@@ -179,6 +187,7 @@ func (sc *_ScopeChecker) check_var_decl(decl *ast.VarDecl) {
 	if sc.is_duplicated_ident(_uintptr(v), v.Ident) {
 		sc.s.push_err(v.Token, "duplicated_ident", v.Ident)
 	}
+
 	sc.s.check_var_decl(v, sc)
 	sc.s.check_type_var(v, sc)
 	
@@ -197,14 +206,20 @@ func (sc *_ScopeChecker) check_type_alias_decl(decl *ast.TypeAliasDecl) {
 	sc.scope.Stmts = append(sc.scope.Stmts, ta)
 }
 
-func (sc *_ScopeChecker) check_child_sc(tree *ast.ScopeTree, ssc *_ScopeChecker) *Scope {
-	s := &Scope{
+func (sc *_ScopeChecker) get_child() *Scope {
+	return &Scope{
 		Parent: sc.scope,
 	}
+}
 
+func (sc *_ScopeChecker) check_child_ssc(tree *ast.ScopeTree, s *Scope, ssc *_ScopeChecker) {
 	ssc.parent = sc
 	ssc.check(tree, s)
+}
 
+func (sc *_ScopeChecker) check_child_sc(tree *ast.ScopeTree, ssc *_ScopeChecker) *Scope {
+	s := sc.get_child()
+	sc.check_child_ssc(tree, s, ssc)
 	return s
 }
 
@@ -274,16 +289,20 @@ func (sc *_ScopeChecker) check_conditional(conditional *ast.Conditional) {
 	sc.scope.Stmts = append(sc.scope.Stmts, c)
 }
 
-func (sc *_ScopeChecker) check_iter_scope(tree *ast.ScopeTree) *Scope {
-	ssc := new_scope_checker(sc.s)
-	ssc.is_iter = true
+func (sc *_ScopeChecker) check_iter_scope_sc(it uintptr, tree *ast.ScopeTree, ssc *_ScopeChecker) *Scope {
+	ssc.it = it
 	return sc.check_child_sc(tree, ssc)
+}
+
+func (sc *_ScopeChecker) check_iter_scope(it uintptr, tree *ast.ScopeTree) *Scope {
+	ssc := new_scope_checker(sc.s)
+	return sc.check_iter_scope_sc(it, tree, ssc)
 }
 
 func (sc *_ScopeChecker) check_inf_iter(it *ast.Iter) {
 	kind := &InfIter{}
 
-	kind.Scope = sc.check_iter_scope(it.Scope)
+	kind.Scope = sc.check_iter_scope(_uintptr(kind), it.Scope)
 
 	sc.scope.Stmts = append(sc.scope.Stmts, kind)
 }
@@ -291,7 +310,7 @@ func (sc *_ScopeChecker) check_inf_iter(it *ast.Iter) {
 func (sc *_ScopeChecker) check_while_iter(it *ast.Iter) {
 	kind := &WhileIter{}
 
-	kind.Scope = sc.check_iter_scope(it.Scope)
+	kind.Scope = sc.check_iter_scope(_uintptr(kind), it.Scope)
 
 	wh := it.Kind.(*ast.WhileKind)
 	d := sc.s.eval(wh.Expr, sc)
@@ -315,6 +334,44 @@ func (sc *_ScopeChecker) check_while_iter(it *ast.Iter) {
 	sc.scope.Stmts = append(sc.scope.Stmts, kind)
 }
 
+func (sc *_ScopeChecker) check_range_iter(it *ast.Iter) {
+	rang := it.Kind.(*ast.RangeKind)
+	
+	d := sc.s.eval(rang.Expr, sc)
+	if d == nil {
+		return
+	}
+
+	kind := &RangeIter{
+		Expr: d,
+	}
+
+	rc := _RangeChecker{
+		sc:   sc,
+		kind: kind,
+		rang: rang,
+		d:    d,
+	}
+	ok := rc.check()
+	if !ok {
+		return
+	}
+
+	ssc := new_scope_checker(sc.s)
+
+	if kind.Key_a != nil {
+		ssc.table.Vars = append(ssc.table.Vars, kind.Key_a)
+	}
+
+	if kind.Key_b != nil {
+		ssc.table.Vars = append(ssc.table.Vars, kind.Key_b)
+	}
+
+	kind.Scope = sc.check_iter_scope_sc(_uintptr(kind), it.Scope, ssc)
+
+	sc.scope.Stmts = append(sc.scope.Stmts, kind)
+}
+
 func (sc *_ScopeChecker) check_iter(it *ast.Iter) {
 	if it.Is_inf() {
 		sc.check_inf_iter(it)
@@ -324,6 +381,9 @@ func (sc *_ScopeChecker) check_iter(it *ast.Iter) {
 	switch it.Kind.(type) {
 	case *ast.WhileKind:
 		sc.check_while_iter(it)
+
+	case *ast.RangeKind:
+		sc.check_range_iter(it)
 
 	default:
 		println("error <unimplemented iteration kind>")

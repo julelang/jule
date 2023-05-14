@@ -663,3 +663,130 @@ func (slc *_StructLitChecker) check(exprs []ast.ExprData) {
 		slc.push_err(slc.error_token, "missing_expr_for", idents)
 	}
 }
+
+// Range checker and setter.
+type _RangeChecker struct {
+	sc   *_ScopeChecker
+	rang *ast.RangeKind
+	kind *RangeIter
+	d    *Data
+}
+
+func (rc *_RangeChecker) build_var(decl *ast.VarDecl) *Var {
+	v := build_var(decl)
+	
+	// Eval ignores variables if Data field is nil.
+	// Prevents this from happening.
+	v.Value.Data = &Data{}
+	
+	return v
+}
+
+func (rc *_RangeChecker) set_size_key() {
+	if rc.rang.Key_a == nil || lex.Is_ignore_ident(rc.rang.Key_a.Ident) {
+		return
+	}
+
+	rc.kind.Key_a = rc.build_var(rc.rang.Key_a)
+	rc.kind.Key_a.Kind = &TypeSymbol{
+		Kind: &TypeKind{
+			kind: build_prim_type(types.TypeKind_INT),
+		},
+	}
+}
+
+func (rc *_RangeChecker) check_slice() {
+	rc.set_size_key()
+	if rc.rang.Key_b == nil || lex.Is_ignore_ident(rc.rang.Key_b.Ident) {
+		return
+	}
+
+	slc := rc.d.Kind.Slc()
+	rc.kind.Key_b = rc.build_var(rc.rang.Key_b)
+	rc.kind.Key_b.Kind = &TypeSymbol{Kind: slc.Elem}
+	rc.sc.s.check_validity_for_init_expr(rc.kind.Key_b.Mutable, rc.d, rc.rang.In_token)
+}
+
+func (rc *_RangeChecker) check_array() {
+	rc.set_size_key()
+	if rc.rang.Key_b == nil || lex.Is_ignore_ident(rc.rang.Key_b.Ident) {
+		return
+	}
+
+	arr := rc.d.Kind.Arr()
+	rc.kind.Key_b = rc.build_var(rc.rang.Key_b)
+	rc.kind.Key_b.Kind = &TypeSymbol{Kind: arr.Elem}
+	rc.sc.s.check_validity_for_init_expr(rc.kind.Key_b.Mutable, rc.d, rc.rang.In_token)
+}
+
+func (rc *_RangeChecker) check_map_key_a() {
+	if rc.rang.Key_a == nil || lex.Is_ignore_ident(rc.rang.Key_a.Ident) {
+		return
+	}
+
+	m := rc.d.Kind.Map()
+	rc.kind.Key_a = rc.build_var(rc.rang.Key_a)
+	rc.kind.Key_a.Kind = &TypeSymbol{Kind: m.Key}
+
+	d := *rc.d
+	d.Kind = m.Key
+	rc.sc.s.check_validity_for_init_expr(rc.kind.Key_a.Mutable, &d, rc.rang.In_token)
+}
+
+func (rc *_RangeChecker) check_map_key_b() {
+	if rc.rang.Key_b == nil || lex.Is_ignore_ident(rc.rang.Key_b.Ident) {
+		return
+	}
+
+	m := rc.d.Kind.Map()
+	rc.kind.Key_b = rc.build_var(rc.rang.Key_b)
+	rc.kind.Key_b.Kind = &TypeSymbol{Kind: m.Val}
+	
+	d := *rc.d
+	d.Kind = m.Val
+	rc.sc.s.check_validity_for_init_expr(rc.kind.Key_b.Mutable, &d, rc.rang.In_token)
+}
+
+func (rc *_RangeChecker) check_map() {
+	rc.check_map_key_a()
+	rc.check_map_key_b()
+}
+
+func (rc *_RangeChecker) check_str() {
+	rc.set_size_key()
+	if rc.rang.Key_b == nil || lex.Is_ignore_ident(rc.rang.Key_b.Ident) {
+		return
+	}
+
+	rc.kind.Key_b = rc.build_var(rc.rang.Key_b)
+	rc.kind.Key_b.Kind = &TypeSymbol{
+		Kind: &TypeKind{
+			kind: build_prim_type(types.TypeKind_U8),
+		},
+	}
+}
+
+func (rc *_RangeChecker) check() bool {
+	switch {
+	case rc.d.Kind.Slc() != nil:
+		rc.check_slice()
+		return true
+
+	case rc.d.Kind.Arr() != nil:
+		rc.check_array()
+		return true
+
+	case rc.d.Kind.Map() != nil:
+		rc.check_map()
+		return true
+	}
+
+	prim := rc.d.Kind.Prim()
+	if prim != nil && prim.Is_str() {
+		rc.check_str()
+		return true
+	}
+
+	rc.sc.s.push_err(rc.rang.In_token, "iter_range_require_enumerable_expr")
+	return false
+}
