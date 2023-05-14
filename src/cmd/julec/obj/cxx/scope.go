@@ -14,6 +14,9 @@ func gen_st(st sema.St) string {
 	case *sema.TypeAlias:
 		return "// " + gen_type_alias(st.(*sema.TypeAlias))
 
+	case *sema.Data:
+		return gen_expr_model(st.(*sema.Data).Model)
+
 	default:
 		return "<unimplemented stmt>"
 	}

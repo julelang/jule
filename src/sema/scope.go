@@ -179,6 +179,15 @@ func (sc *_ScopeChecker) check_sub_scope(tree *ast.ScopeTree) {
 	sc.scope.Stmts = append(sc.scope.Stmts, s)
 }
 
+func (sc *_ScopeChecker) check_expr(expr *ast.Expr) {
+	d := sc.s.eval(expr)
+	if d == nil {
+		return
+	}
+
+	sc.scope.Stmts = append(sc.scope.Stmts, d)
+}
+
 func (sc *_ScopeChecker) check_node(node ast.NodeData) {
 	switch node.(type) {
 	case *ast.ScopeTree:
@@ -193,6 +202,9 @@ func (sc *_ScopeChecker) check_node(node ast.NodeData) {
 	case *ast.Comment:
 		// Skip.
 		break
+
+	case *ast.Expr:
+		sc.check_expr(node.(*ast.Expr))
 
 	default:
 		println("error <unimplemented scope node>")
