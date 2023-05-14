@@ -31,6 +31,11 @@ type Conditional struct {
 	Default *Else
 }
 
+// Infinity iteration.
+type InfIter struct {
+	Scope *Scope
+}
+
 // While iteration.
 type WhileIter struct {
 	Expr  ExprModel
@@ -275,6 +280,14 @@ func (sc *_ScopeChecker) check_iter_scope(tree *ast.ScopeTree) *Scope {
 	return sc.check_child_sc(tree, ssc)
 }
 
+func (sc *_ScopeChecker) check_inf_iter(it *ast.Iter) {
+	kind := &InfIter{}
+
+	kind.Scope = sc.check_iter_scope(it.Scope)
+
+	sc.scope.Stmts = append(sc.scope.Stmts, kind)
+}
+
 func (sc *_ScopeChecker) check_while_iter(it *ast.Iter) {
 	kind := &WhileIter{}
 
@@ -303,6 +316,11 @@ func (sc *_ScopeChecker) check_while_iter(it *ast.Iter) {
 }
 
 func (sc *_ScopeChecker) check_iter(it *ast.Iter) {
+	if it.Is_inf() {
+		sc.check_inf_iter(it)
+		return
+	}
+
 	switch it.Kind.(type) {
 	case *ast.WhileKind:
 		sc.check_while_iter(it)

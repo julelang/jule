@@ -437,6 +437,9 @@ type Iter struct {
 	Scope *ScopeTree
 }
 
+// Reports whether iteration is infinity.
+func (i *Iter) Is_inf() bool { return i.Kind == nil }
+
 // While iteration kind.
 type WhileKind struct {
 	Expr *Expr

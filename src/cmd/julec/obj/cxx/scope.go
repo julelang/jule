@@ -33,26 +33,47 @@ func gen_conditional(c *sema.Conditional) string {
 	return obj
 }
 
-func gen_while_iter(w *sema.WhileIter) string {
-	begin := iter_begin_label_ident(_uintptr(w))
-	end := iter_end_label_ident(_uintptr(w))
-	next := iter_next_label_ident(_uintptr(w))
+func gen_inf_iter(it *sema.InfIter) string {
+	begin := iter_begin_label_ident(_uintptr(it))
+	end := iter_end_label_ident(_uintptr(it))
+	next := iter_next_label_ident(_uintptr(it))
+	indent := indent()
 
 	obj := begin + ":;\n"
-	obj += indent()
+	obj += indent
+	obj += gen_scope(it.Scope)
+	obj += "\n"
+	obj += indent
+	obj += next + ":;\n"
+	obj += indent
+	obj += "goto " + begin + ";\n"
+	obj += indent
+	obj += end + ":;"
+
+	return obj
+}
+
+func gen_while_iter(it *sema.WhileIter) string {
+	begin := iter_begin_label_ident(_uintptr(it))
+	end := iter_end_label_ident(_uintptr(it))
+	next := iter_next_label_ident(_uintptr(it))
+	indent := indent()
+
+	obj := begin + ":;\n"
+	obj += indent
 	obj += "if (!("
-	obj += gen_expr_model(w.Expr)
+	obj += gen_expr_model(it.Expr)
 	obj += ")) { goto "
 	obj += end
 	obj += "; }\n"
-	obj += indent()
-	obj += gen_scope(w.Scope)
+	obj += indent
+	obj += gen_scope(it.Scope)
 	obj += "\n"
-	obj += indent()
+	obj += indent
 	obj += next + ":;\n"
-	obj += indent()
+	obj += indent
 	obj += "goto " + begin + ";\n"
-	obj += indent()
+	obj += indent
 	obj += end + ":;"
 
 	return obj
@@ -75,6 +96,9 @@ func gen_st(st sema.St) string {
 
 	case *sema.Conditional:
 		return gen_conditional(st.(*sema.Conditional))
+
+	case *sema.InfIter:
+		return gen_inf_iter(st.(*sema.InfIter))
 
 	case *sema.WhileIter:
 		return gen_while_iter(st.(*sema.WhileIter))
