@@ -1446,6 +1446,8 @@ func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
 	}
 
 	f.Decl.append_instance(f)
+
+	call_model := d.Model
 	
 	if f.Decl.Is_void() {
 		d = build_void_data()
@@ -1463,7 +1465,7 @@ func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
 
 	d.Model = &FnCallExprModel{
 		Func: f,
-		Expr: d.Model,
+		Expr: call_model,
 		Args: fcac.arg_models,
 	}
 
