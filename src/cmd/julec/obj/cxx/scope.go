@@ -2,6 +2,30 @@ package cxx
 
 import "github.com/julelang/jule/sema"
 
+func gen_if(i *sema.If) string {
+	obj := "if ("
+	obj += gen_expr_model(i.Expr)
+	obj += ") "
+	obj += gen_scope(i.Scope)
+	return obj
+}
+
+func gen_conditional(c *sema.Conditional) string {
+	obj := gen_if(c.If)
+
+	for _, elif := range c.Elifs {
+		obj += " else "
+		obj += gen_if(elif)
+	}
+
+	if c.Default != nil {
+		obj += " else "
+		obj += gen_scope(c.Default.Scope)
+	}
+
+	return obj
+}
+
 // Generates C++ code of statement.
 func gen_st(st sema.St) string {
 	switch st.(type) {
@@ -16,6 +40,9 @@ func gen_st(st sema.St) string {
 
 	case *sema.Data:
 		return gen_expr_model(st.(*sema.Data).Model) + ";"
+
+	case *sema.Conditional:
+		return gen_conditional(st.(*sema.Conditional))
 
 	default:
 		return "<unimplemented stmt>"

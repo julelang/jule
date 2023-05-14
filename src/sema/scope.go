@@ -13,6 +13,24 @@ type Scope struct {
 	Stmts    []St
 }
 
+// Chain conditional node.
+type If struct {
+	Expr  ExprModel
+	Scope *Scope
+}
+
+// Default scope of conditional chain.
+type Else struct {
+	Scope *Scope
+}
+
+// Conditional chain.
+type Conditional struct {
+	If      *If
+	Elifs   []*If
+	Default *Else
+}
+
 // Scope checker.
 type _ScopeChecker struct {
 	s      *_Sema
@@ -167,7 +185,7 @@ func (sc *_ScopeChecker) check_type_alias_decl(decl *ast.TypeAliasDecl) {
 	sc.scope.Stmts = append(sc.scope.Stmts, ta)
 }
 
-func (sc *_ScopeChecker) check_sub_scope(tree *ast.ScopeTree) {
+func (sc *_ScopeChecker) check_another_scope(tree *ast.ScopeTree) *Scope {
 	s := &Scope{
 		Parent: sc.scope,
 	}
@@ -176,6 +194,11 @@ func (sc *_ScopeChecker) check_sub_scope(tree *ast.ScopeTree) {
 	ssc.parent = sc
 	ssc.check(tree, s)
 
+	return s
+}
+
+func (sc *_ScopeChecker) check_sub_scope(tree *ast.ScopeTree) {
+	s := sc.check_another_scope(tree)
 	sc.scope.Stmts = append(sc.scope.Stmts, s)
 }
 
@@ -186,6 +209,53 @@ func (sc *_ScopeChecker) check_expr(expr *ast.Expr) {
 	}
 
 	sc.scope.Stmts = append(sc.scope.Stmts, d)
+}
+
+func (sc *_ScopeChecker) check_if(i *ast.If) *If {
+	s := sc.check_another_scope(i.Scope)
+
+	d := sc.s.eval(i.Expr)
+	if d == nil {
+		return nil
+	}
+
+	prim := d.Kind.Prim()
+	if prim == nil {
+		sc.s.push_err(i.Expr.Token, "if_require_bool_expr")
+		return nil
+	}
+
+	if !prim.Is_bool() {
+		sc.s.push_err(i.Expr.Token, "if_require_bool_expr")
+		return nil
+	}
+
+	return &If{
+		Expr:  d.Model,
+		Scope: s,
+	}
+}
+
+func (sc *_ScopeChecker) check_else(e *ast.Else) *Else {
+	s := sc.check_another_scope(e.Scope)
+	return &Else{
+		Scope: s,
+	}
+}
+
+func (sc *_ScopeChecker) check_conditional(conditional *ast.Conditional) {
+	c := &Conditional{}
+
+	c.If = sc.check_if(conditional.If)
+
+	c.Elifs = make([]*If, len(conditional.Elifs))
+	for i, elif := range conditional.Elifs {
+		c.Elifs[i] = sc.check_if(elif)
+	}
+
+	c.Default = sc.check_else(conditional.Default)
+
+	sc.scope.Stmts = append(sc.scope.Stmts, c)
 }
 
 func (sc *_ScopeChecker) check_node(node ast.NodeData) {
@@ -205,6 +275,9 @@ func (sc *_ScopeChecker) check_node(node ast.NodeData) {
 
 	case *ast.Expr:
 		sc.check_expr(node.(*ast.Expr))
+
+	case *ast.Conditional:
+		sc.check_conditional(node.(*ast.Conditional))
 
 	default:
 		println("error <unimplemented scope node>")
