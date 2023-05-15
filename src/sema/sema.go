@@ -319,6 +319,11 @@ func (s *_Sema) evalpd(expr *ast.Expr, l Lookup, p *TypeSymbol, owner *Var) *Dat
 		owner:  owner,
 	}
 
+	switch l.(type) {
+	case *_ScopeChecker:
+		e.unsafety = l.(*_ScopeChecker).is_unsafe()
+	}
+
 	if p != nil {
 		e.prefix = p.Kind
 	}
