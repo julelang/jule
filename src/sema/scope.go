@@ -213,6 +213,18 @@ func (sc *_ScopeChecker) find_label(ident string) *Label {
 
 // Returns label by identifier.
 // Returns nil if not exist any label in this identifier.
+// Just lookups current scope.
+func (sc *_ScopeChecker) find_label_scope(ident string) *_ScopeLabel {
+	label := sc.find_label_all(ident)
+	if label != nil && label.scope == sc {
+		return label
+	}
+
+	return nil
+}
+
+// Returns label by identifier.
+// Returns nil if not exist any label in this identifier.
 // Lookups all labels.
 func (sc *_ScopeChecker) find_label_all(ident string) *_ScopeLabel {
 	for _, lbl := range *sc.labels {
@@ -362,13 +374,15 @@ func (sc *_ScopeChecker) check_iter_scope(it uintptr, tree *ast.ScopeTree) *Scop
 func (sc *_ScopeChecker) check_inf_iter(it *ast.Iter) {
 	kind := &InfIter{}
 
-	kind.Scope = sc.check_iter_scope(_uintptr(kind), it.Scope)
-
 	sc.scope.Stmts = append(sc.scope.Stmts, kind)
+
+	kind.Scope = sc.check_iter_scope(_uintptr(kind), it.Scope)
 }
 
 func (sc *_ScopeChecker) check_while_iter(it *ast.Iter) {
 	kind := &WhileIter{}
+
+	sc.scope.Stmts = append(sc.scope.Stmts, kind)
 
 	kind.Scope = sc.check_iter_scope(_uintptr(kind), it.Scope)
 
@@ -390,8 +404,6 @@ func (sc *_ScopeChecker) check_while_iter(it *ast.Iter) {
 	}
 
 	kind.Expr = d.Model
-
-	sc.scope.Stmts = append(sc.scope.Stmts, kind)
 }
 
 func (sc *_ScopeChecker) check_range_iter(it *ast.Iter) {
@@ -417,6 +429,8 @@ func (sc *_ScopeChecker) check_range_iter(it *ast.Iter) {
 		return
 	}
 
+	sc.scope.Stmts = append(sc.scope.Stmts, kind)
+
 	ssc := sc.new_child_checker()
 
 	if kind.Key_a != nil {
@@ -428,8 +442,6 @@ func (sc *_ScopeChecker) check_range_iter(it *ast.Iter) {
 	}
 
 	kind.Scope = sc.check_iter_scope_sc(_uintptr(kind), it.Scope, ssc)
-
-	sc.scope.Stmts = append(sc.scope.Stmts, kind)
 }
 
 func (sc *_ScopeChecker) check_iter(it *ast.Iter) {
@@ -450,13 +462,67 @@ func (sc *_ScopeChecker) check_iter(it *ast.Iter) {
 	}
 }
 
+func (sc *_ScopeChecker) check_valid_iter_label(it uintptr) bool {
+	scope := sc
+
+iter:
+	if scope.it == it {
+		return true
+	}
+
+	if scope.parent != nil {
+		scope = scope.parent
+		goto iter
+	}
+
+	return false
+}
+
 func (sc *_ScopeChecker) check_cont(c *ast.ContSt) {
-	// TODO: Add label support.
 	if sc.it == 0 {
 		sc.s.push_err(c.Token, "continue_at_out_of_valid_scope")
 	}
 
-	sc.scope.Stmts = append(sc.scope.Stmts, &ContSt{It: sc.it})
+	cont := &ContSt{It: sc.it}
+
+	if c.Label.File != nil { // Label given.
+		label := find_label_parent(c.Label.Kind, sc.parent)
+		if label == nil {
+			sc.s.push_err(c.Label, "label_not_exist", c.Label.Kind)
+			return
+		} else if label.pos+1 >= len(label.scope.scope.Stmts) {
+			sc.s.push_err(c.Label, "invalid_label")
+			return
+		}
+
+		i := label.pos + 1
+		if i >= len(label.scope.scope.Stmts) {
+			sc.s.push_err(c.Label, "invalid_label")
+		} else {
+			st := label.scope.scope.Stmts[i]
+			switch st.(type) {
+			case *InfIter:
+				cont.It = _uintptr(st.(*InfIter))
+
+			case *RangeIter:
+				cont.It = _uintptr(st.(*RangeIter))
+
+			case *WhileIter:
+				cont.It = _uintptr(st.(*WhileIter))
+
+			default:
+				sc.s.push_err(c.Label, "invalid_label")
+			}
+		}
+	}
+
+	if cont.It != 0 {
+		if !sc.check_valid_iter_label(cont.It) {
+			sc.s.push_err(c.Label, "invalid_label")
+		}
+	}
+
+	sc.scope.Stmts = append(sc.scope.Stmts, cont)
 }
 
 func (sc *_ScopeChecker) check_label(l *ast.LabelSt) {
@@ -686,4 +752,21 @@ func new_scope_checker(s *_Sema) *_ScopeChecker {
 	base.labels = new([]*_ScopeLabel)
 	base.gotos =  new([]*_ScopeGoto)
 	return base
+}
+
+// Returns label by identifier.
+// Returns nil if not exist any label in this identifier.
+// Lookups given scope and parent scopes.
+func find_label_parent(ident string, scope *_ScopeChecker) *_ScopeLabel {
+	label := scope.find_label_scope(ident)
+	for label == nil {
+		if scope.parent == nil {
+			return nil
+		}
+
+		scope = scope.parent
+		label = scope.find_label_scope(ident)
+	}
+
+	return label
 }
