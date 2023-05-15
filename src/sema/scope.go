@@ -55,6 +55,16 @@ type ContSt struct {
 	It uintptr
 }
 
+// Label.
+type Label struct {
+	Ident string
+}
+
+type _ScopeLabel struct {
+	label *Label
+	pos   int
+}
+
 // Scope checker.
 type _ScopeChecker struct {
 	s      *_Sema
@@ -63,6 +73,7 @@ type _ScopeChecker struct {
 	scope  *Scope
 	tree   *ast.ScopeTree
 	it     uintptr
+	labels []*_ScopeLabel
 }
 
 // Returns package by identifier.
@@ -168,6 +179,18 @@ func (sc *_ScopeChecker) Find_trait(ident string) *Trait {
 //  - Sema.
 func (sc *_ScopeChecker) Find_enum(ident string) *Enum {
 	return sc.s.Find_enum(ident)
+}
+
+// Returns label by identifier.
+// Returns nil if not exist any label in this identifier.
+// Just lookups current scope.
+func (sc *_ScopeChecker) find_label(ident string) *Label {
+	for _, label := range sc.labels {
+		if label.label.Ident == ident {
+			return label.label
+		}
+	}
+	return nil
 }
 
 // Reports this identifier duplicated in scope.
@@ -404,7 +427,24 @@ func (sc *_ScopeChecker) check_cont(c *ast.ContSt) {
 	sc.scope.Stmts = append(sc.scope.Stmts, &ContSt{It: sc.it})
 }
 
-func (sc *_ScopeChecker) check_node(node ast.NodeData) {
+func (sc *_ScopeChecker) check_label(i int, l *ast.LabelSt) {
+	if sc.find_label(l.Ident) != nil {
+		sc.s.push_err(l.Token, "label_exist", l.Ident)
+		return
+	}
+
+	label := &Label{
+		Ident: l.Ident,
+	}
+
+	sc.scope.Stmts = append(sc.scope.Stmts, label)
+	sc.labels = append(sc.labels, &_ScopeLabel{
+		label: label,
+		pos:   l.Token.Row,
+	})
+}
+
+func (sc *_ScopeChecker) check_node(i int, node ast.NodeData) {
 	switch node.(type) {
 	case *ast.Comment:
 		// Ignore.
@@ -431,14 +471,17 @@ func (sc *_ScopeChecker) check_node(node ast.NodeData) {
 	case *ast.ContSt:
 		sc.check_cont(node.(*ast.ContSt))
 
+	case *ast.LabelSt:
+		sc.check_label(i, node.(*ast.LabelSt))
+
 	default:
 		println("error <unimplemented scope node>")
 	}
 }
 
 func (sc *_ScopeChecker) check_tree() {
-	for _, node := range sc.tree.Stmts {
-		sc.check_node(node)
+	for i, node := range sc.tree.Stmts {
+		sc.check_node(i, node)
 	}
 }
 

@@ -240,6 +240,10 @@ func gen_cont(c *sema.ContSt) string {
 	return "goto " + iter_next_label_ident(c.It) + ";"
 }
 
+func gen_label(l *sema.Label) string {
+	return label_ident(l.Ident) + ":;"
+}
+
 // Generates C++ code of statement.
 func gen_st(st sema.St) string {
 	switch st.(type) {
@@ -269,6 +273,9 @@ func gen_st(st sema.St) string {
 
 	case *sema.ContSt:
 		return gen_cont(st.(*sema.ContSt))
+
+	case *sema.Label:
+		return gen_label(st.(*sema.Label))
 
 	default:
 		return "<unimplemented stmt>"

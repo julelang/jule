@@ -130,3 +130,8 @@ func iter_end_label_ident(it uintptr) string {
 func iter_next_label_ident(it uintptr) string {
 	return "_iter_next_" + strconv.Itoa(int(it))
 }
+
+// Returns label identifier.
+func label_ident(ident string) string {
+	return "_julec_label_" + ident
+}
