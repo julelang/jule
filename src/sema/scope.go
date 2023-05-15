@@ -1,6 +1,10 @@
 package sema
 
-import "github.com/julelang/jule/ast"
+import (
+	"github.com/julelang/jule/ast"
+	"github.com/julelang/jule/lex"
+	"github.com/julelang/jule/types"
+)
 
 // Statement type.
 type St = any
@@ -65,6 +69,12 @@ type GotoSt struct {
 	Ident string
 }
 
+// Postfix assignment.
+type Postfix struct {
+	Expr ExprModel
+	Op   string
+}
+
 type _ScopeLabel struct {
 	label *Label
 	pos   int
@@ -88,6 +98,23 @@ type _ScopeChecker struct {
 	it          uintptr
 	labels      *[]*_ScopeLabel // All labels of all scopes.
 	gotos       *[]*_ScopeGoto  // All gotos of all scopes.
+}
+
+// Reports whether scope is unsafe.
+func (sc *_ScopeChecker) is_unsafe() bool {
+	scope := sc
+
+iter:
+	if scope.scope.Unsafety {
+		return true
+	}
+
+	if scope.parent != nil {
+		scope = scope.parent
+		goto iter
+	}
+
+	return false
 }
 
 // Returns package by identifier.
@@ -555,6 +582,72 @@ func (sc *_ScopeChecker) push_goto(gt *ast.GotoSt) {
 	})
 }
 
+func (sc *_ScopeChecker) check_assign(left *Data, error_token lex.Token) (ok bool) {
+	switch {
+	case left.Kind.Fnc() != nil:
+		sc.s.push_err(error_token, "assign_type_not_support_value")
+		return false
+	}
+
+	if !left.Lvalue {
+		sc.s.push_err(error_token, "assign_require_lvalue")
+		return false
+	}
+
+	if left.Is_const() {
+		sc.s.push_err(error_token, "assign_const")
+		return false
+	} else if !left.Mutable {
+		sc.s.push_err(error_token, "assignment_to_non_mut")
+		return false
+	}
+
+	return true
+}
+
+func (sc *_ScopeChecker) check_postfix(a *ast.AssignSt) {
+	if len(a.L) > 1 {
+		sc.s.push_err(a.Setter, "invalid_syntax")
+		return
+	}
+
+	d := sc.s.eval(a.L[0].Expr, sc)
+	if d == nil {
+		return
+	}
+
+	_ = sc.check_assign(d, a.Setter)
+
+	if d.Kind.Ptr() != nil {
+		ptr := d.Kind.Ptr()
+		if !ptr.Is_unsafe() && !sc.is_unsafe() {
+			sc.s.push_err(a.L[0].Expr.Token, "unsafe_behavior_at_out_of_unsafe_scope")
+			return
+		}
+	}
+
+	check_t := d.Kind
+	if d.Kind.Ref() != nil {
+		check_t = d.Kind.Ref().Elem
+	}
+
+	if check_t.Prim() != nil {
+		if types.Is_num(check_t.Prim().kind) {
+			return
+		}
+	}
+
+	sc.s.push_err(a.Setter, "operator_not_for_juletype", a.Setter.Kind, d.Kind.To_str())
+}
+
+func (sc *_ScopeChecker) check_assign_st(a *ast.AssignSt) {
+	// TODO: Implement other assignment types.
+	if lex.Is_postfix_op(a.Setter.Kind) {
+		sc.check_postfix(a)
+		return
+	}
+}
+
 func (sc *_ScopeChecker) check_node(node ast.NodeData) {
 	switch node.(type) {
 	case *ast.Comment:
@@ -587,6 +680,9 @@ func (sc *_ScopeChecker) check_node(node ast.NodeData) {
 
 	case *ast.GotoSt:
 		sc.push_goto(node.(*ast.GotoSt))
+
+	case *ast.AssignSt:
+		sc.check_assign_st(node.(*ast.AssignSt))
 
 	default:
 		println("error <unimplemented scope node>")

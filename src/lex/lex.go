@@ -157,8 +157,10 @@ func (l *_Lex) check_ranges() {
 		switch t.Kind {
 		case KND_LPAREN:
 			l.push_err_tok(t, "wait_close_parentheses")
+
 		case KND_LBRACE:
 			l.push_err_tok(t, "wait_close_brace")
+
 		case KND_LBRACKET:
 			l.push_err_tok(t, "wait_close_bracket")
 		}
@@ -211,8 +213,10 @@ func (l *_Lex) resume() string {
 			switch r {
 			case '\n':
 				l.new_line()
+
 			case '\t':
 				l.column += 4
+
 			default:
 				l.column++
 			}
@@ -297,8 +301,10 @@ loop:
 		switch {
 		case Is_decimal(b):
 			continue
+
 		case is_float_fmt_p(b, i):
 			return float_fmt_p(txt, i)
+
 		default:
 			break loop
 		}
@@ -328,6 +334,7 @@ func float_num(txt string, i int) (literal string) {
 			break
 		}
 	}
+
 	if i == 1 { // Just dot
 		return
 	}
@@ -342,12 +349,15 @@ loop:
 		switch {
 		case b == '.':
 			return float_num(txt, i)
+
 		case is_float_fmt_e(b, i):
 			return float_fmt_e(txt, i)
+
 		case !Is_decimal(b):
 			break loop
 		}
 	}
+
 	if i == 0 {
 		return
 	}
@@ -381,18 +391,22 @@ func is_float_fmt_dotnp(txt string, i int) bool {
 	if txt[i] != '.' {
 		return false
 	}
+
 loop:
 	for i++; i < len(txt); i++ {
 		b := txt[i]
 		switch {
 		case Is_decimal(b):
 			continue
+
 		case is_float_fmt_p(b, i):
 			return true
+
 		default:
 			break loop
 		}
 	}
+
 	return false
 }
 
@@ -401,10 +415,13 @@ func is_float_fmt_dotp(txt string, i int) bool {
 	switch {
 	case len(txt) < 3:
 		fallthrough
+
 	case txt[0] != '.':
 		fallthrough
+
 	case txt[1] != 'p' && txt[1] != 'P':
 		return false
+
 	default:
 		return true
 	}
@@ -415,12 +432,16 @@ func is_float_fmt_dotfp(txt string, i int) bool {
 	switch {
 	case len(txt) < 4:
 		fallthrough
+
 	case txt[0] != '.':
 		fallthrough
+
 	case txt[1] != 'f' && txt[1] != 'F':
 		fallthrough
+
 	case txt[2] != 'p' && txt[1] != 'P':
 		return false
+
 	default:
 		return true
 	}
@@ -463,12 +484,16 @@ loop:
 		switch {
 		case is_float_fmt_dotp(txt, i):
 			return float_fmt_dotp(txt, i)
+
 		case is_float_fmt_dotfp(txt, i):
 			return float_fmt_dotfp(txt, i)
+
 		case is_float_fmt_p(b, i):
 			return float_fmt_p(txt, i)
+
 		case is_float_fmt_dotnp(txt, i):
 			return float_fmt_dotnp(txt, i)
+
 		case !Is_hex(b):
 			break loop
 		}
@@ -596,11 +621,13 @@ func (l *_Lex) lex_rune(txt string) string {
 		}
 		n++
 	}
+
 	if n == 0 {
 		l.push_err("rune_empty")
 	} else if n > 1 {
 		l.push_err("rune_overflow")
 	}
+
 	return sb.String()
 }
 
@@ -720,29 +747,41 @@ func (l *_Lex) token() Token {
 		t.Kind = l.lex_rune(txt)
 		t.Id = ID_LIT
 		return t
+
 	case txt[0] == '"' || txt[0] == '`':
 		t.Kind = l.lex_str(txt)
 		t.Id = ID_LIT
 		return t
+
 	case strings.HasPrefix(txt, KND_LN_COMMENT):
 		l.lex_line_comment(&t)
 		return t
+
 	case strings.HasPrefix(txt, KND_RNG_LCOMMENT):
 		l.lex_range_comment()
 		return t
+
 	case l.is_op(txt, KND_LPAREN, ID_RANGE, &t):
 		l.ranges = append(l.ranges, t)
+
 	case l.is_op(txt, KND_RPARENT, ID_RANGE, &t):
 		l.push_range_close(t, KND_LPAREN)
+
 	case l.is_op(txt, KND_LBRACE, ID_RANGE, &t):
 		l.ranges = append(l.ranges, t)
+
 	case l.is_op(txt, KND_RBRACE, ID_RANGE, &t):
 		l.push_range_close(t, KND_LBRACE)
+
 	case l.is_op(txt, KND_LBRACKET, ID_RANGE, &t):
 		l.ranges = append(l.ranges, t)
+
 	case l.is_op(txt, KND_RBRACKET, ID_RANGE, &t):
 		l.push_range_close(t, KND_LBRACKET)
+
 	case l.lex_basic_ops(txt, &t) || l.lex_kws(txt, &t) || l.lex_id(txt, &t):
+		// Skip.
+
 	default:
 		r, sz := utf8.DecodeRuneInString(txt)
 		l.push_err("invalid_token", r)
@@ -750,21 +789,25 @@ func (l *_Lex) token() Token {
 		l.pos++
 		return t
 	}
+
 	l.column += len(t.Kind)
 	return t
 }
 
 func get_close_kind_of_brace(left string) string {
-	var right string
 	switch left {
 	case KND_RPARENT:
-		right = KND_LPAREN
+		return KND_LPAREN
+
 	case KND_RBRACE:
-		right = KND_LBRACE
+		return KND_LBRACE
+
 	case KND_RBRACKET:
-		right = KND_LBRACKET
+		return KND_LBRACKET
+
+	default:
+		return ""
 	}
-	return right
 }
 
 func (l *_Lex) remove_range(i int, kind string) {
@@ -785,8 +828,10 @@ func (l *_Lex) push_range_close(t Token, left string) {
 		switch t.Kind {
 		case KND_RBRACKET:
 			l.push_err_tok(t, "extra_closed_brackets")
+
 		case KND_RBRACE:
 			l.push_err_tok(t, "extra_closed_braces")
+
 		case KND_RPARENT:
 			l.push_err_tok(t, "extra_closed_parentheses")
 		}
@@ -802,11 +847,14 @@ func (l *_Lex) push_wrong_order_close_err(t Token) {
 	switch l.ranges[len(l.ranges)-1].Kind {
 	case KND_LPAREN:
 		msg = "expected_parentheses_close"
+
 	case KND_LBRACE:
 		msg = "expected_brace_close"
+
 	case KND_LBRACKET:
 		msg = "expected_bracket_close"
 	}
+
 	l.push_err_tok(t, msg)
 }
 

@@ -235,6 +235,27 @@ var WEAK_OPS = [...]string{
 	KND_COLON,
 }
 
+// List of postfix operators.
+var POSTFIX_OPS = [...]string{
+	KND_DBL_PLUS,
+	KND_DBL_MINUS,
+}
+
+// List of assign operators.
+var ASSING_OPS = [...]string{
+	KND_EQ,
+	KND_PLUS_EQ,
+	KND_MINUS_EQ,
+	KND_SOLIDUS_EQ,
+	KND_STAR_EQ,
+	KND_PERCENT_EQ,
+	KND_RSHIFT_EQ,
+	KND_LSHIFT_EQ,
+	KND_VLINE_EQ,
+	KND_AMPER_EQ,
+	KND_CARET_EQ,
+}
+
 func exist_op(kind string, operators []string) bool {
 	for _, operator := range operators {
 		if kind == operator {
@@ -266,19 +287,25 @@ func (t *Token) Prec() int {
 	if t.Id != ID_OP {
 		return -1
 	}
+
 	switch t.Kind {
 	case KND_STAR, KND_PERCENT, KND_SOLIDUS,
 		KND_RSHIFT, KND_LSHIFT, KND_AMPER:
 		return 5
+
 	case KND_PLUS, KND_MINUS, KND_VLINE, KND_CARET:
 		return 4
-	case KND_EQS, KND_NOT_EQ, KND_LT,
+
+		case KND_EQS, KND_NOT_EQ, KND_LT,
 		KND_LESS_EQ, KND_GT, KND_GREAT_EQ:
 		return 3
+
 	case KND_DBL_AMPER:
 		return 2
+
 	case KND_DBL_VLINE:
 		return 1
+
 	default:
 		return -1
 	}
@@ -319,6 +346,7 @@ func Is_num(k string) bool {
 	if k == "" {
 		return false
 	}
+
 	b := k[0]
 	return b == '.' || ('0' <= b && b <= '9')
 }
@@ -339,6 +367,7 @@ func rune_exist(r rune, runes []rune) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -379,10 +408,13 @@ func Is_hex(b byte) bool {
 	switch {
 	case '0' <= b && b <= '9':
 		return true
+
 	case 'a' <= b && b <= 'f':
 		return true
+
 	case 'A' <= b && b <= 'F':
 		return true
+
 	default:
 		return false
 	}
@@ -503,4 +535,48 @@ func Parts(tokens []Token, id uint8, expr_must bool) ([][]Token, []build.Log) {
 	}
 
 	return parts, errors
+}
+
+// Reports given token id is allow for
+// assignment left-expression or not.
+func Is_assign(id uint8) bool {
+	switch id {
+	case ID_IDENT,
+		ID_CPP,
+		ID_LET,
+		ID_DOT,
+		ID_SELF,
+		ID_RANGE,
+		ID_OP:
+		return true
+
+	default:
+		return false
+	}
+}
+
+// Reports whether operator kind is postfix operator.
+func Is_postfix_op(kind string) bool {
+	for _, op := range POSTFIX_OPS {
+		if kind == op {
+			return true
+		}
+	}
+
+	return false
+}
+
+// Reports whether operator kind is assignment operator.
+func Is_assign_op(kind string) bool {
+	if Is_postfix_op(kind) {
+		return true
+	}
+
+	for _, op := range ASSING_OPS {
+		if kind == op {
+			return true
+		}
+	}
+
+	return false
 }

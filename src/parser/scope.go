@@ -721,11 +721,13 @@ func (sp *_ScopeParser) build_id_st(tokens []lex.Token) (_ ast.NodeData, ok bool
 	if len(tokens) == 1 {
 		return
 	}
+
 	token := tokens[1]
 	switch token.Id {
 	case lex.ID_COLON:
 		return sp.build_label_st(tokens), true
 	}
+
 	return
 }
 
@@ -739,17 +741,20 @@ func (sp *_ScopeParser) build_assign_info(tokens []lex.Token) *_AssignInfo {
 			switch token.Kind {
 			case lex.KND_LBRACE, lex.KND_LBRACKET, lex.KND_LPAREN:
 				brace_n++
+
 			default:
 				brace_n--
 			}
 		}
+
 		if brace_n > 0 {
 			continue
 		} else if token.Id != lex.ID_OP {
 			continue
-		} else if !is_assign_op(token.Kind) {
+		} else if !lex.Is_assign_op(token.Kind) {
 			continue
 		}
+
 		info.l = tokens[:i]
 		if len(info.l) == 0 {
 			info.ok = false
@@ -757,11 +762,11 @@ func (sp *_ScopeParser) build_assign_info(tokens []lex.Token) *_AssignInfo {
 		info.setter = token
 		if i+1 >= len(tokens) {
 			info.r = nil
-			info.ok = is_postfix_op(info.setter.Kind)
+			info.ok = lex.Is_postfix_op(info.setter.Kind)
 			break
 		}
 		info.r = tokens[i+1:]
-		if is_postfix_op(info.setter.Kind) {
+		if lex.Is_postfix_op(info.setter.Kind) {
 			if len(info.r) > 0 {
 				sp.push_err(info.r[0], "invalid_syntax")
 				info.r = nil
@@ -776,9 +781,11 @@ func (sp *_ScopeParser) build_assign_l(tokens []lex.Token) *ast.AssignLeft {
 	l := &ast.AssignLeft{
 		Token: tokens[0],
 	}
+
 	if tokens[0].Id == lex.ID_IDENT {
 		l.Ident = l.Token.Kind
 	}
+
 	l.Expr = sp.p.build_expr(tokens)
 	return l
 }
@@ -792,38 +799,40 @@ func (sp *_ScopeParser) build_assign_ls(parts [][]lex.Token) []*ast.AssignLeft {
 	return lefts
 }
 
-func (sp *_ScopeParser) build_plain_assign(tokens []lex.Token) (_ *ast.AssignSt, ok bool) {
+func (sp *_ScopeParser) build_plain_assign(tokens []lex.Token) (*ast.AssignSt, bool) {
 	info := sp.build_assign_info(tokens)
 	if !info.ok {
-		return
+		return nil, false
 	}
-	ok = true
+
 	assign := &ast.AssignSt{
 		Setter: info.setter,
 	}
+
 	parts, errs := lex.Parts(info.l, lex.ID_COMMA, true)
 	if len(errs) > 0 {
 		sp.p.errors = append(sp.p.errors, errs...)
 		return nil, false
 	}
+
 	assign.L = sp.build_assign_ls(parts)
 	if info.r != nil {
 		assign.R = sp.p.build_expr(info.r)
 	}
-	return
+
+	return assign, true
 }
 
-func (sp *_ScopeParser) build_decl_assign(tokens []lex.Token) (_ *ast.AssignSt, ok bool) {
+func (sp *_ScopeParser) build_decl_assign(tokens []lex.Token) (*ast.AssignSt, bool) {
 	if len(tokens) < 1 {
-		return
+		return nil, false
 	}
 
 	tokens = tokens[1:] // Skip "let" keyword
 	token := tokens[0]
 	if token.Id != lex.ID_RANGE || token.Kind != lex.KND_LPAREN {
-		return
+		return nil, false
 	}
-	ok = true
 
 	assign := &ast.AssignSt{}
 
@@ -831,7 +840,7 @@ func (sp *_ScopeParser) build_decl_assign(tokens []lex.Token) (_ *ast.AssignSt, 
 	rang := lex.Range(&i, lex.KND_LPAREN, lex.KND_RPARENT, tokens)
 	if rang == nil {
 		sp.push_err(token, "invalid_syntax")
-		return
+		return nil, false
 	} else if i+1 < len(tokens) {
 		assign.Setter = tokens[i]
 		i++
@@ -842,8 +851,9 @@ func (sp *_ScopeParser) build_decl_assign(tokens []lex.Token) (_ *ast.AssignSt, 
 	parts, errs := lex.Parts(rang, lex.ID_COMMA, true)
 	if len(errs) > 0 {
 		sp.p.errors = append(sp.p.errors, errs...)
-		return
+		return nil, false
 	}
+
 	for _, part := range parts {
 		is_mut := false
 		token := part[0]
@@ -855,24 +865,29 @@ func (sp *_ScopeParser) build_decl_assign(tokens []lex.Token) (_ *ast.AssignSt, 
 				continue
 			}
 		}
+
 		if part[0].Id != lex.ID_IDENT && part[0].Id != lex.ID_RANGE && part[0].Kind != lex.KND_LPAREN {
 			sp.push_err(token, "invalid_syntax")
 			continue
 		}
+
 		l := sp.build_assign_l(part)
 		l.Mutable = is_mut
 		assign.L = append(assign.L, l)
 	}
-	return
+
+	return assign, true
 }
 
 func (sp *_ScopeParser) build_assign_st(tokens []lex.Token) (*ast.AssignSt, bool) {
 	if !check_assign_tokens(tokens) {
 		return nil, false
 	}
+
 	switch tokens[0].Id {
 	case lex.ID_LET:
 		return sp.build_decl_assign(tokens)
+
 	default:
 		return sp.build_plain_assign(tokens)
 	}
@@ -945,6 +960,7 @@ func (sp *_ScopeParser) build_st(st *_Stmt) ast.NodeData {
 			return sp.build_call_st(st.tokens)
 		}
 	}
+
 	sp.push_err(token, "invalid_syntax")
 	return nil
 }
