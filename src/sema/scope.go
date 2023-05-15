@@ -60,20 +60,34 @@ type Label struct {
 	Ident string
 }
 
+// Goto statement.
+type GotoSt struct {
+	Ident string
+}
+
 type _ScopeLabel struct {
 	label *Label
+	pos   int
+	scope *_ScopeChecker
+}
+
+type _ScopeGoto struct {
+	gt    *ast.GotoSt
+	scope *_ScopeChecker
 	pos   int
 }
 
 // Scope checker.
 type _ScopeChecker struct {
-	s      *_Sema
-	parent *_ScopeChecker
-	table  *SymbolTable
-	scope  *Scope
-	tree   *ast.ScopeTree
-	it     uintptr
-	labels []*_ScopeLabel
+	s           *_Sema
+	parent      *_ScopeChecker
+	child_index int // Index of child scope.
+	table       *SymbolTable
+	scope       *Scope
+	tree        *ast.ScopeTree
+	it          uintptr
+	labels      *[]*_ScopeLabel // All labels of all scopes.
+	gotos       *[]*_ScopeGoto  // All gotos of all scopes.
 }
 
 // Returns package by identifier.
@@ -185,9 +199,25 @@ func (sc *_ScopeChecker) Find_enum(ident string) *Enum {
 // Returns nil if not exist any label in this identifier.
 // Just lookups current scope.
 func (sc *_ScopeChecker) find_label(ident string) *Label {
-	for _, label := range sc.labels {
-		if label.label.Ident == ident {
-			return label.label
+	for _, st := range sc.scope.Stmts {
+		switch st.(type) {
+		case *Label:
+			label := st.(*Label)
+			if label.Ident == ident {
+				return label
+			}
+		}
+	}
+	return nil
+}
+
+// Returns label by identifier.
+// Returns nil if not exist any label in this identifier.
+// Lookups all labels.
+func (sc *_ScopeChecker) find_label_all(ident string) *_ScopeLabel {
+	for _, lbl := range *sc.labels {
+		if lbl.label.Ident == ident {
+			return lbl
 		}
 	}
 	return nil
@@ -252,7 +282,7 @@ func (sc *_ScopeChecker) check_child_sc(tree *ast.ScopeTree, ssc *_ScopeChecker)
 }
 
 func (sc *_ScopeChecker) check_child(tree *ast.ScopeTree) *Scope {
-	ssc := new_scope_checker(sc.s)
+	ssc := sc.new_child_checker()
 	return sc.check_child_sc(tree, ssc)
 }
 
@@ -312,7 +342,9 @@ func (sc *_ScopeChecker) check_conditional(conditional *ast.Conditional) {
 		c.Elifs[i] = sc.check_if(elif)
 	}
 
-	c.Default = sc.check_else(conditional.Default)
+	if conditional.Default != nil {
+		c.Default = sc.check_else(conditional.Default)
+	}
 
 	sc.scope.Stmts = append(sc.scope.Stmts, c)
 }
@@ -323,7 +355,7 @@ func (sc *_ScopeChecker) check_iter_scope_sc(it uintptr, tree *ast.ScopeTree, ss
 }
 
 func (sc *_ScopeChecker) check_iter_scope(it uintptr, tree *ast.ScopeTree) *Scope {
-	ssc := new_scope_checker(sc.s)
+	ssc := sc.new_child_checker()
 	return sc.check_iter_scope_sc(it, tree, ssc)
 }
 
@@ -385,7 +417,7 @@ func (sc *_ScopeChecker) check_range_iter(it *ast.Iter) {
 		return
 	}
 
-	ssc := new_scope_checker(sc.s)
+	ssc := sc.new_child_checker()
 
 	if kind.Key_a != nil {
 		ssc.table.Vars = append(ssc.table.Vars, kind.Key_a)
@@ -427,7 +459,7 @@ func (sc *_ScopeChecker) check_cont(c *ast.ContSt) {
 	sc.scope.Stmts = append(sc.scope.Stmts, &ContSt{It: sc.it})
 }
 
-func (sc *_ScopeChecker) check_label(i int, l *ast.LabelSt) {
+func (sc *_ScopeChecker) check_label(l *ast.LabelSt) {
 	if sc.find_label(l.Ident) != nil {
 		sc.s.push_err(l.Token, "label_exist", l.Ident)
 		return
@@ -438,13 +470,26 @@ func (sc *_ScopeChecker) check_label(i int, l *ast.LabelSt) {
 	}
 
 	sc.scope.Stmts = append(sc.scope.Stmts, label)
-	sc.labels = append(sc.labels, &_ScopeLabel{
+	*sc.labels = append(*sc.labels, &_ScopeLabel{
 		label: label,
-		pos:   l.Token.Row,
+		pos:   len(sc.scope.Stmts) - 1,
+		scope: sc,
 	})
 }
 
-func (sc *_ScopeChecker) check_node(i int, node ast.NodeData) {
+func (sc *_ScopeChecker) push_goto(gt *ast.GotoSt) {
+	sc.scope.Stmts = append(sc.scope.Stmts, &GotoSt{
+		Ident: gt.Label.Kind,
+	})
+
+	*sc.gotos = append(*sc.gotos, &_ScopeGoto{
+		gt:    gt,
+		pos:   len(sc.scope.Stmts) - 1,
+		scope: sc,
+	})
+}
+
+func (sc *_ScopeChecker) check_node(node ast.NodeData) {
 	switch node.(type) {
 	case *ast.Comment:
 		// Ignore.
@@ -472,7 +517,10 @@ func (sc *_ScopeChecker) check_node(i int, node ast.NodeData) {
 		sc.check_cont(node.(*ast.ContSt))
 
 	case *ast.LabelSt:
-		sc.check_label(i, node.(*ast.LabelSt))
+		sc.check_label(node.(*ast.LabelSt))
+
+	case *ast.GotoSt:
+		sc.push_goto(node.(*ast.GotoSt))
 
 	default:
 		println("error <unimplemented scope node>")
@@ -480,8 +528,126 @@ func (sc *_ScopeChecker) check_node(i int, node ast.NodeData) {
 }
 
 func (sc *_ScopeChecker) check_tree() {
-	for i, node := range sc.tree.Stmts {
-		sc.check_node(i, node)
+	for _, node := range sc.tree.Stmts {
+		sc.check_node(node)
+	}
+}
+
+func st_is_def(st St) bool {
+	// TODO: Add multi-decl variable statements.
+	switch st.(type) {
+	case *Var:
+		return true
+
+	default:
+		return false
+	}
+}
+
+func (sc *_ScopeChecker) check_same_scope_goto(gt *_ScopeGoto, label *_ScopeLabel) {
+	if label.pos < gt.pos { // Label at above.
+		return
+	}
+
+	i := label.pos
+	for ; i > gt.pos; i-- {
+		s := label.scope.scope.Stmts[i]
+		if st_is_def(s) {
+			sc.s.push_err(gt.gt.Token, "goto_jumps_declarations", gt.gt.Label.Kind)
+			break
+		}
+	}
+}
+
+func (sc *_ScopeChecker) check_label_parents(gt *_ScopeGoto, label *_ScopeLabel) bool {
+	scope := label.scope
+
+parent_scopes:
+	if scope.parent != nil && scope.parent != gt.scope {
+		scope = scope.parent
+		for i := 0; i < len(scope.scope.Stmts); i++ {
+			switch {
+			case i >= label.pos:
+				return true
+
+			case st_is_def(scope.scope.Stmts[i]):
+				sc.s.push_err(gt.gt.Token, "goto_jumps_declarations", gt.gt.Label.Kind)
+				return false
+			}
+		}
+
+		goto parent_scopes
+	}
+
+	return true
+}
+
+func (sc *_ScopeChecker) check_goto_scope(gt *_ScopeGoto, label *_ScopeLabel) {
+	for i := gt.pos; i < len(gt.scope.scope.Stmts); i++ {
+		switch {
+		case i >= label.pos:
+			return
+
+		case st_is_def(gt.scope.scope.Stmts[i]):
+			sc.s.push_err(gt.gt.Token, "goto_jumps_declarations", gt.gt.Label.Kind)
+			return
+		}
+	}
+}
+
+func (sc *_ScopeChecker) check_diff_scope_goto(gt *_ScopeGoto, label *_ScopeLabel) {
+	switch {
+	case label.scope.child_index > 0 && gt.scope.child_index == 0:
+		if !sc.check_label_parents(gt, label) {
+			return
+		}
+
+	case label.scope.child_index < gt.scope.child_index: // Label at parent blocks.
+		return
+	}
+
+	scope := label.scope
+	for i := label.pos - 1; i >= 0; i-- {
+		s := scope.scope.Stmts[i]
+		switch s.(type) {
+		case *Scope:
+			if i <= gt.pos {
+				return
+			}
+		}
+
+		if st_is_def(s) {
+			sc.s.push_err(gt.gt.Token, "goto_jumps_declarations", gt.gt.Label.Kind)
+			break
+		}
+	}
+
+	// Parent Scopes
+	if scope.parent != nil && scope.parent != gt.scope {
+		_ = sc.check_label_parents(gt, label)
+	} else { // goto Scope
+		sc.check_goto_scope(gt, label)
+	}
+}
+
+func (sc *_ScopeChecker) check_goto(gt *_ScopeGoto, label *_ScopeLabel) {
+	switch {
+	case gt.scope == label.scope:
+		sc.check_same_scope_goto(gt, label)
+
+	case label.scope.child_index > 0:
+		sc.check_diff_scope_goto(gt, label)
+	}
+}
+
+func (sc *_ScopeChecker) check_gotos() {
+	for _, gt := range *sc.gotos {
+		label := sc.find_label_all(gt.gt.Label.Kind)
+		if label == nil {
+			sc.s.push_err(gt.gt.Token, "label_not_exist", gt.gt.Label.Kind)
+			continue
+		}
+		sc.check_goto(gt, label)
 	}
 }
 
@@ -494,11 +660,30 @@ func (sc *_ScopeChecker) check(tree *ast.ScopeTree, s *Scope) {
 	sc.scope = s
 
 	sc.check_tree()
+
+	if sc.parent == nil { // If parent scope.
+		sc.check_gotos()
+	}
+}
+
+func (sc *_ScopeChecker) new_child_checker() *_ScopeChecker {
+	base := new_scope_checker_base(sc.s)
+	base.labels = sc.labels
+	base.gotos =  sc.gotos
+	base.child_index = sc.child_index + 1
+	return base
+}
+
+func new_scope_checker_base(s *_Sema) *_ScopeChecker {
+	return &_ScopeChecker{
+		s:      s,
+		table:  &SymbolTable{},
+	}
 }
 
 func new_scope_checker(s *_Sema) *_ScopeChecker {
-	return &_ScopeChecker{
-		s:     s,
-		table: &SymbolTable{},
-	}
+	base := new_scope_checker_base(s)
+	base.labels = new([]*_ScopeLabel)
+	base.gotos =  new([]*_ScopeGoto)
+	return base
 }

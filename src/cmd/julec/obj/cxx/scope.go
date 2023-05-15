@@ -244,6 +244,10 @@ func gen_label(l *sema.Label) string {
 	return label_ident(l.Ident) + ":;"
 }
 
+func gen_goto(gt *sema.GotoSt) string {
+	return "goto " + label_ident(gt.Ident) + ";"
+}
+
 // Generates C++ code of statement.
 func gen_st(st sema.St) string {
 	switch st.(type) {
@@ -276,6 +280,9 @@ func gen_st(st sema.St) string {
 
 	case *sema.Label:
 		return gen_label(st.(*sema.Label))
+
+	case *sema.GotoSt:
+		return gen_goto(st.(*sema.GotoSt))
 
 	default:
 		return "<unimplemented stmt>"
