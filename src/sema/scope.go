@@ -75,6 +75,13 @@ type Postfix struct {
 	Op   string
 }
 
+// Assigment.
+type Assign struct {
+	L  ExprModel
+	R  ExprModel
+	Op string
+}
+
 type _ScopeLabel struct {
 	label *Label
 	pos   int
@@ -631,19 +638,87 @@ func (sc *_ScopeChecker) check_postfix(a *ast.AssignSt) {
 		check_t = d.Kind.Ref().Elem
 	}
 
-	if check_t.Prim() != nil {
-		if types.Is_num(check_t.Prim().kind) {
-			return
-		}
+	if check_t.Prim() == nil || !types.Is_num(check_t.Prim().kind) {
+		sc.s.push_err(a.Setter, "operator_not_for_juletype", a.Setter.Kind, d.Kind.To_str())
+		return
 	}
 
-	sc.s.push_err(a.Setter, "operator_not_for_juletype", a.Setter.Kind, d.Kind.To_str())
+	sc.scope.Stmts = append(sc.scope.Stmts, &Postfix{
+		Expr: d.Model,
+		Op:   a.Setter.Kind,
+	})
+}
+
+func (sc *_ScopeChecker) is_new_assign_ident(ident string) bool {
+	return sc.table.def_by_ident(ident, false) == nil
+}
+
+func (sc *_ScopeChecker) check_single_assign(a *ast.AssignSt) {
+	r := sc.s.eval(a.R, sc)
+	if r == nil {
+		return
+	}
+
+	if lex.Is_ignore_ident(a.L[0].Ident) {
+		sc.scope.Stmts = append(sc.scope.Stmts, r)
+		return
+	}
+
+	l := sc.s.eval(a.L[0].Expr, sc)
+	if l == nil {
+		return
+	}
+
+	if !sc.check_assign(l, a.Setter) {
+		return
+	}
+
+	if r.Kind.Tup() != nil {
+		sc.s.push_err(a.Setter, "missing_multi_assign_idents")
+		return
+	}
+
+	if a.Setter.Kind != lex.KND_EQ && !r.Is_const() {
+		a.Setter.Kind = a.Setter.Kind[:len(a.Setter.Kind)-1]
+
+		solver := _BinopSolver{
+			e:  &_Eval{
+				s:        sc.s,
+				lookup:   sc,
+				unsafety: sc.is_unsafe(),
+			},
+			op: a.Setter,
+		}
+
+		r = solver.solve_explicit(l, r)
+		a.Setter.Kind += lex.KND_EQ
+	}
+
+	checker := _AssignTypeChecker{
+		s:           sc.s,
+		dest:        l.Kind,
+		d:           r,
+		error_token: a.Setter,
+	}
+
+	checker.check()
+
+	sc.scope.Stmts = append(sc.scope.Stmts, &Assign{
+		L:  l.Model,
+		R:  r.Model,
+		Op: a.Setter.Kind,
+	})
 }
 
 func (sc *_ScopeChecker) check_assign_st(a *ast.AssignSt) {
 	// TODO: Implement other assignment types.
 	if lex.Is_postfix_op(a.Setter.Kind) {
 		sc.check_postfix(a)
+		return
+	}
+
+	if len(a.L) == 1 && !sc.is_new_assign_ident(a.L[0].Ident) {
+		sc.check_single_assign(a)
 		return
 	}
 }

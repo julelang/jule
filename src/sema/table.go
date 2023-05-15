@@ -114,6 +114,52 @@ func (st *SymbolTable) find_enum(ident string) *Enum {
 	return nil
 }
 
+// Returns define by identifier.
+// Returns nil if not exist any define in this identifier.
+func (st *SymbolTable) def_by_ident(ident string, cpp_linked bool) any {
+	for _, v := range st.Vars {
+		if v.Ident == ident && v.Cpp_linked == cpp_linked {
+			return v
+		}
+	}
+
+	for _, ta := range st.Type_aliases {
+		if ta.Ident == ident && ta.Cpp_linked == cpp_linked {
+			return ta
+		}
+	}
+
+	for _, s := range st.Structs {
+		if s.Ident == ident && s.Cpp_linked == cpp_linked {
+			return s
+		}
+	}
+
+	for _, f := range st.Funcs {
+		if f.Ident == ident && f.Cpp_linked == cpp_linked {
+			return f
+		}
+	}
+
+	if cpp_linked {
+		return false
+	}
+
+	for _, t := range st.Traits {
+		if t.Ident == ident {
+			return t
+		}
+	}
+
+	for _, e := range st.Enums {
+		if e.Ident == ident {
+			return e
+		}
+	}
+
+	return nil
+}
+
 // Reports this identifier duplicated in symbol table.
 // The "self" parameter represents address of exception identifier.
 // If founded identifier address equals to self, will be skipped.

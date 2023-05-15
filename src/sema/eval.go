@@ -2829,6 +2829,25 @@ func (bs *_BinopSolver) post_const(d *Data) {
 	bs.normalize_bitsize(d)
 }
 
+func (bs *_BinopSolver) solve_explicit(l *Data, r *Data) *Data {
+	bs.l, bs.r = l, r
+	data := bs.eval()
+	bs.l, bs.r = l, r // Save normal order
+	
+	bs.solve_const(data)
+	bs.post_const(data)
+	
+	if data != nil {
+		data.Model = &BinopExprModel{
+			L: l.Model,
+			R: r.Model,
+			Op: bs.op.Kind,
+		}
+	}
+	
+	return data
+}
+
 func (bs *_BinopSolver) solve(op *ast.BinopExpr) *Data {
 	l := bs.e.eval_expr_kind(op.L)
 	if l == nil {
@@ -2841,21 +2860,5 @@ func (bs *_BinopSolver) solve(op *ast.BinopExpr) *Data {
 	}
 
 	bs.op = op.Op
-
-	bs.l, bs.r = l, r
-	data := bs.eval()
-	bs.l, bs.r = l, r // Save normal order
-	
-	bs.solve_const(data)
-	bs.post_const(data)
-	
-	if data != nil {
-		data.Model = &BinopExprModel{
-			L: l.Model,
-			R: r.Model,
-			Op: op.Op.Kind,
-		}
-	}
-	
-	return data
+	return bs.solve_explicit(bs.l, bs.r)
 }

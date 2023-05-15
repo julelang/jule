@@ -237,7 +237,7 @@ func gen_range_iter(it *sema.RangeIter) string {
 }
 
 func gen_cont(c *sema.ContSt) string {
-	return "goto " + iter_next_label_ident(c.It) + ";"
+	return "goto " + iter_next_label_ident(c.It) + CPP_ST_TERM
 }
 
 func gen_label(l *sema.Label) string {
@@ -245,7 +245,19 @@ func gen_label(l *sema.Label) string {
 }
 
 func gen_goto(gt *sema.GotoSt) string {
-	return "goto " + label_ident(gt.Ident) + ";"
+	return "goto " + label_ident(gt.Ident) + CPP_ST_TERM
+}
+
+func gen_postfix(p *sema.Postfix) string {
+	return gen_expr_model(p.Expr) + p.Op + CPP_ST_TERM
+}
+
+func gen_assign(a *sema.Assign) string {
+	obj := gen_expr_model(a.L)
+	obj += a.Op
+	obj += gen_expr_model(a.R)
+	obj += CPP_ST_TERM
+	return obj
 }
 
 // Generates C++ code of statement.
@@ -261,7 +273,7 @@ func gen_st(st sema.St) string {
 		return "// " + gen_type_alias(st.(*sema.TypeAlias))
 
 	case *sema.Data:
-		return gen_expr_model(st.(*sema.Data).Model) + ";"
+		return gen_expr_model(st.(*sema.Data).Model) + CPP_ST_TERM
 
 	case *sema.Conditional:
 		return gen_conditional(st.(*sema.Conditional))
@@ -283,6 +295,12 @@ func gen_st(st sema.St) string {
 
 	case *sema.GotoSt:
 		return gen_goto(st.(*sema.GotoSt))
+
+	case *sema.Postfix:
+		return gen_postfix(st.(*sema.Postfix))
+
+	case *sema.Assign:
+		return gen_assign(st.(*sema.Assign))
 
 	default:
 		return "<unimplemented stmt>"
