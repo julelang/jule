@@ -662,6 +662,8 @@ func (e *_Eval) eval_unary(u *ast.UnaryExpr) *Data {
 
 	if data == nil {
 		e.push_err(u.Op, "invalid_expr_unary_operator", u.Op.Kind)
+	} else if data.Is_const() {
+		data.Model = data.Constant
 	}
 
 	return data
