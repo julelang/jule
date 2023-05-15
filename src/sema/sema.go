@@ -1227,7 +1227,9 @@ func (s *_Sema) check_type_fn(f *Fn) {
 			return
 		}
 
-		f.Instances = append(f.Instances, f.instance())
+		ins := f.instance()
+		f.Instances = append(f.Instances, ins)
+		s.reload_fn_ins_types(ins)
 	}
 
 	for _, ins := range f.Instances {
