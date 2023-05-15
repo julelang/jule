@@ -50,6 +50,11 @@ type RangeIter struct {
 	Key_b *Var
 }
 
+// Continue statement.
+type ContSt struct {
+	It uintptr
+}
+
 // Scope checker.
 type _ScopeChecker struct {
 	s      *_Sema
@@ -390,6 +395,15 @@ func (sc *_ScopeChecker) check_iter(it *ast.Iter) {
 	}
 }
 
+func (sc *_ScopeChecker) check_cont(c *ast.ContSt) {
+	// TODO: Add label support.
+	if sc.it == 0 {
+		sc.s.push_err(c.Token, "continue_at_out_of_valid_scope")
+	}
+
+	sc.scope.Stmts = append(sc.scope.Stmts, &ContSt{It: sc.it})
+}
+
 func (sc *_ScopeChecker) check_node(node ast.NodeData) {
 	switch node.(type) {
 	case *ast.Comment:
@@ -413,6 +427,9 @@ func (sc *_ScopeChecker) check_node(node ast.NodeData) {
 
 	case *ast.Iter:
 		sc.check_iter(node.(*ast.Iter))
+
+	case *ast.ContSt:
+		sc.check_cont(node.(*ast.ContSt))
 
 	default:
 		println("error <unimplemented scope node>")

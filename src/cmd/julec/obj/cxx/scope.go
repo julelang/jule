@@ -236,6 +236,10 @@ func gen_range_iter(it *sema.RangeIter) string {
 	return obj
 }
 
+func gen_cont(c *sema.ContSt) string {
+	return "goto " + iter_next_label_ident(c.It) + ";"
+}
+
 // Generates C++ code of statement.
 func gen_st(st sema.St) string {
 	switch st.(type) {
@@ -262,6 +266,9 @@ func gen_st(st sema.St) string {
 
 	case *sema.RangeIter:
 		return gen_range_iter(st.(*sema.RangeIter))
+
+	case *sema.ContSt:
+		return gen_cont(st.(*sema.ContSt))
 
 	default:
 		return "<unimplemented stmt>"
