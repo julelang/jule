@@ -1323,6 +1323,30 @@ func (e *_Eval) is_instanced_struct(s *StructIns) bool {
 	return len(s.Decl.Generics) == len(s.Generics)
 }
 
+func (e *_Eval) eval_struct_lit_explicit(s *StructIns, exprs []ast.ExprData, error_token lex.Token) *Data {
+	ok := e.s.check_generic_quantity(len(s.Decl.Generics), len(s.Generics), error_token)
+	if !ok {
+		return nil
+	}
+	// NOTE: Instance already checked (just fields) if generic quantity passes.
+
+	slc := _StructLitChecker{
+		e:           e,
+		error_token: error_token,
+		s:           s,
+	}
+	slc.check(exprs)
+
+	return &Data{
+		Mutable: true,
+		Kind:    &TypeKind{kind: s},
+		Model:   &StructLitExprModel{
+			Strct: s,
+			Args:  slc.args,
+		},
+	}
+}
+
 func (e *_Eval) eval_struct_lit(lit *ast.StructLit) *Data {
 	t := build_type(lit.Kind)
 	ok := e.s.check_type(t, e.lookup)
@@ -1336,27 +1360,7 @@ func (e *_Eval) eval_struct_lit(lit *ast.StructLit) *Data {
 		return nil
 	}
 
-	ok = e.s.check_generic_quantity(len(s.Decl.Generics), len(s.Generics), lit.Kind.Token)
-	if !ok {
-		return nil
-	}
-	// NOTE: Instance already checked (just fields) if generic quantity passes.
-
-	slc := _StructLitChecker{
-		e:           e,
-		error_token: lit.Kind.Token,
-		s:           s,
-	}
-	slc.check(lit.Exprs)
-
-	return &Data{
-		Mutable: true,
-		Kind:    t.Kind,
-		Model:   &StructLitExprModel{
-			Strct: s,
-			Args:  slc.args,
-		},
-	}
+	return e.eval_struct_lit_explicit(s, lit.Exprs, lit.Kind.Token)
 }
 
 func (e *_Eval) eval_type(t *ast.Type) *Data {
@@ -2170,7 +2174,6 @@ func (e *_Eval) eval_map(m *Map, lit *ast.BraceLit) *Data {
 }
 
 func (e *_Eval) eval_brace_lit(lit *ast.BraceLit) *Data {
-	// TODO: Add support for structure prefix.
 	switch {
 	case e.prefix == nil:
 		e.push_err(lit.Token, "invalid_syntax")
@@ -2178,6 +2181,9 @@ func (e *_Eval) eval_brace_lit(lit *ast.BraceLit) *Data {
 
 	case e.prefix.Map() != nil:
 		return e.eval_map(e.prefix.Map(), lit)
+
+	case e.prefix.Strct() != nil:
+		return e.eval_struct_lit_explicit(e.prefix.Strct(), lit.Exprs, lit.Token)
 	
 	default:
 		e.push_err(lit.Token, "invalid_syntax")

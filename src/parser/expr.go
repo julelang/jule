@@ -721,10 +721,10 @@ func (ep *_ExprBuilder) build_brace_lit_part(tokens []lex.Token) ast.ExprData {
 			Val:   ep.build_from_tokens(r).Kind,
 		}
 	}
-	return ep.build_from_tokens(tokens).Kind
+	return ep.build_from_tokens(tokens)
 }
 
-func (ep *_ExprBuilder) build_brace_literal(tokens []lex.Token) *ast.BraceLit {
+func (ep *_ExprBuilder) build_brace_lit(tokens []lex.Token) *ast.BraceLit {
 	lit := &ast.BraceLit{
 		Token: tokens[0],
 	}
@@ -747,7 +747,7 @@ func (ep *_ExprBuilder) build_brace_range(tokens []lex.Token) ast.ExprData {
 
 	switch {
 	case len(expr_tokens) == 0:
-		return ep.build_brace_literal(tokens)
+		return ep.build_brace_lit(tokens)
 
 	case range_n > 0:
 		ep.push_err(tokens[0], "invalid_syntax")

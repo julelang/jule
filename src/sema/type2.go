@@ -720,8 +720,38 @@ dup_lookup:
 	slc.push_match(f, d, pair.Field)
 }
 
+func (slc *_StructLitChecker) ready_exprs(exprs []ast.ExprData) bool {
+	ok := true
+	for i, expr := range exprs {
+		switch expr.(type) {
+		case *ast.KeyValPair:
+			pair := expr.(*ast.KeyValPair)
+			switch pair.Key.(type) {
+			case *ast.IdentExpr:
+				// Ok
+
+			default:
+				slc.push_err(pair.Colon, "invalid_syntax")
+				ok = false
+				continue
+			}
+
+			exprs[i] = &ast.FieldExprPair{
+				Field: pair.Key.(*ast.IdentExpr).Token,
+				Expr:  pair.Val,
+			}
+		}
+	}
+
+	return ok
+}
+
 func (slc *_StructLitChecker) check(exprs []ast.ExprData) {
 	if len(exprs) == 0 {
+		return
+	}
+
+	if !slc.ready_exprs(exprs) {
 		return
 	}
 
