@@ -287,9 +287,16 @@ func gen_case(m *sema.Match, c *sema.Case) string {
 	if len(c.Exprs) > 0 {
 		obj += "if (!("
 		for i, expr := range c.Exprs {
-			obj += gen_expr_model(expr)
-			obj += " == "
+			if !m.Type_match {
+				obj += gen_expr_model(expr)
+				obj += " == "
+			}
+
 			obj += MATCH_EXPR
+
+			if m.Type_match {
+				obj += ".__type_is<" + gen_expr_model(expr)  + ">()"
+			}
 
 			if i+1 < len(c.Exprs) {
 				obj += " || "

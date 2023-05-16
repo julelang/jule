@@ -328,7 +328,7 @@ func (s *_Sema) evalpd(expr *ast.Expr, l Lookup, p *TypeSymbol, owner *Var) *Dat
 		e.prefix = p.Kind
 	}
 
-	return e.eval(expr)
+	return e.eval_expr(expr)
 }
 
 // Evaluates expression with type prefixed Eval and returns result.

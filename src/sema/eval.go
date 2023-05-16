@@ -2307,6 +2307,20 @@ func (e *_Eval) eval(expr *ast.Expr) *Data {
 	case d == nil:
 		return nil
 
+	default:
+		return d
+	}
+}
+
+// Returns value data of evaluated expression.
+// Returns nil if error occurs.
+// Accepts decls as invalid expression.
+func (e *_Eval) eval_expr(expr *ast.Expr) *Data {
+	d := e.eval(expr)
+	switch {
+	case d == nil:
+		return nil
+
 	case d.Decl:
 		e.push_err(expr.Token, "invalid_expr")
 		return nil

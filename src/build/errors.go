@@ -169,6 +169,7 @@ var ERRORS = map[string]string{
 	`array_size_is_not_int`:                    `array size must be integer`,
 	`array_size_is_negative`:                   `array size must be positive integer`,
 	`builtin_as_anonymous_fn`:                  `built-in define cannot use as anonymous function`,
+	`type_case_has_not_any_expr`:               `type-case must be have <any> typed expression`,
 }
 
 // Returns formatted error message by key and args.

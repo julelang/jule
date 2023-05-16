@@ -383,6 +383,9 @@ func gen_tuple_expr_model(m *sema.TupleExprModel) string {
 
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
+	case *sema.TypeKind:
+		return gen_type_kind(m.(*sema.TypeKind))
+
 	case *constant.Const:
 		return gen_const_expr_model(m.(*constant.Const))
 

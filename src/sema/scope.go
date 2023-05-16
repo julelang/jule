@@ -91,9 +91,10 @@ type MultiAssign struct {
 
 // Match-Case.
 type Match struct {
-	Expr    ExprModel
-	Cases   []*Case
-	Default *Case
+	Expr       ExprModel
+	Type_match bool
+	Cases      []*Case
+	Default    *Case
 }
 
 // Match-Case case.
@@ -841,12 +842,31 @@ func (sc *_ScopeChecker) check_case_scope(tree *ast.ScopeTree) *Scope {
 	return sc.check_child(tree)
 }
 
-func (sc *_ScopeChecker) check_case(c *ast.Case, expr *Data) *Case {
+func (sc *_ScopeChecker) check_case(m *Match, c *ast.Case, expr *Data) *Case {
 	_case := &Case{
 		Exprs: make([]ExprModel, len(c.Exprs)),
 	}
 
+	m.Cases = append(m.Cases, _case)
+
 	for i, e := range c.Exprs {
+		if m.Type_match {
+			eval := _Eval{
+				s:      sc.s,
+				lookup: sc,
+			}
+
+			d := eval.eval(e)
+			if d != nil {
+				_case.Exprs[i] = d.Kind
+				if count_match_type(m, d.Kind) > 1 {
+					sc.s.push_err(e.Token, "duplicate_match_type", d.Kind.To_str())
+				}
+			}
+
+			continue
+		}
+
 		d := sc.s.eval(e, sc)
 		if d == nil {
 			continue
@@ -867,18 +887,40 @@ func (sc *_ScopeChecker) check_case(c *ast.Case, expr *Data) *Case {
 	return _case
 }
 
-func (sc *_ScopeChecker) check_cases(m *ast.MatchCase, expr *Data) []*Case {
-	cases := make([]*Case, len(m.Cases))
-	for i, c := range m.Cases {
-		cases[i] = sc.check_case(c, expr)
+func (sc *_ScopeChecker) check_cases(m *ast.MatchCase, rm *Match, expr *Data) {
+	for _, c := range m.Cases {
+		sc.check_case(rm, c, expr)
 	}
-	return cases
 }
 
 func (sc *_ScopeChecker) check_default(d *ast.Else) *Case {
 	def := &Case{}
 	def.Scope = sc.check_case_scope(d.Scope)
 	return def
+}
+
+func (sc *_ScopeChecker) check_type_match(m *ast.MatchCase) {
+	d := sc.s.eval(m.Expr, sc)
+	if d == nil {
+		return
+	}
+
+	if d.Kind.Prim() == nil || !d.Kind.Prim().Is_any() {
+		sc.s.push_err(m.Expr.Token, "type_case_has_not_any_expr")
+		return
+	}
+
+	tm := &Match{
+		Type_match: true,
+		Expr:       d.Model,
+	}
+
+	sc.check_cases(m, tm, d)
+	if m.Default != nil {
+		tm.Default = sc.check_default(m.Default)
+	}
+
+	sc.scope.Stmts = append(sc.scope.Stmts, tm)
 }
 
 func (sc *_ScopeChecker) check_common_match(m *ast.MatchCase) {
@@ -900,7 +942,7 @@ func (sc *_ScopeChecker) check_common_match(m *ast.MatchCase) {
 		Expr: d.Model,
 	}
 
-	mc.Cases = sc.check_cases(m, d)
+	sc.check_cases(m, mc, d)
 	if m.Default != nil {
 		mc.Default = sc.check_default(m.Default)
 	}
@@ -909,6 +951,10 @@ func (sc *_ScopeChecker) check_common_match(m *ast.MatchCase) {
 }
 
 func (sc *_ScopeChecker) check_match(m *ast.MatchCase) {
+	if m.Type_match {
+		sc.check_type_match(m)
+		return
+	}
 	sc.check_common_match(m)
 }
 
@@ -1131,4 +1177,28 @@ func find_label_parent(ident string, scope *_ScopeChecker) *_ScopeLabel {
 	}
 
 	return label
+}
+
+func count_match_type(m *Match, t *TypeKind) int {
+	n := 0
+	kind := t.To_str()
+loop:
+	for _, c := range m.Cases {
+		if c == nil {
+			continue
+		}
+
+		for _, expr := range c.Exprs {
+			// Break loop because this expression is not parsed yet.
+			// So, parsed cases finished.
+			if expr == nil {
+				break loop
+			}
+
+			if kind == expr.(*TypeKind).To_str() {
+				n++
+			}
+		}
+	}
+	return n
 }
