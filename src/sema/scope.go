@@ -771,6 +771,7 @@ func (sc *_ScopeChecker) check_multi_assign(a *ast.AssignSt) {
 			sc.s.check_var(v)
 
 			st.L = append(st.L, v)
+			sc.table.Vars = append(sc.table.Vars, v)
 			sc.scope.Stmts = append(sc.scope.Stmts, v)
 
 			continue
@@ -789,7 +790,7 @@ func (sc *_ScopeChecker) check_multi_assign(a *ast.AssignSt) {
 			continue
 		}
 
-		sc.s.check_validity_for_init_expr(lexpr.Mutable, r, a.Setter)
+		sc.s.check_validity_for_init_expr(l.Mutable, r, a.Setter)
 
 		checker := _AssignTypeChecker{
 			s:           sc.s,
@@ -867,7 +868,6 @@ func (sc *_ScopeChecker) check_tree() {
 }
 
 func st_is_def(st St) bool {
-	// TODO: Add multi-decl variable statements.
 	switch st.(type) {
 	case *Var:
 		return true
