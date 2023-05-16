@@ -12,10 +12,10 @@ import (
 )
 
 // Returns literal if expression is literal, nil if not.
-func expr_is_lit(e *ast.Expr) *ast.LitExpr {
-	switch e.Kind.(type) {
+func expr_data_is_lit(k ast.ExprData) *ast.LitExpr {
+	switch k.(type) {
 	case *ast.LitExpr:
-		return e.Kind.(*ast.LitExpr)
+		return k.(*ast.LitExpr)
 
 	default:
 		return nil
@@ -23,8 +23,8 @@ func expr_is_lit(e *ast.Expr) *ast.LitExpr {
 }
 
 // Reports whether expression is rune literal.
-func expr_is_rune_lit(e *ast.Expr) bool {
-	lit := expr_is_lit(e)
+func expr_data_is_rune_lit(k ast.ExprData) bool {
+	lit := expr_data_is_lit(k)
 	return lit != nil && lex.Is_rune(lit.Value)
 }
 
@@ -2185,80 +2185,71 @@ func (e *_Eval) eval_binop(op *ast.BinopExpr) *Data {
 }
 
 func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
+	var d *Data
 	switch kind.(type) {
 	case *ast.LitExpr:
-		return e.eval_lit(kind.(*ast.LitExpr))
+		d = e.eval_lit(kind.(*ast.LitExpr))
 		
 	case *ast.IdentExpr:
-		return e.eval_ident(kind.(*ast.IdentExpr))
+		d = e.eval_ident(kind.(*ast.IdentExpr))
 
 	case *ast.UnaryExpr:
-		return e.eval_unary(kind.(*ast.UnaryExpr))
+		d = e.eval_unary(kind.(*ast.UnaryExpr))
 
 	case *ast.VariadicExpr:
-		return e.eval_variadic(kind.(*ast.VariadicExpr))
+		d = e.eval_variadic(kind.(*ast.VariadicExpr))
 
 	case *ast.UnsafeExpr:
-		return e.eval_unsafe(kind.(*ast.UnsafeExpr))
+		d = e.eval_unsafe(kind.(*ast.UnsafeExpr))
 
 	case *ast.SliceExpr:
-		return e.eval_slice_expr(kind.(*ast.SliceExpr))
+		d = e.eval_slice_expr(kind.(*ast.SliceExpr))
 
 	case *ast.IndexingExpr:
-		return e.eval_indexing(kind.(*ast.IndexingExpr))
+		d = e.eval_indexing(kind.(*ast.IndexingExpr))
 
 	case *ast.SlicingExpr:
-		return e.eval_slicing(kind.(*ast.SlicingExpr))
+		d = e.eval_slicing(kind.(*ast.SlicingExpr))
 
 	case *ast.CastExpr:
-		return e.eval_cast(kind.(*ast.CastExpr))
+		d = e.eval_cast(kind.(*ast.CastExpr))
 
 	case *ast.NsSelectionExpr:
-		return e.eval_ns_selection(kind.(*ast.NsSelectionExpr))
+		d = e.eval_ns_selection(kind.(*ast.NsSelectionExpr))
 
 	case *ast.StructLit:
-		return e.eval_struct_lit(kind.(*ast.StructLit))
+		d = e.eval_struct_lit(kind.(*ast.StructLit))
 	
 	case *ast.Type:
-		return e.eval_type(kind.(*ast.Type))
+		d = e.eval_type(kind.(*ast.Type))
 
 	case *ast.FnCallExpr:
-		return e.eval_fn_call(kind.(*ast.FnCallExpr))
+		d = e.eval_fn_call(kind.(*ast.FnCallExpr))
 
 	case *ast.SubIdentExpr:
-		return e.eval_sub_ident(kind.(*ast.SubIdentExpr))
+		d = e.eval_sub_ident(kind.(*ast.SubIdentExpr))
 
 	case *ast.TupleExpr:
-		return e.eval_tuple(kind.(*ast.TupleExpr))
+		d = e.eval_tuple(kind.(*ast.TupleExpr))
 
 	case *ast.BraceLit:
-		return e.eval_brace_lit(kind.(*ast.BraceLit))
+		d = e.eval_brace_lit(kind.(*ast.BraceLit))
 
 	case *ast.FnDecl:
-		return e.eval_anon_fn(kind.(*ast.FnDecl))
+		d = e.eval_anon_fn(kind.(*ast.FnDecl))
 
 	case *ast.BinopExpr:
-		return e.eval_binop(kind.(*ast.BinopExpr))
+		d = e.eval_binop(kind.(*ast.BinopExpr))
 
 	default:
-		return nil
+		d = nil
 	}
-}
 
-// Returns value data of evaluated expression.
-// Returns nil if error occurs.
-func (e *_Eval) eval(expr *ast.Expr) *Data {
-	d := e.eval_expr_kind(expr.Kind)
-	switch {
-	case d == nil:
-		return nil
-
-	case d.Decl:
-		e.push_err(expr.Token, "invalid_expr")
+	if d == nil {
 		return nil
 	}
 
-	if d.Is_const() && d.Kind.Prim() != nil && !expr_is_rune_lit(expr) {
+	if d.Is_const() && d.Kind.Prim() != nil && !expr_data_is_rune_lit(kind) {
 		switch {
 		case d.Constant.Is_i64():
 			if int_assignable(types.TypeKind_INT, d) {
@@ -2273,6 +2264,23 @@ func (e *_Eval) eval(expr *ast.Expr) *Data {
 	}
 
 	return d
+}
+
+// Returns value data of evaluated expression.
+// Returns nil if error occurs.
+func (e *_Eval) eval(expr *ast.Expr) *Data {
+	d := e.eval_expr_kind(expr.Kind)
+	switch {
+	case d == nil:
+		return nil
+
+	case d.Decl:
+		e.push_err(expr.Token, "invalid_expr")
+		return nil
+
+	default:
+		return d
+	}
 }
 
 func is_ok_for_shifting(d *Data) bool {
