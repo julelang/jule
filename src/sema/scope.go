@@ -2,6 +2,7 @@ package sema
 
 import (
 	"github.com/julelang/jule/ast"
+	"github.com/julelang/jule/constant"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
 )
@@ -87,6 +88,22 @@ type MultiAssign struct {
 	L     []ExprModel // Nil models represents ingored expressions.
 	R     ExprModel
 }
+
+// Match-Case.
+type Match struct {
+	Expr    ExprModel
+	Cases   []*Case
+	Default *Case
+}
+
+// Match-Case case.
+type Case struct {
+	Scope *Scope
+	Exprs []ExprModel
+}
+
+// Reports whether case is default.
+func (c *Case) Is_default() bool { return c.Exprs == nil }
 
 type _ScopeLabel struct {
 	label *Label
@@ -820,6 +837,81 @@ func (sc *_ScopeChecker) check_assign_st(a *ast.AssignSt) {
 	sc.check_multi_assign(a)
 }
 
+func (sc *_ScopeChecker) check_case_scope(tree *ast.ScopeTree) *Scope {
+	return sc.check_child(tree)
+}
+
+func (sc *_ScopeChecker) check_case(c *ast.Case, expr *Data) *Case {
+	_case := &Case{
+		Exprs: make([]ExprModel, len(c.Exprs)),
+	}
+
+	for i, e := range c.Exprs {
+		d := sc.s.eval(e, sc)
+		if d == nil {
+			continue
+		}
+
+		_case.Exprs[i] = d.Model
+
+		checker := _AssignTypeChecker{
+			s:           sc.s,
+			dest:        expr.Kind,
+			d:           d,
+			error_token: e.Token,
+		}
+		checker.check()
+	}
+
+	_case.Scope = sc.check_case_scope(c.Scope)
+	return _case
+}
+
+func (sc *_ScopeChecker) check_cases(m *ast.MatchCase, expr *Data) []*Case {
+	cases := make([]*Case, len(m.Cases))
+	for i, c := range m.Cases {
+		cases[i] = sc.check_case(c, expr)
+	}
+	return cases
+}
+
+func (sc *_ScopeChecker) check_default(d *ast.Else) *Case {
+	def := &Case{}
+	def.Scope = sc.check_case_scope(d.Scope)
+	return def
+}
+
+func (sc *_ScopeChecker) check_common_match(m *ast.MatchCase) {
+	var d *Data
+	if m.Expr == nil {
+		d = &Data{
+			Constant: constant.New_bool(true),
+			Kind:     &TypeKind{kind: build_prim_type(types.TypeKind_BOOL)},
+		}
+		d.Model = d.Constant
+	} else {
+		d = sc.s.eval(m.Expr, sc)
+		if d == nil {
+			return
+		}
+	}
+
+	mc := &Match{
+		Expr: d.Model,
+	}
+
+	mc.Cases = sc.check_cases(m, d)
+	if m.Default != nil {
+		mc.Default = sc.check_default(m.Default)
+	}
+
+	sc.scope.Stmts = append(sc.scope.Stmts, mc)
+}
+
+func (sc *_ScopeChecker) check_match(m *ast.MatchCase) {
+	sc.check_common_match(m)
+}
+
 func (sc *_ScopeChecker) check_node(node ast.NodeData) {
 	switch node.(type) {
 	case *ast.Comment:
@@ -855,6 +947,9 @@ func (sc *_ScopeChecker) check_node(node ast.NodeData) {
 
 	case *ast.AssignSt:
 		sc.check_assign_st(node.(*ast.AssignSt))
+
+	case *ast.MatchCase:
+		sc.check_match(node.(*ast.MatchCase))
 
 	default:
 		println("error <unimplemented scope node>")

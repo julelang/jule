@@ -135,3 +135,18 @@ func iter_next_label_ident(it uintptr) string {
 func label_ident(ident string) string {
 	return "_julec_label_" + ident
 }
+
+// Returns end label identifier of match-case.
+func match_end_label_ident(m uintptr) string {
+	return "_match_end_" + strconv.Itoa(int(m))
+}
+
+// Returns begin label identifier of case.
+func case_begin_label_ident(c uintptr) string {
+	return "_case_begin_" + strconv.Itoa(int(c))
+}
+
+// Returns end label identifier of case.
+func case_end_label_ident(c uintptr) string {
+	return "_case_end_" + strconv.Itoa(int(c))
+}

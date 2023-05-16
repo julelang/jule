@@ -278,6 +278,82 @@ func gen_multi_assign(a *sema.MultiAssign) string {
 	return obj
 }
 
+func gen_case(m *sema.Match, c *sema.Case) string {
+	const MATCH_EXPR = "_match_expr"
+
+	end := case_end_label_ident(_uintptr(c))
+	obj := ""
+
+	if len(c.Exprs) > 0 {
+		obj += "if (!("
+		for i, expr := range c.Exprs {
+			obj += gen_expr_model(expr)
+			obj += " == "
+			obj += MATCH_EXPR
+
+			if i+1 < len(c.Exprs) {
+				obj += " || "
+			}
+		}
+		obj += ")) { goto "
+		obj += end + "; }\n"
+	}
+
+	if len(c.Scope.Stmts) > 0 {
+		obj += indent()
+		obj += case_begin_label_ident(_uintptr(c)) + ":;\n"
+		obj += indent()
+		obj += gen_scope(c.Scope)
+		obj += "\n"
+		obj += indent()
+		obj += "goto "
+		obj += match_end_label_ident(_uintptr(m)) + CPP_ST_TERM
+		obj += "\n"
+	}
+
+	obj += indent()
+	obj += end + ":;"
+	return obj
+}
+
+func gen_match(m *sema.Match) string {
+	obj := "{\n"
+
+	add_indent()
+
+	obj += indent()
+	obj += "auto _match_expr{ "
+	obj += gen_expr_model(m.Expr)
+	obj += " };\n"
+	obj += indent()
+
+	if len(m.Cases) > 0 {
+		obj += gen_case(m, m.Cases[0])
+		for _, c := range m.Cases[1:] {
+			obj += "\n"
+			obj += indent()
+			obj += gen_case(m, c)
+		}
+	}
+
+	if m.Default != nil {
+		obj += "\n"
+		obj += gen_case(m, m.Default)
+	}
+
+	obj += "\n"
+	obj += indent()
+	obj += match_end_label_ident(_uintptr(m)) + ":;"
+	obj += "\n"
+	
+	done_indent()
+
+	obj += indent()
+	obj += "}"
+
+	return obj
+}
+
 // Generates C++ code of statement.
 func gen_st(st sema.St) string {
 	switch st.(type) {
@@ -322,6 +398,9 @@ func gen_st(st sema.St) string {
 
 	case *sema.MultiAssign:
 		return gen_multi_assign(st.(*sema.MultiAssign))
+
+	case *sema.Match:
+		return gen_match(st.(*sema.Match))
 
 	default:
 		return "<unimplemented stmt>"
