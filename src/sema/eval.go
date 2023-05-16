@@ -28,6 +28,32 @@ func expr_data_is_rune_lit(k ast.ExprData) bool {
 	return lit != nil && lex.Is_rune(lit.Value)
 }
 
+func normalize_bitsize(d *Data) {
+	if !d.Is_const() {
+		return
+	}
+
+	var kind string
+	switch {
+	case d.Constant.Is_f64():
+		x := d.Constant.Read_f64()
+		kind = types.Float_from_bits(types.Bitsize_of_float(x))
+	
+	case d.Constant.Is_i64():
+		x := d.Constant.Read_i64()
+		kind = types.Int_from_bits(types.Bitsize_of_int(x))
+	
+	case d.Constant.Is_u64():
+		x := d.Constant.Read_u64()
+		kind = types.Uint_from_bits(types.Bitsize_of_uint(x))
+	
+	default:
+		return
+	}
+	
+	d.Kind.kind = build_prim_type(kind)
+}
+
 // Value data.
 type Data struct {
 	Kind       *TypeKind
@@ -250,7 +276,7 @@ func (e *_Eval) lit_int(l *ast.LitExpr) *Data {
 	}
 
 
-	data := &Data{
+	d := &Data{
 		Lvalue:  false,
 		Mutable: false,
 		Decl:    false,
@@ -261,21 +287,21 @@ func (e *_Eval) lit_int(l *ast.LitExpr) *Data {
 	sig, err := strconv.ParseInt(lit, base, BIT_SIZE)
 	if err == nil {
 		value = sig
-		data.Constant = constant.New_i64(sig)
+		d.Constant = constant.New_i64(sig)
 	} else {
 		unsig, _ := strconv.ParseUint(lit, base, BIT_SIZE)
-		data.Constant = constant.New_u64(unsig)
+		d.Constant = constant.New_u64(unsig)
 		value = unsig
 	}
 
-	data.Kind = &TypeKind{
+	d.Kind = &TypeKind{
 		kind: build_prim_type(kind_by_bitsize(value)),
 	}
 
-	// TODO: Implement normalization.
+	normalize_bitsize(d)
+	d.Model = d.Constant
 
-	data.Model = data.Constant
-	return data
+	return d
 }
 
 func (e *_Eval) lit_num(l *ast.LitExpr) *Data {
@@ -2843,38 +2869,12 @@ func (bs *_BinopSolver) solve_const(d *Data) {
 	}
 }
 
-func (bs *_BinopSolver) normalize_bitsize(d *Data) {
-	if !d.Is_const() {
-		return
-	}
-
-	var kind string
-	switch {
-	case d.Constant.Is_f64():
-		x := d.Constant.Read_f64()
-		kind = types.Float_from_bits(types.Bitsize_of_float(x))
-	
-	case d.Constant.Is_i64():
-		x := d.Constant.Read_i64()
-		kind = types.Int_from_bits(types.Bitsize_of_int(x))
-	
-	case d.Constant.Is_u64():
-		x := d.Constant.Read_u64()
-		kind = types.Uint_from_bits(types.Bitsize_of_uint(x))
-	
-	default:
-		return
-	}
-	
-	d.Kind.kind = build_prim_type(kind)
-}
-
 func (bs *_BinopSolver) post_const(d *Data) {
 	if d == nil || !d.Is_const() {
 		return
 	}
 
-	bs.normalize_bitsize(d)
+	normalize_bitsize(d)
 }
 
 func (bs *_BinopSolver) solve_explicit(l *Data, r *Data) *Data {
