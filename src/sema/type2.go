@@ -1,6 +1,9 @@
 package sema
 
 import (
+	"math"
+	"strconv"
+
 	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
@@ -16,6 +19,81 @@ func trait_has_reference_receiver(t *Trait) bool {
 		}
 	}
 	return false
+}
+
+func float_assignable(kind string, d *Data) bool {
+	value := strconv.FormatFloat(d.Constant.Read_f64(), 'e', -1, 64)
+	return types.Check_bit_float(value, types.Bitsize_of(kind))
+}
+
+func signed_assignable(kind string, d *Data) bool {
+	min := int64(types.Min_of(kind))
+	max := int64(types.Max_of(kind))
+
+	switch {
+	case d.Constant.Is_f64():
+		x := d.Constant.Read_f64()
+		i, frac := math.Modf(x)
+		if frac != 0 {
+			return false
+		}
+		return i >= float64(min) && i <= float64(max)
+
+	case d.Constant.Is_u64():
+		x := d.Constant.Read_u64()
+		if x <= uint64(max) {
+			return true
+		}
+
+	case d.Constant.Is_i64():
+		x := d.Constant.Read_i64()
+		return min <= x && x <= max
+	}
+
+	return false
+}
+
+func unsigned_assignable(kind string, d *Data) bool {
+	max := uint64(types.Max_of(kind))
+
+	switch {
+	case d.Constant.Is_f64():
+		x := d.Constant.Read_f64()
+		if x < 0 {
+			return false
+		}
+
+		i, frac := math.Modf(x)
+		if frac != 0 {
+			return false
+		}
+		return i <= float64(max)
+
+	case d.Constant.Is_u64():
+		x := d.Constant.Read_u64()
+		if x <= max {
+			return true
+		}
+
+	case d.Constant.Is_i64():
+		x := d.Constant.Read_i64()
+		return 0 <= x && uint64(x) <= max
+	}
+
+	return false
+}
+
+func int_assignable(kind string, d *Data) bool {
+	switch {
+	case types.Is_sig_int(kind):
+		return signed_assignable(kind, d)
+
+	case types.Is_unsig_int(kind):
+		return unsigned_assignable(kind, d)
+
+	default:
+		return false
+	}
 }
 
 type _TypeCompatibilityChecker struct {
@@ -195,13 +273,16 @@ func (atc *_AssignTypeChecker) check_validity() bool {
 	switch {
 	case atc.d.Kind.Fnc() != nil:
 		f := atc.d.Kind.Fnc()
-		if f.Is_builtin() {
+		switch {
+		case f.Is_builtin():
 			atc.push_err("builtin_as_anonymous_fn")
 			valid = false
-		} else if f.Decl.Is_method() {
+
+		case f.Decl.Is_method():
 			atc.push_err("method_as_anonymous_fn")
 			valid = false
-		} else if len(f.Decl.Generics) > 0 {
+
+		case len(f.Decl.Generics) > 0:
 			atc.push_err("genericed_fn_as_anonymous_fn")
 			valid = false
 		}
@@ -214,8 +295,34 @@ func (atc *_AssignTypeChecker) check_validity() bool {
 	return valid
 }
 
+func (atc *_AssignTypeChecker) check_const() bool {
+	if !atc.d.Is_const() || atc.dest.Prim() == nil ||
+		atc.d.Kind.Prim() == nil || !types.Is_num(atc.d.Kind.Prim().kind) {
+		return false
+	}
+
+	kind := atc.dest.Prim().kind
+	switch {
+	case types.Is_float(kind):
+		if !float_assignable(kind, atc.d) {
+			atc.push_err("overflow_limits")
+			return false
+		}
+
+	case types.Is_int(kind):
+		if !int_assignable(kind, atc.d) {
+			atc.push_err("overflow_limits")
+			return false
+		}
+
+	default:
+		return false
+	}
+
+	return true
+}
+
 func (atc *_AssignTypeChecker) check() {
-	// TODO: Check constants.
 	switch {
 	case atc.d == nil:
 		// Skip Data is nil.
@@ -223,6 +330,9 @@ func (atc *_AssignTypeChecker) check() {
 
 	case !atc.check_validity():
 		// Data is invalid and error(s) logged about it.
+		return
+
+	case !atc.check_const():
 		return
 	
 	default:
