@@ -741,6 +741,10 @@ func (sc *_ScopeChecker) check_multi_assign(a *ast.AssignSt) {
 		R: rd.Model,
 	}
 
+	if rd.Kind.Tup() == nil {
+		st.R = &TupleExprModel{Datas: r}
+	}
+
 	for i := range a.L {
 		lexpr := a.L[i]
 
