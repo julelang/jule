@@ -2166,7 +2166,8 @@ func (e *_Eval) eval_anon_fn(decl *ast.FnDecl) *Data {
 	}
 	ins := tc.build_fn(decl)
 
-	// TODO: Check scope.
+	sc := new_scope_checker(e.s)
+	sc.check(decl.Scope, ins.Scope)
 
 	return &Data{
 		Kind:  &TypeKind{kind: ins},
