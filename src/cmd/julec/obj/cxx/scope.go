@@ -260,6 +260,24 @@ func gen_assign(a *sema.Assign) string {
 	return obj
 }
 
+func gen_multi_assign(a *sema.MultiAssign) string {
+	obj := "std::tie("
+	
+	for _, l := range a.L {
+		if l == nil {
+			obj += CPP_IGNORE + ","
+		} else {
+			obj += gen_expr_model(l) + ","
+		}
+	}
+	obj = obj[:len(obj)-1] // Remove last comma.
+
+	obj += ") = "
+	obj += gen_expr_model(a.R)
+	obj += CPP_ST_TERM
+	return obj
+}
+
 // Generates C++ code of statement.
 func gen_st(st sema.St) string {
 	switch st.(type) {
@@ -301,6 +319,9 @@ func gen_st(st sema.St) string {
 
 	case *sema.Assign:
 		return gen_assign(st.(*sema.Assign))
+
+	case *sema.MultiAssign:
+		return gen_multi_assign(st.(*sema.MultiAssign))
 
 	default:
 		return "<unimplemented stmt>"

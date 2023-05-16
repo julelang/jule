@@ -82,6 +82,12 @@ type Assign struct {
 	Op string
 }
 
+// Mult-declarative assignment.
+type MultiAssign struct {
+	L     []ExprModel // Nil models represents ingored expressions.
+	R     ExprModel
+}
+
 type _ScopeLabel struct {
 	label *Label
 	pos   int
@@ -700,7 +706,6 @@ func (sc *_ScopeChecker) check_single_assign(a *ast.AssignSt) {
 		d:           r,
 		error_token: a.Setter,
 	}
-
 	checker.check()
 
 	sc.scope.Stmts = append(sc.scope.Stmts, &Assign{
@@ -710,8 +715,93 @@ func (sc *_ScopeChecker) check_single_assign(a *ast.AssignSt) {
 	})
 }
 
+func (sc *_ScopeChecker) check_multi_assign(a *ast.AssignSt) {
+	rd := sc.s.eval(a.R, sc)
+	if rd == nil {
+		return
+	}
+
+	var r []*Data
+	if rd.Kind.Tup() != nil {
+		r = rd.Model.(*TupleExprModel).Datas
+	} else {
+		r = append(r, rd)
+	}
+
+	switch {
+	case len(a.L) > len(r):
+		sc.s.push_err(a.Setter, "overflow_multi_assign_idents")
+		return
+	case len(a.L) < len(r):
+		sc.s.push_err(a.Setter, "missing_multi_assign_idents")
+		return
+	}
+
+	st := &MultiAssign{
+		R: rd.Model,
+	}
+
+	for i := range a.L {
+		lexpr := a.L[i]
+
+		if lex.Is_ignore_ident(lexpr.Ident) {
+			st.L = append(st.L, nil)
+			continue
+		}
+
+		r := r[i]
+
+		if sc.is_new_assign_ident(lexpr.Ident) {
+			// Add new variable declaration statement.
+			v := &Var{
+				Ident:   lexpr.Ident,
+				Token:   lexpr.Token,
+				Mutable: lexpr.Mutable,
+				Scope:   sc.tree,
+				Value:   &Value{
+					Expr: a.R,
+					Data: r,
+				},
+			}
+
+			sc.s.check_var(v)
+
+			st.L = append(st.L, v)
+			sc.scope.Stmts = append(sc.scope.Stmts, v)
+
+			continue
+		}
+
+		if lexpr.Mutable {
+			sc.s.push_err(lexpr.Token, "duplicated_ident", lexpr.Ident)
+		}
+
+		l := sc.s.eval(lexpr.Expr, sc)
+		if l == nil {
+			continue
+		}
+
+		if !sc.check_assign(l, a.Setter) {
+			continue
+		}
+
+		sc.s.check_validity_for_init_expr(lexpr.Mutable, r, a.Setter)
+
+		checker := _AssignTypeChecker{
+			s:           sc.s,
+			dest:        l.Kind,
+			d:           r,
+			error_token: a.Setter,
+		}
+		checker.check()
+
+		st.L = append(st.L, l.Model)
+	}
+
+	sc.scope.Stmts = append(sc.scope.Stmts, st)
+}
+
 func (sc *_ScopeChecker) check_assign_st(a *ast.AssignSt) {
-	// TODO: Implement other assignment types.
 	if lex.Is_postfix_op(a.Setter.Kind) {
 		sc.check_postfix(a)
 		return
@@ -721,6 +811,8 @@ func (sc *_ScopeChecker) check_assign_st(a *ast.AssignSt) {
 		sc.check_single_assign(a)
 		return
 	}
+
+	sc.check_multi_assign(a)
 }
 
 func (sc *_ScopeChecker) check_node(node ast.NodeData) {

@@ -131,3 +131,8 @@ type CommonSubIdentExprModel struct {
 	Expr  ExprModel
 	Ident string
 }
+
+// Tuple expression model.
+type TupleExprModel struct {
+	Datas []*Data
+}

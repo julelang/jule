@@ -679,7 +679,7 @@ func gen_var(v *sema.Var) string {
 
 	obj := gen_type_kind(v.Kind.Kind) + " "
 	obj += var_out_ident(v)
-	if v.Value.Expr != nil {
+	if v.Value != nil && v.Value.Expr != nil {
 		obj += " = "
 		obj += gen_expr(v.Value)
 	} else {

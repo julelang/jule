@@ -1175,36 +1175,40 @@ func (s *_Sema) check_data_for_auto_type(d *Data, err_token lex.Token) {
 	}
 }
 
-func (s *_Sema) check_type_var(decl *Var, l Lookup) {
-	decl.Value.Data = s.evalpd(decl.Value.Expr, l, decl.Kind, decl)
-	if decl.Value.Data == nil {
-		return // Skip checks if error ocurrs.
+func (s *_Sema) check_var(v *Var) {
+	if !v.Constant {
+		v.Value.Data.Constant = nil
 	}
 
-	if !decl.Constant {
-		decl.Value.Data.Constant = nil
-	}
-
-	if decl.Is_auto_typed() {
+	if v.Is_auto_typed() {
 		// Build new TypeSymbol because
 		// auto-type symbols are nil.
-		decl.Kind = &TypeSymbol{Kind: decl.Value.Data.Kind}
+		v.Kind = &TypeSymbol{Kind: v.Value.Data.Kind}
 
-		s.check_data_for_auto_type(decl.Value.Data, decl.Value.Expr.Token)
-		s.check_validity_for_init_expr(decl.Mutable, decl.Value.Data, decl.Value.Expr.Token)
+		s.check_data_for_auto_type(v.Value.Data, v.Value.Expr.Token)
+		s.check_validity_for_init_expr(v.Mutable, v.Value.Data, v.Value.Expr.Token)
 	} else {
-		arr := decl.Kind.Kind.Arr()
+		arr := v.Kind.Kind.Arr()
 		if arr != nil {
 			if arr.Auto {
-				data_arr := decl.Value.Data.Kind.Arr()
+				data_arr := v.Value.Data.Kind.Arr()
 				if data_arr != nil {
 					arr.N = data_arr.N
 				}
 			}
 		}
 
-		s.check_assign_type(decl.Kind.Kind, decl.Value.Data, decl.Value.Expr.Token, false)
+		s.check_assign_type(v.Kind.Kind, v.Value.Data, v.Value.Expr.Token, false)
 	}
+}
+
+func (s *_Sema) check_type_var(decl *Var, l Lookup) {
+	decl.Value.Data = s.evalpd(decl.Value.Expr, l, decl.Kind, decl)
+	if decl.Value.Data == nil {
+		return // Skip checks if error ocurrs.
+	}
+
+	s.check_var(decl)
 }
 
 // Checks types of current package file's global variables.

@@ -332,7 +332,7 @@ func (atc *_AssignTypeChecker) check() {
 		// Data is invalid and error(s) logged about it.
 		return
 
-	case !atc.check_const():
+	case atc.check_const():
 		return
 	
 	default:

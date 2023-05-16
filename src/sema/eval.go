@@ -2052,6 +2052,11 @@ func (e *_Eval) eval_sub_ident(si *ast.SubIdentExpr) *Data {
 func (e *_Eval) eval_tuple(tup *ast.TupleExpr) *Data {
 	tup_t := &Tuple{}
 	tup_t.Types = make([]*TypeKind, len(tup.Expr))
+	
+	model := &TupleExprModel{
+		Datas: make([]*Data, len(tup.Expr)),
+	}
+
 	ok := true
 	for i, expr := range tup.Expr {
 		d := e.eval_expr_kind(expr)
@@ -2060,6 +2065,7 @@ func (e *_Eval) eval_tuple(tup *ast.TupleExpr) *Data {
 			continue
 		}
 		tup_t.Types[i] = d.Kind
+		model.Datas[i] = d
 	}
 
 	if !ok {
@@ -2067,7 +2073,8 @@ func (e *_Eval) eval_tuple(tup *ast.TupleExpr) *Data {
 	}
 
 	return &Data{
-		Kind: &TypeKind{kind: tup_t},
+		Kind:  &TypeKind{kind: tup_t},
+		Model: model,
 	}
 }
 

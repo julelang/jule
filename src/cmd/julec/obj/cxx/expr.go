@@ -371,6 +371,16 @@ func gen_fn_ins_expr_model(m *sema.FnIns) string {
 	return fn_out_ident(m.Decl)
 }
 
+func gen_tuple_expr_model(m *sema.TupleExprModel) string {
+	obj := "std::make_tuple("
+	for _, d := range m.Datas {
+		obj += gen_expr_model(d.Model) + ","
+	}
+	obj = obj[:len(obj)-1] // Remove last comma.
+	obj += ")"
+	return obj
+}
+
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
 	case *constant.Const:
@@ -432,6 +442,9 @@ func gen_expr_model(m sema.ExprModel) string {
 
 	case *sema.CommonSubIdentExprModel:
 		return gen_common_sub_ident_expr_model(m.(*sema.CommonSubIdentExprModel))
+
+	case *sema.TupleExprModel:
+		return gen_tuple_expr_model(m.(*sema.TupleExprModel))
 
 	default:
 		return "<unimplemented_expression_model>"
