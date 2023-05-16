@@ -462,6 +462,7 @@ func (s *_Sema) check_validity_for_init_expr(left_mut bool, d *Data, error_token
 		s.push_err(error_token, "assignment_non_mut_to_mut")
 		return
 	}
+
 	atc := _AssignTypeChecker{
 		s:           s,
 		d:           d,

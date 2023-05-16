@@ -11,6 +11,23 @@ import (
 	"github.com/julelang/jule/types"
 )
 
+// Returns literal if expression is literal, nil if not.
+func expr_is_lit(e *ast.Expr) *ast.LitExpr {
+	switch e.Kind.(type) {
+	case *ast.LitExpr:
+		return e.Kind.(*ast.LitExpr)
+
+	default:
+		return nil
+	}
+}
+
+// Reports whether expression is rune literal.
+func expr_is_rune_lit(e *ast.Expr) bool {
+	lit := expr_is_lit(e)
+	return lit != nil && lex.Is_rune(lit.Value)
+}
+
 // Value data.
 type Data struct {
 	Kind       *TypeKind
@@ -2239,10 +2256,23 @@ func (e *_Eval) eval(expr *ast.Expr) *Data {
 	case d.Decl:
 		e.push_err(expr.Token, "invalid_expr")
 		return nil
-
-	default:
-		return d
 	}
+
+	if d.Is_const() && d.Kind.Prim() != nil && !expr_is_rune_lit(expr) {
+		switch {
+		case d.Constant.Is_i64():
+			if int_assignable(types.TypeKind_INT, d) {
+				d.Kind.kind = build_prim_type(types.TypeKind_INT)
+			}
+
+		case d.Constant.Is_u64():
+			if int_assignable(types.TypeKind_UINT, d) {
+				d.Kind.kind = build_prim_type(types.TypeKind_UINT)
+			}
+		}
+	}
+
+	return d
 }
 
 func is_ok_for_shifting(d *Data) bool {
@@ -2826,7 +2856,7 @@ func (bs *_BinopSolver) normalize_bitsize(d *Data) {
 	default:
 		return
 	}
-
+	
 	d.Kind.kind = build_prim_type(kind)
 }
 
