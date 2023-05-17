@@ -623,7 +623,7 @@ func gen_fn_decl_head(f *sema.FnIns, method bool) string {
 		obj += struct_out_ident(f.Decl.Owner)
 		obj += def + lex.KND_DBLCOLON
 	}
-	obj += fn_out_ident(f.Decl)
+	obj += fn_ins_out_ident(f)
 	return obj
 }
 
@@ -709,6 +709,7 @@ func gen_fn(f *sema.Fn) string {
 		obj += gen_fn_decl_head(c, false)
 		obj += gen_params_ins(c.Params) + " "
 		obj += gen_fn_scope(c)
+		obj += "\n\n"
 	}
 	return obj
 }

@@ -347,7 +347,7 @@ func gen_struct_sub_ident_expr_model(m *sema.StrctSubIdentExprModel) string {
 	if m.Field != nil {
 		obj += field_out_ident(m.Field.Decl)
 	} else {
-		obj += fn_out_ident(m.Method.Decl)
+		obj += fn_ins_out_ident(m.Method)
 	}
 	return obj
 }
@@ -368,7 +368,7 @@ func gen_array_expr_model(m *sema.ArrayExprModel) string {
 }
 
 func gen_fn_ins_expr_model(m *sema.FnIns) string {
-	return fn_out_ident(m.Decl)
+	return fn_ins_out_ident(m)
 }
 
 func gen_tuple_expr_model(m *sema.TupleExprModel) string {

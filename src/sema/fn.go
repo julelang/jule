@@ -131,37 +131,37 @@ func (f *Fn) instance() *FnIns {
 	return f.instance_force()
 }
 
-func (f *Fn) append_instance(ins *FnIns) bool {
+func (f *Fn) append_instance(ins *FnIns) (bool, int) {
 	if len(f.Generics) == 0 {
 		// Skip already created instance for just one unique combination.
 		if len(f.Instances) == 1 {
-			return false
+			return false, 0
 		}
 
 		f.Instances = append(f.Instances, ins)
-		return true
+		return true, -1
 	}
 
 	if len(f.Instances) == 0 {
 		f.Instances = append(f.Instances, ins)
-		return true
+		return true, -1
 	}
 
 	if !f.Parameters_uses_generics() && f.Result_uses_generics() {
-		return false
+		return false, -1
 	}
 
-	for _, ains := range f.Instances {
+	for j, ains := range f.Instances {
 		for i, ag := range ains.Generics {
 			if ag.To_str() == ins.Generics[i].To_str() {
 				// Instance is exist.
-				return false
+				return false, j
 			}
 		}
 	}
 
 	f.Instances = append(f.Instances, ins)
-	return true
+	return true, -1
 }
 
 // Parameter instance.

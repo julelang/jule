@@ -1503,10 +1503,13 @@ func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
 		return nil
 	}
 
-	is_unique_ins := f.Decl.append_instance(f)
+	is_unique_ins, pos := f.Decl.append_instance(f)
+	if pos != -1 {
+		f = f.Decl.Instances[pos]
+	}
 
 	call_model := d.Model
-	
+
 	if f.Decl.Is_void() {
 		d = build_void_data()
 	} else {
@@ -2316,13 +2319,18 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 // Returns nil if error occurs.
 func (e *_Eval) eval(expr *ast.Expr) *Data {
 	d := e.eval_expr_kind(expr.Kind)
-	switch {
-	case d == nil:
+	if d == nil {
 		return nil
-
-	default:
-		return d
 	}
+
+	switch d.Model.(type) {
+	case *FnIns:
+		if len(d.Model.(*FnIns).Generics) != len(d.Model.(*FnIns).Decl.Generics) {
+			e.s.push_err(expr.Token, "has_generics")
+		}
+	}
+
+	return d
 }
 
 // Returns value data of evaluated expression.

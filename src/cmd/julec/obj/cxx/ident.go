@@ -71,6 +71,21 @@ func fn_out_ident(f *sema.Fn) string {
 	}
 }
 
+func fn_ins_out_ident(f *sema.FnIns) string {
+	if len(f.Generics) == 0 || f.Decl.Parameters_uses_generics() {
+		return fn_out_ident(f.Decl)
+	}
+
+	kind := f.To_str()
+	for i, ins := range f.Decl.Instances {
+		if kind == ins.To_str() {
+			return fn_out_ident(f.Decl) + "_" + strconv.Itoa(i)
+		}
+	}
+
+	return "__?__"
+}
+
 // Returns output identifier of trait.
 func trait_out_ident(t *sema.Trait) string {
 	return as_out_ident(t.Ident, t.Token.File.Addr())
