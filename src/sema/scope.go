@@ -1,6 +1,8 @@
 package sema
 
 import (
+	"unsafe"
+
 	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/constant"
 	"github.com/julelang/jule/lex"
@@ -101,10 +103,16 @@ type Match struct {
 type Case struct {
 	Scope *Scope
 	Exprs []ExprModel
+	Next  *Case
 }
 
 // Reports whether case is default.
 func (c *Case) Is_default() bool { return c.Exprs == nil }
+
+// Fall statement.
+type FallSt struct {
+	Dest_case uintptr
+}
 
 type _ScopeLabel struct {
 	label *Label
@@ -127,6 +135,7 @@ type _ScopeChecker struct {
 	scope       *Scope
 	tree        *ast.ScopeTree
 	it          uintptr
+	cse         uintptr
 	labels      *[]*_ScopeLabel // All labels of all scopes.
 	gotos       *[]*_ScopeGoto  // All gotos of all scopes.
 }
@@ -838,16 +847,15 @@ func (sc *_ScopeChecker) check_assign_st(a *ast.AssignSt) {
 	sc.check_multi_assign(a)
 }
 
-func (sc *_ScopeChecker) check_case_scope(tree *ast.ScopeTree) *Scope {
-	return sc.check_child(tree)
+func (sc *_ScopeChecker) check_case_scope(c *Case, tree *ast.ScopeTree) *Scope {
+	ssc := sc.new_child_checker()
+	ssc.cse = _uintptr(c)
+	return sc.check_child_sc(tree, ssc)
 }
 
-func (sc *_ScopeChecker) check_case(m *Match, c *ast.Case, expr *Data) *Case {
-	_case := &Case{
-		Exprs: make([]ExprModel, len(c.Exprs)),
-	}
-
-	m.Cases = append(m.Cases, _case)
+func (sc *_ScopeChecker) check_case(m *Match, i int, c *ast.Case, expr *Data) *Case {
+	_case := m.Cases[i]
+	_case.Exprs = make([]ExprModel, len(c.Exprs))
 
 	for i, e := range c.Exprs {
 		if m.Type_match {
@@ -883,19 +891,34 @@ func (sc *_ScopeChecker) check_case(m *Match, c *ast.Case, expr *Data) *Case {
 		checker.check()
 	}
 
-	_case.Scope = sc.check_case_scope(c.Scope)
+	_case.Scope = sc.check_case_scope(_case, c.Scope)
 	return _case
 }
 
 func (sc *_ScopeChecker) check_cases(m *ast.MatchCase, rm *Match, expr *Data) {
-	for _, c := range m.Cases {
-		sc.check_case(rm, c, expr)
+	rm.Cases = make([]*Case, len(m.Cases))
+	for i := range m.Cases {
+		_case := &Case{}
+
+		if i > 0 {
+			rm.Cases[i-1].Next = _case
+		}
+
+		rm.Cases[i] = _case
+	}
+
+	if rm.Default != nil {
+		rm.Cases[len(rm.Cases)-1].Next = rm.Default
+	}
+
+	for i, c := range m.Cases {
+		sc.check_case(rm, i, c, expr)
 	}
 }
 
-func (sc *_ScopeChecker) check_default(d *ast.Else) *Case {
+func (sc *_ScopeChecker) check_default(m *Match, d *ast.Else) *Case {
 	def := &Case{}
-	def.Scope = sc.check_case_scope(d.Scope)
+	def.Scope = sc.check_case_scope(def, d.Scope)
 	return def
 }
 
@@ -915,10 +938,10 @@ func (sc *_ScopeChecker) check_type_match(m *ast.MatchCase) {
 		Expr:       d.Model,
 	}
 
-	sc.check_cases(m, tm, d)
 	if m.Default != nil {
-		tm.Default = sc.check_default(m.Default)
+		tm.Default = sc.check_default(tm, m.Default)
 	}
+	sc.check_cases(m, tm, d)
 
 	sc.scope.Stmts = append(sc.scope.Stmts, tm)
 }
@@ -942,10 +965,10 @@ func (sc *_ScopeChecker) check_common_match(m *ast.MatchCase) {
 		Expr: d.Model,
 	}
 
-	sc.check_cases(m, mc, d)
 	if m.Default != nil {
-		mc.Default = sc.check_default(m.Default)
+		mc.Default = sc.check_default(mc, m.Default)
 	}
+	sc.check_cases(m, mc, d)
 
 	sc.scope.Stmts = append(sc.scope.Stmts, mc)
 }
@@ -956,6 +979,23 @@ func (sc *_ScopeChecker) check_match(m *ast.MatchCase) {
 		return
 	}
 	sc.check_common_match(m)
+}
+
+func (sc *_ScopeChecker) check_fall(f *ast.FallSt) {
+	if sc.cse == 0 || len(sc.scope.Stmts)+1 < len(sc.scope.Stmts) {
+		sc.s.push_err(f.Token, "fallthrough_wrong_use")
+		return
+	}
+
+	_case := (*Case)(unsafe.Pointer(sc.cse))
+	if _case.Next == nil {
+		sc.s.push_err(f.Token, "fallthrough_into_final_case")
+		return
+	}
+
+	sc.scope.Stmts = append(sc.scope.Stmts, &FallSt{
+		Dest_case: _uintptr(_case.Next),
+	})
 }
 
 func (sc *_ScopeChecker) check_node(node ast.NodeData) {
@@ -996,6 +1036,9 @@ func (sc *_ScopeChecker) check_node(node ast.NodeData) {
 
 	case *ast.MatchCase:
 		sc.check_match(node.(*ast.MatchCase))
+
+	case *ast.FallSt:
+		sc.check_fall(node.(*ast.FallSt))
 
 	default:
 		println("error <unimplemented scope node>")

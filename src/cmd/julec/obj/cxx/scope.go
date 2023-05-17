@@ -361,6 +361,10 @@ func gen_match(m *sema.Match) string {
 	return obj
 }
 
+func gen_fall_st(f *sema.FallSt) string {
+	return "goto " + case_begin_label_ident(f.Dest_case) + CPP_ST_TERM
+}
+
 // Generates C++ code of statement.
 func gen_st(st sema.St) string {
 	switch st.(type) {
@@ -408,6 +412,9 @@ func gen_st(st sema.St) string {
 
 	case *sema.Match:
 		return gen_match(st.(*sema.Match))
+
+	case *sema.FallSt:
+		return gen_fall_st(st.(*sema.FallSt))
 
 	default:
 		return "<unimplemented stmt>"
