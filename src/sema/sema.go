@@ -55,6 +55,25 @@ func build_ret_vars(f *FnIns) []*Var {
 	return vars
 }
 
+func build_generic_type_aliases(f *FnIns) []*TypeAlias {
+	if len(f.Generics) == 0 {
+		return nil
+	}
+
+	aliases := make([]*TypeAlias, len(f.Generics))
+	for i, g := range f.Generics {
+		decl := f.Decl.Generics[i]
+		aliases[i] = &TypeAlias{
+			Scope: f.Decl.Scope,
+			Ident: decl.Ident,
+			Token: decl.Token,
+			Kind:  &TypeSymbol{Kind: g},
+		}
+	}
+
+	return aliases
+}
+
 // Sema must implement Lookup.
 
 // TODO: Implement built-in definitions.
@@ -1259,6 +1278,7 @@ func (s *_Sema) check_fn_ins(f *FnIns) {
 
 	sc := new_scope_checker(s, f)
 	sc.table.Vars = append(sc.table.Vars, vars...)
+	sc.table.Type_aliases = append(sc.table.Type_aliases, build_generic_type_aliases(f)...)
 
 	sc.check(f.Decl.Scope, f.Scope)
 
@@ -1295,6 +1315,10 @@ func (s *_Sema) check_type_fn(f *Fn) {
 
 // Checks types of current package file's functions.
 func (s *_Sema) check_fn_types() (ok bool) {
+	for _, decl := range s.file.Funcs {
+		s.check_type_fn(decl)
+	}
+
 	for _, decl := range s.file.Funcs {
 		s.check_type_fn(decl)
 	}
