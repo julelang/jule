@@ -365,6 +365,18 @@ func gen_fall_st(f *sema.FallSt) string {
 	return "goto " + case_begin_label_ident(f.Dest_case) + CPP_ST_TERM
 }
 
+func gen_break_st(b *sema.BreakSt) string {
+	obj := "goto "
+	if b.It != 0 {
+		obj += iter_end_label_ident(b.It)
+	} else {
+		obj += match_end_label_ident(b.Mtch)
+	}
+
+	obj += CPP_ST_TERM
+	return obj
+}
+
 // Generates C++ code of statement.
 func gen_st(st sema.St) string {
 	switch st.(type) {
@@ -415,6 +427,9 @@ func gen_st(st sema.St) string {
 
 	case *sema.FallSt:
 		return gen_fall_st(st.(*sema.FallSt))
+
+	case *sema.BreakSt:
+		return gen_break_st(st.(*sema.BreakSt))
 
 	default:
 		return "<unimplemented stmt>"

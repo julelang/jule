@@ -62,6 +62,12 @@ type ContSt struct {
 	It uintptr
 }
 
+// Break statement.
+type BreakSt struct {
+	It   uintptr
+	Mtch uintptr
+}
+
 // Label.
 type Label struct {
 	Ident string
@@ -101,6 +107,7 @@ type Match struct {
 
 // Match-Case case.
 type Case struct {
+	Owner *Match
 	Scope *Scope
 	Exprs []ExprModel
 	Next  *Case
@@ -529,12 +536,35 @@ func (sc *_ScopeChecker) check_iter(it *ast.Iter) {
 	}
 }
 
-func (sc *_ScopeChecker) check_valid_iter_label(it uintptr) bool {
+func (sc *_ScopeChecker) check_valid_cont_label(it uintptr) bool {
 	scope := sc
 
 iter:
 	if scope.it == it {
 		return true
+	}
+
+	if scope.parent != nil {
+		scope = scope.parent
+		goto iter
+	}
+
+	return false
+}
+
+func (sc *_ScopeChecker) check_valid_break_label(ptr uintptr) bool {
+	scope := sc
+
+iter:
+	if scope.it == ptr {
+		return true
+	}
+
+	if scope.cse != 0 {
+		mtch := _uintptr((*Case)(unsafe.Pointer(scope.cse)).Owner)
+		if mtch == ptr {
+			return true
+		}
 	}
 
 	if scope.parent != nil {
@@ -552,7 +582,7 @@ func (sc *_ScopeChecker) check_cont(c *ast.ContSt) {
 
 	cont := &ContSt{It: sc.it}
 
-	if c.Label.File != nil { // Label given.
+	if c.Label.Id != lex.ID_NA { // Label given.
 		label := find_label_parent(c.Label.Kind, sc.parent)
 		if label == nil {
 			sc.s.push_err(c.Label, "label_not_exist", c.Label.Kind)
@@ -584,7 +614,7 @@ func (sc *_ScopeChecker) check_cont(c *ast.ContSt) {
 	}
 
 	if cont.It != 0 {
-		if !sc.check_valid_iter_label(cont.It) {
+		if !sc.check_valid_cont_label(cont.It) {
 			sc.s.push_err(c.Label, "invalid_label")
 		}
 	}
@@ -902,7 +932,9 @@ func (sc *_ScopeChecker) check_case(m *Match, i int, c *ast.Case, expr *Data) *C
 func (sc *_ScopeChecker) check_cases(m *ast.MatchCase, rm *Match, expr *Data) {
 	rm.Cases = make([]*Case, len(m.Cases))
 	for i := range m.Cases {
-		_case := &Case{}
+		_case := &Case{
+			Owner: rm,
+		}
 
 		if i > 0 {
 			rm.Cases[i-1].Next = _case
@@ -911,7 +943,7 @@ func (sc *_ScopeChecker) check_cases(m *ast.MatchCase, rm *Match, expr *Data) {
 		rm.Cases[i] = _case
 	}
 
-	if rm.Default != nil {
+	if rm.Default != nil && len(m.Cases) > 0 {
 		rm.Cases[len(rm.Cases)-1].Next = rm.Default
 	}
 
@@ -921,7 +953,9 @@ func (sc *_ScopeChecker) check_cases(m *ast.MatchCase, rm *Match, expr *Data) {
 }
 
 func (sc *_ScopeChecker) check_default(m *Match, d *ast.Else) *Case {
-	def := &Case{}
+	def := &Case{
+		Owner: m,
+	}
 	def.Scope = sc.check_case_scope(def, d.Scope)
 	return def
 }
@@ -942,12 +976,12 @@ func (sc *_ScopeChecker) check_type_match(m *ast.MatchCase) {
 		Expr:       d.Model,
 	}
 
+	sc.scope.Stmts = append(sc.scope.Stmts, tm)
+
 	if m.Default != nil {
 		tm.Default = sc.check_default(tm, m.Default)
 	}
 	sc.check_cases(m, tm, d)
-
-	sc.scope.Stmts = append(sc.scope.Stmts, tm)
 }
 
 func (sc *_ScopeChecker) check_common_match(m *ast.MatchCase) {
@@ -969,12 +1003,12 @@ func (sc *_ScopeChecker) check_common_match(m *ast.MatchCase) {
 		Expr: d.Model,
 	}
 
+	sc.scope.Stmts = append(sc.scope.Stmts, mc)
+
 	if m.Default != nil {
 		mc.Default = sc.check_default(mc, m.Default)
 	}
 	sc.check_cases(m, mc, d)
-
-	sc.scope.Stmts = append(sc.scope.Stmts, mc)
 }
 
 func (sc *_ScopeChecker) check_match(m *ast.MatchCase) {
@@ -1000,6 +1034,94 @@ func (sc *_ScopeChecker) check_fall(f *ast.FallSt) {
 	sc.scope.Stmts = append(sc.scope.Stmts, &FallSt{
 		Dest_case: _uintptr(_case.Next),
 	})
+}
+
+func (sc *_ScopeChecker) check_break_with_label(b *ast.BreakSt) *BreakSt {
+	brk := sc.check_plain_break(b)
+	if brk == nil {
+		return nil
+	}
+
+	// Set pointer to zero.
+	// Pointer will set by label.
+	brk.It = 0
+	brk.Mtch = 0
+
+	label := find_label_parent(b.Label.Kind, sc.parent)
+	if label == nil {
+		sc.s.push_err(b.Label, "label_not_exist", b.Label.Kind)
+		return nil
+	} else if label.pos+1 >= len(label.scope.scope.Stmts) {
+		sc.s.push_err(b.Label, "invalid_label")
+		return nil
+	}
+
+	i := label.pos + 1
+	if i >= len(label.scope.scope.Stmts) {
+		sc.s.push_err(b.Label, "invalid_label")
+	} else {
+		st := label.scope.scope.Stmts[i]
+		switch st.(type) {
+		case *InfIter:
+			brk.It = _uintptr(st.(*InfIter))
+
+		case *RangeIter:
+			brk.It = _uintptr(st.(*RangeIter))
+
+		case *WhileIter:
+			brk.It = _uintptr(st.(*WhileIter))
+
+		case *Match:
+			brk.Mtch = _uintptr(st.(*Match))
+
+		default:
+			sc.s.push_err(b.Label, "invalid_label")
+		}
+	}
+
+	if brk.It != 0 {
+		if !sc.check_valid_break_label(brk.It) {
+			sc.s.push_err(b.Label, "invalid_label")
+		}
+	}
+	
+	if brk.Mtch != 0 {
+		if !sc.check_valid_break_label(brk.Mtch) {
+			sc.s.push_err(b.Label, "invalid_label")
+		}
+	}
+
+	return brk
+}
+
+func (sc *_ScopeChecker) check_plain_break(b *ast.BreakSt) *BreakSt {
+	scope := sc
+iter:
+	switch {
+	case scope.it == 0 && scope.cse == 0 && scope.parent != nil:
+		scope = scope.parent
+		goto iter
+
+	case scope.it != 0:
+		return &BreakSt{It: scope.it}
+
+	case scope.cse != 0:
+		return &BreakSt{Mtch: _uintptr((*Case)(unsafe.Pointer(scope.cse)).Owner)}
+	}
+
+	sc.s.push_err(b.Token, "break_at_out_of_valid_scope")
+	return nil
+}
+
+func (sc *_ScopeChecker) check_break(b *ast.BreakSt) {
+	if b.Label.Id != lex.ID_NA { // Label given.
+		brk := sc.check_break_with_label(b)
+		sc.scope.Stmts = append(sc.scope.Stmts, brk)
+		return
+	}
+
+	brk := sc.check_plain_break(b)
+	sc.scope.Stmts = append(sc.scope.Stmts, brk)
 }
 
 func (sc *_ScopeChecker) check_node(node ast.NodeData) {
@@ -1043,6 +1165,9 @@ func (sc *_ScopeChecker) check_node(node ast.NodeData) {
 
 	case *ast.FallSt:
 		sc.check_fall(node.(*ast.FallSt))
+
+	case *ast.BreakSt:
+		sc.check_break(node.(*ast.BreakSt))
 
 	default:
 		println("error <unimplemented scope node>")
