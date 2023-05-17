@@ -454,6 +454,8 @@ func (e *_Eval) eval_var(v *Var, error_token lex.Token) *Data {
 		return nil
 	}
 
+	v.Used = true
+
 	ok := e.check_illegal_cycles(v, error_token)
 	if !ok {
 		return nil

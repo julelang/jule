@@ -18,6 +18,7 @@ type Var struct {
 	Constant   bool
 	Mutable    bool
 	Public     bool
+	Used       bool
 	Doc        string
 	Kind       *TypeSymbol
 	Value      *Value

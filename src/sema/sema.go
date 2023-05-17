@@ -40,6 +40,7 @@ func build_ret_vars(f *FnIns) []*Var {
 		}
 
 		v := &Var{
+			Used:    true,
 			Mutable: true,
 			Ident:   ident.Kind,
 			Token:   ident,

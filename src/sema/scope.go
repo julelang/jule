@@ -1364,6 +1364,14 @@ func (sc *_ScopeChecker) check_labels() {
 	}
 }
 
+func (sc *_ScopeChecker) check_vars() {
+	for _, v := range sc.table.Vars {
+		if !v.Used {
+			sc.s.push_err(v.Token, "declared_but_not_used", v.Ident)
+		}
+	}
+}
+
 // Checks scope tree.
 func (sc *_ScopeChecker) check(tree *ast.ScopeTree, s *Scope) {
 	s.Deferred = tree.Deferred
@@ -1373,6 +1381,8 @@ func (sc *_ScopeChecker) check(tree *ast.ScopeTree, s *Scope) {
 	sc.scope = s
 
 	sc.check_tree()
+
+	sc.check_vars()
 
 	if sc.parent == nil { // If parent scope.
 		sc.check_gotos()
