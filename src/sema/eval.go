@@ -1490,6 +1490,7 @@ func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
 	} else {
 		e.s.build_fn_non_generic_type_kinds(f, false)
 	}
+
 	fcac := _FnCallArgChecker{
 		e:                  e,
 		f:                  f,
@@ -1502,7 +1503,7 @@ func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
 		return nil
 	}
 
-	f.Decl.append_instance(f)
+	is_unique_ins := f.Decl.append_instance(f)
 
 	call_model := d.Model
 	
@@ -1525,6 +1526,11 @@ func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
 		IsCo: fc.Concurrent,
 		Expr: call_model,
 		Args: fcac.arg_models,
+	}
+
+	if len(f.Generics) > 0 && is_unique_ins {
+		// Check generic function instance instantly.
+		e.s.check_fn_ins(f)
 	}
 
 	return d
