@@ -65,6 +65,8 @@ func (f *Fn) Is_void() bool { return f.Result == nil }
 func (f *Fn) Is_method() bool { return f.Owner != nil }
 // Reports whether function is entry point.
 func (f *Fn) Is_entry_point() bool { return f.Ident == jule.ENTRY_POINT }
+// Reports whether function has return variable(s).
+func (f *Fn) Any_var() bool { return f.Result != nil && len(f.Result.Idents) > 0 }
 
 // Reports whether any parameter uses generic types.
 func (f *Fn) Parameters_uses_generics() bool {

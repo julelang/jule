@@ -3,6 +3,7 @@ package cxx
 import (
 	"unsafe"
 
+	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/sema"
 )
 
@@ -377,6 +378,85 @@ func gen_break_st(b *sema.BreakSt) string {
 	return obj
 }
 
+func gen_ret_vars(r *sema.RetSt) string {
+	obj := "std::make_tuple("
+	for _, v := range r.Vars {
+		if lex.Is_ignore_ident(v.Ident) {
+			obj += get_init_expr(v.Kind.Kind)
+		} else {
+			obj += var_out_ident(v)
+		}
+
+		obj += lex.KND_COMMA
+	}
+
+	obj = obj[:len(obj)-1] // Remove last comma.
+	obj += ")" + CPP_ST_TERM
+	return obj
+}
+
+func gen_ret_expr_tuple(r *sema.RetSt) string {
+	datas := r.Expr.(*sema.TupleExprModel).Datas
+	obj := ""
+
+	for i, v := range r.Vars {
+		if !lex.Is_ignore_ident(v.Ident) {
+			ident := var_out_ident(v)
+			obj += ident + " = " + gen_expr_model(datas[i].Model) + ";\n"
+			obj += indent()
+		}
+	}
+
+	obj += "return std::make_tuple("
+	for i, d := range datas {
+		v := r.Vars[i]
+		if lex.Is_ignore_ident(v.Ident) {
+			obj += gen_expr_model(d.Model)
+		} else {
+			obj += var_out_ident(v)
+		}
+
+		obj += ","
+	}
+	obj = obj[:len(obj)-1] // Remove last comma.
+	obj += ");"
+
+	return obj
+}
+
+func gen_ret_expr(r *sema.RetSt) string {
+	if len(r.Vars) == 0 {
+		return "return " + gen_expr_model(r.Expr) + CPP_ST_TERM
+	}
+
+	if len(r.Vars) > 1 {
+		return gen_ret_expr_tuple(r)
+	}
+
+	obj := ""
+	if !lex.Is_ignore_ident(r.Vars[0].Ident) {
+		ident := var_out_ident(r.Vars[0])
+		obj += ident + " = " + gen_expr_model(r.Expr) + ";\n"
+		obj += indent()
+		obj += "return " + ident + CPP_ST_TERM
+		return obj
+	}
+
+	return "return " + gen_expr_model(r.Expr) + CPP_ST_TERM
+}
+
+func gen_ret_st(r *sema.RetSt) string {
+	if r.Expr == nil && len(r.Vars) == 0 {
+		return "return;"
+	}
+
+	if r.Expr == nil {
+		return gen_ret_vars(r)
+	}
+
+	return gen_ret_expr(r)
+}
+
 // Generates C++ code of statement.
 func gen_st(st sema.St) string {
 	switch st.(type) {
@@ -431,6 +511,9 @@ func gen_st(st sema.St) string {
 	case *sema.BreakSt:
 		return gen_break_st(st.(*sema.BreakSt))
 
+	case *sema.RetSt:
+		return gen_ret_st(st.(*sema.RetSt))
+
 	default:
 		return "<unimplemented stmt>"
 	}
@@ -460,6 +543,5 @@ func gen_scope(s *sema.Scope) string {
 
 // Generates C++ code of function's scope.
 func gen_fn_scope(f *sema.FnIns) string {
-	// TODO: Add return variables to root scope.
 	return gen_scope(f.Scope)
 }

@@ -27,6 +27,33 @@ func compiler_err(token lex.Token, key string, args ...any) build.Log {
 	}
 }
 
+func build_ret_vars(f *FnIns) []*Var {
+	if f.Decl.Is_void() {
+		return nil
+	}
+
+	var vars []*Var = nil
+	types := get_fn_result_types(f)
+	for i, ident := range f.Decl.Result.Idents {
+		if lex.Is_ignore_ident(ident.Kind) {
+			continue
+		}
+
+		v := &Var{
+			Mutable: true,
+			Ident:   ident.Kind,
+			Token:   ident,
+			Kind:    &TypeSymbol{Kind: types[i]},
+			Value:   &Value{
+				Data: &Data{},
+			},
+		}
+		vars = append(vars, v)
+	}
+
+	return vars
+}
+
 // Sema must implement Lookup.
 
 // TODO: Implement built-in definitions.
@@ -1227,8 +1254,26 @@ func (s *_Sema) check_global_types() {
 }
 
 func (s *_Sema) check_fn_ins(f *FnIns) {
-	sc := new_scope_checker(s)
+	vars := build_ret_vars(f)
+
+	sc := new_scope_checker(s, f)
+	sc.table.Vars = append(sc.table.Vars, vars...)
+
 	sc.check(f.Decl.Scope, f.Scope)
+
+	// Append return variables.
+	if len(vars) > 0 {
+		stms := make([]St, len(f.Scope.Stmts)+len(vars))
+		for i, v := range vars {
+			stms[i] = v
+		}
+
+		for i := len(vars); i < len(stms); i++ {
+			stms[i] = f.Scope.Stmts[i-len(vars)]
+		}
+
+		f.Scope.Stmts = stms
+	}
 }
 
 func (s *_Sema) check_type_fn(f *Fn) {

@@ -11,6 +11,19 @@ import (
 
 // This file reserved for type compatibility checking.
 
+func get_fn_result_types(f *FnIns) []*TypeKind {
+	switch {
+	case f.Decl.Is_void():
+		return nil
+
+	case f.Result.Tup() == nil:
+		return []*TypeKind{f.Result}
+
+	default:
+		return f.Result.Tup().Types
+	}
+}
+
 func trait_has_reference_receiver(t *Trait) bool {
 	for _, f := range t.Methods {
 		p := f.Params[0]
@@ -929,4 +942,104 @@ func (rc *_RangeChecker) check() bool {
 
 	rc.sc.s.push_err(rc.rang.In_token, "iter_range_require_enumerable_expr")
 	return false
+}
+
+// Return type checker for return statements.
+type _RetTypeChecker struct {
+	sc          *_ScopeChecker
+	f           *FnIns
+	types       []*TypeKind    // Return types.
+	exprs       []*Data        // Return expressions.
+	vars        []*Var         // Return variables.
+	error_token lex.Token
+}
+
+func (rtc *_RetTypeChecker) prepare_types() {
+	rtc.types = get_fn_result_types(rtc.f)
+}
+
+func (rtc *_RetTypeChecker) prepare_exprs(d *Data) {
+	if d == nil {
+		return
+	}
+
+	if d.Kind.Tup() == nil {
+		rtc.exprs = append(rtc.exprs, d)
+		return
+	}
+
+	rtc.exprs = d.Model.(*TupleExprModel).Datas
+}
+
+func (rtc *_RetTypeChecker) ret_vars() {
+	rtc.vars = make([]*Var, len(rtc.f.Decl.Result.Idents))
+
+	j := 0
+	for i, ident := range rtc.f.Decl.Result.Idents {
+		if !lex.Is_ignore_ident(ident.Kind) {
+			rtc.vars[i] = rtc.sc.table.Vars[j]
+			j++
+		} else {
+			rtc.vars[i] = &Var{
+				Ident: lex.IGNORE_IDENT,
+				Kind:  &TypeSymbol{Kind: rtc.types[i]},
+			}
+		}
+	}
+
+	// Not exist any real variable.
+	if j == 0 {
+		rtc.vars = nil
+	}
+}
+
+func (rtc *_RetTypeChecker) check_exprs() {
+	for i, d := range rtc.exprs {
+		if i >= len(rtc.types) {
+			break
+		}
+
+		t := rtc.types[i]
+		if !d.Mutable && is_mut(d.Kind) {
+			rtc.sc.s.push_err(rtc.error_token, "ret_with_mut_typed_non_mut")
+			return
+		}
+
+		ac := _AssignTypeChecker{
+			s:           rtc.sc.s,
+			dest:        t,
+			d:           d,
+			error_token: rtc.error_token,
+		}
+		ac.check()
+	}
+}
+
+func (rtc *_RetTypeChecker) check(d *Data) bool {
+	rtc.prepare_types()
+	rtc.prepare_exprs(d)
+	rtc.ret_vars()
+
+	n := len(rtc.exprs)
+	if n == 0 && !rtc.f.Decl.Is_void() {
+		if !rtc.f.Decl.Any_var() {
+			rtc.sc.s.push_err(rtc.error_token, "require_ret_expr")
+			return false
+		}
+		return true
+	}
+
+	if n > 0 && rtc.f.Decl.Is_void() {
+		rtc.sc.s.push_err(rtc.error_token, "void_function_ret_expr")
+		return false
+	}
+
+	if n > len(rtc.types) {
+		rtc.sc.s.push_err(rtc.error_token, "overflow_ret")
+	} else if n < len(rtc.types) {
+		rtc.sc.s.push_err(rtc.error_token, "missing_multi_ret")
+	}
+
+	rtc.check_exprs()
+	return true
 }

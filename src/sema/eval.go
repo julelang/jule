@@ -459,7 +459,7 @@ func (e *_Eval) eval_var(v *Var, error_token lex.Token) *Data {
 		return nil
 	}
 
-	if v.Value.Data == nil {
+	if v.Value == nil || v.Value.Data == nil {
 		return nil
 	}
 
@@ -2203,7 +2203,7 @@ func (e *_Eval) eval_anon_fn(decl *ast.FnDecl) *Data {
 	}
 	ins := tc.build_fn(decl)
 
-	sc := new_scope_checker(e.s)
+	sc := new_scope_checker(e.s, ins)
 	sc.check(decl.Scope, ins.Scope)
 
 	return &Data{

@@ -121,6 +121,12 @@ type FallSt struct {
 	Dest_case uintptr
 }
 
+// Return statement.
+type RetSt struct {
+	Vars []*Var    // Used "_" identifier to pass ignored vars for ordering.
+	Expr ExprModel
+}
+
 type _ScopeLabel struct {
 	label *Label
 	pos   int
@@ -136,6 +142,7 @@ type _ScopeGoto struct {
 // Scope checker.
 type _ScopeChecker struct {
 	s           *_Sema
+	owner       *FnIns
 	parent      *_ScopeChecker
 	child_index int // Index of child scope.
 	table       *SymbolTable
@@ -1124,6 +1131,42 @@ func (sc *_ScopeChecker) check_break(b *ast.BreakSt) {
 	sc.scope.Stmts = append(sc.scope.Stmts, brk)
 }
 
+func (sc *_ScopeChecker) check_ret(r *ast.RetSt) {
+	var d *Data = nil
+
+	if r.Expr != nil {
+		d = sc.s.eval(r.Expr, sc)
+		if d == nil {
+			return
+		}
+	}
+
+	rtc := &_RetTypeChecker{
+		sc:          sc,
+		f:           sc.owner,
+		error_token: r.Token,
+	}
+	ok := rtc.check(d)
+	if !ok {
+		return
+	}
+
+	if d == nil && len(rtc.vars) == 0 {
+		sc.scope.Stmts = append(sc.scope.Stmts, &RetSt{})
+		return
+	}
+
+	rt := &RetSt{
+		Vars: rtc.vars,
+	}
+
+	if d != nil {
+		rt.Expr = d.Model
+	}
+
+	sc.scope.Stmts = append(sc.scope.Stmts, rt)
+}
+
 func (sc *_ScopeChecker) check_node(node ast.NodeData) {
 	switch node.(type) {
 	case *ast.Comment:
@@ -1168,6 +1211,9 @@ func (sc *_ScopeChecker) check_node(node ast.NodeData) {
 
 	case *ast.BreakSt:
 		sc.check_break(node.(*ast.BreakSt))
+
+	case *ast.RetSt:
+		sc.check_ret(node.(*ast.RetSt))
 
 	default:
 		println("error <unimplemented scope node>")
@@ -1313,22 +1359,23 @@ func (sc *_ScopeChecker) check(tree *ast.ScopeTree, s *Scope) {
 }
 
 func (sc *_ScopeChecker) new_child_checker() *_ScopeChecker {
-	base := new_scope_checker_base(sc.s)
+	base := new_scope_checker_base(sc.s, sc.owner)
 	base.labels = sc.labels
 	base.gotos =  sc.gotos
 	base.child_index = sc.child_index + 1
 	return base
 }
 
-func new_scope_checker_base(s *_Sema) *_ScopeChecker {
+func new_scope_checker_base(s *_Sema, owner *FnIns) *_ScopeChecker {
 	return &_ScopeChecker{
-		s:      s,
-		table:  &SymbolTable{},
+		s:     s,
+		owner: owner,
+		table: &SymbolTable{},
 	}
 }
 
-func new_scope_checker(s *_Sema) *_ScopeChecker {
-	base := new_scope_checker_base(s)
+func new_scope_checker(s *_Sema, owner *FnIns) *_ScopeChecker {
+	base := new_scope_checker_base(s, owner)
 	base.labels = new([]*_ScopeLabel)
 	base.gotos =  new([]*_ScopeGoto)
 	return base

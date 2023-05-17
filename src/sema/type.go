@@ -829,9 +829,7 @@ func (tc *_TypeChecker) build_tuple(decl *ast.TupleType) *Tuple {
 		types[i] = kind
 	}
 
-	return &Tuple{
-		Types: types,
-	}
+	return &Tuple{Types: types}
 }
 
 func (tc *_TypeChecker) check_fn_types(f *FnIns) (ok bool) {
