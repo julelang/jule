@@ -472,6 +472,11 @@ func (e *_Eval) eval_var(v *Var, error_token lex.Token) *Data {
 		Model:    v,
 	}
 
+	if v.Constant {
+		d.Constant = v.Value.Data.Constant
+		d.Model = d.Constant
+	}
+
 	return d
 }
 
