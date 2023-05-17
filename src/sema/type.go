@@ -20,6 +20,7 @@ type TypeAlias struct {
 	Scope      *ast.ScopeTree
 	Public     bool
 	Cpp_linked bool
+	Used       bool
 	Token      lex.Token
 	Ident      string
 	Kind       *TypeSymbol
@@ -476,6 +477,8 @@ func (tc *_TypeChecker) from_type_alias(decl *ast.IdentType, ta *TypeAlias) _Kin
 		tc.push_err(decl.Token, "ident_not_exist", decl.Ident)
 		return nil
 	}
+
+	ta.Used = true
 
 	if len(decl.Generics) > 0 {
 		tc.push_err(decl.Token, "type_not_supports_generics", decl.Ident)

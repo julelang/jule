@@ -1372,6 +1372,14 @@ func (sc *_ScopeChecker) check_vars() {
 	}
 }
 
+func (sc *_ScopeChecker) check_aliases() {
+	for _, a := range sc.table.Type_aliases {
+		if !a.Used {
+			sc.s.push_err(a.Token, "declared_but_not_used", a.Ident)
+		}
+	}
+}
+
 // Checks scope tree.
 func (sc *_ScopeChecker) check(tree *ast.ScopeTree, s *Scope) {
 	s.Deferred = tree.Deferred
@@ -1383,6 +1391,7 @@ func (sc *_ScopeChecker) check(tree *ast.ScopeTree, s *Scope) {
 	sc.check_tree()
 
 	sc.check_vars()
+	sc.check_aliases()
 
 	if sc.parent == nil { // If parent scope.
 		sc.check_gotos()
