@@ -128,9 +128,11 @@ type RetSt struct {
 }
 
 type _ScopeLabel struct {
+	token lex.Token
 	label *Label
 	pos   int
 	scope *_ScopeChecker
+	used  bool
 }
 
 type _ScopeGoto struct {
@@ -594,7 +596,11 @@ func (sc *_ScopeChecker) check_cont(c *ast.ContSt) {
 		if label == nil {
 			sc.s.push_err(c.Label, "label_not_exist", c.Label.Kind)
 			return
-		} else if label.pos+1 >= len(label.scope.scope.Stmts) {
+		}
+
+		label.used = true
+
+		if label.pos+1 >= len(label.scope.scope.Stmts) {
 			sc.s.push_err(c.Label, "invalid_label")
 			return
 		}
@@ -641,6 +647,7 @@ func (sc *_ScopeChecker) check_label(l *ast.LabelSt) {
 
 	sc.scope.Stmts = append(sc.scope.Stmts, label)
 	*sc.labels = append(*sc.labels, &_ScopeLabel{
+		token: l.Token,
 		label: label,
 		pos:   len(sc.scope.Stmts) - 1,
 		scope: sc,
@@ -1058,7 +1065,11 @@ func (sc *_ScopeChecker) check_break_with_label(b *ast.BreakSt) *BreakSt {
 	if label == nil {
 		sc.s.push_err(b.Label, "label_not_exist", b.Label.Kind)
 		return nil
-	} else if label.pos+1 >= len(label.scope.scope.Stmts) {
+	}
+
+	label.used = true
+
+	if label.pos+1 >= len(label.scope.scope.Stmts) {
 		sc.s.push_err(b.Label, "invalid_label")
 		return nil
 	}
@@ -1339,7 +1350,17 @@ func (sc *_ScopeChecker) check_gotos() {
 			sc.s.push_err(gt.gt.Token, "label_not_exist", gt.gt.Label.Kind)
 			continue
 		}
+
+		label.used = true
 		sc.check_goto(gt, label)
+	}
+}
+
+func (sc *_ScopeChecker) check_labels() {
+	for _, l := range *sc.labels {
+		if !l.used {
+			sc.s.push_err(l.token, "declared_but_not_used", l.label.Ident)
+		}
 	}
 }
 
@@ -1355,6 +1376,7 @@ func (sc *_ScopeChecker) check(tree *ast.ScopeTree, s *Scope) {
 
 	if sc.parent == nil { // If parent scope.
 		sc.check_gotos()
+		sc.check_labels()
 	}
 }
 
