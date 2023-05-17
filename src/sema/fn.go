@@ -141,7 +141,7 @@ func (f *Fn) append_instance(ins *FnIns) bool {
 		f.Instances = append(f.Instances, ins)
 		return true
 	}
-	
+
 	if len(f.Instances) == 0 {
 		f.Instances = append(f.Instances, ins)
 		return true
@@ -153,14 +153,15 @@ func (f *Fn) append_instance(ins *FnIns) bool {
 
 	for _, ains := range f.Instances {
 		for i, ag := range ains.Generics {
-			if ag.To_str() != ins.Generics[i].To_str() {
-				f.Instances = append(f.Instances, ins)
-				return true
+			if ag.To_str() == ins.Generics[i].To_str() {
+				// Instance is exist.
+				return false
 			}
 		}
 	}
 
-	return false
+	f.Instances = append(f.Instances, ins)
+	return true
 }
 
 // Parameter instance.

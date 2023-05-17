@@ -83,16 +83,18 @@ func (s *Struct) append_instance(ins *StructIns) {
 
 	for _, ains := range s.Instances {
 		for i, ag := range ains.Generics {
-			if ag.To_str() != ins.Generics[i].To_str() {
-				for _, f := range ins.Methods {
-					f.Decl.append_instance(f)
-				}
-
-				s.Instances = append(s.Instances, ins)
+			if ag.To_str() == ins.Generics[i].To_str() {
+				// Instance exist.
 				return
 			}
 		}
 	}
+
+	for _, f := range ins.Methods {
+		f.Decl.append_instance(f)
+	}
+
+	s.Instances = append(s.Instances, ins)
 }
 
 // Returns method by identifier.
