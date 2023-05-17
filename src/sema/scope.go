@@ -683,6 +683,10 @@ func (sc *_ScopeChecker) check_postfix(a *ast.AssignSt) {
 }
 
 func (sc *_ScopeChecker) is_new_assign_ident(ident string) bool {
+	if lex.Is_ignore_ident(ident) {
+		return false
+	}
+
 	return sc.table.def_by_ident(ident, false) == nil
 }
 
