@@ -1639,16 +1639,18 @@ func (e *_Eval) eval_struct_sub_ident(d *Data, s *StructIns, si *ast.SubIdentExp
 		return nil
 	}
 
-	if m.Decl.Params[0].Is_ref() && !ref {
+	if m.Params[0].Is_ref() && !ref {
 		e.push_err(si.Ident, "ref_method_used_with_not_ref_instance")
 	}
 
+	ins := m.instance()
+	ins.Owner = s
 	d.Model = &StrctSubIdentExprModel{
 		ExprKind: d.Kind,
 		Expr:     d.Model,
-		Method:   m,
+		Method:   ins,
 	}
-	d.Kind = &TypeKind{kind: m}
+	d.Kind = &TypeKind{kind: ins}
 	return d
 }
 

@@ -61,7 +61,7 @@ func (s *Struct) instance() *StructIns {
 	ins := &StructIns{
 		Decl:    s,
 		Fields:  make([]*FieldIns, len(s.Fields)),
-		Methods: make([]*FnIns, len(s.Methods)),
+		Methods: make([]*Fn, len(s.Methods)),
 	}
 
 	for i, f := range s.Fields {
@@ -69,8 +69,8 @@ func (s *Struct) instance() *StructIns {
 	}
 
 	for i, f := range s.Methods {
-		fins := f.instance()
-		fins.Owner = ins
+		fins := new(Fn)
+		*fins = *f
 		ins.Methods[i] = fins
 	}
 
@@ -90,10 +90,6 @@ func (s *Struct) append_instance(ins *StructIns) {
 				return
 			}
 		}
-	}
-
-	for _, f := range ins.Methods {
-		f.Decl.append_instance(f)
 	}
 
 	s.Instances = append(s.Instances, ins)
@@ -131,7 +127,7 @@ type StructIns struct {
 	Decl     *Struct
 	Generics []*TypeKind
 	Fields   []*FieldIns
-	Methods  []*FnIns
+	Methods  []*Fn
 }
 
 // Implement: Kind
@@ -153,9 +149,9 @@ func (s StructIns) To_str() string {
 
 // Returns method by identifier.
 // Returns nil if not exist any method in this identifier.
-func (s *StructIns) Find_method(ident string) *FnIns {
+func (s *StructIns) Find_method(ident string) *Fn {
 	for _, f := range s.Methods {
-		if f.Decl.Ident == ident {
+		if f.Ident == ident {
 			return f
 		}
 	}

@@ -156,10 +156,6 @@ func gen_struct_expr_model(m *sema.Struct) string {
 	return struct_out_ident(m)
 }
 
-func gen_fn_expr_model(m *sema.Fn) string {
-	return fn_out_ident(m)
-}
-
 func gen_unary_expr_model(m *sema.UnaryExprModel) string {
 	switch m.Op {
 	case lex.KND_CARET:
@@ -175,7 +171,7 @@ func gen_get_ref_ptr_expr_model(m *sema.GetRefPtrExprModel) string {
 }
 
 func gen_struct_lit_expr_model(m *sema.StructLitExprModel) string {
-	obj := struct_out_ident(m.Strct.Decl)
+	obj := struct_ins_out_ident(m.Strct)
 	obj += "("
 	if len(m.Args) > 0 {
 		for _, f := range m.Strct.Fields {
@@ -229,15 +225,6 @@ func gen_casting_expr_model(m *sema.CastingExprModel) string {
 	return obj
 }
 
-func gen_generic_type_kinds(kinds []*sema.TypeKind) string {
-	obj := ""
-	for _, kind := range kinds {
-		obj += gen_type_kind(kind) + ","
-	}
-	obj = obj[:len(obj)-1] // Remove last comma.
-	return obj
-}
-
 func gen_arg_expr_models(models []sema.ExprModel) string {
 	if len(models) == 0 {
 		return ""
@@ -253,11 +240,6 @@ func gen_arg_expr_models(models []sema.ExprModel) string {
 
 func gen_fn_call_expr_model(m *sema.FnCallExprModel) string {
 	obj := gen_expr_model(m.Expr)
-	if len(m.Func.Generics) > 0 && !has_directive(m.Func.Decl.Directives, build.DIRECTIVE_CDEF) {
-		obj += "<"
-		obj += gen_generic_type_kinds(m.Func.Generics)
-		obj += ">"
-	}
 	obj += "("
 	obj += gen_arg_expr_models(m.Args)
 	obj += ")"

@@ -2,7 +2,6 @@ package cxx
 
 import (
 	"github.com/julelang/jule"
-	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/sema"
@@ -335,36 +334,15 @@ func gen_traits(pkg *sema.Package, used []*sema.Package) string {
 	return obj
 }
 
-// Generates C++ declaration code of generic.
-func gen_generic_decl(g *ast.Generic) string {
-	obj := "typename "
-	obj += generic_decl_out_ident(g)
-	return obj
-}
-
-// Generates C++ declaration code of all generics.
-func gen_generic_decls(generics []*ast.Generic) string {
-	if len(generics) == 0 {
-		return ""
-	}
-
-	obj := "template<"
-	for _, g := range generics {
-		obj += gen_generic_decl(g) + ","
-	}
-
-	obj = obj[:len(obj)-1] // Remove last comma.
-	obj += ">"
-	return obj
-}
-
 // Generates C++ plain-prototype code of structure.
 func gen_struct_plain_prototype(s *sema.Struct) string {
 	obj := ""
-	obj += gen_generic_decls(s.Generics)
-	obj += "\nstruct "
-	obj += struct_out_ident(s)
-	obj += CPP_ST_TERM
+	for _, ins := range s.Instances {
+		obj += "\nstruct "
+		obj += struct_ins_out_ident(ins)
+		obj += CPP_ST_TERM
+		obj += "\n"
+	}
 	return obj
 }
 
@@ -377,32 +355,6 @@ func gen_struct_plain_prototypes(structs []*sema.Struct) string {
 		}
 	}
 	return obj
-}
-
-// Generates C++ code of structure generics.
-// Returns declaration and definition code.
-func gen_struct_generics(generics []*ast.Generic) (decl string, def string) {
-	if len(generics) == 0 {
-		return "", ""
-	}
-
-	decl = "template<"
-	def = "<"
-
-	for _, g := range generics {
-		decl += gen_generic_decl(g)
-		decl += ","
-
-		def += generic_decl_out_ident(g)
-		def += ","
-	}
-
-	decl = decl[:len(decl)-1] // Remove last comma.
-	decl += ">\n"
-
-	def = def[:len(def)-1] // Remove last comma.
-	def += ">"
-	return
 }
 
 // Generates C++ derive code of structure's implemented traits.
@@ -421,41 +373,41 @@ func gen_struct_traits(s *sema.Struct) string {
 	return obj
 }
 
-func gen_struct_self_field_type_kind(s *sema.Struct) string {
-	return as_ref_kind(gen_struct_kind(s))
+func gen_struct_self_field_type_kind(s *sema.StructIns) string {
+	return as_ref_kind(gen_struct_kind_ins(s))
 }
 
 // Generates C++ field declaration code of structure's self field.
-func gen_struct_self_field(s *sema.Struct) string {
+func gen_struct_self_field(s *sema.StructIns) string {
 	obj := gen_struct_self_field_type_kind(s)
 	obj += " self{};"
 	return obj
 }
 
 // Generates C++ declaration code of field.
-func gen_field_decl(f *sema.Field) string {
-	obj := gen_type_kind(f.Kind.Kind) + " "
-	obj += field_out_ident(f)
-	obj += get_init_expr(f.Kind.Kind)
+func gen_field_decl(f *sema.FieldIns) string {
+	obj := gen_type_kind(f.Kind) + " "
+	obj += field_out_ident(f.Decl)
+	obj += get_init_expr(f.Kind)
 	obj += CPP_ST_TERM
 	return obj
 }
 
-func gen_struct_self_field_init_st(s *sema.Struct) string {
+func gen_struct_self_field_init_st(s *sema.StructIns) string {
 	obj := "this->self = "
 	obj += gen_struct_self_field_type_kind(s)
 	obj += "::make(this, nil);"
 	return obj
 }
 
-func gen_struct_constructor(s *sema.Struct) string {
-	obj := struct_out_ident(s)
+func gen_struct_constructor(s *sema.StructIns) string {
+	obj := struct_ins_out_ident(s)
 
 	obj += "("
 	if len(s.Fields) > 0 {
 		for _, f := range s.Fields {
-			obj += gen_type_kind(f.Kind.Kind)
-			obj += " __param_" + f.Ident + ", "
+			obj += gen_type_kind(f.Kind)
+			obj += " __param_" + f.Decl.Ident + ", "
 		}
 		obj = obj[:len(obj)-2] // Remove last comma.
 	} else {
@@ -473,9 +425,9 @@ func gen_struct_constructor(s *sema.Struct) string {
 			obj += "\n"
 			obj += indent()
 			obj += "this->"
-			obj += field_out_ident(f)
+			obj += field_out_ident(f.Decl)
 			obj += " = "
-			obj += "__param_" + f.Ident
+			obj += "__param_" + f.Decl.Ident
 			obj += CPP_ST_TERM
 		}
 	}
@@ -485,22 +437,20 @@ func gen_struct_constructor(s *sema.Struct) string {
 	return obj
 }
 
-func gen_struct_destructor(s *sema.Struct) string {
+func gen_struct_destructor(s *sema.StructIns) string {
 	obj := "~"
-	obj += struct_out_ident(s)
+	obj += struct_ins_out_ident(s)
 	obj += "(void) noexcept { /* heap allocations managed by traits or references */ this->self.__ref = nil; }"
 	return obj
 }
 
-func gen_struct_operators(s *sema.Struct) string {
-	out_ident := struct_out_ident(s)
-	_, def := gen_struct_generics(s.Generics)
+func gen_struct_operators(s *sema.StructIns) string {
+	out_ident := struct_ins_out_ident(s)
 	obj := ""
 
 	obj += indent()
 	obj += "inline bool operator==(const "
 	obj += out_ident
-	obj += def
 	obj += " &_Src) {"
 	if len(s.Fields) > 0 {
 		add_indent()
@@ -512,7 +462,7 @@ func gen_struct_operators(s *sema.Struct) string {
 			obj += "\n"
 			obj += indent()
 			obj += "this->"
-			f_ident := field_out_ident(f)
+			f_ident := field_out_ident(f.Decl)
 			obj += f_ident
 			obj += " == _Src."
 			obj += f_ident
@@ -531,18 +481,15 @@ func gen_struct_operators(s *sema.Struct) string {
 	obj += indent()
 	obj += "inline bool operator!=(const "
 	obj += out_ident
-	obj += def
 	obj += " &_Src) { return !this->operator==(_Src); }"
 	return obj
 }
 
-// Generates C++ declaration code of structure.
-func gen_struct_prototype(s *sema.Struct) string {
-	obj := gen_generic_decls(s.Generics) + "\n"
-	obj += "struct "
-	out_ident := struct_out_ident(s)
+func gen_struct_ins_prototype(s *sema.StructIns) string {
+	obj := "struct "
+	out_ident := struct_ins_out_ident(s)
 	obj += out_ident
-	obj += gen_struct_traits(s)
+	obj += gen_struct_traits(s.Decl)
 	obj += " {\n"
 
 	add_indent()
@@ -572,7 +519,6 @@ func gen_struct_prototype(s *sema.Struct) string {
 	obj += " }\n\n"
 
 	for _, f := range s.Methods {
-		obj += indent()
 		obj += gen_fn_prototype(f, true)
 		obj += "\n\n"
 	}
@@ -582,6 +528,15 @@ func gen_struct_prototype(s *sema.Struct) string {
 
 	done_indent()
 	obj += indent() + "};"
+	return obj
+}
+
+// Generates C++ declaration code of structure.
+func gen_struct_prototype(s *sema.Struct) string {
+	obj := ""
+	for _, ins := range s.Instances {
+		obj += gen_struct_ins_prototype(ins) + "\n\n"
+	}
 	return obj
 }
 
@@ -598,30 +553,14 @@ func gen_struct_prototypes(structs []*sema.Struct) string {
 
 func gen_fn_decl_head(f *sema.FnIns, method bool) string {
 	obj := ""
-
-	if !method && f.Decl.Owner != nil {
-		generics := gen_generic_decls(f.Decl.Owner.Generics)
-		if generics != "" {
-			obj += generics
-			obj += "\n" + indent()
-		}
-	}
-
-	generics := gen_generic_decls(f.Decl.Generics)
-	if generics != "" {
-		obj += generics
-		obj += "\n" + indent()
-	}
-
 	if !f.Decl.Is_entry_point() {
 		obj += "inline "
 	}
+
 	obj += gen_fn_ins_result(f) + " "
 
 	if f.Decl.Owner != nil {
-		_, def := gen_struct_generics(f.Decl.Owner.Generics)
-		obj += struct_out_ident(f.Decl.Owner)
-		obj += def + lex.KND_DBLCOLON
+		obj += struct_ins_out_ident(f.Owner) + lex.KND_DBLCOLON
 	}
 	obj += fn_ins_out_ident(f)
 	return obj
@@ -631,6 +570,7 @@ func gen_fn_decl_head(f *sema.FnIns, method bool) string {
 func gen_fn_prototype(f *sema.Fn, method bool) string {
 	obj := ""
 	for _, c := range f.Instances {
+		obj += indent()
 		obj += gen_fn_decl_head(c, method)
 		obj += gen_params_prototypes(c.Params)
 		obj += CPP_ST_TERM + "\n"
@@ -728,7 +668,7 @@ func gen_pkg_fns(p *sema.Package) string {
 }
 
 // Generates C++ code of structure's methods.
-func gen_struct_method_defs(s *sema.Struct) string {
+func gen_struct_method_defs(s *sema.StructIns) string {
 	obj := ""
 	for _, f := range s.Methods {
 		obj += indent()
@@ -739,30 +679,24 @@ func gen_struct_method_defs(s *sema.Struct) string {
 }
 
 // Generates C++ code of structure's ostream.
-func gen_struct_ostream(s *sema.Struct) string {
+func gen_struct_ostream(s *sema.StructIns) string {
 	obj := ""
-	generics_decl, generics_def := gen_struct_generics(s.Generics)
 	obj += indent()
-	if generics_decl != "" {
-		obj += generics_decl + "\n"
-		obj += indent()
-	}
 	obj += "std::ostream &operator<<(std::ostream &_Stream, const "
-	obj += struct_out_ident(s)
-	obj += generics_def
+	obj += struct_ins_out_ident(s)
 	obj += " &_Src) {\n"
 	add_indent()
 	obj += indent()
 	obj += `_Stream << "`
-	obj += struct_out_ident(s)
+	obj += struct_ins_out_ident(s)
 	obj += "{\";\n"
 
 	for i, field := range s.Fields {
 		obj += indent()
 		obj += `_Stream << "`
-		obj += field.Ident
+		obj += field.Decl.Ident
 		obj += `:" << _Src.`
-		obj += field_out_ident(field)
+		obj += field_out_ident(field.Decl)
 		if i+1 < len(s.Fields) {
 			obj += " << \", \""
 		}
@@ -779,12 +713,20 @@ func gen_struct_ostream(s *sema.Struct) string {
 	return obj
 }
 
+// Generates C++ code of structure instance definition.
+func gen_struct_ins(s *sema.StructIns) string {
+	obj := gen_struct_method_defs(s)
+	obj += "\n\n"
+	obj += gen_struct_ostream(s)
+	return obj
+}
+
 // Generates C++ code of structure definition.
 func gen_struct(s *sema.Struct) string {
 	obj := ""
-	obj += gen_struct_method_defs(s)
-	obj += "\n\n"
-	obj += gen_struct_ostream(s)
+	for _, ins := range s.Instances {
+		obj += gen_struct_ins(ins) + "\n\n"
+	}
 	return obj
 }
 

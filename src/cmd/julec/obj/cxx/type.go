@@ -91,19 +91,7 @@ func gen_struct_kind(s *sema.Struct) string {
 		rep += "struct "
 	}
 
-	rep += as_out_ident(s.Ident, s.Token.File.Addr())
-	if len(s.Generics) == 0 {
-		return rep
-	}
-
-	rep += "<"
-	for _, g := range s.Generics {
-		rep += gen_generic_decl(g)
-		rep += ","
-	}
-	rep = rep[:len(rep)-1] // Remove last comma.
-	rep += ">"
-
+	rep += struct_out_ident(s)
 	return rep
 }
 
@@ -114,19 +102,7 @@ func gen_struct_kind_ins(s *sema.StructIns) string {
 		rep += "struct "
 	}
 
-	rep += as_out_ident(s.Decl.Ident, s.Decl.Token.File.Addr())
-	if len(s.Generics) == 0 {
-		return rep
-	}
-
-	rep += "<"
-	for _, g := range s.Generics {
-		rep += gen_type_kind(g)
-		rep += ","
-	}
-	rep = rep[:len(rep)-1] // Remove last comma.
-	rep += ">"
-
+	rep += struct_ins_out_ident(s)
 	return rep
 }
 

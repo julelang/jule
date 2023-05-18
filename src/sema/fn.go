@@ -75,6 +75,10 @@ func (f *Fn) Parameters_uses_generics() bool {
 	}
 
 	for _, p := range f.Params {
+		if p.Is_self() {
+			continue
+		}
+
 		pk := p.Kind.Kind.To_str()
 		for _, g := range f.Generics {
 			if strings.Contains(pk, g.Ident) {
@@ -119,6 +123,7 @@ func (f *Fn) instance_force() *FnIns {
 	if ins.Decl.Result != nil {
 		ins.Result = ins.Decl.Result.Kind.Kind
 	}
+
 	return ins
 }
 

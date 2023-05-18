@@ -74,6 +74,7 @@ func fn_out_ident(f *sema.Fn) string {
 	}
 }
 
+// Returns output identifier of function instance.
 func fn_ins_out_ident(f *sema.FnIns) string {
 	if f.Decl.Cpp_linked || len(f.Generics) == 0 || f.Decl.Parameters_uses_generics() {
 		return fn_out_ident(f.Decl)
@@ -105,6 +106,22 @@ func struct_out_ident(s *sema.Struct) string {
 		return s.Ident
 	}
 	return as_out_ident(s.Ident, s.Token.File.Addr())
+}
+
+// Returns output identifier of structure instance.
+func struct_ins_out_ident(s *sema.StructIns) string {
+	if s.Decl.Cpp_linked || len(s.Generics) == 0 {
+		return struct_out_ident(s.Decl)
+	}
+
+	kind := s.To_str()
+	for i, ins := range s.Decl.Instances {
+		if kind == ins.To_str() {
+			return struct_out_ident(s.Decl) + "_" + strconv.Itoa(i)
+		}
+	}
+
+	return "__?__"
 }
 
 // Returns output identifier of generic type declaration.

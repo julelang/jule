@@ -1328,6 +1328,28 @@ func (s *_Sema) check_global_types() {
 	}
 }
 
+func (s *_Sema) check_type_method(strct *StructIns, f *Fn) {
+	if f.Cpp_linked {
+		return
+	}
+
+	// Generic instances are checked instantly.
+	if len(f.Generics) > 0 {
+		return
+	}
+
+	if len(f.Instances) == 0 {
+		ins := f.instance()
+		ins.Owner = strct
+		f.Instances = append(f.Instances, ins)
+		s.reload_fn_ins_types(ins)
+	}
+
+	for _, ins := range f.Instances {
+		s.check_fn_ins(ins)
+	}
+}
+
 func (s *_Sema) check_type_struct(strct *Struct) {
 	if strct.Cpp_linked {
 		return
@@ -1345,7 +1367,7 @@ func (s *_Sema) check_type_struct(strct *Struct) {
 
 	for _, ins := range strct.Instances {
 		for _, f := range ins.Methods {
-			s.check_fn_ins(f)
+			s.check_type_method(ins, f)
 		}
 	}
 }

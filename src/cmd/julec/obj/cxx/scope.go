@@ -559,7 +559,7 @@ func gen_method_scope(f *sema.FnIns) string {
 	if slf.Is_ref() {
 		slf_decl = "auto self{ this->self };"
 	} else if !slf.Mutable {
-		slf_decl = gen_struct_kind(f.Owner.Decl) + " self{ *this };"
+		slf_decl = gen_struct_kind_ins(f.Owner) + " self{ *this };"
 	}
 
 	robj := "{\n"

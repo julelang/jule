@@ -1379,7 +1379,7 @@ func (sc *_ScopeChecker) check_labels() {
 
 func (sc *_ScopeChecker) check_vars() {
 	for _, v := range sc.table.Vars {
-		if !v.Used {
+		if v.Ident != lex.KND_SELF && !v.Used {
 			sc.s.push_err(v.Token, "declared_but_not_used", v.Ident)
 		}
 	}
