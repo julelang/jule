@@ -938,6 +938,7 @@ func (tc *_TypeChecker) build(decl_kind ast.TypeDeclKind) *TypeKind {
 	if kind == nil {
 		return nil
 	}
+
 	return &TypeKind{
 		kind: kind,
 	}

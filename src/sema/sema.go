@@ -44,12 +44,43 @@ func build_ret_vars(f *FnIns) []*Var {
 			Mutable: true,
 			Ident:   ident.Kind,
 			Token:   ident,
+			Scope:   f.Decl.Scope,
 			Kind:    &TypeSymbol{Kind: types[i]},
 			Value:   &Value{
 				Data: &Data{},
 			},
 		}
 		vars = append(vars, v)
+	}
+
+	return vars
+}
+
+func build_param_vars(f *FnIns) []*Var {
+	if len(f.Params) == 0 {
+		return nil
+	}
+
+	vars := make([]*Var, len(f.Params))
+	for i, p := range f.Params {
+		v := &Var{
+			Mutable: p.Decl.Mutable,
+			Ident:   p.Decl.Ident,
+			Token:   p.Decl.Token,
+			Kind:    &TypeSymbol{},
+			Scope:   f.Decl.Scope,
+			Value:   &Value{
+				Data: &Data{},
+			},
+		}
+
+		if p.Decl.Is_self() {
+			v.Kind.Kind = &TypeKind{kind: f.Owner}
+		} else {
+			v.Kind.Kind = p.Kind
+		}
+
+		vars[i] = v
 	}
 
 	return vars
@@ -1291,8 +1322,24 @@ func (s *_Sema) check_global_types() {
 }
 
 func (s *_Sema) check_type_struct(strct *Struct) {
-	for _, f := range strct.Methods {
-		s.check_type_fn(f)
+	if strct.Cpp_linked {
+		return
+	}
+
+	// Generic instances are checked instantly.
+	if len(strct.Generics) > 0 {
+		return
+	}
+
+	if len(strct.Instances) == 0 {
+		ins := strct.instance()
+		strct.Instances = append(strct.Instances, ins)
+	}
+
+	for _, ins := range strct.Instances {
+		for _, f := range ins.Methods {
+			s.check_fn_ins(f)
+		}
 	}
 }
 
@@ -1311,6 +1358,7 @@ func (s *_Sema) check_fn_ins(f *FnIns) {
 
 	sc := new_scope_checker(s, f)
 	sc.table.Vars = append(sc.table.Vars, vars...)
+	sc.table.Vars = append(sc.table.Vars, build_param_vars(f)...)
 	sc.table.Type_aliases = append(sc.table.Type_aliases, build_generic_type_aliases(f)...)
 
 	sc.check(f.Decl.Scope, f.Scope)

@@ -197,6 +197,7 @@ func (p ParamIns) To_str() string {
 
 // Function instance.
 type FnIns struct {
+	Owner    *StructIns
 	Decl     *Fn
 	Generics []*TypeKind
 	Params   []*ParamIns

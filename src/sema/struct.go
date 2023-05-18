@@ -69,7 +69,9 @@ func (s *Struct) instance() *StructIns {
 	}
 
 	for i, f := range s.Methods {
-		ins.Methods[i] = f.instance()
+		fins := f.instance()
+		fins.Owner = ins
+		ins.Methods[i] = fins
 	}
 
 	return ins
