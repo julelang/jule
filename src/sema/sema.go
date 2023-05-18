@@ -981,7 +981,7 @@ func (s *_Sema) impl_struct(decl *Impl) {
 
 	dest := s.Find_struct(decl.Dest.Kind, CPP_LINKED)
 	if dest == nil {
-		s.push_err(decl.Base, "impl_dest_not_exist", decl.Base.Kind)
+		s.push_err(decl.Dest, "impl_dest_not_exist", decl.Dest.Kind)
 		return
 	}
 
