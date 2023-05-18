@@ -54,7 +54,7 @@ func normalize_bitsize(d *Data) {
 	default:
 		return
 	}
-	
+
 	d.Kind.kind = build_prim_type(kind)
 }
 
@@ -2257,10 +2257,15 @@ func (e *_Eval) eval_binop(op *ast.BinopExpr) *Data {
 
 func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 	var d *Data
+
+	is_rune := false
+
 	switch kind.(type) {
 	case *ast.LitExpr:
-		d = e.eval_lit(kind.(*ast.LitExpr))
-		
+		lit := kind.(*ast.LitExpr)
+		is_rune = lex.Is_rune(lit.Value)
+		d = e.eval_lit(lit)
+
 	case *ast.IdentExpr:
 		d = e.eval_ident(kind.(*ast.IdentExpr))
 
@@ -2310,7 +2315,9 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 		d = e.eval_anon_fn(kind.(*ast.FnDecl))
 
 	case *ast.BinopExpr:
-		d = e.eval_binop(kind.(*ast.BinopExpr))
+		lit := kind.(*ast.BinopExpr)
+		is_rune = expr_data_is_rune_lit(lit.L) || expr_data_is_rune_lit(lit.R)
+		d = e.eval_binop(lit)
 
 	default:
 		d = nil
@@ -2324,7 +2331,7 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 		return d
 	}
 
-	if d.Is_const() && d.Kind.Prim() != nil && !expr_data_is_rune_lit(kind) {
+	if d.Is_const() && d.Kind.Prim() != nil && !is_rune {
 		switch {
 		case d.Constant.Is_i64():
 			if int_assignable(types.TypeKind_INT, d) {
@@ -2980,5 +2987,13 @@ func (bs *_BinopSolver) solve(op *ast.BinopExpr) *Data {
 	}
 
 	bs.op = op.Op
-	return bs.solve_explicit(l, r)
+
+	d := bs.solve_explicit(l, r)
+
+	// Save rune type.
+	if expr_data_is_rune_lit(op.L) || expr_data_is_rune_lit(op.R) {
+		d.Kind = &TypeKind{kind: build_prim_type(types.TypeKind_U8)}
+	}
+
+	return d
 }
