@@ -1600,7 +1600,6 @@ func (e *_Eval) eval_trait_sub_ident(d *Data, trt *Trait, ident lex.Token) *Data
 func (e *_Eval) eval_struct_sub_ident(d *Data, si *ast.SubIdentExpr, ref bool) *Data {
 	s := d.Kind.Strct()
 
-	// TODO: Apply interior mutability.
 	f := s.Find_field(si.Ident.Kind)
 	if f != nil {
 		d.Model = &StrctSubIdentExprModel{
@@ -1609,6 +1608,16 @@ func (e *_Eval) eval_struct_sub_ident(d *Data, si *ast.SubIdentExpr, ref bool) *
 			Field:    f,
 		}
 		d.Kind = f.Kind
+
+		if f.Decl.Mutable && !d.Mutable {
+			// Interior mutability.
+			switch e.lookup.(type) {
+			case *_ScopeChecker:
+				scope := e.lookup.(*_ScopeChecker)
+				d.Mutable = scope.owner != nil && scope.owner.Owner == s
+			}
+		}
+
 		return d
 	}
 
