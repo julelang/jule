@@ -11,6 +11,10 @@ import (
 	"github.com/julelang/jule/types"
 )
 
+func is_instanced_struct(s *StructIns) bool {
+	return len(s.Decl.Generics) == len(s.Generics)
+}
+
 // Returns literal if expression is literal, nil if not.
 func expr_data_is_lit(k ast.ExprData) *ast.LitExpr {
 	switch k.(type) {
@@ -469,7 +473,7 @@ func (e *_Eval) eval_var(v *Var, error_token lex.Token) *Data {
 		Lvalue:   !v.Constant,
 		Mutable:  v.Mutable,
 		Decl:     false,
-		Kind:     v.Kind.Kind,
+		Kind:     &TypeKind{kind: v.Kind.Kind.kind},
 		Model:    v,
 	}
 
@@ -1325,10 +1329,6 @@ func (e *_Eval) eval_ns_selection(s *ast.NsSelectionExpr) *Data {
 	return d
 }
 
-func (e *_Eval) is_instanced_struct(s *StructIns) bool {
-	return len(s.Decl.Generics) == len(s.Generics)
-}
-
 func (e *_Eval) eval_struct_lit_explicit(s *StructIns, exprs []ast.ExprData, error_token lex.Token) *Data {
 	ok := e.s.check_generic_quantity(len(s.Decl.Generics), len(s.Generics), error_token)
 	if !ok {
@@ -2079,7 +2079,7 @@ func (e *_Eval) eval_obj_sub_ident(d *Data, si *ast.SubIdentExpr) *Data {
 	
 	case kind.Strct() != nil:
 		s := kind.Strct()
-		if e.is_instanced_struct(s) {
+		if is_instanced_struct(s) {
 			used_reference_elem := kind != d.Kind
 			return e.eval_struct_sub_ident(d, si, used_reference_elem)
 		}
