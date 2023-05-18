@@ -2326,10 +2326,15 @@ func (e *_Eval) eval(expr *ast.Expr) *Data {
 		return nil
 	}
 
-	switch d.Model.(type) {
-	case *FnIns:
-		if len(d.Model.(*FnIns).Generics) != len(d.Model.(*FnIns).Decl.Generics) {
+	switch {
+	case d.Kind.Fnc() != nil:
+		f := d.Kind.Fnc()
+		if len(f.Generics) != len(f.Decl.Generics) {
 			e.s.push_err(expr.Token, "has_generics")
+		}
+
+		if f.Decl.Is_method() {
+			e.s.push_err(expr.Token, "method_not_invoked")
 		}
 	}
 

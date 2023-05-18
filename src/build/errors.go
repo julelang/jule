@@ -171,6 +171,7 @@ var ERRORS = map[string]string{
 	`builtin_as_anonymous_fn`:                  `built-in define cannot use as anonymous function`,
 	`type_case_has_not_any_expr`:               `type-case must be have <any> typed expression`,
 	`illegal_impl_out_of_package`:              `illegal implementation via definition from out of package`,
+	`method_not_invoked`:                       `methods should be invoked`,
 }
 
 // Returns formatted error message by key and args.
