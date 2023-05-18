@@ -1290,6 +1290,18 @@ func (s *_Sema) check_global_types() {
 	}
 }
 
+func (s *_Sema) check_type_struct(strct *Struct) {
+	for _, f := range strct.Methods {
+		s.check_type_fn(f)
+	}
+}
+
+func (s *_Sema) check_struct_types() {
+	for _, strct := range s.file.Structs {
+		s.check_type_struct(strct)
+	}
+}
+
 func (s *_Sema) check_fn_ins(f *FnIns) {
 	if f.Decl.Cpp_linked {
 		return
@@ -1350,8 +1362,8 @@ func (s *_Sema) check_fn_types() (ok bool) {
 // Checks all types of current package file.
 // Reports whether checking is success.
 func (s *_Sema) check_file_types() {
-	// TODO: Implement other declarations.
 	s.check_global_types()
+	s.check_struct_types()
 	s.check_fn_types()
 }
 

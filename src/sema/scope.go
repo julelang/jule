@@ -337,20 +337,20 @@ func (sc *_ScopeChecker) is_duplicated_ident(self uintptr, ident string) bool {
 
 func (sc *_ScopeChecker) check_var_decl(decl *ast.VarDecl) {
 	v := build_var(decl)
+
+	sc.table.Vars = append(sc.table.Vars, v)
+	sc.scope.Stmts = append(sc.scope.Stmts, v)
+
 	if sc.is_duplicated_ident(_uintptr(v), v.Ident) {
 		sc.s.push_err(v.Token, "duplicated_ident", v.Ident)
 	}
 
 	sc.s.check_var_decl(v, sc)
-
-	if decl.Kind == nil || decl.Kind.Kind == nil {
+	if !v.Is_auto_typed() && (v.Kind == nil || v.Kind.Kind == nil) {
 		return
 	}
 
 	sc.s.check_type_var(v, sc)
-	
-	sc.table.Vars = append(sc.table.Vars, v)
-	sc.scope.Stmts = append(sc.scope.Stmts, v)
 }
 
 func (sc *_ScopeChecker) check_type_alias_decl(decl *ast.TypeAliasDecl) {

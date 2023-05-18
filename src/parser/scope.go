@@ -747,11 +747,14 @@ func (sp *_ScopeParser) build_assign_info(tokens []lex.Token) *_AssignInfo {
 			}
 		}
 
-		if brace_n > 0 {
+		switch {
+		case brace_n > 0:
 			continue
-		} else if token.Id != lex.ID_OP {
+
+		case token.Id != lex.ID_OP:
 			continue
-		} else if !lex.Is_assign_op(token.Kind) {
+
+		case !lex.Is_assign_op(token.Kind):
 			continue
 		}
 
@@ -772,6 +775,7 @@ func (sp *_ScopeParser) build_assign_info(tokens []lex.Token) *_AssignInfo {
 				info.r = nil
 			}
 		}
+
 		break
 	}
 	return info
@@ -796,6 +800,7 @@ func (sp *_ScopeParser) build_assign_ls(parts [][]lex.Token) []*ast.AssignLeft {
 		l := sp.build_assign_l(part)
 		lefts = append(lefts, l)
 	}
+
 	return lefts
 }
 

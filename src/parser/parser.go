@@ -1397,6 +1397,7 @@ func (p *_Parser) check_use_decl(node ast.Node) {
 	switch node.Data.(type) {
 	case *ast.UseDecl:
 		// Ignore.
+
 	default:
 		return
 	}

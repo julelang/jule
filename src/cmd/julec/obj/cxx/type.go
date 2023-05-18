@@ -144,6 +144,10 @@ func gen_fn_anon_decl(f *sema.FnIns) string {
 	decl += "("
 	if len(f.Params) > 0 {
 		for _, param := range f.Params {
+			if param.Decl.Is_self() {
+				continue
+			}
+
 			decl += gen_param_ins_prototype(param)
 			decl += ","
 		}
