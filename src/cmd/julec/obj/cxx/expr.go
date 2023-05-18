@@ -253,7 +253,7 @@ func gen_arg_expr_models(models []sema.ExprModel) string {
 
 func gen_fn_call_expr_model(m *sema.FnCallExprModel) string {
 	obj := gen_expr_model(m.Expr)
-	if len(m.Func.Generics) > 0 {
+	if len(m.Func.Generics) > 0 && !has_directive(m.Func.Decl.Directives, build.DIRECTIVE_CDEF) {
 		obj += "<"
 		obj += gen_generic_type_kinds(m.Func.Generics)
 		obj += ">"

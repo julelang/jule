@@ -1282,6 +1282,10 @@ func (s *_Sema) check_global_types() {
 }
 
 func (s *_Sema) check_fn_ins(f *FnIns) {
+	if f.Decl.Cpp_linked {
+		return
+	}
+
 	vars := build_ret_vars(f)
 
 	sc := new_scope_checker(s, f)
@@ -1306,6 +1310,10 @@ func (s *_Sema) check_fn_ins(f *FnIns) {
 }
 
 func (s *_Sema) check_type_fn(f *Fn) {
+	if f.Cpp_linked {
+		return
+	}
+
 	// Generic instances are checked instantly.
 	if len(f.Generics) > 0 {
 		return

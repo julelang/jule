@@ -226,6 +226,7 @@ func (p *_Parser) build_var_begin(v *ast.VarDecl, i *int, tokens []lex.Token) {
 			// Skip the mut keyword
 			*i++
 		}
+
 	case lex.ID_CONST:
 		*i++
 		if v.Constant {
@@ -237,10 +238,12 @@ func (p *_Parser) build_var_begin(v *ast.VarDecl, i *int, tokens []lex.Token) {
 			break
 		}
 		fallthrough
+
 	default:
 		p.push_err(tok, "invalid_syntax")
 		return
 	}
+
 	if *i >= len(tokens) {
 		p.push_err(tok, "invalid_syntax")
 	}
@@ -521,10 +524,12 @@ func (p *_Parser) build_ret_type(tokens []lex.Token, i *int) (t *ast.RetType, ok
 		if token.Kind == lex.KND_LBRACE {
 			return
 		}
+
 	case lex.ID_OP:
 		if token.Kind == lex.KND_EQ {
 			return
 		}
+
 	case lex.ID_COLON:
 		if *i+1 >= len(tokens) {
 			p.push_err(token, "missing_type")
@@ -778,13 +783,16 @@ func (p *_Parser) build_enum_item_expr(i *int, tokens []lex.Token) *ast.Expr {
 			case lex.KND_LBRACE, lex.KND_LBRACKET, lex.KND_LPAREN:
 				brace_n++
 				continue
+
 			default:
 				brace_n--
 			}
 		}
+
 		if brace_n > 0 {
 			continue
 		}
+
 		if t.Id == lex.ID_COMMA || *i+1 >= len(tokens) {
 			var expr_tokens []lex.Token
 			if t.Id == lex.ID_COMMA {
@@ -1082,12 +1090,16 @@ func (p *_Parser) build_cpp_link(tokens []lex.Token) ast.NodeData {
 	switch token.Id {
 	case lex.ID_FN, lex.ID_UNSAFE:
 		return p.build_cpp_link_fn(tokens)
+
 	case lex.ID_CONST, lex.ID_LET:
 		return p.build_cpp_link_var(tokens)
+
 	case lex.ID_STRUCT:
 		return p.build_cpp_link_struct(tokens)
+
 	case lex.ID_TYPE:
 		return p.build_cpp_link_type_alias(tokens)
+
 	default:
 		p.push_err(token, "invalid_syntax")
 	}
@@ -1287,8 +1299,9 @@ func (p *_Parser) check_comment_group(node ast.Node) {
 		return
 	}
 	switch node.Data.(type) {
-	case ast.Comment, ast.Directive:
+	case *ast.Comment, *ast.Directive:
 		// Ignore
+
 	default:
 		p.comment_group = nil
 	}
@@ -1298,9 +1311,11 @@ func (p *_Parser) check_directive(node ast.Node) {
 	if p.directives == nil {
 		return
 	}
+
 	switch node.Data.(type) {
-	case ast.Directive, ast.Comment:
+	case *ast.Directive, *ast.Comment:
 		// Ignore
+
 	default:
 		p.directives = nil
 	}
@@ -1323,6 +1338,7 @@ func (p *_Parser) apply_meta(node ast.Node, is_pub bool) {
 		if f == nil {
 			return
 		}
+
 		f.Public = is_pub
 		is_pub = false
 		f.Directives = p.directives

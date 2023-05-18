@@ -60,6 +60,9 @@ func as_local_ident(row int, col int, ident string) string {
 // Returns output identifier of function.
 func fn_out_ident(f *sema.Fn) string {
 	switch {
+	case f.Cpp_linked:
+		return f.Ident
+
 	case f.Ident == jule.ENTRY_POINT:
 		return as_ident(f.Ident)
 
@@ -72,7 +75,7 @@ func fn_out_ident(f *sema.Fn) string {
 }
 
 func fn_ins_out_ident(f *sema.FnIns) string {
-	if len(f.Generics) == 0 || f.Decl.Parameters_uses_generics() {
+	if f.Decl.Cpp_linked || len(f.Generics) == 0 || f.Decl.Parameters_uses_generics() {
 		return fn_out_ident(f.Decl)
 	}
 
