@@ -14,6 +14,7 @@ struct fn_jt {
     std::function<_Function_t> __buffer;
     
     fn_jt<_Function_t>(void) noexcept {}
+    fn_jt<_Function_t>(std::nullptr_t) noexcept {}
 
     fn_jt<_Function_t>(const std::function<_Function_t> &_Function) noexcept
     { this->__buffer = _Function; }
