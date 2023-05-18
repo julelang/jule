@@ -170,6 +170,7 @@ var ERRORS = map[string]string{
 	`array_size_is_negative`:                   `array size must be positive integer`,
 	`builtin_as_anonymous_fn`:                  `built-in define cannot use as anonymous function`,
 	`type_case_has_not_any_expr`:               `type-case must be have <any> typed expression`,
+	`illegal_impl_out_of_package`:              `illegal implementation via definition from out of package`,
 }
 
 // Returns formatted error message by key and args.

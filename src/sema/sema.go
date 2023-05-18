@@ -963,6 +963,11 @@ func (s *_Sema) impl_trait(decl *Impl) {
 		return
 	}
 
+	if dest.Token.File.Dir() != s.file.File.Dir() {
+		s.push_err(decl.Dest, "illegal_impl_out_of_package")
+		return
+	}
+
 	dest.Implements = append(dest.Implements, base)
 
 	switch  {
@@ -985,6 +990,11 @@ func (s *_Sema) impl_struct(decl *Impl) {
 		return
 	}
 
+	if dest.Token.File.Dir() != s.file.File.Dir() {
+		s.push_err(decl.Dest, "illegal_impl_out_of_package")
+		return
+	}
+
 	switch  {
 	case !s.impl_to_struct(dest, decl):
 		return
@@ -993,7 +1003,6 @@ func (s *_Sema) impl_struct(decl *Impl) {
 
 // Implement implementation.
 func (s *_Sema) impl_impl(decl *Impl) {
-	// TODO: Illegal implementation from out of package.
 	switch {
 	case decl.Is_trait_impl():
 		s.impl_trait(decl)
