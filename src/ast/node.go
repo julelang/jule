@@ -365,9 +365,10 @@ type AssignLeft struct {
 
 // Assign statement.
 type AssignSt struct {
-	Setter lex.Token
-	L      []*AssignLeft
-	R      *Expr
+	Declarative bool
+	Setter      lex.Token
+	L           []*AssignLeft
+	R           *Expr
 }
 
 // ScopeTree.

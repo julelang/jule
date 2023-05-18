@@ -843,7 +843,7 @@ func (sc *_ScopeChecker) check_multi_assign(a *ast.AssignSt) {
 			continue
 		}
 
-		if sc.is_new_assign_ident(lexpr.Ident) {
+		if a.Declarative && sc.is_new_assign_ident(lexpr.Ident) {
 			// Add new variable declaration statement.
 			v := &Var{
 				Ident:   lexpr.Ident,
@@ -900,7 +900,7 @@ func (sc *_ScopeChecker) check_assign_st(a *ast.AssignSt) {
 		return
 	}
 
-	if len(a.L) == 1 && !sc.is_new_assign_ident(a.L[0].Ident) {
+	if len(a.L) == 1 && !a.Declarative {
 		sc.check_single_assign(a)
 		return
 	}

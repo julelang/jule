@@ -839,7 +839,9 @@ func (sp *_ScopeParser) build_decl_assign(tokens []lex.Token) (*ast.AssignSt, bo
 		return nil, false
 	}
 
-	assign := &ast.AssignSt{}
+	assign := &ast.AssignSt{
+		Declarative: true,
+	}
 
 	var i int
 	rang := lex.Range(&i, lex.KND_LPAREN, lex.KND_RPARENT, tokens)
