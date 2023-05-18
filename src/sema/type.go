@@ -519,8 +519,6 @@ func (tc *_TypeChecker) from_enum(decl *ast.IdentType, e *Enum) *Enum {
 }
 
 func (tc *_TypeChecker) check_struct_ins(ins *StructIns, error_token lex.Token) (ok bool) {
-	// TODO: Skip checking if already parsed instance.
-
 	ok = tc.s.check_generic_quantity(len(ins.Decl.Generics), len(ins.Generics), error_token)
 	if !ok {
 		return false

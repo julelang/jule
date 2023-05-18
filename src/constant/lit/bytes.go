@@ -60,8 +60,6 @@ func Rtoa(r rune) string { return "0x" + strconv.FormatInt(int64(r), 16) }
 // Returns raw-string value string from bytes, not includes quotes.
 // Bytes are represents string characters, allows escape sequences.
 // Returns empty string if len(bytes) == 0
-//
-// TODO: Make sure this function works fine.
 func To_raw_str(bytes []byte) string { return To_str(bytes) }
 
 // Returns string value string from bytes, not includes quotes.
