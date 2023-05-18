@@ -76,6 +76,13 @@ func build_param_vars(f *FnIns) []*Var {
 
 		if p.Decl.Is_self() {
 			v.Kind.Kind = &TypeKind{kind: f.Owner}
+
+			if p.Decl.Is_ref() {
+				v.Ident = v.Ident[1:] // Remove reference sign.
+				v.Kind.Kind.kind = &Ref{
+					Elem: &TypeKind{kind: v.Kind.Kind.kind},
+				}
+			}
 		} else {
 			v.Kind.Kind = p.Kind
 		}

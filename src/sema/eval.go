@@ -653,8 +653,15 @@ func (e *_Eval) eval_unary_star(d *Data, op lex.Token) *Data {
 func (e *_Eval) eval_unary_amper(d *Data) *Data {
 	switch d.Model.(type) {
 	case *StructLitExprModel:
+		lit := d.Model.(*StructLitExprModel)
+		d.Kind = &TypeKind{
+			kind: &Ref{
+				Elem: &TypeKind{kind: lit.Strct},
+			},
+		}
+
 		d.Model = &AllocStructLitExprModel{
-			Lit: d.Model.(*StructLitExprModel),
+			Lit: lit,
 		}
 
 	default:
@@ -1597,16 +1604,15 @@ func (e *_Eval) eval_trait_sub_ident(d *Data, trt *Trait, ident lex.Token) *Data
 	}
 }
 
-func (e *_Eval) eval_struct_sub_ident(d *Data, si *ast.SubIdentExpr, ref bool) *Data {
-	s := d.Kind.Strct()
-
+func (e *_Eval) eval_struct_sub_ident(d *Data, s *StructIns, si *ast.SubIdentExpr, ref bool) *Data {
 	f := s.Find_field(si.Ident.Kind)
 	if f != nil {
-		d.Model = &StrctSubIdentExprModel{
+		model := &StrctSubIdentExprModel{
 			ExprKind: d.Kind,
 			Expr:     d.Model,
 			Field:    f,
 		}
+		d.Model = model
 		d.Kind = f.Kind
 
 		if f.Decl.Mutable && !d.Mutable {
@@ -1615,6 +1621,12 @@ func (e *_Eval) eval_struct_sub_ident(d *Data, si *ast.SubIdentExpr, ref bool) *
 			case *_ScopeChecker:
 				scope := e.lookup.(*_ScopeChecker)
 				d.Mutable = scope.owner != nil && scope.owner.Owner == s
+				if d.Mutable {
+					v := new(Var)
+					*v = *model.Expr.(*Var)
+					v.Mutable = true
+					model.Expr = v
+				}
 			}
 		}
 
@@ -1636,7 +1648,7 @@ func (e *_Eval) eval_struct_sub_ident(d *Data, si *ast.SubIdentExpr, ref bool) *
 		Expr:     d.Model,
 		Method:   m,
 	}
-	d.Kind.kind = m
+	d.Kind = &TypeKind{kind: m}
 	return d
 }
 
@@ -2082,15 +2094,15 @@ func (e *_Eval) eval_obj_sub_ident(d *Data, si *ast.SubIdentExpr) *Data {
 	switch {
 	case kind.Enm() != nil:
 		return e.eval_enum_sub_ident(kind.Enm(), si.Ident)
-	
+
 	case kind.Trt() != nil:
 		return e.eval_trait_sub_ident(d, kind.Trt(), si.Ident)
-	
+
 	case kind.Strct() != nil:
 		s := kind.Strct()
 		if is_instanced_struct(s) {
-			used_reference_elem := kind != d.Kind
-			return e.eval_struct_sub_ident(d, si, used_reference_elem)
+			used_reference_elem := d.Kind.Ref() != nil
+			return e.eval_struct_sub_ident(d, kind.Strct(), si, used_reference_elem)
 		}
 
 	case kind.Slc() != nil:
