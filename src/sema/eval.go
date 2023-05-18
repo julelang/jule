@@ -461,7 +461,7 @@ func (e *_Eval) eval_var(v *Var, error_token lex.Token) *Data {
 		return nil
 	}
 
-	if v.Value == nil || v.Value.Data == nil {
+	if !v.Cpp_linked && (v.Value == nil || v.Value.Data == nil) {
 		return nil
 	}
 
@@ -469,7 +469,6 @@ func (e *_Eval) eval_var(v *Var, error_token lex.Token) *Data {
 		Lvalue:   !v.Constant,
 		Mutable:  v.Mutable,
 		Decl:     false,
-		Constant: v.Value.Data.Constant,
 		Kind:     v.Kind.Kind,
 		Model:    v,
 	}
@@ -2296,6 +2295,10 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 
 	if d == nil {
 		return nil
+	}
+
+	if d.Kind == nil {
+		return d
 	}
 
 	if d.Is_const() && d.Kind.Prim() != nil && !expr_data_is_rune_lit(kind) {

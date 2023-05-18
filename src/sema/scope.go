@@ -342,6 +342,11 @@ func (sc *_ScopeChecker) check_var_decl(decl *ast.VarDecl) {
 	}
 
 	sc.s.check_var_decl(v, sc)
+
+	if decl.Kind == nil || decl.Kind.Kind == nil {
+		return
+	}
+
 	sc.s.check_type_var(v, sc)
 	
 	sc.table.Vars = append(sc.table.Vars, v)

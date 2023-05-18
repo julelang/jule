@@ -1023,7 +1023,7 @@ func (s *_Sema) check_var_decl(decl *Var, l Lookup) {
 		s.push_err(decl.Token, "ignore_ident")
 	}
 
-	if decl.Value == nil || decl.Value.Expr == nil {
+	if !decl.Cpp_linked && (decl.Value == nil || decl.Value.Expr == nil) {
 		s.push_err(decl.Token, "variable_not_initialized")
 	}
 
@@ -1039,7 +1039,7 @@ func (s *_Sema) check_var_decl(decl *Var, l Lookup) {
 // Checks variable declaration.
 // Checks duplicated identifiers by Sema.
 func (s *_Sema) check_var_decl_dup(decl *Var) {
-	if s.is_duplicated_ident(_uintptr(decl), decl.Ident, false) {
+	if s.is_duplicated_ident(_uintptr(decl), decl.Ident, decl.Cpp_linked) {
 		s.push_err(decl.Token, "duplicated_ident", decl.Ident)
 	}
 	s.check_var_decl(decl, s)
@@ -1224,6 +1224,10 @@ func (s *_Sema) check_data_for_auto_type(d *Data, err_token lex.Token) {
 }
 
 func (s *_Sema) check_var(v *Var) {
+	if v.Cpp_linked {
+		return
+	}
+
 	if !v.Constant {
 		v.Value.Data.Constant = nil
 	}
@@ -1251,6 +1255,10 @@ func (s *_Sema) check_var(v *Var) {
 }
 
 func (s *_Sema) check_type_var(decl *Var, l Lookup) {
+	if decl.Cpp_linked {
+		return
+	}
+
 	decl.Value.Data = s.evalpd(decl.Value.Expr, l, decl.Kind, decl)
 	if decl.Value.Data == nil {
 		return // Skip checks if error ocurrs.
