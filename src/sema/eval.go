@@ -1446,36 +1446,54 @@ func (e *_Eval) check_fn_call_generics(f *FnIns,
 	}
 }
 
+func (e *_Eval) call_builtin_fn(fc *ast.FnCallExpr, d *Data) *Data {
+	f := d.Kind.Fnc()
+
+	fcac := _FnCallArgChecker{
+		e:                  e,
+		f:                  f,
+		args:               fc.Args,
+		dynamic_annotation: false,
+		error_token:        fc.Token,
+	}
+	_ = fcac.check()
+
+	model := &FnCallExprModel{
+		Func: f,
+		IsCo: fc.Concurrent,
+		Expr: d.Model,
+		Args: fcac.arg_models,
+	}
+
+	if f.Result == nil {
+		d = build_void_data()
+	} else {
+		d = &Data{
+			Kind: f.Result,
+		}
+	}
+
+	d.Model = model
+	return d
+}
+
 func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
 	f := d.Kind.Fnc()
 	if f.Is_builtin() {
-		fcac := _FnCallArgChecker{
-			e:                  e,
-			f:                  f,
-			args:               fc.Args,
-			dynamic_annotation: false,
-			error_token:        fc.Token,
-		}
-		_ = fcac.check()
-
-		model := &FnCallExprModel{
-			Func: f,
-			IsCo: fc.Concurrent,
-			Expr: d.Model,
-			Args: fcac.arg_models,
-		}
-
-		if f.Result == nil {
-			d = build_void_data()
-		} else {
-			d = &Data{
-				Kind: f.Result,
-			}
-		}
-
-		d.Model = model
-		return d
+		return e.call_builtin_fn(fc, d)
 	}
+
+	old := e.s
+	if f.Decl.Owner != nil {
+		e.s = f.Decl.Owner.sema
+	}
+
+	defer func() {
+		if old != e.s {
+			old.errors = append(old.errors, e.s.errors...)
+		}
+		e.s = old
+	}()
 
 	if !d.Mutable && f.Decl.Is_method() && f.Decl.Params[0].Mutable {
 		e.push_err(fc.Token, "mutable_operation_on_immutable")

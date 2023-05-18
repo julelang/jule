@@ -569,8 +569,6 @@ func (tc *_TypeChecker) check_struct_ins(ins *StructIns, error_token lex.Token) 
 		f.Kind = kind
 	}
 
-	// TODO: Check methods if declaration comes out of package.
-
 	return true
 }
 
