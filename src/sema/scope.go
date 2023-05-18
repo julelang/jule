@@ -676,22 +676,22 @@ func (sc *_ScopeChecker) check_assign(left *Data, error_token lex.Token) (ok boo
 	case left.Kind.Fnc() != nil:
 		sc.s.push_err(error_token, "assign_type_not_support_value")
 		return false
-	}
 
-	if !left.Lvalue {
+	case !left.Lvalue:
 		sc.s.push_err(error_token, "assign_require_lvalue")
 		return false
-	}
 
-	if left.Is_const() {
+	case left.Is_const():
 		sc.s.push_err(error_token, "assign_const")
 		return false
-	} else if !left.Mutable {
+
+	case !left.Mutable:
 		sc.s.push_err(error_token, "assignment_to_non_mut")
 		return false
-	}
 
-	return true
+	default:
+		return true
+	}
 }
 
 func (sc *_ScopeChecker) check_postfix(a *ast.AssignSt) {
@@ -746,6 +746,10 @@ func (sc *_ScopeChecker) check_single_assign(a *ast.AssignSt) {
 	}
 
 	if lex.Is_ignore_ident(a.L[0].Ident) {
+		if r.Kind.Is_void() {
+			sc.s.push_err(a.R.Token, "invalid_expr")
+		}
+
 		sc.scope.Stmts = append(sc.scope.Stmts, r)
 		return
 	}
@@ -812,6 +816,7 @@ func (sc *_ScopeChecker) check_multi_assign(a *ast.AssignSt) {
 	case len(a.L) > len(r):
 		sc.s.push_err(a.Setter, "overflow_multi_assign_idents")
 		return
+
 	case len(a.L) < len(r):
 		sc.s.push_err(a.Setter, "missing_multi_assign_idents")
 		return
@@ -827,13 +832,16 @@ func (sc *_ScopeChecker) check_multi_assign(a *ast.AssignSt) {
 
 	for i := range a.L {
 		lexpr := a.L[i]
+		r := r[i]
 
 		if lex.Is_ignore_ident(lexpr.Ident) {
+			if r.Kind.Is_void() {
+				sc.s.push_err(a.R.Token, "invalid_expr")
+			}
+
 			st.L = append(st.L, nil)
 			continue
 		}
-
-		r := r[i]
 
 		if sc.is_new_assign_ident(lexpr.Ident) {
 			// Add new variable declaration statement.
