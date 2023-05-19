@@ -261,7 +261,7 @@ func (s *_SymbolBuilder) check_cpp_use_decl_path(decl *ast.UseDecl) (ok bool) {
 	return save_pwd()
 }
 
-func (s *_SymbolBuilder) build_cpp_header_package(decl *ast.UseDecl) *Package {
+func (s *_SymbolBuilder) build_cpp_header_package(decl *ast.UseDecl) *ImportInfo {
 	path := decl.Link_path
 
 	if !build.Is_std_header_path(decl.Link_path) {
@@ -278,18 +278,18 @@ func (s *_SymbolBuilder) build_cpp_header_package(decl *ast.UseDecl) *Package {
 		}
 	}
 
-	return &Package{
+	return &ImportInfo{
 		Token:     decl.Token,
 		Path:      path,
 		Link_path: decl.Link_path,
 		Ident:     "",    // Cpp headers haven't identifiers.
 		Cpp:       true,
 		Std:       false,
-		Files:     nil,   // Cpp headers haven't symbol table.
+		Package:   nil,   // Cpp headers haven't symbol table.
 	}
 }
 
-func (s *_SymbolBuilder) build_std_package(decl *ast.UseDecl) *Package {
+func (s *_SymbolBuilder) build_std_package(decl *ast.UseDecl) *ImportInfo {
 	path := decl.Link_path[len("std::"):] // Skip "std::" prefix.
 	path = strings.Replace(path, lex.KND_DBLCOLON, string(filepath.Separator), -1)
 	path = filepath.Join(s.pstd, path)
@@ -309,18 +309,20 @@ func (s *_SymbolBuilder) build_std_package(decl *ast.UseDecl) *Package {
 	// Select last identifier of namespace chain.
 	ident := decl.Link_path[strings.LastIndex(decl.Link_path, lex.KND_DBLCOLON)+1:]
 
-	return &Package{
+	return &ImportInfo{
 		Token:     decl.Token,
 		Path:      path,
 		Link_path: decl.Link_path,
 		Ident:     ident,
 		Cpp:       false,
 		Std:       true,
-		Files:     nil,             // Appends by import algorithm.
+		Package:   &Package{
+			Files:     nil, // Appends by import algorithm.
+		},
 	}
 }
 
-func (s *_SymbolBuilder) build_package(decl *ast.UseDecl) *Package {
+func (s *_SymbolBuilder) build_package(decl *ast.UseDecl) *ImportInfo {
 	switch {
 	case decl.Cpp:
 		return s.build_cpp_header_package(decl)
@@ -333,9 +335,9 @@ func (s *_SymbolBuilder) build_package(decl *ast.UseDecl) *Package {
 	}
 }
 
-func (s *_SymbolBuilder) check_duplicate_use_decl(pkg *Package) (ok bool) {
+func (s *_SymbolBuilder) check_duplicate_use_decl(pkg *ImportInfo) (ok bool) {
 	// Find package by path to detect cpp header imports.
-	lpkg := s.table.Select_package(func(spkg *Package) bool {
+	lpkg := s.table.Select_package(func(spkg *ImportInfo) bool {
 		return pkg.Path == spkg.Path
 	})
 	if lpkg == nil {
@@ -345,7 +347,7 @@ func (s *_SymbolBuilder) check_duplicate_use_decl(pkg *Package) (ok bool) {
 	return false
 }
 
-func (s *_SymbolBuilder) import_package(pkg *Package) (ok bool) {
+func (s *_SymbolBuilder) import_package(pkg *ImportInfo) (ok bool) {
 	if pkg.Cpp {
 		return true
 	}
@@ -366,7 +368,7 @@ func (s *_SymbolBuilder) import_package(pkg *Package) (ok bool) {
 			return false
 		}
 
-		pkg.Files = append(pkg.Files, table)
+		pkg.Package.Files = append(pkg.Package.Files, table)
 	}
 
 	// TODO: Add identifier selections.
@@ -375,7 +377,7 @@ func (s *_SymbolBuilder) import_package(pkg *Package) (ok bool) {
 	return true
 }
 
-func (s *_SymbolBuilder) import_use_decl(decl *ast.UseDecl) *Package {
+func (s *_SymbolBuilder) import_use_decl(decl *ast.UseDecl) *ImportInfo {
 	pkg := s.build_package(decl)
 	// Break analysis if error occurs.
 	if pkg == nil {
@@ -388,7 +390,7 @@ func (s *_SymbolBuilder) import_use_decl(decl *ast.UseDecl) *Package {
 	}
 
 	ok = s.import_package(pkg)
-	s.table.Packages = append(s.table.Packages, pkg)
+	s.table.Imports = append(s.table.Imports, pkg)
 	if ok {
 		s.importer.Imported(pkg)
 		return pkg

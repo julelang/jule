@@ -173,22 +173,22 @@ iter:
 	return false
 }
 
-// Returns package by identifier.
+// Returns imported package by identifier.
 // Returns nil if not exist any package in this identifier.
 //
 // Lookups:
 //  - Sema.
-func (sc *_ScopeChecker) Find_package(ident string) *Package {
+func (sc *_ScopeChecker) Find_package(ident string) *ImportInfo {
 	return sc.s.Find_package(ident)
 }
 
-// Returns package by selector.
+// Returns imported package by selector.
 // Returns nil if selector returns false for all packages.
 // Returns nil if selector is nil.
 //
 // Lookups:
 //  - Sema.
-func (sc *_ScopeChecker) Select_package(selector func(*Package) bool) *Package {
+func (sc *_ScopeChecker) Select_package(selector func(*ImportInfo) bool) *ImportInfo {
 	return sc.s.Select_package(selector)
 }
 

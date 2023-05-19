@@ -220,7 +220,7 @@ func read_package_dirents(path string) (_ []fs.DirEntry, err_msg string) {
 }
 
 type Importer struct {
-	all_packages []*sema.Package
+	all_packages []*sema.ImportInfo
 }
 
 func (i *Importer) Import_package(path string) ([]*ast.Ast, []build.Log) {
@@ -250,14 +250,14 @@ func (i *Importer) Import_package(path string) ([]*ast.Ast, []build.Log) {
 	return asts, nil
 }
 
-func (i *Importer) Imported(pkg *sema.Package) {
+func (i *Importer) Imported(imp *sema.ImportInfo) {
 	for _, p := range i.all_packages {
-		if p.Cpp == pkg.Cpp && p.Link_path == pkg.Link_path {
+		if p.Cpp == imp.Cpp && p.Link_path == imp.Link_path {
 			return
 		}
 	}
 
-	i.all_packages = append(i.all_packages, pkg)
+	i.all_packages = append(i.all_packages, imp)
 }
 
 func check_mode() {

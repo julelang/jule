@@ -42,7 +42,7 @@ func indent() string {
 
 // Returns all structures of main package and used pakcages.
 // Ignores cpp-linked declarations.
-func get_all_structures(pkg *sema.Package, used []*sema.Package) []*sema.Struct {
+func get_all_structures(pkg *sema.Package, used []*sema.ImportInfo) []*sema.Struct {
 	buffer := []*sema.Struct{}
 
 	append_structs := func(p *sema.Package) {
@@ -57,8 +57,8 @@ func get_all_structures(pkg *sema.Package, used []*sema.Package) []*sema.Struct 
 
 	append_structs(pkg)
 
-	for _, p := range used {
-		append_structs(p)
+	for _, u := range used {
+		append_structs(u.Package)
 	}
 
 	return buffer
@@ -66,7 +66,7 @@ func get_all_structures(pkg *sema.Package, used []*sema.Package) []*sema.Struct 
 
 // Returns all variables of main package and used pakcages.
 // Ignores cpp-linked declarations.
-func get_all_variables(pkg *sema.Package, used []*sema.Package) []*sema.Var {
+func get_all_variables(pkg *sema.Package, used []*sema.ImportInfo) []*sema.Var {
 	buffer := []*sema.Var{}
 
 	append_vars := func(p *sema.Package) {
@@ -81,15 +81,15 @@ func get_all_variables(pkg *sema.Package, used []*sema.Package) []*sema.Var {
 
 	append_vars(pkg)
 
-	for _, p := range used {
-		append_vars(p)
+	for _, u := range used {
+		append_vars(u.Package)
 	}
 
 	return buffer
 }
 
 // Generates all C/C++ include directives.
-func gen_links(used []*sema.Package) string {
+func gen_links(used []*sema.ImportInfo) string {
 	obj := ""
 	for _, pkg := range used {
 		if !pkg.Cpp {
@@ -138,11 +138,11 @@ func gen_type_aliases_pkg(pkg *sema.Package) string {
 }
 
 // Generates C++ code of all type aliases.
-func gen_type_aliases(pkg *sema.Package, used []*sema.Package) string {
+func gen_type_aliases(pkg *sema.Package, used []*sema.ImportInfo) string {
 	obj := ""
-	for _, pkg := range used {
-		if !pkg.Cpp {
-			obj += gen_type_aliases_pkg(pkg)
+	for _, u := range used {
+		if !u.Cpp {
+			obj += gen_type_aliases_pkg(u.Package)
 		}
 	}
 	obj += gen_type_aliases_pkg(pkg)
@@ -323,10 +323,10 @@ func gen_traits_pkg(pkg *sema.Package) string {
 }
 
 // Generates C++ code of all traits.
-func gen_traits(pkg *sema.Package, used []*sema.Package) string {
+func gen_traits(pkg *sema.Package, used []*sema.ImportInfo) string {
 	obj := ""
-	for _, pkg := range used {
-		if !pkg.Cpp {
+	for _, u := range used {
+		if !u.Cpp {
 			obj += gen_traits_pkg(pkg)
 		}
 	}
@@ -592,15 +592,15 @@ func gen_fn_prototypes(pkg *sema.Package) string {
 }
 
 // Generates C++ code of all can-be-prototyped declarations.
-func gen_prototypes(pkg *sema.Package, used []*sema.Package, structs []*sema.Struct) string {
+func gen_prototypes(pkg *sema.Package, used []*sema.ImportInfo, structs []*sema.Struct) string {
 	obj := ""
 
 	obj += gen_struct_plain_prototypes(structs)
 	obj += gen_struct_prototypes(structs)
 
-	for _, p := range used {
-		if !p.Cpp {
-			obj += gen_fn_prototypes(p)
+	for _, u := range used {
+		if !u.Cpp {
+			obj += gen_fn_prototypes(u.Package)
 		}
 	}
 	obj += gen_fn_prototypes(pkg)
@@ -743,12 +743,12 @@ func gen_structs(structs []*sema.Struct) string {
 }
 
 // Generates C++ code of all functions.
-func gen_fns(pkg *sema.Package, used []*sema.Package) string {
+func gen_fns(pkg *sema.Package, used []*sema.ImportInfo) string {
 	obj := ""
 
-	for _, p := range used {
-		if !p.Cpp {
-			obj += gen_pkg_fns(p)
+	for _, u := range used {
+		if !u.Cpp {
+			obj += gen_pkg_fns(u.Package)
 		}
 	}
 	obj += gen_pkg_fns(pkg)
@@ -757,7 +757,7 @@ func gen_fns(pkg *sema.Package, used []*sema.Package) string {
 }
 
 // Generated C++ code of all initializer functions.
-func gen_init_caller(pkg *sema.Package, used []*sema.Package) string {
+func gen_init_caller(pkg *sema.Package, used []*sema.ImportInfo) string {
 	const INDENTION = "\t"
 
 	obj := "void "
@@ -776,7 +776,7 @@ func gen_init_caller(pkg *sema.Package, used []*sema.Package) string {
 
 	for _, u := range used {
 		if !u.Cpp {
-			push_init(u)
+			push_init(u.Package)
 		}
 	}
 	push_init(pkg)
@@ -786,7 +786,7 @@ func gen_init_caller(pkg *sema.Package, used []*sema.Package) string {
 }
 
 // Generates C++ codes from SymbolTables.
-func Gen(pkg *sema.Package, used []*sema.Package) string {
+func Gen(pkg *sema.Package, used []*sema.ImportInfo) string {
 	od := &_OrderedDecls{}
 	od.structs = get_all_structures(pkg, used)
 	order_structures(od.structs)

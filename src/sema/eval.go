@@ -1315,7 +1315,7 @@ func (e *_Eval) eval_cast(c *ast.CastExpr) *Data {
 
 func (e *_Eval) eval_ns_selection(s *ast.NsSelectionExpr) *Data {
 	path := build_link_path_by_tokens(s.Ns)
-	pkg := e.lookup.Select_package(func(p *Package) bool {
+	pkg := e.lookup.Select_package(func(p *ImportInfo) bool {
 		return p.Link_path == path
 	})
 

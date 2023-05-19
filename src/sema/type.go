@@ -867,7 +867,7 @@ func (tc *_TypeChecker) build_fn(decl *ast.FnDecl) *FnIns {
 
 func (tc *_TypeChecker) build_by_std_namespace(decl *ast.NamespaceType) _Kind {
 	path := build_link_path_by_tokens(decl.Idents)
-	pkg := tc.lookup.Select_package(func(pkg *Package) bool {
+	pkg := tc.lookup.Select_package(func(pkg *ImportInfo) bool {
 		return pkg.Std && pkg.Link_path == path
 	})
 	if pkg == nil {

@@ -11,21 +11,21 @@ import "github.com/julelang/jule/lex"
 // Symbol table.
 // Builds by semantic analyzer.
 type SymbolTable struct {
-	File         *lex.File    // Owner fileset of this symbol table.
-	Packages     []*Package   // Imported packages.
-	Vars         []*Var       // Variables.
-	Type_aliases []*TypeAlias // Type aliases.
-	Structs      []*Struct    // Structures.
-	Funcs        []*Fn        // Functions.
-	Traits       []*Trait     // Traits.
-	Enums        []*Enum      // Enums.
-	Impls        []*Impl      // Implementations.
+	File         *lex.File     // Owner fileset of this symbol table.
+	Imports      []*ImportInfo // Imported packages.
+	Vars         []*Var        // Variables.
+	Type_aliases []*TypeAlias  // Type aliases.
+	Structs      []*Struct     // Structures.
+	Funcs        []*Fn         // Functions.
+	Traits       []*Trait      // Traits.
+	Enums        []*Enum       // Enums.
+	Impls        []*Impl       // Implementations.
 }
 
-// Returns package by identifier.
+// Returns imported package by identifier.
 // Returns nil if not exist any package in this identifier.
-func (st *SymbolTable) Find_package(ident string) *Package {
-	for _, pkg := range st.Packages {
+func (st *SymbolTable) Find_package(ident string) *ImportInfo {
+	for _, pkg := range st.Imports {
 		if pkg.Ident == ident {
 			return pkg
 		}
@@ -33,14 +33,14 @@ func (st *SymbolTable) Find_package(ident string) *Package {
 	return nil
 }
 
-// Returns package by selector.
+// Returns imported package by selector.
 // Returns nil if selector returns false for all packages.
 // Returns nil if selector is nil.
-func (st *SymbolTable) Select_package(selector func(*Package) bool) *Package {
+func (st *SymbolTable) Select_package(selector func(*ImportInfo) bool) *ImportInfo {
 	if selector == nil {
 		return nil
 	}
-	for _, pkg := range st.Packages {
+	for _, pkg := range st.Imports {
 		if selector(pkg) {
 			return pkg
 		}
