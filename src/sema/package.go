@@ -121,6 +121,12 @@ type ImportInfo struct {
 	// Is standard library package.
 	Std bool
 
+	// Is imported all defines implicitly.
+	Import_all bool
+
+	// Identifiers of selected definition.
+	Selected []lex.Token
+
 	// Nil if package is cpp header.
 	Package *Package
 }
@@ -133,38 +139,100 @@ func (*ImportInfo) Select_package(func(*ImportInfo) bool) *ImportInfo { return n
 
 // Returns variable by identifier and cpp linked state.
 // Returns nil if not exist any variable in this identifier.
+//
+// Lookups by import way such as identifier selection.
+// Just lookups non-cpp-linked defines.
 func (i *ImportInfo) Find_var(ident string, cpp_linked bool) *Var {
-	return find_var_in_package(i.Package.Files, ident, cpp_linked)
+	if !i.is_lookupable(ident) {
+		return nil
+	}
+
+	return find_var_in_package(i.Package.Files, ident, false)
 }
 
-// Returns type alias by identifier and cpp linked state.
+// Returns type alias by identifier.
 // Returns nil if not exist any type alias in this identifier.
+//
+// Lookups by import way such as identifier selection.
+// Just lookups non-cpp-linked defines.
 func (i *ImportInfo) Find_type_alias(ident string, cpp_linked bool) *TypeAlias {
-	return find_type_alias_in_package(i.Package.Files, ident, cpp_linked)
+	if !i.is_lookupable(ident) {
+		return nil
+	}
+
+	return find_type_alias_in_package(i.Package.Files, ident, false)
 }
 
 // Returns struct by identifier and cpp linked state.
 // Returns nil if not exist any struct in this identifier.
+//
+// Lookups by import way such as identifier selection.
+// Just lookups non-cpp-linked defines.
 func (i *ImportInfo) Find_struct(ident string, cpp_linked bool) *Struct {
-	return find_struct_in_package(i.Package.Files, ident, cpp_linked)
+	if !i.is_lookupable(ident) {
+		return nil
+	}
+
+	return find_struct_in_package(i.Package.Files, ident, false)
 }
 
 // Returns function by identifier and cpp linked state.
 // Returns nil if not exist any function in this identifier.
+//
+// Lookups by import way such as identifier selection.
+// Just lookups non-cpp-linked defines.
 func (i *ImportInfo) Find_fn(ident string, cpp_linked bool) *Fn {
-	return find_fn_in_package(i.Package.Files, ident, cpp_linked)
+	if !i.is_lookupable(ident) {
+		return nil
+	}
+
+	return find_fn_in_package(i.Package.Files, ident, false)
 }
 
 // Returns trait by identifier.
 // Returns nil if not exist any trait in this identifier.
+//
+// Lookups by import way such as identifier selection.
 func (i *ImportInfo) Find_trait(ident string) *Trait {
+	if !i.is_lookupable(ident) {
+		return nil
+	}
+
 	return find_trait_in_package(i.Package.Files, ident)
 }
 
 // Returns enum by identifier.
 // Returns nil if not exist any enum in this identifier.
+//
+// Lookups by import way such as identifier selection.
 func (i *ImportInfo) Find_enum(ident string) *Enum {
+	if !i.is_lookupable(ident) {
+		return nil
+	}
+
 	return find_enum_in_package(i.Package.Files, ident)
+}
+
+func (i *ImportInfo) is_lookupable(ident string) bool {
+	if !i.Import_all {
+		if len(i.Selected) > 0 {
+			if !i.exist_ident(ident) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// Reports whether identifier is selected.
+func (i *ImportInfo) exist_ident(ident string) bool {
+	for _, sident := range i.Selected {
+		if sident.Kind == ident {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Package must implement Lookup.

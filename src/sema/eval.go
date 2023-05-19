@@ -373,7 +373,7 @@ func (e *_Eval) get_def(ident string, cpp_linked bool) any {
 
 func (e *_Eval) eval_enum(enm *Enum, error_token lex.Token) *Data {
 	if !e.s.is_accessible_define(enm.Public, enm.Token) {
-		e.push_err(error_token, "ident_not_exist", enm.Ident)
+		e.push_err(error_token, "ident_is_not_accessible", enm.Ident)
 		return nil
 	}
 
@@ -390,7 +390,7 @@ func (e *_Eval) eval_enum(enm *Enum, error_token lex.Token) *Data {
 
 func (e *_Eval) eval_struct(s *StructIns, error_token lex.Token) *Data {
 	if !e.s.is_accessible_define(s.Decl.Public, s.Decl.Token) {
-		e.push_err(error_token, "ident_not_exist", s.Decl.Ident)
+		e.push_err(error_token, "ident_is_not_accessible", s.Decl.Ident)
 		return nil
 	}
 
@@ -408,7 +408,7 @@ func (e *_Eval) eval_struct(s *StructIns, error_token lex.Token) *Data {
 
 func (e *_Eval) eval_fn(f *Fn, error_token lex.Token) *Data {
 	if !e.s.is_accessible_define(f.Public, f.Token) {
-		e.push_err(error_token, "ident_not_exist", f.Ident)
+		e.push_err(error_token, "ident_is_not_accessible", f.Ident)
 		return nil
 	}
 
@@ -454,7 +454,7 @@ func (e *_Eval) check_illegal_cycles(v *Var, decl_token lex.Token) (ok bool) {
 
 func (e *_Eval) eval_var(v *Var, error_token lex.Token) *Data {
 	if !e.s.is_accessible_define(v.Public, v.Token) {
-		e.push_err(error_token, "ident_not_exist", v.Ident)
+		e.push_err(error_token, "ident_is_not_accessible", v.Ident)
 		return nil
 	}
 
@@ -487,7 +487,7 @@ func (e *_Eval) eval_var(v *Var, error_token lex.Token) *Data {
 
 func (e *_Eval) eval_type_alias(ta *TypeAlias, error_token lex.Token) *Data {
 	if !e.s.is_accessible_define(ta.Public, ta.Token) {
-		e.push_err(error_token, "ident_not_exist", ta.Ident)
+		e.push_err(error_token, "ident_is_not_accessible", ta.Ident)
 		return nil
 	}
 
@@ -1315,17 +1315,17 @@ func (e *_Eval) eval_cast(c *ast.CastExpr) *Data {
 
 func (e *_Eval) eval_ns_selection(s *ast.NsSelectionExpr) *Data {
 	path := build_link_path_by_tokens(s.Ns)
-	pkg := e.lookup.Select_package(func(p *ImportInfo) bool {
+	imp := e.lookup.Select_package(func(p *ImportInfo) bool {
 		return p.Link_path == path
 	})
 
-	if pkg == nil {
+	if imp == nil || !imp.is_lookupable(lex.KND_SELF) {
 		e.push_err(s.Ident, "namespace_not_exist", s.Ident.Kind)
 		return nil
 	}
 
 	lookup := e.lookup
-	e.lookup = pkg
+	e.lookup = imp
 
 	const CPP_LINKED = false
 	def := e.get_def(s.Ident.Kind, CPP_LINKED)

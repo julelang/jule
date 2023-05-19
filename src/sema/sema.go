@@ -203,8 +203,8 @@ func (s *_Sema) Find_var(ident string, cpp_linked bool) *Var {
 	}
 
 	// Lookup current file's public denifes of imported packages.
-	for _, pkg := range s.file.Imports {
-		v := pkg.Find_var(ident, cpp_linked)
+	for _, imp := range s.file.Imports {
+		v := imp.Find_var(ident, cpp_linked)
 		if v != nil && s.is_accessible_define(v.Public, v.Token) {
 			return v
 		}
@@ -227,8 +227,8 @@ func (s *_Sema) Find_type_alias(ident string, cpp_linked bool) *TypeAlias {
 	}
 
 	// Lookup current file's public denifes of imported packages.
-	for _, pkg := range s.file.Imports {
-		ta := pkg.Find_type_alias(ident, cpp_linked)
+	for _, imp := range s.file.Imports {
+		ta := imp.Find_type_alias(ident, cpp_linked)
 		if ta != nil && s.is_accessible_define(ta.Public, ta.Token) {
 			return ta
 		}
@@ -251,8 +251,8 @@ func (s *_Sema) Find_struct(ident string, cpp_linked bool) *Struct {
 	}
 
 	// Lookup current file's public denifes of imported packages.
-	for _, pkg := range s.file.Imports {
-		strct := pkg.Find_struct(ident, cpp_linked)
+	for _, imp := range s.file.Imports {
+		strct := imp.Find_struct(ident, cpp_linked)
 		if strct != nil && s.is_accessible_define(strct.Public, strct.Token) {
 			return strct
 		}
@@ -275,8 +275,8 @@ func (s *_Sema) Find_fn(ident string, cpp_linked bool) *Fn {
 	}
 
 	// Lookup current file's public denifes of imported packages.
-	for _, pkg := range s.file.Imports {
-		f := pkg.Find_fn(ident, cpp_linked)
+	for _, imp := range s.file.Imports {
+		f := imp.Find_fn(ident, cpp_linked)
 		if f != nil && s.is_accessible_define(f.Public, f.Token) {
 			return f
 		}
@@ -299,8 +299,8 @@ func (s *_Sema) Find_trait(ident string) *Trait {
 	}
 
 	// Lookup current file's public denifes of imported packages.
-	for _, pkg := range s.file.Imports {
-		t := pkg.Find_trait(ident)
+	for _, imp := range s.file.Imports {
+		t := imp.Find_trait(ident)
 		if t != nil && s.is_accessible_define(t.Public, t.Token) {
 			return t
 		}
@@ -323,8 +323,8 @@ func (s *_Sema) Find_enum(ident string) *Enum {
 	}
 
 	// Lookup current file's public denifes of imported packages.
-	for _, pkg := range s.file.Imports {
-		e := pkg.Find_enum(ident)
+	for _, imp := range s.file.Imports {
+		e := imp.Find_enum(ident)
 		if e != nil && s.is_accessible_define(e.Public, e.Token) {
 			return e
 		}
@@ -333,25 +333,100 @@ func (s *_Sema) Find_enum(ident string) *Enum {
 	return nil
 }
 
-func (s *_Sema) check_import(pkg *ImportInfo) {
-	if pkg.Cpp || len(pkg.Package.Files) == 0{
-		return
+func (s *_Sema) check_import(imp *ImportInfo) bool {
+	if imp.Cpp || len(imp.Package.Files) == 0{
+		return false
 	}
+
 	sema := _Sema{}
-	sema.check(pkg.Package.Files)
+	sema.check(imp.Package.Files)
 	if len(sema.errors) > 0 {
 		s.errors = append(s.errors, sema.errors...)
+		return false
 	}
+
+	s.check_import_selections(imp)
+	return true
+}
+
+func (s *_Sema) check_import_selections(imp *ImportInfo) {
+	// Set file to any package file for accessibility checking.
+	s.set_current_file(s.files[0])
+
+	get_def := func(ident string) any {
+		for _, f := range imp.Package.Files {
+			def := f.def_by_ident(ident, false)
+			if def != nil {
+				return def
+			}
+		}
+
+		return nil
+	}
+
+	for _, ident := range imp.Selected {
+		if ident.Kind == lex.KND_SELF {
+			continue
+		}
+
+		def := get_def(ident.Kind)
+		switch def.(type) {
+		case *Var:
+			v := def.(*Var)
+			if s.is_accessible_define(v.Public, v.Token) {
+				continue
+			}
+
+		case *TypeAlias:
+			ta := def.(*TypeAlias)
+			if s.is_accessible_define(ta.Public, ta.Token) {
+				continue
+			}
+
+		case *Struct:
+			strct := def.(*Struct)
+			if s.is_accessible_define(strct.Public, strct.Token) {
+				continue
+			}
+
+		case *Trait:
+			t := def.(*Trait)
+			if s.is_accessible_define(t.Public, t.Token) {
+				continue
+			}
+
+		case *Enum:
+			e := def.(*Enum)
+			if s.is_accessible_define(e.Public, e.Token) {
+				continue
+			}
+
+		case *Fn:
+			f := def.(*Fn)
+			if s.is_accessible_define(f.Public, f.Token) {
+				continue
+			}
+
+		default:
+			s.push_err(ident, "ident_not_exist", ident.Kind)
+			continue
+		}
+		
+		s.push_err(ident, "ident_is_not_accessible", ident.Kind)
+
+	}
+
+	s.file = nil // Reset file.
 }
 
 func (s *_Sema) check_imports() {
 	for _, file := range s.files {
-		for _, pkg := range file.Imports {
-			s.check_import(pkg)
+		for _, imp := range file.Imports {
+			ok := s.check_import(imp)
 
 			// Break checking if package has error.
-			if len(s.errors) > 0 {
-				s.push_err(pkg.Token, "used_package_has_errors", pkg.Link_path)
+			if !ok {
+				s.push_err(imp.Token, "used_package_has_errors", imp.Link_path)
 				return
 			}
 		}

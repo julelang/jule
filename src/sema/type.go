@@ -867,16 +867,17 @@ func (tc *_TypeChecker) build_fn(decl *ast.FnDecl) *FnIns {
 
 func (tc *_TypeChecker) build_by_std_namespace(decl *ast.NamespaceType) _Kind {
 	path := build_link_path_by_tokens(decl.Idents)
-	pkg := tc.lookup.Select_package(func(pkg *ImportInfo) bool {
-		return pkg.Std && pkg.Link_path == path
+	imp := tc.lookup.Select_package(func(imp *ImportInfo) bool {
+		return imp.Std && imp.Link_path == path
 	})
-	if pkg == nil {
+
+	if imp == nil || !imp.is_lookupable(lex.KND_SELF) {
 		tc.push_err(decl.Idents[0], "namespace_not_exist", path)
 		return nil
 	}
 
 	lookup := tc.lookup
-	tc.lookup = pkg
+	tc.lookup = imp
 
 	kind := tc.build_ident(decl.Kind)
 

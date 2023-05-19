@@ -172,6 +172,8 @@ var ERRORS = map[string]string{
 	`type_case_has_not_any_expr`:               `type-case must be have <any> typed expression`,
 	`illegal_impl_out_of_package`:              `illegal implementation via definition from out of package`,
 	`method_not_invoked`:                       `methods should be invoked`,
+	`duplicated_import_selection`:              `duplicated identifier selection: @`,
+	`ident_is_not_accessible`:                  `identifier is not accessible: @`,
 }
 
 // Returns formatted error message by key and args.

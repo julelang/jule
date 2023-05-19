@@ -261,7 +261,7 @@ func (s *_SymbolBuilder) check_cpp_use_decl_path(decl *ast.UseDecl) (ok bool) {
 	return save_pwd()
 }
 
-func (s *_SymbolBuilder) build_cpp_header_package(decl *ast.UseDecl) *ImportInfo {
+func (s *_SymbolBuilder) build_cpp_header_import(decl *ast.UseDecl) *ImportInfo {
 	path := decl.Link_path
 
 	if !build.Is_std_header_path(decl.Link_path) {
@@ -289,7 +289,7 @@ func (s *_SymbolBuilder) build_cpp_header_package(decl *ast.UseDecl) *ImportInfo
 	}
 }
 
-func (s *_SymbolBuilder) build_std_package(decl *ast.UseDecl) *ImportInfo {
+func (s *_SymbolBuilder) build_std_import(decl *ast.UseDecl) *ImportInfo {
 	path := decl.Link_path[len("std::"):] // Skip "std::" prefix.
 	path = strings.Replace(path, lex.KND_DBLCOLON, string(filepath.Separator), -1)
 	path = filepath.Join(s.pstd, path)
@@ -322,13 +322,13 @@ func (s *_SymbolBuilder) build_std_package(decl *ast.UseDecl) *ImportInfo {
 	}
 }
 
-func (s *_SymbolBuilder) build_package(decl *ast.UseDecl) *ImportInfo {
+func (s *_SymbolBuilder) build_import(decl *ast.UseDecl) *ImportInfo {
 	switch {
 	case decl.Cpp:
-		return s.build_cpp_header_package(decl)
+		return s.build_cpp_header_import(decl)
 
 	case decl.Std:
-		return s.build_std_package(decl)
+		return s.build_std_import(decl)
 
 	default:
 		return nil
@@ -347,12 +347,23 @@ func (s *_SymbolBuilder) check_duplicate_use_decl(pkg *ImportInfo) (ok bool) {
 	return false
 }
 
-func (s *_SymbolBuilder) import_package(pkg *ImportInfo) (ok bool) {
-	if pkg.Cpp {
+func (s *_SymbolBuilder) impl_import_selections(imp *ImportInfo, decl *ast.UseDecl) {
+	for _, ident := range decl.Selected {
+		if imp.exist_ident(ident.Kind) {
+			s.push_err(ident, "duplicated_import_selection", ident.Kind)
+			continue
+		}
+
+		imp.Selected = append(imp.Selected, ident)
+	}
+}
+
+func (s *_SymbolBuilder) import_package(imp *ImportInfo, decl *ast.UseDecl) (ok bool) {
+	if imp.Cpp {
 		return true
 	}
 
-	asts, errors := s.importer.Import_package(pkg.Path)
+	asts, errors := s.importer.Import_package(imp.Path)
 	if len(errors) > 0 {
 		s.errors = append(s.errors, errors...)
 		return false
@@ -364,36 +375,39 @@ func (s *_SymbolBuilder) import_package(pkg *ImportInfo) (ok bool) {
 		// Break import if file has error(s).
 		if len(errors) > 0 {
 			s.errors = append(s.errors, errors...)
-			s.push_err(pkg.Token, "used_package_has_errors", pkg.Link_path)
+			s.push_err(imp.Token, "used_package_has_errors", imp.Link_path)
 			return false
 		}
 
-		pkg.Package.Files = append(pkg.Package.Files, table)
+		imp.Package.Files = append(imp.Package.Files, table)
 	}
 
-	// TODO: Add identifier selections.
+	imp.Import_all = decl.Full
+
+	s.impl_import_selections(imp, decl)
+
 	// TODO: Add package's built-in defines to symbol table.
 
 	return true
 }
 
 func (s *_SymbolBuilder) import_use_decl(decl *ast.UseDecl) *ImportInfo {
-	pkg := s.build_package(decl)
+	imp := s.build_import(decl)
 	// Break analysis if error occurs.
-	if pkg == nil {
+	if imp == nil {
 		return nil
 	}
 
-	ok := s.check_duplicate_use_decl(pkg)
+	ok := s.check_duplicate_use_decl(imp)
 	if !ok {
 		return nil
 	}
 
-	ok = s.import_package(pkg)
-	s.table.Imports = append(s.table.Imports, pkg)
+	ok = s.import_package(imp, decl)
+	s.table.Imports = append(s.table.Imports, imp)
 	if ok {
-		s.importer.Imported(pkg)
-		return pkg
+		s.importer.Imported(imp)
+		return imp
 	}
 	return nil
 }
