@@ -76,7 +76,7 @@ func fn_out_ident(f *sema.Fn) string {
 
 // Returns output identifier of function instance.
 func fn_ins_out_ident(f *sema.FnIns) string {
-	if f.Decl.Cpp_linked || len(f.Generics) == 0 || f.Decl.Parameters_uses_generics() {
+	if f.Decl.Cpp_linked || f.Caller != nil || len(f.Generics) == 0 || f.Decl.Parameters_uses_generics() {
 		return fn_out_ident(f.Decl)
 	}
 
