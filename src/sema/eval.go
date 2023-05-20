@@ -1448,33 +1448,7 @@ func (e *_Eval) check_fn_call_generics(f *FnIns,
 
 func (e *_Eval) call_builtin_fn(fc *ast.FnCallExpr, d *Data) *Data {
 	f := d.Kind.Fnc()
-
-	fcac := _FnCallArgChecker{
-		e:                  e,
-		f:                  f,
-		args:               fc.Args,
-		dynamic_annotation: false,
-		error_token:        fc.Token,
-	}
-	_ = fcac.check()
-
-	model := &FnCallExprModel{
-		Func: f,
-		IsCo: fc.Concurrent,
-		Expr: d.Model,
-		Args: fcac.arg_models,
-	}
-
-	if f.Result == nil {
-		d = build_void_data()
-	} else {
-		d = &Data{
-			Kind: f.Result,
-		}
-	}
-
-	d.Model = model
-	return d
+	return f.Caller(e, fc, d)
 }
 
 func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
@@ -1732,7 +1706,9 @@ func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
 	case "clear":
 		return &Data{
 			Kind: &TypeKind{
-				kind:  &FnIns{},
+				kind:  &FnIns{
+					Caller: common_builtin_caller,
+				},
 			},
 			Model: &CommonSubIdentExprModel{
 				Expr:  d.Model,
@@ -1745,6 +1721,7 @@ func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
 		return &Data{
 			Kind: &TypeKind{
 				kind: &FnIns{
+					Caller: common_builtin_caller,
 					Result: &TypeKind{
 						kind: &Slc{
 							Elem: m.Key,
@@ -1763,6 +1740,7 @@ func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
 		return &Data{
 			Kind: &TypeKind{
 				kind: &FnIns{
+					Caller: common_builtin_caller,
 					Result: &TypeKind{
 						kind: &Slc{
 							Elem: m.Val,
@@ -1781,6 +1759,7 @@ func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
 		return &Data{
 			Kind: &TypeKind{
 				kind: &FnIns{
+					Caller: common_builtin_caller,
 					Params: []*ParamIns{
 						{
 							Decl: &Param{
@@ -1803,6 +1782,7 @@ func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
 		return &Data{
 			Kind: &TypeKind{
 				kind: &FnIns{
+					Caller: common_builtin_caller,
 					Params: []*ParamIns{
 						{
 							Decl: &Param{

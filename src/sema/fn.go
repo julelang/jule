@@ -208,6 +208,7 @@ type FnIns struct {
 	Params   []*ParamIns
 	Result   *TypeKind
 	Scope    *Scope
+	Caller   _BuiltinCaller
 }
 
 // Reports whether instance is built-in.
