@@ -1379,7 +1379,7 @@ func (sc *_ScopeChecker) check_labels() {
 
 func (sc *_ScopeChecker) check_vars() {
 	for _, v := range sc.table.Vars {
-		if v.Ident != lex.KND_SELF && !v.Used {
+		if!v.Used && !lex.Is_ignore_ident(v.Ident) && !lex.Is_anon_ident(v.Ident) && v.Ident != lex.KND_SELF {
 			sc.s.push_err(v.Token, "declared_but_not_used", v.Ident)
 		}
 	}
@@ -1387,7 +1387,7 @@ func (sc *_ScopeChecker) check_vars() {
 
 func (sc *_ScopeChecker) check_aliases() {
 	for _, a := range sc.table.Type_aliases {
-		if !a.Used {
+		if !a.Used && !lex.Is_ignore_ident(a.Ident) && !lex.Is_anon_ident(a.Ident) {
 			sc.s.push_err(a.Token, "declared_but_not_used", a.Ident)
 		}
 	}
