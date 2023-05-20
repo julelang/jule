@@ -376,6 +376,13 @@ func gen_builtin_new_call_expr_model(m *sema.BuiltinNewCallExprModel) string {
 	return obj
 }
 
+func gen_builtin_real_call_expr_model(m *sema.BuiltinRealCallExprModel) string {
+	obj := "_real("
+	obj += gen_expr_model(m.Expr)
+	obj += ")"
+	return obj
+}
+
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
 	case *sema.TypeKind:
@@ -446,6 +453,9 @@ func gen_expr_model(m sema.ExprModel) string {
 
 	case *sema.BuiltinNewCallExprModel:
 		return gen_builtin_new_call_expr_model(m.(*sema.BuiltinNewCallExprModel))
+
+	case *sema.BuiltinRealCallExprModel:
+		return gen_builtin_real_call_expr_model(m.(*sema.BuiltinRealCallExprModel))
 
 	default:
 		return "<unimplemented_expression_model>"

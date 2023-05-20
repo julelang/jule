@@ -137,8 +137,13 @@ type TupleExprModel struct {
 	Datas []*Data
 }
 
-// Expression mode for built-in new function calls.
+// Expression model for built-in new function calls.
 type BuiltinNewCallExprModel struct {
 	Kind *TypeKind // Element type of reference.
 	Init ExprModel // Nil for not initialized.
+}
+
+// Expression model for built-in real function calls.
+type BuiltinRealCallExprModel struct {
+	Expr ExprModel
 }

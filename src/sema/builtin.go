@@ -1,6 +1,9 @@
 package sema
 
-import "github.com/julelang/jule/ast"
+import (
+	"github.com/julelang/jule/ast"
+	"github.com/julelang/jule/types"
+)
 
 // Type alias for built-in function callers.
 //
@@ -12,14 +15,22 @@ type _BuiltinCaller = func(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data
 
 var builtin_fn_new = &FnIns{}
 
+var builtin_fn_real = &FnIns{
+	Result: &TypeKind{kind: build_prim_type(types.TypeKind_BOOL)},
+}
+
 func init() {
 	builtin_fn_new.Caller = builtin_caller_new
+	builtin_fn_real.Caller = builtin_caller_real
 }
 
 func get_builtin_def(ident string) any {
 	switch ident {
 	case "new":
 		return builtin_fn_new
+
+	case "real":
+		return builtin_fn_real
 
 	default:
 		return nil
@@ -72,7 +83,7 @@ func builtin_caller_new(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 	}
 
 	if !t.Decl {
-		e.push_err(fc.Args[0].Token, "invalid_expr")
+		e.push_err(fc.Args[0].Token, "invalid_type")
 		return nil
 	}
 
@@ -99,5 +110,34 @@ func builtin_caller_new(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 		}
 	}
 
+	return d
+}
+
+func builtin_caller_real(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
+	if len(fc.Args) < 1 {
+		e.push_err(fc.Token, "missing_expr_for", "ref")
+		return nil
+	}
+	if len(fc.Args) > 1 {
+		e.push_err(fc.Args[2].Token, "argument_overflow")
+	}
+
+	ref := e.eval_expr_kind(fc.Args[0].Kind)
+	if ref == nil {
+		return nil
+	}
+
+	if ref.Decl {
+		e.push_err(fc.Args[0].Token, "invalid_expr")
+		return nil
+	}
+
+	if ref.Kind.Ref() == nil {
+		e.push_err(fc.Args[0].Token, "invalid_expr")
+		return nil
+	}
+
+	d.Kind = builtin_fn_real.Result
+	d.Model = &BuiltinRealCallExprModel{Expr: ref.Model}
 	return d
 }
