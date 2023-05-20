@@ -1805,6 +1805,222 @@ func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
 	}
 }
 
+func (e *_Eval) eval_str_sub_ident(d *Data, ident lex.Token) *Data {
+	switch ident.Kind {
+	case "len":
+		return &Data{
+			Mutable: false,
+			Kind:    &TypeKind{kind: build_prim_type(types.SYS_INT)},
+			Model:   &CommonSubIdentExprModel{
+				Expr:  d.Model,
+				Ident: "_len()",
+			},
+		}
+
+	case "has_prefix":
+		return &Data{
+			Kind: &TypeKind{
+				kind: &FnIns{
+					Caller: common_builtin_caller,
+					Params: []*ParamIns{
+						{
+							Decl: &Param{
+								Ident: "sub",
+							},
+							Kind: d.Kind,
+						},
+					},
+					Result: &TypeKind{kind: build_prim_type(types.TypeKind_BOOL)},
+				},
+			},
+			Model: &CommonSubIdentExprModel{
+				Expr:  d.Model,
+				Ident: "_has_prefix",
+			},
+		}
+
+	case "has_suffix":
+		return &Data{
+			Kind: &TypeKind{
+				kind: &FnIns{
+					Caller: common_builtin_caller,
+					Params: []*ParamIns{
+						{
+							Decl: &Param{
+								Ident: "sub",
+							},
+							Kind: d.Kind,
+						},
+					},
+					Result: &TypeKind{kind: build_prim_type(types.TypeKind_BOOL)},
+				},
+			},
+			Model: &CommonSubIdentExprModel{
+				Expr:  d.Model,
+				Ident: "_has_suffix",
+			},
+		}
+
+	case "find":
+		return &Data{
+			Kind: &TypeKind{
+				kind: &FnIns{
+					Caller: common_builtin_caller,
+					Params: []*ParamIns{
+						{
+							Decl: &Param{
+								Ident: "sub",
+							},
+							Kind: d.Kind,
+						},
+					},
+					Result: &TypeKind{kind: build_prim_type(types.TypeKind_INT)},
+				},
+			},
+			Model: &CommonSubIdentExprModel{
+				Expr:  d.Model,
+				Ident: "_find",
+			},
+		}
+
+	case "rfind":
+		return &Data{
+			Kind: &TypeKind{
+				kind: &FnIns{
+					Caller: common_builtin_caller,
+					Params: []*ParamIns{
+						{
+							Decl: &Param{
+								Ident: "sub",
+							},
+							Kind: d.Kind,
+						},
+					},
+					Result: &TypeKind{kind: build_prim_type(types.TypeKind_INT)},
+				},
+			},
+			Model: &CommonSubIdentExprModel{
+				Expr:  d.Model,
+				Ident: "_rfind",
+			},
+		}
+
+	case "trim":
+		return &Data{
+			Kind: &TypeKind{
+				kind: &FnIns{
+					Caller: common_builtin_caller,
+					Params: []*ParamIns{
+						{
+							Decl: &Param{
+								Ident: "bytes",
+							},
+							Kind: d.Kind,
+						},
+					},
+					Result: d.Kind,
+				},
+			},
+			Model: &CommonSubIdentExprModel{
+				Expr:  d.Model,
+				Ident: "_trim",
+			},
+		}
+
+	case "rtrim":
+		return &Data{
+			Kind: &TypeKind{
+				kind: &FnIns{
+					Caller: common_builtin_caller,
+					Params: []*ParamIns{
+						{
+							Decl: &Param{
+								Ident: "bytes",
+							},
+							Kind: d.Kind,
+						},
+					},
+					Result: d.Kind,
+				},
+			},
+			Model: &CommonSubIdentExprModel{
+				Expr:  d.Model,
+				Ident: "_rtrim",
+			},
+		}
+
+	case "split":
+		return &Data{
+			Kind: &TypeKind{
+				kind: &FnIns{
+					Caller: common_builtin_caller,
+					Params: []*ParamIns{
+						{
+							Decl: &Param{
+								Ident: "sub",
+							},
+							Kind: d.Kind,
+						},
+						{
+							Decl: &Param{
+								Ident: "n",
+							},
+							Kind: &TypeKind{kind: build_prim_type(types.TypeKind_INT)},
+						},
+					},
+					Result: &TypeKind{
+						kind: &Slc{
+							Elem: d.Kind,
+						},
+					},
+				},
+			},
+			Model: &CommonSubIdentExprModel{
+				Expr:  d.Model,
+				Ident: "_split",
+			},
+		}
+
+	case "replace":
+		return &Data{
+			Kind: &TypeKind{
+				kind: &FnIns{
+					Caller: common_builtin_caller,
+					Params: []*ParamIns{
+						{
+							Decl: &Param{
+								Ident: "sub",
+							},
+							Kind: d.Kind,
+						},
+						{
+							Decl: &Param{
+								Ident: "new",
+							},
+							Kind: d.Kind,
+						},
+						{
+							Decl: &Param{
+								Ident: "n",
+							},
+							Kind: &TypeKind{kind: build_prim_type(types.TypeKind_INT)},
+						},
+					},
+					Result: d.Kind,
+				},
+			},
+			Model: &CommonSubIdentExprModel{
+				Expr:  d.Model,
+				Ident: "_replace",
+			},
+		}
+
+	default:
+		e.push_err(ident, "obj_have_not_ident", ident.Kind)
+		return nil
+	}
+}
+
 func (e *_Eval) eval_int_type_sub_ident(si *ast.SubIdentExpr) *Data {
 	const kind = types.TypeKind_INT
 	switch si.Ident.Kind {
@@ -2028,7 +2244,7 @@ func (e *_Eval) eval_u64_type_sub_ident(si *ast.SubIdentExpr) *Data {
 }
 
 func (e *_Eval) eval_prim_type_sub_ident(p *Prim, si *ast.SubIdentExpr) *Data {
-	kind := p.To_str()
+	kind := p.kind
 	switch kind {
 	case types.TypeKind_INT:
 		return e.eval_int_type_sub_ident(si)
@@ -2113,6 +2329,13 @@ func (e *_Eval) eval_obj_sub_ident(d *Data, si *ast.SubIdentExpr) *Data {
 
 	case kind.Map() != nil:
 		return e.eval_map_sub_ident(d, si.Ident)
+
+	case kind.Prim() != nil:
+		p := kind.Prim()
+		switch p.kind {
+		case types.TypeKind_STR:
+			return e.eval_str_sub_ident(d, si.Ident)
+		}
 	}
 
 	e.push_err(si.Ident, "obj_not_support_sub_fields", d.Kind.To_str())
