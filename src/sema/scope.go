@@ -789,6 +789,7 @@ func (sc *_ScopeChecker) check_single_assign(a *ast.AssignSt) {
 		dest:        l.Kind,
 		d:           r,
 		error_token: a.Setter,
+		deref:       true,
 	}
 	checker.check()
 
@@ -885,6 +886,7 @@ func (sc *_ScopeChecker) check_multi_assign(a *ast.AssignSt) {
 			dest:        l.Kind,
 			d:           r,
 			error_token: a.Setter,
+			deref:       true,
 		}
 		checker.check()
 
@@ -948,6 +950,7 @@ func (sc *_ScopeChecker) check_case(m *Match, i int, c *ast.Case, expr *Data) *C
 			dest:        expr.Kind,
 			d:           d,
 			error_token: e.Token,
+			deref:       true,
 		}
 		checker.check()
 	}

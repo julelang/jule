@@ -165,7 +165,11 @@ func (tcc *_TypeCompatibilityChecker) check_ref() (ok bool) {
 		return true
 	} else if !tcc.deref {
 		return false
+	} else if tcc.src.Ref() == nil {
+		tcc.dest = tcc.dest.Ref().Elem
+		return tcc.check()
 	}
+
 	tcc.src = tcc.src.Ref().Elem
 	return tcc.check()
 }
