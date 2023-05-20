@@ -517,10 +517,10 @@ func (fcac *_FnCallArgChecker) check_counts(params []*ParamIns) (ok bool) {
 
 	diff := n - len(fcac.args)
 	switch {
-	case diff <= 0:
+	case diff == 0:
 		return true
 
-	case diff > len(params):
+	case diff < 0 || diff > len(params):
 		fcac.push_err("argument_overflow")
 		return false
 	}
