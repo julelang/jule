@@ -310,6 +310,10 @@ func is_nil_compatible(t *TypeKind) bool {
 		t.Map() != nil)
 }
 
+func is_valid_for_ref(t *TypeKind) bool {
+	return !(t.Enm() != nil || t.Ptr() != nil || t.Ref() != nil|| t.Arr() != nil)
+}
+
 func is_variadicable(tk *TypeKind) bool { return tk.Slc() != nil }
 
 func build_link_path_by_tokens(tokens []lex.Token) string {

@@ -365,6 +365,17 @@ func gen_tuple_expr_model(m *sema.TupleExprModel) string {
 	return obj
 }
 
+func gen_builtin_new_call_expr_model(m *sema.BuiltinNewCallExprModel) string {
+	obj := "_new<"
+	obj += gen_type_kind(m.Kind)
+	obj += ">("
+	if m.Init != nil {
+		obj += gen_expr_model(m.Init)
+	}
+	obj += ")"
+	return obj
+}
+
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
 	case *sema.TypeKind:
@@ -432,6 +443,9 @@ func gen_expr_model(m sema.ExprModel) string {
 
 	case *sema.TupleExprModel:
 		return gen_tuple_expr_model(m.(*sema.TupleExprModel))
+
+	case *sema.BuiltinNewCallExprModel:
+		return gen_builtin_new_call_expr_model(m.(*sema.BuiltinNewCallExprModel))
 
 	default:
 		return "<unimplemented_expression_model>"

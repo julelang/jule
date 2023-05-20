@@ -132,7 +132,6 @@ var ERRORS = map[string]string{
 	`ref_method_used_with_not_ref_instance`:    `reference method cannot use with non-reference instance`,
 	`method_as_anonymous_fn`:                   `methods cannot use as anonymous function`,
 	`genericed_fn_as_anonymous_fn`:             `genericed functions cannot use as anonymous function`,
-	`ref_used_struct_used_at_new_fn`:           `reference field used structures cannot initialize with new function, use reference literal instead`,
 	`reference_field_not_initialized`:          `reference field must initialize explicitly: @`,
 	`illegal_cycle_refers_itself`:              `illegal cycle in declaration, @ refers to itself`,
 	`illegal_cross_cycle`:                      `illegal cross cycle in declaration, @ and @ refers to each other`,
