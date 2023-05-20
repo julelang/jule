@@ -290,16 +290,18 @@ func gen_map_expr_model(m *sema.MapExprModel) string {
 	obj += ","
 	obj += gen_type_kind(m.Val_kind)
 	obj += ">({"
-	for _, pair := range m.Entries {
-		pairObj := "{"
-		pairObj += gen_expr_model(pair.Key)
-		pairObj += ","
-		pairObj += gen_expr_model(pair.Val)
-		pairObj += "}"
-		obj += pairObj
-		obj += ","
+	if len(m.Entries) > 0 {
+		for _, pair := range m.Entries {
+			pair_obj := "{"
+			pair_obj += gen_expr_model(pair.Key)
+			pair_obj += ","
+			pair_obj += gen_expr_model(pair.Val)
+			pair_obj += "}"
+			obj += pair_obj
+			obj += ","
+		}
+		obj = obj[:len(obj)-1] // Remove last comma.
 	}
-	obj = obj[:len(obj)-1] // Remove last comma.
 	obj += "})"
 	return obj
 }
