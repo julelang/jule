@@ -137,6 +137,11 @@ type TupleExprModel struct {
 	Datas []*Data
 }
 
+// Expression model for built-in out function calls.
+type BuiltinOutCallExprModel struct {
+	Expr ExprModel
+}
+
 // Expression model for built-in new function calls.
 type BuiltinNewCallExprModel struct {
 	Kind *TypeKind // Element type of reference.

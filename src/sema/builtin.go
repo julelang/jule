@@ -13,6 +13,7 @@ import (
 //  d: Data instance for evaluated expression of function.
 type _BuiltinCaller = func(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data
 
+var builtin_fn_out = &FnIns{}
 var builtin_fn_new = &FnIns{}
 var builtin_fn_drop = &FnIns{}
 
@@ -21,6 +22,7 @@ var builtin_fn_real = &FnIns{
 }
 
 func init() {
+	builtin_fn_out.Caller = builtin_caller_out
 	builtin_fn_new.Caller = builtin_caller_new
 	builtin_fn_real.Caller = builtin_caller_real
 	builtin_fn_drop.Caller = builtin_caller_drop
@@ -28,6 +30,9 @@ func init() {
 
 func get_builtin_def(ident string) any {
 	switch ident {
+	case "out":
+		return builtin_fn_out
+
 	case "new":
 		return builtin_fn_new
 
@@ -73,6 +78,30 @@ func builtin_caller_common(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 	return d
 }
 
+func builtin_caller_out(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
+	if len(fc.Args) < 1 {
+		e.push_err(fc.Token, "missing_expr_for", "ref")
+		return nil
+	}
+	if len(fc.Args) > 1 {
+		e.push_err(fc.Args[2].Token, "argument_overflow")
+	}
+
+	expr := e.eval_expr(fc.Args[0])
+	if expr == nil {
+		return nil
+	}
+
+	if expr.Kind.Fnc() != nil {
+		e.push_err(fc.Args[0].Token, "invalid_expr")
+		return nil
+	}
+
+	d := build_void_data()
+	d.Model = &BuiltinOutCallExprModel{Expr: expr.Model}
+	return d
+}
+
 func builtin_caller_new(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 	if len(fc.Args) < 1 {
 		e.push_err(fc.Token, "missing_expr_for", "type")
@@ -110,9 +139,7 @@ func builtin_caller_new(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 			}
 		}
 	} else {
-		d.Model = &BuiltinNewCallExprModel{
-			Kind: t.Kind,
-		}
+		d.Model = &BuiltinNewCallExprModel{Kind: t.Kind}
 	}
 
 	return d
@@ -127,13 +154,8 @@ func builtin_caller_real(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 		e.push_err(fc.Args[2].Token, "argument_overflow")
 	}
 
-	ref := e.eval_expr_kind(fc.Args[0].Kind)
+	ref := e.eval_expr(fc.Args[0])
 	if ref == nil {
-		return nil
-	}
-
-	if ref.Decl {
-		e.push_err(fc.Args[0].Token, "invalid_expr")
 		return nil
 	}
 
@@ -156,13 +178,8 @@ func builtin_caller_drop(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
 		e.push_err(fc.Args[2].Token, "argument_overflow")
 	}
 
-	ref := e.eval_expr_kind(fc.Args[0].Kind)
+	ref := e.eval_expr(fc.Args[0])
 	if ref == nil {
-		return nil
-	}
-
-	if ref.Decl {
-		e.push_err(fc.Args[0].Token, "invalid_expr")
 		return nil
 	}
 
