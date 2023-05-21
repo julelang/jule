@@ -36,6 +36,13 @@ var builtin_type_alias_byte = &TypeAlias{
 	},
 }
 
+var builtin_type_alias_rune = &TypeAlias{
+	Public: true,
+	Kind:   &TypeSymbol{
+		Kind: &TypeKind{kind: build_prim_type(types.TypeKind_I32)},
+	},
+}
+
 func init() {
 	builtin_fn_out.Caller = builtin_caller_out
 	builtin_fn_outln.Caller = builtin_caller_outln
@@ -86,6 +93,9 @@ func find_builtin_type_alias(ident string) *TypeAlias {
 	switch ident {
 	case "byte":
 		return builtin_type_alias_byte
+
+	case "rune":
+		return builtin_type_alias_rune
 
 	default:
 		return nil
