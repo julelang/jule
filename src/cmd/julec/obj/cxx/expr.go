@@ -336,6 +336,10 @@ func gen_struct_sub_ident_expr_model(m *sema.StrctSubIdentExprModel) string {
 	return obj
 }
 
+func gen_common_ident_expr_model(m *sema.CommonIdentExprModel) string {
+	return m.Ident
+}
+
 func gen_common_sub_ident_expr_model(m *sema.CommonSubIdentExprModel) string {
 	obj := gen_expr_model(m.Expr)
 	obj += "."
@@ -482,6 +486,9 @@ func gen_expr_model(m sema.ExprModel) string {
 
 	case *sema.StrctSubIdentExprModel:
 		return gen_struct_sub_ident_expr_model(m.(*sema.StrctSubIdentExprModel))
+
+	case *sema.CommonIdentExprModel:
+		return gen_common_ident_expr_model(m.(*sema.CommonIdentExprModel))
 
 	case *sema.CommonSubIdentExprModel:
 		return gen_common_sub_ident_expr_model(m.(*sema.CommonSubIdentExprModel))

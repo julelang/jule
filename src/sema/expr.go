@@ -126,6 +126,11 @@ type ArrayExprModel struct {
 	Elems []ExprModel
 }
 
+// Common ident expression model.
+type CommonIdentExprModel struct {
+	Ident string
+}
+
 // Common sub-ident expression model.
 type CommonSubIdentExprModel struct {
 	Expr  ExprModel

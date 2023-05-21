@@ -512,7 +512,7 @@ func (fcac *_FnCallArgChecker) tuple_as_params(params []*ParamIns) bool {
 func (fcac *_FnCallArgChecker) check_counts(params []*ParamIns) (ok bool) {
 	n := len(params)
 	if n > 0 && params[n-1].Decl.Variadic {
-		n--
+		return true
 	}
 
 	if n > 0 && params[0].Decl.Is_self() {

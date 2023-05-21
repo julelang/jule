@@ -19,6 +19,7 @@ var builtin_fn_new = &FnIns{}
 var builtin_fn_drop = &FnIns{}
 var builtin_fn_panic = &FnIns{}
 var builtin_fn_make = &FnIns{}
+var builtin_fn_append = &FnIns{}
 
 var builtin_fn_real = &FnIns{
 	Result: &TypeKind{kind: build_prim_type(types.TypeKind_BOOL)},
@@ -32,6 +33,7 @@ func init() {
 	builtin_fn_drop.Caller = builtin_caller_drop
 	builtin_fn_panic.Caller = builtin_caller_panic
 	builtin_fn_make.Caller = builtin_caller_make
+	builtin_fn_append.Caller = builtin_caller_append
 }
 
 func get_builtin_def(ident string) any {
@@ -56,6 +58,9 @@ func get_builtin_def(ident string) any {
 
 	case "make":
 		return builtin_fn_make
+
+	case "append":
+		return builtin_fn_append
 
 	default:
 		return nil
@@ -281,5 +286,47 @@ func builtin_caller_make(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 		Size: size.Model,
 	}
 
+	return d
+}
+
+func builtin_caller_append(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
+	if len(fc.Args) < 2 {
+		if len(fc.Args) == 1 {
+			e.push_err(fc.Token, "missing_expr_for", "src")
+			return nil
+		}
+		e.push_err(fc.Token, "missing_expr_for", "src, and values")
+		return nil
+	}
+
+	t := e.eval_expr(fc.Args[0])
+	if t == nil {
+		return nil
+	}
+
+	if t.Kind.Slc() == nil {
+		e.push_err(fc.Args[0].Token, "invalid_expr")
+		return nil
+	}
+
+	f := &FnIns{
+		Params: []*ParamIns{
+			{
+				Decl: &Param{},
+				Kind: t.Kind,
+			},
+			{
+				Decl: &Param{
+					Variadic: true,
+				},
+				Kind: t.Kind.Slc().Elem,
+			},
+		},
+		Result: t.Kind,
+	}
+	d.Kind = &TypeKind{kind: f}
+	d.Model = &CommonIdentExprModel{Ident: "_append"}
+
+	d = builtin_caller_common(e, fc, d)
 	return d
 }
