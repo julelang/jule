@@ -368,7 +368,7 @@ func (e *_Eval) get_def(ident string, cpp_linked bool) any {
 		return ta
 	}
 
-	return get_builtin_def(ident)
+	return find_builtin_def(ident)
 }
 
 func (e *_Eval) eval_enum(enm *Enum, error_token lex.Token) *Data {

@@ -29,6 +29,13 @@ var builtin_fn_copy = &FnIns{
 	Result: &TypeKind{kind: build_prim_type(types.TypeKind_INT)},
 }
 
+var builtin_type_alias_byte = &TypeAlias{
+	Public: true,
+	Kind:   &TypeSymbol{
+		Kind: &TypeKind{kind: build_prim_type(types.TypeKind_U8)},
+	},
+}
+
 func init() {
 	builtin_fn_out.Caller = builtin_caller_out
 	builtin_fn_outln.Caller = builtin_caller_outln
@@ -41,7 +48,7 @@ func init() {
 	builtin_fn_copy.Caller = builtin_caller_copy
 }
 
-func get_builtin_def(ident string) any {
+func find_builtin_fn(ident string) *FnIns {
 	switch ident {
 	case "out":
 		return builtin_fn_out
@@ -73,6 +80,30 @@ func get_builtin_def(ident string) any {
 	default:
 		return nil
 	}
+}
+
+func find_builtin_type_alias(ident string) *TypeAlias {
+	switch ident {
+	case "byte":
+		return builtin_type_alias_byte
+
+	default:
+		return nil
+	}
+}
+
+func find_builtin_def(ident string) any {
+	f := find_builtin_fn(ident)
+	if f != nil {
+		return f
+	}
+
+	ta := find_builtin_type_alias(ident)
+	if ta != nil {
+		return ta
+	}
+
+	return nil
 }
 
 func builtin_caller_common(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {

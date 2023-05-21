@@ -666,6 +666,9 @@ func (tc *_TypeChecker) get_def(decl *ast.IdentType) _Kind {
 	}
 
 	ta := tc.lookup.Find_type_alias(decl.Ident, decl.Cpp_linked)
+	if ta == nil {
+		ta = find_builtin_type_alias(decl.Ident)
+	}
 	if ta != nil {
 		return tc.from_type_alias(decl, ta)
 	}
