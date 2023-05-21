@@ -387,8 +387,6 @@ func (s *_SymbolBuilder) import_package(imp *ImportInfo, decl *ast.UseDecl) (ok 
 
 	s.impl_import_selections(imp, decl)
 
-	// TODO: Add package's built-in defines to symbol table.
-
 	return true
 }
 

@@ -21,6 +21,7 @@ var builtin_fn_panic = &FnIns{}
 var builtin_fn_make = &FnIns{}
 var builtin_fn_append = &FnIns{}
 var builtin_fn_recover = &FnIns{}
+var builtin_fn_std_mem_size_of = &FnIns{}
 
 var builtin_fn_real = &FnIns{
 	Result: &TypeKind{kind: build_prim_type(types.TypeKind_BOOL)},
@@ -76,6 +77,8 @@ func init() {
 	builtin_fn_append.Caller = builtin_caller_append
 	builtin_fn_copy.Caller = builtin_caller_copy
 	builtin_fn_recover.Caller = builtin_caller_recover
+
+	builtin_fn_std_mem_size_of.Caller = builtin_caller_std_mem_size_of
 }
 
 func find_builtin_fn(ident string) *FnIns {
@@ -155,6 +158,26 @@ func find_builtin_def(ident string) any {
 	}
 
 	return nil
+}
+
+func find_builtin_def_std_mem(ident string) any {
+	switch ident {
+	case "size_of":
+		return builtin_fn_std_mem_size_of
+
+	default:
+		return nil
+	}
+}
+
+func find_package_builtin_def(link_path string, ident string) any {
+	switch link_path {
+	case "std::mem":
+		return find_builtin_def_std_mem(ident)
+
+	default:
+		return nil
+	}
 }
 
 func builtin_caller_common(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
@@ -501,4 +524,26 @@ func builtin_caller_recover(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
 		Handler_expr: t.Model,
 	}
 	return d
+}
+
+func builtin_caller_std_mem_size_of(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
+	result := &Data{
+		Kind:  &TypeKind{kind: build_prim_type(types.TypeKind_UINT)},
+	}
+
+	if len(fc.Args) < 1 {
+		e.push_err(fc.Token, "missing_expr_for", "type|expr")
+		return result
+	}
+	if len(fc.Args) > 1 {
+		e.push_err(fc.Args[1].Token, "argument_overflow")
+	}
+
+	d := e.eval_expr_kind(fc.Args[0].Kind)
+	if d == nil {
+		return result
+	}
+
+	result.Model = &SizeofExprModel{Expr: d.Model}
+	return result
 }

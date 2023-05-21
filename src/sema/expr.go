@@ -178,3 +178,9 @@ type BuiltinMakeCallExprModel struct {
 	Kind *TypeKind
 	Size ExprModel // Nil for nil slice.
 }
+
+// Expression model for sizeof expressions.
+// For example, in C: sizeof(int)
+type SizeofExprModel struct {
+	Expr ExprModel
+}

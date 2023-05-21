@@ -425,6 +425,13 @@ func gen_builtin_make_call_expr_model(m *sema.BuiltinMakeCallExprModel) string {
 	return obj
 }
 
+func gen_sizeof_expr_model(m *sema.SizeofExprModel) string {
+	obj := "sizeof("
+	obj += gen_expr_model(m.Expr)
+	obj += ")"
+	return obj
+}
+
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
 	case *sema.TypeKind:
@@ -516,6 +523,9 @@ func gen_expr_model(m sema.ExprModel) string {
 
 	case *sema.BuiltinMakeCallExprModel:
 		return gen_builtin_make_call_expr_model(m.(*sema.BuiltinMakeCallExprModel))
+
+	case *sema.SizeofExprModel:
+		return gen_sizeof_expr_model(m.(*sema.SizeofExprModel))
 
 	default:
 		return "<unimplemented_expression_model>"

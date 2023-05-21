@@ -114,8 +114,6 @@ func build_generic_type_aliases(f *FnIns) []*TypeAlias {
 
 // Sema must implement Lookup.
 
-// TODO: Implement built-in definitions.
-
 // Semantic analyzer for tables.
 // Accepts tables as files of package.
 type _Sema struct {
@@ -354,6 +352,10 @@ func (s *_Sema) check_import_selections(imp *ImportInfo) {
 	s.set_current_file(s.files[0])
 
 	get_def := func(ident string) any {
+		if find_package_builtin_def(imp.Link_path, ident) != nil {
+			return true // Return "true" for built-in define detection.
+		}
+
 		for _, f := range imp.Package.Files {
 			def := f.def_by_ident(ident, false)
 			if def != nil {
@@ -371,6 +373,10 @@ func (s *_Sema) check_import_selections(imp *ImportInfo) {
 
 		def := get_def(ident.Kind)
 		switch def.(type) {
+		case bool:
+			// Built-in.
+			continue
+
 		case *Var:
 			v := def.(*Var)
 			if s.is_accessible_define(v.Public, v.Token) {

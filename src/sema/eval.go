@@ -340,6 +340,46 @@ func (e *_Eval) eval_lit(lit *ast.LitExpr) *Data {
 	}
 }
 
+func find_builtins_import(ident string, imp *ImportInfo) any {
+	return find_package_builtin_def(imp.Link_path, ident)
+}
+
+func find_builtins_sema(ident string, s *_Sema) any {
+	for _, imp := range s.file.Imports {
+		if imp.Import_all || imp.exist_ident(ident) {
+			def := find_builtins_import(ident, imp)
+			if def != nil {
+				return def
+			}
+		} 
+	}
+	return nil
+}
+
+func (e *_Eval) find_builtins(ident string) any {
+	switch e.lookup.(type) {
+	case *ImportInfo:
+		def := find_builtins_import(ident, e.lookup.(*ImportInfo))
+		if def != nil {
+			return def
+		}
+
+	case *_Sema:
+		def := find_builtins_sema(ident, e.lookup.(*_Sema))
+		if def != nil {
+			return def
+		}
+
+	case *_ScopeChecker:
+		def := find_builtins_sema(ident, e.lookup.(*_ScopeChecker).s)
+		if def != nil {
+			return def
+		}
+	}
+
+	return find_builtin_def(ident)
+}
+
 func (e *_Eval) get_def(ident string, cpp_linked bool) any {
 	if !cpp_linked {
 		enm := e.lookup.Find_enum(ident)
@@ -368,7 +408,7 @@ func (e *_Eval) get_def(ident string, cpp_linked bool) any {
 		return ta
 	}
 
-	return find_builtin_def(ident)
+	return e.find_builtins(ident)
 }
 
 func (e *_Eval) eval_enum(enm *Enum, error_token lex.Token) *Data {
@@ -1400,8 +1440,9 @@ func (e *_Eval) eval_type(t *ast.Type) *Data {
 	}
 
 	return &Data{
-		Decl: true,
-		Kind: tk.Kind,
+		Decl:  true,
+		Kind:  tk.Kind,
+		Model: tk.Kind,
 	}
 }
 
