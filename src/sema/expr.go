@@ -180,7 +180,13 @@ type BuiltinMakeCallExprModel struct {
 }
 
 // Expression model for sizeof expressions.
-// For example, in C: sizeof(int)
+// For example, in C++: sizeof(int)
 type SizeofExprModel struct {
+	Expr ExprModel
+}
+
+// Expression model for alignof expressions.
+// For example, in C++: alignof(int)
+type AlignofExprModel struct {
 	Expr ExprModel
 }

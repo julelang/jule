@@ -432,6 +432,13 @@ func gen_sizeof_expr_model(m *sema.SizeofExprModel) string {
 	return obj
 }
 
+func gen_alignof_expr_model(m *sema.AlignofExprModel) string {
+	obj := "alignof("
+	obj += gen_expr_model(m.Expr)
+	obj += ")"
+	return obj
+}
+
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
 	case *sema.TypeKind:
@@ -526,6 +533,9 @@ func gen_expr_model(m sema.ExprModel) string {
 
 	case *sema.SizeofExprModel:
 		return gen_sizeof_expr_model(m.(*sema.SizeofExprModel))
+
+	case *sema.AlignofExprModel:
+		return gen_alignof_expr_model(m.(*sema.AlignofExprModel))
 
 	default:
 		return "<unimplemented_expression_model>"
