@@ -162,3 +162,8 @@ type BuiltinRealCallExprModel struct {
 type BuiltinDropCallExprModel struct {
 	Expr ExprModel
 }
+
+// Expression model for built-in panic function calls.
+type BuiltinPanicCallExprModel struct {
+	Expr ExprModel
+}

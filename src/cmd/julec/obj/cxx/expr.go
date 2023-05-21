@@ -404,6 +404,13 @@ func gen_builtin_drop_call_expr_model(m *sema.BuiltinDropCallExprModel) string {
 	return obj
 }
 
+func gen_builtin_panic_call_expr_model(m *sema.BuiltinPanicCallExprModel) string {
+	obj := "_panic("
+	obj += gen_expr_model(m.Expr)
+	obj += ")"
+	return obj
+}
+
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
 	case *sema.TypeKind:
@@ -486,6 +493,9 @@ func gen_expr_model(m sema.ExprModel) string {
 
 	case *sema.BuiltinDropCallExprModel:
 		return gen_builtin_drop_call_expr_model(m.(*sema.BuiltinDropCallExprModel))
+
+	case *sema.BuiltinPanicCallExprModel:
+		return gen_builtin_panic_call_expr_model(m.(*sema.BuiltinPanicCallExprModel))
 
 	default:
 		return "<unimplemented_expression_model>"

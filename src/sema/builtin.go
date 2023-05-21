@@ -17,6 +17,7 @@ var builtin_fn_out = &FnIns{}
 var builtin_fn_outln = &FnIns{}
 var builtin_fn_new = &FnIns{}
 var builtin_fn_drop = &FnIns{}
+var builtin_fn_panic = &FnIns{}
 
 var builtin_fn_real = &FnIns{
 	Result: &TypeKind{kind: build_prim_type(types.TypeKind_BOOL)},
@@ -28,6 +29,7 @@ func init() {
 	builtin_fn_new.Caller = builtin_caller_new
 	builtin_fn_real.Caller = builtin_caller_real
 	builtin_fn_drop.Caller = builtin_caller_drop
+	builtin_fn_panic.Caller = builtin_caller_panic
 }
 
 func get_builtin_def(ident string) any {
@@ -46,6 +48,9 @@ func get_builtin_def(ident string) any {
 
 	case "drop":
 		return builtin_fn_drop
+
+	case "panic":
+		return builtin_fn_panic
 
 	default:
 		return nil
@@ -85,7 +90,7 @@ func builtin_caller_common(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 
 func builtin_caller_out(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
 	if len(fc.Args) < 1 {
-		e.push_err(fc.Token, "missing_expr_for", "ref")
+		e.push_err(fc.Token, "missing_expr_for", "v")
 		return nil
 	}
 	if len(fc.Args) > 1 {
@@ -207,5 +212,24 @@ func builtin_caller_drop(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
 
 	d := build_void_data()
 	d.Model = &BuiltinDropCallExprModel{Expr: ref.Model}
+	return d
+}
+
+func builtin_caller_panic(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
+	if len(fc.Args) < 1 {
+		e.push_err(fc.Token, "missing_expr_for", "error")
+		return nil
+	}
+	if len(fc.Args) > 1 {
+		e.push_err(fc.Args[2].Token, "argument_overflow")
+	}
+
+	expr := e.eval_expr(fc.Args[0])
+	if expr == nil {
+		return nil
+	}
+
+	d := build_void_data()
+	d.Model = &BuiltinPanicCallExprModel{Expr: expr.Model}
 	return d
 }
