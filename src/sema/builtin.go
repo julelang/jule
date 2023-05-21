@@ -25,6 +25,10 @@ var builtin_fn_real = &FnIns{
 	Result: &TypeKind{kind: build_prim_type(types.TypeKind_BOOL)},
 }
 
+var builtin_fn_copy = &FnIns{
+	Result: &TypeKind{kind: build_prim_type(types.TypeKind_INT)},
+}
+
 func init() {
 	builtin_fn_out.Caller = builtin_caller_out
 	builtin_fn_outln.Caller = builtin_caller_outln
@@ -34,6 +38,7 @@ func init() {
 	builtin_fn_panic.Caller = builtin_caller_panic
 	builtin_fn_make.Caller = builtin_caller_make
 	builtin_fn_append.Caller = builtin_caller_append
+	builtin_fn_copy.Caller = builtin_caller_copy
 }
 
 func get_builtin_def(ident string) any {
@@ -61,6 +66,9 @@ func get_builtin_def(ident string) any {
 
 	case "append":
 		return builtin_fn_append
+
+	case "copy":
+		return builtin_fn_copy
 
 	default:
 		return nil
@@ -326,6 +334,47 @@ func builtin_caller_append(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 	}
 	d.Kind = &TypeKind{kind: f}
 	d.Model = &CommonIdentExprModel{Ident: "_append"}
+
+	d = builtin_caller_common(e, fc, d)
+	return d
+}
+
+func builtin_caller_copy(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
+	if len(fc.Args) < 2 {
+		if len(fc.Args) == 1 {
+			e.push_err(fc.Token, "missing_expr_for", "src")
+			return nil
+		}
+		e.push_err(fc.Token, "missing_expr_for", "src, and values")
+		return nil
+	}
+
+	t := e.eval_expr(fc.Args[0])
+	if t == nil {
+		return nil
+	}
+
+	if t.Kind.Slc() == nil {
+		e.push_err(fc.Args[0].Token, "invalid_expr")
+		return nil
+	}
+
+	f := &FnIns{
+		Params: []*ParamIns{
+			{
+				Decl: &Param{},
+				Kind: t.Kind,
+			},
+			{
+				Decl: &Param{},
+				Kind: t.Kind,
+			},
+		},
+		Result: builtin_fn_copy.Result,
+	}
+
+	d.Kind = &TypeKind{kind: f}
+	d.Model = &CommonIdentExprModel{Ident: "_copy"}
 
 	d = builtin_caller_common(e, fc, d)
 	return d
