@@ -147,3 +147,8 @@ type BuiltinNewCallExprModel struct {
 type BuiltinRealCallExprModel struct {
 	Expr ExprModel
 }
+
+// Expression model for built-in drop function calls.
+type BuiltinDropCallExprModel struct {
+	Expr ExprModel
+}

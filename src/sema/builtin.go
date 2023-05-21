@@ -14,6 +14,7 @@ import (
 type _BuiltinCaller = func(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data
 
 var builtin_fn_new = &FnIns{}
+var builtin_fn_drop = &FnIns{}
 
 var builtin_fn_real = &FnIns{
 	Result: &TypeKind{kind: build_prim_type(types.TypeKind_BOOL)},
@@ -22,6 +23,7 @@ var builtin_fn_real = &FnIns{
 func init() {
 	builtin_fn_new.Caller = builtin_caller_new
 	builtin_fn_real.Caller = builtin_caller_real
+	builtin_fn_drop.Caller = builtin_caller_drop
 }
 
 func get_builtin_def(ident string) any {
@@ -31,6 +33,9 @@ func get_builtin_def(ident string) any {
 
 	case "real":
 		return builtin_fn_real
+
+	case "drop":
+		return builtin_fn_drop
 
 	default:
 		return nil
@@ -139,5 +144,34 @@ func builtin_caller_real(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 
 	d.Kind = builtin_fn_real.Result
 	d.Model = &BuiltinRealCallExprModel{Expr: ref.Model}
+	return d
+}
+
+func builtin_caller_drop(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
+	if len(fc.Args) < 1 {
+		e.push_err(fc.Token, "missing_expr_for", "ref")
+		return nil
+	}
+	if len(fc.Args) > 1 {
+		e.push_err(fc.Args[2].Token, "argument_overflow")
+	}
+
+	ref := e.eval_expr_kind(fc.Args[0].Kind)
+	if ref == nil {
+		return nil
+	}
+
+	if ref.Decl {
+		e.push_err(fc.Args[0].Token, "invalid_expr")
+		return nil
+	}
+
+	if ref.Kind.Ref() == nil {
+		e.push_err(fc.Args[0].Token, "invalid_expr")
+		return nil
+	}
+
+	d := build_void_data()
+	d.Model = &BuiltinDropCallExprModel{Expr: ref.Model}
 	return d
 }
