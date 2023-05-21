@@ -331,6 +331,26 @@ func build_prim_type(kind string) *Prim {
 	}
 }
 
+// Reports whether kind is primitive type.
+func is_prim(kind string) bool {
+	return kind == lex.KND_I8 ||
+		kind == lex.KND_I16 ||
+		kind == lex.KND_I32 ||
+		kind == lex.KND_I64 ||
+		kind == lex.KND_U8 ||
+		kind == lex.KND_U16 ||
+		kind == lex.KND_U32 ||
+		kind == lex.KND_U64 ||
+		kind == lex.KND_F32 ||
+		kind == lex.KND_F64 ||
+		kind == lex.KND_INT ||
+		kind == lex.KND_UINT ||
+		kind == lex.KND_UINTPTR ||
+		kind == lex.KND_BOOL ||
+		kind == lex.KND_STR ||
+		kind == lex.KND_ANY
+}
+
 type _Referencer struct {
 	ident  string
 	owner  uintptr
@@ -381,25 +401,7 @@ func (tc *_TypeChecker) push_err(token lex.Token, key string, args ...any) {
 }
 
 func (tc *_TypeChecker) build_prim(decl *ast.IdentType) *Prim {
-	switch decl.Ident {
-	case lex.KND_I8,
-		lex.KND_I16,
-		lex.KND_I32,
-		lex.KND_I64,
-		lex.KND_U8,
-		lex.KND_U16,
-		lex.KND_U32,
-		lex.KND_U64,
-		lex.KND_F32,
-		lex.KND_F64,
-		lex.KND_INT,
-		lex.KND_UINT,
-		lex.KND_UINTPTR,
-		lex.KND_BOOL,
-		lex.KND_STR,
-		lex.KND_ANY:
-		// Ignore.
-	default:
+	if !is_prim(decl.Ident) {
 		tc.push_err(tc.error_token, "invalid_type")
 		return nil 
 	}
@@ -646,6 +648,9 @@ func (tc *_TypeChecker) get_def(decl *ast.IdentType) _Kind {
 		}
 
 		t := tc.lookup.Find_trait(decl.Ident)
+		if t == nil {
+			t = find_builtin_trait(decl.Ident)
+		}
 		if t != nil {
 			if !tc.s.is_accessible_define(t.Public, t.Token) {
 				tc.push_err(decl.Token, "ident_not_exist", decl.Ident)
@@ -679,7 +684,7 @@ func (tc *_TypeChecker) get_def(decl *ast.IdentType) _Kind {
 
 func (tc *_TypeChecker) build_ident(decl *ast.IdentType) _Kind {
 	switch {
-	case decl.Is_prim():
+	case is_prim(decl.Ident):
 		return tc.build_prim(decl)
 	
 	default:

@@ -132,7 +132,7 @@ func (s *_Sema) push_err(token lex.Token, key string, args ...any) {
 
 // Reports whether define is accessible in the current package.
 func (s *_Sema) is_accessible_define(public bool, token lex.Token) bool {
-	return public || s.file.File.Dir() == token.File.Dir()
+	return public || token.File == nil || s.file.File.Dir() == token.File.Dir()
 }
 
 // Reports this identifier duplicated in package's global scope.
@@ -1061,6 +1061,9 @@ func (s *_Sema) impl_to_struct(dest *Struct, ipl *Impl) (ok bool) {
 // Implement trait to destination.
 func (s *_Sema) impl_trait(decl *Impl) {
 	base := s.Find_trait(decl.Base.Kind)
+	if base == nil {
+		base = find_builtin_trait(decl.Base.Kind)
+	}
 	if base == nil {
 		s.push_err(decl.Base, "impl_base_not_exist", decl.Base.Kind)
 		return

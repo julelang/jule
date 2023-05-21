@@ -43,6 +43,27 @@ var builtin_type_alias_rune = &TypeAlias{
 	},
 }
 
+var builtin_trait_error = &Trait{
+	Public:  true,
+	Ident:   "Error",
+	Methods: []*Fn{
+		{
+			Public: true,
+			Ident:  "error",
+			Params: []*Param{
+				{
+					Ident: "self",
+				},
+			},
+			Result: &RetType{
+				Kind: &TypeSymbol{
+					Decl: &ast.Type{Kind: &ast.IdentType{Ident: "str"}},
+				},
+			},
+		},
+	},
+}
+
 func init() {
 	builtin_fn_out.Caller = builtin_caller_out
 	builtin_fn_outln.Caller = builtin_caller_outln
@@ -102,6 +123,16 @@ func find_builtin_type_alias(ident string) *TypeAlias {
 	}
 }
 
+func find_builtin_trait(ident string) *Trait {
+	switch ident {
+	case "Error":
+		return builtin_trait_error
+
+	default:
+		return nil
+	}
+}
+
 func find_builtin_def(ident string) any {
 	f := find_builtin_fn(ident)
 	if f != nil {
@@ -111,6 +142,11 @@ func find_builtin_def(ident string) any {
 	ta := find_builtin_type_alias(ident)
 	if ta != nil {
 		return ta
+	}
+
+	t := find_builtin_trait(ident)
+	if t != nil {
+		return t
 	}
 
 	return nil
