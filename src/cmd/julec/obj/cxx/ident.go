@@ -97,6 +97,9 @@ func trait_out_ident(t *sema.Trait) string {
 
 // Returns output identifier of parameter.
 func param_out_ident(p *sema.Param) string {
+	if lex.Is_anon_ident(p.Ident) || lex.Is_ignore_ident(p.Ident) {
+		return ""
+	}
 	return as_local_ident(p.Token.Row, p.Token.Column, p.Ident)
 }
 
