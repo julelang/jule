@@ -359,6 +359,10 @@ func builtin_caller_copy(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 		return nil
 	}
 
+	if !t.Mutable {
+		e.push_err(fc.Args[0].Token, "mutable_operation_on_immutable")
+	}
+
 	f := &FnIns{
 		Params: []*ParamIns{
 			{
