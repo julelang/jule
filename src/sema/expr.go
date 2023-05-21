@@ -167,3 +167,9 @@ type BuiltinDropCallExprModel struct {
 type BuiltinPanicCallExprModel struct {
 	Expr ExprModel
 }
+
+// Expression model for built-in make function calls.
+type BuiltinMakeCallExprModel struct {
+	Kind *TypeKind
+	Size ExprModel // Nil for nil slice.
+}
