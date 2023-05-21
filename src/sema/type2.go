@@ -611,7 +611,6 @@ func (fcac *_FnCallArgChecker) push_variadic(p *ParamIns, i int) (ok bool) {
 
 		if d.Variadiced {
 			variadiced = true
-			d.Kind = d.Kind.Slc().Elem
 			model = d.Model.(*SliceExprModel)
 			model.Elem_kind = p.Kind
 		} else {

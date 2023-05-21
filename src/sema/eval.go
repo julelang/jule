@@ -748,6 +748,7 @@ func (e *_Eval) eval_variadic(v *ast.VariadicExpr) *Data {
 	}
 
 	d.Variadiced = true
+	d.Kind = d.Kind.Slc().Elem
 	return d
 }
 
