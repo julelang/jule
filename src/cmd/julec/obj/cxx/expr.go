@@ -383,6 +383,13 @@ func gen_builtin_out_call_expr_model(m *sema.BuiltinOutCallExprModel) string {
 	return obj
 }
 
+func gen_builtin_outln_call_expr_model(m *sema.BuiltinOutlnCallExprModel) string {
+	obj := "_outln("
+	obj += gen_expr_model(m.Expr)
+	obj += ")"
+	return obj
+}
+
 func gen_builtin_real_call_expr_model(m *sema.BuiltinRealCallExprModel) string {
 	obj := "_real("
 	obj += gen_expr_model(m.Expr)
@@ -465,11 +472,14 @@ func gen_expr_model(m sema.ExprModel) string {
 	case *sema.TupleExprModel:
 		return gen_tuple_expr_model(m.(*sema.TupleExprModel))
 
-	case *sema.BuiltinNewCallExprModel:
-		return gen_builtin_new_call_expr_model(m.(*sema.BuiltinNewCallExprModel))
-
 	case *sema.BuiltinOutCallExprModel:
 		return gen_builtin_out_call_expr_model(m.(*sema.BuiltinOutCallExprModel))
+
+	case *sema.BuiltinOutlnCallExprModel:
+		return gen_builtin_outln_call_expr_model(m.(*sema.BuiltinOutlnCallExprModel))
+
+	case *sema.BuiltinNewCallExprModel:
+		return gen_builtin_new_call_expr_model(m.(*sema.BuiltinNewCallExprModel))
 
 	case *sema.BuiltinRealCallExprModel:
 		return gen_builtin_real_call_expr_model(m.(*sema.BuiltinRealCallExprModel))

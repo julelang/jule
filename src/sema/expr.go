@@ -142,6 +142,11 @@ type BuiltinOutCallExprModel struct {
 	Expr ExprModel
 }
 
+// Expression model for built-in out function calls.
+type BuiltinOutlnCallExprModel struct {
+	Expr ExprModel
+}
+
 // Expression model for built-in new function calls.
 type BuiltinNewCallExprModel struct {
 	Kind *TypeKind // Element type of reference.

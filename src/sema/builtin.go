@@ -14,6 +14,7 @@ import (
 type _BuiltinCaller = func(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data
 
 var builtin_fn_out = &FnIns{}
+var builtin_fn_outln = &FnIns{}
 var builtin_fn_new = &FnIns{}
 var builtin_fn_drop = &FnIns{}
 
@@ -23,6 +24,7 @@ var builtin_fn_real = &FnIns{
 
 func init() {
 	builtin_fn_out.Caller = builtin_caller_out
+	builtin_fn_outln.Caller = builtin_caller_outln
 	builtin_fn_new.Caller = builtin_caller_new
 	builtin_fn_real.Caller = builtin_caller_real
 	builtin_fn_drop.Caller = builtin_caller_drop
@@ -32,6 +34,9 @@ func get_builtin_def(ident string) any {
 	switch ident {
 	case "out":
 		return builtin_fn_out
+
+	case "outln":
+		return builtin_fn_outln
 
 	case "new":
 		return builtin_fn_new
@@ -99,6 +104,18 @@ func builtin_caller_out(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
 
 	d := build_void_data()
 	d.Model = &BuiltinOutCallExprModel{Expr: expr.Model}
+	return d
+}
+
+func builtin_caller_outln(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
+	d := builtin_caller_out(e, fc, nil)
+	if d == nil {
+		return nil
+	}
+
+	d.Model = &BuiltinOutlnCallExprModel{
+		Expr: d.Model.(*BuiltinOutCallExprModel).Expr,
+	}
 	return d
 }
 
