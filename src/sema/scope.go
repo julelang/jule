@@ -127,6 +127,13 @@ type RetSt struct {
 	Expr ExprModel
 }
 
+// Built-in recover function call statement.
+type Recover struct {
+	Handler      *FnIns
+	Handler_expr ExprModel
+	Scope        *Scope
+}
+
 type _ScopeLabel struct {
 	token lex.Token
 	label *Label
@@ -154,6 +161,7 @@ type _ScopeChecker struct {
 	cse         uintptr
 	labels      *[]*_ScopeLabel // All labels of all scopes.
 	gotos       *[]*_ScopeGoto  // All gotos of all scopes.
+	i           int
 }
 
 // Reports whether scope is unsafe.
@@ -391,10 +399,38 @@ func (sc *_ScopeChecker) check_anon_scope(tree *ast.ScopeTree) {
 	sc.scope.Stmts = append(sc.scope.Stmts, s)
 }
 
+func (sc *_ScopeChecker) try_call_recover(d *Data) bool {
+	switch d.Model.(type) {
+	case *Recover:
+		// Ok.
+
+	default:
+		return false
+	}
+
+	rec := d.Model.(*Recover)
+	rec.Handler = d.Kind.Fnc() // Argument function.
+	rec.Scope = &Scope{}
+
+	sc.scope.Stmts = append(sc.scope.Stmts, rec)
+
+	sc.tree.Stmts = sc.tree.Stmts[sc.i+1:]
+	sc.scope = rec.Scope
+	sc.check_tree()
+	return true
+}
+
 func (sc *_ScopeChecker) check_expr(expr *ast.Expr) {
 	d := sc.s.eval(expr, sc)
 	if d == nil {
 		return
+	}
+
+	if expr.Is_fn_call() {
+		ok := sc.try_call_recover(d)
+		if ok {
+			return
+		}
 	}
 
 	sc.scope.Stmts = append(sc.scope.Stmts, d)
@@ -1248,8 +1284,9 @@ func (sc *_ScopeChecker) check_node(node ast.NodeData) {
 }
 
 func (sc *_ScopeChecker) check_tree() {
-	for _, node := range sc.tree.Stmts {
-		sc.check_node(node)
+	sc.i = 0
+	for ; sc.i < len(sc.tree.Stmts); sc.i++ {
+		sc.check_node(sc.tree.Stmts[sc.i])
 	}
 }
 

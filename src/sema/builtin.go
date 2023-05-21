@@ -20,6 +20,7 @@ var builtin_fn_drop = &FnIns{}
 var builtin_fn_panic = &FnIns{}
 var builtin_fn_make = &FnIns{}
 var builtin_fn_append = &FnIns{}
+var builtin_fn_recover = &FnIns{}
 
 var builtin_fn_real = &FnIns{
 	Result: &TypeKind{kind: build_prim_type(types.TypeKind_BOOL)},
@@ -74,6 +75,7 @@ func init() {
 	builtin_fn_make.Caller = builtin_caller_make
 	builtin_fn_append.Caller = builtin_caller_append
 	builtin_fn_copy.Caller = builtin_caller_copy
+	builtin_fn_recover.Caller = builtin_caller_recover
 }
 
 func find_builtin_fn(ident string) *FnIns {
@@ -105,6 +107,9 @@ func find_builtin_fn(ident string) *FnIns {
 	case "copy":
 		return builtin_fn_copy
 
+	case "recover":
+		return builtin_fn_recover
+	
 	default:
 		return nil
 	}
@@ -422,8 +427,11 @@ func builtin_caller_copy(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 			e.push_err(fc.Token, "missing_expr_for", "src")
 			return nil
 		}
-		e.push_err(fc.Token, "missing_expr_for", "src, and values")
+		e.push_err(fc.Token, "missing_expr_for", "src, values")
 		return nil
+	}
+	if len(fc.Args) > 2 {
+		e.push_err(fc.Args[2].Token, "argument_overflow")
 	}
 
 	t := e.eval_expr(fc.Args[0])
@@ -458,5 +466,39 @@ func builtin_caller_copy(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 	d.Model = &CommonIdentExprModel{Ident: "_copy"}
 
 	d = builtin_caller_common(e, fc, d)
+	return d
+}
+
+func builtin_caller_recover(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
+	const HANDLER_KIND = "fn(Error)"
+
+	if len(fc.Args) < 1 {
+		e.push_err(fc.Token, "missing_expr_for", "handler")
+		return nil
+	}
+	if len(fc.Args) > 1 {
+		e.push_err(fc.Args[1].Token, "argument_overflow")
+	}
+
+	t := e.eval_expr(fc.Args[0])
+	if t == nil {
+		return nil
+	}
+
+	if t.Kind.Fnc() == nil {
+		e.push_err(fc.Args[0].Token, "invalid_expr")
+		return nil
+	}
+
+	tkind := t.Kind.Fnc().To_str()
+	if tkind !=  HANDLER_KIND {
+		e.push_err(fc.Args[0].Token, "incompatible_types", tkind, HANDLER_KIND)
+	}
+
+	d := build_void_data()
+	d.Kind = t.Kind
+	d.Model = &Recover{
+		Handler_expr: t.Model,
+	}
 	return d
 }

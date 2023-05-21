@@ -486,6 +486,14 @@ func (e *_Eval) eval_var(v *Var, error_token lex.Token) *Data {
 		d.Model = d.Constant
 	}
 
+	if d.Kind.Fnc() != nil {
+		f := d.Kind.Fnc()
+		if f.Decl != nil {
+			// Ignore identifier for non-anonymous (because has an identifier via variable).
+			f.Decl.Ident = v.Ident
+		}
+	}
+
 	return d
 }
 

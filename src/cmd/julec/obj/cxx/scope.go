@@ -457,6 +457,38 @@ func gen_ret_st(r *sema.RetSt) string {
 	return gen_ret_expr(r)
 }
 
+func gen_recover(r *sema.Recover) string {
+	obj := "try "
+	obj += gen_scope(r.Scope)
+	obj += " catch("
+	obj += gen_trait_kind_from_ident(as_ident("Error"))
+	if r.Handler.Is_anon() {
+		// Anonymous function.
+		// Parse body as catch block.
+		//
+		// NOTICE:
+		//  If passed anonymous function from variable, field, or something
+		//  like that, parses block. Not calls variable, fields or whatever.
+
+		handler_param := r.Handler.Decl.Params[0]
+		if !lex.Is_ignore_ident(handler_param.Ident) && !lex.Is_anon_ident(handler_param.Ident) {
+			obj += " "
+			obj += param_out_ident(handler_param)
+		}
+		obj += ") "
+		obj += gen_scope(r.Handler.Scope)
+	} else {
+		// Passed defined function.
+		// Therefore, call passed function with error.
+
+		obj += " _Error ) {"
+		obj += gen_expr_model(r.Handler_expr)
+		obj += "( _Error ); }"
+	}
+
+	return obj
+}
+
 // Generates C++ code of statement.
 func gen_st(st sema.St) string {
 	switch st.(type) {
@@ -513,6 +545,9 @@ func gen_st(st sema.St) string {
 
 	case *sema.RetSt:
 		return gen_ret_st(st.(*sema.RetSt))
+
+	case *sema.Recover:
+		return gen_recover(st.(*sema.Recover))
 
 	default:
 		return "<unimplemented stmt>"

@@ -65,6 +65,8 @@ func (f *Fn) Is_void() bool { return f.Result == nil }
 func (f *Fn) Is_method() bool { return f.Owner != nil }
 // Reports whether function is entry point.
 func (f *Fn) Is_entry_point() bool { return f.Ident == jule.ENTRY_POINT }
+// Reports whether function is anonymous function.
+func (f *Fn) Is_anon() bool { return lex.Is_anon_ident(f.Ident) }
 // Reports whether function has return variable(s).
 func (f *Fn) Any_var() bool { return f.Result != nil && len(f.Result.Idents) > 0 }
 
@@ -213,6 +215,8 @@ type FnIns struct {
 
 // Reports whether instance is built-in.
 func (f *FnIns) Is_builtin() bool { return f.Decl == nil || f.Scope == nil }
+// Reports whether instance is anonymous function.
+func (f *FnIns) Is_anon() bool { return f.Decl != nil && f.Decl.Is_anon() }
 
 // Implement: Kind
 // Returns Fn's type kind as string.

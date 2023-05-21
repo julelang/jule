@@ -77,11 +77,15 @@ func gen_map_kind(m *sema.Map) string {
 	return _map + "<" + key + "," + val + ">"
 }
 
+func gen_trait_kind_from_ident(ident string) string {
+	trt := as_jt("trait")
+	return trt + "<" + ident + ">"
+}
+
 // Generates C++ code of Trait TypeKind.
 func gen_trait_kind(t *sema.Trait) string {
-	trt := as_jt("trait")
 	ident := as_out_ident(t.Ident, t.Token.File.Addr())
-	return trt + "<" + ident + ">"
+	return gen_trait_kind_from_ident(ident)
 }
 
 // Generates C++ code of Struct TypeKind.
