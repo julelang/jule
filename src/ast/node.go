@@ -397,6 +397,7 @@ func (p *Param) Is_ref() bool { return p.Ident != "" && p.Ident[0] == '&'}
 // Also represents anonymous function expression.
 type FnDecl struct {
 	Token        lex.Token
+	Global       bool
 	Unsafety     bool
 	Public       bool
 	Cpp_linked   bool

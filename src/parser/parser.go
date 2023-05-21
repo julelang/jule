@@ -1257,7 +1257,9 @@ func (p *_Parser) build_node_data(tokens []lex.Token) ast.NodeData {
 		return p.build_use_decl(tokens)
 		
 	case lex.ID_FN, lex.ID_UNSAFE:
-		return p.build_fn(tokens, false, false, false)
+		f := p.build_fn(tokens, false, false, false)
+		f.Global = true
+		return f
 
 	case lex.ID_CONST, lex.ID_LET, lex.ID_MUT:
 		return p.build_var(tokens)

@@ -124,6 +124,7 @@ func build_ret_type(decl *ast.RetType) *RetType {
 func build_fn(decl *ast.FnDecl) *Fn {
 	return &Fn{
 		Token:      decl.Token,
+		Global:     decl.Global,
 		Unsafety:   decl.Unsafety,
 		Public:     decl.Public,
 		Cpp_linked: decl.Cpp_linked,

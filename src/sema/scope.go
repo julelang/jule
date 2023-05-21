@@ -708,11 +708,13 @@ func (sc *_ScopeChecker) push_goto(gt *ast.GotoSt) {
 }
 
 func (sc *_ScopeChecker) check_assign(left *Data, error_token lex.Token) (ok bool) {
-	switch {
-	case left.Kind.Fnc() != nil:
+	f := left.Kind.Fnc()
+	if f.Decl != nil && f.Decl.Global {
 		sc.s.push_err(error_token, "assign_type_not_support_value")
 		return false
+	}
 
+	switch {
 	case !left.Lvalue:
 		sc.s.push_err(error_token, "assign_require_lvalue")
 		return false
