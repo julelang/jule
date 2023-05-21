@@ -349,6 +349,10 @@ func (atc *_AssignTypeChecker) check() {
 		// Data is invalid and error(s) logged about it.
 		return
 
+	case atc.d.Variadiced:
+		atc.push_err("incompatible_types", atc.dest.To_str(), atc.d.Kind.To_str() + "...")
+		return
+
 	case atc.check_const():
 		return
 	
@@ -611,6 +615,7 @@ func (fcac *_FnCallArgChecker) push_variadic(p *ParamIns, i int) (ok bool) {
 
 		if d.Variadiced {
 			variadiced = true
+			d.Variadiced = false // For ignore assignment checking error.
 			model = d.Model.(*SliceExprModel)
 			model.Elem_kind = p.Kind
 		} else {
