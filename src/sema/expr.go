@@ -190,3 +190,9 @@ type SizeofExprModel struct {
 type AlignofExprModel struct {
 	Expr ExprModel
 }
+
+// Expression model for constructor call of str type.
+// For example: str(my_expr)
+type StrConstructorcallExprModel struct {
+	Expr ExprModel
+}

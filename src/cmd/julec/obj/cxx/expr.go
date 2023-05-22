@@ -439,6 +439,10 @@ func gen_alignof_expr_model(m *sema.AlignofExprModel) string {
 	return obj
 }
 
+func gen_str_constructor_expr_model(m *sema.StrConstructorcallExprModel) string {
+	return "__julec_to_str(" + gen_expr_model(m.Expr) + ")"
+}
+
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
 	case *sema.TypeKind:
@@ -536,6 +540,9 @@ func gen_expr_model(m sema.ExprModel) string {
 
 	case *sema.AlignofExprModel:
 		return gen_alignof_expr_model(m.(*sema.AlignofExprModel))
+
+	case *sema.StrConstructorcallExprModel:
+		return gen_str_constructor_expr_model(m.(*sema.StrConstructorcallExprModel))
 
 	default:
 		return "<unimplemented_expression_model>"
