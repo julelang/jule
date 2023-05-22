@@ -332,22 +332,6 @@ func (s *_Sema) Find_enum(ident string) *Enum {
 	return nil
 }
 
-func (s *_Sema) check_import(imp *ImportInfo) bool {
-	if imp.Cpp || len(imp.Package.Files) == 0{
-		return false
-	}
-
-	sema := _Sema{}
-	sema.check(imp.Package.Files)
-	if len(sema.errors) > 0 {
-		s.errors = append(s.errors, sema.errors...)
-		return false
-	}
-
-	s.check_import_selections(imp)
-	return true
-}
-
 func (s *_Sema) check_import_selections(imp *ImportInfo) {
 	// Set file to any package file for accessibility checking.
 	s.set_current_file(s.files[0])
@@ -424,6 +408,22 @@ func (s *_Sema) check_import_selections(imp *ImportInfo) {
 	}
 
 	s.file = nil // Reset file.
+}
+
+func (s *_Sema) check_import(imp *ImportInfo) bool {
+	if imp.Cpp || len(imp.Package.Files) == 0{
+		return false
+	}
+
+	sema := _Sema{}
+	sema.check(imp.Package.Files)
+	if len(sema.errors) > 0 {
+		s.errors = append(s.errors, sema.errors...)
+		return false
+	}
+
+	s.check_import_selections(imp)
+	return true
 }
 
 func (s *_Sema) check_imports() {

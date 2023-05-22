@@ -620,8 +620,12 @@ func gen_var(v *sema.Var) string {
 	obj := gen_type_kind(v.Kind.Kind) + " "
 	obj += var_out_ident(v)
 	if v.Value != nil && v.Value.Expr != nil {
-		obj += " = "
-		obj += gen_expr(v.Value)
+		if v.Value.Data.Model != nil {
+			obj += " = "
+			obj += gen_expr(v.Value)
+		} else {
+			obj += CPP_DEFAULT_EXPR
+		}
 	} else {
 		obj += get_init_expr(v.Kind.Kind)
 	}

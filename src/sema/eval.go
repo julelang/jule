@@ -1340,17 +1340,24 @@ func (e *_Eval) eval_cast_by_type_n_data(t *TypeKind, d *Data, error_token lex.T
 		d = nil
 	}
 
-	if d != nil {
-		d.Lvalue = is_lvalue(t)
-		d.Mutable = is_mut(t)
-		d.Decl = false
+	if d == nil {
+		return nil
+	}
+
+	d.Lvalue = is_lvalue(t)
+	d.Mutable = is_mut(t)
+	d.Decl = false
+	if d.Is_const() {
+		d.Model = d.Constant
+	} else {
 		d.Model = &CastingExprModel{
 			Kind:     t,
 			Expr:     d.Model,
 			ExprKind: d.Kind,
 		}
-		d.Kind = t
 	}
+	d.Kind = t
+
 	return d
 }
 
@@ -1463,7 +1470,7 @@ func (e *_Eval) call_type_fn(fc *ast.FnCallExpr, d *Data) *Data {
 		prim := d.Kind.Prim()
 		if prim != nil && prim.Is_str() {
 			d.Model = &StrConstructorcallExprModel{
-				Expr:     arg.Model,
+				Expr: arg.Model,
 			}
 			goto _ret
 		}
@@ -3223,6 +3230,8 @@ func (bs *_BinopSolver) solve_const(d *Data) {
 		_ = bs.l.Constant.Rshift(*bs.r.Constant)
 		d.Constant = bs.l.Constant
 	}
+
+	d.Model = d.Constant
 }
 
 func (bs *_BinopSolver) post_const(d *Data) {
