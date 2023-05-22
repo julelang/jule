@@ -64,6 +64,7 @@ func build_param_vars(f *FnIns) []*Var {
 	vars := make([]*Var, len(f.Params))
 	for i, p := range f.Params {
 		v := &Var{
+			Used:    true,
 			Mutable: p.Decl.Mutable,
 			Ident:   p.Decl.Ident,
 			Token:   p.Decl.Token,
