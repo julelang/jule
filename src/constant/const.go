@@ -544,6 +544,7 @@ func (c *Const) Lshift(x Const) bool {
 	default:
 		return false
 	}
+
 	return true
 }
 
@@ -566,5 +567,6 @@ func (c *Const) Rshift(x Const) bool {
 	default:
 		return false
 	}
+
 	return true
 }

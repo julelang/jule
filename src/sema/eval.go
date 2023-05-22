@@ -647,7 +647,7 @@ func (e *_Eval) eval_unary_caret(d *Data) *Data {
 	if t == nil || !types.Is_int(t.To_str()) {
 		return nil
 	}
-	
+
 	if d.Is_const() {
 		switch {
 		case d.Constant.Is_i64():
@@ -657,7 +657,7 @@ func (e *_Eval) eval_unary_caret(d *Data) *Data {
 			d.Constant.Set_u64(^d.Constant.Read_u64())
 		}
 	}
-	
+
 	d.Lvalue = false
 	d.Model = &UnaryExprModel{
 		Expr: d.Model,
@@ -1231,7 +1231,7 @@ func (e *_Eval) cast_str(d *Data, error_token lex.Token) {
 
 func (e *_Eval) cast_int(t *TypeKind, d *Data, error_token lex.Token) {
 	if d.Is_const() {
-		prim := d.Kind.Prim()
+		prim := t.Prim()
 		switch {
 		case types.Is_sig_int(prim.kind):
 			d.Constant.Set_i64(d.Constant.As_i64())
@@ -1270,7 +1270,7 @@ func (e *_Eval) cast_int(t *TypeKind, d *Data, error_token lex.Token) {
 
 func (e *_Eval) cast_num(t *TypeKind, d *Data, error_token lex.Token) {
 	if d.Is_const() {
-		prim := d.Kind.Prim()
+		prim := t.Prim()
 		switch {
 		case types.Is_float(prim.kind):
 			d.Constant.Set_f64(d.Constant.As_f64())
@@ -2678,7 +2678,9 @@ func is_ok_for_shifting(d *Data) bool {
 	prim := d.Kind.Prim()
 	if prim == nil || !types.Is_int(prim.To_str()) {
 		return false
-	} else if !d.Is_const() {
+	}
+
+	if !d.Is_const() {
 		return true
 	}
 
