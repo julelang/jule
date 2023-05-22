@@ -806,6 +806,12 @@ func (sc *_ScopeChecker) check_single_assign(a *ast.AssignSt) {
 		return
 	}
 
+	sc.scope.Stmts = append(sc.scope.Stmts, &Assign{
+		L:  l.Model,
+		R:  r.Model,
+		Op: a.Setter.Kind,
+	})
+
 	if a.Setter.Kind != lex.KND_EQ && !r.Is_const() {
 		a.Setter.Kind = a.Setter.Kind[:len(a.Setter.Kind)-1]
 
@@ -819,6 +825,9 @@ func (sc *_ScopeChecker) check_single_assign(a *ast.AssignSt) {
 		}
 
 		r = solver.solve_explicit(l, r)
+		if r == nil {
+			return
+		}
 		a.Setter.Kind += lex.KND_EQ
 	}
 
@@ -830,12 +839,6 @@ func (sc *_ScopeChecker) check_single_assign(a *ast.AssignSt) {
 		deref:       true,
 	}
 	checker.check()
-
-	sc.scope.Stmts = append(sc.scope.Stmts, &Assign{
-		L:  l.Model,
-		R:  r.Model,
-		Op: a.Setter.Kind,
-	})
 }
 
 func (sc *_ScopeChecker) check_multi_assign(a *ast.AssignSt) {
