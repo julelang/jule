@@ -2997,7 +2997,6 @@ func (bs *_BinopSolver) eval_unsig_int() *Data {
 			bs.e.push_err(bs.op, "bitshift_must_unsigned")
 			return nil
 		}
-		bs.l.Kind.kind = build_prim_type(types.TypeKind_U64)
 		return bs.l
 
 	default:
@@ -3080,21 +3079,12 @@ func (bs *_BinopSolver) eval_prim() *Data {
 	rk := rprim.To_str()
 	switch {
 	case types.Is_float(lk) || types.Is_float(rk):
-		if types.Is_float(rk) {
-			bs.l, bs.r = bs.r, bs.l
-		}
 		return bs.eval_float()
 
 	case types.Is_unsig_int(lk) || types.Is_unsig_int(rk):
-		if types.Is_unsig_int(rk) {
-			bs.l, bs.r = bs.r, bs.l
-		}
 		return bs.eval_unsig_int()
 
 	case types.Is_sig_int(lk) || types.Is_sig_int(rk):
-		if types.Is_sig_int(rk) {
-			bs.l, bs.r = bs.r, bs.l
-		}
 		return bs.eval_sig_int()
 
 	default:
