@@ -1521,20 +1521,22 @@ func (s *_Sema) check_fn_types() (ok bool) {
 	return true
 }
 
-// Checks all types of current package file.
-// Reports whether checking is success.
-func (s *_Sema) check_file_types() {
-	s.check_global_types()
-	s.check_struct_types()
-	s.check_fn_types()
-}
-
 // Checks all types of all package files.
 // Breaks checking if checked file failed.
 func (s *_Sema) check_package_types() {
 	for _, f := range s.files {
 		s.set_current_file(f)
-		s.check_file_types()
+		s.check_global_types()
+	}
+
+	for _, f := range s.files {
+		s.set_current_file(f)
+		s.check_struct_types()
+	}
+
+	for _, f := range s.files {
+		s.set_current_file(f)
+		s.check_fn_types()
 	}
 }
 
