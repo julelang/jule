@@ -846,7 +846,17 @@ func (sc *_ScopeChecker) check_multi_assign(a *ast.AssignSt) {
 
 	var r []*Data
 	if rd.Kind.Tup() != nil {
-		r = rd.Model.(*TupleExprModel).Datas
+		switch rd.Model.(type) {
+		case *TupleExprModel:
+			r = rd.Model.(*TupleExprModel).Datas
+
+		default:
+			t := rd.Kind.Tup()
+			r = make([]*Data, len(t.Types))
+			for i, kind := range t.Types {
+				r[i] = &Data{Kind: kind}
+			}
+		}
 	} else {
 		r = append(r, rd)
 	}
