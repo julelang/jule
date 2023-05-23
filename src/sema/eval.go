@@ -2434,6 +2434,9 @@ func (e *_Eval) eval_type_sub_ident(d *Data, si *ast.SubIdentExpr) *Data {
 	case d.Kind.Prim() != nil:
 		return e.eval_prim_type_sub_ident(d.Kind.Prim(), si)
 
+	case d.Kind.Enm() != nil:
+		return e.eval_enum_sub_ident(d.Kind.Enm(), si.Ident)
+
 	default:
 		e.push_err(si.Ident, "type_not_support_sub_fields", d.Kind.To_str())
 		return nil
@@ -2455,11 +2458,8 @@ func (e *_Eval) eval_obj_sub_ident(d *Data, si *ast.SubIdentExpr) *Data {
 	}
 
 	switch {
-	case kind.Enm() != nil:
-		return e.eval_enum_sub_ident(kind.Enm(), si.Ident)
-
-	case kind.Trt() != nil:
-		return e.eval_trait_sub_ident(d, kind.Trt(), si.Ident)
+	case d.Kind.Trt() != nil:
+		return e.eval_trait_sub_ident(d, d.Kind.Trt(), si.Ident)
 
 	case kind.Strct() != nil:
 		s := kind.Strct()
