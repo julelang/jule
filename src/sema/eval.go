@@ -1649,7 +1649,7 @@ func (e *_Eval) eval_enum_sub_ident(enm *Enum, ident lex.Token) *Data {
 		Lvalue:   false,
 		Decl:     false,
 		Mutable:  false,
-		Kind:     enm.Kind.Kind,
+		Kind:     &TypeKind{kind: enm},
 	}
 
 	item := enm.Find_item(ident.Kind)
