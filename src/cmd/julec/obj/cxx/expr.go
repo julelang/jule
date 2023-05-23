@@ -216,10 +216,10 @@ func gen_struct_expr_model(m *sema.Struct) string {
 func gen_unary_expr_model(m *sema.UnaryExprModel) string {
 	switch m.Op {
 	case lex.KND_CARET:
-		return "~" + gen_expr_model(m.Expr)
+		return "(~" + gen_expr(m.Expr) + ")"
 
 	default:
-		return m.Op + gen_expr_model(m.Expr)
+		return  "(" + m.Op + gen_expr(m.Expr) + ")"
 	}
 }
 
