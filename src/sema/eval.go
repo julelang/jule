@@ -698,6 +698,7 @@ func (e *_Eval) eval_unary_star(d *Data, op lex.Token) *Data {
 	}
 	d.Constant = nil
 	d.Lvalue = true
+	d.Kind = t.Elem
 	d.Model = &UnaryExprModel{
 		Expr: d.Model,
 		Op:   lex.KND_STAR,
@@ -722,11 +723,17 @@ func (e *_Eval) eval_unary_amper(d *Data) *Data {
 	default:
 		switch {
 		case d.Kind.Ref() != nil:
+			d.Kind = &TypeKind{
+				kind: &Ptr{Elem: d.Kind.Ref().Elem},
+			}
 			d.Model = &GetRefPtrExprModel{
 				Expr: d.Model,
 			}
 
 		case can_get_ptr(d):
+			d.Kind = &TypeKind{
+				kind: &Ptr{Elem: d.Kind},
+			}
 			d.Model = &UnaryExprModel{
 				Expr: d.Model,
 				Op:   lex.KND_AMPER,
