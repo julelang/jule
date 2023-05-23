@@ -701,12 +701,31 @@ iter:
 	return false
 }
 
-func (sc *_ScopeChecker) check_cont(c *ast.ContSt) {
-	if sc.it == 0 {
-		sc.s.push_err(c.Token, "continue_at_out_of_valid_scope")
+func (sc *_ScopeChecker) check_cont_valid_scope(c *ast.ContSt) *ContSt {
+	if c.Label.Id != lex.ID_NA {
+		return &ContSt{}
 	}
 
-	cont := &ContSt{It: sc.it}
+	scope := sc
+iter:
+	switch {
+	case scope.it == 0 && scope.parent != nil:
+		scope = scope.parent
+		goto iter
+
+	case scope.it != 0:
+		return &ContSt{It: scope.it}
+	}
+
+	sc.s.push_err(c.Token, "continue_at_out_of_valid_scope")
+	return nil
+}
+
+func (sc *_ScopeChecker) check_cont(c *ast.ContSt) {
+	cont := sc.check_cont_valid_scope(c)
+	if cont == nil {
+		return
+	}
 
 	if c.Label.Id != lex.ID_NA { // Label given.
 		label := find_label_parent(c.Label.Kind, sc.parent)
