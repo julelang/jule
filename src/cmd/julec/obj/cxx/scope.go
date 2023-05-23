@@ -384,7 +384,7 @@ func gen_break_st(b *sema.BreakSt) string {
 }
 
 func gen_ret_vars(r *sema.RetSt) string {
-	obj := "return std::make_tuple("
+	obj := ""
 	for _, v := range r.Vars {
 		if lex.Is_ignore_ident(v.Ident) {
 			obj += get_init_expr(v.Kind.Kind)
@@ -396,7 +396,12 @@ func gen_ret_vars(r *sema.RetSt) string {
 	}
 
 	obj = obj[:len(obj)-1] // Remove last comma.
-	obj += ")" + CPP_ST_TERM
+
+	if len(r.Vars) > 1 {
+		obj = "return std::make_tuple(" + obj + ")"
+	}
+
+	obj += CPP_ST_TERM
 	return obj
 }
 
