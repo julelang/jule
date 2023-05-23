@@ -173,6 +173,7 @@ var ERRORS = map[string]string{
 	`method_not_invoked`:                       `methods should be invoked`,
 	`duplicated_import_selection`:              `duplicated identifier selection: @`,
 	`ident_is_not_accessible`:                  `identifier is not accessible: @`,
+	`invalid_stmt_for_next`:                    `invalid statement for while-next`,
 }
 
 // Returns formatted error message by key and args.

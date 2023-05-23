@@ -444,8 +444,13 @@ func (i *Iter) Is_inf() bool { return i.Kind == nil }
 
 // While iteration kind.
 type WhileKind struct {
-	Expr *Expr
+	Expr       *Expr
+	Next       NodeData // Nil if kind is while-next iteration.
+	Next_token lex.Token
 }
+
+// Reports whether kind is while-next iteration.
+func (wk *WhileKind) Is_while_next() bool { return wk.Next != nil }
 
 // Range iteration kind.
 type RangeKind struct {
@@ -453,12 +458,6 @@ type RangeKind struct {
 	Expr     *Expr
 	Key_a    *VarDecl  // first key of range
 	Key_b    *VarDecl  // second key of range
-}
-
-// While-next iteration kind.
-type WhileNextKind struct {
-	Expr *Expr
-	Next NodeData
 }
 
 // Break statement.

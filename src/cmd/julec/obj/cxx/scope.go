@@ -163,6 +163,11 @@ func gen_while_iter(it *sema.WhileIter) string {
 	obj += indent
 	obj += next + ":;\n"
 	obj += indent
+	if it.Next != nil {
+		obj += gen_st(it.Next)
+		obj += "\n"
+		obj += indent
+	}
 	obj += "goto " + begin + ";\n"
 	obj += indent
 	obj += end + ":;"

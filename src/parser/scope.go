@@ -160,14 +160,17 @@ func (sp *_ScopeParser) build_while_next_iter(s *_Stmt) ast.NodeData {
 		Token: s.tokens[0],
 	}
 	tokens := s.tokens[1:] // Skip "iter" keyword.
-	kind := &ast.WhileNextKind{}
+	kind := &ast.WhileKind{}
+
 	if len(tokens) > 0 {
 		kind.Expr = sp.p.build_expr(tokens)
 	}
+
 	if sp.is_last_st() {
 		sp.push_err(it.Token, "invalid_syntax")
 		return nil
 	}
+
 	tokens = sp.next().tokens
 	st_tokens := get_block_expr(tokens)
 	if len(st_tokens) > 0 {
@@ -175,8 +178,10 @@ func (sp *_ScopeParser) build_while_next_iter(s *_Stmt) ast.NodeData {
 			terminated: s.terminated,
 			tokens:     st_tokens,
 		}
+		kind.Next_token = st_tokens[0]
 		kind.Next = sp.build_st(s)
 	}
+
 	i := len(st_tokens)
 	block_tokens := lex.Range(&i, lex.KND_LBRACE, lex.KND_RBRACE, tokens)
 	if block_tokens == nil {
@@ -187,8 +192,10 @@ func (sp *_ScopeParser) build_while_next_iter(s *_Stmt) ast.NodeData {
 	if i < len(tokens) {
 		sp.push_err(tokens[i], "invalid_syntax")
 	}
+
 	it.Scope = sp.build_scope(block_tokens)
 	it.Kind = kind
+
 	return it
 }
 

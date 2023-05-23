@@ -46,6 +46,7 @@ type InfIter struct {
 // While iteration.
 type WhileIter struct {
 	Expr  ExprModel
+	Next  St
 	Scope *Scope
 }
 
@@ -503,6 +504,41 @@ func (sc *_ScopeChecker) check_inf_iter(it *ast.Iter) {
 	kind.Scope = sc.check_iter_scope(_uintptr(kind), it.Scope)
 }
 
+func (sc *_ScopeChecker) is_valid_ast_st_for_next_st(n ast.NodeData) bool {
+	switch n.(type) {
+	case *ast.AssignSt:
+		return !n.(*ast.AssignSt).Declarative
+
+	case *ast.FnCallExpr, *ast.Expr:
+		return true
+
+	default:
+		return false
+	}
+}
+
+func (sc *_ScopeChecker) is_valid_st_for_next_st(st St) bool {
+	switch st.(type) {
+	case *FnCallExprModel,
+		*Postfix,
+		*Assign,
+		*MultiAssign:
+		return true
+
+	case *Data:
+		switch st.(*Data).Model.(type) {
+		case *FnCallExprModel:
+			return true
+
+		default:
+			return false
+		}
+
+	default:
+		return false
+	}
+}
+
 func (sc *_ScopeChecker) check_while_iter(it *ast.Iter) {
 	kind := &WhileIter{}
 
@@ -525,6 +561,25 @@ func (sc *_ScopeChecker) check_while_iter(it *ast.Iter) {
 	if !prim.Is_bool() {
 		sc.s.push_err(it.Token, "iter_while_require_bool_expr")
 		return
+	}
+
+	if wh.Is_while_next() {
+		if !sc.is_valid_ast_st_for_next_st(wh.Next) {
+			sc.s.push_err(wh.Next_token, "invalid_stmt_for_next")
+			return
+		}
+
+		n := len(sc.scope.Stmts)
+		sc.check_node(wh.Next)
+		if n < len(sc.scope.Stmts) {
+			st := sc.scope.Stmts[n]
+			sc.scope.Stmts = sc.scope.Stmts[:n] // Remove statement.
+			if !sc.is_valid_st_for_next_st(st) {
+				sc.s.push_err(wh.Next_token, "invalid_stmt_for_next")
+			}
+
+			kind.Next = st
+		}
 	}
 
 	kind.Expr = d.Model
