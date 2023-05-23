@@ -13,11 +13,15 @@ import (
 // Importer.
 // Used by semantic analyzer for import use declarations.
 type Importer interface {
+	// Returns *ImportInfo by path.
+	// This function accepted as returns already imported and checked package.
+	// If returns not-nil value, will be used instead of Import_package
+	// if possible and package content is not checked by Sema.
+	Get_import(path string) *ImportInfo
 	// Path is the directory path of package to import.
 	// Should return abstract syntax tree of package files.
 	// Logs accepts as error.
 	Import_package(path string) ([]*ast.Ast, []build.Log)
-
 	// Invoked after the package is imported.
 	Imported(*ImportInfo)
 }
@@ -114,6 +118,9 @@ type ImportInfo struct {
 	// Package identifier (aka package name).
 	// Empty if package is cpp header.
 	Ident string
+
+	// True if imported with Importer.Get_import function.
+	Duplicate bool
 
 	// Is cpp header.
 	Cpp bool

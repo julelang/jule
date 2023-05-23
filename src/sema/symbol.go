@@ -364,23 +364,29 @@ func (s *_SymbolBuilder) import_package(imp *ImportInfo, decl *ast.UseDecl) (ok 
 		return true
 	}
 
-	asts, errors := s.importer.Import_package(imp.Path)
-	if len(errors) > 0 {
-		s.errors = append(s.errors, errors...)
-		return false
-	}
-
-	for _, ast := range asts {
-		table, errors := build_symbols(s.pwd, s.pstd, ast, s.importer)
-
-		// Break import if file has error(s).
+	port := s.importer.Get_import(imp.Path)
+	if port != nil {
+		imp.Package = port.Package
+		imp.Duplicate = true
+	} else {
+		asts, errors := s.importer.Import_package(imp.Path)
 		if len(errors) > 0 {
 			s.errors = append(s.errors, errors...)
-			s.push_err(imp.Token, "used_package_has_errors", imp.Link_path)
 			return false
 		}
 
-		imp.Package.Files = append(imp.Package.Files, table)
+		for _, ast := range asts {
+			table, errors := build_symbols(s.pwd, s.pstd, ast, s.importer)
+
+			// Break import if file has error(s).
+			if len(errors) > 0 {
+				s.errors = append(s.errors, errors...)
+				s.push_err(imp.Token, "used_package_has_errors", imp.Link_path)
+				return false
+			}
+
+			imp.Package.Files = append(imp.Package.Files, table)
+		}
 	}
 
 	imp.Import_all = decl.Full

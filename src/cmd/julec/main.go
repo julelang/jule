@@ -223,6 +223,16 @@ type Importer struct {
 	all_packages []*sema.ImportInfo
 }
 
+func (i *Importer) Get_import(path string) *sema.ImportInfo {
+	for _, p := range i.all_packages {
+		if p.Path == path {
+			return p
+		}
+	}
+
+	return nil
+}
+
 func (i *Importer) Import_package(path string) ([]*ast.Ast, []build.Log) {
 	dirents, err_msg := read_package_dirents(path)
 	if err_msg != "" {

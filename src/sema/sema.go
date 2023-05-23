@@ -411,8 +411,8 @@ func (s *_Sema) check_import_selections(imp *ImportInfo) {
 }
 
 func (s *_Sema) check_import(imp *ImportInfo) bool {
-	if imp.Cpp || len(imp.Package.Files) == 0{
-		return false
+	if imp.Duplicate || imp.Cpp || len(imp.Package.Files) == 0 {
+		return true
 	}
 
 	sema := _Sema{}
