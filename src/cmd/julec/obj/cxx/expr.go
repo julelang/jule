@@ -202,7 +202,9 @@ func gen_binop_expr_model(m *sema.BinopExprModel) string {
 	default:
 		obj := "("
 		obj += gen_expr_model(m.L)
+		obj += " "
 		obj += m.Op
+		obj += " "
 		obj += gen_expr_model(m.R)
 		obj += ")"
 		return obj

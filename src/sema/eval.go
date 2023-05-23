@@ -41,9 +41,23 @@ func normalize_bitsize(d *Data) {
 	d.Kind.kind = build_prim_type(kind)
 }
 
+func apply_cast_kind(d *Data) {
+	if d.Cast_kind == nil {
+		return
+	}
+
+	d.Model = &CastingExprModel{
+		Expr:     d.Model,
+		Kind:     d.Cast_kind,
+		ExprKind: d.Kind,
+	}
+	d.Cast_kind = nil // Ignore, because model added.
+}
+
 // Value data.
 type Data struct {
 	Kind       *TypeKind
+	Cast_kind  *TypeKind // This expression should be cast to this kind.
 	Mutable    bool
 	Lvalue     bool
 	Variadiced bool
@@ -120,6 +134,8 @@ func check_data_for_integer_indexing(d *Data) (err_key string) {
 		return "overflow_limits"
 
 	default:
+		d.Cast_kind = &TypeKind{kind: build_prim_type(types.TypeKind_INT)}
+		apply_cast_kind(d)
 		return ""
 	}
 }
@@ -749,41 +765,45 @@ func (e *_Eval) eval_unary_amper(d *Data) *Data {
 }
 
 func (e *_Eval) eval_unary(u *ast.UnaryExpr) *Data {
-	data := e.eval_expr_kind(u.Expr)
-	if data == nil {
+	d := e.eval_expr_kind(u.Expr)
+	if d == nil {
 		return nil
 	}
 
+	cast_kind := d.Cast_kind
 	switch u.Op.Kind {
 	case lex.KND_MINUS:
-		data = e.eval_unary_minus(data)
+		d = e.eval_unary_minus(d)
 
 	case lex.KND_PLUS:
-		data = e.eval_unary_plus(data)
+		d = e.eval_unary_plus(d)
 
 	case lex.KND_CARET:
-		data = e.eval_unary_caret(data)
+		d = e.eval_unary_caret(d)
 
 	case lex.KND_EXCL:
-		data = e.eval_unary_excl(data)
+		d = e.eval_unary_excl(d)
 
 	case lex.KND_STAR:
-		data = e.eval_unary_star(data, u.Op)
+		d = e.eval_unary_star(d, u.Op)
 
 	case lex.KND_AMPER:
-		data = e.eval_unary_amper(data)
+		d = e.eval_unary_amper(d)
 
 	default:
-		data = nil
+		d = nil
 	}
 
-	if data == nil {
+	if d == nil {
 		e.push_err(u.Op, "invalid_expr_unary_operator", u.Op.Kind)
-	} else if data.Is_const() {
-		data.Model = data.Constant
+	} else if d.Is_const() {
+		d.Model = d.Constant
+	} else if cast_kind != nil {
+		d.Cast_kind = cast_kind
+		apply_cast_kind(d)
 	}
 
-	return data
+	return d
 }
 
 func (e *_Eval) eval_variadic(v *ast.VariadicExpr) *Data {
@@ -1358,11 +1378,7 @@ func (e *_Eval) eval_cast_by_type_n_data(t *TypeKind, d *Data, error_token lex.T
 	if t.Prim() != nil && d.Is_const() {
 		d.Model = d.Constant
 	} else {
-		d.Model = &CastingExprModel{
-			Kind:     t,
-			Expr:     d.Model,
-			ExprKind: d.Kind,
-		}
+		d.Cast_kind = t
 	}
 	d.Kind = t
 
@@ -2703,6 +2719,11 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 		}
 	}
 
+	if d.Cast_kind == nil && !d.Lvalue && !d.Is_const() && d.Kind.Prim() != nil && types.Is_num(d.Kind.Prim().kind) {
+		d.Cast_kind = d.Kind
+	}
+
+	apply_cast_kind(d)
 	return d
 }
 
@@ -3395,6 +3416,12 @@ func (bs *_BinopSolver) solve_explicit(l *Data, r *Data) *Data {
 			R: r.Model,
 			Op: bs.op.Kind,
 		}
+	}
+
+	if l.Cast_kind != nil && r.Cast_kind == nil {
+		d.Cast_kind = l.Cast_kind
+	} else if r.Cast_kind != nil && l.Cast_kind == nil {
+		d.Cast_kind = r.Cast_kind
 	}
 
 	return d
