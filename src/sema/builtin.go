@@ -185,7 +185,7 @@ func find_package_builtin_def(link_path string, ident string) any {
 	}
 }
 
-func builtin_caller_common(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
+func builtin_caller_common_plain(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 	f := d.Kind.Fnc()
 
 	fcac := _FnCallArgChecker{
@@ -216,7 +216,18 @@ func builtin_caller_common(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 	return d
 }
 
+func builtin_caller_common(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
+	if len(fc.Generics) > 0 {
+		e.push_err(fc.Token, "not_has_generics")
+	}
+
+	return builtin_caller_common_plain(e, fc, d)
+}
+
 func builtin_caller_out(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
+	if len(fc.Generics) > 0 {
+		e.push_err(fc.Token, "not_has_generics")
+	}
 	if len(fc.Args) < 1 {
 		e.push_err(fc.Token, "missing_expr_for", "v")
 		return nil
@@ -253,6 +264,9 @@ func builtin_caller_outln(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
 }
 
 func builtin_caller_new(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
+	if len(fc.Generics) > 0 {
+		e.push_err(fc.Token, "not_has_generics")
+	}
 	if len(fc.Args) < 1 {
 		e.push_err(fc.Token, "missing_expr_for", "type")
 		return nil
@@ -296,6 +310,9 @@ func builtin_caller_new(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 }
 
 func builtin_caller_real(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
+	if len(fc.Generics) > 0 {
+		e.push_err(fc.Token, "not_has_generics")
+	}
 	if len(fc.Args) < 1 {
 		e.push_err(fc.Token, "missing_expr_for", "ref")
 		return nil
@@ -320,6 +337,9 @@ func builtin_caller_real(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 }
 
 func builtin_caller_drop(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
+	if len(fc.Generics) > 0 {
+		e.push_err(fc.Token, "not_has_generics")
+	}
 	if len(fc.Args) < 1 {
 		e.push_err(fc.Token, "missing_expr_for", "ref")
 		return nil
@@ -344,6 +364,9 @@ func builtin_caller_drop(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
 }
 
 func builtin_caller_panic(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
+	if len(fc.Generics) > 0 {
+		e.push_err(fc.Token, "not_has_generics")
+	}
 	if len(fc.Args) < 1 {
 		e.push_err(fc.Token, "missing_expr_for", "error")
 		return nil
@@ -363,12 +386,15 @@ func builtin_caller_panic(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
 }
 
 func builtin_caller_make(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
+	if len(fc.Generics) > 0 {
+		e.push_err(fc.Token, "not_has_generics")
+	}
 	if len(fc.Args) < 2 {
 		if len(fc.Args) == 1 {
 			e.push_err(fc.Token, "missing_expr_for", "size")
 			return nil
 		}
-		e.push_err(fc.Token, "missing_expr_for", "type, and size")
+		e.push_err(fc.Token, "missing_expr_for", "type, size")
 		return nil
 	}
 	if len(fc.Args) > 2 {
@@ -408,12 +434,15 @@ func builtin_caller_make(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 }
 
 func builtin_caller_append(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
+	if len(fc.Generics) > 0 {
+		e.push_err(fc.Token, "not_has_generics")
+	}
 	if len(fc.Args) < 2 {
 		if len(fc.Args) == 1 {
 			e.push_err(fc.Token, "missing_expr_for", "src")
 			return nil
 		}
-		e.push_err(fc.Token, "missing_expr_for", "src, and values")
+		e.push_err(fc.Token, "missing_expr_for", "src, values")
 		return nil
 	}
 
@@ -445,11 +474,14 @@ func builtin_caller_append(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 	d.Kind = &TypeKind{kind: f}
 	d.Model = &CommonIdentExprModel{Ident: "_append"}
 
-	d = builtin_caller_common(e, fc, d)
+	d = builtin_caller_common_plain(e, fc, d)
 	return d
 }
 
 func builtin_caller_copy(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
+	if len(fc.Generics) > 0 {
+		e.push_err(fc.Token, "not_has_generics")
+	}
 	if len(fc.Args) < 2 {
 		if len(fc.Args) == 1 {
 			e.push_err(fc.Token, "missing_expr_for", "src")
@@ -493,11 +525,14 @@ func builtin_caller_copy(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 	d.Kind = &TypeKind{kind: f}
 	d.Model = &CommonIdentExprModel{Ident: "_copy"}
 
-	d = builtin_caller_common(e, fc, d)
+	d = builtin_caller_common_plain(e, fc, d)
 	return d
 }
 
 func builtin_caller_recover(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
+	if len(fc.Generics) > 0 {
+		e.push_err(fc.Token, "not_has_generics")
+	}
 	const HANDLER_KIND = "fn(Error)"
 
 	if len(fc.Args) < 1 {
@@ -532,6 +567,9 @@ func builtin_caller_recover(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
 }
 
 func builtin_caller_std_mem_size_of(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
+	if len(fc.Generics) > 0 {
+		e.push_err(fc.Token, "not_has_generics")
+	}
 	result := &Data{
 		Kind:  &TypeKind{kind: build_prim_type(types.TypeKind_UINT)},
 	}
@@ -554,6 +592,9 @@ func builtin_caller_std_mem_size_of(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data
 }
 
 func builtin_caller_std_mem_align_of(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
+	if len(fc.Generics) > 0 {
+		e.push_err(fc.Token, "not_has_generics")
+	}
 	result := &Data{
 		Kind:  &TypeKind{kind: build_prim_type(types.TypeKind_UINT)},
 	}
