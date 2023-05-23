@@ -1360,10 +1360,6 @@ func (s *_Sema) check_var(v *Var) {
 		return
 	}
 
-	if !v.Constant {
-		v.Value.Data.Constant = nil
-	}
-
 	if v.Is_auto_typed() {
 		// Build new TypeSymbol because
 		// auto-type symbols are nil.
@@ -1383,6 +1379,10 @@ func (s *_Sema) check_var(v *Var) {
 		}
 
 		s.check_assign_type(v.Kind.Kind, v.Value.Data, v.Value.Expr.Token, false)
+	}
+
+	if !v.Constant {
+		v.Value.Data.Constant = nil
 	}
 }
 

@@ -259,6 +259,8 @@ func (e *_Eval) lit_float(l *ast.LitExpr) *Data {
 }
 
 func (e *_Eval) lit_int(l *ast.LitExpr) *Data {
+	const BIT_SIZE = 0b01000000
+
 	lit := l.Value
 	base := 0
 
@@ -267,7 +269,7 @@ func (e *_Eval) lit_int(l *ast.LitExpr) *Data {
 		lit = lit[2:]
 		base = 0b00010000
 
-		case strings.HasPrefix(lit, "0b"): // Binary
+	case strings.HasPrefix(lit, "0b"): // Binary
 		lit = lit[2:]
 		base = 0b10
 
@@ -279,7 +281,6 @@ func (e *_Eval) lit_int(l *ast.LitExpr) *Data {
 		base = 0b1010
 	}
 
-
 	d := &Data{
 		Lvalue:  false,
 		Mutable: false,
@@ -287,7 +288,6 @@ func (e *_Eval) lit_int(l *ast.LitExpr) *Data {
 	}
 
 	var value any = nil
-	const BIT_SIZE = 0b01000000
 	sig, err := strconv.ParseInt(lit, base, BIT_SIZE)
 	if err == nil {
 		value = sig
@@ -522,7 +522,8 @@ func (e *_Eval) eval_var(v *Var, error_token lex.Token) *Data {
 	}
 
 	if v.Constant {
-		d.Constant = v.Value.Data.Constant
+		d.Constant = new(constant.Const)
+		*d.Constant = *v.Value.Data.Constant
 		d.Model = d.Constant
 	}
 
@@ -2988,10 +2989,29 @@ func (bs *_BinopSolver) eval_str() *Data {
 	}
 }
 
+func (bs *_BinopSolver) set_type_to_greater() {
+	if bs.l.Is_const() && bs.r.Is_const() || !bs.l.Is_const() && !bs.r.Is_const() {
+		lk := bs.l.Kind.To_str()
+		rk := bs.r.Kind.To_str()
+		if types.Is_greater(rk, lk) {
+			bs.l.Kind = bs.r.Kind
+		}
+		return
+	}
+
+	if bs.l.Is_const() {
+		bs.l.Kind = bs.r.Kind
+		return
+	}
+
+	bs.r.Kind = bs.l.Kind
+}
+
 func (bs *_BinopSolver) eval_float() *Data {
+	lk := bs.l.Kind.To_str()
 	rk := bs.r.Kind.To_str()
-	if !types.Is_num(rk) {
-		bs.e.push_err(bs.op, "incompatible_types", bs.l.Kind.To_str(), rk)
+	if !types.Is_num(lk) || !types.Is_num(rk) {
+		bs.e.push_err(bs.op, "incompatible_types", lk, rk)
 		return nil
 	}
 
@@ -3016,14 +3036,12 @@ func (bs *_BinopSolver) eval_float() *Data {
 		lex.KND_MINUS,
 		lex.KND_STAR,
 		lex.KND_SOLIDUS:
-		if types.Is_greater(rk, bs.l.Kind.To_str()) {
-			bs.l.Kind = bs.r.Kind
-		}
+		bs.set_type_to_greater()
 		return bs.l
 
 	case lex.KND_PERCENT:
 		if !types.Is_int(rk) {
-			bs.e.push_err(bs.op, "incompatible_types", bs.l.Kind.To_str(), rk)
+			bs.e.push_err(bs.op, "incompatible_types", lk, rk)
 			return nil
 		}
 		return bs.r
@@ -3035,9 +3053,10 @@ func (bs *_BinopSolver) eval_float() *Data {
 }
 
 func (bs *_BinopSolver) eval_unsig_int() *Data {
+	lk := bs.l.Kind.To_str()
 	rk := bs.r.Kind.To_str()
-	if !types.Is_num(rk) {
-		bs.e.push_err(bs.op, "incompatible_types", bs.l.Kind.To_str(), rk)
+	if !types.Is_num(lk) || !types.Is_num(rk) {
+		bs.e.push_err(bs.op, "incompatible_types", lk, rk)
 		return nil
 	}
 
@@ -3066,9 +3085,7 @@ func (bs *_BinopSolver) eval_unsig_int() *Data {
 		lex.KND_AMPER,
 		lex.KND_VLINE,
 		lex.KND_CARET:
-		if types.Is_greater(rk, bs.l.Kind.To_str()) {
-			bs.l.Kind = bs.r.Kind
-		}
+		bs.set_type_to_greater()
 		return bs.l
 
 	case lex.KND_LSHIFT, lex.KND_RSHIFT:
@@ -3076,6 +3093,11 @@ func (bs *_BinopSolver) eval_unsig_int() *Data {
 			bs.e.push_err(bs.op, "bitshift_must_unsigned")
 			return nil
 		}
+
+		if bs.l.Is_const() {
+			bs.l.Kind = bs.r.Kind
+		}
+
 		return bs.l
 
 	default:
@@ -3085,9 +3107,10 @@ func (bs *_BinopSolver) eval_unsig_int() *Data {
 }
 
 func (bs *_BinopSolver) eval_sig_int() *Data {
+	lk := bs.l.Kind.To_str()
 	rk := bs.r.Kind.To_str()
-	if !types.Is_num(rk) {
-		bs.e.push_err(bs.op, "incompatible_types", bs.l.Kind.To_str(), rk)
+	if !types.Is_num(lk) || !types.Is_num(rk) {
+		bs.e.push_err(bs.op, "incompatible_types", lk, rk)
 		return nil
 	}
 
@@ -3116,9 +3139,7 @@ func (bs *_BinopSolver) eval_sig_int() *Data {
 		lex.KND_AMPER,
 		lex.KND_VLINE,
 		lex.KND_CARET:
-		if types.Is_greater(rk, bs.l.Kind.To_str()) {
-			bs.l.Kind = bs.r.Kind
-		}
+		bs.set_type_to_greater()
 		return bs.l
 
 	case lex.KND_LSHIFT, lex.KND_RSHIFT:
@@ -3217,6 +3238,50 @@ func (bs *_BinopSolver) eval() *Data {
 	}
 }
 
+func (bs *_BinopSolver) assign_shift(d *Data, r float64) {
+	switch {
+	case r <= 6:
+		d.Kind.Prim().kind = types.TypeKind_I8
+		d.Constant.Set_i64(d.Constant.As_i64())
+
+	case r <= 7:
+		d.Kind.Prim().kind = types.TypeKind_U8
+		d.Constant.Set_u64(d.Constant.As_u64())
+
+	case r <= 14:
+		d.Kind.Prim().kind = types.TypeKind_I16
+		d.Constant.Set_i64(d.Constant.As_i64())
+
+	case r <= 15:
+		d.Kind.Prim().kind = types.TypeKind_U16
+		d.Constant.Set_u64(d.Constant.As_u64())
+
+	case r <= 30:
+		d.Kind.Prim().kind = types.TypeKind_I32
+		d.Constant.Set_i64(d.Constant.As_i64())
+
+	case r <= 31:
+		d.Kind.Prim().kind = types.TypeKind_U32
+		d.Constant.Set_u64(d.Constant.As_u64())
+
+	case r <= 62:
+		d.Kind.Prim().kind = types.TypeKind_I64
+		d.Constant.Set_i64(d.Constant.As_i64())
+
+	case r <= 63:
+		d.Kind.Prim().kind = types.TypeKind_U64
+		d.Constant.Set_u64(d.Constant.As_u64())
+
+	case r <= 127:
+		d.Kind.Prim().kind = types.TypeKind_F32
+		d.Constant.Set_f64(d.Constant.As_f64())
+
+	default:
+		d.Kind.Prim().kind = types.TypeKind_F64
+		d.Constant.Set_f64(d.Constant.As_f64())
+	}
+}
+
 func (bs *_BinopSolver) solve_const(d *Data) {
 	switch {
 	case d == nil:
@@ -3293,10 +3358,12 @@ func (bs *_BinopSolver) solve_const(d *Data) {
 	case lex.KND_LSHIFT:
 		_ = bs.l.Constant.Lshift(*bs.r.Constant)
 		d.Constant = bs.l.Constant
+		bs.assign_shift(d, bs.r.Constant.As_f64())
 
 	case lex.KND_RSHIFT:
 		_ = bs.l.Constant.Rshift(*bs.r.Constant)
 		d.Constant = bs.l.Constant
+		bs.assign_shift(d, bs.r.Constant.As_f64())
 	}
 
 	d.Model = d.Constant

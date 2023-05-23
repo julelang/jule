@@ -531,8 +531,12 @@ func (c *Const) Lshift(x Const) bool {
 	switch {
 	case c.Is_i64():
 		l := c.As_i64()
-		r := x.As_u64()
-		c.Set_i64(l << r)
+		if l < 0 {
+			r := x.As_u64()
+			c.Set_i64(l << r)
+		} else {
+			lshift_unsig(c, x)
+		}
 
 	case c.Is_u64():
 		lshift_unsig(c, x)
@@ -550,8 +554,12 @@ func (c *Const) Rshift(x Const) bool {
 	switch {
 	case c.Is_i64():
 		l := c.As_i64()
-		r := x.As_u64()
-		c.Set_i64(l >> r)
+		if l < 0 {
+			r := x.As_u64()
+			c.Set_i64(l >> r)
+		} else {
+			rshift_unsig(c, x)
+		}
 
 	case c.Is_u64():
 		rshift_unsig(c, x)

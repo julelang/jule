@@ -163,22 +163,38 @@ func Is_i64_greater(k string) bool {
 	return k == TypeKind_I8 || k == TypeKind_I16 || k == TypeKind_I32
 }
 
+// Reports whether u8 is greater than given kind.
+func Is_u8_greater(k string) bool {
+	k = Real_kind_of(k)
+	return k == TypeKind_I8
+}
+
 // Reports whether u16 is greater than given kind.
 func Is_u16_greater(k string) bool {
 	k = Real_kind_of(k)
-	return k == TypeKind_U8
+	return k == TypeKind_U8 || k == TypeKind_I8 || k == TypeKind_I16
 }
 
 // Reports whether u32 is greater than given kind.
 func Is_u32_greater(k string) bool {
 	k = Real_kind_of(k)
-	return k == TypeKind_U8 || k == TypeKind_U16
+	return (k == TypeKind_U8 ||
+		k == TypeKind_U16 ||
+		k == TypeKind_I8 ||
+		k == TypeKind_I16 ||
+		k == TypeKind_I32)
 }
 
 // Reports whether u64 is greater than given kind.
 func Is_u64_greater(k string) bool {
 	k = Real_kind_of(k)
-	return k == TypeKind_U8 || k == TypeKind_U16 || k == TypeKind_U32
+	return (k == TypeKind_U8 ||
+		k == TypeKind_U16 ||
+		k == TypeKind_U32 ||
+		k == TypeKind_I8 ||
+		k == TypeKind_I16 ||
+		k == TypeKind_I32 ||
+		k == TypeKind_I64)
 }
 
 // Reports whether f32 is greater than given kind.
@@ -207,6 +223,9 @@ func Is_greater(k1 string, k2 string) bool {
 
 	case TypeKind_U16:
 		return Is_u16_greater(k2)
+
+	case TypeKind_U8:
+		return Is_u8_greater(k2)
 
 	case TypeKind_U32:
 		return Is_u32_greater(k2)
