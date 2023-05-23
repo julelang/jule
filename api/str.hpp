@@ -10,38 +10,59 @@ class str_jt;
 
 class str_jt {
 public:
+    int_jt __len{};
     std::basic_string<u8_jt> __buffer{};
 
     str_jt(void) noexcept {}
 
+    str_jt(const char *_Src, const int_jt &_Len) noexcept {
+        if (!_Src)
+        { return; }
+        this->__len = _Len;
+        this->__buffer = std::basic_string<u8_jt>(&_Src[0],
+                                                 &_Src[this->__len]);
+    }
+
     str_jt(const char *_Src) noexcept {
         if (!_Src)
         { return; }
+        this->__len = std::strlen( _Src );
         this->__buffer = std::basic_string<u8_jt>(&_Src[0],
-                                                 &_Src[std::strlen( _Src )]);
+                                                 &_Src[this->__len]);
     }
 
-    str_jt(const std::initializer_list<u8_jt> &_Src) noexcept
-    { this->__buffer = _Src; }
+    str_jt(const std::initializer_list<u8_jt> &_Src) noexcept {
+        this->__len = _Src.size();
+        this->__buffer = _Src;
+    }
 
     str_jt(const i32_jt &_Rune) noexcept
     : str_jt( __julec_utf8_rune_to_bytes( _Rune ) ) {}
 
-    str_jt(const std::basic_string<u8_jt> &_Src) noexcept
-    { this->__buffer = _Src; }
+    str_jt(const std::basic_string<u8_jt> &_Src) noexcept {
+        this->__len = _Src.length();
+        this->__buffer = _Src;
+    }
 
-    str_jt(const std::string &_Src) noexcept
-    { this->__buffer = std::basic_string<u8_jt>( _Src.begin(), _Src.end() ); }
+    str_jt(const std::string &_Src) noexcept {
+        this->__len = _Src.length();
+        this->__buffer = std::basic_string<u8_jt>( _Src.begin(), _Src.end() );
+    }
 
-    str_jt(const str_jt &_Src) noexcept
-    { this->__buffer = _Src.__buffer; }
+    str_jt(const str_jt &_Src) noexcept {
+        this->__len = _Src.__len;
+        this->__buffer = _Src.__buffer;
+    }
 
-    str_jt(const slice_jt<u8_jt> &_Src) noexcept
-    { this->__buffer = std::basic_string<u8_jt>( _Src.begin(), _Src.end() ); }
+    str_jt(const slice_jt<u8_jt> &_Src) noexcept {
+        this->__len = _Src._len();
+        this->__buffer = std::basic_string<u8_jt>( _Src.begin(), _Src.end() );
+    }
 
     str_jt(const slice_jt<i32_jt> &_Src) noexcept {
         for (const i32_jt &_rune: _Src) {
             const slice_jt<u8_jt> _bytes{ __julec_utf8_rune_to_bytes( _rune ) };
+            this->__len += _bytes._len();
             for (const u8_jt _byte: _bytes)
             { this->__buffer += _byte; }
         }
@@ -83,7 +104,7 @@ public:
     { return ( this->___slice( 0, this->_len() ) ); }
 
     inline int_jt _len(void) const noexcept
-    { return ( this->__buffer.length() ); }
+    { return ( this->__len ); }
 
     inline bool _empty(void) const noexcept
     { return ( this->__buffer.empty() ); }
@@ -201,12 +222,8 @@ public:
     inline operator const std::basic_string<u8_jt>(void) const noexcept
     { return ( this->__buffer ); }
 
-    inline operator const std::basic_string<char>(void) const noexcept {
-        return (
-            std::basic_string<char>( this->__buffer.begin(),
-                                     this->__buffer.end() )
-        );
-    }
+    inline operator const std::basic_string<char>(void) const noexcept
+    { return ( std::basic_string<char>( this->begin(), this->end() ) ); }
 
     operator slice_jt<u8_jt>(void) const noexcept {
         slice_jt<u8_jt> _slice( this->_len() );
@@ -241,8 +258,10 @@ public:
     inline u8_jt operator[](const int_jt &_Index) const
     { return ( (*this).__buffer[_Index] ); }
 
-    inline void operator+=(const str_jt &_Str) noexcept
-    { this->__buffer += _Str.__buffer; }
+    inline void operator+=(const str_jt &_Str) noexcept {
+        this->__len += _Str._len();
+        this->__buffer += _Str.__buffer;
+    }
 
     inline str_jt operator+(const str_jt &_Str) const noexcept
     { return ( str_jt( this->__buffer + _Str.__buffer ) ); }

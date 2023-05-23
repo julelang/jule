@@ -82,12 +82,14 @@ func sbtoa(b byte) string {
 
 func get_str_model(c *constant.Const) string {
 	content := c.Read_str()
-	s := ""
+	len := strconv.FormatInt(int64(len(content)), 10)
+
+	lit := ""
 	for _, b := range []byte(content) {
-		s += sbtoa(b)
+		lit += sbtoa(b)
 	}
 
-	return as_jt("str") + `("` + s + `")`
+	return as_jt("str") + `("` + lit + `", ` + len + ")"
 }
 
 func get_bool_model(c *constant.Const) string {
