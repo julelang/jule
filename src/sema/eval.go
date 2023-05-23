@@ -845,6 +845,8 @@ func (e *_Eval) eval_arr(s *ast.SliceExpr) *Data {
 		Elems: make([]ExprModel, len(s.Elems)),
 	}
 
+	prefix := e.prefix
+	e.prefix = arr.Elem
 	for i, elem := range s.Elems {
 		d := e.eval_expr_kind(elem)
 		if d == nil {
@@ -854,6 +856,7 @@ func (e *_Eval) eval_arr(s *ast.SliceExpr) *Data {
 		e.s.check_assign_type(arr.Elem, d, s.Token, true)
 		model.Elems[i] = d.Model
 	}
+	e.prefix = prefix
 
 	return &Data{
 		Kind:  &TypeKind{kind: arr},
@@ -871,6 +874,8 @@ func (e *_Eval) eval_exp_slc(s *ast.SliceExpr, elem_type *TypeKind) *Data {
 		Elems: make([]ExprModel, len(s.Elems)),
 	}
 
+	prefix := e.prefix
+	e.prefix = slc.Elem
 	for i, elem := range s.Elems {
 		d := e.eval_expr_kind(elem)
 		if d == nil {
@@ -880,6 +885,7 @@ func (e *_Eval) eval_exp_slc(s *ast.SliceExpr, elem_type *TypeKind) *Data {
 		e.s.check_assign_type(slc.Elem, d, s.Token, true)
 		model.Elems[i] = d.Model
 	}
+	e.prefix = prefix
 
 	return &Data{
 		Kind:  &TypeKind{kind: slc},
