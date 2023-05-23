@@ -775,23 +775,27 @@ func (tc *_TypeChecker) build_slc(decl *ast.SlcType) *Slc {
 }
 
 func (tc *_TypeChecker) build_arr(decl *ast.ArrType) *Arr {
-	size := tc.s.eval(decl.Size, tc.lookup)
-	if size == nil {
-		return nil
-	}
+	var n int = 0
 
-	if !size.Is_const() {
-		tc.push_err(decl.Elem.Token, "expr_not_const")
-		return nil
-	} else if !types.Is_int(size.Kind.Prim().kind) {
-		tc.push_err(decl.Elem.Token, "array_size_is_not_int")
-		return nil
-	}
+	if !decl.Auto_sized() {
+		size := tc.s.eval(decl.Size, tc.lookup)
+		if size == nil {
+			return nil
+		}
 
-	n := size.Constant.As_i64()
-	if n < 0 {
-		tc.push_err(decl.Elem.Token, "array_size_is_negative")
-		return nil
+		if !size.Is_const() {
+			tc.push_err(decl.Elem.Token, "expr_not_const")
+			return nil
+		} else if !types.Is_int(size.Kind.Prim().kind) {
+			tc.push_err(decl.Elem.Token, "array_size_is_not_int")
+			return nil
+		}
+
+		n = int(size.Constant.As_i64())
+		if n < 0 {
+			tc.push_err(decl.Elem.Token, "array_size_is_negative")
+			return nil
+		}
 	}
 
 	elem := tc.check_decl(decl.Elem)
@@ -808,7 +812,7 @@ func (tc *_TypeChecker) build_arr(decl *ast.ArrType) *Arr {
 
 	return &Arr{
 		Auto: decl.Auto_sized(),
-		N:    int(n),
+		N:    n,
 		Elem: elem,
 	}
 }
