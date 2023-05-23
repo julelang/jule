@@ -1369,7 +1369,7 @@ func (e *_Eval) eval_cast_by_type_n_data(t *TypeKind, d *Data, error_token lex.T
 	d.Lvalue = is_lvalue(t)
 	d.Mutable = is_mut(t)
 	d.Decl = false
-	if d.Is_const() {
+	if t.Prim() != nil && d.Is_const() {
 		d.Model = d.Constant
 	} else {
 		d.Model = &CastingExprModel{
