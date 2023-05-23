@@ -6,7 +6,6 @@ import (
 
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/constant"
-	"github.com/julelang/jule/constant/lit"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/sema"
 )
@@ -24,14 +23,70 @@ func get_accessor(t *sema.TypeKind) string {
 	return lex.KND_DOT
 }
 
+func decompose_common_esq(b byte) string {
+	switch b {
+	case '\\':
+		return "\\\\"
+
+	case '\'':
+		return "'"
+
+	case '"':
+		return `\"`
+
+	case '\a':
+		return `\a`
+
+	case '\b':
+		return `\b`
+
+	case '\f':
+		return `\f`
+
+	case '\n':
+		return `\n`
+
+	case '\r':
+		return `\r`
+
+	case '\t':
+		return `\t`
+
+	case '\v':
+		return `\v`
+
+	default:
+		return ""
+	}
+}
+
+func sbtoa(b byte) string {
+	if b == 0 {
+		return "\\x00"
+	}
+
+	if b <= 127 { // ASCII
+		seq := decompose_common_esq(b)
+		if seq != "" {
+			return seq
+		}
+
+		if 32 <= b && b <= 126 {
+			return string(b)
+		}
+	}
+
+	seq := strconv.FormatUint(uint64(b), 8)
+	return "\\" + seq
+}
+
 func get_str_model(c *constant.Const) string {
 	content := c.Read_str()
 	s := ""
-	if lex.Is_raw_str(content) {
-		s = lit.To_raw_str([]byte(content))
-	} else {
-		s = lit.To_str([]byte(content))
+	for _, b := range []byte(content) {
+		s += sbtoa(b)
 	}
+
 	return as_jt("str") + `("` + s + `")`
 }
 

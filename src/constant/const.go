@@ -347,7 +347,7 @@ func (c *Const) Gt(x Const) bool {
 func (c *Const) Add(x Const) bool {
 	switch {
 	case c.Is_str():
-		if x.Is_str() {
+		if !x.Is_str() {
 			return false
 		}
 		c.Set_str(c.Read_str() + x.Read_str())
@@ -531,12 +531,8 @@ func (c *Const) Lshift(x Const) bool {
 	switch {
 	case c.Is_i64():
 		l := c.As_i64()
-		if l < 0 {
-			r := x.As_u64()
-			c.Set_i64(l << r)
-		} else {
-			lshift_unsig(c, x)
-		}
+		r := x.As_u64()
+		c.Set_i64(l << r)
 
 	case c.Is_u64():
 		lshift_unsig(c, x)
@@ -554,12 +550,8 @@ func (c *Const) Rshift(x Const) bool {
 	switch {
 	case c.Is_i64():
 		l := c.As_i64()
-		if l < 0 {
-			r := x.As_u64()
-			c.Set_i64(l >> r)
-		} else {
-			rshift_unsig(c, x)
-		}
+		r := x.As_u64()
+		c.Set_i64(l >> r)
 
 	case c.Is_u64():
 		rshift_unsig(c, x)

@@ -182,8 +182,11 @@ func (e *_Eval) lit_nil() *Data {
 	}
 }
 
-func (e *_Eval) lit_str(lit *ast.LitExpr) *Data {
-	constant := constant.New_str(lit.Value[1:len(lit.Value)-1])
+func (e *_Eval) lit_str(lt *ast.LitExpr) *Data {
+	s := lt.Value[1:len(lt.Value)-1]
+	s = lit.To_str([]byte(s))
+	constant := constant.New_str(s)
+
 	return &Data{
 		Lvalue:   false,
 		Mutable:  false,
@@ -214,14 +217,11 @@ func (e *_Eval) lit_rune(l *ast.LitExpr) *Data {
 	const BYTE_KIND = types.TypeKind_U8
 	const RUNE_KIND = types.TypeKind_I32
 	
-	rs := lit.To_rune([]byte(l.Value))
-	rs = rs[2:] // Skip hexadecimal prefix.
-	r, _ := strconv.ParseInt(rs, 16, 64)
-
+	r := lit.To_rune([]byte(l.Value))
 	data := &Data{
 		Lvalue:   false,
 		Mutable:  false,
-		Constant: constant.New_i64(r),
+		Constant: constant.New_i64(int64(r)),
 		Decl:     false,
 	}
 
@@ -3163,6 +3163,7 @@ func (bs *_BinopSolver) solve_const(d *Data) {
 		return
 		
 	case !bs.l.Is_const() || !bs.r.Is_const():
+		d.Constant = nil
 		return
 	}
 
@@ -3242,7 +3243,10 @@ func (bs *_BinopSolver) solve_const(d *Data) {
 }
 
 func (bs *_BinopSolver) post_const(d *Data) {
-	if d == nil || !d.Is_const() {
+	if d == nil {
+		return
+	}
+	if !d.Is_const() {
 		return
 	}
 

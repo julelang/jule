@@ -39,7 +39,7 @@ func float_assignable(kind string, d *Data) bool {
 	return types.Check_bit_float(value, types.Bitsize_of(kind))
 }
 
-func signed_assignable(kind string, d *Data) bool {
+func sig_assignable(kind string, d *Data) bool {
 	min := int64(types.Min_of(kind))
 	max := int64(types.Max_of(kind))
 
@@ -66,7 +66,7 @@ func signed_assignable(kind string, d *Data) bool {
 	return false
 }
 
-func unsigned_assignable(kind string, d *Data) bool {
+func unsig_assignable(kind string, d *Data) bool {
 	max := uint64(types.Max_of(kind))
 
 	switch {
@@ -99,10 +99,10 @@ func unsigned_assignable(kind string, d *Data) bool {
 func int_assignable(kind string, d *Data) bool {
 	switch {
 	case types.Is_sig_int(kind):
-		return signed_assignable(kind, d)
+		return sig_assignable(kind, d)
 
 	case types.Is_unsig_int(kind):
-		return unsigned_assignable(kind, d)
+		return unsig_assignable(kind, d)
 
 	default:
 		return false
