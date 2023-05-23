@@ -1537,7 +1537,14 @@ func (e *_Eval) check_fn_call_generics(f *FnIns,
 
 func (e *_Eval) call_builtin_fn(fc *ast.FnCallExpr, d *Data) *Data {
 	f := d.Kind.Fnc()
-	return f.Caller(e, fc, d)
+	
+	d = f.Caller(e, fc, d)
+	if d == nil {
+		return d
+	}
+
+	d.Mutable = true
+	return d
 }
 
 func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
@@ -1611,6 +1618,7 @@ func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
 		d.Lvalue = is_lvalue(f.Result)
 	}
 
+	d.Mutable = true
 	d.Model = &FnCallExprModel{
 		Func: f,
 		IsCo: fc.Concurrent,

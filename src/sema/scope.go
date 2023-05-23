@@ -1621,7 +1621,10 @@ func get_datas_from_tuple_data(d *Data) []*Data {
 			t := d.Kind.Tup()
 			r := make([]*Data, len(t.Types))
 			for i, kind := range t.Types {
-				r[i] = &Data{Kind: kind}
+				r[i] = &Data{
+					Mutable: true, // Function return.
+					Kind: kind,
+				}
 			}
 			return r
 		}
