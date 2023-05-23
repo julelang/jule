@@ -15,23 +15,6 @@ func is_instanced_struct(s *StructIns) bool {
 	return len(s.Decl.Generics) == len(s.Generics)
 }
 
-// Returns literal if expression is literal, nil if not.
-func expr_data_is_lit(k ast.ExprData) *ast.LitExpr {
-	switch k.(type) {
-	case *ast.LitExpr:
-		return k.(*ast.LitExpr)
-
-	default:
-		return nil
-	}
-}
-
-// Reports whether expression is rune literal.
-func expr_data_is_rune_lit(k ast.ExprData) bool {
-	lit := expr_data_is_lit(k)
-	return lit != nil && lex.Is_rune(lit.Value)
-}
-
 func normalize_bitsize(d *Data) {
 	if !d.Is_const() {
 		return
@@ -64,6 +47,7 @@ type Data struct {
 	Mutable    bool
 	Lvalue     bool
 	Variadiced bool
+	Is_rune    bool
 	Model      ExprModel
 
 	// True if kind is declaration such as:
@@ -237,6 +221,7 @@ func (e *_Eval) lit_rune(l *ast.LitExpr) *Data {
 	}
 
 	data.Model = data.Constant
+	data.Is_rune = true
 	return data
 }
 
@@ -1395,7 +1380,9 @@ func (e *_Eval) eval_cast(c *ast.CastExpr) *Data {
 		return nil
 	}
 
-	return e.eval_cast_by_type_n_data(t.Kind, d, c.Kind.Token)
+	d = e.eval_cast_by_type_n_data(t.Kind, d, c.Kind.Token)
+
+	return d
 }
 
 func (e *_Eval) eval_ns_selection(s *ast.NsSelectionExpr) *Data {
@@ -2634,13 +2621,9 @@ func (e *_Eval) eval_binop(op *ast.BinopExpr) *Data {
 func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 	var d *Data
 
-	is_rune := false
-
 	switch kind.(type) {
 	case *ast.LitExpr:
-		lit := kind.(*ast.LitExpr)
-		is_rune = lex.Is_rune(lit.Value)
-		d = e.eval_lit(lit)
+		d = e.eval_lit(kind.(*ast.LitExpr))
 
 	case *ast.IdentExpr:
 		d = e.eval_ident(kind.(*ast.IdentExpr))
@@ -2691,9 +2674,7 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 		d = e.eval_anon_fn(kind.(*ast.FnDecl))
 
 	case *ast.BinopExpr:
-		lit := kind.(*ast.BinopExpr)
-		is_rune = expr_data_is_rune_lit(lit.L) || expr_data_is_rune_lit(lit.R)
-		d = e.eval_binop(lit)
+		d = e.eval_binop(kind.(*ast.BinopExpr))
 
 	default:
 		d = nil
@@ -2707,7 +2688,7 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 		return d
 	}
 
-	if d.Is_const() && d.Kind.Prim() != nil && !is_rune {
+	if d.Is_const() && !d.Is_rune && d.Kind.Prim() != nil {
 		switch {
 		case d.Constant.Is_i64():
 			if int_assignable(types.TypeKind_INT, d) {
@@ -3167,7 +3148,7 @@ func (bs *_BinopSolver) eval_sig_int() *Data {
 			bs.e.push_err(bs.op, "bitshift_must_unsigned")
 			return nil
 		}
-		bs.l.Kind.kind = build_prim_type(types.TypeKind_U64)
+		
 		return bs.l
 
 	default:
@@ -3196,15 +3177,14 @@ func (bs *_BinopSolver) eval_prim() *Data {
 	}
 
 	lk := prim.To_str()
-	rk := rprim.To_str()
 	switch {
-	case types.Is_float(lk) || types.Is_float(rk):
+	case types.Is_float(lk):
 		return bs.eval_float()
 
-	case types.Is_unsig_int(lk) || types.Is_unsig_int(rk):
+	case types.Is_unsig_int(lk):
 		return bs.eval_unsig_int()
 
-	case types.Is_sig_int(lk) || types.Is_sig_int(rk):
+	case types.Is_sig_int(lk):
 		return bs.eval_sig_int()
 
 	default:
@@ -3435,10 +3415,8 @@ func (bs *_BinopSolver) solve(op *ast.BinopExpr) *Data {
 	d := bs.solve_explicit(l, r)
 
 	// Save rune type.
-	if d != nil && d.Kind.Prim() != nil && !d.Kind.Prim().Is_bool() {
-		if expr_data_is_rune_lit(op.L) || expr_data_is_rune_lit(op.R) {
-			d.Kind = &TypeKind{kind: build_prim_type(types.TypeKind_U8)}
-		}
+	if d != nil && l.Is_rune && r.Is_rune {
+		d.Is_rune = true
 	}
 
 	return d
