@@ -3421,8 +3421,10 @@ func (bs *_BinopSolver) solve(op *ast.BinopExpr) *Data {
 	d := bs.solve_explicit(l, r)
 
 	// Save rune type.
-	if expr_data_is_rune_lit(op.L) || expr_data_is_rune_lit(op.R) {
-		d.Kind = &TypeKind{kind: build_prim_type(types.TypeKind_U8)}
+	if d != nil && d.Kind.Prim() != nil && !d.Kind.Prim().Is_bool() {
+		if expr_data_is_rune_lit(op.L) || expr_data_is_rune_lit(op.R) {
+			d.Kind = &TypeKind{kind: build_prim_type(types.TypeKind_U8)}
+		}
 	}
 
 	return d
