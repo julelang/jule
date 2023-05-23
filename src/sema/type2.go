@@ -616,8 +616,11 @@ func (fcac *_FnCallArgChecker) push_variadic(p *ParamIns, i int) (ok bool) {
 		if d.Variadiced {
 			variadiced = true
 			d.Variadiced = false // For ignore assignment checking error.
-			model = d.Model.(*SliceExprModel)
-			model.Elem_kind = p.Kind
+			switch d.Model.(type) {
+			case *SliceExprModel:
+				model = d.Model.(*SliceExprModel)
+				model.Elem_kind = p.Kind
+			}
 		} else {
 			model.Elems = append(model.Elems, d.Model)
 		}
