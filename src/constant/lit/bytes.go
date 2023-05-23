@@ -35,7 +35,7 @@ func Is_byte_lit(kind string) (string, bool) {
 	return kind, is_byte
 }
 
-// Returns rune value string from bytes.
+// Returns rune value string from bytes, not includes quotes.
 // Bytes are represents rune literal, allows escape sequences.
 // Returns empty string if len(bytes) == 0
 func To_rune(bytes []byte) rune {

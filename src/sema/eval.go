@@ -167,7 +167,7 @@ func (e *_Eval) lit_nil() *Data {
 }
 
 func (e *_Eval) lit_str(lt *ast.LitExpr) *Data {
-	s := lt.Value[1:len(lt.Value)-1]
+	s := lt.Value[1:len(lt.Value)-1] // Remove quotes.
 	s = lit.To_str([]byte(s))
 	constant := constant.New_str(s)
 
@@ -201,7 +201,8 @@ func (e *_Eval) lit_rune(l *ast.LitExpr) *Data {
 	const BYTE_KIND = types.TypeKind_U8
 	const RUNE_KIND = types.TypeKind_I32
 	
-	r := lit.To_rune([]byte(l.Value))
+	lt := l.Value[1:len(l.Value)-1] // Remove quotes.
+	r := lit.To_rune([]byte(lt))
 	data := &Data{
 		Lvalue:   false,
 		Mutable:  false,
@@ -220,7 +221,7 @@ func (e *_Eval) lit_rune(l *ast.LitExpr) *Data {
 		}
 	}
 
-	data.Model = data.Constant
+	data.Model = &RuneExprModel{Code: r}
 	data.Is_rune = true
 	return data
 }

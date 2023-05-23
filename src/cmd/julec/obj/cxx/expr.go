@@ -119,12 +119,16 @@ func get_float_model(d *sema.Data) string {
 	}
 }
 
-func get_i64_model(c *constant.Const) string {
-	fmt := strconv.FormatInt(c.Read_i64(), 10)
+func i64toa(x int64) string {
+	fmt := strconv.FormatInt(x, 10)
 	if build.Is_64bit(runtime.GOARCH) {
 		return fmt + "LL"
 	}
 	return fmt + "L"
+}
+
+func get_i64_model(c *constant.Const) string {
+	return i64toa(c.Read_i64())
 }
 
 func get_u64_model(c *constant.Const) string {
@@ -500,6 +504,13 @@ func gen_str_constructor_expr_model(m *sema.StrConstructorcallExprModel) string 
 	return "__julec_to_str(" + gen_expr(m.Expr) + ")"
 }
 
+func gen_rune_expr_model(m *sema.RuneExprModel) string {
+	if m.Code <= 127 { // ASCII
+		return "'" + sbtoa(byte(m.Code)) + "'"
+	}
+	return i64toa(int64(m.Code))
+}
+
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
 	case *sema.TypeKind:
@@ -600,6 +611,9 @@ func gen_expr_model(m sema.ExprModel) string {
 
 	case *sema.StrConstructorcallExprModel:
 		return gen_str_constructor_expr_model(m.(*sema.StrConstructorcallExprModel))
+
+	case *sema.RuneExprModel:
+		return gen_rune_expr_model(m.(*sema.RuneExprModel))
 
 	default:
 		return "<unimplemented_expression_model>"

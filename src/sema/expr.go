@@ -196,3 +196,9 @@ type AlignofExprModel struct {
 type StrConstructorcallExprModel struct {
 	Expr ExprModel
 }
+
+// Rune literal expression model.
+// For example: 'a'
+type RuneExprModel struct {
+	Code rune
+}
