@@ -544,6 +544,8 @@ func (e *_Eval) eval_type_alias(ta *TypeAlias, error_token lex.Token) *Data {
 		return nil
 	}
 
+	ta.Used = true
+
 	kind := ta.Kind.Kind.kind
 	switch kind.(type) {
 	case *StructIns:
@@ -552,6 +554,12 @@ func (e *_Eval) eval_type_alias(ta *TypeAlias, error_token lex.Token) *Data {
 	case *Enum:
 		return e.eval_enum(kind.(*Enum), error_token)
 
+	case *Prim, *Slc:
+		return &Data{
+			Decl: true,
+			Kind: &TypeKind{kind: ta.Kind.Kind.kind},
+		}
+	
 	default:
 		e.push_err(error_token, "invalid_expr")
 		return nil
@@ -1625,9 +1633,7 @@ func (e *_Eval) eval_fn_call(fc *ast.FnCallExpr) *Data {
 	}
 
 	if d.Decl {
-		if d.Kind.Prim() != nil {
-			return e.call_type_fn(fc, d)
-		}
+		return e.call_type_fn(fc, d)
 	}
 
 	if d.Kind.Fnc() == nil {
