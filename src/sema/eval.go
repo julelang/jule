@@ -1082,7 +1082,7 @@ func (e *_Eval) eval_slicing_exprs(s *ast.SlicingExpr) (*Data, *Data) {
 
 func (e *_Eval) slicing_arr(d *Data) {
 	d.Lvalue = false
-	d.Kind.kind = &Slc{Elem: d.Kind.Slc().Elem}
+	d.Kind.kind = &Slc{Elem: d.Kind.Arr().Elem}
 }
 
 func (e *_Eval) slicing_slc(d *Data) {
