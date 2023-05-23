@@ -379,7 +379,7 @@ func gen_break_st(b *sema.BreakSt) string {
 }
 
 func gen_ret_vars(r *sema.RetSt) string {
-	obj := "std::make_tuple("
+	obj := "return std::make_tuple("
 	for _, v := range r.Vars {
 		if lex.Is_ignore_ident(v.Ident) {
 			obj += get_init_expr(v.Kind.Kind)
