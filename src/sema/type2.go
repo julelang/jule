@@ -980,6 +980,9 @@ func (rtc *_RetTypeChecker) prepare_exprs(d *Data) {
 }
 
 func (rtc *_RetTypeChecker) ret_vars() {
+	if rtc.f.Decl.Is_void() {
+		return
+	}
 	rtc.vars = make([]*Var, len(rtc.f.Decl.Result.Idents))
 
 	j := 0
