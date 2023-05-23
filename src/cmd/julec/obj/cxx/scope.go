@@ -102,7 +102,7 @@ func _uintptr[T any](t *T) uintptr { return uintptr(unsafe.Pointer(t)) }
 
 func gen_if(i *sema.If) string {
 	obj := "if ("
-	obj += gen_expr_model(i.Expr)
+	obj += gen_expr(i.Expr)
 	obj += ") "
 	obj += gen_scope(i.Scope)
 	return obj
@@ -153,7 +153,7 @@ func gen_while_iter(it *sema.WhileIter) string {
 	obj := begin + ":;\n"
 	obj += indent
 	obj += "if (!("
-	obj += gen_expr_model(it.Expr)
+	obj += gen_expr(it.Expr)
 	obj += ")) { goto "
 	obj += end
 	obj += "; }\n"
@@ -198,7 +198,7 @@ func gen_range_iter(it *sema.RangeIter) string {
 	obj := "{\n"
 	obj += _indent
 	obj += "auto __julec_range_expr = "
-	obj += gen_expr_model(it.Expr.Model) + ";\n"
+	obj += gen_expr(it.Expr.Model) + ";\n"
 	obj += _indent
 	obj += "if (__julec_range_expr.begin() != __julec_range_expr.end()) {\n"
 
@@ -250,13 +250,13 @@ func gen_goto(gt *sema.GotoSt) string {
 }
 
 func gen_postfix(p *sema.Postfix) string {
-	return gen_expr_model(p.Expr) + p.Op + CPP_ST_TERM
+	return "(" + gen_expr(p.Expr) + ")" + p.Op + CPP_ST_TERM
 }
 
 func gen_assign(a *sema.Assign) string {
-	obj := gen_expr_model(a.L)
+	obj := gen_expr(a.L)
 	obj += a.Op
-	obj += gen_expr_model(a.R)
+	obj += gen_expr(a.R)
 	obj += CPP_ST_TERM
 	return obj
 }
@@ -268,13 +268,13 @@ func gen_multi_assign(a *sema.MultiAssign) string {
 		if l == nil {
 			obj += CPP_IGNORE + ","
 		} else {
-			obj += gen_expr_model(l) + ","
+			obj += gen_expr(l) + ","
 		}
 	}
 	obj = obj[:len(obj)-1] // Remove last comma.
 
 	obj += ") = "
-	obj += gen_expr_model(a.R)
+	obj += gen_expr(a.R)
 	obj += CPP_ST_TERM
 	return obj
 }
@@ -289,14 +289,14 @@ func gen_case(m *sema.Match, c *sema.Case) string {
 		obj += "if (!("
 		for i, expr := range c.Exprs {
 			if !m.Type_match {
-				obj += gen_expr_model(expr)
+				obj += gen_expr(expr)
 				obj += " == "
 			}
 
 			obj += MATCH_EXPR
 
 			if m.Type_match {
-				obj += ".__type_is<" + gen_expr_model(expr)  + ">()"
+				obj += ".__type_is<" + gen_expr(expr)  + ">()"
 			}
 
 			if i+1 < len(c.Exprs) {
@@ -331,7 +331,7 @@ func gen_match(m *sema.Match) string {
 
 	obj += indent()
 	obj += "auto _match_expr{ "
-	obj += gen_expr_model(m.Expr)
+	obj += gen_expr(m.Expr)
 	obj += " };\n"
 	obj += indent()
 
@@ -402,7 +402,7 @@ func gen_ret_expr_tuple(r *sema.RetSt) string {
 	for i, v := range r.Vars {
 		if !lex.Is_ignore_ident(v.Ident) {
 			ident := var_out_ident(v)
-			obj += ident + " = " + gen_expr_model(datas[i].Model) + ";\n"
+			obj += ident + " = " + gen_expr(datas[i].Model) + ";\n"
 			obj += indent()
 		}
 	}
@@ -411,7 +411,7 @@ func gen_ret_expr_tuple(r *sema.RetSt) string {
 	for i, d := range datas {
 		v := r.Vars[i]
 		if lex.Is_ignore_ident(v.Ident) {
-			obj += gen_expr_model(d.Model)
+			obj += gen_expr(d.Model)
 		} else {
 			obj += var_out_ident(v)
 		}
@@ -426,7 +426,7 @@ func gen_ret_expr_tuple(r *sema.RetSt) string {
 
 func gen_ret_expr(r *sema.RetSt) string {
 	if len(r.Vars) == 0 {
-		return "return " + gen_expr_model(r.Expr) + CPP_ST_TERM
+		return "return " + gen_expr(r.Expr) + CPP_ST_TERM
 	}
 
 	if len(r.Vars) > 1 {
@@ -436,13 +436,13 @@ func gen_ret_expr(r *sema.RetSt) string {
 	obj := ""
 	if !lex.Is_ignore_ident(r.Vars[0].Ident) {
 		ident := var_out_ident(r.Vars[0])
-		obj += ident + " = " + gen_expr_model(r.Expr) + ";\n"
+		obj += ident + " = " + gen_expr(r.Expr) + ";\n"
 		obj += indent()
 		obj += "return " + ident + CPP_ST_TERM
 		return obj
 	}
 
-	return "return " + gen_expr_model(r.Expr) + CPP_ST_TERM
+	return "return " + gen_expr(r.Expr) + CPP_ST_TERM
 }
 
 func gen_ret_st(r *sema.RetSt) string {
@@ -482,7 +482,7 @@ func gen_recover(r *sema.Recover) string {
 		// Therefore, call passed function with error.
 
 		obj += " _Error ) {"
-		obj += gen_expr_model(r.Handler_expr)
+		obj += gen_expr(r.Handler_expr)
 		obj += "( _Error ); }"
 	}
 
@@ -502,7 +502,7 @@ func gen_st(st sema.St) string {
 		return "// " + gen_type_alias(st.(*sema.TypeAlias))
 
 	case *sema.Data:
-		return gen_expr_model(st.(*sema.Data).Model) + CPP_ST_TERM
+		return gen_expr(st.(*sema.Data).Model) + CPP_ST_TERM
 
 	case *sema.Conditional:
 		return gen_conditional(st.(*sema.Conditional))

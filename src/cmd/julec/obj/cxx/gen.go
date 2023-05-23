@@ -622,7 +622,7 @@ func gen_var(v *sema.Var) string {
 	if v.Value != nil && v.Value.Expr != nil {
 		if v.Value.Data.Model != nil {
 			obj += " = "
-			obj += gen_expr(v.Value)
+			obj += gen_val(v.Value)
 		} else {
 			obj += CPP_DEFAULT_EXPR
 		}

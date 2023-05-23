@@ -189,9 +189,9 @@ func gen_binop_expr_model(m *sema.BinopExprModel) string {
 	switch m.Op {
 	case lex.KND_SOLIDUS:
 		obj := "__julec_div("
-		obj += gen_expr_model(m.L)
+		obj += gen_expr(m.L)
 		obj += ","
-		obj += gen_expr_model(m.R)
+		obj += gen_expr(m.R)
 		obj += ")"
 		return obj
 
@@ -224,7 +224,7 @@ func gen_unary_expr_model(m *sema.UnaryExprModel) string {
 }
 
 func gen_get_ref_ptr_expr_model(m *sema.GetRefPtrExprModel) string {
-	return "(" + gen_expr_model(m.Expr) + ").__alloc"
+	return "(" + gen_expr(m.Expr) + ").__alloc"
 }
 
 func gen_struct_lit_expr_model(m *sema.StructLitExprModel) string {
@@ -234,7 +234,7 @@ func gen_struct_lit_expr_model(m *sema.StructLitExprModel) string {
 		for _, f := range m.Strct.Fields {
 			for _, arg := range m.Args {
 				if arg.Field == f {
-					obj += gen_expr_model(arg.Expr) + ","
+					obj += gen_expr(arg.Expr) + ","
 					break;
 				}
 			}
@@ -261,7 +261,7 @@ func gen_casting_expr_model(m *sema.CastingExprModel) string {
 		obj += "(("
 		obj += gen_type_kind(m.Kind)
 		obj += ")("
-		obj += gen_expr_model(m.Expr)
+		obj += gen_expr(m.Expr)
 		obj += "))"
 		return obj
 
@@ -277,7 +277,7 @@ func gen_casting_expr_model(m *sema.CastingExprModel) string {
 	obj += "static_cast<"
 	obj += gen_type_kind(m.Kind)
 	obj += ">("
-	obj += gen_expr_model(m.Expr)
+	obj += gen_expr(m.Expr)
 	obj += ")"
 	return obj
 }
@@ -289,7 +289,7 @@ func gen_arg_expr_models(models []sema.ExprModel) string {
 
 	obj := ""
 	for _, m := range models {
-		obj += gen_expr_model(m) + ","
+		obj += gen_expr(m) + ","
 	}
 	obj = obj[:len(obj)-1] // Remove last comma.
 	return obj
@@ -319,7 +319,7 @@ func gen_slice_expr_model(m *sema.SliceExprModel) string {
 func gen_indexing_expr_model(m *sema.IndexigExprModel) string {
 	obj := gen_expr_model(m.Expr)
 	obj += "["
-	obj += gen_expr_model(m.Index)
+	obj += gen_expr(m.Index)
 	obj += "]"
 	return obj
 }
@@ -350,9 +350,9 @@ func gen_map_expr_model(m *sema.MapExprModel) string {
 	if len(m.Entries) > 0 {
 		for _, pair := range m.Entries {
 			pair_obj := "{"
-			pair_obj += gen_expr_model(pair.Key)
+			pair_obj += gen_expr(pair.Key)
 			pair_obj += ","
-			pair_obj += gen_expr_model(pair.Val)
+			pair_obj += gen_expr(pair.Val)
 			pair_obj += "}"
 			obj += pair_obj
 			obj += ","
@@ -366,10 +366,10 @@ func gen_map_expr_model(m *sema.MapExprModel) string {
 func gen_slicing_expr_model(m *sema.SlicingExprModel) string {
 	obj := gen_expr_model(m.Expr)
 	obj += ".___slice("
-	obj += gen_expr_model(m.L)
+	obj += gen_expr(m.L)
 	if m.R != nil {
 		obj += ","
-		obj += gen_expr_model(m.R)
+		obj += gen_expr(m.R)
 	}
 	obj += ")"
 	return obj
@@ -419,7 +419,7 @@ func gen_fn_ins_expr_model(m *sema.FnIns) string {
 func gen_tuple_expr_model(m *sema.TupleExprModel) string {
 	obj := "std::make_tuple("
 	for _, d := range m.Datas {
-		obj += gen_expr_model(d.Model) + ","
+		obj += gen_expr(d.Model) + ","
 	}
 	obj = obj[:len(obj)-1] // Remove last comma.
 	obj += ")"
@@ -431,7 +431,7 @@ func gen_builtin_new_call_expr_model(m *sema.BuiltinNewCallExprModel) string {
 	obj += gen_type_kind(m.Kind)
 	obj += ">("
 	if m.Init != nil {
-		obj += gen_expr_model(m.Init)
+		obj += gen_expr(m.Init)
 	}
 	obj += ")"
 	return obj
@@ -439,35 +439,35 @@ func gen_builtin_new_call_expr_model(m *sema.BuiltinNewCallExprModel) string {
 
 func gen_builtin_out_call_expr_model(m *sema.BuiltinOutCallExprModel) string {
 	obj := "_out("
-	obj += gen_expr_model(m.Expr)
+	obj += gen_expr(m.Expr)
 	obj += ")"
 	return obj
 }
 
 func gen_builtin_outln_call_expr_model(m *sema.BuiltinOutlnCallExprModel) string {
 	obj := "_outln("
-	obj += gen_expr_model(m.Expr)
+	obj += gen_expr(m.Expr)
 	obj += ")"
 	return obj
 }
 
 func gen_builtin_real_call_expr_model(m *sema.BuiltinRealCallExprModel) string {
 	obj := "_real("
-	obj += gen_expr_model(m.Expr)
+	obj += gen_expr(m.Expr)
 	obj += ")"
 	return obj
 }
 
 func gen_builtin_drop_call_expr_model(m *sema.BuiltinDropCallExprModel) string {
 	obj := "_drop("
-	obj += gen_expr_model(m.Expr)
+	obj += gen_expr(m.Expr)
 	obj += ")"
 	return obj
 }
 
 func gen_builtin_panic_call_expr_model(m *sema.BuiltinPanicCallExprModel) string {
 	obj := "_panic("
-	obj += gen_expr_model(m.Expr)
+	obj += gen_expr(m.Expr)
 	obj += ")"
 	return obj
 }
@@ -476,7 +476,7 @@ func gen_builtin_make_call_expr_model(m *sema.BuiltinMakeCallExprModel) string {
 	obj := gen_type_kind(m.Kind)
 	obj += "("
 	if m.Size != nil {
-		obj += gen_expr_model(m.Size)
+		obj += gen_expr(m.Size)
 	}
 	obj += ")"
 	return obj
@@ -484,20 +484,20 @@ func gen_builtin_make_call_expr_model(m *sema.BuiltinMakeCallExprModel) string {
 
 func gen_sizeof_expr_model(m *sema.SizeofExprModel) string {
 	obj := "sizeof("
-	obj += gen_expr_model(m.Expr)
+	obj += gen_expr(m.Expr)
 	obj += ")"
 	return obj
 }
 
 func gen_alignof_expr_model(m *sema.AlignofExprModel) string {
 	obj := "alignof("
-	obj += gen_expr_model(m.Expr)
+	obj += gen_expr(m.Expr)
 	obj += ")"
 	return obj
 }
 
 func gen_str_constructor_expr_model(m *sema.StrConstructorcallExprModel) string {
-	return "__julec_to_str(" + gen_expr_model(m.Expr) + ")"
+	return "__julec_to_str(" + gen_expr(m.Expr) + ")"
 }
 
 func gen_expr_model(m sema.ExprModel) string {
@@ -606,11 +606,24 @@ func gen_expr_model(m sema.ExprModel) string {
 	}
 }
 
-func gen_expr(v *sema.Value) string {
+func gen_expr(e sema.ExprModel) string {
+	obj := gen_expr_model(e)
+
+	if obj != "" && obj[0] == '(' {
+		switch e.(type) {
+		case *sema.BinopExprModel:
+			obj = obj[1:len(obj)-1] // Remove unnecessary parentheses.
+		}
+	}
+
+	return obj
+}
+
+func gen_val(v *sema.Value) string {
 	if v.Data.Is_const() {
 		return gen_const_expr(v.Data)
 	}
-	return gen_expr_model(v.Data.Model)
+	return gen_expr(v.Data.Model)
 }
 
 func get_init_expr(t *sema.TypeKind) string {
@@ -618,5 +631,5 @@ func get_init_expr(t *sema.TypeKind) string {
 	if enm == nil {
 		return CPP_DEFAULT_EXPR
 	}
-	return "{" + gen_expr(enm.Items[0].Value) + "}"
+	return "{" + gen_val(enm.Items[0].Value) + "}"
 }
