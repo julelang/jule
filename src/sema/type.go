@@ -419,7 +419,7 @@ func (tc *_TypeChecker) build_prim(decl *ast.IdentType) *Prim {
 // Returns true if tc.referencer is nil.
 // Returns true if refers is nil.
 func (tc *_TypeChecker) check_illegal_cycles(decl uintptr, refers *[]uintptr, decl_token lex.Token) (ok bool) {
-	if tc.referencer == nil || refers == nil {
+	if tc.referencer == nil || tc.referencer.refers == nil || refers == nil {
 		return true
 	}
 
