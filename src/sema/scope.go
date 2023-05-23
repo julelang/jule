@@ -913,22 +913,7 @@ func (sc *_ScopeChecker) check_multi_assign(a *ast.AssignSt) {
 		return
 	}
 
-	var r []*Data
-	if rd.Kind.Tup() != nil {
-		switch rd.Model.(type) {
-		case *TupleExprModel:
-			r = rd.Model.(*TupleExprModel).Datas
-
-		default:
-			t := rd.Kind.Tup()
-			r = make([]*Data, len(t.Types))
-			for i, kind := range t.Types {
-				r[i] = &Data{Kind: kind}
-			}
-		}
-	} else {
-		r = append(r, rd)
-	}
+	r := get_datas_from_tuple_data(rd)
 
 	switch {
 	case len(a.L) > len(r):
@@ -1595,4 +1580,23 @@ loop:
 		}
 	}
 	return n
+}
+
+func get_datas_from_tuple_data(d *Data) []*Data {
+	if d.Kind.Tup() != nil {
+		switch d.Model.(type) {
+		case *TupleExprModel:
+			return d.Model.(*TupleExprModel).Datas
+
+		default:
+			t := d.Kind.Tup()
+			r := make([]*Data, len(t.Types))
+			for i, kind := range t.Types {
+				r[i] = &Data{Kind: kind}
+			}
+			return r
+		}
+	} else {
+		return []*Data{d}
+	}
 }

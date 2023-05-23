@@ -976,7 +976,7 @@ func (rtc *_RetTypeChecker) prepare_exprs(d *Data) {
 		return
 	}
 
-	rtc.exprs = d.Model.(*TupleExprModel).Datas
+	rtc.exprs = get_datas_from_tuple_data(d)
 }
 
 func (rtc *_RetTypeChecker) ret_vars() {
