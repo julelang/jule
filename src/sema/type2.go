@@ -985,10 +985,12 @@ func (rtc *_RetTypeChecker) ret_vars() {
 	}
 	rtc.vars = make([]*Var, len(rtc.f.Decl.Result.Idents))
 
+	root_scope := rtc.sc.get_root()
+
 	j := 0
 	for i, ident := range rtc.f.Decl.Result.Idents {
 		if !lex.Is_ignore_ident(ident.Kind) {
-			rtc.vars[i] = rtc.sc.table.Vars[j]
+			rtc.vars[i] = root_scope.table.Vars[j]
 			j++
 		} else {
 			rtc.vars[i] = &Var{

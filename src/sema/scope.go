@@ -182,6 +182,17 @@ iter:
 	return false
 }
 
+// Reports scope is root.
+func (sc *_ScopeChecker) is_root() bool { return sc.parent == nil }
+
+func (sc *_ScopeChecker) get_root() *_ScopeChecker {
+	root := sc
+	for root.parent != nil {
+		root = root.parent
+	}
+	return root
+}
+
 // Returns imported package by identifier.
 // Returns nil if not exist any package in this identifier.
 //
@@ -1516,7 +1527,7 @@ func (sc *_ScopeChecker) check(tree *ast.ScopeTree, s *Scope) {
 	sc.check_vars()
 	sc.check_aliases()
 
-	if sc.parent == nil { // If parent scope.
+	if sc.is_root() {
 		sc.check_gotos()
 		sc.check_labels()
 	}
