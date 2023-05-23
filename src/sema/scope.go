@@ -45,10 +45,13 @@ type InfIter struct {
 
 // While iteration.
 type WhileIter struct {
-	Expr  ExprModel
-	Next  St
+	Expr  ExprModel // Can be nil if iteration is while-next kind.
+	Next  St        // Nil if iteration is not while-next kind.
 	Scope *Scope
 }
+
+// Reports whether iteration is while-next kind.
+func (wi *WhileIter) Is_while_next() bool { return wi.Next != nil }
 
 // Range iteration.
 type RangeIter struct {
@@ -551,27 +554,36 @@ func (sc *_ScopeChecker) is_valid_st_for_next_st(st St) bool {
 }
 
 func (sc *_ScopeChecker) check_while_iter(it *ast.Iter) {
+	wh := it.Kind.(*ast.WhileKind)
+	if wh.Expr == nil && wh.Next == nil {
+		sc.check_inf_iter(it)
+		return
+	}
+
 	kind := &WhileIter{}
 
 	sc.scope.Stmts = append(sc.scope.Stmts, kind)
 
 	kind.Scope = sc.check_iter_scope(_uintptr(kind), it.Scope)
 
-	wh := it.Kind.(*ast.WhileKind)
-	d := sc.s.eval(wh.Expr, sc)
-	if d == nil {
-		return
-	}
+	if wh.Expr != nil {
+		d := sc.s.eval(wh.Expr, sc)
+		if d == nil {
+			return
+		}
 
-	prim := d.Kind.Prim()
-	if prim == nil {
-		sc.s.push_err(it.Token, "iter_while_require_bool_expr")
-		return
-	}
+		prim := d.Kind.Prim()
+		if prim == nil {
+			sc.s.push_err(it.Token, "iter_while_require_bool_expr")
+			return
+		}
 
-	if !prim.Is_bool() {
-		sc.s.push_err(it.Token, "iter_while_require_bool_expr")
-		return
+		if !prim.Is_bool() {
+			sc.s.push_err(it.Token, "iter_while_require_bool_expr")
+			return
+		}
+
+		kind.Expr = d.Model
 	}
 
 	if wh.Is_while_next() {
@@ -592,8 +604,6 @@ func (sc *_ScopeChecker) check_while_iter(it *ast.Iter) {
 			kind.Next = st
 		}
 	}
-
-	kind.Expr = d.Model
 }
 
 func (sc *_ScopeChecker) check_range_iter(it *ast.Iter) {

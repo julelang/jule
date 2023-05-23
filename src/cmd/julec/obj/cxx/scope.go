@@ -152,12 +152,14 @@ func gen_while_iter(it *sema.WhileIter) string {
 
 	obj := begin + ":;\n"
 	obj += indent
-	obj += "if (!("
-	obj += gen_expr(it.Expr)
-	obj += ")) { goto "
-	obj += end
-	obj += "; }\n"
-	obj += indent
+	if it.Expr != nil {
+		obj += "if (!("
+		obj += gen_expr(it.Expr)
+		obj += ")) { goto "
+		obj += end
+		obj += "; }\n"
+		obj += indent
+	}
 	obj += gen_scope(it.Scope)
 	obj += "\n"
 	obj += indent
