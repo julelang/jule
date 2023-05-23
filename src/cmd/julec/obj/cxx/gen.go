@@ -559,7 +559,7 @@ func gen_fn_decl_head(f *sema.FnIns, method bool) string {
 
 	obj += gen_fn_ins_result(f) + " "
 
-	if f.Decl.Owner != nil {
+	if !method && f.Decl.Owner != nil {
 		obj += struct_ins_out_ident(f.Owner) + lex.KND_DBLCOLON
 	}
 	obj += fn_ins_out_ident(f)
