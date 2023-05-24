@@ -33,7 +33,11 @@ type _Kind interface {
 }
 
 // Type's kind's type.
-type TypeKind struct { kind _Kind }
+type TypeKind struct {
+	Cpp_linked bool
+	Cpp_ident  string
+	kind      _Kind
+}
 // Returns kind as string.
 func (tk TypeKind) To_str() string {
 	if tk.Is_nil() {
@@ -502,7 +506,16 @@ func (tc *_TypeChecker) from_type_alias(decl *ast.IdentType, ta *TypeAlias) _Kin
 		return nil
 	}
 
-	return ta.Kind.Kind.kind
+	kind := &TypeKind{
+		kind: ta.Kind.Kind.kind,
+	}
+
+	if ta.Cpp_linked {
+		kind.Cpp_linked = true
+		kind.Cpp_ident = ta.Ident
+	}
+
+	return kind
 }
 
 func (tc *_TypeChecker) from_enum(decl *ast.IdentType, e *Enum) *Enum {
@@ -952,8 +965,14 @@ func (tc *_TypeChecker) build(decl_kind ast.TypeDeclKind) *TypeKind {
 		return nil
 	}
 
-	return &TypeKind{
-		kind: kind,
+	switch kind.(type) {
+	case *TypeKind:
+		return kind.(*TypeKind)
+
+	default:
+		return &TypeKind{
+			kind: kind,
+		}
 	}
 }
 

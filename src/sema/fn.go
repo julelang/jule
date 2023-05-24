@@ -41,6 +41,8 @@ func (p *Param) Is_ref() bool { return p.Ident != "" && p.Ident[0] == '&'}
 
 // Function.
 type Fn struct {
+	sema       *_Sema
+
 	Token      lex.Token
 	Global     bool
 	Unsafety   bool

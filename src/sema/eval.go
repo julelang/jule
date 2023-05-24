@@ -1688,7 +1688,7 @@ func (e *_Eval) eval_trait_sub_ident(d *Data, trt *Trait, ident lex.Token) *Data
 		Decl:     false,
 		Mutable:  false,
 		Constant: nil,
-		Kind:     &TypeKind{f.instance()},
+		Kind:     &TypeKind{kind: f.instance()},
 		Model:    &TraitSubIdentExprModel{
 			Expr:  d.Model,
 			Ident: ident.Kind,

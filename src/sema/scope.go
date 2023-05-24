@@ -487,6 +487,7 @@ func (sc *_ScopeChecker) check_else(e *ast.Else) *Else {
 
 func (sc *_ScopeChecker) check_conditional(conditional *ast.Conditional) {
 	c := &Conditional{}
+	sc.scope.Stmts = append(sc.scope.Stmts, c)
 
 	c.Elifs = make([]*If, len(conditional.Elifs)+1)
 
@@ -498,8 +499,6 @@ func (sc *_ScopeChecker) check_conditional(conditional *ast.Conditional) {
 	if conditional.Default != nil {
 		c.Default = sc.check_else(conditional.Default)
 	}
-
-	sc.scope.Stmts = append(sc.scope.Stmts, c)
 }
 
 func (sc *_ScopeChecker) check_iter_scope_sc(it uintptr, tree *ast.ScopeTree, ssc *_ScopeChecker) *Scope {

@@ -980,6 +980,7 @@ func (s *_Sema) check_fn_decl_types(f *Fn) (ok bool) {
 // Checks generics, parameters and return type.
 // Not checks scope, and other things.
 func (s *_Sema) check_fn_decl_prototype(f *Fn) (ok bool) {
+	f.sema = s
 	switch {
 	case !s.check_decl_generics(f.Generics):
 		return false
@@ -1497,6 +1498,9 @@ func (s *_Sema) check_struct_types() {
 func conditional_has_ret(c *Conditional) (ok bool, breaking bool) {
 	breaked := false
 	for _, elif := range c.Elifs {
+		if elif == nil {
+			return false, false
+		}
 		ok, _, breaking = __has_ret(elif.Scope)
 		breaked = breaked || breaking
 		if !ok {
@@ -1522,6 +1526,9 @@ func match_has_ret(m *Match) bool {
 	falled := false
 	breaked := false
 	for _, c := range m.Cases {
+		if c == nil {
+			return false
+		}
 		ok, falled, breaked = __has_ret(c.Scope)
 		if !ok && !falled || breaked {
 			return false
@@ -1642,8 +1649,12 @@ func (s *_Sema) check_fn_ins_sc(f *FnIns, sc *_ScopeChecker) {
 }
 
 func (s *_Sema) check_fn_ins(f *FnIns) {
-	sc := new_scope_checker(s, f)
+	sc := new_scope_checker(f.Decl.sema, f)
 	s.check_fn_ins_sc(f, sc)
+
+	if f.Decl.sema != s {
+		s.errors = append(s.errors, f.Decl.sema.errors...)
+	}
 }
 
 func (s *_Sema) check_type_fn(f *Fn) {
