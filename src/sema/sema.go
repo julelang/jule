@@ -1485,14 +1485,13 @@ func (s *_Sema) check_struct_types() {
 	}
 }
 
-func (s *_Sema) check_fn_ins(f *FnIns) {
+func (s *_Sema) check_fn_ins_sc(f *FnIns, sc *_ScopeChecker) {
 	if f.Decl.Cpp_linked {
 		return
 	}
 
 	vars := build_ret_vars(f)
 
-	sc := new_scope_checker(s, f)
 	sc.table.Vars = append(sc.table.Vars, vars...)
 	sc.table.Vars = append(sc.table.Vars, build_param_vars(f)...)
 	sc.table.Type_aliases = append(sc.table.Type_aliases, build_generic_type_aliases(f)...)
@@ -1512,6 +1511,11 @@ func (s *_Sema) check_fn_ins(f *FnIns) {
 
 		f.Scope.Stmts = stms
 	}
+}
+
+func (s *_Sema) check_fn_ins(f *FnIns) {
+	sc := new_scope_checker(s, f)
+	s.check_fn_ins_sc(f, sc)
 }
 
 func (s *_Sema) check_type_fn(f *Fn) {

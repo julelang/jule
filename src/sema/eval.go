@@ -2617,8 +2617,22 @@ func (e *_Eval) eval_anon_fn(decl *ast.FnDecl) *Data {
 	}
 	ins := tc.build_fn(decl)
 
-	sc := new_scope_checker(e.s, ins)
-	sc.check(decl.Scope, ins.Scope)
+	switch e.lookup.(type) {
+	case *_ScopeChecker:
+		sc := e.lookup.(*_ScopeChecker)
+		scc := sc.new_child_checker()
+		scc.labels = new([]*_ScopeLabel)
+		scc.gotos =  new([]*_ScopeGoto)
+		scc.owner = nil
+		scc.child_index = 0
+		scc.it = 0
+		scc.cse = 0
+		scc.owner = ins
+		e.s.check_fn_ins_sc(ins, scc)
+
+	default:
+		e.s.check_fn_ins(ins)
+	}
 
 	return &Data{
 		Kind:  &TypeKind{kind: ins},

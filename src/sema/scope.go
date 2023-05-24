@@ -186,11 +186,14 @@ iter:
 }
 
 // Reports scope is root.
-func (sc *_ScopeChecker) is_root() bool { return sc.parent == nil }
+// Accepts anonymous functions as root.
+func (sc *_ScopeChecker) is_root() bool { return sc.parent == nil || sc.owner != nil }
 
+// Returns root scope.
+// Accepts anonymous functions as root.
 func (sc *_ScopeChecker) get_root() *_ScopeChecker {
 	root := sc
-	for root.parent != nil {
+	for root.parent != nil && root.owner == nil {
 		root = root.parent
 	}
 	return root
@@ -709,7 +712,7 @@ func (sc *_ScopeChecker) check_cont_valid_scope(c *ast.ContSt) *ContSt {
 	scope := sc
 iter:
 	switch {
-	case scope.it == 0 && scope.parent != nil:
+	case scope.it == 0 && scope.parent != nil && scope.owner == nil:
 		scope = scope.parent
 		goto iter
 
@@ -1263,7 +1266,7 @@ func (sc *_ScopeChecker) check_plain_break(b *ast.BreakSt) *BreakSt {
 	scope := sc
 iter:
 	switch {
-	case scope.it == 0 && scope.cse == 0 && scope.parent != nil:
+	case scope.it == 0 && scope.cse == 0 && scope.parent != nil && scope.owner == nil:
 		scope = scope.parent
 		goto iter
 
@@ -1576,7 +1579,7 @@ func new_scope_checker(s *_Sema, owner *FnIns) *_ScopeChecker {
 func find_label_parent(ident string, scope *_ScopeChecker) *_ScopeLabel {
 	label := scope.find_label_scope(ident)
 	for label == nil {
-		if scope.parent == nil {
+		if scope.parent == nil || scope.owner != nil {
 			return nil
 		}
 
