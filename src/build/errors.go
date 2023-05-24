@@ -174,6 +174,7 @@ var ERRORS = map[string]string{
 	`duplicated_import_selection`:              `duplicated identifier selection: @`,
 	`ident_is_not_accessible`:                  `identifier is not accessible: @`,
 	`invalid_stmt_for_next`:                    `invalid statement for while-next`,
+	`modulo_with_not_int`:                      `module operator must be used with integer type`,
 }
 
 // Returns formatted error message by key and args.

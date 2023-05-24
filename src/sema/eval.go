@@ -3031,6 +3031,31 @@ func (bs *_BinopSolver) set_type_to_greater() {
 	bs.r.Kind = bs.l.Kind
 }
 
+func (bs *_BinopSolver) mod() {
+	check := func(d *Data) {
+		if !d.Is_const() {
+			if d.Kind.Prim() == nil || !types.Is_int(d.Kind.Prim().kind) {
+				bs.e.push_err(bs.op, "modulo_with_not_int")
+			}
+			return
+		}
+
+		switch {
+		case sig_assignable(types.TypeKind_I64, d):
+			d.Constant.Set_i64(d.Constant.As_i64())
+
+		case unsig_assignable(types.TypeKind_U64, d):
+			d.Constant.Set_u64(d.Constant.As_u64())
+
+		default:
+			bs.e.push_err(bs.op, "modulo_with_not_int")
+		}
+	}
+
+	check(bs.l)
+	check(bs.r)
+}
+
 func (bs *_BinopSolver) eval_float() *Data {
 	lk := bs.l.Kind.To_str()
 	rk := bs.r.Kind.To_str()
@@ -3068,6 +3093,7 @@ func (bs *_BinopSolver) eval_float() *Data {
 			bs.e.push_err(bs.op, "incompatible_types", lk, rk)
 			return nil
 		}
+		bs.mod()
 		return bs.r
 
 	default:
@@ -3105,10 +3131,14 @@ func (bs *_BinopSolver) eval_unsig_int() *Data {
 		lex.KND_MINUS,
 		lex.KND_STAR,
 		lex.KND_SOLIDUS,
-		lex.KND_PERCENT,
 		lex.KND_AMPER,
 		lex.KND_VLINE,
 		lex.KND_CARET:
+		bs.set_type_to_greater()
+		return bs.l
+
+	case lex.KND_PERCENT:
+		bs.mod()
 		bs.set_type_to_greater()
 		return bs.l
 
@@ -3159,10 +3189,14 @@ func (bs *_BinopSolver) eval_sig_int() *Data {
 		lex.KND_MINUS,
 		lex.KND_STAR,
 		lex.KND_SOLIDUS,
-		lex.KND_PERCENT,
 		lex.KND_AMPER,
 		lex.KND_VLINE,
 		lex.KND_CARET:
+		bs.set_type_to_greater()
+		return bs.l
+
+	case lex.KND_PERCENT:
+		bs.mod()
 		bs.set_type_to_greater()
 		return bs.l
 
