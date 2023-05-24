@@ -157,7 +157,7 @@ type _ScopeChecker struct {
 	s           *_Sema
 	owner       *FnIns
 	parent      *_ScopeChecker
-	child_index int // Index of child scope.
+	child_index int             // Index of child scope.
 	table       *SymbolTable
 	scope       *Scope
 	tree        *ast.ScopeTree
@@ -1304,7 +1304,7 @@ func (sc *_ScopeChecker) check_ret(r *ast.RetSt) {
 
 	rtc := &_RetTypeChecker{
 		sc:          sc,
-		f:           sc.owner,
+		f:           sc.get_root().owner,
 		error_token: r.Token,
 	}
 	ok := rtc.check(d)
@@ -1551,7 +1551,8 @@ func (sc *_ScopeChecker) check(tree *ast.ScopeTree, s *Scope) {
 }
 
 func (sc *_ScopeChecker) new_child_checker() *_ScopeChecker {
-	base := new_scope_checker_base(sc.s, sc.owner)
+	base := new_scope_checker_base(sc.s, nil)
+	base.parent = sc
 	base.labels = sc.labels
 	base.gotos =  sc.gotos
 	base.child_index = sc.child_index + 1
