@@ -401,6 +401,8 @@ func gen_ret_vars(r *sema.RetSt) string {
 
 	if len(r.Vars) > 1 {
 		obj = "return std::make_tuple(" + obj + ")"
+	} else {
+		obj = "return " + obj
 	}
 
 	obj += CPP_ST_TERM
