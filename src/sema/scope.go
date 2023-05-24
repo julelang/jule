@@ -611,7 +611,7 @@ func (sc *_ScopeChecker) check_while_iter(it *ast.Iter) {
 
 func (sc *_ScopeChecker) check_range_iter(it *ast.Iter) {
 	rang := it.Kind.(*ast.RangeKind)
-	
+
 	d := sc.s.eval(rang.Expr, sc)
 	if d == nil {
 		return

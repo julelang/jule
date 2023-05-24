@@ -75,7 +75,8 @@ func build_param_vars(f *FnIns) []*Var {
 			},
 		}
 
-		if p.Decl.Is_self() {
+		switch {
+		case p.Decl.Is_self():
 			v.Kind.Kind = &TypeKind{kind: f.Owner}
 
 			if p.Decl.Is_ref() {
@@ -84,8 +85,16 @@ func build_param_vars(f *FnIns) []*Var {
 					Elem: &TypeKind{kind: v.Kind.Kind.kind},
 				}
 			}
-		} else {
-			v.Kind.Kind = p.Kind
+
+		case p.Decl.Variadic:
+			v.Kind.Kind = &TypeKind{
+				kind: &Slc{
+					Elem: &TypeKind{kind: p.Kind.kind},
+				},
+			}
+
+		default:
+			v.Kind.Kind = &TypeKind{kind: p.Kind.kind}
 		}
 
 		vars[i] = v
