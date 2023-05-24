@@ -237,13 +237,15 @@ func gen_struct_lit_expr_model(m *sema.StructLitExprModel) string {
 	obj := struct_ins_out_ident(m.Strct)
 	obj += "("
 	if len(m.Args) > 0 {
+	iter:
 		for _, f := range m.Strct.Fields {
 			for _, arg := range m.Args {
 				if arg.Field == f {
 					obj += gen_expr(arg.Expr) + ","
-					break;
+					continue iter;
 				}
 			}
+			obj += get_init_expr(f.Kind) + ","
 		}
 		obj = obj[:len(obj)-1] // Remove last comma.
 	}
