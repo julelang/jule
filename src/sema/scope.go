@@ -33,8 +33,7 @@ type Else struct {
 
 // Conditional chain.
 type Conditional struct {
-	If      *If
-	Elifs   []*If
+	Elifs   []*If // First not is root condition.
 	Default *Else
 }
 
@@ -489,11 +488,11 @@ func (sc *_ScopeChecker) check_else(e *ast.Else) *Else {
 func (sc *_ScopeChecker) check_conditional(conditional *ast.Conditional) {
 	c := &Conditional{}
 
-	c.If = sc.check_if(conditional.If)
+	c.Elifs = make([]*If, len(conditional.Elifs)+1)
 
-	c.Elifs = make([]*If, len(conditional.Elifs))
+	c.Elifs[0] = sc.check_if(conditional.If)
 	for i, elif := range conditional.Elifs {
-		c.Elifs[i] = sc.check_if(elif)
+		c.Elifs[i+1] = sc.check_if(elif)
 	}
 
 	if conditional.Default != nil {
@@ -1293,6 +1292,9 @@ func (sc *_ScopeChecker) check_break(b *ast.BreakSt) {
 }
 
 func (sc *_ScopeChecker) check_ret(r *ast.RetSt) {
+	rt := &RetSt{}
+	sc.scope.Stmts = append(sc.scope.Stmts, rt)
+
 	var d *Data = nil
 
 	if r.Expr != nil {
@@ -1317,15 +1319,11 @@ func (sc *_ScopeChecker) check_ret(r *ast.RetSt) {
 		return
 	}
 
-	rt := &RetSt{
-		Vars: rtc.vars,
-	}
+	rt.Vars = rtc.vars
 
 	if d != nil {
 		rt.Expr = d.Model
 	}
-
-	sc.scope.Stmts = append(sc.scope.Stmts, rt)
 }
 
 func (sc *_ScopeChecker) check_node(node ast.NodeData) {

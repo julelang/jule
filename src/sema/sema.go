@@ -1494,6 +1494,123 @@ func (s *_Sema) check_struct_types() {
 	}
 }
 
+func conditional_has_ret(c *Conditional) (ok bool, breaking bool) {
+	breaked := false
+	for _, elif := range c.Elifs {
+		ok, _, breaking = __has_ret(elif.Scope)
+		breaked = breaked || breaking
+		if !ok {
+			return false, breaked
+		}
+	}
+
+	if c.Default == nil {
+		return false, breaked
+	}
+
+	ok, _, breaking = __has_ret(c.Default.Scope)
+	breaked = breaked || breaking
+	return ok, breaked
+}
+
+func match_has_ret(m *Match) bool {
+	if m.Default == nil {
+		return false
+	}
+
+	ok := true
+	falled := false
+	breaked := false
+	for _, c := range m.Cases {
+		ok, falled, breaked = __has_ret(c.Scope)
+		if !ok && !falled || breaked {
+			return false
+		}
+
+		switch {
+		case !ok:
+			if !falled {
+				return false
+			}
+			fallthrough
+
+		case falled:
+			if c.Next == nil {
+				return false
+			}
+			continue
+		}
+		falled = false
+	}
+
+	return has_ret(m.Default.Scope)
+}
+
+func __has_ret(s *Scope) (ok bool, falled bool, breaked bool) {
+	if s == nil {
+		return false, false, false
+	}
+
+	for _, st := range s.Stmts {
+		switch st.(type) {
+		case *FallSt:
+			falled = true
+
+		case *BreakSt:
+			return false, false, true
+
+		case *RetSt:
+			return true, falled, breaked
+
+		case *Scope:
+			ok := has_ret(st.(*Scope))
+			if ok {
+				return true, false, false
+			}
+
+		case *Recover:
+			ok, falled, breaked := __has_ret(st.(*Recover).Scope)
+			if ok {
+				return true, falled, breaked
+			}
+
+		case *Conditional:
+			ok, breaking := conditional_has_ret(st.(*Conditional))
+			if ok {
+				return true, false, false
+			}
+
+			if breaking {
+				return false, false, breaked
+			}
+
+		case *Match:
+			ok := match_has_ret(st.(*Match))
+			if ok {
+				return true, false, false
+			}
+		}
+	}
+
+	return false, falled, breaked
+}
+
+func has_ret(s *Scope) bool {
+	ok, _, _ := __has_ret(s)
+	return ok
+}
+
+func (s *_Sema) check_rets(f *FnIns) {
+	if f.Decl.Is_void() {
+		return
+	}
+
+	ok := has_ret(f.Scope)
+	if !ok {
+		s.push_err(f.Decl.Token, "missing_ret")
+	}
+}
+
 func (s *_Sema) check_fn_ins_sc(f *FnIns, sc *_ScopeChecker) {
 	if f.Decl.Cpp_linked {
 		return
@@ -1520,6 +1637,8 @@ func (s *_Sema) check_fn_ins_sc(f *FnIns, sc *_ScopeChecker) {
 
 		f.Scope.Stmts = stms
 	}
+
+	s.check_rets(f)
 }
 
 func (s *_Sema) check_fn_ins(f *FnIns) {

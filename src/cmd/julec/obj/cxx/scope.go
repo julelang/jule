@@ -109,9 +109,9 @@ func gen_if(i *sema.If) string {
 }
 
 func gen_conditional(c *sema.Conditional) string {
-	obj := gen_if(c.If)
+	obj := gen_if(c.Elifs[0])
 
-	for _, elif := range c.Elifs {
+	for _, elif := range c.Elifs[1:] {
 		obj += " else "
 		obj += gen_if(elif)
 	}
