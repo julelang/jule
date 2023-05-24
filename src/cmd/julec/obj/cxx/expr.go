@@ -385,7 +385,7 @@ func gen_slicing_expr_model(m *sema.SlicingExprModel) string {
 
 func gen_trait_sub_ident_expr_model(m *sema.TraitSubIdentExprModel) string {
 	obj := gen_expr_model(m.Expr)
-	obj += "._get()."
+	obj += "._get()._method_"
 	obj += m.Ident
 	return obj
 }
