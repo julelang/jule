@@ -596,6 +596,10 @@ func (fcac *_FnCallArgChecker) push_variadic(p *ParamIns, i int) (ok bool) {
 			case *SliceExprModel:
 				model = d.Model.(*SliceExprModel)
 				model.Elem_kind = p.Kind
+
+			default:
+				model = nil
+				fcac.arg_models = append(fcac.arg_models, d.Model)
 			}
 		} else {
 			model.Elems = append(model.Elems, d.Model)
@@ -608,7 +612,9 @@ func (fcac *_FnCallArgChecker) push_variadic(p *ParamIns, i int) (ok bool) {
 		fcac.push_err("more_args_with_variadiced")
 	}
 
-	fcac.arg_models = append(fcac.arg_models, model)
+	if model != nil {
+		fcac.arg_models = append(fcac.arg_models, model)
+	}
 	return ok
 }
 
