@@ -520,10 +520,10 @@ func (fcac *_FnCallArgChecker) check_counts(params []*ParamIns) (ok bool) {
 	case diff == 0:
 		return true
 
+	case n > 0 && params[n-1].Decl.Variadic:
+		return true
+
 	case diff < 0 || diff > len(params):
-		if n > 0 && params[n-1].Decl.Variadic {
-			return true
-		}
 		fcac.push_err("argument_overflow")
 		return false
 	}

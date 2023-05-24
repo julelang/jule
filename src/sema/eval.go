@@ -1377,9 +1377,8 @@ func (e *_Eval) eval_cast_by_type_n_data(t *TypeKind, d *Data, error_token lex.T
 	d.Decl = false
 	if t.Prim() != nil && d.Is_const() {
 		d.Model = d.Constant
-	} else {
-		d.Cast_kind = t
 	}
+	d.Cast_kind = t
 	d.Kind = t
 
 	return d
@@ -2720,7 +2719,7 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 		return d
 	}
 
-	if d.Is_const() && !d.Is_rune && d.Kind.Prim() != nil {
+	if d.Cast_kind == nil && d.Is_const() && !d.Is_rune && d.Kind.Prim() != nil {
 		switch {
 		case d.Constant.Is_i64():
 			if int_assignable(types.TypeKind_INT, d) {
