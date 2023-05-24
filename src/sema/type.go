@@ -51,6 +51,11 @@ func (tk TypeKind) To_str() string {
 	if tk.Is_nil() {
 		return "nil"
 	}
+
+	if tk.Cpp_linked {
+		return "cpp." + tk.Cpp_ident
+	}
+
 	return tk.kind.To_str()
 }
 // Reports whether kind is "nil".
