@@ -40,26 +40,26 @@ func float_assignable(kind string, d *Data) bool {
 }
 
 func sig_assignable(kind string, d *Data) bool {
-	min := int64(types.Min_of(kind))
-	max := int64(types.Max_of(kind))
+	min := types.Min_of(kind)
+	max := types.Max_of(kind)
 
 	switch {
 	case d.Constant.Is_f64():
-		x := d.Constant.Read_f64()
+		x := float64(d.Constant.Read_f64())
 		i, frac := math.Modf(x)
 		if frac != 0 {
 			return false
 		}
-		return i >= float64(min) && i <= float64(max)
+		return i >= min && i <= max
 
 	case d.Constant.Is_u64():
-		x := d.Constant.Read_u64()
-		if x <= uint64(max) {
+		x := float64(d.Constant.Read_u64())
+		if x <= max {
 			return true
 		}
 
 	case d.Constant.Is_i64():
-		x := d.Constant.Read_i64()
+		x := float64(d.Constant.Read_i64())
 		return min <= x && x <= max
 	}
 
@@ -67,7 +67,7 @@ func sig_assignable(kind string, d *Data) bool {
 }
 
 func unsig_assignable(kind string, d *Data) bool {
-	max := uint64(types.Max_of(kind))
+	max := types.Max_of(kind)
 
 	switch {
 	case d.Constant.Is_f64():
@@ -80,17 +80,17 @@ func unsig_assignable(kind string, d *Data) bool {
 		if frac != 0 {
 			return false
 		}
-		return i <= float64(max)
+		return i <= max
 
 	case d.Constant.Is_u64():
-		x := d.Constant.Read_u64()
+		x := float64(d.Constant.Read_u64())
 		if x <= max {
 			return true
 		}
 
 	case d.Constant.Is_i64():
-		x := d.Constant.Read_i64()
-		return 0 <= x && uint64(x) <= max
+		x := float64(d.Constant.Read_i64())
+		return 0 <= x && x <= max
 	}
 
 	return false
