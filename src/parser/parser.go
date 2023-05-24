@@ -5,6 +5,7 @@
 package parser
 
 import (
+	"path/filepath"
 	"strings"
 
 	"github.com/julelang/jule/ast"
@@ -681,6 +682,7 @@ func (p *_Parser) build_cpp_use_decl(decl *ast.UseDecl, tokens []lex.Token) {
 	}
 	decl.Cpp = true
 	decl.Link_path = token.Kind[1 : len(token.Kind)-1]
+	decl.Link_path = filepath.Join(token.File.Dir(), decl.Link_path)
 }
 
 func (p *_Parser) build_std_use_decl(decl *ast.UseDecl, tokens []lex.Token) {

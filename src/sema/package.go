@@ -221,6 +221,10 @@ func (i *ImportInfo) Find_enum(ident string) *Enum {
 }
 
 func (i *ImportInfo) is_lookupable(ident string) bool {
+	if i.Cpp {
+		return false
+	}
+
 	if !i.Import_all {
 		if len(i.Selected) > 0 {
 			if !i.exist_ident(ident) {

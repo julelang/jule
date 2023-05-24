@@ -235,31 +235,14 @@ func (s *_SymbolBuilder) check_cpp_use_decl_path(decl *ast.UseDecl) (ok bool) {
 		return false
 	}
 
-	save_pwd := func() bool {
-		err := os.Chdir(s.pwd)
-		if err != nil {
-			s.push_err(decl.Token, "pwd_cannot_set", decl.Link_path)
-			return false
-		}
-		return true
-	}
-
-	err := os.Chdir(decl.Token.File.Dir())
-	if err != nil {
-		s.push_err(decl.Token, "use_not_found", decl.Link_path)
-		_ = save_pwd()
-		return false
-	}
-
 	info, err := os.Stat(decl.Link_path)
 	// Exist?
 	if err != nil || info.IsDir() {
 		s.push_err(decl.Token, "use_not_found", decl.Link_path)
-		_ = save_pwd()
 		return false
 	}
 
-	return save_pwd()
+	return true
 }
 
 func (s *_SymbolBuilder) build_cpp_header_import(decl *ast.UseDecl) *ImportInfo {

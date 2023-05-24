@@ -58,7 +58,9 @@ func get_all_structures(pkg *sema.Package, used []*sema.ImportInfo) []*sema.Stru
 	append_structs(pkg)
 
 	for _, u := range used {
-		append_structs(u.Package)
+		if !u.Cpp {
+			append_structs(u.Package)
+		}
 	}
 
 	return buffer
@@ -82,7 +84,9 @@ func get_all_variables(pkg *sema.Package, used []*sema.ImportInfo) []*sema.Var {
 	append_vars(pkg)
 
 	for _, u := range used {
-		append_vars(u.Package)
+		if !u.Cpp {
+			append_vars(u.Package)
+		}
 	}
 
 	return buffer
