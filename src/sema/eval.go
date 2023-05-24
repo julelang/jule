@@ -51,6 +51,7 @@ func apply_cast_kind(d *Data) {
 		Kind:     d.Cast_kind,
 		ExprKind: d.Kind,
 	}
+	d.Kind = d.Cast_kind
 	d.Cast_kind = nil // Ignore, because model added.
 }
 
@@ -1379,7 +1380,7 @@ func (e *_Eval) eval_cast_by_type_n_data(t *TypeKind, d *Data, error_token lex.T
 		d.Model = d.Constant
 	}
 	d.Cast_kind = t
-	d.Kind = t
+	//d.Kind = t // Do not this, will be set automatically end of the eval.
 
 	return d
 }
