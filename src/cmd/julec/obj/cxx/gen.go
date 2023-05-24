@@ -327,7 +327,7 @@ func gen_traits(pkg *sema.Package, used []*sema.ImportInfo) string {
 	obj := ""
 	for _, u := range used {
 		if !u.Cpp {
-			obj += gen_traits_pkg(pkg)
+			obj += gen_traits_pkg(u.Package)
 		}
 	}
 	obj += gen_traits_pkg(pkg)
