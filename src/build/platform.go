@@ -1,16 +1,20 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
 package build
 
-const OS_WINDOWS = "windows"
-const OS_LINUX = "linux"
-const OS_DARWIN = "darwin"
-const OS_UNIX = "unix"
+const OS_WINDOWS = "windows" // File annotation kind for windows operating system.
+const OS_LINUX = "linux"     // File annotation kind for linux operating system.
+const OS_DARWIN = "darwin"   // File annotation kind for darwin operating system.
+const OS_UNIX = "unix"       // File annotation kind for unix operating systems.
 
-const ARCH_ARM = "arm"
-const ARCH_ARM64 = "arm64"
-const ARCH_AMD64 = "amd64"
-const ARCH_I386 = "i386"
-const ARCH_64Bit = "64bit"
-const ARCH_32Bit = "32bit"
+const ARCH_ARM = "arm"     // File annotation kind for arm architecture.
+const ARCH_ARM64 = "arm64" // File annotation kind for arm64 architecture.
+const ARCH_AMD64 = "amd64" // File annotation kind for amd64 architecture.
+const ARCH_I386 = "i386"   // File annotation kind for intel 386 architecture.
+const ARCH_64Bit = "64bit" // File annotation kind for 64-bit architectures.
+const ARCH_32Bit = "32bit" // File annotation kind for 32-bit architectures.
 
 // List of supported operating systems.
 var DISTOS = []string{
@@ -27,47 +31,43 @@ var DISTARCH = []string{
 	ARCH_I386,
 }
 
-const goos_windows = "windows"
-const goos_darwin = "darwin"
-const goos_linux = "linux"
+// List of all possible runtime.GOOS values:
+const _RUNTIME_OS_WINDOWS = "windows"
+const _RUNTIME_OS_DARWIN = "darwin"
+const _RUNTIME_OS_LINUX = "linux"
 
-const goarch_i386 = "386"
-const goarch_amd64 = "amd64"
-const goarch_arm = "arm"
-const goarch_arm64 = "arm64"
+// List of all possible runtime.GOARCH values:
+const _RUNTIME_ARCH_I386 = "386"
+const _RUNTIME_ARCH_AMD64 = "amd64"
+const _RUNTIME_ARCH_ARM = "arm"
+const _RUNTIME_ARCH_ARM64 = "arm64"
 
-// IsWindows reports whether os is windows.
-func IsWindows(os string) bool { return os == goos_windows }
+// Reports whether os is windows.
+func Is_windows(os string) bool { return os == _RUNTIME_OS_WINDOWS }
+// Reports whether os is darwin.
+func Is_darwin(os string) bool { return os == _RUNTIME_OS_DARWIN }
+// Reports whether os is linux.
+func Is_linux(os string) bool { return os == _RUNTIME_OS_LINUX }
+// Reports whether architecture is intel 386.
+func Is_i386(arch string) bool { return arch == _RUNTIME_ARCH_I386 }
+// Reports whether architecture is amd64.
+func Is_amd64(arch string) bool { return arch == _RUNTIME_ARCH_AMD64 }
+// Reports whether architecture is arm.
+func Is_arm(arch string) bool { return arch == _RUNTIME_ARCH_ARM }
+// Is_arm64 reports whether architecture is arm64.
+func Is_arm64(arch string) bool { return arch == _RUNTIME_ARCH_ARM64 }
 
-// IsDarwin reports whether os is darwin.
-func IsDarwin(os string) bool { return os == goos_darwin }
-
-// IsLinux reports whether os is linux.
-func IsLinux(os string) bool { return os == goos_linux }
-
-// IsUnix reports whether os is unix.
-func IsUnix(os string) bool {
-	return IsDarwin(os) || IsLinux(os)
+// Reports whether os is unix.
+func Is_unix(os string) bool {
+	return Is_darwin(os) || Is_linux(os)
 }
 
-// IsI386 reports whether architecture is i386.
-func IsI386(arch string) bool { return arch == goarch_i386 }
-
-// IsAmd64 reports whether architecture is amd64.
-func IsAmd64(arch string) bool { return arch == goarch_amd64 }
-
-// IsArm reports whether architecture is arm.
-func IsArm(arch string) bool { return arch == goarch_arm }
-
-// IsArm64 reports whether architecture is arm64.
-func IsArm64(arch string) bool { return arch == goarch_arm64 }
-
-// IsX32 reports whether architecture is 32 bit.
-func IsX32(arch string) bool {
-	return IsI386(arch) || IsArm(arch)
+// Reports whether architecture is 32-bit.
+func Is_32bit(arch string) bool {
+	return Is_i386(arch) || Is_arm(arch)
 }
 
-// IsX64 reports whether architecture is 64 bit.
-func IsX64(arch string) bool {
-	return IsAmd64(arch) || IsArm64(arch)
+// Reports whether architecture is 64-bit.
+func Is_64bit(arch string) bool {
+	return Is_amd64(arch) || Is_arm64(arch)
 }

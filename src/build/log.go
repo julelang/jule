@@ -1,3 +1,7 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
 package build
 
 import (
@@ -6,8 +10,8 @@ import (
 )
 
 // Log types.
-const FLAT_ERR uint8 = 0
-const ERR uint8 = 1
+const FLAT_ERR = 0 // Just text.
+const ERR = 1      // Column, row, path and text.
 
 // Log is a build log.
 type Log struct {

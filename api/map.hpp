@@ -42,6 +42,9 @@ public:
         { this->insert( _data ); }
     }
 
+    inline void _clear(void) noexcept
+    { this->clear(); }
+
     slice_jt<_Key_t> _keys(void) const noexcept {
         slice_jt<_Key_t> _keys( this->size() );
         uint_jt _index { 0 };

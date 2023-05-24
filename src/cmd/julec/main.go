@@ -2,10 +2,14 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+// This is the main package of JuleC.
+// Naming conventions fully same with Jule.
+
 package main
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,43 +18,50 @@ import (
 	"time"
 
 	"github.com/julelang/jule"
+	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/build"
-	"github.com/julelang/jule/cmd/julec/analysis"
-	"github.com/julelang/jule/cmd/julec/gen"
+	"github.com/julelang/jule/cmd/julec/obj/cxx"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/parser"
+	"github.com/julelang/jule/sema"
 )
 
-const mode_transpile = "transpile"
-const mode_compile = "compile"
+// Environment Variables.
+var LOCALIZATION_PATH string
+var STDLIB_PATH string
+var EXEC_PATH string
+var WORKING_PATH string
 
-const compiler_gcc = "gcc"
-const compiler_clang = "clang"
+const COMPILER_GCC = "gcc"
+const COMPILER_CLANG = "clang"
 
-const compiler_path_gcc = "g++"
-const compiler_path_clang = "clang++"
+const COMPILER_PATH_GCC = "g++"
+const COMPILER_PATH_CLANG = "clang++"
 
-var out_dir = "dist"
-var mode = mode_compile
-var out_name = "ir.cpp"
-var out = ""
+// Sets by COMPILER or command-line inputs
+var COMPILER = ""
+var COMPILER_PATH = ""
 
-// Sets by compiler or command-line inputs
-var compiler = ""
-var compiler_path = ""
+// JULEC_HEADER is the header path of "julec.hpp"
+var JULEC_HEADER = ""
 
-// julec_header is the header path of "julec.hpp"
-var julec_header = ""
+const CMD_HELP = "help"
+const CMD_VERSION = "version"
+const CMD_TOOL = "tool"
 
-const cmd_help = "help"
-const cmd_version = "version"
-const cmd_tool = "tool"
+const MODE_T = "transpile"
+const MODE_C = "compile"
 
 var HELP_MAP = [...][2]string{
-	{cmd_help, "Show help"},
-	{cmd_version, "Show version"},
-	{cmd_tool, "Tools for effective Jule"},
+	{CMD_HELP,    "Show help"},
+	{CMD_VERSION, "Show version"},
+	{CMD_TOOL,    "Tools for effective Jule"},
 }
+
+var OUT_DIR = "dist"
+var MODE = MODE_C
+var OUT_NAME = "ir.cpp"
+var OUT = ""
 
 func help() {
 	if len(os.Args) > 2 {
@@ -76,12 +87,6 @@ func help() {
 }
 
 func print_error_message(msg string) { println(msg) }
-
-func exit_err(msg string) {
-	print_error_message(msg)
-	const ERROR_EXIT_CODE = 0
-	os.Exit(ERROR_EXIT_CODE)
-}
 
 func version() {
 	if len(os.Args) > 2 {
@@ -121,11 +126,11 @@ func tool() {
 
 func process_command() bool {
 	switch os.Args[1] {
-	case cmd_help:
+	case CMD_HELP:
 		help()
-	case cmd_version:
+	case CMD_VERSION:
 		version()
-	case cmd_tool:
+	case CMD_TOOL:
 		tool()
 	default:
 		return false
@@ -133,18 +138,36 @@ func process_command() bool {
 	return true
 }
 
+func exit_err(msg string) {
+	println(msg)
+	const ERROR_EXIT_CODE = 0
+	os.Exit(ERROR_EXIT_CODE)
+}
+
 func init() {
-	julec_header = filepath.Join(jule.EXEC_PATH, "..")
-	julec_header = filepath.Join(julec_header, "api")
-	julec_header = filepath.Join(julec_header, "julec.hpp")
+	path, err := os.Executable()
+	if err != nil {
+		exit_err(err.Error())
+	}
+	WORKING_PATH, err = os.Getwd()
+	if err != nil {
+		exit_err(err.Error())
+	}
+	EXEC_PATH = filepath.Dir(path)
+	path = filepath.Join(EXEC_PATH, "..") // Go to parent directory
+	STDLIB_PATH = filepath.Join(path, jule.STDLIB)
+
+	JULEC_HEADER = filepath.Join(EXEC_PATH, "..")
+	JULEC_HEADER = filepath.Join(JULEC_HEADER, "api")
+	JULEC_HEADER = filepath.Join(JULEC_HEADER, "julec.hpp")
 
 	// Configure compiler to default by platform
 	if runtime.GOOS == "windows" {
-		compiler = compiler_gcc
-		compiler_path = compiler_path_gcc
+		COMPILER = COMPILER_GCC
+		COMPILER_PATH = COMPILER_PATH_GCC
 	} else {
-		compiler = compiler_clang
-		compiler_path = compiler_path_clang
+		COMPILER = COMPILER_CLANG
+		COMPILER_PATH = COMPILER_PATH_CLANG
 	}
 
 	// Not started with arguments.
@@ -152,21 +175,111 @@ func init() {
 	if len(os.Args) < 2 {
 		os.Exit(0)
 	}
+
 	if process_command() {
 		os.Exit(0)
 	}
 }
 
+func read_buff(path string) []byte {
+	bytes, err := os.ReadFile(path)
+	if err != nil {
+		panic("buffering failed: " + err.Error())
+	}
+	return bytes
+}
+
+func flat_compiler_err(text string) build.Log {
+	return build.Log{
+		Type:   build.FLAT_ERR,
+		Text:   text,
+	}
+}
+
+func read_package_dirents(path string) (_ []fs.DirEntry, err_msg string) {
+	dirents, err := os.ReadDir(path)
+	if err != nil {
+		return nil, "connot read package directory: " + path
+	}
+
+	var passed_dirents []fs.DirEntry
+	for _, dirent := range dirents {
+		name := dirent.Name()
+
+		// Skip directories, non-jule files, and file annotation fails.
+		if dirent.IsDir() ||
+			!strings.HasSuffix(name, jule.EXT) ||
+			!build.Is_pass_file_annotation(name) {
+			continue
+		}
+
+		passed_dirents = append(passed_dirents, dirent)
+	}
+
+	return passed_dirents, ""
+}
+
+type Importer struct {
+	all_packages []*sema.ImportInfo
+}
+
+func (i *Importer) Get_import(path string) *sema.ImportInfo {
+	for _, p := range i.all_packages {
+		if p.Path == path {
+			return p
+		}
+	}
+
+	return nil
+}
+
+func (i *Importer) Import_package(path string) ([]*ast.Ast, []build.Log) {
+	dirents, err_msg := read_package_dirents(path)
+	if err_msg != "" {
+		errors := []build.Log{flat_compiler_err(err_msg)}
+		return nil, errors
+	}
+
+	var asts []*ast.Ast
+	for _, dirent := range dirents {
+		path := filepath.Join(path, dirent.Name())
+		file := lex.New_file_set(path)
+		errors := lex.Lex(file, string(read_buff(file.Path())))
+		if len(errors) > 0 {
+			return nil, errors
+		}
+
+		finfo := parser.Parse_file(file)
+		if len(finfo.Errors) > 0 {
+			return nil, finfo.Errors
+		}
+
+		asts = append(asts, finfo.Ast)
+	}
+
+	return asts, nil
+}
+
+func (i *Importer) Imported(imp *sema.ImportInfo) {
+	for _, p := range i.all_packages {
+		if p.Cpp == imp.Cpp && p.Link_path == imp.Link_path {
+			return
+		}
+	}
+
+	i.all_packages = append(i.all_packages, imp)
+}
+
 func check_mode() {
-	if mode != mode_transpile && mode != mode_compile {
-		println(build.Errorf("invalid_value_for_key", mode, "mode"))
+	if MODE != MODE_T && MODE != MODE_C {
+		println(build.Errorf("invalid_value_for_key", MODE, "mode"))
 		os.Exit(0)
 	}
 }
 
 func check_compiler() {
-	if compiler != compiler_gcc && compiler != compiler_clang {
-		println(build.Errorf("invalid_value_for_key", compiler, "compiler"))
+	if COMPILER != COMPILER_GCC && COMPILER != COMPILER_CLANG {
+		println(build.Errorf("invalid_value_for_key", COMPILER, "compiler"))
 		os.Exit(0)
 	}
 }
@@ -178,14 +291,13 @@ func set() {
 
 // print_logs prints logs and returns true
 // if logs has error, false if not.
-func print_logs(p *analysis.Analyzer) bool {
+func print_logs(logs []build.Log) {
 	var str strings.Builder
-	for _, l := range p.Errors {
+	for _, l := range logs {
 		str.WriteString(l.String())
 		str.WriteByte('\n')
 	}
 	print(str.String())
-	return len(p.Errors) > 0
 }
 
 func append_standard(obj_code *string) {
@@ -201,18 +313,17 @@ func append_standard(obj_code *string) {
 	sb.WriteString("// Date: ")
 	sb.WriteString(timeStr)
 	sb.WriteString("\n\n#include \"")
-	sb.WriteString(julec_header)
+	sb.WriteString(JULEC_HEADER)
 	sb.WriteString("\"\n\n")
 	sb.WriteString(*obj_code)
 	sb.WriteString(`
-
 int main(int argc, char *argv[]) {
 	std::set_terminate( &__julec_terminate_handler );
 	__julec_set_sig_handler( __julec_signal_handler );
 	__julec_setup_command_line_args( argc , argv );
-	__julec_call_package_initializers();
+	__julec_call_initializers();
 	JULEC_ID( main )();
-		
+
 	return ( EXIT_SUCCESS );
 }`)
 	*obj_code = sb.String()
@@ -235,58 +346,56 @@ func write_output(path, content string) {
 	_ = f.Close()
 }
 
-func compile(path string) *analysis.Analyzer {
+func compile(path string) (*sema.Package, *Importer) {
 	set()
+
 	// Check standard library.
-	inf, err := os.Stat(jule.STDLIB_PATH)
+	inf, err := os.Stat(STDLIB_PATH)
 	if err != nil || !inf.IsDir() {
-		p := &analysis.Analyzer{}
-		p.PushErr("stdlib_not_exist")
-		return p
-	}
-	if !build.IsPassFileAnnotation(path) {
-		p := &analysis.Analyzer{}
-		p.PushErr("file_not_useable")
-		return p
+		exit_err(build.Errorf("stdlib_not_exist"))
+		return nil, nil
 	}
 
-	pinf, err_msg := parser.ParsePackage(path)
-	if err_msg != "" {
-		exit_err(err_msg)
+	importer := &Importer{}
+	files, errors := importer.Import_package(path)
+	if len(errors) > 0 {
+		print_logs(errors)
+		return nil, nil
 	}
 
-	p := analysis.AnalyzePackage(pinf)
-	if len(p.Errors) == 0 {
-		f, _, _ := p.Defines.FnById(jule.ENTRY_POINT, nil)
-		if f == nil {
-			p.PushErr("no_entry_point")
-		} else {
-			f.IsEntryPoint = true
-			f.Used = true
-		}
+	pkg, errors := sema.Analyze_package(WORKING_PATH, STDLIB_PATH, files, importer)
+	if len(errors) > 0 {
+		print_logs(errors)
+		return nil, nil
 	}
 
-	return p
+	const CPP_LINKED = false
+	f := pkg.Find_fn(jule.ENTRY_POINT, CPP_LINKED)
+	if f == nil {
+		exit_err(build.Errorf("no_entry_point"))
+	}
+
+	return pkg, importer
 }
 
-func gen_compile_cmd(source_path string) (c string, cmd string) {
-	var cpp strings.Builder
-	cpp.WriteString("-g -O0 -Wno-narrowing ")
-	if out != "" {
-		cpp.WriteString("-o ")
-		cpp.WriteString(out)
-		cpp.WriteByte(' ')
+func gen_compile_cmd(source_path string) (string, string) {
+	compiler := COMPILER_PATH
+
+	cmd := "-g -O0 -Wno-narrowing --std=c++14 "
+	if OUT != "" {
+		cmd += "-o " + OUT + " "
 	}
-	cpp.WriteString(source_path)
-	return compiler_path, cpp.String()
+	cmd += source_path
+
+	return compiler, cmd
 }
 
-func do_spell(cpp string) {
-	path := filepath.Join(jule.WORKING_PATH, out_dir)
-	path = filepath.Join(path, out_name)
-	write_output(path, cpp)
-	switch mode {
-	case mode_compile:
+func do_spell(obj string) {
+	path := filepath.Join(WORKING_PATH, OUT_DIR)
+	path = filepath.Join(path, OUT_NAME)
+	write_output(path, obj)
+	switch MODE {
+	case MODE_C:
 		c, cmd := gen_compile_cmd(path)
 		println(c + " " + cmd)
 		entries := strings.SplitN(cmd, " ", -1)
@@ -325,14 +434,14 @@ func get_option(i *int) (arg string, content string) {
 			}
 			r = runes[j]
 		}
-		if !lex.IsIdentifierRune(string(r)) {
+		if !lex.Is_ident_rune(string(r)) {
 			exit_err("undefined syntax: " + arg)
 		}
 		j++
 		for ; j < len(runes); j++ {
 			r = runes[j]
-			if !lex.IsSpace(r) && !lex.IsLetter(r) &&
-				!lex.IsDecimal(byte(r)) && r != '_' && r != '-' {
+			if !lex.Is_space(r) && !lex.Is_letter(r) &&
+				!lex.Is_decimal(byte(r)) && r != '_' && r != '-' {
 				exit_err("undefined syntax: " + string(runes[j:]))
 			}
 		}
@@ -355,23 +464,26 @@ func parse_out_option(i *int) {
 	if value == "" {
 		exit_err("missing option value: -o --out")
 	}
-	out = value
+	OUT = value
 }
 
 func parse_compiler_option(i *int) {
-	value := get_option_value(i)
-	if value == "" {
-		exit_err("missing option value: --compiler")
-	}
+	value := get_option_value(i)	
 	switch value {
-	case compiler_clang:
-		compiler_path = compiler_path_clang
-	case compiler_gcc:
-		compiler_path = compiler_path_gcc
+	case "":
+		exit_err("missing option value: --compiler")
+
+	case COMPILER_CLANG:
+		COMPILER_PATH = COMPILER_PATH_CLANG
+
+	case COMPILER_GCC:
+		COMPILER_PATH = COMPILER_PATH_GCC
+
 	default:
 		exit_err("invalid option value for --compiler: " + value)
 	}
-	compiler = value
+
+	COMPILER = value
 }
 
 func parse_options() string {
@@ -382,14 +494,19 @@ func parse_options() string {
 		cmd += content
 		switch arg {
 		case "":
+
 		case "-o", "--out":
 			parse_out_option(&i)
+
 		case "-t", "--transpile":
-			mode = mode_transpile
+			MODE = MODE_T
+
 		case "-c", "--compile":
-			mode = mode_compile
+			MODE = MODE_C
+
 		case "--compiler":
 			parse_compiler_option(&i)
+
 		default:
 			exit_err("undefined option: " + arg)
 		}
@@ -401,19 +518,15 @@ func parse_options() string {
 func main() {
 	cmd := parse_options()
 	if cmd == "" {
-		exit_err("missing compile path")
+		exit_err(build.Errorf("missing_compile_path"))
 	}
 
-	p := compile(cmd)
-	if p == nil {
+	pkg, importer := compile(cmd)
+	if pkg == nil || importer == nil {
 		return
 	}
 
-	if print_logs(p) {
-		return
-	}
-	p.WrapPackage()
-	obj_code := gen.Gen(p.Defines, p.Used)
-	append_standard(&obj_code)
-	do_spell(obj_code)
+	obj := cxx.Gen(pkg, importer.all_packages)
+	append_standard(&obj)
+	do_spell(obj)
 }

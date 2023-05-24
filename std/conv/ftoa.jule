@@ -109,7 +109,7 @@ unsafe fn generic_ftoa(mut dst: []byte, val: f64, fmt: byte, mut prec: int, bit_
 		|:
 			s = "+inf"
 		}
-		ret append[byte](dst, s...)
+		ret append(dst, ([]byte)(s)...)
 	| 0:
 		// denormalized
 		exp++
@@ -253,7 +253,7 @@ fn fmt_digits(mut dst: []byte, shortest: bool, neg: bool,
 	}
 
 	// unknown format
-	ret append[byte](dst, '%', fmt)
+	ret append(dst, '%', fmt)
 }
 
 // Rounds d (= mant * 2^exp) to the shortest number of digits
@@ -400,7 +400,7 @@ unsafe fn round_shortest(mut d: *Decimal, mant: u64, exp: int, flt: *FloatInfo) 
 fn fmt_e(mut dst: []byte, neg: bool, d: DecimalSlice, prec: int, fmt: byte): []byte {
 	// sign
 	if neg {
-		dst = append[byte](dst, '-')
+		dst = append(dst, '-')
 	}
 
 	// first digit
@@ -408,24 +408,24 @@ fn fmt_e(mut dst: []byte, neg: bool, d: DecimalSlice, prec: int, fmt: byte): []b
 	if d.nd != 0 {
 		ch = d.d[0]
 	}
-	dst = append[byte](dst, ch)
+	dst = append(dst, ch)
 
 	// .moredigits
 	if prec > 0 {
-		dst = append[byte](dst, '.')
+		dst = append(dst, '.')
 		let mut i = 1
 		let m = min(d.nd, prec+1)
 		if i < m {
-			dst = append[byte](dst, d.d[i:m]...)
+			dst = append(dst, d.d[i:m]...)
 			i = m
 		}
 		for i <= prec; i++ {
-			dst = append[byte](dst, '0')
+			dst = append(dst, '0')
 		}
 	}
 
 	// e±
-	dst = append[byte](dst, fmt)
+	dst = append(dst, fmt)
 	let mut exp = d.dp - 1
 	if d.nd == 0 { // special case: 0 has exponent 0
 		exp = 0
@@ -436,16 +436,16 @@ fn fmt_e(mut dst: []byte, neg: bool, d: DecimalSlice, prec: int, fmt: byte): []b
 	} else {
 		ch = '+'
 	}
-	dst = append[byte](dst, ch)
+	dst = append(dst, ch)
 
 	// dd or ddd
 	match {
 	| exp < 10:
-		dst = append[byte](dst, '0', byte(exp)+'0')
+		dst = append(dst, '0', byte(exp)+'0')
 	| exp < 100:
-		dst = append[byte](dst, byte(exp/10)+'0', byte(exp%10)+'0')
+		dst = append(dst, byte(exp/10)+'0', byte(exp%10)+'0')
 	|:
-		dst = append[byte](dst, byte(exp/100)+'0', byte(exp/10)%10+'0', byte(exp%10)+'0')
+		dst = append(dst, byte(exp/100)+'0', byte(exp/10)%10+'0', byte(exp%10)+'0')
 	}
 
 	ret dst
@@ -455,22 +455,22 @@ fn fmt_e(mut dst: []byte, neg: bool, d: DecimalSlice, prec: int, fmt: byte): []b
 fn fmt_f(mut dst: []byte, neg: bool, d: DecimalSlice, prec: int): []byte {
 	// sign
 	if neg {
-		dst = append[byte](dst, '-')
+		dst = append(dst, '-')
 	}
 
 	// integer, padded with zeros as needed.
 	if d.dp > 0 {
 		let mut m = min(d.nd, d.dp)
-		dst = append[byte](dst, d.d[:m]...)
+		dst = append(dst, d.d[:m]...)
 		for m < d.dp; m++ {
-			dst = append[byte](dst, '0')
+			dst = append(dst, '0')
 		}
 	} else {
-		dst = append[byte](dst, '0')
+		dst = append(dst, '0')
 	}
 	// fraction
 	if prec > 0 {
-		dst = append[byte](dst, '.')
+		dst = append(dst, '.')
 		let mut i = 0
 		for i < prec; i++ {
 			let mut ch = byte('0')
@@ -478,7 +478,7 @@ fn fmt_f(mut dst: []byte, neg: bool, d: DecimalSlice, prec: int): []byte {
 			if 0 <= j && j < d.nd {
 				ch = d.d[j]
 			}
-			dst = append[byte](dst, ch)
+			dst = append(dst, ch)
 		}
 	}
 	ret dst
@@ -488,19 +488,19 @@ fn fmt_f(mut dst: []byte, neg: bool, d: DecimalSlice, prec: int): []byte {
 unsafe fn fmt_b(mut dst: []byte, neg: bool, mant: u64, mut exp: int, flt: *FloatInfo): []byte {
 	// sign
 	if neg {
-		dst = append[byte](dst, '-')
+		dst = append(dst, '-')
 	}
 
 	// mantissa
 	dst, _ = fmt_bits(dst, mant, 10, false, true)
 
 	// p
-	dst = append[byte](dst, 'p')
+	dst = append(dst, 'p')
 
 	// ±exponent
 	exp -= int(flt.mantbits)
 	if exp >= 0 {
-		dst = append[byte](dst, '+')
+		dst = append(dst, '+')
 	}
 	dst, _ = fmt_bits(dst, u64(exp), 10, exp < 0, true)
 	ret dst
@@ -543,23 +543,23 @@ unsafe fn fmt_x(mut dst: []byte, prec: int, fmt: byte, neg: bool,
 
 	// sign, 0x, leading digit
 	if neg {
-		dst = append[byte](dst, '-')
+		dst = append(dst, '-')
 	}
-	dst = append[byte](dst, '0', fmt, '0'+byte((mant>>60)&1))
+	dst = append(dst, '0', fmt, '0'+byte((mant>>60)&1))
 
 	// .fraction
 	mant <<= 4 // remove leading 0 or 1
 	if prec < 0 && mant != 0 {
-		dst = append[byte](dst, '.')
+		dst = append(dst, '.')
 		for mant != 0 {
-			dst = append[byte](dst, hex[(mant>>60)&15])
+			dst = append(dst, hex[(mant>>60)&15])
 			mant <<= 4
 		}
 	} else if prec > 0 {
-		dst = append[byte](dst, '.')
+		dst = append(dst, '.')
 		let mut i = 0
 		for i < prec; i++ {
-			dst = append[byte](dst, hex[(mant>>60)&15])
+			dst = append(dst, hex[(mant>>60)&15])
 			mant <<= 4
 		}
 	}
@@ -569,23 +569,23 @@ unsafe fn fmt_x(mut dst: []byte, prec: int, fmt: byte, neg: bool,
 	if fmt == lower(fmt) {
 		ch = 'p'
 	}
-	dst = append[byte](dst, ch)
+	dst = append(dst, ch)
 	if exp < 0 {
 		ch = '-'
 		exp = -exp
 	} else {
 		ch = '+'
 	}
-	dst = append[byte](dst, ch)
+	dst = append(dst, ch)
 
 	// dd or ddd or dddd
 	match {
 	| exp < 100:
-		dst = append[byte](dst, byte(exp/10)+'0', byte(exp%10)+'0')
+		dst = append(dst, byte(exp/10)+'0', byte(exp%10)+'0')
 	| exp < 1000:
-		dst = append[byte](dst, byte(exp/100)+'0', byte((exp/10)%10)+'0', byte(exp%10)+'0')
+		dst = append(dst, byte(exp/100)+'0', byte((exp/10)%10)+'0', byte(exp%10)+'0')
 	|:
-		dst = append[byte](dst, byte(exp/1000)+'0', byte(exp/100)%10+'0', byte((exp/10)%10)+'0', byte(exp%10)+'0')
+		dst = append(dst, byte(exp/1000)+'0', byte(exp/100)%10+'0', byte((exp/10)%10)+'0', byte(exp%10)+'0')
 	}
 	ret dst
 }

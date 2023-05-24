@@ -1,3 +1,7 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
 package build
 
 import (
@@ -8,14 +12,22 @@ import (
 	"github.com/julelang/jule"
 )
 
-// This attributes should be added to the attribute map.
-const ATTR_CDEF = "cdef"
-const ATTR_TYPEDEF = "typedef"
+// These directives must added to the DIRECTIVES.
+const DIRECTIVE_CDEF = "cdef"        // Directive: jule:cdef
+const DIRECTIVE_TYPEDEF = "typedef"  // Directive: jule:typedef
 
-// ATTRS is list of all attributes.
-var ATTRS = [...]string{
-	ATTR_CDEF,
-	ATTR_TYPEDEF,
+// List of all directives.
+var DIRECTIVES = [...]string{
+	DIRECTIVE_CDEF,
+	DIRECTIVE_TYPEDEF,
+}
+
+// Valid extensions of cpp headers.
+var CPP_HEADER_EXTS = []string{
+	".h",
+	".hpp",
+	".hxx",
+	".hh",
 }
 
 func check_os(arg string) (ok bool, exist bool) {
@@ -23,13 +35,13 @@ func check_os(arg string) (ok bool, exist bool) {
 	exist = true
 	switch arg {
 	case OS_WINDOWS:
-		ok = IsWindows(runtime.GOOS)
+		ok = Is_windows(runtime.GOOS)
 	case OS_DARWIN:
-		ok = IsDarwin(runtime.GOOS)
+		ok = Is_darwin(runtime.GOOS)
 	case OS_LINUX:
-		ok = IsLinux(runtime.GOOS)
+		ok = Is_linux(runtime.GOOS)
 	case OS_UNIX:
-		ok = IsUnix(runtime.GOOS)
+		ok = Is_unix(runtime.GOOS)
 	default:
 		ok = true
 		exist = false
@@ -42,17 +54,17 @@ func check_arch(arg string) (ok bool, exist bool) {
 	exist = true
 	switch arg {
 	case ARCH_I386:
-		ok = IsI386(runtime.GOARCH)
+		ok = Is_i386(runtime.GOARCH)
 	case ARCH_AMD64:
-		ok = IsAmd64(runtime.GOARCH)
+		ok = Is_amd64(runtime.GOARCH)
 	case ARCH_ARM:
-		ok = IsArm(runtime.GOARCH)
+		ok = Is_arm(runtime.GOARCH)
 	case ARCH_ARM64:
-		ok = IsArm64(runtime.GOARCH)
+		ok = Is_arm64(runtime.GOARCH)
 	case ARCH_64Bit:
-		ok = IsX64(runtime.GOARCH)
+		ok = Is_64bit(runtime.GOARCH)
 	case ARCH_32Bit:
-		ok = IsX32(runtime.GOARCH)
+		ok = Is_32bit(runtime.GOARCH)
 	default:
 		ok = true
 		exist = false
@@ -60,10 +72,8 @@ func check_arch(arg string) (ok bool, exist bool) {
 	return
 }
 
-// IsPassFileAnnotation returns true
-// if file path is passes file annotation,
-// returns false if not.
-func IsPassFileAnnotation(p string) bool {
+// Reports whether file path passes file annotation by current system.
+func Is_pass_file_annotation(p string) bool {
 	p = filepath.Base(p)
 	n := len(p)
 	p = p[:n-len(filepath.Ext(p))]
@@ -124,32 +134,20 @@ func IsPassFileAnnotation(p string) bool {
 	return !exist || ok
 }
 
-// IsStdHeaderPath reports path is C++ std library path.
-func IsStdHeaderPath(p string) bool {
+// Reports path is C++ std library path.
+func Is_std_header_path(p string) bool {
 	return p[0] == '<' && p[len(p)-1] == '>'
 }
 
-// CPP_HEADER_EXTS are valid extensions of cpp headers.
-var CPP_HEADER_EXTS = []string{
-	".h",
-	".hpp",
-	".hxx",
-	".hh",
-}
-
-// IsValidHeader returns true if given extension is valid, false if not.
-func IsValidHeader(ext string) bool {
-	for _, validExt := range CPP_HEADER_EXTS {
-		if ext == validExt {
+// Reports whether C++ header extension is valid.
+func Is_valid_header_ext(ext string) bool {
+	for _, valid_ext := range CPP_HEADER_EXTS {
+		if ext == valid_ext {
 			return true
 		}
 	}
 	return false
 }
 
-// IsJule reports whether file path is Jule source code.
-// Returns false if error occur.
-func IsJule(path string) bool {
-	abs, err := filepath.Abs(path)
-	return err == nil && filepath.Ext(abs) == jule.EXT
-}
+// Reports whether file path is Jule source code.
+func Is_jule(path string) bool { return filepath.Ext(path) == jule.EXT }

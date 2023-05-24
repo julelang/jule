@@ -1,59 +1,105 @@
 package types
 
-import "math"
+// Maximum positive value of 32-bit floating-points.
+const MAX_F32 = 0x1p127 * (1 + (1 - 0x1p-23))
+// Maximum negative value of 32-bit floating-points.
+const MIN_F32 = -0x1p127 * (1 + (1 - 0x1p-23))
 
-// MinOfType returns minimum value of integer type.
-//
-// Special case is;
-//
-//	MinOfType(id) -> returns 0 if type id is not integer type.
-//	MinOfType(id) -> returns 0 if type id is not supported.
-func MinOfType(id uint8) int64 {
-	if !IsInteger(id) {
+// Maximum positive value of 64-bit floating-points.
+const MAX_F64 = 0x1p1023 * (1 + (1 - 0x1p-52))
+// Maximum negative value of 64-bit floating-points.
+const MIN_F64 = -0x1p1023 * (1 + (1 - 0x1p-52))
+
+// Maximum positive value of 8-bit signed integers.
+const MAX_I8 = 127
+// Maximum negative value of 8-bit signed integers.
+const MIN_I8 = -128
+// Maximum positive value of 16-bit signed integers.
+const MAX_I16 = 32767
+// Maximum negative value of 16-bit signed integers.
+const MIN_I16 = -32768
+// Maximum positive value of 32-bit signed integers.
+const MAX_I32 = 2147483647
+// Maximum negative value of 32-bit signed integers.
+const MIN_I32 = -2147483648
+// Maximum positive value of 64-bit signed integers.
+const MAX_I64 = 9223372036854775807
+// Maximum negative value of 64-bit signed integers.
+const MIN_I64 = -9223372036854775808
+
+// Maximum value of 8-bit unsigned integers.
+const MAX_U8 = 255
+// Maximum value of 16-bit unsigned integers.
+const MAX_U16 = 65535
+// Maximum value of 32-bit unsigned integers.
+const MAX_U32 = 4294967295
+// Maximum value of 64-bit unsigned integers.
+const MAX_U64 = 18446744073709551615
+
+// Returns minimum value of signed/unsigned integer and floating-point kinds.
+// Returns 0 if kind is invalid.
+func Min_of(k string) float64 {
+	k = Real_kind_of(k)
+	switch k {
+	case TypeKind_I8:
+		return MIN_I8
+
+	case TypeKind_I16:
+		return MIN_I16
+
+	case TypeKind_I32:
+		return MIN_I32
+
+	case TypeKind_I64:
+		return MIN_I64
+
+	case TypeKind_F32:
+		return MIN_F32
+
+	case TypeKind_F64:
+		return MIN_F64
+
+	default:
 		return 0
 	}
-	id = GetRealCode(id)
-	switch id {
-	case I8:
-		return math.MinInt8
-	case I16:
-		return math.MinInt16
-	case I32:
-		return math.MinInt32
-	case I64:
-		return math.MinInt64
-	}
-	return 0
 }
 
-// MaxOfType returns maximum value of integer type.
-//
-// Special case is;
-//
-//	MaxOfType(id) -> returns 0 if type id is not integer type.
-//	MaxOfType(id) -> returns 0 if type id is not supported.
-func MaxOfType(id uint8) uint64 {
-	if !IsInteger(id) {
+// Returns minimum value of signed/unsigned integer and floating-point kinds.
+// Returns 0 if kind is invalid.
+func Max_of(k string) float64 {
+	k = Real_kind_of(k)
+	switch k {
+	case TypeKind_I8:
+		return MAX_I8
+
+	case TypeKind_I16:
+		return MAX_I16
+
+	case TypeKind_I32:
+		return MAX_I32
+
+	case TypeKind_I64:
+		return MAX_I64
+
+	case TypeKind_U8:
+		return MAX_U8
+
+	case TypeKind_U16:
+		return MAX_U16
+
+	case TypeKind_U32:
+		return MAX_U32
+
+	case TypeKind_U64:
+		return MAX_U64
+
+	case TypeKind_F32:
+		return MAX_F32
+
+	case TypeKind_F64:
+		return MAX_F64
+
+	default:
 		return 0
 	}
-	id = GetRealCode(id)
-	switch id {
-	case I8:
-		return math.MaxInt8
-	case I16:
-		return math.MaxInt16
-	case I32:
-		return math.MaxInt32
-	case I64:
-		return math.MaxInt64
-	case U8:
-		return math.MaxUint8
-	case U16:
-		return math.MaxUint16
-	case U32:
-		return math.MaxUint32
-	case U64:
-		return math.MaxUint64
-	}
-	return 0
 }

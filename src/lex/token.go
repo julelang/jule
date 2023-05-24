@@ -1,24 +1,30 @@
+// Copyright 2021 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
 package lex
 
 import (
 	"strings"
 	"unicode/utf8"
+
+	"github.com/julelang/jule/build"
 )
 
 // Token identities.
 const ID_NA = 0
-const ID_DT = 1
+const ID_PRIM = 1
 const ID_IDENT = 2
-const ID_BRACE = 3
+const ID_RANGE = 3
 const ID_RET = 4
 const ID_SEMICOLON = 5
-const ID_LITERAL = 6
+const ID_LIT = 6
 const ID_OP = 7
 const ID_COMMA = 8
 const ID_CONST = 9
 const ID_TYPE = 10
 const ID_COLON = 11
-const ID_ITER = 12
+const ID_FOR = 12
 const ID_BREAK = 13
 const ID_CONTINUE = 14
 const ID_IN = 15
@@ -139,16 +145,17 @@ const KND_UNSAFE = "unsafe"
 const KND_MUT = "mut"
 const KND_DEFER = "defer"
 
-const IGNORE_ID = "_"
-const ANONYMOUS_ID = "<anonymous>"
+// Ignore identifier.
+const IGNORE_IDENT = "_"
+// Anonymous identifier.
+const ANON_IDENT = "<anonymous>"
 
-const COMMENT_PRAGMA_SEP = ":"
-const PRAGMA_COMMENT_PREFIX = "jule" + COMMENT_PRAGMA_SEP
+// Directive seperator of directive comments.
+const DIRECTIVE_SEP = ":"
+// Prefix of directive comments.
+const DIRECTIVE_PREFIX = "jule" + DIRECTIVE_SEP
 
-const MARK_ARRAY = "..."
-const PREFIX_SLICE = "[]"
-const PREFIX_ARRAY = "[" + MARK_ARRAY + "]"
-
+// Punctuations.
 var PUNCTS = [...]rune{
 	'!',
 	'#',
@@ -185,6 +192,7 @@ var PUNCTS = [...]rune{
 	'¦',
 }
 
+// Space characters.
 var SPACES = [...]rune{
 	' ',
 	'\t',
@@ -192,6 +200,77 @@ var SPACES = [...]rune{
 	'\r',
 	'\n',
 }
+
+// Kind list of unary operators.
+var UNARY_OPS = [...]string{
+	KND_MINUS,
+	KND_PLUS,
+	KND_CARET,
+	KND_EXCL,
+	KND_STAR,
+	KND_AMPER,
+}
+
+// Kind list of binary operators.
+var BIN_OPS = [...]string{
+	KND_PLUS,
+	KND_MINUS,
+	KND_STAR,
+	KND_SOLIDUS,
+	KND_PERCENT,
+	KND_AMPER,
+	KND_VLINE,
+	KND_CARET,
+	KND_LT,
+	KND_GT,
+	KND_EXCL,
+	KND_DBL_AMPER,
+	KND_DBL_VLINE,
+}
+
+// Kind list of weak operators.
+// These operators are weak, can used as part of expression.
+var WEAK_OPS = [...]string{
+	KND_TRIPLE_DOT,
+	KND_COLON,
+}
+
+// List of postfix operators.
+var POSTFIX_OPS = [...]string{
+	KND_DBL_PLUS,
+	KND_DBL_MINUS,
+}
+
+// List of assign operators.
+var ASSING_OPS = [...]string{
+	KND_EQ,
+	KND_PLUS_EQ,
+	KND_MINUS_EQ,
+	KND_SOLIDUS_EQ,
+	KND_STAR_EQ,
+	KND_PERCENT_EQ,
+	KND_RSHIFT_EQ,
+	KND_LSHIFT_EQ,
+	KND_VLINE_EQ,
+	KND_AMPER_EQ,
+	KND_CARET_EQ,
+}
+
+func exist_op(kind string, operators []string) bool {
+	for _, operator := range operators {
+		if kind == operator {
+			return true
+		}
+	}
+	return false
+}
+
+// Reports whether kind is unary operator.
+func Is_unary_op(kind string) bool { return exist_op(kind, UNARY_OPS[:]) }
+// Reports whether kind is binary operator.
+func Is_bin_op(kind string) bool { return exist_op(kind, BIN_OPS[:]) }
+// Reports whether kind is weak operator.
+func Is_weak_op(kind string) bool { return exist_op(kind, WEAK_OPS[:]) }
 
 // Token is lexer token.
 type Token struct {
@@ -202,35 +281,47 @@ type Token struct {
 	Id     uint8
 }
 
-// Prec returns operator precedence of token.
+// Returns operator precedence of token.
 // Returns -1 if token is not operator or invalid operator for operator precedence.
 func (t *Token) Prec() int {
 	if t.Id != ID_OP {
 		return -1
 	}
+
 	switch t.Kind {
 	case KND_STAR, KND_PERCENT, KND_SOLIDUS,
 		KND_RSHIFT, KND_LSHIFT, KND_AMPER:
 		return 5
+
 	case KND_PLUS, KND_MINUS, KND_VLINE, KND_CARET:
 		return 4
-	case KND_EQS, KND_NOT_EQ, KND_LT,
+
+		case KND_EQS, KND_NOT_EQ, KND_LT,
 		KND_LESS_EQ, KND_GT, KND_GREAT_EQ:
 		return 3
+
 	case KND_DBL_AMPER:
 		return 2
+
 	case KND_DBL_VLINE:
 		return 1
+
 	default:
 		return -1
 	}
 }
 
-func IsStr(k string) bool    { return k != "" && (k[0] == '"' || IsRawStr(k)) }
-func IsRawStr(k string) bool { return k != "" && k[0] == '`' }
-func IsRune(k string) bool   { return k != "" && k[0] == '\'' }
-func IsNil(k string) bool    { return k == KND_NIL }
-func IsBool(k string) bool   { return k == KND_TRUE || k == KND_FALSE }
+// Reports whether kind is string literal.
+func Is_str(k string) bool { return k != "" && (k[0] == '"' || Is_raw_str(k)) }
+// Reports whether kind is raw string literal.
+func Is_raw_str(k string) bool { return k != "" && k[0] == '`' }
+// Reports whether kind is rune literal.
+// Literal value can be byte or rune.
+func Is_rune(k string) bool { return k != "" && k[0] == '\'' }
+// Reports whether kind is nil literal.
+func Is_nil(k string) bool { return k == KND_NIL }
+// Reports whether kind is boolean literal.
+func Is_bool(k string) bool { return k == KND_TRUE || k == KND_FALSE }
 
 func contains_any(s string, bytes string) bool {
 	for _, b := range bytes {
@@ -242,29 +333,33 @@ func contains_any(s string, bytes string) bool {
 	return false
 }
 
-func IsFloat(k string) bool {
+// Reports whether kind is float.
+func Is_float(k string) bool {
 	if strings.HasPrefix(k, "0x") {
 		return contains_any(k, ".pP")
 	}
 	return contains_any(k, ".eE")
 }
 
-func IsNum(k string) bool {
+// Reports whether kind is numeric.
+func Is_num(k string) bool {
 	if k == "" {
 		return false
 	}
-	return k[0] == '-' || (k[0] >= '0' && k[0] <= '9')
+
+	b := k[0]
+	return b == '.' || ('0' <= b && b <= '9')
 }
 
-func IsLiteral(k string) bool {
-	return IsNum(k) || IsStr(k) || IsRune(k) || IsNil(k) || IsBool(k)
+// Reports whether kind is literal.
+func Is_lit(k string) bool {
+	return Is_num(k) || Is_str(k) || Is_rune(k) || Is_nil(k) || Is_bool(k)
 }
 
-// IsIgnoreId reports identifier is ignore or not.
-func IsIgnoreId(id string) bool { return id == IGNORE_ID }
-
-// IsAnonymousId reports whether identifier is anonymous.
-func IsAnonymousId(id string) bool { return id == ANONYMOUS_ID }
+// Reports whether identifier is ignore.
+func Is_ignore_ident(ident string) bool { return ident == IGNORE_IDENT }
+// Reports whether identifier is anonymous.
+func Is_anon_ident(ident string) bool { return ident == ANON_IDENT }
 
 func rune_exist(r rune, runes []rune) bool {
 	for _, cr := range runes {
@@ -272,54 +367,216 @@ func rune_exist(r rune, runes []rune) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
-// IsPunct reports rune is punctuation or not.
-func IsPunct(r rune) bool { return rune_exist(r, PUNCTS[:]) }
+// Reports whether rune is punctuation.
+func Is_punct(r rune) bool { return rune_exist(r, PUNCTS[:]) }
+// Reports wheter byte is whitespace.
+func Is_space(r rune) bool { return rune_exist(r, SPACES[:]) }
 
-// IsSpace reports byte is whitespace or not.
-func IsSpace(r rune) bool { return rune_exist(r, SPACES[:]) }
-
-// IsLetter reports rune is letter or not.
-func IsLetter(r rune) bool {
+// Reports whether rune is letter.
+func Is_letter(r rune) bool {
 	return ('a' <= r && r <= 'z') || ('A' <= r && r <= 'Z')
 }
 
-// IsIdentifierRune returns true if first rune of string is allowed to
-// first char for identifiers, false if not.
-func IsIdentifierRune(s string) bool {
+// Reports whether firs rune of string is allowed
+// to first rune for identifier.
+func Is_ident_rune(s string) bool {
 	if s == "" {
 		return false
 	}
 	if s[0] != '_' {
 		r, _ := utf8.DecodeRuneInString(s)
-		if !IsLetter(r) {
+		if !Is_letter(r) {
 			return false
 		}
 	}
 	return true
 }
 
-// IsDecimal reports byte is decimal sequence or not.
-func IsDecimal(b byte) bool { return '0' <= b && b <= '9' }
+// Reports whether byte is decimal sequence.
+func Is_decimal(b byte) bool { return '0' <= b && b <= '9' }
+// Reports whether byte is binary sequence.
+func Is_binary(b byte) bool { return b == '0' || b == '1' }
+// Reports whether byte is octal sequence.
+func Is_octal(b byte) bool { return '0' <= b && b <= '7' }
 
-// IsBinary reports byte is binary sequence or not.
-func IsBinary(b byte) bool { return b == '0' || b == '1' }
-
-// IsOctal reports byte is octal sequence or not.
-func IsOctal(b byte) bool { return '0' <= b && b <= '7' }
-
-// IsHex reports byte is hexadecimal sequence or not.
-func IsHex(b byte) bool {
+// Reports whether byte is hexadecimal sequence.
+func Is_hex(b byte) bool {
 	switch {
 	case '0' <= b && b <= '9':
 		return true
+
 	case 'a' <= b && b <= 'f':
 		return true
+
 	case 'A' <= b && b <= 'F':
 		return true
+
 	default:
 		return false
 	}
+}
+
+// Returns between of open and close ranges.
+// Starts selection at *i.
+// Moves one *i for each selected token.
+// *i points to close range token after selection.
+//
+// Special case is:
+//  Range(i, open, close, tokens) = nil if i == nil
+//  Range(i, open, close, tokens) = nil if *i > len(tokens)
+//  Range(i, open, close, tokens) = nil if tokens[i*].Id != ID_RANGE
+//  Range(i, open, close, tokens) = nil if tokens[i*].Kind != open
+func Range(i *int, open string, close string, tokens []Token) []Token {
+	if i == nil || *i >= len(tokens) {
+		return nil
+	}
+
+	tok := tokens[*i]
+	if tok.Id != ID_RANGE || tok.Kind != open {
+		return nil
+	}
+
+	*i++
+	range_n := 1
+	start := *i
+	for ; range_n != 0 && *i < len(tokens); *i++ {
+		token := tokens[*i]
+		if token.Id == ID_RANGE {
+			switch token.Kind {
+			case open:
+				range_n++
+			case close:
+				range_n--
+			}
+		}
+	}
+
+	return tokens[start : *i-1]
+}
+
+// Range_last returns last range from tokens.
+// Returns tokens without range tokens and range tokens.
+// Range tokens includes left and right range tokens.
+//
+// Special cases are;
+//  Range_last(toks) = toks, nil if len(toks) == 0
+//  Range_last(toks) = toks, nil if toks is not has range at last
+func Range_last(tokens []Token) (cutted []Token, cut []Token) {
+	if len(tokens) == 0 {
+		return tokens, nil
+	} else if tokens[len(tokens)-1].Id != ID_RANGE {
+		return tokens, nil
+	}
+	brace_n := 0
+	for i := len(tokens) - 1; i >= 0; i-- {
+		token := tokens[i]
+		if token.Id == ID_RANGE {
+			switch token.Kind {
+			case KND_RBRACE, KND_RBRACKET, KND_RPARENT:
+				brace_n++
+				continue
+			default:
+				brace_n--
+			}
+		}
+		if brace_n == 0 {
+			return tokens[:i], tokens[i:]
+		}
+	}
+	return tokens, nil
+}
+
+// Returns parts separated by given token identifier.
+// It's skips parentheses ranges.
+// Logs missing_expr if expr_must == true and not exist any expression for part.
+//
+// Special case is;
+//  Parts(toks) = nil if len(toks) == 0
+func Parts(tokens []Token, id uint8, expr_must bool) ([][]Token, []build.Log) {
+	if len(tokens) == 0 {
+		return nil, nil
+	}
+
+	var parts [][]Token = nil
+	var errors []build.Log = nil
+
+	range_n := 0
+	last := 0
+	for i, token := range tokens {
+		if token.Id == ID_RANGE {
+			switch token.Kind {
+			case KND_LBRACE, KND_LBRACKET, KND_LPAREN:
+				range_n++
+				continue
+			default:
+				range_n--
+			}
+		}
+		if range_n > 0 {
+			continue
+		}
+		if token.Id == id {
+			if expr_must && i-last <= 0 {
+				errors = append(errors, make_err(token.Row, token.Column, token.File, "missing_expr"))
+			}
+			parts = append(parts, tokens[last:i])
+			last = i + 1
+		}
+	}
+
+	if last < len(tokens) {
+		parts = append(parts, tokens[last:])
+	} else if !expr_must {
+		parts = append(parts, []Token{})
+	}
+
+	return parts, errors
+}
+
+// Reports given token id is allow for
+// assignment left-expression or not.
+func Is_assign(id uint8) bool {
+	switch id {
+	case ID_IDENT,
+		ID_CPP,
+		ID_LET,
+		ID_DOT,
+		ID_SELF,
+		ID_RANGE,
+		ID_OP:
+		return true
+
+	default:
+		return false
+	}
+}
+
+// Reports whether operator kind is postfix operator.
+func Is_postfix_op(kind string) bool {
+	for _, op := range POSTFIX_OPS {
+		if kind == op {
+			return true
+		}
+	}
+
+	return false
+}
+
+// Reports whether operator kind is assignment operator.
+func Is_assign_op(kind string) bool {
+	if Is_postfix_op(kind) {
+		return true
+	}
+
+	for _, op := range ASSING_OPS {
+		if kind == op {
+			return true
+		}
+	}
+
+	return false
 }
