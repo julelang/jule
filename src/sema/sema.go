@@ -514,25 +514,45 @@ func (s *_Sema) check_assign_type(dest *TypeKind, d *Data, error_token lex.Token
 		d:           d,
 		deref:       deref,
 	}
-	atc.check()
+	ok := atc.check()
+	if !ok {
+		return
+	}
+
+	if !d.Is_const() || dest.Prim() == nil {
+		return
+	}
+
+	kind := dest.Prim().kind
+
+	switch {
+	case types.Is_sig_int(kind):
+		d.Constant.Set_i64(d.Constant.As_i64())
+
+	case types.Is_unsig_int(kind):
+		d.Constant.Set_u64(d.Constant.As_u64())
+
+	case types.Is_float(kind):
+		d.Constant.Set_f64(d.Constant.As_f64())
+	}
 }
 
-func (s *_Sema) check_type_compatibility(dest *TypeKind, src *TypeKind, error_token lex.Token, deref bool) {
+func (s *_Sema) check_type_compatibility(dest *TypeKind, src *TypeKind, error_token lex.Token, deref bool) bool {
 	dest_kind := dest.To_str()
 	if src == nil {
 		s.push_err(error_token, "incompatible_types", dest_kind, "<untyped>")
-		return
+		return false
 	}
 	src_kind := src.To_str()
 
 	// Tuple to single type, always fails.
 	if src.Tup() != nil {
 		s.push_err(error_token, "incompatible_types", dest_kind, src_kind)
-		return
+		return false
 	}
 
 	if dest.Prim() != nil && dest.Prim().Is_any() {
-		return
+		return false
 	}
 
 	tcc := _TypeCompatibilityChecker{
@@ -546,13 +566,14 @@ func (s *_Sema) check_type_compatibility(dest *TypeKind, src *TypeKind, error_to
 
 	switch {
 	case ok:
-		// Ok.
+		return true
 
 	case dest_kind == src_kind:
-		// Ok.
+		return true
 
 	default:
 		s.push_err(error_token, "incompatible_types", dest_kind, src_kind)
+		return false
 	}
 }
 

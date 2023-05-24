@@ -1668,7 +1668,8 @@ func (e *_Eval) eval_enum_sub_ident(enm *Enum, ident lex.Token) *Data {
 	if item == nil {
 		e.push_err(ident, "obj_have_not_ident", ident.Kind)
 	} else {
-		d.Constant = item.Value.Data.Constant
+		d.Constant = new(constant.Const)
+		*d.Constant = *item.Value.Data.Constant
 		d.Model = d.Constant
 	}
 

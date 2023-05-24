@@ -339,25 +339,25 @@ func (atc *_AssignTypeChecker) check_const() bool {
 	return true
 }
 
-func (atc *_AssignTypeChecker) check() {
+func (atc *_AssignTypeChecker) check() bool {
 	switch {
 	case atc.d == nil:
 		// Skip Data is nil.
-		return
+		return false
 
 	case !atc.check_validity():
 		// Data is invalid and error(s) logged about it.
-		return
+		return false
 
 	case atc.d.Variadiced:
 		atc.push_err("incompatible_types", atc.dest.To_str(), atc.d.Kind.To_str() + "...")
-		return
+		return false
 
 	case atc.check_const():
-		return
+		return true
 	
 	default:
-		atc.s.check_type_compatibility(atc.dest, atc.d.Kind, atc.error_token, atc.deref)
+		return atc.s.check_type_compatibility(atc.dest, atc.d.Kind, atc.error_token, atc.deref)
 	}
 }
 
