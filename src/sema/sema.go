@@ -1278,7 +1278,7 @@ func (s *_Sema) check_struct_fields(st *Struct) (ok bool) {
 func (s *_Sema) check_struct_decl(strct *Struct) {
 	if lex.Is_ignore_ident(strct.Ident) {
 		s.push_err(strct.Token, "ignore_ident")
-	} else if s.is_duplicated_ident(_uintptr(strct), strct.Ident, false) {
+	} else if s.is_duplicated_ident(_uintptr(strct), strct.Ident, strct.Cpp_linked) {
 		s.push_err(strct.Token, "duplicated_ident", strct.Ident)
 	}
 
@@ -1311,7 +1311,7 @@ func (s *_Sema) check_struct_decls() (ok bool) {
 func (s *_Sema) check_fn_decl(f *Fn) {
 	if lex.Is_ignore_ident(f.Ident) {
 		s.push_err(f.Token, "ignore_ident")
-	} else if s.is_duplicated_ident(_uintptr(f), f.Ident, false) {
+	} else if s.is_duplicated_ident(_uintptr(f), f.Ident, f.Cpp_linked) {
 		s.push_err(f.Token, "duplicated_ident", f.Ident)
 	}
 
