@@ -103,6 +103,7 @@ func build_generic_type_aliases(f *FnIns) []*TypeAlias {
 	for i, g := range f.Generics {
 		decl := f.Decl.Generics[i]
 		aliases[i] = &TypeAlias{
+			Used:  f.Decl.Parameters_uses_generics() || f.Decl.Result_uses_generics(),
 			Scope: f.Decl.Scope,
 			Ident: decl.Ident,
 			Token: decl.Token,
