@@ -410,6 +410,11 @@ func gen_ret_vars(r *sema.RetSt) string {
 }
 
 func gen_ret_expr_tuple(r *sema.RetSt) string {
+	switch r.Expr.(type) {
+	case *sema.FnCallExprModel:
+		return "return " + gen_expr_model(r.Expr) + CPP_ST_TERM
+	}
+
 	datas := r.Expr.(*sema.TupleExprModel).Datas
 	obj := ""
 

@@ -13,15 +13,15 @@
 
 // Declarations
 
-str_jt __julec_str_from_byte_ptr(const char *_Ptr) noexcept;
-str_jt __julec_str_from_byte_ptr(const JULEC_ID(byte) *_Ptr) noexcept;
+str_jt __julec_str_from_char_ptr(const char *_Ptr) noexcept;
+str_jt __julec_str_from_char_ptr(const JULEC_ID(byte) *_Ptr) noexcept;
 int_jt __julec_stat(const char *_Path, struct stat *_Stat) noexcept;
 
 // Definitions
-str_jt __julec_str_from_byte_ptr(const char *_Ptr) noexcept
-{ return ( __julec_str_from_byte_ptr( (const JULEC_ID(byte)*)( _Ptr ) ) ); }
+str_jt __julec_str_from_char_ptr(const char *_Ptr) noexcept
+{ return ( __julec_str_from_char_ptr( (const JULEC_ID(byte)*)( _Ptr ) ) ); }
 
-str_jt __julec_str_from_byte_ptr(const JULEC_ID(byte) *_Ptr) noexcept
+str_jt __julec_str_from_char_ptr(const JULEC_ID(byte) *_Ptr) noexcept
 { return ( str_jt( _Ptr ) ); }
 
 int_jt __julec_stat(const char *_Path, struct stat *_Stat) noexcept

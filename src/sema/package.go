@@ -226,6 +226,10 @@ func (i *ImportInfo) is_lookupable(ident string) bool {
 	}
 
 	if !i.Import_all {
+		if i.exist_ident(lex.KND_SELF) {
+			return true
+		}
+
 		if len(i.Selected) > 0 {
 			if !i.exist_ident(ident) {
 				return false

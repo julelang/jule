@@ -27,6 +27,21 @@ func compiler_err(token lex.Token, key string, args ...any) build.Log {
 	}
 }
 
+func imp_is_lookupable(i *ImportInfo, ident string) bool {
+	if i.Cpp {
+		return false
+	}
+
+	if !i.Import_all {
+		if len(i.Selected) > 0 {
+			if !i.exist_ident(ident) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func build_ret_vars(f *FnIns) []*Var {
 	if f.Decl.Is_void() {
 		return nil
@@ -82,19 +97,19 @@ func build_param_vars(f *FnIns) []*Var {
 			if p.Decl.Is_ref() {
 				v.Ident = v.Ident[1:] // Remove reference sign.
 				v.Kind.Kind.kind = &Ref{
-					Elem: &TypeKind{kind: v.Kind.Kind.kind},
+					Elem: v.Kind.Kind.clone(),
 				}
 			}
 
 		case p.Decl.Variadic:
 			v.Kind.Kind = &TypeKind{
 				kind: &Slc{
-					Elem: &TypeKind{kind: p.Kind.kind},
+					Elem: p.Kind.clone(),
 				},
 			}
 
 		default:
-			v.Kind.Kind = &TypeKind{kind: p.Kind.kind}
+			v.Kind.Kind = p.Kind.clone()
 		}
 
 		vars[i] = v
@@ -213,6 +228,9 @@ func (s *_Sema) Find_var(ident string, cpp_linked bool) *Var {
 
 	// Lookup current file's public denifes of imported packages.
 	for _, imp := range s.file.Imports {
+		if !imp_is_lookupable(imp, ident) {
+			continue
+		}
 		v := imp.Find_var(ident, cpp_linked)
 		if v != nil && s.is_accessible_define(v.Public, v.Token) {
 			return v
@@ -237,6 +255,9 @@ func (s *_Sema) Find_type_alias(ident string, cpp_linked bool) *TypeAlias {
 
 	// Lookup current file's public denifes of imported packages.
 	for _, imp := range s.file.Imports {
+		if !imp_is_lookupable(imp, ident) {
+			continue
+		}
 		ta := imp.Find_type_alias(ident, cpp_linked)
 		if ta != nil && s.is_accessible_define(ta.Public, ta.Token) {
 			return ta
@@ -261,6 +282,9 @@ func (s *_Sema) Find_struct(ident string, cpp_linked bool) *Struct {
 
 	// Lookup current file's public denifes of imported packages.
 	for _, imp := range s.file.Imports {
+		if !imp_is_lookupable(imp, ident) {
+			continue
+		}
 		strct := imp.Find_struct(ident, cpp_linked)
 		if strct != nil && s.is_accessible_define(strct.Public, strct.Token) {
 			return strct
@@ -285,6 +309,9 @@ func (s *_Sema) Find_fn(ident string, cpp_linked bool) *Fn {
 
 	// Lookup current file's public denifes of imported packages.
 	for _, imp := range s.file.Imports {
+		if !imp_is_lookupable(imp, ident) {
+			continue
+		}
 		f := imp.Find_fn(ident, cpp_linked)
 		if f != nil && s.is_accessible_define(f.Public, f.Token) {
 			return f
@@ -309,6 +336,9 @@ func (s *_Sema) Find_trait(ident string) *Trait {
 
 	// Lookup current file's public denifes of imported packages.
 	for _, imp := range s.file.Imports {
+		if !imp_is_lookupable(imp, ident) {
+			continue
+		}
 		t := imp.Find_trait(ident)
 		if t != nil && s.is_accessible_define(t.Public, t.Token) {
 			return t
@@ -333,6 +363,9 @@ func (s *_Sema) Find_enum(ident string) *Enum {
 
 	// Lookup current file's public denifes of imported packages.
 	for _, imp := range s.file.Imports {
+		if !imp_is_lookupable(imp, ident) {
+			continue
+		}
 		e := imp.Find_enum(ident)
 		if e != nil && s.is_accessible_define(e.Public, e.Token) {
 			return e
@@ -629,6 +662,8 @@ func (s *_Sema) get_trait_check_fn_kind(f *Fn) string {
 }
 
 func (s *_Sema) reload_fn_ins_types(f *FnIns) (ok bool) {
+	sema := f.Decl.sema
+
 	generics := make([]*TypeAlias, len(f.Generics))
 	for i, g := range f.Generics {
 		generics[i] = &TypeAlias{
@@ -642,14 +677,18 @@ func (s *_Sema) reload_fn_ins_types(f *FnIns) (ok bool) {
 	ok = true
 	for _, p := range f.Params {
 		if !p.Decl.Is_self() {
-			p.Kind = s.build_type_with_generics(p.Decl.Kind.Decl, generics)
+			p.Kind = sema.build_type_with_generics(p.Decl.Kind.Decl, generics)
 			ok = p.Kind != nil && ok
 		}
 	}
 
 	if !f.Decl.Is_void() {
-		f.Result = s.build_type_with_generics(f.Decl.Result.Kind.Decl, generics)
+		f.Result = sema.build_type_with_generics(f.Decl.Result.Kind.Decl, generics)
 		ok = f.Result != nil && ok
+	}
+
+	if sema != s {
+		s.errors = append(s.errors, sema.errors...)
 	}
 
 	return ok
@@ -806,7 +845,7 @@ func (s *_Sema) check_enum_decl(e *Enum) {
 		e.Kind = &TypeSymbol{
 			Decl: nil,
 			Kind: &TypeKind{
-				kind: &Prim{kind: types.TypeKind_I32},
+				kind: build_prim_type(types.TypeKind_I32),
 			},
 		}
 	}
@@ -980,7 +1019,6 @@ func (s *_Sema) check_fn_decl_types(f *Fn) (ok bool) {
 // Checks generics, parameters and return type.
 // Not checks scope, and other things.
 func (s *_Sema) check_fn_decl_prototype(f *Fn) (ok bool) {
-	f.sema = s
 	switch {
 	case !s.check_decl_generics(f.Generics):
 		return false
@@ -1005,6 +1043,7 @@ func (s *_Sema) check_trait_decl_method(f *Fn) {
 	}
 
 	s.check_fn_decl_prototype(f)
+	f.sema = s
 }
 
 func (s *_Sema) check_trait_decl_methods(t *Trait) {
@@ -1091,6 +1130,7 @@ func (s *_Sema) impl_to_struct(dest *Struct, ipl *Impl) (ok bool) {
 			}
 		}
 
+		f.sema = s
 		f.Owner = dest
 		dest.Methods = append(dest.Methods, f)
 	}
@@ -1261,6 +1301,7 @@ func (s *_Sema) check_struct_fields(st *Struct) (ok bool) {
 		},
 	}
 	for _, f := range st.Fields {
+		f.Owner = st
 		f.Kind.Kind = tc.check_decl(f.Kind.Decl)
 		ok = f.Kind.Kind != nil && ok
 
@@ -1316,6 +1357,7 @@ func (s *_Sema) check_fn_decl(f *Fn) {
 		s.push_err(f.Token, "duplicated_ident", f.Ident)
 	}
 
+	f.sema = s
 	ok := s.check_fn_decl_prototype(f)
 	if !ok {
 		return

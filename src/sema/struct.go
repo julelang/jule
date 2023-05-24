@@ -11,6 +11,7 @@ import (
 
 // Field.
 type Field struct {
+	Owner   *Struct
 	Token   lex.Token
 	Public  bool
 	Mutable bool         // Interior mutability.

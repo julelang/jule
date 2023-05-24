@@ -233,7 +233,32 @@ func gen_get_ref_ptr_expr_model(m *sema.GetRefPtrExprModel) string {
 	return "(" + gen_expr(m.Expr) + ").__alloc"
 }
 
+func gen_cpp_struct_lit_expr_model(m *sema.StructLitExprModel) string {
+	obj := "(" + struct_ins_out_ident(m.Strct)
+	obj += "){"
+	if len(m.Args) > 0 {
+	iter:
+		for _, f := range m.Strct.Fields {
+			obj += field_out_ident(f.Decl) + ": "
+			for _, arg := range m.Args {
+				if arg.Field == f {
+					obj += gen_expr(arg.Expr) + ","
+					continue iter;
+				}
+			}
+			obj += get_init_expr(f.Kind) + ","
+		}
+		obj = obj[:len(obj)-1] // Remove last comma.
+	}
+	obj += "}"
+	return obj
+}
+
 func gen_struct_lit_expr_model(m *sema.StructLitExprModel) string {
+	if m.Strct.Decl.Cpp_linked {
+		return gen_cpp_struct_lit_expr_model(m)
+	}
+
 	obj := struct_ins_out_ident(m.Strct)
 	obj += "("
 	if len(m.Args) > 0 {

@@ -104,13 +104,7 @@ func gen_struct_kind(s *sema.Struct) string {
 
 // Generates C++ code of Struct instance TypeKind.
 func gen_struct_kind_ins(s *sema.StructIns) string {
-	rep := ""
-	if s.Decl.Cpp_linked && !has_directive(s.Decl.Directives, build.DIRECTIVE_TYPEDEF) {
-		rep += "struct "
-	}
-
-	rep += struct_ins_out_ident(s)
-	return rep
+	return struct_ins_out_ident(s)
 }
 
 // Generates C++ code of Arr TypeKind.

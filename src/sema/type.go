@@ -38,6 +38,14 @@ type TypeKind struct {
 	Cpp_ident  string
 	kind      _Kind
 }
+// Returns clone.
+func (tk *TypeKind) clone() *TypeKind {
+	kind := new(TypeKind)
+	kind.Cpp_ident = tk.Cpp_ident
+	kind.Cpp_linked = tk.Cpp_linked
+	kind.kind = tk.kind
+	return kind
+}
 // Returns kind as string.
 func (tk TypeKind) To_str() string {
 	if tk.Is_nil() {
@@ -506,9 +514,7 @@ func (tc *_TypeChecker) from_type_alias(decl *ast.IdentType, ta *TypeAlias) _Kin
 		return nil
 	}
 
-	kind := &TypeKind{
-		kind: ta.Kind.Kind.kind,
-	}
+	kind := ta.Kind.Kind.clone()
 
 	if ta.Cpp_linked {
 		kind.Cpp_linked = true

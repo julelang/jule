@@ -290,8 +290,7 @@ func builtin_caller_new(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 		return nil
 	}
 
-	d.Kind = &TypeKind{kind: &Ref{Elem: t.Kind}}
-
+	d.Kind = &TypeKind{kind: &Ref{Elem: t.Kind.clone()}}
 
 	if len(fc.Args) == 2 { // Initialize expression.
 		init := e.s.evalp(fc.Args[1], e.lookup, &TypeSymbol{Kind: t.Kind})
@@ -460,16 +459,16 @@ func builtin_caller_append(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 		Params: []*ParamIns{
 			{
 				Decl: &Param{},
-				Kind: t.Kind,
+				Kind: t.Kind.clone(),
 			},
 			{
 				Decl: &Param{
 					Variadic: true,
 				},
-				Kind: t.Kind.Slc().Elem,
+				Kind: t.Kind.Slc().Elem.clone(),
 			},
 		},
-		Result: t.Kind,
+		Result: t.Kind.clone(),
 	}
 	d.Kind = &TypeKind{kind: f}
 	d.Model = &CommonIdentExprModel{Ident: "_append"}
@@ -512,11 +511,11 @@ func builtin_caller_copy(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 		Params: []*ParamIns{
 			{
 				Decl: &Param{},
-				Kind: t.Kind,
+				Kind: t.Kind.clone(),
 			},
 			{
 				Decl: &Param{},
-				Kind: t.Kind,
+				Kind: t.Kind.clone(),
 			},
 		},
 		Result: builtin_fn_copy.Result,
@@ -559,7 +558,7 @@ func builtin_caller_recover(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
 	}
 
 	d := build_void_data()
-	d.Kind = t.Kind
+	d.Kind = t.Kind.clone()
 	d.Model = &Recover{
 		Handler_expr: t.Model,
 	}

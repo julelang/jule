@@ -177,7 +177,7 @@ func (tcc *_TypeCompatibilityChecker) check_ref() (ok bool) {
 func (tcc *_TypeCompatibilityChecker) check_ptr() (ok bool) {
 	if tcc.src.Is_nil() {
 		return true
-	} else if tcc.src.Ptr() != nil && tcc.src.Ptr().Is_unsafe() {
+	} else if tcc.dest.Ptr() != nil && tcc.dest.Ptr().Is_unsafe() {
 		return true
 	}
 	return tcc.dest.To_str() == tcc.src.To_str()
@@ -238,12 +238,17 @@ func (tcc *_TypeCompatibilityChecker) check_enum() (ok bool) {
 }
 
 func (tcc *_TypeCompatibilityChecker) check() (ok bool) {
+	if tcc.dest.Ref() != nil {
+		return tcc.check_ref()
+	}
+
+	if tcc.src.Ref() != nil {
+		tcc.src = tcc.src.Ref().Elem
+	}
+
 	switch {
 	case tcc.dest.Trt() != nil:
 		return tcc.check_trait()
-
-	case tcc.dest.Ref() != nil:
-		return tcc.check_ref()
 
 	case tcc.dest.Ptr() != nil:
 		return tcc.check_ptr()

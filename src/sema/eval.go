@@ -520,8 +520,12 @@ func (e *_Eval) eval_var(v *Var, error_token lex.Token) *Data {
 		Lvalue:   !v.Constant,
 		Mutable:  v.Mutable,
 		Decl:     false,
-		Kind:     &TypeKind{kind: v.Kind.Kind.kind},
+		Kind:     v.Kind.Kind.clone(),
 		Model:    v,
+	}
+
+	if !v.Cpp_linked {
+		d.Is_rune = v.Value.Data.Is_rune
 	}
 
 	if v.Constant {
@@ -560,7 +564,7 @@ func (e *_Eval) eval_type_alias(ta *TypeAlias, error_token lex.Token) *Data {
 	case *Prim, *Slc:
 		return &Data{
 			Decl: true,
-			Kind: &TypeKind{kind: ta.Kind.Kind.kind},
+			Kind: ta.Kind.Kind.clone(),
 		}
 	
 	default:
@@ -736,7 +740,7 @@ func (e *_Eval) eval_unary_amper(d *Data) *Data {
 		switch {
 		case d.Kind.Ref() != nil:
 			d.Kind = &TypeKind{
-				kind: &Ptr{Elem: d.Kind.Ref().Elem},
+				kind: &Ptr{Elem: d.Kind.Ref().Elem.clone()},
 			}
 			d.Model = &GetRefPtrExprModel{
 				Expr: d.Model,
@@ -744,7 +748,7 @@ func (e *_Eval) eval_unary_amper(d *Data) *Data {
 
 		case can_get_ptr(d):
 			d.Kind = &TypeKind{
-				kind: &Ptr{Elem: d.Kind},
+				kind: &Ptr{Elem: d.Kind.clone()},
 			}
 			d.Model = &UnaryExprModel{
 				Expr: d.Model,
@@ -959,18 +963,18 @@ func (e *_Eval) indexing_ptr(d *Data, index *Data, i *ast.IndexingExpr) {
 		e.push_err(i.Token, "unsafe_behavior_at_out_of_unsafe_scope")
 	}
 
-	d.Kind = ptr.Elem
+	d.Kind = ptr.Elem.clone()
 }
 
 func (e *_Eval) indexing_arr(d *Data, index *Data, i *ast.IndexingExpr) {
 	arr := d.Kind.Arr()
-	d.Kind = arr.Elem
+	d.Kind = arr.Elem.clone()
 	e.check_integer_indexing_by_data(index, i.Token)
 }
 
 func (e *_Eval) indexing_slc(d *Data, index *Data, i *ast.IndexingExpr) {
 	slc := d.Kind.Slc()
-	d.Kind = slc.Elem
+	d.Kind = slc.Elem.clone()
 	e.check_integer_indexing_by_data(index, i.Token)
 }
 
@@ -982,7 +986,7 @@ func (e *_Eval) indexing_map(d *Data, index *Data, i *ast.IndexingExpr) {
 	m := d.Kind.Map()
 	e.s.check_type_compatibility(m.Key, index.Kind, i.Token, true)
 
-	d.Kind = m.Val
+	d.Kind = m.Val.clone()
 }
 
 func (e *_Eval) indexing_str(d *Data, index *Data, i *ast.IndexingExpr) {
@@ -1103,7 +1107,7 @@ func (e *_Eval) eval_slicing_exprs(s *ast.SlicingExpr) (*Data, *Data) {
 
 func (e *_Eval) slicing_arr(d *Data) {
 	d.Lvalue = false
-	d.Kind.kind = &Slc{Elem: d.Kind.Arr().Elem}
+	d.Kind.kind = &Slc{Elem: d.Kind.Arr().Elem.clone()}
 }
 
 func (e *_Eval) slicing_slc(d *Data) {
@@ -1113,6 +1117,11 @@ func (e *_Eval) slicing_slc(d *Data) {
 func (e *_Eval) slicing_str(d *Data, l *Data, r *Data) {
 	d.Lvalue = false
 	if !d.Is_const() {
+		return
+	}
+
+	if l == nil || r == nil {
+		d.Constant = nil
 		return
 	}
 	
@@ -1705,7 +1714,7 @@ func (e *_Eval) eval_struct_sub_ident(d *Data, s *StructIns, si *ast.SubIdentExp
 			Field:    f,
 		}
 		d.Model = model
-		d.Kind = f.Kind
+		d.Kind = f.Kind.clone()
 
 		if f.Decl.Mutable && !d.Mutable {
 			// Interior mutability.

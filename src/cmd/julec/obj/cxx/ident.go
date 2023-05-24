@@ -5,6 +5,7 @@ import (
 
 	"github.com/julelang/jule"
 	"github.com/julelang/jule/ast"
+	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/sema"
 )
@@ -106,7 +107,10 @@ func param_out_ident(p *sema.Param) string {
 // Returns output identifier of structure.
 func struct_out_ident(s *sema.Struct) string {
 	if s.Cpp_linked {
-		return s.Ident
+		if has_directive(s.Directives, build.DIRECTIVE_TYPEDEF) {
+			return s.Ident
+		}
+		return "struct " + s.Ident
 	}
 	return as_out_ident(s.Ident, s.Token.File.Addr())
 }
@@ -134,6 +138,9 @@ func generic_decl_out_ident(g *ast.Generic) string {
 
 // Returns output identifier of field.
 func field_out_ident(f *sema.Field) string {
+	if f.Owner.Cpp_linked {
+		return f.Ident
+	}
 	return "_field_" + f.Ident
 }
 
