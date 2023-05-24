@@ -509,16 +509,8 @@ func (fcac *_FnCallArgChecker) get_params() []*ParamIns {
 	return fcac.f.Params
 }
 
-func (fcac *_FnCallArgChecker) tuple_as_params(params []*ParamIns) bool {
-	return len(params) > 1 && len(fcac.args) == 1
-}
-
 func (fcac *_FnCallArgChecker) check_counts(params []*ParamIns) (ok bool) {
 	n := len(params)
-	if n > 0 && params[n-1].Decl.Variadic {
-		return true
-	}
-
 	if n > 0 && params[0].Decl.Is_self() {
 		n--
 	}
@@ -529,6 +521,9 @@ func (fcac *_FnCallArgChecker) check_counts(params []*ParamIns) (ok bool) {
 		return true
 
 	case diff < 0 || diff > len(params):
+		if n > 0 && params[n-1].Decl.Variadic {
+			return true
+		}
 		fcac.push_err("argument_overflow")
 		return false
 	}
@@ -562,30 +557,6 @@ func (fcac *_FnCallArgChecker) check_arg(p *ParamIns, arg *Data, error_token lex
 	fcac.e.s.check_validity_for_init_expr(p.Decl.Mutable, arg, error_token)
 	fcac.e.s.check_assign_type(p.Kind, arg, error_token, false)
 	return true
-}
-
-func (fcac *_FnCallArgChecker) try_tuple_as_params(params []*ParamIns) (ok bool) {
-	d := fcac.e.eval_expr_kind(fcac.args[0].Kind)
-	if d == nil {
-		return false
-	}
-
-	tup := d.Kind.Tup()
-	if tup == nil {
-		return false
-	}
-
-	if len(tup.Types) != len(params) {
-		return false
-	}
-
-	for i, arg := range tup.Types {
-		param := params[i]
-		d := Data{Kind: arg}
-		ok = fcac.check_arg(param, &d, fcac.args[0].Token) && ok
-	}
-
-	return ok
 }
 
 func (fcac *_FnCallArgChecker) push(p *ParamIns, arg *ast.Expr) (ok bool) {
@@ -671,14 +642,6 @@ func (fcac *_FnCallArgChecker) check_dynamic_type_annotation() (ok bool) {
 
 func (fcac *_FnCallArgChecker) check() (ok bool) {
 	params := fcac.get_params()
-
-	if fcac.tuple_as_params(params) {
-		ok = fcac.try_tuple_as_params(params)
-		if ok {
-			return true
-		}
-	}
-
 	ok = fcac.check_counts(params)
 	if !ok {
 		return false
