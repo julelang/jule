@@ -229,6 +229,10 @@ func (s *_SymbolBuilder) push_err(token lex.Token, key string, args ...any) {
 }
 
 func (s *_SymbolBuilder) check_cpp_use_decl_path(decl *ast.UseDecl) (ok bool) {
+	if build.Is_std_header_path(decl.Link_path) {
+		return true
+	}
+
 	ext := filepath.Ext(decl.Link_path)
 	if !build.Is_valid_header_ext(ext) {
 		s.push_err(decl.Token, "invalid_header_ext", ext)
