@@ -210,6 +210,7 @@ func build_impl(decl *ast.Impl) *Impl {
 // Just builds symbols, not analyze metadatas
 // like struct's implemented traits.
 type _SymbolBuilder struct {
+	owner    *_SymbolBuilder
 	pwd      string
 	pstd     string
 	importer Importer
@@ -298,14 +299,15 @@ func (s *_SymbolBuilder) build_std_import(decl *ast.UseDecl) *ImportInfo {
 	ident := decl.Link_path[strings.LastIndex(decl.Link_path, lex.KND_DBLCOLON)+1:]
 
 	return &ImportInfo{
-		Token:     decl.Token,
-		Path:      path,
-		Link_path: decl.Link_path,
-		Ident:     ident,
-		Cpp:       false,
-		Std:       true,
-		Package:   &Package{
-			Files:     nil, // Appends by import algorithm.
+		Import_all: decl.Full,
+		Token:      decl.Token,
+		Path:       path,
+		Link_path:  decl.Link_path,
+		Ident:      ident,
+		Cpp:        false,
+		Std:        true,
+		Package:    &Package{
+			Files: nil, // Appends by import algorithm.
 		},
 	}
 }
@@ -346,6 +348,76 @@ func (s *_SymbolBuilder) impl_import_selections(imp *ImportInfo, decl *ast.UseDe
 	}
 }
 
+func (s *_SymbolBuilder) get_as_link_path(path string) string {
+	if strings.HasPrefix(path, s.pstd) {
+		path = path[len(s.pstd):]
+		return "std" + strings.ReplaceAll(path, string(filepath.Separator), lex.KND_DBLCOLON)
+	}
+
+	return path
+}
+
+func (s *_SymbolBuilder) push_cross_cycle_error(target *_SymbolBuilder, imp *ImportInfo, error_token lex.Token) {
+	const PADDING = 4
+
+	message := ""
+
+	push := func(sb *_SymbolBuilder, path string) {
+		refers_to := build.Errorf("refers_to", s.get_as_link_path(sb.table.File.Dir()), s.get_as_link_path(path))
+		message = strings.Repeat(" ", PADDING) + refers_to + "\n" + message
+	}
+
+	push(s, imp.Path)
+
+	owner := s.owner
+	old := s
+
+	for owner.owner != nil {
+		push(old.owner, old.table.File.Dir())
+
+		if owner.owner == target {
+			push(target, owner.table.File.Dir())
+			break
+		}
+
+		old = owner
+		owner = owner.owner
+	}
+
+	s.push_err(error_token, "pkg_illegal_cross_cycle", message)
+}
+
+func (s *_SymbolBuilder) check_import_cycles(imp *ImportInfo, decl *ast.UseDecl) bool {
+	if imp.Path == s.table.File.Dir() {
+		s.push_err(decl.Token, "pkg_illegal_cycle_refers_itself", s.get_as_link_path(imp.Path))
+		return false
+	}
+
+	if s.owner == nil {
+		return true
+	}
+
+	if s.owner.table.File.Dir() == imp.Path {
+		s.push_cross_cycle_error(s.owner, imp, decl.Token)
+		return false
+	}
+
+	owner := s.owner
+iter:
+	if owner.table.File.Dir() == imp.Path {
+		s.push_cross_cycle_error(owner, imp, decl.Token)
+		return false
+	}
+
+	if owner.owner != nil {
+		owner = owner.owner
+		goto iter
+	}
+
+
+	return true
+}
+
 func (s *_SymbolBuilder) import_package(imp *ImportInfo, decl *ast.UseDecl) (ok bool) {
 	if imp.Cpp {
 		return true
@@ -356,6 +428,10 @@ func (s *_SymbolBuilder) import_package(imp *ImportInfo, decl *ast.UseDecl) (ok 
 		imp.Package = port.Package
 		imp.Duplicate = true
 	} else {
+		if !s.check_import_cycles(imp, decl) {
+			return false
+		}
+
 		asts, errors := s.importer.Import_package(imp.Path)
 		if len(errors) > 0 {
 			s.errors = append(s.errors, errors...)
@@ -363,7 +439,7 @@ func (s *_SymbolBuilder) import_package(imp *ImportInfo, decl *ast.UseDecl) (ok 
 		}
 
 		for _, ast := range asts {
-			table, errors := build_symbols(s.pwd, s.pstd, ast, s.importer)
+			table, errors := build_symbols(s.pwd, s.pstd, ast, s.importer, s)
 
 			// Break import if file has error(s).
 			if len(errors) > 0 {
@@ -375,8 +451,6 @@ func (s *_SymbolBuilder) import_package(imp *ImportInfo, decl *ast.UseDecl) (ok 
 			imp.Package.Files = append(imp.Package.Files, table)
 		}
 	}
-
-	imp.Import_all = decl.Full
 
 	s.impl_import_selections(imp, decl)
 

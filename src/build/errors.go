@@ -175,6 +175,9 @@ var ERRORS = map[string]string{
 	`ident_is_not_accessible`:                  `identifier is not accessible: @`,
 	`invalid_stmt_for_next`:                    `invalid statement for while-next`,
 	`modulo_with_not_int`:                      `module operator must be used with integer type`,
+	`pkg_illegal_cycle_refers_itself`:          `illegal cycle in use declaration, package @ refers to itself`,
+	`pkg_illegal_cross_cycle`:                  "illegal cross cycle in use declarations;\n@",
+	`refers_to`:                                `@ refers to @`,
 }
 
 // Returns formatted error message by key and args.
