@@ -1300,6 +1300,7 @@ func (s *_Sema) check_struct_fields(st *Struct) (ok bool) {
 			strct: st,
 		},
 	}
+
 	for _, f := range st.Fields {
 		f.Owner = st
 		f.Kind.Kind = tc.check_decl(f.Kind.Decl)
@@ -1314,6 +1315,7 @@ func (s *_Sema) check_struct_fields(st *Struct) (ok bool) {
 			}
 		}
 	}
+
 	return ok
 }
 

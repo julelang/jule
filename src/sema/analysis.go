@@ -13,12 +13,13 @@ import (
 
 // Builds symbol table of AST.
 func build_symbols(pwd string, pstd string, ast *ast.Ast,
-	importer Importer) (*SymbolTable, []build.Log) {
+	importer Importer, owner *_SymbolBuilder) (*SymbolTable, []build.Log) {
 	sb := &_SymbolBuilder{
 		ast:      ast,
 		importer: importer,
 		pwd:      pwd,
 		pstd:     pstd,
+		owner:    owner,
 	}
 	sb.build()
 
@@ -33,7 +34,7 @@ func analyze_package(pwd string, pstd string, files []*ast.Ast,
 	// Build symbol tables of files.
 	tables := make([]*SymbolTable, len(files))
 	for i, f := range files {
-		table, errors := build_symbols(pwd, pstd, f, importer)
+		table, errors := build_symbols(pwd, pstd, f, importer, nil)
 		if len(errors) > 0 {
 			return nil, errors
 		}
