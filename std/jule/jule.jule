@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::os::{ARGS, OsError, exit, getwd}
-use std::fs::path::{abs, dir, join}
-
 // Version of package and sub-packages.
 // This version represents also JuleC version.
 pub const VERSION = `@master`
@@ -23,45 +20,3 @@ pub const ENTRY_POINT = "main"
 
 // Identifier of initializer function.
 pub const INIT_FN = "init"
-
-// Absolute directory path of standard library.
-pub let STDLIB_PATH = ""
-
-// Absolute directory path of compiler (JuleC).
-// Actually, this package and sub-packages designed for JuleC.
-// So returns JuleC's executable file path.
-// But actually returns executable path of current program.
-pub let EXEC_PATH = ""
-
-// Absolute directory path of working path of compiler (JuleC).
-// Actually, this package and sub-packages designed for JuleC.
-// So returns JuleC's working path.
-// But actually returns working path of current program.
-pub let WORKING_PATH = ""
-
-fn exit_err(msg: str) {
-	outln(msg)
-	const EXIT_CODE = 0
-	exit(EXIT_CODE)
-}
-
-fn init() {
-	let ((unsafe { *(&WORKING_PATH) }), err) = getwd()
-	if err != OsError.Ok {
-		exit_err("std::jule: WORKING_PATH cannot set")
-	}
-
-	// Use ARGS[0] because ARGS[0] represents executable path.
-	// This path is not absolute path everytime.
-	// But works fine, returns absolute path.
-	// But still not reliable yet, needs more test case.
-	let (path, ok) = abs(ARGS[0])
-	if !ok {
-		exit_err("std::jule: EXEC_PATH cannot set")
-	}
-
-	unsafe {
-		*(&EXEC_PATH) = dir(path)
-		*(&STDLIB_PATH) = join(EXEC_PATH, "..", STDLIB)
-	}
-}
