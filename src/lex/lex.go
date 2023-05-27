@@ -189,17 +189,19 @@ func (l *_Lex) id(ln string) string {
 	if !Is_ident_rune(ln) {
 		return ""
 	}
-	var sb strings.Builder
+
+	ident := ""
 	for _, r := range ln {
 		if r != '_' &&
 			!Is_decimal(byte(r)) &&
 			!Is_letter(r) {
 			break
 		}
-		sb.WriteRune(r)
+		ident += string(r)
 		l.pos++
 	}
-	return sb.String()
+
+	return ident
 }
 
 // resume to lex from position.
@@ -590,26 +592,26 @@ func (l *_Lex) get_rune(txt string, raw bool) string {
 	if !raw && txt[0] == '\\' {
 		return l.escape_seq(txt)
 	}
+
 	r, _ := utf8.DecodeRuneInString(txt)
 	l.pos++
 	return string(r)
 }
 
 func (l *_Lex) lex_rune(txt string) string {
-	var sb strings.Builder
-	sb.WriteByte('\'')
+	run := "'"
 	l.column++
-	txt = txt[1:]
 	n := 0
-	for i := 0; i < len(txt); i++ {
+	for i := 1; i < len(txt); i++ {
 		if txt[i] == '\n' {
 			l.push_err("missing_rune_end")
 			l.pos++
 			l.new_line()
 			return ""
 		}
+
 		r := l.get_rune(txt[i:], false)
-		sb.WriteString(r)
+		run += r
 		length := len(r)
 		l.column += length
 		if r == "'" {
@@ -628,17 +630,17 @@ func (l *_Lex) lex_rune(txt string) string {
 		l.push_err("rune_overflow")
 	}
 
-	return sb.String()
+	return run
 }
 
 func (l *_Lex) lex_str(txt string) string {
-	var sb strings.Builder
+	s := ""
 	mark := txt[0]
 	raw := mark == '`'
-	sb.WriteByte(mark)
+	s += string(mark)
 	l.column++
-	txt = txt[1:]
-	for i := 0; i < len(txt); i++ {
+
+	for i := 1; i < len(txt); i++ {
 		ch := txt[i]
 		if ch == '\n' {
 			l.new_line()
@@ -649,7 +651,7 @@ func (l *_Lex) lex_str(txt string) string {
 			}
 		}
 		r := l.get_rune(txt[i:], raw)
-		sb.WriteString(r)
+		s += r
 		n := len(r)
 		l.column += n
 		if ch == mark {
@@ -660,7 +662,8 @@ func (l *_Lex) lex_str(txt string) string {
 			i += n - 1
 		}
 	}
-	return sb.String()
+
+	return s
 }
 
 func (l *_Lex) new_line() {
@@ -712,6 +715,7 @@ func (l *_Lex) lex_id(txt string, t *Token) bool {
 	if lex == "" {
 		return false
 	}
+
 	t.Kind = lex
 	t.Id = ID_IDENT
 	return true
@@ -722,6 +726,7 @@ func (l *_Lex) lex_num(txt string, t *Token) bool {
 	if lex == "" {
 		return false
 	}
+
 	t.Kind = lex
 	t.Id = ID_LIT
 	return true

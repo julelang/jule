@@ -19,8 +19,7 @@ func Is_byte_lit(kind string) (string, bool) {
 
 	kind = kind[1 : len(kind)-1] // Remove quotes.
 	is_byte := false
-	
-	// TODO: Add support for byte escape sequences.
+
 	switch {
 	case len(kind) == 1 && kind[0] <= 255:
 		is_byte = true
@@ -53,9 +52,6 @@ func To_rune(bytes []byte) rune {
 
 	return r
 }
-
-// Returns rune as rune value in hexadecimal.
-func Rtoa(r rune) string { return "0x" + strconv.FormatInt(int64(r), 16) }
 
 // Returns raw-string value string from bytes, not includes quotes.
 // Bytes are represents string characters, allows escape sequences.
