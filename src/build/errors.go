@@ -134,7 +134,7 @@ var ERRORS = map[string]string{
 	`genericed_fn_as_anonymous_fn`:             `genericed functions cannot use as anonymous function`,
 	`reference_field_not_initialized`:          `reference field must initialize explicitly: @`,
 	`illegal_cycle_refers_itself`:              `illegal cycle in declaration, @ refers to itself`,
-	`illegal_cross_cycle`:                      `illegal cross cycle in declaration, @ and @ refers to each other`,
+	`illegal_cross_cycle`:                      "illegal cross cycle in declarations;\n@",
 	`assignment_to_non_mut`:                    `cannot assign to immutable define`,
 	`assignment_non_mut_to_mut`:                `cannot assign mutable type used immutable define to mutable define`,
 	`ret_with_mut_typed_non_mut`:               `mutable typed return expressions should be mutable`,

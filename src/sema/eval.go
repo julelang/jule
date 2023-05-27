@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/julelang/jule/ast"
+	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/constant"
 	"github.com/julelang/jule/constant/lit"
 	"github.com/julelang/jule/lex"
@@ -487,12 +488,40 @@ func (e *_Eval) check_illegal_cycles(v *Var, decl_token lex.Token) (ok bool) {
 		return false
 	}
 
+	const PADDING = 4
+
+	message := ""
+
+	push := func(v1 *Var, v2 *Var) {
+		refers_to := build.Errorf("refers_to", v1.Ident, v2.Ident)
+		message = strings.Repeat(" ", PADDING) + refers_to + "\n" + message
+	}
+
 	// Check cross illegal cycle.
-	for _, d := range v.Depends {
-		if d == e.owner {
-			e.push_err(decl_token, "illegal_cross_cycle", e.owner.Ident, decl_token.Kind)
-			return false
+	var check_cross func(v *Var) bool
+	check_cross = func(v *Var) bool {
+		for _, d := range v.Depends {
+			if d == e.owner {
+				push(v, d)
+				return false
+			}
+
+			if !check_cross(d) {
+				push(v, d)
+				return false
+			}
 		}
+
+		return true
+	}
+
+	if !check_cross(v) {
+		err_msg := message
+		message = ""
+		push(e.owner, v)
+		err_msg = err_msg + message
+		e.push_err(decl_token, "illegal_cross_cycle", err_msg)
+		return false
 	}
 
 	e.owner.Depends = append(e.owner.Depends, v)

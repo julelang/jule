@@ -24,7 +24,6 @@ type Enum struct {
 	Kind   *TypeSymbol
 	Items  []*EnumItem
 	Doc    string
-	Refers []uintptr // Addresses of referred identifiers.
 }
 
 // Implement: Kind

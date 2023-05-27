@@ -9,8 +9,10 @@ package sema
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/julelang/jule/ast"
+	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/types"
 )
@@ -25,7 +27,7 @@ type TypeAlias struct {
 	Ident      string
 	Kind       *TypeSymbol
 	Doc        string
-	Refers     []uintptr // Addresses of referred identifiers.
+	Refers     []any // Referred identifiers.
 }
 
 type _Kind interface {
@@ -369,13 +371,10 @@ func is_prim(kind string) bool {
 }
 
 type _Referencer struct {
-	ident  string
-	owner  uintptr
-	refers *[]uintptr
-	strct  *Struct
+	ident string
+	owner any
+	refs  *[]any
 }
-
-func (r *_Referencer) is_struct_mode() bool { return r.strct != nil }
 
 // Checks type and builds result as kind.
 // Removes kind if error occurs,
@@ -431,67 +430,114 @@ func (tc *_TypeChecker) build_prim(decl *ast.IdentType) *Prim {
 	return build_prim_type(decl.Ident)
 }
 
-// Checks illegal cycles.
+// Checks type alias illegal cycles.
 // Appends reference to reference if there is no illegal cycle.
 // Returns true if tc.referencer is nil.
 // Returns true if refers is nil.
-func (tc *_TypeChecker) check_illegal_cycles(decl uintptr, refers *[]uintptr, decl_token lex.Token) (ok bool) {
-	if tc.referencer == nil || tc.referencer.refers == nil || refers == nil {
+func (tc *_TypeChecker) check_illegal_cycles(ident *ast.IdentType, decl any) (ok bool) {
+	if tc.referencer == nil {
 		return true
+	}
+
+	switch decl.(type) {
+	case *Struct:
+		if tc.not_plain {
+			return true
+		}
 	}
 
 	// Check illegal cycle for itself.
 	// Because refers's owner is ta.
-	if tc.referencer.refers == refers {
-		tc.push_err(decl_token, "illegal_cycle_refers_itself", tc.referencer.ident)
+	if tc.referencer.owner == decl {
+		tc.push_err(ident.Token, "illegal_cycle_refers_itself", tc.referencer.ident)
 		return false
 	}
 
-	// Check cross illegal cycle.
-	for _, r := range *refers {
-		if r == tc.referencer.owner {
-			tc.push_err(decl_token, "illegal_cross_cycle", tc.referencer.ident, decl_token.Kind)
-			return false
+	const PADDING = 4
+
+	message := ""
+
+	push := func(def1 any, def2 any) {
+		get_ident := func(def any) string {
+			switch def.(type) {
+			case *TypeAlias:
+				return def.(*TypeAlias).Ident
+	
+			case *Struct:
+				return def.(*Struct).Ident
+	
+			case *Enum:
+				return def.(*Enum).Ident
+
+			default:
+				return ""
+			}
 		}
+
+		def1_ident := get_ident(def1)
+		def2_ident := get_ident(def2)
+		refers_to := build.Errorf("refers_to", def1_ident, def2_ident)
+		message = strings.Repeat(" ", PADDING) + refers_to + "\n" + message
 	}
 
-	*tc.referencer.refers = append(*tc.referencer.refers, decl)
-	return true
-}
+	// Check cross illegal cycle.
+	var check_cross func(decl any) bool
+	check_cross = func(decl any) bool {
+		switch decl.(type) {
+		case *TypeAlias:
+			ta := decl.(*TypeAlias)
+			for _, d := range ta.Refers {
+				if d == tc.referencer.owner {
+					push(ta, d)
+					return false
+				}
 
-// Checks structure illegal cycles.
-// Appends depend to depends if there is no illegal cycle.
-// Returns true if tc.referencer is nil.
-// Returns true if tc.referencer.is_struct_mode() is false.
-// Returns true if tc.not_plain is true.
-func (tc *_TypeChecker) check_struct_illegal_cycles(decl *ast.IdentType, s *Struct) (ok bool) {
-	switch {
-	case tc.referencer == nil:
-		return true
+				if !check_cross(d) {
+					push(ta, d)
+					return false
+				}
+			}
 
-	case !tc.referencer.is_struct_mode():
-		return true
+		case *Struct:
+			s := decl.(*Struct)
+			for _, d := range s.Depends {
+				if d == tc.referencer.owner {
+					push(s, d)
+					return false
+				}
 
-	case tc.not_plain:
+				if !check_cross(d) {
+					push(s, d)
+					return false
+				}
+			}
+
+		}
+
 		return true
 	}
 
-	// Check illegal cycle for itself.
-	// Because refers's owner is ta.
-	if tc.referencer.strct == s {
-		tc.push_err(decl.Token, "illegal_cycle_refers_itself", tc.referencer.ident)
+	if !check_cross(decl) {
+		err_msg := message
+		message = ""
+		push(tc.referencer.owner, decl)
+		err_msg = err_msg + message
+		tc.push_err(ident.Token, "illegal_cross_cycle", err_msg)
 		return false
 	}
 
-	// Check cross illegal cycle.
-	for _, d := range s.Depends {
-		if d == tc.referencer.strct {
-			tc.push_err(decl.Token, "illegal_cross_cycle", tc.referencer.ident, decl.Ident)
-			return false
+	switch tc.referencer.owner.(type) {
+	case *TypeAlias:
+		*tc.referencer.refs = append(*tc.referencer.refs, decl)
+
+	case *Struct:
+		switch decl.(type) {
+		case *Struct:
+			s := tc.referencer.owner.(*Struct)
+			s.Depends = append(s.Depends, decl.(*Struct))
 		}
 	}
 
-	tc.referencer.strct.Depends = append(tc.referencer.strct.Depends, s)
 	return true
 }
 
@@ -508,7 +554,7 @@ func (tc *_TypeChecker) from_type_alias(decl *ast.IdentType, ta *TypeAlias) _Kin
 		return nil
 	}
 
-	ok := tc.check_illegal_cycles(_uintptr(ta), &ta.Refers, decl.Token)
+	ok := tc.check_illegal_cycles(decl, ta)
 	if !ok {
 		return nil
 	}
@@ -540,11 +586,6 @@ func (tc *_TypeChecker) from_enum(decl *ast.IdentType, e *Enum) *Enum {
 		return nil
 	}
 
-	ok := tc.check_illegal_cycles(_uintptr(e), &e.Refers, decl.Token)
-	if !ok {
-		return nil
-	}
-
 	return e
 }
 
@@ -559,7 +600,7 @@ func (tc *_TypeChecker) check_struct_ins(ins *StructIns, error_token lex.Token) 
 		return false
 	}
 
-	if tc.referencer != nil && tc.referencer.strct == ins.Decl {
+	if tc.referencer != nil && tc.referencer.owner == ins.Decl {
 		// Break algorithm cycle.
 		return true
 	} /* else if ins.Decl.sema != nil && len(ins.Decl.Generics) == 0 {
@@ -569,7 +610,7 @@ func (tc *_TypeChecker) check_struct_ins(ins *StructIns, error_token lex.Token) 
 
 	referencer := &_Referencer{
 		ident: ins.Decl.Ident,
-		strct: ins.Decl,
+		owner: ins.Decl,
 	}
 
 	generics := make([]*TypeAlias, len(ins.Generics))
@@ -613,7 +654,7 @@ func (tc *_TypeChecker) from_struct(decl *ast.IdentType, s *Struct) *StructIns {
 		return nil
 	}
 
-	ok := tc.check_struct_illegal_cycles(decl, s)
+	ok := tc.check_illegal_cycles(decl, s)
 	if !ok {
 		return nil
 	}
@@ -662,7 +703,7 @@ func (tc *_TypeChecker) get_def(decl *ast.IdentType) _Kind {
 		if g.Ident == decl.Ident {
 			st := g.Kind.Kind.Strct()
 			if st != nil {
-				ok := tc.check_struct_illegal_cycles(decl, st.Decl)
+				ok := tc.check_illegal_cycles(decl, st.Decl)
 				if !ok {
 					return nil
 				}
@@ -723,6 +764,10 @@ func (tc *_TypeChecker) build_ident(decl *ast.IdentType) _Kind {
 }
 
 func (tc *_TypeChecker) build_ref(decl *ast.RefType) *Ref {
+	not_plain := tc.not_plain
+	tc.not_plain = true
+	defer func() { tc.not_plain = not_plain }()
+
 	elem := tc.check_decl(decl.Elem)
 
 	// Check special cases.
@@ -787,6 +832,10 @@ func (tc *_TypeChecker) build_ptr(decl *ast.PtrType) *Ptr {
 }
 
 func (tc *_TypeChecker) build_slc(decl *ast.SlcType) *Slc {
+	not_plain := tc.not_plain
+	tc.not_plain = true
+	defer func() { tc.not_plain = not_plain }()
+
 	elem := tc.check_decl(decl.Elem)
 
 	// Check special cases.
@@ -805,6 +854,10 @@ func (tc *_TypeChecker) build_slc(decl *ast.SlcType) *Slc {
 }
 
 func (tc *_TypeChecker) build_arr(decl *ast.ArrType) *Arr {
+	not_plain := tc.not_plain
+	tc.not_plain = true
+	defer func() { tc.not_plain = not_plain }()
+
 	var n int = 0
 
 	if !decl.Auto_sized() {
@@ -848,6 +901,10 @@ func (tc *_TypeChecker) build_arr(decl *ast.ArrType) *Arr {
 }
 
 func (tc *_TypeChecker) build_map(decl *ast.MapType) *Map {
+	not_plain := tc.not_plain
+	tc.not_plain = true
+	defer func() { tc.not_plain = not_plain }()
+
 	key := tc.check_decl(decl.Key)
 	if key == nil {
 		return nil

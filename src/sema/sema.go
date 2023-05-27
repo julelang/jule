@@ -710,9 +710,9 @@ func (s *_Sema) check_validity_for_init_expr(left_mut bool, d *Data, error_token
 
 func (s *_Sema) check_type_alias_decl_kind(ta *TypeAlias, l Lookup) (ok bool) {
 	ok = s.check_type_with_refers(ta.Kind, l, &_Referencer{
-		ident:  ta.Ident,
-		owner:  _uintptr(ta),
-		refers: &ta.Refers,
+		ident: ta.Ident,
+		owner: ta,
+		refs:  &ta.Refers,
 	})
 	if ok && ta.Kind.Kind.Arr() != nil && ta.Kind.Kind.Arr().Auto {
 		s.push_err(ta.Kind.Decl.Token, "array_auto_sized")
@@ -833,11 +833,7 @@ func (s *_Sema) check_enum_decl(e *Enum) {
 	s.check_enum_items_dup(e)
 
 	if e.Kind != nil {
-		if !s.check_type_with_refers(e.Kind, s, &_Referencer{
-			ident:  e.Ident,
-			owner: _uintptr(e),
-			refers: &e.Refers,
-		}) {
+		if !s.check_type(e.Kind, s) {
 			return
 		}
 	} else {
@@ -1297,7 +1293,7 @@ func (s *_Sema) check_struct_fields(st *Struct) (ok bool) {
 		ignore_generics: st.Generics,
 		referencer:      &_Referencer{
 			ident: st.Ident,
-			strct: st,
+			owner: st,
 		},
 	}
 
