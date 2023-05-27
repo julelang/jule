@@ -1211,6 +1211,7 @@ func (e *_Eval) eval_slicing(s *ast.SlicingExpr) *Data {
 	}
 
 	e.check_slicing(d, l, r, s)
+	d.Cast_kind = nil
 
 	model := &SlicingExprModel{
 		Expr: d.Model,
@@ -2772,7 +2773,7 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 		}
 	}
 
-	if d.Cast_kind == nil && !d.Lvalue && !d.Is_const() && d.Kind.Prim() != nil && types.Is_num(d.Kind.Prim().kind) {
+	if d.Cast_kind == nil && !d.Variadiced && !d.Lvalue && !d.Is_const() && d.Kind.Prim() != nil && types.Is_num(d.Kind.Prim().kind) {
 		d.Cast_kind = d.Kind
 	}
 
