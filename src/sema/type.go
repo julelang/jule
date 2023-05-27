@@ -549,6 +549,11 @@ func (tc *_TypeChecker) from_enum(decl *ast.IdentType, e *Enum) *Enum {
 }
 
 func (tc *_TypeChecker) check_struct_ins(ins *StructIns, error_token lex.Token) (ok bool) {
+	if ins.Checked {
+		return true
+	}
+	ins.Checked = true
+
 	ok = tc.s.check_generic_quantity(len(ins.Decl.Generics), len(ins.Generics), error_token)
 	if !ok {
 		return false
@@ -557,10 +562,10 @@ func (tc *_TypeChecker) check_struct_ins(ins *StructIns, error_token lex.Token) 
 	if tc.referencer != nil && tc.referencer.strct == ins.Decl {
 		// Break algorithm cycle.
 		return true
-	} else if ins.Decl.sema != nil && len(ins.Decl.Generics) == 0 {
+	} /* else if ins.Decl.sema != nil && len(ins.Decl.Generics) == 0 {
 		// Break algorithm cycle.
 		return true
-	}
+	}*/
 
 	referencer := &_Referencer{
 		ident: ins.Decl.Ident,
@@ -581,7 +586,7 @@ func (tc *_TypeChecker) check_struct_ins(ins *StructIns, error_token lex.Token) 
 	for _, f := range ins.Fields {
 		tc := _TypeChecker{
 			s:            tc.s,
-			lookup:       tc.s,
+			lookup:       tc.lookup,
 			referencer:   referencer,
 			use_generics: generics,
 		}
@@ -632,12 +637,13 @@ func (tc *_TypeChecker) from_struct(decl *ast.IdentType, s *Struct) *StructIns {
 		return nil
 	}
 
+	s.append_instance(ins)
+
 	ok = tc.check_struct_ins(ins, decl.Token)
 	if !ok {
 		return nil
 	}
 
-	s.append_instance(ins)
 	return ins
 }
 

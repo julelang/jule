@@ -256,22 +256,6 @@ var ASSING_OPS = [...]string{
 	KND_CARET_EQ,
 }
 
-func exist_op(kind string, operators []string) bool {
-	for _, operator := range operators {
-		if kind == operator {
-			return true
-		}
-	}
-	return false
-}
-
-// Reports whether kind is unary operator.
-func Is_unary_op(kind string) bool { return exist_op(kind, UNARY_OPS[:]) }
-// Reports whether kind is binary operator.
-func Is_bin_op(kind string) bool { return exist_op(kind, BIN_OPS[:]) }
-// Reports whether kind is weak operator.
-func Is_weak_op(kind string) bool { return exist_op(kind, WEAK_OPS[:]) }
-
 // Token is lexer token.
 type Token struct {
 	File   *File
@@ -311,6 +295,21 @@ func (t *Token) Prec() int {
 	}
 }
 
+func exist_op(kind string, operators []string) bool {
+	for _, operator := range operators {
+		if kind == operator {
+			return true
+		}
+	}
+	return false
+}
+
+// Reports whether kind is unary operator.
+func Is_unary_op(kind string) bool { return exist_op(kind, UNARY_OPS[:]) }
+// Reports whether kind is binary operator.
+func Is_bin_op(kind string) bool { return exist_op(kind, BIN_OPS[:]) }
+// Reports whether kind is weak operator.
+func Is_weak_op(kind string) bool { return exist_op(kind, WEAK_OPS[:]) }
 // Reports whether kind is string literal.
 func Is_str(k string) bool { return k != "" && (k[0] == '"' || Is_raw_str(k)) }
 // Reports whether kind is raw string literal.

@@ -1300,6 +1300,7 @@ func (s *_Sema) check_struct_fields(st *Struct) (ok bool) {
 			strct: st,
 		},
 	}
+
 	for _, f := range st.Fields {
 		f.Owner = st
 		f.Kind.Kind = tc.check_decl(f.Kind.Decl)
@@ -1314,6 +1315,7 @@ func (s *_Sema) check_struct_fields(st *Struct) (ok bool) {
 			}
 		}
 	}
+
 	return ok
 }
 
@@ -1347,6 +1349,7 @@ func (s *_Sema) check_struct_decls() (ok bool) {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -1521,6 +1524,7 @@ func (s *_Sema) check_type_struct(strct *Struct) {
 
 	if len(strct.Instances) == 0 {
 		ins := strct.instance()
+		ins.Checked = true
 		strct.Instances = append(strct.Instances, ins)
 	}
 

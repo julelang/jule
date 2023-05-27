@@ -125,6 +125,7 @@ type FieldIns struct {
 
 // Strucutre instance.
 type StructIns struct {
+	Checked  bool
 	Decl     *Struct
 	Generics []*TypeKind
 	Fields   []*FieldIns
