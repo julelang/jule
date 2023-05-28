@@ -28,5 +28,7 @@ type Var struct {
 	Depends    []*Var
 }
 
+// Reports whether variable is initialized explicitly.
+func (v *Var) Is_initialized() bool { return v.Value != nil }
 // Reports whether variable is auto-typed.
 func (v *Var) Is_auto_typed() bool { return v.Kind == nil || v.Kind.Decl == nil }

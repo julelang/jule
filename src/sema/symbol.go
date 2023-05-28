@@ -38,10 +38,7 @@ func build_type(t *ast.Type) *TypeSymbol {
 
 func build_expr(expr *ast.Expr) *Value {
 	if expr == nil {
-		return &Value{
-			Data: nil,
-			Expr: nil,
-		}
+		return nil
 	}
 
 	return &Value{

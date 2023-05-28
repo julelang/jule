@@ -542,7 +542,9 @@ func (e *_Eval) eval_var(v *Var, error_token lex.Token) *Data {
 	}
 
 	if !v.Cpp_linked && (v.Value == nil || v.Value.Data == nil) {
-		return nil
+		if v.Constant {
+			return nil
+		}
 	}
 
 	d := &Data{
@@ -553,7 +555,7 @@ func (e *_Eval) eval_var(v *Var, error_token lex.Token) *Data {
 		Model:    v,
 	}
 
-	if !v.Cpp_linked {
+	if !v.Cpp_linked && v.Is_initialized() {
 		d.Is_rune = v.Value.Data.Is_rune
 	}
 

@@ -812,11 +812,6 @@ type _RangeChecker struct {
 
 func (rc *_RangeChecker) build_var(decl *ast.VarDecl) *Var {
 	v := build_var(decl)
-	
-	// Eval ignores variables if Data field is nil.
-	// Prevents this from happening.
-	v.Value.Data = &Data{}
-	
 	return v
 }
 

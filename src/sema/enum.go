@@ -14,7 +14,7 @@ type EnumItem struct {
 }
 
 // Reports whether item has auto expression.
-func (ei *EnumItem) Auto_expr() bool { return ei.Value.Expr == nil }
+func (ei *EnumItem) Auto_expr() bool { return ei.Value == nil }
 
 // Enum.
 type Enum struct {

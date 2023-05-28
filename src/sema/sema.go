@@ -1223,12 +1223,8 @@ func (s *_Sema) check_var_decl(decl *Var, l Lookup) {
 		s.push_err(decl.Token, "ignore_ident")
 	}
 
-	if !decl.Cpp_linked && (decl.Value == nil || decl.Value.Expr == nil) {
-		s.push_err(decl.Token, "variable_not_initialized")
-	}
-
 	if decl.Is_auto_typed() {
-		if decl.Value == nil {
+		if !decl.Is_initialized() {
 			s.push_err(decl.Token, "missing_autotype_value")
 		}
 	} else {
@@ -1357,10 +1353,7 @@ func (s *_Sema) check_fn_decl(f *Fn) {
 	}
 
 	f.sema = s
-	ok := s.check_fn_decl_prototype(f)
-	if !ok {
-		return
-	}
+	_ = s.check_fn_decl_prototype(f)
 }
 
 // Checks current package file's function declarations.
@@ -1460,7 +1453,7 @@ func (s *_Sema) check_var(v *Var) {
 }
 
 func (s *_Sema) check_type_var(decl *Var, l Lookup) {
-	if decl.Cpp_linked {
+	if decl.Cpp_linked || !decl.Is_initialized() {
 		return
 	}
 
@@ -1480,7 +1473,7 @@ func (s *_Sema) check_global_types() {
 
 	// Re-check depended.
 	for _, decl := range s.file.Vars {
-		if decl.Value.Data == nil && len(decl.Depends) > 0 {
+		if decl.Is_initialized() && len(decl.Depends) > 0 {
 			s.check_type_var(decl, s)
 		}
 	}
