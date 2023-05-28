@@ -1230,6 +1230,10 @@ func (s *_Sema) check_var_decl(decl *Var, l Lookup) {
 	} else {
 		_ = s.check_type(decl.Kind, l)
 	}
+
+	if decl.Constant && !decl.Is_initialized() {
+		s.push_err(decl.Token, "const_var_not_have_expr")
+	}
 }
 
 // Checks variable declaration.
