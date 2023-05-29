@@ -1262,7 +1262,9 @@ func (p *_Parser) build_node_data(tokens []lex.Token) ast.NodeData {
 		
 	case lex.ID_FN, lex.ID_UNSAFE:
 		f := p.build_fn(tokens, false, false, false)
-		f.Global = true
+		if f != nil {
+			f.Global = true
+		}
 		return f
 
 	case lex.ID_CONST, lex.ID_LET, lex.ID_MUT:
