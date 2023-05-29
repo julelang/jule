@@ -1444,6 +1444,10 @@ func (e *_Eval) eval_cast(c *ast.CastExpr) *Data {
 }
 
 func (e *_Eval) eval_ns_selection(s *ast.NsSelectionExpr) *Data {
+	if s.Ns[0].Id == lex.ID_PRIM {
+		return e.eval_prim_type_sub_ident(s.Ns[0], s.Ident)
+	}
+
 	path := build_link_path_by_tokens(s.Ns)
 	imp := e.lookup.Select_package(func(p *ImportInfo) bool {
 		return p.Link_path == path
@@ -2162,10 +2166,11 @@ func (e *_Eval) eval_str_sub_ident(d *Data, ident lex.Token) *Data {
 	}
 }
 
-func (e *_Eval) eval_int_type_sub_ident(si *ast.SubIdentExpr) *Data {
+func (e *_Eval) eval_int_type_sub_ident(ident lex.Token) *Data {
 	const kind = types.TypeKind_INT
-	switch si.Ident.Kind {
-	case "max":
+
+	switch ident.Kind {
+	case "MAX":
 		c := constant.New_i64(int64(types.Max_of(kind)))
 		return &Data{
 			Constant: c,
@@ -2173,7 +2178,7 @@ func (e *_Eval) eval_int_type_sub_ident(si *ast.SubIdentExpr) *Data {
 			Kind:     &TypeKind{kind: build_prim_type(kind)},
 		}
 
-	case "min":
+	case "MIN":
 		c := constant.New_i64(int64(types.Min_of(kind)))
 		return &Data{
 			Constant: c,
@@ -2182,15 +2187,16 @@ func (e *_Eval) eval_int_type_sub_ident(si *ast.SubIdentExpr) *Data {
 		}
 
 	default:
-		e.push_err(si.Ident, "type_have_not_ident", kind, si.Ident.Kind)
+		e.push_err(ident, "type_have_not_ident", kind, ident.Kind)
 		return nil
 	}
 }
 
-func (e *_Eval) eval_uint_type_sub_ident(si *ast.SubIdentExpr) *Data {
+func (e *_Eval) eval_uint_type_sub_ident(ident lex.Token) *Data {
 	const kind = types.TypeKind_UINT
-	switch si.Ident.Kind {
-	case "max":
+
+	switch ident.Kind {
+	case "MAX":
 		c := constant.New_u64(uint64(types.Max_of(kind)))
 		return &Data{
 			Constant: c,
@@ -2199,17 +2205,18 @@ func (e *_Eval) eval_uint_type_sub_ident(si *ast.SubIdentExpr) *Data {
 		}
 
 	default:
-		e.push_err(si.Ident, "type_have_not_ident", kind, si.Ident.Kind)
+		e.push_err(ident, "type_have_not_ident", kind, ident.Kind)
 		return nil
 	}
 }
 
-func (e *_Eval) eval_i8_type_sub_ident(si *ast.SubIdentExpr) *Data {
+func (e *_Eval) eval_i8_type_sub_ident(ident lex.Token) *Data {
 	const kind = types.TypeKind_I8
 	const min = types.MIN_I8
 	const max = types.MAX_I8
-	switch si.Ident.Kind {
-	case "max":
+
+	switch ident.Kind {
+	case "MAX":
 		c := constant.New_i64(max)
 		return &Data{
 			Constant: c,
@@ -2217,7 +2224,7 @@ func (e *_Eval) eval_i8_type_sub_ident(si *ast.SubIdentExpr) *Data {
 			Kind:     &TypeKind{kind: build_prim_type(kind)},
 		}
 
-	case "min":
+	case "MIN":
 		c := constant.New_i64(min)
 		return &Data{
 			Constant: c,
@@ -2226,17 +2233,18 @@ func (e *_Eval) eval_i8_type_sub_ident(si *ast.SubIdentExpr) *Data {
 		}
 
 	default:
-		e.push_err(si.Ident, "type_have_not_ident", kind, si.Ident.Kind)
+		e.push_err(ident, "type_have_not_ident", kind, ident.Kind)
 		return nil
 	}
 }
 
-func (e *_Eval) eval_i16_type_sub_ident(si *ast.SubIdentExpr) *Data {
+func (e *_Eval) eval_i16_type_sub_ident(ident lex.Token) *Data {
 	const kind = types.TypeKind_I16
 	const min = types.MIN_I16
 	const max = types.MAX_I16
-	switch si.Ident.Kind {
-	case "max":
+
+	switch ident.Kind {
+	case "MAX":
 		c := constant.New_i64(max)
 		return &Data{
 			Constant: c,
@@ -2244,7 +2252,7 @@ func (e *_Eval) eval_i16_type_sub_ident(si *ast.SubIdentExpr) *Data {
 			Kind:     &TypeKind{kind: build_prim_type(kind)},
 		}
 
-	case "min":
+	case "MIN":
 		c := constant.New_i64(min)
 		return &Data{
 			Constant: c,
@@ -2253,17 +2261,18 @@ func (e *_Eval) eval_i16_type_sub_ident(si *ast.SubIdentExpr) *Data {
 		}
 
 	default:
-		e.push_err(si.Ident, "type_have_not_ident", kind, si.Ident.Kind)
+		e.push_err(ident, "type_have_not_ident", kind, ident.Kind)
 		return nil
 	}
 }
 
-func (e *_Eval) eval_i32_type_sub_ident(si *ast.SubIdentExpr) *Data {
+func (e *_Eval) eval_i32_type_sub_ident(ident lex.Token) *Data {
 	const kind = types.TypeKind_I32
 	const min = types.MIN_I32
 	const max = types.MAX_I32
-	switch si.Ident.Kind {
-	case "max":
+
+	switch ident.Kind {
+	case "MAX":
 		c := constant.New_i64(max)
 		return &Data{
 			Constant: c,
@@ -2271,7 +2280,7 @@ func (e *_Eval) eval_i32_type_sub_ident(si *ast.SubIdentExpr) *Data {
 			Kind:     &TypeKind{kind: build_prim_type(kind)},
 		}
 
-	case "min":
+	case "MIN":
 		c := constant.New_i64(min)
 		return &Data{
 			Constant: c,
@@ -2280,17 +2289,18 @@ func (e *_Eval) eval_i32_type_sub_ident(si *ast.SubIdentExpr) *Data {
 		}
 
 	default:
-		e.push_err(si.Ident, "type_have_not_ident", kind, si.Ident.Kind)
+		e.push_err(ident, "type_have_not_ident", kind, ident.Kind)
 		return nil
 	}
 }
 
-func (e *_Eval) eval_i64_type_sub_ident(si *ast.SubIdentExpr) *Data {
+func (e *_Eval) eval_i64_type_sub_ident(ident lex.Token) *Data {
 	const kind = types.TypeKind_I64
 	const min = types.MIN_I64
 	const max = types.MAX_I64
-	switch si.Ident.Kind {
-	case "max":
+
+	switch ident.Kind {
+	case "MAX":
 		c := constant.New_i64(min)
 		return &Data{
 			Constant: c,
@@ -2298,7 +2308,7 @@ func (e *_Eval) eval_i64_type_sub_ident(si *ast.SubIdentExpr) *Data {
 			Kind:     &TypeKind{kind: build_prim_type(kind)},
 		}
 
-	case "min":
+	case "MIN":
 		c := constant.New_i64(max)
 		return &Data{
 			Constant: c,
@@ -2307,16 +2317,17 @@ func (e *_Eval) eval_i64_type_sub_ident(si *ast.SubIdentExpr) *Data {
 		}
 
 	default:
-		e.push_err(si.Ident, "type_have_not_ident", kind, si.Ident.Kind)
+		e.push_err(ident, "type_have_not_ident", kind, ident.Kind)
 		return nil
 	}
 }
 
-func (e *_Eval) eval_u8_type_sub_ident(si *ast.SubIdentExpr) *Data {
+func (e *_Eval) eval_u8_type_sub_ident(ident lex.Token) *Data {
 	const kind = types.TypeKind_U8
 	const max = types.MAX_U8
-	switch si.Ident.Kind {
-	case "max":
+
+	switch ident.Kind {
+	case "MAX":
 		c := constant.New_u64(max)
 		return &Data{
 			Constant: c,
@@ -2325,16 +2336,17 @@ func (e *_Eval) eval_u8_type_sub_ident(si *ast.SubIdentExpr) *Data {
 		}
 
 	default:
-		e.push_err(si.Ident, "type_have_not_ident", kind, si.Ident.Kind)
+		e.push_err(ident, "type_have_not_ident", kind, ident.Kind)
 		return nil
 	}
 }
 
-func (e *_Eval) eval_u16_type_sub_ident(si *ast.SubIdentExpr) *Data {
+func (e *_Eval) eval_u16_type_sub_ident(ident lex.Token) *Data {
 	const kind = types.TypeKind_U16
 	const max = types.MAX_U16
-	switch si.Ident.Kind {
-	case "max":
+
+	switch ident.Kind {
+	case "MAX":
 		c := constant.New_u64(max)
 		return &Data{
 			Constant: c,
@@ -2343,16 +2355,17 @@ func (e *_Eval) eval_u16_type_sub_ident(si *ast.SubIdentExpr) *Data {
 		}
 
 	default:
-		e.push_err(si.Ident, "type_have_not_ident", kind, si.Ident.Kind)
+		e.push_err(ident, "type_have_not_ident", kind, ident.Kind)
 		return nil
 	}
 }
 
-func (e *_Eval) eval_u32_type_sub_ident(si *ast.SubIdentExpr) *Data {
+func (e *_Eval) eval_u32_type_sub_ident(ident lex.Token) *Data {
 	const kind = types.TypeKind_U32
 	const max = types.MAX_U32
-	switch si.Ident.Kind {
-	case "max":
+
+	switch ident.Kind {
+	case "MAX":
 		c := constant.New_u64(max)
 		return &Data{
 			Constant: c,
@@ -2361,16 +2374,17 @@ func (e *_Eval) eval_u32_type_sub_ident(si *ast.SubIdentExpr) *Data {
 		}
 
 	default:
-		e.push_err(si.Ident, "type_have_not_ident", kind, si.Ident.Kind)
+		e.push_err(ident, "type_have_not_ident", kind, ident.Kind)
 		return nil
 	}
 }
 
-func (e *_Eval) eval_u64_type_sub_ident(si *ast.SubIdentExpr) *Data {
+func (e *_Eval) eval_u64_type_sub_ident(ident lex.Token) *Data {
 	const kind = types.TypeKind_U64
 	const max = types.MAX_U64
-	switch si.Ident.Kind {
-	case "max":
+
+	switch ident.Kind {
+	case "MAX":
 		c := constant.New_u64(max)
 		return &Data{
 			Constant: c,
@@ -2379,17 +2393,18 @@ func (e *_Eval) eval_u64_type_sub_ident(si *ast.SubIdentExpr) *Data {
 		}
 
 	default:
-		e.push_err(si.Ident, "type_have_not_ident", kind, si.Ident.Kind)
+		e.push_err(ident, "type_have_not_ident", kind, ident.Kind)
 		return nil
 	}
 }
 
-func (e *_Eval) eval_f32_type_sub_ident(si *ast.SubIdentExpr) *Data {
+func (e *_Eval) eval_f32_type_sub_ident(ident lex.Token) *Data {
 	const kind = types.TypeKind_F32
 	const max = types.MAX_F32
 	const min = types.MIN_F32
-	switch si.Ident.Kind {
-	case "max":
+
+	switch ident.Kind {
+	case "MAX":
 		c := constant.New_f64(max)
 		return &Data{
 			Constant: c,
@@ -2397,7 +2412,7 @@ func (e *_Eval) eval_f32_type_sub_ident(si *ast.SubIdentExpr) *Data {
 			Kind:     &TypeKind{kind: build_prim_type(kind)},
 		}
 
-	case "min":
+	case "MIN":
 		c := constant.New_f64(min)
 		return &Data{
 			Constant: c,
@@ -2406,17 +2421,18 @@ func (e *_Eval) eval_f32_type_sub_ident(si *ast.SubIdentExpr) *Data {
 		}
 
 	default:
-		e.push_err(si.Ident, "type_have_not_ident", kind, si.Ident.Kind)
+		e.push_err(ident, "type_have_not_ident", kind, ident.Kind)
 		return nil
 	}
 }
 
-func (e *_Eval) eval_f64_type_sub_ident(si *ast.SubIdentExpr) *Data {
+func (e *_Eval) eval_f64_type_sub_ident(ident lex.Token) *Data {
 	const kind = types.TypeKind_F64
 	const max = types.MAX_F64
 	const min = types.MIN_F64
-	switch si.Ident.Kind {
-	case "max":
+
+	switch ident.Kind {
+	case "MAX":
 		c := constant.New_f64(max)
 		return &Data{
 			Constant: c,
@@ -2424,7 +2440,7 @@ func (e *_Eval) eval_f64_type_sub_ident(si *ast.SubIdentExpr) *Data {
 			Kind:     &TypeKind{kind: build_prim_type(kind)},
 		}
 
-	case "min":
+	case "MIN":
 		c := constant.New_f64(min)
 		return &Data{
 			Constant: c,
@@ -2433,61 +2449,57 @@ func (e *_Eval) eval_f64_type_sub_ident(si *ast.SubIdentExpr) *Data {
 		}
 
 	default:
-		e.push_err(si.Ident, "type_have_not_ident", kind, si.Ident.Kind)
+		e.push_err(ident, "type_have_not_ident", kind, ident.Kind)
 		return nil
 	}
 }
 
-func (e *_Eval) eval_prim_type_sub_ident(p *Prim, si *ast.SubIdentExpr) *Data {
-	kind := p.kind
-	switch kind {
+func (e *_Eval) eval_prim_type_sub_ident(kind lex.Token, ident lex.Token) *Data {
+	switch kind.Kind {
 	case types.TypeKind_INT:
-		return e.eval_int_type_sub_ident(si)
+		return e.eval_int_type_sub_ident(ident)
 
 	case types.TypeKind_UINT:
-		return e.eval_uint_type_sub_ident(si)
+		return e.eval_uint_type_sub_ident(ident)
 
 	case types.TypeKind_I8:
-		return e.eval_i8_type_sub_ident(si)
+		return e.eval_i8_type_sub_ident(ident)
 
 	case types.TypeKind_I16:
-		return e.eval_i16_type_sub_ident(si)
+		return e.eval_i16_type_sub_ident(ident)
 
 	case types.TypeKind_I32:
-		return e.eval_i32_type_sub_ident(si)
+		return e.eval_i32_type_sub_ident(ident)
 
 	case types.TypeKind_I64:
-		return e.eval_i64_type_sub_ident(si)
+		return e.eval_i64_type_sub_ident(ident)
 
 	case types.TypeKind_U8:
-		return e.eval_u8_type_sub_ident(si)
+		return e.eval_u8_type_sub_ident(ident)
 
 	case types.TypeKind_U16:
-		return e.eval_u16_type_sub_ident(si)
+		return e.eval_u16_type_sub_ident(ident)
 
 	case types.TypeKind_U32:
-		return e.eval_u32_type_sub_ident(si)
+		return e.eval_u32_type_sub_ident(ident)
 
 	case types.TypeKind_U64:
-		return e.eval_u64_type_sub_ident(si)
+		return e.eval_u64_type_sub_ident(ident)
 
 	case types.TypeKind_F32:
-		return e.eval_f32_type_sub_ident(si)
+		return e.eval_f32_type_sub_ident(ident)
 
 	case types.TypeKind_F64:
-		return e.eval_f64_type_sub_ident(si)
+		return e.eval_f64_type_sub_ident(ident)
 
 	default:
-		e.push_err(si.Ident, "type_have_not_ident", kind, si.Ident.Kind)
+		e.push_err(ident, "type_have_not_ident", kind.Kind, ident.Kind)
 		return nil
 	}
 }
 
 func (e *_Eval) eval_type_sub_ident(d *Data, si *ast.SubIdentExpr) *Data {
 	switch {
-	case d.Kind.Prim() != nil:
-		return e.eval_prim_type_sub_ident(d.Kind.Prim(), si)
-
 	case d.Kind.Enm() != nil:
 		return e.eval_enum_sub_ident(d.Kind.Enm(), si.Ident)
 

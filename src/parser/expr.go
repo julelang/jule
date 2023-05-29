@@ -325,6 +325,23 @@ func (ep *_ExprBuilder) build_obj_sub_ident(tokens []lex.Token) *ast.SubIdentExp
 	}
 }
 
+func (ep *_ExprBuilder) build_type_static(tokens []lex.Token) *ast.NsSelectionExpr {
+	if len(tokens) < 3 {
+		ep.push_err(tokens[1], "invalid_syntax")
+		return nil
+	}
+	
+	if tokens[2].Id != lex.ID_IDENT {
+		ep.push_err(tokens[2], "invalid_syntax")
+		return nil
+	}
+
+	ns := &ast.NsSelectionExpr{}
+	ns.Ident = tokens[2]
+	ns.Ns = tokens[:1]
+	return ns
+}
+
 func (ep *_ExprBuilder) build_ns_sub_ident(tokens []lex.Token) *ast.NsSelectionExpr {
 	ns := &ast.NsSelectionExpr{}
 	for i, token := range tokens {
@@ -418,10 +435,12 @@ func (ep *_ExprBuilder) try_build_cast(tokens []lex.Token) *ast.CastExpr {
 			case lex.KND_LBRACE, lex.KND_LBRACKET, lex.KND_LPAREN:
 				range_n++
 				continue
+
 			default:
 				range_n--
 			}
 		}
+
 		if range_n > 0 {
 			continue
 		} else if i+1 == len(tokens) {
@@ -462,6 +481,7 @@ func (ep *_ExprBuilder) try_build_cast(tokens []lex.Token) *ast.CastExpr {
 		cast.Expr = ep.build(expr_tokens)
 		return cast
 	}
+
 	return nil
 }
 
@@ -488,6 +508,7 @@ func (ep *_ExprBuilder) build_args(tokens []lex.Token) []*ast.Expr {
 			switch token.Kind {
 			case lex.KND_LBRACE, lex.KND_LBRACKET, lex.KND_LPAREN:
 				range_n++
+
 			default:
 				range_n--
 			}
@@ -594,6 +615,7 @@ func (ep *_ExprBuilder) build_unsafe(tokens []lex.Token) ast.ExprData {
 		ep.push_err(tokens[0], "invalid_syntax")
 		return nil
 	}
+
 	switch tokens[1].Id {
 	case lex.ID_FN:
 		// Unsafe anonymous function.
@@ -629,6 +651,7 @@ func (ep *_ExprBuilder) get_brace_range_lit_expr_parts(tokens []lex.Token) ([][]
 			switch token.Kind {
 			case lex.KND_LBRACE, lex.KND_LBRACKET, lex.KND_LPAREN:
 				range_n++
+
 			default:
 				range_n--
 			}
@@ -869,6 +892,11 @@ func (ep *_ExprBuilder) build_data(tokens []lex.Token) ast.ExprData {
 	switch token.Id {
 	case lex.ID_OP:
 		return ep.build_unary(tokens)
+
+	case lex.ID_PRIM:
+		if len(tokens) > 1 && tokens[1].Id == lex.ID_DBLCOLON {
+			return ep.build_type_static(tokens)
+		}
 	}
 
 	token = tokens[len(tokens)-1]
