@@ -176,6 +176,7 @@ var ERRORS = map[string]string{
 	`pkg_illegal_cycle_refers_itself`:          `illegal cycle in use declaration, package @ refers to itself`,
 	`pkg_illegal_cross_cycle`:                  "illegal cross cycle in use declarations;\n@",
 	`refers_to`:                                `@ refers to @`,
+	`no_file_in_entry_package`:                 `there is no Jule source code in this package: @`,
 }
 
 // Returns formatted error message by key and args.

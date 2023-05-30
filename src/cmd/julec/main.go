@@ -363,6 +363,10 @@ func compile(path string) (*sema.Package, *Importer) {
 		return nil, nil
 	}
 
+	if len(files) == 0 {
+		exit_err(build.Errorf("no_file_in_entry_package", path))
+	}
+
 	pkg, errors := sema.Analyze_package(WORKING_PATH, STDLIB_PATH, files, importer)
 	if len(errors) > 0 {
 		print_logs(errors)
