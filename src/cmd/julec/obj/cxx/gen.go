@@ -696,7 +696,7 @@ func gen_struct_ostream(s *sema.StructIns) string {
 	add_indent()
 	obj += indent()
 	obj += `_Stream << "`
-	obj += struct_ins_out_ident(s)
+	obj += s.Decl.Ident
 	obj += "{\";\n"
 
 	for i, field := range s.Fields {
