@@ -5,7 +5,7 @@
 #ifndef __JULE_ATOMIC_HPP
 #define __JULE_ATOMIC_HPP
 
-#define __jule_atomic_store_explicit(_ADDR, _VAL, _MO) \
+#define __jule_atomic_store_explicit(ADDR, VAL, MO) \
     __extension__({ \
         auto atomic_store_ptr{ ADDR }; \
         __typeof__((void)(0), *atomic_store_ptr) atomic_store_tmp{ VAL }; \
@@ -26,12 +26,12 @@
 #define __jule_atomic_load(ADDR) \
     __jule_atomic_load_explicit(ADDR, __ATOMIC_SEQ_CST)
 
-#define __jule_atomic_swap_explicit(_ADDR, _NEW, _MO)  \
-    __extension__({    \
+#define __jule_atomic_swap_explicit(ADDR, NEW, MO)  \
+    __extension__({ \
         auto atomic_exchange_ptr{ ADDR }; \
         __typeof__((void)(0), *atomic_exchange_ptr) atomic_exchange_val{ NEW }; \
         __typeof__((void)(0), *atomic_exchange_ptr) atomic_exchange_tmp; \
-        __atomic_exchange(__atomic_exchange_ptr, &atomic_exchange_val, \
+        __atomic_exchange(atomic_exchange_ptr, &atomic_exchange_val, \
                           &atomic_exchange_tmp, MO); \
         atomic_exchange_tmp;\
     })

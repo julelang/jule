@@ -22,6 +22,8 @@ type Trait struct {
 // Implement: Kind
 // Returns Trait's identifier.
 func (t Trait) To_str() string { return t.Ident }
+// Reports whether Trait is built-in.
+func (t *Trait) Is_builtin() bool { return t.Token.Id == lex.ID_NA }
 
 // Returns method by identifier.
 // Returns nil if not exist any method in this identifier.

@@ -379,6 +379,16 @@ func builtin_caller_panic(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
 		return nil
 	}
 
+	if expr.Kind.Strct() != nil {
+		s := expr.Kind.Strct()
+		if s.Decl.Is_implements(builtin_trait_error) {
+			expr.Cast_kind = &TypeKind{
+				kind: builtin_trait_error,
+			}
+			apply_cast_kind(expr)
+		}
+	}
+
 	d := build_void_data()
 	d.Model = &BuiltinPanicCallExprModel{Expr: expr.Model}
 	return d
@@ -471,7 +481,7 @@ func builtin_caller_append(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 		Result: t.Kind.clone(),
 	}
 	d.Kind = &TypeKind{kind: f}
-	d.Model = &CommonIdentExprModel{Ident: "_append"}
+	d.Model = &CommonIdentExprModel{Ident: "append"}
 
 	d = builtin_caller_common_plain(e, fc, d)
 	return d
@@ -522,7 +532,7 @@ func builtin_caller_copy(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 	}
 
 	d.Kind = &TypeKind{kind: f}
-	d.Model = &CommonIdentExprModel{Ident: "_copy"}
+	d.Model = &CommonIdentExprModel{Ident: "copy"}
 
 	d = builtin_caller_common_plain(e, fc, d)
 	return d

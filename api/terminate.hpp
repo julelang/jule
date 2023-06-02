@@ -18,12 +18,15 @@ namespace jule {
     // Error mask for terminations.
     // It's also built-in Error trait.
     struct Error {
-        virtual jule::Str error(void) { return {}; }
+        virtual jule::Str error(void) { return jule::Str(); }
 
         virtual ~Error(void) noexcept {}
 
         jule::Bool operator==(const Error&) { return false; }
         jule::Bool operator!=(const Error &src) { return !this->operator==(src); }
+
+        friend std::ostream &operator<<(std::ostream &stream, Error error) noexcept
+        { return stream << error.error(); }
     };
 
     // JuleC terminate handler.

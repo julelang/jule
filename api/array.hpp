@@ -10,9 +10,9 @@
 #include <ostream>
 
 #include "error.hpp"
-//#include "panic.hpp"
+#include "panic.hpp"
 #include "types.hpp"
-//#include "slice.hpp"
+#include "slice.hpp"
 
 namespace jule {
 
@@ -28,7 +28,7 @@ namespace jule {
         Array<Item, N>(const std::initializer_list<Item> &src) noexcept {
             const auto src_begin{ src.begin() };
             for (jule::Int index{ 0 }; index < src.size(); ++index)
-                this->buffer[index] = *reinterpret_cast<Item*>(src_begin+index);
+                this->buffer[index] = *(Item*)(src_begin+index);
         }
 
         typedef Item       *Iterator;
@@ -91,7 +91,7 @@ namespace jule {
         { return !this->operator==(src); }
 
         Item &operator[](const jule::Int &index) {
-            if (this->_empty() || index < 0 || this->len() <= index) {
+            if (this->empty() || index < 0 || this->len() <= index) {
                 std::stringstream sstream;
                 __JULEC_WRITE_ERROR_INDEX_OUT_OF_RANGE(sstream, index);
                 jule::panic(sstream.str().c_str());

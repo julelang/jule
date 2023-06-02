@@ -22,7 +22,7 @@ namespace jule {
     template<typename Mask>
     struct Trait {
     public:
-        jule::Ref<Mask> data{};
+        mutable jule::Ref<Mask> data{};
         const char *type_id { nullptr };
     
         Trait<Mask>(void) noexcept {}
@@ -41,7 +41,7 @@ namespace jule {
     
         template<typename T>
         Trait<Mask>(const jule::Ref<T> &ref) noexcept {
-            this->data = jule::Ref<T>::make(reinterpret_cast<T*>(ref.alloc), ref.ref);
+            this->data = jule::Ref<Mask>::make(reinterpret_cast<Mask*>(ref.alloc), ref.ref);
             this->data.add_ref();
             this->type_id = typeid(ref).name();
         }
@@ -52,12 +52,17 @@ namespace jule {
         void dealloc(void) noexcept
         { this->data.drop(); }
     
-        inline void must_ok(void) noexcept {
+        inline void must_ok(void) const noexcept {
             if (this->operator==(nullptr))
                 jule::panic(jule::ERROR_INVALID_MEMORY);
         }
     
         inline Mask &get(void) noexcept {
+            this->must_ok();
+            return this->data;
+        }
+
+        inline Mask &get(void) const noexcept {
             this->must_ok();
             return this->data;
         }

@@ -18,20 +18,20 @@
 namespace jule {
 
     // std::function wrapper of JuleC.
-    template <typename Function> struct fn_jt;
+    template <typename Function> struct Fn;
 
     template <typename Function>
-    struct fn_jt {
+    struct Fn {
     public:
         std::function<Function> buffer;
 
-        fn_jt<Function>(void) noexcept {}
-        fn_jt<Function>(std::nullptr_t) noexcept {}
+        Fn<Function>(void) noexcept {}
+        Fn<Function>(std::nullptr_t) noexcept {}
 
-        fn_jt<Function>(const std::function<Function> &function) noexcept
+        Fn<Function>(const std::function<Function> &function) noexcept
         { this->buffer = function; }
 
-        fn_jt<Function>(const Function &function) noexcept
+        Fn<Function>(const Function &function) noexcept
         { this->buffer = function; }
 
         template<typename ...Arguments>

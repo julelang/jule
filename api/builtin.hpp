@@ -60,13 +60,13 @@ namespace jule {
         if (dest.empty() || src.empty())
             return 0;
 
-        jule::Int len{ dest.len() > src.len() ? src._len()
+        jule::Int len{ dest.len() > src.len() ? src.len()
                        : src.len() > dest.len() ? dest.len()
                        : src.len()
         };
 
         for (jule::Int index{ 0 }; index < len; ++index)
-            dest.slice[index] = src.slice[index];
+            dest._slice[index] = src._slice[index];
 
         return len;
     }
@@ -79,7 +79,7 @@ namespace jule {
         jule::copy<Item>(buffer, src);
 
         for (jule::Int index{ 0 }; index < components.len(); ++index)
-            buffer[src.len()+index] = components.slice[index];
+            buffer[src.len()+index] = components._slice[index];
 
         return buffer;
     }

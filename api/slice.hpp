@@ -233,7 +233,7 @@ namespace jule {
 
             stream << '[';
             for (jule::Int index{ 0 }; index < src._len;) {
-                stream << src.slice[index++];
+                stream << src._slice[index++];
                 if (index < src._len)
                     stream << ' ';
             }

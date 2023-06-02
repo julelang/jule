@@ -99,7 +99,7 @@ func get_bool_model(c *constant.Const) string {
 	return "false"
 }
 
-func get_nil_model() string { return "nil" }
+func get_nil_model() string { return "nullptr" }
 
 func get_f32_model(c *constant.Const) string {
 	return strconv.FormatFloat(c.Read_f64(), 'e', -1, 32) + "f"
@@ -192,7 +192,7 @@ func gen_const_expr_model(m *constant.Const) string {
 func gen_binop_expr_model(m *sema.BinopExprModel) string {
 	switch m.Op {
 	case lex.KND_SOLIDUS:
-		obj := "__julec_div("
+		obj := "jule::div("
 		obj += gen_expr(m.L)
 		obj += ","
 		obj += gen_expr(m.R)
@@ -279,7 +279,7 @@ func gen_struct_lit_expr_model(m *sema.StructLitExprModel) string {
 }
 
 func gen_alloc_struct_lit_expr_model(m *sema.AllocStructLitExprModel) string {
-	obj := "__julec_new_structure<"
+	obj := "jule::new_struct<"
 	obj += struct_out_ident(m.Lit.Strct.Decl)
 	obj += ">(new( std::nothrow ) ";
 	obj += gen_struct_lit_expr_model(m.Lit)
@@ -330,12 +330,22 @@ func gen_arg_expr_models(models []sema.ExprModel) string {
 
 func gen_fn_call_expr_model(m *sema.FnCallExprModel) string {
 	obj := gen_expr_model(m.Expr)
+	if !m.Func.Is_builtin() && m.Func.Decl.Cpp_linked && len(m.Func.Generics) > 0 {
+		if !has_directive(m.Func.Decl.Directives, build.DIRECTIVE_CDEF) {
+			obj += "<"
+			for _, g := range m.Func.Generics {
+				obj += gen_type_kind(g) + ","
+			}
+			obj = obj[:len(obj)-1] // Remove last comma.
+			obj += ">"
+		}
+	}
 	obj += "("
 	obj += gen_arg_expr_models(m.Args)
 	obj += ")"
 
 	if m.IsCo {
-		obj = "__JULEC_CO(" + obj + ")"
+		obj = "__JULE_CO(" + obj + ")"
 	}
 
 	return obj
@@ -398,7 +408,7 @@ func gen_map_expr_model(m *sema.MapExprModel) string {
 
 func gen_slicing_expr_model(m *sema.SlicingExprModel) string {
 	obj := gen_expr_model(m.Expr)
-	obj += ".___slice("
+	obj += ".slice("
 	obj += gen_expr(m.L)
 	if m.R != nil {
 		obj += ","
@@ -460,7 +470,7 @@ func gen_tuple_expr_model(m *sema.TupleExprModel) string {
 }
 
 func gen_builtin_new_call_expr_model(m *sema.BuiltinNewCallExprModel) string {
-	obj := "_new<"
+	obj := "jule::new_ref<"
 	obj += gen_type_kind(m.Kind)
 	obj += ">("
 	if m.Init != nil {
@@ -471,35 +481,35 @@ func gen_builtin_new_call_expr_model(m *sema.BuiltinNewCallExprModel) string {
 }
 
 func gen_builtin_out_call_expr_model(m *sema.BuiltinOutCallExprModel) string {
-	obj := "_out("
+	obj := "jule::out("
 	obj += gen_expr(m.Expr)
 	obj += ")"
 	return obj
 }
 
 func gen_builtin_outln_call_expr_model(m *sema.BuiltinOutlnCallExprModel) string {
-	obj := "_outln("
+	obj := "jule::outln("
 	obj += gen_expr(m.Expr)
 	obj += ")"
 	return obj
 }
 
 func gen_builtin_real_call_expr_model(m *sema.BuiltinRealCallExprModel) string {
-	obj := "_real("
+	obj := "jule::real("
 	obj += gen_expr(m.Expr)
 	obj += ")"
 	return obj
 }
 
 func gen_builtin_drop_call_expr_model(m *sema.BuiltinDropCallExprModel) string {
-	obj := "_drop("
+	obj := "jule::drop("
 	obj += gen_expr(m.Expr)
 	obj += ")"
 	return obj
 }
 
 func gen_builtin_panic_call_expr_model(m *sema.BuiltinPanicCallExprModel) string {
-	obj := "_panic("
+	obj := "jule::panic("
 	obj += gen_expr(m.Expr)
 	obj += ")"
 	return obj
@@ -530,7 +540,7 @@ func gen_alignof_expr_model(m *sema.AlignofExprModel) string {
 }
 
 func gen_str_constructor_expr_model(m *sema.StrConstructorcallExprModel) string {
-	return "__julec_to_str(" + gen_expr(m.Expr) + ")"
+	return "jule::to_str(" + gen_expr(m.Expr) + ")"
 }
 
 func gen_rune_expr_model(m *sema.RuneExprModel) string {

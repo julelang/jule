@@ -6,6 +6,7 @@
 #define __JULE_PANIC_HPP
 
 #include <sstream>
+#include <string>
 
 namespace jule {
     class Exception;
@@ -17,7 +18,7 @@ namespace jule {
 
     class Exception: public std::exception {
     private:
-        char *message;
+        std::string message;
 
     public:
         Exception(void) noexcept {}
@@ -25,11 +26,14 @@ namespace jule {
         Exception(char *message) noexcept
         { this->message = message; }
 
+        Exception(const std::string &message) noexcept
+        { this->message = message; }
+
         char *what(void) noexcept
-        { return this->message; }
+        { return (char*)this->message.c_str(); }
 
         const char *what(void) const noexcept
-        { return this->message; }
+        { return this->message.c_str(); }
     };
 
     template<typename T>
@@ -37,7 +41,7 @@ namespace jule {
         std::stringstream sstream;
         sstream << expr;
 
-        jule::Exception exception((char*)sstream.str().c_str());
+        jule::Exception exception(sstream.str());
         throw exception;
     }
 
