@@ -8,12 +8,16 @@
 #include <csignal>
 
 #include "platform.hpp"
+#include "builtin.hpp"
 
 namespace jule {
     typedef int Signal;
 
     // Sets all signals to handler.
     void set_sig_handler(void(*handler)(int sig)) noexcept;
+
+    // JuleC signal handler.
+    void signal_handler(int signal) noexcept;
 
 #if defined(OS_WINDOWS)
 
@@ -106,7 +110,7 @@ namespace jule {
 
 #endif
 
-void set_sig_handler(void(*handler)(int _sig)) noexcept {
+    void set_sig_handler(void(*handler)(int _sig)) noexcept {
 #if defined(OS_WINDOWS)
 
     std::signal(jule::SIG_HUP, handler);
@@ -197,7 +201,16 @@ void set_sig_handler(void(*handler)(int _sig)) noexcept {
     std::signal(jule::SIG_XFSZ, handler);
 
 #endif
-}
+    }
+
+    void signal_handler(int signal) noexcept {
+        // Ignore the interrupt signal.
+        if (signal == jule::SIG_INT)
+            return;
+
+        jule::out("program terminated with signal: ");
+        jule::outln(signal);
+    }
 
 } // namespace jule
 
