@@ -20,11 +20,7 @@ namespace jule {
 
     jule::Slice<jule::Str> command_line_args;
 
-    jule::Slice<jule::Str> get_command_line_args(void) noexcept;
     void setup_command_line_args(int argc, char *argv[]) noexcept;
-
-    jule::Slice<jule::Str> get_command_line_args(void) noexcept
-    { return jule::command_line_args; }
 
     void setup_command_line_args(int argc, char *argv[]) noexcept {
 #ifdef OS_WINDOWS
