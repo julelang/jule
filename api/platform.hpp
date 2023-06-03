@@ -27,7 +27,7 @@
 #define ARCH_I386
 #endif
 
-#if defined(_AMD64) || defined(_ARM64)
+#if defined(ARCH_AMD64) || defined(ARCH_ARM64)
 #define ARCH_64BIT
 #else
 #define ARCH_32BIT

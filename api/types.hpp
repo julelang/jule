@@ -1,6 +1,8 @@
 #ifndef __JULE_TYPES_HPP
 #define __JULE_TYPES_HPP
 
+#include "platform.hpp"
+
 namespace jule {
 
 #if defined(ARCH_32BIT)
