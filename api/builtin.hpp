@@ -7,9 +7,14 @@
 
 #include <iostream>
 
+#ifdef OS_WINDOWS
+#include <windows.h>
+#endif
+
 #include "types.hpp"
 #include "ref.hpp"
 #include "slice.hpp"
+#include "utf16.hpp"
 
 namespace jule {
 

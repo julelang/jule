@@ -12,7 +12,7 @@
 #include "slice.hpp"
 #include "utf16.hpp"
 
-#if OS_WINDOWS
+#ifdef OS_WINDOWS
 #include <windows.h>
 #endif
 

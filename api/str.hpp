@@ -189,9 +189,10 @@ namespace jule {
 
             const ConstIterator begin{ this->begin() };
             std::basic_string<jule::U8> s{ this->buffer };
-            jule::Uint pos{ std::string::npos };
+            constexpr jule::Uint npos{ static_cast<jule::Uint>(std::string::npos) };
+            jule::Uint pos{ npos };
             if (n < 0) {
-                while ((pos = s.find(sub.buffer)) != std::string::npos) {
+                while ((pos = s.find(sub.buffer)) != npos) {
                     parts.push(s.substr(0, pos));
                     s = s.substr(pos+sub.len());
                 }
@@ -199,7 +200,7 @@ namespace jule {
                     parts.push(jule::Str(s));
             } else {
                 jule::Uint _n{ 0 };
-                while ((pos = s.find(sub.buffer)) != std::string::npos) {
+                while ((pos = s.find(sub.buffer)) != npos) {
                     if (++_n >= n) {
                         parts.push(jule::Str(s));
                         break;
@@ -223,15 +224,16 @@ namespace jule {
                 return *this;
 
             std::basic_string<jule::U8> s(this->buffer);
+            constexpr jule::Uint npos{ static_cast<jule::Uint>(std::string::npos) };
             jule::Uint start_pos{ 0 };
             if (n < 0) {
-                while((start_pos = s.find(sub.buffer, start_pos)) != std::string::npos) {
+                while((start_pos = s.find(sub.buffer, start_pos)) != npos) {
                     s.replace(start_pos, sub.len(), _new.buffer);
                     start_pos += _new.len();
                 }
             } else {
                 jule::Uint _n{ 0 };
-                while((start_pos = s.find(sub.buffer, start_pos)) != std::string::npos) {
+                while((start_pos = s.find(sub.buffer, start_pos)) != npos) {
                     s.replace(start_pos, sub.len(), _new.buffer);
                     start_pos += _new.len();
                     if (++_n >= n)
