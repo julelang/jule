@@ -303,7 +303,7 @@ func gen_case(m *sema.Match, c *sema.Case) string {
 			obj += MATCH_EXPR
 
 			if m.Type_match {
-				obj += ".__type_is<" + gen_expr(expr)  + ">()"
+				obj += ".type_is<" + gen_expr(expr)  + ">()"
 			}
 
 			if i+1 < len(c.Exprs) {
@@ -493,7 +493,7 @@ func gen_recover(r *sema.Recover) string {
 			add_indent()
 			obj += "{\n"
 			obj += indent()
-			obj += "auto "
+			obj += "jule::Trait<jule::Error> "
 			obj += param_out_ident(handler_param)
 			obj += "{ jule::exception_to_error(e) };\n"
 			obj += indent()

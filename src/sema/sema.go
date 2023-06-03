@@ -662,6 +662,10 @@ func (s *_Sema) get_trait_check_fn_kind(f *Fn) string {
 }
 
 func (s *_Sema) reload_fn_ins_types(f *FnIns) (ok bool) {
+	if f.Is_builtin() {
+		return true
+	}
+
 	sema := f.Decl.sema
 
 	generics := make([]*TypeAlias, len(f.Generics))

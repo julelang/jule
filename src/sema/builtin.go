@@ -81,6 +81,12 @@ func init() {
 
 	builtin_fn_std_mem_size_of.Caller = builtin_caller_std_mem_size_of
 	builtin_fn_std_mem_align_of.Caller = builtin_caller_std_mem_align_of
+
+	for _, f := range builtin_trait_error.Methods {
+		ins := f.instance()
+		ins.Caller = builtin_caller_common
+		f.append_instance(ins)
+	}
 }
 
 func find_builtin_fn(ident string) *FnIns {

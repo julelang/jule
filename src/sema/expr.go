@@ -179,6 +179,12 @@ type BuiltinMakeCallExprModel struct {
 	Size ExprModel // Nil for nil slice.
 }
 
+// Expression model for sub-ident expression to built-in Error trait.
+type BuiltinErrorTraitSubIdentExprModel struct {
+	Expr  ExprModel
+	Ident string
+}
+
 // Expression model for sizeof expressions.
 // For example, in C++: sizeof(int)
 type SizeofExprModel struct {

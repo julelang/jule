@@ -1732,16 +1732,26 @@ func (e *_Eval) eval_trait_sub_ident(d *Data, trt *Trait, ident lex.Token) *Data
 		return nil
 	}
 
+	var model any = nil
+	if trt == builtin_trait_error {
+		model = &BuiltinErrorTraitSubIdentExprModel{
+			Expr:  d.Model,
+			Ident: ident.Kind,
+		}
+	} else {
+		model = &TraitSubIdentExprModel{
+			Expr:  d.Model,
+			Ident: ident.Kind,
+		}
+	}
+
 	return &Data{
 		Lvalue:   false,
 		Decl:     false,
 		Mutable:  false,
 		Constant: nil,
 		Kind:     &TypeKind{kind: f.instance()},
-		Model:    &TraitSubIdentExprModel{
-			Expr:  d.Model,
-			Ident: ident.Kind,
-		},
+		Model:    model,
 	}
 }
 

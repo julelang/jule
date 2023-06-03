@@ -420,7 +420,7 @@ func gen_slicing_expr_model(m *sema.SlicingExprModel) string {
 
 func gen_trait_sub_ident_expr_model(m *sema.TraitSubIdentExprModel) string {
 	obj := gen_expr_model(m.Expr)
-	obj += "._get()._method_"
+	obj += ".get()._method_"
 	obj += m.Ident
 	return obj
 }
@@ -550,6 +550,13 @@ func gen_rune_expr_model(m *sema.RuneExprModel) string {
 	return i64toa(int64(m.Code))
 }
 
+func gen_builtin_error_trait_sub_ident_expr_model(m *sema.BuiltinErrorTraitSubIdentExprModel) string {
+	obj := gen_expr_model(m.Expr)
+	obj += ".get()."
+	obj += m.Ident
+	return obj
+}
+
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
 	case *sema.TypeKind:
@@ -653,6 +660,9 @@ func gen_expr_model(m sema.ExprModel) string {
 
 	case *sema.RuneExprModel:
 		return gen_rune_expr_model(m.(*sema.RuneExprModel))
+
+	case *sema.BuiltinErrorTraitSubIdentExprModel:
+		return gen_builtin_error_trait_sub_ident_expr_model(m.(*sema.BuiltinErrorTraitSubIdentExprModel))
 
 	default:
 		return "<unimplemented_expression_model>"
