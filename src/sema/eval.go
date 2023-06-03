@@ -547,6 +547,10 @@ func (e *_Eval) eval_var(v *Var, error_token lex.Token) *Data {
 		}
 	}
 
+	if v.Kind == nil || v.Kind.Kind == nil {
+		return nil
+	}
+
 	d := &Data{
 		Lvalue:   !v.Constant,
 		Mutable:  v.Mutable,
