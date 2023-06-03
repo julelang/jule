@@ -320,12 +320,12 @@ func gen_case(m *sema.Match, c *sema.Case) string {
 		obj += indent()
 		obj += gen_scope(c.Scope)
 		obj += "\n"
-		obj += indent()
-		obj += "goto "
-		obj += match_end_label_ident(_uintptr(m)) + CPP_ST_TERM
-		obj += "\n"
 	}
 
+	obj += indent()
+	obj += "goto "
+	obj += match_end_label_ident(_uintptr(m)) + CPP_ST_TERM
+	obj += "\n"
 	obj += indent()
 	obj += end + ":;"
 	return obj
