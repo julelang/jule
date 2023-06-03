@@ -1378,6 +1378,9 @@ func (e *_Eval) cast_prim(t *TypeKind, d *Data, error_token lex.Token) {
 	case prim.Is_any():
 		// The any type supports casting to any data type.
 
+	case d.Kind.Prim() != nil && d.Kind.Prim().Is_any():
+		// The any type supports casting to any data type.
+
 	case prim.Is_str():
 		e.cast_str(d, error_token)
 
