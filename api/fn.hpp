@@ -50,10 +50,10 @@ namespace jule {
         inline void operator=(const Function &function) noexcept
         { this->buffer = function; }
 
-        inline bool operator==(std::nullptr_t) const noexcept
+        inline jule::Bool operator==(std::nullptr_t) const noexcept
         { return this->buffer == nullptr; }
 
-        inline bool operator!=(std::nullptr_t) const noexcept
+        inline jule::Bool operator!=(std::nullptr_t) const noexcept
         { return !this->operator==(nullptr); }
     };
 

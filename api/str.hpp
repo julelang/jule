@@ -126,15 +126,15 @@ namespace jule {
         inline jule::Int len(void) const noexcept
         { return this->_len; }
     
-        inline bool empty(void) const noexcept
+        inline jule::Bool empty(void) const noexcept
         { return this->buffer.empty(); }
     
-        inline bool has_prefix(const jule::Str &sub) const noexcept {
+        inline jule::Bool has_prefix(const jule::Str &sub) const noexcept {
             return this->len() >= sub.len() &&
                     this->buffer.substr(0, sub.len()) == sub.buffer;
         }
     
-        inline bool has_suffix(const jule::Str &sub) const noexcept {
+        inline jule::Bool has_suffix(const jule::Str &sub) const noexcept {
             return this->len() >= sub.len() &&
                 this->buffer.substr(this->len()-sub.len()) == sub.buffer;
         }
@@ -150,7 +150,7 @@ namespace jule {
             const ConstIterator end{ this->end() };
             ConstIterator begin{ this->begin() };
             for (; it < end; ++it) {
-                bool exist{ false };
+                jule::Bool exist{ false };
                 ConstIterator bytes_it{ bytes.begin() };
                 const ConstIterator bytes_end{ bytes.end() };
                 for (; bytes_it < bytes_end; ++bytes_it) {
@@ -168,7 +168,7 @@ namespace jule {
             ConstIterator it{ this->end()-1 };
             const ConstIterator begin{ this->begin() };
             for (; it >= begin; --it) {
-                bool exist{ false };
+                jule::Bool exist{ false };
                 ConstIterator bytes_it{ bytes.begin() };
                 const ConstIterator bytes_end{ bytes.end() };
                 for (; bytes_it < bytes_end; ++bytes_it) {

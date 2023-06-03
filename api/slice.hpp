@@ -153,7 +153,7 @@ namespace jule {
         jule::Int cap(void) const noexcept
         { return this->_cap; }
     
-        inline bool empty(void) const noexcept
+        inline jule::Bool empty(void) const noexcept
         { return !this->_slice || this->_len == 0 || this->_cap == 0; }
     
         void push(const Item &item) noexcept {
@@ -179,7 +179,7 @@ namespace jule {
             ++this->_len;
         }
     
-        bool operator==(const jule::Slice<Item> &src) const noexcept {
+        jule::Bool operator==(const jule::Slice<Item> &src) const noexcept {
             if (this->_len != src._len)
                 return false;
 
@@ -192,15 +192,15 @@ namespace jule {
         }
     
         inline constexpr
-        bool operator!=(const jule::Slice<Item> &src) const noexcept
+        jule::Bool operator!=(const jule::Slice<Item> &src) const noexcept
         { return !this->operator==(src); }
     
         inline constexpr
-        bool operator==(const std::nullptr_t) const noexcept
+        jule::Bool operator==(const std::nullptr_t) const noexcept
         { return !this->_slice; }
     
         inline constexpr
-        bool operator!=(const std::nullptr_t) const noexcept
+        jule::Bool operator!=(const std::nullptr_t) const noexcept
         { return !this->operator==(nullptr); }
     
         Item &operator[](const jule::Int &index) const {

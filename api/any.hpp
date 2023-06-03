@@ -159,12 +159,12 @@ namespace jule {
         }
 
         template<typename T>
-        inline bool operator==(const T &_Expr) const noexcept
+        inline jule::bool operator==(const T &_Expr) const noexcept
         { return ( this->type_is<T>() && this->operator T() == _Expr ); }
 
         template<typename T>
         inline constexpr
-        bool operator!=(const T &_Expr) const noexcept
+        jule::Bool operator!=(const T &_Expr) const noexcept
         { return ( !this->operator==( _Expr ) ); }
 
         inline jule::Bool operator==(const jule::Any &other) const noexcept {
