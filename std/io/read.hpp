@@ -2,31 +2,32 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-// Depends:
-//   - api/julec.hpp
+#ifndef __JULE_STD_IO_READ_HPP
+#define __JULE_STD_IO_READ_HPP
 
-#ifndef __JULEC_STD_IO_READ_HPP
-#define __JULEC_STD_IO_READ_HPP
+#include <iostream>
 
-str_jt __julec_readln(void) noexcept;
+#include "../../api/jule.hpp"
 
-str_jt __julec_readln(void) noexcept {
-    str_jt _input;
+jule::Str __jule_readln(void) noexcept;
+
+jule::Str __jule_readln(void) noexcept {
+    jule::Str input;
 #ifdef _WINDOWS
-    std::wstring _buffer;
-    std::getline( std::wcin , _buffer );
+    std::wstring buffer;
+    std::getline(std::wcin , buffer);
     // std::wcin.clear();
     // std::wcin.ignore();
-    if ( _buffer.length() > 0 )
-    { _input = str_jt( __julec_utf16_to_utf8_str( &_buffer[0] , _buffer.length() ) ); }
+    if (buffer.length() > 0)
+        input = jule::Str(jule::utf16_to_utf8_str(&buffer[0], buffer.length()));
 #else
-    std::string _buffer;
-    std::getline( std::cin , _buffer );
+    std::string buffer;
+    std::getline(std::cin, buffer);
     // std::cin.clear();
     // std::cin.ignore();
-    _input = str_jt( _buffer.c_str() );
-#endif // #ifdef _WINDOWS
-    return ( _input );
+    input = jule::Str(buffer.c_str());
+#endif
+    return input;
 }
 
-#endif // #ifndef __JULEC_STD_IO_READ_HPP
+#endif // ifndef __JULE_STD_IO_READ_HPP

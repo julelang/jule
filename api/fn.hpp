@@ -2,47 +2,61 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-#ifndef __JULEC_FN_HPP
-#define __JULEC_FN_HPP
+#ifndef __JULE_FN_HPP
+#define __JULE_FN_HPP
 
-// std::function wrapper of JuleC.
-template <typename _Function_t>
-struct fn_jt;
+#include <stddef.h>
+#include <functional>
+#include <thread>
 
-template <typename _Function_t>
-struct fn_jt {
-    std::function<_Function_t> __buffer;
-    
-    fn_jt<_Function_t>(void) noexcept {}
-    fn_jt<_Function_t>(std::nullptr_t) noexcept {}
+#include "builtin.hpp"
+#include "error.hpp"
 
-    fn_jt<_Function_t>(const std::function<_Function_t> &_Function) noexcept
-    { this->__buffer = _Function; }
+#define __JULE_CO(EXPR) \
+    ( std::thread{[&](void) mutable -> void { EXPR; }}.detach() )
 
-    fn_jt<_Function_t>(const _Function_t &_Function) noexcept
-    { this->__buffer = _Function; }
-    
-    template<typename ..._Arguments_t>
-    auto operator()(_Arguments_t... _Arguments) noexcept {
-        if (this->__buffer == nil)
-        { JULEC_ID(panic)( __JULEC_ERROR_INVALID_MEMORY ); }
-        return ( this->__buffer( _Arguments... ) );
-    }
+namespace jule {
 
-    inline void operator=(std::nullptr_t) noexcept
-    { this->__buffer = nil; }
+    // std::function wrapper of JuleC.
+    template <typename Function> struct Fn;
 
-    inline void operator=(const std::function<_Function_t> &_Function) noexcept
-    { this->__buffer = _Function; }
+    template <typename Function>
+    struct Fn {
+    public:
+        std::function<Function> buffer;
 
-    inline void operator=(const _Function_t &_Function) noexcept
-    { this->__buffer = _Function; }
+        Fn<Function>(void) noexcept {}
+        Fn<Function>(std::nullptr_t) noexcept {}
 
-    inline bool operator==(std::nullptr_t) const noexcept
-    { return ( this->__buffer == nil ); }
+        Fn<Function>(const std::function<Function> &function) noexcept
+        { this->buffer = function; }
 
-    inline bool operator!=(std::nullptr_t) const noexcept
-    { return ( !this->operator==( nil ) ); }
-};
+        Fn<Function>(const Function &function) noexcept
+        { this->buffer = function; }
 
-#endif // #ifndef __JULEC_ATOMICITY_HPP
+        template<typename ...Arguments>
+        auto operator()(Arguments... arguments) noexcept {
+            if (this->buffer == nullptr)
+                jule::panic(jule::ERROR_INVALID_MEMORY);
+            return this->buffer(arguments...);
+        }
+
+        inline void operator=(std::nullptr_t) noexcept
+        { this->buffer = nullptr; }
+
+        inline void operator=(const std::function<Function> &function) noexcept
+        { this->buffer = function; }
+
+        inline void operator=(const Function &function) noexcept
+        { this->buffer = function; }
+
+        inline jule::Bool operator==(std::nullptr_t) const noexcept
+        { return this->buffer == nullptr; }
+
+        inline jule::Bool operator!=(std::nullptr_t) const noexcept
+        { return !this->operator==(nullptr); }
+    };
+
+} // namespace jule
+
+#endif // ifndef __JULE_FN_HPP

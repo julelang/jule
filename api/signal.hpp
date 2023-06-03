@@ -2,202 +2,216 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-#ifndef __JULEC_SIGNAL_HPP
-#define __JULEC_SIGNAL_HPP
+#ifndef __JULE_SIGNAL_HPP
+#define __JULE_SIGNAL_HPP
 
 #include <csignal>
 
-#define __JULEC_SIG constexpr int
+#include "platform.hpp"
+#include "builtin.hpp"
 
-#if defined(_WINDOWS)
+namespace jule {
+    typedef int Signal;
 
-__JULEC_SIG __JULEC_SIGHUP{ 0x1 };
-__JULEC_SIG __JULEC_SIGINT{ 0x2 };
-__JULEC_SIG __JULEC_SIGQUIT{ 0x3 };
-__JULEC_SIG __JULEC_SIGILL{ 0x4 };
-__JULEC_SIG __JULEC_SIGTRAP{ 0x5 };
-__JULEC_SIG __JULEC_SIGABRT{ 0x6 };
-__JULEC_SIG __JULEC_SIGBUS{ 0x7 };
-__JULEC_SIG __JULEC_SIGFPE{ 0x8 };
-__JULEC_SIG __JULEC_SIGKILL{ 0x9 };
-__JULEC_SIG __JULEC_SIGSEGV{ 0xb };
-__JULEC_SIG __JULEC_SIGPIPE{ 0xd };
-__JULEC_SIG __JULEC_SIGALRM{ 0xe };
-__JULEC_SIG __JULEC_SIGTERM{ 0xf };
+    // Sets all signals to handler.
+    void set_sig_handler(void(*handler)(int sig)) noexcept;
 
-#elif defined(_DARWIN)
+    // JuleC signal handler.
+    void signal_handler(int signal) noexcept;
 
-__JULEC_SIG __JULEC_SIGABRT{ 0x6 };
-__JULEC_SIG __JULEC_SIGALRM{ 0xe };
-__JULEC_SIG __JULEC_SIGBUS{ 0xa };
-__JULEC_SIG __JULEC_SIGCHLD{ 0x14 };
-__JULEC_SIG __JULEC_SIGCONT{ 0x13 };
-__JULEC_SIG __JULEC_SIGEMT{ 0x7 };
-__JULEC_SIG __JULEC_SIGFPE{ 0x8 };
-__JULEC_SIG __JULEC_SIGHUP{ 0x1 };
-__JULEC_SIG __JULEC_SIGILL{ 0x4 };
-__JULEC_SIG __JULEC_SIGINFO{ 0x1d };
-__JULEC_SIG __JULEC_SIGINT{ 0x2 };
-__JULEC_SIG __JULEC_SIGIO{ 0x17 };
-__JULEC_SIG __JULEC_SIGIOT{ 0x6 };
-__JULEC_SIG __JULEC_SIGKILL{ 0x9 };
-__JULEC_SIG __JULEC_SIGPIPE{ 0xd };
-__JULEC_SIG __JULEC_SIGPROF{ 0x1b };
-__JULEC_SIG __JULEC_SIGQUIT{ 0x3 };
-__JULEC_SIG __JULEC_SIGSEGV{ 0xb };
-__JULEC_SIG __JULEC_SIGSTOP{ 0x11 };
-__JULEC_SIG __JULEC_SIGSYS{ 0xc };
-__JULEC_SIG __JULEC_SIGTERM{ 0xf };
-__JULEC_SIG __JULEC_SIGTRAP{ 0x5 };
-__JULEC_SIG __JULEC_SIGTSTP{ 0x12 };
-__JULEC_SIG __JULEC_SIGTTIN{ 0x15 };
-__JULEC_SIG __JULEC_SIGTTOU{ 0x16 };
-__JULEC_SIG __JULEC_SIGURG{ 0x10 };
-__JULEC_SIG __JULEC_SIGUSR1{ 0x1e };
-__JULEC_SIG __JULEC_SIGUSR2{ 0x1f };
-__JULEC_SIG __JULEC_SIGVTALRM{ 0x1a };
-__JULEC_SIG __JULEC_SIGWINCH{ 0x1c };
-__JULEC_SIG __JULEC_SIGXCPU{ 0x18 };
-__JULEC_SIG __JULEC_SIGXFSZ{ 0x19 };
+#if defined(OS_WINDOWS)
 
-#elif defined(_LINUX)
+    constexpr jule::Signal SIG_HUP{ 0x1 };
+    constexpr jule::Signal SIG_INT{ 0x2 };
+    constexpr jule::Signal SIG_QUIT{ 0x3 };
+    constexpr jule::Signal SIG_ILL{ 0x4 };
+    constexpr jule::Signal SIG_TRAP{ 0x5 };
+    constexpr jule::Signal SIG_ABRT{ 0x6 };
+    constexpr jule::Signal SIG_BUS{ 0x7 };
+    constexpr jule::Signal SIG_FPE{ 0x8 };
+    constexpr jule::Signal SIG_KILL{ 0x9 };
+    constexpr jule::Signal SIG_SEGV{ 0xb };
+    constexpr jule::Signal SIG_PIPE{ 0xd };
+    constexpr jule::Signal SIG_ALRM{ 0xe };
+    constexpr jule::Signal SIG_TERM{ 0xf };
 
-__JULEC_SIG ___JULEC_SIGABRT{ 0x6 };
-__JULEC_SIG ___JULEC_SIGALRM{ 0xe };
-__JULEC_SIG ___JULEC_SIGBUS{ 0x7 };
-__JULEC_SIG ___JULEC_SIGCHLD{ 0x11 };
-__JULEC_SIG ___JULEC_SIGCLD{ 0x11 };
-__JULEC_SIG ___JULEC_SIGCONT{ 0x12 };
-__JULEC_SIG ___JULEC_SIGFPE{ 0x8 };
-__JULEC_SIG ___JULEC_SIGHUP{ 0x1 };
-__JULEC_SIG ___JULEC_SIGILL{ 0x4 };
-__JULEC_SIG ___JULEC_SIGINT{ 0x2 };
-__JULEC_SIG ___JULEC_SIGIO{ 0x1d };
-__JULEC_SIG ___JULEC_SIGIOT{ 0x6 };
-__JULEC_SIG ___JULEC_SIGKILL{ 0x9 };
-__JULEC_SIG ___JULEC_SIGPIPE{ 0xd };
-__JULEC_SIG ___JULEC_SIGPOLL{ 0x1d };
-__JULEC_SIG ___JULEC_SIGPROF{ 0x1b };
-__JULEC_SIG ___JULEC_SIGPWR{ 0x1e };
-__JULEC_SIG ___JULEC_SIGQUIT{ 0x3 };
-__JULEC_SIG ___JULEC_SIGSEGV{ 0xb };
-__JULEC_SIG ___JULEC_SIGSTKFLT{ 0x10 };
-__JULEC_SIG ___JULEC_SIGSTOP{ 0x13 };
-__JULEC_SIG ___JULEC_SIGSYS{ 0x1f };
-__JULEC_SIG ___JULEC_SIGTERM{ 0xf };
-__JULEC_SIG ___JULEC_SIGTRAP{ 0x5 };
-__JULEC_SIG ___JULEC_SIGTSTP{ 0x14 };
-__JULEC_SIG ___JULEC_SIGTTIN{ 0x15 };
-__JULEC_SIG ___JULEC_SIGTTOU{ 0x16 };
-__JULEC_SIG ___JULEC_SIGUNUSED{ 0x1f };
-__JULEC_SIG ___JULEC_SIGURG{ 0x17 };
-__JULEC_SIG ___JULEC_SIGUSR1{ 0xa };
-__JULEC_SIG ___JULEC_SIGUSR2{ 0xc };
-__JULEC_SIG ___JULEC_SIGVTALRM{ 0x1a };
-__JULEC_SIG ___JULEC_SIGWINCH{ 0x1c };
-__JULEC_SIG ___JULEC_SIGXCPU{ 0x18 };
-__JULEC_SIG ___JULEC_SIGXFSZ{ 0x19 };
+#elif defined(OS_DARWIN)
 
-#endif // #if defined(_WINDOWS)
+    constexpr jule::Signal SIG_ABRT{ 0x6 };
+    constexpr jule::Signal SIG_ALRM{ 0xe };
+    constexpr jule::Signal SIG_BUS{ 0xa };
+    constexpr jule::Signal SIG_CHLD{ 0x14 };
+    constexpr jule::Signal SIG_CONT{ 0x13 };
+    constexpr jule::Signal SIG_EMT{ 0x7 };
+    constexpr jule::Signal SIG_FPE{ 0x8 };
+    constexpr jule::Signal SIG_HUP{ 0x1 };
+    constexpr jule::Signal SIG_ILL{ 0x4 };
+    constexpr jule::Signal SIG_INFO{ 0x1d };
+    constexpr jule::Signal SIG_INT{ 0x2 };
+    constexpr jule::Signal SIG_IO{ 0x17 };
+    constexpr jule::Signal SIG_IOT{ 0x6 };
+    constexpr jule::Signal SIG_KILL{ 0x9 };
+    constexpr jule::Signal SIG_PIPE{ 0xd };
+    constexpr jule::Signal SIG_PROF{ 0x1b };
+    constexpr jule::Signal SIG_QUIT{ 0x3 };
+    constexpr jule::Signal SIG_SEGV{ 0xb };
+    constexpr jule::Signal SIG_STOP{ 0x11 };
+    constexpr jule::Signal SIG_SYS{ 0xc };
+    constexpr jule::Signal SIG_TERM{ 0xf };
+    constexpr jule::Signal SIG_TRAP{ 0x5 };
+    constexpr jule::Signal SIG_TSTP{ 0x12 };
+    constexpr jule::Signal SIG_TTIN{ 0x15 };
+    constexpr jule::Signal SIG_TTOU{ 0x16 };
+    constexpr jule::Signal SIG_URG{ 0x10 };
+    constexpr jule::Signal SIG_USR1{ 0x1e };
+    constexpr jule::Signal SIG_USR2{ 0x1f };
+    constexpr jule::Signal SIG_VTALRM{ 0x1a };
+    constexpr jule::Signal SIG_WINCH{ 0x1c };
+    constexpr jule::Signal SIG_XCPU{ 0x18 };
+    constexpr jule::Signal SIG_XFSZ{ 0x19 };
 
-// Declarations.
+#elif defined(OS_LINUX)
 
-// Sets all signals to handler.
-void __julec_set_sig_handler(void(*_Handler)(int _Sig)) noexcept;
+    constexpr jule::Signal SIG_ABRT{ 0x6 };
+    constexpr jule::Signal SIG_ALRM{ 0xe };
+    constexpr jule::Signal SIG_BUS{ 0x7 };
+    constexpr jule::Signal SIG_CHLD{ 0x11 };
+    constexpr jule::Signal SIG_CLD{ 0x11 };
+    constexpr jule::Signal SIG_CONT{ 0x12 };
+    constexpr jule::Signal SIG_FPE{ 0x8 };
+    constexpr jule::Signal SIG_HUP{ 0x1 };
+    constexpr jule::Signal SIG_ILL{ 0x4 };
+    constexpr jule::Signal SIG_INT{ 0x2 };
+    constexpr jule::Signal SIG_IO{ 0x1d };
+    constexpr jule::Signal SIG_IOT{ 0x6 };
+    constexpr jule::Signal SIG_KILL{ 0x9 };
+    constexpr jule::Signal SIG_PIPE{ 0xd };
+    constexpr jule::Signal SIG_POLL{ 0x1d };
+    constexpr jule::Signal SIG_PROF{ 0x1b };
+    constexpr jule::Signal SIG_PWR{ 0x1e };
+    constexpr jule::Signal SIG_QUIT{ 0x3 };
+    constexpr jule::Signal SIG_SEGV{ 0xb };
+    constexpr jule::Signal SIG_STKFLT{ 0x10 };
+    constexpr jule::Signal SIG_STOP{ 0x13 };
+    constexpr jule::Signal SIG_SYS{ 0x1f };
+    constexpr jule::Signal SIG_TERM{ 0xf };
+    constexpr jule::Signal SIG_TRAP{ 0x5 };
+    constexpr jule::Signal SIG_TSTP{ 0x14 };
+    constexpr jule::Signal SIG_TTIN{ 0x15 };
+    constexpr jule::Signal SIG_TTOU{ 0x16 };
+    constexpr jule::Signal SIG_UNUSED{ 0x1f };
+    constexpr jule::Signal SIG_URG{ 0x17 };
+    constexpr jule::Signal SIG_USR1{ 0xa };
+    constexpr jule::Signal SIG_USR2{ 0xc };
+    constexpr jule::Signal SIG_VTALRM{ 0x1a };
+    constexpr jule::Signal SIG_WINCH{ 0x1c };
+    constexpr jule::Signal SIG_XCPU{ 0x18 };
+    constexpr jule::Signal SIG_XFSZ{ 0x19 };
 
-// Definitions.
+#endif
 
-void __julec_set_sig_handler(void(*_Handler)(int _Sig)) noexcept {
-#if defined(_WINDOWS)
+    void set_sig_handler(void(*handler)(int _sig)) noexcept {
+#if defined(OS_WINDOWS)
 
-    signal( __JULEC_SIGHUP , _Handler );
-    signal( __JULEC_SIGINT , _Handler );
-    signal( __JULEC_SIGQUIT , _Handler );
-    signal( __JULEC_SIGILL , _Handler );
-    signal( __JULEC_SIGTRAP , _Handler );
-    signal( __JULEC_SIGABRT , _Handler );
-    signal( __JULEC_SIGBUS , _Handler );
-    signal( __JULEC_SIGFPE , _Handler );
-    signal( __JULEC_SIGKILL , _Handler );
-    signal( __JULEC_SIGSEGV , _Handler );
-    signal( __JULEC_SIGPIPE , _Handler );
-    signal( __JULEC_SIGALRM , _Handler );
-    signal( __JULEC_SIGTERM , _Handler );
+    std::signal(jule::SIG_HUP, handler);
+    std::signal(jule::SIG_INT, handler);
+    std::signal(jule::SIG_QUIT, handler);
+    std::signal(jule::SIG_ILL, handler);
+    std::signal(jule::SIG_TRAP, handler);
+    std::signal(jule::SIG_ABRT, handler);
+    std::signal(jule::SIG_BUS, handler);
+    std::signal(jule::SIG_FPE, handler);
+    std::signal(jule::SIG_KILL, handler);
+    std::signal(jule::SIG_SEGV, handler);
+    std::signal(jule::SIG_PIPE, handler);
+    std::signal(jule::SIG_ALRM, handler);
+    std::signal(jule::SIG_TERM, handler);
 
-#elif defined(_DARWIN)
+#elif defined(OS_DARWIN)
 
-    signal( __JULEC_SIGABRT , _Handler );
-    signal( __JULEC_SIGALRM , _Handler );
-    signal( __JULEC_SIGBUS , _Handler );
-    signal( __JULEC_SIGCHLD , _Handler );
-    signal( __JULEC_SIGCONT , _Handler );
-    signal( __JULEC_SIGEMT , _Handler );
-    signal( __JULEC_SIGFPE , _Handler );
-    signal( __JULEC_SIGHUP , _Handler );
-    signal( __JULEC_SIGILL , _Handler );
-    signal( __JULEC_SIGINFO , _Handler );
-    signal( __JULEC_SIGINT , _Handler );
-    signal( __JULEC_SIGIO , _Handler );
-    signal( __JULEC_SIGIOT , _Handler );
-    signal( __JULEC_SIGKILL , _Handler );
-    signal( __JULEC_SIGPIPE , _Handler );
-    signal( __JULEC_SIGPROF , _Handler );
-    signal( __JULEC_SIGQUIT , _Handler );
-    signal( __JULEC_SIGSEGV , _Handler );
-    signal( __JULEC_SIGSTOP , _Handler );
-    signal( __JULEC_SIGSYS , _Handler );
-    signal( __JULEC_SIGTERM , _Handler );
-    signal( __JULEC_SIGTRAP , _Handler );
-    signal( __JULEC_SIGTSTP , _Handler );
-    signal( __JULEC_SIGTTIN , _Handler );
-    signal( __JULEC_SIGTTOU , _Handler );
-    signal( __JULEC_SIGURG , _Handler );
-    signal( __JULEC_SIGUSR1 , _Handler );
-    signal( __JULEC_SIGUSR2 , _Handler );
-    signal( __JULEC_SIGVTALRM , _Handler );
-    signal( __JULEC_SIGWINCH , _Handler );
-    signal( __JULEC_SIGXCPU , _Handler );
-    signal( __JULEC_SIGXFSZ , _Handler );
+   std::signal(jule::SIG_ABRT, handler);
+   std::signal(jule::SIG_ALRM, handler);
+   std::signal(jule::SIG_BUS, handler);
+   std::signal(jule::SIG_CHLD, handler);
+   std::signal(jule::SIG_CONT, handler);
+   std::signal(jule::SIG_EMT, handler);
+   std::signal(jule::SIG_FPE, handler);
+   std::signal(jule::SIG_HUP, handler);
+   std::signal(jule::SIG_ILL, handler);
+   std::signal(jule::SIG_INFO, handler);
+   std::signal(jule::SIG_INT, handler);
+   std::signal(jule::SIG_IO, handler);
+   std::signal(jule::SIG_IOT, handler);
+   std::signal(jule::SIG_KILL, handler);
+   std::signal(jule::SIG_PIPE, handler);
+   std::signal(jule::SIG_PROF, handler);
+   std::signal(jule::SIG_QUIT, handler);
+   std::signal(jule::SIG_SEGV, handler);
+   std::signal(jule::SIG_STOP, handler);
+   std::signal(jule::SIG_SYS, handler);
+   std::signal(jule::SIG_TERM, handler);
+   std::signal(jule::SIG_TRAP, handler);
+   std::signal(jule::SIG_TSTP, handler);
+   std::signal(jule::SIG_TTIN, handler);
+   std::signal(jule::SIG_TTOU, handler);
+   std::signal(jule::SIG_URG, handler);
+   std::signal(jule::SIG_USR1, handler);
+   std::signal(jule::SIG_USR2, handler);
+   std::signal(jule::SIG_VTALRM, handler);
+   std::signal(jule::SIG_WINCH, handler);
+   std::signal(jule::SIG_XCPU, handler);
+   std::signal(jule::SIG_XFSZ, handler);
 
-#elif defined(_LINUX)
+#elif defined(OS_LINUX)
 
-    signal( ___JULEC_SIGABRT , _Handler );
-    signal( ___JULEC_SIGALRM , _Handler );
-    signal( ___JULEC_SIGBUS , _Handler );
-    signal( ___JULEC_SIGCHLD , _Handler );
-    signal( ___JULEC_SIGCLD , _Handler );
-    signal( ___JULEC_SIGCONT , _Handler );
-    signal( ___JULEC_SIGFPE , _Handler );
-    signal( ___JULEC_SIGHUP , _Handler );
-    signal( ___JULEC_SIGILL , _Handler );
-    signal( ___JULEC_SIGINT , _Handler );
-    signal( ___JULEC_SIGIO , _Handler );
-    signal( ___JULEC_SIGIOT , _Handler );
-    signal( ___JULEC_SIGKILL , _Handler );
-    signal( ___JULEC_SIGPIPE , _Handler );
-    signal( ___JULEC_SIGPOLL , _Handler );
-    signal( ___JULEC_SIGPROF , _Handler );
-    signal( ___JULEC_SIGPWR , _Handler );
-    signal( ___JULEC_SIGQUIT , _Handler );
-    signal( ___JULEC_SIGSEGV , _Handler );
-    signal( ___JULEC_SIGSTKFLT , _Handler );
-    signal( ___JULEC_SIGSTOP , _Handler );
-    signal( ___JULEC_SIGSYS , _Handler );
-    signal( ___JULEC_SIGTERM , _Handler );
-    signal( ___JULEC_SIGTRAP , _Handler );
-    signal( ___JULEC_SIGTSTP , _Handler );
-    signal( ___JULEC_SIGTTIN , _Handler );
-    signal( ___JULEC_SIGTTOU , _Handler );
-    signal( ___JULEC_SIGUNUSED , _Handler );
-    signal( ___JULEC_SIGURG , _Handler );
-    signal( ___JULEC_SIGUSR1 , _Handler );
-    signal( ___JULEC_SIGUSR2 , _Handler );
-    signal( ___JULEC_SIGVTALRM , _Handler );
-    signal( ___JULEC_SIGWINCH , _Handler );
-    signal( ___JULEC_SIGXCPU , _Handler );
-    signal( ___JULEC_SIGXFSZ , _Handler );
+    std::signal(jule::SIG_ABRT, handler);
+    std::signal(jule::SIG_ALRM, handler);
+    std::signal(jule::SIG_BUS, handler);
+    std::signal(jule::SIG_CHLD, handler);
+    std::signal(jule::SIG_CLD, handler);
+    std::signal(jule::SIG_CONT, handler);
+    std::signal(jule::SIG_FPE, handler);
+    std::signal(jule::SIG_HUP, handler);
+    std::signal(jule::SIG_ILL, handler);
+    std::signal(jule::SIG_INT, handler);
+    std::signal(jule::SIG_IO, handler);
+    std::signal(jule::SIG_IOT, handler);
+    std::signal(jule::SIG_KILL, handler);
+    std::signal(jule::SIG_PIPE, handler);
+    std::signal(jule::SIG_POLL, handler);
+    std::signal(jule::SIG_PROF, handler);
+    std::signal(jule::SIG_PWR, handler);
+    std::signal(jule::SIG_QUIT, handler);
+    std::signal(jule::SIG_SEGV, handler);
+    std::signal(jule::SIG_STKFLT, handler);
+    std::signal(jule::SIG_STOP, handler);
+    std::signal(jule::SIG_SYS, handler);
+    std::signal(jule::SIG_TERM, handler);
+    std::signal(jule::SIG_TRAP, handler);
+    std::signal(jule::SIG_TSTP, handler);
+    std::signal(jule::SIG_TTIN, handler);
+    std::signal(jule::SIG_TTOU, handler);
+    std::signal(jule::SIG_UNUSED, handler);
+    std::signal(jule::SIG_URG, handler);
+    std::signal(jule::SIG_USR1, handler);
+    std::signal(jule::SIG_USR2, handler);
+    std::signal(jule::SIG_VTALRM, handler);
+    std::signal(jule::SIG_WINCH, handler);
+    std::signal(jule::SIG_XCPU, handler);
+    std::signal(jule::SIG_XFSZ, handler);
 
-#endif // #if defined(_WINDOWS)
-}
+#endif
+    }
 
-#endif // #ifndef __JULEC_SIGNAL_HPP
+    void signal_handler(int signal) noexcept {
+        // Ignore the interrupt signal.
+        if (signal == jule::SIG_INT)
+            return;
+
+        jule::out("program terminated with signal: ");
+        jule::outln(signal);
+    }
+
+} // namespace jule
+
+#endif // ifndef __JULE_SIGNAL_HPP

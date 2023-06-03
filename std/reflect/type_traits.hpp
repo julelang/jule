@@ -2,26 +2,25 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-// Depends:
-//   - api/julec.hpp
-
-#ifndef __JULEC_STD_REFLECT_TYPE_TRAITS_HPP
-#define __JULEC_STD_REFLECT_TYPE_TRAITS_HPP
+#ifndef __JULE_STD_REFLECT_TYPE_TRAITS_HPP
+#define __JULE_STD_REFLECT_TYPE_TRAITS_HPP
 
 #include <type_traits>
 
-template<typename T1, typename T2>
-inline bool __julec_is_same(void) noexcept;
-
-template<typename T>
-inline bool __julec_any_is(const any_jt &_Src) noexcept;
+#include "../../api/jule.hpp"
 
 template<typename T1, typename T2>
-inline bool __julec_is_same(void) noexcept
-{ return std::is_same<T1, T2>::value; }
+inline jule::Bool __jule_is_same(void) noexcept;
 
 template<typename T>
-inline bool __julec_any_is(const any_jt &_Src) noexcept
-{ return _Src.__type_is<T>(); }
+inline jule::Bool __jule_any_is(const jule::Any &src) noexcept;
 
-#endif // #ifndef __JULEC_STD_REFLECT_TYPE_TRAITS_HPP
+template<typename T1, typename T2>
+inline jule::Bool __jule_is_same(void) noexcept
+{ return std::is_same<std::decay<T1>::type, std::decay<T2>::type>::value; }
+
+template<typename T>
+inline jule::Bool __jule_any_is(const jule::Any &src) noexcept
+{ return src.type_is<T>(); }
+
+#endif // ifndef __JULE_STD_REFLECT_TYPE_TRAITS_HPP

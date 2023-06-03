@@ -1799,7 +1799,7 @@ func (e *_Eval) eval_slice_sub_ident(d *Data, ident lex.Token) *Data {
 			Kind:    &TypeKind{kind: build_prim_type(types.SYS_INT)},
 			Model:   &CommonSubIdentExprModel{
 				Expr:  d.Model,
-				Ident: "_len()",
+				Ident: "len()",
 			},
 		}
 
@@ -1809,7 +1809,7 @@ func (e *_Eval) eval_slice_sub_ident(d *Data, ident lex.Token) *Data {
 			Kind:    &TypeKind{kind: build_prim_type(types.SYS_INT)},
 			Model:   &CommonSubIdentExprModel{
 				Expr:  d.Model,
-				Ident: "_cap()",
+				Ident: "cap()",
 			},
 		}
 
@@ -1844,7 +1844,7 @@ func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
 			Kind:    &TypeKind{kind: build_prim_type(types.SYS_INT)},
 			Model:   &CommonSubIdentExprModel{
 				Expr:  d.Model,
-				Ident: "_len()",
+				Ident: "len()",
 			},
 		}
 
@@ -1857,7 +1857,7 @@ func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
 			},
 			Model: &CommonSubIdentExprModel{
 				Expr:  d.Model,
-				Ident: "_clear",
+				Ident: "clear",
 			},
 		}
 
@@ -1876,7 +1876,7 @@ func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
 			},
 			Model: &CommonSubIdentExprModel{
 				Expr:  d.Model,
-				Ident: "_keys",
+				Ident: "keys",
 			},
 		}
 
@@ -1895,7 +1895,7 @@ func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
 			},
 			Model: &CommonSubIdentExprModel{
 				Expr:  d.Model,
-				Ident: "_values",
+				Ident: "values",
 			},
 		}
 
@@ -1918,7 +1918,7 @@ func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
 			},
 			Model: &CommonSubIdentExprModel{
 				Expr:  d.Model,
-				Ident: "_has",
+				Ident: "has",
 			},
 		}
 
@@ -1940,7 +1940,7 @@ func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
 			},
 			Model: &CommonSubIdentExprModel{
 				Expr:  d.Model,
-				Ident: "_del",
+				Ident: "del",
 			},
 		}
 
@@ -1958,7 +1958,7 @@ func (e *_Eval) eval_str_sub_ident(d *Data, ident lex.Token) *Data {
 			Kind:    &TypeKind{kind: build_prim_type(types.SYS_INT)},
 			Model:   &CommonSubIdentExprModel{
 				Expr:  d.Model,
-				Ident: "_len()",
+				Ident: "len()",
 			},
 		}
 
@@ -1980,7 +1980,7 @@ func (e *_Eval) eval_str_sub_ident(d *Data, ident lex.Token) *Data {
 			},
 			Model: &CommonSubIdentExprModel{
 				Expr:  d.Model,
-				Ident: "_has_prefix",
+				Ident: "has_prefix",
 			},
 		}
 
@@ -2002,7 +2002,7 @@ func (e *_Eval) eval_str_sub_ident(d *Data, ident lex.Token) *Data {
 			},
 			Model: &CommonSubIdentExprModel{
 				Expr:  d.Model,
-				Ident: "_has_suffix",
+				Ident: "has_suffix",
 			},
 		}
 
@@ -2024,7 +2024,7 @@ func (e *_Eval) eval_str_sub_ident(d *Data, ident lex.Token) *Data {
 			},
 			Model: &CommonSubIdentExprModel{
 				Expr:  d.Model,
-				Ident: "_find",
+				Ident: "find",
 			},
 		}
 
@@ -2046,7 +2046,7 @@ func (e *_Eval) eval_str_sub_ident(d *Data, ident lex.Token) *Data {
 			},
 			Model: &CommonSubIdentExprModel{
 				Expr:  d.Model,
-				Ident: "_rfind",
+				Ident: "rfind",
 			},
 		}
 
@@ -2068,7 +2068,7 @@ func (e *_Eval) eval_str_sub_ident(d *Data, ident lex.Token) *Data {
 			},
 			Model: &CommonSubIdentExprModel{
 				Expr:  d.Model,
-				Ident: "_trim",
+				Ident: "trim",
 			},
 		}
 
@@ -2090,7 +2090,7 @@ func (e *_Eval) eval_str_sub_ident(d *Data, ident lex.Token) *Data {
 			},
 			Model: &CommonSubIdentExprModel{
 				Expr:  d.Model,
-				Ident: "_rtrim",
+				Ident: "rtrim",
 			},
 		}
 
@@ -2122,7 +2122,7 @@ func (e *_Eval) eval_str_sub_ident(d *Data, ident lex.Token) *Data {
 			},
 			Model: &CommonSubIdentExprModel{
 				Expr:  d.Model,
-				Ident: "_split",
+				Ident: "split",
 			},
 		}
 
@@ -2156,7 +2156,7 @@ func (e *_Eval) eval_str_sub_ident(d *Data, ident lex.Token) *Data {
 			},
 			Model: &CommonSubIdentExprModel{
 				Expr:  d.Model,
-				Ident: "_replace",
+				Ident: "replace",
 			},
 		}
 

@@ -2,177 +2,200 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-#ifndef __JULEC_ANY_HPP
-#define __JULEC_ANY_HPP
+#ifndef __JULE_ANY_HPP
+#define __JULE_ANY_HPP
 
-// Built-in any type.
-class any_jt;
+#include <stddef.h>
+#include <cstdlib>
+#include <cstring>
+#include <ostream>
 
-class any_jt {
-private:
-    template<typename _Object_t>
-    struct __dynamic_type {
-    public:
-        static const char *__type_id(void) noexcept
-        { return ( typeid( _Object_t ).name() ); }
+#include "str.hpp"
+#include "builtin.hpp"
+#include "ref.hpp"
 
-        static void __dealloc(void *_Alloc) noexcept
-        { delete ( reinterpret_cast<_Object_t*>( _Alloc ) ); }
+namespace jule {
 
-        static bool_jt __eq(void *_Alloc, void *_Other) noexcept {
-            _Object_t *_l{ reinterpret_cast<_Object_t*>( _Alloc ) };
-            _Object_t *_r{ reinterpret_cast<_Object_t*>( _Other ) };
-            return ( *_l == *_r );
-        }
+    // Built-in any type.
+    class Any;
 
-        static const str_jt __to_str(const void *_Alloc) noexcept {
-            const _Object_t *_v{ reinterpret_cast<const _Object_t*>( _Alloc) };
-            return ( __julec_to_str( *_v ) );
-        }
-    };
+    class Any {
+    private:
+        template<typename T>
+        struct DynamicType {
+        public:
+            static const char *type_id(void) noexcept
+            { return typeid(T).name(); }
 
-    struct __value_type {
-    public:
-        const char*(*__type_id)(void) noexcept;
-        void(*__dealloc)(void *_Alloc) noexcept;
-        bool_jt(*__eq)(void *_Alloc, void *_Other) noexcept;
-        const str_jt(*__to_str)(const void *_Alloc) noexcept;
-    };
+            static void dealloc(void *alloc) noexcept
+            { delete reinterpret_cast<T*>(alloc); }
 
-    template<typename _Object_t>
-    static __value_type *__new_value_type(void) noexcept {
-        using _type = typename std::decay<__dynamic_type<_Object_t>>::type;
-        static __value_type _table = {
-            _type::__type_id,
-            _type::__dealloc,
-            _type::__eq,
-            _type::__to_str,
+            static jule::Bool eq(void *alloc, void *other) noexcept {
+                const T *l{ reinterpret_cast<const T*>(alloc) };
+                const T *r{ reinterpret_cast<const T*>(other) };
+                return *l == *r;
+            }
+
+            static const jule::Str to_str(const void *alloc) noexcept {
+                const T *v{ reinterpret_cast<const T*>(alloc) };
+                return jule::to_str(*v);
+            }
         };
-        return ( &_table );
-    }
 
-public:
-    ref_jt<void*> __data{};
-    __value_type *__type{ nil };
+        struct Type {
+        public:
+            const char*(*type_id)(void) noexcept;
+            void(*dealloc)(void *alloc) noexcept;
+            jule::Bool(*eq)(void *alloc, void *other) noexcept;
+            const jule::Str(*to_str)(const void *alloc) noexcept;
+        };
 
-    any_jt(void) noexcept {}
-
-    template<typename T>
-    any_jt(const T &_Expr) noexcept
-    { this->operator=( _Expr ); }
-
-    any_jt(const any_jt &_Src) noexcept
-    { this->operator=( _Src ); }
-
-    ~any_jt(void) noexcept
-    { this->__dealloc(); }
-
-    inline void __dealloc(void) noexcept {
-        if (!this->__data.__ref) {
-            this->__type = nil;
-            this->__data.__alloc = nil;
-            return;
+        template<typename T>
+        static jule::Any::Type *new_type(void) noexcept {
+            using t = typename std::decay<DynamicType<T>>::type;
+            static jule::Any::Type table = {
+                t::type_id,
+                t::dealloc,
+                t::eq,
+                t::to_str,
+            };
+            return &table;
         }
 
-        // Use __JULEC_REFERENCE_DELTA, DON'T USE __drop_ref METHOD BECAUSE
-        // jule_ref does automatically this.
-        // If not in this case:
-        //   if this is method called from destructor, reference count setted to
-        //   negative integer but reference count is unsigned, for this reason
-        //   allocation is not deallocated.
-        if ( ( this->__data.__get_ref_n() ) != __JULEC_REFERENCE_DELTA )
-        { return; }
+    public:
+        jule::Ref<void*> data{};
+        jule::Any::Type *type{ nullptr };
 
-        this->__type->__dealloc( *this->__data.__alloc );
-        *this->__data.__alloc = nil;
-        this->__type = nil;
+        Any(void) noexcept {}
 
-        delete this->__data.__ref;
-        this->__data.__ref = nil;
-        std::free( this->__data.__alloc );
-        this->__data.__alloc = nil;
-    }
+        template<typename T>
+        Any(const T &expr) noexcept
+        { this->operator=(expr); }
 
-    template<typename T>
-    inline bool_jt __type_is(void) const noexcept {
-        if (std::is_same<typename std::decay<T>::type, std::nullptr_t>::value)
-        { return ( false ); }
-        if (this->operator==( nil ))
-        { return ( false ); }
-        return std::strcmp( this->__type->__type_id(), typeid(T).name() ) == 0;
-    }
+        Any(const Any &src) noexcept
+        { this->operator=(src); }
 
-    template<typename T>
-    void operator=(const T &_Expr) noexcept {
-        this->__dealloc();
-        T *_alloc{ new(std::nothrow) T };
-        if (!_alloc)
-        { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
-        void **_main_alloc{ new(std::nothrow) void* };
-        if (!_main_alloc)
-        { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
-        *_alloc = _Expr;
-        *_main_alloc = ( (void*)(_alloc) );
-        this->__data = ref_jt<void*>::make( _main_alloc );
-        this->__type = any_jt::__new_value_type<T>();
-    }
+        ~Any(void) noexcept
+        { this->dealloc(); }
 
-    void operator=(const any_jt &_Src) noexcept {
-        if (_Src.operator==( nil )) {
-            this->operator=( nil );
-            return;
+        void dealloc(void) noexcept {
+            if (!this->data.ref) {
+                this->type = nullptr;
+                this->data.alloc = nullptr;
+                return;
+            }
+
+            // Use jule::REFERENCE_DELTA, DON'T USE drop_ref METHOD BECAUSE
+            // jule_ref does automatically this.
+            // If not in this case:
+            //   if this is method called from destructor, reference count setted to
+            //   negative integer but reference count is unsigned, for this reason
+            //   allocation is not deallocated.
+            if ( ( this->data.get_ref_n() ) != jule::REFERENCE_DELTA )
+                return;
+
+            this->type->dealloc(*this->data.alloc);
+            *this->data.alloc = nullptr;
+            this->type = nullptr;
+
+            delete this->data.ref;
+            this->data.ref = nullptr;
+            std::free(this->data.alloc);
+            this->data.alloc = nullptr;
         }
-        this->__dealloc();
-        this->__data = _Src.__data;
-        this ->__type = _Src.__type;
-    }
 
-    inline void operator=(const std::nullptr_t) noexcept
-    { this->__dealloc(); }
+        template<typename T>
+        inline jule::Bool type_is(void) const noexcept {
+            if (std::is_same<typename std::decay<T>::type, std::nullptr_t>::value)
+                return false;
 
-    template<typename T>
-    operator T(void) const noexcept {
-        if (this->operator==( nil ))
-        { JULEC_ID(panic)( __JULEC_ERROR_INVALID_MEMORY ); }
-        if (!this->__type_is<T>())
-        { JULEC_ID(panic)( __JULEC_ERROR_INCOMPATIBLE_TYPE ); }
-        return ( *( (T*)( *this->__data.__alloc ) ) );
-    }
+            if (this->operator==(nullptr))
+                return false;
 
-    template<typename T>
-    inline bool operator==(const T &_Expr) const noexcept
-    { return ( this->__type_is<T>() && this->operator T() == _Expr ); }
+            return std::strcmp(this->type->type_id(), typeid(T).name()) == 0;
+        }
 
-    template<typename T>
-    inline constexpr
-    bool operator!=(const T &_Expr) const noexcept
-    { return ( !this->operator==( _Expr ) ); }
+        template<typename T>
+        void operator=(const T &expr) noexcept {
+            this->dealloc();
 
-    inline bool_jt operator==(const any_jt &_Any) const noexcept {
-        if (this->operator==( nil ) && _Any.operator==( nil ))
-        { return ( true ); }
-        if (std::strcmp( this->__type->__type_id() , _Any.__type->__type_id() ) != 0)
-        { return ( false ); }
-        return ( this->__type->__eq( *this->__data.__alloc , *_Any.__data.__alloc ) );
-    }
+            T *alloc{ new(std::nothrow) T };
+            if (!alloc)
+                jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
 
-    inline bool_jt operator!=(const any_jt &_Any) const noexcept
-    { return ( !this->operator==( _Any ) ); }
+            void **main_alloc{ new(std::nothrow) void* };
+            if (!main_alloc)
+                jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
 
-    inline bool_jt operator==(std::nullptr_t) const noexcept
-    { return ( !this->__data.__alloc ); }
+            *alloc = expr;
+            *main_alloc = reinterpret_cast<void*>(alloc);
+            this->data = jule::Ref<void*>::make(main_alloc);
+            this->type = jule::Any::new_type<T>();
+        }
 
-    inline bool_jt operator!=(std::nullptr_t) const noexcept
-    { return ( !this->operator==( nil ) ); }
+        void operator=(const jule::Any &src) noexcept {
+            if (src.operator==(nullptr)) {
+                this->operator=(nullptr);
+                return;
+            }
 
-    friend std::ostream &operator<<(std::ostream &_Stream,
-                                    const any_jt &_Src) noexcept {
-        if (_Src.operator!=( nil ))
-        { _Stream << _Src.__type->__to_str( *_Src.__data.__alloc ); }
-        else
-        { _Stream << 0; }
-        return ( _Stream );
-    }
-};
+            this->dealloc();
+            this->data = src.data;
+            this->type = src.type;
+        }
 
-#endif // #ifndef __JULEC_ANY_HPP
+        inline void operator=(const std::nullptr_t) noexcept
+        { this->dealloc(); }
+
+        template<typename T>
+        operator T(void) const noexcept {
+            if (this->operator==(nullptr))
+                jule::panic(jule::ERROR_INVALID_MEMORY);
+
+            if (!this->type_is<T>())
+                jule::panic(jule::ERROR_INCOMPATIBLE_TYPE);
+
+            return *reinterpret_cast<T*>(*this->data.alloc);
+        }
+
+        template<typename T>
+        inline jule::Bool operator==(const T &_Expr) const noexcept
+        { return ( this->type_is<T>() && this->operator T() == _Expr ); }
+
+        template<typename T>
+        inline constexpr
+        jule::Bool operator!=(const T &_Expr) const noexcept
+        { return ( !this->operator==( _Expr ) ); }
+
+        inline jule::Bool operator==(const jule::Any &other) const noexcept {
+            if (this->operator==(nullptr) && other.operator==(nullptr))
+                return true;
+
+            if (std::strcmp(this->type->type_id(), other.type->type_id()) != 0)
+                return false;
+
+            return this->type->eq(*this->data.alloc, *other.data.alloc );
+        }
+
+        inline jule::Bool operator!=(const jule::Any &other) const noexcept
+        { return !this->operator==(other); }
+
+        inline jule::Bool operator==(std::nullptr_t) const noexcept
+        { return !this->data.alloc; }
+
+        inline jule::Bool operator!=(std::nullptr_t) const noexcept
+        { return !this->operator==(nullptr); }
+
+        friend std::ostream &operator<<(std::ostream &stream,
+                                        const jule::Any &src) noexcept {
+            if (src.operator!=(nullptr))
+                stream << src.type->to_str(*src.data.alloc);
+            else
+                stream << 0;
+            return stream;
+        }
+    };
+
+} // namespace jule
+
+#endif // ifndef __JULE_ANY_HPP

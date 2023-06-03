@@ -2,29 +2,28 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-// Depends:
-//   - api/julec.hpp
-
-#ifndef __JULEC_STD_SYS_SYSCALL_UNIX_HPP
-#define __JULEC_STD_SYS_SYSCALL_UNIX_HPP
+#ifndef __JULE_STD_SYS_SYSCALL_UNIX_HPP
+#define __JULE_STD_SYS_SYSCALL_UNIX_HPP
 
 #include <limits.h>
 #include <unistd.h>
 
+#include "../../api/jule.hpp"
+
 // Declarations
 
-str_jt __julec_str_from_byte_ptr(const char *_Ptr) noexcept;
-str_jt __julec_str_from_byte_ptr(const JULEC_ID(byte) *_Ptr) noexcept;
-int_jt __julec_stat(const char *_Path, struct stat *_Stat) noexcept;
+jule::Str __jule_str_from_byte_ptr(const char *_Ptr) noexcept;
+jule::Str __jule_str_from_byte_ptr(const jule::Byte *ptr) noexcept;
+jule::Int __jule_stat(const char *path, struct stat *_stat) noexcept;
 
 // Definitions
-str_jt __julec_str_from_byte_ptr(const char *_Ptr) noexcept
-{ return ( __julec_str_from_byte_ptr( (const JULEC_ID(byte)*)( _Ptr ) ) ); }
+jule::Str __jule_str_from_byte_ptr(const char *ptr) noexcept
+{ return __jule_str_from_byte_ptr((const jule::Byte*)(ptr)); }
 
-str_jt __julec_str_from_byte_ptr(const JULEC_ID(byte) *_Ptr) noexcept
-{ return ( str_jt( _Ptr ) ); }
+jule::Str __jule_str_from_byte_ptr(const jule::Byte *ptr) noexcept
+{ return jule::Str(ptr); }
 
-int_jt __julec_stat(const char *_Path, struct stat *_Stat) noexcept
-{ return ( stat( _Path, _Stat ) ); }
+jule::Int __jule_stat(const char *path, struct stat *_stat) noexcept
+{ return stat(path, _stat); }
 
-#endif // #ifndef __JULEC_STD_SYS_SYSCALL_UNIX_HPP
+#endif // ifndef __JULE_STD_SYS_SYSCALL_UNIX_HPP

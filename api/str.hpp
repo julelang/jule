@@ -2,282 +2,321 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-#ifndef __JULEC_STR_HPP
-#define __JULEC_STR_HPP
+#ifndef __JULE_STR_HPP
+#define __JULE_STR_HPP
 
-// Built-in str type.
-class str_jt;
+#include <sstream>
+#include <ostream>
+#include <string>
+#include <cstring>
 
-class str_jt {
-public:
-    int_jt __len{};
-    std::basic_string<u8_jt> __buffer{};
+#include "panic.hpp"
+#include "utf8.hpp"
+#include "slice.hpp"
+#include "types.hpp"
+#include "error.hpp"
 
-    str_jt(void) noexcept {}
+namespace jule {
 
-    str_jt(const char *_Src, const int_jt &_Len) noexcept {
-        if (!_Src)
-        { return; }
-        this->__len = _Len;
-        this->__buffer = std::basic_string<u8_jt>(&_Src[0],
-                                                 &_Src[this->__len]);
-    }
+    // Built-in str type.
+    class Str;
 
-    str_jt(const char *_Src) noexcept {
-        if (!_Src)
-        { return; }
-        this->__len = std::strlen( _Src );
-        this->__buffer = std::basic_string<u8_jt>(&_Src[0],
-                                                 &_Src[this->__len]);
-    }
+    // Libraries uses this function for UTf-8 encoded Jule strings.
+    // Also it is builtin str type constructor.
+    template<typename T>
+    jule::Str to_str(const T &obj) noexcept;
 
-    str_jt(const std::initializer_list<u8_jt> &_Src) noexcept {
-        this->__len = _Src.size();
-        this->__buffer = _Src;
-    }
-
-    str_jt(const i32_jt &_Rune) noexcept
-    : str_jt( __julec_utf8_rune_to_bytes( _Rune ) ) {}
-
-    str_jt(const std::basic_string<u8_jt> &_Src) noexcept {
-        this->__len = _Src.length();
-        this->__buffer = _Src;
-    }
-
-    str_jt(const std::string &_Src) noexcept {
-        this->__len = _Src.length();
-        this->__buffer = std::basic_string<u8_jt>( _Src.begin(), _Src.end() );
-    }
-
-    str_jt(const str_jt &_Src) noexcept {
-        this->__len = _Src.__len;
-        this->__buffer = _Src.__buffer;
-    }
-
-    str_jt(const slice_jt<u8_jt> &_Src) noexcept {
-        this->__len = _Src._len();
-        this->__buffer = std::basic_string<u8_jt>( _Src.begin(), _Src.end() );
-    }
-
-    str_jt(const slice_jt<i32_jt> &_Src) noexcept {
-        for (const i32_jt &_rune: _Src) {
-            const slice_jt<u8_jt> _bytes{ __julec_utf8_rune_to_bytes( _rune ) };
-            this->__len += _bytes._len();
-            for (const u8_jt _byte: _bytes)
-            { this->__buffer += _byte; }
+    jule::Str to_str(const jule::Str &s) noexcept;
+    
+    class Str {
+    public:
+        jule::Int _len{};
+        std::basic_string<jule::U8> buffer{};
+    
+        Str(void) noexcept {}
+    
+        Str(const char *src, const jule::Int &len) noexcept {
+            if (!src)
+                return;
+            this->_len = len;
+            this->buffer = std::basic_string<jule::U8>(&src[0],
+                                                       &src[this->_len]);
         }
-    }
-
-    typedef u8_jt       *iterator;
-    typedef const u8_jt *const_iterator;
-
-    inline iterator begin(void) noexcept
-    { return ( (iterator)(&this->__buffer[0]) ); }
-
-    inline const_iterator begin(void) const noexcept
-    { return ( (const_iterator)(&this->__buffer[0]) ); }
-
-    inline iterator end(void) noexcept
-    { return ( (iterator)(&this->__buffer[this->_len()]) ); }
-
-    inline const_iterator end(void) const noexcept
-    { return ( (const_iterator)(&this->__buffer[this->_len()]) ); }
-
-    inline str_jt ___slice(const int_jt &_Start,
-                              const int_jt &_End) const noexcept {
-        if (_Start < 0 || _End < 0 || _Start > _End || _End > this->_len()) {
-            std::stringstream _sstream;
-            __JULEC_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(
-                _sstream, _Start, _End );
-            JULEC_ID(panic)( _sstream.str().c_str() );
-        } else if (_Start == _End) {
-            return ( str_jt() );
+    
+        Str(const char *src) noexcept {
+            if (!src)
+                return;
+            this->_len = std::strlen(src);
+            this->buffer = std::basic_string<jule::U8>(&src[0],
+                                                       &src[this->_len]);
         }
-        const int_jt _n{ _End-_Start };
-        return ( this->__buffer.substr( _Start, _n ) );
-    }
-
-    inline str_jt ___slice(const int_jt &_Start) const noexcept
-    { return ( this->___slice( _Start, this->_len() ) ); }
-
-    inline str_jt ___slice(void) const noexcept
-    { return ( this->___slice( 0, this->_len() ) ); }
-
-    inline int_jt _len(void) const noexcept
-    { return ( this->__len ); }
-
-    inline bool _empty(void) const noexcept
-    { return ( this->__buffer.empty() ); }
-
-    inline bool _has_prefix(const str_jt &_Sub) const noexcept {
-        return this->_len() >= _Sub._len() &&
-                this->__buffer.substr( 0, _Sub._len() ) == _Sub.__buffer;
-    }
-
-    inline bool _has_suffix(const str_jt &_Sub) const noexcept {
-        return this->_len() >= _Sub._len() &&
-            this->__buffer.substr( this->_len()-_Sub._len() ) == _Sub.__buffer;
-    }
-
-    inline int_jt _find(const str_jt &_Sub) const noexcept
-    { return ( (int_jt)(this->__buffer.find( _Sub.__buffer) ) ); }
-
-    inline int_jt _rfind(const str_jt &_Sub) const noexcept
-    { return ( (int_jt)(this->__buffer.rfind( _Sub.__buffer) ) ); }
-
-    str_jt _trim(const str_jt &_Bytes) const noexcept {
-        const_iterator _it{ this->begin() };
-        const const_iterator _end{ this->end() };
-        const_iterator _begin{ this->begin() };
-        for (; _it < _end; ++_it) {
-            bool exist{ false };
-            const_iterator _bytes_it{ _Bytes.begin() };
-            const const_iterator _bytes_end{ _Bytes.end() };
-            for (; _bytes_it < _bytes_end; ++_bytes_it) {
-                if ((exist = *_it == *_bytes_it))
-                { break; }
+    
+        Str(const std::initializer_list<jule::U8> &src) noexcept {
+            this->_len = src.size();
+            this->buffer = src;
+        }
+    
+        Str(const jule::I32 &rune) noexcept
+        : Str( jule::utf8_rune_to_bytes(rune) ) {}
+    
+        Str(const std::basic_string<jule::U8> &src) noexcept {
+            this->_len = src.length();
+            this->buffer = src;
+        }
+    
+        Str(const std::string &src) noexcept {
+            this->_len = src.length();
+            this->buffer = std::basic_string<jule::U8>(src.begin(), src.end());
+        }
+    
+        Str(const jule::Str &src) noexcept {
+            this->_len = src._len;
+            this->buffer = src.buffer;
+        }
+    
+        Str(const jule::Slice<U8> &src) noexcept {
+            this->_len = src.len();
+            this->buffer = std::basic_string<jule::U8>(src.begin(), src.end());
+        }
+    
+        Str(const jule::Slice<jule::I32> &src) noexcept {
+            for (const jule::I32 &r: src) {
+                const jule::Slice<jule::U8> bytes{ jule::utf8_rune_to_bytes(r) };
+                this->_len += bytes.len();
+                for (const jule::U8 _byte: bytes)
+                    this->buffer += _byte;
             }
-            if (!exist)
-            { return ( this->__buffer.substr( _it-_begin ) ); }
         }
-        return ( str_jt() );
-    }
+    
+        typedef jule::U8       *Iterator;
+        typedef const jule::U8 *ConstIterator;
+    
+        inline Iterator begin(void) noexcept
+        { return reinterpret_cast<Iterator>(&this->buffer[0]); }
+    
+        inline ConstIterator begin(void) const noexcept
+        { return reinterpret_cast<ConstIterator>(&this->buffer[0]); }
+    
+        inline Iterator end(void) noexcept
+        { return reinterpret_cast<Iterator>(&this->buffer[this->len()]); }
+    
+        inline ConstIterator end(void) const noexcept
+        { return reinterpret_cast<ConstIterator>(&this->buffer[this->len()]); }
+    
+        inline jule::Str slice(const jule::Int &start,
+                               const jule::Int &end) const noexcept {
+            if (start < 0 || end < 0 || start > end || end > this->len()) {
+                std::stringstream sstream;
+                __JULEC_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(
+                    sstream, start, end);
+                jule::panic(sstream.str().c_str());
+            } else if (start == end)
+                return jule::Str();
 
-    str_jt _rtrim(const str_jt &_Bytes) const noexcept {
-        const_iterator _it{ this->end()-1 };
-        const const_iterator _begin{ this->begin() };
-        for (; _it >= _begin; --_it) {
-            bool exist{ false };
-            const_iterator _bytes_it{ _Bytes.begin() };
-            const const_iterator _bytes_end{ _Bytes.end() };
-            for (; _bytes_it < _bytes_end; ++_bytes_it) {
-                if ((exist = *_it == *_bytes_it))
-                { break; }
-            }
-            if (!exist)
-            { return ( this->__buffer.substr( 0, _it-_begin+1 ) ); }
+            const jule::Int n{ end-start };
+            return this->buffer.substr(start, n);
         }
-        return ( str_jt() );
-    }
-
-    slice_jt<str_jt> _split(const str_jt &_Sub,
-                            const i64_jt &_N) const noexcept {
-        slice_jt<str_jt> _parts;
-        if (_N == 0)
-        { return ( _parts ); }
-        const const_iterator _begin{ this->begin() };
-        std::basic_string<u8_jt> _s{ this->__buffer };
-        uint_jt _pos{ std::string::npos };
-        if (_N < 0) {
-            while ((_pos = _s.find( _Sub.__buffer )) != std::string::npos) {
-                _parts.__push( _s.substr( 0, _pos ) );
-                _s = _s.substr( _pos+_Sub._len() );
-            }
-            if (!_s.empty())
-            { _parts.__push( str_jt( _s ) ); }
-        } else {
-            uint_jt _n{ 0 };
-            while ((_pos = _s.find( _Sub.__buffer )) != std::string::npos) {
-                if (++_n >= _N) {
-                    _parts.__push( str_jt( _s ) );
-                    break;
+    
+        inline jule::Str slice(const jule::Int &start) const noexcept
+        { return this->slice(start, this->len()); }
+    
+        inline jule::Str slice(void) const noexcept
+        { return this->slice(0, this->len()); }
+    
+        inline jule::Int len(void) const noexcept
+        { return this->_len; }
+    
+        inline jule::Bool empty(void) const noexcept
+        { return this->buffer.empty(); }
+    
+        inline jule::Bool has_prefix(const jule::Str &sub) const noexcept {
+            return this->len() >= sub.len() &&
+                    this->buffer.substr(0, sub.len()) == sub.buffer;
+        }
+    
+        inline jule::Bool has_suffix(const jule::Str &sub) const noexcept {
+            return this->len() >= sub.len() &&
+                this->buffer.substr(this->len()-sub.len()) == sub.buffer;
+        }
+    
+        inline jule::Int find(const jule::Str &sub) const noexcept
+        { return static_cast<jule::Int>(this->buffer.find(sub.buffer) ); }
+    
+        inline jule::Int rfind(const jule::Str &sub) const noexcept
+        { return static_cast<jule::Int>(this->buffer.rfind(sub.buffer)); }
+    
+        jule::Str trim(const jule::Str &bytes) const noexcept {
+            ConstIterator it{ this->begin() };
+            const ConstIterator end{ this->end() };
+            ConstIterator begin{ this->begin() };
+            for (; it < end; ++it) {
+                jule::Bool exist{ false };
+                ConstIterator bytes_it{ bytes.begin() };
+                const ConstIterator bytes_end{ bytes.end() };
+                for (; bytes_it < bytes_end; ++bytes_it) {
+                    if ((exist = *it == *bytes_it))
+                        break;
                 }
-                _parts.__push( _s.substr( 0, _pos ) );
-                _s = _s.substr( _pos+_Sub._len() );
+
+                if (!exist)
+                    return this->buffer.substr(it-begin);
             }
-            if (!_parts._empty() && _n < _N)
-            { _parts.__push( str_jt( _s ) ); }
-            else if (_parts._empty())
-            { _parts.__push( str_jt( _s ) ); }
+            return jule::Str();
         }
-        return ( _parts );
-    }
 
-    str_jt _replace(const str_jt &_Sub,
-                    const str_jt &_New,
-                    const i64_jt &_N) const noexcept {
-        if (_N == 0) { return ( *this ); }
-        std::basic_string<u8_jt> _s(this->__buffer);
-        uint_jt start_pos{ 0 };
-        if (_N < 0) {
-            while((start_pos = _s.find( _Sub.__buffer, start_pos )) != std::string::npos) {
-                _s.replace( start_pos, _Sub._len(), _New.__buffer );
-                start_pos += _New._len();
+        jule::Str rtrim(const jule::Str &bytes) const noexcept {
+            ConstIterator it{ this->end()-1 };
+            const ConstIterator begin{ this->begin() };
+            for (; it >= begin; --it) {
+                jule::Bool exist{ false };
+                ConstIterator bytes_it{ bytes.begin() };
+                const ConstIterator bytes_end{ bytes.end() };
+                for (; bytes_it < bytes_end; ++bytes_it) {
+                    if ((exist = *it == *bytes_it))
+                        break;
+                }
+                if (!exist)
+                    return this->buffer.substr(0, it-begin+1);
             }
-        } else {
-            uint_jt _n{ 0 };
-            while((start_pos = _s.find( _Sub.__buffer, start_pos )) != std::string::npos) {
-                _s.replace( start_pos, _Sub._len(), _New.__buffer );
-                start_pos += _New._len();
-                if (++_n >= _N)
-                { break; }
+            return jule::Str();
+        }
+    
+        jule::Slice<jule::Str> split(const jule::Str &sub,
+                                     const jule::I64 &n) const noexcept {
+            jule::Slice<jule::Str> parts;
+            if (n == 0)
+                return parts;
+
+            const ConstIterator begin{ this->begin() };
+            std::basic_string<jule::U8> s{ this->buffer };
+            constexpr jule::Uint npos{ static_cast<jule::Uint>(std::string::npos) };
+            jule::Uint pos{ npos };
+            if (n < 0) {
+                while ((pos = s.find(sub.buffer)) != npos) {
+                    parts.push(s.substr(0, pos));
+                    s = s.substr(pos+sub.len());
+                }
+                if (!s.empty())
+                    parts.push(jule::Str(s));
+            } else {
+                jule::Uint _n{ 0 };
+                while ((pos = s.find(sub.buffer)) != npos) {
+                    if (++_n >= n) {
+                        parts.push(jule::Str(s));
+                        break;
+                    }
+                    parts.push(s.substr(0, pos));
+                    s = s.substr(pos+sub.len());
+                }
+                if (!parts.empty() && _n < n)
+                    parts.push(jule::Str(s));
+                else if (parts.empty())
+                    parts.push(jule::Str(s));
             }
+
+            return parts;
         }
-        return ( str_jt( _s ) );
-    }
+    
+        jule::Str replace(const jule::Str &sub,
+                          const jule::Str &_new,
+                          const jule::I64 &n) const noexcept {
+            if (n == 0)
+                return *this;
 
-    inline operator const char*(void) const noexcept
-    { return ( (char*)( this->__buffer.c_str() ) ); }
-
-    inline operator const std::basic_string<u8_jt>(void) const noexcept
-    { return ( this->__buffer ); }
-
-    inline operator const std::basic_string<char>(void) const noexcept
-    { return ( std::basic_string<char>( this->begin(), this->end() ) ); }
-
-    operator slice_jt<u8_jt>(void) const noexcept {
-        slice_jt<u8_jt> _slice( this->_len() );
-        for (int_jt _index{ 0 }; _index < this->_len(); ++_index)
-        { _slice[_index] = this->operator[]( _index );  }
-        return ( _slice );
-    }
-
-    operator slice_jt<i32_jt>(void) const noexcept {
-        slice_jt<i32_jt> _runes{};
-        const char *_str{ this->operator const char *() };
-        for (int_jt _index{ 0 }; _index < this->_len(); ) {
-            i32_jt _rune;
-            int_jt _n;
-            std::tie( _rune, _n ) = __julec_utf8_decode_rune_str( _str+_index ,
-                                                                  this->_len()-_index );
-            _index += _n;
-            _runes.__push( _rune );
+            std::basic_string<jule::U8> s(this->buffer);
+            constexpr jule::Uint npos{ static_cast<jule::Uint>(std::string::npos) };
+            jule::Uint start_pos{ 0 };
+            if (n < 0) {
+                while((start_pos = s.find(sub.buffer, start_pos)) != npos) {
+                    s.replace(start_pos, sub.len(), _new.buffer);
+                    start_pos += _new.len();
+                }
+            } else {
+                jule::Uint _n{ 0 };
+                while((start_pos = s.find(sub.buffer, start_pos)) != npos) {
+                    s.replace(start_pos, sub.len(), _new.buffer);
+                    start_pos += _new.len();
+                    if (++_n >= n)
+                        break;
+                }
+            }
+            return jule::Str(s);
         }
-        return ( _runes );
-    }
+    
+        inline operator const char*(void) const noexcept
+        { return reinterpret_cast<const char*>(this->buffer.c_str()); }
+    
+        inline operator const std::basic_string<jule::U8>(void) const noexcept
+        { return this->buffer; }
 
-    u8_jt &operator[](const int_jt &_Index) {
-        if (this->_empty() || _Index < 0 || this->_len() <= _Index) {
-            std::stringstream _sstream;
-            __JULEC_WRITE_ERROR_INDEX_OUT_OF_RANGE( _sstream, _Index );
-            JULEC_ID(panic)( _sstream.str().c_str() );
+        inline operator const std::basic_string<char>(void) const noexcept
+        { return std::basic_string<char>(this->begin(), this->end()); }
+
+        operator jule::Slice<jule::U8>(void) const noexcept {
+            jule::Slice<jule::U8> slice(this->len());
+            for (jule::Int index{ 0 }; index < this->len(); ++index)
+                slice[index] = this->operator[](index);
+            return slice;
         }
-        return ( this->__buffer[_Index] );
+    
+        operator jule::Slice<jule::I32>(void) const noexcept {
+            jule::Slice<jule::I32> runes{};
+            const char *str{ this->operator const char *() };
+            for (jule::Int index{ 0 }; index < this->len(); ) {
+                jule::I32 rune;
+                jule::Int n;
+                std::tie(rune, n) = jule::utf8_decode_rune_str(str+index ,
+                                                               this->len()-index);
+                index += n;
+                runes.push(rune);
+            }
+            return runes;
+        }
+    
+        jule::U8 &operator[](const jule::Int &index) {
+            if (this->empty() || index < 0 || this->len() <= index) {
+                std::stringstream sstream;
+                __JULEC_WRITE_ERROR_INDEX_OUT_OF_RANGE(sstream, index);
+                jule::panic(sstream.str().c_str());
+            }
+            return this->buffer[index];
+        }
+    
+        inline jule::U8 operator[](const jule::Int &index) const
+        { return (*this).buffer[index]; }
+    
+        inline void operator+=(const jule::Str &str) noexcept {
+            this->_len += str.len();
+            this->buffer += str.buffer;
+        }
+    
+        inline jule::Str operator+(const jule::Str &str) const noexcept
+        { return jule::Str(this->buffer + str.buffer); }
+    
+        inline jule::Bool operator==(const jule::Str &str) const noexcept
+        { return this->buffer == str.buffer; }
+    
+        inline jule::Bool operator!=(const jule::Str &str) const noexcept
+        { return !this->operator==(str); }
+    
+        friend std::ostream &operator<<(std::ostream &stream,
+                                        const jule::Str &src) noexcept {
+            for (const jule::U8 &b: src)
+            { stream << static_cast<char>(b); }
+            return stream;
+        }
+    };
+
+    template<typename T>
+    jule::Str to_str(const T &obj) noexcept {
+        std::stringstream stream;
+        stream << obj;
+        return jule::Str(stream.str());
     }
 
-    inline u8_jt operator[](const int_jt &_Index) const
-    { return ( (*this).__buffer[_Index] ); }
+    jule::Str to_str(const jule::Str &s) noexcept
+    { return s; }
 
-    inline void operator+=(const str_jt &_Str) noexcept {
-        this->__len += _Str._len();
-        this->__buffer += _Str.__buffer;
-    }
+} // namespace jule
 
-    inline str_jt operator+(const str_jt &_Str) const noexcept
-    { return ( str_jt( this->__buffer + _Str.__buffer ) ); }
-
-    inline bool operator==(const str_jt &_Str) const noexcept
-    { return ( this->__buffer == _Str.__buffer ); }
-
-    inline bool operator!=(const str_jt &_Str) const noexcept
-    { return ( !this->operator==( _Str ) ); }
-
-    friend std::ostream &operator<<(std::ostream &_Stream,
-                                    const str_jt &_Src) noexcept {
-        for (const u8_jt &_byte: _Src)
-        { _Stream << static_cast<char>( _byte ); }
-        return ( _Stream );
-    }
-};
-
-#endif // #ifndef __JULEC_STR_HPP
+#endif // #ifndef __JULE_STR_HPP

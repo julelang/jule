@@ -42,8 +42,8 @@ const COMPILER_PATH_CLANG = "clang++"
 var COMPILER = ""
 var COMPILER_PATH = ""
 
-// JULEC_HEADER is the header path of "julec.hpp"
-var JULEC_HEADER = ""
+// JULEC_HEADER is the header path of "jule.hpp"
+var JULE_HEADER = ""
 
 const CMD_HELP = "help"
 const CMD_VERSION = "version"
@@ -157,9 +157,9 @@ func init() {
 	path = filepath.Join(EXEC_PATH, "..") // Go to parent directory
 	STDLIB_PATH = filepath.Join(path, jule.STDLIB)
 
-	JULEC_HEADER = filepath.Join(EXEC_PATH, "..")
-	JULEC_HEADER = filepath.Join(JULEC_HEADER, "api")
-	JULEC_HEADER = filepath.Join(JULEC_HEADER, "julec.hpp")
+	JULE_HEADER = filepath.Join(EXEC_PATH, "..")
+	JULE_HEADER = filepath.Join(JULE_HEADER, "api")
+	JULE_HEADER = filepath.Join(JULE_HEADER, "jule.hpp")
 
 	// Configure compiler to default by platform
 	if runtime.GOOS == "windows" {
@@ -313,18 +313,18 @@ func append_standard(obj_code *string) {
 	sb.WriteString("// Date: ")
 	sb.WriteString(timeStr)
 	sb.WriteString("\n\n#include \"")
-	sb.WriteString(JULEC_HEADER)
+	sb.WriteString(JULE_HEADER)
 	sb.WriteString("\"\n\n")
 	sb.WriteString(*obj_code)
 	sb.WriteString(`
 int main(int argc, char *argv[]) {
-	std::set_terminate( &__julec_terminate_handler );
-	__julec_set_sig_handler( __julec_signal_handler );
-	__julec_setup_command_line_args( argc , argv );
-	__julec_call_initializers();
-	JULEC_ID( main )();
+	std::set_terminate(&jule::terminate_handler);
+	jule::set_sig_handler(jule::signal_handler);
+	jule::setup_command_line_args(argc, argv);
+	__jule_call_initializers();
+	entry_point();
 
-	return ( EXIT_SUCCESS );
+	return EXIT_SUCCESS;
 }`)
 	*obj_code = sb.String()
 }

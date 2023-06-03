@@ -4,24 +4,26 @@ import (
 	"strconv"
 
 	"github.com/julelang/jule"
-	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/sema"
 )
 
-// Extension of Jule data types.
-const TYPE_EXT = "_jt"
-
 // Identifier of initialize function caller function.
-const INIT_CALLER_IDENT = "__julec_call_initializers"
+const INIT_CALLER_IDENT = "__jule_call_initializers"
 
 // Returns specified identifer as JuleC identifer.
 // Equavalents: "JULEC_ID(" + ident + ")" of JuleC API.
 func as_ident(ident string) string { return "_" + ident }
 
 // Returns given identifier as Jule type identifier.
-func as_jt(id string) string { return id + TYPE_EXT }
+func as_jt(id string) string {
+	ident := []rune(id)
+	if 97 <= ident[0] && ident[0] <= 122 {
+		ident[0] -= 32
+	}
+	return "jule::" + string(ident)
+}
 
 // Returns cpp output identifier form of pointer address.
 func get_ptr_as_ident(ptr uintptr) string {
@@ -65,9 +67,9 @@ func fn_out_ident(f *sema.Fn) string {
 		return f.Ident
 
 	case f.Ident == jule.ENTRY_POINT:
-		return as_ident(f.Ident)
+		return "entry_point"
 
-	case f.Owner != nil:
+	case f.Is_method():
 		return "_method_" + f.Ident
 
 	default:
@@ -77,6 +79,10 @@ func fn_out_ident(f *sema.Fn) string {
 
 // Returns output identifier of function instance.
 func fn_ins_out_ident(f *sema.FnIns) string {
+	if f.Is_builtin() {
+		return "jule::" + f.Decl.Ident
+	}
+
 	if f.Decl.Cpp_linked || f.Caller != nil || len(f.Generics) == 0 || f.Decl.Parameters_uses_generics() {
 		return fn_out_ident(f.Decl)
 	}
@@ -93,6 +99,9 @@ func fn_ins_out_ident(f *sema.FnIns) string {
 
 // Returns output identifier of trait.
 func trait_out_ident(t *sema.Trait) string {
+	if t.Is_builtin() {
+		return "jule::" + t.Ident
+	}
 	return as_out_ident(t.Ident, t.Token.File.Addr())
 }
 
@@ -129,11 +138,6 @@ func struct_ins_out_ident(s *sema.StructIns) string {
 	}
 
 	return "__?__"
-}
-
-// Returns output identifier of generic type declaration.
-func generic_decl_out_ident(g *ast.Generic) string {
-	return as_ident(g.Ident)
 }
 
 // Returns output identifier of field.

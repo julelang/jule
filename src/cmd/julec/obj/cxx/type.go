@@ -87,7 +87,7 @@ func gen_trait_kind_from_ident(ident string) string {
 
 // Generates C++ code of Trait TypeKind.
 func gen_trait_kind(t *sema.Trait) string {
-	ident := as_out_ident(t.Ident, t.Token.File.Addr())
+	ident := trait_out_ident(t)
 	return gen_trait_kind_from_ident(ident)
 }
 

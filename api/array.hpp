@@ -2,102 +2,116 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-#ifndef __JULEC_ARRAY_HPP
-#define __JULEC_ARRAY_HPP
+#ifndef __JULE_ARRAY_HPP
+#define __JULE_ARRAY_HPP
 
-// Built-in array type.
-template<typename _Item_t, const uint_jt _N>
-struct array_jt;
+#include <initializer_list>
+#include <sstream>
+#include <ostream>
 
-template<typename _Item_t, const uint_jt _N>
-struct array_jt {
-public:
-    std::array<_Item_t, _N> _buffer{};
+#include "error.hpp"
+#include "panic.hpp"
+#include "types.hpp"
+#include "slice.hpp"
 
-    array_jt<_Item_t, _N>(const std::initializer_list<_Item_t> &_Src) noexcept {
-        const auto _Src_begin{ _Src.begin() };
-        for (int_jt _index{ 0 }; _index < _Src.size(); ++_index)
-        { this->_buffer[_index] = *( (_Item_t*)(_Src_begin+_index) ); }
-    }
+namespace jule {
 
-    typedef _Item_t       *iterator;
-    typedef const _Item_t *const_iterator;
+    // Built-in array type.
+    template<typename Item, const jule::Uint N>
+    struct Array;
 
-    inline constexpr
-    iterator begin(void) noexcept
-    { return ( &this->_buffer[0] ); }
+    template<typename Item, const jule::Uint N>
+    struct Array {
+    public:
+        std::array<Item, N> buffer{};
 
-    inline constexpr
-    const_iterator begin(void) const noexcept
-    { return ( &this->_buffer[0] ); }
-
-    inline constexpr
-    iterator end(void) noexcept
-    { return ( &this->_buffer[_N] ); }
-
-    inline constexpr
-    const_iterator end(void) const noexcept
-    { return ( &this->_buffer[_N] ); }
-
-    inline slice_jt<_Item_t> ___slice(const int_jt &_Start,
-                                    const int_jt &_End) const noexcept {
-        if (_Start < 0 || _End < 0 || _Start > _End || _End > this->_len()) {
-            std::stringstream _sstream;
-            __JULEC_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(
-                _sstream, _Start, _End );
-            JULEC_ID(panic)( _sstream.str().c_str() );
-        } else if (_Start == _End) {
-            return ( slice_jt<_Item_t>() );
+        Array<Item, N>(const std::initializer_list<Item> &src) noexcept {
+            const auto src_begin{ src.begin() };
+            for (jule::Int index{ 0 }; index < src.size(); ++index)
+                this->buffer[index] = *(Item*)(src_begin+index);
         }
-        const int_jt _n{ _End-_Start };
-        slice_jt<_Item_t> _slice( _n );
-        for (int_jt _counter{ 0 }; _counter < _n; ++_counter)
-        { _slice[_counter] = this->_buffer[_Start+_counter]; }
-        return ( _slice );
-    }
 
-    inline slice_jt<_Item_t> ___slice(const int_jt &_Start) const noexcept
-    { return this->___slice( _Start, this->_len() ); }
+        typedef Item       *Iterator;
+        typedef const Item *ConstIterator;
 
-    inline slice_jt<_Item_t> ___slice(void) const noexcept
-    { return this->___slice( 0, this->_len() ); }
+        inline constexpr
+        Iterator begin(void) noexcept
+        { return &this->_buffer[0]; }
 
-    inline constexpr
-    int_jt _len(void) const noexcept
-    { return ( _N ); }
+        inline constexpr
+        ConstIterator begin(void) const noexcept
+        { return &this->buffer[0]; }
 
-    inline constexpr
-    bool _empty(void) const noexcept
-    { return ( _N == 0 ); }
+        inline constexpr
+        Iterator end(void) noexcept
+        { return &this->buffer[N]; }
 
-    inline constexpr
-    bool operator==(const array_jt<_Item_t, _N> &_Src) const noexcept
-    { return ( this->_buffer == _Src._buffer ); }
+        inline constexpr
+        ConstIterator end(void) const noexcept
+        { return &this->_buffer[N]; }
 
-    inline constexpr
-    bool operator!=(const array_jt<_Item_t, _N> &_Src) const noexcept
-    { return ( !this->operator==( _Src ) ); }
+        inline jule::Slice<Item> slice(const jule::Int &start,
+                                       const jule::Int &end) const noexcept {
+            if (start < 0 || end < 0 || start > end || end > this->len()) {
+                std::stringstream sstream;
+                __JULEC_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(
+                    sstream, start, end );
+                jule::panic(sstream.str().c_str());
+            } else if (start == end)
+                return jule::Slice<Item>();
 
-    _Item_t &operator[](const int_jt &_Index) {
-        if (this->_empty() || _Index < 0 || this->_len() <= _Index) {
-            std::stringstream _sstream;
-            __JULEC_WRITE_ERROR_INDEX_OUT_OF_RANGE( _sstream , _Index );
-            JULEC_ID(panic)( _sstream.str().c_str() );
+            const jule::Int n{ end-start };
+            jule::Slice<Item> slice(n);
+            for (jule::Int counter{ 0 }; counter < n; ++counter)
+                slice[counter] = this->buffer[start+counter];
+
+            return slice;
         }
-        return ( this->_buffer[_Index] );
-    }
 
-    friend std::ostream &operator<<(std::ostream &_Stream,
-                                    const array_jt<_Item_t, _N> &_Src) noexcept {
-        _Stream << '[';
-        for (int_jt _index{0}; _index < _Src._len();) {
-            _Stream << _Src._buffer[_index++];
-            if (_index < _Src._len())
-            { _Stream << " "; }
+        inline jule::Slice<Item> slice(const jule::Int &start) const noexcept
+        { return this->slice(start, this->len()); }
+
+        inline jule::Slice<Item> slice(void) const noexcept
+        { return this->slice(0, this->len()); }
+
+        inline constexpr
+        jule::Int len(void) const noexcept
+        { return N; }
+
+        inline constexpr
+        jule::Bool empty(void) const noexcept
+        { return N == 0; }
+
+        inline constexpr
+        jule::Bool operator==(const jule::Array<Item, N> &src) const noexcept
+        { return this->buffer == src.buffer; }
+
+        inline constexpr
+        jule::Bool operator!=(const jule::Array<Item, N> &src) const noexcept
+        { return !this->operator==(src); }
+
+        Item &operator[](const jule::Int &index) {
+            if (this->empty() || index < 0 || this->len() <= index) {
+                std::stringstream sstream;
+                __JULEC_WRITE_ERROR_INDEX_OUT_OF_RANGE(sstream, index);
+                jule::panic(sstream.str().c_str());
+            }
+            return this->buffer[index];
         }
-        _Stream << ']';
-        return ( _Stream );
-    }
-};
 
-#endif // #ifndef __JULEC_ARRAY_HPP
+        friend std::ostream &operator<<(std::ostream &stream,
+                                        const jule::Array<Item, N> &src) noexcept {
+            stream << '[';
+            for (jule::Int index{0}; index < src.len();) {
+                stream << src.buffer[index++];
+                if (index < src.len())
+                    stream << " ";
+            }
+            stream << ']';
+            return stream;
+        }
+    };
+
+} // namespace jule
+
+#endif // #ifndef __JULE_ARRAY_HPP

@@ -2,21 +2,30 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-#ifndef __JULEC_DEFER_HPP
-#define __JULEC_DEFER_HPP
+#ifndef __JULE_DEFER_HPP
+#define __JULE_DEFER_HPP
 
 #include <functional>
 
-struct defer_base {
-public:
-    std::function<void(void)> __scope;
-    defer_base(const std::function<void(void)> &_Fn) noexcept
-    { this->__scope = _Fn; }
-    ~defer_base(void) noexcept
-    { this->__scope(); }
-};
+#define __JULE_CCONCAT(A, B) A ## B
+#define __JULE_CONCAT(A, B) __JULE_CCONCAT(A, B)
 
-#define __JULEC_DEFER(_BLOCK) \
-    defer_base __JULEC_CONCAT(__deferred_, __LINE__){ [&]_BLOCK }
+#define __JULE_DEFER(BLOCK) \
+    jule::DeferBase __JULE_CONCAT(__deferred_, __LINE__){ [&]BLOCK }
 
-#endif // #ifndef __JULEC_DEFER_HPP
+namespace jule {
+
+    struct DeferBase;
+
+    struct DeferBase {
+    public:
+        std::function<void(void)> scope;
+        DeferBase(const std::function<void(void)> &fn) noexcept
+        { this->scope = fn; }
+
+        ~DeferBase(void) noexcept
+        { this->scope(); }
+    };
+}
+
+#endif // ifndef __JULE_DEFER_HPP

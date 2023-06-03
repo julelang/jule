@@ -400,7 +400,7 @@ func gen_field_decl(f *sema.FieldIns) string {
 func gen_struct_self_field_init_st(s *sema.StructIns) string {
 	obj := "this->self = "
 	obj += gen_struct_self_field_type_kind(s)
-	obj += "::make(this, nil);"
+	obj += "::make(this, nullptr);"
 	return obj
 }
 
@@ -444,7 +444,7 @@ func gen_struct_constructor(s *sema.StructIns) string {
 func gen_struct_destructor(s *sema.StructIns) string {
 	obj := "~"
 	obj += struct_ins_out_ident(s)
-	obj += "(void) noexcept { /* heap allocations managed by traits or references */ this->self.__ref = nil; }"
+	obj += "(void) noexcept { /* heap allocations managed by traits or references */ this->self.ref = nullptr; }"
 	return obj
 }
 

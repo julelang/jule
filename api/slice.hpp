@@ -2,217 +2,247 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-#ifndef __JULEC_SLICE_HPP
-#define __JULEC_SLICE_HPP
+#ifndef __JULE_SLICE_HPP
+#define __JULE_SLICE_HPP
 
-// Built-in slice type.
-template<typename _Item_t>
-class slice_jt;
+#include <stddef.h>
+#include <sstream>
+#include <ostream>
+#include <initializer_list>
 
-template<typename _Item_t>
-class slice_jt {
-public:
-    ref_jt<_Item_t> __data{};
-    _Item_t *__slice{ nil };
-    uint_jt __len{ 0 };
-    uint_jt __cap{ 0 };
+#include "error.hpp"
+#include "ref.hpp"
+#include "types.hpp"
 
-    slice_jt<_Item_t>(void) noexcept {}
-    slice_jt<_Item_t>(const std::nullptr_t) noexcept {}
+namespace jule {
 
-    slice_jt<_Item_t>(const uint_jt &_N) noexcept {
-        const uint_jt _n{ _N < 0 ? 0 : _N };
-        if ( _n == 0 )
-        { return; }
-        this->__alloc_new( _n );
-    }
-
-    slice_jt<_Item_t>(const slice_jt<_Item_t>& _Src) noexcept
-    { this->operator=( _Src ); }
-
-    slice_jt<_Item_t>(const std::initializer_list<_Item_t> &_Src) noexcept {
-        if ( _Src.size() == 0 )
-        { return; }
-
-        this->__alloc_new( _Src.size() );
-        const auto _Src_begin{ _Src.begin() };
-        for (int_jt _i{ 0 }; _i < this->__len; ++_i)
-        { this->__data.__alloc[_i] = *(_Item_t*)(_Src_begin+_i); }
-    }
-
-    ~slice_jt<_Item_t>(void) noexcept
-    { this->__dealloc(); }
-
-    inline void __check(void) const noexcept {
-        if(this->operator==( nil ))
-        { JULEC_ID(panic)( __JULEC_ERROR_INVALID_MEMORY ); }
-    }
-
-    void __dealloc(void) noexcept {
-        this->__len = 0;
-        this->__cap = 0;
-        if (!this->__data.__ref) {
-            this->__data.__alloc = nil;
-            return;
+    // Built-in slice type.
+    template<typename Item>
+    class Slice;
+    
+    template<typename Item>
+    class Slice {
+    public:
+        jule::Ref<Item> data{};
+        Item *_slice{ nullptr };
+        jule::Uint _len{ 0 };
+        jule::Uint _cap{ 0 };
+    
+        Slice<Item>(void) noexcept {}
+        Slice<Item>(const std::nullptr_t) noexcept {}
+    
+        Slice<Item>(const jule::Uint &n) noexcept {
+            const jule::Uint _n{ n < 0 ? 0 : n };
+            if ( _n == 0 )
+                return;
+            this->alloc_new(_n);
         }
-        // Use __JULEC_REFERENCE_DELTA, DON'T USE __drop_ref METHOD BECAUSE
-        // jule_ref does automatically this.
-        // If not in this case:
-        //   if this is method called from destructor, reference count setted to
-        //   negative integer but reference count is unsigned, for this reason
-        //   allocation is not deallocated.
-        if ( ( this->__data.__get_ref_n() ) != __JULEC_REFERENCE_DELTA ) {
-            this->__data.__alloc = nil;
-            return;
+
+        Slice<Item>(const jule::Slice<Item>& src) noexcept
+        { this->operator=(src); }
+
+        Slice<Item>(const std::initializer_list<Item> &src) noexcept {
+            if (src.size() == 0)
+                return;
+
+            this->alloc_new(src.size());
+            const auto src_begin{ src.begin() };
+            for (jule::Int i{ 0 }; i < this->_len; ++i)
+                this->data.alloc[i] = *reinterpret_cast<const Item*>(src_begin+i);
         }
-        delete this->__data.__ref;
-        this->__data.__ref = nil;
-        delete[] this->__data.__alloc;
-        this->__data.__alloc = nil;
-        this->__data.__ref = nil;
-        this->__slice = nil;
-    }
 
-    void __alloc_new(const int_jt _N) noexcept {
-        this->__dealloc();
-        _Item_t *_alloc{ new( std::nothrow ) _Item_t[_N]{ _Item_t() } };
-        if (!_alloc)
-        { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
-        this->__data = ref_jt<_Item_t>::make( _alloc );
-        this->__len = _N;
-        this->__cap = _N;
-        this->__slice = &_alloc[0];
-    }
+        ~Slice<Item>(void) noexcept
+        { this->dealloc(); }
 
-    typedef _Item_t       *iterator;
-    typedef const _Item_t *const_iterator;
-
-    inline constexpr
-    iterator begin(void) noexcept
-    { return &this->__slice[0]; }
-
-    inline constexpr
-    const_iterator begin(void) const noexcept
-    { return &this->__slice[0]; }
-
-    inline constexpr
-    iterator end(void) noexcept
-    { return &this->__slice[this->__len]; }
-
-    inline constexpr
-    const_iterator end(void) const noexcept
-    { return &this->__slice[this->__len]; }
-
-    inline slice_jt<_Item_t> ___slice(const int_jt &_Start,
-                                      const int_jt &_End) const noexcept {
-        this->__check();
-        if (_Start < 0 || _End < 0 || _Start > _End || _End > this->_cap()) {
-            std::stringstream _sstream;
-            __JULEC_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(_sstream, _Start, _End);
-            JULEC_ID(panic)(_sstream.str().c_str());
-        } else if (_Start == _End) { return slice_jt<_Item_t>(); }
-        slice_jt<_Item_t> _slice;
-        _slice.__data = this->__data;
-        _slice.__slice = &this->__slice[_Start];
-        _slice.__len = _End-_Start;
-        _slice.__cap = this->__cap-_Start;
-        return _slice;
-    }
-
-    inline slice_jt<_Item_t> ___slice(const int_jt &_Start) const noexcept
-    { return this->___slice( _Start , this->_len() ); }
-
-    inline slice_jt<_Item_t> ___slice(void) const noexcept
-    { return this->___slice( 0 , this->_len() ); }
-
-    inline constexpr
-    int_jt _len(void) const noexcept
-    { return ( this->__len ); }
-
-    inline constexpr
-    int_jt _cap(void) const noexcept
-    { return ( this->__cap ); }
-
-    inline bool _empty(void) const noexcept
-    { return ( !this->__slice || this->__len == 0 || this->__cap == 0 ); }
-
-    void __push(const _Item_t &_Item) noexcept {
-        if (this->__len == this->__cap) {
-            _Item_t *_new{ new(std::nothrow) _Item_t[this->__len+1] };
-            if (!_new)
-            { JULEC_ID(panic)( __JULEC_ERROR_MEMORY_ALLOCATION_FAILED ); }
-            for (int_jt _index{ 0 }; _index < this->__len; ++_index)
-            { _new[_index] = this->__data.__alloc[_index]; }
-            _new[this->__len] = _Item;
-            delete[] this->__data.__alloc;
-            this->__data.__alloc = nil;
-            this->__data.__alloc = _new;
-            this->__slice = this->__data.__alloc;
-            ++this->__cap;
-        } else {
-            this->__slice[this->__len] = _Item;
+        inline void check(void) const noexcept {
+            if(this->operator==(nullptr))
+                jule::panic(jule::ERROR_INVALID_MEMORY);
         }
-        ++this->__len;
-    }
 
-    bool operator==(const slice_jt<_Item_t> &_Src) const noexcept {
-        if (this->__len != _Src.__len)
-        { return false; }
-        for (int_jt _index{ 0 }; _index < this->__len; ++_index) {
-            if (this->__slice[_index] != _Src.__slice[_index])
-            { return ( false ); }
+        void dealloc(void) noexcept {
+            this->_len = 0;
+            this->_cap = 0;
+
+            if (!this->data.ref) {
+                this->data.alloc = nullptr;
+                return;
+            }
+
+            // Use jule::REFERENCE_DELTA, DON'T USE drop_ref METHOD BECAUSE
+            // jule_ref does automatically this.
+            // If not in this case:
+            //   if this is method called from destructor, reference count setted to
+            //   negative integer but reference count is unsigned, for this reason
+            //   allocation is not deallocated.
+            if (this->data.get_ref_n() != jule::REFERENCE_DELTA) {
+                this->data.alloc = nullptr;
+                return;
+            }
+
+            delete this->data.ref;
+            this->data.ref = nullptr;
+
+            delete[] this->data.alloc;
+            this->data.alloc = nullptr;
+            this->data.ref = nullptr;
+            this->_slice = nullptr;
         }
-        return ( true );
-    }
 
-    inline constexpr
-    bool operator!=(const slice_jt<_Item_t> &_Src) const noexcept
-    { return !this->operator==( _Src ); }
+        void alloc_new(const jule::Int n) noexcept {
+            this->dealloc();
 
-    inline constexpr
-    bool operator==(const std::nullptr_t) const noexcept
-    { return !this->__slice; }
+            Item *alloc{ new(std::nothrow) Item[n]{ Item() } };
+            if (!alloc)
+                jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
 
-    inline constexpr
-    bool operator!=(const std::nullptr_t) const noexcept
-    { return !this->operator==( nil ); }
-
-    _Item_t &operator[](const int_jt &_Index) const {
-        this->__check();
-        if (this->_empty() || _Index < 0 || this->_len() <= _Index) {
-            std::stringstream _sstream;
-            __JULEC_WRITE_ERROR_INDEX_OUT_OF_RANGE( _sstream , _Index );
-            JULEC_ID(panic)( _sstream.str().c_str() );
+            this->data = jule::Ref<Item>::make(alloc);
+            this->_len = n;
+            this->_cap = n;
+            this->_slice = &alloc[0];
         }
-        return this->__slice[_Index];
-    }
+    
+        typedef Item       *Iterator;
+        typedef const Item *ConstIterator;
+    
+        inline constexpr
+        Iterator begin(void) noexcept
+        { return &this->_slice[0]; }
+    
+        inline constexpr
+        ConstIterator begin(void) const noexcept
+        { return &this->_slice[0]; }
+    
+        inline constexpr
+        Iterator end(void) noexcept
+        { return &this->_slice[this->_len]; }
+    
+        inline constexpr
+        ConstIterator end(void) const noexcept
+        { return &this->_slice[this->_len]; }
+    
+        inline Slice<Item> slice(const jule::Int &start,
+                                 const jule::Int &end) const noexcept {
+            this->check();
 
-    void operator=(const slice_jt<_Item_t> &_Src) noexcept {
-        this->__dealloc();
-        if ( _Src.operator==( nil ) )
-        { return; }
-        this->__len = _Src.__len;
-        this->__cap = _Src.__cap;
-        this->__data = _Src.__data;
-        this->__slice = _Src.__slice;
-    }
+            if (start < 0 || end < 0 || start > end || end > this->cap()) {
+                std::stringstream sstream;
+                __JULEC_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(sstream, start, end);
+                jule::panic(sstream.str().c_str());
+            } else if (start == end)
+                return jule::Slice<Item>();
 
-    void operator=(const std::nullptr_t) noexcept
-    { this->__dealloc(); }
-
-    friend std::ostream &operator<<(std::ostream &_Stream,
-                                    const slice_jt<_Item_t> &_Src) noexcept {
-        if (_Src._empty())
-        { return ( _Stream << "[]" ); }
-        _Stream << '[';
-        for (int_jt _index{ 0 }; _index < _Src.__len;) {
-            _Stream << _Src.__slice[_index++];
-            if (_index < _Src.__len)
-            { _Stream << ' '; }
+            jule::Slice<Item> slice;
+            slice.data = this->data;
+            slice._slice = &this->_slice[start];
+            slice._len = end-start;
+            slice._cap = this->_cap-start;
+            return slice;
         }
-        _Stream << ']';
-        return ( _Stream );
-    }
-};
+    
+        inline jule::Slice<Item> slice(const jule::Int &start) const noexcept
+        { return this->slice(start, this->len()); }
+    
+        inline jule::Slice<Item> slice(void) const noexcept
+        { return this->slice(0, this->len() ); }
+    
+        inline constexpr
+        jule::Int len(void) const noexcept
+        { return this->_len; }
+    
+        inline constexpr
+        jule::Int cap(void) const noexcept
+        { return this->_cap; }
+    
+        inline jule::Bool empty(void) const noexcept
+        { return !this->_slice || this->_len == 0 || this->_cap == 0; }
+    
+        void push(const Item &item) noexcept {
+            if (this->_len == this->_cap) {
+                Item *_new{ new(std::nothrow) Item[this->_len+1] };
+                if (!_new)
+                    jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
+                
+                for (jule::Int index{ 0 }; index < this->_len; ++index)
+                    _new[index] = this->data.alloc[index];
+                _new[this->_len] = item;
 
-#endif // #ifndef __JULEC_SLICE_HPP
+                delete[] this->data.alloc;
+                this->data.alloc = nullptr;
+
+                this->data.alloc = _new;
+                this->_slice = this->data.alloc;
+
+                ++this->_cap;
+            } else
+                this->_slice[this->_len] = item;
+
+            ++this->_len;
+        }
+    
+        jule::Bool operator==(const jule::Slice<Item> &src) const noexcept {
+            if (this->_len != src._len)
+                return false;
+
+            for (jule::Int index{ 0 }; index < this->_len; ++index) {
+                if (this->_slice[index] != src._slice[index])
+                    return false;
+            }
+
+            return true;
+        }
+    
+        inline constexpr
+        jule::Bool operator!=(const jule::Slice<Item> &src) const noexcept
+        { return !this->operator==(src); }
+    
+        inline constexpr
+        jule::Bool operator==(const std::nullptr_t) const noexcept
+        { return !this->_slice; }
+    
+        inline constexpr
+        jule::Bool operator!=(const std::nullptr_t) const noexcept
+        { return !this->operator==(nullptr); }
+    
+        Item &operator[](const jule::Int &index) const {
+            this->check();
+            if (this->empty() || index < 0 || this->len() <= index) {
+                std::stringstream sstream;
+                __JULEC_WRITE_ERROR_INDEX_OUT_OF_RANGE(sstream, index);
+                jule::panic(sstream.str().c_str());
+            }
+            return this->_slice[index];
+        }
+
+        void operator=(const jule::Slice<Item> &src) noexcept {
+            this->dealloc();
+            if (src.operator==(nullptr))
+                return;
+            this->_len = src._len;
+            this->_cap = src._cap;
+            this->data = src.data;
+            this->_slice = src._slice;
+        }
+
+        void operator=(const std::nullptr_t) noexcept
+        { this->dealloc(); }
+
+        friend std::ostream &operator<<(std::ostream &stream,
+                                        const jule::Slice<Item> &src) noexcept {
+            if (src.empty())
+                return stream << "[]";
+
+            stream << '[';
+            for (jule::Int index{ 0 }; index < src._len;) {
+                stream << src._slice[index++];
+                if (index < src._len)
+                    stream << ' ';
+            }
+            stream << ']';
+
+            return stream;
+        }
+    };
+
+} // namespace jule
+
+#endif // #ifndef __JULE_SLICE_HPP

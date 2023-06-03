@@ -1,0 +1,15 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+#ifndef __JULE_STD_OS_PROC_HPP
+#define __JULE_STD_OS_PROC_HPP
+
+#include "../../api/jule.hpp"
+
+jule::Slice<jule::Str> __jule_get_command_line_args(void) noexcept;
+
+jule::Slice<jule::Str> __jule_get_command_line_args(void) noexcept
+{ return jule::command_line_args; }
+
+#endif // ifndef __JULE_STD_OS_PROC_HPP

@@ -479,8 +479,7 @@ func gen_ret_st(r *sema.RetSt) string {
 func gen_recover(r *sema.Recover) string {
 	obj := "try "
 	obj += gen_scope(r.Scope)
-	obj += " catch("
-	obj += gen_trait_kind_from_ident(as_ident("Error"))
+	obj += " catch(jule::Exception e) "
 	if r.Handler.Is_anon() {
 		// Anonymous function.
 		// Parse body as catch block.
@@ -491,18 +490,28 @@ func gen_recover(r *sema.Recover) string {
 
 		handler_param := r.Handler.Decl.Params[0]
 		if !lex.Is_ignore_ident(handler_param.Ident) && !lex.Is_anon_ident(handler_param.Ident) {
-			obj += " "
+			add_indent()
+			obj += "{\n"
+			obj += indent()
+			obj += "auto "
 			obj += param_out_ident(handler_param)
+			obj += "{ jule::exception_to_error(e) };\n"
+			obj += indent()
+			obj += gen_scope(r.Handler.Scope)
+			done_indent()
+			obj += "\n"
+			obj += indent()
+			obj += "}"
+		} else {
+			obj += gen_scope(r.Handler.Scope)
 		}
-		obj += ") "
-		obj += gen_scope(r.Handler.Scope)
 	} else {
 		// Passed defined function.
 		// Therefore, call passed function with error.
 
-		obj += " _Error ) {"
+		obj += "{ "
 		obj += gen_expr(r.Handler_expr)
-		obj += "( _Error ); }"
+		obj += "(jule::exception_to_error(e)); }"
 	}
 
 	return obj
@@ -589,7 +598,7 @@ func gen_scope(s *sema.Scope) string {
 	obj += "}"
 	
 	if s.Deferred {
-		obj = "__JULEC_DEFER(" + obj + ");"
+		obj = "__JULE_DEFER(" + obj + ");"
 	}
 
 	return obj
