@@ -31,7 +31,34 @@ Jule designed for maintainable and reliable software development.
 Guarantees memory safety and committed not contain undefined behavior, has a reference compiler with obsessions that encourage developers to build safe software.
 It offers fully integrated Jule-C++ development with API and interoperability.
 
-<img src="./docs/images/quicksort.png"/>
+File: `quicksort.jule`
+```rs
+fn quicksort(mut s: []int) {
+    if s.len <= 1 {
+        ret
+    }
+
+    let (mut i, last) = -1, s[s.len-1]
+    for j in s {
+        let mut x = &s[j]
+        if (unsafe{ *x <= last }) {
+            i++
+            let mut y = &s[i]
+            unsafe { *x, *y = *y, *x }
+        }
+    }
+
+    quicksort(s[:i])
+    quicksort(s[i+1:])
+}
+
+fn main() {
+    let mut my_slice = [1, 9, -2, 25, -24, 4623, 0, -1, 0xFD2]
+    outln(my_slice)
+    quicksort(my_slice)
+    outln(my_slice)
+}
+```
 
 <h2 id="key-features">Design Principles</h2>
 
@@ -80,7 +107,38 @@ It's pretty easy to write C++ code that is compatible with the Jule code compile
 JuleC keeps all the C++ code it uses for Jule in its <a href="https://github.com/julelang/jule/tree/master/api">api</a> directory.
 This API makes it possible and easy to write C++ code that can be fully integrated into Jule.
 <ol></ol> <!-- for space -->
-<img src="./docs/images/cpp_interop.png"/>
+
+File: ``sum.hpp``
+```cpp
+using namespace jule;
+
+Int sum(const Slice<Int> slice) {
+    Int total{ 0 };
+    for (const Int x: slice)
+        total += x;
+    return total;
+}
+```
+
+File: ``main.jule``
+```rs
+use cpp "sum.hpp"
+
+cpp fn sum([]int): int
+
+fn main() {
+    let numbers = [1, 2, 3, 4, 5, 6, 7, 8]
+    let total = cpp.sum(numbers)
+    outln(total)
+}
+```
+
+The above example demonstrates the interoperability of Jule with a C++ function that returns total of all values of an integer slice.
+The C++ header file is written entirely using the Jule API.
+The `Int`, and `Slice` types used are part of the API.
+The `Int` data type is equally sensitive to system architecture as in Jule.
+The Jule source code declares to use `sum.hpp` first and binds the C++ function in it to Jule accordingly.
+Then a call is made from Jule and the result of the function is written to the command line.
 
 <h2 id="future-changes">Future Changes</h2>
 JuleC is in early development and currently it can only be built from source.

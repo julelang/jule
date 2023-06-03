@@ -159,7 +159,7 @@ namespace jule {
         }
 
         template<typename T>
-        inline jule::bool operator==(const T &_Expr) const noexcept
+        inline jule::Bool operator==(const T &_Expr) const noexcept
         { return ( this->type_is<T>() && this->operator T() == _Expr ); }
 
         template<typename T>
