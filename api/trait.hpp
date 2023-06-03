@@ -35,7 +35,7 @@ namespace jule {
                 jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
 
             *alloc = data;
-            this->data = jule::Ref<T>::make(reinterpret_cast<T*>(alloc));
+            this->data = jule::Ref<Mask>::make(reinterpret_cast<Mask*>(alloc));
             this->type_id = typeid(T).name();
         }
     
