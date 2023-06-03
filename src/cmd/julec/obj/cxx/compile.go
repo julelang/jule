@@ -254,6 +254,7 @@ func Compile(path string) {
 	}
 
 	obj := Gen(pkg, importer.all_packages)
+	append_standard(&obj)
 	do_spell(obj)
 }
 
