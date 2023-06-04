@@ -845,7 +845,7 @@ func (s *_Sema) check_enum_decl(e *Enum) {
 		e.Kind = &TypeSymbol{
 			Decl: nil,
 			Kind: &TypeKind{
-				kind: build_prim_type(types.TypeKind_I32),
+				kind: build_prim_type(types.TypeKind_INT),
 			},
 		}
 	}

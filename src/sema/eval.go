@@ -1270,7 +1270,12 @@ func (e *_Eval) cast_ref(t *TypeKind, d *Data, error_token lex.Token) {
 }
 
 func (e *_Eval) cast_slc(t *TypeKind, d *Data, error_token lex.Token) {
-	if d.Kind.Prim() == nil || !d.Kind.Prim().Is_str() {
+	if d.Kind.Enm() != nil {
+		if d.Kind.Enm().Kind.Kind.Prim() == nil || !d.Kind.Enm().Kind.Kind.Prim().Is_str() {
+			e.push_err(error_token, "type_not_supports_casting_to", d.Kind.To_str(), t.To_str())
+			return
+		}
+	} else if d.Kind.Prim() == nil || !d.Kind.Prim().Is_str() {
 		e.push_err(error_token, "type_not_supports_casting_to", d.Kind.To_str(), t.To_str())
 		return
 	}
@@ -1427,8 +1432,13 @@ func (e *_Eval) eval_cast_by_type_n_data(t *TypeKind, d *Data, error_token lex.T
 	if t.Prim() != nil && d.Is_const() {
 		d.Model = d.Constant
 	}
-	d.Cast_kind = t
-	//d.Kind = t // Do not this, will be set automatically end of the eval.
+
+	if d.Kind.Enm() == nil ||  d.Kind.Enm().Kind.Kind.To_str() != t.To_str() {
+		d.Cast_kind = t
+		//d.Kind = t // Do not this, will be set automatically end of the eval.
+	} else {
+		d.Kind = t
+	}
 
 	return d
 }
