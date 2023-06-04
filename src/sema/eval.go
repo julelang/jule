@@ -39,6 +39,11 @@ func normalize_bitsize(d *Data) {
 		return
 	}
 
+	// Save enum.
+	if d.Kind.Enm() != nil {
+		return
+	}
+
 	d.Kind.kind = build_prim_type(kind)
 }
 
@@ -2932,8 +2937,9 @@ func (bs *_BinopSolver) eval_nil() *Data {
 }
 
 func (bs *_BinopSolver) eval_enum() *Data {
-	if bs.r.Kind.Enm() == nil || bs.l.Kind.Enm() != bs.r.Kind.Enm() {
-		bs.e.push_err(bs.op, "incompatible_types", bs.l.Kind.To_str(), bs.r.Kind.To_str())
+	enm := bs.l.Kind.Enm()
+	if bs.r.Kind.Enm() == nil || enm != bs.r.Kind.Enm() {
+		bs.e.push_err(bs.op, "incompatible_types", enm.Ident, bs.r.Kind.To_str())
 		return nil
 	}
 
@@ -2945,8 +2951,14 @@ func (bs *_BinopSolver) eval_enum() *Data {
 			},
 		}
 
+	case lex.KND_AMPER, lex.KND_VLINE:
+		if enm.Kind.Kind.Prim() == nil || !types.Is_int(enm.Kind.Kind.Prim().To_str()) {
+			bs.e.push_err(bs.op, "operator_not_for_juletype", bs.op.Kind, enm.Ident)
+		}
+		return bs.l
+
 	default:
-		bs.e.push_err(bs.op, "operator_not_for_juletype", bs.op.Kind, bs.l.Kind.To_str())
+		bs.e.push_err(bs.op, "operator_not_for_juletype", bs.op.Kind, enm.Ident)
 		return nil
 	}
 }
