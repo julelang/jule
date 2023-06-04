@@ -2927,6 +2927,26 @@ func (bs *_BinopSolver) eval_nil() *Data {
 	}
 }
 
+func (bs *_BinopSolver) eval_enum() *Data {
+	if bs.r.Kind.Enm() == nil || bs.l.Kind.Enm() != bs.r.Kind.Enm() {
+		bs.e.push_err(bs.op, "incompatible_types", bs.l.Kind.To_str(), bs.r.Kind.To_str())
+		return nil
+	}
+
+	switch bs.op.Kind {
+	case lex.KND_EQS, lex.KND_NOT_EQ:
+		return &Data{
+			Kind: &TypeKind{
+				kind: build_prim_type(types.TypeKind_BOOL),
+			},
+		}
+
+	default:
+		bs.e.push_err(bs.op, "operator_not_for_juletype", bs.op.Kind, bs.l.Kind.To_str())
+		return nil
+	}
+}
+
 func (bs *_BinopSolver) eval_ptr() *Data {
 	if !bs.check_type_compatibility() {
 		bs.e.push_err(bs.op, "incompatible_types", bs.l.Kind.To_str(), bs.r.Kind.To_str())
@@ -3344,13 +3364,6 @@ func (bs *_BinopSolver) eval_prim() *Data {
 }
 
 func (bs *_BinopSolver) eval() *Data {
-	if bs.l.Kind.Enm() != nil {
-		bs.l.Kind = bs.l.Kind.Enm().Kind.Kind
-	}
-	if bs.r.Kind.Enm() != nil {
-		bs.r.Kind = bs.r.Kind.Enm().Kind.Kind
-	}
-
 	switch {
 	case bs.l.Kind.Is_void():
 		bs.e.push_err(bs.op, "operator_not_for_juletype", bs.op.Kind, "void")
@@ -3358,6 +3371,9 @@ func (bs *_BinopSolver) eval() *Data {
 
 	case bs.l.Kind.Is_nil():
 		return bs.eval_nil()
+
+	case bs.l.Kind.Enm() != nil:
+		return bs.eval_enum()
 
 	case bs.l.Kind.Ptr() != nil:
 		return bs.eval_ptr()
