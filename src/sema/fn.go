@@ -217,7 +217,17 @@ type FnIns struct {
 }
 
 // Reports whether instance is built-in.
-func (f *FnIns) Is_builtin() bool { return (f.Decl == nil || f.Decl.Scope == nil) || f.Scope == nil }
+func (f *FnIns) Is_builtin() bool {
+	if f.Decl == nil {
+		return true
+	} else {
+		if !f.Decl.Cpp_linked && f.Decl.Scope == nil {
+			return true
+		}
+		return false
+	}
+	return f.Scope == nil
+}
 // Reports whether instance is anonymous function.
 func (f *FnIns) Is_anon() bool { return f.Decl != nil && f.Decl.Is_anon() }
 

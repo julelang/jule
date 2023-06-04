@@ -1720,6 +1720,10 @@ func (s *_Sema) check_fn_ins_sc(f *FnIns, sc *_ScopeChecker) {
 }
 
 func (s *_Sema) check_fn_ins(f *FnIns) {
+	if f.Decl.Cpp_linked {
+		return
+	}
+
 	sc := new_scope_checker(f.Decl.sema, f)
 	s.check_fn_ins_sc(f, sc)
 

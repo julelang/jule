@@ -1612,7 +1612,7 @@ func (e *_Eval) check_fn_call_generics(f *FnIns,
 
 func (e *_Eval) call_builtin_fn(fc *ast.FnCallExpr, d *Data) *Data {
 	f := d.Kind.Fnc()
-	
+
 	d = f.Caller(e, fc, d)
 	if d == nil {
 		return d
