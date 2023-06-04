@@ -1465,7 +1465,7 @@ func (e *_Eval) eval_cast(c *ast.CastExpr) *Data {
 	return d
 }
 
-func (e *_Eval) eval_def_ns_selection(s *ast.NsSelectionExpr) *Data {
+func (e *_Eval) eval_ns_selection(s *ast.NsSelectionExpr) *Data {
 	path := build_link_path_by_tokens(s.Ns)
 	imp := e.lookup.Select_package(func(p *ImportInfo) bool {
 		return p.Link_path == path
@@ -1486,14 +1486,6 @@ func (e *_Eval) eval_def_ns_selection(s *ast.NsSelectionExpr) *Data {
 	e.lookup = lookup
 
 	return d
-}
-
-func (e *_Eval) eval_ns_selection(s *ast.NsSelectionExpr) *Data {
-	if s.Ns[0].Id == lex.ID_PRIM {
-		return e.eval_prim_ns_selection(s.Ns[0], s.Ident)
-	}
-
-	return e.eval_def_ns_selection(s)
 }
 
 func (e *_Eval) eval_struct_lit_explicit(s *StructIns, exprs []ast.ExprData, error_token lex.Token) *Data {
@@ -1727,7 +1719,7 @@ func (e *_Eval) eval_fn_call(fc *ast.FnCallExpr) *Data {
 	return e.call_fn(fc, d)
 }
 
-func (e *_Eval) eval_enum_sub_ident(enm *Enum, ident lex.Token) *Data {
+func (e *_Eval) eval_enum_static(enm *Enum, ident lex.Token) *Data {
 	d := &Data{
 		Lvalue:   false,
 		Decl:     false,
@@ -2490,8 +2482,8 @@ func (e *_Eval) eval_f64_type_static(ident lex.Token) *Data {
 	}
 }
 
-func (e *_Eval) eval_prim_ns_selection(kind lex.Token, ident lex.Token) *Data {
-	switch kind.Kind {
+func (e *_Eval) eval_prim_static(kind string, ident lex.Token) *Data {
+	switch kind {
 	case types.TypeKind_INT:
 		return e.eval_int_type_static(ident)
 
@@ -2529,15 +2521,18 @@ func (e *_Eval) eval_prim_ns_selection(kind lex.Token, ident lex.Token) *Data {
 		return e.eval_f64_type_static(ident)
 
 	default:
-		e.push_err(ident, "type_have_not_ident", kind.Kind, ident.Kind)
+		e.push_err(ident, "type_have_not_ident", kind, ident.Kind)
 		return nil
 	}
 }
 
-func (e *_Eval) eval_type_sub_ident(d *Data, si *ast.SubIdentExpr) *Data {
+func (e *_Eval) eval_type_static(d *Data, si *ast.SubIdentExpr) *Data {
 	switch {
+	case d.Kind.Prim() != nil:
+		return e.eval_prim_static(d.Kind.Prim().To_str(), si.Ident)
+
 	case d.Kind.Enm() != nil:
-		return e.eval_enum_sub_ident(d.Kind.Enm(), si.Ident)
+		return e.eval_enum_static(d.Kind.Enm(), si.Ident)
 
 	default:
 		e.push_err(si.Ident, "type_not_support_sub_fields", d.Kind.To_str())
@@ -2598,7 +2593,7 @@ func (e *_Eval) eval_sub_ident(si *ast.SubIdentExpr) *Data {
 	}
 
 	if d.Decl {
-		return e.eval_type_sub_ident(d, si)
+		return e.eval_type_static(d, si)
 	}
 
 	return e.eval_obj_sub_ident(d, si)

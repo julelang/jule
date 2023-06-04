@@ -325,23 +325,6 @@ func (ep *_ExprBuilder) build_obj_sub_ident(tokens []lex.Token) *ast.SubIdentExp
 	}
 }
 
-func (ep *_ExprBuilder) build_type_static(tokens []lex.Token) *ast.NsSelectionExpr {
-	if len(tokens) < 3 {
-		ep.push_err(tokens[1], "invalid_syntax")
-		return nil
-	}
-	
-	if tokens[2].Id != lex.ID_IDENT {
-		ep.push_err(tokens[2], "invalid_syntax")
-		return nil
-	}
-
-	ns := &ast.NsSelectionExpr{}
-	ns.Ident = tokens[2]
-	ns.Ns = tokens[:1]
-	return ns
-}
-
 func (ep *_ExprBuilder) build_ns_sub_ident(tokens []lex.Token) *ast.NsSelectionExpr {
 	ns := &ast.NsSelectionExpr{}
 	for i, token := range tokens {
@@ -892,11 +875,6 @@ func (ep *_ExprBuilder) build_data(tokens []lex.Token) ast.ExprData {
 	switch token.Id {
 	case lex.ID_OP:
 		return ep.build_unary(tokens)
-
-	case lex.ID_PRIM:
-		if len(tokens) > 1 && tokens[1].Id == lex.ID_DBLCOLON {
-			return ep.build_type_static(tokens)
-		}
 	}
 
 	token = tokens[len(tokens)-1]
