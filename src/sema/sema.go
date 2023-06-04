@@ -167,6 +167,14 @@ func (s *_Sema) is_duplicated_ident(self uintptr, ident string, cpp_linked bool)
 		if f.is_duplicated_ident(self, ident, cpp_linked) {
 			return true
 		}
+
+		for _, imp := range f.Imports {
+			for _, selected := range imp.Selected {
+				if selected.Kind == ident {
+					return true
+				}
+			}
+		}
 	}
 	return false
 }
@@ -375,6 +383,21 @@ func (s *_Sema) Find_enum(ident string) *Enum {
 	return nil
 }
 
+func (s *_Sema) is_duplicated_import_selection(self uintptr, ident string) bool {
+	for _, imp := range s.file.Imports {
+		if _uintptr(imp) == self {
+			// Don't scan trailing imports.
+			break
+		}
+
+		if imp.exist_ident(ident) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (s *_Sema) check_import_selections(imp *ImportInfo) {
 	// Set file to any package file for accessibility checking.
 	s.set_current_file(s.files[0])
@@ -396,6 +419,11 @@ func (s *_Sema) check_import_selections(imp *ImportInfo) {
 
 	for _, ident := range imp.Selected {
 		if ident.Kind == lex.KND_SELF {
+			continue
+		}
+
+		if s.is_duplicated_import_selection(_uintptr(imp), ident.Kind) {
+			s.push_err(ident, "duplicated_ident", ident.Kind)
 			continue
 		}
 

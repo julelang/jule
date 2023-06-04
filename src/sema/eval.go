@@ -1460,11 +1460,7 @@ func (e *_Eval) eval_cast(c *ast.CastExpr) *Data {
 	return d
 }
 
-func (e *_Eval) eval_ns_selection(s *ast.NsSelectionExpr) *Data {
-	if s.Ns[0].Id == lex.ID_PRIM {
-		return e.eval_prim_type_sub_ident(s.Ns[0], s.Ident)
-	}
-
+func (e *_Eval) eval_def_ns_selection(s *ast.NsSelectionExpr) *Data {
 	path := build_link_path_by_tokens(s.Ns)
 	imp := e.lookup.Select_package(func(p *ImportInfo) bool {
 		return p.Link_path == path
@@ -1485,6 +1481,14 @@ func (e *_Eval) eval_ns_selection(s *ast.NsSelectionExpr) *Data {
 	e.lookup = lookup
 
 	return d
+}
+
+func (e *_Eval) eval_ns_selection(s *ast.NsSelectionExpr) *Data {
+	if s.Ns[0].Id == lex.ID_PRIM {
+		return e.eval_prim_ns_selection(s.Ns[0], s.Ident)
+	}
+
+	return e.eval_def_ns_selection(s)
 }
 
 func (e *_Eval) eval_struct_lit_explicit(s *StructIns, exprs []ast.ExprData, error_token lex.Token) *Data {
@@ -2193,7 +2197,7 @@ func (e *_Eval) eval_str_sub_ident(d *Data, ident lex.Token) *Data {
 	}
 }
 
-func (e *_Eval) eval_int_type_sub_ident(ident lex.Token) *Data {
+func (e *_Eval) eval_int_type_static(ident lex.Token) *Data {
 	const kind = types.TypeKind_INT
 
 	switch ident.Kind {
@@ -2219,7 +2223,7 @@ func (e *_Eval) eval_int_type_sub_ident(ident lex.Token) *Data {
 	}
 }
 
-func (e *_Eval) eval_uint_type_sub_ident(ident lex.Token) *Data {
+func (e *_Eval) eval_uint_type_static(ident lex.Token) *Data {
 	const kind = types.TypeKind_UINT
 
 	switch ident.Kind {
@@ -2237,7 +2241,7 @@ func (e *_Eval) eval_uint_type_sub_ident(ident lex.Token) *Data {
 	}
 }
 
-func (e *_Eval) eval_i8_type_sub_ident(ident lex.Token) *Data {
+func (e *_Eval) eval_i8_type_static(ident lex.Token) *Data {
 	const kind = types.TypeKind_I8
 	const min = types.MIN_I8
 	const max = types.MAX_I8
@@ -2265,7 +2269,7 @@ func (e *_Eval) eval_i8_type_sub_ident(ident lex.Token) *Data {
 	}
 }
 
-func (e *_Eval) eval_i16_type_sub_ident(ident lex.Token) *Data {
+func (e *_Eval) eval_i16_type_static(ident lex.Token) *Data {
 	const kind = types.TypeKind_I16
 	const min = types.MIN_I16
 	const max = types.MAX_I16
@@ -2293,7 +2297,7 @@ func (e *_Eval) eval_i16_type_sub_ident(ident lex.Token) *Data {
 	}
 }
 
-func (e *_Eval) eval_i32_type_sub_ident(ident lex.Token) *Data {
+func (e *_Eval) eval_i32_type_static(ident lex.Token) *Data {
 	const kind = types.TypeKind_I32
 	const min = types.MIN_I32
 	const max = types.MAX_I32
@@ -2321,7 +2325,7 @@ func (e *_Eval) eval_i32_type_sub_ident(ident lex.Token) *Data {
 	}
 }
 
-func (e *_Eval) eval_i64_type_sub_ident(ident lex.Token) *Data {
+func (e *_Eval) eval_i64_type_static(ident lex.Token) *Data {
 	const kind = types.TypeKind_I64
 	const min = types.MIN_I64
 	const max = types.MAX_I64
@@ -2349,7 +2353,7 @@ func (e *_Eval) eval_i64_type_sub_ident(ident lex.Token) *Data {
 	}
 }
 
-func (e *_Eval) eval_u8_type_sub_ident(ident lex.Token) *Data {
+func (e *_Eval) eval_u8_type_static(ident lex.Token) *Data {
 	const kind = types.TypeKind_U8
 	const max = types.MAX_U8
 
@@ -2368,7 +2372,7 @@ func (e *_Eval) eval_u8_type_sub_ident(ident lex.Token) *Data {
 	}
 }
 
-func (e *_Eval) eval_u16_type_sub_ident(ident lex.Token) *Data {
+func (e *_Eval) eval_u16_type_static(ident lex.Token) *Data {
 	const kind = types.TypeKind_U16
 	const max = types.MAX_U16
 
@@ -2387,7 +2391,7 @@ func (e *_Eval) eval_u16_type_sub_ident(ident lex.Token) *Data {
 	}
 }
 
-func (e *_Eval) eval_u32_type_sub_ident(ident lex.Token) *Data {
+func (e *_Eval) eval_u32_type_static(ident lex.Token) *Data {
 	const kind = types.TypeKind_U32
 	const max = types.MAX_U32
 
@@ -2406,7 +2410,7 @@ func (e *_Eval) eval_u32_type_sub_ident(ident lex.Token) *Data {
 	}
 }
 
-func (e *_Eval) eval_u64_type_sub_ident(ident lex.Token) *Data {
+func (e *_Eval) eval_u64_type_static(ident lex.Token) *Data {
 	const kind = types.TypeKind_U64
 	const max = types.MAX_U64
 
@@ -2425,7 +2429,7 @@ func (e *_Eval) eval_u64_type_sub_ident(ident lex.Token) *Data {
 	}
 }
 
-func (e *_Eval) eval_f32_type_sub_ident(ident lex.Token) *Data {
+func (e *_Eval) eval_f32_type_tatic(ident lex.Token) *Data {
 	const kind = types.TypeKind_F32
 	const max = types.MAX_F32
 	const min = types.MIN_F32
@@ -2453,7 +2457,7 @@ func (e *_Eval) eval_f32_type_sub_ident(ident lex.Token) *Data {
 	}
 }
 
-func (e *_Eval) eval_f64_type_sub_ident(ident lex.Token) *Data {
+func (e *_Eval) eval_f64_type_static(ident lex.Token) *Data {
 	const kind = types.TypeKind_F64
 	const max = types.MAX_F64
 	const min = types.MIN_F64
@@ -2481,43 +2485,43 @@ func (e *_Eval) eval_f64_type_sub_ident(ident lex.Token) *Data {
 	}
 }
 
-func (e *_Eval) eval_prim_type_sub_ident(kind lex.Token, ident lex.Token) *Data {
+func (e *_Eval) eval_prim_ns_selection(kind lex.Token, ident lex.Token) *Data {
 	switch kind.Kind {
 	case types.TypeKind_INT:
-		return e.eval_int_type_sub_ident(ident)
+		return e.eval_int_type_static(ident)
 
 	case types.TypeKind_UINT:
-		return e.eval_uint_type_sub_ident(ident)
+		return e.eval_uint_type_static(ident)
 
 	case types.TypeKind_I8:
-		return e.eval_i8_type_sub_ident(ident)
+		return e.eval_i8_type_static(ident)
 
 	case types.TypeKind_I16:
-		return e.eval_i16_type_sub_ident(ident)
+		return e.eval_i16_type_static(ident)
 
 	case types.TypeKind_I32:
-		return e.eval_i32_type_sub_ident(ident)
+		return e.eval_i32_type_static(ident)
 
 	case types.TypeKind_I64:
-		return e.eval_i64_type_sub_ident(ident)
+		return e.eval_i64_type_static(ident)
 
 	case types.TypeKind_U8:
-		return e.eval_u8_type_sub_ident(ident)
+		return e.eval_u8_type_static(ident)
 
 	case types.TypeKind_U16:
-		return e.eval_u16_type_sub_ident(ident)
+		return e.eval_u16_type_static(ident)
 
 	case types.TypeKind_U32:
-		return e.eval_u32_type_sub_ident(ident)
+		return e.eval_u32_type_static(ident)
 
 	case types.TypeKind_U64:
-		return e.eval_u64_type_sub_ident(ident)
+		return e.eval_u64_type_static(ident)
 
 	case types.TypeKind_F32:
-		return e.eval_f32_type_sub_ident(ident)
+		return e.eval_f32_type_tatic(ident)
 
 	case types.TypeKind_F64:
-		return e.eval_f64_type_sub_ident(ident)
+		return e.eval_f64_type_static(ident)
 
 	default:
 		e.push_err(ident, "type_have_not_ident", kind.Kind, ident.Kind)
