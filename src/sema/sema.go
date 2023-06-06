@@ -862,6 +862,10 @@ func (s *_Sema) check_enum_decl(e *Enum) {
 		s.push_err(e.Token, "duplicated_ident", e.Ident)
 	}
 
+	if len(e.Items) == 0 {
+		s.push_err(e.Token, "no_member_in_enum", e.Ident)
+	}
+
 	s.check_enum_items_dup(e)
 
 	if e.Kind != nil {

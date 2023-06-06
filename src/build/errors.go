@@ -177,6 +177,7 @@ var ERRORS = map[string]string{
 	`pkg_illegal_cross_cycle`:                  "illegal cross cycle in use declarations;\n@",
 	`refers_to`:                                `@ refers to @`,
 	`no_file_in_entry_package`:                 `there is no Jule source code in this package: @`,
+	`no_member_in_enum`:                        `there is no member for enum: @`,
 }
 
 // Returns formatted error message by key and args.
