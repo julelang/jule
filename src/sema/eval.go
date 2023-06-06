@@ -1293,6 +1293,13 @@ func (e *_Eval) cast_slc(t *TypeKind, d *Data, error_token lex.Token) {
 }
 
 func (e *_Eval) cast_str(d *Data, error_token lex.Token) {
+	if d.Kind.Enm() != nil {
+		e := d.Kind.Enm()
+		if e.Kind.Kind.Prim() != nil && e.Kind.Kind.Prim().Is_str() {
+			return
+		}
+	}
+
 	if d.Kind.Prim() != nil {
 		prim := d.Kind.Prim()
 		if !prim.Is_u8() && !prim.Is_i32() {
