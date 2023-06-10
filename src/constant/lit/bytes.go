@@ -73,8 +73,9 @@ func To_str(bytes []byte) string {
 		if b == '\\' {
 			s += str_esq_seq(bytes, &i)
 		} else {
-			s += string(b)
-			i++
+			r, size := utf8.DecodeRune(bytes[i:])
+			i += size
+			s += string(r)
 		}
 	}
 	return s
