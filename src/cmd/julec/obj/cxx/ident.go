@@ -3,7 +3,6 @@ package cxx
 import (
 	"strconv"
 
-	"github.com/julelang/jule"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/sema"
@@ -66,7 +65,7 @@ func fn_out_ident(f *sema.Fn) string {
 	case f.Cpp_linked:
 		return f.Ident
 
-	case f.Ident == jule.ENTRY_POINT:
+	case f.Ident == build.ENTRY_POINT:
 		return "entry_point"
 
 	case f.Is_method():

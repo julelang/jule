@@ -778,7 +778,7 @@ func gen_init_caller(pkg *sema.Package, used []*sema.ImportInfo) string {
 
 	push_init := func(pkg *sema.Package) {
 		const CPP_LINKED = false
-		f := pkg.Find_fn(jule.INIT_FN, CPP_LINKED)
+		f := pkg.Find_fn(build.INIT_FN, CPP_LINKED)
 		if f == nil {
 			return
 		}

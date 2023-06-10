@@ -7,8 +7,8 @@ package sema
 import (
 	"strings"
 
-	"github.com/julelang/jule"
 	"github.com/julelang/jule/ast"
+	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 )
 
@@ -67,7 +67,7 @@ func (f *Fn) Is_void() bool { return f.Result == nil }
 // Reports whether function is method.
 func (f *Fn) Is_method() bool { return f.Owner != nil }
 // Reports whether function is entry point.
-func (f *Fn) Is_entry_point() bool { return f.Ident == jule.ENTRY_POINT }
+func (f *Fn) Is_entry_point() bool { return f.Ident == build.ENTRY_POINT }
 // Reports whether function is anonymous function.
 func (f *Fn) Is_anon() bool { return lex.Is_anon_ident(f.Ident) }
 // Reports whether function has return variable(s).

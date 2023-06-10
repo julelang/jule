@@ -8,9 +8,13 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-
-	"github.com/julelang/jule"
 )
+
+const EXT = `.jule`
+const API = "api"
+const STDLIB = "std"
+const ENTRY_POINT = "main"
+const INIT_FN = "init"
 
 // These directives must added to the DIRECTIVES.
 const DIRECTIVE_CDEF = "cdef"        // Directive: jule:cdef
@@ -150,4 +154,4 @@ func Is_valid_header_ext(ext string) bool {
 }
 
 // Reports whether file path is Jule source code.
-func Is_jule(path string) bool { return filepath.Ext(path) == jule.EXT }
+func Is_jule(path string) bool { return filepath.Ext(path) == EXT }

@@ -8,7 +8,6 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/julelang/jule"
 	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/cmd/julec/env"
@@ -69,7 +68,7 @@ func read_package_dirents(path string) (_ []fs.DirEntry, err_msg string) {
 
 		// Skip directories, non-jule files, and file annotation fails.
 		if dirent.IsDir() ||
-			!strings.HasSuffix(name, jule.EXT) ||
+			!strings.HasSuffix(name, build.EXT) ||
 			!build.Is_pass_file_annotation(name) {
 			continue
 		}
@@ -206,7 +205,7 @@ func compile(path string) (*sema.Package, *Importer) {
 	}
 
 	const CPP_LINKED = false
-	f := pkg.Find_fn(jule.ENTRY_POINT, CPP_LINKED)
+	f := pkg.Find_fn(build.ENTRY_POINT, CPP_LINKED)
 	if f == nil {
 		exit_err(build.Errorf("no_entry_point"))
 	}

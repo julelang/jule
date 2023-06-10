@@ -4,7 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/julelang/jule"
+	"github.com/julelang/jule/build"
 )
 
 // Environment Variables.
@@ -33,7 +33,7 @@ func init() {
 	}
 	EXEC_PATH = filepath.Dir(path)
 	path = filepath.Join(EXEC_PATH, "..") // Go to parent directory
-	STDLIB_PATH = filepath.Join(path, jule.STDLIB)
+	STDLIB_PATH = filepath.Join(path, build.STDLIB)
 
 	JULE_HEADER = filepath.Join(EXEC_PATH, "..")
 	JULE_HEADER = filepath.Join(JULE_HEADER, "api")
