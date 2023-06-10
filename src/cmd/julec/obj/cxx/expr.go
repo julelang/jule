@@ -82,10 +82,11 @@ func sbtoa(b byte) string {
 
 func get_str_model(c *constant.Const) string {
 	content := c.Read_str()
-	len := strconv.FormatInt(int64(len(content)), 10)
+	bytes := []byte(content)
+	len := strconv.FormatInt(int64(len(bytes)), 10)
 
 	lit := ""
-	for _, b := range []byte(content) {
+	for _, b := range bytes {
 		lit += sbtoa(b)
 	}
 

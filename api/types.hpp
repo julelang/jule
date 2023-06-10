@@ -1,6 +1,8 @@
 #ifndef __JULE_TYPES_HPP
 #define __JULE_TYPES_HPP
 
+#include <stddef.h>
+
 #include "platform.hpp"
 
 namespace jule {
@@ -26,6 +28,8 @@ namespace jule {
     typedef float F32;
     typedef double F64;
     typedef bool Bool;
+
+    constexpr std::nullptr_t nil{ nullptr };
 
 } // namespace jule
 

@@ -43,14 +43,14 @@ namespace jule {
 
     template<typename T>
     inline void out(const T &obj) noexcept {
-    #ifdef OS_WINDOWS
+#ifdef OS_WINDOWS
         const jule::Str str{ jule::to_str<T>(obj) };
         const jule::Slice<jule::U16> utf16_str{ jule::utf16_from_str(str) };
         HANDLE handle{ GetStdHandle(STD_OUTPUT_HANDLE) };
         WriteConsoleW(handle, &utf16_str[0], utf16_str.len(), nullptr, nullptr);
-    #else
+#else
         std::cout << obj;
-    #endif
+#endif
     }
 
     template<typename T>
