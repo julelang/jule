@@ -565,7 +565,15 @@ func (fcac *_FnCallArgChecker) check_arg(p *ParamIns, arg *Data, error_token lex
 }
 
 func (fcac *_FnCallArgChecker) push(p *ParamIns, arg *ast.Expr) (ok bool) {
-	d := fcac.e.eval_expr_kind(arg.Kind)
+	var d *Data
+	if !fcac.dynamic_annotation {
+		old := fcac.e.prefix
+		fcac.e.prefix = p.Kind
+		d = fcac.e.eval_expr_kind(arg.Kind)
+		fcac.e.prefix = old
+	} else {
+		d = fcac.e.eval_expr_kind(arg.Kind)
+	}
 	if d == nil {
 		return false
 	}
@@ -581,6 +589,8 @@ func (fcac *_FnCallArgChecker) push_variadic(p *ParamIns, i int) (ok bool) {
 		Elem_kind: p.Kind,
 	}
 
+	old := fcac.e.prefix
+	fcac.e.prefix = p.Kind
 	for ; i < len(fcac.args); i++ {
 		arg := fcac.args[i]
 		d := fcac.e.eval_expr_kind(arg.Kind)
@@ -607,6 +617,7 @@ func (fcac *_FnCallArgChecker) push_variadic(p *ParamIns, i int) (ok bool) {
 
 		ok = fcac.check_arg(p, d, arg.Token) && ok
 	}
+	fcac.e.prefix = old
 
 	if variadiced && more {
 		fcac.push_err("more_args_with_variadiced")
