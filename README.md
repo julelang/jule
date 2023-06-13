@@ -9,10 +9,21 @@ It contains the reference compiler, API and standard library.
 
 [Website](https://jule.dev) |
 [Manual](https://jule.dev/pages/manual.html) |
-[Contributing](https://jule.dev/pages/contributing.html)
+[Contributing](https://jule.dev/pages/contributing.html) |
+[Community](https://github.com/julelang/jule/wiki#the-jule-community)
 
 </strong>
 </div>
+
+<h2 id="community">Community</h2>
+
+Join Julenours to support Jule, explore and interact with the community.
+
+
+Our main community platforms:
+- [Official Discord server of the Jule Community](https://discord.gg/CZhK7dyh9X)
+- [GitHub Discussions](https://github.com/jule-lang/jule/discussions)
+
 
 <h2 id="motivation">Motivation</h2>
 
