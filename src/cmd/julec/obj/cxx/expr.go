@@ -546,7 +546,11 @@ func gen_str_constructor_expr_model(m *sema.StrConstructorcallExprModel) string 
 
 func gen_rune_expr_model(m *sema.RuneExprModel) string {
 	if m.Code <= 127 { // ASCII
-		return "'" + sbtoa(byte(m.Code)) + "'"
+		b := sbtoa(byte(m.Code))
+		if b == "'" {
+			b = "\\'"
+		}
+		return "'" + b + "'"
 	}
 	return i64toa(int64(m.Code))
 }
