@@ -928,7 +928,7 @@ func (sp *_ScopeParser) build_st(st *_Stmt) ast.NodeData {
 	case lex.ID_RET:
 		return sp.build_ret_st(st.tokens)
 
-	case lex.ID_FOR:
+	case lex.ID_ITER:
 		return sp.buid_iter_st(st)
 
 	case lex.ID_BREAK:

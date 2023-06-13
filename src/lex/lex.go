@@ -11,61 +11,60 @@ import (
 	"github.com/julelang/jule/build"
 )
 
-// [keyword]id
-var _KEYWORDS = map[string]uint8{
-	KND_I8:       ID_PRIM,
-	KND_I16:      ID_PRIM,
-	KND_I32:      ID_PRIM,
-	KND_I64:      ID_PRIM,
-	KND_U8:       ID_PRIM,
-	KND_U16:      ID_PRIM,
-	KND_U32:      ID_PRIM,
-	KND_U64:      ID_PRIM,
-	KND_F32:      ID_PRIM,
-	KND_F64:      ID_PRIM,
-	KND_UINT:     ID_PRIM,
-	KND_INT:      ID_PRIM,
-	KND_UINTPTR:  ID_PRIM,
-	KND_BOOL:     ID_PRIM,
-	KND_STR:      ID_PRIM,
-	KND_ANY:      ID_PRIM,
-	KND_TRUE:     ID_LIT,
-	KND_FALSE:    ID_LIT,
-	KND_NIL:      ID_LIT,
-	KND_CONST:    ID_CONST,
-	KND_RET:      ID_RET,
-	KND_TYPE:     ID_TYPE,
-	KND_ITER:     ID_FOR,
-	KND_BREAK:    ID_BREAK,
-	KND_CONTINUE: ID_CONTINUE,
-	KND_IN:       ID_IN,
-	KND_IF:       ID_IF,
-	KND_ELSE:     ID_ELSE,
-	KND_USE:      ID_USE,
-	KND_PUB:      ID_PUB,
-	KND_GOTO:     ID_GOTO,
-	KND_ENUM:     ID_ENUM,
-	KND_STRUCT:   ID_STRUCT,
-	KND_CO:       ID_CO,
-	KND_MATCH:    ID_MATCH,
-	KND_SELF:     ID_SELF,
-	KND_TRAIT:    ID_TRAIT,
-	KND_IMPL:     ID_IMPL,
-	KND_CPP:      ID_CPP,
-	KND_FALL:     ID_FALL,
-	KND_FN:       ID_FN,
-	KND_LET:      ID_LET,
-	KND_UNSAFE:   ID_UNSAFE,
-	KND_MUT:      ID_MUT,
-	KND_DEFER:    ID_DEFER,
+type _KindPair struct {
+	kind string
+	id   uint8
 }
 
-type _OpPair struct {
-	op string
-	id uint8
+var _KEYWORDS = [...]_KindPair{
+	{KND_I8, ID_PRIM},
+	{KND_I16, ID_PRIM},
+	{KND_I32, ID_PRIM},
+	{KND_I64, ID_PRIM},
+	{KND_U8, ID_PRIM},
+	{KND_U16, ID_PRIM},
+	{KND_U32, ID_PRIM},
+	{KND_U64, ID_PRIM},
+	{KND_F32, ID_PRIM},
+	{KND_F64, ID_PRIM},
+	{KND_UINT, ID_PRIM},
+	{KND_INT, ID_PRIM},
+	{KND_UINTPTR, ID_PRIM},
+	{KND_BOOL, ID_PRIM},
+	{KND_STR, ID_PRIM},
+	{KND_ANY, ID_PRIM},
+	{KND_TRUE, ID_LIT},
+	{KND_FALSE, ID_LIT},
+	{KND_NIL, ID_LIT},
+	{KND_CONST, ID_CONST},
+	{KND_RET, ID_RET},
+	{KND_TYPE, ID_TYPE},
+	{KND_ITER, ID_ITER},
+	{KND_BREAK, ID_BREAK},
+	{KND_CONTINUE, ID_CONTINUE},
+	{KND_IN, ID_IN},
+	{KND_IF, ID_IF},
+	{KND_ELSE, ID_ELSE},
+	{KND_USE, ID_USE},
+	{KND_PUB, ID_PUB},
+	{KND_GOTO, ID_GOTO},
+	{KND_ENUM, ID_ENUM},
+	{KND_STRUCT, ID_STRUCT},
+	{KND_CO, ID_CO},
+	{KND_MATCH, ID_MATCH},
+	{KND_SELF, ID_SELF},
+	{KND_TRAIT, ID_TRAIT},
+	{KND_IMPL, ID_IMPL},
+	{KND_CPP, ID_CPP},
+	{KND_FALL, ID_FALL},
+	{KND_FN, ID_FN},
+	{KND_LET, ID_LET},
+	{KND_UNSAFE, ID_UNSAFE},
+	{KND_MUT, ID_MUT},
+	{KND_DEFER, ID_DEFER},
 }
 
-var _BASIC_OPS = [...]_OpPair{
+var _BASIC_OPS = [...]_KindPair{
 	{KND_DBLCOLON, ID_DBLCOLON},
 	{KND_COLON, ID_COLON},
 	{KND_SEMICOLON, ID_SEMICOLON},
@@ -106,6 +105,16 @@ var _BASIC_OPS = [...]_OpPair{
 	{KND_EQ, ID_OP},
 }
 
+func make_err(row int, col int, f *File, key string, args ...any) build.Log {
+	return build.Log{
+		Type:   build.ERR,
+		Row:    row,
+		Column: col,
+		Path:   f.Path(),
+		Text:   build.Errorf(key, args...),
+	}
+}
+
 type _Lex struct {
 	first_token_of_line bool
 	ranges              []Token
@@ -115,16 +124,6 @@ type _Lex struct {
 	column              int
 	row                 int
 	errors              []build.Log
-}
-
-func make_err(row int, col int, f *File, key string, args ...any) build.Log {
-	return build.Log{
-		Type:   build.ERR,
-		Row:    row,
-		Column: col,
-		Path:   f.Path(),
-		Text:   build.Errorf(key, args...),
-	}
 }
 
 func (l *_Lex) push_err(key string, args ...any) {
@@ -693,8 +692,8 @@ func (l *_Lex) is_kw(txt, kind string, id uint8, t *Token) bool {
 }
 
 func (l *_Lex) lex_kws(txt string, tok *Token) bool {
-	for k, v := range _KEYWORDS {
-		if l.is_kw(txt, k, v, tok) {
+	for _, pair := range _KEYWORDS {
+		if l.is_kw(txt, pair.kind, pair.id, tok) {
 			return true
 		}
 	}
@@ -703,7 +702,7 @@ func (l *_Lex) lex_kws(txt string, tok *Token) bool {
 
 func (l *_Lex) lex_basic_ops(txt string, tok *Token) bool {
 	for _, pair := range _BASIC_OPS {
-		if l.is_op(txt, pair.op, pair.id, tok) {
+		if l.is_op(txt, pair.kind, pair.id, tok) {
 			return true
 		}
 	}
