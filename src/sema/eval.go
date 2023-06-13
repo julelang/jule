@@ -3571,8 +3571,20 @@ func (bs *_BinopSolver) post_const(d *Data) {
 	normalize_bitsize(d)
 }
 
+func (*_BinopSolver) prepare_data(d *Data) {
+	if d != nil && d.Kind.Ref() != nil {
+		d.Kind = d.Kind.Ref().Elem
+	}
+}
+
+func (bs *_BinopSolver) prepare_eval() {
+	bs.prepare_data(bs.r)
+	bs.prepare_data(bs.l)
+}
+
 func (bs *_BinopSolver) solve_explicit(l *Data, r *Data) *Data {
 	bs.l, bs.r = l, r
+	bs.prepare_eval()
 	d := bs.eval()
 	bs.l, bs.r = l, r // Save normal order
 
