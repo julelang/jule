@@ -127,14 +127,20 @@ func kind_by_bitsize(expr any) string {
 }
 
 func check_data_for_integer_indexing(d *Data) (err_key string) {
-	switch {
-	case d == nil:
+	if d == nil {
 		return ""
+	}
 
-	case d.Kind.Prim() == nil:
+	kind := d.Kind
+	if kind.Ref() != nil {
+		kind = kind.Ref().Elem
+	}
+
+	switch {
+	case kind.Prim() == nil:
 		return "invalid_expr"
 
-	case !types.Is_int(d.Kind.Prim().To_str()):
+	case !types.Is_int(kind.Prim().To_str()):
 		return "invalid_expr"
 
 	case d.Is_const() && d.Constant.As_i64() < 0:
