@@ -216,7 +216,11 @@ func compile(path string) (*sema.Package, *Importer) {
 func gen_compile_cmd(source_path string) (string, string) {
 	compiler := COMPILER_PATH
 
-	cmd := "-g -O0 -Wno-narrowing --std=c++14 "
+	const ZERO_LEVEL_OPTIMIZATION = "-O0"
+	const DISABLE_ALL_WARNINGS = "-Wno-everything"
+	const SET_STD = "--std=c++14"
+
+	cmd := ZERO_LEVEL_OPTIMIZATION + " " + DISABLE_ALL_WARNINGS + " " + SET_STD + " "
 	if OUT != "" {
 		cmd += "-o " + OUT + " "
 	}
@@ -225,9 +229,14 @@ func gen_compile_cmd(source_path string) (string, string) {
 	return compiler, cmd
 }
 
-func do_spell(obj string) {
+func get_compile_path() string {
 	path := filepath.Join(env.WORKING_PATH, OUT_DIR)
 	path = filepath.Join(path, OUT_NAME)
+	return path
+}
+
+func do_spell(obj string) {
+	path := get_compile_path()
 	write_output(path, obj)
 	switch MODE {
 	case MODE_C:

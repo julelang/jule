@@ -808,6 +808,14 @@ func append_standard(obj_code *string) {
 	sb.WriteByte('\n')
 	sb.WriteString("// Date: ")
 	sb.WriteString(timeStr)
+	sb.WriteString(`
+//
+// Recommended Compile Command;
+// `)
+	c, cmd := gen_compile_cmd(get_compile_path())
+	sb.WriteString(c)
+	sb.WriteByte(' ')
+	sb.WriteString(cmd)
 	sb.WriteString("\n\n#include \"")
 	sb.WriteString(env.JULE_HEADER)
 	sb.WriteString("\"\n\n")

@@ -72,7 +72,7 @@ namespace jule {
         Any(const T &expr) noexcept
         { this->operator=(expr); }
 
-        Any(const Any &src) noexcept
+        Any(const jule::Any &src) noexcept
         { this->operator=(src); }
 
         ~Any(void) noexcept
