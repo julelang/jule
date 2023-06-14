@@ -36,7 +36,7 @@ namespace jule {
 
         inline constexpr
         Iterator begin(void) noexcept
-        { return &this->_buffer[0]; }
+        { return &this->buffer[0]; }
 
         inline constexpr
         ConstIterator begin(void) const noexcept
