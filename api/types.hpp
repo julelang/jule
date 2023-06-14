@@ -7,7 +7,7 @@
 
 namespace jule {
 
-#if defined(ARCH_32BIT)
+#ifdef ARCH_32BIT
     typedef unsigned long int Uint;
     typedef signed long int Int;
     typedef unsigned long int Uintptr;
@@ -29,7 +29,7 @@ namespace jule {
     typedef double F64;
     typedef bool Bool;
 
-    constexpr std::nullptr_t nil{ nullptr };
+    constexpr decltype(nullptr) nil{ nullptr };
 
 } // namespace jule
 

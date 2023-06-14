@@ -5,7 +5,6 @@
 #ifndef __JULE_HPP
 #define __JULE_HPP
 
-#include "platform.hpp"
 #include "any.hpp"
 #include "array.hpp"
 #include "atomic.hpp"
@@ -14,17 +13,18 @@
 #include "error.hpp"
 #include "fn.hpp"
 #include "map.hpp"
+#include "misc.hpp"
 #include "panic.hpp"
+#include "platform.hpp"
+#include "process.hpp"
 #include "ref.hpp"
 #include "signal.hpp"
 #include "slice.hpp"
 #include "str.hpp"
+#include "terminate.hpp"
 #include "trait.hpp"
 #include "types.hpp"
 #include "utf8.hpp"
 #include "utf16.hpp"
-#include "terminate.hpp"
-#include "process.hpp"
-#include "misc.hpp"
 
 #endif // ifndef __JULE_HPP
