@@ -615,23 +615,5 @@ func gen_fn_scope(f *sema.FnIns) string {
 
 // Generates C++ code of method's scope.
 func gen_method_scope(f *sema.FnIns) string {
-	obj := gen_scope(f.Scope)
-
-	slf_decl := ""
-	slf := f.Decl.Params[0]
-	if slf.Is_ref() {
-		slf_decl = "auto self{ this->self };"
-	} else if !slf.Mutable {
-		slf_decl = gen_struct_kind_ins(f.Owner) + " self{ *this };"
-	}
-
-	robj := "{\n"
-	add_indent()
-	robj += indent()
-	done_indent()
-	robj += slf_decl
-	robj += "\n"
-	robj += obj[2:] // Skip left brace and new line.
-
-	return robj
+	return gen_scope(f.Scope)
 }

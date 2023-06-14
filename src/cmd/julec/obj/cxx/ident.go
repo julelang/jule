@@ -154,10 +154,10 @@ func var_out_ident(v *sema.Var) string {
 		return v.Ident
 
 	case v.Ident == lex.KND_SELF:
-		if v.Mutable && v.Kind.Kind.Ref() == nil {
-			return "(*this)"
+		if v.Kind.Kind.Ref() != nil {
+			return "this->self"
 		}
-		return "self"
+		return "(*this)"
 
 	case v.Scope != nil:
 		return as_local_ident(v.Token.Row, v.Token.Column, v.Ident)

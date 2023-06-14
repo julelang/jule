@@ -231,7 +231,7 @@ func gen_unary_expr_model(m *sema.UnaryExprModel) string {
 }
 
 func gen_get_ref_ptr_expr_model(m *sema.GetRefPtrExprModel) string {
-	return "(" + gen_expr(m.Expr) + ").__alloc"
+	return "(" + gen_expr(m.Expr) + ").alloc"
 }
 
 func gen_cpp_struct_lit_expr_model(m *sema.StructLitExprModel) string {
