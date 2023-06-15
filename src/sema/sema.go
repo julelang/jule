@@ -727,9 +727,11 @@ func (s *_Sema) reload_fn_ins_types(f *FnIns) (ok bool) {
 }
 
 func (s *_Sema) check_validity_for_init_expr(left_mut bool, d *Data, error_token lex.Token) {
-	if d.Lvalue && left_mut && !d.Mutable && is_mut(d.Kind) {
-		s.push_err(error_token, "assignment_non_mut_to_mut")
-		return
+	if d.Lvalue && left_mut && !d.Mutable {
+		if is_mut(d.Kind) {
+			s.push_err(error_token, "assignment_non_mut_to_mut")
+			return
+		}
 	}
 
 	atc := _AssignTypeChecker{
@@ -1333,6 +1335,7 @@ func (s *_Sema) check_struct_fields(st *Struct) (ok bool) {
 		},
 	}
 
+	n := len(st.Instances)
 	for _, f := range st.Fields {
 		f.Owner = st
 		f.Kind.Kind = tc.check_decl(f.Kind.Decl)
@@ -1345,6 +1348,14 @@ func (s *_Sema) check_struct_fields(st *Struct) (ok bool) {
 				s.push_err(f.Token, "duplicated_ident", f.Ident)
 				ok = false
 			}
+		}
+	}
+
+	// Save itself for legal cycles like *Struct.
+	if ok && n != len(st.Instances) {
+		st.Instances = st.Instances[:n]
+		for _, f := range st.Fields {
+			f.Kind.Kind = tc.check_decl(f.Kind.Decl)
 		}
 	}
 

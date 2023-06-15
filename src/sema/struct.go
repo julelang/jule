@@ -67,6 +67,9 @@ func (s *Struct) instance() *StructIns {
 
 	for i, f := range s.Fields {
 		ins.Fields[i] = f.instance()
+		if f.Kind.Kind != nil {
+			ins.HasMut = is_mut(f.Kind.Kind)
+		}
 	}
 
 	for i, f := range s.Methods {
@@ -130,6 +133,7 @@ type StructIns struct {
 	Generics []*TypeKind
 	Fields   []*FieldIns
 	Methods  []*Fn
+	HasMut   bool // This structure has mutable defines.
 }
 
 // Implement: Kind

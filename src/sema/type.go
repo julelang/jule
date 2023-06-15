@@ -312,6 +312,9 @@ func is_lvalue(t *TypeKind) bool {
 }
 
 func is_mut(t *TypeKind) bool {
+	if t.Strct() != nil {
+		return t.Strct().HasMut
+	}
 	if t.Prim() != nil {
 		p := t.Prim()
 		return p.Is_any()
@@ -647,6 +650,7 @@ func (tc *_TypeChecker) check_struct_ins(ins *StructIns, error_token lex.Token) 
 		}
 
 		f.Kind = kind
+		ins.HasMut = is_mut(f.Kind)
 	}
 
 	return true
