@@ -86,13 +86,13 @@ namespace jule {
         inline constexpr
         jule::Bool has(const Key &key) const noexcept
         { return this->buffer.find(key) != this->end(); }
-    
+
         inline jule::Int len(void) const noexcept
         { return this->buffer.size(); }
-    
+
         inline void del(const Key &key) noexcept
         { this->buffer.erase(key); }
-    
+
         inline jule::Bool operator==(const std::nullptr_t) const noexcept
         { return this->buffer.empty(); }
     
@@ -108,7 +108,7 @@ namespace jule {
         friend std::ostream &operator<<(std::ostream &stream,
                                         const Map<Key, Value> &src) noexcept {
             stream << '{';
-            jule::Uint length{ src.size() };
+            jule::Int length{ src.len() };
             for (const auto pair: src) {
                 stream << pair.first;
                 stream << ':';
