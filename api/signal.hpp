@@ -204,12 +204,9 @@ namespace jule {
     }
 
     void signal_handler(int signal) noexcept {
-        // Ignore the interrupt signal.
-        if (signal == jule::SIG_INT)
-            return;
-
         jule::out("program terminated with signal: ");
         jule::outln(signal);
+        std::exit(signal);
     }
 
 } // namespace jule
