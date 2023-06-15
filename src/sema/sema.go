@@ -1483,7 +1483,6 @@ func (s *_Sema) check_var(v *Var) {
 		v.Kind = &TypeSymbol{Kind: v.Value.Data.Kind}
 
 		s.check_data_for_auto_type(v.Value.Data, v.Value.Expr.Token)
-		s.check_validity_for_init_expr(v.Mutable, v.Value.Data, v.Value.Expr.Token)
 	} else {
 		arr := v.Kind.Kind.Arr()
 		if arr != nil {
@@ -1497,6 +1496,8 @@ func (s *_Sema) check_var(v *Var) {
 
 		s.check_assign_type(v.Kind.Kind, v.Value.Data, v.Value.Expr.Token, false)
 	}
+
+	s.check_validity_for_init_expr(v.Mutable, v.Value.Data, v.Value.Expr.Token)
 
 	if !v.Constant {
 		v.Value.Data.Constant = nil
