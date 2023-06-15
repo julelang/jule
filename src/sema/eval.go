@@ -563,14 +563,14 @@ func (e *_Eval) eval_var(v *Var, error_token lex.Token) *Data {
 	}
 
 	d := &Data{
-		Lvalue:   !v.Constant,
-		Mutable:  v.Mutable,
-		Decl:     false,
-		Kind:     v.Kind.Kind.clone(),
-		Model:    v,
+		Lvalue:  !v.Constant,
+		Mutable: v.Mutable,
+		Decl:    false,
+		Kind:    v.Kind.Kind.clone(),
+		Model:   v,
 	}
 
-	if !v.Cpp_linked && v.Is_initialized() {
+	if !v.Cpp_linked && v.Is_initialized() && v.Value.Data != nil {
 		d.Is_rune = v.Value.Data.Is_rune
 	}
 
@@ -1618,7 +1618,7 @@ func (e *_Eval) check_fn_call_generics(f *FnIns,
 func (e *_Eval) call_builtin_fn(fc *ast.FnCallExpr, d *Data) *Data {
 	f := d.Kind.Fnc()
 
-	d = f.Caller(e, fc, d)
+	d = f.caller(e, fc, d)
 	if d == nil {
 		return d
 	}
@@ -1893,7 +1893,7 @@ func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
 		return &Data{
 			Kind: &TypeKind{
 				kind:  &FnIns{
-					Caller: builtin_caller_common,
+					caller: builtin_caller_common,
 				},
 			},
 			Model: &CommonSubIdentExprModel{
@@ -1907,7 +1907,7 @@ func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
 		return &Data{
 			Kind: &TypeKind{
 				kind: &FnIns{
-					Caller: builtin_caller_common,
+					caller: builtin_caller_common,
 					Result: &TypeKind{
 						kind: &Slc{
 							Elem: m.Key,
@@ -1926,7 +1926,7 @@ func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
 		return &Data{
 			Kind: &TypeKind{
 				kind: &FnIns{
-					Caller: builtin_caller_common,
+					caller: builtin_caller_common,
 					Result: &TypeKind{
 						kind: &Slc{
 							Elem: m.Val,
@@ -1945,7 +1945,7 @@ func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
 		return &Data{
 			Kind: &TypeKind{
 				kind: &FnIns{
-					Caller: builtin_caller_common,
+					caller: builtin_caller_common,
 					Params: []*ParamIns{
 						{
 							Decl: &Param{
@@ -1968,7 +1968,7 @@ func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
 		return &Data{
 			Kind: &TypeKind{
 				kind: &FnIns{
-					Caller: builtin_caller_common,
+					caller: builtin_caller_common,
 					Params: []*ParamIns{
 						{
 							Decl: &Param{
@@ -2007,7 +2007,7 @@ func (e *_Eval) eval_str_sub_ident(d *Data, ident lex.Token) *Data {
 		return &Data{
 			Kind: &TypeKind{
 				kind: &FnIns{
-					Caller: builtin_caller_common,
+					caller: builtin_caller_common,
 					Params: []*ParamIns{
 						{
 							Decl: &Param{
@@ -2029,7 +2029,7 @@ func (e *_Eval) eval_str_sub_ident(d *Data, ident lex.Token) *Data {
 		return &Data{
 			Kind: &TypeKind{
 				kind: &FnIns{
-					Caller: builtin_caller_common,
+					caller: builtin_caller_common,
 					Params: []*ParamIns{
 						{
 							Decl: &Param{
@@ -2051,7 +2051,7 @@ func (e *_Eval) eval_str_sub_ident(d *Data, ident lex.Token) *Data {
 		return &Data{
 			Kind: &TypeKind{
 				kind: &FnIns{
-					Caller: builtin_caller_common,
+					caller: builtin_caller_common,
 					Params: []*ParamIns{
 						{
 							Decl: &Param{
@@ -2073,7 +2073,7 @@ func (e *_Eval) eval_str_sub_ident(d *Data, ident lex.Token) *Data {
 		return &Data{
 			Kind: &TypeKind{
 				kind: &FnIns{
-					Caller: builtin_caller_common,
+					caller: builtin_caller_common,
 					Params: []*ParamIns{
 						{
 							Decl: &Param{
@@ -2095,7 +2095,7 @@ func (e *_Eval) eval_str_sub_ident(d *Data, ident lex.Token) *Data {
 		return &Data{
 			Kind: &TypeKind{
 				kind: &FnIns{
-					Caller: builtin_caller_common,
+					caller: builtin_caller_common,
 					Params: []*ParamIns{
 						{
 							Decl: &Param{
@@ -2117,7 +2117,7 @@ func (e *_Eval) eval_str_sub_ident(d *Data, ident lex.Token) *Data {
 		return &Data{
 			Kind: &TypeKind{
 				kind: &FnIns{
-					Caller: builtin_caller_common,
+					caller: builtin_caller_common,
 					Params: []*ParamIns{
 						{
 							Decl: &Param{
@@ -2139,7 +2139,7 @@ func (e *_Eval) eval_str_sub_ident(d *Data, ident lex.Token) *Data {
 		return &Data{
 			Kind: &TypeKind{
 				kind: &FnIns{
-					Caller: builtin_caller_common,
+					caller: builtin_caller_common,
 					Params: []*ParamIns{
 						{
 							Decl: &Param{
@@ -2171,7 +2171,7 @@ func (e *_Eval) eval_str_sub_ident(d *Data, ident lex.Token) *Data {
 		return &Data{
 			Kind: &TypeKind{
 				kind: &FnIns{
-					Caller: builtin_caller_common,
+					caller: builtin_caller_common,
 					Params: []*ParamIns{
 						{
 							Decl: &Param{
@@ -2713,6 +2713,7 @@ func (e *_Eval) eval_anon_fn(decl *ast.FnDecl) *Data {
 		lookup: e.lookup,
 	}
 	ins := tc.build_fn(decl)
+	ins.anon = true
 
 	switch e.lookup.(type) {
 	case *_ScopeChecker:

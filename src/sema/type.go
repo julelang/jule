@@ -959,6 +959,7 @@ func (tc *_TypeChecker) build_fn(decl *ast.FnDecl) *FnIns {
 
 	f := build_fn(decl)
 	ins := f.instance_force()
+	ins.anon = true
 
 	ok := tc.check_fn_types(ins)
 	if !ok {

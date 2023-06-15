@@ -213,23 +213,14 @@ type FnIns struct {
 	Params   []*ParamIns
 	Result   *TypeKind
 	Scope    *Scope
-	Caller   _BuiltinCaller
+	caller   _BuiltinCaller
+	anon     bool
 }
 
 // Reports whether instance is built-in.
-func (f *FnIns) Is_builtin() bool {
-	if f.Decl == nil {
-		return true
-	} else {
-		if !f.Decl.Cpp_linked && f.Decl.Scope == nil {
-			return true
-		}
-		return false
-	}
-	return f.Scope == nil
-}
+func (f *FnIns) Is_builtin() bool { return f.caller != nil }
 // Reports whether instance is anonymous function.
-func (f *FnIns) Is_anon() bool { return f.Decl != nil && f.Decl.Is_anon() }
+func (f *FnIns) Is_anon() bool { return f.anon || f.Decl != nil && f.Decl.Is_anon() }
 
 // Implement: Kind
 // Returns Fn's type kind as string.

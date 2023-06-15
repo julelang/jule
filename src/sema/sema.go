@@ -690,7 +690,7 @@ func (s *_Sema) get_trait_check_fn_kind(f *Fn) string {
 }
 
 func (s *_Sema) reload_fn_ins_types(f *FnIns) (ok bool) {
-	if f.Is_builtin() {
+	if f.Is_builtin() || f.Is_anon() {
 		return true
 	}
 

@@ -68,23 +68,23 @@ var builtin_trait_error = &Trait{
 }
 
 func init() {
-	builtin_fn_out.Caller = builtin_caller_out
-	builtin_fn_outln.Caller = builtin_caller_outln
-	builtin_fn_new.Caller = builtin_caller_new
-	builtin_fn_real.Caller = builtin_caller_real
-	builtin_fn_drop.Caller = builtin_caller_drop
-	builtin_fn_panic.Caller = builtin_caller_panic
-	builtin_fn_make.Caller = builtin_caller_make
-	builtin_fn_append.Caller = builtin_caller_append
-	builtin_fn_copy.Caller = builtin_caller_copy
-	builtin_fn_recover.Caller = builtin_caller_recover
+	builtin_fn_out.caller = builtin_caller_out
+	builtin_fn_outln.caller = builtin_caller_outln
+	builtin_fn_new.caller = builtin_caller_new
+	builtin_fn_real.caller = builtin_caller_real
+	builtin_fn_drop.caller = builtin_caller_drop
+	builtin_fn_panic.caller = builtin_caller_panic
+	builtin_fn_make.caller = builtin_caller_make
+	builtin_fn_append.caller = builtin_caller_append
+	builtin_fn_copy.caller = builtin_caller_copy
+	builtin_fn_recover.caller = builtin_caller_recover
 
-	builtin_fn_std_mem_size_of.Caller = builtin_caller_std_mem_size_of
-	builtin_fn_std_mem_align_of.Caller = builtin_caller_std_mem_align_of
+	builtin_fn_std_mem_size_of.caller = builtin_caller_std_mem_size_of
+	builtin_fn_std_mem_align_of.caller = builtin_caller_std_mem_align_of
 
 	for _, f := range builtin_trait_error.Methods {
 		ins := f.instance()
-		ins.Caller = builtin_caller_common
+		ins.caller = builtin_caller_common
 		f.append_instance(ins)
 	}
 }
@@ -485,6 +485,7 @@ func builtin_caller_append(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 			},
 		},
 		Result: t.Kind.clone(),
+		caller: builtin_caller_common_plain,
 	}
 	d.Kind = &TypeKind{kind: f}
 	d.Model = &CommonIdentExprModel{Ident: "append"}
@@ -535,6 +536,7 @@ func builtin_caller_copy(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 			},
 		},
 		Result: builtin_fn_copy.Result,
+		caller: builtin_caller_common_plain,
 	}
 
 	d.Kind = &TypeKind{kind: f}
