@@ -1576,7 +1576,7 @@ func (e *_Eval) call_type_fn(fc *ast.FnCallExpr, d *Data) *Data {
 		// takes any type.
 		prim := d.Kind.Prim()
 		if prim != nil && prim.Is_str() {
-			d.Model = &StrConstructorcallExprModel{
+			d.Model = &StrConstructorCallExprModel{
 				Expr: arg.Model,
 			}
 			goto _ret

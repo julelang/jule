@@ -88,6 +88,7 @@ func (c *Comment) Is_directive() bool {
 type Directive struct {
 	Token lex.Token
 	Tag   string
+	Args  []string
 }
 
 // Kind type of type declarations.

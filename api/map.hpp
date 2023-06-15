@@ -38,7 +38,7 @@ namespace jule {
     template<typename Key, typename Value>
     class Map {
     public:
-        std::unordered_map<Key, Value, MapKeyHasher> buffer{};
+        mutable std::unordered_map<Key, Value, MapKeyHasher> buffer{};
 
         Map<Key, Value>(void) noexcept {}
         Map<Key, Value>(const std::nullptr_t) noexcept {}
@@ -98,7 +98,13 @@ namespace jule {
     
         inline jule::Bool operator!=(const std::nullptr_t) const noexcept
         { return !this->operator==(nullptr); }
-    
+
+        Value &operator[](const Key &key)
+        { return this->buffer[key]; }
+
+        Value &operator[](const Key &key) const
+        { return this->buffer[key]; }
+
         friend std::ostream &operator<<(std::ostream &stream,
                                         const Map<Key, Value> &src) noexcept {
             stream << '{';

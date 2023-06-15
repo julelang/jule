@@ -726,12 +726,9 @@ func (s *_Sema) reload_fn_ins_types(f *FnIns) (ok bool) {
 	return ok
 }
 
-func (s *_Sema) check_validity_for_init_expr(left_mut bool, d *Data, error_token lex.Token) {
-	if d.Lvalue && left_mut && !d.Mutable {
-		if is_mut(d.Kind) {
-			s.push_err(error_token, "assignment_non_mut_to_mut")
-			return
-		}
+func (s *_Sema) check_validity_for_init_expr(left_mut bool, left_kind *TypeKind, d *Data, error_token lex.Token) {
+	if d.Lvalue && left_mut && !d.Mutable && is_mut(d.Kind) {
+		s.push_err(error_token, "assignment_non_mut_to_mut")
 	}
 
 	atc := _AssignTypeChecker{
@@ -1352,10 +1349,20 @@ func (s *_Sema) check_struct_fields(st *Struct) (ok bool) {
 	}
 
 	// Save itself for legal cycles like *Struct.
+	reparse := false
 	if ok && n != len(st.Instances) {
 		st.Instances = st.Instances[:n]
-		for _, f := range st.Fields {
+		reparse = true
+	}
+
+	for _, f := range st.Fields {
+		if reparse {
 			f.Kind.Kind = tc.check_decl(f.Kind.Decl)
+		}
+		if f.Kind.Kind != nil && is_mut(f.Kind.Kind) {
+			if st.Is_derives(build.DERIVE_CLONE) && !supports_clonning(f.Kind.Kind) {
+				s.push_err(st.Token, "type_not_compatible_for_derive", f.Kind.Kind.To_str(), build.DERIVE_CLONE)
+			}
 		}
 	}
 
@@ -1497,7 +1504,7 @@ func (s *_Sema) check_var(v *Var) {
 		s.check_assign_type(v.Kind.Kind, v.Value.Data, v.Value.Expr.Token, false)
 	}
 
-	s.check_validity_for_init_expr(v.Mutable, v.Value.Data, v.Value.Expr.Token)
+	s.check_validity_for_init_expr(v.Mutable, v.Kind.Kind, v.Value.Data, v.Value.Expr.Token)
 
 	if !v.Constant {
 		v.Value.Data.Constant = nil

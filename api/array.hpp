@@ -23,7 +23,7 @@ namespace jule {
     template<typename Item, const jule::Uint N>
     struct Array {
     public:
-        std::array<Item, N> buffer{};
+        mutable std::array<Item, N> buffer{};
 
         Array<Item, N>(const std::initializer_list<Item> &src) noexcept {
             const auto src_begin{ src.begin() };
@@ -89,6 +89,15 @@ namespace jule {
         inline constexpr
         jule::Bool operator!=(const jule::Array<Item, N> &src) const noexcept
         { return !this->operator==(src); }
+
+        Item &operator[](const jule::Int &index) const {
+            if (this->empty() || index < 0 || this->len() <= index) {
+                std::stringstream sstream;
+                __JULEC_WRITE_ERROR_INDEX_OUT_OF_RANGE(sstream, index);
+                jule::panic(sstream.str().c_str());
+            }
+            return this->buffer[index];
+        }
 
         Item &operator[](const jule::Int &index) {
             if (this->empty() || index < 0 || this->len() <= index) {

@@ -322,6 +322,47 @@ func is_mut(t *TypeKind) bool {
 	return t.Slc() != nil || t.Ptr() != nil || t.Ref() != nil
 }
 
+func supports_clonning(k *TypeKind) bool {
+	switch {
+	case k.Prim() != nil:
+		return !k.Prim().Is_any()
+
+	case k.Enm() != nil:
+		return true
+
+	case k.Fnc() != nil:
+		return true
+
+	case k.Ptr() != nil:
+		return true;
+
+	case k.Slc() != nil:
+		return supports_clonning(k.Slc().Elem)
+
+	case k.Map() != nil:
+		return supports_clonning(k.Map().Key) && supports_clonning(k.Map().Val)
+
+	case k.Arr() != nil:
+		return supports_clonning(k.Arr().Elem)
+
+	case k.Ref() != nil:
+		return supports_clonning(k.Ref().Elem)
+
+	case k.Strct() != nil:
+		s := k.Strct()
+		if !s.HasMut {
+			return true
+		}
+		if s.Decl == nil || s.Decl.Cpp_linked || !s.Decl.Is_derives(build.DERIVE_CLONE) {
+			return false
+		}
+		return true
+
+	default:
+		return false
+	}
+}
+
 func is_nil_compatible(t *TypeKind) bool {
 	prim := t.Prim()
 	if prim != nil && prim.Is_any() {
@@ -650,7 +691,12 @@ func (tc *_TypeChecker) check_struct_ins(ins *StructIns, error_token lex.Token) 
 		}
 
 		f.Kind = kind
-		ins.HasMut = is_mut(f.Kind)
+		if is_mut(f.Kind) {
+			ins.HasMut = true
+			if ins.Decl.Is_derives(build.DERIVE_CLONE) && !supports_clonning(f.Kind) {
+				tc.push_err(f.Decl.Token, "type_not_compatible_for_derive", f.Kind.To_str(), build.DERIVE_CLONE)
+			}
+		}
 	}
 
 	return true

@@ -2,6 +2,7 @@ package sema
 
 import (
 	"github.com/julelang/jule/ast"
+	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/types"
 )
 
@@ -21,6 +22,7 @@ var builtin_fn_panic = &FnIns{}
 var builtin_fn_make = &FnIns{}
 var builtin_fn_append = &FnIns{}
 var builtin_fn_recover = &FnIns{}
+var builtin_fn_clone = &FnIns{}
 var builtin_fn_std_mem_size_of = &FnIns{}
 var builtin_fn_std_mem_align_of = &FnIns{}
 
@@ -78,6 +80,7 @@ func init() {
 	builtin_fn_append.caller = builtin_caller_append
 	builtin_fn_copy.caller = builtin_caller_copy
 	builtin_fn_recover.caller = builtin_caller_recover
+	builtin_fn_clone.caller = builtin_caller_clone
 
 	builtin_fn_std_mem_size_of.caller = builtin_caller_std_mem_size_of
 	builtin_fn_std_mem_align_of.caller = builtin_caller_std_mem_align_of
@@ -120,6 +123,9 @@ func find_builtin_fn(ident string) *FnIns {
 
 	case "recover":
 		return builtin_fn_recover
+
+	case "clone":
+		return builtin_fn_clone
 	
 	default:
 		return nil
@@ -580,6 +586,76 @@ func builtin_caller_recover(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
 	d.Model = &Recover{
 		Handler_expr: t.Model,
 	}
+	return d
+}
+
+func builtin_caller_clone(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
+	if len(fc.Generics) > 0 {
+		e.push_err(fc.Token, "not_has_generics")
+	}
+
+	if len(fc.Args) < 1 {
+		e.push_err(fc.Token, "missing_expr_for", "expr")
+		return nil
+	}
+	if len(fc.Args) > 1 {
+		e.push_err(fc.Args[1].Token, "argument_overflow")
+	}
+
+	d := e.eval_expr_kind(fc.Args[0].Kind)
+	if d == nil {
+		return nil
+	}
+
+	check_kind := func(k *TypeKind) {
+		switch {
+		case k.Slc() != nil:
+			if !supports_clonning(k.Slc().Elem) {
+				e.push_err(fc.Args[0].Token, "internal_type_not_supports_clone", k.To_str())
+			}
+
+		case k.Map() != nil:
+			if !supports_clonning(k.Map().Key) || supports_clonning(k.Map().Val) {
+				e.push_err(fc.Args[0].Token, "internal_type_not_supports_clone", k.To_str())
+			}
+
+		case k.Arr() != nil:
+			if !supports_clonning(k.Arr().Elem) {
+				e.push_err(fc.Args[0].Token, "internal_type_not_supports_clone", k.To_str())
+			}
+
+		case k.Ref() != nil:
+			if !supports_clonning(k.Ref().Elem) {
+				e.push_err(fc.Args[0].Token, "internal_type_not_supports_clone", k.To_str())
+			}
+
+		case k.Strct() != nil:
+			s := d.Kind.Strct()
+			if !s.HasMut {
+				e.push_err(fc.Args[0].Token, "clone_immut_struct", d.Kind.To_str())
+			}
+			if s.Decl == nil || s.Decl.Cpp_linked || !s.Decl.Is_derives(build.DERIVE_CLONE) {
+				e.push_err(fc.Args[0].Token, "type_is_not_derives", d.Kind.To_str(), build.DERIVE_CLONE)
+			}
+
+		default:
+			e.push_err(fc.Args[0].Token, "type_is_not_derives", d.Kind.To_str(), build.DERIVE_CLONE)
+		}
+	}
+
+	switch {
+	case d.Mutable:
+		e.push_err(fc.Token, "clone_with_mut")
+
+	case !d.Lvalue:
+		e.push_err(fc.Args[0].Token, "clone_non_lvalue")
+
+	case !supports_clonning(d.Kind):
+		check_kind(d.Kind)
+	}
+
+	d.Mutable = true
+	d.Model = &BuiltinCloneCallExprModel{Expr: d.Model}
 	return d
 }
 

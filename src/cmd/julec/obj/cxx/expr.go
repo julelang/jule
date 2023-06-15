@@ -526,6 +526,13 @@ func gen_builtin_make_call_expr_model(m *sema.BuiltinMakeCallExprModel) string {
 	return obj
 }
 
+func gen_builtin_clone_call_expr_model(m *sema.BuiltinCloneCallExprModel) string {
+	obj := "jule::clone("
+	obj += gen_expr_model(m.Expr)
+	obj += ")"
+	return obj
+}
+
 func gen_sizeof_expr_model(m *sema.SizeofExprModel) string {
 	obj := "sizeof("
 	obj += gen_expr(m.Expr)
@@ -540,7 +547,7 @@ func gen_alignof_expr_model(m *sema.AlignofExprModel) string {
 	return obj
 }
 
-func gen_str_constructor_expr_model(m *sema.StrConstructorcallExprModel) string {
+func gen_str_constructor_expr_model(m *sema.StrConstructorCallExprModel) string {
 	return "jule::to_str(" + gen_expr(m.Expr) + ")"
 }
 
@@ -654,14 +661,17 @@ func gen_expr_model(m sema.ExprModel) string {
 	case *sema.BuiltinMakeCallExprModel:
 		return gen_builtin_make_call_expr_model(m.(*sema.BuiltinMakeCallExprModel))
 
+	case *sema.BuiltinCloneCallExprModel:
+		return gen_builtin_clone_call_expr_model(m.(*sema.BuiltinCloneCallExprModel))
+
 	case *sema.SizeofExprModel:
 		return gen_sizeof_expr_model(m.(*sema.SizeofExprModel))
 
 	case *sema.AlignofExprModel:
 		return gen_alignof_expr_model(m.(*sema.AlignofExprModel))
 
-	case *sema.StrConstructorcallExprModel:
-		return gen_str_constructor_expr_model(m.(*sema.StrConstructorcallExprModel))
+	case *sema.StrConstructorCallExprModel:
+		return gen_str_constructor_expr_model(m.(*sema.StrConstructorCallExprModel))
 
 	case *sema.RuneExprModel:
 		return gen_rune_expr_model(m.(*sema.RuneExprModel))

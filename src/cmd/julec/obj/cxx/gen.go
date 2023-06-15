@@ -493,6 +493,18 @@ func gen_struct_operators(s *sema.StructIns) string {
 	return obj
 }
 
+func gen_struct_derive_defs_prototypes(s *sema.StructIns) string {
+	obj := ""
+
+	if s.Decl.Is_derives(build.DERIVE_CLONE) {
+		obj += indent()
+		obj += get_derive_fn_decl_clone(s.Decl)
+		obj += ";\n\n"
+	}
+
+	return obj
+}
+
 func gen_struct_ins_prototype(s *sema.StructIns) string {
 	obj := "struct "
 	out_ident := struct_ins_out_ident(s)
@@ -530,6 +542,8 @@ func gen_struct_ins_prototype(s *sema.StructIns) string {
 		obj += gen_fn_prototype(f, true)
 		obj += "\n\n"
 	}
+
+	obj += gen_struct_derive_defs_prototypes(s)
 
 	obj += gen_struct_operators(s)
 	obj += "\n"
@@ -725,9 +739,42 @@ func gen_struct_ostream(s *sema.StructIns) string {
 	return obj
 }
 
+func gen_struct_derive_defs(s *sema.StructIns) string {
+	obj := ""
+
+	if s.Decl.Is_derives(build.DERIVE_CLONE) {
+		obj += indent()
+		obj += get_derive_fn_def_clone(s.Decl)
+		obj += "{\n"
+		add_indent()
+		obj += indent()
+		obj += gen_struct_kind_ins(s)
+		obj += " clone;\n"
+		for _, f := range s.Fields {
+			ident := field_out_ident(f.Decl)
+
+			obj += indent()
+			obj += "clone."
+			obj += ident
+			obj += " = jule::clone(this->"
+			obj += ident
+			obj += ");\n"
+		}
+		obj += indent()
+		obj += "return clone;\n"
+		done_indent()
+		obj += indent()
+		obj += "}"
+	}
+
+	return obj
+}
+
 // Generates C++ code of structure instance definition.
 func gen_struct_ins(s *sema.StructIns) string {
 	obj := gen_struct_method_defs(s)
+	obj += "\n\n"
+	obj += gen_struct_derive_defs(s)
 	obj += "\n\n"
 	obj += gen_struct_ostream(s)
 	return obj

@@ -6,6 +6,7 @@ package sema
 
 import (
 	"github.com/julelang/jule/ast"
+	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 )
 
@@ -67,8 +68,8 @@ func (s *Struct) instance() *StructIns {
 
 	for i, f := range s.Fields {
 		ins.Fields[i] = f.instance()
-		if f.Kind.Kind != nil {
-			ins.HasMut = is_mut(f.Kind.Kind)
+		if f.Kind.Kind != nil && is_mut(f.Kind.Kind) {
+			ins.HasMut = true
 		}
 	}
 
@@ -115,6 +116,17 @@ func (s *Struct) Is_implements(t *Trait) bool {
 	for _, it := range s.Implements {
 		if t == it {
 			return true
+		}
+	}
+	return false
+}
+
+func (s *Struct) Is_derives(ident string) bool {
+	for _, d := range s.Directives {
+		if d.Tag == build.DIRECTIVE_DERIVE {
+			if len(d.Args) == 1 && d.Args[0] == ident {
+				return true
+			}
 		}
 	}
 	return false

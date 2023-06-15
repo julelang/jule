@@ -803,7 +803,7 @@ func (sc *_ScopeChecker) push_goto(gt *ast.GotoSt) {
 	})
 }
 
-func (sc *_ScopeChecker) check_assign(left *Data, error_token lex.Token) (ok bool) {
+func (sc *_ScopeChecker) check_assign(left *Data, right *Data, error_token lex.Token) (ok bool) {
 	f := left.Kind.Fnc()
 	if f != nil && f.Decl != nil && f.Decl.Global {
 		sc.s.push_err(error_token, "assign_type_not_support_value")
@@ -823,6 +823,10 @@ func (sc *_ScopeChecker) check_assign(left *Data, error_token lex.Token) (ok boo
 		sc.s.push_err(error_token, "assignment_to_non_mut")
 		return false
 
+	case right != nil && !right.Mutable && is_mut(right.Kind):
+		sc.s.push_err(error_token, "assignment_non_mut_to_mut")
+		return false
+
 	default:
 		return true
 	}
@@ -839,7 +843,7 @@ func (sc *_ScopeChecker) check_postfix(a *ast.AssignSt) {
 		return
 	}
 
-	_ = sc.check_assign(d, a.Setter)
+	_ = sc.check_assign(d, nil, a.Setter)
 
 	if d.Kind.Ptr() != nil {
 		ptr := d.Kind.Ptr()
@@ -893,7 +897,7 @@ func (sc *_ScopeChecker) check_single_assign(a *ast.AssignSt) {
 		return
 	}
 
-	if !sc.check_assign(l, a.Setter) {
+	if !sc.check_assign(l, r, a.Setter) {
 		return
 	}
 
@@ -1007,11 +1011,11 @@ func (sc *_ScopeChecker) check_multi_assign(a *ast.AssignSt) {
 			continue
 		}
 
-		if !sc.check_assign(l, a.Setter) {
+		if !sc.check_assign(l, r, a.Setter) {
 			continue
 		}
 
-		sc.s.check_validity_for_init_expr(l.Mutable, r, a.Setter)
+		sc.s.check_validity_for_init_expr(l.Mutable, l.Kind, r, a.Setter)
 
 		checker := _AssignTypeChecker{
 			s:           sc.s,

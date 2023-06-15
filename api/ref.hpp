@@ -106,12 +106,12 @@ namespace jule {
 
         inline jule::Bool real() const noexcept
         { return this->alloc != nullptr; }
-    
+
         inline T *operator->(void) noexcept {
             this->must_ok();
             return this->alloc;
         }
-    
+
         inline operator T(void) const noexcept {
             this->must_ok();
             return *this->alloc;
@@ -136,18 +136,18 @@ namespace jule {
             this->ref = ref.ref;
             this->alloc = ref.alloc;
         }
-    
+
         inline void operator=(const T &val) const noexcept {
             this->must_ok();
             *this->alloc = val;
         }
-    
+
         inline jule::Bool operator==(const T &val) const noexcept
         { return this->__alloc == nullptr ? false : *this->alloc == val; }
-    
+
         inline jule::Bool operator!=(const T &val) const noexcept
         { return !this->operator==(val); }
-    
+
         inline jule::Bool operator==(const jule::Ref<T> &ref) const noexcept {
             if (this->alloc == nullptr)
                 return ref.alloc == nullptr;

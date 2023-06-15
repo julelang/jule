@@ -152,6 +152,11 @@ type BuiltinOutlnCallExprModel struct {
 	Expr ExprModel
 }
 
+// Expression model for built-in clone function calls.
+type BuiltinCloneCallExprModel struct {
+	Expr ExprModel
+}
+
 // Expression model for built-in new function calls.
 type BuiltinNewCallExprModel struct {
 	Kind *TypeKind // Element type of reference.
@@ -199,7 +204,7 @@ type AlignofExprModel struct {
 
 // Expression model for constructor call of str type.
 // For example: str(my_expr)
-type StrConstructorcallExprModel struct {
+type StrConstructorCallExprModel struct {
 	Expr ExprModel
 }
 

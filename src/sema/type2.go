@@ -559,7 +559,7 @@ func (fcac *_FnCallArgChecker) check_arg(p *ParamIns, arg *Data, error_token lex
 		}
 	}
 
-	fcac.e.s.check_validity_for_init_expr(p.Decl.Mutable, arg, error_token)
+	fcac.e.s.check_validity_for_init_expr(p.Decl.Mutable, p.Decl.Kind.Kind, arg, error_token)
 	fcac.e.s.check_assign_type(p.Kind, arg, error_token, false)
 	return true
 }
@@ -693,7 +693,7 @@ func (slc *_StructLitChecker) push_match(f *FieldIns, d *Data, error_token lex.T
 		Field: f,
 		Expr:  d.Model,
 	})
-	slc.e.s.check_validity_for_init_expr(f.Decl.Mutable, d, error_token)
+	slc.e.s.check_validity_for_init_expr(f.Decl.Mutable, f.Kind, d, error_token)
 	slc.e.s.check_assign_type(f.Kind, d, error_token, false)
 }
 
@@ -848,7 +848,7 @@ func (rc *_RangeChecker) check_slice() {
 	slc := rc.d.Kind.Slc()
 	rc.kind.Key_b = rc.build_var(rc.rang.Key_b)
 	rc.kind.Key_b.Kind = &TypeSymbol{Kind: slc.Elem}
-	rc.sc.s.check_validity_for_init_expr(rc.kind.Key_b.Mutable, rc.d, rc.rang.In_token)
+	rc.sc.s.check_validity_for_init_expr(rc.kind.Key_b.Mutable, rc.kind.Key_b.Kind.Kind, rc.d, rc.rang.In_token)
 }
 
 func (rc *_RangeChecker) check_array() {
@@ -860,7 +860,7 @@ func (rc *_RangeChecker) check_array() {
 	arr := rc.d.Kind.Arr()
 	rc.kind.Key_b = rc.build_var(rc.rang.Key_b)
 	rc.kind.Key_b.Kind = &TypeSymbol{Kind: arr.Elem}
-	rc.sc.s.check_validity_for_init_expr(rc.kind.Key_b.Mutable, rc.d, rc.rang.In_token)
+	rc.sc.s.check_validity_for_init_expr(rc.kind.Key_b.Mutable, rc.kind.Key_b.Kind.Kind, rc.d, rc.rang.In_token)
 }
 
 func (rc *_RangeChecker) check_map_key_a() {
@@ -874,7 +874,7 @@ func (rc *_RangeChecker) check_map_key_a() {
 
 	d := *rc.d
 	d.Kind = m.Key
-	rc.sc.s.check_validity_for_init_expr(rc.kind.Key_a.Mutable, &d, rc.rang.In_token)
+	rc.sc.s.check_validity_for_init_expr(rc.kind.Key_a.Mutable, rc.kind.Key_a.Kind.Kind, &d, rc.rang.In_token)
 }
 
 func (rc *_RangeChecker) check_map_key_b() {
@@ -888,7 +888,7 @@ func (rc *_RangeChecker) check_map_key_b() {
 	
 	d := *rc.d
 	d.Kind = m.Val
-	rc.sc.s.check_validity_for_init_expr(rc.kind.Key_b.Mutable, &d, rc.rang.In_token)
+	rc.sc.s.check_validity_for_init_expr(rc.kind.Key_b.Mutable, rc.kind.Key_b.Kind.Kind, &d, rc.rang.In_token)
 }
 
 func (rc *_RangeChecker) check_map() {

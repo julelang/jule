@@ -19,11 +19,15 @@ const INIT_FN = "init"
 // These directives must added to the DIRECTIVES.
 const DIRECTIVE_CDEF = "cdef"        // Directive: jule:cdef
 const DIRECTIVE_TYPEDEF = "typedef"  // Directive: jule:typedef
+const DIRECTIVE_DERIVE = "derive"    // Directive: jule:derive
+
+const DERIVE_CLONE = "Clone"
 
 // List of all directives.
 var DIRECTIVES = [...]string{
 	DIRECTIVE_CDEF,
 	DIRECTIVE_TYPEDEF,
+	DIRECTIVE_DERIVE,
 }
 
 // Valid extensions of cpp headers.

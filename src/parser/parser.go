@@ -64,8 +64,13 @@ func (p *_Parser) build_expr(tokens []lex.Token) *ast.Expr {
 func (p *_Parser) push_directive(c *ast.Comment) {
 	d := &ast.Directive{
 		Token: c.Token,
-		Tag:   c.Token.Kind[len(lex.DIRECTIVE_PREFIX):], // Remove directive prefix
 	}
+
+	pragma := c.Token.Kind[len(lex.DIRECTIVE_PREFIX):] // Remove directive prefix
+	parts := strings.SplitN(pragma, " ", -1)
+
+	d.Tag = parts[0]
+	d.Args = parts[1:]
 
 	// Don't append if directive kind is invalid.
 	ok := false

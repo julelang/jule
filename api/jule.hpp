@@ -5,6 +5,7 @@
 #ifndef __JULE_HPP
 #define __JULE_HPP
 
+#include "derive/derive.hpp"
 #include "any.hpp"
 #include "array.hpp"
 #include "atomic.hpp"
