@@ -34,49 +34,67 @@ namespace jule {
         inline size_t operator()(const T &obj) const noexcept
         { return this->operator()(jule::to_str<T>(obj)); }
     };
-    
+
     template<typename Key, typename Value>
-    class Map: public std::unordered_map<Key, Value, MapKeyHasher> {
+    class Map {
     public:
+        std::unordered_map<Key, Value, MapKeyHasher> buffer{};
+
         Map<Key, Value>(void) noexcept {}
         Map<Key, Value>(const std::nullptr_t) noexcept {}
-    
+
         Map<Key, Value>(const std::initializer_list<std::pair<Key, Value>> &src) noexcept {
-            for (const auto data: src)
-                this->insert(data);
+            for (const std::pair<Key, Value> &pair: src)
+                this->buffer.insert(pair);
         }
+
+        inline constexpr
+        auto begin(void) noexcept
+        { return this->buffer.begin(); }
+
+        inline constexpr
+        auto begin(void) const noexcept
+        { return this->buffer.begin(); }
+
+        inline constexpr
+        auto end(void) noexcept
+        { return this->buffer.end(); }
+
+        inline constexpr
+        auto end(void) const noexcept
+        { return this->buffer.end(); }
     
         inline void clear(void) noexcept
-        { this->clear(); }
-    
+        { this->buffer.clear(); }
+
         jule::Slice<Key> keys(void) const noexcept {
-            jule::Slice<Key> keys(this->size());
-            jule::Uint index { 0 };
-            for (const auto &pair: *this)
-                keys.alloc[index++] = pair.first;
-            return keys;
-        }
-    
-        jule::Slice<Value> values(void) const noexcept {
-            jule::Slice<Value> keys(this->size());
+            jule::Slice<Key> keys(this->len());
             jule::Uint index{ 0 };
             for (const auto &pair: *this)
-                keys.alloc[index++] = pair.second;
+                keys._slice[index++] = pair.first;
+            return keys;
+        }
+
+        jule::Slice<Value> values(void) const noexcept {
+            jule::Slice<Value> keys(this->len());
+            jule::Uint index{ 0 };
+            for (const auto &pair: *this)
+                keys._slice[index++] = pair.second;
             return keys;
         }
 
         inline constexpr
         jule::Bool has(const Key &key) const noexcept
-        { return this->find(key) != this->end(); }
+        { return this->buffer.find(key) != this->end(); }
     
         inline jule::Int len(void) const noexcept
-        { return this->size(); }
+        { return this->buffer.size(); }
     
         inline void del(const Key &key) noexcept
-        { this->erase(key); }
+        { this->buffer.erase(key); }
     
         inline jule::Bool operator==(const std::nullptr_t) const noexcept
-        { return this->empty(); }
+        { return this->buffer.empty(); }
     
         inline jule::Bool operator!=(const std::nullptr_t) const noexcept
         { return !this->operator==(nullptr); }
