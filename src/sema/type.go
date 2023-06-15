@@ -312,6 +312,10 @@ func is_lvalue(t *TypeKind) bool {
 }
 
 func is_mut(t *TypeKind) bool {
+	if t.Prim() != nil {
+		p := t.Prim()
+		return p.Is_any()
+	}
 	return t.Slc() != nil || t.Ptr() != nil || t.Ref() != nil
 }
 
