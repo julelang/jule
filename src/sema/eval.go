@@ -1677,7 +1677,14 @@ func (e *_Eval) call_fn(fc *ast.FnCallExpr, d *Data) *Data {
 		dynamic_annotation: dynamic_annotation,
 		error_token:        fc.Token,
 	}
-	ok = fcac.check()
+	if f.Decl.Owner != nil {
+		old, e.s = e.s, old // Save current Sema.
+		ok = fcac.check()
+		old, e.s = e.s, old // Save owner Sema.
+	} else {
+		ok = fcac.check()
+	}
+
 	if !ok && dynamic_annotation {
 		return nil
 	}
@@ -3425,7 +3432,6 @@ func (bs *_BinopSolver) eval() *Data {
 
 	case bs.l.Kind.Strct() != nil:
 		return bs.eval_struct()
-
 
 	case bs.l.Kind.Prim() != nil:
 		return bs.eval_prim()

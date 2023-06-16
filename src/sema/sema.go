@@ -90,26 +90,28 @@ func build_param_vars(f *FnIns) []*Var {
 			},
 		}
 
-		switch {
-		case p.Decl.Is_self():
-			v.Kind.Kind = &TypeKind{kind: f.Owner}
+		if p.Kind != nil {
+			switch {
+			case p.Decl.Is_self():
+				v.Kind.Kind = &TypeKind{kind: f.Owner}
 
-			if p.Decl.Is_ref() {
-				v.Ident = v.Ident[1:] // Remove reference sign.
-				v.Kind.Kind.kind = &Ref{
-					Elem: v.Kind.Kind.clone(),
+				if p.Decl.Is_ref() {
+					v.Ident = v.Ident[1:] // Remove reference sign.
+					v.Kind.Kind.kind = &Ref{
+						Elem: v.Kind.Kind.clone(),
+					}
 				}
-			}
 
-		case p.Decl.Variadic:
-			v.Kind.Kind = &TypeKind{
-				kind: &Slc{
-					Elem: p.Kind.clone(),
-				},
-			}
+			case p.Decl.Variadic:
+				v.Kind.Kind = &TypeKind{
+					kind: &Slc{
+						Elem: p.Kind.clone(),
+					},
+				}
 
-		default:
-			v.Kind.Kind = p.Kind.clone()
+			default:
+				v.Kind.Kind = p.Kind.clone()
+			}
 		}
 
 		vars[i] = v
