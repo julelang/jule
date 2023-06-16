@@ -7,25 +7,37 @@ use std::sys::{
 	seek,
 	read,
 	write,
-	close
+	close,
+	O_RDONLY,
+	O_WRONLY,
+	O_RDWR,
+	O_APPEND,
+	O_CREAT,
+	O_EXCL,
+	O_SYNC,
+	O_TRUNC,
+}
+
+// Seek whence values.
+pub enum Seek: int {
+	Set = 0, // Seek relative to the origin of the file
+	Cur = 1, // Seek relative to the current offset
+	End = 2, // Seek relative to the end
 }
 
 // Flags to open wrapping those of the underlying system.
 // Not all flags may be implemented on a given system.
-// Exactly one of O_RDONLY, O_WRONLY, or O_RDWR must be specified.
-pub const O_RDONLY = std::sys::O_RDONLY // open the file read-only
-pub const O_WRONLY = std::sys::O_WRONLY // open the file write-only
-pub const O_RDWR   = std::sys::O_RDWR   // open the file read-write
-pub const O_APPEND = std::sys::O_APPEND // append data to the file when writing
-pub const O_CREAT  = std::sys::O_CREAT  // create a new file if none exists
-pub const O_EXCL   = std::sys::O_EXCL   // used with O_CREAT, file must not exist
-pub const O_SYNC   = std::sys::O_SYNC   // open for synchronous I/O
-pub const O_TRUNC  = std::sys::O_TRUNC  // truncate regular writable file when opened
-
-// Seek whence values.
-pub const SEEK_SET = 0 // seek relative to the origin of the file
-pub const SEEK_CUR = 1 // seek relative to the current offset
-pub const SEEK_END = 2 // seek relative to the end
+// Exactly one of Rdonly, Wronly, or Rdwr must be specified.
+pub enum OFlag: int {
+	Rdonly = O_RDONLY, // Open the file read-only
+	Wronly = O_WRONLY, // Open the file write-only
+	Rdwr = O_RDWR,     // Open the file read-write
+	Append = O_APPEND, // Append data to the file when writing
+	Creat = O_CREAT,   // Create a new file if none exists
+	Excl = O_EXCL,     // Used with Sema.Creat, file must not exist
+	Sync = O_SYNC,     // Open for synchronous I/O
+	Trunc = O_TRUNC,   // Truncate regular writable file when opened
+}
 
 // The file stream handle.
 pub struct File {
@@ -34,14 +46,14 @@ pub struct File {
 
 impl File {
 	// Sets offset to next Read/Write operation and returns the new offset.
-	// whence: 0 (SEEK_SET) means, relative to the origin of the file, 1 (SEEK_CUR)
-	// means relative to the current offset, and 2 (SEEK_END) means relative to end.
+	// whence: 0 (Seek.Set) means, relative to the origin of the file, 1 (Seek.Cur)
+	// means relative to the current offset, and 2 (Seek.End) means relative to end.
 	// Return 0 if error occurs.
 	//
 	// Possible errors:
 	//  InvalidDescriptor SyncIO Overflow Seek
-	pub fn seek(mut self, offset: i64, origin: int): (i64, FsError) {
-		let pos = seek(self.handle, offset, origin)
+	pub fn seek(mut self, offset: i64, origin: Seek): (i64, FsError) {
+		let pos = seek(self.handle, offset, int(origin))
 		ret pos, FsError.Ok
 	}
 
