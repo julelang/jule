@@ -12,6 +12,7 @@ import "github.com/julelang/jule/lex"
 // Builds by semantic analyzer.
 type SymbolTable struct {
 	File         *lex.File     // Owner fileset of this symbol table.
+	Passes       []Pass        // All passed flags with jule:pass directive.
 	Imports      []*ImportInfo // Imported packages.
 	Vars         []*Var        // Variables.
 	Type_aliases []*TypeAlias  // Type aliases.

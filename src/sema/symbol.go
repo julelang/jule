@@ -14,6 +14,12 @@ import (
 	"github.com/julelang/jule/lex"
 )
 
+// Directive pass.
+type Pass struct {
+	Token lex.Token
+	Text  string
+}
+
 func build_doc(cg *ast.CommentGroup) string {
 	if cg == nil {
 		return ""
@@ -476,7 +482,7 @@ func (s *_SymbolBuilder) import_use_decl(decl *ast.UseDecl) *ImportInfo {
 }
 
 func (s *_SymbolBuilder) import_use_decls() {
-	for _, decl := range s.ast.UseDecls {
+	for _, decl := range s.ast.Use_decls {
 		s.import_use_decl(decl)
 
 		// Break analysis if error occurs.
@@ -530,11 +536,35 @@ func (s *_SymbolBuilder) append_impls() {
 	}
 }
 
+func (s *_SymbolBuilder) push_directive_pass(d *ast.Directive) {
+	pass := Pass{
+		Token: d.Token,
+	}
+	for _, arg := range d.Args {
+		if arg != "" {
+			pass.Text += arg + " "
+		}
+	}
+	pass.Text = strings.TrimSpace(pass.Text)
+	s.table.Passes = append(s.table.Passes, pass)
+}
+
+func (s *_SymbolBuilder) append_top_directives() {
+	for _, d := range s.ast.Top_directives {
+		switch d.Tag {
+		case build.DIRECTIVE_PASS:
+			s.push_directive_pass(d)
+		}
+	}
+}
+
 func (s *_SymbolBuilder) build() {
 	s.table = &SymbolTable{
 		File: s.ast.File,
 	}
-	
+
+	s.append_top_directives()
+
 	s.import_use_decls()
 	// Break analysis if use declarations has error.
 	if len(s.errors) > 0 {

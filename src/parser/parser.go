@@ -61,7 +61,7 @@ func (p *_Parser) build_expr(tokens []lex.Token) *ast.Expr {
 	return expr
 }
 
-func (p *_Parser) push_directive(c *ast.Comment) {
+func (p *_Parser) get_directive(c *ast.Comment) *ast.Directive {
 	d := &ast.Directive{
 		Token: c.Token,
 	}
@@ -81,6 +81,15 @@ func (p *_Parser) push_directive(c *ast.Comment) {
 		}
 	}
 	if !ok {
+		return nil
+	}
+
+	return d
+}
+
+func (p *_Parser) push_directive(c *ast.Comment) {
+	d := p.get_directive(c)
+	if d == nil {
 		return
 	}
 
@@ -1460,7 +1469,7 @@ func (p *_Parser) append_node(st []lex.Token) {
 
 	switch {
 	case node.Is_use_decl():
-		p.ast.UseDecls = append(p.ast.UseDecls, node.Data.(*ast.UseDecl))
+		p.ast.Use_decls = append(p.ast.Use_decls, node.Data.(*ast.UseDecl))
 
 	case node.Is_decl():
 		// Use declarations eliminated.
@@ -1483,8 +1492,38 @@ func (p *_Parser) parse(f *lex.File) {
 	p.ast = &ast.Ast{
 		File: f,
 	}
+
 	stms := split_stms(f.Tokens())
-	for _, st := range stms {
+
+	// Get top directives.
+	i := 0
+	for ; i < len(stms); i++ {
+		st := stms[i]
+		if len(st.tokens) == 0 {
+			return
+		}
+	
+		node := p.parse_node(st.tokens)
+		if node.Data == nil {
+			continue
+		}
+
+		if p.stopped() {
+			return
+		}
+
+		if node.Is_comment() {
+			d := p.get_directive(node.Data.(*ast.Comment))
+			if d != nil {
+				p.ast.Top_directives = append(p.ast.Top_directives, d)
+			}
+		} else {
+			break
+		}
+	}
+
+	for ; i < len(stms); i++ {
+		st := stms[i]
 		p.append_node(st.tokens)
 
 		if p.stopped() {

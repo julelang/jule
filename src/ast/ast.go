@@ -8,10 +8,11 @@ import "github.com/julelang/jule/lex"
 
 // Abstract syntax tree.
 type Ast struct {
-	File     *lex.File
-	UseDecls []*UseDecl
-	Impls    []*Impl
-	Comments []*Comment
+	File           *lex.File
+	Top_directives []*Directive
+	Use_decls      []*UseDecl
+	Impls          []*Impl
+	Comments       []*Comment
 
 	// Possible types:
 	//  *EnumDecl

@@ -20,6 +20,7 @@ const INIT_FN = "init"
 const DIRECTIVE_CDEF = "cdef"        // Directive: jule:cdef
 const DIRECTIVE_TYPEDEF = "typedef"  // Directive: jule:typedef
 const DIRECTIVE_DERIVE = "derive"    // Directive: jule:derive
+const DIRECTIVE_PASS = "pass"        // Directive: jule:pass
 
 const DERIVE_CLONE = "Clone"
 
@@ -28,6 +29,7 @@ var DIRECTIVES = [...]string{
 	DIRECTIVE_CDEF,
 	DIRECTIVE_TYPEDEF,
 	DIRECTIVE_DERIVE,
+	DIRECTIVE_PASS,
 }
 
 // Valid extensions of cpp headers.

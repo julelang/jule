@@ -844,7 +844,7 @@ func gen_init_caller(pkg *sema.Package, used []*sema.ImportInfo) string {
 	return obj
 }
 
-func append_standard(obj_code *string) {
+func append_standard(obj_code *string, compiler string, compiler_cmd string) {
 	y, m, d := time.Now().Date()
 	h, min, _ := time.Now().Clock()
 	timeStr := fmt.Sprintf("%d/%d/%d %d.%d (DD/MM/YYYY) (HH.MM)", d, m, y, h, min)
@@ -859,10 +859,9 @@ func append_standard(obj_code *string) {
 //
 // Recommended Compile Command;
 // `)
-	c, cmd := gen_compile_cmd(get_compile_path())
-	sb.WriteString(c)
+	sb.WriteString(compiler)
 	sb.WriteByte(' ')
-	sb.WriteString(cmd)
+	sb.WriteString(compiler_cmd)
 	sb.WriteString("\n\n#include \"")
 	sb.WriteString(env.JULE_HEADER)
 	sb.WriteString("\"\n\n")

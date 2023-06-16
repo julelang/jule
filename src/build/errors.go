@@ -153,6 +153,7 @@ var ERRORS = map[string]string{
 	`missing_expr_for_unary`:                   `missing expression for unary operator`,
 	`invalid_op_for_unary`:                     `invalid_operator_for_unary: @`,
 	`use_decl_at_body`:                         `use declarations must declared before other declarations`,
+	`pass_directive_at_body`:                   `pass directives must declared top of source file`,
 	`pwd_cannot_set`:                           `current working directory cannot set`,
 	`array_auto_sized`:                         `array must have explicit size`,
 	`namespace_not_exist`:                      `namespace not exist: @`,
@@ -184,6 +185,7 @@ var ERRORS = map[string]string{
 	`clone_immut_struct`:                       `struct "@" is not breaks immutability, do not needs clonning`,
 	`internal_type_not_supports_clone`:         `internal types of "@" is not supports clonning`,
 	`type_not_compatible_for_derive`:           `type "@" is not compatible to derive "@"`,
+	`pass_directive_not_starts_with_dash`:      `the pass directive must be start with dash`,
 }
 
 // Returns formatted error message by key and args.

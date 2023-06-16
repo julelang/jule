@@ -1427,10 +1427,34 @@ func (s *_Sema) check_fn_decls() (ok bool) {
 	return true
 }
 
+func (s *_Sema) check_directive_pass(pass Pass) (ok bool) {
+	if pass.Text == "" {
+		return true
+	}
+
+	if pass.Text[0] != '-' {
+		s.push_err(pass.Token, "pass_directive_not_starts_with_dash")
+		return false
+	}
+
+	return true
+}
+
+func (s *_Sema) check_passes() (ok bool) {
+	ok = true
+	for _, pass := range s.file.Passes {
+		ok = s.check_directive_pass(pass) && ok
+	}
+	return
+}
+
 // Checks all declarations of current package file.
 // Reports whether checking is success.
 func (s *_Sema) check_file_decls() (ok bool) {
 	switch {
+	case !s.check_passes():
+		return false
+
 	case !s.check_type_alias_decls():
 		return false
 

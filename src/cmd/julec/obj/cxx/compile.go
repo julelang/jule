@@ -213,14 +213,22 @@ func compile(path string) (*sema.Package, *Importer) {
 	return pkg, importer
 }
 
-func gen_compile_cmd(source_path string) (string, string) {
+func gen_compile_cmd(source_path string, passes []string) (string, string) {
 	compiler := COMPILER_PATH
 
 	const ZERO_LEVEL_OPTIMIZATION = "-O0"
 	const DISABLE_ALL_WARNINGS = "-Wno-everything"
 	const SET_STD = "--std=c++14"
 
-	cmd := ZERO_LEVEL_OPTIMIZATION + " " + DISABLE_ALL_WARNINGS + " " + SET_STD + " "
+	cmd := ZERO_LEVEL_OPTIMIZATION + " "
+	cmd += DISABLE_ALL_WARNINGS + " "
+	cmd += SET_STD + " "
+
+	// Push passes.
+	for _, pass := range passes {
+		cmd += pass + " "
+	}
+
 	if OUT != "" {
 		cmd += "-o " + OUT + " "
 	}
@@ -235,15 +243,13 @@ func get_compile_path() string {
 	return path
 }
 
-func do_spell(obj string) {
+func do_spell(obj string, compiler string, compiler_cmd string) {
 	path := get_compile_path()
 	write_output(path, obj)
 	switch MODE {
 	case MODE_C:
-		c, cmd := gen_compile_cmd(path)
-		println(c + " " + cmd)
-		entries := strings.SplitN(cmd, " ", -1)
-		command := exec.Command(c, entries...)
+		entries := strings.SplitN(compiler_cmd, " ", -1)
+		command := exec.Command(compiler, entries...)
 		err := command.Start()
 		if err != nil {
 			println(err.Error())
@@ -255,15 +261,50 @@ func do_spell(obj string) {
 	}
 }
 
+func get_all_unique_passes(pkg *sema.Package, uses []*sema.ImportInfo) []string {
+	var passes []string
+	push_passes := func(p *sema.Package) {
+		for _, f := range p.Files {
+		push:
+			for _, pass := range f.Passes {
+				if pass.Text == "" {
+					continue
+				}
+
+				for _, cpass := range passes {
+					if cpass == pass.Text {
+						continue push
+					}
+				}
+
+				passes = append(passes, pass.Text)
+			}
+		}
+	}
+
+	push_passes(pkg)
+	for _, u := range uses {
+		if !u.Cpp {
+			push_passes(u.Package)
+		}
+	}
+
+	return passes
+}
+
 func Compile(path string) {
 	pkg, importer := compile(path)
 	if pkg == nil || importer == nil {
 		return
 	}
 
+	passes := get_all_unique_passes(pkg, importer.all_packages)
+	compiler, compiler_cmd := gen_compile_cmd(get_compile_path(), passes)
+
 	obj := Gen(pkg, importer.all_packages)
-	append_standard(&obj)
-	do_spell(obj)
+	append_standard(&obj, compiler, compiler_cmd)
+
+	do_spell(obj, compiler, compiler_cmd)
 }
 
 func init() {
