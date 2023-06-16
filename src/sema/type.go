@@ -42,6 +42,10 @@ type TypeKind struct {
 }
 // Returns clone.
 func (tk *TypeKind) clone() *TypeKind {
+	if tk == nil {
+		return nil
+	}
+
 	kind := new(TypeKind)
 	kind.Cpp_ident = tk.Cpp_ident
 	kind.Cpp_linked = tk.Cpp_linked
