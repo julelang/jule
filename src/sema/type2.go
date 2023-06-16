@@ -559,7 +559,7 @@ func (fcac *_FnCallArgChecker) check_arg(p *ParamIns, arg *Data, error_token lex
 		}
 	}
 
-	fcac.e.s.check_validity_for_init_expr(p.Decl.Mutable, p.Decl.Kind.Kind, arg, error_token)
+	fcac.e.s.check_validity_for_init_expr(p.Decl.Mutable, p.Kind, arg, error_token)
 	fcac.e.s.check_assign_type(p.Kind, arg, error_token, false)
 	return true
 }
