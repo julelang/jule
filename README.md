@@ -32,14 +32,14 @@ Our main community platforms:
 > Some commits may not be fully honored due to some compiler/API errors. \
 > Please report it with the [Jule Issue Tracker](https://github.com/julelang/jule/issues) if you come across something like this.
 
-Our motivation is to create a safe and fast programming language option that focused on system programming.
+Our motivation is to create a safe and fast programming language that focuses on system programming.
 A safer, more modern and readable option than C.
 However, we do not want to stray too far from C, C is a language that excels in systems programming.
 Since Jule is transpiled to C++ code, it can have very high interoperability with C++.
 Due to its interoperability with C++, it also offers a great deal of support for C.
 
-Jule designed for maintainable and reliable software development.
-Guarantees memory safety and committed not contain undefined behavior, has a reference compiler with obsessions that encourage developers to build safe software.
+Jule is designed for maintainable and reliable software development.
+It guarantees memory safety and is committed to not contain undefined behavior, it has a reference compiler with obsessions that encourage developers to build safe software.
 It offers fully integrated Jule-C++ development with API and interoperability.
 
 File: `quicksort.jule`
@@ -73,7 +73,7 @@ fn main() {
 
 <h2 id="key-features">Design Principles</h2>
 
-Jule is develops within the framework of certain design principles.
+Jule is developed within the framework of certain design principles.
 These principles often follow the motivation for the emergence of Jule.
 Our aim is to present a design and implementation that meets these principles in the most balanced way.
 
@@ -102,7 +102,7 @@ Please read the <a href="https://jule.dev/pages/manual.html?page=memory-memory-m
 <br><br>
 Variables are immutable by default, and each variable is encouraged to be initialized at declaration.
 Safe Jule performs bounds checking and nil (aka null) checking.
-It is committed to no undefined behavior.
+It is committed to have no undefined behavior.
 Unsafe behaviors are encouraged to be done deliberately with unsafe scopes.
 Please read the <a href="https://jule.dev/pages/manual.html?page=unsafe-jule">Unsafe Jule</a> part of manual for more information about of Unsafe Jule.
 <br><br>
@@ -144,12 +144,12 @@ fn main() {
 }
 ```
 
-The above example demonstrates the interoperability of Jule with a C++ function that returns total of all values of an integer slice.
+The above example demonstrates the interoperability of Jule with a C++ function that returns the total of all values of an integer slice.
 The C++ header file is written entirely using the Jule API.
 The `Int`, and `Slice` types used are part of the API.
-The `Int` data type is equally sensitive to system architecture as in Jule.
-The Jule source code declares to use `sum.hpp` first and binds the C++ function in it to Jule accordingly.
-Then a call is made from Jule and the result of the function is written to the command line.
+The `Int` data type is equally sensitive to the system architecture as in Jule.
+The Jule source code declares to use `sum.hpp` first, and binds the C++ function into Jule accordingly.
+Then, a call is made from Jule and the result of the function is written to the command line.
 
 <h2 id="future-changes">Future Changes</h2>
 JuleC is in early development and currently it can only be built from source.
@@ -186,23 +186,22 @@ To contribute to the website, manual or something else, please use the <a href="
 <h2 id="os-support">Compiler and C++ Standard Support</h2>
 JuleC officially supports some C++ compilers.
 When you try to compile with these compilers, it promises that code can be compiled in the officially supported C++ standard.
-JuleC is committed to creating code according to the most ideal C++ standard it has adopted.
-Commits that the generated code can be compiled by C++ compilers that fully support this standard.
-Likewise, this commit is also available for the <a href="./api">API</a> of JuleC.
+JuleC is committed to creating code according to the most ideal C++ standard it has adopted, and that the generated code can be compiled by C++ compilers that fully support this standard.
+Likewise, this commitment is also true for the <a href="./api">API</a> of JuleC.
 Jule's ideal C++ standard is determined by the most ideal C++ standard, fully supported by officially supported C++ compilers.
 <br><br>
 If you are getting a compiler error even though you are using the officially supported compiler and standard, please let us know with the <a href="https://github.com/julelang/jule/issues">Jule Issue Tracker</a>.
-If you are trying to use a standard or compiler that is not officially supported, you can still contact us to find out about the problem.
-But keep in mind that since it's out of official support, it's likely that the maintainers won't make the effort to fix it.
+If you are trying to use a standard or a compiler that is not officially supported, you can still contact us to find out about the problem.
+But keep in mind that since it's out of the official support, it's likely that the maintainers won't make the effort to fix it.
 <br><br>
 
 See [compiling](https://jule.dev/pages/manual.html?page=compiler-compiling) part of manual for supported compilers and C++ standards.
 
 <h2 id="os-support">Platform Support</h2>
 Jule supports multiple platforms.
-It supports development on i386, amd64 architectures on Windows, Linux and Darwin platforms.
-JuleC undertakes that the code and standard library it produces will be compatible with all these platforms.
-All supported platforms by JuleC are documented in the <a href="https://jule.dev/pages/manual.html?page=compiler-platform-support">platform support</a> part of manual.
+It supports development on i386, amd64 and arm64 architectures on Windows, Linux and macOS (Darwin) platforms. 
+JuleC undertakes the effort, that the code and standard library it produces will be compatible with all these platforms.
+All supported platforms by JuleC are documented in the <a href="https://jule.dev/pages/manual.html?page=compiler-platform-support">platform support</a> part of manual. 
 
 <h2 id="building-project">Building Project</h2>
 
@@ -222,12 +221,17 @@ JuleC is in development with the [Go](https://github.com/golang/go) programming 
 
 In `src` directory.
 
-#### Windows (PowerShell)
+#### Windows 
 ```powershell
 go build -o julec.exe -v cmd\julec\main.go
 ```
 
-#### Linux (Bash)
+#### macOS (Darwin)
+```zsh
+go build -o julec -v cmd/julec/main.go
+```
+
+#### Linux 
 ```bash
 go build -o julec -v cmd/julec/main.go
 ```
@@ -236,12 +240,12 @@ Run the above command in your terminal, in the `src` directory of Jule project.
 
 <h2 id="contributing">Contributing</h2>
 
-Thanks for you want contributing to Jule! \
+Thanks in advance for your contribution to Jule! \
 Every contribution, big or small, to Jule is greatly appreciated.
 
-The Jule project use issues for only bug reports and proposals. \
+The Jule project uses issues only for bug reports and proposals. \
 To contribute, please read the [contribution guidelines](https://jule.dev/pages/contributing.html). \
-To discussions and ask questions, please use [discussions](https://github.com/julelang/jule/discussions). \
+For discussions and asking questions, please use [discussions](https://github.com/julelang/jule/discussions). \
 Regarding security, please refer to the [security policy](https://github.com/julelang/jule/security/policy).
 
 <h2 id="code-of-conduct">Code of Conduct</h2>
