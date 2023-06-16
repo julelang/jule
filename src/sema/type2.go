@@ -396,7 +396,7 @@ func (dta *_DynamicTypeAnnotation) annotate_prim(k *TypeKind) (ok bool) {
 
 		case t.To_str() != k.To_str():
 			// Generic already pushed but generic type and current kind
-			// is different, so incopatible.
+			// is different, so incompatible.
 			return false
 		}
 		*dta.k = k
@@ -465,8 +465,46 @@ func (dta *_DynamicTypeAnnotation) annotate_fn(k *TypeKind) (ok bool) {
 	return ok
 }
 
+func (dta *_DynamicTypeAnnotation) annotate_ptr(k *TypeKind) (ok bool) {
+	pptr := (*dta.k).Ptr()
+	if pptr == nil {
+		return false
+	}
+
+	ptr := k.Ptr()
+	dta.k = &pptr.Elem
+	return dta.annotate_kind(ptr.Elem)
+}
+
+func (dta *_DynamicTypeAnnotation) annotate_any(k *TypeKind) (ok bool) {
+	kind := (*dta.k).To_str()
+	for i, g := range dta.f.Decl.Generics {
+		if kind != g.Ident {
+			continue
+		}
+
+		t := dta.f.Generics[i]
+		switch {
+		case t == nil:
+			dta.push_generic(k, i)
+
+		case t.To_str() != k.To_str():
+			// Generic already pushed but generic type and current kind
+			// is different, so incompatible.
+			return false
+		}
+		*dta.k = k
+		return true
+	}
+
+	return false
+}
+
 func (dta *_DynamicTypeAnnotation) annotate_kind(k *TypeKind) (ok bool) {
 	switch {
+	case dta.annotate_any(k):
+		return true
+
 	case k.Prim() != nil:
 		return dta.annotate_prim(k)
 
@@ -478,6 +516,9 @@ func (dta *_DynamicTypeAnnotation) annotate_kind(k *TypeKind) (ok bool) {
 
 	case k.Fnc() != nil:
 		return dta.annotate_fn(k)
+
+	case k.Ptr() != nil:
+		return dta.annotate_ptr(k)
 
 	default:
 		return false
