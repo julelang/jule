@@ -62,6 +62,10 @@ func (p *_Parser) build_expr(tokens []lex.Token) *ast.Expr {
 }
 
 func (p *_Parser) get_directive(c *ast.Comment) *ast.Directive {
+	if len(c.Token.Kind) <= len(lex.DIRECTIVE_PREFIX) {
+		return nil
+	}
+
 	d := &ast.Directive{
 		Token: c.Token,
 	}
