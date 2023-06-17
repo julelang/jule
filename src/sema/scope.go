@@ -803,35 +803,6 @@ func (sc *_ScopeChecker) push_goto(gt *ast.GotoSt) {
 	})
 }
 
-func (sc *_ScopeChecker) check_assign(left *Data, right *Data, error_token lex.Token) (ok bool) {
-	f := left.Kind.Fnc()
-	if f != nil && f.Decl != nil && f.Decl.Global {
-		sc.s.push_err(error_token, "assign_type_not_support_value")
-		return false
-	}
-
-	switch {
-	case !left.Lvalue:
-		sc.s.push_err(error_token, "assign_require_lvalue")
-		return false
-
-	case left.Is_const():
-		sc.s.push_err(error_token, "assign_const")
-		return false
-
-	case !left.Mutable:
-		sc.s.push_err(error_token, "assignment_to_non_mut")
-		return false
-
-	case right != nil && !right.Mutable && is_mut(right.Kind):
-		sc.s.push_err(error_token, "assignment_non_mut_to_mut")
-		return false
-
-	default:
-		return true
-	}
-}
-
 func (sc *_ScopeChecker) check_postfix(a *ast.AssignSt) {
 	if len(a.L) > 1 {
 		sc.s.push_err(a.Setter, "invalid_syntax")
@@ -843,7 +814,7 @@ func (sc *_ScopeChecker) check_postfix(a *ast.AssignSt) {
 		return
 	}
 
-	_ = sc.check_assign(d, nil, a.Setter)
+	_ = check_assign(sc.s, d, nil, a.Setter)
 
 	if d.Kind.Ptr() != nil {
 		ptr := d.Kind.Ptr()
@@ -897,7 +868,7 @@ func (sc *_ScopeChecker) check_single_assign(a *ast.AssignSt) {
 		return
 	}
 
-	if !sc.check_assign(l, r, a.Setter) {
+	if !check_assign(sc.s, l, r, a.Setter) {
 		return
 	}
 
@@ -1011,7 +982,7 @@ func (sc *_ScopeChecker) check_multi_assign(a *ast.AssignSt) {
 			continue
 		}
 
-		if !sc.check_assign(l, r, a.Setter) {
+		if !check_assign(sc.s, l, r, a.Setter) {
 			continue
 		}
 
@@ -1635,5 +1606,44 @@ func get_datas_from_tuple_data(d *Data) []*Data {
 		}
 	} else {
 		return []*Data{d}
+	}
+}
+
+func check_mut(s *_Sema, left *Data, right *Data, error_token lex.Token) (ok bool) {
+	switch {
+	case !left.Mutable:
+		s.push_err(error_token, "assignment_to_non_mut")
+		return false
+
+	case right != nil && !right.Mutable && is_mut(right.Kind):
+		s.push_err(error_token, "assignment_non_mut_to_mut")
+		return false
+
+	default:
+		return true
+	}
+}
+
+func check_assign(s *_Sema, left *Data, right *Data, error_token lex.Token) (ok bool) {
+	f := left.Kind.Fnc()
+	if f != nil && f.Decl != nil && f.Decl.Global {
+		s.push_err(error_token, "assign_type_not_support_value")
+		return false
+	}
+
+	switch {
+	case !left.Lvalue:
+		s.push_err(error_token, "assign_require_lvalue")
+		return false
+
+	case left.Is_const():
+		s.push_err(error_token, "assign_const")
+		return false
+
+	case !check_mut(s, left, right, error_token):
+		return false
+
+	default:
+		return true
 	}
 }

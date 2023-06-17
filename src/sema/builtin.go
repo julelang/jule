@@ -236,6 +236,13 @@ func builtin_caller_common(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 	return builtin_caller_common_plain(e, fc, d)
 }
 
+func builtin_caller_common_mut(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
+	if !d.Mutable {
+		e.push_err(fc.Token, "mutable_operation_on_immutable")
+	}
+	return builtin_caller_common(e, fc, d)
+}
+
 func builtin_caller_out(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
 	if len(fc.Generics) > 0 {
 		e.push_err(fc.Token, "not_has_generics")
@@ -307,6 +314,8 @@ func builtin_caller_new(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 	if len(fc.Args) == 2 { // Initialize expression.
 		init := e.s.evalp(fc.Args[1], e.lookup, &TypeSymbol{Kind: t.Kind})
 		if init != nil {
+			t.Mutable = true
+			_ = check_mut(e.s, t, init, fc.Args[1].Token)
 			e.s.check_assign_type(t.Kind, init, fc.Args[1].Token, false)
 			d.Model = &BuiltinNewCallExprModel{
 				Kind: t.Kind,
@@ -368,6 +377,8 @@ func builtin_caller_drop(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
 		e.push_err(fc.Args[0].Token, "invalid_expr")
 		return nil
 	}
+
+	_ = check_mut(e.s, ref, nil, fc.Args[0].Token)
 
 	d := build_void_data()
 	d.Model = &BuiltinDropCallExprModel{Expr: ref.Model}
@@ -485,6 +496,7 @@ func builtin_caller_append(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 			},
 			{
 				Decl: &Param{
+					Mutable: true,
 					Variadic: true,
 				},
 				Kind: t.Kind.Slc().Elem.clone(),
@@ -537,7 +549,9 @@ func builtin_caller_copy(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 				Kind: t.Kind.clone(),
 			},
 			{
-				Decl: &Param{},
+				Decl: &Param{
+					Mutable: true,
+				},
 				Kind: t.Kind.clone(),
 			},
 		},

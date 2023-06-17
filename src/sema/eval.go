@@ -1907,9 +1907,10 @@ func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
 
 	case "clear":
 		return &Data{
+			Mutable: d.Mutable,
 			Kind: &TypeKind{
 				kind:  &FnIns{
-					caller: builtin_caller_common,
+					caller: builtin_caller_common_mut,
 				},
 			},
 			Model: &CommonSubIdentExprModel{
@@ -1921,9 +1922,10 @@ func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
 	case "keys":
 		m := d.Kind.Map()
 		return &Data{
+			Mutable: d.Mutable,
 			Kind: &TypeKind{
 				kind: &FnIns{
-					caller: builtin_caller_common,
+					caller: builtin_caller_common_mut,
 					Result: &TypeKind{
 						kind: &Slc{
 							Elem: m.Key,
@@ -1940,9 +1942,10 @@ func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
 	case "values":
 		m := d.Kind.Map()
 		return &Data{
+			Mutable: d.Mutable,
 			Kind: &TypeKind{
 				kind: &FnIns{
-					caller: builtin_caller_common,
+					caller: builtin_caller_common_mut,
 					Result: &TypeKind{
 						kind: &Slc{
 							Elem: m.Val,
@@ -1959,6 +1962,7 @@ func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
 	case "has":
 		m := d.Kind.Map()
 		return &Data{
+			Mutable: d.Mutable,
 			Kind: &TypeKind{
 				kind: &FnIns{
 					caller: builtin_caller_common,
@@ -1982,9 +1986,10 @@ func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
 	case "del":
 		m := d.Kind.Map()
 		return &Data{
+			Mutable: d.Mutable,
 			Kind: &TypeKind{
 				kind: &FnIns{
-					caller: builtin_caller_common,
+					caller: builtin_caller_common_mut,
 					Params: []*ParamIns{
 						{
 							Decl: &Param{
