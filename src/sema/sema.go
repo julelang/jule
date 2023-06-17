@@ -727,7 +727,7 @@ func (s *_Sema) reload_fn_ins_types(f *FnIns) (ok bool) {
 }
 
 func (s *_Sema) check_validity_for_init_expr(left_mut bool, left_kind *TypeKind, d *Data, error_token lex.Token) {
-	if d.Lvalue && left_mut && !d.Mutable && is_mut(d.Kind) {
+	if left_mut && !d.Mutable && is_mut(d.Kind) {
 		s.push_err(error_token, "assignment_non_mut_to_mut")
 	}
 

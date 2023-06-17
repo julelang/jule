@@ -924,6 +924,7 @@ func (e *_Eval) eval_arr(s *ast.SliceExpr) *Data {
 	e.prefix = prefix
 
 	return &Data{
+		Mutable: true,
 		Kind:  &TypeKind{kind: arr},
 		Model: model,
 	}
@@ -953,7 +954,8 @@ func (e *_Eval) eval_exp_slc(s *ast.SliceExpr, elem_type *TypeKind) *Data {
 	e.prefix = prefix
 
 	return &Data{
-		Kind:  &TypeKind{kind: slc},
+		Mutable: true,
+		Kind: &TypeKind{kind: slc},
 		Model: model,
 	}
 }
@@ -1152,8 +1154,14 @@ func (e *_Eval) eval_slicing_exprs(s *ast.SlicingExpr) (*Data, *Data) {
 }
 
 func (e *_Eval) slicing_arr(d *Data) {
+	elem_type := d.Kind.Arr().Elem.clone()
+	d.Kind.kind = &Slc{Elem: elem_type}
+
 	d.Lvalue = false
-	d.Kind.kind = &Slc{Elem: d.Kind.Arr().Elem.clone()}
+
+	// Keep mutability id already mutable.
+	// Be mutable, if element is not mutable-type.
+	d.Mutable = d.Mutable || !is_mut(elem_type)
 }
 
 func (e *_Eval) slicing_slc(d *Data) {
@@ -1162,6 +1170,7 @@ func (e *_Eval) slicing_slc(d *Data) {
 
 func (e *_Eval) slicing_str(d *Data, l *Data, r *Data) {
 	d.Lvalue = false
+	d.Mutable = true
 	if !d.Is_const() {
 		return
 	}
@@ -1264,7 +1273,12 @@ func (e *_Eval) cast_struct(t *TypeKind, d *Data, error_token lex.Token) {
 		return
 	}
 
-	s := t.Strct()
+	var s *StructIns
+	if t.Ref() != nil {
+		s = t.Ref().Elem.Strct()
+	} else {
+		s = t.Strct()
+	}
 	if !s.Decl.Is_implements(tr) {
 		e.push_err(error_token, "type_not_supports_casting_to", d.Kind.To_str(), t.To_str())
 	}
@@ -1400,6 +1414,7 @@ func (e *_Eval) cast_prim(t *TypeKind, d *Data, error_token lex.Token) {
 	switch {
 	case prim.Is_any():
 		// The any type supports casting to any data type.
+		d.Kind = t // Set type for mutability safety checking.
 
 	case prim.Is_str():
 		e.cast_str(d, error_token)
@@ -1419,6 +1434,7 @@ func (e *_Eval) eval_cast_by_type_n_data(t *TypeKind, d *Data, error_token lex.T
 	switch {
 	case d.Kind.Prim() != nil && d.Kind.Prim().Is_any():
 		// The any type supports casting to any data type.
+		d.Kind = t // Set type for mutability safety checking.
 
 	case t.Ptr() != nil:
 		e.cast_ptr(t, d, error_token)
@@ -1444,11 +1460,9 @@ func (e *_Eval) eval_cast_by_type_n_data(t *TypeKind, d *Data, error_token lex.T
 		return nil
 	}
 
-	// Set to mutable if type is mutable.
-	// Ignore any for keep mutability safety of value.
-	if d.Kind.Prim() == nil || !d.Kind.Prim().Is_any() {
-		d.Mutable = is_mut(t)
-	}
+	// Keep mutability if data is already mutable.
+	// Even if the data is not mutable, set as mutable if the type is not mutable-type.
+	d.Mutable = d.Mutable || !is_mut(t)
 
 	d.Lvalue = is_lvalue(t)
 	d.Decl = false
