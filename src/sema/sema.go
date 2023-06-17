@@ -1144,7 +1144,7 @@ func (s *_Sema) check_trait_impl_methods(base *Trait, ipl *Impl) (ok bool) {
 func (s *_Sema) impl_to_struct(dest *Struct, ipl *Impl) (ok bool) {
 	ok = true
 	for _, f := range ipl.Methods {
-		if dest.Find_method(f.Ident) != nil {
+		if dest.Find_method(f.Ident) != nil || dest.Find_field(f.Ident) != nil {
 			s.push_err(f.Token, "struct_already_have_ident", dest.Ident, f.Ident)
 			ok = false
 			continue

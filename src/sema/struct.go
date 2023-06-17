@@ -111,6 +111,17 @@ func (s *Struct) Find_method(ident string) *Fn {
 	return nil
 }
 
+// Returns field by identifier.
+// Returns nil if not exist any field in this identifier.
+func (s *Struct) Find_field(ident string) *Field {
+	for _, f := range s.Fields {
+		if f.Ident == ident {
+			return f
+		}
+	}
+	return nil
+}
+
 // Reports whether structure implements given trait.
 func (s *Struct) Is_implements(t *Trait) bool {
 	for _, it := range s.Implements {
