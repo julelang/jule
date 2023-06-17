@@ -1797,6 +1797,10 @@ func (e *_Eval) eval_trait_sub_ident(d *Data, trt *Trait, ident lex.Token) *Data
 func (e *_Eval) eval_struct_sub_ident(d *Data, s *StructIns, si *ast.SubIdentExpr, ref bool) *Data {
 	f := s.Find_field(si.Ident.Kind)
 	if f != nil {
+		if !e.s.is_accessible_define(f.Decl.Public, f.Decl.Token) {
+			e.push_err(si.Ident, "ident_is_not_accessible", f.Decl.Ident)
+		}
+
 		model := &StrctSubIdentExprModel{
 			ExprKind: d.Kind,
 			Expr:     d.Model,
