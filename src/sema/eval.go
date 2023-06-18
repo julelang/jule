@@ -3615,9 +3615,22 @@ func (bs *_BinopSolver) prepare_eval() {
 	bs.prepare_data(bs.l)
 }
 
+func (bs *_BinopSolver) check_data(d *Data) {
+	f := d.Kind.Fnc()
+	if f != nil && f.Decl != nil && f.Decl.Is_method() {
+		bs.e.push_err(bs.op, "invalid_expr_for_binop")
+	}
+}
+
+func (bs *_BinopSolver) check_datas() {
+	bs.check_data(bs.l)
+	bs.check_data(bs.r)
+}
+
 func (bs *_BinopSolver) solve_explicit(l *Data, r *Data) *Data {
 	bs.l, bs.r = l, r
 	bs.prepare_eval()
+	bs.check_datas()
 	d := bs.eval()
 	bs.l, bs.r = l, r // Save normal order
 
