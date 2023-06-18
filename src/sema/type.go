@@ -684,7 +684,7 @@ func (tc *_TypeChecker) check_struct_ins(ins *StructIns, error_token lex.Token) 
 			use_generics: generics,
 		}
 		kind := tc.check_decl(f.Decl.Kind.Decl)
-		ok := kind != nil
+		ok = kind != nil
 
 		if ins.Decl.sema != nil && tc.s != ins.Decl.sema && len(ins.Decl.sema.errors) > 0 {
 			tc.s.errors = append(tc.s.errors, ins.Decl.sema.errors...)
@@ -697,13 +697,25 @@ func (tc *_TypeChecker) check_struct_ins(ins *StructIns, error_token lex.Token) 
 		f.Kind = kind
 		if is_mut(f.Kind) {
 			ins.HasMut = true
-			if ins.Decl.Is_derives(build.DERIVE_CLONE) && !supports_clonning(f.Kind) {
-				tc.push_err(f.Decl.Token, "type_not_compatible_for_derive", f.Kind.To_str(), build.DERIVE_CLONE)
-			}
+			_ = tc.s.check_struct_ins_derive_clone(ins)
 		}
 	}
 
 	return true
+}
+
+func (tc *_TypeChecker) append_used_struct_reference(s *Struct) {
+	if tc.referencer == nil {
+		return
+	}
+
+	switch tc.referencer.owner.(type) {
+	case *Struct:
+		ref_s := tc.referencer.owner.(*Struct)
+		if !ref_s.Is_uses(s) {
+			ref_s.Uses = append(ref_s.Uses, s)
+		}
+	}
 }
 
 func (tc *_TypeChecker) from_struct(decl *ast.IdentType, s *Struct) *StructIns {
@@ -716,6 +728,8 @@ func (tc *_TypeChecker) from_struct(decl *ast.IdentType, s *Struct) *StructIns {
 	if !ok {
 		return nil
 	}
+
+	tc.append_used_struct_reference(s)
 
 	ins := s.instance()
 	ins.Generics = make([]*TypeKind, len(decl.Generics))

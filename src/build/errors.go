@@ -186,6 +186,8 @@ var ERRORS = map[string]string{
 	`internal_type_not_supports_clone`:         `internal types of "@" is not supports clonning`,
 	`type_not_compatible_for_derive`:           `type "@" is not compatible to derive "@"`,
 	`pass_directive_not_starts_with_dash`:      `the pass directive must be start with dash`,
+	`derive_illegal_cycle_refers_itself`:       `illegal cycle for "@" derive, struct "@" refers to itself`,
+	`derive_illegal_cross_cycle`:               "illegal cross cycle for \"@\" derive;\n@",
 }
 
 // Returns formatted error message by key and args.

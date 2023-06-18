@@ -5,6 +5,7 @@
 package sema
 
 import (
+	"strings"
 	"unsafe"
 
 	"github.com/julelang/jule/ast"
@@ -1471,18 +1472,122 @@ func (s *_Sema) check_file_decls() (ok bool) {
 	}
 }
 
+func (s *_Sema) check_struct_derive_illegal_cycles(derive string, st1 *Struct, k *TypeKind) (ok bool) {
+	var get_struct_from_kind func(*TypeKind) *Struct
+	get_struct_from_kind = func(k *TypeKind) *Struct {
+		switch {
+		case k == nil:
+			return nil
+
+		case k.Strct() != nil:
+			return k.Strct().Decl
+
+		case k.Ref() != nil:
+			return get_struct_from_kind(k.Ref().Elem)
+
+		case k.Slc() != nil:
+			return get_struct_from_kind(k.Slc().Elem)
+
+		case k.Arr() != nil:
+			return get_struct_from_kind(k.Arr().Elem)
+
+		case k.Ptr() != nil:
+			// Pass pointers.
+			// Clonning just copies pointer address.
+			// There is no any illegal cycle risk.
+			return nil
+
+		default:
+			return nil
+		}
+	}
+	st2 := get_struct_from_kind(k)
+	if st2 == nil {
+		return true
+	}
+
+	// Check illegal cycle for itself.
+	// Because refers's owner is ta.
+	if st1 == st2 {
+		s.push_err(st1.Token, "derive_illegal_cycle_refers_itself", derive, st1.Ident)
+		return false
+	}
+
+	const PADDING = 4
+
+	message := ""
+
+	push := func(st1 *Struct, st2 *Struct) {
+		refers_to := build.Errorf("refers_to", st1.Ident, st2.Ident)
+		message = strings.Repeat(" ", PADDING) + refers_to + "\n" + message
+	}
+
+	// Check cross illegal cycle.
+	var check_cross func(st2 *Struct) bool
+	check_cross = func(st2 *Struct) bool {
+		for _, u := range st2.Uses {
+			if u == st1 {
+				push(st2, u)
+				return false
+			}
+
+			if !check_cross(u) {
+				push(st2, u)
+				return false
+			}
+		}
+
+		return true
+	}
+
+	if !check_cross(st2) {
+		err_msg := message
+		message = ""
+		push(st1, st2)
+		err_msg = err_msg + message
+		s.push_err(st1.Token, "derive_illegal_cross_cycle", derive, err_msg)
+		return false
+	}
+
+	return true
+}
+
+func (s *_Sema) check_struct_ins_derive_clone(st *StructIns) (ok bool) {
+	if !st.Decl.Is_derives(build.DERIVE_CLONE) {
+		return true
+	}
+
+	for _, f := range st.Fields {
+		if f.Kind == nil || !is_mut(f.Kind) {
+			continue
+		}
+
+		if !supports_clonning(f.Kind) {
+			s.push_err(st.Decl.Token, "type_not_compatible_for_derive", f.Kind.To_str(), build.DERIVE_CLONE)
+			return false
+		}
+
+		if !s.check_struct_derive_illegal_cycles(build.DERIVE_CLONE, st.Decl, f.Kind) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (s *_Sema) check_struct_derive_clone(st *Struct) (ok bool) {
+	return s.check_struct_ins_derive_clone(st.instance())
+}
+
 func (s *_Sema) check_file_derives() (ok bool) {
 	// Check derives.
 	for _, st := range s.file.Structs {
-		for _, f := range st.Fields {
-			if f.Kind.Kind != nil && is_mut(f.Kind.Kind) {
-				if st.Is_derives(build.DERIVE_CLONE) && !supports_clonning(f.Kind.Kind) {
-					s.push_err(st.Token, "type_not_compatible_for_derive", f.Kind.Kind.To_str(), build.DERIVE_CLONE)
-					return false
-				}
-			}
+		ok := s.check_struct_derive_clone(st)
+		if !ok {
+			return false
 		}
 	}
+
 	return true
 }
 

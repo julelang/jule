@@ -38,6 +38,10 @@ type Struct struct {
 	// Not includes non-pain identifier references such as *A, &B, and []MyStruct.
 	Depends    []*Struct
 
+	// This structures uses these structures.
+	// Stores all referred structures.
+	Uses       []*Struct
+
 	Token      lex.Token
 	Ident      string
 	Fields     []*Field
@@ -132,12 +136,23 @@ func (s *Struct) Is_implements(t *Trait) bool {
 	return false
 }
 
+// Reports whether structure is derives given derive.
 func (s *Struct) Is_derives(ident string) bool {
 	for _, d := range s.Directives {
 		if d.Tag == build.DIRECTIVE_DERIVE {
 			if len(d.Args) == 1 && d.Args[0] == ident {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+// Reports whether structure is uses given structure.
+func (s *Struct) Is_uses(st *Struct) bool {
+	for _, u := range s.Uses {
+		for st == u {
+			return true
 		}
 	}
 	return false
