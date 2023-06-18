@@ -1414,7 +1414,6 @@ func (e *_Eval) cast_prim(t *TypeKind, d *Data, error_token lex.Token) {
 	switch {
 	case prim.Is_any():
 		// The any type supports casting to any data type.
-		d.Kind = t // Set type for mutability safety checking.
 
 	case prim.Is_str():
 		e.cast_str(d, error_token)
@@ -1434,7 +1433,6 @@ func (e *_Eval) eval_cast_by_type_n_data(t *TypeKind, d *Data, error_token lex.T
 	switch {
 	case d.Kind.Prim() != nil && d.Kind.Prim().Is_any():
 		// The any type supports casting to any data type.
-		d.Kind = t // Set type for mutability safety checking.
 
 	case t.Ptr() != nil:
 		e.cast_ptr(t, d, error_token)

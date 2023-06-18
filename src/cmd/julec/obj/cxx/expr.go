@@ -297,7 +297,6 @@ func gen_casting_expr_model(m *sema.CastingExprModel) string {
 		obj += ")("
 		obj += gen_expr(m.Expr)
 		obj += "))"
-		return obj
 
 	case m.ExprKind.Trt() != nil || (m.ExprKind.Prim() != nil && m.ExprKind.Prim().Is_any()):
 		obj += gen_expr_model(m.Expr)
@@ -305,14 +304,14 @@ func gen_casting_expr_model(m *sema.CastingExprModel) string {
 		obj += "operator "
 		obj += gen_type_kind(m.Kind)
 		obj += "()"
-		return obj
-	}
 
-	obj += "static_cast<"
-	obj += gen_type_kind(m.Kind)
-	obj += ">("
-	obj += gen_expr(m.Expr)
-	obj += ")"
+	default:
+		obj += "static_cast<"
+		obj += gen_type_kind(m.Kind)
+		obj += ">("
+		obj += gen_expr(m.Expr)
+		obj += ")"
+	}
 	return obj
 }
 
