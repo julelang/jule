@@ -16,22 +16,6 @@ const STDLIB = "std"
 const ENTRY_POINT = "main"
 const INIT_FN = "init"
 
-// These directives must added to the DIRECTIVES.
-const DIRECTIVE_CDEF = "cdef"        // Directive: jule:cdef
-const DIRECTIVE_TYPEDEF = "typedef"  // Directive: jule:typedef
-const DIRECTIVE_DERIVE = "derive"    // Directive: jule:derive
-const DIRECTIVE_PASS = "pass"        // Directive: jule:pass
-
-const DERIVE_CLONE = "Clone"
-
-// List of all directives.
-var DIRECTIVES = [...]string{
-	DIRECTIVE_CDEF,
-	DIRECTIVE_TYPEDEF,
-	DIRECTIVE_DERIVE,
-	DIRECTIVE_PASS,
-}
-
 // Valid extensions of cpp headers.
 var CPP_HEADER_EXTS = []string{
 	".h",

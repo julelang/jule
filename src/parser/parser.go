@@ -1433,26 +1433,32 @@ func (p *_Parser) check_use_decl(node ast.Node) {
 	}
 }
 
+func (p *_Parser) build_general_scope_node_data(st []lex.Token) (is_pub bool, data ast.NodeData) {
+	// Detect pub keyword.
+	if st[0].Id == lex.ID_PUB {
+		is_pub = true
+		st = st[1:]
+		if len(st) == 0 {
+			p.push_err(st[0], "invalid_syntax")
+			return
+		}
+	}
+
+	data = p.build_node_data(st)
+	return is_pub, data
+}
+
 func (p *_Parser) parse_node(st []lex.Token) ast.Node {
 	node := ast.Node{
 		Token: st[0],
 	}
 
-	// Detect pub keyword.
-	is_pub := false
-	if node.Token.Id == lex.ID_PUB {
-		is_pub = true
-		st = st[1:]
-		if len(st) == 0 {
-			p.push_err(node.Token, "invalid_syntax")
-			return node
-		}
-	}
-
-	node.Data = p.build_node_data(st)
-	if node.Data == nil {
+	is_pub, data := p.build_general_scope_node_data(st)
+	if data == nil {
 		return node
 	}
+
+	node.Data = data
 
 	p.apply_meta(node, is_pub)
 	p.check_comment_group(node)
@@ -1507,7 +1513,7 @@ func (p *_Parser) parse(f *lex.File) {
 			return
 		}
 	
-		data := p.build_node_data(st.tokens)
+		_, data := p.build_general_scope_node_data(st.tokens)
 		if data == nil {
 			continue
 		}
@@ -1519,8 +1525,10 @@ func (p *_Parser) parse(f *lex.File) {
 		node := ast.Node{Data: data}
 		if node.Is_comment() {
 			d := p.get_directive(node.Data.(*ast.Comment))
-			if d != nil {
+			if d != nil && build.Is_top_directive(d.Tag) {
 				p.ast.Top_directives = append(p.ast.Top_directives, d)
+			} else {
+				break
 			}
 		} else {
 			break
