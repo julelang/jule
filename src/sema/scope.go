@@ -1289,7 +1289,6 @@ func (sc *_ScopeChecker) check_ret(r *ast.RetSt) {
 	}
 
 	if d == nil && len(rtc.vars) == 0 {
-		sc.scope.Stmts = append(sc.scope.Stmts, &RetSt{})
 		return
 	}
 
