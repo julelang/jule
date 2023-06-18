@@ -452,10 +452,9 @@ func gen_ret_expr(r *sema.RetSt) string {
 		return gen_ret_expr_tuple(r)
 	}
 
-	obj := ""
 	if !lex.Is_ignore_ident(r.Vars[0].Ident) {
 		ident := var_out_ident(r.Vars[0])
-		obj += ident + " = " + gen_expr(r.Expr) + ";\n"
+		obj := ident + " = " + gen_expr(r.Expr) + ";\n"
 		obj += indent()
 		obj += "return " + ident + CPP_ST_TERM
 		return obj

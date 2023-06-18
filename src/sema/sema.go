@@ -1349,20 +1349,10 @@ func (s *_Sema) check_struct_fields(st *Struct) (ok bool) {
 	}
 
 	// Save itself for legal cycles like *Struct.
-	reparse := false
 	if ok && n != len(st.Instances) {
 		st.Instances = st.Instances[:n]
-		reparse = true
-	}
-
-	for _, f := range st.Fields {
-		if reparse {
+		for _, f := range st.Fields {
 			f.Kind.Kind = tc.check_decl(f.Kind.Decl)
-		}
-		if f.Kind.Kind != nil && is_mut(f.Kind.Kind) {
-			if st.Is_derives(build.DERIVE_CLONE) && !supports_clonning(f.Kind.Kind) {
-				s.push_err(st.Token, "type_not_compatible_for_derive", f.Kind.Kind.To_str(), build.DERIVE_CLONE)
-			}
 		}
 	}
 
@@ -1481,6 +1471,31 @@ func (s *_Sema) check_file_decls() (ok bool) {
 	}
 }
 
+func (s *_Sema) check_file_derives() (ok bool) {
+	// Check derives.
+	for _, st := range s.file.Structs {
+		for _, f := range st.Fields {
+			if f.Kind.Kind != nil && is_mut(f.Kind.Kind) {
+				if st.Is_derives(build.DERIVE_CLONE) && !supports_clonning(f.Kind.Kind) {
+					s.push_err(st.Token, "type_not_compatible_for_derive", f.Kind.Kind.To_str(), build.DERIVE_CLONE)
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
+
+func (s *_Sema) check_package_derives() {
+	for _, f := range s.files {
+		s.set_current_file(f)
+		ok := s.check_file_derives()
+		if !ok {
+			return
+		}
+	}
+}
+
 // Checks declarations of all package files.
 // Breaks checking if checked file failed.
 func (s *_Sema) check_package_decls() {
@@ -1491,6 +1506,8 @@ func (s *_Sema) check_package_decls() {
 			return
 		}
 	}
+
+	s.check_package_derives()
 }
 
 func (s *_Sema) check_data_for_auto_type(d *Data, err_token lex.Token) {
