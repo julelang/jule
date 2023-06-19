@@ -1,0 +1,596 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::jule::build::{Log}
+use std::unicode::utf8::{decode_rune_str}
+
+// Punctuations.
+pub let PUNCTS: []rune = [
+	'!',
+	'#',
+	'$',
+	',',
+	'.',
+	'\'',
+	'"',
+	':',
+	';',
+	'<',
+	'>',
+	'=',
+	'?',
+	'-',
+	'+',
+	'*',
+	'(',
+	')',
+	'[',
+	']',
+	'{',
+	'}',
+	'%',
+	'&',
+	'/',
+	'\\',
+	'@',
+	'^',
+	'_',
+	'`',
+	'|',
+	'~',
+	'¦',
+]
+
+// Space characters.
+pub let SPACES: []rune = [
+	' ',
+	'\t',
+	'\v',
+	'\r',
+	'\n',
+]
+
+// Kind list of unary operators.
+pub let UNARY_OPS = [
+	TokenKind.Minus,
+	TokenKind.Plus,
+	TokenKind.Caret,
+	TokenKind.Excl,
+	TokenKind.Star,
+	TokenKind.Amper,
+]
+
+// Kind list of binary operators.
+pub let BIN_OPS = [
+	TokenKind.Plus,
+	TokenKind.Minus,
+	TokenKind.Star,
+	TokenKind.Solidus,
+	TokenKind.Percent,
+	TokenKind.Amper,
+	TokenKind.Vline,
+	TokenKind.Caret,
+	TokenKind.Lt,
+	TokenKind.Gt,
+	TokenKind.Excl,
+	TokenKind.DblAmper,
+	TokenKind.DblVline,
+]
+
+// Kind list of weak operators.
+// These operators are weak, can used as part of expression.
+pub let WEAK_OPS = [
+	TokenKind.TripleDot,
+	TokenKind.Colon,
+]
+
+// List of postfix operators.
+pub let POSTFIX_OPS = [
+	TokenKind.Plus,
+	TokenKind.Minus,
+]
+
+// List of assign operators.
+pub let ASSING_OPS = [
+	TokenKind.Eq,
+	TokenKind.PlusEq,
+	TokenKind.MinusEq,
+	TokenKind.SolidusEq,
+	TokenKind.StarEq,
+	TokenKind.PercentEq,
+	TokenKind.RshiftEq,
+	TokenKind.LshiftEq,
+	TokenKind.VlineEq,
+	TokenKind.AmperEq,
+	TokenKind.CaretEq,
+]
+
+// Special identifiers.
+pub enum Ident: str {
+	Ignore = "_",         // Ignore
+	Anon = "<anonymous>", // Anonymous
+}
+
+// Token identities.
+pub enum TokenId: uint {
+	Na,
+	Prim,
+	Ident,
+	Range,
+	Ret,
+	Semicolon,
+	Lit,
+	Op,
+	Comma,
+	Const,
+	Type,
+	Colon,
+	Iter,
+	Break,
+	Cont,
+	In,
+	If,
+	Else,
+	Comment,
+	Use,
+	Dot,
+	Pub,
+	Goto,
+	DblColon,
+	Enum,
+	Struct,
+	Co,
+	Match,
+	Self,
+	Trait,
+	Impl,
+	Cpp,
+	Fall,
+	Fn,
+	Let,
+	Unsafe,
+	Mut,
+	Defer,
+}
+
+// Token kinds.
+pub enum TokenKind: str {
+	DblColon = "::",
+	Colon = ":",
+	Semicolon = ";",
+	Comma = ",",
+	TripleDot = "...",
+	Dot = ".",
+	PlusEq = "+=",
+	MinusEq = "-=",
+	StarEq = "*=",
+	SolidusEq = "/=",
+	PercentEq = "%=",
+	LshiftEq = "<<=",
+	RshiftEq = ">>=",
+	CaretEq = "^=",
+	AmperEq = "&=",
+	VlineEq = "|=",
+	Eqs = "==",
+	NotEq = "!=",
+	GreatEq = ">=",
+	LessEq = "<=",
+	DblAmper = "&&",
+	DblVline = "||",
+	Lshift = "<<",
+	Rshift = ">>",
+	DblPlus = "++",
+	DblMinus = "--",
+	Plus = "+",
+	Minus = "-",
+	Star = "*",
+	Solidus = "/",
+	Percent = "%",
+	Amper = "&",
+	Vline = "|",
+	Caret = "^",
+	Excl = "!",
+	Lt = "<",
+	Gt = ">",
+	Eq = "=",
+	LnComment = "//",
+	RangLComment = "/*",
+	RangRComment = "*/",
+	LParent = "(",
+	RParent = ")",
+	LBracket = "[",
+	RBracket = "]",
+	LBrace = "{",
+	RBrace = "}",
+	I8 = "i8",
+	I16 = "i16",
+	I32 = "i32",
+	I64 = "i64",
+	U8 = "u8",
+	U16 = "u16",
+	U32 = "u32",
+	U64 = "u64",
+	F32 = "f32",
+	F64 = "f64",
+	Uint = "uint",
+	Int = "int",
+	Uintptr = "uintptr",
+	Bool = "bool",
+	Str = "str",
+	Any = "any",
+	True = "true",
+	False = "false",
+	Nil = "nil",
+	Const = "const",
+	Ret = "ret",
+	Type = "type",
+	Iter = "for",
+	Break = "break",
+	Cont = "continue",
+	In = "in",
+	If = "if",
+	Else = "else",
+	Use = "use",
+	Pub = "pub",
+	Goto = "goto",
+	Enum = "enum",
+	Struct = "struct",
+	Co = "co",
+	Match = "match",
+	Self = "self",
+	Trait = "trait",
+	Impl = "impl",
+	Cpp = "cpp",
+	Fall = "fall",
+	Fn = "fn",
+	Let = "let",
+	Unsafe = "unsafe",
+	Mut = "mut",
+	Defer = "defer",
+}
+
+// Token is lexer token.
+pub struct Token {
+	pub file:   &File
+	pub row:    int
+	pub column: int
+	pub kind:   str
+	pub id:     TokenId
+}
+
+impl Token {
+	// Returns operator precedence of token.
+	// Returns -1 if token is not operator or
+	// invalid operator for operator precedence.
+	pub fn prec(self): int {
+		if self.id != TokenId.Op {
+			ret -1
+		}
+
+		match self.kind {
+		| TokenKind.Star
+		| TokenKind.Percent
+		| TokenKind.Solidus
+		| TokenKind.RShift
+		| TokenKind.LShift
+		| TokenKind.Amper:
+			ret 5
+
+		| TokenKind.Plus
+		| TokenKind.Minus
+		| TokenKind.Vline
+		| TokenKind.Caret:
+			ret 4
+
+		| TokenKind.Eqs
+		| TokenKind.NotEq
+		| TokenKind.Eq
+		| TokenKind.Lt
+		| TokenKind.LessEq
+		| TokenKind.Gt
+		| TokenKind.GreatEq:
+			ret 3
+
+		| TokenKind.DblAmper:
+			ret 2
+
+		| TokenKind.DblVline:
+			ret 1
+
+		|:
+			ret -1
+		}
+	}
+}
+
+fn exist_op(kind: str, ops: []TokenKind): bool {
+	for _, op in ops {
+		if kind == (str)(op) {
+			ret true
+		}
+	}
+
+	ret false
+}
+
+// Reports whether kind is unary operator.
+pub fn is_unary_op(kind: str): bool { ret exist_op(kind, UNARY_OPS) }
+// Reports whether kind is binary operator.
+pub fn is_bin_op(kind: str): bool { ret exist_op(kind, BIN_OPS) }
+// Reports whether kind is weak operator.
+pub fn is_weak_op(kind: str): bool { ret exist_op(kind, WEAK_OPS) }
+// Reports whether kind is string literal.
+pub fn is_str(k: str): bool { ret k != "" && (k[0] == '"' || is_raw_str(k)) }
+// Reports whether kind is raw string literal.
+pub fn is_raw_str(k: str): bool { ret k != "" && k[0] == '`' }
+// Reports whether kind is rune literal.
+// Literal value can be byte or rune.
+pub fn is_rune(k: str): bool { ret k != "" && k[0] == '\'' }
+// Reports whether kind is nil literal.
+pub fn is_nil(k: str): bool { ret k == (str)(TokenKind.Nil) }
+// Reports whether kind is boolean literal.
+pub fn is_bool(k: str): bool { ret k == (str)(TokenKind.True) || k == (str)(TokenKind.False) }
+
+fn contains_any(s: str, bytes: str): bool {
+	for _, b in bytes {
+		let i = s.find((str)(b))
+		if i >= 0 {
+			ret true
+		}
+	}
+
+	ret false
+}
+
+// Reports whether kind is float.
+pub fn is_float(k: str): bool {
+	if k.has_prefix("0x") {
+		ret contains_any(k, ".pP")
+	}
+
+	ret contains_any(k, ".eE")
+}
+
+// Reports whether kind is numeric.
+pub fn is_num(k: str): bool {
+	if k == "" {
+		ret false
+	}
+
+	let b = k[0]
+	ret b == '.' || ('0' <= b && b <= '9')
+}
+
+// Reports whether kind is literal.
+pub fn is_lit(k: str): bool {
+	ret is_num(k) || is_str(k) || is_rune(k) || is_nil(k) || is_bool(k)
+}
+
+// Reports whether identifier is ignore.
+pub fn is_ignore_ident(ident: str): bool { ret ident == (str)(Ident.Ignore) }
+// Reports whether identifier is anonymous.
+pub fn is_anon_ident(ident: str): bool { ret ident == (str)(Ident.Anon) }
+
+fn rune_exist(r: rune, runes: []rune): bool {
+	for _, cr in runes {
+		if r == cr {
+			ret true
+		}
+	}
+
+	ret false
+}
+
+// Reports whether rune is punctuation.
+pub fn is_punct(r: rune): bool { ret rune_exist(r, PUNCTS) }
+// Reports wheter byte is whitespace.
+pub fn is_space(r: rune): bool { ret rune_exist(r, SPACES) }
+
+// Reports whether rune is letter.
+pub fn is_letter(r: rune): bool {
+	ret ('a' <= r && r <= 'z') || ('A' <= r && r <= 'Z')
+}
+
+// Reports whether firs rune of string is allowed
+// to first rune for identifier.
+pub fn is_ident_rune(s: str): bool {
+	if s == "" {
+		ret false
+	}
+
+	if s[0] != '_' {
+		let (r, _) = decode_rune_str(s)
+		if !is_letter(r) {
+			ret false
+		}
+	}
+
+	ret true
+}
+
+// Reports whether byte is decimal sequence.
+pub fn is_decimal(b: byte): bool { ret '0' <= b && b <= '9' }
+// Reports whether byte is binary sequence.
+pub fn is_binary(b: byte): bool { ret b == '0' || b == '1' }
+// Reports whether byte is octal sequence.
+pub fn is_octal(b: byte): bool { ret '0' <= b && b <= '7' }
+
+// Reports whether byte is hexadecimal sequence.
+pub fn is_hex(b: byte): bool {
+	match {
+	| '0' <= b && b <= '9': ret true
+	| 'a' <= b && b <= 'f': ret true
+	| 'A' <= b && b <= 'F': ret true
+	|:
+		ret false
+	}
+}
+
+// Returns between of open and close ranges.
+// Starts selection at i.
+// Increases i for each selected token.
+// i points to close range token after selection.
+//
+// Special cases are:
+//  range(i, open, close, tokens) = nil if !real(i)
+//  range(i, open, close, tokens) = nil if i == nil
+//  range(i, open, close, tokens) = nil if i > tokens.len
+//  range(i, open, close, tokens) = nil if tokens[i].id != TokenId.Range
+//  range(i, open, close, tokens) = nil if tokens[i].kind != open
+pub fn range(mut i: &int, open: TokenKind, close: TokenKind, mut tokens: []Token): []Token {
+	if !real(i) || i >= tokens.len {
+		ret nil
+	}
+
+	let tok = tokens[i]
+	if tok.id != TokenId.Range || tok.kind != (str)(open) {
+		ret nil
+	}
+
+	i++
+	let mut range_n = 1
+	let start = i
+	for range_n != 0 && i < tokens.len; i++ {
+		let token = tokens[i]
+		if token.id == TokenId.Range {
+			match token.kind {
+			| (str)(open): range_n++
+			| (str)(close): range_n--
+			}
+		}
+	}
+
+	ret tokens[start : i-1]
+}
+
+// Range_last returns last range from tokens.
+// Returns tokens without range tokens and range tokens.
+// Range tokens includes left and right range tokens.
+//
+// Special cases are;
+//  range_last(tokens) = tokens, nil if tokens.len == 0
+//  range_last(tokens) = tokens, nil if tokens is not has range at last
+pub fn range_last(mut tokens: []Token): (cutted: []Token, cut: []Token) {
+	if tokens.len == 0 {
+		ret tokens, nil
+	} else if tokens[tokens.len-1].id != TokenId.Range {
+		ret tokens, nil
+	}
+
+	let mut brace_n = 0
+	let mut i = tokens.len - 1
+	for i >= 0; i-- {
+		let token = tokens[i]
+		if token.id == TokenId.Range {
+			match token.kind {
+			| (str)(TokenKind.RBrace)
+			| (str)(TokenKind.RBracket)
+			| (str)(TokenKind.RParent):
+				brace_n++
+				continue
+
+			|:
+				brace_n--
+			}
+		}
+
+		if brace_n == 0 {
+			ret tokens[:i], tokens[i:]
+		}
+	}
+
+	ret tokens, nil
+}
+
+// Returns parts separated by given token identifier.
+// It's skips parentheses ranges.
+// Logs missing_expr if expr_must == true and not exist any expression for part.
+//
+// Special case is;
+//  parts(tokens) = nil if tokens.len == 0
+pub fn parts(mut tokens: []Token, id: TokenId, expr_must: bool): ([][]Token, []Log) {
+	if tokens.len == 0 {
+		ret nil, nil
+	}
+
+	let mut parts: [][]Token = nil
+	let mut errors: []Log = nil
+
+	let mut range_n = 0
+	let mut last = 0
+	for i, token in tokens {
+		if token.id == TokenId.Range {
+			match token.kind {
+			| (str)(TokenKind.LBrace)
+			| (str)(TokenKind.LBracket)
+			| (str)(TokenKind.LParent):
+				range_n++
+				continue
+			|:
+				range_n--
+			}
+		}
+
+		if range_n > 0 {
+			continue
+		}
+
+		if token.id == id {
+			if expr_must && i-last <= 0 {
+				let err = make_err(token.row, token.column, token.file, "missing_expr")
+				errors = append(errors, err)
+			}
+			parts = append(parts, tokens[last:i])
+			last = i + 1
+		}
+	}
+
+	if last < tokens.len {
+		parts = append(parts, tokens[last:])
+	} else if !expr_must {
+		parts = append(parts, [])
+	}
+
+	ret parts, errors
+}
+
+// Reports given token id is allow for
+// assignment left-expression or not.
+pub fn is_assign(id: TokenId): bool {
+	ret (
+		id == TokenId.Ident ||
+		id == TokenId.Cpp ||
+		id == TokenId.Let ||
+		id == TokenId.Dot ||
+		id == TokenId.Self ||
+		id == TokenId.Range ||
+		id == TokenId.Op
+	)
+}
+
+// Reports whether operator kind is postfix operator.
+pub fn is_postfix_op(kind: TokenKind): bool {
+	for _, op in POSTFIX_OPS {
+		if kind == op {
+			ret true
+		}
+	}
+
+	ret false
+}
+
+// Reports whether operator kind is assignment operator.
+pub fn is_assign_op(kind: TokenKind): bool {
+	if is_postfix_op(kind) {
+		ret true
+	}
+
+	for _, op in ASSING_OPS {
+		if kind == op {
+			ret true
+		}
+	}
+
+	ret false
+}

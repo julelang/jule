@@ -1,0 +1,927 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::jule::build::{errorf, Log, LogKind}
+use std::unicode::utf8::{decode_rune_str}
+
+struct KindPair {
+	kind: TokenKind
+	id:   TokenId
+}
+
+let KEYWORDS: [...]KindPair = [
+	{TokenKind.I8, TokenId.Prim},
+	{TokenKind.I16, TokenId.Prim},
+	{TokenKind.I32, TokenId.Prim},
+	{TokenKind.I64, TokenId.Prim},
+	{TokenKind.U8, TokenId.Prim},
+	{TokenKind.U16, TokenId.Prim},
+	{TokenKind.U32, TokenId.Prim},
+	{TokenKind.U64, TokenId.Prim},
+	{TokenKind.F32, TokenId.Prim},
+	{TokenKind.F64, TokenId.Prim},
+	{TokenKind.Uint, TokenId.Prim},
+	{TokenKind.Int, TokenId.Prim},
+	{TokenKind.Uintptr, TokenId.Prim},
+	{TokenKind.Bool, TokenId.Prim},
+	{TokenKind.Str, TokenId.Prim},
+	{TokenKind.Any, TokenId.Prim},
+	{TokenKind.True, TokenId.Lit},
+	{TokenKind.False, TokenId.Lit},
+	{TokenKind.Nil, TokenId.Lit},
+	{TokenKind.Const, TokenId.Const},
+	{TokenKind.Ret, TokenId.Ret},
+	{TokenKind.Type, TokenId.Type},
+	{TokenKind.Iter, TokenId.Iter},
+	{TokenKind.Break, TokenId.Break},
+	{TokenKind.Cont, TokenId.Cont},
+	{TokenKind.In, TokenId.In},
+	{TokenKind.If, TokenId.If},
+	{TokenKind.Else, TokenId.Else},
+	{TokenKind.Use, TokenId.Use},
+	{TokenKind.Pub, TokenId.Pub},
+	{TokenKind.Goto, TokenId.Goto},
+	{TokenKind.Enum, TokenId.Enum},
+	{TokenKind.Struct, TokenId.Struct},
+	{TokenKind.Co, TokenId.Co},
+	{TokenKind.Match, TokenId.Match},
+	{TokenKind.Self, TokenId.Self},
+	{TokenKind.Trait, TokenId.Trait},
+	{TokenKind.Impl, TokenId.Impl},
+	{TokenKind.Cpp, TokenId.Cpp},
+	{TokenKind.Fall, TokenId.Fall},
+	{TokenKind.Fn, TokenId.Fn},
+	{TokenKind.Let, TokenId.Let},
+	{TokenKind.Unsafe, TokenId.Unsafe},
+	{TokenKind.Mut, TokenId.Mut},
+	{TokenKind.Defer, TokenId.Defer},
+]
+
+let BASIC_OPS: [...]KindPair = [
+	{TokenKind.DblColon, TokenId.DblColon},
+	{TokenKind.Colon, TokenId.Colon},
+	{TokenKind.Semicolon, TokenId.Semicolon},
+	{TokenKind.Comma, TokenId.Comma},
+	{TokenKind.TripleDot, TokenId.Op},
+	{TokenKind.Dot, TokenId.Dot},
+	{TokenKind.PlusEq, TokenId.Op},
+	{TokenKind.MinusEq, TokenId.Op},
+	{TokenKind.StarEq, TokenId.Op},
+	{TokenKind.SolidusEq, TokenId.Op},
+	{TokenKind.PercentEq, TokenId.Op},
+	{TokenKind.LshiftEq, TokenId.Op},
+	{TokenKind.RshiftEq, TokenId.Op},
+	{TokenKind.CaretEq, TokenId.Op},
+	{TokenKind.AmperEq, TokenId.Op},
+	{TokenKind.VlineEq, TokenId.Op},
+	{TokenKind.Eqs, TokenId.Op},
+	{TokenKind.NotEq, TokenId.Op},
+	{TokenKind.GreatEq, TokenId.Op},
+	{TokenKind.LessEq, TokenId.Op},
+	{TokenKind.DblAmper, TokenId.Op},
+	{TokenKind.DblVline, TokenId.Op},
+	{TokenKind.Lshift, TokenId.Op},
+	{TokenKind.Rshift, TokenId.Op},
+	{TokenKind.DblPlus, TokenId.Op},
+	{TokenKind.DblMinus, TokenId.Op},
+	{TokenKind.Plus, TokenId.Op},
+	{TokenKind.Minus, TokenId.Op},
+	{TokenKind.Star, TokenId.Op},
+	{TokenKind.Solidus, TokenId.Op},
+	{TokenKind.Percent, TokenId.Op},
+	{TokenKind.Amper, TokenId.Op},
+	{TokenKind.Vline, TokenId.Op},
+	{TokenKind.Caret, TokenId.Op},
+	{TokenKind.Excl, TokenId.Op},
+	{TokenKind.Lt, TokenId.Op},
+	{TokenKind.Gt, TokenId.Op},
+	{TokenKind.Eq, TokenId.Op},
+]
+
+fn make_err(row: int, col: int, f: &File, key: str, args: ...any): Log {
+	ret Log{
+		kind:   LogKind.Error,
+		row:    row,
+		column: col,
+		path:   f.path(),
+		text:   errorf(key, args...),
+	}
+}
+
+// Reports whether part is keyword..
+fn is_kw(mut ln: str, kw: str): bool {
+	if !ln.has_prefix(kw) {
+		ret false
+	}
+
+	ln = ln[kw.len:]
+	if ln == "" {
+		ret true
+	}
+
+	let (r, _) = decode_rune_str(ln)
+	if r == '_' {
+		ret false
+	}
+	ret is_space(r) || is_punct(r) || !is_letter(r)
+}
+
+fn float_fmt_e(txt: str, mut i: int): (lit: str) {
+	i++ // Skip E | e
+	if i >= txt.len {
+		ret
+	}
+
+	let b = txt[i]
+	if b == '+' || b == '-' {
+		i++ // Skip operator
+		if i >= txt.len {
+			ret
+		}
+	}
+
+	let first = i
+	for i < txt.len; i++ {
+		let b = txt[i]
+		if !is_decimal(b) {
+			break
+		}
+	}
+
+	if i == first {
+		ret ""
+	}
+	ret txt[:i]
+}
+
+fn float_fmt_p(txt: str, i: int): str { ret float_fmt_e(txt, i) }
+
+fn float_fmt_dotnp(txt: str, mut i: int): str {
+	if txt[i] != '.' {
+		ret ""
+	}
+
+	i++
+loop:
+	for i < txt.len; i++ {
+		let b = txt[i]
+		match {
+		| is_decimal(b):
+			continue
+
+		| is_float_fmt_p(b, i):
+			ret float_fmt_p(txt, i)
+
+		|:
+			break loop
+		}
+	}
+	ret ""
+}
+
+fn float_fmt_dotfp(txt: str, mut i: int): str {
+	// skip .f
+	i += 2
+
+	ret float_fmt_e(txt, i)
+}
+
+fn float_fmt_dotp(txt: str, mut i: int): str {
+	// skip .
+	i++
+
+	ret float_fmt_e(txt, i)
+}
+
+fn float_num(txt: str, mut i: int): (lit: str) {
+	i++ // Skip dot
+	for i < txt.len; i++ {
+		let b = txt[i]
+		if i > 1 && (b == 'e' || b == 'E') {
+			ret float_fmt_e(txt, i)
+		}
+		if !is_decimal(b) {
+			break
+		}
+	}
+
+	if i == 1 { // Just dot
+		ret
+	}
+	ret txt[:i]
+}
+
+fn common_num(txt: str): (lit: str) {
+	let mut i = 0
+loop:
+	for i < txt.len; i++ {
+		let b = txt[i]
+		match {
+		| b == '.':
+			ret float_num(txt, i)
+
+		| is_float_fmt_e(b, i):
+			ret float_fmt_e(txt, i)
+
+		| !is_decimal(b):
+			break loop
+		}
+	}
+
+	if i == 0 {
+		ret
+	}
+	ret txt[:i]
+}
+
+fn binary_num(txt: str): (lit: str) {
+	if !txt.has_prefix("0b") {
+		ret ""
+	}
+	if txt.len < 2 {
+		ret
+	}
+
+	const BINARY_START = 2
+	let mut i = BINARY_START
+	for i < txt.len; i++ {
+		if !is_binary(txt[i]) {
+			break
+		}
+	}
+
+	if i == BINARY_START {
+		ret
+	}
+	ret txt[:i]
+}
+
+fn is_float_fmt_e(b: byte, i: int): bool { ret i > 0 && (b == 'e' || b == 'E') }
+fn is_float_fmt_p(b: byte, i: int): bool { ret i > 0 && (b == 'p' || b == 'P') }
+
+fn is_float_fmt_dotnp(txt: str, mut i: int): bool {
+	if txt[i] != '.' {
+		ret false
+	}
+
+	i++
+loop:
+	for i < txt.len; i++ {
+		let b = txt[i]
+		match {
+		| is_decimal(b):
+			continue
+
+		| is_float_fmt_p(b, i):
+			ret true
+
+		|:
+			break loop
+		}
+	}
+
+	ret false
+}
+
+fn is_float_fmt_dotp(mut txt: str, i: int): bool {
+	txt = txt[i:]
+	match {
+	| txt.len < 3:
+		fall
+
+	| txt[0] != '.':
+		fall
+
+	| txt[1] != 'p' && txt[1] != 'P':
+		ret false
+
+	|:
+		ret true
+	}
+}
+
+fn is_float_fmt_dotfp(mut txt: str, i: int): bool {
+	txt = txt[i:]
+	match {
+	| txt.len < 4:
+		fall
+
+	| txt[0] != '.':
+		fall
+
+	| txt[1] != 'f' && txt[1] != 'F':
+		fall
+
+	| txt[2] != 'p' && txt[1] != 'P':
+		ret false
+
+	|:
+		ret true
+	}
+}
+
+fn octal_num(txt: str): (lit: str) {
+	if txt[0] != '0' {
+		ret ""
+	}
+	if txt.len < 2 {
+		ret
+	}
+
+	const OCTAL_START = 1
+	let mut i = OCTAL_START
+	for i < txt.len; i++ {
+		let b = txt[i]
+		if is_float_fmt_e(b, i) {
+			ret float_fmt_e(txt, i)
+		}
+		if !is_octal(b) {
+			break
+		}
+	}
+
+	if i == OCTAL_START {
+		ret
+	}
+	ret txt[:i]
+}
+
+fn hex_num(txt: str): (lit: str) {
+	if txt.len < 3 {
+		ret
+	}
+	if txt[0] != '0' || (txt[1] != 'x' && txt[1] != 'X') {
+		ret
+	}
+
+	const HEX_START = 2
+	let mut i = HEX_START
+loop:
+	for i < txt.len; i++ {
+		let b = txt[i]
+		match {
+		| is_float_fmt_dotp(txt, i):
+			ret float_fmt_dotp(txt, i)
+
+		| is_float_fmt_dotfp(txt, i):
+			ret float_fmt_dotfp(txt, i)
+
+		| is_float_fmt_p(b, i):
+			ret float_fmt_p(txt, i)
+
+		| is_float_fmt_dotnp(txt, i):
+			ret float_fmt_dotnp(txt, i)
+
+		| !is_hex(b):
+			break loop
+		}
+	}
+
+	if i == HEX_START {
+		ret
+	}
+	ret txt[:i]
+}
+
+fn hex_escape(txt: str, n: int): (seq: str) {
+	if txt.len < n {
+		ret
+	}
+
+	const HEX_START = 2
+	let mut i = HEX_START
+	for i < n; i++ {
+		if !is_hex(txt[i]) {
+			ret
+		}
+	}
+
+	seq = txt[:n]
+	ret
+}
+
+// Pattern (RegEx): ^\\U.{8}
+fn big_unicode_point_escape(txt: str): str { ret hex_escape(txt, 10) }
+
+// Pattern (RegEx): ^\\u.{4}
+fn little_unicode_point_escape(txt: str): str { ret hex_escape(txt, 6) }
+
+// Pattern (RegEx): ^\\x..
+fn hex_byte_escape(txt: str): str { ret hex_escape(txt, 4) }
+
+// Patter (RegEx): ^\\[0-7]{3}
+fn byte_escape(txt: str): (seq: str) {
+	if txt.len < 4 {
+		ret
+	}
+	if !is_octal(txt[1]) || !is_octal(txt[2]) || !is_octal(txt[3]) {
+		ret
+	}
+	ret txt[:4]
+}
+
+fn get_close_kind_of_brace(left: str): str {
+	match left {
+	| (str)(TokenKind.RParent):
+		ret (str)(TokenKind.LParent)
+
+	| (str)(TokenKind.RBrace):
+		ret (str)(TokenKind.LBrace)
+
+	| (str)(TokenKind.RBracket):
+		ret (str)(TokenKind.LBracket)
+
+	|:
+		ret ""
+	}
+}
+
+struct Lex {
+	first_token_of_line: bool
+	ranges:              []Token
+	data:                []rune
+	file:                &File
+	pos:                 int
+	column:              int
+	row:                 int
+	errors:              []Log
+}
+
+impl Lex {
+	fn push_err(mut self, key: str, args: ...any) {
+		self.errors = append(self.errors,
+			make_err(self.row, self.column, self.file, key, args...))
+	}
+
+	fn push_err_tok(mut self, token: Token, key: str) {
+		self.errors = append(self.errors,
+			make_err(token.row, token.column, self.file, key))
+	}
+
+	// Lexs all source content.
+	fn lex(mut self): []Token {
+		let mut tokens: []Token = nil
+		self.errors = nil
+		self.new_line()
+		for self.pos < self.data.len {
+			let mut token = self.token()
+			self.first_token_of_line = false
+			if token.id != TokenId.Na {
+				tokens = append(tokens, token)
+			}
+		}
+		self.check_ranges()
+		self.data = nil
+		ret tokens
+	}
+
+	fn check_ranges(mut self) {
+		for _, token in self.ranges {
+			match token.kind {
+			| (str)(TokenKind.LParent):
+				self.push_err_tok(token, "wait_close_parentheses")
+
+			| (str)(TokenKind.LBrace):
+				self.push_err_tok(token, "wait_close_brace")
+
+			| (str)(TokenKind.LBracket):
+				self.push_err_tok(token, "wait_close_bracket")
+			}
+		}
+	}
+
+	// Returns identifer if next token is identifer,
+	// returns empty string if not.
+	fn id(mut self, ln: str): str {
+		if !is_ident_rune(ln) {
+			ret ""
+		}
+
+		let mut ident = ""
+		for _, r in ln {
+			if r != '_' && !is_decimal(byte(r)) && !is_letter(r) {
+				break
+			}
+
+			ident += (str)(r)
+			self.pos++
+		}
+
+		ret ident
+	}
+
+	// Resume to lex from position.
+	fn resume(mut self): str {
+		let mut ln = ""
+		let runes = self.data[self.pos:]
+
+		// Skip spaces.
+		for i, r in runes {
+			if is_space(r) {
+				self.pos++
+				match r {
+				| '\n':
+					self.new_line()
+
+				| '\t':
+					self.column += 4
+
+				|:
+					self.column++
+				}
+				continue
+			}
+			ln = (str)(runes[i:])
+			break
+		}
+		ret ln
+	}
+
+	unsafe fn lex_line_comment(mut self, mut token: *Token) {
+		let start = self.pos
+		self.pos += 2
+
+		for self.pos < self.data.len; self.pos++ {
+			if self.data[self.pos] == '\n' {
+				if self.first_token_of_line {
+					token.id = TokenId.Comment
+					token.kind = (str)(self.data[start:self.pos])
+				}
+				ret
+			}
+		}
+
+		if self.first_token_of_line {
+			token.id = TokenId.Comment
+			token.kind = (str)(self.data[start:])
+		}
+	}
+
+	fn lex_range_comment(mut self) {
+		self.pos += 2
+		for self.pos < self.data.len; self.pos++ {
+			let r = self.data[self.pos]
+			if r == '\n' {
+				self.new_line()
+				continue
+			}
+			self.column += ((str)(r)).len
+			let cont = (str)(self.data[self.pos:])
+			if cont.has_prefix((str)(TokenKind.RangRComment)) {
+				self.column += 2
+				self.pos += 2
+				ret
+			}
+		}
+		self.push_err("missing_block_comment")
+	}
+
+	// Returns literal if next token is numeric, returns empty string if not.
+	fn num(mut self, txt: str): (lit: str) {
+		lit = hex_num(txt)
+		if lit != "" {
+			goto end
+		}
+		lit = octal_num(txt)
+		if lit != "" {
+			goto end
+		}
+		lit = binary_num(txt)
+		if lit != "" {
+			goto end
+		}
+		lit = common_num(txt)
+	end:
+		self.pos += lit.len
+		ret
+	}
+
+	fn escape_seq(mut self, txt: str): str {
+		let mut seq = ""
+		if txt.len < 2 {
+			goto end
+		}
+
+		match txt[1] {
+		| '\\' | '\'' | '"' | 'a' | 'b' | 'f' | 'n' | 'r' | 't' | 'v':
+			self.pos += 2
+			ret txt[:2]
+
+		| 'U':
+			seq = big_unicode_point_escape(txt)
+
+		| 'u':
+			seq = little_unicode_point_escape(txt)
+
+		| 'x':
+			seq = hex_byte_escape(txt)
+
+		|:
+			seq = byte_escape(txt)
+		}
+
+	end:
+		if seq == "" {
+			self.pos++
+			self.push_err("invalid_escape_sequence")
+			ret ""
+		}
+		self.pos += seq.len
+		ret seq
+	}
+
+	fn get_rune(mut self, txt: str, raw: bool): str {
+		if !raw && txt[0] == '\\' {
+			ret self.escape_seq(txt)
+		}
+	
+		let (r, _) = decode_rune_str(txt)
+		self.pos++
+		ret (str)(r)
+	}
+
+	fn lex_rune(mut self, txt: str): str {
+		let mut run = "'"
+		self.column++
+		let mut n = 0
+		let mut i = 1
+		for i < txt.len; i++ {
+			if txt[i] == '\n' {
+				self.push_err("missing_rune_end")
+				self.pos++
+				self.new_line()
+				ret ""
+			}
+
+			let r = self.get_rune(txt[i:], false)
+			run += r
+			let length = r.len
+			self.column += length
+			if r == "'" {
+				self.pos++
+				break
+			}
+			if length > 1 {
+				i += length - 1
+			}
+			n++
+		}
+
+		if n == 0 {
+			self.push_err("rune_empty")
+		} else if n > 1 {
+			self.push_err("rune_overflow")
+		}
+
+		ret run
+	}
+
+	fn lex_str(mut self, txt: str): str {
+		let mut s = ""
+		let mark = txt[0]
+		let raw = mark == '`'
+		s += (str)(mark)
+		self.column++
+
+		let mut i = 1
+		for i < txt.len; i++ {
+			let ch = txt[i]
+			if ch == '\n' {
+				self.new_line()
+				if !raw {
+					self.push_err("missing_string_end")
+					self.pos++
+					ret ""
+				}
+			}
+			let r = self.get_rune(txt[i:], raw)
+			s += r
+			let n = r.len
+			self.column += n
+			if ch == mark {
+				self.pos++
+				break
+			}
+			if n > 1 {
+				i += n - 1
+			}
+		}
+
+		ret s
+	}
+
+	fn new_line(mut self) {
+		self.first_token_of_line = true
+		self.row++
+		self.column = 1
+	}
+
+	unsafe fn is_op(mut self, txt: str, kind: str, id: TokenId, mut t: *Token): bool {
+		if !txt.has_prefix(kind) {
+			ret false
+		}
+
+		t.kind = kind
+		t.id = id
+		self.pos += []rune(kind).len
+		ret true
+	}
+
+	unsafe fn is_kw(mut self, txt: str, kind: str, id: TokenId, mut t: *Token): bool {
+		if !is_kw(txt, kind) {
+			ret false
+		}
+
+		t.kind = kind
+		t.id = id
+		self.pos += []rune(kind).len
+		ret true
+	}
+
+	unsafe fn lex_kws(mut self, txt: str, mut tok: *Token): bool {
+		for _, pair in KEYWORDS {
+			if self.is_kw(txt, (str)(pair.kind), pair.id, tok) {
+				ret true
+			}
+		}
+
+		ret false
+	}
+
+	unsafe fn lex_basic_ops(mut self, txt: str, mut tok: *Token): bool {
+		for _, pair in BASIC_OPS {
+			if self.is_op(txt, (str)(pair.kind), pair.id, tok) {
+				ret true
+			}
+		}
+
+		ret false
+	}
+
+	unsafe fn lex_id(mut self, txt: str, mut t: *Token): bool {
+		let lex = self.id(txt)
+		if lex == "" {
+			ret false
+		}
+
+		t.kind = lex
+		t.id = TokenId.Ident
+		ret true
+	}
+
+	unsafe fn lex_num(mut self, txt: str, mut t: *Token): bool {
+		let lex = self.num(txt)
+		if lex == "" {
+			ret false
+		}
+
+		t.kind = lex
+		t.id = TokenId.Lit
+		ret true
+	}
+
+	// lex.token generates next token from resume at position.
+	fn token(mut self): Token {
+		let mut t = Token{file: self.file, id: TokenId.Na}
+
+		let txt = self.resume()
+		if txt == "" {
+			ret t
+		}
+
+		// Set token values.
+		t.column = self.column
+		t.row = self.row
+
+		//* lex.Tokenenize
+		match {
+		| unsafe { self.lex_num(txt, &t) }:
+			// Pass.
+
+		| txt[0] == '\'':
+			t.kind = self.lex_rune(txt)
+			t.id = TokenId.Lit
+			ret t
+
+		| txt[0] == '"' || txt[0] == '`':
+			t.kind = self.lex_str(txt)
+			t.id = TokenId.Lit
+			ret t
+
+		| txt.has_prefix((str)(TokenKind.LnComment)):
+			unsafe { self.lex_line_comment(&t) }
+			ret t
+
+		| txt.has_prefix((str)(TokenKind.RangLComment)):
+			self.lex_range_comment()
+			ret t
+
+		| unsafe { self.is_op(txt, (str)(TokenKind.LParent), TokenId.Range, &t) }:
+			self.ranges = append(self.ranges, t)
+
+		| unsafe { self.is_op(txt, (str)(TokenKind.RParent), TokenId.Range, &t) }:
+			self.push_range_close(t, (str)(TokenKind.LParent))
+
+		| unsafe { self.is_op(txt, (str)(TokenKind.LBrace), TokenId.Range, &t) }:
+			self.ranges = append(self.ranges, t)
+
+		| unsafe { self.is_op(txt, (str)(TokenKind.RBrace), TokenId.Range, &t) }:
+			self.push_range_close(t, (str)(TokenKind.LBrace))
+
+		| unsafe { self.is_op(txt, (str)(TokenKind.LBracket), TokenId.Range, &t) }:
+			self.ranges = append(self.ranges, t)
+
+		| unsafe { self.is_op(txt, (str)(TokenKind.RBracket), TokenId.Range, &t) }:
+			self.push_range_close(t, (str)(TokenKind.LBracket))
+
+		| unsafe { self.lex_basic_ops(txt, &t) || self.lex_kws(txt, &t) || self.lex_id(txt, &t) }:
+			// Pass.
+
+		|:
+			let (r, sz) = decode_rune_str(txt)
+			self.push_err("invalid_token", r)
+			self.column += sz
+			self.pos++
+			ret t
+		}
+
+		self.column += t.kind.len
+		ret t
+	}
+
+	fn remove_range(mut self, mut i: int, kind: str) {
+		let close = get_close_kind_of_brace(kind)
+		for i >= 0; i-- {
+			let tok = self.ranges[i]
+			if tok.kind != close {
+				continue
+			}
+
+			self.ranges = append(self.ranges[:i], self.ranges[i+1:]...)
+			break
+		}
+	}
+
+	fn push_range_close(mut self, t: Token, left: str) {
+		let n = self.ranges.len
+		if n == 0 {
+			match t.kind {
+			| (str)(TokenKind.RBracket):
+				self.push_err_tok(t, "extra_closed_brackets")
+
+			| (str)(TokenKind.RBrace):
+				self.push_err_tok(t, "extra_closed_braces")
+
+			| (str)(TokenKind.RParent):
+				self.push_err_tok(t, "extra_closed_parentheses")
+			}
+			ret
+		} else if self.ranges[n-1].kind != left {
+			self.push_wrong_order_close_err(t)
+		}
+		self.remove_range(n-1, t.kind)
+	}
+
+	fn push_wrong_order_close_err(mut self, t: Token) {
+		let mut msg = ""
+		match self.ranges[self.ranges.len-1].kind {
+		| (str)(TokenKind.LParent):
+			msg = "expected_parentheses_close"
+
+		| (str)(TokenKind.LBrace):
+			msg = "expected_brace_close"
+
+		| (str)(TokenKind.LBracket):
+			msg = "expected_bracket_close"
+		}
+
+		self.push_err_tok(t, msg)
+	}
+}
+
+// Lex source code into fileset.
+// Returns nil if !real(f).
+// Returns nil slice for errors if no any error.
+pub fn lex(mut f: &File, text: str): []Log {
+	if !real(f) {
+		ret nil
+	}
+
+	let mut lex = Lex{
+		file: f,
+		pos:  0,
+		row:  -1, // For true row
+		data: ([]rune)(text),
+	}
+
+	lex.new_line()
+	let mut tokens = lex.lex()
+
+	if lex.errors.len > 0 {
+		ret lex.errors
+	}
+
+	f._tokens = tokens
+	ret nil
+}
