@@ -150,11 +150,6 @@ const IGNORE_IDENT = "_"
 // Anonymous identifier.
 const ANON_IDENT = "<anonymous>"
 
-// Directive seperator of directive comments.
-const DIRECTIVE_SEP = ":"
-// Prefix of directive comments.
-const DIRECTIVE_PREFIX = "jule" + DIRECTIVE_SEP
-
 // Punctuations.
 var PUNCTS = [...]rune{
 	'!',

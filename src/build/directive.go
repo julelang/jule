@@ -4,6 +4,9 @@
 
 package build
 
+// Prefix of directive comments.
+const DIRECTIVE_PREFIX = "jule:"
+
 // These directives must added to the DIRECTIVES.
 const DIRECTIVE_CDEF = "cdef"        // Directive: jule:cdef
 const DIRECTIVE_TYPEDEF = "typedef"  // Directive: jule:typedef

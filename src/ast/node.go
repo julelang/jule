@@ -7,6 +7,7 @@ package ast
 import (
 	"strings"
 
+	"github.com/julelang/jule/build"
 	"github.com/julelang/jule/lex"
 )
 
@@ -81,7 +82,7 @@ type Comment struct {
 
 // Reports whether comment is directive.
 func (c *Comment) Is_directive() bool {
-	return strings.HasPrefix(c.Text, lex.DIRECTIVE_PREFIX)
+	return strings.HasPrefix(c.Text, build.DIRECTIVE_PREFIX)
 }
 
 // Directive.

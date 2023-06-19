@@ -62,7 +62,7 @@ func (p *_Parser) build_expr(tokens []lex.Token) *ast.Expr {
 }
 
 func (p *_Parser) get_directive(c *ast.Comment) *ast.Directive {
-	if len(c.Token.Kind) <= len(lex.DIRECTIVE_PREFIX) {
+	if len(c.Text) <= len(build.DIRECTIVE_PREFIX) {
 		return nil
 	}
 
@@ -70,7 +70,7 @@ func (p *_Parser) get_directive(c *ast.Comment) *ast.Directive {
 		Token: c.Token,
 	}
 
-	pragma := c.Token.Kind[len(lex.DIRECTIVE_PREFIX):] // Remove directive prefix
+	pragma := c.Token.Kind[len(build.DIRECTIVE_PREFIX):] // Remove directive prefix
 	parts := strings.SplitN(pragma, " ", -1)
 
 	d.Tag = parts[0]
