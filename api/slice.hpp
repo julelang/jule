@@ -27,16 +27,19 @@ namespace jule {
         Item *_slice{ nullptr };
         jule::Uint _len{ 0 };
         jule::Uint _cap{ 0 };
-    
-        Slice<Item>(void) noexcept {}
-        Slice<Item>(const std::nullptr_t) noexcept {}
-    
-        Slice<Item>(const jule::Uint &n) noexcept {
+
+        static jule::Slice<Item> alloc(const jule::Uint &n) noexcept {
+            jule::Slice<Item> buffer;
             const jule::Uint _n{ n < 0 ? 0 : n };
             if ( _n == 0 )
-                return;
-            this->alloc_new(_n);
+                return buffer;
+
+            buffer.alloc_new(_n);
+            return buffer;
         }
+
+        Slice<Item>(void) noexcept {}
+        Slice<Item>(const std::nullptr_t) noexcept {}
 
         Slice<Item>(const jule::Slice<Item>& src) noexcept
         { this->operator=(src); }

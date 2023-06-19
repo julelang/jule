@@ -80,7 +80,7 @@ namespace jule {
     jule::Slice<Item> append(const jule::Slice<Item> &src,
                              const jule::Slice<Item> &components) noexcept {
         const jule::Int n{ src.len() + components.len() };
-        jule::Slice<Item> buffer(n);
+        jule::Slice<Item> buffer{ jule::Slice<Item>::alloc(n) };
         jule::copy<Item>(buffer, src);
 
         for (jule::Int index{ 0 }; index < components.len(); ++index)

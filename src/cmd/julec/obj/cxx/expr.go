@@ -517,7 +517,7 @@ func gen_builtin_panic_call_expr_model(m *sema.BuiltinPanicCallExprModel) string
 
 func gen_builtin_make_call_expr_model(m *sema.BuiltinMakeCallExprModel) string {
 	obj := gen_type_kind(m.Kind)
-	obj += "("
+	obj += "::alloc("
 	if m.Size != nil {
 		obj += gen_expr(m.Size)
 	}

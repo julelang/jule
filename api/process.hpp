@@ -28,7 +28,7 @@ namespace jule {
     LPWSTR *argvw{ CommandLineToArgvW(cmdl, &argc) };
 #endif
 
-    jule::command_line_args = jule::Slice<jule::Str>(argc);
+    jule::command_line_args = jule::Slice<jule::Str>::alloc(argc);
     for (jule::Int i{ 0 }; i < argc; ++i) {
 #ifdef OS_WINDOWS
     const LPWSTR warg{ argvw[i] };

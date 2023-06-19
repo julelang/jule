@@ -50,7 +50,7 @@ namespace jule {
     }
     
     jule::Slice<jule::I32> utf16_decode(const jule::Slice<jule::U16> &s) noexcept {
-        jule::Slice<jule::I32> a(s.len());
+        jule::Slice<jule::I32> a{ jule::Slice<jule::I32>::alloc(s.len()) };
         jule::Int n{ 0 };
         for (jule::Int i{ 0 }; i < s.len(); ++i) {
             jule::U16 r{ s[i] };
@@ -75,7 +75,7 @@ namespace jule {
     
     jule::Str utf16_to_utf8_str(const wchar_t *wstr,
                                 const std::size_t len) noexcept {
-        jule::Slice<jule::U16> code_page(len);
+        jule::Slice<jule::U16> code_page{ jule::Slice<jule::U16>::alloc(len) };
         for (jule::Int i{ 0 }; i < len; ++i)
             code_page[i] = static_cast<jule::U16>(wstr[i]);
         return static_cast<jule::Str>(jule::utf16_decode(code_page));
@@ -97,7 +97,7 @@ namespace jule {
             if ( v >= jule::UTF16_SURR_SELF )
                 ++n;
 
-        jule::Slice<jule::U16> a{ jule::Slice<jule::U16>(n) };
+        jule::Slice<jule::U16> a{ jule::Slice<jule::U16>::alloc(n) };
         n = 0;
         for (const jule::I32 v: runes) {
             if (0 <= v &&

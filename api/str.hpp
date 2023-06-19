@@ -253,7 +253,7 @@ namespace jule {
         { return std::basic_string<char>(this->begin(), this->end()); }
 
         operator jule::Slice<jule::U8>(void) const noexcept {
-            jule::Slice<jule::U8> slice(this->len());
+            jule::Slice<jule::U8> slice{ jule::Slice<jule::U8>::alloc(this->len()) };
             for (jule::Int index{ 0 }; index < this->len(); ++index)
                 slice[index] = this->operator[](index);
             return slice;
