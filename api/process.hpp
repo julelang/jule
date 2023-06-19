@@ -12,8 +12,14 @@
 #include "slice.hpp"
 #include "utf16.hpp"
 
-#ifdef OS_WINDOWS
+#if defined(OS_DARWIN)
+#include <mach-o/dyld.h>
+#include <climits>
+#elif defined(OS_WINDOWS)
 #include <windows.h>
+#elif defined(OS_LINUX)
+#include <unistd.h>
+#include <linux/limits.h>
 #endif
 
 namespace jule {
@@ -21,6 +27,7 @@ namespace jule {
     jule::Slice<jule::Str> command_line_args;
 
     void setup_command_line_args(int argc, char *argv[]) noexcept;
+    jule::Str executable(void) noexcept;
 
     void setup_command_line_args(int argc, char *argv[]) noexcept {
 #ifdef OS_WINDOWS
@@ -42,7 +49,29 @@ namespace jule {
     LocalFree(argvw);
     argvw = nullptr;
 #endif
-}
+    }
+
+    jule::Str executable(void) noexcept {
+#if defined(OS_DARWIN)
+        char buff[PATH_MAX];
+        uint32_t buff_size{ PATH_MAX };
+        if(!_NSGetExecutablePath(buff, &buff_size))
+            return jule::Str(buff);
+        return jule::Str();
+#elif defined(OS_WINDOWS)
+        wchar_t buffer[MAX_PATH];
+        const DWORD n{ GetModuleFileNameW(NULL, buffer, MAX_PATH) };
+        if (n)
+            return jule::utf16_to_utf8_str(&buffer[0], n);
+        return jule::Str();
+#elif defined(OS_LINUX)
+        char result[PATH_MAX];
+        const ssize_t count{ readlink("/proc/self/exe", result, PATH_MAX) };
+        if (count != -1)
+            return jule::Str(result);
+        return jule::Str();
+#endif
+    }
 
 } // namespace jule
 
