@@ -214,8 +214,6 @@ func build_impl(decl *ast.Impl) *Impl {
 // like struct's implemented traits.
 type _SymbolBuilder struct {
 	owner    *_SymbolBuilder
-	pwd      string
-	pstd     string
 	importer Importer
 	errors   []build.Log
 	ast      *ast.Ast
@@ -284,7 +282,7 @@ func (s *_SymbolBuilder) build_cpp_header_import(decl *ast.UseDecl) *ImportInfo 
 func (s *_SymbolBuilder) build_std_import(decl *ast.UseDecl) *ImportInfo {
 	path := decl.Link_path[len("std::"):] // Skip "std::" prefix.
 	path = strings.Replace(path, lex.KND_DBLCOLON, string(filepath.Separator), -1)
-	path = filepath.Join(s.pstd, path)
+	path = filepath.Join(build.PATH_STDLIB, path)
 	path, err := filepath.Abs(path)
 	if err != nil {
 		s.push_err(decl.Token, "use_not_found", decl.Link_path)
@@ -352,8 +350,8 @@ func (s *_SymbolBuilder) impl_import_selections(imp *ImportInfo, decl *ast.UseDe
 }
 
 func (s *_SymbolBuilder) get_as_link_path(path string) string {
-	if strings.HasPrefix(path, s.pstd) {
-		path = path[len(s.pstd):]
+	if strings.HasPrefix(path, build.PATH_STDLIB) {
+		path = path[len(build.PATH_STDLIB):]
 		return "std" + strings.ReplaceAll(path, string(filepath.Separator), lex.KND_DBLCOLON)
 	}
 
@@ -442,7 +440,7 @@ func (s *_SymbolBuilder) import_package(imp *ImportInfo, decl *ast.UseDecl) (ok 
 		}
 
 		for _, ast := range asts {
-			table, errors := build_symbols(s.pwd, s.pstd, ast, s.importer, s)
+			table, errors := build_symbols(ast, s.importer, s)
 
 			// Break import if file has error(s).
 			if len(errors) > 0 {

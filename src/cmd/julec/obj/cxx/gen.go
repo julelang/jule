@@ -7,7 +7,6 @@ import (
 
 	"github.com/julelang/jule"
 	"github.com/julelang/jule/build"
-	"github.com/julelang/jule/cmd/julec/env"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/sema"
 )
@@ -863,7 +862,7 @@ func append_standard(obj_code *string, compiler string, compiler_cmd string) {
 	sb.WriteByte(' ')
 	sb.WriteString(compiler_cmd)
 	sb.WriteString("\n\n#include \"")
-	sb.WriteString(env.JULE_HEADER)
+	sb.WriteString(build.PATH_API)
 	sb.WriteString("\"\n\n")
 	sb.WriteString(*obj_code)
 	sb.WriteString(`

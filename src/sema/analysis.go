@@ -5,20 +5,15 @@
 package sema
 
 import (
-	"strings"
-
 	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/build"
 )
 
 // Builds symbol table of AST.
-func build_symbols(pwd string, pstd string, ast *ast.Ast,
-	importer Importer, owner *_SymbolBuilder) (*SymbolTable, []build.Log) {
+func build_symbols(ast *ast.Ast, importer Importer, owner *_SymbolBuilder) (*SymbolTable, []build.Log) {
 	sb := &_SymbolBuilder{
 		ast:      ast,
 		importer: importer,
-		pwd:      pwd,
-		pstd:     pstd,
 		owner:    owner,
 	}
 	sb.build()
@@ -29,12 +24,11 @@ func build_symbols(pwd string, pstd string, ast *ast.Ast,
 	return nil, sb.errors
 }
 
-func analyze_package(pwd string, pstd string, files []*ast.Ast,
-	importer Importer) (*Package, []build.Log){
+func analyze_package(files []*ast.Ast, importer Importer) (*Package, []build.Log){
 	// Build symbol tables of files.
 	tables := make([]*SymbolTable, len(files))
 	for i, f := range files {
-		table, errors := build_symbols(pwd, pstd, f, importer, nil)
+		table, errors := build_symbols(f, importer, nil)
 		if len(errors) > 0 {
 			return nil, errors
 		}
@@ -61,31 +55,22 @@ func analyze_package(pwd string, pstd string, files []*ast.Ast,
 // Accepts current working directory is pwd.
 //
 // Parameters:
-//   pwd:      working directory path
-//   pstd:     standard library directory path
 //   files:    abstract syntax trees of files
 //   importer: importer that used for use declarations
+//
+// Dependent Parameters:
+//   working-directory: uses working directory path provided by build
+//   std-path: uses standard library path provided by build
 //
 // Risks:
 //  - You can pass nil to importer, but panics if importer is nil and
 //    semantic analyzer used nil importer.
-func Analyze_package(pwd string, pstd string, files []*ast.Ast,
-	importer Importer) (*Package, []build.Log) {
+func Analyze_package(files []*ast.Ast, importer Importer) (*Package, []build.Log) {
 	if len(files) == 0 {
 		return nil, nil
 	}
 
-	pwd = strings.TrimSpace(pwd)
-	if pwd == "" {
-		return nil, nil
-	}
-
-	pstd = strings.TrimSpace(pstd)
-	if pstd == "" {
-		return nil, nil
-	}
-
-	return analyze_package(pwd, pstd, files, importer)
+	return analyze_package(files, importer)
 }
 
 // Builds symbol table of AST.
@@ -95,18 +80,19 @@ func Analyze_package(pwd string, pstd string, files []*ast.Ast,
 // Accepts current working directory is pwd.
 //
 // Parameters:
-//   pwd:      working directory path
-//   pstd:     standard library directory path
 //   f:        file's abstract syntax tree
 //   importer: importer that used for use declarations
+//
+// Dependent Parameters:
+//   working-directory: uses working directory path provided by build
+//   std-path: uses standard library path provided by build
 //
 // Risks:
 //  - You can pass nil to importer, but panics if importer is nil and
 //    semantic analyzer used nil importer.
-func Analyze_file(pwd string, pstd string, f *ast.Ast,
-	importer Importer) (*SymbolTable, []build.Log) {
+func Analyze_file(f *ast.Ast, importer Importer) (*SymbolTable, []build.Log) {
 	files := []*ast.Ast{f}
-	pkg, errors := Analyze_package(pwd, pstd, files, importer)
+	pkg, errors := Analyze_package(files, importer)
 	if len(errors) > 0 {
 		return nil, errors
 	}

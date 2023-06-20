@@ -10,7 +10,6 @@ import (
 
 	"github.com/julelang/jule/ast"
 	"github.com/julelang/jule/build"
-	"github.com/julelang/jule/cmd/julec/env"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/parser"
 	"github.com/julelang/jule/sema"
@@ -181,7 +180,7 @@ func compile(path string) (*sema.Package, *Importer) {
 	set()
 
 	// Check standard library.
-	inf, err := os.Stat(env.STDLIB_PATH)
+	inf, err := os.Stat(build.PATH_STDLIB)
 	if err != nil || !inf.IsDir() {
 		exit_err(build.Errorf("stdlib_not_exist"))
 		return nil, nil
@@ -198,7 +197,7 @@ func compile(path string) (*sema.Package, *Importer) {
 		exit_err(build.Errorf("no_file_in_entry_package", path))
 	}
 
-	pkg, errors := sema.Analyze_package(env.WORKING_PATH, env.STDLIB_PATH, files, importer)
+	pkg, errors := sema.Analyze_package(files, importer)
 	if len(errors) > 0 {
 		print_logs(errors)
 		return nil, nil
@@ -238,7 +237,7 @@ func gen_compile_cmd(source_path string, passes []string) (string, string) {
 }
 
 func get_compile_path() string {
-	path := filepath.Join(env.WORKING_PATH, OUT_DIR)
+	path := filepath.Join(build.PATH_WD, OUT_DIR)
 	path = filepath.Join(path, OUT_NAME)
 	return path
 }
