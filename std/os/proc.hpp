@@ -8,8 +8,12 @@
 #include "../../api/jule.hpp"
 
 jule::Slice<jule::Str> __jule_get_command_line_args(void) noexcept;
+jule::Str __jule_executable(void) noexcept;
 
 jule::Slice<jule::Str> __jule_get_command_line_args(void) noexcept
 { return jule::command_line_args; }
+
+jule::Str __jule_executable(void) noexcept
+{ return jule::executable(); }
 
 #endif // ifndef __JULE_STD_OS_PROC_HPP
