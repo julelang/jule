@@ -554,7 +554,12 @@ func (e *_Eval) eval_var(v *Var, error_token lex.Token) *Data {
 
 	if !v.Cpp_linked && (v.Value == nil || v.Value.Data == nil) {
 		if v.Constant {
-			return nil
+			// Eval constant dependent variable.
+			e.s.check_type_var(v, e.s)
+			if v.Value.Data == nil {
+				// Skip error.
+				return nil
+			}
 		}
 	}
 
