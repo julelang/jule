@@ -220,6 +220,14 @@ type _SymbolBuilder struct {
 	table    *SymbolTable
 }
 
+func (s *_SymbolBuilder) get_root() *_SymbolBuilder {
+	root := s
+	for root.owner != nil {
+		root = root.owner
+	}
+	return root
+}
+
 func (s *_SymbolBuilder) push_err(token lex.Token, key string, args ...any) {
 	s.errors = append(s.errors, build.Log{
 		Type:   build.ERR,
@@ -313,6 +321,41 @@ func (s *_SymbolBuilder) build_std_import(decl *ast.UseDecl) *ImportInfo {
 	}
 }
 
+func (s *_SymbolBuilder) build_ident_import(decl *ast.UseDecl) *ImportInfo {
+	path := decl.Link_path
+	path = strings.Replace(path, lex.KND_DBLCOLON, string(filepath.Separator), -1)
+	path = filepath.Join(s.get_root().ast.File.Dir(), path)
+
+	path, err := filepath.Abs(path)
+	if err != nil {
+		s.push_err(decl.Token, "use_not_found", decl.Link_path)
+		return nil
+	}
+
+	info, err := os.Stat(path)
+	// Exist?
+	if err != nil || !info.IsDir() {
+		s.push_err(decl.Token, "use_not_found", decl.Link_path)
+		return nil
+	}
+
+	// Select last identifier of namespace chain.
+	ident := decl.Link_path[strings.LastIndex(decl.Link_path, lex.KND_DBLCOLON)+1:]
+
+	return &ImportInfo{
+		Import_all: decl.Full,
+		Token:      decl.Token,
+		Path:       path,
+		Link_path:  decl.Link_path,
+		Ident:      ident,
+		Cpp:        false,
+		Std:        false,
+		Package:    &Package{
+			Files: nil, // Appends by import algorithm.
+		},
+	}
+}
+
 func (s *_SymbolBuilder) build_import(decl *ast.UseDecl) *ImportInfo {
 	switch {
 	case decl.Cpp:
@@ -322,7 +365,7 @@ func (s *_SymbolBuilder) build_import(decl *ast.UseDecl) *ImportInfo {
 		return s.build_std_import(decl)
 
 	default:
-		return nil
+		return s.build_ident_import(decl)
 	}
 }
 
@@ -355,7 +398,12 @@ func (s *_SymbolBuilder) get_as_link_path(path string) string {
 		return "std" + strings.ReplaceAll(path, string(filepath.Separator), lex.KND_DBLCOLON)
 	}
 
-	return path
+	root, _ := filepath.Abs(s.get_root().ast.File.Dir())
+	path = path[len(root):]
+	if path[0] == filepath.Separator {
+		path = path[1:]
+	}
+	return strings.ReplaceAll(path, string(filepath.Separator), lex.KND_DBLCOLON)
 }
 
 func (s *_SymbolBuilder) push_cross_cycle_error(target *_SymbolBuilder, imp *ImportInfo, error_token lex.Token) {

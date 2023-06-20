@@ -769,17 +769,92 @@ func (p *_Parser) build_std_use_decl(decl *ast.UseDecl, tokens []lex.Token) {
 	decl.Link_path = "std::" + tokstoa(tokens)
 }
 
+func (p *_Parser) build_ident_use_decl(decl *ast.UseDecl, tokens []lex.Token) {
+	decl.Std = false
+
+	token := tokens[len(tokens)-1]
+	switch token.Id {
+	case lex.ID_DBLCOLON:
+		p.push_err(token, "invalid_syntax")
+		return
+
+	case lex.ID_RANGE:
+		if token.Kind != lex.KND_RBRACE {
+			p.push_err(token, "invalid_syntax")
+			return
+		}
+
+		var selectors []lex.Token
+		tokens, selectors = lex.Range_last(tokens)
+		decl.Selected = p.get_use_decl_selectors(selectors)
+		if len(tokens) == 0 {
+			p.push_err(token, "invalid_syntax")
+			return
+		}
+
+		token = tokens[len(tokens)-1]
+		if token.Id != lex.ID_DBLCOLON {
+			p.push_err(token, "invalid_syntax")
+			return
+		}
+
+		tokens = tokens[:len(tokens)-1]
+		if len(tokens) == 0 {
+			p.push_err(token, "invalid_syntax")
+			return
+		}
+
+	case lex.ID_OP:
+		if token.Kind != lex.KND_STAR {
+			p.push_err(token, "invalid_syntax")
+			return
+		}
+
+		tokens = tokens[:len(tokens)-1]
+		if len(tokens) == 0 {
+			p.push_err(token, "invalid_syntax")
+			return
+		}
+
+		token = tokens[len(tokens)-1]
+		if token.Id != lex.ID_DBLCOLON {
+			p.push_err(token, "invalid_syntax")
+			return
+		}
+
+		tokens = tokens[:len(tokens)-1]
+		if len(tokens) == 0 {
+			p.push_err(token, "invalid_syntax")
+			return
+		}
+
+		decl.Full = true
+	}
+
+	decl.Link_path = tokstoa(tokens)
+}
+
 func (p *_Parser) parse_use_decl(decl *ast.UseDecl, tokens []lex.Token) {
 	token := tokens[0]
 	if token.Id == lex.ID_CPP {
 		p.build_cpp_use_decl(decl, tokens)
 		return
 	}
-	if token.Id != lex.ID_IDENT || token.Kind != "std" {
+
+	if token.Id != lex.ID_IDENT {
 		p.push_err(token, "invalid_syntax")
 		return
 	}
-	p.build_std_use_decl(decl, tokens)
+
+	const STD_LIB_PREFIX = "std"
+
+	switch {
+	case token.Kind == STD_LIB_PREFIX:
+		p.build_std_use_decl(decl, tokens)
+
+	default:
+		p.build_ident_use_decl(decl, tokens)
+	}
 }
 
 func (p *_Parser) build_use_decl(tokens []lex.Token) *ast.UseDecl {
