@@ -149,6 +149,22 @@ func (c *Const) Set_f64(x float64) { c.data = x }
 // Sets constant value to nil.
 func (c *Const) Set_nil() { c.data = nil }
 
+func (c *Const) set_by_type(v float64, x Const) {
+	switch {
+	case x.Is_f64():
+		c.Set_f64(v)
+
+	case c.Is_f64():
+		c.Set_f64(v)
+
+	case c.Is_i64():
+		c.Set_i64(int64(v))
+
+	case c.Is_u64():
+		c.Set_u64(uint64(v))
+	}
+}
+
 //
 // Types
 //
@@ -352,14 +368,8 @@ func (c *Const) Add(x Const) bool {
 		}
 		c.Set_str(c.Read_str() + x.Read_str())
 
-	case c.Is_f64():
-		c.Set_f64(c.Read_f64() + x.As_f64())
-
-	case c.Is_i64():
-		c.Set_i64(c.Read_i64() + x.As_i64())
-
-	case c.Is_u64():
-		c.Set_u64(c.Read_u64() + x.As_u64())
+	case c.Is_f64() || c.Is_i64() || c.Is_u64():
+		c.set_by_type(c.As_f64() + x.As_f64(), x)
 
 	default:
 		return false
@@ -371,14 +381,8 @@ func (c *Const) Add(x Const) bool {
 // Reports whether operation is success.
 func (c *Const) Sub(x Const) bool {
 	switch {
-	case c.Is_f64():
-		c.Set_f64(c.Read_f64() - x.As_f64())
-
-	case c.Is_i64():
-		c.Set_i64(c.Read_i64() - x.As_i64())
-
-	case c.Is_u64():
-		c.Set_u64(c.Read_u64() - x.As_u64())
+	case c.Is_f64() || c.Is_i64() || c.Is_u64():
+		c.set_by_type(c.As_f64() - x.As_f64(), x)
 
 	default:
 		return false
@@ -390,14 +394,8 @@ func (c *Const) Sub(x Const) bool {
 // Reports whether operation is success.
 func (c *Const) Mul(x Const) bool {
 	switch {
-	case c.Is_f64():
-		c.Set_f64(c.Read_f64() * x.As_f64())
-
-	case c.Is_i64():
-		c.Set_i64(c.Read_i64() * x.As_i64())
-
-	case c.Is_u64():
-		c.Set_u64(c.Read_u64() * x.As_u64())
+	case c.Is_f64() || c.Is_i64() || c.Is_u64():
+		c.set_by_type(c.As_f64() * x.As_f64(), x)
 
 	default:
 		return false

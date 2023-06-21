@@ -3634,8 +3634,10 @@ func (bs *_BinopSolver) check_datas() {
 
 func (bs *_BinopSolver) solve_explicit(l *Data, r *Data) *Data {
 	bs.l, bs.r = l, r
+
 	bs.prepare_eval()
 	bs.check_datas()
+
 	d := bs.eval()
 	bs.l, bs.r = l, r // Save normal order
 
