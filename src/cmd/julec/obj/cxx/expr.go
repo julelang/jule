@@ -1,6 +1,7 @@
 package cxx
 
 import (
+	"math"
 	"runtime"
 	"strconv"
 
@@ -102,12 +103,44 @@ func get_bool_model(c *constant.Const) string {
 
 func get_nil_model() string { return "nullptr" }
 
+func gen_float_special_cases(x float64) string {
+	switch {
+	case math.IsNaN(x):
+		return "NAN"
+
+	case math.IsInf(x, 1):
+		return "INFINITY"
+
+	case math.IsInf(x, -1):
+		return "-INFINITY"
+
+	default:
+		return ""
+	}
+}
+
 func get_f32_model(c *constant.Const) string {
-	return strconv.FormatFloat(c.Read_f64(), 'e', -1, 32) + "f"
+	x := c.As_f64()
+
+	// Special cases.
+	f := gen_float_special_cases(x)
+	if f != "" {
+		return f
+	}
+
+	return strconv.FormatFloat(x, 'e', -1, 32) + "f"
 }
 
 func get_f64_model(c *constant.Const) string {
-	return strconv.FormatFloat(c.Read_f64(), 'e', -1, 64)
+	x := c.As_f64()
+
+	// Special cases.
+	f := gen_float_special_cases(x)
+	if f != "" {
+		return f
+	}
+
+	return strconv.FormatFloat(x, 'e', -1, 64)
 }
 
 func get_float_model(d *sema.Data) string {
