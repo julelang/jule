@@ -1088,31 +1088,58 @@ func (tc *_TypeChecker) build(decl_kind ast.TypeDeclKind) *TypeKind {
 
 	switch decl_kind.(type) {
 	case *ast.IdentType:
-		kind = tc.build_ident(decl_kind.(*ast.IdentType))
+		t := tc.build_ident(decl_kind.(*ast.IdentType))
+		if t != nil {
+			kind = t
+		}
 
 	case *ast.RefType:
-		kind = tc.build_ref(decl_kind.(*ast.RefType))
+		t := tc.build_ref(decl_kind.(*ast.RefType))
+		if t != nil {
+			kind = t
+		}
 
 	case *ast.PtrType:
-		kind = tc.build_ptr(decl_kind.(*ast.PtrType))
+		t := tc.build_ptr(decl_kind.(*ast.PtrType))
+		if t != nil {
+			kind = t
+		}
 
 	case *ast.SlcType:
-		kind = tc.build_slc(decl_kind.(*ast.SlcType))
+		t := tc.build_slc(decl_kind.(*ast.SlcType))
+		if t != nil {
+			kind = t
+		}
 
 	case *ast.ArrType:
-		kind = tc.build_arr(decl_kind.(*ast.ArrType))
+		t := tc.build_arr(decl_kind.(*ast.ArrType))
+		if t != nil {
+			kind = t
+		}
 
 	case *ast.MapType:
-		kind = tc.build_map(decl_kind.(*ast.MapType))
+		t := tc.build_map(decl_kind.(*ast.MapType))
+		if t != nil {
+			kind = t
+		}
 
 	case *ast.TupleType:
-		kind = tc.build_tuple(decl_kind.(*ast.TupleType))
+		t := tc.build_tuple(decl_kind.(*ast.TupleType))
+		if t != nil {
+			kind = t
+		}
 
 	case *ast.FnDecl:
-		kind = tc.build_fn(decl_kind.(*ast.FnDecl))
+		t := tc.build_fn(decl_kind.(*ast.FnDecl))
+		if t != nil {
+			kind = t
+		}
 
 	case *ast.NamespaceType:
-		kind = tc.build_by_namespace(decl_kind.(*ast.NamespaceType))
+		t := tc.build_by_namespace(decl_kind.(*ast.NamespaceType))
+		if t != nil {
+			kind = t
+		}
 
 	default:
 		tc.push_err(tc.error_token, "invalid_type")
