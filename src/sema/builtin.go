@@ -305,7 +305,12 @@ func builtin_caller_new(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 	}
 
 	if !is_valid_for_ref(t.Kind) {
-		e.push_err(fc.Args[0].Token, "invalid_type")
+		s := t.Kind.Strct()
+		if s != nil && s.Decl != nil && s.Decl.Cpp_linked {
+			e.push_err(fc.Args[0].Token, "cpp_linked_struct_for_ref")
+		} else {
+			e.push_err(fc.Args[0].Token, "invalid_type")
+		}
 		return nil
 	}
 

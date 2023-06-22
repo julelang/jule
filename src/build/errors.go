@@ -189,6 +189,7 @@ var ERRORS = map[string]string{
 	`derive_illegal_cycle_refers_itself`:       `illegal cycle for "@" derive, struct "@" refers to itself`,
 	`derive_illegal_cross_cycle`:               "illegal cross cycle for \"@\" derive;\n@",
 	`invalid_expr_for_binop`:                   `invalid expression used for binary operation`,
+	`cpp_linked_struct_for_ref`:                `cpp-linked structures cannot supports reference counting`,
 }
 
 // Returns formatted error message by key and args.

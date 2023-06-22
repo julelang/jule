@@ -382,6 +382,10 @@ func is_nil_compatible(t *TypeKind) bool {
 }
 
 func is_valid_for_ref(t *TypeKind) bool {
+	s := t.Strct()
+	if s != nil && s.Decl != nil && s.Decl.Cpp_linked {
+		return false
+	}
 	return !(t.Enm() != nil || t.Ptr() != nil || t.Ref() != nil|| t.Arr() != nil)
 }
 
@@ -846,6 +850,13 @@ func (tc *_TypeChecker) build_ref(decl *ast.RefType) *Ref {
 	switch {
 	case elem == nil:
 		return nil
+
+	case elem.Strct() != nil:
+		s := elem.Strct()
+		if s != nil && s.Decl != nil && s.Decl.Cpp_linked {
+			tc.push_err(tc.error_token, "cpp_linked_struct_for_ref")
+			return nil
+		}
 
 	case elem.Ref() != nil:
 		tc.push_err(tc.error_token, "ref_refs_ref")
