@@ -244,8 +244,8 @@ func (s *_SymbolBuilder) check_cpp_use_decl_path(decl *ast.UseDecl) (ok bool) {
 	}
 
 	ext := filepath.Ext(decl.Link_path)
-	if !build.Is_valid_header_ext(ext) {
-		s.push_err(decl.Token, "invalid_header_ext", ext)
+	if !build.Is_valid_header_ext(ext) && !build.Is_valid_cpp_ext(ext) {
+		s.push_err(decl.Token, "invalid_cpp_ext", ext)
 		return false
 	}
 

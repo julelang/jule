@@ -55,7 +55,7 @@ var ERRORS = map[string]string{
 	`invalid_type_for_const`:                   `@ is invalid data-type for constant`,
 	`invalid_value_for_key`:                    `"@" is invalid value for the "@" key`,
 	`invalid_expr`:                             `invalid expression`,
-	`invalid_header_ext`:                       `invalid header extension: @`,
+	`invalid_cpp_ext`:                          `invalid C++ extension: @`,
 	`invalid_label`:                            `invalid label`,
 	`missing_autotype_value`:                   `auto type declarations should have a initializer`,
 	`missing_type`:                             `data-type missing`,

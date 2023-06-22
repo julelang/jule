@@ -1,28 +1,10 @@
-// Copyright 2023 The Jule Programming Language.
-// Use of this source code is governed by a BSD 3-Clause
-// license that can be found in the LICENSE file.
-
 package build
 
 import (
-	"path/filepath"
 	"runtime"
 	"strings"
+	"path/filepath"
 )
-
-const EXT = `.jule`
-const API = "api"
-const STDLIB = "std"
-const ENTRY_POINT = "main"
-const INIT_FN = "init"
-
-// Valid extensions of cpp headers.
-var CPP_HEADER_EXTS = []string{
-	".h",
-	".hpp",
-	".hxx",
-	".hh",
-}
 
 func check_os(arg string) (ok bool, exist bool) {
 	ok = false
@@ -127,21 +109,3 @@ func Is_pass_file_annotation(p string) bool {
 	ok, exist = check_os(a1)
 	return !exist || ok
 }
-
-// Reports path is C++ std library path.
-func Is_std_header_path(p string) bool {
-	return p[0] == '<' && p[len(p)-1] == '>'
-}
-
-// Reports whether C++ header extension is valid.
-func Is_valid_header_ext(ext string) bool {
-	for _, valid_ext := range CPP_HEADER_EXTS {
-		if ext == valid_ext {
-			return true
-		}
-	}
-	return false
-}
-
-// Reports whether file path is Jule source code.
-func Is_jule(path string) bool { return filepath.Ext(path) == EXT }
