@@ -99,17 +99,16 @@ func get_all_variables(pkg *sema.Package, used []*sema.ImportInfo) []*sema.Var {
 func gen_links(used []*sema.ImportInfo) string {
 	obj := ""
 	for _, pkg := range used {
-		if !pkg.Cpp {
+		switch {
+		case !pkg.Cpp:
 			continue
-		}
 
-		obj += "#include "
-		if build.Is_std_header_path(pkg.Path) {
-			obj += pkg.Path
-		} else {
-			obj += `"` + pkg.Path + `"`
+		case build.Is_std_header_path(pkg.Path):
+			obj += "#include " + pkg.Path + "\n"
+
+		case is_cpp_header_file(pkg.Path):
+			obj += `#include "` + pkg.Path + "\"\n"
 		}
-		obj += "\n"
 	}
 	return obj
 }

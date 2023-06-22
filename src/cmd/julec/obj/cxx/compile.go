@@ -212,7 +212,15 @@ func compile(path string) (*sema.Package, *Importer) {
 	return pkg, importer
 }
 
-func gen_compile_cmd(source_path string, passes []string) (string, string) {
+func is_cpp_header_file(path string) bool {
+	return build.Is_valid_header_ext(path[strings.LastIndex(path, "."):])
+}
+
+func is_cpp_source_file(path string) bool {
+	return build.Is_valid_cpp_ext(path[strings.LastIndex(path, "."):])
+}
+
+func gen_compile_cmd(source_path string, used []*sema.ImportInfo, passes []string) (string, string) {
 	compiler := COMPILER_PATH
 
 	const ZERO_LEVEL_OPTIMIZATION = "-O0"
@@ -226,6 +234,13 @@ func gen_compile_cmd(source_path string, passes []string) (string, string) {
 	// Push passes.
 	for _, pass := range passes {
 		cmd += pass + " "
+	}
+
+	// Push linked source files.
+	for _, u := range used {
+		if u.Cpp && is_cpp_source_file(u.Path) {
+			cmd += u.Path + " "
+		}
 	}
 
 	if OUT != "" {
@@ -298,7 +313,7 @@ func Compile(path string) {
 	}
 
 	passes := get_all_unique_passes(pkg, importer.all_packages)
-	compiler, compiler_cmd := gen_compile_cmd(get_compile_path(), passes)
+	compiler, compiler_cmd := gen_compile_cmd(get_compile_path(), importer.all_packages, passes)
 
 	obj := Gen(pkg, importer.all_packages)
 	append_standard(&obj, compiler, compiler_cmd)
