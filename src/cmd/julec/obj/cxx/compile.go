@@ -213,11 +213,19 @@ func compile(path string) (*sema.Package, *Importer) {
 }
 
 func is_cpp_header_file(path string) bool {
-	return build.Is_valid_header_ext(path[strings.LastIndex(path, "."):])
+	offset := strings.LastIndex(path, ".")
+	if offset == -1 {
+		return false
+	}
+	return build.Is_valid_header_ext(path[offset:])
 }
 
 func is_cpp_source_file(path string) bool {
-	return build.Is_valid_cpp_ext(path[strings.LastIndex(path, "."):])
+	offset := strings.LastIndex(path, ".")
+	if offset == -1 {
+		return false
+	}
+	return build.Is_valid_cpp_ext(path[offset:])
 }
 
 func gen_compile_cmd(source_path string, used []*sema.ImportInfo, passes []string) (string, string) {
