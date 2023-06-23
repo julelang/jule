@@ -1,0 +1,649 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::jule::build::{DIRECTIVE_PREFIX}
+use std::jule::lex::{Token, TokenId, TokenKind}
+
+// Type of AST Node's data.
+pub type NodeData: any
+
+// AST Node.
+pub struct Node {
+	pub token: Token
+	pub data:  NodeData
+}
+
+impl Node {
+	// Reports whether node data is declaration.
+	pub fn is_decl(self): bool {
+		match type self.data {
+		| &EnumDecl
+		| &FnDecl
+		| &StructDecl
+		| &TraitDecl
+		| &TypeAliasDecl
+		| &FieldDecl
+		| &UseDecl
+		| &VarDecl
+		| &Type:
+			ret true
+
+		|:
+			ret false
+		}
+	}
+
+	// Reports whether node data is comment or comment group.
+	pub fn is_comment(self): bool {
+		match type self.data {
+		| &Comment
+		| &CommentGroup:
+			ret true
+
+		|:
+			ret false
+		}
+	}
+
+	// Reports whether node data is impl.
+	pub fn is_impl(self): bool {
+		match type self.data {
+		| &Impl: ret true
+		|:       ret false
+		}
+	}
+
+	// Reports whether node data is use declaration.
+	pub fn is_use_decl(self): bool {
+		match type self.data {
+		| &UseDecl: ret true
+		|:          ret false
+		}
+	}
+}
+
+// Comment group.
+pub struct CommentGroup {
+	pub comments: []&Comment
+}
+
+// Comment line.
+pub struct Comment {
+	pub token: Token
+	pub text:  str
+}
+
+impl Comment {
+	// Reports whether comment is directive.
+	pub fn is_directive(self): bool {
+		ret self.text.has_prefix(DIRECTIVE_PREFIX)
+	}
+}
+
+// Directive.
+pub struct Directive {
+	pub token: Token
+	pub tag:   str
+	pub args:  []str
+}
+
+// Kind type of type declarations.
+pub type TypeDeclKind: any
+
+// Type declaration.
+// Also represents type expression.
+//
+// For primitive types:
+//  - Represented by IdentType.
+//  - Token's identity is data type.
+//  - Primitive type kind is Ident.
+//
+// For function types:
+//  - Function types represented by &FnDecl.
+pub struct Type {
+	pub token: Token
+	pub kind:  TypeDeclKind
+}
+
+// Identifier type.
+pub struct IdentType {
+	pub token:      Token
+	pub ident:      str
+	pub cpp_linked: bool
+	pub generics:   []&Type
+}
+
+impl IdentType {
+	// Reports whether identifier is primitive type.
+	pub fn is_prim(self): bool { ret self.token.id == TokenId.Prim }
+}
+
+// Namespace chain type.
+pub struct NamespaceType {
+	pub idents: []Token // Namespace chain with identifier tokens.
+	pub kind:   &IdentType  // Type of identifier.
+}
+
+// Reference type.
+pub struct RefType {
+	pub elem: &Type
+}
+
+// Slice type.
+pub struct SlcType {
+	pub elem: &Type
+}
+
+// Tuple type.
+pub struct TupleType {
+	pub types: []&Type
+}
+
+// Pointer type.
+pub struct PtrType {
+	pub elem: &Type
+}
+
+impl PtrType {
+	// Reports whether pointer is unsafe pointer (*unsafe).
+	pub fn is_unsafe(self): bool { ret !real(self.elem) }
+}
+
+// Array type.
+// Size epxression is nil for auto-sized array.
+pub struct ArrType {
+	pub elem: &Type
+	pub size: &Expr
+}
+
+impl ArrType {
+	// Reports whether array is auto-sized.
+	pub fn auto_sized(self): bool { ret !real(self.size) }
+}
+
+// Map type.
+pub struct MapType {
+	pub key: &Type
+	pub val: &Type
+}
+
+// Return type.
+// Kind and Idents is nil for void type.
+pub struct RetType {
+	pub kind:   &Type
+	pub idents: []Token
+}
+
+// Type of Expr's data.
+pub type ExprData: any
+
+// Expression.
+pub struct Expr {
+	pub token: Token
+
+	// Possible types:
+	//  - &TupleExpr
+	//  - &LitExpr
+	//  - &Type
+	//  - &IdentExpr
+	//  - &UnaryExpr
+	//  - &SubIdentExpr
+	//  - &NsSelectionExpr
+	//  - &VariadicExpr
+	//  - &CastExpr
+	//  - &FnCallExpr
+	//  - &StructLit
+	//  - &BraceLit
+	//  - &SlicingExpr
+	//  - &SliceExpr
+	//  - &BinopExpr
+	//  - &UnsafeExpr
+	//  - &IndexingExpr
+	//  - &FnDecl
+	pub kind:  ExprData
+}
+
+impl Expr {
+	// Reports whether expression kind is function call.
+	pub fn is_fn_call(self): bool {
+		if self.kind == nil {
+			ret false
+		}
+		match type self.kind {
+		| &FnCallExpr: ret true
+		|:             ret false
+		}
+	}
+}
+
+// Tuple expression.
+pub struct TupleExpr {
+	pub expr: []ExprData
+}
+
+// Literal expression.
+pub struct LitExpr {
+	pub token: Token
+	pub value: str
+}
+
+impl LitExpr {
+	// Reports whether literal is nil value.
+	pub fn is_nil(self): bool { ret self.value == (str)(TokenKind.Nil) }
+}
+
+// Unsafe expression.
+pub struct UnsafeExpr {
+	pub token: Token // Token of unsafe keyword.
+	pub expr:  ExprData
+}
+
+// Identifier expression.
+pub struct IdentExpr {
+	pub token:      Token // Token of identifier.
+	pub ident:      str
+	pub cpp_linked: bool
+}
+
+impl IdentExpr {
+	// Reports whether identifier is self keyword.
+	pub fn is_self(self): bool { ret self.ident == (str)(TokenKind.Self) }
+}
+
+// Unary expression.
+pub struct UnaryExpr {
+	pub op:   Token
+	pub expr: ExprData
+}
+
+// Variadiced expression.
+pub struct VariadicExpr {
+	pub token: Token
+	pub expr:  ExprData
+}
+
+// Casting expression.
+pub struct CastExpr {
+	kind: &Type
+	expr: ExprData
+}
+
+// Namespace identifier selection expression.
+pub struct NsSelectionExpr {
+	pub ns:    []Token // Tokens of selected namespace identifier chain.
+	pub ident: Token   // Token of selected identifier.
+}
+
+// Object sub identifier selection expression.
+pub struct SubIdentExpr {
+	pub is_self: bool      // True if root selector is "self" keyword.
+	pub expr:    ExprData  // Selected object.
+	pub ident:   Token // TOken of selected identifier.
+}
+
+// Binary operation.
+pub struct BinopExpr {
+	pub left:  ExprData
+	pub right: ExprData
+	pub op:    Token
+}
+
+// Function call expression kind.
+pub struct FnCallExpr {
+	pub token:      Token
+	pub expr:       &Expr
+	pub generics:   []&Type
+	pub args:       []&Expr
+	pub concurrent: bool
+}
+
+// Field-Expression pair.
+pub struct FieldExprPair {
+	pub field: Token // Field identifier token.
+	pub expr:  ExprData
+}
+
+impl FieldExprPair {
+	// Reports whether pair targeted field.
+	pub fn is_targeted(self): bool { ret self.field.id != TokenId.Na }
+}
+
+// Struct literal instiating expression.
+pub struct StructLit {
+	pub kind: &Type
+	pub exprs: []ExprData  // Possible types: &FieldExprPair, and other expressions.
+}
+
+// Anonymous brace instiating expression.
+pub struct BraceLit {
+	pub token: Token
+	pub exprs: []ExprData
+}
+
+impl BraceLit {
+	// Reports whether literal is empty ( {} ).
+	pub fn is_empty(self): bool { ret self.exprs.len == 0 }
+}
+
+// Key-value pair expression.
+pub struct KeyValPair {
+	pub key:   ExprData
+	pub val:   ExprData
+	pub colon: Token
+}
+
+// Slice initiating expression.
+// Also represents array initiating expression.
+pub struct SliceExpr {
+	pub token: Token
+	pub elems: []ExprData
+}
+
+impl SliceExpr {
+	// Reports whether slice is empty.
+	pub fn is_empty(self): bool { ret self.elems.len == 0 }
+}
+
+// Indexing expression.
+pub struct IndexingExpr {
+	pub token: Token
+	pub expr:  ExprData // Value expression to indexing.
+	pub index: ExprData // Index value expression.
+}
+
+// Slicing expression.
+pub struct SlicingExpr {
+	pub token: Token
+	pub expr:  ExprData // Value expression to slicing.
+	pub start: ExprData // Start index value expression.
+	pub to:    ExprData // To index value expression.
+}
+
+// Generic type.
+pub struct Generic {
+	pub token: Token
+	pub ident: str
+}
+
+// Label statement.
+pub struct LabelSt {
+	pub token: Token
+	pub ident: str
+}
+
+// Goto statement.
+pub struct GotoSt {
+	pub token: Token
+	pub label: Token
+}
+
+// Fall statement.
+pub struct FallSt {
+	pub token: Token
+}
+
+// Left expression of assign statement.
+pub struct AssignLeft {
+	pub token:   Token
+	pub mutable: bool
+	pub ident:   str
+	pub expr:    &Expr
+}
+
+// Assign statement.
+pub struct AssignSt {
+	pub declarative: bool
+	pub setter:      Token
+	pub left:       []&AssignLeft
+	pub right:       &Expr
+}
+
+// Scope tree.
+pub struct ScopeTree {
+	pub parent:   &ScopeTree // Nil if scope is root.
+	pub unsafety: bool
+	pub deferred: bool
+	pub stmts:    []NodeData // Statements.
+}
+
+// Parameter.
+pub struct Param {
+	pub token:    Token
+	pub mutable:  bool
+	pub variadic: bool
+	pub kind:     &Type
+	pub ident:    str
+}
+
+impl Param {
+	// Reports whether parameter is self (receiver) parameter.
+	pub fn is_self(self): bool { ret self.ident.has_suffix((str)(TokenKind.Self)) }
+
+	// Reports whether self (receiver) parameter is reference.
+	pub fn is_ref(self): bool { ret self.ident != "" && self.ident[0] == '&'}
+}
+
+// Function declaration.
+// Also represents anonymous function expression.
+pub struct FnDecl {
+	pub token:        Token
+	pub global:       bool
+	pub unsafety:     bool
+	pub public:       bool
+	pub cpp_linked:   bool
+	pub ident:        str
+	pub directives:   []&Directive
+	pub doc_comments: &CommentGroup
+	pub scope:        &ScopeTree
+	pub generics:     []&Generic
+	pub result:       &RetType
+	pub params:       []&Param
+}
+
+// Variable declaration.
+pub struct VarDecl {
+	pub scope:        &ScopeTree    // nil for global scopes
+	pub token:        Token
+	pub ident:        str
+	pub cpp_linked:   bool
+	pub public:       bool
+	pub mutable:      bool
+	pub constant:     bool
+	pub doc_comments: &CommentGroup
+	pub kind:         &Type     // nil for auto-typed
+	pub expr:         &Expr
+}
+
+// Return statement.
+pub struct RetSt {
+	pub token: Token
+	pub expr:  &Expr
+}
+
+// Type of Iter's kind.
+pub type IterKind: any
+
+// Iteration.
+pub struct Iter {
+	pub token: Token
+	pub kind:  IterKind
+	pub scope: &ScopeTree
+}
+
+impl Iter {
+	// Reports whether iteration is infinity.
+	pub fn is_inf(self): bool { ret self.kind == nil }
+}
+
+// While iteration kind.
+pub struct WhileKind {
+	pub expr:       &Expr
+	pub next:       NodeData // Nil if kind is while-next iteration.
+	pub next_token: Token
+}
+
+impl WhileKind {
+	// Reports whether kind is while-next iteration.
+	pub fn is_while_next(self): bool { ret self.next != nil }
+}
+
+// Range iteration kind.
+pub struct RangeKind {
+	pub in_token: Token // Token of "in" keyword
+	pub expr:     &Expr
+	pub key_a:    &VarDecl  // first key of range
+	pub key_b:    &VarDecl  // second key of range
+}
+
+// Break statement.
+pub struct BreakSt {
+	pub token: Token
+	pub label: Token
+}
+
+// Continue statement.
+pub struct ContSt {
+	pub token: Token
+	pub label: Token
+}
+
+// If condition.
+pub struct If {
+	pub token: Token
+	pub expr:  &Expr
+	pub scope: &ScopeTree
+}
+
+// Else condition.
+pub struct Else {
+	pub token: Token
+	pub scope: &ScopeTree
+}
+
+// Condition chain.
+pub struct Conditional {
+	pub head:    &If
+	pub tail:    []&If
+	pub default: &Else
+}
+
+// Type alias declaration.
+pub struct TypeAliasDecl {
+	pub scope:        &ScopeTree
+	pub public:       bool
+	pub cpp_linked:   bool
+	pub token:        Token
+	pub ident:        str
+	pub kind:         &Type
+	pub doc_comments: &CommentGroup
+}
+
+// Case of match-case.
+pub struct Case {
+	pub token: Token
+	pub scope: &ScopeTree
+
+	// Holds expression.
+	// Expressions holds *Type if If type matching.
+	pub exprs: []&Expr
+}
+
+// Match-Case.
+pub struct MatchCase {
+	pub token:      Token
+	pub type_match: bool
+	pub expr:       &Expr
+	pub cases:      []&Case
+	pub default:    &Else
+}
+
+// Use declaration statement.
+pub struct UseDecl {
+	pub token:      Token
+	pub link_path:  str         // Use declaration path string.
+	pub full:       bool        // Full implicit import.
+	pub selected:   []Token
+	pub cpp_linked: bool        // Cpp header use declaration.
+	pub std:        bool        // Standard package use declaration.
+}
+
+// Enum item.
+pub struct EnumItem {
+	pub token: Token
+	pub ident: str
+	pub expr:  &Expr   // Nil for auto expression.
+}
+
+impl EnumItem {
+	// Reports whether item has auto expression.
+	pub fn auto_expr(self): bool { ret !real(self.expr) }
+}
+
+// Enum declaration.
+pub struct EnumDecl {
+	pub token:        Token
+	pub public:       bool
+	pub ident:        str
+	pub kind:         &Type
+	pub items:        []&EnumItem
+	pub doc_comments: &CommentGroup
+}
+
+impl EnumDecl {
+	// Reports whether enum's type is default.
+	pub fn default_typed(self): bool { ret !real(self.kind) }
+}
+
+// Field declaration.
+pub struct FieldDecl {
+	pub token:   Token
+	pub public:  bool
+	pub mutable: bool       // Interior mutability.
+	pub ident:   str
+	pub kind:    &Type
+}
+
+// Structure declaration.
+pub struct StructDecl {
+	pub token:        Token
+	pub ident:        str
+	pub fields:       []&FieldDecl
+	pub public:       bool
+	pub cpp_linked:   bool
+	pub directives:   []&Directive
+	pub doc_comments: &CommentGroup
+	pub generics:     []&Generic
+}
+
+// Trait declaration.
+pub struct TraitDecl {
+	pub token:        Token
+	pub ident:        str
+	pub public:       bool
+	pub doc_comments: &CommentGroup
+	pub methods:      []&FnDecl
+}
+
+// Implementation.
+pub struct Impl {
+	// This token available for these cases:
+	//  - Implementation trait to structure, represents trait's token.
+	pub base:    Token
+
+	// This token available for these cases:
+	//  - Implementation trait to structure, represents structure's token.
+	//  - Implementation to structure, represents structure's token.
+	pub dest:    Token
+
+	// Given methods to implement.
+	pub methods: []&FnDecl
+}
+
+impl Impl {
+	// Reports whether implementation type is trait to structure.
+	pub fn is_trait_impl(self): bool { ret self.base.id != TokenId.Na }
+
+	// Reports whether implementation type is append to destination structure.
+	pub fn is_struct_impl(self): bool { ret self.base.id == TokenId.Na }
+}
