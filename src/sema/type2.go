@@ -13,7 +13,7 @@ import (
 
 func get_fn_result_types(f *FnIns) []*TypeKind {
 	switch {
-	case f.Decl.Is_void():
+	case f.Decl.Is_void() || f.Result == nil:
 		return nil
 
 	case f.Result.Tup() == nil:
