@@ -61,7 +61,7 @@ func get_all_structures(pkg *sema.Package, used []*sema.ImportInfo) []*sema.Stru
 	append_structs(pkg)
 
 	for _, u := range used {
-		if !u.Cpp {
+		if !u.Cpp_linked {
 			append_structs(u.Package)
 		}
 	}
@@ -87,7 +87,7 @@ func get_all_variables(pkg *sema.Package, used []*sema.ImportInfo) []*sema.Var {
 	append_vars(pkg)
 
 	for _, u := range used {
-		if !u.Cpp {
+		if !u.Cpp_linked {
 			append_vars(u.Package)
 		}
 	}
@@ -100,7 +100,7 @@ func gen_links(used []*sema.ImportInfo) string {
 	obj := ""
 	for _, pkg := range used {
 		switch {
-		case !pkg.Cpp:
+		case !pkg.Cpp_linked:
 			continue
 
 		case build.Is_std_header_path(pkg.Path):
@@ -147,7 +147,7 @@ func gen_type_aliases_pkg(pkg *sema.Package) string {
 func gen_type_aliases(pkg *sema.Package, used []*sema.ImportInfo) string {
 	obj := ""
 	for _, u := range used {
-		if !u.Cpp {
+		if !u.Cpp_linked {
 			obj += gen_type_aliases_pkg(u.Package)
 		}
 	}
@@ -332,7 +332,7 @@ func gen_traits_pkg(pkg *sema.Package) string {
 func gen_traits(pkg *sema.Package, used []*sema.ImportInfo) string {
 	obj := ""
 	for _, u := range used {
-		if !u.Cpp {
+		if !u.Cpp_linked {
 			obj += gen_traits_pkg(u.Package)
 		}
 	}
@@ -619,7 +619,7 @@ func gen_prototypes(pkg *sema.Package, used []*sema.ImportInfo, structs []*sema.
 	obj += gen_struct_prototypes(structs)
 
 	for _, u := range used {
-		if !u.Cpp {
+		if !u.Cpp_linked {
 			obj += gen_fn_prototypes(u.Package)
 		}
 	}
@@ -804,7 +804,7 @@ func gen_fns(pkg *sema.Package, used []*sema.ImportInfo) string {
 	obj := ""
 
 	for _, u := range used {
-		if !u.Cpp {
+		if !u.Cpp_linked {
 			obj += gen_pkg_fns(u.Package)
 		}
 	}
@@ -832,7 +832,7 @@ func gen_init_caller(pkg *sema.Package, used []*sema.ImportInfo) string {
 	}
 
 	for _, u := range used {
-		if !u.Cpp {
+		if !u.Cpp_linked {
 			push_init(u.Package)
 		}
 	}

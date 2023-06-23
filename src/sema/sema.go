@@ -29,7 +29,7 @@ func compiler_err(token lex.Token, key string, args ...any) build.Log {
 }
 
 func imp_is_lookupable(i *ImportInfo, ident string) bool {
-	if i.Cpp {
+	if i.Cpp_linked {
 		return false
 	}
 
@@ -483,7 +483,7 @@ func (s *_Sema) check_import_selections(imp *ImportInfo) {
 }
 
 func (s *_Sema) check_import(imp *ImportInfo) bool {
-	if imp.Duplicate || imp.Cpp || len(imp.Package.Files) == 0 {
+	if imp.Duplicate || imp.Cpp_linked || len(imp.Package.Files) == 0 {
 		return true
 	}
 

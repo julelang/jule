@@ -122,8 +122,8 @@ type ImportInfo struct {
 	// True if imported with Importer.Get_import function.
 	Duplicate bool
 
-	// Is cpp header.
-	Cpp bool
+	// Is cpp use declaration.
+	Cpp_linked bool
 
 	// Is standard library package.
 	Std bool
@@ -221,7 +221,7 @@ func (i *ImportInfo) Find_enum(ident string) *Enum {
 }
 
 func (i *ImportInfo) is_lookupable(ident string) bool {
-	if i.Cpp {
+	if i.Cpp_linked {
 		return false
 	}
 

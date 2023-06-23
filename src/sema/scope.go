@@ -489,10 +489,10 @@ func (sc *_ScopeChecker) check_conditional(conditional *ast.Conditional) {
 	c := &Conditional{}
 	sc.scope.Stmts = append(sc.scope.Stmts, c)
 
-	c.Elifs = make([]*If, len(conditional.Elifs)+1)
+	c.Elifs = make([]*If, len(conditional.Tail)+1)
 
-	c.Elifs[0] = sc.check_if(conditional.If)
-	for i, elif := range conditional.Elifs {
+	c.Elifs[0] = sc.check_if(conditional.Head)
+	for i, elif := range conditional.Tail {
 		c.Elifs[i+1] = sc.check_if(elif)
 	}
 

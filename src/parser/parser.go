@@ -698,7 +698,7 @@ func (p *_Parser) build_cpp_use_decl(decl *ast.UseDecl, tokens []lex.Token) {
 		p.push_err(token, "invalid_expr")
 		return
 	}
-	decl.Cpp = true
+	decl.Cpp_linked = true
 	decl.Link_path = token.Kind[1 : len(token.Kind)-1]
 	if !build.Is_std_header_path(decl.Link_path) {
 		decl.Link_path = filepath.Join(token.File.Dir(), decl.Link_path)

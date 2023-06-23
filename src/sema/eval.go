@@ -3662,12 +3662,12 @@ func (bs *_BinopSolver) solve_explicit(l *Data, r *Data) *Data {
 }
 
 func (bs *_BinopSolver) solve(op *ast.BinopExpr) *Data {
-	l := bs.e.eval_expr_kind(op.L)
+	l := bs.e.eval_expr_kind(op.Left)
 	if l == nil {
 		return nil
 	}
 
-	r := bs.e.eval_expr_kind(op.R)
+	r := bs.e.eval_expr_kind(op.Right)
 	if r == nil {
 		return nil
 	}

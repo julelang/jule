@@ -281,7 +281,7 @@ func (s *_SymbolBuilder) build_cpp_header_import(decl *ast.UseDecl) *ImportInfo 
 		Path:      path,
 		Link_path: decl.Link_path,
 		Ident:     "",    // Cpp headers haven't identifiers.
-		Cpp:       true,
+		Cpp_linked:       true,
 		Std:       false,
 		Package:   nil,   // Cpp headers haven't symbol table.
 	}
@@ -313,7 +313,7 @@ func (s *_SymbolBuilder) build_std_import(decl *ast.UseDecl) *ImportInfo {
 		Path:       path,
 		Link_path:  decl.Link_path,
 		Ident:      ident,
-		Cpp:        false,
+		Cpp_linked:        false,
 		Std:        true,
 		Package:    &Package{
 			Files: nil, // Appends by import algorithm.
@@ -348,7 +348,7 @@ func (s *_SymbolBuilder) build_ident_import(decl *ast.UseDecl) *ImportInfo {
 		Path:       path,
 		Link_path:  decl.Link_path,
 		Ident:      ident,
-		Cpp:        false,
+		Cpp_linked:        false,
 		Std:        false,
 		Package:    &Package{
 			Files: nil, // Appends by import algorithm.
@@ -358,7 +358,7 @@ func (s *_SymbolBuilder) build_ident_import(decl *ast.UseDecl) *ImportInfo {
 
 func (s *_SymbolBuilder) build_import(decl *ast.UseDecl) *ImportInfo {
 	switch {
-	case decl.Cpp:
+	case decl.Cpp_linked:
 		return s.build_cpp_header_import(decl)
 
 	case decl.Std:
@@ -468,7 +468,7 @@ iter:
 }
 
 func (s *_SymbolBuilder) import_package(imp *ImportInfo, decl *ast.UseDecl) (ok bool) {
-	if imp.Cpp {
+	if imp.Cpp_linked {
 		return true
 	}
 

@@ -444,9 +444,9 @@ func (sp *_ScopeParser) build_else(tokens []lex.Token) *ast.Else {
 
 func (sp *_ScopeParser) build_if_else_chain(tokens []lex.Token) ast.NodeData {
 	chain := &ast.Conditional{
-		If: sp.build_if(&tokens),
+		Head: sp.build_if(&tokens),
 	}
-	if chain.If == nil {
+	if chain.Head == nil {
 		return nil
 	}
 	for tokens != nil {
@@ -456,7 +456,7 @@ func (sp *_ScopeParser) build_if_else_chain(tokens []lex.Token) ast.NodeData {
 		if len(tokens) > 1 && tokens[1].Id == lex.ID_IF {
 			tokens = tokens[1:] // Remove else token
 			elif := sp.build_if(&tokens)
-			chain.Elifs = append(chain.Elifs, elif)
+			chain.Tail = append(chain.Tail, elif)
 			continue
 		}
 		chain.Default = sp.build_else(tokens)

@@ -263,9 +263,9 @@ type SubIdentExpr struct {
 
 // Binary operation.
 type BinopExpr struct {
-	L  ExprData
-	R  ExprData
-	Op lex.Token
+	Left  ExprData
+	Right ExprData
+	Op    lex.Token
 }
 
 // Function call expression kind.
@@ -489,8 +489,8 @@ type Else struct {
 
 // Condition chain.
 type Conditional struct {
-	If      *If
-	Elifs   []*If
+	Head    *If
+	Tail    []*If
 	Default *Else
 }
 
@@ -526,12 +526,12 @@ type MatchCase struct {
 
 // Use declaration statement.
 type UseDecl struct {
-	Token     lex.Token
-	Link_path string      // Use declaration path string.
-	Full      bool        // Full implicit import.
-	Selected  []lex.Token
-	Cpp       bool        // Cpp header use declaration.
-	Std       bool        // Standard package use declaration.
+	Token      lex.Token
+	Link_path  string      // Use declaration path string.
+	Full       bool        // Full implicit import.
+	Selected   []lex.Token
+	Cpp_linked bool        // Cpp header use declaration.
+	Std        bool        // Standard package use declaration.
 }
 
 // Enum item.

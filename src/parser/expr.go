@@ -912,8 +912,8 @@ func (ep *_ExprBuilder) build_data(tokens []lex.Token) ast.ExprData {
 
 func (ep *_ExprBuilder) build_binop(tokens []lex.Token, i int) *ast.BinopExpr {
 	return &ast.BinopExpr{
-		L:  ep.build(tokens[:i]),
-		R:  ep.build(tokens[i+1:]),
+		Left:  ep.build(tokens[:i]),
+		Right:  ep.build(tokens[i+1:]),
 		Op: tokens[i],
 	}
 }

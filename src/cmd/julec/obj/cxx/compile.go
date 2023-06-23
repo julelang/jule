@@ -121,7 +121,7 @@ func (i *Importer) Import_package(path string) ([]*ast.Ast, []build.Log) {
 
 func (i *Importer) Imported(imp *sema.ImportInfo) {
 	for _, p := range i.all_packages {
-		if p.Cpp == imp.Cpp && p.Link_path == imp.Link_path {
+		if p.Cpp_linked == imp.Cpp_linked && p.Link_path == imp.Link_path {
 			return
 		}
 	}
@@ -238,7 +238,7 @@ func gen_compile_cmd(source_path string, used []*sema.ImportInfo, passes []strin
 
 	// Push linked source files.
 	for _, u := range used {
-		if u.Cpp && is_cpp_source_file(u.Path) {
+		if u.Cpp_linked && is_cpp_source_file(u.Path) {
 			cmd += u.Path + " "
 		}
 	}
@@ -298,7 +298,7 @@ func get_all_unique_passes(pkg *sema.Package, uses []*sema.ImportInfo) []string 
 
 	push_passes(pkg)
 	for _, u := range uses {
-		if !u.Cpp {
+		if !u.Cpp_linked {
 			push_passes(u.Package)
 		}
 	}
