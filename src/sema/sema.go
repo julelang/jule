@@ -44,7 +44,7 @@ func imp_is_lookupable(i *ImportInfo, ident string) bool {
 }
 
 func build_ret_vars(f *FnIns) []*Var {
-	if f.Decl.Is_void() {
+	if f.Decl.Is_void() || f.Result == nil {
 		return nil
 	}
 
@@ -509,6 +509,19 @@ func (s *_Sema) check_imports() {
 				return
 			}
 		}
+	}
+}
+
+func (s *_Sema) impl_file_impls() {
+	for _, imp := range s.file.Impls {
+		s.impl_impl(imp)
+	}
+}
+
+func (s *_Sema) impl_impls() {
+	for _, file := range s.files {
+		s.set_current_file(file)
+		s.impl_file_impls()
 	}
 }
 
@@ -1239,19 +1252,6 @@ func (s *_Sema) impl_impl(decl *Impl) {
 	}
 }
 
-// Implement implementations.
-func (s *_Sema) impl_impls() (ok bool) {
-	for _, decl := range s.file.Impls {
-		s.impl_impl(decl)
-
-		// Break checking if type alias has error.
-		if len(s.errors) > 0 {
-			return false
-		}
-	}
-	return true
-}
-
 // Checks variable declaration.
 // No checks duplicated identifiers.
 func (s *_Sema) check_var_decl(decl *Var, l Lookup) {
@@ -1453,9 +1453,6 @@ func (s *_Sema) check_file_decls() (ok bool) {
 		return false
 
 	case !s.check_trait_decls():
-		return false
-
-	case !s.impl_impls():
 		return false
 
 	case !s.check_global_decls():
@@ -1951,7 +1948,14 @@ func (s *_Sema) check_package_types() {
 
 func (s *_Sema) check(files []*SymbolTable) {
 	s.files = files
+
 	s.check_imports()
+	// Break checking if imports has error.
+	if len(s.errors) > 0 {
+		return
+	}
+
+	s.impl_impls()
 	// Break checking if imports has error.
 	if len(s.errors) > 0 {
 		return
