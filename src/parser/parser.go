@@ -348,7 +348,7 @@ func (p *_Parser) build_self_param(tokens []lex.Token) *ast.Param {
 		param.Token = tokens[i]
 		i++
 		if i < len(tokens) {
-			p.push_err(tokens[i+1], "invalid_syntax")
+			p.push_err(tokens[i], "invalid_syntax")
 		}
 	}
 
