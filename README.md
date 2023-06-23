@@ -32,17 +32,15 @@ Our main community platforms:
 > Some commits may not be fully honored due to some compiler/API errors. \
 > Please report it with the [Jule Issue Tracker](https://github.com/julelang/jule/issues) if you come across something like this.
 
-Our motivation is to create a safe and fast programming language that focuses on system programming.
-A safer, more modern and readable option than C.
-However, we do not want to stray too far from C, C is a language that excels in systems programming.
-Since Jule is transpiled to C++ code, it can have very high interoperability with C++.
-Due to its interoperability with C++, it also offers a great deal of support for C.
-
-Jule is designed for maintainable and reliable software development.
+Our motivation is to develop a safe and fast programming language that focuses on systems programming.
+However, instead of ignoring C and C++ programming languages, which are widely used in systems programming, it is aimed to provide good interoperability support for these languages.
+Jule cares about security and tries to maintain the balance of performance.
 It guarantees memory safety and is committed to not contain undefined behavior, it has a reference compiler with obsessions that encourage developers to build safe software.
 It offers fully integrated Jule-C++ development with API and interoperability.
 
-File: `quicksort.jule`
+
+
+Showcase: `quicksort.jule`
 ```rs
 fn quicksort(mut s: []int) {
     if s.len <= 1 {
@@ -155,14 +153,18 @@ Then, a call is made from Jule and the result of the function is written to the 
 JuleC is in early development and currently it can only be built from source.
 However, despite being in the early development stage, many algorithms (<a href="https://github.com/julelang/jule/tree/master/std">see the standard library</a>) can be successfully implemented.
 It is planned to rewrite the compiler with Jule after reference compiler and standard library reaches sufficient maturity.
-JuleC has or is very close to having many of the things Jule was intended to have, such as memory safety, properties, structures with methods and generics.
+JuleC has or is very close to having many of the things Jule was intended to have, such as memory safety, no undefined behavior, structures with methods and generics.
 <br><br>
-A release is not expected until JuleC itself is developed with the Jule programming language.
+A release is not expected until JuleC itself is developed with the Jule.
 The syntax and language design of the Jule programming language has emerged and is not expected to undergo major changes.
 When the reference compiler is rewritten with Jule, it is thought that AST, Lexer and some packages will be included in the standard library.
 This will be a change that will cause the official compiler's project structure to be rebuilt.
 The reference compiler will probably use the standard library a lot.
 This will also allow developers to quickly develop tools for the language by leveraging Jule's standard library.
+<br><br>
+Also several packages that are part of JuleC have already been added to the standard library.
+Some of these packages are <a href="https://github.com/julelang/jule/tree/master/std/jule/lex">std::jule::lex</a>, <a href="https://github.com/julelang/jule/tree/master/std/jule/build">std::jule::build</a> and <a href="https://github.com/julelang/jule/tree/master/std/jule/constant">std::jule::constant</a>.
+Since these packages are part of JuleC and are intended to be used for bootsrapping purposes, they are updated simultaneously with JuleC.
 <br><br>
 There is an idea to include a package manager in JuleC as well, although it doesn't have one yet.
 Jule's modern understanding of language and convenience suggests that there should be a package manager that comes with the compiler.
