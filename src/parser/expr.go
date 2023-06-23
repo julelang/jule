@@ -169,26 +169,45 @@ func find_lowest_prec_op(tokens []lex.Token) int {
 			switch token.Kind {
 			case lex.KND_LBRACE, lex.KND_LPAREN, lex.KND_LBRACKET:
 				brace_n++
+
 			default:
 				brace_n--
 			}
 			continue
+
 		case i == 0:
 			continue
+
 		case token.Id != lex.ID_OP:
 			continue
+
 		case brace_n > 0:
 			continue
 		}
+
+		left := tokens[i-1]
+
 		// Skip unary operator.
-		if tokens[i-1].Id == lex.ID_OP {
+		if left.Id == lex.ID_OP {
 			continue
 		}
+
+		if i > 1 && left.Id == lex.ID_RANGE && left.Kind == lex.KND_RBRACKET {
+			lleft := tokens[i-2]
+			if lleft.Id == lex.ID_RANGE && lleft.Kind == lex.KND_LBRACKET {
+				// Skip potential type statements.
+				if token.Kind == lex.KND_AMPER || token.Kind == lex.KND_STAR {
+					continue
+				}
+			}
+		}
+
 		p := token.Prec()
 		if p != -1 {
 			prec.set(p, i)
 		}
 	}
+
 	data := prec.get_lower()
 	if data == nil {
 		return -1
@@ -879,6 +898,18 @@ func (ep *_ExprBuilder) build_data(tokens []lex.Token) ast.ExprData {
 	switch token.Id {
 	case lex.ID_OP:
 		return ep.build_unary(tokens)
+
+	case lex.ID_RANGE:
+		if token.Kind != lex.KND_LBRACKET || len(tokens) < 3 {
+			break
+		}
+
+		next := tokens[1]
+		if next.Id != lex.ID_RANGE || next.Kind != lex.KND_RBRACKET {
+			break
+		}
+
+		return ep.build_type(tokens)
 	}
 
 	token = tokens[len(tokens)-1]

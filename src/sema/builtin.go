@@ -449,12 +449,12 @@ func builtin_caller_make(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 	}
 
 	d.Kind = t.Kind
-	
+
 	size := e.s.evalp(fc.Args[1], e.lookup, &TypeSymbol{Kind: t.Kind})
 	if size == nil {
 		return d
 	}
-	
+
 	e.check_integer_indexing_by_data(size, fc.Args[1].Token)
 
 	// Ignore size expression if size is constant zero.
