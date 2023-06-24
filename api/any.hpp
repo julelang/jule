@@ -134,6 +134,10 @@ namespace jule {
         }
 
         void operator=(const jule::Any &src) noexcept {
+            // Assignment to itself.
+            if (this->data.alloc == src.data.alloc)
+                return;
+
             if (src.operator==(nullptr)) {
                 this->operator=(nullptr);
                 return;
