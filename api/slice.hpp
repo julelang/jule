@@ -103,14 +103,14 @@ namespace jule {
             this->_cap = n;
             this->_slice = &alloc[0];
         }
-    
+
         typedef Item       *Iterator;
         typedef const Item *ConstIterator;
     
         inline constexpr
         Iterator begin(void) noexcept
         { return &this->_slice[0]; }
-    
+
         inline constexpr
         ConstIterator begin(void) const noexcept
         { return &this->_slice[0]; }
@@ -118,11 +118,11 @@ namespace jule {
         inline constexpr
         Iterator end(void) noexcept
         { return &this->_slice[this->_len]; }
-    
+
         inline constexpr
         ConstIterator end(void) const noexcept
         { return &this->_slice[this->_len]; }
-    
+
         inline Slice<Item> slice(const jule::Int &start,
                                  const jule::Int &end) const noexcept {
             this->check();
@@ -131,8 +131,7 @@ namespace jule {
                 std::stringstream sstream;
                 __JULEC_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(sstream, start, end);
                 jule::panic(sstream.str().c_str());
-            } else if (start == end)
-                return jule::Slice<Item>();
+            }
 
             jule::Slice<Item> slice;
             slice.data = this->data;
@@ -141,24 +140,24 @@ namespace jule {
             slice._cap = this->_cap-start;
             return slice;
         }
-    
+
         inline jule::Slice<Item> slice(const jule::Int &start) const noexcept
         { return this->slice(start, this->len()); }
     
         inline jule::Slice<Item> slice(void) const noexcept
         { return this->slice(0, this->len() ); }
-    
+
         inline constexpr
         jule::Int len(void) const noexcept
         { return this->_len; }
-    
+
         inline constexpr
         jule::Int cap(void) const noexcept
         { return this->_cap; }
-    
+
         inline jule::Bool empty(void) const noexcept
         { return !this->_slice || this->_len == 0 || this->_cap == 0; }
-    
+
         void push(const Item &item) noexcept {
             if (this->_len == this->_cap) {
                 Item *_new{ new(std::nothrow) Item[this->_len+1] };
@@ -181,7 +180,7 @@ namespace jule {
 
             ++this->_len;
         }
-    
+
         jule::Bool operator==(const jule::Slice<Item> &src) const noexcept {
             if (this->_len != src._len)
                 return false;
@@ -193,19 +192,19 @@ namespace jule {
 
             return true;
         }
-    
+
         inline constexpr
         jule::Bool operator!=(const jule::Slice<Item> &src) const noexcept
         { return !this->operator==(src); }
-    
+
         inline constexpr
         jule::Bool operator==(const std::nullptr_t) const noexcept
         { return !this->_slice; }
-    
+
         inline constexpr
         jule::Bool operator!=(const std::nullptr_t) const noexcept
         { return !this->operator==(nullptr); }
-    
+
         Item &operator[](const jule::Int &index) const {
             this->check();
             if (this->empty() || index < 0 || this->len() <= index) {
