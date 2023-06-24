@@ -553,6 +553,8 @@ func gen_builtin_make_call_expr_model(m *sema.BuiltinMakeCallExprModel) string {
 	obj += "::alloc("
 	if m.Size != nil {
 		obj += gen_expr(m.Size)
+	} else {
+		obj += "0"
 	}
 	obj += ")"
 	return obj

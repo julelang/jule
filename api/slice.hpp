@@ -30,11 +30,7 @@ namespace jule {
 
         static jule::Slice<Item> alloc(const jule::Uint &n) noexcept {
             jule::Slice<Item> buffer;
-            const jule::Uint _n{ n < 0 ? 0 : n };
-            if ( _n == 0 )
-                return buffer;
-
-            buffer.alloc_new(_n);
+            buffer.alloc_new(n < 0 ? 0 : n);
             return buffer;
         }
 
@@ -94,7 +90,11 @@ namespace jule {
         void alloc_new(const jule::Int n) noexcept {
             this->dealloc();
 
-            Item *alloc{ new(std::nothrow) Item[n]{ Item() } };
+            Item *alloc{
+                n == 0 ?
+                    new(std::nothrow) Item[0] :
+                    new(std::nothrow) Item[n]{ Item() }
+            };
             if (!alloc)
                 jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
 
@@ -106,7 +106,7 @@ namespace jule {
 
         typedef Item       *Iterator;
         typedef const Item *ConstIterator;
-    
+
         inline constexpr
         Iterator begin(void) noexcept
         { return &this->_slice[0]; }
