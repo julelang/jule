@@ -363,8 +363,10 @@ func (sc *_ScopeChecker) is_duplicated_ident(self uintptr, ident string) bool {
 func (sc *_ScopeChecker) check_var_decl(decl *ast.VarDecl) {
 	v := build_var(decl)
 
-	sc.table.Vars = append(sc.table.Vars, v)
-	sc.scope.Stmts = append(sc.scope.Stmts, v)
+	defer func() {
+		sc.table.Vars = append(sc.table.Vars, v)
+		sc.scope.Stmts = append(sc.scope.Stmts, v)
+	}()
 
 	if sc.is_duplicated_ident(_uintptr(v), v.Ident) {
 		sc.s.push_err(v.Token, "duplicated_ident", v.Ident)
