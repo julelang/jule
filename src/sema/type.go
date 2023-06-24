@@ -666,14 +666,10 @@ func (tc *_TypeChecker) check_struct_ins(ins *StructIns, error_token lex.Token) 
 
 	f := tc.s.file
 	defer tc.s.set_current_file(f)
-	for _, fl := range tc.s.files {
-		if fl.File == ins.Decl.Token.File {
-			f = fl
-			break
-		}
+	f = find_file(tc.s.files, ins.Decl.Token.File)
+	if f != nil {
+		tc.s.set_current_file(f)
 	}
-
-	tc.s.set_current_file(f)
 
 	referencer := &_Referencer{
 		ident: ins.Decl.Ident,

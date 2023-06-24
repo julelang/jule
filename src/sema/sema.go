@@ -139,6 +139,15 @@ func build_generic_type_aliases(f *FnIns) []*TypeAlias {
 	return aliases
 }
 
+func find_file(files []*SymbolTable, handler *lex.File) *SymbolTable {
+	for _, fl := range files {
+		if fl.File == handler {
+			return fl
+		}
+	}
+	return nil
+}
+
 // Sema must implement Lookup.
 
 // Semantic analyzer for tables.
@@ -709,6 +718,13 @@ func (s *_Sema) reload_fn_ins_types(f *FnIns) (ok bool) {
 	}
 
 	sema := f.Decl.sema
+
+	file := f.Decl.sema.file
+	defer f.Decl.sema.set_current_file(file)
+	file = find_file(f.Decl.sema.files, f.Decl.Token.File)
+	if file != nil {
+		f.Decl.sema.set_current_file(file)
+	}
 
 	generics := make([]*TypeAlias, len(f.Generics))
 	for i, g := range f.Generics {
@@ -1888,6 +1904,13 @@ func (s *_Sema) check_fn_ins_sc(f *FnIns, sc *_ScopeChecker) {
 func (s *_Sema) check_fn_ins(f *FnIns) {
 	if f.Decl.Cpp_linked {
 		return
+	}
+
+	file := f.Decl.sema.file
+	defer f.Decl.sema.set_current_file(file)
+	file = find_file(f.Decl.sema.files, f.Decl.Token.File)
+	if file != nil {
+		f.Decl.sema.set_current_file(file)
 	}
 
 	sc := new_scope_checker(f.Decl.sema, f)
