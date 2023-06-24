@@ -15,17 +15,20 @@ func is_fn_call(tokens []lex.Token) []lex.Token {
 	switch tokens[0].Id {
 	case lex.ID_RANGE, lex.ID_IDENT, lex.ID_PRIM:
 		// Ignore.
+
 	default:
 		tok := tokens[len(tokens)-1]
 		if tok.Id != lex.ID_RANGE && tok.Kind != lex.KND_RPARENT {
 			return nil
 		}
 	}
+
 	tok := tokens[len(tokens)-1]
 	if tok.Id != lex.ID_RANGE || tok.Kind != lex.KND_RPARENT {
 		return nil
 	}
 	brace_n := 0
+
 	// Loops i >= 1 because expression must be has function expression at begin.
 	// For this reason, ignore first token.
 	for i := len(tokens) - 1; i >= 1; i-- {
@@ -91,11 +94,8 @@ func get_block_expr(tokens []lex.Token) []lex.Token {
 	return nil
 }
 
-// Returns colon index, left range and right range tokens..
+// Returns colon index, left range and right range tokens.
 // Returns nil slice and -1 if not found.
-// Starts search at *i.
-// Increases once *i for each selection.
-// *i points to close range token after selection.
 func split_colon(tokens []lex.Token) ([]lex.Token, []lex.Token) {
 	range_n := 0
 	for i, token := range tokens {

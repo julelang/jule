@@ -394,7 +394,7 @@ func gen_struct_self_field(s *sema.StructIns) string {
 func gen_field_decl(f *sema.FieldIns) string {
 	obj := gen_type_kind(f.Kind) + " "
 	obj += field_out_ident(f.Decl)
-	obj += get_init_expr(f.Kind)
+	obj += "{" + get_init_expr(f.Kind) + "}"
 	obj += CPP_ST_TERM
 	return obj
 }
@@ -647,7 +647,7 @@ func gen_var(v *sema.Var) string {
 			obj += CPP_DEFAULT_EXPR
 		}
 	} else {
-		obj += get_init_expr(v.Kind.Kind)
+		obj += "{" + get_init_expr(v.Kind.Kind) + "}"
 	}
 	obj += CPP_ST_TERM
 	return obj

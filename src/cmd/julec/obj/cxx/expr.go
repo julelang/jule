@@ -741,7 +741,7 @@ func gen_val(v *sema.Value) string {
 func get_init_expr(t *sema.TypeKind) string {
 	enm := t.Enm()
 	if enm == nil {
-		return CPP_DEFAULT_EXPR
+		return gen_type_kind(t) + "()"
 	}
-	return "{" + gen_val(enm.Items[0].Value) + "}"
+	return gen_val(enm.Items[0].Value)
 }
