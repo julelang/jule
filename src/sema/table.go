@@ -49,12 +49,43 @@ func (st *SymbolTable) Select_package(selector func(*ImportInfo) bool) *ImportIn
 	return nil
 }
 
+func (st *SymbolTable) __find_var(ident string, cpp_linked bool, reverse bool) *Var {
+	if reverse {
+		for i := len(st.Vars) - 1; i >= 0; i-- {
+			v := st.Vars[i]
+			if v.Ident == ident && v.Cpp_linked == cpp_linked {
+				return v
+			}
+		}
+	} else {
+		for _, v := range st.Vars {
+			if v.Ident == ident && v.Cpp_linked == cpp_linked {
+				return v
+			}
+		}
+	}
+	return nil
+}
+
 // Returns variable by identifier and cpp linked state.
 // Returns nil if not exist any variable in this identifier.
 func (st *SymbolTable) Find_var(ident string, cpp_linked bool) *Var {
-	for _, v := range st.Vars {
-		if v.Ident == ident && v.Cpp_linked == cpp_linked {
-			return v
+	return st.__find_var(ident, cpp_linked, false)
+}
+
+func (st *SymbolTable) __find_type_alias(ident string, cpp_linked bool, reverse bool) *TypeAlias {
+	if reverse {
+		for i := len(st.Type_aliases) - 1; i >= 0; i-- {
+			ta := st.Type_aliases[i]
+			if ta.Ident == ident && ta.Cpp_linked == cpp_linked {
+				return ta
+			}
+		}
+	} else {
+		for _, ta := range st.Type_aliases {
+			if ta.Ident == ident && ta.Cpp_linked == cpp_linked {
+				return ta
+			}
 		}
 	}
 	return nil
@@ -63,12 +94,7 @@ func (st *SymbolTable) Find_var(ident string, cpp_linked bool) *Var {
 // Returns type alias by identifier and cpp linked state.
 // Returns nil if not exist any type alias in this identifier.
 func (st *SymbolTable) Find_type_alias(ident string, cpp_linked bool) *TypeAlias {
-	for _, ta := range st.Type_aliases {
-		if ta.Ident == ident && ta.Cpp_linked == cpp_linked {
-			return ta
-		}
-	}
-	return nil
+	return st.__find_type_alias(ident, cpp_linked, false)
 }
 
 // Returns struct by identifier and cpp linked state.

@@ -225,7 +225,9 @@ func (sc *_ScopeChecker) Select_package(selector func(*ImportInfo) bool) *Import
 //  - Parent scopes.
 //  - Sema.
 func (sc *_ScopeChecker) Find_var(ident string, cpp_linked bool) *Var {
-	v := sc.table.Find_var(ident, cpp_linked)
+	// Search reverse for correct shadowing.
+	const REVERSE = true
+	v := sc.table.__find_var(ident, cpp_linked, REVERSE)
 	if v != nil {
 		return v
 	}
@@ -250,7 +252,9 @@ func (sc *_ScopeChecker) Find_var(ident string, cpp_linked bool) *Var {
 //  - Parent scopes.
 //  - Sema.
 func (sc *_ScopeChecker) Find_type_alias(ident string, cpp_linked bool) *TypeAlias {
-	ta := sc.table.Find_type_alias(ident, cpp_linked)
+	// Search reverse for correct shadowing.
+	const REVERSE = true
+	ta := sc.table.__find_type_alias(ident, cpp_linked, REVERSE)
 	if ta != nil {
 		return ta
 	}
