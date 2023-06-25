@@ -197,7 +197,11 @@ func (e *_Eval) lit_nil() *Data {
 
 func (e *_Eval) lit_str(lt *ast.LitExpr) *Data {
 	s := lt.Value[1:len(lt.Value)-1] // Remove quotes.
-	s = lit.To_str([]byte(s))
+	if lex.Is_raw_str(lt.Value) {
+		s = lit.To_raw_str([]byte(s))
+	} else {
+		s = lit.To_str([]byte(s))
+	}
 	constant := constant.New_str(s)
 
 	return &Data{

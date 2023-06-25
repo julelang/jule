@@ -475,7 +475,7 @@ func (sp *_ScopeParser) build_call_st(tokens []lex.Token) ast.NodeData {
 		sp.push_err(token, "expr_not_func_call")
 	}
 	expr := sp.p.build_expr(tokens)
-	if !expr.Is_fn_call() {
+	if expr != nil && !expr.Is_fn_call() {
 		sp.push_err(token, "invalid_syntax")
 	}
 	return expr
