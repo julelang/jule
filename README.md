@@ -35,7 +35,7 @@ Our main community platforms:
 Our motivation is to develop a safe and fast programming language that focuses on systems programming.
 However, instead of ignoring C and C++ programming languages, which are widely used in systems programming, it is aimed to provide good interoperability support for these languages.
 Jule cares about security and tries to maintain the balance of performance.
-It guarantees memory safety and is committed to not contain undefined behavior, it has a reference compiler with obsessions that encourage developers to build safe software.
+It guarantees memory safety and is committed to not contain undefined behavior (except Unsafe Jule), it has a reference compiler with obsessions that encourage developers to build safe software.
 It offers fully integrated Jule-C++ development with API and interoperability.
 
 
