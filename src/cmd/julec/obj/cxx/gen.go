@@ -13,6 +13,7 @@ import (
 
 // The self keyword equavalent of generated cpp.
 const CPP_SELF = "this"
+
 // C++ statement terminator.
 const CPP_ST_TERM = ";"
 
@@ -26,6 +27,7 @@ type _OrderedDecls struct {
 
 // Increase indentation.
 func add_indent() { INDENT++ }
+
 // Decrase indentation.
 func done_indent() { INDENT-- }
 
@@ -221,7 +223,7 @@ func gen_params(params []*sema.Param) string {
 	switch {
 	case len(params) == 0:
 		return "(void)"
-	
+
 	case len(params) == 1 && params[0].Is_self():
 		return "(void)"
 	}
@@ -242,7 +244,7 @@ func gen_params_ins(params []*sema.ParamIns) string {
 	switch {
 	case len(params) == 0:
 		return "(void)"
-	
+
 	case len(params) == 1 && params[0].Decl.Is_self():
 		return "(void)"
 	}
@@ -264,7 +266,7 @@ func gen_params_prototypes(params []*sema.ParamIns) string {
 	switch {
 	case len(params) == 0:
 		return "(void)"
-	
+
 	case len(params) == 1 && params[0].Decl.Is_self():
 		return "(void)"
 	}

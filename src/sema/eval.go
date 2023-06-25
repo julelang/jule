@@ -26,15 +26,15 @@ func normalize_bitsize(d *Data) {
 	case d.Constant.Is_f64():
 		x := d.Constant.Read_f64()
 		kind = types.Float_from_bits(types.Bitsize_of_float(x))
-	
+
 	case d.Constant.Is_i64():
 		x := d.Constant.Read_i64()
 		kind = types.Int_from_bits(types.Bitsize_of_int(x))
-	
+
 	case d.Constant.Is_u64():
 		x := d.Constant.Read_u64()
 		kind = types.Uint_from_bits(types.Bitsize_of_uint(x))
-	
+
 	default:
 		return
 	}
@@ -76,16 +76,18 @@ type Data struct {
 	//  - *Struct
 	//  - int type
 	//  - bool type
-	Decl       bool
+	Decl bool
 
 	// Constant expression data.
-	Constant   *constant.Const
+	Constant *constant.Const
 }
 
 // Reports whether Data is nil literal.
 func (d *Data) Is_nil() bool { return d.Kind.Is_nil() }
+
 // Reports whether Data is void.
 func (d *Data) Is_void() bool { return d.Kind.Is_void() }
+
 // Reports whether Data is constant expression.
 func (d *Data) Is_const() bool { return d.Constant != nil }
 
@@ -95,7 +97,7 @@ func build_void_data() *Data {
 		Lvalue:   false,
 		Decl:     false,
 		Constant: nil,
-		Kind:     &TypeKind{
+		Kind: &TypeKind{
 			kind: build_prim_type("void"),
 		},
 	}
@@ -103,8 +105,8 @@ func build_void_data() *Data {
 
 // Value.
 type Value struct {
-	Expr  *ast.Expr
-	Data  *Data
+	Expr *ast.Expr
+	Data *Data
 }
 
 func kind_by_bitsize(expr any) string {
@@ -155,7 +157,7 @@ func check_data_for_integer_indexing(d *Data) (err_key string) {
 
 // Evaluator.
 type _Eval struct {
-	s        *_Sema  // Used for error logging.
+	s        *_Sema // Used for error logging.
 	lookup   Lookup
 	prefix   *TypeKind
 	unsafety bool
@@ -196,7 +198,7 @@ func (e *_Eval) lit_nil() *Data {
 }
 
 func (e *_Eval) lit_str(lt *ast.LitExpr) *Data {
-	s := lt.Value[1:len(lt.Value)-1] // Remove quotes.
+	s := lt.Value[1 : len(lt.Value)-1] // Remove quotes.
 	if lex.Is_raw_str(lt.Value) {
 		s = lit.To_raw_str([]byte(s))
 	} else {
@@ -209,10 +211,10 @@ func (e *_Eval) lit_str(lt *ast.LitExpr) *Data {
 		Mutable:  false,
 		Constant: constant,
 		Decl:     false,
-		Kind:     &TypeKind{
+		Kind: &TypeKind{
 			kind: build_prim_type(types.TypeKind_STR),
 		},
-		Model:    constant,
+		Model: constant,
 	}
 }
 
@@ -223,18 +225,18 @@ func (e *_Eval) lit_bool(lit *ast.LitExpr) *Data {
 		Mutable:  false,
 		Constant: constant,
 		Decl:     false,
-		Kind:     &TypeKind{
+		Kind: &TypeKind{
 			kind: build_prim_type(types.TypeKind_BOOL),
 		},
-		Model:    constant,
+		Model: constant,
 	}
 }
 
 func (e *_Eval) lit_rune(l *ast.LitExpr) *Data {
 	const BYTE_KIND = types.TypeKind_U8
 	const RUNE_KIND = types.TypeKind_I32
-	
-	lt := l.Value[1:len(l.Value)-1] // Remove quotes.
+
+	lt := l.Value[1 : len(l.Value)-1] // Remove quotes.
 	r := lit.To_rune([]byte(lt))
 	data := &Data{
 		Lvalue:   false,
@@ -270,10 +272,10 @@ func (e *_Eval) lit_float(l *ast.LitExpr) *Data {
 		Mutable:  false,
 		Constant: constant,
 		Decl:     false,
-		Kind:     &TypeKind{
+		Kind: &TypeKind{
 			kind: build_prim_type(FLOAT_KIND),
 		},
-		Model:    constant,
+		Model: constant,
 	}
 }
 
@@ -370,7 +372,7 @@ func find_builtins_sema(ident string, s *_Sema) any {
 			if def != nil {
 				return def
 			}
-		} 
+		}
 	}
 	return nil
 }
@@ -441,7 +443,7 @@ func (e *_Eval) eval_enum(enm *Enum, error_token lex.Token) *Data {
 		Mutable:  false,
 		Constant: nil,
 		Decl:     true,
-		Kind:     &TypeKind{
+		Kind: &TypeKind{
 			kind: enm,
 		},
 	}
@@ -458,10 +460,10 @@ func (e *_Eval) eval_struct(s *StructIns, error_token lex.Token) *Data {
 		Mutable:  false,
 		Constant: nil,
 		Decl:     true,
-		Kind:     &TypeKind{
+		Kind: &TypeKind{
 			kind: s,
 		},
-		Model:    s,
+		Model: s,
 	}
 }
 
@@ -471,10 +473,10 @@ func (e *_Eval) eval_fn_ins(f *FnIns) *Data {
 		Mutable:  false,
 		Constant: nil,
 		Decl:     false,
-		Kind:     &TypeKind{
+		Kind: &TypeKind{
 			kind: f,
 		},
-		Model:    f,
+		Model: f,
 	}
 }
 
@@ -621,7 +623,7 @@ func (e *_Eval) eval_type_alias(ta *TypeAlias, error_token lex.Token) *Data {
 			Decl: true,
 			Kind: ta.Kind.Kind.clone(),
 		}
-	
+
 	default:
 		e.push_err(error_token, "invalid_expr")
 		return nil
@@ -664,7 +666,7 @@ func (e *_Eval) eval_unary_minus(d *Data) *Data {
 	if t == nil || !types.Is_num(t.To_str()) {
 		return nil
 	}
-	
+
 	if d.Is_const() {
 		switch {
 		case d.Constant.Is_f64():
@@ -691,7 +693,7 @@ func (e *_Eval) eval_unary_plus(d *Data) *Data {
 	if t == nil || !types.Is_num(t.To_str()) {
 		return nil
 	}
-	
+
 	if d.Is_const() {
 		switch {
 		case d.Constant.Is_f64():
@@ -704,7 +706,7 @@ func (e *_Eval) eval_unary_plus(d *Data) *Data {
 			d.Constant.Set_u64(+d.Constant.Read_u64())
 		}
 	}
-	
+
 	d.Lvalue = false
 	d.Model = &UnaryExprModel{
 		Expr: d.Model,
@@ -742,14 +744,14 @@ func (e *_Eval) eval_unary_excl(d *Data) *Data {
 	if t == nil || !t.Is_bool() {
 		return nil
 	}
-	
+
 	if d.Is_const() {
 		switch {
 		case d.Constant.Is_bool():
 			d.Constant.Set_bool(!d.Constant.Read_bool())
 		}
 	}
-	
+
 	d.Lvalue = false
 	d.Model = &UnaryExprModel{
 		Expr: d.Model,
@@ -934,8 +936,8 @@ func (e *_Eval) eval_arr(s *ast.SliceExpr) *Data {
 
 	return &Data{
 		Mutable: true,
-		Kind:  &TypeKind{kind: arr},
-		Model: model,
+		Kind:    &TypeKind{kind: arr},
+		Model:   model,
 	}
 }
 
@@ -945,8 +947,8 @@ func (e *_Eval) eval_exp_slc(s *ast.SliceExpr, elem_type *TypeKind) *Data {
 	}
 
 	model := &SliceExprModel{
-		Elem_kind:  elem_type,
-		Elems: make([]ExprModel, len(s.Elems)),
+		Elem_kind: elem_type,
+		Elems:     make([]ExprModel, len(s.Elems)),
 	}
 
 	prefix := e.prefix
@@ -964,8 +966,8 @@ func (e *_Eval) eval_exp_slc(s *ast.SliceExpr, elem_type *TypeKind) *Data {
 
 	return &Data{
 		Mutable: true,
-		Kind: &TypeKind{kind: slc},
-		Model: model,
+		Kind:    &TypeKind{kind: slc},
+		Model:   model,
 	}
 }
 
@@ -1145,7 +1147,7 @@ func (e *_Eval) eval_slicing_exprs(s *ast.SlicingExpr) (*Data, *Data) {
 	} else {
 		l = &Data{
 			Constant: constant.New_i64(0),
-			Kind: &TypeKind{kind: build_prim_type(types.SYS_INT)},
+			Kind:     &TypeKind{kind: build_prim_type(types.SYS_INT)},
 		}
 		l.Model = l.Constant
 	}
@@ -1188,7 +1190,7 @@ func (e *_Eval) slicing_str(d *Data, l *Data, r *Data) {
 		d.Constant = nil
 		return
 	}
-	
+
 	if l.Is_const() && r.Is_const() {
 		left := l.Constant.As_i64()
 		if left < 0 {
@@ -1250,11 +1252,11 @@ func (e *_Eval) eval_slicing(s *ast.SlicingExpr) *Data {
 
 	model := &SlicingExprModel{
 		Expr: d.Model,
-		L:    l.Model,
+		Left: l.Model,
 	}
 
 	if r != nil {
-		model.R = r.Model
+		model.Right = r.Model
 	}
 
 	d.Model = model
@@ -1477,7 +1479,7 @@ func (e *_Eval) eval_cast_by_type_n_data(t *TypeKind, d *Data, error_token lex.T
 		d.Model = d.Constant
 	}
 
-	if d.Kind.Enm() == nil ||  d.Kind.Enm().Kind.Kind.To_str() != t.To_str() {
+	if d.Kind.Enm() == nil || d.Kind.Enm().Kind.Kind.To_str() != t.To_str() {
 		d.Cast_kind = t
 		//d.Kind = t // Do not this, will be set automatically end of the eval.
 	} else {
@@ -1493,7 +1495,7 @@ func (e *_Eval) eval_cast(c *ast.CastExpr) *Data {
 	if !ok {
 		return nil
 	}
-	
+
 	d := e.eval_expr_kind(c.Expr)
 	if d == nil {
 		return nil
@@ -1544,7 +1546,7 @@ func (e *_Eval) eval_struct_lit_explicit(s *StructIns, exprs []ast.ExprData, err
 	return &Data{
 		Mutable: true,
 		Kind:    &TypeKind{kind: s},
-		Model:   &StructLitExprModel{
+		Model: &StructLitExprModel{
 			Strct: s,
 			Args:  slc.args,
 		},
@@ -1767,10 +1769,10 @@ func (e *_Eval) eval_fn_call(fc *ast.FnCallExpr) *Data {
 
 func (e *_Eval) eval_enum_static(enm *Enum, ident lex.Token) *Data {
 	d := &Data{
-		Lvalue:   false,
-		Decl:     false,
-		Mutable:  false,
-		Kind:     &TypeKind{kind: enm},
+		Lvalue:  false,
+		Decl:    false,
+		Mutable: false,
+		Kind:    &TypeKind{kind: enm},
 	}
 
 	item := enm.Find_item(ident.Kind)
@@ -1822,7 +1824,7 @@ func (e *_Eval) eval_struct_sub_ident(d *Data, s *StructIns, si *ast.SubIdentExp
 			e.push_err(si.Ident, "ident_is_not_accessible", f.Decl.Ident)
 		}
 
-		model := &StrctSubIdentExprModel{
+		model := &StructSubIdentExprModel{
 			ExprKind: d.Kind,
 			Expr:     d.Model,
 			Field:    f,
@@ -1860,7 +1862,7 @@ func (e *_Eval) eval_struct_sub_ident(d *Data, s *StructIns, si *ast.SubIdentExp
 
 	ins := m.instance()
 	ins.Owner = s
-	d.Model = &StrctSubIdentExprModel{
+	d.Model = &StructSubIdentExprModel{
 		ExprKind: d.Kind,
 		Expr:     d.Model,
 		Method:   ins,
@@ -1875,7 +1877,7 @@ func (e *_Eval) eval_slice_sub_ident(d *Data, ident lex.Token) *Data {
 		return &Data{
 			Mutable: false,
 			Kind:    &TypeKind{kind: build_prim_type(types.SYS_INT)},
-			Model:   &CommonSubIdentExprModel{
+			Model: &CommonSubIdentExprModel{
 				Expr:  d.Model,
 				Ident: "len()",
 			},
@@ -1885,7 +1887,7 @@ func (e *_Eval) eval_slice_sub_ident(d *Data, ident lex.Token) *Data {
 		return &Data{
 			Mutable: false,
 			Kind:    &TypeKind{kind: build_prim_type(types.SYS_INT)},
-			Model:   &CommonSubIdentExprModel{
+			Model: &CommonSubIdentExprModel{
 				Expr:  d.Model,
 				Ident: "cap()",
 			},
@@ -1920,7 +1922,7 @@ func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
 		return &Data{
 			Mutable: false,
 			Kind:    &TypeKind{kind: build_prim_type(types.SYS_INT)},
-			Model:   &CommonSubIdentExprModel{
+			Model: &CommonSubIdentExprModel{
 				Expr:  d.Model,
 				Ident: "len()",
 			},
@@ -1930,7 +1932,7 @@ func (e *_Eval) eval_map_sub_ident(d *Data, ident lex.Token) *Data {
 		return &Data{
 			Mutable: d.Mutable,
 			Kind: &TypeKind{
-				kind:  &FnIns{
+				kind: &FnIns{
 					caller: builtin_caller_common_mut,
 				},
 			},
@@ -2039,7 +2041,7 @@ func (e *_Eval) eval_str_sub_ident(d *Data, ident lex.Token) *Data {
 		return &Data{
 			Mutable: false,
 			Kind:    &TypeKind{kind: build_prim_type(types.SYS_INT)},
-			Model:   &CommonSubIdentExprModel{
+			Model: &CommonSubIdentExprModel{
 				Expr:  d.Model,
 				Ident: "len()",
 			},
@@ -2657,7 +2659,7 @@ func (e *_Eval) eval_sub_ident(si *ast.SubIdentExpr) *Data {
 func (e *_Eval) eval_tuple(tup *ast.TupleExpr) *Data {
 	tup_t := &Tuple{}
 	tup_t.Types = make([]*TypeKind, len(tup.Expr))
-	
+
 	model := &TupleExprModel{
 		Datas: make([]*Data, len(tup.Expr)),
 	}
@@ -2742,7 +2744,7 @@ func (e *_Eval) eval_brace_lit(lit *ast.BraceLit) *Data {
 
 	case e.prefix.Strct() != nil:
 		return e.eval_struct_lit_explicit(e.prefix.Strct(), lit.Exprs, lit.Token)
-	
+
 	default:
 		e.push_err(lit.Token, "invalid_syntax")
 		return nil
@@ -2762,7 +2764,7 @@ func (e *_Eval) eval_anon_fn(decl *ast.FnDecl) *Data {
 		sc := e.lookup.(*_ScopeChecker)
 		scc := sc.new_child_checker()
 		scc.labels = new([]*_ScopeLabel)
-		scc.gotos =  new([]*_ScopeGoto)
+		scc.gotos = new([]*_ScopeGoto)
 		scc.owner = nil
 		scc.child_index = 0
 		scc.it = 0
@@ -2775,7 +2777,7 @@ func (e *_Eval) eval_anon_fn(decl *ast.FnDecl) *Data {
 	}
 
 	return &Data{
-		Kind:  &TypeKind{kind: ins},
+		Kind: &TypeKind{kind: ins},
 		Model: &AnonFnExprModel{
 			Func:   ins,
 			Global: e.is_global(),
@@ -2826,7 +2828,7 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 
 	case *ast.StructLit:
 		d = e.eval_struct_lit(kind.(*ast.StructLit))
-	
+
 	case *ast.Type:
 		d = e.eval_type(kind.(*ast.Type))
 
@@ -3386,7 +3388,7 @@ func (bs *_BinopSolver) eval_sig_int() *Data {
 			bs.e.push_err(bs.op, "bitshift_must_unsigned")
 			return nil
 		}
-		
+
 		return bs.l
 
 	default:
@@ -3400,7 +3402,7 @@ func (bs *_BinopSolver) eval_prim() *Data {
 	switch {
 	case prim.Is_any():
 		return bs.eval_any()
-	
+
 	case prim.Is_bool():
 		return bs.eval_bool()
 
@@ -3453,7 +3455,7 @@ func (bs *_BinopSolver) eval() *Data {
 
 	case bs.l.Kind.Fnc() != nil:
 		return bs.eval_fn()
-		
+
 	case bs.l.Kind.Trt() != nil || bs.r.Kind.Trt() != nil:
 		if bs.r.Kind.Trt() != nil {
 			bs.l, bs.r = bs.r, bs.l
@@ -3519,7 +3521,7 @@ func (bs *_BinopSolver) solve_const(d *Data) {
 	switch {
 	case d == nil:
 		return
-		
+
 	case !bs.l.Is_const() || !bs.r.Is_const():
 		d.Constant = nil
 		return
@@ -3650,9 +3652,9 @@ func (bs *_BinopSolver) solve_explicit(l *Data, r *Data) *Data {
 
 	if d != nil && !d.Is_const() {
 		d.Model = &BinopExprModel{
-			L: l.Model,
-			R: r.Model,
-			Op: bs.op.Kind,
+			Left:  l.Model,
+			Right: r.Model,
+			Op:    bs.op.Kind,
 		}
 	}
 

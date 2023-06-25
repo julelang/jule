@@ -50,8 +50,8 @@ func read_buff(path string) []byte {
 
 func flat_compiler_err(text string) build.Log {
 	return build.Log{
-		Type:   build.FLAT_ERR,
-		Text:   text,
+		Type: build.FLAT_ERR,
+		Text: text,
 	}
 }
 

@@ -36,12 +36,13 @@ func (p *Param) instance() *ParamIns {
 
 // Reports whether parameter is self (receiver) parameter.
 func (p *Param) Is_self() bool { return strings.HasSuffix(p.Ident, lex.KND_SELF) }
+
 // Reports whether self (receiver) parameter is reference.
-func (p *Param) Is_ref() bool { return p.Ident != "" && p.Ident[0] == '&'}
+func (p *Param) Is_ref() bool { return p.Ident != "" && p.Ident[0] == '&' }
 
 // Function.
 type Fn struct {
-	sema       *_Sema
+	sema *_Sema
 
 	Token      lex.Token
 	Global     bool
@@ -59,17 +60,21 @@ type Fn struct {
 
 	// Function instances for each unique type combination of function call.
 	// Nil if function is never used.
-	Instances   []*FnIns
+	Instances []*FnIns
 }
 
 // Reports whether return type is void.
 func (f *Fn) Is_void() bool { return f.Result == nil }
+
 // Reports whether function is method.
 func (f *Fn) Is_method() bool { return f.Owner != nil }
+
 // Reports whether function is entry point.
 func (f *Fn) Is_entry_point() bool { return f.Ident == build.ENTRY_POINT }
+
 // Reports whether function is anonymous function.
 func (f *Fn) Is_anon() bool { return lex.Is_anon_ident(f.Ident) }
+
 // Reports whether function has return variable(s).
 func (f *Fn) Any_var() bool { return f.Result != nil && len(f.Result.Idents) > 0 }
 
@@ -219,6 +224,7 @@ type FnIns struct {
 
 // Reports whether instance is built-in.
 func (f *FnIns) Is_builtin() bool { return f.caller != nil }
+
 // Reports whether instance is anonymous function.
 func (f *FnIns) Is_anon() bool { return f.anon || f.Decl != nil && f.Decl.Is_anon() }
 

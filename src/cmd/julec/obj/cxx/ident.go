@@ -39,8 +39,8 @@ func get_ptr_as_ident(ptr uintptr) string {
 // Returns cpp output identifier form of given identifier.
 //
 // Parameters:
-//  - ident: Identifier.
-//  - ptr:   Pointer address of package file handler.
+//   - ident: Identifier.
+//   - ptr:   Pointer address of package file handler.
 func as_out_ident(ident string, ptr uintptr) string {
 	if ptr != 0 {
 		return get_ptr_as_ident(ptr) + "_" + ident
@@ -51,9 +51,9 @@ func as_out_ident(ident string, ptr uintptr) string {
 // Returns cpp output local identifier form of fiven identifier.
 //
 // Parameters:
-//  - row:   Row of definition.
-//  - col:   Column of definition.
-//  - ident: Identifier of definition.
+//   - row:   Row of definition.
+//   - col:   Column of definition.
+//   - ident: Identifier of definition.
 func as_local_ident(row int, col int, ident string) string {
 	ident = strconv.Itoa(row) + strconv.Itoa(col) + "_" + ident
 	return as_ident(ident)

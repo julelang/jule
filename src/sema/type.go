@@ -38,8 +38,9 @@ type _Kind interface {
 type TypeKind struct {
 	Cpp_linked bool
 	Cpp_ident  string
-	kind      _Kind
+	kind       _Kind
 }
+
 // Returns clone.
 func (tk *TypeKind) clone() *TypeKind {
 	if tk == nil {
@@ -52,6 +53,7 @@ func (tk *TypeKind) clone() *TypeKind {
 	kind.kind = tk.kind
 	return kind
 }
+
 // Returns kind as string.
 func (tk TypeKind) To_str() string {
 	if tk.Is_nil() {
@@ -64,13 +66,16 @@ func (tk TypeKind) To_str() string {
 
 	return tk.kind.To_str()
 }
+
 // Reports whether kind is "nil".
 func (tk *TypeKind) Is_nil() bool { return tk.kind == nil }
+
 // Reports whether kind is "void".
 func (tk *TypeKind) Is_void() bool {
 	prim := tk.Prim()
 	return prim != nil && prim.To_str() == "void"
 }
+
 // Returns primitive type if kind is primitive type, nil if not.
 func (tk *TypeKind) Prim() *Prim {
 	switch tk.kind.(type) {
@@ -81,6 +86,7 @@ func (tk *TypeKind) Prim() *Prim {
 		return nil
 	}
 }
+
 // Returns reference type if kind is reference, nil if not.
 func (tk *TypeKind) Ref() *Ref {
 	switch tk.kind.(type) {
@@ -91,6 +97,7 @@ func (tk *TypeKind) Ref() *Ref {
 		return nil
 	}
 }
+
 // Returns pointer type if kind is pointer, nil if not.
 func (tk *TypeKind) Ptr() *Ptr {
 	switch tk.kind.(type) {
@@ -101,6 +108,7 @@ func (tk *TypeKind) Ptr() *Ptr {
 		return nil
 	}
 }
+
 // Returns enum type if kind is enum, nil if not.
 func (tk *TypeKind) Enm() *Enum {
 	switch tk.kind.(type) {
@@ -111,6 +119,7 @@ func (tk *TypeKind) Enm() *Enum {
 		return nil
 	}
 }
+
 // Returns array type if kind is array, nil if not.
 func (tk *TypeKind) Arr() *Arr {
 	switch tk.kind.(type) {
@@ -121,6 +130,7 @@ func (tk *TypeKind) Arr() *Arr {
 		return nil
 	}
 }
+
 // Returns slice type if kind is slice, nil if not.
 func (tk *TypeKind) Slc() *Slc {
 	switch tk.kind.(type) {
@@ -131,6 +141,7 @@ func (tk *TypeKind) Slc() *Slc {
 		return nil
 	}
 }
+
 // Returns fn type if kind is function, nil if not.
 func (tk *TypeKind) Fnc() *FnIns {
 	switch tk.kind.(type) {
@@ -141,6 +152,7 @@ func (tk *TypeKind) Fnc() *FnIns {
 		return nil
 	}
 }
+
 // Returns struct type if kind is structure, nil if not.
 func (tk *TypeKind) Strct() *StructIns {
 	switch tk.kind.(type) {
@@ -151,6 +163,7 @@ func (tk *TypeKind) Strct() *StructIns {
 		return nil
 	}
 }
+
 // Returns trait type if kind is trait, nil if not.
 func (tk *TypeKind) Trt() *Trait {
 	switch tk.kind.(type) {
@@ -161,6 +174,7 @@ func (tk *TypeKind) Trt() *Trait {
 		return nil
 	}
 }
+
 // Returns map type if kind is map, nil if not.
 func (tk *TypeKind) Map() *Map {
 	switch tk.kind.(type) {
@@ -171,6 +185,7 @@ func (tk *TypeKind) Map() *Map {
 		return nil
 	}
 }
+
 // Returns tuple type if kind is tuple, nil if not.
 func (tk *TypeKind) Tup() *Tuple {
 	switch tk.kind.(type) {
@@ -190,59 +205,80 @@ type TypeSymbol struct {
 
 // Reports whether type is checked already.
 func (ts *TypeSymbol) checked() bool { return ts.Kind != nil }
+
 // Removes kind and ready to check.
 // checked() reports false after this function.
 func (ts *TypeSymbol) remove_kind() { ts.Kind = nil }
 
 // Primitive type.
-type Prim struct { kind string }
+type Prim struct{ kind string }
+
 // Returns kind.
 func (p Prim) To_str() string { return p.kind }
+
 // Reports whether type is primitive i8.
 func (p *Prim) Is_i8() bool { return p.kind == types.TypeKind_I8 }
+
 // Reports whether type is primitive i16.
 func (p *Prim) Is_i16() bool { return p.kind == types.TypeKind_I16 }
+
 // Reports whether type is primitive i32.
 func (p *Prim) Is_i32() bool { return p.kind == types.TypeKind_I32 }
+
 // Reports whether type is primitive i64.
 func (p *Prim) Is_i64() bool { return p.kind == types.TypeKind_I64 }
+
 // Reports whether type is primitive u8.
 func (p *Prim) Is_u8() bool { return p.kind == types.TypeKind_U8 }
+
 // Reports whether type is primitive u16.
 func (p *Prim) Is_u16() bool { return p.kind == types.TypeKind_U16 }
+
 // Reports whether type is primitive u32.
 func (p *Prim) Is_u32() bool { return p.kind == types.TypeKind_U32 }
+
 // Reports whether type is primitive u64.
 func (p *Prim) Is_u64() bool { return p.kind == types.TypeKind_U64 }
+
 // Reports whether type is primitive f32.
 func (p *Prim) Is_f32() bool { return p.kind == types.TypeKind_F32 }
+
 // Reports whether type is primitive f64.
 func (p *Prim) Is_f64() bool { return p.kind == types.TypeKind_F64 }
+
 // Reports whether type is primitive int.
 func (p *Prim) Is_int() bool { return p.kind == types.TypeKind_INT }
+
 // Reports whether type is primitive uint.
 func (p *Prim) Is_uint() bool { return p.kind == types.TypeKind_UINT }
+
 // Reports whether type is primitive uintptr.
 func (p *Prim) Is_uintptr() bool { return p.kind == types.TypeKind_UINTPTR }
+
 // Reports whether type is primitive bool.
 func (p *Prim) Is_bool() bool { return p.kind == types.TypeKind_BOOL }
+
 // Reports whether type is primitive str.
 func (p *Prim) Is_str() bool { return p.kind == types.TypeKind_STR }
+
 // Reports whether type is primitive any.
 func (p *Prim) Is_any() bool { return p.kind == types.TypeKind_ANY }
 
 // Reference type.
-type Ref struct { Elem *TypeKind }
+type Ref struct{ Elem *TypeKind }
+
 // Returns reference kind as string.
 func (r Ref) To_str() string { return "&" + r.Elem.To_str() }
 
 // Slice type.
-type Slc struct { Elem *TypeKind }
+type Slc struct{ Elem *TypeKind }
+
 // Returns slice kind as string.
 func (s Slc) To_str() string { return "[]" + s.Elem.To_str() }
 
 // Tuple type.
-type Tuple struct { Types []*TypeKind }
+type Tuple struct{ Types []*TypeKind }
+
 // Returns tuple kind as string.
 func (t Tuple) To_str() string {
 	s := "("
@@ -260,6 +296,7 @@ type Map struct {
 	Key *TypeKind
 	Val *TypeKind
 }
+
 // Returns map kind as string.
 func (m Map) To_str() string {
 	s := "["
@@ -272,10 +309,11 @@ func (m Map) To_str() string {
 
 // Array type.
 type Arr struct {
-	Auto bool       // Auto-sized array.
+	Auto bool // Auto-sized array.
 	N    int
 	Elem *TypeKind
 }
+
 // Returns array kind as string.
 func (a Arr) To_str() string {
 	s := "["
@@ -286,7 +324,8 @@ func (a Arr) To_str() string {
 }
 
 // Pointer type.
-type Ptr struct { Elem *TypeKind }
+type Ptr struct{ Elem *TypeKind }
+
 // Returns pointer kind as string.
 func (p Ptr) To_str() string {
 	if p.Is_unsafe() {
@@ -294,6 +333,7 @@ func (p Ptr) To_str() string {
 	}
 	return "*" + p.Elem.To_str()
 }
+
 // Reports whether pointer is unsafe pointer (*unsafe).
 func (p *Ptr) Is_unsafe() bool { return p.Elem == nil }
 
@@ -338,7 +378,7 @@ func supports_clonning(k *TypeKind) bool {
 		return true
 
 	case k.Ptr() != nil:
-		return true;
+		return true
 
 	case k.Slc() != nil:
 		return supports_clonning(k.Slc().Elem)
@@ -386,7 +426,7 @@ func is_valid_for_ref(t *TypeKind) bool {
 	if s != nil && s.Decl != nil && s.Decl.Cpp_linked {
 		return false
 	}
-	return !(t.Enm() != nil || t.Ptr() != nil || t.Ref() != nil|| t.Arr() != nil)
+	return !(t.Enm() != nil || t.Ptr() != nil || t.Ref() != nil || t.Arr() != nil)
 }
 
 func is_variadicable(tk *TypeKind) bool { return tk.Slc() != nil }
@@ -475,7 +515,7 @@ func (tc *_TypeChecker) push_err(token lex.Token, key string, args ...any) {
 func (tc *_TypeChecker) build_prim(decl *ast.IdentType) *Prim {
 	if !is_prim(decl.Ident) {
 		tc.push_err(tc.error_token, "invalid_type")
-		return nil 
+		return nil
 	}
 
 	if len(decl.Generics) > 0 {
@@ -518,10 +558,10 @@ func (tc *_TypeChecker) check_illegal_cycles(ident *ast.IdentType, decl any) (ok
 			switch def.(type) {
 			case *TypeAlias:
 				return def.(*TypeAlias).Ident
-	
+
 			case *Struct:
 				return def.(*Struct).Ident
-	
+
 			case *Enum:
 				return def.(*Enum).Ident
 
@@ -680,7 +720,7 @@ func (tc *_TypeChecker) check_struct_ins(ins *StructIns, error_token lex.Token) 
 	for i, g := range ins.Generics {
 		generics[i] = &TypeAlias{
 			Ident: ins.Decl.Generics[i].Ident,
-			Kind:  &TypeSymbol{
+			Kind: &TypeSymbol{
 				Kind: g,
 			},
 		}
@@ -840,7 +880,7 @@ func (tc *_TypeChecker) build_ident(decl *ast.IdentType) _Kind {
 	switch {
 	case is_prim(decl.Ident):
 		return tc.build_prim(decl)
-	
+
 	default:
 		return tc.get_def(decl)
 	}
@@ -905,7 +945,7 @@ func (tc *_TypeChecker) build_ptr(decl *ast.PtrType) *Ptr {
 		case elem.Ref() != nil:
 			tc.push_err(tc.error_token, "ptr_points_ref")
 			return nil
-	
+
 		case elem.Enm() != nil:
 			tc.push_err(tc.error_token, "ptr_points_enum")
 			return nil
@@ -932,7 +972,7 @@ func (tc *_TypeChecker) build_slc(decl *ast.SlcType) *Slc {
 	switch {
 	case elem == nil:
 		return nil
-	
+
 	case elem.Arr() != nil && elem.Arr().Auto:
 		tc.push_err(decl.Elem.Token, "array_auto_sized")
 		return nil
@@ -977,7 +1017,7 @@ func (tc *_TypeChecker) build_arr(decl *ast.ArrType) *Arr {
 	switch {
 	case elem == nil:
 		return nil
-	
+
 	case elem.Arr() != nil && elem.Arr().Auto:
 		tc.push_err(decl.Elem.Token, "array_auto_sized")
 		return nil

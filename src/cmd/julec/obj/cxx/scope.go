@@ -12,7 +12,7 @@ type _RangeSetter interface {
 	next_steps(key_a *sema.Var, key_b *sema.Var, begin string) string
 }
 
-type _IndexRangeSetter struct {}
+type _IndexRangeSetter struct{}
 
 func (*_IndexRangeSetter) setup_vars(key_a *sema.Var, key_b *sema.Var) string {
 	indent := indent()
@@ -37,10 +37,10 @@ func (*_IndexRangeSetter) setup_vars(key_a *sema.Var, key_b *sema.Var) string {
 
 func (*_IndexRangeSetter) next_steps(key_a *sema.Var, key_b *sema.Var, begin string) string {
 	indent := indent()
-	
+
 	obj := "++__julec_range_begin;\n"
 	obj += indent
-	
+
 	obj += "if (__julec_range_begin != __julec_range_end) { "
 	if key_a != nil {
 		obj += "++" + var_out_ident(key_a) + "; "
@@ -53,7 +53,7 @@ func (*_IndexRangeSetter) next_steps(key_a *sema.Var, key_b *sema.Var, begin str
 	return obj
 }
 
-type _MapRangeSetter struct {}
+type _MapRangeSetter struct{}
 
 func (*_MapRangeSetter) setup_vars(key_a *sema.Var, key_b *sema.Var) string {
 	indent := indent()
@@ -81,7 +81,7 @@ func (*_MapRangeSetter) next_steps(key_a *sema.Var, key_b *sema.Var, begin strin
 
 	obj := "++__julec_range_begin;\n"
 	obj += indent
-	
+
 	obj += "if (__julec_range_begin != __julec_range_end) { "
 	if key_a != nil {
 		obj += var_out_ident(key_a)
@@ -270,7 +270,7 @@ func gen_assign(a *sema.Assign) string {
 
 func gen_multi_assign(a *sema.MultiAssign) string {
 	obj := "std::tie("
-	
+
 	for _, l := range a.L {
 		if l == nil {
 			obj += CPP_IGNORE + ","
@@ -303,7 +303,7 @@ func gen_case(m *sema.Match, c *sema.Case) string {
 			obj += MATCH_EXPR
 
 			if m.Type_match {
-				obj += ".type_is<" + gen_expr(expr)  + ">()"
+				obj += ".type_is<" + gen_expr(expr) + ">()"
 			}
 
 			if i+1 < len(c.Exprs) {
@@ -360,7 +360,7 @@ func gen_match(m *sema.Match) string {
 	obj += indent()
 	obj += match_end_label_ident(_uintptr(m)) + ":;"
 	obj += "\n"
-	
+
 	done_indent()
 
 	obj += indent()
@@ -595,7 +595,7 @@ func gen_scope(s *sema.Scope) string {
 	done_indent()
 	obj += indent()
 	obj += "}"
-	
+
 	if s.Deferred {
 		obj = "__JULE_DEFER(" + obj + ");"
 	}

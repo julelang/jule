@@ -23,31 +23,33 @@ type Node struct {
 // Reports whether node data is declaration.
 func (n *Node) Is_decl() bool {
 	switch n.Data.(type) {
-		case *EnumDecl,
-			*FnDecl,
-			*StructDecl,
-			*TraitDecl,
-			*TypeAliasDecl,
-			*FieldDecl,
-			*UseDecl,
-			*VarDecl,
-			*Type:
+	case *EnumDecl,
+		*FnDecl,
+		*StructDecl,
+		*TraitDecl,
+		*TypeAliasDecl,
+		*FieldDecl,
+		*UseDecl,
+		*VarDecl,
+		*Type:
 		return true
 
 	default:
 		return false
 	}
 }
+
 // Reports whether node data is comment or comment group.
 func (n *Node) Is_comment() bool {
 	switch n.Data.(type) {
-		case *Comment, *CommentGroup:
+	case *Comment, *CommentGroup:
 		return true
 
 	default:
 		return false
 	}
 }
+
 // Reports whether node data is impl.
 func (n *Node) Is_impl() bool {
 	switch n.Data.(type) {
@@ -58,6 +60,7 @@ func (n *Node) Is_impl() bool {
 		return false
 	}
 }
+
 // Reports whether node data is use declaration.
 func (n *Node) Is_use_decl() bool {
 	switch n.Data.(type) {
@@ -99,12 +102,12 @@ type TypeDeclKind = any
 // Also represents type expression.
 //
 // For primitive types:
-//  - Represented by IdentType.
-//  - Token's identity is data type.
-//  - Primitive type kind is Ident.
+//   - Represented by IdentType.
+//   - Token's identity is data type.
+//   - Primitive type kind is Ident.
 //
 // For function types:
-//  - Function types represented by *FnDecl.
+//   - Function types represented by *FnDecl.
 type Type struct {
 	Token lex.Token
 	Kind  TypeDeclKind
@@ -127,10 +130,10 @@ type NamespaceType struct {
 	Kind   *IdentType  // Type of identifier.
 }
 
-type RefType struct { Elem *Type }      // Reference type.
-type PtrType struct { Elem *Type }      // Pointer type.
-type SlcType struct { Elem *Type }      // Slice type.
-type TupleType struct { Types []*Type } // Tuple type.
+type RefType struct{ Elem *Type }      // Reference type.
+type PtrType struct{ Elem *Type }      // Pointer type.
+type SlcType struct{ Elem *Type }      // Slice type.
+type TupleType struct{ Types []*Type } // Tuple type.
 
 // Reports whether pointer is unsafe pointer (*unsafe).
 func (pt *PtrType) Is_unsafe() bool { return pt.Elem == nil }
@@ -184,7 +187,7 @@ type Expr struct {
 	//  - *UnsafeExpr
 	//  - *IndexingExpr
 	//  - *FnDecl
-	Kind  ExprData
+	Kind ExprData
 }
 
 // Reports whether expression kind is function call.
@@ -289,7 +292,7 @@ func (fep *FieldExprPair) Is_targeted() bool { return fep.Field.Id != lex.ID_NA 
 // Struct literal instiating expression.
 type StructLit struct {
 	Kind  *Type
-	Exprs []ExprData  // Possible types: *FieldExprPair, and other expressions.
+	Exprs []ExprData // Possible types: *FieldExprPair, and other expressions.
 }
 
 // Anonymous brace instiating expression.
@@ -392,8 +395,9 @@ type Param struct {
 
 // Reports whether parameter is self (receiver) parameter.
 func (p *Param) Is_self() bool { return strings.HasSuffix(p.Ident, lex.KND_SELF) }
+
 // Reports whether self (receiver) parameter is reference.
-func (p *Param) Is_ref() bool { return p.Ident != "" && p.Ident[0] == '&'}
+func (p *Param) Is_ref() bool { return p.Ident != "" && p.Ident[0] == '&' }
 
 // Function declaration.
 // Also represents anonymous function expression.
@@ -414,7 +418,7 @@ type FnDecl struct {
 
 // Variable declaration.
 type VarDecl struct {
-	Scope        *ScopeTree    // nil for global scopes
+	Scope        *ScopeTree // nil for global scopes
 	Token        lex.Token
 	Ident        string
 	Cpp_linked   bool
@@ -422,7 +426,7 @@ type VarDecl struct {
 	Mutable      bool
 	Constant     bool
 	Doc_comments *CommentGroup
-	Kind         *Type     // nil for auto-typed
+	Kind         *Type // nil for auto-typed
 	Expr         *Expr
 }
 
@@ -458,8 +462,8 @@ func (wk *WhileKind) Is_while_next() bool { return wk.Next != nil }
 type RangeKind struct {
 	In_token lex.Token // Token of "in" keyword
 	Expr     *Expr
-	Key_a    *VarDecl  // first key of range
-	Key_b    *VarDecl  // second key of range
+	Key_a    *VarDecl // first key of range
+	Key_b    *VarDecl // second key of range
 }
 
 // Break statement.
@@ -527,18 +531,18 @@ type MatchCase struct {
 // Use declaration statement.
 type UseDecl struct {
 	Token      lex.Token
-	Link_path  string      // Use declaration path string.
-	Full       bool        // Full implicit import.
+	Link_path  string // Use declaration path string.
+	Full       bool   // Full implicit import.
 	Selected   []lex.Token
-	Cpp_linked bool        // Cpp header use declaration.
-	Std        bool        // Standard package use declaration.
+	Cpp_linked bool // Cpp header use declaration.
+	Std        bool // Standard package use declaration.
 }
 
 // Enum item.
 type EnumItem struct {
 	Token lex.Token
 	Ident string
-	Expr *Expr   // Nil for auto expression.
+	Expr  *Expr // Nil for auto expression.
 }
 
 // Reports whether item has auto expression.
@@ -561,7 +565,7 @@ func (ed *EnumDecl) Default_typed() bool { return ed.Kind == nil }
 type FieldDecl struct {
 	Token   lex.Token
 	Public  bool
-	Mutable bool       // Interior mutability.
+	Mutable bool // Interior mutability.
 	Ident   string
 	Kind    *Type
 }
@@ -591,12 +595,12 @@ type TraitDecl struct {
 type Impl struct {
 	// This token available for these cases:
 	//  - Implementation trait to structure, represents trait's token.
-	Base    lex.Token
+	Base lex.Token
 
 	// This token available for these cases:
 	//  - Implementation trait to structure, represents structure's token.
 	//  - Implementation to structure, represents structure's token.
-	Dest    lex.Token
+	Dest lex.Token
 
 	// Given methods to implement.
 	Methods []*FnDecl
@@ -604,5 +608,6 @@ type Impl struct {
 
 // Reports whether implementation type is trait to structure.
 func (ipl *Impl) Is_trait_impl() bool { return ipl.Base.Id != lex.ID_NA }
+
 // Reports whether implementation type is append to destination structure.
 func (ipl *Impl) Is_struct_impl() bool { return ipl.Base.Id == lex.ID_NA }

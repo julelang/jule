@@ -9,10 +9,10 @@ import "github.com/julelang/jule/lex"
 // Implementation.
 type Impl struct {
 	// Equavalent to ast.Impl's Base field.
-	Base    lex.Token
+	Base lex.Token
 
 	// Equavalent to ast.Impl's Dest field.
-	Dest    lex.Token
+	Dest lex.Token
 
 	// Equavalent to ast.Impl's Methods field.
 	Methods []*Fn
@@ -20,5 +20,6 @@ type Impl struct {
 
 // Reports whether implementation type is trait to structure.
 func (ipl *Impl) Is_trait_impl() bool { return ipl.Base.Id != lex.ID_NA }
+
 // Reports whether implementation type is append to destination structure.
 func (ipl *Impl) Is_struct_impl() bool { return ipl.Base.Id == lex.ID_NA }

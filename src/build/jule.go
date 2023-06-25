@@ -14,6 +14,5 @@ const STDLIB = "std"
 const ENTRY_POINT = "main"
 const INIT_FN = "init"
 
-
 // Reports whether file path is Jule source code.
 func Is_jule(path string) bool { return filepath.Ext(path) == EXT }

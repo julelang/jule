@@ -8,10 +8,10 @@ package build
 const DIRECTIVE_PREFIX = "jule:"
 
 // These directives must added to the DIRECTIVES.
-const DIRECTIVE_CDEF = "cdef"        // Directive: jule:cdef
-const DIRECTIVE_TYPEDEF = "typedef"  // Directive: jule:typedef
-const DIRECTIVE_DERIVE = "derive"    // Directive: jule:derive
-const DIRECTIVE_PASS = "pass"        // Directive: jule:pass
+const DIRECTIVE_CDEF = "cdef"       // Directive: jule:cdef
+const DIRECTIVE_TYPEDEF = "typedef" // Directive: jule:typedef
+const DIRECTIVE_DERIVE = "derive"   // Directive: jule:derive
+const DIRECTIVE_PASS = "pass"       // Directive: jule:pass
 
 const DERIVE_CLONE = "Clone"
 

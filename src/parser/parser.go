@@ -47,7 +47,7 @@ type _Parser struct {
 	errors        []build.Log
 }
 
-func (p *_Parser) stop() { p.ast = nil }
+func (p *_Parser) stop()         { p.ast = nil }
 func (p *_Parser) stopped() bool { return p.ast == nil }
 
 // Appends error by specified token, key and args.
@@ -190,7 +190,7 @@ func (p *_Parser) build_var_type_and_expr(v *ast.VarDecl, tokens []lex.Token) {
 	if tok.Id == lex.ID_COLON {
 		i++ // Skip type annotation operator (:)
 		if i >= len(tokens) ||
-		(tokens[i].Id == lex.ID_OP && tokens[i].Kind == lex.KND_EQ) {
+			(tokens[i].Id == lex.ID_OP && tokens[i].Kind == lex.KND_EQ) {
 			p.push_err(tok, "missing_type")
 			return
 		}
@@ -454,7 +454,7 @@ func (p *_Parser) check_params(params []*ast.Param) {
 		} else {
 			param.Kind = &ast.Type{
 				Token: param.Token,
-				Kind:   &ast.IdentType{
+				Kind: &ast.IdentType{
 					Token: param.Token,
 					Ident: param.Token.Kind,
 				},
@@ -519,7 +519,7 @@ func (p *_Parser) build_multi_ret_type(tokens []lex.Token, i *int) (t *ast.RetTy
 	if len(types) > 1 {
 		t.Kind = &ast.Type{
 			Token: tokens[0],
-			Kind:  &ast.TupleType{
+			Kind: &ast.TupleType{
 				Types: types,
 			},
 		}
@@ -1045,7 +1045,7 @@ func (p *_Parser) build_struct_decl(tokens []lex.Token) *ast.StructDecl {
 		p.push_err(tokens[0], "invalid_syntax")
 		return nil
 	}
-	
+
 	i := 1
 	s := &ast.StructDecl{
 		Token: tokens[i],
@@ -1315,7 +1315,7 @@ func (p *_Parser) build_impl(tokens []lex.Token) *ast.Impl {
 			// Therefore, swap Base and Dest tokens.
 			ipl.Base, ipl.Dest = ipl.Dest, ipl.Base
 
-			tokens = tokens[2:]  // Remove prefix tokens.
+			tokens = tokens[2:] // Remove prefix tokens.
 			goto body
 		}
 		p.push_err(token, "invalid_syntax")
@@ -1352,7 +1352,7 @@ func (p *_Parser) build_node_data(tokens []lex.Token) ast.NodeData {
 	switch token.Id {
 	case lex.ID_USE:
 		return p.build_use_decl(tokens)
-		
+
 	case lex.ID_FN, lex.ID_UNSAFE:
 		f := p.build_fn(tokens, false, false, false)
 		if f != nil {
@@ -1362,7 +1362,7 @@ func (p *_Parser) build_node_data(tokens []lex.Token) ast.NodeData {
 
 	case lex.ID_CONST, lex.ID_LET, lex.ID_MUT:
 		return p.build_var(tokens)
-	
+
 	case lex.ID_TYPE:
 		return p.build_type_alias_decl(tokens)
 
@@ -1371,7 +1371,7 @@ func (p *_Parser) build_node_data(tokens []lex.Token) ast.NodeData {
 
 	case lex.ID_STRUCT:
 		return p.build_struct_decl(tokens)
-	
+
 	case lex.ID_TRAIT:
 		return p.build_trait_decl(tokens)
 
@@ -1567,7 +1567,7 @@ func (p *_Parser) append_node(st []lex.Token) {
 
 	case node.Is_impl():
 		p.ast.Impls = append(p.ast.Impls, node.Data.(*ast.Impl))
-	
+
 	default:
 		p.push_err(node.Token, "invalid_syntax")
 	}
@@ -1587,7 +1587,7 @@ func (p *_Parser) parse(f *lex.File) {
 		if len(st.tokens) == 0 {
 			return
 		}
-	
+
 		_, data := p.build_general_scope_node_data(st.tokens)
 		if data == nil {
 			continue

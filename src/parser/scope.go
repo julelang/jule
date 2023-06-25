@@ -112,15 +112,15 @@ type _ScopeParser struct {
 	pos  int
 }
 
-func (sp *_ScopeParser) stop() { sp.pos = -1 }
-func (sp *_ScopeParser) stopped() bool { return sp.pos == -1 }
-func (sp *_ScopeParser) finished() bool { return sp.pos >= len(sp.stms) }
-func (sp *_ScopeParser) is_last_st() bool { return sp.pos+1 >= len(sp.stms) }
+func (sp *_ScopeParser) stop()                                { sp.pos = -1 }
+func (sp *_ScopeParser) stopped() bool                        { return sp.pos == -1 }
+func (sp *_ScopeParser) finished() bool                       { return sp.pos >= len(sp.stms) }
+func (sp *_ScopeParser) is_last_st() bool                     { return sp.pos+1 >= len(sp.stms) }
 func (sp *_ScopeParser) push_err(token lex.Token, key string) { sp.p.push_err(token, key) }
 
 func (sp *_ScopeParser) insert_as_next(tokens []lex.Token) {
-    sp.stms = append(sp.stms[:sp.pos+1], sp.stms[sp.pos:]...)
-    sp.stms[sp.pos+1] = &_Stmt{tokens: tokens}
+	sp.stms = append(sp.stms[:sp.pos+1], sp.stms[sp.pos:]...)
+	sp.stms[sp.pos+1] = &_Stmt{tokens: tokens}
 }
 
 func (sp *_ScopeParser) next() *_Stmt {
@@ -581,7 +581,7 @@ func (sp *_ScopeParser) build_case_scope(tokens *[]lex.Token) *ast.ScopeTree {
 	for {
 		i := 0
 		next, _ := skip_st(&i, (*tokens)[n:])
-		if len( next) == 0 {
+		if len(next) == 0 {
 			break
 		}
 		tok := next[0]
@@ -600,7 +600,7 @@ func (sp *_ScopeParser) build_case_scope(tokens *[]lex.Token) *ast.ScopeTree {
 
 func (sp *_ScopeParser) build_case(tokens *[]lex.Token, type_match bool) (*ast.Case, bool) {
 	c := &ast.Case{
-		Token: (*tokens)[0], 
+		Token: (*tokens)[0],
 	}
 	*tokens = (*tokens)[1:] // Remove case prefix.
 	c.Exprs = sp.build_case_exprs(tokens, type_match)
@@ -641,7 +641,7 @@ func (sp *_ScopeParser) build_match_case(tokens []lex.Token) *ast.MatchCase {
 		Token: tokens[0],
 	}
 	tokens = tokens[1:] // Remove "match" keyword.
-	
+
 	if len(tokens) > 0 && tokens[0].Id == lex.ID_TYPE {
 		m.Type_match = true
 		tokens = tokens[1:] // Skip "type" keyword
@@ -653,7 +653,7 @@ func (sp *_ScopeParser) build_match_case(tokens []lex.Token) *ast.MatchCase {
 	} else if m.Type_match {
 		sp.push_err(m.Token, "missing_expr")
 	}
-	
+
 	i := len(expr_tokens)
 	block_toks := lex.Range(&i, lex.KND_LBRACE, lex.KND_RBRACE, tokens)
 	if block_toks == nil {
@@ -661,7 +661,7 @@ func (sp *_ScopeParser) build_match_case(tokens []lex.Token) *ast.MatchCase {
 		sp.push_err(m.Token, "body_not_exist")
 		return nil
 	}
-	
+
 	m.Cases, m.Default = sp.build_cases(block_toks, m.Type_match)
 	return m
 }
@@ -739,7 +739,7 @@ func (sp *_ScopeParser) build_id_st(tokens []lex.Token) (_ ast.NodeData, ok bool
 }
 
 func (sp *_ScopeParser) build_assign_info(tokens []lex.Token) *_AssignInfo {
-	info:= &_AssignInfo{
+	info := &_AssignInfo{
 		ok: true,
 	}
 	brace_n := 0
@@ -963,12 +963,12 @@ func (sp *_ScopeParser) build_st(st *_Stmt) ast.NodeData {
 
 	case lex.ID_UNSAFE, lex.ID_DEFER:
 		return sp.build_scope_st(st.tokens)
-	
+
 	case lex.ID_RANGE:
 		if token.Kind == lex.KND_LBRACE {
 			return sp.build_scope_st(st.tokens)
 		}
-	
+
 	default:
 		if is_fn_call(st.tokens) != nil {
 			return sp.build_call_st(st.tokens)

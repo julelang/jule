@@ -9,9 +9,9 @@ import (
 // literal without quotes.
 //
 // Byte literal patterns:
-//  - 'x': 0 <= x && x <= 255
-//  - '\xhh'
-//  - '\nnn'
+//   - 'x': 0 <= x && x <= 255
+//   - '\xhh'
+//   - '\nnn'
 func Is_byte_lit(kind string) (string, bool) {
 	if len(kind) < 3 {
 		return "", false
@@ -147,7 +147,7 @@ func rune_from_esq_seq(bytes []byte, i *int) rune {
 
 	case 'x':
 		const SEQ_LEN = 3
-		seq := bytes[*i+1:*i+SEQ_LEN]
+		seq := bytes[*i+1 : *i+SEQ_LEN]
 		*i += SEQ_LEN
 		b, _ := strconv.ParseUint(string(seq), 16, 8)
 		return rune(b)

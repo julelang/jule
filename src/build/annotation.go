@@ -1,9 +1,9 @@
 package build
 
 import (
+	"path/filepath"
 	"runtime"
 	"strings"
-	"path/filepath"
 )
 
 func check_os(arg string) (ok bool, exist bool) {

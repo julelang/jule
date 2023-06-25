@@ -109,7 +109,7 @@ func split_colon(tokens []lex.Token) ([]lex.Token, []lex.Token) {
 			default:
 				range_n--
 			}
-		
+
 		case lex.ID_COLON:
 			if range_n < 1 {
 				l := tokens[:i]
@@ -217,8 +217,8 @@ func find_lowest_prec_op(tokens []lex.Token) int {
 
 func build_ident_expr(token lex.Token) *ast.IdentExpr {
 	return &ast.IdentExpr{
-		Token:     token,
-		Ident:     token.Kind,
+		Token:      token,
+		Ident:      token.Kind,
 		Cpp_linked: false,
 	}
 }
@@ -232,7 +232,7 @@ func get_range_expr_tokens(tokens []lex.Token) ([]lex.Token, int) {
 			switch tok.Kind {
 			case lex.KND_RBRACE, lex.KND_RBRACKET, lex.KND_RPARENT:
 				range_n++
-	
+
 			default:
 				range_n--
 			}
@@ -332,7 +332,7 @@ func (ep *_ExprBuilder) build_unary(tokens []lex.Token) *ast.UnaryExpr {
 func (ep *_ExprBuilder) build_obj_sub_ident(tokens []lex.Token) *ast.SubIdentExpr {
 	i := len(tokens) - 1
 	ident_token := tokens[i]
-	i-- // Set offset to delimiter token.
+	i--                 // Set offset to delimiter token.
 	tokens = tokens[:i] // Remove dot token and selected identifier token.
 	if len(tokens) == 0 {
 		ep.push_err(ident_token, "invalid_syntax")
@@ -398,7 +398,7 @@ func (ep *_ExprBuilder) build_sub_ident(tokens []lex.Token) ast.ExprData {
 }
 
 func (ep *_ExprBuilder) build_variadic(tokens []lex.Token) *ast.VariadicExpr {
-	token := tokens[len(tokens)-1] // Variadic operator token.
+	token := tokens[len(tokens)-1]  // Variadic operator token.
 	tokens = tokens[:len(tokens)-1] // Remove variadic operator token.
 	return &ast.VariadicExpr{
 		Token: token,
@@ -633,7 +633,7 @@ func (ep *_ExprBuilder) build_unsafe(tokens []lex.Token) ast.ExprData {
 }
 
 // Tokens should include brace tokens.
-func (ep *_ExprBuilder) get_brace_range_lit_expr_parts(tokens []lex.Token) ([][]lex.Token) {
+func (ep *_ExprBuilder) get_brace_range_lit_expr_parts(tokens []lex.Token) [][]lex.Token {
 	// No part.
 	if len(tokens) < 2 {
 		return nil
@@ -816,7 +816,7 @@ func (ep *_ExprBuilder) build_slice(tokens []lex.Token) *ast.SliceExpr {
 	if len(parts) == 0 {
 		return slc
 	}
-	
+
 	slc.Elems = make([]ast.ExprData, len(parts))
 	for i, p := range parts {
 		slc.Elems[i] = ep.build_from_tokens(p).Kind
@@ -920,7 +920,7 @@ func (ep *_ExprBuilder) build_data(tokens []lex.Token) ast.ExprData {
 	case lex.ID_PRIM:
 		// Catch slice, and array types.
 		return ep.build_type(tokens)
-	
+
 	case lex.ID_OP:
 		return ep.build_op_right(tokens)
 
@@ -931,7 +931,7 @@ func (ep *_ExprBuilder) build_data(tokens []lex.Token) ast.ExprData {
 
 		case lex.KND_RBRACE:
 			return ep.build_brace_range(tokens)
-		
+
 		case lex.KND_RBRACKET:
 			return ep.build_bracket_range(tokens)
 		}
@@ -944,8 +944,8 @@ func (ep *_ExprBuilder) build_data(tokens []lex.Token) ast.ExprData {
 func (ep *_ExprBuilder) build_binop(tokens []lex.Token, i int) *ast.BinopExpr {
 	return &ast.BinopExpr{
 		Left:  ep.build(tokens[:i]),
-		Right:  ep.build(tokens[i+1:]),
-		Op: tokens[i],
+		Right: ep.build(tokens[i+1:]),
+		Op:    tokens[i],
 	}
 }
 

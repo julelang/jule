@@ -58,10 +58,10 @@ func split_map_range(tokens []lex.Token, i *int) (range_tokens []lex.Token, colo
 }
 
 type _TypeBuilder struct {
-	p        *_Parser
-	tokens   []lex.Token
-	i        *int
-	err      bool
+	p      *_Parser
+	tokens []lex.Token
+	i      *int
+	err    bool
 }
 
 func (tb *_TypeBuilder) push_err(token lex.Token, key string) {
@@ -207,7 +207,7 @@ func (tb *_TypeBuilder) build_ptr() *ast.Type {
 		*tb.i++
 		return &ast.Type{
 			Token: token,
-			Kind:  &ast.PtrType{
+			Kind: &ast.PtrType{
 				Elem: nil, // Set Elem as nil for unsafe pointer (*unsafe) type.
 			},
 		}
@@ -220,7 +220,7 @@ func (tb *_TypeBuilder) build_ptr() *ast.Type {
 
 	return &ast.Type{
 		Token: token,
-		Kind:  &ast.PtrType{
+		Kind: &ast.PtrType{
 			Elem: elem,
 		},
 	}
@@ -241,7 +241,7 @@ func (tb *_TypeBuilder) build_ref() *ast.Type {
 
 	return &ast.Type{
 		Token: token,
-		Kind:  &ast.RefType{
+		Kind: &ast.RefType{
 			Elem: elem,
 		},
 	}
@@ -275,7 +275,7 @@ func (tb *_TypeBuilder) build_slc() *ast.Type {
 	}
 	return &ast.Type{
 		Token: token,
-		Kind:  &ast.SlcType{
+		Kind: &ast.SlcType{
 			Elem: elem,
 		},
 	}
@@ -291,7 +291,7 @@ func (tb *_TypeBuilder) build_arr() *ast.Type {
 	}
 
 	expr_delta := *tb.i
-	
+
 	elem := tb.step()
 	if elem == nil {
 		return nil
@@ -339,7 +339,7 @@ func (tb *_TypeBuilder) build_map(colon int, tokens []lex.Token) *ast.Type {
 	valt, ok := tb.p.build_type(val_tokens, &j, tb.err)
 	if !ok {
 		return nil
-	}  else if j < len(val_tokens) {
+	} else if j < len(val_tokens) {
 		tb.push_err(val_tokens[j], "invalid_syntax")
 	}
 	mapt.Val = valt

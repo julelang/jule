@@ -15,8 +15,7 @@ func Is_i16_compatible(k string) bool {
 // Reports whether i32 is compatible with kind.
 func Is_i32_compatible(k string) bool {
 	k = Real_kind_of(k)
-	return (
-		k == TypeKind_I8 ||
+	return (k == TypeKind_I8 ||
 		k == TypeKind_I16 ||
 		k == TypeKind_I32 ||
 		k == TypeKind_U8 ||
@@ -26,8 +25,7 @@ func Is_i32_compatible(k string) bool {
 // Reports whether i64 is compatible with kind.
 func Is_i64_compatible(k string) bool {
 	k = Real_kind_of(k)
-	return (
-		k == TypeKind_I8 ||
+	return (k == TypeKind_I8 ||
 		k == TypeKind_I16 ||
 		k == TypeKind_I32 ||
 		k == TypeKind_I64 ||
@@ -57,8 +55,7 @@ func Is_u32_compatible(k string) bool {
 // Reports whether u64 is compatible with kind.
 func Is_u64_compatible(k string) bool {
 	k = Real_kind_of(k)
-	return (
-		k == TypeKind_U8 ||
+	return (k == TypeKind_U8 ||
 		k == TypeKind_U16 ||
 		k == TypeKind_U32 ||
 		k == TypeKind_U64)
@@ -67,8 +64,7 @@ func Is_u64_compatible(k string) bool {
 // Reports whether f32 is compatible with kind.
 func Is_f32_compatible(k string) bool {
 	k = Real_kind_of(k)
-	return (
-		k == TypeKind_F32 ||
+	return (k == TypeKind_F32 ||
 		k == TypeKind_I8 ||
 		k == TypeKind_I16 ||
 		k == TypeKind_I32 ||
@@ -82,8 +78,7 @@ func Is_f32_compatible(k string) bool {
 // Reports whether f64 is compatible with kind.
 func Is_f64_compatible(k string) bool {
 	k = Real_kind_of(k)
-	return (
-		k == TypeKind_F64 ||
+	return (k == TypeKind_F64 ||
 		k == TypeKind_F32 ||
 		k == TypeKind_I8 ||
 		k == TypeKind_I16 ||
@@ -130,7 +125,7 @@ func Types_are_compatible(k1 string, k2 string) bool {
 
 	case TypeKind_F32:
 		return Is_f32_compatible(k2)
-		
+
 	case TypeKind_F64:
 		return Is_f64_compatible(k2)
 

@@ -274,7 +274,7 @@ func (c *Const) And(x Const) bool {
 func (c *Const) Or(x Const) bool {
 	switch {
 	case c.Is_bool() && x.Is_bool():
-		return c.Read_bool() ||  x.Read_bool()
+		return c.Read_bool() || x.Read_bool()
 
 	default:
 		return false
@@ -312,9 +312,9 @@ func (c *Const) Eqs(x Const) bool {
 // Returns false if type is unsupported by operation.
 //
 // Supported types are:
-//  - 64-bit signed integer
-//  - 64-bit unsigned integer
-//  - 64-bit floating-point
+//   - 64-bit signed integer
+//   - 64-bit unsigned integer
+//   - 64-bit floating-point
 func (c *Const) Lt(x Const) bool {
 	switch {
 	case c.Is_i64():
@@ -335,9 +335,9 @@ func (c *Const) Lt(x Const) bool {
 // Returns false if type is unsupported by operation.
 //
 // Supported types are:
-//  - 64-bit signed integer
-//  - 64-bit unsigned integer
-//  - 64-bit floating-point
+//   - 64-bit signed integer
+//   - 64-bit unsigned integer
+//   - 64-bit floating-point
 func (c *Const) Gt(x Const) bool {
 	switch {
 	case c.Is_i64():
@@ -369,7 +369,7 @@ func (c *Const) Add(x Const) bool {
 		c.Set_str(c.Read_str() + x.Read_str())
 
 	case c.Is_f64() || c.Is_i64() || c.Is_u64():
-		c.set_by_type(c.As_f64() + x.As_f64(), x)
+		c.set_by_type(c.As_f64()+x.As_f64(), x)
 
 	default:
 		return false
@@ -382,7 +382,7 @@ func (c *Const) Add(x Const) bool {
 func (c *Const) Sub(x Const) bool {
 	switch {
 	case c.Is_f64() || c.Is_i64() || c.Is_u64():
-		c.set_by_type(c.As_f64() - x.As_f64(), x)
+		c.set_by_type(c.As_f64()-x.As_f64(), x)
 
 	default:
 		return false
@@ -395,7 +395,7 @@ func (c *Const) Sub(x Const) bool {
 func (c *Const) Mul(x Const) bool {
 	switch {
 	case c.Is_f64() || c.Is_i64() || c.Is_u64():
-		c.set_by_type(c.As_f64() * x.As_f64(), x)
+		c.set_by_type(c.As_f64()*x.As_f64(), x)
 
 	default:
 		return false
@@ -408,7 +408,8 @@ func (c *Const) Mul(x Const) bool {
 // Reports false if divided-by-zero.
 //
 // NOTICE
-//  This operation makes constant value is floating-point.
+//
+//	This operation makes constant value is floating-point.
 func (c *Const) Div(x Const) bool {
 	switch {
 	case c.Is_f64():

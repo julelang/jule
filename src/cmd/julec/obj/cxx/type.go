@@ -149,7 +149,7 @@ func gen_type_kind(k *sema.TypeKind) string {
 	switch {
 	case k.Cpp_linked:
 		return k.Cpp_ident
-	
+
 	case k.Prim() != nil:
 		return gen_prim_kind(k.Prim())
 
@@ -158,7 +158,7 @@ func gen_type_kind(k *sema.TypeKind) string {
 
 	case k.Ref() != nil:
 		return gen_ref_kind(k.Ref())
-	
+
 	case k.Ptr() != nil:
 		return gen_ptr_kind(k.Ptr())
 

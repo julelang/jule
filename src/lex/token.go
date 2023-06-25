@@ -147,6 +147,7 @@ const KND_DEFER = "defer"
 
 // Ignore identifier.
 const IGNORE_IDENT = "_"
+
 // Anonymous identifier.
 const ANON_IDENT = "<anonymous>"
 
@@ -275,7 +276,7 @@ func (t *Token) Prec() int {
 	case KND_PLUS, KND_MINUS, KND_VLINE, KND_CARET:
 		return 4
 
-		case KND_EQS, KND_NOT_EQ, KND_LT,
+	case KND_EQS, KND_NOT_EQ, KND_LT,
 		KND_LESS_EQ, KND_GT, KND_GREAT_EQ:
 		return 3
 
@@ -301,19 +302,26 @@ func exist_op(kind string, operators []string) bool {
 
 // Reports whether kind is unary operator.
 func Is_unary_op(kind string) bool { return exist_op(kind, UNARY_OPS[:]) }
+
 // Reports whether kind is binary operator.
 func Is_bin_op(kind string) bool { return exist_op(kind, BIN_OPS[:]) }
+
 // Reports whether kind is weak operator.
 func Is_weak_op(kind string) bool { return exist_op(kind, WEAK_OPS[:]) }
+
 // Reports whether kind is string literal.
 func Is_str(k string) bool { return k != "" && (k[0] == '"' || Is_raw_str(k)) }
+
 // Reports whether kind is raw string literal.
 func Is_raw_str(k string) bool { return k != "" && k[0] == '`' }
+
 // Reports whether kind is rune literal.
 // Literal value can be byte or rune.
 func Is_rune(k string) bool { return k != "" && k[0] == '\'' }
+
 // Reports whether kind is nil literal.
 func Is_nil(k string) bool { return k == KND_NIL }
+
 // Reports whether kind is boolean literal.
 func Is_bool(k string) bool { return k == KND_TRUE || k == KND_FALSE }
 
@@ -352,6 +360,7 @@ func Is_lit(k string) bool {
 
 // Reports whether identifier is ignore.
 func Is_ignore_ident(ident string) bool { return ident == IGNORE_IDENT }
+
 // Reports whether identifier is anonymous.
 func Is_anon_ident(ident string) bool { return ident == ANON_IDENT }
 
@@ -367,6 +376,7 @@ func rune_exist(r rune, runes []rune) bool {
 
 // Reports whether rune is punctuation.
 func Is_punct(r rune) bool { return rune_exist(r, PUNCTS[:]) }
+
 // Reports wheter byte is whitespace.
 func Is_space(r rune) bool { return rune_exist(r, SPACES[:]) }
 
@@ -392,8 +402,10 @@ func Is_ident_rune(s string) bool {
 
 // Reports whether byte is decimal sequence.
 func Is_decimal(b byte) bool { return '0' <= b && b <= '9' }
+
 // Reports whether byte is binary sequence.
 func Is_binary(b byte) bool { return b == '0' || b == '1' }
+
 // Reports whether byte is octal sequence.
 func Is_octal(b byte) bool { return '0' <= b && b <= '7' }
 
@@ -420,10 +432,11 @@ func Is_hex(b byte) bool {
 // *i points to close range token after selection.
 //
 // Special case is:
-//  Range(i, open, close, tokens) = nil if i == nil
-//  Range(i, open, close, tokens) = nil if *i > len(tokens)
-//  Range(i, open, close, tokens) = nil if tokens[i*].Id != ID_RANGE
-//  Range(i, open, close, tokens) = nil if tokens[i*].Kind != open
+//
+//	Range(i, open, close, tokens) = nil if i == nil
+//	Range(i, open, close, tokens) = nil if *i > len(tokens)
+//	Range(i, open, close, tokens) = nil if tokens[i*].Id != ID_RANGE
+//	Range(i, open, close, tokens) = nil if tokens[i*].Kind != open
 func Range(i *int, open string, close string, tokens []Token) []Token {
 	if i == nil || *i >= len(tokens) {
 		return nil
@@ -457,8 +470,9 @@ func Range(i *int, open string, close string, tokens []Token) []Token {
 // Range tokens includes left and right range tokens.
 //
 // Special cases are;
-//  Range_last(toks) = toks, nil if len(toks) == 0
-//  Range_last(toks) = toks, nil if toks is not has range at last
+//
+//	Range_last(toks) = toks, nil if len(toks) == 0
+//	Range_last(toks) = toks, nil if toks is not has range at last
 func Range_last(tokens []Token) (cutted []Token, cut []Token) {
 	if len(tokens) == 0 {
 		return tokens, nil
@@ -489,7 +503,8 @@ func Range_last(tokens []Token) (cutted []Token, cut []Token) {
 // Logs missing_expr if expr_must == true and not exist any expression for part.
 //
 // Special case is;
-//  Parts(toks) = nil if len(toks) == 0
+//
+//	Parts(toks) = nil if len(toks) == 0
 func Parts(tokens []Token, id uint8, expr_must bool) ([][]Token, []build.Log) {
 	if len(tokens) == 0 {
 		return nil, nil

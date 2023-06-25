@@ -23,9 +23,9 @@ const CMD_VERSION = "version"
 const CMD_TOOL = "tool"
 
 var HELP_MAP = [...][2]string{
-	{CMD_HELP,    "Show help"},
+	{CMD_HELP, "Show help"},
 	{CMD_VERSION, "Show version"},
-	{CMD_TOOL,    "Tools for effective Jule"},
+	{CMD_TOOL, "Tools for effective Jule"},
 }
 
 func help() {

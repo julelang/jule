@@ -227,19 +227,19 @@ func gen_binop_expr_model(m *sema.BinopExprModel) string {
 	switch m.Op {
 	case lex.KND_SOLIDUS:
 		obj := "jule::div("
-		obj += gen_expr(m.L)
+		obj += gen_expr(m.Left)
 		obj += ","
-		obj += gen_expr(m.R)
+		obj += gen_expr(m.Right)
 		obj += ")"
 		return obj
 
 	default:
 		obj := "("
-		obj += gen_expr_model(m.L)
+		obj += gen_expr_model(m.Left)
 		obj += " "
 		obj += m.Op
 		obj += " "
-		obj += gen_expr_model(m.R)
+		obj += gen_expr_model(m.Right)
 		obj += ")"
 		return obj
 	}
@@ -259,7 +259,7 @@ func gen_unary_expr_model(m *sema.UnaryExprModel) string {
 		return "(~" + gen_expr(m.Expr) + ")"
 
 	default:
-		return  "(" + m.Op + gen_expr(m.Expr) + ")"
+		return "(" + m.Op + gen_expr(m.Expr) + ")"
 	}
 }
 
@@ -277,7 +277,7 @@ func gen_cpp_struct_lit_expr_model(m *sema.StructLitExprModel) string {
 			for _, arg := range m.Args {
 				if arg.Field == f {
 					obj += gen_expr(arg.Expr) + ","
-					continue iter;
+					continue iter
 				}
 			}
 			obj += get_init_expr(f.Kind) + ","
@@ -301,7 +301,7 @@ func gen_struct_lit_expr_model(m *sema.StructLitExprModel) string {
 			for _, arg := range m.Args {
 				if arg.Field == f {
 					obj += gen_expr(arg.Expr) + ","
-					continue iter;
+					continue iter
 				}
 			}
 			obj += get_init_expr(f.Kind) + ","
@@ -315,7 +315,7 @@ func gen_struct_lit_expr_model(m *sema.StructLitExprModel) string {
 func gen_alloc_struct_lit_expr_model(m *sema.AllocStructLitExprModel) string {
 	obj := "jule::new_struct<"
 	obj += struct_out_ident(m.Lit.Strct.Decl)
-	obj += ">(new( std::nothrow ) ";
+	obj += ">(new( std::nothrow ) "
 	obj += gen_struct_lit_expr_model(m.Lit)
 	obj += ")"
 	return obj
@@ -442,10 +442,10 @@ func gen_map_expr_model(m *sema.MapExprModel) string {
 func gen_slicing_expr_model(m *sema.SlicingExprModel) string {
 	obj := gen_expr_model(m.Expr)
 	obj += ".slice("
-	obj += gen_expr(m.L)
-	if m.R != nil {
+	obj += gen_expr(m.Left)
+	if m.Right != nil {
 		obj += ","
-		obj += gen_expr(m.R)
+		obj += gen_expr(m.Right)
 	}
 	obj += ")"
 	return obj
@@ -458,7 +458,7 @@ func gen_trait_sub_ident_expr_model(m *sema.TraitSubIdentExprModel) string {
 	return obj
 }
 
-func gen_struct_sub_ident_expr_model(m *sema.StrctSubIdentExprModel) string {
+func gen_struct_sub_ident_expr_model(m *sema.StructSubIdentExprModel) string {
 	obj := gen_expr_model(m.Expr)
 	obj += get_accessor(m.ExprKind)
 	if m.Field != nil {
@@ -662,8 +662,8 @@ func gen_expr_model(m sema.ExprModel) string {
 	case *sema.TraitSubIdentExprModel:
 		return gen_trait_sub_ident_expr_model(m.(*sema.TraitSubIdentExprModel))
 
-	case *sema.StrctSubIdentExprModel:
-		return gen_struct_sub_ident_expr_model(m.(*sema.StrctSubIdentExprModel))
+	case *sema.StructSubIdentExprModel:
+		return gen_struct_sub_ident_expr_model(m.(*sema.StructSubIdentExprModel))
 
 	case *sema.CommonIdentExprModel:
 		return gen_common_ident_expr_model(m.(*sema.CommonIdentExprModel))
@@ -724,7 +724,7 @@ func gen_expr(e sema.ExprModel) string {
 	if obj != "" && obj[0] == '(' {
 		switch e.(type) {
 		case *sema.BinopExprModel:
-			obj = obj[1:len(obj)-1] // Remove unnecessary parentheses.
+			obj = obj[1 : len(obj)-1] // Remove unnecessary parentheses.
 		}
 	}
 

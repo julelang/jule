@@ -6,34 +6,49 @@ package types
 
 // Kind of signed 8-bit integer.
 const TypeKind_I8 = "i8"
+
 // Kind of signed 16-bit integer.
 const TypeKind_I16 = "i16"
+
 // Kind of signed 32-bit integer.
 const TypeKind_I32 = "i32"
+
 // Kind of signed 64-bit integer.
 const TypeKind_I64 = "i64"
+
 // Kind of unsigned 8-bit integer.
 const TypeKind_U8 = "u8"
+
 // Kind of unsigned 16-bit integer.
 const TypeKind_U16 = "u16"
+
 // Kind of unsigned 32-bit integer.
 const TypeKind_U32 = "u32"
+
 // Kind of unsigned 64-bit integer.
 const TypeKind_U64 = "u64"
+
 // Kind of 32-bit floating-point.
 const TypeKind_F32 = "f32"
+
 // Kind of 64-bit floating-point.
 const TypeKind_F64 = "f64"
+
 // Kind of system specific bit-size unsigned integer.
 const TypeKind_UINT = "uint"
+
 // Kind of system specific bit-size signed integer.
 const TypeKind_INT = "int"
+
 // Kind of system specific bit-size unsigned integer.
 const TypeKind_UINTPTR = "uintptr"
+
 // Kind of boolean.
 const TypeKind_BOOL = "bool"
+
 // Kind of string.
 const TypeKind_STR = "str"
+
 // Kind of any type.
 const TypeKind_ANY = "any"
 

@@ -1,13 +1,13 @@
 package sema
 
 // Expression model.
-type ExprModel = any;
+type ExprModel = any
 
 // Binary operation expression model.
 type BinopExprModel struct {
-	L  ExprModel
-	R  ExprModel
-	Op string
+	Left  ExprModel
+	Right ExprModel
+	Op    string
 }
 
 // Unary operation expression model.
@@ -60,8 +60,8 @@ type FnCallExprModel struct {
 // Slice expression model.
 // For example: [1, 2, 3, 4, 5, 6, 8, 9, 10]
 type SliceExprModel struct {
-	Elem_kind  *TypeKind
-	Elems []ExprModel
+	Elem_kind *TypeKind
+	Elems     []ExprModel
 }
 
 // Indexing expression model.
@@ -98,10 +98,10 @@ type SlicingExprModel struct {
 	Expr ExprModel
 	// Left index expression.
 	// Zero integer if expression have not left index.
-	L    ExprModel
+	Left ExprModel
 	// Right index expression.
 	// Nil if expression have not right index.
-	R    ExprModel
+	Right ExprModel
 }
 
 // Trait sub-ident expression model.
@@ -113,7 +113,7 @@ type TraitSubIdentExprModel struct {
 
 // Structure sub-ident expression model.
 // For example: my_struct.my_sub_ident
-type StrctSubIdentExprModel struct {
+type StructSubIdentExprModel struct {
 	Expr     ExprModel
 	ExprKind *TypeKind
 	Method   *FnIns
@@ -122,7 +122,7 @@ type StrctSubIdentExprModel struct {
 
 // Array expression model.
 type ArrayExprModel struct {
-	Kind *Arr
+	Kind  *Arr
 	Elems []ExprModel
 }
 

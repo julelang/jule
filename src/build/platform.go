@@ -44,16 +44,22 @@ const _RUNTIME_ARCH_ARM64 = "arm64"
 
 // Reports whether os is windows.
 func Is_windows(os string) bool { return os == _RUNTIME_OS_WINDOWS }
+
 // Reports whether os is darwin.
 func Is_darwin(os string) bool { return os == _RUNTIME_OS_DARWIN }
+
 // Reports whether os is linux.
 func Is_linux(os string) bool { return os == _RUNTIME_OS_LINUX }
+
 // Reports whether architecture is intel 386.
 func Is_i386(arch string) bool { return arch == _RUNTIME_ARCH_I386 }
+
 // Reports whether architecture is amd64.
 func Is_amd64(arch string) bool { return arch == _RUNTIME_ARCH_AMD64 }
+
 // Reports whether architecture is arm.
 func Is_arm(arch string) bool { return arch == _RUNTIME_ARCH_ARM }
+
 // Is_arm64 reports whether architecture is arm64.
 func Is_arm64(arch string) bool { return arch == _RUNTIME_ARCH_ARM64 }
 

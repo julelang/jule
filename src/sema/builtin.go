@@ -9,9 +9,10 @@ import (
 // Type alias for built-in function callers.
 //
 // Parameters;
-//  e: Caller owner Eval instance.
-//  fc: Function call expression.
-//  d: Data instance for evaluated expression of function.
+//
+//	e: Caller owner Eval instance.
+//	fc: Function call expression.
+//	d: Data instance for evaluated expression of function.
 type _BuiltinCaller = func(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data
 
 var builtin_fn_out = &FnIns{}
@@ -36,21 +37,21 @@ var builtin_fn_copy = &FnIns{
 
 var builtin_type_alias_byte = &TypeAlias{
 	Public: true,
-	Kind:   &TypeSymbol{
+	Kind: &TypeSymbol{
 		Kind: &TypeKind{kind: build_prim_type(types.TypeKind_U8)},
 	},
 }
 
 var builtin_type_alias_rune = &TypeAlias{
 	Public: true,
-	Kind:   &TypeSymbol{
+	Kind: &TypeSymbol{
 		Kind: &TypeKind{kind: build_prim_type(types.TypeKind_I32)},
 	},
 }
 
 var builtin_trait_error = &Trait{
-	Public:  true,
-	Ident:   "Error",
+	Public: true,
+	Ident:  "Error",
 	Methods: []*Fn{
 		{
 			Public: true,
@@ -126,7 +127,7 @@ func find_builtin_fn(ident string) *FnIns {
 
 	case "clone":
 		return builtin_fn_clone
-	
+
 	default:
 		return nil
 	}
@@ -501,7 +502,7 @@ func builtin_caller_append(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 			},
 			{
 				Decl: &Param{
-					Mutable: true,
+					Mutable:  true,
 					Variadic: true,
 				},
 				Kind: t.Kind.Slc().Elem.clone(),
@@ -596,7 +597,7 @@ func builtin_caller_recover(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
 	}
 
 	tkind := t.Kind.Fnc().To_str()
-	if tkind !=  HANDLER_KIND {
+	if tkind != HANDLER_KIND {
 		e.push_err(fc.Args[0].Token, "incompatible_types", tkind, HANDLER_KIND)
 	}
 
@@ -683,7 +684,7 @@ func builtin_caller_std_mem_size_of(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data
 		e.push_err(fc.Token, "not_has_generics")
 	}
 	result := &Data{
-		Kind:  &TypeKind{kind: build_prim_type(types.TypeKind_UINT)},
+		Kind: &TypeKind{kind: build_prim_type(types.TypeKind_UINT)},
 	}
 
 	if len(fc.Args) < 1 {
@@ -708,7 +709,7 @@ func builtin_caller_std_mem_align_of(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Dat
 		e.push_err(fc.Token, "not_has_generics")
 	}
 	result := &Data{
-		Kind:  &TypeKind{kind: build_prim_type(types.TypeKind_UINT)},
+		Kind: &TypeKind{kind: build_prim_type(types.TypeKind_UINT)},
 	}
 
 	if len(fc.Args) < 1 {

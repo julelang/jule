@@ -62,7 +62,7 @@ func build_ret_vars(f *FnIns) []*Var {
 			Token:   ident,
 			Scope:   f.Decl.Scope,
 			Kind:    &TypeSymbol{Kind: types[i]},
-			Value:   &Value{
+			Value: &Value{
 				Data: &Data{},
 			},
 		}
@@ -86,7 +86,7 @@ func build_param_vars(f *FnIns) []*Var {
 			Token:   p.Decl.Token,
 			Kind:    &TypeSymbol{},
 			Scope:   f.Decl.Scope,
-			Value:   &Value{
+			Value: &Value{
 				Data: &Data{},
 			},
 		}
@@ -216,7 +216,7 @@ func (s *_Sema) check_generic_quantity(required int, given int, error_token lex.
 // Returns nil if not exist any package in this identifier.
 //
 // Lookups:
-//  - Current file's imported packages.
+//   - Current file's imported packages.
 func (s *_Sema) Find_package(ident string) *ImportInfo {
 	return s.file.Find_package(ident)
 }
@@ -226,7 +226,7 @@ func (s *_Sema) Find_package(ident string) *ImportInfo {
 // Returns nil if selector is nil.
 //
 // Lookups:
-//  - Current file's imported packages.
+//   - Current file's imported packages.
 func (s *_Sema) Select_package(selector func(*ImportInfo) bool) *ImportInfo {
 	return s.file.Select_package(selector)
 }
@@ -235,8 +235,8 @@ func (s *_Sema) Select_package(selector func(*ImportInfo) bool) *ImportInfo {
 // Returns nil if not exist any variable in this identifier.
 //
 // Lookups:
-//  - Package file's symbol table.
-//  - Current file's public denifes of imported packages.
+//   - Package file's symbol table.
+//   - Current file's public denifes of imported packages.
 func (s *_Sema) Find_var(ident string, cpp_linked bool) *Var {
 	// Lookup package files.
 	v := find_var_in_package(s.files, ident, cpp_linked)
@@ -262,8 +262,8 @@ func (s *_Sema) Find_var(ident string, cpp_linked bool) *Var {
 // Returns nil if not exist any type alias in this identifier.
 //
 // Lookups:
-//  - Package file's symbol table.
-//  - Current file's public denifes of imported packages.
+//   - Package file's symbol table.
+//   - Current file's public denifes of imported packages.
 func (s *_Sema) Find_type_alias(ident string, cpp_linked bool) *TypeAlias {
 	// Lookup package files.
 	ta := find_type_alias_in_package(s.files, ident, cpp_linked)
@@ -289,8 +289,8 @@ func (s *_Sema) Find_type_alias(ident string, cpp_linked bool) *TypeAlias {
 // Returns nil if not exist any struct in this identifier.
 //
 // Lookups:
-//  - Package file's symbol table.
-//  - Current file's public denifes of imported packages.
+//   - Package file's symbol table.
+//   - Current file's public denifes of imported packages.
 func (s *_Sema) Find_struct(ident string, cpp_linked bool) *Struct {
 	// Lookup package files.
 	strct := find_struct_in_package(s.files, ident, cpp_linked)
@@ -316,8 +316,8 @@ func (s *_Sema) Find_struct(ident string, cpp_linked bool) *Struct {
 // Returns nil if not exist any function in this identifier.
 //
 // Lookups:
-//  - Package file's symbol table.
-//  - Current file's public denifes of imported packages.
+//   - Package file's symbol table.
+//   - Current file's public denifes of imported packages.
 func (s *_Sema) Find_fn(ident string, cpp_linked bool) *Fn {
 	// Lookup package files.
 	f := find_fn_in_package(s.files, ident, cpp_linked)
@@ -343,8 +343,8 @@ func (s *_Sema) Find_fn(ident string, cpp_linked bool) *Fn {
 // Returns nil if not exist any trait in this identifier.
 //
 // Lookups:
-//  - Package file's symbol table.
-//  - Current file's public denifes of imported packages.
+//   - Package file's symbol table.
+//   - Current file's public denifes of imported packages.
 func (s *_Sema) Find_trait(ident string) *Trait {
 	// Lookup package files.
 	t := find_trait_in_package(s.files, ident)
@@ -370,8 +370,8 @@ func (s *_Sema) Find_trait(ident string) *Trait {
 // Returns nil if not exist any enum in this identifier.
 //
 // Lookups:
-//  - Package file's symbol table.
-//  - Current file's public denifes of imported packages.
+//   - Package file's symbol table.
+//   - Current file's public denifes of imported packages.
 func (s *_Sema) Find_enum(ident string) *Enum {
 	// Lookup package files.
 	e := find_enum_in_package(s.files, ident)
@@ -483,7 +483,7 @@ func (s *_Sema) check_import_selections(imp *ImportInfo) {
 			s.push_err(ident, "ident_not_exist", ident.Kind)
 			continue
 		}
-		
+
 		s.push_err(ident, "ident_is_not_accessible", ident.Kind)
 
 	}
@@ -675,8 +675,8 @@ func (s *_Sema) check_type_compatibility(dest *TypeKind, src *TypeKind, error_to
 // Builds generic identifiers as primitive type.
 //
 // Useful:
-//  - For non-generic type parsed string type kinds.
-//  - For checking non-generic types.
+//   - For non-generic type parsed string type kinds.
+//   - For checking non-generic types.
 func (s *_Sema) build_non_generic_type_kind(ast *ast.Type,
 	generics []*ast.Generic, ignore_with_trait_pattern bool) *TypeKind {
 	tc := _TypeChecker{
@@ -730,7 +730,7 @@ func (s *_Sema) reload_fn_ins_types(f *FnIns) (ok bool) {
 	for i, g := range f.Generics {
 		generics[i] = &TypeAlias{
 			Ident: f.Decl.Generics[i].Ident,
-			Kind:  &TypeSymbol{
+			Kind: &TypeSymbol{
 				Kind: g,
 			},
 		}
@@ -801,7 +801,7 @@ func (s *_Sema) check_type_alias_decl_dup(ta *TypeAlias) {
 func (s *_Sema) check_type_alias_decls() (ok bool) {
 	for _, ta := range s.file.Type_aliases {
 		s.check_type_alias_decl_dup(ta)
-		
+
 		// Break checking if type alias has error.
 		if len(s.errors) > 0 {
 			return false
@@ -934,7 +934,7 @@ func (s *_Sema) check_enum_decl(e *Enum) {
 func (s *_Sema) check_enum_decls() (ok bool) {
 	for _, e := range s.file.Enums {
 		s.check_enum_decl(e)
-		
+
 		// Break checking if type alias has error.
 		if len(s.errors) > 0 {
 			return false
@@ -1006,7 +1006,7 @@ check:
 
 func (s *_Sema) check_fn_decl_result_dup(f *Fn) (ok bool) {
 	ok = true
-	
+
 	if f.Is_void() {
 		return
 	}
@@ -1128,7 +1128,7 @@ func (s *_Sema) check_trait_decl_methods(t *Trait) {
 			case j >= i:
 				// Skip current and following methods.
 				break duplicate_lookup
-			
+
 			case f.Ident == jf.Ident:
 				s.push_err(f.Token, "duplicated_ident", f.Ident)
 				break duplicate_lookup
@@ -1226,7 +1226,7 @@ func (s *_Sema) impl_trait(decl *Impl) {
 
 	dest.Implements = append(dest.Implements, base)
 
-	switch  {
+	switch {
 	case !s.check_trait_impl_methods(base, decl):
 		return
 
@@ -1251,7 +1251,7 @@ func (s *_Sema) impl_struct(decl *Impl) {
 		return
 	}
 
-	switch  {
+	switch {
 	case !s.impl_to_struct(dest, decl):
 		return
 	}
@@ -1343,7 +1343,7 @@ func (s *_Sema) check_struct_fields(st *Struct) (ok bool) {
 		s:               s,
 		lookup:          s,
 		ignore_generics: st.Generics,
-		referencer:      &_Referencer{
+		referencer: &_Referencer{
 			ident: st.Ident,
 			owner: st,
 		},
@@ -1387,7 +1387,7 @@ func (s *_Sema) check_struct_decl(strct *Struct) {
 	switch {
 	case !s.check_decl_generics(strct.Generics):
 		return
-		
+
 	case !s.check_struct_fields(strct):
 		return
 
@@ -1400,7 +1400,7 @@ func (s *_Sema) check_struct_decl(strct *Struct) {
 func (s *_Sema) check_struct_decls() (ok bool) {
 	for _, strct := range s.file.Structs {
 		s.check_struct_decl(strct)
-		
+
 		// Break checking if type alias has error.
 		if len(s.errors) > 0 {
 			return false
@@ -1425,7 +1425,7 @@ func (s *_Sema) check_fn_decl(f *Fn) {
 func (s *_Sema) check_fn_decls() (ok bool) {
 	for _, f := range s.file.Funcs {
 		s.check_fn_decl(f)
-		
+
 		// Break checking if type alias has error.
 		if len(s.errors) > 0 {
 			return false

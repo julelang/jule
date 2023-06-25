@@ -15,7 +15,7 @@ type Field struct {
 	Owner   *Struct
 	Token   lex.Token
 	Public  bool
-	Mutable bool         // Interior mutability.
+	Mutable bool // Interior mutability.
 	Ident   string
 	Kind    *TypeSymbol
 }
@@ -31,16 +31,16 @@ func (f *Field) instance() *FieldIns {
 type Struct struct {
 	// Used for type parsing.
 	// Used declaration'sema sema for instance type checking.
-	sema       *_Sema
+	sema *_Sema
 
 	// This structure depended to these structures.
 	// Only stores plain identifier references such as A, B, and MyStruct.
 	// Not includes non-pain identifier references such as *A, &B, and []MyStruct.
-	Depends    []*Struct
+	Depends []*Struct
 
 	// This structures uses these structures.
 	// Stores all referred structures.
-	Uses       []*Struct
+	Uses []*Struct
 
 	Token      lex.Token
 	Ident      string
@@ -55,7 +55,7 @@ type Struct struct {
 
 	// Structure instances for each unique type combination of structure.
 	// Nil if structure is never used.
-	Instances  []*StructIns
+	Instances []*StructIns
 }
 
 func (s *Struct) instance() *StructIns {

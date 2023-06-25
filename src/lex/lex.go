@@ -876,10 +876,10 @@ func Lex(f *File, text string) []build.Log {
 		row:  -1, // For true row
 		data: ([]rune)(text),
 	}
-	
+
 	lex.new_line()
 	tokens := lex.lex()
-	
+
 	if len(lex.errors) > 0 {
 		return lex.errors
 	}

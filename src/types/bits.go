@@ -21,7 +21,7 @@ var SYS_INT string
 // Accept as constant.
 var SYS_UINT string
 
-func check_bit(v string, bit int, checker bit_checker) bool {	
+func check_bit(v string, bit int, checker bit_checker) bool {
 	switch {
 	case v == "":
 		return false
@@ -168,8 +168,8 @@ func Check_bit_float(val string, bit int) bool {
 // Reports minimum bit-size of given floating-point.
 //
 // Possible values are:
-//  - 32 for 32-bit
-//  - 64 for 64-bit
+//   - 32 for 32-bit
+//   - 64 for 64-bit
 func Bitsize_of_float(x float64) uint64 {
 	switch {
 	case MIN_F32 <= x && x <= MAX_F32:
@@ -183,10 +183,10 @@ func Bitsize_of_float(x float64) uint64 {
 // Reports minimum bit-size of given signed integer.
 //
 // Possible values are:
-//  - 8 for 8-bit
-//  - 16 for 16-bit
-//  - 32 for 32-bit
-//  - 64 for 64-bit
+//   - 8 for 8-bit
+//   - 16 for 16-bit
+//   - 32 for 32-bit
+//   - 64 for 64-bit
 func Bitsize_of_int(x int64) uint64 {
 	switch {
 	case MIN_I8 <= x && x <= MAX_I8:
@@ -206,10 +206,10 @@ func Bitsize_of_int(x int64) uint64 {
 // Reports minimum bit-size of given unsigned integer.
 //
 // Possible values are:
-//  - 8 for 8-bit
-//  - 16 for 16-bit
-//  - 32 for 32-bit
-//  - 64 for 64-bit
+//   - 8 for 8-bit
+//   - 16 for 16-bit
+//   - 32 for 32-bit
+//   - 64 for 64-bit
 func Bitsize_of_uint(x uint64) uint64 {
 	switch {
 	case x <= MAX_U8:

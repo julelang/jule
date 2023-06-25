@@ -96,8 +96,8 @@ type Assign struct {
 
 // Mult-declarative assignment.
 type MultiAssign struct {
-	L     []ExprModel // Nil models represents ingored expressions.
-	R     ExprModel
+	L []ExprModel // Nil models represents ingored expressions.
+	R ExprModel
 }
 
 // Match-Case.
@@ -126,7 +126,7 @@ type FallSt struct {
 
 // Return statement.
 type RetSt struct {
-	Vars []*Var    // Used "_" identifier to pass ignored vars for ordering.
+	Vars []*Var // Used "_" identifier to pass ignored vars for ordering.
 	Expr ExprModel
 }
 
@@ -156,7 +156,7 @@ type _ScopeChecker struct {
 	s           *_Sema
 	owner       *FnIns
 	parent      *_ScopeChecker
-	child_index int             // Index of child scope.
+	child_index int // Index of child scope.
 	table       *SymbolTable
 	scope       *Scope
 	tree        *ast.ScopeTree
@@ -202,7 +202,7 @@ func (sc *_ScopeChecker) get_root() *_ScopeChecker {
 // Returns nil if not exist any package in this identifier.
 //
 // Lookups:
-//  - Sema.
+//   - Sema.
 func (sc *_ScopeChecker) Find_package(ident string) *ImportInfo {
 	return sc.s.Find_package(ident)
 }
@@ -212,7 +212,7 @@ func (sc *_ScopeChecker) Find_package(ident string) *ImportInfo {
 // Returns nil if selector is nil.
 //
 // Lookups:
-//  - Sema.
+//   - Sema.
 func (sc *_ScopeChecker) Select_package(selector func(*ImportInfo) bool) *ImportInfo {
 	return sc.s.Select_package(selector)
 }
@@ -221,9 +221,9 @@ func (sc *_ScopeChecker) Select_package(selector func(*ImportInfo) bool) *Import
 // Returns nil if not exist any variable in this identifier.
 //
 // Lookups:
-//  - Current scope.
-//  - Parent scopes.
-//  - Sema.
+//   - Current scope.
+//   - Parent scopes.
+//   - Sema.
 func (sc *_ScopeChecker) Find_var(ident string, cpp_linked bool) *Var {
 	// Search reverse for correct shadowing.
 	const REVERSE = true
@@ -248,9 +248,9 @@ func (sc *_ScopeChecker) Find_var(ident string, cpp_linked bool) *Var {
 // Returns nil if not exist any type alias in this identifier.
 //
 // Lookups:
-//  - Current scope.
-//  - Parent scopes.
-//  - Sema.
+//   - Current scope.
+//   - Parent scopes.
+//   - Sema.
 func (sc *_ScopeChecker) Find_type_alias(ident string, cpp_linked bool) *TypeAlias {
 	// Search reverse for correct shadowing.
 	const REVERSE = true
@@ -275,7 +275,7 @@ func (sc *_ScopeChecker) Find_type_alias(ident string, cpp_linked bool) *TypeAli
 // Returns nil if not exist any struct in this identifier.
 //
 // Lookups:
-//  - Sema.
+//   - Sema.
 func (sc *_ScopeChecker) Find_struct(ident string, cpp_linked bool) *Struct {
 	return sc.s.Find_struct(ident, cpp_linked)
 }
@@ -284,7 +284,7 @@ func (sc *_ScopeChecker) Find_struct(ident string, cpp_linked bool) *Struct {
 // Returns nil if not exist any function in this identifier.
 //
 // Lookups:
-//  - Sema.
+//   - Sema.
 func (sc *_ScopeChecker) Find_fn(ident string, cpp_linked bool) *Fn {
 	return sc.s.Find_fn(ident, cpp_linked)
 }
@@ -293,7 +293,7 @@ func (sc *_ScopeChecker) Find_fn(ident string, cpp_linked bool) *Fn {
 // Returns nil if not exist any trait in this identifier.
 //
 // Lookups:
-//  - Sema.
+//   - Sema.
 func (sc *_ScopeChecker) Find_trait(ident string) *Trait {
 	return sc.s.Find_trait(ident)
 }
@@ -302,7 +302,7 @@ func (sc *_ScopeChecker) Find_trait(ident string) *Trait {
 // Returns nil if not exist any enum in this identifier.
 //
 // Lookups:
-//  - Sema.
+//   - Sema.
 func (sc *_ScopeChecker) Find_enum(ident string) *Enum {
 	return sc.s.Find_enum(ident)
 }
@@ -893,7 +893,7 @@ func (sc *_ScopeChecker) check_single_assign(a *ast.AssignSt) {
 		a.Setter.Kind = a.Setter.Kind[:len(a.Setter.Kind)-1]
 
 		solver := _BinopSolver{
-			e:  &_Eval{
+			e: &_Eval{
 				s:        sc.s,
 				lookup:   sc,
 				unsafety: sc.is_unsafe(),
@@ -964,7 +964,7 @@ func (sc *_ScopeChecker) check_multi_assign(a *ast.AssignSt) {
 				Token:   lexpr.Token,
 				Mutable: lexpr.Mutable,
 				Scope:   sc.tree,
-				Value:   &Value{
+				Value: &Value{
 					Expr: a.R,
 					Data: r,
 				},
@@ -1231,7 +1231,7 @@ func (sc *_ScopeChecker) check_break_with_label(b *ast.BreakSt) *BreakSt {
 			sc.s.push_err(b.Label, "invalid_label")
 		}
 	}
-	
+
 	if brk.Mtch != 0 {
 		if !sc.check_valid_break_label(brk.Mtch) {
 			sc.s.push_err(b.Label, "invalid_label")
@@ -1494,7 +1494,7 @@ func (sc *_ScopeChecker) check_labels() {
 
 func (sc *_ScopeChecker) check_vars() {
 	for _, v := range sc.table.Vars {
-		if!v.Used && !lex.Is_ignore_ident(v.Ident) && !lex.Is_anon_ident(v.Ident) && v.Ident != lex.KND_SELF {
+		if !v.Used && !lex.Is_ignore_ident(v.Ident) && !lex.Is_anon_ident(v.Ident) && v.Ident != lex.KND_SELF {
 			sc.s.push_err(v.Token, "declared_but_not_used", v.Ident)
 		}
 	}
@@ -1531,7 +1531,7 @@ func (sc *_ScopeChecker) new_child_checker() *_ScopeChecker {
 	base := new_scope_checker_base(sc.s, nil)
 	base.parent = sc
 	base.labels = sc.labels
-	base.gotos =  sc.gotos
+	base.gotos = sc.gotos
 	base.child_index = sc.child_index + 1
 	return base
 }
@@ -1547,7 +1547,7 @@ func new_scope_checker_base(s *_Sema, owner *FnIns) *_ScopeChecker {
 func new_scope_checker(s *_Sema, owner *FnIns) *_ScopeChecker {
 	base := new_scope_checker_base(s, owner)
 	base.labels = new([]*_ScopeLabel)
-	base.gotos =  new([]*_ScopeGoto)
+	base.gotos = new([]*_ScopeGoto)
 	return base
 }
 
@@ -1604,7 +1604,7 @@ func get_datas_from_tuple_data(d *Data) []*Data {
 			for i, kind := range t.Types {
 				r[i] = &Data{
 					Mutable: true, // Function return.
-					Kind: kind,
+					Kind:    kind,
 				}
 			}
 			return r

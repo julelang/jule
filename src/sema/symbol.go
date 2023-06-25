@@ -27,7 +27,7 @@ func build_doc(cg *ast.CommentGroup) string {
 	doc := ""
 	for _, c := range cg.Comments {
 		doc += c.Text
-		doc += " "    // Write space for each newline.
+		doc += " " // Write space for each newline.
 	}
 	return doc
 }
@@ -37,7 +37,7 @@ func build_type(t *ast.Type) *TypeSymbol {
 		return nil
 	}
 	return &TypeSymbol{
-		Decl:  t,
+		Decl: t,
 		Kind: nil,
 	}
 }
@@ -85,14 +85,14 @@ func build_fields(decls []*ast.FieldDecl) []*Field {
 
 func build_struct(decl *ast.StructDecl) *Struct {
 	return &Struct{
-		Token:        decl.Token,
-		Ident:        decl.Ident,
-		Fields:       build_fields(decl.Fields),
-		Public:       decl.Public,
-		Cpp_linked:   decl.Cpp_linked,
-		Directives:   decl.Directives,
-		Doc:          build_doc(decl.Doc_comments),
-		Generics:     decl.Generics,
+		Token:      decl.Token,
+		Ident:      decl.Ident,
+		Fields:     build_fields(decl.Fields),
+		Public:     decl.Public,
+		Cpp_linked: decl.Cpp_linked,
+		Directives: decl.Directives,
+		Doc:        build_doc(decl.Doc_comments),
+		Generics:   decl.Generics,
 	}
 }
 
@@ -277,13 +277,13 @@ func (s *_SymbolBuilder) build_cpp_header_import(decl *ast.UseDecl) *ImportInfo 
 	}
 
 	return &ImportInfo{
-		Token:     decl.Token,
-		Path:      path,
-		Link_path: decl.Link_path,
-		Ident:     "",    // Cpp headers haven't identifiers.
-		Cpp_linked:       true,
-		Std:       false,
-		Package:   nil,   // Cpp headers haven't symbol table.
+		Token:      decl.Token,
+		Path:       path,
+		Link_path:  decl.Link_path,
+		Ident:      "", // Cpp headers haven't identifiers.
+		Cpp_linked: true,
+		Std:        false,
+		Package:    nil, // Cpp headers haven't symbol table.
 	}
 }
 
@@ -313,9 +313,9 @@ func (s *_SymbolBuilder) build_std_import(decl *ast.UseDecl) *ImportInfo {
 		Path:       path,
 		Link_path:  decl.Link_path,
 		Ident:      ident,
-		Cpp_linked:        false,
+		Cpp_linked: false,
 		Std:        true,
-		Package:    &Package{
+		Package: &Package{
 			Files: nil, // Appends by import algorithm.
 		},
 	}
@@ -348,9 +348,9 @@ func (s *_SymbolBuilder) build_ident_import(decl *ast.UseDecl) *ImportInfo {
 		Path:       path,
 		Link_path:  decl.Link_path,
 		Ident:      ident,
-		Cpp_linked:        false,
+		Cpp_linked: false,
 		Std:        false,
-		Package:    &Package{
+		Package: &Package{
 			Files: nil, // Appends by import algorithm.
 		},
 	}
@@ -462,7 +462,6 @@ iter:
 		owner = owner.owner
 		goto iter
 	}
-
 
 	return true
 }

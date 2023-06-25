@@ -110,13 +110,13 @@ func int_assignable(kind string, d *Data) bool {
 }
 
 type _TypeCompatibilityChecker struct {
-	s           *_Sema    // Used for error logging.
+	s           *_Sema // Used for error logging.
 	dest        *TypeKind
 	src         *TypeKind
 	error_token lex.Token
 
 	// References uses elem's type itself if true.
-	deref       bool
+	deref bool
 }
 
 func (tcc *_TypeCompatibilityChecker) push_err(key string, args ...any) {
@@ -154,7 +154,7 @@ func (tcc *_TypeCompatibilityChecker) check_trait() (ok bool) {
 
 	case tcc.src.Trt() != nil:
 		return trt == tcc.src.Trt()
-	
+
 	default:
 		return false
 	}
@@ -267,7 +267,7 @@ func (tcc *_TypeCompatibilityChecker) check() (ok bool) {
 
 	case tcc.dest.Strct() != nil:
 		return tcc.check_struct()
-	
+
 	case is_nil_compatible(tcc.dest):
 		return tcc.src.Is_nil()
 
@@ -278,11 +278,11 @@ func (tcc *_TypeCompatibilityChecker) check() (ok bool) {
 
 // Checks value and type compatibility for assignment.
 type _AssignTypeChecker struct {
-	s           *_Sema    // Used for error logging and type checking.
+	s           *_Sema // Used for error logging and type checking.
 	dest        *TypeKind
 	d           *Data
 	error_token lex.Token
-	deref       bool     // Same as TypeCompatibilityChecker.deref field.
+	deref       bool // Same as TypeCompatibilityChecker.deref field.
 }
 
 func (tcc *_AssignTypeChecker) push_err(key string, args ...any) {
@@ -355,12 +355,12 @@ func (atc *_AssignTypeChecker) check() bool {
 		return false
 
 	case atc.d.Variadiced:
-		atc.push_err("incompatible_types", atc.dest.To_str(), atc.d.Kind.To_str() + "...")
+		atc.push_err("incompatible_types", atc.dest.To_str(), atc.d.Kind.To_str()+"...")
 		return false
 
 	case atc.check_const():
 		return true
-	
+
 	default:
 		return atc.s.check_type_compatibility(atc.dest, atc.d.Kind, atc.error_token, atc.deref)
 	}
@@ -755,7 +755,7 @@ dup_lookup:
 			switch {
 			case pair == dpair:
 				break dup_lookup
-	
+
 			case pair.Field.Kind == dpair.Field.Kind:
 				slc.push_err(pair.Field, "already_has_expr", pair.Field.Kind)
 				break dup_lookup
@@ -844,7 +844,7 @@ func (slc *_StructLitChecker) check(exprs []ast.ExprData) {
 		case diff <= 0:
 			return
 		}
-	
+
 		idents := ""
 		for ; diff > 0; diff-- {
 			idents += ", " + slc.s.Fields[n-diff].Decl.Ident
@@ -926,7 +926,7 @@ func (rc *_RangeChecker) check_map_key_b() {
 	m := rc.d.Kind.Map()
 	rc.kind.Key_b = rc.build_var(rc.rang.Key_b)
 	rc.kind.Key_b.Kind = &TypeSymbol{Kind: m.Val}
-	
+
 	d := *rc.d
 	d.Kind = m.Val
 	rc.sc.s.check_validity_for_init_expr(rc.kind.Key_b.Mutable, rc.kind.Key_b.Kind.Kind, &d, rc.rang.In_token)
@@ -980,9 +980,9 @@ func (rc *_RangeChecker) check() bool {
 type _RetTypeChecker struct {
 	sc          *_ScopeChecker
 	f           *FnIns
-	types       []*TypeKind    // Return types.
-	exprs       []*Data        // Return expressions.
-	vars        []*Var         // Return variables.
+	types       []*TypeKind // Return types.
+	exprs       []*Data     // Return expressions.
+	vars        []*Var      // Return variables.
 	error_token lex.Token
 }
 
