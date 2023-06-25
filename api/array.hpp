@@ -25,6 +25,8 @@ namespace jule {
     public:
         mutable std::array<Item, N> buffer{};
 
+        Array<Item, N>(void) noexcept {}
+
         Array<Item, N>(const std::initializer_list<Item> &src) noexcept {
             const auto src_begin{ src.begin() };
             for (jule::Int index{ 0 }; index < src.size(); ++index)
