@@ -1,0 +1,45 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::jule::lex::{Token, TokenId, TokenKind, is_assign, is_assign_op}
+
+// Assignment information.
+struct AssignInfo {
+	l:      []Token
+	r:      []Token
+	setter: Token
+	ok:     bool
+}
+
+// Checks assignment tokens and whether reports is ok or not.
+fn check_assign_tokens(tokens: []Token): bool {
+	if tokens.len == 0 || !is_assign(tokens[0].id) {
+		ret false
+	}
+
+	let mut brace_n = 0
+	for _, t in tokens {
+		if t.id == TokenId.Range {
+			match t.kind {
+			| (str)(TokenKind.LBrace)
+			| (str)(TokenKind.LBracket)
+			| (str)(TokenKind.LParent):
+				brace_n++
+
+			|:
+				brace_n--
+			}
+		}
+
+		if brace_n < 0 {
+			ret false
+		} else if brace_n > 0 {
+			continue
+		} else if t.id == TokenId.Op && is_assign_op(t.kind) {
+			ret true
+		}
+	}
+
+	ret false
+}
