@@ -35,12 +35,10 @@ func imp_is_lookupable(i *ImportInfo, ident string) bool {
 
 	if !i.Import_all {
 		if len(i.Selected) > 0 {
-			if !i.exist_ident(ident) {
-				return false
-			}
+			return i.exist_ident(ident)
 		}
 	}
-	return true
+	return i.Import_all
 }
 
 func build_ret_vars(f *FnIns) []*Var {
