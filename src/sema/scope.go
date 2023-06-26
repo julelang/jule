@@ -350,14 +350,14 @@ func (sc *_ScopeChecker) find_label_all(ident string) *_ScopeLabel {
 // Reports this identifier duplicated in scope.
 // The "self" parameter represents address of exception identifier.
 // If founded identifier address equals to self, will be skipped.
-func (sc *_ScopeChecker) is_duplicated_ident(self uintptr, ident string) bool {
+func (sc *_ScopeChecker) is_duplicated_ident(itself uintptr, ident string) bool {
 	v := sc.Find_var(ident, false)
-	if v != nil && _uintptr(v) != self && v.Scope == sc.tree {
+	if v != nil && _uintptr(v) != itself && v.Scope == sc.tree {
 		return true
 	}
 
 	ta := sc.Find_type_alias(ident, false)
-	if ta != nil && _uintptr(ta) != self && ta.Scope == sc.tree {
+	if ta != nil && _uintptr(ta) != itself && ta.Scope == sc.tree {
 		return true
 	}
 

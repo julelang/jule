@@ -169,7 +169,7 @@ func (st *SymbolTable) def_by_ident(ident string, cpp_linked bool) any {
 	}
 
 	if cpp_linked {
-		return false
+		return nil
 	}
 
 	for _, t := range st.Traits {
@@ -190,27 +190,27 @@ func (st *SymbolTable) def_by_ident(ident string, cpp_linked bool) any {
 // Reports this identifier duplicated in symbol table.
 // The "self" parameter represents address of exception identifier.
 // If founded identifier address equals to self, will be skipped.
-func (st *SymbolTable) is_duplicated_ident(self uintptr, ident string, cpp_linked bool) bool {
+func (st *SymbolTable) is_duplicated_ident(itself uintptr, ident string, cpp_linked bool) bool {
 	for _, v := range st.Vars {
-		if _uintptr(v) != self && v.Ident == ident && v.Cpp_linked == cpp_linked {
+		if _uintptr(v) != itself && v.Ident == ident && v.Cpp_linked == cpp_linked {
 			return true
 		}
 	}
 
 	for _, ta := range st.Type_aliases {
-		if _uintptr(ta) != self && ta.Ident == ident && ta.Cpp_linked == cpp_linked {
+		if _uintptr(ta) != itself && ta.Ident == ident && ta.Cpp_linked == cpp_linked {
 			return true
 		}
 	}
 
 	for _, s := range st.Structs {
-		if _uintptr(s) != self && s.Ident == ident && s.Cpp_linked == cpp_linked {
+		if _uintptr(s) != itself && s.Ident == ident && s.Cpp_linked == cpp_linked {
 			return true
 		}
 	}
 
 	for _, f := range st.Funcs {
-		if _uintptr(f) != self && f.Ident == ident && f.Cpp_linked == cpp_linked {
+		if _uintptr(f) != itself && f.Ident == ident && f.Cpp_linked == cpp_linked {
 			return true
 		}
 	}
@@ -220,13 +220,13 @@ func (st *SymbolTable) is_duplicated_ident(self uintptr, ident string, cpp_linke
 	}
 
 	for _, t := range st.Traits {
-		if _uintptr(t) != self && t.Ident == ident {
+		if _uintptr(t) != itself && t.Ident == ident {
 			return true
 		}
 	}
 
 	for _, e := range st.Enums {
-		if _uintptr(e) != self && e.Ident == ident {
+		if _uintptr(e) != itself && e.Ident == ident {
 			return true
 		}
 	}

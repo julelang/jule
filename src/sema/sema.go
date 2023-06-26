@@ -172,9 +172,9 @@ func (s *_Sema) is_accessible_define(public bool, token lex.Token) bool {
 // Reports this identifier duplicated in package's global scope.
 // The "self" parameter represents address of exception identifier.
 // If founded identifier address equals to self, will be skipped.
-func (s *_Sema) is_duplicated_ident(self uintptr, ident string, cpp_linked bool) bool {
+func (s *_Sema) is_duplicated_ident(itself uintptr, ident string, cpp_linked bool) bool {
 	for _, f := range s.files {
-		if f.is_duplicated_ident(self, ident, cpp_linked) {
+		if f.is_duplicated_ident(itself, ident, cpp_linked) {
 			return true
 		}
 
