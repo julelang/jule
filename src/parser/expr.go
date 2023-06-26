@@ -885,6 +885,9 @@ func (ep *_ExprBuilder) build_bracket_range(tokens []lex.Token) ast.ExprData {
 
 func (ep *_ExprBuilder) build_data(tokens []lex.Token) ast.ExprData {
 	switch len(tokens) {
+	case 0:
+		return nil
+
 	case 1:
 		return ep.build_single(tokens[0])
 
