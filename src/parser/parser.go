@@ -1098,7 +1098,11 @@ func (p *_Parser) build_trait_methods(tokens []lex.Token) []*ast.FnDecl {
 	var methods []*ast.FnDecl
 	stms := split_stms(tokens)
 	for _, st := range stms {
-		tokens := st.tokens
+		tokens := eliminate_comments(st.tokens)
+		if len(tokens) == 0 {
+			continue
+		}
+
 		f := p.build_fn(tokens, true, false, true)
 		if f != nil {
 			p.check_method_receiver(f)
