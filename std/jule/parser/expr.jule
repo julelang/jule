@@ -7,7 +7,7 @@ use std::jule::ast::{
 	TupleExpr,
 	ExprData,
 	LitExpr,
-	Type,
+	TypeDecl,
 	UnaryExpr,
 	SubIdentExpr,
 	NsSelectionExpr,
@@ -307,7 +307,7 @@ impl ExprBuilder {
 		}
 	}
 
-	fn build_primitive_type(self, mut token: Token): &Type {
+	fn build_primitive_type(self, mut token: Token): &TypeDecl {
 		ret build_prim_type(token)
 	}
 
@@ -399,12 +399,12 @@ impl ExprBuilder {
 		ret ns
 	}
 
-	fn build_type(mut self, mut tokens: []Token): &Type {
+	fn build_type(mut self, mut tokens: []Token): &TypeDecl {
 		let mut i = new(int, 0)
 		let (mut t, ok) = self.p.build_type(tokens, i, false)
 		if !ok {
 			self.push_err(tokens[0], "invalid_syntax")
-			ret new(Type)
+			ret new(TypeDecl)
 		}
 
 		if i < tokens.len {
@@ -581,14 +581,14 @@ impl ExprBuilder {
 	}
 
 	// Tokens should include brackets.
-	fn build_call_generics(mut self, mut tokens: []Token): []&Type {
+	fn build_call_generics(mut self, mut tokens: []Token): []&TypeDecl {
 		if tokens.len == 0 {
 			ret nil
 		}
 
 		tokens = tokens[1 : tokens.len-1] // Remove brackets.
 		let (mut parts, errs) = parts(tokens, TokenId.Comma, true)
-		let mut generics = make([]&Type, parts.len)
+		let mut generics = make([]&TypeDecl, parts.len)
 		self.p.errors = append(self.p.errors, errs...)
 		for (i, mut part) in parts {
 			if part.len == 0 {

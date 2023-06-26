@@ -31,7 +31,7 @@ func (n *Node) Is_decl() bool {
 		*FieldDecl,
 		*UseDecl,
 		*VarDecl,
-		*Type:
+		*TypeDecl:
 		return true
 
 	default:
@@ -108,56 +108,56 @@ type TypeDeclKind = any
 //
 // For function types:
 //   - Function types represented by *FnDecl.
-type Type struct {
+type TypeDecl struct {
 	Token lex.Token
 	Kind  TypeDeclKind
 }
 
 // Identifier type.
-type IdentType struct {
+type IdentTypeDecl struct {
 	Token      lex.Token
 	Ident      string
 	Cpp_linked bool
-	Generics   []*Type
+	Generics   []*TypeDecl
 }
 
 // Reports whether identifier is primitive type.
-func (it *IdentType) Is_prim() bool { return it.Token.Id == lex.ID_PRIM }
+func (it *IdentTypeDecl) Is_prim() bool { return it.Token.Id == lex.ID_PRIM }
 
 // Namespace chain type.
-type NamespaceType struct {
+type NamespaceTypeDecl struct {
 	Idents []lex.Token // Namespace chain with identifier tokens.
-	Kind   *IdentType  // Type of identifier.
+	Kind   *IdentTypeDecl  // Type of identifier.
 }
 
-type RefType struct{ Elem *Type }      // Reference type.
-type PtrType struct{ Elem *Type }      // Pointer type.
-type SlcType struct{ Elem *Type }      // Slice type.
-type TupleType struct{ Types []*Type } // Tuple type.
+type RefTypeDecl struct{ Elem *TypeDecl }      // Reference type.
+type PtrTypeDecl struct{ Elem *TypeDecl }      // Pointer type.
+type SlcTypeDecl struct{ Elem *TypeDecl }      // Slice type.
+type TupleTypeDecl struct{ Types []*TypeDecl } // Tuple type.
 
 // Reports whether pointer is unsafe pointer (*unsafe).
-func (pt *PtrType) Is_unsafe() bool { return pt.Elem == nil }
+func (pt *PtrTypeDecl) Is_unsafe() bool { return pt.Elem == nil }
 
 // Array type.
 // Size epxression is nil for auto-sized array.
-type ArrType struct {
-	Elem *Type
+type ArrTypeDecl struct {
+	Elem *TypeDecl
 	Size *Expr
 }
 
 // Reports whether array is auto-sized.
-func (at *ArrType) Auto_sized() bool { return at.Size == nil }
+func (at *ArrTypeDecl) Auto_sized() bool { return at.Size == nil }
 
 // Map type.
-type MapType struct {
-	Key *Type
-	Val *Type
+type MapTypeDecl struct {
+	Key *TypeDecl
+	Val *TypeDecl
 }
 
 // Return type.
 // Kind and Idents is nil for void type.
-type RetType struct {
-	Kind   *Type
+type RetTypeDecl struct {
+	Kind   *TypeDecl
 	Idents []lex.Token
 }
 
@@ -247,7 +247,7 @@ type VariadicExpr struct {
 
 // Casting expression.
 type CastExpr struct {
-	Kind *Type
+	Kind *TypeDecl
 	Expr ExprData
 }
 
@@ -275,7 +275,7 @@ type BinopExpr struct {
 type FnCallExpr struct {
 	Token      lex.Token
 	Expr       *Expr
-	Generics   []*Type
+	Generics   []*TypeDecl
 	Args       []*Expr
 	Concurrent bool
 }
@@ -291,7 +291,7 @@ func (fep *FieldExprPair) Is_targeted() bool { return fep.Field.Id != lex.ID_NA 
 
 // Struct literal instiating expression.
 type StructLit struct {
-	Kind  *Type
+	Kind  *TypeDecl
 	Exprs []ExprData // Possible types: *FieldExprPair, and other expressions.
 }
 
@@ -337,8 +337,8 @@ type SlicingExpr struct {
 	To    ExprData // To index value expression.
 }
 
-// Generic type.
-type Generic struct {
+// GenericDecl type.
+type GenericDecl struct {
 	Token lex.Token
 	Ident string
 }
@@ -384,20 +384,20 @@ type ScopeTree struct {
 	Stmts    []NodeData // Statements.
 }
 
-// Param.
-type Param struct {
+// ParamDecl.
+type ParamDecl struct {
 	Token    lex.Token
 	Mutable  bool
 	Variadic bool
-	Kind     *Type
+	Kind     *TypeDecl
 	Ident    string
 }
 
 // Reports whether parameter is self (receiver) parameter.
-func (p *Param) Is_self() bool { return strings.HasSuffix(p.Ident, lex.KND_SELF) }
+func (p *ParamDecl) Is_self() bool { return strings.HasSuffix(p.Ident, lex.KND_SELF) }
 
 // Reports whether self (receiver) parameter is reference.
-func (p *Param) Is_ref() bool { return p.Ident != "" && p.Ident[0] == '&' }
+func (p *ParamDecl) Is_ref() bool { return p.Ident != "" && p.Ident[0] == '&' }
 
 // Function declaration.
 // Also represents anonymous function expression.
@@ -411,9 +411,9 @@ type FnDecl struct {
 	Directives   []*Directive
 	Doc_comments *CommentGroup
 	Scope        *ScopeTree
-	Generics     []*Generic
-	Result       *RetType
-	Params       []*Param
+	Generics     []*GenericDecl
+	Result       *RetTypeDecl
+	Params       []*ParamDecl
 }
 
 // Variable declaration.
@@ -426,7 +426,7 @@ type VarDecl struct {
 	Mutable      bool
 	Constant     bool
 	Doc_comments *CommentGroup
-	Kind         *Type // nil for auto-typed
+	Kind         *TypeDecl // nil for auto-typed
 	Expr         *Expr
 }
 
@@ -505,7 +505,7 @@ type TypeAliasDecl struct {
 	Cpp_linked   bool
 	Token        lex.Token
 	Ident        string
-	Kind         *Type
+	Kind         *TypeDecl
 	Doc_comments *CommentGroup
 }
 
@@ -539,22 +539,22 @@ type UseDecl struct {
 }
 
 // Enum item.
-type EnumItem struct {
+type EnumItemDecl struct {
 	Token lex.Token
 	Ident string
 	Expr  *Expr // Nil for auto expression.
 }
 
 // Reports whether item has auto expression.
-func (ei *EnumItem) Auto_expr() bool { return ei.Expr == nil }
+func (ei *EnumItemDecl) Auto_expr() bool { return ei.Expr == nil }
 
 // Enum declaration.
 type EnumDecl struct {
 	Token        lex.Token
 	Public       bool
 	Ident        string
-	Kind         *Type
-	Items        []*EnumItem
+	Kind         *TypeDecl
+	Items        []*EnumItemDecl
 	Doc_comments *CommentGroup
 }
 
@@ -567,7 +567,7 @@ type FieldDecl struct {
 	Public  bool
 	Mutable bool // Interior mutability.
 	Ident   string
-	Kind    *Type
+	Kind    *TypeDecl
 }
 
 // Structure declaration.
@@ -579,7 +579,7 @@ type StructDecl struct {
 	Cpp_linked   bool
 	Directives   []*Directive
 	Doc_comments *CommentGroup
-	Generics     []*Generic
+	Generics     []*GenericDecl
 }
 
 // Trait declaration.

@@ -32,7 +32,7 @@ func build_doc(cg *ast.CommentGroup) string {
 	return doc
 }
 
-func build_type(t *ast.Type) *TypeSymbol {
+func build_type(t *ast.TypeDecl) *TypeSymbol {
 	if t == nil {
 		return nil
 	}
@@ -96,7 +96,7 @@ func build_struct(decl *ast.StructDecl) *Struct {
 	}
 }
 
-func build_param(decl *ast.Param) *Param {
+func build_param(decl *ast.ParamDecl) *Param {
 	return &Param{
 		Token:    decl.Token,
 		Mutable:  decl.Mutable,
@@ -106,7 +106,7 @@ func build_param(decl *ast.Param) *Param {
 	}
 }
 
-func build_params(decls []*ast.Param) []*Param {
+func build_params(decls []*ast.ParamDecl) []*Param {
 	params := make([]*Param, len(decls))
 	for i, decl := range decls {
 		params[i] = build_param(decl)
@@ -114,7 +114,7 @@ func build_params(decls []*ast.Param) []*Param {
 	return params
 }
 
-func build_ret_type(decl *ast.RetType) *RetType {
+func build_ret_type(decl *ast.RetTypeDecl) *RetType {
 	if decl.Idents == nil && decl.Kind == nil {
 		return nil // Void type.
 	}
@@ -159,7 +159,7 @@ func build_trait(decl *ast.TraitDecl) *Trait {
 	}
 }
 
-func build_enum_item(decl *ast.EnumItem) *EnumItem {
+func build_enum_item(decl *ast.EnumItemDecl) *EnumItem {
 	return &EnumItem{
 		Token: decl.Token,
 		Ident: decl.Ident,
@@ -167,7 +167,7 @@ func build_enum_item(decl *ast.EnumItem) *EnumItem {
 	}
 }
 
-func build_enum_items(decls []*ast.EnumItem) []*EnumItem {
+func build_enum_items(decls []*ast.EnumItemDecl) []*EnumItem {
 	items := make([]*EnumItem, len(decls))
 	for i, decl := range decls {
 		items[i] = build_enum_item(decl)

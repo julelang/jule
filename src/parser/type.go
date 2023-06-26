@@ -9,12 +9,12 @@ import (
 	"github.com/julelang/jule/lex"
 )
 
-func build_void_type() *ast.Type { return &ast.Type{} }
+func build_void_type() *ast.TypeDecl { return &ast.TypeDecl{} }
 
-func build_prim_type(token lex.Token) *ast.Type {
-	return &ast.Type{
+func build_prim_type(token lex.Token) *ast.TypeDecl {
+	return &ast.TypeDecl{
 		Token: token,
-		Kind: &ast.IdentType{
+		Kind: &ast.IdentTypeDecl{
 			Token:      token,
 			Ident:      token.Kind,
 			Cpp_linked: false,
@@ -70,18 +70,18 @@ func (tb *_TypeBuilder) push_err(token lex.Token, key string) {
 	}
 }
 
-func (tb *_TypeBuilder) build_prim() *ast.Type {
+func (tb *_TypeBuilder) build_prim() *ast.TypeDecl {
 	t := build_prim_type(tb.tokens[*tb.i])
 	*tb.i++
 	return t
 }
 
-func (tb *_TypeBuilder) build_namespace() *ast.Type {
-	t := &ast.Type{
+func (tb *_TypeBuilder) build_namespace() *ast.TypeDecl {
+	t := &ast.TypeDecl{
 		Token: tb.tokens[*tb.i],
 	}
 
-	nst := &ast.NamespaceType{}
+	nst := &ast.NamespaceTypeDecl{}
 	n := 0
 	for ; *tb.i < len(tb.tokens); *tb.i++ {
 		token := tb.tokens[*tb.i]
@@ -100,12 +100,12 @@ func (tb *_TypeBuilder) build_namespace() *ast.Type {
 	nst.Idents = nst.Idents[:len(nst.Idents)-1]
 
 	*tb.i-- // Set offset to last identifier.
-	nst.Kind = tb.build_ident().Kind.(*ast.IdentType)
+	nst.Kind = tb.build_ident().Kind.(*ast.IdentTypeDecl)
 	t.Kind = nst
 	return t
 }
 
-func (tb *_TypeBuilder) build_generics() []*ast.Type {
+func (tb *_TypeBuilder) build_generics() []*ast.TypeDecl {
 	if *tb.i >= len(tb.tokens) {
 		return nil
 	}
@@ -115,7 +115,7 @@ func (tb *_TypeBuilder) build_generics() []*ast.Type {
 	}
 
 	parts := tb.ident_generics()
-	types := make([]*ast.Type, len(parts))
+	types := make([]*ast.TypeDecl, len(parts))
 	for i, part := range parts {
 		j := 0
 		t, _ := tb.p.build_type(part, &j, true)
@@ -154,48 +154,48 @@ func (tb *_TypeBuilder) ident_generics() [][]lex.Token {
 	return parts
 }
 
-func (tb *_TypeBuilder) build_ident() *ast.Type {
+func (tb *_TypeBuilder) build_ident() *ast.TypeDecl {
 	if *tb.i+1 < len(tb.tokens) && tb.tokens[*tb.i+1].Id == lex.ID_DBLCOLON {
 		return tb.build_namespace()
 	}
 	token := tb.tokens[*tb.i]
-	it := &ast.IdentType{
+	it := &ast.IdentTypeDecl{
 		Token:      token,
 		Ident:      token.Kind,
 		Cpp_linked: false,
 	}
 	*tb.i++
 	it.Generics = tb.build_generics()
-	return &ast.Type{
+	return &ast.TypeDecl{
 		Token: token,
 		Kind:  it,
 	}
 }
 
-func (tb *_TypeBuilder) build_cpp_link() *ast.Type {
+func (tb *_TypeBuilder) build_cpp_link() *ast.TypeDecl {
 	if *tb.i+1 >= len(tb.tokens) || tb.tokens[*tb.i+1].Id != lex.ID_DOT {
 		tb.push_err(tb.tokens[*tb.i], "invalid_syntax")
 		return nil
 	}
 	*tb.i += 2 // Skip cpp keyword and dot token.
 	t := tb.build_ident()
-	t.Kind.(*ast.IdentType).Cpp_linked = true
+	t.Kind.(*ast.IdentTypeDecl).Cpp_linked = true
 	return t
 }
 
-func (tb *_TypeBuilder) build_fn() *ast.Type {
+func (tb *_TypeBuilder) build_fn() *ast.TypeDecl {
 	token := tb.tokens[*tb.i]
 	f := tb.p.build_fn_prototype(tb.tokens, tb.i, false, true)
 	if f == nil {
 		return nil
 	}
-	return &ast.Type{
+	return &ast.TypeDecl{
 		Token: token,
 		Kind:  f,
 	}
 }
 
-func (tb *_TypeBuilder) build_ptr() *ast.Type {
+func (tb *_TypeBuilder) build_ptr() *ast.TypeDecl {
 	token := tb.tokens[*tb.i]
 	if *tb.i+1 >= len(tb.tokens) {
 		tb.push_err(token, "invalid_syntax")
@@ -205,9 +205,9 @@ func (tb *_TypeBuilder) build_ptr() *ast.Type {
 	*tb.i++
 	if tb.tokens[*tb.i].Id == lex.ID_UNSAFE {
 		*tb.i++
-		return &ast.Type{
+		return &ast.TypeDecl{
 			Token: token,
-			Kind: &ast.PtrType{
+			Kind: &ast.PtrTypeDecl{
 				Elem: nil, // Set Elem as nil for unsafe pointer (*unsafe) type.
 			},
 		}
@@ -218,15 +218,15 @@ func (tb *_TypeBuilder) build_ptr() *ast.Type {
 		return nil
 	}
 
-	return &ast.Type{
+	return &ast.TypeDecl{
 		Token: token,
-		Kind: &ast.PtrType{
+		Kind: &ast.PtrTypeDecl{
 			Elem: elem,
 		},
 	}
 }
 
-func (tb *_TypeBuilder) build_ref() *ast.Type {
+func (tb *_TypeBuilder) build_ref() *ast.TypeDecl {
 	token := tb.tokens[*tb.i]
 	if *tb.i+1 >= len(tb.tokens) {
 		tb.push_err(token, "invalid_syntax")
@@ -239,15 +239,15 @@ func (tb *_TypeBuilder) build_ref() *ast.Type {
 		return nil
 	}
 
-	return &ast.Type{
+	return &ast.TypeDecl{
 		Token: token,
-		Kind: &ast.RefType{
+		Kind: &ast.RefTypeDecl{
 			Elem: elem,
 		},
 	}
 }
 
-func (tb *_TypeBuilder) build_op() *ast.Type {
+func (tb *_TypeBuilder) build_op() *ast.TypeDecl {
 	token := tb.tokens[*tb.i]
 	switch token.Kind {
 	case lex.KND_STAR:
@@ -266,22 +266,22 @@ func (tb *_TypeBuilder) build_op() *ast.Type {
 	return nil
 }
 
-func (tb *_TypeBuilder) build_slc() *ast.Type {
+func (tb *_TypeBuilder) build_slc() *ast.TypeDecl {
 	token := tb.tokens[*tb.i]
 	*tb.i++ // skip right bracket
 	elem := tb.step()
 	if elem == nil {
 		return nil
 	}
-	return &ast.Type{
+	return &ast.TypeDecl{
 		Token: token,
-		Kind: &ast.SlcType{
+		Kind: &ast.SlcTypeDecl{
 			Elem: elem,
 		},
 	}
 }
 
-func (tb *_TypeBuilder) build_arr() *ast.Type {
+func (tb *_TypeBuilder) build_arr() *ast.TypeDecl {
 	// *tb.i points to element type of array.
 	// Brackets places at ... < *tb.i offset.
 
@@ -297,7 +297,7 @@ func (tb *_TypeBuilder) build_arr() *ast.Type {
 		return nil
 	}
 
-	arrt := &ast.ArrType{
+	arrt := &ast.ArrTypeDecl{
 		Elem: elem,
 	}
 
@@ -310,13 +310,13 @@ func (tb *_TypeBuilder) build_arr() *ast.Type {
 		arrt.Size = tb.p.build_expr(expr_tokens)
 	}
 
-	return &ast.Type{
+	return &ast.TypeDecl{
 		Token: token,
 		Kind:  arrt,
 	}
 }
 
-func (tb *_TypeBuilder) build_map(colon int, tokens []lex.Token) *ast.Type {
+func (tb *_TypeBuilder) build_map(colon int, tokens []lex.Token) *ast.TypeDecl {
 	colon_token := tb.tokens[colon]
 	if colon == 0 || colon+1 >= len(tokens) {
 		tb.push_err(colon_token, "missing_type")
@@ -324,7 +324,7 @@ func (tb *_TypeBuilder) build_map(colon int, tokens []lex.Token) *ast.Type {
 	}
 	key_tokens := tokens[:colon]
 	val_tokens := tokens[colon+1:]
-	mapt := &ast.MapType{}
+	mapt := &ast.MapTypeDecl{}
 
 	j := 0
 	keyt, ok := tb.p.build_type(key_tokens, &j, tb.err)
@@ -344,13 +344,13 @@ func (tb *_TypeBuilder) build_map(colon int, tokens []lex.Token) *ast.Type {
 	}
 	mapt.Val = valt
 
-	return &ast.Type{
+	return &ast.TypeDecl{
 		Token: colon_token,
 		Kind:  mapt,
 	}
 }
 
-func (tb *_TypeBuilder) build_enumerable() *ast.Type {
+func (tb *_TypeBuilder) build_enumerable() *ast.TypeDecl {
 	token := tb.tokens[*tb.i]
 	if *tb.i+2 >= len(tb.tokens) || token.Id != lex.ID_RANGE || token.Kind != lex.KND_LBRACKET {
 		tb.push_err(token, "invalid_syntax")
@@ -371,7 +371,7 @@ func (tb *_TypeBuilder) build_enumerable() *ast.Type {
 	return tb.build_map(colon, map_tokens)
 }
 
-func (tb *_TypeBuilder) step() *ast.Type {
+func (tb *_TypeBuilder) step() *ast.TypeDecl {
 	token := tb.tokens[*tb.i]
 	switch token.Id {
 	case lex.ID_PRIM:
@@ -401,7 +401,7 @@ func (tb *_TypeBuilder) step() *ast.Type {
 
 // Builds type.
 // Returns void if error occurs.
-func (tb *_TypeBuilder) build() (_ *ast.Type, ok bool) {
+func (tb *_TypeBuilder) build() (_ *ast.TypeDecl, ok bool) {
 	root := tb.step()
 	if root == nil {
 		return build_void_type(), false

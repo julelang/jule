@@ -1569,7 +1569,7 @@ func (e *_Eval) eval_struct_lit(lit *ast.StructLit) *Data {
 	return e.eval_struct_lit_explicit(s, lit.Exprs, lit.Kind.Token)
 }
 
-func (e *_Eval) eval_type(t *ast.Type) *Data {
+func (e *_Eval) eval_type(t *ast.TypeDecl) *Data {
 	tk := build_type(t)
 	ok := e.s.check_type(tk, e.lookup)
 	if !ok {
@@ -2829,8 +2829,8 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 	case *ast.StructLit:
 		d = e.eval_struct_lit(kind.(*ast.StructLit))
 
-	case *ast.Type:
-		d = e.eval_type(kind.(*ast.Type))
+	case *ast.TypeDecl:
+		d = e.eval_type(kind.(*ast.TypeDecl))
 
 	case *ast.FnCallExpr:
 		d = e.eval_fn_call(kind.(*ast.FnCallExpr))

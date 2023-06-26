@@ -199,7 +199,7 @@ func (tk *TypeKind) Tup() *Tuple {
 
 // Type.
 type TypeSymbol struct {
-	Decl *ast.Type // Never changed by semantic analyzer.
+	Decl *ast.TypeDecl // Never changed by semantic analyzer.
 	Kind *TypeKind
 }
 
@@ -494,7 +494,7 @@ type _TypeChecker struct {
 	// appends as primitive type.
 	//
 	// Each dimension 2 array accepted as identifier group.
-	ignore_generics []*ast.Generic
+	ignore_generics []*ast.GenericDecl
 
 	// Ignores with trait check pattern.
 	// Uses to_trait_kind_str's representation.
@@ -512,7 +512,7 @@ func (tc *_TypeChecker) push_err(token lex.Token, key string, args ...any) {
 	tc.s.push_err(token, key, args...)
 }
 
-func (tc *_TypeChecker) build_prim(decl *ast.IdentType) *Prim {
+func (tc *_TypeChecker) build_prim(decl *ast.IdentTypeDecl) *Prim {
 	if !is_prim(decl.Ident) {
 		tc.push_err(tc.error_token, "invalid_type")
 		return nil
@@ -530,7 +530,7 @@ func (tc *_TypeChecker) build_prim(decl *ast.IdentType) *Prim {
 // Appends reference to reference if there is no illegal cycle.
 // Returns true if tc.referencer is nil.
 // Returns true if refers is nil.
-func (tc *_TypeChecker) check_illegal_cycles(ident *ast.IdentType, decl any) (ok bool) {
+func (tc *_TypeChecker) check_illegal_cycles(ident *ast.IdentTypeDecl, decl any) (ok bool) {
 	if tc.referencer == nil {
 		return true
 	}
@@ -637,7 +637,7 @@ func (tc *_TypeChecker) check_illegal_cycles(ident *ast.IdentType, decl any) (ok
 	return true
 }
 
-func (tc *_TypeChecker) from_type_alias(decl *ast.IdentType, ta *TypeAlias) _Kind {
+func (tc *_TypeChecker) from_type_alias(decl *ast.IdentTypeDecl, ta *TypeAlias) _Kind {
 	if !tc.s.is_accessible_define(ta.Public, ta.Token) {
 		tc.push_err(decl.Token, "ident_not_exist", decl.Ident)
 		return nil
@@ -671,7 +671,7 @@ func (tc *_TypeChecker) from_type_alias(decl *ast.IdentType, ta *TypeAlias) _Kin
 	return kind
 }
 
-func (tc *_TypeChecker) from_enum(decl *ast.IdentType, e *Enum) *Enum {
+func (tc *_TypeChecker) from_enum(decl *ast.IdentTypeDecl, e *Enum) *Enum {
 	if !tc.s.is_accessible_define(e.Public, e.Token) {
 		tc.push_err(decl.Token, "ident_not_exist", decl.Ident)
 		return nil
@@ -769,7 +769,7 @@ func (tc *_TypeChecker) append_used_struct_reference(s *Struct) {
 	}
 }
 
-func (tc *_TypeChecker) from_struct(decl *ast.IdentType, s *Struct) *StructIns {
+func (tc *_TypeChecker) from_struct(decl *ast.IdentTypeDecl, s *Struct) *StructIns {
 	if !tc.s.is_accessible_define(s.Public, s.Token) {
 		tc.push_err(decl.Token, "ident_not_exist", decl.Ident)
 		return nil
@@ -811,7 +811,7 @@ func (tc *_TypeChecker) from_struct(decl *ast.IdentType, s *Struct) *StructIns {
 	return ins
 }
 
-func (tc *_TypeChecker) get_def(decl *ast.IdentType) _Kind {
+func (tc *_TypeChecker) get_def(decl *ast.IdentTypeDecl) _Kind {
 	for i, g := range tc.ignore_generics {
 		if g.Ident == decl.Ident {
 			if tc.ignore_with_trait_pattern {
@@ -876,7 +876,7 @@ func (tc *_TypeChecker) get_def(decl *ast.IdentType) _Kind {
 	return nil
 }
 
-func (tc *_TypeChecker) build_ident(decl *ast.IdentType) _Kind {
+func (tc *_TypeChecker) build_ident(decl *ast.IdentTypeDecl) _Kind {
 	switch {
 	case is_prim(decl.Ident):
 		return tc.build_prim(decl)
@@ -886,7 +886,7 @@ func (tc *_TypeChecker) build_ident(decl *ast.IdentType) _Kind {
 	}
 }
 
-func (tc *_TypeChecker) build_ref(decl *ast.RefType) *Ref {
+func (tc *_TypeChecker) build_ref(decl *ast.RefTypeDecl) *Ref {
 	not_plain := tc.not_plain
 	tc.not_plain = true
 	defer func() { tc.not_plain = not_plain }()
@@ -927,7 +927,7 @@ func (tc *_TypeChecker) build_ref(decl *ast.RefType) *Ref {
 	}
 }
 
-func (tc *_TypeChecker) build_ptr(decl *ast.PtrType) *Ptr {
+func (tc *_TypeChecker) build_ptr(decl *ast.PtrTypeDecl) *Ptr {
 	not_plain := tc.not_plain
 	tc.not_plain = true
 	defer func() { tc.not_plain = not_plain }()
@@ -961,7 +961,7 @@ func (tc *_TypeChecker) build_ptr(decl *ast.PtrType) *Ptr {
 	}
 }
 
-func (tc *_TypeChecker) build_slc(decl *ast.SlcType) *Slc {
+func (tc *_TypeChecker) build_slc(decl *ast.SlcTypeDecl) *Slc {
 	not_plain := tc.not_plain
 	tc.not_plain = true
 	defer func() { tc.not_plain = not_plain }()
@@ -983,7 +983,7 @@ func (tc *_TypeChecker) build_slc(decl *ast.SlcType) *Slc {
 	}
 }
 
-func (tc *_TypeChecker) build_arr(decl *ast.ArrType) *Arr {
+func (tc *_TypeChecker) build_arr(decl *ast.ArrTypeDecl) *Arr {
 	not_plain := tc.not_plain
 	tc.not_plain = true
 	defer func() { tc.not_plain = not_plain }()
@@ -1030,7 +1030,7 @@ func (tc *_TypeChecker) build_arr(decl *ast.ArrType) *Arr {
 	}
 }
 
-func (tc *_TypeChecker) build_map(decl *ast.MapType) *Map {
+func (tc *_TypeChecker) build_map(decl *ast.MapTypeDecl) *Map {
 	not_plain := tc.not_plain
 	tc.not_plain = true
 	defer func() { tc.not_plain = not_plain }()
@@ -1051,7 +1051,7 @@ func (tc *_TypeChecker) build_map(decl *ast.MapType) *Map {
 	}
 }
 
-func (tc *_TypeChecker) build_tuple(decl *ast.TupleType) *Tuple {
+func (tc *_TypeChecker) build_tuple(decl *ast.TupleTypeDecl) *Tuple {
 	types := make([]*TypeKind, len(decl.Types))
 	for i, t := range decl.Types {
 		kind := tc.check_decl(t)
@@ -1099,7 +1099,7 @@ func (tc *_TypeChecker) build_fn(decl *ast.FnDecl) *FnIns {
 	return ins
 }
 
-func (tc *_TypeChecker) build_by_std_namespace(decl *ast.NamespaceType) _Kind {
+func (tc *_TypeChecker) build_by_std_namespace(decl *ast.NamespaceTypeDecl) _Kind {
 	path := build_link_path_by_tokens(decl.Idents)
 	imp := tc.lookup.Select_package(func(imp *ImportInfo) bool {
 		return imp.Std && imp.Link_path == path
@@ -1120,7 +1120,7 @@ func (tc *_TypeChecker) build_by_std_namespace(decl *ast.NamespaceType) _Kind {
 	return kind
 }
 
-func (tc *_TypeChecker) build_by_namespace(decl *ast.NamespaceType) _Kind {
+func (tc *_TypeChecker) build_by_namespace(decl *ast.NamespaceTypeDecl) _Kind {
 	token := decl.Idents[0]
 	if token.Kind == "std" {
 		return tc.build_by_std_namespace(decl)
@@ -1134,44 +1134,44 @@ func (tc *_TypeChecker) build(decl_kind ast.TypeDeclKind) *TypeKind {
 	var kind _Kind = nil
 
 	switch decl_kind.(type) {
-	case *ast.IdentType:
-		t := tc.build_ident(decl_kind.(*ast.IdentType))
+	case *ast.IdentTypeDecl:
+		t := tc.build_ident(decl_kind.(*ast.IdentTypeDecl))
 		if t != nil {
 			kind = t
 		}
 
-	case *ast.RefType:
-		t := tc.build_ref(decl_kind.(*ast.RefType))
+	case *ast.RefTypeDecl:
+		t := tc.build_ref(decl_kind.(*ast.RefTypeDecl))
 		if t != nil {
 			kind = t
 		}
 
-	case *ast.PtrType:
-		t := tc.build_ptr(decl_kind.(*ast.PtrType))
+	case *ast.PtrTypeDecl:
+		t := tc.build_ptr(decl_kind.(*ast.PtrTypeDecl))
 		if t != nil {
 			kind = t
 		}
 
-	case *ast.SlcType:
-		t := tc.build_slc(decl_kind.(*ast.SlcType))
+	case *ast.SlcTypeDecl:
+		t := tc.build_slc(decl_kind.(*ast.SlcTypeDecl))
 		if t != nil {
 			kind = t
 		}
 
-	case *ast.ArrType:
-		t := tc.build_arr(decl_kind.(*ast.ArrType))
+	case *ast.ArrTypeDecl:
+		t := tc.build_arr(decl_kind.(*ast.ArrTypeDecl))
 		if t != nil {
 			kind = t
 		}
 
-	case *ast.MapType:
-		t := tc.build_map(decl_kind.(*ast.MapType))
+	case *ast.MapTypeDecl:
+		t := tc.build_map(decl_kind.(*ast.MapTypeDecl))
 		if t != nil {
 			kind = t
 		}
 
-	case *ast.TupleType:
-		t := tc.build_tuple(decl_kind.(*ast.TupleType))
+	case *ast.TupleTypeDecl:
+		t := tc.build_tuple(decl_kind.(*ast.TupleTypeDecl))
 		if t != nil {
 			kind = t
 		}
@@ -1182,8 +1182,8 @@ func (tc *_TypeChecker) build(decl_kind ast.TypeDeclKind) *TypeKind {
 			kind = t
 		}
 
-	case *ast.NamespaceType:
-		t := tc.build_by_namespace(decl_kind.(*ast.NamespaceType))
+	case *ast.NamespaceTypeDecl:
+		t := tc.build_by_namespace(decl_kind.(*ast.NamespaceTypeDecl))
 		if t != nil {
 			kind = t
 		}
@@ -1208,7 +1208,7 @@ func (tc *_TypeChecker) build(decl_kind ast.TypeDeclKind) *TypeKind {
 	}
 }
 
-func (tc *_TypeChecker) check_decl(decl *ast.Type) *TypeKind {
+func (tc *_TypeChecker) check_decl(decl *ast.TypeDecl) *TypeKind {
 	// Save current token.
 	error_token := tc.error_token
 

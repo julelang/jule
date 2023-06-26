@@ -127,7 +127,7 @@ func (p *_Parser) build_scope(tokens []lex.Token) *ast.ScopeTree {
 	return s
 }
 
-func (p *_Parser) __build_type(tokens []lex.Token, i *int, err bool) (*ast.Type, bool) {
+func (p *_Parser) __build_type(tokens []lex.Token, i *int, err bool) (*ast.TypeDecl, bool) {
 	tb := _TypeBuilder{
 		p:      p,
 		tokens: tokens,
@@ -138,7 +138,7 @@ func (p *_Parser) __build_type(tokens []lex.Token, i *int, err bool) (*ast.Type,
 }
 
 // build_type builds AST model of data-type.
-func (p *_Parser) build_type(tokens []lex.Token, i *int, err bool) (*ast.Type, bool) {
+func (p *_Parser) build_type(tokens []lex.Token, i *int, err bool) (*ast.TypeDecl, bool) {
 	token := tokens[*i]
 	t, ok := p.__build_type(tokens, i, err)
 	if err && !ok {
@@ -282,11 +282,11 @@ func (p *_Parser) build_var(tokens []lex.Token) *ast.VarDecl {
 	return v
 }
 
-func (p *_Parser) build_generic(tokens []lex.Token) *ast.Generic {
+func (p *_Parser) build_generic(tokens []lex.Token) *ast.GenericDecl {
 	if len(tokens) > 1 {
 		p.push_err(tokens[1], "invalid_syntax")
 	}
-	g := &ast.Generic{
+	g := &ast.GenericDecl{
 		Token: tokens[0],
 	}
 	if g.Token.Id != lex.ID_IDENT {
@@ -296,7 +296,7 @@ func (p *_Parser) build_generic(tokens []lex.Token) *ast.Generic {
 	return g
 }
 
-func (p *_Parser) build_generics(tokens []lex.Token) []*ast.Generic {
+func (p *_Parser) build_generics(tokens []lex.Token) []*ast.GenericDecl {
 	token := tokens[0]
 	if len(tokens) == 0 {
 		p.push_err(token, "missing_expr")
@@ -306,7 +306,7 @@ func (p *_Parser) build_generics(tokens []lex.Token) []*ast.Generic {
 	parts, errors := lex.Parts(tokens, lex.ID_COMMA, true)
 	p.errors = append(p.errors, errors...)
 
-	generics := make([]*ast.Generic, len(parts))
+	generics := make([]*ast.GenericDecl, len(parts))
 	for i, part := range parts {
 		if len(parts) > 0 {
 			generics[i] = p.build_generic(part)
@@ -316,12 +316,12 @@ func (p *_Parser) build_generics(tokens []lex.Token) []*ast.Generic {
 	return generics
 }
 
-func (p *_Parser) build_self_param(tokens []lex.Token) *ast.Param {
+func (p *_Parser) build_self_param(tokens []lex.Token) *ast.ParamDecl {
 	if len(tokens) == 0 {
 		return nil
 	}
 
-	param := &ast.Param{}
+	param := &ast.ParamDecl{}
 
 	// Detects mut keyword.
 	i := 0
@@ -355,7 +355,7 @@ func (p *_Parser) build_self_param(tokens []lex.Token) *ast.Param {
 	return param
 }
 
-func (p *_Parser) param_type_begin(param *ast.Param, i *int, tokens []lex.Token) {
+func (p *_Parser) param_type_begin(param *ast.ParamDecl, i *int, tokens []lex.Token) {
 	for ; *i < len(tokens); *i++ {
 		token := tokens[*i]
 		if token.Id != lex.ID_OP {
@@ -372,7 +372,7 @@ func (p *_Parser) param_type_begin(param *ast.Param, i *int, tokens []lex.Token)
 	}
 }
 
-func (p *_Parser) build_param_type(param *ast.Param, tokens []lex.Token, must_pure bool) {
+func (p *_Parser) build_param_type(param *ast.ParamDecl, tokens []lex.Token, must_pure bool) {
 	i := 0
 	if !must_pure {
 		p.param_type_begin(param, &i, tokens)
@@ -386,7 +386,7 @@ func (p *_Parser) build_param_type(param *ast.Param, tokens []lex.Token, must_pu
 	}
 }
 
-func (p *_Parser) param_body_id(param *ast.Param, token lex.Token) {
+func (p *_Parser) param_body_id(param *ast.ParamDecl, token lex.Token) {
 	if lex.Is_ignore_ident(token.Kind) {
 		param.Ident = lex.ANON_IDENT
 		return
@@ -394,7 +394,7 @@ func (p *_Parser) param_body_id(param *ast.Param, token lex.Token) {
 	param.Ident = token.Kind
 }
 
-func (p *_Parser) build_param_body(param *ast.Param, i *int, tokens []lex.Token, must_pure bool) {
+func (p *_Parser) build_param_body(param *ast.ParamDecl, i *int, tokens []lex.Token, must_pure bool) {
 	p.param_body_id(param, tokens[*i])
 	tok := tokens[*i]
 	// +1 for skip identifier token
@@ -416,8 +416,8 @@ func (p *_Parser) build_param_body(param *ast.Param, i *int, tokens []lex.Token,
 	p.build_param_type(param, tokens, must_pure)
 }
 
-func (p *_Parser) build_param(tokens []lex.Token, must_pure bool) *ast.Param {
-	param := &ast.Param{
+func (p *_Parser) build_param(tokens []lex.Token, must_pure bool) *ast.ParamDecl {
+	param := &ast.ParamDecl{
 		Token: tokens[0],
 	}
 
@@ -444,7 +444,7 @@ func (p *_Parser) build_param(tokens []lex.Token, must_pure bool) *ast.Param {
 	return param
 }
 
-func (p *_Parser) check_params(params []*ast.Param) {
+func (p *_Parser) check_params(params []*ast.ParamDecl) {
 	for _, param := range params {
 		if param.Is_self() || param.Kind != nil {
 			continue
@@ -452,9 +452,9 @@ func (p *_Parser) check_params(params []*ast.Param) {
 		if param.Token.Id == lex.ID_NA {
 			p.push_err(param.Token, "missing_type")
 		} else {
-			param.Kind = &ast.Type{
+			param.Kind = &ast.TypeDecl{
 				Token: param.Token,
-				Kind: &ast.IdentType{
+				Kind: &ast.IdentTypeDecl{
 					Token: param.Token,
 					Ident: param.Token.Kind,
 				},
@@ -465,14 +465,14 @@ func (p *_Parser) check_params(params []*ast.Param) {
 	}
 }
 
-func (p *_Parser) build_params(tokens []lex.Token, method bool, must_pure bool) []*ast.Param {
+func (p *_Parser) build_params(tokens []lex.Token, method bool, must_pure bool) []*ast.ParamDecl {
 	parts, errs := lex.Parts(tokens, lex.ID_COMMA, true)
 	p.errors = append(p.errors, errs...)
 	if len(parts) == 0 {
 		return nil
 	}
 
-	var params []*ast.Param
+	var params []*ast.ParamDecl
 	if method && len(parts) > 0 {
 		param := p.build_self_param(parts[0])
 		if param != nil && param.Is_self() {
@@ -492,8 +492,8 @@ func (p *_Parser) build_params(tokens []lex.Token, method bool, must_pure bool) 
 	return params
 }
 
-func (p *_Parser) build_multi_ret_type(tokens []lex.Token, i *int) (t *ast.RetType, ok bool) {
-	t = &ast.RetType{}
+func (p *_Parser) build_multi_ret_type(tokens []lex.Token, i *int) (t *ast.RetTypeDecl, ok bool) {
+	t = &ast.RetTypeDecl{}
 	*i++
 	if *i >= len(tokens) {
 		*i--
@@ -505,7 +505,7 @@ func (p *_Parser) build_multi_ret_type(tokens []lex.Token, i *int) (t *ast.RetTy
 	range_tokens := lex.Range(i, lex.KND_LPAREN, lex.KND_RPARENT, tokens)
 	params := p.build_params(range_tokens, false, true)
 
-	types := make([]*ast.Type, len(params))
+	types := make([]*ast.TypeDecl, len(params))
 	for i, param := range params {
 		types[i] = param.Kind
 		if param.Ident != lex.ANON_IDENT {
@@ -517,9 +517,9 @@ func (p *_Parser) build_multi_ret_type(tokens []lex.Token, i *int) (t *ast.RetTy
 	}
 
 	if len(types) > 1 {
-		t.Kind = &ast.Type{
+		t.Kind = &ast.TypeDecl{
 			Token: tokens[0],
-			Kind: &ast.TupleType{
+			Kind: &ast.TupleTypeDecl{
 				Types: types,
 			},
 		}
@@ -531,8 +531,8 @@ func (p *_Parser) build_multi_ret_type(tokens []lex.Token, i *int) (t *ast.RetTy
 	return
 }
 
-func (p *_Parser) build_ret_type(tokens []lex.Token, i *int) (t *ast.RetType, ok bool) {
-	t = &ast.RetType{}
+func (p *_Parser) build_ret_type(tokens []lex.Token, i *int) (t *ast.RetTypeDecl, ok bool) {
+	t = &ast.RetTypeDecl{}
 	if *i >= len(tokens) {
 		return
 	}
@@ -903,14 +903,14 @@ func (p *_Parser) build_enum_item_expr(i *int, tokens []lex.Token) *ast.Expr {
 	return nil
 }
 
-func (p *_Parser) build_enum_items(tokens []lex.Token) []*ast.EnumItem {
-	items := make([]*ast.EnumItem, 0)
+func (p *_Parser) build_enum_items(tokens []lex.Token) []*ast.EnumItemDecl {
+	items := make([]*ast.EnumItemDecl, 0)
 	for i := 0; i < len(tokens); i++ {
 		t := tokens[i]
 		if t.Id == lex.ID_COMMENT {
 			continue
 		}
-		item := new(ast.EnumItem)
+		item := new(ast.EnumItemDecl)
 		item.Token = t
 		if item.Token.Id != lex.ID_IDENT {
 			p.push_err(item.Token, "invalid_syntax")

@@ -53,7 +53,7 @@ type Fn struct {
 	Directives []*ast.Directive
 	Doc        string
 	Scope      *ast.ScopeTree
-	Generics   []*ast.Generic
+	Generics   []*ast.GenericDecl
 	Result     *RetType
 	Params     []*Param
 	Owner      *Struct

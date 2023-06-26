@@ -26,7 +26,7 @@ impl Node {
 		| &FieldDecl
 		| &UseDecl
 		| &VarDecl
-		| &Type:
+		| &TypeDecl:
 			ret true
 
 		|:
@@ -95,83 +95,83 @@ pub type TypeDeclKind: any
 // Also represents type expression.
 //
 // For primitive types:
-//  - Represented by IdentType.
+//  - Represented by IdentTypeDecl.
 //  - Token's identity is data type.
 //  - Primitive type kind is Ident.
 //
 // For function types:
 //  - Function types represented by &FnDecl.
-pub struct Type {
+pub struct TypeDecl {
 	pub token: Token
 	pub kind:  TypeDeclKind
 }
 
 // Identifier type.
-pub struct IdentType {
+pub struct IdentTypeDecl {
 	pub token:      Token
 	pub ident:      str
 	pub cpp_linked: bool
-	pub generics:   []&Type
+	pub generics:   []&TypeDecl
 }
 
-impl IdentType {
+impl IdentTypeDecl {
 	// Reports whether identifier is primitive type.
 	pub fn is_prim(self): bool { ret self.token.id == TokenId.Prim }
 }
 
 // Namespace chain type.
-pub struct NamespaceType {
+pub struct NamespaceTypeDecl {
 	pub idents: []Token // Namespace chain with identifier tokens.
-	pub kind:   &IdentType  // Type of identifier.
+	pub kind:   &IdentTypeDecl // Type of identifier.
 }
 
 // Reference type.
-pub struct RefType {
-	pub elem: &Type
+pub struct RefTypeDecl {
+	pub elem: &TypeDecl
 }
 
 // Slice type.
-pub struct SlcType {
-	pub elem: &Type
+pub struct SlcTypeDecl {
+	pub elem: &TypeDecl
 }
 
 // Tuple type.
-pub struct TupleType {
-	pub types: []&Type
+pub struct TupleTypeDecl {
+	pub types: []&TypeDecl
 }
 
 // Pointer type.
-pub struct PtrType {
-	pub elem: &Type
+pub struct PtrTypeDecl {
+	pub elem: &TypeDecl
 }
 
-impl PtrType {
+impl PtrTypeDecl {
 	// Reports whether pointer is unsafe pointer (*unsafe).
 	pub fn is_unsafe(self): bool { ret !real(self.elem) }
 }
 
 // Array type.
 // Size epxression is nil for auto-sized array.
-pub struct ArrType {
-	pub elem: &Type
+pub struct ArrTypeDecl {
+	pub elem: &TypeDecl
 	pub size: &Expr
 }
 
-impl ArrType {
+impl ArrTypeDecl {
 	// Reports whether array is auto-sized.
 	pub fn auto_sized(self): bool { ret !real(self.size) }
 }
 
 // Map type.
-pub struct MapType {
-	pub key: &Type
-	pub val: &Type
+pub struct MapTypeDecl {
+	pub key: &TypeDecl
+	pub val: &TypeDecl
 }
 
 // Return type.
 // Kind and Idents is nil for void type.
-pub struct RetType {
-	pub kind:   &Type
+pub struct RetTypeDecl {
+	pub kind:   &TypeDecl
 	pub idents: []Token
 }
 
@@ -185,7 +185,7 @@ pub struct Expr {
 	// Possible types:
 	//  - &TupleExpr
 	//  - &LitExpr
-	//  - &Type
+	//  - &TypeDecl
 	//  - &IdentExpr
 	//  - &UnaryExpr
 	//  - &SubIdentExpr
@@ -265,7 +265,7 @@ pub struct VariadicExpr {
 
 // Casting expression.
 pub struct CastExpr {
-	pub kind: &Type
+	pub kind: &TypeDecl
 	pub expr: ExprData
 }
 
@@ -293,7 +293,7 @@ pub struct BinopExpr {
 pub struct FnCallExpr {
 	pub token:      Token
 	pub expr:       &Expr
-	pub generics:   []&Type
+	pub generics:   []&TypeDecl
 	pub args:       []&Expr
 	pub concurrent: bool
 }
@@ -311,7 +311,7 @@ impl FieldExprPair {
 
 // Struct literal instiating expression.
 pub struct StructLit {
-	pub kind: &Type
+	pub kind: &TypeDecl
 	pub exprs: []ExprData  // Possible types: &FieldExprPair, and other expressions.
 }
 
@@ -360,8 +360,8 @@ pub struct SlicingExpr {
 	pub to:    ExprData // To index value expression.
 }
 
-// Generic type.
-pub struct Generic {
+// Generic type declaration.
+pub struct GenericDecl {
 	pub token: Token
 	pub ident: str
 }
@@ -408,15 +408,15 @@ pub struct ScopeTree {
 }
 
 // Parameter.
-pub struct Param {
+pub struct ParamDecl {
 	pub token:    Token
 	pub mutable:  bool
 	pub variadic: bool
-	pub kind:     &Type
+	pub kind:     &TypeDecl
 	pub ident:    str
 }
 
-impl Param {
+impl ParamDecl {
 	// Reports whether parameter is self (receiver) parameter.
 	pub fn is_self(self): bool { ret self.ident.has_suffix((str)(TokenKind.Self)) }
 
@@ -436,9 +436,9 @@ pub struct FnDecl {
 	pub directives:   []&Directive
 	pub doc_comments: &CommentGroup
 	pub scope:        &ScopeTree
-	pub generics:     []&Generic
-	pub result:       &RetType
-	pub params:       []&Param
+	pub generics:     []&GenericDecl
+	pub result:       &RetTypeDecl
+	pub params:       []&ParamDecl
 }
 
 // Variable declaration.
@@ -451,7 +451,7 @@ pub struct VarDecl {
 	pub mutable:      bool
 	pub constant:     bool
 	pub doc_comments: &CommentGroup
-	pub kind:         &Type     // nil for auto-typed
+	pub kind:         &TypeDecl     // nil for auto-typed
 	pub expr:         &Expr
 }
 
@@ -535,7 +535,7 @@ pub struct TypeAliasDecl {
 	pub cpp_linked:   bool
 	pub token:        Token
 	pub ident:        str
-	pub kind:         &Type
+	pub kind:         &TypeDecl
 	pub doc_comments: &CommentGroup
 }
 
@@ -569,13 +569,13 @@ pub struct UseDecl {
 }
 
 // Enum item.
-pub struct EnumItem {
+pub struct EnumItemDecl {
 	pub token: Token
 	pub ident: str
 	pub expr:  &Expr   // Nil for auto expression.
 }
 
-impl EnumItem {
+impl EnumItemDecl {
 	// Reports whether item has auto expression.
 	pub fn auto_expr(self): bool { ret !real(self.expr) }
 }
@@ -585,8 +585,8 @@ pub struct EnumDecl {
 	pub token:        Token
 	pub public:       bool
 	pub ident:        str
-	pub kind:         &Type
-	pub items:        []&EnumItem
+	pub kind:         &TypeDecl
+	pub items:        []&EnumItemDecl
 	pub doc_comments: &CommentGroup
 }
 
@@ -601,7 +601,7 @@ pub struct FieldDecl {
 	pub public:  bool
 	pub mutable: bool       // Interior mutability.
 	pub ident:   str
-	pub kind:    &Type
+	pub kind:    &TypeDecl
 }
 
 // Structure declaration.
@@ -613,7 +613,7 @@ pub struct StructDecl {
 	pub cpp_linked:   bool
 	pub directives:   []&Directive
 	pub doc_comments: &CommentGroup
-	pub generics:     []&Generic
+	pub generics:     []&GenericDecl
 }
 
 // Trait declaration.
@@ -629,12 +629,12 @@ pub struct TraitDecl {
 pub struct Impl {
 	// This token available for these cases:
 	//  - Implementation trait to structure, represents trait's token.
-	pub base:    Token
+	pub base: Token
 
 	// This token available for these cases:
 	//  - Implementation trait to structure, represents structure's token.
 	//  - Implementation to structure, represents structure's token.
-	pub dest:    Token
+	pub dest: Token
 
 	// Given methods to implement.
 	pub methods: []&FnDecl

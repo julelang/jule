@@ -63,7 +63,7 @@ var builtin_trait_error = &Trait{
 			},
 			Result: &RetType{
 				Kind: &TypeSymbol{
-					Decl: &ast.Type{Kind: &ast.IdentType{Ident: "str"}},
+					Decl: &ast.TypeDecl{Kind: &ast.IdentTypeDecl{Ident: "str"}},
 				},
 			},
 		},

@@ -50,7 +50,7 @@ type Struct struct {
 	Cpp_linked bool
 	Directives []*ast.Directive
 	Doc        string
-	Generics   []*ast.Generic
+	Generics   []*ast.GenericDecl
 	Implements []*Trait
 
 	// Structure instances for each unique type combination of structure.

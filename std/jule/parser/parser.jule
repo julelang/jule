@@ -10,17 +10,17 @@ use std::jule::ast::{
 	Directive,
 	Expr,
 	ScopeTree,
-	Type,
+	TypeDecl,
 	TypeAliasDecl,
 	VarDecl,
-	Generic,
-	Param,
-	IdentType,
-	RetType,
-	TupleType,
+	GenericDecl,
+	ParamDecl,
+	IdentTypeDecl,
+	RetTypeDecl,
+	TupleTypeDecl,
 	FnDecl,
 	UseDecl,
-	EnumItem,
+	EnumItemDecl,
 	EnumDecl,
 	FieldDecl,
 	StructDecl,
@@ -165,7 +165,7 @@ impl Parser {
 		ret s
 	}
 
-	fn __build_type(mut &self, mut tokens: []Token, mut i: &int, err: bool): (&Type, bool) {
+	fn __build_type(mut &self, mut tokens: []Token, mut i: &int, err: bool): (&TypeDecl, bool) {
 		let mut tb = TypeBuilder{
 			p:      self,
 			tokens: tokens,
@@ -176,7 +176,7 @@ impl Parser {
 	}
 
 	// build_type builds AST model of data-type.
-	fn build_type(mut &self, mut tokens: []Token, mut i: &int, err: bool): (&Type, bool) {
+	fn build_type(mut &self, mut tokens: []Token, mut i: &int, err: bool): (&TypeDecl, bool) {
 		let token = tokens[i]
 		let (mut t, ok) = self.__build_type(tokens, i, err)
 		if err && !ok {
@@ -320,11 +320,11 @@ impl Parser {
 		ret v
 	}
 
-	fn build_generic(mut self, mut tokens: []Token): &Generic {
+	fn build_generic(mut self, mut tokens: []Token): &GenericDecl {
 		if tokens.len > 1 {
 			self.push_err(tokens[1], "invalid_syntax")
 		}
-		let mut g = &Generic{
+		let mut g = &GenericDecl{
 			token: tokens[0],
 		}
 		if g.token.id != TokenId.Ident {
@@ -334,7 +334,7 @@ impl Parser {
 		ret g
 	}
 
-	fn build_generics(mut self, mut tokens: []Token): []&Generic {
+	fn build_generics(mut self, mut tokens: []Token): []&GenericDecl {
 		let token = tokens[0]
 		if tokens.len == 0 {
 			self.push_err(token, "missing_expr")
@@ -344,7 +344,7 @@ impl Parser {
 		let (mut parts, errors) = parts(tokens, TokenId.Comma, true)
 		self.errors = append(self.errors, errors...)
 
-		let mut generics = make([]&Generic, parts.len)
+		let mut generics = make([]&GenericDecl, parts.len)
 		for (i, mut part) in parts {
 			if parts.len > 0 {
 				generics[i] = self.build_generic(part)
@@ -354,12 +354,12 @@ impl Parser {
 		ret generics
 	}
 
-	fn build_self_param(mut self, mut tokens: []Token): &Param {
+	fn build_self_param(mut self, mut tokens: []Token): &ParamDecl {
 		if tokens.len == 0 {
-			ret new(Param)
+			ret new(ParamDecl)
 		}
 
-		let mut param = &Param{}
+		let mut param = &ParamDecl{}
 
 		// Detects mut keyword.
 		let mut i = 0
@@ -368,7 +368,7 @@ impl Parser {
 			i++
 			if i >= tokens.len {
 				self.push_err(tokens[i-1], "invalid_syntax")
-				ret new(Param)
+				ret new(ParamDecl)
 			}
 		}
 
@@ -377,7 +377,7 @@ impl Parser {
 			i++
 			if i >= tokens.len {
 				self.push_err(tokens[i-1], "invalid_syntax")
-				ret new(Param)
+				ret new(ParamDecl)
 			}
 		}
 
@@ -393,7 +393,7 @@ impl Parser {
 		ret param
 	}
 
-	fn param_type_begin(mut self, mut param: &Param, mut i: &int, tokens: []Token) {
+	fn param_type_begin(mut self, mut param: &ParamDecl, mut i: &int, tokens: []Token) {
 		for i < tokens.len; i++ {
 			let token = tokens[i]
 			if token.id != TokenId.Op {
@@ -410,7 +410,7 @@ impl Parser {
 		}
 	}
 
-	fn build_param_type(mut &self, mut param: &Param, mut tokens: []Token, must_pure: bool) {
+	fn build_param_type(mut &self, mut param: &ParamDecl, mut tokens: []Token, must_pure: bool) {
 		let mut i = new(int, 0)
 		if !must_pure {
 			unsafe { self.param_type_begin(param, i, tokens) }
@@ -424,7 +424,7 @@ impl Parser {
 		}
 	}
 
-	fn param_body_id(self, mut param: &Param, token: Token) {
+	fn param_body_id(self, mut param: &ParamDecl, token: Token) {
 		if is_ignore_ident(token.kind) {
 			param.ident = (str)(Ident.Anon)
 			ret
@@ -432,7 +432,7 @@ impl Parser {
 		param.ident = token.kind
 	}
 
-	fn build_param_body(mut &self, mut param: &Param, mut i: &int, mut tokens: []Token, must_pure: bool) {
+	fn build_param_body(mut &self, mut param: &ParamDecl, mut i: &int, mut tokens: []Token, must_pure: bool) {
 		self.param_body_id(param, tokens[i])
 		let mut tok = tokens[i]
 		// +1 for skip identifier token
@@ -454,8 +454,8 @@ impl Parser {
 		self.build_param_type(param, tokens, must_pure)
 	}
 
-	fn build_param(mut &self, mut tokens: []Token, must_pure: bool): &Param {
-		let mut param = &Param{
+	fn build_param(mut &self, mut tokens: []Token, must_pure: bool): &ParamDecl {
+		let mut param = &ParamDecl{
 			token: tokens[0],
 		}
 
@@ -464,7 +464,7 @@ impl Parser {
 			param.mutable = true
 			if tokens.len == 1 {
 				self.push_err(tokens[0], "invalid_syntax")
-				ret new(Param)
+				ret new(ParamDecl)
 			}
 			tokens = tokens[1:]
 			param.token = tokens[0]
@@ -482,7 +482,7 @@ impl Parser {
 		ret param
 	}
 
-	fn check_params(mut self, mut params: []&Param) {
+	fn check_params(mut self, mut params: []&ParamDecl) {
 		for (_, mut param) in params {
 			if param.is_self() || real(param.kind) {
 				continue
@@ -490,9 +490,9 @@ impl Parser {
 			if param.token.id == TokenId.Na {
 				self.push_err(param.token, "missing_type")
 			} else {
-				param.kind = &Type{
+				param.kind = &TypeDecl{
 					token: param.token,
-					kind:  &IdentType{
+					kind:  &IdentTypeDecl{
 						token: param.token,
 						ident: param.token.kind,
 					},
@@ -503,14 +503,14 @@ impl Parser {
 		}
 	}
 
-	fn build_params(mut &self, mut tokens: []Token, method: bool, must_pure: bool): []&Param {
+	fn build_params(mut &self, mut tokens: []Token, method: bool, must_pure: bool): []&ParamDecl {
 		let (mut parts, errs) = parts(tokens, TokenId.Comma, true)
 		self.errors = append(self.errors, errs...)
 		if parts.len == 0 {
 			ret nil
 		}
 
-		let mut params: []&Param = nil
+		let mut params: []&ParamDecl = nil
 		if method && parts.len > 0 {
 			let mut param = self.build_self_param(parts[0])
 			if real(param) && param.is_self() {
@@ -530,8 +530,8 @@ impl Parser {
 		ret params
 	}
 
-	fn build_multi_ret_type(mut &self, mut tokens: []Token, mut i: &int): (t: &RetType, ok: bool) {
-		t = &RetType{}
+	fn build_multi_ret_type(mut &self, mut tokens: []Token, mut i: &int): (t: &RetTypeDecl, ok: bool) {
+		t = &RetTypeDecl{}
 		i++
 		if i >= tokens.len {
 			i--
@@ -543,7 +543,7 @@ impl Parser {
 		let mut range_tokens = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
 		let mut params = self.build_params(range_tokens, false, true)
 
-		let mut types = make([]&Type, params.len)
+		let mut types = make([]&TypeDecl, params.len)
 		for (i, mut param) in params {
 			types[i] = param.kind
 			if param.ident != (str)(Ident.Anon) {
@@ -555,9 +555,9 @@ impl Parser {
 		}
 
 		if types.len > 1 {
-			t.kind = &Type{
+			t.kind = &TypeDecl{
 				token: tokens[0],
-				kind:  &TupleType{
+				kind:  &TupleTypeDecl{
 					types: types,
 				},
 			}
@@ -569,8 +569,8 @@ impl Parser {
 		ret
 	}
 
-	fn build_ret_type(mut &self, mut tokens: []Token, mut i: &int): (t: &RetType, ok: bool) {
-		t = &RetType{}
+	fn build_ret_type(mut &self, mut tokens: []Token, mut i: &int): (t: &RetTypeDecl, ok: bool) {
+		t = &RetTypeDecl{}
 		if i >= tokens.len {
 			ret
 		}
@@ -944,8 +944,8 @@ impl Parser {
 		ret new(Expr)
 	}
 
-	fn build_enum_items(mut &self, mut tokens: []Token): []&EnumItem {
-		let mut items = make([]&EnumItem, 0)
+	fn build_enum_items(mut &self, mut tokens: []Token): []&EnumItemDecl {
+		let mut items = make([]&EnumItemDecl, 0)
 		let mut i = new(int, 0)
 		for i < tokens.len; i++ {
 			let mut t = tokens[i]
@@ -953,7 +953,7 @@ impl Parser {
 				continue
 			}
 
-			let mut item = &EnumItem{}
+			let mut item = &EnumItemDecl{}
 			item.token = t
 			if item.token.id != TokenId.Ident {
 				self.push_err(item.token, "invalid_syntax")
