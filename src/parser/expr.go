@@ -187,8 +187,8 @@ func find_lowest_prec_op(tokens []lex.Token) int {
 
 		left := tokens[i-1]
 
-		// Skip unary operator.
-		if left.Id == lex.ID_OP {
+		// Skip unary operator or type annotation.
+		if left.Id == lex.ID_OP || left.Id == lex.ID_COLON {
 			continue
 		}
 
