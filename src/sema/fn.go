@@ -35,7 +35,7 @@ func (p *Param) instance() *ParamIns {
 }
 
 // Reports whether parameter is self (receiver) parameter.
-func (p *Param) Is_self() bool { return strings.HasSuffix(p.Ident, lex.KND_SELF) }
+func (p *Param) Is_self() bool { return p.Ident == "&self" || p.Ident == "self" }
 
 // Reports whether self (receiver) parameter is reference.
 func (p *Param) Is_ref() bool { return p.Ident != "" && p.Ident[0] == '&' }

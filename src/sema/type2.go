@@ -684,6 +684,10 @@ iter:
 			ok = fcac.push_variadic(p, i) && ok
 			break iter // Variadiced parameters always last.
 
+		case len(fcac.args) <= i:
+			ok = false
+			break iter
+
 		default:
 			ok = fcac.push(p, fcac.args[i]) && ok
 		}
