@@ -177,17 +177,46 @@ func (tcc *_TypeCompatibilityChecker) check_ref() (ok bool) {
 func (tcc *_TypeCompatibilityChecker) check_ptr() (ok bool) {
 	if tcc.src.Is_nil() {
 		return true
-	} else if tcc.dest.Ptr() != nil && tcc.dest.Ptr().Is_unsafe() {
+	}
+	
+	src := tcc.src.Ptr()
+	if src == nil {
+		return false
+	}
+
+	dest := tcc.dest.Ptr()
+
+	if dest.Is_unsafe() {
 		return true
 	}
-	return tcc.dest.To_str() == tcc.src.To_str()
+
+	sub := _TypeCompatibilityChecker{
+		s:           tcc.s,
+		error_token: tcc.error_token,
+		src:         src.Elem,
+		dest:        dest.Elem,
+	}
+	return sub.check()
 }
 
 func (tcc *_TypeCompatibilityChecker) check_slc() (ok bool) {
 	if tcc.src.Is_nil() {
 		return true
 	}
-	return tcc.dest.To_str() == tcc.src.To_str()
+
+	src := tcc.src.Slc()
+	if src == nil {
+		return false
+	}
+	dest := tcc.dest.Slc()
+
+	sub := _TypeCompatibilityChecker{
+		s:           tcc.s,
+		error_token: tcc.error_token,
+		src:         src.Elem,
+		dest:        dest.Elem,
+	}
+	return sub.check()
 }
 
 func (tcc *_TypeCompatibilityChecker) check_arr() (ok bool) {
@@ -196,14 +225,44 @@ func (tcc *_TypeCompatibilityChecker) check_arr() (ok bool) {
 		return false
 	}
 	dest := tcc.dest.Arr()
-	return dest.N == src.N
+	if dest.N != src.N {
+		return false
+	}
+	
+	sub := _TypeCompatibilityChecker{
+		s:           tcc.s,
+		error_token: tcc.error_token,
+		src:         src.Elem,
+		dest:        dest.Elem,
+	}
+	return sub.check()
 }
 
 func (tcc *_TypeCompatibilityChecker) check_map() (ok bool) {
 	if tcc.src.Is_nil() {
 		return true
 	}
-	return tcc.dest.To_str() == tcc.src.To_str()
+	
+	src := tcc.src.Map()
+	if src == nil {
+		return false
+	}
+
+	dest := tcc.dest.Map()
+
+	sub := _TypeCompatibilityChecker{
+		s:           tcc.s,
+		error_token: tcc.error_token,
+		src:         src.Key,
+		dest:        dest.Key,
+	}
+	if !sub.check() {
+		return false
+	}
+
+	sub.src = src.Val
+	sub.dest = dest.Val
+	return sub.check()
 }
 
 func (tcc *_TypeCompatibilityChecker) check_struct() (ok bool) {
@@ -222,7 +281,13 @@ func (tcc *_TypeCompatibilityChecker) check_struct() (ok bool) {
 
 	for i, dg := range dest.Generics {
 		sg := src.Generics[i]
-		if dg.To_str() != sg.To_str() {
+		sub := _TypeCompatibilityChecker{
+			s:           tcc.s,
+			error_token: tcc.error_token,
+			src:         sg,
+			dest:        dg,
+		}
+		if !sub.check() {
 			return false
 		}
 	}
