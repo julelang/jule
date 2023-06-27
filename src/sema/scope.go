@@ -1048,6 +1048,11 @@ func (sc *_ScopeChecker) check_case(m *Match, i int, c *ast.Case, expr *Data) *C
 				}
 			}
 
+			trt := expr.Kind.Trt()
+			if trt != nil {
+				_ = sc.s.check_type_compatibility(expr.Kind, d.Kind, e.Token, false)
+			}
+
 			continue
 		}
 
@@ -1109,8 +1114,8 @@ func (sc *_ScopeChecker) check_type_match(m *ast.MatchCase) {
 		return
 	}
 
-	if d.Kind.Prim() == nil || !d.Kind.Prim().Is_any() {
-		sc.s.push_err(m.Expr.Token, "type_case_has_not_any_expr")
+	if !((d.Kind.Prim() != nil && d.Kind.Prim().Is_any()) || d.Kind.Trt() != nil) {
+		sc.s.push_err(m.Expr.Token, "type_case_has_not_valid_expr")
 		return
 	}
 
