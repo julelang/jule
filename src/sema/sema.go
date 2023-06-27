@@ -768,6 +768,13 @@ func (s *_Sema) check_validity_for_init_expr(left_mut bool, left_kind *TypeKind,
 }
 
 func (s *_Sema) check_type_alias_decl_kind(ta *TypeAlias, l Lookup) (ok bool) {
+	old := s.file
+	defer s.set_current_file(old)
+	file := find_file(s.files, ta.Token.File)
+	if file != nil {
+		s.set_current_file(file)
+	}
+
 	ok = s.check_type_with_refers(ta.Kind, l, &_Referencer{
 		ident: ta.Ident,
 		owner: ta,
