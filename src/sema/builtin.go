@@ -261,7 +261,7 @@ func builtin_caller_out(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
 		return nil
 	}
 
-	if expr.Kind.Fnc() != nil {
+	if expr.Is_void() || expr.Kind.Fnc() != nil {
 		e.push_err(fc.Args[0].Token, "invalid_expr")
 		return nil
 	}
