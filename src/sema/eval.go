@@ -1043,7 +1043,14 @@ func (e *_Eval) indexing_map(d *Data, index *Data, i *ast.IndexingExpr) {
 	}
 
 	m := d.Kind.Map()
-	e.s.check_type_compatibility(m.Key, index.Kind, i.Token, true)
+	atc := _AssignTypeChecker{
+		s:           e.s,
+		dest:        m.Key,
+		d:           index,
+		error_token: i.Token,
+		deref:       true,
+	}
+	_ = atc.check()
 
 	d.Kind = m.Val.clone()
 }
