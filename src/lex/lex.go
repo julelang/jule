@@ -664,7 +664,7 @@ func (l *_Lex) lex_str() string {
 		if l.pos+20 < len(l.data) {
 			txt = string(l.data[l.pos:l.pos+20])
 		} else {
-			txt = string(l.data[l.pos])
+			txt = string(l.data[l.pos:])
 		}
 		r := l.get_rune(txt, raw)
 		s += r
