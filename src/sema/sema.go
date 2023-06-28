@@ -1958,12 +1958,17 @@ func (s *_Sema) precheck_type_fn(f *Fn) {
 	}
 }
 
-// Checks types of current package file's functions.
-func (s *_Sema) check_fn_types() (ok bool) {
+// Prechecks types of current package file's functions.
+func (s *_Sema) precheck_fn_types() (ok bool) {
 	for _, decl := range s.file.Funcs {
 		s.precheck_type_fn(decl)
 	}
 
+	return true
+}
+
+// Checks types of current package file's functions.
+func (s *_Sema) check_fn_types() (ok bool) {
 	for _, decl := range s.file.Funcs {
 		s.check_type_fn(decl)
 	}
@@ -1977,6 +1982,11 @@ func (s *_Sema) check_package_types() {
 	for _, f := range s.files {
 		s.set_current_file(f)
 		s.check_global_types()
+	}
+
+	for _, f := range s.files {
+		s.set_current_file(f)
+		s.precheck_fn_types()
 	}
 
 	for _, f := range s.files {
