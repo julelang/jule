@@ -81,6 +81,7 @@ namespace jule {
                              const jule::Slice<Item> &components) noexcept {
         if (src == nullptr && components == nullptr)
             return nullptr;
+
         const jule::Int n{ src.len() + components.len() };
         jule::Slice<Item> buffer{ jule::Slice<Item>::alloc(n) };
         jule::copy<Item>(buffer, src);

@@ -19,7 +19,7 @@ namespace jule {
     // Built-in slice type.
     template<typename Item>
     class Slice;
-    
+
     template<typename Item>
     class Slice {
     public:
@@ -216,9 +216,18 @@ namespace jule {
         }
 
         void operator=(const jule::Slice<Item> &src) noexcept {
+            if (this->data.alloc == src.data.alloc) {
+                this->_len = src._len;
+                this->_cap = src._cap;
+                this->data = src.data;
+                this->_slice = src._slice;
+                return;
+            }
+
             this->dealloc();
             if (src.operator==(nullptr))
                 return;
+
             this->_len = src._len;
             this->_cap = src._cap;
             this->data = src.data;
