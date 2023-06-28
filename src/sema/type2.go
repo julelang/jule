@@ -668,7 +668,7 @@ func (fcac *_FnCallArgChecker) push_err(key string, args ...any) {
 }
 
 func (fcac *_FnCallArgChecker) get_params() []*ParamIns {
-	if !fcac.f.Is_builtin() && fcac.f.Decl.Is_method() {
+	if len(fcac.f.Params) > 0 && fcac.f.Params[0].Decl != nil && fcac.f.Params[0].Decl.Is_self() {
 		return fcac.f.Params[1:] // Remove receiver parameter.
 	}
 	return fcac.f.Params
