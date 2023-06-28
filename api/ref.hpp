@@ -122,6 +122,9 @@ namespace jule {
             return *this->alloc;
         }
 
+        inline T& get(void) noexcept
+        { return this->operator T&(); }
+
         inline void must_ok(void) const noexcept {
             if (!this->real())
                 jule::panic(jule::ERROR_INVALID_MEMORY);

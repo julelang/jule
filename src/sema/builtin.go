@@ -489,6 +489,12 @@ func builtin_caller_append(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 		return nil
 	}
 
+	ref := false
+	if t.Kind.Ref() != nil {
+		t.Kind = t.Kind.Ref().Elem
+		ref = true
+	}
+
 	if t.Kind.Slc() == nil {
 		e.push_err(fc.Args[0].Token, "invalid_expr")
 		return nil
@@ -515,6 +521,11 @@ func builtin_caller_append(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 	d.Model = &CommonIdentExprModel{Ident: "append"}
 
 	d = builtin_caller_common_plain(e, fc, d)
+	if d != nil && ref {
+		d.Model.(*FnCallExprModel).Args[0] = &ExplicitDerefExprModel{
+			Expr: t.Model,
+		}
+	}
 	return d
 }
 
@@ -537,6 +548,12 @@ func builtin_caller_copy(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 	t := e.eval_expr(fc.Args[0])
 	if t == nil {
 		return nil
+	}
+
+	ref := false
+	if t.Kind.Ref() != nil {
+		t.Kind = t.Kind.Ref().Elem
+		ref = true
 	}
 
 	if t.Kind.Slc() == nil {
@@ -569,6 +586,11 @@ func builtin_caller_copy(e *_Eval, fc *ast.FnCallExpr, d *Data) *Data {
 	d.Model = &CommonIdentExprModel{Ident: "copy"}
 
 	d = builtin_caller_common_plain(e, fc, d)
+	if d != nil && ref {
+		d.Model.(*FnCallExprModel).Args[0] = &ExplicitDerefExprModel{
+			Expr: t.Model,
+		}
+	}
 	return d
 }
 

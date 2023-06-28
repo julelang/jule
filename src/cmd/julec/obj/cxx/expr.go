@@ -603,6 +603,12 @@ func gen_builtin_error_trait_sub_ident_expr_model(m *sema.BuiltinErrorTraitSubId
 	return obj
 }
 
+func gen_explicit_deref_expr_model(m *sema.ExplicitDerefExprModel) string {
+	obj := gen_expr_model(m.Expr)
+	obj += ".get()"
+	return obj
+}
+
 func gen_expr_model(m sema.ExprModel) string {
 	switch m.(type) {
 	case *sema.TypeKind:
@@ -712,6 +718,9 @@ func gen_expr_model(m sema.ExprModel) string {
 
 	case *sema.BuiltinErrorTraitSubIdentExprModel:
 		return gen_builtin_error_trait_sub_ident_expr_model(m.(*sema.BuiltinErrorTraitSubIdentExprModel))
+
+	case *sema.ExplicitDerefExprModel:
+		return gen_explicit_deref_expr_model(m.(*sema.ExplicitDerefExprModel))
 
 	default:
 		return "<unimplemented_expression_model>"

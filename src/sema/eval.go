@@ -874,6 +874,13 @@ func (e *_Eval) eval_variadic(v *ast.VariadicExpr) *Data {
 		return nil
 	}
 
+	if d.Kind.Ref() != nil {
+		d.Kind = d.Kind.Ref().Elem
+		d.Model = &ExplicitDerefExprModel{
+			Expr: d.Model,
+		}
+	}
+
 	if !is_variadicable(d.Kind) {
 		e.push_err(v.Token, "variadic_with_non_variadicable", d.Kind.To_str())
 		return nil

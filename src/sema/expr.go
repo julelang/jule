@@ -147,7 +147,7 @@ type BuiltinOutCallExprModel struct {
 	Expr ExprModel
 }
 
-// Expression model for built-in out function calls.
+// Expression model for built-in outln function calls.
 type BuiltinOutlnCallExprModel struct {
 	Expr ExprModel
 }
@@ -212,4 +212,9 @@ type StrConstructorCallExprModel struct {
 // For example: 'a'
 type RuneExprModel struct {
 	Code rune
+}
+
+// Expression model for explicit dereferencing of reference.
+type ExplicitDerefExprModel struct {
+	Expr ExprModel
 }
