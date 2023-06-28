@@ -514,25 +514,30 @@ impl Lex {
 	// Resume to lex from position.
 	fn resume(mut self): str {
 		let mut ln = ""
-		let runes = self.data[self.pos:]
 
 		// Skip spaces.
-		for i, r in runes {
+		let mut i = self.pos
+		for i < self.data.len; i++ {
+			let r = self.data[i]
 			if is_space(r) {
 				self.pos++
 				match r {
-				| '\n':
-					self.new_line()
-
-				| '\t':
-					self.column += 4
-
-				|:
-					self.column++
+				| '\n': self.new_line()
+				| '\t': self.column += 4
+				|:      self.column++
 				}
 				continue
 			}
-			ln = (str)(runes[i:])
+
+			let mut j = i
+			for j < self.data.len; j++ {
+				let r = self.data[j]
+				if r == '\n' {
+					break
+				}
+			}
+
+			ln = (str)(self.data[i:j])
 			break
 		}
 		ret ln
@@ -566,9 +571,8 @@ impl Lex {
 				self.new_line()
 				continue
 			}
-			self.column += ((str)(r)).len
-			let cont = (str)(self.data[self.pos:])
-			if cont.has_prefix((str)(TokenKind.RangRComment)) {
+			self.column += 1
+			if self.pos+1 < self.data.len && r == '*' && self.data[self.pos+1] == '/' {
 				self.column += 2
 				self.pos += 2
 				ret
@@ -677,16 +681,16 @@ impl Lex {
 		ret run
 	}
 
-	fn lex_str(mut self, txt: str): str {
+	fn lex_str(mut self): str {
 		let mut s = ""
-		let mark = txt[0]
+		let mark = self.data[self.pos]
+		self.pos++ // Skip mark
 		let raw = mark == '`'
 		s += (str)(mark)
 		self.column++
 
-		let mut i = 1
-		for i < txt.len; i++ {
-			let ch = txt[i]
+		for self.pos < self.data.len {
+			let ch = self.data[self.pos]
 			if ch == '\n' {
 				self.new_line()
 				if !raw {
@@ -695,16 +699,17 @@ impl Lex {
 					ret ""
 				}
 			}
-			let r = self.get_rune(txt[i:], raw)
-			s += r
-			let n = r.len
-			self.column += n
-			if ch == mark {
-				self.pos++
-				break
+			let mut txt = ""
+			if self.pos+20 < self.data.len {
+				txt = (str)(self.data[self.pos:self.pos+20])
+			} else {
+				txt = (str)(self.data[self.pos:])
 			}
-			if n > 1 {
-				i += n - 1
+			let r = self.get_rune(txt, raw)
+			s += r
+			self.column += r.len
+			if ch == mark {
+				break
 			}
 		}
 
@@ -805,7 +810,7 @@ impl Lex {
 			ret t
 
 		| txt[0] == '"' || txt[0] == '`':
-			t.kind = self.lex_str(txt)
+			t.kind = self.lex_str()
 			t.id = TokenId.Lit
 			ret t
 

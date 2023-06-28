@@ -206,9 +206,10 @@ func (l *_Lex) id(ln string) string {
 // resume to lex from position.
 func (l *_Lex) resume() string {
 	var ln string
-	runes := l.data[l.pos:]
 	// Skip spaces.
-	for i, r := range runes {
+	i := l.pos
+	for ; i < len(l.data); i++ {
+		r := l.data[i]
 		if Is_space(r) {
 			l.pos++
 			switch r {
@@ -223,7 +224,16 @@ func (l *_Lex) resume() string {
 			}
 			continue
 		}
-		ln = string(runes[i:])
+
+		j := i
+		for ; j < len(l.data); j++ {
+			r := l.data[j]
+			if r == '\n' {
+				break
+			}
+		}
+
+		ln = string(l.data[i:j])
 		break
 	}
 	return ln
@@ -255,12 +265,12 @@ func (l *_Lex) lex_range_comment() {
 			l.new_line()
 			continue
 		}
-		l.column += len(string(r))
-		if strings.HasPrefix(string(l.data[l.pos:]), KND_RNG_RCOMMENT) {
+		l.column += 1
+		if l.pos+1 < len(l.data) && r == '*' && l.data[l.pos+1] == '/' {
 			l.column += 2
 			l.pos += 2
 			return
-		}
+		} 
 	}
 	l.push_err("missing_block_comment")
 }
@@ -632,15 +642,16 @@ func (l *_Lex) lex_rune(txt string) string {
 	return run
 }
 
-func (l *_Lex) lex_str(txt string) string {
+func (l *_Lex) lex_str() string {
 	s := ""
-	mark := txt[0]
+	mark := l.data[l.pos]
+	l.pos++ // Skip mark
 	raw := mark == '`'
 	s += string(mark)
 	l.column++
 
-	for i := 1; i < len(txt); i++ {
-		ch := txt[i]
+	for l.pos < len(l.data) {
+		ch := l.data[l.pos]
 		if ch == '\n' {
 			l.new_line()
 			if !raw {
@@ -649,16 +660,17 @@ func (l *_Lex) lex_str(txt string) string {
 				return ""
 			}
 		}
-		r := l.get_rune(txt[i:], raw)
-		s += r
-		n := len(r)
-		l.column += n
-		if ch == mark {
-			l.pos++
-			break
+		txt := ""
+		if l.pos+20 < len(l.data) {
+			txt = string(l.data[l.pos:l.pos+20])
+		} else {
+			txt = string(l.data[l.pos])
 		}
-		if n > 1 {
-			i += n - 1
+		r := l.get_rune(txt, raw)
+		s += r
+		l.column += len(r)
+		if ch == mark {
+			break
 		}
 	}
 
@@ -753,7 +765,7 @@ func (l *_Lex) token() Token {
 		return t
 
 	case txt[0] == '"' || txt[0] == '`':
-		t.Kind = l.lex_str(txt)
+		t.Kind = l.lex_str()
 		t.Id = ID_LIT
 		return t
 
