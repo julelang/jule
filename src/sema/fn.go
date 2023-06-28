@@ -162,10 +162,6 @@ func (f *Fn) append_instance(ins *FnIns) (bool, int) {
 		return true, -1
 	}
 
-	if !f.Parameters_uses_generics() && f.Result_uses_generics() {
-		return false, -1
-	}
-
 	for j, ains := range f.Instances {
 		for i, ag := range ains.Generics {
 			if ag.To_str() == ins.Generics[i].To_str() {
