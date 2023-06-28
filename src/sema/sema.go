@@ -1936,22 +1936,38 @@ func (s *_Sema) check_type_fn(f *Fn) {
 		return
 	}
 
+	for _, ins := range f.Instances {
+		s.check_fn_ins(ins)
+	}
+}
+
+func (s *_Sema) precheck_type_fn(f *Fn) {
+	if f.Cpp_linked {
+		return
+	}
+
+	// Generic instances are checked instantly.
+	if len(f.Generics) > 0 {
+		return
+	}
+
 	if len(f.Instances) == 0 {
 		ins := f.instance()
 		f.Instances = append(f.Instances, ins)
 		s.reload_fn_ins_types(ins)
-	}
-
-	for _, ins := range f.Instances {
-		s.check_fn_ins(ins)
 	}
 }
 
 // Checks types of current package file's functions.
 func (s *_Sema) check_fn_types() (ok bool) {
 	for _, decl := range s.file.Funcs {
+		s.precheck_type_fn(decl)
+	}
+
+	for _, decl := range s.file.Funcs {
 		s.check_type_fn(decl)
 	}
+
 	return true
 }
 
