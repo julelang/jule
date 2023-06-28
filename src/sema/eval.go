@@ -3089,7 +3089,7 @@ func (bs *_BinopSolver) eval_slc() *Data {
 }
 
 func (bs *_BinopSolver) eval_fn() *Data {
-	if !bs.r.Kind.Is_nil() {
+	if !bs.check_type_compatibility() {
 		bs.e.push_err(bs.op, "incompatible_types", bs.l.Kind.To_str(), bs.r.Kind.To_str())
 		return nil
 	}

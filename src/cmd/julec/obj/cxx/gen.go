@@ -115,48 +115,6 @@ func gen_links(used []*sema.ImportInfo) string {
 	return obj
 }
 
-// Generates C++ code of type aliase.
-func gen_type_alias(ta *sema.TypeAlias) string {
-	obj := "typedef "
-	obj += gen_type_kind(ta.Kind.Kind)
-	obj += " "
-	obj += as_out_ident(ta.Ident, ta.Token.File.Addr())
-	obj += CPP_ST_TERM
-	return obj
-}
-
-// Generates C++ code of SymbolTable's all type aliases.
-func gen_type_aliases_tbl(tbl *sema.SymbolTable) string {
-	obj := ""
-	for _, ta := range tbl.Type_aliases {
-		if !ta.Cpp_linked {
-			obj += gen_type_alias(ta) + "\n"
-		}
-	}
-	return obj
-}
-
-// Generates C++ code of package's all type aliases.
-func gen_type_aliases_pkg(pkg *sema.Package) string {
-	obj := ""
-	for _, tbl := range pkg.Files {
-		obj += gen_type_aliases_tbl(tbl)
-	}
-	return obj
-}
-
-// Generates C++ code of all type aliases.
-func gen_type_aliases(pkg *sema.Package, used []*sema.ImportInfo) string {
-	obj := ""
-	for _, u := range used {
-		if !u.Cpp_linked {
-			obj += gen_type_aliases_pkg(u.Package)
-		}
-	}
-	obj += gen_type_aliases_pkg(pkg)
-	return obj
-}
-
 // Generates C++ code of function's result type.
 func gen_fn_result(f *sema.Fn) string {
 	if f.Is_void() {
@@ -890,7 +848,6 @@ func Gen(pkg *sema.Package, used []*sema.ImportInfo) string {
 
 	obj := ""
 	obj += gen_links(used) + "\n"
-	obj += gen_type_aliases(pkg, used) + "\n"
 	obj += gen_traits(pkg, used) + "\n"
 	obj += gen_prototypes(pkg, used, od.structs) + "\n\n"
 	obj += gen_globals(od.globals) + "\n"

@@ -525,9 +525,6 @@ func gen_st(st sema.St) string {
 	case *sema.Var:
 		return gen_var(st.(*sema.Var))
 
-	case *sema.TypeAlias:
-		return "// " + gen_type_alias(st.(*sema.TypeAlias))
-
 	case *sema.Data:
 		return gen_expr(st.(*sema.Data).Model) + CPP_ST_TERM
 

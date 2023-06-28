@@ -294,6 +294,57 @@ func (tcc *_TypeCompatibilityChecker) check_struct() (ok bool) {
 	return true
 }
 
+func (tcc *_TypeCompatibilityChecker) check_fn() (ok bool) {
+	if tcc.src.Is_nil() {
+		return true
+	}
+
+	src  := tcc.src.Fnc()
+	if src == nil {
+		return false
+	}
+
+	dest := tcc.dest.Fnc()
+	if (src.Result != nil) != (dest.Result != nil) {
+		return false
+	}
+	if len(src.Params) != len(dest.Params) {
+		return false
+	}
+
+	for i := range src.Params {
+		srcp := src.Params[i]
+		destp := dest.Params[i]
+		if (srcp != nil) && (destp != nil) {
+			return false
+		}
+
+		sub := _TypeCompatibilityChecker{
+			s:           tcc.s,
+			error_token: tcc.error_token,
+			src:         srcp.Kind,
+			dest:        destp.Kind,
+		}
+		if !sub.check() {
+			return false
+		}
+	}
+
+	if src.Result != nil {
+		sub := _TypeCompatibilityChecker{
+			s:           tcc.s,
+			error_token: tcc.error_token,
+			src:         src.Result,
+			dest:        dest.Result,
+		}
+		if !sub.check() {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (tcc *_TypeCompatibilityChecker) check_enum() (ok bool) {
 	r := tcc.src.Enm()
 	if r == nil {
@@ -332,6 +383,9 @@ func (tcc *_TypeCompatibilityChecker) check() (ok bool) {
 
 	case tcc.dest.Strct() != nil:
 		return tcc.check_struct()
+
+	case tcc.dest.Fnc() != nil:
+		return tcc.check_fn()
 
 	case is_nil_compatible(tcc.dest):
 		return tcc.src.Is_nil()
