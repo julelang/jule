@@ -1075,6 +1075,13 @@ func (rc *_RangeChecker) check_str() {
 }
 
 func (rc *_RangeChecker) check() bool {
+	if rc.d.Kind.Ref() != nil {
+		rc.d.Model = &ExplicitDerefExprModel{
+			Expr: rc.d.Model,
+		}
+		rc.d.Kind = rc.d.Kind.Ref().Elem
+	}
+
 	switch {
 	case rc.d.Kind.Slc() != nil:
 		rc.check_slice()
