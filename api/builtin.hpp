@@ -39,7 +39,7 @@ namespace jule {
     inline void drop(T &obj) noexcept;
 
     template<typename T>
-    inline jule::Bool real(T &obj) noexcept;
+    inline jule::Bool real(const T &obj) noexcept;
 
     template<typename T>
     inline void out(const T &obj) noexcept {
@@ -97,7 +97,7 @@ namespace jule {
     { obj.drop(); }
 
     template<typename T>
-    inline jule::Bool real(T &obj) noexcept
+    inline jule::Bool real(const T &obj) noexcept
     { return obj.real(); }
 
 } // namespace jule
