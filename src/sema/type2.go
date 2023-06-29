@@ -518,7 +518,7 @@ func (dta *_DynamicTypeAnnotation) annotate_prim(k *TypeKind) (ok bool) {
 			// is different, so incompatible.
 			return false
 		}
-		*dta.k = k
+		(*dta.k).kind = k
 		return true
 	}
 
@@ -612,7 +612,7 @@ func (dta *_DynamicTypeAnnotation) annotate_any(k *TypeKind) (ok bool) {
 			// is different, so incompatible.
 			return false
 		}
-		*dta.k = k
+		(*dta.k).kind = k
 		return true
 	}
 
@@ -645,7 +645,8 @@ func (dta *_DynamicTypeAnnotation) annotate_kind(k *TypeKind) (ok bool) {
 }
 
 func (dta *_DynamicTypeAnnotation) annotate() (ok bool) {
-	dta.k = &dta.p.Kind
+	pk := dta.p.Kind
+	dta.k = &pk
 
 	return dta.annotate_kind(dta.a.Kind)
 }

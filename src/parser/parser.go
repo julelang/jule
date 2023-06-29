@@ -1606,8 +1606,6 @@ func (p *_Parser) parse(f *lex.File) {
 			d := p.get_directive(node.Data.(*ast.Comment))
 			if d != nil && build.Is_top_directive(d.Tag) {
 				p.ast.Top_directives = append(p.ast.Top_directives, d)
-			} else {
-				break
 			}
 		} else {
 			break
