@@ -81,6 +81,12 @@ namespace jule {
 
         inline jule::Bool operator!=(std::nullptr_t) const noexcept
         { return !this->operator==(nullptr); }
+
+        friend std::ostream &operator<<(std::ostream &stream,
+                                        const Fn<Function> &src) noexcept {
+            stream << "<fn>";
+            return stream;
+        }
     };
 
     template<typename T, typename... U>
