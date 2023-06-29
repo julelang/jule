@@ -47,6 +47,18 @@ func normalize_bitsize(d *Data) {
 	d.Kind.kind = build_prim_type(kind)
 }
 
+func normalize_type(d *Data) {
+	switch {
+	case int_assignable(types.TypeKind_INT, d):
+		d.Kind.kind = build_prim_type(types.TypeKind_INT)
+		d.Constant.Set_i64(int64(d.Constant.As_f64()))
+
+	case int_assignable(types.TypeKind_UINT, d):
+		d.Kind.kind = build_prim_type(types.TypeKind_UINT)
+		d.Constant.Set_u64(uint64(d.Constant.As_f64()))
+	}
+}
+
 func apply_cast_kind(d *Data) {
 	if d.Cast_kind == nil {
 		return
@@ -673,11 +685,12 @@ func (e *_Eval) eval_unary_minus(d *Data) *Data {
 			d.Constant.Set_f64(-d.Constant.Read_f64())
 
 		case d.Constant.Is_i64():
-			d.Constant.Set_i64(-d.Constant.Read_i64())
+			d.Constant.Set_f64(-d.Constant.As_f64())
 
 		case d.Constant.Is_u64():
-			d.Constant.Set_u64(-d.Constant.Read_u64())
+			d.Constant.Set_f64(-d.Constant.As_f64())
 		}
+		normalize_type(d)
 	}
 
 	d.Lvalue = false
@@ -697,14 +710,15 @@ func (e *_Eval) eval_unary_plus(d *Data) *Data {
 	if d.Is_const() {
 		switch {
 		case d.Constant.Is_f64():
-			d.Constant.Set_f64(+d.Constant.Read_f64())
+			d.Constant.Set_f64(-d.Constant.Read_f64())
 
 		case d.Constant.Is_i64():
-			d.Constant.Set_i64(+d.Constant.Read_i64())
+			d.Constant.Set_f64(-d.Constant.As_f64())
 
 		case d.Constant.Is_u64():
-			d.Constant.Set_u64(+d.Constant.Read_u64())
+			d.Constant.Set_f64(-d.Constant.As_f64())
 		}
+		normalize_type(d)
 	}
 
 	d.Lvalue = false
