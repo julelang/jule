@@ -710,13 +710,13 @@ func (e *_Eval) eval_unary_plus(d *Data) *Data {
 	if d.Is_const() {
 		switch {
 		case d.Constant.Is_f64():
-			d.Constant.Set_f64(-d.Constant.Read_f64())
+			d.Constant.Set_f64(+d.Constant.Read_f64())
 
 		case d.Constant.Is_i64():
-			d.Constant.Set_f64(-d.Constant.As_f64())
+			d.Constant.Set_f64(+d.Constant.As_f64())
 
 		case d.Constant.Is_u64():
-			d.Constant.Set_f64(-d.Constant.As_f64())
+			d.Constant.Set_f64(+d.Constant.As_f64())
 		}
 		normalize_type(d)
 	}
