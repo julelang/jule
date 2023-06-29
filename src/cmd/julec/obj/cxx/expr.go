@@ -748,6 +748,10 @@ func gen_val(v *sema.Value) string {
 }
 
 func get_init_expr(t *sema.TypeKind) string {
+	if t.Ptr() != nil {
+		return "nullptr"
+	}
+
 	enm := t.Enm()
 	if enm == nil {
 		return gen_type_kind(t) + "()"
