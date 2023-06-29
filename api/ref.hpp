@@ -158,6 +158,10 @@ namespace jule {
             if (ref.alloc == nullptr)
                 return false;
 
+            // Break comparison cycle.
+            if (this->alloc == ref.alloc)
+                return true;
+
             return *this->alloc == *ref.alloc;
         }
     
