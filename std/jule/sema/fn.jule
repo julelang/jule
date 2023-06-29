@@ -1,0 +1,276 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::jule::ast::{Directive, GenericDecl, ScopeTree}
+use std::jule::build::{ENTRY_POINT}
+use std::jule::lex::{Token, TokenKind, is_anon_ident}
+
+// Return type.
+pub struct RetType {
+	pub kind:   &TypeSymbol
+	pub idents: []Token
+}
+
+// Parameter.
+pub struct Param {
+	pub token:    Token
+	pub mutable:  bool
+	pub variadic: bool
+	pub kind:     &TypeSymbol
+	pub ident:    str
+}
+
+impl Param {
+	fn instance(mut &self): &ParamIns {
+		ret &ParamIns{
+			decl: self,
+		}
+	}
+
+	// Reports whether parameter is self (receiver) parameter.
+	pub fn is_self(self): bool { ret self.ident == "&self" || self.ident == "self" }
+
+	// Reports whether self (receiver) parameter is reference.
+	pub fn is_ref(self): bool { ret self.ident != "" && self.ident[0] == '&' }
+}
+
+// Function.
+pub struct Fn {
+	sema: &Sema
+
+	pub token:      Token
+	pub global:     bool
+	pub unsafety:   bool
+	pub public:     bool
+	pub cpp_linked: bool
+	pub ident:      str
+	pub directives: []&Directive
+	pub doc:        str
+	pub scope:      &ScopeTree
+	pub generics:   []&GenericDecl
+	pub result:     &RetType
+	pub params:     []&Param
+	pub owner:      &Struct
+
+	// Function instances for each unique type combination of function call.
+	// Nil if function is never used.
+	pub instances: []&FnIns
+}
+
+impl Fn {
+	// Reports whether return type is void.
+	pub fn is_void(self): bool { ret !real(self.result) }
+
+	// Reports whether function is method.
+	pub fn is_method(self): bool { ret real(self.owner) }
+
+	// Reports whether function is entry point.
+	pub fn is_entry_point(self): bool { ret self.ident == ENTRY_POINT }
+
+	// Reports whether function is anonymous function.
+	pub fn is_anon(self): bool { ret is_anon_ident(self.ident) }
+
+	// Reports whether function has return variable(s).
+	pub fn any_var(self): bool { ret real(self.result) && self.result.idents.len > 0 }
+
+	// Reports whether any parameter uses generic types.
+	pub fn parameters_uses_generics(self): bool {
+		if self.generics.len == 0 {
+			ret false
+		}
+
+		for _, p in self.params {
+			if p.is_self() {
+				continue
+			}
+
+			let pk = p.kind.kind.to_str()
+			for _, g in self.generics {
+				if pk.find(g.ident) != -1 {
+					ret true
+				}
+			}
+		}
+
+		ret false
+	}
+
+	// Reports whether result type uses generic types.
+	pub fn result_uses_generics(self): bool {
+		if self.is_void() {
+			ret false
+		} else if !real(self.result.kind) || !real(self.result.kind.kind) {
+			ret false
+		}
+
+		let rk = self.result.kind.kind.to_str()
+		for _, g in self.generics {
+			if rk.find(g.ident) != -1 {
+				ret true
+			}
+		}
+
+		ret false
+	}
+
+
+	// Force to new instance.
+	fn instance_force(mut &self): &FnIns {
+		let mut ins = &FnIns{
+			decl:  self,
+			scope: &Scope{},
+		}
+
+		ins.params = make([]&ParamIns, self.params.len)
+		for (i, mut p) in self.params {
+			ins.params[i] = p.instance()
+		}
+
+		if real(ins.decl.result) {
+			ins.result = ins.decl.result.kind.kind
+		}
+
+		ret ins
+	}
+
+	fn instance(mut &self): &FnIns {
+		// Returns already created instance for just one unique combination.
+		if self.generics.len == 0 && self.instances.len == 1 {
+			ret self.instances[0]
+		}
+
+		ret self.instance_force()
+	}
+
+	fn append_instance(mut self, mut ins: &FnIns): (bool, int) {
+		if self.generics.len == 0 {
+			// Skip already created instance for just one unique combination.
+			if self.instances.len == 1 {
+				ret false, 0
+			}
+
+			self.instances = append(self.instances, ins)
+			ret true, -1
+		}
+
+		if self.instances.len == 0 {
+			self.instances = append(self.instances, ins)
+			ret true, -1
+		}
+
+		for j, ains in self.instances {
+			for i, ag in ains.generics {
+				if ag.to_str() == ins.generics[i].to_str() {
+					// Instance is exist.
+					ret false, j
+				}
+			}
+		}
+
+		self.instances = append(self.instances, ins)
+		ret true, -1
+	}
+}
+
+// Parameter instance.
+pub struct ParamIns {
+	pub decl: &Param
+	pub kind: &TypeKind
+}
+
+impl Kind for ParamIns {
+	// Implement: Kind
+	// Returns ParamIns's type kind as string.
+	fn to_str(self): str {
+		let mut s = ""
+		if self.decl.mutable {
+			s += (str)(TokenKind.Mut) + " "
+		}
+
+		if self.decl.is_self() {
+			if self.decl.is_ref() {
+				s += "&"
+			}
+			s += "self"
+			ret s
+		}
+
+		if self.decl.variadic {
+			s += "..."
+		}
+		if real(self.kind) {
+			s += self.kind.to_str()
+		}
+		ret s
+	}
+}
+
+// Function instance.
+pub struct FnIns {
+	pub owner:    &StructIns
+	pub decl:     &Fn
+	pub generics: []&TypeKind
+	pub params:   []&ParamIns
+	pub result:   &TypeKind
+	pub scope:    &Scope
+
+	caller:   BuiltinCaller
+	anon:     bool
+}
+
+impl Kind for FnIns {
+	// Implement: Kind
+	// Returns Fn's type kind as string.
+	fn to_str(self): str {
+		let mut s = ""
+		if self.decl.unsafety {
+			s += "unsafe "
+		}
+		s += "fn"
+
+		if self.generics.len > 0 {
+			s += "["
+			for i, t in self.generics {
+				s += t.to_str()
+				if i+1 < self.generics.len {
+					s += ","
+				}
+			}
+			s += "]"
+		} else if self.decl.generics.len > 0 { // Use Decl's generic if not parsed yet.
+			s += "["
+			for i, g in self.decl.generics {
+				s += g.ident
+				if i+1 < self.decl.generics.len {
+					s += ","
+				}
+			}
+			s += "]"
+		}
+
+		s += "("
+		let n = self.params.len
+		if n > 0 {
+			for _, p in self.params {
+				s += p.to_str()
+				s += ","
+			}
+			s = s[:s.len-1] // Remove comma.
+		}
+		s += ")"
+		if !self.decl.is_void() {
+			s += ":"
+			s += self.result.to_str()
+		}
+		ret s
+	}
+}
+
+impl FnIns {
+	// Reports whether instance is built-in.
+	pub fn is_builtin(self): bool { ret self.caller != nil }
+
+	// Reports whether instance is anonymous function.
+	pub fn is_anon(self): bool { ret self.anon || real(self.decl) && self.decl.is_anon() }
+}

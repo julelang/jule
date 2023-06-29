@@ -1,0 +1,655 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::fs::{FsError, stat}
+use std::fs::path::{SEPARATOR, abs, ext, join}
+use std::jule::ast::{
+	self,
+	Ast,
+	CommentGroup,
+	TypeDecl,
+	TypeAliasDecl,
+	FieldDecl,
+	EnumDecl,
+	EnumItemDecl,
+	VarDecl,
+	TraitDecl,
+	StructDecl,
+	ParamDecl,
+	FnDecl,
+	RetTypeDecl,
+	Node,
+	Expr,
+	UseDecl,
+}
+use std::jule::build::{
+	PATH_STDLIB,
+	Log,
+	LogKind,
+	Directive,
+	errorf,
+	is_std_header_path,
+	is_valid_header_ext,
+	is_valid_cpp_ext,
+}
+use std::jule::lex::{Token, TokenKind}
+
+// Directive pass.
+pub struct Pass {
+	pub token: Token
+	pub text:  str
+}
+
+fn str_repeat(sub: str, mut n: int): str {
+	if n == 0 {
+		ret ""
+	}
+
+	let mut s = ""
+	for n > 0; n-- {
+		s += sub
+	}
+	ret s
+}
+
+fn build_doc(mut cg: &CommentGroup): str {
+	if !real(cg) {
+		ret ""
+	}
+
+	let mut doc = ""
+	for _, c in cg.comments {
+		doc += c.text
+		doc += " " // Write space for each newline.
+	}
+	ret doc
+}
+
+fn build_type(mut t: &TypeDecl): &TypeSymbol {
+	if !real(t) {
+		ret new(TypeSymbol)
+	}
+	ret &TypeSymbol{
+		decl: t,
+	}
+}
+
+fn build_expr(mut expr: &Expr): &Value {
+	if !real(expr) {
+		ret new(Value)
+	}
+
+	ret &Value{
+		expr: expr,
+	}
+}
+
+fn build_type_alias(mut decl: &TypeAliasDecl): &TypeAlias {
+	ret &TypeAlias{
+		scope:      decl.scope,
+		public:     decl.public,
+		cpp_linked: decl.cpp_linked,
+		token:      decl.token,
+		ident:      decl.ident,
+		kind:       build_type(decl.kind),
+		doc:        build_doc(decl.doc_comments),
+	}
+}
+
+fn build_field(mut decl: &FieldDecl): &Field {
+	ret &Field{
+		token:   decl.token,
+		public:  decl.public,
+		mutable: decl.mutable,
+		ident:   decl.ident,
+		kind:    build_type(decl.kind),
+	}
+}
+
+fn build_fields(mut decls: []&FieldDecl): []&Field {
+	let mut fields = make([]&Field, decls.len)
+	for (i, mut decl) in decls {
+		fields[i] = build_field(decl)
+	}
+	ret fields
+}
+
+fn build_struct(mut decl: &StructDecl): &Struct {
+	ret &Struct{
+		token:      decl.token,
+		ident:      decl.ident,
+		fields:     build_fields(decl.fields),
+		public:     decl.public,
+		cpp_linked: decl.cpp_linked,
+		directives: decl.directives,
+		doc:        build_doc(decl.doc_comments),
+		generics:   decl.generics,
+	}
+}
+
+fn build_param(mut decl: &ParamDecl): &Param {
+	ret &Param{
+		token:    decl.token,
+		mutable:  decl.mutable,
+		variadic: decl.variadic,
+		kind:     build_type(decl.kind),
+		ident:    decl.ident,
+	}
+}
+
+fn build_params(mut decls: []&ParamDecl): []&Param {
+	let mut params = make([]&Param, decls.len)
+	for (i, mut decl) in decls {
+		params[i] = build_param(decl)
+	}
+	ret params
+}
+
+fn build_ret_type(mut decl: &RetTypeDecl): &RetType {
+	if decl.idents == nil && !real(decl.kind) {
+		ret new(RetType) // Void type.
+	}
+	ret &RetType{
+		kind:   build_type(decl.kind),
+		idents: decl.idents,
+	}
+}
+
+fn build_fn(mut decl: &FnDecl): &Fn {
+	ret &Fn{
+		token:      decl.token,
+		global:     decl.global,
+		unsafety:   decl.unsafety,
+		public:     decl.public,
+		cpp_linked: decl.cpp_linked,
+		ident:      decl.ident,
+		directives: decl.directives,
+		doc:        build_doc(decl.doc_comments),
+		scope:      decl.scope,
+		generics:   decl.generics,
+		result:     build_ret_type(decl.result),
+		params:     build_params(decl.params),
+	}
+}
+
+fn build_methods(mut decls: []&FnDecl): []&Fn {
+	let mut methods = make([]&Fn, decls.len)
+	for (i, mut decl) in decls {
+		methods[i] = build_fn(decl)
+	}
+	ret methods
+}
+
+fn build_trait(mut decl: &TraitDecl): &Trait {
+	ret &Trait{
+		token:   decl.token,
+		ident:   decl.ident,
+		public:  decl.public,
+		doc:     build_doc(decl.doc_comments),
+		methods: build_methods(decl.methods),
+	}
+}
+
+fn build_enum_item(mut decl: &EnumItemDecl): &EnumItem {
+	ret &EnumItem{
+		token: decl.token,
+		ident: decl.ident,
+		value: build_expr(decl.expr),
+	}
+}
+
+fn build_enum_items(mut decls: []&EnumItemDecl): []&EnumItem {
+	let mut items = make([]&EnumItem, decls.len)
+	for (i, mut decl) in decls {
+		items[i] = build_enum_item(decl)
+	}
+	ret items
+}
+
+fn build_enum(mut decl: &EnumDecl): &Enum {
+	ret &Enum{
+		token:  decl.token,
+		public: decl.public,
+		ident:  decl.ident,
+		kind:   build_type(decl.kind),
+		items:  build_enum_items(decl.items),
+		doc:    build_doc(decl.doc_comments),
+	}
+}
+
+fn build_var(mut decl: &VarDecl): &Var {
+	ret &Var{
+		scope:      decl.scope,
+		token:      decl.token,
+		ident:      decl.ident,
+		cpp_linked: decl.cpp_linked,
+		constant:   decl.constant,
+		mutable:    decl.mutable,
+		public:     decl.public,
+		doc:        build_doc(decl.doc_comments),
+		kind:       build_type(decl.kind),
+		value:      build_expr(decl.expr),
+	}
+}
+
+fn build_impl(mut decl: &std::jule::ast::Impl): &Impl {
+	ret &Impl{
+		base:    decl.base,
+		dest:    decl.dest,
+		methods: build_methods(decl.methods),
+	}
+}
+
+// Symbol table builder.
+// Just builds symbols, not analyze metadatas
+// like struct's implemented traits.
+struct SymbolBuilder {
+	owner:    &SymbolBuilder
+	importer: Importer
+	errors:   []Log
+	ast:      &Ast
+	table:    &SymbolTable
+}
+
+impl SymbolBuilder {
+	fn get_root(mut &self): &SymbolBuilder {
+		let mut root = self
+		for real(root.owner) {
+			root = root.owner
+		}
+		ret root
+	}
+
+	fn push_err(mut self, token: Token, key: str, args: ...any) {
+		self.errors = append(self.errors, Log{
+			kind:   LogKind.Error,
+			row:    token.row,
+			column: token.column,
+			path:   token.file.path(),
+			text:   errorf(key, args...),
+		})
+	}
+
+	fn check_cpp_use_decl_path(mut self, decl: &UseDecl): (ok: bool) {
+		if is_std_header_path(decl.link_path) {
+			ret true
+		}
+
+		let ext = ext(decl.link_path)
+		if !is_valid_header_ext(ext) && !is_valid_cpp_ext(ext) {
+			self.push_err(decl.token, "invalid_cpp_ext", ext)
+			ret false
+		}
+
+		let (info, err) = stat(decl.link_path)
+		// Exist?
+		if err != FsError.Ok || info.is_dir() {
+			self.push_err(decl.token, "use_not_found", decl.link_path)
+			ret false
+		}
+
+		ret true
+	}
+
+	fn build_cpp_header_import(mut self, mut decl: &UseDecl): &ImportInfo {
+		let mut path = decl.link_path
+
+		if !is_std_header_path(decl.link_path) {
+			let mut ok = self.check_cpp_use_decl_path(decl)
+			if !ok {
+				ret new(ImportInfo)
+			}
+
+			// Set to absolute path for correct include path.
+			path, ok = abs(decl.link_path)
+			if !ok {
+				self.push_err(decl.token, "use_not_found", decl.link_path)
+			}
+		}
+
+		ret &ImportInfo{
+			token:      decl.token,
+			path:       path,
+			link_path:  decl.link_path,
+			ident:      "", // Cpp headers haven't identifiers.
+			cpp_linked: true,
+			std:        false,
+			package:    new(Package), // Cpp headers haven't symbol table.
+		}
+	}
+
+	fn build_std_import(mut self, mut decl: &UseDecl): &ImportInfo {
+		let mut path = decl.link_path["std::".len:] // Skip "std::" prefix.
+		path = path.replace((str)(TokenKind.DblColon), (str)(SEPARATOR), -1)
+		path = join(PATH_STDLIB, path)
+		let (path, ok) = abs(path)
+		if !ok {
+			self.push_err(decl.token, "use_not_found", decl.link_path)
+			ret new(ImportInfo)
+		}
+
+		let (info, err) = stat(path)
+		// Exist?
+		if err != FsError.Ok || !info.is_dir() {
+			self.push_err(decl.token, "use_not_found", decl.link_path)
+			ret new(ImportInfo)
+		}
+
+		// Select last identifier of namespace chain.
+		let ident = decl.link_path[decl.link_path.rfind((str)(TokenKind.DblColon))+1:]
+
+		ret &ImportInfo{
+			import_all: decl.full,
+			token:      decl.token,
+			path:       path,
+			link_path:  decl.link_path,
+			ident:      ident,
+			cpp_linked: false,
+			std:        true,
+			package: &Package{
+				files: nil, // Appends by import algorithm.
+			},
+		}
+	}
+
+	fn build_ident_import(mut &self, mut decl: &UseDecl): &ImportInfo {
+		let mut path = decl.link_path
+		path = path.replace((str)(TokenKind.DblColon), (str)(SEPARATOR), -1)
+		path = join(self.get_root().ast.file.dir(), path)
+
+		let (path, ok) = abs(path)
+		if !ok {
+			self.push_err(decl.token, "use_not_found", decl.link_path)
+			ret new(ImportInfo)
+		}
+
+		let (info, err) = stat(path)
+		// Exist?
+		if err != FsError.Ok || !info.is_dir() {
+			self.push_err(decl.token, "use_not_found", decl.link_path)
+			ret new(ImportInfo)
+		}
+
+		// Select last identifier of namespace chain.
+		let ident = decl.link_path[decl.link_path.rfind((str(TokenKind.DblColon)))+1:]
+
+		ret &ImportInfo{
+			import_all: decl.full,
+			token:      decl.token,
+			path:       path,
+			link_path:  decl.link_path,
+			ident:      ident,
+			cpp_linked: false,
+			std:        false,
+			package: &Package{
+				files: nil, // Appends by import algorithm.
+			},
+		}
+	}
+
+	fn build_import(mut &self, mut decl: &UseDecl): &ImportInfo {
+		match {
+		| decl.cpp_linked: ret self.build_cpp_header_import(decl)
+		| decl.std:        ret self.build_std_import(decl)
+		|:                 ret self.build_ident_import(decl)
+		}
+	}
+
+	fn check_duplicate_use_decl(mut self, pkg: &ImportInfo): (ok: bool) {
+		// Find package by path to detect cpp header imports.
+		let lpkg = self.table.select_package(fn(spkg: &ImportInfo): bool {
+			ret pkg.path == spkg.path
+		})
+		if !real(lpkg) {
+			ret true
+		}
+
+		self.push_err(pkg.token, "duplicate_use_decl", pkg.link_path)
+		ret false
+	}
+
+	fn impl_import_selections(mut self, mut imp: &ImportInfo, mut decl: &UseDecl) {
+		for (_, mut ident) in decl.selected {
+			if imp.exist_ident(ident.kind) {
+				self.push_err(ident, "duplicated_import_selection", ident.kind)
+				continue
+			}
+
+			imp.selected = append(imp.selected, ident)
+		}
+	}
+
+	fn get_as_link_path(mut &self, mut path: str): str {
+		if path.has_prefix(PATH_STDLIB) {
+			path = path[PATH_STDLIB.len:]
+			ret "std" + path.replace((str)(SEPARATOR), (str)(TokenKind.DblColon), -1)
+		}
+
+		let (root, _) = abs(self.get_root().ast.file.dir())
+		path = path[root.len:]
+		if path[0] == SEPARATOR {
+			path = path[1:]
+		}
+		ret path.replace((str)(SEPARATOR), (str)(TokenKind.DblColon), -1)
+	}
+
+	fn push_cross_cycle_error(mut &self, target: &SymbolBuilder, imp: &ImportInfo, error_token: Token) {
+		const PADDING = 4
+
+		let mut message = ""
+
+		let push = fn(sb: &SymbolBuilder, path: str) {
+			let refers_to = errorf("refers_to", self.get_as_link_path(sb.table.file.dir()), self.get_as_link_path(path))
+			message = str_repeat(" ", PADDING) + refers_to + "\n" + message
+		}
+
+		push(self, imp.path)
+
+		let mut owner = self.owner
+		let mut old = self
+
+		for real(owner.owner) {
+			push(old.owner, old.table.file.dir())
+
+			if &owner.owner == &target {
+				push(target, owner.table.file.dir())
+				break
+			}
+
+			old = owner
+			owner = owner.owner
+		}
+
+		self.push_err(error_token, "pkg_illegal_cross_cycle", message)
+	}
+
+	fn check_import_cycles(mut &self, imp: &ImportInfo, decl: &UseDecl): bool {
+		if imp.path == self.table.file.dir() {
+			self.push_err(decl.token, "pkg_illegal_cycle_refers_itself", self.get_as_link_path(imp.path))
+			ret false
+		}
+
+		if !real(self.owner) {
+			ret true
+		}
+
+		if self.owner.table.file.dir() == imp.path {
+			self.push_cross_cycle_error(self.owner, imp, decl.token)
+			ret false
+		}
+
+		let mut owner = self.owner
+	iter:
+		if owner.table.file.dir() == imp.path {
+			self.push_cross_cycle_error(owner, imp, decl.token)
+			ret false
+		}
+
+		if real(owner.owner) {
+			owner = owner.owner
+			goto iter
+		}
+
+		ret true
+	}
+
+	fn import_package(mut &self, mut imp: &ImportInfo, mut decl: &UseDecl): (ok: bool) {
+		if imp.cpp_linked {
+			ret true
+		}
+
+		let mut port = self.importer.get_import(imp.path)
+		if real(port) {
+			imp.package = port.package
+			imp.duplicate = true
+		} else {
+			if !self.check_import_cycles(imp, decl) {
+				ret false
+			}
+
+			let (mut asts, errors) = self.importer.import_package(imp.path)
+			if errors.len > 0 {
+				self.errors = append(self.errors, errors...)
+				ret false
+			}
+
+			for (_, mut ast) in asts {
+				let (mut table, errors) = build_symbols(ast, self.importer, self)
+
+				// Break import if file has error(s).
+				if errors.len > 0 {
+					self.errors = append(self.errors, errors...)
+					self.push_err(imp.token, "used_package_has_errors", imp.link_path)
+					ret false
+				}
+
+				imp.package.files = append(imp.package.files, table)
+			}
+		}
+
+		self.impl_import_selections(imp, decl)
+
+		ret true
+	}
+
+	fn import_use_decl(mut &self, mut decl: &UseDecl): &ImportInfo {
+		let mut imp = self.build_import(decl)
+		// Break analysis if error occurs.
+		if !real(imp) {
+			ret new(ImportInfo)
+		}
+
+		let mut ok = self.check_duplicate_use_decl(imp)
+		if !ok {
+			ret new(ImportInfo)
+		}
+
+		ok = self.import_package(imp, decl)
+		self.table.imports = append(self.table.imports, imp)
+		if ok {
+			self.importer.imported(imp)
+			ret imp
+		}
+		ret new(ImportInfo)
+	}
+
+	fn import_use_decls(mut &self) {
+		for (_, mut decl) in self.ast.use_decls {
+			self.import_use_decl(decl)
+
+			// Break analysis if error occurs.
+			if self.errors.len > 0 {
+				break
+			}
+		}
+	}
+
+	fn append_decl(mut self, mut decl: Node) {
+		match type decl.data {
+		| &TypeAliasDecl:
+			let mut ta = build_type_alias((&TypeAliasDecl)(decl.data))
+			self.table.type_aliases = append(self.table.type_aliases, ta)
+
+		| &StructDecl:
+			let mut srct = build_struct((&StructDecl)(decl.data))
+			self.table.structs = append(self.table.structs, srct)
+
+		| &FnDecl:
+			let mut f = build_fn((&FnDecl)(decl.data))
+			self.table.funcs = append(self.table.funcs, f)
+
+		| &TraitDecl:
+			let mut t = build_trait((&TraitDecl)(decl.data))
+			self.table.traits = append(self.table.traits, t)
+
+		| &VarDecl:
+			let mut v = build_var((&VarDecl)(decl.data))
+			self.table.vars = append(self.table.vars, v)
+
+		| &EnumDecl:
+			let mut e = build_enum((&EnumDecl)(decl.data))
+			self.table.enums = append(self.table.enums, e)
+
+		|:
+			self.push_err(decl.token, "invalid_syntax")
+		}
+	}
+
+	fn append_decls(mut self) {
+		for (_, mut decl) in self.ast.decls {
+			self.append_decl(decl)
+		}
+	}
+
+	fn append_impls(mut self) {
+		self.table.impls = make([]&Impl, self.ast.impls.len)
+		for (i, mut decl) in self.ast.impls {
+			self.table.impls[i] = build_impl(decl)
+		}
+	}
+
+	fn push_directive_pass(mut self, mut d: &std::jule::ast::Directive) {
+		let mut pass = Pass{
+			token: d.token,
+		}
+		for _, arg in d.args {
+			if arg != "" {
+				pass.text += arg + " "
+			}
+		}
+		pass.text = pass.text.trim(" \n\r\t\v")
+		self.table.passes = append(self.table.passes, pass)
+	}
+
+	fn append_top_directives(mut self) {
+		for (_, mut d) in self.ast.top_directives {
+			match d.tag {
+			| (str)(Directive.Pass):
+				self.push_directive_pass(d)
+			}
+		}
+	}
+
+	fn build(mut &self) {
+		self.table = &SymbolTable{
+			file: self.ast.file,
+		}
+
+		self.append_top_directives()
+
+		self.import_use_decls()
+		// Break analysis if use declarations has error.
+		if self.errors.len > 0 {
+			ret
+		}
+
+		self.append_decls()
+		// Break analysis if declarations has error.
+		if self.errors.len > 0 {
+			ret
+		}
+
+		self.append_impls()
+	}
+}

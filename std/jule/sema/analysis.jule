@@ -1,0 +1,100 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::jule::ast::{Ast}
+use std::jule::build::{Log}
+
+// Builds symbol table of AST.
+fn build_symbols(mut ast: &Ast, mut importer: Importer, mut owner: &SymbolBuilder): (&SymbolTable, []Log) {
+	let mut sb = &SymbolBuilder{
+		ast:      ast,
+		importer: importer,
+		owner:    owner,
+	}
+	sb.build()
+
+	if sb.errors.len == 0 {
+		ret sb.table, nil
+	}
+	ret new(SymbolTable), sb.errors
+}
+
+fn __analyze_package(mut files: []&Ast, mut importer: Importer): (&Package, []Log) {
+	// Build symbol tables of files.
+	let mut tables = make([]&SymbolTable, files.len)
+	for (i, mut f) in files {
+		let (mut table, mut errors) = build_symbols(f, importer, new(SymbolBuilder))
+		if errors.len > 0 {
+			ret new(Package), errors
+		}
+		tables[i] = table
+	}
+
+	let mut sema = &Sema{}
+	sema.check(tables)
+	if sema.errors.len > 0 {
+		ret new(Package), sema.errors
+	}
+
+	let mut pkg = &Package{
+		files: sema.files,
+	}
+
+	ret pkg, nil
+}
+
+// Builds symbol table of package's ASTs.
+// Returns nil if files is nil.
+// Returns nil if pwd is empty.
+// Returns nil if pstd is empty.
+// Accepts current working directory is pwd.
+//
+// Parameters:
+//  files:    abstract syntax trees of files
+//  importer: importer that used for use declarations
+//
+// Dependent Parameters:
+//  working-directory: uses working directory path provided by build
+//  std-path:          uses standard library path provided by build
+//
+// Risks:
+//   - You can pass nil to importer, but panics if importer is nil and
+//     semantic analyzer used nil importer.
+pub fn analyze_package(mut files: []&Ast, mut importer: Importer): (&Package, []Log) {
+	if files.len == 0 {
+		ret new(Package), nil
+	}
+
+	ret __analyze_package(files, importer)
+}
+
+// Builds symbol table of AST.
+// Returns nil if f is nil.
+// Returns nil if pwd is empty.
+// Returns nil if pstd is empty.
+// Accepts current working directory is pwd.
+//
+// Parameters:
+//  f:        file's abstract syntax tree
+//  importer: importer that used for use declarations
+//
+// Dependent Parameters:
+//  working-directory: uses working directory path provided by build
+//  std-path:          uses standard library path provided by build
+//
+// Risks:
+//   - You can pass nil to importer, but panics if importer is nil and
+//     semantic analyzer used nil importer.
+pub fn analyze_file(mut f: &Ast, mut importer: Importer): (&SymbolTable, []Log) {
+	let mut files: []&Ast = [f]
+	let (mut pkg, mut errors) = analyze_package(files, importer)
+	if errors.len > 0 {
+		ret new(SymbolTable), errors
+	}
+
+	// Select first table, because package has only one file.
+	// We give just one file.
+	let mut table = pkg.files[0]
+	ret table, nil
+}

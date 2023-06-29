@@ -1,0 +1,217 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::jule::ast::{GenericDecl, Directive}
+use std::jule::build
+use std::jule::lex::{Token}
+
+// Field.
+pub struct Field {
+	pub owner:   &Struct
+	pub token:   Token
+	pub public:  bool
+	pub mutable: bool // Interior mutability.
+	pub ident:   str
+	pub kind:    &TypeSymbol
+}
+
+impl Field {
+	fn instance(mut &self): &FieldIns {
+		ret &FieldIns{
+			decl: self,
+			kind: self.kind.kind,
+		}
+	}
+}
+
+// Structure.
+pub struct Struct {
+	// Used for type parsing.
+	// Used declaration'sema sema for instance type checking.
+	sema: &Sema
+
+	// This structure depended to these structures.
+	// Only stores plain identifier references such as A, B, and MyStruct.
+	// Not includes non-pain identifier references such as *A, &B, and []MyStruct.
+	pub depends: []&Struct
+
+	// This structures uses these structures.
+	// Stores all referred structures.
+	pub uses: []&Struct
+
+	pub token:      Token
+	pub ident:      str
+	pub fields:     []&Field
+	pub methods:    []&Fn
+	pub public:     bool
+	pub cpp_linked: bool
+	pub directives: []&Directive
+	pub doc:        str
+	pub generics:   []&GenericDecl
+	pub implements: []&Trait
+
+	// Structure instances for each unique type combination of structure.
+	// Nil if structure is never used.
+	pub instances: []&StructIns
+}
+
+impl Struct {
+	fn instance(mut &self): &StructIns {
+		// Returns already created instance for just one unique combination.
+		if self.generics.len == 0 && self.instances.len == 1 {
+			ret self.instances[0]
+		}
+
+		let mut ins = &StructIns{
+			decl:    self,
+			fields:  make([]&FieldIns, self.fields.len),
+			methods: make([]&Fn, self.methods.len),
+		}
+
+		for (i, mut f) in self.fields {
+			ins.fields[i] = f.instance()
+			if real(f.kind.kind) && is_mut(f.kind.kind) {
+				ins.has_mut = true
+			}
+		}
+
+		for (i, mut f) in self.methods {
+			let mut fins = new(Fn, f)
+			ins.methods[i] = fins
+		}
+
+		ret ins
+	}
+
+	fn append_instance(mut self, mut ins: &StructIns) {
+		// Skip already created instance for just one unique combination.
+		if self.generics.len == 0 && self.instances.len == 1 {
+			ret
+		}
+
+		for _, ains in self.instances {
+			for i, ag in ains.generics {
+				if ag.to_str() == ins.generics[i].to_str() {
+					// Instance exist.
+					ret
+				}
+			}
+		}
+
+		self.instances = append(self.instances, ins)
+	}
+
+	// Returns method by identifier.
+	// Returns nil reference if not exist any method in this identifier.
+	pub fn find_method(mut self, ident: str): &Fn {
+		for (_, mut f) in self.methods {
+			if f.ident == ident {
+				ret f
+			}
+		}
+		ret new(Fn)
+	}
+
+	// Returns field by identifier.
+	// Returns nil reference if not exist any field in this identifier.
+	pub fn find_field(mut self, ident: str): &Field {
+		for (_, mut f) in self.fields {
+			if f.ident == ident {
+				ret f
+			}
+		}
+		ret new(Field)
+	}
+
+	// Reports whether structure implements given trait.
+	pub fn is_implements(self, t: &Trait): bool {
+		for _, it in self.implements {
+			if &t == &it {
+				ret true
+			}
+		}
+		ret false
+	}
+
+	// Reports whether structure is derives given derive.
+	pub fn is_derives(self, ident: str): bool {
+		for _, d in self.directives {
+			if d.tag == (str)(std::jule::build::Directive.Derive) {
+				if d.args.len == 1 && d.args[0] == ident {
+					ret true
+				}
+			}
+		}
+		ret false
+	}
+
+	// Reports whether structure is uses given structure.
+	pub fn is_uses(self, s: &Struct): bool {
+		for _, u in self.uses {
+			for &s == &u {
+				ret true
+			}
+		}
+		ret false
+	}
+}
+
+// Field instance.
+pub struct FieldIns {
+	pub decl: &Field
+	pub kind: &TypeKind
+}
+
+// Structure instance.
+pub struct StructIns {
+	pub checked:  bool
+	pub decl:     &Struct
+	pub generics: []&TypeKind
+	pub fields:   []&FieldIns
+	pub methods:  []&Fn
+	pub has_mut:  bool // This structure has mutable defines.
+}
+
+impl Kind for StructIns {
+	// Implement: Kind
+	// Returns Struct's type kind as string.
+	fn to_str(self): str {
+		let mut kind = ""
+		kind += self.decl.ident
+		if self.generics.len > 0 {
+			kind += "["
+			for _, g in self.generics {
+				kind += g.to_str()
+				kind += ","
+			}
+			kind = kind[:kind.len-1] // Remove comma.
+			kind += "]"
+		}
+		ret kind
+	}
+}
+
+impl StructIns {
+	// Returns method by identifier.
+	// Returns nil reference if not exist any method in this identifier.
+	pub fn find_method(mut self, ident: str): &Fn {
+		for (_, mut f) in self.methods {
+			if f.ident == ident {
+				ret f
+			}
+		}
+		ret new(Fn)
+	}
+
+	// Returns field by identifier.
+	// Returns nil reference if not exist any field in this identifier.
+	pub fn find_field(mut self, ident: str): &FieldIns {
+		for (_, mut f) in self.fields {
+			if f.decl.ident == ident {
+				ret f
+			}
+		}
+		ret new(FieldIns)
+	}
+}

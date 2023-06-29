@@ -1,0 +1,1632 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::jule::ast::{
+	self,
+	Expr,
+	ScopeTree,
+	TypeAliasDecl,
+	VarDecl,
+	NodeData,
+	AssignSt,
+	FnCallExpr,
+	WhileKind,
+	RangeKind,
+	Iter,
+	Comment,
+}
+use std::jule::constant::{new_bool}
+use std::jule::lex::{
+	Token,
+	TokenId,
+	TokenKind,
+	is_ignore_ident,
+	is_anon_ident,
+	is_postfix_op,
+}
+use std::jule::types::{
+	is_num,
+}
+
+// Statement type.
+pub type St: any
+
+fn new_scope_checker_base(mut s: &Sema, mut owner: &FnIns): &ScopeChecker {
+	ret &ScopeChecker{
+		s:     s,
+		owner: owner,
+		table: &SymbolTable{},
+	}
+}
+
+fn new_scope_checker(mut s: &Sema, mut owner: &FnIns): &ScopeChecker {
+	let mut base = new_scope_checker_base(s, owner)
+	base.labels = new([]&ScopeLabel, nil)
+	base.gotos = new([]&ScopeGoto, nil)
+	ret base
+}
+
+// Returns label by identifier.
+// Returns nil if not exist any label in this identifier.
+// Lookups given scope and parent scopes.
+fn find_label_parent(ident: str, mut scope: &ScopeChecker): &ScopeLabel {
+	let mut label = scope.find_label_scope(ident)
+	for !real(label) {
+		if !real(scope.parent) || real(scope.owner) {
+			ret new(ScopeLabel)
+		}
+
+		scope = scope.parent
+		label = scope.find_label_scope(ident)
+	}
+
+	ret label
+}
+
+fn count_match_type(m: &Match, t: &TypeKind): int {
+	let mut n = 0
+	let kind = t.to_str()
+loop:
+	for _, c in m.cases {
+		if !real(c) {
+			continue
+		}
+
+		for _, expr in c.exprs {
+			// Break loop because this expression is not parsed yet.
+			// So, parsed cases finished.
+			if expr == nil {
+				break loop
+			}
+
+			if kind == (&TypeKind)(expr).to_str() {
+				n++
+			}
+		}
+	}
+	ret n
+}
+
+fn get_datas_from_tuple_data(mut d: &Data): []&Data {
+	if real(d.kind.tup()) {
+		match type d.model {
+		| &TupleExprModel:
+			ret (&TupleExprModel)(d.model).datas
+
+		|:
+			let mut t = d.kind.tup()
+			let mut r = make([]&Data, t.types.len)
+			for (i, mut kind) in t.types {
+				r[i] = &Data{
+					mutable: true, // Function return.
+					kind:    kind,
+				}
+			}
+			ret r
+		}
+	} else {
+		ret [d]
+	}
+}
+
+fn check_mut(mut s: &Sema, left: &Data, mut right: &Data, error_token: Token): (ok: bool) {
+	match {
+	| !left.mutable:
+		s.push_err(error_token, "assignment_to_non_mut")
+		ret false
+
+	| real(right) && !right.mutable && is_mut(right.kind):
+		s.push_err(error_token, "assignment_non_mut_to_mut")
+		ret false
+
+	|:
+		ret true
+	}
+}
+
+fn check_assign(mut s: &Sema, mut left: &Data, mut right: &Data, error_token: Token): (ok: bool) {
+	let f = left.kind.fnc()
+	if real(f) && real(f.decl) && f.decl.global {
+		s.push_err(error_token, "assign_type_not_support_value")
+		ret false
+	}
+
+	match {
+	| !left.lvalue:
+		s.push_err(error_token, "assign_require_lvalue")
+		ret false
+
+	| left.is_const():
+		s.push_err(error_token, "assign_const")
+		ret false
+
+	| !check_mut(s, left, right, error_token):
+		ret false
+
+	|:
+		ret true
+	}
+}
+
+fn is_valid_ast_st_for_next_st(mut n: NodeData): bool {
+	match type n {
+	| &AssignSt:
+		ret !(&AssignSt)(n).declarative
+
+	| &FnCallExpr
+	| &Expr:
+		ret true
+
+	|:
+		ret false
+	}
+}
+
+fn is_valid_st_for_next_st(st: St): bool {
+	match type st {
+	| &FnCallExprModel
+	| &Postfix
+	| &Assign
+	| &MultiAssign:
+		ret true
+
+	| &Data:
+		match type (&Data)(st).model {
+		| &FnCallExprModel: ret true
+		|:                  ret false
+		}
+
+	|:
+		ret false
+	}
+}
+
+fn st_is_def(st: St): bool {
+	match type st {
+	| &Var: ret true
+	|:      ret false
+	}
+}
+
+// Scope.
+pub struct Scope {
+	pub parent:   &Scope
+	pub unsafety: bool
+	pub deferred: bool
+	pub stmts:    []St
+}
+
+// Chain conditional node.
+pub struct If {
+	pub expr:  ExprModel
+	pub scope: &Scope
+}
+
+// Default scope of conditional chain.
+pub struct Else {
+	pub scope: &Scope
+}
+
+// Conditional chain.
+pub struct Conditional {
+	pub elifs:   []&If // First not is root condition.
+	pub default: &Else
+}
+
+// Infinity iteration.
+pub struct InfIter {
+	pub scope: &Scope
+}
+
+// While iteration.
+pub struct WhileIter {
+	pub expr:  ExprModel // Can be nil if iteration is while-next kind.
+	pub next:  St        // Nil if iteration is not while-next kind.
+	pub scope: &Scope
+}
+
+impl WhileIter {
+	// Reports whether iteration is while-next kind.
+	pub fn is_while_next(self): bool { ret self.next != nil }
+}
+
+// Range iteration.
+pub struct RangeIter {
+	pub expr:  &Data
+	pub scope: &Scope
+	pub key_a: &Var
+	pub key_b: &Var
+}
+
+// Continue statement.
+pub struct ContSt {
+	pub it: uintptr
+}
+
+// Break statement.
+pub struct BreakSt {
+	pub it:   uintptr
+	pub mtch: uintptr
+}
+
+// Label.
+pub struct Label {
+	pub ident: str
+}
+
+// Goto statement.
+pub struct GotoSt {
+	pub ident: str
+}
+
+// Postfix assignment.
+pub struct Postfix {
+	pub expr: ExprModel
+	pub op:   str
+}
+
+// Assigment.
+pub struct Assign {
+	pub l:  ExprModel
+	pub r:  ExprModel
+	pub op: str
+}
+
+// Multi-declarative assignment.
+pub struct MultiAssign {
+	pub l: []ExprModel // Nil models represents ingored expressions.
+	pub r: ExprModel
+}
+
+// Match-Case.
+pub struct Match {
+	pub expr:       ExprModel
+	pub type_match: bool
+	pub cases:      []&Case
+	pub default:    &Case
+}
+
+// Match-Case case.
+pub struct Case {
+	pub owner: &Match
+	pub scope: &Scope
+	pub exprs: []ExprModel
+	pub next:  &Case
+}
+
+impl Case {
+	// Reports whether case is default.
+	fn is_default(self): bool { ret self.exprs == nil }
+}
+
+// Fall statement.
+pub struct FallSt {
+	pub dest_case: uintptr
+}
+
+// Return statement.
+pub struct RetSt {
+	pub vars: []&Var // Used "_" identifier to pass ignored vars for ordering.
+	pub expr: ExprModel
+}
+
+// Built-in recover function call statement.
+pub struct Recover {
+	pub handler:      &FnIns
+	pub handler_expr: ExprModel
+	pub scope:        &Scope
+}
+
+struct ScopeLabel {
+	token: Token
+	label: &Label
+	pos:   int
+	scope: &ScopeChecker
+	used:  bool
+}
+
+struct ScopeGoto {
+	gt:    &std::jule::ast::GotoSt
+	scope: &ScopeChecker
+	pos:   int
+}
+
+// Scope checker.
+struct ScopeChecker {
+	s:           &Sema
+	owner:       &FnIns
+	parent:      &ScopeChecker
+	child_index: int // Index of child scope.
+	table:       &SymbolTable
+	scope:       &Scope
+	tree:        &ScopeTree
+	it:          uintptr
+	cse:         uintptr
+	labels:      &[]&ScopeLabel // All labels of all scopes.
+	gotos:       &[]&ScopeGoto  // All gotos of all scopes.
+	i:           int
+}
+
+impl Lookup for ScopeChecker {
+	// Returns imported package by identifier.
+	// Returns nil reference if not exist any package in this identifier.
+	//
+	// Lookups:
+	//   - Sema.
+	fn find_package(mut self, ident: str): &ImportInfo {
+		ret self.s.find_package(ident)
+	}
+
+	// Returns imported package by selector.
+	// Returns nil reference if selector returns false for all packages.
+	// Returns nil reference if selector is nil.
+	//
+	// Lookups:
+	//   - Sema.
+	fn select_package(mut self, selector: fn(&ImportInfo): bool): &ImportInfo {
+		ret self.s.select_package(selector)
+	}
+
+	// Returns variable by identifier and cpp linked state.
+	// Returns nil reference if not exist any variable in this identifier.
+	//
+	// Lookups:
+	//   - Current scope.
+	//   - Parent scopes.
+	//   - Sema.
+	fn find_var(mut self, ident: str, cpp_linked: bool): &Var {
+		// Search reverse for correct shadowing.
+		const REVERSE = true
+		let mut v = self.table.__find_var(ident, cpp_linked, REVERSE)
+		if real(v) {
+			ret v
+		}
+
+		let mut parent = self.parent
+		for real(parent) {
+			let mut v = parent.table.find_var(ident, cpp_linked)
+			if real(v) {
+				ret v
+			}
+			parent = parent.parent
+		}
+
+		ret self.s.find_var(ident, cpp_linked)
+	}
+
+	// Returns type alias by identifier and cpp linked state.
+	// Returns nil reference if not exist any type alias in this identifier.
+	//
+	// Lookups:
+	//   - Current scope.
+	//   - Parent scopes.
+	//   - Sema.
+	fn find_type_alias(mut self, ident: str, cpp_linked: bool): &TypeAlias {
+		// Search reverse for correct shadowing.
+		const REVERSE = true
+		let mut ta = self.table.__find_type_alias(ident, cpp_linked, REVERSE)
+		if real(ta) {
+			ret ta
+		}
+
+		let mut parent = self.parent
+		for real(parent) {
+			let mut ta = parent.table.find_type_alias(ident, cpp_linked)
+			if real(ta) {
+				ret ta
+			}
+			parent = parent.parent
+		}
+
+		ret self.s.find_type_alias(ident, cpp_linked)
+	}
+
+	// Returns struct by identifier and cpp linked state.
+	// Returns nil reference if not exist any struct in this identifier.
+	//
+	// Lookups:
+	//   - Sema.
+	fn find_struct(mut self, ident: str, cpp_linked: bool): &Struct {
+		ret self.s.find_struct(ident, cpp_linked)
+	}
+
+	// Returns function by identifier and cpp linked state.
+	// Returns nil reference if not exist any function in this identifier.
+	//
+	// Lookups:
+	//   - Sema.
+	fn find_fn(mut self, ident: str, cpp_linked: bool): &Fn {
+		ret self.s.find_fn(ident, cpp_linked)
+	}
+
+	// Returns trait by identifier.
+	// Returns nil reference if not exist any trait in this identifier.
+	//
+	// Lookups:
+	//   - Sema.
+	fn find_trait(mut self, ident: str): &Trait {
+		ret self.s.find_trait(ident)
+	}
+
+	// Returns enum by identifier.
+	// Returns nil reference if not exist any enum in this identifier.
+	//
+	// Lookups:
+	//   - Sema.
+	fn find_enum(mut self, ident: str): &Enum {
+		ret self.s.find_enum(ident)
+	}
+}
+
+impl ScopeChecker {
+	// Reports whether scope is unsafe.
+	fn is_unsafe(mut &self): bool {
+		let mut scope = self
+
+	iter:
+		if scope.scope.unsafety {
+			ret true
+		}
+
+		if real(scope.parent) {
+			scope = scope.parent
+			goto iter
+		}
+
+		ret false
+	}
+
+	// Reports scope is root.
+	// Accepts anonymous functions as root.
+	fn is_root(self): bool { ret !real(self.parent) || real(self.owner) }
+
+	// Returns root scope.
+	// Accepts anonymous functions as root.
+	fn get_root(mut &self): &ScopeChecker {
+		let mut root = self
+		for real(root.parent) && !real(root.owner) {
+			root = root.parent
+		}
+		ret root
+	}
+
+	// Returns label by identifier.
+	// Returns nil if not exist any label in this identifier.
+	// Just lookups current scope.
+	fn find_label(mut self, ident: str): &Label {
+		for (_, mut st) in self.scope.stmts {
+			match type st {
+			| &Label:
+				let mut label = (&Label)(st)
+				if label.ident == ident {
+					ret label
+				}
+			}
+		}
+		ret new(Label)
+	}
+
+	// Returns label by identifier.
+	// Returns nil if not exist any label in this identifier.
+	// Just lookups current scope.
+	fn find_label_scope(mut &self, ident: str): &ScopeLabel {
+		let mut label = self.find_label_all(ident)
+		if real(label) && &label.scope == &self {
+			ret label
+		}
+
+		ret new(ScopeLabel)
+	}
+
+	// Returns label by identifier.
+	// Returns nil if not exist any label in this identifier.
+	// Lookups all labels.
+	fn find_label_all(mut self, ident: str): &ScopeLabel {
+		for (_, mut lbl) in self.labels {
+			if lbl.label.ident == ident {
+				ret lbl
+			}
+		}
+		ret new(ScopeLabel)
+	}
+
+	// Reports this identifier duplicated in scope.
+	// The "self" parameter represents address of exception identifier.
+	// If founded identifier address equals to self, will be skipped.
+	fn is_duplicated_ident(mut self, itself: uintptr, ident: str): bool {
+		let v = self.find_var(ident, false)
+		if real(v) && uintptr(&v) != itself && &v.scope == &self.tree {
+			ret true
+		}
+
+		let ta = self.find_type_alias(ident, false)
+		if real(ta) && uintptr(&ta) != itself && &ta.scope == &self.tree {
+			ret true
+		}
+
+		ret false
+	}
+
+	fn check_var_decl(mut &self, mut decl: &VarDecl) {
+		let mut v = build_var(decl)
+
+		defer {
+			self.table.vars = append(self.table.vars, v)
+			self.scope.stmts = append(self.scope.stmts, v)
+		}()
+
+		if self.is_duplicated_ident(uintptr(&v), v.ident) {
+			self.s.push_err(v.token, "duplicated_ident", v.ident)
+		}
+
+		self.s.check_var_decl(v, self)
+		if !v.is_auto_typed() && (!real(v.kind) || !real(v.kind.kind)) {
+			ret
+		}
+
+		self.s.check_type_var(v, self)
+	}
+
+	fn check_type_alias_decl(mut &self, mut decl: &TypeAliasDecl) {
+		let mut ta = build_type_alias(decl)
+		if self.is_duplicated_ident(uintptr(&ta), ta.ident) {
+			self.s.push_err(ta.token, "duplicated_ident", ta.ident)
+		}
+		self.s.check_type_alias_decl(ta, self)
+
+		self.table.type_aliases = append(self.table.type_aliases, ta)
+		self.scope.stmts = append(self.scope.stmts, ta)
+	}
+
+	fn get_child(mut self): &Scope {
+		ret &Scope{
+			parent: self.scope,
+		}
+	}
+
+	fn check_child_ssc(mut &self, mut tree: &ScopeTree, mut s: &Scope, mut ssc: &ScopeChecker) {
+		ssc.parent = self
+		ssc.check(tree, s)
+	}
+
+	fn check_child_sc(mut &self, mut tree: &ScopeTree, mut ssc: &ScopeChecker): &Scope {
+		let mut s = self.get_child()
+		self.check_child_ssc(tree, s, ssc)
+		ret s
+	}
+
+	fn check_child(mut &self, mut tree: &ScopeTree): &Scope {
+		let mut ssc = self.new_child_checker()
+		ret self.check_child_sc(tree, ssc)
+	}
+
+	fn check_anon_scope(mut &self, mut tree: &ScopeTree) {
+		let mut s = self.check_child(tree)
+		self.scope.stmts = append(self.scope.stmts, s)
+	}
+
+	fn try_call_recover(mut &self, mut d: &Data): bool {
+		match type d.model {
+		| &Recover:
+			// Ok.
+
+		|:
+			ret false
+		}
+
+		let mut rec = (&Recover)(d.model)
+		rec.handler = d.kind.fnc() // Argument function.
+		rec.scope = &Scope{}
+
+		self.scope.stmts = append(self.scope.stmts, rec)
+
+		self.tree.stmts = self.tree.stmts[self.i+1:]
+		self.scope = rec.scope
+		self.check_tree()
+		ret true
+	}
+
+	fn check_expr(mut &self, mut expr: &Expr) {
+		let mut d = self.s.eval(expr, self)
+		if !real(d) {
+			ret
+		}
+
+		if expr.is_fn_call() {
+			let ok = self.try_call_recover(d)
+			if ok {
+				ret
+			}
+		}
+
+		self.scope.stmts = append(self.scope.stmts, d)
+	}
+
+	fn check_if(mut &self, mut i: &std::jule::ast::If): &If {
+		let mut s = self.check_child(i.scope)
+
+		let mut d = self.s.eval(i.expr, self)
+		if !real(d) {
+			ret new(If)
+		}
+
+		let prim = d.kind.prim()
+		if !real(prim) {
+			self.s.push_err(i.expr.token, "if_require_bool_expr")
+			ret new(If)
+		}
+
+		if !prim.is_bool() {
+			self.s.push_err(i.expr.token, "if_require_bool_expr")
+			ret new(If)
+		}
+
+		ret &If{
+			expr:  d.model,
+			scope: s,
+		}
+	}
+
+	fn check_else(mut &self, mut e: &std::jule::ast::Else): &Else {
+		let mut s = self.check_child(e.scope)
+		ret &Else{
+			scope: s,
+		}
+	}
+
+	fn check_conditional(mut &self, mut conditional: &std::jule::ast::Conditional) {
+		let mut c = &Conditional{}
+		self.scope.stmts = append(self.scope.stmts, c)
+
+		c.elifs = make([]&If, conditional.tail.len+1)
+
+		c.elifs[0] = self.check_if(conditional.head)
+		for (i, mut elif) in conditional.tail {
+			c.elifs[i+1] = self.check_if(elif)
+		}
+
+		if real(conditional.default) {
+			c.default = self.check_else(conditional.default)
+		}
+	}
+
+	fn check_iter_scope_sc(mut &self, it :uintptr, mut tree: &ScopeTree, mut ssc: &ScopeChecker): &Scope {
+		ssc.it = it
+		ret self.check_child_sc(tree, ssc)
+	}
+
+	fn check_iter_scope(mut &self, it: uintptr, mut tree: &ScopeTree): &Scope {
+		let mut ssc = self.new_child_checker()
+		ret self.check_iter_scope_sc(it, tree, ssc)
+	}
+
+	fn check_inf_iter(mut &self, mut it: &Iter) {
+		let mut kind = &InfIter{}
+
+		self.scope.stmts = append(self.scope.stmts, kind)
+
+		kind.scope = self.check_iter_scope(uintptr(&kind), it.scope)
+	}
+
+	fn check_while_iter(mut &self, mut it: &Iter) {
+		let mut wh = (&WhileKind)(it.kind)
+		if !real(wh.expr) && wh.next == nil {
+			self.check_inf_iter(it)
+			ret
+		}
+
+		let mut kind = &WhileIter{}
+
+		self.scope.stmts = append(self.scope.stmts, kind)
+
+		kind.scope = self.check_iter_scope(uintptr(&kind), it.scope)
+
+		if real(wh.expr) {
+			let mut d = self.s.eval(wh.expr, self)
+			if !real(d) {
+				ret
+			}
+
+			let prim = d.kind.prim()
+			if !real(prim) {
+				self.s.push_err(it.token, "iter_while_require_bool_expr")
+				ret
+			}
+
+			if !prim.is_bool() {
+				self.s.push_err(it.token, "iter_while_require_bool_expr")
+				ret
+			}
+
+			kind.expr = d.model
+		}
+
+		if wh.is_while_next() {
+			if !is_valid_ast_st_for_next_st(wh.next) {
+				self.s.push_err(wh.next_token, "invalid_stmt_for_next")
+				ret
+			}
+
+			let n = self.scope.stmts.len
+			self.check_node(wh.next)
+			if n < self.scope.stmts.len {
+				let mut st = self.scope.stmts[n]
+				self.scope.stmts = self.scope.stmts[:n] // Remove statement.
+				if !is_valid_st_for_next_st(st) {
+					self.s.push_err(wh.next_token, "invalid_stmt_for_next")
+				}
+
+				kind.next = st
+			}
+		}
+	}
+
+	fn check_range_iter(mut &self, mut it: &Iter) {
+		let mut rang = (&RangeKind)(it.kind)
+
+		let mut d = self.s.eval(rang.expr, self)
+		if !real(d) {
+			ret
+		}
+
+		let mut kind = &RangeIter{
+			expr: d,
+		}
+
+		let mut rc = RangeChecker{
+			sc:   self,
+			kind: kind,
+			rang: rang,
+			d:    d,
+		}
+		let ok = rc.check()
+		if !ok {
+			ret
+		}
+
+		self.scope.stmts = append(self.scope.stmts, kind)
+
+		let mut ssc = self.new_child_checker()
+
+		if real(kind.key_a) {
+			ssc.table.vars = append(ssc.table.vars, kind.key_a)
+		}
+
+		if real(kind.key_b) {
+			ssc.table.vars = append(ssc.table.vars, kind.key_b)
+		}
+
+		kind.scope = self.check_iter_scope_sc(uintptr(&kind), it.scope, ssc)
+	}
+
+	fn check_iter(mut &self, mut it: &Iter) {
+		if it.is_inf() {
+			self.check_inf_iter(it)
+			ret
+		}
+
+		match type it.kind {
+		| &WhileKind: self.check_while_iter(it)
+		| &RangeKind: self.check_range_iter(it)
+		|:            outln("error <unimplemented iteration kind>")
+		}
+	}
+
+	fn check_valid_cont_label(mut &self, it: uintptr): bool {
+		let mut scope = self
+
+	iter:
+		if scope.it == it {
+			ret true
+		}
+
+		if real(scope.parent) {
+			scope = scope.parent
+			goto iter
+		}
+
+		ret false
+	}
+
+	fn check_valid_break_label(mut &self, ptr: uintptr): bool {
+		let mut scope = self
+
+	iter:
+		if scope.it == ptr {
+			ret true
+		}
+
+		if scope.cse != 0 {
+			let mtch = unsafe { uintptr(&(*Case)(scope.cse).owner) }
+			if mtch == ptr {
+				ret true
+			}
+		}
+
+		if real(scope.parent) {
+			scope = scope.parent
+			goto iter
+		}
+
+		ret false
+	}
+
+	fn check_cont_valid_scope(mut self, c: &std::jule::ast::ContSt): &ContSt {
+		if c.label.id != TokenId.Na {
+			ret &ContSt{}
+		}
+
+		let mut scope = self
+	iter:
+		match {
+		| scope.it == 0 && real(scope.parent) && !real(scope.owner):
+			scope = scope.parent
+			goto iter
+
+		| scope.it != 0:
+			ret &ContSt{it: scope.it}
+		}
+
+		self.s.push_err(c.token, "continue_at_out_of_valid_scope")
+		ret new(ContSt)
+	}
+
+	fn check_cont(mut &self, c: &std::jule::ast::ContSt) {
+		let mut cont = self.check_cont_valid_scope(c)
+		if !real(cont) {
+			ret
+		}
+
+		if c.label.id != TokenId.Na { // Label given.
+			let mut label = find_label_parent(c.label.kind, self.parent)
+			if !real(label) {
+				self.s.push_err(c.label, "label_not_exist", c.label.kind)
+				ret
+			}
+
+			label.used = true
+
+			if label.pos+1 >= label.scope.scope.stmts.len {
+				self.s.push_err(c.label, "invalid_label")
+				ret
+			}
+
+			let i = label.pos + 1
+			if i >= label.scope.scope.stmts.len {
+				self.s.push_err(c.label, "invalid_label")
+			} else {
+				let mut st = label.scope.scope.stmts[i]
+				match type st {
+				| &InfIter:   cont.it = uintptr(&(&InfIter)(st))
+				| &RangeIter: cont.it = uintptr(&(&RangeIter)(st))
+				| &WhileIter: cont.it = uintptr(&(&WhileIter)(st))
+				|:            self.s.push_err(c.label, "invalid_label")
+				}
+			}
+		}
+
+		if cont.it != 0 {
+			if !self.check_valid_cont_label(cont.it) {
+				self.s.push_err(c.label, "invalid_label")
+			}
+		}
+
+		self.scope.stmts = append(self.scope.stmts, cont)
+	}
+
+	fn check_label(mut &self, mut l: &std::jule::ast::LabelSt) {
+		if real(self.find_label(l.ident)) {
+			self.s.push_err(l.token, "label_exist", l.ident)
+			ret
+		}
+
+		let mut label = &Label{
+			ident: l.ident,
+		}
+
+		self.scope.stmts = append(self.scope.stmts, label)
+		self.labels = append(self.labels, &ScopeLabel{
+			token: l.token,
+			label: label,
+			pos:   self.scope.stmts.len - 1,
+			scope: self,
+		})
+	}
+
+	fn push_goto(mut &self, mut gt: &std::jule::ast::GotoSt) {
+		self.scope.stmts = append(self.scope.stmts, &GotoSt{
+			ident: gt.label.kind,
+		})
+
+		self.gotos = append(self.gotos, &ScopeGoto{
+			gt:    gt,
+			pos:   self.scope.stmts.len - 1,
+			scope: self,
+		})
+	}
+
+	fn check_postfix(mut &self, mut a: &AssignSt) {
+		if a.left.len > 1 {
+			self.s.push_err(a.setter, "invalid_syntax")
+			ret
+		}
+
+		let mut d = self.s.eval(a.left[0].expr, self)
+		if !real(d) {
+			ret
+		}
+
+		_ = check_assign(self.s, d, new(Data), a.setter)
+
+		if real(d.kind.ptr()) {
+			let mut ptr = d.kind.ptr()
+			if !ptr.is_unsafe() && !self.is_unsafe() {
+				self.s.push_err(a.left[0].expr.token, "unsafe_behavior_at_out_of_unsafe_scope")
+				ret
+			}
+		}
+
+		let mut check_t = d.kind
+		if real(d.kind.ref()) {
+			check_t = d.kind.ref().elem
+		}
+
+		if !real(check_t.prim()) || !is_num(check_t.prim().kind) {
+			self.s.push_err(a.setter, "operator_not_for_juletype", a.setter.kind, d.kind.to_str())
+			ret
+		}
+
+		self.scope.stmts = append(self.scope.stmts, &Postfix{
+			expr: d.model,
+			op:   a.setter.kind,
+		})
+	}
+
+	fn is_new_assign_ident(mut self, ident: str): bool {
+		if is_ignore_ident(ident) || ident == "" {
+			ret false
+		}
+
+		ret self.table.def_by_ident(ident, false) == nil
+	}
+
+	fn check_single_assign(mut &self, mut a: &AssignSt) {
+		let mut r = self.s.eval(a.right, self)
+		if !real(r) {
+			ret
+		}
+
+		if is_ignore_ident(a.left[0].ident) {
+			if r.kind.is_void() {
+				self.s.push_err(a.right.token, "invalid_expr")
+			}
+
+			self.scope.stmts = append(self.scope.stmts, r)
+			ret
+		}
+
+		let mut l = self.s.eval(a.left[0].expr, self)
+		if !real(l) {
+			ret
+		}
+
+		if !check_assign(self.s, l, r, a.setter) {
+			ret
+		}
+
+		if real(r.kind.tup()) {
+			self.s.push_err(a.setter, "missing_multi_assign_idents")
+			ret
+		}
+
+		self.scope.stmts = append(self.scope.stmts, &Assign{
+			l:  l.model,
+			r:  r.model,
+			op: a.setter.kind,
+		})
+
+		if a.setter.kind != (str)(TokenKind.Eq) && !r.is_const() {
+			a.setter.kind = a.setter.kind[:a.setter.kind.len-1]
+
+			let mut solver = BinopSolver{
+				e: &Eval{
+					s:        self.s,
+					lookup:   self,
+					unsafety: self.is_unsafe(),
+				},
+				op: a.setter,
+			}
+
+			r = solver.solve_explicit(l, r)
+			if !real(r) {
+				ret
+			}
+			a.setter.kind += (str)(TokenKind.Eq)
+		}
+
+		let mut checker = AssignTypeChecker{
+			s:           self.s,
+			dest:        l.kind,
+			d:           r,
+			error_token: a.setter,
+			deref:       true,
+		}
+		checker.check()
+	}
+
+	fn check_multi_assign(mut &self, mut a: &AssignSt) {
+		let mut rd = self.s.eval(a.right, self)
+		if !real(rd) {
+			ret
+		}
+
+		let mut r = get_datas_from_tuple_data(rd)
+
+		match {
+		| a.left.len > r.len:
+			self.s.push_err(a.setter, "overflow_multi_assign_idents")
+			ret
+
+		| a.left.len < r.len:
+			self.s.push_err(a.setter, "missing_multi_assign_idents")
+			ret
+		}
+
+		let mut st = &MultiAssign{
+			r: rd.model,
+		}
+
+		if real(rd.kind.tup()) {
+			st.r = &TupleExprModel{datas: r}
+		}
+
+		for i in a.left {
+			let mut lexpr = a.left[i]
+			let mut r = r[i]
+
+			if is_ignore_ident(lexpr.ident) {
+				if r.kind.is_void() {
+					self.s.push_err(a.right.token, "invalid_expr")
+				}
+
+				st.l = append(st.l, nil)
+				continue
+			}
+
+			if a.declarative && self.is_new_assign_ident(lexpr.ident) {
+				// Add new variable declaration statement.
+				let mut v = &Var{
+					ident:   lexpr.ident,
+					token:   lexpr.token,
+					mutable: lexpr.mutable,
+					scope:   self.tree,
+					value: &Value{
+						expr: a.right,
+						data: r,
+					},
+				}
+
+				self.s.check_var(v)
+
+				st.l = append(st.l, v)
+				self.table.vars = append(self.table.vars, v)
+				self.scope.stmts = append(self.scope.stmts, v)
+
+				continue
+			}
+
+			if lexpr.mutable {
+				self.s.push_err(lexpr.token, "duplicated_ident", lexpr.ident)
+			}
+
+			let mut l = self.s.eval(lexpr.expr, self)
+			if !real(l) {
+				continue
+			}
+
+			if !check_assign(self.s, l, r, a.setter) {
+				continue
+			}
+
+			self.s.check_validity_for_init_expr(l.mutable, l.kind, r, a.setter)
+
+			let mut checker = AssignTypeChecker{
+				s:           self.s,
+				dest:        l.kind,
+				d:           r,
+				error_token: a.setter,
+				deref:       true,
+			}
+			checker.check()
+
+			st.l = append(st.l, l.model)
+		}
+
+		self.scope.stmts = append(self.scope.stmts, st)
+	}
+
+	fn check_assign_st(mut &self, mut a: &AssignSt) {
+		if is_postfix_op(a.setter.kind) {
+			self.check_postfix(a)
+			ret
+		}
+
+		if a.left.len == 1 && !a.declarative {
+			self.check_single_assign(a)
+			ret
+		}
+
+		self.check_multi_assign(a)
+	}
+
+	fn check_case_scope(mut &self, c: &Case, mut tree: &ScopeTree): &Scope {
+		let mut ssc = self.new_child_checker()
+		ssc.cse = uintptr(&c)
+		ret self.check_child_sc(tree, ssc)
+	}
+
+	fn check_case(mut &self, mut m: &Match, i: int, mut c: &std::jule::ast::Case, mut expr: &Data): &Case {
+		let mut _case = m.cases[i]
+		_case.exprs = make([]ExprModel, c.exprs.len)
+
+		for (i, mut e) in c.exprs {
+			if m.type_match {
+				let mut eval = &Eval{
+					s:      self.s,
+					lookup: self,
+				}
+
+				let mut d = eval.eval(e)
+				if real(d) {
+					_case.exprs[i] = d.kind
+					if count_match_type(m, d.kind) > 1 {
+						self.s.push_err(e.token, "duplicate_match_type", d.kind.to_str())
+					}
+				}
+
+				let trt = expr.kind.trt()
+				if real(trt) {
+					_ = self.s.check_type_compatibility(expr.kind, d.kind, e.token, false)
+				}
+
+				continue
+			}
+
+			let mut d = self.s.eval(e, self)
+			if !real(d) {
+				continue
+			}
+
+			_case.exprs[i] = d.model
+
+			let mut checker = AssignTypeChecker{
+				s:           self.s,
+				dest:        expr.kind,
+				d:           d,
+				error_token: e.token,
+				deref:       true,
+			}
+			checker.check()
+		}
+
+		_case.scope = self.check_case_scope(_case, c.scope)
+		ret _case
+	}
+
+	fn check_cases(mut &self, mut m: &std::jule::ast::MatchCase, mut rm: &Match, mut expr: &Data) {
+		rm.cases = make([]&Case, m.cases.len)
+		for i in m.cases {
+			let mut _case = &Case{
+				owner: rm,
+			}
+
+			if i > 0 {
+				rm.cases[i-1].next = _case
+			}
+
+			rm.cases[i] = _case
+		}
+
+		if real(rm.default) && m.cases.len > 0 {
+			rm.cases[rm.cases.len-1].next = rm.default
+		}
+
+		for (i, mut c) in m.cases {
+			self.check_case(rm, i, c, expr)
+		}
+	}
+
+	fn check_default(mut &self, mut m: &Match, mut d: &std::jule::ast::Else): &Case {
+		let mut def = &Case{
+			owner: m,
+		}
+		def.scope = self.check_case_scope(def, d.scope)
+		ret def
+	}
+
+	fn check_type_match(mut &self, mut m: &std::jule::ast::MatchCase) {
+		let mut d = self.s.eval(m.expr, self)
+		if !real(d) {
+			ret
+		}
+
+		if !((real(d.kind.prim()) && d.kind.prim().is_any()) || real(d.kind.trt())) {
+			self.s.push_err(m.expr.token, "type_case_has_not_valid_expr")
+			ret
+		}
+
+		let mut tm = &Match{
+			type_match: true,
+			expr:       d.model,
+		}
+
+		self.scope.stmts = append(self.scope.stmts, tm)
+
+		if real(m.default) {
+			tm.default = self.check_default(tm, m.default)
+		}
+		self.check_cases(m, tm, d)
+	}
+
+	fn check_common_match(mut &self, mut m: &std::jule::ast::MatchCase) {
+		let mut d = new(Data)
+		if !real(m.expr) {
+			d = &Data{
+				constant: new_bool(true),
+				kind:     &TypeKind{kind: build_prim_type((str)(PrimKind.Bool))},
+			}
+			d.model = d.constant
+		} else {
+			d = self.s.eval(m.expr, self)
+			if !real(d) {
+				ret
+			}
+		}
+
+		let mut mc = &Match{
+			expr: d.model,
+		}
+
+		self.scope.stmts = append(self.scope.stmts, mc)
+
+		if real(m.default) {
+			mc.default = self.check_default(mc, m.default)
+		}
+		self.check_cases(m, mc, d)
+	}
+
+	fn check_match(mut &self, mut m: &std::jule::ast::MatchCase) {
+		if m.type_match {
+			self.check_type_match(m)
+			ret
+		}
+		self.check_common_match(m)
+	}
+
+	fn check_fall(mut self, f: &std::jule::ast::FallSt) {
+		if self.cse == 0 || self.scope.stmts.len+1 < self.scope.stmts.len {
+			self.s.push_err(f.token, "fallthrough_wrong_use")
+			ret
+		}
+
+		let mut _case = unsafe { (*Case)(self.cse) }
+		if !real(unsafe { _case.next }) {
+			self.s.push_err(f.token, "fallthrough_into_final_case")
+			ret
+		}
+
+		self.scope.stmts = append(self.scope.stmts, &FallSt{
+			dest_case: unsafe { uintptr(&_case.next) },
+		})
+	}
+
+	fn check_break_with_label(mut &self, b: &std::jule::ast::BreakSt): &BreakSt {
+		let mut brk = self.check_plain_break(b)
+		if !real(brk) {
+			ret new(BreakSt)
+		}
+
+		// Set pointer to zero.
+		// Pointer will set by label.
+		brk.it = 0
+		brk.mtch = 0
+
+		let mut label = find_label_parent(b.label.kind, self.parent)
+		if !real(label) {
+			self.s.push_err(b.label, "label_not_exist", b.label.kind)
+			ret new(BreakSt)
+		}
+
+		label.used = true
+
+		if label.pos+1 >= label.scope.scope.stmts.len {
+			self.s.push_err(b.label, "invalid_label")
+			ret new(BreakSt)
+		}
+
+		let i = label.pos + 1
+		if i >= label.scope.scope.stmts.len {
+			self.s.push_err(b.label, "invalid_label")
+		} else {
+			let mut st = label.scope.scope.stmts[i]
+			match type st {
+			| &InfIter:   brk.it = uintptr(&(&InfIter)(st))
+			| &RangeIter: brk.it = uintptr(&(&RangeIter)(st))
+			| &WhileIter: brk.it = uintptr(&(&WhileIter)(st))
+			| &Match:     brk.mtch = uintptr(&(&Match)(st))
+			|:            self.s.push_err(b.label, "invalid_label")
+			}
+		}
+
+		if brk.it != 0 {
+			if !self.check_valid_break_label(brk.it) {
+				self.s.push_err(b.label, "invalid_label")
+			}
+		}
+
+		if brk.mtch != 0 {
+			if !self.check_valid_break_label(brk.mtch) {
+				self.s.push_err(b.label, "invalid_label")
+			}
+		}
+
+		ret brk
+	}
+
+	fn check_plain_break(mut &self, b: &std::jule::ast::BreakSt): &BreakSt {
+		let mut scope = self
+	iter:
+		match {
+		| scope.it == 0 && scope.cse == 0 && real(scope.parent) && !real(scope.owner):
+			scope = scope.parent
+			goto iter
+
+		| scope.it != 0:
+			ret &BreakSt{it: scope.it}
+
+		| scope.cse != 0:
+			ret &BreakSt{mtch: unsafe { uintptr(&(*Case)(scope.cse).owner) }}
+		}
+
+		self.s.push_err(b.token, "break_at_out_of_valid_scope")
+		ret new(BreakSt)
+	}
+
+	fn check_break(mut &self, b: &std::jule::ast::BreakSt) {
+		if b.label.id != TokenId.Na { // Label given.
+			let mut brk = self.check_break_with_label(b)
+			self.scope.stmts = append(self.scope.stmts, brk)
+			ret
+		}
+
+		let mut brk = self.check_plain_break(b)
+		self.scope.stmts = append(self.scope.stmts, brk)
+	}
+
+	fn check_ret(mut &self, mut r: &std::jule::ast::RetSt) {
+		let mut rt = &RetSt{}
+		self.scope.stmts = append(self.scope.stmts, rt)
+
+		let mut d = new(Data)
+
+		if real(r.expr) {
+			d = self.s.eval(r.expr, self)
+			if !real(d) {
+				ret
+			}
+		}
+
+		let mut rtc = &RetTypeChecker{
+			sc:          self,
+			f:           self.get_root().owner,
+			error_token: r.token,
+		}
+		let ok = rtc.check(d)
+		if !ok {
+			ret
+		}
+
+		if !real(d) && rtc.vars.len == 0 {
+			ret
+		}
+
+		rt.vars = rtc.vars
+
+		if real(d) {
+			rt.expr = d.model
+		}
+	}
+
+	fn check_node(mut &self, mut node: NodeData) {
+		match type node {
+		| &Comment:                     break // Ignore.
+		| &ScopeTree:                   self.check_anon_scope((&ScopeTree)(node))
+		| &VarDecl:                     self.check_var_decl((&VarDecl)(node))
+		| &TypeAliasDecl:               self.check_type_alias_decl((&TypeAliasDecl)(node))
+		| &Expr:                        self.check_expr((&Expr)(node))
+		| &std::jule::ast::Conditional: self.check_conditional((&std::jule::ast::Conditional)(node))
+		| &Iter:                        self.check_iter((&Iter)(node))
+		| &std::jule::ast::ContSt:       self.check_cont((&std::jule::ast::ContSt)(node))
+		| &std::jule::ast::LabelSt:      self.check_label((&std::jule::ast::LabelSt)(node))
+		| &std::jule::ast::GotoSt:       self.push_goto((&std::jule::ast::GotoSt)(node))
+		| &AssignSt:                    self.check_assign_st((&AssignSt)(node))
+		| &std::jule::ast::MatchCase:    self.check_match((&std::jule::ast::MatchCase)(node))
+		| &std::jule::ast::FallSt:       self.check_fall((&std::jule::ast::FallSt)(node))
+		| &std::jule::ast::BreakSt:      self.check_break((&std::jule::ast::BreakSt)(node))
+		| &std::jule::ast::RetSt:        self.check_ret((&std::jule::ast::RetSt)(node))
+		|:                              outln("error <unimplemented scope node>")
+		}
+	}
+
+	fn check_tree(mut &self) {
+		self.i = 0
+		for self.i < self.tree.stmts.len; self.i++ {
+			self.check_node(self.tree.stmts[self.i])
+		}
+	}
+
+	fn check_same_scope_goto(mut self, gt: &ScopeGoto, label: &ScopeLabel) {
+		if label.pos < gt.pos { // Label at above.
+			ret
+		}
+
+		let mut i = label.pos
+		for i > gt.pos; i-- {
+			let s = label.scope.scope.stmts[i]
+			if st_is_def(s) {
+				self.s.push_err(gt.gt.token, "goto_jumps_declarations", gt.gt.label.kind)
+				break
+			}
+		}
+	}
+
+	fn check_label_parents(mut self, gt: &ScopeGoto, mut label: &ScopeLabel): bool {
+		let mut scope = label.scope
+
+	parent_scopes:
+		if real(scope.parent) && &scope.parent != &gt.scope {
+			scope = scope.parent
+			let mut i = 0
+			for i < scope.scope.stmts.len; i++ {
+				match {
+				| i >= label.pos:
+					ret true
+
+				| st_is_def(scope.scope.stmts[i]):
+					self.s.push_err(gt.gt.token, "goto_jumps_declarations", gt.gt.label.kind)
+					ret false
+				}
+			}
+
+			goto parent_scopes
+		}
+
+		ret true
+	}
+
+	fn check_goto_scope(mut self, gt: &ScopeGoto, label: &ScopeLabel) {
+		let mut i = gt.pos
+		for i < gt.scope.scope.stmts.len; i++ {
+			match {
+			| i >= label.pos:
+				ret
+
+			| st_is_def(gt.scope.scope.stmts[i]):
+				self.s.push_err(gt.gt.token, "goto_jumps_declarations", gt.gt.label.kind)
+				ret
+			}
+		}
+	}
+
+	fn check_diff_scope_goto(mut self, gt: &ScopeGoto, mut label: &ScopeLabel) {
+		match {
+		| label.scope.child_index > 0 && gt.scope.child_index == 0:
+			if !self.check_label_parents(gt, label) {
+				ret
+			}
+
+		| label.scope.child_index < gt.scope.child_index: // Label at parent blocks.
+			ret
+		}
+
+		let scope = label.scope
+		let mut i = label.pos - 1
+		for i >= 0; i-- {
+			let s = scope.scope.stmts[i]
+			match type s {
+			| &Scope:
+				if i <= gt.pos {
+					ret
+				}
+			}
+
+			if st_is_def(s) {
+				self.s.push_err(gt.gt.token, "goto_jumps_declarations", gt.gt.label.kind)
+				break
+			}
+		}
+
+		// Parent Scopes
+		if real(scope.parent) && &scope.parent != &gt.scope {
+			_ = self.check_label_parents(gt, label)
+		} else { // goto Scope
+			self.check_goto_scope(gt, label)
+		}
+	}
+
+	fn check_goto(mut self, gt: &ScopeGoto, mut label: &ScopeLabel) {
+		match {
+		| &gt.scope == &label.scope:
+			self.check_same_scope_goto(gt, label)
+
+		| label.scope.child_index > 0:
+			self.check_diff_scope_goto(gt, label)
+		}
+	}
+
+	fn check_gotos(mut self) {
+		for _, gt in self.gotos {
+			let mut label = self.find_label_all(gt.gt.label.kind)
+			if !real(label) {
+				self.s.push_err(gt.gt.token, "label_not_exist", gt.gt.label.kind)
+				continue
+			}
+
+			label.used = true
+			self.check_goto(gt, label)
+		}
+	}
+
+	fn check_labels(mut self) {
+		for _, l in self.labels {
+			if !l.used {
+				self.s.push_err(l.token, "declared_but_not_used", l.label.ident)
+			}
+		}
+	}
+
+	fn check_vars(mut self) {
+		for _, v in self.table.vars {
+			if !v.used && !is_ignore_ident(v.ident) && !is_anon_ident(v.ident) && v.ident != (str)(TokenKind.Self) {
+				self.s.push_err(v.token, "declared_but_not_used", v.ident)
+			}
+		}
+	}
+
+	fn check_aliases(mut self) {
+		for _, a in self.table.type_aliases {
+			if !a.used && !is_ignore_ident(a.ident) && !is_anon_ident(a.ident) {
+				self.s.push_err(a.token, "declared_but_not_used", a.ident)
+			}
+		}
+	}
+
+	// Checks scope tree.
+	fn check(mut &self, mut tree: &ScopeTree, mut s: &Scope) {
+		s.deferred = tree.deferred
+		s.unsafety = tree.unsafety
+
+		self.tree = tree
+		self.scope = s
+
+		self.check_tree()
+
+		self.check_vars()
+		self.check_aliases()
+
+		if self.is_root() {
+			self.check_gotos()
+			self.check_labels()
+		}
+	}
+
+	fn new_child_checker(mut &self): &ScopeChecker {
+		let mut base = new_scope_checker_base(self.s, new(FnIns))
+		base.parent = self
+		base.labels = self.labels
+		base.gotos = self.gotos
+		base.child_index = self.child_index + 1
+		ret base
+	}
+}

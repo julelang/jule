@@ -1,0 +1,1244 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// This file reserved for types, type kinds and type build algorithms.
+// This file haven't type compatibility checking algorithm or something else.
+
+use std::conv::{itoa}
+use std::jule::ast::{
+	Ast,
+	TypeDecl,
+	GenericDecl,
+	FnDecl,
+	MapTypeDecl,
+	PtrTypeDecl,
+	SlcTypeDecl,
+	ArrTypeDecl,
+	ScopeTree,
+	NamespaceTypeDecl,
+	TypeDeclKind,
+	TupleTypeDecl,
+	RefTypeDecl,
+	IdentTypeDecl,
+}
+use std::jule::build::{Derives, errorf}
+use std::jule::lex::{Token, TokenKind}
+use std::jule::types::{self, is_int}
+
+type PrimKind: std::jule::types::TypeKind
+
+// Type alias.
+pub struct TypeAlias {
+	pub scope:      &ScopeTree
+	pub public:     bool
+	pub cpp_linked: bool
+	pub used:       bool
+	pub token:      Token
+	pub ident:      str
+	pub kind:       &TypeSymbol
+	pub doc:        str
+	pub refers:     []any // Referred identifiers.
+}
+
+trait Kind {
+	fn to_str(self): str
+}
+
+// Type's kind's type.
+pub struct TypeKind {
+	pub cpp_linked: bool
+	pub cpp_ident:  str
+	kind:           Kind
+}
+
+impl Kind for TypeKind {
+	// Returns kind as string.
+	fn to_str(self): str {
+		if self.is_nil() {
+			ret "nil"
+		}
+
+		if self.cpp_linked {
+			ret "cpp." + self.cpp_ident
+		}
+
+		ret self.kind.to_str()
+	}
+}
+
+impl TypeKind {
+	// Returns clone.
+	fn clone(mut &self): &TypeKind {
+		if !real(self) {
+			ret new(TypeKind)
+		}
+
+		let mut kind = &TypeKind{
+			cpp_ident:  self.cpp_ident,
+			cpp_linked: self.cpp_linked,
+			kind:       self.kind,
+		}
+		ret kind
+	}
+
+	// Reports whether kind is "nil".
+	pub fn is_nil(self): bool { ret self.kind == nil }
+
+	// Reports whether kind is "void".
+	pub fn is_void(self): bool {
+		let prim = unsafe { (*(&self)).prim() }
+		ret real(prim) && prim.to_str() == "void"
+	}
+
+	// Returns primitive type if kind is primitive type, nil reference if not.
+	pub fn prim(mut self): &Prim {
+		match type self.kind {
+		| &Prim: ret (&Prim)(self.kind)
+		|:       ret new(Prim)
+		}
+	}
+
+	// Returns reference type if kind is reference, nil reference if not.
+	pub fn ref(mut self): &Ref {
+		match type self.kind {
+		| &Ref: ret (&Ref)(self.kind)
+		|:      ret new(Ref)
+		}
+	}
+
+	// Returns pointer type if kind is pointer, nil reference if not.
+	pub fn ptr(mut self): &Ptr {
+		match type self.kind {
+		| &Ptr: ret (&Ptr)(self.kind)
+		|:      ret new(Ptr)
+		}
+	}
+
+	// Returns enum type if kind is enum, nil reference if not.
+	pub fn enm(mut self): &Enum {
+		match type self.kind {
+		| &Enum: ret (&Enum)(self.kind)
+		|:       ret new(Enum)
+		}
+	}
+
+	// Returns array type if kind is array, nil reference if not.
+	pub fn arr(mut self): &Arr {
+		match type self.kind {
+		| &Arr: ret (&Arr)(self.kind)
+		|:      ret new(Arr)
+		}
+	}
+
+	// Returns slice type if kind is slice, nil reference if not.
+	pub fn slc(mut self): &Slc {
+		match type self.kind {
+		| &Slc: ret (&Slc)(self.kind)
+		|:      ret new(Slc)
+		}
+	}
+
+	// Returns fn type if kind is function, nil reference if not.
+	pub fn fnc(mut self): &FnIns {
+		match type self.kind {
+		| &FnIns: ret (&FnIns)(self.kind)
+		|:        ret new(FnIns)
+		}
+	}
+
+	// Returns struct type if kind is structure, nil reference if not.
+	pub fn strct(mut self): &StructIns {
+		match type self.kind {
+		| &StructIns: ret (&StructIns)(self.kind)
+		|:            ret new(StructIns)
+		}
+	}
+
+	// Returns trait type if kind is trait, nil reference if not.
+	pub fn trt(mut self): &Trait {
+		match type self.kind {
+		| &Trait: ret (&Trait)(self.kind)
+		|:        ret new(Trait)
+		}
+	}
+
+	// Returns map type if kind is map, nil reference if not.
+	pub fn map(mut self): &Map {
+		match type self.kind {
+		| &Map: ret (&Map)(self.kind)
+		|:      ret new(Map)
+		}
+	}
+
+	// Returns tuple type if kind is tuple, nil reference if not.
+	pub fn tup(mut self): &Tuple {
+		match type self.kind {
+		| &Tuple: ret (&Tuple)(self.kind)
+		|:        ret new(Tuple)
+		}
+	}
+}
+
+// Type.
+pub struct TypeSymbol {
+	pub decl: &TypeDecl // Never changed by semantic analyzer.
+	pub kind: &TypeKind
+}
+
+impl TypeSymbol {
+	// Reports whether type is checked already.
+	fn checked(self): bool { ret real(self.kind) }
+
+	// Removes kind and ready to check.
+	// checked() reports false after this function.
+	fn remove_kind(mut self) { drop(self.kind) }
+}
+
+// Primitive type.
+pub struct Prim {
+	kind: str
+}
+
+impl Kind for Prim {
+	// Returns kind.
+	fn to_str(self): str { ret self.kind }
+}
+
+impl Prim {
+	// Reports whether type is primitive i8.
+	pub fn is_i8(self): bool { ret self.kind == (str)(PrimKind.I8) }
+
+	// Reports whether type is primitive i16.
+	pub fn is_i16(self): bool { ret self.kind == (str)(PrimKind.I16) }
+
+	// Reports whether type is primitive i32.
+	pub fn is_i32(self): bool { ret self.kind == (str)(PrimKind.I32) }
+
+	// Reports whether type is primitive i64.
+	pub fn is_i64(self): bool { ret self.kind == (str)(PrimKind.I64) }
+
+	// Reports whether type is primitive u8.
+	pub fn is_u8(self): bool { ret self.kind == (str)(PrimKind.U8) }
+
+	// Reports whether type is primitive u16.
+	pub fn is_u16(self): bool { ret self.kind == (str)(PrimKind.U16) }
+
+	// Reports whether type is primitive u32.
+	pub fn is_u32(self): bool { ret self.kind == (str)(PrimKind.U32) }
+
+	// Reports whether type is primitive u64.
+	pub fn is_u64(self): bool { ret self.kind == (str)(PrimKind.U64) }
+
+	// Reports whether type is primitive f32.
+	pub fn is_f32(self): bool { ret self.kind == (str)(PrimKind.F32) }
+
+	// Reports whether type is primitive f64.
+	pub fn is_f64(self): bool { ret self.kind == (str)(PrimKind.F64) }
+
+	// Reports whether type is primitive int.
+	pub fn is_int(self): bool { ret self.kind == (str)(PrimKind.Int) }
+
+	// Reports whether type is primitive uint.
+	pub fn is_uint(self): bool { ret self.kind == (str)(PrimKind.Uint) }
+
+	// Reports whether type is primitive uintptr.
+	pub fn is_uintptr(self): bool { ret self.kind == (str)(PrimKind.Uintptr) }
+
+	// Reports whether type is primitive bool.
+	pub fn is_bool(self): bool { ret self.kind == (str)(PrimKind.Bool) }
+
+	// Reports whether type is primitive str.
+	pub fn is_str(self): bool { ret self.kind == (str)(PrimKind.Str) }
+
+	// Reports whether type is primitive any.
+	pub fn is_any(self): bool { ret self.kind == (str)(PrimKind.Any) }
+}
+
+// Reference type.
+pub struct Ref {
+	pub elem: &TypeKind
+}
+
+impl Kind for Ref {
+	// Returns reference kind as string.
+	fn to_str(self): str { ret "&" + self.elem.to_str() }
+}
+
+// Slice type.
+pub struct Slc {
+	pub elem: &TypeKind
+}
+
+impl Kind for Slc {
+	// Returns slice kind as string.
+	fn to_str(self): str { ret "[]" + self.elem.to_str() }
+}
+
+// Tuple type.
+pub struct Tuple {
+	pub types: []&TypeKind
+}
+
+impl Kind for Tuple {
+	// Returns tuple kind as string.
+	fn to_str(self): str {
+		let mut s = "("
+		s += self.types[0].to_str()
+		for _, t in self.types[1:] {
+			s += ","
+			s += t.to_str()
+		}
+		s += ")"
+		ret s
+	}
+}
+
+// Map type.
+pub struct Map {
+	pub key: &TypeKind
+	pub val: &TypeKind
+}
+
+impl Kind for Map {
+	// Returns map kind as string.
+	fn to_str(self): str {
+		let mut s = "["
+		s += self.key.to_str()
+		s += ":"
+		s += self.val.to_str()
+		s += "]"
+		ret s
+	}
+}
+
+// Array type.
+pub struct Arr {
+	pub auto: bool // Auto-sized array.
+	pub n:    int
+	pub elem: &TypeKind
+}
+
+impl Kind for Arr {
+	// Returns array kind as string.
+	fn to_str(self): str {
+		let mut s = "["
+		s += itoa(self.n)
+		s += "]"
+		s += self.elem.to_str()
+		ret s
+	}
+}
+
+// Pointer type.
+pub struct Ptr {
+	pub elem: &TypeKind
+}
+
+impl Kind for Ptr {
+	// Returns pointer kind as string.
+	fn to_str(self): str {
+		if self.is_unsafe() {
+			ret "*unsafe"
+		}
+		ret "*" + self.elem.to_str()
+	}
+}
+
+impl Ptr {
+	// Reports whether pointer is unsafe pointer (*unsafe).
+	pub fn is_unsafe(self): bool { ret !real(self.elem) }
+}
+
+fn can_get_ptr(mut d: &Data): bool {
+	if !d.lvalue || d.is_const() {
+		ret false
+	}
+
+	match {
+	| real(d.kind.fnc()) || real(d.kind.enm()):
+		ret false
+
+	|:
+		ret true
+	}
+}
+
+fn is_lvalue(mut t: &TypeKind): bool {
+	ret real(t.ref()) || real(t.ptr()) || real(t.slc()) || real(t.map())
+}
+
+fn is_mut(mut t: &TypeKind): bool {
+	if real(t.strct()) {
+		ret t.strct().has_mut
+	}
+	if real(t.prim()) {
+		let p = t.prim()
+		ret p.is_any()
+	}
+	ret real(t.slc()) || real(t.ptr()) || real(t.ref())
+}
+
+fn supports_clonning(mut k: &TypeKind): bool {
+	match {
+	| real(k.prim()):
+		ret !k.prim().is_any()
+
+	| real(k.enm()):
+		ret true
+
+	| real(k.fnc()):
+		ret true
+
+	| real(k.ptr()):
+		ret true
+
+	| real(k.slc()):
+		ret supports_clonning(k.slc().elem)
+
+	| real(k.map()):
+		ret supports_clonning(k.map().key) && supports_clonning(k.map().val)
+
+	| real(k.arr()):
+		ret supports_clonning(k.arr().elem)
+
+	| real(k.ref()):
+		ret supports_clonning(k.ref().elem)
+
+	| real(k.strct()):
+		let mut s = k.strct()
+		if !s.has_mut {
+			ret true
+		}
+		if !real(s.decl) || s.decl.cpp_linked || !s.decl.is_derives((str)(Derives.Clone)) {
+			ret false
+		}
+		ret true
+
+	|:
+		ret false
+	}
+}
+
+fn is_nil_compatible(mut t: &TypeKind): bool {
+	let prim = t.prim()
+	if real(prim) && prim.is_any() {
+		ret true
+	}
+
+	ret (
+		t.is_nil() ||
+		real(t.fnc()) ||
+		real(t.ptr()) ||
+		real(t.trt()) ||
+		real(t.slc()) ||
+		real(t.map())
+	)
+}
+
+fn is_valid_for_ref(mut t: &TypeKind): bool {
+	let mut s = t.strct()
+	if real(s) && real(s.decl) && s.decl.cpp_linked {
+		ret false
+	}
+	ret !(real(t.enm()) || real(t.ptr()) || real(t.ref()) || real(t.arr()))
+}
+
+fn is_variadicable(mut tk: &TypeKind): bool { ret real(tk.slc()) }
+
+fn build_link_path_by_tokens(tokens: []Token): str {
+	let mut s = tokens[0].kind
+	for _, token in tokens[1:] {
+		s += "::"
+		s += token.kind
+	}
+	ret s
+}
+
+fn build_prim_type(kind: str): &Prim {
+	ret &Prim{
+		kind: kind,
+	}
+}
+
+// Reports whether kind is primitive type.
+fn is_prim(kind: str): bool {
+	ret (
+		kind == (str)(TokenKind.I8) ||
+		kind == (str)(TokenKind.I16) ||
+		kind == (str)(TokenKind.I32) ||
+		kind == (str)(TokenKind.I64) ||
+		kind == (str)(TokenKind.U8) ||
+		kind == (str)(TokenKind.U16) ||
+		kind == (str)(TokenKind.U32) ||
+		kind == (str)(TokenKind.U64) ||
+		kind == (str)(TokenKind.F32) ||
+		kind == (str)(TokenKind.F64) ||
+		kind == (str)(TokenKind.Int) ||
+		kind == (str)(TokenKind.Uint) ||
+		kind == (str)(TokenKind.Uintptr) ||
+		kind == (str)(TokenKind.Bool) ||
+		kind == (str)(TokenKind.Str) ||
+		kind == (str)(TokenKind.Any)
+	)
+}
+
+struct Referencer {
+	ident: str
+	owner: any
+	refs:  *[]any
+}
+
+// Checks type and builds result as kind.
+// Removes kind if error occurs,
+// so type is not reports true for checked state.
+struct TypeChecker {
+	// Uses Sema for:
+	//  - Push errors.
+	s: &Sema
+
+	// Uses Lookup for:
+	//  - Lookup symbol tables.
+	lookup: Lookup
+
+	// If this is not nil, appends referred ident types.
+	// Also used as checker owner.
+	referencer: &Referencer
+
+	error_token: Token
+
+	// This identifiers ignored and
+	// appends as primitive type.
+	//
+	// Each dimension 2 array accepted as identifier group.
+	ignore_generics: []&GenericDecl
+
+	// Ignores with trait check pattern.
+	// Uses to_trait_kind_str's representation.
+	ignore_with_trait_pattern: bool
+
+	// This generics used as type alias for real kind.
+	use_generics: []&TypeAlias
+
+	// Current checked type is not plain type.
+	// Type is pointer, reference, slice or similar.
+	not_plain: bool
+}
+
+impl TypeChecker {
+	fn push_err(mut self, token: Token, key: str, args: ...any) {
+		self.s.push_err(token, key, args...)
+	}
+
+	fn build_prim(mut self, decl: &IdentTypeDecl): &Prim {
+		if !is_prim(decl.ident) {
+			self.push_err(self.error_token, "invalid_type")
+			ret new(Prim)
+		}
+
+		if decl.generics.len > 0 {
+			self.push_err(decl.token, "type_not_supports_generics", decl.ident)
+			ret new(Prim)
+		}
+
+		ret build_prim_type(decl.ident)
+	}
+
+	// Checks type alias illegal cycles.
+	// Appends reference to reference if there is no illegal cycle.
+	// Returns true if self.referencer is nil reference.
+	// Returns true if refers is nil.
+	fn check_illegal_cycles(mut self, ident: &IdentTypeDecl, mut decl: any): (ok: bool) {
+		if !real(self.referencer) {
+			ret true
+		}
+	
+		match type decl {
+		| &Struct:
+			if self.not_plain {
+				ret true
+			}
+		}
+	
+		// Check illegal cycle for itself.
+		// Because refers's owner is ta.
+		if self.referencer.owner == decl {
+			self.push_err(ident.token, "illegal_cycle_refers_itself", self.referencer.ident)
+			ret false
+		}
+	
+		const PADDING = 4
+	
+		let mut message = ""
+	
+		let push = fn(def1: any, def2: any) {
+			let get_ident = fn(def: any): str {
+				match type def {
+				| &TypeAlias: ret (&TypeAlias)(def).ident
+				| &Struct:    ret (&Struct)(def).ident
+				| &Enum:      ret (&Enum)(def).ident
+				|:            ret ""
+				}
+			}
+	
+			let def1_ident = get_ident(def1)
+			let def2_ident = get_ident(def2)
+			let refers_to = errorf("refers_to", def1_ident, def2_ident)
+			message = str_repeat(" ", PADDING) + refers_to + "\n" + message
+		}
+	
+		// Check cross illegal cycle.
+		let mut check_cross: fn(decl: any): bool = nil
+		check_cross = fn(decl: any): bool {
+			match type decl {
+			| &TypeAlias:
+				let ta = (&TypeAlias)(decl)
+				for _, d in ta.refers {
+					if d == self.referencer.owner {
+						push(ta, d)
+						ret false
+					}
+	
+					if !check_cross(d) {
+						push(ta, d)
+						ret false
+					}
+				}
+	
+			| &Struct:
+				let s = (&Struct)(decl)
+				for _, d in s.depends {
+					if self.referencer.owner == d {
+						push(s, d)
+						ret false
+					}
+	
+					if !check_cross(d) {
+						push(s, d)
+						ret false
+					}
+				}
+	
+			}
+	
+			ret true
+		}
+	
+		if !check_cross(decl) {
+			let mut err_msg = message
+			message = ""
+			push(self.referencer.owner, decl)
+			err_msg = err_msg + message
+			self.push_err(ident.token, "illegal_cross_cycle", err_msg)
+			ret false
+		}
+	
+		match type self.referencer.owner {
+		| &TypeAlias:
+			unsafe { *self.referencer.refs = append(*self.referencer.refs, decl) }
+	
+		| &Struct:
+			match type decl {
+			| &Struct:
+				let mut s = (&Struct)(self.referencer.owner)
+				s.depends = append(s.depends, (&Struct)(decl))
+			}
+		}
+	
+		ret true
+	}
+
+	fn from_type_alias(mut self, decl: &IdentTypeDecl, mut ta: &TypeAlias): Kind {
+		if !self.s.is_accessible_define(ta.public, ta.token) {
+			self.push_err(decl.token, "ident_not_exist", decl.ident)
+			ret nil
+		}
+
+		ta.used = true
+
+		if decl.generics.len > 0 {
+			self.push_err(decl.token, "type_not_supports_generics", decl.ident)
+			ret nil
+		}
+
+		let mut ok = self.check_illegal_cycles(decl, ta)
+		if !ok {
+			ret nil
+		}
+
+		// Build kind if not builded already.
+		ok = self.s.check_type_alias_decl_kind(ta, self.lookup)
+		if !ok {
+			ret nil
+		}
+
+		let mut kind = ta.kind.kind.clone()
+
+		if ta.cpp_linked {
+			kind.cpp_linked = true
+			kind.cpp_ident = ta.ident
+		}
+
+		ret kind
+	}
+
+	fn from_enum(mut self, decl: &IdentTypeDecl, mut e: &Enum): &Enum {
+		if !self.s.is_accessible_define(e.public, e.token) {
+			self.push_err(decl.token, "ident_not_exist", decl.ident)
+			ret new(Enum)
+		}
+
+		if decl.generics.len > 0 {
+			self.push_err(decl.token, "type_not_supports_generics", decl.ident)
+			ret new(Enum)
+		}
+
+		ret e
+	}
+
+	fn check_struct_ins(mut self, mut ins: &StructIns, error_token: Token): (ok: bool) {
+		if ins.checked {
+			ret true
+		}
+		ins.checked = true
+
+		ok = self.s.check_generic_quantity(ins.decl.generics.len, ins.generics.len, error_token)
+		if !ok {
+			ret false
+		}
+
+		if real(self.referencer) && self.referencer.owner == ins.decl {
+			// Break algorithm cycle.
+			ret true
+		} /* else if ins.decl.sema != nil && ins.decl.generics.len == 0 {
+			// Break algorithm cycle.
+			ret true
+		}*/
+
+		let mut old = self.s.file
+		defer {
+			self.s.set_current_file(old)
+		}
+		let mut f = find_file(self.s.files, ins.decl.token.file)
+		if real(f) {
+			self.s.set_current_file(f)
+		}
+
+		let mut referencer = &Referencer{
+			ident: ins.decl.ident,
+			owner: ins.decl,
+		}
+
+		let mut generics = make([]&TypeAlias, ins.generics.len)
+		for i, g in ins.generics {
+			generics[i] = &TypeAlias{
+				ident: ins.decl.generics[i].ident,
+				kind: &TypeSymbol{
+					kind: g,
+				},
+			}
+		}
+
+		// Check field types.
+		for (_, mut f) in ins.fields {
+			let mut tc = TypeChecker{
+				s:            self.s,
+				lookup:       self.lookup,
+				referencer:   referencer,
+				use_generics: generics,
+			}
+			let mut kind = tc.check_decl(f.decl.kind.decl)
+			ok = real(kind)
+
+			if real(ins.decl.sema) && self.s != ins.decl.sema && ins.decl.sema.errors.len > 0 {
+				self.s.errors = append(self.s.errors, ins.decl.sema.errors...)
+			}
+
+			if !ok {
+				ret false
+			}
+
+			f.kind = kind
+			if is_mut(f.kind) {
+				ins.has_mut = true
+				_ = self.s.check_struct_ins_derive_clone(ins)
+			}
+		}
+
+		ret true
+	}
+
+	fn append_used_struct_reference(mut self, mut s: &Struct) {
+		if !real(self.referencer) {
+			ret
+		}
+
+		match type self.referencer.owner {
+		| &Struct:
+			let mut ref_s = (&Struct)(self.referencer.owner)
+			if !ref_s.is_uses(s) {
+				ref_s.uses = append(ref_s.uses, s)
+			}
+		}
+	}
+
+	fn from_struct(mut self, mut decl: &IdentTypeDecl, mut s: &Struct): &StructIns {
+		if !self.s.is_accessible_define(s.public, s.token) {
+			self.push_err(decl.token, "ident_not_exist", decl.ident)
+			ret new(StructIns)
+		}
+
+		let mut ok = self.check_illegal_cycles(decl, s)
+		if !ok {
+			ret new(StructIns)
+		}
+
+		self.append_used_struct_reference(s)
+
+		let mut ins = s.instance()
+		ins.generics = make([]&TypeKind, decl.generics.len)
+		let mut referencer = self.referencer
+		drop(self.referencer)
+		for (i, mut g) in decl.generics {
+			let mut kind = self.build(g.kind)
+			if !real(kind) {
+				ok = false
+				continue
+			}
+			ins.generics[i] = kind
+		}
+
+		self.referencer = referencer
+
+		if !ok {
+			ret new(StructIns)
+		}
+
+		s.append_instance(ins)
+
+		ok = self.check_struct_ins(ins, decl.token)
+		if !ok {
+			ret new(StructIns)
+		}
+
+		ret ins
+	}
+
+	fn get_def(mut self, mut decl: &IdentTypeDecl): Kind {
+		for i, g in self.ignore_generics {
+			if g.ident == decl.ident {
+				if self.ignore_with_trait_pattern {
+					ret build_prim_type(itoa(i))
+				} else {
+					ret build_prim_type(g.ident)
+				}
+			}
+		}
+
+		for (_, mut g) in self.use_generics {
+			if g.ident == decl.ident {
+				let mut st = g.kind.kind.strct()
+				if real(st) {
+					let ok = self.check_illegal_cycles(decl, st.decl)
+					if !ok {
+						ret nil
+					}
+				}
+				ret g.kind.kind.kind
+			}
+		}
+
+		if !decl.cpp_linked {
+			let mut e = self.lookup.find_enum(decl.ident)
+			if real(e) {
+				ret self.from_enum(decl, e)
+			}
+
+			let mut t = self.lookup.find_trait(decl.ident)
+			if !real(t) {
+				t = find_builtin_trait(decl.ident)
+			}
+			if real(t) {
+				if !self.s.is_accessible_define(t.public, t.token) {
+					self.push_err(decl.token, "ident_not_exist", decl.ident)
+					ret nil
+				}
+
+				if decl.generics.len > 0 {
+					self.push_err(decl.token, "type_not_supports_generics", decl.ident)
+					ret nil
+				}
+				ret t
+			}
+		}
+
+		let mut s = self.lookup.find_struct(decl.ident, decl.cpp_linked)
+		if real(s) {
+			ret self.from_struct(decl, s)
+		}
+
+		let mut ta = self.lookup.find_type_alias(decl.ident, decl.cpp_linked)
+		if !real(ta) {
+			ta = find_builtin_type_alias(decl.ident)
+		}
+		if real(ta) {
+			ret self.from_type_alias(decl, ta)
+		}
+
+		self.push_err(decl.token, "ident_not_exist", decl.ident)
+		ret nil
+	}
+
+	fn build_ident(mut self, mut decl: &IdentTypeDecl): Kind {
+		match {
+		| is_prim(decl.ident): ret self.build_prim(decl)
+		|:                     ret self.get_def(decl)
+		}
+	}
+
+	fn build_ref(mut self, mut decl: &RefTypeDecl): &Ref {
+		let not_plain = self.not_plain
+		self.not_plain = true
+		defer { self.not_plain = not_plain }
+
+		let mut elem = self.check_decl(decl.elem)
+
+		// Check special cases.
+		match {
+		| !real(elem):
+			ret new(Ref)
+
+		| real(elem.strct()):
+			let s = elem.strct()
+			if real(s.decl) && s.decl.cpp_linked {
+				self.push_err(self.error_token, "cpp_linked_struct_for_ref")
+				ret new(Ref)
+			}
+
+		| real(elem.ref()):
+			self.push_err(self.error_token, "ref_refs_ref")
+			ret new(Ref)
+
+		| real(elem.ptr()):
+			self.push_err(self.error_token, "ref_refs_ptr")
+			ret new(Ref)
+
+		| real(elem.enm()):
+			self.push_err(self.error_token, "ref_refs_enum")
+			ret new(Ref)
+
+		| real(elem.arr()):
+			self.push_err(self.error_token, "ref_refs_array")
+			ret new(Ref)
+		}
+
+		ret &Ref{
+			elem: elem,
+		}
+	}
+
+	fn build_ptr(mut self, mut decl: &PtrTypeDecl): &Ptr {
+		let not_plain = self.not_plain
+		self.not_plain = true
+		defer { self.not_plain = not_plain }
+
+		let mut elem = new(TypeKind)
+
+		if !decl.is_unsafe() {
+			elem = self.check_decl(decl.elem)
+
+			// Check special cases.
+			match {
+			| !real(elem):
+				ret new(Ptr)
+
+			| real(elem.ref()):
+				self.push_err(self.error_token, "ptr_points_ref")
+				ret new(Ptr)
+
+			| real(elem.enm()):
+				self.push_err(self.error_token, "ptr_points_enum")
+				ret new(Ptr)
+
+			| real(elem.arr()) && elem.arr().auto:
+				self.push_err(decl.elem.token, "array_auto_sized")
+				ret new(Ptr)
+			}
+		}
+
+		ret &Ptr{
+			elem: elem,
+		}
+	}
+
+	fn build_slc(mut self, mut decl: &SlcTypeDecl): &Slc {
+		let not_plain = self.not_plain
+		self.not_plain = true
+		defer { self.not_plain = not_plain }
+
+		let mut elem = self.check_decl(decl.elem)
+
+		// Check special cases.
+		match {
+		| !real(elem):
+			ret new(Slc)
+
+		| real(elem.arr()) && elem.arr().auto:
+			self.push_err(decl.elem.token, "array_auto_sized")
+			ret new(Slc)
+		}
+
+		ret &Slc{
+			elem: elem,
+		}
+	}
+
+	fn build_arr(mut self, mut decl: &ArrTypeDecl): &Arr {
+		let not_plain = self.not_plain
+		self.not_plain = true
+		defer { self.not_plain = not_plain }
+
+		let mut n = 0
+
+		if !decl.auto_sized() {
+			let mut size = self.s.eval(decl.size, self.lookup)
+			if !real(size) {
+				ret new(Arr)
+			}
+
+			if !size.is_const() {
+				self.push_err(decl.elem.token, "expr_not_const")
+				ret new(Arr)
+			} else if !is_int(size.kind.prim().kind) {
+				self.push_err(decl.elem.token, "array_size_is_not_int")
+				ret new(Arr)
+			}
+
+			n = int(size.constant.as_i64())
+			if n < 0 {
+				self.push_err(decl.elem.token, "array_size_is_negative")
+				ret new(Arr)
+			}
+		}
+
+		let mut elem = self.check_decl(decl.elem)
+
+		// Check special cases.
+		match {
+		| !real(elem):
+			ret new(Arr)
+
+		| real(elem.arr()) && elem.arr().auto:
+			self.push_err(decl.elem.token, "array_auto_sized")
+			ret new(Arr)
+		}
+
+		ret &Arr{
+			auto: decl.auto_sized(),
+			n:    n,
+			elem: elem,
+		}
+	}
+
+	fn build_map(mut self, mut decl: &MapTypeDecl): &Map {
+		let not_plain = self.not_plain
+		self.not_plain = true
+		defer { self.not_plain = not_plain }
+
+		let mut key = self.check_decl(decl.key)
+		if !real(key) {
+			ret new(Map)
+		}
+
+		let mut val = self.check_decl(decl.val)
+		if !real(val) {
+			ret new(Map)
+		}
+
+		ret &Map{
+			key: key,
+			val: val,
+		}
+	}
+
+	fn build_tuple(mut self, mut decl: &TupleTypeDecl): &Tuple {
+		let mut types = make([]&TypeKind, decl.types.len)
+		for (i, mut t) in decl.types {
+			let mut kind = self.check_decl(t)
+			if !real(kind) {
+				ret new(Tuple)
+			}
+			types[i] = kind
+		}
+
+		ret &Tuple{types: types}
+	}
+
+	fn check_fn_types(mut self, mut f: &FnIns): (ok: bool) {
+		for (_, mut p) in f.params {
+			p.kind = self.build(p.decl.kind.decl.kind)
+			ok = real(p.kind)
+			if !ok {
+				ret false
+			}
+		}
+
+		if !f.decl.is_void() {
+			f.result = self.build(f.decl.result.kind.decl.kind)
+			ret real(f.result)
+		}
+
+		ret true
+	}
+
+	fn build_fn(mut self, mut decl: &FnDecl): &FnIns {
+		if decl.generics.len > 0 {
+			self.push_err(decl.token, "genericed_fn_as_anonymous_fn")
+			ret new(FnIns)
+		}
+
+		let mut f = build_fn(decl)
+		let mut ins = f.instance_force()
+		ins.anon = true
+
+		let ok = self.check_fn_types(ins)
+		if !ok {
+			ret new(FnIns)
+		}
+
+		ret ins
+	}
+
+	fn build_by_std_namespace(mut self, mut decl: &NamespaceTypeDecl): Kind {
+		let path = build_link_path_by_tokens(decl.idents)
+		let mut imp = self.lookup.select_package(fn(imp: &ImportInfo): bool {
+			ret imp.std && imp.link_path == path
+		})
+
+		if !real(imp) || !imp.is_lookupable((str)(TokenKind.Self)) {
+			self.push_err(decl.idents[0], "namespace_not_exist", path)
+			ret nil
+		}
+
+		let mut lookup = self.lookup
+		self.lookup = imp
+
+		let mut kind = self.build_ident(decl.kind)
+
+		self.lookup = lookup
+
+		ret kind
+	}
+
+	fn build_by_namespace(mut self, mut decl: &NamespaceTypeDecl): Kind {
+		let token = decl.idents[0]
+		if token.kind == "std" {
+			ret self.build_by_std_namespace(decl)
+		}
+
+		self.push_err(token, "ident_not_exist", token.kind)
+		ret nil
+	}
+
+	fn build(mut self, mut decl_kind: TypeDeclKind): &TypeKind {
+		let mut kind: Kind = nil
+
+		match type decl_kind {
+		| &IdentTypeDecl:
+			let mut t = self.build_ident((&IdentTypeDecl)(decl_kind))
+			if t != nil {
+				kind = t
+			}
+
+		| &RefTypeDecl:
+			let mut t = self.build_ref((&RefTypeDecl)(decl_kind))
+			if real(t) {
+				kind = t
+			}
+
+		| &PtrTypeDecl:
+			let mut t = self.build_ptr((&PtrTypeDecl)(decl_kind))
+			if real(t) {
+				kind = t
+			}
+
+		| &SlcTypeDecl:
+			let mut t = self.build_slc((&SlcTypeDecl)(decl_kind))
+			if real(t) {
+				kind = t
+			}
+
+		| &ArrTypeDecl:
+			let mut t = self.build_arr((&ArrTypeDecl)(decl_kind))
+			if real(t) {
+				kind = t
+			}
+
+		| &MapTypeDecl:
+			let mut t = self.build_map((&MapTypeDecl)(decl_kind))
+			if real(t) {
+				kind = t
+			}
+
+		| &TupleTypeDecl:
+			let mut t = self.build_tuple((&TupleTypeDecl)(decl_kind))
+			if real(t) {
+				kind = t
+			}
+
+		| &FnDecl:
+			let mut t = self.build_fn((&FnDecl)(decl_kind))
+			if real(t) {
+				kind = t
+			}
+
+		| &NamespaceTypeDecl:
+			let mut t = self.build_by_namespace((&NamespaceTypeDecl)(decl_kind))
+			if t != nil {
+				kind = t
+			}
+
+		|:
+			self.push_err(self.error_token, "invalid_type")
+			ret new(TypeKind)
+		}
+
+		if kind == nil {
+			ret new(TypeKind)
+		}
+
+		match type kind {
+		| &TypeKind:
+			ret (&TypeKind)(kind)
+
+		|:
+			ret &TypeKind{
+				kind: kind,
+			}
+		}
+	}
+
+	fn check_decl(mut self, mut decl: &TypeDecl): &TypeKind {
+		// Save current token.
+		let mut error_token = self.error_token
+
+		self.error_token = decl.token
+		let mut kind = self.build(decl.kind)
+		self.error_token = error_token
+
+		ret kind
+	}
+
+	fn check(mut self, mut t: &TypeSymbol) {
+		if !real(t.decl) {
+			ret
+		}
+
+		let mut kind = self.check_decl(t.decl)
+		if !real(kind) {
+			t.remove_kind()
+			ret
+		}
+		t.kind = kind
+	}
+}

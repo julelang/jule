@@ -1,0 +1,75 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::conv::{itoa}
+use std::jule::lex::{Token, TokenId}
+
+// Trait.
+pub struct Trait {
+	pub token:   Token
+	pub ident:   str
+	pub public:  bool
+	pub doc:     str
+	pub methods: []&Fn
+}
+
+impl Kind for Trait {
+	// Implement: Kind
+	// Returns Trait's identifier.
+	fn to_str(self): str { ret self.ident }
+}
+
+impl Trait {
+	// Reports whether Trait is built-in.
+	pub fn is_builtin(self): bool { ret self.token.id == TokenId.Na }
+
+	// Returns method by identifier.
+	// Returns nil if not exist any method in this identifier.
+	pub fn find_method(mut self, ident: str): &Fn {
+		for (_, mut f) in self.methods {
+			if f.ident == ident {
+				ret f
+			}
+		}
+		ret new(Fn)
+	}
+}
+
+// Returns function declaration text for trait checking.
+// Returns special representation of function.
+fn to_trait_kind_str(f: &FnIns): str {
+	let mut s = ""
+	if f.decl.public {
+		s += "p"
+	}
+	if f.decl.unsafety {
+		s += "u"
+	}
+	s += "f&"
+	s += f.decl.ident
+	s += "#"
+
+	if f.generics.len > 0 {
+		for i in f.generics {
+			s += itoa(i)
+		}
+	} else if f.decl.generics.len > 0 { // Use Decl's generic if not parsed yet.
+		for i in f.decl.generics {
+			s += itoa(i)
+		}
+	}
+
+	s += "?"
+	let n = f.params.len
+	if n > 0 {
+		for _, p in f.params {
+			s += p.to_str()
+		}
+	}
+	s += "="
+	if !f.decl.is_void() {
+		s += f.result.to_str()
+	}
+	ret s
+}

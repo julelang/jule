@@ -1,0 +1,237 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::jule::lex::{File}
+
+// Symbol table.
+// Builds by semantic analyzer.
+pub struct SymbolTable {
+	pub file:         &File         // Owner fileset of this symbol table.
+	pub passes:       []Pass        // All passed flags with jule:pass directive.
+	pub imports:      []&ImportInfo // Imported packages.
+	pub vars:         []&Var        // Variables.
+	pub type_aliases: []&TypeAlias  // Type aliases.
+	pub structs:      []&Struct     // Structures.
+	pub funcs:        []&Fn         // Functions.
+	pub traits:       []&Trait      // Traits.
+	pub enums:        []&Enum       // Enums.
+	pub impls:        []&Impl       // Implementations.
+}
+
+impl Lookup for SymbolTable {
+	// Returns imported package by identifier.
+	// Returns nil reference if not exist any package in this identifier.
+	fn find_package(mut self, ident: str): &ImportInfo {
+		for (_, mut pkg) in self.imports {
+			if pkg.ident == ident {
+				ret pkg
+			}
+		}
+		ret new(ImportInfo)
+	}
+
+	// Returns imported package by selector.
+	// Returns nil reference if selector returns false for all packages.
+	// Returns nil reference if selector is nil.
+	fn select_package(mut self, selector: fn(&ImportInfo): bool): &ImportInfo {
+		if selector == nil {
+			ret new(ImportInfo)
+		}
+		for (_, mut pkg) in self.imports {
+			if selector(pkg) {
+				ret pkg
+			}
+		}
+		ret new(ImportInfo)
+	}
+
+	// Returns variable by identifier and cpp linked state.
+	// Returns nil if refenrece not exist any variable in this identifier.
+	fn find_var(mut self, ident: str, cpp_linked: bool): &Var {
+		ret self.__find_var(ident, cpp_linked, false)
+	}
+
+	// Returns type alias by identifier and cpp linked state.
+	// Returns nil reference if not exist any type alias in this identifier.
+	fn find_type_alias(mut self, ident: str, cpp_linked: bool): &TypeAlias {
+		ret self.__find_type_alias(ident, cpp_linked, false)
+	}
+
+	// Returns struct by identifier and cpp linked state.
+	// Returns nil reference if not exist any struct in this identifier.
+	fn find_struct(mut self, ident: str, cpp_linked: bool): &Struct {
+		for (_, mut s) in self.structs {
+			if s.ident == ident && s.cpp_linked == cpp_linked {
+				ret s
+			}
+		}
+		ret new(Struct)
+	}
+
+	// Returns function by identifier and cpp linked state.
+	// Returns nil reference if not exist any function in this identifier.
+	fn find_fn(mut self, ident: str, cpp_linked: bool): &Fn {
+		for (_, mut f) in self.funcs {
+			if f.ident == ident && f.cpp_linked == cpp_linked {
+				ret f
+			}
+		}
+		ret new(Fn)
+	}
+
+	// Returns trait by identifier.
+	// Returns nil reference if not exist any trait in this identifier.
+	fn find_trait(mut self, ident: str): &Trait {
+		for (_, mut t) in self.traits {
+			if t.ident == ident {
+				ret t
+			}
+		}
+		ret new(Trait)
+	}
+
+	// Returns enum by identifier.
+	// Returns nil reference if not exist any enum in this identifier.
+	fn find_enum(mut self, ident: str): &Enum {
+		for (_, mut e) in self.enums {
+			if e.ident == ident {
+				ret e
+			}
+		}
+		ret new(Enum)
+	}
+}
+
+impl SymbolTable {
+	fn __find_var(mut self, ident: str, cpp_linked: bool, reverse: bool): &Var {
+		if reverse {
+			let mut i = self.vars.len - 1
+			for i >= 0; i-- {
+				let mut v = self.vars[i]
+				if v.ident == ident && v.cpp_linked == cpp_linked {
+					ret v
+				}
+			}
+		} else {
+			for (_, mut v) in self.vars {
+				if v.ident == ident && v.cpp_linked == cpp_linked {
+					ret v
+				}
+			}
+		}
+		ret new(Var)
+	}
+
+	fn __find_type_alias(mut self, ident: str, cpp_linked: bool, reverse: bool): &TypeAlias {
+		if reverse {
+			let mut i = self.type_aliases.len - 1
+			for i >= 0; i-- {
+				let mut ta = self.type_aliases[i]
+				if ta.ident == ident && ta.cpp_linked == cpp_linked {
+					ret ta
+				}
+			}
+		} else {
+			for (_, mut ta) in self.type_aliases {
+				if ta.ident == ident && ta.cpp_linked == cpp_linked {
+					ret ta
+				}
+			}
+		}
+		ret new(TypeAlias)
+	}
+
+	// Returns define by identifier.
+	// Returns nil reference if not exist any define in this identifier.
+	fn def_by_ident(mut self, ident: str, cpp_linked: bool): any {
+		for (_, mut v) in self.vars {
+			if v.ident == ident && v.cpp_linked == cpp_linked {
+				ret v
+			}
+		}
+
+		for (_, mut ta) in self.type_aliases {
+			if ta.ident == ident && ta.cpp_linked == cpp_linked {
+				ret ta
+			}
+		}
+
+		for (_, mut s) in self.structs {
+			if s.ident == ident && s.cpp_linked == cpp_linked {
+				ret s
+			}
+		}
+
+		for (_, mut f) in self.funcs {
+			if f.ident == ident && f.cpp_linked == cpp_linked {
+				ret f
+			}
+		}
+
+		if cpp_linked {
+			ret nil
+		}
+
+		for (_, mut t) in self.traits {
+			if t.ident == ident {
+				ret t
+			}
+		}
+
+		for (_, mut e) in self.enums {
+			if e.ident == ident {
+				ret e
+			}
+		}
+
+		ret nil
+	}
+
+	// Reports this identifier duplicated in symbol table.
+	// The "self" parameter represents address of exception identifier.
+	// If founded identifier address equals to self, will be skipped.
+	fn is_duplicated_ident(self, itself: uintptr, ident: str, cpp_linked: bool): bool {
+		for _, v in self.vars {
+			if uintptr(&v) != itself && v.ident == ident && v.cpp_linked == cpp_linked {
+				ret true
+			}
+		}
+
+		for _, ta in self.type_aliases {
+			if uintptr(&ta) != itself && ta.ident == ident && ta.cpp_linked == cpp_linked {
+				ret true
+			}
+		}
+
+		for _, s in self.structs {
+			if uintptr(&s) != itself && s.ident == ident && s.cpp_linked == cpp_linked {
+				ret true
+			}
+		}
+
+		for _, f in self.funcs {
+			if uintptr(&f) != itself && f.ident == ident && f.cpp_linked == cpp_linked {
+				ret true
+			}
+		}
+
+		if cpp_linked {
+			ret false
+		}
+
+		for _, t in self.traits {
+			if uintptr(&t) != itself && t.ident == ident {
+				ret true
+			}
+		}
+
+		for _, e in self.enums {
+			if uintptr(&e) != itself && e.ident == ident {
+				ret true
+			}
+		}
+
+		ret false
+	}
+}
