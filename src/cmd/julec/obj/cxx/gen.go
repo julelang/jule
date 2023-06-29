@@ -300,6 +300,24 @@ func gen_traits(pkg *sema.Package, used []*sema.ImportInfo) string {
 	return obj
 }
 
+// Generates C++ declaration code of trait.
+func gen_trait_prototype(t *sema.Trait) string {
+	return "struct " + trait_out_ident(t) + CPP_ST_TERM
+}
+
+// Generates C++ declaration code of all traits.
+func gen_trait_prototypes(p *sema.Package) string {
+	obj := ""
+	for _, f := range p.Files {
+		for _, t := range f.Traits {
+			if t.Token.Id != lex.ID_NA {
+				obj += gen_trait_prototype(t) + "\n"
+			}
+		}
+	}
+	return obj
+}
+
 // Generates C++ plain-prototype code of structure.
 func gen_struct_plain_prototype(s *sema.Struct) string {
 	obj := ""
@@ -575,7 +593,18 @@ func gen_fn_prototypes(pkg *sema.Package) string {
 func gen_prototypes(pkg *sema.Package, used []*sema.ImportInfo, structs []*sema.Struct) string {
 	obj := ""
 
+	for _, u := range used {
+		if !u.Cpp_linked {
+			obj += gen_trait_prototypes(u.Package)
+		}
+	}
+	obj += gen_trait_prototypes(pkg)
+
+	
 	obj += gen_struct_plain_prototypes(structs)
+
+	obj += gen_traits(pkg, used) + "\n"
+
 	obj += gen_struct_prototypes(structs)
 
 	for _, u := range used {
@@ -848,7 +877,6 @@ func Gen(pkg *sema.Package, used []*sema.ImportInfo) string {
 
 	obj := ""
 	obj += gen_links(used) + "\n"
-	obj += gen_traits(pkg, used) + "\n"
 	obj += gen_prototypes(pkg, used, od.structs) + "\n\n"
 	obj += gen_globals(od.globals) + "\n"
 	obj += gen_structs(od.structs)
