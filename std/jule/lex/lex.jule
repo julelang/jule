@@ -10,53 +10,53 @@ struct KindPair {
 	id:   TokenId
 }
 
-let KEYWORDS: [...]KindPair = [
-	{TokenKind.I8, TokenId.Prim},
-	{TokenKind.I16, TokenId.Prim},
-	{TokenKind.I32, TokenId.Prim},
-	{TokenKind.I64, TokenId.Prim},
-	{TokenKind.U8, TokenId.Prim},
-	{TokenKind.U16, TokenId.Prim},
-	{TokenKind.U32, TokenId.Prim},
-	{TokenKind.U64, TokenId.Prim},
-	{TokenKind.F32, TokenId.Prim},
-	{TokenKind.F64, TokenId.Prim},
-	{TokenKind.Uint, TokenId.Prim},
-	{TokenKind.Int, TokenId.Prim},
-	{TokenKind.Uintptr, TokenId.Prim},
-	{TokenKind.Bool, TokenId.Prim},
-	{TokenKind.Str, TokenId.Prim},
-	{TokenKind.Any, TokenId.Prim},
-	{TokenKind.True, TokenId.Lit},
-	{TokenKind.False, TokenId.Lit},
-	{TokenKind.Nil, TokenId.Lit},
-	{TokenKind.Const, TokenId.Const},
-	{TokenKind.Ret, TokenId.Ret},
-	{TokenKind.Type, TokenId.Type},
-	{TokenKind.Iter, TokenId.Iter},
-	{TokenKind.Break, TokenId.Break},
-	{TokenKind.Cont, TokenId.Cont},
-	{TokenKind.In, TokenId.In},
-	{TokenKind.If, TokenId.If},
-	{TokenKind.Else, TokenId.Else},
-	{TokenKind.Use, TokenId.Use},
-	{TokenKind.Pub, TokenId.Pub},
-	{TokenKind.Goto, TokenId.Goto},
-	{TokenKind.Enum, TokenId.Enum},
-	{TokenKind.Struct, TokenId.Struct},
-	{TokenKind.Co, TokenId.Co},
-	{TokenKind.Match, TokenId.Match},
-	{TokenKind.Self, TokenId.Self},
-	{TokenKind.Trait, TokenId.Trait},
-	{TokenKind.Impl, TokenId.Impl},
-	{TokenKind.Cpp, TokenId.Cpp},
-	{TokenKind.Fall, TokenId.Fall},
-	{TokenKind.Fn, TokenId.Fn},
-	{TokenKind.Let, TokenId.Let},
-	{TokenKind.Unsafe, TokenId.Unsafe},
-	{TokenKind.Mut, TokenId.Mut},
-	{TokenKind.Defer, TokenId.Defer},
-]
+let KEYWORDS: [str:TokenId] = {
+	(str)(TokenKind.I8): TokenId.Prim,
+	(str)(TokenKind.I16): TokenId.Prim,
+	(str)(TokenKind.I32): TokenId.Prim,
+	(str)(TokenKind.I64): TokenId.Prim,
+	(str)(TokenKind.U8): TokenId.Prim,
+	(str)(TokenKind.U16): TokenId.Prim,
+	(str)(TokenKind.U32): TokenId.Prim,
+	(str)(TokenKind.U64): TokenId.Prim,
+	(str)(TokenKind.F32): TokenId.Prim,
+	(str)(TokenKind.F64): TokenId.Prim,
+	(str)(TokenKind.Uint): TokenId.Prim,
+	(str)(TokenKind.Int): TokenId.Prim,
+	(str)(TokenKind.Uintptr): TokenId.Prim,
+	(str)(TokenKind.Bool): TokenId.Prim,
+	(str)(TokenKind.Str): TokenId.Prim,
+	(str)(TokenKind.Any): TokenId.Prim,
+	(str)(TokenKind.True): TokenId.Lit,
+	(str)(TokenKind.False): TokenId.Lit,
+	(str)(TokenKind.Nil): TokenId.Lit,
+	(str)(TokenKind.Const): TokenId.Const,
+	(str)(TokenKind.Ret): TokenId.Ret,
+	(str)(TokenKind.Type): TokenId.Type,
+	(str)(TokenKind.Iter): TokenId.Iter,
+	(str)(TokenKind.Break): TokenId.Break,
+	(str)(TokenKind.Cont): TokenId.Cont,
+	(str)(TokenKind.In): TokenId.In,
+	(str)(TokenKind.If): TokenId.If,
+	(str)(TokenKind.Else): TokenId.Else,
+	(str)(TokenKind.Use): TokenId.Use,
+	(str)(TokenKind.Pub): TokenId.Pub,
+	(str)(TokenKind.Goto): TokenId.Goto,
+	(str)(TokenKind.Enum): TokenId.Enum,
+	(str)(TokenKind.Struct): TokenId.Struct,
+	(str)(TokenKind.Co): TokenId.Co,
+	(str)(TokenKind.Match): TokenId.Match,
+	(str)(TokenKind.Self): TokenId.Self,
+	(str)(TokenKind.Trait): TokenId.Trait,
+	(str)(TokenKind.Impl): TokenId.Impl,
+	(str)(TokenKind.Cpp): TokenId.Cpp,
+	(str)(TokenKind.Fall): TokenId.Fall,
+	(str)(TokenKind.Fn): TokenId.Fn,
+	(str)(TokenKind.Let): TokenId.Let,
+	(str)(TokenKind.Unsafe): TokenId.Unsafe,
+	(str)(TokenKind.Mut): TokenId.Mut,
+	(str)(TokenKind.Defer): TokenId.Defer,
+}
 
 let BASIC_OPS: [...]KindPair = [
 	{TokenKind.DblColon, TokenId.DblColon},
@@ -109,24 +109,6 @@ fn make_err(row: int, col: int, f: &File, key: str, args: ...any): Log {
 	}
 }
 
-// Reports whether part is keyword..
-fn is_kw(mut ln: str, kw: str): bool {
-	if !ln.has_prefix(kw) {
-		ret false
-	}
-
-	ln = ln[kw.len:]
-	if ln == "" {
-		ret true
-	}
-
-	let (r, _) = decode_rune_str(ln)
-	if r == '_' {
-		ret false
-	}
-	ret is_space(r) || is_punct(r) || !is_letter(r)
-}
-
 fn float_fmt_e(txt: str, mut i: int): (lit: str) {
 	i++ // Skip E | e
 	if i >= txt.len {
@@ -167,14 +149,9 @@ loop:
 	for i < txt.len; i++ {
 		let b = txt[i]
 		match {
-		| is_decimal(b):
-			continue
-
-		| is_float_fmt_p(b, i):
-			ret float_fmt_p(txt, i)
-
-		|:
-			break loop
+		| is_decimal(b):        continue
+		| is_float_fmt_p(b, i): ret float_fmt_p(txt, i)
+		|:                      break loop
 		}
 	}
 	ret ""
@@ -218,14 +195,9 @@ loop:
 	for i < txt.len; i++ {
 		let b = txt[i]
 		match {
-		| b == '.':
-			ret float_num(txt, i)
-
-		| is_float_fmt_e(b, i):
-			ret float_fmt_e(txt, i)
-
-		| !is_decimal(b):
-			break loop
+		| b == '.':             ret float_num(txt, i)
+		| is_float_fmt_e(b, i): ret float_fmt_e(txt, i)
+		| !is_decimal(b):       break loop
 		}
 	}
 
@@ -270,14 +242,9 @@ loop:
 	for i < txt.len; i++ {
 		let b = txt[i]
 		match {
-		| is_decimal(b):
-			continue
-
-		| is_float_fmt_p(b, i):
-			ret true
-
-		|:
-			break loop
+		| is_decimal(b):        continue
+		| is_float_fmt_p(b, i): ret true
+		|:                      break loop
 		}
 	}
 
@@ -285,39 +252,21 @@ loop:
 }
 
 fn is_float_fmt_dotp(mut txt: str, i: int): bool {
-	txt = txt[i:]
 	match {
-	| txt.len < 3:
-		fall
-
-	| txt[0] != '.':
-		fall
-
-	| txt[1] != 'p' && txt[1] != 'P':
-		ret false
-
-	|:
-		ret true
+	| txt.len < 3:                        fall
+	| txt[i] != '.':                      fall
+	| txt[i+1] != 'p' && txt[i+1] != 'P': ret false
+	|:                                    ret true
 	}
 }
 
 fn is_float_fmt_dotfp(mut txt: str, i: int): bool {
-	txt = txt[i:]
 	match {
-	| txt.len < 4:
-		fall
-
-	| txt[0] != '.':
-		fall
-
-	| txt[1] != 'f' && txt[1] != 'F':
-		fall
-
-	| txt[2] != 'p' && txt[1] != 'P':
-		ret false
-
-	|:
-		ret true
+	| txt.len < 4:                        fall
+	| txt[i] != '.':                      fall
+	| txt[i+1] != 'f' && txt[i+1] != 'F': fall
+	| txt[i+2] != 'p' && txt[i+1] != 'P': ret false
+	|:                                    ret true
 	}
 }
 
@@ -423,17 +372,10 @@ fn byte_escape(txt: str): (seq: str) {
 
 fn get_close_kind_of_brace(left: str): str {
 	match left {
-	| (str)(TokenKind.RParent):
-		ret (str)(TokenKind.LParent)
-
-	| (str)(TokenKind.RBrace):
-		ret (str)(TokenKind.LBrace)
-
-	| (str)(TokenKind.RBracket):
-		ret (str)(TokenKind.LBracket)
-
-	|:
-		ret ""
+	| (str)(TokenKind.RParent):  ret (str)(TokenKind.LParent)
+	| (str)(TokenKind.RBrace):   ret (str)(TokenKind.LBrace)
+	| (str)(TokenKind.RBracket): ret (str)(TokenKind.LBracket)
+	|:                           ret ""
 	}
 }
 
@@ -729,29 +671,8 @@ impl Lex {
 
 		t.kind = kind
 		t.id = id
-		self.pos += ([]rune)(kind).len
+		self.pos += kind.len
 		ret true
-	}
-
-	unsafe fn is_kw(mut self, txt: str, kind: str, id: TokenId, mut t: *Token): bool {
-		if !is_kw(txt, kind) {
-			ret false
-		}
-
-		t.kind = kind
-		t.id = id
-		self.pos += ([]rune)(kind).len
-		ret true
-	}
-
-	unsafe fn lex_kws(mut self, txt: str, mut tok: *Token): bool {
-		for _, pair in KEYWORDS {
-			if self.is_kw(txt, (str)(pair.kind), pair.id, tok) {
-				ret true
-			}
-		}
-
-		ret false
 	}
 
 	unsafe fn lex_basic_ops(mut self, txt: str, mut tok: *Token): bool {
@@ -840,8 +761,14 @@ impl Lex {
 		| unsafe { self.is_op(txt, (str)(TokenKind.RBracket), TokenId.Range, &t) }:
 			self.push_range_close(t, (str)(TokenKind.LBracket))
 
-		| unsafe { self.lex_basic_ops(txt, &t) || self.lex_kws(txt, &t) || self.lex_id(txt, &t) }:
+		| unsafe { self.lex_basic_ops(txt, &t) }:
 			// Pass.
+
+		| unsafe { self.lex_id(txt, &t) }:
+			let id = KEYWORDS[t.kind]
+			if id != TokenId.Na {
+				t.id = id
+			}
 
 		|:
 			let (r, sz) = decode_rune_str(txt)
@@ -891,14 +818,9 @@ impl Lex {
 	fn push_wrong_order_close_err(mut self, t: Token) {
 		let mut msg = ""
 		match self.ranges[self.ranges.len-1].kind {
-		| (str)(TokenKind.LParent):
-			msg = "expected_parentheses_close"
-
-		| (str)(TokenKind.LBrace):
-			msg = "expected_brace_close"
-
-		| (str)(TokenKind.LBracket):
-			msg = "expected_bracket_close"
+		| (str)(TokenKind.LParent):  msg = "expected_parentheses_close"
+		| (str)(TokenKind.LBrace):   msg = "expected_brace_close"
+		| (str)(TokenKind.LBracket): msg = "expected_bracket_close"
 		}
 
 		self.push_err_tok(t, msg)

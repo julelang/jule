@@ -107,7 +107,7 @@ namespace jule {
         inline jule::Bool real() const noexcept
         { return this->alloc != nullptr; }
 
-        inline T *operator->(void) noexcept {
+        inline T *operator->(void) const noexcept {
             this->must_ok();
             return this->alloc;
         }

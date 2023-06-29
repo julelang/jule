@@ -130,8 +130,7 @@ namespace jule {
         { return this->buffer.empty(); }
     
         inline jule::Bool has_prefix(const jule::Str &sub) const noexcept {
-            return this->len() >= sub.len() &&
-                    this->buffer.substr(0, sub.len()) == sub.buffer;
+            return this->buffer.find(sub.buffer, 0) == 0;
         }
     
         inline jule::Bool has_suffix(const jule::Str &sub) const noexcept {

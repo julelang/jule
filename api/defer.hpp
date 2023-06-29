@@ -11,7 +11,7 @@
 #define __JULE_CONCAT(A, B) __JULE_CCONCAT(A, B)
 
 #define __JULE_DEFER(BLOCK) \
-    jule::DeferBase __JULE_CONCAT(__deferred_, __LINE__){ [&]BLOCK }
+    jule::DeferBase __JULE_CONCAT(__deferred_, __LINE__){ [=]BLOCK }
 
 namespace jule {
 
