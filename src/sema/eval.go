@@ -1527,7 +1527,7 @@ func (e *_Eval) eval_ns_selection(s *ast.NsSelectionExpr) *Data {
 	})
 
 	if imp == nil || !imp.is_lookupable(lex.KND_SELF) {
-		e.push_err(s.Ident, "namespace_not_exist", s.Ident.Kind)
+		e.push_err(s.Ident, "namespace_not_exist", path)
 		return nil
 	}
 
