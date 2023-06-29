@@ -9,6 +9,7 @@ import (
 	"github.com/julelang/jule/constant"
 	"github.com/julelang/jule/lex"
 	"github.com/julelang/jule/sema"
+	"github.com/julelang/jule/types"
 )
 
 // Ignore expression for std::tie function.
@@ -128,6 +129,14 @@ func get_f32_model(c *constant.Const) string {
 		return f
 	}
 
+	switch {
+	case x == types.MAX_F32:
+		return "jule::MAX_F32"
+
+	case x == types.MIN_F32:
+		return "jule::MIN_F32"
+	}
+
 	return strconv.FormatFloat(x, 'e', -1, 32) + "f"
 }
 
@@ -138,6 +147,14 @@ func get_f64_model(c *constant.Const) string {
 	f := gen_float_special_cases(x)
 	if f != "" {
 		return f
+	}
+
+	switch {
+	case x == types.MAX_F64:
+		return "jule::MAX_F64"
+
+	case x == types.MIN_F64:
+		return "jule::MIN_F64"
 	}
 
 	return strconv.FormatFloat(x, 'e', -1, 64)
@@ -154,6 +171,14 @@ func get_float_model(d *sema.Data) string {
 }
 
 func i64toa(x int64) string {
+	switch {
+	case x == types.MAX_I64:
+		return "jule::MAX_I64"
+
+	case x == types.MIN_I64:
+		return "jule::MIN_I64"
+	}
+
 	fmt := strconv.FormatInt(x, 10)
 	if build.Is_64bit(runtime.GOARCH) {
 		return fmt + "LL"
@@ -166,7 +191,14 @@ func get_i64_model(c *constant.Const) string {
 }
 
 func get_u64_model(c *constant.Const) string {
-	fmt := strconv.FormatUint(c.Read_u64(), 10)
+	x := c.Read_u64()
+
+	switch {
+	case x == types.MAX_U64:
+		return "jule::MAX_U64"
+	}
+
+	fmt := strconv.FormatUint(x, 10)
 	if build.Is_64bit(runtime.GOARCH) {
 		return fmt + "LLU"
 	}
