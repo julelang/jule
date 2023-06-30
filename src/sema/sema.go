@@ -1762,6 +1762,10 @@ func (s *_Sema) check_type_method(strct *StructIns, f *Fn) {
 	}
 
 	for _, ins := range f.Instances {
+		if len(ins.Scope.Stmts) > 0 {
+			// Checked
+			continue
+		}
 		s.check_fn_ins(ins)
 	}
 }

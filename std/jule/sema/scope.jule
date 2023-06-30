@@ -25,9 +25,8 @@ use std::jule::lex::{
 	is_anon_ident,
 	is_postfix_op,
 }
-use std::jule::types::{
-	is_num,
-}
+use std::jule::types::{is_num}
+use std::vector::{Vector}
 
 // Statement type.
 pub type St: any
@@ -194,7 +193,7 @@ pub struct Scope {
 	pub parent:   &Scope
 	pub unsafety: bool
 	pub deferred: bool
-	pub stmts:    []St
+	pub stmts:    Vector[St]
 }
 
 // Chain conditional node.
@@ -495,7 +494,9 @@ impl ScopeChecker {
 	// Returns nil if not exist any label in this identifier.
 	// Just lookups current scope.
 	fn find_label(mut self, ident: str): &Label {
-		for (_, mut st) in self.scope.stmts {
+		let mut i = 0
+		for i < self.scope.stmts.len(); i++ {
+			let mut st = self.scope.stmts.at(i)
 			match type st {
 			| &Label:
 				let mut label = (&Label)(st)
@@ -553,7 +554,7 @@ impl ScopeChecker {
 
 		defer {
 			self.table.vars = append(self.table.vars, v)
-			self.scope.stmts = append(self.scope.stmts, v)
+			self.scope.stmts.push(v)
 		}()
 
 		if self.is_duplicated_ident(uintptr(&v), v.ident) {
@@ -576,7 +577,7 @@ impl ScopeChecker {
 		self.s.check_type_alias_decl(ta, self)
 
 		self.table.type_aliases = append(self.table.type_aliases, ta)
-		self.scope.stmts = append(self.scope.stmts, ta)
+		self.scope.stmts.push(ta)
 	}
 
 	fn get_child(mut self): &Scope {
@@ -603,7 +604,7 @@ impl ScopeChecker {
 
 	fn check_anon_scope(mut &self, mut tree: &ScopeTree) {
 		let mut s = self.check_child(tree)
-		self.scope.stmts = append(self.scope.stmts, s)
+		self.scope.stmts.push(s)
 	}
 
 	fn try_call_recover(mut &self, mut d: &Data): bool {
@@ -619,7 +620,7 @@ impl ScopeChecker {
 		rec.handler = d.kind.fnc() // Argument function.
 		rec.scope = &Scope{}
 
-		self.scope.stmts = append(self.scope.stmts, rec)
+		self.scope.stmts.push(rec)
 
 		self.tree.stmts = self.tree.stmts[self.i+1:]
 		self.scope = rec.scope
@@ -640,7 +641,7 @@ impl ScopeChecker {
 			}
 		}
 
-		self.scope.stmts = append(self.scope.stmts, d)
+		self.scope.stmts.push(d)
 	}
 
 	fn check_if(mut &self, mut i: &std::jule::ast::If): &If {
@@ -677,7 +678,7 @@ impl ScopeChecker {
 
 	fn check_conditional(mut &self, mut conditional: &std::jule::ast::Conditional) {
 		let mut c = &Conditional{}
-		self.scope.stmts = append(self.scope.stmts, c)
+		self.scope.stmts.push(c)
 
 		c.elifs = make([]&If, conditional.tail.len+1)
 
@@ -704,7 +705,7 @@ impl ScopeChecker {
 	fn check_inf_iter(mut &self, mut it: &Iter) {
 		let mut kind = &InfIter{}
 
-		self.scope.stmts = append(self.scope.stmts, kind)
+		self.scope.stmts.push(kind)
 
 		kind.scope = self.check_iter_scope(uintptr(&kind), it.scope)
 	}
@@ -718,7 +719,7 @@ impl ScopeChecker {
 
 		let mut kind = &WhileIter{}
 
-		self.scope.stmts = append(self.scope.stmts, kind)
+		self.scope.stmts.push(kind)
 
 		kind.scope = self.check_iter_scope(uintptr(&kind), it.scope)
 
@@ -748,11 +749,11 @@ impl ScopeChecker {
 				ret
 			}
 
-			let n = self.scope.stmts.len
+			let n = self.scope.stmts.len()
 			self.check_node(wh.next)
-			if n < self.scope.stmts.len {
-				let mut st = self.scope.stmts[n]
-				self.scope.stmts = self.scope.stmts[:n] // Remove statement.
+			if n < self.scope.stmts.len() {
+				let mut st = self.scope.stmts.at(n)
+				self.scope.stmts.set_len(self.scope.stmts.len()-n) // Remove statement.
 				if !is_valid_st_for_next_st(st) {
 					self.s.push_err(wh.next_token, "invalid_stmt_for_next")
 				}
@@ -785,7 +786,7 @@ impl ScopeChecker {
 			ret
 		}
 
-		self.scope.stmts = append(self.scope.stmts, kind)
+		self.scope.stmts.push(kind)
 
 		let mut ssc = self.new_child_checker()
 
@@ -887,16 +888,16 @@ impl ScopeChecker {
 
 			label.used = true
 
-			if label.pos+1 >= label.scope.scope.stmts.len {
+			if label.pos+1 >= label.scope.scope.stmts.len() {
 				self.s.push_err(c.label, "invalid_label")
 				ret
 			}
 
 			let i = label.pos + 1
-			if i >= label.scope.scope.stmts.len {
+			if i >= label.scope.scope.stmts.len() {
 				self.s.push_err(c.label, "invalid_label")
 			} else {
-				let mut st = label.scope.scope.stmts[i]
+				let mut st = label.scope.scope.stmts.at(i)
 				match type st {
 				| &InfIter:   cont.it = uintptr(&(&InfIter)(st))
 				| &RangeIter: cont.it = uintptr(&(&RangeIter)(st))
@@ -912,7 +913,7 @@ impl ScopeChecker {
 			}
 		}
 
-		self.scope.stmts = append(self.scope.stmts, cont)
+		self.scope.stmts.push(cont)
 	}
 
 	fn check_label(mut &self, mut l: &std::jule::ast::LabelSt) {
@@ -925,23 +926,23 @@ impl ScopeChecker {
 			ident: l.ident,
 		}
 
-		self.scope.stmts = append(self.scope.stmts, label)
+		self.scope.stmts.push(label)
 		self.labels = append(self.labels, &ScopeLabel{
 			token: l.token,
 			label: label,
-			pos:   self.scope.stmts.len - 1,
+			pos:   self.scope.stmts.len() - 1,
 			scope: self,
 		})
 	}
 
 	fn push_goto(mut &self, mut gt: &std::jule::ast::GotoSt) {
-		self.scope.stmts = append(self.scope.stmts, &GotoSt{
+		self.scope.stmts.push(&GotoSt{
 			ident: gt.label.kind,
 		})
 
 		self.gotos = append(self.gotos, &ScopeGoto{
 			gt:    gt,
-			pos:   self.scope.stmts.len - 1,
+			pos:   self.scope.stmts.len() - 1,
 			scope: self,
 		})
 	}
@@ -977,7 +978,7 @@ impl ScopeChecker {
 			ret
 		}
 
-		self.scope.stmts = append(self.scope.stmts, &Postfix{
+		self.scope.stmts.push(&Postfix{
 			expr: d.model,
 			op:   a.setter.kind,
 		})
@@ -1002,7 +1003,7 @@ impl ScopeChecker {
 				self.s.push_err(a.right.token, "invalid_expr")
 			}
 
-			self.scope.stmts = append(self.scope.stmts, r)
+			self.scope.stmts.push(r)
 			ret
 		}
 
@@ -1020,7 +1021,7 @@ impl ScopeChecker {
 			ret
 		}
 
-		self.scope.stmts = append(self.scope.stmts, &Assign{
+		self.scope.stmts.push(&Assign{
 			l:  l.model,
 			r:  r.model,
 			op: a.setter.kind,
@@ -1111,7 +1112,7 @@ impl ScopeChecker {
 
 				st.l = append(st.l, v)
 				self.table.vars = append(self.table.vars, v)
-				self.scope.stmts = append(self.scope.stmts, v)
+				self.scope.stmts.push(self.scope.stmts, v)
 
 				continue
 			}
@@ -1143,7 +1144,7 @@ impl ScopeChecker {
 			st.l = append(st.l, l.model)
 		}
 
-		self.scope.stmts = append(self.scope.stmts, st)
+		self.scope.stmts.push(st)
 	}
 
 	fn check_assign_st(mut &self, mut a: &AssignSt) {
@@ -1261,7 +1262,7 @@ impl ScopeChecker {
 			expr:       d.model,
 		}
 
-		self.scope.stmts = append(self.scope.stmts, tm)
+		self.scope.stmts.push(tm)
 
 		if real(m.default) {
 			tm.default = self.check_default(tm, m.default)
@@ -1288,7 +1289,7 @@ impl ScopeChecker {
 			expr: d.model,
 		}
 
-		self.scope.stmts = append(self.scope.stmts, mc)
+		self.scope.stmts.push(mc)
 
 		if real(m.default) {
 			mc.default = self.check_default(mc, m.default)
@@ -1305,7 +1306,7 @@ impl ScopeChecker {
 	}
 
 	fn check_fall(mut self, f: &std::jule::ast::FallSt) {
-		if self.cse == 0 || self.scope.stmts.len+1 < self.scope.stmts.len {
+		if self.cse == 0 || self.scope.stmts.len()+1 < self.scope.stmts.len() {
 			self.s.push_err(f.token, "fallthrough_wrong_use")
 			ret
 		}
@@ -1316,7 +1317,7 @@ impl ScopeChecker {
 			ret
 		}
 
-		self.scope.stmts = append(self.scope.stmts, &FallSt{
+		self.scope.stmts.push(&FallSt{
 			dest_case: unsafe { uintptr(&_case.next) },
 		})
 	}
@@ -1340,16 +1341,16 @@ impl ScopeChecker {
 
 		label.used = true
 
-		if label.pos+1 >= label.scope.scope.stmts.len {
+		if label.pos+1 >= label.scope.scope.stmts.len() {
 			self.s.push_err(b.label, "invalid_label")
 			ret new(BreakSt)
 		}
 
 		let i = label.pos + 1
-		if i >= label.scope.scope.stmts.len {
+		if i >= label.scope.scope.stmts.len() {
 			self.s.push_err(b.label, "invalid_label")
 		} else {
-			let mut st = label.scope.scope.stmts[i]
+			let mut st = label.scope.scope.stmts.at(i)
 			match type st {
 			| &InfIter:   brk.it = uintptr(&(&InfIter)(st))
 			| &RangeIter: brk.it = uintptr(&(&RangeIter)(st))
@@ -1396,17 +1397,17 @@ impl ScopeChecker {
 	fn check_break(mut &self, b: &std::jule::ast::BreakSt) {
 		if b.label.id != TokenId.Na { // Label given.
 			let mut brk = self.check_break_with_label(b)
-			self.scope.stmts = append(self.scope.stmts, brk)
+			self.scope.stmts.push(brk)
 			ret
 		}
 
 		let mut brk = self.check_plain_break(b)
-		self.scope.stmts = append(self.scope.stmts, brk)
+		self.scope.stmts.push(brk)
 	}
 
 	fn check_ret(mut &self, mut r: &std::jule::ast::RetSt) {
 		let mut rt = &RetSt{}
-		self.scope.stmts = append(self.scope.stmts, rt)
+		self.scope.stmts.push(rt)
 
 		let mut d = new(Data)
 
@@ -1466,14 +1467,14 @@ impl ScopeChecker {
 		}
 	}
 
-	fn check_same_scope_goto(mut self, gt: &ScopeGoto, label: &ScopeLabel) {
+	fn check_same_scope_goto(mut self, gt: &ScopeGoto, mut label: &ScopeLabel) {
 		if label.pos < gt.pos { // Label at above.
 			ret
 		}
 
 		let mut i = label.pos
 		for i > gt.pos; i-- {
-			let s = label.scope.scope.stmts[i]
+			let s = label.scope.scope.stmts.at(i)
 			if st_is_def(s) {
 				self.s.push_err(gt.gt.token, "goto_jumps_declarations", gt.gt.label.kind)
 				break
@@ -1488,12 +1489,12 @@ impl ScopeChecker {
 		if real(scope.parent) && &scope.parent != &gt.scope {
 			scope = scope.parent
 			let mut i = 0
-			for i < scope.scope.stmts.len; i++ {
+			for i < scope.scope.stmts.len(); i++ {
 				match {
 				| i >= label.pos:
 					ret true
 
-				| st_is_def(scope.scope.stmts[i]):
+				| st_is_def(scope.scope.stmts.at(i)):
 					self.s.push_err(gt.gt.token, "goto_jumps_declarations", gt.gt.label.kind)
 					ret false
 				}
@@ -1505,21 +1506,21 @@ impl ScopeChecker {
 		ret true
 	}
 
-	fn check_goto_scope(mut self, gt: &ScopeGoto, label: &ScopeLabel) {
+	fn check_goto_scope(mut self, mut gt: &ScopeGoto, label: &ScopeLabel) {
 		let mut i = gt.pos
-		for i < gt.scope.scope.stmts.len; i++ {
+		for i < gt.scope.scope.stmts.len(); i++ {
 			match {
 			| i >= label.pos:
 				ret
 
-			| st_is_def(gt.scope.scope.stmts[i]):
+			| st_is_def(gt.scope.scope.stmts.at(i)):
 				self.s.push_err(gt.gt.token, "goto_jumps_declarations", gt.gt.label.kind)
 				ret
 			}
 		}
 	}
 
-	fn check_diff_scope_goto(mut self, gt: &ScopeGoto, mut label: &ScopeLabel) {
+	fn check_diff_scope_goto(mut self, mut gt: &ScopeGoto, mut label: &ScopeLabel) {
 		match {
 		| label.scope.child_index > 0 && gt.scope.child_index == 0:
 			if !self.check_label_parents(gt, label) {
@@ -1530,10 +1531,10 @@ impl ScopeChecker {
 			ret
 		}
 
-		let scope = label.scope
+		let mut scope = label.scope
 		let mut i = label.pos - 1
 		for i >= 0; i-- {
-			let s = scope.scope.stmts[i]
+			let s = scope.scope.stmts.at(i)
 			match type s {
 			| &Scope:
 				if i <= gt.pos {
@@ -1555,7 +1556,7 @@ impl ScopeChecker {
 		}
 	}
 
-	fn check_goto(mut self, gt: &ScopeGoto, mut label: &ScopeLabel) {
+	fn check_goto(mut self, mut gt: &ScopeGoto, mut label: &ScopeLabel) {
 		match {
 		| &gt.scope == &label.scope:
 			self.check_same_scope_goto(gt, label)
@@ -1566,7 +1567,7 @@ impl ScopeChecker {
 	}
 
 	fn check_gotos(mut self) {
-		for _, gt in self.gotos {
+		for (_, mut gt) in self.gotos {
 			let mut label = self.find_label_all(gt.gt.label.kind)
 			if !real(label) {
 				self.s.push_err(gt.gt.token, "label_not_exist", gt.gt.label.kind)

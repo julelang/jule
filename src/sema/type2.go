@@ -624,6 +624,10 @@ func (dta *_DynamicTypeAnnotation) annotate_any(k *TypeKind) (ok bool) {
 }
 
 func (dta *_DynamicTypeAnnotation) annotate_kind(k *TypeKind) (ok bool) {
+	if dta.k == nil || *dta.k == nil {
+		return
+	}
+
 	switch {
 	case dta.annotate_any(k):
 		return true

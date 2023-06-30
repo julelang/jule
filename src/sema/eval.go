@@ -2916,7 +2916,7 @@ func (e *_Eval) eval_expr_kind(kind ast.ExprData) *Data {
 // Returns nil if error occurs.
 func (e *_Eval) eval(expr *ast.Expr) *Data {
 	d := e.eval_expr_kind(expr.Kind)
-	if d == nil {
+	if d == nil || d.Kind == nil {
 		return nil
 	}
 
@@ -3697,12 +3697,12 @@ func (bs *_BinopSolver) solve_explicit(l *Data, r *Data) *Data {
 
 func (bs *_BinopSolver) solve(op *ast.BinopExpr) *Data {
 	l := bs.e.eval_expr_kind(op.Left)
-	if l == nil {
+	if l == nil || l.Kind == nil {
 		return nil
 	}
 
 	r := bs.e.eval_expr_kind(op.Right)
-	if r == nil {
+	if r == nil || r.Kind == nil {
 		return nil
 	}
 

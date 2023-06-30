@@ -160,9 +160,9 @@ fn find_file(mut files: []&SymbolTable, handler: &File): &SymbolTable {
 	ret new(SymbolTable)
 }
 
-fn conditional_has_ret(c: &Conditional): (ok: bool, breaking: bool) {
+fn conditional_has_ret(mut c: &Conditional): (ok: bool, breaking: bool) {
 	let mut breaked = false
-	for _, elif in c.elifs {
+	for (_, mut elif) in c.elifs {
 		if !real(elif) {
 			ret false, false
 		}
@@ -182,7 +182,7 @@ fn conditional_has_ret(c: &Conditional): (ok: bool, breaking: bool) {
 	ret ok, breaked
 }
 
-fn match_has_ret(m: &Match): bool {
+fn match_has_ret(mut m: &Match): bool {
 	if !real(m.default) {
 		ret false
 	}
@@ -190,7 +190,7 @@ fn match_has_ret(m: &Match): bool {
 	let mut ok = true
 	let mut falled = false
 	let mut breaked = false
-	for _, c in m.cases {
+	for (_, mut c) in m.cases {
 		if !real(c) {
 			ret false
 		}
@@ -218,12 +218,14 @@ fn match_has_ret(m: &Match): bool {
 	ret has_ret(m.default.scope)
 }
 
-fn __has_ret(s: &Scope): (ok: bool, falled: bool, breaked: bool) {
+fn __has_ret(mut s: &Scope): (ok: bool, falled: bool, breaked: bool) {
 	if !real(s) {
 		ret false, false, false
 	}
 
-	for _, st in s.stmts {
+	let mut i = 0
+	for i < s.stmts.len(); i++ {
+		let mut st = s.stmts.at(i)
 		match type st {
 		| &FallSt:
 			falled = true
@@ -267,7 +269,7 @@ fn __has_ret(s: &Scope): (ok: bool, falled: bool, breaked: bool) {
 	ret false, falled, breaked
 }
 
-fn has_ret(s: &Scope): bool {
+fn has_ret(mut s: &Scope): bool {
 	let (ok, _, _) = __has_ret(s)
 	ret ok
 }
@@ -1852,6 +1854,10 @@ impl Sema {
 		}
 
 		for (_, mut ins) in f.instances {
+			if ins.scope.stmts.len() > 0 {
+				// Checked
+				continue
+			}
 			self.check_fn_ins(ins)
 		}
 	}
@@ -1880,7 +1886,7 @@ impl Sema {
 		}
 	}
 
-	fn check_rets(mut self, f: &FnIns) {
+	fn check_rets(mut self, mut f: &FnIns) {
 		if f.decl.is_void() {
 			ret
 		}
@@ -1906,17 +1912,18 @@ impl Sema {
 
 		// Append return variables.
 		if vars.len > 0 {
-			let mut stms = make([]St, f.scope.stmts.len+vars.len)
+			// TODO: Make here
+			/*let mut stms = make([]St, f.scope.stmts.len()+vars.len)
 			for (i, mut v) in vars {
 				stms[i] = v
 			}
 
 			let mut i = vars.len
 			for i < stms.len; i++ {
-				stms[i] = f.scope.stmts[i-vars.len]
+				stms[i] = f.scope.stmts.at(i-vars.len)
 			}
 
-			f.scope.stmts = stms
+			f.scope.stmts = stms*/
 		}
 
 		self.check_rets(f)

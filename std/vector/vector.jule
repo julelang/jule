@@ -1,0 +1,99 @@
+use cpp "alloc.hpp"
+
+cpp fn __jule_std_vector_alloc[T](n: int): *unsafe
+cpp unsafe fn __jule_std_vector_dealloc[T](heap: *unsafe)
+cpp unsafe fn __jule_std_vector_deref[T](heap: *unsafe, i: int): T
+cpp unsafe fn __jule_std_vector_heap_assign[T](heap: *unsafe, i: int, item: T)
+
+// Wrapper for dynamic array.
+// Uses capacity for performance.
+// Grows capacity if necessary.
+// But always allocates more for future pushes.
+//
+// Does not deallocates itself.
+// Use the dealloc() method for deallocate.
+pub struct Vector[T] {
+	_heap: *unsafe
+	_len:  int
+	_cap:  int
+}
+
+impl Vector {
+	fn calc_grow(self, delta: int): int {
+		let t = self.len() + delta
+		ret t + (t/2)
+	}
+
+	fn resize_alloc(mut self, n: int) {
+		let mut new_heap = cpp.__jule_std_vector_alloc[T](n)
+		if new_heap == nil {
+			panic("Vector[T].resize_alloc: heap reallocation failed")
+		}
+
+		let mut i = 0
+		for i < self._len; i++ {
+			unsafe {
+				let mut item = unsafe { cpp.__jule_std_vector_deref[T](self._heap, i) }
+				cpp.__jule_std_vector_heap_assign[T](new_heap, i, item)
+			}
+		}
+		unsafe { cpp.__jule_std_vector_dealloc[T](self._heap) }
+		self._heap = new_heap
+		self._cap = n
+	}
+
+	fn review_allocation(mut self, delta: int) {
+		if self._heap == nil {
+			self.resize_alloc(self.calc_grow(delta))
+			ret
+		}
+
+		if self._len+delta >= self._cap {
+			self.resize_alloc(self.calc_grow(delta))
+		}
+	}
+
+	// Returns length.
+	pub fn len(self): int { ret self._len }
+
+	// Returns capacity.
+	pub fn cap(self): int { ret self._cap }
+
+	// Sets length.
+	// Sets length to zero if n < 0.
+	// Don't set length if n >= length of vector.
+	pub fn set_len(mut self, n: int) {
+		if n < 0 {
+			self._len = 0
+			ret
+		}
+		if n >= self._len {
+			ret
+		}
+		self._len = n
+	}
+
+	// Returns item by index.
+	pub fn at(mut self, i: int): T {
+		if i < 0 || i >= self._len {
+			panic("Vector[T].at: out of range")
+		}
+		ret unsafe { cpp.__jule_std_vector_deref[T](self._heap, i) }
+	}
+
+	// Deallocates heap.
+	pub fn dealloc(mut self) {
+		unsafe { cpp.__jule_std_vector_dealloc[T](self._heap) }
+		self._heap = nil
+	}
+
+	// Push item.
+	pub fn push(mut self, mut items: ...T) {
+		self.review_allocation(items.len)
+		for (i, mut item) in items {
+			unsafe { cpp.__jule_std_vector_heap_assign[T](self._heap, self._len+i, item) }
+		}
+
+		self._len += items.len
+	}
+}
