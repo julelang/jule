@@ -354,6 +354,10 @@ func (tcc *_TypeCompatibilityChecker) check_enum() (ok bool) {
 }
 
 func (tcc *_TypeCompatibilityChecker) check() (ok bool) {
+	if tcc.src == nil {
+		return false
+	}
+
 	if tcc.dest.Ref() != nil {
 		return tcc.check_ref()
 	}
