@@ -83,8 +83,7 @@ namespace jule {
             for (const jule::I32 &r: src) {
                 const jule::Slice<jule::U8> bytes{ jule::utf8_rune_to_bytes(r) };
                 this->_len += bytes.len();
-                for (const jule::U8 _byte: bytes)
-                    this->buffer += _byte;
+                this->buffer.append(&bytes[0], bytes.len());
             }
         }
 
