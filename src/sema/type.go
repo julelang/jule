@@ -786,6 +786,11 @@ func (tc *_TypeChecker) from_struct(decl *ast.IdentTypeDecl, s *Struct) *StructI
 		return nil
 	}
 
+	if len(tc.ignore_generics) > 0 {
+		// Ignore prototypes.
+		return nil
+	}
+
 	ok := tc.check_illegal_cycles(decl, s)
 	if !ok {
 		return nil
