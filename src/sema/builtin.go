@@ -253,7 +253,7 @@ func builtin_caller_out(e *_Eval, fc *ast.FnCallExpr, _ *Data) *Data {
 		return nil
 	}
 	if len(fc.Args) > 1 {
-		e.push_err(fc.Args[2].Token, "argument_overflow")
+		e.push_err(fc.Args[1].Token, "argument_overflow")
 	}
 
 	expr := e.eval_expr(fc.Args[0])
