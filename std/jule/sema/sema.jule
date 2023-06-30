@@ -111,20 +111,51 @@ fn build_param_vars(mut f: &FnIns): []&Var {
 	ret vars
 }
 
+fn find_owner_instance(mut f: &FnIns): &StructIns {
+	for (_, mut ins) in f.decl.owner.instances {
+		for (_, mut m) in ins.methods {
+			if &f.decl == &m {
+				ret ins
+			}
+		}
+	}
+	ret nil
+}
+
 fn build_generic_type_aliases(mut f: &FnIns): []&TypeAlias {
-	if f.generics.len == 0 {
+	let size = f.generics.len
+	if real(f.decl.owner) {
+		size += f.decl.owner.generics.len
+	}
+
+	if size == 0 {
 		ret nil
 	}
 
-	let mut aliases = make([]&TypeAlias, f.generics.len)
+	let mut aliases = make([]&TypeAlias, size)
+
 	for (i, mut g) in f.generics {
 		let mut decl = f.decl.generics[i]
 		aliases[i] = &TypeAlias{
-			used:  f.decl.parameters_uses_generics() || f.decl.result_uses_generics(),
+			used:  true,
 			scope: f.decl.scope,
 			ident: decl.ident,
 			token: decl.token,
 			kind:  &TypeSymbol{kind: g},
+		}
+	}
+
+	if real(f.decl.owner) {
+		let mut owner = find_owner_instance(f)
+		for (i, mut g) in owner.generics {
+			let mut decl = owner.decl.generics[i]
+			aliases[f.generics.len+i] = &TypeAlias{
+				used:  true,
+				scope: f.decl.scope,
+				ident: decl.ident,
+				token: decl.token,
+				kind:  &TypeSymbol{kind: g},
+			}
 		}
 	}
 
@@ -833,13 +864,31 @@ impl Sema {
 			f.decl.sema.set_current_file(file)
 		}
 
-		let mut generics = make([]&TypeAlias, f.generics.len)
+		let size = f.generics.len
+		if real(f.decl) && real(f.decl.owner) {
+			size += f.decl.owner.generics.len
+		}
+
+		let mut generics = make([]&TypeAlias, size)
+
 		for i, g in f.generics {
 			generics[i] = &TypeAlias{
 				ident: f.decl.generics[i].ident,
 				kind: &TypeSymbol{
 					kind: g,
 				},
+			}
+		}
+
+		if real(f.decl) && real(f.decl.owner) {
+			let mut owner = find_owner_instance(f)
+			for (i, mut g) in owner.generics {
+				generics[i] = &TypeAlias{
+					ident: owner.decl.generics[i].ident,
+					kind: &TypeSymbol{
+						kind: g,
+					},
+				}
 			}
 		}
 

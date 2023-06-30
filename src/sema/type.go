@@ -752,6 +752,15 @@ func (tc *_TypeChecker) check_struct_ins(ins *StructIns, error_token lex.Token) 
 		}
 	}
 
+	for _, m := range ins.Methods {
+		// Genericed functions checked when called.
+		if len(m.Generics) > 0 {
+			continue
+		}
+
+		tc.s.check_type_method(ins, m)
+	}
+
 	return true
 }
 

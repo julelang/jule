@@ -117,20 +117,51 @@ func build_param_vars(f *FnIns) []*Var {
 	return vars
 }
 
+func find_owner_instance(f *FnIns) *StructIns {
+	for _, ins := range f.Decl.Owner.Instances {
+		for _, m := range ins.Methods {
+			if f.Decl == m {
+				return ins
+			}
+		}
+	}
+	return nil
+}
+
 func build_generic_type_aliases(f *FnIns) []*TypeAlias {
-	if len(f.Generics) == 0 {
+	size := len(f.Generics)
+	if f.Decl.Owner != nil {
+		size += len(f.Decl.Owner.Generics)
+	}
+
+	if size == 0 {
 		return nil
 	}
 
-	aliases := make([]*TypeAlias, len(f.Generics))
+	aliases := make([]*TypeAlias, size)
+
 	for i, g := range f.Generics {
 		decl := f.Decl.Generics[i]
 		aliases[i] = &TypeAlias{
-			Used:  f.Decl.Parameters_uses_generics() || f.Decl.Result_uses_generics(),
+			Used:  true,
 			Scope: f.Decl.Scope,
 			Ident: decl.Ident,
 			Token: decl.Token,
 			Kind:  &TypeSymbol{Kind: g},
+		}
+	}
+
+	if f.Decl.Owner != nil {
+		owner := find_owner_instance(f)
+		for i, g := range owner.Generics {
+			decl := owner.Decl.Generics[i]
+			aliases[len(f.Generics)+i] = &TypeAlias{
+				Used:  true,
+				Scope: f.Decl.Scope,
+				Ident: decl.Ident,
+				Token: decl.Token,
+				Kind:  &TypeSymbol{Kind: g},
+			}
 		}
 	}
 
@@ -724,13 +755,31 @@ func (s *_Sema) reload_fn_ins_types(f *FnIns) (ok bool) {
 		f.Decl.sema.set_current_file(file)
 	}
 
-	generics := make([]*TypeAlias, len(f.Generics))
+	size := len(f.Generics)
+	if f.Decl != nil && f.Decl.Owner != nil {
+		size += len(f.Decl.Owner.Generics)
+	}
+
+	generics := make([]*TypeAlias, size)
+
 	for i, g := range f.Generics {
 		generics[i] = &TypeAlias{
 			Ident: f.Decl.Generics[i].Ident,
 			Kind: &TypeSymbol{
 				Kind: g,
 			},
+		}
+	}
+
+	if f.Decl != nil && f.Decl.Owner != nil {
+		owner := find_owner_instance(f)
+		for i, g := range owner.Generics {
+			generics[i] = &TypeAlias{
+				Ident: owner.Decl.Generics[i].Ident,
+				Kind: &TypeSymbol{
+					Kind: g,
+				},
+			}
 		}
 	}
 
