@@ -563,6 +563,13 @@ func (s *_Sema) impl_impls() {
 	}
 }
 
+func (s *_Sema) check_enums() {
+	for _, file := range s.files {
+		s.set_current_file(file)
+		s.check_enum_decls()
+	}
+}
+
 // Checks type, builds result as kind and collect referred type aliases.
 // Skips already checked types.
 func (s *_Sema) check_type_with_refers(t *TypeSymbol, l Lookup, referencer *_Referencer) (ok bool) {
@@ -1519,9 +1526,6 @@ func (s *_Sema) check_file_decls() (ok bool) {
 	case !s.check_type_alias_decls():
 		return false
 
-	case !s.check_enum_decls():
-		return false
-
 	case !s.check_trait_decls():
 		return false
 
@@ -2054,6 +2058,12 @@ func (s *_Sema) check(files []*SymbolTable) {
 
 	s.check_imports()
 	// Break checking if imports has error.
+	if len(s.errors) > 0 {
+		return
+	}
+
+	s.check_enums()
+	// Break checking if enums has error.
 	if len(s.errors) > 0 {
 		return
 	}

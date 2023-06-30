@@ -670,6 +670,13 @@ impl Sema {
 		}
 	}
 
+	fn check_enums(mut self) {
+		for (_, mut file) in self.files {
+			s.set_current_file(file)
+			s.check_enum_decls()
+		}
+	}
+
 	// Checks type, builds result as kind and collect referred type aliases.
 	// Skips already checked types.
 	fn check_type_with_refers(mut &self, mut t: &TypeSymbol, l: Lookup, referencer: &Referencer): (ok: bool) {
@@ -1618,7 +1625,6 @@ impl Sema {
 		match {
 		| !self.check_passes():           ret false
 		| !self.check_type_alias_decls(): ret false
-		| !self.check_enum_decls():       ret false
 		| !self.check_trait_decls():      ret false
 		| !self.check_global_decls():     ret false
 		| !self.check_fn_decls():         ret false
@@ -2032,6 +2038,12 @@ impl Sema {
 		self.check_imports()
 		// Break checking if imports has error.
 		if self.errors.len > 0 {
+			ret
+		}
+
+		s.check_enums()
+		// Break checking if enums has error.
+		if s.errors.len > 0 {
 			ret
 		}
 
