@@ -5,7 +5,6 @@
 package lex
 
 import (
-	"strings"
 	"unicode/utf8"
 
 	"github.com/julelang/jule/build"
@@ -166,16 +165,28 @@ func (l *_Lex) check_ranges() {
 	}
 }
 
+func bytes_has_prefix(bytes []byte, prefix string) bool {
+	if len(bytes) < len(prefix) {
+		return false
+	}
+	for i := range prefix {
+		if bytes[i] != prefix[i] {
+			return false
+		}
+	}
+	return true
+}
+
 // is_kw returns true if part is keyword, false if not.
-func is_kw(ln, kw string) bool {
-	if !strings.HasPrefix(ln, kw) {
+func is_kw(ln []byte, kw string) bool {
+	if !bytes_has_prefix(ln, kw) {
 		return false
 	}
 	ln = ln[len(kw):]
-	if ln == "" {
+	if len(ln) == 0 {
 		return true
 	}
-	r, _ := utf8.DecodeRuneInString(ln)
+	r, _ := utf8.DecodeRune(ln)
 	if r == '_' {
 		return false
 	}
@@ -184,8 +195,11 @@ func is_kw(ln, kw string) bool {
 
 // id returns identifer if next token is identifer,
 // returns empty string if not.
-func (l *_Lex) id(ln string) string {
-	if !Is_ident_rune(ln) {
+func (l *_Lex) id(ln []byte) string {
+	if len(ln) == 0 {
+		return ""
+	}
+	if ln[0] != '_' && !Is_letter(rune(ln[0])) {
 		return ""
 	}
 
@@ -193,7 +207,7 @@ func (l *_Lex) id(ln string) string {
 	for _, r := range ln {
 		if r != '_' &&
 			!Is_decimal(byte(r)) &&
-			!Is_letter(r) {
+			!Is_letter(rune(r)) {
 			break
 		}
 		ident += string(r)
@@ -204,8 +218,7 @@ func (l *_Lex) id(ln string) string {
 }
 
 // resume to lex from position.
-func (l *_Lex) resume() string {
-	var ln string
+func (l *_Lex) resume() []byte {
 	// Skip spaces.
 	i := l.pos
 	for ; i < len(l.data); i++ {
@@ -233,10 +246,9 @@ func (l *_Lex) resume() string {
 			}
 		}
 
-		ln = string(l.data[i:j])
-		break
+		return l.data[i:j]
 	}
-	return ln
+	return nil
 }
 
 func (l *_Lex) lex_line_comment(t *Token) {
@@ -275,7 +287,7 @@ func (l *_Lex) lex_range_comment() {
 	l.push_err("missing_block_comment")
 }
 
-func float_fmt_e(txt string, i int) (literal string) {
+func float_fmt_e(txt []byte, i int) (literal string) {
 	i++ // Skip E | e
 	if i >= len(txt) {
 		return
@@ -297,12 +309,12 @@ func float_fmt_e(txt string, i int) (literal string) {
 	if i == first {
 		return ""
 	}
-	return txt[:i]
+	return string(txt[:i])
 }
 
-func float_fmt_p(txt string, i int) string { return float_fmt_e(txt, i) }
+func float_fmt_p(txt []byte, i int) string { return float_fmt_e(txt, i) }
 
-func float_fmt_dotnp(txt string, i int) string {
+func float_fmt_dotnp(txt []byte, i int) string {
 	if txt[i] != '.' {
 		return ""
 	}
@@ -323,19 +335,19 @@ loop:
 	return ""
 }
 
-func float_fmt_dotfp(txt string, i int) string {
+func float_fmt_dotfp(txt []byte, i int) string {
 	// skip .f
 	i += 2
 	return float_fmt_e(txt, i)
 }
 
-func float_fmt_dotp(txt string, i int) string {
+func float_fmt_dotp(txt []byte, i int) string {
 	// skip .
 	i++
 	return float_fmt_e(txt, i)
 }
 
-func float_num(txt string, i int) (literal string) {
+func float_num(txt []byte, i int) (literal string) {
 	i++ // Skip dot
 	for ; i < len(txt); i++ {
 		b := txt[i]
@@ -349,10 +361,10 @@ func float_num(txt string, i int) (literal string) {
 	if i == 1 { // Just dot
 		return
 	}
-	return txt[:i]
+	return string(txt[:i])
 }
 
-func common_num(txt string) (literal string) {
+func common_num(txt []byte) (literal string) {
 	i := 0
 loop:
 	for ; i < len(txt); i++ {
@@ -372,11 +384,11 @@ loop:
 	if i == 0 {
 		return
 	}
-	return txt[:i]
+	return string(txt[:i])
 }
 
-func binary_num(txt string) (literal string) {
-	if !strings.HasPrefix(txt, "0b") {
+func binary_num(txt []byte) (literal string) {
+	if len(txt) < 2 || txt[0] != '0' || txt[1] != 'b' {
 		return ""
 	}
 	if len(txt) < 2 {
@@ -392,13 +404,13 @@ func binary_num(txt string) (literal string) {
 	if i == binaryStart {
 		return
 	}
-	return txt[:i]
+	return string(txt[:i])
 }
 
 func is_float_fmt_e(b byte, i int) bool { return i > 0 && (b == 'e' || b == 'E') }
 func is_float_fmt_p(b byte, i int) bool { return i > 0 && (b == 'p' || b == 'P') }
 
-func is_float_fmt_dotnp(txt string, i int) bool {
+func is_float_fmt_dotnp(txt []byte, i int) bool {
 	if txt[i] != '.' {
 		return false
 	}
@@ -421,7 +433,7 @@ loop:
 	return false
 }
 
-func is_float_fmt_dotp(txt string, i int) bool {
+func is_float_fmt_dotp(txt []byte, i int) bool {
 	txt = txt[i:]
 	switch {
 	case len(txt) < 3:
@@ -438,7 +450,7 @@ func is_float_fmt_dotp(txt string, i int) bool {
 	}
 }
 
-func is_float_fmt_dotfp(txt string, i int) bool {
+func is_float_fmt_dotfp(txt []byte, i int) bool {
 	txt = txt[i:]
 	switch {
 	case len(txt) < 4:
@@ -458,7 +470,7 @@ func is_float_fmt_dotfp(txt string, i int) bool {
 	}
 }
 
-func octal_num(txt string) (literal string) {
+func octal_num(txt []byte) (literal string) {
 	if txt[0] != '0' {
 		return ""
 	}
@@ -478,10 +490,10 @@ func octal_num(txt string) (literal string) {
 	if i == octalStart {
 		return
 	}
-	return txt[:i]
+	return string(txt[:i])
 }
 
-func hex_num(txt string) (literal string) {
+func hex_num(txt []byte) (literal string) {
 	if len(txt) < 3 {
 		return
 	} else if txt[0] != '0' || (txt[1] != 'x' && txt[1] != 'X') {
@@ -512,12 +524,12 @@ loop:
 	if i == hexStart {
 		return
 	}
-	return txt[:i]
+	return string(txt[:i])
 }
 
 // num returns literal if next token is numeric,
 // returns empty string if not.
-func (l *_Lex) num(txt string) (literal string) {
+func (l *_Lex) num(txt []byte) (literal string) {
 	literal = hex_num(txt)
 	if literal != "" {
 		goto end
@@ -536,7 +548,7 @@ end:
 	return
 }
 
-func hex_escape(txt string, n int) (seq string) {
+func hex_escape(txt []byte, n int) (seq string) {
 	if len(txt) < n {
 		return
 	}
@@ -546,30 +558,30 @@ func hex_escape(txt string, n int) (seq string) {
 			return
 		}
 	}
-	seq = txt[:n]
+	seq = string(txt[:n])
 	return
 }
 
 // Pattern (RegEx): ^\\U.{8}
-func big_unicode_point_escape(txt string) string { return hex_escape(txt, 10) }
+func big_unicode_point_escape(txt []byte) string { return hex_escape(txt, 10) }
 
 // Pattern (RegEx): ^\\u.{4}
-func little_unicode_point_escape(txt string) string { return hex_escape(txt, 6) }
+func little_unicode_point_escape(txt []byte) string { return hex_escape(txt, 6) }
 
 // Pattern (RegEx): ^\\x..
-func hex_byte_escape(txt string) string { return hex_escape(txt, 4) }
+func hex_byte_escape(txt []byte) string { return hex_escape(txt, 4) }
 
 // Patter (RegEx): ^\\[0-7]{3}
-func byte_escape(txt string) (seq string) {
+func byte_escape(txt []byte) (seq string) {
 	if len(txt) < 4 {
 		return
 	} else if !Is_octal(txt[1]) || !Is_octal(txt[2]) || !Is_octal(txt[3]) {
 		return
 	}
-	return txt[:4]
+	return string(txt[:4])
 }
 
-func (l *_Lex) escape_seq(txt string) string {
+func (l *_Lex) escape_seq(txt []byte) string {
 	seq := ""
 	if len(txt) < 2 {
 		goto end
@@ -577,7 +589,7 @@ func (l *_Lex) escape_seq(txt string) string {
 	switch txt[1] {
 	case '\\', '\'', '"', 'a', 'b', 'f', 'n', 'r', 't', 'v':
 		l.pos += 2
-		return txt[:2]
+		return string(txt[:2])
 	case 'U':
 		seq = big_unicode_point_escape(txt)
 	case 'u':
@@ -597,17 +609,17 @@ end:
 	return seq
 }
 
-func (l *_Lex) get_rune(txt string, raw bool) string {
+func (l *_Lex) get_rune(txt []byte, raw bool) string {
 	if !raw && txt[0] == '\\' {
 		return l.escape_seq(txt)
 	}
 
-	r, n := utf8.DecodeRuneInString(txt)
+	r, n := utf8.DecodeRune(txt)
 	l.pos += n
 	return string(r)
 }
 
-func (l *_Lex) lex_rune(txt string) string {
+func (l *_Lex) lex_rune(txt []byte) string {
 	run := "'"
 	l.column++
 	n := 0
@@ -660,11 +672,11 @@ func (l *_Lex) lex_str() string {
 				return ""
 			}
 		}
-		txt := ""
+		var txt []byte = nil
 		if l.pos+20 < len(l.data) {
-			txt = string(l.data[l.pos:l.pos+20])
+			txt = l.data[l.pos:l.pos+20]
 		} else {
-			txt = string(l.data[l.pos:])
+			txt = l.data[l.pos:]
 		}
 		r := l.get_rune(txt, raw)
 		s += r
@@ -683,8 +695,8 @@ func (l *_Lex) new_line() {
 	l.column = 1
 }
 
-func (l *_Lex) is_op(txt, kind string, id uint8, t *Token) bool {
-	if !strings.HasPrefix(txt, kind) {
+func (l *_Lex) is_op(txt []byte, kind string, id uint8, t *Token) bool {
+	if !bytes_has_prefix(txt, kind) {
 		return false
 	}
 	t.Kind = kind
@@ -693,7 +705,7 @@ func (l *_Lex) is_op(txt, kind string, id uint8, t *Token) bool {
 	return true
 }
 
-func (l *_Lex) is_kw(txt, kind string, id uint8, t *Token) bool {
+func (l *_Lex) is_kw(txt []byte, kind string, id uint8, t *Token) bool {
 	if !is_kw(txt, kind) {
 		return false
 	}
@@ -703,7 +715,7 @@ func (l *_Lex) is_kw(txt, kind string, id uint8, t *Token) bool {
 	return true
 }
 
-func (l *_Lex) lex_kws(txt string, tok *Token) bool {
+func (l *_Lex) lex_kws(txt []byte, tok *Token) bool {
 	for _, pair := range _KEYWORDS {
 		if l.is_kw(txt, pair.kind, pair.id, tok) {
 			return true
@@ -712,7 +724,7 @@ func (l *_Lex) lex_kws(txt string, tok *Token) bool {
 	return false
 }
 
-func (l *_Lex) lex_basic_ops(txt string, tok *Token) bool {
+func (l *_Lex) lex_basic_ops(txt []byte, tok *Token) bool {
 	for _, pair := range _BASIC_OPS {
 		if l.is_op(txt, pair.kind, pair.id, tok) {
 			return true
@@ -721,7 +733,7 @@ func (l *_Lex) lex_basic_ops(txt string, tok *Token) bool {
 	return false
 }
 
-func (l *_Lex) lex_id(txt string, t *Token) bool {
+func (l *_Lex) lex_id(txt []byte, t *Token) bool {
 	lex := l.id(txt)
 	if lex == "" {
 		return false
@@ -732,7 +744,7 @@ func (l *_Lex) lex_id(txt string, t *Token) bool {
 	return true
 }
 
-func (l *_Lex) lex_num(txt string, t *Token) bool {
+func (l *_Lex) lex_num(txt []byte, t *Token) bool {
 	lex := l.num(txt)
 	if lex == "" {
 		return false
@@ -747,8 +759,8 @@ func (l *_Lex) lex_num(txt string, t *Token) bool {
 func (l *_Lex) token() Token {
 	t := Token{File: l.file, Id: ID_NA}
 
-	txt := l.resume()
-	if txt == "" {
+	line := l.resume()
+	if line == nil {
 		return t
 	}
 
@@ -758,48 +770,48 @@ func (l *_Lex) token() Token {
 
 	//* lex.Tokenenize
 	switch {
-	case l.lex_num(txt, &t):
-	case txt[0] == '\'':
-		t.Kind = l.lex_rune(txt)
+	case l.lex_num(line, &t):
+	case line[0] == '\'':
+		t.Kind = l.lex_rune(line)
 		t.Id = ID_LIT
 		return t
 
-	case txt[0] == '"' || txt[0] == '`':
+	case line[0] == '"' || line[0] == '`':
 		t.Kind = l.lex_str()
 		t.Id = ID_LIT
 		return t
 
-	case strings.HasPrefix(txt, KND_LN_COMMENT):
+	case bytes_has_prefix(line, KND_LN_COMMENT):
 		l.lex_line_comment(&t)
 		return t
 
-	case strings.HasPrefix(txt, KND_RNG_LCOMMENT):
+	case bytes_has_prefix(line, KND_RNG_LCOMMENT):
 		l.lex_range_comment()
 		return t
 
-	case l.is_op(txt, KND_LPAREN, ID_RANGE, &t):
+	case l.is_op(line, KND_LPAREN, ID_RANGE, &t):
 		l.ranges = append(l.ranges, len(l.tokens))
 
-	case l.is_op(txt, KND_RPARENT, ID_RANGE, &t):
+	case l.is_op(line, KND_RPARENT, ID_RANGE, &t):
 		l.push_range_close(t, KND_LPAREN)
 
-	case l.is_op(txt, KND_LBRACE, ID_RANGE, &t):
+	case l.is_op(line, KND_LBRACE, ID_RANGE, &t):
 		l.ranges = append(l.ranges, len(l.tokens))
 
-	case l.is_op(txt, KND_RBRACE, ID_RANGE, &t):
+	case l.is_op(line, KND_RBRACE, ID_RANGE, &t):
 		l.push_range_close(t, KND_LBRACE)
 
-	case l.is_op(txt, KND_LBRACKET, ID_RANGE, &t):
+	case l.is_op(line, KND_LBRACKET, ID_RANGE, &t):
 		l.ranges = append(l.ranges, len(l.tokens))
 
-	case l.is_op(txt, KND_RBRACKET, ID_RANGE, &t):
+	case l.is_op(line, KND_RBRACKET, ID_RANGE, &t):
 		l.push_range_close(t, KND_LBRACKET)
 
-	case l.lex_basic_ops(txt, &t) || l.lex_kws(txt, &t) || l.lex_id(txt, &t):
+	case l.lex_basic_ops(line, &t) || l.lex_kws(line, &t) || l.lex_id(line, &t):
 		// Skip.
 
 	default:
-		r, sz := utf8.DecodeRuneInString(txt)
+		r, sz := utf8.DecodeRune(line)
 		l.push_err("invalid_token", r)
 		l.column += sz
 		l.pos++
