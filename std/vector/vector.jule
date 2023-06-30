@@ -1,5 +1,11 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
 use cpp "alloc.hpp"
 
+cpp fn __jule_std_vector_new_heap(): **unsafe
+cpp unsafe fn __jule_std_vector_delete_heap(heap: **unsafe)
 cpp fn __jule_std_vector_alloc[T](n: int): *unsafe
 cpp unsafe fn __jule_std_vector_dealloc[T](heap: *unsafe)
 cpp unsafe fn __jule_std_vector_deref[T](heap: *unsafe, i: int): T
@@ -13,7 +19,7 @@ cpp unsafe fn __jule_std_vector_heap_assign[T](heap: *unsafe, i: int, item: T)
 // Does not deallocates itself.
 // Use the dealloc() method for deallocate.
 pub struct Vector[T] {
-	_heap: *unsafe
+	_heap: **unsafe
 	_len:  int
 	_cap:  int
 }
@@ -30,20 +36,30 @@ impl Vector {
 			panic("Vector[T].resize_alloc: heap reallocation failed")
 		}
 
+		if self._heap == nil {
+			self._heap = cpp.__jule_std_vector_new_heap()
+			if self._heap == nil {
+				panic("Vector[T].resize_alloc: heap reallocation failed")
+			}
+			unsafe { *self._heap = new_heap }
+			self._cap = n
+			ret
+		}
+
 		let mut i = 0
 		for i < self._len; i++ {
 			unsafe {
-				let mut item = unsafe { cpp.__jule_std_vector_deref[T](self._heap, i) }
+				let mut item = unsafe { cpp.__jule_std_vector_deref[T](*self._heap, i) }
 				cpp.__jule_std_vector_heap_assign[T](new_heap, i, item)
 			}
 		}
-		unsafe { cpp.__jule_std_vector_dealloc[T](self._heap) }
-		self._heap = new_heap
+		unsafe { cpp.__jule_std_vector_dealloc[T](*self._heap) }
+		unsafe { *self._heap = new_heap }
 		self._cap = n
 	}
 
 	fn review_allocation(mut self, delta: int) {
-		if self._heap == nil {
+		if (self._heap == nil || unsafe { *self._heap } == nil) {
 			self.resize_alloc(self.calc_grow(delta))
 			ret
 		}
@@ -78,12 +94,20 @@ impl Vector {
 		if i < 0 || i >= self._len {
 			panic("Vector[T].at: out of range")
 		}
-		ret unsafe { cpp.__jule_std_vector_deref[T](self._heap, i) }
+		ret unsafe { cpp.__jule_std_vector_deref[T](*self._heap, i) }
 	}
 
 	// Deallocates heap.
 	pub fn dealloc(mut self) {
-		unsafe { cpp.__jule_std_vector_dealloc[T](self._heap) }
+		if self._heap == nil {
+			ret
+		}
+
+		if (unsafe { *self._heap != nil }) {
+			unsafe { cpp.__jule_std_vector_dealloc[T](*self._heap) }
+			unsafe { *self._heap = nil }
+		}
+		unsafe { cpp.__jule_std_vector_delete_heap(self._heap) }
 		self._heap = nil
 	}
 
@@ -91,7 +115,7 @@ impl Vector {
 	pub fn push(mut self, mut items: ...T) {
 		self.review_allocation(items.len)
 		for (i, mut item) in items {
-			unsafe { cpp.__jule_std_vector_heap_assign[T](self._heap, self._len+i, item) }
+			unsafe { cpp.__jule_std_vector_heap_assign[T](*self._heap, self._len+i, item) }
 		}
 
 		self._len += items.len
