@@ -103,7 +103,7 @@ func (i *Importer) Import_package(path string) ([]*ast.Ast, []build.Log) {
 	for _, dirent := range dirents {
 		path := filepath.Join(path, dirent.Name())
 		file := lex.New_file_set(path)
-		errors := lex.Lex(file, string(read_buff(file.Path())))
+		errors := lex.Lex(file, read_buff(file.Path()))
 		if len(errors) > 0 {
 			return nil, errors
 		}

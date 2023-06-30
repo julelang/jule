@@ -383,7 +383,7 @@ struct Lex {
 	first_token_of_line: bool
 	tokens:              []Token
 	ranges:              []int
-	data:                []rune
+	data:                []byte
 	file:                &File
 	pos:                 int
 	column:              int
@@ -460,7 +460,7 @@ impl Lex {
 		// Skip spaces.
 		let mut i = self.pos
 		for i < self.data.len; i++ {
-			let r = self.data[i]
+			let r = rune(self.data[i])
 			if is_space(r) {
 				self.pos++
 				match r {
@@ -582,8 +582,8 @@ impl Lex {
 			ret self.escape_seq(txt)
 		}
 	
-		let (r, _) = decode_rune_str(txt)
-		self.pos++
+		let (r, n) = decode_rune_str(txt)
+		self.pos += n
 		ret (str)(r)
 	}
 
@@ -830,7 +830,7 @@ impl Lex {
 // Lex source code into fileset.
 // Returns nil if !real(f).
 // Returns nil slice for errors if no any error.
-pub fn lex(mut f: &File, text: str): []Log {
+pub fn lex(mut f: &File, text: []byte): []Log {
 	if !real(f) {
 		ret nil
 	}
@@ -839,7 +839,7 @@ pub fn lex(mut f: &File, text: str): []Log {
 		file: f,
 		pos:  0,
 		row:  -1, // For true row
-		data: ([]rune)(text),
+		data: text,
 	}
 
 	lex.new_line()

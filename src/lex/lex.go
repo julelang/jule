@@ -119,7 +119,7 @@ type _Lex struct {
 	first_token_of_line bool
 	tokens              []Token
 	ranges              []int
-	data                []rune
+	data                []byte
 	file                *File
 	pos                 int
 	column              int
@@ -209,7 +209,7 @@ func (l *_Lex) resume() string {
 	// Skip spaces.
 	i := l.pos
 	for ; i < len(l.data); i++ {
-		r := l.data[i]
+		r := rune(l.data[i])
 		if Is_space(r) {
 			l.pos++
 			switch r {
@@ -602,8 +602,8 @@ func (l *_Lex) get_rune(txt string, raw bool) string {
 		return l.escape_seq(txt)
 	}
 
-	r, _ := utf8.DecodeRuneInString(txt)
-	l.pos++
+	r, n := utf8.DecodeRuneInString(txt)
+	l.pos += n
 	return string(r)
 }
 
@@ -877,8 +877,8 @@ func (l *_Lex) push_wrong_order_close_err(t Token) {
 // Lex source code into fileset.
 // Returns nil if f is nil.
 // Returns nil slice for errors if no any error.
-func Lex(f *File, text string) []build.Log {
-	if f == nil {
+func Lex(f *File, text []byte) []build.Log {
+	if f == nil || text == nil {
 		return nil
 	}
 
@@ -886,7 +886,7 @@ func Lex(f *File, text string) []build.Log {
 		file: f,
 		pos:  0,
 		row:  -1, // For true row
-		data: ([]rune)(text),
+		data: text,
 	}
 
 	lex.new_line()
