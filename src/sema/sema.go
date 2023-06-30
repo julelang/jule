@@ -2053,6 +2053,23 @@ func (s *_Sema) check_package_types() {
 	}
 }
 
+func (s *_Sema) set_file_sema_fields() {
+	for _, f := range s.file.Funcs {
+		f.sema = s
+	}
+
+	for _, st := range s.file.Structs {
+		st.sema = s
+	}
+}
+
+func (s *_Sema) set_sema_fields() {
+	for _, file := range s.files {
+		s.set_current_file(file)
+		s.set_file_sema_fields()
+	}
+}
+
 func (s *_Sema) check(files []*SymbolTable) {
 	s.files = files
 
@@ -2067,6 +2084,8 @@ func (s *_Sema) check(files []*SymbolTable) {
 	if len(s.errors) > 0 {
 		return
 	}
+
+	s.set_sema_fields()
 
 	s.impl_impls()
 	// Break checking if imports has error.

@@ -2032,6 +2032,23 @@ impl Sema {
 		}
 	}
 
+	fn set_file_sema_fields(mut &self) {
+		for (_, mut f) in self.file.funcs {
+			f.sema = self
+		}
+
+		for (_, mut st) in self.file.structs {
+			st.sema = self
+		}
+	}
+
+	fn set_sema_fields(mut &self) {
+		for (_, mut file) in self.files {
+			self.set_current_file(file)
+			self.set_file_sema_fields()
+		}
+	}
+
 	fn check(mut &self, mut files: []&SymbolTable) {
 		self.files = files
 
@@ -2046,6 +2063,8 @@ impl Sema {
 		if s.errors.len > 0 {
 			ret
 		}
+
+		s.set_sema_fields()
 
 		self.impl_impls()
 		// Break checking if imports has error.
