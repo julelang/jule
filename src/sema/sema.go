@@ -117,17 +117,6 @@ func build_param_vars(f *FnIns) []*Var {
 	return vars
 }
 
-func find_owner_instance(f *FnIns) *StructIns {
-	for _, ins := range f.Decl.Owner.Instances {
-		for _, m := range ins.Methods {
-			if f.Decl == m {
-				return ins
-			}
-		}
-	}
-	return nil
-}
-
 func build_generic_type_aliases(f *FnIns) []*TypeAlias {
 	size := len(f.Generics)
 	if f.Decl.Owner != nil {
@@ -152,7 +141,7 @@ func build_generic_type_aliases(f *FnIns) []*TypeAlias {
 	}
 
 	if f.Decl.Owner != nil {
-		owner := find_owner_instance(f)
+		owner := f.Owner
 		for i, g := range owner.Generics {
 			decl := owner.Decl.Generics[i]
 			aliases[len(f.Generics)+i] = &TypeAlias{
@@ -779,7 +768,7 @@ func (s *_Sema) reload_fn_ins_types(f *FnIns) (ok bool) {
 	}
 
 	if f.Decl != nil && f.Decl.Owner != nil {
-		owner := find_owner_instance(f)
+		owner := f.Owner
 		for i, g := range owner.Generics {
 			generics[i] = &TypeAlias{
 				Ident: owner.Decl.Generics[i].Ident,

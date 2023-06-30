@@ -111,17 +111,6 @@ fn build_param_vars(mut f: &FnIns): []&Var {
 	ret vars
 }
 
-fn find_owner_instance(mut f: &FnIns): &StructIns {
-	for (_, mut ins) in f.decl.owner.instances {
-		for (_, mut m) in ins.methods {
-			if &f.decl == &m {
-				ret ins
-			}
-		}
-	}
-	ret new(StructIns)
-}
-
 fn build_generic_type_aliases(mut f: &FnIns): []&TypeAlias {
 	let mut size = f.generics.len
 	if real(f.decl.owner) {
@@ -146,7 +135,7 @@ fn build_generic_type_aliases(mut f: &FnIns): []&TypeAlias {
 	}
 
 	if real(f.decl.owner) {
-		let mut owner = find_owner_instance(f)
+		let mut owner = f.owner
 		for (i, mut g) in owner.generics {
 			let mut decl = owner.decl.generics[i]
 			aliases[f.generics.len+i] = &TypeAlias{
@@ -888,7 +877,7 @@ impl Sema {
 		}
 
 		if real(f.decl) && real(f.decl.owner) {
-			let mut owner = find_owner_instance(f)
+			let mut owner = f.owner
 			for (i, mut g) in owner.generics {
 				generics[i] = &TypeAlias{
 					ident: owner.decl.generics[i].ident,
