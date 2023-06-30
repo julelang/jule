@@ -31,8 +31,8 @@ namespace jule {
             { delete reinterpret_cast<T*>(alloc); }
 
             static jule::Bool eq(void *alloc, void *other) noexcept {
-                const T *l{ reinterpret_cast<const T*>(alloc) };
-                const T *r{ reinterpret_cast<const T*>(other) };
+                T *l{ reinterpret_cast<T*>(alloc) };
+                T *r{ reinterpret_cast<T*>(other) };
                 return *l == *r;
             }
 

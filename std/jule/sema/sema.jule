@@ -11,6 +11,7 @@ use std::jule::build::{Derives, Log, LogKind, errorf}
 use std::jule::constant::{new_str, new_u64}
 use std::jule::lex::{File, Token, TokenKind, is_ignore_ident, is_anon_ident}
 use std::jule::types::{is_float, is_int, is_sig_int, is_unsig_int, max_of}
+use std::vector::{new_vector}
 
 fn compiler_err(token: Token, key: str, args: ...any): Log {
 	ret Log{
@@ -112,19 +113,39 @@ fn build_param_vars(mut f: &FnIns): []&Var {
 }
 
 fn build_generic_type_aliases(mut f: &FnIns): []&TypeAlias {
-	if f.generics.len == 0 {
+	let mut size = f.generics.len
+	if real(f.decl.owner) {
+		size += f.decl.owner.generics.len
+	}
+
+	if size == 0 {
 		ret nil
 	}
 
-	let mut aliases = make([]&TypeAlias, f.generics.len)
+	let mut aliases = make([]&TypeAlias, size)
+
 	for (i, mut g) in f.generics {
 		let mut decl = f.decl.generics[i]
 		aliases[i] = &TypeAlias{
-			used:  f.decl.parameters_uses_generics() || f.decl.result_uses_generics(),
+			used:  true,
 			scope: f.decl.scope,
 			ident: decl.ident,
 			token: decl.token,
 			kind:  &TypeSymbol{kind: g},
+		}
+	}
+
+	if real(f.decl.owner) {
+		let mut owner = f.owner
+		for (i, mut g) in owner.generics {
+			let mut decl = owner.decl.generics[i]
+			aliases[f.generics.len+i] = &TypeAlias{
+				used:  true,
+				scope: f.decl.scope,
+				ident: decl.ident,
+				token: decl.token,
+				kind:  &TypeSymbol{kind: g},
+			}
 		}
 	}
 
@@ -140,9 +161,9 @@ fn find_file(mut files: []&SymbolTable, handler: &File): &SymbolTable {
 	ret new(SymbolTable)
 }
 
-fn conditional_has_ret(c: &Conditional): (ok: bool, breaking: bool) {
+fn conditional_has_ret(mut c: &Conditional): (ok: bool, breaking: bool) {
 	let mut breaked = false
-	for _, elif in c.elifs {
+	for (_, mut elif) in c.elifs {
 		if !real(elif) {
 			ret false, false
 		}
@@ -162,7 +183,7 @@ fn conditional_has_ret(c: &Conditional): (ok: bool, breaking: bool) {
 	ret ok, breaked
 }
 
-fn match_has_ret(m: &Match): bool {
+fn match_has_ret(mut m: &Match): bool {
 	if !real(m.default) {
 		ret false
 	}
@@ -170,7 +191,7 @@ fn match_has_ret(m: &Match): bool {
 	let mut ok = true
 	let mut falled = false
 	let mut breaked = false
-	for _, c in m.cases {
+	for (_, mut c) in m.cases {
 		if !real(c) {
 			ret false
 		}
@@ -198,12 +219,14 @@ fn match_has_ret(m: &Match): bool {
 	ret has_ret(m.default.scope)
 }
 
-fn __has_ret(s: &Scope): (ok: bool, falled: bool, breaked: bool) {
+fn __has_ret(mut s: &Scope): (ok: bool, falled: bool, breaked: bool) {
 	if !real(s) {
 		ret false, false, false
 	}
 
-	for _, st in s.stmts {
+	let mut i = 0
+	for i < s.stmts.len(); i++ {
+		let mut st = s.stmts.at(i)
 		match type st {
 		| &FallSt:
 			falled = true
@@ -247,7 +270,7 @@ fn __has_ret(s: &Scope): (ok: bool, falled: bool, breaked: bool) {
 	ret false, falled, breaked
 }
 
-fn has_ret(s: &Scope): bool {
+fn has_ret(mut s: &Scope): bool {
 	let (ok, _, _) = __has_ret(s)
 	ret ok
 }
@@ -639,6 +662,13 @@ impl Sema {
 		}
 	}
 
+	fn check_enums(mut &self) {
+		for (_, mut file) in self.files {
+			self.set_current_file(file)
+			self.check_enum_decls()
+		}
+	}
+
 	// Checks type, builds result as kind and collect referred type aliases.
 	// Skips already checked types.
 	fn check_type_with_refers(mut &self, mut t: &TypeSymbol, l: Lookup, referencer: &Referencer): (ok: bool) {
@@ -833,13 +863,31 @@ impl Sema {
 			f.decl.sema.set_current_file(file)
 		}
 
-		let mut generics = make([]&TypeAlias, f.generics.len)
+		let mut size = f.generics.len
+		if real(f.decl) && real(f.decl.owner) {
+			size += f.decl.owner.generics.len
+		}
+
+		let mut generics = make([]&TypeAlias, size)
+
 		for i, g in f.generics {
 			generics[i] = &TypeAlias{
 				ident: f.decl.generics[i].ident,
 				kind: &TypeSymbol{
 					kind: g,
 				},
+			}
+		}
+
+		if real(f.decl) && real(f.decl.owner) {
+			let mut owner = f.owner
+			for (i, mut g) in owner.generics {
+				generics[i] = &TypeAlias{
+					ident: owner.decl.generics[i].ident,
+					kind: &TypeSymbol{
+						kind: g,
+					},
+				}
 			}
 		}
 
@@ -1569,7 +1617,6 @@ impl Sema {
 		match {
 		| !self.check_passes():           ret false
 		| !self.check_type_alias_decls(): ret false
-		| !self.check_enum_decls():       ret false
 		| !self.check_trait_decls():      ret false
 		| !self.check_global_decls():     ret false
 		| !self.check_fn_decls():         ret false
@@ -1808,6 +1855,10 @@ impl Sema {
 		}
 
 		for (_, mut ins) in f.instances {
+			if ins.scope.stmts.len() > 0 {
+				// Checked
+				continue
+			}
 			self.check_fn_ins(ins)
 		}
 	}
@@ -1817,12 +1868,7 @@ impl Sema {
 			ret
 		}
 
-		// Generic instances are checked instantly.
-		if strct.generics.len > 0 {
-			ret
-		}
-
-		if strct.instances.len == 0 {
+		if strct.generics.len == 0 && strct.instances.len == 0 {
 			let mut ins = strct.instance()
 			ins.checked = true
 			strct.instances = append(strct.instances, ins)
@@ -1841,7 +1887,7 @@ impl Sema {
 		}
 	}
 
-	fn check_rets(mut self, f: &FnIns) {
+	fn check_rets(mut self, mut f: &FnIns) {
 		if f.decl.is_void() {
 			ret
 		}
@@ -1867,14 +1913,14 @@ impl Sema {
 
 		// Append return variables.
 		if vars.len > 0 {
-			let mut stms = make([]St, f.scope.stmts.len+vars.len)
-			for (i, mut v) in vars {
-				stms[i] = v
+			let mut stms = new_vector[St](f.scope.stmts.len()+vars.len)
+			for (_, mut v) in vars {
+				stms.push(v)
 			}
 
 			let mut i = vars.len
-			for i < stms.len; i++ {
-				stms[i] = f.scope.stmts[i-vars.len]
+			for i < stms.len(); i++ {
+				stms.push(f.scope.stmts.at(i-vars.len))
 			}
 
 			f.scope.stmts = stms
@@ -1968,12 +2014,29 @@ impl Sema {
 
 		for (_, mut f) in self.files {
 			self.set_current_file(f)
-			self.check_struct_types()
+			self.check_fn_types()
 		}
 
 		for (_, mut f) in self.files {
 			self.set_current_file(f)
-			self.check_fn_types()
+			self.check_struct_types()
+		}
+	}
+
+	fn set_file_sema_fields(mut &self) {
+		for (_, mut f) in self.file.funcs {
+			f.sema = self
+		}
+
+		for (_, mut st) in self.file.structs {
+			st.sema = self
+		}
+	}
+
+	fn set_sema_fields(mut &self) {
+		for (_, mut file) in self.files {
+			self.set_current_file(file)
+			self.set_file_sema_fields()
 		}
 	}
 
@@ -1985,6 +2048,14 @@ impl Sema {
 		if self.errors.len > 0 {
 			ret
 		}
+
+		self.check_enums()
+		// Break checking if enums has error.
+		if self.errors.len > 0 {
+			ret
+		}
+
+		self.set_sema_fields()
 
 		self.impl_impls()
 		// Break checking if imports has error.

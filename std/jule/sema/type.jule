@@ -765,6 +765,17 @@ impl TypeChecker {
 			}
 		}
 
+		if ins.generics.len > 0 {
+			for (_, mut m) in ins.methods {
+				// Genericed functions checked when called.
+				if m.generics.len > 0 {
+					continue
+				}
+
+				self.s.check_type_method(ins, m)
+			}
+		}
+
 		ret true
 	}
 
@@ -785,6 +796,11 @@ impl TypeChecker {
 	fn from_struct(mut self, mut decl: &IdentTypeDecl, mut s: &Struct): &StructIns {
 		if !self.s.is_accessible_define(s.public, s.token) {
 			self.push_err(decl.token, "ident_not_exist", decl.ident)
+			ret new(StructIns)
+		}
+
+		if self.ignore_generics.len > 0 {
+			// Ignore prototypes.
 			ret new(StructIns)
 		}
 

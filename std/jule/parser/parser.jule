@@ -49,6 +49,11 @@ use std::jule::build::{
 	is_std_header_path,
 	is_top_directive,
 }
+use std::vector::{Vector}
+
+use cpp "parser.hpp"
+
+cpp unsafe fn __jule_parser_vector_as_slice[Vec, T](vec: any): []T
 
 fn compiler_err(token: Token, key: str, args: ...any): Log {
 	ret Log{
@@ -1559,7 +1564,7 @@ impl Parser {
 			ret
 		}
 
-		if self.ast.decls.len > 0 {
+		if self.ast.decls.len() > 0 {
 			self.push_err(node.token, "use_decl_at_body")
 		}
 	}
@@ -1610,19 +1615,19 @@ impl Parser {
 
 		match {
 		| node.is_use_decl():
-			self.ast.use_decls = append(self.ast.use_decls, (&UseDecl)(node.data))
+			self.ast.use_decls.push((&UseDecl)(node.data))
 
 		| node.is_decl():
 			// Use declarations eliminated.
-			self.ast.decls = append(self.ast.decls, node)
+			self.ast.decls.push(node)
 
 		| node.is_comment():
 			// Global scope is not appends &CommentGroup.
 			let mut c = (&Comment)(node.data)
-			self.ast.comments = append(self.ast.comments, c)
+			self.ast.comments.push(c)
 
 		| node.is_impl():
-			self.ast.impls = append(self.ast.impls, (&Impl)(node.data))
+			self.ast.impls.push((&Impl)(node.data))
 
 		|:
 			self.push_err(node.token, "invalid_syntax")
@@ -1634,7 +1639,8 @@ impl Parser {
 			file: f,
 		}
 
-		let mut stms = split_stms(f.tokens())
+		let mut tokens = unsafe { cpp.__jule_parser_vector_as_slice[Vector[Token], Token](f.tokens()) }
+		let mut stms = split_stms(tokens)
 
 		// Get top directives.
 		let mut i = 0
@@ -1657,7 +1663,7 @@ impl Parser {
 			if node.is_comment() {
 				let mut d = self.get_directive((&Comment)(node.data))
 				if real(d) && is_top_directive(d.tag) {
-					self.ast.top_directives = append(self.ast.top_directives, d)
+					self.ast.top_directives.push(d)
 				}
 			} else {
 				break
