@@ -1782,12 +1782,7 @@ func (s *_Sema) check_type_struct(strct *Struct) {
 		return
 	}
 
-	// Generic instances are checked instantly.
-	if len(strct.Generics) > 0 {
-		return
-	}
-
-	if len(strct.Instances) == 0 {
+	if len(strct.Generics) == 0 && len(strct.Instances) == 0 {
 		ins := strct.instance()
 		ins.Checked = true
 		strct.Instances = append(strct.Instances, ins)
@@ -2044,12 +2039,12 @@ func (s *_Sema) check_package_types() {
 
 	for _, f := range s.files {
 		s.set_current_file(f)
-		s.check_struct_types()
+		s.check_fn_types()
 	}
 
 	for _, f := range s.files {
 		s.set_current_file(f)
-		s.check_fn_types()
+		s.check_struct_types()
 	}
 }
 
