@@ -117,7 +117,8 @@ func make_err(row int, col int, f *File, key string, args ...any) build.Log {
 
 type _Lex struct {
 	first_token_of_line bool
-	ranges              []Token
+	tokens              []Token
+	ranges              []int
 	data                []rune
 	file                *File
 	pos                 int
@@ -135,24 +136,23 @@ func (l *_Lex) push_err_tok(tok Token, key string) {
 }
 
 // lexs all source content.
-func (l *_Lex) lex() []Token {
-	var toks []Token
+func (l *_Lex) lex() {
 	l.errors = nil
 	l.new_line()
 	for l.pos < len(l.data) {
 		t := l.token()
 		l.first_token_of_line = false
 		if t.Id != ID_NA {
-			toks = append(toks, t)
+			l.tokens = append(l.tokens, t)
 		}
 	}
 	l.check_ranges()
 	l.data = nil
-	return toks
 }
 
 func (l *_Lex) check_ranges() {
-	for _, t := range l.ranges {
+	for _, i := range l.ranges {
+		t := l.tokens[i]
 		switch t.Kind {
 		case KND_LPAREN:
 			l.push_err_tok(t, "wait_close_parentheses")
@@ -778,19 +778,19 @@ func (l *_Lex) token() Token {
 		return t
 
 	case l.is_op(txt, KND_LPAREN, ID_RANGE, &t):
-		l.ranges = append(l.ranges, t)
+		l.ranges = append(l.ranges, len(l.tokens))
 
 	case l.is_op(txt, KND_RPARENT, ID_RANGE, &t):
 		l.push_range_close(t, KND_LPAREN)
 
 	case l.is_op(txt, KND_LBRACE, ID_RANGE, &t):
-		l.ranges = append(l.ranges, t)
+		l.ranges = append(l.ranges, len(l.tokens))
 
 	case l.is_op(txt, KND_RBRACE, ID_RANGE, &t):
 		l.push_range_close(t, KND_LBRACE)
 
 	case l.is_op(txt, KND_LBRACKET, ID_RANGE, &t):
-		l.ranges = append(l.ranges, t)
+		l.ranges = append(l.ranges, len(l.tokens))
 
 	case l.is_op(txt, KND_RBRACKET, ID_RANGE, &t):
 		l.push_range_close(t, KND_LBRACKET)
@@ -829,7 +829,7 @@ func get_close_kind_of_brace(left string) string {
 func (l *_Lex) remove_range(i int, kind string) {
 	close := get_close_kind_of_brace(kind)
 	for ; i >= 0; i-- {
-		tok := l.ranges[i]
+		tok := l.tokens[l.ranges[i]]
 		if tok.Kind != close {
 			continue
 		}
@@ -852,7 +852,7 @@ func (l *_Lex) push_range_close(t Token, left string) {
 			l.push_err_tok(t, "extra_closed_parentheses")
 		}
 		return
-	} else if l.ranges[n-1].Kind != left {
+	} else if l.tokens[l.ranges[n-1]].Kind != left {
 		l.push_wrong_order_close_err(t)
 	}
 	l.remove_range(n-1, t.Kind)
@@ -860,7 +860,7 @@ func (l *_Lex) push_range_close(t Token, left string) {
 
 func (l *_Lex) push_wrong_order_close_err(t Token) {
 	var msg string
-	switch l.ranges[len(l.ranges)-1].Kind {
+	switch l.tokens[l.ranges[len(l.ranges)-1]].Kind {
 	case KND_LPAREN:
 		msg = "expected_parentheses_close"
 
@@ -890,12 +890,12 @@ func Lex(f *File, text string) []build.Log {
 	}
 
 	lex.new_line()
-	tokens := lex.lex()
+	lex.lex()
 
 	if len(lex.errors) > 0 {
 		return lex.errors
 	}
 
-	f.tokens = tokens
+	f.tokens = lex.tokens
 	return nil
 }
