@@ -1,0 +1,255 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// This is the main package of JuleC.
+
+use std::os::{ARGS, exit}
+use std::jule::{VERSION}
+use std::jule::build::{DISTOS, DISTARCH, errorf}
+use std::jule::lex::{is_decimal, is_ident_rune, is_letter, is_space}
+
+const CMD_HELP = "help"
+const CMD_VERSION = "version"
+const CMD_TOOL = "tool"
+
+let HELP_MAP: [...][2]str = [
+	[CMD_HELP, "Show help"],
+	[CMD_VERSION, "Show version"],
+	[CMD_TOOL, "Tools for effective Jule"],
+]
+
+fn str_repeat(sub: str, mut n: int): str {
+	if n == 0 {
+		ret ""
+	}
+
+	let mut s = ""
+	for n > 0; n-- {
+		s += sub
+	}
+	ret s
+}
+
+fn print_error_message(msg: str) { outln(msg) }
+
+fn help() {
+	if ARGS.len > 2 {
+		print_error_message("invalid command: " + ARGS[2])
+		ret
+	}
+
+	let mut max = HELP_MAP[0][0].len
+	for _, k in HELP_MAP {
+		let n = k[0].len
+		if n > max {
+			max = n
+		}
+	}
+
+	let mut s = ""
+	const SPACE = 5 // Space of between command name and description.
+	for i, part in HELP_MAP {
+		s += part[0]
+		s += str_repeat(" ", (max-part[0].len)+SPACE)
+		s += part[1]
+		if i+1 < HELP_MAP.len {
+			s += "\n"
+		}
+	}
+	outln(s)
+}
+
+fn version() {
+	if ARGS.len > 2 {
+		print_error_message("invalid command: " + ARGS[2])
+		ret
+	}
+	out("julec version ")
+	outln(VERSION)
+}
+
+fn tool_distos() {
+	out("supported operating systems:\n ")
+	for _, os in DISTOS {
+		out(os)
+		out(" ")
+	}
+	outln("")
+}
+
+fn tool_distarch() {
+	out("supported architects:\n ")
+	for _, arch in DISTARCH {
+		out(arch)
+		out(" ")
+	}
+	outln("")
+}
+ 
+fn tool() {
+	if ARGS.len == 2 {
+		outln(`tool commands:
+ distos     Lists all supported operating systems
+ distarch   Lists all supported architects`)
+		ret
+	} else if ARGS.len > 3 {
+		print_error_message("invalid command: " + ARGS[3])
+		ret
+	}
+
+	let cmd = ARGS[2]
+	match cmd {
+	| "distos":   tool_distos()
+	| "distarch": tool_distarch()
+	|:            print_error_message("Undefined command: " + cmd)
+	}
+}
+
+fn process_command(): bool {
+	match ARGS[1] {
+	| CMD_HELP:    help()
+	| CMD_VERSION: version()
+	| CMD_TOOL:    tool()
+	|: ret false
+	}
+
+	ret true
+}
+
+fn init() {
+	// Not started with arguments.
+	// Here is "2" but "os.Args" always have one element for store working directory.
+	if ARGS.len < 2 {
+		exit(0)
+	}
+
+	if process_command() {
+		exit(0)
+	}
+}
+
+fn exit_err(msg: str) {
+	const ERROR_EXIT_CODE = 0
+
+	outln(msg)
+	exit(ERROR_EXIT_CODE)
+}
+
+unsafe fn get_option(args: []str, mut i: *int): (arg: str, content: str) {
+	for *i < args.len; *i++ {
+		arg = args[*i]
+		let mut j = 0
+		let mut runes = ([]rune)(arg)
+		let mut r = runes[j]
+		if r != '-' {
+			content += arg
+			arg = "" // Forget argument
+			continue
+		}
+		j++
+		if j >= runes.len {
+			exit_err("undefined syntax: " + arg)
+		}
+		r = runes[j]
+		if r == '-' {
+			j++
+			if j >= runes.len {
+				exit_err("undefined syntax: " + arg)
+			}
+			r = runes[j]
+		}
+		if !is_ident_rune((str)(r)) {
+			exit_err("undefined syntax: " + arg)
+		}
+		j++
+		for j < runes.len; j++ {
+			r = runes[j]
+			if (
+				!is_space(r) &&
+				!is_letter(r) &&
+				!is_decimal(byte(r)) &&
+				r != '_' &&
+				r != '-'
+			) {
+				exit_err("undefined syntax: " + (str)(runes[j:]))
+			}
+		}
+		break
+	}
+	ret
+}
+
+unsafe fn get_option_value(args: []str, mut i: *int): str {
+	*i++ // Argument value is the next argument
+	if *i < args.len {
+		let arg = args[*i]
+		ret arg
+	}
+	ret ""
+}
+
+unsafe fn parse_out_option(args: []str, mut i: *int) {
+	let value = get_option_value(args, i)
+	if value == "" {
+		exit_err("missing option value: -o --out")
+	}
+	cxx::OUT = value
+}
+
+unsafe fn parse_compiler_option(args: []str, mut i: *int) {
+	let value = get_option_value(args, i)
+	match value {
+	| "":
+		exit_err("missing option value: --compiler")
+
+	| cxx::COMPILER_CLANG:
+		cxx.COMPILER_PATH = cxx::COMPILER_PATH_CLANG
+
+	| cxx::COMPILER_GCC:
+		cxx::COMPILER_PATH = cxx::COMPILER_PATH_GCC
+
+	|:
+		exit_err("invalid option value for --compiler: " + value)
+	}
+
+	cxx::COMPILER = value
+}
+
+fn parse_options(args: []str): str {
+	let mut cmd = ""
+	let mut i = 1 // Start 1 because the index 0 is a path, not an command-line argument
+	for i < args.len; i++ {
+		let (arg, content) = unsafe { get_option(args, &i) }
+		cmd += content
+		match arg {
+		| "":
+
+		| "-o" | "--out":
+			unsafe { parse_out_option(args, &i) }
+
+		| "-t" | "--transpile":
+			cxx::MODE = cxx::MODE_T
+
+		| "-c" | "--compile":
+			cxx::MODE = cxx::MODE_C
+
+		| "--compiler":
+			unsafe { parse_compiler_option(args, &i) }
+
+		|:
+			exit_err("undefined option: " + arg)
+		}
+	}
+	cmd = cmd.trim(" \t\r\n\v")
+	ret cmd
+}
+
+fn main() {
+	let path = parse_options(ARGS)
+	if path == "" {
+		exit_err(errorf("missing_compile_path"))
+	}
+
+	cxx::compile(path)
+}
