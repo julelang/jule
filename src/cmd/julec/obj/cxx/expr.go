@@ -762,13 +762,6 @@ func gen_expr_model(m sema.ExprModel) string {
 func gen_expr(e sema.ExprModel) string {
 	obj := gen_expr_model(e)
 
-	if obj != "" && obj[0] == '(' {
-		switch e.(type) {
-		case *sema.BinopExprModel:
-			obj = obj[1 : len(obj)-1] // Remove unnecessary parentheses.
-		}
-	}
-
 	return obj
 }
 
