@@ -100,7 +100,7 @@ namespace jule {
 
         inline void operator=(const jule::Trait<Mask> &src) noexcept {
             // Assignment to itself.
-            if (this->data.alloc == src.data.alloc)
+            if (this->data.alloc != nullptr && this->data.alloc == src.data.alloc)
                 return;
 
             this->dealloc();

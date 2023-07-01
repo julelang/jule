@@ -217,7 +217,7 @@ namespace jule {
 
         void operator=(const jule::Slice<Item> &src) noexcept {
             // Assignment to itself.
-            if (this->data.alloc == src.data.alloc) {
+            if (this->data.alloc != nullptr && this->data.alloc == src.data.alloc) {
                 this->_len = src._len;
                 this->_cap = src._cap;
                 this->data = src.data;

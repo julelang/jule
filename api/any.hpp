@@ -40,6 +40,15 @@ namespace jule {
                 const T *v{ reinterpret_cast<const T*>(alloc) };
                 return jule::to_str(*v);
             }
+
+            static void *alloc_new_copy(void *data) noexcept {
+                T *heap{ new (std::nothrow) T };
+                if (!heap)
+                    return nullptr;
+
+                *heap = *reinterpret_cast<T*>(data);
+                return heap;
+            }
         };
 
         struct Type {
@@ -48,6 +57,7 @@ namespace jule {
             void(*dealloc)(void *alloc) noexcept;
             jule::Bool(*eq)(void *alloc, void *other) noexcept;
             const jule::Str(*to_str)(const void *alloc) noexcept;
+            void *(*alloc_new_copy)(void *data) noexcept;
         };
 
         template<typename T>
@@ -58,6 +68,7 @@ namespace jule {
                 t::dealloc,
                 t::eq,
                 t::to_str,
+                t::alloc_new_copy,
             };
             return &table;
         }
@@ -135,7 +146,7 @@ namespace jule {
 
         void operator=(const jule::Any &src) noexcept {
             // Assignment to itself.
-            if (this->data.alloc == src.data.alloc)
+            if (this->data.alloc != nullptr && this->data.alloc == src.data.alloc)
                 return;
 
             if (src.operator==(nullptr)) {
@@ -144,7 +155,12 @@ namespace jule {
             }
 
             this->dealloc();
-            this->data = src.data;
+
+            void *new_heap{ src.type->alloc_new_copy(*src.data.alloc) };
+            if (!new_heap)
+                jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
+
+            this->data = jule::Ref<void*>::make(new_heap);
             this->type = src.type;
         }
 
