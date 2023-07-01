@@ -10,6 +10,7 @@ cpp fn __jule_std_vector_alloc[T](n: int): *unsafe
 cpp unsafe fn __jule_std_vector_dealloc[T](heap: *unsafe)
 cpp unsafe fn __jule_std_vector_deref[T](heap: *unsafe, i: int): T
 cpp unsafe fn __jule_std_vector_heap_assign[T](heap: *unsafe, i: int, item: T)
+cpp unsafe fn __jule_std_vector_heap_move[T](heap: *unsafe, i: int, dest: int)
 
 // Wrapper for dynamic array.
 // Uses capacity for performance.
@@ -111,11 +112,30 @@ impl Vector {
 		self._heap = nil
 	}
 
-	// Push item.
+	// Push items.
 	pub fn push(mut self, mut items: ...T) {
 		self.review_allocation(items.len)
 		for (i, mut item) in items {
 			unsafe { cpp.__jule_std_vector_heap_assign[T](*self._heap, self._len+i, item) }
+		}
+
+		self._len += items.len
+	}
+
+	// Push items to front of heap.
+	pub fn push_front(mut self, mut items: ...T) {
+		self.review_allocation(items.len)
+
+		// Shift items.
+		let mut i = self._len-1
+		for i >= 0; i-- {
+			let offset = items.len+i
+			unsafe { cpp.__jule_std_vector_heap_move[T](*self._heap, i, offset) }
+		}
+
+		// Assign.
+		for (i, mut item) in items {
+			unsafe { cpp.__jule_std_vector_heap_assign[T](*self._heap, i, item) }
 		}
 
 		self._len += items.len
