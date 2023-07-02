@@ -1,0 +1,602 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::jule::lex::{TokenKind, is_ignore_ident, is_anon_ident}
+use std::jule::sema::{
+	Data,
+	St,
+	FnIns,
+	Var,
+	Scope,
+	If,
+	Else,
+	Conditional,
+	InfIter,
+	WhileIter,
+	RangeIter,
+	ContSt,
+	BreakSt,
+	Label,
+	GotoSt,
+	Postfix,
+	Assign,
+	MultiAssign,
+	Match,
+	Case,
+	FallSt,
+	RetSt,
+	Recover,
+	FnCallExprModel,
+	TupleExprModel,
+}
+
+trait RangeSetter {
+	fn setup_vars(self, mut key_a: &Var, mut key_b: &Var): str
+	fn next_steps(self, mut key_a: &Var, mut key_b: &Var, begin: str): str
+}
+
+struct IndexRangeSetter {}
+
+impl RangeSetter for IndexRangeSetter {
+	fn setup_vars(self, mut key_a: &Var, mut key_b: &Var): str {
+		let indent = indent()
+
+		let mut obj = ""
+		if real(key_a) {
+			obj += gen_var(key_a)
+			obj += var_out_ident(key_a)
+			obj += " = 0;\n"
+			obj += indent
+		}
+
+		if real(key_b) {
+			obj += gen_var(key_b)
+			obj += var_out_ident(key_b)
+			obj += " = *__julec_range_begin;\n"
+			obj += indent
+		}
+
+		ret obj
+	}
+
+	fn next_steps(self, mut key_a: &Var, mut key_b: &Var, begin: str): str {
+		let indent = indent()
+
+		let mut obj = "++__julec_range_begin;\n"
+		obj += indent
+
+		obj += "if (__julec_range_begin != __julec_range_end) { "
+		if real(key_a) {
+			obj += "++" + var_out_ident(key_a) + "; "
+		}
+		if real(key_b) {
+			obj += var_out_ident(key_b) + " = *__julec_range_begin; "
+		}
+
+		obj += "goto " + begin + "; }\n"
+		ret obj
+	}
+}
+
+struct MapRangeSetter {}
+
+impl RangeSetter for MapRangeSetter {
+	fn setup_vars(self, mut key_a: &Var, mut key_b: &Var): str {
+		let indent = indent()
+		let mut obj = ""
+
+		if real(key_a) {
+			obj += gen_var(key_a)
+			obj += var_out_ident(key_a)
+			obj += " = __julec_range_begin->first;\n"
+			obj += indent
+		}
+
+		if real(key_b) {
+			obj += gen_var(key_b)
+			obj += var_out_ident(key_b)
+			obj += " = __julec_range_begin->second;\n"
+			obj += indent
+		}
+
+		ret obj
+	}
+
+	fn next_steps(self, mut key_a: &Var, mut key_b: &Var, begin: str): str {
+		let indent = indent()
+
+		let mut obj = "++__julec_range_begin;\n"
+		obj += indent
+
+		obj += "if (__julec_range_begin != __julec_range_end) { "
+		if real(key_a) {
+			obj += var_out_ident(key_a)
+			obj += " = __julec_range_begin->first; "
+		}
+		if real(key_b) {
+			obj += var_out_ident(key_b)
+			obj += " = __julec_range_begin->second; "
+		}
+
+		obj += "goto " + begin + "; }\n"
+
+		ret obj
+	}
+}
+
+fn gen_if(mut i: &If): str {
+	let mut obj = "if ("
+	obj += gen_expr(i.expr)
+	obj += ") "
+	obj += gen_scope(i.scope)
+	ret obj
+}
+
+fn gen_conditional(mut c: &Conditional): str {
+	let mut obj = gen_if(c.elifs[0])
+
+	for (_, mut elif) in c.elifs[1:] {
+		obj += " else "
+		obj += gen_if(elif)
+	}
+
+	if real(c.default) {
+		obj += " else "
+		obj += gen_scope(c.default.scope)
+	}
+
+	ret obj
+}
+
+fn gen_inf_iter(mut it: &InfIter): str {
+	let begin = iter_begin_label_ident(uintptr(&it))
+	let end = iter_end_label_ident(uintptr(&it))
+	let next = iter_next_label_ident(uintptr(&it))
+	let indent = indent()
+
+	let mut obj = begin + ":;\n"
+	obj += indent
+	obj += gen_scope(it.scope)
+	obj += "\n"
+	obj += indent
+	obj += next + ":;\n"
+	obj += indent
+	obj += "goto " + begin + ";\n"
+	obj += indent
+	obj += end + ":;"
+
+	ret obj
+}
+
+fn gen_while_iter(mut it: &WhileIter): str {
+	let begin = iter_begin_label_ident(uintptr(&it))
+	let end = iter_end_label_ident(uintptr(&it))
+	let next = iter_next_label_ident(uintptr(&it))
+	let indent = indent()
+
+	let mut obj = begin + ":;\n"
+	obj += indent
+	if it.expr != nil {
+		obj += "if (!("
+		obj += gen_expr(it.expr)
+		obj += ")) { goto "
+		obj += end
+		obj += "; }\n"
+		obj += indent
+	}
+	obj += gen_scope(it.scope)
+	obj += "\n"
+	obj += indent
+	obj += next + ":;\n"
+	obj += indent
+	if it.next != nil {
+		obj += gen_st(it.next)
+		obj += "\n"
+		obj += indent
+	}
+	obj += "goto " + begin + ";\n"
+	obj += indent
+	obj += end + ":;"
+
+	ret obj
+}
+
+fn get_range_setter(mut it: &RangeIter): RangeSetter {
+	match {
+	| real(it.expr.kind.slc()): ret &IndexRangeSetter{}
+	| real(it.expr.kind.arr()): ret &IndexRangeSetter{}
+	| real(it.expr.kind.map()): ret &MapRangeSetter{}
+	|:                          ret &IndexRangeSetter{} // Str
+	}
+}
+
+fn gen_range_iter(mut it: &RangeIter): str {
+	add_indent()
+
+	let begin = iter_begin_label_ident(uintptr(&it))
+	let end = iter_end_label_ident(uintptr(&it))
+	let next = iter_next_label_ident(uintptr(&it))
+	let mut _indent = indent()
+	let setter = get_range_setter(it)
+
+	let mut obj = "{\n"
+	obj += _indent
+	obj += "auto __julec_range_expr = "
+	obj += gen_expr(it.expr.model) + ";\n"
+	obj += _indent
+	obj += "if (__julec_range_expr.begin() != __julec_range_expr.end()) {\n"
+
+	add_indent()
+	_indent = indent()
+
+	obj += _indent
+	obj += "auto __julec_range_begin = __julec_range_expr.begin();\n"
+	obj += _indent
+	obj += "const auto __julec_range_end = __julec_range_expr.end();\n"
+	obj += _indent
+	obj += setter.setup_vars(it.key_a, it.key_b)
+	obj += begin + ":;\n"
+	obj += _indent
+	obj += gen_scope(it.scope)
+	obj += "\n"
+	obj += _indent
+	obj += next + ":;\n"
+	obj += _indent
+	obj += setter.next_steps(it.key_a, it.key_b, begin)
+	obj += _indent
+	obj += end + ":;\n"
+
+	done_indent()
+	_indent = indent()
+
+	obj += _indent
+	obj += "}\n"
+
+	done_indent()
+	_indent = indent()
+
+	obj += _indent
+	obj += "}"
+
+	ret obj
+}
+
+fn gen_cont(c: &ContSt): str {
+	ret "goto " + iter_next_label_ident(c.it) + CPP_ST_TERM
+}
+
+fn gen_label(l: &Label): str {
+	ret label_ident(l.ident) + ":;"
+}
+
+fn gen_goto(gt: &GotoSt): str {
+	ret "goto " + label_ident(gt.ident) + CPP_ST_TERM
+}
+
+fn gen_postfix(mut p: &Postfix): str {
+	ret "(" + gen_expr(p.expr) + ")" + p.op + CPP_ST_TERM
+}
+
+fn gen_assign(mut a: &Assign): str {
+	let mut obj = gen_expr(a.l)
+	obj += a.op
+	obj += gen_expr(a.r)
+	obj += CPP_ST_TERM
+	ret obj
+}
+
+fn gen_multi_assign(mut a: &MultiAssign): str {
+	let mut obj = "std::tie("
+
+	for (_, mut l) in a.l {
+		if l == nil {
+			obj += CPP_IGNORE + ","
+		} else {
+			obj += gen_expr(l) + ","
+		}
+	}
+	obj = obj[:obj.len-1] // Remove last comma.
+
+	obj += ") = "
+	obj += gen_expr(a.r)
+	obj += CPP_ST_TERM
+	ret obj
+}
+
+fn gen_case(m: &Match, mut c: &Case): str {
+	const MATCH_EXPR = "_match_expr"
+
+	let end = case_end_label_ident(uintptr(&c))
+	let mut obj = ""
+
+	if c.exprs.len > 0 {
+		obj += "if (!("
+		for (i, mut expr) in c.exprs {
+			if !m.type_match {
+				obj += gen_expr(expr)
+				obj += " == "
+			}
+
+			obj += MATCH_EXPR
+
+			if m.type_match {
+				obj += ".type_is<" + gen_expr(expr) + ">()"
+			}
+
+			if i+1 < c.exprs.len {
+				obj += " || "
+			}
+		}
+		obj += ")) { goto "
+		obj += end + "; }\n"
+	}
+
+	if c.scope.stmts.len() > 0 {
+		obj += indent()
+		obj += case_begin_label_ident(uintptr(&c)) + ":;\n"
+		obj += indent()
+		obj += gen_scope(c.scope)
+		obj += "\n"
+	}
+
+	obj += indent()
+	obj += "goto "
+	obj += match_end_label_ident(uintptr(&m)) + CPP_ST_TERM
+	obj += "\n"
+	obj += indent()
+	obj += end + ":;"
+	ret obj
+}
+
+fn gen_match(mut m: &Match): str {
+	let mut obj = "{\n"
+
+	add_indent()
+
+	obj += indent()
+	obj += "auto _match_expr{ "
+	obj += gen_expr(m.expr)
+	obj += " };\n"
+	obj += indent()
+
+	if m.cases.len > 0 {
+		obj += gen_case(m, m.cases[0])
+		for (_, mut c) in m.cases[1:] {
+			obj += "\n"
+			obj += indent()
+			obj += gen_case(m, c)
+		}
+	}
+
+	if real(m.default) {
+		obj += "\n"
+		obj += gen_case(m, m.default)
+	}
+
+	obj += "\n"
+	obj += indent()
+	obj += match_end_label_ident(uintptr(&m)) + ":;"
+	obj += "\n"
+
+	done_indent()
+
+	obj += indent()
+	obj += "}"
+
+	ret obj
+}
+
+fn gen_fall_st(f: &FallSt): str {
+	ret "goto " + case_begin_label_ident(f.dest_case) + CPP_ST_TERM
+}
+
+fn gen_break_st(b: &BreakSt): str {
+	let mut obj = "goto "
+	if b.it != 0 {
+		obj += iter_end_label_ident(b.it)
+	} else {
+		obj += match_end_label_ident(b.mtch)
+	}
+
+	obj += CPP_ST_TERM
+	ret obj
+}
+
+fn gen_ret_vars(mut r: &RetSt): str {
+	let mut obj = ""
+	for (_, mut v) in r.vars {
+		if is_ignore_ident(v.ident) {
+			obj += get_init_expr(v.kind.kind)
+		} else {
+			obj += var_out_ident(v)
+		}
+
+		obj += (str)(TokenKind.Comma)
+	}
+
+	obj = obj[:obj.len-1] // Remove last comma.
+
+	if r.vars.len > 1 {
+		obj = "return std::make_tuple(" + obj + ")"
+	} else {
+		obj = "return " + obj
+	}
+
+	obj += CPP_ST_TERM
+	ret obj
+}
+
+fn gen_ret_expr_tuple(mut r: &RetSt): str {
+	match type r.expr {
+	| &FnCallExprModel:
+		ret "return " + gen_expr_model(r.expr) + CPP_ST_TERM
+	}
+
+	let mut datas = (&TupleExprModel)(r.expr).datas
+	let mut obj = ""
+
+	for (i, mut v) in r.vars {
+		if !is_ignore_ident(v.ident) {
+			let ident = var_out_ident(v)
+			obj += ident + " = " + gen_expr(datas[i].model) + ";\n"
+			obj += indent()
+		}
+	}
+
+	obj += "return std::make_tuple("
+	for (i, mut d) in datas {
+		let mut v = r.vars[i]
+		if is_ignore_ident(v.ident) {
+			obj += gen_expr(d.model)
+		} else {
+			obj += var_out_ident(v)
+		}
+
+		obj += ","
+	}
+	obj = obj[:obj.len-1] // Remove last comma.
+	obj += ");"
+
+	ret obj
+}
+
+fn gen_ret_expr(mut r: &RetSt): str {
+	if r.vars.len == 0 {
+		ret "return " + gen_expr(r.expr) + CPP_ST_TERM
+	}
+
+	if r.vars.len > 1 {
+		ret gen_ret_expr_tuple(r)
+	}
+
+	if !is_ignore_ident(r.vars[0].ident) {
+		let ident = var_out_ident(r.vars[0])
+		let obj = ident + " = " + gen_expr(r.expr) + ";\n"
+		obj += indent()
+		obj += "return " + ident + CPP_ST_TERM
+		ret obj
+	}
+
+	ret "return " + gen_expr(r.expr) + CPP_ST_TERM
+}
+
+fn gen_ret_st(mut r: &RetSt): str {
+	if r.expr != nil && r.vars.len == 0 {
+		ret "return;"
+	}
+
+	if r.expr != nil {
+		ret gen_ret_vars(r)
+	}
+
+	ret gen_ret_expr(r)
+}
+
+fn gen_recover(mut r: &Recover): str {
+	let mut obj = "try "
+	obj += gen_scope(r.scope)
+	obj += " catch(jule::Exception e) "
+	if r.handler.is_anon() {
+		// Anonymous function.
+		// Parse body as catch block.
+		//
+		// NOTICE:
+		//  If passed anonymous function from variable, field, or something
+		//  like that, parses block. Not calls variable, fields or whatever.
+
+		let handler_param = r.handler.decl.params[0]
+		if !is_ignore_ident(handler_param.ident) && !is_anon_ident(handler_param.ident) {
+			add_indent()
+			obj += "{\n"
+			obj += indent()
+			obj += "jule::Trait<jule::Error> "
+			obj += param_out_ident(handler_param)
+			obj += "{ jule::exception_to_error(e) };\n"
+			obj += indent()
+			obj += gen_scope(r.handler.scope)
+			done_indent()
+			obj += "\n"
+			obj += indent()
+			obj += "}"
+		} else {
+			obj += gen_scope(r.handler.scope)
+		}
+	} else {
+		// Passed defined function.
+		// Therefore, call passed function with error.
+
+		obj += "{ "
+		obj += gen_expr(r.handler_expr)
+		obj += "(jule::exception_to_error(e)); }"
+	}
+
+	ret obj
+}
+
+fn get_data_expr(mut d: &Data): str {
+	ret gen_expr(d.model) + CPP_ST_TERM
+}
+
+// Generates C++ code of statement.
+fn gen_st(mut st: St): str {
+	match type st {
+	| &Scope:       ret gen_scope((&Scope)(st))
+	| &Var:         ret gen_var((&Var)(st))
+	| &Data:        ret gen_data_expr((&Data)(st))
+	| &Conditional: ret gen_conditional((&Conditional)(st))
+	| &InfIter:     ret gen_inf_iter((&InfIter)(st))
+	| &WhileIter:   ret gen_while_iter((&WhileIter)(st))
+	| &RangeIter:   ret gen_range_iter((&RangeIter)(st))
+	| &ContSt:      ret gen_cont((&ContSt)(st))
+	| &Label:       ret gen_label((&Label)(st))
+	| &GotoSt:      ret gen_goto((&GotoSt)(st))
+	| &Postfix:     ret gen_postfix((&Postfix)(st))
+	| &Assign:      ret gen_assign((&Assign)(st))
+	| &MultiAssign: ret gen_multi_assign((&MultiAssign)(st))
+	| &Match:       ret gen_match((&Match)(st))
+	| &FallSt:      ret gen_fall_st((&FallSt)(st))
+	| &BreakSt:     ret gen_break_st((&BreakSt)(st))
+	| &RetSt:       ret gen_ret_st((&RetSt)(st))
+	| &Recover:     ret gen_recover((&Recover)(st))
+	|:              ret "<unimplemented stmt>"
+	}
+}
+
+// Generates C++ code of scope.
+fn gen_scope(mut s: &Scope): str {
+	let mut obj = "{\n"
+	add_indent()
+
+	let mut i = 0
+	for i < s.stmts.len(); i++ {
+		let mut st = s.stmts.at(i)
+		obj += indent()
+		obj += gen_st(st)
+		obj += "\n"
+	}
+
+	done_indent()
+	obj += indent()
+	obj += "}"
+
+	if s.deferred {
+		obj = "__JULE_DEFER(" + obj + ");"
+	}
+
+	ret obj
+}
+
+// Generates C++ code of function's scope.
+fn gen_fn_scope(mut f: &FnIns): str {
+	if real(f.owner) {
+		ret gen_method_scope(f)
+	}
+
+	ret gen_scope(f.scope)
+}
+
+// Generates C++ code of method's scope.
+fn gen_method_scope(mut f: &FnIns): str {
+	ret gen_scope(f.scope)
+}
