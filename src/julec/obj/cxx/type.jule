@@ -1,0 +1,177 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::conv::{itoa}
+use std::jule::ast
+use std::jule::build::{Directive}
+use std::jule::sema::{
+	Prim,
+	Tuple,
+	Ref,
+	Ptr,
+	Slc,
+	Enum,
+	TypeKind,
+	Map,
+	Trait,
+	Struct,
+	StructIns,
+	FnIns,
+	Arr,
+}
+
+// Reports wherher tag is exist in directives.
+fn has_directive(directives: []&std::jule::ast::Directive, tag: str): bool {
+	for _, dr in directives {
+		if dr.tag == tag {
+			ret true
+		}
+	}
+	ret false
+}
+
+// Generates C++ code of Prim TypeKind.
+fn gen_prim_kind(p: &Prim): str {
+	ret as_jt(p.to_str())
+}
+
+// Generates C++ code of Tupe TypeKind.
+fn gen_tuple_kind(mut t: &Tuple): str {
+	let mut obj = "std::tuple<"
+	for (_, mut t) in t.types {
+		obj += gen_type_kind(t) + ","
+	}
+	obj = obj[:obj.len-1] // Remove comma
+	ret obj + ">"
+}
+
+// Returns C++ code of reference type with element type.
+fn as_ref_kind(elem: str): str {
+	let ref = as_jt("ref")
+	ret ref + "<" + elem + ">"
+}
+
+// Generates C++ code of Ref TypeKind.
+fn gen_ref_kind(mut r: &Ref): str {
+	let elem = gen_type_kind(r.elem)
+	ret as_ref_kind(elem)
+}
+
+// Generates C++ code of Ptr TypeKind.
+fn gen_ptr_kind(mut p: &Ptr): str {
+	const CPP_POINTER_MARK = "*"
+	if p.is_unsafe() {
+		ret "void" + CPP_POINTER_MARK
+	}
+
+	let elem = gen_type_kind(p.elem)
+	ret elem + CPP_POINTER_MARK
+}
+
+// Generates C++ code of Enum TypeKind.
+fn gen_enum_kind(mut e: &Enum): str {
+	ret gen_type_kind(e.kind.kind)
+}
+
+fn as_slice_kind(mut elem: &TypeKind): str {
+	let elem_s = gen_type_kind(elem)
+	let slc = as_jt("slice")
+	ret slc + "<" + elem_s + ">"
+}
+
+// Generates C++ code of Slc TypeKind.
+fn gen_slice_kind(mut s: &Slc): str {
+	ret as_slice_kind(s.elem)
+}
+
+// Generates C++ code of Map TypeKind.
+fn gen_map_kind(mut m: &Map): str {
+	let key = gen_type_kind(m.key)
+	let val = gen_type_kind(m.val)
+	let _map = as_jt("map")
+	ret _map + "<" + key + "," + val + ">"
+}
+
+fn gen_trait_kind_from_ident(ident: str): str {
+	let trt = as_jt("trait")
+	ret trt + "<" + ident + ">"
+}
+
+// Generates C++ code of Trait TypeKind.
+fn gen_trait_kind(t: &Trait): str {
+	let ident = trait_out_ident(t)
+	ret gen_trait_kind_from_ident(ident)
+}
+
+// Generates C++ code of Struct TypeKind.
+fn gen_struct_kind(s: &Struct): str {
+	let mut rep = ""
+	if s.cpp_linked && !has_directive(s.directives, (str)(Directive.Typedef)) {
+		rep += "struct "
+	}
+
+	rep += struct_out_ident(s)
+	ret rep
+}
+
+// Generates C++ code of Struct instance TypeKind.
+fn gen_struct_kind_ins(s: &StructIns): str {
+	ret struct_ins_out_ident(s)
+}
+
+// Generates C++ code of Arr TypeKind.
+fn gen_array_kind(mut a: &Arr): str {
+	let arr = as_jt("array")
+	let elem = gen_type_kind(a.elem)
+	let size = itoa(a.n)
+	ret arr + "<" + elem + "," + size + ">"
+}
+
+fn gen_fn_anon_decl(f: &FnIns): str {
+	let mut decl = gen_fn_ins_result(f)
+
+	decl += "("
+	if f.params.len > 0 {
+		for _, param in f.params {
+			if param.decl.is_self() {
+				continue
+			}
+
+			decl += gen_param_ins_prototype(param)
+			decl += ","
+		}
+		decl = decl[:decl.len-1] // Remove last comma.
+	} else {
+		decl += "void"
+	}
+	decl += ")"
+
+	ret decl
+}
+
+// Generates C++ code of Fn TypeKind.
+fn gen_fn_kind(f: &FnIns): str {
+	let fnc = as_jt("fn")
+	let decl = gen_fn_anon_decl(f)
+	ret fnc + "<" + decl + ">"
+}
+
+// Generates C++ code of TypeKind.
+fn gen_type_kind(mut k: &TypeKind): str {
+	match {
+	| k.cpp_linked:    ret k.cpp_ident
+	| real(k.prim()):  ret gen_prim_kind(k.prim())
+	| real(k.tup()):   ret gen_tuple_kind(k.tup())
+	| real(k.ref()):   ret gen_ref_kind(k.ref())
+	| real(k.ptr()):   ret gen_ptr_kind(k.ptr())
+	| real(k.enm()):   ret gen_enum_kind(k.enm())
+	| real(k.slc()):   ret gen_slice_kind(k.slc())
+	| real(k.map()):   ret gen_map_kind(k.map())
+	| real(k.trt()):   ret gen_trait_kind(k.trt())
+	| real(k.strct()): ret gen_struct_kind_ins(k.strct())
+	| real(k.arr()):   ret gen_array_kind(k.arr())
+	| real(k.fnc()):   ret gen_fn_kind(k.fnc())
+	|:                 ret "[<unimplemented_type_kind>]"
+	}
+}
