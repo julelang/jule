@@ -42,7 +42,8 @@ namespace jule {
         template<typename T>
         Trait<Mask>(const jule::Ref<T> &ref) noexcept {
             this->data = jule::Ref<Mask>::make(reinterpret_cast<Mask*>(ref.alloc), ref.ref);
-            this->data.add_ref();
+            if (ref.real())
+                this->data.add_ref();
             this->type_id = typeid(ref).name();
         }
 
@@ -99,7 +100,7 @@ namespace jule {
 
         inline void operator=(const jule::Trait<Mask> &src) noexcept {
             // Assignment to itself.
-            if (this->data.alloc == src.data.alloc)
+            if (this->data.alloc != nullptr && this->data.alloc == src.data.alloc)
                 return;
 
             this->dealloc();

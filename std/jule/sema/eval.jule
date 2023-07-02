@@ -41,7 +41,6 @@ use std::jule::lex::{
 	self,
 	Token,
 	TokenKind,
-	is_float,
 	is_str,
 	is_bool,
 	is_rune,
@@ -163,16 +162,20 @@ fn normalize_type(mut d: &Data) {
 	}
 }
 
-fn apply_cast_kind(mut d: &Data) {
-	if !real(d.cast_kind) {
-		ret
-	}
-
+fn apply_cast_kind_model(mut d: &Data) {
 	d.model = &CastingExprModel{
 		expr:      d.model,
 		kind:      d.cast_kind,
 		expr_kind: d.kind,
 	}
+}
+
+fn apply_cast_kind(mut d: &Data) {
+	if !real(d.cast_kind) {
+		ret
+	}
+
+	apply_cast_kind_model(d)
 	d.kind = d.cast_kind
 	drop(d.cast_kind) // Ignore, because model added.
 }
@@ -446,8 +449,8 @@ impl Eval {
 
 	fn lit_num(self, l: &LitExpr): &Data {
 		match {
-		| is_float(l.value): ret self.lit_float(l)
-		|:                   ret self.lit_int(l)
+		| std::jule::lex::is_float(l.value): ret self.lit_float(l)
+		|:                                   ret self.lit_int(l)
 		}
 	}
 
@@ -585,7 +588,7 @@ impl Eval {
 
 		// Check illegal cycle for itself.
 		// Because refers's owner is ta.
-		if self.owner == v {
+		if &self.owner == &v {
 			self.push_err(self.owner.token, "illegal_cycle_refers_itself", self.owner.ident)
 			ret false
 		}
@@ -904,6 +907,10 @@ impl Eval {
 	}
 
 	fn eval_unary(mut &self, mut u: &UnaryExpr): &Data {
+		let mut prefix = self.prefix
+		drop(self.prefix)
+		defer { self.prefix = prefix }
+
 		let mut d = self.eval_expr_kind(u.expr)
 		if !real(d) {
 			ret new(Data)
@@ -917,7 +924,7 @@ impl Eval {
 		| (str)(TokenKind.Excl):  d = self.eval_unary_excl(d)
 		| (str)(TokenKind.Star):  d = self.eval_unary_star(d, u.op)
 		| (str)(TokenKind.Amper): d = self.eval_unary_amper(d)
-		|:               drop(d)
+		|:                        drop(d)
 		}
 
 		if !real(d) {
@@ -933,6 +940,10 @@ impl Eval {
 	}
 
 	fn eval_variadic(mut &self, mut v: &VariadicExpr): &Data {
+		let mut prefix = self.prefix
+		drop(self.prefix)
+		defer { self.prefix = prefix }
+
 		let mut d = self.eval_expr_kind(v.expr)
 		if !real(d) {
 			ret new(Data)
@@ -1184,6 +1195,10 @@ impl Eval {
 	}
 
 	fn eval_indexing(mut &self, mut i: &IndexingExpr): &Data {
+		let mut prefix = self.prefix
+		drop(self.prefix)
+		defer { self.prefix = prefix }
+
 		let mut d = self.eval_expr_kind(i.expr)
 		if !real(d) {
 			ret new(Data)
@@ -1549,7 +1564,7 @@ impl Eval {
 
 		// Keep mutability if data is already mutable.
 		// Even if the data is not mutable, set as mutable if the type is not mutable-type.
-		d.mutable = d.mutable || !is_mut(t)
+		d.mutable = d.mutable || (!is_mut(d.kind) && is_mut(t))
 
 		d.lvalue = is_lvalue(t)
 		d.decl = false
@@ -1573,6 +1588,10 @@ impl Eval {
 		if !ok {
 			ret new(Data)
 		}
+
+		let mut prefix = self.prefix
+		drop(self.prefix)
+		defer { self.prefix = prefix }
 
 		let mut d = self.eval_expr_kind(c.expr)
 		if !real(d) {
@@ -1745,11 +1764,11 @@ impl Eval {
 		}
 
 		defer {
-			if old != self.s {
+			if &old != &self.s {
 				old.errors = append(old.errors, self.s.errors...)
 			}
 			self.s = old
-		}()
+		}
 
 		if !d.mutable && f.decl.is_method() && f.decl.params[0].mutable {
 			self.push_err(fc.token, "mutable_operation_on_immutable")
@@ -1828,6 +1847,10 @@ impl Eval {
 	}
 
 	fn eval_fn_call(mut &self, mut fc: &FnCallExpr): &Data {
+		let mut prefix = self.prefix
+		drop(self.prefix)
+		defer { self.prefix = prefix }
+
 		let mut d = self.eval_expr_kind(fc.expr.kind)
 		if !real(d) {
 			ret new(Data)
@@ -2695,6 +2718,10 @@ impl Eval {
 	}
 
 	fn eval_sub_ident(mut &self, mut si: &SubIdentExpr): &Data {
+		let mut prefix = self.prefix
+		drop(self.prefix)
+		defer { self.prefix = prefix }
+
 		let mut d = self.eval_expr_kind(si.expr)
 		if !real(d) {
 			ret new(Data)
@@ -2836,6 +2863,10 @@ impl Eval {
 	}
 
 	fn eval_binop(mut &self, mut op: &BinopExpr): &Data {
+		let mut prefix = self.prefix
+		drop(self.prefix)
+		defer { self.prefix = prefix }
+
 		let mut bs = BinopSolver{
 			e: self,
 		}
@@ -2894,6 +2925,13 @@ impl Eval {
 		}
 
 		apply_cast_kind(d)
+
+		if real(self.prefix) && real(self.prefix.prim()) && self.prefix.prim().is_any() {
+			d.cast_kind = self.prefix
+			apply_cast_kind_model(d)
+			drop(d.cast_kind)
+		}
+
 		ret d
 	}
 

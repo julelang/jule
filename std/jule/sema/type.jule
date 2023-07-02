@@ -43,6 +43,7 @@ pub struct TypeAlias {
 
 trait Kind {
 	fn to_str(self): str
+	fn equals(self, other: &TypeKind): bool
 }
 
 // Type's kind's type.
@@ -64,6 +65,22 @@ impl Kind for TypeKind {
 		}
 
 		ret self.kind.to_str()
+	}
+
+	// Reports whether types are same.
+	fn equals(self, other: &TypeKind): bool {
+		if self.is_nil() {
+			ret other.is_nil()
+		}
+
+		if self.cpp_linked {
+			if !other.cpp_linked {
+				ret false
+			}
+			ret self.cpp_ident == other.cpp_ident
+		}
+
+		ret self.kind.equals(other)
 	}
 }
 
@@ -203,6 +220,15 @@ pub struct Prim {
 impl Kind for Prim {
 	// Returns kind.
 	fn to_str(self): str { ret self.kind }
+
+	// Reports whether types are same.
+	fn equals(self, other: &TypeKind): bool {
+		let prim = unsafe { (&other).prim() }
+		if !real(prim) {
+			ret false
+		}
+		ret self.kind == prim.kind
+	}
 }
 
 impl Prim {
@@ -263,6 +289,15 @@ pub struct Ref {
 impl Kind for Ref {
 	// Returns reference kind as string.
 	fn to_str(self): str { ret "&" + self.elem.to_str() }
+
+	// Reports whether types are same.
+	fn equals(self, other: &TypeKind): bool {
+		let ref = unsafe { (&other).ref() }
+		if !real(ref) {
+			ret false
+		}
+		ret self.elem.equals(ref.elem)
+	}
 }
 
 // Slice type.
@@ -273,6 +308,15 @@ pub struct Slc {
 impl Kind for Slc {
 	// Returns slice kind as string.
 	fn to_str(self): str { ret "[]" + self.elem.to_str() }
+
+	// Reports whether types are same.
+	fn equals(self, other: &TypeKind): bool {
+		let slc = unsafe { (&other).slc() }
+		if !real(slc) {
+			ret false
+		}
+		ret self.elem.equals(slc.elem)
+	}
 }
 
 // Tuple type.
@@ -292,6 +336,27 @@ impl Kind for Tuple {
 		s += ")"
 		ret s
 	}
+
+	// Reports whether types are same.
+	fn equals(self, other: &TypeKind): bool {
+		let tup = unsafe { (&other).tup() }
+		if !real(tup) {
+			ret false
+		}
+		
+		if self.types.len != tup.types.len {
+			ret false
+		}
+
+		let mut i = 0
+		for i < self.types.len; i++ {
+			if !self.types[i].equals(tup.types[i]) {
+				ret false
+			}
+		}
+
+		ret true
+	}
 }
 
 // Map type.
@@ -309,6 +374,15 @@ impl Kind for Map {
 		s += self.val.to_str()
 		s += "]"
 		ret s
+	}
+
+	// Reports whether types are same.
+	fn equals(self, other: &TypeKind): bool {
+		let map = unsafe { (&other).map() }
+		if !real(map) {
+			ret false
+		}
+		ret self.key.equals(map.key) && self.val.equals(map.val)
 	}
 }
 
@@ -328,6 +402,15 @@ impl Kind for Arr {
 		s += self.elem.to_str()
 		ret s
 	}
+
+	// Reports whether types are same.
+	fn equals(self, other: &TypeKind): bool {
+		let arr = unsafe { (&other).arr() }
+		if !real(arr) {
+			ret false
+		}
+		ret self.n == arr.n && self.elem.equals(arr.elem)
+	}
 }
 
 // Pointer type.
@@ -342,6 +425,15 @@ impl Kind for Ptr {
 			ret "*unsafe"
 		}
 		ret "*" + self.elem.to_str()
+	}
+
+	// Reports whether types are same.
+	fn equals(self, other: &TypeKind): bool {
+		let ptr = unsafe { (&other).ptr() }
+		if !real(ptr) {
+			ret false
+		}
+		ret self.elem.equals(ptr.elem)
 	}
 }
 

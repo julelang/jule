@@ -15,6 +15,7 @@ use std::jule::ast::{
 	RangeKind,
 	Iter,
 	Comment,
+	LabelSt,
 }
 use std::jule::constant::{new_bool}
 use std::jule::lex::{
@@ -555,7 +556,7 @@ impl ScopeChecker {
 		defer {
 			self.table.vars = append(self.table.vars, v)
 			self.scope.stmts.push(v)
-		}()
+		}
 
 		if self.is_duplicated_ident(uintptr(&v), v.ident) {
 			self.s.push_err(v.token, "duplicated_ident", v.ident)
@@ -753,7 +754,7 @@ impl ScopeChecker {
 			self.check_node(wh.next)
 			if n < self.scope.stmts.len() {
 				let mut st = self.scope.stmts.at(n)
-				self.scope.stmts.set_len(self.scope.stmts.len()-n) // Remove statement.
+				self.scope.stmts.set_len(n) // Remove trailing statements.
 				if !is_valid_st_for_next_st(st) {
 					self.s.push_err(wh.next_token, "invalid_stmt_for_next")
 				}
@@ -916,7 +917,7 @@ impl ScopeChecker {
 		self.scope.stmts.push(cont)
 	}
 
-	fn check_label(mut &self, mut l: &std::jule::ast::LabelSt) {
+	fn check_label(mut &self, mut l: &LabelSt) {
 		if real(self.find_label(l.ident)) {
 			self.s.push_err(l.token, "label_exist", l.ident)
 			ret
@@ -1078,7 +1079,7 @@ impl ScopeChecker {
 			r: rd.model,
 		}
 
-		if real(rd.kind.tup()) {
+		if !real(rd.kind.tup()) {
 			st.r = &TupleExprModel{datas: r}
 		}
 
@@ -1112,7 +1113,7 @@ impl ScopeChecker {
 
 				st.l = append(st.l, v)
 				self.table.vars = append(self.table.vars, v)
-				self.scope.stmts.push(self.scope.stmts, v)
+				self.scope.stmts.push(v)
 
 				continue
 			}
@@ -1448,14 +1449,14 @@ impl ScopeChecker {
 		| &Expr:                        self.check_expr((&Expr)(node))
 		| &std::jule::ast::Conditional: self.check_conditional((&std::jule::ast::Conditional)(node))
 		| &Iter:                        self.check_iter((&Iter)(node))
-		| &std::jule::ast::ContSt:       self.check_cont((&std::jule::ast::ContSt)(node))
-		| &std::jule::ast::LabelSt:      self.check_label((&std::jule::ast::LabelSt)(node))
-		| &std::jule::ast::GotoSt:       self.push_goto((&std::jule::ast::GotoSt)(node))
+		| &std::jule::ast::ContSt:      self.check_cont((&std::jule::ast::ContSt)(node))
+		| &LabelSt:                     self.check_label((&LabelSt)(node))
+		| &std::jule::ast::GotoSt:      self.push_goto((&std::jule::ast::GotoSt)(node))
 		| &AssignSt:                    self.check_assign_st((&AssignSt)(node))
-		| &std::jule::ast::MatchCase:    self.check_match((&std::jule::ast::MatchCase)(node))
-		| &std::jule::ast::FallSt:       self.check_fall((&std::jule::ast::FallSt)(node))
-		| &std::jule::ast::BreakSt:      self.check_break((&std::jule::ast::BreakSt)(node))
-		| &std::jule::ast::RetSt:        self.check_ret((&std::jule::ast::RetSt)(node))
+		| &std::jule::ast::MatchCase:   self.check_match((&std::jule::ast::MatchCase)(node))
+		| &std::jule::ast::FallSt:      self.check_fall((&std::jule::ast::FallSt)(node))
+		| &std::jule::ast::BreakSt:     self.check_break((&std::jule::ast::BreakSt)(node))
+		| &std::jule::ast::RetSt:       self.check_ret((&std::jule::ast::RetSt)(node))
 		|:                              outln("error <unimplemented scope node>")
 		}
 	}

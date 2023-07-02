@@ -23,6 +23,12 @@ Item __jule_std_vector_deref(void *heap, const jule::Int &i) noexcept;
 template<typename Item>
 void __jule_std_vector_heap_assign(void *heap, const jule::Int &i, const Item &item) noexcept;
 
+template<typename Item>
+void __jule_std_vector_heap_move(void *heap, const jule::Int &i, const jule::Int &dest) noexcept;
+
+
+
+
 void **__jule_std_vector_new_heap(void) noexcept
 { return new(std::nothrow) void*{nullptr}; };
 
@@ -44,5 +50,11 @@ Item __jule_std_vector_deref(void *heap, const jule::Int &i) noexcept
 template<typename Item>
 void __jule_std_vector_heap_assign(void *heap, const jule::Int &i, const Item &item) noexcept
 { reinterpret_cast<Item*>(heap)[i] = item; }
+
+template<typename Item>
+void __jule_std_vector_heap_move(void *heap, const jule::Int &i, const jule::Int &dest) noexcept {
+	Item *_heap{ reinterpret_cast<Item*>(heap) };
+	_heap[dest] = _heap[i];
+}
 
 #endif // __JULE_STD_VECTOR

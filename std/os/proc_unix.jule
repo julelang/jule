@@ -2,20 +2,23 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use std::mem::c::{free}
 use std::sys::{
 	self,
-	PATH_MAX,
+	byte_ptr_to_str,
 	getcwd,
 }
 
 // Possible errors:
 //  Denied
 fn __getwd(): (str, OsError) {
-	let mut buff = make([]byte, PATH_MAX)
-	if (unsafe { getcwd(&buff[0], PATH_MAX) }) == nil {
+	let mut buff = unsafe { getcwd(nil, 0) }
+	if buff == nil {
 		ret "", get_last_os_error()
 	}
-	ret (str)(buff), OsError.Ok
+	let pwd = unsafe { byte_ptr_to_str(buff) }
+	unsafe { free(buff) }
+	ret pwd, OsError.Ok
 }
 
 // Possible errors:

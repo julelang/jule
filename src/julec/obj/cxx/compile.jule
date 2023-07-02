@@ -1,0 +1,379 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::os::{exit}
+use std::fs::{DirEntry, FsError, OFlag, open, read_dir, stat}
+use std::fs::path::{join, dir}
+use std::jule::ast::{Ast}
+use std::jule::build::{
+	ENTRY_POINT,
+	PATH_STDLIB,
+	PATH_WD,
+	EXT,
+	Log,
+	LogKind,
+	errorf,
+	is_pass_file_annotation,
+	is_valid_header_ext,
+	is_valid_cpp_ext,
+}
+use std::jule::lex::{new_file_set, lex}
+use std::jule::parser::{parse_file}
+use std::jule::sema::{Importer, ImportInfo, Package, analyze_package}
+use std::runtime::{OS}
+
+use cpp "cxx.hpp"
+
+cpp fn mkdir(path: str): bool
+cpp fn system(cmd: str): int
+// Truncate file.
+// Creates new one if file is not exist in this path.
+cpp fn __julec_truncate_file(path: str)
+
+
+pub const COMPILER_GCC = "gcc"
+pub const COMPILER_CLANG = "clang"
+
+pub const COMPILER_PATH_GCC = "g++"
+pub const COMPILER_PATH_CLANG = "clang++"
+
+pub const MODE_T = "transpile"
+pub const MODE_C = "compile"
+
+// Sets by COMPILER or command-line inputs
+pub let mut COMPILER = ""
+pub let mut COMPILER_PATH = ""
+
+pub let mut OUT_DIR = "dist"
+pub let mut MODE = MODE_C
+pub let mut OUT_NAME = "ir.cpp"
+pub let mut OUT = ""
+
+fn exit_err(msg: str) {
+	const ERROR_EXIT_CODE = 0
+
+	outln(msg)
+	exit(ERROR_EXIT_CODE)
+}
+
+fn read_buff(path: str): []byte {
+	let (mut f, _) = open(path, OFlag.Rdonly, 0)
+	if !real(f) {
+		exit_err("error: file cannot read")
+	}
+
+	let mut buff = make([]byte, 0)
+	for {
+		let mut bytes = make([]byte, 1024)
+		let (n, err) = f.read(bytes)
+		if err != FsError.Ok {
+			exit_err("buffering failed")
+		}
+		if n == 0 {
+			break
+		}
+		buff = append(buff, bytes[:n]...)
+	}
+
+	ret buff
+}
+
+fn flat_compiler_err(text: str): Log {
+	ret Log{
+		kind: LogKind.Error,
+		text: text,
+	}
+}
+
+fn read_package_dirents(path: str): ([]&DirEntry, err_msg: str) {
+	let (mut dirents, err) = read_dir(path)
+	if err != FsError.Ok {
+		ret nil, "connot read package directory: " + path
+	}
+
+	let mut passed_dirents: []&DirEntry = nil
+	for (_, mut dirent) in dirents {
+		let name = dirent.name
+
+		// Skip directories, non-jule files, and file annotation fails.
+		if (
+			dirent.stat.is_dir() ||
+			!name.has_suffix(EXT) ||
+			!is_pass_file_annotation(name)
+		) {
+			continue
+		}
+
+		passed_dirents = append(passed_dirents, dirent)
+	}
+
+	ret passed_dirents, ""
+}
+
+pub struct PlainImporter {
+	all_packages: []&ImportInfo
+}
+
+impl Importer for PlainImporter {
+	fn get_import(mut self, path: str): &ImportInfo {
+		for (_, mut p) in self.all_packages {
+			if p.path == path {
+				ret p
+			}
+		}
+
+		ret new(ImportInfo)
+	}
+
+	fn import_package(mut self, path: str): ([]&Ast, []Log) {
+		let (dirents, err_msg) = read_package_dirents(path)
+		if err_msg != "" {
+			let mut errors = [flat_compiler_err(err_msg)]
+			ret nil, errors
+		}
+
+		let mut asts: []&Ast = nil
+		for _, dirent in dirents {
+			let path = join(path, dirent.name)
+			let mut file = new_file_set(path)
+			let mut errors = lex(file, read_buff(file.path()))
+			if errors.len > 0 {
+				ret nil, errors
+			}
+
+			let mut finfo = parse_file(file)
+			if finfo.errors.len > 0 {
+				ret nil, finfo.errors
+			}
+
+			asts = append(asts, finfo.ast)
+		}
+
+		ret asts, nil
+	}
+
+	fn imported(mut self, mut imp: &ImportInfo) {
+		for _, p in self.all_packages {
+			if p.cpp_linked == imp.cpp_linked && p.link_path == imp.link_path {
+				ret
+			}
+		}
+
+		self.all_packages = append(self.all_packages, imp)
+	}
+}
+
+fn check_mode() {
+	if MODE != MODE_T && MODE != MODE_C {
+		outln(errorf("invalid_value_for_key", MODE, "mode"))
+		exit(0)
+	}
+}
+
+fn check_compiler() {
+	if COMPILER != COMPILER_GCC && COMPILER != COMPILER_CLANG {
+		outln(errorf("invalid_value_for_key", COMPILER, "compiler"))
+		exit(0)
+	}
+}
+
+fn set() {
+	check_mode()
+	check_compiler()
+}
+
+// print_logs prints logs and returns true
+// if logs has error, false if not.
+fn print_logs(logs: []Log) {
+	let mut s = ""
+	for _, l in logs {
+		s += l.to_str() + "\n"
+	}
+	out(s)
+}
+
+fn write_output(path: str, content: str) {
+	let dir = dir(path)
+
+	let (_, mut err) = stat(dir)
+	if err != FsError.Ok {
+		let ok = cpp.mkdir(dir)
+		if !ok {
+			exit_err("a problem occurs when code generation")
+		}
+	}
+
+	cpp.__julec_truncate_file(path)
+
+	let (mut f, err) = open(path, OFlag.Rdwr|OFlag.Create|OFlag.Trunc, 0666)
+	if err != FsError.Ok {
+		exit_err("a problem occurs when code generati")
+	}
+
+	_, err = f.write(([]byte)(content))
+	if err != FsError.Ok {
+		exit_err("a problem occurs when code generat")
+	}
+	_ = f.close()
+}
+
+fn __compile(path: str): (&Package, &PlainImporter) {
+	set()
+
+	// Check standard library.
+	let (inf, err) = stat(PATH_STDLIB)
+	if err != FsError.Ok || !inf.is_dir() {
+		exit_err(errorf("stdlib_not_exist"))
+		ret new(Package), new(PlainImporter)
+	}
+
+	let mut importer = &PlainImporter{}
+	let (mut files, mut errors) = importer.import_package(path)
+	if errors.len > 0 {
+		print_logs(errors)
+		ret new(Package), new(PlainImporter)
+	}
+
+	if files.len == 0 {
+		exit_err(errorf("no_file_in_entry_package", path))
+	}
+
+	let (mut pkg, errors) = analyze_package(files, importer)
+	if errors.len > 0 {
+		print_logs(errors)
+		ret new(Package), new(PlainImporter)
+	}
+
+	const CPP_LINKED = false
+	let f = pkg.find_fn(ENTRY_POINT, CPP_LINKED)
+	if !real(f) {
+		exit_err(errorf("no_entry_point"))
+	}
+
+	ret pkg, importer
+}
+
+fn is_cpp_header_file(path: str): bool {
+	let offset = path.rfind(".")
+	if offset == -1 {
+		ret false
+	}
+	ret is_valid_header_ext(path[offset:])
+}
+
+fn is_cpp_source_file(path: str): bool {
+	let offset = path.rfind(".")
+	if offset == -1 {
+		ret false
+	}
+	ret is_valid_cpp_ext(path[offset:])
+}
+
+fn gen_compile_cmd(source_path: str, used: []&ImportInfo, passes: []str): (str, str) {
+	let compiler = COMPILER_PATH
+
+	const ZERO_LEVEL_OPTIMIZATION = "-O0"
+	const DISABLE_ALL_WARNINGS = "-Wno-everything"
+	const SET_STD = "--std=c++14"
+
+	let mut cmd = ZERO_LEVEL_OPTIMIZATION + " "
+	cmd += DISABLE_ALL_WARNINGS + " "
+	cmd += SET_STD + " "
+
+	// Push passes.
+	for _, pass in passes {
+		cmd += pass + " "
+	}
+
+	// Push linked source files.
+	for _, u in used {
+		if u.cpp_linked && is_cpp_source_file(u.path) {
+			cmd += u.path + " "
+		}
+	}
+
+	if OUT != "" {
+		cmd += "-o " + OUT + " "
+	}
+	cmd += source_path
+
+	ret compiler, cmd
+}
+
+fn get_compile_path(): str {
+	let mut path = join(PATH_WD, OUT_DIR)
+	path = join(path, OUT_NAME)
+	ret path
+}
+
+fn do_spell(obj: str, compiler: str, compiler_cmd: str) {
+	let path = get_compile_path()
+	write_output(path, obj)
+	match MODE {
+	| MODE_C:
+		let status = cpp.system(compiler + " " + compiler_cmd)
+		if status != 0 {
+			out("external compiler failed with status code: ");
+			outln(status)
+			exit(0)
+		}
+	}
+}
+
+fn get_all_unique_passes(pkg: &Package, uses: []&ImportInfo): []str {
+	let mut passes: []str = nil
+	let push_passes = fn(p: &Package) {
+		for _, f in p.files {
+		push:
+			for _, pass in f.passes {
+				if pass.text == "" {
+					continue
+				}
+
+				for _, cpass in passes {
+					if cpass == pass.text {
+						continue push
+					}
+				}
+
+				passes = append(passes, pass.text)
+			}
+		}
+	}
+
+	push_passes(pkg)
+	for _, u in uses {
+		if !u.cpp_linked {
+			push_passes(u.package)
+		}
+	}
+
+	ret passes
+}
+
+pub fn compile(path: str) {
+	let (mut pkg, mut importer) = __compile(path)
+	if !real(pkg) || !real(importer) {
+		ret
+	}
+
+	let passes = get_all_unique_passes(pkg, importer.all_packages)
+	let (compiler, compiler_cmd) = gen_compile_cmd(get_compile_path(), importer.all_packages, passes)
+
+	let mut obj = gen(pkg, importer.all_packages)
+	unsafe { append_standard(&obj, compiler, compiler_cmd) }
+
+	do_spell(obj, compiler, compiler_cmd)
+}
+
+fn init() {
+	// Configure compiler to default by platform
+	if OS == "windows" {
+		COMPILER = COMPILER_GCC
+		COMPILER_PATH = COMPILER_PATH_GCC
+	} else {
+		COMPILER = COMPILER_CLANG
+		COMPILER_PATH = COMPILER_PATH_CLANG
+	}
+}

@@ -1500,6 +1500,7 @@ impl Sema {
 
 	fn check_struct_fields(mut &self, mut st: &Struct): (ok: bool) {
 		ok = true
+
 		let mut tc = &TypeChecker{
 			s:               self,
 			lookup:          self,
@@ -1609,20 +1610,6 @@ impl Sema {
 			ok = self.check_directive_pass(pass) && ok
 		}
 		ret
-	}
-
-	// Checks all declarations of current package file.
-	// Reports whether checking is success.
-	fn check_file_decls(mut &self): (ok: bool) {
-		match {
-		| !self.check_passes():           ret false
-		| !self.check_type_alias_decls(): ret false
-		| !self.check_trait_decls():      ret false
-		| !self.check_global_decls():     ret false
-		| !self.check_fn_decls():         ret false
-		| !self.check_struct_decls():     ret false
-		|:                                ret true
-		}
 	}
 
 	fn check_struct_derive_illegal_cycles(mut self, derive: str, st1: &Struct, mut k: &TypeKind): (ok: bool) {
@@ -1759,8 +1746,42 @@ impl Sema {
 	fn check_package_decls(mut &self) {
 		for (_, mut f) in self.files {
 			self.set_current_file(f)
-			let ok = self.check_file_decls()
-			if !ok {
+			if !self.check_passes() {
+				ret
+			}
+		}
+
+		for (_, mut f) in self.files {
+			self.set_current_file(f)
+			if !self.check_type_alias_decls() {
+				ret
+			}
+		}
+
+		for (_, mut f) in self.files {
+			self.set_current_file(f)
+			if !self.check_trait_decls() {
+				ret
+			}
+		}
+
+		for (_, mut f) in self.files {
+			self.set_current_file(f)
+			if !self.check_global_decls() {
+				ret
+			}
+		}
+
+		for (_, mut f) in self.files {
+			self.set_current_file(f)
+			if !self.check_fn_decls() {
+				ret
+			}
+		}
+
+		for (_, mut f) in self.files {
+			self.set_current_file(f)
+			if !self.check_struct_decls() {
 				ret
 			}
 		}
@@ -1913,17 +1934,9 @@ impl Sema {
 
 		// Append return variables.
 		if vars.len > 0 {
-			let mut stms = new_vector[St](f.scope.stmts.len()+vars.len)
 			for (_, mut v) in vars {
-				stms.push(v)
+				f.scope.stmts.push_front(v)
 			}
-
-			let mut i = vars.len
-			for i < stms.len(); i++ {
-				stms.push(f.scope.stmts.at(i-vars.len))
-			}
-
-			f.scope.stmts = stms
 		}
 
 		self.check_rets(f)

@@ -131,6 +131,10 @@ namespace jule {
         }
 
         void operator=(const jule::Ref<T> &ref) noexcept {
+            // Assignment to itself.
+            if (this->alloc != nullptr && this->alloc == ref.alloc)
+                return;
+
             this->drop();
 
             if (ref.ref)
