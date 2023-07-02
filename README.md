@@ -15,6 +15,12 @@ It contains the reference compiler, API and standard library.
 </strong>
 </div>
 
+> **Warning** \
+> JuleC, the reference compiler of Jule, has moved on to the bootstrapping phase. \
+> Therefore, it cannot yet be compiled from source. \
+> The first beta build of JuleC will be released as soon as possible after known bugs have been handled. \
+> _Thank you for your understanding._
+
 <h2 id="community">Community</h2>
 
 Join Julenours to support Jule, explore and interact with the community.
@@ -27,7 +33,7 @@ Our main community platforms:
 
 <h2 id="motivation">Motivation</h2>
 
-> **Warning** \
+> **Note** \
 > [JuleC](#what-is-julec) is still under pre development. Therefore, design changes and the like may occur in the language. \
 > Some commits may not be fully honored due to some compiler/API errors. \
 > Please report it with the [Jule Issue Tracker](https://github.com/julelang/jule/issues) if you come across something like this.
@@ -217,7 +223,7 @@ JuleC is in development with the [Jule](https://github.com/julelang/jule) progra
 
 In `src/julec` directory:
 
-> **Warning** \
+> **Note** \
 > This example command accepts you already have JuleC in global path.
 
 ```
