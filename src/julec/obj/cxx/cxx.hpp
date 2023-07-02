@@ -17,8 +17,17 @@ namespace fs = std::__fs::filesystem;
 namespace fs = std::filesystem;
 #endif
 
+struct JuleCompileTime {
+	jule::Int day;
+	jule::Int month;
+	jule::Int year;
+	jule::Int hour;
+	jule::Int minute;
+};
+
 jule::Bool mkdir(const jule::Str &path) noexcept;
 jule::Int system(const jule::Str &cmd) noexcept;
+JuleCompileTime time_now(void) noexcept;
 
 jule::Bool mkdir(const jule::Str &path) noexcept
 { return fs::create_directories(path.operator const char *()); }
@@ -26,5 +35,18 @@ jule::Bool mkdir(const jule::Str &path) noexcept
 jule::Int system(const jule::Str &cmd) noexcept
 { return std::system(cmd.operator const char *()); }
 
+JuleCompileTime time_now(void) noexcept {
+	time_t now;
+	time(&now);
+
+	struct tm *time{ localtime(&now) };
+	return JuleCompileTime{
+		day: time->tm_mday,
+		month: time->tm_mon,
+		year: time->tm_year,
+		hour: time->tm_hour,
+		minute: time->tm_min,
+	};
+}
 
 #endif // __JULEC_OBJ_CXX

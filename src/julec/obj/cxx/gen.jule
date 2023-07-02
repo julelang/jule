@@ -1,0 +1,934 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::conv::{itoa}
+use std::jule::{VERSION}
+use std::jule::build::{
+	Derives,
+	INIT_FN,
+	PATH_API,
+	is_std_header_path,
+}
+use std::jule::lex::{
+	TokenId,
+	TokenKind,
+	is_ignore_ident,
+	is_anon_ident,
+}
+use std::jule::sema::{
+	Package,
+	ImportInfo,
+	SymbolTable,
+	Var,
+	StructIns,
+	Struct,
+	FieldIns,
+	Fn,
+	FnIns,
+	Trait,
+	Param,
+	ParamIns,
+}
+
+
+use cpp "cxx.hpp"
+
+cpp struct JuleCompileTime {
+	day:    int
+	month:  int
+	year:   int
+	hour:   int
+	minute: int
+}
+
+cpp fn time_now(): cpp.JuleCompileTime
+
+
+// The self keyword equavalent of generated cpp.
+const CPP_SELF = "this"
+
+// C++ statement terminator.
+const CPP_ST_TERM = ";"
+
+// Current indention count.
+let mut INDENT = 0
+
+struct OrderedDecls {
+	structs: []&Struct
+	globals: []&Var
+}
+
+// Increase indentation.
+fn add_indent() { INDENT++ }
+
+// Decrase indentation.
+fn done_indent() { INDENT-- }
+
+// Returns indention string by INDENT.
+fn indent(): str {
+	const INDENT_KIND = "\t"
+	if INDENT == 0 {
+		ret ""
+	}
+
+	let mut s = ""
+	let mut i = 0
+	for i < INDENT; i++ {
+		s += INDENT_KIND
+	}
+	ret s
+}
+
+// Returns all structures of main package and used pakcages.
+// Ignores cpp-linked declarations.
+fn get_all_structures(mut pkg: &Package, mut used: []&ImportInfo): []&Struct {
+	let mut buffer: []&Struct = nil
+
+	let append_structs = fn(mut p: &Package) {
+		for (_, mut f) in p.files {
+			for (_, mut s) in f.structs {
+				if !s.cpp_linked {
+					buffer = append(buffer, s)
+				}
+			}
+		}
+	}
+
+	append_structs(pkg)
+
+	for (_, mut u) in used {
+		if !u.cpp_linked {
+			append_structs(u.package)
+		}
+	}
+
+	ret buffer
+}
+
+// Returns all variables of main package and used pakcages.
+// Ignores cpp-linked declarations.
+fn get_all_variables(mut pkg: &Package, mut used: []&ImportInfo): []&Var {
+	let mut buffer: []&Var = nil
+
+	let append_vars = fn(mut p: &Package) {
+		for (_, mut f) in p.files {
+			for (_, mut v) in f.vars {
+				if !v.cpp_linked {
+					buffer = append(buffer, v)
+				}
+			}
+		}
+	}
+
+	append_vars(pkg)
+
+	for (_, mut u) in used {
+		if !u.cpp_linked {
+			append_vars(u.package)
+		}
+	}
+
+	ret buffer
+}
+
+// Generates all C/C++ include directives.
+fn gen_links(mut used: []&ImportInfo): str {
+	let mut obj = ""
+	for (_, mut pkg) in used {
+		match {
+		| !pkg.cpp_linked:
+			continue
+
+		| is_std_header_path(pkg.path):
+			obj += "#include " + pkg.path + "\n"
+
+		| is_cpp_header_file(pkg.path):
+			obj += `#include "` + pkg.path + "\"\n"
+		}
+	}
+	ret obj
+}
+
+// Generates C++ code of function's result type.
+fn gen_fn_result(mut f: &Fn): str {
+	if f.is_void() {
+		ret "void"
+	}
+	ret gen_type_kind(f.result.kind.kind)
+}
+
+// Generates C++ code of function instance's result type.
+fn gen_fn_ins_result(mut f: &FnIns): str {
+	if f.decl.is_void() {
+		ret "void"
+	}
+	ret gen_type_kind(f.result)
+}
+
+// Generates C++ prototype code of parameter.
+fn gen_param_prototype(mut p: &Param): str {
+	let mut obj = ""
+	if p.variadic {
+		obj += as_jt("slice")
+		obj += "<"
+		obj += gen_type_kind(p.kind.kind)
+		obj += ">"
+	} else {
+		obj += gen_type_kind(p.kind.kind)
+	}
+	ret obj
+}
+
+// Generates C++ code of parameter instance.
+fn gen_param_ins(mut p: &ParamIns): str {
+	let mut obj = gen_param_ins_prototype(p)
+	obj += " "
+	obj += param_out_ident(p.decl)
+	ret obj
+}
+
+// Generates C++ prototype code of parameter instance.
+fn gen_param_ins_prototype(mut p: &ParamIns): str {
+	let mut obj = ""
+	if p.decl.variadic {
+		obj += as_jt("slice")
+		obj += "<"
+		obj += gen_type_kind(p.kind)
+		obj += ">"
+	} else {
+		obj += gen_type_kind(p.kind)
+	}
+	ret obj
+}
+
+// Generates C++ code of parameter.
+fn gen_param(mut p: &Param): str {
+	let mut obj = gen_param_prototype(p)
+	if p.ident != "" && !is_ignore_ident(p.ident) && !is_anon_ident(p.ident) {
+		obj += " " + param_out_ident(p)
+	}
+	ret obj
+}
+
+// Generates C++ code of parameters.
+fn gen_params(mut params: []&Param): str {
+	match {
+	| params.len == 0:
+		ret "(void)"
+
+	| params.len == 1 && params[0].is_self():
+		ret "(void)"
+	}
+
+	let mut obj = "("
+	for (_, mut p) in params {
+		if !p.is_self() {
+			obj += gen_param(p) + ","
+		}
+	}
+
+	// Remove comma.
+	obj = obj[:obj.len-1]
+	ret obj + ")"
+}
+
+fn gen_params_ins(mut params: []&ParamIns): str {
+	match {
+	| params.len == 0:
+		ret "(void)"
+
+	| params.len == 1 && params[0].decl.is_self():
+		ret "(void)"
+	}
+
+	let mut obj = "("
+	for (_, mut p) in params {
+		if !p.decl.is_self() {
+			obj += gen_param_ins(p) + ","
+		}
+	}
+
+	// Remove comma.
+	obj = obj[:obj.len-1]
+	ret obj + ")"
+}
+
+// Generates C++ declaration code of parameters.
+fn gen_params_prototypes(mut params: []&ParamIns): str {
+	match {
+	| params.len == 0:
+		ret "(void)"
+
+	| params.len == 1 && params[0].decl.is_self():
+		ret "(void)"
+	}
+
+	let mut obj = "("
+	for (_, mut p) in params {
+		if !p.decl.is_self() {
+			obj += gen_param_ins_prototype(p) + ","
+		}
+	}
+
+	// Remove comma.
+	obj = obj[:obj.len-1]
+	ret obj + ")"
+}
+
+// Generates C++ code of trait.
+fn gen_trait(mut t: &Trait): str {
+	const INDENTION = "\t"
+	let outid = trait_out_ident(t)
+
+	let mut obj = "struct "
+	obj += outid
+	obj += " {\n"
+	obj += INDENTION
+	obj += "virtual ~"
+	obj += outid
+	obj += "(void) noexcept {}\n\n"
+	for (_, mut f) in t.methods {
+		obj += INDENTION
+		obj += "virtual "
+		obj += gen_fn_result(f)
+		obj += " _method_"
+		obj += f.ident
+		obj += gen_params(f.params)
+		obj += " {"
+		if !f.is_void() {
+			obj += " return {}; "
+		}
+		obj += "}\n"
+	}
+	obj += "};"
+	ret obj
+}
+
+// Generates C++ code of SymbolTable's all traits.
+fn gen_traits_tbl(mut tbl: &SymbolTable): str {
+	let mut obj = ""
+	for (_, mut t) in tbl.traits {
+		obj += gen_trait(t) + "\n\n"
+	}
+	ret obj
+}
+
+// Generates C++ code of package's all traits.
+fn gen_traits_pkg(mut pkg: &Package): str {
+	let mut obj = ""
+	for (_, mut tbl) in pkg.files {
+		obj += gen_traits_tbl(tbl)
+	}
+	ret obj
+}
+
+// Generates C++ code of all traits.
+fn gen_traits(mut pkg: &Package, mut used: []&ImportInfo): str {
+	let mut obj = ""
+	for (_, mut u) in used {
+		if !u.cpp_linked {
+			obj += gen_traits_pkg(u.package)
+		}
+	}
+	obj += gen_traits_pkg(pkg)
+	ret obj
+}
+
+// Generates C++ declaration code of trait.
+fn gen_trait_prototype(t: &Trait): str {
+	ret "struct " + trait_out_ident(t) + CPP_ST_TERM
+}
+
+// Generates C++ declaration code of all traits.
+fn gen_trait_prototypes(p: &Package): str {
+	let mut obj = ""
+	for _, f in p.files {
+		for _, t in f.traits {
+			if t.token.id != TokenId.Na {
+				obj += gen_trait_prototype(t) + "\n"
+			}
+		}
+	}
+	ret obj
+}
+
+// Generates C++ plain-prototype code of structure.
+fn gen_struct_plain_prototype(s: &Struct): str {
+	let mut obj = ""
+	for _, ins in s.instances {
+		obj += "\nstruct "
+		obj += struct_ins_out_ident(ins)
+		obj += CPP_ST_TERM
+		obj += "\n"
+	}
+	ret obj
+}
+
+// Generates C++ plain-prototype code of all structures.
+fn gen_struct_plain_prototypes(mut structs: []&Struct): str {
+	let mut obj = ""
+	for (_, mut s) in structs {
+		if !s.cpp_linked && s.token.id != TokenId.Na {
+			obj += gen_struct_plain_prototype(s) + "\n"
+		}
+	}
+	ret obj
+}
+
+// Generates C++ derive code of structure's implemented traits.
+fn gen_struct_traits(s: &Struct): str {
+	if s.implements.len == 0 {
+		ret ""
+	}
+
+	let mut obj = ": "
+	for _, i in s.implements {
+		obj += "public "
+		obj += trait_out_ident(i)
+		obj += ","
+	}
+	obj = obj[:obj.len-1] // Remove last comma.
+	ret obj
+}
+
+// Generates C++ declaration code of field.
+fn gen_field_decl(mut f: &FieldIns): str {
+	let mut obj = gen_type_kind(f.kind) + " "
+	obj += field_out_ident(f.decl)
+	obj += "{" + get_init_expr(f.kind) + "}"
+	obj += CPP_ST_TERM
+	ret obj
+}
+
+
+fn gen_struct_self_field_type_kind(s: &StructIns): str {
+	ret as_ref_kind(gen_struct_kind_ins(s))
+}
+
+// Generates C++ field declaration code of structure's self field.
+fn gen_struct_self_field(s: &StructIns): str {
+	let mut obj = gen_struct_self_field_type_kind(s)
+	obj += " self{};"
+	ret obj
+}
+
+fn gen_struct_self_field_init_st(s: &StructIns): str {
+	let mut obj = "this->self = "
+	obj += gen_struct_self_field_type_kind(s)
+	obj += "::make(this, nullptr);"
+	ret obj
+}
+
+fn gen_struct_constructor(mut s: &StructIns): str {
+	let mut obj = struct_ins_out_ident(s)
+
+	obj += "("
+	if s.fields.len > 0 {
+		for (_, mut f) in s.fields {
+			obj += gen_type_kind(f.kind)
+			obj += " __param_" + f.decl.ident + ", "
+		}
+		obj = obj[:obj.len-2] // Remove last comma.
+	} else {
+		obj += "void"
+	}
+
+	obj += ") noexcept {\n"
+	add_indent()
+	obj += indent()
+	obj += gen_struct_self_field_init_st(s)
+	obj += "\n"
+
+	if s.fields.len > 0 {
+		for _, f in s.fields {
+			obj += "\n"
+			obj += indent()
+			obj += "this->"
+			obj += field_out_ident(f.decl)
+			obj += " = "
+			obj += "__param_" + f.decl.ident
+			obj += CPP_ST_TERM
+		}
+	}
+
+	done_indent()
+	obj += "\n" + indent() + "}"
+	ret obj
+}
+
+fn gen_struct_destructor(s: &StructIns): str {
+	let mut obj = "~"
+	obj += struct_ins_out_ident(s)
+	obj += "(void) noexcept { /* heap allocations managed by traits or references */ this->self.ref = nullptr; }"
+	ret obj
+}
+
+fn gen_struct_operators(s: &StructIns): str {
+	let out_ident = struct_ins_out_ident(s)
+	let mut obj = ""
+
+	obj += indent()
+	obj += "inline bool operator==(const "
+	obj += out_ident
+	obj += " &_Src) {"
+	if s.fields.len > 0 {
+		add_indent()
+		obj += "\n"
+		obj += indent()
+		obj += "return "
+		add_indent()
+		for _, f in s.fields {
+			obj += "\n"
+			obj += indent()
+			obj += "this->"
+			let f_ident = field_out_ident(f.decl)
+			obj += f_ident
+			obj += " == _Src."
+			obj += f_ident
+			obj += " &&"
+		}
+		done_indent()
+		obj = obj[:obj.len-3] // Remove last suffix " &&"
+		obj += ";\n"
+		done_indent()
+		obj += indent()
+		obj += "}"
+	} else {
+		obj += " return true; }"
+	}
+	obj += "\n\n"
+	obj += indent()
+	obj += "inline bool operator!=(const "
+	obj += out_ident
+	obj += " &_Src) { return !this->operator==(_Src); }"
+	ret obj
+}
+
+fn gen_struct_derive_defs_prototypes(s: &StructIns): str {
+	let mut obj = ""
+
+	if s.decl.is_derives((str)(Derives.Clone)) {
+		obj += indent()
+		obj += get_derive_fn_decl_clone(s.decl)
+		obj += ";\n\n"
+	}
+
+	ret obj
+}
+
+fn gen_struct_ins_prototype(mut s: &StructIns): str {
+	let mut obj = "struct "
+	let out_ident = struct_ins_out_ident(s)
+
+	obj += out_ident
+	obj += gen_struct_traits(s.decl)
+	obj += " {\n"
+
+	add_indent()
+	obj += indent()
+	obj += gen_struct_self_field(s)
+	obj += "\n\n"
+	if s.fields.len > 0 {
+		for (_, mut f) in s.fields {
+			obj += indent()
+			obj += gen_field_decl(f)
+			obj += "\n"
+		}
+		obj += "\n\n"
+		obj += indent()
+		obj += gen_struct_constructor(s)
+		obj += "\n\n"
+	}
+
+	obj += indent()
+	obj += gen_struct_destructor(s)
+	obj += "\n\n"
+
+	obj += indent()
+	obj += out_ident
+	obj += "(void) noexcept { "
+	obj += gen_struct_self_field_init_st(s)
+	obj += " }\n\n"
+
+	for (_, mut f) in s.methods {
+		obj += gen_fn_prototype(f, true)
+		obj += "\n\n"
+	}
+
+	obj += gen_struct_derive_defs_prototypes(s)
+
+	obj += gen_struct_operators(s)
+	obj += "\n"
+
+	done_indent()
+	obj += indent() + "};"
+	ret obj
+}
+
+// Generates C++ declaration code of structure.
+fn gen_struct_prototype(mut s: &Struct): str {
+	let mut obj = ""
+	for (_, mut ins) in s.instances {
+		obj += gen_struct_ins_prototype(ins) + "\n\n"
+	}
+	ret obj
+}
+
+// Generates C++ declaration code of all structures.
+fn gen_struct_prototypes(mut structs: []&Struct): str {
+	let mut obj = ""
+	for (_, mut s) in structs {
+		if !s.cpp_linked && s.token.id != TokenId.Na {
+			obj += gen_struct_prototype(s) + "\n"
+		}
+	}
+	ret obj
+}
+
+fn gen_fn_decl_head(mut f: &FnIns, method: bool): str {
+	let mut obj = ""
+	if !f.decl.is_entry_point() {
+		obj += "inline "
+	}
+
+	obj += gen_fn_ins_result(f) + " "
+
+	if !method && real(f.decl.owner) {
+		obj += struct_ins_out_ident(f.owner) + (str)(TokenKind.DblColon)
+	}
+	obj += fn_ins_out_ident(f)
+	ret obj
+}
+
+// Generates C++ declaration code of function's combinations.
+fn gen_fn_prototype(mut f: &Fn, method: bool): str {
+	let mut obj = ""
+	for (_, mut c) in f.instances {
+		obj += indent()
+		obj += gen_fn_decl_head(c, method)
+		obj += gen_params_prototypes(c.params)
+		obj += CPP_ST_TERM + "\n"
+	}
+	ret obj
+}
+
+// Generates C++ declaration code of all functions.
+fn gen_fn_prototypes(mut pkg: &Package): str {
+	let mut obj = ""
+	for (_, mut file) in pkg.files {
+		for (_, mut f) in file.funcs {
+			if !f.cpp_linked && f.token.id != TokenId.Na {
+				obj += gen_fn_prototype(f, false)
+			}
+		}
+	}
+	ret obj
+}
+
+// Generates C++ code of all can-be-prototyped declarations.
+fn gen_prototypes(mut pkg: &Package, mut used: []&ImportInfo, mut structs: []&Struct): str {
+	let mut obj = ""
+
+	for (_, mut u) in used {
+		if !u.cpp_linked {
+			obj += gen_trait_prototypes(u.package)
+		}
+	}
+	obj += gen_trait_prototypes(pkg)
+
+	
+	obj += gen_struct_plain_prototypes(structs)
+
+	obj += gen_traits(pkg, used) + "\n"
+
+	obj += gen_struct_prototypes(structs)
+
+	for (_, mut u) in used {
+		if !u.cpp_linked {
+			obj += gen_fn_prototypes(u.package)
+		}
+	}
+	obj += gen_fn_prototypes(pkg)
+
+	ret obj
+}
+
+// Generates C++ code of variable.
+fn gen_var(mut v: &Var): str {
+	if is_ignore_ident(v.ident) {
+		ret ""
+	}
+	if v.constant {
+		ret ""
+	}
+
+	let mut obj = gen_type_kind(v.kind.kind) + " "
+	obj += var_out_ident(v)
+	if real(v.value) && real(v.value.expr) {
+		if v.value.data.model != nil {
+			obj += " = "
+			obj += gen_val(v.value)
+		} else {
+			obj += CPP_DEFAULT_EXPR
+		}
+	} else {
+		obj += "{" + get_init_expr(v.kind.kind) + "}"
+	}
+	obj += CPP_ST_TERM
+	ret obj
+}
+
+// Generates C++ code of all globals.
+fn gen_globals(mut globals: []&Var): str {
+	let mut obj = ""
+
+	for (_, mut v) in globals {
+		if !v.constant && v.token.id != TokenId.Na {
+			obj += gen_var(v) + "\n"
+		}
+	}
+
+	ret obj
+}
+
+// Generates C++ code of function.
+fn gen_fn(mut f: &Fn): str {
+	let mut obj = ""
+	for (_, mut ins) in f.instances {
+		obj += gen_fn_decl_head(ins, false)
+		obj += gen_params_ins(ins.params) + " "
+		obj += gen_fn_scope(ins)
+		obj += "\n\n"
+	}
+	ret obj
+}
+
+// Generates C++ code of all functions of package.
+fn gen_pkg_fns(mut p: &Package): str {
+	let mut obj = ""
+	for (_, mut f) in p.files {
+		for (_, mut f) in f.funcs {
+			if !f.cpp_linked && f.token.id != TokenId.Na {
+				obj += gen_fn(f) + "\n\n"
+			}
+		}
+	}
+	ret obj
+}
+
+// Generates C++ code of structure's methods.
+fn gen_struct_method_defs(mut s: &StructIns): str {
+	let mut obj = ""
+	for (_, mut f) in s.methods {
+		obj += indent()
+		obj += gen_fn(f)
+		obj += "\n\n"
+	}
+	ret obj
+}
+
+// Generates C++ code of structure's ostream.
+fn gen_struct_ostream(mut s: &StructIns): str {
+	let mut obj = ""
+	obj += indent()
+	obj += "std::ostream &operator<<(std::ostream &_Stream, const "
+	obj += struct_ins_out_ident(s)
+	obj += " &_Src) {\n"
+	add_indent()
+	obj += indent()
+	obj += `_Stream << "`
+	obj += s.decl.ident
+	obj += "{\";\n"
+
+	for (i, mut field) in s.fields {
+		obj += indent()
+		obj += `_Stream << "`
+		obj += field.decl.ident
+		obj += `:" << _Src.`
+		obj += field_out_ident(field.decl)
+		if i+1 < s.fields.len {
+			obj += " << \", \""
+		}
+		obj += ";\n"
+	}
+
+	obj += indent()
+	obj += "_Stream << \"}\";\n"
+	obj += indent()
+	obj += "return _Stream;\n"
+	done_indent()
+	obj += indent()
+	obj += "}"
+	ret obj
+}
+
+fn gen_struct_derive_defs(s: &StructIns): str {
+	let mut obj = ""
+
+	if s.decl.is_derives((str)(Derives.Clone)) {
+		obj += indent()
+		obj += get_derive_fn_def_clone(s.decl)
+		obj += "{\n"
+		add_indent()
+		obj += indent()
+		obj += gen_struct_kind_ins(s)
+		obj += " clone;\n"
+		for _, f in s.fields {
+			let ident = field_out_ident(f.decl)
+
+			obj += indent()
+			obj += "clone."
+			obj += ident
+			obj += " = jule::clone(this->"
+			obj += ident
+			obj += ");\n"
+		}
+		obj += indent()
+		obj += "return clone;\n"
+		done_indent()
+		obj += indent()
+		obj += "}"
+	}
+
+	ret obj
+}
+
+// Generates C++ code of structure instance definition.
+fn gen_struct_ins(mut s: &StructIns): str {
+	let mut obj = gen_struct_method_defs(s)
+	obj += "\n\n"
+	obj += gen_struct_derive_defs(s)
+	obj += "\n\n"
+	obj += gen_struct_ostream(s)
+	ret obj
+}
+
+// Generates C++ code of structure definition.
+fn gen_struct(mut s: &Struct): str {
+	let mut obj = ""
+	for (_, mut ins) in s.instances {
+		obj += gen_struct_ins(ins) + "\n\n"
+	}
+	ret obj
+}
+
+// Generates C++ code of all structures.
+fn gen_structs(mut structs: []&Struct): str {
+	let mut obj = ""
+	for (_, mut s) in structs {
+		if !s.cpp_linked && s.token.id != TokenId.Na {
+			obj += gen_struct(s)
+			obj += "\n\n"
+		}
+	}
+	ret obj
+}
+
+// Generates C++ code of all functions.
+fn gen_fns(mut pkg: &Package, mut used: []&ImportInfo): str {
+	let mut obj = ""
+
+	for (_, mut u) in used {
+		if !u.cpp_linked {
+			obj += gen_pkg_fns(u.package)
+		}
+	}
+	obj += gen_pkg_fns(pkg)
+
+	ret obj
+}
+
+// Generated C++ code of all initializer functions.
+fn gen_init_caller(mut pkg: &Package, mut used: []&ImportInfo): str {
+	const INDENTION = "\t"
+
+	let mut obj = "void "
+	obj += INIT_CALLER_IDENT
+	obj += "(void) {"
+
+	let push_init = fn(mut pkg: &Package) {
+		const CPP_LINKED = false
+		let f = pkg.find_fn(INIT_FN, CPP_LINKED)
+		if !real(f) {
+			ret
+		}
+
+		obj += "\n" + INDENTION + fn_out_ident(f) + "();"
+	}
+
+	for (_, mut u) in used {
+		if !u.cpp_linked {
+			push_init(u.package)
+		}
+	}
+	push_init(pkg)
+
+	obj += "\n}"
+	ret obj
+}
+
+unsafe fn append_standard(mut obj_code: *str, compiler: str, compiler_cmd: str) {
+	let time = cpp.time_now()
+	
+	let mut time_str = ""
+	time_str += itoa(time.day)
+	time_str += "/"
+	time_str += itoa(time.month)
+	time_str += "/"
+	time_str += itoa(time.year)
+	time_str += " "
+	time_str += itoa(time.hour)
+	time_str += "."
+	time_str += itoa(time.minute)
+	time_str += " (DD/MM/YYYY) (HH.MM)"
+	
+	let mut s = ""
+	s += "// Auto generated by JuleC.\n"
+	s += "// JuleC version: "
+	s += VERSION
+	s += "\n"
+	s += "// Date: "
+	s += time_str
+	s += `
+//
+// Recommended Compile Command;
+// `
+	s += compiler
+	s += " "
+	s += compiler_cmd
+	s += "\n\n#include \""
+	s += PATH_API
+	s += "\"\n\n"
+	s += *obj_code
+	s += `
+int main(int argc, char *argv[]) {
+	std::set_terminate(&jule::terminate_handler);
+	jule::set_sig_handler(jule::signal_handler);
+	jule::setup_command_line_args(argc, argv);
+	__jule_call_initializers();
+	entry_point();
+
+	return EXIT_SUCCESS;
+}`
+	*obj_code = s
+}
+
+// Generates C++ codes from SymbolTables.
+pub fn gen(mut pkg: &Package, mut used: []&ImportInfo): str {
+	let mut od = &OrderedDecls{}
+	od.structs = get_all_structures(pkg, used)
+	order_structures(od.structs)
+
+	od.globals = get_all_variables(pkg, used)
+	order_variables(od.globals)
+
+	let mut obj = ""
+	obj += gen_links(used) + "\n"
+	obj += gen_prototypes(pkg, used, od.structs) + "\n\n"
+	obj += gen_globals(od.globals) + "\n"
+	obj += gen_structs(od.structs)
+	obj += gen_fns(pkg, used) + "\n"
+	obj += gen_init_caller(pkg, used) + "\n"
+	ret obj
+}
