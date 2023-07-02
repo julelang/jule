@@ -152,19 +152,13 @@ Then, a call is made from Jule and the result of the function is written to the 
 <h2 id="future-changes">Future Changes</h2>
 JuleC is in early development and currently it can only be built from source.
 However, despite being in the early development stage, many algorithms (<a href="https://github.com/julelang/jule/tree/master/std">see the standard library</a>) can be successfully implemented.
-It is planned to rewrite the compiler with Jule after reference compiler and standard library reaches sufficient maturity.
+However, Jule's compiler is bootstrapped.
+The official compiler, JuleC, is developed with Pure Jule.
 JuleC has or is very close to having many of the things Jule was intended to have, such as memory safety, no undefined behavior, structures with methods and generics.
 <br><br>
-A release is not expected until JuleC itself is developed with the Jule.
 The syntax and language design of the Jule programming language has emerged and is not expected to undergo major changes.
-When the reference compiler is rewritten with Jule, it is thought that AST, Lexer and some packages will be included in the standard library.
-This will be a change that will cause the official compiler's project structure to be rebuilt.
-The reference compiler will probably use the standard library a lot.
+Many parts of JuleC, included in standard library such as lexer, parser and semantic analyzer.
 This will also allow developers to quickly develop tools for the language by leveraging Jule's standard library.
-<br><br>
-Also several packages that are part of JuleC have already been added to the standard library.
-Some of these packages are <a href="https://github.com/julelang/jule/tree/master/std/jule/lex">std::jule::lex</a>, <a href="https://github.com/julelang/jule/tree/master/std/jule/build">std::jule::build</a> and <a href="https://github.com/julelang/jule/tree/master/std/jule/constant">std::jule::constant</a>.
-Since these packages are part of JuleC and are intended to be used for bootsrapping purposes, they are updated simultaneously with JuleC.
 <br><br>
 There is an idea to include a package manager in JuleC as well, although it doesn't have one yet.
 Jule's modern understanding of language and convenience suggests that there should be a package manager that comes with the compiler.
@@ -211,34 +205,27 @@ All supported platforms by JuleC are documented in the <a href="https://jule.dev
 > Please read the [install from source](https://julelang.github.io/website/pages/manual.html?page=getting-started-install-from-source) part of manual for compiling from source code.
  
 When you enter the directory where the source code is located, you can find some compilation scripts for compiling of JuleC. \
-These scripts are written to run from the [src](./src) directory:
+These scripts are written to run from the [src](./src/julec) directory:
 
 - `build`: scripts used for compile.
 - `brun`: scripts used for compile and execute if compiling is successful.
 
 JuleC aims to have a single main build file. \
-JuleC is in development with the [Go](https://github.com/golang/go) programming language.
+JuleC is in development with the [Jule](https://github.com/julelang/jule) programming language.
 
-### Building with Go Compiler
+### Building with JuleC
 
-In `src` directory.
+In `src/julec` directory:
 
-#### Windows 
-```powershell
-go build -o julec.exe -v cmd\julec\main.go
+> **Warning** \
+> This example command accepts you already have JuleC in global path.
+
+```
+julec -o julec .
 ```
 
-#### macOS (Darwin)
-```zsh
-go build -o julec -v cmd/julec/main.go
-```
 
-#### Linux 
-```bash
-go build -o julec -v cmd/julec/main.go
-```
-
-Run the above command in your terminal, in the `src` directory of Jule project.
+Run the above command in your terminal, in the `src/julec` directory of Jule project.
 
 <h2 id="contributing">Contributing</h2>
 
