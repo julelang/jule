@@ -153,7 +153,7 @@ Then, a call is made from Jule and the result of the function is written to the 
 JuleC is in early development and currently it can only be built from source.
 However, despite being in the early development stage, many algorithms (<a href="https://github.com/julelang/jule/tree/master/std">see the standard library</a>) can be successfully implemented.
 However, Jule's compiler is bootstrapped.
-The official compiler, JuleC, is developed with Pure Jule.
+The reference compiler, JuleC, is developed with Pure Jule.
 JuleC has or is very close to having many of the things Jule was intended to have, such as memory safety, no undefined behavior, structures with methods and generics.
 <br><br>
 The syntax and language design of the Jule programming language has emerged and is not expected to undergo major changes.
