@@ -26,6 +26,9 @@ void __jule_std_vector_heap_assign(void *heap, const jule::Int &i, const Item &i
 template<typename Item>
 void __jule_std_vector_heap_move(void *heap, const jule::Int &i, const jule::Int &dest) noexcept;
 
+
+
+
 void **__jule_std_vector_new_heap(void) noexcept
 { return new(std::nothrow) void*{nullptr}; };
 
