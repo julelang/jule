@@ -584,7 +584,7 @@ impl Eval {
 
 		// Check illegal cycle for itself.
 		// Because refers's owner is ta.
-		if self.owner == v {
+		if &self.owner == &v {
 			self.push_err(self.owner.token, "illegal_cycle_refers_itself", self.owner.ident)
 			ret false
 		}
@@ -1744,11 +1744,11 @@ impl Eval {
 		}
 
 		defer {
-			if old != self.s {
+			if &old != &self.s {
 				old.errors = append(old.errors, self.s.errors...)
 			}
 			self.s = old
-		}()
+		}
 
 		if !d.mutable && f.decl.is_method() && f.decl.params[0].mutable {
 			self.push_err(fc.token, "mutable_operation_on_immutable")
@@ -2888,8 +2888,11 @@ impl Eval {
 			}
 		}
 
-		if !real(d.cast_kind) && !d.variadiced && !d.lvalue && !d.is_const() && real(d.kind.prim()) && is_num(d.kind.prim().kind) {
-			d.cast_kind = d.kind
+		if !real(d.cast_kind) && !d.variadiced && !d.lvalue && !d.is_const() && real(d.kind.prim()) {
+			let prim = d.kind.prim()
+			if is_num(prim.kind) || prim.is_any() {
+				d.cast_kind = d.kind
+			}
 		}
 
 		apply_cast_kind(d)

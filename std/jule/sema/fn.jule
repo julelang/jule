@@ -179,7 +179,7 @@ pub struct ParamIns {
 	pub kind: &TypeKind
 }
 
-impl Kind for ParamIns {
+impl ParamIns {
 	// Implement: Kind
 	// Returns ParamIns's type kind as string.
 	fn to_str(self): str {
@@ -264,6 +264,48 @@ impl Kind for FnIns {
 			s += self.result.to_str()
 		}
 		ret s
+	}
+
+	// Reports whether types are same.
+	fn equals(self, other: &TypeKind): bool {
+		let f = unsafe { (&other).fnc() }
+		if !real(f) {
+			ret false
+		}
+
+		if self.decl.unsafety != f.decl.unsafety {
+			ret false
+		}
+
+		if self.generics.len != f.generics.len {
+			ret false
+		}
+
+		if self.decl.is_void() != f.decl.is_void() {
+			ret false
+		}
+
+		let mut i = 0
+		for i < self.generics.len; i++ {
+			if !self.generics[i].equals(f.generics[i]) {
+				ret false
+			}
+		}
+
+		i = 0
+		for i < self.params.len; i++ {
+			if !self.params[i].kind.equals(f.params[i].kind) {
+				ret false
+			}
+		}
+
+		if !self.decl.is_void() {
+			if !self.result.equals(f.result) {
+				ret false
+			}
+		}
+
+		ret true
 	}
 }
 

@@ -5,7 +5,17 @@
 use std::conv::{itoa, fmt_uint}
 use std::jule::build::{ENTRY_POINT, Directive}
 use std::jule::lex::{TokenKind, is_anon_ident, is_ignore_ident}
-use std::jule::sema::{Fn, FnIns, Trait, Struct, StructIns, Field, Var, Param}
+use std::jule::sema::{
+	Fn,
+	FnIns,
+	Trait,
+	Struct,
+	StructIns,
+	Field,
+	Var,
+	Param,
+	TypeKind,
+}
 
 // Identifier of initialize function caller function.
 const INIT_CALLER_IDENT = "__jule_call_initializers"
@@ -15,7 +25,7 @@ const INIT_CALLER_IDENT = "__jule_call_initializers"
 fn as_ident(ident: str): str { ret "_" + ident }
 
 // Returns given identifier as Jule type identifier.
-fn as_jt(id: str): str {
+fn as_jt(mut id: str): str {
 	let mut ident = ([]rune)(id)
 	if 97 <= ident[0] && ident[0] <= 122 {
 		ident[0] -= 32
@@ -85,9 +95,9 @@ fn fn_ins_out_ident(f: &FnIns): str {
 		ret fn_out_ident(f.decl)
 	}
 
-	let kind = f.to_str()
 	for i, ins in f.decl.instances {
-		if kind == ins.to_str() {
+		let kind = &TypeKind{kind: ins}
+		if f.equals(kind) {
 			ret fn_out_ident(f.decl) + "_" + itoa(i)
 		}
 	}
@@ -128,9 +138,9 @@ fn struct_ins_out_ident(s: &StructIns): str {
 		ret struct_out_ident(s.decl)
 	}
 
-	let kind = s.to_str()
 	for i, ins in s.decl.instances {
-		if kind == ins.to_str() {
+		let kind = &TypeKind{kind: ins}
+		if s.equals(kind) {
 			ret struct_out_ident(s.decl) + "_" + itoa(i)
 		}
 	}

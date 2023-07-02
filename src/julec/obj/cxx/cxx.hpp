@@ -41,11 +41,11 @@ JuleCompileTime time_now(void) noexcept {
 
 	struct tm *time{ localtime(&now) };
 	return JuleCompileTime{
-		day: time->tm_mday,
-		month: time->tm_mon + 1,
-		year: time->tm_year + 1900,
-		hour: time->tm_hour,
-		minute: time->tm_min,
+		time->tm_mday,
+		time->tm_mon + 1,
+		time->tm_year + 1900,
+		time->tm_hour,
+		time->tm_min,
 	};
 }
 

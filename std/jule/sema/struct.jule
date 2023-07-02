@@ -77,7 +77,23 @@ impl Struct {
 		}
 
 		for (i, mut f) in self.methods {
-			let mut fins = new(Fn, f)
+			let mut fins = &Fn{
+				sema: f.sema,
+				token: f.token,
+				global: f.global,
+				unsafety: f.unsafety,
+				public: f.public,
+				cpp_linked: f.cpp_linked,
+				ident: f.ident,
+				directives: f.directives,
+				doc: f.doc,
+				scope: f.scope,
+				generics: f.generics,
+				result: f.result,
+				params: f.params,
+				owner: f.owner,
+				instances: nil,
+			}
 			ins.methods[i] = fins
 		}
 
@@ -92,7 +108,7 @@ impl Struct {
 
 		for _, ains in self.instances {
 			for i, ag in ains.generics {
-				if ag.to_str() == ins.generics[i].to_str() {
+				if ag.equals(ins.generics[i]) {
 					// Instance exist.
 					ret
 				}
@@ -189,6 +205,31 @@ impl Kind for StructIns {
 			kind += "]"
 		}
 		ret kind
+	}
+
+	// Reports whether types are same.
+	fn equals(self, other: &TypeKind): bool {
+		let s = unsafe { (&other).strct() }
+		if !real(s) {
+			ret false
+		}
+
+		if &self.decl != &s.decl {
+			ret false
+		}
+
+		if self.generics.len != s.generics.len {
+			ret false
+		}
+
+		let mut i = 0
+		for i < self.generics.len; i++ {
+			if !self.generics[i].equals(s.generics[i]) {
+				ret false
+			}
+		}
+
+		ret true
 	}
 }
 
