@@ -86,13 +86,16 @@ namespace jule {
         Any(const jule::Any &src) noexcept
         { this->operator=(src); }
 
+        Any(const std::nullptr_t) noexcept
+        { this->operator=(nullptr); }
+
         ~Any(void) noexcept
         { this->dealloc(); }
 
         void dealloc(void) noexcept {
             if (!this->data.ref) {
                 this->type = nullptr;
-                this->data.alloc = nullptr;
+                this->data.drop();
                 return;
             }
 
@@ -102,8 +105,11 @@ namespace jule {
             //   if this is method called from destructor, reference count setted to
             //   negative integer but reference count is unsigned, for this reason
             //   allocation is not deallocated.
-            if ( ( this->data.get_ref_n() ) != jule::REFERENCE_DELTA )
+            if ( ( this->data.get_ref_n() ) != jule::REFERENCE_DELTA ) {
+                this->type = nullptr;
+                this->data.drop();
                 return;
+            }
 
             this->type->dealloc(*this->data.alloc);
             *this->data.alloc = nullptr;
@@ -113,6 +119,7 @@ namespace jule {
             this->data.ref = nullptr;
             std::free(this->data.alloc);
             this->data.alloc = nullptr;
+            this->data.drop();
         }
 
         template<typename T>
@@ -179,18 +186,18 @@ namespace jule {
         }
 
         template<typename T>
-        inline jule::Bool operator==(const T &_Expr) const noexcept
-        { return ( this->type_is<T>() && this->operator T() == _Expr ); }
+        inline jule::Bool operator==(const T &expr) const noexcept
+        { return this->type_is<T>() && this->operator T() == expr; }
 
         template<typename T>
         inline constexpr
-        jule::Bool operator!=(const T &_Expr) const noexcept
-        { return ( !this->operator==( _Expr ) ); }
+        jule::Bool operator!=(const T &expr) const noexcept
+        { return !this->operator==(expr); }
 
         inline jule::Bool operator==(const jule::Any &other) const noexcept {
             // Break comparison cycle.
-            if (this->data.alloc == other.data.alloc)
-                return true;
+            if (this->data.alloc != nullptr && this->data.alloc == other.data.alloc)
+                return;
 
             if (this->operator==(nullptr) && other.operator==(nullptr))
                 return true;
