@@ -321,12 +321,14 @@ fn do_spell(obj: str, compiler: str, compiler_cmd: str) {
 	}
 }
 
-fn get_all_unique_passes(pkg: &Package, uses: []&ImportInfo): []str {
+fn get_all_unique_passes(mut pkg: &Package, mut uses: []&ImportInfo): []str {
 	let mut passes: []str = nil
-	let push_passes = fn(p: &Package) {
-		for _, f in p.files {
+	let push_passes = fn(mut p: &Package) {
+		for (_, mut f) in p.files {
+			let mut i = 0
 		push:
-			for _, pass in f.passes {
+			for i < f.passes.len(); i++ {
+				let mut pass = f.passes.at(i)
 				if pass.text == "" {
 					continue
 				}
@@ -343,7 +345,7 @@ fn get_all_unique_passes(pkg: &Package, uses: []&ImportInfo): []str {
 	}
 
 	push_passes(pkg)
-	for _, u in uses {
+	for (_, mut u) in uses {
 		if !u.cpp_linked {
 			push_passes(u.package)
 		}

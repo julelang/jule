@@ -34,6 +34,7 @@ use std::jule::build::{
 	is_valid_cpp_ext,
 }
 use std::jule::lex::{Token, TokenKind}
+use std::vector::{new_vector}
 
 // Directive pass.
 pub struct Pass {
@@ -546,7 +547,7 @@ impl SymbolBuilder {
 		}
 
 		ok = self.import_package(imp, decl)
-		self.table.imports = append(self.table.imports, imp)
+		self.table.imports.push(imp)
 		if ok {
 			self.importer.imported(imp)
 			ret imp
@@ -571,27 +572,27 @@ impl SymbolBuilder {
 		match type decl.data {
 		| &TypeAliasDecl:
 			let mut ta = build_type_alias((&TypeAliasDecl)(decl.data))
-			self.table.type_aliases = append(self.table.type_aliases, ta)
+			self.table.type_aliases.push(ta)
 
 		| &StructDecl:
 			let mut srct = build_struct((&StructDecl)(decl.data))
-			self.table.structs = append(self.table.structs, srct)
+			self.table.structs.push(srct)
 
 		| &FnDecl:
 			let mut f = build_fn((&FnDecl)(decl.data))
-			self.table.funcs = append(self.table.funcs, f)
+			self.table.funcs.push(f)
 
 		| &TraitDecl:
 			let mut t = build_trait((&TraitDecl)(decl.data))
-			self.table.traits = append(self.table.traits, t)
+			self.table.traits.push(t)
 
 		| &VarDecl:
 			let mut v = build_var((&VarDecl)(decl.data))
-			self.table.vars = append(self.table.vars, v)
+			self.table.vars.push(v)
 
 		| &EnumDecl:
 			let mut e = build_enum((&EnumDecl)(decl.data))
-			self.table.enums = append(self.table.enums, e)
+			self.table.enums.push(e)
 
 		|:
 			self.push_err(decl.token, "invalid_syntax")
@@ -607,11 +608,11 @@ impl SymbolBuilder {
 	}
 
 	fn append_impls(mut self) {
-		self.table.impls = make([]&Impl, self.ast.impls.len())
+		self.table.impls = new_vector[&Impl](self.ast.impls.len())
 		let mut i = 0
 		for i < self.ast.impls.len(); i++ {
 			let mut decl = self.ast.impls.at(i)
-			self.table.impls[i] = build_impl(decl)
+			self.table.impls.push(build_impl(decl))
 		}
 	}
 
@@ -625,7 +626,7 @@ impl SymbolBuilder {
 			}
 		}
 		pass.text = pass.text.trim(" \n\r\t\v")
-		self.table.passes = append(self.table.passes, pass)
+		self.table.passes.push(pass)
 	}
 
 	fn append_top_directives(mut self) {

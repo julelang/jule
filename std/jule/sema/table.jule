@@ -3,27 +3,30 @@
 // license that can be found in the LICENSE file.
 
 use std::jule::lex::{File}
+use std::vector::{Vector}
 
 // Symbol table.
 // Builds by semantic analyzer.
 pub struct SymbolTable {
-	pub file:         &File         // Owner fileset of this symbol table.
-	pub passes:       []Pass        // All passed flags with jule:pass directive.
-	pub imports:      []&ImportInfo // Imported packages.
-	pub vars:         []&Var        // Variables.
-	pub type_aliases: []&TypeAlias  // Type aliases.
-	pub structs:      []&Struct     // Structures.
-	pub funcs:        []&Fn         // Functions.
-	pub traits:       []&Trait      // Traits.
-	pub enums:        []&Enum       // Enums.
-	pub impls:        []&Impl       // Implementations.
+	pub file:         &File               // Owner fileset of this symbol table.
+	pub passes:       Vector[Pass]        // All passed flags with jule:pass directive.
+	pub imports:      Vector[&ImportInfo] // Imported packages.
+	pub vars:         Vector[&Var]        // Variables.
+	pub type_aliases: Vector[&TypeAlias]  // Type aliases.
+	pub structs:      Vector[&Struct]     // Structures.
+	pub funcs:        Vector[&Fn]         // Functions.
+	pub traits:       Vector[&Trait]      // Traits.
+	pub enums:        Vector[&Enum]       // Enums.
+	pub impls:        Vector[&Impl]       // Implementations.
 }
 
 impl Lookup for SymbolTable {
 	// Returns imported package by identifier.
 	// Returns nil reference if not exist any package in this identifier.
 	fn find_package(mut self, ident: str): &ImportInfo {
-		for (_, mut pkg) in self.imports {
+		let mut i = 0
+		for i < self.imports.len(); i++ {
+			let mut pkg = self.imports.at(i)
 			if pkg.ident == ident {
 				ret pkg
 			}
@@ -38,7 +41,10 @@ impl Lookup for SymbolTable {
 		if selector == nil {
 			ret new(ImportInfo)
 		}
-		for (_, mut pkg) in self.imports {
+
+		let mut i = 0
+		for i < self.imports.len(); i++ {
+			let mut pkg = self.imports.at(i)
 			if selector(pkg) {
 				ret pkg
 			}
@@ -61,7 +67,9 @@ impl Lookup for SymbolTable {
 	// Returns struct by identifier and cpp linked state.
 	// Returns nil reference if not exist any struct in this identifier.
 	fn find_struct(mut self, ident: str, cpp_linked: bool): &Struct {
-		for (_, mut s) in self.structs {
+		let mut i = 0
+		for i < self.structs.len(); i++ {
+			let mut s = self.structs.at(i)
 			if s.ident == ident && s.cpp_linked == cpp_linked {
 				ret s
 			}
@@ -72,7 +80,9 @@ impl Lookup for SymbolTable {
 	// Returns function by identifier and cpp linked state.
 	// Returns nil reference if not exist any function in this identifier.
 	fn find_fn(mut self, ident: str, cpp_linked: bool): &Fn {
-		for (_, mut f) in self.funcs {
+		let mut i = 0
+		for i < self.funcs.len(); i++ {
+			let mut f = self.funcs.at(i)
 			if f.ident == ident && f.cpp_linked == cpp_linked {
 				ret f
 			}
@@ -83,7 +93,9 @@ impl Lookup for SymbolTable {
 	// Returns trait by identifier.
 	// Returns nil reference if not exist any trait in this identifier.
 	fn find_trait(mut self, ident: str): &Trait {
-		for (_, mut t) in self.traits {
+		let mut i = 0
+		for i < self.traits.len(); i++ {
+			let mut t = self.traits.at(i)
 			if t.ident == ident {
 				ret t
 			}
@@ -94,7 +106,9 @@ impl Lookup for SymbolTable {
 	// Returns enum by identifier.
 	// Returns nil reference if not exist any enum in this identifier.
 	fn find_enum(mut self, ident: str): &Enum {
-		for (_, mut e) in self.enums {
+		let mut i = 0
+		for i < self.enums.len(); i++ {
+			let mut e = self.enums.at(i)
 			if e.ident == ident {
 				ret e
 			}
@@ -106,15 +120,17 @@ impl Lookup for SymbolTable {
 impl SymbolTable {
 	fn __find_var(mut self, ident: str, cpp_linked: bool, reverse: bool): &Var {
 		if reverse {
-			let mut i = self.vars.len - 1
+			let mut i = self.vars.len() - 1
 			for i >= 0; i-- {
-				let mut v = self.vars[i]
+				let mut v = self.vars.at(i)
 				if v.ident == ident && v.cpp_linked == cpp_linked {
 					ret v
 				}
 			}
 		} else {
-			for (_, mut v) in self.vars {
+			let mut i = 0
+			for i < self.vars.len(); i++ {
+				let mut v = self.vars.at(i)
 				if v.ident == ident && v.cpp_linked == cpp_linked {
 					ret v
 				}
@@ -125,15 +141,17 @@ impl SymbolTable {
 
 	fn __find_type_alias(mut self, ident: str, cpp_linked: bool, reverse: bool): &TypeAlias {
 		if reverse {
-			let mut i = self.type_aliases.len - 1
+			let mut i = self.type_aliases.len() - 1
 			for i >= 0; i-- {
-				let mut ta = self.type_aliases[i]
+				let mut ta = self.type_aliases.at(i)
 				if ta.ident == ident && ta.cpp_linked == cpp_linked {
 					ret ta
 				}
 			}
 		} else {
-			for (_, mut ta) in self.type_aliases {
+			let mut i = 0
+			for i < self.type_aliases.len(); i++ {
+				let mut ta = self.type_aliases.at(i)
 				if ta.ident == ident && ta.cpp_linked == cpp_linked {
 					ret ta
 				}
@@ -145,25 +163,33 @@ impl SymbolTable {
 	// Returns define by identifier.
 	// Returns nil reference if not exist any define in this identifier.
 	fn def_by_ident(mut self, ident: str, cpp_linked: bool): any {
-		for (_, mut v) in self.vars {
+		let mut i = 0
+		for i < self.vars.len(); i++ {
+			let mut v = self.vars.at(i)
 			if v.ident == ident && v.cpp_linked == cpp_linked {
 				ret v
 			}
 		}
 
-		for (_, mut ta) in self.type_aliases {
+		i = 0
+		for i < self.type_aliases.len(); i++ {
+			let mut ta = self.type_aliases.at(i)
 			if ta.ident == ident && ta.cpp_linked == cpp_linked {
 				ret ta
 			}
 		}
 
-		for (_, mut s) in self.structs {
+		i = 0
+		for i < self.structs.len(); i++ {
+			let mut s = self.structs.at(i)
 			if s.ident == ident && s.cpp_linked == cpp_linked {
 				ret s
 			}
 		}
 
-		for (_, mut f) in self.funcs {
+		i = 0
+		for i < self.funcs.len(); i++ {
+			let mut f = self.funcs.at(i)
 			if f.ident == ident && f.cpp_linked == cpp_linked {
 				ret f
 			}
@@ -173,13 +199,17 @@ impl SymbolTable {
 			ret nil
 		}
 
-		for (_, mut t) in self.traits {
+		i = 0
+		for i < self.traits.len(); i++ {
+			let mut t = self.traits.at(i)
 			if t.ident == ident {
 				ret t
 			}
 		}
 
-		for (_, mut e) in self.enums {
+		i = 0
+		for i < self.enums.len(); i++ {
+			let mut e = self.enums.at(i)
 			if e.ident == ident {
 				ret e
 			}
@@ -192,25 +222,33 @@ impl SymbolTable {
 	// The "self" parameter represents address of exception identifier.
 	// If founded identifier address equals to self, will be skipped.
 	fn is_duplicated_ident(self, itself: uintptr, ident: str, cpp_linked: bool): bool {
-		for _, v in self.vars {
+		let mut i = 0
+		for i < self.vars.len(); i++ {
+			let v = unsafe { (&self.vars).at(i) }
 			if uintptr(&v) != itself && v.ident == ident && v.cpp_linked == cpp_linked {
 				ret true
 			}
 		}
 
-		for _, ta in self.type_aliases {
+		i = 0
+		for i < self.type_aliases.len(); i++ {
+			let ta = unsafe { (&self.type_aliases).at(i) }
 			if uintptr(&ta) != itself && ta.ident == ident && ta.cpp_linked == cpp_linked {
 				ret true
 			}
 		}
 
-		for _, s in self.structs {
+		i = 0
+		for i < self.structs.len(); i++ {
+			let s = unsafe { (&self.structs).at(i) }
 			if uintptr(&s) != itself && s.ident == ident && s.cpp_linked == cpp_linked {
 				ret true
 			}
 		}
 
-		for _, f in self.funcs {
+		i = 0
+		for i < self.funcs.len(); i++ {
+			let f = unsafe { (&self.funcs).at(i) }
 			if uintptr(&f) != itself && f.ident == ident && f.cpp_linked == cpp_linked {
 				ret true
 			}
@@ -220,13 +258,17 @@ impl SymbolTable {
 			ret false
 		}
 
-		for _, t in self.traits {
+		i = 0
+		for i < self.traits.len(); i++ {
+			let t = unsafe { (&self.traits).at(i) }
 			if uintptr(&t) != itself && t.ident == ident {
 				ret true
 			}
 		}
 
-		for _, e in self.enums {
+		i = 0
+		for i < self.enums.len(); i++ {
+			let e = unsafe { (&self.enums).at(i) }
 			if uintptr(&e) != itself && e.ident == ident {
 				ret true
 			}

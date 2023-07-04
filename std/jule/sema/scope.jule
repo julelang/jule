@@ -554,7 +554,7 @@ impl ScopeChecker {
 		let mut v = build_var(decl)
 
 		defer {
-			self.table.vars = append(self.table.vars, v)
+			self.table.vars.push(v)
 			self.scope.stmts.push(v)
 		}
 
@@ -577,7 +577,7 @@ impl ScopeChecker {
 		}
 		self.s.check_type_alias_decl(ta, self)
 
-		self.table.type_aliases = append(self.table.type_aliases, ta)
+		self.table.type_aliases.push(ta)
 		self.scope.stmts.push(ta)
 	}
 
@@ -792,11 +792,11 @@ impl ScopeChecker {
 		let mut ssc = self.new_child_checker()
 
 		if real(kind.key_a) {
-			ssc.table.vars = append(ssc.table.vars, kind.key_a)
+			ssc.table.vars.push(kind.key_a)
 		}
 
 		if real(kind.key_b) {
-			ssc.table.vars = append(ssc.table.vars, kind.key_b)
+			ssc.table.vars.push(kind.key_b)
 		}
 
 		kind.scope = self.check_iter_scope_sc(uintptr(&kind), it.scope, ssc)
@@ -1112,7 +1112,7 @@ impl ScopeChecker {
 				self.s.check_var(v)
 
 				st.l = append(st.l, v)
-				self.table.vars = append(self.table.vars, v)
+				self.table.vars.push(v)
 				self.scope.stmts.push(v)
 
 				continue
@@ -1589,7 +1589,9 @@ impl ScopeChecker {
 	}
 
 	fn check_vars(mut self) {
-		for _, v in self.table.vars {
+		let mut i = 0
+		for i < self.table.vars.len(); i++ {
+			let v = self.table.vars.at(i)
 			if !v.used && !is_ignore_ident(v.ident) && !is_anon_ident(v.ident) && v.ident != (str)(TokenKind.Self) {
 				self.s.push_err(v.token, "declared_but_not_used", v.ident)
 			}
@@ -1597,7 +1599,9 @@ impl ScopeChecker {
 	}
 
 	fn check_aliases(mut self) {
-		for _, a in self.table.type_aliases {
+		let mut i = 0
+		for i < self.table.type_aliases.len(); i++ {
+			let a = self.table.type_aliases.at(i)
 			if !a.used && !is_ignore_ident(a.ident) && !is_anon_ident(a.ident) {
 				self.s.push_err(a.token, "declared_but_not_used", a.ident)
 			}
