@@ -1758,6 +1758,17 @@ impl Eval {
 			ret self.call_builtin_fn(fc, d)
 		}
 
+		if !d.mutable && f.decl.is_method() && f.decl.params[0].mutable {
+			self.push_err(fc.token, "mutable_operation_on_immutable")
+		} else if !self.is_unsafe() && f.decl.unsafety {
+			self.push_err(fc.token, "unsafe_behavior_at_out_of_unsafe_scope")
+		}
+
+		let (mut ok, dynamic_annotation) = self.check_fn_call_generics(f, fc)
+		if !ok {
+			ret new(Data)
+		}
+
 		let mut old = self.s
 		if real(f.decl.owner) {
 			self.s = f.decl.owner.sema
@@ -1768,17 +1779,6 @@ impl Eval {
 				old.errors = append(old.errors, self.s.errors...)
 			}
 			self.s = old
-		}
-
-		if !d.mutable && f.decl.is_method() && f.decl.params[0].mutable {
-			self.push_err(fc.token, "mutable_operation_on_immutable")
-		} else if !self.is_unsafe() && f.decl.unsafety {
-			self.push_err(fc.token, "unsafe_behavior_at_out_of_unsafe_scope")
-		}
-
-		let (mut ok, dynamic_annotation) = self.check_fn_call_generics(f, fc)
-		if !ok {
-			ret new(Data)
 		}
 
 		if !dynamic_annotation {
@@ -1938,7 +1938,16 @@ impl Eval {
 					let scope = (&ScopeChecker)(self.lookup)
 					d.mutable = real(scope.owner) && &scope.owner.owner == &s
 					if d.mutable {
-						let mut v = new(Var, (&Var)(model.expr))
+						let mut field = (&Var)(model.expr)
+						let mut v = &Var{
+							scope:      field.scope,
+							token:      field.token,
+							ident:      field.ident,
+							cpp_linked: field.cpp_linked,
+							constant:   field.constant,
+							kind:       field.kind,
+							value:      field.value,
+						}
 						v.mutable = true
 						model.expr = v
 					}
