@@ -8,7 +8,7 @@ This repository is the main source tree of Jule. \
 It contains the reference compiler, API and standard library.
 
 [Website](https://jule.dev) |
-[Manual](https://jule.dev/pages/manual.html) |
+[Manual](https://manual.jule.dev) |
 [Contributing](https://jule.dev/pages/contributing.html) |
 [Community](https://github.com/julelang/jule/wiki#the-jule-community)
 
@@ -102,13 +102,13 @@ Memory safety and memory management is a major challenge in C , C++ and similar 
 Jule has a reference-based memory management design to solve these issues.
 Jule guarantees memory safety and uses reference counting for memory management.
 An account-allocation is automatically released as soon as the reference count reaches zero.
-Please read the <a href="https://jule.dev/pages/manual.html?page=memory-memory-management">memory management</a> part of manual for more information about reference-counting approach of Jule.
+Please read the <a href="https://manual.jule.dev/memory/memory-management">memory management</a> part of manual for more information about reference-counting approach of Jule.
 <br><br>
 Variables are immutable by default, and each variable is encouraged to be initialized at declaration.
 Safe Jule performs bounds checking and nil (aka null) checking.
 It is committed to have no undefined behavior.
 Unsafe behaviors are encouraged to be done deliberately with unsafe scopes.
-Please read the <a href="https://jule.dev/pages/manual.html?page=unsafe-jule">Unsafe Jule</a> part of manual for more information about of Unsafe Jule.
+Please read the <a href="https://manual.jule.dev/unsafe-jule">Unsafe Jule</a> part of manual for more information about of Unsafe Jule.
 <br><br>
 
 > **Note** \
@@ -181,7 +181,7 @@ or etc.) are almost complete and are not expected to undergo major changes.
 <h2 id="documentations">Documentations</h2>
 
 All documentations about Jule and JuleC is on the website as manual. <br>
-See [Jule Manual](https://julelang.github.io/website/pages/manual.html)
+See [Jule Manual](hthttps://manual.jule.dev)
 <br><br>
 To contribute to the website, manual or something else, please use the <a href="https://github.com/julelang/website">website repository</a>.
 
@@ -197,18 +197,18 @@ If you are trying to use a standard or a compiler that is not officially support
 But keep in mind that since it's out of the official support, it's likely that the maintainers won't make the effort to fix it.
 <br><br>
 
-See [compiling](https://jule.dev/pages/manual.html?page=compiler-compiling) part of manual for supported compilers and C++ standards.
+See [compiling](https://manual.jule.dev/compiler/compiling) part of manual for supported compilers and C++ standards.
 
 <h2 id="os-support">Platform Support</h2>
 Jule supports multiple platforms.
 It supports development on i386, amd64 and arm64 architectures on Windows, Linux and macOS (Darwin) platforms. 
 JuleC undertakes the effort, that the code and standard library it produces will be compatible with all these platforms.
-All supported platforms by JuleC are documented in the <a href="https://jule.dev/pages/manual.html?page=compiler-platform-support">platform support</a> part of manual. 
+All supported platforms by JuleC are documented in the <a href="https://manual.jule.dev/compiler/platform-support">platform support</a> part of manual. 
 
 <h2 id="building-project">Building Project</h2>
 
 > **Note** \
-> Please read the [install from source](https://julelang.github.io/website/pages/manual.html?page=getting-started-install-from-source) part of manual for compiling from source code.
+> Please read the [install from source](https://manual.jule.dev/getting-started/install-from-source) part of manual for compiling from source code.
  
 When you enter the directory where the source code is located, you can find some compilation scripts for compiling of JuleC. \
 These scripts are written to run from the [src](./src/julec) directory:

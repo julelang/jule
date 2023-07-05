@@ -2,4 +2,4 @@
 
 Jule documentations is shared via official website as manual.
 
-[Go to Jule Manual](https://julelang.github.io/website/pages/manual.html)
+[Go to Jule Manual](https://manual.jule.dev)
