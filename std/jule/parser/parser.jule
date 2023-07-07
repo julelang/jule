@@ -1634,12 +1634,101 @@ impl Parser {
 		}
 	}
 
+	fn check_ranges(mut self, tokens: []Token) {
+		let mut ranges: []int = nil
+
+		let get_close_kind_of_brace = fn(left: str): str {
+			match left {
+			| (str)(TokenKind.RParent):  ret (str)(TokenKind.LParent)
+			| (str)(TokenKind.RBrace):   ret (str)(TokenKind.LBrace)
+			| (str)(TokenKind.RBracket): ret (str)(TokenKind.LBracket)
+			|:                           ret ""
+			}
+		}
+
+		let remove_range = fn(mut i: int, kind: str) {
+			let close = get_close_kind_of_brace(kind)
+			for i >= 0; i-- {
+				let tok = tokens[ranges[i]]
+				if tok.kind != close {
+					continue
+				}
+
+				ranges = append(ranges[:i], ranges[i+1:]...)
+				break
+			}
+		}
+
+		let push_wrong_order_close_err = fn(t: Token) {
+			let mut msg = ""
+			match tokens[ranges[ranges.len-1]].kind {
+			| (str)(TokenKind.LParent):  msg = "expected_parentheses_close"
+			| (str)(TokenKind.LBrace):   msg = "expected_brace_close"
+			| (str)(TokenKind.LBracket): msg = "expected_bracket_close"
+			}
+
+			self.push_err(t, msg)
+		}
+
+		let push_range_close = fn(t: Token, left: str) {
+			let n = ranges.len
+			if n == 0 {
+				match t.kind {
+				| (str)(TokenKind.RBracket): self.push_err(t, "extra_closed_brackets")
+				| (str)(TokenKind.RBrace):   self.push_err(t, "extra_closed_braces")
+				| (str)(TokenKind.RParent):  self.push_err(t, "extra_closed_parentheses")
+				}
+				ret
+			} else if tokens[ranges[n-1]].kind != left {
+				push_wrong_order_close_err(t)
+			}
+			remove_range(n-1, t.kind)
+		}
+
+		for i, token in tokens {
+			if token.id != TokenId.Range {
+				continue
+			}
+
+			match token.kind {
+			| (str)(TokenKind.LParent)
+			| (str)(TokenKind.LBrace)
+			| (str)(TokenKind.LBracket):
+				ranges = append(ranges, i)
+
+			| (str)(TokenKind.RParent):
+				push_range_close(token, (str)(TokenKind.LParent))
+
+			| (str)(TokenKind.RBrace):
+				push_range_close(token, (str)(TokenKind.LBrace))
+
+			| (str)(TokenKind.RBracket):
+				push_range_close(token, (str)(TokenKind.LBracket))
+			}
+		}
+
+		for _, i in ranges {
+			let token = tokens[i]
+			match token.kind {
+			| (str)(TokenKind.LParent):  self.push_err(token, "wait_close_parentheses")
+			| (str)(TokenKind.LBrace):   self.push_err(token, "wait_close_brace")
+			| (str)(TokenKind.LBracket): self.push_err(token, "wait_close_bracket")
+			}
+		}
+	}
+
 	fn parse(mut &self, mut f: &File) {
 		self.ast = &Ast{
 			file: f,
 		}
 
 		let mut tokens = unsafe { cpp.__jule_parser_vector_as_slice[Vector[Token], Token](f.tokens()) }
+		
+		self.check_ranges(tokens)
+		if self.errors.len > 0 {
+			ret
+		}
+
 		let mut stms = split_stms(tokens)
 
 		// Get top directives.

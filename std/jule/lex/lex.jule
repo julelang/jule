@@ -383,19 +383,9 @@ fn byte_escape(txt: []byte): (seq: str) {
 	ret (str)(txt[:4])
 }
 
-fn get_close_kind_of_brace(left: str): str {
-	match left {
-	| (str)(TokenKind.RParent):  ret (str)(TokenKind.LParent)
-	| (str)(TokenKind.RBrace):   ret (str)(TokenKind.LBrace)
-	| (str)(TokenKind.RBracket): ret (str)(TokenKind.LBracket)
-	|:                           ret ""
-	}
-}
-
 struct Lex {
 	first_token_of_line: bool
 	tokens:              Vector[Token]
-	ranges:              []int
 	data:                []byte
 	file:                &File
 	pos:                 int
@@ -426,24 +416,7 @@ impl Lex {
 				self.tokens.push(token)
 			}
 		}
-		self.check_ranges()
 		self.data = nil
-	}
-
-	fn check_ranges(mut self) {
-		for _, i in self.ranges {
-			let token = self.tokens.at(i)
-			match token.kind {
-			| (str)(TokenKind.LParent):
-				self.push_err_tok(token, "wait_close_parentheses")
-
-			| (str)(TokenKind.LBrace):
-				self.push_err_tok(token, "wait_close_brace")
-
-			| (str)(TokenKind.LBracket):
-				self.push_err_tok(token, "wait_close_bracket")
-			}
-		}
 	}
 
 	// Returns identifer if next token is identifer,
@@ -747,24 +720,12 @@ impl Lex {
 			self.lex_range_comment()
 			ret t
 
-		| unsafe { self.is_op(txt, (str)(TokenKind.LParent), TokenId.Range, &t) }:
-			self.ranges = append(self.ranges, self.tokens.len())
-
-		| unsafe { self.is_op(txt, (str)(TokenKind.RParent), TokenId.Range, &t) }:
-			self.push_range_close(t, (str)(TokenKind.LParent))
-
-		| unsafe { self.is_op(txt, (str)(TokenKind.LBrace), TokenId.Range, &t) }:
-			self.ranges = append(self.ranges, self.tokens.len())
-
-		| unsafe { self.is_op(txt, (str)(TokenKind.RBrace), TokenId.Range, &t) }:
-			self.push_range_close(t, (str)(TokenKind.LBrace))
-
-		| unsafe { self.is_op(txt, (str)(TokenKind.LBracket), TokenId.Range, &t) }:
-			self.ranges = append(self.ranges, self.tokens.len())
-
-		| unsafe { self.is_op(txt, (str)(TokenKind.RBracket), TokenId.Range, &t) }:
-			self.push_range_close(t, (str)(TokenKind.LBracket))
-
+		| unsafe { self.is_op(txt, (str)(TokenKind.LParent), TokenId.Range, &t) }
+		| unsafe { self.is_op(txt, (str)(TokenKind.RParent), TokenId.Range, &t) }
+		| unsafe { self.is_op(txt, (str)(TokenKind.LBrace), TokenId.Range, &t) }
+		| unsafe { self.is_op(txt, (str)(TokenKind.RBrace), TokenId.Range, &t) }
+		| unsafe { self.is_op(txt, (str)(TokenKind.LBracket), TokenId.Range, &t) }
+		| unsafe { self.is_op(txt, (str)(TokenKind.RBracket), TokenId.Range, &t) }
 		| unsafe { self.lex_basic_ops(txt, &t) }:
 			// Pass.
 
@@ -784,50 +745,6 @@ impl Lex {
 
 		self.column += t.kind.len
 		ret t
-	}
-
-	fn remove_range(mut self, mut i: int, kind: str) {
-		let close = get_close_kind_of_brace(kind)
-		for i >= 0; i-- {
-			let tok = self.tokens.at(self.ranges[i])
-			if tok.kind != close {
-				continue
-			}
-
-			self.ranges = append(self.ranges[:i], self.ranges[i+1:]...)
-			break
-		}
-	}
-
-	fn push_range_close(mut self, t: Token, left: str) {
-		let n = self.ranges.len
-		if n == 0 {
-			match t.kind {
-			| (str)(TokenKind.RBracket):
-				self.push_err_tok(t, "extra_closed_brackets")
-
-			| (str)(TokenKind.RBrace):
-				self.push_err_tok(t, "extra_closed_braces")
-
-			| (str)(TokenKind.RParent):
-				self.push_err_tok(t, "extra_closed_parentheses")
-			}
-			ret
-		} else if self.tokens.at(self.ranges[n-1]).kind != left {
-			self.push_wrong_order_close_err(t)
-		}
-		self.remove_range(n-1, t.kind)
-	}
-
-	fn push_wrong_order_close_err(mut self, t: Token) {
-		let mut msg = ""
-		match self.tokens.at(self.ranges[self.ranges.len-1]).kind {
-		| (str)(TokenKind.LParent):  msg = "expected_parentheses_close"
-		| (str)(TokenKind.LBrace):   msg = "expected_brace_close"
-		| (str)(TokenKind.LBracket): msg = "expected_bracket_close"
-		}
-
-		self.push_err_tok(t, msg)
 	}
 }
 
