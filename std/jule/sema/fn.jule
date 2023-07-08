@@ -292,9 +292,33 @@ impl Kind for FnIns {
 			}
 		}
 
+		let check_params = fn(p1: &ParamIns, p2: &ParamIns): bool {
+			if p1.decl.mutable != p2.decl.mutable {
+				ret false
+			}
+
+			if p1.decl.is_self() {
+				if !p2.decl.is_self() {
+					ret false
+				}
+
+				if p1.decl.is_ref() != p2.decl.is_ref() {
+					ret false
+				}
+
+				ret true
+			}
+
+			if p1.decl.variadic != p2.decl.variadic {
+				ret false
+			}
+
+			ret p1.kind.equals(p2.kind)
+		}
+
 		i = 0
 		for i < self.params.len; i++ {
-			if !self.params[i].kind.equals(f.params[i].kind) {
+			if !check_params(self.params[i], f.params[i]) {
 				ret false
 			}
 		}

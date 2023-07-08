@@ -831,18 +831,16 @@ impl Sema {
 	// Useful:
 	//   - For non-generic type parsed string type kinds.
 	//   - For checking non-generic types.
-	fn build_non_generic_type_kind(mut &self, mut ast: &TypeDecl,
-		generics: []&GenericDecl, ignore_with_trait_pattern: bool): &TypeKind {
+	fn build_non_generic_type_kind(mut &self, mut ast: &TypeDecl, generics: []&GenericDecl): &TypeKind {
 		let mut tc = &TypeChecker{
-			s:                         self,
-			lookup:                    self,
-			ignore_generics:           generics,
-			ignore_with_trait_pattern: ignore_with_trait_pattern,
+			s:               self,
+			lookup:          self,
+			ignore_generics: generics,
 		}
 		ret tc.check_decl(ast)
 	}
 
-	fn build_fn_non_generic_type_kinds(mut &self, mut f: &FnIns, with_trait_pattern: bool) {
+	fn build_fn_non_generic_type_kinds(mut &self, mut f: &FnIns) {
 		let mut generics: []&GenericDecl = nil
 		if f.decl.is_method() {
 			generics = append(f.decl.generics, f.decl.owner.generics...)
@@ -852,18 +850,18 @@ impl Sema {
 
 		for (_, mut p) in f.params {
 			if !p.decl.is_self() {
-				p.kind = self.build_non_generic_type_kind(p.decl.kind.decl, generics, with_trait_pattern)
+				p.kind = self.build_non_generic_type_kind(p.decl.kind.decl, generics)
 			}
 		}
 		if !f.decl.is_void() {
-			f.result = self.build_non_generic_type_kind(f.decl.result.kind.decl, generics, with_trait_pattern)
+			f.result = self.build_non_generic_type_kind(f.decl.result.kind.decl, generics)
 		}
 	}
 
-	fn get_trait_check_fn_kind(mut &self, mut f: &Fn): str {
+	fn get_trait_check_fn_kind(mut &self, mut f: &Fn): &FnIns {
 		let mut ins = f.instance_force()
-		self.build_fn_non_generic_type_kinds(ins, true)
-		ret to_trait_kind_str(ins)
+		self.build_fn_non_generic_type_kinds(ins)
+		ret ins
 	}
 
 	fn reload_fn_ins_types(mut &self, mut f: &FnIns): (ok: bool) {
@@ -1244,14 +1242,14 @@ impl Sema {
 
 		for (_, mut p) in f.params {
 			if !p.is_self() {
-				let mut kind = self.build_non_generic_type_kind(p.kind.decl, generics, false)
+				let mut kind = self.build_non_generic_type_kind(p.kind.decl, generics)
 				ok = real(kind) && ok
 				p.kind.kind = kind
 			}
 		}
 
 		if !f.is_void() {
-			let mut kind = self.build_non_generic_type_kind(f.result.kind.decl, generics, false)
+			let mut kind = self.build_non_generic_type_kind(f.result.kind.decl, generics)
 			ok = real(kind) && ok
 			f.result.kind.kind = kind
 		}
@@ -1500,15 +1498,18 @@ impl Sema {
 		for (_, mut tf) in trt.methods {
 			let mut exist = false
 			let mut sf = strct.find_method(tf.ident)
+			let tf_k = self.get_trait_check_fn_kind(tf)
 			if real(sf) {
-				let tf_k = self.get_trait_check_fn_kind(tf)
 				let sf_k = self.get_trait_check_fn_kind(sf)
-				exist = tf_k == sf_k
+				_ = sf_k
+				exist = (
+					tf_k.decl.public == sf_k.decl.public &&
+					tf_k.decl.ident == sf_k.decl.ident &&
+					tf_k.equals(&TypeKind{kind: sf_k})
+				)
 			}
 			if !exist {
-				let mut ins = tf.instance_force()
-				self.build_fn_non_generic_type_kinds(ins, false)
-				self.push_err(strct.token, "not_impl_trait_def", trt.ident, ins.to_str())
+				self.push_err(strct.token, "not_impl_trait_def", trt.ident, tf_k.to_str())
 				ok = false
 			}
 		}
