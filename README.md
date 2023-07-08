@@ -227,7 +227,7 @@ In `src/julec` directory:
 > This example command accepts you already have JuleC in global path.
 
 ```
-julec -o julec .
+julec -o ../../bin/julec .
 ```
 
 
