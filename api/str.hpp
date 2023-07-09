@@ -186,7 +186,6 @@ namespace jule {
             if (n == 0)
                 return parts;
 
-            const ConstIterator begin{ this->begin() };
             std::basic_string<jule::U8> s{ this->buffer };
             constexpr jule::Uint npos{ static_cast<jule::Uint>(std::string::npos) };
             jule::Uint pos{ npos };

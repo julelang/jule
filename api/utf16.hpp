@@ -48,7 +48,7 @@ namespace jule {
 
         return jule::UTF16_REPLACEMENT_CHAR;
     }
-    
+
     jule::Slice<jule::I32> utf16_decode(const jule::Slice<jule::U16> &s) noexcept {
         jule::Slice<jule::I32> a{ jule::Slice<jule::I32>::alloc(s.len()) };
         jule::Int n{ 0 };
@@ -72,7 +72,7 @@ namespace jule {
         }
         return a.slice(0, n);
     }
-    
+
     jule::Str utf16_to_utf8_str(const wchar_t *wstr,
                                 const std::size_t len) noexcept {
         jule::Slice<jule::U16> code_page{ jule::Slice<jule::U16>::alloc(len) };
@@ -80,7 +80,7 @@ namespace jule {
             code_page[i] = static_cast<jule::U16>(wstr[i]);
         return static_cast<jule::Str>(jule::utf16_decode(code_page));
     }
-    
+
     std::tuple<jule::I32, jule::I32> utf16_encode_rune(jule::I32 r) noexcept {
         if (r < jule::UTF16_SURR_SELF || r > jule::UTF16_MAX_RUNE)
             return std::make_tuple<jule::I32, jule::I32>(
@@ -90,7 +90,7 @@ namespace jule {
         return std::make_tuple<jule::I32, jule::I32>(
             jule::UTF16_SURR1 + (r>>10)&0x3ff, jule::UTF16_SURR2 + r&0x3ff);
     }
-    
+
     jule::Slice<jule::U16> utf16_encode(const jule::Slice<jule::I32> &runes) noexcept {
         jule::Int n{ runes.len() };
         for (const jule::I32 v: runes)
@@ -100,10 +100,10 @@ namespace jule {
         jule::Slice<jule::U16> a{ jule::Slice<jule::U16>::alloc(n) };
         n = 0;
         for (const jule::I32 v: runes) {
-            if (0 <= v &&
-                v < jule::UTF16_SURR1 ||
-                jule::UTF16_SURR3 <= v &&
-                v < jule::UTF16_SURR_SELF) {
+            if ((0 <= v &&
+                v < jule::UTF16_SURR1) ||
+                (jule::UTF16_SURR3 <= v &&
+                v < jule::UTF16_SURR_SELF)) {
                 // normal rune
                 a[n] = static_cast<jule::U16>(v);
                 ++n;
@@ -122,7 +122,7 @@ namespace jule {
         }
         return a.slice(0, n);
     }
-    
+
     jule::Slice<jule::U16> utf16_append_rune(jule::Slice<jule::U16> &a, const jule::I32 &r) noexcept {
         if (0 <= r && r < jule::UTF16_SURR1 | jule::UTF16_SURR3 <= r && r < jule::UTF16_SURR_SELF) {
             a.push(static_cast<jule::U16>(r));

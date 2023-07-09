@@ -144,7 +144,7 @@ namespace jule {
 
         jule::I32 _r{ r };
         if (i > jule::UTF8_MAX_RUNE ||
-            jule::UTF8_SURROGATE_MIN <= i && i <= jule::UTF8_SURROGATE_MAX)
+            (jule::UTF8_SURROGATE_MIN <= i && i <= jule::UTF8_SURROGATE_MAX))
             _r = jule::UTF8_RUNE_ERROR;
 
         if (i <= jule::UTF8_RUNE3_MAX)
