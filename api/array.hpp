@@ -33,24 +33,27 @@ namespace jule {
                 this->buffer[index] = *(Item*)(src_begin+index);
         }
 
+        Array<Item, N>(const jule::Array<Item, N> &src) noexcept
+        { this->buffer = src.buffer; }
+
         typedef Item       *Iterator;
         typedef const Item *ConstIterator;
 
         inline constexpr
         Iterator begin(void) noexcept
-        { return &this->buffer[0]; }
+        { return this->buffer.begin(); }
 
         inline constexpr
         ConstIterator begin(void) const noexcept
-        { return &this->buffer[0]; }
+        { return this->buffer.begin(); }
 
         inline constexpr
         Iterator end(void) noexcept
-        { return &this->buffer[N]; }
+        { return this->buffer.end(); }
 
         inline constexpr
         ConstIterator end(void) const noexcept
-        { return &this->_buffer[N]; }
+        { return this->buffer.end(); }
 
         inline jule::Slice<Item> slice(const jule::Int &start,
                                        const jule::Int &end) const noexcept {
