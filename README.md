@@ -15,12 +15,6 @@ It contains the reference compiler, API and standard library.
 </strong>
 </div>
 
-> **Warning** \
-> JuleC, the reference compiler of Jule, has moved on to the bootstrapping phase. \
-> Therefore, it cannot yet be compiled from source. \
-> The first beta build of JuleC will be released as soon as possible after known bugs have been handled. \
-> _Thank you for your understanding._
-
 <h2 id="community">Community</h2>
 
 Join Julenours to support Jule, explore and interact with the community.
@@ -101,7 +95,7 @@ This is sort of a standard for the Jule programming language and represents the 
 Memory safety and memory management is a major challenge in C , C++ and similar programming languages.
 Jule has a reference-based memory management design to solve these issues.
 Jule guarantees memory safety and uses reference counting for memory management.
-An account-allocation is automatically released as soon as the reference count reaches zero.
+An allocation is automatically released as soon as the reference count reaches zero.
 Please read the <a href="https://manual.jule.dev/memory/memory-management">memory management</a> part of manual for more information about reference-counting approach of Jule.
 <br><br>
 Variables are immutable by default, and each variable is encouraged to be initialized at declaration.
