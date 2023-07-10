@@ -339,10 +339,9 @@ impl Parser {
 		ret g
 	}
 
-	fn build_generics(mut self, mut tokens: []Token): []&GenericDecl {
-		let token = tokens[0]
+	fn build_generics(mut self, mut tokens: []Token, error_token: Token): []&GenericDecl {
 		if tokens.len == 0 {
-			self.push_err(token, "missing_expr")
+			self.push_err(error_token, "missing_expr")
 			ret nil
 		}
 
@@ -658,9 +657,10 @@ impl Parser {
 			ret new(FnDecl)
 		}
 
+		let error_token = tokens[i]
 		let mut generics_tokens = range(i, TokenKind.LBracket, TokenKind.RBracket, tokens)
 		if generics_tokens != nil {
-			f.generics = self.build_generics(generics_tokens)
+			f.generics = self.build_generics(generics_tokens, error_token)
 		}
 
 		if tokens[i].kind != (str)(TokenKind.LParent) {
@@ -1108,9 +1108,10 @@ impl Parser {
 		}
 		s.ident = s.token.kind
 
+		let error_token = tokens[i]
 		let mut generics_tokens = range(i, TokenKind.LBracket, TokenKind.RBracket, tokens)
 		if generics_tokens != nil {
-			s.generics = self.build_generics(generics_tokens)
+			s.generics = self.build_generics(generics_tokens, error_token)
 		}
 		if i >= tokens.len {
 			self.push_err(tokens[i], "invalid_syntax")
