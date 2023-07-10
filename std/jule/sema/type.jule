@@ -1037,6 +1037,30 @@ impl TypeChecker {
 		}
 	}
 
+	fn build_ptr_from_type(mut self, mut elem: &TypeKind): &Ptr {
+		// Check special cases.
+		match {
+		| !real(elem):
+			ret new(Ptr)
+
+		| real(elem.ref()):
+			self.push_err(self.error_token, "ptr_points_ref")
+			ret new(Ptr)
+
+		| real(elem.enm()):
+			self.push_err(self.error_token, "ptr_points_enum")
+			ret new(Ptr)
+
+		| real(elem.arr()) && elem.arr().auto:
+			self.push_err(self.error_token, "array_auto_sized")
+			ret new(Ptr)
+		}
+
+		ret &Ptr{
+			elem: elem,
+		}
+	}
+
 	fn build_ptr(mut self, mut decl: &PtrTypeDecl): &Ptr {
 		let not_plain = self.not_plain
 		self.not_plain = true
@@ -1046,24 +1070,7 @@ impl TypeChecker {
 
 		if !decl.is_unsafe() {
 			elem = self.check_decl(decl.elem)
-
-			// Check special cases.
-			match {
-			| !real(elem):
-				ret new(Ptr)
-
-			| real(elem.ref()):
-				self.push_err(self.error_token, "ptr_points_ref")
-				ret new(Ptr)
-
-			| real(elem.enm()):
-				self.push_err(self.error_token, "ptr_points_enum")
-				ret new(Ptr)
-
-			| real(elem.arr()) && elem.arr().auto:
-				self.push_err(decl.elem.token, "array_auto_sized")
-				ret new(Ptr)
-			}
+			ret self.build_ptr_from_type(elem)
 		}
 
 		ret &Ptr{

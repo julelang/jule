@@ -558,9 +558,8 @@ impl Sema {
 		defer { drop(self.file) } // Reset file.
 
 		let get_def = fn(ident: str): any {
-			let mut def = find_package_builtin_def(imp.link_path, ident)
-			if def != nil {
-				ret def
+			if find_package_builtin_def(imp.link_path, ident) != nil {
+				ret true
 			}
 
 			for (_, mut f) in imp.package.files {
@@ -586,6 +585,10 @@ impl Sema {
 
 			let mut def = get_def(ident.kind)
 			match type def {
+			| bool:
+				// Pass, built-in.
+				continue
+
 			| &Var:
 				let mut v = (&Var)(def)
 				if self.is_accessible_define(v.public, v.token) {

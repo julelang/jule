@@ -229,7 +229,7 @@ fn find_lowest_prec_op(tokens: []Token): int {
 		if i > 1 && left.id == TokenId.Range && left.kind == (str)(TokenKind.RBracket) {
 			let lleft = tokens[i-2]
 			if lleft.id == TokenId.Range && lleft.kind == (str)(TokenKind.LBracket) {
-				// Skip potential type statements.
+				// Skip potential type annotations.
 				if token.kind == (str)(TokenKind.Amper) || token.kind == (str)(TokenKind.Star) {
 					continue
 				}
@@ -945,6 +945,14 @@ impl ExprBuilder {
 		let mut token = tokens[0]
 		match token.id {
 		| TokenId.Op:
+			// Handle pointer to primitive type.
+			if tokens.len > 1 && token.kind == (str)(TokenKind.Star) {
+				token = tokens[1]
+				if token.id == TokenId.Prim || token.id == TokenId.Unsafe {
+					ret self.build_type(tokens)
+				}
+			}
+
 			ret self.build_unary(tokens)
 
 		| TokenId.Range:
