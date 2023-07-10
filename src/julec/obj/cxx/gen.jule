@@ -479,7 +479,7 @@ fn gen_struct_destructor(s: &StructIns): str {
 	ret obj
 }
 
-fn gen_struct_operators(s: &StructIns): str {
+fn gen_struct_operators(mut s: &StructIns): str {
 	let out_ident = struct_ins_out_ident(s)
 	let mut obj = ""
 
@@ -493,7 +493,15 @@ fn gen_struct_operators(s: &StructIns): str {
 		obj += indent()
 		obj += "return "
 		add_indent()
-		for _, f in s.fields {
+		let mut n = 0
+		for (_, mut f) in s.fields {
+			// Skip C++-linked struct kinds.
+			let strct = f.kind.strct()
+			if real(strct) && real(strct.decl) && strct.decl.cpp_linked {
+				continue
+			}
+
+			n++
 			obj += "\n"
 			obj += indent()
 			obj += "this->"
@@ -504,7 +512,11 @@ fn gen_struct_operators(s: &StructIns): str {
 			obj += " &&"
 		}
 		done_indent()
-		obj = obj[:obj.len-3] // Remove last suffix " &&"
+		if n > 0 {
+			obj = obj[:obj.len-3] // Remove last suffix " &&"
+		} else {
+			obj += "true"
+		}
 		obj += ";\n"
 		done_indent()
 		obj += indent()
@@ -760,12 +772,20 @@ fn gen_struct_ostream(mut s: &StructIns): str {
 	obj += s.decl.ident
 	obj += "{\";\n"
 
-	for (i, mut field) in s.fields {
+	for (i, mut f) in s.fields {
 		obj += indent()
 		obj += `_Stream << "`
-		obj += field.decl.ident
-		obj += `:" << _Src.`
-		obj += field_out_ident(field.decl)
+		obj += f.decl.ident
+		obj += `:`
+
+		// Skip C++-linked struct kinds.
+		let strct = f.kind.strct()
+		if real(strct) && real(strct.decl) && strct.decl.cpp_linked {
+			obj += ` cpp.` + field_out_ident(f.decl) + `"`
+		} else {
+			obj += `" << _Src.`
+			obj += field_out_ident(f.decl)
+		}
 		if i+1 < s.fields.len {
 			obj += " << \", \""
 		}
