@@ -803,10 +803,9 @@ impl TypeChecker {
 			ret true
 		}*/
 
-		let mut old = self.s.file
-		defer {
-			self.s.set_current_file(old)
-		}
+		let mut old_file = self.s.file
+		defer { self.s.set_current_file(old_file) }
+
 		let mut f = find_file(self.s.files, ins.decl.token.file)
 		if real(f) {
 			self.s.set_current_file(f)
@@ -827,11 +826,14 @@ impl TypeChecker {
 			}
 		}
 
+		let mut old_sema_file = ins.decl.sema.file
+		defer { ins.decl.sema.set_current_file(old_sema_file) }
+
 		// Check field types.
 		for (_, mut f) in ins.fields {
 			let mut tc = TypeChecker{
-				s:            self.s,
-				lookup:       self.lookup,
+				s:            ins.decl.sema,
+				lookup:       ins.decl.sema,
 				referencer:   referencer,
 				use_generics: generics,
 			}
