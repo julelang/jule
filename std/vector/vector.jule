@@ -256,6 +256,42 @@ impl Vector {
 		unsafe { cpp.__jule_std_vector_heap_assign[T](self._buffer.heap, i, item) }
 		self._buffer.len++
 	}
+
+	// Slice between indexes except end position.
+	pub fn slice(mut self, start: int, end: int): Vector[T] {
+		if start < 0 {
+			panic("Vector[T].slice: slicing starts at negative index")
+		}
+		if start > self._buffer.len {
+			panic("Vector[T].slice: slicing starts at out of range")
+		}
+		if end > self._buffer.len {
+			panic("Vector[T].slice: slicing ends at out of range")
+		}
+		if end < 0 {
+			panic("Vector[T].slice: slicing ends at negative index")
+		}
+		if start > end {
+			panic("Vector[T].slice: start point < end point")
+		}
+
+		if start == end {
+			ret new_vector[T](0)
+		}
+
+		let mut vec = new_vector[T](end-start)
+
+		unsafe {
+			cpp.__jule_std_vector_copy_range[T](
+				vec._buffer.heap,
+				(*unsafe)(uintptr(self._buffer.heap)+(size_of(T)*start)),
+				vec._buffer.cap)
+		}
+
+		vec._buffer.len = vec._buffer.cap
+
+		ret vec
+	}
 }
 
 // Allocate new vector.
