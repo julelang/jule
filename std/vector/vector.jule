@@ -165,6 +165,32 @@ impl Vector {
 		self._buffer.len += vec._buffer.len
 	}
 
+	// Merge items to front of heap.
+	pub fn merge_front(mut self, mut vec: Vector[T]) {
+		if vec._buffer.len == 0 {
+			ret
+		}
+
+		self.review_allocation(vec._buffer.len)
+
+		// Shift items.
+		let mut i = self._buffer.len-1
+		for i >= 0; i-- {
+			unsafe {
+				cpp.__jule_std_vector_heap_move[T](
+					self._buffer.heap, i, i+vec._buffer.len)
+			}
+		}
+
+		unsafe {
+			cpp.__jule_std_vector_copy_range[T](
+				self._buffer.heap,
+				vec._buffer.heap,
+				vec._buffer.len)
+		}
+		self._buffer.len += vec._buffer.len
+	}
+
 	// Push item to front of heap.
 	pub fn push_front(mut self, mut item: T) {
 		if self._buffer.len >= self._buffer.cap {
