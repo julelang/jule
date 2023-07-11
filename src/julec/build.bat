@@ -7,7 +7,7 @@
 if exist ..\..\bin\julec_dev.exe ( del /f ..\..\bin\julec_dev.exe )
 
 if exist .\main.jule (
-  ../../bin/julec -o ../../bin/julec_dev.exe .
+  ..\..\bin\julec -o ..\..\bin\julec_dev.exe .
 ) else (
   echo error: working directory is not source directory
   exit /b
