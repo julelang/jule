@@ -5,6 +5,13 @@
 #ifndef __JULE_ATOMIC_HPP
 #define __JULE_ATOMIC_HPP
 
+#define __JULE_ATOMIC_MEMORY_ORDER__RELAXED __ATOMIC_RELAXED
+#define __JULE_ATOMIC_MEMORY_ORDER__RELEASE __ATOMIC_RELEASE
+#define __JULE_ATOMIC_MEMORY_ORDER__CONSUME __ATOMIC_CONSUME
+#define __JULE_ATOMIC_MEMORY_ORDER__ACQUIRE __ATOMIC_ACQUIRE
+#define __JULE_ATOMIC_MEMORY_ORDER__ACQ_REL __ATOMIC_ACQ_REL
+#define __JULE_ATOMIC_MEMORY_ORDER__SEQ_CST __ATOMIC_SEQ_CST
+
 #define __jule_atomic_store_explicit(ADDR, VAL, MO) \
     __extension__({ \
         auto atomic_store_ptr{ ADDR }; \
@@ -51,7 +58,10 @@
     __jule_atomic_compare_swap_explicit(ADDR, OLD, NEW, \
                                         __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
 
+#define __jule_atomic_add_explicit(ADDR, DELTA, MO) \
+    __atomic_fetch_add(ADDR, DELTA, MO)
+
 #define __jule_atomic_add(ADDR, DELTA) \
-    __atomic_fetch_add(ADDR, DELTA, __ATOMIC_SEQ_CST)
+    __jule_atomic_add_explicit(ADDR, DELTA, __ATOMIC_SEQ_CST)
 
 #endif // #ifndef __JULE_ATOMIC_HPP

@@ -88,14 +88,24 @@ namespace jule {
         ~Ref<T>(void) noexcept
         { this->drop(); }
 
-        inline jule::Int drop_ref(void) const noexcept
-        { return __jule_atomic_add(this->ref, -jule::REFERENCE_DELTA); }
+        inline jule::Int drop_ref(void) const noexcept {
+            return __jule_atomic_add_explicit(
+                this->ref,
+                -jule::REFERENCE_DELTA,
+                __JULE_ATOMIC_MEMORY_ORDER__RELAXED);
+        }
 
-        inline jule::Int add_ref(void) const noexcept
-        { return __jule_atomic_add(this->ref, jule::REFERENCE_DELTA); }
+        inline jule::Int add_ref(void) const noexcept {
+            return __jule_atomic_add_explicit(
+                this->ref,
+                jule::REFERENCE_DELTA,
+                __JULE_ATOMIC_MEMORY_ORDER__RELAXED);
+        }
 
-        inline jule::Uint get_ref_n(void) const noexcept
-        { return __jule_atomic_load(this->ref); }
+        inline jule::Uint get_ref_n(void) const noexcept {
+            return __jule_atomic_load_explicit(
+                this->ref, __JULE_ATOMIC_MEMORY_ORDER__RELAXED);
+        }
 
         void drop(void) const noexcept {
             if (!this->ref) {
