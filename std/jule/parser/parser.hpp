@@ -14,8 +14,13 @@ jule::Slice<Item> __jule_parser_vector_as_slice(Vector vec) noexcept {
 
 	slice._len = vec._method_len();
 	slice._cap = vec._method_cap();
-	slice.data.alloc = *reinterpret_cast<Item**>(vec._field__heap);
-	slice._slice = &slice.data.alloc[0];
+	slice.data = jule::Ref<Item>::make(reinterpret_cast<Item*>(vec._field__buffer.heap));
+	slice._slice = slice.data.alloc;
+
+	// Ignore auto-deallocation.
+	// Owner is slice now.
+	vec._field__buffer.heap = nullptr;
+
 	return slice;
 }
 

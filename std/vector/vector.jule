@@ -2,33 +2,46 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use std::mem::{size_of}
+
 use cpp "alloc.hpp"
 
-cpp fn __jule_std_vector_new_heap(): **unsafe
-cpp unsafe fn __jule_std_vector_delete_heap(heap: **unsafe)
 cpp fn __jule_std_vector_alloc[T](n: int): *unsafe
 cpp unsafe fn __jule_std_vector_dealloc[T](heap: *unsafe)
 cpp unsafe fn __jule_std_vector_deref[T](heap: *unsafe, i: int): T
 cpp unsafe fn __jule_std_vector_heap_assign[T](heap: *unsafe, i: int, item: T)
 cpp unsafe fn __jule_std_vector_heap_move[T](heap: *unsafe, i: int, dest: int)
+cpp unsafe fn __jule_std_vector_copy_range[T](dest: *unsafe, buff: *unsafe, len: int)
+cpp unsafe fn __jule_get_pointer_of_slice[T](slc: []T): *unsafe
+
+//jule:typedef
+cpp struct StdJuleVectorBuffer[T] {
+	len:  int
+	cap:  int
+	heap: *unsafe
+	drop: fn()
+}
+
+const GROW_FACTOR = 2
 
 // Wrapper for dynamic array.
 // Uses capacity for performance.
 // Grows capacity if necessary.
 // But always allocates more for future pushes.
+// The elements are stored contiguously.
 //
-// Does not deallocates itself.
-// Use the dealloc() method for deallocate.
+// Deallocates itself when destroyed.
+//
+// Vectors aren't use shared allocation between them.
+// Allocates new space and copies (not deep copy) items into space.
 pub struct Vector[T] {
-	_heap: **unsafe
-	_len:  int
-	_cap:  int
+	_buffer: cpp.StdJuleVectorBuffer[T]
 }
 
 impl Vector {
 	fn calc_grow(self, delta: int): int {
-		let t = self.len() + delta
-		ret t + (t/2)
+		let t = self._buffer.len + delta
+		ret t*GROW_FACTOR
 	}
 
 	fn resize_alloc(mut self, n: int) {
@@ -37,107 +50,119 @@ impl Vector {
 			panic("Vector[T].resize_alloc: heap reallocation failed")
 		}
 
-		if self._heap == nil {
-			self._heap = cpp.__jule_std_vector_new_heap()
-			if self._heap == nil {
-				panic("Vector[T].resize_alloc: heap reallocation failed")
-			}
-			unsafe { *self._heap = new_heap }
-			self._cap = n
+		if self._buffer.heap == nil {
+			self._buffer.heap = new_heap
+			self._buffer.cap = n
 			ret
 		}
 
-		let mut i = 0
-		for i < self._len; i++ {
-			unsafe {
-				let mut item = unsafe { cpp.__jule_std_vector_deref[T](*self._heap, i) }
-				cpp.__jule_std_vector_heap_assign[T](new_heap, i, item)
+		unsafe {
+			if self._buffer.len > 0 {
+				cpp.__jule_std_vector_copy_range[T](
+					new_heap,
+					self._buffer.heap,
+					self._buffer.len)
 			}
+			cpp.__jule_std_vector_dealloc[T](self._buffer.heap)
+			self._buffer.heap = new_heap
 		}
-		unsafe { cpp.__jule_std_vector_dealloc[T](*self._heap) }
-		unsafe { *self._heap = new_heap }
-		self._cap = n
+		self._buffer.cap = n
 	}
 
 	fn review_allocation(mut self, delta: int) {
-		if (self._heap == nil || unsafe { *self._heap } == nil) {
-			self.resize_alloc(self.calc_grow(delta))
-			ret
-		}
-
-		if self._len+delta >= self._cap {
+		if self._buffer.len+delta > self._buffer.cap {
 			self.resize_alloc(self.calc_grow(delta))
 		}
 	}
 
 	// Returns length.
-	pub fn len(self): int { ret self._len }
+	pub fn len(self): int { ret self._buffer.len }
 
 	// Returns capacity.
-	pub fn cap(self): int { ret self._cap }
+	pub fn cap(self): int { ret self._buffer.cap }
+
+	// Deallocates heap.
+	pub fn dealloc(mut self) {
+		self._buffer.drop()
+	}
 
 	// Sets length.
 	// Sets length to zero if n < 0.
 	// Don't set length if n >= length of vector.
 	pub fn set_len(mut self, n: int) {
 		if n < 0 {
-			self._len = 0
+			self._buffer.len = 0
 			ret
 		}
-		if n >= self._len {
+		if n >= self._buffer.len {
 			ret
 		}
-		self._len = n
+		self._buffer.len = n
 	}
 
 	// Returns item by index.
 	pub fn at(mut self, i: int): T {
-		if i < 0 || i >= self._len {
+		if i < 0 || i >= self._buffer.len {
 			panic("Vector[T].at: out of range")
 		}
-		ret unsafe { cpp.__jule_std_vector_deref[T](*self._heap, i) }
+		ret unsafe { cpp.__jule_std_vector_deref[T](self._buffer.heap, i) }
 	}
 
-	// Deallocates heap.
-	pub fn dealloc(mut self) {
-		if self._heap == nil {
+	// Set element by index.
+	pub fn set(mut self, i: int, mut item: T) {
+		if i < 0 || i >= self._buffer.len {
+			panic("Vector[T].set: out of range")
+		}
+		unsafe { cpp.__jule_std_vector_heap_assign[T](self._buffer.heap, i, item) }
+	}
+
+	// Push item to end of heap.
+	pub fn push(mut self, mut item: T) {
+		if self._buffer.len >= self._buffer.cap {
+			self.resize_alloc((self._buffer.cap*GROW_FACTOR)+1)
+		}
+
+		unsafe {
+			cpp.__jule_std_vector_heap_assign[T](
+				self._buffer.heap,
+				self._buffer.len,
+				item)
+		}
+		self._buffer.len++
+	}
+
+	// Push items to end of heap.
+	pub fn append(mut self, mut items: ...T) {
+		if items.len == 0 {
 			ret
 		}
 
-		if (unsafe { *self._heap != nil }) {
-			unsafe { cpp.__jule_std_vector_dealloc[T](*self._heap) }
-			unsafe { *self._heap = nil }
+		self.review_allocation(items.len)
+
+		unsafe {
+			cpp.__jule_std_vector_copy_range[T](
+				(*unsafe)(uintptr(self._buffer.heap)+(size_of(T)*self._buffer.len)),
+				cpp.__jule_get_pointer_of_slice[T](items),
+				items.len)
 		}
-		unsafe { cpp.__jule_std_vector_delete_heap(self._heap) }
-		self._heap = nil
+		self._buffer.len += items.len
 	}
 
-	// Push items.
-	pub fn push(mut self, mut items: ...T) {
-		self.review_allocation(items.len)
-		for (i, mut item) in items {
-			unsafe { cpp.__jule_std_vector_heap_assign[T](*self._heap, self._len+i, item) }
+	// Push item to front of heap.
+	pub fn push_front(mut self, mut item: T) {
+		if self._buffer.len >= self._buffer.cap {
+			self.resize_alloc((self._buffer.cap*GROW_FACTOR)+1)
 		}
-
-		self._len += items.len
-	}
-	// Push items to front of heap.
-	pub fn push_front(mut self, mut items: ...T) {
-		self.review_allocation(items.len)
 
 		// Shift items.
-		let mut i = self._len-1
+		let mut i = self._buffer.len-1
 		for i >= 0; i-- {
-			let offset = items.len+i
-			unsafe { cpp.__jule_std_vector_heap_move[T](*self._heap, i, offset) }
+			unsafe { cpp.__jule_std_vector_heap_move[T](self._buffer.heap, i, i+1) }
 		}
 
 		// Assign.
-		for (i, mut item) in items {
-			unsafe { cpp.__jule_std_vector_heap_assign[T](*self._heap, i, item) }
-		}
-
-		self._len += items.len
+		unsafe { cpp.__jule_std_vector_heap_assign[T](self._buffer.heap, 0, item) }
+		self._buffer.len++
 	}
 }
 
