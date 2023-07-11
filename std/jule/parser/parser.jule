@@ -440,21 +440,20 @@ impl Parser {
 		self.param_body_id(param, tokens[i])
 		let mut tok = tokens[i]
 		// +1 for skip identifier token
-		tokens = tokens[i+1:]
-		if tokens.len == 0 {
+		if i+1 >= tokens.len {
 			ret
-		} else if tokens.len < 2 {
+		} else if tokens.len-i-1 < 2 {
 			self.push_err(tok, "missing_type")
 			ret
 		}
 
-		tok = tokens[i]
+		tok = tokens[i+1]
 		if tok.id != TokenId.Colon {
-			self.push_err(tok, "invalid_syntax")
+			self.build_param_type(param, tokens, must_pure)
 			ret
 		}
 
-		tokens = tokens[i+1:] // Skip colon
+		tokens = tokens[i+2:] // Skip colon
 		self.build_param_type(param, tokens, must_pure)
 	}
 
@@ -543,7 +542,7 @@ impl Parser {
 			ret
 		}
 
-		i-- // For point to parenthses - ( -
+		i-- // For point to parentheses - ( -
 		let mut range_tokens = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
 		let mut params = self.build_params(range_tokens, false, true)
 
