@@ -27,45 +27,57 @@ namespace jule {
 
     template<typename T>
     inline jule::Ref<T> new_ref(const T &init) noexcept;
-    
+
     template<typename T>
     struct Ref {
         mutable T *alloc{ nullptr };
         mutable jule::Uint *ref{ nullptr };
-    
+
         static jule::Ref<T> make(T *ptr, jule::Uint *ref) noexcept {
             jule::Ref<T> buffer;
             buffer.alloc = ptr;
             buffer.ref = ref;
             return buffer;
         }
-    
+
         static jule::Ref<T> make(T *ptr) noexcept {
             jule::Ref<T> buffer;
-            
-            buffer.ref = new( std::nothrow ) jule::Uint;
+
+#ifndef __JULE_DISABLE__REFERENCE_COUNTING
+            buffer.ref = new (std::nothrow) jule::Uint;
             if (!buffer.ref)
                 jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
 
-            *buffer.ref = 1;
+            *buffer.ref = jule::REFERENCE_DELTA;
+#endif
+
             buffer.alloc = ptr;
             return buffer;
         }
 
-        static jule::Ref<T> make(const T &instance) noexcept {
+        static jule::Ref<T> make(const T &instance, jule::Uint *ref) noexcept {
             jule::Ref<T> buffer;
-            
-            buffer.alloc = new(std::nothrow) T;
+
+            buffer.alloc = new (std::nothrow) T;
             if (!buffer.alloc)
                 jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
-            
-            buffer.ref = new(std::nothrow) jule::Uint;
-            if (!buffer.ref)
-                jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
-            
-            *buffer.ref = jule::REFERENCE_DELTA;
+
             *buffer.alloc = instance;
+            buffer.ref = ref;
             return buffer;
+        }
+
+        static jule::Ref<T> make(const T &instance) noexcept {
+#ifdef __JULE_DISABLE__REFERENCE_COUNTING
+            return jule::Ref<T>::make(instance, nullptr);
+#else
+            jule::Uint *ref = new (std::nothrow) jule::Uint;
+            if (!ref)
+                jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
+            *ref = jule::REFERENCE_DELTA;
+
+            return jule::Ref<T>::make(instance, ref);
+#endif
         }
 
         Ref<T>(void) noexcept {}
@@ -78,7 +90,7 @@ namespace jule {
 
         inline jule::Int drop_ref(void) const noexcept
         { return __jule_atomic_add(this->ref, -jule::REFERENCE_DELTA); }
-    
+
         inline jule::Int add_ref(void) const noexcept
         { return __jule_atomic_add(this->ref, jule::REFERENCE_DELTA); }
 
@@ -91,7 +103,7 @@ namespace jule {
                 return;
             }
 
-            if ( this->drop_ref() != jule::REFERENCE_DELTA) {
+            if (this->drop_ref() != jule::REFERENCE_DELTA) {
                 this->ref = nullptr;
                 this->alloc = nullptr;
                 return;
@@ -168,10 +180,10 @@ namespace jule {
 
             return *this->alloc == *ref.alloc;
         }
-    
+
         inline jule::Bool operator!=(const jule::Ref<T> &ref) const noexcept
         { return !this->operator==(ref); }
-    
+
         friend inline
         std::ostream &operator<<(std::ostream &stream,
                                  const jule::Ref<T> &ref) noexcept {
@@ -188,8 +200,13 @@ namespace jule {
     { return jule::Ref<T>(); }
 
     template<typename T>
-    inline jule::Ref<T> new_ref(const T &init) noexcept
-    { return jule::Ref<T>::make(init); }
+    inline jule::Ref<T> new_ref(const T &init) noexcept {
+#ifdef __JULE_DISABLE__REFERENCE_COUNTING
+        return jule::Ref<T>::make(init, nullptr);
+#else
+        return jule::Ref<T>::make(init);
+#endif
+    }
 
 } // namespace jule
 

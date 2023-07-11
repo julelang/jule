@@ -28,12 +28,15 @@ namespace jule {
         if (!ptr)
             jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
 
-        ptr->self.ref = new(std::nothrow) jule::Uint;
+#ifndef __JULE_DISABLE__REFERENCE_COUNTING
+        ptr->self.ref = new (std::nothrow) jule::Uint;
         if (!ptr->self.ref)
             jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED );
 
         // Initialize with zero because return reference is counts 1 reference.
         *ptr->self.ref = 0; // ( jule::REFERENCE_DELTA - jule::REFERENCE_DELTA );
+#endif
+
         return ptr->self;
     }
 } // namespace jule

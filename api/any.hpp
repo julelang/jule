@@ -93,6 +93,10 @@ namespace jule {
         { this->dealloc(); }
 
         void dealloc(void) noexcept {
+#ifdef __JULE_DISABLE__REFERENCE_COUNTING
+            this->type = nullptr;
+            this->data.drop();
+#else
             if (!this->data.ref) {
                 this->type = nullptr;
                 this->data.drop();
@@ -105,7 +109,7 @@ namespace jule {
             //   if this is method called from destructor, reference count setted to
             //   negative integer but reference count is unsigned, for this reason
             //   allocation is not deallocated.
-            if ( ( this->data.get_ref_n() ) != jule::REFERENCE_DELTA ) {
+            if (this->data.get_ref_n() != jule::REFERENCE_DELTA) {
                 this->type = nullptr;
                 this->data.drop();
                 return;
@@ -120,6 +124,7 @@ namespace jule {
             std::free(this->data.alloc);
             this->data.alloc = nullptr;
             this->data.drop();
+#endif // __JULE_DISABLE__REFERENCE_COUNTING
         }
 
         template<typename T>
@@ -147,7 +152,11 @@ namespace jule {
 
             *alloc = expr;
             *main_alloc = reinterpret_cast<void*>(alloc);
+#ifdef __JULE_DISABLE__REFERENCE_COUNTING
+            this->data = jule::Ref<void*>::make(main_alloc, nullptr);
+#else
             this->data = jule::Ref<void*>::make(main_alloc);
+#endif
             this->type = jule::Any::new_type<T>();
         }
 
@@ -167,7 +176,11 @@ namespace jule {
             if (!new_heap)
                 jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
 
+#ifdef __JULE_DISABLE__REFERENCE_COUNTING
+            this->data = jule::Ref<void*>::make(new_heap, nullptr);
+#else
             this->data = jule::Ref<void*>::make(new_heap);
+#endif
             this->type = src.type;
         }
 

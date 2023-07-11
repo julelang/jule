@@ -59,6 +59,11 @@ namespace jule {
         }
 
         void dealloc(void) noexcept {
+#ifdef __JULE_DISABLE__REFERENCE_COUNTING
+            this->_len = 0;
+            this->_cap = 0;
+            this->data.drop();
+#else
             this->_len = 0;
             this->_cap = 0;
 
@@ -85,6 +90,7 @@ namespace jule {
             this->data.alloc = nullptr;
             this->data.ref = nullptr;
             this->_slice = nullptr;
+#endif // __JULE_DISABLE__REFERENCE_COUNTING
         }
 
         void alloc_new(const jule::Int n) noexcept {
@@ -98,7 +104,11 @@ namespace jule {
             if (!alloc)
                 jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
 
+#ifdef __JULE_DISABLE__REFERENCE_COUNTING
+            this->data = jule::Ref<Item>::make(alloc, nullptr);
+#else
             this->data = jule::Ref<Item>::make(alloc);
+#endif
             this->_len = n;
             this->_cap = n;
             this->_slice = &alloc[0];

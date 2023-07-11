@@ -35,15 +35,23 @@ namespace jule {
                 jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
 
             *alloc = data;
+#ifdef __JULE_DISABLE__REFERENCE_COUNTING
+            this->data = jule::Ref<Mask>::make(reinterpret_cast<Mask*>(alloc), nullptr);
+#else
             this->data = jule::Ref<Mask>::make(reinterpret_cast<Mask*>(alloc));
+#endif
             this->type_id = typeid(T).name();
         }
 
         template<typename T>
         Trait<Mask>(const jule::Ref<T> &ref) noexcept {
+#ifdef __JULE_DISABLE__REFERENCE_COUNTING
+            this->data = jule::Ref<Mask>::make(reinterpret_cast<Mask*>(ref.alloc), nullptr);
+#else
             this->data = jule::Ref<Mask>::make(reinterpret_cast<Mask*>(ref.alloc), ref.ref);
             if (ref.real())
                 this->data.add_ref();
+#endif
             this->type_id = typeid(ref).name();
         }
 
@@ -91,7 +99,9 @@ namespace jule {
             this->must_ok();
             if (std::strcmp(this->type_id, typeid(jule::Ref<T>).name()) != 0)
                 jule::panic(jule::ERROR_INCOMPATIBLE_TYPE);
+#ifndef __JULE_DISABLE__REFERENCE_COUNTING
             this->data.add_ref();
+#endif
             return jule::Ref<T>::make(reinterpret_cast<T*>(this->data.alloc), this->data.ref);
         }
 
