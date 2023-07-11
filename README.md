@@ -112,7 +112,7 @@ Please read the <a href="https://manual.jule.dev/unsafe-jule">Unsafe Jule</a> pa
 <h2 id="cpp-interoperability">C++ Interoperability</h2>
 Jule is designed to be interoperable with C++.
 A C++ header file dependency can be added to the Jule code and its functions can be linked.
-It's pretty easy to write C++ code that is compatible with the Jule code compiled by the compiler.
+It's pretty easy to write C++ code that is compatible with the Jule code and compiled by the compiler.
 JuleC keeps all the C++ code it uses for Jule in its <a href="https://github.com/julelang/jule/tree/master/api">api</a> directory.
 This API makes it possible and easy to write C++ code that can be fully integrated into Jule.
 <ol></ol> <!-- for space -->
@@ -144,7 +144,7 @@ fn main() {
 
 The above example demonstrates the interoperability of Jule with a C++ function that returns the total of all values of an integer slice.
 The C++ header file is written entirely using the Jule API.
-The `Int`, and `Slice` types used are part of the API.
+The `Int`, and `Slice` types are part of the API.
 The `Int` data type is equally sensitive to the system architecture as in Jule.
 The Jule source code declares to use `sum.hpp` first, and binds the C++ function into Jule accordingly.
 Then, a call is made from Jule and the result of the function is written to the command line.
@@ -171,10 +171,10 @@ JuleC is in early development and currently it can only be built from source.
 However, despite being in the early development stage, many algorithms (<a href="https://github.com/julelang/jule/tree/master/std">see the standard library</a>) can be successfully implemented.
 However, Jule's compiler is bootstrapped.
 The reference compiler, JuleC, is developed with Pure Jule.
-JuleC has or is very close to having many of the things Jule was intended to have, such as memory safety, no undefined behavior, structures with methods and generics.
+JuleC has or is very close to have many of the things Jule was intended to incorporate, such as memory safety, no undefined behavior, structures with methods and generics.
 <br><br>
 The syntax and language design of the Jule programming language has emerged and is not expected to undergo major changes.
-Many parts of JuleC, included in standard library such as lexer, parser and semantic analyzer.
+Many parts of JuleC, are included in the standard library such as lexer, parser and semantic analyzer.
 This will also allow developers to quickly develop tools for the language by leveraging Jule's standard library.
 <br><br>
 There is an idea to include a package manager in JuleC as well, although it doesn't have one yet.
@@ -182,7 +182,7 @@ Jule's modern understanding of language and convenience suggests that there shou
 This package manager will provide management of non-standard library packages developed and published by the community.
 Jule's standard library only gets updates with compiler releases.
 <br><br>
-The language and standard library will continue to evolve and change in the future but JuleC will guarantee stability since its first stable release.
+The language and standard library will continue to evolve and change in the future but JuleC will guarantee stability starting with its first stable release.
 Some packages of the standard library
 (<a href="https://github.com/julelang/jule/tree/master/std/math">std::math</a>,
 <a href="https://github.com/julelang/jule/tree/master/std/conv">std::conv</a>,
@@ -191,7 +191,7 @@ or etc.) are almost complete and are not expected to undergo major changes.
 
 <h2 id="documentations">Documentations</h2>
 
-All documentations about Jule and JuleC is on the website as manual. <br>
+All documentations about Jule and JuleC is on the website as a manual. <br>
 See [Jule Manual](hthttps://manual.jule.dev)
 <br><br>
 To contribute to the website, manual or something else, please use the <a href="https://github.com/julelang/website">website repository</a>.
