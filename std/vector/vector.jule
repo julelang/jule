@@ -232,6 +232,30 @@ impl Vector {
 
 		self._buffer.len -= n
 	}
+
+	// Insert item by index.
+	pub fn insert(mut self, i: int, mut item: T) {
+		if i < 0 {
+			panic("Vector[T].insert: insertion starts at negative index")
+		}
+		if i > self._buffer.len {
+			panic("Vector[T].insert: insertion starts at out of range")
+		}
+
+		if self._buffer.len >= self._buffer.cap {
+			self.resize_alloc((self._buffer.cap*GROW_FACTOR)+1)
+		}
+
+		// Shift items.
+		let mut j = self._buffer.len-1
+		for j >= i; j-- {
+			unsafe { cpp.__jule_std_vector_heap_move[T](self._buffer.heap, j, j+1) }
+		}
+
+		// Assign.
+		unsafe { cpp.__jule_std_vector_heap_assign[T](self._buffer.heap, i, item) }
+		self._buffer.len++
+	}
 }
 
 // Allocate new vector.
