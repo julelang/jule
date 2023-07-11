@@ -131,6 +131,23 @@ impl Vector {
 		self._buffer.len++
 	}
 
+	// Push item to front of heap.
+	pub fn push_front(mut self, mut item: T) {
+		if self._buffer.len >= self._buffer.cap {
+			self.resize_alloc((self._buffer.cap*GROW_FACTOR)+1)
+		}
+
+		// Shift items.
+		let mut i = self._buffer.len-1
+		for i >= 0; i-- {
+			unsafe { cpp.__jule_std_vector_heap_move[T](self._buffer.heap, i, i+1) }
+		}
+
+		// Assign.
+		unsafe { cpp.__jule_std_vector_heap_assign[T](self._buffer.heap, 0, item) }
+		self._buffer.len++
+	}
+
 	// Push items to end of heap.
 	pub fn append(mut self, mut items: ...T) {
 		if items.len == 0 {
@@ -191,21 +208,29 @@ impl Vector {
 		self._buffer.len += vec._buffer.len
 	}
 
-	// Push item to front of heap.
-	pub fn push_front(mut self, mut item: T) {
-		if self._buffer.len >= self._buffer.cap {
-			self.resize_alloc((self._buffer.cap*GROW_FACTOR)+1)
+	// Remove range from heap.
+	pub fn remove_range(mut self, start: int, d: int) {
+		if n < 1 {
+			ret
+		}
+
+		if start < -1 {
+			panic("Vector[T].remove_range: removing starts at negative index")
+		}
+		if start >= self._buffer.len {
+			panic("Vector[T].remove_range: removing starts at out of range")
+		}
+		if self._buffer.len-start-n < 0 {
+			panic("Vector[T].remove_range: removing continues at out of range ")
 		}
 
 		// Shift items.
-		let mut i = self._buffer.len-1
-		for i >= 0; i-- {
-			unsafe { cpp.__jule_std_vector_heap_move[T](self._buffer.heap, i, i+1) }
+		let mut i = start + n
+		for i < self._buffer.len; i++ {
+			unsafe { cpp.__jule_std_vector_heap_move[T](self._buffer.heap, i, i-n) }
 		}
 
-		// Assign.
-		unsafe { cpp.__jule_std_vector_heap_assign[T](self._buffer.heap, 0, item) }
-		self._buffer.len++
+		self._buffer.len -= n
 	}
 }
 
