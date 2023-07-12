@@ -9,7 +9,7 @@ use obj::cxx
 
 use std::os::{ARGS, exit}
 use std::jule::{VERSION}
-use std::jule::build::{DISTOS, DISTARCH, errorf}
+use std::jule::build::{self, DISTOS, DISTARCH, errorf}
 use std::jule::lex::{is_decimal, is_ident_rune, is_letter, is_space}
 
 const CMD_HELP = "help"
@@ -213,6 +213,50 @@ unsafe fn parse_opt_option(args: []str, mut i: *int) {
 	}
 }
 
+fn check_target_arch(arch: str) {
+	for _, distarch in DISTARCH {
+		if arch == (str)(distarch) {
+			ret
+		}
+	}
+
+	exit_err("unsupported/undefined architecture: " + arch)
+}
+
+fn check_target_os(os: str) {
+	for _, distos in DISTOS {
+		if os == (str)(distos) {
+			ret
+		}
+	}
+
+	exit_err("unsupported/undefined operating system: " + os)
+}
+
+unsafe fn parse_target_option(args: []str, mut i: *int) {
+	let value = get_option_value(args, i)
+	if value == "" {
+		exit_err("missing option value: --target")
+	}
+
+	let parts = value.split("-", -1)
+	if parts.len != 2 {
+		exit_err("undefined platform target format: " + value)
+	}
+
+	let (os, arch) = parts[0], parts[1]
+
+	if os != "native" {
+		check_target_os(os)
+		std::jule::build::OS = os
+	}
+
+	if arch != "native" {
+		check_target_arch(arch)
+		std::jule::build::ARCH = arch
+	}
+}
+
 unsafe fn parse_compiler_option(args: []str, mut i: *int) {
 	let value = get_option_value(args, i)
 	match value {
@@ -258,6 +302,9 @@ fn parse_options(args: []str): str {
 
 		| "--opt":
 			unsafe { parse_opt_option(args, &i) }
+
+		| "--target":
+			unsafe { parse_target_option(args, &i) }
 
 		|:
 			exit_err("undefined option: " + arg)
