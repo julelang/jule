@@ -12,7 +12,7 @@ use std::jule::ast::{
 	ArrTypeDecl,
 	MapTypeDecl,
 }
-use std::jule::lex::{Token, TokenId, TokenKind, parts, range_last}
+use std::jule::lex::{Token, TokenId, TokenKind}
 
 fn build_void_type(): &TypeDecl { ret &TypeDecl{} }
 
@@ -31,12 +31,12 @@ fn build_prim_type(mut token: Token): &TypeDecl {
 // Returns colon index and range tokens.
 // Returns nil slice and -1 if not found.
 // Starts search at *i.
-fn split_map_range(mut tokens: []Token, mut i: &int): (range_tokens: []Token, colon: int) {
+unsafe fn split_map_range(mut tokens: []Token, mut i: *int): (range_tokens: []Token, colon: int) {
 	colon = -1
 	let mut range_n = 0
-	let start: int = i
-	for i < tokens.len; i++ {
-		let token = tokens[i]
+	let start = *i
+	for *i < tokens.len; *i++ {
+		let token = tokens[*i]
 		if token.id == TokenId.Range {
 			match token.kind {
 			| (str)(TokenKind.LBrace)
@@ -51,16 +51,16 @@ fn split_map_range(mut tokens: []Token, mut i: &int): (range_tokens: []Token, co
 		}
 
 		if range_n == 0 {
-			if start+1 > i {
+			if start+1 > *i {
 				ret
 			}
-			range_tokens = tokens[start+1 : i]
+			range_tokens = tokens[start+1 : *i]
 			break
 		} else if range_n != 1 {
 			continue
 		}
 		if colon == -1 && token.id == TokenId.Colon {
-			colon = i - start - 1
+			colon = *i - start - 1
 		}
 	}
 	ret
@@ -69,7 +69,7 @@ fn split_map_range(mut tokens: []Token, mut i: &int): (range_tokens: []Token, co
 struct TypeBuilder {
 	p:        &Parser
 	tokens:   []Token
-	i:        &int
+	i:        *int
 	err:      bool
 }
 
@@ -80,21 +80,21 @@ impl TypeBuilder {
 		}
 	}
 
-	fn build_prim(mut self): &TypeDecl {
-		let mut t = build_prim_type(self.tokens[self.i])
-		self.i++
+	unsafe fn build_prim(mut self): &TypeDecl {
+		let mut t = build_prim_type(self.tokens[*self.i])
+		*self.i++
 		ret t
 	}
 
-	fn build_namespace(mut self): &TypeDecl {
+	unsafe fn build_namespace(mut self): &TypeDecl {
 		let mut t = &TypeDecl{
-			token: self.tokens[self.i],
+			token: self.tokens[*self.i],
 		}
 
 		let mut nst = &NamespaceTypeDecl{}
 		let mut n = 0
-		for self.i < self.tokens.len; self.i++ {
-			let mut token = self.tokens[self.i]
+		for *self.i < self.tokens.len; *self.i++ {
+			let mut token = self.tokens[*self.i]
 			if n%2 == 0 {
 				if token.id != TokenId.Ident {
 					self.push_err(token, "invalid_syntax")
@@ -109,17 +109,17 @@ impl TypeBuilder {
 		// Remove selected identifier token.
 		nst.idents = nst.idents[:nst.idents.len-1]
 
-		self.i-- // Set offset to last identifier.
+		*self.i-- // Set offset to last identifier.
 		nst.kind = (&IdentTypeDecl)(self.build_ident().kind)
 		t.kind = nst
 		ret t
 	}
 
-	fn build_generics(mut self): []&TypeDecl {
-		if self.i >= self.tokens.len {
+	unsafe fn build_generics(mut self): []&TypeDecl {
+		if *self.i >= self.tokens.len {
 			ret nil
 		}
-		let token = self.tokens[self.i]
+		let token = self.tokens[*self.i]
 		if token.id != TokenId.Range || token.kind != (str)(TokenKind.LBracket) {
 			ret nil
 		}
@@ -127,8 +127,8 @@ impl TypeBuilder {
 		let mut parts = self.ident_generics()
 		let mut types = make([]&TypeDecl, parts.len)
 		for (i, mut part) in parts {
-			let mut j = new(int, 0)
-			let (mut t, _) = self.p.build_type(part, j, true)
+			let mut j = 0
+			let (mut t, _) = unsafe { self.p.build_type(part, &j, true) }
 			if j < part.len {
 				self.push_err(part[j], "invalid_syntax")
 			}
@@ -137,11 +137,11 @@ impl TypeBuilder {
 		ret types
 	}
 
-	fn ident_generics(mut self): [][]Token {
-		let first: int = self.i
+	unsafe fn ident_generics(mut self): [][]Token {
+		let first = *self.i
 		let mut range_n = 0
-		for self.i < self.tokens.len; self.i++ {
-			let token = self.tokens[self.i]
+		for *self.i < self.tokens.len; *self.i++ {
+			let token = self.tokens[*self.i]
 			if token.id == TokenId.Range {
 				match token.kind {
 				| (str)(TokenKind.LBracket): range_n++
@@ -149,11 +149,11 @@ impl TypeBuilder {
 				}
 			}
 			if range_n == 0 {
-				self.i++ // Skip right bracket
+				*self.i++ // Skip right bracket
 				break
 			}
 		}
-		let mut tokens = self.tokens[first+1 : self.i-1] // Take range of brackets.
+		let mut tokens = self.tokens[first+1 : *self.i-1] // Take range of brackets.
 		let (mut parts, errors) = parts(tokens, TokenId.Comma, true)
 		if self.err {
 			self.p.errors = append(self.p.errors, errors...)
@@ -161,17 +161,17 @@ impl TypeBuilder {
 		ret parts
 	}
 
-	fn build_ident(mut self): &TypeDecl {
-		if self.i+1 < self.tokens.len && self.tokens[self.i+1].id == TokenId.DblColon {
+	unsafe fn build_ident(mut self): &TypeDecl {
+		if *self.i+1 < self.tokens.len && self.tokens[*self.i+1].id == TokenId.DblColon {
 			ret self.build_namespace()
 		}
-		let mut token = self.tokens[self.i]
+		let mut token = self.tokens[*self.i]
 		let mut it = &IdentTypeDecl{
 			token:      token,
 			ident:      token.kind,
 			cpp_linked: false,
 		}
-		self.i++
+		*self.i++
 		it.generics = self.build_generics()
 		ret &TypeDecl{
 			token: token,
@@ -179,20 +179,20 @@ impl TypeBuilder {
 		}
 	}
 
-	fn build_cpp_link(mut self): &TypeDecl {
-		if self.i+1 >= self.tokens.len || self.tokens[self.i+1].id != TokenId.Dot {
-			self.push_err(self.tokens[self.i], "invalid_syntax")
+	unsafe fn build_cpp_link(mut self): &TypeDecl {
+		if *self.i+1 >= self.tokens.len || self.tokens[*self.i+1].id != TokenId.Dot {
+			self.push_err(self.tokens[*self.i], "invalid_syntax")
 			ret new(TypeDecl)
 		}
-		self.i += 2 // Skip cpp keyword and dot token.
+		*self.i += 2 // Skip cpp keyword and dot token.
 		let mut t = self.build_ident()
 		(&IdentTypeDecl)(t.kind).cpp_linked = true
 		ret t
 	}
 
-	fn build_fn(mut self): &TypeDecl {
-		let mut token = self.tokens[self.i]
-		let mut f = self.p.build_fn_prototype(self.tokens, self.i, false, true)
+	unsafe fn build_fn(mut self): &TypeDecl {
+		let mut token = self.tokens[*self.i]
+		let mut f = unsafe { self.p.build_fn_prototype(self.tokens, self.i, false, true) }
 		if !real(f) {
 			ret new(TypeDecl)
 		}
@@ -202,16 +202,16 @@ impl TypeBuilder {
 		}
 	}
 
-	fn build_ptr(mut self): &TypeDecl {
-		let mut token = self.tokens[self.i]
-		if self.i+1 >= self.tokens.len {
+	unsafe fn build_ptr(mut self): &TypeDecl {
+		let mut token = self.tokens[*self.i]
+		if *self.i+1 >= self.tokens.len {
 			self.push_err(token, "invalid_syntax")
 			ret new(TypeDecl)
 		}
 
-		self.i++
-		if self.tokens[self.i].id == TokenId.Unsafe {
-			self.i++
+		*self.i++
+		if self.tokens[*self.i].id == TokenId.Unsafe {
+			*self.i++
 			ret &TypeDecl{
 				token: token,
 				kind:  &PtrTypeDecl{
@@ -233,14 +233,14 @@ impl TypeBuilder {
 		}
 	}
 
-	fn build_ref(mut self): &TypeDecl {
-		let mut token = self.tokens[self.i]
-		if self.i+1 >= self.tokens.len {
+	unsafe fn build_ref(mut self): &TypeDecl {
+		let mut token = self.tokens[*self.i]
+		if *self.i+1 >= self.tokens.len {
 			self.push_err(token, "invalid_syntax")
 			ret new(TypeDecl)
 		}
 
-		self.i++
+		*self.i++
 		let mut elem = self.step()
 		if !real(elem){
 			ret new(TypeDecl)
@@ -254,8 +254,8 @@ impl TypeBuilder {
 		}
 	}
 
-	fn build_op(mut self): &TypeDecl {
-		let mut token = self.tokens[self.i]
+	unsafe fn build_op(mut self): &TypeDecl {
+		let mut token = self.tokens[*self.i]
 		match token.kind {
 		| (str)(TokenKind.Star):
 			ret self.build_ptr()
@@ -273,9 +273,9 @@ impl TypeBuilder {
 		}
 	}
 
-	fn build_slc(mut self): &TypeDecl {
-		let mut token = self.tokens[self.i]
-		self.i++ // skip right bracket
+	unsafe fn build_slc(mut self): &TypeDecl {
+		let mut token = self.tokens[*self.i]
+		*self.i++ // skip right bracket
 		let mut elem = self.step()
 		if !real(elem) {
 			ret new(TypeDecl)
@@ -288,16 +288,16 @@ impl TypeBuilder {
 		}
 	}
 
-	fn build_arr(mut self): &TypeDecl {
+	unsafe fn build_arr(mut self): &TypeDecl {
 		// *tb.i points to element type of array.
 		// Brackets places at ... < *tb.i offset.
 
-		if self.i >= self.tokens.len {
-			self.push_err(self.tokens[self.i-1], "missing_type")
+		if *self.i >= self.tokens.len {
+			self.push_err(self.tokens[*self.i-1], "missing_type")
 			ret new(TypeDecl)
 		}
 
-		let expr_delta: int = self.i
+		let expr_delta = *self.i
 
 		let mut elem = self.step()
 		if !real(elem) {
@@ -333,8 +333,8 @@ impl TypeBuilder {
 		let mut val_tokens = tokens[colon+1:]
 		let mut mapt = &MapTypeDecl{}
 
-		let mut j = new(int, 0)
-		let (mut keyt, mut ok) = self.p.build_type(key_tokens, j, self.err)
+		let mut j = 0
+		let (mut keyt, mut ok) = unsafe { self.p.build_type(key_tokens, &j, self.err) }
 		if !ok {
 			ret new(TypeDecl)
 		} else if j < key_tokens.len {
@@ -343,7 +343,7 @@ impl TypeBuilder {
 		mapt.key = keyt
 
 		j = 0
-		let (mut valt, ok) = self.p.build_type(val_tokens, j, self.err)
+		let (mut valt, ok) = unsafe { self.p.build_type(val_tokens, &j, self.err) }
 		if !ok {
 			ret new(TypeDecl)
 		}  else if j < val_tokens.len {
@@ -357,31 +357,31 @@ impl TypeBuilder {
 		}
 	}
 
-	fn build_enumerable(mut self): &TypeDecl {
-		let mut token = self.tokens[self.i]
-		if (self.i+2 >= self.tokens.len ||
+	unsafe fn build_enumerable(mut self): &TypeDecl {
+		let mut token = self.tokens[*self.i]
+		if (*self.i+2 >= self.tokens.len ||
 			token.id != TokenId.Range ||
 			token.kind != (str)(TokenKind.LBracket)) {
 			self.push_err(token, "invalid_syntax")
 			ret new(TypeDecl)
 		}
-		self.i++
-		token = self.tokens[self.i]
+		*self.i++
+		token = self.tokens[*self.i]
 		if token.id == TokenId.Range && token.kind == (str)(TokenKind.RBracket) {
 			ret self.build_slc()
 		}
 
-		self.i-- // Point to left bracket for range parsing of split_colon.
+		*self.i-- // Point to left bracket for range parsing of split_colon.
 		let (mut map_tokens, colon) = split_map_range(self.tokens, self.i)
-		self.i++
+		*self.i++
 		if colon == -1 {
 			ret self.build_arr()
 		}
 		ret self.build_map(colon, map_tokens)
 	}
 
-	fn step(mut self): &TypeDecl {
-		let token = self.tokens[self.i]
+	unsafe fn step(mut self): &TypeDecl {
+		let token = self.tokens[*self.i]
 		match token.id {
 		| TokenId.Prim:
 			ret self.build_prim()
@@ -402,7 +402,7 @@ impl TypeBuilder {
 			ret self.build_enumerable()
 
 		|:
-			self.i++
+			*self.i++
 			self.push_err(token, "invalid_syntax")
 			ret new(TypeDecl)
 		}
@@ -410,7 +410,7 @@ impl TypeBuilder {
 
 	// Builds type.
 	// Returns void if error occurs.
-	fn build(mut self): (&TypeDecl, ok: bool) {
+	unsafe fn build(mut self): (&TypeDecl, ok: bool) {
 		let mut root = self.step()
 		if !real(root) {
 			ret build_void_type(), false

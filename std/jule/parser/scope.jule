@@ -30,8 +30,6 @@ use std::jule::lex::{
 	Token,
 	TokenId,
 	TokenKind,
-	parts,
-	range,
 	is_assign_op,
 	is_postfix_op,
 }
@@ -216,8 +214,8 @@ impl ScopeParser {
 			kind.next = self.build_st(s)
 		}
 
-		let mut i = new(int, st_tokens.len)
-		let mut block_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+		let mut i = st_tokens.len
+		let mut block_tokens = unsafe { range(&i, TokenKind.LBrace, TokenKind.RBrace, tokens) }
 		if block_tokens == nil {
 			self.stop()
 			self.push_err(it.token, "body_not_exist")
@@ -293,8 +291,8 @@ impl ScopeParser {
 	}
 
 	fn setup_range_kind_keys_explicit(mut self, mut rng: &RangeKind, mut tokens: []Token) {
-		let mut i = new(int, 0)
-		let mut rang = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
+		let mut i = 0
+		let mut rang = unsafe { range(&i, TokenKind.LParent, TokenKind.RParent, tokens) }
 		if i < tokens.len {
 			self.push_err(rng.in_token, "invalid_syntax")
 		}
@@ -370,8 +368,8 @@ impl ScopeParser {
 		if expr_tokens.len > 0 {
 			it.kind = self.build_common_iter_kind(expr_tokens, it.token)
 		}
-		let mut i = new(int, expr_tokens.len)
-		let mut scope_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+		let mut i = expr_tokens.len
+		let mut scope_tokens = unsafe { range(&i, TokenKind.LBrace, TokenKind.RBrace, tokens) }
 		if scope_tokens == nil {
 			self.stop()
 			self.push_err(it.token, "body_not_exist")
@@ -431,13 +429,13 @@ impl ScopeParser {
 		}
 		*tokens = (*tokens)[1:]
 		let mut expr_tokens = get_block_expr(*tokens)
-		let mut i = new(int, 0)
+		let mut i = 0
 		if expr_tokens.len == 0 {
 			self.push_err(model.token, "missing_expr")
 		} else {
 			i = expr_tokens.len
 		}
-		let mut scope_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, *tokens)
+		let mut scope_tokens = unsafe { range(&i, TokenKind.LBrace, TokenKind.RBrace, *tokens) }
 		if scope_tokens == nil {
 			self.stop()
 			self.push_err(model.token, "body_not_exist")
@@ -461,8 +459,8 @@ impl ScopeParser {
 			token: tokens[0],
 		}
 		tokens = tokens[1:] // Remove "else" keyword.
-		let mut i = new(int, 0)
-		let mut scope_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+		let mut i = 0
+		let mut scope_tokens = unsafe { range(&i, TokenKind.LBrace, TokenKind.RBrace, tokens) }
 		if scope_tokens == nil {
 			if i < tokens.len {
 				self.push_err(els.token, "else_have_expr")
@@ -565,8 +563,8 @@ impl ScopeParser {
 		let push_expr = fn(mut tokens: []Token, mut token: Token) {
 			if tokens.len > 0 {
 				if type_match {
-					let mut i = new(int, 0)
-					let (mut t, ok) = self.p.build_type(tokens, i, true)
+					let mut i = 0
+					let (mut t, ok) = unsafe { self.p.build_type(tokens, &i, true) }
 					if ok {
 						exprs = append(exprs, &Expr{
 							token: token,
@@ -693,8 +691,8 @@ impl ScopeParser {
 			self.push_err(m.token, "missing_expr")
 		}
 
-		let mut i = new(int, expr_tokens.len)
-		let mut block_toks = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+		let mut i = expr_tokens.len
+		let mut block_toks = unsafe { range(&i, TokenKind.LBrace, TokenKind.RBrace, tokens) }
 		if block_toks == nil {
 			self.stop()
 			self.push_err(m.token, "body_not_exist")
@@ -734,8 +732,8 @@ impl ScopeParser {
 			}
 		}
 
-		let mut i = new(int, 0)
-		let mut scope_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+		let mut i = 0
+		let mut scope_tokens = unsafe { range(&i, TokenKind.LBrace, TokenKind.RBrace, tokens) }
 		if scope_tokens == nil {
 			self.push_err(token, "invalid_syntax")
 			ret new(ScopeTree)
@@ -886,8 +884,8 @@ impl ScopeParser {
 			declarative: true,
 		}
 
-		let mut i = new(int, 0)
-		let mut rang = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
+		let mut i = 0
+		let mut rang = unsafe { range(&i, TokenKind.LParent, TokenKind.RParent, tokens) }
 		if rang == nil {
 			self.push_err(token, "invalid_syntax")
 			ret new(AssignSt), false

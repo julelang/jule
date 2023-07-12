@@ -8,24 +8,26 @@ jule::Slice<Item> __jule_parser_vector_as_slice(Vector vec) noexcept;
 
 template<typename Vector, typename Item>
 jule::Slice<Item> __jule_parser_vector_as_slice(Vector vec) noexcept {
-	jule::Slice<Item> slice;
-	if (vec._method_len() == 0)
-		return slice;
+    jule::Slice<Item> slice;
+    if (vec._method_len() == 0)
+        return slice;
 
-	slice._len = vec._method_len();
-	slice._cap = vec._method_cap();
+    slice._len = vec._method_len();
+    slice._cap = vec._method_cap();
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
-	slice.data = jule::Ref<Item>::make(reinterpret_cast<Item*>(vec._field__buffer.heap), nullptr);
+    slice.data = jule::Ref<Item>::make(
+        reinterpret_cast<Item*>(vec._field__buffer.heap), nullptr);
 #else
-	slice.data = jule::Ref<Item>::make(reinterpret_cast<Item*>(vec._field__buffer.heap));
+    slice.data = jule::Ref<Item>::make(
+        reinterpret_cast<Item*>(vec._field__buffer.heap));
 #endif
-	slice._slice = slice.data.alloc;
+    slice._slice = slice.data.alloc;
 
-	// Ignore auto-deallocation.
-	// Owner is slice now.
-	vec._field__buffer.heap = nullptr;
+    // Ignore auto-deallocation.
+    // Owner is slice now.
+    vec._field__buffer.heap = nullptr;
 
-	return slice;
+    return slice;
 }
 
 #endif // __JULE_STD_JULE_PARSER

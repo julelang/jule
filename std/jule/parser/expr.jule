@@ -30,10 +30,7 @@ use std::jule::lex::{
 	Token,
 	TokenId,
 	TokenKind,
-	range_last,
 	is_unary_op,
-	range,
-	parts,
 }
 
 // Returns function expressions without call expression
@@ -400,8 +397,8 @@ impl ExprBuilder {
 	}
 
 	fn build_type(mut self, mut tokens: []Token): &TypeDecl {
-		let mut i = new(int, 0)
-		let (mut t, ok) = self.p.build_type(tokens, i, false)
+		let mut i = 0
+		let (mut t, ok) = unsafe { self.p.build_type(tokens, &i, false) }
 		if !ok {
 			self.push_err(tokens[0], "invalid_syntax")
 			ret new(TypeDecl)
@@ -508,8 +505,8 @@ impl ExprBuilder {
 				self.push_err(error_token, "missing_expr")
 			}
 
-			let mut type_index = new(int, 0)
-			let (mut t, ok) = self.p.build_type(type_tokens, type_index, true)
+			let mut type_index = 0
+			let (mut t, ok) = unsafe { self.p.build_type(type_tokens, &type_index, true) }
 			if ok && type_index < type_tokens.len {
 				self.push_err(type_tokens[type_index], "invalid_syntax")
 			} else if !ok {
@@ -517,8 +514,8 @@ impl ExprBuilder {
 			}
 			cast.kind = t
 
-			let mut i = new(int, 0)
-			_ = range(i, TokenKind.LParent, TokenKind.RParent, expr_tokens)
+			let mut i = 0
+			_ = unsafe { range(&i, TokenKind.LParent, TokenKind.RParent, expr_tokens) }
 			if i < expr_tokens.len {
 				ret new(CastExpr)
 			}
@@ -594,8 +591,8 @@ impl ExprBuilder {
 			if part.len == 0 {
 				continue
 			}
-			let mut j = new(int, 0)
-			let (mut generic, _) = self.p.build_type(part, j, true)
+			let mut j = 0
+			let (mut generic, _) = unsafe { self.p.build_type(part, &j, true) }
 			if j < part.len {
 				self.push_err(part[j], "invalid_syntax")
 			}
@@ -641,8 +638,8 @@ impl ExprBuilder {
 	fn build_unsafe_expr(mut self, mut tokens: []Token): &UnsafeExpr {
 		let mut token = tokens[0]
 		tokens = tokens[1:] // Remove unsafe keyword.
-		let mut i = new(int, 0)
-		let mut range_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+		let mut i = 0
+		let mut range_tokens = unsafe { range(&i, TokenKind.LBrace, TokenKind.RBrace, tokens) }
 		if range_tokens.len == 0 {
 			self.push_err(tokens[0], "missing_expr")
 			ret new(UnsafeExpr)
@@ -761,8 +758,8 @@ impl ExprBuilder {
 	}
 
 	fn build_typed_struct_literal(mut self, mut tokens: []Token): &StructLit {
-		let mut i = new(int, 0)
-		let (mut t, ok) = self.p.build_type(tokens, i, true)
+		let mut i = 0
+		let (mut t, ok) = unsafe { self.p.build_type(tokens, &i, true) }
 		if !ok {
 			ret new(StructLit)
 		} else if i >= tokens.len {
@@ -920,8 +917,8 @@ impl ExprBuilder {
 		// Use split_map_range because same thing.
 		// Map types like: [KEY:VALUE]
 		// Slicing expressions like: [START:TO]
-		let mut i = new(int, 0)
-		let (mut slicing_tokens, colon) = split_map_range(tokens, i)
+		let mut i = 0
+		let (mut slicing_tokens, colon) = unsafe { split_map_range(tokens, &i) }
 		if colon != -1 {
 			ret self.build_slicing(expr_tokens, slicing_tokens, colon, error_token)
 		}
