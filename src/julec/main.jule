@@ -4,6 +4,7 @@
 
 // This is the main package of JuleC.
 
+use env::{Opt, OptLevel, OPTIMIZATIONS, push_opt_level}
 use obj::cxx
 
 use std::os::{ARGS, exit}
@@ -199,6 +200,19 @@ unsafe fn parse_out_option(args: []str, mut i: *int) {
 	obj::cxx::OUT = value
 }
 
+unsafe fn parse_opt_option(args: []str, mut i: *int) {
+	let value = get_option_value(args, i)
+	if value == "" {
+		exit_err("missing option value: --opt")
+	}
+
+	match value {
+	| "L0": push_opt_level(OptLevel.L0)
+	| "L1": push_opt_level(OptLevel.L1)
+	|:      exit_err("invalid optimization level: " + value)
+	}
+}
+
 unsafe fn parse_compiler_option(args: []str, mut i: *int) {
 	let value = get_option_value(args, i)
 	match value {
@@ -238,6 +252,12 @@ fn parse_options(args: []str): str {
 
 		| "--compiler":
 			unsafe { parse_compiler_option(args, &i) }
+
+		| (str)(Opt.Copy):
+			OPTIMIZATIONS = append(OPTIMIZATIONS, Opt.Copy)
+
+		| "--opt":
+			unsafe { parse_opt_option(args, &i) }
 
 		|:
 			exit_err("undefined option: " + arg)

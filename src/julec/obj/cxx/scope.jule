@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use env::{Opt, is_opt_enabled}
+
 use std::jule::lex::{TokenKind, is_ignore_ident, is_anon_ident}
 use std::jule::sema::{
 	Data,
@@ -222,7 +224,11 @@ fn gen_range_iter(mut it: &RangeIter): str {
 
 	let mut obj = "{\n"
 	obj += _indent
-	obj += "auto __julec_range_expr = "
+	if it.expr.lvalue && is_opt_enabled(Opt.Copy) {
+		obj += "auto &__julec_range_expr = "
+	} else {
+		obj += "auto __julec_range_expr = "
+	}
 	obj += gen_expr(it.expr.model) + ";\n"
 	obj += _indent
 	obj += "if (__julec_range_expr.begin() != __julec_range_expr.end()) {\n"
