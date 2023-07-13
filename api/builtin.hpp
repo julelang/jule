@@ -65,13 +65,12 @@ namespace jule {
         if (dest.empty() || src.empty())
             return 0;
 
-        jule::Int len{ dest.len() > src.len() ? src.len()
+        const jule::Int len{ dest.len() > src.len() ? src.len()
                        : src.len() > dest.len() ? dest.len()
                        : src.len()
         };
 
-        for (jule::Int index{ 0 }; index < len; ++index)
-            dest._slice[index] = src._slice[index];
+        std::copy(src._slice, src._slice+len, dest._slice);
 
         return len;
     }
@@ -86,8 +85,10 @@ namespace jule {
         jule::Slice<Item> buffer{ jule::Slice<Item>::alloc(n) };
         jule::copy<Item>(buffer, src);
 
-        for (jule::Int index{ 0 }; index < components.len(); ++index)
-            buffer[src.len()+index] = components._slice[index];
+        std::copy(
+            components._slice,
+            components._slice+components._len,
+            buffer._slice+src._len);
 
         return buffer;
     }

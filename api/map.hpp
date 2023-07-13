@@ -109,7 +109,7 @@ namespace jule {
                                         const Map<Key, Value> &src) noexcept {
             stream << '{';
             jule::Int length{ src.len() };
-            for (const auto pair: src) {
+            for (const auto &pair: src) {
                 stream << pair.first;
                 stream << ':';
                 stream << pair.second;

@@ -24,7 +24,7 @@ namespace jule {
     class Slice {
     public:
         jule::Ref<Item> data{};
-        Item *_slice{ nullptr };
+        mutable Item *_slice{ nullptr };
         jule::Uint _len{ 0 };
         jule::Uint _cap{ 0 };
 
@@ -41,13 +41,9 @@ namespace jule {
         { this->operator=(src); }
 
         Slice<Item>(const std::initializer_list<Item> &src) noexcept {
-            if (src.size() == 0)
-                return;
-
             this->alloc_new(src.size());
-            const auto src_begin{ src.begin() };
-            for (jule::Int i{ 0 }; i < this->_len; ++i)
-                this->data.alloc[i] = *reinterpret_cast<const Item*>(src_begin+i);
+            const Item *begin{ reinterpret_cast<const Item*>(src.begin()) };
+            std::copy(begin, begin+this->_len, this->data.alloc);
         }
 
         ~Slice<Item>(void) noexcept
@@ -111,7 +107,7 @@ namespace jule {
 #endif
             this->_len = n;
             this->_cap = n;
-            this->_slice = &alloc[0];
+            this->_slice = alloc;
         }
 
         typedef Item       *Iterator;
@@ -119,19 +115,19 @@ namespace jule {
 
         inline constexpr
         Iterator begin(void) noexcept
-        { return &this->_slice[0]; }
+        { return this->_slice; }
 
         inline constexpr
         ConstIterator begin(void) const noexcept
-        { return &this->_slice[0]; }
+        { return this->_slice; }
     
         inline constexpr
         Iterator end(void) noexcept
-        { return &this->_slice[this->_len]; }
+        { return this->_slice+this->_len; }
 
         inline constexpr
         ConstIterator end(void) const noexcept
-        { return &this->_slice[this->_len]; }
+        { return this->_slice+this->_len; }
 
         inline Slice<Item> slice(const jule::Int &start,
                                  const jule::Int &end) const noexcept {
@@ -145,7 +141,7 @@ namespace jule {
 
             jule::Slice<Item> slice;
             slice.data = this->data;
-            slice._slice = &this->_slice[start];
+            slice._slice = this->_slice+start;
             slice._len = end-start;
             slice._cap = this->_cap-start;
             return slice;
@@ -173,10 +169,9 @@ namespace jule {
                 Item *_new{ new(std::nothrow) Item[this->_len+1] };
                 if (!_new)
                     jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
-                
-                for (jule::Int index{ 0 }; index < this->_len; ++index)
-                    _new[index] = this->data.alloc[index];
-                _new[this->_len] = item;
+
+                std::copy(this->data.alloc, this->data.alloc+this->_len, _new);
+                *(_new+this->_len) = item;
 
                 delete[] this->data.alloc;
                 this->data.alloc = nullptr;
@@ -186,7 +181,7 @@ namespace jule {
 
                 ++this->_cap;
             } else
-                this->_slice[this->_len] = item;
+                *(this->_slice+this->_len) = item;
 
             ++this->_len;
         }
@@ -222,7 +217,7 @@ namespace jule {
                 __JULEC_WRITE_ERROR_INDEX_OUT_OF_RANGE(sstream, index);
                 jule::panic(sstream.str().c_str());
             }
-            return this->_slice[index];
+            return *(this->_slice+index);
         }
 
         void operator=(const jule::Slice<Item> &src) noexcept {
