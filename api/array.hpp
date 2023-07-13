@@ -28,7 +28,9 @@ namespace jule {
         Array<Item, N>(void) noexcept {}
 
         Array<Item, N>(const std::initializer_list<Item> &src) noexcept {
-            std::copy(src.begin(), src.begin()+src.size(), this->buffer.begin());
+            const auto src_begin{ src.begin() };
+            for (jule::Int index{ 0 }; index < src.size(); ++index)
+                this->buffer[index] = *(Item*)(src_begin+index);
         }
 
         Array<Item, N>(const jule::Array<Item, N> &src) noexcept
@@ -99,7 +101,7 @@ namespace jule {
                 __JULEC_WRITE_ERROR_INDEX_OUT_OF_RANGE(sstream, index);
                 jule::panic(sstream.str().c_str());
             }
-            return *(this->buffer+index);
+            return this->buffer[index];
         }
 
         Item &operator[](const jule::Int &index) {
@@ -108,7 +110,7 @@ namespace jule {
                 __JULEC_WRITE_ERROR_INDEX_OUT_OF_RANGE(sstream, index);
                 jule::panic(sstream.str().c_str());
             }
-            return *(this->buffer.begin()+index);
+            return this->buffer[index];
         }
 
         friend std::ostream &operator<<(std::ostream &stream,
