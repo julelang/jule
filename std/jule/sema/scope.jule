@@ -16,6 +16,9 @@ use std::jule::ast::{
 	Iter,
 	Comment,
 	LabelSt,
+	TupleExpr,
+	UnsafeExpr,
+	AssignLeft,
 }
 use std::jule::constant::{new_bool}
 use std::jule::lex::{
@@ -107,6 +110,13 @@ fn get_datas_from_tuple_data(mut d: &Data): []&Data {
 		}
 	} else {
 		ret [d]
+	}
+}
+
+fn get_expr_models(mut m: ExprModel): []ExprModel {
+	match type m {
+	| &TupleExpr: ret (&TupleExpr)(m).expr
+	|:            ret [m]
 	}
 }
 
@@ -993,22 +1003,31 @@ impl ScopeChecker {
 	}
 
 	fn check_single_assign(mut &self, mut a: &AssignSt) {
-		let mut r = self.s.eval(a.right, self)
+		let mut l = new(Data)
+		let mut r = new(Data)
+
+		if !is_ignore_ident(a.left[0].ident) {
+			l = self.s.eval(a.left[0].expr, self)
+			if !real(l) {
+				ret
+			}
+		}
+
+		if real(l) {
+			r = self.s.evalp(a.right, self, l.kind)
+		} else {
+			r = self.s.eval(a.right, self)
+		}
 		if !real(r) {
 			ret
 		}
 
-		if is_ignore_ident(a.left[0].ident) {
+		if !real(l) {
 			if r.kind.is_void() {
 				self.s.push_err(a.right.token, "invalid_expr")
 			}
 
 			self.scope.stmts.push(r)
-			ret
-		}
-
-		let mut l = self.s.eval(a.left[0].expr, self)
-		if !real(l) {
 			ret
 		}
 
@@ -1056,7 +1075,62 @@ impl ScopeChecker {
 		checker.check()
 	}
 
-	fn check_multi_assign(mut &self, mut a: &AssignSt) {
+	fn __process_end_part_of_multi_assign(mut self, mut st: &MultiAssign,
+		mut a: &AssignSt, lexpr: &AssignLeft, mut l: &Data, mut r: &Data) {
+		if is_ignore_ident(lexpr.ident) {
+			if r.kind.is_void() {
+				self.s.push_err(a.right.token, "invalid_expr")
+			}
+
+			st.l = append(st.l, nil)
+			ret
+		}
+
+		if a.declarative && self.is_new_assign_ident(lexpr.ident) {
+			// Add new variable declaration statement.
+			let mut v = &Var{
+				ident:   lexpr.ident,
+				token:   lexpr.token,
+				mutable: lexpr.mutable,
+				scope:   self.tree,
+				value: &Value{
+					expr: a.right,
+					data: r,
+				},
+			}
+
+			self.s.check_var(v)
+
+			st.l = append(st.l, v)
+			self.table.vars.push(v)
+			self.scope.stmts.push(v)
+
+			ret
+		}
+
+		if lexpr.mutable {
+			self.s.push_err(lexpr.token, "duplicated_ident", lexpr.ident)
+		}
+
+		if !check_assign(self.s, l, r, a.setter) {
+			ret
+		}
+
+		self.s.check_validity_for_init_expr(l.mutable, l.kind, r, a.setter)
+
+		let mut checker = AssignTypeChecker{
+			s:           self.s,
+			dest:        l.kind,
+			d:           r,
+			error_token: a.setter,
+			deref:       true,
+		}
+		checker.check()
+
+		st.l = append(st.l, l.model)
+	}
+
+	fn check_ret_multi_assign(mut &self, mut a: &AssignSt) {
 		let mut rd = self.s.eval(a.right, self)
 		if !real(rd) {
 			ret
@@ -1084,64 +1158,80 @@ impl ScopeChecker {
 
 		for i in a.left {
 			let mut lexpr = a.left[i]
+			let mut l = new(Data)
 			let mut r = r[i]
 
-			if is_ignore_ident(lexpr.ident) {
-				if r.kind.is_void() {
-					self.s.push_err(a.right.token, "invalid_expr")
+			if !is_ignore_ident(lexpr.ident) && (!a.declarative || !self.is_new_assign_ident(lexpr.ident)) {
+				l = self.s.eval(lexpr.expr, self)
+				if !real(l) {
+					continue
 				}
-
-				st.l = append(st.l, nil)
-				continue
 			}
 
-			if a.declarative && self.is_new_assign_ident(lexpr.ident) {
-				// Add new variable declaration statement.
-				let mut v = &Var{
-					ident:   lexpr.ident,
-					token:   lexpr.token,
-					mutable: lexpr.mutable,
-					scope:   self.tree,
-					value: &Value{
-						expr: a.right,
-						data: r,
-					},
+			self.__process_end_part_of_multi_assign(st, a, lexpr, l, r)
+		}
+
+		self.scope.stmts.push(st)
+	}
+
+	fn check_multi_assign(mut &self, mut a: &AssignSt) {
+		match type a.right.kind {
+		| &FnCallExpr:
+			self.check_ret_multi_assign(a)
+			ret
+
+		| &UnsafeExpr:
+			match type (&UnsafeExpr)(a.right.kind).expr {
+			| &FnCallExpr:
+				self.check_ret_multi_assign(a)
+				ret
+			}
+		}
+
+		let mut right = get_expr_models(a.right.kind)
+
+		match {
+		| a.left.len > right.len:
+			self.s.push_err(a.setter, "overflow_multi_assign_idents")
+			ret
+
+		| a.left.len < right.len:
+			self.s.push_err(a.setter, "missing_multi_assign_idents")
+			ret
+		}
+
+		let mut right_tuple = &TupleExprModel{}
+
+		let mut st = &MultiAssign {
+			r: right_tuple,
+		}
+
+		for i in a.left {
+			let mut lexpr = a.left[i]
+			let mut l = new(Data)
+			let mut r = new(Data)
+
+			if !is_ignore_ident(lexpr.ident) && (!a.declarative || !self.is_new_assign_ident(lexpr.ident)) {
+				l = self.s.eval(lexpr.expr, self)
+				if !real(l) {
+					continue
 				}
+			}
 
-				self.s.check_var(v)
-
-				st.l = append(st.l, v)
-				self.table.vars.push(v)
-				self.scope.stmts.push(v)
-
+			if real(l) {
+				let mut expr = &Expr{kind: right[i], token: a.right.token}
+				r = self.s.evalp(expr, self, l.kind)
+			} else {
+				let mut expr = &Expr{kind: right[i], token: a.right.token}
+				r = self.s.eval(expr, self)
+			}
+			if !real(r) {
 				continue
 			}
 
-			if lexpr.mutable {
-				self.s.push_err(lexpr.token, "duplicated_ident", lexpr.ident)
-			}
+			right_tuple.datas = append(right_tuple.datas, r)
 
-			let mut l = self.s.eval(lexpr.expr, self)
-			if !real(l) {
-				continue
-			}
-
-			if !check_assign(self.s, l, r, a.setter) {
-				continue
-			}
-
-			self.s.check_validity_for_init_expr(l.mutable, l.kind, r, a.setter)
-
-			let mut checker = AssignTypeChecker{
-				s:           self.s,
-				dest:        l.kind,
-				d:           r,
-				error_token: a.setter,
-				deref:       true,
-			}
-			checker.check()
-
-			st.l = append(st.l, l.model)
+			self.__process_end_part_of_multi_assign(st, a, lexpr, l, r)
 		}
 
 		self.scope.stmts.push(st)

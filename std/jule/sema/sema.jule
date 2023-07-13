@@ -728,7 +728,7 @@ impl Sema {
 
 	// Evaluates expression with type prefixed Eval and returns result.
 	// Checks variable dependencies if exist.
-	fn evalpd(mut &self, mut expr: &Expr, mut l: Lookup, mut p: &TypeSymbol, owner: &Var): &Data {
+	fn evalpd(mut &self, mut expr: &Expr, mut l: Lookup, mut p: &TypeKind, owner: &Var): &Data {
 		let mut e = &Eval{
 			s:      self,
 			lookup: l,
@@ -740,21 +740,19 @@ impl Sema {
 			e.unsafety = (&ScopeChecker)(l).is_unsafe()
 		}
 
-		if real(p) {
-			e.prefix = p.kind
-		}
+		e.prefix = p
 
 		ret e.eval_expr(expr)
 	}
 
 	// Evaluates expression with type prefixed Eval and returns result.
-	fn evalp(mut &self, mut expr: &Expr, mut l: Lookup, mut p: &TypeSymbol): &Data {
+	fn evalp(mut &self, mut expr: &Expr, mut l: Lookup, mut p: &TypeKind): &Data {
 		ret self.evalpd(expr, l, p, new(Var))
 	}
 
 	// Evaluates expression with Eval and returns result.
 	fn eval(mut &self, mut expr: &Expr, mut l: Lookup): &Data {
-		ret self.evalp(expr, l, new(TypeSymbol))
+		ret self.evalp(expr, l, new(TypeKind))
 	}
 
 	fn check_assign_type(mut &self, mut dest: &TypeKind, mut d: &Data, error_token: Token, deref: bool) {
@@ -1874,7 +1872,11 @@ impl Sema {
 			ret
 		}
 
-		decl.value.data = self.evalpd(decl.value.expr, l, decl.kind, decl)
+		if real(decl.kind) {
+			decl.value.data = self.evalpd(decl.value.expr, l, decl.kind.kind, decl)
+		} else {
+			decl.value.data = self.evalpd(decl.value.expr, l, new(TypeKind), decl)
+		}
 		if !real(decl.value.data) {
 			ret // Skip checks if error ocurrs.
 		}
