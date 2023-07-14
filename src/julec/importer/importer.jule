@@ -1,0 +1,135 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::fs::{OFlag, FsError, DirEntry, read_dir, open}
+use std::fs::path::{join}
+use std::jule::ast::{Ast}
+use std::jule::build::{
+	LogKind,
+	Log,
+	EXT,
+	is_pass_file_annotation,
+}
+use std::jule::lex::{new_file_set, lex}
+use std::jule::parser::{parse_file}
+use std::jule::sema::{
+	Importer,
+	ImportInfo,
+}
+use std::os::{exit}
+
+fn exit_err(msg: str) {
+	const ERROR_EXIT_CODE = 0
+
+	outln(msg)
+	exit(ERROR_EXIT_CODE)
+}
+
+fn read_buff(path: str): []byte {
+	let (mut f, _) = open(path, OFlag.Rdonly, 0)
+	if !real(f) {
+		exit_err("error: file cannot read")
+	}
+
+	let mut buff = make([]byte, 0)
+	for {
+		let mut bytes = make([]byte, 1024)
+		let (n, err) = f.read(bytes)
+		if err != FsError.Ok {
+			exit_err("buffering failed")
+		}
+		if n == 0 {
+			break
+		}
+		buff = append(buff, bytes[:n]...)
+	}
+
+	ret buff
+}
+
+fn flat_compiler_err(text: str): Log {
+	ret Log{
+		kind: LogKind.Error,
+		text: text,
+	}
+}
+
+fn read_package_dirents(path: str): ([]&DirEntry, err_msg: str) {
+	let (mut dirents, err) = read_dir(path)
+	if err != FsError.Ok {
+		ret nil, "connot read package directory: " + path
+	}
+
+	let mut passed_dirents: []&DirEntry = nil
+	for (_, mut dirent) in dirents {
+		let name = dirent.name
+
+		// Skip directories, non-jule files, and file annotation fails.
+		if (
+			dirent.stat.is_dir() ||
+			!name.has_suffix(EXT) ||
+			!is_pass_file_annotation(name)
+		) {
+			continue
+		}
+
+		passed_dirents = append(passed_dirents, dirent)
+	}
+
+	ret passed_dirents, ""
+}
+
+// Common importer of JuleC.
+pub struct PlainImporter {
+	pub all_packages: []&ImportInfo
+}
+
+impl Importer for PlainImporter {
+	fn get_import(mut self, path: str): &ImportInfo {
+		for (_, mut p) in self.all_packages {
+			if p.path == path {
+				ret p
+			}
+		}
+
+		ret new(ImportInfo)
+	}
+
+	fn import_package(mut self, path: str): ([]&Ast, []Log) {
+		let (dirents, err_msg) = read_package_dirents(path)
+		if err_msg != "" {
+			let mut errors = [flat_compiler_err(err_msg)]
+			ret nil, errors
+		}
+
+		let mut asts: []&Ast = nil
+		for _, dirent in dirents {
+			let path = join(path, dirent.name)
+			let mut file = new_file_set(path)
+			let mut errors = lex(file, read_buff(file.path()))
+			if errors.len > 0 {
+				ret nil, errors
+			}
+
+			let mut finfo = parse_file(file)
+			if finfo.errors.len > 0 {
+				ret nil, finfo.errors
+			}
+
+			asts = append(asts, finfo.ast)
+		}
+
+		ret asts, nil
+	}
+
+	fn imported(mut self, mut imp: &ImportInfo) {
+		for _, p in self.all_packages {
+			if p.cpp_linked == imp.cpp_linked && p.link_path == imp.link_path {
+				ret
+			}
+		}
+
+		self.all_packages = append(self.all_packages, imp)
+	}
+}

@@ -4,13 +4,68 @@
 
 // This is the main package of JuleC.
 
-use env::{Opt, OptLevel, OPTIMIZATIONS, push_opt_level}
+use deadcode::{eliminate_dead_code}
+use env::{Opt, OptLevel, OPTIMIZATIONS, push_opt_level, is_opt_enabled}
+use importer::{PlainImporter}
+use obj::{IR, build_ir}
 use obj::cxx
 
-use std::os::{ARGS, exit}
+use std::fs::{FsError, OFlag, stat, open}
+use std::fs::path::{join, dir}
 use std::jule::{VERSION}
-use std::jule::build::{self, DISTOS, DISTARCH, errorf}
+use std::jule::build::{
+	self,
+	Log,
+	PATH_WD,
+	PATH_STDLIB,
+	DISTOS,
+	DISTARCH,
+	ENTRY_POINT,
+	errorf,
+	is_valid_cpp_ext,
+}
 use std::jule::lex::{is_decimal, is_ident_rune, is_letter, is_space}
+use std::jule::sema::{
+	ImportInfo,
+	Package,
+	analyze_package,
+}
+use std::os::{ARGS, exit}
+use std::runtime::{OS}
+
+use cpp "julec.hpp"
+
+cpp fn mkdir(path: str): bool
+cpp fn system(cmd: str): int
+// Truncate file.
+// Creates new one if file is not exist in this path.
+cpp fn __julec_truncate_file(path: str)
+
+enum Compiler: str {
+	NA = "",
+	GCC = "gcc",
+	Clang = "clang",
+}
+
+enum CompilerPath: str {
+	NA = "",
+	GCC = "g++",
+	Clang = "clang++",
+}
+
+enum Mode {
+	Compile,
+	Transpile,
+}
+
+// Sets by COMPILER or command-line inputs
+let mut COMPILER = Compiler.NA
+let mut COMPILER_PATH = CompilerPath.NA
+
+let mut OUT_DIR = "dist"
+let mut MODE = Mode.Compile
+let mut OUT_NAME = "ir.cpp"
+let mut OUT = ""
 
 const CMD_HELP = "help"
 const CMD_VERSION = "version"
@@ -127,16 +182,18 @@ fn init() {
 		exit(0)
 	}
 
+	// Configure compiler to default by platform
+	if OS == "windows" {
+		COMPILER = Compiler.GCC
+		COMPILER_PATH = CompilerPath.GCC
+	} else {
+		COMPILER = Compiler.Clang
+		COMPILER_PATH = CompilerPath.Clang
+	}
+
 	if process_command() {
 		exit(0)
 	}
-}
-
-fn exit_err(msg: str) {
-	const ERROR_EXIT_CODE = 0
-
-	outln(msg)
-	exit(ERROR_EXIT_CODE)
 }
 
 unsafe fn get_option(args: []str, mut i: *int): (arg: str, content: str) {
@@ -197,7 +254,7 @@ unsafe fn parse_out_option(args: []str, mut i: *int) {
 	if value == "" {
 		exit_err("missing option value: -o --out")
 	}
-	obj::cxx::OUT = value
+	OUT = value
 }
 
 unsafe fn parse_opt_option(args: []str, mut i: *int) {
@@ -263,17 +320,17 @@ unsafe fn parse_compiler_option(args: []str, mut i: *int) {
 	| "":
 		exit_err("missing option value: --compiler")
 
-	| obj::cxx::COMPILER_CLANG:
-		obj::cxx::COMPILER_PATH = obj::cxx::COMPILER_PATH_CLANG
+	| (str)(Compiler.Clang):
+		COMPILER = Compiler.Clang
+		COMPILER_PATH = CompilerPath.Clang
 
-	| obj::cxx::COMPILER_GCC:
-		obj::cxx::COMPILER_PATH = obj::cxx::COMPILER_PATH_GCC
+	| (str)(Compiler.GCC):
+		COMPILER = Compiler.GCC
+		COMPILER_PATH = CompilerPath.GCC
 
 	|:
 		exit_err("invalid option value for --compiler: " + value)
 	}
-
-	obj::cxx::COMPILER = value
 }
 
 fn parse_options(args: []str): str {
@@ -289,10 +346,10 @@ fn parse_options(args: []str): str {
 			unsafe { parse_out_option(args, &i) }
 
 		| "-t" | "--transpile":
-			obj::cxx::MODE = obj::cxx::MODE_T
+			MODE = Mode.Transpile
 
 		| "-c" | "--compile":
-			obj::cxx::MODE = obj::cxx::MODE_C
+			MODE = Mode.Compile
 
 		| "--compiler":
 			unsafe { parse_compiler_option(args, &i) }
@@ -317,11 +374,169 @@ fn parse_options(args: []str): str {
 	ret cmd
 }
 
+fn write_output(path: str, content: str) {
+	let dir = dir(path)
+
+	let (_, mut err) = stat(dir)
+	if err != FsError.Ok {
+		let ok = cpp.mkdir(dir)
+		if !ok {
+			exit_err("a problem occurs when code generation")
+		}
+	}
+
+	cpp.__julec_truncate_file(path)
+
+	let (mut f, err) = open(path, OFlag.Rdwr|OFlag.Create|OFlag.Trunc, 0666)
+	if err != FsError.Ok {
+		exit_err("a problem occurs when code generati")
+	}
+
+	_, err = f.write(([]byte)(content))
+	if err != FsError.Ok {
+		exit_err("a problem occurs when code generat")
+	}
+	_ = f.close()
+}
+
+fn do_spell(obj: str, compiler: str, compiler_cmd: str) {
+	let path = get_compile_path()
+	write_output(path, obj)
+	match MODE {
+	| Mode.Compile:
+		let status = cpp.system(compiler + " " + compiler_cmd)
+		if status != 0 {
+			out("external compiler failed with status code: ");
+			outln(status)
+			exit(0)
+		}
+	}
+}
+
+fn exit_err(msg: str) {
+	const ERROR_EXIT_CODE = 0
+
+	outln(msg)
+	exit(ERROR_EXIT_CODE)
+}
+
+fn check_mode() {
+	if MODE != Mode.Transpile && MODE != Mode.Compile {
+		outln(errorf("invalid_value_for_key", MODE, "mode"))
+		exit(0)
+	}
+}
+
+fn check_compiler() {
+	if COMPILER != Compiler.GCC && COMPILER != Compiler.Clang {
+		outln(errorf("invalid_value_for_key", COMPILER, "compiler"))
+		exit(0)
+	}
+}
+
+fn set() {
+	check_mode()
+	check_compiler()
+}
+
+// print_logs prints logs and returns true
+// if logs has error, false if not.
+fn print_logs(logs: []Log) {
+	let mut s = ""
+	for _, l in logs {
+		s += l.to_str() + "\n"
+	}
+	out(s)
+}
+
+fn is_cpp_source_file(path: str): bool {
+	let offset = path.rfind(".")
+	if offset == -1 {
+		ret false
+	}
+	ret is_valid_cpp_ext(path[offset:])
+}
+
+fn gen_compile_cmd(source_path: str, ir: &IR): (str, str) {
+	let compiler = (str)(COMPILER_PATH)
+
+	const ZERO_LEVEL_OPTIMIZATION = "-O0"
+	const DISABLE_ALL_WARNINGS = "-Wno-everything"
+	const SET_STD = "--std=c++14"
+
+	let mut cmd = ZERO_LEVEL_OPTIMIZATION + " "
+	cmd += DISABLE_ALL_WARNINGS + " "
+	cmd += SET_STD + " "
+
+	// Push passes.
+	for _, pass in ir.passes {
+		cmd += pass + " "
+	}
+
+	// Push linked source files.
+	for _, u in ir.used {
+		if u.cpp_linked && is_cpp_source_file(u.path) {
+			cmd += u.path + " "
+		}
+	}
+
+	if OUT != "" {
+		cmd += "-o " + OUT + " "
+	}
+	cmd += source_path
+
+	ret compiler, cmd
+}
+
+fn get_compile_path(): str {
+	let mut path = join(PATH_WD, OUT_DIR)
+	path = join(path, OUT_NAME)
+	ret path
+}
+
+fn apply_target_independent_optimizations(mut ir: &IR) {
+	if is_opt_enabled(Opt.DeadCode) {
+		eliminate_dead_code(ir)
+	}
+}
+
 fn main() {
 	let path = parse_options(ARGS)
 	if path == "" {
 		exit_err(errorf("missing_compile_path"))
 	}
 
-	obj::cxx::compile(path)
+	// Check standard library.
+	let (inf, err) = stat(PATH_STDLIB)
+	if err != FsError.Ok || !inf.is_dir() {
+		exit_err(errorf("stdlib_not_exist"))
+	}
+
+	set()
+
+	let (mut ir, logs) = build_ir(path)
+
+	if !real(ir) && logs == nil {
+		exit_err(errorf("no_file_in_entry_package", path))
+	}
+
+	if logs != nil {
+		print_logs(logs)
+		exit_err("")
+	}
+
+	const CPP_LINKED = false
+	let f = ir.main.find_fn(ENTRY_POINT, CPP_LINKED)
+	if !real(f) {
+		exit_err(errorf("no_entry_point"))
+	}
+
+	apply_target_independent_optimizations(ir)
+
+	let (compiler, compiler_cmd) = gen_compile_cmd(get_compile_path(), ir)
+
+	let mut obj = obj::cxx::gen(ir)
+	unsafe { obj::cxx::append_standard(&obj, compiler, compiler_cmd) }
+
+	do_spell(obj, compiler, compiler_cmd)
 }

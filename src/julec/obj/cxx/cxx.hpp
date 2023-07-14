@@ -25,16 +25,7 @@ struct JuleCompileTime {
 	jule::Int minute;
 };
 
-jule::Bool mkdir(const jule::Str &path) noexcept;
-jule::Int system(const jule::Str &cmd) noexcept;
 JuleCompileTime time_now(void) noexcept;
-void __julec_truncate_file(const jule::Str &path) noexcept;
-
-jule::Bool mkdir(const jule::Str &path) noexcept
-{ return fs::create_directories(path.operator const char *()); }
-
-jule::Int system(const jule::Str &cmd) noexcept
-{ return std::system(cmd.operator const char *()); }
 
 JuleCompileTime time_now(void) noexcept {
 	time_t now;
@@ -48,12 +39,6 @@ JuleCompileTime time_now(void) noexcept {
 		time->tm_hour,
 		time->tm_min,
 	};
-}
-
-void __julec_truncate_file(const jule::Str &path) noexcept {
-	FILE *f{ std::fopen(static_cast<const char*>(path), "w") };
-	std::fclose(f);
-	f = nullptr;
 }
 
 #endif // __JULEC_OBJ_CXX

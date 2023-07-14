@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use obj::{IR}
+
 use std::conv::{itoa}
 use std::jule::{VERSION}
 use std::jule::build::{
@@ -9,6 +11,8 @@ use std::jule::build::{
 	INIT_FN,
 	PATH_API,
 	is_std_header_path,
+	is_valid_cpp_ext,
+	is_valid_header_ext,
 }
 use std::jule::lex::{
 	TokenId,
@@ -80,66 +84,18 @@ fn indent(): str {
 	ret s
 }
 
-// Returns all structures of main package and used pakcages.
-// Ignores cpp-linked declarations.
-fn get_all_structures(mut pkg: &Package, mut used: []&ImportInfo): []&Struct {
-	let mut buffer: []&Struct = nil
-
-	let append_structs = fn(mut p: &Package) {
-		for (_, mut f) in p.files {
-			let mut i = 0
-			for i < f.structs.len(); i++ {
-				let mut s = f.structs.at(i)
-				if !s.cpp_linked {
-					buffer = append(buffer, s)
-				}
-			}
-		}
+fn is_cpp_header_file(path: str): bool {
+	let offset = path.rfind(".")
+	if offset == -1 {
+		ret false
 	}
-
-	append_structs(pkg)
-
-	for (_, mut u) in used {
-		if !u.cpp_linked {
-			append_structs(u.package)
-		}
-	}
-
-	ret buffer
-}
-
-// Returns all variables of main package and used pakcages.
-// Ignores cpp-linked declarations.
-fn get_all_variables(mut pkg: &Package, mut used: []&ImportInfo): []&Var {
-	let mut buffer: []&Var = nil
-
-	let append_vars = fn(mut p: &Package) {
-		for (_, mut f) in p.files {
-			let mut i = 0
-			for i < f.vars.len(); i++ {
-				let mut v = f.vars.at(i)
-				if !v.cpp_linked {
-					buffer = append(buffer, v)
-				}
-			}
-		}
-	}
-
-	append_vars(pkg)
-
-	for (_, mut u) in used {
-		if !u.cpp_linked {
-			append_vars(u.package)
-		}
-	}
-
-	ret buffer
+	ret is_valid_header_ext(path[offset:])
 }
 
 // Generates all C/C++ include directives.
-fn gen_links(mut used: []&ImportInfo): str {
+fn gen_links(mut ir: &IR): str {
 	let mut obj = ""
-	for (_, mut pkg) in used {
+	for (_, mut pkg) in ir.used {
 		match {
 		| !pkg.cpp_linked:
 			continue
@@ -149,7 +105,7 @@ fn gen_links(mut used: []&ImportInfo): str {
 		}
 	}
 
-	for (_, mut pkg) in used {
+	for (_, mut pkg) in ir.used {
 		match {
 		| !pkg.cpp_linked:
 			continue
@@ -337,14 +293,14 @@ fn gen_traits_pkg(mut pkg: &Package): str {
 }
 
 // Generates C++ code of all traits.
-fn gen_traits(mut pkg: &Package, mut used: []&ImportInfo): str {
+fn gen_traits(mut ir: &IR): str {
 	let mut obj = ""
-	for (_, mut u) in used {
+	for (_, mut u) in ir.used {
 		if !u.cpp_linked {
 			obj += gen_traits_pkg(u.package)
 		}
 	}
-	obj += gen_traits_pkg(pkg)
+	obj += gen_traits_pkg(ir.main)
 	ret obj
 }
 
@@ -656,29 +612,29 @@ fn gen_fn_prototypes(mut pkg: &Package): str {
 }
 
 // Generates C++ code of all can-be-prototyped declarations.
-fn gen_prototypes(mut pkg: &Package, mut used: []&ImportInfo, mut structs: []&Struct): str {
+fn gen_prototypes(mut ir: &IR, mut structs: []&Struct): str {
 	let mut obj = ""
 
-	for (_, mut u) in used {
+	for (_, mut u) in ir.used {
 		if !u.cpp_linked {
 			obj += gen_trait_prototypes(u.package)
 		}
 	}
-	obj += gen_trait_prototypes(pkg)
+	obj += gen_trait_prototypes(ir.main)
 
 	
 	obj += gen_struct_plain_prototypes(structs)
 
-	obj += gen_traits(pkg, used) + "\n"
+	obj += gen_traits(ir) + "\n"
 
 	obj += gen_struct_prototypes(structs)
 
-	for (_, mut u) in used {
+	for (_, mut u) in ir.used {
 		if !u.cpp_linked {
 			obj += gen_fn_prototypes(u.package)
 		}
 	}
-	obj += gen_fn_prototypes(pkg)
+	obj += gen_fn_prototypes(ir.main)
 
 	ret obj
 }
@@ -865,21 +821,21 @@ fn gen_structs(mut structs: []&Struct): str {
 }
 
 // Generates C++ code of all functions.
-fn gen_fns(mut pkg: &Package, mut used: []&ImportInfo): str {
+fn gen_fns(mut ir: &IR): str {
 	let mut obj = ""
 
-	for (_, mut u) in used {
+	for (_, mut u) in ir.used {
 		if !u.cpp_linked {
 			obj += gen_pkg_fns(u.package)
 		}
 	}
-	obj += gen_pkg_fns(pkg)
+	obj += gen_pkg_fns(ir.main)
 
 	ret obj
 }
 
 // Generated C++ code of all initializer functions.
-fn gen_init_caller(mut pkg: &Package, mut used: []&ImportInfo): str {
+fn gen_init_caller(mut ir: &IR): str {
 	const INDENTION = "\t"
 
 	let mut obj = "void "
@@ -896,18 +852,18 @@ fn gen_init_caller(mut pkg: &Package, mut used: []&ImportInfo): str {
 		obj += "\n" + INDENTION + fn_out_ident(f) + "();"
 	}
 
-	for (_, mut u) in used {
+	for (_, mut u) in ir.used {
 		if !u.cpp_linked {
 			push_init(u.package)
 		}
 	}
-	push_init(pkg)
+	push_init(ir.main)
 
 	obj += "\n}"
 	ret obj
 }
 
-unsafe fn append_standard(mut obj_code: *str, compiler: str, compiler_cmd: str) {
+pub unsafe fn append_standard(mut obj_code: *str, compiler: str, compiler_cmd: str) {
 	let time = cpp.time_now()
 	
 	let mut time_str = ""
@@ -954,20 +910,20 @@ int main(int argc, char *argv[]) {
 }
 
 // Generates C++ codes from SymbolTables.
-pub fn gen(mut pkg: &Package, mut used: []&ImportInfo): str {
+pub fn gen(mut ir: &IR): str {
 	let mut od = &OrderedDecls{}
-	od.structs = get_all_structures(pkg, used)
+	od.structs = ir.get_all_structures()
 	order_structures(od.structs)
 
-	od.globals = get_all_variables(pkg, used)
+	od.globals = ir.get_all_variables()
 	order_variables(od.globals)
 
 	let mut obj = ""
-	obj += gen_links(used) + "\n"
-	obj += gen_prototypes(pkg, used, od.structs) + "\n\n"
+	obj += gen_links(ir) + "\n"
+	obj += gen_prototypes(ir, od.structs) + "\n\n"
 	obj += gen_globals(od.globals) + "\n"
 	obj += gen_structs(od.structs)
-	obj += gen_fns(pkg, used) + "\n"
-	obj += gen_init_caller(pkg, used) + "\n"
+	obj += gen_fns(ir) + "\n"
+	obj += gen_init_caller(ir) + "\n"
 	ret obj
 }
