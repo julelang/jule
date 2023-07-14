@@ -33,7 +33,7 @@ namespace jule {
                 jule::panic("[]T: slice allocation length lower than zero");
 
             jule::Slice<Item> buffer;
-            buffer.alloc_new(len, len);
+            buffer.alloc_new(len, len, Item());
             return buffer;
         }
 
@@ -46,7 +46,30 @@ namespace jule {
                 jule::panic("[]T: slice allocation length greater than capacity");
 
             jule::Slice<Item> buffer;
-            buffer.alloc_new(len, cap);
+            buffer.alloc_new(len, cap, Item());
+            return buffer;
+        }
+
+        static jule::Slice<Item> alloc_def(const jule::Uint &len, const Item &def) noexcept {
+            if (len < 0)
+                jule::panic("[]T: slice allocation length lower than zero");
+
+            jule::Slice<Item> buffer;
+            buffer.alloc_new(len, len, def);
+            return buffer;
+        }
+
+        static jule::Slice<Item> alloc(const jule::Uint &len,
+            const jule::Uint &cap, const Item &def) noexcept {
+            if (len < 0)
+                jule::panic("[]T: slice allocation length lower than zero");
+            if (cap < 0)
+                jule::panic("[]T: slice allocation capacity lower than zero");
+            if (len > cap)
+                jule::panic("[]T: slice allocation length greater than capacity");
+
+            jule::Slice<Item> buffer;
+            buffer.alloc_new(len, cap, def);
             return buffer;
         }
 
@@ -60,7 +83,8 @@ namespace jule {
             if (src.size() == 0)
                 return;
 
-            this->alloc_new(src.size(), src.size());
+            this->alloc_new(0, src.size(), Item());
+            this->_len = this->_cap;
             const auto src_begin{ src.begin() };
             for (jule::Int i{ 0 }; i < this->_len; ++i)
                 this->data.alloc[i] = *reinterpret_cast<const Item*>(src_begin+i);
@@ -109,7 +133,8 @@ namespace jule {
 #endif // __JULE_DISABLE__REFERENCE_COUNTING
         }
 
-        void alloc_new(const jule::Int &len, const jule::Int &cap) noexcept {
+        void alloc_new(const jule::Int &len, const jule::Int &cap,
+            const Item &def) noexcept {
             this->dealloc();
 
             Item *alloc{
@@ -122,7 +147,7 @@ namespace jule {
 
             // Initialize elements.
             for (jule::Int i{ 0 }; i < len; ++i)
-                alloc[i] = Item();
+                alloc[i] = def;
 
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
             this->data = jule::Ref<Item>::make(alloc, nullptr);
