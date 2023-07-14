@@ -570,11 +570,23 @@ impl Eval {
 		}
 	}
 
+	fn push_reference_to_fn(mut self, mut f: &Fn) {
+		match type self.lookup {
+		| &ScopeChecker:
+			let mut sc = (&ScopeChecker)(self.lookup).get_root()
+			if !f.references.exist[Fn](sc.owner.decl) {
+				f.references.push(sc.owner.decl)
+			}
+		}
+	}
+
 	fn eval_fn(mut self, mut f: &Fn, error_token: Token): &Data {
 		if !self.s.is_accessible_define(f.public, f.token) {
 			self.push_err(error_token, "ident_is_not_accessible", f.ident)
 			ret new(Data)
 		}
+
+		self.push_reference_to_fn(f)
 
 		let mut ins = f.instance()
 		ret self.eval_fn_ins(ins)
@@ -1630,9 +1642,9 @@ impl Eval {
 
 		const CPP_LINKED = false
 		let mut def = self.get_def(s.ident.kind, CPP_LINKED)
-		let mut d = self.eval_def(def, s.ident)
-
 		self.lookup = lookup
+
+		let mut d = self.eval_def(def, s.ident)
 
 		ret d
 	}
@@ -1977,6 +1989,8 @@ impl Eval {
 		if m.params[0].is_ref() && !ref {
 			self.push_err(si.ident, "ref_method_used_with_not_ref_instance")
 		}
+
+		self.push_reference_to_fn(m)
 
 		let mut ins = m.instance()
 		ins.owner = s

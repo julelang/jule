@@ -1,0 +1,96 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::jule::sema::{
+	Package,
+	ImportInfo,
+	Fn,
+	Struct,
+}
+use std::vector::{Vector}
+
+fn is_checked[T](checked: []any, t: &T): bool {
+	for _, ref in checked {
+		match type ref {
+		| &T:
+			if &(&T)(ref) == &t {
+				ret true
+			}
+		}
+	}
+	ret false
+}
+
+fn fn_is_dead(mut f: &Fn): bool {
+	let mut checked: []any = nil
+
+	let mut check: fn(mut ff: &Fn): bool = nil
+	check = fn(mut ff: &Fn): bool {
+		if !ff.global || ff.cpp_linked || ff.is_entry_point() || ff.is_init() || ff.is_anon() {
+			ret false
+		}
+		checked = append(checked, ff)
+
+		let mut i = 0
+		for i < ff.references.len(); i++ {
+			let mut ref = ff.references.at(i)
+			match type ref {
+			| &Fn:
+				let mut rf = (&Fn)(ref)
+				if is_checked[Fn](checked, rf) { // Cycle.
+					continue
+				}
+
+				if !check(rf) {
+					ret false
+				}
+			}
+		}
+		ret true
+	}
+
+	ret check(f)
+}
+
+unsafe fn eliminate_dead_functions(mut funcs: *Vector[&Fn]) {
+	let mut i = 0
+	for i < funcs.len() {
+		if fn_is_dead(funcs.at(i)) {
+			funcs.remove_range(i, 1)
+		} else {
+			i++
+		}
+	}
+}
+
+fn eliminate_dead_functions_package(mut pkg: &Package) {
+	for (_, mut f) in pkg.files {
+		unsafe { eliminate_dead_functions(&f.funcs) }
+	}
+}
+
+fn eliminate_dead_structs(mut pkg: &Package) {
+	for (_, mut f) in pkg.files {
+		let mut i = 0
+		for i < f.structs.len() {
+			let mut s = f.structs.at(i)
+			unsafe { eliminate_dead_functions(&s.methods) }
+			i++
+		}
+	}
+}
+
+fn eliminate_dead_code_package(mut pkg: &Package) {
+	eliminate_dead_functions_package(pkg)
+	eliminate_dead_structs(pkg)
+}
+
+pub fn eliminate_dead_code(mut pkg: &Package, mut uses: []&ImportInfo) {
+	for (_, mut u) in uses {
+		if !u.cpp_linked {
+			eliminate_dead_code_package(u.package)
+		}
+	}
+	eliminate_dead_code_package(pkg)
+}

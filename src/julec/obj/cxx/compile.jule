@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use deadcode::{eliminate_dead_code}
+use env::{Opt, is_opt_enabled}
+
 use std::os::{exit}
 use std::fs::{DirEntry, FsError, OFlag, open, read_dir, stat}
 use std::fs::path::{join, dir}
@@ -358,6 +361,10 @@ pub fn compile(path: str) {
 	let (mut pkg, mut importer) = __compile(path)
 	if !real(pkg) || !real(importer) {
 		ret
+	}
+
+	if is_opt_enabled(Opt.DeadCode) {
+		eliminate_dead_code(pkg, importer.all_packages)
 	}
 
 	let passes = get_all_unique_passes(pkg, importer.all_packages)
