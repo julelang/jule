@@ -82,13 +82,24 @@ namespace jule {
         if (src == nullptr && components == nullptr)
             return nullptr;
 
-        const jule::Int n{ src.len() + components.len() };
-        jule::Slice<Item> buffer{ jule::Slice<Item>::alloc(n) };
-        jule::copy<Item>(buffer, src);
+        if (src._len+components._len > src._cap) {
+            const jule::Int n{ (src._len+components._len)*2 };
+            jule::Slice<Item> buffer{ jule::Slice<Item>::alloc(n) };
+            buffer._len = src._len+components._len;
+            jule::copy<Item>(buffer, src);
 
-        for (jule::Int index{ 0 }; index < components.len(); ++index)
-            buffer[src.len()+index] = components._slice[index];
+            for (jule::Int index{ 0 }; index < components._len; ++index)
+                buffer._slice[src._len+index] = components._slice[index];
 
+            return buffer;
+        }
+
+        jule::Slice<Item> buffer{ src };
+
+        for (jule::Int index{ 0 }; index < components._len; ++index)
+            buffer._slice[buffer._len+index] = components._slice[index];
+
+        buffer._len += components._len;
         return buffer;
     }
 

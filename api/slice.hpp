@@ -23,14 +23,30 @@ namespace jule {
     template<typename Item>
     class Slice {
     public:
-        jule::Ref<Item> data{};
-        Item *_slice{ nullptr };
-        jule::Uint _len{ 0 };
-        jule::Uint _cap{ 0 };
+        mutable jule::Ref<Item> data{};
+        mutable Item *_slice{ nullptr };
+        mutable jule::Uint _len{ 0 };
+        mutable jule::Uint _cap{ 0 };
 
-        static jule::Slice<Item> alloc(const jule::Uint &n) noexcept {
+        static jule::Slice<Item> alloc(const jule::Uint &len) noexcept {
+            if (len < 0)
+                jule::panic("[]T: slice allocation length lower than zero");
+
             jule::Slice<Item> buffer;
-            buffer.alloc_new(n < 0 ? 0 : n);
+            buffer.alloc_new(len, len);
+            return buffer;
+        }
+
+        static jule::Slice<Item> alloc(const jule::Uint &len, const jule::Uint &cap) noexcept {
+            if (len < 0)
+                jule::panic("[]T: slice allocation length lower than zero");
+            if (cap < 0)
+                jule::panic("[]T: slice allocation capacity lower than zero");
+            if (len > cap)
+                jule::panic("[]T: slice allocation length greater than capacity");
+
+            jule::Slice<Item> buffer;
+            buffer.alloc_new(len, cap);
             return buffer;
         }
 
@@ -44,7 +60,7 @@ namespace jule {
             if (src.size() == 0)
                 return;
 
-            this->alloc_new(src.size());
+            this->alloc_new(src.size(), src.size());
             const auto src_begin{ src.begin() };
             for (jule::Int i{ 0 }; i < this->_len; ++i)
                 this->data.alloc[i] = *reinterpret_cast<const Item*>(src_begin+i);
@@ -93,24 +109,28 @@ namespace jule {
 #endif // __JULE_DISABLE__REFERENCE_COUNTING
         }
 
-        void alloc_new(const jule::Int n) noexcept {
+        void alloc_new(const jule::Int &len, const jule::Int &cap) noexcept {
             this->dealloc();
 
             Item *alloc{
-                n == 0 ?
+                cap == 0 ?
                     new(std::nothrow) Item[0] :
-                    new(std::nothrow) Item[n]{ Item() }
+                    new(std::nothrow) Item[cap]
             };
             if (!alloc)
                 jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
+
+            // Initialize elements.
+            for (jule::Int i{ 0 }; i < len; ++i)
+                alloc[i] = Item();
 
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
             this->data = jule::Ref<Item>::make(alloc, nullptr);
 #else
             this->data = jule::Ref<Item>::make(alloc);
 #endif
-            this->_len = n;
-            this->_cap = n;
+            this->_len = len;
+            this->_cap = cap;
             this->_slice = &alloc[0];
         }
 
