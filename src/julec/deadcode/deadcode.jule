@@ -10,6 +10,7 @@ use std::jule::sema::{
 	Struct,
 	Var,
 	ReferenceStack,
+	Trait,
 }
 use std::vector::{Vector}
 
@@ -33,6 +34,7 @@ fn is_dead_ref(ref: any): bool {
 	| &Fn:     ret is_exist[Fn](deads, (&Fn)(ref))
 	| &Var:    ret is_exist[Var](deads, (&Var)(ref))
 	| &Struct: ret is_exist[Struct](deads, (&Struct)(ref))
+	| &Trait:  ret is_exist[Trait](deads, (&Trait)(ref))
 	|:         ret false
 	}
 }
@@ -55,6 +57,7 @@ fn is_dead(mut ref: any): (dead: bool) {
 	| &Fn:     ret is_fn_dead((&Fn)(ref))
 	| &Var:    ret is_var_dead((&Var)(ref))
 	| &Struct: ret is_struct_dead((&Struct)(ref))
+	| &Trait:  ret is_trait_dead((&Trait)(ref))
 	|:         ret false
 	}
 }
@@ -114,6 +117,15 @@ fn is_struct_dead(mut s: &Struct): bool {
 	ret is_all_references_are_dead(s.references)
 }
 
+fn is_trait_dead(mut t: &Trait): bool {
+	for (_, mut imp) in t.implemented {
+		if !is_struct_dead(imp) {
+			ret false
+		}
+	}
+	ret true
+}
+
 unsafe fn eliminate_dead_functions(mut funcs: *Vector[&Fn]) {
 	let mut i = 0
 	for i < funcs.len() {
@@ -159,10 +171,24 @@ fn eliminate_dead_structs(mut pkg: &Package) {
 	}
 }
 
+fn eliminate_dead_traits(mut pkg: &Package) {
+	for (_, mut f) in pkg.files {
+		let mut i = 0
+		for i < f.traits.len() {
+			if is_trait_dead(f.traits.at(i)) {
+				f.traits.remove_range(i, 1)
+			} else {
+				i++
+			}
+		}
+	}
+}
+
 fn eliminate_dead_code_package(mut pkg: &Package) {
 	eliminate_dead_globals(pkg)
 	eliminate_dead_functions_package(pkg)
 	eliminate_dead_structs(pkg)
+	eliminate_dead_traits(pkg)
 }
 
 pub fn eliminate_dead_code(mut ir: &IR) {
