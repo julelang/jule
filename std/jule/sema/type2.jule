@@ -736,13 +736,16 @@ impl FnCallArgChecker {
 
 	fn push(mut self, mut p: &ParamIns, mut arg: &Expr): (ok: bool) {
 		let mut d = new(Data)
-		if !self.dynamic_annotation {
+		if !self.dynamic_annotation && !p.decl.variadic {
 			let mut old = self.e.prefix
 			self.e.prefix = p.kind
 			d = self.e.eval_expr_kind(arg.kind)
 			self.e.prefix = old
 		} else {
+			let mut old = self.e.prefix
+			drop(self.e.prefix)
 			d = self.e.eval_expr_kind(arg.kind)
+			self.e.prefix = old
 		}
 		if !real(d) {
 			ret false
@@ -760,7 +763,7 @@ impl FnCallArgChecker {
 		}
 
 		let mut old = self.e.prefix
-		self.e.prefix = p.kind
+		self.e.prefix = &TypeKind{kind: &Slc{elem: p.kind}}
 		for i < self.args.len; i++ {
 			let mut arg = self.args[i]
 			let mut d = self.e.eval_expr_kind(arg.kind)
