@@ -17,6 +17,7 @@ use std::jule::ast::{
 }
 use std::jule::lex::{Token, Ident, is_ignore_ident}
 use std::jule::types::{
+	self,
 	bitsize_of,
 	check_bit_float,
 	max_of,
@@ -130,6 +131,7 @@ struct TypeCompatibilityChecker {
 
 	// References uses elem's type itself if true.
 	deref: bool
+	ignore_any: bool
 }
 
 impl TypeCompatibilityChecker {
@@ -209,6 +211,7 @@ impl TypeCompatibilityChecker {
 			error_token: self.error_token,
 			src:         src.elem,
 			dest:        dest.elem,
+			ignore_any:  true,
 		}
 		ret sub.check()
 	}
@@ -229,6 +232,7 @@ impl TypeCompatibilityChecker {
 			error_token: self.error_token,
 			src:         src.elem,
 			dest:        dest.elem,
+			ignore_any:  true,
 		}
 		ret sub.check()
 	}
@@ -248,6 +252,7 @@ impl TypeCompatibilityChecker {
 			error_token: self.error_token,
 			src:         src.elem,
 			dest:        dest.elem,
+			ignore_any:  true,
 		}
 		ret sub.check()
 	}
@@ -389,16 +394,20 @@ impl TypeCompatibilityChecker {
 		| real(self.dest.enm()):   ret self.check_enum()
 		| real(self.dest.strct()): ret self.check_struct()
 		| real(self.dest.fnc()):   ret self.check_fn()
-
-		| types_are_compatible(self.dest.to_str(), self.src.to_str()):
-			ret true
-
-		| is_nil_compatible(self.dest):
-			ret self.src.is_nil()
-
-		|:
-			ret false
 		}
+
+		let dest = self.dest.to_str()
+		if !self.ignore_any || dest != (str)(std::jule::types::TypeKind.Any) {
+			if types_are_compatible(dest, self.src.to_str()) {
+				ret true
+			}
+		}
+
+		if is_nil_compatible(self.dest) {
+			ret self.src.is_nil()
+		}
+
+		ret false
 	}
 }
 
