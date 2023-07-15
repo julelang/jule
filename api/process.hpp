@@ -25,8 +25,10 @@
 namespace jule {
 
     jule::Slice<jule::Str> command_line_args;
+    jule::Slice<jule::Str> environment_variables;
 
     void setup_command_line_args(int argc, char *argv[]) noexcept;
+    void setup_environment_variables(char **envp) noexcept;
     jule::Str executable(void) noexcept;
 
     void setup_command_line_args(int argc, char *argv[]) noexcept {
@@ -72,6 +74,24 @@ namespace jule {
         return jule::Str();
 #endif
     }
+
+    void setup_environment_variables(char **envp) noexcept {
+#ifdef OS_WINDOWS
+    wchar_t *env_s{ GetEnvironmentStringsW() };
+    wchar_t *np{ env_s };
+    wchar_t *latest{ env_s };
+    while (*latest != 0) {
+        for (; *np != 0; ++np) {}
+        jule::environment_variables.push(jule::utf16_to_utf8_str(latest, np-latest));
+        ++np;
+        latest = np;
+    }
+    FreeEnvironmentStringsW(env_s);
+#else
+    for (; *envp != 0; ++envp)
+        jule::environment_variables.push(jule::Str(*envp));
+#endif
+}
 
 } // namespace jule
 
