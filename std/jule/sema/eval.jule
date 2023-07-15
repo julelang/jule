@@ -522,19 +522,23 @@ impl Eval {
 		ret self.find_builtins(ident)
 	}
 
-	fn push_reference_to_fn(mut self, mut f: &Fn) {
+	fn push_reference(mut self, mut references: &ReferenceStack) {
 		match type self.lookup {
 		| &ScopeChecker:
 			let mut sc = (&ScopeChecker)(self.lookup).get_root()
-			if !f.references.exist[Fn](sc.owner.decl) {
-				f.references.push(sc.owner.decl)
+			if !references.exist[Fn](sc.owner.decl) {
+				references.push(sc.owner.decl)
 			}
 
 		|:
-			if real(self.owner) && !f.references.exist[Var](self.owner) {
-				f.references.push(self.owner)
+			if real(self.owner) && !references.exist[Var](self.owner) {
+				references.push(self.owner)
 			}
 		}
+	}
+
+	fn push_reference_to_fn(mut self, mut f: &Fn) {
+		self.push_reference(f.references)
 	}
 
 	fn push_reference_to_var(mut self, mut v: &Var) {
@@ -542,18 +546,11 @@ impl Eval {
 			ret
 		}
 
-		match type self.lookup {
-		| &ScopeChecker:
-			let mut sc = (&ScopeChecker)(self.lookup).get_root()
-			if !v.references.exist[Fn](sc.owner.decl) {
-				v.references.push(sc.owner.decl)
-			}
+		self.push_reference(v.references)
+	}
 
-		|:
-			if real(self.owner) && !v.references.exist[Var](self.owner) {
-				v.references.push(self.owner)
-			}
-		}
+	fn push_reference_to_struct(mut self, mut s: &Struct) {
+		self.push_reference(s.references)
 	}
 
 	fn eval_enum(mut self, enm: &Enum, error_token: Token): &Data {
@@ -1436,6 +1433,9 @@ impl Eval {
 		} else {
 			s = t.strct()
 		}
+
+		self.push_reference_to_struct(s.decl)
+
 		if !s.decl.is_implements(tr) {
 			self.push_err(error_token, "type_not_supports_casting_to", d.kind.to_str(), t.to_str())
 		}
@@ -1685,6 +1685,8 @@ impl Eval {
 			ret new(Data)
 		}
 		// NOTE: Instance already checked (just fields) if generic quantity passes.
+
+		self.push_reference_to_struct(s.decl)
 
 		let mut slc = StructLitChecker{
 			e:           self,

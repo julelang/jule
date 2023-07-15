@@ -30,9 +30,10 @@ fn is_exist[T](arr: []any, t: &T): bool {
 
 fn is_dead_ref(ref: any): bool {
 	match type ref {
-	| &Fn:  ret is_exist[Fn](deads, (&Fn)(ref))
-	| &Var: ret is_exist[Var](deads, (&Var)(ref))
-	|:      ret false
+	| &Fn:     ret is_exist[Fn](deads, (&Fn)(ref))
+	| &Var:    ret is_exist[Var](deads, (&Var)(ref))
+	| &Struct: ret is_exist[Struct](deads, (&Struct)(ref))
+	|:         ret false
 	}
 }
 
@@ -51,9 +52,10 @@ fn is_dead(mut ref: any): (dead: bool) {
 	}
 
 	match type ref {
-	| &Fn:  ret fn_is_dead((&Fn)(ref))
-	| &Var: ret var_is_dead((&Var)(ref))
-	|:      ret false
+	| &Fn:     ret is_fn_dead((&Fn)(ref))
+	| &Var:    ret is_var_dead((&Var)(ref))
+	| &Struct: ret is_struct_dead((&Struct)(ref))
+	|:         ret false
 	}
 }
 
@@ -76,21 +78,21 @@ fn is_all_references_are_dead(mut references: &ReferenceStack): bool {
 	ret true
 }
 
-fn fn_is_dead(mut f: &Fn): bool {
+fn is_fn_dead(mut f: &Fn): bool {
 	if !f.global || f.cpp_linked || f.is_entry_point() || f.is_init() || f.is_anon() {
 		ret false
 	}
 
 	// Genericed functions has instances
 	// if only really referred to them.
-	if f.generics.len > 0 && f.instances.len > 0 {
-		ret false
+	if f.generics.len > 0 {
+		ret f.instances.len == 0
 	}
 
 	ret is_all_references_are_dead(f.references)
 }
 
-fn var_is_dead(mut v: &Var): bool {
+fn is_var_dead(mut v: &Var): bool {
 	if v.cpp_linked {
 		ret false
 	}
@@ -98,10 +100,24 @@ fn var_is_dead(mut v: &Var): bool {
 	ret is_all_references_are_dead(v.references)
 }
 
+fn is_struct_dead(mut s: &Struct): bool {
+	if s.cpp_linked {
+		ret false
+	}
+
+	// Genericed functions has instances
+	// if only really referred to them.
+	if s.generics.len > 0 {
+		ret s.instances.len == 0
+	}
+
+	ret is_all_references_are_dead(s.references)
+}
+
 unsafe fn eliminate_dead_functions(mut funcs: *Vector[&Fn]) {
 	let mut i = 0
 	for i < funcs.len() {
-		if fn_is_dead(funcs.at(i)) {
+		if is_fn_dead(funcs.at(i)) {
 			funcs.remove_range(i, 1)
 		} else {
 			i++
@@ -113,7 +129,7 @@ fn eliminate_dead_globals(mut pkg: &Package) {
 	for (_, mut f) in pkg.files {
 		let mut i = 0
 		for i < f.vars.len() {
-			if var_is_dead(f.vars.at(i)) {
+			if is_var_dead(f.vars.at(i)) {
 				f.vars.remove_range(i, 1)
 			} else {
 				i++
@@ -133,8 +149,12 @@ fn eliminate_dead_structs(mut pkg: &Package) {
 		let mut i = 0
 		for i < f.structs.len() {
 			let mut s = f.structs.at(i)
-			unsafe { eliminate_dead_functions(&s.methods) }
-			i++
+			if is_struct_dead(s) {
+				f.structs.remove_range(i, 1)
+			} else {
+				unsafe { eliminate_dead_functions(&s.methods) }
+				i++
+			}
 		}
 	}
 }
