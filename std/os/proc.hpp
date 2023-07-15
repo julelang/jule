@@ -8,10 +8,14 @@
 #include "../../api/jule.hpp"
 
 jule::Slice<jule::Str> __jule_get_command_line_args(void) noexcept;
+jule::Slice<jule::Str> __jule_get_environment_variables(void) noexcept;
 jule::Str __jule_executable(void) noexcept;
 
 jule::Slice<jule::Str> __jule_get_command_line_args(void) noexcept
 { return jule::command_line_args; }
+
+jule::Slice<jule::Str> __jule_get_environment_variables(void) noexcept
+{ return jule::environment_variables; }
 
 jule::Str __jule_executable(void) noexcept
 { return jule::executable(); }

@@ -7,19 +7,23 @@ use std::sys
 use cpp "proc.hpp"
 
 cpp fn __jule_get_command_line_args(): []str
+cpp fn __jule_get_environment_variables(): []str
 cpp fn __jule_executable(): str
 
 // Holds the command-line arguments.
 // Starts with the program name.
 //
-// Special bytes trimmed if program name have
-// any special byte at begin or end.
-// Special bytes are: " ' < >
-//
 // Command-line arguments sets at runtime with init function.
 // Initialize expression is nil.
 // You got nil slice if used as initialize expression to any global.
 pub let ARGS: []str = nil
+
+// Holds the envrionment variables.
+//
+// Environment variables sets at runtime with init function.
+// Initialize expression is nil.
+// You got nil slice if used as initialize expression to any global.
+pub let ENV: []str = nil
 
 // Returns an absolute path name of the current working
 // directory of the calling process.
@@ -50,8 +54,10 @@ pub fn executable(): str { ret cpp.__jule_executable() }
 
 fn init() {
 	unsafe {
-		// Break immutability for set parsed command-line arguments
-		let mut mut_args = &ARGS
-		*mut_args = cpp.__jule_get_command_line_args()
+		// Break immutability for set parsed command-line arguments.
+		*(&ARGS) = cpp.__jule_get_command_line_args()
+
+		// Break immutability for set parsed environment variables.
+		*(&ENV) = cpp.__jule_get_environment_variables()
 	}
 }
