@@ -8,11 +8,16 @@ use std::jule::sema::{
 	Package,
 	Fn,
 	Struct,
+	Var,
+	ReferenceStack,
 }
 use std::vector::{Vector}
 
-fn is_checked[T](checked: []any, t: &T): bool {
-	for _, ref in checked {
+// Stores all dead definitions.
+let mut deads: []any = nil
+
+fn is_exist[T](arr: []any, t: &T): bool {
+	for _, ref in arr {
 		match type ref {
 		| &T:
 			if &(&T)(ref) == &t {
@@ -23,35 +28,74 @@ fn is_checked[T](checked: []any, t: &T): bool {
 	ret false
 }
 
-fn fn_is_dead(mut f: &Fn): bool {
-	let mut checked: []any = nil
+fn is_dead_ref(ref: any): bool {
+	match type ref {
+	| &Fn:  ret is_exist[Fn](deads, (&Fn)(ref))
+	| &Var: ret is_exist[Var](deads, (&Var)(ref))
+	|:      ret false
+	}
+}
 
-	let mut check: fn(mut ff: &Fn): bool = nil
-	check = fn(mut ff: &Fn): bool {
-		if !ff.global || ff.cpp_linked || ff.is_entry_point() || ff.is_init() || ff.is_anon() {
-			ret false
-		}
-		checked = append(checked, ff)
-
-		let mut i = 0
-		for i < ff.references.len(); i++ {
-			let mut ref = ff.references.at(i)
-			match type ref {
-			| &Fn:
-				let mut rf = (&Fn)(ref)
-				if is_checked[Fn](checked, rf) { // Cycle.
-					continue
-				}
-
-				if !check(rf) {
-					ret false
-				}
-			}
-		}
+fn is_dead(mut ref: any): (dead: bool) {
+	if is_dead_ref(ref) {
+		// Cycle, also already checked and marked as dead.
 		ret true
 	}
 
-	ret check(f)
+	let len = deads.len
+	deads = append(deads, ref)
+	defer {
+		if !dead {
+			drop_deads(len)
+		}
+	}
+
+	match type ref {
+	| &Fn:  ret fn_is_dead((&Fn)(ref))
+	| &Var: ret var_is_dead((&Var)(ref))
+	|:      ret false
+	}
+}
+
+fn drop_deads(pos: int) {
+	if pos == deads.len {
+		deads = deads[:pos]
+		ret
+	}
+	deads = append(deads[:pos], deads[pos+1:]...)
+}
+
+fn is_all_references_are_dead(mut references: &ReferenceStack): bool {
+	let mut i = 0
+	for i < references.len(); i++ {
+		let mut ref = references.at(i)
+		if !is_dead(ref) {
+			ret false
+		}
+	}
+	ret true
+}
+
+fn fn_is_dead(mut f: &Fn): bool {
+	if !f.global || f.cpp_linked || f.is_entry_point() || f.is_init() || f.is_anon() {
+		ret false
+	}
+
+	// Genericed functions has instances
+	// if only really referred to them.
+	if f.generics.len > 0 && f.instances.len > 0 {
+		ret false
+	}
+
+	ret is_all_references_are_dead(f.references)
+}
+
+fn var_is_dead(mut v: &Var): bool {
+	if v.cpp_linked {
+		ret false
+	}
+
+	ret is_all_references_are_dead(v.references)
 }
 
 unsafe fn eliminate_dead_functions(mut funcs: *Vector[&Fn]) {
@@ -61,6 +105,19 @@ unsafe fn eliminate_dead_functions(mut funcs: *Vector[&Fn]) {
 			funcs.remove_range(i, 1)
 		} else {
 			i++
+		}
+	}
+}
+
+fn eliminate_dead_globals(mut pkg: &Package) {
+	for (_, mut f) in pkg.files {
+		let mut i = 0
+		for i < f.vars.len() {
+			if var_is_dead(f.vars.at(i)) {
+				f.vars.remove_range(i, 1)
+			} else {
+				i++
+			}
 		}
 	}
 }
@@ -83,6 +140,7 @@ fn eliminate_dead_structs(mut pkg: &Package) {
 }
 
 fn eliminate_dead_code_package(mut pkg: &Package) {
+	eliminate_dead_globals(pkg)
 	eliminate_dead_functions_package(pkg)
 	eliminate_dead_structs(pkg)
 }
@@ -94,4 +152,6 @@ pub fn eliminate_dead_code(mut ir: &IR) {
 		}
 	}
 	eliminate_dead_code_package(ir.main)
+
+	deads = nil // Clear memory.
 }

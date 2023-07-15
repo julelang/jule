@@ -522,6 +522,40 @@ impl Eval {
 		ret self.find_builtins(ident)
 	}
 
+	fn push_reference_to_fn(mut self, mut f: &Fn) {
+		match type self.lookup {
+		| &ScopeChecker:
+			let mut sc = (&ScopeChecker)(self.lookup).get_root()
+			if !f.references.exist[Fn](sc.owner.decl) {
+				f.references.push(sc.owner.decl)
+			}
+
+		|:
+			if real(self.owner) && !f.references.exist[Var](self.owner) {
+				f.references.push(self.owner)
+			}
+		}
+	}
+
+	fn push_reference_to_var(mut self, mut v: &Var) {
+		if !real(v.references) {
+			ret
+		}
+
+		match type self.lookup {
+		| &ScopeChecker:
+			let mut sc = (&ScopeChecker)(self.lookup).get_root()
+			if !v.references.exist[Fn](sc.owner.decl) {
+				v.references.push(sc.owner.decl)
+			}
+
+		|:
+			if real(self.owner) && !v.references.exist[Var](self.owner) {
+				v.references.push(self.owner)
+			}
+		}
+	}
+
 	fn eval_enum(mut self, enm: &Enum, error_token: Token): &Data {
 		if !self.s.is_accessible_define(enm.public, enm.token) {
 			self.push_err(error_token, "ident_is_not_accessible", enm.ident)
@@ -567,16 +601,6 @@ impl Eval {
 				kind: f,
 			},
 			model: f,
-		}
-	}
-
-	fn push_reference_to_fn(mut self, mut f: &Fn) {
-		match type self.lookup {
-		| &ScopeChecker:
-			let mut sc = (&ScopeChecker)(self.lookup).get_root()
-			if !f.references.exist[Fn](sc.owner.decl) {
-				f.references.push(sc.owner.decl)
-			}
 		}
 	}
 
@@ -659,6 +683,8 @@ impl Eval {
 		if !ok {
 			ret new(Data)
 		}
+
+		self.push_reference_to_var(v)
 
 		if !v.cpp_linked && (!real(v.value) || !real(v.value.data)) {
 			if v.constant {
