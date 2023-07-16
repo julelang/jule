@@ -190,7 +190,7 @@ namespace jule {
 
             jule::Slice<Item> slice;
             slice.data = this->data;
-            slice._slice = &this->_slice[start];
+            slice._slice = this->_slice+start;
             slice._len = end-start;
             slice._cap = this->_cap-start;
             return slice;
@@ -200,7 +200,7 @@ namespace jule {
         { return this->slice(start, this->len()); }
     
         inline jule::Slice<Item> slice(void) const noexcept
-        { return this->slice(0, this->len() ); }
+        { return this->slice(0, this->len()); }
 
         inline constexpr
         jule::Int len(void) const noexcept

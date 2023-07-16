@@ -84,7 +84,7 @@ namespace jule {
 
         if (src._len+components._len > src._cap) {
             const jule::Int n{ (src._len+components._len)*2 };
-            jule::Slice<Item> buffer{ jule::Slice<Item>::alloc(n) };
+            jule::Slice<Item> buffer{ jule::Slice<Item>::alloc(0, n) };
             buffer._len = src._len+components._len;
             jule::copy<Item>(buffer, src);
 

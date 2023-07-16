@@ -27,14 +27,14 @@ namespace jule {
     jule::Str to_str(const T &obj) noexcept;
 
     jule::Str to_str(const jule::Str &s) noexcept;
-    
+
     class Str {
     public:
         jule::Int _len{};
         std::basic_string<jule::U8> buffer{};
-    
+
         Str(void) noexcept {}
-    
+
         Str(const char *src, const jule::Int &len) noexcept {
             if (!src)
                 return;
@@ -42,7 +42,15 @@ namespace jule {
             this->buffer = std::basic_string<jule::U8>(&src[0],
                                                        &src[this->_len]);
         }
-    
+
+        Str(const jule::U8 *src, const jule::Int &len) noexcept {
+            if (!src)
+                return;
+            this->_len = len;
+            this->buffer = std::basic_string<jule::U8>(&src[0],
+                                                       &src[this->_len]);
+        }
+
         Str(const char *src) noexcept {
             if (!src)
                 return;
@@ -50,35 +58,35 @@ namespace jule {
             this->buffer = std::basic_string<jule::U8>(&src[0],
                                                        &src[this->_len]);
         }
-    
+
         Str(const std::initializer_list<jule::U8> &src) noexcept {
             this->_len = src.size();
             this->buffer = src;
         }
-    
+
         Str(const jule::I32 &rune) noexcept
         : Str( jule::utf8_rune_to_bytes(rune) ) {}
-    
+
         Str(const std::basic_string<jule::U8> &src) noexcept {
             this->_len = src.length();
             this->buffer = src;
         }
-    
+
         Str(const std::string &src) noexcept {
             this->_len = src.length();
             this->buffer = std::basic_string<jule::U8>(src.begin(), src.end());
         }
-    
+
         Str(const jule::Str &src) noexcept {
             this->_len = src._len;
             this->buffer = src.buffer;
         }
-    
+
         Str(const jule::Slice<U8> &src) noexcept {
             this->_len = src.len();
             this->buffer = std::basic_string<jule::U8>(src.begin(), src.end());
         }
-    
+
         Str(const jule::Slice<jule::I32> &src) noexcept {
             for (const jule::I32 &r: src) {
                 const jule::Slice<jule::U8> bytes{ jule::utf8_rune_to_bytes(r) };
@@ -87,22 +95,22 @@ namespace jule {
                     this->buffer += _byte;
             }
         }
-    
+
         typedef jule::U8       *Iterator;
         typedef const jule::U8 *ConstIterator;
-    
+
         inline Iterator begin(void) noexcept
         { return reinterpret_cast<Iterator>(&this->buffer[0]); }
-    
+
         inline ConstIterator begin(void) const noexcept
         { return reinterpret_cast<ConstIterator>(&this->buffer[0]); }
-    
+
         inline Iterator end(void) noexcept
         { return reinterpret_cast<Iterator>(&this->buffer[this->len()]); }
-    
+
         inline ConstIterator end(void) const noexcept
         { return reinterpret_cast<ConstIterator>(&this->buffer[this->len()]); }
-    
+
         inline jule::Str slice(const jule::Int &start,
                                const jule::Int &end) const noexcept {
             if (start < 0 || end < 0 || start > end || end > this->len()) {
@@ -114,36 +122,36 @@ namespace jule {
                 return jule::Str();
 
             const jule::Int n{ end-start };
-            return this->buffer.substr(start, n);
+            return jule::Str(this->buffer.substr(start, n).c_str(), n);
         }
-    
+
         inline jule::Str slice(const jule::Int &start) const noexcept
         { return this->slice(start, this->len()); }
-    
+
         inline jule::Str slice(void) const noexcept
         { return this->slice(0, this->len()); }
-    
+
         inline jule::Int len(void) const noexcept
         { return this->_len; }
-    
+
         inline jule::Bool empty(void) const noexcept
         { return this->buffer.empty(); }
-    
+
         inline jule::Bool has_prefix(const jule::Str &sub) const noexcept {
             return this->buffer.find(sub.buffer, 0) == 0;
         }
-    
+
         inline jule::Bool has_suffix(const jule::Str &sub) const noexcept {
             return this->len() >= sub.len() &&
                 this->buffer.substr(this->len()-sub.len()) == sub.buffer;
         }
-    
+
         inline jule::Int find(const jule::Str &sub) const noexcept
         { return static_cast<jule::Int>(this->buffer.find(sub.buffer) ); }
-    
+
         inline jule::Int rfind(const jule::Str &sub) const noexcept
         { return static_cast<jule::Int>(this->buffer.rfind(sub.buffer)); }
-    
+
         jule::Str trim(const jule::Str &bytes) const noexcept {
             ConstIterator it{ this->begin() };
             const ConstIterator end{ this->end() };
@@ -179,42 +187,42 @@ namespace jule {
             }
             return jule::Str();
         }
-    
+
         jule::Slice<jule::Str> split(const jule::Str &sub,
                                      const jule::I64 &n) const noexcept {
             jule::Slice<jule::Str> parts;
             if (n == 0)
                 return parts;
 
-            std::basic_string<jule::U8> s{ this->buffer };
+            std::basic_string<jule::U8> s{ this->buffer.c_str() };
             constexpr jule::Uint npos{ static_cast<jule::Uint>(std::string::npos) };
             jule::Uint pos{ npos };
             if (n < 0) {
                 while ((pos = s.find(sub.buffer)) != npos) {
-                    parts.push(s.substr(0, pos));
+                    parts.push(jule::Str(s.substr(0, pos).c_str(), pos+1));
                     s = s.substr(pos+sub.len());
                 }
                 if (!s.empty())
-                    parts.push(jule::Str(s));
+                    parts.push(jule::Str(s.c_str(), s.length()));
             } else {
                 jule::Uint _n{ 0 };
                 while ((pos = s.find(sub.buffer)) != npos) {
                     if (++_n >= n) {
-                        parts.push(jule::Str(s));
+                        parts.push(jule::Str(s.c_str(), s.length()));
                         break;
                     }
-                    parts.push(s.substr(0, pos));
+                    parts.push(jule::Str(s.substr(0, pos).c_str(), pos+1));
                     s = s.substr(pos+sub.len());
                 }
                 if (!parts.empty() && _n < n)
-                    parts.push(jule::Str(s));
+                    parts.push(jule::Str(s.c_str(), s.length()));
                 else if (parts.empty())
-                    parts.push(jule::Str(s));
+                    parts.push(jule::Str(s.c_str(), s.length()));
             }
 
             return parts;
         }
-    
+
         jule::Str replace(const jule::Str &sub,
                           const jule::Str &_new,
                           const jule::I64 &n) const noexcept {
@@ -240,10 +248,10 @@ namespace jule {
             }
             return jule::Str(s);
         }
-    
+
         inline operator const char*(void) const noexcept
         { return reinterpret_cast<const char*>(this->buffer.c_str()); }
-    
+
         inline operator const std::basic_string<jule::U8>(void) const noexcept
         { return this->buffer; }
 
@@ -253,10 +261,10 @@ namespace jule {
         operator jule::Slice<jule::U8>(void) const noexcept {
             jule::Slice<jule::U8> slice{ jule::Slice<jule::U8>::alloc(this->len()) };
             for (jule::Int index{ 0 }; index < this->len(); ++index)
-                slice[index] = this->operator[](index);
+                slice._slice[index] = this->operator[](index);
             return slice;
         }
-    
+
         operator jule::Slice<jule::I32>(void) const noexcept {
             jule::Slice<jule::I32> runes{};
             const char *str{ this->operator const char *() };
@@ -270,7 +278,7 @@ namespace jule {
             }
             return runes;
         }
-    
+
         jule::U8 &operator[](const jule::Int &index) {
             if (this->empty() || index < 0 || this->len() <= index) {
                 std::stringstream sstream;
@@ -279,24 +287,24 @@ namespace jule {
             }
             return this->buffer[index];
         }
-    
+
         inline jule::U8 operator[](const jule::Int &index) const
         { return (*this).buffer[index]; }
-    
+
         inline void operator+=(const jule::Str &str) noexcept {
             this->_len += str.len();
             this->buffer += str.buffer;
         }
-    
+
         inline jule::Str operator+(const jule::Str &str) const noexcept
         { return jule::Str(this->buffer + str.buffer); }
-    
+
         inline jule::Bool operator==(const jule::Str &str) const noexcept
         { return this->buffer == str.buffer; }
-    
+
         inline jule::Bool operator!=(const jule::Str &str) const noexcept
         { return !this->operator==(str); }
-    
+
         friend std::ostream &operator<<(std::ostream &stream,
                                         const jule::Str &src) noexcept {
             for (const jule::U8 &b: src)
