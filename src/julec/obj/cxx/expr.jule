@@ -392,14 +392,16 @@ fn gen_arg_expr_models(mut models: []ExprModel): str {
 
 fn gen_fn_call_expr_model(mut m: &FnCallExprModel): str {
 	let mut obj = gen_expr_model(m.expr)
-	if !m.func.is_builtin() && m.func.decl.cpp_linked && m.func.generics.len > 0 {
-		if !has_directive(m.func.decl.directives, str(Directive.Cdef)) {
-			obj += "<"
-			for (_, mut g) in m.func.generics {
-				obj += gen_type_kind(g) + ","
+	if !m.func.is_builtin() {
+		if m.func.decl.cpp_linked && m.func.generics.len > 0 {
+			if !has_directive(m.func.decl.directives, str(Directive.Cdef)) {
+				obj += "<"
+				for (_, mut g) in m.func.generics {
+					obj += gen_type_kind(g) + ","
+				}
+				obj = obj[:obj.len-1] // Remove last comma.
+				obj += ">"
 			}
-			obj = obj[:obj.len-1] // Remove last comma.
-			obj += ">"
 		}
 	}
 	obj += "("
