@@ -147,7 +147,7 @@ fn float_fmt_e(txt: []byte, mut i: int): (lit: str) {
 	if i == first {
 		ret ""
 	}
-	ret (str)(txt[:i])
+	ret str(txt[:i])
 }
 
 fn float_fmt_p(txt: []byte, i: int): str { ret float_fmt_e(txt, i) }
@@ -199,7 +199,7 @@ fn float_num(txt: []byte, mut i: int): (lit: str) {
 	if i == 1 { // Just dot
 		ret
 	}
-	ret (str)(txt[:i])
+	ret str(txt[:i])
 }
 
 fn common_num(txt: []byte): (lit: str) {
@@ -217,7 +217,7 @@ loop:
 	if i == 0 {
 		ret
 	}
-	ret (str)(txt[:i])
+	ret str(txt[:i])
 }
 
 fn binary_num(txt: []byte): (lit: str) {
@@ -239,7 +239,7 @@ fn binary_num(txt: []byte): (lit: str) {
 	if i == BINARY_START {
 		ret
 	}
-	ret (str)(txt[:i])
+	ret str(txt[:i])
 }
 
 fn is_float_fmt_e(b: byte, i: int): bool { ret i > 0 && (b == 'e' || b == 'E') }
@@ -306,7 +306,7 @@ fn octal_num(txt: []byte): (lit: str) {
 	if i == OCTAL_START {
 		ret
 	}
-	ret (str)(txt[:i])
+	ret str(txt[:i])
 }
 
 fn hex_num(txt: []byte): (lit: str) {
@@ -343,7 +343,7 @@ loop:
 	if i == HEX_START {
 		ret
 	}
-	ret (str)(txt[:i])
+	ret str(txt[:i])
 }
 
 fn hex_escape(txt: []byte, n: int): (seq: str) {
@@ -359,7 +359,7 @@ fn hex_escape(txt: []byte, n: int): (seq: str) {
 		}
 	}
 
-	seq = (str)(txt[:n])
+	seq = str(txt[:n])
 	ret
 }
 
@@ -380,7 +380,7 @@ fn byte_escape(txt: []byte): (seq: str) {
 	if !is_octal(txt[1]) || !is_octal(txt[2]) || !is_octal(txt[3]) {
 		ret
 	}
-	ret (str)(txt[:4])
+	ret str(txt[:4])
 }
 
 struct Lex {
@@ -431,12 +431,12 @@ impl Lex {
 
 		for i, r in ln {
 			if r != '_' && !is_decimal(byte(r)) && !is_letter(r) {
-				ret (str)(ln[:i])
+				ret str(ln[:i])
 			}
 			self.pos++
 		}
 
-		ret (str)(ln)
+		ret str(ln)
 	}
 
 	// Resume to lex from position.
@@ -476,7 +476,7 @@ impl Lex {
 			if self.data[self.pos] == '\n' {
 				if self.first_token_of_line {
 					token.id = TokenId.Comment
-					token.kind = (str)(self.data[start:self.pos])
+					token.kind = str(self.data[start:self.pos])
 				}
 				ret
 			}
@@ -484,7 +484,7 @@ impl Lex {
 
 		if self.first_token_of_line {
 			token.id = TokenId.Comment
-			token.kind = (str)(self.data[start:])
+			token.kind = str(self.data[start:])
 		}
 	}
 
@@ -535,7 +535,7 @@ impl Lex {
 		match txt[1] {
 		| '\\' | '\'' | '"' | 'a' | 'b' | 'f' | 'n' | 'r' | 't' | 'v':
 			self.pos += 2
-			ret (str)(txt[:2])
+			ret str(txt[:2])
 
 		| 'U':
 			seq = big_unicode_point_escape(txt)
@@ -567,7 +567,7 @@ impl Lex {
 	
 		let (r, n) = decode_rune(txt)
 		self.pos += n
-		ret (str)(r)
+		ret str(r)
 	}
 
 	fn lex_rune(mut self, txt: []byte): str {
@@ -611,7 +611,7 @@ impl Lex {
 		let mark = self.data[self.pos]
 		self.pos++ // Skip mark
 		let raw = mark == '`'
-		s += (str)(mark)
+		s += str(mark)
 		self.column++
 
 		for self.pos < self.data.len {
@@ -654,7 +654,7 @@ impl Lex {
 
 	unsafe fn lex_basic_ops(mut self, txt: []byte, mut tok: *Token): bool {
 		for _, pair in BASIC_OPS {
-			if self.is_op(txt, (str)(pair.kind), pair.id, tok) {
+			if self.is_op(txt, str(pair.kind), pair.id, tok) {
 				ret true
 			}
 		}
@@ -712,26 +712,26 @@ impl Lex {
 			t.id = TokenId.Lit
 			ret t
 
-		| bytes_has_prefix(txt, (str)(TokenKind.LnComment)):
+		| bytes_has_prefix(txt, str(TokenKind.LnComment)):
 			unsafe { self.lex_line_comment(&t) }
 			ret t
 
-		| bytes_has_prefix(txt, (str)(TokenKind.RangLComment)):
+		| bytes_has_prefix(txt, str(TokenKind.RangLComment)):
 			self.lex_range_comment()
 			ret t
 
-		| unsafe { self.is_op(txt, (str)(TokenKind.LParent), TokenId.Range, &t) }
-		| unsafe { self.is_op(txt, (str)(TokenKind.RParent), TokenId.Range, &t) }
-		| unsafe { self.is_op(txt, (str)(TokenKind.LBrace), TokenId.Range, &t) }
-		| unsafe { self.is_op(txt, (str)(TokenKind.RBrace), TokenId.Range, &t) }
-		| unsafe { self.is_op(txt, (str)(TokenKind.LBracket), TokenId.Range, &t) }
-		| unsafe { self.is_op(txt, (str)(TokenKind.RBracket), TokenId.Range, &t) }
+		| unsafe { self.is_op(txt, str(TokenKind.LParent), TokenId.Range, &t) }
+		| unsafe { self.is_op(txt, str(TokenKind.RParent), TokenId.Range, &t) }
+		| unsafe { self.is_op(txt, str(TokenKind.LBrace), TokenId.Range, &t) }
+		| unsafe { self.is_op(txt, str(TokenKind.RBrace), TokenId.Range, &t) }
+		| unsafe { self.is_op(txt, str(TokenKind.LBracket), TokenId.Range, &t) }
+		| unsafe { self.is_op(txt, str(TokenKind.RBracket), TokenId.Range, &t) }
 		| unsafe { self.lex_basic_ops(txt, &t) }:
 			// Pass.
 
 		| unsafe { self.lex_id(txt, &t) }:
 			for _, pair in KEYWORDS {
-				if (str)(pair.kind) == t.kind {
+				if str(pair.kind) == t.kind {
 					t.id = pair.id
 					break
 				}

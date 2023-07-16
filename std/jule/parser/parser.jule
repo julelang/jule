@@ -79,7 +79,7 @@ unsafe fn range(mut i: *int, open: TokenKind, close: TokenKind, mut tokens: []To
 	}
 
 	let tok = tokens[*i]
-	if tok.id != TokenId.Range || tok.kind != (str)(open) {
+	if tok.id != TokenId.Range || tok.kind != str(open) {
 		ret nil
 	}
 
@@ -90,8 +90,8 @@ unsafe fn range(mut i: *int, open: TokenKind, close: TokenKind, mut tokens: []To
 		let token = tokens[*i]
 		if token.id == TokenId.Range {
 			match token.kind {
-			| (str)(open): range_n++
-			| (str)(close): range_n--
+			| str(open): range_n++
+			| str(close): range_n--
 			}
 		}
 	}
@@ -119,9 +119,9 @@ fn range_last(mut tokens: []Token): (cutted: []Token, cut: []Token) {
 		let token = tokens[i]
 		if token.id == TokenId.Range {
 			match token.kind {
-			| (str)(TokenKind.RBrace)
-			| (str)(TokenKind.RBracket)
-			| (str)(TokenKind.RParent):
+			| str(TokenKind.RBrace)
+			| str(TokenKind.RBracket)
+			| str(TokenKind.RParent):
 				brace_n++
 				continue
 
@@ -157,9 +157,9 @@ fn parts(mut tokens: []Token, id: TokenId, expr_must: bool): ([][]Token, []Log) 
 	for i, token in tokens {
 		if token.id == TokenId.Range {
 			match token.kind {
-			| (str)(TokenKind.LBrace)
-			| (str)(TokenKind.LBracket)
-			| (str)(TokenKind.LParent):
+			| str(TokenKind.LBrace)
+			| str(TokenKind.LBracket)
+			| str(TokenKind.LParent):
 				range_n++
 				continue
 			|:
@@ -257,7 +257,7 @@ impl Parser {
 		// Don't append if directive kind is invalid.
 		let mut ok = false
 		for _, kind in DIRECTIVES {
-			if d.tag == (str)(kind) {
+			if d.tag == str(kind) {
 				ok = true
 				break
 			}
@@ -368,7 +368,7 @@ impl Parser {
 		if tok.id == TokenId.Colon {
 			i++ // Skip type annotation operator (:)
 			if (i >= tokens.len ||
-			(tokens[i].id == TokenId.Op && tokens[i].kind == (str)(TokenKind.Eq))) {
+			(tokens[i].id == TokenId.Op && tokens[i].kind == str(TokenKind.Eq))) {
 				self.push_err(tok, "missing_type")
 				ret
 			}
@@ -383,7 +383,7 @@ impl Parser {
 		}
 
 		if tok.id == TokenId.Op {
-			if tok.kind != (str)(TokenKind.Eq) {
+			if tok.kind != str(TokenKind.Eq) {
 				self.push_err(tok, "invalid_syntax")
 				ret
 			}
@@ -511,8 +511,8 @@ impl Parser {
 			}
 		}
 
-		if tokens[i].kind == (str)(TokenKind.Amper) {
-			param.ident = (str)(TokenKind.Amper)
+		if tokens[i].kind == str(TokenKind.Amper) {
+			param.ident = str(TokenKind.Amper)
 			i++
 			if i >= tokens.len {
 				self.push_err(tokens[i-1], "invalid_syntax")
@@ -521,7 +521,7 @@ impl Parser {
 		}
 
 		if tokens[i].id == TokenId.Self {
-			param.ident += (str)(TokenKind.Self)
+			param.ident += str(TokenKind.Self)
 			param.token = tokens[i]
 			i++
 			if i < tokens.len {
@@ -537,7 +537,7 @@ impl Parser {
 			let token = tokens[*i]
 			if token.id != TokenId.Op {
 				ret
-			} else if token.kind != (str)(TokenKind.TripleDot) {
+			} else if token.kind != str(TokenKind.TripleDot) {
 				ret
 			}
 
@@ -565,7 +565,7 @@ impl Parser {
 
 	fn param_body_id(self, mut param: &ParamDecl, token: Token) {
 		if is_ignore_ident(token.kind) {
-			param.ident = (str)(Ident.Anon)
+			param.ident = str(Ident.Anon)
 			ret
 		}
 		param.ident = token.kind
@@ -610,7 +610,7 @@ impl Parser {
 
 		if param.token.id != TokenId.Ident {
 			// Just data type
-			param.ident = (str)(Ident.Anon)
+			param.ident = str(Ident.Anon)
 			self.build_param_type(param, tokens, must_pure)
 		} else {
 			let mut i = new(int, 0)
@@ -635,7 +635,7 @@ impl Parser {
 						ident: param.token.kind,
 					},
 				}
-				param.ident = (str)(Ident.Anon)
+				param.ident = str(Ident.Anon)
 				param.token = Token{}
 			}
 		}
@@ -684,10 +684,10 @@ impl Parser {
 		let mut types = make([]&TypeDecl, params.len)
 		for (i, mut param) in params {
 			types[i] = param.kind
-			if param.ident != (str)(Ident.Anon) {
+			if param.ident != str(Ident.Anon) {
 				param.token.kind = param.ident
 			} else {
-				param.token.kind = (str)(Ident.Ignore)
+				param.token.kind = str(Ident.Ignore)
 			}
 			t.idents = append(t.idents, param.token)
 		}
@@ -716,12 +716,12 @@ impl Parser {
 		let mut token = tokens[*i]
 		match token.id {
 		| TokenId.Range:
-			if token.kind == (str)(TokenKind.LBrace) {
+			if token.kind == str(TokenKind.LBrace) {
 				ret
 			}
 
 		| TokenId.Op:
-			if token.kind == (str)(TokenKind.Eq) {
+			if token.kind == str(TokenKind.Eq) {
 				ret
 			}
 
@@ -735,10 +735,10 @@ impl Parser {
 			token = tokens[*i]
 			if token.id == TokenId.Range {
 				match token.kind {
-				| (str)(TokenKind.LParent):
+				| str(TokenKind.LParent):
 					ret self.build_multi_ret_type(tokens, i)
 
-				| (str)(TokenKind.LBrace):
+				| str(TokenKind.LBrace):
 					self.push_err(token, "missing_type")
 					ret
 				}
@@ -775,7 +775,7 @@ impl Parser {
 		}
 
 		if anon {
-			f.ident = (str)(Ident.Anon)
+			f.ident = str(Ident.Anon)
 		} else {
 			let tok = tokens[*i]
 			if tok.id != TokenId.Ident {
@@ -797,7 +797,7 @@ impl Parser {
 			f.generics = self.build_generics(generics_tokens, error_token)
 		}
 
-		if tokens[*i].kind != (str)(TokenKind.LParent) {
+		if tokens[*i].kind != str(TokenKind.LParent) {
 			self.push_err(tokens[*i], "missing_function_parentheses")
 			ret new(FnDecl)
 		}
@@ -900,7 +900,7 @@ impl Parser {
 			ret
 
 		| TokenId.Range:
-			if token.kind != (str)(TokenKind.RBrace) {
+			if token.kind != str(TokenKind.RBrace) {
 				self.push_err(token, "invalid_syntax")
 				ret
 			}
@@ -923,7 +923,7 @@ impl Parser {
 			}
 
 		| TokenId.Op:
-			if token.kind != (str)(TokenKind.Star) {
+			if token.kind != str(TokenKind.Star) {
 				self.push_err(token, "invalid_syntax")
 				ret
 			}
@@ -957,7 +957,7 @@ impl Parser {
 			ret
 
 		| TokenId.Range:
-			if token.kind != (str)(TokenKind.RBrace) {
+			if token.kind != str(TokenKind.RBrace) {
 				self.push_err(token, "invalid_syntax")
 				ret
 			}
@@ -983,7 +983,7 @@ impl Parser {
 			}
 
 		| TokenId.Op:
-			if token.kind != (str)(TokenKind.Star) {
+			if token.kind != str(TokenKind.Star) {
 				self.push_err(token, "invalid_syntax")
 				ret
 			}
@@ -1055,9 +1055,9 @@ impl Parser {
 			let t = tokens[i]
 			if t.id == TokenId.Range {
 				match t.kind {
-				| (str)(TokenKind.LBrace)
-				| (str)(TokenKind.LBracket)
-				| (str)(TokenKind.LParent):
+				| str(TokenKind.LBrace)
+				| str(TokenKind.LBracket)
+				| str(TokenKind.LParent):
 					brace_n++
 					continue
 
@@ -1107,7 +1107,7 @@ impl Parser {
 			}
 			i++
 			t = tokens[i]
-			if t.id != TokenId.Op && t.kind != (str)(TokenKind.Eq) {
+			if t.id != TokenId.Op && t.kind != str(TokenKind.Eq) {
 				self.push_err(tokens[0], "invalid_syntax")
 			}
 			i++
@@ -1503,7 +1503,7 @@ impl Parser {
 		}
 		token = tokens[2]
 		if token.id != TokenId.Iter {
-			if token.id == TokenId.Range && token.kind == (str)(TokenKind.LBrace) {
+			if token.id == TokenId.Range && token.kind == str(TokenKind.LBrace) {
 				// This implementation is single.
 				// Just implements to destination.
 				// Therefore, swap Base and Dest tokens.
@@ -1777,9 +1777,9 @@ impl Parser {
 
 		let get_close_kind_of_brace = fn(left: str): str {
 			match left {
-			| (str)(TokenKind.RParent):  ret (str)(TokenKind.LParent)
-			| (str)(TokenKind.RBrace):   ret (str)(TokenKind.LBrace)
-			| (str)(TokenKind.RBracket): ret (str)(TokenKind.LBracket)
+			| str(TokenKind.RParent):  ret str(TokenKind.LParent)
+			| str(TokenKind.RBrace):   ret str(TokenKind.LBrace)
+			| str(TokenKind.RBracket): ret str(TokenKind.LBracket)
 			|:                           ret ""
 			}
 		}
@@ -1800,9 +1800,9 @@ impl Parser {
 		let push_wrong_order_close_err = fn(t: Token) {
 			let mut msg = ""
 			match tokens[ranges[ranges.len-1]].kind {
-			| (str)(TokenKind.LParent):  msg = "expected_parentheses_close"
-			| (str)(TokenKind.LBrace):   msg = "expected_brace_close"
-			| (str)(TokenKind.LBracket): msg = "expected_bracket_close"
+			| str(TokenKind.LParent):  msg = "expected_parentheses_close"
+			| str(TokenKind.LBrace):   msg = "expected_brace_close"
+			| str(TokenKind.LBracket): msg = "expected_bracket_close"
 			}
 
 			self.push_err(t, msg)
@@ -1812,9 +1812,9 @@ impl Parser {
 			let n = ranges.len
 			if n == 0 {
 				match t.kind {
-				| (str)(TokenKind.RBracket): self.push_err(t, "extra_closed_brackets")
-				| (str)(TokenKind.RBrace):   self.push_err(t, "extra_closed_braces")
-				| (str)(TokenKind.RParent):  self.push_err(t, "extra_closed_parentheses")
+				| str(TokenKind.RBracket): self.push_err(t, "extra_closed_brackets")
+				| str(TokenKind.RBrace):   self.push_err(t, "extra_closed_braces")
+				| str(TokenKind.RParent):  self.push_err(t, "extra_closed_parentheses")
 				}
 				ret
 			} else if tokens[ranges[n-1]].kind != left {
@@ -1829,28 +1829,28 @@ impl Parser {
 			}
 
 			match token.kind {
-			| (str)(TokenKind.LParent)
-			| (str)(TokenKind.LBrace)
-			| (str)(TokenKind.LBracket):
+			| str(TokenKind.LParent)
+			| str(TokenKind.LBrace)
+			| str(TokenKind.LBracket):
 				ranges = append(ranges, i)
 
-			| (str)(TokenKind.RParent):
-				push_range_close(token, (str)(TokenKind.LParent))
+			| str(TokenKind.RParent):
+				push_range_close(token, str(TokenKind.LParent))
 
-			| (str)(TokenKind.RBrace):
-				push_range_close(token, (str)(TokenKind.LBrace))
+			| str(TokenKind.RBrace):
+				push_range_close(token, str(TokenKind.LBrace))
 
-			| (str)(TokenKind.RBracket):
-				push_range_close(token, (str)(TokenKind.LBracket))
+			| str(TokenKind.RBracket):
+				push_range_close(token, str(TokenKind.LBracket))
 			}
 		}
 
 		for _, i in ranges {
 			let token = tokens[i]
 			match token.kind {
-			| (str)(TokenKind.LParent):  self.push_err(token, "wait_close_parentheses")
-			| (str)(TokenKind.LBrace):   self.push_err(token, "wait_close_brace")
-			| (str)(TokenKind.LBracket): self.push_err(token, "wait_close_bracket")
+			| str(TokenKind.LParent):  self.push_err(token, "wait_close_parentheses")
+			| str(TokenKind.LBrace):   self.push_err(token, "wait_close_brace")
+			| str(TokenKind.LBracket): self.push_err(token, "wait_close_bracket")
 			}
 		}
 	}

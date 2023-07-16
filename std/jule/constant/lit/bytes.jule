@@ -56,7 +56,7 @@ pub fn to_rune(bytes: []byte): rune {
 // Returns raw-string value string from bytes, not includes quotes.
 // Bytes are represents string characters.
 // Returns empty string if bytes.len == 0
-pub fn to_raw_str(bytes: []byte): str { ret (str)(bytes) }
+pub fn to_raw_str(bytes: []byte): str { ret str(bytes) }
 
 // Returns string value string from bytes, not includes quotes.
 // Bytes are represents string characters, allows escape sequences.
@@ -75,7 +75,7 @@ pub fn to_str(bytes: []byte): str {
 		} else {
 			let (r, size) = decode_rune(bytes[i:])
 			i += size
-			s += (str)(r)
+			s += str(r)
 		}
 	}
 	ret s
@@ -114,14 +114,14 @@ unsafe fn rune_from_esq_seq(bytes: []byte, mut i: *int): rune {
 	match bytes[*i] {
 	| 'u':
 		const SEQ_LEN = 5
-		let (rc, _) = parse_uint((str)(bytes[*i+1:*i+SEQ_LEN]), 16, 64)
+		let (rc, _) = parse_uint(str(bytes[*i+1:*i+SEQ_LEN]), 16, 64)
 		*i += SEQ_LEN
 		let r = rune(rc)
 		ret r
 
 	| 'U':
 		const SEQ_LEN = 9
-		let (rc, _) = parse_uint((str)(bytes[*i+1:*i+SEQ_LEN]), 16, 64)
+		let (rc, _) = parse_uint(str(bytes[*i+1:*i+SEQ_LEN]), 16, 64)
 		*i += SEQ_LEN
 		let r = rune(rc)
 		ret r
@@ -130,14 +130,14 @@ unsafe fn rune_from_esq_seq(bytes: []byte, mut i: *int): rune {
 		const SEQ_LEN = 3
 		let seq = bytes[*i+1:*i+SEQ_LEN]
 		*i += SEQ_LEN
-		let (b, _) = parse_uint((str)(seq), 16, 64)
+		let (b, _) = parse_uint(str(seq), 16, 64)
 		ret rune(b)
 
 	|:
 		const SEQ_LEN = 3
 		let seq = bytes[*i : *i+SEQ_LEN]
 		*i += SEQ_LEN
-		let (b, _) = parse_uint((str)(seq[1:]), 8, 64)
+		let (b, _) = parse_uint(str(seq[1:]), 8, 64)
 		ret rune(b)
 	}
 }
@@ -145,7 +145,7 @@ unsafe fn rune_from_esq_seq(bytes: []byte, mut i: *int): rune {
 unsafe fn str_esq_seq(bytes: []byte, mut i: *int): str {
 	let r = rune_from_esq_seq(bytes, i)
 	if r <= 255 {
-		ret (str)(r)
+		ret str(r)
 	}
-	ret to_str(([]byte)((str)(r)))
+	ret to_str(([]byte)(str(r)))
 }
