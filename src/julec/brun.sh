@@ -4,7 +4,7 @@
 # license that can be found in the LICENSE file.
 
 if [ -f ./main.jule ]; then
-  ../../bin/julec --opt L0 -o ../../bin/julec_dev .
+  ../../bin/julec --opt-deadcode -o ../../bin/julec_dev .
 else
   echo "error: working directory is not source directory"
   exit
