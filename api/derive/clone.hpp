@@ -47,9 +47,10 @@ namespace jule {
 
     template<typename Item>
     jule::Slice<Item> clone(const jule::Slice<Item> &s) noexcept {
-        jule::Slice<Item> s_clone(s.len());
-        for (int i{ 0 }; i < s.len(); ++i)
-            s_clone.operator[](i) = jule::clone(s.operator[](i));
+        jule::Slice<Item> s_clone{ jule::Slice<Item>::alloc(0, s._len) };
+        s_clone._len = s._len;
+        for (int i{ 0 }; i < s._len; ++i)
+            s_clone._slice[i] = jule::clone(s._slice[i]);
         return s_clone;
     }
 
