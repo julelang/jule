@@ -10,7 +10,7 @@ That's why paths are adjusted accordingly.
 ## Introduction to JuleC
 
 JuleC has a structure that handles processes step by step. \
-The working principle of the compiler roughly consists of the steps described below. \
+The working principle of the compiler roughly consists of the steps described below.
 
 After obtaining the source code, the first step is to perform lexical analysis
 As a result of lexical analysis, the tokens of the source code are obtained. 
