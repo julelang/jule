@@ -133,9 +133,13 @@ fn is_trait_dead(mut t: &Trait): bool {
 unsafe fn eliminate_dead_functions(mut funcs: *Vector[&Fn]) {
 	let mut i = 0
 	for i < funcs.len() {
-		if is_fn_dead(funcs.at(i)) {
+		let mut f = funcs.at(i)
+		if is_fn_dead(f) {
 			funcs.remove_range(i, 1)
 		} else {
+			for (_, mut ins) in f.instances {
+				eliminate_dead_code_of_scope(ins.scope)
+			}
 			i++
 		}
 	}
@@ -168,6 +172,10 @@ fn eliminate_dead_structs(mut pkg: &Package) {
 			if is_struct_dead(s) {
 				f.structs.remove_range(i, 1)
 			} else {
+				// Not removes trait-implemented functions.
+				// This is safe.
+				// Because methods marked as not-global and
+				// not-global functions are not removed.
 				unsafe { eliminate_dead_functions(&s.methods) }
 				i++
 			}

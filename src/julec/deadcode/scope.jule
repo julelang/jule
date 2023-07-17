@@ -1,0 +1,43 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::jule::sema::{
+	Scope,
+	St,
+	RetSt,
+}
+use std::vector::{Vector}
+
+// Dead code eliminate optimizer for scopes.
+struct ScopeDeadCode {
+	s:     &Scope
+	stmts: *Vector[St]
+	i:     int // Position.
+}
+
+impl ScopeDeadCode {
+	unsafe fn optimize_stmt(mut self, mut st: St) {
+		match type st {
+		| &RetSt:
+			// Remove followed statements of the return statement.
+			// Unreachable code.
+			self.stmts.remove_range(self.i+1, self.stmts.len()-self.i-1)
+		}
+	}
+
+	unsafe fn optimize_stmts(mut self) {
+		self.i = 0
+		for self.i < self.stmts.len(); self.i++ {
+			self.optimize_stmt(self.stmts.at(self.i))
+		}
+	}
+}
+
+fn eliminate_dead_code_of_scope(mut s: &Scope) {
+	let mut sdc = ScopeDeadCode{
+		s:     s,
+		stmts: &s.stmts,
+	}
+	unsafe { sdc.optimize_stmts() }
+}
