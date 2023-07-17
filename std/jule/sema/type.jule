@@ -790,11 +790,6 @@ impl TypeChecker {
 		}
 		ins.checked = true
 
-		ok = self.s.check_generic_quantity(ins.decl.generics.len, ins.generics.len, error_token)
-		if !ok {
-			ret false
-		}
-
 		if real(self.referencer) && self.referencer.owner == ins.decl {
 			// Break algorithm cycle.
 			ret true
@@ -901,7 +896,6 @@ impl TypeChecker {
 		}
 
 		self.append_used_struct_reference(s)
-
 		let mut ins = s.instance()
 		ins.generics = make([]&TypeKind, decl.generics.len)
 		let mut referencer = self.referencer
@@ -917,6 +911,11 @@ impl TypeChecker {
 
 		self.referencer = referencer
 
+		if !ok {
+			ret new(StructIns)
+		}
+
+		ok = self.s.check_generic_quantity(ins.decl.generics.len, ins.generics.len, decl.token)
 		if !ok {
 			ret new(StructIns)
 		}
