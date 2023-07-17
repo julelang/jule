@@ -829,14 +829,15 @@ impl TypeChecker {
 		let mut old_sema_file = ins.decl.sema.file
 		defer { ins.decl.sema.set_current_file(old_sema_file) }
 
+		let mut tc = TypeChecker{
+			s:            ins.decl.sema,
+			lookup:       ins.decl.sema,
+			referencer:   referencer,
+			use_generics: generics,
+		}
+
 		// Check field types.
 		for (_, mut f) in ins.fields {
-			let mut tc = TypeChecker{
-				s:            ins.decl.sema,
-				lookup:       ins.decl.sema,
-				referencer:   referencer,
-				use_generics: generics,
-			}
 			let mut kind = tc.check_decl(f.decl.kind.decl)
 			ok = real(kind)
 
@@ -894,7 +895,7 @@ impl TypeChecker {
 			ret new(StructIns)
 		}
 
-		let mut ok = self.check_illegal_cycles(decl, s)
+		let mut ok = self.not_plain || self.check_illegal_cycles(decl, s)
 		if !ok {
 			ret new(StructIns)
 		}
