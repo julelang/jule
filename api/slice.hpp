@@ -87,7 +87,7 @@ namespace jule {
             this->_len = this->_cap;
             const auto src_begin{ src.begin() };
             for (jule::Int i{ 0 }; i < this->_len; ++i)
-                this->data.alloc[i] = *reinterpret_cast<const Item*>(src_begin+i);
+                this->data.alloc[i] = *static_cast<const Item*>(src_begin+i);
         }
 
         ~Slice<Item>(void) noexcept

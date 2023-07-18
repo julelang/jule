@@ -102,7 +102,8 @@ namespace jule {
 #ifndef __JULE_DISABLE__REFERENCE_COUNTING
             this->data.add_ref();
 #endif
-            return jule::Ref<T>::make(reinterpret_cast<T*>(this->data.alloc), this->data.ref);
+            return jule::Ref<T>::make(
+                reinterpret_cast<T*>(this->data.alloc), this->data.ref);
         }
 
         inline void operator=(const std::nullptr_t) noexcept

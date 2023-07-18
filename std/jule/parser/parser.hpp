@@ -16,10 +16,10 @@ jule::Slice<Item> __jule_parser_vector_as_slice(Vector vec) noexcept {
     slice._cap = vec._method_cap();
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
     slice.data = jule::Ref<Item>::make(
-        reinterpret_cast<Item*>(vec._field__buffer.heap), nullptr);
+        static_cast<Item*>(vec._field__buffer.heap), nullptr);
 #else
     slice.data = jule::Ref<Item>::make(
-        reinterpret_cast<Item*>(vec._field__buffer.heap));
+        static_cast<Item*>(vec._field__buffer.heap));
 #endif
     slice._slice = slice.data.alloc;
 

@@ -28,16 +28,16 @@ namespace jule {
             { return typeid(T).name(); }
 
             static void dealloc(void *alloc) noexcept
-            { delete reinterpret_cast<T*>(alloc); }
+            { delete static_cast<T*>(alloc); }
 
             static jule::Bool eq(void *alloc, void *other) noexcept {
-                T *l{ reinterpret_cast<T*>(alloc) };
-                T *r{ reinterpret_cast<T*>(other) };
+                T *l{ static_cast<T*>(alloc) };
+                T *r{ static_cast<T*>(other) };
                 return *l == *r;
             }
 
             static const jule::Str to_str(const void *alloc) noexcept {
-                const T *v{ reinterpret_cast<const T*>(alloc) };
+                const T *v{ static_cast<const T*>(alloc) };
                 return jule::to_str(*v);
             }
 
@@ -46,7 +46,7 @@ namespace jule {
                 if (!heap)
                     return nullptr;
 
-                *heap = *reinterpret_cast<T*>(data);
+                *heap = *static_cast<T*>(data);
                 return heap;
             }
         };
@@ -151,7 +151,7 @@ namespace jule {
                 jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
 
             *alloc = expr;
-            *main_alloc = reinterpret_cast<void*>(alloc);
+            *main_alloc = static_cast<void*>(alloc);
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
             this->data = jule::Ref<void*>::make(main_alloc, nullptr);
 #else
@@ -195,7 +195,7 @@ namespace jule {
             if (!this->type_is<T>())
                 jule::panic(jule::ERROR_INCOMPATIBLE_TYPE);
 
-            return *reinterpret_cast<T*>(*this->data.alloc);
+            return *static_cast<T*>(*this->data.alloc);
         }
 
         template<typename T>

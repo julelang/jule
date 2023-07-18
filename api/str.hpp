@@ -100,16 +100,16 @@ namespace jule {
         typedef const jule::U8 *ConstIterator;
 
         inline Iterator begin(void) noexcept
-        { return reinterpret_cast<Iterator>(&this->buffer[0]); }
+        { return static_cast<Iterator>(&this->buffer[0]); }
 
         inline ConstIterator begin(void) const noexcept
-        { return reinterpret_cast<ConstIterator>(&this->buffer[0]); }
+        { return static_cast<ConstIterator>(&this->buffer[0]); }
 
         inline Iterator end(void) noexcept
-        { return reinterpret_cast<Iterator>(&this->buffer[this->len()]); }
+        { return static_cast<Iterator>(&this->buffer[this->len()]); }
 
         inline ConstIterator end(void) const noexcept
-        { return reinterpret_cast<ConstIterator>(&this->buffer[this->len()]); }
+        { return static_cast<ConstIterator>(&this->buffer[this->len()]); }
 
         inline jule::Str slice(const jule::Int &start,
                                const jule::Int &end) const noexcept {

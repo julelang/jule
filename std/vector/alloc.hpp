@@ -43,26 +43,26 @@ inline Item *__jule_std_vector_alloc(const jule::Int &n) noexcept
 
 template<typename Item>
 inline void __jule_std_vector_dealloc(void *heap) noexcept
-{ delete[] reinterpret_cast<Item*>(heap); }
+{ delete[] static_cast<Item*>(heap); }
 
 template<typename Item>
 inline Item __jule_std_vector_deref(void *heap, const jule::Int &i) noexcept
-{ return reinterpret_cast<Item*>(heap)[i]; }
+{ return static_cast<Item*>(heap)[i]; }
 
 template<typename Item>
 inline void __jule_std_vector_heap_assign(void *heap, const jule::Int &i, const Item &item) noexcept
-{ reinterpret_cast<Item*>(heap)[i] = item; }
+{ static_cast<Item*>(heap)[i] = item; }
 
 template<typename Item>
 inline void __jule_std_vector_heap_move(void *heap, const jule::Int &i, const jule::Int &dest) noexcept {
-    Item *_heap{ reinterpret_cast<Item*>(heap) };
+    Item *_heap{ static_cast<Item*>(heap) };
     _heap[dest] = _heap[i];
 }
 
 template<typename Item>
 inline void __jule_std_vector_copy_range(void *dest, void *buff, const jule::Int &length) noexcept {
-    Item *_buff{ reinterpret_cast<Item*>(buff) };
-    std::copy(_buff, _buff+length, reinterpret_cast<Item*>(dest));
+    Item *_buff{ static_cast<Item*>(buff) };
+    std::copy(_buff, _buff+length, static_cast<Item*>(dest));
 }
 
 template<typename Item>
