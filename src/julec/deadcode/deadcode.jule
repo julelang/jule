@@ -85,10 +85,19 @@ unsafe fn drop_ref(mut refs: *[]any, pos: int) {
 	*refs = append((*refs)[:pos], (*refs)[pos+1:]...)*/
 }
 
-fn is_all_references_are_dead(mut references: &ReferenceStack): bool {
+fn is_all_references_are_dead[T](mut references: &ReferenceStack): bool {
 	let mut i = 0
 	for i < references.len(); i++ {
 		let mut ref = references.at(i)
+		match type current {
+		| &T:
+			match type ref {
+			| &T:
+				if &(&T)(current) == &(&T)(ref) {
+					continue
+				}
+			}
+		}
 		if !is_dead(ref) {
 			ret false
 		}
@@ -107,7 +116,7 @@ fn is_fn_dead(mut f: &Fn): bool {
 		ret f.instances.len == 0
 	}
 
-	ret is_all_references_are_dead(f.references)
+	ret is_all_references_are_dead[Fn](f.references)
 }
 
 fn is_var_dead(mut v: &Var): bool {
@@ -119,7 +128,7 @@ fn is_var_dead(mut v: &Var): bool {
 		ret false
 	}
 
-	ret is_all_references_are_dead(v.references)
+	ret is_all_references_are_dead[Var](v.references)
 }
 
 fn is_struct_dead(mut s: &Struct): bool {
@@ -133,7 +142,7 @@ fn is_struct_dead(mut s: &Struct): bool {
 		ret s.instances.len == 0
 	}
 
-	ret is_all_references_are_dead(s.references)
+	ret is_all_references_are_dead[Struct](s.references)
 }
 
 fn is_trait_dead(mut t: &Trait): bool {
