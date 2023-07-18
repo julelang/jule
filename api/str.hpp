@@ -199,7 +199,7 @@ namespace jule {
             jule::Uint pos{ npos };
             if (n < 0) {
                 while ((pos = s.find(sub.buffer)) != npos) {
-                    parts.push(jule::Str(s.substr(0, pos).c_str(), pos+1));
+                    parts.push(jule::Str(s.substr(0, pos).c_str(), pos));
                     s = s.substr(pos+sub.len());
                 }
                 if (!s.empty())
@@ -211,7 +211,7 @@ namespace jule {
                         parts.push(jule::Str(s.c_str(), s.length()));
                         break;
                     }
-                    parts.push(jule::Str(s.substr(0, pos).c_str(), pos+1));
+                    parts.push(jule::Str(s.substr(0, pos).c_str(), pos));
                     s = s.substr(pos+sub.len());
                 }
                 if (!parts.empty() && _n < n)
