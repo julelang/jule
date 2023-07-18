@@ -5,6 +5,7 @@
 #ifndef __JULE_ARRAY_HPP
 #define __JULE_ARRAY_HPP
 
+#include <array>
 #include <initializer_list>
 #include <sstream>
 #include <ostream>
