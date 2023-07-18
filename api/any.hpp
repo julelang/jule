@@ -212,8 +212,11 @@ namespace jule {
             if (this->data.alloc != nullptr && this->data.alloc == other.data.alloc)
                 return true;
 
-            if (this->operator==(nullptr) && other.operator==(nullptr))
-                return true;
+            if (this->operator==(nullptr))
+                return other.operator==(nullptr);
+
+            if (other.operator==(nullptr))
+                return false;
 
             if (std::strcmp(this->type->type_id(), other.type->type_id()) != 0)
                 return false;
