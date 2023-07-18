@@ -18,11 +18,15 @@ namespace fs = std::filesystem;
 #endif
 
 jule::Bool mkdir(const jule::Str &path) noexcept;
+void rmdir(const jule::Str &path) noexcept;
 jule::Int system(const jule::Str &cmd) noexcept;
 void __julec_truncate_file(const jule::Str &path) noexcept;
 
 jule::Bool mkdir(const jule::Str &path) noexcept
 { return fs::create_directories(path.operator const char *()); }
+
+void rmdir(const jule::Str &path) noexcept
+{ fs::remove_all(path.operator const char*()); }
 
 jule::Int system(const jule::Str &cmd) noexcept
 { return std::system(cmd.operator const char *()); }

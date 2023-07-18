@@ -36,6 +36,7 @@ use std::runtime::{OS}
 use cpp "julec.hpp"
 
 cpp fn mkdir(path: str): bool
+cpp fn rmdir(path: str)
 cpp fn system(cmd: str): int
 // Truncate file.
 // Creates new one if file is not exist in this path.
@@ -399,17 +400,27 @@ fn write_output(path: str, content: str) {
 	_ = f.close()
 }
 
+fn clear_objects() {
+	cpp.rmdir(OUT_DIR)
+}
+
+fn compile_ir(compiler: str, compiler_cmd: str) {
+	let status = cpp.system(compiler + " " + compiler_cmd)
+	if status != 0 {
+		out("external compiler failed with status code: ");
+		outln(status)
+		exit(0)
+	}
+
+	clear_objects()
+}
+
 fn do_spell(obj: str, compiler: str, compiler_cmd: str) {
 	let path = get_compile_path()
 	write_output(path, obj)
 	match MODE {
 	| Mode.Compile:
-		let status = cpp.system(compiler + " " + compiler_cmd)
-		if status != 0 {
-			out("external compiler failed with status code: ");
-			outln(status)
-			exit(0)
-		}
+		compile_ir(compiler, compiler_cmd)
 	}
 }
 
