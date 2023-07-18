@@ -17,6 +17,12 @@ use std::vector::{Vector}
 // Stores all dead definitions.
 let mut deads: []any = nil
 
+// Stores currently checking definitions.
+let mut checking: []any = nil
+
+// Currently checking reference.
+let mut current: any = nil
+
 fn is_exist[T](arr: []any, t: &T): bool {
 	for _, ref in arr {
 		match type ref {
@@ -29,27 +35,35 @@ fn is_exist[T](arr: []any, t: &T): bool {
 	ret false
 }
 
-fn is_dead_ref(ref: any): bool {
+fn is_exist_ref(mut refs: []any, ref: any): bool {
 	match type ref {
-	| &Fn:     ret is_exist[Fn](deads, (&Fn)(ref))
-	| &Var:    ret is_exist[Var](deads, (&Var)(ref))
-	| &Struct: ret is_exist[Struct](deads, (&Struct)(ref))
-	| &Trait:  ret is_exist[Trait](deads, (&Trait)(ref))
+	| &Fn:     ret is_exist[Fn](refs, (&Fn)(ref))
+	| &Var:    ret is_exist[Var](refs, (&Var)(ref))
+	| &Struct: ret is_exist[Struct](refs, (&Struct)(ref))
+	| &Trait:  ret is_exist[Trait](refs, (&Trait)(ref))
 	|:         ret false
 	}
 }
 
 fn is_dead(mut ref: any): (dead: bool) {
-	if is_dead_ref(ref) {
+	if is_exist_ref(deads, ref) {
 		// Cycle, also already checked and marked as dead.
 		ret true
 	}
+	if is_exist_ref(checking, ref) {
+		// Cycle, also already checked and should be marked alive.
+		ret false
+	}
 
-	let len = deads.len
-	deads = append(deads, ref)
+	let mut old = current
+	current = ref
+	let len = checking.len
+	checking = append(checking, ref)
 	defer {
-		if !dead {
-			drop_deads(len)
+		current = old
+		unsafe { drop_ref(&checking, len) }
+		if dead {
+			deads = append(deads, ref)
 		}
 	}
 
@@ -62,12 +76,13 @@ fn is_dead(mut ref: any): (dead: bool) {
 	}
 }
 
-fn drop_deads(pos: int) {
-	if pos == deads.len {
-		deads = deads[:pos]
+unsafe fn drop_ref(mut refs: *[]any, pos: int) {
+	*refs = (*refs)[:pos]
+	/*
+	if pos == (*refs).len {
 		ret
 	}
-	deads = append(deads[:pos], deads[pos+1:]...)
+	*refs = append((*refs)[:pos], (*refs)[pos+1:]...)*/
 }
 
 fn is_all_references_are_dead(mut references: &ReferenceStack): bool {
@@ -211,5 +226,8 @@ pub fn eliminate_dead_code(mut ir: &IR) {
 	}
 	eliminate_dead_code_package(ir.main)
 
-	deads = nil // Clear memory.
+	// Clear memory.
+	deads = nil
+	checking = nil
+	current = nil
 }
