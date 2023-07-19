@@ -11,13 +11,13 @@
 
 namespace jule {
     template<typename T, typename Denominator>
-    auto div(const T &x, const Denominator &denominator) noexcept;
+    auto div(const T &x, const Denominator &denominator)  ;
 
     template<typename T>
     jule::Ref<T> new_struct(T *ptr);
 
     template<typename T, typename Denominator>
-    auto div(const T &x, const Denominator &denominator) noexcept {
+    auto div(const T &x, const Denominator &denominator)   {
         if (denominator == 0)
             jule::panic(jule::ERROR_DIVIDE_BY_ZERO);
         return (x/denominator);

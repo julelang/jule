@@ -23,24 +23,24 @@ namespace jule {
     struct Ref;
 
     template<typename T>
-    inline jule::Ref<T> new_ref(void) noexcept;
+    inline jule::Ref<T> new_ref(void)  ;
 
     template<typename T>
-    inline jule::Ref<T> new_ref(const T &init) noexcept;
+    inline jule::Ref<T> new_ref(const T &init)  ;
 
     template<typename T>
     struct Ref {
         mutable T *alloc{ nullptr };
         mutable jule::Uint *ref{ nullptr };
 
-        static jule::Ref<T> make(T *ptr, jule::Uint *ref) noexcept {
+        static jule::Ref<T> make(T *ptr, jule::Uint *ref)   {
             jule::Ref<T> buffer;
             buffer.alloc = ptr;
             buffer.ref = ref;
             return buffer;
         }
 
-        static jule::Ref<T> make(T *ptr) noexcept {
+        static jule::Ref<T> make(T *ptr)   {
             jule::Ref<T> buffer;
 
 #ifndef __JULE_DISABLE__REFERENCE_COUNTING
@@ -55,7 +55,7 @@ namespace jule {
             return buffer;
         }
 
-        static jule::Ref<T> make(const T &instance, jule::Uint *ref) noexcept {
+        static jule::Ref<T> make(const T &instance, jule::Uint *ref)   {
             jule::Ref<T> buffer;
 
             buffer.alloc = new (std::nothrow) T;
@@ -67,7 +67,7 @@ namespace jule {
             return buffer;
         }
 
-        static jule::Ref<T> make(const T &instance) noexcept {
+        static jule::Ref<T> make(const T &instance)   {
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
             return jule::Ref<T>::make(instance, nullptr);
 #else
@@ -80,34 +80,34 @@ namespace jule {
 #endif
         }
 
-        Ref<T>(void) noexcept {}
+        Ref<T>(void)   {}
 
-        Ref<T> (const jule::Ref<T> &ref) noexcept
+        Ref<T> (const jule::Ref<T> &ref)  
         { this->operator=(ref); }
 
-        ~Ref<T>(void) noexcept
+        ~Ref<T>(void)  
         { this->drop(); }
 
-        inline jule::Int drop_ref(void) const noexcept {
+        inline jule::Int drop_ref(void) const   {
             return __jule_atomic_add_explicit(
                 this->ref,
                 -jule::REFERENCE_DELTA,
                 __JULE_ATOMIC_MEMORY_ORDER__RELAXED);
         }
 
-        inline jule::Int add_ref(void) const noexcept {
+        inline jule::Int add_ref(void) const   {
             return __jule_atomic_add_explicit(
                 this->ref,
                 jule::REFERENCE_DELTA,
                 __JULE_ATOMIC_MEMORY_ORDER__RELAXED);
         }
 
-        inline jule::Uint get_ref_n(void) const noexcept {
+        inline jule::Uint get_ref_n(void) const   {
             return __jule_atomic_load_explicit(
                 this->ref, __JULE_ATOMIC_MEMORY_ORDER__RELAXED);
         }
 
-        void drop(void) const noexcept {
+        void drop(void) const   {
             if (!this->ref) {
                 this->alloc = nullptr;
                 return;
@@ -126,33 +126,33 @@ namespace jule {
             this->alloc = nullptr;
         }
 
-        inline jule::Bool real() const noexcept
+        inline jule::Bool real() const  
         { return this->alloc != nullptr; }
 
-        inline T *operator->(void) const noexcept {
+        inline T *operator->(void) const   {
             this->must_ok();
             return this->alloc;
         }
 
-        inline operator T(void) const noexcept {
+        inline operator T(void) const   {
             this->must_ok();
             return *this->alloc;
         }
 
-        inline operator T&(void) noexcept {
+        inline operator T&(void)   {
             this->must_ok();
             return *this->alloc;
         }
 
-        inline T& get(void) noexcept
+        inline T& get(void)  
         { return this->operator T&(); }
 
-        inline void must_ok(void) const noexcept {
+        inline void must_ok(void) const   {
             if (!this->real())
                 jule::panic(jule::ERROR_INVALID_MEMORY);
         }
 
-        void operator=(const jule::Ref<T> &ref) noexcept {
+        void operator=(const jule::Ref<T> &ref)   {
             // Assignment to itself.
             if (this->alloc != nullptr && this->alloc == ref.alloc)
                 return;
@@ -166,18 +166,18 @@ namespace jule {
             this->alloc = ref.alloc;
         }
 
-        inline void operator=(const T &val) const noexcept {
+        inline void operator=(const T &val) const   {
             this->must_ok();
             *this->alloc = val;
         }
 
-        inline jule::Bool operator==(const T &val) const noexcept
+        inline jule::Bool operator==(const T &val) const  
         { return this->__alloc == nullptr ? false : *this->alloc == val; }
 
-        inline jule::Bool operator!=(const T &val) const noexcept
+        inline jule::Bool operator!=(const T &val) const  
         { return !this->operator==(val); }
 
-        inline jule::Bool operator==(const jule::Ref<T> &ref) const noexcept {
+        inline jule::Bool operator==(const jule::Ref<T> &ref) const   {
             if (this->alloc == nullptr)
                 return ref.alloc == nullptr;
 
@@ -191,12 +191,12 @@ namespace jule {
             return *this->alloc == *ref.alloc;
         }
 
-        inline jule::Bool operator!=(const jule::Ref<T> &ref) const noexcept
+        inline jule::Bool operator!=(const jule::Ref<T> &ref) const  
         { return !this->operator==(ref); }
 
         friend inline
         std::ostream &operator<<(std::ostream &stream,
-                                 const jule::Ref<T> &ref) noexcept {
+                                 const jule::Ref<T> &ref)   {
             if (!ref.real())
                 stream << "nil";
             else
@@ -206,11 +206,11 @@ namespace jule {
     };
 
     template<typename T>
-    inline jule::Ref<T> new_ref(void) noexcept
+    inline jule::Ref<T> new_ref(void)  
     { return jule::Ref<T>(); }
 
     template<typename T>
-    inline jule::Ref<T> new_ref(const T &init) noexcept {
+    inline jule::Ref<T> new_ref(const T &init)   {
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
         return jule::Ref<T>::make(init, nullptr);
 #else

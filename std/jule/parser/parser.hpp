@@ -4,10 +4,10 @@
 #include "../../../api/jule.hpp"
 
 template<typename Vector, typename Item>
-jule::Slice<Item> __jule_parser_vector_as_slice(Vector vec) noexcept;
+jule::Slice<Item> __jule_parser_vector_as_slice(Vector vec)  ;
 
 template<typename Vector, typename Item>
-jule::Slice<Item> __jule_parser_vector_as_slice(Vector vec) noexcept {
+jule::Slice<Item> __jule_parser_vector_as_slice(Vector vec)   {
     jule::Slice<Item> slice;
     if (vec._method_len() == 0)
         return slice;

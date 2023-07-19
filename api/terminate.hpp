@@ -20,21 +20,21 @@ namespace jule {
     struct Error {
         virtual jule::Str error(void) { return jule::Str(); }
 
-        virtual ~Error(void) noexcept {}
+        virtual ~Error(void)   {}
 
         jule::Bool operator==(const Error&) { return false; }
         jule::Bool operator!=(const Error &src) { return !this->operator==(src); }
 
-        friend std::ostream &operator<<(std::ostream &stream, Error error) noexcept
+        friend std::ostream &operator<<(std::ostream &stream, Error error)  
         { return stream << error.error(); }
     };
 
     // JuleC terminate handler.
-    void terminate_handler(void) noexcept;
+    void terminate_handler(void)  ;
 
     jule::Trait<Error> exception_to_error(const jule::Exception &exception);
 
-    void terminate_handler(void) noexcept {
+    void terminate_handler(void)   {
         try { std::rethrow_exception(std::current_exception()); }
         catch (const jule::Exception &e) {
             jule::outln(std::string("panic: ") + std::string(e.what()));

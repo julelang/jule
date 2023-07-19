@@ -22,27 +22,27 @@ namespace jule {
     typedef jule::I32 Rune; // builtin: type rune: i32
 
     template<typename T>
-    inline void out(const T &obj) noexcept;
+    inline void out(const T &obj)  ;
 
     template<typename T>
-    inline void outln(const T &obj) noexcept;
+    inline void outln(const T &obj)  ;
 
     template<typename Item>
     jule::Int copy(const jule::Slice<Item> &dest,
-                      const jule::Slice<Item> &src) noexcept;
+                      const jule::Slice<Item> &src)  ;
 
     template<typename Item>
     jule::Slice<Item> append(const jule::Slice<Item> &src,
-                             const jule::Slice<Item> &components) noexcept;
+                             const jule::Slice<Item> &components)  ;
 
     template<typename T>
-    inline void drop(T &obj) noexcept;
+    inline void drop(T &obj)  ;
 
     template<typename T>
-    inline jule::Bool real(const T &obj) noexcept;
+    inline jule::Bool real(const T &obj)  ;
 
     template<typename T>
-    inline void out(const T &obj) noexcept {
+    inline void out(const T &obj)   {
 #ifdef OS_WINDOWS
         const jule::Str str{ jule::to_str<T>(obj) };
         const jule::Slice<jule::U16> utf16_str{ jule::utf16_from_str(str) };
@@ -54,14 +54,14 @@ namespace jule {
     }
 
     template<typename T>
-    inline void outln(const T &obj) noexcept {
+    inline void outln(const T &obj)   {
         jule::out(obj);
         std::cout << std::endl;
     }
 
     template<typename Item>
     jule::Int copy(const jule::Slice<Item> &dest,
-                   const jule::Slice<Item> &src) noexcept {
+                   const jule::Slice<Item> &src)   {
         if (dest.empty() || src.empty())
             return 0;
 
@@ -78,7 +78,7 @@ namespace jule {
 
     template<typename Item>
     jule::Slice<Item> append(const jule::Slice<Item> &src,
-                             const jule::Slice<Item> &components) noexcept {
+                             const jule::Slice<Item> &components)   {
         if (src == nullptr && components == nullptr)
             return nullptr;
 
@@ -104,11 +104,11 @@ namespace jule {
     }
 
     template<typename T>
-    inline void drop(T &obj) noexcept
+    inline void drop(T &obj)  
     { obj.drop(); }
 
     template<typename T>
-    inline jule::Bool real(const T &obj) noexcept
+    inline jule::Bool real(const T &obj)  
     { return obj.real(); }
 
 } // namespace jule

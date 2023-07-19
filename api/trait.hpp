@@ -25,11 +25,11 @@ namespace jule {
         mutable jule::Ref<Mask> data{};
         const char *type_id { nullptr };
 
-        Trait<Mask>(void) noexcept {}
-        Trait<Mask>(std::nullptr_t) noexcept {}
+        Trait<Mask>(void)   {}
+        Trait<Mask>(std::nullptr_t)   {}
 
         template<typename T>
-        Trait<Mask>(const T &data) noexcept {
+        Trait<Mask>(const T &data)   {
             T *alloc{ new(std::nothrow) T };
             if (!alloc)
                 jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
@@ -44,7 +44,7 @@ namespace jule {
         }
 
         template<typename T>
-        Trait<Mask>(const jule::Ref<T> &ref) noexcept {
+        Trait<Mask>(const jule::Ref<T> &ref)   {
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
             this->data = jule::Ref<Mask>::make(static_cast<Mask*>(ref.alloc), nullptr);
 #else
@@ -55,39 +55,39 @@ namespace jule {
             this->type_id = typeid(ref).name();
         }
 
-        Trait<Mask>(const jule::Trait<Mask> &src) noexcept
+        Trait<Mask>(const jule::Trait<Mask> &src)  
         { this->operator=(src); }
 
-        void dealloc(void) noexcept
+        void dealloc(void)  
         { this->data.drop(); }
     
-        inline void must_ok(void) const noexcept {
+        inline void must_ok(void) const   {
             if (this->operator==(nullptr))
                 jule::panic(jule::ERROR_INVALID_MEMORY);
         }
 
         template<typename T>
-        inline jule::Bool type_is(void) const noexcept {
+        inline jule::Bool type_is(void) const   {
             if (this->operator==(nullptr))
                 return false;
 
             return std::strcmp(this->type_id, typeid(T).name()) == 0;
         }
 
-        inline Mask &get(void) noexcept {
+        inline Mask &get(void)   {
             this->must_ok();
             return this->data;
         }
 
-        inline Mask &get(void) const noexcept {
+        inline Mask &get(void) const   {
             this->must_ok();
             return this->data;
         }
 
-        ~Trait(void) noexcept {}
+        ~Trait(void)   {}
 
         template<typename T>
-        operator T(void) noexcept {
+        operator T(void)   {
             this->must_ok();
             if (std::strcmp(this->type_id, typeid(T).name()) != 0)
                 jule::panic(jule::ERROR_INCOMPATIBLE_TYPE);
@@ -95,7 +95,7 @@ namespace jule {
         }
 
         template<typename T>
-        operator jule::Ref<T>(void) noexcept {
+        operator jule::Ref<T>(void)   {
             this->must_ok();
             if (std::strcmp(this->type_id, typeid(jule::Ref<T>).name()) != 0)
                 jule::panic(jule::ERROR_INCOMPATIBLE_TYPE);
@@ -106,10 +106,10 @@ namespace jule {
                 reinterpret_cast<T*>(this->data.alloc), this->data.ref);
         }
 
-        inline void operator=(const std::nullptr_t) noexcept
+        inline void operator=(const std::nullptr_t)  
         { this->dealloc(); }
 
-        inline void operator=(const jule::Trait<Mask> &src) noexcept {
+        inline void operator=(const jule::Trait<Mask> &src)   {
             // Assignment to itself.
             if (this->data.alloc != nullptr && this->data.alloc == src.data.alloc)
                 return;
@@ -121,20 +121,20 @@ namespace jule {
             this->type_id = src.type_id;
         }
 
-        inline jule::Bool operator==(const jule::Trait<Mask> &src) const noexcept
+        inline jule::Bool operator==(const jule::Trait<Mask> &src) const  
         { return this->data.alloc == this->data.alloc; }
 
-        inline jule::Bool operator!=(const jule::Trait<Mask> &src) const noexcept
+        inline jule::Bool operator!=(const jule::Trait<Mask> &src) const  
         { return !this->operator==(src); }
 
-        inline jule::Bool operator==(std::nullptr_t) const noexcept
+        inline jule::Bool operator==(std::nullptr_t) const  
         { return this->data.alloc == nullptr; }
 
-        inline jule::Bool operator!=(std::nullptr_t) const noexcept
+        inline jule::Bool operator!=(std::nullptr_t) const  
         { return !this->operator==(nullptr); }
 
         friend inline std::ostream &operator<<(std::ostream &stream,
-                                               const jule::Trait<Mask> &src) noexcept
+                                               const jule::Trait<Mask> &src)  
         { return stream << src.data.alloc; }
     };
 

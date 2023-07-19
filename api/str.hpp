@@ -24,18 +24,18 @@ namespace jule {
     // Libraries uses this function for UTf-8 encoded Jule strings.
     // Also it is builtin str type constructor.
     template<typename T>
-    jule::Str to_str(const T &obj) noexcept;
+    jule::Str to_str(const T &obj)  ;
 
-    jule::Str to_str(const jule::Str &s) noexcept;
+    jule::Str to_str(const jule::Str &s)  ;
 
     class Str {
     public:
         jule::Int _len{};
         std::basic_string<jule::U8> buffer{};
 
-        Str(void) noexcept {}
+        Str(void)   {}
 
-        Str(const char *src, const jule::Int &len) noexcept {
+        Str(const char *src, const jule::Int &len)   {
             if (!src)
                 return;
             this->_len = len;
@@ -43,7 +43,7 @@ namespace jule {
                                                        &src[this->_len]);
         }
 
-        Str(const jule::U8 *src, const jule::Int &len) noexcept {
+        Str(const jule::U8 *src, const jule::Int &len)   {
             if (!src)
                 return;
             this->_len = len;
@@ -51,7 +51,7 @@ namespace jule {
                                                        &src[this->_len]);
         }
 
-        Str(const char *src) noexcept {
+        Str(const char *src)   {
             if (!src)
                 return;
             this->_len = std::strlen(src);
@@ -59,35 +59,35 @@ namespace jule {
                                                        &src[this->_len]);
         }
 
-        Str(const std::initializer_list<jule::U8> &src) noexcept {
+        Str(const std::initializer_list<jule::U8> &src)   {
             this->_len = src.size();
             this->buffer = src;
         }
 
-        Str(const jule::I32 &rune) noexcept
+        Str(const jule::I32 &rune)  
         : Str( jule::utf8_rune_to_bytes(rune) ) {}
 
-        Str(const std::basic_string<jule::U8> &src) noexcept {
+        Str(const std::basic_string<jule::U8> &src)   {
             this->_len = src.length();
             this->buffer = src;
         }
 
-        Str(const std::string &src) noexcept {
+        Str(const std::string &src)   {
             this->_len = src.length();
             this->buffer = std::basic_string<jule::U8>(src.begin(), src.end());
         }
 
-        Str(const jule::Str &src) noexcept {
+        Str(const jule::Str &src)   {
             this->_len = src._len;
             this->buffer = src.buffer;
         }
 
-        Str(const jule::Slice<U8> &src) noexcept {
+        Str(const jule::Slice<U8> &src)   {
             this->_len = src.len();
             this->buffer = std::basic_string<jule::U8>(src.begin(), src.end());
         }
 
-        Str(const jule::Slice<jule::I32> &src) noexcept {
+        Str(const jule::Slice<jule::I32> &src)   {
             for (const jule::I32 &r: src) {
                 const jule::Slice<jule::U8> bytes{ jule::utf8_rune_to_bytes(r) };
                 this->_len += bytes.len();
@@ -99,20 +99,20 @@ namespace jule {
         typedef jule::U8       *Iterator;
         typedef const jule::U8 *ConstIterator;
 
-        inline Iterator begin(void) noexcept
+        inline Iterator begin(void)  
         { return static_cast<Iterator>(&this->buffer[0]); }
 
-        inline ConstIterator begin(void) const noexcept
+        inline ConstIterator begin(void) const  
         { return static_cast<ConstIterator>(&this->buffer[0]); }
 
-        inline Iterator end(void) noexcept
+        inline Iterator end(void)  
         { return static_cast<Iterator>(&this->buffer[this->len()]); }
 
-        inline ConstIterator end(void) const noexcept
+        inline ConstIterator end(void) const  
         { return static_cast<ConstIterator>(&this->buffer[this->len()]); }
 
         inline jule::Str slice(const jule::Int &start,
-                               const jule::Int &end) const noexcept {
+                               const jule::Int &end) const   {
             if (start < 0 || end < 0 || start > end || end > this->len()) {
                 std::stringstream sstream;
                 __JULEC_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(
@@ -125,34 +125,34 @@ namespace jule {
             return jule::Str(this->buffer.substr(start, n).c_str(), n);
         }
 
-        inline jule::Str slice(const jule::Int &start) const noexcept
+        inline jule::Str slice(const jule::Int &start) const  
         { return this->slice(start, this->len()); }
 
-        inline jule::Str slice(void) const noexcept
+        inline jule::Str slice(void) const  
         { return this->slice(0, this->len()); }
 
-        inline jule::Int len(void) const noexcept
+        inline jule::Int len(void) const  
         { return this->_len; }
 
-        inline jule::Bool empty(void) const noexcept
+        inline jule::Bool empty(void) const  
         { return this->buffer.empty(); }
 
-        inline jule::Bool has_prefix(const jule::Str &sub) const noexcept {
+        inline jule::Bool has_prefix(const jule::Str &sub) const   {
             return this->buffer.find(sub.buffer, 0) == 0;
         }
 
-        inline jule::Bool has_suffix(const jule::Str &sub) const noexcept {
+        inline jule::Bool has_suffix(const jule::Str &sub) const   {
             return this->len() >= sub.len() &&
                 this->buffer.substr(this->len()-sub.len()) == sub.buffer;
         }
 
-        inline jule::Int find(const jule::Str &sub) const noexcept
+        inline jule::Int find(const jule::Str &sub) const  
         { return static_cast<jule::Int>(this->buffer.find(sub.buffer) ); }
 
-        inline jule::Int rfind(const jule::Str &sub) const noexcept
+        inline jule::Int rfind(const jule::Str &sub) const  
         { return static_cast<jule::Int>(this->buffer.rfind(sub.buffer)); }
 
-        jule::Str trim(const jule::Str &bytes) const noexcept {
+        jule::Str trim(const jule::Str &bytes) const   {
             ConstIterator it{ this->begin() };
             const ConstIterator end{ this->end() };
             ConstIterator begin{ this->begin() };
@@ -171,7 +171,7 @@ namespace jule {
             return jule::Str();
         }
 
-        jule::Str rtrim(const jule::Str &bytes) const noexcept {
+        jule::Str rtrim(const jule::Str &bytes) const   {
             ConstIterator it{ this->end()-1 };
             const ConstIterator begin{ this->begin() };
             for (; it >= begin; --it) {
@@ -189,7 +189,7 @@ namespace jule {
         }
 
         jule::Slice<jule::Str> split(const jule::Str &sub,
-                                     const jule::I64 &n) const noexcept {
+                                     const jule::I64 &n) const   {
             jule::Slice<jule::Str> parts;
             if (n == 0)
                 return parts;
@@ -225,7 +225,7 @@ namespace jule {
 
         jule::Str replace(const jule::Str &sub,
                           const jule::Str &_new,
-                          const jule::I64 &n) const noexcept {
+                          const jule::I64 &n) const   {
             if (n == 0)
                 return *this;
 
@@ -249,23 +249,23 @@ namespace jule {
             return jule::Str(s);
         }
 
-        inline operator const char*(void) const noexcept
+        inline operator const char*(void) const  
         { return reinterpret_cast<const char*>(this->buffer.c_str()); }
 
-        inline operator const std::basic_string<jule::U8>(void) const noexcept
+        inline operator const std::basic_string<jule::U8>(void) const  
         { return this->buffer; }
 
-        inline operator const std::basic_string<char>(void) const noexcept
+        inline operator const std::basic_string<char>(void) const  
         { return std::basic_string<char>(this->begin(), this->end()); }
 
-        operator jule::Slice<jule::U8>(void) const noexcept {
+        operator jule::Slice<jule::U8>(void) const   {
             jule::Slice<jule::U8> slice{ jule::Slice<jule::U8>::alloc(this->len()) };
             for (jule::Int index{ 0 }; index < this->len(); ++index)
                 slice._slice[index] = this->operator[](index);
             return slice;
         }
 
-        operator jule::Slice<jule::I32>(void) const noexcept {
+        operator jule::Slice<jule::I32>(void) const   {
             jule::Slice<jule::I32> runes{};
             const char *str{ this->operator const char *() };
             for (jule::Int index{ 0 }; index < this->len(); ) {
@@ -291,22 +291,22 @@ namespace jule {
         inline jule::U8 operator[](const jule::Int &index) const
         { return (*this).buffer[index]; }
 
-        inline void operator+=(const jule::Str &str) noexcept {
+        inline void operator+=(const jule::Str &str)   {
             this->_len += str.len();
             this->buffer += str.buffer;
         }
 
-        inline jule::Str operator+(const jule::Str &str) const noexcept
+        inline jule::Str operator+(const jule::Str &str) const  
         { return jule::Str(this->buffer + str.buffer); }
 
-        inline jule::Bool operator==(const jule::Str &str) const noexcept
+        inline jule::Bool operator==(const jule::Str &str) const  
         { return this->buffer == str.buffer; }
 
-        inline jule::Bool operator!=(const jule::Str &str) const noexcept
+        inline jule::Bool operator!=(const jule::Str &str) const  
         { return !this->operator==(str); }
 
         friend std::ostream &operator<<(std::ostream &stream,
-                                        const jule::Str &src) noexcept {
+                                        const jule::Str &src)   {
             for (const jule::U8 &b: src)
             { stream << static_cast<char>(b); }
             return stream;
@@ -314,13 +314,13 @@ namespace jule {
     };
 
     template<typename T>
-    jule::Str to_str(const T &obj) noexcept {
+    jule::Str to_str(const T &obj)   {
         std::stringstream stream;
         stream << obj;
         return jule::Str(stream.str());
     }
 
-    jule::Str to_str(const jule::Str &s) noexcept
+    jule::Str to_str(const jule::Str &s)  
     { return s; }
 
 } // namespace jule

@@ -20,10 +20,10 @@ namespace jule {
     struct DeferBase {
     public:
         std::function<void(void)> scope;
-        DeferBase(const std::function<void(void)> &fn) noexcept
+        DeferBase(const std::function<void(void)> &fn)  
         { this->scope = fn; }
 
-        ~DeferBase(void) noexcept
+        ~DeferBase(void)  
         { this->scope(); }
     };
 }

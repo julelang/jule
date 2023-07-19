@@ -23,7 +23,7 @@ namespace jule {
 
     class MapKeyHasher {
     public:
-        size_t operator()(const jule::Str &key) const noexcept {
+        size_t operator()(const jule::Str &key) const   {
             size_t hash{ 0 };
             for (jule::Int i{ 0 }; i < key.len(); ++i)
                 hash += key[i] % 7;
@@ -31,7 +31,7 @@ namespace jule {
         }
     
         template<typename T>
-        inline size_t operator()(const T &obj) const noexcept
+        inline size_t operator()(const T &obj) const  
         { return this->operator()(jule::to_str<T>(obj)); }
     };
 
@@ -40,34 +40,34 @@ namespace jule {
     public:
         mutable std::unordered_map<Key, Value, MapKeyHasher> buffer{};
 
-        Map<Key, Value>(void) noexcept {}
-        Map<Key, Value>(const std::nullptr_t) noexcept {}
+        Map<Key, Value>(void)   {}
+        Map<Key, Value>(const std::nullptr_t)   {}
 
-        Map<Key, Value>(const std::initializer_list<std::pair<Key, Value>> &src) noexcept {
+        Map<Key, Value>(const std::initializer_list<std::pair<Key, Value>> &src)   {
             for (const std::pair<Key, Value> &pair: src)
                 this->buffer.insert(pair);
         }
 
         inline constexpr
-        auto begin(void) noexcept
+        auto begin(void)  
         { return this->buffer.begin(); }
 
         inline constexpr
-        auto begin(void) const noexcept
+        auto begin(void) const  
         { return this->buffer.begin(); }
 
         inline constexpr
-        auto end(void) noexcept
+        auto end(void)  
         { return this->buffer.end(); }
 
         inline constexpr
-        auto end(void) const noexcept
+        auto end(void) const  
         { return this->buffer.end(); }
     
-        inline void clear(void) noexcept
+        inline void clear(void)  
         { this->buffer.clear(); }
 
-        jule::Slice<Key> keys(void) const noexcept {
+        jule::Slice<Key> keys(void) const   {
             jule::Slice<Key> keys(this->len());
             jule::Uint index{ 0 };
             for (const auto &pair: *this)
@@ -75,7 +75,7 @@ namespace jule {
             return keys;
         }
 
-        jule::Slice<Value> values(void) const noexcept {
+        jule::Slice<Value> values(void) const   {
             jule::Slice<Value> keys(this->len());
             jule::Uint index{ 0 };
             for (const auto &pair: *this)
@@ -84,19 +84,19 @@ namespace jule {
         }
 
         inline constexpr
-        jule::Bool has(const Key &key) const noexcept
+        jule::Bool has(const Key &key) const  
         { return this->buffer.find(key) != this->end(); }
 
-        inline jule::Int len(void) const noexcept
+        inline jule::Int len(void) const  
         { return this->buffer.size(); }
 
-        inline void del(const Key &key) noexcept
+        inline void del(const Key &key)  
         { this->buffer.erase(key); }
 
-        inline jule::Bool operator==(const std::nullptr_t) const noexcept
+        inline jule::Bool operator==(const std::nullptr_t) const  
         { return this->buffer.empty(); }
     
-        inline jule::Bool operator!=(const std::nullptr_t) const noexcept
+        inline jule::Bool operator!=(const std::nullptr_t) const  
         { return !this->operator==(nullptr); }
 
         Value &operator[](const Key &key)
@@ -106,7 +106,7 @@ namespace jule {
         { return this->buffer[key]; }
 
         friend std::ostream &operator<<(std::ostream &stream,
-                                        const Map<Key, Value> &src) noexcept {
+                                        const Map<Key, Value> &src)   {
             stream << '{';
             jule::Int length{ src.len() };
             for (const auto pair: src) {

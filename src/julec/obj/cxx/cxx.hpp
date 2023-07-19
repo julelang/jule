@@ -25,9 +25,9 @@ struct JuleCompileTime {
 	jule::Int minute;
 };
 
-JuleCompileTime time_now(void) noexcept;
+JuleCompileTime time_now(void)  ;
 
-JuleCompileTime time_now(void) noexcept {
+JuleCompileTime time_now(void)   {
 	time_t now;
 	time(&now);
 

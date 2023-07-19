@@ -9,9 +9,9 @@
 
 #include "../../api/jule.hpp"
 
-jule::Str __jule_readln(void) noexcept;
+jule::Str __jule_readln(void)  ;
 
-jule::Str __jule_readln(void) noexcept {
+jule::Str __jule_readln(void)   {
     jule::Str input;
 #ifdef _WINDOWS
     std::wstring buffer;

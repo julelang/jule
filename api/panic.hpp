@@ -21,12 +21,12 @@ namespace jule {
         std::string message;
 
     public:
-        Exception(void) noexcept {}
+        Exception(void) {}
 
-        Exception(char *message) noexcept
+        Exception(char *message)
         { this->message = message; }
 
-        Exception(const std::string &message) noexcept
+        Exception(const std::string &message)
         { this->message = message; }
 
         char *what(void) noexcept

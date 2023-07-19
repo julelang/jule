@@ -24,24 +24,24 @@ namespace jule {
         template<typename T>
         struct DynamicType {
         public:
-            static const char *type_id(void) noexcept
+            static const char *type_id(void)  
             { return typeid(T).name(); }
 
-            static void dealloc(void *alloc) noexcept
+            static void dealloc(void *alloc)  
             { delete static_cast<T*>(alloc); }
 
-            static jule::Bool eq(void *alloc, void *other) noexcept {
+            static jule::Bool eq(void *alloc, void *other)   {
                 T *l{ static_cast<T*>(alloc) };
                 T *r{ static_cast<T*>(other) };
                 return *l == *r;
             }
 
-            static const jule::Str to_str(const void *alloc) noexcept {
+            static const jule::Str to_str(const void *alloc)   {
                 const T *v{ static_cast<const T*>(alloc) };
                 return jule::to_str(*v);
             }
 
-            static void *alloc_new_copy(void *data) noexcept {
+            static void *alloc_new_copy(void *data)   {
                 T *heap{ new (std::nothrow) T };
                 if (!heap)
                     return nullptr;
@@ -53,15 +53,15 @@ namespace jule {
 
         struct Type {
         public:
-            const char*(*type_id)(void) noexcept;
-            void(*dealloc)(void *alloc) noexcept;
-            jule::Bool(*eq)(void *alloc, void *other) noexcept;
-            const jule::Str(*to_str)(const void *alloc) noexcept;
-            void *(*alloc_new_copy)(void *data) noexcept;
+            const char*(*type_id)(void)  ;
+            void(*dealloc)(void *alloc)  ;
+            jule::Bool(*eq)(void *alloc, void *other)  ;
+            const jule::Str(*to_str)(const void *alloc)  ;
+            void *(*alloc_new_copy)(void *data)  ;
         };
 
         template<typename T>
-        static jule::Any::Type *new_type(void) noexcept {
+        static jule::Any::Type *new_type(void)   {
             using t = typename std::decay<DynamicType<T>>::type;
             static jule::Any::Type table = {
                 t::type_id,
@@ -77,22 +77,22 @@ namespace jule {
         jule::Ref<void*> data{};
         jule::Any::Type *type{ nullptr };
 
-        Any(void) noexcept {}
+        Any(void)   {}
 
         template<typename T>
-        Any(const T &expr) noexcept
+        Any(const T &expr)  
         { this->operator=(expr); }
 
-        Any(const jule::Any &src) noexcept
+        Any(const jule::Any &src)  
         { this->operator=(src); }
 
-        Any(const std::nullptr_t) noexcept
+        Any(const std::nullptr_t)  
         { this->operator=(nullptr); }
 
-        ~Any(void) noexcept
+        ~Any(void)  
         { this->dealloc(); }
 
-        void dealloc(void) noexcept {
+        void dealloc(void)   {
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
             this->type = nullptr;
             this->data.drop();
@@ -128,7 +128,7 @@ namespace jule {
         }
 
         template<typename T>
-        inline jule::Bool type_is(void) const noexcept {
+        inline jule::Bool type_is(void) const   {
             if (std::is_same<typename std::decay<T>::type, std::nullptr_t>::value)
                 return false;
 
@@ -139,7 +139,7 @@ namespace jule {
         }
 
         template<typename T>
-        void operator=(const T &expr) noexcept {
+        void operator=(const T &expr)   {
             this->dealloc();
 
             T *alloc{ new(std::nothrow) T };
@@ -160,7 +160,7 @@ namespace jule {
             this->type = jule::Any::new_type<T>();
         }
 
-        void operator=(const jule::Any &src) noexcept {
+        void operator=(const jule::Any &src)   {
             // Assignment to itself.
             if (this->data.alloc != nullptr && this->data.alloc == src.data.alloc)
                 return;
@@ -184,11 +184,11 @@ namespace jule {
             this->type = src.type;
         }
 
-        inline void operator=(const std::nullptr_t) noexcept
+        inline void operator=(const std::nullptr_t)  
         { this->dealloc(); }
 
         template<typename T>
-        operator T(void) const noexcept {
+        operator T(void) const   {
             if (this->operator==(nullptr))
                 jule::panic(jule::ERROR_INVALID_MEMORY);
 
@@ -199,15 +199,15 @@ namespace jule {
         }
 
         template<typename T>
-        inline jule::Bool operator==(const T &expr) const noexcept
+        inline jule::Bool operator==(const T &expr) const  
         { return this->type_is<T>() && this->operator T() == expr; }
 
         template<typename T>
         inline constexpr
-        jule::Bool operator!=(const T &expr) const noexcept
+        jule::Bool operator!=(const T &expr) const  
         { return !this->operator==(expr); }
 
-        inline jule::Bool operator==(const jule::Any &other) const noexcept {
+        inline jule::Bool operator==(const jule::Any &other) const   {
             // Break comparison cycle.
             if (this->data.alloc != nullptr && this->data.alloc == other.data.alloc)
                 return true;
@@ -224,17 +224,17 @@ namespace jule {
             return this->type->eq(*this->data.alloc, *other.data.alloc);
         }
 
-        inline jule::Bool operator!=(const jule::Any &other) const noexcept
+        inline jule::Bool operator!=(const jule::Any &other) const  
         { return !this->operator==(other); }
 
-        inline jule::Bool operator==(std::nullptr_t) const noexcept
+        inline jule::Bool operator==(std::nullptr_t) const  
         { return !this->data.alloc; }
 
-        inline jule::Bool operator!=(std::nullptr_t) const noexcept
+        inline jule::Bool operator!=(std::nullptr_t) const  
         { return !this->operator==(nullptr); }
 
         friend std::ostream &operator<<(std::ostream &stream,
-                                        const jule::Any &src) noexcept {
+                                        const jule::Any &src)   {
             if (src.operator!=(nullptr))
                 stream << src.type->to_str(*src.data.alloc);
             else
