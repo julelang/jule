@@ -68,13 +68,13 @@ fn trig_reduce(mut x: f64): (j: u64, z: f64) {
 	let exp = int(ix>>SHIFT&MASK) - BIAS - SHIFT
 	x = ix & ^(MASK << SHIFT)
 	ix |= 1 << SHIFT
-	// Use the exponent to extract the 3 appropriate uint64 digits from mPi4,
+	// Use the exponent to extract the 3 appropriate uint64 digits from M_PI4,
 	// B ~ (z0, z1, z2), such that the product leading digit has the exponent -61.
 	// Note, exp >= -53 since x >= PI4 and exp < 971 for maximum f64.
 	let (digit, bitshift) = uint(exp+61)/64, uint(exp+61)%64
-	let z0 = (mPi4[digit] << bitshift) | (mPi4[digit+1] >> (64 - bitshift))
-	let z1 = (mPi4[digit+1] << bitshift) | (mPi4[digit+2] >> (64 - bitshift))
-	let z2 = (mPi4[digit+2] << bitshift) | (mPi4[digit+3] >> (64 - bitshift))
+	let z0 = (M_PI4[digit] << bitshift) | (M_PI4[digit+1] >> (64 - bitshift))
+	let z1 = (M_PI4[digit+1] << bitshift) | (M_PI4[digit+2] >> (64 - bitshift))
+	let z2 = (M_PI4[digit+2] << bitshift) | (M_PI4[digit+3] >> (64 - bitshift))
 	// Multiply mantissa by the digits and extract the upper two digits (hi, lo).
 	let (z2hi, _) = mul64(z2, ix)
 	let (z1hi, z1lo) = mul64(z1, ix)
@@ -104,10 +104,10 @@ fn trig_reduce(mut x: f64): (j: u64, z: f64) {
 }
 
 // Is the binary digits of 4/pi as a u64 array,
-// that is, 4/pi = Sum mPi4[i]*2^(-64*i)
+// that is, 4/pi = Sum M_PI4[i]*2^(-64*i)
 // 19 64-bit digits and the leading one bit give 1217 bits
 // of precision to handle the largest possible f64 exponent.
-let mPi4: [...]u64 = [
+static M_PI4: [...]u64 = [
 	0x0000000000000001,
 	0x45f306dc9c882a53,
 	0xf84eafa3ea69bb81,
