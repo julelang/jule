@@ -63,11 +63,6 @@ static mut BUILTIN_TRAIT_ERROR: &Trait = &Trait{
 					ident: "self",
 				},
 			],
-			result: &RetType{
-				kind: &TypeSymbol{
-					decl: &TypeDecl{kind: &IdentTypeDecl{ident: "str"}},
-				},
-			},
 		},
 	],
 }
@@ -88,11 +83,11 @@ fn init() {
 	BUILTIN_FN_STD_MEM_SIZE_OF.caller = builtin_caller_std_mem_size_of
 	BUILTIN_FN_STD_MEM_ALIGN_OF.caller = builtin_caller_std_mem_align_of
 
-	for (_, mut f) in BUILTIN_TRAIT_ERROR.methods {
-		let mut ins = f.instance()
-		ins.caller = builtin_caller_common
-		f.append_instance(ins)
-	}
+	let mut error_method = BUILTIN_TRAIT_ERROR.find_method("error")
+	let mut error_method_ins = error_method.instance()
+	error_method_ins.result = &TypeKind{kind: build_prim_type(str(PrimKind.Str))}
+	error_method_ins.caller = builtin_caller_common
+	error_method.append_instance(error_method_ins)
 }
 
 fn find_builtin_fn(ident: str): &FnIns {
