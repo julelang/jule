@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::fs::{OFlag, FsError, DirEntry, read_dir, open}
+use std::fs::{OFlag, FsError, DirEntry, read_dir, read_file, open}
 use std::fs::path::{join}
 use std::jule::ast::{Ast}
 use std::jule::build::{
@@ -27,25 +27,11 @@ fn exit_err(msg: str) {
 }
 
 fn read_buff(path: str): []byte {
-	let (mut f, _) = open(path, OFlag.Rdonly, 0)
-	if !real(f) {
+	let (mut buffer, err) = read_file(path)
+	if err != FsError.Ok {
 		exit_err("error: file cannot read")
 	}
-
-	let mut buff = make([]byte, 0, 10240)
-	let mut bytes = make([]byte, 1024)
-	for {
-		let (n, err) = f.read(bytes)
-		if err != FsError.Ok {
-			exit_err("buffering failed")
-		}
-		if n == 0 {
-			break
-		}
-		buff = append(buff, bytes[:n]...)
-	}
-
-	ret buff
+	ret buffer
 }
 
 fn flat_compiler_err(text: str): Log {

@@ -66,7 +66,7 @@ impl File {
 	//
 	// Possible errors:
 	//  Retry InvalidDescriptor Signal SyncIO IO IsDir Overflow Buffer
-	//  InsufficientMemory Divice Seek
+	//  InsufficientMemory Device Seek
 	pub fn read(mut self, mut buff: []byte): (n: int, FsError) {
 		if buff.len == 0 {
 			ret 0, FsError.Ok
@@ -85,7 +85,7 @@ impl File {
 	//
 	// Possible errors:
 	//  Retry InvalidDescriptor Big Signal IO NoSpace Pipe Range SyncIO
-	//  Seek Divice Buffer
+	//  Seek Device Buffer
 	pub fn write(mut self, buff: []byte): (n: int, FsError) {
 		if buff.len == 0 {
 			ret 0, FsError.Ok
@@ -108,4 +108,40 @@ impl File {
 		}
 		ret FsError.Ok
 	}
+}
+
+// Reads bytes of file.
+// First, learns byte-size of file.
+// Then reads bytes and returns buffer.
+//
+// Possible errors:
+//  Denied Exist Signal SyncIO IO IsDir Loop PerProcessLimit LongPath
+//  SystemWideLimit NotExist UnableStream NoSpace NotDir Device Overflow
+//  ReadOnly Retry Busy Device Seek InsufficientMemory Buffer
+pub fn read_file(path: str): ([]byte, FsError) {
+	let (s, mut err) = stat(path)
+	if err != FsError.Ok {
+		ret nil, err
+	}
+
+	if !s.is_reg() {
+		ret nil, FsError.IsDir
+	}
+
+	if s.size == 0 {
+		ret make([]byte, 0), FsError.Ok
+	}
+
+	let (mut f, err) = open(path, OFlag.Rdonly, 0)
+	if err != FsError.Ok {
+		ret nil, err
+	}
+	defer { f.close() }
+
+	let mut buff = make([]byte, s.size)
+	let (_, err) = f.read(buff)
+	if err != FsError.Ok {
+		ret nil, err
+	}
+	ret buff, FsError.Ok
 }
