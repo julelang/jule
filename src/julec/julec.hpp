@@ -17,24 +17,17 @@ namespace fs = std::__fs::filesystem;
 namespace fs = std::filesystem;
 #endif
 
-jule::Bool mkdir(const jule::Str &path)  ;
-void rmdir(const jule::Str &path)  ;
-jule::Int system(const jule::Str &cmd)  ;
-void __julec_truncate_file(const jule::Str &path)  ;
+jule::Bool mkdir(const jule::Str &path);
+void rmdir(const jule::Str &path);
+jule::Int system(const jule::Str &cmd);
 
-jule::Bool mkdir(const jule::Str &path)  
+jule::Bool mkdir(const jule::Str &path)
 { return fs::create_directories(path.operator const char *()); }
 
-void rmdir(const jule::Str &path)  
+void rmdir(const jule::Str &path)
 { fs::remove_all(path.operator const char*()); }
 
-jule::Int system(const jule::Str &cmd)  
+jule::Int system(const jule::Str &cmd)
 { return std::system(cmd.operator const char *()); }
-
-void __julec_truncate_file(const jule::Str &path)   {
-	FILE *f{ std::fopen(static_cast<const char*>(path), "w") };
-	std::fclose(f);
-	f = nullptr;
-}
 
 #endif // __JULEC
