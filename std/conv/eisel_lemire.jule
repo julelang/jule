@@ -49,7 +49,7 @@ fn eisel_lemire64(mut man: u64, exp10: int, neg: bool): (f: f64, ok: bool) {
 		}
 		ret f, true
 	}
-	if exp10 < detailed_pows_of_ten_min_exp10 || detailed_pows_of_ten_max_exp10 < exp10 {
+	if exp10 < DETAILED_POWS_OF_TEN_MIN_EXP10 || DETAILED_POWS_OF_TEN_MAX_EXP10 < exp10 {
 		ret 0, false
 	}
 
@@ -60,11 +60,11 @@ fn eisel_lemire64(mut man: u64, exp10: int, neg: bool): (f: f64, ok: bool) {
 	let mut ret_exp2 = u64(217706*exp10>>16+64+F64_EXPONENT_BIAS) - u64(clz)
 
 	// Multiplication.
-	let (mut x_hi, mut x_lo) = mul64(man, detailed_pows_of_ten[exp10-detailed_pows_of_ten_min_exp10][1])
+	let (mut x_hi, mut x_lo) = mul64(man, DETAILED_POWS_OF_TEN[exp10-DETAILED_POWS_OF_TEN_MIN_EXP10][1])
 
 	// Wider Approximation.
 	if x_hi&0x1FF == 0x1FF && x_lo+man < man {
-		let (y_hi, y_lo) = mul64(man, detailed_pows_of_ten[exp10-detailed_pows_of_ten_min_exp10][0])
+		let (y_hi, y_lo) = mul64(man, DETAILED_POWS_OF_TEN[exp10-DETAILED_POWS_OF_TEN_MIN_EXP10][0])
 		let (mut merged_hi, merged_lo) = x_hi, x_lo+y_hi
 		if merged_lo < x_lo {
 			merged_hi++
@@ -124,7 +124,7 @@ fn eisel_lemire32(mut man: u64, exp10: int, neg: bool): (f: f32, ok: bool) {
 		}
 		ret f, true
 	}
-	if exp10 < detailed_pows_of_ten_min_exp10 || detailed_pows_of_ten_max_exp10 < exp10 {
+	if exp10 < DETAILED_POWS_OF_TEN_MIN_EXP10 || DETAILED_POWS_OF_TEN_MAX_EXP10 < exp10 {
 		ret 0, false
 	}
 
@@ -135,11 +135,11 @@ fn eisel_lemire32(mut man: u64, exp10: int, neg: bool): (f: f32, ok: bool) {
 	let mut ret_exp2 = u64(217706*exp10>>16+64+F32_EXPONENT_BIAS) - u64(clz)
 
 	// Multiplication.
-	let (mut x_hi, mut x_lo) = mul64(man, detailed_pows_of_ten[exp10-detailed_pows_of_ten_min_exp10][1])
+	let (mut x_hi, mut x_lo) = mul64(man, DETAILED_POWS_OF_TEN[exp10-DETAILED_POWS_OF_TEN_MIN_EXP10][1])
 
 	// Wider Approximation.
 	if x_hi&0x3FFFFFFFFF == 0x3FFFFFFFFF && x_lo+man < man {
-		let (y_hi, y_lo) = mul64(man, detailed_pows_of_ten[exp10-detailed_pows_of_ten_min_exp10][0])
+		let (y_hi, y_lo) = mul64(man, DETAILED_POWS_OF_TEN[exp10-DETAILED_POWS_OF_TEN_MIN_EXP10][0])
 		let (mut merged_hi, merged_lo) = x_hi, x_lo+y_hi
 		if merged_lo < x_lo {
 			merged_hi++
@@ -184,8 +184,8 @@ fn eisel_lemire32(mut man: u64, exp10: int, neg: bool): (f: f32, ok: bool) {
 
 // detailed_pows_of_ten{min,max}exp10 is the power of 10 represented by the
 // first and last rows of detailed_pows_of_ten. Both bounds are inclusive.
-const detailed_pows_of_ten_min_exp10 = -348
-const detailed_pows_of_ten_max_exp10 = +347
+const DETAILED_POWS_OF_TEN_MIN_EXP10 = -348
+const DETAILED_POWS_OF_TEN_MAX_EXP10 = +347
 
 // Contains 128-bit mantissa approximations (rounded down)
 // to the powers of 10. For example:
@@ -198,7 +198,7 @@ const detailed_pows_of_ten_max_exp10 = +347
 //
 // The table based of this generated table:
 // https://github.com/google/wuffs/blob/ba3818cb6b473a2ed0b38ecfc07dbbd3a97e8ae7/script/print-mpb-powers-of-10.go
-let detailed_pows_of_ten: [...][2]u64 = [
+static DETAILED_POWS_OF_TEN: [...][2]u64 = [
 	[0x1732C869CD60E453, 0xFA8FD5A0081C0288], // 1e-348
 	[0x0E7FBD42205C8EB4, 0x9C99E58405118195], // 1e-347
 	[0x521FAC92A873B261, 0xC3C05EE50655E1FA], // 1e-346

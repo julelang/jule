@@ -193,7 +193,7 @@ unsafe fn ryu_ftoa_fixed64(mut d: *DecimalSlice, mut mant: u64, exp: int, prec: 
 	d.dp -= q
 }
 
-let u64pow10: [...]u64 = [
+static U64_POW10: [...]u64 = [
 	1, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9,
 	1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19,
 ]
@@ -202,7 +202,7 @@ let u64pow10: [...]u64 = [
 // of mantissa m. The boolean trunc indicates whether m
 // is truncated compared to the original number being formatted.
 unsafe fn format_decimal(mut d: *DecimalSlice, mut m: u64, mut trunc: bool, mut round_up: bool, prec: int) {
-	let max = u64pow10[prec]
+	let max = U64_POW10[prec]
 	let mut trimmed = 0
 	for m >= max {
 		let (a, b) = m/10, m%10
@@ -290,7 +290,7 @@ unsafe fn ryu_ftoa_shortest(mut d: *DecimalSlice, mut mant: u64, exp: int, flt: 
 	let mut dl0 = false
 	let mut dc0 = false
 	let mut du0 = false
-	if *flt == f32_info {
+	if *flt == F32_INFO {
 		let mut dl32: u32 = 0
 		let mut dc32: u32 = 0
 		let mut du32: u32 = 0
@@ -532,7 +532,7 @@ unsafe fn ryu_digits32(mut d: *DecimalSlice, mut lower: u32, mut central: u32,
 
 // Takes a floating-point input with a 25-bit
 // mantissa and multiplies it with 10^q. The resulting mantissa
-// is m*P >> 57 where P is a 64-bit element of the detailed_pows_of_ten tables.
+// is m*P >> 57 where P is a 64-bit element of the DETAILED_POWS_OF_TEN tables.
 // It is typically 31 or 32-bit wide.
 // The returned boolean is true if all trimmed bits were zero.
 //
@@ -544,11 +544,11 @@ fn mult64bit_pow10(m: u32, mut e2: int, q: int): (resM: u32, resE: int, exact: b
 		// P == 1<<63
 		ret m << 6, e2 - 6, true
 	}
-	if q < detailed_pows_of_ten_min_exp10 || detailed_pows_of_ten_max_exp10 < q {
+	if q < DETAILED_POWS_OF_TEN_MIN_EXP10 || DETAILED_POWS_OF_TEN_MAX_EXP10 < q {
 		// This never happens due to the range of f32/f64 exponent
 		panic("mult64bit_pow10: power of 10 is out of range")
 	}
-	let mut pow = detailed_pows_of_ten[q-detailed_pows_of_ten_min_exp10][1]
+	let mut pow = DETAILED_POWS_OF_TEN[q-DETAILED_POWS_OF_TEN_MIN_EXP10][1]
 	if q < 0 {
 		// Inverse powers of ten must be rounded up.
 		pow += 1
@@ -572,11 +572,11 @@ fn mult128bit_pow10(m: u64, mut e2: int, q: int): (resM: u64, resE: int, exact: 
 		// P == 1<<127
 		ret m << 8, e2 - 8, true
 	}
-	if q < detailed_pows_of_ten_min_exp10 || detailed_pows_of_ten_max_exp10 < q {
+	if q < DETAILED_POWS_OF_TEN_MIN_EXP10 || DETAILED_POWS_OF_TEN_MAX_EXP10 < q {
 		// This never happens due to the range of f32/f64 exponent
 		panic("mult128bit_pow10: power of 10 is out of range")
 	}
-	let mut pow = detailed_pows_of_ten[q-detailed_pows_of_ten_min_exp10]
+	let mut pow = DETAILED_POWS_OF_TEN[q-DETAILED_POWS_OF_TEN_MIN_EXP10]
 	if q < 0 {
 		// Inverse powers of ten must be rounded up.
 		pow[0] += 1

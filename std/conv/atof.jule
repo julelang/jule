@@ -37,7 +37,7 @@
 
 use std::math::{nan, inf, f32_from_bits, f64_from_bits}
 
-let OPTIMIZE = true
+const OPTIMIZE = true
 
 // Returns the length of the common
 // prefix of s and prefix, with the character case of s ignored.
@@ -223,7 +223,7 @@ loop_end:
 }
 
 // Decimal power of ten to binary power of two.
-let powtab = [1, 3, 6, 9, 13, 16, 19, 23, 26]
+static POWTAB: []int = [1, 3, 6, 9, 13, 16, 19, 23, 26]
 
 impl Decimal {
 	fn set(mut self, s: str): (ok: bool) {
@@ -343,20 +343,20 @@ impl Decimal {
 		exp = 0
 		for self.dp > 0 {
 			let mut n: int = 0
-			if self.dp >= powtab.len {
+			if self.dp >= POWTAB.len {
 				n = 27
 			} else {
-				n = powtab[self.dp]
+				n = POWTAB[self.dp]
 			}
 			self.shift(-n)
 			exp += n
 		}
 		for self.dp < 0 || self.dp == 0 && self.d[0] < '5' {
 			let mut n: int = 0
-			if -self.dp >= powtab.len {
+			if -self.dp >= POWTAB.len {
 				n = 27
 			} else {
-				n = powtab[-self.dp]
+				n = POWTAB[-self.dp]
 			}
 			self.shift(n)
 			exp -= n
@@ -415,12 +415,12 @@ impl Decimal {
 }
 
 // Exact powers of 10.
-let f64_pow10: []f64 = [
+static F64_POW10: []f64 = [
 	1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9,
 	1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19,
 	1e20, 1e21, 1e22,
 ]
-let f32_pow10: []f32 = [1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10]
+static F32_POW10: []f32 = [1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10]
 
 // If possible to convert decimal representation to 64-bit float f exactly,
 // entirely in floating-point math, do so, avoiding the expense of decimal_to_float_bits.
@@ -431,7 +431,7 @@ let f32_pow10: []f32 = [1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10]
 //
 // These all produce potentially inexact but correctly rounded answers.
 fn atof64_exact(mantissa: u64, mut exp: int, neg: bool): (f: f64, ok: bool) {
-	if mantissa>>f64_info.mantbits != 0 {
+	if mantissa>>F64_INFO.mantbits != 0 {
 		ret
 	}
 	f = f64(mantissa)
@@ -448,16 +448,16 @@ fn atof64_exact(mantissa: u64, mut exp: int, neg: bool): (f: f64, ok: bool) {
 		// If exponent is big but number of digits is not,
 		// can move a few zeros into the integer part.
 		if exp > 22 {
-			f *= f64_pow10[exp-22]
+			f *= F64_POW10[exp-22]
 			exp = 22
 		}
 		if f > 1e15 || f < -1e15 {
 			// the exponent was really too large.
 			ret
 		}
-		ret f * f64_pow10[exp], true
+		ret f * F64_POW10[exp], true
 	| exp < 0 && exp >= -22: // int / 10^k
-		ret f / f64_pow10[-exp], true
+		ret f / F64_POW10[-exp], true
 	}
 	ret
 }
@@ -470,7 +470,7 @@ fn atof64_exact(mantissa: u64, mut exp: int, neg: bool): (f: f64, ok: bool) {
 //  value is exact integer / exact power of ten
 // These all produce potentially inexact but correctly rounded answers.
 fn atof64exact(mantissa: u64, mut exp: int, neg: bool): (f: f64, ok: bool) {
-	if mantissa>>f64_info.mantbits != 0 {
+	if mantissa>>F64_INFO.mantbits != 0 {
 		ret
 	}
 	f = f64(mantissa)
@@ -487,16 +487,16 @@ fn atof64exact(mantissa: u64, mut exp: int, neg: bool): (f: f64, ok: bool) {
 		// If exponent is big but number of digits is not,
 		// can move a few zeros into the integer part.
 		if exp > 22 {
-			f *= f64_pow10[exp-22]
+			f *= F64_POW10[exp-22]
 			exp = 22
 		}
 		if f > 1e15 || f < -1e15 {
 			// the exponent was really too large.
 			ret
 		}
-		ret f * f64_pow10[exp], true
+		ret f * F64_POW10[exp], true
 	| exp < 0 && exp >= -22: // int / 10^k
-		ret f / f64_pow10[-exp], true
+		ret f / F64_POW10[-exp], true
 	}
 	ret
 }
@@ -504,7 +504,7 @@ fn atof64exact(mantissa: u64, mut exp: int, neg: bool): (f: f64, ok: bool) {
 // If possible to compute mantissa*10^exp to 32-bit float f exactly,
 // entirely in floating-point math, do so, avoiding the machinery above.
 fn atof32exact(mantissa: u64, mut exp: int, mut neg: bool): (f: f32, ok: bool) {
-	if mantissa>>f32_info.mantbits != 0 {
+	if mantissa>>F32_INFO.mantbits != 0 {
 		ret
 	}
 	f = f32(mantissa)
@@ -520,16 +520,16 @@ fn atof32exact(mantissa: u64, mut exp: int, mut neg: bool): (f: f32, ok: bool) {
 		// If exponent is big but number of digits is not,
 		// can move a few zeros into the integer part.
 		if exp > 10 {
-			f *= f32_pow10[exp-10]
+			f *= F32_POW10[exp-10]
 			exp = 10
 		}
 		if f > 1e7 || f < -1e7 {
 			// the exponent was really too large.
 			ret
 		}
-		ret f * f32_pow10[exp], true
+		ret f * F32_POW10[exp], true
 	| exp < 0 && exp >= -10: // int / 10^k
-		ret f / f32_pow10[-exp], true
+		ret f / F32_POW10[-exp], true
 	}
 	ret
 }
@@ -598,7 +598,7 @@ unsafe fn atof_hex(s: str, flt: *FloatInfo, mut mantissa: u64, mut exp: int, neg
 	if neg {
 		bits |= 1 << flt.mantbits << flt.expbits
 	}
-	if *flt == f32_info {
+	if *flt == F32_INFO {
 		ret f64(f32_from_bits(u32(bits))), err
 	}
 	ret f64_from_bits(bits), err
@@ -620,7 +620,7 @@ unsafe fn atof32(s: str): (f: f32, mut n: int, mut err: ConvError) {
 
 	if hex {
 		let mut ff: f64 = 0
-		ff, err = atof_hex(s[:n], &f32_info, mantissa, exp, neg, trunc)
+		ff, err = atof_hex(s[:n], &F32_INFO, mantissa, exp, neg, trunc)
 		ret f32(ff), n, err
 	}
 
@@ -654,7 +654,7 @@ unsafe fn atof32(s: str): (f: f32, mut n: int, mut err: ConvError) {
 	if !d.set(s[:n]) {
 		ret 0, n, ConvError.InvalidSyntax
 	}
-	let (b, ovf) = d.float_bits(&f32_info)
+	let (b, ovf) = d.float_bits(&F32_INFO)
 	f = f32_from_bits(u32(b))
 	if ovf {
 		err = ConvError.OutOfRange
@@ -677,7 +677,7 @@ unsafe fn atof64(s: str): (mut f: f64, mut n: int, err: ConvError) {
 	}
 
 	if hex {
-		f, err = atof_hex(s[:n], &f64_info, mantissa, exp, neg, trunc)
+		f, err = atof_hex(s[:n], &F64_INFO, mantissa, exp, neg, trunc)
 		ret f, n, err
 	}
 
@@ -711,7 +711,7 @@ unsafe fn atof64(s: str): (mut f: f64, mut n: int, err: ConvError) {
 	if !d.set(s[:n]) {
 		ret 0, n, ConvError.InvalidSyntax
 	}
-	let (b, ovf) = d.float_bits(&f64_info)
+	let (b, ovf) = d.float_bits(&F64_INFO)
 	f = f64_from_bits(b)
 	if ovf {
 		err = ConvError.OutOfRange
