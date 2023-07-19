@@ -96,7 +96,7 @@ const S6 = 0x04 // accept 0, size 4
 const S7 = 0x44 // accept 4, size 4
 
 // Is information about the first byte in a UTF-8 sequence.
-let first: [256]byte = [
+static FIRST: [256]byte = [
 	//   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
 	AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, // 0x00-0x0F
 	AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, AS, // 0x10-0x1F
@@ -124,7 +124,7 @@ struct accept_range {
 }
 
 // Has size 16 to avoid bounds checks in the code that uses it.
-let accept_ranges: [16]accept_range = [
+static ACCEPT_RANGES: [16]accept_range = [
 	{LOCB, HICB},
 	{0xA0, HICB},
 	{LOCB, 0x9F},
@@ -138,12 +138,12 @@ pub fn full_rune(p: []byte): bool {
 	if p.len == 0 {
 		ret false
 	}
-	let x = first[p[0]]
+	let x = FIRST[p[0]]
 	if p.len >= int(x&7) {
 		ret true // ASCII, invalid or valid.
 	}
 	// Must be short or invalid.
-	let accept = accept_ranges[x>>4]
+	let accept = ACCEPT_RANGES[x>>4]
 	if p.len > 1 && (p[1] < accept.lo || accept.hi < p[1]) {
 		ret true
 	} else if p.len > 2 && (p[2] < LOCB || HICB < p[2]) {
@@ -157,12 +157,12 @@ pub fn full_rune_str(s: str): bool {
 	if s.len == 0 {
 		ret false
 	}
-	let x = first[s[0]]
+	let x = FIRST[s[0]]
 	if s.len >= int(x&7) {
 		ret true // ASCII, invalid, or valid.
 	}
 	// Must be short or invalid.
-	let accept = accept_ranges[x>>4]
+	let accept = ACCEPT_RANGES[x>>4]
 	if s.len > 1 && (s[1] < accept.lo || accept.hi < s[1]) {
 		ret true
 	} else if s.len > 2 && (s[2] < LOCB || HICB < s[2]) {
@@ -184,7 +184,7 @@ pub fn decode_rune(p: []byte): (r: rune, size: int) {
 		ret RUNE_ERROR, 0
 	}
 	let p0 = p[0]
-	let x = first[p0]
+	let x = FIRST[p0]
 	if x >= AS {
 		// The following code simulates an additional check for x == XX and
 		// handling the ASCII and invalid cases accordingly. This mask-and-or
@@ -193,7 +193,7 @@ pub fn decode_rune(p: []byte): (r: rune, size: int) {
 		ret rune(p[0])&^mask | RUNE_ERROR&mask, 1
 	}
 	let sz = int(x & 7)
-	let accept = accept_ranges[x>>4]
+	let accept = ACCEPT_RANGES[x>>4]
 	if p.len < sz {
 		ret RUNE_ERROR, 1
 	}
@@ -231,7 +231,7 @@ pub fn decode_rune_str(s: str): (r: rune, size: int) {
 		ret RUNE_ERROR, 0
 	}
 	let s0 = s[0]
-	let x = first[s0]
+	let x = FIRST[s0]
 	if x >= AS {
 		// The following code simulates an additional check for x == xx and
 		// handling the ASCII and invalid cases accordingly. This mask-and-or
@@ -240,7 +240,7 @@ pub fn decode_rune_str(s: str): (r: rune, size: int) {
 		ret rune(s[0])&^mask | RUNE_ERROR&mask, 1
 	}
 	let sz = int(x & 7)
-	let accept = accept_ranges[x>>4]
+	let accept = ACCEPT_RANGES[x>>4]
 	if s.len < sz {
 		ret RUNE_ERROR, 1
 	}
@@ -430,7 +430,7 @@ pub fn rune_count(p: []byte): (n: int) {
 			i++
 			continue
 		}
-		let x = first[c]
+		let x = FIRST[c]
 		if x == XX {
 			i++ // invalid.
 			continue
@@ -440,7 +440,7 @@ pub fn rune_count(p: []byte): (n: int) {
 			i++ // Short or invalid.
 			continue
 		}
-		let accept = accept_ranges[x>>4]
+		let accept = ACCEPT_RANGES[x>>4]
 		c = p[i+1]
 		if c < accept.lo || accept.hi < c {
 			size = 1
@@ -472,7 +472,7 @@ pub fn rune_count_str(s: str): (n: int) {
 			i++
 			continue
 		}
-		let x = first[c]
+		let x = FIRST[c]
 		if x == XX {
 			i++ // invalid.
 			continue
@@ -482,7 +482,7 @@ pub fn rune_count_str(s: str): (n: int) {
 			i++ // Short or invalid.
 			continue
 		}
-		let accept = accept_ranges[x>>4]
+		let accept = ACCEPT_RANGES[x>>4]
 		c = s[i+1]
 		if c < accept.lo || accept.hi < c {
 			size = 1
@@ -534,7 +534,7 @@ pub fn valid(p: []byte): bool {
 			i++
 			continue
 		}
-		let x = first[pi]
+		let x = FIRST[pi]
 		if x == XX {
 			ret false // Illegal starter byte.
 		}
@@ -542,7 +542,7 @@ pub fn valid(p: []byte): bool {
 		if i+size > cp.len {
 			ret false // Short or invalid.
 		}
-		let accept = accept_ranges[x>>4]
+		let accept = ACCEPT_RANGES[x>>4]
 		let mut c = cp[i+1]
 		if c < accept.lo || accept.hi < c {
 			ret false
@@ -585,7 +585,7 @@ pub fn valid_str(mut s: str): bool {
 			i++
 			continue
 		}
-		let x = first[si]
+		let x = FIRST[si]
 		if x == XX {
 			ret false // Illegal starter byte.
 		}
@@ -593,7 +593,7 @@ pub fn valid_str(mut s: str): bool {
 		if i+size > s.len {
 			ret false // Short or invalid.
 		}
-		let accept = accept_ranges[x>>4]
+		let accept = ACCEPT_RANGES[x>>4]
 		let mut c = s[i+1]
 		if c < accept.lo || accept.hi < c {
 			ret false
