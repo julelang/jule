@@ -6,7 +6,7 @@ use std::jule::build::{Log}
 use std::unicode::utf8::{decode_rune_str}
 
 // Punctuations.
-pub let PUNCTS: []rune = [
+pub static PUNCTS: [...]rune = [
 	'!',
 	'#',
 	'$',
@@ -43,7 +43,7 @@ pub let PUNCTS: []rune = [
 ]
 
 // Space characters.
-pub let SPACES: []rune = [
+pub static SPACES: [...]rune = [
 	' ',
 	'\t',
 	'\v',
@@ -52,7 +52,7 @@ pub let SPACES: []rune = [
 ]
 
 // Kind list of unary operators.
-pub let UNARY_OPS = [
+pub static UNARY_OPS: [...]TokenKind = [
 	TokenKind.Minus,
 	TokenKind.Plus,
 	TokenKind.Caret,
@@ -62,7 +62,7 @@ pub let UNARY_OPS = [
 ]
 
 // Kind list of binary operators.
-pub let BIN_OPS = [
+pub static BIN_OPS: [...]TokenKind = [
 	TokenKind.Plus,
 	TokenKind.Minus,
 	TokenKind.Star,
@@ -80,19 +80,19 @@ pub let BIN_OPS = [
 
 // Kind list of weak operators.
 // These operators are weak, can used as part of expression.
-pub let WEAK_OPS = [
+pub static WEAK_OPS: [...]TokenKind = [
 	TokenKind.TripleDot,
 	TokenKind.Colon,
 ]
 
 // List of postfix operators.
-pub let POSTFIX_OPS = [
+pub static POSTFIX_OPS: [...]TokenKind = [
 	TokenKind.DblPlus,
 	TokenKind.DblMinus,
 ]
 
 // List of assign operators.
-pub let ASSING_OPS = [
+pub static ASSING_OPS: [...]TokenKind = [
 	TokenKind.Eq,
 	TokenKind.PlusEq,
 	TokenKind.MinusEq,
@@ -306,8 +306,9 @@ impl Token {
 	}
 }
 
-fn exist_op(kind: str, ops: []TokenKind): bool {
-	for _, op in ops {
+// Reports whether kind is unary operator.
+pub fn is_unary_op(kind: str): bool {
+	for _, op in UNARY_OPS {
 		if kind == str(op) {
 			ret true
 		}
@@ -316,12 +317,28 @@ fn exist_op(kind: str, ops: []TokenKind): bool {
 	ret false
 }
 
-// Reports whether kind is unary operator.
-pub fn is_unary_op(kind: str): bool { ret exist_op(kind, UNARY_OPS) }
 // Reports whether kind is binary operator.
-pub fn is_bin_op(kind: str): bool { ret exist_op(kind, BIN_OPS) }
+pub fn is_bin_op(kind: str): bool {
+	for _, op in BIN_OPS {
+		if kind == str(op) {
+			ret true
+		}
+	}
+
+	ret false
+}
+
 // Reports whether kind is weak operator.
-pub fn is_weak_op(kind: str): bool { ret exist_op(kind, WEAK_OPS) }
+pub fn is_weak_op(kind: str): bool {
+	for _, op in WEAK_OPS {
+		if kind == str(op) {
+			ret true
+		}
+	}
+
+	ret false
+}
+
 // Reports whether kind is string literal.
 pub fn is_str(k: str): bool { ret k != "" && (k[0] == '"' || is_raw_str(k)) }
 // Reports whether kind is raw string literal.
@@ -374,8 +391,9 @@ pub fn is_ignore_ident(ident: str): bool { ret ident == str(Ident.Ignore) }
 // Reports whether identifier is anonymous.
 pub fn is_anon_ident(ident: str): bool { ret ident == str(Ident.Anon) }
 
-fn rune_exist(r: rune, runes: []rune): bool {
-	for _, cr in runes {
+// Reports whether rune is punctuation.
+pub fn is_punct(r: rune): bool {
+	for _, cr in PUNCTS {
 		if r == cr {
 			ret true
 		}
@@ -384,10 +402,16 @@ fn rune_exist(r: rune, runes: []rune): bool {
 	ret false
 }
 
-// Reports whether rune is punctuation.
-pub fn is_punct(r: rune): bool { ret rune_exist(r, PUNCTS) }
 // Reports wheter byte is whitespace.
-pub fn is_space(r: rune): bool { ret rune_exist(r, SPACES) }
+pub fn is_space(r: rune): bool {
+	for _, cr in SPACES {
+		if r == cr {
+			ret true
+		}
+	}
+
+	ret false
+}
 
 // Reports whether rune is letter.
 pub fn is_letter(r: rune): bool {
