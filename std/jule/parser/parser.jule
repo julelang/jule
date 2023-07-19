@@ -305,7 +305,8 @@ impl Parser {
 		ret s
 	}
 
-	unsafe fn __build_type(mut &self, mut tokens: []Token, mut i: *int, err: bool): (&TypeDecl, bool) {
+	unsafe fn __build_type(mut &self, mut tokens: []Token,
+		mut i: *int, err: bool): (&TypeDecl, bool) {
 		let mut tb = TypeBuilder{
 			p:      self,
 			tokens: tokens,
@@ -316,7 +317,8 @@ impl Parser {
 	}
 
 	// build_type builds AST model of data-type.
-	unsafe fn build_type(mut &self, mut tokens: []Token, mut i: *int, err: bool): (&TypeDecl, bool) {
+	unsafe fn build_type(mut &self, mut tokens: []Token,
+		mut i: *int, err: bool): (&TypeDecl, bool) {
 		let token = tokens[*i]
 		let (mut t, ok) = self.__build_type(tokens, i, err)
 		if err && !ok {
@@ -415,6 +417,9 @@ impl Parser {
 	fn build_var_begin(mut self, mut v: &VarDecl, mut i: &int, tokens: []Token) {
 		let tok = tokens[i]
 		match tok.id {
+		| TokenId.Static:
+			v.statically = true
+			fall
 		| TokenId.Let:
 			// Initialize 1 for skip the let keyword
 			i++
@@ -1342,9 +1347,6 @@ impl Parser {
 			if real(v.expr) {
 				self.push_err(v.token, "cpp_linked_variable_has_expr")
 			}
-			if v.constant {
-				self.push_err(v.token, "cpp_linked_variable_is_const")
-			}
 		}
 		ret v
 	}
@@ -1555,9 +1557,10 @@ impl Parser {
 			}
 			ret f
 
-		| TokenId.Const
 		| TokenId.Let
-		| TokenId.Mut:
+		| TokenId.Const
+		| TokenId.Mut
+		| TokenId.Static:
 			ret self.build_var(tokens)
 
 		| TokenId.Type:

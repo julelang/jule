@@ -1461,6 +1461,9 @@ impl Sema {
 		}
 
 		if decl.is_auto_typed() {
+			if decl.statically {
+				self.push_err(decl.token, "static_is_auto_typed")
+			}
 			if !decl.is_initialized() {
 				self.push_err(decl.token, "missing_autotype_value")
 			}
@@ -1468,16 +1471,28 @@ impl Sema {
 			_ = self.check_type(decl.kind, l)
 		}
 
-		if decl.constant && !decl.is_initialized() {
-			self.push_err(decl.token, "const_var_not_have_expr")
+		if !decl.is_initialized() {
+			if decl.constant {
+				self.push_err(decl.token, "const_var_not_have_expr")
+			}
+
+			if decl.statically {
+				self.push_err(decl.token, "static_not_have_expr")
+			}
 		}
 	}
 
-	// Checks variable declaration.
+	// Checks variable declaration for global scope.
 	// Checks duplicated identifiers by Sema.
-	fn check_var_decl_dup(mut &self, mut decl: &Var) {
+	fn check_global_var_decl(mut &self, mut decl: &Var) {
 		if self.is_duplicated_ident(uintptr(&decl), decl.ident, decl.cpp_linked) {
 			self.push_err(decl.token, "duplicated_ident", decl.ident)
+		}
+		if decl.cpp_linked && decl.constant {
+			self.push_err(decl.token, "cpp_linked_variable_is_const")
+		}
+		if !decl.constant && !decl.statically {
+			self.push_err(decl.token, "global_not_static")
 		}
 		self.check_var_decl(decl, self)
 	}
@@ -1487,7 +1502,7 @@ impl Sema {
 		let mut i = 0
 		for i < self.file.vars.len(); i++ {
 			let mut decl = self.file.vars.at(i)
-			self.check_var_decl_dup(decl)
+			self.check_global_var_decl(decl)
 
 			// Break checking if type alias has error.
 			if self.errors.len > 0 {
