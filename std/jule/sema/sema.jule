@@ -885,26 +885,26 @@ impl Sema {
 			size += f.decl.owner.generics.len
 		}
 
-		let mut generics = make([]&TypeAlias, size)
+		let mut generics = make([]&TypeAlias, 0, size)
 
 		for i, g in f.generics {
-			generics[i] = &TypeAlias{
+			generics = append(generics, &TypeAlias{
 				ident: f.decl.generics[i].ident,
 				kind: &TypeSymbol{
 					kind: g,
 				},
-			}
+			})
 		}
 
 		if real(f.decl) && real(f.decl.owner) {
 			let mut owner = f.owner
 			for (i, mut g) in owner.generics {
-				generics[i] = &TypeAlias{
+				generics = append(generics, &TypeAlias{
 					ident: owner.decl.generics[i].ident,
 					kind: &TypeSymbol{
 						kind: g,
 					},
-				}
+				})
 			}
 		}
 
@@ -1358,7 +1358,7 @@ impl Sema {
 	fn impl_to_struct(mut &self, mut dest: &Struct, mut ipl: &Impl): (ok: bool) {
 		ok = true
 		for (_, mut f) in ipl.methods {
-			if real(dest.find_method(f.ident)) || real(dest.find_field(f.ident)) {
+			if real(dest.find_method(f.ident, f.statically)) || real(dest.find_field(f.ident)) {
 				self.push_err(f.token, "struct_already_have_ident", dest.ident, f.ident)
 				ok = false
 				continue
@@ -1515,7 +1515,7 @@ impl Sema {
 	fn check_struct_trait_impl(mut &self, mut strct: &Struct, mut trt: &Trait): (ok: bool) {
 		for (_, mut tf) in trt.methods {
 			let mut exist = false
-			let mut sf = strct.find_method(tf.ident)
+			let mut sf = strct.find_method(tf.ident, tf.statically)
 			let tf_k = self.get_trait_check_fn_kind(tf)
 			if real(sf) {
 				let sf_k = self.get_trait_check_fn_kind(sf)
@@ -2148,6 +2148,7 @@ impl Sema {
 		}
 
 		self.check_package_decls()
+
 		// Break checking if imports has error.
 		if self.errors.len > 0 {
 			ret

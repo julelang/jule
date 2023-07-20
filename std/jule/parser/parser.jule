@@ -761,6 +761,17 @@ impl Parser {
 			token: tokens[*i],
 		}
 
+		// Detect static keyword.
+		if f.token.id == TokenId.Static {
+			f.statically = true
+			*i++
+			if *i >= tokens.len {
+				self.push_err(f.token, "invalid_syntax")
+				ret new(FnDecl)
+			}
+			f.token = tokens[*i]
+		}
+
 		// Detect unsafe keyword.
 		if f.token.id == TokenId.Unsafe {
 			f.unsafety = true
@@ -772,7 +783,7 @@ impl Parser {
 			f.token = tokens[*i]
 		}
 
-		// Skips fn tok
+		// Skips fn token.
 		*i++
 		if *i >= tokens.len {
 			self.push_err(f.token, "invalid_syntax")
@@ -1271,6 +1282,14 @@ impl Parser {
 	}
 
 	fn check_method_receiver(mut self, f: &FnDecl) {
+		// Static methods cannot have receiver.
+		if f.statically {
+			if f.params.len > 0 && f.params[0].is_self() {
+				self.push_err(f.token, "static_function_has_receiver")
+			}
+			ret
+		}
+
 		if f.params.len == 0 {
 			self.push_err(f.token, "missing_receiver")
 			ret
@@ -1398,16 +1417,31 @@ impl Parser {
 	}
 
 	fn get_method(mut &self, mut tokens: []Token): &FnDecl {
-		let token = tokens[0]
-		if token.id == TokenId.Unsafe {
-			if tokens.len == 1 || tokens[1].id != TokenId.Fn {
+		let mut i = 0
+		let mut token = tokens[i]
+		if token.id == TokenId.Static {
+			if i+1 >= tokens.len {
 				self.push_err(token, "invalid_syntax")
 				ret new(FnDecl)
 			}
-		} else if tokens[0].id != TokenId.Fn {
+			i++
+			token = tokens[i]
+		}
+
+		if token.id == TokenId.Unsafe {
+			if i+1 >= tokens.len {
+				self.push_err(token, "invalid_syntax")
+				ret new(FnDecl)
+			}
+			i++
+			token = tokens[i]
+		}
+
+		if token.id != TokenId.Fn {
 			self.push_err(token, "invalid_syntax")
 			ret new(FnDecl)
 		}
+
 		ret self.build_fn(tokens, true, false, false)
 	}
 
@@ -1421,6 +1455,7 @@ impl Parser {
 				// Ignore.
 				continue
 
+			| TokenId.Static
 			| TokenId.Fn
 			| TokenId.Unsafe:
 				let mut f = self.get_method(tokens)
@@ -1461,6 +1496,7 @@ impl Parser {
 			}
 
 			match token.id {
+			| TokenId.Static
 			| TokenId.Fn
 			| TokenId.Unsafe:
 				let mut f = self.get_method(tokens)

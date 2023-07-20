@@ -44,6 +44,7 @@ pub struct Fn {
 	pub unsafety:   bool
 	pub public:     bool
 	pub cpp_linked: bool
+	pub statically: bool
 	pub ident:      str
 	pub directives: []&Directive
 	pub doc:        str
@@ -228,9 +229,15 @@ impl Kind for FnIns {
 	// Returns Fn's type kind as string.
 	fn to_str(self): str {
 		let mut s = ""
+
+		if self.decl.statically {
+			s += "static "
+		}
+
 		if self.decl.unsafety {
 			s += "unsafe "
 		}
+
 		s += "fn"
 
 		if self.generics.len > 0 {
@@ -274,6 +281,10 @@ impl Kind for FnIns {
 	fn equals(self, other: &TypeKind): bool {
 		let f = unsafe { (&other).fnc() }
 		if !real(f) {
+			ret false
+		}
+
+		if self.decl.statically != f.decl.statically {
 			ret false
 		}
 

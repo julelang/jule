@@ -1850,7 +1850,7 @@ impl Eval {
 			ret self.call_builtin_fn(fc, d)
 		}
 
-		if !d.mutable && f.decl.is_method() && f.decl.params[0].mutable {
+		if !d.mutable && f.decl.is_method() && !f.decl.statically && f.decl.params[0].mutable {
 			self.push_err(fc.token, "mutable_operation_on_immutable")
 		} else if !self.is_unsafe() && f.decl.unsafety {
 			self.push_err(fc.token, "unsafe_behavior_at_out_of_unsafe_scope")
@@ -1979,6 +1979,33 @@ impl Eval {
 		ret d
 	}
 
+	fn eval_struct_static(mut self, mut s: &StructIns, ident: Token): &Data {
+		const STATIC = true
+		let mut method = s.find_method(ident.kind, STATIC)
+		if !real(method) {
+			self.push_err(ident, "obj_have_not_ident", ident.kind)
+		}
+
+		let mut d = &Data{
+			lvalue:  false,
+			decl:    false,
+			mutable: false,
+		}
+
+		self.push_reference_to_fn(method)
+
+		let mut ins = method.instance()
+		ins.owner = s
+		d.model = &StructStaticIdentExprModel{
+			structure: s,
+			expr:      d.model,
+			method:    ins,
+		}
+		d.kind = &TypeKind{kind: ins}
+
+		ret d
+	}
+
 	fn eval_trait_sub_ident(mut self, d: &Data, mut trt: &Trait, ident: Token): &Data {
 		let mut f = trt.find_method(ident.kind)
 		if !real(f) {
@@ -2049,7 +2076,8 @@ impl Eval {
 			ret d
 		}
 
-		let mut m = s.find_method(si.ident.kind)
+		const STATIC = false
+		let mut m = s.find_method(si.ident.kind, STATIC)
 		if !real(m) {
 			self.push_err(si.ident, "obj_have_not_ident", si.ident.kind)
 			ret new(Data)
@@ -2784,6 +2812,9 @@ impl Eval {
 
 		| real(d.kind.enm()):
 			ret self.eval_enum_static(d.kind.enm(), si.ident)
+
+		| real(d.kind.strct()):
+			ret self.eval_struct_static(d.kind.strct(), si.ident)
 
 		|:
 			self.push_err(si.ident, "type_not_support_sub_fields", d.kind.to_str())
