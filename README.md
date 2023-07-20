@@ -27,9 +27,10 @@ Our main community platforms:
 
 <h2 id="motivation">Motivation</h2>
 
-> **Note** \
-> [JuleC](#what-is-julec) is still under pre development. Therefore, design changes and the like may occur in the language. \
-> Some commits may not be fully honored due to some compiler/API errors. \
+> **Info** \
+> [JuleC](#what-is-julec) is still under development for stable release. \
+> Therefore, design changes and the like may occur in the language. \
+> Some commits may not be fully honored due to some compiler/API errors \
 > Please report it with the [Jule Issue Tracker](https://github.com/julelang/jule/issues) if you come across something like this.
 
 Our motivation is to develop a safe and fast programming language that focuses on systems programming.
@@ -60,7 +61,7 @@ fn quicksort(mut s: []int) {
 }
 
 fn main() {
-    let mut my_slice = [1, 9, -2, 25, -24, 4623, 0, -1, 0xFD2]
+    let mut my_slice = [5, 9, 0, 4, 8, 6, 7, 2, 1, 3]
     outln(my_slice)
     quicksort(my_slice)
     outln(my_slice)
