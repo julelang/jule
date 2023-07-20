@@ -49,11 +49,9 @@ fn quicksort(mut s: []int) {
 
     let (mut i, last) = -1, s[s.len-1]
     for j in s {
-        let mut x = &s[j]
-        if (unsafe{ *x <= last }) {
+        if s[j] <= last {
             i++
-            let mut y = &s[i]
-            unsafe { *x, *y = *y, *x }
+            s[j], s[i] = s[i], s[j]
         }
     }
 
