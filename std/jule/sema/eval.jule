@@ -25,6 +25,7 @@ use std::jule::ast::{
 	CastExpr,
 	StructLit,
 	KeyValPair,
+	IdentTypeDecl,
 }
 use std::jule::build::{errorf}
 use std::jule::constant::{
@@ -1240,6 +1241,48 @@ impl Eval {
 		self.push_err(i.token, "not_supports_indexing", d.kind.to_str())
 	}
 
+	fn eval_ident_decl_from_indexing(mut self, mut i: &IndexingExpr): &Data {
+		match type i.expr {
+		| &IdentExpr:
+		|:
+			self.push_err(i.token, "invalid_syntax")
+			ret new(Data)
+		}
+
+		let mut decl = &IdentTypeDecl{
+			ident: (&IdentExpr)(i.expr).ident,
+		}
+
+		match type i.index {
+		| &TypeDecl:
+			decl.generics = append(decl.generics, (&TypeDecl)(i.index))
+
+		| &IdentExpr:
+			decl.generics = append(decl.generics, &TypeDecl{
+				kind: &IdentTypeDecl{ident: (&IdentExpr)(i.index).ident}
+			})
+
+		| &TupleExpr:
+			for (_, mut expr) in (&TupleExpr)(i.index).expr {
+				match type expr {
+				| &TypeDecl:
+					decl.generics = append(decl.generics, (&TypeDecl)(expr))
+
+				| &IdentExpr:
+					decl.generics = append(decl.generics, &TypeDecl{
+						kind: &IdentTypeDecl{ident: (&IdentExpr)(expr).ident}
+					})
+				}
+			}
+
+		|:
+			self.push_err(i.token, "invalid_syntax")
+			ret new(Data)
+		}
+
+		ret self.eval_type(&TypeDecl{kind: decl})
+	}
+
 	fn eval_indexing(mut &self, mut i: &IndexingExpr): &Data {
 		let mut prefix = self.prefix
 		drop(self.prefix)
@@ -1248,6 +1291,11 @@ impl Eval {
 		let mut d = self.eval_expr_kind(i.expr)
 		if !real(d) {
 			ret new(Data)
+		}
+
+		// Catch types.
+		if d.decl {
+			ret self.eval_ident_decl_from_indexing(i)
 		}
 
 		let mut expr_model = d.model
@@ -3048,6 +3096,7 @@ impl Eval {
 			ret new(Data)
 
 		| d.decl:
+			outln(d.kind.to_str())
 			self.push_err(expr.token, "invalid_expr")
 			ret new(Data)
 
