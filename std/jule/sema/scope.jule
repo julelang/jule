@@ -1089,9 +1089,10 @@ impl ScopeChecker {
 		if a.declarative && self.is_new_assign_ident(lexpr.ident) {
 			// Add new variable declaration statement.
 			let mut v = &Var{
-				ident:   lexpr.ident,
-				token:   lexpr.token,
-				mutable: lexpr.mutable,
+				ident:     lexpr.ident,
+				token:     lexpr.token,
+				mutable:   lexpr.mutable,
+				reference: lexpr.reference,
 				scope:   self.tree,
 				value: &Value{
 					expr: a.right,
@@ -1108,7 +1109,7 @@ impl ScopeChecker {
 			ret
 		}
 
-		if lexpr.mutable {
+		if lexpr.mutable || lexpr.reference {
 			self.s.push_err(lexpr.token, "duplicated_ident", lexpr.ident)
 		}
 
@@ -1116,7 +1117,10 @@ impl ScopeChecker {
 			ret
 		}
 
-		self.s.check_validity_for_init_expr(l.mutable, l.kind, r, a.setter)
+		// Set reference false because this is normal assigment.
+		// So, we don't need to check reference assignment should using lvalue.
+		const REFERENCE = false
+		self.s.check_validity_for_init_expr(l.mutable, REFERENCE, l.kind, r, a.setter)
 
 		let mut checker = AssignTypeChecker{
 			s:           self.s,

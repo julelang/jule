@@ -420,6 +420,7 @@ impl Parser {
 		| TokenId.Static:
 			v.statically = true
 			fall
+
 		| TokenId.Let:
 			// Initialize 1 for skip the let keyword
 			i++
@@ -460,7 +461,15 @@ impl Parser {
 		if i >= tokens.len {
 			ret new(VarDecl)
 		}
+
 		tokens = tokens[i:]
+		if tokens[0].id == TokenId.Op && tokens[0].kind == str(TokenKind.Amper) {
+			v.reference = true
+			if tokens.len == 1 {
+				ret new(VarDecl)
+			}
+			tokens = tokens[1:]
+		}
 		self.build_var_common(v, tokens)
 		ret v
 	}
@@ -611,6 +620,22 @@ impl Parser {
 			}
 			tokens = tokens[1:]
 			param.token = tokens[0]
+		}
+
+		// Catch reference parameters.
+		if tokens.len >= 3 {
+			if param.token.id == TokenId.Op && param.token.kind == str(TokenKind.Amper) {
+				if tokens.len == 1 {
+					self.push_err(tokens[0], "invalid_syntax")
+					ret new(ParamDecl)
+				}
+
+				if tokens[1].id == TokenId.Ident && tokens[2].id == TokenId.Colon {
+					param.reference = true
+					tokens = tokens[1:]
+					param.token = tokens[0]
+				}
+			}
 		}
 
 		if param.token.id != TokenId.Ident {

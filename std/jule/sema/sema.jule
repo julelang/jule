@@ -928,9 +928,18 @@ impl Sema {
 		ret ok
 	}
 
-	fn check_validity_for_init_expr(mut &self, left_mut: bool, left_kind: &TypeKind, mut d: &Data, error_token: Token) {
+	fn check_validity_for_init_expr(mut &self, left_mut: bool, left_ref: bool,
+		left_kind: &TypeKind, mut d: &Data, error_token: Token) {
 		if left_mut && !d.mutable && is_mut(d.kind) {
 			self.push_err(error_token, "assignment_non_mut_to_mut")
+		}
+		if left_ref {
+			if !d.lvalue {
+				self.push_err(error_token, "reference_assign_non_lvalue")
+			}
+			if left_mut && !d.mutable {
+				self.push_err(error_token, "mut_reference_points_to_immut")
+			}
 		}
 
 		let mut atc = &AssignTypeChecker{
@@ -1471,6 +1480,10 @@ impl Sema {
 			_ = self.check_type(decl.kind, l)
 		}
 
+		if decl.constant && decl.reference {
+			self.push_err(decl.token, "constant_reference")
+		}
+
 		if !decl.is_initialized() {
 			if decl.constant {
 				self.push_err(decl.token, "const_var_not_have_expr")
@@ -1478,6 +1491,10 @@ impl Sema {
 
 			if decl.statically {
 				self.push_err(decl.token, "static_not_have_expr")
+			}
+
+			if decl.reference {
+				self.push_err(decl.token, "reference_not_initialized")
 			}
 		}
 	}
@@ -1874,10 +1891,16 @@ impl Sema {
 				}
 			}
 
-			self.check_assign_type(v.kind.kind, v.value.data, v.value.expr.token, false)
+			self.check_assign_type(
+				v.kind.kind, v.value.data, v.value.expr.token, false)
 		}
 
-		self.check_validity_for_init_expr(v.mutable, v.kind.kind, v.value.data, v.value.expr.token)
+		self.check_validity_for_init_expr(
+			v.mutable,
+			v.reference,
+			v.kind.kind,
+			v.value.data,
+			v.value.expr.token)
 
 		if !v.constant {
 			drop(v.value.data.constant)
@@ -1890,9 +1913,11 @@ impl Sema {
 		}
 
 		if real(decl.kind) {
-			decl.value.data = self.evalpd(decl.value.expr, l, decl.kind.kind, decl)
+			decl.value.data = self.evalpd(
+				decl.value.expr, l, decl.kind.kind, decl)
 		} else {
-			decl.value.data = self.evalpd(decl.value.expr, l, new(TypeKind), decl)
+			decl.value.data = self.evalpd(
+				decl.value.expr, l, new(TypeKind), decl)
 		}
 		if !real(decl.value.data) {
 			ret // Skip checks if error ocurrs.

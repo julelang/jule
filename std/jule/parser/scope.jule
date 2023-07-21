@@ -910,11 +910,22 @@ impl ScopeParser {
 
 		for (_, mut part) in parts {
 			let mut is_mut = false
+			let mut is_ref = false
+
 			let token = part[0]
 			if token.id == TokenId.Mut {
 				is_mut = true
 				part = part[1:]
-				if part.len != 1 {
+				if part.len == 0 {
+					self.push_err(token, "invalid_syntax")
+					continue
+				}
+			}
+
+			if part[0].id == TokenId.Op && part[0].kind == str(TokenKind.Amper) {
+				is_ref = true
+				part = part[1:]
+				if part.len == 0 {
 					self.push_err(token, "invalid_syntax")
 					continue
 				}
@@ -929,6 +940,7 @@ impl ScopeParser {
 
 			let mut l = self.build_assign_l(part)
 			l.mutable = is_mut
+			l.reference = is_ref
 			assign.left = append(assign.left, l)
 		}
 
