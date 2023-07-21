@@ -105,7 +105,7 @@ Please read the <a href="https://manual.jule.dev/unsafe-jule">Unsafe Jule</a> pa
 <br><br>
 
 > **Note** \
-> Jule also has different memory management methods. \
+> Jule also has different memory management approaches. \
 > For example, the ``std::memory::c`` standard library provides C-like memory management.
 
 <h2 id="cpp-interoperability">C++ Interoperability</h2>
@@ -147,23 +147,6 @@ The `Int`, and `Slice` types are part of the API.
 The `Int` data type is equally sensitive to the system architecture as in Jule.
 The Jule source code declares to use `sum.hpp` first, and binds the C++ function into Jule accordingly.
 Then, a call is made from Jule and the result of the function is written to the command line.
-
-<h2 id="performance">Performance</h2>
-
-The programming languages ​​Jule (julec [0d4ea5b](https://github.com/julelang/jule/tree/0d4ea5b52f18f1921d76aee13725e693a6528b82)), Rust (rustc 1.68.2), and C++ (c++17, Apple clang-1403.0.22.14.1) were put to the test for vectors.
-In total, 10.000.000 iterations were performed and a 256-capacity vector was created at each iteration step.
-Then, the expression ``~(i<<2)`` was added to the vector with a 256-step iteration.
-
-Here is the used implementations for vector:
-- Jule: ``Vector[T]`` from [``std::vector``](./std/vector)
-- Rust: ``Vec<T>``
-- C++: ``vector<T>`` from STL
-
-The tests were performed 5 times for each language and the average values ​​were taken as basis.
-The graphs below show the average total runtime times and the average peak memory consumption rates within the runtime.
-
-<img width="326" alt="image" src="https://github.com/julelang/jule/assets/54983926/f8a6db59-97ff-4e97-8500-9f544b9db886">
-<img width="326" alt="image" src="https://github.com/julelang/jule/assets/54983926/6f3c1fe4-0015-40aa-a829-52925aaa0421">
 
 <h2 id="future-changes">Future Changes</h2>
 JuleC is in early development and currently it can only be built from source.
@@ -211,7 +194,7 @@ See [compiling](https://manual.jule.dev/compiler/compiling) part of manual for s
 
 <h2 id="os-support">Platform Support</h2>
 Jule supports multiple platforms.
-It supports development on i386, amd64 and arm64 architectures on Windows, Linux and macOS (Darwin) platforms. 
+It supports development on intel 386, amd64 and arm64 architectures on Windows, Linux and macOS (Darwin) platforms. 
 JuleC undertakes the effort, that the code and standard library it produces will be compatible with all these platforms.
 All supported platforms by JuleC are documented in the <a href="https://manual.jule.dev/compiler/platform-support">platform support</a> part of manual. 
 
