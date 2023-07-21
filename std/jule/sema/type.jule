@@ -1003,13 +1003,7 @@ impl TypeChecker {
 		}
 	}
 
-	fn build_ref(mut self, mut decl: &RefTypeDecl): &Ref {
-		let not_plain = self.not_plain
-		self.not_plain = true
-		defer { self.not_plain = not_plain }
-
-		let mut elem = self.check_decl(decl.elem)
-
+	fn build_ref_from_type(mut self, mut elem: &TypeKind): &Ref {
 		// Check special cases.
 		match {
 		| !real(elem):
@@ -1042,6 +1036,15 @@ impl TypeChecker {
 		ret &Ref{
 			elem: elem,
 		}
+	}
+
+	fn build_ref(mut self, mut decl: &RefTypeDecl): &Ref {
+		let not_plain = self.not_plain
+		self.not_plain = true
+		defer { self.not_plain = not_plain }
+
+		let mut elem = self.check_decl(decl.elem)
+		ret self.build_ref_from_type(elem)
 	}
 
 	fn build_ptr_from_type(mut self, mut elem: &TypeKind): &Ptr {

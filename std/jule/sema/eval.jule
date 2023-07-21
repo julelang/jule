@@ -941,6 +941,29 @@ impl Eval {
 		ret d
 	}
 
+	fn eval_unary_type_decl(mut self, mut d: &Data, u: &UnaryExpr): &Data {
+		let mut tc = TypeChecker{
+			s:           self.s,
+			lookup:      self.lookup,
+			error_token: u.op,
+		}
+
+		match u.op.kind {
+		| str(TokenKind.Star):
+			d.kind = &TypeKind{kind: tc.build_ptr_from_type(d.kind)}
+
+		| str(TokenKind.Amper):
+			d.kind = &TypeKind{kind: tc.build_ref_from_type(d.kind)}
+
+		|:
+			self.push_err(u.op, "invalid_expr_unary_operator", u.op.kind)
+			ret new(Data)
+		}
+
+		d.decl = true
+		ret d
+	}
+
 	fn eval_unary(mut &self, mut u: &UnaryExpr): &Data {
 		let mut prefix = self.prefix
 		drop(self.prefix)
@@ -952,15 +975,7 @@ impl Eval {
 		}
 
 		if d.decl {
-			let mut tc = TypeChecker{
-				s:           self.s,
-				lookup:      self.lookup,
-				error_token: u.op,
-			}
-
-			d.kind = &TypeKind{kind: tc.build_ptr_from_type(d.kind)}
-			d.decl = true
-			ret d
+			ret self.eval_unary_type_decl(d, u)
 		}
 
 		let mut cast_kind = d.cast_kind
@@ -1241,7 +1256,7 @@ impl Eval {
 		self.push_err(i.token, "not_supports_indexing", d.kind.to_str())
 	}
 
-	fn eval_ident_decl_from_indexing(mut self, mut i: &IndexingExpr): &Data {
+	fn eval_ident_decl_from_indexing(mut &self, mut i: &IndexingExpr): &Data {
 		match type i.expr {
 		| &IdentExpr:
 		|:
@@ -1254,6 +1269,17 @@ impl Eval {
 		}
 
 		match type i.index {
+		| &UnaryExpr:
+			// Unary eval catches type declarations.
+			// Therefore use unary eval algorithm for eval related type declarations.
+			let mut d = self.eval_unary((&UnaryExpr)(i.index))
+			if !d.decl {
+				self.push_err(i.token, "invalid_syntax")
+				ret new(Data)
+			}
+			decl.generics = append(decl.generics, &TypeDecl{kind: d.kind})
+			outln(d.kind.to_str())
+
 		| &TypeDecl:
 			decl.generics = append(decl.generics, (&TypeDecl)(i.index))
 
