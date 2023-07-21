@@ -25,8 +25,8 @@ namespace jule {
     public:
         mutable jule::Ref<Item> data{};
         mutable Item *_slice{ nullptr };
-        mutable jule::Uint _len{ 0 };
-        mutable jule::Uint _cap{ 0 };
+        mutable jule::Int _len{ 0 };
+        mutable jule::Int _cap{ 0 };
 
         static jule::Slice<Item> alloc(const jule::Uint &len)   {
             if (len < 0)
