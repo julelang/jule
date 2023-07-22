@@ -3,143 +3,201 @@
 // license that can be found in the LICENSE file.
 
 //jule:cdef
-cpp unsafe fn __jule_atomic_swap[T](mut addr: *T, new: T): (old: T)
+cpp unsafe fn __jule_atomic_swap_explicit[T](
+	mut addr: *T, new: T, order: MemoryOrder): (old: T)
 
 //jule:cdef
-cpp unsafe fn __jule_atomic_compare_swap[T](mut addr: *T,
-											old: *T, new: T): (swapped: bool)
+cpp unsafe fn __jule_atomic_compare_swap_explicit[T](mut addr: *T, old: *T,
+	new: T, suc: MemoryOrder, fail: MemoryOrder): (swapped: bool)
 
 //jule:cdef
-cpp unsafe fn __jule_atomic_add[T](mut addr: *T, delta: T): (old: T)
+cpp unsafe fn __jule_atomic_add_explicit[T](
+	mut addr: *T, delta: T, order: MemoryOrder): (old: T)
 
 //jule:cdef
-cpp unsafe fn __jule_atomic_load[T](addr: *T): T
+cpp unsafe fn __jule_atomic_load_explicit[T](addr: *T, order: MemoryOrder): T
 
 //jule:cdef
-cpp unsafe fn __jule_atomic_store[T](mut addr: *T, val: T)
+cpp unsafe fn __jule_atomic_store_explicit[T](
+	mut addr: *T, val: T, order: MemoryOrder)
 
-// Atomically stores new into addr and returns the previous addr value.
-pub fn swap_i32(mut &addr: i32, new: i32): (old: i32) {
-	ret unsafe { cpp.__jule_atomic_swap[i32](&addr, new) }
+// Memory order for atomic operations.
+// Specifies how memory accesses.
+pub enum MemoryOrder {
+	// The weakest memory order.
+	// There no synchronization or ordering on read/write access.
+	// Only the operation is guaranteed to be atomic.
+	// Usually performs fastest atomicity performance.
+	Relaxed = 0,
+
+	// Combined with a load, if the loaded value was written
+	// by a store operation with a Release or stronger order,
+	// all subsequent operations are ordered after that store.
+	// Especially all subsequent uploads will see the data
+	// written before the repository.
+	Acquire = 2,
+
+	// When combined with a store, all previous operations are
+	// ordered with the Acquire or stronger order before any load
+	// of that value. In particular, all previous writes become
+	// visible to all threads that perform an Acquire or stronger
+	// load of this value.
+	Release = 3,
+
+	// Acquire and Release combined.
+	// Aka acquire/release.
+	// For loads it uses Acquire, for stores it uses Release ordering.
+	AcqRel = 4,
+
+	// Default memory order for most things.
+	// Aka sequentially consistent.
+	// Operations are sequenced consistently.
+	SeqCst = 5,
 }
 
 // Atomically stores new into addr and returns the previous addr value.
-pub fn swap_i64(mut &addr: i64, new: i64): (old: i64) {
-	ret unsafe { cpp.__jule_atomic_swap[i64](&addr, new) }
+pub fn swap_i32(mut &addr: i32, new: i32, order: MemoryOrder): (old: i32) {
+	ret unsafe { cpp.__jule_atomic_swap_explicit[i32](&addr, new, order) }
 }
 
 // Atomically stores new into addr and returns the previous addr value.
-pub fn swap_u32(mut &addr: u32, new: u32): (old: u32) {
-	ret unsafe { cpp.__jule_atomic_swap[u32](&addr, new) }
+pub fn swap_i64(mut &addr: i64, new: i64, order: MemoryOrder): (old: i64) {
+	ret unsafe { cpp.__jule_atomic_swap_explicit[i64](&addr, new, order) }
 }
 
 // Atomically stores new into addr and returns the previous addr value.
-pub fn swap_u64(mut &addr: u64, new: u64): (old: u64) {
-	ret unsafe { cpp.__jule_atomic_swap[u64](&addr, new) }
+pub fn swap_u32(mut &addr: u32, new: u32, order: MemoryOrder): (old: u32) {
+	ret unsafe { cpp.__jule_atomic_swap_explicit[u32](&addr, new, order) }
 }
 
 // Atomically stores new into addr and returns the previous addr value.
-pub fn swap_uinptr(mut &addr: uintptr, new: uintptr): (old: uintptr) {
-	ret unsafe { cpp.__jule_atomic_swap[uintptr](&addr, new) }
+pub fn swap_u64(mut &addr: u64, new: u64, order: MemoryOrder): (old: u64) {
+	ret unsafe { cpp.__jule_atomic_swap_explicit[u64](&addr, new, order) }
+}
+
+// Atomically stores new into addr and returns the previous addr value.
+pub fn swap_uinptr(mut &addr: uintptr, new: uintptr,
+	order: MemoryOrder): (old: uintptr) {
+	ret unsafe { cpp.__jule_atomic_swap_explicit[uintptr](&addr, new, order) }
 }
 
 // Executes the compare-and-swap operation for an i32 value.
-pub fn compare_swap_i32(mut &addr: i32, old: i32, new: i32): (swapped: bool) {
-	ret unsafe { cpp.__jule_atomic_compare_swap[i32](&addr, &old, new) }
+pub fn compare_swap_i32(mut &addr: i32, old: i32, new: i32,
+	order: MemoryOrder): (swapped: bool) {
+	ret unsafe {
+		cpp.__jule_atomic_compare_swap_explicit[i32](
+			&addr, &old, new, order, order)
+	}
 }
 
 // Executes the compare-and-swap operation for an i64 value.
-pub fn compare_swap_i64(mut &addr: i64, old: i64, new: i64): (swapped: bool) {
-	ret unsafe { cpp.__jule_atomic_compare_swap[i64](&addr, &old, new) }
+pub fn compare_swap_i64(mut &addr: i64, old: i64, new: i64,
+	order: MemoryOrder): (swapped: bool) {
+	ret unsafe {
+		cpp.__jule_atomic_compare_swap_explicit[i64](
+			&addr, &old, new, order, order)
+	}
 }
 
 // Executes the compare-and-swap operation for an u32 value.
-pub fn compare_swap_u32(mut &addr: u32, old: u32, new: u32): (swapped: bool) {
-	ret unsafe { cpp.__jule_atomic_compare_swap[u32](&addr, &old, new) }
+pub fn compare_swap_u32(mut &addr: u32, old: u32, new: u32,
+	order: MemoryOrder): (swapped: bool) {
+	ret unsafe {
+		cpp.__jule_atomic_compare_swap_explicit[u32](
+			&addr, &old, new, order, order)
+	}
 }
 
 // Executes the compare-and-swap operation for an u64 value.
-pub fn compare_swap_u64(mut &addr: u64, old: u64, new: u64): (swapped: bool) {
-	ret unsafe { cpp.__jule_atomic_compare_swap[u64](&addr, &old, new) }
+pub fn compare_swap_u64(mut &addr: u64, old: u64, new: u64,
+	order: MemoryOrder): (swapped: bool) {
+	ret unsafe {
+		cpp.__jule_atomic_compare_swap_explicit[u64](
+			&addr, &old, new, order, order)
+	}
 }
 
 // Executes the compare-and-swap operation for an uintptr value.
-pub fn compare_swap_uintptr(mut &addr: uintptr,
-							old: uintptr, new: uintptr): (swapped: bool) {
-	ret unsafe { cpp.__jule_atomic_compare_swap[uintptr](&addr, &old, new) }
+pub fn compare_swap_uintptr(mut &addr: uintptr, old: uintptr, new: uintptr,
+	order: MemoryOrder): (swapped: bool) {
+	ret unsafe {
+		cpp.__jule_atomic_compare_swap_explicit[uintptr](
+			&addr, &old, new, order, order)
+	}
 }
 
 // Atomically adds delta to addr and returns the previous addr value.
-pub fn add_i32(mut &addr: i32, delta: i32): (old: i32) {
-	ret unsafe { cpp.__jule_atomic_add[i32](&addr, delta) }
+pub fn add_i32(mut &addr: i32, delta: i32, order: MemoryOrder): (old: i32) {
+	ret unsafe { cpp.__jule_atomic_add_explicit[i32](&addr, delta, order) }
 }
 
 // Atomically adds delta to addr and returns the previous addr value.
-pub fn add_i64(mut &addr: i64, delta: i64): (old: i64) {
-	ret unsafe { cpp.__jule_atomic_add[i64](&addr, delta) }
+pub fn add_i64(mut &addr: i64, delta: i64, order: MemoryOrder): (old: i64) {
+	ret unsafe { cpp.__jule_atomic_add_explicit[i64](&addr, delta, order) }
 }
 
 // Atomically adds delta to addr and returns the previous addr value.
-pub fn add_u32(mut &addr: u32, delta: u32): (old: u32) {
-	ret unsafe { cpp.__jule_atomic_add[u32](&addr, delta) }
+pub fn add_u32(mut &addr: u32, delta: u32, order: MemoryOrder): (old: u32) {
+	ret unsafe { cpp.__jule_atomic_add_explicit[u32](&addr, delta, order) }
 }
 
 // Atomically adds delta to addr and returns the previous addr value.
-pub fn add_u64(mut &addr: u64, delta: u64): (old: u64) {
-	ret unsafe { cpp.__jule_atomic_add[u64](&addr, delta) }
+pub fn add_u64(mut &addr: u64, delta: u64, order: MemoryOrder): (old: u64) {
+	ret unsafe { cpp.__jule_atomic_add_explicit[u64](&addr, delta, order) }
 }
 
 // Atomically adds delta to addr and returns the previous addr value.
-pub fn add_uinptr(mut &addr: uintptr, delta: uintptr): (old: uintptr) {
-	ret unsafe { cpp.__jule_atomic_add[uintptr](&addr, delta) }
+pub fn add_uinptr(mut &addr: uintptr, delta: uintptr,
+	order: MemoryOrder): (old: uintptr) {
+	ret unsafe { cpp.__jule_atomic_add_explicit[uintptr](&addr, delta, order) }
 }
 
 // Atomically loads addr.
-pub fn load_i32(&addr: i32): i32 {
-	ret unsafe { cpp.__jule_atomic_load[i32](&addr) }
+pub fn load_i32(&addr: i32, order: MemoryOrder): i32 {
+	ret unsafe { cpp.__jule_atomic_load_explicit[i32](&addr, order) }
 }
 
 // Atomically loads addr.
-pub fn load_i64(&addr: i64): i64 {
-	ret unsafe { cpp.__jule_atomic_load[i64](&addr) }
+pub fn load_i64(&addr: i64, order: MemoryOrder): i64 {
+	ret unsafe { cpp.__jule_atomic_load_explicit[i64](&addr, order) }
 }
 
 // Atomically loads addr.
-pub fn load_u32(&addr: u32): u32 {
-	ret unsafe { cpp.__jule_atomic_load[u32](&addr) }
+pub fn load_u32(&addr: u32, order: MemoryOrder): u32 {
+	ret unsafe { cpp.__jule_atomic_load_explicit[u32](&addr, order) }
 }
 
 // Atomically loads addr.
-pub fn load_u64(&addr: u64): u64 {
-	ret unsafe { cpp.__jule_atomic_load[u64](&addr) }
+pub fn load_u64(&addr: u64, order: MemoryOrder): u64 {
+	ret unsafe { cpp.__jule_atomic_load_explicit[u64](&addr, order) }
 }
 
 // Atomically loads addr.
-pub fn load_uinptr(&addr: uintptr): uintptr {
-	ret unsafe { cpp.__jule_atomic_load[uintptr](&addr) }
+pub fn load_uinptr(&addr: uintptr, order: MemoryOrder): uintptr {
+	ret unsafe { cpp.__jule_atomic_load_explicit[uintptr](&addr, order) }
 }
 
 // Atomically stores val into addr.
-pub fn store_i32(mut &addr: i32, val: i32) {
-	unsafe { cpp.__jule_atomic_store[i32](&addr, val) }
+pub fn store_i32(mut &addr: i32, val: i32, order: MemoryOrder) {
+	unsafe { cpp.__jule_atomic_store_explicit[i32](&addr, val, order) }
 }
 
 // Atomically stores val into addr.
-pub fn store_i64(mut &addr: i64, val: i64) {
-	unsafe { cpp.__jule_atomic_store[i64](&addr, val) }
+pub fn store_i64(mut &addr: i64, val: i64, order: MemoryOrder) {
+	unsafe { cpp.__jule_atomic_store_explicit[i64](&addr, val, order) }
 }
 
 // Atomically stores val into addr.
-pub fn store_u32(mut &addr: u32, val: u32) {
-	unsafe { cpp.__jule_atomic_store[u32](&addr, val) }
+pub fn store_u32(mut &addr: u32, val: u32, order: MemoryOrder) {
+	unsafe { cpp.__jule_atomic_store_explicit[u32](&addr, val, order) }
 }
 
 // Atomically stores val into addr.
-pub fn store_u64(mut &addr: u64, val: u64) {
-	unsafe { cpp.__jule_atomic_store[u64](&addr, val) }
+pub fn store_u64(mut &addr: u64, val: u64, order: MemoryOrder) {
+	unsafe { cpp.__jule_atomic_store_explicit[u64](&addr, val, order) }
 }
 
 // Atomically stores val into addr.
-pub fn store_uinptr(mut &addr: uintptr, val: uintptr) {
-	unsafe { cpp.__jule_atomic_store[uintptr](&addr, val) }
+pub fn store_uinptr(mut &addr: uintptr, val: uintptr, order: MemoryOrder) {
+	unsafe { cpp.__jule_atomic_store_explicit[uintptr](&addr, val, order) }
 }

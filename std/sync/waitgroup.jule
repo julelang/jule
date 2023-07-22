@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::sync::atomic::{add_u32, load_u32, compare_swap_u32}
+use std::sync::atomic::{MemoryOrder, add_u32, load_u32, compare_swap_u32}
 
 // Do not copy an instance of WaitGroup, use a ref or pointer instead.
 //
@@ -23,7 +23,7 @@ impl WaitGroup {
 	// and unblocks any wait() calls if task count becomes zero.
 	// Panics if task count reaches below zero.
 	pub fn add(mut self, delta: int) {
-		let old_nr_tasks = int(add_u32(self.task_n, u32(delta)))
+		let old_nr_tasks = int(add_u32(self.task_n, u32(delta), MemoryOrder.Relaxed))
 		let new_nr_tasks = old_nr_tasks + delta
 		if new_nr_tasks < 0 {
 			panic("negative number of tasks in WaitGroup")
@@ -33,17 +33,17 @@ impl WaitGroup {
 			ret
 		}
 
-		let mut n_waiters = load_u32(self.wait_n)
+		let mut n_waiters = load_u32(self.wait_n, MemoryOrder.Relaxed)
 		if n_waiters == 0 {
 			ret
 		}
 		// clear waiters
 		for {
-			compare_swap_u32(self.wait_n, n_waiters, 0)
+			compare_swap_u32(self.wait_n, n_waiters, 0, MemoryOrder.Relaxed)
 			if n_waiters == 0 {
 				ret
 			}
-			n_waiters = load_u32(self.wait_n)
+			n_waiters = load_u32(self.wait_n, MemoryOrder.Relaxed)
 		}
 	}
 
@@ -52,13 +52,13 @@ impl WaitGroup {
 
 	// Blocks until all tasks are done (task count becomes zero)
 	pub fn wait(mut self) {
-		let nr_tasks = int(load_u32(self.task_n))
+		let nr_tasks = int(load_u32(self.task_n, MemoryOrder.Relaxed))
 		if nr_tasks == 0 {
 			// no need to wait
 			ret
 		}
-		add_u32(self.wait_n, 1)
+		add_u32(self.wait_n, 1, MemoryOrder.Relaxed)
 		// blocks until task_n becomes 0
-		for load_u32(self.wait_n) != 0 {}
+		for load_u32(self.wait_n, MemoryOrder.Relaxed) != 0 {}
 	}
 }
