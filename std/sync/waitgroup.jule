@@ -14,8 +14,8 @@ use std::sync::atomic::{add_u32, load_u32, compare_swap_u32}
 // in each parallel job:
 // `wg.done()` when finished
 pub struct WaitGroup {
-	task_n: u32       // current task count - reading/writing should be atomic
-	wait_n: u32       // current wait count - reading/writing should be atomic
+	task_n: u32  // current task count - reading/writing should be atomic
+	wait_n: u32  // current wait count - reading/writing should be atomic
 }
 
 impl WaitGroup {
@@ -23,7 +23,7 @@ impl WaitGroup {
 	// and unblocks any wait() calls if task count becomes zero.
 	// Panics if task count reaches below zero.
 	pub fn add(mut self, delta: int) {
-		let old_nr_tasks = int(unsafe { add_u32(&self.task_n, u32(delta)) })
+		let old_nr_tasks = int(add_u32(self.task_n, u32(delta)))
 		let new_nr_tasks = old_nr_tasks + delta
 		if new_nr_tasks < 0 {
 			panic("negative number of tasks in WaitGroup")
@@ -33,17 +33,17 @@ impl WaitGroup {
 			ret
 		}
 
-		let mut n_waiters = unsafe { load_u32(&self.wait_n) }
+		let mut n_waiters = load_u32(self.wait_n)
 		if n_waiters == 0 {
 			ret
 		}
 		// clear waiters
 		for {
-			_ = unsafe { compare_swap_u32(&self.wait_n, n_waiters, 0) }
+			compare_swap_u32(self.wait_n, n_waiters, 0)
 			if n_waiters == 0 {
 				ret
 			}
-			n_waiters = unsafe { load_u32(&self.wait_n) }
+			n_waiters = load_u32(self.wait_n)
 		}
 	}
 
@@ -52,13 +52,13 @@ impl WaitGroup {
 
 	// Blocks until all tasks are done (task count becomes zero)
 	pub fn wait(mut self) {
-		let nr_tasks = int(unsafe { load_u32(&self.task_n) })
+		let nr_tasks = int(load_u32(self.task_n))
 		if nr_tasks == 0 {
 			// no need to wait
 			ret
 		}
-		_ = unsafe { add_u32(&self.wait_n, 1) }
+		add_u32(self.wait_n, 1)
 		// blocks until task_n becomes 0
-		for (unsafe { load_u32(&self.wait_n) }) != 0 {}
+		for load_u32(self.wait_n) != 0 {}
 	}
 }
