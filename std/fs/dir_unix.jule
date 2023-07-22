@@ -7,7 +7,8 @@ use std::sys::{
 	byte_ptr_to_str,
 	opendir,
 	readdir,
-	closedir
+	closedir,
+	mkdir,
 }
 
 // Reads the named directory and returs all its directory entries can read.
@@ -41,4 +42,17 @@ pub fn read_dir(path: str): (dirents: []&DirEntry, err: FsError) {
 	}
 	_ = unsafe { closedir(dir) }
 	ret
+}
+
+// Creates directory.
+//
+// Possible errors: Denied Exist ReadOnly NoSpace
+pub fn create_directory(path: str): FsError {
+	// NOTICE
+	// Also can has EMLINK error-code.
+	// Make sure this situation should documented or not.
+	if (unsafe { mkdir(&path[0], 0700) } == 0) {
+		ret FsError.Ok
+	}
+	ret get_last_fs_error()
 }

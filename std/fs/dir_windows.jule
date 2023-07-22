@@ -4,6 +4,7 @@
 
 use std::fs::path::{join}
 use std::sys::{
+	self,
 	utf16_from_str,
 	u16_ptr_to_str,
 	_wopendir,
@@ -43,4 +44,19 @@ pub fn read_dir(path: str): (dirents: []&DirEntry, err: FsError) {
 	}
 	_ = unsafe { _wclosedir(dir) }
 	ret
+}
+
+// Creates directory.
+//
+// Possible errors: Denied Exist ReadOnly NoSpace
+pub fn create_directory(path: str): FsError {
+	// NOTICE
+	// Also can has EMLINK error-code.
+	// Make sure this situation should documented or not.
+
+	let utf16_path = utf16_from_str(path)
+	if (unsafe { std::sys::create_directory(&utf16_path[0]) }) {
+		ret FsError.Ok
+	}
+	ret get_last_fs_error()
 }
