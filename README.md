@@ -198,13 +198,13 @@ It supports development on intel 386, amd64 and arm64 architectures on Windows, 
 JuleC undertakes the effort, that the code and standard library it produces will be compatible with all these platforms.
 All supported platforms by JuleC are documented in the <a href="https://manual.jule.dev/compiler/platform-support">platform support</a> part of manual. 
 
-<h2 id="building-project">Building Project</h2>
+<h2 id="building-project">Building the Project</h2>
 
 > **Note** \
-> Please read the [install from source](https://manual.jule.dev/getting-started/install-from-source) part of manual for compiling from source code.
+> Please refer to the [install from source](https://manual.jule.dev/getting-started/install-from-source) section in the manual to compile the project from source.
  
 When you enter the directory where the source code is located, you can find some compilation scripts for compiling of JuleC. \
-These scripts are written to run from the [src](./src/julec) directory:
+These scripts are written to be run from the [src](./src/julec) directory:
 
 - `build`: scripts used for compile.
 - `brun`: scripts used for compile and execute if compiling is successful.
@@ -217,14 +217,14 @@ JuleC is in development with the [Jule](https://github.com/julelang/jule) progra
 In `src/julec` directory:
 
 > **Note** \
-> This example command accepts you already have JuleC in global path.
+> This example command assumes that JuleC is already available in your path.
 
 ```
 julec -o ../../bin/julec .
 ```
 
 
-Run the above command in your terminal, in the `src/julec` directory of Jule project.
+Run the above command in your terminal, in the `src/julec` directory of the Jule project.
 
 <h2 id="contributing">Contributing</h2>
 
