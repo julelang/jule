@@ -18,7 +18,7 @@
 - [ ] All the new and existing test pass.
 - [ ] The code follows the code style and conventions of the project.
 - [ ] No plagiarized, duplicated, or repetitive code that has been directly copied from another source.
-- [ ] I have read the whole [Contributing guidelines](https://jule.dev/pages/contributing.html) of the project and its resources/related pages.
+- [ ] I have read the whole [Contributing guidelines](https://jule.dev/contribute) of the project and its resources/related pages.
 
 ### Screenshots (if any)
 
