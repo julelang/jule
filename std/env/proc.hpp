@@ -7,17 +7,13 @@
 
 #include "../../api/jule.hpp"
 
-jule::Slice<jule::Str> __jule_get_command_line_args(void)  ;
-jule::Slice<jule::Str> __jule_get_environment_variables(void)  ;
-jule::Str __jule_executable(void)  ;
+jule::Slice<jule::Str> __jule_get_command_line_args(void);
+jule::Slice<jule::Str> __jule_get_environment_variables(void);
 
-jule::Slice<jule::Str> __jule_get_command_line_args(void)  
+jule::Slice<jule::Str> __jule_get_command_line_args(void)
 { return jule::command_line_args; }
 
-jule::Slice<jule::Str> __jule_get_environment_variables(void)  
+jule::Slice<jule::Str> __jule_get_environment_variables(void)
 { return jule::environment_variables; }
-
-jule::Str __jule_executable(void)  
-{ return jule::executable(); }
 
 #endif // ifndef __JULE_STD_OS_PROC_HPP
