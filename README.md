@@ -223,8 +223,16 @@ In `src/julec` directory:
 julec -o ../../bin/julec .
 ```
 
-
 Run the above command in your terminal, in the `src/julec` directory of the Jule project.
+
+<h3 id="building-project-ir-options">IR Options</h2>
+
+Released JuleC versions may not be able to compile existing JuleC code after major changes.
+If your current JuleC build isn't up-to-date enough to compile from source code, you can use JuleC's C++ IR to get a fairly up-to-date build.
+IR codes can also be used for different purposes.
+For more detailed information about JuleC IR, please see the relevant repository.
+
+Here is the [IRs](https://github.com/julelang/julec-ir) of JuleC.
 
 <h2 id="contributing">Contributing</h2>
 
