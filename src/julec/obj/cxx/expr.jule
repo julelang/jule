@@ -280,8 +280,8 @@ fn gen_struct_ins_expr_model(mut m: &StructIns): str {
 
 fn gen_unary_expr_model(mut m: &UnaryExprModel): str {
 	match m.op {
-	| str(TokenKind.Caret): ret "(~" + gen_expr(m.expr) + ")"
-	|:                      ret "(" + m.op + gen_expr(m.expr) + ")"
+	| str(TokenKind.Caret): ret "(~(" + gen_expr(m.expr) + "))"
+	|:                      ret "(" + m.op + "(" + gen_expr(m.expr) + "))"
 	}
 }
 
@@ -797,7 +797,15 @@ fn gen_expr_model(mut m: ExprModel): str {
 }
 
 fn gen_expr(mut e: ExprModel): str {
-	let obj = gen_expr_model(e)
+	let mut obj = gen_expr_model(e)
+	if obj[0] != '(' {
+		ret obj
+	}
+
+	match type e {
+	| &BinopExprModel:
+		obj = obj[1:obj.len-1]
+	}
 	ret obj
 }
 
