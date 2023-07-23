@@ -307,7 +307,7 @@ fn gen_multi_assign(mut a: &MultiAssign): str {
 	ret obj
 }
 
-fn gen_case(m: &Match, mut c: &Case): str {
+fn gen_case(mut m: &Match, mut c: &Case): str {
 	const MATCH_EXPR = "_match_expr"
 
 	let end = case_end_label_ident(uintptr(&c))
@@ -316,14 +316,24 @@ fn gen_case(m: &Match, mut c: &Case): str {
 	if c.exprs.len > 0 {
 		obj += "if (!("
 		for (i, mut expr) in c.exprs {
-			if !m.type_match {
+			match {
+			| !m.type_match:
+				obj += "("
 				obj += gen_expr(expr)
-				obj += " == "
-			}
+				obj += ")"
 
-			obj += MATCH_EXPR
+				if m.expr.is_const() {
+					if !m.expr.constant.is_bool() || !m.expr.constant.read_bool() {
+						obj += " == "
+						obj += gen_expr_model(m.expr.model)
+					}
+				} else {
+					obj += " == "
+					obj += MATCH_EXPR
+				}
 
-			if m.type_match {
+			|:
+				obj += MATCH_EXPR
 				obj += ".type_is<" + gen_expr(expr) + ">()"
 			}
 
@@ -358,14 +368,18 @@ fn gen_match(mut m: &Match): str {
 	add_indent()
 
 	obj += indent()
-	if m.expr.lvalue && is_opt_enabled(Opt.Copy) {
-		obj += "auto &_match_expr{ "
-	} else {
-		obj += "auto _match_expr{ "
+
+	// Constant expressions generated as literals in conditions.
+	if !m.expr.is_const() {
+		if m.expr.lvalue && is_opt_enabled(Opt.Copy) {
+			obj += "auto &_match_expr{ "
+		} else {
+			obj += "auto _match_expr{ "
+		}
+		obj += gen_expr(m.expr.model)
+		obj += " };\n"
+		obj += indent()
 	}
-	obj += gen_expr(m.expr.model)
-	obj += " };\n"
-	obj += indent()
 
 	if m.cases.len > 0 {
 		obj += gen_case(m, m.cases[0])
