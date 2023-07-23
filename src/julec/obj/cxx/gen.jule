@@ -649,15 +649,8 @@ fn gen_prototypes(mut ir: &IR, mut structs: []&Struct): str {
 	ret obj
 }
 
-// Generates C++ code of variable.
-fn gen_var(mut v: &Var): str {
-	if is_ignore_ident(v.ident) {
-		ret ""
-	}
-	if v.constant {
-		ret ""
-	}
-
+// Generats C++ code of variable with initialize expression.
+fn gen_var_init_expr(mut v: &Var, init: str): str {
 	let mut obj = ""
 	if v.statically {
 		obj += "static "
@@ -668,18 +661,29 @@ fn gen_var(mut v: &Var): str {
 		obj += "&"
 	}
 	obj += var_out_ident(v)
-	if real(v.value) && real(v.value.expr) {
-		if v.value.data.model != nil {
-			obj += " = "
-			obj += gen_val(v.value)
-		} else {
-			obj += CPP_DEFAULT_EXPR
-		}
-	} else {
-		obj += "{" + get_init_expr(v.kind.kind) + "}"
+	if init != "" {
+		obj += " = " + init
 	}
 	obj += CPP_ST_TERM
 	ret obj
+}
+
+// Generates C++ code of variable.
+fn gen_var(mut v: &Var): str {
+	if is_ignore_ident(v.ident) {
+		ret ""
+	}
+	if v.constant {
+		ret ""
+	}
+
+	if real(v.value) && real(v.value.expr) {
+		if v.value.data.model != nil {
+			ret gen_var_init_expr(v, gen_val(v.value))
+		}
+		ret gen_var_init_expr(v, "")
+	}
+	ret gen_var_init_expr(v, get_init_expr(v.kind.kind))
 }
 
 // Generates C++ code of all globals.
