@@ -5,6 +5,7 @@
 #ifndef __JULE_ANY_HPP
 #define __JULE_ANY_HPP
 
+#include <typeinfo>
 #include <stddef.h>
 #include <cstdlib>
 #include <cstring>

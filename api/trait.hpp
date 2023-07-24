@@ -5,6 +5,7 @@
 #ifndef __JULE_TRAIT_HPP
 #define __JULE_TRAIT_HPP
 
+#include <typeinfo>
 #include <ostream>
 #include <cstring>
 
