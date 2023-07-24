@@ -82,10 +82,10 @@ namespace jule {
 
         Ref<T>(void)   {}
 
-        Ref<T> (const jule::Ref<T> &ref)  
+        Ref<T> (const jule::Ref<T> &ref)
         { this->operator=(ref); }
 
-        ~Ref<T>(void)  
+        ~Ref<T>(void)
         { this->drop(); }
 
         inline jule::Int drop_ref(void) const   {
@@ -126,7 +126,7 @@ namespace jule {
             this->alloc = nullptr;
         }
 
-        inline jule::Bool real() const  
+        inline jule::Bool real() const
         { return this->alloc != nullptr; }
 
         inline T *operator->(void) const   {
@@ -144,7 +144,7 @@ namespace jule {
             return *this->alloc;
         }
 
-        inline T& get(void)  
+        inline T& get(void)
         { return this->operator T&(); }
 
         inline void must_ok(void) const   {
@@ -171,10 +171,10 @@ namespace jule {
             *this->alloc = val;
         }
 
-        inline jule::Bool operator==(const T &val) const  
+        inline jule::Bool operator==(const T &val) const
         { return this->__alloc == nullptr ? false : *this->alloc == val; }
 
-        inline jule::Bool operator!=(const T &val) const  
+        inline jule::Bool operator!=(const T &val) const
         { return !this->operator==(val); }
 
         inline jule::Bool operator==(const jule::Ref<T> &ref) const   {
@@ -191,7 +191,7 @@ namespace jule {
             return *this->alloc == *ref.alloc;
         }
 
-        inline jule::Bool operator!=(const jule::Ref<T> &ref) const  
+        inline jule::Bool operator!=(const jule::Ref<T> &ref) const
         { return !this->operator==(ref); }
 
         friend inline
@@ -206,7 +206,7 @@ namespace jule {
     };
 
     template<typename T>
-    inline jule::Ref<T> new_ref(void)  
+    inline jule::Ref<T> new_ref(void)
     { return jule::Ref<T>(); }
 
     template<typename T>

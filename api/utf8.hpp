@@ -47,15 +47,15 @@ namespace jule {
     constexpr signed int UTF8_MAX_RUNE{ 1114111 };
     constexpr signed int UTF8_SURROGATE_MIN{ 55296 };
     constexpr signed int UTF8_SURROGATE_MAX{ 57343 };
-    
+
     // Declarations
-    
+
     struct UTF8AcceptRange;
     std::tuple<jule::I32, jule::Int> utf8_decode_rune_str(const char *s, const jule::Int &len)  ;
     jule::Slice<jule::U8> utf8_rune_to_bytes(const jule::I32 &r)  ;
-    
+
     // Definitions
-    
+
     constexpr jule::U8 utf8_first[256] = {
         jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS,
         jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS, jule::UTF8_AS,
@@ -74,9 +74,9 @@ namespace jule {
         jule::UTF8_S2, jule::UTF8_S3, jule::UTF8_S3, jule::UTF8_S3, jule::UTF8_S3, jule::UTF8_S3, jule::UTF8_S3, jule::UTF8_S3, jule::UTF8_S3, jule::UTF8_S3, jule::UTF8_S3, jule::UTF8_S3, jule::UTF8_S3, jule::UTF8_S4, jule::UTF8_S3, jule::UTF8_S3,
         jule::UTF8_S5, jule::UTF8_S6, jule::UTF8_S6, jule::UTF8_S6, jule::UTF8_S7, jule::UTF8_XX, jule::UTF8_XX, jule::UTF8_XX, jule::UTF8_XX, jule::UTF8_XX, jule::UTF8_XX, jule::UTF8_XX, jule::UTF8_XX, jule::UTF8_XX, jule::UTF8_XX, jule::UTF8_XX,
     };
-    
+
     struct UTF8AcceptRange{ const jule::U8 lo, hi; };
-    
+
     constexpr struct jule::UTF8AcceptRange utf8_accept_ranges[16] = {
         { jule::UTF8_LOCB, jule::UTF8_HICB },
         { 0xA0, jule::UTF8_HICB },
@@ -131,7 +131,7 @@ namespace jule {
                                (static_cast<jule::I32>(s2&jule::UTF8_MASKX)<<6) |
                                 static_cast<jule::I32>(s3&jule::UTF8_MASKX), 4);
     }
-    
+
     jule::Slice<jule::U8> utf8_rune_to_bytes(const jule::I32 &r)   {
         if (static_cast<jule::U32>(r) <= jule::UTF8_RUNE1_MAX)
             return jule::Slice<jule::U8>({static_cast<jule::U8>(r)});

@@ -29,9 +29,9 @@ namespace jule {
                 hash += key[i] % 7;
             return hash;
         }
-    
+
         template<typename T>
-        inline size_t operator()(const T &obj) const  
+        inline size_t operator()(const T &obj) const
         { return this->operator()(jule::to_str<T>(obj)); }
     };
 
@@ -49,22 +49,22 @@ namespace jule {
         }
 
         inline constexpr
-        auto begin(void)  
+        auto begin(void)
         { return this->buffer.begin(); }
 
         inline constexpr
-        auto begin(void) const  
+        auto begin(void) const
         { return this->buffer.begin(); }
 
         inline constexpr
-        auto end(void)  
+        auto end(void)
         { return this->buffer.end(); }
 
         inline constexpr
-        auto end(void) const  
+        auto end(void) const
         { return this->buffer.end(); }
-    
-        inline void clear(void)  
+
+        inline void clear(void)
         { this->buffer.clear(); }
 
         jule::Slice<Key> keys(void) const   {
@@ -84,19 +84,19 @@ namespace jule {
         }
 
         inline constexpr
-        jule::Bool has(const Key &key) const  
+        jule::Bool has(const Key &key) const
         { return this->buffer.find(key) != this->end(); }
 
-        inline jule::Int len(void) const  
+        inline jule::Int len(void) const
         { return this->buffer.size(); }
 
-        inline void del(const Key &key)  
+        inline void del(const Key &key)
         { this->buffer.erase(key); }
 
-        inline jule::Bool operator==(const std::nullptr_t) const  
+        inline jule::Bool operator==(const std::nullptr_t) const
         { return this->buffer.empty(); }
-    
-        inline jule::Bool operator!=(const std::nullptr_t) const  
+
+        inline jule::Bool operator!=(const std::nullptr_t) const
         { return !this->operator==(nullptr); }
 
         Value &operator[](const Key &key)

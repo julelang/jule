@@ -104,11 +104,11 @@ namespace jule {
     }
 
     template<typename T>
-    inline void drop(T &obj)  
+    inline void drop(T &obj)
     { obj.drop(); }
 
     template<typename T>
-    inline jule::Bool real(const T &obj)  
+    inline jule::Bool real(const T &obj)
     { return obj.real(); }
 
 } // namespace jule

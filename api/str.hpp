@@ -64,7 +64,7 @@ namespace jule {
             this->buffer = src;
         }
 
-        Str(const jule::I32 &rune)  
+        Str(const jule::I32 &rune)
         : Str( jule::utf8_rune_to_bytes(rune) ) {}
 
         Str(const std::basic_string<jule::U8> &src)   {
@@ -99,16 +99,16 @@ namespace jule {
         typedef jule::U8       *Iterator;
         typedef const jule::U8 *ConstIterator;
 
-        inline Iterator begin(void)  
+        inline Iterator begin(void)
         { return static_cast<Iterator>(&this->buffer[0]); }
 
-        inline ConstIterator begin(void) const  
+        inline ConstIterator begin(void) const
         { return static_cast<ConstIterator>(&this->buffer[0]); }
 
-        inline Iterator end(void)  
+        inline Iterator end(void)
         { return static_cast<Iterator>(&this->buffer[this->len()]); }
 
-        inline ConstIterator end(void) const  
+        inline ConstIterator end(void) const
         { return static_cast<ConstIterator>(&this->buffer[this->len()]); }
 
         inline jule::Str slice(const jule::Int &start,
@@ -125,16 +125,16 @@ namespace jule {
             return jule::Str(this->buffer.substr(start, n).c_str(), n);
         }
 
-        inline jule::Str slice(const jule::Int &start) const  
+        inline jule::Str slice(const jule::Int &start) const
         { return this->slice(start, this->len()); }
 
-        inline jule::Str slice(void) const  
+        inline jule::Str slice(void) const
         { return this->slice(0, this->len()); }
 
-        inline jule::Int len(void) const  
+        inline jule::Int len(void) const
         { return this->_len; }
 
-        inline jule::Bool empty(void) const  
+        inline jule::Bool empty(void) const
         { return this->buffer.empty(); }
 
         inline jule::Bool has_prefix(const jule::Str &sub) const   {
@@ -146,10 +146,10 @@ namespace jule {
                 this->buffer.substr(this->len()-sub.len()) == sub.buffer;
         }
 
-        inline jule::Int find(const jule::Str &sub) const  
+        inline jule::Int find(const jule::Str &sub) const
         { return static_cast<jule::Int>(this->buffer.find(sub.buffer) ); }
 
-        inline jule::Int rfind(const jule::Str &sub) const  
+        inline jule::Int rfind(const jule::Str &sub) const
         { return static_cast<jule::Int>(this->buffer.rfind(sub.buffer)); }
 
         jule::Str trim(const jule::Str &bytes) const   {
@@ -249,13 +249,13 @@ namespace jule {
             return jule::Str(s);
         }
 
-        inline operator const char*(void) const  
+        inline operator const char*(void) const
         { return reinterpret_cast<const char*>(this->buffer.c_str()); }
 
-        inline operator const std::basic_string<jule::U8>(void) const  
+        inline operator const std::basic_string<jule::U8>(void) const
         { return this->buffer; }
 
-        inline operator const std::basic_string<char>(void) const  
+        inline operator const std::basic_string<char>(void) const
         { return std::basic_string<char>(this->begin(), this->end()); }
 
         operator jule::Slice<jule::U8>(void) const   {
@@ -296,13 +296,13 @@ namespace jule {
             this->buffer += str.buffer;
         }
 
-        inline jule::Str operator+(const jule::Str &str) const  
+        inline jule::Str operator+(const jule::Str &str) const
         { return jule::Str(this->buffer + str.buffer); }
 
-        inline jule::Bool operator==(const jule::Str &str) const  
+        inline jule::Bool operator==(const jule::Str &str) const
         { return this->buffer == str.buffer; }
 
-        inline jule::Bool operator!=(const jule::Str &str) const  
+        inline jule::Bool operator!=(const jule::Str &str) const
         { return !this->operator==(str); }
 
         friend std::ostream &operator<<(std::ostream &stream,
@@ -320,7 +320,7 @@ namespace jule {
         return jule::Str(stream.str());
     }
 
-    jule::Str to_str(const jule::Str &s)  
+    jule::Str to_str(const jule::Str &s)
     { return s; }
 
 } // namespace jule

@@ -55,12 +55,12 @@ namespace jule {
             this->type_id = typeid(ref).name();
         }
 
-        Trait<Mask>(const jule::Trait<Mask> &src)  
+        Trait<Mask>(const jule::Trait<Mask> &src)
         { this->operator=(src); }
 
-        void dealloc(void)  
+        void dealloc(void)
         { this->data.drop(); }
-    
+
         inline void must_ok(void) const   {
             if (this->operator==(nullptr))
                 jule::panic(jule::ERROR_INVALID_MEMORY);
@@ -106,7 +106,7 @@ namespace jule {
                 reinterpret_cast<T*>(this->data.alloc), this->data.ref);
         }
 
-        inline void operator=(const std::nullptr_t)  
+        inline void operator=(const std::nullptr_t)
         { this->dealloc(); }
 
         inline void operator=(const jule::Trait<Mask> &src)   {
@@ -121,20 +121,20 @@ namespace jule {
             this->type_id = src.type_id;
         }
 
-        inline jule::Bool operator==(const jule::Trait<Mask> &src) const  
+        inline jule::Bool operator==(const jule::Trait<Mask> &src) const
         { return this->data.alloc == this->data.alloc; }
 
-        inline jule::Bool operator!=(const jule::Trait<Mask> &src) const  
+        inline jule::Bool operator!=(const jule::Trait<Mask> &src) const
         { return !this->operator==(src); }
 
-        inline jule::Bool operator==(std::nullptr_t) const  
+        inline jule::Bool operator==(std::nullptr_t) const
         { return this->data.alloc == nullptr; }
 
-        inline jule::Bool operator!=(std::nullptr_t) const  
+        inline jule::Bool operator!=(std::nullptr_t) const
         { return !this->operator==(nullptr); }
 
         friend inline std::ostream &operator<<(std::ostream &stream,
-                                               const jule::Trait<Mask> &src)  
+                                               const jule::Trait<Mask> &src)
         { return stream << src.data.alloc; }
     };
 

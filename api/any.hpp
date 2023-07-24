@@ -24,10 +24,10 @@ namespace jule {
         template<typename T>
         struct DynamicType {
         public:
-            static const char *type_id(void)  
+            static const char *type_id(void)
             { return typeid(T).name(); }
 
-            static void dealloc(void *alloc)  
+            static void dealloc(void *alloc)
             { delete static_cast<T*>(alloc); }
 
             static jule::Bool eq(void *alloc, void *other)   {
@@ -80,16 +80,16 @@ namespace jule {
         Any(void)   {}
 
         template<typename T>
-        Any(const T &expr)  
+        Any(const T &expr)
         { this->operator=(expr); }
 
-        Any(const jule::Any &src)  
+        Any(const jule::Any &src)
         { this->operator=(src); }
 
-        Any(const std::nullptr_t)  
+        Any(const std::nullptr_t)
         { this->operator=(nullptr); }
 
-        ~Any(void)  
+        ~Any(void)
         { this->dealloc(); }
 
         void dealloc(void)   {
@@ -184,7 +184,7 @@ namespace jule {
             this->type = src.type;
         }
 
-        inline void operator=(const std::nullptr_t)  
+        inline void operator=(const std::nullptr_t)
         { this->dealloc(); }
 
         template<typename T>
@@ -199,12 +199,12 @@ namespace jule {
         }
 
         template<typename T>
-        inline jule::Bool operator==(const T &expr) const  
+        inline jule::Bool operator==(const T &expr) const
         { return this->type_is<T>() && this->operator T() == expr; }
 
         template<typename T>
         inline constexpr
-        jule::Bool operator!=(const T &expr) const  
+        jule::Bool operator!=(const T &expr) const
         { return !this->operator==(expr); }
 
         inline jule::Bool operator==(const jule::Any &other) const   {
@@ -224,13 +224,13 @@ namespace jule {
             return this->type->eq(*this->data.alloc, *other.data.alloc);
         }
 
-        inline jule::Bool operator!=(const jule::Any &other) const  
+        inline jule::Bool operator!=(const jule::Any &other) const
         { return !this->operator==(other); }
 
-        inline jule::Bool operator==(std::nullptr_t) const  
+        inline jule::Bool operator==(std::nullptr_t) const
         { return !this->data.alloc; }
 
-        inline jule::Bool operator!=(std::nullptr_t) const  
+        inline jule::Bool operator!=(std::nullptr_t) const
         { return !this->operator==(nullptr); }
 
         friend std::ostream &operator<<(std::ostream &stream,

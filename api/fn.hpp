@@ -58,28 +58,28 @@ namespace jule {
             return this->buffer(arguments...);
         }
 
-        jule::Uintptr addr(void) const  
+        jule::Uintptr addr(void) const
         { return this->_addr; }
 
-        inline void operator=(std::nullptr_t)  
+        inline void operator=(std::nullptr_t)
         { this->buffer = nullptr; }
 
-        inline void operator=(const std::function<Function> &function)  
+        inline void operator=(const std::function<Function> &function)
         { this->buffer = function; }
 
-        inline void operator=(const Function &function)  
+        inline void operator=(const Function &function)
         { this->buffer = function; }
 
-        inline jule::Bool operator==(const Fn<Function> &fn) const  
+        inline jule::Bool operator==(const Fn<Function> &fn) const
         { return this->addr() == fn.addr(); }
 
-        inline jule::Bool operator!=(const Fn<Function> &fn) const  
+        inline jule::Bool operator!=(const Fn<Function> &fn) const
         { return !this->operator==(fn); }
 
-        inline jule::Bool operator==(std::nullptr_t) const  
+        inline jule::Bool operator==(std::nullptr_t) const
         { return this->buffer == nullptr; }
 
-        inline jule::Bool operator!=(std::nullptr_t) const  
+        inline jule::Bool operator!=(std::nullptr_t) const
         { return !this->operator==(nullptr); }
 
         friend std::ostream &operator<<(std::ostream &stream,

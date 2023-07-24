@@ -87,19 +87,19 @@ namespace jule {
     }
 
     template<typename T>
-    jule::Fn<T> clone(const jule::Fn<T> &fn)  
+    jule::Fn<T> clone(const jule::Fn<T> &fn)
     { return fn; }
 
     template<typename T>
-    T *clone(T *ptr)  
+    T *clone(T *ptr)
     { return ptr; }
 
     template<typename T>
-    const T *clone(const T *ptr)  
+    const T *clone(const T *ptr)
     { return ptr; }
 
     template<typename T>
-    T clone(const T &t)  
+    T clone(const T &t)
     { return t.clone(); }
 
 }; // namespace jule

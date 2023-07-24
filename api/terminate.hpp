@@ -25,7 +25,7 @@ namespace jule {
         jule::Bool operator==(const Error&) { return false; }
         jule::Bool operator!=(const Error &src) { return !this->operator==(src); }
 
-        friend std::ostream &operator<<(std::ostream &stream, Error error)  
+        friend std::ostream &operator<<(std::ostream &stream, Error error)
         { return stream << error.error(); }
     };
 

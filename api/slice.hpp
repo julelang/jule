@@ -76,7 +76,7 @@ namespace jule {
         Slice<Item>(void)   {}
         Slice<Item>(const std::nullptr_t)   {}
 
-        Slice<Item>(const jule::Slice<Item>& src)  
+        Slice<Item>(const jule::Slice<Item>& src)
         { this->operator=(src); }
 
         Slice<Item>(const std::initializer_list<Item> &src)   {
@@ -90,7 +90,7 @@ namespace jule {
                 this->data.alloc[i] = *static_cast<const Item*>(src_begin+i);
         }
 
-        ~Slice<Item>(void)  
+        ~Slice<Item>(void)
         { this->dealloc(); }
 
         inline void check(void) const   {
@@ -163,19 +163,19 @@ namespace jule {
         typedef const Item *ConstIterator;
 
         inline constexpr
-        Iterator begin(void)  
+        Iterator begin(void)
         { return &this->_slice[0]; }
 
         inline constexpr
-        ConstIterator begin(void) const  
+        ConstIterator begin(void) const
         { return &this->_slice[0]; }
-    
+
         inline constexpr
-        Iterator end(void)  
+        Iterator end(void)
         { return &this->_slice[this->_len]; }
 
         inline constexpr
-        ConstIterator end(void) const  
+        ConstIterator end(void) const
         { return &this->_slice[this->_len]; }
 
         inline Slice<Item> slice(const jule::Int &start,
@@ -196,21 +196,21 @@ namespace jule {
             return slice;
         }
 
-        inline jule::Slice<Item> slice(const jule::Int &start) const  
+        inline jule::Slice<Item> slice(const jule::Int &start) const
         { return this->slice(start, this->len()); }
-    
-        inline jule::Slice<Item> slice(void) const  
+
+        inline jule::Slice<Item> slice(void) const
         { return this->slice(0, this->len()); }
 
         inline constexpr
-        jule::Int len(void) const  
+        jule::Int len(void) const
         { return this->_len; }
 
         inline constexpr
-        jule::Int cap(void) const  
+        jule::Int cap(void) const
         { return this->_cap; }
 
-        inline jule::Bool empty(void) const  
+        inline jule::Bool empty(void) const
         { return !this->_slice || this->_len == 0 || this->_cap == 0; }
 
         void push(const Item &item)   {
@@ -218,7 +218,7 @@ namespace jule {
                 Item *_new{ new(std::nothrow) Item[this->_len+1] };
                 if (!_new)
                     jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
-                
+
                 for (jule::Int index{ 0 }; index < this->_len; ++index)
                     _new[index] = this->data.alloc[index];
                 _new[this->_len] = item;
@@ -249,15 +249,15 @@ namespace jule {
         }
 
         inline constexpr
-        jule::Bool operator!=(const jule::Slice<Item> &src) const  
+        jule::Bool operator!=(const jule::Slice<Item> &src) const
         { return !this->operator==(src); }
 
         inline constexpr
-        jule::Bool operator==(const std::nullptr_t) const  
+        jule::Bool operator==(const std::nullptr_t) const
         { return !this->_slice; }
 
         inline constexpr
-        jule::Bool operator!=(const std::nullptr_t) const  
+        jule::Bool operator!=(const std::nullptr_t) const
         { return !this->operator==(nullptr); }
 
         Item &operator[](const jule::Int &index) const {
@@ -290,7 +290,7 @@ namespace jule {
             this->_slice = src._slice;
         }
 
-        void operator=(const std::nullptr_t)  
+        void operator=(const std::nullptr_t)
         { this->dealloc(); }
 
         friend std::ostream &operator<<(std::ostream &stream,

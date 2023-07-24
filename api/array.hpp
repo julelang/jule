@@ -34,26 +34,26 @@ namespace jule {
                 this->buffer[index] = *(Item*)(src_begin+index);
         }
 
-        Array<Item, N>(const jule::Array<Item, N> &src)  
+        Array<Item, N>(const jule::Array<Item, N> &src)
         { this->buffer = src.buffer; }
 
         typedef Item       *Iterator;
         typedef const Item *ConstIterator;
 
         inline constexpr
-        Iterator begin(void)  
+        Iterator begin(void)
         { return this->buffer.begin(); }
 
         inline constexpr
-        ConstIterator begin(void) const  
+        ConstIterator begin(void) const
         { return this->buffer.begin(); }
 
         inline constexpr
-        Iterator end(void)  
+        Iterator end(void)
         { return this->buffer.end(); }
 
         inline constexpr
-        ConstIterator end(void) const  
+        ConstIterator end(void) const
         { return this->buffer.end(); }
 
         inline jule::Slice<Item> slice(const jule::Int &start,
@@ -74,26 +74,26 @@ namespace jule {
             return slice;
         }
 
-        inline jule::Slice<Item> slice(const jule::Int &start) const  
+        inline jule::Slice<Item> slice(const jule::Int &start) const
         { return this->slice(start, this->len()); }
 
-        inline jule::Slice<Item> slice(void) const  
+        inline jule::Slice<Item> slice(void) const
         { return this->slice(0, this->len()); }
 
         inline constexpr
-        jule::Int len(void) const  
+        jule::Int len(void) const
         { return N; }
 
         inline constexpr
-        jule::Bool empty(void) const  
+        jule::Bool empty(void) const
         { return N == 0; }
 
         inline constexpr
-        jule::Bool operator==(const jule::Array<Item, N> &src) const  
+        jule::Bool operator==(const jule::Array<Item, N> &src) const
         { return this->buffer == src.buffer; }
 
         inline constexpr
-        jule::Bool operator!=(const jule::Array<Item, N> &src) const  
+        jule::Bool operator!=(const jule::Array<Item, N> &src) const
         { return !this->operator==(src); }
 
         Item &operator[](const jule::Int &index) const {
