@@ -31,7 +31,7 @@ namespace jule {
     void setup_environment_variables(char **envp)  ;
     jule::Str executable(void)  ;
 
-    void setup_command_line_args(int argc, char *argv[])   {
+    void setup_command_line_args(int argc, char *argv[]) {
 #ifdef OS_WINDOWS
     const LPWSTR cmdl{ GetCommandLineW() };
     LPWSTR *argvw{ CommandLineToArgvW(cmdl, &argc) };
@@ -53,7 +53,7 @@ namespace jule {
 #endif
     }
 
-    jule::Str executable(void)   {
+    jule::Str executable(void) {
 #if defined(OS_DARWIN)
         char buff[PATH_MAX];
         uint32_t buff_size{ PATH_MAX };
@@ -75,7 +75,7 @@ namespace jule {
 #endif
     }
 
-    void setup_environment_variables(char **envp)   {
+    void setup_environment_variables(char **envp) {
 #ifdef OS_WINDOWS
     wchar_t *env_s{ GetEnvironmentStringsW() };
     wchar_t *np{ env_s };

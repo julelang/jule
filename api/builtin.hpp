@@ -42,7 +42,7 @@ namespace jule {
     inline jule::Bool real(const T &obj)  ;
 
     template<typename T>
-    inline void out(const T &obj)   {
+    inline void out(const T &obj) {
 #ifdef OS_WINDOWS
         const jule::Str str{ jule::to_str<T>(obj) };
         const jule::Slice<jule::U16> utf16_str{ jule::utf16_from_str(str) };
@@ -54,31 +54,30 @@ namespace jule {
     }
 
     template<typename T>
-    inline void outln(const T &obj)   {
+    inline void outln(const T &obj) {
         jule::out(obj);
         std::cout << std::endl;
     }
 
     template<typename Item>
     jule::Int copy(const jule::Slice<Item> &dest,
-                   const jule::Slice<Item> &src)   {
+                   const jule::Slice<Item> &src) {
         if (dest.empty() || src.empty())
             return 0;
 
-        jule::Int len{ dest.len() > src.len() ? src.len()
-                       : src.len() > dest.len() ? dest.len()
-                       : src.len()
+        const jule::Int len{ dest.len() > src.len() ? src.len()
+                            : src.len() > dest.len() ? dest.len()
+                            : src.len()
         };
 
-        for (jule::Int index{ 0 }; index < len; ++index)
-            dest._slice[index] = src._slice[index];
+        std::copy(src._slice, src._slice+len, dest._slice);
 
         return len;
     }
 
     template<typename Item>
     jule::Slice<Item> append(const jule::Slice<Item> &src,
-                             const jule::Slice<Item> &components)   {
+                             const jule::Slice<Item> &components) {
         if (src == nullptr && components == nullptr)
             return nullptr;
 
@@ -88,16 +87,20 @@ namespace jule {
             buffer._len = src._len+components._len;
             jule::copy<Item>(buffer, src);
 
-            for (jule::Int index{ 0 }; index < components._len; ++index)
-                buffer._slice[src._len+index] = components._slice[index];
+            std::copy(
+                components._slice,
+                components._slice+components._len,
+                buffer._slice+src._len);
 
             return buffer;
         }
 
         jule::Slice<Item> buffer{ src };
 
-        for (jule::Int index{ 0 }; index < components._len; ++index)
-            buffer._slice[buffer._len+index] = components._slice[index];
+        std::copy(
+            components._slice,
+            components._slice+components._len,
+            buffer._slice+buffer._len);
 
         buffer._len += components._len;
         return buffer;

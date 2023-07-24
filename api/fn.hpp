@@ -29,30 +29,30 @@ namespace jule {
         std::function<Function> buffer;
         jule::Uintptr _addr;
 
-        Fn<Function>(void)   {}
-        Fn<Function>(std::nullptr_t)   {}
+        Fn<Function>(void) {}
+        Fn<Function>(std::nullptr_t) {}
 
-        Fn<Function>(const std::function<Function> &function)   {
+        Fn<Function>(const std::function<Function> &function) {
             this->_addr = jule::addr_of_fn(function);
             if (this->_addr == 0)
                 this->_addr = (jule::Uintptr)(&function);
             this->buffer = function;
         }
 
-        Fn<Function>(const Function *function)   {
+        Fn<Function>(const Function *function) {
             this->buffer = function;
             this->_addr = jule::addr_of_fn(this->buffer);
             if (this->_addr == 0)
                 this->_addr = (jule::Uintptr)(function);
         }
 
-        Fn<Function>(const Fn<Function> &fn)   {
+        Fn<Function>(const Fn<Function> &fn) {
             this->buffer = fn.buffer;
             this->_addr = fn._addr;
         }
 
         template<typename ...Arguments>
-        auto operator()(Arguments... arguments)   {
+        auto operator()(Arguments... arguments) {
             if (this->buffer == nullptr)
                 jule::panic(jule::ERROR_INVALID_MEMORY);
             return this->buffer(arguments...);
@@ -83,14 +83,14 @@ namespace jule {
         { return !this->operator==(nullptr); }
 
         friend std::ostream &operator<<(std::ostream &stream,
-                                        const Fn<Function> &src)   {
+                                        const Fn<Function> &src) {
             stream << "<fn>";
             return stream;
         }
     };
 
     template<typename T, typename... U>
-    jule::Uintptr addr_of_fn(std::function<T(U...)> f)   {
+    jule::Uintptr addr_of_fn(std::function<T(U...)> f) {
         typedef T(FnType)(U...);
         FnType **fn_ptr{ f.template target<FnType*>() };
         if (!fn_ptr)

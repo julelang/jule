@@ -26,11 +26,11 @@ namespace jule {
         mutable jule::Ref<Mask> data{};
         const char *type_id { nullptr };
 
-        Trait<Mask>(void)   {}
-        Trait<Mask>(std::nullptr_t)   {}
+        Trait<Mask>(void) {}
+        Trait<Mask>(std::nullptr_t) {}
 
         template<typename T>
-        Trait<Mask>(const T &data)   {
+        Trait<Mask>(const T &data) {
             T *alloc{ new(std::nothrow) T };
             if (!alloc)
                 jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
@@ -45,7 +45,7 @@ namespace jule {
         }
 
         template<typename T>
-        Trait<Mask>(const jule::Ref<T> &ref)   {
+        Trait<Mask>(const jule::Ref<T> &ref) {
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
             this->data = jule::Ref<Mask>::make(static_cast<Mask*>(ref.alloc), nullptr);
 #else
@@ -62,33 +62,33 @@ namespace jule {
         void dealloc(void)
         { this->data.drop(); }
 
-        inline void must_ok(void) const   {
+        inline void must_ok(void) const {
             if (this->operator==(nullptr))
                 jule::panic(jule::ERROR_INVALID_MEMORY);
         }
 
         template<typename T>
-        inline jule::Bool type_is(void) const   {
+        inline jule::Bool type_is(void) const {
             if (this->operator==(nullptr))
                 return false;
 
             return std::strcmp(this->type_id, typeid(T).name()) == 0;
         }
 
-        inline Mask &get(void)   {
+        inline Mask &get(void) {
             this->must_ok();
             return this->data;
         }
 
-        inline Mask &get(void) const   {
+        inline Mask &get(void) const {
             this->must_ok();
             return this->data;
         }
 
-        ~Trait(void)   {}
+        ~Trait(void) {}
 
         template<typename T>
-        operator T(void)   {
+        operator T(void) {
             this->must_ok();
             if (std::strcmp(this->type_id, typeid(T).name()) != 0)
                 jule::panic(jule::ERROR_INCOMPATIBLE_TYPE);
@@ -96,7 +96,7 @@ namespace jule {
         }
 
         template<typename T>
-        operator jule::Ref<T>(void)   {
+        operator jule::Ref<T>(void) {
             this->must_ok();
             if (std::strcmp(this->type_id, typeid(jule::Ref<T>).name()) != 0)
                 jule::panic(jule::ERROR_INCOMPATIBLE_TYPE);
@@ -110,7 +110,7 @@ namespace jule {
         inline void operator=(const std::nullptr_t)
         { this->dealloc(); }
 
-        inline void operator=(const jule::Trait<Mask> &src)   {
+        inline void operator=(const jule::Trait<Mask> &src) {
             // Assignment to itself.
             if (this->data.alloc != nullptr && this->data.alloc == src.data.alloc)
                 return;

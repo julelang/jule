@@ -110,7 +110,7 @@ namespace jule {
 
 #endif
 
-    void set_sig_handler(void(*handler)(int _sig))   {
+    void set_sig_handler(void(*handler)(int _sig)) {
 #if defined(OS_WINDOWS)
 
     std::signal(jule::SIG_HUP, handler);
@@ -203,7 +203,7 @@ namespace jule {
 #endif
     }
 
-    void signal_handler(int signal)   {
+    void signal_handler(int signal) {
         jule::out("program terminated with signal: ");
         jule::outln(signal);
         std::exit(signal);

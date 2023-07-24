@@ -28,7 +28,7 @@ namespace jule {
         mutable jule::Int _len{ 0 };
         mutable jule::Int _cap{ 0 };
 
-        static jule::Slice<Item> alloc(const jule::Uint &len)   {
+        static jule::Slice<Item> alloc(const jule::Uint &len) {
             if (len < 0)
                 jule::panic("[]T: slice allocation length lower than zero");
 
@@ -37,7 +37,7 @@ namespace jule {
             return buffer;
         }
 
-        static jule::Slice<Item> alloc(const jule::Uint &len, const jule::Uint &cap)   {
+        static jule::Slice<Item> alloc(const jule::Uint &len, const jule::Uint &cap) {
             if (len < 0)
                 jule::panic("[]T: slice allocation length lower than zero");
             if (cap < 0)
@@ -50,7 +50,7 @@ namespace jule {
             return buffer;
         }
 
-        static jule::Slice<Item> alloc_def(const jule::Uint &len, const Item &def)   {
+        static jule::Slice<Item> alloc_def(const jule::Uint &len, const Item &def) {
             if (len < 0)
                 jule::panic("[]T: slice allocation length lower than zero");
 
@@ -60,7 +60,7 @@ namespace jule {
         }
 
         static jule::Slice<Item> alloc(const jule::Uint &len,
-            const jule::Uint &cap, const Item &def)   {
+            const jule::Uint &cap, const Item &def) {
             if (len < 0)
                 jule::panic("[]T: slice allocation length lower than zero");
             if (cap < 0)
@@ -73,13 +73,13 @@ namespace jule {
             return buffer;
         }
 
-        Slice<Item>(void)   {}
-        Slice<Item>(const std::nullptr_t)   {}
+        Slice<Item>(void) {}
+        Slice<Item>(const std::nullptr_t) {}
 
         Slice<Item>(const jule::Slice<Item>& src)
         { this->operator=(src); }
 
-        Slice<Item>(const std::initializer_list<Item> &src)   {
+        Slice<Item>(const std::initializer_list<Item> &src) {
             if (src.size() == 0)
                 return;
 
@@ -93,12 +93,12 @@ namespace jule {
         ~Slice<Item>(void)
         { this->dealloc(); }
 
-        inline void check(void) const   {
+        inline void check(void) const {
             if(this->operator==(nullptr))
                 jule::panic(jule::ERROR_INVALID_MEMORY);
         }
 
-        void dealloc(void)   {
+        void dealloc(void) {
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
             this->_len = 0;
             this->_cap = 0;
@@ -134,7 +134,7 @@ namespace jule {
         }
 
         void alloc_new(const jule::Int &len, const jule::Int &cap,
-            const Item &def)   {
+            const Item &def) {
             this->dealloc();
 
             Item *alloc{
@@ -179,7 +179,7 @@ namespace jule {
         { return &this->_slice[this->_len]; }
 
         inline Slice<Item> slice(const jule::Int &start,
-                                 const jule::Int &end) const   {
+                                 const jule::Int &end) const {
             this->check();
 
             if (start < 0 || end < 0 || start > end || end > this->cap()) {
@@ -213,14 +213,16 @@ namespace jule {
         inline jule::Bool empty(void) const
         { return !this->_slice || this->_len == 0 || this->_cap == 0; }
 
-        void push(const Item &item)   {
+        void push(const Item &item) {
             if (this->_len == this->_cap) {
                 Item *_new{ new(std::nothrow) Item[this->_len+1] };
                 if (!_new)
                     jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
 
-                for (jule::Int index{ 0 }; index < this->_len; ++index)
-                    _new[index] = this->data.alloc[index];
+                std::copy(
+                    this->data.alloc,
+                    this->data.alloc+this->_len,
+                    _new);
                 _new[this->_len] = item;
 
                 delete[] this->data.alloc;
@@ -236,7 +238,7 @@ namespace jule {
             ++this->_len;
         }
 
-        jule::Bool operator==(const jule::Slice<Item> &src) const   {
+        jule::Bool operator==(const jule::Slice<Item> &src) const {
             if (this->_len != src._len)
                 return false;
 
@@ -270,7 +272,7 @@ namespace jule {
             return this->_slice[index];
         }
 
-        void operator=(const jule::Slice<Item> &src)   {
+        void operator=(const jule::Slice<Item> &src) {
             // Assignment to itself.
             if (this->data.alloc != nullptr && this->data.alloc == src.data.alloc) {
                 this->_len = src._len;
@@ -294,7 +296,7 @@ namespace jule {
         { this->dealloc(); }
 
         friend std::ostream &operator<<(std::ostream &stream,
-                                        const jule::Slice<Item> &src)   {
+                                        const jule::Slice<Item> &src) {
             if (src.empty())
                 return stream << "[]";
 

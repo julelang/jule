@@ -33,14 +33,14 @@ namespace jule {
         mutable T *alloc{ nullptr };
         mutable jule::Uint *ref{ nullptr };
 
-        static jule::Ref<T> make(T *ptr, jule::Uint *ref)   {
+        static jule::Ref<T> make(T *ptr, jule::Uint *ref) {
             jule::Ref<T> buffer;
             buffer.alloc = ptr;
             buffer.ref = ref;
             return buffer;
         }
 
-        static jule::Ref<T> make(T *ptr)   {
+        static jule::Ref<T> make(T *ptr) {
             jule::Ref<T> buffer;
 
 #ifndef __JULE_DISABLE__REFERENCE_COUNTING
@@ -55,7 +55,7 @@ namespace jule {
             return buffer;
         }
 
-        static jule::Ref<T> make(const T &instance, jule::Uint *ref)   {
+        static jule::Ref<T> make(const T &instance, jule::Uint *ref) {
             jule::Ref<T> buffer;
 
             buffer.alloc = new (std::nothrow) T;
@@ -67,7 +67,7 @@ namespace jule {
             return buffer;
         }
 
-        static jule::Ref<T> make(const T &instance)   {
+        static jule::Ref<T> make(const T &instance) {
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
             return jule::Ref<T>::make(instance, nullptr);
 #else
@@ -80,7 +80,7 @@ namespace jule {
 #endif
         }
 
-        Ref<T>(void)   {}
+        Ref<T>(void) {}
 
         Ref<T> (const jule::Ref<T> &ref)
         { this->operator=(ref); }
@@ -88,26 +88,26 @@ namespace jule {
         ~Ref<T>(void)
         { this->drop(); }
 
-        inline jule::Int drop_ref(void) const   {
+        inline jule::Int drop_ref(void) const {
             return __jule_atomic_add_explicit(
                 this->ref,
                 -jule::REFERENCE_DELTA,
                 __JULE_ATOMIC_MEMORY_ORDER__RELAXED);
         }
 
-        inline jule::Int add_ref(void) const   {
+        inline jule::Int add_ref(void) const {
             return __jule_atomic_add_explicit(
                 this->ref,
                 jule::REFERENCE_DELTA,
                 __JULE_ATOMIC_MEMORY_ORDER__RELAXED);
         }
 
-        inline jule::Uint get_ref_n(void) const   {
+        inline jule::Uint get_ref_n(void) const {
             return __jule_atomic_load_explicit(
                 this->ref, __JULE_ATOMIC_MEMORY_ORDER__RELAXED);
         }
 
-        void drop(void) const   {
+        void drop(void) const {
             if (!this->ref) {
                 this->alloc = nullptr;
                 return;
@@ -129,17 +129,17 @@ namespace jule {
         inline jule::Bool real() const
         { return this->alloc != nullptr; }
 
-        inline T *operator->(void) const   {
+        inline T *operator->(void) const {
             this->must_ok();
             return this->alloc;
         }
 
-        inline operator T(void) const   {
+        inline operator T(void) const {
             this->must_ok();
             return *this->alloc;
         }
 
-        inline operator T&(void)   {
+        inline operator T&(void) {
             this->must_ok();
             return *this->alloc;
         }
@@ -147,12 +147,12 @@ namespace jule {
         inline T& get(void)
         { return this->operator T&(); }
 
-        inline void must_ok(void) const   {
+        inline void must_ok(void) const {
             if (!this->real())
                 jule::panic(jule::ERROR_INVALID_MEMORY);
         }
 
-        void operator=(const jule::Ref<T> &ref)   {
+        void operator=(const jule::Ref<T> &ref) {
             // Assignment to itself.
             if (this->alloc != nullptr && this->alloc == ref.alloc)
                 return;
@@ -166,7 +166,7 @@ namespace jule {
             this->alloc = ref.alloc;
         }
 
-        inline void operator=(const T &val) const   {
+        inline void operator=(const T &val) const {
             this->must_ok();
             *this->alloc = val;
         }
@@ -177,7 +177,7 @@ namespace jule {
         inline jule::Bool operator!=(const T &val) const
         { return !this->operator==(val); }
 
-        inline jule::Bool operator==(const jule::Ref<T> &ref) const   {
+        inline jule::Bool operator==(const jule::Ref<T> &ref) const {
             if (this->alloc == nullptr)
                 return ref.alloc == nullptr;
 
@@ -196,7 +196,7 @@ namespace jule {
 
         friend inline
         std::ostream &operator<<(std::ostream &stream,
-                                 const jule::Ref<T> &ref)   {
+                                 const jule::Ref<T> &ref) {
             if (!ref.real())
                 stream << "nil";
             else
@@ -210,7 +210,7 @@ namespace jule {
     { return jule::Ref<T>(); }
 
     template<typename T>
-    inline jule::Ref<T> new_ref(const T &init)   {
+    inline jule::Ref<T> new_ref(const T &init) {
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
         return jule::Ref<T>::make(init, nullptr);
 #else

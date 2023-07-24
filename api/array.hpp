@@ -26,12 +26,10 @@ namespace jule {
     public:
         mutable std::array<Item, N> buffer{};
 
-        Array<Item, N>(void)   {}
+        Array<Item, N>(void) {}
 
-        Array<Item, N>(const std::initializer_list<Item> &src)   {
-            const auto src_begin{ src.begin() };
-            for (jule::Int index{ 0 }; index < src.size(); ++index)
-                this->buffer[index] = *(Item*)(src_begin+index);
+        Array<Item, N>(const std::initializer_list<Item> &src) {
+            std::copy(src.begin(), src.begin()+src.size(), this->buffer.begin());
         }
 
         Array<Item, N>(const jule::Array<Item, N> &src)
@@ -57,7 +55,7 @@ namespace jule {
         { return this->buffer.end(); }
 
         inline jule::Slice<Item> slice(const jule::Int &start,
-                                       const jule::Int &end) const   {
+                                       const jule::Int &end) const {
             if (start < 0 || end < 0 || start > end || end > this->len()) {
                 std::stringstream sstream;
                 __JULEC_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(
@@ -115,7 +113,7 @@ namespace jule {
         }
 
         friend std::ostream &operator<<(std::ostream &stream,
-                                        const jule::Array<Item, N> &src)   {
+                                        const jule::Array<Item, N> &src) {
             stream << '[';
             for (jule::Int index{0}; index < src.len();) {
                 stream << src.buffer[index++];

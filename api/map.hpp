@@ -23,7 +23,7 @@ namespace jule {
 
     class MapKeyHasher {
     public:
-        size_t operator()(const jule::Str &key) const   {
+        size_t operator()(const jule::Str &key) const {
             size_t hash{ 0 };
             for (jule::Int i{ 0 }; i < key.len(); ++i)
                 hash += key[i] % 7;
@@ -40,10 +40,10 @@ namespace jule {
     public:
         mutable std::unordered_map<Key, Value, MapKeyHasher> buffer{};
 
-        Map<Key, Value>(void)   {}
-        Map<Key, Value>(const std::nullptr_t)   {}
+        Map<Key, Value>(void) {}
+        Map<Key, Value>(const std::nullptr_t) {}
 
-        Map<Key, Value>(const std::initializer_list<std::pair<Key, Value>> &src)   {
+        Map<Key, Value>(const std::initializer_list<std::pair<Key, Value>> &src) {
             for (const std::pair<Key, Value> &pair: src)
                 this->buffer.insert(pair);
         }
@@ -67,7 +67,7 @@ namespace jule {
         inline void clear(void)
         { this->buffer.clear(); }
 
-        jule::Slice<Key> keys(void) const   {
+        jule::Slice<Key> keys(void) const {
             jule::Slice<Key> keys(this->len());
             jule::Uint index{ 0 };
             for (const auto &pair: *this)
@@ -75,7 +75,7 @@ namespace jule {
             return keys;
         }
 
-        jule::Slice<Value> values(void) const   {
+        jule::Slice<Value> values(void) const {
             jule::Slice<Value> keys(this->len());
             jule::Uint index{ 0 };
             for (const auto &pair: *this)
@@ -106,7 +106,7 @@ namespace jule {
         { return this->buffer[key]; }
 
         friend std::ostream &operator<<(std::ostream &stream,
-                                        const Map<Key, Value> &src)   {
+                                        const Map<Key, Value> &src) {
             stream << '{';
             jule::Int length{ src.len() };
             for (const auto pair: src) {

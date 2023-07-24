@@ -86,7 +86,7 @@ namespace jule {
     };
 
     std::tuple<jule::I32, jule::Int>
-    utf8_decode_rune_str(const char *s, const jule::Int &len)   {
+    utf8_decode_rune_str(const char *s, const jule::Int &len) {
         if (len < 1)
             return std::make_tuple<jule::I32, jule::Int>(jule::UTF8_RUNE_ERROR, 0);
 
@@ -132,7 +132,7 @@ namespace jule {
                                 static_cast<jule::I32>(s3&jule::UTF8_MASKX), 4);
     }
 
-    jule::Slice<jule::U8> utf8_rune_to_bytes(const jule::I32 &r)   {
+    jule::Slice<jule::U8> utf8_rune_to_bytes(const jule::I32 &r) {
         if (static_cast<jule::U32>(r) <= jule::UTF8_RUNE1_MAX)
             return jule::Slice<jule::U8>({static_cast<jule::U8>(r)});
 
