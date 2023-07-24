@@ -1901,9 +1901,12 @@ impl Eval {
 		}
 
 		if !dynamic_annotation {
-			let ok = self.s.reload_fn_ins_types(f)
-			if !ok {
-				ret new(Data)
+			if !f.reloaded {
+				let ok = self.s.reload_fn_ins_types(f)
+				if !ok {
+					ret new(Data)
+				}
+				f.reloaded = true
 			}
 		} else {
 			self.s.build_fn_non_generic_type_kinds(f)
@@ -1929,7 +1932,7 @@ impl Eval {
 		}
 
 		let (is_unique_ins, pos) = f.decl.append_instance(f)
-		if pos != -1 {
+		if !is_unique_ins {
 			f = f.decl.instances[pos]
 		}
 
@@ -1943,6 +1946,7 @@ impl Eval {
 				if !ok {
 					ret new(Data)
 				}
+				f.reloaded = true
 			}
 
 			d.kind = f.result
