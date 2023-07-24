@@ -9,7 +9,7 @@ It contains the reference compiler, API and standard library.
 
 [Website](https://jule.dev) |
 [Manual](https://manual.jule.dev) |
-[Contributing](https://jule.dev/pages/contributing.html) |
+[Contributing](https://jule.dev/contribute) |
 [Community](https://github.com/julelang/jule/wiki#the-jule-community)
 
 </strong>
@@ -240,13 +240,13 @@ Thanks in advance for your contribution to Jule! \
 Every contribution, big or small, to Jule is greatly appreciated.
 
 The Jule project uses issues only for bug reports and proposals. \
-To contribute, please read the [contribution guidelines](https://jule.dev/pages/contributing.html). \
+To contribute, please read the [contribution guidelines](https://jule.dev/contribute). \
 For discussions and asking questions, please use [discussions](https://github.com/julelang/jule/discussions). \
 Regarding security, please refer to the [security policy](https://github.com/julelang/jule/security/policy).
 
 <h2 id="code-of-conduct">Code of Conduct</h2>
 
-[See Julenour Code of Conduct](https://jule.dev/pages/code_of_conduct.html)
+[See Julenour Code of Conduct](https://jule.dev/code-of-conduct)
 
 <h2 id="license">License</h2>
 
