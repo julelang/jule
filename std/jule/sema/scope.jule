@@ -1706,13 +1706,18 @@ impl ScopeChecker {
 		s.deferred = tree.deferred
 		s.unsafety = tree.unsafety
 
+		let errors = self.s.errors.len
+
 		self.tree = tree
 		self.scope = s
 
 		self.check_tree()
 
-		self.check_vars()
-		self.check_aliases()
+		// If we have new errors, don't check unused declarations.
+		if errors == self.s.errors.len {
+			self.check_vars()
+			self.check_aliases()
+		}
 
 		if self.is_root() {
 			self.check_gotos()
