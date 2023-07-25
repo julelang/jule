@@ -101,12 +101,12 @@ fn next_st_pos(tokens: []Token, start: int): (int, bool) {
 }
 
 // Returns current statement tokens.
-// Starts selection at *i.
-unsafe fn skip_st(mut i: *int, mut tokens: []Token): ([]Token, bool) {
-	let start = *i
+// Starts selection at i.
+fn skip_st(mut &i: int, mut tokens: []Token): ([]Token, bool) {
+	let start = i
 	let mut terminated = false
-	*i, terminated = next_st_pos(tokens, start)
-	let mut st_tokens = tokens[start:*i]
+	i, terminated = next_st_pos(tokens, start)
+	let mut st_tokens = tokens[start:i]
 	if terminated {
 		if st_tokens.len == 1 {
 			ret skip_st(i, tokens)
@@ -127,7 +127,7 @@ fn split_stms(mut tokens: []Token): []&Stmt {
 	let mut stms: []&Stmt = nil
 	let mut pos = 0
 	for pos < tokens.len {
-		let (mut tokens, terminated) = unsafe { skip_st(&pos, tokens) }
+		let (mut tokens, terminated) = skip_st(pos, tokens)
 		stms = append(stms, &Stmt{
 			tokens:     tokens,
 			terminated: terminated,
@@ -215,7 +215,7 @@ impl ScopeParser {
 		}
 
 		let mut i = st_tokens.len
-		let mut block_tokens = unsafe { range(&i, TokenKind.LBrace, TokenKind.RBrace, tokens) }
+		let mut block_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
 		if block_tokens == nil {
 			self.stop()
 			self.push_err(it.token, "body_not_exist")
@@ -292,7 +292,7 @@ impl ScopeParser {
 
 	fn setup_range_kind_keys_explicit(mut self, mut rng: &RangeKind, mut tokens: []Token) {
 		let mut i = 0
-		let mut rang = unsafe { range(&i, TokenKind.LParent, TokenKind.RParent, tokens) }
+		let mut rang = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
 		if i < tokens.len {
 			self.push_err(rng.in_token, "invalid_syntax")
 		}
@@ -369,7 +369,7 @@ impl ScopeParser {
 			it.kind = self.build_common_iter_kind(expr_tokens, it.token)
 		}
 		let mut i = expr_tokens.len
-		let mut scope_tokens = unsafe { range(&i, TokenKind.LBrace, TokenKind.RBrace, tokens) }
+		let mut scope_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
 		if scope_tokens == nil {
 			self.stop()
 			self.push_err(it.token, "body_not_exist")
@@ -423,30 +423,30 @@ impl ScopeParser {
 		ret cont
 	}
 
-	unsafe fn build_if(mut self, mut tokens: *[]Token): &If {
+	fn build_if(mut self, mut &tokens: []Token): &If {
 		let mut model = &If{
-			token: (*tokens)[0],
+			token: tokens[0],
 		}
-		*tokens = (*tokens)[1:]
-		let mut expr_tokens = get_block_expr(*tokens)
+		tokens = tokens[1:]
+		let mut expr_tokens = get_block_expr(tokens)
 		let mut i = 0
 		if expr_tokens.len == 0 {
 			self.push_err(model.token, "missing_expr")
 		} else {
 			i = expr_tokens.len
 		}
-		let mut scope_tokens = unsafe { range(&i, TokenKind.LBrace, TokenKind.RBrace, *tokens) }
+		let mut scope_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
 		if scope_tokens == nil {
 			self.stop()
 			self.push_err(model.token, "body_not_exist")
 			ret new(If)
 		}
-		if i < (*tokens).len {
-			if (*tokens)[i].id == TokenId.Else {
-				*tokens = (*tokens)[i:]
+		if i < tokens.len {
+			if tokens[i].id == TokenId.Else {
+				tokens = tokens[i:]
 			} else {
-				self.push_err((*tokens)[i], "invalid_syntax")
-				*tokens = nil
+				self.push_err(tokens[i], "invalid_syntax")
+				tokens = nil
 			}
 		}
 		model.expr = self.p.build_expr(expr_tokens)
@@ -460,7 +460,7 @@ impl ScopeParser {
 		}
 		tokens = tokens[1:] // Remove "else" keyword.
 		let mut i = 0
-		let mut scope_tokens = unsafe { range(&i, TokenKind.LBrace, TokenKind.RBrace, tokens) }
+		let mut scope_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
 		if scope_tokens == nil {
 			if i < tokens.len {
 				self.push_err(els.token, "else_have_expr")
@@ -479,7 +479,7 @@ impl ScopeParser {
 
 	fn build_if_else_chain(mut self, mut tokens: []Token): NodeData {
 		let mut chain = &Conditional{
-			head: unsafe { self.build_if(&tokens) },
+			head: self.build_if(tokens),
 		}
 		if !real(chain.head) {
 			ret nil
@@ -490,7 +490,7 @@ impl ScopeParser {
 			}
 			if tokens.len > 1 && tokens[1].id == TokenId.If {
 				tokens = tokens[1:] // Remove else token
-				let mut elif = unsafe { self.build_if(&tokens) }
+				let mut elif = self.build_if(tokens)
 				chain.tail = append(chain.tail, elif)
 				continue
 			}
@@ -558,7 +558,7 @@ impl ScopeParser {
 		ret tad
 	}
 
-	unsafe fn build_case_exprs(mut self, mut tokens: *[]Token, type_match: bool): []&Expr {
+	fn build_case_exprs(mut self, mut &tokens: []Token, type_match: bool): []&Expr {
 		let mut exprs: []&Expr = nil
 		let push_expr = fn(mut tokens: []Token, mut token: Token) {
 			if tokens.len > 0 {
@@ -582,7 +582,7 @@ impl ScopeParser {
 
 		let mut brace_n = 0
 		let mut j = 0
-		for (i, mut tok) in *tokens {
+		for (i, mut tok) in tokens {
 			if tok.id == TokenId.Range {
 				match tok.kind {
 				| str(TokenKind.LParent)
@@ -599,25 +599,25 @@ impl ScopeParser {
 			}
 			match {
 			| tok.id == TokenId.Op && tok.kind == str(TokenKind.Vline):
-				push_expr((*tokens)[j:i], tok)
+				push_expr(tokens[j:i], tok)
 				j = i + 1
 
 			| tok.id == TokenId.Colon:
-				push_expr((*tokens)[j:i], tok)
-				*tokens = (*tokens)[i+1:]
+				push_expr(tokens[j:i], tok)
+				tokens = tokens[i+1:]
 				ret exprs
 			}
 		}
-		self.push_err((*tokens)[0], "invalid_syntax")
-		*tokens = nil
+		self.push_err(tokens[0], "invalid_syntax")
+		tokens = nil
 		ret nil
 	}
 
-	unsafe fn build_case_scope(mut self, mut tokens: *[]Token): &ScopeTree {
+	fn build_case_scope(mut self, mut &tokens: []Token): &ScopeTree {
 		let mut n = 0
 		for {
 			let mut i = 0
-			let (mut next, _) = skip_st(&i, (*tokens)[n:])
+			let (mut next, _) = skip_st(i, tokens[n:])
 			if next.len == 0 {
 				break
 			}
@@ -626,20 +626,20 @@ impl ScopeParser {
 				n += next.len
 				continue
 			}
-			let mut scope = self.build_scope((*tokens)[:n])
-			*tokens = (*tokens)[n:]
+			let mut scope = self.build_scope(tokens[:n])
+			tokens = tokens[n:]
 			ret scope
 		}
-		let mut scope = self.build_scope(*tokens)
-		*tokens = nil
+		let mut scope = self.build_scope(tokens)
+		tokens = nil
 		ret scope
 	}
 
-	unsafe fn build_case(mut self, mut tokens: *[]Token, type_match: bool): (&Case, bool) {
+	fn build_case(mut self, mut &tokens: []Token, type_match: bool): (&Case, bool) {
 		let mut c = &Case{
-			token: (*tokens)[0], 
+			token: tokens[0],
 		}
-		*tokens = (*tokens)[1:] // Remove case prefix.
+		tokens = tokens[1:] // Remove case prefix.
 		c.exprs = self.build_case_exprs(tokens, type_match)
 		c.scope = self.build_case_scope(tokens)
 		let is_default = c.exprs.len == 0
@@ -661,7 +661,7 @@ impl ScopeParser {
 				self.push_err(tok, "invalid_syntax")
 				break
 			}
-			let (mut c, is_default) = unsafe { self.build_case(&tokens, type_match) }
+			let (mut c, is_default) = self.build_case(tokens, type_match)
 			if is_default {
 				c.token = tok
 				if !real(def) {
@@ -698,7 +698,7 @@ impl ScopeParser {
 		}
 
 		let mut i = expr_tokens.len
-		let mut block_toks = unsafe { range(&i, TokenKind.LBrace, TokenKind.RBrace, tokens) }
+		let mut block_toks = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
 		if block_toks == nil {
 			self.stop()
 			self.push_err(m.token, "body_not_exist")
@@ -739,7 +739,7 @@ impl ScopeParser {
 		}
 
 		let mut i = 0
-		let mut scope_tokens = unsafe { range(&i, TokenKind.LBrace, TokenKind.RBrace, tokens) }
+		let mut scope_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
 		if scope_tokens == nil {
 			self.push_err(token, "invalid_syntax")
 			ret new(ScopeTree)
@@ -891,7 +891,7 @@ impl ScopeParser {
 		}
 
 		let mut i = 0
-		let mut rang = unsafe { range(&i, TokenKind.LParent, TokenKind.RParent, tokens) }
+		let mut rang = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
 		if rang == nil {
 			self.push_err(token, "invalid_syntax")
 			ret new(AssignSt), false

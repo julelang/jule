@@ -45,7 +45,7 @@ pub fn to_rune(bytes: []byte): rune {
 	let mut r: rune = 0
 	if bytes[0] == '\\' && bytes.len > 1 {
 		let mut i = 0
-		r = unsafe { rune_from_esq_seq(bytes, &i) }
+		r = rune_from_esq_seq(bytes, i)
 	} else {
 		r, _ = decode_rune(bytes)
 	}
@@ -71,7 +71,7 @@ pub fn to_str(bytes: []byte): str {
 	for i < bytes.len {
 		let b = bytes[i]
 		if b == '\\' {
-			s += unsafe { str_esq_seq(bytes, &i) }
+			s += str_esq_seq(bytes, i)
 		} else {
 			let (r, size) = decode_rune(bytes[i:])
 			i += size
@@ -103,46 +103,46 @@ fn try_btoa_common_esq(bytes: []byte): (seq: byte, ok: bool) {
 	ret
 }
 
-unsafe fn rune_from_esq_seq(bytes: []byte, mut i: *int): rune {
-	let (b, ok) = try_btoa_common_esq(bytes[*i:])
-	*i++ // Skip escape sequence solidus.
+fn rune_from_esq_seq(bytes: []byte, mut &i: int): rune {
+	let (b, ok) = try_btoa_common_esq(bytes[i:])
+	i++ // Skip escape sequence solidus.
 	if ok {
-		*i++ // Skip sequence specifier.
+		i++ // Skip sequence specifier.
 		ret rune(b)
 	}
 
-	match bytes[*i] {
+	match bytes[i] {
 	| 'u':
 		const SEQ_LEN = 5
-		let (rc, _) = parse_uint(str(bytes[*i+1:*i+SEQ_LEN]), 16, 64)
-		*i += SEQ_LEN
+		let (rc, _) = parse_uint(str(bytes[i+1:i+SEQ_LEN]), 16, 64)
+		i += SEQ_LEN
 		let r = rune(rc)
 		ret r
 
 	| 'U':
 		const SEQ_LEN = 9
-		let (rc, _) = parse_uint(str(bytes[*i+1:*i+SEQ_LEN]), 16, 64)
-		*i += SEQ_LEN
+		let (rc, _) = parse_uint(str(bytes[i+1:i+SEQ_LEN]), 16, 64)
+		i += SEQ_LEN
 		let r = rune(rc)
 		ret r
 
 	| 'x':
 		const SEQ_LEN = 3
-		let seq = bytes[*i+1:*i+SEQ_LEN]
-		*i += SEQ_LEN
+		let seq = bytes[i+1:i+SEQ_LEN]
+		i += SEQ_LEN
 		let (b, _) = parse_uint(str(seq), 16, 64)
 		ret rune(b)
 
 	|:
 		const SEQ_LEN = 3
-		let seq = bytes[*i : *i+SEQ_LEN]
-		*i += SEQ_LEN
+		let seq = bytes[i : i+SEQ_LEN]
+		i += SEQ_LEN
 		let (b, _) = parse_uint(str(seq[1:]), 8, 64)
 		ret rune(b)
 	}
 }
 
-unsafe fn str_esq_seq(bytes: []byte, mut i: *int): str {
+fn str_esq_seq(bytes: []byte, mut &i: int): str {
 	let r = rune_from_esq_seq(bytes, i)
 	if r <= 255 {
 		ret str(r)

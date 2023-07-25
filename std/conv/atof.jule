@@ -315,7 +315,7 @@ impl Decimal {
 		ret
 	}
 
-	unsafe fn float_bits(mut self, flt: *FloatInfo): (b: u64, overflow: bool) {
+	fn float_bits(mut self, &flt: FloatInfo): (b: u64, overflow: bool) {
 		let mut exp: int = 0
 		let mut mant: u64 = 0
 
@@ -539,7 +539,7 @@ fn atof32exact(mantissa: u64, mut exp: int, mut neg: bool): (f: f32, ok: bool) {
 // and returns it as a f64.
 // The string s has already been parsed into a mantissa, exponent, and sign (neg==true for negative).
 // If trunc is true, trailing non-zero bits have been omitted from the mantissa.
-unsafe fn atof_hex(s: str, flt: *FloatInfo, mut mantissa: u64, mut exp: int, neg: bool, trunc: bool): (f64, ConvError) {
+fn atof_hex(s: str, &flt: FloatInfo, mut mantissa: u64, mut exp: int, neg: bool, trunc: bool): (f64, ConvError) {
 	let max_exp = 1<<flt.expbits + flt.bias - 2
 	let min_exp = flt.bias + 1
 	exp += int(flt.mantbits) // mantissa now implicitly divided by 2^mantbits.
@@ -598,13 +598,13 @@ unsafe fn atof_hex(s: str, flt: *FloatInfo, mut mantissa: u64, mut exp: int, neg
 	if neg {
 		bits |= 1 << flt.mantbits << flt.expbits
 	}
-	if *flt == F32_INFO {
+	if flt == F32_INFO {
 		ret f64(f32_from_bits(u32(bits))), err
 	}
 	ret f64_from_bits(bits), err
 }
 
-unsafe fn atof32(s: str): (f: f32, mut n: int, mut err: ConvError) {
+fn atof32(s: str): (f: f32, mut n: int, mut err: ConvError) {
 	{
 		let (val, _n, ok) = special(s)
 		if ok {
@@ -620,7 +620,7 @@ unsafe fn atof32(s: str): (f: f32, mut n: int, mut err: ConvError) {
 
 	if hex {
 		let mut ff: f64 = 0
-		ff, err = atof_hex(s[:n], &F32_INFO, mantissa, exp, neg, trunc)
+		ff, err = atof_hex(s[:n], F32_INFO, mantissa, exp, neg, trunc)
 		ret f32(ff), n, err
 	}
 
@@ -654,7 +654,7 @@ unsafe fn atof32(s: str): (f: f32, mut n: int, mut err: ConvError) {
 	if !d.set(s[:n]) {
 		ret 0, n, ConvError.InvalidSyntax
 	}
-	let (b, ovf) = d.float_bits(&F32_INFO)
+	let (b, ovf) = d.float_bits(F32_INFO)
 	f = f32_from_bits(u32(b))
 	if ovf {
 		err = ConvError.OutOfRange
@@ -662,7 +662,7 @@ unsafe fn atof32(s: str): (f: f32, mut n: int, mut err: ConvError) {
 	ret f, n, err
 }
 
-unsafe fn atof64(s: str): (mut f: f64, mut n: int, err: ConvError) {
+fn atof64(s: str): (mut f: f64, mut n: int, err: ConvError) {
 	{
 		let (val, _n, ok) = special(s)
 		if ok {
@@ -677,7 +677,7 @@ unsafe fn atof64(s: str): (mut f: f64, mut n: int, err: ConvError) {
 	}
 
 	if hex {
-		f, err = atof_hex(s[:n], &F64_INFO, mantissa, exp, neg, trunc)
+		f, err = atof_hex(s[:n], F64_INFO, mantissa, exp, neg, trunc)
 		ret f, n, err
 	}
 
@@ -711,7 +711,7 @@ unsafe fn atof64(s: str): (mut f: f64, mut n: int, err: ConvError) {
 	if !d.set(s[:n]) {
 		ret 0, n, ConvError.InvalidSyntax
 	}
-	let (b, ovf) = d.float_bits(&F64_INFO)
+	let (b, ovf) = d.float_bits(F64_INFO)
 	f = f64_from_bits(b)
 	if ovf {
 		err = ConvError.OutOfRange
@@ -719,7 +719,7 @@ unsafe fn atof64(s: str): (mut f: f64, mut n: int, err: ConvError) {
 	ret f, n, err
 }
 
-unsafe fn parse_float_prefix(s: str, bit_size: int): (f64, int, ConvError) {
+fn parse_float_prefix(s: str, bit_size: int): (f64, int, ConvError) {
 	if bit_size == 32 {
 		let (f, n, err) = atof32(s)
 		ret f64(f), n, err
@@ -752,7 +752,7 @@ unsafe fn parse_float_prefix(s: str, bit_size: int): (f64, int, ConvError) {
 // Recognizes the string "nan", and the (possibly signed) strings "inf" and "infinity"
 // as their respective special floating point values. It ignores case when matching.
 pub fn parse_float(s: str, bit_size: int): (f64, ConvError) {
-	let (f, n, err) = unsafe { parse_float_prefix(s, bit_size) }
+	let (f, n, err) = parse_float_prefix(s, bit_size)
 	if n != s.len && (err == ConvError.Ok || err != ConvError.InvalidSyntax) {
 		ret 0, ConvError.InvalidSyntax
 	}

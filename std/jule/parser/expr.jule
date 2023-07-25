@@ -515,7 +515,7 @@ impl ExprBuilder {
 			cast.kind = t
 
 			let mut i = 0
-			_ = unsafe { range(&i, TokenKind.LParent, TokenKind.RParent, expr_tokens) }
+			_ = range(i, TokenKind.LParent, TokenKind.RParent, expr_tokens)
 			if i < expr_tokens.len {
 				ret new(CastExpr)
 			}
@@ -527,12 +527,12 @@ impl ExprBuilder {
 		ret new(CastExpr)
 	}
 
-	unsafe fn push_arg(mut self, mut args: *[]&Expr, mut tokens: []Token, err_token: Token) {
+	fn push_arg(mut self, mut &args: []&Expr, mut tokens: []Token, err_token: Token) {
 		if tokens.len == 0 {
 			self.push_err(err_token, "invalid_syntax")
 			ret
 		}
-		*args = append(*args, self.build_from_tokens(tokens))
+		args = append(args, self.build_from_tokens(tokens))
 	}
 
 	fn build_args(mut self, mut tokens: []Token): []&Expr {
@@ -560,17 +560,17 @@ impl ExprBuilder {
 			if range_n > 0 || token.id != TokenId.Comma {
 				continue
 			}
-			unsafe { self.push_arg(&args, tokens[last:i], token) }
+			self.push_arg(args, tokens[last:i], token)
 			last = i + 1
 		}
 
 		if last < tokens.len {
 			if last == 0 {
 				if tokens.len > 0 {
-					unsafe { self.push_arg(&args, tokens[last:], tokens[last]) }
+					self.push_arg(args, tokens[last:], tokens[last])
 				}
 			} else {
-				unsafe { self.push_arg(&args, tokens[last:], tokens[last-1]) }
+				self.push_arg(args, tokens[last:], tokens[last-1])
 			}
 		}
 
@@ -639,7 +639,7 @@ impl ExprBuilder {
 		let mut token = tokens[0]
 		tokens = tokens[1:] // Remove unsafe keyword.
 		let mut i = 0
-		let mut range_tokens = unsafe { range(&i, TokenKind.LBrace, TokenKind.RBrace, tokens) }
+		let mut range_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
 		if range_tokens.len == 0 {
 			self.push_err(tokens[0], "missing_expr")
 			ret new(UnsafeExpr)
@@ -918,7 +918,7 @@ impl ExprBuilder {
 		// Map types like: [KEY:VALUE]
 		// Slicing expressions like: [START:TO]
 		let mut i = 0
-		let (mut slicing_tokens, colon) = unsafe { split_map_range(tokens, &i) }
+		let (mut slicing_tokens, colon) = split_map_range(tokens, i)
 		if colon != -1 {
 			ret self.build_slicing(expr_tokens, slicing_tokens, colon, error_token)
 		}

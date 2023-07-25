@@ -469,7 +469,7 @@ impl Lex {
 		ret nil
 	}
 
-	unsafe fn lex_line_comment(mut self, mut token: *Token) {
+	fn lex_line_comment(mut self, mut &token: Token) {
 		let start = self.pos
 		self.pos += 2
 
@@ -652,7 +652,7 @@ impl Lex {
 		self.column = 1
 	}
 
-	unsafe fn is_op(mut self, txt: []byte, kind: str, id: TokenId, mut t: *Token): bool {
+	fn is_op(mut self, txt: []byte, kind: str, id: TokenId, mut &t: Token): bool {
 		if !bytes_has_prefix(txt, kind) {
 			ret false
 		}
@@ -663,7 +663,7 @@ impl Lex {
 		ret true
 	}
 
-	unsafe fn lex_basic_ops(mut self, txt: []byte, mut tok: *Token): bool {
+	fn lex_basic_ops(mut self, txt: []byte, mut &tok: Token): bool {
 		for _, pair in BASIC_OPS {
 			if self.is_op(txt, str(pair.kind), pair.id, tok) {
 				ret true
@@ -673,7 +673,7 @@ impl Lex {
 		ret false
 	}
 
-	unsafe fn lex_id(mut self, txt: []byte, mut t: *Token): bool {
+	fn lex_id(mut self, txt: []byte, mut &t: Token): bool {
 		let lex = self.id(txt)
 		if lex == "" {
 			ret false
@@ -684,7 +684,7 @@ impl Lex {
 		ret true
 	}
 
-	unsafe fn lex_num(mut self, txt: []byte, mut t: *Token): bool {
+	fn lex_num(mut self, txt: []byte, mut &t: Token): bool {
 		let lex = self.num(txt)
 		if lex == "" {
 			ret false
@@ -710,7 +710,7 @@ impl Lex {
 
 		//* lex.Tokenenize
 		match {
-		| unsafe { self.lex_num(txt, &t) }:
+		| self.lex_num(txt, t):
 			// Pass.
 
 		| txt[0] == '\'':
@@ -724,23 +724,23 @@ impl Lex {
 			ret t
 
 		| bytes_has_prefix(txt, str(TokenKind.LnComment)):
-			unsafe { self.lex_line_comment(&t) }
+			self.lex_line_comment(t)
 			ret t
 
 		| bytes_has_prefix(txt, str(TokenKind.RangLComment)):
 			self.lex_range_comment()
 			ret t
 
-		| unsafe { self.is_op(txt, str(TokenKind.LParent), TokenId.Range, &t) }
-		| unsafe { self.is_op(txt, str(TokenKind.RParent), TokenId.Range, &t) }
-		| unsafe { self.is_op(txt, str(TokenKind.LBrace), TokenId.Range, &t) }
-		| unsafe { self.is_op(txt, str(TokenKind.RBrace), TokenId.Range, &t) }
-		| unsafe { self.is_op(txt, str(TokenKind.LBracket), TokenId.Range, &t) }
-		| unsafe { self.is_op(txt, str(TokenKind.RBracket), TokenId.Range, &t) }
-		| unsafe { self.lex_basic_ops(txt, &t) }:
+		| self.is_op(txt, str(TokenKind.LParent), TokenId.Range, t)
+		| self.is_op(txt, str(TokenKind.RParent), TokenId.Range, t)
+		| self.is_op(txt, str(TokenKind.LBrace), TokenId.Range, t)
+		| self.is_op(txt, str(TokenKind.RBrace), TokenId.Range, t)
+		| self.is_op(txt, str(TokenKind.LBracket), TokenId.Range, t)
+		| self.is_op(txt, str(TokenKind.RBracket), TokenId.Range, t)
+		| self.lex_basic_ops(txt, t):
 			// Pass.
 
-		| unsafe { self.lex_id(txt, &t) }:
+		| self.lex_id(txt, t):
 			for _, pair in KEYWORDS {
 				if str(pair.kind) == t.kind {
 					t.id = pair.id

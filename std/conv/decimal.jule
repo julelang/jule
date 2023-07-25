@@ -170,7 +170,7 @@ impl Decimal {
 			self.nd++
 		}
 		self.dp = self.nd
-		unsafe { trim(&self) }
+		trim(self)
 	}
 
 	// Binary shift left (k > 0) or right (k < 0).
@@ -180,16 +180,16 @@ impl Decimal {
 			// nothing to do: a == 0
 		| k > 0:
 			for k > max_shift {
-				unsafe { left_shift(&self, max_shift) }
+				left_shift(self, max_shift)
 				k -= max_shift
 			}
-			unsafe { left_shift(&self, uint(k)) }
+			left_shift(self, uint(k))
 		| k < 0:
 			for k < -max_shift {
-				unsafe { right_shift(&self, max_shift) }
+				right_shift(self, max_shift)
 				k += max_shift
 			}
-			unsafe { right_shift(&self, uint(-k)) }
+			right_shift(self, uint(-k))
 		}
 	}
 
@@ -199,7 +199,7 @@ impl Decimal {
 			ret
 		}
 		self.nd = nd
-		unsafe { trim(&self) }
+		trim(self)
 	}
 
 	// Round a up to nd digits (or fewer).
@@ -234,7 +234,7 @@ impl Decimal {
 		if nd < 0 || nd >= self.nd {
 			ret
 		}
-		if (unsafe { should_round_up(&self, nd) }) {
+		if should_round_up(self, nd) {
 			self.round_up(nd)
 		} else {
 			self.round_down(nd)
@@ -255,7 +255,7 @@ impl Decimal {
 		for i < self.dp; i++ {
 			n *= 10
 		}
-		if (unsafe { should_round_up(&self, self.dp) }) {
+		if should_round_up(self, self.dp) {
 			n++
 		}
 		ret n
@@ -272,7 +272,7 @@ fn digit_zero(mut dst: []byte): int {
 // Trailing zeros from number.
 // (They are meaningless; the decimal point is tracked
 // independent of the number of digits.)
-unsafe fn trim(mut a: *Decimal) {
+fn trim(mut &a: Decimal) {
 	for a.nd > 0 && a.d[a.nd-1] == '0' {
 		a.nd--
 	}
@@ -282,7 +282,7 @@ unsafe fn trim(mut a: *Decimal) {
 }
 
 // Binary shift right (/ 2) by k bits.  k <= maxShift to avoid overflow.
-unsafe fn right_shift(mut a: *Decimal, k: uint) {
+fn right_shift(mut &a: Decimal, k: uint) {
 	let mut r = 0 // read pointer
 	let mut w = 0 // write pointer
 
@@ -350,7 +350,7 @@ fn prefix_is_less_than(b: []byte, s: str): bool {
 }
 
 // Binary shift left (* 2) by k bits.  k <= maxShift to avoid overflow.
-unsafe fn left_shift(mut a: *Decimal, k: uint) {
+fn left_shift(mut &a: Decimal, k: uint) {
 	let mut delta = LEFTCHEATS[k].delta
 	if prefix_is_less_than(a.d[0:a.nd], LEFTCHEATS[k].cutoff) {
 		delta--
@@ -397,7 +397,7 @@ unsafe fn left_shift(mut a: *Decimal, k: uint) {
 }
 
 // If we chop a at nd digits, should we round up?
-unsafe fn should_round_up(a: *Decimal, nd: int): bool {
+fn should_round_up(&a: Decimal, nd: int): bool {
 	if nd < 0 || nd >= a.nd {
 		ret false
 	}

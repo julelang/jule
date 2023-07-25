@@ -68,26 +68,24 @@ fn make_err(row: int, col: int, f: &File, key: str, args: ...any): Log {
 // i points to close range token after selection.
 //
 // Special cases are:
-//  range(i, open, close, tokens) = nil if !real(i)
-//  range(i, open, close, tokens) = nil if i == nil
 //  range(i, open, close, tokens) = nil if i > tokens.len
 //  range(i, open, close, tokens) = nil if tokens[i].id != TokenId.Range
 //  range(i, open, close, tokens) = nil if tokens[i].kind != open
-unsafe fn range(mut i: *int, open: TokenKind, close: TokenKind, mut tokens: []Token): []Token {
-	if i == nil || *i >= tokens.len {
+fn range(mut &i: int, open: TokenKind, close: TokenKind, mut tokens: []Token): []Token {
+	if i >= tokens.len {
 		ret nil
 	}
 
-	let tok = tokens[*i]
+	let tok = tokens[i]
 	if tok.id != TokenId.Range || tok.kind != str(open) {
 		ret nil
 	}
 
-	*i++
+	i++
 	let mut range_n = 1
-	let start = *i
-	for range_n != 0 && *i < tokens.len; *i++ {
-		let token = tokens[*i]
+	let start = i
+	for range_n != 0 && i < tokens.len; i++ {
+		let token = tokens[i]
 		if token.id == TokenId.Range {
 			match token.kind {
 			| str(open): range_n++
@@ -96,7 +94,7 @@ unsafe fn range(mut i: *int, open: TokenKind, close: TokenKind, mut tokens: []To
 		}
 	}
 
-	ret tokens[start : *i-1]
+	ret tokens[start : i-1]
 }
 
 // Range_last returns last range from tokens.
@@ -546,9 +544,9 @@ impl Parser {
 		ret param
 	}
 
-	unsafe fn param_type_begin(mut self, mut param: &ParamDecl, mut i: *int, tokens: []Token) {
-		for *i < tokens.len; *i++ {
-			let token = tokens[*i]
+	fn param_type_begin(mut self, mut param: &ParamDecl, mut &i: int, tokens: []Token) {
+		for i < tokens.len; i++ {
+			let token = tokens[i]
 			if token.id != TokenId.Op {
 				ret
 			} else if token.kind != str(TokenKind.TripleDot) {
@@ -566,7 +564,7 @@ impl Parser {
 	fn build_param_type(mut &self, mut param: &ParamDecl, mut tokens: []Token, must_pure: bool) {
 		let mut i = 0
 		if !must_pure {
-			unsafe { self.param_type_begin(param, &i, tokens) }
+			self.param_type_begin(param, i, tokens)
 			if i >= tokens.len {
 				ret
 			}
@@ -698,16 +696,16 @@ impl Parser {
 		ret params
 	}
 
-	unsafe fn build_multi_ret_type(mut &self, mut tokens: []Token, mut i: *int): (t: &RetTypeDecl, ok: bool) {
+	fn build_multi_ret_type(mut &self, mut tokens: []Token, mut &i: int): (t: &RetTypeDecl, ok: bool) {
 		t = &RetTypeDecl{}
-		*i++
-		if *i >= tokens.len {
-			*i--
-			t.kind, ok = self.build_type(tokens, i, false)
+		i++
+		if i >= tokens.len {
+			i--
+			t.kind, ok = unsafe { self.build_type(tokens, &i, false) }
 			ret
 		}
 
-		*i-- // For point to parentheses - ( -
+		i-- // For point to parentheses - ( -
 		let mut range_tokens = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
 		let mut params = self.build_params(range_tokens, false, true)
 
@@ -737,13 +735,13 @@ impl Parser {
 		ret
 	}
 
-	unsafe fn build_ret_type(mut &self, mut tokens: []Token, mut i: *int): (t: &RetTypeDecl, ok: bool) {
+	fn build_ret_type(mut &self, mut tokens: []Token, mut &i: int): (t: &RetTypeDecl, ok: bool) {
 		t = &RetTypeDecl{}
-		if *i >= tokens.len {
+		if i >= tokens.len {
 			ret
 		}
 
-		let mut token = tokens[*i]
+		let mut token = tokens[i]
 		match token.id {
 		| TokenId.Range:
 			if token.kind == str(TokenKind.LBrace) {
@@ -756,13 +754,13 @@ impl Parser {
 			}
 
 		| TokenId.Colon:
-			if *i+1 >= tokens.len {
+			if i+1 >= tokens.len {
 				self.push_err(token, "missing_type")
 				ret
 			}
 
-			*i++
-			token = tokens[*i]
+			i++
+			token = tokens[i]
 			if token.id == TokenId.Range {
 				match token.kind {
 				| str(TokenKind.LParent):
@@ -773,44 +771,44 @@ impl Parser {
 					ret
 				}
 			}
-			t.kind, ok = self.build_type(tokens, i, true)
+			t.kind, ok = unsafe { self.build_type(tokens, &i, true) }
 			ret
 		}
-		*i++
+		i++
 		self.push_err(token, "invalid_syntax")
 		ret
 	}
 
-	unsafe fn build_fn_prototype(mut &self, mut tokens: []Token, mut i: *int, method: bool, anon: bool): &FnDecl {
+	fn build_fn_prototype(mut &self, mut tokens: []Token, mut &i: int, method: bool, anon: bool): &FnDecl {
 		let mut f = &FnDecl{
-			token: tokens[*i],
+			token: tokens[i],
 		}
 
 		// Detect static keyword.
 		if f.token.id == TokenId.Static {
 			f.statically = true
-			*i++
-			if *i >= tokens.len {
+			i++
+			if i >= tokens.len {
 				self.push_err(f.token, "invalid_syntax")
 				ret new(FnDecl)
 			}
-			f.token = tokens[*i]
+			f.token = tokens[i]
 		}
 
 		// Detect unsafe keyword.
 		if f.token.id == TokenId.Unsafe {
 			f.unsafety = true
-			*i++
-			if *i >= tokens.len {
+			i++
+			if i >= tokens.len {
 				self.push_err(f.token, "invalid_syntax")
 				ret new(FnDecl)
 			}
-			f.token = tokens[*i]
+			f.token = tokens[i]
 		}
 
 		// Skips fn token.
-		*i++
-		if *i >= tokens.len {
+		i++
+		if i >= tokens.len {
 			self.push_err(f.token, "invalid_syntax")
 			ret new(FnDecl)
 		}
@@ -818,28 +816,28 @@ impl Parser {
 		if anon {
 			f.ident = str(Ident.Anon)
 		} else {
-			let tok = tokens[*i]
+			let tok = tokens[i]
 			if tok.id != TokenId.Ident {
 				self.push_err(tok, "invalid_syntax")
 				ret new(FnDecl)
 			}
 			f.ident = tok.kind
-			*i++
+			i++
 		}
 
-		if *i >= tokens.len {
+		if i >= tokens.len {
 			self.push_err(f.token, "invalid_syntax")
 			ret new(FnDecl)
 		}
 
-		let error_token = tokens[*i]
+		let error_token = tokens[i]
 		let mut generics_tokens = range(i, TokenKind.LBracket, TokenKind.RBracket, tokens)
 		if generics_tokens != nil {
 			f.generics = self.build_generics(generics_tokens, error_token)
 		}
 
-		if tokens[*i].kind != str(TokenKind.LParent) {
-			self.push_err(tokens[*i], "missing_function_parentheses")
+		if tokens[i].kind != str(TokenKind.LParent) {
+			self.push_err(tokens[i], "missing_function_parentheses")
 			ret new(FnDecl)
 		}
 
@@ -854,7 +852,7 @@ impl Parser {
 
 	fn build_fn(mut &self, mut tokens: []Token, method: bool, anon: bool, prototype: bool): &FnDecl {
 		let mut i = 0
-		let mut f = unsafe { self.build_fn_prototype(tokens, &i, method, anon) }
+		let mut f = self.build_fn_prototype(tokens, i, method, anon)
 		if prototype {
 			if i < tokens.len {
 				self.push_err(tokens[i+1], "invalid_syntax")
@@ -869,7 +867,7 @@ impl Parser {
 			self.push_err(f.token, "body_not_exist")
 			ret new(FnDecl)
 		}
-		let mut block_tokens = unsafe { range(&i, TokenKind.LBrace, TokenKind.RBrace, tokens) }
+		let mut block_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
 		if block_tokens != nil {
 			f.scope = self.build_scope(block_tokens)
 			f.scope.unsafety = f.unsafety
@@ -886,7 +884,7 @@ impl Parser {
 
 	fn get_use_decl_selectors(mut self, mut tokens: []Token): []Token {
 		let mut i = 0
-		tokens = unsafe { range(&i, TokenKind.LBrace, TokenKind.RBrace, tokens) }
+		tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
 		let (mut parts, errs) = parts(tokens, TokenId.Comma, true)
 		if errs.len > 0 {
 			self.errors = append(self.errors, errs...)
@@ -1190,7 +1188,7 @@ impl Parser {
 		} else {
 			drop(e.kind)
 		}
-		let mut item_tokens = unsafe { range(&i, TokenKind.LBrace, TokenKind.RBrace, tokens) }
+		let mut item_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
 		if item_tokens == nil {
 			self.stop()
 			self.push_err(e.token, "body_not_exist")
@@ -1284,7 +1282,7 @@ impl Parser {
 		s.ident = s.token.kind
 
 		let error_token = tokens[i]
-		let mut generics_tokens = unsafe { range(&i, TokenKind.LBracket, TokenKind.RBracket, tokens) }
+		let mut generics_tokens = range(i, TokenKind.LBracket, TokenKind.RBracket, tokens)
 		if generics_tokens != nil {
 			s.generics = self.build_generics(generics_tokens, error_token)
 		}
@@ -1293,7 +1291,7 @@ impl Parser {
 			ret s
 		}
 
-		let mut body_tokens = unsafe { range(&i, TokenKind.LBrace, TokenKind.RBrace, tokens) }
+		let mut body_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
 		if body_tokens == nil {
 			self.stop()
 			self.push_err(s.token, "body_not_exist")
@@ -1361,7 +1359,7 @@ impl Parser {
 		}
 		t.ident = t.token.kind
 		let mut i = 2
-		let mut body_tokens = unsafe { range(&i, TokenKind.LBrace, TokenKind.RBrace, tokens) }
+		let mut body_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
 		if body_tokens == nil {
 			self.stop()
 			self.push_err(t.token, "body_not_exist")
@@ -1591,7 +1589,7 @@ impl Parser {
 		tokens = tokens[4:] // Remove prefix tokens.
 	body:
 		let mut i = 0
-		let mut body_tokens = unsafe { range(&i, TokenKind.LBrace, TokenKind.RBrace, tokens) }
+		let mut body_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
 		if body_tokens == nil {
 			self.stop()
 			self.push_err(ipl.base, "body_not_exist")

@@ -46,7 +46,7 @@ use std::math::bits::{len32, len64, trailing_zeros64, add64, mul64}
 // sharing the same rounding guarantees.
 
 // Formats mant*(2^exp) with prec decimal digits.
-unsafe fn ryu_ftoa_fixed32(mut d: *DecimalSlice, mut mant: u32, exp: int, prec: int) {
+fn ryu_ftoa_fixed32(mut &d: DecimalSlice, mut mant: u32, exp: int, prec: int) {
 	if prec < 0 {
 		panic("ryu_ftoa_fixed32 called with negative prec")
 	}
@@ -120,7 +120,7 @@ unsafe fn ryu_ftoa_fixed32(mut d: *DecimalSlice, mut mant: u32, exp: int, prec: 
 }
 
 // Formats mant*(2^exp) with prec decimal digits.
-unsafe fn ryu_ftoa_fixed64(mut d: *DecimalSlice, mut mant: u64, exp: int, prec: int) {
+fn ryu_ftoa_fixed64(mut &d: DecimalSlice, mut mant: u64, exp: int, prec: int) {
 	if prec > 18 {
 		panic("ryu_ftoa_fixed64 called with prec > 18")
 	}
@@ -201,7 +201,7 @@ static U64_POW10: [...]u64 = [
 // Fills d with at most prec decimal digits
 // of mantissa m. The boolean trunc indicates whether m
 // is truncated compared to the original number being formatted.
-unsafe fn format_decimal(mut d: *DecimalSlice, mut m: u64, mut trunc: bool, mut round_up: bool, prec: int) {
+fn format_decimal(mut &d: DecimalSlice, mut m: u64, mut trunc: bool, mut round_up: bool, prec: int) {
 	let max = U64_POW10[prec]
 	let mut trimmed = 0
 	for m >= max {
@@ -262,7 +262,7 @@ unsafe fn format_decimal(mut d: *DecimalSlice, mut m: u64, mut trunc: bool, mut 
 }
 
 // Formats mant*2^exp with prec decimal digits.
-unsafe fn ryu_ftoa_shortest(mut d: *DecimalSlice, mut mant: u64, exp: int, flt: *FloatInfo) {
+fn ryu_ftoa_shortest(mut &d: DecimalSlice, mut mant: u64, exp: int, &flt: FloatInfo) {
 	if mant == 0 {
 		d.nd, d.dp = 0, 0
 		ret
@@ -290,7 +290,7 @@ unsafe fn ryu_ftoa_shortest(mut d: *DecimalSlice, mut mant: u64, exp: int, flt: 
 	let mut dl0 = false
 	let mut dc0 = false
 	let mut du0 = false
-	if *flt == F32_INFO {
+	if flt == F32_INFO {
 		let mut dl32: u32 = 0
 		let mut dc32: u32 = 0
 		let mut du32: u32 = 0
@@ -398,8 +398,8 @@ fn mul_by_log10_log2(x: int): int {
 // Returns a floating-point vector (l, c, u)×2^e2
 // where the mantissas are 55-bit (or 26-bit) integers, describing the interval
 // represented by the input f64 or f32.
-unsafe fn compute_bounds(mant: u64, exp: int,
-						flt: *FloatInfo): (lower: u64, central: u64, upper: u64, e2: int) {
+fn compute_bounds(mant: u64, exp: int,
+				&flt: FloatInfo): (lower: u64, central: u64, upper: u64, e2: int) {
 	if mant != 1<<flt.mantbits || exp == flt.bias+1-int(flt.mantbits) {
 		// regular case (or denormals)
 		lower, central, upper = 2*mant-1, 2*mant, 2*mant+1
@@ -412,7 +412,7 @@ unsafe fn compute_bounds(mant: u64, exp: int,
 	ret
 }
 
-unsafe fn ryu_digits(mut d: *DecimalSlice, lower: u64, central: u64, upper: u64, mut c0: bool, mut cup: bool) {
+fn ryu_digits(mut &d: DecimalSlice, lower: u64, central: u64, upper: u64, mut c0: bool, mut cup: bool) {
 	let (mut lhi, llo) = divmod1e9(lower)
 	let (chi, clo) = divmod1e9(central)
 	let (uhi, ulo) = divmod1e9(upper)
@@ -457,8 +457,8 @@ unsafe fn ryu_digits(mut d: *DecimalSlice, lower: u64, central: u64, upper: u64,
 }
 
 // Emits decimal digits for a number less than 1e9.
-unsafe fn ryu_digits32(mut d: *DecimalSlice, mut lower: u32, mut central: u32,
-					mut upper: u32, mut c0: bool, mut cup: bool, mut endindex: int) {
+fn ryu_digits32(mut &d: DecimalSlice, mut lower: u32, mut central: u32,
+				mut upper: u32, mut c0: bool, mut cup: bool, mut endindex: int) {
 	if upper == 0 {
 		d.dp = endindex + 1
 		ret

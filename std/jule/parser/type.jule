@@ -31,12 +31,12 @@ fn build_prim_type(mut token: Token): &TypeDecl {
 // Returns colon index and range tokens.
 // Returns nil slice and -1 if not found.
 // Starts search at *i.
-unsafe fn split_map_range(mut tokens: []Token, mut i: *int): (range_tokens: []Token, colon: int) {
+fn split_map_range(mut tokens: []Token, mut &i: int): (range_tokens: []Token, colon: int) {
 	colon = -1
 	let mut range_n = 0
-	let start = *i
-	for *i < tokens.len; *i++ {
-		let token = tokens[*i]
+	let start = i
+	for i < tokens.len; i++ {
+		let token = tokens[i]
 		if token.id == TokenId.Range {
 			match token.kind {
 			| str(TokenKind.LBrace)
@@ -51,16 +51,16 @@ unsafe fn split_map_range(mut tokens: []Token, mut i: *int): (range_tokens: []To
 		}
 
 		if range_n == 0 {
-			if start+1 > *i {
+			if start+1 > i {
 				ret
 			}
-			range_tokens = tokens[start+1 : *i]
+			range_tokens = tokens[start+1 : i]
 			break
 		} else if range_n != 1 {
 			continue
 		}
 		if colon == -1 && token.id == TokenId.Colon {
-			colon = *i - start - 1
+			colon = i - start - 1
 		}
 	}
 	ret
@@ -197,7 +197,7 @@ impl TypeBuilder {
 
 	unsafe fn build_fn(mut self): &TypeDecl {
 		let mut token = self.tokens[*self.i]
-		let mut f = unsafe { self.p.build_fn_prototype(self.tokens, self.i, false, true) }
+		let mut f = self.p.build_fn_prototype(self.tokens, *self.i, false, true)
 		if !real(f) {
 			ret new(TypeDecl)
 		}
@@ -377,7 +377,7 @@ impl TypeBuilder {
 		}
 
 		*self.i-- // Point to left bracket for range parsing of split_colon.
-		let (mut map_tokens, colon) = split_map_range(self.tokens, self.i)
+		let (mut map_tokens, colon) = split_map_range(self.tokens, *self.i)
 		*self.i++
 		if colon == -1 {
 			ret self.build_arr()

@@ -61,7 +61,7 @@ fn is_dead(mut ref: any): (dead: bool) {
 	checking = append(checking, ref)
 	defer {
 		current = old
-		unsafe { drop_ref(&checking, len) }
+		drop_ref(checking, len)
 		if dead {
 			deads = append(deads, ref)
 		}
@@ -76,8 +76,8 @@ fn is_dead(mut ref: any): (dead: bool) {
 	}
 }
 
-unsafe fn drop_ref(mut refs: *[]any, pos: int) {
-	*refs = (*refs)[:pos]
+fn drop_ref(mut &refs: []any, pos: int) {
+	refs = refs[:pos]
 	/*
 	if pos == (*refs).len {
 		ret
@@ -154,7 +154,7 @@ fn is_trait_dead(mut t: &Trait): bool {
 	ret true
 }
 
-unsafe fn eliminate_dead_functions(mut funcs: *Vector[&Fn]) {
+fn eliminate_dead_functions(mut &funcs: Vector[&Fn]) {
 	let mut i = 0
 	for i < funcs.len() {
 		let mut f = funcs.at(i)
@@ -184,7 +184,7 @@ fn eliminate_dead_globals(mut pkg: &Package) {
 
 fn eliminate_dead_functions_package(mut pkg: &Package) {
 	for (_, mut f) in pkg.files {
-		unsafe { eliminate_dead_functions(&f.funcs) }
+		eliminate_dead_functions(f.funcs)
 	}
 }
 
@@ -200,7 +200,7 @@ fn eliminate_dead_structs(mut pkg: &Package) {
 				// This is safe.
 				// Because methods marked as not-global and
 				// not-global functions are not removed.
-				unsafe { eliminate_dead_functions(&s.methods) }
+				eliminate_dead_functions(s.methods)
 				i++
 			}
 		}
