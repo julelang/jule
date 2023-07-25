@@ -1,0 +1,31 @@
+name: Build (Linux)
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Get latest IR
+        run: |
+          curl -o ./ir.cpp https://raw.githubusercontent.com/julelang/julec-ir/main/src/linux-amd64.cpp
+
+      - name: Compile Latest JuleC IR
+        run: |
+          mkdir ./bin
+          clang++ -O0 --std=c++17 -Wno-everything -o ./bin/julec ./ir.cpp
+          git update-index --add --chmod=-x ./bin/julec
+          chmod +x ./bin/julec
+          
+      - name: JuleC Version
+        run: |
+          ./bin/julec version
+
+      - name: Build JuleC
+        run: |
+          ./bin/julec -t ./src/julec
+          clang++ -O0 --std=c++17 -Wno-everything -o ./bin/julec ./dist/ir.cpp
+          git update-index --add --chmod=-x ./bin/julec
+          chmod +x ./bin/julec
