@@ -678,9 +678,13 @@ impl Eval {
 
 		v.used = true
 
-		let ok = self.check_illegal_cycles(v, error_token)
-		if !ok {
-			ret new(Data)
+		// Check cycles for global scope.
+		match type self.lookup {
+		| &Sema:
+			let ok = self.check_illegal_cycles(v, error_token)
+			if !ok {
+				ret new(Data)
+			}
 		}
 
 		self.push_reference_to_var(v)
@@ -721,7 +725,8 @@ impl Eval {
 		if real(d.kind.fnc()) {
 			let mut f = d.kind.fnc()
 			if real(f.decl) {
-				// Ignore identifier for non-anonymous (because has an identifier via variable).
+				// Ignore identifier for non-anonymous
+				// (because has an identifier via variable).
 				f.decl.ident = v.ident
 			}
 		}
@@ -1871,10 +1876,27 @@ impl Eval {
 		ret d
 	}
 
+	fn check_fn_of_concurrent_call(mut self, &f: &FnIns, error_token: Token) {
+		if self.is_unsafe() {
+			ret
+		}
+
+		for _, p in f.params {
+			if p.decl.reference {
+				self.push_err(error_token, "concurrent_call_with_reference_parameter")
+				ret
+			}
+		}
+	}
+
 	fn call_fn(mut &self, mut fc: &FnCallExpr, mut d: &Data): &Data {
 		let mut f = d.kind.fnc()
 		if f.is_builtin() {
 			ret self.call_builtin_fn(fc, d)
+		}
+
+		if fc.concurrent {
+			self.check_fn_of_concurrent_call(f, fc.token)
 		}
 
 		if !d.mutable && f.decl.is_method() && !f.decl.statically && f.decl.params[0].mutable {

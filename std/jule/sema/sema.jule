@@ -934,8 +934,25 @@ impl Sema {
 			self.push_err(error_token, "assignment_non_mut_to_mut")
 		}
 		if left_ref {
-			if !d.lvalue {
-				self.push_err(error_token, "reference_assign_non_lvalue")
+			match type d.model {
+			| &Var
+			| &TraitSubIdentExprModel
+			| &CommonIdentExprModel
+			| &StructSubIdentExprModel
+			| &CommonSubIdentExprModel:
+				// Pass
+
+			| &UnaryExprModel:
+				let unary = (&UnaryExprModel)(d.model)
+				if unary.op == str(TokenKind.Star) {
+					// Pointer dereference, pass
+					break
+				}
+
+				fall
+
+			|:
+				self.push_err(error_token, "reference_assign_non_var")
 			}
 			if left_mut && !d.mutable {
 				self.push_err(error_token, "mut_reference_points_to_immut")
@@ -1511,6 +1528,7 @@ impl Sema {
 		if !decl.cpp_linked && !decl.constant && !decl.statically {
 			self.push_err(decl.token, "global_not_static")
 		}
+
 		self.check_var_decl(decl, self)
 	}
 
