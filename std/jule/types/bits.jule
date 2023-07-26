@@ -6,28 +6,10 @@ use std::conv::{ConvError, parse_int, parse_uint, parse_float}
 
 type BitChecker: fn(v: str, base: int, bit: int): bool
 
-// Bit-size of runtime architecture.
-// Possible values are: 32, and 64.
-pub const BIT_SIZE = 32 << (^uint(0) >> 63)
-
-// Signed integer kind of runtime architecture.
-// Is equavalent to "int", but specific bit-sized integer kind.
-// Accept as constant.
-//
-// Setted by initializer function.
-pub static SYS_INT: str = ""
-
-// Unsigned integer kind of runtime architecture.
-// Is equavalent to "uint" and "uintptr", but specific bit-sized integer kind.
-// Accept as constant.
-//
-// Setted by initializer function.
-pub static SYS_UINT: str = ""
-
 fn check_bit(v: str, bit: int, checker: BitChecker): bool {
 	match {
-	| v == "":    ret false
-	| v.len == 1: ret true
+	| v == "":            ret false
+	| v.len == 1:         ret true
 	| v.has_prefix("0x"): ret checker(v[2:], 0b00010000, bit) // Hexadecimal
 	| v.has_prefix("0b"): ret checker(v[2:], 0b10, bit)       // Binary
 	| v.has_prefix("0o"): ret checker(v[2:], 0b1000, bit)     // Octal
@@ -185,21 +167,5 @@ pub fn bitsize_of_uint(x: u64): u64 {
 	| x <= MAX_U16: ret 0b00010000
 	| x <= MAX_U32: ret 0b00100000
 	|:              ret 0b01000000
-	}
-}
-
-fn init() {
-	match BIT_SIZE {
-	| 0b00100000:
-		unsafe {
-			*(&SYS_INT) = str(TypeKind.I32)
-			*(&SYS_UINT) = str(TypeKind.U32)
-		}
-
-	| 0b01000000:
-		unsafe {
-			*(&SYS_INT) = str(TypeKind.I64)
-			*(&SYS_UINT) = str(TypeKind.U64)
-		}
 	}
 }
