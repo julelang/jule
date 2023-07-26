@@ -676,12 +676,25 @@ impl Eval {
 
 		v.used = true
 
-		// Check cycles for global scope.
 		match type self.lookup {
 		| &Sema:
+			// Check cycles for global scope.
 			let ok = self.check_illegal_cycles(v, error_token)
 			if !ok {
 				ret new(Data)
+			}
+
+		| &ScopeChecker:
+			if !v.reference || self.is_unsafe() {
+				break
+			}
+
+			let mut s = (&ScopeChecker)(self.lookup)
+			for !real(s.owner) && real(s.parent) {
+				s = s.parent
+			}
+			if real(s.owner) && s.owner.anon && &v.scope != &s.owner.scope {
+				self.push_err(error_token, "used_ref_in_anon_fn_from_parent_scope", v.ident)
 			}
 		}
 
