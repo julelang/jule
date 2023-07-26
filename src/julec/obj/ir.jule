@@ -21,32 +21,44 @@ pub struct IR {
 }
 
 impl IR {
+	fn append_structs(self, mut p: &Package, mut &buffer: []&Struct) {
+		for (_, mut f) in p.files {
+			let mut i = 0
+			for i < f.structs.len(); i++ {
+				let mut s = f.structs.at(i)
+				if !s.cpp_linked {
+					buffer = append(buffer, s)
+				}
+			}
+		}
+	}
+
 	// Returns all structures of main package and used pakcages.
 	// Ignores cpp-linked declarations.
 	pub fn get_all_structures(mut self): []&Struct {
 		let mut buffer: []&Struct = nil
 
-		let append_structs = fn(mut p: &Package) {
-			for (_, mut f) in p.files {
-				let mut i = 0
-				for i < f.structs.len(); i++ {
-					let mut s = f.structs.at(i)
-					if !s.cpp_linked {
-						buffer = append(buffer, s)
-					}
-				}
-			}
-		}
-
-		append_structs(self.main)
+		self.append_structs(self.main, buffer)
 
 		for (_, mut u) in self.used {
 			if !u.cpp_linked {
-				append_structs(u.package)
+				self.append_structs(u.package, buffer)
 			}
 		}
 
 		ret buffer
+	}
+
+	fn append_vars(self, mut p: &Package, mut &buffer: []&Var) {
+		for (_, mut f) in p.files {
+			let mut i = 0
+			for i < f.vars.len(); i++ {
+				let mut v = f.vars.at(i)
+				if !v.cpp_linked {
+					buffer = append(buffer, v)
+				}
+			}
+		}
 	}
 
 	// Returns all variables of main package and used pakcages.
@@ -54,23 +66,11 @@ impl IR {
 	pub fn get_all_variables(mut self): []&Var {
 		let mut buffer: []&Var = nil
 
-		let append_vars = fn(mut p: &Package) {
-			for (_, mut f) in p.files {
-				let mut i = 0
-				for i < f.vars.len(); i++ {
-					let mut v = f.vars.at(i)
-					if !v.cpp_linked {
-						buffer = append(buffer, v)
-					}
-				}
-			}
-		}
-
-		append_vars(self.main)
+		self.append_vars(self.main, buffer)
 
 		for (_, mut u) in self.used {
 			if !u.cpp_linked {
-				append_vars(u.package)
+				self.append_vars(u.package, buffer)
 			}
 		}
 
@@ -78,33 +78,32 @@ impl IR {
 	}
 }
 
-fn get_all_unique_passes(mut pkg: &Package, mut uses: []&ImportInfo): []str {
-	let mut passes: []str = nil
-	let push_passes = fn(mut p: &Package) {
-		for (_, mut f) in p.files {
-			let mut i = 0
-		push:
-			for i < f.passes.len(); i++ {
-				let mut pass = f.passes.at(i)
-				if pass.text == "" {
-					continue
-				}
-
-				for _, cpass in passes {
-					if cpass == pass.text {
-						continue push
-					}
-				}
-
-				passes = append(passes, pass.text)
+fn push_passes(mut p: &Package, mut &passes: []str) {
+	for (_, mut f) in p.files {
+		let mut i = 0
+	push:
+		for i < f.passes.len(); i++ {
+			let mut pass = f.passes.at(i)
+			if pass.text == "" {
+				continue
 			}
+			for _, cpass in passes {
+				if cpass == pass.text {
+					continue push
+				}
+			}
+			passes = append(passes, pass.text)
 		}
 	}
+}
 
-	push_passes(pkg)
+fn get_all_unique_passes(mut pkg: &Package, mut uses: []&ImportInfo): []str {
+	let mut passes: []str = nil
+
+	push_passes(pkg, passes)
 	for (_, mut u) in uses {
 		if !u.cpp_linked {
-			push_passes(u.package)
+			push_passes(u.package, passes)
 		}
 	}
 

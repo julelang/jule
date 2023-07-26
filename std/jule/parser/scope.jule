@@ -558,27 +558,31 @@ impl ScopeParser {
 		ret tad
 	}
 
+	fn push_case_expr(mut self, mut tokens: []Token, mut token: Token,
+		type_match: bool, mut &exprs: []&Expr) {
+		if tokens.len == 0 {
+			ret
+		}
+
+		if type_match {
+			let mut i = 0
+			let (mut t, ok) = unsafe { self.p.build_type(tokens, &i, true) }
+			if ok {
+				exprs = append(exprs, &Expr{
+					token: token,
+					kind:  t,
+				})
+			}
+			if i < tokens.len {
+				self.push_err(tokens[i], "invalid_syntax")
+			}
+			ret
+		}
+		exprs = append(exprs, self.p.build_expr(tokens))
+	}
+
 	fn build_case_exprs(mut self, mut &tokens: []Token, type_match: bool): []&Expr {
 		let mut exprs: []&Expr = nil
-		let push_expr = fn(mut tokens: []Token, mut token: Token) {
-			if tokens.len > 0 {
-				if type_match {
-					let mut i = 0
-					let (mut t, ok) = unsafe { self.p.build_type(tokens, &i, true) }
-					if ok {
-						exprs = append(exprs, &Expr{
-							token: token,
-							kind:  t,
-						})
-					}
-					if i < tokens.len {
-						self.push_err(tokens[i], "invalid_syntax")
-					}
-					ret
-				}
-				exprs = append(exprs, self.p.build_expr(tokens))
-			}
-		}
 
 		let mut brace_n = 0
 		let mut j = 0
@@ -599,11 +603,11 @@ impl ScopeParser {
 			}
 			match {
 			| tok.id == TokenId.Op && tok.kind == str(TokenKind.Vline):
-				push_expr(tokens[j:i], tok)
+				self.push_case_expr(tokens[j:i], tok, type_match, exprs)
 				j = i + 1
 
 			| tok.id == TokenId.Colon:
-				push_expr(tokens[j:i], tok)
+				self.push_case_expr(tokens[j:i], tok, type_match, exprs)
 				tokens = tokens[i+1:]
 				ret exprs
 			}

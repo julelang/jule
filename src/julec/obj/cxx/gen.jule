@@ -856,30 +856,30 @@ fn gen_fns(mut ir: &IR): str {
 	ret obj
 }
 
-// Generated C++ code of all initializer functions.
-fn gen_init_caller(mut ir: &IR): str {
+fn push_init(mut pkg: &Package, mut &obj: str) {
 	const INDENTION = "\t"
 
+	const CPP_LINKED = false
+	let f = pkg.find_fn(INIT_FN, CPP_LINKED)
+	if !real(f) {
+		ret
+	}
+
+	obj += "\n" + INDENTION + fn_out_ident(f) + "();"
+}
+
+// Generated C++ code of all initializer functions.
+fn gen_init_caller(mut ir: &IR): str {
 	let mut obj = "void "
 	obj += INIT_CALLER_IDENT
 	obj += "(void) {"
 
-	let push_init = fn(mut pkg: &Package) {
-		const CPP_LINKED = false
-		let f = pkg.find_fn(INIT_FN, CPP_LINKED)
-		if !real(f) {
-			ret
-		}
-
-		obj += "\n" + INDENTION + fn_out_ident(f) + "();"
-	}
-
 	for (_, mut u) in ir.used {
 		if !u.cpp_linked {
-			push_init(u.package)
+			push_init(u.package, obj)
 		}
 	}
-	push_init(ir.main)
+	push_init(ir.main, obj)
 
 	obj += "\n}"
 	ret obj

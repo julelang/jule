@@ -188,6 +188,15 @@ fn parts(mut tokens: []Token, id: TokenId, expr_must: bool): ([][]Token, []Log) 
 	ret parts, errors
 }
 
+fn get_close_kind_of_brace(left: str): str {
+	match left {
+		| str(TokenKind.RParent):  ret str(TokenKind.LParent)
+		| str(TokenKind.RBrace):   ret str(TokenKind.LBrace)
+		| str(TokenKind.RBracket): ret str(TokenKind.LBracket)
+		|:                         ret ""
+	}
+}
+
 fn compiler_err(token: Token, key: str, args: ...any): Log {
 	ret Log{
 		kind:   LogKind.Error,
@@ -1834,56 +1843,47 @@ impl Parser {
 		}
 	}
 
+	fn remove_range(self, mut i: int, kind: str, &tokens: []Token, mut &ranges: []int) {
+		let close = get_close_kind_of_brace(kind)
+		for i >= 0; i-- {
+			let tok = tokens[ranges[i]]
+			if tok.kind != close {
+				continue
+			}
+
+			ranges = append(ranges[:i], ranges[i+1:]...)
+			break
+		}
+	}
+
+	fn push_wrong_order_close_err(mut self, t: Token, &tokens: []Token, &ranges: []int) {
+		let mut msg = ""
+		match tokens[ranges[ranges.len-1]].kind {
+		| str(TokenKind.LParent):  msg = "expected_parentheses_close"
+		| str(TokenKind.LBrace):   msg = "expected_brace_close"
+		| str(TokenKind.LBracket): msg = "expected_bracket_close"
+		}
+
+		self.push_err(t, msg)
+	}
+
+	fn push_range_close(mut self, t: Token, left: str, &tokens: []Token, mut &ranges: []int) {
+		let n = ranges.len
+		if n == 0 {
+			match t.kind {
+			| str(TokenKind.RBracket): self.push_err(t, "extra_closed_brackets")
+			| str(TokenKind.RBrace):   self.push_err(t, "extra_closed_braces")
+			| str(TokenKind.RParent):  self.push_err(t, "extra_closed_parentheses")
+			}
+			ret
+		} else if tokens[ranges[n-1]].kind != left {
+			self.push_wrong_order_close_err(t, tokens, ranges)
+		}
+		self.remove_range(n-1, t.kind, tokens, ranges)
+	}
+
 	fn check_ranges(mut self, tokens: []Token) {
 		let mut ranges: []int = nil
-
-		let get_close_kind_of_brace = fn(left: str): str {
-			match left {
-			| str(TokenKind.RParent):  ret str(TokenKind.LParent)
-			| str(TokenKind.RBrace):   ret str(TokenKind.LBrace)
-			| str(TokenKind.RBracket): ret str(TokenKind.LBracket)
-			|:                         ret ""
-			}
-		}
-
-		let remove_range = fn(mut i: int, kind: str) {
-			let close = get_close_kind_of_brace(kind)
-			for i >= 0; i-- {
-				let tok = tokens[ranges[i]]
-				if tok.kind != close {
-					continue
-				}
-
-				ranges = append(ranges[:i], ranges[i+1:]...)
-				break
-			}
-		}
-
-		let push_wrong_order_close_err = fn(t: Token) {
-			let mut msg = ""
-			match tokens[ranges[ranges.len-1]].kind {
-			| str(TokenKind.LParent):  msg = "expected_parentheses_close"
-			| str(TokenKind.LBrace):   msg = "expected_brace_close"
-			| str(TokenKind.LBracket): msg = "expected_bracket_close"
-			}
-
-			self.push_err(t, msg)
-		}
-
-		let push_range_close = fn(t: Token, left: str) {
-			let n = ranges.len
-			if n == 0 {
-				match t.kind {
-				| str(TokenKind.RBracket): self.push_err(t, "extra_closed_brackets")
-				| str(TokenKind.RBrace):   self.push_err(t, "extra_closed_braces")
-				| str(TokenKind.RParent):  self.push_err(t, "extra_closed_parentheses")
-				}
-				ret
-			} else if tokens[ranges[n-1]].kind != left {
-				push_wrong_order_close_err(t)
-			}
-			remove_range(n-1, t.kind)
-		}
 
 		for i, token in tokens {
 			if token.id != TokenId.Range {
@@ -1897,13 +1897,13 @@ impl Parser {
 				ranges = append(ranges, i)
 
 			| str(TokenKind.RParent):
-				push_range_close(token, str(TokenKind.LParent))
+				self.push_range_close(token, str(TokenKind.LParent), tokens, ranges)
 
 			| str(TokenKind.RBrace):
-				push_range_close(token, str(TokenKind.LBrace))
+				self.push_range_close(token, str(TokenKind.LBrace), tokens, ranges)
 
 			| str(TokenKind.RBracket):
-				push_range_close(token, str(TokenKind.LBracket))
+				self.push_range_close(token, str(TokenKind.LBracket), tokens, ranges)
 			}
 		}
 

@@ -670,6 +670,15 @@ impl ExprBuilder {
 		}
 	}
 
+	fn push_range_lit_part(mut self, mut part: []Token,
+		error_token: Token, mut &parts: [][]Token) {
+		if part.len == 0 {
+			self.push_err(error_token, "invalid_syntax")
+			ret
+		}
+		parts = append(parts, part)
+	}
+
 	// Tokens should include brace tokens.
 	fn get_brace_range_lit_expr_parts(mut self, mut tokens: []Token): [][]Token {
 		// No part.
@@ -678,14 +687,6 @@ impl ExprBuilder {
 		}
 
 		let mut parts: [][]Token = nil
-
-		let push = fn(mut part: []Token, error_token: Token) {
-			if part.len == 0 {
-				self.push_err(error_token, "invalid_syntax")
-				ret
-			}
-			parts = append(parts, part)
-		}
 
 		let mut last = 0
 		let mut range_n = 0
@@ -705,17 +706,17 @@ impl ExprBuilder {
 			if range_n > 0 || token.id != TokenId.Comma {
 				continue
 			}
-			push(tokens[last:i], token)
+			self.push_range_lit_part(tokens[last:i], token, parts)
 			last = i + 1
 		}
 
 		if last < tokens.len {
 			if last == 0 {
 				if tokens.len > 0 {
-					push(tokens[last:], tokens[last])
+					self.push_range_lit_part(tokens[last:], tokens[last], parts)
 				}
 			} else {
-				push(tokens[last:], tokens[last-1])
+				self.push_range_lit_part(tokens[last:], tokens[last-1], parts)
 			}
 		}
 

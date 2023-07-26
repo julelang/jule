@@ -343,7 +343,7 @@ impl Kind for Tuple {
 		if !real(tup) {
 			ret false
 		}
-		
+
 		if self.types.len != tup.types.len {
 			ret false
 		}
@@ -553,6 +553,34 @@ fn build_prim_type(kind: str): &Prim {
 	}
 }
 
+fn get_struct_from_kind(mut k: &TypeKind): &Struct {
+	match {
+	| !real(k):
+		ret new(Struct)
+
+	| real(k.strct()):
+		ret k.strct().decl
+
+	| real(k.ref()):
+		ret get_struct_from_kind(k.ref().elem)
+
+	| real(k.slc()):
+		ret get_struct_from_kind(k.slc().elem)
+
+	| real(k.arr()):
+		ret get_struct_from_kind(k.arr().elem)
+
+	| real(k.ptr()):
+		// Pass pointers.
+		// Cloning just copies pointer address.
+		// There is no any illegal cycle risk.
+		ret new(Struct)
+
+	|:
+		ret new(Struct)
+	}
+}
+
 // Reports whether kind is primitive type.
 fn is_prim(kind: str): bool {
 	ret (
@@ -632,6 +660,59 @@ impl TypeChecker {
 		ret build_prim_type(decl.ident)
 	}
 
+	fn push_cycle_error(self, def1: any, def2: any, mut &message: str) {
+		const PADDING = 4
+
+		let get_ident = fn(&def: any): str {
+			match type def {
+			| &TypeAlias: ret (&TypeAlias)(def).ident
+			| &Struct:    ret (&Struct)(def).ident
+			| &Enum:      ret (&Enum)(def).ident
+			|:            ret ""
+			}
+		}
+
+		let def1_ident = get_ident(def1)
+		let def2_ident = get_ident(def2)
+		let refers_to = errorf("refers_to", def1_ident, def2_ident)
+		message = str_repeat(" ", PADDING) + refers_to + "\n" + message
+	}
+
+	fn check_cross_cycle(self, decl: any, mut &message: str): bool {
+		match type decl {
+		| &TypeAlias:
+			let ta = (&TypeAlias)(decl)
+			for _, d in ta.refers {
+				if d == self.referencer.owner {
+					self.push_cycle_error(ta, d, message)
+					ret false
+				}
+
+				if !self.check_cross_cycle(d, message) {
+					self.push_cycle_error(ta, d, message)
+					ret false
+				}
+			}
+
+		| &Struct:
+			let s = (&Struct)(decl)
+			for _, d in s.depends {
+				if self.referencer.owner == d {
+					self.push_cycle_error(s, d, message)
+					ret false
+				}
+
+				if !self.check_cross_cycle(d, message) {
+					self.push_cycle_error(s, d, message)
+					ret false
+				}
+			}
+
+		}
+
+		ret true
+	}
+
 	// Checks type alias illegal cycles.
 	// Appends reference to reference if there is no illegal cycle.
 	// Returns true if self.referencer is nil reference.
@@ -640,91 +721,36 @@ impl TypeChecker {
 		if !real(self.referencer) {
 			ret true
 		}
-	
+
 		match type decl {
 		| &Struct:
 			if self.not_plain {
 				ret true
 			}
 		}
-	
+
 		// Check illegal cycle for itself.
 		// Because refers's owner is ta.
 		if self.referencer.owner == decl {
 			self.push_err(ident.token, "illegal_cycle_refers_itself", self.referencer.ident)
 			ret false
 		}
-	
-		const PADDING = 4
-	
+
 		let mut message = ""
-	
-		let push = fn(def1: any, def2: any) {
-			let get_ident = fn(def: any): str {
-				match type def {
-				| &TypeAlias: ret (&TypeAlias)(def).ident
-				| &Struct:    ret (&Struct)(def).ident
-				| &Enum:      ret (&Enum)(def).ident
-				|:            ret ""
-				}
-			}
-	
-			let def1_ident = get_ident(def1)
-			let def2_ident = get_ident(def2)
-			let refers_to = errorf("refers_to", def1_ident, def2_ident)
-			message = str_repeat(" ", PADDING) + refers_to + "\n" + message
-		}
-	
-		// Check cross illegal cycle.
-		let mut check_cross: fn(decl: any): bool = nil
-		check_cross = fn(decl: any): bool {
-			match type decl {
-			| &TypeAlias:
-				let ta = (&TypeAlias)(decl)
-				for _, d in ta.refers {
-					if d == self.referencer.owner {
-						push(ta, d)
-						ret false
-					}
-	
-					if !check_cross(d) {
-						push(ta, d)
-						ret false
-					}
-				}
-	
-			| &Struct:
-				let s = (&Struct)(decl)
-				for _, d in s.depends {
-					if self.referencer.owner == d {
-						push(s, d)
-						ret false
-					}
-	
-					if !check_cross(d) {
-						push(s, d)
-						ret false
-					}
-				}
-	
-			}
-	
-			ret true
-		}
-	
-		if !check_cross(decl) {
+
+		if !self.check_cross_cycle(decl, message) {
 			let mut err_msg = message
 			message = ""
-			push(self.referencer.owner, decl)
+			self.push_cycle_error(self.referencer.owner, decl, message)
 			err_msg = err_msg + message
 			self.push_err(ident.token, "illegal_cross_cycle", err_msg)
 			ret false
 		}
-	
+
 		match type self.referencer.owner {
 		| &TypeAlias:
 			unsafe { *self.referencer.refs = append(*self.referencer.refs, decl) }
-	
+
 		| &Struct:
 			match type decl {
 			| &Struct:
@@ -732,7 +758,7 @@ impl TypeChecker {
 				s.depends = append(s.depends, (&Struct)(decl))
 			}
 		}
-	
+
 		ret true
 	}
 

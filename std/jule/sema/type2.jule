@@ -563,6 +563,14 @@ impl DynamicTypeAnnotation {
 		ret self.annotate_kind(slc.elem)
 	}
 
+	unsafe fn check_map_key(mut self, mut k: **TypeKind, mut ck: &TypeKind): (ok: bool) {
+		let mut old = self.k
+		self.k = k
+		ok = self.annotate_kind(ck)
+		self.k = old
+		ret ok
+	}
+
 	unsafe fn annotate_map(mut self, mut k: &TypeKind): (ok: bool) {
 		let mut pmap = (*self.k).map()
 		if !real(pmap) {
@@ -570,17 +578,10 @@ impl DynamicTypeAnnotation {
 		}
 
 		let mut m = k.map()
-		let check = fn(mut k: **TypeKind, mut ck: &TypeKind): (ok: bool) {
-			let mut old = self.k
-			self.k = k
-			ok = self.annotate_kind(ck)
-			self.k = old
-			ret ok
-		}
 
 		let mut key = &pmap.key
 		let mut val = &pmap.val
-		ret check(&key, m.key) && check(&val, m.val)
+		ret self.check_map_key(&key, m.key) && self.check_map_key(&val, m.val)
 	}
 
 	unsafe fn annotate_fn(mut self, mut k: &TypeKind): (ok: bool) {

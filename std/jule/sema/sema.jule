@@ -552,26 +552,26 @@ impl Sema {
 		ret false
 	}
 
+	fn get_import_def(self, ident: str, mut &imp: &ImportInfo): any {
+		if find_package_builtin_def(imp.link_path, ident) != nil {
+			ret true
+		}
+
+		for (_, mut f) in imp.package.files {
+			const CPP_LINKED = false // C++-linked defines can't export.
+			let mut def = f.def_by_ident(ident, CPP_LINKED)
+			if def != nil {
+				ret def
+			}
+		}
+
+		ret nil
+	}
+
 	fn check_import_selections(mut self, mut imp: &ImportInfo) {
 		// Set file to any package file for accessibility checking.
 		self.set_current_file(self.files[0])
 		defer { drop(self.file) } // Reset file.
-
-		let get_def = fn(ident: str): any {
-			if find_package_builtin_def(imp.link_path, ident) != nil {
-				ret true
-			}
-
-			for (_, mut f) in imp.package.files {
-				const CPP_LINKED = false // C++-linked defines can't export.
-				let mut def = f.def_by_ident(ident, CPP_LINKED)
-				if def != nil {
-					ret def
-				}
-			}
-
-			ret nil
-		}
 
 		for _, ident in imp.selected {
 			if ident.kind == str(TokenKind.Self) {
@@ -583,7 +583,7 @@ impl Sema {
 				continue
 			}
 
-			let mut def = get_def(ident.kind)
+			let mut def = self.get_import_def(ident.kind, imp)
 			match type def {
 			| bool:
 				// Pass, built-in.
@@ -1697,35 +1697,30 @@ impl Sema {
 		ret
 	}
 
-	fn check_struct_derive_illegal_cycles(mut self, derive: str, st1: &Struct, mut k: &TypeKind): (ok: bool) {
-		let mut get_struct_from_kind: fn(mut _: &TypeKind): &Struct = nil
-		get_struct_from_kind = fn(mut k: &TypeKind): &Struct {
-			match {
-			| !real(k):
-				ret new(Struct)
+	fn push_cycle_error(self, st1: &Struct, st2: &Struct, mut &message: str) {
+		const PADDING = 4
 
-			| real(k.strct()):
-				ret k.strct().decl
+		let refers_to = errorf("refers_to", st1.ident, st2.ident)
+		message = str_repeat(" ", PADDING) + refers_to + "\n" + message
+	}
 
-			| real(k.ref()):
-				ret get_struct_from_kind(k.ref().elem)
+	fn check_cross_cycle(self, st1: &Struct, st2: &Struct, mut &message: str): bool {
+		for _, u in st2.uses {
+			if &u == &st1 {
+				self.push_cycle_error(st2, u, message)
+				ret false
+			}
 
-			| real(k.slc()):
-				ret get_struct_from_kind(k.slc().elem)
-
-			| real(k.arr()):
-				ret get_struct_from_kind(k.arr().elem)
-
-			| real(k.ptr()):
-				// Pass pointers.
-				// Cloning just copies pointer address.
-				// There is no any illegal cycle risk.
-				ret new(Struct)
-
-			|:
-				ret new(Struct)
+			if !self.check_cross_cycle(st1, u, message) {
+				self.push_cycle_error(st2, u, message)
+				ret false
 			}
 		}
+
+		ret true
+	}
+
+	fn check_struct_derive_illegal_cycles(mut self, derive: str, st1: &Struct, mut k: &TypeKind): (ok: bool) {
 		let mut st2 = get_struct_from_kind(k)
 		if !real(st2) {
 			ret true
@@ -1738,37 +1733,12 @@ impl Sema {
 			ret false
 		}
 
-		const PADDING = 4
-
 		let mut message = ""
 
-		let push = fn(st1: &Struct, st2: &Struct) {
-			let refers_to = errorf("refers_to", st1.ident, st2.ident)
-			message = str_repeat(" ", PADDING) + refers_to + "\n" + message
-		}
-
-		// Check cross illegal cycle.
-		let mut check_cross: fn(st2: &Struct): bool = nil
-		check_cross = fn(st2: &Struct): bool {
-			for _, u in st2.uses {
-				if u == st1 {
-					push(st2, u)
-					ret false
-				}
-
-				if !check_cross(u) {
-					push(st2, u)
-					ret false
-				}
-			}
-
-			ret true
-		}
-
-		if !check_cross(st2) {
+		if !self.check_cross_cycle(st1, st2, message) {
 			let mut err_msg = message
 			message = ""
-			push(st1, st2)
+			self.push_cycle_error(st1, st2, message)
 			err_msg = err_msg + message
 			self.push_err(st1.token, "derive_illegal_cross_cycle", derive, err_msg)
 			ret false

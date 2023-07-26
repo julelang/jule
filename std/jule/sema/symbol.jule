@@ -488,26 +488,29 @@ impl SymbolBuilder {
 		ret path.replace(str(SEPARATOR), str(TokenKind.DblColon), -1)
 	}
 
-	fn push_cross_cycle_error(mut &self, target: &SymbolBuilder, imp: &ImportInfo, error_token: Token) {
+	fn push_cycle_error(mut &self, sb: &SymbolBuilder, path: str, mut &message: str) {
 		const PADDING = 4
 
+		let refers_to = errorf(
+			"refers_to",
+			self.get_as_link_path(sb.table.file.dir()),
+			self.get_as_link_path(path))
+		message = str_repeat(" ", PADDING) + refers_to + "\n" + message
+	}
+
+	fn push_cross_cycle_error(mut &self, target: &SymbolBuilder, imp: &ImportInfo, error_token: Token) {
 		let mut message = ""
 
-		let push = fn(sb: &SymbolBuilder, path: str) {
-			let refers_to = errorf("refers_to", self.get_as_link_path(sb.table.file.dir()), self.get_as_link_path(path))
-			message = str_repeat(" ", PADDING) + refers_to + "\n" + message
-		}
-
-		push(self, imp.path)
+		self.push_cycle_error(self, imp.path, message)
 
 		let mut owner = self.owner
 		let mut old = self
 
 		for real(owner.owner) {
-			push(old.owner, old.table.file.dir())
+			self.push_cycle_error(old.owner, old.table.file.dir(), message)
 
 			if &owner.owner == &target {
-				push(target, owner.table.file.dir())
+				self.push_cycle_error(target, owner.table.file.dir(), message)
 				break
 			}
 

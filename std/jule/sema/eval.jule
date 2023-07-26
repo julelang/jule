@@ -615,6 +615,29 @@ impl Eval {
 		ret self.eval_fn_ins(ins)
 	}
 
+	fn push_illegal_cycle_error(mut self, v1: &Var, v2: &Var, mut &message: str) {
+		const PADDING = 4
+
+		let refers_to = errorf("refers_to", v1.ident, v2.ident)
+		message = str_repeat(" ", PADDING) + refers_to + "\n" + message
+	}
+
+	fn check_cross_cycle(mut self, v: &Var, mut &message: str): bool {
+		for _, d in v.depends {
+			if d == self.owner {
+				self.push_illegal_cycle_error(v, d, message)
+				ret false
+			}
+
+			if !self.check_cross_cycle(d, message) {
+				self.push_illegal_cycle_error(v, d, message)
+				ret false
+			}
+		}
+
+		ret true
+	}
+
 	// Checks owner illegal cycles.
 	// Appends depend to depends if there is no illegal cycle.
 	// Returns true if e.owner is nil.
@@ -630,37 +653,12 @@ impl Eval {
 			ret false
 		}
 
-		const PADDING = 4
-
 		let mut message = ""
 
-		let push = fn(v1: &Var, v2: &Var) {
-			let refers_to = errorf("refers_to", v1.ident, v2.ident)
-			message = str_repeat(" ", PADDING) + refers_to + "\n" + message
-		}
-
-		// Check cross illegal cycle.
-		let mut check_cross: fn(v: &Var): bool
-		check_cross = fn(v: &Var): bool {
-			for _, d in v.depends {
-				if d == self.owner {
-					push(v, d)
-					ret false
-				}
-
-				if !check_cross(d) {
-					push(v, d)
-					ret false
-				}
-			}
-
-			ret true
-		}
-
-		if !check_cross(v) {
+		if !self.check_cross_cycle(v, message) {
 			let mut err_msg = message
 			message = ""
-			push(self.owner, v)
+			self.push_illegal_cycle_error(self.owner, v, message)
 			err_msg = err_msg + message
 			self.push_err(decl_token, "illegal_cross_cycle", err_msg)
 			ret false
@@ -3474,29 +3472,29 @@ impl BinopSolver {
 		self.r.kind = self.l.kind
 	}
 
-	fn mod(mut self) {
-		let check = fn(mut d: &Data) {
-			if !d.is_const() {
-				if !real(d.kind.prim()) || !is_int(d.kind.prim().kind) {
-					self.e.push_err(self.op, "modulo_with_not_int")
-				}
-				ret
-			}
-
-			match {
-			| sig_assignable(str(PrimKind.I64), d):
-				d.constant.set_i64(d.constant.as_i64())
-
-			| unsig_assignable(str(PrimKind.U64), d):
-				d.constant.set_u64(d.constant.as_u64())
-
-			|:
+	fn check_mod_data(mut self, mut d: &Data) {
+		if !d.is_const() {
+			if !real(d.kind.prim()) || !is_int(d.kind.prim().kind) {
 				self.e.push_err(self.op, "modulo_with_not_int")
 			}
+			ret
 		}
 
-		check(self.l)
-		check(self.r)
+		match {
+		| sig_assignable(str(PrimKind.I64), d):
+			d.constant.set_i64(d.constant.as_i64())
+
+		| unsig_assignable(str(PrimKind.U64), d):
+			d.constant.set_u64(d.constant.as_u64())
+
+		|:
+			self.e.push_err(self.op, "modulo_with_not_int")
+		}
+	}
+
+	fn mod(mut self) {
+		self.check_mod_data(self.l)
+		self.check_mod_data(self.r)
 	}
 
 	fn eval_float(mut self): &Data {
