@@ -9,7 +9,7 @@ use obj::{IR, build_ir}
 use obj::cxx
 
 use std::env::{ARGS}
-use std::fs::{FsError, OFlag, stat, open}
+use std::fs::{FsError, OFlag, stat, open, create_dir, delete_file, remove_dir}
 use std::fs::path::{join, dir}
 use std::jule::lex::{is_decimal, is_ident_rune, is_letter, is_space}
 use std::jule::sema::{
@@ -28,6 +28,36 @@ use std::jule::build::{
 	errorf,
 	is_valid_cpp_ext,
 }
+
+use cpp "julec.hpp"
+
+cpp fn system(cmd: str): int
+
+enum Compiler: str {
+	NA = "",
+	GCC = "gcc",
+	Clang = "clang",
+}
+
+enum CompilerPath: str {
+	NA = "",
+	GCC = "g++",
+	Clang = "clang++",
+}
+
+enum Mode {
+	Compile,
+	Transpile,
+}
+
+// Sets by COMPILER or command-line inputs
+static mut COMPILER: Compiler = Compiler.NA
+static mut COMPILER_PATH: CompilerPath = CompilerPath.NA
+
+static mut OUT_DIR: str = "dist"
+static mut MODE: Mode = Mode.Compile
+static mut OUT_NAME: str = "ir.cpp"
+static mut OUT: str = ""
 
 fn get_option(args: []str, mut &i: int): (arg: str, content: str) {
 	for i < args.len; i++ {
@@ -215,8 +245,8 @@ fn write_output(path: str, content: str) {
 
 	let (_, mut err) = stat(dir)
 	if err != FsError.Ok {
-		let ok = cpp.mkdir(dir)
-		if !ok {
+		let err = create_dir(dir)
+		if err != FsError.Ok {
 			exit_err("a problem occurs when code generation")
 		}
 	}
@@ -234,7 +264,15 @@ fn write_output(path: str, content: str) {
 }
 
 fn clear_objects() {
-	cpp.rmdir(OUT_DIR)
+	if delete_file(get_compile_path()) != FsError.Ok {
+		outln("a problem occurs when object cleaning")
+		ret
+	}
+
+	// All created objects are cleaned.
+	// So, deletes directory if empty after cleaned all objects,
+	// if not, leaves the directory.
+	_ = remove_dir(OUT_DIR)
 }
 
 fn compile_ir(compiler: str, compiler_cmd: str) {
