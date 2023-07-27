@@ -30,7 +30,9 @@ use std::sys::{
 	ERANGE,
 	ESPIPE,
 	ENOBUFS,
-	EBADMSG
+	EBADMSG,
+	ENOTEMPTY,
+	EBUSY,
 }
 
 // File system error codes.
@@ -63,39 +65,41 @@ pub enum FsError {
 	Seek,               // Illegal seek
 	Buffer,             // No buffer space available
 	BadMessage,         // Not a data message
+	NotEmpty,           // Not empty
 }
 
 // Returns last filesystem error by errno.
 fn get_last_fs_error(): FsError {
 	let err = get_last_errno()
 	match err {
-	| EACCES:       ret FsError.Denied
-	| EIO:          ret FsError.IO
-	| ELOOP:        ret FsError.Loop
-	| ENAMETOOLONG: ret FsError.LongPath
-	| ENOENT:       ret FsError.NotExist
-	| ENOTDIR:      ret FsError.NotDir
-	| EOVERFLOW:    ret FsError.Overflow
-	| EBADF:        ret FsError.InvalidDescriptor
-	| EMFILE:       ret FsError.PerProcessLimit
-	| ENFILE:       ret FsError.SystemWideLimit
-	| ENOMEM:       ret FsError.InsufficientMemory
-	| EEXIST:       ret FsError.Exist
-	| EINTR:        ret FsError.Signal
-	| EINVAL:       ret FsError.SyncIO
-	| EISDIR:       ret FsError.IsDir
-	| ENOSR:        ret FsError.UnableStream
-	| ENOSPC:       ret FsError.NoSpace
-	| ENXIO:        ret FsError.Device
-	| EROFS:        ret FsError.ReadOnly
-	| EAGAIN:       ret FsError.Retry
-	| ETXTBSY:      ret FsError.Busy
-	| EFBIG:        ret FsError.Big
-	| EPIPE:        ret FsError.Pipe
-	| ERANGE:       ret FsError.Range
-	| ESPIPE:       ret FsError.Seek
-	| ENOBUFS:      ret FsError.Buffer
-	| EBADMSG:      ret FsError.BadMessage
-	|:              ret FsError.Ok
+	| EACCES:          ret FsError.Denied
+	| EIO:             ret FsError.IO
+	| ELOOP:           ret FsError.Loop
+	| ENAMETOOLONG:    ret FsError.LongPath
+	| ENOENT:          ret FsError.NotExist
+	| ENOTDIR:         ret FsError.NotDir
+	| EOVERFLOW:       ret FsError.Overflow
+	| EBADF:           ret FsError.InvalidDescriptor
+	| EMFILE:          ret FsError.PerProcessLimit
+	| ENFILE:          ret FsError.SystemWideLimit
+	| ENOMEM:          ret FsError.InsufficientMemory
+	| EEXIST:          ret FsError.Exist
+	| EINTR:           ret FsError.Signal
+	| EINVAL:          ret FsError.SyncIO
+	| EISDIR:          ret FsError.IsDir
+	| ENOSR:           ret FsError.UnableStream
+	| ENOSPC:          ret FsError.NoSpace
+	| ENXIO:           ret FsError.Device
+	| EROFS:           ret FsError.ReadOnly
+	| EAGAIN:          ret FsError.Retry
+	| ETXTBSY | EBUSY: ret FsError.Busy
+	| EFBIG:           ret FsError.Big
+	| EPIPE:           ret FsError.Pipe
+	| ERANGE:          ret FsError.Range
+	| ESPIPE:          ret FsError.Seek
+	| ENOBUFS:         ret FsError.Buffer
+	| EBADMSG:         ret FsError.BadMessage
+	| ENOTEMPTY:       ret FsError.NotEmpty
+	|:                 ret FsError.Ok
 	}
 }
