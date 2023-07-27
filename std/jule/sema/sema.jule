@@ -1487,12 +1487,12 @@ impl Sema {
 			self.push_err(decl.token, "ignore_ident")
 		}
 
-		if decl.is_auto_typed() {
+		if decl.is_type_inferred() {
 			if decl.statically {
-				self.push_err(decl.token, "static_is_auto_typed")
+				self.push_err(decl.token, "static_is_type_inferred")
 			}
 			if !decl.is_initialized() {
-				self.push_err(decl.token, "missing_autotype_value")
+				self.push_err(decl.token, "missing_value_for_type_inference")
 			}
 		} else {
 			_ = self.check_type(decl.kind, l)
@@ -1847,13 +1847,13 @@ impl Sema {
 		self.check_package_derives()
 	}
 
-	fn check_data_for_auto_type(mut self, d: &Data, err_token: Token) {
+	fn check_data_for_type_inference(mut self, d: &Data, err_token: Token) {
 		match {
 		| d.is_nil():
-			self.push_err(err_token, "nil_for_autotype")
+			self.push_err(err_token, "nil_for_type_inference")
 
 		| d.is_void():
-			self.push_err(err_token, "void_for_autotype")
+			self.push_err(err_token, "void_for_type_inreference")
 		}
 	}
 
@@ -1862,12 +1862,12 @@ impl Sema {
 			ret
 		}
 
-		if v.is_auto_typed() {
+		if v.is_type_inferred() {
 			// Build new TypeSymbol because
 			// auto-type symbols are nil.
 			v.kind = &TypeSymbol{kind: v.value.data.kind}
 
-			self.check_data_for_auto_type(v.value.data, v.value.expr.token)
+			self.check_data_for_type_inference(v.value.data, v.value.expr.token)
 		} else {
 			let mut arr = v.kind.kind.arr()
 			if real(arr) {
