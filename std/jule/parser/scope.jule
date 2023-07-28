@@ -32,6 +32,7 @@ use std::jule::lex::{
 	TokenKind,
 	is_assign_op,
 	is_postfix_op,
+	is_bin_op,
 }
 
 fn new_scope(): &ScopeTree {
@@ -53,7 +54,8 @@ fn next_st_pos(tokens: []Token, start: int): (int, bool) {
 		let mut ok: bool = false
 		let mut terminated: bool = false
 		let tok = tokens[i]
-		if tok.id == TokenId.Range {
+		match tok.id {
+		| TokenId.Range:
 			match tok.kind {
 			| str(TokenKind.LBrace)
 			| str(TokenKind.LBracket)
@@ -78,12 +80,21 @@ fn next_st_pos(tokens: []Token, start: int): (int, bool) {
 				}
 				continue
 			}
+
+		| TokenId.Op:
+			if is_bin_op(tok.kind) {
+				continue
+			}
 		}
 
 		if brace_n != 0 {
 			continue
 		} else if i > start {
-			ok, terminated = is_st(tok, tokens[i-1])
+			let prev = tokens[i-1]
+			if prev.id == TokenId.Op && is_bin_op(prev.kind) && prev.row < tok.row {
+				continue
+			}
+			ok, terminated = is_st(tok, prev)
 		} else {
 			ok, terminated = is_st(tok, tok)
 		}
