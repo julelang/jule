@@ -22,14 +22,6 @@ It contains the reference compiler, API, and standard library.
 
 <h2 id="motivation">Motivation</h2>
 
-> **Note**
->
-> [JuleC](#what-is-julec) is still under development for a stable release.\
-> Therefore, design changes and the like may occur in the language.
->
-> Some commits may not be fully honored due to some compiler/API errors.\
-> Please report it with the [Jule Issue Tracker](https://github.com/julelang/jule/issues) if you come across something like this.
-
 Our motivation is to develop a safe and fast programming language that focuses on systems programming.
 However, instead of ignoring C and C++ programming languages, which are widely used in systems programming, it is aimed to provide good interoperability support for these languages.
 Jule cares about security and tries to maintain a balance of performance.
@@ -62,6 +54,13 @@ fn main() {
     outln(my_slice)
 }
 ```
+
+> **Note** \
+> [JuleC](#what-is-julec) is still under development for a stable release.\
+> Therefore, design changes and the like may occur in the language.
+>
+> Some commits may not be fully honored due to some compiler/API errors.\
+> Please report it with the [Jule Issue Tracker](https://github.com/julelang/jule/issues) if you come across something like this.
 
 <h2 id="key-features">Design Principles</h2>
 
@@ -99,8 +98,7 @@ Unsafe behaviors are encouraged to be done deliberately with unsafe scopes.
 Please read the <a href="https://manual.jule.dev/unsafe-jule">Unsafe Jule</a> part of the manual for more information about Unsafe Jule.
 <br><br>
 
-> **Note**
->
+> **Note** \
 > Jule also has different memory management approaches.\
 > For example, the `std::memory::c` standard library provides C-like memory management.
 
@@ -189,8 +187,7 @@ All supported platforms by JuleC are documented in the <a href="https://manual.j
 
 <h2 id="building-project">Building the Project</h2>
 
-> **Note**
->
+> **Note** \
 > Please refer to the [install from source](https://manual.jule.dev/getting-started/install-from-source) section in the manual to compile the project from source.
  
 When you enter the directory where the source code is located, you can find some compilation scripts for compiling JuleC. \
@@ -206,7 +203,7 @@ JuleC is in development with the [Jule](https://github.com/julelang/jule) progra
 
 In `src/julec` directory:
 
-> **Note**\
+> **Note** \
 > This example command assumes that JuleC is already available in your path.
 
 ```bash
