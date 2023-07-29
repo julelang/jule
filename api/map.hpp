@@ -68,7 +68,7 @@ namespace jule {
         { this->buffer.clear(); }
 
         jule::Slice<Key> keys(void) const {
-            jule::Slice<Key> keys(this->len());
+            jule::Slice<Key> keys { jule::Slice<Key>::alloc(this->len()) };
             jule::Uint index{ 0 };
             for (const auto &pair: *this)
                 keys._slice[index++] = pair.first;
@@ -76,7 +76,7 @@ namespace jule {
         }
 
         jule::Slice<Value> values(void) const {
-            jule::Slice<Value> keys(this->len());
+            jule::Slice<Value> keys { jule::Slice<Value>::alloc(this->len()) };
             jule::Uint index{ 0 };
             for (const auto &pair: *this)
                 keys._slice[index++] = pair.second;
