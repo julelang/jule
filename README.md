@@ -12,17 +12,13 @@ It contains the reference compiler, API, and standard library.
 [Contributing](https://jule.dev/contribute) |
 [Community](https://github.com/julelang/jule/wiki#the-jule-community)
 
+[![Build (Darwin)](https://github.com/julelang/jule/actions/workflows/build_darwin.yml/badge.svg)](https://github.com/julelang/jule/actions/workflows/build_darwin.yml)
+[![Build (Linux)](https://github.com/julelang/jule/actions/workflows/build_linux.yml/badge.svg)](https://github.com/julelang/jule/actions/workflows/build_linux.yml)
+[![Jule Community](https://dcbadge.vercel.app/api/server/ReWQgPDnP6?style=flat)](https://discord.gg/ReWQgPDnP6)
+
 </strong>
+
 </div>
-
-<h2 id="community">Community</h2>
-
-Join Julenours to support Jule, explore and interact with the community.\
-Our main community platforms:
-
-- [Official Discord server of the Jule Community](https://discord.gg/CZhK7dyh9X)
-- [GitHub Discussions](https://github.com/jule-lang/jule/discussions)
-
 
 <h2 id="motivation">Motivation</h2>
 
@@ -171,13 +167,6 @@ Some packages of the standard library
 <a href="https://github.com/julelang/jule/tree/master/std/unicode/utf8">std::unicode::utf8</a>
 or etc.) are almost complete and are not expected to undergo major changes.
 
-<h2 id="documentations">Documentations</h2>
-
-All documentation about Jule and JuleC is on the website as a manual. <br>
-See [Jule Manual](hthttps://manual.jule.dev)
-<br><br>
-To contribute to the website, manual, or anything else, please use the <a href="https://github.com/julelang/website">website repository</a>.
-
 <h2 id="os-support">Compiler and C++ Standard Support</h2>
 JuleC officially supports some C++ compilers.
 When you try to compile with these compilers, it promises that code can be compiled in the officially supported C++ standard.
@@ -234,6 +223,21 @@ IR codes can also be used for different purposes.
 For more detailed information about JuleC IR, please see the relevant repository.
 
 Here is the [IRs](https://github.com/julelang/julec-ir) of JuleC.
+
+<h2 id="documentations">Documentations</h2>
+
+All documentation about Jule and JuleC is on the website as a manual. <br>
+See [Jule Manual](https://manual.jule.dev).
+
+To contribute to the website, manual, or anything else, please use the <a href="https://github.com/julelang/website">website repository</a>.
+
+<h2 id="community">Community</h2>
+
+Join Julenours to support Jule, explore and interact with the community.\
+Our main community platforms:
+
+- [Official Discord server of the Jule Community](https://discord.gg/CZhK7dyh9X)
+- [GitHub Discussions](https://github.com/jule-lang/jule/discussions)
 
 <h2 id="contributing">Contributing</h2>
 
