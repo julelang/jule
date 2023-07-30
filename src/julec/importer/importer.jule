@@ -6,6 +6,7 @@ use std::fs::{OFlag, FsError, DirEntry, read_dir, read_file, open}
 use std::fs::path::{join}
 use std::jule::ast::{Ast}
 use std::jule::build::{
+	Directive,
 	LogKind,
 	Log,
 	EXT,
@@ -52,11 +53,9 @@ fn read_package_dirents(path: str): ([]&DirEntry, err_msg: str) {
 		let name = dirent.name
 
 		// Skip directories, non-jule files, and file annotation fails.
-		if (
-			dirent.stat.is_dir() ||
+		if dirent.stat.is_dir() ||
 			!name.has_suffix(EXT) ||
-			!is_pass_file_annotation(name)
-		) {
+			!is_pass_file_annotation(name) {
 			continue
 		}
 
@@ -64,6 +63,31 @@ fn read_package_dirents(path: str): ([]&DirEntry, err_msg: str) {
 	}
 
 	ret passed_dirents, ""
+}
+
+fn concat_all_parts(parts: ...str): str {
+	let mut s = ""
+	for _, part in parts {
+		s += part
+	}
+	ret s
+}
+
+fn is_pass_build_directives(mut &file: &Ast): bool {
+	let mut i = 0
+	for i < file.top_directives.len(); i++ {
+		let mut td = file.top_directives.at(i)
+		if td.tag != str(Directive.Build) {
+			continue
+		}
+
+		let expr = concat_all_parts(td.args...)
+		let result = eval_directive_expr(expr)
+		if !result {
+			ret false
+		}
+	}
+	ret true
 }
 
 // Common importer of JuleC.
@@ -101,6 +125,10 @@ impl Importer for PlainImporter {
 			let mut finfo = parse_file(file)
 			if finfo.errors.len > 0 {
 				ret nil, finfo.errors
+			}
+
+			if !is_pass_build_directives(finfo.ast) {
+				continue
 			}
 
 			asts = append(asts, finfo.ast)
