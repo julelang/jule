@@ -81,9 +81,9 @@ Our aim is to present a design and implementation that meets these principles in
 
 <h2 id="what-is-julec">What is JuleC?</h2>
 JuleC is the name of the reference compiler for the Jule programming language.
-It is the original compiler of the Jule programming language.
+It is the original compiler of the Jule programming language and written in Jule.
 The features that JuleC represents are the official and must-have features of the Jule programming language.
-This is a standard for the Jule programming language and represents the minimum competency that unofficial compilers should have.
+This is a standard for the Jule programming language and represents the minimum competency that unofficial/3rd party Jule compilers should have.
 
 <h2 id="memory-safety">Memory Safety and Management</h2>
 Memory safety and memory management are major challenges in C, C++, and similar programming languages.
