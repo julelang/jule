@@ -115,7 +115,8 @@ fn skip_st(mut &i: int, mut tokens: []Token): ([]Token, bool) {
 	let mut st_tokens = tokens[start:i]
 	if terminated {
 		if st_tokens.len == 1 {
-			ret skip_st(i, tokens)
+			st_tokens, terminated = skip_st(i, tokens)
+			ret st_tokens, terminated
 		}
 		// -1 for eliminate statement terminator.
 		st_tokens = st_tokens[:st_tokens.len-1]
@@ -957,15 +958,17 @@ impl ScopeParser {
 		ret assign, true
 	}
 
-	fn build_assign_st(mut self, mut tokens: []Token): (&AssignSt, bool) {
+	fn build_assign_st(mut self, mut tokens: []Token): (st: &AssignSt, ok: bool) {
 		if !check_assign_tokens(tokens) {
 			ret new(AssignSt), false
 		}
 
 		match tokens[0].id {
-		| TokenId.Let: ret self.build_decl_assign(tokens)
-		|:             ret self.build_plain_assign(tokens)
+		| TokenId.Let: st, ok = self.build_decl_assign(tokens)
+		|:             st, ok = self.build_plain_assign(tokens)
 		}
+
+		ret
 	}
 
 	fn build_st(mut self, mut st: &Stmt): NodeData {

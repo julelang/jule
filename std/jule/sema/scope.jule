@@ -1504,33 +1504,24 @@ impl ScopeChecker {
 		let mut rt = &RetSt{}
 		self.scope.stmts.push(rt)
 
-		let mut d = new(Data)
-
-		if real(r.expr) {
-			d = self.s.eval(r.expr, self)
-			if !real(d) {
-				ret
-			}
-		}
-
 		let mut rtc = &RetTypeChecker{
 			sc:          self,
 			f:           self.get_root().owner,
 			error_token: r.token,
 		}
-		let ok = rtc.check(d)
+		let ok = rtc.check(r.expr)
 		if !ok {
 			ret
 		}
 
-		if !real(d) && rtc.vars.len == 0 {
+		if !real(r.expr) && rtc.vars.len == 0 {
 			ret
 		}
 
 		rt.vars = rtc.vars
 
-		if real(d) {
-			rt.expr = d.model
+		if real(r.expr) {
+			rt.expr = rtc.model
 		}
 	}
 

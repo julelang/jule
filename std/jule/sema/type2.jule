@@ -16,6 +16,7 @@ use std::jule::ast::{
 	IdentExpr,
 	SliceExpr,
 	VariadicExpr,
+	TupleExpr,
 }
 use std::jule::lex::{Token, Ident, is_ignore_ident}
 use std::jule::types::{
@@ -1190,9 +1191,10 @@ struct RetTypeChecker {
 	sc:          &ScopeChecker
 	f:           &FnIns
 	types:       []&TypeKind // Return types.
-	exprs:       []&Data     // Return expressions.
+	exprs:       []ExprData  // Return expressions.
 	vars:        []&Var      // Return variables.
 	error_token: Token
+	model:       ExprModel
 }
 
 impl RetTypeChecker {
@@ -1200,17 +1202,19 @@ impl RetTypeChecker {
 		self.types = get_fn_result_types(self.f)
 	}
 
-	fn prepare_exprs(mut self, mut d: &Data) {
-		if !real(d) {
+	fn prepare_exprs(mut self, mut e: &Expr) {
+		if !real(e) {
 			ret
 		}
 
-		if !real(d.kind.tup()) {
-			self.exprs = append(self.exprs, d)
-			ret
-		}
+		match type e.kind {
+		| &TupleExpr:
+			let mut tup = (&TupleExpr)(e.kind)
+			self.exprs = tup.expr
 
-		self.exprs = get_datas_from_tuple_data(d)
+		|:
+			self.exprs = append(self.exprs, e.kind)
+		}
 	}
 
 	fn ret_vars(mut self) {
@@ -1241,12 +1245,29 @@ impl RetTypeChecker {
 	}
 
 	fn check_exprs(mut self) {
-		for (i, mut d) in self.exprs {
+		if self.exprs.len == 0 {
+			ret
+		}
+
+		let mut datas = make([]&Data, 0, self.exprs.len)
+
+		let mut e = &Expr{}
+
+		for (i, mut expr) in self.exprs {
 			if i >= self.types.len {
 				break
 			}
 
 			let mut t = self.types[i]
+
+			e.kind = expr
+			let mut d = self.sc.s.evalp(e, self.sc, t)
+			if !real(d) {
+				continue
+			}
+
+			datas = append(datas, d)
+
 			if !d.mutable && is_mut(d.kind) {
 				self.sc.s.push_err(self.error_token, "ret_with_mut_typed_non_mut")
 				ret
@@ -1260,11 +1281,20 @@ impl RetTypeChecker {
 			}
 			ac.check()
 		}
+
+		// Set model.
+		if datas.len > 1 { // Tuple
+			self.model = &TupleExprModel{
+				datas: datas,
+			}
+		} else if datas.len == 1 {
+			self.model = datas[0].model
+		}
 	}
 
-	fn check(mut self, mut d: &Data): bool {
+	fn check(mut self, mut e: &Expr): bool {
 		self.prepare_types()
-		self.prepare_exprs(d)
+		self.prepare_exprs(e)
 		self.ret_vars()
 
 		let n = self.exprs.len
