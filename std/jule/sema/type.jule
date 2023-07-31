@@ -678,14 +678,30 @@ impl TypeChecker {
 		message = str_repeat(" ", PADDING) + refers_to + "\n" + message
 	}
 
+	fn are_equals_cross_cycle_data[T](self, a: any, b: any): bool {
+		match type a {
+		| &T:
+			match type b {
+			| &T: ret &(&T)(a) == &(&T)(b)
+			|:    ret false
+			}
+
+		|:
+			ret false
+		}
+	}
+
 	fn check_cross_cycle(self, decl: any, mut &message: str): bool {
 		match type decl {
 		| &TypeAlias:
 			let ta = (&TypeAlias)(decl)
 			for _, d in ta.refers {
-				if d == self.referencer.owner {
-					self.push_cycle_error(ta, d, message)
-					ret false
+				match type d {
+				| &TypeAlias:
+					if self.are_equals_cross_cycle_data[TypeAlias](d, self.referencer.owner) {
+						self.push_cycle_error(ta, d, message)
+						ret false
+					}
 				}
 
 				if !self.check_cross_cycle(d, message) {
@@ -697,7 +713,7 @@ impl TypeChecker {
 		| &Struct:
 			let s = (&Struct)(decl)
 			for _, d in s.depends {
-				if self.referencer.owner == d {
+				if self.are_equals_cross_cycle_data[Struct](d, self.referencer.owner) {
 					self.push_cycle_error(s, d, message)
 					ret false
 				}
