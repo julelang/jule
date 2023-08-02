@@ -23,6 +23,7 @@ static mut checking: []any = nil
 // Currently checking reference.
 static mut current: any = nil
 
+// Reports whether the reference type of T exist in arr.
 fn is_exist[T](arr: []any, t: &T): bool {
 	for _, ref in arr {
 		match type ref {
@@ -35,6 +36,7 @@ fn is_exist[T](arr: []any, t: &T): bool {
 	ret false
 }
 
+// Reports whether ref is exist in refs.
 fn is_exist_ref(mut refs: []any, ref: any): bool {
 	match type ref {
 	| &Fn:     ret is_exist[Fn](refs, (&Fn)(ref))
@@ -45,6 +47,7 @@ fn is_exist_ref(mut refs: []any, ref: any): bool {
 	}
 }
 
+// Reports whether reference in dead.
 fn is_dead(mut ref: any): (dead: bool) {
 	if is_exist_ref(deads, ref) {
 		// Cycle, also already checked and marked as dead.
@@ -76,8 +79,14 @@ fn is_dead(mut ref: any): (dead: bool) {
 	}
 }
 
+// Remove reference from refs by pos.
 fn drop_ref(mut &refs: []any, pos: int) {
+	// Remove position, and following references.
+	// This is safe.
+	// References dropped after processed, so following
+	// references should be already processed.
 	refs = refs[:pos]
+
 	/*
 	if pos == (*refs).len {
 		ret
@@ -106,7 +115,11 @@ fn is_all_references_are_dead[T](mut references: &ReferenceStack): bool {
 }
 
 fn is_fn_dead(mut f: &Fn): bool {
-	if !f.global || f.cpp_linked || f.is_entry_point() || f.is_init() || f.is_anon() {
+	if !f.global ||
+		f.cpp_linked ||
+		f.is_entry_point() ||
+		f.is_init() ||
+		f.is_anon() {
 		ret false
 	}
 
@@ -154,6 +167,8 @@ fn is_trait_dead(mut t: &Trait): bool {
 	ret true
 }
 
+// Eliminates dead functions.
+// If functions is alive, eliminates unreachable codes, and etc for scope.
 fn eliminate_dead_functions(mut &funcs: Vector[&Fn]) {
 	let mut i = 0
 	for i < funcs.len() {
