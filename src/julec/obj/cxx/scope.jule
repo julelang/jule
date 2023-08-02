@@ -31,6 +31,7 @@ use std::jule::sema::{
 	Recover,
 	FnCallExprModel,
 	TupleExprModel,
+	TypeKind,
 }
 
 trait RangeSetter {
@@ -513,42 +514,67 @@ fn gen_ret_st(mut r: &RetSt): str {
 	ret gen_ret_expr(r)
 }
 
+fn gen_ret_st_with_defaults(mut result: &TypeKind): str {
+	let mut obj = "return "
+	if real(result.tup()) {
+		obj += "std::make_tuple("
+		for (_, mut t) in result.tup().types {
+			obj += get_init_expr(t)
+			obj += str(TokenKind.Comma)
+		}
+		obj = obj[:obj.len-1] // Remove last comma.
+		obj += ")"
+	} else {
+		obj += get_init_expr(result)
+	}
+	obj += CPP_ST_TERM
+	ret obj
+}
+
 fn gen_recover(mut r: &Recover): str {
 	let mut obj = "try "
 	obj += gen_scope(r.scope)
 	obj += " catch(jule::Exception e) "
 	if r.handler.is_anon() {
 		// Anonymous function.
-		// Parse body as catch block.
-		//
-		// NOTICE:
-		//  If passed anonymous function from variable, field, or something
-		//  like that, parses block. Not calls variable, fields or whatever.
 
-		let handler_param = r.handler.decl.params[0]
-		if !is_ignore_ident(handler_param.ident) && !is_anon_ident(handler_param.ident) {
-			add_indent()
-			obj += "{\n"
-			obj += indent()
-			obj += "jule::Trait<jule::Error> "
-			obj += param_out_ident(handler_param)
-			obj += "{ jule::exception_to_error(e) };\n"
-			obj += indent()
-			obj += gen_scope(r.handler.scope)
-			done_indent()
+		add_indent()
+		obj += "{\n"
+		obj += indent()
+		obj += gen_expr(r.handler_expr)
+		obj += "(jule::exception_to_error(e))" + CPP_ST_TERM
+
+		if !r.scope_owner.decl.is_void() {
 			obj += "\n"
 			obj += indent()
-			obj += "}"
+			done_indent()
+			obj += gen_ret_st_with_defaults(r.scope_owner.result)
 		} else {
-			obj += gen_scope(r.handler.scope)
+			done_indent()
 		}
+		obj += "\n"
+		obj += indent()
+		obj += "}"
 	} else {
 		// Passed defined function.
 		// Therefore, call passed function with error.
 
-		obj += "{ "
+		obj += "{\n"
+		add_indent()
+		obj += indent()
 		obj += gen_expr(r.handler_expr)
-		obj += "(jule::exception_to_error(e)); }"
+		obj += "(jule::exception_to_error(e));\n"
+		obj += indent()
+		if r.scope_owner.decl.is_void() {
+			done_indent()
+			obj += " }"
+		} else {
+			obj += gen_ret_st_with_defaults(r.scope_owner.result)
+			obj += "\n"
+			done_indent()
+			obj += indent()
+			obj += "}"
+		}
 	}
 
 	ret obj
