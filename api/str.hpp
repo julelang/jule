@@ -249,6 +249,9 @@ namespace jule {
             return jule::Str(s);
         }
 
+        inline operator char*(void) const
+        { return const_cast<char*>(reinterpret_cast<const char*>(this->buffer.c_str())); }
+
         inline operator const char*(void) const
         { return reinterpret_cast<const char*>(this->buffer.c_str()); }
 
