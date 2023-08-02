@@ -27,6 +27,7 @@ fn exit_err(msg: str) {
 	exit(ERROR_EXIT_CODE)
 }
 
+// Read buffer by file path.
 fn read_buff(path: str): []byte {
 	let (mut buffer, err) = read_file(path)
 	if err != FsError.Ok {
@@ -35,6 +36,8 @@ fn read_buff(path: str): []byte {
 	ret buffer
 }
 
+// Make compiler error, just text.
+// Not includes row, column, and etc. informations.
 fn flat_compiler_err(text: str): Log {
 	ret Log{
 		kind: LogKind.Error,
@@ -42,6 +45,7 @@ fn flat_compiler_err(text: str): Log {
 	}
 }
 
+// Read package directory entries by package (directory) path.
 fn read_package_dirents(path: str): ([]&DirEntry, err_msg: str) {
 	let (mut dirents, err) = read_dir(path)
 	if err != FsError.Ok {
@@ -65,6 +69,7 @@ fn read_package_dirents(path: str): ([]&DirEntry, err_msg: str) {
 	ret passed_dirents, ""
 }
 
+// Concatenate all strings into single string.
 fn concat_all_parts(parts: ...str): str {
 	let mut s = ""
 	for _, part in parts {
@@ -73,6 +78,7 @@ fn concat_all_parts(parts: ...str): str {
 	ret s
 }
 
+// Reports whether file passes build directives.
 fn is_pass_build_directives(mut &file: &Ast): bool {
 	let mut i = 0
 	for i < file.top_directives.len(); i++ {
@@ -127,6 +133,7 @@ impl Importer for PlainImporter {
 				ret nil, finfo.errors
 			}
 
+			// Skip file if can't pass build directives.
 			if !is_pass_build_directives(finfo.ast) {
 				continue
 			}
@@ -138,6 +145,7 @@ impl Importer for PlainImporter {
 	}
 
 	fn imported(mut self, mut imp: &ImportInfo) {
+		// Already imported?
 		for _, p in self.all_packages {
 			if p.cpp_linked == imp.cpp_linked && p.link_path == imp.link_path {
 				ret
