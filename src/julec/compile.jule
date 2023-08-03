@@ -25,6 +25,7 @@ use std::jule::build::{
 	DISTOS,
 	DISTARCH,
 	ENTRY_POINT,
+	INIT_FN,
 	errorf,
 	is_valid_cpp_ext,
 }
@@ -421,9 +422,15 @@ fn compile_command() {
 	}
 
 	const CPP_LINKED = false
-	let f = ir.main.find_fn(ENTRY_POINT, CPP_LINKED)
+	let mut f = ir.main.find_fn(ENTRY_POINT, CPP_LINKED)
 	if !real(f) {
 		exit_err(errorf("no_entry_point"))
+	}
+	f.statically = true // Used
+
+	f = ir.main.find_fn(INIT_FN, CPP_LINKED)
+	if real(f) {
+		f.statically = true // Used
 	}
 
 	apply_target_independent_optimizations(ir)

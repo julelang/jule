@@ -54,7 +54,6 @@ pub struct Fn {
 	pub result:     &RetType
 	pub params:     []&Param
 	pub owner:      &Struct
-	pub references: &ReferenceStack
 
 	// Function instances for each unique type combination of function call.
 	// Nil if function is never used.
@@ -120,12 +119,16 @@ impl Fn {
 		ret false
 	}
 
-
 	// Force to new instance.
 	fn instance_force(mut &self): &FnIns {
 		let mut ins = &FnIns{
-			decl:  self,
-			scope: &Scope{},
+			decl:       self,
+			scope:      &Scope{},
+			references: new_reference_stack(),
+		}
+
+		if self.is_init() {
+			ins.refers = new_reference_stack()
 		}
 
 		ins.params = make([]&ParamIns, self.params.len)
@@ -218,12 +221,17 @@ impl ParamIns {
 
 // Function instance.
 pub struct FnIns {
-	pub owner:    &StructIns
-	pub decl:     &Fn
-	pub generics: []&TypeKind
-	pub params:   []&ParamIns
-	pub result:   &TypeKind
-	pub scope:    &Scope
+	pub owner:      &StructIns
+	pub decl:       &Fn
+	pub generics:   []&TypeKind
+	pub params:     []&ParamIns
+	pub result:     &TypeKind
+	pub scope:      &Scope
+	pub references: &ReferenceStack
+
+	// Stores all referenced definitions.
+	// Only stores for initializer functions.
+	pub refers: &ReferenceStack
 
 	caller:   BuiltinCaller
 	reloaded: bool

@@ -51,7 +51,6 @@ pub struct Struct {
 	pub doc:        str
 	pub generics:   []&GenericDecl
 	pub implements: []&Trait
-	pub references: &ReferenceStack
 
 	// Structure instances for each unique type combination of structure.
 	// Nil if structure is never used.
@@ -66,9 +65,10 @@ impl Struct {
 		}
 
 		let mut ins = &StructIns{
-			decl:    self,
-			fields:  make([]&FieldIns, self.fields.len),
-			methods: make([]&Fn, self.methods.len()),
+			decl:       self,
+			fields:     make([]&FieldIns, self.fields.len),
+			methods:    make([]&Fn, self.methods.len()),
+			references: new_reference_stack(),
 		}
 
 		for (i, mut f) in self.fields {
@@ -98,7 +98,6 @@ impl Struct {
 				params: f.params,
 				owner: f.owner,
 				instances: nil,
-				references: f.references,
 			}
 			ins.methods[i] = fins
 		}
@@ -192,12 +191,13 @@ pub struct FieldIns {
 
 // Structure instance.
 pub struct StructIns {
-	pub checked:  bool
-	pub decl:     &Struct
-	pub generics: []&TypeKind
-	pub fields:   []&FieldIns
-	pub methods:  []&Fn
-	pub has_mut:  bool // This structure has mutable defines.
+	pub checked:    bool
+	pub decl:       &Struct
+	pub generics:   []&TypeKind
+	pub fields:     []&FieldIns
+	pub methods:    []&Fn
+	pub has_mut:    bool // This structure has mutable defines.
+	pub references: &ReferenceStack
 }
 
 impl Kind for StructIns {

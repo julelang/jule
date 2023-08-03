@@ -532,8 +532,8 @@ impl Eval {
 		match type self.lookup {
 		| &ScopeChecker:
 			let mut sc = (&ScopeChecker)(self.lookup).get_root()
-			if !references.exist[Fn](sc.owner.decl) {
-				references.push(sc.owner.decl)
+			if !references.exist[FnIns](sc.owner) {
+				references.push(sc.owner)
 			}
 
 		|:
@@ -543,7 +543,14 @@ impl Eval {
 		}
 	}
 
-	fn push_reference_to_fn(mut self, mut f: &Fn) {
+	fn push_reference_to_fn(mut self, mut f: &FnIns) {
+		match type self.lookup {
+		| &ScopeChecker:
+			let mut sc = (&ScopeChecker)(self.lookup).get_root()
+			if sc.owner.decl.is_init() && !sc.owner.references.exist[FnIns](f) {
+				sc.owner.refers.push(f)
+			}
+		}
 		self.push_reference(f.references)
 	}
 
@@ -552,10 +559,25 @@ impl Eval {
 			ret
 		}
 
+		match type self.lookup {
+		| &ScopeChecker:
+			let mut sc = (&ScopeChecker)(self.lookup).get_root()
+			if sc.owner.decl.is_init() && !sc.owner.references.exist[Var](v) {
+				sc.owner.refers.push(v)
+			}
+		}
+
 		self.push_reference(v.references)
 	}
 
-	fn push_reference_to_struct(mut self, mut s: &Struct) {
+	fn push_reference_to_struct(mut self, mut s: &StructIns) {
+		match type self.lookup {
+		| &ScopeChecker:
+			let mut sc = (&ScopeChecker)(self.lookup).get_root()
+			if sc.owner.decl.is_init() && !sc.owner.references.exist[StructIns](s) {
+				sc.owner.refers.push(s)
+			}
+		}
 		self.push_reference(s.references)
 	}
 
@@ -613,9 +635,9 @@ impl Eval {
 			ret new(Data)
 		}
 
-		self.push_reference_to_fn(f)
 
 		let mut ins = f.instance()
+		self.push_reference_to_fn(ins)
 		ret self.eval_fn_ins(ins)
 	}
 
@@ -1529,7 +1551,7 @@ impl Eval {
 			s = t.strct()
 		}
 
-		self.push_reference_to_struct(s.decl)
+		self.push_reference_to_struct(s)
 
 		if !s.decl.is_implements(tr) {
 			self.push_err(error_token, "type_not_supports_casting_to", d.kind.to_str(), t.to_str())
@@ -1781,7 +1803,7 @@ impl Eval {
 		}
 		// NOTE: Instance already checked (just fields) if generic quantity passes.
 
-		self.push_reference_to_struct(s.decl)
+		self.push_reference_to_struct(s)
 
 		let mut slc = StructLitChecker{
 			e:           self,
@@ -2060,10 +2082,10 @@ impl Eval {
 			mutable: false,
 		}
 
-		self.push_reference_to_fn(method)
 
 		let mut ins = method.instance()
 		ins.owner = s
+		self.push_reference_to_fn(ins)
 		d.model = &StructStaticIdentExprModel{
 			structure: s,
 			expr:      d.model,
@@ -2155,10 +2177,10 @@ impl Eval {
 			self.push_err(si.ident, "ref_method_used_with_not_ref_instance")
 		}
 
-		self.push_reference_to_fn(m)
 
 		let mut ins = m.instance()
 		ins.owner = s
+		self.push_reference_to_fn(ins)
 		d.model = &StructSubIdentExprModel{
 			expr_kind: d.kind,
 			expr:      d.model,
