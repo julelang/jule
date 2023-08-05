@@ -153,6 +153,11 @@ namespace jule {
         { return static_cast<jule::Int>(this->buffer.rfind(sub.buffer)); }
 
         jule::Str trim(const jule::Str &bytes) const {
+            jule::Str s{ this->ltrim(bytes) };
+            return s.rtrim(bytes);
+        }
+
+        jule::Str ltrim(const jule::Str &bytes) const {
             ConstIterator it{ this->begin() };
             const ConstIterator end{ this->end() };
             ConstIterator begin{ this->begin() };
