@@ -139,7 +139,12 @@ struct TypeCompatibilityChecker {
 
 	// References uses elem's type itself if true.
 	deref: bool
+
 	ignore_any: bool
+
+	// This checker is sub-checker for another checker's element.
+	// For example: elements of slice ([]T) types.
+	sub_check: bool
 }
 
 impl TypeCompatibilityChecker {
@@ -220,6 +225,7 @@ impl TypeCompatibilityChecker {
 			src:         src.elem,
 			dest:        dest.elem,
 			ignore_any:  true,
+			sub_check:   true,
 		}
 		ret sub.check()
 	}
@@ -241,6 +247,7 @@ impl TypeCompatibilityChecker {
 			src:         src.elem,
 			dest:        dest.elem,
 			ignore_any:  true,
+			sub_check:   true,
 		}
 		ret sub.check()
 	}
@@ -261,6 +268,7 @@ impl TypeCompatibilityChecker {
 			src:         src.elem,
 			dest:        dest.elem,
 			ignore_any:  true,
+			sub_check:   true,
 		}
 		ret sub.check()
 	}
@@ -282,6 +290,7 @@ impl TypeCompatibilityChecker {
 			error_token: self.error_token,
 			src:         src.key,
 			dest:        dest.key,
+			sub_check:   true,
 		}
 		if !sub.check() {
 			ret false
@@ -389,7 +398,7 @@ impl TypeCompatibilityChecker {
 			ret self.check_ref()
 		}
 
-		if real(self.src.ref()) {
+		if !self.sub_check && real(self.src.ref()) {
 			self.src = self.src.ref().elem
 		}
 
