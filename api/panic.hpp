@@ -15,6 +15,8 @@ namespace jule {
     // Also it is builtin panic function.
     template<typename T>
     void panic(const T &expr);
+    void panic(const char *expr);
+    void panic(char *expr);
 
     class Exception: public std::exception {
     private:
@@ -42,6 +44,16 @@ namespace jule {
         sstream << expr;
 
         jule::Exception exception(sstream.str());
+        throw exception;
+    }
+
+    void panic(const char *expr) {
+        jule::Exception exception(expr);
+        throw exception;
+    }
+
+    void panic(char *expr) {
+        jule::Exception exception(expr);
         throw exception;
     }
 

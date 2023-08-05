@@ -24,9 +24,10 @@ namespace jule {
     // Libraries uses this function for UTf-8 encoded Jule strings.
     // Also it is builtin str type constructor.
     template<typename T>
-    jule::Str to_str(const T &obj)  ;
-
-    jule::Str to_str(const jule::Str &s)  ;
+    jule::Str to_str(const T &obj);
+    jule::Str to_str(const jule::Str &s);
+    jule::Str to_str(const char *s);
+    jule::Str to_str(char *s);
 
     class Str {
     public:
@@ -329,6 +330,12 @@ namespace jule {
 
     jule::Str to_str(const jule::Str &s)
     { return s; }
+
+    jule::Str to_str(const char *s)
+    { return jule::Str(s); }
+
+    jule::Str to_str(char *s)
+    { return jule::Str(s); }
 
 } // namespace jule
 
