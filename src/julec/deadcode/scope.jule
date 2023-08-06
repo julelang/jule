@@ -5,7 +5,9 @@
 use std::jule::sema::{
 	Scope,
 	St,
+	Data,
 	RetSt,
+	BuiltinPanicCallExprModel,
 }
 use std::vector::{Vector}
 
@@ -44,6 +46,14 @@ impl ScopeDeadCode {
 				eliminate_dead_code_of_scope(scope)
 			} else {
 				self.optimize_child(scope)
+			}
+
+		| &Data:
+			match type (&Data)(st).model {
+			| &BuiltinPanicCallExprModel:
+				// Remove followed statements of the built-in panic function call.
+				// Unreachable code.
+				self.eliminate_followed()
 			}
 
 		| &RetSt:
