@@ -56,10 +56,8 @@ fn read_package_dirents(path: str): ([]&DirEntry, err_msg: str) {
 	for (_, mut dirent) in dirents {
 		let name = dirent.name
 
-		// Skip directories, non-jule files, and file annotation fails.
-		if dirent.stat.is_dir() ||
-			!name.has_suffix(EXT) ||
-			!is_pass_file_annotation(name) {
+		// Skip directories, and non-jule files.
+		if dirent.stat.is_dir() || !name.has_suffix(EXT) {
 			continue
 		}
 
@@ -119,7 +117,7 @@ impl Importer for PlainImporter {
 			ret nil, errors
 		}
 
-		let mut asts: []&Ast = nil
+		let mut asts = make([]&Ast, 0, dirents.len)
 		for _, dirent in dirents {
 			let path = join(path, dirent.name)
 			let mut file = new_file_set(path)
@@ -131,6 +129,11 @@ impl Importer for PlainImporter {
 			let mut finfo = parse_file(file)
 			if finfo.errors.len > 0 {
 				ret nil, finfo.errors
+			}
+
+			// Skip this source file if file annotation is failed.
+			if !is_pass_file_annotation(dirent.name) {
+				continue
 			}
 
 			// Skip file if can't pass build directives.
