@@ -5,98 +5,98 @@
 use std::fs::path::{base, ext}
 
 fn check_os(arg: str): (ok: bool, exist: bool) {
-	ok = false
-	exist = true
+    ok = false
+    exist = true
 
-	match arg {
-	| str(Os.Windows): ok = is_windows(OS)
-	| str(Os.Darwin):  ok = is_darwin(OS)
-	| str(Os.Linux):   ok = is_linux(OS)
-	| str(Os.Unix):    ok = is_unix(OS)
-	|:
-		ok = true
-		exist = false
-	}
+    match arg {
+    | str(Os.Windows): ok = is_windows(OS)
+    | str(Os.Darwin):  ok = is_darwin(OS)
+    | str(Os.Linux):   ok = is_linux(OS)
+    | str(Os.Unix):    ok = is_unix(OS)
+    |:
+        ok = true
+        exist = false
+    }
 
-	ret
+    ret
 }
 
 fn check_arch(arg: str): (ok: bool, exist: bool) {
-	ok = false
-	exist = true
+    ok = false
+    exist = true
 
-	match arg {
-	| str(Arch.I386):  ok = is_i386(ARCH)
-	| str(Arch.Amd64): ok = is_amd64(ARCH)
-	| str(Arch.Arm64): ok = is_arm64(ARCH)
-	| str(Arch.Bit64): ok = is_64bit(ARCH)
-	| str(Arch.Bit32): ok = is_32bit(ARCH)
-	|:
-		ok = true
-		exist = false
-	}
+    match arg {
+    | str(Arch.I386):  ok = is_i386(ARCH)
+    | str(Arch.Amd64): ok = is_amd64(ARCH)
+    | str(Arch.Arm64): ok = is_arm64(ARCH)
+    | str(Arch.Bit64): ok = is_64bit(ARCH)
+    | str(Arch.Bit32): ok = is_32bit(ARCH)
+    |:
+        ok = true
+        exist = false
+    }
 
-	ret
+    ret
 }
 
 // Reports whether file path passes file annotation by current system.
 pub fn is_pass_file_annotation(mut p: str): bool {
-	p = base(p)
-	let n = p.len
-	p = p[:n-ext(p).len]
+    p = base(p)
+    let n = p.len
+    p = p[:n-ext(p).len]
 
-	// a1 is the second annotation.
-	// Should be architecture annotation if exist annotation 2 (aka a2),
-	// can operating system or architecture annotation if not.
-	let mut a1 = ""
-	// a2 is first filter.
-	// Should be operating system filter if exist and valid annotation.
-	let mut a2 = ""
+    // a1 is the second annotation.
+    // Should be architecture annotation if exist annotation 2 (aka a2),
+    // can operating system or architecture annotation if not.
+    let mut a1 = ""
+    // a2 is first filter.
+    // Should be operating system filter if exist and valid annotation.
+    let mut a2 = ""
 
-	// Annotation 1
-	let mut i = p.rfind("_")
-	if i == -1 {
-		// Check file name directly if not exist any _ character.
-		let (mut ok, mut exist) = check_os(p)
-		if exist {
-			ret ok
-		}
-		ok, exist = check_arch(p)
-		ret !exist || ok
-	}
-	if i+1 >= n {
-		ret true
-	}
-	a1 = p[i+1:]
+    // Annotation 1
+    let mut i = p.rfind("_")
+    if i == -1 {
+        // Check file name directly if not exist any _ character.
+        let (mut ok, mut exist) = check_os(p)
+        if exist {
+            ret ok
+        }
+        ok, exist = check_arch(p)
+        ret !exist || ok
+    }
+    if i+1 >= n {
+        ret true
+    }
+    a1 = p[i+1:]
 
-	p = p[:i]
+    p = p[:i]
 
-	// Annotation 2
-	i = p.rfind("_")
-	if i != -1 {
-		a2 = p[i+1:]
-	}
+    // Annotation 2
+    i = p.rfind("_")
+    if i != -1 {
+        a2 = p[i+1:]
+    }
 
-	if a2 == "" {
-		let (mut ok, mut exist) = check_os(a1)
-		if exist {
-			ret ok
-		}
-		ok, exist = check_arch(a1)
-		ret !exist || ok
-	}
+    if a2 == "" {
+        let (mut ok, mut exist) = check_os(a1)
+        if exist {
+            ret ok
+        }
+        ok, exist = check_arch(a1)
+        ret !exist || ok
+    }
 
-	let (mut ok, mut exist) = check_arch(a1)
-	if exist {
-		if !ok {
-			ret false
-		}
-		let (ok, exist) = check_os(a2)
-		ret !exist || ok
-	}
+    let (mut ok, mut exist) = check_arch(a1)
+    if exist {
+        if !ok {
+            ret false
+        }
+        let (ok, exist) = check_os(a2)
+        ret !exist || ok
+    }
 
-	// a1 is not architecture, for this reason bad couple pattern.
-	// Accept as one pattern, so a1 can be platform.
-	ok, exist = check_os(a1)
-	ret !exist || ok
+    // a1 is not architecture, for this reason bad couple pattern.
+    // Accept as one pattern, so a1 can be platform.
+    ok, exist = check_os(a1)
+    ret !exist || ok
 }

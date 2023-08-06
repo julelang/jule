@@ -6,15 +6,15 @@ use std::conv::{itoa, fmt_uint}
 use std::jule::build::{ENTRY_POINT, Directive}
 use std::jule::lex::{TokenKind, is_anon_ident, is_ignore_ident}
 use std::jule::sema::{
-	Fn,
-	FnIns,
-	Trait,
-	Struct,
-	StructIns,
-	Field,
-	Var,
-	Param,
-	TypeKind,
+    Fn,
+    FnIns,
+    Trait,
+    Struct,
+    StructIns,
+    Field,
+    Var,
+    Param,
+    TypeKind,
 }
 
 // Identifier of initialize function caller function.
@@ -26,23 +26,23 @@ fn as_ident(ident: str): str { ret "_" + ident }
 
 // Returns given identifier as Jule type identifier.
 fn as_jt(id: str): str {
-	let mut ident = ([]rune)(id)
-	if 97 <= ident[0] && ident[0] <= 122 {
-		ident[0] -= 32
-	}
-	ret "jule::" + str(ident)
+    let mut ident = ([]rune)(id)
+    if 97 <= ident[0] && ident[0] <= 122 {
+        ident[0] -= 32
+    }
+    ret "jule::" + str(ident)
 }
 
 // Returns cpp output identifier form of pointer address.
 fn get_ptr_as_ident(ptr: uintptr): str {
-	let mut addr = "_" + fmt_uint(u64(ptr), 16)
-	for i, r in addr {
-		if r != '0' {
-			addr = addr[i:]
-			break
-		}
-	}
-	ret addr
+    let mut addr = "_" + fmt_uint(u64(ptr), 16)
+    for i, r in addr {
+        if r != '0' {
+            addr = addr[i:]
+            break
+        }
+    }
+    ret addr
 }
 
 // Returns cpp output identifier form of given identifier.
@@ -51,10 +51,10 @@ fn get_ptr_as_ident(ptr: uintptr): str {
 //   - ident: Identifier.
 //   - ptr:   Pointer address of package file handler.
 fn as_out_ident(ident: str, ptr: uintptr): str {
-	if ptr != 0 {
-		ret get_ptr_as_ident(ptr) + "_" + ident
-	}
-	ret as_ident(ident)
+    if ptr != 0 {
+        ret get_ptr_as_ident(ptr) + "_" + ident
+    }
+    ret as_ident(ident)
 }
 
 // Returns cpp output local identifier form of fiven identifier.
@@ -64,152 +64,152 @@ fn as_out_ident(ident: str, ptr: uintptr): str {
 //   - col:   Column of definition.
 //   - ident: Identifier of definition.
 fn as_local_ident(row: int, col: int, mut ident: str): str {
-	ident = itoa(row) + itoa(col) + "_" + ident
-	ret as_ident(ident)
+    ident = itoa(row) + itoa(col) + "_" + ident
+    ret as_ident(ident)
 }
 
 // Returns output identifier of function.
 fn fn_out_ident(f: &Fn): str {
-	match {
-	| f.cpp_linked:
-		ret f.ident
+    match {
+    | f.cpp_linked:
+        ret f.ident
 
-	| f.ident == ENTRY_POINT:
-		ret "entry_point"
+    | f.ident == ENTRY_POINT:
+        ret "entry_point"
 
-	| f.is_method():
-		if f.statically {
-			ret "_static_method_" + f.ident
-		}
-		ret "_method_" + f.ident
+    | f.is_method():
+        if f.statically {
+            ret "_static_method_" + f.ident
+        }
+        ret "_method_" + f.ident
 
-	|:
-		ret as_out_ident(f.ident, f.token.file.addr())
-	}
+    |:
+        ret as_out_ident(f.ident, f.token.file.addr())
+    }
 }
 
 // Returns output identifier of function instance.
 fn fn_ins_out_ident(f: &FnIns): str {
-	if f.is_builtin() {
-		ret "jule::" + f.decl.ident
-	}
+    if f.is_builtin() {
+        ret "jule::" + f.decl.ident
+    }
 
-	if f.decl.cpp_linked || f.generics.len == 0 {
-		ret fn_out_ident(f.decl)
-	}
+    if f.decl.cpp_linked || f.generics.len == 0 {
+        ret fn_out_ident(f.decl)
+    }
 
-	for i, ins in f.decl.instances {
-		let kind = &TypeKind{kind: ins}
-		if f.equals(kind) {
-			ret fn_out_ident(f.decl) + "_" + itoa(i)
-		}
-	}
+    for i, ins in f.decl.instances {
+        let kind = &TypeKind{kind: ins}
+        if f.equals(kind) {
+            ret fn_out_ident(f.decl) + "_" + itoa(i)
+        }
+    }
 
-	ret "__?__"
+    ret "__?__"
 }
 
 // Returns output identifier of trait.
 fn trait_out_ident(t: &Trait): str {
-	if t.is_builtin() {
-		ret "jule::" + t.ident
-	}
-	ret as_out_ident(t.ident, t.token.file.addr())
+    if t.is_builtin() {
+        ret "jule::" + t.ident
+    }
+    ret as_out_ident(t.ident, t.token.file.addr())
 }
 
 // Returns output identifier of parameter.
 fn param_out_ident(p: &Param): str {
-	if is_anon_ident(p.ident) || is_ignore_ident(p.ident) {
-		ret ""
-	}
-	ret as_local_ident(p.token.row, p.token.column, p.ident)
+    if is_anon_ident(p.ident) || is_ignore_ident(p.ident) {
+        ret ""
+    }
+    ret as_local_ident(p.token.row, p.token.column, p.ident)
 }
 
 // Returns output identifier of structure.
 fn struct_out_ident(s: &Struct): str {
-	if s.cpp_linked {
-		if has_directive(s.directives, str(Directive.Typedef)) {
-			ret s.ident
-		}
-		ret "struct " + s.ident
-	}
-	ret as_out_ident(s.ident, s.token.file.addr())
+    if s.cpp_linked {
+        if has_directive(s.directives, str(Directive.Typedef)) {
+            ret s.ident
+        }
+        ret "struct " + s.ident
+    }
+    ret as_out_ident(s.ident, s.token.file.addr())
 }
 
 // Returns output identifier of structure instance.
 fn struct_ins_out_ident(s: &StructIns): str {
-	if s.decl.cpp_linked || s.generics.len == 0 {
-		ret struct_out_ident(s.decl)
-	}
+    if s.decl.cpp_linked || s.generics.len == 0 {
+        ret struct_out_ident(s.decl)
+    }
 
-	for i, ins in s.decl.instances {
-		let kind = &TypeKind{kind: ins}
-		if s.equals(kind) {
-			ret struct_out_ident(s.decl) + "_" + itoa(i)
-		}
-	}
+    for i, ins in s.decl.instances {
+        let kind = &TypeKind{kind: ins}
+        if s.equals(kind) {
+            ret struct_out_ident(s.decl) + "_" + itoa(i)
+        }
+    }
 
-	ret "__?__"
+    ret "__?__"
 }
 
 // Returns output identifier of field.
 fn field_out_ident(f: &Field): str {
-	if f.owner.cpp_linked {
-		ret f.ident
-	}
-	ret "_field_" + f.ident
+    if f.owner.cpp_linked {
+        ret f.ident
+    }
+    ret "_field_" + f.ident
 }
 
 // Returns output identifier of variable.
 fn var_out_ident(mut v: &Var): str {
-	match {
-	| v.cpp_linked:
-		ret v.ident
+    match {
+    | v.cpp_linked:
+        ret v.ident
 
-	| v.ident == str(TokenKind.Self):
-		if real(v.kind.kind.ref()) {
-			ret "this->self"
-		}
-		ret "(*this)"
+    | v.ident == str(TokenKind.Self):
+        if real(v.kind.kind.ref()) {
+            ret "this->self"
+        }
+        ret "(*this)"
 
-	| real(v.scope):
-		ret as_local_ident(v.token.row, v.token.column, v.ident)
+    | real(v.scope):
+        ret as_local_ident(v.token.row, v.token.column, v.ident)
 
-	|:
-		ret as_out_ident(v.ident, v.token.file.addr())
-	}
+    |:
+        ret as_out_ident(v.ident, v.token.file.addr())
+    }
 }
 
 // Returns begin label identifier of iteration.
 fn iter_begin_label_ident(it: uintptr): str {
-	ret "_iter_begin_" + itoa(int(it))
+    ret "_iter_begin_" + itoa(int(it))
 }
 
 // Returns end label identifier of iteration.
 fn iter_end_label_ident(it: uintptr): str {
-	ret "_iter_end_" + itoa(int(it))
+    ret "_iter_end_" + itoa(int(it))
 }
 
 // Returns next label identifier of iteration.
 fn iter_next_label_ident(it: uintptr): str {
-	ret "_iter_next_" + itoa(int(it))
+    ret "_iter_next_" + itoa(int(it))
 }
 
 // Returns label identifier.
 fn label_ident(ident: str): str {
-	ret "_julec_label_" + ident
+    ret "_julec_label_" + ident
 }
 
 // Returns end label identifier of match-case.
 fn match_end_label_ident(m: uintptr): str {
-	ret "_match_end_" + itoa(int(m))
+    ret "_match_end_" + itoa(int(m))
 }
 
 // Returns begin label identifier of case.
 fn case_begin_label_ident(c: uintptr): str {
-	ret "_case_begin_" + itoa(int(c))
+    ret "_case_begin_" + itoa(int(c))
 }
 
 // Returns end label identifier of case.
 fn case_end_label_ident(c: uintptr): str {
-	ret "_case_end_" + itoa(int(c))
+    ret "_case_end_" + itoa(int(c))
 }

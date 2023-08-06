@@ -62,118 +62,118 @@
 //  pow(-inf, y) = pow(-0, -y)
 //  pow(x, y) = nan for finite x < 0 and finite non-integer y
 pub fn pow(x: f64, y: f64): f64 {
-	match {
-	| y == 0 | x == 1:
-		ret 1
-	| y == 1:
-		ret x
-	| is_nan(x) | is_nan(y):
-		ret nan()
-	| x == 0:
-		match {
-		| y < 0:
-			if is_odd_int(y) {
-				ret copysign(inf(1), x)
-			}
-			ret inf(1)
-		| y > 0:
-			if is_odd_int(y) {
-				ret x
-			}
-			ret 0
-		}
-	| is_inf(y, 0):
-		match {
-		| x == -1:
-			ret 1
-		| (abs(x) < 1) == is_inf(y, 1):
-			ret 0
-		|:
-			ret inf(1)
-		}
-	| is_inf(x, 0):
-		if is_inf(x, -1) {
-			ret pow(1/x, -y) // pow(-0, -y)
-		}
-		match {
-		| y < 0: ret 0
-		| y > 0: ret inf(1)
-		}
-	| y == 0.5:
-		ret sqrt(x)
-	| y == -0.5:
-		ret 1 / sqrt(x)
-	}
+    match {
+    | y == 0 | x == 1:
+        ret 1
+    | y == 1:
+        ret x
+    | is_nan(x) | is_nan(y):
+        ret nan()
+    | x == 0:
+        match {
+        | y < 0:
+            if is_odd_int(y) {
+                ret copysign(inf(1), x)
+            }
+            ret inf(1)
+        | y > 0:
+            if is_odd_int(y) {
+                ret x
+            }
+            ret 0
+        }
+    | is_inf(y, 0):
+        match {
+        | x == -1:
+            ret 1
+        | (abs(x) < 1) == is_inf(y, 1):
+            ret 0
+        |:
+            ret inf(1)
+        }
+    | is_inf(x, 0):
+        if is_inf(x, -1) {
+            ret pow(1/x, -y) // pow(-0, -y)
+        }
+        match {
+        | y < 0: ret 0
+        | y > 0: ret inf(1)
+        }
+    | y == 0.5:
+        ret sqrt(x)
+    | y == -0.5:
+        ret 1 / sqrt(x)
+    }
 
-	let (mut yi, mut yf) = modf(abs(y))
-	if yf != 0 && x < 0 {
-		ret nan()
-	}
-	if yi >= 1<<63 {
-		// yi is a large even int that will lead to overflow (or underflow to 0)
-		// for all x except -1 (x == 1 was handled earlier)
-		match {
-		| x == -1:
-			ret 1
-		| (abs(x) < 1) == (y > 0):
-			ret 0
-		|:
-			ret inf(1)
-		}
-	}
+    let (mut yi, mut yf) = modf(abs(y))
+    if yf != 0 && x < 0 {
+        ret nan()
+    }
+    if yi >= 1<<63 {
+        // yi is a large even int that will lead to overflow (or underflow to 0)
+        // for all x except -1 (x == 1 was handled earlier)
+        match {
+        | x == -1:
+            ret 1
+        | (abs(x) < 1) == (y > 0):
+            ret 0
+        |:
+            ret inf(1)
+        }
+    }
 
-	// ans = a1 * 2**ae (= 1 for now).
-	let mut a1 = 1.0
-	let mut ae = 0
+    // ans = a1 * 2**ae (= 1 for now).
+    let mut a1 = 1.0
+    let mut ae = 0
 
-	// ans *= x**yf
-	if yf != 0 {
-		if yf > 0.5 {
-			yf--
-			yi++
-		}
-		a1 = exp(yf * log(x))
-	}
+    // ans *= x**yf
+    if yf != 0 {
+        if yf > 0.5 {
+            yf--
+            yi++
+        }
+        a1 = exp(yf * log(x))
+    }
 
-	// ans *= x**yi
-	// by multiplying in successive squarings
-	// of x according to bits of yi.
-	// accumulate powers of two into exp.
-	let (mut x1, mut xe) = frexp(x)
-	let mut i = i64(yi)
-	for i != 0; i >>= 1 {
-		if xe < -1<<12 || 1<<12 < xe {
-			// catch xe before it overflows the left shift below
-			// Since i !=0 it has at least one bit still set, so ae will accumulate xe
-			// on at least one more iteration, ae += xe is a lower bound on ae
-			// the lower bound on ae exceeds the size of a float64 exp
-			// so the final call to Ldexp will produce under/overflow (0/Inf)
-			ae += xe
-			break
-		}
-		if i&1 == 1 {
-			a1 *= x1
-			ae += xe
-		}
-		x1 *= x1
-		xe <<= 1
-		if x1 < 0.5 {
-			x1 += x1
-			xe--
-		}
-	}
+    // ans *= x**yi
+    // by multiplying in successive squarings
+    // of x according to bits of yi.
+    // accumulate powers of two into exp.
+    let (mut x1, mut xe) = frexp(x)
+    let mut i = i64(yi)
+    for i != 0; i >>= 1 {
+        if xe < -1<<12 || 1<<12 < xe {
+            // catch xe before it overflows the left shift below
+            // Since i !=0 it has at least one bit still set, so ae will accumulate xe
+            // on at least one more iteration, ae += xe is a lower bound on ae
+            // the lower bound on ae exceeds the size of a float64 exp
+            // so the final call to Ldexp will produce under/overflow (0/Inf)
+            ae += xe
+            break
+        }
+        if i&1 == 1 {
+            a1 *= x1
+            ae += xe
+        }
+        x1 *= x1
+        xe <<= 1
+        if x1 < 0.5 {
+            x1 += x1
+            xe--
+        }
+    }
 
-	// ans = a1*2**ae
-	// if y < 0 { ans = 1 / ans }
-	// but in the opposite order
-	if y < 0 {
-		a1 = 1 / a1
-		ae = -ae
-	}
-	ret ldexp(a1, ae)
+    // ans = a1*2**ae
+    // if y < 0 { ans = 1 / ans }
+    // but in the opposite order
+    if y < 0 {
+        a1 = 1 / a1
+        ae = -ae
+    }
+    ret ldexp(a1, ae)
 }
 
 fn is_odd_int(x: f64): bool {
-	let (xi, xf) = modf(x)
-	ret xf == 0 && i64(xi)&1 == 1
+    let (xi, xf) = modf(x)
+    ret xf == 0 && i64(xi)&1 == 1
 }

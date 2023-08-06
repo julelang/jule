@@ -8,272 +8,272 @@ use std::vector::{Vector}
 // Symbol table.
 // Builds by semantic analyzer.
 pub struct SymbolTable {
-	pub file:         &File               // Owner fileset of this symbol table.
-	pub passes:       Vector[Pass]        // All passed flags with jule:pass directive.
-	pub imports:      Vector[&ImportInfo] // Imported packages.
-	pub vars:         Vector[&Var]        // Variables.
-	pub type_aliases: Vector[&TypeAlias]  // Type aliases.
-	pub structs:      Vector[&Struct]     // Structures.
-	pub funcs:        Vector[&Fn]         // Functions.
-	pub traits:       Vector[&Trait]      // Traits.
-	pub enums:        Vector[&Enum]       // Enums.
-	pub impls:        Vector[&Impl]       // Implementations.
+    pub file:         &File               // Owner fileset of this symbol table.
+    pub passes:       Vector[Pass]        // All passed flags with jule:pass directive.
+    pub imports:      Vector[&ImportInfo] // Imported packages.
+    pub vars:         Vector[&Var]        // Variables.
+    pub type_aliases: Vector[&TypeAlias]  // Type aliases.
+    pub structs:      Vector[&Struct]     // Structures.
+    pub funcs:        Vector[&Fn]         // Functions.
+    pub traits:       Vector[&Trait]      // Traits.
+    pub enums:        Vector[&Enum]       // Enums.
+    pub impls:        Vector[&Impl]       // Implementations.
 }
 
 impl Lookup for SymbolTable {
-	// Returns imported package by identifier.
-	// Returns nil reference if not exist any package in this identifier.
-	fn find_package(mut self, ident: str): &ImportInfo {
-		let mut i = 0
-		for i < self.imports.len(); i++ {
-			let mut pkg = self.imports.at(i)
-			if pkg.ident == ident {
-				ret pkg
-			}
-		}
-		ret new(ImportInfo)
-	}
+    // Returns imported package by identifier.
+    // Returns nil reference if not exist any package in this identifier.
+    fn find_package(mut self, ident: str): &ImportInfo {
+        let mut i = 0
+        for i < self.imports.len(); i++ {
+            let mut pkg = self.imports.at(i)
+            if pkg.ident == ident {
+                ret pkg
+            }
+        }
+        ret new(ImportInfo)
+    }
 
-	// Returns imported package by selector.
-	// Returns nil reference if selector returns false for all packages.
-	// Returns nil reference if selector is nil.
-	fn select_package(mut self, selector: fn(&ImportInfo): bool): &ImportInfo {
-		if selector == nil {
-			ret new(ImportInfo)
-		}
+    // Returns imported package by selector.
+    // Returns nil reference if selector returns false for all packages.
+    // Returns nil reference if selector is nil.
+    fn select_package(mut self, selector: fn(&ImportInfo): bool): &ImportInfo {
+        if selector == nil {
+            ret new(ImportInfo)
+        }
 
-		let mut i = 0
-		for i < self.imports.len(); i++ {
-			let mut pkg = self.imports.at(i)
-			if selector(pkg) {
-				ret pkg
-			}
-		}
-		ret new(ImportInfo)
-	}
+        let mut i = 0
+        for i < self.imports.len(); i++ {
+            let mut pkg = self.imports.at(i)
+            if selector(pkg) {
+                ret pkg
+            }
+        }
+        ret new(ImportInfo)
+    }
 
-	// Returns variable by identifier and cpp linked state.
-	// Returns nil if refenrece not exist any variable in this identifier.
-	fn find_var(mut self, ident: str, cpp_linked: bool): &Var {
-		ret self.__find_var(ident, cpp_linked, false)
-	}
+    // Returns variable by identifier and cpp linked state.
+    // Returns nil if refenrece not exist any variable in this identifier.
+    fn find_var(mut self, ident: str, cpp_linked: bool): &Var {
+        ret self.__find_var(ident, cpp_linked, false)
+    }
 
-	// Returns type alias by identifier and cpp linked state.
-	// Returns nil reference if not exist any type alias in this identifier.
-	fn find_type_alias(mut self, ident: str, cpp_linked: bool): &TypeAlias {
-		ret self.__find_type_alias(ident, cpp_linked, false)
-	}
+    // Returns type alias by identifier and cpp linked state.
+    // Returns nil reference if not exist any type alias in this identifier.
+    fn find_type_alias(mut self, ident: str, cpp_linked: bool): &TypeAlias {
+        ret self.__find_type_alias(ident, cpp_linked, false)
+    }
 
-	// Returns struct by identifier and cpp linked state.
-	// Returns nil reference if not exist any struct in this identifier.
-	fn find_struct(mut self, ident: str, cpp_linked: bool): &Struct {
-		let mut i = 0
-		for i < self.structs.len(); i++ {
-			let mut s = self.structs.at(i)
-			if s.ident == ident && s.cpp_linked == cpp_linked {
-				ret s
-			}
-		}
-		ret new(Struct)
-	}
+    // Returns struct by identifier and cpp linked state.
+    // Returns nil reference if not exist any struct in this identifier.
+    fn find_struct(mut self, ident: str, cpp_linked: bool): &Struct {
+        let mut i = 0
+        for i < self.structs.len(); i++ {
+            let mut s = self.structs.at(i)
+            if s.ident == ident && s.cpp_linked == cpp_linked {
+                ret s
+            }
+        }
+        ret new(Struct)
+    }
 
-	// Returns function by identifier and cpp linked state.
-	// Returns nil reference if not exist any function in this identifier.
-	fn find_fn(mut self, ident: str, cpp_linked: bool): &Fn {
-		let mut i = 0
-		for i < self.funcs.len(); i++ {
-			let mut f = self.funcs.at(i)
-			if f.ident == ident && f.cpp_linked == cpp_linked {
-				ret f
-			}
-		}
-		ret new(Fn)
-	}
+    // Returns function by identifier and cpp linked state.
+    // Returns nil reference if not exist any function in this identifier.
+    fn find_fn(mut self, ident: str, cpp_linked: bool): &Fn {
+        let mut i = 0
+        for i < self.funcs.len(); i++ {
+            let mut f = self.funcs.at(i)
+            if f.ident == ident && f.cpp_linked == cpp_linked {
+                ret f
+            }
+        }
+        ret new(Fn)
+    }
 
-	// Returns trait by identifier.
-	// Returns nil reference if not exist any trait in this identifier.
-	fn find_trait(mut self, ident: str): &Trait {
-		let mut i = 0
-		for i < self.traits.len(); i++ {
-			let mut t = self.traits.at(i)
-			if t.ident == ident {
-				ret t
-			}
-		}
-		ret new(Trait)
-	}
+    // Returns trait by identifier.
+    // Returns nil reference if not exist any trait in this identifier.
+    fn find_trait(mut self, ident: str): &Trait {
+        let mut i = 0
+        for i < self.traits.len(); i++ {
+            let mut t = self.traits.at(i)
+            if t.ident == ident {
+                ret t
+            }
+        }
+        ret new(Trait)
+    }
 
-	// Returns enum by identifier.
-	// Returns nil reference if not exist any enum in this identifier.
-	fn find_enum(mut self, ident: str): &Enum {
-		let mut i = 0
-		for i < self.enums.len(); i++ {
-			let mut e = self.enums.at(i)
-			if e.ident == ident {
-				ret e
-			}
-		}
-		ret new(Enum)
-	}
+    // Returns enum by identifier.
+    // Returns nil reference if not exist any enum in this identifier.
+    fn find_enum(mut self, ident: str): &Enum {
+        let mut i = 0
+        for i < self.enums.len(); i++ {
+            let mut e = self.enums.at(i)
+            if e.ident == ident {
+                ret e
+            }
+        }
+        ret new(Enum)
+    }
 }
 
 impl SymbolTable {
-	fn __find_var(mut self, ident: str, cpp_linked: bool, reverse: bool): &Var {
-		if reverse {
-			let mut i = self.vars.len() - 1
-			for i >= 0; i-- {
-				let mut v = self.vars.at(i)
-				if v.ident == ident && v.cpp_linked == cpp_linked {
-					ret v
-				}
-			}
-		} else {
-			let mut i = 0
-			for i < self.vars.len(); i++ {
-				let mut v = self.vars.at(i)
-				if v.ident == ident && v.cpp_linked == cpp_linked {
-					ret v
-				}
-			}
-		}
-		ret new(Var)
-	}
+    fn __find_var(mut self, ident: str, cpp_linked: bool, reverse: bool): &Var {
+        if reverse {
+            let mut i = self.vars.len() - 1
+            for i >= 0; i-- {
+                let mut v = self.vars.at(i)
+                if v.ident == ident && v.cpp_linked == cpp_linked {
+                    ret v
+                }
+            }
+        } else {
+            let mut i = 0
+            for i < self.vars.len(); i++ {
+                let mut v = self.vars.at(i)
+                if v.ident == ident && v.cpp_linked == cpp_linked {
+                    ret v
+                }
+            }
+        }
+        ret new(Var)
+    }
 
-	fn __find_type_alias(mut self, ident: str, cpp_linked: bool, reverse: bool): &TypeAlias {
-		if reverse {
-			let mut i = self.type_aliases.len() - 1
-			for i >= 0; i-- {
-				let mut ta = self.type_aliases.at(i)
-				if ta.ident == ident && ta.cpp_linked == cpp_linked {
-					ret ta
-				}
-			}
-		} else {
-			let mut i = 0
-			for i < self.type_aliases.len(); i++ {
-				let mut ta = self.type_aliases.at(i)
-				if ta.ident == ident && ta.cpp_linked == cpp_linked {
-					ret ta
-				}
-			}
-		}
-		ret new(TypeAlias)
-	}
+    fn __find_type_alias(mut self, ident: str, cpp_linked: bool, reverse: bool): &TypeAlias {
+        if reverse {
+            let mut i = self.type_aliases.len() - 1
+            for i >= 0; i-- {
+                let mut ta = self.type_aliases.at(i)
+                if ta.ident == ident && ta.cpp_linked == cpp_linked {
+                    ret ta
+                }
+            }
+        } else {
+            let mut i = 0
+            for i < self.type_aliases.len(); i++ {
+                let mut ta = self.type_aliases.at(i)
+                if ta.ident == ident && ta.cpp_linked == cpp_linked {
+                    ret ta
+                }
+            }
+        }
+        ret new(TypeAlias)
+    }
 
-	// Returns define by identifier.
-	// Returns nil reference if not exist any define in this identifier.
-	fn def_by_ident(mut self, ident: str, cpp_linked: bool): any {
-		let mut i = 0
-		for i < self.vars.len(); i++ {
-			let mut v = self.vars.at(i)
-			if v.ident == ident && v.cpp_linked == cpp_linked {
-				ret v
-			}
-		}
+    // Returns define by identifier.
+    // Returns nil reference if not exist any define in this identifier.
+    fn def_by_ident(mut self, ident: str, cpp_linked: bool): any {
+        let mut i = 0
+        for i < self.vars.len(); i++ {
+            let mut v = self.vars.at(i)
+            if v.ident == ident && v.cpp_linked == cpp_linked {
+                ret v
+            }
+        }
 
-		i = 0
-		for i < self.type_aliases.len(); i++ {
-			let mut ta = self.type_aliases.at(i)
-			if ta.ident == ident && ta.cpp_linked == cpp_linked {
-				ret ta
-			}
-		}
+        i = 0
+        for i < self.type_aliases.len(); i++ {
+            let mut ta = self.type_aliases.at(i)
+            if ta.ident == ident && ta.cpp_linked == cpp_linked {
+                ret ta
+            }
+        }
 
-		i = 0
-		for i < self.structs.len(); i++ {
-			let mut s = self.structs.at(i)
-			if s.ident == ident && s.cpp_linked == cpp_linked {
-				ret s
-			}
-		}
+        i = 0
+        for i < self.structs.len(); i++ {
+            let mut s = self.structs.at(i)
+            if s.ident == ident && s.cpp_linked == cpp_linked {
+                ret s
+            }
+        }
 
-		i = 0
-		for i < self.funcs.len(); i++ {
-			let mut f = self.funcs.at(i)
-			if f.ident == ident && f.cpp_linked == cpp_linked {
-				ret f
-			}
-		}
+        i = 0
+        for i < self.funcs.len(); i++ {
+            let mut f = self.funcs.at(i)
+            if f.ident == ident && f.cpp_linked == cpp_linked {
+                ret f
+            }
+        }
 
-		if cpp_linked {
-			ret nil
-		}
+        if cpp_linked {
+            ret nil
+        }
 
-		i = 0
-		for i < self.traits.len(); i++ {
-			let mut t = self.traits.at(i)
-			if t.ident == ident {
-				ret t
-			}
-		}
+        i = 0
+        for i < self.traits.len(); i++ {
+            let mut t = self.traits.at(i)
+            if t.ident == ident {
+                ret t
+            }
+        }
 
-		i = 0
-		for i < self.enums.len(); i++ {
-			let mut e = self.enums.at(i)
-			if e.ident == ident {
-				ret e
-			}
-		}
+        i = 0
+        for i < self.enums.len(); i++ {
+            let mut e = self.enums.at(i)
+            if e.ident == ident {
+                ret e
+            }
+        }
 
-		ret nil
-	}
+        ret nil
+    }
 
-	// Reports this identifier duplicated in symbol table.
-	// The "self" parameter represents address of exception identifier.
-	// If founded identifier address equals to self, will be skipped.
-	fn is_duplicated_ident(self, itself: uintptr, ident: str, cpp_linked: bool): bool {
-		let mut i = 0
-		for i < self.vars.len(); i++ {
-			let v = unsafe { (&self.vars).at(i) }
-			if uintptr(&v) != itself && v.ident == ident && v.cpp_linked == cpp_linked {
-				ret true
-			}
-		}
+    // Reports this identifier duplicated in symbol table.
+    // The "self" parameter represents address of exception identifier.
+    // If founded identifier address equals to self, will be skipped.
+    fn is_duplicated_ident(self, itself: uintptr, ident: str, cpp_linked: bool): bool {
+        let mut i = 0
+        for i < self.vars.len(); i++ {
+            let v = unsafe { (&self.vars).at(i) }
+            if uintptr(&v) != itself && v.ident == ident && v.cpp_linked == cpp_linked {
+                ret true
+            }
+        }
 
-		i = 0
-		for i < self.type_aliases.len(); i++ {
-			let ta = unsafe { (&self.type_aliases).at(i) }
-			if uintptr(&ta) != itself && ta.ident == ident && ta.cpp_linked == cpp_linked {
-				ret true
-			}
-		}
+        i = 0
+        for i < self.type_aliases.len(); i++ {
+            let ta = unsafe { (&self.type_aliases).at(i) }
+            if uintptr(&ta) != itself && ta.ident == ident && ta.cpp_linked == cpp_linked {
+                ret true
+            }
+        }
 
-		i = 0
-		for i < self.structs.len(); i++ {
-			let s = unsafe { (&self.structs).at(i) }
-			if uintptr(&s) != itself && s.ident == ident && s.cpp_linked == cpp_linked {
-				ret true
-			}
-		}
+        i = 0
+        for i < self.structs.len(); i++ {
+            let s = unsafe { (&self.structs).at(i) }
+            if uintptr(&s) != itself && s.ident == ident && s.cpp_linked == cpp_linked {
+                ret true
+            }
+        }
 
-		i = 0
-		for i < self.funcs.len(); i++ {
-			let f = unsafe { (&self.funcs).at(i) }
-			if uintptr(&f) != itself && f.ident == ident && f.cpp_linked == cpp_linked {
-				ret true
-			}
-		}
+        i = 0
+        for i < self.funcs.len(); i++ {
+            let f = unsafe { (&self.funcs).at(i) }
+            if uintptr(&f) != itself && f.ident == ident && f.cpp_linked == cpp_linked {
+                ret true
+            }
+        }
 
-		if cpp_linked {
-			ret false
-		}
+        if cpp_linked {
+            ret false
+        }
 
-		i = 0
-		for i < self.traits.len(); i++ {
-			let t = unsafe { (&self.traits).at(i) }
-			if uintptr(&t) != itself && t.ident == ident {
-				ret true
-			}
-		}
+        i = 0
+        for i < self.traits.len(); i++ {
+            let t = unsafe { (&self.traits).at(i) }
+            if uintptr(&t) != itself && t.ident == ident {
+                ret true
+            }
+        }
 
-		i = 0
-		for i < self.enums.len(); i++ {
-			let e = unsafe { (&self.enums).at(i) }
-			if uintptr(&e) != itself && e.ident == ident {
-				ret true
-			}
-		}
+        i = 0
+        for i < self.enums.len(); i++ {
+            let e = unsafe { (&self.enums).at(i) }
+            if uintptr(&e) != itself && e.ident == ident {
+                ret true
+            }
+        }
 
-		ret false
-	}
+        ret false
+    }
 }

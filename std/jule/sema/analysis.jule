@@ -7,41 +7,41 @@ use std::jule::build::{Log}
 
 // Builds symbol table of AST.
 fn build_symbols(mut ast: &Ast, mut importer: Importer, mut owner: &SymbolBuilder): (&SymbolTable, []Log) {
-	let mut sb = &SymbolBuilder{
-		ast:      ast,
-		importer: importer,
-		owner:    owner,
-	}
-	sb.build()
+    let mut sb = &SymbolBuilder{
+        ast:      ast,
+        importer: importer,
+        owner:    owner,
+    }
+    sb.build()
 
-	if sb.errors.len == 0 {
-		ret sb.table, nil
-	}
-	ret new(SymbolTable), sb.errors
+    if sb.errors.len == 0 {
+        ret sb.table, nil
+    }
+    ret new(SymbolTable), sb.errors
 }
 
 fn __analyze_package(mut files: []&Ast, mut importer: Importer): (&Package, []Log) {
-	// Build symbol tables of files.
-	let mut tables = make([]&SymbolTable, files.len)
-	for (i, mut f) in files {
-		let (mut table, mut errors) = build_symbols(f, importer, new(SymbolBuilder))
-		if errors.len > 0 {
-			ret new(Package), errors
-		}
-		tables[i] = table
-	}
+    // Build symbol tables of files.
+    let mut tables = make([]&SymbolTable, files.len)
+    for (i, mut f) in files {
+        let (mut table, mut errors) = build_symbols(f, importer, new(SymbolBuilder))
+        if errors.len > 0 {
+            ret new(Package), errors
+        }
+        tables[i] = table
+    }
 
-	let mut sema = &Sema{}
-	sema.check(tables)
-	if sema.errors.len > 0 {
-		ret new(Package), sema.errors
-	}
+    let mut sema = &Sema{}
+    sema.check(tables)
+    if sema.errors.len > 0 {
+        ret new(Package), sema.errors
+    }
 
-	let mut pkg = &Package{
-		files: sema.files,
-	}
+    let mut pkg = &Package{
+        files: sema.files,
+    }
 
-	ret pkg, nil
+    ret pkg, nil
 }
 
 // Builds symbol table of package's ASTs.
@@ -62,12 +62,12 @@ fn __analyze_package(mut files: []&Ast, mut importer: Importer): (&Package, []Lo
 //   - You can pass nil to importer, but panics if importer is nil and
 //     semantic analyzer used nil importer.
 pub fn analyze_package(mut files: []&Ast, mut importer: Importer): (&Package, []Log) {
-	if files.len == 0 {
-		ret new(Package), nil
-	}
+    if files.len == 0 {
+        ret new(Package), nil
+    }
 
-	let (mut package, mut logs) = __analyze_package(files, importer)
-	ret package, logs
+    let (mut package, mut logs) = __analyze_package(files, importer)
+    ret package, logs
 }
 
 // Builds symbol table of AST.
@@ -88,14 +88,14 @@ pub fn analyze_package(mut files: []&Ast, mut importer: Importer): (&Package, []
 //   - You can pass nil to importer, but panics if importer is nil and
 //     semantic analyzer used nil importer.
 pub fn analyze_file(mut f: &Ast, mut importer: Importer): (&SymbolTable, []Log) {
-	let mut files: []&Ast = [f]
-	let (mut pkg, mut errors) = analyze_package(files, importer)
-	if errors.len > 0 {
-		ret new(SymbolTable), errors
-	}
+    let mut files: []&Ast = [f]
+    let (mut pkg, mut errors) = analyze_package(files, importer)
+    if errors.len > 0 {
+        ret new(SymbolTable), errors
+    }
 
-	// Select first table, because package has only one file.
-	// We give just one file.
-	let mut table = pkg.files[0]
-	ret table, nil
+    // Select first table, because package has only one file.
+    // We give just one file.
+    let mut table = pkg.files[0]
+    ret table, nil
 }

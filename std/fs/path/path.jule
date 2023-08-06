@@ -42,40 +42,40 @@ use std::runtime::{OS}
 // and retrieving the final string. It does not allocate a buffer
 // to hold the output until that output diverges from s.
 struct LazyBuff {
-	path: str
-	buff: []byte
-	w: int
-	vol_and_path: str
-	vol_len: int
+    path: str
+    buff: []byte
+    w: int
+    vol_and_path: str
+    vol_len: int
 }
 
 impl LazyBuff {
-	fn index(mut self, i: int): byte {
-		if self.buff != nil {
-			ret self.buff[i]
-		}
-		ret self.path[i]
-	}
+    fn index(mut self, i: int): byte {
+        if self.buff != nil {
+            ret self.buff[i]
+        }
+        ret self.path[i]
+    }
 
-	fn append(mut self, c: byte) {
-		if self.buff == nil {
-			if self.w < self.path.len && self.path[self.w] == c {
-				self.w++
-				ret
-			}
-			self.buff = make([]byte, self.path.len)
-			copy(self.buff, ([]byte)(self.path[:self.w]))
-		}
-		self.buff[self.w] = c
-		self.w++
-	}
+    fn append(mut self, c: byte) {
+        if self.buff == nil {
+            if self.w < self.path.len && self.path[self.w] == c {
+                self.w++
+                ret
+            }
+            self.buff = make([]byte, self.path.len)
+            copy(self.buff, ([]byte)(self.path[:self.w]))
+        }
+        self.buff[self.w] = c
+        self.w++
+    }
 
-	fn string(mut self): str {
-		if self.buff == nil {
-			ret self.vol_and_path[:self.vol_len+self.w]
-		}
-		ret self.vol_and_path[:self.vol_len] + str(self.buff[:self.w])
-	}
+    fn string(mut self): str {
+        if self.buff == nil {
+            ret self.vol_and_path[:self.vol_len+self.w]
+        }
+        ret self.vol_and_path[:self.vol_len] + str(self.buff[:self.w])
+    }
 }
 
 // Returns the shortest path name equivalent to path
@@ -105,113 +105,113 @@ impl LazyBuff {
 // See also Rob Pike, “Lexical File Names in Plan 9 or Getting Dot-Dot Right”
 // https://9p.io/sys/doc/lexnames.html
 pub fn clean(mut path: str): str {
-	let original_path = path
-	let vol_len = volume_name_len(path)
-	path = path[vol_len:]
-	if path == "" {
-		if vol_len > 1 && is_path_sep(original_path[0]) && is_path_sep(original_path[1]) {
-			// should be UNC
-			ret from_slash(original_path)
-		}
-		ret original_path + "."
-	}
-	let rooted = is_path_sep(path[0])
+    let original_path = path
+    let vol_len = volume_name_len(path)
+    path = path[vol_len:]
+    if path == "" {
+        if vol_len > 1 && is_path_sep(original_path[0]) && is_path_sep(original_path[1]) {
+            // should be UNC
+            ret from_slash(original_path)
+        }
+        ret original_path + "."
+    }
+    let rooted = is_path_sep(path[0])
 
-	// Invariants:
-	//  reading from path; r is index of next byte to process.
-	//  writing to buf; w is index of next byte to write.
-	//  dotdot is index in buf where .. must stop, either because
-	//      it is the leading slash or it is a leading ../../.. prefix.
-	let n = path.len
-	let mut out = LazyBuff{
-		path:         path,
-		vol_and_path: original_path,
-		vol_len:      vol_len,
-	}
-	let (mut r, mut dotdot) = 0, 0
-	if rooted {
-		out.append(SEPARATOR)
-		r, dotdot = 1, 1
-	}
+    // Invariants:
+    //  reading from path; r is index of next byte to process.
+    //  writing to buf; w is index of next byte to write.
+    //  dotdot is index in buf where .. must stop, either because
+    //      it is the leading slash or it is a leading ../../.. prefix.
+    let n = path.len
+    let mut out = LazyBuff{
+        path:         path,
+        vol_and_path: original_path,
+        vol_len:      vol_len,
+    }
+    let (mut r, mut dotdot) = 0, 0
+    if rooted {
+        out.append(SEPARATOR)
+        r, dotdot = 1, 1
+    }
 
-	for r < n {
-		match {
-		| is_path_sep(path[r]):
-			// empty path element
-			r++
-		| path[r] == '.' && (r+1 == n || is_path_sep(path[r+1])):
-			// . element
-			r++
-		| path[r] == '.' && path[r+1] == '.' && (r+2 == n || is_path_sep(path[r+2])):
-			// .. element: remove to last separator
-			r += 2
-			match {
-			| out.w > dotdot:
-				// can backtrack
-				out.w--
-				for out.w > dotdot && !is_path_sep(out.index(out.w)) {
-					out.w--
-				}
-			| !rooted:
-				// cannot backtrack, but not rooted, so append .. element.
-				if out.w > 0 {
-					out.append(SEPARATOR)
-				}
-				out.append('.')
-				out.append('.')
-				dotdot = out.w
-			}
-		|:
-			// real path element.
-			// add slash if needed
-			if rooted && out.w != 1 || !rooted && out.w != 0 {
-				out.append(SEPARATOR)
-			}
-			// If a ':' appears in the path element at the start of a Windows path,
-			// insert a .\ at the beginning to avoid converting relative paths
-			// like a/../c: into c:.
-			if OS == "windows" && out.w == 0 && out.vol_len == 0 && r != 0 {
-				let mut i = r
-				for i < n && !is_path_sep(path[i]); i++ {
-					if path[i] == ':' {
-						out.append('.')
-						out.append(SEPARATOR)
-						break
-					}
-				}
-			}
-			// copy element
-			for r < n && !is_path_sep(path[r]); r++ {
-				out.append(path[r])
-			}
-		}
-	}
+    for r < n {
+        match {
+        | is_path_sep(path[r]):
+            // empty path element
+            r++
+        | path[r] == '.' && (r+1 == n || is_path_sep(path[r+1])):
+            // . element
+            r++
+        | path[r] == '.' && path[r+1] == '.' && (r+2 == n || is_path_sep(path[r+2])):
+            // .. element: remove to last separator
+            r += 2
+            match {
+            | out.w > dotdot:
+                // can backtrack
+                out.w--
+                for out.w > dotdot && !is_path_sep(out.index(out.w)) {
+                    out.w--
+                }
+            | !rooted:
+                // cannot backtrack, but not rooted, so append .. element.
+                if out.w > 0 {
+                    out.append(SEPARATOR)
+                }
+                out.append('.')
+                out.append('.')
+                dotdot = out.w
+            }
+        |:
+            // real path element.
+            // add slash if needed
+            if rooted && out.w != 1 || !rooted && out.w != 0 {
+                out.append(SEPARATOR)
+            }
+            // If a ':' appears in the path element at the start of a Windows path,
+            // insert a .\ at the beginning to avoid converting relative paths
+            // like a/../c: into c:.
+            if OS == "windows" && out.w == 0 && out.vol_len == 0 && r != 0 {
+                let mut i = r
+                for i < n && !is_path_sep(path[i]); i++ {
+                    if path[i] == ':' {
+                        out.append('.')
+                        out.append(SEPARATOR)
+                        break
+                    }
+                }
+            }
+            // copy element
+            for r < n && !is_path_sep(path[r]); r++ {
+                out.append(path[r])
+            }
+        }
+    }
 
-	// Turn empty string into "."
-	if out.w == 0 {
-		out.append('.')
-	}
-	ret from_slash(out.string())
+    // Turn empty string into "."
+    if out.w == 0 {
+        out.append('.')
+    }
+    ret from_slash(out.string())
 }
 
 // Returns the result of replacing each separator character
 // in path with a slash ('/') character. Multiple separators are
 // replaced by multiple slashes.
 pub fn to_slash(path: str): str {
-	if SEPARATOR == '/' {
-		ret path
-	}
-	ret path.replace(str(SEPARATOR), "/", -1)
+    if SEPARATOR == '/' {
+        ret path
+    }
+    ret path.replace(str(SEPARATOR), "/", -1)
 }
 
 // Returns the result of replacing each slash ('/') character
 // in path with a separator character. Multiple slashes are replaced
 // by multiple separators.
 pub fn from_slash(path: str): str {
-	if SEPARATOR == '/' {
-		ret path
-	}
-	ret path.replace("/", str(SEPARATOR), -1)
+    if SEPARATOR == '/' {
+        ret path
+    }
+    ret path.replace("/", str(SEPARATOR), -1)
 }
 
 // Joins any number of path elements into a single path,
@@ -227,13 +227,13 @@ pub fn join(elem: ...str): str { ret __join(elem...) }
 // The extension is the suffix beginning at the final dot
 // in the final element of path; it is empty if there is no dot.
 pub fn ext(path: str): str {
-	let mut i = path.len - 1
-	for i >= 0 && !is_path_sep(path[i]); i-- {
-		if path[i] == '.' {
-			ret path[i:]
-		}
-	}
-	ret ""
+    let mut i = path.len - 1
+    for i >= 0 && !is_path_sep(path[i]); i-- {
+        if path[i] == '.' {
+            ret path[i:]
+        }
+    }
+    ret ""
 }
 
 // Returns an absolute representation of path.
@@ -242,8 +242,8 @@ pub fn ext(path: str): str {
 // path name for a given file is not guaranteed to be unique.
 // abs calls clean on the result.
 pub fn abs(path: str): (str, bool) {
-	let (abs_path, ok) = __abs(path)
-	ret abs_path, ok
+    let (abs_path, ok) = __abs(path)
+    ret abs_path, ok
 }
 
 // Returns the last element of path.
@@ -251,28 +251,28 @@ pub fn abs(path: str): (str, bool) {
 // If the path is empty, base returns ".".
 // If the path consists entirely of separators, base returns a single separator.
 pub fn base(mut path: str): str {
-	if path == "" {
-		ret "."
-	}
-	// Strip trailing slashes.
-	for path.len > 0 && is_path_sep(path[path.len-1]) {
-		path = path[0 : path.len-1]
-	}
-	// Throw away volume name
-	path = path[volume_name(path).len:]
-	// Find the last element
-	let mut i = path.len - 1
-	for i >= 0 && !is_path_sep(path[i]) {
-		i--
-	}
-	if i >= 0 {
-		path = path[i+1:]
-	}
-	// If empty now, it had only slashes.
-	if path == "" {
-		ret str(SEPARATOR)
-	}
-	ret path
+    if path == "" {
+        ret "."
+    }
+    // Strip trailing slashes.
+    for path.len > 0 && is_path_sep(path[path.len-1]) {
+        path = path[0 : path.len-1]
+    }
+    // Throw away volume name
+    path = path[volume_name(path).len:]
+    // Find the last element
+    let mut i = path.len - 1
+    for i >= 0 && !is_path_sep(path[i]) {
+        i--
+    }
+    if i >= 0 {
+        path = path[i+1:]
+    }
+    // If empty now, it had only slashes.
+    if path == "" {
+        ret str(SEPARATOR)
+    }
+    ret path
 }
 
 // Returns all but the last element of path, typically the path's directory.
@@ -282,17 +282,17 @@ pub fn base(mut path: str): str {
 // If the path consists entirely of separators, dir returns a single separator.
 // The returned path does not end in a separator unless it is the root directory.
 pub fn dir(path: str): str {
-	let vol = volume_name(path)
-	let mut i = path.len - 1
-	for i >= vol.len && !is_path_sep(path[i]) {
-		i--
-	}
-	let dir = clean(path[vol.len : i+1])
-	if dir == "." && vol.len > 2 {
-		// must be UNC
-		ret vol
-	}
-	ret vol + dir
+    let vol = volume_name(path)
+    let mut i = path.len - 1
+    for i >= vol.len && !is_path_sep(path[i]) {
+        i--
+    }
+    let dir = clean(path[vol.len : i+1])
+    if dir == "." && vol.len > 2 {
+        // must be UNC
+        ret vol
+    }
+    ret vol + dir
 }
 
 // Returns leading volume name.
@@ -300,5 +300,5 @@ pub fn dir(path: str): str {
 // Given "\\host\share\foo" it returns "\\host\share".
 // On other platforms it returns empty string.
 pub fn volume_name(path: str): str {
-	ret from_slash(path[:volume_name_len(path)])
+    ret from_slash(path[:volume_name_len(path)])
 }

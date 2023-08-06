@@ -5,14 +5,14 @@
 use obj::{IR}
 
 use std::jule::sema::{
-	Package,
-	Fn,
-	FnIns,
-	StructIns,
-	Var,
-	ReferenceStack,
-	Trait,
-	TypeKind,
+    Package,
+    Fn,
+    FnIns,
+    StructIns,
+    Var,
+    ReferenceStack,
+    Trait,
+    TypeKind,
 }
 use std::vector::{Vector}
 
@@ -29,388 +29,388 @@ static mut main_current: any = nil
 
 // Reports whether the reference type of T exist in arr.
 fn is_exist[T](arr: []any, t: &T): bool {
-	for _, ref in arr {
-		match type ref {
-		| &T:
-			if &(&T)(ref) == &t {
-				ret true
-			}
-		}
-	}
-	ret false
+    for _, ref in arr {
+        match type ref {
+        | &T:
+            if &(&T)(ref) == &t {
+                ret true
+            }
+        }
+    }
+    ret false
 }
 
 // Reports whether ref is exist in refs.
 fn is_exist_ref(mut refs: []any, ref: any): bool {
-	match type ref {
-	| &FnIns:     ret is_exist[FnIns](refs, (&FnIns)(ref))
-	| &Var:       ret is_exist[Var](refs, (&Var)(ref))
-	| &StructIns: ret is_exist[StructIns](refs, (&StructIns)(ref))
-	| &Trait:     ret is_exist[Trait](refs, (&Trait)(ref))
-	|:            ret false
-	}
+    match type ref {
+    | &FnIns:     ret is_exist[FnIns](refs, (&FnIns)(ref))
+    | &Var:       ret is_exist[Var](refs, (&Var)(ref))
+    | &StructIns: ret is_exist[StructIns](refs, (&StructIns)(ref))
+    | &Trait:     ret is_exist[Trait](refs, (&Trait)(ref))
+    |:            ret false
+    }
 }
 
 // Reports whether reference in dead.
 fn is_dead(mut ref: any): (dead: bool) {
-	if is_exist_ref(deads, ref) {
-		// Cycle, also already checked and marked as dead.
-		ret true
-	}
-	match type ref {
-	| &FnIns:
-		if (&FnIns)(ref).decl.is_init() {
-			break
-		}
-		fall
-	|:
-		if is_exist_ref([current, main_current], ref) {
-			ret true
-		}
-		if is_exist_ref(checking, ref) {
-			// Cycle, also already checking and should be marked dead.
-			ret true
-		}
-	}
+    if is_exist_ref(deads, ref) {
+        // Cycle, also already checked and marked as dead.
+        ret true
+    }
+    match type ref {
+    | &FnIns:
+        if (&FnIns)(ref).decl.is_init() {
+            break
+        }
+        fall
+    |:
+        if is_exist_ref([current, main_current], ref) {
+            ret true
+        }
+        if is_exist_ref(checking, ref) {
+            // Cycle, also already checking and should be marked dead.
+            ret true
+        }
+    }
 
-	let mut old = current
-	current = ref
-	let len = checking.len
-	checking = append(checking, ref)
-	defer {
-		current = old
-		drop_ref(checking, len)
-		/*if dead {
-			deads = append(deads, ref)
-		}*/
-	}
+    let mut old = current
+    current = ref
+    let len = checking.len
+    checking = append(checking, ref)
+    defer {
+        current = old
+        drop_ref(checking, len)
+        /*if dead {
+            deads = append(deads, ref)
+        }*/
+    }
 
-	match type ref {
-	| &FnIns:
-		ret is_fn_dead((&FnIns)(ref))
+    match type ref {
+    | &FnIns:
+        ret is_fn_dead((&FnIns)(ref))
 
-	| &Var:
-		ret is_var_dead((&Var)(ref))
+    | &Var:
+        ret is_var_dead((&Var)(ref))
 
-	| &StructIns:
-		ret is_struct_dead((&StructIns)(ref))
+    | &StructIns:
+        ret is_struct_dead((&StructIns)(ref))
 
-	| &Trait:
-		ret is_trait_dead((&Trait)(ref))
+    | &Trait:
+        ret is_trait_dead((&Trait)(ref))
 
-	|:
-		ret false
-	}
+    |:
+        ret false
+    }
 }
 
 fn remove_from_slice[T](mut &s: []&T, pos: int) {
-	if pos == s.len {
-		ret
-	}
-	s = append(s[:pos], s[pos+1:]...)
+    if pos == s.len {
+        ret
+    }
+    s = append(s[:pos], s[pos+1:]...)
 }
 
 // Remove reference from refs by pos.
 fn drop_ref(mut &refs: []any, pos: int) {
-	// Remove position, and following references.
-	// This is safe.
-	// References dropped after processed, so following
-	// references should be already processed.
-	refs = refs[:pos]
+    // Remove position, and following references.
+    // This is safe.
+    // References dropped after processed, so following
+    // references should be already processed.
+    refs = refs[:pos]
 
-	/*remove_from_slice[any](refs, pos)*/
+    /*remove_from_slice[any](refs, pos)*/
 }
 
 fn is_all_references_are_dead[T](mut references: &ReferenceStack): bool {
-	let mut i = 0
-	for i < references.len(); i++ {
-		let mut ref = references.at(i)
-		match type current {
-		| &T:
-			match type ref {
-			| &T:
-				if &(&T)(current) == &(&T)(ref) {
-					continue
-				}
-			}
-		}
-		match type main_current {
-		| &T:
-			match type ref {
-			| &T:
-				if &(&T)(main_current) == &(&T)(ref) {
-					continue
-				}
-			}
-		}
-		if !is_dead(ref) {
-			ret false
-		}
-	}
-	ret true
+    let mut i = 0
+    for i < references.len(); i++ {
+        let mut ref = references.at(i)
+        match type current {
+        | &T:
+            match type ref {
+            | &T:
+                if &(&T)(current) == &(&T)(ref) {
+                    continue
+                }
+            }
+        }
+        match type main_current {
+        | &T:
+            match type ref {
+            | &T:
+                if &(&T)(main_current) == &(&T)(ref) {
+                    continue
+                }
+            }
+        }
+        if !is_dead(ref) {
+            ret false
+        }
+    }
+    ret true
 }
 
 fn is_fn_dead(mut f: &FnIns): bool {
-	if f.decl.cpp_linked {
-		ret false
-	}
+    if f.decl.cpp_linked {
+        ret false
+    }
 
-	if f.decl.is_entry_point() || f.decl.is_init(){
-		ret !f.decl.statically
-	}
+    if f.decl.is_entry_point() || f.decl.is_init(){
+        ret !f.decl.statically
+    }
 
-	if real(f.owner) {
-		if is_exist_ref(checking, f.owner) {
-			// Cycle, also already checking and should be marked dead.
-			ret true
-		}
-		ret is_dead(f.owner)
-	}
+    if real(f.owner) {
+        if is_exist_ref(checking, f.owner) {
+            // Cycle, also already checking and should be marked dead.
+            ret true
+        }
+        ret is_dead(f.owner)
+    }
 
-	/*if f.generics.len > 0 {
-		if is_any_generic_is_dead(f.generics) {
-			ret true
-		}
-	}*/
+    /*if f.generics.len > 0 {
+        if is_any_generic_is_dead(f.generics) {
+            ret true
+        }
+    }*/
 
-	ret is_all_references_are_dead[FnIns](f.references)
+    ret is_all_references_are_dead[FnIns](f.references)
 }
 
 fn is_var_dead(mut v: &Var): bool {
-	if v.constant {
-		ret true
-	}
+    if v.constant {
+        ret true
+    }
 
-	if v.cpp_linked {
-		ret false
-	}
+    if v.cpp_linked {
+        ret false
+    }
 
-	ret is_all_references_are_dead[Var](v.references)
+    ret is_all_references_are_dead[Var](v.references)
 }
 
 fn kind_is_dead(mut k: &TypeKind): bool {
-	match {
-	| real(k.ref()):
-		ret kind_is_dead(k.ref().elem)
+    match {
+    | real(k.ref()):
+        ret kind_is_dead(k.ref().elem)
 
-	| real(k.ptr()):
-		ret kind_is_dead(k.ptr().elem)
+    | real(k.ptr()):
+        ret kind_is_dead(k.ptr().elem)
 
-	| real(k.slc()):
-		ret kind_is_dead(k.slc().elem)
+    | real(k.slc()):
+        ret kind_is_dead(k.slc().elem)
 
-	| real(k.arr()):
-		ret kind_is_dead(k.arr().elem)
+    | real(k.arr()):
+        ret kind_is_dead(k.arr().elem)
 
-	| real(k.trt()):
-		let mut t = k.trt()
-		if is_dead(t) {
-			ret true
-		}
+    | real(k.trt()):
+        let mut t = k.trt()
+        if is_dead(t) {
+            ret true
+        }
 
-	| real(k.strct()):
-		let mut s = k.strct()
-		if is_dead(s) {
-			ret true
-		}
-	}
-	ret false
+    | real(k.strct()):
+        let mut s = k.strct()
+        if is_dead(s) {
+            ret true
+        }
+    }
+    ret false
 }
 
 fn is_any_generic_is_dead(mut &generics: []&TypeKind): bool {
-	for (_, mut g) in generics {
-		if kind_is_dead(g) {
-			ret true
-		}
-	}
-	ret false
+    for (_, mut g) in generics {
+        if kind_is_dead(g) {
+            ret true
+        }
+    }
+    ret false
 }
 
 fn is_struct_dead(mut s: &StructIns): bool {
-	// Do not eliminate structure.
-	ret false
+    // Do not eliminate structure.
+    ret false
 
-	if s.decl.cpp_linked {
-		ret false
-	}
+    if s.decl.cpp_linked {
+        ret false
+    }
 
-	/*if s.generics.len > 0 {
-		if is_any_generic_is_dead(s.generics) {
-			ret true
-		}
-	}*/
+    /*if s.generics.len > 0 {
+        if is_any_generic_is_dead(s.generics) {
+            ret true
+        }
+    }*/
 
-	ret is_all_references_are_dead[StructIns](s.references)
+    ret is_all_references_are_dead[StructIns](s.references)
 }
 
 fn is_trait_dead(mut t: &Trait): bool {
-	// Do not eliminate trait.
-	ret false
+    // Do not eliminate trait.
+    ret false
 
-	for (_, mut imp) in t.implemented {
-		let mut i = 0
-		for i < imp.instances.len; i++ {
-			let mut ins = imp.instances[i]
-			if !is_struct_dead(ins) {
-				ret false
-			}
-		}
-	}
-	ret true
+    for (_, mut imp) in t.implemented {
+        let mut i = 0
+        for i < imp.instances.len; i++ {
+            let mut ins = imp.instances[i]
+            if !is_struct_dead(ins) {
+                ret false
+            }
+        }
+    }
+    ret true
 }
 
 // Eliminates dead functions.
 // If functions is alive, eliminates unreachable codes, and etc for scope.
 fn eliminate_dead_functions(mut &funcs: Vector[&Fn]) {
-	let mut i = 0
-	for i < funcs.len() {
-		let mut f = funcs.at(i)
-		let mut j = 0
-		for j < f.instances.len {
-			let mut ins = f.instances[j]
-			main_current = ins
-			if is_fn_dead(ins) {
-				deads = append(deads, ins)
-				remove_from_slice[FnIns](f.instances, j)
-				continue
-			}
-			eliminate_dead_code_of_scope(ins.scope)
-			j++
-		}
+    let mut i = 0
+    for i < funcs.len() {
+        let mut f = funcs.at(i)
+        let mut j = 0
+        for j < f.instances.len {
+            let mut ins = f.instances[j]
+            main_current = ins
+            if is_fn_dead(ins) {
+                deads = append(deads, ins)
+                remove_from_slice[FnIns](f.instances, j)
+                continue
+            }
+            eliminate_dead_code_of_scope(ins.scope)
+            j++
+        }
 
-		// Remove function, no instances.
-		if f.instances.len == 0 {
-			funcs.remove_range(i, 1)
-			continue
-		}
-		i++
-	}
+        // Remove function, no instances.
+        if f.instances.len == 0 {
+            funcs.remove_range(i, 1)
+            continue
+        }
+        i++
+    }
 }
 
 fn eliminate_dead_globals(mut &pkg: &Package) {
-	for (_, mut f) in pkg.files {
-		let mut i = 0
-		for i < f.vars.len() {
-			let mut v = f.vars.at(i)
-			main_current = v
-			if is_var_dead(v) {
-				deads = append(deads, v)
-				f.vars.remove_range(i, 1)
-			} else {
-				i++
-			}
-		}
-	}
+    for (_, mut f) in pkg.files {
+        let mut i = 0
+        for i < f.vars.len() {
+            let mut v = f.vars.at(i)
+            main_current = v
+            if is_var_dead(v) {
+                deads = append(deads, v)
+                f.vars.remove_range(i, 1)
+            } else {
+                i++
+            }
+        }
+    }
 }
 
 fn eliminate_dead_functions_package(mut &pkg: &Package) {
-	for (_, mut f) in pkg.files {
-		eliminate_dead_functions(f.funcs)
-	}
+    for (_, mut f) in pkg.files {
+        eliminate_dead_functions(f.funcs)
+    }
 }
 
 fn eliminate_dead_structs(mut &pkg: &Package) {
-	for (_, mut f) in pkg.files {
-		let mut i = 0
-		for i < f.structs.len() {
-			let mut s = f.structs.at(i)
-			let mut j = 0
-			for j < s.instances.len {
-				let mut ins = s.instances[j]
-				main_current = ins
-				if is_struct_dead(ins) {
-					deads = append(deads, ins)
-					remove_from_slice[StructIns](s.instances, j)
-					continue
-				}
-				j++
-			}
+    for (_, mut f) in pkg.files {
+        let mut i = 0
+        for i < f.structs.len() {
+            let mut s = f.structs.at(i)
+            let mut j = 0
+            for j < s.instances.len {
+                let mut ins = s.instances[j]
+                main_current = ins
+                if is_struct_dead(ins) {
+                    deads = append(deads, ins)
+                    remove_from_slice[StructIns](s.instances, j)
+                    continue
+                }
+                j++
+            }
 
-			if s.instances.len == 0 {
-				f.structs.remove_range(i, 1)
-				continue
-			}
-			i++
+            if s.instances.len == 0 {
+                f.structs.remove_range(i, 1)
+                continue
+            }
+            i++
 
-			/*if is_struct_dead(s) {
-				f.structs.remove_range(i, 1)
-			} else {
-				// Not removes trait-implemented functions.
-				// This is safe.
-				// Because methods marked as not-global and
-				// not-global functions are not removed.
-				eliminate_dead_functions(s.methods)
-				i++
-			}*/
-		}
-	}
+            /*if is_struct_dead(s) {
+                f.structs.remove_range(i, 1)
+            } else {
+                // Not removes trait-implemented functions.
+                // This is safe.
+                // Because methods marked as not-global and
+                // not-global functions are not removed.
+                eliminate_dead_functions(s.methods)
+                i++
+            }*/
+        }
+    }
 }
 
 fn eliminate_dead_traits(mut &pkg: &Package) {
-	for (_, mut f) in pkg.files {
-		let mut i = 0
-		for i < f.traits.len() {
-			let mut t = f.traits.at(i)
-			main_current = t
-			if is_trait_dead(t) {
-				deads = append(deads, t)
-				f.traits.remove_range(i, 1)
-			} else {
-				i++
-			}
-		}
-	}
+    for (_, mut f) in pkg.files {
+        let mut i = 0
+        for i < f.traits.len() {
+            let mut t = f.traits.at(i)
+            main_current = t
+            if is_trait_dead(t) {
+                deads = append(deads, t)
+                f.traits.remove_range(i, 1)
+            } else {
+                i++
+            }
+        }
+    }
 }
 
 fn catch_alive_init(mut &pkg: &Package) {
-	const CPP_LINKED = false
-	const INIT_FN = "init"
-	let mut f = pkg.find_fn(INIT_FN, CPP_LINKED)
-	if !real(f) {
-		ret
-	}
+    const CPP_LINKED = false
+    const INIT_FN = "init"
+    let mut f = pkg.find_fn(INIT_FN, CPP_LINKED)
+    if !real(f) {
+        ret
+    }
 
-	let n = deads.len
-	defer {
-		// Clear memory.
-		deads = deads[:n]
-		checking = nil
-		current = nil
-	}
+    let n = deads.len
+    defer {
+        // Clear memory.
+        deads = deads[:n]
+        checking = nil
+        current = nil
+    }
 
-	let mut ins = f.instances[0]
-	let mut i = 0
-	for i < ins.refers.len(); i++ {
-		if !is_dead(ins.refers.at(i)) {
-			f.statically = true
-			ret
-		}
-	}
+    let mut ins = f.instances[0]
+    let mut i = 0
+    for i < ins.refers.len(); i++ {
+        if !is_dead(ins.refers.at(i)) {
+            f.statically = true
+            ret
+        }
+    }
 }
 
 fn eliminate_dead_code_package(mut &pkg: &Package) {
-	deads = make([]any, 0, 2000)
+    deads = make([]any, 0, 2000)
 
-	catch_alive_init(pkg)
+    catch_alive_init(pkg)
 
-	//eliminate_dead_structs(pkg)
-	//eliminate_dead_traits(pkg)
-	eliminate_dead_globals(pkg)
-	eliminate_dead_functions_package(pkg)
+    //eliminate_dead_structs(pkg)
+    //eliminate_dead_traits(pkg)
+    eliminate_dead_globals(pkg)
+    eliminate_dead_functions_package(pkg)
 }
 
 pub fn eliminate_dead_code(mut ir: &IR) {
-	let mut i = ir.used.len -1 
-	for i >= 0 ; i-- {
-		let mut u = ir.used[i]
-		if !u.cpp_linked {
-			eliminate_dead_code_package(u.package)
-		}
-	}
-	eliminate_dead_code_package(ir.main)
+    let mut i = ir.used.len -1 
+    for i >= 0 ; i-- {
+        let mut u = ir.used[i]
+        if !u.cpp_linked {
+            eliminate_dead_code_package(u.package)
+        }
+    }
+    eliminate_dead_code_package(ir.main)
 
-	// Clear memory.
-	deads = nil
-	checking = nil
-	current = nil
+    // Clear memory.
+    deads = nil
+    checking = nil
+    current = nil
 }

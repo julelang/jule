@@ -121,49 +121,49 @@
 //  sqrt(x < 0) = nan
 //  sqrt(nan) = nan
 pub fn sqrt(x: f64): f64 {
-	// special cases
-	match {
-	| x == 0 | is_nan(x) | is_inf(x, 1):
-		ret x
-	| x < 0:
-		ret nan()
-	}
-	let mut ix = f64_bits(x)
-	// normalize x
-	let mut exp = int((ix >> SHIFT) & MASK)
-	if exp == 0 { // subnormal x
-		for ix&(1<<SHIFT) == 0 {
-			ix <<= 1
-			exp--
-		}
-		exp++
-	}
-	exp -= BIAS // unbias exponent
-	ix = ix & ^(MASK << SHIFT)
-	ix |= 1 << SHIFT
-	if exp&1 == 1 { // odd exp, double x to make it even
-		ix <<= 1
-	}
-	exp >>= 1 // exp = exp/2, exponent of square root
-	// generate sqrt(x) bit by bit
-	ix <<= 1
-	let mut q: u64 = 0 // q = sqrt(x)
-	let mut s: u64 = 0
-	let mut r = u64(1 << (SHIFT + 1)) // r = moving bit from MSB to LSB
-	for r != 0 {
-		let t = s + r
-		if t <= ix {
-			s = t + r
-			ix -= t
-			q += r
-		}
-		ix <<= 1
-		r >>= 1
-	}
-	// final rounding
-	if ix != 0 { // remainder, result not exact
-		q += q & 1 // round according to extra bit
-	}
-	ix = q>>1 + u64(exp-1+BIAS)<<SHIFT // significand + biased exponent
-	ret f64_from_bits(ix)
+    // special cases
+    match {
+    | x == 0 | is_nan(x) | is_inf(x, 1):
+        ret x
+    | x < 0:
+        ret nan()
+    }
+    let mut ix = f64_bits(x)
+    // normalize x
+    let mut exp = int((ix >> SHIFT) & MASK)
+    if exp == 0 { // subnormal x
+        for ix&(1<<SHIFT) == 0 {
+            ix <<= 1
+            exp--
+        }
+        exp++
+    }
+    exp -= BIAS // unbias exponent
+    ix = ix & ^(MASK << SHIFT)
+    ix |= 1 << SHIFT
+    if exp&1 == 1 { // odd exp, double x to make it even
+        ix <<= 1
+    }
+    exp >>= 1 // exp = exp/2, exponent of square root
+    // generate sqrt(x) bit by bit
+    ix <<= 1
+    let mut q: u64 = 0 // q = sqrt(x)
+    let mut s: u64 = 0
+    let mut r = u64(1 << (SHIFT + 1)) // r = moving bit from MSB to LSB
+    for r != 0 {
+        let t = s + r
+        if t <= ix {
+            s = t + r
+            ix -= t
+            q += r
+        }
+        ix <<= 1
+        r >>= 1
+    }
+    // final rounding
+    if ix != 0 { // remainder, result not exact
+        q += q & 1 // round according to extra bit
+    }
+    ix = q>>1 + u64(exp-1+BIAS)<<SHIFT // significand + biased exponent
+    ret f64_from_bits(ix)
 }

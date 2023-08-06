@@ -4,12 +4,12 @@
 
 use std::fs::path::{join}
 use std::sys::{
-	byte_ptr_to_str,
-	opendir,
-	readdir,
-	closedir,
-	mkdir,
-	rmdir,
+    byte_ptr_to_str,
+    opendir,
+    readdir,
+    closedir,
+    mkdir,
+    rmdir,
 }
 
 // Reads the named directory and returs all its directory entries can read.
@@ -19,51 +19,51 @@ use std::sys::{
 //  Denied InvalidDescriptor PerProcessLimit SystemWideLimit
 //  NotExist InsufficientMemory NotDir
 pub fn read_dir(path: str): (dirents: []&DirEntry, err: FsError) {
-	let mut dir = unsafe { opendir(&path[0]) }
-	if dir == nil {
-		err = get_last_fs_error()
-		ret
-	}
-	for {
-		let dirent = unsafe { readdir(dir) }
-		if dirent == nil {
-			break
-		}
-		let name = unsafe { byte_ptr_to_str((*u8)(dirent.d_name)) }
-		let (stat, serr) = stat(join(path, name))
-		if serr != FsError.Ok {
-			err = serr
-			dirents = nil
-			break
-		}
-		dirents = append(dirents, &DirEntry{
-			name: name,
-			stat: stat,
-		})
-	}
-	_ = unsafe { closedir(dir) }
-	ret
+    let mut dir = unsafe { opendir(&path[0]) }
+    if dir == nil {
+        err = get_last_fs_error()
+        ret
+    }
+    for {
+        let dirent = unsafe { readdir(dir) }
+        if dirent == nil {
+            break
+        }
+        let name = unsafe { byte_ptr_to_str((*u8)(dirent.d_name)) }
+        let (stat, serr) = stat(join(path, name))
+        if serr != FsError.Ok {
+            err = serr
+            dirents = nil
+            break
+        }
+        dirents = append(dirents, &DirEntry{
+            name: name,
+            stat: stat,
+        })
+    }
+    _ = unsafe { closedir(dir) }
+    ret
 }
 
 // Creates directory.
 //
 // Possible errors: Denied Exist ReadOnly NoSpace
 pub fn create_dir(path: str): FsError {
-	// NOTICE
-	// Also can has EMLINK error-code.
-	// Make sure this situation should documented or not.
-	if (unsafe { mkdir(&path[0], 0700) } == 0) {
-		ret FsError.Ok
-	}
-	ret get_last_fs_error()
+    // NOTICE
+    // Also can has EMLINK error-code.
+    // Make sure this situation should documented or not.
+    if (unsafe { mkdir(&path[0], 0700) } == 0) {
+        ret FsError.Ok
+    }
+    ret get_last_fs_error()
 }
 
 // Removes empty directory.
 //
 // Possible errors: Denined NotExist NotEmpty SyncIO IO Loop NotDir
 pub fn remove_dir(path: str): FsError {
-	if (unsafe { rmdir(&path[0]) } == 0) {
-		ret FsError.Ok
-	}
-	ret get_last_fs_error()
+    if (unsafe { rmdir(&path[0]) } == 0) {
+        ret FsError.Ok
+    }
+    ret get_last_fs_error()
 }

@@ -13,21 +13,21 @@ use std::fs::{FsError, OFlag, stat, open, create_dir, remove_file, remove_dir}
 use std::fs::path::{join, dir}
 use std::jule::lex::{is_decimal, is_ident_rune, is_letter, is_space}
 use std::jule::sema::{
-	ImportInfo,
-	Package,
-	analyze_package,
+    ImportInfo,
+    Package,
+    analyze_package,
 }
 use std::jule::build::{
-	self,
-	Log,
-	PATH_WD,
-	PATH_STDLIB,
-	DISTOS,
-	DISTARCH,
-	ENTRY_POINT,
-	INIT_FN,
-	errorf,
-	is_valid_cpp_ext,
+    self,
+    Log,
+    PATH_WD,
+    PATH_STDLIB,
+    DISTOS,
+    DISTARCH,
+    ENTRY_POINT,
+    INIT_FN,
+    errorf,
+    is_valid_cpp_ext,
 }
 
 use cpp "julec.hpp"
@@ -36,22 +36,22 @@ cpp fn system(cmd: str): int
 
 // Officially supported backend-compilers.
 enum Compiler: str {
-	NA = "",
-	GCC = "gcc",
-	Clang = "clang",
+    NA = "",
+    GCC = "gcc",
+    Clang = "clang",
 }
 
 // Paths of officially supported backend-compilers.
 enum CompilerPath: str {
-	NA = "",
-	GCC = "g++",
-	Clang = "clang++",
+    NA = "",
+    GCC = "g++",
+    Clang = "clang++",
 }
 
 // Compiler mode.
 enum Mode {
-	Compile,
-	Transpile,
+    Compile,
+    Transpile,
 }
 
 // Sets by COMPILER or command-line inputs.
@@ -64,381 +64,381 @@ static mut OUT_NAME: str = "ir.cpp"
 static mut OUT: str = ""
 
 fn get_option(args: []str, mut &i: int): (arg: str, content: str) {
-	for i < args.len; i++ {
-		arg = args[i]
-		let mut j = 0
-		let mut runes = ([]rune)(arg)
-		let mut r = runes[j]
-		if r != '-' {
-			content += arg
-			arg = "" // Forget argument
-			continue
-		}
-		j++
-		if j >= runes.len {
-			exit_err("undefined syntax: " + arg)
-		}
-		r = runes[j]
-		if r == '-' {
-			j++
-			if j >= runes.len {
-				exit_err("undefined syntax: " + arg)
-			}
-			r = runes[j]
-		}
-		if !is_ident_rune(str(r)) {
-			exit_err("undefined syntax: " + arg)
-		}
-		j++
-		for j < runes.len; j++ {
-			r = runes[j]
-			if (
-				!is_space(r) &&
-				!is_letter(r) &&
-				!is_decimal(byte(r)) &&
-				r != '_' &&
-				r != '-'
-			) {
-				exit_err("undefined syntax: " + str(runes[j:]))
-			}
-		}
-		break
-	}
-	ret
+    for i < args.len; i++ {
+        arg = args[i]
+        let mut j = 0
+        let mut runes = ([]rune)(arg)
+        let mut r = runes[j]
+        if r != '-' {
+            content += arg
+            arg = "" // Forget argument
+            continue
+        }
+        j++
+        if j >= runes.len {
+            exit_err("undefined syntax: " + arg)
+        }
+        r = runes[j]
+        if r == '-' {
+            j++
+            if j >= runes.len {
+                exit_err("undefined syntax: " + arg)
+            }
+            r = runes[j]
+        }
+        if !is_ident_rune(str(r)) {
+            exit_err("undefined syntax: " + arg)
+        }
+        j++
+        for j < runes.len; j++ {
+            r = runes[j]
+            if (
+                !is_space(r) &&
+                !is_letter(r) &&
+                !is_decimal(byte(r)) &&
+                r != '_' &&
+                r != '-'
+            ) {
+                exit_err("undefined syntax: " + str(runes[j:]))
+            }
+        }
+        break
+    }
+    ret
 }
 
 fn get_option_value(args: []str, mut &i: int): str {
-	i++ // Argument value is the next argument
-	if i < args.len {
-		let arg = args[i]
-		ret arg
-	}
-	ret ""
+    i++ // Argument value is the next argument
+    if i < args.len {
+        let arg = args[i]
+        ret arg
+    }
+    ret ""
 }
 
 fn parse_out_option(args: []str, mut &i: int) {
-	let value = get_option_value(args, i)
-	if value == "" {
-		exit_err("missing option value: -o --out")
-	}
-	OUT = value
+    let value = get_option_value(args, i)
+    if value == "" {
+        exit_err("missing option value: -o --out")
+    }
+    OUT = value
 }
 
 fn parse_opt_option(args: []str, mut &i: int) {
-	let value = get_option_value(args, i)
-	if value == "" {
-		exit_err("missing option value: --opt")
-	}
+    let value = get_option_value(args, i)
+    if value == "" {
+        exit_err("missing option value: --opt")
+    }
 
-	match value {
-	| "L0": push_opt_level(OptLevel.L0)
-	| "L1": push_opt_level(OptLevel.L1)
-	|:      exit_err("invalid optimization level: " + value)
-	}
+    match value {
+    | "L0": push_opt_level(OptLevel.L0)
+    | "L1": push_opt_level(OptLevel.L1)
+    |:      exit_err("invalid optimization level: " + value)
+    }
 }
 
 fn check_target_arch(arch: str) {
-	for _, distarch in DISTARCH {
-		if arch == str(distarch) {
-			ret
-		}
-	}
+    for _, distarch in DISTARCH {
+        if arch == str(distarch) {
+            ret
+        }
+    }
 
-	exit_err("unsupported/undefined architecture: " + arch)
+    exit_err("unsupported/undefined architecture: " + arch)
 }
 
 fn check_target_os(os: str) {
-	for _, distos in DISTOS {
-		if os == str(distos) {
-			ret
-		}
-	}
+    for _, distos in DISTOS {
+        if os == str(distos) {
+            ret
+        }
+    }
 
-	exit_err("unsupported/undefined operating system: " + os)
+    exit_err("unsupported/undefined operating system: " + os)
 }
 
 fn parse_target_option(args: []str, mut &i: int) {
-	let value = get_option_value(args, i)
-	if value == "" {
-		exit_err("missing option value: --target")
-	}
+    let value = get_option_value(args, i)
+    if value == "" {
+        exit_err("missing option value: --target")
+    }
 
-	let parts = value.split("-", -1)
-	if parts.len != 2 {
-		exit_err("undefined platform target format: " + value)
-	}
+    let parts = value.split("-", -1)
+    if parts.len != 2 {
+        exit_err("undefined platform target format: " + value)
+    }
 
-	let (os, arch) = parts[0], parts[1]
+    let (os, arch) = parts[0], parts[1]
 
-	if os != "native" {
-		check_target_os(os)
-		std::jule::build::OS = os
-	}
+    if os != "native" {
+        check_target_os(os)
+        std::jule::build::OS = os
+    }
 
-	if arch != "native" {
-		check_target_arch(arch)
-		std::jule::build::ARCH = arch
-	}
+    if arch != "native" {
+        check_target_arch(arch)
+        std::jule::build::ARCH = arch
+    }
 }
 
 fn parse_compiler_option(args: []str, mut &i: int) {
-	let value = get_option_value(args, i)
-	match value {
-	| "":
-		exit_err("missing option value: --compiler")
+    let value = get_option_value(args, i)
+    match value {
+    | "":
+        exit_err("missing option value: --compiler")
 
-	| str(Compiler.Clang):
-		COMPILER = Compiler.Clang
-		COMPILER_PATH = CompilerPath.Clang
+    | str(Compiler.Clang):
+        COMPILER = Compiler.Clang
+        COMPILER_PATH = CompilerPath.Clang
 
-	| str(Compiler.GCC):
-		COMPILER = Compiler.GCC
-		COMPILER_PATH = CompilerPath.GCC
+    | str(Compiler.GCC):
+        COMPILER = Compiler.GCC
+        COMPILER_PATH = CompilerPath.GCC
 
-	|:
-		exit_err("invalid option value for --compiler: " + value)
-	}
+    |:
+        exit_err("invalid option value for --compiler: " + value)
+    }
 }
 
 fn parse_options(args: []str): str {
-	let mut cmd = ""
+    let mut cmd = ""
 
-	// Start at 1 because the index 0 is a path,
-	// not an command-line argument
-	let mut i = 1
-	for i < args.len; i++ {
-		let (arg, content) = get_option(args, i)
-		cmd += content
-		match arg {
-		| "":
+    // Start at 1 because the index 0 is a path,
+    // not an command-line argument
+    let mut i = 1
+    for i < args.len; i++ {
+        let (arg, content) = get_option(args, i)
+        cmd += content
+        match arg {
+        | "":
 
-		| "-o" | "--out":
-			parse_out_option(args, i)
+        | "-o" | "--out":
+            parse_out_option(args, i)
 
-		| "-t" | "--transpile":
-			MODE = Mode.Transpile
+        | "-t" | "--transpile":
+            MODE = Mode.Transpile
 
-		| "-c" | "--compile":
-			MODE = Mode.Compile
+        | "-c" | "--compile":
+            MODE = Mode.Compile
 
-		| "--compiler":
-			parse_compiler_option(args, i)
+        | "--compiler":
+            parse_compiler_option(args, i)
 
-		| str(Opt.Copy):
-			OPTIMIZATIONS = append(OPTIMIZATIONS, Opt.Copy)
+        | str(Opt.Copy):
+            OPTIMIZATIONS = append(OPTIMIZATIONS, Opt.Copy)
 
-		| str(Opt.DeadCode):
-			OPTIMIZATIONS = append(OPTIMIZATIONS, Opt.DeadCode)
+        | str(Opt.DeadCode):
+            OPTIMIZATIONS = append(OPTIMIZATIONS, Opt.DeadCode)
 
-		| "--opt":
-			parse_opt_option(args, i)
+        | "--opt":
+            parse_opt_option(args, i)
 
-		| "--target":
-			parse_target_option(args, i)
+        | "--target":
+            parse_target_option(args, i)
 
-		|:
-			exit_err("undefined option: " + arg)
-		}
-	}
-	cmd = cmd.trim(" \t\r\n\v")
-	ret cmd
+        |:
+            exit_err("undefined option: " + arg)
+        }
+    }
+    cmd = cmd.trim(" \t\r\n\v")
+    ret cmd
 }
 
 fn write_output(path: str, content: str) {
-	let dir = dir(path)
+    let dir = dir(path)
 
-	let (_, mut err) = stat(dir)
-	if err != FsError.Ok {
-		let err = create_dir(dir)
-		if err != FsError.Ok {
-			exit_err("a problem occurs when code generation")
-		}
-	}
+    let (_, mut err) = stat(dir)
+    if err != FsError.Ok {
+        let err = create_dir(dir)
+        if err != FsError.Ok {
+            exit_err("a problem occurs when code generation")
+        }
+    }
 
-	let (mut f, err) = open(path, OFlag.Rdwr|OFlag.Create|OFlag.Trunc, 0666)
-	if err != FsError.Ok {
-		exit_err("a problem occurs when code generation")
-	}
+    let (mut f, err) = open(path, OFlag.Rdwr|OFlag.Create|OFlag.Trunc, 0666)
+    if err != FsError.Ok {
+        exit_err("a problem occurs when code generation")
+    }
 
-	_, err = f.write(([]byte)(content))
-	if err != FsError.Ok {
-		exit_err("a problem occurs when code generation")
-	}
-	_ = f.close()
+    _, err = f.write(([]byte)(content))
+    if err != FsError.Ok {
+        exit_err("a problem occurs when code generation")
+    }
+    _ = f.close()
 }
 
 // Remove generated objects for compilation.
 fn clear_objects() {
-	if remove_file(get_compile_path()) != FsError.Ok {
-		outln("a problem occurs when object cleaning")
-		ret
-	}
+    if remove_file(get_compile_path()) != FsError.Ok {
+        outln("a problem occurs when object cleaning")
+        ret
+    }
 
-	// All created objects are cleaned.
-	// So, deletes directory if empty after cleaned all objects,
-	// if not, leaves the directory.
-	_ = remove_dir(OUT_DIR)
+    // All created objects are cleaned.
+    // So, deletes directory if empty after cleaned all objects,
+    // if not, leaves the directory.
+    _ = remove_dir(OUT_DIR)
 }
 
 // Compie generated IR.
 fn compile_ir(compiler: str, compiler_cmd: str) {
-	let status = cpp.system(compiler + " " + compiler_cmd)
-	if status != 0 {
-		out("external compiler failed with status code: ");
-		outln(status)
-		exit_err("")
-	}
+    let status = cpp.system(compiler + " " + compiler_cmd)
+    if status != 0 {
+        out("external compiler failed with status code: ");
+        outln(status)
+        exit_err("")
+    }
 
-	clear_objects()
+    clear_objects()
 }
 
 // Compile.
 fn do_spell(obj: str, compiler: str, compiler_cmd: str) {
-	let path = get_compile_path()
-	write_output(path, obj)
-	match MODE {
-	| Mode.Compile:
-		compile_ir(compiler, compiler_cmd)
-	}
+    let path = get_compile_path()
+    write_output(path, obj)
+    match MODE {
+    | Mode.Compile:
+        compile_ir(compiler, compiler_cmd)
+    }
 }
 
 fn check_mode() {
-	if MODE != Mode.Transpile && MODE != Mode.Compile {
-		outln(errorf("invalid_value_for_key", MODE, "mode"))
-		exit_err("")
-	}
+    if MODE != Mode.Transpile && MODE != Mode.Compile {
+        outln(errorf("invalid_value_for_key", MODE, "mode"))
+        exit_err("")
+    }
 }
 
 fn check_compiler() {
-	if COMPILER != Compiler.GCC && COMPILER != Compiler.Clang {
-		outln(errorf("invalid_value_for_key", COMPILER, "compiler"))
-		exit_err("")
-	}
+    if COMPILER != Compiler.GCC && COMPILER != Compiler.Clang {
+        outln(errorf("invalid_value_for_key", COMPILER, "compiler"))
+        exit_err("")
+    }
 }
 
 fn set() {
-	check_mode()
-	check_compiler()
+    check_mode()
+    check_compiler()
 }
 
 // print_logs prints logs and returns true
 // if logs has error, false if not.
 fn print_logs(logs: []Log) {
-	let mut s = ""
-	for _, l in logs {
-		s += l.to_str() + "\n"
-	}
-	out(s)
+    let mut s = ""
+    for _, l in logs {
+        s += l.to_str() + "\n"
+    }
+    out(s)
 }
 
 fn is_cpp_source_file(path: str): bool {
-	let offset = path.rfind(".")
-	if offset == -1 {
-		ret false
-	}
-	ret is_valid_cpp_ext(path[offset:])
+    let offset = path.rfind(".")
+    if offset == -1 {
+        ret false
+    }
+    ret is_valid_cpp_ext(path[offset:])
 }
 
 // Generate compile command for backend-compiler.
 fn gen_compile_cmd(source_path: str, ir: &IR): (str, str) {
-	let compiler = str(COMPILER_PATH)
+    let compiler = str(COMPILER_PATH)
 
-	const ZERO_LEVEL_OPTIMIZATION = "-O0"
-	const DISABLE_ALL_WARNINGS_CLANG = "-Wno-everything"
-	const DISABLE_ALL_WARNINGS_GCC = "-w"
-	const SET_STD = "--std=c++14"
+    const ZERO_LEVEL_OPTIMIZATION = "-O0"
+    const DISABLE_ALL_WARNINGS_CLANG = "-Wno-everything"
+    const DISABLE_ALL_WARNINGS_GCC = "-w"
+    const SET_STD = "--std=c++14"
 
-	let mut cmd = ZERO_LEVEL_OPTIMIZATION + " "
+    let mut cmd = ZERO_LEVEL_OPTIMIZATION + " "
 
-	match COMPILER {
-	| Compiler.GCC:
-		cmd += DISABLE_ALL_WARNINGS_GCC + " "
+    match COMPILER {
+    | Compiler.GCC:
+        cmd += DISABLE_ALL_WARNINGS_GCC + " "
 
-	| Compiler.Clang:
-		cmd += DISABLE_ALL_WARNINGS_CLANG + " "
-	}
-	cmd += SET_STD + " "
+    | Compiler.Clang:
+        cmd += DISABLE_ALL_WARNINGS_CLANG + " "
+    }
+    cmd += SET_STD + " "
 
-	// Push passes.
-	for _, pass in ir.passes {
-		cmd += pass + " "
-	}
+    // Push passes.
+    for _, pass in ir.passes {
+        cmd += pass + " "
+    }
 
-	// Push linked source files.
-	for _, u in ir.used {
-		if u.cpp_linked && is_cpp_source_file(u.path) {
-			cmd += u.path + " "
-		}
-	}
+    // Push linked source files.
+    for _, u in ir.used {
+        if u.cpp_linked && is_cpp_source_file(u.path) {
+            cmd += u.path + " "
+        }
+    }
 
-	if OUT != "" {
-		cmd += "-o " + OUT + " "
-	}
-	cmd += source_path
+    if OUT != "" {
+        cmd += "-o " + OUT + " "
+    }
+    cmd += source_path
 
-	ret compiler, cmd
+    ret compiler, cmd
 }
 
 fn get_compile_path(): str {
-	// let mut path = join(PATH_WD, OUT_DIR)
-	// path = join(path, OUT_NAME)
-	// ret path
+    // let mut path = join(PATH_WD, OUT_DIR)
+    // path = join(path, OUT_NAME)
+    // ret path
 
-	// Return command-line argument form
-	// instead of absolute path.
-	ret join(OUT_DIR, OUT_NAME)
+    // Return command-line argument form
+    // instead of absolute path.
+    ret join(OUT_DIR, OUT_NAME)
 }
 
 fn apply_target_independent_optimizations(mut ir: &IR) {
-	if is_opt_enabled(Opt.DeadCode) {
-		eliminate_dead_code(ir)
-	}
+    if is_opt_enabled(Opt.DeadCode) {
+        eliminate_dead_code(ir)
+    }
 }
 
 // Process compile command by "ARGS" global.
 fn compile_command() {
-	let path = parse_options(ARGS)
-	if path == "" {
-		exit_err(errorf("missing_compile_path"))
-	}
+    let path = parse_options(ARGS)
+    if path == "" {
+        exit_err(errorf("missing_compile_path"))
+    }
 
-	// Check standard library.
-	let (inf, err) = stat(PATH_STDLIB)
-	if err != FsError.Ok || !inf.is_dir() {
-		exit_err(errorf("stdlib_not_exist"))
-	}
+    // Check standard library.
+    let (inf, err) = stat(PATH_STDLIB)
+    if err != FsError.Ok || !inf.is_dir() {
+        exit_err(errorf("stdlib_not_exist"))
+    }
 
-	set()
+    set()
 
-	let (mut ir, logs) = build_ir(path)
+    let (mut ir, logs) = build_ir(path)
 
-	if !real(ir) && logs == nil {
-		exit_err(errorf("no_file_in_entry_package", path))
-	}
+    if !real(ir) && logs == nil {
+        exit_err(errorf("no_file_in_entry_package", path))
+    }
 
-	if logs != nil {
-		print_logs(logs)
-		exit_err("")
-	}
+    if logs != nil {
+        print_logs(logs)
+        exit_err("")
+    }
 
-	const CPP_LINKED = false
-	let mut f = ir.main.find_fn(ENTRY_POINT, CPP_LINKED)
-	if !real(f) {
-		exit_err(errorf("no_entry_point"))
-	}
-	f.statically = true // Used
+    const CPP_LINKED = false
+    let mut f = ir.main.find_fn(ENTRY_POINT, CPP_LINKED)
+    if !real(f) {
+        exit_err(errorf("no_entry_point"))
+    }
+    f.statically = true // Used
 
-	f = ir.main.find_fn(INIT_FN, CPP_LINKED)
-	if real(f) {
-		f.statically = true // Used
-	}
+    f = ir.main.find_fn(INIT_FN, CPP_LINKED)
+    if real(f) {
+        f.statically = true // Used
+    }
 
-	apply_target_independent_optimizations(ir)
+    apply_target_independent_optimizations(ir)
 
-	let (compiler, compiler_cmd) = gen_compile_cmd(get_compile_path(), ir)
+    let (compiler, compiler_cmd) = gen_compile_cmd(get_compile_path(), ir)
 
-	let mut obj = obj::cxx::gen(ir)
-	obj::cxx::append_standard(obj, compiler, compiler_cmd)
+    let mut obj = obj::cxx::gen(ir)
+    obj::cxx::append_standard(obj, compiler, compiler_cmd)
 
-	do_spell(obj, compiler, compiler_cmd)
+    do_spell(obj, compiler, compiler_cmd)
 }

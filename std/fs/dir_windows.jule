@@ -4,12 +4,12 @@
 
 use std::fs::path::{join}
 use std::sys::{
-	self,
-	utf16_from_str,
-	u16_ptr_to_str,
-	_wopendir,
-	_wreaddir,
-	_wclosedir
+    self,
+    utf16_from_str,
+    u16_ptr_to_str,
+    _wopendir,
+    _wreaddir,
+    _wclosedir
 }
 
 // Reads the named directory and returs all its directory entries can read.
@@ -19,55 +19,55 @@ use std::sys::{
 //  Denied InvalidDescriptor PerProcessLimit SystemWideLimit
 //  NotExist InsufficientMemory NotDir
 pub fn read_dir(path: str): (dirents: []&DirEntry, err: FsError) {
-	let utf16_path = utf16_from_str(path)
-	let mut dir = unsafe { _wopendir(&utf16_path[0]) }
-	if dir == nil {
-		err = get_last_fs_error()
-		ret
-	}
-	for {
-		let dirent = unsafe { _wreaddir(dir) }
-		if dirent == nil {
-			break
-		}
-		let name = unsafe { u16_ptr_to_str((*u16)(dirent.d_name)) }
-		let (stat, serr) = stat(join(path, name))
-		if serr != FsError.Ok {
-			err = serr
-			dirents = nil
-			break
-		}
-		dirents = append(dirents, &DirEntry{
-			name: name,
-			stat: stat,
-		})
-	}
-	_ = unsafe { _wclosedir(dir) }
-	ret
+    let utf16_path = utf16_from_str(path)
+    let mut dir = unsafe { _wopendir(&utf16_path[0]) }
+    if dir == nil {
+        err = get_last_fs_error()
+        ret
+    }
+    for {
+        let dirent = unsafe { _wreaddir(dir) }
+        if dirent == nil {
+            break
+        }
+        let name = unsafe { u16_ptr_to_str((*u16)(dirent.d_name)) }
+        let (stat, serr) = stat(join(path, name))
+        if serr != FsError.Ok {
+            err = serr
+            dirents = nil
+            break
+        }
+        dirents = append(dirents, &DirEntry{
+            name: name,
+            stat: stat,
+        })
+    }
+    _ = unsafe { _wclosedir(dir) }
+    ret
 }
 
 // Creates directory.
 //
 // Possible errors: Denied Exist ReadOnly NoSpace
 pub fn create_dir(path: str): FsError {
-	// NOTICE
-	// Also can has EMLINK error-code.
-	// Make sure this situation should documented or not.
+    // NOTICE
+    // Also can has EMLINK error-code.
+    // Make sure this situation should documented or not.
 
-	let utf16_path = utf16_from_str(path)
-	if (unsafe { std::sys::create_directory(&utf16_path[0]) }) {
-		ret FsError.Ok
-	}
-	ret get_last_fs_error()
+    let utf16_path = utf16_from_str(path)
+    if (unsafe { std::sys::create_directory(&utf16_path[0]) }) {
+        ret FsError.Ok
+    }
+    ret get_last_fs_error()
 }
 
 // Removes empty directory.
 //
 // Possible errors: Denined NotExist NotEmpty SyncIO IO Loop NotDir
 pub fn remove_dir(path: str): FsError {
-	let utf16_path = utf16_from_str(path)
-	if (unsafe { std::sys::remove_directory(&utf16_path[0]) }) {
-		ret FsError.Ok
-	}
-	ret get_last_fs_error()
+    let utf16_path = utf16_from_str(path)
+    if (unsafe { std::sys::remove_directory(&utf16_path[0]) }) {
+        ret FsError.Ok
+    }
+    ret get_last_fs_error()
 }

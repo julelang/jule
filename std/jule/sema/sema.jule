@@ -3,9 +3,9 @@
 // license that can be found in the LICENSE file.
 
 use std::jule::ast::{
-	Expr,
-	TypeDecl,
-	GenericDecl,
+    Expr,
+    TypeDecl,
+    GenericDecl,
 }
 use std::jule::build::{Derives, Log, LogKind, errorf}
 use std::jule::constant::{Const}
@@ -14,2167 +14,2167 @@ use std::jule::types::{is_float, is_int, is_sig_int, is_unsig_int, max_of}
 use std::vector::{Vector}
 
 fn compiler_err(token: Token, key: str, args: ...any): Log {
-	ret Log{
-		kind:   LogKind.Error,
-		row:    token.row,
-		column: token.column,
-		path:   token.file.path(),
-		text:   errorf(key, args...),
-	}
+    ret Log{
+        kind:   LogKind.Error,
+        row:    token.row,
+        column: token.column,
+        path:   token.file.path(),
+        text:   errorf(key, args...),
+    }
 }
 
 fn imp_is_lookupable(i: &ImportInfo, ident: str): bool {
-	if i.cpp_linked {
-		ret false
-	}
+    if i.cpp_linked {
+        ret false
+    }
 
-	if !i.import_all {
-		if i.selected.len > 0 {
-			ret i.exist_ident(ident)
-		}
-	}
-	ret i.import_all
+    if !i.import_all {
+        if i.selected.len > 0 {
+            ret i.exist_ident(ident)
+        }
+    }
+    ret i.import_all
 }
 
 fn build_ret_vars(mut f: &FnIns): []&Var {
-	if f.decl.is_void() || !real(f.result) {
-		ret nil
-	}
+    if f.decl.is_void() || !real(f.result) {
+        ret nil
+    }
 
-	let mut vars: []&Var = nil
-	let mut types = get_fn_result_types(f)
-	for i, ident in f.decl.result.idents {
-		if is_ignore_ident(ident.kind) {
-			continue
-		}
+    let mut vars: []&Var = nil
+    let mut types = get_fn_result_types(f)
+    for i, ident in f.decl.result.idents {
+        if is_ignore_ident(ident.kind) {
+            continue
+        }
 
-		let mut v = &Var{
-			used:    true,
-			mutable: true,
-			ident:   ident.kind,
-			token:   ident,
-			scope:   f.scope,
-			kind:    &TypeSymbol{kind: types[i]},
-			value: &Value{
-				data: &Data{},
-			},
-		}
-		vars = append(vars, v)
-	}
+        let mut v = &Var{
+            used:    true,
+            mutable: true,
+            ident:   ident.kind,
+            token:   ident,
+            scope:   f.scope,
+            kind:    &TypeSymbol{kind: types[i]},
+            value: &Value{
+                data: &Data{},
+            },
+        }
+        vars = append(vars, v)
+    }
 
-	ret vars
+    ret vars
 }
 
 fn build_param_vars(mut f: &FnIns): []&Var {
-	if f.params.len == 0 {
-		ret nil
-	}
+    if f.params.len == 0 {
+        ret nil
+    }
 
-	let mut vars = make([]&Var, f.params.len)
-	for (i, mut p) in f.params {
-		let mut v = &Var{
-			used:    true,
-			mutable: p.decl.mutable,
-			ident:   p.decl.ident,
-			token:   p.decl.token,
-			kind:    &TypeSymbol{},
-			scope:   f.scope,
-			value: &Value{
-				data: &Data{},
-			},
-		}
+    let mut vars = make([]&Var, f.params.len)
+    for (i, mut p) in f.params {
+        let mut v = &Var{
+            used:    true,
+            mutable: p.decl.mutable,
+            ident:   p.decl.ident,
+            token:   p.decl.token,
+            kind:    &TypeSymbol{},
+            scope:   f.scope,
+            value: &Value{
+                data: &Data{},
+            },
+        }
 
-		match {
-		| p.decl.is_self():
-			v.kind.kind = &TypeKind{kind: f.owner}
-			v.reference = true
+        match {
+        | p.decl.is_self():
+            v.kind.kind = &TypeKind{kind: f.owner}
+            v.reference = true
 
-			if p.decl.is_ref() {
-				v.ident = v.ident[1:] // Remove reference sign.
-				v.kind.kind.kind = &Ref{
-					elem: v.kind.kind.clone(),
-				}
-			}
+            if p.decl.is_ref() {
+                v.ident = v.ident[1:] // Remove reference sign.
+                v.kind.kind.kind = &Ref{
+                    elem: v.kind.kind.clone(),
+                }
+            }
 
-		| p.decl.variadic:
-			v.kind.kind = &TypeKind{
-				kind: &Slc{
-					elem: p.kind.clone(),
-				},
-			}
+        | p.decl.variadic:
+            v.kind.kind = &TypeKind{
+                kind: &Slc{
+                    elem: p.kind.clone(),
+                },
+            }
 
-		|:
-			v.kind.kind = p.kind.clone()
-		}
+        |:
+            v.kind.kind = p.kind.clone()
+        }
 
-		vars[i] = v
-	}
+        vars[i] = v
+    }
 
-	ret vars
+    ret vars
 }
 
 fn build_generic_type_aliases(mut f: &FnIns): []&TypeAlias {
-	let mut size = f.generics.len
-	if real(f.decl.owner) {
-		size += f.decl.owner.generics.len
-	}
+    let mut size = f.generics.len
+    if real(f.decl.owner) {
+        size += f.decl.owner.generics.len
+    }
 
-	if size == 0 {
-		ret nil
-	}
+    if size == 0 {
+        ret nil
+    }
 
-	let mut aliases = make([]&TypeAlias, size)
+    let mut aliases = make([]&TypeAlias, size)
 
-	for (i, mut g) in f.generics {
-		let mut decl = f.decl.generics[i]
-		aliases[i] = &TypeAlias{
-			used:  true,
-			scope: f.decl.scope,
-			ident: decl.ident,
-			token: decl.token,
-			kind:  &TypeSymbol{kind: g},
-		}
-	}
+    for (i, mut g) in f.generics {
+        let mut decl = f.decl.generics[i]
+        aliases[i] = &TypeAlias{
+            used:  true,
+            scope: f.decl.scope,
+            ident: decl.ident,
+            token: decl.token,
+            kind:  &TypeSymbol{kind: g},
+        }
+    }
 
-	if real(f.decl.owner) {
-		let mut owner = f.owner
-		for (i, mut g) in owner.generics {
-			let mut decl = owner.decl.generics[i]
-			aliases[f.generics.len+i] = &TypeAlias{
-				used:  true,
-				scope: f.decl.scope,
-				ident: decl.ident,
-				token: decl.token,
-				kind:  &TypeSymbol{kind: g},
-			}
-		}
-	}
+    if real(f.decl.owner) {
+        let mut owner = f.owner
+        for (i, mut g) in owner.generics {
+            let mut decl = owner.decl.generics[i]
+            aliases[f.generics.len+i] = &TypeAlias{
+                used:  true,
+                scope: f.decl.scope,
+                ident: decl.ident,
+                token: decl.token,
+                kind:  &TypeSymbol{kind: g},
+            }
+        }
+    }
 
-	ret aliases
+    ret aliases
 }
 
 fn find_file(mut files: []&SymbolTable, handler: &File): &SymbolTable {
-	for (_, mut fl) in files {
-		if &fl.file == &handler {
-			ret fl
-		}
-	}
-	ret new(SymbolTable)
+    for (_, mut fl) in files {
+        if &fl.file == &handler {
+            ret fl
+        }
+    }
+    ret new(SymbolTable)
 }
 
 fn conditional_has_ret(mut c: &Conditional): (ok: bool, breaking: bool) {
-	let mut breaked = false
-	for (_, mut elif) in c.elifs {
-		if !real(elif) {
-			ret false, false
-		}
-		ok, _, breaking = __has_ret(elif.scope)
-		breaked = breaked || breaking
-		if !ok {
-			ret false, breaked
-		}
-	}
+    let mut breaked = false
+    for (_, mut elif) in c.elifs {
+        if !real(elif) {
+            ret false, false
+        }
+        ok, _, breaking = __has_ret(elif.scope)
+        breaked = breaked || breaking
+        if !ok {
+            ret false, breaked
+        }
+    }
 
-	if !real(c.default) {
-		ret false, breaked
-	}
+    if !real(c.default) {
+        ret false, breaked
+    }
 
-	ok, _, breaking = __has_ret(c.default.scope)
-	breaked = breaked || breaking
-	ret ok, breaked
+    ok, _, breaking = __has_ret(c.default.scope)
+    breaked = breaked || breaking
+    ret ok, breaked
 }
 
 fn match_has_ret(mut m: &Match): bool {
-	if !real(m.default) {
-		ret false
-	}
+    if !real(m.default) {
+        ret false
+    }
 
-	let mut ok = true
-	let mut falled = false
-	let mut breaked = false
-	for (_, mut c) in m.cases {
-		if !real(c) {
-			ret false
-		}
-		ok, falled, breaked = __has_ret(c.scope)
-		if !ok && !falled || breaked {
-			ret false
-		}
+    let mut ok = true
+    let mut falled = false
+    let mut breaked = false
+    for (_, mut c) in m.cases {
+        if !real(c) {
+            ret false
+        }
+        ok, falled, breaked = __has_ret(c.scope)
+        if !ok && !falled || breaked {
+            ret false
+        }
 
-		match {
-		| !ok:
-			if !falled {
-				ret false
-			}
-			fall
+        match {
+        | !ok:
+            if !falled {
+                ret false
+            }
+            fall
 
-		| falled:
-			if !real(c.next) {
-				ret false
-			}
-			continue
-		}
-		falled = false
-	}
+        | falled:
+            if !real(c.next) {
+                ret false
+            }
+            continue
+        }
+        falled = false
+    }
 
-	ret has_ret(m.default.scope)
+    ret has_ret(m.default.scope)
 }
 
 fn __has_ret(mut s: &Scope): (ok: bool, falled: bool, breaked: bool) {
-	if !real(s) {
-		ret false, false, false
-	}
+    if !real(s) {
+        ret false, false, false
+    }
 
-	let mut i = 0
-	for i < s.stmts.len(); i++ {
-		let mut st = s.stmts.at(i)
-		match type st {
-		| &FallSt:
-			falled = true
+    let mut i = 0
+    for i < s.stmts.len(); i++ {
+        let mut st = s.stmts.at(i)
+        match type st {
+        | &FallSt:
+            falled = true
 
-		| &BreakSt:
-			ret false, false, true
+        | &BreakSt:
+            ret false, false, true
 
-		| &RetSt:
-			ret true, falled, breaked
+        | &RetSt:
+            ret true, falled, breaked
 
-		| &Scope:
-			let ok = has_ret((&Scope)(st))
-			if ok {
-				ret true, false, false
-			}
+        | &Scope:
+            let ok = has_ret((&Scope)(st))
+            if ok {
+                ret true, false, false
+            }
 
-		| &Data:
-			match type (&Data)(st).model {
-			| &BuiltinPanicCallExprModel:
-				ret true, falled, breaked
-			}
+        | &Data:
+            match type (&Data)(st).model {
+            | &BuiltinPanicCallExprModel:
+                ret true, falled, breaked
+            }
 
-		| &Recover:
-			let (ok, falled, breaked) = __has_ret((&Recover)(st).scope)
-			if ok {
-				ret true, falled, breaked
-			}
+        | &Recover:
+            let (ok, falled, breaked) = __has_ret((&Recover)(st).scope)
+            if ok {
+                ret true, falled, breaked
+            }
 
-		| &Conditional:
-			let (ok, breaking) = conditional_has_ret((&Conditional)(st))
-			if ok {
-				ret true, false, false
-			}
+        | &Conditional:
+            let (ok, breaking) = conditional_has_ret((&Conditional)(st))
+            if ok {
+                ret true, false, false
+            }
 
-			if breaking {
-				ret false, false, breaked
-			}
+            if breaking {
+                ret false, false, breaked
+            }
 
-		| &Match:
-			let ok = match_has_ret((&Match)(st))
-			if ok {
-				ret true, false, false
-			}
-		}
-	}
+        | &Match:
+            let ok = match_has_ret((&Match)(st))
+            if ok {
+                ret true, false, false
+            }
+        }
+    }
 
-	ret false, falled, breaked
+    ret false, falled, breaked
 }
 
 fn has_ret(mut s: &Scope): bool {
-	let (ok, _, _) = __has_ret(s)
-	ret ok
+    let (ok, _, _) = __has_ret(s)
+    ret ok
 }
 
 // Semantic analyzer for tables.
 // Accepts tables as files of package.
 struct Sema {
-	errors: []Log
-	files:  []&SymbolTable // Package files.
-	file:   &SymbolTable   // Current package file.
+    errors: []Log
+    files:  []&SymbolTable // Package files.
+    file:   &SymbolTable   // Current package file.
 }
 
 impl Lookup for Sema {
-	// Returns imported package by identifier.
-	// Returns nil reference if not exist any package in this identifier.
-	//
-	// Lookups:
-	//   - Current file's imported packages.
-	fn find_package(mut self, ident: str): &ImportInfo {
-		ret self.file.find_package(ident)
-	}
+    // Returns imported package by identifier.
+    // Returns nil reference if not exist any package in this identifier.
+    //
+    // Lookups:
+    //   - Current file's imported packages.
+    fn find_package(mut self, ident: str): &ImportInfo {
+        ret self.file.find_package(ident)
+    }
 
-	// Returns imported package by selector.
-	// Returns nil reference if selector returns false for all packages.
-	// Returns nil reference if selector is nil.
-	//
-	// Lookups:
-	//   - Current file's imported packages.
-	fn select_package(mut self, selector: fn(&ImportInfo): bool): &ImportInfo {
-		ret self.file.select_package(selector)
-	}
+    // Returns imported package by selector.
+    // Returns nil reference if selector returns false for all packages.
+    // Returns nil reference if selector is nil.
+    //
+    // Lookups:
+    //   - Current file's imported packages.
+    fn select_package(mut self, selector: fn(&ImportInfo): bool): &ImportInfo {
+        ret self.file.select_package(selector)
+    }
 
-	// Returns variable by identifier and cpp linked state.
-	// Returns nil reference if not exist any variable in this identifier.
-	//
-	// Lookups:
-	//   - Package file's symbol table.
-	//   - Current file's public denifes of imported packages.
-	fn find_var(mut self, ident: str, cpp_linked: bool): &Var {
-		// Lookup package files.
-		let mut v = find_var_in_package(self.files, ident, cpp_linked)
-		if real(v) {
-			ret v
-		}
+    // Returns variable by identifier and cpp linked state.
+    // Returns nil reference if not exist any variable in this identifier.
+    //
+    // Lookups:
+    //   - Package file's symbol table.
+    //   - Current file's public denifes of imported packages.
+    fn find_var(mut self, ident: str, cpp_linked: bool): &Var {
+        // Lookup package files.
+        let mut v = find_var_in_package(self.files, ident, cpp_linked)
+        if real(v) {
+            ret v
+        }
 
-		// Lookup current file's public denifes of imported packages.
-		let mut i = 0
-		for i < self.file.imports.len(); i++ {
-			let mut imp = self.file.imports.at(i)
-			if !imp_is_lookupable(imp, ident) {
-				continue
-			}
-			let mut v = imp.find_var(ident, cpp_linked)
-			if real(v) && self.is_accessible_define(v.public, v.token) {
-				ret v
-			}
-		}
+        // Lookup current file's public denifes of imported packages.
+        let mut i = 0
+        for i < self.file.imports.len(); i++ {
+            let mut imp = self.file.imports.at(i)
+            if !imp_is_lookupable(imp, ident) {
+                continue
+            }
+            let mut v = imp.find_var(ident, cpp_linked)
+            if real(v) && self.is_accessible_define(v.public, v.token) {
+                ret v
+            }
+        }
 
-		ret new(Var)
-	}
+        ret new(Var)
+    }
 
-	// Returns type alias by identifier and cpp linked state.
-	// Returns nil reference if not exist any type alias in this identifier.
-	//
-	// Lookups:
-	//   - Package file's symbol table.
-	//   - Current file's public denifes of imported packages.
-	fn find_type_alias(mut self, ident: str, cpp_linked: bool): &TypeAlias {
-		// Lookup package files.
-		let mut ta = find_type_alias_in_package(self.files, ident, cpp_linked)
-		if real(ta) {
-			ret ta
-		}
+    // Returns type alias by identifier and cpp linked state.
+    // Returns nil reference if not exist any type alias in this identifier.
+    //
+    // Lookups:
+    //   - Package file's symbol table.
+    //   - Current file's public denifes of imported packages.
+    fn find_type_alias(mut self, ident: str, cpp_linked: bool): &TypeAlias {
+        // Lookup package files.
+        let mut ta = find_type_alias_in_package(self.files, ident, cpp_linked)
+        if real(ta) {
+            ret ta
+        }
 
-		// Lookup current file's public denifes of imported packages.
-		let mut i = 0
-		for i < self.file.imports.len(); i++ {
-			let mut imp = self.file.imports.at(i)
-			if !imp_is_lookupable(imp, ident) {
-				continue
-			}
-			let mut ta = imp.find_type_alias(ident, cpp_linked)
-			if real(ta) && self.is_accessible_define(ta.public, ta.token) {
-				ret ta
-			}
-		}
+        // Lookup current file's public denifes of imported packages.
+        let mut i = 0
+        for i < self.file.imports.len(); i++ {
+            let mut imp = self.file.imports.at(i)
+            if !imp_is_lookupable(imp, ident) {
+                continue
+            }
+            let mut ta = imp.find_type_alias(ident, cpp_linked)
+            if real(ta) && self.is_accessible_define(ta.public, ta.token) {
+                ret ta
+            }
+        }
 
-		ret new(TypeAlias)
-	}
+        ret new(TypeAlias)
+    }
 
-	// Returns struct by identifier and cpp linked state.
-	// Returns nil reference if not exist any struct in this identifier.
-	//
-	// Lookups:
-	//   - Package file's symbol table.
-	//   - Current file's public denifes of imported packages.
-	fn find_struct(mut self, ident: str, cpp_linked: bool): &Struct {
-		// Lookup package files.
-		let mut strct = find_struct_in_package(self.files, ident, cpp_linked)
-		if real(strct) {
-			ret strct
-		}
+    // Returns struct by identifier and cpp linked state.
+    // Returns nil reference if not exist any struct in this identifier.
+    //
+    // Lookups:
+    //   - Package file's symbol table.
+    //   - Current file's public denifes of imported packages.
+    fn find_struct(mut self, ident: str, cpp_linked: bool): &Struct {
+        // Lookup package files.
+        let mut strct = find_struct_in_package(self.files, ident, cpp_linked)
+        if real(strct) {
+            ret strct
+        }
 
-		// Lookup current file's public denifes of imported packages.
-		let mut i = 0
-		for i < self.file.imports.len(); i++ {
-			let mut imp = self.file.imports.at(i)
-			if !imp_is_lookupable(imp, ident) {
-				continue
-			}
-			let mut strct = imp.find_struct(ident, cpp_linked)
-			if real(strct) && self.is_accessible_define(strct.public, strct.token) {
-				ret strct
-			}
-		}
+        // Lookup current file's public denifes of imported packages.
+        let mut i = 0
+        for i < self.file.imports.len(); i++ {
+            let mut imp = self.file.imports.at(i)
+            if !imp_is_lookupable(imp, ident) {
+                continue
+            }
+            let mut strct = imp.find_struct(ident, cpp_linked)
+            if real(strct) && self.is_accessible_define(strct.public, strct.token) {
+                ret strct
+            }
+        }
 
-		ret new(Struct)
-	}
+        ret new(Struct)
+    }
 
-	// Returns function by identifier and cpp linked state.
-	// Returns nil reference if not exist any function in this identifier.
-	//
-	// Lookups:
-	//   - Package file's symbol table.
-	//   - Current file's public denifes of imported packages.
-	fn find_fn(mut self, ident: str, cpp_linked: bool): &Fn {
-		// Lookup package files.
-		let mut f = find_fn_in_package(self.files, ident, cpp_linked)
-		if real(f) {
-			ret f
-		}
+    // Returns function by identifier and cpp linked state.
+    // Returns nil reference if not exist any function in this identifier.
+    //
+    // Lookups:
+    //   - Package file's symbol table.
+    //   - Current file's public denifes of imported packages.
+    fn find_fn(mut self, ident: str, cpp_linked: bool): &Fn {
+        // Lookup package files.
+        let mut f = find_fn_in_package(self.files, ident, cpp_linked)
+        if real(f) {
+            ret f
+        }
 
-		// Lookup current file's public denifes of imported packages.
-		let mut i = 0
-		for i < self.file.imports.len(); i++ {
-			let mut imp = self.file.imports.at(i)
-			if !imp_is_lookupable(imp, ident) {
-				continue
-			}
-			let mut f = imp.find_fn(ident, cpp_linked)
-			if real(f) && self.is_accessible_define(f.public, f.token) {
-				ret f
-			}
-		}
+        // Lookup current file's public denifes of imported packages.
+        let mut i = 0
+        for i < self.file.imports.len(); i++ {
+            let mut imp = self.file.imports.at(i)
+            if !imp_is_lookupable(imp, ident) {
+                continue
+            }
+            let mut f = imp.find_fn(ident, cpp_linked)
+            if real(f) && self.is_accessible_define(f.public, f.token) {
+                ret f
+            }
+        }
 
-		ret new(Fn)
-	}
+        ret new(Fn)
+    }
 
-	// Returns trait by identifier.
-	// Returns nil reference if not exist any trait in this identifier.
-	//
-	// Lookups:
-	//   - Package file's symbol table.
-	//   - Current file's public denifes of imported packages.
-	fn find_trait(mut self, ident: str): &Trait {
-		// Lookup package files.
-		let mut t = find_trait_in_package(self.files, ident)
-		if real(t) {
-			ret t
-		}
+    // Returns trait by identifier.
+    // Returns nil reference if not exist any trait in this identifier.
+    //
+    // Lookups:
+    //   - Package file's symbol table.
+    //   - Current file's public denifes of imported packages.
+    fn find_trait(mut self, ident: str): &Trait {
+        // Lookup package files.
+        let mut t = find_trait_in_package(self.files, ident)
+        if real(t) {
+            ret t
+        }
 
-		// Lookup current file's public denifes of imported packages.
-		let mut i = 0
-		for i < self.file.imports.len(); i++ {
-			let mut imp = self.file.imports.at(i)
-			if !imp_is_lookupable(imp, ident) {
-				continue
-			}
-			let mut t = imp.find_trait(ident)
-			if real(t) && self.is_accessible_define(t.public, t.token) {
-				ret t
-			}
-		}
+        // Lookup current file's public denifes of imported packages.
+        let mut i = 0
+        for i < self.file.imports.len(); i++ {
+            let mut imp = self.file.imports.at(i)
+            if !imp_is_lookupable(imp, ident) {
+                continue
+            }
+            let mut t = imp.find_trait(ident)
+            if real(t) && self.is_accessible_define(t.public, t.token) {
+                ret t
+            }
+        }
 
-		ret new(Trait)
-	}
+        ret new(Trait)
+    }
 
-	// Returns enum by identifier.
-	// Returns nil reference if not exist any enum in this identifier.
-	//
-	// Lookups:
-	//   - Package file's symbol table.
-	//   - Current file's public denifes of imported packages.
-	fn find_enum(mut self, ident: str): &Enum {
-		// Lookup package files.
-		let mut e = find_enum_in_package(self.files, ident)
-		if real(e) {
-			ret e
-		}
+    // Returns enum by identifier.
+    // Returns nil reference if not exist any enum in this identifier.
+    //
+    // Lookups:
+    //   - Package file's symbol table.
+    //   - Current file's public denifes of imported packages.
+    fn find_enum(mut self, ident: str): &Enum {
+        // Lookup package files.
+        let mut e = find_enum_in_package(self.files, ident)
+        if real(e) {
+            ret e
+        }
 
-		// Lookup current file's public denifes of imported packages.
-		let mut i = 0
-		for i < self.file.imports.len(); i++ {
-			let mut imp = self.file.imports.at(i)
-			if !imp_is_lookupable(imp, ident) {
-				continue
-			}
-			let mut e = imp.find_enum(ident)
-			if real(e) && self.is_accessible_define(e.public, e.token) {
-				ret e
-			}
-		}
+        // Lookup current file's public denifes of imported packages.
+        let mut i = 0
+        for i < self.file.imports.len(); i++ {
+            let mut imp = self.file.imports.at(i)
+            if !imp_is_lookupable(imp, ident) {
+                continue
+            }
+            let mut e = imp.find_enum(ident)
+            if real(e) && self.is_accessible_define(e.public, e.token) {
+                ret e
+            }
+        }
 
-		ret new(Enum)
-	}
+        ret new(Enum)
+    }
 }
 
 impl Sema {
-	fn set_current_file(mut self, mut f: &SymbolTable) { self.file = f }
-
-	fn push_err(mut self, token: Token, key: str, args: ...any) {
-		self.errors = append(self.errors, compiler_err(token, key, args...))
-	}
-
-	// Reports whether define is accessible in the current package.
-	fn is_accessible_define(self, public: bool, token: Token): bool {
-		ret public || !real(token.file) || self.file.file.dir() == token.file.dir()
-	}
-
-	// Reports this identifier duplicated in package's global scope.
-	// The "self" parameter represents address of exception identifier.
-	// If founded identifier address equals to self, will be skipped.
-	fn is_duplicated_ident(self, itself: uintptr, ident: str, cpp_linked: bool): bool {
-		for _, f in self.files {
-			if f.is_duplicated_ident(itself, ident, cpp_linked) {
-				ret true
-			}
-
-			let mut i = 0
-			for i < f.imports.len(); i++ {
-				let imp = unsafe { (&f.imports).at(i) }
-				for _, selected in imp.selected {
-					if selected.kind == ident {
-						ret true
-					}
-				}
-			}
-		}
-		ret false
-	}
-
-	fn check_generic_quantity(mut self, required: int, given: int, error_token: Token): (ok: bool) {
-		match {
-		| required == 0 && given > 0:
-			self.push_err(error_token, "not_has_generics")
-			ret false
-
-		| required > 0 && given == 0:
-			self.push_err(error_token, "has_generics")
-			ret false
-
-		| required < given:
-			self.push_err(error_token, "generics_overflow")
-			ret false
-
-		| required > given:
-			self.push_err(error_token, "missing_generics")
-			ret false
-
-		|:
-			ret true
-		}
-	}
-
-	fn is_duplicated_import_selection(self, itself: uintptr, ident: str): bool {
-		let mut i = 0
-		for i < self.file.imports.len(); i++ {
-			let imp = unsafe { (&self.file).imports.at(i) }
-			if uintptr(&imp) == itself {
-				// Don't scan trailing imports.
-				break
-			}
-
-			if imp.exist_ident(ident) {
-				ret true
-			}
-		}
-
-		ret false
-	}
-
-	fn get_import_def(self, ident: str, mut &imp: &ImportInfo): any {
-		if find_package_builtin_def(imp.link_path, ident) != nil {
-			ret true
-		}
-
-		for (_, mut f) in imp.package.files {
-			const CPP_LINKED = false // C++-linked defines can't export.
-			let mut def = f.def_by_ident(ident, CPP_LINKED)
-			if def != nil {
-				ret def
-			}
-		}
-
-		ret nil
-	}
-
-	fn check_import_selections(mut self, mut imp: &ImportInfo) {
-		// Set file to any package file for accessibility checking.
-		self.set_current_file(self.files[0])
-		defer { drop(self.file) } // Reset file.
-
-		for _, ident in imp.selected {
-			if ident.kind == str(TokenKind.Self) {
-				continue
-			}
-
-			if self.is_duplicated_import_selection(uintptr(&imp), ident.kind) {
-				self.push_err(ident, "duplicated_ident", ident.kind)
-				continue
-			}
-
-			let mut def = self.get_import_def(ident.kind, imp)
-			match type def {
-			| bool:
-				// Pass, built-in.
-				continue
-
-			| &Var:
-				let mut v = (&Var)(def)
-				if self.is_accessible_define(v.public, v.token) {
-					continue
-				}
-
-			| &TypeAlias:
-				let mut ta = (&TypeAlias)(def)
-				if self.is_accessible_define(ta.public, ta.token) {
-					continue
-				}
-
-			| &Struct:
-				let mut strct = (&Struct)(def)
-				if self.is_accessible_define(strct.public, strct.token) {
-					continue
-				}
-
-			| &Trait:
-				let mut t = (&Trait)(def)
-				if self.is_accessible_define(t.public, t.token) {
-					continue
-				}
-
-			| &Enum:
-				let mut e = (&Enum)(def)
-				if self.is_accessible_define(e.public, e.token) {
-					continue
-				}
-
-			| &Fn:
-				let mut f = (&Fn)(def)
-				if self.is_accessible_define(f.public, f.token) {
-					continue
-				}
-
-			|:
-				self.push_err(ident, "ident_not_exist", ident.kind)
-				continue
-			}
-
-			self.push_err(ident, "ident_is_not_accessible", ident.kind)
-
-		}
-	}
-
-	fn check_import(mut self, mut imp: &ImportInfo): bool {
-		if imp.duplicate || imp.cpp_linked || imp.package.files.len == 0 {
-			ret true
-		}
-	
-		let mut sema = &Sema{}
-		sema.check(imp.package.files)
-		if sema.errors.len > 0 {
-			self.errors = append(self.errors, sema.errors...)
-			ret false
-		}
-	
-		self.check_import_selections(imp)
-		ret true
-	}
-
-	fn check_imports(mut self) {
-		for (_, mut file) in self.files {
-			let mut i = 0
-			for i < file.imports.len(); i++ {
-				let mut imp = file.imports.at(i)
-				let ok = self.check_import(imp)
-
-				// Break checking if package has error.
-				if !ok {
-					self.push_err(imp.token, "used_package_has_errors", imp.link_path)
-					ret
-				}
-			}
-		}
-	}
-
-	fn impl_file_impls(mut &self) {
-		let mut i = 0
-		for i < self.file.impls.len(); i++ {
-			let mut imp = self.file.impls.at(i)
-			self.impl_impl(imp)
-		}
-	}
-
-	fn impl_impls(mut &self) {
-		for (_, mut file) in self.files {
-			self.set_current_file(file)
-			self.impl_file_impls()
-		}
-	}
-
-	fn check_enums(mut &self) {
-		for (_, mut file) in self.files {
-			self.set_current_file(file)
-			self.check_enum_decls()
-		}
-	}
-
-	// Checks type, builds result as kind and collect referred type aliases.
-	// Skips already checked types.
-	fn check_type_with_refers(mut &self, mut t: &TypeSymbol, l: Lookup, referencer: &Referencer): (ok: bool) {
-		if t.checked() {
-			ret true
-		}
-		let mut tc = TypeChecker{
-			s:          self,
-			lookup:     l,
-			referencer: referencer,
-		}
-		tc.check(t)
-		ret t.checked()
-	}
-
-	// Checks type and builds result as kind.
-	// Skips already checked types.
-	fn check_type(mut &self, mut t: &TypeSymbol, l: Lookup): (ok: bool) {
-		ret self.check_type_with_refers(t, l, new(Referencer))
-	}
-
-	// Builds type with type aliases for generics.
-	// Returns nil if error occur or failed.
-	fn build_type_with_generics(mut &self, mut t: &TypeDecl, generics: []&TypeAlias): &TypeKind {
-		let mut tc = &TypeChecker{
-			s:            self,
-			lookup:       self,
-			use_generics: generics,
-		}
-		ret tc.check_decl(t)
-	}
-
-	// Same as s.build_type_with_generics but not uses any generics.
-	fn build_type(mut &self, mut t: &TypeDecl): &TypeKind {
-		ret self.build_type_with_generics(t, nil)
-	}
-
-	// Evaluates expression with type prefixed Eval and returns result.
-	// Checks variable dependencies if exist.
-	fn evalpd(mut &self, mut expr: &Expr, mut l: Lookup, mut p: &TypeKind, owner: &Var): &Data {
-		let mut e = &Eval{
-			s:      self,
-			lookup: l,
-			owner:  owner,
-		}
-
-		match type l {
-		| &ScopeChecker:
-			e.unsafety = (&ScopeChecker)(l).is_unsafe()
-		}
-
-		e.prefix = p
-
-		ret e.eval_expr(expr)
-	}
-
-	// Evaluates expression with type prefixed Eval and returns result.
-	fn evalp(mut &self, mut expr: &Expr, mut l: Lookup, mut p: &TypeKind): &Data {
-		ret self.evalpd(expr, l, p, new(Var))
-	}
-
-	// Evaluates expression with Eval and returns result.
-	fn eval(mut &self, mut expr: &Expr, mut l: Lookup): &Data {
-		ret self.evalp(expr, l, new(TypeKind))
-	}
-
-	fn check_assign_type(mut &self, mut dest: &TypeKind, mut d: &Data, error_token: Token, deref: bool) {
-		let mut atc = &AssignTypeChecker{
-			s:           self,
-			error_token: error_token,
-			dest:        dest,
-			d:           d,
-			deref:       deref,
-		}
-		let ok = atc.check()
-		if !ok {
-			ret
-		}
-
-		if !d.is_const() || !real(dest.prim()) {
-			ret
-		}
-
-		let mut kind = dest.prim().kind
-
-		match {
-		| is_sig_int(kind):
-			d.constant.set_i64(d.constant.as_i64())
-
-		| is_unsig_int(kind):
-			d.constant.set_u64(d.constant.as_u64())
-
-		| is_float(kind):
-			d.constant.set_f64(d.constant.as_f64())
-		}
-	}
-
-	fn check_type_compatibility(mut &self, mut dest: &TypeKind,
-		mut src: &TypeKind, error_token: Token, deref: bool): bool {
-		let dest_kind = dest.to_str()
-		if !real(src) {
-			self.push_err(error_token, "incompatible_types", dest_kind, "<untyped>")
-			ret false
-		}
-		let src_kind = src.to_str()
-
-		// Tuple to single type, always fails.
-		if real(src.tup()) {
-			self.push_err(error_token, "incompatible_types", dest_kind, src_kind)
-			ret false
-		}
-
-		if real(dest.prim()) && dest.prim().is_any() {
-			ret false
-		}
-
-		let mut tcc = &TypeCompatibilityChecker{
-			s:           self,
-			error_token: error_token,
-			dest:        dest,
-			src:         src,
-			deref:       deref,
-		}
-		let ok = tcc.check()
-
-		match {
-		| ok:
-			ret true
-
-		| dest_kind == src_kind:
-			ret true
-
-		|:
-			self.push_err(error_token, "incompatible_types", dest_kind, src_kind)
-			ret false
-		}
-	}
-
-	// Builds non-generic types but skips generic types.
-	// Builds generic identifiers as primitive type.
-	//
-	// Useful:
-	//   - For non-generic type parsed string type kinds.
-	//   - For checking non-generic types.
-	fn build_non_generic_type_kind(mut &self, mut ast: &TypeDecl, generics: []&GenericDecl): &TypeKind {
-		let mut tc = &TypeChecker{
-			s:               self,
-			lookup:          self,
-			ignore_generics: generics,
-		}
-		ret tc.check_decl(ast)
-	}
-
-	fn build_fn_non_generic_type_kinds(mut &self, mut f: &FnIns) {
-		let mut generics: []&GenericDecl = nil
-		if f.decl.is_method() {
-			generics = append(f.decl.generics, f.decl.owner.generics...)
-		} else {
-			generics = f.decl.generics
-		}
-
-		for (_, mut p) in f.params {
-			if !p.decl.is_self() {
-				p.kind = self.build_non_generic_type_kind(p.decl.kind.decl, generics)
-			}
-		}
-		if !f.decl.is_void() {
-			f.result = self.build_non_generic_type_kind(f.decl.result.kind.decl, generics)
-		}
-	}
-
-	fn get_trait_check_fn_kind(mut &self, mut f: &Fn): &FnIns {
-		let mut ins = f.instance_force()
-		self.build_fn_non_generic_type_kinds(ins)
-		ret ins
-	}
-
-	fn reload_fn_ins_types(mut &self, mut f: &FnIns): (ok: bool) {
-		if f.is_builtin() || f.is_anon() {
-			ret true
-		}
-
-		let mut sema = f.decl.sema
-
-		let mut old = f.decl.sema.file
-		defer { f.decl.sema.set_current_file(old) }
-		let mut file = find_file(f.decl.sema.files, f.decl.token.file)
-		if real(file) {
-			f.decl.sema.set_current_file(file)
-		}
-
-		let mut size = f.generics.len
-		if real(f.decl) && real(f.decl.owner) {
-			size += f.decl.owner.generics.len
-		}
-
-		let mut generics = make([]&TypeAlias, 0, size)
-
-		for i, g in f.generics {
-			generics = append(generics, &TypeAlias{
-				ident: f.decl.generics[i].ident,
-				kind: &TypeSymbol{
-					kind: g,
-				},
-			})
-		}
-
-		if real(f.decl) && real(f.decl.owner) {
-			let mut owner = f.owner
-			for (i, mut g) in owner.generics {
-				generics = append(generics, &TypeAlias{
-					ident: owner.decl.generics[i].ident,
-					kind: &TypeSymbol{
-						kind: g,
-					},
-				})
-			}
-		}
-
-		ok = true
-		for (_, mut p) in f.params {
-			if !p.decl.is_self() {
-				p.kind = sema.build_type_with_generics(p.decl.kind.decl, generics)
-				ok = real(p.kind) && ok
-			}
-		}
-
-		if !f.decl.is_void() {
-			f.result = sema.build_type_with_generics(f.decl.result.kind.decl, generics)
-			ok = real(f.result) && ok
-		}
-
-		if &sema != &self {
-			self.errors = append(self.errors, sema.errors...)
-		}
-
-		ret ok
-	}
-
-	fn check_validity_for_init_expr(mut &self, left_mut: bool, left_ref: bool,
-		left_kind: &TypeKind, mut d: &Data, error_token: Token) {
-		if left_mut && !d.mutable && is_mut(d.kind) {
-			self.push_err(error_token, "assignment_non_mut_to_mut")
-		}
-		if left_ref {
-			match type d.model {
-			| &Var
-			| &TraitSubIdentExprModel
-			| &CommonIdentExprModel
-			| &StructSubIdentExprModel
-			| &CommonSubIdentExprModel:
-				// Pass
-
-			| &UnaryExprModel:
-				let unary = (&UnaryExprModel)(d.model)
-				if unary.op == str(TokenKind.Star) {
-					// Pointer dereference, pass
-					break
-				}
-
-				fall
-
-			|:
-				self.push_err(error_token, "reference_assign_non_var")
-			}
-			if left_mut && !d.mutable {
-				self.push_err(error_token, "mut_reference_points_to_immut")
-			}
-		}
-
-		let mut atc = &AssignTypeChecker{
-			s:           self,
-			d:           d,
-			error_token: error_token,
-		}
-		_ = atc.check_validity()
-	}
-
-	fn check_type_alias_decl_kind(mut &self, mut ta: &TypeAlias, l: Lookup): (ok: bool) {
-		let mut old = self.file
-		defer { self.set_current_file(old) }
-		let mut file = find_file(self.files, ta.token.file)
-		if real(file) {
-			self.set_current_file(file)
-		}
-
-		ok = self.check_type_with_refers(ta.kind, l, &Referencer{
-			ident: ta.ident,
-			owner: ta,
-			refs:  &ta.refers,
-		})
-		if ok && real(ta.kind.kind.arr()) && ta.kind.kind.arr().auto {
-			self.push_err(ta.kind.decl.token, "array_auto_sized")
-			ok = false
-		}
-		ret
-	}
-
-	fn check_type_alias_decl(mut &self, mut ta: &TypeAlias, l: Lookup) {
-		if is_ignore_ident(ta.ident) {
-			self.push_err(ta.token, "ignore_ident")
-		}
-		self.check_type_alias_decl_kind(ta, l)
-	}
-
-	// Checks type alias declaration with duplicated identifiers.
-	fn check_type_alias_decl_dup(mut &self, mut ta: &TypeAlias) {
-		if self.is_duplicated_ident(uintptr(&ta), ta.ident, ta.cpp_linked) {
-			self.push_err(ta.token, "duplicated_ident", ta.ident)
-		}
-		self.check_type_alias_decl_kind(ta, self)
-	}
-
-	// Checks current package file's type alias declarations.
-	fn check_type_alias_decls(mut &self): (ok: bool) {
-		let mut i = 0
-		for i < self.file.type_aliases.len(); i++ {
-			let mut ta = self.file.type_aliases.at(i)
-			self.check_type_alias_decl_dup(ta)
-
-			// Break checking if type alias has error.
-			if self.errors.len > 0 {
-				ret false
-			}
-		}
-		ret true
-	}
-
-	fn check_enum_items_dup(mut self, e: &Enum) {
-		for _, item in e.items {
-			if is_ignore_ident(item.ident) {
-				self.push_err(item.token, "ignore_ident")
-			} else {
-				for _, citem in e.items {
-					if item == citem {
-						break
-					} else if item.ident == citem.ident {
-						self.push_err(item.token, "duplicated_ident", item.ident)
-						break
-					}
-				}
-			}
-		}
-	}
-
-	fn check_enum_items_str(mut &self, mut e: &Enum) {
-		for (_, mut item) in e.items {
-			if item.auto_expr() {
-				item.value = &Value{
-					data: &Data{
-						constant: Const.new_str(item.ident),
-					},
-				}
-				item.value.data.model = item.value.data.constant
-			} else {
-				let mut d = self.eval(item.value.expr, self)
-				if !real(d) {
-					continue
-				}
-
-				if !d.is_const() {
-					self.push_err(item.value.expr.token, "expr_not_const")
-				}
-
-				self.check_assign_type(e.kind.kind, d, item.token, false)
-				item.value.data = d
-			}
-		}
-	}
-
-	fn check_enum_items_int(mut &self, mut e: &Enum) {
-		let mut max = u64(max_of(e.kind.kind.prim().to_str()))
-		for (i, mut item) in e.items {
-			if max == 0 {
-				self.push_err(item.token, "overflow_limits")
-			} else {
-				max--
-			}
-
-			if item.auto_expr() {
-				item.value = &Value{
-					data: &Data{
-						constant: Const.new_u64(max - (max - u64(i))),
-					},
-				}
-				item.value.data.model = item.value.data.constant
-			} else {
-				let mut d = self.eval(item.value.expr, self)
-				if !real(d) {
-					continue
-				}
-
-				if !d.is_const() {
-					self.push_err(item.value.expr.token, "expr_not_const")
-				}
-
-				self.check_assign_type(e.kind.kind, d, item.token, false)
-				item.value.data = d
-			}
-		}
-	}
-
-	fn check_enum_decl(mut &self, mut e: &Enum) {
-		if is_ignore_ident(e.ident) {
-			self.push_err(e.token, "ignore_ident")
-		} else if self.is_duplicated_ident(uintptr(&e), e.ident, false) {
-			self.push_err(e.token, "duplicated_ident", e.ident)
-		}
-
-		if e.items.len == 0 {
-			self.push_err(e.token, "no_member_in_enum", e.ident)
-		}
-
-		self.check_enum_items_dup(e)
-
-		if real(e.kind) {
-			if !self.check_type(e.kind, self) {
-				ret
-			}
-		} else {
-			// Set to default type.
-			e.kind = &TypeSymbol{
-				kind: &TypeKind{
-					kind: build_prim_type(str(PrimKind.Int)),
-				},
-			}
-		}
-
-		let mut t = e.kind.kind.prim()
-		if !real(t) {
-			self.push_err(e.token, "invalid_type_source")
-			ret
-		}
-
-		// Check items.
-		match {
-		| t.is_str():
-			self.check_enum_items_str(e)
-
-		| is_int(t.to_str()):
-			self.check_enum_items_int(e)
-
-		|:
-			self.push_err(e.token, "invalid_type_source")
-		}
-	}
-
-	// Checks current package file's enum declarations.
-	fn check_enum_decls(mut &self): (ok: bool) {
-		let mut i = 0
-		for i < self.file.enums.len(); i++ {
-			let mut e = self.file.enums.at(i)
-			self.check_enum_decl(e)
-
-			// Break checking if type alias has error.
-			if self.errors.len > 0 {
-				ret false
-			}
-		}
-		ret true
-	}
-
-	fn check_decl_generics(mut self, generics: []&GenericDecl): (ok: bool) {
-		ok = true
-		for i, g in generics {
-			if is_ignore_ident(g.ident) {
-				self.push_err(g.token, "ignore_ident")
-				ok = false
-				continue
-			}
-
-			// Check duplications.
-		duplication_lookup:
-			for j, ct in generics {
-				match {
-				| j >= i:
-					// Skip current and following generics.
-					break duplication_lookup
-
-				| g.ident == ct.ident:
-					self.push_err(g.token, "duplicated_ident", g.ident)
-					ok = false
-					break duplication_lookup
-				}
-			}
-		}
-		ret
-	}
-
-	fn check_fn_decl_params_dup(mut self, f: &Fn): (ok: bool) {
-		ok = true
-	check:
-		for i, p in f.params {
-			// Lookup in generics.
-			for _, g in f.generics {
-				if p.ident == g.ident {
-					ok = false
-					self.push_err(p.token, "duplicated_ident", p.ident)
-					continue check
-				}
-			}
-
-		params_lookup:
-			for j, jp in f.params {
-				match {
-				| j >= i:
-					// Skip current and following parameters.
-					break params_lookup
-
-				| is_anon_ident(p.ident) || is_anon_ident(jp.ident):
-					// Skip anonymous parameters.
-					break params_lookup
-
-				| p.ident == jp.ident:
-					ok = false
-					self.push_err(p.token, "duplicated_ident", p.ident)
-					continue check
-				}
-			}
-		}
-		ret
-	}
-
-	fn check_fn_decl_result_dup(mut self, f: &Fn): (ok: bool) {
-		ok = true
-
-		if f.is_void() {
-			ret
-		}
-
-		// Check duplications.
-		for i, v in f.result.idents {
-			if is_ignore_ident(v.kind) {
-				continue // Skip anonymous return variables.
-			}
-
-			// Lookup in generics.
-			for _, g in f.generics {
-				if v.kind == g.ident {
-					goto exist
-				}
-			}
-
-			// Lookup in parameters.
-			for _, p in f.params {
-				if v.kind == p.ident {
-					goto exist
-				}
-			}
-
-			// Lookup in return identifiers.
-		itself_lookup:
-			for j, jv in f.result.idents {
-				match {
-				| j >= i:
-					// Skip current and following identifiers.
-					break itself_lookup
-
-				| jv.kind == v.kind:
-					goto exist
-				}
-			}
-			continue
-		exist:
-			self.push_err(v, "duplicated_ident", v.kind)
-			ok = false
-		}
-
-		ret
-	}
-
-	fn check_fn_decl_types(mut &self, mut f: &Fn): (ok: bool) {
-		ok = true
-
-		let mut generics = f.generics
-		if real(f.owner) {
-			generics = append(generics, f.owner.generics...)
-		}
-
-		for (_, mut p) in f.params {
-			if !p.is_self() {
-				let mut kind = self.build_non_generic_type_kind(p.kind.decl, generics)
-				ok = real(kind) && ok
-				p.kind.kind = kind
-			}
-		}
-
-		if !f.is_void() {
-			let mut kind = self.build_non_generic_type_kind(f.result.kind.decl, generics)
-			ok = real(kind) && ok
-			f.result.kind.kind = kind
-		}
-
-		ret ok
-	}
-
-	// Checks generics, parameters and return type.
-	// Not checks scope, and other things.
-	fn check_fn_decl_prototype(mut &self, mut f: &Fn): (ok: bool) {
-		match {
-		| !self.check_decl_generics(f.generics):
-			ret false
-
-		| !self.check_fn_decl_params_dup(f):
-			ret false
-
-		| !self.check_fn_decl_result_dup(f):
-			ret false
-
-		| !self.check_fn_decl_types(f):
-			ret false
-
-		|:
-			ret true
-		}
-	}
-
-	fn check_trait_decl_method(mut &self, mut f: &Fn) {
-		if is_ignore_ident(f.ident) {
-			self.push_err(f.token, "ignore_ident")
-		}
-	
-		self.check_fn_decl_prototype(f)
-		f.sema = self
-	}
-
-	fn check_trait_decl_methods(mut &self, mut t: &Trait) {
-		for (i, mut f) in t.methods {
-			self.check_trait_decl_method(f)
-
-			// Break checking if type alias has error.
-			if self.errors.len > 0 {
-				ret
-			}
-
-			// Check duplications.
-		duplicate_lookup:
-			for j, jf in t.methods {
-				// NOTE:
-				//  Ignore identifier checking is unnecessary here.
-				//  Because ignore identifiers logs error.
-				//  Errors breaks checking, so here is unreachable code for
-				//  ignore identified methods.
-				match {
-				| j >= i:
-					// Skip current and following methods.
-					break duplicate_lookup
-
-				| f.ident == jf.ident:
-					self.push_err(f.token, "duplicated_ident", f.ident)
-					break duplicate_lookup
-				}
-			}
-		}
-	}
-
-	fn check_trait_decl(mut &self, mut t: &Trait) {
-		if is_ignore_ident(t.ident) {
-			self.push_err(t.token, "ignore_ident")
-		} else if self.is_duplicated_ident(uintptr(&t), t.ident, false) {
-			self.push_err(t.token, "duplicated_ident", t.ident)
-		}
-
-		self.check_trait_decl_methods(t)
-	}
-
-	// Checks current package file's trait declarations.
-	fn check_trait_decls(mut &self): (ok: bool) {
-		let mut i = 0
-		for i < self.file.traits.len(); i++ {
-			let mut t = self.file.traits.at(i)
-			self.check_trait_decl(t)
-
-			// Break checking if type alias has error.
-			if self.errors.len > 0 {
-				ret false
-			}
-		}
-		ret true
-	}
-
-	fn check_trait_impl_methods(mut self, mut base: &Trait, ipl: &Impl): (ok: bool) {
-		ok = true
-		for _, f in ipl.methods {
-			if !real(base.find_method(f.ident)) {
-				self.push_err(f.token, "trait_have_not_ident", base.ident, f.ident)
-				ok = false
-			}
-		}
-		ret
-	}
-
-	fn impl_to_struct(mut &self, mut dest: &Struct, mut ipl: &Impl): (ok: bool) {
-		ok = true
-		for (_, mut f) in ipl.methods {
-			if real(dest.find_method(f.ident, f.statically)) || real(dest.find_field(f.ident)) {
-				self.push_err(f.token, "struct_already_have_ident", dest.ident, f.ident)
-				ok = false
-				continue
-			}
-
-			if dest.generics.len > 0 && f.generics.len > 0 {
-				for _, fg in f.generics {
-					for _, dg in dest.generics {
-						if fg.ident == dg.ident {
-							self.push_err(fg.token, "method_has_generic_with_same_ident")
-							ok = false
-						}
-					}
-				}
-			}
-
-			f.sema = self
-			f.owner = dest
-			dest.methods.push(f)
-		}
-		ret
-	}
-
-	// Implement trait to destination.
-	fn impl_trait(mut &self, mut decl: &Impl) {
-		let mut base = self.find_trait(decl.base.kind)
-		if !real(base) {
-			base = find_builtin_trait(decl.base.kind)
-		}
-		if !real(base) {
-			self.push_err(decl.base, "impl_base_not_exist", decl.base.kind)
-			ret
-		}
-
-		// Cpp-link state always false because cpp-linked
-		// definitions haven't support implementations.
-		const CPP_LINKED = false
-
-		let mut dest = self.find_struct(decl.dest.kind, CPP_LINKED)
-		if !real(dest) {
-			self.push_err(decl.dest, "impl_dest_not_exist", decl.dest.kind)
-			ret
-		}
-
-		if dest.token.file.dir() != self.file.file.dir() {
-			self.push_err(decl.dest, "illegal_impl_out_of_package")
-			ret
-		}
-
-		base.implemented = append(base.implemented, dest)
-		dest.implements = append(dest.implements, base)
-
-		match {
-		| !self.check_trait_impl_methods(base, decl):
-			ret
-
-		| !self.impl_to_struct(dest, decl):
-			ret
-		}
-	}
-
-	fn impl_struct(mut &self, mut decl: &Impl) {
-		// Cpp-link state always false because cpp-linked
-		// definitions haven't support implementations.
-		const CPP_LINKED = false
-
-		let mut dest = self.find_struct(decl.dest.kind, CPP_LINKED)
-		if !real(dest) {
-			self.push_err(decl.dest, "impl_dest_not_exist", decl.dest.kind)
-			ret
-		}
-
-		if dest.token.file.dir() != self.file.file.dir() {
-			self.push_err(decl.dest, "illegal_impl_out_of_package")
-			ret
-		}
-
-		match {
-		| !self.impl_to_struct(dest, decl):
-			ret
-		}
-	}
-
-	// Implement implementation.
-	fn impl_impl(mut &self, mut decl: &Impl) {
-		match {
-		| decl.is_trait_impl():
-			self.impl_trait(decl)
-
-		| decl.is_struct_impl():
-			self.impl_struct(decl)
-		}
-	}
-
-	// Checks variable declaration.
-	// No checks duplicated identifiers.
-	fn check_var_decl(mut &self, mut decl: &Var, l: Lookup) {
-		if is_ignore_ident(decl.ident) {
-			self.push_err(decl.token, "ignore_ident")
-		}
-
-		if decl.is_type_inferred() {
-			if decl.statically {
-				self.push_err(decl.token, "static_is_type_inferred")
-			}
-			if !decl.is_initialized() {
-				self.push_err(decl.token, "missing_value_for_type_inference")
-			}
-		} else {
-			_ = self.check_type(decl.kind, l)
-		}
-
-		if decl.constant && decl.reference {
-			self.push_err(decl.token, "constant_reference")
-		}
-
-		if !decl.is_initialized() {
-			if decl.constant {
-				self.push_err(decl.token, "const_var_not_have_expr")
-			}
-
-			if decl.statically {
-				self.push_err(decl.token, "static_not_have_expr")
-			}
-
-			if decl.reference {
-				self.push_err(decl.token, "reference_not_initialized")
-			}
-		}
-	}
-
-	// Checks variable declaration for global scope.
-	// Checks duplicated identifiers by Sema.
-	fn check_global_var_decl(mut &self, mut decl: &Var) {
-		if self.is_duplicated_ident(uintptr(&decl), decl.ident, decl.cpp_linked) {
-			self.push_err(decl.token, "duplicated_ident", decl.ident)
-		}
-		if decl.cpp_linked && decl.constant {
-			self.push_err(decl.token, "cpp_linked_variable_is_const")
-		}
-		if !decl.cpp_linked && !decl.constant && !decl.statically {
-			self.push_err(decl.token, "global_not_static")
-		}
-
-		self.check_var_decl(decl, self)
-	}
-
-	// Checks current package file's global variable declarations.
-	fn check_global_decls(mut &self): (ok: bool) {
-		let mut i = 0
-		for i < self.file.vars.len(); i++ {
-			let mut decl = self.file.vars.at(i)
-			self.check_global_var_decl(decl)
-
-			// Break checking if type alias has error.
-			if self.errors.len > 0 {
-				ret false
-			}
-		}
-		ret true
-	}
-
-	fn check_struct_trait_impl(mut &self, mut strct: &Struct, mut trt: &Trait): (ok: bool) {
-		for (_, mut tf) in trt.methods {
-			let mut exist = false
-			let mut sf = strct.find_method(tf.ident, tf.statically)
-			let tf_k = self.get_trait_check_fn_kind(tf)
-			if real(sf) {
-				let sf_k = self.get_trait_check_fn_kind(sf)
-				exist = (
-					tf_k.decl.public == sf_k.decl.public &&
-					tf_k.decl.ident == sf_k.decl.ident &&
-					tf_k.equals(&TypeKind{kind: sf_k})
-				)
-			}
-			if !exist {
-				self.push_err(strct.token, "not_impl_trait_def", trt.ident, tf_k.to_str())
-				ok = false
-			}
-		}
-		ret
-	}
-
-	fn check_struct_impls(mut &self, mut strct: &Struct): (ok: bool) {
-		ok = true
-		for (_, mut trt) in strct.implements {
-			ok = self.check_struct_trait_impl(strct, trt) && ok
-		}
-		ret ok
-	}
-
-	fn check_struct_fields(mut &self, mut st: &Struct): (ok: bool) {
-		ok = true
-
-		let mut tc = &TypeChecker{
-			s:               self,
-			lookup:          self,
-			ignore_generics: st.generics,
-			referencer: &Referencer{
-				ident: st.ident,
-				owner: st,
-			},
-		}
-
-		let n = st.instances.len
-		for (_, mut f) in st.fields {
-			f.owner = st
-			f.kind.kind = tc.check_decl(f.kind.decl)
-			ok = real(f.kind.kind) && ok
-
-			for _, cf in st.fields {
-				if f == cf {
-					break
-				} else if f.ident == cf.ident {
-					self.push_err(f.token, "duplicated_ident", f.ident)
-					ok = false
-				}
-			}
-		}
-
-		// Save itself for legal cycles like *Struct, or &Struct.
-		if ok && n != st.instances.len {
-			drop(tc.referencer)
-			st.instances = st.instances[:n]
-			for (_, mut f) in st.fields {
-				f.kind.kind = tc.check_decl(f.kind.decl)
-			}
-		}
-
-		ret ok
-	}
-
-	fn check_struct_decl(mut &self, mut strct: &Struct) {
-		if is_ignore_ident(strct.ident) {
-			self.push_err(strct.token, "ignore_ident")
-		} else if self.is_duplicated_ident(uintptr(&strct), strct.ident, strct.cpp_linked) {
-			self.push_err(strct.token, "duplicated_ident", strct.ident)
-		}
-
-		strct.sema = self
-		match {
-		| !self.check_decl_generics(strct.generics): ret
-		| !self.check_struct_fields(strct):          ret
-		| !self.check_struct_impls(strct):           ret
-		}
-	}
-
-	// Checks current package file's structure declarations.
-	fn check_struct_decls(mut &self): (ok: bool) {
-		let mut i = 0
-		for i < self.file.structs.len(); i++ {
-			let mut strct = self.file.structs.at(i)
-			self.check_struct_decl(strct)
-
-			// Break checking if type alias has error.
-			if self.errors.len > 0 {
-				ret false
-			}
-		}
-
-		ret true
-	}
-
-	fn check_fn_decl(mut &self, mut f: &Fn) {
-		if is_ignore_ident(f.ident) {
-			self.push_err(f.token, "ignore_ident")
-		} else if self.is_duplicated_ident(uintptr(&f), f.ident, f.cpp_linked) {
-			self.push_err(f.token, "duplicated_ident", f.ident)
-		}
-
-		f.sema = self
-		_ = self.check_fn_decl_prototype(f)
-	}
-
-	// Checks current package file's function declarations.
-	fn check_fn_decls(mut &self): (ok: bool) {
-		let mut i = 0
-		for i < self.file.funcs.len(); i++ {
-			let mut f = self.file.funcs.at(i)
-			self.check_fn_decl(f)
-
-			// Break checking if type alias has error.
-			if self.errors.len > 0 {
-				ret false
-			}
-		}
-		ret true
-	}
-
-	fn check_directive_pass(mut self, pass: Pass): (ok: bool) {
-		if pass.text == "" {
-			ret true
-		}
-
-		if pass.text[0] != '-' {
-			self.push_err(pass.token, "pass_directive_not_starts_with_dash")
-			ret false
-		}
-
-		ret true
-	}
-
-	fn check_passes(mut self): (ok: bool) {
-		ok = true
-		let mut i = 0
-		for i < self.file.passes.len(); i++ {
-			let pass = self.file.passes.at(i)
-			ok = self.check_directive_pass(pass) && ok
-		}
-		ret
-	}
-
-	fn push_cycle_error(self, st1: &Struct, st2: &Struct, mut &message: str) {
-		const PADDING = 4
-
-		let refers_to = errorf("refers_to", st1.ident, st2.ident)
-		message = str_repeat(" ", PADDING) + refers_to + "\n" + message
-	}
-
-	fn check_cross_cycle(self, st1: &Struct, st2: &Struct, mut &message: str): bool {
-		for _, u in st2.uses {
-			if &u == &st1 {
-				self.push_cycle_error(st2, u, message)
-				ret false
-			}
-
-			if !self.check_cross_cycle(st1, u, message) {
-				self.push_cycle_error(st2, u, message)
-				ret false
-			}
-		}
-
-		ret true
-	}
-
-	fn check_struct_derive_illegal_cycles(mut self, derive: str, st1: &Struct, mut k: &TypeKind): (ok: bool) {
-		let mut st2 = get_struct_from_kind(k)
-		if !real(st2) {
-			ret true
-		}
-
-		// Check illegal cycle for itself.
-		// Because refers's owner is ta.
-		if &st1 == &st2 {
-			self.push_err(st1.token, "derive_illegal_cycle_refers_itself", derive, st1.ident)
-			ret false
-		}
-
-		let mut message = ""
-
-		if !self.check_cross_cycle(st1, st2, message) {
-			let mut err_msg = message
-			message = ""
-			self.push_cycle_error(st1, st2, message)
-			err_msg = err_msg + message
-			self.push_err(st1.token, "derive_illegal_cross_cycle", derive, err_msg)
-			ret false
-		}
-
-		ret true
-	}
-
-	fn check_struct_ins_derive_clone(mut self, mut st: &StructIns): (ok: bool) {
-		if !st.decl.is_derives(str(Derives.Clone)) {
-			ret true
-		}
-
-		for (_, mut f) in st.fields {
-			if !real(f.kind) || !is_mut(f.kind) {
-				continue
-			}
-
-			if !supports_cloning(f.kind) {
-				self.push_err(st.decl.token, "type_not_compatible_for_derive", f.kind.to_str(), str(Derives.Clone))
-				ret false
-			}
-
-			if !self.check_struct_derive_illegal_cycles(str(Derives.Clone), st.decl, f.kind) {
-				ret false
-			}
-		}
-
-		ret true
-	}
-
-	fn check_struct_derive_clone(mut self, mut st: &Struct): (ok: bool) {
-		ret self.check_struct_ins_derive_clone(st.instance())
-	}
-
-	fn check_file_derives(mut self): (ok: bool) {
-		// Check derives.
-		let mut i = 0
-		for i < self.file.structs.len(); i++ {
-			let mut st = self.file.structs.at(i)
-			let ok = self.check_struct_derive_clone(st)
-			if !ok {
-				ret false
-			}
-		}
-
-		ret true
-	}
-
-	fn check_package_derives(mut self) {
-		for (_, mut f) in self.files {
-			self.set_current_file(f)
-			let ok = self.check_file_derives()
-			if !ok {
-				ret
-			}
-		}
-	}
-
-	// Checks declarations of all package files.
-	// Breaks checking if checked file failed.
-	fn check_package_decls(mut &self) {
-		for (_, mut f) in self.files {
-			self.set_current_file(f)
-			if !self.check_passes() {
-				ret
-			}
-		}
-
-		for (_, mut f) in self.files {
-			self.set_current_file(f)
-			if !self.check_type_alias_decls() {
-				ret
-			}
-		}
-
-		for (_, mut f) in self.files {
-			self.set_current_file(f)
-			if !self.check_trait_decls() {
-				ret
-			}
-		}
-
-		for (_, mut f) in self.files {
-			self.set_current_file(f)
-			if !self.check_global_decls() {
-				ret
-			}
-		}
-
-		for (_, mut f) in self.files {
-			self.set_current_file(f)
-			if !self.check_fn_decls() {
-				ret
-			}
-		}
-
-		for (_, mut f) in self.files {
-			self.set_current_file(f)
-			if !self.check_struct_decls() {
-				ret
-			}
-		}
-
-		self.check_package_derives()
-	}
-
-	fn check_data_for_type_inference(mut self, d: &Data, err_token: Token) {
-		match {
-		| d.is_nil():
-			self.push_err(err_token, "nil_for_type_inference")
-
-		| d.is_void():
-			self.push_err(err_token, "void_for_type_inreference")
-		}
-	}
-
-	fn check_var(mut &self, mut v: &Var) {
-		if v.cpp_linked {
-			ret
-		}
-
-		if v.is_type_inferred() {
-			// Build new TypeSymbol because
-			// auto-type symbols are nil.
-			v.kind = &TypeSymbol{kind: v.value.data.kind}
-
-			self.check_data_for_type_inference(v.value.data, v.value.expr.token)
-		} else {
-			let mut arr = v.kind.kind.arr()
-			if real(arr) {
-				if arr.auto {
-					let data_arr = v.value.data.kind.arr()
-					if real(data_arr) {
-						arr.n = data_arr.n
-					}
-				}
-			}
-
-			self.check_assign_type(
-				v.kind.kind, v.value.data, v.value.expr.token, false)
-		}
-
-		self.check_validity_for_init_expr(
-			v.mutable,
-			v.reference,
-			v.kind.kind,
-			v.value.data,
-			v.value.expr.token)
-
-		if !v.constant {
-			drop(v.value.data.constant)
-		}
-	}
-
-	fn check_type_var(mut &self, mut decl: &Var, l: Lookup) {
-		if decl.cpp_linked || !decl.is_initialized() {
-			ret
-		}
-
-		if real(decl.kind) {
-			decl.value.data = self.evalpd(
-				decl.value.expr, l, decl.kind.kind, decl)
-		} else {
-			decl.value.data = self.evalpd(
-				decl.value.expr, l, new(TypeKind), decl)
-		}
-		if !real(decl.value.data) {
-			ret // Skip checks if error ocurrs.
-		}
-
-		self.check_var(decl)
-	}
-
-	// Checks types of current package file's global variables.
-	fn check_global_types(mut &self) {
-		let mut i = 0
-		for i < self.file.vars.len(); i++ {
-			let mut decl = self.file.vars.at(i)
-			self.check_type_var(decl, self)
-		}
-
-		// Re-check depended.
-		i = 0
-		for i < self.file.vars.len(); i++ {
-			let mut decl = self.file.vars.at(i)
-			if decl.is_initialized() && decl.depends.len > 0 {
-				self.check_type_var(decl, self)
-			}
-		}
-	}
-
-	fn check_type_method(mut &self, mut strct: &StructIns, mut f: &Fn) {
-		if f.cpp_linked {
-			ret
-		}
-
-		// Generic instances are checked instantly.
-		if f.generics.len > 0 {
-			ret
-		}
-
-		if f.instances.len == 0 {
-			let mut ins = f.instance()
-			ins.owner = strct
-			f.append_instance(ins)
-			self.reload_fn_ins_types(ins)
-			ins.reloaded = true
-		}
-
-		for (_, mut ins) in f.instances {
-			if ins.scope.stmts.len() > 0 {
-				// Checked
-				continue
-			}
-			self.check_fn_ins(ins)
-		}
-	}
-
-	fn check_type_struct(mut &self, mut strct: &Struct) {
-		if strct.cpp_linked {
-			ret
-		}
-
-		if strct.generics.len == 0 && strct.instances.len == 0 {
-			let mut ins = strct.instance()
-			ins.checked = true
-			strct.append_instance(ins)
-		}
-
-		for (_, mut ins) in strct.instances {
-			for (_, mut f) in ins.methods {
-				self.check_type_method(ins, f)
-			}
-		}
-	}
-
-	fn check_struct_types(mut &self) {
-		let mut i = 0
-		for i < self.file.structs.len(); i++ {
-			let mut strct = self.file.structs.at(i)
-			self.check_type_struct(strct)
-		}
-	}
-
-	fn check_rets(mut self, mut f: &FnIns) {
-		if f.decl.is_void() {
-			ret
-		}
-
-		let ok = has_ret(f.scope)
-		if !ok {
-			self.push_err(f.decl.token, "missing_ret")
-		}
-	}
-
-	fn check_fn_ins_sc(mut self, mut f: &FnIns, mut sc: &ScopeChecker) {
-		if f.decl.cpp_linked {
-			ret
-		}
-
-		let mut vars = build_ret_vars(f)
-
-		sc.table.vars.append(vars...)
-		sc.table.vars.append(build_param_vars(f)...)
-		sc.table.type_aliases.append(build_generic_type_aliases(f)...)
-
-		sc.check(f.decl.scope, f.scope)
-
-		// Append return variables.
-		if vars.len > 0 {
-			for (_, mut v) in vars {
-				f.scope.stmts.push_front(v)
-			}
-		}
-
-		self.check_rets(f)
-	}
-
-	fn check_fn_ins(mut self, mut f: &FnIns) {
-		if f.decl.cpp_linked {
-			ret
-		}
-
-		let mut old = f.decl.sema.file
-		defer { f.decl.sema.set_current_file(old) }
-		let mut file = find_file(f.decl.sema.files, f.decl.token.file)
-		if real(file) {
-			f.decl.sema.set_current_file(file)
-		}
-
-		let mut sc = new_scope_checker(f.decl.sema, f)
-		self.check_fn_ins_sc(f, sc)
-
-		if &f.decl.sema != &self {
-			self.errors = append(self.errors, f.decl.sema.errors...)
-		}
-	}
-
-	fn check_type_fn(mut &self, mut f: &Fn) {
-		if f.cpp_linked {
-			ret
-		}
-
-		// Generic instances are checked instantly.
-		if f.generics.len > 0 {
-			ret
-		}
-
-		for (_, mut ins) in f.instances {
-			self.check_fn_ins(ins)
-		}
-	}
-
-	fn precheck_type_fn(mut &self, mut f: &Fn) {
-		if f.cpp_linked {
-			ret
-		}
-
-		// Generic instances are checked instantly.
-		if f.generics.len > 0 {
-			ret
-		}
-
-		if f.instances.len == 0 {
-			let mut ins = f.instance()
-			f.instances = append(f.instances, ins)
-			self.reload_fn_ins_types(ins)
-			ins.reloaded = true
-		}
-	}
-
-	// Prechecks types of current package file's functions.
-	fn precheck_fn_types(mut &self): (ok: bool) {
-		let mut i = 0
-		for i < self.file.funcs.len(); i++ {
-			let mut decl = self.file.funcs.at(i)
-			self.precheck_type_fn(decl)
-		}
-
-		ret true
-	}
-
-	// Checks types of current package file's functions.
-	fn check_fn_types(mut &self): (ok: bool) {
-		let mut i = 0
-		for i < self.file.funcs.len(); i++ {
-			let mut decl = self.file.funcs.at(i)
-			self.check_type_fn(decl)
-		}
-
-		ret true
-	}
-
-	// Checks all types of all package files.
-	// Breaks checking if checked file failed.
-	fn check_package_types(mut &self) {
-		for (_, mut f) in self.files {
-			self.set_current_file(f)
-			self.check_global_types()
-		}
-
-		for (_, mut f) in self.files {
-			self.set_current_file(f)
-			self.precheck_fn_types()
-		}
-
-		for (_, mut f) in self.files {
-			self.set_current_file(f)
-			self.check_fn_types()
-		}
-
-		for (_, mut f) in self.files {
-			self.set_current_file(f)
-			self.check_struct_types()
-		}
-	}
-
-	fn set_file_sema_fields(mut &self) {
-		let mut i = 0
-		for i < self.file.funcs.len(); i++ {
-			let mut f = self.file.funcs.at(i)
-			f.sema = self
-		}
-
-		i = 0
-		for i < self.file.structs.len(); i++ {
-			let mut st = self.file.structs.at(i)
-			st.sema = self
-		}
-	}
-
-	fn set_sema_fields(mut &self) {
-		for (_, mut file) in self.files {
-			self.set_current_file(file)
-			self.set_file_sema_fields()
-		}
-	}
-
-	fn check(mut &self, mut files: []&SymbolTable) {
-		self.files = files
-
-		self.check_imports()
-		// Break checking if imports has error.
-		if self.errors.len > 0 {
-			ret
-		}
-
-		self.check_enums()
-		// Break checking if enums has error.
-		if self.errors.len > 0 {
-			ret
-		}
-
-		self.set_sema_fields()
-
-		self.impl_impls()
-		// Break checking if imports has error.
-		if self.errors.len > 0 {
-			ret
-		}
-
-		self.check_package_decls()
-
-		// Break checking if imports has error.
-		if self.errors.len > 0 {
-			ret
-		}
-
-		self.check_package_types()
-	}
+    fn set_current_file(mut self, mut f: &SymbolTable) { self.file = f }
+
+    fn push_err(mut self, token: Token, key: str, args: ...any) {
+        self.errors = append(self.errors, compiler_err(token, key, args...))
+    }
+
+    // Reports whether define is accessible in the current package.
+    fn is_accessible_define(self, public: bool, token: Token): bool {
+        ret public || !real(token.file) || self.file.file.dir() == token.file.dir()
+    }
+
+    // Reports this identifier duplicated in package's global scope.
+    // The "self" parameter represents address of exception identifier.
+    // If founded identifier address equals to self, will be skipped.
+    fn is_duplicated_ident(self, itself: uintptr, ident: str, cpp_linked: bool): bool {
+        for _, f in self.files {
+            if f.is_duplicated_ident(itself, ident, cpp_linked) {
+                ret true
+            }
+
+            let mut i = 0
+            for i < f.imports.len(); i++ {
+                let imp = unsafe { (&f.imports).at(i) }
+                for _, selected in imp.selected {
+                    if selected.kind == ident {
+                        ret true
+                    }
+                }
+            }
+        }
+        ret false
+    }
+
+    fn check_generic_quantity(mut self, required: int, given: int, error_token: Token): (ok: bool) {
+        match {
+        | required == 0 && given > 0:
+            self.push_err(error_token, "not_has_generics")
+            ret false
+
+        | required > 0 && given == 0:
+            self.push_err(error_token, "has_generics")
+            ret false
+
+        | required < given:
+            self.push_err(error_token, "generics_overflow")
+            ret false
+
+        | required > given:
+            self.push_err(error_token, "missing_generics")
+            ret false
+
+        |:
+            ret true
+        }
+    }
+
+    fn is_duplicated_import_selection(self, itself: uintptr, ident: str): bool {
+        let mut i = 0
+        for i < self.file.imports.len(); i++ {
+            let imp = unsafe { (&self.file).imports.at(i) }
+            if uintptr(&imp) == itself {
+                // Don't scan trailing imports.
+                break
+            }
+
+            if imp.exist_ident(ident) {
+                ret true
+            }
+        }
+
+        ret false
+    }
+
+    fn get_import_def(self, ident: str, mut &imp: &ImportInfo): any {
+        if find_package_builtin_def(imp.link_path, ident) != nil {
+            ret true
+        }
+
+        for (_, mut f) in imp.package.files {
+            const CPP_LINKED = false // C++-linked defines can't export.
+            let mut def = f.def_by_ident(ident, CPP_LINKED)
+            if def != nil {
+                ret def
+            }
+        }
+
+        ret nil
+    }
+
+    fn check_import_selections(mut self, mut imp: &ImportInfo) {
+        // Set file to any package file for accessibility checking.
+        self.set_current_file(self.files[0])
+        defer { drop(self.file) } // Reset file.
+
+        for _, ident in imp.selected {
+            if ident.kind == str(TokenKind.Self) {
+                continue
+            }
+
+            if self.is_duplicated_import_selection(uintptr(&imp), ident.kind) {
+                self.push_err(ident, "duplicated_ident", ident.kind)
+                continue
+            }
+
+            let mut def = self.get_import_def(ident.kind, imp)
+            match type def {
+            | bool:
+                // Pass, built-in.
+                continue
+
+            | &Var:
+                let mut v = (&Var)(def)
+                if self.is_accessible_define(v.public, v.token) {
+                    continue
+                }
+
+            | &TypeAlias:
+                let mut ta = (&TypeAlias)(def)
+                if self.is_accessible_define(ta.public, ta.token) {
+                    continue
+                }
+
+            | &Struct:
+                let mut strct = (&Struct)(def)
+                if self.is_accessible_define(strct.public, strct.token) {
+                    continue
+                }
+
+            | &Trait:
+                let mut t = (&Trait)(def)
+                if self.is_accessible_define(t.public, t.token) {
+                    continue
+                }
+
+            | &Enum:
+                let mut e = (&Enum)(def)
+                if self.is_accessible_define(e.public, e.token) {
+                    continue
+                }
+
+            | &Fn:
+                let mut f = (&Fn)(def)
+                if self.is_accessible_define(f.public, f.token) {
+                    continue
+                }
+
+            |:
+                self.push_err(ident, "ident_not_exist", ident.kind)
+                continue
+            }
+
+            self.push_err(ident, "ident_is_not_accessible", ident.kind)
+
+        }
+    }
+
+    fn check_import(mut self, mut imp: &ImportInfo): bool {
+        if imp.duplicate || imp.cpp_linked || imp.package.files.len == 0 {
+            ret true
+        }
+    
+        let mut sema = &Sema{}
+        sema.check(imp.package.files)
+        if sema.errors.len > 0 {
+            self.errors = append(self.errors, sema.errors...)
+            ret false
+        }
+    
+        self.check_import_selections(imp)
+        ret true
+    }
+
+    fn check_imports(mut self) {
+        for (_, mut file) in self.files {
+            let mut i = 0
+            for i < file.imports.len(); i++ {
+                let mut imp = file.imports.at(i)
+                let ok = self.check_import(imp)
+
+                // Break checking if package has error.
+                if !ok {
+                    self.push_err(imp.token, "used_package_has_errors", imp.link_path)
+                    ret
+                }
+            }
+        }
+    }
+
+    fn impl_file_impls(mut &self) {
+        let mut i = 0
+        for i < self.file.impls.len(); i++ {
+            let mut imp = self.file.impls.at(i)
+            self.impl_impl(imp)
+        }
+    }
+
+    fn impl_impls(mut &self) {
+        for (_, mut file) in self.files {
+            self.set_current_file(file)
+            self.impl_file_impls()
+        }
+    }
+
+    fn check_enums(mut &self) {
+        for (_, mut file) in self.files {
+            self.set_current_file(file)
+            self.check_enum_decls()
+        }
+    }
+
+    // Checks type, builds result as kind and collect referred type aliases.
+    // Skips already checked types.
+    fn check_type_with_refers(mut &self, mut t: &TypeSymbol, l: Lookup, referencer: &Referencer): (ok: bool) {
+        if t.checked() {
+            ret true
+        }
+        let mut tc = TypeChecker{
+            s:          self,
+            lookup:     l,
+            referencer: referencer,
+        }
+        tc.check(t)
+        ret t.checked()
+    }
+
+    // Checks type and builds result as kind.
+    // Skips already checked types.
+    fn check_type(mut &self, mut t: &TypeSymbol, l: Lookup): (ok: bool) {
+        ret self.check_type_with_refers(t, l, new(Referencer))
+    }
+
+    // Builds type with type aliases for generics.
+    // Returns nil if error occur or failed.
+    fn build_type_with_generics(mut &self, mut t: &TypeDecl, generics: []&TypeAlias): &TypeKind {
+        let mut tc = &TypeChecker{
+            s:            self,
+            lookup:       self,
+            use_generics: generics,
+        }
+        ret tc.check_decl(t)
+    }
+
+    // Same as s.build_type_with_generics but not uses any generics.
+    fn build_type(mut &self, mut t: &TypeDecl): &TypeKind {
+        ret self.build_type_with_generics(t, nil)
+    }
+
+    // Evaluates expression with type prefixed Eval and returns result.
+    // Checks variable dependencies if exist.
+    fn evalpd(mut &self, mut expr: &Expr, mut l: Lookup, mut p: &TypeKind, owner: &Var): &Data {
+        let mut e = &Eval{
+            s:      self,
+            lookup: l,
+            owner:  owner,
+        }
+
+        match type l {
+        | &ScopeChecker:
+            e.unsafety = (&ScopeChecker)(l).is_unsafe()
+        }
+
+        e.prefix = p
+
+        ret e.eval_expr(expr)
+    }
+
+    // Evaluates expression with type prefixed Eval and returns result.
+    fn evalp(mut &self, mut expr: &Expr, mut l: Lookup, mut p: &TypeKind): &Data {
+        ret self.evalpd(expr, l, p, new(Var))
+    }
+
+    // Evaluates expression with Eval and returns result.
+    fn eval(mut &self, mut expr: &Expr, mut l: Lookup): &Data {
+        ret self.evalp(expr, l, new(TypeKind))
+    }
+
+    fn check_assign_type(mut &self, mut dest: &TypeKind, mut d: &Data, error_token: Token, deref: bool) {
+        let mut atc = &AssignTypeChecker{
+            s:           self,
+            error_token: error_token,
+            dest:        dest,
+            d:           d,
+            deref:       deref,
+        }
+        let ok = atc.check()
+        if !ok {
+            ret
+        }
+
+        if !d.is_const() || !real(dest.prim()) {
+            ret
+        }
+
+        let mut kind = dest.prim().kind
+
+        match {
+        | is_sig_int(kind):
+            d.constant.set_i64(d.constant.as_i64())
+
+        | is_unsig_int(kind):
+            d.constant.set_u64(d.constant.as_u64())
+
+        | is_float(kind):
+            d.constant.set_f64(d.constant.as_f64())
+        }
+    }
+
+    fn check_type_compatibility(mut &self, mut dest: &TypeKind,
+        mut src: &TypeKind, error_token: Token, deref: bool): bool {
+        let dest_kind = dest.to_str()
+        if !real(src) {
+            self.push_err(error_token, "incompatible_types", dest_kind, "<untyped>")
+            ret false
+        }
+        let src_kind = src.to_str()
+
+        // Tuple to single type, always fails.
+        if real(src.tup()) {
+            self.push_err(error_token, "incompatible_types", dest_kind, src_kind)
+            ret false
+        }
+
+        if real(dest.prim()) && dest.prim().is_any() {
+            ret false
+        }
+
+        let mut tcc = &TypeCompatibilityChecker{
+            s:           self,
+            error_token: error_token,
+            dest:        dest,
+            src:         src,
+            deref:       deref,
+        }
+        let ok = tcc.check()
+
+        match {
+        | ok:
+            ret true
+
+        | dest_kind == src_kind:
+            ret true
+
+        |:
+            self.push_err(error_token, "incompatible_types", dest_kind, src_kind)
+            ret false
+        }
+    }
+
+    // Builds non-generic types but skips generic types.
+    // Builds generic identifiers as primitive type.
+    //
+    // Useful:
+    //   - For non-generic type parsed string type kinds.
+    //   - For checking non-generic types.
+    fn build_non_generic_type_kind(mut &self, mut ast: &TypeDecl, generics: []&GenericDecl): &TypeKind {
+        let mut tc = &TypeChecker{
+            s:               self,
+            lookup:          self,
+            ignore_generics: generics,
+        }
+        ret tc.check_decl(ast)
+    }
+
+    fn build_fn_non_generic_type_kinds(mut &self, mut f: &FnIns) {
+        let mut generics: []&GenericDecl = nil
+        if f.decl.is_method() {
+            generics = append(f.decl.generics, f.decl.owner.generics...)
+        } else {
+            generics = f.decl.generics
+        }
+
+        for (_, mut p) in f.params {
+            if !p.decl.is_self() {
+                p.kind = self.build_non_generic_type_kind(p.decl.kind.decl, generics)
+            }
+        }
+        if !f.decl.is_void() {
+            f.result = self.build_non_generic_type_kind(f.decl.result.kind.decl, generics)
+        }
+    }
+
+    fn get_trait_check_fn_kind(mut &self, mut f: &Fn): &FnIns {
+        let mut ins = f.instance_force()
+        self.build_fn_non_generic_type_kinds(ins)
+        ret ins
+    }
+
+    fn reload_fn_ins_types(mut &self, mut f: &FnIns): (ok: bool) {
+        if f.is_builtin() || f.is_anon() {
+            ret true
+        }
+
+        let mut sema = f.decl.sema
+
+        let mut old = f.decl.sema.file
+        defer { f.decl.sema.set_current_file(old) }
+        let mut file = find_file(f.decl.sema.files, f.decl.token.file)
+        if real(file) {
+            f.decl.sema.set_current_file(file)
+        }
+
+        let mut size = f.generics.len
+        if real(f.decl) && real(f.decl.owner) {
+            size += f.decl.owner.generics.len
+        }
+
+        let mut generics = make([]&TypeAlias, 0, size)
+
+        for i, g in f.generics {
+            generics = append(generics, &TypeAlias{
+                ident: f.decl.generics[i].ident,
+                kind: &TypeSymbol{
+                    kind: g,
+                },
+            })
+        }
+
+        if real(f.decl) && real(f.decl.owner) {
+            let mut owner = f.owner
+            for (i, mut g) in owner.generics {
+                generics = append(generics, &TypeAlias{
+                    ident: owner.decl.generics[i].ident,
+                    kind: &TypeSymbol{
+                        kind: g,
+                    },
+                })
+            }
+        }
+
+        ok = true
+        for (_, mut p) in f.params {
+            if !p.decl.is_self() {
+                p.kind = sema.build_type_with_generics(p.decl.kind.decl, generics)
+                ok = real(p.kind) && ok
+            }
+        }
+
+        if !f.decl.is_void() {
+            f.result = sema.build_type_with_generics(f.decl.result.kind.decl, generics)
+            ok = real(f.result) && ok
+        }
+
+        if &sema != &self {
+            self.errors = append(self.errors, sema.errors...)
+        }
+
+        ret ok
+    }
+
+    fn check_validity_for_init_expr(mut &self, left_mut: bool, left_ref: bool,
+        left_kind: &TypeKind, mut d: &Data, error_token: Token) {
+        if left_mut && !d.mutable && is_mut(d.kind) {
+            self.push_err(error_token, "assignment_non_mut_to_mut")
+        }
+        if left_ref {
+            match type d.model {
+            | &Var
+            | &TraitSubIdentExprModel
+            | &CommonIdentExprModel
+            | &StructSubIdentExprModel
+            | &CommonSubIdentExprModel:
+                // Pass
+
+            | &UnaryExprModel:
+                let unary = (&UnaryExprModel)(d.model)
+                if unary.op == str(TokenKind.Star) {
+                    // Pointer dereference, pass
+                    break
+                }
+
+                fall
+
+            |:
+                self.push_err(error_token, "reference_assign_non_var")
+            }
+            if left_mut && !d.mutable {
+                self.push_err(error_token, "mut_reference_points_to_immut")
+            }
+        }
+
+        let mut atc = &AssignTypeChecker{
+            s:           self,
+            d:           d,
+            error_token: error_token,
+        }
+        _ = atc.check_validity()
+    }
+
+    fn check_type_alias_decl_kind(mut &self, mut ta: &TypeAlias, l: Lookup): (ok: bool) {
+        let mut old = self.file
+        defer { self.set_current_file(old) }
+        let mut file = find_file(self.files, ta.token.file)
+        if real(file) {
+            self.set_current_file(file)
+        }
+
+        ok = self.check_type_with_refers(ta.kind, l, &Referencer{
+            ident: ta.ident,
+            owner: ta,
+            refs:  &ta.refers,
+        })
+        if ok && real(ta.kind.kind.arr()) && ta.kind.kind.arr().auto {
+            self.push_err(ta.kind.decl.token, "array_auto_sized")
+            ok = false
+        }
+        ret
+    }
+
+    fn check_type_alias_decl(mut &self, mut ta: &TypeAlias, l: Lookup) {
+        if is_ignore_ident(ta.ident) {
+            self.push_err(ta.token, "ignore_ident")
+        }
+        self.check_type_alias_decl_kind(ta, l)
+    }
+
+    // Checks type alias declaration with duplicated identifiers.
+    fn check_type_alias_decl_dup(mut &self, mut ta: &TypeAlias) {
+        if self.is_duplicated_ident(uintptr(&ta), ta.ident, ta.cpp_linked) {
+            self.push_err(ta.token, "duplicated_ident", ta.ident)
+        }
+        self.check_type_alias_decl_kind(ta, self)
+    }
+
+    // Checks current package file's type alias declarations.
+    fn check_type_alias_decls(mut &self): (ok: bool) {
+        let mut i = 0
+        for i < self.file.type_aliases.len(); i++ {
+            let mut ta = self.file.type_aliases.at(i)
+            self.check_type_alias_decl_dup(ta)
+
+            // Break checking if type alias has error.
+            if self.errors.len > 0 {
+                ret false
+            }
+        }
+        ret true
+    }
+
+    fn check_enum_items_dup(mut self, e: &Enum) {
+        for _, item in e.items {
+            if is_ignore_ident(item.ident) {
+                self.push_err(item.token, "ignore_ident")
+            } else {
+                for _, citem in e.items {
+                    if item == citem {
+                        break
+                    } else if item.ident == citem.ident {
+                        self.push_err(item.token, "duplicated_ident", item.ident)
+                        break
+                    }
+                }
+            }
+        }
+    }
+
+    fn check_enum_items_str(mut &self, mut e: &Enum) {
+        for (_, mut item) in e.items {
+            if item.auto_expr() {
+                item.value = &Value{
+                    data: &Data{
+                        constant: Const.new_str(item.ident),
+                    },
+                }
+                item.value.data.model = item.value.data.constant
+            } else {
+                let mut d = self.eval(item.value.expr, self)
+                if !real(d) {
+                    continue
+                }
+
+                if !d.is_const() {
+                    self.push_err(item.value.expr.token, "expr_not_const")
+                }
+
+                self.check_assign_type(e.kind.kind, d, item.token, false)
+                item.value.data = d
+            }
+        }
+    }
+
+    fn check_enum_items_int(mut &self, mut e: &Enum) {
+        let mut max = u64(max_of(e.kind.kind.prim().to_str()))
+        for (i, mut item) in e.items {
+            if max == 0 {
+                self.push_err(item.token, "overflow_limits")
+            } else {
+                max--
+            }
+
+            if item.auto_expr() {
+                item.value = &Value{
+                    data: &Data{
+                        constant: Const.new_u64(max - (max - u64(i))),
+                    },
+                }
+                item.value.data.model = item.value.data.constant
+            } else {
+                let mut d = self.eval(item.value.expr, self)
+                if !real(d) {
+                    continue
+                }
+
+                if !d.is_const() {
+                    self.push_err(item.value.expr.token, "expr_not_const")
+                }
+
+                self.check_assign_type(e.kind.kind, d, item.token, false)
+                item.value.data = d
+            }
+        }
+    }
+
+    fn check_enum_decl(mut &self, mut e: &Enum) {
+        if is_ignore_ident(e.ident) {
+            self.push_err(e.token, "ignore_ident")
+        } else if self.is_duplicated_ident(uintptr(&e), e.ident, false) {
+            self.push_err(e.token, "duplicated_ident", e.ident)
+        }
+
+        if e.items.len == 0 {
+            self.push_err(e.token, "no_member_in_enum", e.ident)
+        }
+
+        self.check_enum_items_dup(e)
+
+        if real(e.kind) {
+            if !self.check_type(e.kind, self) {
+                ret
+            }
+        } else {
+            // Set to default type.
+            e.kind = &TypeSymbol{
+                kind: &TypeKind{
+                    kind: build_prim_type(str(PrimKind.Int)),
+                },
+            }
+        }
+
+        let mut t = e.kind.kind.prim()
+        if !real(t) {
+            self.push_err(e.token, "invalid_type_source")
+            ret
+        }
+
+        // Check items.
+        match {
+        | t.is_str():
+            self.check_enum_items_str(e)
+
+        | is_int(t.to_str()):
+            self.check_enum_items_int(e)
+
+        |:
+            self.push_err(e.token, "invalid_type_source")
+        }
+    }
+
+    // Checks current package file's enum declarations.
+    fn check_enum_decls(mut &self): (ok: bool) {
+        let mut i = 0
+        for i < self.file.enums.len(); i++ {
+            let mut e = self.file.enums.at(i)
+            self.check_enum_decl(e)
+
+            // Break checking if type alias has error.
+            if self.errors.len > 0 {
+                ret false
+            }
+        }
+        ret true
+    }
+
+    fn check_decl_generics(mut self, generics: []&GenericDecl): (ok: bool) {
+        ok = true
+        for i, g in generics {
+            if is_ignore_ident(g.ident) {
+                self.push_err(g.token, "ignore_ident")
+                ok = false
+                continue
+            }
+
+            // Check duplications.
+        duplication_lookup:
+            for j, ct in generics {
+                match {
+                | j >= i:
+                    // Skip current and following generics.
+                    break duplication_lookup
+
+                | g.ident == ct.ident:
+                    self.push_err(g.token, "duplicated_ident", g.ident)
+                    ok = false
+                    break duplication_lookup
+                }
+            }
+        }
+        ret
+    }
+
+    fn check_fn_decl_params_dup(mut self, f: &Fn): (ok: bool) {
+        ok = true
+    check:
+        for i, p in f.params {
+            // Lookup in generics.
+            for _, g in f.generics {
+                if p.ident == g.ident {
+                    ok = false
+                    self.push_err(p.token, "duplicated_ident", p.ident)
+                    continue check
+                }
+            }
+
+        params_lookup:
+            for j, jp in f.params {
+                match {
+                | j >= i:
+                    // Skip current and following parameters.
+                    break params_lookup
+
+                | is_anon_ident(p.ident) || is_anon_ident(jp.ident):
+                    // Skip anonymous parameters.
+                    break params_lookup
+
+                | p.ident == jp.ident:
+                    ok = false
+                    self.push_err(p.token, "duplicated_ident", p.ident)
+                    continue check
+                }
+            }
+        }
+        ret
+    }
+
+    fn check_fn_decl_result_dup(mut self, f: &Fn): (ok: bool) {
+        ok = true
+
+        if f.is_void() {
+            ret
+        }
+
+        // Check duplications.
+        for i, v in f.result.idents {
+            if is_ignore_ident(v.kind) {
+                continue // Skip anonymous return variables.
+            }
+
+            // Lookup in generics.
+            for _, g in f.generics {
+                if v.kind == g.ident {
+                    goto exist
+                }
+            }
+
+            // Lookup in parameters.
+            for _, p in f.params {
+                if v.kind == p.ident {
+                    goto exist
+                }
+            }
+
+            // Lookup in return identifiers.
+        itself_lookup:
+            for j, jv in f.result.idents {
+                match {
+                | j >= i:
+                    // Skip current and following identifiers.
+                    break itself_lookup
+
+                | jv.kind == v.kind:
+                    goto exist
+                }
+            }
+            continue
+        exist:
+            self.push_err(v, "duplicated_ident", v.kind)
+            ok = false
+        }
+
+        ret
+    }
+
+    fn check_fn_decl_types(mut &self, mut f: &Fn): (ok: bool) {
+        ok = true
+
+        let mut generics = f.generics
+        if real(f.owner) {
+            generics = append(generics, f.owner.generics...)
+        }
+
+        for (_, mut p) in f.params {
+            if !p.is_self() {
+                let mut kind = self.build_non_generic_type_kind(p.kind.decl, generics)
+                ok = real(kind) && ok
+                p.kind.kind = kind
+            }
+        }
+
+        if !f.is_void() {
+            let mut kind = self.build_non_generic_type_kind(f.result.kind.decl, generics)
+            ok = real(kind) && ok
+            f.result.kind.kind = kind
+        }
+
+        ret ok
+    }
+
+    // Checks generics, parameters and return type.
+    // Not checks scope, and other things.
+    fn check_fn_decl_prototype(mut &self, mut f: &Fn): (ok: bool) {
+        match {
+        | !self.check_decl_generics(f.generics):
+            ret false
+
+        | !self.check_fn_decl_params_dup(f):
+            ret false
+
+        | !self.check_fn_decl_result_dup(f):
+            ret false
+
+        | !self.check_fn_decl_types(f):
+            ret false
+
+        |:
+            ret true
+        }
+    }
+
+    fn check_trait_decl_method(mut &self, mut f: &Fn) {
+        if is_ignore_ident(f.ident) {
+            self.push_err(f.token, "ignore_ident")
+        }
+    
+        self.check_fn_decl_prototype(f)
+        f.sema = self
+    }
+
+    fn check_trait_decl_methods(mut &self, mut t: &Trait) {
+        for (i, mut f) in t.methods {
+            self.check_trait_decl_method(f)
+
+            // Break checking if type alias has error.
+            if self.errors.len > 0 {
+                ret
+            }
+
+            // Check duplications.
+        duplicate_lookup:
+            for j, jf in t.methods {
+                // NOTE:
+                //  Ignore identifier checking is unnecessary here.
+                //  Because ignore identifiers logs error.
+                //  Errors breaks checking, so here is unreachable code for
+                //  ignore identified methods.
+                match {
+                | j >= i:
+                    // Skip current and following methods.
+                    break duplicate_lookup
+
+                | f.ident == jf.ident:
+                    self.push_err(f.token, "duplicated_ident", f.ident)
+                    break duplicate_lookup
+                }
+            }
+        }
+    }
+
+    fn check_trait_decl(mut &self, mut t: &Trait) {
+        if is_ignore_ident(t.ident) {
+            self.push_err(t.token, "ignore_ident")
+        } else if self.is_duplicated_ident(uintptr(&t), t.ident, false) {
+            self.push_err(t.token, "duplicated_ident", t.ident)
+        }
+
+        self.check_trait_decl_methods(t)
+    }
+
+    // Checks current package file's trait declarations.
+    fn check_trait_decls(mut &self): (ok: bool) {
+        let mut i = 0
+        for i < self.file.traits.len(); i++ {
+            let mut t = self.file.traits.at(i)
+            self.check_trait_decl(t)
+
+            // Break checking if type alias has error.
+            if self.errors.len > 0 {
+                ret false
+            }
+        }
+        ret true
+    }
+
+    fn check_trait_impl_methods(mut self, mut base: &Trait, ipl: &Impl): (ok: bool) {
+        ok = true
+        for _, f in ipl.methods {
+            if !real(base.find_method(f.ident)) {
+                self.push_err(f.token, "trait_have_not_ident", base.ident, f.ident)
+                ok = false
+            }
+        }
+        ret
+    }
+
+    fn impl_to_struct(mut &self, mut dest: &Struct, mut ipl: &Impl): (ok: bool) {
+        ok = true
+        for (_, mut f) in ipl.methods {
+            if real(dest.find_method(f.ident, f.statically)) || real(dest.find_field(f.ident)) {
+                self.push_err(f.token, "struct_already_have_ident", dest.ident, f.ident)
+                ok = false
+                continue
+            }
+
+            if dest.generics.len > 0 && f.generics.len > 0 {
+                for _, fg in f.generics {
+                    for _, dg in dest.generics {
+                        if fg.ident == dg.ident {
+                            self.push_err(fg.token, "method_has_generic_with_same_ident")
+                            ok = false
+                        }
+                    }
+                }
+            }
+
+            f.sema = self
+            f.owner = dest
+            dest.methods.push(f)
+        }
+        ret
+    }
+
+    // Implement trait to destination.
+    fn impl_trait(mut &self, mut decl: &Impl) {
+        let mut base = self.find_trait(decl.base.kind)
+        if !real(base) {
+            base = find_builtin_trait(decl.base.kind)
+        }
+        if !real(base) {
+            self.push_err(decl.base, "impl_base_not_exist", decl.base.kind)
+            ret
+        }
+
+        // Cpp-link state always false because cpp-linked
+        // definitions haven't support implementations.
+        const CPP_LINKED = false
+
+        let mut dest = self.find_struct(decl.dest.kind, CPP_LINKED)
+        if !real(dest) {
+            self.push_err(decl.dest, "impl_dest_not_exist", decl.dest.kind)
+            ret
+        }
+
+        if dest.token.file.dir() != self.file.file.dir() {
+            self.push_err(decl.dest, "illegal_impl_out_of_package")
+            ret
+        }
+
+        base.implemented = append(base.implemented, dest)
+        dest.implements = append(dest.implements, base)
+
+        match {
+        | !self.check_trait_impl_methods(base, decl):
+            ret
+
+        | !self.impl_to_struct(dest, decl):
+            ret
+        }
+    }
+
+    fn impl_struct(mut &self, mut decl: &Impl) {
+        // Cpp-link state always false because cpp-linked
+        // definitions haven't support implementations.
+        const CPP_LINKED = false
+
+        let mut dest = self.find_struct(decl.dest.kind, CPP_LINKED)
+        if !real(dest) {
+            self.push_err(decl.dest, "impl_dest_not_exist", decl.dest.kind)
+            ret
+        }
+
+        if dest.token.file.dir() != self.file.file.dir() {
+            self.push_err(decl.dest, "illegal_impl_out_of_package")
+            ret
+        }
+
+        match {
+        | !self.impl_to_struct(dest, decl):
+            ret
+        }
+    }
+
+    // Implement implementation.
+    fn impl_impl(mut &self, mut decl: &Impl) {
+        match {
+        | decl.is_trait_impl():
+            self.impl_trait(decl)
+
+        | decl.is_struct_impl():
+            self.impl_struct(decl)
+        }
+    }
+
+    // Checks variable declaration.
+    // No checks duplicated identifiers.
+    fn check_var_decl(mut &self, mut decl: &Var, l: Lookup) {
+        if is_ignore_ident(decl.ident) {
+            self.push_err(decl.token, "ignore_ident")
+        }
+
+        if decl.is_type_inferred() {
+            if decl.statically {
+                self.push_err(decl.token, "static_is_type_inferred")
+            }
+            if !decl.is_initialized() {
+                self.push_err(decl.token, "missing_value_for_type_inference")
+            }
+        } else {
+            _ = self.check_type(decl.kind, l)
+        }
+
+        if decl.constant && decl.reference {
+            self.push_err(decl.token, "constant_reference")
+        }
+
+        if !decl.is_initialized() {
+            if decl.constant {
+                self.push_err(decl.token, "const_var_not_have_expr")
+            }
+
+            if decl.statically {
+                self.push_err(decl.token, "static_not_have_expr")
+            }
+
+            if decl.reference {
+                self.push_err(decl.token, "reference_not_initialized")
+            }
+        }
+    }
+
+    // Checks variable declaration for global scope.
+    // Checks duplicated identifiers by Sema.
+    fn check_global_var_decl(mut &self, mut decl: &Var) {
+        if self.is_duplicated_ident(uintptr(&decl), decl.ident, decl.cpp_linked) {
+            self.push_err(decl.token, "duplicated_ident", decl.ident)
+        }
+        if decl.cpp_linked && decl.constant {
+            self.push_err(decl.token, "cpp_linked_variable_is_const")
+        }
+        if !decl.cpp_linked && !decl.constant && !decl.statically {
+            self.push_err(decl.token, "global_not_static")
+        }
+
+        self.check_var_decl(decl, self)
+    }
+
+    // Checks current package file's global variable declarations.
+    fn check_global_decls(mut &self): (ok: bool) {
+        let mut i = 0
+        for i < self.file.vars.len(); i++ {
+            let mut decl = self.file.vars.at(i)
+            self.check_global_var_decl(decl)
+
+            // Break checking if type alias has error.
+            if self.errors.len > 0 {
+                ret false
+            }
+        }
+        ret true
+    }
+
+    fn check_struct_trait_impl(mut &self, mut strct: &Struct, mut trt: &Trait): (ok: bool) {
+        for (_, mut tf) in trt.methods {
+            let mut exist = false
+            let mut sf = strct.find_method(tf.ident, tf.statically)
+            let tf_k = self.get_trait_check_fn_kind(tf)
+            if real(sf) {
+                let sf_k = self.get_trait_check_fn_kind(sf)
+                exist = (
+                    tf_k.decl.public == sf_k.decl.public &&
+                    tf_k.decl.ident == sf_k.decl.ident &&
+                    tf_k.equals(&TypeKind{kind: sf_k})
+                )
+            }
+            if !exist {
+                self.push_err(strct.token, "not_impl_trait_def", trt.ident, tf_k.to_str())
+                ok = false
+            }
+        }
+        ret
+    }
+
+    fn check_struct_impls(mut &self, mut strct: &Struct): (ok: bool) {
+        ok = true
+        for (_, mut trt) in strct.implements {
+            ok = self.check_struct_trait_impl(strct, trt) && ok
+        }
+        ret ok
+    }
+
+    fn check_struct_fields(mut &self, mut st: &Struct): (ok: bool) {
+        ok = true
+
+        let mut tc = &TypeChecker{
+            s:               self,
+            lookup:          self,
+            ignore_generics: st.generics,
+            referencer: &Referencer{
+                ident: st.ident,
+                owner: st,
+            },
+        }
+
+        let n = st.instances.len
+        for (_, mut f) in st.fields {
+            f.owner = st
+            f.kind.kind = tc.check_decl(f.kind.decl)
+            ok = real(f.kind.kind) && ok
+
+            for _, cf in st.fields {
+                if f == cf {
+                    break
+                } else if f.ident == cf.ident {
+                    self.push_err(f.token, "duplicated_ident", f.ident)
+                    ok = false
+                }
+            }
+        }
+
+        // Save itself for legal cycles like *Struct, or &Struct.
+        if ok && n != st.instances.len {
+            drop(tc.referencer)
+            st.instances = st.instances[:n]
+            for (_, mut f) in st.fields {
+                f.kind.kind = tc.check_decl(f.kind.decl)
+            }
+        }
+
+        ret ok
+    }
+
+    fn check_struct_decl(mut &self, mut strct: &Struct) {
+        if is_ignore_ident(strct.ident) {
+            self.push_err(strct.token, "ignore_ident")
+        } else if self.is_duplicated_ident(uintptr(&strct), strct.ident, strct.cpp_linked) {
+            self.push_err(strct.token, "duplicated_ident", strct.ident)
+        }
+
+        strct.sema = self
+        match {
+        | !self.check_decl_generics(strct.generics): ret
+        | !self.check_struct_fields(strct):          ret
+        | !self.check_struct_impls(strct):           ret
+        }
+    }
+
+    // Checks current package file's structure declarations.
+    fn check_struct_decls(mut &self): (ok: bool) {
+        let mut i = 0
+        for i < self.file.structs.len(); i++ {
+            let mut strct = self.file.structs.at(i)
+            self.check_struct_decl(strct)
+
+            // Break checking if type alias has error.
+            if self.errors.len > 0 {
+                ret false
+            }
+        }
+
+        ret true
+    }
+
+    fn check_fn_decl(mut &self, mut f: &Fn) {
+        if is_ignore_ident(f.ident) {
+            self.push_err(f.token, "ignore_ident")
+        } else if self.is_duplicated_ident(uintptr(&f), f.ident, f.cpp_linked) {
+            self.push_err(f.token, "duplicated_ident", f.ident)
+        }
+
+        f.sema = self
+        _ = self.check_fn_decl_prototype(f)
+    }
+
+    // Checks current package file's function declarations.
+    fn check_fn_decls(mut &self): (ok: bool) {
+        let mut i = 0
+        for i < self.file.funcs.len(); i++ {
+            let mut f = self.file.funcs.at(i)
+            self.check_fn_decl(f)
+
+            // Break checking if type alias has error.
+            if self.errors.len > 0 {
+                ret false
+            }
+        }
+        ret true
+    }
+
+    fn check_directive_pass(mut self, pass: Pass): (ok: bool) {
+        if pass.text == "" {
+            ret true
+        }
+
+        if pass.text[0] != '-' {
+            self.push_err(pass.token, "pass_directive_not_starts_with_dash")
+            ret false
+        }
+
+        ret true
+    }
+
+    fn check_passes(mut self): (ok: bool) {
+        ok = true
+        let mut i = 0
+        for i < self.file.passes.len(); i++ {
+            let pass = self.file.passes.at(i)
+            ok = self.check_directive_pass(pass) && ok
+        }
+        ret
+    }
+
+    fn push_cycle_error(self, st1: &Struct, st2: &Struct, mut &message: str) {
+        const PADDING = 4
+
+        let refers_to = errorf("refers_to", st1.ident, st2.ident)
+        message = str_repeat(" ", PADDING) + refers_to + "\n" + message
+    }
+
+    fn check_cross_cycle(self, st1: &Struct, st2: &Struct, mut &message: str): bool {
+        for _, u in st2.uses {
+            if &u == &st1 {
+                self.push_cycle_error(st2, u, message)
+                ret false
+            }
+
+            if !self.check_cross_cycle(st1, u, message) {
+                self.push_cycle_error(st2, u, message)
+                ret false
+            }
+        }
+
+        ret true
+    }
+
+    fn check_struct_derive_illegal_cycles(mut self, derive: str, st1: &Struct, mut k: &TypeKind): (ok: bool) {
+        let mut st2 = get_struct_from_kind(k)
+        if !real(st2) {
+            ret true
+        }
+
+        // Check illegal cycle for itself.
+        // Because refers's owner is ta.
+        if &st1 == &st2 {
+            self.push_err(st1.token, "derive_illegal_cycle_refers_itself", derive, st1.ident)
+            ret false
+        }
+
+        let mut message = ""
+
+        if !self.check_cross_cycle(st1, st2, message) {
+            let mut err_msg = message
+            message = ""
+            self.push_cycle_error(st1, st2, message)
+            err_msg = err_msg + message
+            self.push_err(st1.token, "derive_illegal_cross_cycle", derive, err_msg)
+            ret false
+        }
+
+        ret true
+    }
+
+    fn check_struct_ins_derive_clone(mut self, mut st: &StructIns): (ok: bool) {
+        if !st.decl.is_derives(str(Derives.Clone)) {
+            ret true
+        }
+
+        for (_, mut f) in st.fields {
+            if !real(f.kind) || !is_mut(f.kind) {
+                continue
+            }
+
+            if !supports_cloning(f.kind) {
+                self.push_err(st.decl.token, "type_not_compatible_for_derive", f.kind.to_str(), str(Derives.Clone))
+                ret false
+            }
+
+            if !self.check_struct_derive_illegal_cycles(str(Derives.Clone), st.decl, f.kind) {
+                ret false
+            }
+        }
+
+        ret true
+    }
+
+    fn check_struct_derive_clone(mut self, mut st: &Struct): (ok: bool) {
+        ret self.check_struct_ins_derive_clone(st.instance())
+    }
+
+    fn check_file_derives(mut self): (ok: bool) {
+        // Check derives.
+        let mut i = 0
+        for i < self.file.structs.len(); i++ {
+            let mut st = self.file.structs.at(i)
+            let ok = self.check_struct_derive_clone(st)
+            if !ok {
+                ret false
+            }
+        }
+
+        ret true
+    }
+
+    fn check_package_derives(mut self) {
+        for (_, mut f) in self.files {
+            self.set_current_file(f)
+            let ok = self.check_file_derives()
+            if !ok {
+                ret
+            }
+        }
+    }
+
+    // Checks declarations of all package files.
+    // Breaks checking if checked file failed.
+    fn check_package_decls(mut &self) {
+        for (_, mut f) in self.files {
+            self.set_current_file(f)
+            if !self.check_passes() {
+                ret
+            }
+        }
+
+        for (_, mut f) in self.files {
+            self.set_current_file(f)
+            if !self.check_type_alias_decls() {
+                ret
+            }
+        }
+
+        for (_, mut f) in self.files {
+            self.set_current_file(f)
+            if !self.check_trait_decls() {
+                ret
+            }
+        }
+
+        for (_, mut f) in self.files {
+            self.set_current_file(f)
+            if !self.check_global_decls() {
+                ret
+            }
+        }
+
+        for (_, mut f) in self.files {
+            self.set_current_file(f)
+            if !self.check_fn_decls() {
+                ret
+            }
+        }
+
+        for (_, mut f) in self.files {
+            self.set_current_file(f)
+            if !self.check_struct_decls() {
+                ret
+            }
+        }
+
+        self.check_package_derives()
+    }
+
+    fn check_data_for_type_inference(mut self, d: &Data, err_token: Token) {
+        match {
+        | d.is_nil():
+            self.push_err(err_token, "nil_for_type_inference")
+
+        | d.is_void():
+            self.push_err(err_token, "void_for_type_inreference")
+        }
+    }
+
+    fn check_var(mut &self, mut v: &Var) {
+        if v.cpp_linked {
+            ret
+        }
+
+        if v.is_type_inferred() {
+            // Build new TypeSymbol because
+            // auto-type symbols are nil.
+            v.kind = &TypeSymbol{kind: v.value.data.kind}
+
+            self.check_data_for_type_inference(v.value.data, v.value.expr.token)
+        } else {
+            let mut arr = v.kind.kind.arr()
+            if real(arr) {
+                if arr.auto {
+                    let data_arr = v.value.data.kind.arr()
+                    if real(data_arr) {
+                        arr.n = data_arr.n
+                    }
+                }
+            }
+
+            self.check_assign_type(
+                v.kind.kind, v.value.data, v.value.expr.token, false)
+        }
+
+        self.check_validity_for_init_expr(
+            v.mutable,
+            v.reference,
+            v.kind.kind,
+            v.value.data,
+            v.value.expr.token)
+
+        if !v.constant {
+            drop(v.value.data.constant)
+        }
+    }
+
+    fn check_type_var(mut &self, mut decl: &Var, l: Lookup) {
+        if decl.cpp_linked || !decl.is_initialized() {
+            ret
+        }
+
+        if real(decl.kind) {
+            decl.value.data = self.evalpd(
+                decl.value.expr, l, decl.kind.kind, decl)
+        } else {
+            decl.value.data = self.evalpd(
+                decl.value.expr, l, new(TypeKind), decl)
+        }
+        if !real(decl.value.data) {
+            ret // Skip checks if error ocurrs.
+        }
+
+        self.check_var(decl)
+    }
+
+    // Checks types of current package file's global variables.
+    fn check_global_types(mut &self) {
+        let mut i = 0
+        for i < self.file.vars.len(); i++ {
+            let mut decl = self.file.vars.at(i)
+            self.check_type_var(decl, self)
+        }
+
+        // Re-check depended.
+        i = 0
+        for i < self.file.vars.len(); i++ {
+            let mut decl = self.file.vars.at(i)
+            if decl.is_initialized() && decl.depends.len > 0 {
+                self.check_type_var(decl, self)
+            }
+        }
+    }
+
+    fn check_type_method(mut &self, mut strct: &StructIns, mut f: &Fn) {
+        if f.cpp_linked {
+            ret
+        }
+
+        // Generic instances are checked instantly.
+        if f.generics.len > 0 {
+            ret
+        }
+
+        if f.instances.len == 0 {
+            let mut ins = f.instance()
+            ins.owner = strct
+            f.append_instance(ins)
+            self.reload_fn_ins_types(ins)
+            ins.reloaded = true
+        }
+
+        for (_, mut ins) in f.instances {
+            if ins.scope.stmts.len() > 0 {
+                // Checked
+                continue
+            }
+            self.check_fn_ins(ins)
+        }
+    }
+
+    fn check_type_struct(mut &self, mut strct: &Struct) {
+        if strct.cpp_linked {
+            ret
+        }
+
+        if strct.generics.len == 0 && strct.instances.len == 0 {
+            let mut ins = strct.instance()
+            ins.checked = true
+            strct.append_instance(ins)
+        }
+
+        for (_, mut ins) in strct.instances {
+            for (_, mut f) in ins.methods {
+                self.check_type_method(ins, f)
+            }
+        }
+    }
+
+    fn check_struct_types(mut &self) {
+        let mut i = 0
+        for i < self.file.structs.len(); i++ {
+            let mut strct = self.file.structs.at(i)
+            self.check_type_struct(strct)
+        }
+    }
+
+    fn check_rets(mut self, mut f: &FnIns) {
+        if f.decl.is_void() {
+            ret
+        }
+
+        let ok = has_ret(f.scope)
+        if !ok {
+            self.push_err(f.decl.token, "missing_ret")
+        }
+    }
+
+    fn check_fn_ins_sc(mut self, mut f: &FnIns, mut sc: &ScopeChecker) {
+        if f.decl.cpp_linked {
+            ret
+        }
+
+        let mut vars = build_ret_vars(f)
+
+        sc.table.vars.append(vars...)
+        sc.table.vars.append(build_param_vars(f)...)
+        sc.table.type_aliases.append(build_generic_type_aliases(f)...)
+
+        sc.check(f.decl.scope, f.scope)
+
+        // Append return variables.
+        if vars.len > 0 {
+            for (_, mut v) in vars {
+                f.scope.stmts.push_front(v)
+            }
+        }
+
+        self.check_rets(f)
+    }
+
+    fn check_fn_ins(mut self, mut f: &FnIns) {
+        if f.decl.cpp_linked {
+            ret
+        }
+
+        let mut old = f.decl.sema.file
+        defer { f.decl.sema.set_current_file(old) }
+        let mut file = find_file(f.decl.sema.files, f.decl.token.file)
+        if real(file) {
+            f.decl.sema.set_current_file(file)
+        }
+
+        let mut sc = new_scope_checker(f.decl.sema, f)
+        self.check_fn_ins_sc(f, sc)
+
+        if &f.decl.sema != &self {
+            self.errors = append(self.errors, f.decl.sema.errors...)
+        }
+    }
+
+    fn check_type_fn(mut &self, mut f: &Fn) {
+        if f.cpp_linked {
+            ret
+        }
+
+        // Generic instances are checked instantly.
+        if f.generics.len > 0 {
+            ret
+        }
+
+        for (_, mut ins) in f.instances {
+            self.check_fn_ins(ins)
+        }
+    }
+
+    fn precheck_type_fn(mut &self, mut f: &Fn) {
+        if f.cpp_linked {
+            ret
+        }
+
+        // Generic instances are checked instantly.
+        if f.generics.len > 0 {
+            ret
+        }
+
+        if f.instances.len == 0 {
+            let mut ins = f.instance()
+            f.instances = append(f.instances, ins)
+            self.reload_fn_ins_types(ins)
+            ins.reloaded = true
+        }
+    }
+
+    // Prechecks types of current package file's functions.
+    fn precheck_fn_types(mut &self): (ok: bool) {
+        let mut i = 0
+        for i < self.file.funcs.len(); i++ {
+            let mut decl = self.file.funcs.at(i)
+            self.precheck_type_fn(decl)
+        }
+
+        ret true
+    }
+
+    // Checks types of current package file's functions.
+    fn check_fn_types(mut &self): (ok: bool) {
+        let mut i = 0
+        for i < self.file.funcs.len(); i++ {
+            let mut decl = self.file.funcs.at(i)
+            self.check_type_fn(decl)
+        }
+
+        ret true
+    }
+
+    // Checks all types of all package files.
+    // Breaks checking if checked file failed.
+    fn check_package_types(mut &self) {
+        for (_, mut f) in self.files {
+            self.set_current_file(f)
+            self.check_global_types()
+        }
+
+        for (_, mut f) in self.files {
+            self.set_current_file(f)
+            self.precheck_fn_types()
+        }
+
+        for (_, mut f) in self.files {
+            self.set_current_file(f)
+            self.check_fn_types()
+        }
+
+        for (_, mut f) in self.files {
+            self.set_current_file(f)
+            self.check_struct_types()
+        }
+    }
+
+    fn set_file_sema_fields(mut &self) {
+        let mut i = 0
+        for i < self.file.funcs.len(); i++ {
+            let mut f = self.file.funcs.at(i)
+            f.sema = self
+        }
+
+        i = 0
+        for i < self.file.structs.len(); i++ {
+            let mut st = self.file.structs.at(i)
+            st.sema = self
+        }
+    }
+
+    fn set_sema_fields(mut &self) {
+        for (_, mut file) in self.files {
+            self.set_current_file(file)
+            self.set_file_sema_fields()
+        }
+    }
+
+    fn check(mut &self, mut files: []&SymbolTable) {
+        self.files = files
+
+        self.check_imports()
+        // Break checking if imports has error.
+        if self.errors.len > 0 {
+            ret
+        }
+
+        self.check_enums()
+        // Break checking if enums has error.
+        if self.errors.len > 0 {
+            ret
+        }
+
+        self.set_sema_fields()
+
+        self.impl_impls()
+        // Break checking if imports has error.
+        if self.errors.len > 0 {
+            ret
+        }
+
+        self.check_package_decls()
+
+        // Break checking if imports has error.
+        if self.errors.len > 0 {
+            ret
+        }
+
+        self.check_package_types()
+    }
 }

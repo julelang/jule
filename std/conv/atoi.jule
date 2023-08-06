@@ -52,94 +52,94 @@ fn lower(c: byte): byte { ret c | ('x' - 'X') }
 //
 // A sign prefix is not permitted.
 pub fn parse_uint(mut s: str, mut base: int, mut bit_size: int): (u64, ConvError) {
-	if s == "" {
-		ret 0, ConvError.InvalidSyntax
-	}
+    if s == "" {
+        ret 0, ConvError.InvalidSyntax
+    }
 
-	match {
-	| 2 <= base && base <= 36:
-		// valid base; nothing to do
-	| base == 0:
-		// Look for octal, hex prefix.
-		base = 10
-		if s[0] == '0' {
-			match {
-			| s.len >= 3 && lower(s[1]) == 'b':
-				base = 2
-				s = s[2:]
-			| s.len >= 3 && lower(s[1]) == 'o':
-				base = 8
-				s = s[2:]
-			| s.len >= 3 && lower(s[1]) == 'x':
-				base = 16
-				s = s[2:]
-			|:
-				base = 8
-				s = s[1:]
-			}
-		}
-	|:
-		ret 0, ConvError.InvalidBase
-	}
+    match {
+    | 2 <= base && base <= 36:
+        // valid base; nothing to do
+    | base == 0:
+        // Look for octal, hex prefix.
+        base = 10
+        if s[0] == '0' {
+            match {
+            | s.len >= 3 && lower(s[1]) == 'b':
+                base = 2
+                s = s[2:]
+            | s.len >= 3 && lower(s[1]) == 'o':
+                base = 8
+                s = s[2:]
+            | s.len >= 3 && lower(s[1]) == 'x':
+                base = 16
+                s = s[2:]
+            |:
+                base = 8
+                s = s[1:]
+            }
+        }
+    |:
+        ret 0, ConvError.InvalidBase
+    }
 
-	if bit_size == 0 {
-		bit_size = INT_SIZE
-	} else if bit_size < 0 || bit_size > 64 {
-		ret 0, ConvError.InvalidBitSize
-	}
+    if bit_size == 0 {
+        bit_size = INT_SIZE
+    } else if bit_size < 0 || bit_size > 64 {
+        ret 0, ConvError.InvalidBitSize
+    }
 
-	// Cutoff is the smallest number such that cutoff*base > MAX_UINT64.
-	// Use compile-time constants for common cases.
-	let mut cutoff: u64 = 0
-	match base {
-	| 10: cutoff = MAX_UINT64/10 + 1
-	| 16: cutoff = MAX_UINT64/16 + 1
-	|:    cutoff = MAX_UINT64/u64(base) + 1
-	}
+    // Cutoff is the smallest number such that cutoff*base > MAX_UINT64.
+    // Use compile-time constants for common cases.
+    let mut cutoff: u64 = 0
+    match base {
+    | 10: cutoff = MAX_UINT64/10 + 1
+    | 16: cutoff = MAX_UINT64/16 + 1
+    |:    cutoff = MAX_UINT64/u64(base) + 1
+    }
 
-	let mut max_val: u64 = 0
-	match bit_size {
-	| 32: max_val = u32.MAX
-	| 64: max_val = u64.MAX
-	}
-	/*
-	let mut prec = 1
-	if bit_size == 64 {
-		prec = 2
-	}
-	let max_val = u64(1)<<uint(bit_size) - prec*/
+    let mut max_val: u64 = 0
+    match bit_size {
+    | 32: max_val = u32.MAX
+    | 64: max_val = u64.MAX
+    }
+    /*
+    let mut prec = 1
+    if bit_size == 64 {
+        prec = 2
+    }
+    let max_val = u64(1)<<uint(bit_size) - prec*/
 
-	let mut n: u64 = 0
-	for _, c in s {
-		let mut d: byte = 0
-		match {
-		| '0' <= c && c <= '9':
-			d = c - '0'
-		| 'a' <= lower(c) && lower(c) <= 'z':
-			d = lower(c) - 'a' + 10
-		|:
-			ret 0, ConvError.InvalidSyntax
-		}
+    let mut n: u64 = 0
+    for _, c in s {
+        let mut d: byte = 0
+        match {
+        | '0' <= c && c <= '9':
+            d = c - '0'
+        | 'a' <= lower(c) && lower(c) <= 'z':
+            d = lower(c) - 'a' + 10
+        |:
+            ret 0, ConvError.InvalidSyntax
+        }
 
-		if d >= byte(base) {
-			ret 0, ConvError.InvalidSyntax
-		}
+        if d >= byte(base) {
+            ret 0, ConvError.InvalidSyntax
+        }
 
-		if n >= cutoff {
-			// n*base overflows
-			ret max_val, ConvError.OutOfRange
-		}
-		n *= u64(base)
+        if n >= cutoff {
+            // n*base overflows
+            ret max_val, ConvError.OutOfRange
+        }
+        n *= u64(base)
 
-		let n1 = n + u64(d)
-		if n1 < n || n1 > max_val {
-			// n+d overflows
-			ret max_val, ConvError.OutOfRange
-		}
-		n = n1
-	}
+        let n1 = n + u64(d)
+        if n1 < n || n1 > max_val {
+            // n+d overflows
+            ret max_val, ConvError.OutOfRange
+        }
+        n = n1
+    }
 
-	ret n, ConvError.Ok
+    ret n, ConvError.Ok
 }
 
 // Interprets a string s in the given base (0, 2 to 36) and
@@ -163,40 +163,40 @@ pub fn parse_uint(mut s: str, mut base: int, mut bit_size: int): (u64, ConvError
 // and the returned value is the maximum magnitude integer of the
 // appropriate bit_size and sign.
 pub fn parse_int(mut s: str, base: int, mut bit_size: int): (i: i64, err: ConvError) {
-	if s == "" {
-		ret 0, ConvError.InvalidSyntax
-	}
+    if s == "" {
+        ret 0, ConvError.InvalidSyntax
+    }
 
-	// Pick off leading sign.
-	let mut neg = false
-	if s[0] == '+' {
-		s = s[1:]
-	} else if s[0] == '-' {
-		neg = true
-		s = s[1:]
-	}
+    // Pick off leading sign.
+    let mut neg = false
+    if s[0] == '+' {
+        s = s[1:]
+    } else if s[0] == '-' {
+        neg = true
+        s = s[1:]
+    }
 
-	// Convert unsigned and check range.
-	let mut un: uint = 0
-	un, err = parse_uint(s, base, bit_size)
-	if err != ConvError.Ok && err != ConvError.OutOfRange {
-		ret 0, err
-	}
+    // Convert unsigned and check range.
+    let mut un: uint = 0
+    un, err = parse_uint(s, base, bit_size)
+    if err != ConvError.Ok && err != ConvError.OutOfRange {
+        ret 0, err
+    }
 
-	if bit_size == 0 {
-		bit_size = INT_SIZE
-	}
+    if bit_size == 0 {
+        bit_size = INT_SIZE
+    }
 
-	let cutoff = u64(1 << uint(bit_size-1))
-	if !neg && un >= cutoff {
-		ret i64(cutoff - 1), ConvError.OutOfRange
-	}
-	if neg && un > cutoff {
-		ret -i64(cutoff), ConvError.OutOfRange
-	}
-	let mut n = i64(un)
-	if neg {
-		n = -n
-	}
-	ret n, ConvError.Ok
+    let cutoff = u64(1 << uint(bit_size-1))
+    if !neg && un >= cutoff {
+        ret i64(cutoff - 1), ConvError.OutOfRange
+    }
+    if neg && un > cutoff {
+        ret -i64(cutoff), ConvError.OutOfRange
+    }
+    let mut n = i64(un)
+    if neg {
+        n = -n
+    }
+    ret n, ConvError.Ok
 }

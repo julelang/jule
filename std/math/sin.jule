@@ -122,22 +122,22 @@
 
 // sin coefficients
 static _SIN: [...]f64 = [
-	1.58962301576546568060e-10, // 0x3de5d8fd1fd19ccd
-	-2.50507477628578072866e-8, // 0xbe5ae5e5a9291f5d
-	2.75573136213857245213e-6,  // 0x3ec71de3567d48a1
-	-1.98412698295895385996e-4, // 0xbf2a01a019bfdf03
-	8.33333333332211858878e-3,  // 0x3f8111111110f7d0
-	-1.66666666666666307295e-1, // 0xbfc5555555555548
+    1.58962301576546568060e-10, // 0x3de5d8fd1fd19ccd
+    -2.50507477628578072866e-8, // 0xbe5ae5e5a9291f5d
+    2.75573136213857245213e-6,  // 0x3ec71de3567d48a1
+    -1.98412698295895385996e-4, // 0xbf2a01a019bfdf03
+    8.33333333332211858878e-3,  // 0x3f8111111110f7d0
+    -1.66666666666666307295e-1, // 0xbfc5555555555548
 ]
 
 // cos coefficients
 static _COS: [...]f64 = [
-	-1.13585365213876817300e-11, // 0xbda8fa49a0861a9b
-	2.08757008419747316778e-9,   // 0x3e21ee9d7b4e3f05
-	-2.75573141792967388112e-7,  // 0xbe927e4f7eac4bc6
-	2.48015872888517045348e-5,   // 0x3efa01a019c844f5
-	-1.38888888888730564116e-3,  // 0xbf56c16c16c14f91
-	4.16666666666665929218e-2,   // 0x3fa555555555554b
+    -1.13585365213876817300e-11, // 0xbda8fa49a0861a9b
+    2.08757008419747316778e-9,   // 0x3e21ee9d7b4e3f05
+    -2.75573141792967388112e-7,  // 0xbe927e4f7eac4bc6
+    2.48015872888517045348e-5,   // 0x3efa01a019c844f5
+    -1.38888888888730564116e-3,  // 0xbf56c16c16c14f91
+    4.16666666666665929218e-2,   // 0x3fa555555555554b
 ]
 
 // Returns the cosine of the radian argument x.
@@ -146,54 +146,54 @@ static _COS: [...]f64 = [
 //  cos(±inf) = nan
 //  cos(nan) = nan
 pub fn cos(mut x: f64): f64 {
-	const PI4A = 7.85398125648498535156e-1  // 0x3fe921fb40000000, PI/4 split into three parts
-	const PI4B = 3.77489470793079817668e-8  // 0x3e64442d00000000,
-	const PI4C = 2.69515142907905952645e-15 // 0x3ce8469898cc5170,
-	// special cases
-	if is_nan(x) || is_inf(x, 0) {
-		ret nan()
-	}
+    const PI4A = 7.85398125648498535156e-1  // 0x3fe921fb40000000, PI/4 split into three parts
+    const PI4B = 3.77489470793079817668e-8  // 0x3e64442d00000000,
+    const PI4C = 2.69515142907905952645e-15 // 0x3ce8469898cc5170,
+    // special cases
+    if is_nan(x) || is_inf(x, 0) {
+        ret nan()
+    }
 
-	// make argument positive
-	let mut sign = false
-	x = abs(x)
+    // make argument positive
+    let mut sign = false
+    x = abs(x)
 
-	let mut j: u64 = 0
-	let mut y: f64 = 0
-	let mut z: f64 = 0
-	if x >= REDUCE_THRESHOLD {
-		j, z = trig_reduce(x)
-	} else {
-		j = u64(x * (4 / PI)) // integer part of x/(PI/4), as integer for tests on the phase angle
-		y = f64(j)            // integer part of x/(PI/4), as float
+    let mut j: u64 = 0
+    let mut y: f64 = 0
+    let mut z: f64 = 0
+    if x >= REDUCE_THRESHOLD {
+        j, z = trig_reduce(x)
+    } else {
+        j = u64(x * (4 / PI)) // integer part of x/(PI/4), as integer for tests on the phase angle
+        y = f64(j)            // integer part of x/(PI/4), as float
 
-		// map zeros to origin
-		if j&1 == 1 {
-			j++
-			y++
-		}
-		j &= 7                               // octant modulo 2Pi radians (360 degrees)
-		z = ((x - y*PI4A) - y*PI4B) - y*PI4C // Extended precision modular arithmetic
-	}
+        // map zeros to origin
+        if j&1 == 1 {
+            j++
+            y++
+        }
+        j &= 7                               // octant modulo 2Pi radians (360 degrees)
+        z = ((x - y*PI4A) - y*PI4B) - y*PI4C // Extended precision modular arithmetic
+    }
 
-	if j > 3 {
-		j -= 4
-		sign = !sign
-	}
-	if j > 1 {
-		sign = !sign
-	}
+    if j > 3 {
+        j -= 4
+        sign = !sign
+    }
+    if j > 1 {
+        sign = !sign
+    }
 
-	let zz = z * z
-	if j == 1 || j == 2 {
-		y = z + z*zz*((((((_SIN[0]*zz)+_SIN[1])*zz+_SIN[2])*zz+_SIN[3])*zz+_SIN[4])*zz+_SIN[5])
-	} else {
-		y = 1.0 - 0.5*zz + zz*zz*((((((_COS[0]*zz)+_COS[1])*zz+_COS[2])*zz+_COS[3])*zz+_COS[4])*zz+_COS[5])
-	}
-	if sign {
-		y = -y
-	}
-	ret y
+    let zz = z * z
+    if j == 1 || j == 2 {
+        y = z + z*zz*((((((_SIN[0]*zz)+_SIN[1])*zz+_SIN[2])*zz+_SIN[3])*zz+_SIN[4])*zz+_SIN[5])
+    } else {
+        y = 1.0 - 0.5*zz + zz*zz*((((((_COS[0]*zz)+_COS[1])*zz+_COS[2])*zz+_COS[3])*zz+_COS[4])*zz+_COS[5])
+    }
+    if sign {
+        y = -y
+    }
+    ret y
 }
 
 // Returns the sine of the radian argument x.
@@ -203,54 +203,54 @@ pub fn cos(mut x: f64): f64 {
 //  sin(±inf) = nan
 //  sin(nan) = nan
 pub fn sin(mut x: f64): f64 {
-	const PI4A = 7.85398125648498535156e-1  // 0x3fe921fb40000000, PI/4 split into three parts
-	const PI4B = 3.77489470793079817668e-8  // 0x3e64442d00000000,
-	const PI4C = 2.69515142907905952645e-15 // 0x3ce8469898cc5170,
-	// special cases
-	match {
-	| x == 0 | is_nan(x):
-		ret x // ret ±0 || nan()
-	| is_inf(x, 0):
-		ret nan()
-	}
+    const PI4A = 7.85398125648498535156e-1  // 0x3fe921fb40000000, PI/4 split into three parts
+    const PI4B = 3.77489470793079817668e-8  // 0x3e64442d00000000,
+    const PI4C = 2.69515142907905952645e-15 // 0x3ce8469898cc5170,
+    // special cases
+    match {
+    | x == 0 | is_nan(x):
+        ret x // ret ±0 || nan()
+    | is_inf(x, 0):
+        ret nan()
+    }
 
-	// make argument positive but save the sign
-	let mut sign = false
-	if x < 0 {
-		x = -x
-		sign = true
-	}
+    // make argument positive but save the sign
+    let mut sign = false
+    if x < 0 {
+        x = -x
+        sign = true
+    }
 
-	let mut j: u64 = 0
-	let mut y: f64 = 0
-	let mut z: f64 = 0
-	if x >= REDUCE_THRESHOLD {
-		j, z = trig_reduce(x)
-	} else {
-		j = u64(x * (4 / PI)) // integer part of x/(PI/4), as integer for tests on the phase angle
-		y = f64(j)            // integer part of x/(PI/4), as float
+    let mut j: u64 = 0
+    let mut y: f64 = 0
+    let mut z: f64 = 0
+    if x >= REDUCE_THRESHOLD {
+        j, z = trig_reduce(x)
+    } else {
+        j = u64(x * (4 / PI)) // integer part of x/(PI/4), as integer for tests on the phase angle
+        y = f64(j)            // integer part of x/(PI/4), as float
 
-		// map zeros to origin
-		if j&1 == 1 {
-			j++
-			y++
-		}
-		j &= 7                               // octant modulo 2Pi radians (360 degrees)
-		z = ((x - y*PI4A) - y*PI4B) - y*PI4C // Extended precision modular arithmetic
-	}
-	// reflect in x axis
-	if j > 3 {
-		sign = !sign
-		j -= 4
-	}
-	let zz = z * z
-	if j == 1 || j == 2 {
-		y = 1.0 - 0.5*zz + zz*zz*((((((_COS[0]*zz)+_COS[1])*zz+_COS[2])*zz+_COS[3])*zz+_COS[4])*zz+_COS[5])
-	} else {
-		y = z + z*zz*((((((_SIN[0]*zz)+_SIN[1])*zz+_SIN[2])*zz+_SIN[3])*zz+_SIN[4])*zz+_SIN[5])
-	}
-	if sign {
-		y = -y
-	}
-	ret y
+        // map zeros to origin
+        if j&1 == 1 {
+            j++
+            y++
+        }
+        j &= 7                               // octant modulo 2Pi radians (360 degrees)
+        z = ((x - y*PI4A) - y*PI4B) - y*PI4C // Extended precision modular arithmetic
+    }
+    // reflect in x axis
+    if j > 3 {
+        sign = !sign
+        j -= 4
+    }
+    let zz = z * z
+    if j == 1 || j == 2 {
+        y = 1.0 - 0.5*zz + zz*zz*((((((_COS[0]*zz)+_COS[1])*zz+_COS[2])*zz+_COS[3])*zz+_COS[4])*zz+_COS[5])
+    } else {
+        y = z + z*zz*((((((_SIN[0]*zz)+_SIN[1])*zz+_SIN[2])*zz+_SIN[3])*zz+_SIN[4])*zz+_SIN[5])
+    }
+    if sign {
+        y = -y
+    }
+    ret y
 }

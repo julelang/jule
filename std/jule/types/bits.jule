@@ -7,89 +7,89 @@ use std::conv::{ConvError, parse_int, parse_uint, parse_float}
 type BitChecker: fn(v: str, base: int, bit: int): bool
 
 fn check_bit(v: str, bit: int, checker: BitChecker): bool {
-	match {
-	| v == "":            ret false
-	| v.len == 1:         ret true
-	| v.has_prefix("0x"): ret checker(v[2:], 0b00010000, bit) // Hexadecimal
-	| v.has_prefix("0b"): ret checker(v[2:], 0b10, bit)       // Binary
-	| v.has_prefix("0o"): ret checker(v[2:], 0b1000, bit)     // Octal
-	| v[0] == '0':        ret checker(v[1:], 0b1000, bit)     // Octal
-	|:                    ret checker(v, 0b1010, bit)         // Decimal
-	}
+    match {
+    | v == "":            ret false
+    | v.len == 1:         ret true
+    | v.has_prefix("0x"): ret checker(v[2:], 0b00010000, bit) // Hexadecimal
+    | v.has_prefix("0b"): ret checker(v[2:], 0b10, bit)       // Binary
+    | v.has_prefix("0o"): ret checker(v[2:], 0b1000, bit)     // Octal
+    | v[0] == '0':        ret checker(v[1:], 0b1000, bit)     // Octal
+    |:                    ret checker(v, 0b1010, bit)         // Decimal
+    }
 }
 
 // Returns kind's bit-specific kind if bit-specific like int, uint, and uintptr.
 // Returns kind if not bit-specific.
 // Bit-size is determined by runtime.
 pub fn real_kind_of(kind: str): str {
-	match kind {
-	| str(TypeKind.Int):
-		ret SYS_INT
+    match kind {
+    | str(TypeKind.Int):
+        ret SYS_INT
 
-	| str(TypeKind.Uint)
-	| str(TypeKind.Uintptr):
-		ret SYS_UINT
+    | str(TypeKind.Uint)
+    | str(TypeKind.Uintptr):
+        ret SYS_UINT
 
-	|:
-		ret kind
-	}
+    |:
+        ret kind
+    }
 }
 
 // Returns kind's bit-size.
 // Returns -1 if kind is not numeric.
 pub fn bitsize_of(k: str): int {
-	match k {
-	| str(TypeKind.I8)
-	| str(TypeKind.U8):
-		ret 0b1000
+    match k {
+    | str(TypeKind.I8)
+    | str(TypeKind.U8):
+        ret 0b1000
 
-	| str(TypeKind.I16)
-	| str(TypeKind.U16):
-		ret 0b00010000
+    | str(TypeKind.I16)
+    | str(TypeKind.U16):
+        ret 0b00010000
 
-	| str(TypeKind.I32)
-	| str(TypeKind.U32)
-	| str(TypeKind.F32):
-		ret 0b00100000
+    | str(TypeKind.I32)
+    | str(TypeKind.U32)
+    | str(TypeKind.F32):
+        ret 0b00100000
 
-	| str(TypeKind.I64)
-	| str(TypeKind.U64)
-	| str(TypeKind.F64):
-		ret 0b01000000
+    | str(TypeKind.I64)
+    | str(TypeKind.U64)
+    | str(TypeKind.F64):
+        ret 0b01000000
 
-	| str(TypeKind.Uint)
-	| str(TypeKind.Int):
-		ret BIT_SIZE
+    | str(TypeKind.Uint)
+    | str(TypeKind.Int):
+        ret BIT_SIZE
 
-	|:
-		ret -1
-	}
+    |:
+        ret -1
+    }
 }
 
 // Returns signed integer kind by bit-size.
 // Possible bit-sizes are: 8, 16, 32, and 64.
 // Returns empty string if bits is invalid.
 pub fn int_from_bits(bits: u64): str {
-	match bits {
-	| 0b1000:     ret str(TypeKind.I8)
-	| 0b00010000: ret str(TypeKind.I16)
-	| 0b00100000: ret str(TypeKind.I32)
-	| 0b01000000: ret str(TypeKind.I64)
-	|:            ret ""
-	}
+    match bits {
+    | 0b1000:     ret str(TypeKind.I8)
+    | 0b00010000: ret str(TypeKind.I16)
+    | 0b00100000: ret str(TypeKind.I32)
+    | 0b01000000: ret str(TypeKind.I64)
+    |:            ret ""
+    }
 }
 
 // Returns unsigned integer kind by bit-size.
 // Possible bit-sizes are: 8, 16, 32, and 64.
 // Returns empty string if bits is invalid.
 pub fn uint_from_bits(bits: u64): str {
-	match bits {
-	| 0b1000:     ret str(TypeKind.U8)
-	| 0b00010000: ret str(TypeKind.U16)
-	| 0b00100000: ret str(TypeKind.U32)
-	| 0b01000000: ret str(TypeKind.U64)
-	|:            ret ""
-	}
+    match bits {
+    | 0b1000:     ret str(TypeKind.U8)
+    | 0b00010000: ret str(TypeKind.U16)
+    | 0b00100000: ret str(TypeKind.U32)
+    | 0b01000000: ret str(TypeKind.U64)
+    |:            ret ""
+    }
 }
 
 
@@ -97,33 +97,33 @@ pub fn uint_from_bits(bits: u64): str {
 // Possible bit-sizes are: 32, and 64.
 // Returns empty string if bits is invalid.
 pub fn float_from_bits(bits: u64): str {
-	match bits {
-	| 0b00100000: ret str(TypeKind.F32)
-	| 0b01000000: ret str(TypeKind.F64)
-	|:            ret ""
-	}
+    match bits {
+    | 0b00100000: ret str(TypeKind.F32)
+    | 0b01000000: ret str(TypeKind.F64)
+    |:            ret ""
+    }
 }
 
 // Reports whether signed integer literal is compatible given bit-size.
 pub fn check_bit_int(v: str, bit: int): bool {
-	ret check_bit(v, bit, fn(v: str, base: int, bit: int): bool {
-		let (_, err) = parse_int(v, base, bit)
-		ret err == ConvError.Ok
-	})
+    ret check_bit(v, bit, fn(v: str, base: int, bit: int): bool {
+        let (_, err) = parse_int(v, base, bit)
+        ret err == ConvError.Ok
+    })
 }
 
 // Reports whether unsigned integer literal is compatible given bit-size.
 pub fn check_bit_uint(v: str, bit: int): bool {
-	ret check_bit(v, bit, fn(v: str, base: int, bit: int): bool {
-		let (_, err) = parse_uint(v, base, bit)
-		ret err == ConvError.Ok
-	})
+    ret check_bit(v, bit, fn(v: str, base: int, bit: int): bool {
+        let (_, err) = parse_uint(v, base, bit)
+        ret err == ConvError.Ok
+    })
 }
 
 // Reports whether float literal is compatible given bit-size.
 pub fn check_bit_float(val: str, bit: int): bool {
-	let (_, err) = parse_float(val, bit)
-	ret err == ConvError.Ok
+    let (_, err) = parse_float(val, bit)
+    ret err == ConvError.Ok
 }
 
 // Reports minimum bit-size of given floating-point.
@@ -132,10 +132,10 @@ pub fn check_bit_float(val: str, bit: int): bool {
 //  - 32 for 32-bit
 //  - 64 for 64-bit
 pub fn bitsize_of_float(x: f64): u64 {
-	match {
-	| MIN_F32 <= x && x <= MAX_F32: ret 0b00100000
-	|:                              ret 0b01000000
-	}
+    match {
+    | MIN_F32 <= x && x <= MAX_F32: ret 0b00100000
+    |:                              ret 0b01000000
+    }
 }
 
 // Reports minimum bit-size of given signed integer.
@@ -146,12 +146,12 @@ pub fn bitsize_of_float(x: f64): u64 {
 //  - 32 for 32-bit
 //  - 64 for 64-bit
 pub fn bitsize_of_int(x: i64): u64 {
-	match {
-	| MIN_I8 <= x && x <= MAX_I8:   ret 0b1000
-	| MIN_I16 <= x && x <= MAX_I16: ret 0b00010000
-	| MIN_I32 <= x && x <= MAX_I32: ret 0b00100000
-	|:                              ret 0b01000000
-	}
+    match {
+    | MIN_I8 <= x && x <= MAX_I8:   ret 0b1000
+    | MIN_I16 <= x && x <= MAX_I16: ret 0b00010000
+    | MIN_I32 <= x && x <= MAX_I32: ret 0b00100000
+    |:                              ret 0b01000000
+    }
 }
 
 // Reports minimum bit-size of given unsigned integer.
@@ -162,10 +162,10 @@ pub fn bitsize_of_int(x: i64): u64 {
 //  - 32 for 32-bit
 //  - 64 for 64-bit
 pub fn bitsize_of_uint(x: u64): u64 {
-	match {
-	| x <= MAX_U8:  ret 0b1000
-	| x <= MAX_U16: ret 0b00010000
-	| x <= MAX_U32: ret 0b00100000
-	|:              ret 0b01000000
-	}
+    match {
+    | x <= MAX_U8:  ret 0b1000
+    | x <= MAX_U16: ret 0b00010000
+    | x <= MAX_U32: ret 0b00100000
+    |:              ret 0b01000000
+    }
 }

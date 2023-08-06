@@ -215,73 +215,73 @@ const SB7 = -2.24409524465858183362e+01 // 0xC03670E242712D62
 //  erf(-inf) = -1
 //  erf(nan) = nan
 pub fn erf(mut x: f64): f64 {
-	const VERY_TINY = 2.848094538889218e-306 // 0x0080000000000000
-	const SMALL     = 1.0 / (1 << 28)        // 2**-28
-	// special cases
-	match {
-	| is_nan(x):
-		ret nan()
-	| is_inf(x, 1):
-		ret 1
-	| is_inf(x, -1):
-		ret -1
-	}
-	let mut sign = false
-	if x < 0 {
-		x = -x
-		sign = true
-	}
-	if x < 0.84375 { // |x| < 0.84375
-		let mut temp: f64 = 0
-		if x < SMALL { // |x| < 2**-28
-			if x < VERY_TINY {
-				temp = 0.125 * (8.0*x + EFX8*x) // avoid underflow
-			} else {
-				temp = x + EFX*x
-			}
-		} else {
-			let z = x * x
-			let r = PP0 + z*(PP1+z*(PP2+z*(PP3+z*PP4)))
-			let s = 1 + z*(QQ1+z*(QQ2+z*(QQ3+z*(QQ4+z*QQ5))))
-			let y = r / s
-			temp = x + x*y
-		}
-		if sign {
-			ret -temp
-		}
-		ret temp
-	}
-	if x < 1.25 { // 0.84375 <= |x| < 1.25
-		let s = x - 1
-		let P = PA0 + s*(PA1+s*(PA2+s*(PA3+s*(PA4+s*(PA5+s*PA6)))))
-		let Q = 1 + s*(QA1+s*(QA2+s*(QA3+s*(QA4+s*(QA5+s*QA6)))))
-		if sign {
-			ret -ERX - P/Q
-		}
-		ret ERX + P/Q
-	}
-	if x >= 6 { // inf > |x| >= 6
-		if sign {
-			ret -1
-		}
-		ret 1
-	}
-	let s = 1 / (x * x)
-	let mut R: f64 = 0
-	let mut S: f64 = 0
-	if x < 1/0.35 { // |x| < 1 / 0.35  ~ 2.857143
-		R = RA0 + s*(RA1+s*(RA2+s*(RA3+s*(RA4+s*(RA5+s*(RA6+s*RA7))))))
-		S = 1 + s*(SA1+s*(SA2+s*(SA3+s*(SA4+s*(SA5+s*(SA6+s*(SA7+s*SA8)))))))
-	} else { // |x| >= 1 / 0.35  ~ 2.857143
-		R = RB0 + s*(RB1+s*(RB2+s*(RB3+s*(RB4+s*(RB5+s*RB6)))))
-		S = 1 + s*(SB1+s*(SB2+s*(SB3+s*(SB4+s*(SB5+s*(SB6+s*SB7))))))
-	}
-	let z = f64_from_bits(f64_bits(x) & 0xffffffff00000000) // pseudo-single (20-bit) precision x
-	let r = exp(-z*z-0.5625) * exp((z-x)*(z+x)+R/S)
-	if sign {
-		ret r/x - 1
-	}
-	ret 1 - r/x
+    const VERY_TINY = 2.848094538889218e-306 // 0x0080000000000000
+    const SMALL     = 1.0 / (1 << 28)        // 2**-28
+    // special cases
+    match {
+    | is_nan(x):
+        ret nan()
+    | is_inf(x, 1):
+        ret 1
+    | is_inf(x, -1):
+        ret -1
+    }
+    let mut sign = false
+    if x < 0 {
+        x = -x
+        sign = true
+    }
+    if x < 0.84375 { // |x| < 0.84375
+        let mut temp: f64 = 0
+        if x < SMALL { // |x| < 2**-28
+            if x < VERY_TINY {
+                temp = 0.125 * (8.0*x + EFX8*x) // avoid underflow
+            } else {
+                temp = x + EFX*x
+            }
+        } else {
+            let z = x * x
+            let r = PP0 + z*(PP1+z*(PP2+z*(PP3+z*PP4)))
+            let s = 1 + z*(QQ1+z*(QQ2+z*(QQ3+z*(QQ4+z*QQ5))))
+            let y = r / s
+            temp = x + x*y
+        }
+        if sign {
+            ret -temp
+        }
+        ret temp
+    }
+    if x < 1.25 { // 0.84375 <= |x| < 1.25
+        let s = x - 1
+        let P = PA0 + s*(PA1+s*(PA2+s*(PA3+s*(PA4+s*(PA5+s*PA6)))))
+        let Q = 1 + s*(QA1+s*(QA2+s*(QA3+s*(QA4+s*(QA5+s*QA6)))))
+        if sign {
+            ret -ERX - P/Q
+        }
+        ret ERX + P/Q
+    }
+    if x >= 6 { // inf > |x| >= 6
+        if sign {
+            ret -1
+        }
+        ret 1
+    }
+    let s = 1 / (x * x)
+    let mut R: f64 = 0
+    let mut S: f64 = 0
+    if x < 1/0.35 { // |x| < 1 / 0.35  ~ 2.857143
+        R = RA0 + s*(RA1+s*(RA2+s*(RA3+s*(RA4+s*(RA5+s*(RA6+s*RA7))))))
+        S = 1 + s*(SA1+s*(SA2+s*(SA3+s*(SA4+s*(SA5+s*(SA6+s*(SA7+s*SA8)))))))
+    } else { // |x| >= 1 / 0.35  ~ 2.857143
+        R = RB0 + s*(RB1+s*(RB2+s*(RB3+s*(RB4+s*(RB5+s*RB6)))))
+        S = 1 + s*(SB1+s*(SB2+s*(SB3+s*(SB4+s*(SB5+s*(SB6+s*SB7))))))
+    }
+    let z = f64_from_bits(f64_bits(x) & 0xffffffff00000000) // pseudo-single (20-bit) precision x
+    let r = exp(-z*z-0.5625) * exp((z-x)*(z+x)+R/S)
+    if sign {
+        ret r/x - 1
+    }
+    ret 1 - r/x
 }
 
 // Returns the complementary error function of x.
@@ -291,74 +291,74 @@ pub fn erf(mut x: f64): f64 {
 //  erfc(-inf) = 2
 //  erfc(nan) = nan
 pub fn erfc(mut x: f64): f64 {
-	const TINY = 1.0 / (1 << 56) // 2**-56
-	// special cases
-	match {
-	| is_nan(x):
-		ret nan()
-	| is_inf(x, 1):
-		ret 0
-	| is_inf(x, -1):
-		ret 2
-	}
-	let mut sign = false
-	if x < 0 {
-		x = -x
-		sign = true
-	}
-	if x < 0.84375 { // |x| < 0.84375
-		let mut temp: f64 = 0
-		if x < TINY { // |x| < 2**-56
-			temp = x
-		} else {
-			let z = x * x
-			let r = PP0 + z*(PP1+z*(PP2+z*(PP3+z*PP4)))
-			let s = 1 + z*(QQ1+z*(QQ2+z*(QQ3+z*(QQ4+z*QQ5))))
-			let y = r / s
-			if x < 0.25 { // |x| < 1/4
-				temp = x + x*y
-			} else {
-				temp = 0.5 + (x*y + (x - 0.5))
-			}
-		}
-		if sign {
-			ret 1 + temp
-		}
-		ret 1 - temp
-	}
-	if x < 1.25 { // 0.84375 <= |x| < 1.25
-		let s = x - 1
-		let P = PA0 + s*(PA1+s*(PA2+s*(PA3+s*(PA4+s*(PA5+s*PA6)))))
-		let Q = 1 + s*(QA1+s*(QA2+s*(QA3+s*(QA4+s*(QA5+s*QA6)))))
-		if sign {
-			ret 1 + ERX + P/Q
-		}
-		ret 1 - ERX - P/Q
+    const TINY = 1.0 / (1 << 56) // 2**-56
+    // special cases
+    match {
+    | is_nan(x):
+        ret nan()
+    | is_inf(x, 1):
+        ret 0
+    | is_inf(x, -1):
+        ret 2
+    }
+    let mut sign = false
+    if x < 0 {
+        x = -x
+        sign = true
+    }
+    if x < 0.84375 { // |x| < 0.84375
+        let mut temp: f64 = 0
+        if x < TINY { // |x| < 2**-56
+            temp = x
+        } else {
+            let z = x * x
+            let r = PP0 + z*(PP1+z*(PP2+z*(PP3+z*PP4)))
+            let s = 1 + z*(QQ1+z*(QQ2+z*(QQ3+z*(QQ4+z*QQ5))))
+            let y = r / s
+            if x < 0.25 { // |x| < 1/4
+                temp = x + x*y
+            } else {
+                temp = 0.5 + (x*y + (x - 0.5))
+            }
+        }
+        if sign {
+            ret 1 + temp
+        }
+        ret 1 - temp
+    }
+    if x < 1.25 { // 0.84375 <= |x| < 1.25
+        let s = x - 1
+        let P = PA0 + s*(PA1+s*(PA2+s*(PA3+s*(PA4+s*(PA5+s*PA6)))))
+        let Q = 1 + s*(QA1+s*(QA2+s*(QA3+s*(QA4+s*(QA5+s*QA6)))))
+        if sign {
+            ret 1 + ERX + P/Q
+        }
+        ret 1 - ERX - P/Q
 
-	}
-	if x < 28 { // |x| < 28
-		let s = 1 / (x * x)
-		let mut R: f64 = 0
-		let mut S: f64 = 0
-		if x < 1/0.35 { // |x| < 1 / 0.35 ~ 2.857143
-			R = RA0 + s*(RA1+s*(RA2+s*(RA3+s*(RA4+s*(RA5+s*(RA6+s*RA7))))))
-			S = 1 + s*(SA1+s*(SA2+s*(SA3+s*(SA4+s*(SA5+s*(SA6+s*(SA7+s*SA8)))))))
-		} else { // |x| >= 1 / 0.35 ~ 2.857143
-			if sign && x > 6 {
-				ret 2 // x < -6
-			}
-			R = RB0 + s*(RB1+s*(RB2+s*(RB3+s*(RB4+s*(RB5+s*RB6)))))
-			S = 1 + s*(SB1+s*(SB2+s*(SB3+s*(SB4+s*(SB5+s*(SB6+s*SB7))))))
-		}
-		let z = f64_from_bits(f64_bits(x) & 0xffffffff00000000) // pseudo-single (20-bit) precision x
-		let r = exp(-z*z-0.5625) * exp((z-x)*(z+x)+R/S)
-		if sign {
-			ret 2 - r/x
-		}
-		ret r / x
-	}
-	if sign {
-		ret 2
-	}
-	ret 0
+    }
+    if x < 28 { // |x| < 28
+        let s = 1 / (x * x)
+        let mut R: f64 = 0
+        let mut S: f64 = 0
+        if x < 1/0.35 { // |x| < 1 / 0.35 ~ 2.857143
+            R = RA0 + s*(RA1+s*(RA2+s*(RA3+s*(RA4+s*(RA5+s*(RA6+s*RA7))))))
+            S = 1 + s*(SA1+s*(SA2+s*(SA3+s*(SA4+s*(SA5+s*(SA6+s*(SA7+s*SA8)))))))
+        } else { // |x| >= 1 / 0.35 ~ 2.857143
+            if sign && x > 6 {
+                ret 2 // x < -6
+            }
+            R = RB0 + s*(RB1+s*(RB2+s*(RB3+s*(RB4+s*(RB5+s*RB6)))))
+            S = 1 + s*(SB1+s*(SB2+s*(SB3+s*(SB4+s*(SB5+s*(SB6+s*SB7))))))
+        }
+        let z = f64_from_bits(f64_bits(x) & 0xffffffff00000000) // pseudo-single (20-bit) precision x
+        let r = exp(-z*z-0.5625) * exp((z-x)*(z+x)+R/S)
+        if sign {
+            ret 2 - r/x
+        }
+        ret r / x
+    }
+    if sign {
+        ret 2
+    }
+    ret 0
 }

@@ -13,44 +13,44 @@ use std::unicode::utf8::{decode_rune}
 //  - '\xhh'
 //  - '\nnn'
 pub fn is_byte_lit(mut kind: str): (str, bool) {
-	if kind.len < 3 {
-		ret "", false
-	}
+    if kind.len < 3 {
+        ret "", false
+    }
 
-	kind = kind[1 : kind.len-1] // Remove quotes.
-	let mut is_byte = false
+    kind = kind[1 : kind.len-1] // Remove quotes.
+    let mut is_byte = false
 
-	match {
-	| kind.len == 1 && kind[0] <= 255:
-		is_byte = true
+    match {
+    | kind.len == 1 && kind[0] <= 255:
+        is_byte = true
 
-	| kind[0] == '\\' && kind[1] == 'x':
-		is_byte = true
+    | kind[0] == '\\' && kind[1] == 'x':
+        is_byte = true
 
-	| kind[0] == '\\' && kind[1] >= '0' && kind[1] <= '7':
-		is_byte = true
-	}
+    | kind[0] == '\\' && kind[1] >= '0' && kind[1] <= '7':
+        is_byte = true
+    }
 
-	ret kind, is_byte
+    ret kind, is_byte
 }
 
 // Returns rune value string from bytes, not includes quotes.
 // Bytes are represents rune literal, allows escape sequences.
 // Returns empty string if bytes.len == 0
 pub fn to_rune(bytes: []byte): rune {
-	if bytes.len == 0 {
-		ret 0
-	}
+    if bytes.len == 0 {
+        ret 0
+    }
 
-	let mut r: rune = 0
-	if bytes[0] == '\\' && bytes.len > 1 {
-		let mut i = 0
-		r = rune_from_esq_seq(bytes, i)
-	} else {
-		r, _ = decode_rune(bytes)
-	}
+    let mut r: rune = 0
+    if bytes[0] == '\\' && bytes.len > 1 {
+        let mut i = 0
+        r = rune_from_esq_seq(bytes, i)
+    } else {
+        r, _ = decode_rune(bytes)
+    }
 
-	ret r
+    ret r
 }
 
 // Returns raw-string value string from bytes, not includes quotes.
@@ -62,90 +62,90 @@ pub fn to_raw_str(bytes: []byte): str { ret str(bytes) }
 // Bytes are represents string characters, allows escape sequences.
 // Returns empty string if bytes.len == 0
 pub fn to_str(bytes: []byte): str {
-	if bytes.len == 0 {
-		ret ""
-	}
+    if bytes.len == 0 {
+        ret ""
+    }
 
-	let mut s = ""
-	let mut i = 0
-	for i < bytes.len {
-		let b = bytes[i]
-		if b == '\\' {
-			s += str_esq_seq(bytes, i)
-		} else {
-			let (r, size) = decode_rune(bytes[i:])
-			i += size
-			s += str(r)
-		}
-	}
-	ret s
+    let mut s = ""
+    let mut i = 0
+    for i < bytes.len {
+        let b = bytes[i]
+        if b == '\\' {
+            s += str_esq_seq(bytes, i)
+        } else {
+            let (r, size) = decode_rune(bytes[i:])
+            i += size
+            s += str(r)
+        }
+    }
+    ret s
 }
 
 fn try_btoa_common_esq(bytes: []byte): (seq: byte, ok: bool) {
-	if bytes.len < 2 || bytes[0] != '\\' {
-		ret
-	}
+    if bytes.len < 2 || bytes[0] != '\\' {
+        ret
+    }
 
-	match bytes[1] {
-	| '\\': seq = '\\'
-	| '\'': seq = '\''
-	| '"':  seq = '"'
-	| 'a':  seq = '\a'
-	| 'b':  seq = '\b'
-	| 'f':  seq = '\f'
-	| 'n':  seq = '\n'
-	| 'r':  seq = '\r'
-	| 't':  seq = '\t'
-	| 'v':  seq = '\v'
-	}
+    match bytes[1] {
+    | '\\': seq = '\\'
+    | '\'': seq = '\''
+    | '"':  seq = '"'
+    | 'a':  seq = '\a'
+    | 'b':  seq = '\b'
+    | 'f':  seq = '\f'
+    | 'n':  seq = '\n'
+    | 'r':  seq = '\r'
+    | 't':  seq = '\t'
+    | 'v':  seq = '\v'
+    }
 
-	ok = seq != 0
-	ret
+    ok = seq != 0
+    ret
 }
 
 fn rune_from_esq_seq(bytes: []byte, mut &i: int): rune {
-	let (b, ok) = try_btoa_common_esq(bytes[i:])
-	i++ // Skip escape sequence solidus.
-	if ok {
-		i++ // Skip sequence specifier.
-		ret rune(b)
-	}
+    let (b, ok) = try_btoa_common_esq(bytes[i:])
+    i++ // Skip escape sequence solidus.
+    if ok {
+        i++ // Skip sequence specifier.
+        ret rune(b)
+    }
 
-	match bytes[i] {
-	| 'u':
-		const SEQ_LEN = 5
-		let (rc, _) = parse_uint(str(bytes[i+1:i+SEQ_LEN]), 16, 64)
-		i += SEQ_LEN
-		let r = rune(rc)
-		ret r
+    match bytes[i] {
+    | 'u':
+        const SEQ_LEN = 5
+        let (rc, _) = parse_uint(str(bytes[i+1:i+SEQ_LEN]), 16, 64)
+        i += SEQ_LEN
+        let r = rune(rc)
+        ret r
 
-	| 'U':
-		const SEQ_LEN = 9
-		let (rc, _) = parse_uint(str(bytes[i+1:i+SEQ_LEN]), 16, 64)
-		i += SEQ_LEN
-		let r = rune(rc)
-		ret r
+    | 'U':
+        const SEQ_LEN = 9
+        let (rc, _) = parse_uint(str(bytes[i+1:i+SEQ_LEN]), 16, 64)
+        i += SEQ_LEN
+        let r = rune(rc)
+        ret r
 
-	| 'x':
-		const SEQ_LEN = 3
-		let seq = bytes[i+1:i+SEQ_LEN]
-		i += SEQ_LEN
-		let (b, _) = parse_uint(str(seq), 16, 64)
-		ret rune(b)
+    | 'x':
+        const SEQ_LEN = 3
+        let seq = bytes[i+1:i+SEQ_LEN]
+        i += SEQ_LEN
+        let (b, _) = parse_uint(str(seq), 16, 64)
+        ret rune(b)
 
-	|:
-		const SEQ_LEN = 3
-		let seq = bytes[i : i+SEQ_LEN]
-		i += SEQ_LEN
-		let (b, _) = parse_uint(str(seq[1:]), 8, 64)
-		ret rune(b)
-	}
+    |:
+        const SEQ_LEN = 3
+        let seq = bytes[i : i+SEQ_LEN]
+        i += SEQ_LEN
+        let (b, _) = parse_uint(str(seq[1:]), 8, 64)
+        ret rune(b)
+    }
 }
 
 fn str_esq_seq(bytes: []byte, mut &i: int): str {
-	let r = rune_from_esq_seq(bytes, i)
-	if r <= 255 {
-		ret str(r)
-	}
-	ret to_str(([]byte)(str(r)))
+    let r = rune_from_esq_seq(bytes, i)
+    if r <= 255 {
+        ret str(r)
+    }
+    ret to_str(([]byte)(str(r)))
 }

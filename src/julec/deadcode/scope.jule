@@ -3,78 +3,78 @@
 // license that can be found in the LICENSE file.
 
 use std::jule::sema::{
-	Scope,
-	St,
-	Data,
-	RetSt,
-	BuiltinPanicCallExprModel,
+    Scope,
+    St,
+    Data,
+    RetSt,
+    BuiltinPanicCallExprModel,
 }
 use std::vector::{Vector}
 
 // Dead code eliminate optimizer for scopes.
 struct ScopeDeadCode {
-	parent: &ScopeDeadCode
-	s:      &Scope
-	stmts:  *Vector[St]
-	i:      int // Position.
+    parent: &ScopeDeadCode
+    s:      &Scope
+    stmts:  *Vector[St]
+    i:      int // Position.
 }
 
 impl ScopeDeadCode {
-	fn optimize_child(mut &self, mut s: &Scope) {
-		let mut sdc = &ScopeDeadCode {
-			parent: self,
-			s:      s,
-			stmts:  &s.stmts,
-		}
-		unsafe { sdc.optimize_stmts() }
-	}
+    fn optimize_child(mut &self, mut s: &Scope) {
+        let mut sdc = &ScopeDeadCode {
+            parent: self,
+            s:      s,
+            stmts:  &s.stmts,
+        }
+        unsafe { sdc.optimize_stmts() }
+    }
 
-	unsafe fn eliminate_followed(mut self) {
-		self.stmts.remove_range(self.i+1, self.stmts.len()-self.i-1)
-		let mut parent = self.parent
-		for real(parent) {
-			parent.stmts.remove_range(parent.i+1, parent.stmts.len()-parent.i-1)
-			parent = parent.parent
-		}
-	}
+    unsafe fn eliminate_followed(mut self) {
+        self.stmts.remove_range(self.i+1, self.stmts.len()-self.i-1)
+        let mut parent = self.parent
+        for real(parent) {
+            parent.stmts.remove_range(parent.i+1, parent.stmts.len()-parent.i-1)
+            parent = parent.parent
+        }
+    }
 
-	unsafe fn optimize_stmt(mut &self, mut st: St) {
-		match type st {
-		| &Scope:
-			let mut scope = (&Scope)(st)
-			if scope.deferred {
-				eliminate_dead_code_of_scope(scope)
-			} else {
-				self.optimize_child(scope)
-			}
+    unsafe fn optimize_stmt(mut &self, mut st: St) {
+        match type st {
+        | &Scope:
+            let mut scope = (&Scope)(st)
+            if scope.deferred {
+                eliminate_dead_code_of_scope(scope)
+            } else {
+                self.optimize_child(scope)
+            }
 
-		| &Data:
-			match type (&Data)(st).model {
-			| &BuiltinPanicCallExprModel:
-				// Remove followed statements of the built-in panic function call.
-				// Unreachable code.
-				self.eliminate_followed()
-			}
+        | &Data:
+            match type (&Data)(st).model {
+            | &BuiltinPanicCallExprModel:
+                // Remove followed statements of the built-in panic function call.
+                // Unreachable code.
+                self.eliminate_followed()
+            }
 
-		| &RetSt:
-			// Remove followed statements of the return statement.
-			// Unreachable code.
-			self.eliminate_followed()
-		}
-	}
+        | &RetSt:
+            // Remove followed statements of the return statement.
+            // Unreachable code.
+            self.eliminate_followed()
+        }
+    }
 
-	unsafe fn optimize_stmts(mut &self) {
-		self.i = 0
-		for self.i < self.stmts.len(); self.i++ {
-			self.optimize_stmt(self.stmts.at(self.i))
-		}
-	}
+    unsafe fn optimize_stmts(mut &self) {
+        self.i = 0
+        for self.i < self.stmts.len(); self.i++ {
+            self.optimize_stmt(self.stmts.at(self.i))
+        }
+    }
 }
 
 fn eliminate_dead_code_of_scope(mut s: &Scope) {
-	let mut sdc = &ScopeDeadCode{
-		s:     s,
-		stmts: &s.stmts,
-	}
-	unsafe { sdc.optimize_stmts() }
+    let mut sdc = &ScopeDeadCode{
+        s:     s,
+        stmts: &s.stmts,
+    }
+    unsafe { sdc.optimize_stmts() }
 }

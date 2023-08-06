@@ -82,174 +82,174 @@
 //  jn(n, ±inf) = 0
 //  jn(n, nan) = nan
 pub fn jn(mut n: int, mut x: f64): f64 {
-	const TWO_M29 = 1.0 / (1 << 29)    // 2**-29 0x3e10000000000000
-	const TWO302  = 0x52D0000000000000 //1 << 302 // 2**302 0x52D0000000000000
-	// special cases
-	match {
-	| is_nan(x):
-		ret x
-	| is_inf(x, 0):
-		ret 0
-	}
-	// J(-n, x) = (-1)**n * J(n, x), J(n, -x) = (-1)**n * J(n, x)
-	// Thus, J(-n, x) = J(n, -x)
+    const TWO_M29 = 1.0 / (1 << 29)    // 2**-29 0x3e10000000000000
+    const TWO302  = 0x52D0000000000000 //1 << 302 // 2**302 0x52D0000000000000
+    // special cases
+    match {
+    | is_nan(x):
+        ret x
+    | is_inf(x, 0):
+        ret 0
+    }
+    // J(-n, x) = (-1)**n * J(n, x), J(n, -x) = (-1)**n * J(n, x)
+    // Thus, J(-n, x) = J(n, -x)
 
-	if n == 0 {
-		ret j0(x)
-	}
-	if x == 0 {
-		ret 0
-	}
-	if n < 0 {
-		n, x = -n, -x
-	}
-	if n == 1 {
-		ret j1(x)
-	}
-	let mut sign = false
-	if x < 0 {
-		x = -x
-		if n&1 == 1 {
-			sign = true // odd n and negative x
-		}
-	}
-	let mut b: f64 = 0
-	if f64(n) <= x {
-		// Safe to use J(n+1,x)=2n/x *J(n,x)-J(n-1,x)
-		if x >= TWO302 { // x > 2**302
-			// (x >> n**2)
-			//          Jn(x) = cos(x-(2n+1)*pi/4)*sqrt(2/x*pi)
-			//          Yn(x) = sin(x-(2n+1)*pi/4)*sqrt(2/x*pi)
-			//          Let s=sin(x), c=cos(x),
-			//              xn=x-(2n+1)*pi/4, sqt2 = sqrt(2),then
-			//
-			//                 n    sin(xn)*sqt2    cos(xn)*sqt2
-			//              ----------------------------------
-			//                 0     s-c             c+s
-			//                 1    -s-c            -c+s
-			//                 2    -s+c            -c-s
-			//                 3     s+c             c-s
+    if n == 0 {
+        ret j0(x)
+    }
+    if x == 0 {
+        ret 0
+    }
+    if n < 0 {
+        n, x = -n, -x
+    }
+    if n == 1 {
+        ret j1(x)
+    }
+    let mut sign = false
+    if x < 0 {
+        x = -x
+        if n&1 == 1 {
+            sign = true // odd n and negative x
+        }
+    }
+    let mut b: f64 = 0
+    if f64(n) <= x {
+        // Safe to use J(n+1,x)=2n/x *J(n,x)-J(n-1,x)
+        if x >= TWO302 { // x > 2**302
+            // (x >> n**2)
+            //          Jn(x) = cos(x-(2n+1)*pi/4)*sqrt(2/x*pi)
+            //          Yn(x) = sin(x-(2n+1)*pi/4)*sqrt(2/x*pi)
+            //          Let s=sin(x), c=cos(x),
+            //              xn=x-(2n+1)*pi/4, sqt2 = sqrt(2),then
+            //
+            //                 n    sin(xn)*sqt2    cos(xn)*sqt2
+            //              ----------------------------------
+            //                 0     s-c             c+s
+            //                 1    -s-c            -c+s
+            //                 2    -s+c            -c-s
+            //                 3     s+c             c-s
 
-			let mut temp: f64 = 0
-			let (s, c) = sincos(x)
-			match n & 3 {
-			| 0: temp = c + s
-			| 1: temp = -c + s
-			| 2: temp = -c - s
-			| 3: temp = c - s
-			}
-			b = (1 / SQRT_PI) * temp / sqrt(x)
-		} else {
-			b = j1(x)
-			let (mut i, mut a) = 1, j0(x)
-			for i < n; i++ {
-				a, b = b, b*(f64(i+i)/x)-a // avoid underflow
-			}
-		}
-	} else {
-		if x < TWO_M29 { // x < 2**-29
-			// x is tiny, return the first Taylor expansion of J(n,x)
-			// J(n,x) = 1/n!*(x/2)**n  - ...
+            let mut temp: f64 = 0
+            let (s, c) = sincos(x)
+            match n & 3 {
+            | 0: temp = c + s
+            | 1: temp = -c + s
+            | 2: temp = -c - s
+            | 3: temp = c - s
+            }
+            b = (1 / SQRT_PI) * temp / sqrt(x)
+        } else {
+            b = j1(x)
+            let (mut i, mut a) = 1, j0(x)
+            for i < n; i++ {
+                a, b = b, b*(f64(i+i)/x)-a // avoid underflow
+            }
+        }
+    } else {
+        if x < TWO_M29 { // x < 2**-29
+            // x is tiny, return the first Taylor expansion of J(n,x)
+            // J(n,x) = 1/n!*(x/2)**n  - ...
 
-			if n > 33 { // underflow
-				b = 0
-			} else {
-				let temp = x * 0.5
-				b = temp
-				let mut a = 1.0
-				let mut i = 2
-				for i <= n; i++ {
-					a *= f64(i) // a = n!
-					b *= temp   // b = (x/2)**n
-				}
-				b /= a
-			}
-		} else {
-			// use backward recurrence
-			//                      x      x**2      x**2
-			//  J(n,x)/J(n-1,x) =  ----   ------   ------   .....
-			//                      2n  - 2(n+1) - 2(n+2)
-			//
-			//                      1      1        1
-			//  (for large x)   =  ----  ------   ------   .....
-			//                      2n   2(n+1)   2(n+2)
-			//                      -- - ------ - ------ -
-			//                       x     x         x
-			//
-			// Let w = 2n/x and h=2/x, then the above quotient
-			// is equal to the continued fraction:
-			//                  1
-			//      = -----------------------
-			//                     1
-			//         w - -----------------
-			//                        1
-			//              w+h - ---------
-			//                     w+2h - ...
-			//
-			// To determine how many terms needed, let
-			// Q(0) = w, Q(1) = w(w+h) - 1,
-			// Q(k) = (w+k*h)*Q(k-1) - Q(k-2),
-			// When Q(k) > 1e4	good for single
-			// When Q(k) > 1e9	good for double
-			// When Q(k) > 1e17	good for quadruple
+            if n > 33 { // underflow
+                b = 0
+            } else {
+                let temp = x * 0.5
+                b = temp
+                let mut a = 1.0
+                let mut i = 2
+                for i <= n; i++ {
+                    a *= f64(i) // a = n!
+                    b *= temp   // b = (x/2)**n
+                }
+                b /= a
+            }
+        } else {
+            // use backward recurrence
+            //                      x      x**2      x**2
+            //  J(n,x)/J(n-1,x) =  ----   ------   ------   .....
+            //                      2n  - 2(n+1) - 2(n+2)
+            //
+            //                      1      1        1
+            //  (for large x)   =  ----  ------   ------   .....
+            //                      2n   2(n+1)   2(n+2)
+            //                      -- - ------ - ------ -
+            //                       x     x         x
+            //
+            // Let w = 2n/x and h=2/x, then the above quotient
+            // is equal to the continued fraction:
+            //                  1
+            //      = -----------------------
+            //                     1
+            //         w - -----------------
+            //                        1
+            //              w+h - ---------
+            //                     w+2h - ...
+            //
+            // To determine how many terms needed, let
+            // Q(0) = w, Q(1) = w(w+h) - 1,
+            // Q(k) = (w+k*h)*Q(k-1) - Q(k-2),
+            // When Q(k) > 1e4	good for single
+            // When Q(k) > 1e9	good for double
+            // When Q(k) > 1e17	good for quadruple
 
-			// determine k
-			let w = f64(n+n) / x
-			let h = 2 / x
-			let mut q0 = w
-			let mut z = w + h
-			let mut q1 = w*z - 1
-			let mut k = 1
-			for q1 < 1e9 {
-				k++
-				z += h
-				q0, q1 = q1, z*q1-q0
-			}
-			let m = n + n
-			let mut t = 0.0
-			let mut i = 2 * (n + k)
-			for i >= m; i -= 2 {
-				t = 1 / (f64(i)/x - t)
-			}
-			let mut a = t
-			b = 1
-			//  estimate log((2/x)**n*n!) = n*log(2/x)+n*ln(n)
-			//  Hence, if n*(log(2n/x)) > ...
-			//  single 8.8722839355e+01
-			//  double 7.09782712893383973096e+02
-			//  long double 1.1356523406294143949491931077970765006170e+04
-			//  then recurrent value may overflow and the result is
-			//  likely underflow to zero
+            // determine k
+            let w = f64(n+n) / x
+            let h = 2 / x
+            let mut q0 = w
+            let mut z = w + h
+            let mut q1 = w*z - 1
+            let mut k = 1
+            for q1 < 1e9 {
+                k++
+                z += h
+                q0, q1 = q1, z*q1-q0
+            }
+            let m = n + n
+            let mut t = 0.0
+            let mut i = 2 * (n + k)
+            for i >= m; i -= 2 {
+                t = 1 / (f64(i)/x - t)
+            }
+            let mut a = t
+            b = 1
+            //  estimate log((2/x)**n*n!) = n*log(2/x)+n*ln(n)
+            //  Hence, if n*(log(2n/x)) > ...
+            //  single 8.8722839355e+01
+            //  double 7.09782712893383973096e+02
+            //  long double 1.1356523406294143949491931077970765006170e+04
+            //  then recurrent value may overflow and the result is
+            //  likely underflow to zero
 
-			let mut tmp = f64(n)
-			let v = 2 / x
-			tmp = tmp * log(abs(v*tmp))
-			if tmp < 7.09782712893383973096e+02 {
-				let mut i = n - 1
-				for i > 0; i-- {
-					let di = f64(i + i)
-					a, b = b, b*di/x-a
-				}
-			} else {
-				let mut i = n - 1
-				for i > 0; i-- {
-					let di = f64(i + i)
-					a, b = b, b*di/x-a
-					// scale b to avoid spurious overflow
-					if b > 1e100 {
-						a /= b
-						t /= b
-						b = 1
-					}
-				}
-			}
-			b = t * j0(x) / b
-		}
-	}
-	if sign {
-		ret -b
-	}
-	ret b
+            let mut tmp = f64(n)
+            let v = 2 / x
+            tmp = tmp * log(abs(v*tmp))
+            if tmp < 7.09782712893383973096e+02 {
+                let mut i = n - 1
+                for i > 0; i-- {
+                    let di = f64(i + i)
+                    a, b = b, b*di/x-a
+                }
+            } else {
+                let mut i = n - 1
+                for i > 0; i-- {
+                    let di = f64(i + i)
+                    a, b = b, b*di/x-a
+                    // scale b to avoid spurious overflow
+                    if b > 1e100 {
+                        a /= b
+                        t /= b
+                        b = 1
+                    }
+                }
+            }
+            b = t * j0(x) / b
+        }
+    }
+    if sign {
+        ret -b
+    }
+    ret b
 }
 
 // Returns the order-n Bessel function of the second kind.
@@ -261,72 +261,72 @@ pub fn jn(mut n: int, mut x: f64): f64 {
 //  yn(n, x < 0) = nan
 //  yn(n, nan) = nan
 pub fn yn(mut n: int, x: f64): f64 {
-	const TWO302 = 0x52D0000000000000 // 1 << 302 // 2**302 0x52D0000000000000
-	// special cases
-	match {
-	| x < 0 | is_nan(x):
-		ret nan()
-	| is_inf(x, 1):
-		ret 0
-	}
+    const TWO302 = 0x52D0000000000000 // 1 << 302 // 2**302 0x52D0000000000000
+    // special cases
+    match {
+    | x < 0 | is_nan(x):
+        ret nan()
+    | is_inf(x, 1):
+        ret 0
+    }
 
-	if n == 0 {
-		ret y0(x)
-	}
-	if x == 0 {
-		if n < 0 && n&1 == 1 {
-			ret inf(1)
-		}
-		ret inf(-1)
-	}
-	let mut sign = false
-	if n < 0 {
-		n = -n
-		if n&1 == 1 {
-			sign = true // sign true if n < 0 && |n| odd
-		}
-	}
-	if n == 1 {
-		if sign {
-			ret -y1(x)
-		}
-		ret y1(x)
-	}
-	let mut b: f64 = 0
-	if x >= TWO302 { // x > 2**302
-		// (x >> n**2)
-		//	    Jn(x) = cos(x-(2n+1)*pi/4)*sqrt(2/x*pi)
-		//	    Yn(x) = sin(x-(2n+1)*pi/4)*sqrt(2/x*pi)
-		//	    Let s=sin(x), c=cos(x),
-		//		xn=x-(2n+1)*pi/4, sqt2 = sqrt(2),then
-		//
-		//		   n	sin(xn)*sqt2	cos(xn)*sqt2
-		//		----------------------------------
-		//		   0	 s-c		 c+s
-		//		   1	-s-c 		-c+s
-		//		   2	-s+c		-c-s
-		//		   3	 s+c		 c-s
+    if n == 0 {
+        ret y0(x)
+    }
+    if x == 0 {
+        if n < 0 && n&1 == 1 {
+            ret inf(1)
+        }
+        ret inf(-1)
+    }
+    let mut sign = false
+    if n < 0 {
+        n = -n
+        if n&1 == 1 {
+            sign = true // sign true if n < 0 && |n| odd
+        }
+    }
+    if n == 1 {
+        if sign {
+            ret -y1(x)
+        }
+        ret y1(x)
+    }
+    let mut b: f64 = 0
+    if x >= TWO302 { // x > 2**302
+        // (x >> n**2)
+        //	    Jn(x) = cos(x-(2n+1)*pi/4)*sqrt(2/x*pi)
+        //	    Yn(x) = sin(x-(2n+1)*pi/4)*sqrt(2/x*pi)
+        //	    Let s=sin(x), c=cos(x),
+        //		xn=x-(2n+1)*pi/4, sqt2 = sqrt(2),then
+        //
+        //		   n	sin(xn)*sqt2	cos(xn)*sqt2
+        //		----------------------------------
+        //		   0	 s-c		 c+s
+        //		   1	-s-c 		-c+s
+        //		   2	-s+c		-c-s
+        //		   3	 s+c		 c-s
 
-		let mut temp: f64 = 0
-		let (s, c) = sincos(x)
-		match n & 3 {
-		| 0: temp = s - c
-		| 1: temp = -s - c
-		| 2: temp = -s + c
-		| 3: temp = s + c
-		}
-		b = (1 / SQRT_PI) * temp / sqrt(x)
-	} else {
-		let mut a = y0(x)
-		b = y1(x)
-		// quit if b is -inf
-		let mut i = 1
-		for i < n && !is_inf(b, -1); i++ {
-			a, b = b, (f64(i+i)/x)*b-a
-		}
-	}
-	if sign {
-		ret -b
-	}
-	ret b
+        let mut temp: f64 = 0
+        let (s, c) = sincos(x)
+        match n & 3 {
+        | 0: temp = s - c
+        | 1: temp = -s - c
+        | 2: temp = -s + c
+        | 3: temp = s + c
+        }
+        b = (1 / SQRT_PI) * temp / sqrt(x)
+    } else {
+        let mut a = y0(x)
+        b = y1(x)
+        // quit if b is -inf
+        let mut i = 1
+        for i < n && !is_inf(b, -1); i++ {
+            a, b = b, (f64(i+i)/x)*b-a
+        }
+    }
+    if sign {
+        ret -b
+    }
+    ret b
 }

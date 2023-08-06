@@ -4,79 +4,79 @@
 
 // Eval directive flag.
 fn eval_directive_ident(ident: str): bool {
-	if ident == "" {
-		ret false
-	}
+    if ident == "" {
+        ret false
+    }
 
-	for _, flag in FLAGS {
-		if flag == ident {
-			ret true
-		}
-	}
+    for _, flag in FLAGS {
+        if flag == ident {
+            ret true
+        }
+    }
 
-	ret false
+    ret false
 }
 
 // Eval directive expression part.
 // Accepts unary operators.
 fn eval_directive_part(mut part: str): bool {
-	let logical_not = part[0] == '!'
-	if logical_not {
-		part = part[1:]
-	}
+    let logical_not = part[0] == '!'
+    if logical_not {
+        part = part[1:]
+    }
 
-	let mut result = eval_directive_ident(part)
-	if logical_not {
-		result = !result
-	}
-	ret result
+    let mut result = eval_directive_ident(part)
+    if logical_not {
+        result = !result
+    }
+    ret result
 }
 
 // Split operans by binary operators.
 // Skips range of parentheses.
 fn split_operans(op: str, expr: str): []str {
-	let mut parts = make([]str, 0, 10)
+    let mut parts = make([]str, 0, 10)
 
-	let mut range_n = 0
-	let mut i = 0
-	let mut last = 0
-	for i < expr.len - 1; i++ {
-		let b = expr[i]
-		if b == '(' {
-			range_n++
-			continue
-		} else if b == ')' {
-			range_n--
-		}
+    let mut range_n = 0
+    let mut i = 0
+    let mut last = 0
+    for i < expr.len - 1; i++ {
+        let b = expr[i]
+        if b == '(' {
+            range_n++
+            continue
+        } else if b == ')' {
+            range_n--
+        }
 
-		if range_n > 0 {
-			continue
-		}
+        if range_n > 0 {
+            continue
+        }
 
-		match op {
-		| "||":
-			if b == '|' && expr[i+1] == '|' {
-				parts = append(parts, expr[last:i])
-				last = i + 2
-			}
+        match op {
+        | "||":
+            if b == '|' && expr[i+1] == '|' {
+                parts = append(parts, expr[last:i])
+                last = i + 2
+            }
 
-		| "&&":
-			if b == '&' && expr[i+1] == '&' {
-				parts = append(parts, expr[last:i])
-				last = i + 2
-			}
-		}
-	}
+        | "&&":
+            if b == '&' && expr[i+1] == '&' {
+                parts = append(parts, expr[last:i])
+                last = i + 2
+            }
+        }
+    }
 
-	if last < expr.len {
-		parts = append(parts, expr[last:])
-	} else {
-		// Missing operand.
-		// Add empty part for error handling.
-		parts = append(parts, "")
-	}
+    if last < expr.len {
+        parts = append(parts, expr[last:])
+    } else {
+        // Missing operand.
+        // Add empty part for error handling.
+        parts = append(parts, "")
+    }
 
-	ret parts
+    ret parts
 }
 
 // Eval directory expression.
@@ -85,34 +85,34 @@ fn split_operans(op: str, expr: str): []str {
 // Read manual for more information about syntax or etc:
 // https://manual.jule.dev/compiler/platform-specific-programming#the-build-directive
 fn eval_directive_expr(expr: str): bool {
-	if expr == "" {
-		ret false
-	}
+    if expr == "" {
+        ret false
+    }
 
-	let mut result = false
+    let mut result = false
 
-	let logical_or_parts = split_operans("||", expr)
-	for _, part in logical_or_parts {
-		if part == "" {
-			ret false
-		}
+    let logical_or_parts = split_operans("||", expr)
+    for _, part in logical_or_parts {
+        if part == "" {
+            ret false
+        }
 
-		let mut and = true
-		let logical_and_parts = split_operans("&&", part)
-		for _, and_part in logical_and_parts {
-			if and_part.find("(") != -1 {
-				if and_part[and_part.len-1] != ')' { // Missing close.
-					ret false
-				}
-				let expr = and_part[1:and_part.len-1] // Remove parentheses.
-				and = and && eval_directive_expr(expr)
-			} else {
-				and = and && eval_directive_part(and_part)
-			}
-		}
+        let mut and = true
+        let logical_and_parts = split_operans("&&", part)
+        for _, and_part in logical_and_parts {
+            if and_part.find("(") != -1 {
+                if and_part[and_part.len-1] != ')' { // Missing close.
+                    ret false
+                }
+                let expr = and_part[1:and_part.len-1] // Remove parentheses.
+                and = and && eval_directive_expr(expr)
+            } else {
+                and = and && eval_directive_part(and_part)
+            }
+        }
 
-		result = result || and
-	}
+        result = result || and
+    }
 
-	ret result
+    ret result
 }

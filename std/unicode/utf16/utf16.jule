@@ -58,99 +58,99 @@ const SURR_SELF = 0x10000
 // Reports whether the specified Unicode code point
 // can appear in a surrogate pair.
 pub fn is_surrogate(r: rune): bool {
-	ret SURR1 <= r && r < SURR3
+    ret SURR1 <= r && r < SURR3
 }
 
 // Returns the UTF-16 decoding of a surrogate pair.
 // If the pair is not a valid UTF-16 surrogate pair, decode_rune returns
 // the Unicode replacement code point U+FFFD.
 pub fn decode_rune(r1: rune, r2: rune): rune {
-	if SURR1 <= r1 && r1 < SURR2 && SURR2 <= r2 && r2 < SURR3 {
-		ret (r1-SURR1)<<10 | (r2 - SURR2) + SURR_SELF
-	}
-	ret REPLACEMENT_CHAR
+    if SURR1 <= r1 && r1 < SURR2 && SURR2 <= r2 && r2 < SURR3 {
+        ret (r1-SURR1)<<10 | (r2 - SURR2) + SURR_SELF
+    }
+    ret REPLACEMENT_CHAR
 }
 
 // Returns the UTF-16 surrogate pair r1, r2 for the given rune.
 // If the rune is not a valid Unicode code point or does not need encoding,
 // encode_rune returns U+FFFD, U+FFFD.
 pub fn encode_rune(mut r: rune): (r1: rune, r2: rune) {
-	if r < SURR_SELF || r > MAX_RUNE {
-		ret REPLACEMENT_CHAR, REPLACEMENT_CHAR
-	}
-	r -= SURR_SELF
-	ret SURR1 + (r>>10)&0x3ff, SURR2 + r&0x3ff
+    if r < SURR_SELF || r > MAX_RUNE {
+        ret REPLACEMENT_CHAR, REPLACEMENT_CHAR
+    }
+    r -= SURR_SELF
+    ret SURR1 + (r>>10)&0x3ff, SURR2 + r&0x3ff
 }
 
 // Returns the UTF-16 encoding of the Unicode code point sequence s.
 pub fn encode(s: []rune): []u16 {
-	let mut n = s.len
-	for _, v in s {
-		if v >= SURR_SELF {
-			n++
-		}
-	}
+    let mut n = s.len
+    for _, v in s {
+        if v >= SURR_SELF {
+            n++
+        }
+    }
 
-	let mut a = make([]u16, n)
-	n = 0
-	for _, v in s {
-		match {
-		| 0 <= v && v < SURR1 | SURR3 <= v && v < SURR_SELF:
-			// normal rune
-			a[n] = u16(v)
-			n++
-		| SURR_SELF <= v && v <= MAX_RUNE:
-			// needs surrogate sequence
-			let (r1, r2) = encode_rune(v)
-			a[n] = u16(r1)
-			a[n+1] = u16(r2)
-			n += 2
-		|:
-			a[n] = u16(REPLACEMENT_CHAR)
-			n++
-		}
-	}
-	ret a[:n]
+    let mut a = make([]u16, n)
+    n = 0
+    for _, v in s {
+        match {
+        | 0 <= v && v < SURR1 | SURR3 <= v && v < SURR_SELF:
+            // normal rune
+            a[n] = u16(v)
+            n++
+        | SURR_SELF <= v && v <= MAX_RUNE:
+            // needs surrogate sequence
+            let (r1, r2) = encode_rune(v)
+            a[n] = u16(r1)
+            a[n+1] = u16(r2)
+            n += 2
+        |:
+            a[n] = u16(REPLACEMENT_CHAR)
+            n++
+        }
+    }
+    ret a[:n]
 }
 
 // Returns the Unicode code point sequence
 // represented by the UTF-16 encoding s.
 pub fn decode(s: []u16): []rune {
-	let mut a = make([]rune, s.len)
-	let mut n = 0
-	let mut i = 0
-	for i < s.len; i++ {
-		let r = s[i]
-		match {
-		| r < SURR1 | SURR3 <= r:
-			// normal rune
-			a[n] = rune(r)
-		| (SURR1 <= r && r < SURR2 && i+1 < s.len &&
-			SURR2 <= s[i+1] && s[i+1] < SURR3):
-			// valid surrogate sequence
-			a[n] = decode_rune(rune(r), rune(s[i+1]))
-			i++
-		|:
-			// invalid surrogate sequence
-			a[n] = REPLACEMENT_CHAR
-		}
-		n++
-	}
-	ret a[:n]
+    let mut a = make([]rune, s.len)
+    let mut n = 0
+    let mut i = 0
+    for i < s.len; i++ {
+        let r = s[i]
+        match {
+        | r < SURR1 | SURR3 <= r:
+            // normal rune
+            a[n] = rune(r)
+        | (SURR1 <= r && r < SURR2 && i+1 < s.len &&
+            SURR2 <= s[i+1] && s[i+1] < SURR3):
+            // valid surrogate sequence
+            a[n] = decode_rune(rune(r), rune(s[i+1]))
+            i++
+        |:
+            // invalid surrogate sequence
+            a[n] = REPLACEMENT_CHAR
+        }
+        n++
+    }
+    ret a[:n]
 }
 
 // Appends the UTF-16 encoding of the Unicode code point r
 // to the end of p and returns the extended buffer. If the rune is not
 // a valid Unicode code point, it appends the encoding of U+FFFD.
 pub fn append_rune(mut a: []u16, r: rune): []u16 {
-	match {
-	| 0 <= r && r < SURR1 | SURR3 <= r && r < SURR_SELF:
-		// normal rune
-		ret append(a, u16(r))
-	| SURR_SELF <= r && r <= MAX_RUNE:
-		// needs surrogate sequence
-		let (r1, r2) = encode_rune(r)
-		ret append(a, u16(r1), u16(r2))
-	}
-	ret append(a, REPLACEMENT_CHAR)
+    match {
+    | 0 <= r && r < SURR1 | SURR3 <= r && r < SURR_SELF:
+        // normal rune
+        ret append(a, u16(r))
+    | SURR_SELF <= r && r <= MAX_RUNE:
+        // needs surrogate sequence
+        let (r1, r2) = encode_rune(r)
+        ret append(a, u16(r1), u16(r2))
+    }
+    ret append(a, REPLACEMENT_CHAR)
 }

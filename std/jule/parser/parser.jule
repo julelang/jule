@@ -4,47 +4,47 @@
 
 use std::fs::path::{join}
 use std::jule::ast::{
-	Ast,
-	Comment,
-	CommentGroup,
-	Directive,
-	Expr,
-	ScopeTree,
-	TypeDecl,
-	TypeAliasDecl,
-	VarDecl,
-	GenericDecl,
-	ParamDecl,
-	IdentTypeDecl,
-	RetTypeDecl,
-	TupleTypeDecl,
-	FnDecl,
-	UseDecl,
-	EnumItemDecl,
-	EnumDecl,
-	FieldDecl,
-	StructDecl,
-	TraitDecl,
-	NodeData,
-	Impl,
-	Node,
+    Ast,
+    Comment,
+    CommentGroup,
+    Directive,
+    Expr,
+    ScopeTree,
+    TypeDecl,
+    TypeAliasDecl,
+    VarDecl,
+    GenericDecl,
+    ParamDecl,
+    IdentTypeDecl,
+    RetTypeDecl,
+    TupleTypeDecl,
+    FnDecl,
+    UseDecl,
+    EnumItemDecl,
+    EnumDecl,
+    FieldDecl,
+    StructDecl,
+    TraitDecl,
+    NodeData,
+    Impl,
+    Node,
 }
 use std::jule::lex::{
-	File,
-	Token,
-	TokenId,
-	TokenKind,
-	Ident,
-	is_ignore_ident,
+    File,
+    Token,
+    TokenId,
+    TokenKind,
+    Ident,
+    is_ignore_ident,
 }
 use std::jule::build::{
-	DIRECTIVES,
-	DIRECTIVE_PREFIX,
-	Log,
-	LogKind,
-	errorf,
-	is_std_header_path,
-	is_top_directive,
+    DIRECTIVES,
+    DIRECTIVE_PREFIX,
+    Log,
+    LogKind,
+    errorf,
+    is_std_header_path,
+    is_top_directive,
 }
 use std::vector::{Vector}
 
@@ -53,13 +53,13 @@ use cpp "parser.hpp"
 cpp unsafe fn __jule_parser_vector_as_slice[Vec, T](vec: Vec): []T
 
 fn make_err(row: int, col: int, f: &File, key: str, args: ...any): Log {
-	ret Log{
-		kind:   LogKind.Error,
-		row:    row,
-		column: col,
-		path:   f.path(),
-		text:   errorf(key, args...),
-	}
+    ret Log{
+        kind:   LogKind.Error,
+        row:    row,
+        column: col,
+        path:   f.path(),
+        text:   errorf(key, args...),
+    }
 }
 
 // Returns between of open and close ranges.
@@ -72,29 +72,29 @@ fn make_err(row: int, col: int, f: &File, key: str, args: ...any): Log {
 //  range(i, open, close, tokens) = nil if tokens[i].id != TokenId.Range
 //  range(i, open, close, tokens) = nil if tokens[i].kind != open
 fn range(mut &i: int, open: TokenKind, close: TokenKind, mut tokens: []Token): []Token {
-	if i >= tokens.len {
-		ret nil
-	}
+    if i >= tokens.len {
+        ret nil
+    }
 
-	let tok = tokens[i]
-	if tok.id != TokenId.Range || tok.kind != str(open) {
-		ret nil
-	}
+    let tok = tokens[i]
+    if tok.id != TokenId.Range || tok.kind != str(open) {
+        ret nil
+    }
 
-	i++
-	let mut range_n = 1
-	let start = i
-	for range_n != 0 && i < tokens.len; i++ {
-		let token = tokens[i]
-		if token.id == TokenId.Range {
-			match token.kind {
-			| str(open): range_n++
-			| str(close): range_n--
-			}
-		}
-	}
+    i++
+    let mut range_n = 1
+    let start = i
+    for range_n != 0 && i < tokens.len; i++ {
+        let token = tokens[i]
+        if token.id == TokenId.Range {
+            match token.kind {
+            | str(open): range_n++
+            | str(close): range_n--
+            }
+        }
+    }
 
-	ret tokens[start : i-1]
+    ret tokens[start : i-1]
 }
 
 // Range_last returns last range from tokens.
@@ -105,35 +105,35 @@ fn range(mut &i: int, open: TokenKind, close: TokenKind, mut tokens: []Token): [
 //  range_last(tokens) = tokens, nil if tokens.len == 0
 //  range_last(tokens) = tokens, nil if tokens is not has range at last
 fn range_last(mut tokens: []Token): (cutted: []Token, cut: []Token) {
-	if tokens.len == 0 {
-		ret tokens, nil
-	} else if tokens[tokens.len-1].id != TokenId.Range {
-		ret tokens, nil
-	}
+    if tokens.len == 0 {
+        ret tokens, nil
+    } else if tokens[tokens.len-1].id != TokenId.Range {
+        ret tokens, nil
+    }
 
-	let mut brace_n = 0
-	let mut i = tokens.len - 1
-	for i >= 0; i-- {
-		let token = tokens[i]
-		if token.id == TokenId.Range {
-			match token.kind {
-			| str(TokenKind.RBrace)
-			| str(TokenKind.RBracket)
-			| str(TokenKind.RParent):
-				brace_n++
-				continue
+    let mut brace_n = 0
+    let mut i = tokens.len - 1
+    for i >= 0; i-- {
+        let token = tokens[i]
+        if token.id == TokenId.Range {
+            match token.kind {
+            | str(TokenKind.RBrace)
+            | str(TokenKind.RBracket)
+            | str(TokenKind.RParent):
+                brace_n++
+                continue
 
-			|:
-				brace_n--
-			}
-		}
+            |:
+                brace_n--
+            }
+        }
 
-		if brace_n == 0 {
-			ret tokens[:i], tokens[i:]
-		}
-	}
+        if brace_n == 0 {
+            ret tokens[:i], tokens[i:]
+        }
+    }
 
-	ret tokens, nil
+    ret tokens, nil
 }
 
 // Returns parts separated by given token identifier.
@@ -143,1844 +143,1844 @@ fn range_last(mut tokens: []Token): (cutted: []Token, cut: []Token) {
 // Special case is;
 //  parts(tokens) = nil if tokens.len == 0
 fn parts(mut tokens: []Token, id: TokenId, expr_must: bool): ([][]Token, []Log) {
-	if tokens.len == 0 {
-		ret nil, nil
-	}
+    if tokens.len == 0 {
+        ret nil, nil
+    }
 
-	let mut parts: [][]Token = nil
-	let mut errors: []Log = nil
+    let mut parts: [][]Token = nil
+    let mut errors: []Log = nil
 
-	let mut range_n = 0
-	let mut last = 0
-	for i, token in tokens {
-		if token.id == TokenId.Range {
-			match token.kind {
-			| str(TokenKind.LBrace)
-			| str(TokenKind.LBracket)
-			| str(TokenKind.LParent):
-				range_n++
-				continue
-			|:
-				range_n--
-			}
-		}
+    let mut range_n = 0
+    let mut last = 0
+    for i, token in tokens {
+        if token.id == TokenId.Range {
+            match token.kind {
+            | str(TokenKind.LBrace)
+            | str(TokenKind.LBracket)
+            | str(TokenKind.LParent):
+                range_n++
+                continue
+            |:
+                range_n--
+            }
+        }
 
-		if range_n > 0 {
-			continue
-		}
+        if range_n > 0 {
+            continue
+        }
 
-		if token.id == id {
-			if expr_must && i-last <= 0 {
-				let err = make_err(token.row, token.column, token.file, "missing_expr")
-				errors = append(errors, err)
-			}
-			parts = append(parts, tokens[last:i])
-			last = i + 1
-		}
-	}
+        if token.id == id {
+            if expr_must && i-last <= 0 {
+                let err = make_err(token.row, token.column, token.file, "missing_expr")
+                errors = append(errors, err)
+            }
+            parts = append(parts, tokens[last:i])
+            last = i + 1
+        }
+    }
 
-	if last < tokens.len {
-		parts = append(parts, tokens[last:])
-	} else if !expr_must {
-		parts = append(parts, [])
-	}
+    if last < tokens.len {
+        parts = append(parts, tokens[last:])
+    } else if !expr_must {
+        parts = append(parts, [])
+    }
 
-	ret parts, errors
+    ret parts, errors
 }
 
 fn get_close_kind_of_brace(left: str): str {
-	match left {
-		| str(TokenKind.RParent):  ret str(TokenKind.LParent)
-		| str(TokenKind.RBrace):   ret str(TokenKind.LBrace)
-		| str(TokenKind.RBracket): ret str(TokenKind.LBracket)
-		|:                         ret ""
-	}
+    match left {
+        | str(TokenKind.RParent):  ret str(TokenKind.LParent)
+        | str(TokenKind.RBrace):   ret str(TokenKind.LBrace)
+        | str(TokenKind.RBracket): ret str(TokenKind.LBracket)
+        |:                         ret ""
+    }
 }
 
 fn compiler_err(token: Token, key: str, args: ...any): Log {
-	ret Log{
-		kind:   LogKind.Error,
-		row:    token.row,
-		column: token.column,
-		path:   token.file.path(),
-		text:   errorf(key, args...),
-	}
+    ret Log{
+        kind:   LogKind.Error,
+        row:    token.row,
+        column: token.column,
+        path:   token.file.path(),
+        text:   errorf(key, args...),
+    }
 }
 
 fn build_comment(mut token: Token): &Comment {
-	// Remove slashes and trim spaces.
-	token.kind = token.kind[2:].trim(" \n\r\t\v")
-	ret &Comment{
-		token: token,
-		text:  token.kind,
-	}
+    // Remove slashes and trim spaces.
+    token.kind = token.kind[2:].trim(" \n\r\t\v")
+    ret &Comment{
+        token: token,
+        text:  token.kind,
+    }
 }
 
 fn tokstoa(tokens: []Token): str {
-	let mut s = ""
-	for _, token in tokens {
-		s += token.kind
-	}
-	ret s
+    let mut s = ""
+    for _, token in tokens {
+        s += token.kind
+    }
+    ret s
 }
 
 struct Parser {
-	ast:           &Ast
-	directives:    []&Directive
-	comment_group: &CommentGroup
-	errors:        []Log
+    ast:           &Ast
+    directives:    []&Directive
+    comment_group: &CommentGroup
+    errors:        []Log
 }
 
 impl Parser {
-	fn stop(mut self) { drop(self.ast) }
-	fn stopped(self): bool { ret !real(self.ast) }
-
-	// Appends error by specified token, key and args.
-	fn push_err(mut self, token: Token, key: str, args: ...any) {
-		self.errors = append(self.errors, compiler_err(token, key, args...))
-	}
-
-	fn build_expr(mut &self, mut tokens: []Token): &Expr {
-		let mut ep = &ExprBuilder{p: self}
-		let mut expr = ep.build_from_tokens(tokens)
-		ret expr
-	}
-
-	fn get_directive(self, c: &Comment): &Directive {
-		if c.text.len <= DIRECTIVE_PREFIX.len {
-			ret new(Directive)
-		}
-
-		let mut d = &Directive{
-			token: c.token,
-		}
-
-		let pragma = c.token.kind[DIRECTIVE_PREFIX.len:] // Remove directive prefix
-		let mut parts = pragma.split(" ", -1)
-
-		d.tag = parts[0]
-		d.args = parts[1:]
-
-		// Don't append if directive kind is invalid.
-		let mut ok = false
-		for _, kind in DIRECTIVES {
-			if d.tag == str(kind) {
-				ok = true
-				break
-			}
-		}
-		if !ok {
-			ret new(Directive)
-		}
-
-		ret d
-	}
-
-	fn push_directive(mut self, c: &Comment) {
-		let mut d = self.get_directive(c)
-		if !real(d) {
-			ret
-		}
-
-		// Don't append if already added this directive.
-		for _, pd in self.directives {
-			if d.tag == pd.tag {
-				ret
-			}
-		}
-
-		self.directives = append(self.directives, d)
-	}
-
-	fn process_comment(mut self, mut c: &Comment) {
-		if c.is_directive() {
-			self.push_directive(c)
-			ret
-		}
-		if !real(self.comment_group) {
-			self.comment_group = &CommentGroup{}
-		}
-		self.comment_group.comments = append(self.comment_group.comments, c)
-	}
-
-	fn build_scope(mut &self, mut tokens: []Token): &ScopeTree {
-		let mut s = new_scope()
-		let mut sp = ScopeParser{
-			p: self,
-		}
-		sp.build(tokens, s)
-		ret s
-	}
-
-	unsafe fn __build_type(mut &self, mut tokens: []Token,
-		mut i: *int, err: bool): (&TypeDecl, bool) {
-		let mut tb = TypeBuilder{
-			p:      self,
-			tokens: tokens,
-			i:      i,
-			err:    err,
-		}
-		let (mut decl, ok) = tb.build()
-		ret decl, ok
-	}
-
-	// build_type builds AST model of data-type.
-	unsafe fn build_type(mut &self, mut tokens: []Token,
-		mut i: *int, err: bool): (&TypeDecl, bool) {
-		let token = tokens[*i]
-		let (mut t, ok) = self.__build_type(tokens, i, err)
-		if err && !ok {
-			self.push_err(token, "invalid_type")
-		}
-		ret t, ok
-	}
-
-	fn build_type_alias_decl(mut &self, mut tokens: []Token): &TypeAliasDecl {
-		let mut i = 1 // Skip "type" keyword.
-		if i >= tokens.len {
-			self.push_err(tokens[i-1], "invalid_syntax")
-			ret new(TypeAliasDecl)
-		}
-		let mut tad = &TypeAliasDecl{
-			token: tokens[1],
-			ident: tokens[1].kind,
-		}
-		let mut token = tokens[i]
-		if token.id != TokenId.Ident {
-			self.push_err(token, "invalid_syntax")
-		}
-		i++
-		if i >= tokens.len {
-			self.push_err(tokens[i-1], "invalid_syntax")
-			ret tad
-		}
-		token = tokens[i]
-		if token.id != TokenId.Colon {
-			self.push_err(tokens[i-1], "invalid_syntax")
-			ret tad
-		}
-		i++
-		if i >= tokens.len {
-			self.push_err(tokens[i-1], "missing_type")
-			ret tad
-		}
-		let (mut t, ok) = unsafe { self.build_type(tokens, &i, true) }
-		tad.kind = t
-		if ok && i < tokens.len {
-			self.push_err(tokens[i], "invalid_syntax")
-		}
-		ret tad
-	}
-
-	fn build_var_type_and_expr(mut &self, mut v: &VarDecl, mut tokens: []Token) {
-		let mut i = 0
-		let mut tok = tokens[i]
-		if tok.id == TokenId.Colon {
-			i++ // Skip type annotation operator (:)
-			if (i >= tokens.len ||
-			(tokens[i].id == TokenId.Op && tokens[i].kind == str(TokenKind.Eq))) {
-				self.push_err(tok, "missing_type")
-				ret
-			}
-			let (mut t, ok) = unsafe { self.build_type(tokens, &i, true) }
-			if ok {
-				v.kind = t
-				if i >= tokens.len {
-					ret
-				}
-				tok = tokens[i]
-			}
-		}
-
-		if tok.id == TokenId.Op {
-			if tok.kind != str(TokenKind.Eq) {
-				self.push_err(tok, "invalid_syntax")
-				ret
-			}
-			let mut expr_tokens = tokens[i+1:]
-			if expr_tokens.len == 0 {
-				self.push_err(tok, "missing_expr")
-				ret
-			}
-			v.expr = self.build_expr(expr_tokens)
-		} else {
-			self.push_err(tok, "invalid_syntax")
-		}
-	}
-
-	fn build_var_common(mut &self, mut v: &VarDecl, mut tokens: []Token) {
-		v.token = tokens[0]
-		if v.token.id != TokenId.Ident {
-			self.push_err(v.token, "invalid_syntax")
-			ret
-		}
-		v.ident = v.token.kind
-		drop(v.kind) // For auto-type.
-		if tokens.len > 1 {
-			tokens = tokens[1:] // Remove identifier.
-			self.build_var_type_and_expr(v, tokens)
-		}
-	}
-
-	fn build_var_begin(mut self, mut v: &VarDecl, mut i: &int, tokens: []Token) {
-		let tok = tokens[i]
-		match tok.id {
-		| TokenId.Static:
-			v.statically = true
-			fall
-
-		| TokenId.Let:
-			// Initialize 1 for skip the let keyword
-			i++
-			if i >= tokens.len {
-				self.push_err(tok, "invalid_syntax")
-				ret
-			}
-			if tokens[i].id == TokenId.Mut {
-				v.mutable = true
-				// Skip the mut keyword
-				i++
-			}
-
-		| TokenId.Const:
-			i++
-			if v.constant {
-				self.push_err(tok, "already_const")
-				break
-			}
-			v.constant = true
-			if !v.mutable {
-				break
-			}
-			fall
-
-		|:
-			self.push_err(tok, "invalid_syntax")
-			ret
-		}
-
-		if i >= tokens.len {
-			self.push_err(tok, "invalid_syntax")
-		}
-	}
-
-	fn build_var(mut &self, mut tokens: []Token): &VarDecl {
-		let mut i = new(int, 0)
-		let mut v = &VarDecl{
-			token: tokens[i],
-		}
-		self.build_var_begin(v, i, tokens)
-		if i >= tokens.len {
-			ret new(VarDecl)
-		}
-
-		tokens = tokens[i:]
-		if tokens[0].id == TokenId.Op && tokens[0].kind == str(TokenKind.Amper) {
-			v.reference = true
-			if tokens.len == 1 {
-				ret new(VarDecl)
-			}
-			tokens = tokens[1:]
-		}
-		self.build_var_common(v, tokens)
-		ret v
-	}
-
-	fn build_generic(mut self, mut tokens: []Token): &GenericDecl {
-		if tokens.len > 1 {
-			self.push_err(tokens[1], "invalid_syntax")
-		}
-		let mut g = &GenericDecl{
-			token: tokens[0],
-		}
-		if g.token.id != TokenId.Ident {
-			self.push_err(g.token, "invalid_syntax")
-		}
-		g.ident = g.token.kind
-		ret g
-	}
-
-	fn build_generics(mut self, mut tokens: []Token, error_token: Token): []&GenericDecl {
-		if tokens.len == 0 {
-			self.push_err(error_token, "missing_expr")
-			ret nil
-		}
-
-		let (mut parts, errors) = parts(tokens, TokenId.Comma, true)
-		self.errors = append(self.errors, errors...)
-
-		let mut generics = make([]&GenericDecl, parts.len)
-		for (i, mut part) in parts {
-			if parts.len > 0 {
-				generics[i] = self.build_generic(part)
-			}
-		}
-
-		ret generics
-	}
-
-	fn build_self_param(mut self, mut tokens: []Token): &ParamDecl {
-		if tokens.len == 0 {
-			ret new(ParamDecl)
-		}
-
-		let mut param = &ParamDecl{}
-
-		// Detects mut keyword.
-		let mut i = 0
-		if tokens[i].id == TokenId.Mut {
-			param.mutable = true
-			i++
-			if i >= tokens.len {
-				self.push_err(tokens[i-1], "invalid_syntax")
-				ret new(ParamDecl)
-			}
-		}
-
-		if tokens[i].kind == str(TokenKind.Amper) {
-			param.ident = str(TokenKind.Amper)
-			i++
-			if i >= tokens.len {
-				self.push_err(tokens[i-1], "invalid_syntax")
-				ret new(ParamDecl)
-			}
-		}
-
-		if tokens[i].id == TokenId.Self {
-			param.ident += str(TokenKind.Self)
-			param.token = tokens[i]
-			i++
-			if i < tokens.len {
-				self.push_err(tokens[i], "invalid_syntax")
-			}
-		}
-
-		ret param
-	}
-
-	fn param_type_begin(mut self, mut param: &ParamDecl, mut &i: int, tokens: []Token) {
-		for i < tokens.len; i++ {
-			let token = tokens[i]
-			if token.id != TokenId.Op {
-				ret
-			} else if token.kind != str(TokenKind.TripleDot) {
-				ret
-			}
-
-			if param.variadic {
-				self.push_err(token, "already_variadic")
-				continue
-			}
-			param.variadic = true
-		}
-	}
-
-	fn build_param_type(mut &self, mut param: &ParamDecl, mut tokens: []Token, must_pure: bool) {
-		let mut i = 0
-		if !must_pure {
-			self.param_type_begin(param, i, tokens)
-			if i >= tokens.len {
-				ret
-			}
-		}
-		param.kind, _ = unsafe { self.build_type(tokens, &i, true) }
-		if i < tokens.len {
-			self.push_err(tokens[i], "invalid_syntax")
-		}
-	}
-
-	fn param_body_id(self, mut param: &ParamDecl, token: Token) {
-		if is_ignore_ident(token.kind) {
-			param.ident = str(Ident.Anon)
-			ret
-		}
-		param.ident = token.kind
-	}
-
-	fn build_param_body(mut &self, mut param: &ParamDecl, mut i: &int, mut tokens: []Token, must_pure: bool) {
-		self.param_body_id(param, tokens[i])
-		let mut tok = tokens[i]
-		// +1 for skip identifier token
-		if i+1 >= tokens.len {
-			ret
-		} else if tokens.len-i-1 < 2 {
-			self.push_err(tok, "missing_type")
-			ret
-		}
-
-		tok = tokens[i+1]
-		if tok.id != TokenId.Colon {
-			self.build_param_type(param, tokens, must_pure)
-			ret
-		}
-
-		tokens = tokens[i+2:] // Skip colon
-		self.build_param_type(param, tokens, must_pure)
-	}
-
-	fn build_param(mut &self, mut tokens: []Token, must_pure: bool): &ParamDecl {
-		let mut param = &ParamDecl{
-			token: tokens[0],
-		}
-
-		// Detects mut keyword.
-		if param.token.id == TokenId.Mut {
-			param.mutable = true
-			if tokens.len == 1 {
-				self.push_err(tokens[0], "invalid_syntax")
-				ret new(ParamDecl)
-			}
-			tokens = tokens[1:]
-			param.token = tokens[0]
-		}
-
-		// Catch reference parameters.
-		if tokens.len >= 3 {
-			if param.token.id == TokenId.Op && param.token.kind == str(TokenKind.Amper) {
-				if tokens.len == 1 {
-					self.push_err(tokens[0], "invalid_syntax")
-					ret new(ParamDecl)
-				}
-
-				if tokens[1].id == TokenId.Ident && tokens[2].id == TokenId.Colon {
-					param.reference = true
-					tokens = tokens[1:]
-					param.token = tokens[0]
-				}
-			}
-		}
-
-		if param.token.id != TokenId.Ident {
-			// Just data type
-			param.ident = str(Ident.Anon)
-			self.build_param_type(param, tokens, must_pure)
-		} else {
-			let mut i = new(int, 0)
-			self.build_param_body(param, i, tokens, must_pure)
-		}
-
-		ret param
-	}
-
-	fn check_params(mut self, mut params: []&ParamDecl) {
-		for (_, mut param) in params {
-			if param.is_self() || real(param.kind) {
-				continue
-			}
-			if param.token.id == TokenId.Na {
-				self.push_err(param.token, "missing_type")
-			} else {
-				param.kind = &TypeDecl{
-					token: param.token,
-					kind:  &IdentTypeDecl{
-						token: param.token,
-						ident: param.token.kind,
-					},
-				}
-				param.ident = str(Ident.Anon)
-				param.token = Token{}
-			}
-		}
-	}
-
-	fn build_params(mut &self, mut tokens: []Token, method: bool, must_pure: bool): []&ParamDecl {
-		let (mut parts, errs) = parts(tokens, TokenId.Comma, true)
-		self.errors = append(self.errors, errs...)
-		if parts.len == 0 {
-			ret nil
-		}
-
-		let mut params: []&ParamDecl = nil
-		if method && parts.len > 0 {
-			let mut param = self.build_self_param(parts[0])
-			if real(param) && param.is_self() {
-				params = append(params, param)
-				parts = parts[1:]
-			}
-		}
-
-		for (_, mut part) in parts {
-			let mut param = self.build_param(part, must_pure)
-			if real(param) {
-				params = append(params, param)
-			}
-		}
-
-		self.check_params(params)
-		ret params
-	}
-
-	fn build_multi_ret_type(mut &self, mut tokens: []Token, mut &i: int): (t: &RetTypeDecl, ok: bool) {
-		t = &RetTypeDecl{}
-		i++
-		if i >= tokens.len {
-			i--
-			t.kind, ok = unsafe { self.build_type(tokens, &i, false) }
-			ret
-		}
-
-		i-- // For point to parentheses - ( -
-		let mut range_tokens = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
-		let mut params = self.build_params(range_tokens, false, true)
-
-		let mut types = make([]&TypeDecl, params.len)
-		for (i, mut param) in params {
-			types[i] = param.kind
-			if param.ident != str(Ident.Anon) {
-				param.token.kind = param.ident
-			} else {
-				param.token.kind = str(Ident.Ignore)
-			}
-			t.idents = append(t.idents, param.token)
-		}
-
-		if types.len > 1 {
-			t.kind = &TypeDecl{
-				token: tokens[0],
-				kind:  &TupleTypeDecl{
-					types: types,
-				},
-			}
-		} else {
-			t.kind = types[0]
-		}
-
-		ok = true
-		ret
-	}
-
-	// Builds function return type from tokens.
-	fn build_ret_type(mut &self, mut tokens: []Token, mut &i: int): (t: &RetTypeDecl, ok: bool) {
-		t = &RetTypeDecl{}
-		if i >= tokens.len {
-			ret
-		}
-
-		let mut token = tokens[i]
-		match token.id {
-		| TokenId.Range:
-			if token.kind == str(TokenKind.LBrace) {
-				ret
-			}
-
-		| TokenId.Op:
-			if token.kind == str(TokenKind.Eq) {
-				ret
-			}
-
-		| TokenId.Colon:
-			if i+1 >= tokens.len {
-				self.push_err(token, "missing_type")
-				ret
-			}
-
-			i++
-			token = tokens[i]
-			if token.id == TokenId.Range {
-				match token.kind {
-				| str(TokenKind.LParent):
-					let (mut decl, ok) = self.build_multi_ret_type(tokens, i)
-					ret decl, ok
-
-				| str(TokenKind.LBrace):
-					self.push_err(token, "missing_type")
-					ret
-				}
-			}
-			t.kind, ok = unsafe { self.build_type(tokens, &i, true) }
-			ret
-		}
-		i++
-		self.push_err(token, "invalid_syntax")
-		ret
-	}
-
-	// Build function prototype.
-	// Body is not necessary for successfull parsing.
-	// Just declration.
-	fn build_fn_prototype(mut &self, mut tokens: []Token, mut &i: int, method: bool, anon: bool): &FnDecl {
-		let mut f = &FnDecl{
-			token: tokens[i],
-		}
-
-		// Detect static keyword.
-		if f.token.id == TokenId.Static {
-			f.statically = true
-			i++
-			if i >= tokens.len {
-				self.push_err(f.token, "invalid_syntax")
-				ret new(FnDecl)
-			}
-			f.token = tokens[i]
-		}
-
-		// Detect unsafe keyword.
-		if f.token.id == TokenId.Unsafe {
-			f.unsafety = true
-			i++
-			if i >= tokens.len {
-				self.push_err(f.token, "invalid_syntax")
-				ret new(FnDecl)
-			}
-			f.token = tokens[i]
-		}
-
-		// Skips fn token.
-		i++
-		if i >= tokens.len {
-			self.push_err(f.token, "invalid_syntax")
-			ret new(FnDecl)
-		}
-
-		if anon {
-			f.ident = str(Ident.Anon)
-		} else {
-			let tok = tokens[i]
-			if tok.id != TokenId.Ident {
-				self.push_err(tok, "invalid_syntax")
-				ret new(FnDecl)
-			}
-			f.ident = tok.kind
-			i++
-		}
-
-		if i >= tokens.len {
-			self.push_err(f.token, "invalid_syntax")
-			ret new(FnDecl)
-		}
-
-		let error_token = tokens[i]
-		let mut generics_tokens = range(i, TokenKind.LBracket, TokenKind.RBracket, tokens)
-		if generics_tokens != nil {
-			f.generics = self.build_generics(generics_tokens, error_token)
-		}
-
-		if tokens[i].kind != str(TokenKind.LParent) {
-			self.push_err(tokens[i], "missing_function_parentheses")
-			ret new(FnDecl)
-		}
-
-		let mut params_toks = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
-		if params_toks.len > 0 {
-			f.params = self.build_params(params_toks, method, false)
-		}
-
-		f.result, _ = self.build_ret_type(tokens, i)
-		ret f
-	}
-
-	// Parses function define.
-	// Prototype and body.
-	fn build_fn(mut &self, mut tokens: []Token, method: bool, anon: bool, prototype: bool): &FnDecl {
-		let mut i = 0
-		let mut f = self.build_fn_prototype(tokens, i, method, anon)
-		if prototype {
-			if i < tokens.len {
-				self.push_err(tokens[i+1], "invalid_syntax")
-			}
-			ret f
-		} else if !real(f) {
-			ret f
-		}
-
-		if i >= tokens.len {
-			self.stop()
-			self.push_err(f.token, "body_not_exist")
-			ret new(FnDecl)
-		}
-		let mut block_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
-		if block_tokens != nil {
-			f.scope = self.build_scope(block_tokens)
-			f.scope.unsafety = f.unsafety
-			if i < tokens.len {
-				self.push_err(tokens[i], "invalid_syntax")
-			}
-		} else {
-			self.stop()
-			self.push_err(f.token, "body_not_exist")
-			ret new(FnDecl)
-		}
-		ret f
-	}
-
-	fn get_use_decl_selectors(mut self, mut tokens: []Token): []Token {
-		let mut i = 0
-		tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
-		let (mut parts, errs) = parts(tokens, TokenId.Comma, true)
-		if errs.len > 0 {
-			self.errors = append(self.errors, errs...)
-			ret nil
-		}
-
-		let mut selectors = make([]Token, parts.len)
-		for (i, mut part) in parts {
-			if part.len > 1 {
-				self.push_err(part[1], "invalid_syntax")
-			}
-			let mut tok = part[0]
-			if tok.id != TokenId.Ident && tok.id != TokenId.Self {
-				self.push_err(tok, "invalid_syntax")
-				continue
-			}
-			selectors[i] = tok
-		}
-		ret selectors
-	}
-
-	fn build_cpp_use_decl(mut self, mut decl: &UseDecl, tokens: []Token) {
-		if tokens.len > 2 {
-			self.push_err(tokens[2], "invalid_syntax")
-		}
-		let token = tokens[1]
-		if token.id != TokenId.Lit || (token.kind[0] != '`' && token.kind[0] != '"') {
-			self.push_err(token, "invalid_expr")
-			ret
-		}
-		decl.cpp_linked = true
-		decl.link_path = token.kind[1 : token.kind.len-1]
-		if !is_std_header_path(decl.link_path) {
-			decl.link_path = join(token.file.dir(), decl.link_path)
-		}
-	}
-
-	fn build_std_use_decl(mut self, mut decl: &UseDecl, mut tokens: []Token) {
-		decl.std = true
-
-		let mut token = tokens[0]
-		if tokens.len < 3 {
-			self.push_err(token, "invalid_syntax")
-			ret
-		}
-
-		tokens = tokens[2:]
-		token = tokens[tokens.len-1]
-		match token.id {
-		| TokenId.DblColon:
-			self.push_err(token, "invalid_syntax")
-			ret
-
-		| TokenId.Range:
-			if token.kind != str(TokenKind.RBrace) {
-				self.push_err(token, "invalid_syntax")
-				ret
-			}
-			let mut selectors: []Token = nil
-			tokens, selectors = range_last(tokens)
-			decl.selected = self.get_use_decl_selectors(selectors)
-			if tokens.len == 0 {
-				self.push_err(token, "invalid_syntax")
-				ret
-			}
-			token = tokens[tokens.len-1]
-			if token.id != TokenId.DblColon {
-				self.push_err(token, "invalid_syntax")
-				ret
-			}
-			tokens = tokens[:tokens.len-1]
-			if tokens.len == 0 {
-				self.push_err(token, "invalid_syntax")
-				ret
-			}
-
-		| TokenId.Op:
-			if token.kind != str(TokenKind.Star) {
-				self.push_err(token, "invalid_syntax")
-				ret
-			}
-			tokens = tokens[:tokens.len-1]
-			if tokens.len == 0 {
-				self.push_err(token, "invalid_syntax")
-				ret
-			}
-			token = tokens[tokens.len-1]
-			if token.id != TokenId.DblColon {
-				self.push_err(token, "invalid_syntax")
-				ret
-			}
-			tokens = tokens[:tokens.len-1]
-			if tokens.len == 0 {
-				self.push_err(token, "invalid_syntax")
-				ret
-			}
-			decl.full = true
-		}
-		decl.link_path = "std::" + tokstoa(tokens)
-	}
-
-	fn build_ident_use_decl(mut self, mut decl: &UseDecl, mut tokens: []Token) {
-		decl.std = false
-
-		let mut token = tokens[tokens.len-1]
-		match token.id {
-		| TokenId.DblColon:
-			self.push_err(token, "invalid_syntax")
-			ret
-
-		| TokenId.Range:
-			if token.kind != str(TokenKind.RBrace) {
-				self.push_err(token, "invalid_syntax")
-				ret
-			}
-
-			let mut selectors: []Token = nil
-			tokens, selectors = range_last(tokens)
-			decl.selected = self.get_use_decl_selectors(selectors)
-			if tokens.len == 0 {
-				self.push_err(token, "invalid_syntax")
-				ret
-			}
-
-			token = tokens[tokens.len-1]
-			if token.id != TokenId.DblColon {
-				self.push_err(token, "invalid_syntax")
-				ret
-			}
-
-			tokens = tokens[:tokens.len-1]
-			if tokens.len == 0 {
-				self.push_err(token, "invalid_syntax")
-				ret
-			}
-
-		| TokenId.Op:
-			if token.kind != str(TokenKind.Star) {
-				self.push_err(token, "invalid_syntax")
-				ret
-			}
-
-			tokens = tokens[:tokens.len-1]
-			if tokens.len == 0 {
-				self.push_err(token, "invalid_syntax")
-				ret
-			}
-
-			token = tokens[tokens.len-1]
-			if token.id != TokenId.DblColon {
-				self.push_err(token, "invalid_syntax")
-				ret
-			}
-
-			tokens = tokens[:tokens.len-1]
-			if tokens.len == 0 {
-				self.push_err(token, "invalid_syntax")
-				ret
-			}
-
-			decl.full = true
-		}
-
-		decl.link_path = tokstoa(tokens)
-	}
-
-	fn parse_use_decl(mut self, mut decl: &UseDecl, mut tokens: []Token) {
-		let token = tokens[0]
-		if token.id == TokenId.Cpp {
-			self.build_cpp_use_decl(decl, tokens)
-			ret
-		}
-
-		if token.id != TokenId.Ident {
-			self.push_err(token, "invalid_syntax")
-			ret
-		}
-
-		const STD_LIB_PREFIX = "std"
-
-		match {
-		| token.kind == STD_LIB_PREFIX:
-			self.build_std_use_decl(decl, tokens)
-
-		|:
-			self.build_ident_use_decl(decl, tokens)
-		}
-	}
-
-	fn build_use_decl(mut self, mut tokens: []Token): &UseDecl {
-		let mut decl = &UseDecl{
-			token: tokens[0],
-		}
-		if tokens.len < 2 {
-			self.push_err(decl.token, "missing_use_path")
-			ret new(UseDecl)
-		}
-		tokens = tokens[1:] // Skip "use" keyword.
-		self.parse_use_decl(decl, tokens)
-		ret decl
-	}
-
-	fn build_enum_item_expr(mut &self, mut i: &int, mut tokens: []Token): &Expr {
-		let mut brace_n = 0
-		let expr_start: int = i
-		for i < tokens.len; i++ {
-			let t = tokens[i]
-			if t.id == TokenId.Range {
-				match t.kind {
-				| str(TokenKind.LBrace)
-				| str(TokenKind.LBracket)
-				| str(TokenKind.LParent):
-					brace_n++
-					continue
-
-				|:
-					brace_n--
-				}
-			}
-
-			if brace_n > 0 {
-				continue
-			}
-
-			if t.id == TokenId.Comma || i+1 >= tokens.len {
-				let mut expr_tokens: []Token = nil
-				if t.id == TokenId.Comma {
-					expr_tokens = tokens[expr_start:i]
-				} else {
-					expr_tokens = tokens[expr_start:]
-				}
-				ret self.build_expr(expr_tokens)
-			}
-		}
-		ret new(Expr)
-	}
-
-	fn build_enum_items(mut &self, mut tokens: []Token): []&EnumItemDecl {
-		let mut items = make([]&EnumItemDecl, 0)
-		let mut i = new(int, 0)
-		for i < tokens.len; i++ {
-			let mut t = tokens[i]
-			if t.id == TokenId.Comment {
-				continue
-			}
-
-			let mut item = &EnumItemDecl{}
-			item.token = t
-			if item.token.id != TokenId.Ident {
-				self.push_err(item.token, "invalid_syntax")
-			}
-			item.ident = item.token.kind
-			if i+1 >= tokens.len || tokens[i+1].id == TokenId.Comma {
-				if i+1 < tokens.len {
-					i++
-				}
-				items = append(items, item)
-				continue
-			}
-			i++
-			t = tokens[i]
-			if t.id != TokenId.Op && t.kind != str(TokenKind.Eq) {
-				self.push_err(tokens[0], "invalid_syntax")
-			}
-			i++
-			if i >= tokens.len || tokens[i].id == TokenId.Comma {
-				self.push_err(tokens[0], "missing_expr")
-				continue
-			}
-			item.expr = self.build_enum_item_expr(i, tokens)
-			items = append(items, item)
-		}
-		ret items
-	}
-
-	fn build_enum_decl(mut &self, mut tokens: []Token): &EnumDecl {
-		if tokens.len < 2 || tokens.len < 3 {
-			self.push_err(tokens[0], "invalid_syntax")
-			ret new(EnumDecl)
-		}
-		let mut e = &EnumDecl{
-			token: tokens[1],
-		}
-		if e.token.id != TokenId.Ident {
-			self.push_err(e.token, "invalid_syntax")
-		}
-		e.ident = e.token.kind
-		let mut i = 2
-		if tokens[i].id == TokenId.Colon {
-			i++
-			if i >= tokens.len {
-				self.push_err(tokens[i-1], "invalid_syntax")
-				ret e
-			}
-			e.kind, _ = unsafe { self.build_type(tokens, &i, true) }
-			if i >= tokens.len {
-				self.stop()
-				self.push_err(e.token, "body_not_exist")
-				ret e
-			}
-		} else {
-			drop(e.kind)
-		}
-		let mut item_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
-		if item_tokens == nil {
-			self.stop()
-			self.push_err(e.token, "body_not_exist")
-			ret e
-		} else if i < tokens.len {
-			self.push_err(tokens[i], "invalid_syntax")
-		}
-		e.items = self.build_enum_items(item_tokens)
-		ret e
-	}
-
-	fn build_field(mut &self, mut tokens: []Token): &FieldDecl {
-		let mut f = &FieldDecl{}
-
-		f.public = tokens[0].id == TokenId.Pub
-		if f.public {
-			if tokens.len == 1 {
-				self.push_err(tokens[0], "invalid_syntax")
-				ret new(FieldDecl)
-			}
-			tokens = tokens[1:]
-		}
-
-		f.mutable = tokens[0].id == TokenId.Mut
-		if f.mutable {
-			if tokens.len == 1 {
-				self.push_err(tokens[0], "invalid_syntax")
-				ret new(FieldDecl)
-			}
-			tokens = tokens[1:]
-		}
-
-		f.token = tokens[0]
-		if f.token.id != TokenId.Ident {
-			self.push_err(f.token, "invalid_syntax")
-			ret new(FieldDecl)
-		}
-		f.ident = f.token.kind
-
-		if tokens.len == 1 {
-			self.push_err(tokens[0], "missing_type")
-			ret new(FieldDecl)
-		} else if tokens[1].id != TokenId.Colon {
-			self.push_err(tokens[1], "missing_type")
-			ret new(FieldDecl)
-		}
-
-		tokens = tokens[2:] // Remove identifier and colon tokens.
-		let mut i = 0
-		f.kind, _ = unsafe { self.build_type(tokens, &i, true) }
-		if i < tokens.len {
-			self.push_err(tokens[i], "invalid_syntax")
-			ret new(FieldDecl)
-		}
-
-		ret f
-	}
-
-	fn build_struct_decl_fields(mut &self, mut tokens: []Token): []&FieldDecl {
-		let mut fields: []&FieldDecl = nil
-		let mut stms = split_stms(tokens)
-		for (_, mut st) in stms {
-			let mut tokens = st.tokens
-			if tokens[0].id == TokenId.Comment {
-				continue
-			}
-			let mut f = self.build_field(tokens)
-			fields = append(fields, f)
-		}
-		ret fields
-	}
-
-	fn build_struct_decl(mut &self, mut tokens: []Token): &StructDecl {
-		if tokens.len < 3 {
-			self.push_err(tokens[0], "invalid_syntax")
-			ret new(StructDecl)
-		}
-
-		let mut i = 1
-		let mut s = &StructDecl{
-			token: tokens[i],
-		}
-		if s.token.id != TokenId.Ident {
-			self.push_err(s.token, "invalid_syntax")
-		}
-		i++
-		if i >= tokens.len {
-			self.push_err(tokens[i], "invalid_syntax")
-			ret s
-		}
-		s.ident = s.token.kind
-
-		let error_token = tokens[i]
-		let mut generics_tokens = range(i, TokenKind.LBracket, TokenKind.RBracket, tokens)
-		if generics_tokens != nil {
-			s.generics = self.build_generics(generics_tokens, error_token)
-		}
-		if i >= tokens.len {
-			self.push_err(tokens[i], "invalid_syntax")
-			ret s
-		}
-
-		let mut body_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
-		if body_tokens == nil {
-			self.stop()
-			self.push_err(s.token, "body_not_exist")
-			ret s
-		}
-		if i < tokens.len {
-			self.push_err(tokens[i], "invalid_syntax")
-		}
-		s.fields = self.build_struct_decl_fields(body_tokens)
-		ret s
-	}
-
-	fn check_method_receiver(mut self, f: &FnDecl) {
-		// Static methods cannot have receiver.
-		if f.statically {
-			if f.params.len > 0 && f.params[0].is_self() {
-				self.push_err(f.token, "static_function_has_receiver")
-			}
-			ret
-		}
-
-		if f.params.len == 0 {
-			self.push_err(f.token, "missing_receiver")
-			ret
-		}
-		let param = f.params[0]
-		if !param.is_self() {
-			self.push_err(f.token, "missing_receiver")
-			ret
-		}
-	}
-
-	fn build_trait_methods(mut &self, mut tokens: []Token): []&FnDecl {
-		let mut methods: []&FnDecl = nil
-		let mut stms = split_stms(tokens)
-		for (_, mut st) in stms {
-			let mut tokens = eliminate_comments(st.tokens)
-			if tokens.len == 0 {
-				continue
-			}
-
-			let mut f = self.build_fn(tokens, true, false, true)
-			if real(f) {
-				self.check_method_receiver(f)
-				if f.generics.len > 0 {
-					self.push_err(f.token, "trait_method_has_generics")
-				}
-				f.public = true
-				methods = append(methods, f)
-			}
-		}
-		ret methods
-	}
-
-	fn build_trait_decl(mut &self, mut tokens: []Token): &TraitDecl {
-		if tokens.len < 3 {
-			self.push_err(tokens[0], "invalid_syntax")
-			ret new(TraitDecl)
-		}
-		let mut t = &TraitDecl{
-			token: tokens[1],
-		}
-		if t.token.id != TokenId.Ident {
-			self.push_err(t.token, "invalid_syntax")
-		}
-		t.ident = t.token.kind
-		let mut i = 2
-		let mut body_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
-		if body_tokens == nil {
-			self.stop()
-			self.push_err(t.token, "body_not_exist")
-			ret new(TraitDecl)
-		}
-		if i < tokens.len {
-			self.push_err(tokens[i], "invalid_syntax")
-		}
-		t.methods = self.build_trait_methods(body_tokens)
-		ret t
-	}
-
-	fn build_cpp_link_fn(mut &self, mut tokens: []Token): &FnDecl {
-		tokens = tokens[1:] // Remove "cpp" keyword.
-		let mut f = self.build_fn(tokens, false, false, true)
-		if real(f) {
-			f.cpp_linked = true
-		}
-		ret f
-	}
-
-	fn build_cpp_link_var(mut &self, mut tokens: []Token): &VarDecl {
-		tokens = tokens[1:] // Remove "cpp" keyword.
-		let mut v = self.build_var(tokens)
-		if real(v) {
-			v.cpp_linked = true
-			if real(v.expr) {
-				self.push_err(v.token, "cpp_linked_variable_has_expr")
-			}
-		}
-		ret v
-	}
-
-	fn build_cpp_link_struct(mut &self, mut tokens: []Token): &StructDecl {
-		tokens = tokens[1:] // Remove "cpp" keyword.
-		let mut s = self.build_struct_decl(tokens)
-		if real(s) {
-			s.cpp_linked = true
-		}
-		ret s
-	}
-
-	fn build_cpp_link_type_alias(mut &self, mut tokens: []Token): &TypeAliasDecl {
-		tokens = tokens[1:] // Remove "cpp" keyword.
-		let mut t = self.build_type_alias_decl(tokens)
-		if real(t) {
-			t.cpp_linked = true
-		}
-		ret t
-	}
-
-	fn build_cpp_link(mut &self, mut tokens: []Token): NodeData {
-		let mut token = tokens[0]
-		if tokens.len == 1 {
-			self.push_err(token, "invalid_syntax")
-			ret nil
-		}
-		token = tokens[1]
-		match token.id {
-		| TokenId.Fn
-		| TokenId.Unsafe:
-			ret self.build_cpp_link_fn(tokens)
-
-		| TokenId.Const
-		| TokenId.Let:
-			ret self.build_cpp_link_var(tokens)
-
-		| TokenId.Struct:
-			ret self.build_cpp_link_struct(tokens)
-
-		| TokenId.Type:
-			ret self.build_cpp_link_type_alias(tokens)
-
-		|:
-			self.push_err(token, "invalid_syntax")
-		}
-		ret nil
-	}
-
-	fn get_method(mut &self, mut tokens: []Token): &FnDecl {
-		let mut i = 0
-		let mut token = tokens[i]
-		if token.id == TokenId.Static {
-			if i+1 >= tokens.len {
-				self.push_err(token, "invalid_syntax")
-				ret new(FnDecl)
-			}
-			i++
-			token = tokens[i]
-		}
-
-		if token.id == TokenId.Unsafe {
-			if i+1 >= tokens.len {
-				self.push_err(token, "invalid_syntax")
-				ret new(FnDecl)
-			}
-			i++
-			token = tokens[i]
-		}
-
-		if token.id != TokenId.Fn {
-			self.push_err(token, "invalid_syntax")
-			ret new(FnDecl)
-		}
-
-		ret self.build_fn(tokens, true, false, false)
-	}
-
-	fn parse_impl_trait(mut &self, mut ipl: &Impl, mut tokens: []Token) {
-		let mut stms = split_stms(tokens)
-		for (_, mut st) in stms {
-			let mut tokens = st.tokens
-			let token = tokens[0]
-			match token.id {
-			| TokenId.Comment:
-				// Ignore.
-				continue
-
-			| TokenId.Static
-			| TokenId.Fn
-			| TokenId.Unsafe:
-				let mut f = self.get_method(tokens)
-				if real(f) {
-					f.public = true
-					self.check_method_receiver(f)
-					ipl.methods = append(ipl.methods, f)
-				}
-
-			|:
-				self.push_err(token, "invalid_syntax")
-				continue
-			}
-		}
-	}
-
-	fn parse_impl_struct(mut &self, mut ipl: &Impl, mut tokens: []Token) {
-		let mut stms = split_stms(tokens)
-		for (_, mut st) in stms {
-			let mut tokens = st.tokens
-			let mut token = tokens[0]
-			let mut is_pub = false
-			match token.id {
-			| TokenId.Comment:
-				// Ignore.
-				continue
-
-			| TokenId.Pub:
-				is_pub = true
-				if tokens.len == 1 {
-					self.push_err(tokens[0], "invalid_syntax")
-					continue
-				}
-				tokens = tokens[1:]
-				if tokens.len > 0 {
-					token = tokens[0]
-				}
-			}
-
-			match token.id {
-			| TokenId.Static
-			| TokenId.Fn
-			| TokenId.Unsafe:
-				let mut f = self.get_method(tokens)
-				if real(f) {
-					f.public = is_pub
-					self.check_method_receiver(f)
-					ipl.methods = append(ipl.methods, f)
-				}
-
-			|:
-				self.push_err(token, "invalid_syntax")
-				continue
-			}
-		}
-	}
-
-	fn parse_impl_body(mut &self, mut ipl: &Impl, mut tokens: []Token) {
-		if ipl.is_trait_impl() {
-			self.parse_impl_trait(ipl, tokens)
-			ret
-		}
-		self.parse_impl_struct(ipl, tokens)
-	}
-
-	fn build_impl(mut &self, mut tokens: []Token): &Impl {
-		let mut token = tokens[0]
-		if tokens.len < 2 {
-			self.push_err(token, "invalid_syntax")
-			ret new(Impl)
-		}
-		token = tokens[1]
-		if token.id != TokenId.Ident {
-			self.push_err(token, "invalid_syntax")
-			ret new(Impl)
-		}
-		if tokens.len < 3 {
-			self.push_err(token, "invalid_syntax")
-			ret new(Impl)
-		}
-		let mut ipl = &Impl{
-			base: token,
-		}
-		token = tokens[2]
-		if token.id != TokenId.Iter {
-			if token.id == TokenId.Range && token.kind == str(TokenKind.LBrace) {
-				// This implementation is single.
-				// Just implements to destination.
-				// Therefore, swap Base and Dest tokens.
-				ipl.base, ipl.dest = ipl.dest, ipl.base
-
-				tokens = tokens[2:]  // Remove prefix tokens.
-				goto body
-			}
-			self.push_err(token, "invalid_syntax")
-			ret new(Impl)
-		}
-		if tokens.len < 4 {
-			self.push_err(token, "invalid_syntax")
-			ret new(Impl)
-		}
-		token = tokens[3]
-		if token.id != TokenId.Ident {
-			self.push_err(token, "invalid_syntax")
-			ret new(Impl)
-		}
-		ipl.dest = token
-		tokens = tokens[4:] // Remove prefix tokens.
-	body:
-		let mut i = 0
-		let mut body_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
-		if body_tokens == nil {
-			self.stop()
-			self.push_err(ipl.base, "body_not_exist")
-			ret new(Impl)
-		}
-		if i < tokens.len {
-			self.push_err(tokens[i], "invalid_syntax")
-		}
-		self.parse_impl_body(ipl, body_tokens)
-		ret ipl
-	}
-
-	fn build_node_data(mut &self, mut tokens: []Token): NodeData {
-		let mut token = tokens[0]
-		match token.id {
-		| TokenId.Use:
-			ret self.build_use_decl(tokens)
-
-		| TokenId.Fn
-		| TokenId.Unsafe:
-			let mut f = self.build_fn(tokens, false, false, false)
-			if real(f) {
-				f.global = true
-			}
-			ret f
-
-		| TokenId.Let
-		| TokenId.Const
-		| TokenId.Mut
-		| TokenId.Static:
-			ret self.build_var(tokens)
-
-		| TokenId.Type:
-			ret self.build_type_alias_decl(tokens)
-
-		| TokenId.Enum:
-			ret self.build_enum_decl(tokens)
-
-		| TokenId.Struct:
-			ret self.build_struct_decl(tokens)
-
-		| TokenId.Trait:
-			ret self.build_trait_decl(tokens)
-
-		| TokenId.Impl:
-			ret self.build_impl(tokens)
-
-		| TokenId.Cpp:
-			ret self.build_cpp_link(tokens)
-
-		| TokenId.Comment:
-			// Push first token because this is full text comment.
-			// Comments are just single-line.
-			// Range comments not accepts by lexer.
-			let mut c = build_comment(token)
-			self.process_comment(c)
-			ret c
-
-		|:
-			self.push_err(token, "invalid_syntax")
-			ret nil
-		}
-	}
-
-	fn check_comment_group(mut self, node: Node) {
-		if !real(self.comment_group) {
-			ret
-		}
-		match type node.data {
-		| &Comment
-		| &Directive:
-			// Ignore
-
-		|:
-			drop(self.comment_group)
-		}
-	}
-
-	fn check_directive(mut self, node: Node) {
-		if self.directives == nil {
-			ret
-		}
-
-		match type node.data {
-		| &Directive
-		| &Comment:
-			// Ignore
-
-		|:
-			self.directives = nil
-		}
-	}
-
-	fn apply_meta(mut self, mut node: Node, mut is_pub: bool) {
-		match type node.data {
-		| &VarDecl:
-			let mut v = (&VarDecl)(node.data)
-			if !real(v) {
-				ret
-			}
-			v.public = is_pub
-			v.doc_comments = self.comment_group
-			is_pub = false
-			drop(self.comment_group)
-
-		| &FnDecl:
-			let mut f = (&FnDecl)(node.data)
-			if !real(f) {
-				ret
-			}
-
-			f.public = is_pub
-			is_pub = false
-			f.directives = self.directives
-			self.directives = nil
-			f.doc_comments = self.comment_group
-			drop(self.comment_group)
-
-		| &TypeAliasDecl:
-			let mut tad = (&TypeAliasDecl)(node.data)
-			if !real(tad) {
-				ret
-			}
-			tad.public = is_pub
-			is_pub = false
-			tad.doc_comments = self.comment_group
-			drop(self.comment_group)
-
-		| &EnumDecl:
-			let mut ed = (&EnumDecl)(node.data)
-			if !real(ed) {
-				ret
-			}
-			ed.doc_comments = self.comment_group
-			drop(self.comment_group)
-			ed.public = is_pub
-			is_pub = false
-
-		| &StructDecl:
-			let mut sd = (&StructDecl)(node.data)
-			if !real(sd) {
-				ret
-			}
-			sd.directives = self.directives
-			self.directives = nil
-			sd.doc_comments = self.comment_group
-			drop(self.comment_group)
-			sd.public = is_pub
-			is_pub = false
-
-		| &TraitDecl:
-			let mut td = (&TraitDecl)(node.data)
-			if !real(td) {
-				ret
-			}
-			td.doc_comments = self.comment_group
-			drop(self.comment_group)
-			td.public = is_pub
-			is_pub = false
-		}
-		if is_pub {
-			self.push_err(node.token, "def_not_support_pub")
-		}
-	}
-
-	fn check_use_decl(mut self, node: Node) {
-		match type node.data {
-		| &UseDecl:
-			// Ignore.
-
-		|:
-			ret
-		}
-
-		if self.ast.decls.len() > 0 {
-			self.push_err(node.token, "use_decl_at_body")
-		}
-	}
-
-	fn build_general_scope_node_data(mut &self, mut st: []Token): (is_pub: bool, data: NodeData) {
-		// Detect pub keyword.
-		if st[0].id == TokenId.Pub {
-			is_pub = true
-			st = st[1:]
-			if st.len == 0 {
-				self.push_err(st[0], "invalid_syntax")
-				ret
-			}
-		}
-
-		data = self.build_node_data(st)
-		ret is_pub, data
-	}
-
-	fn parse_node(mut &self, mut st: []Token): Node {
-		let mut node = Node{
-			token: st[0],
-		}
-
-		let (is_pub, mut data) = self.build_general_scope_node_data(st)
-		if data == nil {
-			ret node
-		}
-
-		node.data = data
-
-		self.apply_meta(node, is_pub)
-		self.check_comment_group(node)
-		self.check_directive(node)
-		self.check_use_decl(node)
-		ret node
-	}
-
-	fn append_node(mut &self, mut st: []Token) {
-		if st.len == 0 {
-			ret
-		}
-
-		let mut node = self.parse_node(st)
-		if node.data == nil || self.stopped() {
-			ret
-		}
-
-		match {
-		| node.is_use_decl():
-			self.ast.use_decls.push((&UseDecl)(node.data))
-
-		| node.is_decl():
-			// Use declarations eliminated.
-			self.ast.decls.push(node)
-
-		| node.is_comment():
-			// Global scope is not appends &CommentGroup.
-			let mut c = (&Comment)(node.data)
-			self.ast.comments.push(c)
-
-		| node.is_impl():
-			self.ast.impls.push((&Impl)(node.data))
-
-		|:
-			self.push_err(node.token, "invalid_syntax")
-		}
-	}
-
-	fn remove_range(self, mut i: int, kind: str, &tokens: []Token, mut &ranges: []int) {
-		let close = get_close_kind_of_brace(kind)
-		for i >= 0; i-- {
-			let tok = tokens[ranges[i]]
-			if tok.kind != close {
-				continue
-			}
-
-			ranges = append(ranges[:i], ranges[i+1:]...)
-			break
-		}
-	}
-
-	fn push_wrong_order_close_err(mut self, t: Token, &tokens: []Token, &ranges: []int) {
-		let mut msg = ""
-		match tokens[ranges[ranges.len-1]].kind {
-		| str(TokenKind.LParent):  msg = "expected_parentheses_close"
-		| str(TokenKind.LBrace):   msg = "expected_brace_close"
-		| str(TokenKind.LBracket): msg = "expected_bracket_close"
-		}
-
-		self.push_err(t, msg)
-	}
-
-	fn push_range_close(mut self, t: Token, left: str, &tokens: []Token, mut &ranges: []int) {
-		let n = ranges.len
-		if n == 0 {
-			match t.kind {
-			| str(TokenKind.RBracket): self.push_err(t, "extra_closed_brackets")
-			| str(TokenKind.RBrace):   self.push_err(t, "extra_closed_braces")
-			| str(TokenKind.RParent):  self.push_err(t, "extra_closed_parentheses")
-			}
-			ret
-		} else if tokens[ranges[n-1]].kind != left {
-			self.push_wrong_order_close_err(t, tokens, ranges)
-		}
-		self.remove_range(n-1, t.kind, tokens, ranges)
-	}
-
-	fn check_ranges(mut self, tokens: []Token) {
-		let mut ranges: []int = nil
-
-		for i, token in tokens {
-			if token.id != TokenId.Range {
-				continue
-			}
-
-			match token.kind {
-			| str(TokenKind.LParent)
-			| str(TokenKind.LBrace)
-			| str(TokenKind.LBracket):
-				ranges = append(ranges, i)
-
-			| str(TokenKind.RParent):
-				self.push_range_close(token, str(TokenKind.LParent), tokens, ranges)
-
-			| str(TokenKind.RBrace):
-				self.push_range_close(token, str(TokenKind.LBrace), tokens, ranges)
-
-			| str(TokenKind.RBracket):
-				self.push_range_close(token, str(TokenKind.LBracket), tokens, ranges)
-			}
-		}
-
-		for _, i in ranges {
-			let token = tokens[i]
-			match token.kind {
-			| str(TokenKind.LParent):  self.push_err(token, "wait_close_parentheses")
-			| str(TokenKind.LBrace):   self.push_err(token, "wait_close_brace")
-			| str(TokenKind.LBracket): self.push_err(token, "wait_close_bracket")
-			}
-		}
-	}
-
-	fn parse(mut &self, mut f: &File) {
-		self.ast = &Ast{
-			file: f,
-		}
-
-		let mut tokens = unsafe { cpp.__jule_parser_vector_as_slice[Vector[Token], Token](f.tokens()) }
-
-		self.check_ranges(tokens)
-		if self.errors.len > 0 {
-			ret
-		}
-
-		let mut stms = split_stms(tokens)
-
-		// Get top directives.
-		let mut i = 0
-		for i < stms.len; i++ {
-			let mut st = stms[i]
-			if st.tokens.len == 0 {
-				ret
-			}
-
-			let (_, mut data) = self.build_general_scope_node_data(st.tokens)
-			if data == nil {
-				break
-			}
-
-			if self.stopped() {
-				ret
-			}
-
-			let mut node = Node{data: data}
-			if node.is_comment() {
-				let mut d = self.get_directive((&Comment)(node.data))
-				if real(d) && is_top_directive(d.tag) {
-					self.ast.top_directives.push(d)
-				}
-			} else {
-				break
-			}
-		}
-
-		// Remove all errors.
-		self.errors = nil
-
-		for i < stms.len; i++ {
-			let mut st = stms[i]
-			self.append_node(st.tokens)
-
-			if self.stopped() {
-				break
-			}
-		}
-	}
+    fn stop(mut self) { drop(self.ast) }
+    fn stopped(self): bool { ret !real(self.ast) }
+
+    // Appends error by specified token, key and args.
+    fn push_err(mut self, token: Token, key: str, args: ...any) {
+        self.errors = append(self.errors, compiler_err(token, key, args...))
+    }
+
+    fn build_expr(mut &self, mut tokens: []Token): &Expr {
+        let mut ep = &ExprBuilder{p: self}
+        let mut expr = ep.build_from_tokens(tokens)
+        ret expr
+    }
+
+    fn get_directive(self, c: &Comment): &Directive {
+        if c.text.len <= DIRECTIVE_PREFIX.len {
+            ret new(Directive)
+        }
+
+        let mut d = &Directive{
+            token: c.token,
+        }
+
+        let pragma = c.token.kind[DIRECTIVE_PREFIX.len:] // Remove directive prefix
+        let mut parts = pragma.split(" ", -1)
+
+        d.tag = parts[0]
+        d.args = parts[1:]
+
+        // Don't append if directive kind is invalid.
+        let mut ok = false
+        for _, kind in DIRECTIVES {
+            if d.tag == str(kind) {
+                ok = true
+                break
+            }
+        }
+        if !ok {
+            ret new(Directive)
+        }
+
+        ret d
+    }
+
+    fn push_directive(mut self, c: &Comment) {
+        let mut d = self.get_directive(c)
+        if !real(d) {
+            ret
+        }
+
+        // Don't append if already added this directive.
+        for _, pd in self.directives {
+            if d.tag == pd.tag {
+                ret
+            }
+        }
+
+        self.directives = append(self.directives, d)
+    }
+
+    fn process_comment(mut self, mut c: &Comment) {
+        if c.is_directive() {
+            self.push_directive(c)
+            ret
+        }
+        if !real(self.comment_group) {
+            self.comment_group = &CommentGroup{}
+        }
+        self.comment_group.comments = append(self.comment_group.comments, c)
+    }
+
+    fn build_scope(mut &self, mut tokens: []Token): &ScopeTree {
+        let mut s = new_scope()
+        let mut sp = ScopeParser{
+            p: self,
+        }
+        sp.build(tokens, s)
+        ret s
+    }
+
+    unsafe fn __build_type(mut &self, mut tokens: []Token,
+        mut i: *int, err: bool): (&TypeDecl, bool) {
+        let mut tb = TypeBuilder{
+            p:      self,
+            tokens: tokens,
+            i:      i,
+            err:    err,
+        }
+        let (mut decl, ok) = tb.build()
+        ret decl, ok
+    }
+
+    // build_type builds AST model of data-type.
+    unsafe fn build_type(mut &self, mut tokens: []Token,
+        mut i: *int, err: bool): (&TypeDecl, bool) {
+        let token = tokens[*i]
+        let (mut t, ok) = self.__build_type(tokens, i, err)
+        if err && !ok {
+            self.push_err(token, "invalid_type")
+        }
+        ret t, ok
+    }
+
+    fn build_type_alias_decl(mut &self, mut tokens: []Token): &TypeAliasDecl {
+        let mut i = 1 // Skip "type" keyword.
+        if i >= tokens.len {
+            self.push_err(tokens[i-1], "invalid_syntax")
+            ret new(TypeAliasDecl)
+        }
+        let mut tad = &TypeAliasDecl{
+            token: tokens[1],
+            ident: tokens[1].kind,
+        }
+        let mut token = tokens[i]
+        if token.id != TokenId.Ident {
+            self.push_err(token, "invalid_syntax")
+        }
+        i++
+        if i >= tokens.len {
+            self.push_err(tokens[i-1], "invalid_syntax")
+            ret tad
+        }
+        token = tokens[i]
+        if token.id != TokenId.Colon {
+            self.push_err(tokens[i-1], "invalid_syntax")
+            ret tad
+        }
+        i++
+        if i >= tokens.len {
+            self.push_err(tokens[i-1], "missing_type")
+            ret tad
+        }
+        let (mut t, ok) = unsafe { self.build_type(tokens, &i, true) }
+        tad.kind = t
+        if ok && i < tokens.len {
+            self.push_err(tokens[i], "invalid_syntax")
+        }
+        ret tad
+    }
+
+    fn build_var_type_and_expr(mut &self, mut v: &VarDecl, mut tokens: []Token) {
+        let mut i = 0
+        let mut tok = tokens[i]
+        if tok.id == TokenId.Colon {
+            i++ // Skip type annotation operator (:)
+            if (i >= tokens.len ||
+            (tokens[i].id == TokenId.Op && tokens[i].kind == str(TokenKind.Eq))) {
+                self.push_err(tok, "missing_type")
+                ret
+            }
+            let (mut t, ok) = unsafe { self.build_type(tokens, &i, true) }
+            if ok {
+                v.kind = t
+                if i >= tokens.len {
+                    ret
+                }
+                tok = tokens[i]
+            }
+        }
+
+        if tok.id == TokenId.Op {
+            if tok.kind != str(TokenKind.Eq) {
+                self.push_err(tok, "invalid_syntax")
+                ret
+            }
+            let mut expr_tokens = tokens[i+1:]
+            if expr_tokens.len == 0 {
+                self.push_err(tok, "missing_expr")
+                ret
+            }
+            v.expr = self.build_expr(expr_tokens)
+        } else {
+            self.push_err(tok, "invalid_syntax")
+        }
+    }
+
+    fn build_var_common(mut &self, mut v: &VarDecl, mut tokens: []Token) {
+        v.token = tokens[0]
+        if v.token.id != TokenId.Ident {
+            self.push_err(v.token, "invalid_syntax")
+            ret
+        }
+        v.ident = v.token.kind
+        drop(v.kind) // For auto-type.
+        if tokens.len > 1 {
+            tokens = tokens[1:] // Remove identifier.
+            self.build_var_type_and_expr(v, tokens)
+        }
+    }
+
+    fn build_var_begin(mut self, mut v: &VarDecl, mut i: &int, tokens: []Token) {
+        let tok = tokens[i]
+        match tok.id {
+        | TokenId.Static:
+            v.statically = true
+            fall
+
+        | TokenId.Let:
+            // Initialize 1 for skip the let keyword
+            i++
+            if i >= tokens.len {
+                self.push_err(tok, "invalid_syntax")
+                ret
+            }
+            if tokens[i].id == TokenId.Mut {
+                v.mutable = true
+                // Skip the mut keyword
+                i++
+            }
+
+        | TokenId.Const:
+            i++
+            if v.constant {
+                self.push_err(tok, "already_const")
+                break
+            }
+            v.constant = true
+            if !v.mutable {
+                break
+            }
+            fall
+
+        |:
+            self.push_err(tok, "invalid_syntax")
+            ret
+        }
+
+        if i >= tokens.len {
+            self.push_err(tok, "invalid_syntax")
+        }
+    }
+
+    fn build_var(mut &self, mut tokens: []Token): &VarDecl {
+        let mut i = new(int, 0)
+        let mut v = &VarDecl{
+            token: tokens[i],
+        }
+        self.build_var_begin(v, i, tokens)
+        if i >= tokens.len {
+            ret new(VarDecl)
+        }
+
+        tokens = tokens[i:]
+        if tokens[0].id == TokenId.Op && tokens[0].kind == str(TokenKind.Amper) {
+            v.reference = true
+            if tokens.len == 1 {
+                ret new(VarDecl)
+            }
+            tokens = tokens[1:]
+        }
+        self.build_var_common(v, tokens)
+        ret v
+    }
+
+    fn build_generic(mut self, mut tokens: []Token): &GenericDecl {
+        if tokens.len > 1 {
+            self.push_err(tokens[1], "invalid_syntax")
+        }
+        let mut g = &GenericDecl{
+            token: tokens[0],
+        }
+        if g.token.id != TokenId.Ident {
+            self.push_err(g.token, "invalid_syntax")
+        }
+        g.ident = g.token.kind
+        ret g
+    }
+
+    fn build_generics(mut self, mut tokens: []Token, error_token: Token): []&GenericDecl {
+        if tokens.len == 0 {
+            self.push_err(error_token, "missing_expr")
+            ret nil
+        }
+
+        let (mut parts, errors) = parts(tokens, TokenId.Comma, true)
+        self.errors = append(self.errors, errors...)
+
+        let mut generics = make([]&GenericDecl, parts.len)
+        for (i, mut part) in parts {
+            if parts.len > 0 {
+                generics[i] = self.build_generic(part)
+            }
+        }
+
+        ret generics
+    }
+
+    fn build_self_param(mut self, mut tokens: []Token): &ParamDecl {
+        if tokens.len == 0 {
+            ret new(ParamDecl)
+        }
+
+        let mut param = &ParamDecl{}
+
+        // Detects mut keyword.
+        let mut i = 0
+        if tokens[i].id == TokenId.Mut {
+            param.mutable = true
+            i++
+            if i >= tokens.len {
+                self.push_err(tokens[i-1], "invalid_syntax")
+                ret new(ParamDecl)
+            }
+        }
+
+        if tokens[i].kind == str(TokenKind.Amper) {
+            param.ident = str(TokenKind.Amper)
+            i++
+            if i >= tokens.len {
+                self.push_err(tokens[i-1], "invalid_syntax")
+                ret new(ParamDecl)
+            }
+        }
+
+        if tokens[i].id == TokenId.Self {
+            param.ident += str(TokenKind.Self)
+            param.token = tokens[i]
+            i++
+            if i < tokens.len {
+                self.push_err(tokens[i], "invalid_syntax")
+            }
+        }
+
+        ret param
+    }
+
+    fn param_type_begin(mut self, mut param: &ParamDecl, mut &i: int, tokens: []Token) {
+        for i < tokens.len; i++ {
+            let token = tokens[i]
+            if token.id != TokenId.Op {
+                ret
+            } else if token.kind != str(TokenKind.TripleDot) {
+                ret
+            }
+
+            if param.variadic {
+                self.push_err(token, "already_variadic")
+                continue
+            }
+            param.variadic = true
+        }
+    }
+
+    fn build_param_type(mut &self, mut param: &ParamDecl, mut tokens: []Token, must_pure: bool) {
+        let mut i = 0
+        if !must_pure {
+            self.param_type_begin(param, i, tokens)
+            if i >= tokens.len {
+                ret
+            }
+        }
+        param.kind, _ = unsafe { self.build_type(tokens, &i, true) }
+        if i < tokens.len {
+            self.push_err(tokens[i], "invalid_syntax")
+        }
+    }
+
+    fn param_body_id(self, mut param: &ParamDecl, token: Token) {
+        if is_ignore_ident(token.kind) {
+            param.ident = str(Ident.Anon)
+            ret
+        }
+        param.ident = token.kind
+    }
+
+    fn build_param_body(mut &self, mut param: &ParamDecl, mut i: &int, mut tokens: []Token, must_pure: bool) {
+        self.param_body_id(param, tokens[i])
+        let mut tok = tokens[i]
+        // +1 for skip identifier token
+        if i+1 >= tokens.len {
+            ret
+        } else if tokens.len-i-1 < 2 {
+            self.push_err(tok, "missing_type")
+            ret
+        }
+
+        tok = tokens[i+1]
+        if tok.id != TokenId.Colon {
+            self.build_param_type(param, tokens, must_pure)
+            ret
+        }
+
+        tokens = tokens[i+2:] // Skip colon
+        self.build_param_type(param, tokens, must_pure)
+    }
+
+    fn build_param(mut &self, mut tokens: []Token, must_pure: bool): &ParamDecl {
+        let mut param = &ParamDecl{
+            token: tokens[0],
+        }
+
+        // Detects mut keyword.
+        if param.token.id == TokenId.Mut {
+            param.mutable = true
+            if tokens.len == 1 {
+                self.push_err(tokens[0], "invalid_syntax")
+                ret new(ParamDecl)
+            }
+            tokens = tokens[1:]
+            param.token = tokens[0]
+        }
+
+        // Catch reference parameters.
+        if tokens.len >= 3 {
+            if param.token.id == TokenId.Op && param.token.kind == str(TokenKind.Amper) {
+                if tokens.len == 1 {
+                    self.push_err(tokens[0], "invalid_syntax")
+                    ret new(ParamDecl)
+                }
+
+                if tokens[1].id == TokenId.Ident && tokens[2].id == TokenId.Colon {
+                    param.reference = true
+                    tokens = tokens[1:]
+                    param.token = tokens[0]
+                }
+            }
+        }
+
+        if param.token.id != TokenId.Ident {
+            // Just data type
+            param.ident = str(Ident.Anon)
+            self.build_param_type(param, tokens, must_pure)
+        } else {
+            let mut i = new(int, 0)
+            self.build_param_body(param, i, tokens, must_pure)
+        }
+
+        ret param
+    }
+
+    fn check_params(mut self, mut params: []&ParamDecl) {
+        for (_, mut param) in params {
+            if param.is_self() || real(param.kind) {
+                continue
+            }
+            if param.token.id == TokenId.Na {
+                self.push_err(param.token, "missing_type")
+            } else {
+                param.kind = &TypeDecl{
+                    token: param.token,
+                    kind:  &IdentTypeDecl{
+                        token: param.token,
+                        ident: param.token.kind,
+                    },
+                }
+                param.ident = str(Ident.Anon)
+                param.token = Token{}
+            }
+        }
+    }
+
+    fn build_params(mut &self, mut tokens: []Token, method: bool, must_pure: bool): []&ParamDecl {
+        let (mut parts, errs) = parts(tokens, TokenId.Comma, true)
+        self.errors = append(self.errors, errs...)
+        if parts.len == 0 {
+            ret nil
+        }
+
+        let mut params: []&ParamDecl = nil
+        if method && parts.len > 0 {
+            let mut param = self.build_self_param(parts[0])
+            if real(param) && param.is_self() {
+                params = append(params, param)
+                parts = parts[1:]
+            }
+        }
+
+        for (_, mut part) in parts {
+            let mut param = self.build_param(part, must_pure)
+            if real(param) {
+                params = append(params, param)
+            }
+        }
+
+        self.check_params(params)
+        ret params
+    }
+
+    fn build_multi_ret_type(mut &self, mut tokens: []Token, mut &i: int): (t: &RetTypeDecl, ok: bool) {
+        t = &RetTypeDecl{}
+        i++
+        if i >= tokens.len {
+            i--
+            t.kind, ok = unsafe { self.build_type(tokens, &i, false) }
+            ret
+        }
+
+        i-- // For point to parentheses - ( -
+        let mut range_tokens = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
+        let mut params = self.build_params(range_tokens, false, true)
+
+        let mut types = make([]&TypeDecl, params.len)
+        for (i, mut param) in params {
+            types[i] = param.kind
+            if param.ident != str(Ident.Anon) {
+                param.token.kind = param.ident
+            } else {
+                param.token.kind = str(Ident.Ignore)
+            }
+            t.idents = append(t.idents, param.token)
+        }
+
+        if types.len > 1 {
+            t.kind = &TypeDecl{
+                token: tokens[0],
+                kind:  &TupleTypeDecl{
+                    types: types,
+                },
+            }
+        } else {
+            t.kind = types[0]
+        }
+
+        ok = true
+        ret
+    }
+
+    // Builds function return type from tokens.
+    fn build_ret_type(mut &self, mut tokens: []Token, mut &i: int): (t: &RetTypeDecl, ok: bool) {
+        t = &RetTypeDecl{}
+        if i >= tokens.len {
+            ret
+        }
+
+        let mut token = tokens[i]
+        match token.id {
+        | TokenId.Range:
+            if token.kind == str(TokenKind.LBrace) {
+                ret
+            }
+
+        | TokenId.Op:
+            if token.kind == str(TokenKind.Eq) {
+                ret
+            }
+
+        | TokenId.Colon:
+            if i+1 >= tokens.len {
+                self.push_err(token, "missing_type")
+                ret
+            }
+
+            i++
+            token = tokens[i]
+            if token.id == TokenId.Range {
+                match token.kind {
+                | str(TokenKind.LParent):
+                    let (mut decl, ok) = self.build_multi_ret_type(tokens, i)
+                    ret decl, ok
+
+                | str(TokenKind.LBrace):
+                    self.push_err(token, "missing_type")
+                    ret
+                }
+            }
+            t.kind, ok = unsafe { self.build_type(tokens, &i, true) }
+            ret
+        }
+        i++
+        self.push_err(token, "invalid_syntax")
+        ret
+    }
+
+    // Build function prototype.
+    // Body is not necessary for successfull parsing.
+    // Just declration.
+    fn build_fn_prototype(mut &self, mut tokens: []Token, mut &i: int, method: bool, anon: bool): &FnDecl {
+        let mut f = &FnDecl{
+            token: tokens[i],
+        }
+
+        // Detect static keyword.
+        if f.token.id == TokenId.Static {
+            f.statically = true
+            i++
+            if i >= tokens.len {
+                self.push_err(f.token, "invalid_syntax")
+                ret new(FnDecl)
+            }
+            f.token = tokens[i]
+        }
+
+        // Detect unsafe keyword.
+        if f.token.id == TokenId.Unsafe {
+            f.unsafety = true
+            i++
+            if i >= tokens.len {
+                self.push_err(f.token, "invalid_syntax")
+                ret new(FnDecl)
+            }
+            f.token = tokens[i]
+        }
+
+        // Skips fn token.
+        i++
+        if i >= tokens.len {
+            self.push_err(f.token, "invalid_syntax")
+            ret new(FnDecl)
+        }
+
+        if anon {
+            f.ident = str(Ident.Anon)
+        } else {
+            let tok = tokens[i]
+            if tok.id != TokenId.Ident {
+                self.push_err(tok, "invalid_syntax")
+                ret new(FnDecl)
+            }
+            f.ident = tok.kind
+            i++
+        }
+
+        if i >= tokens.len {
+            self.push_err(f.token, "invalid_syntax")
+            ret new(FnDecl)
+        }
+
+        let error_token = tokens[i]
+        let mut generics_tokens = range(i, TokenKind.LBracket, TokenKind.RBracket, tokens)
+        if generics_tokens != nil {
+            f.generics = self.build_generics(generics_tokens, error_token)
+        }
+
+        if tokens[i].kind != str(TokenKind.LParent) {
+            self.push_err(tokens[i], "missing_function_parentheses")
+            ret new(FnDecl)
+        }
+
+        let mut params_toks = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
+        if params_toks.len > 0 {
+            f.params = self.build_params(params_toks, method, false)
+        }
+
+        f.result, _ = self.build_ret_type(tokens, i)
+        ret f
+    }
+
+    // Parses function define.
+    // Prototype and body.
+    fn build_fn(mut &self, mut tokens: []Token, method: bool, anon: bool, prototype: bool): &FnDecl {
+        let mut i = 0
+        let mut f = self.build_fn_prototype(tokens, i, method, anon)
+        if prototype {
+            if i < tokens.len {
+                self.push_err(tokens[i+1], "invalid_syntax")
+            }
+            ret f
+        } else if !real(f) {
+            ret f
+        }
+
+        if i >= tokens.len {
+            self.stop()
+            self.push_err(f.token, "body_not_exist")
+            ret new(FnDecl)
+        }
+        let mut block_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        if block_tokens != nil {
+            f.scope = self.build_scope(block_tokens)
+            f.scope.unsafety = f.unsafety
+            if i < tokens.len {
+                self.push_err(tokens[i], "invalid_syntax")
+            }
+        } else {
+            self.stop()
+            self.push_err(f.token, "body_not_exist")
+            ret new(FnDecl)
+        }
+        ret f
+    }
+
+    fn get_use_decl_selectors(mut self, mut tokens: []Token): []Token {
+        let mut i = 0
+        tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        let (mut parts, errs) = parts(tokens, TokenId.Comma, true)
+        if errs.len > 0 {
+            self.errors = append(self.errors, errs...)
+            ret nil
+        }
+
+        let mut selectors = make([]Token, parts.len)
+        for (i, mut part) in parts {
+            if part.len > 1 {
+                self.push_err(part[1], "invalid_syntax")
+            }
+            let mut tok = part[0]
+            if tok.id != TokenId.Ident && tok.id != TokenId.Self {
+                self.push_err(tok, "invalid_syntax")
+                continue
+            }
+            selectors[i] = tok
+        }
+        ret selectors
+    }
+
+    fn build_cpp_use_decl(mut self, mut decl: &UseDecl, tokens: []Token) {
+        if tokens.len > 2 {
+            self.push_err(tokens[2], "invalid_syntax")
+        }
+        let token = tokens[1]
+        if token.id != TokenId.Lit || (token.kind[0] != '`' && token.kind[0] != '"') {
+            self.push_err(token, "invalid_expr")
+            ret
+        }
+        decl.cpp_linked = true
+        decl.link_path = token.kind[1 : token.kind.len-1]
+        if !is_std_header_path(decl.link_path) {
+            decl.link_path = join(token.file.dir(), decl.link_path)
+        }
+    }
+
+    fn build_std_use_decl(mut self, mut decl: &UseDecl, mut tokens: []Token) {
+        decl.std = true
+
+        let mut token = tokens[0]
+        if tokens.len < 3 {
+            self.push_err(token, "invalid_syntax")
+            ret
+        }
+
+        tokens = tokens[2:]
+        token = tokens[tokens.len-1]
+        match token.id {
+        | TokenId.DblColon:
+            self.push_err(token, "invalid_syntax")
+            ret
+
+        | TokenId.Range:
+            if token.kind != str(TokenKind.RBrace) {
+                self.push_err(token, "invalid_syntax")
+                ret
+            }
+            let mut selectors: []Token = nil
+            tokens, selectors = range_last(tokens)
+            decl.selected = self.get_use_decl_selectors(selectors)
+            if tokens.len == 0 {
+                self.push_err(token, "invalid_syntax")
+                ret
+            }
+            token = tokens[tokens.len-1]
+            if token.id != TokenId.DblColon {
+                self.push_err(token, "invalid_syntax")
+                ret
+            }
+            tokens = tokens[:tokens.len-1]
+            if tokens.len == 0 {
+                self.push_err(token, "invalid_syntax")
+                ret
+            }
+
+        | TokenId.Op:
+            if token.kind != str(TokenKind.Star) {
+                self.push_err(token, "invalid_syntax")
+                ret
+            }
+            tokens = tokens[:tokens.len-1]
+            if tokens.len == 0 {
+                self.push_err(token, "invalid_syntax")
+                ret
+            }
+            token = tokens[tokens.len-1]
+            if token.id != TokenId.DblColon {
+                self.push_err(token, "invalid_syntax")
+                ret
+            }
+            tokens = tokens[:tokens.len-1]
+            if tokens.len == 0 {
+                self.push_err(token, "invalid_syntax")
+                ret
+            }
+            decl.full = true
+        }
+        decl.link_path = "std::" + tokstoa(tokens)
+    }
+
+    fn build_ident_use_decl(mut self, mut decl: &UseDecl, mut tokens: []Token) {
+        decl.std = false
+
+        let mut token = tokens[tokens.len-1]
+        match token.id {
+        | TokenId.DblColon:
+            self.push_err(token, "invalid_syntax")
+            ret
+
+        | TokenId.Range:
+            if token.kind != str(TokenKind.RBrace) {
+                self.push_err(token, "invalid_syntax")
+                ret
+            }
+
+            let mut selectors: []Token = nil
+            tokens, selectors = range_last(tokens)
+            decl.selected = self.get_use_decl_selectors(selectors)
+            if tokens.len == 0 {
+                self.push_err(token, "invalid_syntax")
+                ret
+            }
+
+            token = tokens[tokens.len-1]
+            if token.id != TokenId.DblColon {
+                self.push_err(token, "invalid_syntax")
+                ret
+            }
+
+            tokens = tokens[:tokens.len-1]
+            if tokens.len == 0 {
+                self.push_err(token, "invalid_syntax")
+                ret
+            }
+
+        | TokenId.Op:
+            if token.kind != str(TokenKind.Star) {
+                self.push_err(token, "invalid_syntax")
+                ret
+            }
+
+            tokens = tokens[:tokens.len-1]
+            if tokens.len == 0 {
+                self.push_err(token, "invalid_syntax")
+                ret
+            }
+
+            token = tokens[tokens.len-1]
+            if token.id != TokenId.DblColon {
+                self.push_err(token, "invalid_syntax")
+                ret
+            }
+
+            tokens = tokens[:tokens.len-1]
+            if tokens.len == 0 {
+                self.push_err(token, "invalid_syntax")
+                ret
+            }
+
+            decl.full = true
+        }
+
+        decl.link_path = tokstoa(tokens)
+    }
+
+    fn parse_use_decl(mut self, mut decl: &UseDecl, mut tokens: []Token) {
+        let token = tokens[0]
+        if token.id == TokenId.Cpp {
+            self.build_cpp_use_decl(decl, tokens)
+            ret
+        }
+
+        if token.id != TokenId.Ident {
+            self.push_err(token, "invalid_syntax")
+            ret
+        }
+
+        const STD_LIB_PREFIX = "std"
+
+        match {
+        | token.kind == STD_LIB_PREFIX:
+            self.build_std_use_decl(decl, tokens)
+
+        |:
+            self.build_ident_use_decl(decl, tokens)
+        }
+    }
+
+    fn build_use_decl(mut self, mut tokens: []Token): &UseDecl {
+        let mut decl = &UseDecl{
+            token: tokens[0],
+        }
+        if tokens.len < 2 {
+            self.push_err(decl.token, "missing_use_path")
+            ret new(UseDecl)
+        }
+        tokens = tokens[1:] // Skip "use" keyword.
+        self.parse_use_decl(decl, tokens)
+        ret decl
+    }
+
+    fn build_enum_item_expr(mut &self, mut i: &int, mut tokens: []Token): &Expr {
+        let mut brace_n = 0
+        let expr_start: int = i
+        for i < tokens.len; i++ {
+            let t = tokens[i]
+            if t.id == TokenId.Range {
+                match t.kind {
+                | str(TokenKind.LBrace)
+                | str(TokenKind.LBracket)
+                | str(TokenKind.LParent):
+                    brace_n++
+                    continue
+
+                |:
+                    brace_n--
+                }
+            }
+
+            if brace_n > 0 {
+                continue
+            }
+
+            if t.id == TokenId.Comma || i+1 >= tokens.len {
+                let mut expr_tokens: []Token = nil
+                if t.id == TokenId.Comma {
+                    expr_tokens = tokens[expr_start:i]
+                } else {
+                    expr_tokens = tokens[expr_start:]
+                }
+                ret self.build_expr(expr_tokens)
+            }
+        }
+        ret new(Expr)
+    }
+
+    fn build_enum_items(mut &self, mut tokens: []Token): []&EnumItemDecl {
+        let mut items = make([]&EnumItemDecl, 0)
+        let mut i = new(int, 0)
+        for i < tokens.len; i++ {
+            let mut t = tokens[i]
+            if t.id == TokenId.Comment {
+                continue
+            }
+
+            let mut item = &EnumItemDecl{}
+            item.token = t
+            if item.token.id != TokenId.Ident {
+                self.push_err(item.token, "invalid_syntax")
+            }
+            item.ident = item.token.kind
+            if i+1 >= tokens.len || tokens[i+1].id == TokenId.Comma {
+                if i+1 < tokens.len {
+                    i++
+                }
+                items = append(items, item)
+                continue
+            }
+            i++
+            t = tokens[i]
+            if t.id != TokenId.Op && t.kind != str(TokenKind.Eq) {
+                self.push_err(tokens[0], "invalid_syntax")
+            }
+            i++
+            if i >= tokens.len || tokens[i].id == TokenId.Comma {
+                self.push_err(tokens[0], "missing_expr")
+                continue
+            }
+            item.expr = self.build_enum_item_expr(i, tokens)
+            items = append(items, item)
+        }
+        ret items
+    }
+
+    fn build_enum_decl(mut &self, mut tokens: []Token): &EnumDecl {
+        if tokens.len < 2 || tokens.len < 3 {
+            self.push_err(tokens[0], "invalid_syntax")
+            ret new(EnumDecl)
+        }
+        let mut e = &EnumDecl{
+            token: tokens[1],
+        }
+        if e.token.id != TokenId.Ident {
+            self.push_err(e.token, "invalid_syntax")
+        }
+        e.ident = e.token.kind
+        let mut i = 2
+        if tokens[i].id == TokenId.Colon {
+            i++
+            if i >= tokens.len {
+                self.push_err(tokens[i-1], "invalid_syntax")
+                ret e
+            }
+            e.kind, _ = unsafe { self.build_type(tokens, &i, true) }
+            if i >= tokens.len {
+                self.stop()
+                self.push_err(e.token, "body_not_exist")
+                ret e
+            }
+        } else {
+            drop(e.kind)
+        }
+        let mut item_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        if item_tokens == nil {
+            self.stop()
+            self.push_err(e.token, "body_not_exist")
+            ret e
+        } else if i < tokens.len {
+            self.push_err(tokens[i], "invalid_syntax")
+        }
+        e.items = self.build_enum_items(item_tokens)
+        ret e
+    }
+
+    fn build_field(mut &self, mut tokens: []Token): &FieldDecl {
+        let mut f = &FieldDecl{}
+
+        f.public = tokens[0].id == TokenId.Pub
+        if f.public {
+            if tokens.len == 1 {
+                self.push_err(tokens[0], "invalid_syntax")
+                ret new(FieldDecl)
+            }
+            tokens = tokens[1:]
+        }
+
+        f.mutable = tokens[0].id == TokenId.Mut
+        if f.mutable {
+            if tokens.len == 1 {
+                self.push_err(tokens[0], "invalid_syntax")
+                ret new(FieldDecl)
+            }
+            tokens = tokens[1:]
+        }
+
+        f.token = tokens[0]
+        if f.token.id != TokenId.Ident {
+            self.push_err(f.token, "invalid_syntax")
+            ret new(FieldDecl)
+        }
+        f.ident = f.token.kind
+
+        if tokens.len == 1 {
+            self.push_err(tokens[0], "missing_type")
+            ret new(FieldDecl)
+        } else if tokens[1].id != TokenId.Colon {
+            self.push_err(tokens[1], "missing_type")
+            ret new(FieldDecl)
+        }
+
+        tokens = tokens[2:] // Remove identifier and colon tokens.
+        let mut i = 0
+        f.kind, _ = unsafe { self.build_type(tokens, &i, true) }
+        if i < tokens.len {
+            self.push_err(tokens[i], "invalid_syntax")
+            ret new(FieldDecl)
+        }
+
+        ret f
+    }
+
+    fn build_struct_decl_fields(mut &self, mut tokens: []Token): []&FieldDecl {
+        let mut fields: []&FieldDecl = nil
+        let mut stms = split_stms(tokens)
+        for (_, mut st) in stms {
+            let mut tokens = st.tokens
+            if tokens[0].id == TokenId.Comment {
+                continue
+            }
+            let mut f = self.build_field(tokens)
+            fields = append(fields, f)
+        }
+        ret fields
+    }
+
+    fn build_struct_decl(mut &self, mut tokens: []Token): &StructDecl {
+        if tokens.len < 3 {
+            self.push_err(tokens[0], "invalid_syntax")
+            ret new(StructDecl)
+        }
+
+        let mut i = 1
+        let mut s = &StructDecl{
+            token: tokens[i],
+        }
+        if s.token.id != TokenId.Ident {
+            self.push_err(s.token, "invalid_syntax")
+        }
+        i++
+        if i >= tokens.len {
+            self.push_err(tokens[i], "invalid_syntax")
+            ret s
+        }
+        s.ident = s.token.kind
+
+        let error_token = tokens[i]
+        let mut generics_tokens = range(i, TokenKind.LBracket, TokenKind.RBracket, tokens)
+        if generics_tokens != nil {
+            s.generics = self.build_generics(generics_tokens, error_token)
+        }
+        if i >= tokens.len {
+            self.push_err(tokens[i], "invalid_syntax")
+            ret s
+        }
+
+        let mut body_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        if body_tokens == nil {
+            self.stop()
+            self.push_err(s.token, "body_not_exist")
+            ret s
+        }
+        if i < tokens.len {
+            self.push_err(tokens[i], "invalid_syntax")
+        }
+        s.fields = self.build_struct_decl_fields(body_tokens)
+        ret s
+    }
+
+    fn check_method_receiver(mut self, f: &FnDecl) {
+        // Static methods cannot have receiver.
+        if f.statically {
+            if f.params.len > 0 && f.params[0].is_self() {
+                self.push_err(f.token, "static_function_has_receiver")
+            }
+            ret
+        }
+
+        if f.params.len == 0 {
+            self.push_err(f.token, "missing_receiver")
+            ret
+        }
+        let param = f.params[0]
+        if !param.is_self() {
+            self.push_err(f.token, "missing_receiver")
+            ret
+        }
+    }
+
+    fn build_trait_methods(mut &self, mut tokens: []Token): []&FnDecl {
+        let mut methods: []&FnDecl = nil
+        let mut stms = split_stms(tokens)
+        for (_, mut st) in stms {
+            let mut tokens = eliminate_comments(st.tokens)
+            if tokens.len == 0 {
+                continue
+            }
+
+            let mut f = self.build_fn(tokens, true, false, true)
+            if real(f) {
+                self.check_method_receiver(f)
+                if f.generics.len > 0 {
+                    self.push_err(f.token, "trait_method_has_generics")
+                }
+                f.public = true
+                methods = append(methods, f)
+            }
+        }
+        ret methods
+    }
+
+    fn build_trait_decl(mut &self, mut tokens: []Token): &TraitDecl {
+        if tokens.len < 3 {
+            self.push_err(tokens[0], "invalid_syntax")
+            ret new(TraitDecl)
+        }
+        let mut t = &TraitDecl{
+            token: tokens[1],
+        }
+        if t.token.id != TokenId.Ident {
+            self.push_err(t.token, "invalid_syntax")
+        }
+        t.ident = t.token.kind
+        let mut i = 2
+        let mut body_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        if body_tokens == nil {
+            self.stop()
+            self.push_err(t.token, "body_not_exist")
+            ret new(TraitDecl)
+        }
+        if i < tokens.len {
+            self.push_err(tokens[i], "invalid_syntax")
+        }
+        t.methods = self.build_trait_methods(body_tokens)
+        ret t
+    }
+
+    fn build_cpp_link_fn(mut &self, mut tokens: []Token): &FnDecl {
+        tokens = tokens[1:] // Remove "cpp" keyword.
+        let mut f = self.build_fn(tokens, false, false, true)
+        if real(f) {
+            f.cpp_linked = true
+        }
+        ret f
+    }
+
+    fn build_cpp_link_var(mut &self, mut tokens: []Token): &VarDecl {
+        tokens = tokens[1:] // Remove "cpp" keyword.
+        let mut v = self.build_var(tokens)
+        if real(v) {
+            v.cpp_linked = true
+            if real(v.expr) {
+                self.push_err(v.token, "cpp_linked_variable_has_expr")
+            }
+        }
+        ret v
+    }
+
+    fn build_cpp_link_struct(mut &self, mut tokens: []Token): &StructDecl {
+        tokens = tokens[1:] // Remove "cpp" keyword.
+        let mut s = self.build_struct_decl(tokens)
+        if real(s) {
+            s.cpp_linked = true
+        }
+        ret s
+    }
+
+    fn build_cpp_link_type_alias(mut &self, mut tokens: []Token): &TypeAliasDecl {
+        tokens = tokens[1:] // Remove "cpp" keyword.
+        let mut t = self.build_type_alias_decl(tokens)
+        if real(t) {
+            t.cpp_linked = true
+        }
+        ret t
+    }
+
+    fn build_cpp_link(mut &self, mut tokens: []Token): NodeData {
+        let mut token = tokens[0]
+        if tokens.len == 1 {
+            self.push_err(token, "invalid_syntax")
+            ret nil
+        }
+        token = tokens[1]
+        match token.id {
+        | TokenId.Fn
+        | TokenId.Unsafe:
+            ret self.build_cpp_link_fn(tokens)
+
+        | TokenId.Const
+        | TokenId.Let:
+            ret self.build_cpp_link_var(tokens)
+
+        | TokenId.Struct:
+            ret self.build_cpp_link_struct(tokens)
+
+        | TokenId.Type:
+            ret self.build_cpp_link_type_alias(tokens)
+
+        |:
+            self.push_err(token, "invalid_syntax")
+        }
+        ret nil
+    }
+
+    fn get_method(mut &self, mut tokens: []Token): &FnDecl {
+        let mut i = 0
+        let mut token = tokens[i]
+        if token.id == TokenId.Static {
+            if i+1 >= tokens.len {
+                self.push_err(token, "invalid_syntax")
+                ret new(FnDecl)
+            }
+            i++
+            token = tokens[i]
+        }
+
+        if token.id == TokenId.Unsafe {
+            if i+1 >= tokens.len {
+                self.push_err(token, "invalid_syntax")
+                ret new(FnDecl)
+            }
+            i++
+            token = tokens[i]
+        }
+
+        if token.id != TokenId.Fn {
+            self.push_err(token, "invalid_syntax")
+            ret new(FnDecl)
+        }
+
+        ret self.build_fn(tokens, true, false, false)
+    }
+
+    fn parse_impl_trait(mut &self, mut ipl: &Impl, mut tokens: []Token) {
+        let mut stms = split_stms(tokens)
+        for (_, mut st) in stms {
+            let mut tokens = st.tokens
+            let token = tokens[0]
+            match token.id {
+            | TokenId.Comment:
+                // Ignore.
+                continue
+
+            | TokenId.Static
+            | TokenId.Fn
+            | TokenId.Unsafe:
+                let mut f = self.get_method(tokens)
+                if real(f) {
+                    f.public = true
+                    self.check_method_receiver(f)
+                    ipl.methods = append(ipl.methods, f)
+                }
+
+            |:
+                self.push_err(token, "invalid_syntax")
+                continue
+            }
+        }
+    }
+
+    fn parse_impl_struct(mut &self, mut ipl: &Impl, mut tokens: []Token) {
+        let mut stms = split_stms(tokens)
+        for (_, mut st) in stms {
+            let mut tokens = st.tokens
+            let mut token = tokens[0]
+            let mut is_pub = false
+            match token.id {
+            | TokenId.Comment:
+                // Ignore.
+                continue
+
+            | TokenId.Pub:
+                is_pub = true
+                if tokens.len == 1 {
+                    self.push_err(tokens[0], "invalid_syntax")
+                    continue
+                }
+                tokens = tokens[1:]
+                if tokens.len > 0 {
+                    token = tokens[0]
+                }
+            }
+
+            match token.id {
+            | TokenId.Static
+            | TokenId.Fn
+            | TokenId.Unsafe:
+                let mut f = self.get_method(tokens)
+                if real(f) {
+                    f.public = is_pub
+                    self.check_method_receiver(f)
+                    ipl.methods = append(ipl.methods, f)
+                }
+
+            |:
+                self.push_err(token, "invalid_syntax")
+                continue
+            }
+        }
+    }
+
+    fn parse_impl_body(mut &self, mut ipl: &Impl, mut tokens: []Token) {
+        if ipl.is_trait_impl() {
+            self.parse_impl_trait(ipl, tokens)
+            ret
+        }
+        self.parse_impl_struct(ipl, tokens)
+    }
+
+    fn build_impl(mut &self, mut tokens: []Token): &Impl {
+        let mut token = tokens[0]
+        if tokens.len < 2 {
+            self.push_err(token, "invalid_syntax")
+            ret new(Impl)
+        }
+        token = tokens[1]
+        if token.id != TokenId.Ident {
+            self.push_err(token, "invalid_syntax")
+            ret new(Impl)
+        }
+        if tokens.len < 3 {
+            self.push_err(token, "invalid_syntax")
+            ret new(Impl)
+        }
+        let mut ipl = &Impl{
+            base: token,
+        }
+        token = tokens[2]
+        if token.id != TokenId.Iter {
+            if token.id == TokenId.Range && token.kind == str(TokenKind.LBrace) {
+                // This implementation is single.
+                // Just implements to destination.
+                // Therefore, swap Base and Dest tokens.
+                ipl.base, ipl.dest = ipl.dest, ipl.base
+
+                tokens = tokens[2:]  // Remove prefix tokens.
+                goto body
+            }
+            self.push_err(token, "invalid_syntax")
+            ret new(Impl)
+        }
+        if tokens.len < 4 {
+            self.push_err(token, "invalid_syntax")
+            ret new(Impl)
+        }
+        token = tokens[3]
+        if token.id != TokenId.Ident {
+            self.push_err(token, "invalid_syntax")
+            ret new(Impl)
+        }
+        ipl.dest = token
+        tokens = tokens[4:] // Remove prefix tokens.
+    body:
+        let mut i = 0
+        let mut body_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
+        if body_tokens == nil {
+            self.stop()
+            self.push_err(ipl.base, "body_not_exist")
+            ret new(Impl)
+        }
+        if i < tokens.len {
+            self.push_err(tokens[i], "invalid_syntax")
+        }
+        self.parse_impl_body(ipl, body_tokens)
+        ret ipl
+    }
+
+    fn build_node_data(mut &self, mut tokens: []Token): NodeData {
+        let mut token = tokens[0]
+        match token.id {
+        | TokenId.Use:
+            ret self.build_use_decl(tokens)
+
+        | TokenId.Fn
+        | TokenId.Unsafe:
+            let mut f = self.build_fn(tokens, false, false, false)
+            if real(f) {
+                f.global = true
+            }
+            ret f
+
+        | TokenId.Let
+        | TokenId.Const
+        | TokenId.Mut
+        | TokenId.Static:
+            ret self.build_var(tokens)
+
+        | TokenId.Type:
+            ret self.build_type_alias_decl(tokens)
+
+        | TokenId.Enum:
+            ret self.build_enum_decl(tokens)
+
+        | TokenId.Struct:
+            ret self.build_struct_decl(tokens)
+
+        | TokenId.Trait:
+            ret self.build_trait_decl(tokens)
+
+        | TokenId.Impl:
+            ret self.build_impl(tokens)
+
+        | TokenId.Cpp:
+            ret self.build_cpp_link(tokens)
+
+        | TokenId.Comment:
+            // Push first token because this is full text comment.
+            // Comments are just single-line.
+            // Range comments not accepts by lexer.
+            let mut c = build_comment(token)
+            self.process_comment(c)
+            ret c
+
+        |:
+            self.push_err(token, "invalid_syntax")
+            ret nil
+        }
+    }
+
+    fn check_comment_group(mut self, node: Node) {
+        if !real(self.comment_group) {
+            ret
+        }
+        match type node.data {
+        | &Comment
+        | &Directive:
+            // Ignore
+
+        |:
+            drop(self.comment_group)
+        }
+    }
+
+    fn check_directive(mut self, node: Node) {
+        if self.directives == nil {
+            ret
+        }
+
+        match type node.data {
+        | &Directive
+        | &Comment:
+            // Ignore
+
+        |:
+            self.directives = nil
+        }
+    }
+
+    fn apply_meta(mut self, mut node: Node, mut is_pub: bool) {
+        match type node.data {
+        | &VarDecl:
+            let mut v = (&VarDecl)(node.data)
+            if !real(v) {
+                ret
+            }
+            v.public = is_pub
+            v.doc_comments = self.comment_group
+            is_pub = false
+            drop(self.comment_group)
+
+        | &FnDecl:
+            let mut f = (&FnDecl)(node.data)
+            if !real(f) {
+                ret
+            }
+
+            f.public = is_pub
+            is_pub = false
+            f.directives = self.directives
+            self.directives = nil
+            f.doc_comments = self.comment_group
+            drop(self.comment_group)
+
+        | &TypeAliasDecl:
+            let mut tad = (&TypeAliasDecl)(node.data)
+            if !real(tad) {
+                ret
+            }
+            tad.public = is_pub
+            is_pub = false
+            tad.doc_comments = self.comment_group
+            drop(self.comment_group)
+
+        | &EnumDecl:
+            let mut ed = (&EnumDecl)(node.data)
+            if !real(ed) {
+                ret
+            }
+            ed.doc_comments = self.comment_group
+            drop(self.comment_group)
+            ed.public = is_pub
+            is_pub = false
+
+        | &StructDecl:
+            let mut sd = (&StructDecl)(node.data)
+            if !real(sd) {
+                ret
+            }
+            sd.directives = self.directives
+            self.directives = nil
+            sd.doc_comments = self.comment_group
+            drop(self.comment_group)
+            sd.public = is_pub
+            is_pub = false
+
+        | &TraitDecl:
+            let mut td = (&TraitDecl)(node.data)
+            if !real(td) {
+                ret
+            }
+            td.doc_comments = self.comment_group
+            drop(self.comment_group)
+            td.public = is_pub
+            is_pub = false
+        }
+        if is_pub {
+            self.push_err(node.token, "def_not_support_pub")
+        }
+    }
+
+    fn check_use_decl(mut self, node: Node) {
+        match type node.data {
+        | &UseDecl:
+            // Ignore.
+
+        |:
+            ret
+        }
+
+        if self.ast.decls.len() > 0 {
+            self.push_err(node.token, "use_decl_at_body")
+        }
+    }
+
+    fn build_general_scope_node_data(mut &self, mut st: []Token): (is_pub: bool, data: NodeData) {
+        // Detect pub keyword.
+        if st[0].id == TokenId.Pub {
+            is_pub = true
+            st = st[1:]
+            if st.len == 0 {
+                self.push_err(st[0], "invalid_syntax")
+                ret
+            }
+        }
+
+        data = self.build_node_data(st)
+        ret is_pub, data
+    }
+
+    fn parse_node(mut &self, mut st: []Token): Node {
+        let mut node = Node{
+            token: st[0],
+        }
+
+        let (is_pub, mut data) = self.build_general_scope_node_data(st)
+        if data == nil {
+            ret node
+        }
+
+        node.data = data
+
+        self.apply_meta(node, is_pub)
+        self.check_comment_group(node)
+        self.check_directive(node)
+        self.check_use_decl(node)
+        ret node
+    }
+
+    fn append_node(mut &self, mut st: []Token) {
+        if st.len == 0 {
+            ret
+        }
+
+        let mut node = self.parse_node(st)
+        if node.data == nil || self.stopped() {
+            ret
+        }
+
+        match {
+        | node.is_use_decl():
+            self.ast.use_decls.push((&UseDecl)(node.data))
+
+        | node.is_decl():
+            // Use declarations eliminated.
+            self.ast.decls.push(node)
+
+        | node.is_comment():
+            // Global scope is not appends &CommentGroup.
+            let mut c = (&Comment)(node.data)
+            self.ast.comments.push(c)
+
+        | node.is_impl():
+            self.ast.impls.push((&Impl)(node.data))
+
+        |:
+            self.push_err(node.token, "invalid_syntax")
+        }
+    }
+
+    fn remove_range(self, mut i: int, kind: str, &tokens: []Token, mut &ranges: []int) {
+        let close = get_close_kind_of_brace(kind)
+        for i >= 0; i-- {
+            let tok = tokens[ranges[i]]
+            if tok.kind != close {
+                continue
+            }
+
+            ranges = append(ranges[:i], ranges[i+1:]...)
+            break
+        }
+    }
+
+    fn push_wrong_order_close_err(mut self, t: Token, &tokens: []Token, &ranges: []int) {
+        let mut msg = ""
+        match tokens[ranges[ranges.len-1]].kind {
+        | str(TokenKind.LParent):  msg = "expected_parentheses_close"
+        | str(TokenKind.LBrace):   msg = "expected_brace_close"
+        | str(TokenKind.LBracket): msg = "expected_bracket_close"
+        }
+
+        self.push_err(t, msg)
+    }
+
+    fn push_range_close(mut self, t: Token, left: str, &tokens: []Token, mut &ranges: []int) {
+        let n = ranges.len
+        if n == 0 {
+            match t.kind {
+            | str(TokenKind.RBracket): self.push_err(t, "extra_closed_brackets")
+            | str(TokenKind.RBrace):   self.push_err(t, "extra_closed_braces")
+            | str(TokenKind.RParent):  self.push_err(t, "extra_closed_parentheses")
+            }
+            ret
+        } else if tokens[ranges[n-1]].kind != left {
+            self.push_wrong_order_close_err(t, tokens, ranges)
+        }
+        self.remove_range(n-1, t.kind, tokens, ranges)
+    }
+
+    fn check_ranges(mut self, tokens: []Token) {
+        let mut ranges: []int = nil
+
+        for i, token in tokens {
+            if token.id != TokenId.Range {
+                continue
+            }
+
+            match token.kind {
+            | str(TokenKind.LParent)
+            | str(TokenKind.LBrace)
+            | str(TokenKind.LBracket):
+                ranges = append(ranges, i)
+
+            | str(TokenKind.RParent):
+                self.push_range_close(token, str(TokenKind.LParent), tokens, ranges)
+
+            | str(TokenKind.RBrace):
+                self.push_range_close(token, str(TokenKind.LBrace), tokens, ranges)
+
+            | str(TokenKind.RBracket):
+                self.push_range_close(token, str(TokenKind.LBracket), tokens, ranges)
+            }
+        }
+
+        for _, i in ranges {
+            let token = tokens[i]
+            match token.kind {
+            | str(TokenKind.LParent):  self.push_err(token, "wait_close_parentheses")
+            | str(TokenKind.LBrace):   self.push_err(token, "wait_close_brace")
+            | str(TokenKind.LBracket): self.push_err(token, "wait_close_bracket")
+            }
+        }
+    }
+
+    fn parse(mut &self, mut f: &File) {
+        self.ast = &Ast{
+            file: f,
+        }
+
+        let mut tokens = unsafe { cpp.__jule_parser_vector_as_slice[Vector[Token], Token](f.tokens()) }
+
+        self.check_ranges(tokens)
+        if self.errors.len > 0 {
+            ret
+        }
+
+        let mut stms = split_stms(tokens)
+
+        // Get top directives.
+        let mut i = 0
+        for i < stms.len; i++ {
+            let mut st = stms[i]
+            if st.tokens.len == 0 {
+                ret
+            }
+
+            let (_, mut data) = self.build_general_scope_node_data(st.tokens)
+            if data == nil {
+                break
+            }
+
+            if self.stopped() {
+                ret
+            }
+
+            let mut node = Node{data: data}
+            if node.is_comment() {
+                let mut d = self.get_directive((&Comment)(node.data))
+                if real(d) && is_top_directive(d.tag) {
+                    self.ast.top_directives.push(d)
+                }
+            } else {
+                break
+            }
+        }
+
+        // Remove all errors.
+        self.errors = nil
+
+        for i < stms.len; i++ {
+            let mut st = stms[i]
+            self.append_node(st.tokens)
+
+            if self.stopped() {
+                break
+            }
+        }
+    }
 }

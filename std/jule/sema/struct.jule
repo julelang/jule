@@ -9,261 +9,261 @@ use std::vector::{Vector}
 
 // Field.
 pub struct Field {
-	pub owner:   &Struct
-	pub token:   Token
-	pub public:  bool
-	pub mutable: bool // Interior mutability.
-	pub ident:   str
-	pub kind:    &TypeSymbol
+    pub owner:   &Struct
+    pub token:   Token
+    pub public:  bool
+    pub mutable: bool // Interior mutability.
+    pub ident:   str
+    pub kind:    &TypeSymbol
 }
 
 impl Field {
-	fn instance(mut &self): &FieldIns {
-		ret &FieldIns{
-			decl: self,
-			kind: self.kind.kind,
-		}
-	}
+    fn instance(mut &self): &FieldIns {
+        ret &FieldIns{
+            decl: self,
+            kind: self.kind.kind,
+        }
+    }
 }
 
 // Structure.
 pub struct Struct {
-	// Used for type parsing.
-	// Used declaration'sema sema for instance type checking.
-	sema: &Sema
+    // Used for type parsing.
+    // Used declaration'sema sema for instance type checking.
+    sema: &Sema
 
-	// This structure depended to these structures.
-	// Only stores plain identifier references such as A, B, and MyStruct.
-	// Not includes non-pain identifier references such as *A, &B, and []MyStruct.
-	pub depends: []&Struct
+    // This structure depended to these structures.
+    // Only stores plain identifier references such as A, B, and MyStruct.
+    // Not includes non-pain identifier references such as *A, &B, and []MyStruct.
+    pub depends: []&Struct
 
-	// This structures uses these structures.
-	// Stores all referred structures.
-	pub uses: []&Struct
+    // This structures uses these structures.
+    // Stores all referred structures.
+    pub uses: []&Struct
 
-	pub token:      Token
-	pub ident:      str
-	pub fields:     []&Field
-	pub methods:    Vector[&Fn]
-	pub public:     bool
-	pub cpp_linked: bool
-	pub directives: []&Directive
-	pub doc:        str
-	pub generics:   []&GenericDecl
-	pub implements: []&Trait
+    pub token:      Token
+    pub ident:      str
+    pub fields:     []&Field
+    pub methods:    Vector[&Fn]
+    pub public:     bool
+    pub cpp_linked: bool
+    pub directives: []&Directive
+    pub doc:        str
+    pub generics:   []&GenericDecl
+    pub implements: []&Trait
 
-	// Structure instances for each unique type combination of structure.
-	// Nil if structure is never used.
-	pub instances: []&StructIns
+    // Structure instances for each unique type combination of structure.
+    // Nil if structure is never used.
+    pub instances: []&StructIns
 }
 
 impl Struct {
-	fn instance(mut &self): &StructIns {
-		// Returns already created instance for just one unique combination.
-		if self.generics.len == 0 && self.instances.len == 1 {
-			ret self.instances[0]
-		}
+    fn instance(mut &self): &StructIns {
+        // Returns already created instance for just one unique combination.
+        if self.generics.len == 0 && self.instances.len == 1 {
+            ret self.instances[0]
+        }
 
-		let mut ins = &StructIns{
-			decl:       self,
-			fields:     make([]&FieldIns, self.fields.len),
-			methods:    make([]&Fn, self.methods.len()),
-			references: new_reference_stack(),
-		}
+        let mut ins = &StructIns{
+            decl:       self,
+            fields:     make([]&FieldIns, self.fields.len),
+            methods:    make([]&Fn, self.methods.len()),
+            references: new_reference_stack(),
+        }
 
-		for (i, mut f) in self.fields {
-			ins.fields[i] = f.instance()
-			if real(f.kind.kind) && is_mut(f.kind.kind) {
-				ins.has_mut = true
-			}
-		}
+        for (i, mut f) in self.fields {
+            ins.fields[i] = f.instance()
+            if real(f.kind.kind) && is_mut(f.kind.kind) {
+                ins.has_mut = true
+            }
+        }
 
-		let mut i = 0
-		for i < self.methods.len(); i++ {
-			let mut f = self.methods.at(i)
-			let mut fins = &Fn{
-				sema: f.sema,
-				token: f.token,
-				global: f.global,
-				unsafety: f.unsafety,
-				public: f.public,
-				cpp_linked: f.cpp_linked,
-				statically: f.statically,
-				ident: f.ident,
-				directives: f.directives,
-				doc: f.doc,
-				scope: f.scope,
-				generics: f.generics,
-				result: f.result,
-				params: f.params,
-				owner: f.owner,
-				instances: nil,
-			}
-			ins.methods[i] = fins
-		}
+        let mut i = 0
+        for i < self.methods.len(); i++ {
+            let mut f = self.methods.at(i)
+            let mut fins = &Fn{
+                sema: f.sema,
+                token: f.token,
+                global: f.global,
+                unsafety: f.unsafety,
+                public: f.public,
+                cpp_linked: f.cpp_linked,
+                statically: f.statically,
+                ident: f.ident,
+                directives: f.directives,
+                doc: f.doc,
+                scope: f.scope,
+                generics: f.generics,
+                result: f.result,
+                params: f.params,
+                owner: f.owner,
+                instances: nil,
+            }
+            ins.methods[i] = fins
+        }
 
-		ret ins
-	}
+        ret ins
+    }
 
-	// Appends instance if unique.
-	// Returns already exist instance if given insance is not unique.
-	fn append_instance(mut self, mut ins: &StructIns): &StructIns {
-		// Skip already created instance for just one unique combination.
-		if self.generics.len == 0 && self.instances.len == 1 {
-			ret self.instances[0]
-		}
+    // Appends instance if unique.
+    // Returns already exist instance if given insance is not unique.
+    fn append_instance(mut self, mut ins: &StructIns): &StructIns {
+        // Skip already created instance for just one unique combination.
+        if self.generics.len == 0 && self.instances.len == 1 {
+            ret self.instances[0]
+        }
 
-		for (_, mut ains) in self.instances {
-			for i, ag in ains.generics {
-				if ag.equals(ins.generics[i]) {
-					// Instance exist.
-					ret ains
-				}
-			}
-		}
+        for (_, mut ains) in self.instances {
+            for i, ag in ains.generics {
+                if ag.equals(ins.generics[i]) {
+                    // Instance exist.
+                    ret ains
+                }
+            }
+        }
 
-		self.instances = append(self.instances, ins)
-		ret new(StructIns)
-	}
+        self.instances = append(self.instances, ins)
+        ret new(StructIns)
+    }
 
-	// Returns method by identifier.
-	// Returns nil reference if not exist any method in this identifier.
-	pub fn find_method(mut self, ident: str, statically: bool): &Fn {
-		let mut i = 0
-		for i < self.methods.len(); i++ {
-			let mut f = self.methods.at(i)
-			if f.statically == statically && f.ident == ident {
-				ret f
-			}
-		}
-		ret new(Fn)
-	}
+    // Returns method by identifier.
+    // Returns nil reference if not exist any method in this identifier.
+    pub fn find_method(mut self, ident: str, statically: bool): &Fn {
+        let mut i = 0
+        for i < self.methods.len(); i++ {
+            let mut f = self.methods.at(i)
+            if f.statically == statically && f.ident == ident {
+                ret f
+            }
+        }
+        ret new(Fn)
+    }
 
-	// Returns field by identifier.
-	// Returns nil reference if not exist any field in this identifier.
-	pub fn find_field(mut self, ident: str): &Field {
-		for (_, mut f) in self.fields {
-			if f.ident == ident {
-				ret f
-			}
-		}
-		ret new(Field)
-	}
+    // Returns field by identifier.
+    // Returns nil reference if not exist any field in this identifier.
+    pub fn find_field(mut self, ident: str): &Field {
+        for (_, mut f) in self.fields {
+            if f.ident == ident {
+                ret f
+            }
+        }
+        ret new(Field)
+    }
 
-	// Reports whether structure implements given trait.
-	pub fn is_implements(self, t: &Trait): bool {
-		for _, it in self.implements {
-			if &t == &it {
-				ret true
-			}
-		}
-		ret false
-	}
+    // Reports whether structure implements given trait.
+    pub fn is_implements(self, t: &Trait): bool {
+        for _, it in self.implements {
+            if &t == &it {
+                ret true
+            }
+        }
+        ret false
+    }
 
-	// Reports whether structure is derives given derive.
-	pub fn is_derives(self, ident: str): bool {
-		for _, d in self.directives {
-			if d.tag == str(std::jule::build::Directive.Derive) {
-				if d.args.len == 1 && d.args[0] == ident {
-					ret true
-				}
-			}
-		}
-		ret false
-	}
+    // Reports whether structure is derives given derive.
+    pub fn is_derives(self, ident: str): bool {
+        for _, d in self.directives {
+            if d.tag == str(std::jule::build::Directive.Derive) {
+                if d.args.len == 1 && d.args[0] == ident {
+                    ret true
+                }
+            }
+        }
+        ret false
+    }
 
-	// Reports whether structure is uses given structure.
-	pub fn is_uses(self, s: &Struct): bool {
-		for _, u in self.uses {
-			for &s == &u {
-				ret true
-			}
-		}
-		ret false
-	}
+    // Reports whether structure is uses given structure.
+    pub fn is_uses(self, s: &Struct): bool {
+        for _, u in self.uses {
+            for &s == &u {
+                ret true
+            }
+        }
+        ret false
+    }
 }
 
 // Field instance.
 pub struct FieldIns {
-	pub decl: &Field
-	pub kind: &TypeKind
+    pub decl: &Field
+    pub kind: &TypeKind
 }
 
 // Structure instance.
 pub struct StructIns {
-	pub checked:    bool
-	pub decl:       &Struct
-	pub generics:   []&TypeKind
-	pub fields:     []&FieldIns
-	pub methods:    []&Fn
-	pub has_mut:    bool // This structure has mutable defines.
-	pub references: &ReferenceStack
+    pub checked:    bool
+    pub decl:       &Struct
+    pub generics:   []&TypeKind
+    pub fields:     []&FieldIns
+    pub methods:    []&Fn
+    pub has_mut:    bool // This structure has mutable defines.
+    pub references: &ReferenceStack
 }
 
 impl Kind for StructIns {
-	// Implement: Kind
-	// Returns Struct's type kind as string.
-	fn to_str(self): str {
-		let mut kind = ""
-		kind += self.decl.ident
-		if self.generics.len > 0 {
-			kind += "["
-			for _, g in self.generics {
-				kind += g.to_str()
-				kind += ","
-			}
-			kind = kind[:kind.len-1] // Remove comma.
-			kind += "]"
-		}
-		ret kind
-	}
+    // Implement: Kind
+    // Returns Struct's type kind as string.
+    fn to_str(self): str {
+        let mut kind = ""
+        kind += self.decl.ident
+        if self.generics.len > 0 {
+            kind += "["
+            for _, g in self.generics {
+                kind += g.to_str()
+                kind += ","
+            }
+            kind = kind[:kind.len-1] // Remove comma.
+            kind += "]"
+        }
+        ret kind
+    }
 
-	// Reports whether types are same.
-	fn equals(self, other: &TypeKind): bool {
-		let s = unsafe { (&other).strct() }
-		if !real(s) {
-			ret false
-		}
+    // Reports whether types are same.
+    fn equals(self, other: &TypeKind): bool {
+        let s = unsafe { (&other).strct() }
+        if !real(s) {
+            ret false
+        }
 
-		if &self.decl != &s.decl {
-			ret false
-		}
+        if &self.decl != &s.decl {
+            ret false
+        }
 
-		if self.generics.len != s.generics.len {
-			ret false
-		}
+        if self.generics.len != s.generics.len {
+            ret false
+        }
 
-		let mut i = 0
-		for i < self.generics.len; i++ {
-			if !self.generics[i].equals(s.generics[i]) {
-				ret false
-			}
-		}
+        let mut i = 0
+        for i < self.generics.len; i++ {
+            if !self.generics[i].equals(s.generics[i]) {
+                ret false
+            }
+        }
 
-		ret true
-	}
+        ret true
+    }
 }
 
 impl StructIns {
-	// Returns method by identifier.
-	// Returns nil reference if not exist any method in this identifier.
-	pub fn find_method(mut self, ident: str, statically: bool): &Fn {
-		for (_, mut f) in self.methods {
-			if f.statically == statically && f.ident == ident {
-				ret f
-			}
-		}
-		ret new(Fn)
-	}
+    // Returns method by identifier.
+    // Returns nil reference if not exist any method in this identifier.
+    pub fn find_method(mut self, ident: str, statically: bool): &Fn {
+        for (_, mut f) in self.methods {
+            if f.statically == statically && f.ident == ident {
+                ret f
+            }
+        }
+        ret new(Fn)
+    }
 
-	// Returns field by identifier.
-	// Returns nil reference if not exist any field in this identifier.
-	pub fn find_field(mut self, ident: str): &FieldIns {
-		for (_, mut f) in self.fields {
-			if f.decl.ident == ident {
-				ret f
-			}
-		}
-		ret new(FieldIns)
-	}
+    // Returns field by identifier.
+    // Returns nil reference if not exist any field in this identifier.
+    pub fn find_field(mut self, ident: str): &FieldIns {
+        for (_, mut f) in self.fields {
+            if f.decl.ident == ident {
+                ret f
+            }
+        }
+        ret new(FieldIns)
+    }
 }

@@ -18,27 +18,27 @@ namespace fs = std::filesystem;
 #endif
 
 struct JuleCompileTime {
-	jule::Int day;
-	jule::Int month;
-	jule::Int year;
-	jule::Int hour;
-	jule::Int minute;
+    jule::Int day;
+    jule::Int month;
+    jule::Int year;
+    jule::Int hour;
+    jule::Int minute;
 };
 
 JuleCompileTime time_now(void);
 
 JuleCompileTime time_now(void) {
-	time_t now;
-	time(&now);
+    time_t now;
+    time(&now);
 
-	struct tm *time{ localtime(&now) };
-	return JuleCompileTime{
-		time->tm_mday,
-		time->tm_mon + 1,
-		time->tm_year + 1900,
-		time->tm_hour,
-		time->tm_min,
-	};
+    struct tm *time{ localtime(&now) };
+    return JuleCompileTime{
+        time->tm_mday,
+        time->tm_mon + 1,
+        time->tm_year + 1900,
+        time->tm_hour,
+        time->tm_min,
+    };
 }
 
 #endif // __JULEC_OBJ_CXX
