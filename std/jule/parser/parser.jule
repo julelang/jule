@@ -928,10 +928,10 @@ impl Parser {
     }
 
     fn build_cpp_use_decl(mut self, mut decl: &UseDecl, tokens: []Token) {
-        if tokens.len > 2 {
-            self.push_err(tokens[2], "invalid_syntax")
+        if tokens.len > 1 {
+            self.push_err(tokens[1], "invalid_syntax")
         }
-        let token = tokens[1]
+        let token = tokens[0]
         if token.id != TokenId.Lit || (token.kind[0] != '`' && token.kind[0] != '"') {
             self.push_err(token, "invalid_expr")
             ret
@@ -1073,12 +1073,12 @@ impl Parser {
     }
 
     fn parse_use_decl(mut self, mut decl: &UseDecl, mut tokens: []Token) {
-        let token = tokens[0]
-        if token.id == TokenId.Cpp {
+        if decl.cpp_linked {
             self.build_cpp_use_decl(decl, tokens)
             ret
         }
 
+        let token = tokens[0]
         if token.id != TokenId.Ident {
             self.push_err(token, "invalid_syntax")
             ret
@@ -1095,9 +1095,10 @@ impl Parser {
         }
     }
 
-    fn build_use_decl(mut self, mut tokens: []Token): &UseDecl {
+    fn build_use_decl(mut self, mut tokens: []Token, cpp_linked: bool): &UseDecl {
         let mut decl = &UseDecl{
-            token: tokens[0],
+            token:      tokens[0],
+            cpp_linked: cpp_linked,
         }
         if tokens.len < 2 {
             self.push_err(decl.token, "missing_use_path")
@@ -1432,6 +1433,17 @@ impl Parser {
         ret t
     }
 
+    fn build_cpp_link_use(mut &self, mut tokens: []Token): &UseDecl {
+        if tokens.len == 1 {
+            self.push_err(tokens[0], "invalid_syntax")
+            ret new(UseDecl)
+        }
+        tokens = tokens[1:] // Remove the "cpp" keyword.
+
+        const CPP_LINKED = true
+        ret self.build_use_decl(tokens, CPP_LINKED)
+    }
+
     fn build_cpp_link(mut &self, mut tokens: []Token): NodeData {
         let mut token = tokens[0]
         if tokens.len == 1 {
@@ -1440,6 +1452,9 @@ impl Parser {
         }
         token = tokens[1]
         match token.id {
+        | TokenId.Use:
+            ret self.build_cpp_link_use(tokens)
+
         | TokenId.Fn
         | TokenId.Unsafe:
             ret self.build_cpp_link_fn(tokens)
@@ -1627,7 +1642,8 @@ impl Parser {
         let mut token = tokens[0]
         match token.id {
         | TokenId.Use:
-            ret self.build_use_decl(tokens)
+            const CPP_LINKED = false
+            ret self.build_use_decl(tokens, CPP_LINKED)
 
         | TokenId.Fn
         | TokenId.Unsafe:
