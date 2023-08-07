@@ -22,18 +22,18 @@ namespace jule {
     typedef jule::I32 Rune; // builtin: type rune: i32
 
     template<typename T>
-    inline void out(const T &obj)  ;
+    inline void out(const T &obj);
 
     template<typename T>
-    inline void outln(const T &obj)  ;
+    inline void outln(const T &obj);
 
     template<typename Item>
     jule::Int copy(const jule::Slice<Item> &dest,
-                      const jule::Slice<Item> &src)  ;
+                      const jule::Slice<Item> &src);
 
     template<typename Item>
     jule::Slice<Item> append(const jule::Slice<Item> &src,
-                             const jule::Slice<Item> &components)  ;
+                             const jule::Slice<Item> &components);
 
     template<typename T>
     inline void drop(T &obj)  ;

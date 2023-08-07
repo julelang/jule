@@ -17,6 +17,7 @@ namespace jule {
     void panic(const T &expr);
     void panic(const char *expr);
     void panic(char *expr);
+    void panic(const std::string &expr);
 
     class Exception: public std::exception {
     private:
@@ -53,6 +54,11 @@ namespace jule {
     }
 
     void panic(char *expr) {
+        jule::Exception exception(expr);
+        throw exception;
+    }
+
+    void panic(const std::string &expr) {
         jule::Exception exception(expr);
         throw exception;
     }

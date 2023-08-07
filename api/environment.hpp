@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-#ifndef __JULE_PROCESS_HPP
-#define __JULE_PROCESS_HPP
+#ifndef __JULE_ENVIRONMENT_HPP
+#define __JULE_ENVIRONMENT_HPP
 
 #include <cstring>
 
@@ -27,9 +27,9 @@ namespace jule {
     jule::Slice<jule::Str> command_line_args;
     jule::Slice<jule::Str> environment_variables;
 
-    void setup_command_line_args(int argc, char *argv[])  ;
-    void setup_environment_variables(char **envp)  ;
-    jule::Str executable(void)  ;
+    void setup_command_line_args(int argc, char *argv[]);
+    void setup_environment_variables(char **envp);
+    jule::Str executable(void);
 
     void setup_command_line_args(int argc, char *argv[]) {
 #ifdef OS_WINDOWS
@@ -95,4 +95,4 @@ namespace jule {
 
 } // namespace jule
 
-#endif // ifndef __JULE_PROCESS_HPP
+#endif // ifndef __JULE_ENVIRONMENT_HPP

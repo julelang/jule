@@ -11,7 +11,7 @@
 
 namespace jule {
     template<typename T, typename Denominator>
-    auto div(const T &x, const Denominator &denominator)  ;
+    auto div(const T &x, const Denominator &denominator);
 
     template<typename T>
     jule::Ref<T> new_struct(T *ptr);

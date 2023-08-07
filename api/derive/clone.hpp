@@ -16,24 +16,24 @@
 
 namespace jule {
 
-    char clone(const char &x)  ;
-    signed char clone(const signed char &x)  ;
-    unsigned char clone(const unsigned char &x)  ;
-    char *clone(char *x)  ;
-    const char *clone(const char *x)  ;
-    jule::Int clone(const jule::Int &x)  ;
-    jule::Uint clone(const jule::Uint &x)  ;
-    jule::Bool clone(const jule::Bool &x)  ;
-    jule::Str clone(const jule::Str &x)  ;
-    template<typename Item> jule::Slice<Item> clone(const jule::Slice<Item> &s)  ;
-    template<typename Item, const jule::Uint N> jule::Array<Item, N> clone(const jule::Array<Item, N> &arr)  ;
-    template<typename Key, typename Value> jule::Map<Key, Value> clone(const jule::Map<Key, Value> &m)  ;
-    template<typename T> jule::Ref<T> clone(const jule::Ref<T> &r)  ;
-    template<typename T> jule::Trait<T> clone(const jule::Trait<T> &t)  ;
-    template<typename T> jule::Fn<T> clone(const jule::Fn<T> &fn)  ;
-    template<typename T> T *clone(T *ptr)  ;
-    template<typename T> const T *clone(const T *ptr)  ;
-    template<typename T> T clone(const T &t)  ;
+    char clone(const char &x);
+    signed char clone(const signed char &x);
+    unsigned char clone(const unsigned char &x);
+    char *clone(char *x);
+    const char *clone(const char *x);
+    jule::Int clone(const jule::Int &x);
+    jule::Uint clone(const jule::Uint &x);
+    jule::Bool clone(const jule::Bool &x);
+    jule::Str clone(const jule::Str &x);
+    template<typename Item> jule::Slice<Item> clone(const jule::Slice<Item> &s);
+    template<typename Item, const jule::Uint N> jule::Array<Item, N> clone(const jule::Array<Item, N> &arr);
+    template<typename Key, typename Value> jule::Map<Key, Value> clone(const jule::Map<Key, Value> &m);
+    template<typename T> jule::Ref<T> clone(const jule::Ref<T> &r);
+    template<typename T> jule::Trait<T> clone(const jule::Trait<T> &t);
+    template<typename T> jule::Fn<T> clone(const jule::Fn<T> &fn);
+    template<typename T> T *clone(T *ptr);
+    template<typename T> const T *clone(const T *ptr);
+    template<typename T> T clone(const T &t);
 
     char clone(const char &x) { return x; }
     signed char clone(const signed char &x) { return x; }

@@ -184,7 +184,7 @@ namespace jule {
 
             if (start < 0 || end < 0 || start > end || end > this->cap()) {
                 std::stringstream sstream;
-                __JULEC_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(sstream, start, end);
+                __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(sstream, start, end);
                 jule::panic(sstream.str().c_str());
             }
 
@@ -266,7 +266,7 @@ namespace jule {
             this->check();
             if (this->empty() || index < 0 || this->len() <= index) {
                 std::stringstream sstream;
-                __JULEC_WRITE_ERROR_INDEX_OUT_OF_RANGE(sstream, index);
+                __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(sstream, index);
                 jule::panic(sstream.str().c_str());
             }
             return this->_slice[index];

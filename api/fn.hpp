@@ -21,7 +21,7 @@ namespace jule {
     template <typename > struct Fn;
 
     template<typename T, typename... U>
-    jule::Uintptr addr_of_fn(std::function<T(U...)> f)  ;
+    jule::Uintptr addr_of_fn(std::function<T(U...)> f);
 
     template <typename Function>
     struct Fn {

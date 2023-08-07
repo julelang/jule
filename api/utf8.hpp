@@ -51,8 +51,8 @@ namespace jule {
     // Declarations
 
     struct UTF8AcceptRange;
-    std::tuple<jule::I32, jule::Int> utf8_decode_rune_str(const char *s, const jule::Int &len)  ;
-    jule::Slice<jule::U8> utf8_rune_to_bytes(const jule::I32 &r)  ;
+    std::tuple<jule::I32, jule::Int> utf8_decode_rune_str(const char *s, const jule::Int &len);
+    jule::Slice<jule::U8> utf8_rune_to_bytes(const jule::I32 &r);
 
     // Definitions
 

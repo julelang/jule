@@ -30,7 +30,7 @@ namespace jule {
     };
 
     // JuleC terminate handler.
-    void terminate_handler(void)  ;
+    void terminate_handler(void);
 
     jule::Trait<Error> exception_to_error(const jule::Exception &exception);
 

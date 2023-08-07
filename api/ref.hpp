@@ -14,6 +14,8 @@
 
 namespace jule {
 
+    // The reference counting data delta value that must occur
+    // per each reference counting operation.
     constexpr signed int REFERENCE_DELTA{ 1 };
 
     // Wrapper structure for raw pointer of JuleC.
@@ -22,17 +24,22 @@ namespace jule {
     template<typename T>
     struct Ref;
 
+    // Equavelent of Jule's new(T) call.
     template<typename T>
-    inline jule::Ref<T> new_ref(void)  ;
+    inline jule::Ref<T> new_ref(void);
 
+    // Equavelent of Jule's new(T, EXPR) call.
     template<typename T>
-    inline jule::Ref<T> new_ref(const T &init)  ;
+    inline jule::Ref<T> new_ref(const T &init);
 
     template<typename T>
     struct Ref {
         mutable T *alloc{ nullptr };
         mutable jule::Uint *ref{ nullptr };
 
+        // Creates new reference from allocation and reference counting
+        // allocation. Reference does not counted if reference count
+        // allocation is null.
         static jule::Ref<T> make(T *ptr, jule::Uint *ref) {
             jule::Ref<T> buffer;
             buffer.alloc = ptr;
@@ -40,6 +47,9 @@ namespace jule {
             return buffer;
         }
 
+        // Creates new reference from allocation.
+        // Allocates new allocation for reference counting data and
+        // starts counting to jule::REFERENCE_DELTA.
         static jule::Ref<T> make(T *ptr) {
             jule::Ref<T> buffer;
 
@@ -107,6 +117,9 @@ namespace jule {
                 this->ref, __JULE_ATOMIC_MEMORY_ORDER__RELAXED);
         }
 
+        // Drops reference.
+        // This function will destruct this instace for reference counting.
+        // Frees memory if reference counting reaches to zero.
         void drop(void) const {
             if (!this->ref) {
                 this->alloc = nullptr;
@@ -126,7 +139,9 @@ namespace jule {
             this->alloc = nullptr;
         }
 
-        inline jule::Bool real() const
+        // Reports whether reference is counting for allocation.
+        // In other word, allocation is nil or not.
+        inline jule::Bool real(void) const
         { return this->alloc != nullptr; }
 
         inline T *operator->(void) const {
@@ -144,6 +159,7 @@ namespace jule {
             return *this->alloc;
         }
 
+        // Returns data of allocation.
         inline T& get(void)
         { return this->operator T&(); }
 

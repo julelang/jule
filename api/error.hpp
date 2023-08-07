@@ -5,7 +5,7 @@
 #ifndef __JULE_ERROR_HPP
 #define __JULE_ERROR_HPP
 
-#define __JULEC_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(STREAM, START, LEN) \
+#define __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(STREAM, START, LEN) \
     (   \
         STREAM << jule::ERROR_INDEX_OUT_OF_RANGE \
                << '[' \
@@ -14,7 +14,7 @@
                << LEN \
                << ']' \
     )
-#define __JULEC_WRITE_ERROR_INDEX_OUT_OF_RANGE(STREAM, INDEX) \
+#define __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(STREAM, INDEX) \
     ( \
         STREAM << jule::ERROR_INDEX_OUT_OF_RANGE \
                << '[' \
