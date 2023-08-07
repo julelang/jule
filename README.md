@@ -115,17 +115,17 @@ File: ``sum.hpp``
 ```cpp
 using namespace jule;
 
-Int sum(const Slice<Int> slice) {
-    Int total{ 0 };
-    for (const Int x: slice)
-        total += x;
-    return total;
+Int sum(const Slice<Int> s) {
+    Int t{ 0 };
+    for (const Int x: s)
+        t += x;
+    return t;
 }
 ```
 
 File: ``main.jule``
 ```rs
-use cpp "sum.hpp"
+cpp use "sum.hpp"
 
 cpp fn sum([]int): int
 
