@@ -30,9 +30,8 @@ use std::jule::build::{
     is_valid_cpp_ext,
 }
 
-use cpp "julec.hpp"
-
-cpp fn system(cmd: str): int
+cpp type char: byte
+cpp unsafe fn system(cmd: *cpp.char): int
 
 // Officially supported backend-compilers.
 enum Compiler: str {
@@ -62,6 +61,10 @@ static mut OUT_DIR: str = "dist"
 static mut MODE: Mode = Mode.Compile
 static mut OUT_NAME: str = "ir.cpp"
 static mut OUT: str = ""
+
+fn system(cmd: str): int {
+    ret unsafe { cpp.system((*cpp.char)(&cmd[0])) }
+}
 
 fn get_option(args: []str, mut &i: int): (arg: str, content: str) {
     for i < args.len; i++ {
@@ -282,7 +285,7 @@ fn clear_objects() {
 
 // Compie generated IR.
 fn compile_ir(compiler: str, compiler_cmd: str) {
-    let status = cpp.system(compiler + " " + compiler_cmd)
+    let status = system(compiler + " " + compiler_cmd)
     if status != 0 {
         out("external compiler failed with status code: ");
         outln(status)

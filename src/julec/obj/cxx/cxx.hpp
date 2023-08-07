@@ -7,16 +7,6 @@
 
 #include "../../../../api/jule.hpp"
 
-#if __cplusplus < 201703L // If the version of C++ is less than 17
-#include <filesystem>
-
-// It was still in the experimental:: namespace
-namespace fs = std::__fs::filesystem;
-#else
-#include <filesystem>
-namespace fs = std::filesystem;
-#endif
-
 struct JuleCompileTime {
     jule::Int day;
     jule::Int month;
