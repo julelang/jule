@@ -1355,13 +1355,23 @@ impl Parser {
                 continue
             }
 
+            let mut is_pub = false
+            if tokens[0].id == TokenId.Pub {
+                is_pub = true
+                if tokens.len == 1 {
+                    self.push_err(tokens[0], "invalid_syntax")
+                    continue
+                }
+                tokens = tokens[1:]
+            }
+
             let mut f = self.build_fn(tokens, true, false, true)
             if real(f) {
                 self.check_method_receiver(f)
                 if f.generics.len > 0 {
                     self.push_err(f.token, "trait_method_has_generics")
                 }
-                f.public = true
+                f.public = is_pub
                 methods = append(methods, f)
             }
         }
@@ -1508,18 +1518,32 @@ impl Parser {
         let mut stms = split_stms(tokens)
         for (_, mut st) in stms {
             let mut tokens = st.tokens
-            let token = tokens[0]
+            let mut token = tokens[0]
+            let mut is_pub = false
             match token.id {
             | TokenId.Comment:
                 // Ignore.
                 continue
 
+            | TokenId.Pub:
+                is_pub = true
+                if tokens.len == 1 {
+                    self.push_err(tokens[0], "invalid_syntax")
+                    continue
+                }
+                tokens = tokens[1:]
+                if tokens.len > 0 {
+                    token = tokens[0]
+                }
+            }
+
+            match token.id {
             | TokenId.Static
             | TokenId.Fn
             | TokenId.Unsafe:
                 let mut f = self.get_method(tokens)
                 if real(f) {
-                    f.public = true
+                    f.public = is_pub
                     self.check_method_receiver(f)
                     ipl.methods = append(ipl.methods, f)
                 }
