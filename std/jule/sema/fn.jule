@@ -242,53 +242,8 @@ impl Kind for FnIns {
     // Implement: Kind
     // Returns Fn's type kind as string.
     fn to_str(self): str {
-        let mut s = ""
-
-        if self.decl.statically {
-            s += "static "
-        }
-
-        if self.decl.unsafety {
-            s += "unsafe "
-        }
-
-        s += "fn"
-
-        if self.generics.len > 0 {
-            s += "["
-            for i, t in self.generics {
-                s += t.to_str()
-                if i+1 < self.generics.len {
-                    s += ","
-                }
-            }
-            s += "]"
-        } else if self.decl.generics.len > 0 { // Use Decl's generic if not parsed yet.
-            s += "["
-            for i, g in self.decl.generics {
-                s += g.ident
-                if i+1 < self.decl.generics.len {
-                    s += ","
-                }
-            }
-            s += "]"
-        }
-
-        s += "("
-        let n = self.params.len
-        if n > 0 {
-            for _, p in self.params {
-                s += p.to_str()
-                s += ","
-            }
-            s = s[:s.len-1] // Remove comma.
-        }
-        s += ")"
-        if !self.decl.is_void() {
-            s += ":"
-            s += self.result.to_str()
-        }
-        ret s
+        const IDENT = false
+        ret self.get_kind_str(IDENT)
     }
 
     // Reports whether types are same.
@@ -372,4 +327,61 @@ impl FnIns {
 
     // Reports whether instance is anonymous function.
     pub fn is_anon(self): bool { ret self.anon || real(self.decl) && self.decl.is_anon() }
+
+    // Returns kind string of function instance.
+    // Appends identifier to kind of this instance.
+    // Does not appends identifier of this instance to kind if self.decl is nil reference.
+    pub fn get_kind_str(self, ident: bool): str {
+        let mut s = ""
+
+        if self.decl.statically {
+            s += "static "
+        }
+
+        if self.decl.unsafety {
+            s += "unsafe "
+        }
+
+        s += "fn"
+
+        if ident && real(self.decl) {
+            s += " " + self.decl.ident
+        }
+
+        if self.generics.len > 0 {
+            s += "["
+            for i, t in self.generics {
+                s += t.to_str()
+                if i+1 < self.generics.len {
+                    s += ","
+                }
+            }
+            s += "]"
+        } else if self.decl.generics.len > 0 { // Use Decl's generic if not parsed yet.
+            s += "["
+            for i, g in self.decl.generics {
+                s += g.ident
+                if i+1 < self.decl.generics.len {
+                    s += ","
+                }
+            }
+            s += "]"
+        }
+
+        s += "("
+        let n = self.params.len
+        if n > 0 {
+            for _, p in self.params {
+                s += p.to_str()
+                s += ","
+            }
+            s = s[:s.len-1] // Remove comma.
+        }
+        s += ")"
+        if !self.decl.is_void() {
+            s += ":"
+            s += self.result.to_str()
+        }
+        ret s
+    }
 }
