@@ -12,8 +12,7 @@ It contains the reference compiler, API, and standard library.
 [Contributing](https://jule.dev/contribute) |
 [Community](https://github.com/julelang/jule/wiki#the-jule-community)
 
-[![Build (Darwin)](https://github.com/julelang/jule/actions/workflows/build_darwin.yml/badge.svg)](https://github.com/julelang/jule/actions/workflows/build_darwin.yml)
-[![Build (Linux)](https://github.com/julelang/jule/actions/workflows/build_linux.yml/badge.svg)](https://github.com/julelang/jule/actions/workflows/build_linux.yml)
+[![Build](https://github.com/julelang/jule/actions/workflows/build.yml/badge.svg)](https://github.com/julelang/jule/actions/workflows/build.yml)
 [![Tests](https://github.com/julelang/jule/actions/workflows/tests.yml/badge.svg)](https://github.com/julelang/jule/actions/workflows/tests.yml)
 [![Jule Community](https://dcbadge.vercel.app/api/server/ReWQgPDnP6?style=flat)](https://discord.gg/ReWQgPDnP6)
 
