@@ -177,7 +177,7 @@ If you are trying to use a standard or a compiler that is not officially support
 But keep in mind that since it's out of official support, it's likely that the maintainers won't make the effort to fix it.
 <br><br>
 
-See [compiling](https://manual.jule.dev/compiler/compiling) part of the manual for supported compilers and C++ standards.
+See [C++ backend compilers](https://manual.jule.dev/compiler/backend/cpp-backend-compilers/) part of the manual for supported compilers and C++ standards.
 
 <h2 id="os-support">Platform Support</h2>
 Jule supports multiple platforms.
