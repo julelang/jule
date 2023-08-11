@@ -1200,7 +1200,7 @@ struct RetTypeChecker {
     sc:          &ScopeChecker
     f:           &FnIns
     types:       []&TypeKind // Return types.
-    exprs:       []ExprData  // Return expressions.
+    exprs:       []&Expr  // Return expressions.
     vars:        []&Var      // Return variables.
     error_token: Token
     model:       ExprModel
@@ -1218,11 +1218,10 @@ impl RetTypeChecker {
 
         match type e.kind {
         | &TupleExpr:
-            let mut tup = (&TupleExpr)(e.kind)
-            self.exprs = tup.expr
+            self.exprs = (&TupleExpr)(e.kind).expr
 
         |:
-            self.exprs = append(self.exprs, e.kind)
+            self.exprs = append(self.exprs, e)
         }
     }
 
@@ -1260,8 +1259,6 @@ impl RetTypeChecker {
 
         let mut datas = make([]&Data, 0, self.exprs.len)
 
-        let mut e = &Expr{}
-
         for (i, mut expr) in self.exprs {
             if i >= self.types.len {
                 break
@@ -1269,8 +1266,7 @@ impl RetTypeChecker {
 
             let mut t = self.types[i]
 
-            e.kind = expr
-            let mut d = self.sc.s.evalp(e, self.sc, t)
+            let mut d = self.sc.s.evalp(expr, self.sc, t)
             if !real(d) {
                 continue
             }
