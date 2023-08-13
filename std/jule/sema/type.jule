@@ -48,7 +48,6 @@ trait Kind {
 
 // Type's kind's type.
 pub struct TypeKind {
-    pub cpp_linked: bool
     pub cpp_ident:  str
     pub kind:       Kind
 }
@@ -60,7 +59,7 @@ impl Kind for TypeKind {
             ret "nil"
         }
 
-        if self.cpp_linked {
+        if self.is_cpp_linked() {
             ret "cpp." + self.cpp_ident
         }
 
@@ -73,8 +72,8 @@ impl Kind for TypeKind {
             ret other.is_nil()
         }
 
-        if self.cpp_linked {
-            if !other.cpp_linked {
+        if self.is_cpp_linked() {
+            if !other.is_cpp_linked() {
                 ret false
             }
             ret self.cpp_ident == other.cpp_ident
@@ -93,11 +92,13 @@ impl TypeKind {
 
         let mut kind = &TypeKind{
             cpp_ident:  self.cpp_ident,
-            cpp_linked: self.cpp_linked,
             kind:       self.kind,
         }
         ret kind
     }
+
+    // Reports whether type is cpp-linked kind.
+    pub fn is_cpp_linked(self): bool { ret self.cpp_ident.len != 0 }
 
     // Reports whether kind is "nil".
     pub fn is_nil(self): bool { ret self.kind == nil }
@@ -805,7 +806,6 @@ impl TypeChecker {
         let mut kind = ta.kind.kind.clone()
 
         if ta.cpp_linked {
-            kind.cpp_linked = true
             kind.cpp_ident = ta.ident
         }
 
