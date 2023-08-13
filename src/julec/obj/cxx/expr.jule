@@ -70,6 +70,15 @@ const CPP_IGNORE = "std::ignore"
 // Represents default expression for type.
 const CPP_DEFAULT_EXPR = "{}"
 
+// Concatenate all strings into single string.
+fn concat_all_parts(parts: ...str): str {
+    let mut s = ""
+    for _, part in parts {
+        s += part
+    }
+    ret s
+}
+
 fn get_accessor(mut t: &TypeKind): str {
     if real(t.ref()) || real(t.ptr()) {
         ret "->"
@@ -534,7 +543,13 @@ fn gen_array_expr_model(mut m: &ArrayExprModel): str {
     ret obj
 }
 
-fn gen_fn_ins_expr_model(m: &FnIns): str {
+fn gen_fn_ins_expr_model(mut m: &FnIns): str {
+    if real(m.decl) && m.decl.cpp_linked {
+        let d = find_directive(m.decl.directives, str(Directive.Namespace))
+        if real(d) {
+            ret concat_all_parts(d.args...) + "::" + fn_ins_out_ident(m)
+        }
+    }
     ret fn_ins_out_ident(m)
 }
 

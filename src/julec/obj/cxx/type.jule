@@ -21,14 +21,19 @@ use std::jule::sema::{
     Arr,
 }
 
-// Reports wherher tag is exist in directives.
-fn has_directive(directives: []&std::jule::ast::Directive, tag: str): bool {
-    for _, dr in directives {
+// Returns directive by tag.
+fn find_directive(mut directives: []&std::jule::ast::Directive, tag: str): &std::jule::ast::Directive {
+    for (_, mut dr) in directives {
         if dr.tag == tag {
-            ret true
+            ret dr
         }
     }
-    ret false
+    ret new(std::jule::ast::Directive)
+}
+
+// Reports wherher tag is exist in directives.
+fn has_directive(directives: []&std::jule::ast::Directive, tag: str): bool {
+    ret real(find_directive(unsafe { *(&directives) }, tag))
 }
 
 // Generates C++ code of Prim TypeKind.
@@ -126,6 +131,10 @@ fn gen_struct_kind_ins(mut s: &StructIns): str {
             }
             ident = ident[:ident.len-1] // Remove last comma.
             ident += ">"
+        }
+        let d = find_directive(s.decl.directives, str(Directive.Namespace))
+        if real(d) {
+            ident = concat_all_parts(d.args...) + "::" + ident
         }
         ret ident
     }
