@@ -33,7 +33,7 @@ namespace jule {
                 jule::panic("[]T: slice allocation length lower than zero");
 
             jule::Slice<Item> buffer;
-            buffer.alloc_new(len, len, Item());
+            buffer.alloc_new(len, len);
             return buffer;
         }
 
@@ -46,7 +46,7 @@ namespace jule {
                 jule::panic("[]T: slice allocation length greater than capacity");
 
             jule::Slice<Item> buffer;
-            buffer.alloc_new(len, cap, Item());
+            buffer.alloc_new(len, cap);
             return buffer;
         }
 
@@ -83,7 +83,7 @@ namespace jule {
             if (src.size() == 0)
                 return;
 
-            this->alloc_new(0, src.size(), Item());
+            this->alloc_new(0, src.size());
             this->_len = this->_cap;
             const auto src_begin{ src.begin() };
             for (jule::Int i{ 0 }; i < this->_len; ++i)
@@ -133,21 +133,12 @@ namespace jule {
 #endif // __JULE_DISABLE__REFERENCE_COUNTING
         }
 
-        void alloc_new(const jule::Int &len, const jule::Int &cap,
-            const Item &def) {
+        void alloc_new(const jule::Int &len, const jule::Int &cap) {
             this->dealloc();
 
-            Item *alloc{
-                cap == 0 ?
-                    new(std::nothrow) Item[0] :
-                    new(std::nothrow) Item[cap]
-            };
+            Item *alloc{ new (std::nothrow) Item[cap] };
             if (!alloc)
                 jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
-
-            // Initialize elements.
-            for (jule::Int i{ 0 }; i < len; ++i)
-                alloc[i] = def;
 
 #ifdef __JULE_DISABLE__REFERENCE_COUNTING
             this->data = jule::Ref<Item>::make(alloc, nullptr);
@@ -156,7 +147,15 @@ namespace jule {
 #endif
             this->_len = len;
             this->_cap = cap;
-            this->_slice = &alloc[0];
+            this->_slice = alloc;
+        }
+
+        void alloc_new(const jule::Int &len, const jule::Int &cap, const Item &def) {
+            this->alloc_new(len, cap);
+
+            // Initialize elements.
+            for (jule::Int i{ 0 }; i < len; ++i)
+                *(this->_slice+i) = def;
         }
 
         typedef Item       *Iterator;
@@ -216,7 +215,7 @@ namespace jule {
         void push(const Item &item) {
             if (this->_len == this->_cap) {
                 jule::Slice<Item> _new;
-                _new.alloc_new(0, (this->_len+1) * 2, Item());
+                _new.alloc_new(0, (this->_len+1) * 2);
                 _new._len = this->_len+1;
                 std::copy(
                     this->_slice,
