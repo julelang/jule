@@ -502,9 +502,16 @@ fn builtin_caller_append(mut e: &Eval, mut fc: &FnCallExpr, mut d: &Data): &Data
     d.model = &CommonIdentExprModel{ident: "append"}
 
     d = builtin_caller_common_plain(e, fc, d)
-    if real(d) && ref {
-        (&FnCallExprModel)(d.model).args[0] = &ExplicitDerefExprModel{
-            expr: t.model,
+    if real(d) {
+        let mut model = (&FnCallExprModel)(d.model)
+        if ref {
+            model.args[0] = &ExplicitDerefExprModel{
+                expr: t.model,
+            }
+        }
+        d.model = &BuiltinAppendCallExprModel{
+            dest:     model.args[0],
+            elements: model.args[1],
         }
     }
     ret d

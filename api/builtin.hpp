@@ -27,12 +27,17 @@ namespace jule {
     template<typename T>
     inline void outln(const T &obj);
 
+    // Returns itself of slice if slice has enough capacity for +n elements.
+    // Returns new allocated slice if not.
     template<typename Item>
-    jule::Int copy(const jule::Slice<Item> &dest,
-                      const jule::Slice<Item> &src);
+    jule::Slice<Item> alloc_for_append(const jule::Slice<Item> &dest,
+                                       const jule::Int &n);
 
     template<typename Item>
-    jule::Slice<Item> append(const jule::Slice<Item> &src,
+    jule::Int copy(const jule::Slice<Item> &dest, const jule::Slice<Item> &src);
+
+    template<typename Item>
+    jule::Slice<Item> append(jule::Slice<Item> src,
                              const jule::Slice<Item> &components);
 
     template<typename T>
@@ -60,6 +65,22 @@ namespace jule {
     }
 
     template<typename Item>
+    jule::Slice<Item> alloc_for_append(const jule::Slice<Item> &dest,
+                                       const jule::Int &n) {
+        if (dest._len+n > dest._cap) {
+            const jule::Int alloc_size{ (dest._len+n)*2 };
+            jule::Slice<Item> buffer{ jule::Slice<Item>::alloc(0, alloc_size) };
+            buffer._len = dest._len;
+            std::copy(
+                dest._slice,
+                dest._slice+dest._len,
+                buffer._slice);
+            return buffer;
+        }
+        return dest;
+    }
+
+    template<typename Item>
     jule::Int copy(const jule::Slice<Item> &dest,
                    const jule::Slice<Item> &src) {
         if (dest.empty() || src.empty())
@@ -76,34 +97,24 @@ namespace jule {
     }
 
     template<typename Item>
-    jule::Slice<Item> append(const jule::Slice<Item> &src,
+    jule::Slice<Item> append(jule::Slice<Item> src,
                              const jule::Slice<Item> &components) {
         if (src == nullptr && components == nullptr)
             return nullptr;
 
-        if (src._len+components._len > src._cap) {
-            const jule::Int n{ (src._len+components._len)*2 };
-            jule::Slice<Item> buffer{ jule::Slice<Item>::alloc(0, n) };
-            buffer._len = src._len+components._len;
-            jule::copy<Item>(buffer, src);
+        if (components._len == 0)
+            return src;
 
-            std::copy(
-                components._slice,
-                components._slice+components._len,
-                buffer._slice+src._len);
-
-            return buffer;
-        }
-
-        jule::Slice<Item> buffer{ src };
+        if (src._len+components._len > src._cap)
+            src = jule::alloc_for_append(src, components._len);
 
         std::copy(
             components._slice,
             components._slice+components._len,
-            buffer._slice+buffer._len);
+            src._slice+src._len);
 
-        buffer._len += components._len;
-        return buffer;
+        src._len += components._len;
+        return src;
     }
 
     template<typename T>

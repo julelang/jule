@@ -32,6 +32,7 @@ use std::jule::sema::{
     FnCallExprModel,
     TupleExprModel,
     TypeKind,
+    BuiltinAppendCallExprModel,
 }
 
 trait RangeSetter {
@@ -284,7 +285,22 @@ fn gen_postfix(mut p: &Postfix): str {
 fn gen_assign(mut a: &Assign): str {
     let mut obj = gen_expr(a.l)
     obj += a.op
-    obj += gen_expr(a.r)
+    if is_opt_enabled(Opt.Append) {
+        match type a.r {
+        | &BuiltinAppendCallExprModel:
+            let mut model = (&BuiltinAppendCallExprModel)(a.r)
+            let (expr, optimized) = gen_builtin_append_call_expr_model_assign(a.l, model)
+            if optimized {
+                ret expr
+            }
+            obj += expr
+
+        |:
+            obj += gen_expr(a.r)
+        }
+    } else {
+        obj += gen_expr(a.r)
+    }
     obj += CPP_ST_TERM
     ret obj
 }

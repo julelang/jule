@@ -215,26 +215,21 @@ namespace jule {
 
         void push(const Item &item) {
             if (this->_len == this->_cap) {
-                Item *_new{ new(std::nothrow) Item[this->_len+1] };
-                if (!_new)
-                    jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
-
+                jule::Slice<Item> _new;
+                _new.alloc_new(0, (this->_len+1) * 2, Item());
+                _new._len = this->_len+1;
                 std::copy(
-                    this->data.alloc,
-                    this->data.alloc+this->_len,
-                    _new);
-                _new[this->_len] = item;
+                    this->_slice,
+                    this->_slice+this->_len,
+                    _new._slice);
+                _new._slice[this->_len] = item;
 
-                delete[] this->data.alloc;
-                this->data.alloc = nullptr;
+                this->dealloc();
+                *this = _new;
+                return;
+            }
 
-                this->data.alloc = _new;
-                this->_slice = this->data.alloc;
-
-                ++this->_cap;
-            } else
-                this->_slice[this->_len] = item;
-
+            this->_slice[this->_len] = item;
             ++this->_len;
         }
 

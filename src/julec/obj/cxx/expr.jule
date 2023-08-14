@@ -44,6 +44,7 @@ use std::jule::sema::{
     BuiltinDropCallExprModel,
     BuiltinPanicCallExprModel,
     BuiltinMakeCallExprModel,
+    BuiltinAppendCallExprModel,
     BuiltinErrorTraitSubIdentExprModel,
     SizeofExprModel,
     AlignofExprModel,
@@ -642,6 +643,32 @@ fn gen_builtin_make_call_expr_model(mut m: &BuiltinMakeCallExprModel): str {
     ret obj
 }
 
+fn gen_builtin_append_call_expr_model_assign(mut dest: ExprModel, mut m: &BuiltinAppendCallExprModel): (str, optimized: bool) {
+    if dest != m.dest {
+        ret gen_builtin_append_call_expr_model(m), false
+    }
+    match type m.elements {
+    | &SliceExprModel:
+        let dest = gen_expr_model(m.dest)
+        let mut obj = ""
+        let mut s = (&SliceExprModel)(m.elements)
+        for (_, mut e) in s.elems {
+            obj += dest
+            obj += ".push("
+            obj += gen_expr_model(e)
+            obj += ")" + CPP_ST_TERM
+        }
+        ret obj, true
+
+    |:
+        ret gen_builtin_append_call_expr_model(m), false
+    }
+}
+
+fn gen_builtin_append_call_expr_model(mut m: &BuiltinAppendCallExprModel): str {
+    ret "jule::append(" + gen_expr_model(m.dest) + "," + gen_expr_model(m.elements) + ")"
+}
+
 fn gen_builtin_clone_call_expr_model(mut m: &BuiltinCloneCallExprModel): str {
     let mut obj = "jule::clone("
     obj += gen_expr_model(m.expr)
@@ -791,6 +818,9 @@ fn gen_expr_model(mut m: ExprModel): str {
 
     | &BuiltinMakeCallExprModel:
         ret gen_builtin_make_call_expr_model((&BuiltinMakeCallExprModel)(m))
+
+    | &BuiltinAppendCallExprModel:
+        ret gen_builtin_append_call_expr_model((&BuiltinAppendCallExprModel)(m))
 
     | &BuiltinCloneCallExprModel:
         ret gen_builtin_clone_call_expr_model((&BuiltinCloneCallExprModel)(m))
