@@ -2,6 +2,7 @@
 #define __JULE_TYPES_HPP
 
 #include <stddef.h>
+#include <ostream>
 
 #include "platform.hpp"
 
@@ -40,5 +41,11 @@ namespace jule {
     constexpr jule::U64 MAX_U64{ 18446744073709551615LLU };
 
 } // namespace jule
+
+inline std::ostream &operator<<(std::ostream &stream, const jule::I8 &x)
+{ return stream << static_cast<int>(x); }
+
+inline std::ostream &operator<<(std::ostream &stream, const jule::U8 &x)
+{ return stream << static_cast<int>(x); }
 
 #endif // ifndef __JULE_TYPES_HPP
