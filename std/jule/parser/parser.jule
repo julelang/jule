@@ -798,7 +798,7 @@ impl Parser {
     // Build function prototype.
     // Body is not necessary for successfull parsing.
     // Just declration.
-    fn build_fn_prototype(mut &self, mut tokens: []Token, mut &i: int, method: bool, anon: bool): &FnDecl {
+    fn build_fn_prototype(mut &self, mut tokens: []Token, mut &i: int, method: bool): &FnDecl {
         let mut f = &FnDecl{
             token: tokens[i],
         }
@@ -832,21 +832,16 @@ impl Parser {
             ret new(FnDecl)
         }
 
-        if anon {
-            f.ident = str(Ident.Anon)
-        } else {
-            let tok = tokens[i]
-            if tok.id != TokenId.Ident {
-                self.push_err(tok, "invalid_syntax")
+        let tok = tokens[i]
+        if tok.id == TokenId.Ident {
+            i++
+            if i >= tokens.len {
+                self.push_err(f.token, "invalid_syntax")
                 ret new(FnDecl)
             }
             f.ident = tok.kind
-            i++
-        }
-
-        if i >= tokens.len {
-            self.push_err(f.token, "invalid_syntax")
-            ret new(FnDecl)
+        } else {
+            f.ident = str(Ident.Anon)
         }
 
         let error_token = tokens[i]
@@ -871,9 +866,9 @@ impl Parser {
 
     // Parses function define.
     // Prototype and body.
-    fn build_fn(mut &self, mut tokens: []Token, method: bool, anon: bool, prototype: bool): &FnDecl {
+    fn build_fn(mut &self, mut tokens: []Token, method: bool, prototype: bool): &FnDecl {
         let mut i = 0
-        let mut f = self.build_fn_prototype(tokens, i, method, anon)
+        let mut f = self.build_fn_prototype(tokens, i, method)
         if prototype {
             if i < tokens.len {
                 self.push_err(tokens[i+1], "invalid_syntax")
@@ -1365,8 +1360,11 @@ impl Parser {
                 tokens = tokens[1:]
             }
 
-            let mut f = self.build_fn(tokens, true, false, true)
+            let mut f = self.build_fn(tokens, true, true)
             if real(f) {
+                if f.is_anon() {
+                    self.push_err(f.token, "invalid_syntax")
+                }
                 self.check_method_receiver(f)
                 if f.generics.len > 0 {
                     self.push_err(f.token, "trait_method_has_generics")
@@ -1406,8 +1404,11 @@ impl Parser {
 
     fn build_cpp_link_fn(mut &self, mut tokens: []Token): &FnDecl {
         tokens = tokens[1:] // Remove "cpp" keyword.
-        let mut f = self.build_fn(tokens, false, false, true)
+        let mut f = self.build_fn(tokens, false, true)
         if real(f) {
+            if f.is_anon() {
+                self.push_err(f.token, "invalid_syntax")
+            }
             f.cpp_linked = true
         }
         ret f
@@ -1511,7 +1512,11 @@ impl Parser {
             ret new(FnDecl)
         }
 
-        ret self.build_fn(tokens, true, false, false)
+        let mut f = self.build_fn(tokens, true, false)
+        if real(f) && f.is_anon() {
+            self.push_err(f.token, "invalid_syntax")
+        }
+        ret f
     }
 
     fn parse_impl_trait(mut &self, mut ipl: &Impl, mut tokens: []Token) {
@@ -1671,9 +1676,12 @@ impl Parser {
 
         | TokenId.Fn
         | TokenId.Unsafe:
-            let mut f = self.build_fn(tokens, false, false, false)
+            let mut f = self.build_fn(tokens, false, false)
             if real(f) {
                 f.global = true
+                if f.is_anon() {
+                    self.push_err(f.token, "invalid_syntax")
+                }
             }
             ret f
 
