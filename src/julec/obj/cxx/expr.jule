@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::conv::{fmt_int, fmt_uint, fmt_float}
+use std::conv::{fmt_int, fmt_uint, fmt_float, itoa}
 use std::jule::build::{Directive, is_64bit}
 use std::jule::constant::{Const}
 use std::jule::lex::{TokenKind}
@@ -12,6 +12,7 @@ use std::jule::sema::{
     FnIns,
     Trait,
     StructIns,
+    FieldIns,
     TypeKind,
     Data,
     Value,
@@ -643,26 +644,49 @@ fn gen_builtin_make_call_expr_model(mut m: &BuiltinMakeCallExprModel): str {
     ret obj
 }
 
-fn gen_builtin_append_call_expr_model_assign(mut dest: ExprModel, mut m: &BuiltinAppendCallExprModel): (str, optimized: bool) {
-    if dest != m.dest {
-        ret gen_builtin_append_call_expr_model(m), false
+fn gen_builtin_append_call_expr_model_assign_opt(
+    same_dest: bool,
+    &dest_expr: str,
+    mut &dest_kind: &TypeKind,
+    mut &s: &SliceExprModel,
+    mut &m: &BuiltinAppendCallExprModel): str {
+    let mut obj = ""
+    if !same_dest {
+        obj += dest_expr + " = jule::alloc_for_append(" + gen_expr_model(m.dest) + "," + itoa(s.elems.len) + ")" + CPP_ST_TERM
     }
+    for (_, mut e) in s.elems {
+        obj += dest_expr
+        obj += get_accessor(dest_kind)
+        obj += "push("
+        obj += gen_expr_model(e)
+        obj += ")" + CPP_ST_TERM
+    }
+    ret obj
+}
+
+fn gen_builtin_append_call_expr_model_assign(mut dest: ExprModel, mut m: &BuiltinAppendCallExprModel): (str, optimized: bool) {
     match type m.elements {
     | &SliceExprModel:
-        let dest = gen_expr_model(m.dest)
-        let mut obj = ""
-        let mut s = (&SliceExprModel)(m.elements)
-        for (_, mut e) in s.elems {
-            obj += dest
-            obj += ".push("
-            obj += gen_expr_model(e)
-            obj += ")" + CPP_ST_TERM
-        }
-        ret obj, true
+        match type dest {
+        | &Var:
+            let mut s = (&SliceExprModel)(m.elements)
+            let dest_expr = gen_expr_model(dest)
+            let mut dest_var = (&Var)(dest)
+            let same_dest = any_equals[Var](dest_var, m.dest)
+            ret gen_builtin_append_call_expr_model_assign_opt(
+                same_dest, dest_expr, dest_var.kind.kind, s, m), true
 
-    |:
-        ret gen_builtin_append_call_expr_model(m), false
+        | &StructSubIdentExprModel:
+            let mut s = (&SliceExprModel)(m.elements)
+            let dest_expr = gen_expr_model(dest)
+            let mut dest_field = (&StructSubIdentExprModel)(dest).field
+            let same_dest = any_equals[FieldIns](dest_field, m.dest)
+            ret gen_builtin_append_call_expr_model_assign_opt(
+                same_dest, dest_expr, dest_field.kind, s, m), true
+        }
+
     }
+    ret gen_builtin_append_call_expr_model(m), false
 }
 
 fn gen_builtin_append_call_expr_model(mut m: &BuiltinAppendCallExprModel): str {
