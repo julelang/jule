@@ -12,6 +12,7 @@ use std::jule::ast::{
     ArrTypeDecl,
     MapTypeDecl,
 }
+use std::jule::build::{LogMsg}
 use std::jule::lex::{Token, TokenId, TokenKind}
 
 fn build_void_type(): &TypeDecl { ret &TypeDecl{} }
@@ -74,9 +75,9 @@ struct TypeBuilder {
 }
 
 impl TypeBuilder {
-    fn push_err(mut self, token: Token, key: str) {
+    fn push_err(mut self, token: Token, fmt: LogMsg) {
         if self.err {
-            self.p.push_err(token, key)
+            self.p.push_err(token, fmt)
         }
     }
 
@@ -97,7 +98,7 @@ impl TypeBuilder {
             let mut token = self.tokens[*self.i]
             if n%2 == 0 {
                 if token.id != TokenId.Ident {
-                    self.push_err(token, "invalid_syntax")
+                    self.push_err(token, LogMsg.InvalidSyntax)
                 }
                 nst.idents = append(nst.idents, token)
             } else if token.id != TokenId.DblColon {
@@ -126,7 +127,7 @@ impl TypeBuilder {
 
         let mut parts = self.ident_generics()
         if parts.len == 0 {
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
             ret nil
         }
 
@@ -135,7 +136,7 @@ impl TypeBuilder {
             let mut j = 0
             let (mut t, _) = unsafe { self.p.build_type(part, &j, true) }
             if j < part.len {
-                self.push_err(part[j], "invalid_syntax")
+                self.push_err(part[j], LogMsg.InvalidSyntax)
             }
             types[i] = t
         }
@@ -186,7 +187,7 @@ impl TypeBuilder {
 
     unsafe fn build_cpp_link(mut self): &TypeDecl {
         if *self.i+1 >= self.tokens.len || self.tokens[*self.i+1].id != TokenId.Dot {
-            self.push_err(self.tokens[*self.i], "invalid_syntax")
+            self.push_err(self.tokens[*self.i], LogMsg.InvalidSyntax)
             ret new(TypeDecl)
         }
         *self.i += 2 // Skip cpp keyword and dot token.
@@ -202,7 +203,7 @@ impl TypeBuilder {
             ret new(TypeDecl)
         }
         if !f.is_anon() {
-            self.push_err(f.token, "invalid_syntax")
+            self.push_err(f.token, LogMsg.InvalidSyntax)
         }
         ret &TypeDecl{
             token: token,
@@ -213,7 +214,7 @@ impl TypeBuilder {
     unsafe fn build_ptr(mut self): &TypeDecl {
         let mut token = self.tokens[*self.i]
         if *self.i+1 >= self.tokens.len {
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
             ret new(TypeDecl)
         }
 
@@ -244,7 +245,7 @@ impl TypeBuilder {
     unsafe fn build_ref(mut self): &TypeDecl {
         let mut token = self.tokens[*self.i]
         if *self.i+1 >= self.tokens.len {
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
             ret new(TypeDecl)
         }
 
@@ -272,11 +273,11 @@ impl TypeBuilder {
             ret self.build_ref()
 
         | str(TokenKind.DblAmper):
-            self.push_err(token, "ref_refs_ref")
+            self.push_err(token, LogMsg.RefRefsRef)
             ret self.build_ref() // Skip tokens and many type error
 
         |:
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
             ret new(TypeDecl)
         }
     }
@@ -301,7 +302,7 @@ impl TypeBuilder {
         // Brackets places at ... < *self.i offset.
 
         if *self.i >= self.tokens.len {
-            self.push_err(self.tokens[*self.i-1], "missing_type")
+            self.push_err(self.tokens[*self.i-1], LogMsg.MissingType)
             ret new(TypeDecl)
         }
 
@@ -334,7 +335,7 @@ impl TypeBuilder {
     fn build_map(mut self, colon: int, mut tokens: []Token): &TypeDecl {
         let mut colon_token = self.tokens[colon]
         if colon == 0 || colon+1 >= tokens.len {
-            self.push_err(colon_token, "missing_type")
+            self.push_err(colon_token, LogMsg.MissingType)
             ret new(TypeDecl)
         }
         let mut key_tokens = tokens[:colon]
@@ -346,7 +347,7 @@ impl TypeBuilder {
         if !ok {
             ret new(TypeDecl)
         } else if j < key_tokens.len {
-            self.push_err(key_tokens[j], "invalid_syntax")
+            self.push_err(key_tokens[j], LogMsg.InvalidSyntax)
         }
         mapt.key = keyt
 
@@ -355,7 +356,7 @@ impl TypeBuilder {
         if !ok {
             ret new(TypeDecl)
         }  else if j < val_tokens.len {
-            self.push_err(val_tokens[j], "invalid_syntax")
+            self.push_err(val_tokens[j], LogMsg.InvalidSyntax)
         }
         mapt.val = valt
 
@@ -370,7 +371,7 @@ impl TypeBuilder {
         if (*self.i+2 >= self.tokens.len ||
             token.id != TokenId.Range ||
             token.kind != str(TokenKind.LBracket)) {
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
             ret new(TypeDecl)
         }
         *self.i++
@@ -411,7 +412,7 @@ impl TypeBuilder {
 
         |:
             *self.i++
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
             ret new(TypeDecl)
         }
     }

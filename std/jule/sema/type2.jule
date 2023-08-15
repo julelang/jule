@@ -18,6 +18,7 @@ use std::jule::ast::{
     VariadicExpr,
     TupleExpr,
 }
+use std::jule::build::{LogMsg}
 use std::jule::lex::{Token, Ident, is_ignore_ident}
 use std::jule::types::{
     self,
@@ -146,8 +147,8 @@ struct TypeCompatibilityChecker {
 }
 
 impl TypeCompatibilityChecker {
-    fn push_err(mut self, key: str, args: ...any) {
-        self.s.push_err(self.error_token, key, args...)
+    fn push_err(mut self, fmt: LogMsg, args: ...any) {
+        self.s.push_err(self.error_token, fmt, args...)
     }
 
     fn check_trait(mut self): (ok: bool) {
@@ -173,7 +174,7 @@ impl TypeCompatibilityChecker {
             }
 
             if trait_has_reference_receiver(trt) && !ref {
-                self.push_err("trait_has_reference_parametered_function")
+                self.push_err(LogMsg.TraitHasRefParamFn)
                 ret false
             }
 
@@ -437,8 +438,8 @@ struct AssignTypeChecker {
 }
 
 impl AssignTypeChecker {
-    fn push_err(mut self, key: str, args: ...any) {
-        self.s.push_err(self.error_token, key, args...)
+    fn push_err(mut self, fmt: LogMsg, args: ...any) {
+        self.s.push_err(self.error_token, fmt, args...)
     }
 
     fn check_validity(mut self): bool {
@@ -449,20 +450,20 @@ impl AssignTypeChecker {
             let f = self.d.kind.fnc()
             match {
             | f.is_builtin():
-                self.push_err("builtin_as_anonymous_fn")
+                self.push_err(LogMsg.BuiltinAsNonFn)
                 valid = false
 
             | f.decl.is_method():
-                self.push_err("method_as_anonymous_fn")
+                self.push_err(LogMsg.MethodAsAnonFn)
                 valid = false
 
             | f.decl.generics.len > 0:
-                self.push_err("genericed_fn_as_anonymous_fn")
+                self.push_err(LogMsg.GenericedFnAsAnonFn)
                 valid = false
             }
 
         | real(self.d.kind.tup()):
-            self.push_err("tuple_assign_to_single")
+            self.push_err(LogMsg.TupleAssignToSingle)
             valid = false
         }
 
@@ -482,13 +483,13 @@ impl AssignTypeChecker {
         match {
         | is_float(kind):
             if !float_assignable(kind, self.d) {
-                self.push_err("overflow_limits")
+                self.push_err(LogMsg.OverflowLimits)
                 ret false
             }
 
         | is_int(kind):
             if !int_assignable(kind, self.d) {
-                self.push_err("overflow_limits")
+                self.push_err(LogMsg.OverflowLimits)
                 ret false
             }
 
@@ -510,7 +511,7 @@ impl AssignTypeChecker {
             ret false
 
         | self.d.variadiced:
-            self.push_err("incompatible_types", self.dest.to_str(), self.d.kind.to_str()+"...")
+            self.push_err(LogMsg.IncompatibleTypes, self.dest.to_str(), self.d.kind.to_str()+"...")
             ret false
 
         | self.check_const():
@@ -695,12 +696,12 @@ struct FnCallArgChecker {
 }
 
 impl FnCallArgChecker {
-    fn push_err_token(mut self, token: Token, key: str, args: ...any) {
-        self.e.s.push_err(token, key, args...)
+    fn push_err_token(mut self, token: Token, fmt: LogMsg, args: ...any) {
+        self.e.s.push_err(token, fmt, args...)
     }
 
-    fn push_err(mut self, key: str, args: ...any) {
-        self.push_err_token(self.error_token, key, args...)
+    fn push_err(mut self, fmt: LogMsg, args: ...any) {
+        self.push_err_token(self.error_token, fmt, args...)
     }
 
     fn get_params(mut self): []&ParamIns {
@@ -725,7 +726,7 @@ impl FnCallArgChecker {
             ret true
 
         | diff < 0 || diff > params.len:
-            self.push_err("argument_overflow")
+            self.push_err(LogMsg.ArgumentOverflow)
             ret false
         }
 
@@ -734,7 +735,7 @@ impl FnCallArgChecker {
             idents += ", " + params[n-diff].decl.ident
         }
         idents = idents[2:] // Remove first separator.
-        self.push_err("missing_expr_for", idents)
+        self.push_err(LogMsg.MissingExprFor, idents)
 
         ret false
     }
@@ -750,7 +751,7 @@ impl FnCallArgChecker {
             }
             ok = unsafe { dta.annotate() }
             if !ok {
-                self.push_err_token(error_token, "dynamic_type_annotation_failed")
+                self.push_err_token(error_token, LogMsg.DynamicTypeAnnotationFailed)
                 ret false
             }
         }
@@ -828,7 +829,7 @@ impl FnCallArgChecker {
         self.e.prefix = old
 
         if variadiced && more {
-            self.push_err("more_args_with_variadiced")
+            self.push_err(LogMsg.MoreArgsWithVariadiced)
         }
 
         if real(model) {
@@ -867,7 +868,7 @@ impl FnCallArgChecker {
     fn check_dynamic_type_annotation(mut self): (ok: bool) {
         for _, g in self.f.generics {
             if !real(g) {
-                self.push_err("dynamic_type_annotation_failed")
+                self.push_err(LogMsg.DynamicTypeAnnotationFailed)
                 ret false
             }
         }
@@ -898,8 +899,8 @@ struct StructLitChecker {
 }
 
 impl StructLitChecker {
-    fn push_err(mut self, token: Token, key: str, args: ...any) {
-        self.e.push_err(token, key, args...)
+    fn push_err(mut self, token: Token, fmt: LogMsg, args: ...any) {
+        self.e.push_err(token, fmt, args...)
     }
 
     fn push_match(mut self, mut f: &FieldIns, mut d: &Data, error_token: Token) {
@@ -917,12 +918,12 @@ impl StructLitChecker {
         // Check existing.
         let mut f = self.s.find_field(pair.field.kind)
         if !real(f) {
-            self.push_err(pair.field, "ident_not_exist", pair.field.kind)
+            self.push_err(pair.field, LogMsg.IdentNotExist, pair.field.kind)
             ret
         }
         
         if !self.e.s.is_accessible_define(f.decl.public, f.decl.token) {
-            self.push_err(pair.field, "ident_is_not_accessible", pair.field.kind)
+            self.push_err(pair.field, LogMsg.IdentIsNotAccessible, pair.field.kind)
         }
 
         // Check duplications.
@@ -936,7 +937,7 @@ impl StructLitChecker {
                     break dup_lookup
 
                 | pair.field.kind == dpair.field.kind:
-                    self.push_err(pair.field, "already_has_expr", pair.field.kind)
+                    self.push_err(pair.field, LogMsg.AlreadyHasExpr, pair.field.kind)
                     break dup_lookup
                 }
             }
@@ -964,7 +965,7 @@ impl StructLitChecker {
                     // Ok
 
                 |:
-                    self.push_err(pair.colon, "invalid_syntax")
+                    self.push_err(pair.colon, LogMsg.InvalidSyntax)
                     ok = false
                     continue
                 }
@@ -994,7 +995,7 @@ impl StructLitChecker {
             | &FieldExprPair:
                 let mut pair = (&FieldExprPair)(expr)
                 if i > 0 && !paired {
-                    self.push_err(pair.field, "invalid_syntax")
+                    self.push_err(pair.field, LogMsg.InvalidSyntax)
                 }
                 paired = true
                 self.check_pair(pair, exprs)
@@ -1002,10 +1003,10 @@ impl StructLitChecker {
             | &Expr:
                 let mut e = (&Expr)(expr)
                 if paired {
-                    self.push_err(e.token, "argument_must_target_to_field")
+                    self.push_err(e.token, LogMsg.ArgMustTargetToField)
                 }
                 if i >= self.s.fields.len {
-                    self.push_err(e.token, "argument_overflow")
+                    self.push_err(e.token, LogMsg.ArgumentOverflow)
                     continue
                 }
 
@@ -1038,7 +1039,7 @@ impl StructLitChecker {
                 idents += ", " + self.s.fields[n-diff].decl.ident
             }
             idents = idents[2:] // Remove first separator.
-            self.push_err(self.error_token, "missing_expr_for", idents)
+            self.push_err(self.error_token, LogMsg.MissingExprFor, idents)
         }
     }
 }
@@ -1189,7 +1190,7 @@ impl RangeChecker {
             ret true
         }
 
-        self.sc.s.push_err(self.rang.in_token, "iter_range_require_enumerable_expr")
+        self.sc.s.push_err(self.rang.in_token, LogMsg.IterRangeRequireEnumerableExpr)
         ret false
     }
 }
@@ -1273,7 +1274,7 @@ impl RetTypeChecker {
             datas = append(datas, d)
 
             if !d.mutable && is_mut(d.kind) {
-                self.sc.s.push_err(self.error_token, "ret_with_mut_typed_non_mut")
+                self.sc.s.push_err(self.error_token, LogMsg.RetWithMutTypedNonMut)
                 ret
             }
 
@@ -1304,21 +1305,21 @@ impl RetTypeChecker {
         let n = self.exprs.len
         if n == 0 && !self.f.decl.is_void() {
             if !self.f.decl.any_var() {
-                self.sc.s.push_err(self.error_token, "require_ret_expr")
+                self.sc.s.push_err(self.error_token, LogMsg.RequireRetExpr)
                 ret false
             }
             ret true
         }
 
         if n > 0 && self.f.decl.is_void() {
-            self.sc.s.push_err(self.error_token, "void_function_ret_expr")
+            self.sc.s.push_err(self.error_token, LogMsg.VoidFnRetExpr)
             ret false
         }
 
         if n > self.types.len {
-            self.sc.s.push_err(self.error_token, "overflow_ret")
+            self.sc.s.push_err(self.error_token, LogMsg.OverflowRet)
         } else if n < self.types.len {
-            self.sc.s.push_err(self.error_token, "missing_multi_ret")
+            self.sc.s.push_err(self.error_token, LogMsg.MissingMultiRet)
         }
 
         self.check_exprs()

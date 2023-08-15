@@ -22,7 +22,7 @@ use std::jule::ast::{
     RefTypeDecl,
     IdentTypeDecl,
 }
-use std::jule::build::{Derives, errorf}
+use std::jule::build::{Derives, LogMsg, errorf}
 use std::jule::lex::{Token, TokenKind}
 use std::jule::types::{self, is_int}
 
@@ -651,18 +651,18 @@ struct TypeChecker {
 }
 
 impl TypeChecker {
-    fn push_err(mut self, token: Token, key: str, args: ...any) {
-        self.s.push_err(token, key, args...)
+    fn push_err(mut self, token: Token, fmt: LogMsg, args: ...any) {
+        self.s.push_err(token, fmt, args...)
     }
 
     fn build_prim(mut self, decl: &IdentTypeDecl): &Prim {
         if !is_prim(decl.ident) {
-            self.push_err(self.error_token, "invalid_type")
+            self.push_err(self.error_token, LogMsg.InvalidType)
             ret new(Prim)
         }
 
         if decl.generics.len > 0 {
-            self.push_err(decl.token, "type_not_supports_generics", decl.ident)
+            self.push_err(decl.token, LogMsg.TypeNotSupportsGenerics, decl.ident)
             ret new(Prim)
         }
 
@@ -683,7 +683,7 @@ impl TypeChecker {
 
         let def1_ident = get_ident(def1)
         let def2_ident = get_ident(def2)
-        let refers_to = errorf("refers_to", def1_ident, def2_ident)
+        let refers_to = errorf(LogMsg.RefersTo, def1_ident, def2_ident)
         message = str_repeat(" ", PADDING) + refers_to + "\n" + message
     }
 
@@ -757,7 +757,7 @@ impl TypeChecker {
         // Check illegal cycle for itself.
         // Because refers's owner is ta.
         if self.referencer.owner == decl {
-            self.push_err(ident.token, "illegal_cycle_refers_itself", self.referencer.ident)
+            self.push_err(ident.token, LogMsg.IllegalCycleRefersItself, self.referencer.ident)
             ret false
         }
 
@@ -768,7 +768,7 @@ impl TypeChecker {
             message = ""
             self.push_cycle_error(self.referencer.owner, decl, message)
             err_msg = err_msg + message
-            self.push_err(ident.token, "illegal_cross_cycle", err_msg)
+            self.push_err(ident.token, LogMsg.IllegalCrossCycle, err_msg)
             ret false
         }
 
@@ -789,14 +789,14 @@ impl TypeChecker {
 
     fn from_type_alias(mut self, decl: &IdentTypeDecl, mut ta: &TypeAlias): Kind {
         if !self.s.is_accessible_define(ta.public, ta.token) {
-            self.push_err(decl.token, "ident_not_exist", decl.ident)
+            self.push_err(decl.token, LogMsg.IdentNotExist, decl.ident)
             ret nil
         }
 
         ta.used = true
 
         if decl.generics.len > 0 {
-            self.push_err(decl.token, "type_not_supports_generics", decl.ident)
+            self.push_err(decl.token, LogMsg.TypeNotSupportsGenerics, decl.ident)
             ret nil
         }
 
@@ -822,12 +822,12 @@ impl TypeChecker {
 
     fn from_enum(mut self, decl: &IdentTypeDecl, mut e: &Enum): &Enum {
         if !self.s.is_accessible_define(e.public, e.token) {
-            self.push_err(decl.token, "ident_not_exist", decl.ident)
+            self.push_err(decl.token, LogMsg.IdentNotExist, decl.ident)
             ret new(Enum)
         }
 
         if decl.generics.len > 0 {
-            self.push_err(decl.token, "type_not_supports_generics", decl.ident)
+            self.push_err(decl.token, LogMsg.TypeNotSupportsGenerics, decl.ident)
             ret new(Enum)
         }
 
@@ -931,7 +931,7 @@ impl TypeChecker {
 
     fn from_struct(mut self, mut decl: &IdentTypeDecl, mut s: &Struct): &StructIns {
         if !self.s.is_accessible_define(s.public, s.token) {
-            self.push_err(decl.token, "ident_not_exist", decl.ident)
+            self.push_err(decl.token, LogMsg.IdentNotExist, decl.ident)
             ret new(StructIns)
         }
 
@@ -1017,12 +1017,12 @@ impl TypeChecker {
             }
             if real(t) {
                 if !self.s.is_accessible_define(t.public, t.token) {
-                    self.push_err(decl.token, "ident_not_exist", decl.ident)
+                    self.push_err(decl.token, LogMsg.IdentNotExist, decl.ident)
                     ret nil
                 }
 
                 if decl.generics.len > 0 {
-                    self.push_err(decl.token, "type_not_supports_generics", decl.ident)
+                    self.push_err(decl.token, LogMsg.TypeNotSupportsGenerics, decl.ident)
                     ret nil
                 }
                 ret t
@@ -1042,7 +1042,7 @@ impl TypeChecker {
             ret self.from_type_alias(decl, ta)
         }
 
-        self.push_err(decl.token, "ident_not_exist", decl.ident)
+        self.push_err(decl.token, LogMsg.IdentNotExist, decl.ident)
         ret nil
     }
 
@@ -1062,24 +1062,24 @@ impl TypeChecker {
         | real(elem.strct()):
             let s = elem.strct()
             if real(s.decl) && s.decl.cpp_linked {
-                self.push_err(self.error_token, "cpp_linked_struct_for_ref")
+                self.push_err(self.error_token, LogMsg.CppLinkedStructForRef)
                 ret new(Ref)
             }
 
         | real(elem.ref()):
-            self.push_err(self.error_token, "ref_refs_ref")
+            self.push_err(self.error_token, LogMsg.RefRefsRef)
             ret new(Ref)
 
         | real(elem.ptr()):
-            self.push_err(self.error_token, "ref_refs_ptr")
+            self.push_err(self.error_token, LogMsg.RefRefsPtr)
             ret new(Ref)
 
         | real(elem.enm()):
-            self.push_err(self.error_token, "ref_refs_enum")
+            self.push_err(self.error_token, LogMsg.RefRefsEnum)
             ret new(Ref)
 
         | real(elem.arr()):
-            self.push_err(self.error_token, "ref_refs_array")
+            self.push_err(self.error_token, LogMsg.RefRefsArr)
             ret new(Ref)
         }
 
@@ -1104,15 +1104,15 @@ impl TypeChecker {
             ret new(Ptr)
 
         | real(elem.ref()):
-            self.push_err(self.error_token, "ptr_points_ref")
+            self.push_err(self.error_token, LogMsg.PtrPointsRef)
             ret new(Ptr)
 
         | real(elem.enm()):
-            self.push_err(self.error_token, "ptr_points_enum")
+            self.push_err(self.error_token, LogMsg.PtrPointsEnum)
             ret new(Ptr)
 
         | real(elem.arr()) && elem.arr().auto:
-            self.push_err(self.error_token, "array_auto_sized")
+            self.push_err(self.error_token, LogMsg.ArrayAutoSized)
             ret new(Ptr)
         }
 
@@ -1151,7 +1151,7 @@ impl TypeChecker {
             ret new(Slc)
 
         | real(elem.arr()) && elem.arr().auto:
-            self.push_err(decl.elem.token, "array_auto_sized")
+            self.push_err(decl.elem.token, LogMsg.ArrayAutoSized)
             ret new(Slc)
         }
 
@@ -1174,16 +1174,16 @@ impl TypeChecker {
             }
 
             if !size.is_const() {
-                self.push_err(decl.elem.token, "expr_not_const")
+                self.push_err(decl.elem.token, LogMsg.ExprNotConst)
                 ret new(Arr)
             } else if !is_int(size.kind.prim().kind) {
-                self.push_err(decl.elem.token, "array_size_is_not_int")
+                self.push_err(decl.elem.token, LogMsg.ArraySizeIsNotInt)
                 ret new(Arr)
             }
 
             n = int(size.constant.as_i64())
             if n < 0 {
-                self.push_err(decl.elem.token, "array_size_is_negative")
+                self.push_err(decl.elem.token, LogMsg.ArraySizeIsNeg)
                 ret new(Arr)
             }
         }
@@ -1196,7 +1196,7 @@ impl TypeChecker {
             ret new(Arr)
 
         | real(elem.arr()) && elem.arr().auto:
-            self.push_err(decl.elem.token, "array_auto_sized")
+            self.push_err(decl.elem.token, LogMsg.ArrayAutoSized)
             ret new(Arr)
         }
 
@@ -1222,7 +1222,7 @@ impl TypeChecker {
             ret new(Map)
         }
         if real(val.enm()) {
-            self.push_err(decl.val.token, "enum_as_map_val")
+            self.push_err(decl.val.token, LogMsg.EnumAsMapVal)
         }
 
         ret &Map{
@@ -1263,7 +1263,7 @@ impl TypeChecker {
 
     fn build_fn(mut self, mut decl: &FnDecl): &FnIns {
         if decl.generics.len > 0 {
-            self.push_err(decl.token, "genericed_fn_as_anonymous_fn")
+            self.push_err(decl.token, LogMsg.GenericedFnAsAnonFn)
             ret new(FnIns)
         }
 
@@ -1286,7 +1286,7 @@ impl TypeChecker {
         })
 
         if !real(imp) || !imp.is_lookupable(str(TokenKind.Self)) {
-            self.push_err(decl.idents[0], "namespace_not_exist", path)
+            self.push_err(decl.idents[0], LogMsg.NamespaceNotExist, path)
             ret nil
         }
 
@@ -1306,7 +1306,7 @@ impl TypeChecker {
             ret self.build_by_std_namespace(decl)
         }
 
-        self.push_err(token, "ident_not_exist", token.kind)
+        self.push_err(token, LogMsg.IdentNotExist, token.kind)
         ret nil
     }
 
@@ -1372,7 +1372,7 @@ impl TypeChecker {
             }
 
         |:
-            self.push_err(self.error_token, "invalid_type")
+            self.push_err(self.error_token, LogMsg.InvalidType)
             ret new(TypeKind)
         }
 

@@ -20,6 +20,7 @@ use std::jule::ast::{
     UnsafeExpr,
     AssignLeft,
 }
+use std::jule::build::{LogMsg}
 use std::jule::constant::{Const}
 use std::jule::lex::{
     Token,
@@ -131,11 +132,11 @@ fn get_expr_models(mut m: ExprModel): []ExprModel {
 fn check_mut(mut s: &Sema, left: &Data, mut right: &Data, error_token: Token): (ok: bool) {
     match {
     | !left.mutable:
-        s.push_err(error_token, "assignment_to_non_mut")
+        s.push_err(error_token, LogMsg.AssignToNonMut)
         ret false
 
     | real(right) && !right.mutable && is_mut(right.kind):
-        s.push_err(error_token, "assignment_non_mut_to_mut")
+        s.push_err(error_token, LogMsg.AssignNonMutToMut)
         ret false
 
     |:
@@ -146,17 +147,17 @@ fn check_mut(mut s: &Sema, left: &Data, mut right: &Data, error_token: Token): (
 fn check_assign(mut s: &Sema, mut left: &Data, mut right: &Data, error_token: Token): (ok: bool) {
     let f = left.kind.fnc()
     if real(f) && real(f.decl) && f.decl.global {
-        s.push_err(error_token, "assign_type_not_support_value")
+        s.push_err(error_token, LogMsg.AssignTypeNotSupportValue)
         ret false
     }
 
     match {
     | !left.lvalue:
-        s.push_err(error_token, "assign_require_lvalue")
+        s.push_err(error_token, LogMsg.AssignRequireLvalue)
         ret false
 
     | left.is_const():
-        s.push_err(error_token, "assign_const")
+        s.push_err(error_token, LogMsg.AssignConst)
         ret false
 
     | !check_mut(s, left, right, error_token):
@@ -579,7 +580,7 @@ impl ScopeChecker {
         }
 
         if self.is_duplicated_ident(uintptr(&v), v.ident) {
-            self.s.push_err(v.token, "duplicated_ident", v.ident)
+            self.s.push_err(v.token, LogMsg.DuplicatedIdent, v.ident)
         }
 
         self.s.check_var_decl(v, self)
@@ -593,7 +594,7 @@ impl ScopeChecker {
     fn check_type_alias_decl(mut &self, mut decl: &TypeAliasDecl) {
         let mut ta = build_type_alias(decl)
         if self.is_duplicated_ident(uintptr(&ta), ta.ident) {
-            self.s.push_err(ta.token, "duplicated_ident", ta.ident)
+            self.s.push_err(ta.token, LogMsg.DuplicatedIdent, ta.ident)
         }
         self.s.check_type_alias_decl(ta, self)
 
@@ -672,12 +673,12 @@ impl ScopeChecker {
 
         let prim = d.kind.prim()
         if !real(prim) {
-            self.s.push_err(i.expr.token, "if_require_bool_expr")
+            self.s.push_err(i.expr.token, LogMsg.IfRequireBoolExpr)
             ret new(If)
         }
 
         if !prim.is_bool() {
-            self.s.push_err(i.expr.token, "if_require_bool_expr")
+            self.s.push_err(i.expr.token, LogMsg.IfRequireBoolExpr)
             ret new(If)
         }
 
@@ -749,12 +750,12 @@ impl ScopeChecker {
 
             let prim = d.kind.prim()
             if !real(prim) {
-                self.s.push_err(it.token, "iter_while_require_bool_expr")
+                self.s.push_err(it.token, LogMsg.IterWhileRequireBoolExpr)
                 ret
             }
 
             if !prim.is_bool() {
-                self.s.push_err(it.token, "iter_while_require_bool_expr")
+                self.s.push_err(it.token, LogMsg.IterWhileRequireBoolExpr)
                 ret
             }
 
@@ -763,7 +764,7 @@ impl ScopeChecker {
 
         if wh.is_while_next() {
             if !is_valid_ast_st_for_next_st(wh.next) {
-                self.s.push_err(wh.next_token, "invalid_stmt_for_next")
+                self.s.push_err(wh.next_token, LogMsg.InvalidStmtForNext)
                 ret
             }
 
@@ -773,7 +774,7 @@ impl ScopeChecker {
                 let mut st = self.scope.stmts.at(n)
                 self.scope.stmts.set_len(n) // Remove trailing statements.
                 if !is_valid_st_for_next_st(st) {
-                    self.s.push_err(wh.next_token, "invalid_stmt_for_next")
+                    self.s.push_err(wh.next_token, LogMsg.InvalidStmtForNext)
                 }
 
                 kind.next = st
@@ -887,7 +888,7 @@ impl ScopeChecker {
             ret &ContSt{it: scope.it}
         }
 
-        self.s.push_err(c.token, "continue_at_out_of_valid_scope")
+        self.s.push_err(c.token, LogMsg.ContinueAtOutOfValidScope)
         ret new(ContSt)
     }
 
@@ -900,34 +901,34 @@ impl ScopeChecker {
         if c.label.id != TokenId.Na { // Label given.
             let mut label = find_label_parent(c.label.kind, self.parent)
             if !real(label) {
-                self.s.push_err(c.label, "label_not_exist", c.label.kind)
+                self.s.push_err(c.label, LogMsg.LabelNotExist, c.label.kind)
                 ret
             }
 
             label.used = true
 
             if label.pos+1 >= label.scope.scope.stmts.len() {
-                self.s.push_err(c.label, "invalid_label")
+                self.s.push_err(c.label, LogMsg.InvalidLabel)
                 ret
             }
 
             let i = label.pos + 1
             if i >= label.scope.scope.stmts.len() {
-                self.s.push_err(c.label, "invalid_label")
+                self.s.push_err(c.label, LogMsg.InvalidLabel)
             } else {
                 let mut st = label.scope.scope.stmts.at(i)
                 match type st {
                 | &InfIter:   cont.it = uintptr(&(&InfIter)(st))
                 | &RangeIter: cont.it = uintptr(&(&RangeIter)(st))
                 | &WhileIter: cont.it = uintptr(&(&WhileIter)(st))
-                |:            self.s.push_err(c.label, "invalid_label")
+                |:            self.s.push_err(c.label, LogMsg.InvalidLabel)
                 }
             }
         }
 
         if cont.it != 0 {
             if !self.check_valid_cont_label(cont.it) {
-                self.s.push_err(c.label, "invalid_label")
+                self.s.push_err(c.label, LogMsg.InvalidLabel)
             }
         }
 
@@ -936,7 +937,7 @@ impl ScopeChecker {
 
     fn check_label(mut &self, mut l: &LabelSt) {
         if real(self.find_label(l.ident)) {
-            self.s.push_err(l.token, "label_exist", l.ident)
+            self.s.push_err(l.token, LogMsg.LabelExist, l.ident)
             ret
         }
 
@@ -967,7 +968,7 @@ impl ScopeChecker {
 
     fn check_postfix(mut &self, mut a: &AssignSt) {
         if a.left.len > 1 {
-            self.s.push_err(a.setter, "invalid_syntax")
+            self.s.push_err(a.setter, LogMsg.InvalidSyntax)
             ret
         }
 
@@ -981,7 +982,7 @@ impl ScopeChecker {
         if real(d.kind.ptr()) {
             let mut ptr = d.kind.ptr()
             if !ptr.is_unsafe() && !self.is_unsafe() {
-                self.s.push_err(a.left[0].expr.token, "unsafe_behavior_at_out_of_unsafe_scope")
+                self.s.push_err(a.left[0].expr.token, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
                 ret
             }
         }
@@ -992,7 +993,7 @@ impl ScopeChecker {
         }
 
         if !real(check_t.prim()) || !is_num(check_t.prim().kind) {
-            self.s.push_err(a.setter, "operator_not_for_juletype", a.setter.kind, d.kind.to_str())
+            self.s.push_err(a.setter, LogMsg.OperatorNotForJuleType, a.setter.kind, d.kind.to_str())
             ret
         }
 
@@ -1032,7 +1033,7 @@ impl ScopeChecker {
 
         if !real(l) {
             if r.kind.is_void() {
-                self.s.push_err(a.right.token, "invalid_expr")
+                self.s.push_err(a.right.token, LogMsg.InvalidExpr)
             }
 
             self.scope.stmts.push(r)
@@ -1044,7 +1045,7 @@ impl ScopeChecker {
         }
 
         if real(r.kind.tup()) {
-            self.s.push_err(a.setter, "missing_multi_assign_idents")
+            self.s.push_err(a.setter, LogMsg.MissingMultiAssignIdents)
             ret
         }
 
@@ -1087,7 +1088,7 @@ impl ScopeChecker {
         mut a: &AssignSt, lexpr: &AssignLeft, mut l: &Data, mut r: &Data) {
         if is_ignore_ident(lexpr.ident) {
             if r.kind.is_void() {
-                self.s.push_err(a.right.token, "invalid_expr")
+                self.s.push_err(a.right.token, LogMsg.InvalidExpr)
             }
 
             st.l = append(st.l, nil)
@@ -1118,7 +1119,7 @@ impl ScopeChecker {
         }
 
         if lexpr.mutable || lexpr.reference {
-            self.s.push_err(lexpr.token, "duplicated_ident", lexpr.ident)
+            self.s.push_err(lexpr.token, LogMsg.DuplicatedIdent, lexpr.ident)
         }
 
         if !check_assign(self.s, l, r, a.setter) {
@@ -1152,11 +1153,11 @@ impl ScopeChecker {
 
         match {
         | a.left.len > r.len:
-            self.s.push_err(a.setter, "overflow_multi_assign_idents")
+            self.s.push_err(a.setter, LogMsg.OverflowMultiAssignIdents)
             ret
 
         | a.left.len < r.len:
-            self.s.push_err(a.setter, "missing_multi_assign_idents")
+            self.s.push_err(a.setter, LogMsg.MissingMultiAssignIdents)
             ret
         }
 
@@ -1204,11 +1205,11 @@ impl ScopeChecker {
 
         match {
         | a.left.len > right.len:
-            self.s.push_err(a.setter, "overflow_multi_assign_idents")
+            self.s.push_err(a.setter, LogMsg.OverflowMultiAssignIdents)
             ret
 
         | a.left.len < right.len:
-            self.s.push_err(a.setter, "missing_multi_assign_idents")
+            self.s.push_err(a.setter, LogMsg.MissingMultiAssignIdents)
             ret
         }
 
@@ -1284,7 +1285,7 @@ impl ScopeChecker {
                 if real(d) {
                     _case.exprs[i] = d.kind
                     if count_match_type(m, d.kind) > 1 {
-                        self.s.push_err(e.token, "duplicate_match_type", d.kind.to_str())
+                        self.s.push_err(e.token, LogMsg.DuplicateMatchType, d.kind.to_str())
                     }
                 }
 
@@ -1355,7 +1356,7 @@ impl ScopeChecker {
         }
 
         if !((real(d.kind.prim()) && d.kind.prim().is_any()) || real(d.kind.trt())) {
-            self.s.push_err(m.expr.token, "type_case_has_not_valid_expr")
+            self.s.push_err(m.expr.token, LogMsg.TypeCaseHasNotValidExpr)
             ret
         }
 
@@ -1409,13 +1410,13 @@ impl ScopeChecker {
 
     fn check_fall(mut self, f: &std::jule::ast::FallSt) {
         if self.cse == 0 || self.scope.stmts.len()+1 < self.scope.stmts.len() {
-            self.s.push_err(f.token, "fallthrough_wrong_use")
+            self.s.push_err(f.token, LogMsg.FalltroughWrongUse)
             ret
         }
 
         let mut _case = unsafe { (*Case)(self.cse) }
         if !real(unsafe { _case.next }) {
-            self.s.push_err(f.token, "fallthrough_into_final_case")
+            self.s.push_err(f.token, LogMsg.FallthroughIntoFinalCase)
             ret
         }
 
@@ -1437,20 +1438,20 @@ impl ScopeChecker {
 
         let mut label = find_label_parent(b.label.kind, self.parent)
         if !real(label) {
-            self.s.push_err(b.label, "label_not_exist", b.label.kind)
+            self.s.push_err(b.label, LogMsg.LabelNotExist, b.label.kind)
             ret new(BreakSt)
         }
 
         label.used = true
 
         if label.pos+1 >= label.scope.scope.stmts.len() {
-            self.s.push_err(b.label, "invalid_label")
+            self.s.push_err(b.label, LogMsg.InvalidLabel)
             ret new(BreakSt)
         }
 
         let i = label.pos + 1
         if i >= label.scope.scope.stmts.len() {
-            self.s.push_err(b.label, "invalid_label")
+            self.s.push_err(b.label, LogMsg.InvalidLabel)
         } else {
             let mut st = label.scope.scope.stmts.at(i)
             match type st {
@@ -1458,19 +1459,19 @@ impl ScopeChecker {
             | &RangeIter: brk.it = uintptr(&(&RangeIter)(st))
             | &WhileIter: brk.it = uintptr(&(&WhileIter)(st))
             | &Match:     brk.mtch = uintptr(&(&Match)(st))
-            |:            self.s.push_err(b.label, "invalid_label")
+            |:            self.s.push_err(b.label, LogMsg.InvalidLabel)
             }
         }
 
         if brk.it != 0 {
             if !self.check_valid_break_label(brk.it) {
-                self.s.push_err(b.label, "invalid_label")
+                self.s.push_err(b.label, LogMsg.InvalidLabel)
             }
         }
 
         if brk.mtch != 0 {
             if !self.check_valid_break_label(brk.mtch) {
-                self.s.push_err(b.label, "invalid_label")
+                self.s.push_err(b.label, LogMsg.InvalidLabel)
             }
         }
 
@@ -1492,7 +1493,7 @@ impl ScopeChecker {
             ret &BreakSt{mtch: unsafe { uintptr(&(*Case)(scope.cse).owner) }}
         }
 
-        self.s.push_err(b.token, "break_at_out_of_valid_scope")
+        self.s.push_err(b.token, LogMsg.BreakAtOutOfValidScope)
         ret new(BreakSt)
     }
 
@@ -1569,7 +1570,7 @@ impl ScopeChecker {
         for i > gt.pos; i-- {
             let s = label.scope.scope.stmts.at(i)
             if st_is_def(s) {
-                self.s.push_err(gt.gt.token, "goto_jumps_declarations", gt.gt.label.kind)
+                self.s.push_err(gt.gt.token, LogMsg.GotoJumpsDeclarations, gt.gt.label.kind)
                 break
             }
         }
@@ -1588,7 +1589,7 @@ impl ScopeChecker {
                     ret true
 
                 | st_is_def(scope.scope.stmts.at(i)):
-                    self.s.push_err(gt.gt.token, "goto_jumps_declarations", gt.gt.label.kind)
+                    self.s.push_err(gt.gt.token, LogMsg.GotoJumpsDeclarations, gt.gt.label.kind)
                     ret false
                 }
             }
@@ -1607,7 +1608,7 @@ impl ScopeChecker {
                 ret
 
             | st_is_def(gt.scope.scope.stmts.at(i)):
-                self.s.push_err(gt.gt.token, "goto_jumps_declarations", gt.gt.label.kind)
+                self.s.push_err(gt.gt.token, LogMsg.GotoJumpsDeclarations, gt.gt.label.kind)
                 ret
             }
         }
@@ -1636,7 +1637,7 @@ impl ScopeChecker {
             }
 
             if st_is_def(s) {
-                self.s.push_err(gt.gt.token, "goto_jumps_declarations", gt.gt.label.kind)
+                self.s.push_err(gt.gt.token, LogMsg.GotoJumpsDeclarations, gt.gt.label.kind)
                 break
             }
         }
@@ -1663,7 +1664,7 @@ impl ScopeChecker {
         for (_, mut gt) in self.gotos {
             let mut label = self.find_label_all(gt.gt.label.kind)
             if !real(label) {
-                self.s.push_err(gt.gt.token, "label_not_exist", gt.gt.label.kind)
+                self.s.push_err(gt.gt.token, LogMsg.LabelNotExist, gt.gt.label.kind)
                 continue
             }
 
@@ -1675,7 +1676,7 @@ impl ScopeChecker {
     fn check_labels(mut self) {
         for _, l in self.labels {
             if !l.used {
-                self.s.push_err(l.token, "declared_but_not_used", l.label.ident)
+                self.s.push_err(l.token, LogMsg.DeclaredButNotUsed, l.label.ident)
             }
         }
     }
@@ -1685,7 +1686,7 @@ impl ScopeChecker {
         for i < self.table.vars.len(); i++ {
             let v = self.table.vars.at(i)
             if !v.used && !is_ignore_ident(v.ident) && !is_anon_ident(v.ident) && v.ident != str(TokenKind.Self) {
-                self.s.push_err(v.token, "declared_but_not_used", v.ident)
+                self.s.push_err(v.token, LogMsg.DeclaredButNotUsed, v.ident)
             }
         }
     }
@@ -1695,7 +1696,7 @@ impl ScopeChecker {
         for i < self.table.type_aliases.len(); i++ {
             let a = self.table.type_aliases.at(i)
             if !a.used && !is_ignore_ident(a.ident) && !is_anon_ident(a.ident) {
-                self.s.push_err(a.token, "declared_but_not_used", a.ident)
+                self.s.push_err(a.token, LogMsg.DeclaredButNotUsed, a.ident)
             }
         }
     }

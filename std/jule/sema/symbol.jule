@@ -25,6 +25,7 @@ use std::jule::ast::{
 }
 use std::jule::build::{
     PATH_STDLIB,
+    LogMsg,
     Log,
     LogKind,
     Directive,
@@ -318,13 +319,13 @@ impl SymbolBuilder {
         ret root
     }
 
-    fn push_err(mut self, token: Token, key: str, args: ...any) {
+    fn push_err(mut self, token: Token, fmt: LogMsg, args: ...any) {
         self.errors = append(self.errors, Log{
             kind:   LogKind.Error,
             row:    token.row,
             column: token.column,
             path:   token.file.path(),
-            text:   errorf(key, args...),
+            text:   errorf(fmt, args...),
         })
     }
 
@@ -335,14 +336,14 @@ impl SymbolBuilder {
 
         let ext = ext(decl.link_path)
         if !is_valid_header_ext(ext) && !is_valid_cpp_ext(ext) {
-            self.push_err(decl.token, "invalid_cpp_ext", ext)
+            self.push_err(decl.token, LogMsg.InvalidCppExt, ext)
             ret false
         }
 
         let (info, err) = stat(decl.link_path)
         // Exist?
         if err != FsError.Ok || info.is_dir() {
-            self.push_err(decl.token, "use_not_found", decl.link_path)
+            self.push_err(decl.token, LogMsg.UseNotFound, decl.link_path)
             ret false
         }
 
@@ -361,7 +362,7 @@ impl SymbolBuilder {
             // Set to absolute path for correct include path.
             path, ok = abs(decl.link_path)
             if !ok {
-                self.push_err(decl.token, "use_not_found", decl.link_path)
+                self.push_err(decl.token, LogMsg.UseNotFound, decl.link_path)
             }
         }
 
@@ -382,14 +383,14 @@ impl SymbolBuilder {
         path = join(PATH_STDLIB, path)
         let (path, ok) = abs(path)
         if !ok {
-            self.push_err(decl.token, "use_not_found", decl.link_path)
+            self.push_err(decl.token, LogMsg.UseNotFound, decl.link_path)
             ret new(ImportInfo)
         }
 
         let (info, err) = stat(path)
         // Exist?
         if err != FsError.Ok || !info.is_dir() {
-            self.push_err(decl.token, "use_not_found", decl.link_path)
+            self.push_err(decl.token, LogMsg.UseNotFound, decl.link_path)
             ret new(ImportInfo)
         }
 
@@ -417,14 +418,14 @@ impl SymbolBuilder {
 
         let (path, ok) = abs(path)
         if !ok {
-            self.push_err(decl.token, "use_not_found", decl.link_path)
+            self.push_err(decl.token, LogMsg.UseNotFound, decl.link_path)
             ret new(ImportInfo)
         }
 
         let (info, err) = stat(path)
         // Exist?
         if err != FsError.Ok || !info.is_dir() {
-            self.push_err(decl.token, "use_not_found", decl.link_path)
+            self.push_err(decl.token, LogMsg.UseNotFound, decl.link_path)
             ret new(ImportInfo)
         }
 
@@ -462,14 +463,14 @@ impl SymbolBuilder {
             ret true
         }
 
-        self.push_err(pkg.token, "duplicate_use_decl", pkg.link_path)
+        self.push_err(pkg.token, LogMsg.DuplicateUseDecl, pkg.link_path)
         ret false
     }
 
     fn impl_import_selections(mut self, mut imp: &ImportInfo, mut decl: &UseDecl) {
         for (_, mut ident) in decl.selected {
             if imp.exist_ident(ident.kind) {
-                self.push_err(ident, "duplicated_import_selection", ident.kind)
+                self.push_err(ident, LogMsg.DuplicatedUseSelection, ident.kind)
                 continue
             }
 
@@ -495,7 +496,7 @@ impl SymbolBuilder {
         const PADDING = 4
 
         let refers_to = errorf(
-            "refers_to",
+            LogMsg.RefersTo,
             self.get_as_link_path(sb.table.file.dir()),
             self.get_as_link_path(path))
         message = str_repeat(" ", PADDING) + refers_to + "\n" + message
@@ -521,12 +522,12 @@ impl SymbolBuilder {
             owner = owner.owner
         }
 
-        self.push_err(error_token, "pkg_illegal_cross_cycle", message)
+        self.push_err(error_token, LogMsg.PkgIllegalCrossCycle, message)
     }
 
     fn check_import_cycles(mut &self, imp: &ImportInfo, decl: &UseDecl): bool {
         if imp.path == self.table.file.dir() {
-            self.push_err(decl.token, "pkg_illegal_cycle_refers_itself", self.get_as_link_path(imp.path))
+            self.push_err(decl.token, LogMsg.PkgIllegalCycleRefersItself, self.get_as_link_path(imp.path))
             ret false
         }
 
@@ -580,7 +581,7 @@ impl SymbolBuilder {
                 // Break import if file has error(s).
                 if errors.len > 0 {
                     self.errors = append(self.errors, errors...)
-                    self.push_err(imp.token, "used_package_has_errors", imp.link_path)
+                    self.push_err(imp.token, LogMsg.UsedPackageHasErrors, imp.link_path)
                     ret false
                 }
 
@@ -654,7 +655,7 @@ impl SymbolBuilder {
             self.table.enums.push(e)
 
         |:
-            self.push_err(decl.token, "invalid_syntax")
+            self.push_err(decl.token, LogMsg.InvalidSyntax)
         }
     }
 

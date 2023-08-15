@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::jule::build::{errorf, Log, LogKind}
+use std::jule::build::{errorf, LogMsg, Log, LogKind}
 use std::unicode::utf8::{decode_rune}
 use std::vector::{Vector}
 
@@ -101,13 +101,13 @@ static BASIC_OPS: [...]KindPair = [
     {TokenKind.Eq, TokenId.Op},
 ]
 
-fn make_err(row: int, col: int, f: &File, key: str, args: ...any): Log {
+fn make_err(row: int, col: int, f: &File, fmt: LogMsg, args: ...any): Log {
     ret Log{
         kind:   LogKind.Error,
         row:    row,
         column: col,
         path:   f.path(),
-        text:   errorf(key, args...),
+        text:   errorf(fmt, args...),
     }
 }
 
@@ -404,14 +404,14 @@ struct Lex {
 }
 
 impl Lex {
-    fn push_err(mut self, key: str, args: ...any) {
+    fn push_err(mut self, fmt: LogMsg, args: ...any) {
         self.errors = append(self.errors,
-            make_err(self.row, self.column, self.file, key, args...))
+            make_err(self.row, self.column, self.file, fmt, args...))
     }
 
-    fn push_err_tok(mut self, token: Token, key: str) {
+    fn push_err_tok(mut self, token: Token, fmt: LogMsg) {
         self.errors = append(self.errors,
-            make_err(token.row, token.column, self.file, key))
+            make_err(token.row, token.column, self.file, fmt))
     }
 
     // Lexs all source content.
@@ -516,7 +516,7 @@ impl Lex {
                 ret
             }
         }
-        self.push_err("missing_block_comment")
+        self.push_err(LogMsg.MissingBlockCommentClose)
     }
 
     // Returns literal if next token is numeric, returns empty string if not.
@@ -566,7 +566,7 @@ impl Lex {
     end:
         if seq == "" {
             self.pos++
-            self.push_err("invalid_escape_sequence")
+            self.push_err(LogMsg.InvalidEscapeSeq)
             ret ""
         }
         self.pos += seq.len
@@ -593,7 +593,7 @@ impl Lex {
                 continue
             }
             if txt[i] == '\n' {
-                self.push_err("missing_rune_end")
+                self.push_err(LogMsg.MissingRuneEnd)
                 self.pos++
                 self.new_line()
                 ret ""
@@ -614,9 +614,9 @@ impl Lex {
         }
 
         if n == 0 {
-            self.push_err("rune_empty")
+            self.push_err(LogMsg.RuneEmpty)
         } else if n > 1 {
-            self.push_err("rune_overflow")
+            self.push_err(LogMsg.RuneOverflow)
         }
 
         ret run
@@ -638,7 +638,7 @@ impl Lex {
             if ch == '\n' {
                 self.new_line()
                 if !raw {
-                    self.push_err("missing_string_end")
+                    self.push_err(LogMsg.MissingStrEnd)
                     self.pos++
                     ret ""
                 }
@@ -758,7 +758,7 @@ impl Lex {
 
         |:
             let (r, sz) = decode_rune(txt)
-            self.push_err("invalid_token", r)
+            self.push_err(LogMsg.InvalidToken, r)
             self.column++
             self.pos += sz
             ret t

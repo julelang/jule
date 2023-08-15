@@ -26,6 +26,7 @@ use std::jule::ast::{
     AssignLeft,
     AssignSt,
 }
+use std::jule::build::{LogMsg}
 use std::jule::lex::{
     Token,
     TokenId,
@@ -155,7 +156,7 @@ impl ScopeParser {
     fn stopped(self): bool { ret self.pos == -1 }
     fn finished(self): bool { ret self.pos >= self.stms.len }
     fn is_last_st(self): bool { ret self.pos+1 >= self.stms.len }
-    fn push_err(mut self, token: Token, key: str) { self.p.push_err(token, key) }
+    fn push_err(mut self, token: Token, fmt: LogMsg) { self.p.push_err(token, fmt) }
 
     fn insert_as_next(mut self, mut tokens: []Token) {
         self.stms = append(self.stms[:self.pos+1], self.stms[self.pos:]...)
@@ -206,7 +207,7 @@ impl ScopeParser {
         }
 
         if self.is_last_st() {
-            self.push_err(it.token, "invalid_syntax")
+            self.push_err(it.token, LogMsg.InvalidSyntax)
             ret nil
         }
 
@@ -225,11 +226,11 @@ impl ScopeParser {
         let mut block_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
         if block_tokens == nil {
             self.stop()
-            self.push_err(it.token, "body_not_exist")
+            self.push_err(it.token, LogMsg.BodyNotExist)
             ret nil
         }
         if i < tokens.len {
-            self.push_err(tokens[i], "invalid_syntax")
+            self.push_err(tokens[i], LogMsg.InvalidSyntax)
         }
 
         it.scope = self.build_scope(block_tokens)
@@ -260,14 +261,14 @@ impl ScopeParser {
         if key.token.id == TokenId.Mut {
             key.mutable = true
             if tokens.len == 1 {
-                self.push_err(key.token, "invalid_syntax")
+                self.push_err(key.token, LogMsg.InvalidSyntax)
             }
             key.token = tokens[1]
         } else if tokens.len > 1 {
-            self.push_err(tokens[1], "invalid_syntax")
+            self.push_err(tokens[1], LogMsg.InvalidSyntax)
         }
         if key.token.id != TokenId.Ident {
-            self.push_err(key.token, "invalid_syntax")
+            self.push_err(key.token, LogMsg.InvalidSyntax)
             ret new(VarDecl)
         }
         key.ident = key.token.kind
@@ -288,7 +289,7 @@ impl ScopeParser {
             ret
         }
         if key_tokens.len > 2 {
-            self.push_err(rng.in_token, "much_range_vars")
+            self.push_err(rng.in_token, LogMsg.MuchRangeVars)
         }
         let mut keys = self.build_range_kind_keys(key_tokens)
         rng.key_a = keys[0]
@@ -301,7 +302,7 @@ impl ScopeParser {
         let mut i = 0
         let mut rang = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
         if i < tokens.len {
-            self.push_err(rng.in_token, "invalid_syntax")
+            self.push_err(rng.in_token, LogMsg.InvalidSyntax)
         }
         self.setup_range_kind_keys_plain(rng, rang)
     }
@@ -309,7 +310,7 @@ impl ScopeParser {
     fn setup_range_kind_keys(mut self, mut rng: &RangeKind, mut tokens: []Token) {
         if tokens[0].id == TokenId.Range {
             if tokens[0].kind != str(TokenKind.LParent) {
-                self.push_err(tokens[0], "invalid_syntax")
+                self.push_err(tokens[0], LogMsg.InvalidSyntax)
                 ret
             }
             self.setup_range_kind_keys_explicit(rng, tokens)
@@ -323,7 +324,7 @@ impl ScopeParser {
             in_token: in_token,
         }
         if expr_tokens.len == 0 {
-            self.push_err(rng.in_token, "missing_expr")
+            self.push_err(rng.in_token, LogMsg.MissingExpr)
             ret rng
         }
         rng.expr = self.p.build_expr(expr_tokens)
@@ -368,7 +369,7 @@ impl ScopeParser {
         tokens = tokens[1:] // Skip "iter" keyword.
         if tokens.len == 0 {
             self.stop()
-            self.push_err(it.token, "body_not_exist")
+            self.push_err(it.token, LogMsg.BodyNotExist)
             ret nil
         }
         let mut expr_tokens = get_block_expr(tokens)
@@ -379,11 +380,11 @@ impl ScopeParser {
         let mut scope_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
         if scope_tokens == nil {
             self.stop()
-            self.push_err(it.token, "body_not_exist")
+            self.push_err(it.token, LogMsg.BodyNotExist)
             ret nil
         }
         if i < tokens.len {
-            self.push_err(tokens[i], "invalid_syntax")
+            self.push_err(tokens[i], LogMsg.InvalidSyntax)
         }
         it.scope = self.build_scope(scope_tokens)
         ret it
@@ -402,11 +403,11 @@ impl ScopeParser {
         }
         if tokens.len > 1 {
             if tokens[1].id != TokenId.Ident {
-                self.push_err(tokens[1], "invalid_syntax")
+                self.push_err(tokens[1], LogMsg.InvalidSyntax)
             } else {
                 brk.label = tokens[1]
                 if tokens.len > 2 {
-                    self.push_err(tokens[1], "invalid_syntax")
+                    self.push_err(tokens[1], LogMsg.InvalidSyntax)
                 }
             }
         }
@@ -419,11 +420,11 @@ impl ScopeParser {
         }
         if tokens.len > 1 {
             if tokens[1].id != TokenId.Ident {
-                self.push_err(tokens[1], "invalid_syntax")
+                self.push_err(tokens[1], LogMsg.InvalidSyntax)
             } else {
                 cont.label = tokens[1]
                 if tokens.len > 2 {
-                    self.push_err(tokens[1], "invalid_syntax")
+                    self.push_err(tokens[1], LogMsg.InvalidSyntax)
                 }
             }
         }
@@ -438,21 +439,21 @@ impl ScopeParser {
         let mut expr_tokens = get_block_expr(tokens)
         let mut i = 0
         if expr_tokens.len == 0 {
-            self.push_err(model.token, "missing_expr")
+            self.push_err(model.token, LogMsg.MissingExpr)
         } else {
             i = expr_tokens.len
         }
         let mut scope_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
         if scope_tokens == nil {
             self.stop()
-            self.push_err(model.token, "body_not_exist")
+            self.push_err(model.token, LogMsg.BodyNotExist)
             ret new(If)
         }
         if i < tokens.len {
             if tokens[i].id == TokenId.Else {
                 tokens = tokens[i:]
             } else {
-                self.push_err(tokens[i], "invalid_syntax")
+                self.push_err(tokens[i], LogMsg.InvalidSyntax)
                 tokens = nil
             }
         }
@@ -470,15 +471,15 @@ impl ScopeParser {
         let mut scope_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
         if scope_tokens == nil {
             if i < tokens.len {
-                self.push_err(els.token, "else_have_expr")
+                self.push_err(els.token, LogMsg.ElseHaveExpr)
             } else {
                 self.stop()
-                self.push_err(els.token, "body_not_exist")
+                self.push_err(els.token, LogMsg.BodyNotExist)
             }
             ret new(Else)
         }
         if i < tokens.len {
-            self.push_err(tokens[i], "invalid_syntax")
+            self.push_err(tokens[i], LogMsg.InvalidSyntax)
         }
         els.scope = self.build_scope(scope_tokens)
         ret els
@@ -514,11 +515,11 @@ impl ScopeParser {
     fn build_call_st(mut self, mut tokens: []Token): NodeData {
         let token = tokens[0]
         if is_fn_call(tokens) == nil {
-            self.push_err(token, "expr_not_func_call")
+            self.push_err(token, LogMsg.ExprNotFnCall)
         }
         let mut expr = self.p.build_expr(tokens)
         if real(expr) && !expr.is_fn_call() {
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
         }
         ret expr
     }
@@ -535,14 +536,14 @@ impl ScopeParser {
             token: tokens[0],
         }
         if tokens.len == 1 {
-            self.push_err(gt.token, "missing_goto_label")
+            self.push_err(gt.token, LogMsg.MissingGotoLabel)
             ret nil
         } else if tokens.len > 2 {
-            self.push_err(tokens[2], "invalid_syntax")
+            self.push_err(tokens[2], LogMsg.InvalidSyntax)
         }
         let mut ident_token = tokens[1]
         if ident_token.id != TokenId.Ident {
-            self.push_err(ident_token, "invalid_syntax")
+            self.push_err(ident_token, LogMsg.InvalidSyntax)
             ret gt
         }
         gt.label = ident_token
@@ -554,7 +555,7 @@ impl ScopeParser {
             token: tokens[0],
         }
         if tokens.len > 1 {
-            self.push_err(tokens[1], "invalid_syntax")
+            self.push_err(tokens[1], LogMsg.InvalidSyntax)
         }
         ret fll
     }
@@ -581,7 +582,7 @@ impl ScopeParser {
                 })
             }
             if i < tokens.len {
-                self.push_err(tokens[i], "invalid_syntax")
+                self.push_err(tokens[i], LogMsg.InvalidSyntax)
             }
             ret
         }
@@ -619,7 +620,7 @@ impl ScopeParser {
                 ret exprs
             }
         }
-        self.push_err(tokens[0], "invalid_syntax")
+        self.push_err(tokens[0], LogMsg.InvalidSyntax)
         tokens = nil
         ret nil
     }
@@ -669,7 +670,7 @@ impl ScopeParser {
             }
 
             if tok.id != TokenId.Op || tok.kind != str(TokenKind.Vline) {
-                self.push_err(tok, "invalid_syntax")
+                self.push_err(tok, LogMsg.InvalidSyntax)
                 break
             }
             let (mut c, is_default) = self.build_case(tokens, type_match)
@@ -681,7 +682,7 @@ impl ScopeParser {
                         scope: c.scope,
                     }
                 } else {
-                    self.push_err(tok, "invalid_syntax")
+                    self.push_err(tok, LogMsg.InvalidSyntax)
                 }
             } else {
                 cases = append(cases, c)
@@ -705,14 +706,14 @@ impl ScopeParser {
         if expr_tokens.len > 0 {
             m.expr = self.p.build_expr(expr_tokens)
         } else if m.type_match {
-            self.push_err(m.token, "missing_expr")
+            self.push_err(m.token, LogMsg.MissingExpr)
         }
 
         let mut i = expr_tokens.len
         let mut block_toks = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
         if block_toks == nil {
             self.stop()
-            self.push_err(m.token, "body_not_exist")
+            self.push_err(m.token, LogMsg.BodyNotExist)
             ret new(MatchCase)
         }
 
@@ -728,7 +729,7 @@ impl ScopeParser {
             is_unsafe = true
             tokens = tokens[1:]
             if tokens.len == 0 {
-                self.push_err(token, "invalid_syntax")
+                self.push_err(token, LogMsg.InvalidSyntax)
                 ret new(ScopeTree)
             }
             token = tokens[0]
@@ -736,7 +737,7 @@ impl ScopeParser {
                 is_deferred = true
                 tokens = tokens[1:]
                 if tokens.len == 0 {
-                    self.push_err(token, "invalid_syntax")
+                    self.push_err(token, LogMsg.InvalidSyntax)
                     ret new(ScopeTree)
                 }
             }
@@ -744,7 +745,7 @@ impl ScopeParser {
             is_deferred = true
             tokens = tokens[1:]
             if tokens.len == 0 {
-                self.push_err(token, "invalid_syntax")
+                self.push_err(token, LogMsg.InvalidSyntax)
                 ret new(ScopeTree)
             }
         }
@@ -752,10 +753,10 @@ impl ScopeParser {
         let mut i = 0
         let mut scope_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
         if scope_tokens == nil {
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
             ret new(ScopeTree)
         } else if i < tokens.len {
-            self.push_err(tokens[i], "invalid_syntax")
+            self.push_err(tokens[i], LogMsg.InvalidSyntax)
         }
         let mut scope = self.build_scope(scope_tokens)
         scope.unsafety = is_unsafe
@@ -829,7 +830,7 @@ impl ScopeParser {
             info.r = tokens[i+1:]
             if is_postfix_op(info.setter.kind) {
                 if info.r.len > 0 {
-                    self.push_err(info.r[0], "invalid_syntax")
+                    self.push_err(info.r[0], LogMsg.InvalidSyntax)
                     info.r = nil
                 }
             }
@@ -904,7 +905,7 @@ impl ScopeParser {
         let mut i = 0
         let mut rang = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
         if rang == nil {
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
             ret new(AssignSt), false
         } else if i+1 < tokens.len {
             assign.setter = tokens[i]
@@ -928,7 +929,7 @@ impl ScopeParser {
                 is_mut = true
                 part = part[1:]
                 if part.len == 0 {
-                    self.push_err(token, "invalid_syntax")
+                    self.push_err(token, LogMsg.InvalidSyntax)
                     continue
                 }
             }
@@ -937,7 +938,7 @@ impl ScopeParser {
                 is_ref = true
                 part = part[1:]
                 if part.len == 0 {
-                    self.push_err(token, "invalid_syntax")
+                    self.push_err(token, LogMsg.InvalidSyntax)
                     continue
                 }
             }
@@ -945,7 +946,7 @@ impl ScopeParser {
             if (part[0].id != TokenId.Ident &&
                 part[0].id != TokenId.Range &&
                 part[0].kind != str(TokenKind.LParent)) {
-                self.push_err(token, "invalid_syntax")
+                self.push_err(token, LogMsg.InvalidSyntax)
                 continue
             }
 
@@ -1043,7 +1044,7 @@ impl ScopeParser {
             }
         }
 
-        self.push_err(token, "invalid_syntax")
+        self.push_err(token, LogMsg.InvalidSyntax)
         ret nil
     }
 

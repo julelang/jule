@@ -7,19 +7,19 @@ use std::jule::ast::{
     TypeDecl,
     GenericDecl,
 }
-use std::jule::build::{Derives, Log, LogKind, errorf}
+use std::jule::build::{Derives, LogMsg, Log, LogKind, errorf}
 use std::jule::constant::{Const}
 use std::jule::lex::{File, Token, TokenKind, is_ignore_ident, is_anon_ident}
 use std::jule::types::{is_float, is_int, is_sig_int, is_unsig_int, max_of}
 use std::vector::{Vector}
 
-fn compiler_err(token: Token, key: str, args: ...any): Log {
+fn compiler_err(token: Token, fmt: LogMsg, args: ...any): Log {
     ret Log{
         kind:   LogKind.Error,
         row:    token.row,
         column: token.column,
         path:   token.file.path(),
-        text:   errorf(key, args...),
+        text:   errorf(fmt, args...),
     }
 }
 
@@ -488,8 +488,8 @@ impl Lookup for Sema {
 impl Sema {
     fn set_current_file(mut self, mut f: &SymbolTable) { self.file = f }
 
-    fn push_err(mut self, token: Token, key: str, args: ...any) {
-        self.errors = append(self.errors, compiler_err(token, key, args...))
+    fn push_err(mut self, token: Token, fmt: LogMsg, args: ...any) {
+        self.errors = append(self.errors, compiler_err(token, fmt, args...))
     }
 
     // Reports whether define is accessible in the current package.
@@ -522,19 +522,19 @@ impl Sema {
     fn check_generic_quantity(mut self, required: int, given: int, error_token: Token): (ok: bool) {
         match {
         | required == 0 && given > 0:
-            self.push_err(error_token, "not_has_generics")
+            self.push_err(error_token, LogMsg.NotHasGenerics)
             ret false
 
         | required > 0 && given == 0:
-            self.push_err(error_token, "has_generics")
+            self.push_err(error_token, LogMsg.HasGenerics)
             ret false
 
         | required < given:
-            self.push_err(error_token, "generics_overflow")
+            self.push_err(error_token, LogMsg.GenericsOverflow)
             ret false
 
         | required > given:
-            self.push_err(error_token, "missing_generics")
+            self.push_err(error_token, LogMsg.MissingGenerics)
             ret false
 
         |:
@@ -586,7 +586,7 @@ impl Sema {
             }
 
             if self.is_duplicated_import_selection(uintptr(&imp), ident.kind) {
-                self.push_err(ident, "duplicated_ident", ident.kind)
+                self.push_err(ident, LogMsg.DuplicatedIdent, ident.kind)
                 continue
             }
 
@@ -633,11 +633,11 @@ impl Sema {
                 }
 
             |:
-                self.push_err(ident, "ident_not_exist", ident.kind)
+                self.push_err(ident, LogMsg.IdentNotExist, ident.kind)
                 continue
             }
 
-            self.push_err(ident, "ident_is_not_accessible", ident.kind)
+            self.push_err(ident, LogMsg.IdentIsNotAccessible, ident.kind)
 
         }
     }
@@ -667,7 +667,7 @@ impl Sema {
 
                 // Break checking if package has error.
                 if !ok {
-                    self.push_err(imp.token, "used_package_has_errors", imp.link_path)
+                    self.push_err(imp.token, LogMsg.UsedPackageHasErrors, imp.link_path)
                     ret
                 }
             }
@@ -797,14 +797,14 @@ impl Sema {
         mut src: &TypeKind, error_token: Token, deref: bool): bool {
         let dest_kind = dest.to_str()
         if !real(src) {
-            self.push_err(error_token, "incompatible_types", dest_kind, "<untyped>")
+            self.push_err(error_token, LogMsg.IncompatibleTypes, dest_kind, "<untyped>")
             ret false
         }
         let src_kind = src.to_str()
 
         // Tuple to single type, always fails.
         if real(src.tup()) {
-            self.push_err(error_token, "incompatible_types", dest_kind, src_kind)
+            self.push_err(error_token, LogMsg.IncompatibleTypes, dest_kind, src_kind)
             ret false
         }
 
@@ -827,7 +827,7 @@ impl Sema {
         }
         let ok = tcc.check()
         if !ok {
-            self.push_err(error_token, "incompatible_types", dest_kind, src_kind)
+            self.push_err(error_token, LogMsg.IncompatibleTypes, dest_kind, src_kind)
         }
         ret ok
     }
@@ -939,7 +939,7 @@ impl Sema {
     fn check_validity_for_init_expr(mut &self, left_mut: bool, left_ref: bool,
         left_kind: &TypeKind, mut d: &Data, error_token: Token) {
         if left_mut && !d.mutable && is_mut(d.kind) {
-            self.push_err(error_token, "assignment_non_mut_to_mut")
+            self.push_err(error_token, LogMsg.AssignNonMutToMut)
         }
         if left_ref {
             match type d.model {
@@ -960,10 +960,10 @@ impl Sema {
                 fall
 
             |:
-                self.push_err(error_token, "reference_assign_non_var")
+                self.push_err(error_token, LogMsg.RefAssignNonVar)
             }
             if left_mut && !d.mutable {
-                self.push_err(error_token, "mut_reference_points_to_immut")
+                self.push_err(error_token, LogMsg.MutRefPointsImmut)
             }
         }
 
@@ -989,7 +989,7 @@ impl Sema {
             refs:  &ta.refers,
         })
         if ok && real(ta.kind.kind.arr()) && ta.kind.kind.arr().auto {
-            self.push_err(ta.kind.decl.token, "array_auto_sized")
+            self.push_err(ta.kind.decl.token, LogMsg.ArrayAutoSized)
             ok = false
         }
         ret
@@ -997,7 +997,7 @@ impl Sema {
 
     fn check_type_alias_decl(mut &self, mut ta: &TypeAlias, l: Lookup) {
         if is_ignore_ident(ta.ident) {
-            self.push_err(ta.token, "ignore_ident")
+            self.push_err(ta.token, LogMsg.IgnoreIdent)
         }
         self.check_type_alias_decl_kind(ta, l)
     }
@@ -1005,7 +1005,7 @@ impl Sema {
     // Checks type alias declaration with duplicated identifiers.
     fn check_type_alias_decl_dup(mut &self, mut ta: &TypeAlias) {
         if self.is_duplicated_ident(uintptr(&ta), ta.ident, ta.cpp_linked) {
-            self.push_err(ta.token, "duplicated_ident", ta.ident)
+            self.push_err(ta.token, LogMsg.DuplicatedIdent, ta.ident)
         }
         self.check_type_alias_decl_kind(ta, self)
     }
@@ -1028,13 +1028,13 @@ impl Sema {
     fn check_enum_items_dup(mut self, e: &Enum) {
         for _, item in e.items {
             if is_ignore_ident(item.ident) {
-                self.push_err(item.token, "ignore_ident")
+                self.push_err(item.token, LogMsg.IgnoreIdent)
             } else {
                 for _, citem in e.items {
                     if item == citem {
                         break
                     } else if item.ident == citem.ident {
-                        self.push_err(item.token, "duplicated_ident", item.ident)
+                        self.push_err(item.token, LogMsg.DuplicatedIdent, item.ident)
                         break
                     }
                 }
@@ -1058,7 +1058,7 @@ impl Sema {
                 }
 
                 if !d.is_const() {
-                    self.push_err(item.value.expr.token, "expr_not_const")
+                    self.push_err(item.value.expr.token, LogMsg.ExprNotConst)
                 }
 
                 self.check_assign_type(e.kind.kind, d, item.token, false)
@@ -1071,7 +1071,7 @@ impl Sema {
         let mut max = u64(max_of(e.kind.kind.prim().to_str()))
         for (i, mut item) in e.items {
             if max == 0 {
-                self.push_err(item.token, "overflow_limits")
+                self.push_err(item.token, LogMsg.OverflowLimits)
             } else {
                 max--
             }
@@ -1090,7 +1090,7 @@ impl Sema {
                 }
 
                 if !d.is_const() {
-                    self.push_err(item.value.expr.token, "expr_not_const")
+                    self.push_err(item.value.expr.token, LogMsg.ExprNotConst)
                 }
 
                 self.check_assign_type(e.kind.kind, d, item.token, false)
@@ -1101,13 +1101,13 @@ impl Sema {
 
     fn check_enum_decl(mut &self, mut e: &Enum) {
         if is_ignore_ident(e.ident) {
-            self.push_err(e.token, "ignore_ident")
+            self.push_err(e.token, LogMsg.IgnoreIdent)
         } else if self.is_duplicated_ident(uintptr(&e), e.ident, false) {
-            self.push_err(e.token, "duplicated_ident", e.ident)
+            self.push_err(e.token, LogMsg.DuplicatedIdent, e.ident)
         }
 
         if e.items.len == 0 {
-            self.push_err(e.token, "no_member_in_enum", e.ident)
+            self.push_err(e.token, LogMsg.NoMemberInEnum, e.ident)
         }
 
         self.check_enum_items_dup(e)
@@ -1127,7 +1127,7 @@ impl Sema {
 
         let mut t = e.kind.kind.prim()
         if !real(t) {
-            self.push_err(e.token, "invalid_type_source")
+            self.push_err(e.token, LogMsg.InvalidTypeSource)
             ret
         }
 
@@ -1140,7 +1140,7 @@ impl Sema {
             self.check_enum_items_int(e)
 
         |:
-            self.push_err(e.token, "invalid_type_source")
+            self.push_err(e.token, LogMsg.InvalidTypeSource)
         }
     }
 
@@ -1163,7 +1163,7 @@ impl Sema {
         ok = true
         for i, g in generics {
             if is_ignore_ident(g.ident) {
-                self.push_err(g.token, "ignore_ident")
+                self.push_err(g.token, LogMsg.IgnoreIdent)
                 ok = false
                 continue
             }
@@ -1177,7 +1177,7 @@ impl Sema {
                     break duplication_lookup
 
                 | g.ident == ct.ident:
-                    self.push_err(g.token, "duplicated_ident", g.ident)
+                    self.push_err(g.token, LogMsg.DuplicatedIdent, g.ident)
                     ok = false
                     break duplication_lookup
                 }
@@ -1194,7 +1194,7 @@ impl Sema {
             for _, g in f.generics {
                 if p.ident == g.ident {
                     ok = false
-                    self.push_err(p.token, "duplicated_ident", p.ident)
+                    self.push_err(p.token, LogMsg.DuplicatedIdent, p.ident)
                     continue check
                 }
             }
@@ -1212,7 +1212,7 @@ impl Sema {
 
                 | p.ident == jp.ident:
                     ok = false
-                    self.push_err(p.token, "duplicated_ident", p.ident)
+                    self.push_err(p.token, LogMsg.DuplicatedIdent, p.ident)
                     continue check
                 }
             }
@@ -1261,7 +1261,7 @@ impl Sema {
             }
             continue
         exist:
-            self.push_err(v, "duplicated_ident", v.kind)
+            self.push_err(v, LogMsg.DuplicatedIdent, v.kind)
             ok = false
         }
 
@@ -1316,7 +1316,7 @@ impl Sema {
 
     fn check_trait_decl_method(mut &self, mut f: &Fn) {
         if is_ignore_ident(f.ident) {
-            self.push_err(f.token, "ignore_ident")
+            self.push_err(f.token, LogMsg.IgnoreIdent)
         }
     
         self.check_fn_decl_prototype(f)
@@ -1346,7 +1346,7 @@ impl Sema {
                     break duplicate_lookup
 
                 | f.ident == jf.ident:
-                    self.push_err(f.token, "duplicated_ident", f.ident)
+                    self.push_err(f.token, LogMsg.DuplicatedIdent, f.ident)
                     break duplicate_lookup
                 }
             }
@@ -1355,9 +1355,9 @@ impl Sema {
 
     fn check_trait_decl(mut &self, mut t: &Trait) {
         if is_ignore_ident(t.ident) {
-            self.push_err(t.token, "ignore_ident")
+            self.push_err(t.token, LogMsg.IgnoreIdent)
         } else if self.is_duplicated_ident(uintptr(&t), t.ident, false) {
-            self.push_err(t.token, "duplicated_ident", t.ident)
+            self.push_err(t.token, LogMsg.DuplicatedIdent, t.ident)
         }
 
         self.check_trait_decl_methods(t)
@@ -1382,7 +1382,7 @@ impl Sema {
         ok = true
         for _, f in ipl.methods {
             if !real(base.find_method(f.ident)) {
-                self.push_err(f.token, "trait_have_not_ident", base.ident, f.ident)
+                self.push_err(f.token, LogMsg.TraitHaveNotIdent, base.ident, f.ident)
                 ok = false
             }
         }
@@ -1393,7 +1393,7 @@ impl Sema {
         ok = true
         for (_, mut f) in ipl.methods {
             if real(dest.find_method(f.ident, f.statically)) || real(dest.find_field(f.ident)) {
-                self.push_err(f.token, "struct_already_have_ident", dest.ident, f.ident)
+                self.push_err(f.token, LogMsg.StructAlreadyHaveIdent, dest.ident, f.ident)
                 ok = false
                 continue
             }
@@ -1402,7 +1402,7 @@ impl Sema {
                 for _, fg in f.generics {
                     for _, dg in dest.generics {
                         if fg.ident == dg.ident {
-                            self.push_err(fg.token, "method_has_generic_with_same_ident")
+                            self.push_err(fg.token, LogMsg.MethodHasGenericWithSameIdent)
                             ok = false
                         }
                     }
@@ -1423,7 +1423,7 @@ impl Sema {
             base = find_builtin_trait(decl.base.kind)
         }
         if !real(base) {
-            self.push_err(decl.base, "impl_base_not_exist", decl.base.kind)
+            self.push_err(decl.base, LogMsg.ImplBaseNotExist, decl.base.kind)
             ret
         }
 
@@ -1433,12 +1433,12 @@ impl Sema {
 
         let mut dest = self.find_struct(decl.dest.kind, CPP_LINKED)
         if !real(dest) {
-            self.push_err(decl.dest, "impl_dest_not_exist", decl.dest.kind)
+            self.push_err(decl.dest, LogMsg.ImplDestNotExist, decl.dest.kind)
             ret
         }
 
         if dest.token.file.dir() != self.file.file.dir() {
-            self.push_err(decl.dest, "illegal_impl_out_of_package")
+            self.push_err(decl.dest, LogMsg.IllegalImplOutOfPackage)
             ret
         }
 
@@ -1461,12 +1461,12 @@ impl Sema {
 
         let mut dest = self.find_struct(decl.dest.kind, CPP_LINKED)
         if !real(dest) {
-            self.push_err(decl.dest, "impl_dest_not_exist", decl.dest.kind)
+            self.push_err(decl.dest, LogMsg.ImplDestNotExist, decl.dest.kind)
             ret
         }
 
         if dest.token.file.dir() != self.file.file.dir() {
-            self.push_err(decl.dest, "illegal_impl_out_of_package")
+            self.push_err(decl.dest, LogMsg.IllegalImplOutOfPackage)
             ret
         }
 
@@ -1491,35 +1491,35 @@ impl Sema {
     // No checks duplicated identifiers.
     fn check_var_decl(mut &self, mut decl: &Var, l: Lookup) {
         if is_ignore_ident(decl.ident) {
-            self.push_err(decl.token, "ignore_ident")
+            self.push_err(decl.token, LogMsg.IgnoreIdent)
         }
 
         if decl.is_type_inferred() {
             if decl.statically {
-                self.push_err(decl.token, "static_is_type_inferred")
+                self.push_err(decl.token, LogMsg.StaticIsTypeInferred)
             }
             if !decl.is_initialized() {
-                self.push_err(decl.token, "missing_value_for_type_inference")
+                self.push_err(decl.token, LogMsg.MissingValueForTypeInference)
             }
         } else {
             _ = self.check_type(decl.kind, l)
         }
 
         if decl.constant && decl.reference {
-            self.push_err(decl.token, "constant_reference")
+            self.push_err(decl.token, LogMsg.ConstRef)
         }
 
         if !decl.is_initialized() {
             if decl.constant {
-                self.push_err(decl.token, "const_var_not_have_expr")
+                self.push_err(decl.token, LogMsg.ConstVarNotHaveExpr)
             }
 
             if decl.statically {
-                self.push_err(decl.token, "static_not_have_expr")
+                self.push_err(decl.token, LogMsg.StaticNotHaveExpr)
             }
 
             if decl.reference {
-                self.push_err(decl.token, "reference_not_initialized")
+                self.push_err(decl.token, LogMsg.RefNotInited)
             }
         }
     }
@@ -1528,13 +1528,13 @@ impl Sema {
     // Checks duplicated identifiers by Sema.
     fn check_global_var_decl(mut &self, mut decl: &Var) {
         if self.is_duplicated_ident(uintptr(&decl), decl.ident, decl.cpp_linked) {
-            self.push_err(decl.token, "duplicated_ident", decl.ident)
+            self.push_err(decl.token, LogMsg.DuplicatedIdent, decl.ident)
         }
         if decl.cpp_linked && decl.constant {
-            self.push_err(decl.token, "cpp_linked_variable_is_const")
+            self.push_err(decl.token, LogMsg.CppLinkedVarIsConst)
         }
         if !decl.cpp_linked && !decl.constant && !decl.statically {
-            self.push_err(decl.token, "global_not_static")
+            self.push_err(decl.token, LogMsg.GlobalNotStatic)
         }
 
         self.check_var_decl(decl, self)
@@ -1574,7 +1574,7 @@ impl Sema {
                 if tf.public {
                     s = "pub " + s
                 }
-                self.push_err(strct.token, "not_impl_trait_def", trt.ident, s)
+                self.push_err(strct.token, LogMsg.NotImplTraitDef, trt.ident, s)
                 ok = false
             }
         }
@@ -1612,7 +1612,7 @@ impl Sema {
                 if f == cf {
                     break
                 } else if f.ident == cf.ident {
-                    self.push_err(f.token, "duplicated_ident", f.ident)
+                    self.push_err(f.token, LogMsg.DuplicatedIdent, f.ident)
                     ok = false
                 }
             }
@@ -1632,9 +1632,9 @@ impl Sema {
 
     fn check_struct_decl(mut &self, mut strct: &Struct) {
         if is_ignore_ident(strct.ident) {
-            self.push_err(strct.token, "ignore_ident")
+            self.push_err(strct.token, LogMsg.IgnoreIdent)
         } else if self.is_duplicated_ident(uintptr(&strct), strct.ident, strct.cpp_linked) {
-            self.push_err(strct.token, "duplicated_ident", strct.ident)
+            self.push_err(strct.token, LogMsg.DuplicatedIdent, strct.ident)
         }
 
         strct.sema = self
@@ -1663,9 +1663,9 @@ impl Sema {
 
     fn check_fn_decl(mut &self, mut f: &Fn) {
         if is_ignore_ident(f.ident) {
-            self.push_err(f.token, "ignore_ident")
+            self.push_err(f.token, LogMsg.IgnoreIdent)
         } else if self.is_duplicated_ident(uintptr(&f), f.ident, f.cpp_linked) {
-            self.push_err(f.token, "duplicated_ident", f.ident)
+            self.push_err(f.token, LogMsg.DuplicatedIdent, f.ident)
         }
 
         f.sema = self
@@ -1693,7 +1693,7 @@ impl Sema {
         }
 
         if pass.text[0] != '-' {
-            self.push_err(pass.token, "pass_directive_not_starts_with_dash")
+            self.push_err(pass.token, LogMsg.PassDirectiveNotStartsWithDash)
             ret false
         }
 
@@ -1713,7 +1713,7 @@ impl Sema {
     fn push_cycle_error(self, st1: &Struct, st2: &Struct, mut &message: str) {
         const PADDING = 4
 
-        let refers_to = errorf("refers_to", st1.ident, st2.ident)
+        let refers_to = errorf(LogMsg.RefersTo, st1.ident, st2.ident)
         message = str_repeat(" ", PADDING) + refers_to + "\n" + message
     }
 
@@ -1742,7 +1742,7 @@ impl Sema {
         // Check illegal cycle for itself.
         // Because refers's owner is ta.
         if &st1 == &st2 {
-            self.push_err(st1.token, "derive_illegal_cycle_refers_itself", derive, st1.ident)
+            self.push_err(st1.token, LogMsg.DeriveIllegalCycleRefersItself, derive, st1.ident)
             ret false
         }
 
@@ -1753,7 +1753,7 @@ impl Sema {
             message = ""
             self.push_cycle_error(st1, st2, message)
             err_msg = err_msg + message
-            self.push_err(st1.token, "derive_illegal_cross_cycle", derive, err_msg)
+            self.push_err(st1.token, LogMsg.DeriveIllegalCrossCycle, derive, err_msg)
             ret false
         }
 
@@ -1771,7 +1771,7 @@ impl Sema {
             }
 
             if !supports_cloning(f.kind) {
-                self.push_err(st.decl.token, "type_not_compatible_for_derive", f.kind.to_str(), str(Derives.Clone))
+                self.push_err(st.decl.token, LogMsg.TypeNotCompatibleForDerive, f.kind.to_str(), str(Derives.Clone))
                 ret false
             }
 
@@ -1862,10 +1862,10 @@ impl Sema {
     fn check_data_for_type_inference(mut self, d: &Data, err_token: Token) {
         match {
         | d.is_nil():
-            self.push_err(err_token, "nil_for_type_inference")
+            self.push_err(err_token, LogMsg.NilForTypeInference)
 
         | d.is_void():
-            self.push_err(err_token, "void_for_type_inreference")
+            self.push_err(err_token, LogMsg.VoidForTypeInference)
         }
     }
 
@@ -2004,7 +2004,7 @@ impl Sema {
 
         let ok = has_ret(f.scope)
         if !ok {
-            self.push_err(f.decl.token, "missing_ret")
+            self.push_err(f.decl.token, LogMsg.MissingRet)
         }
     }
 

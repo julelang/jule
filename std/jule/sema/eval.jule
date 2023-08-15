@@ -27,7 +27,7 @@ use std::jule::ast::{
     KeyValPair,
     IdentTypeDecl,
 }
-use std::jule::build::{errorf}
+use std::jule::build::{LogMsg, errorf}
 use std::jule::constant::{Const}
 use std::jule::constant::lit::{to_str, to_raw_str, to_rune, is_byte_lit}
 use std::jule::lex::{
@@ -205,9 +205,9 @@ fn kind_by_bitsize(expr: any): str {
     }
 }
 
-fn check_data_for_integer_indexing(mut d: &Data): (err_key: str) {
+fn check_data_for_integer_indexing(mut d: &Data): (err_fmt: LogMsg) {
     if !real(d) {
-        ret ""
+        ret LogMsg.Empty
     }
 
     let mut kind = d.kind
@@ -217,21 +217,21 @@ fn check_data_for_integer_indexing(mut d: &Data): (err_key: str) {
 
     match {
     | !real(kind.prim()):
-        ret "invalid_expr"
+        ret LogMsg.InvalidExpr
 
     | !is_int(kind.prim().to_str()):
-        ret "invalid_expr"
+        ret LogMsg.InvalidExpr
 
     | d.is_const():
         if d.constant.as_f64() < 0 {
-            ret "overflow_limits"
+            ret LogMsg.OverflowLimits
         }
 
     |:
         d.cast_kind = &TypeKind{kind: build_prim_type(str(PrimKind.Int))}
         apply_cast_kind(d)
     }
-    ret ""
+    ret LogMsg.Empty
 }
 
 // Value data.
@@ -283,8 +283,8 @@ struct Eval {
 }
 
 impl Eval {
-    fn push_err(mut self, token: Token, key: str, args: ...any) {
-        self.s.errors = append(self.s.errors, compiler_err(token, key, args...))
+    fn push_err(mut self, token: Token, fmt: LogMsg, args: ...any) {
+        self.s.errors = append(self.s.errors, compiler_err(token, fmt, args...))
     }
 
     // Reports whether evaluation in unsafe scope.
@@ -577,7 +577,7 @@ impl Eval {
 
     fn eval_enum(mut self, enm: &Enum, error_token: Token): &Data {
         if !self.s.is_accessible_define(enm.public, enm.token) {
-            self.push_err(error_token, "ident_is_not_accessible", enm.ident)
+            self.push_err(error_token, LogMsg.IdentIsNotAccessible, enm.ident)
             ret new(Data)
         }
 
@@ -594,7 +594,7 @@ impl Eval {
 
     fn eval_struct(mut self, mut s: &StructIns, error_token: Token): &Data {
         if !self.s.is_accessible_define(s.decl.public, s.decl.token) {
-            self.push_err(error_token, "ident_is_not_accessible", s.decl.ident)
+            self.push_err(error_token, LogMsg.IdentIsNotAccessible, s.decl.ident)
             ret new(Data)
         }
 
@@ -625,7 +625,7 @@ impl Eval {
 
     fn eval_fn(mut self, mut f: &Fn, error_token: Token): &Data {
         if !self.s.is_accessible_define(f.public, f.token) {
-            self.push_err(error_token, "ident_is_not_accessible", f.ident)
+            self.push_err(error_token, LogMsg.IdentIsNotAccessible, f.ident)
             ret new(Data)
         }
 
@@ -638,7 +638,7 @@ impl Eval {
     fn push_illegal_cycle_error(mut self, v1: &Var, v2: &Var, mut &message: str) {
         const PADDING = 4
 
-        let refers_to = errorf("refers_to", v1.ident, v2.ident)
+        let refers_to = errorf(LogMsg.RefersTo, v1.ident, v2.ident)
         message = str_repeat(" ", PADDING) + refers_to + "\n" + message
     }
 
@@ -669,7 +669,7 @@ impl Eval {
         // Check illegal cycle for itself.
         // Because refers's owner is ta.
         if &self.owner == &v {
-            self.push_err(self.owner.token, "illegal_cycle_refers_itself", self.owner.ident)
+            self.push_err(self.owner.token, LogMsg.IllegalCycleRefersItself, self.owner.ident)
             ret false
         }
 
@@ -680,7 +680,7 @@ impl Eval {
             message = ""
             self.push_illegal_cycle_error(self.owner, v, message)
             err_msg = err_msg + message
-            self.push_err(decl_token, "illegal_cross_cycle", err_msg)
+            self.push_err(decl_token, LogMsg.IllegalCrossCycle, err_msg)
             ret false
         }
 
@@ -690,7 +690,7 @@ impl Eval {
 
     fn eval_var(mut self, mut v: &Var, error_token: Token): &Data {
         if !self.s.is_accessible_define(v.public, v.token) {
-            self.push_err(error_token, "ident_is_not_accessible", v.ident)
+            self.push_err(error_token, LogMsg.IdentIsNotAccessible, v.ident)
             ret new(Data)
         }
 
@@ -714,7 +714,7 @@ impl Eval {
                 s = s.parent
             }
             if real(s.owner) && s.owner.anon && &v.scope != &s.owner.scope {
-                self.push_err(error_token, "used_ref_in_anon_fn_from_parent_scope", v.ident)
+                self.push_err(error_token, LogMsg.UsedRefInAnonFnFromParentScope, v.ident)
             }
         }
 
@@ -767,7 +767,7 @@ impl Eval {
 
     fn eval_type_alias(mut self, mut ta: &TypeAlias, error_token: Token): &Data {
         if !self.s.is_accessible_define(ta.public, ta.token) {
-            self.push_err(error_token, "ident_is_not_accessible", ta.ident)
+            self.push_err(error_token, LogMsg.IdentIsNotAccessible, ta.ident)
             ret new(Data)
         }
 
@@ -818,7 +818,7 @@ impl Eval {
             ret self.eval_type_alias((&TypeAlias)(def), ident)
 
         |:
-            self.push_err(ident, "ident_not_exist", ident.kind)
+            self.push_err(ident, LogMsg.IdentNotExist, ident.kind)
             ret new(Data)
         }
     }
@@ -921,7 +921,7 @@ impl Eval {
 
     fn eval_unary_star(mut self, mut d: &Data, op: Token): &Data {
         if !self.is_unsafe() {
-            self.push_err(op, "unsafe_behavior_at_out_of_unsafe_scope")
+            self.push_err(op, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
         }
 
         let mut t = d.kind.ptr()
@@ -1000,7 +1000,7 @@ impl Eval {
             d.kind = &TypeKind{kind: tc.build_ref_from_type(d.kind)}
 
         |:
-            self.push_err(u.op, "invalid_expr_unary_operator", u.op.kind)
+            self.push_err(u.op, LogMsg.InvalidExprForUnary, u.op.kind)
             ret new(Data)
         }
 
@@ -1034,7 +1034,7 @@ impl Eval {
         }
 
         if !real(d) {
-            self.push_err(u.op, "invalid_expr_unary_operator", u.op.kind)
+            self.push_err(u.op, LogMsg.InvalidExprForUnary, u.op.kind)
         } else if d.is_const() {
             d.model = d.constant
         } else if real(cast_kind) {
@@ -1063,7 +1063,7 @@ impl Eval {
         }
 
         if !is_variadicable(d.kind) {
-            self.push_err(v.token, "variadic_with_non_variadicable", d.kind.to_str())
+            self.push_err(v.token, LogMsg.VariadicWithNonVariadicable, d.kind.to_str())
             ret new(Data)
         }
 
@@ -1098,7 +1098,7 @@ impl Eval {
         } else {
             arr.n = s.elems.len
             if arr.n > pt.n {
-                self.push_err(s.token, "overflow_limits")
+                self.push_err(s.token, LogMsg.OverflowLimits)
             } else if arr.n < pt.n {
                 arr.n = pt.n
             }
@@ -1175,7 +1175,7 @@ impl Eval {
         drop(self.prefix)
 
         if s.elems.len == 0 {
-            self.push_err(s.token, "dynamic_type_annotation_failed")
+            self.push_err(s.token, LogMsg.DynamicTypeAnnotationFailed)
             ret new(Data)
         }
 
@@ -1192,7 +1192,7 @@ impl Eval {
 
     fn check_integer_indexing_by_data(mut self, mut d: &Data, token: Token) {
         let err_key = check_data_for_integer_indexing(d)
-        if err_key != "" {
+        if err_key != LogMsg.Empty {
             self.push_err(token, err_key)
         }
     }
@@ -1203,11 +1203,11 @@ impl Eval {
         let mut ptr = d.kind.ptr()
         match {
         | ptr.is_unsafe():
-            self.push_err(i.token, "unsafe_ptr_indexing")
+            self.push_err(i.token, LogMsg.UnsafePtrIndexing)
             ret
 
         | !self.is_unsafe():
-            self.push_err(i.token, "unsafe_behavior_at_out_of_unsafe_scope")
+            self.push_err(i.token, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
         }
 
         d.kind = ptr.elem.clone()
@@ -1218,7 +1218,7 @@ impl Eval {
         d.kind = arr.elem.clone()
         self.check_integer_indexing_by_data(index, i.token)
         if index.is_const() && index.constant.as_f64() >= arr.n {
-            self.push_err(i.token, "overflow_limits")
+            self.push_err(i.token, LogMsg.OverflowLimits)
         }
     }
 
@@ -1266,7 +1266,7 @@ impl Eval {
             let i = index.constant.as_i64()
             let s = d.constant.read_str()
             if int(i) >= s.len {
-                self.push_err(error_token, "overflow_limits")
+                self.push_err(error_token, LogMsg.OverflowLimits)
             } else {
                 d.constant.set_u64(u64(s[i]))
             }
@@ -1300,14 +1300,14 @@ impl Eval {
             }
         }
 
-        self.push_err(i.token, "not_supports_indexing", d.kind.to_str())
+        self.push_err(i.token, LogMsg.NotSupportsIndexing, d.kind.to_str())
     }
 
     fn eval_ident_decl_from_indexing(mut &self, mut i: &IndexingExpr): &Data {
         match type i.expr {
         | &IdentExpr:
         |:
-            self.push_err(i.token, "invalid_syntax")
+            self.push_err(i.token, LogMsg.InvalidSyntax)
             ret new(Data)
         }
 
@@ -1321,7 +1321,7 @@ impl Eval {
             // Therefore use unary eval algorithm for eval related type declarations.
             let mut d = self.eval_unary((&UnaryExpr)(i.index))
             if !d.decl {
-                self.push_err(i.token, "invalid_syntax")
+                self.push_err(i.token, LogMsg.InvalidSyntax)
                 ret new(Data)
             }
             decl.generics = append(decl.generics, &TypeDecl{kind: d.kind})
@@ -1348,7 +1348,7 @@ impl Eval {
             }
 
         |:
-            self.push_err(i.token, "invalid_syntax")
+            self.push_err(i.token, LogMsg.InvalidSyntax)
             ret new(Data)
         }
 
@@ -1496,7 +1496,7 @@ impl Eval {
             }
         }
 
-        self.push_err(s.token, "not_supports_slicing", d.kind.to_str())
+        self.push_err(s.token, LogMsg.NotSupportsSlicing, d.kind.to_str())
     }
 
     fn eval_slicing(mut &self, mut s: &SlicingExpr): &Data {
@@ -1528,13 +1528,13 @@ impl Eval {
 
     fn cast_ptr(mut self, t: &TypeKind, mut d: &Data, error_token: Token) {
         if !self.is_unsafe() {
-            self.push_err(error_token, "unsafe_behavior_at_out_of_unsafe_scope")
+            self.push_err(error_token, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
             ret
         }
 
         let prim = d.kind.prim()
         if !real(d.kind.ptr()) && (!real(prim) || !is_int(prim.to_str())) {
-            self.push_err(error_token, "type_not_supports_casting_to", d.kind.to_str(), t.to_str())
+            self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, d.kind.to_str(), t.to_str())
         }
 
         drop(d.constant)
@@ -1543,7 +1543,7 @@ impl Eval {
     fn cast_struct(mut self, mut t: &TypeKind, mut d: &Data, error_token: Token) {
         let mut tr = d.kind.trt()
         if !real(tr) {
-            self.push_err(error_token, "type_not_supports_casting_to", d.kind.to_str(), t.to_str())
+            self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, d.kind.to_str(), t.to_str())
             ret
         }
 
@@ -1557,7 +1557,7 @@ impl Eval {
         self.push_reference_to_struct(s)
 
         if !s.decl.is_implements(tr) {
-            self.push_err(error_token, "type_not_supports_casting_to", d.kind.to_str(), t.to_str())
+            self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, d.kind.to_str(), t.to_str())
         }
     }
 
@@ -1568,24 +1568,24 @@ impl Eval {
             ret
         }
 
-        self.push_err(error_token, "type_not_supports_casting_to", d.kind.to_str(), t.to_str())
+        self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, d.kind.to_str(), t.to_str())
     }
 
     fn cast_slc(mut self, mut t: &TypeKind, mut d: &Data, error_token: Token) {
         if real(d.kind.enm()) {
             if !real(d.kind.enm().kind.kind.prim()) || !d.kind.enm().kind.kind.prim().is_str() {
-                self.push_err(error_token, "type_not_supports_casting_to", d.kind.to_str(), t.to_str())
+                self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, d.kind.to_str(), t.to_str())
                 ret
             }
         } else if !real(d.kind.prim()) || !d.kind.prim().is_str() {
-            self.push_err(error_token, "type_not_supports_casting_to", d.kind.to_str(), t.to_str())
+            self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, d.kind.to_str(), t.to_str())
             ret
         }
 
         t = t.slc().elem
         let prim = t.prim()
         if !real(prim) || (!prim.is_u8() && !prim.is_i32()) {
-            self.push_err(error_token, "type_not_supports_casting_to", d.kind.to_str(), t.to_str())
+            self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, d.kind.to_str(), t.to_str())
         }
     }
 
@@ -1600,20 +1600,20 @@ impl Eval {
         if real(d.kind.prim()) {
             let prim = d.kind.prim()
             if !prim.is_u8() && !prim.is_i32() {
-                self.push_err(error_token, "type_not_supports_casting_to", str(PrimKind.Str), d.kind.to_str())
+                self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, str(PrimKind.Str), d.kind.to_str())
             }
             ret
         }
 
         if !real(d.kind.slc()) {
-            self.push_err(error_token, "type_not_supports_casting_to", str(PrimKind.Str), d.kind.to_str())
+            self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, str(PrimKind.Str), d.kind.to_str())
             ret
         }
 
         let mut t = d.kind.slc().elem
         let prim = t.prim()
         if !real(prim) || (!prim.is_u8() && !prim.is_i32()) {
-            self.push_err(error_token, "type_not_supports_casting_to", str(PrimKind.Str), d.kind.to_str())
+            self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, str(PrimKind.Str), d.kind.to_str())
         }
     }
 
@@ -1641,9 +1641,9 @@ impl Eval {
             if prim.is_uintptr() {
                 // Ignore case.
             } else if !self.is_unsafe() {
-                self.push_err(error_token, "unsafe_behavior_at_out_of_unsafe_scope")
+                self.push_err(error_token, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
             } else if !prim.is_i32() && !prim.is_i64() && !prim.is_u16() && !prim.is_u32() && !prim.is_u64() {
-                self.push_err(error_token, "type_not_supports_casting_to", d.kind.to_str(), t.to_str())
+                self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, d.kind.to_str(), t.to_str())
             }
             ret
         }
@@ -1653,7 +1653,7 @@ impl Eval {
             ret
         }
 
-        self.push_err(error_token, "type_not_supports_casting_to", d.kind.to_str(), t.to_str())
+        self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, d.kind.to_str(), t.to_str())
     }
 
     fn cast_num(mut self, mut t: &TypeKind, mut d: &Data, error_token: Token) {
@@ -1683,7 +1683,7 @@ impl Eval {
             ret
         }
 
-        self.push_err(error_token, "type_not_supports_casting_to", d.kind.to_str(), t.to_str())
+        self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, d.kind.to_str(), t.to_str())
     }
 
     fn cast_prim(mut self, mut t: &TypeKind, mut d: &Data, error_token: Token) {
@@ -1702,7 +1702,7 @@ impl Eval {
             self.cast_num(t, d, error_token)
 
         |:
-            self.push_err(error_token, "type_not_supports_casting", t.to_str())
+            self.push_err(error_token, LogMsg.TypeNotSupportsCasting, t.to_str())
         }
     }
 
@@ -1727,7 +1727,7 @@ impl Eval {
             self.cast_prim(t, d, error_token)
 
         |:
-            self.push_err(error_token, "type_not_supports_casting", t.to_str())
+            self.push_err(error_token, LogMsg.TypeNotSupportsCasting, t.to_str())
             drop(d)
         }
 
@@ -1783,7 +1783,7 @@ impl Eval {
         })
 
         if !real(imp) || !imp.is_lookupable(str(TokenKind.Self)) {
-            self.push_err(s.ident, "namespace_not_exist", path)
+            self.push_err(s.ident, LogMsg.NamespaceNotExist, path)
             ret new(Data)
         }
 
@@ -1834,7 +1834,7 @@ impl Eval {
 
         let mut s = t.kind.strct()
         if !real(s) {
-            self.push_err(lit.kind.token, "invalid_syntax")
+            self.push_err(lit.kind.token, LogMsg.InvalidSyntax)
             ret new(Data)
         }
 
@@ -1857,11 +1857,11 @@ impl Eval {
 
     fn call_type_fn(mut &self, mut fc: &FnCallExpr, mut d: &Data): &Data {
         if fc.generics.len > 0 {
-            self.push_err(fc.token, "type_not_supports_generics", d.kind.to_str())
+            self.push_err(fc.token, LogMsg.TypeNotSupportsGenerics, d.kind.to_str())
         } else if fc.args.len < 1 {
-            self.push_err(fc.token, "missing_expr_for", "v")
+            self.push_err(fc.token, LogMsg.MissingExprFor, "v")
         } else if fc.args.len > 1 {
-            self.push_err(fc.args[1].token, "argument_overflow")
+            self.push_err(fc.args[1].token, LogMsg.ArgumentOverflow)
         }
 
         if fc.args.len > 0 {
@@ -1923,7 +1923,7 @@ impl Eval {
 
         for _, p in f.params {
             if p.decl.reference {
-                self.push_err(error_token, "concurrent_call_with_reference_parameter")
+                self.push_err(error_token, LogMsg.ConcurrenctCallWithRefParam)
                 ret
             }
         }
@@ -1940,9 +1940,9 @@ impl Eval {
         }
 
         if !d.mutable && f.decl.is_method() && !f.decl.statically && f.decl.params[0].mutable {
-            self.push_err(fc.token, "mutable_operation_on_immutable")
+            self.push_err(fc.token, LogMsg.MutOperationOnImmut)
         } else if !self.is_unsafe() && f.decl.unsafety {
-            self.push_err(fc.token, "unsafe_behavior_at_out_of_unsafe_scope")
+            self.push_err(fc.token, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
         }
 
         let (mut ok, dynamic_annotation) = self.check_fn_call_generics(f, fc)
@@ -2046,7 +2046,7 @@ impl Eval {
         }
 
         if !real(d.kind.fnc()) {
-            self.push_err(fc.token, "invalid_syntax")
+            self.push_err(fc.token, LogMsg.InvalidSyntax)
             ret new(Data)
         }
 
@@ -2063,7 +2063,7 @@ impl Eval {
 
         let mut item = enm.find_item(ident.kind)
         if !real(item) {
-            self.push_err(ident, "obj_have_not_ident", ident.kind)
+            self.push_err(ident, LogMsg.ObjHaveNotIdent, ident.kind)
         } else {
             d.constant = new(Const, item.value.data.constant)
             d.model = d.constant
@@ -2076,7 +2076,7 @@ impl Eval {
         const STATIC = true
         let mut method = s.find_method(ident.kind, STATIC)
         if !real(method) {
-            self.push_err(ident, "obj_have_not_ident", ident.kind)
+            self.push_err(ident, LogMsg.ObjHaveNotIdent, ident.kind)
             ret new(Data)
         }
 
@@ -2103,7 +2103,7 @@ impl Eval {
     fn eval_trait_sub_ident(mut self, d: &Data, mut trt: &Trait, ident: Token): &Data {
         let mut f = trt.find_method(ident.kind)
         if !real(f) {
-            self.push_err(ident, "obj_have_not_ident", ident.kind)
+            self.push_err(ident, LogMsg.ObjHaveNotIdent, ident.kind)
             ret new(Data)
         }
 
@@ -2133,7 +2133,7 @@ impl Eval {
         let mut f = s.find_field(si.ident.kind)
         if real(f) {
             if !self.s.is_accessible_define(f.decl.public, f.decl.token) {
-                self.push_err(si.ident, "ident_is_not_accessible", f.decl.ident)
+                self.push_err(si.ident, LogMsg.IdentIsNotAccessible, f.decl.ident)
             }
 
             let mut model = &StructSubIdentExprModel{
@@ -2173,12 +2173,12 @@ impl Eval {
         const STATIC = false
         let mut m = s.find_method(si.ident.kind, STATIC)
         if !real(m) {
-            self.push_err(si.ident, "obj_have_not_ident", si.ident.kind)
+            self.push_err(si.ident, LogMsg.ObjHaveNotIdent, si.ident.kind)
             ret new(Data)
         }
 
         if m.params[0].is_ref() && !ref {
-            self.push_err(si.ident, "ref_method_used_with_not_ref_instance")
+            self.push_err(si.ident, LogMsg.RefMethodUsedWithNotRefInstance)
         }
 
 
@@ -2219,7 +2219,7 @@ impl Eval {
             }
 
         |:
-            self.push_err(ident, "obj_have_not_ident", ident.kind)
+            self.push_err(ident, LogMsg.ObjHaveNotIdent, ident.kind)
             ret new(Data)
         }
     }
@@ -2236,7 +2236,7 @@ impl Eval {
             }
 
         |:
-            self.push_err(ident, "obj_have_not_ident", ident.kind)
+            self.push_err(ident, LogMsg.ObjHaveNotIdent, ident.kind)
             ret new(Data)
         }
     }
@@ -2361,7 +2361,7 @@ impl Eval {
             }
 
         |:
-            self.push_err(ident, "obj_have_not_ident", ident.kind)
+            self.push_err(ident, LogMsg.ObjHaveNotIdent, ident.kind)
             ret new(Data)
         }
     }
@@ -2609,7 +2609,7 @@ impl Eval {
             }
 
         |:
-            self.push_err(ident, "obj_have_not_ident", ident.kind)
+            self.push_err(ident, LogMsg.ObjHaveNotIdent, ident.kind)
             ret new(Data)
         }
     }
@@ -2635,7 +2635,7 @@ impl Eval {
             }
 
         |:
-            self.push_err(ident, "type_have_not_ident", kind, ident.kind)
+            self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
             ret new(Data)
         }
     }
@@ -2653,7 +2653,7 @@ impl Eval {
             }
 
         |:
-            self.push_err(ident, "type_have_not_ident", kind, ident.kind)
+            self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
             ret new(Data)
         }
     }
@@ -2681,7 +2681,7 @@ impl Eval {
             }
 
         |:
-            self.push_err(ident, "type_have_not_ident", kind, ident.kind)
+            self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
             ret new(Data)
         }
     }
@@ -2709,7 +2709,7 @@ impl Eval {
             }
 
         |:
-            self.push_err(ident, "type_have_not_ident", kind, ident.kind)
+            self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
             ret new(Data)
         }
     }
@@ -2737,7 +2737,7 @@ impl Eval {
             }
 
         |:
-            self.push_err(ident, "type_have_not_ident", kind, ident.kind)
+            self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
             ret new(Data)
         }
     }
@@ -2765,7 +2765,7 @@ impl Eval {
             }
 
         |:
-            self.push_err(ident, "type_have_not_ident", kind, ident.kind)
+            self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
             ret new(Data)
         }
     }
@@ -2784,7 +2784,7 @@ impl Eval {
             }
 
         |:
-            self.push_err(ident, "type_have_not_ident", kind, ident.kind)
+            self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
             ret new(Data)
         }
     }
@@ -2803,7 +2803,7 @@ impl Eval {
             }
 
         |:
-            self.push_err(ident, "type_have_not_ident", kind, ident.kind)
+            self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
             ret new(Data)
         }
     }
@@ -2822,7 +2822,7 @@ impl Eval {
             }
 
         |:
-            self.push_err(ident, "type_have_not_ident", kind, ident.kind)
+            self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
             ret new(Data)
         }
     }
@@ -2841,7 +2841,7 @@ impl Eval {
             }
 
         |:
-            self.push_err(ident, "type_have_not_ident", kind, ident.kind)
+            self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
             ret new(Data)
         }
     }
@@ -2869,7 +2869,7 @@ impl Eval {
             }
 
         |:
-            self.push_err(ident, "type_have_not_ident", kind, ident.kind)
+            self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
             ret new(Data)
         }
     }
@@ -2897,7 +2897,7 @@ impl Eval {
             }
 
         |:
-            self.push_err(ident, "type_have_not_ident", kind, ident.kind)
+            self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
             ret new(Data)
         }
     }
@@ -2917,7 +2917,7 @@ impl Eval {
         | str(PrimKind.F32):  ret self.eval_f32_type_tatic(ident)
         | str(PrimKind.F64):  ret self.eval_f64_type_static(ident)
         |:
-            self.push_err(ident, "type_have_not_ident", kind, ident.kind)
+            self.push_err(ident, LogMsg.TypeHaveNotIdent, kind, ident.kind)
             ret new(Data)
         }
     }
@@ -2934,7 +2934,7 @@ impl Eval {
             ret self.eval_struct_static(d.kind.strct(), si.ident)
 
         |:
-            self.push_err(si.ident, "type_not_support_sub_fields", d.kind.to_str())
+            self.push_err(si.ident, LogMsg.TypeNotSupportSubFields, d.kind.to_str())
             ret new(Data)
         }
     }
@@ -2945,7 +2945,7 @@ impl Eval {
             let ptr = d.kind.ptr()
             if !ptr.is_unsafe() {
                 if !si.is_self && !self.is_unsafe() {
-                    self.push_err(si.ident, "unsafe_behavior_at_out_of_unsafe_scope")
+                    self.push_err(si.ident, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
                 }
                 kind = d.kind.ptr().elem
             }
@@ -2981,7 +2981,7 @@ impl Eval {
             }
         }
 
-        self.push_err(si.ident, "obj_not_support_sub_fields", d.kind.to_str())
+        self.push_err(si.ident, LogMsg.ObjNotSupportSubFields, d.kind.to_str())
         ret new(Data)
     }
 
@@ -3043,7 +3043,7 @@ impl Eval {
                 // Ok.
 
             |:
-                self.push_err(lit.token, "invalid_syntax")
+                self.push_err(lit.token, LogMsg.InvalidSyntax)
                 ret new(Data)
             }
 
@@ -3081,7 +3081,7 @@ impl Eval {
     fn eval_brace_lit(mut &self, mut lit: &BraceLit): &Data {
         match {
         | !real(self.prefix):
-            self.push_err(lit.token, "invalid_syntax")
+            self.push_err(lit.token, LogMsg.InvalidSyntax)
             ret new(Data)
 
         | real(self.prefix.map()):
@@ -3091,7 +3091,7 @@ impl Eval {
             ret self.eval_struct_lit_explicit(self.prefix.strct(), lit.exprs, lit.token)
 
         |:
-            self.push_err(lit.token, "invalid_syntax")
+            self.push_err(lit.token, LogMsg.InvalidSyntax)
             ret new(Data)
         }
     }
@@ -3231,11 +3231,11 @@ impl Eval {
             }
 
             if f.generics.len != f.decl.generics.len {
-                self.s.push_err(expr.token, "has_generics")
+                self.s.push_err(expr.token, LogMsg.HasGenerics)
             }
 
             if f.decl.is_method() {
-                self.s.push_err(expr.token, "method_not_invoked")
+                self.s.push_err(expr.token, LogMsg.MethodNotInvoked)
             }
         }
 
@@ -3252,7 +3252,7 @@ impl Eval {
             ret new(Data)
 
         | d.decl:
-            self.push_err(expr.token, "invalid_expr")
+            self.push_err(expr.token, LogMsg.InvalidExpr)
             ret new(Data)
 
         |:
@@ -3282,7 +3282,7 @@ impl BinopSolver {
 
     fn eval_nil(mut self): &Data {
         if !is_nil_compatible(self.r.kind) {
-            self.e.push_err(self.op, "incompatible_types", str(TokenKind.Nil), self.r.kind.to_str())
+            self.e.push_err(self.op, LogMsg.IncompatibleTypes, str(TokenKind.Nil), self.r.kind.to_str())
             ret new(Data)
         }
 
@@ -3296,7 +3296,7 @@ impl BinopSolver {
             }
 
         |:
-            self.e.push_err(self.op, "operator_not_for_juletype", self.op.kind, str(TokenKind.Nil))
+            self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, str(TokenKind.Nil))
             ret new(Data)
         }
     }
@@ -3304,7 +3304,7 @@ impl BinopSolver {
     fn eval_enum(mut self): &Data {
         let mut enm = self.l.kind.enm()
         if !real(self.r.kind.enm()) || &enm != &self.r.kind.enm() {
-            self.e.push_err(self.op, "incompatible_types", enm.ident, self.r.kind.to_str())
+            self.e.push_err(self.op, LogMsg.IncompatibleTypes, enm.ident, self.r.kind.to_str())
             ret new(Data)
         }
 
@@ -3320,19 +3320,19 @@ impl BinopSolver {
         | str(TokenKind.Amper)
         | str(TokenKind.Vline):
             if !real(enm.kind.kind.prim()) || !is_int(enm.kind.kind.prim().to_str()) {
-                self.e.push_err(self.op, "operator_not_for_juletype", self.op.kind, enm.ident)
+                self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, enm.ident)
             }
             ret self.l
 
         |:
-            self.e.push_err(self.op, "operator_not_for_juletype", self.op.kind, enm.ident)
+            self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, enm.ident)
             ret new(Data)
         }
     }
 
     fn eval_ptr(mut self): &Data {
         if !self.check_type_compatibility() {
-            self.e.push_err(self.op, "incompatible_types", self.l.kind.to_str(), self.r.kind.to_str())
+            self.e.push_err(self.op, LogMsg.IncompatibleTypes, self.l.kind.to_str(), self.r.kind.to_str())
             ret new(Data)
         }
 
@@ -3350,14 +3350,14 @@ impl BinopSolver {
             }
 
         |:
-            self.e.push_err(self.op, "operator_not_for_juletype", self.op.kind, self.l.kind.to_str())
+            self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, self.l.kind.to_str())
             ret new(Data)
         }
     }
 
     fn eval_arr(mut self): &Data {
         if !self.check_type_compatibility() {
-            self.e.push_err(self.op, "incompatible_types", self.l.kind.to_str(), self.r.kind.to_str())
+            self.e.push_err(self.op, LogMsg.IncompatibleTypes, self.l.kind.to_str(), self.r.kind.to_str())
             ret new(Data)
         }
 
@@ -3371,14 +3371,14 @@ impl BinopSolver {
             }
 
         |:
-            self.e.push_err(self.op, "operator_not_for_juletype", self.op.kind, self.l.kind.to_str())
+            self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, self.l.kind.to_str())
             ret new(Data)
         }
     }
 
     fn eval_slc(mut self): &Data {
         if !self.check_type_compatibility() {
-            self.e.push_err(self.op, "incompatible_types", self.l.kind.to_str(), self.r.kind.to_str())
+            self.e.push_err(self.op, LogMsg.IncompatibleTypes, self.l.kind.to_str(), self.r.kind.to_str())
             ret new(Data)
         }
 
@@ -3392,14 +3392,14 @@ impl BinopSolver {
             }
 
         |:
-            self.e.push_err(self.op, "operator_not_for_juletype", self.op.kind, self.l.kind.to_str())
+            self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, self.l.kind.to_str())
             ret new(Data)
         }
     }
 
     fn eval_fn(mut self): &Data {
         if !self.check_type_compatibility() {
-            self.e.push_err(self.op, "incompatible_types", self.l.kind.to_str(), self.r.kind.to_str())
+            self.e.push_err(self.op, LogMsg.IncompatibleTypes, self.l.kind.to_str(), self.r.kind.to_str())
             ret new(Data)
         }
 
@@ -3413,14 +3413,14 @@ impl BinopSolver {
             }
 
         |:
-            self.e.push_err(self.op, "operator_not_for_juletype", self.op.kind, self.l.kind.to_str())
+            self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, self.l.kind.to_str())
             ret new(Data)
         }
     }
 
     fn eval_struct(mut self): &Data {
         if !self.check_type_compatibility() {
-            self.e.push_err(self.op, "incompatible_types", self.l.kind.to_str(), self.r.kind.to_str())
+            self.e.push_err(self.op, LogMsg.IncompatibleTypes, self.l.kind.to_str(), self.r.kind.to_str())
             ret new(Data)
         }
 
@@ -3434,14 +3434,14 @@ impl BinopSolver {
             }
 
         |:
-            self.e.push_err(self.op, "operator_not_for_juletype", self.op.kind, self.l.kind.to_str())
+            self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, self.l.kind.to_str())
             ret new(Data)
         }
     }
 
     fn eval_trait(mut self): &Data {
         if !self.check_type_compatibility() {
-            self.e.push_err(self.op, "incompatible_types", self.l.kind.to_str(), self.r.kind.to_str())
+            self.e.push_err(self.op, LogMsg.IncompatibleTypes, self.l.kind.to_str(), self.r.kind.to_str())
             ret new(Data)
         }
 
@@ -3455,7 +3455,7 @@ impl BinopSolver {
             }
 
         |:
-            self.e.push_err(self.op, "operator_not_for_juletype", self.op.kind, self.l.kind.to_str())
+            self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, self.l.kind.to_str())
             ret new(Data)
         }
     }
@@ -3471,14 +3471,14 @@ impl BinopSolver {
             }
 
         |:
-            self.e.push_err(self.op, "operator_not_for_juletype", self.op.kind, str(PrimKind.Any))
+            self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, str(PrimKind.Any))
             ret new(Data)
         }
     }
 
     fn eval_bool(mut self): &Data {
         if !self.check_type_compatibility() {
-            self.e.push_err(self.op, "incompatible_types", self.l.kind.to_str(), self.r.kind.to_str())
+            self.e.push_err(self.op, LogMsg.IncompatibleTypes, self.l.kind.to_str(), self.r.kind.to_str())
             ret new(Data)
         }
 
@@ -3490,7 +3490,7 @@ impl BinopSolver {
             ret self.l
 
         |:
-            self.e.push_err(self.op, "operator_not_for_juletype", self.op.kind, self.l.kind.to_str())
+            self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, self.l.kind.to_str())
             ret new(Data)
         }
     }
@@ -3498,7 +3498,7 @@ impl BinopSolver {
     fn eval_str(mut self): &Data {
         let mut rk = self.r.kind.to_str()
         if rk != str(PrimKind.Str) {
-            self.e.push_err(self.op, "incompatible_types", self.l.kind.to_str(), rk)
+            self.e.push_err(self.op, LogMsg.IncompatibleTypes, self.l.kind.to_str(), rk)
             ret new(Data)
         }
 
@@ -3515,7 +3515,7 @@ impl BinopSolver {
             }
 
         |:
-            self.e.push_err(self.op, "operator_not_for_juletype", self.op.kind, str(PrimKind.Any))
+            self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, str(PrimKind.Any))
             ret new(Data)
         }
     }
@@ -3541,7 +3541,7 @@ impl BinopSolver {
     fn check_mod_data(mut self, mut d: &Data) {
         if !d.is_const() {
             if !real(d.kind.prim()) || !is_int(d.kind.prim().kind) {
-                self.e.push_err(self.op, "modulo_with_not_int")
+                self.e.push_err(self.op, LogMsg.ModuloWithNotInt)
             }
             ret
         }
@@ -3554,7 +3554,7 @@ impl BinopSolver {
             d.constant.set_u64(d.constant.as_u64())
 
         |:
-            self.e.push_err(self.op, "modulo_with_not_int")
+            self.e.push_err(self.op, LogMsg.ModuloWithNotInt)
         }
     }
 
@@ -3567,7 +3567,7 @@ impl BinopSolver {
         let lk = self.l.kind.to_str()
         let rk = self.r.kind.to_str()
         if !is_num(lk) || !is_num(rk) {
-            self.e.push_err(self.op, "incompatible_types", lk, rk)
+            self.e.push_err(self.op, LogMsg.IncompatibleTypes, lk, rk)
             ret new(Data)
         }
 
@@ -3597,14 +3597,14 @@ impl BinopSolver {
 
         | str(TokenKind.Percent):
             if !is_int(rk) {
-                self.e.push_err(self.op, "incompatible_types", lk, rk)
+                self.e.push_err(self.op, LogMsg.IncompatibleTypes, lk, rk)
                 ret new(Data)
             }
             self.mod()
             ret self.r
 
         |:
-            self.e.push_err(self.op, "operator_not_for_float", self.op.kind)
+            self.e.push_err(self.op, LogMsg.OperatorNotForFloat, self.op.kind)
             ret new(Data)
         }
     }
@@ -3613,7 +3613,7 @@ impl BinopSolver {
         let lk = self.l.kind.to_str()
         let rk = self.r.kind.to_str()
         if !is_num(lk) || !is_num(rk) {
-            self.e.push_err(self.op, "incompatible_types", lk, rk)
+            self.e.push_err(self.op, LogMsg.IncompatibleTypes, lk, rk)
             ret new(Data)
         }
 
@@ -3652,7 +3652,7 @@ impl BinopSolver {
         | str(TokenKind.Lshift)
         | str(TokenKind.Rshift):
             if !is_ok_for_shifting(self.r) {
-                self.e.push_err(self.op, "bitshift_must_unsigned")
+                self.e.push_err(self.op, LogMsg.BitShiftMustUnsigned)
                 ret new(Data)
             }
 
@@ -3663,7 +3663,7 @@ impl BinopSolver {
             ret self.l
 
         |:
-            self.e.push_err(self.op, "operator_not_for_uint", self.op.kind)
+            self.e.push_err(self.op, LogMsg.OperatorNotForUint, self.op.kind)
             ret new(Data)
         }
     }
@@ -3672,7 +3672,7 @@ impl BinopSolver {
         let lk = self.l.kind.to_str()
         let rk = self.r.kind.to_str()
         if !is_num(lk) || !is_num(rk) {
-            self.e.push_err(self.op, "incompatible_types", lk, rk)
+            self.e.push_err(self.op, LogMsg.IncompatibleTypes, lk, rk)
             ret new(Data)
         }
 
@@ -3711,14 +3711,14 @@ impl BinopSolver {
         | str(TokenKind.Lshift)
         | str(TokenKind.Rshift):
             if !is_ok_for_shifting(self.r) {
-                self.e.push_err(self.op, "bitshift_must_unsigned")
+                self.e.push_err(self.op, LogMsg.BitShiftMustUnsigned)
                 ret new(Data)
             }
 
             ret self.l
 
         |:
-            self.e.push_err(self.op, "operator_not_for_int", self.op.kind)
+            self.e.push_err(self.op, LogMsg.OperatorNotForInt, self.op.kind)
             ret new(Data)
         }
     }
@@ -3733,7 +3733,7 @@ impl BinopSolver {
 
         let rprim = self.r.kind.prim()
         if !real(rprim) {
-            self.e.push_err(self.op, "incompatible_types", prim.to_str(), self.r.kind.to_str())
+            self.e.push_err(self.op, LogMsg.IncompatibleTypes, prim.to_str(), self.r.kind.to_str())
             ret new(Data)
         }
 
@@ -3749,7 +3749,7 @@ impl BinopSolver {
     fn eval(mut self): &Data {
         match {
         | self.l.kind.is_void():
-            self.e.push_err(self.op, "operator_not_for_juletype", self.op.kind, "void")
+            self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, "void")
             ret new(Data)
 
         | self.l.kind.is_nil():
@@ -3883,14 +3883,14 @@ impl BinopSolver {
         | str(TokenKind.Solidus):
             let ok = self.l.constant.div(self.r.constant)
             if !ok && self.r.constant.as_f64() == 0 {
-                self.e.push_err(self.op, "divide_by_zero")
+                self.e.push_err(self.op, LogMsg.DivByZero)
             }
             d.constant = self.l.constant
 
         | str(TokenKind.Percent):
             let ok = self.l.constant.mod(self.r.constant)
             if !ok && self.r.constant.as_f64() == 0 {
-                self.e.push_err(self.op, "divide_by_zero")
+                self.e.push_err(self.op, LogMsg.DivByZero)
             }
             d.constant = self.l.constant
 
@@ -3945,7 +3945,7 @@ impl BinopSolver {
     fn check_data(mut self, mut d: &Data) {
         let f = d.kind.fnc()
         if real(f) && real(f.decl) && f.decl.is_method() {
-            self.e.push_err(self.op, "invalid_expr_for_binop")
+            self.e.push_err(self.op, LogMsg.InvalidExprForBinop)
         }
     }
 

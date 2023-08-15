@@ -40,6 +40,7 @@ use std::jule::lex::{
 use std::jule::build::{
     DIRECTIVES,
     DIRECTIVE_PREFIX,
+    LogMsg,
     Log,
     LogKind,
     errorf,
@@ -52,13 +53,13 @@ cpp use "parser.hpp"
 
 cpp unsafe fn __jule_parser_vector_as_slice[Vec, T](vec: Vec): []T
 
-fn make_err(row: int, col: int, f: &File, key: str, args: ...any): Log {
+fn make_err(row: int, col: int, f: &File, fmt: LogMsg, args: ...any): Log {
     ret Log{
         kind:   LogKind.Error,
         row:    row,
         column: col,
         path:   f.path(),
-        text:   errorf(key, args...),
+        text:   errorf(fmt, args...),
     }
 }
 
@@ -171,7 +172,7 @@ fn parts(mut tokens: []Token, id: TokenId, expr_must: bool): ([][]Token, []Log) 
 
         if token.id == id {
             if expr_must && i-last <= 0 {
-                let err = make_err(token.row, token.column, token.file, "missing_expr")
+                let err = make_err(token.row, token.column, token.file, LogMsg.MissingExpr)
                 errors = append(errors, err)
             }
             parts = append(parts, tokens[last:i])
@@ -197,13 +198,13 @@ fn get_close_kind_of_brace(left: str): str {
     }
 }
 
-fn compiler_err(token: Token, key: str, args: ...any): Log {
+fn compiler_err(token: Token, fmt: LogMsg, args: ...any): Log {
     ret Log{
         kind:   LogKind.Error,
         row:    token.row,
         column: token.column,
         path:   token.file.path(),
-        text:   errorf(key, args...),
+        text:   errorf(fmt, args...),
     }
 }
 
@@ -236,8 +237,8 @@ impl Parser {
     fn stopped(self): bool { ret !real(self.ast) }
 
     // Appends error by specified token, key and args.
-    fn push_err(mut self, token: Token, key: str, args: ...any) {
-        self.errors = append(self.errors, compiler_err(token, key, args...))
+    fn push_err(mut self, token: Token, fmt: LogMsg, args: ...any) {
+        self.errors = append(self.errors, compiler_err(token, fmt, args...))
     }
 
     fn build_expr(mut &self, mut tokens: []Token): &Expr {
@@ -330,7 +331,7 @@ impl Parser {
         let token = tokens[*i]
         let (mut t, ok) = self.__build_type(tokens, i, err)
         if err && !ok {
-            self.push_err(token, "invalid_type")
+            self.push_err(token, LogMsg.InvalidType)
         }
         ret t, ok
     }
@@ -338,7 +339,7 @@ impl Parser {
     fn build_type_alias_decl(mut &self, mut tokens: []Token): &TypeAliasDecl {
         let mut i = 1 // Skip "type" keyword.
         if i >= tokens.len {
-            self.push_err(tokens[i-1], "invalid_syntax")
+            self.push_err(tokens[i-1], LogMsg.InvalidSyntax)
             ret new(TypeAliasDecl)
         }
         let mut tad = &TypeAliasDecl{
@@ -347,27 +348,27 @@ impl Parser {
         }
         let mut token = tokens[i]
         if token.id != TokenId.Ident {
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
         }
         i++
         if i >= tokens.len {
-            self.push_err(tokens[i-1], "invalid_syntax")
+            self.push_err(tokens[i-1], LogMsg.InvalidSyntax)
             ret tad
         }
         token = tokens[i]
         if token.id != TokenId.Colon {
-            self.push_err(tokens[i-1], "invalid_syntax")
+            self.push_err(tokens[i-1], LogMsg.InvalidSyntax)
             ret tad
         }
         i++
         if i >= tokens.len {
-            self.push_err(tokens[i-1], "missing_type")
+            self.push_err(tokens[i-1], LogMsg.MissingType)
             ret tad
         }
         let (mut t, ok) = unsafe { self.build_type(tokens, &i, true) }
         tad.kind = t
         if ok && i < tokens.len {
-            self.push_err(tokens[i], "invalid_syntax")
+            self.push_err(tokens[i], LogMsg.InvalidSyntax)
         }
         ret tad
     }
@@ -379,7 +380,7 @@ impl Parser {
             i++ // Skip type annotation operator (:)
             if (i >= tokens.len ||
             (tokens[i].id == TokenId.Op && tokens[i].kind == str(TokenKind.Eq))) {
-                self.push_err(tok, "missing_type")
+                self.push_err(tok, LogMsg.MissingType)
                 ret
             }
             let (mut t, ok) = unsafe { self.build_type(tokens, &i, true) }
@@ -394,24 +395,24 @@ impl Parser {
 
         if tok.id == TokenId.Op {
             if tok.kind != str(TokenKind.Eq) {
-                self.push_err(tok, "invalid_syntax")
+                self.push_err(tok, LogMsg.InvalidSyntax)
                 ret
             }
             let mut expr_tokens = tokens[i+1:]
             if expr_tokens.len == 0 {
-                self.push_err(tok, "missing_expr")
+                self.push_err(tok, LogMsg.MissingExpr)
                 ret
             }
             v.expr = self.build_expr(expr_tokens)
         } else {
-            self.push_err(tok, "invalid_syntax")
+            self.push_err(tok, LogMsg.InvalidSyntax)
         }
     }
 
     fn build_var_common(mut &self, mut v: &VarDecl, mut tokens: []Token) {
         v.token = tokens[0]
         if v.token.id != TokenId.Ident {
-            self.push_err(v.token, "invalid_syntax")
+            self.push_err(v.token, LogMsg.InvalidSyntax)
             ret
         }
         v.ident = v.token.kind
@@ -433,7 +434,7 @@ impl Parser {
             // Initialize 1 for skip the let keyword
             i++
             if i >= tokens.len {
-                self.push_err(tok, "invalid_syntax")
+                self.push_err(tok, LogMsg.InvalidSyntax)
                 ret
             }
             if tokens[i].id == TokenId.Mut {
@@ -445,7 +446,7 @@ impl Parser {
         | TokenId.Const:
             i++
             if v.constant {
-                self.push_err(tok, "already_const")
+                self.push_err(tok, LogMsg.AlreadyConst)
                 break
             }
             v.constant = true
@@ -455,12 +456,12 @@ impl Parser {
             fall
 
         |:
-            self.push_err(tok, "invalid_syntax")
+            self.push_err(tok, LogMsg.InvalidSyntax)
             ret
         }
 
         if i >= tokens.len {
-            self.push_err(tok, "invalid_syntax")
+            self.push_err(tok, LogMsg.InvalidSyntax)
         }
     }
 
@@ -488,13 +489,13 @@ impl Parser {
 
     fn build_generic(mut self, mut tokens: []Token): &GenericDecl {
         if tokens.len > 1 {
-            self.push_err(tokens[1], "invalid_syntax")
+            self.push_err(tokens[1], LogMsg.InvalidSyntax)
         }
         let mut g = &GenericDecl{
             token: tokens[0],
         }
         if g.token.id != TokenId.Ident {
-            self.push_err(g.token, "invalid_syntax")
+            self.push_err(g.token, LogMsg.InvalidSyntax)
         }
         g.ident = g.token.kind
         ret g
@@ -502,7 +503,7 @@ impl Parser {
 
     fn build_generics(mut self, mut tokens: []Token, error_token: Token): []&GenericDecl {
         if tokens.len == 0 {
-            self.push_err(error_token, "missing_expr")
+            self.push_err(error_token, LogMsg.MissingExpr)
             ret nil
         }
 
@@ -532,7 +533,7 @@ impl Parser {
             param.mutable = true
             i++
             if i >= tokens.len {
-                self.push_err(tokens[i-1], "invalid_syntax")
+                self.push_err(tokens[i-1], LogMsg.InvalidSyntax)
                 ret new(ParamDecl)
             }
         }
@@ -541,7 +542,7 @@ impl Parser {
             param.ident = str(TokenKind.Amper)
             i++
             if i >= tokens.len {
-                self.push_err(tokens[i-1], "invalid_syntax")
+                self.push_err(tokens[i-1], LogMsg.InvalidSyntax)
                 ret new(ParamDecl)
             }
         }
@@ -551,7 +552,7 @@ impl Parser {
             param.token = tokens[i]
             i++
             if i < tokens.len {
-                self.push_err(tokens[i], "invalid_syntax")
+                self.push_err(tokens[i], LogMsg.InvalidSyntax)
             }
         }
 
@@ -568,7 +569,7 @@ impl Parser {
             }
 
             if param.variadic {
-                self.push_err(token, "already_variadic")
+                self.push_err(token, LogMsg.AlreadyVariadic)
                 continue
             }
             param.variadic = true
@@ -585,7 +586,7 @@ impl Parser {
         }
         param.kind, _ = unsafe { self.build_type(tokens, &i, true) }
         if i < tokens.len {
-            self.push_err(tokens[i], "invalid_syntax")
+            self.push_err(tokens[i], LogMsg.InvalidSyntax)
         }
     }
 
@@ -604,7 +605,7 @@ impl Parser {
         if i+1 >= tokens.len {
             ret
         } else if tokens.len-i-1 < 2 {
-            self.push_err(tok, "missing_type")
+            self.push_err(tok, LogMsg.MissingType)
             ret
         }
 
@@ -627,7 +628,7 @@ impl Parser {
         if param.token.id == TokenId.Mut {
             param.mutable = true
             if tokens.len == 1 {
-                self.push_err(tokens[0], "invalid_syntax")
+                self.push_err(tokens[0], LogMsg.InvalidSyntax)
                 ret new(ParamDecl)
             }
             tokens = tokens[1:]
@@ -638,7 +639,7 @@ impl Parser {
         if tokens.len >= 3 {
             if param.token.id == TokenId.Op && param.token.kind == str(TokenKind.Amper) {
                 if tokens.len == 1 {
-                    self.push_err(tokens[0], "invalid_syntax")
+                    self.push_err(tokens[0], LogMsg.InvalidSyntax)
                     ret new(ParamDecl)
                 }
 
@@ -668,7 +669,7 @@ impl Parser {
                 continue
             }
             if param.token.id == TokenId.Na {
-                self.push_err(param.token, "missing_type")
+                self.push_err(param.token, LogMsg.MissingType)
             } else {
                 param.kind = &TypeDecl{
                     token: param.token,
@@ -770,7 +771,7 @@ impl Parser {
 
         | TokenId.Colon:
             if i+1 >= tokens.len {
-                self.push_err(token, "missing_type")
+                self.push_err(token, LogMsg.MissingType)
                 ret
             }
 
@@ -783,7 +784,7 @@ impl Parser {
                     ret decl, ok
 
                 | str(TokenKind.LBrace):
-                    self.push_err(token, "missing_type")
+                    self.push_err(token, LogMsg.MissingType)
                     ret
                 }
             }
@@ -791,7 +792,7 @@ impl Parser {
             ret
         }
         i++
-        self.push_err(token, "invalid_syntax")
+        self.push_err(token, LogMsg.InvalidSyntax)
         ret
     }
 
@@ -808,7 +809,7 @@ impl Parser {
             f.statically = true
             i++
             if i >= tokens.len {
-                self.push_err(f.token, "invalid_syntax")
+                self.push_err(f.token, LogMsg.InvalidSyntax)
                 ret new(FnDecl)
             }
             f.token = tokens[i]
@@ -819,7 +820,7 @@ impl Parser {
             f.unsafety = true
             i++
             if i >= tokens.len {
-                self.push_err(f.token, "invalid_syntax")
+                self.push_err(f.token, LogMsg.InvalidSyntax)
                 ret new(FnDecl)
             }
             f.token = tokens[i]
@@ -828,7 +829,7 @@ impl Parser {
         // Skips fn token.
         i++
         if i >= tokens.len {
-            self.push_err(f.token, "invalid_syntax")
+            self.push_err(f.token, LogMsg.InvalidSyntax)
             ret new(FnDecl)
         }
 
@@ -836,7 +837,7 @@ impl Parser {
         if tok.id == TokenId.Ident {
             i++
             if i >= tokens.len {
-                self.push_err(f.token, "invalid_syntax")
+                self.push_err(f.token, LogMsg.InvalidSyntax)
                 ret new(FnDecl)
             }
             f.ident = tok.kind
@@ -851,7 +852,7 @@ impl Parser {
         }
 
         if tokens[i].kind != str(TokenKind.LParent) {
-            self.push_err(tokens[i], "missing_function_parentheses")
+            self.push_err(tokens[i], LogMsg.MissingFnParentheses)
             ret new(FnDecl)
         }
 
@@ -871,7 +872,7 @@ impl Parser {
         let mut f = self.build_fn_prototype(tokens, i, method)
         if prototype {
             if i < tokens.len {
-                self.push_err(tokens[i+1], "invalid_syntax")
+                self.push_err(tokens[i+1], LogMsg.InvalidSyntax)
             }
             ret f
         } else if !real(f) {
@@ -880,7 +881,7 @@ impl Parser {
 
         if i >= tokens.len {
             self.stop()
-            self.push_err(f.token, "body_not_exist")
+            self.push_err(f.token, LogMsg.BodyNotExist)
             ret new(FnDecl)
         }
         let mut block_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
@@ -888,11 +889,11 @@ impl Parser {
             f.scope = self.build_scope(block_tokens)
             f.scope.unsafety = f.unsafety
             if i < tokens.len {
-                self.push_err(tokens[i], "invalid_syntax")
+                self.push_err(tokens[i], LogMsg.InvalidSyntax)
             }
         } else {
             self.stop()
-            self.push_err(f.token, "body_not_exist")
+            self.push_err(f.token, LogMsg.BodyNotExist)
             ret new(FnDecl)
         }
         ret f
@@ -910,11 +911,11 @@ impl Parser {
         let mut selectors = make([]Token, parts.len)
         for (i, mut part) in parts {
             if part.len > 1 {
-                self.push_err(part[1], "invalid_syntax")
+                self.push_err(part[1], LogMsg.InvalidSyntax)
             }
             let mut tok = part[0]
             if tok.id != TokenId.Ident && tok.id != TokenId.Self {
-                self.push_err(tok, "invalid_syntax")
+                self.push_err(tok, LogMsg.InvalidSyntax)
                 continue
             }
             selectors[i] = tok
@@ -924,11 +925,11 @@ impl Parser {
 
     fn build_cpp_use_decl(mut self, mut decl: &UseDecl, tokens: []Token) {
         if tokens.len > 1 {
-            self.push_err(tokens[1], "invalid_syntax")
+            self.push_err(tokens[1], LogMsg.InvalidSyntax)
         }
         let token = tokens[0]
         if token.id != TokenId.Lit || (token.kind[0] != '`' && token.kind[0] != '"') {
-            self.push_err(token, "invalid_expr")
+            self.push_err(token, LogMsg.InvalidExpr)
             ret
         }
         decl.cpp_linked = true
@@ -943,7 +944,7 @@ impl Parser {
 
         let mut token = tokens[0]
         if tokens.len < 3 {
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
             ret
         }
 
@@ -951,50 +952,50 @@ impl Parser {
         token = tokens[tokens.len-1]
         match token.id {
         | TokenId.DblColon:
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
             ret
 
         | TokenId.Range:
             if token.kind != str(TokenKind.RBrace) {
-                self.push_err(token, "invalid_syntax")
+                self.push_err(token, LogMsg.InvalidSyntax)
                 ret
             }
             let mut selectors: []Token = nil
             tokens, selectors = range_last(tokens)
             decl.selected = self.get_use_decl_selectors(selectors)
             if tokens.len == 0 {
-                self.push_err(token, "invalid_syntax")
+                self.push_err(token, LogMsg.InvalidSyntax)
                 ret
             }
             token = tokens[tokens.len-1]
             if token.id != TokenId.DblColon {
-                self.push_err(token, "invalid_syntax")
+                self.push_err(token, LogMsg.InvalidSyntax)
                 ret
             }
             tokens = tokens[:tokens.len-1]
             if tokens.len == 0 {
-                self.push_err(token, "invalid_syntax")
+                self.push_err(token, LogMsg.InvalidSyntax)
                 ret
             }
 
         | TokenId.Op:
             if token.kind != str(TokenKind.Star) {
-                self.push_err(token, "invalid_syntax")
+                self.push_err(token, LogMsg.InvalidSyntax)
                 ret
             }
             tokens = tokens[:tokens.len-1]
             if tokens.len == 0 {
-                self.push_err(token, "invalid_syntax")
+                self.push_err(token, LogMsg.InvalidSyntax)
                 ret
             }
             token = tokens[tokens.len-1]
             if token.id != TokenId.DblColon {
-                self.push_err(token, "invalid_syntax")
+                self.push_err(token, LogMsg.InvalidSyntax)
                 ret
             }
             tokens = tokens[:tokens.len-1]
             if tokens.len == 0 {
-                self.push_err(token, "invalid_syntax")
+                self.push_err(token, LogMsg.InvalidSyntax)
                 ret
             }
             decl.full = true
@@ -1008,12 +1009,12 @@ impl Parser {
         let mut token = tokens[tokens.len-1]
         match token.id {
         | TokenId.DblColon:
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
             ret
 
         | TokenId.Range:
             if token.kind != str(TokenKind.RBrace) {
-                self.push_err(token, "invalid_syntax")
+                self.push_err(token, LogMsg.InvalidSyntax)
                 ret
             }
 
@@ -1021,43 +1022,43 @@ impl Parser {
             tokens, selectors = range_last(tokens)
             decl.selected = self.get_use_decl_selectors(selectors)
             if tokens.len == 0 {
-                self.push_err(token, "invalid_syntax")
+                self.push_err(token, LogMsg.InvalidSyntax)
                 ret
             }
 
             token = tokens[tokens.len-1]
             if token.id != TokenId.DblColon {
-                self.push_err(token, "invalid_syntax")
+                self.push_err(token, LogMsg.InvalidSyntax)
                 ret
             }
 
             tokens = tokens[:tokens.len-1]
             if tokens.len == 0 {
-                self.push_err(token, "invalid_syntax")
+                self.push_err(token, LogMsg.InvalidSyntax)
                 ret
             }
 
         | TokenId.Op:
             if token.kind != str(TokenKind.Star) {
-                self.push_err(token, "invalid_syntax")
+                self.push_err(token, LogMsg.InvalidSyntax)
                 ret
             }
 
             tokens = tokens[:tokens.len-1]
             if tokens.len == 0 {
-                self.push_err(token, "invalid_syntax")
+                self.push_err(token, LogMsg.InvalidSyntax)
                 ret
             }
 
             token = tokens[tokens.len-1]
             if token.id != TokenId.DblColon {
-                self.push_err(token, "invalid_syntax")
+                self.push_err(token, LogMsg.InvalidSyntax)
                 ret
             }
 
             tokens = tokens[:tokens.len-1]
             if tokens.len == 0 {
-                self.push_err(token, "invalid_syntax")
+                self.push_err(token, LogMsg.InvalidSyntax)
                 ret
             }
 
@@ -1075,7 +1076,7 @@ impl Parser {
 
         let token = tokens[0]
         if token.id != TokenId.Ident {
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
             ret
         }
 
@@ -1096,7 +1097,7 @@ impl Parser {
             cpp_linked: cpp_linked,
         }
         if tokens.len < 2 {
-            self.push_err(decl.token, "missing_use_path")
+            self.push_err(decl.token, LogMsg.MissingUsePath)
             ret new(UseDecl)
         }
         tokens = tokens[1:] // Skip "use" keyword.
@@ -1151,7 +1152,7 @@ impl Parser {
             let mut item = &EnumItemDecl{}
             item.token = t
             if item.token.id != TokenId.Ident {
-                self.push_err(item.token, "invalid_syntax")
+                self.push_err(item.token, LogMsg.InvalidSyntax)
             }
             item.ident = item.token.kind
             if i+1 >= tokens.len || tokens[i+1].id == TokenId.Comma {
@@ -1164,11 +1165,11 @@ impl Parser {
             i++
             t = tokens[i]
             if t.id != TokenId.Op && t.kind != str(TokenKind.Eq) {
-                self.push_err(tokens[0], "invalid_syntax")
+                self.push_err(tokens[0], LogMsg.InvalidSyntax)
             }
             i++
             if i >= tokens.len || tokens[i].id == TokenId.Comma {
-                self.push_err(tokens[0], "missing_expr")
+                self.push_err(tokens[0], LogMsg.MissingExpr)
                 continue
             }
             item.expr = self.build_enum_item_expr(i, tokens)
@@ -1179,27 +1180,27 @@ impl Parser {
 
     fn build_enum_decl(mut &self, mut tokens: []Token): &EnumDecl {
         if tokens.len < 2 || tokens.len < 3 {
-            self.push_err(tokens[0], "invalid_syntax")
+            self.push_err(tokens[0], LogMsg.InvalidSyntax)
             ret new(EnumDecl)
         }
         let mut e = &EnumDecl{
             token: tokens[1],
         }
         if e.token.id != TokenId.Ident {
-            self.push_err(e.token, "invalid_syntax")
+            self.push_err(e.token, LogMsg.InvalidSyntax)
         }
         e.ident = e.token.kind
         let mut i = 2
         if tokens[i].id == TokenId.Colon {
             i++
             if i >= tokens.len {
-                self.push_err(tokens[i-1], "invalid_syntax")
+                self.push_err(tokens[i-1], LogMsg.InvalidSyntax)
                 ret e
             }
             e.kind, _ = unsafe { self.build_type(tokens, &i, true) }
             if i >= tokens.len {
                 self.stop()
-                self.push_err(e.token, "body_not_exist")
+                self.push_err(e.token, LogMsg.BodyNotExist)
                 ret e
             }
         } else {
@@ -1208,10 +1209,10 @@ impl Parser {
         let mut item_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
         if item_tokens == nil {
             self.stop()
-            self.push_err(e.token, "body_not_exist")
+            self.push_err(e.token, LogMsg.BodyNotExist)
             ret e
         } else if i < tokens.len {
-            self.push_err(tokens[i], "invalid_syntax")
+            self.push_err(tokens[i], LogMsg.InvalidSyntax)
         }
         e.items = self.build_enum_items(item_tokens)
         ret e
@@ -1223,7 +1224,7 @@ impl Parser {
         f.public = tokens[0].id == TokenId.Pub
         if f.public {
             if tokens.len == 1 {
-                self.push_err(tokens[0], "invalid_syntax")
+                self.push_err(tokens[0], LogMsg.InvalidSyntax)
                 ret new(FieldDecl)
             }
             tokens = tokens[1:]
@@ -1232,7 +1233,7 @@ impl Parser {
         f.mutable = tokens[0].id == TokenId.Mut
         if f.mutable {
             if tokens.len == 1 {
-                self.push_err(tokens[0], "invalid_syntax")
+                self.push_err(tokens[0], LogMsg.InvalidSyntax)
                 ret new(FieldDecl)
             }
             tokens = tokens[1:]
@@ -1240,16 +1241,16 @@ impl Parser {
 
         f.token = tokens[0]
         if f.token.id != TokenId.Ident {
-            self.push_err(f.token, "invalid_syntax")
+            self.push_err(f.token, LogMsg.InvalidSyntax)
             ret new(FieldDecl)
         }
         f.ident = f.token.kind
 
         if tokens.len == 1 {
-            self.push_err(tokens[0], "missing_type")
+            self.push_err(tokens[0], LogMsg.MissingType)
             ret new(FieldDecl)
         } else if tokens[1].id != TokenId.Colon {
-            self.push_err(tokens[1], "missing_type")
+            self.push_err(tokens[1], LogMsg.MissingType)
             ret new(FieldDecl)
         }
 
@@ -1257,7 +1258,7 @@ impl Parser {
         let mut i = 0
         f.kind, _ = unsafe { self.build_type(tokens, &i, true) }
         if i < tokens.len {
-            self.push_err(tokens[i], "invalid_syntax")
+            self.push_err(tokens[i], LogMsg.InvalidSyntax)
             ret new(FieldDecl)
         }
 
@@ -1280,7 +1281,7 @@ impl Parser {
 
     fn build_struct_decl(mut &self, mut tokens: []Token): &StructDecl {
         if tokens.len < 3 {
-            self.push_err(tokens[0], "invalid_syntax")
+            self.push_err(tokens[0], LogMsg.InvalidSyntax)
             ret new(StructDecl)
         }
 
@@ -1289,11 +1290,11 @@ impl Parser {
             token: tokens[i],
         }
         if s.token.id != TokenId.Ident {
-            self.push_err(s.token, "invalid_syntax")
+            self.push_err(s.token, LogMsg.InvalidSyntax)
         }
         i++
         if i >= tokens.len {
-            self.push_err(tokens[i], "invalid_syntax")
+            self.push_err(tokens[i], LogMsg.InvalidSyntax)
             ret s
         }
         s.ident = s.token.kind
@@ -1304,18 +1305,18 @@ impl Parser {
             s.generics = self.build_generics(generics_tokens, error_token)
         }
         if i >= tokens.len {
-            self.push_err(tokens[i], "invalid_syntax")
+            self.push_err(tokens[i], LogMsg.InvalidSyntax)
             ret s
         }
 
         let mut body_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
         if body_tokens == nil {
             self.stop()
-            self.push_err(s.token, "body_not_exist")
+            self.push_err(s.token, LogMsg.BodyNotExist)
             ret s
         }
         if i < tokens.len {
-            self.push_err(tokens[i], "invalid_syntax")
+            self.push_err(tokens[i], LogMsg.InvalidSyntax)
         }
         s.fields = self.build_struct_decl_fields(body_tokens)
         ret s
@@ -1325,18 +1326,18 @@ impl Parser {
         // Static methods cannot have receiver.
         if f.statically {
             if f.params.len > 0 && f.params[0].is_self() {
-                self.push_err(f.token, "static_function_has_receiver")
+                self.push_err(f.token, LogMsg.StaticFnHasReceiver)
             }
             ret
         }
 
         if f.params.len == 0 {
-            self.push_err(f.token, "missing_receiver")
+            self.push_err(f.token, LogMsg.MissingReceiver)
             ret
         }
         let param = f.params[0]
         if !param.is_self() {
-            self.push_err(f.token, "missing_receiver")
+            self.push_err(f.token, LogMsg.MissingReceiver)
             ret
         }
     }
@@ -1354,7 +1355,7 @@ impl Parser {
             if tokens[0].id == TokenId.Pub {
                 is_pub = true
                 if tokens.len == 1 {
-                    self.push_err(tokens[0], "invalid_syntax")
+                    self.push_err(tokens[0], LogMsg.InvalidSyntax)
                     continue
                 }
                 tokens = tokens[1:]
@@ -1363,11 +1364,11 @@ impl Parser {
             let mut f = self.build_fn(tokens, true, true)
             if real(f) {
                 if f.is_anon() {
-                    self.push_err(f.token, "invalid_syntax")
+                    self.push_err(f.token, LogMsg.InvalidSyntax)
                 }
                 self.check_method_receiver(f)
                 if f.generics.len > 0 {
-                    self.push_err(f.token, "trait_method_has_generics")
+                    self.push_err(f.token, LogMsg.TraitMethodHasGenerics)
                 }
                 f.public = is_pub
                 methods = append(methods, f)
@@ -1378,25 +1379,25 @@ impl Parser {
 
     fn build_trait_decl(mut &self, mut tokens: []Token): &TraitDecl {
         if tokens.len < 3 {
-            self.push_err(tokens[0], "invalid_syntax")
+            self.push_err(tokens[0], LogMsg.InvalidSyntax)
             ret new(TraitDecl)
         }
         let mut t = &TraitDecl{
             token: tokens[1],
         }
         if t.token.id != TokenId.Ident {
-            self.push_err(t.token, "invalid_syntax")
+            self.push_err(t.token, LogMsg.InvalidSyntax)
         }
         t.ident = t.token.kind
         let mut i = 2
         let mut body_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
         if body_tokens == nil {
             self.stop()
-            self.push_err(t.token, "body_not_exist")
+            self.push_err(t.token, LogMsg.BodyNotExist)
             ret new(TraitDecl)
         }
         if i < tokens.len {
-            self.push_err(tokens[i], "invalid_syntax")
+            self.push_err(tokens[i], LogMsg.InvalidSyntax)
         }
         t.methods = self.build_trait_methods(body_tokens)
         ret t
@@ -1407,7 +1408,7 @@ impl Parser {
         let mut f = self.build_fn(tokens, false, true)
         if real(f) {
             if f.is_anon() {
-                self.push_err(f.token, "invalid_syntax")
+                self.push_err(f.token, LogMsg.InvalidSyntax)
             }
             f.cpp_linked = true
         }
@@ -1420,7 +1421,7 @@ impl Parser {
         if real(v) {
             v.cpp_linked = true
             if real(v.expr) {
-                self.push_err(v.token, "cpp_linked_variable_has_expr")
+                self.push_err(v.token, LogMsg.CppLinkedVarHasExpr)
             }
         }
         ret v
@@ -1446,7 +1447,7 @@ impl Parser {
 
     fn build_cpp_link_use(mut &self, mut tokens: []Token): &UseDecl {
         if tokens.len == 1 {
-            self.push_err(tokens[0], "invalid_syntax")
+            self.push_err(tokens[0], LogMsg.InvalidSyntax)
             ret new(UseDecl)
         }
         tokens = tokens[1:] // Remove the "cpp" keyword.
@@ -1458,7 +1459,7 @@ impl Parser {
     fn build_cpp_link(mut &self, mut tokens: []Token): NodeData {
         let mut token = tokens[0]
         if tokens.len == 1 {
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
             ret nil
         }
         token = tokens[1]
@@ -1481,7 +1482,7 @@ impl Parser {
             ret self.build_cpp_link_type_alias(tokens)
 
         |:
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
         }
         ret nil
     }
@@ -1491,7 +1492,7 @@ impl Parser {
         let mut token = tokens[i]
         if token.id == TokenId.Static {
             if i+1 >= tokens.len {
-                self.push_err(token, "invalid_syntax")
+                self.push_err(token, LogMsg.InvalidSyntax)
                 ret new(FnDecl)
             }
             i++
@@ -1500,7 +1501,7 @@ impl Parser {
 
         if token.id == TokenId.Unsafe {
             if i+1 >= tokens.len {
-                self.push_err(token, "invalid_syntax")
+                self.push_err(token, LogMsg.InvalidSyntax)
                 ret new(FnDecl)
             }
             i++
@@ -1508,13 +1509,13 @@ impl Parser {
         }
 
         if token.id != TokenId.Fn {
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
             ret new(FnDecl)
         }
 
         let mut f = self.build_fn(tokens, true, false)
         if real(f) && f.is_anon() {
-            self.push_err(f.token, "invalid_syntax")
+            self.push_err(f.token, LogMsg.InvalidSyntax)
         }
         ret f
     }
@@ -1533,7 +1534,7 @@ impl Parser {
             | TokenId.Pub:
                 is_pub = true
                 if tokens.len == 1 {
-                    self.push_err(tokens[0], "invalid_syntax")
+                    self.push_err(tokens[0], LogMsg.InvalidSyntax)
                     continue
                 }
                 tokens = tokens[1:]
@@ -1554,7 +1555,7 @@ impl Parser {
                 }
 
             |:
-                self.push_err(token, "invalid_syntax")
+                self.push_err(token, LogMsg.InvalidSyntax)
                 continue
             }
         }
@@ -1574,7 +1575,7 @@ impl Parser {
             | TokenId.Pub:
                 is_pub = true
                 if tokens.len == 1 {
-                    self.push_err(tokens[0], "invalid_syntax")
+                    self.push_err(tokens[0], LogMsg.InvalidSyntax)
                     continue
                 }
                 tokens = tokens[1:]
@@ -1595,7 +1596,7 @@ impl Parser {
                 }
 
             |:
-                self.push_err(token, "invalid_syntax")
+                self.push_err(token, LogMsg.InvalidSyntax)
                 continue
             }
         }
@@ -1612,16 +1613,16 @@ impl Parser {
     fn build_impl(mut &self, mut tokens: []Token): &Impl {
         let mut token = tokens[0]
         if tokens.len < 2 {
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
             ret new(Impl)
         }
         token = tokens[1]
         if token.id != TokenId.Ident {
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
             ret new(Impl)
         }
         if tokens.len < 3 {
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
             ret new(Impl)
         }
         let mut ipl = &Impl{
@@ -1638,16 +1639,16 @@ impl Parser {
                 tokens = tokens[2:]  // Remove prefix tokens.
                 goto body
             }
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
             ret new(Impl)
         }
         if tokens.len < 4 {
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
             ret new(Impl)
         }
         token = tokens[3]
         if token.id != TokenId.Ident {
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
             ret new(Impl)
         }
         ipl.dest = token
@@ -1657,11 +1658,11 @@ impl Parser {
         let mut body_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
         if body_tokens == nil {
             self.stop()
-            self.push_err(ipl.base, "body_not_exist")
+            self.push_err(ipl.base, LogMsg.BodyNotExist)
             ret new(Impl)
         }
         if i < tokens.len {
-            self.push_err(tokens[i], "invalid_syntax")
+            self.push_err(tokens[i], LogMsg.InvalidSyntax)
         }
         self.parse_impl_body(ipl, body_tokens)
         ret ipl
@@ -1680,7 +1681,7 @@ impl Parser {
             if real(f) {
                 f.global = true
                 if f.is_anon() {
-                    self.push_err(f.token, "invalid_syntax")
+                    self.push_err(f.token, LogMsg.InvalidSyntax)
                 }
             }
             ret f
@@ -1718,7 +1719,7 @@ impl Parser {
             ret c
 
         |:
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
             ret nil
         }
     }
@@ -1824,7 +1825,7 @@ impl Parser {
             is_pub = false
         }
         if is_pub {
-            self.push_err(node.token, "def_not_support_pub")
+            self.push_err(node.token, LogMsg.DefNotSupportPub)
         }
     }
 
@@ -1838,7 +1839,7 @@ impl Parser {
         }
 
         if self.ast.decls.len() > 0 {
-            self.push_err(node.token, "use_decl_at_body")
+            self.push_err(node.token, LogMsg.UseDeclAtBody)
         }
     }
 
@@ -1848,7 +1849,7 @@ impl Parser {
             is_pub = true
             st = st[1:]
             if st.len == 0 {
-                self.push_err(st[0], "invalid_syntax")
+                self.push_err(st[0], LogMsg.InvalidSyntax)
                 ret
             }
         }
@@ -1903,7 +1904,7 @@ impl Parser {
             self.ast.impls.push((&Impl)(node.data))
 
         |:
-            self.push_err(node.token, "invalid_syntax")
+            self.push_err(node.token, LogMsg.InvalidSyntax)
         }
     }
 
@@ -1921,23 +1922,20 @@ impl Parser {
     }
 
     fn push_wrong_order_close_err(mut self, t: Token, &tokens: []Token, &ranges: []int) {
-        let mut msg = ""
         match tokens[ranges[ranges.len-1]].kind {
-        | str(TokenKind.LParent):  msg = "expected_parentheses_close"
-        | str(TokenKind.LBrace):   msg = "expected_brace_close"
-        | str(TokenKind.LBracket): msg = "expected_bracket_close"
+        | str(TokenKind.LParent):  self.push_err(t, LogMsg.ExpectedParentClose)
+        | str(TokenKind.LBrace):   self.push_err(t, LogMsg.ExpectedBraceClose)
+        | str(TokenKind.LBracket): self.push_err(t, LogMsg.ExpectedBracketClose)
         }
-
-        self.push_err(t, msg)
     }
 
     fn push_range_close(mut self, t: Token, left: str, &tokens: []Token, mut &ranges: []int) {
         let n = ranges.len
         if n == 0 {
             match t.kind {
-            | str(TokenKind.RBracket): self.push_err(t, "extra_closed_brackets")
-            | str(TokenKind.RBrace):   self.push_err(t, "extra_closed_braces")
-            | str(TokenKind.RParent):  self.push_err(t, "extra_closed_parentheses")
+            | str(TokenKind.RBracket): self.push_err(t, LogMsg.ExtraClosedBracket)
+            | str(TokenKind.RBrace):   self.push_err(t, LogMsg.ExtraClosedBrace)
+            | str(TokenKind.RParent):  self.push_err(t, LogMsg.ExtraClosedParent)
             }
             ret
         } else if tokens[ranges[n-1]].kind != left {
@@ -1974,9 +1972,9 @@ impl Parser {
         for _, i in ranges {
             let token = tokens[i]
             match token.kind {
-            | str(TokenKind.LParent):  self.push_err(token, "wait_close_parentheses")
-            | str(TokenKind.LBrace):   self.push_err(token, "wait_close_brace")
-            | str(TokenKind.LBracket): self.push_err(token, "wait_close_bracket")
+            | str(TokenKind.LParent):  self.push_err(token, LogMsg.WaitCloseParent)
+            | str(TokenKind.LBrace):   self.push_err(token, LogMsg.WaitCloseBrace)
+            | str(TokenKind.LBracket): self.push_err(token, LogMsg.WaitCloseBracket)
             }
         }
     }

@@ -26,6 +26,7 @@ use std::jule::ast::{
     SlicingExpr,
     BinopExpr,
 }
+use std::jule::build::{LogMsg}
 use std::jule::lex::{
     Token,
     TokenId,
@@ -283,8 +284,8 @@ struct ExprBuilder {
 }
 
 impl ExprBuilder {
-    fn push_err(mut self, token: Token, key: str, args: ...any) {
-        self.p.push_err(token, key, args...)
+    fn push_err(mut self, token: Token, fmt: LogMsg, args: ...any) {
+        self.p.push_err(token, fmt, args...)
     }
 
     fn build_tuple(mut self, mut parts: [][]Token): &TupleExpr {
@@ -321,7 +322,7 @@ impl ExprBuilder {
             ret self.build_primitive_type(token)
 
         |:
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
             ret nil
         }
     }
@@ -330,12 +331,12 @@ impl ExprBuilder {
         if tokens[0].id != TokenId.Cpp {
             ret new(IdentExpr)
         } else if tokens[1].id != TokenId.Dot {
-            self.push_err(tokens[1], "invalid_syntax")
+            self.push_err(tokens[1], LogMsg.InvalidSyntax)
             ret new(IdentExpr)
         }
         let mut token = tokens[2]
         if token.id != TokenId.Ident {
-            self.push_err(tokens[2], "invalid_syntax")
+            self.push_err(tokens[2], LogMsg.InvalidSyntax)
             ret new(IdentExpr)
         }
         let mut expr = build_ident_expr(token)
@@ -346,10 +347,10 @@ impl ExprBuilder {
     fn build_unary(mut self, mut tokens: []Token): &UnaryExpr {
         let mut op = tokens[0]
         if tokens.len == 1 {
-            self.push_err(op, "missing_expr_for_unary")
+            self.push_err(op, LogMsg.MissingExprForUnary)
             ret new(UnaryExpr)
         } else if !is_unary_op(op.kind) {
-            self.push_err(op, "invalid_op_for_unary", op.kind)
+            self.push_err(op, LogMsg.InvalidOpForUnary, op.kind)
             ret new(UnaryExpr)
         }
 
@@ -370,7 +371,7 @@ impl ExprBuilder {
         i-- // Set offset to delimiter token.
         tokens = tokens[:i] // Remove dot token and selected identifier token.
         if tokens.len == 0 {
-            self.push_err(ident_token, "invalid_syntax")
+            self.push_err(ident_token, LogMsg.InvalidSyntax)
             ret new(SubIdentExpr)
         }
         ret &SubIdentExpr{
@@ -384,11 +385,11 @@ impl ExprBuilder {
         for (i, mut token) in tokens {
             if i%2 == 0 {
                 if token.id != TokenId.Ident {
-                    self.push_err(token, "invalid_syntax")
+                    self.push_err(token, LogMsg.InvalidSyntax)
                 }
                 ns.ns = append(ns.ns, token)
             } else if token.id != TokenId.DblColon {
-                self.push_err(token, "invalid_syntax")
+                self.push_err(token, LogMsg.InvalidSyntax)
             }
         }
         ns.ident = ns.ns[ns.ns.len-1]
@@ -400,12 +401,12 @@ impl ExprBuilder {
         let mut i = 0
         let (mut t, ok) = unsafe { self.p.build_type(tokens, &i, false) }
         if !ok {
-            self.push_err(tokens[0], "invalid_syntax")
+            self.push_err(tokens[0], LogMsg.InvalidSyntax)
             ret new(TypeDecl)
         }
 
         if i < tokens.len {
-            self.push_err(tokens[i], "invalid_syntax")
+            self.push_err(tokens[i], LogMsg.InvalidSyntax)
         }
         ret t
     }
@@ -427,7 +428,7 @@ impl ExprBuilder {
             }
         }
 
-        self.push_err(token, "invalid_syntax")
+        self.push_err(token, LogMsg.InvalidSyntax)
         ret nil
     }
 
@@ -447,7 +448,7 @@ impl ExprBuilder {
             ret self.build_variadic(tokens)
 
         |:
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
             ret nil
         }
     }
@@ -456,7 +457,7 @@ impl ExprBuilder {
         let token = tokens[0]
         tokens = tokens[1 : tokens.len-1] // Remove parentheses.
         if tokens.len == 0 {
-            self.push_err(token, "missing_expr")
+            self.push_err(token, LogMsg.MissingExpr)
             ret nil
         }
         ret self.build(tokens)
@@ -502,13 +503,13 @@ impl ExprBuilder {
 
             // Expression tokens just parentheses.
             if expr_tokens.len == 2 {
-                self.push_err(error_token, "missing_expr")
+                self.push_err(error_token, LogMsg.MissingExpr)
             }
 
             let mut type_index = 0
             let (mut t, ok) = unsafe { self.p.build_type(type_tokens, &type_index, true) }
             if ok && type_index < type_tokens.len {
-                self.push_err(type_tokens[type_index], "invalid_syntax")
+                self.push_err(type_tokens[type_index], LogMsg.InvalidSyntax)
             } else if !ok {
                 ret cast
             }
@@ -529,7 +530,7 @@ impl ExprBuilder {
 
     fn push_arg(mut self, mut &args: []&Expr, mut tokens: []Token, err_token: Token) {
         if tokens.len == 0 {
-            self.push_err(err_token, "invalid_syntax")
+            self.push_err(err_token, LogMsg.InvalidSyntax)
             ret
         }
         args = append(args, self.build_from_tokens(tokens))
@@ -594,7 +595,7 @@ impl ExprBuilder {
             let mut j = 0
             let (mut generic, _) = unsafe { self.p.build_type(part, &j, true) }
             if j < part.len {
-                self.push_err(part[j], "invalid_syntax")
+                self.push_err(part[j], LogMsg.InvalidSyntax)
             }
             generics[i] = generic
         }
@@ -641,7 +642,7 @@ impl ExprBuilder {
         let mut i = 0
         let mut range_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
         if range_tokens.len == 0 {
-            self.push_err(tokens[0], "missing_expr")
+            self.push_err(tokens[0], LogMsg.MissingExpr)
             ret new(UnsafeExpr)
         }
         ret &UnsafeExpr{
@@ -653,14 +654,14 @@ impl ExprBuilder {
     fn build_anon_fn(mut self, mut tokens: []Token): &FnDecl {
         let mut f = self.p.build_fn(tokens, false, false)
         if !f.is_anon() {
-            self.push_err(f.token, "invalid_syntax")
+            self.push_err(f.token, LogMsg.InvalidSyntax)
         }
         ret f
     }
 
     fn build_unsafe(mut self, mut tokens: []Token): ExprData {
         if tokens.len == 0 {
-            self.push_err(tokens[0], "invalid_syntax")
+            self.push_err(tokens[0], LogMsg.InvalidSyntax)
             ret nil
         }
 
@@ -677,7 +678,7 @@ impl ExprBuilder {
     fn push_range_lit_part(mut self, mut part: []Token,
         error_token: Token, mut &parts: [][]Token) {
         if part.len == 0 {
-            self.push_err(error_token, "invalid_syntax")
+            self.push_err(error_token, LogMsg.InvalidSyntax)
             ret
         }
         parts = append(parts, part)
@@ -768,14 +769,14 @@ impl ExprBuilder {
         if !ok {
             ret new(StructLit)
         } else if i >= tokens.len {
-            self.push_err(tokens[0], "invalid_syntax")
+            self.push_err(tokens[0], LogMsg.InvalidSyntax)
             ret new(StructLit)
         }
 
         tokens = tokens[i:] // Remove type tokens.
         let token = tokens[0]
         if token.id != TokenId.Range || token.kind != str(TokenKind.LBrace) {
-            self.push_err(token, "invalid_syntax")
+            self.push_err(token, LogMsg.InvalidSyntax)
             ret new(StructLit)
         }
 
@@ -824,7 +825,7 @@ impl ExprBuilder {
             ret self.build_brace_lit(tokens)
 
         | range_n > 0:
-            self.push_err(tokens[0], "invalid_syntax")
+            self.push_err(tokens[0], LogMsg.InvalidSyntax)
             ret nil
         }
 
@@ -840,7 +841,7 @@ impl ExprBuilder {
             ret self.build_typed_struct_literal(tokens)
 
         |:
-            self.push_err(expr_tokens[0], "invalid_syntax")
+            self.push_err(expr_tokens[0], LogMsg.InvalidSyntax)
             ret nil
         }
     }
@@ -910,7 +911,7 @@ impl ExprBuilder {
             ret self.build_slice(tokens)
 
         | expr_tokens.len == 0 || range_n > 0:
-            self.push_err(error_token, "invalid_syntax")
+            self.push_err(error_token, LogMsg.InvalidSyntax)
             ret nil
         }
 
@@ -995,7 +996,7 @@ impl ExprBuilder {
             }
         }
 
-        self.push_err(tokens[0], "invalid_syntax")
+        self.push_err(tokens[0], LogMsg.InvalidSyntax)
         ret nil
     }
 
@@ -1004,12 +1005,12 @@ impl ExprBuilder {
         let mut right_tokens = tokens[i+1:]
 
         if left_tokens.len == 0 {
-            self.push_err(tokens[i], "invalid_syntax")
+            self.push_err(tokens[i], LogMsg.InvalidSyntax)
             ret new(BinopExpr)
         }
 
         if right_tokens.len == 0 {
-            self.push_err(tokens[i], "invalid_syntax")
+            self.push_err(tokens[i], LogMsg.InvalidSyntax)
             ret new(BinopExpr)
         }
 
