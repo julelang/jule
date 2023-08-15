@@ -33,7 +33,6 @@ pub enum LogMsg: str {
     ArgumentOverflow = `argument overflow`,
     FnHaveRet = `@ function cannot have return type`,
     FnHaveParameters = `@ function cannot have parameter(s)`,
-    FnIsUnsafe = `@ function cannot unsafe`,
     RequireRetExpr = `return statements of non-void functions should have return expression`,
     VoidFnRetExpr = `void functions is cannot returns any value`,
     BitShiftMustUnsigned = `bit shifting value is must be unsigned`,
@@ -197,6 +196,30 @@ pub enum LogMsg: str {
     RefIsDangling = `you cannot use "@" reference variable, because reference is dangling`,
     ConcurrenctCallWithRefParam = `concurrent calls does not support functions which is has reference parameter(s)`,
     UsedRefInAnonFnFromParentScope = `anonymous functions cannot access to reference "@" definition of parent scope`,
+
+    // Suggestions
+    ExpectedIdentifier = `write an identifier because identifier expected`,
+    ExpectedLabelIdent = `write a label identifier because label expected`,
+    ExpectedDotForCpp = `use dot (.) to access cpp-linked defines`,
+    ExpectedDblColon = `expected double colon "::"`,
+    EmptyParentNotValid = `empty parentheses are not valid expression, must include an expression in range`,
+    GiveExprToCast = `give an expression for casting`,
+    GiveTypeForCast = `type declaration expected for casting`,
+    ExpectedExpr = `an expression expected`,
+    ExpectedAnonFn = `anonymous function expected, remove identifier of function`,
+    ExpectedLeftOperand = `left operand expected for binary operator`,
+    ExpectedRightOperand = `right operand expected for binary operator`,
+    ExpectedColon = `expected colon ":"`,
+    ExpectedBody = `expected a body, bodies should start in same line with their definition and declared with braces "{ }"`,
+    MoveUseDeclToTopOfFile = `move this use declaration to top of source file`,
+    RenameForAvoidDuplication = `rename definition to avoid duplication`,
+    RemoveUseDeclAvoidDuplication = `remove this use declaration, already used, it is safe`,
+    RemoveUseSelectionAvoidDupliation = `remove this use selection, already selected, it is safe`,
+    RemoveConstToAssign = `remove constant qualifer if you need to assign`,
+    UseStaticKeywordToDef = `use "static" keyword to define`,
+    RemoveFallthroughFromFinalCase = `remove "fall" keyword`,
+    MakePubToAccess = `make public with "pub" keyword to access`,
+    ExpressionMustBeReferenceType = `expression must be reference type`,
 }
 
 // Log kinds.
@@ -207,11 +230,13 @@ pub enum LogKind {
 
 // Compiler log.
 pub struct Log {
-    pub kind:   LogKind
-    pub row:    int
-    pub column: int
-    pub path:   str
-    pub text:   str
+    pub kind:    LogKind
+    pub row:     int
+    pub column:  int
+    pub path:    str
+    pub text:    str
+    pub line:    str
+    pub suggest: str
 }
 
 impl Log {
@@ -228,6 +253,22 @@ impl Log {
         log += itoa(self.column)
         log += " "
         log += self.text
+        if self.line.len != 0 {
+            let mut line = self.line.ltrim("\r\n\v\b ")
+            let mut offset = self.line.len-line.len+1
+            let mut old_len = line.len
+            line = line.ltrim("\t")
+            if old_len != line.len {
+                offset += (old_len-line.len)*8
+            }
+            log += "\n    " + line
+            log += "\n    "
+            log += str_repeat(" ", self.column-offset)
+            log += "^"
+            if self.suggest.len != 0 {
+                log += "\n    suggest: " + self.suggest
+            }
+        }
         ret log
     }
 
@@ -278,5 +319,18 @@ fn apply_fmt(mut fmt: str, args: ...any): str {
     }
 
     s += fmt
+    ret s
+}
+
+// Returns N-time repeated value of substring.
+fn str_repeat(sub: str, mut n: int): str {
+    if n == 0 {
+        ret ""
+    }
+
+    let mut s = ""
+    for n > 0; n-- {
+        s += sub
+    }
     ret s
 }

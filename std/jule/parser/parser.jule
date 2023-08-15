@@ -205,7 +205,12 @@ fn compiler_err(token: Token, fmt: LogMsg, args: ...any): Log {
         column: token.column,
         path:   token.file.path(),
         text:   errorf(fmt, args...),
+        line:   token.line,
     }
+}
+
+unsafe fn push_suggest(mut log: *Log, fmt: LogMsg, args: ...any) {
+    log.suggest = errorf(fmt, args...)
 }
 
 fn build_comment(mut token: Token): &Comment {
@@ -239,6 +244,11 @@ impl Parser {
     // Appends error by specified token, key and args.
     fn push_err(mut self, token: Token, fmt: LogMsg, args: ...any) {
         self.errors = append(self.errors, compiler_err(token, fmt, args...))
+    }
+
+    // Push suggestion to last log.
+    fn push_suggest(mut self, fmt: LogMsg, args: ...any) {
+        unsafe { push_suggest(&self.errors[self.errors.len-1], fmt, args...) }
     }
 
     fn build_expr(mut &self, mut tokens: []Token): &Expr {
@@ -349,6 +359,7 @@ impl Parser {
         let mut token = tokens[i]
         if token.id != TokenId.Ident {
             self.push_err(token, LogMsg.InvalidSyntax)
+            self.push_suggest(LogMsg.ExpectedIdentifier)
         }
         i++
         if i >= tokens.len {
@@ -358,6 +369,7 @@ impl Parser {
         token = tokens[i]
         if token.id != TokenId.Colon {
             self.push_err(tokens[i-1], LogMsg.InvalidSyntax)
+            self.push_suggest(LogMsg.ExpectedColon)
             ret tad
         }
         i++
@@ -413,6 +425,7 @@ impl Parser {
         v.token = tokens[0]
         if v.token.id != TokenId.Ident {
             self.push_err(v.token, LogMsg.InvalidSyntax)
+            self.push_suggest(LogMsg.ExpectedIdentifier)
             ret
         }
         v.ident = v.token.kind
@@ -445,15 +458,7 @@ impl Parser {
 
         | TokenId.Const:
             i++
-            if v.constant {
-                self.push_err(tok, LogMsg.AlreadyConst)
-                break
-            }
             v.constant = true
-            if !v.mutable {
-                break
-            }
-            fall
 
         |:
             self.push_err(tok, LogMsg.InvalidSyntax)
@@ -496,6 +501,7 @@ impl Parser {
         }
         if g.token.id != TokenId.Ident {
             self.push_err(g.token, LogMsg.InvalidSyntax)
+            self.push_suggest(LogMsg.ExpectedIdentifier)
         }
         g.ident = g.token.kind
         ret g
@@ -882,6 +888,7 @@ impl Parser {
         if i >= tokens.len {
             self.stop()
             self.push_err(f.token, LogMsg.BodyNotExist)
+            self.push_suggest(LogMsg.ExpectedBody)
             ret new(FnDecl)
         }
         let mut block_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
@@ -894,6 +901,7 @@ impl Parser {
         } else {
             self.stop()
             self.push_err(f.token, LogMsg.BodyNotExist)
+            self.push_suggest(LogMsg.ExpectedBody)
             ret new(FnDecl)
         }
         ret f
@@ -916,6 +924,7 @@ impl Parser {
             let mut tok = part[0]
             if tok.id != TokenId.Ident && tok.id != TokenId.Self {
                 self.push_err(tok, LogMsg.InvalidSyntax)
+                self.push_suggest(LogMsg.ExpectedIdentifier)
                 continue
             }
             selectors[i] = tok
@@ -1077,6 +1086,7 @@ impl Parser {
         let token = tokens[0]
         if token.id != TokenId.Ident {
             self.push_err(token, LogMsg.InvalidSyntax)
+            self.push_suggest(LogMsg.ExpectedIdentifier)
             ret
         }
 
@@ -1153,6 +1163,7 @@ impl Parser {
             item.token = t
             if item.token.id != TokenId.Ident {
                 self.push_err(item.token, LogMsg.InvalidSyntax)
+                self.push_suggest(LogMsg.ExpectedIdentifier)
             }
             item.ident = item.token.kind
             if i+1 >= tokens.len || tokens[i+1].id == TokenId.Comma {
@@ -1188,6 +1199,7 @@ impl Parser {
         }
         if e.token.id != TokenId.Ident {
             self.push_err(e.token, LogMsg.InvalidSyntax)
+            self.push_suggest(LogMsg.ExpectedIdentifier)
         }
         e.ident = e.token.kind
         let mut i = 2
@@ -1201,6 +1213,7 @@ impl Parser {
             if i >= tokens.len {
                 self.stop()
                 self.push_err(e.token, LogMsg.BodyNotExist)
+                self.push_suggest(LogMsg.ExpectedBody)
                 ret e
             }
         } else {
@@ -1210,6 +1223,7 @@ impl Parser {
         if item_tokens == nil {
             self.stop()
             self.push_err(e.token, LogMsg.BodyNotExist)
+            self.push_suggest(LogMsg.ExpectedBody)
             ret e
         } else if i < tokens.len {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
@@ -1242,6 +1256,7 @@ impl Parser {
         f.token = tokens[0]
         if f.token.id != TokenId.Ident {
             self.push_err(f.token, LogMsg.InvalidSyntax)
+            self.push_suggest(LogMsg.ExpectedIdentifier)
             ret new(FieldDecl)
         }
         f.ident = f.token.kind
@@ -1291,6 +1306,7 @@ impl Parser {
         }
         if s.token.id != TokenId.Ident {
             self.push_err(s.token, LogMsg.InvalidSyntax)
+            self.push_suggest(LogMsg.ExpectedIdentifier)
         }
         i++
         if i >= tokens.len {
@@ -1313,6 +1329,7 @@ impl Parser {
         if body_tokens == nil {
             self.stop()
             self.push_err(s.token, LogMsg.BodyNotExist)
+            self.push_suggest(LogMsg.ExpectedBody)
             ret s
         }
         if i < tokens.len {
@@ -1387,6 +1404,7 @@ impl Parser {
         }
         if t.token.id != TokenId.Ident {
             self.push_err(t.token, LogMsg.InvalidSyntax)
+            self.push_suggest(LogMsg.ExpectedIdentifier)
         }
         t.ident = t.token.kind
         let mut i = 2
@@ -1394,6 +1412,7 @@ impl Parser {
         if body_tokens == nil {
             self.stop()
             self.push_err(t.token, LogMsg.BodyNotExist)
+            self.push_suggest(LogMsg.ExpectedBody)
             ret new(TraitDecl)
         }
         if i < tokens.len {
@@ -1619,6 +1638,7 @@ impl Parser {
         token = tokens[1]
         if token.id != TokenId.Ident {
             self.push_err(token, LogMsg.InvalidSyntax)
+            self.push_suggest(LogMsg.ExpectedIdentifier)
             ret new(Impl)
         }
         if tokens.len < 3 {
@@ -1649,6 +1669,7 @@ impl Parser {
         token = tokens[3]
         if token.id != TokenId.Ident {
             self.push_err(token, LogMsg.InvalidSyntax)
+            self.push_suggest(LogMsg.ExpectedIdentifier)
             ret new(Impl)
         }
         ipl.dest = token
@@ -1659,6 +1680,7 @@ impl Parser {
         if body_tokens == nil {
             self.stop()
             self.push_err(ipl.base, LogMsg.BodyNotExist)
+            self.push_suggest(LogMsg.ExpectedBody)
             ret new(Impl)
         }
         if i < tokens.len {
@@ -1840,6 +1862,7 @@ impl Parser {
 
         if self.ast.decls.len() > 0 {
             self.push_err(node.token, LogMsg.UseDeclAtBody)
+            self.push_suggest(LogMsg.MoveUseDeclToTopOfFile)
         }
     }
 

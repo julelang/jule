@@ -20,6 +20,7 @@ fn compiler_err(token: Token, fmt: LogMsg, args: ...any): Log {
         column: token.column,
         path:   token.file.path(),
         text:   errorf(fmt, args...),
+        line:   token.line,
     }
 }
 
@@ -282,6 +283,10 @@ fn has_ret(mut s: &Scope): bool {
     ret ok
 }
 
+unsafe fn push_suggest(mut log: *Log, fmt: LogMsg, args: ...any) {
+    log.suggest = errorf(fmt, args...)
+}
+
 // Semantic analyzer for tables.
 // Accepts tables as files of package.
 struct Sema {
@@ -492,6 +497,11 @@ impl Sema {
         self.errors = append(self.errors, compiler_err(token, fmt, args...))
     }
 
+    // Push suggestion to last log.
+    fn push_suggest(mut self, fmt: LogMsg, args: ...any) {
+        unsafe { push_suggest(&self.errors[self.errors.len-1], fmt, args...) }
+    }
+
     // Reports whether define is accessible in the current package.
     fn is_accessible_define(self, public: bool, token: Token): bool {
         ret public || !real(token.file) || self.file.file.dir() == token.file.dir()
@@ -587,6 +597,7 @@ impl Sema {
 
             if self.is_duplicated_import_selection(uintptr(&imp), ident.kind) {
                 self.push_err(ident, LogMsg.DuplicatedIdent, ident.kind)
+                self.push_suggest(LogMsg.RenameForAvoidDuplication)
                 continue
             }
 
@@ -638,7 +649,7 @@ impl Sema {
             }
 
             self.push_err(ident, LogMsg.IdentIsNotAccessible, ident.kind)
-
+            self.push_suggest(LogMsg.MakePubToAccess)
         }
     }
 
@@ -1006,6 +1017,7 @@ impl Sema {
     fn check_type_alias_decl_dup(mut &self, mut ta: &TypeAlias) {
         if self.is_duplicated_ident(uintptr(&ta), ta.ident, ta.cpp_linked) {
             self.push_err(ta.token, LogMsg.DuplicatedIdent, ta.ident)
+            self.push_suggest(LogMsg.RenameForAvoidDuplication)
         }
         self.check_type_alias_decl_kind(ta, self)
     }
@@ -1035,6 +1047,7 @@ impl Sema {
                         break
                     } else if item.ident == citem.ident {
                         self.push_err(item.token, LogMsg.DuplicatedIdent, item.ident)
+                        self.push_suggest(LogMsg.RenameForAvoidDuplication)
                         break
                     }
                 }
@@ -1104,6 +1117,7 @@ impl Sema {
             self.push_err(e.token, LogMsg.IgnoreIdent)
         } else if self.is_duplicated_ident(uintptr(&e), e.ident, false) {
             self.push_err(e.token, LogMsg.DuplicatedIdent, e.ident)
+            self.push_suggest(LogMsg.RenameForAvoidDuplication)
         }
 
         if e.items.len == 0 {
@@ -1178,6 +1192,7 @@ impl Sema {
 
                 | g.ident == ct.ident:
                     self.push_err(g.token, LogMsg.DuplicatedIdent, g.ident)
+                    self.push_suggest(LogMsg.RenameForAvoidDuplication)
                     ok = false
                     break duplication_lookup
                 }
@@ -1195,6 +1210,7 @@ impl Sema {
                 if p.ident == g.ident {
                     ok = false
                     self.push_err(p.token, LogMsg.DuplicatedIdent, p.ident)
+                    self.push_suggest(LogMsg.RenameForAvoidDuplication)
                     continue check
                 }
             }
@@ -1213,6 +1229,7 @@ impl Sema {
                 | p.ident == jp.ident:
                     ok = false
                     self.push_err(p.token, LogMsg.DuplicatedIdent, p.ident)
+                    self.push_suggest(LogMsg.RenameForAvoidDuplication)
                     continue check
                 }
             }
@@ -1262,6 +1279,7 @@ impl Sema {
             continue
         exist:
             self.push_err(v, LogMsg.DuplicatedIdent, v.kind)
+            self.push_suggest(LogMsg.RenameForAvoidDuplication)
             ok = false
         }
 
@@ -1347,6 +1365,7 @@ impl Sema {
 
                 | f.ident == jf.ident:
                     self.push_err(f.token, LogMsg.DuplicatedIdent, f.ident)
+                    self.push_suggest(LogMsg.RenameForAvoidDuplication)
                     break duplicate_lookup
                 }
             }
@@ -1358,6 +1377,7 @@ impl Sema {
             self.push_err(t.token, LogMsg.IgnoreIdent)
         } else if self.is_duplicated_ident(uintptr(&t), t.ident, false) {
             self.push_err(t.token, LogMsg.DuplicatedIdent, t.ident)
+            self.push_suggest(LogMsg.RenameForAvoidDuplication)
         }
 
         self.check_trait_decl_methods(t)
@@ -1529,12 +1549,14 @@ impl Sema {
     fn check_global_var_decl(mut &self, mut decl: &Var) {
         if self.is_duplicated_ident(uintptr(&decl), decl.ident, decl.cpp_linked) {
             self.push_err(decl.token, LogMsg.DuplicatedIdent, decl.ident)
+            self.push_suggest(LogMsg.RenameForAvoidDuplication)
         }
         if decl.cpp_linked && decl.constant {
             self.push_err(decl.token, LogMsg.CppLinkedVarIsConst)
         }
         if !decl.cpp_linked && !decl.constant && !decl.statically {
             self.push_err(decl.token, LogMsg.GlobalNotStatic)
+            self.push_suggest(LogMsg.UseStaticKeywordToDef)
         }
 
         self.check_var_decl(decl, self)
@@ -1613,6 +1635,7 @@ impl Sema {
                     break
                 } else if f.ident == cf.ident {
                     self.push_err(f.token, LogMsg.DuplicatedIdent, f.ident)
+                    self.push_suggest(LogMsg.RenameForAvoidDuplication)
                     ok = false
                 }
             }
@@ -1635,6 +1658,7 @@ impl Sema {
             self.push_err(strct.token, LogMsg.IgnoreIdent)
         } else if self.is_duplicated_ident(uintptr(&strct), strct.ident, strct.cpp_linked) {
             self.push_err(strct.token, LogMsg.DuplicatedIdent, strct.ident)
+            self.push_suggest(LogMsg.RenameForAvoidDuplication)
         }
 
         strct.sema = self
@@ -1666,6 +1690,7 @@ impl Sema {
             self.push_err(f.token, LogMsg.IgnoreIdent)
         } else if self.is_duplicated_ident(uintptr(&f), f.ident, f.cpp_linked) {
             self.push_err(f.token, LogMsg.DuplicatedIdent, f.ident)
+            self.push_suggest(LogMsg.RenameForAvoidDuplication)
         }
 
         f.sema = self

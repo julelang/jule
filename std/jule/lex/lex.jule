@@ -374,10 +374,8 @@ fn hex_escape(txt: []byte, n: int): (seq: str) {
 
 // Pattern (RegEx): ^\\U.{8}
 fn big_unicode_point_escape(txt: []byte): str { ret hex_escape(txt, 10) }
-
 // Pattern (RegEx): ^\\u.{4}
 fn little_unicode_point_escape(txt: []byte): str { ret hex_escape(txt, 6) }
-
 // Pattern (RegEx): ^\\x..
 fn hex_byte_escape(txt: []byte): str { ret hex_escape(txt, 4) }
 
@@ -393,14 +391,14 @@ fn byte_escape(txt: []byte): (seq: str) {
 }
 
 struct Lex {
-    first_token_of_line: bool
-    tokens:              Vector[Token]
-    data:                []byte
-    file:                &File
-    pos:                 int
-    column:              int
-    row:                 int
-    errors:              []Log
+    line_start: int
+    tokens:     Vector[Token]
+    data:       []byte
+    file:       &File
+    pos:        int
+    column:     int
+    row:        int
+    errors:     []Log
 }
 
 impl Lex {
@@ -420,7 +418,6 @@ impl Lex {
         self.new_line()
         for self.pos < self.data.len {
             let mut token = self.token()
-            self.first_token_of_line = false
             if token.id != TokenId.Na {
                 self.tokens.push(token)
             }
@@ -449,7 +446,7 @@ impl Lex {
     }
 
     // Resume to lex from position.
-    fn resume(mut self): []byte {
+    fn resume(mut self): ([]byte, line_end: int) {
         // Skip spaces.
         let mut i = self.pos
         for i < self.data.len; i++ {
@@ -466,15 +463,14 @@ impl Lex {
 
             let mut j = i
             for j < self.data.len; j++ {
-                let r = self.data[j]
-                if r == '\n' {
+                if self.data[j] == '\n' {
                     break
                 }
             }
 
-            ret self.data[i:j]
+            ret self.data[i:j], j
         }
-        ret nil
+        ret nil, -1
     }
 
     fn lex_line_comment(mut self, mut &token: Token) {
@@ -484,7 +480,7 @@ impl Lex {
         for self.pos < self.data.len; self.pos++ {
             let r = self.data[self.pos]
             if r == '\n' || r == '\r' {
-                if self.first_token_of_line {
+                if self.is_first_token_of_line() {
                     token.id = TokenId.Comment
                     token.kind = str(self.data[start:self.pos])
                 }
@@ -492,7 +488,7 @@ impl Lex {
             }
         }
 
-        if self.first_token_of_line {
+        if self.is_first_token_of_line() {
             token.id = TokenId.Comment
             token.kind = str(self.data[start:])
         }
@@ -654,8 +650,12 @@ impl Lex {
         ret s
     }
 
+    fn is_first_token_of_line(self): bool {
+        ret self.column == 1
+    }
+
     fn new_line(mut self) {
-        self.first_token_of_line = true
+        self.line_start = self.pos
         self.row++
         self.column = 1
     }
@@ -707,7 +707,7 @@ impl Lex {
     fn token(mut self): Token {
         let mut t = Token{file: self.file, id: TokenId.Na}
 
-        let txt = self.resume()
+        let (txt, line_end) = self.resume()
         if txt == nil {
             ret t
         }
@@ -715,6 +715,7 @@ impl Lex {
         // Set token values.
         t.column = self.column
         t.row = self.row
+        t.line = str(self.data[self.line_start:line_end])
 
         //* lex.Tokenenize
         match {

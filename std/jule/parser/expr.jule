@@ -288,6 +288,11 @@ impl ExprBuilder {
         self.p.push_err(token, fmt, args...)
     }
 
+    // Push suggestion to last log.
+    fn push_suggest(mut self, fmt: LogMsg, args: ...any) {
+        self.p.push_suggest(fmt, args...)
+    }
+
     fn build_tuple(mut self, mut parts: [][]Token): &TupleExpr {
         let mut tuple = &TupleExpr{
             expr: make([]&Expr, parts.len),
@@ -332,11 +337,13 @@ impl ExprBuilder {
             ret new(IdentExpr)
         } else if tokens[1].id != TokenId.Dot {
             self.push_err(tokens[1], LogMsg.InvalidSyntax)
+            self.push_suggest(LogMsg.ExpectedDotForCpp)
             ret new(IdentExpr)
         }
         let mut token = tokens[2]
         if token.id != TokenId.Ident {
             self.push_err(tokens[2], LogMsg.InvalidSyntax)
+            self.push_suggest(LogMsg.ExpectedIdentifier)
             ret new(IdentExpr)
         }
         let mut expr = build_ident_expr(token)
@@ -386,10 +393,12 @@ impl ExprBuilder {
             if i%2 == 0 {
                 if token.id != TokenId.Ident {
                     self.push_err(token, LogMsg.InvalidSyntax)
+                    self.push_suggest(LogMsg.ExpectedIdentifier)
                 }
                 ns.ns = append(ns.ns, token)
             } else if token.id != TokenId.DblColon {
                 self.push_err(token, LogMsg.InvalidSyntax)
+                self.push_suggest(LogMsg.ExpectedDblColon)
             }
         }
         ns.ident = ns.ns[ns.ns.len-1]
@@ -458,6 +467,7 @@ impl ExprBuilder {
         tokens = tokens[1 : tokens.len-1] // Remove parentheses.
         if tokens.len == 0 {
             self.push_err(token, LogMsg.MissingExpr)
+            self.push_suggest(LogMsg.EmptyParentNotValid)
             ret nil
         }
         ret self.build(tokens)
@@ -465,7 +475,6 @@ impl ExprBuilder {
 
     fn try_build_cast(mut self, mut tokens: []Token): &CastExpr {
         let mut range_n = 0
-        let error_token = tokens[0]
         for i, token in tokens {
             if token.id == TokenId.Range {
                 match token.kind {
@@ -486,7 +495,7 @@ impl ExprBuilder {
                 ret new(CastExpr)
             }
 
-            let mut type_tokens = tokens[1:i]
+            let mut type_tokens = tokens[:i+1]
             let mut expr_tokens = tokens[i+1:]
 
             if expr_tokens.len == 0 {
@@ -503,25 +512,29 @@ impl ExprBuilder {
 
             // Expression tokens just parentheses.
             if expr_tokens.len == 2 {
-                self.push_err(error_token, LogMsg.MissingExpr)
+                self.push_err(expr_tokens[0], LogMsg.MissingExpr)
+                self.push_suggest(LogMsg.GiveExprToCast)
             }
 
-            let mut type_index = 0
-            let (mut t, ok) = unsafe { self.p.build_type(type_tokens, &type_index, true) }
-            if ok && type_index < type_tokens.len {
-                self.push_err(type_tokens[type_index], LogMsg.InvalidSyntax)
-            } else if !ok {
-                ret cast
-            }
-            cast.kind = t
+            // Type tokens just parentheses.
+            if type_tokens.len == 2 {
+                self.push_err(type_tokens[0], LogMsg.MissingType)
+                self.push_suggest(LogMsg.GiveTypeForCast)
+            } else {
+                type_tokens = type_tokens[1:type_tokens.len-1] // Remove parentheses.
+                let mut type_index = 0
+                let (mut t, ok) = unsafe { self.p.build_type(type_tokens, &type_index, true) }
+                if ok && type_index < type_tokens.len {
+                    self.push_err(type_tokens[type_index], LogMsg.InvalidSyntax)
+                } else if !ok {
+                    ret cast
+                }
+                cast.kind = t
 
-            let mut i = 0
-            _ = range(i, TokenKind.LParent, TokenKind.RParent, expr_tokens)
-            if i < expr_tokens.len {
-                ret new(CastExpr)
+                if expr_tokens.len > 2 {
+                    cast.expr = self.build(expr_tokens[1:i])
+                }
             }
-
-            cast.expr = self.build(expr_tokens[:i])
             ret cast
         }
 
@@ -531,6 +544,7 @@ impl ExprBuilder {
     fn push_arg(mut self, mut &args: []&Expr, mut tokens: []Token, err_token: Token) {
         if tokens.len == 0 {
             self.push_err(err_token, LogMsg.InvalidSyntax)
+            self.push_suggest(LogMsg.ExpectedExpr)
             ret
         }
         args = append(args, self.build_from_tokens(tokens))
@@ -655,16 +669,12 @@ impl ExprBuilder {
         let mut f = self.p.build_fn(tokens, false, false)
         if !f.is_anon() {
             self.push_err(f.token, LogMsg.InvalidSyntax)
+            self.push_suggest(LogMsg.ExpectedAnonFn)
         }
         ret f
     }
 
     fn build_unsafe(mut self, mut tokens: []Token): ExprData {
-        if tokens.len == 0 {
-            self.push_err(tokens[0], LogMsg.InvalidSyntax)
-            ret nil
-        }
-
         match tokens[1].id {
         | TokenId.Fn:
             // Unsafe anonymous function.
@@ -679,6 +689,7 @@ impl ExprBuilder {
         error_token: Token, mut &parts: [][]Token) {
         if part.len == 0 {
             self.push_err(error_token, LogMsg.InvalidSyntax)
+            self.push_suggest(LogMsg.ExpectedExpr)
             ret
         }
         parts = append(parts, part)
@@ -1006,11 +1017,13 @@ impl ExprBuilder {
 
         if left_tokens.len == 0 {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
+            self.push_suggest(LogMsg.ExpectedLeftOperand)
             ret new(BinopExpr)
         }
 
         if right_tokens.len == 0 {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
+            self.push_suggest(LogMsg.ExpectedRightOperand)
             ret new(BinopExpr)
         }
 
