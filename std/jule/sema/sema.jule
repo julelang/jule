@@ -812,6 +812,12 @@ impl Sema {
             ret false
         }
 
+        // Ignore variadic.
+        // Variadic cases checked by variadic support algorithms.
+        let variadic = dest.variadic
+        dest.variadic = false
+        defer { dest.variadic = variadic }
+
         let mut tcc = &TypeCompatibilityChecker{
             s:           self,
             error_token: error_token,
@@ -820,18 +826,10 @@ impl Sema {
             deref:       deref,
         }
         let ok = tcc.check()
-
-        match {
-        | ok:
-            ret true
-
-        | dest_kind == src_kind:
-            ret true
-
-        |:
+        if !ok {
             self.push_err(error_token, "incompatible_types", dest_kind, src_kind)
-            ret false
         }
+        ret ok
     }
 
     // Builds non-generic types but skips generic types.
@@ -920,6 +918,9 @@ impl Sema {
             if !p.decl.is_self() {
                 p.kind = sema.build_type_with_generics(p.decl.kind.decl, generics)
                 ok = real(p.kind) && ok
+                if ok {
+                    p.kind.variadic = p.decl.variadic
+                }
             }
         }
 

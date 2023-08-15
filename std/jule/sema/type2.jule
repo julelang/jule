@@ -140,8 +140,6 @@ struct TypeCompatibilityChecker {
     // References uses elem's type itself if true.
     deref: bool
 
-    ignore_any: bool
-
     // This checker is sub-checker for another checker's element.
     // For example: elements of slice ([]T) types.
     sub_check: bool
@@ -224,7 +222,6 @@ impl TypeCompatibilityChecker {
             error_token: self.error_token,
             src:         src.elem,
             dest:        dest.elem,
-            ignore_any:  true,
             sub_check:   true,
         }
         ret sub.check()
@@ -246,7 +243,6 @@ impl TypeCompatibilityChecker {
             error_token: self.error_token,
             src:         src.elem,
             dest:        dest.elem,
-            ignore_any:  true,
             sub_check:   true,
         }
         ret sub.check()
@@ -267,7 +263,6 @@ impl TypeCompatibilityChecker {
             error_token: self.error_token,
             src:         src.elem,
             dest:        dest.elem,
-            ignore_any:  true,
             sub_check:   true,
         }
         ret sub.check()
@@ -389,6 +384,19 @@ impl TypeCompatibilityChecker {
         ret &self.dest.enm() == &r
     }
 
+    fn check_prim(mut self): (ok: bool) {
+        let mut src = self.src.prim()
+        if !real(src) {
+            ret false
+        }
+        ret types_are_compatible(self.dest.prim().to_str(), src.to_str())
+    }
+
+    fn check_cpp_linked(mut self): (ok: bool) {
+        ret self.src.is_cpp_linked() &&
+            self.dest.cpp_ident == self.src.cpp_ident
+    }
+
     fn check(mut self): (ok: bool) {
         if !real(self.src) {
             ret false
@@ -403,28 +411,19 @@ impl TypeCompatibilityChecker {
         }
 
         match {
-        | real(self.dest.trt()):   ret self.check_trait()
-        | real(self.dest.ptr()):   ret self.check_ptr()
-        | real(self.dest.slc()):   ret self.check_slc()
-        | real(self.dest.arr()):   ret self.check_arr()
-        | real(self.dest.map()):   ret self.check_map()
-        | real(self.dest.enm()):   ret self.check_enum()
-        | real(self.dest.strct()): ret self.check_struct()
-        | real(self.dest.fnc()):   ret self.check_fn()
+        | self.dest.is_cpp_linked():    ret self.check_cpp_linked()
+        | real(self.dest.trt()):        ret self.check_trait()
+        | real(self.dest.ptr()):        ret self.check_ptr()
+        | real(self.dest.slc()):        ret self.check_slc()
+        | real(self.dest.arr()):        ret self.check_arr()
+        | real(self.dest.map()):        ret self.check_map()
+        | real(self.dest.enm()):        ret self.check_enum()
+        | real(self.dest.strct()):      ret self.check_struct()
+        | real(self.dest.fnc()):        ret self.check_fn()
+        | real(self.dest.prim()):       ret self.check_prim()
+        | is_nil_compatible(self.dest): ret self.src.is_nil()
+        |:                              ret false
         }
-
-        let dest = self.dest.to_str()
-        if !self.ignore_any || dest != str(std::jule::types::TypeKind.Any) {
-            if types_are_compatible(dest, self.src.to_str()) {
-                ret true
-            }
-        }
-
-        if is_nil_compatible(self.dest) {
-            ret self.src.is_nil()
-        }
-
-        ret false
     }
 }
 
