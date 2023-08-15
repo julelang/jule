@@ -27,7 +27,7 @@ use std::jule::build::{
     DISTARCH,
     ENTRY_POINT,
     INIT_FN,
-    errorf,
+    logf,
     is_valid_cpp_ext,
 }
 
@@ -312,14 +312,14 @@ fn do_spell(obj: str, compiler: str, compiler_cmd: str) {
 
 fn check_mode() {
     if MODE != Mode.Transpile && MODE != Mode.Compile {
-        outln(errorf(LogMsg.InvalidValueForKey, MODE, "mode"))
+        outln(logf(LogMsg.InvalidValueForKey, MODE, "mode"))
         exit_err("")
     }
 }
 
 fn check_compiler() {
     if COMPILER != Compiler.GCC && COMPILER != Compiler.Clang {
-        outln(errorf(LogMsg.InvalidValueForKey, COMPILER, "compiler"))
+        outln(logf(LogMsg.InvalidValueForKey, COMPILER, "compiler"))
         exit_err("")
     }
 }
@@ -407,13 +407,13 @@ fn apply_target_independent_optimizations(mut ir: &IR) {
 fn compile_command() {
     let path = parse_options(ARGS)
     if path == "" {
-        exit_err(errorf(LogMsg.MissingCompilePath))
+        exit_err(logf(LogMsg.MissingCompilePath))
     }
 
     // Check standard library.
     let (inf, err) = stat(PATH_STDLIB)
     if err != FsError.Ok || !inf.is_dir() {
-        exit_err(errorf(LogMsg.StdlibNotExist))
+        exit_err(logf(LogMsg.StdlibNotExist))
     }
 
     set()
@@ -421,7 +421,7 @@ fn compile_command() {
     let (mut ir, logs) = build_ir(path)
 
     if !real(ir) && logs == nil {
-        exit_err(errorf(LogMsg.NoFileInEntryPackage, path))
+        exit_err(logf(LogMsg.NoFileInEntryPackage, path))
     }
 
     if logs != nil {
@@ -432,7 +432,7 @@ fn compile_command() {
     const CPP_LINKED = false
     let mut f = ir.main.find_fn(ENTRY_POINT, CPP_LINKED)
     if !real(f) {
-        exit_err(errorf(LogMsg.NoEntryPoint))
+        exit_err(logf(LogMsg.NoEntryPoint))
     }
     f.statically = true // Used
 
