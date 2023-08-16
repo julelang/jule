@@ -1,0 +1,50 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::conv::{itoa}
+use std::jule::build::{Log, LogKind}
+
+struct Logger{}
+
+impl Logger {
+    // Prints flag log.
+    static fn log_flat(&l: Log) { outln(l.text) }
+
+    // Prints error log.
+    static fn log_error(&l: Log) {
+        let mut log = ""
+        log += l.path
+        log += ":"
+        log += itoa(l.row)
+        log += ":"
+        log += itoa(l.column)
+        log += " "
+        log += l.text
+        if l.line.len != 0 {
+            let mut line = l.line.ltrim("\r\n\v\b ")
+            let mut offset = l.line.len-line.len+1
+            let mut old_len = line.len
+            line = line.ltrim("\t")
+            if old_len != line.len {
+                offset += (old_len-line.len)*8
+            }
+            log += "\n    " + line
+            log += "\n    "
+            log += str_repeat(" ", l.column-offset)
+            log += "^"
+            if l.suggest.len != 0 {
+                log += "\n    suggest: " + l.suggest
+            }
+        }
+        outln(log)
+    }
+
+    // Log.
+    static fn log(&l: Log) {
+        match l.kind {
+        | LogKind.Flat:  Logger.log_flat(l)
+        | LogKind.Error: Logger.log_error(l)
+        }
+    }
+}
