@@ -806,28 +806,11 @@ impl Sema {
 
     fn check_type_compatibility(mut &self, mut dest: &TypeKind,
         mut src: &TypeKind, error_token: Token, deref: bool): bool {
-        let dest_kind = dest.to_str()
-        if !real(src) {
-            self.push_err(error_token, LogMsg.IncompatibleTypes, dest_kind, "<untyped>")
-            ret false
-        }
-        let src_kind = src.to_str()
-
         // Tuple to single type, always fails.
         if real(src.tup()) {
-            self.push_err(error_token, LogMsg.IncompatibleTypes, dest_kind, src_kind)
+            self.push_err(error_token, LogMsg.IncompatibleTypes, dest.to_str(), src.to_str())
             ret false
         }
-
-        if real(dest.prim()) && dest.prim().is_any() {
-            ret false
-        }
-
-        // Ignore variadic.
-        // Variadic cases checked by variadic support algorithms.
-        let variadic = dest.variadic
-        dest.variadic = false
-        defer { dest.variadic = variadic }
 
         let mut tcc = &TypeCompatibilityChecker{
             s:           self,
@@ -838,7 +821,7 @@ impl Sema {
         }
         let ok = tcc.check()
         if !ok {
-            self.push_err(error_token, LogMsg.IncompatibleTypes, dest_kind, src_kind)
+            self.push_err(error_token, LogMsg.IncompatibleTypes, dest.to_str(), src.to_str())
         }
         ret ok
     }
@@ -929,9 +912,6 @@ impl Sema {
             if !p.decl.is_self() {
                 p.kind = sema.build_type_with_generics(p.decl.kind.decl, generics)
                 ok = real(p.kind) && ok
-                if ok {
-                    p.kind.variadic = p.decl.variadic
-                }
             }
         }
 

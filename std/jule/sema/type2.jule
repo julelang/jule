@@ -137,6 +137,7 @@ struct TypeCompatibilityChecker {
     dest:        &TypeKind
     src:         &TypeKind
     error_token: Token
+    ignore_any:  bool
 
     // References uses elem's type itself if true.
     deref: bool
@@ -224,6 +225,7 @@ impl TypeCompatibilityChecker {
             src:         src.elem,
             dest:        dest.elem,
             sub_check:   true,
+            ignore_any:  true,
         }
         ret sub.check()
     }
@@ -245,6 +247,7 @@ impl TypeCompatibilityChecker {
             src:         src.elem,
             dest:        dest.elem,
             sub_check:   true,
+            ignore_any:  true,
         }
         ret sub.check()
     }
@@ -265,6 +268,7 @@ impl TypeCompatibilityChecker {
             src:         src.elem,
             dest:        dest.elem,
             sub_check:   true,
+            ignore_any:  true,
         }
         ret sub.check()
     }
@@ -386,11 +390,15 @@ impl TypeCompatibilityChecker {
     }
 
     fn check_prim(mut self): (ok: bool) {
+        let dest = self.dest.prim()
         let mut src = self.src.prim()
         if !real(src) {
-            ret false
+            ret dest.is_any()
         }
-        ret types_are_compatible(self.dest.prim().to_str(), src.to_str())
+        if dest.is_any() {
+            ret !self.ignore_any || src.is_any()
+        }
+        ret types_are_compatible(dest.to_str(), src.to_str())
     }
 
     fn check_cpp_linked(mut self): (ok: bool) {
@@ -403,6 +411,12 @@ impl TypeCompatibilityChecker {
             ret false
         }
 
+        if self.dest.variadic != self.src.variadic {
+            ret false
+        } else if self.dest.variadic {
+            self.ignore_any = true
+        }
+
         if real(self.dest.ref()) {
             ret self.check_ref()
         }
@@ -412,6 +426,7 @@ impl TypeCompatibilityChecker {
         }
 
         match {
+        | real(self.dest.prim()):       ret self.check_prim()
         | self.dest.is_cpp_linked():    ret self.check_cpp_linked()
         | real(self.dest.trt()):        ret self.check_trait()
         | real(self.dest.ptr()):        ret self.check_ptr()
@@ -421,7 +436,6 @@ impl TypeCompatibilityChecker {
         | real(self.dest.enm()):        ret self.check_enum()
         | real(self.dest.strct()):      ret self.check_struct()
         | real(self.dest.fnc()):        ret self.check_fn()
-        | real(self.dest.prim()):       ret self.check_prim()
         | is_nil_compatible(self.dest): ret self.src.is_nil()
         |:                              ret false
         }
@@ -811,6 +825,14 @@ impl FnCallArgChecker {
             if d.variadiced {
                 variadiced = true
                 d.variadiced = false // For ignore assignment checking error.
+                
+                p.kind.variadic = true
+                d.kind.variadic = true
+                defer {
+                    d.kind.variadic = false
+                    p.kind.variadic = false
+                }
+
                 match type d.model {
                 | &SliceExprModel:
                     model = (&SliceExprModel)(d.model)
@@ -820,10 +842,12 @@ impl FnCallArgChecker {
                     drop(model)
                     self.arg_models = append(self.arg_models, d.model)
                 }
-            } else {
-                model.elems = append(model.elems, d.model)
+
+                ok = self.check_arg(p, d, arg.token) && ok
+                continue
             }
 
+            model.elems = append(model.elems, d.model)
             ok = self.check_arg(p, d, arg.token) && ok
         }
         self.e.prefix = old
