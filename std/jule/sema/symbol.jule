@@ -320,14 +320,11 @@ impl SymbolBuilder {
     }
 
     fn push_err(mut self, token: Token, fmt: LogMsg, args: ...any) {
-        self.errors = append(self.errors, Log{
-            kind:   LogKind.Error,
-            row:    token.row,
-            column: token.column,
-            path:   token.file.path(),
-            text:   logf(fmt, args...),
-            line:   token.line,
-        })
+        self.errors = append(self.errors, compiler_err(token, true, fmt, args...))
+    }
+
+    fn push_err_text(mut self, token: Token, fmt: LogMsg, args: ...any) {
+        self.errors = append(self.errors, compiler_err(token, false, fmt, args...))
     }
 
     // Push suggestion to last log.
@@ -589,7 +586,7 @@ impl SymbolBuilder {
                 // Break import if file has error(s).
                 if errors.len > 0 {
                     self.errors = append(self.errors, errors...)
-                    self.push_err(imp.token, LogMsg.UsedPackageHasErrors, imp.link_path)
+                    self.push_err_text(imp.token, LogMsg.UsedPackageHasErrors, imp.link_path)
                     ret false
                 }
 

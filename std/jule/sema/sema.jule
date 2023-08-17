@@ -13,15 +13,18 @@ use std::jule::lex::{File, Token, TokenKind, is_ignore_ident, is_anon_ident}
 use std::jule::types::{is_float, is_int, is_sig_int, is_unsig_int, max_of}
 use std::vector::{Vector}
 
-fn compiler_err(token: Token, fmt: LogMsg, args: ...any): Log {
-    ret Log{
+fn compiler_err(token: Token, line: bool, fmt: LogMsg, args: ...any): Log {
+    let mut log = Log{
         kind:   LogKind.Error,
         row:    token.row,
         column: token.column,
         path:   token.file.path(),
         text:   logf(fmt, args...),
-        line:   token.line,
     }
+    if line {
+        log.line = token.file.get_row(token.row)
+    }
+    ret log
 }
 
 fn imp_is_lookupable(i: &ImportInfo, ident: str): bool {
@@ -494,7 +497,7 @@ impl Sema {
     fn set_current_file(mut self, mut f: &SymbolTable) { self.file = f }
 
     fn push_err(mut self, token: Token, fmt: LogMsg, args: ...any) {
-        self.errors = append(self.errors, compiler_err(token, fmt, args...))
+        self.errors = append(self.errors, compiler_err(token, true, fmt, args...))
     }
 
     // Push suggestion to last log.
