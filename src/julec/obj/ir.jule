@@ -21,6 +21,39 @@ pub struct IR {
 }
 
 impl IR {
+    // Returns compiler IR of source code.
+    // Returned IR is lexed, parsed, and analyzed.
+    //
+    // - Returns nil reference and nil logs if path has not any Jule file.
+    // - Returns nil reference and logs if exist any log.
+    // - Returns IR and nil logs if everything is fine.
+    pub static fn build(path: str): (&IR, []Log) {
+        let mut importer = &PlainImporter{}
+        let (mut files, mut logs) = importer.import_package(path)
+        if logs.len > 0 {
+            ret new(IR), logs
+        }
+
+        if files.len == 0 {
+            ret new(IR), nil
+        }
+
+        let (mut pkg, logs) = analyze_package(files, importer)
+        if logs.len > 0 {
+            ret new(IR), logs
+        }
+
+        let mut ir = &IR{
+            main: pkg,
+            used: importer.all_packages,
+        }
+        ir.passes = get_all_unique_passes(ir.main, ir.used)
+
+        ret ir, nil
+    }
+}
+
+impl IR {
     fn append_structs(self, mut p: &Package, mut &buffer: []&Struct) {
         for (_, mut f) in p.files {
             let mut i = 0
@@ -108,35 +141,4 @@ fn get_all_unique_passes(mut pkg: &Package, mut uses: []&ImportInfo): []str {
     }
 
     ret passes
-}
-
-// Returns compiler IR of code.
-// Returned IR is lexed, parsed, and analyzed.
-//
-// - Returns nil reference and nil logs if path has not any Jule file.
-// - Returns nil reference and logs if exist any log.
-// - Returns IR and nil logs if everything is fine.
-pub fn build_ir(path: str): (&IR, []Log) {
-    let mut importer = &PlainImporter{}
-    let (mut files, mut logs) = importer.import_package(path)
-    if logs.len > 0 {
-        ret new(IR), logs
-    }
-
-    if files.len == 0 {
-        ret new(IR), nil
-    }
-
-    let (mut pkg, logs) = analyze_package(files, importer)
-    if logs.len > 0 {
-        ret new(IR), logs
-    }
-
-    let mut ir = &IR{
-        main: pkg,
-        used: importer.all_packages,
-    }
-    ir.passes = get_all_unique_passes(ir.main, ir.used)
-
-    ret ir, nil
 }
