@@ -158,6 +158,23 @@ fn gen_float_special_cases(x: f64): str {
     }
 }
 
+fn ftoa(f: f64, bitsize: int): str {
+    if bitsize != 32 {
+        if f <= MAX_I64 {
+            ret i64toa(i64(f))
+        }
+        if f <= MAX_U64 {
+            ret u64toa(u64(f))
+        }
+    }
+
+    let mut m = fmt_float(f, 'f', -1, bitsize)
+    if m.find(".") == -1  {
+        m += ".0"
+    }
+    ret m
+}
+
 fn get_f32_model(c: &Const): str {
     let x = c.as_f64()
 
@@ -172,7 +189,7 @@ fn get_f32_model(c: &Const): str {
     | x == MIN_F32: ret "jule::MIN_F32"
     }
 
-    ret fmt_float(x, 'e', -1, 32) + "f"
+    ret ftoa(x, 32) + "f"
 }
 
 fn get_f64_model(c: &Const): str {
@@ -189,7 +206,7 @@ fn get_f64_model(c: &Const): str {
     | x == MIN_F64: ret "jule::MIN_F64"
     }
 
-    ret fmt_float(x, 'e', -1, 64)
+    ret ftoa(x, 64)
 }
 
 fn get_float_model(mut d: &Data): str {
@@ -216,9 +233,7 @@ fn get_i64_model(c: &Const): str {
     ret i64toa(c.read_i64())
 }
 
-fn get_u64_model(c: &Const): str {
-    let x = c.read_u64()
-
+fn u64toa(x: u64): str {
     match {
     | x == MAX_U64:
         ret "jule::MAX_U64"
@@ -229,6 +244,10 @@ fn get_u64_model(c: &Const): str {
         ret fmt + "LLU"
     }
     ret fmt + "LU"
+}
+
+fn get_u64_model(c: &Const): str {
+    ret u64toa(c.read_u64())
 }
 
 fn gen_const_expr(mut d: &Data): str {
