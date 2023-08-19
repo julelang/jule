@@ -400,7 +400,7 @@ impl Eval {
         }
     }
 
-    fn lit_int(self, l: &LitExpr): &Data {
+    fn lit_int(mut self, l: &LitExpr): &Data {
         const BIT_SIZE = 0b01000000
 
         let mut lit = l.value
@@ -439,7 +439,11 @@ impl Eval {
             value = sig
             d.constant = Const.new_i64(sig)
         } else {
-            let (unsig, _) = parse_uint(lit, base, BIT_SIZE)
+            let (unsig, err) = parse_uint(lit, base, BIT_SIZE)
+            if err != ConvError.Ok {
+                self.push_err(l.token, LogMsg.InvalidNumericRange)
+                self.push_suggest(LogMsg.TryFloatingPoint)
+            }
             d.constant = Const.new_u64(unsig)
             value = unsig
         }
@@ -454,14 +458,14 @@ impl Eval {
         ret d
     }
 
-    fn lit_num(self, l: &LitExpr): &Data {
+    fn lit_num(mut self, l: &LitExpr): &Data {
         match {
         | std::jule::lex::is_float(l.value): ret self.lit_float(l)
         |:                                   ret self.lit_int(l)
         }
     }
 
-    fn eval_lit(self, lit: &LitExpr): &Data {
+    fn eval_lit(mut self, lit: &LitExpr): &Data {
         match {
         | lit.is_nil():                      ret self.lit_nil()
         | is_str(lit.value):                 ret self.lit_str(lit)
