@@ -32,13 +32,17 @@ impl Logger {
 
     // Prints error log.
     static fn log_error(&l: Log) {
-        AnsiEscape.print(str(AnsiSeq.Red) + str(AnsiSeq.Bold), l.path)
+        out(AnsiSeq.Red)
+        out("error: ")
+        out(l.text)
+        AnsiEscape.reset()
+
+        out("\n  --> ")
+        out(l.path)
         out(":")
         out(itoa(l.row))
         out(":")
         out(itoa(l.column))
-        out(" ")
-        out(l.text)
         if l.line.len != 0 {
             let mut line = l.line.ltrim("\r\n\v\b ")
             let mut offset = l.line.len-line.len+1
@@ -47,18 +51,25 @@ impl Logger {
             if old_len != line.len {
                 offset += (old_len-line.len)*8
             }
-            out("\n    ")
+            out("\n  ")
+            let row = itoa(l.row)
+            out(row)
+            out(" | ")
             out(line)
-            out("\n    ")
+            out("\n  ")
+            out(str_repeat(" ", row.len))
+            out(" | ")
             out(str_repeat(" ", l.column-offset))
             out("^")
-            if l.suggest.len != 0 {
-                AnsiEscape.print(str(AnsiSeq.BrightMagenta), "\n    suggest")
-                out(": ")
-                out(l.suggest)
+            if l.suggestion.len != 0 {
+                out("\n  ")
+                out(str_repeat(" ", row.len))
+                out(" | ")
+                AnsiEscape.print(str(AnsiSeq.BrightMagenta), "suggestion: ")
+                out(l.suggestion)
             }
         }
-        outln("")
+        outln("\n")
     }
 
     // Log.

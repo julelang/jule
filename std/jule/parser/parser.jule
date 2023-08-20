@@ -209,8 +209,8 @@ fn compiler_err(token: Token, fmt: LogMsg, args: ...any): Log {
     }
 }
 
-unsafe fn push_suggest(mut log: *Log, fmt: LogMsg, args: ...any) {
-    log.suggest = logf(fmt, args...)
+unsafe fn push_suggestion(mut log: *Log, fmt: LogMsg, args: ...any) {
+    log.suggestion = logf(fmt, args...)
 }
 
 fn build_comment(mut token: Token): &Comment {
@@ -247,8 +247,8 @@ impl Parser {
     }
 
     // Push suggestion to last log.
-    fn push_suggest(mut self, fmt: LogMsg, args: ...any) {
-        unsafe { push_suggest(&self.errors[self.errors.len-1], fmt, args...) }
+    fn push_suggestion(mut self, fmt: LogMsg, args: ...any) {
+        unsafe { push_suggestion(&self.errors[self.errors.len-1], fmt, args...) }
     }
 
     fn build_expr(mut &self, mut tokens: []Token): &Expr {
@@ -359,7 +359,7 @@ impl Parser {
         let mut token = tokens[i]
         if token.id != TokenId.Ident {
             self.push_err(token, LogMsg.InvalidSyntax)
-            self.push_suggest(LogMsg.ExpectedIdentifier)
+            self.push_suggestion(LogMsg.ExpectedIdentifier)
         }
         i++
         if i >= tokens.len {
@@ -369,7 +369,7 @@ impl Parser {
         token = tokens[i]
         if token.id != TokenId.Colon {
             self.push_err(tokens[i-1], LogMsg.InvalidSyntax)
-            self.push_suggest(LogMsg.ExpectedColon)
+            self.push_suggestion(LogMsg.ExpectedColon)
             ret tad
         }
         i++
@@ -425,7 +425,7 @@ impl Parser {
         v.token = tokens[0]
         if v.token.id != TokenId.Ident {
             self.push_err(v.token, LogMsg.InvalidSyntax)
-            self.push_suggest(LogMsg.ExpectedIdentifier)
+            self.push_suggestion(LogMsg.ExpectedIdentifier)
             ret
         }
         v.ident = v.token.kind
@@ -501,7 +501,7 @@ impl Parser {
         }
         if g.token.id != TokenId.Ident {
             self.push_err(g.token, LogMsg.InvalidSyntax)
-            self.push_suggest(LogMsg.ExpectedIdentifier)
+            self.push_suggestion(LogMsg.ExpectedIdentifier)
         }
         g.ident = g.token.kind
         ret g
@@ -888,7 +888,7 @@ impl Parser {
         if i >= tokens.len {
             self.stop()
             self.push_err(f.token, LogMsg.BodyNotExist)
-            self.push_suggest(LogMsg.ExpectedBody)
+            self.push_suggestion(LogMsg.ExpectedBody)
             ret new(FnDecl)
         }
         let mut block_tokens = range(i, TokenKind.LBrace, TokenKind.RBrace, tokens)
@@ -901,7 +901,7 @@ impl Parser {
         } else {
             self.stop()
             self.push_err(f.token, LogMsg.BodyNotExist)
-            self.push_suggest(LogMsg.ExpectedBody)
+            self.push_suggestion(LogMsg.ExpectedBody)
             ret new(FnDecl)
         }
         ret f
@@ -924,7 +924,7 @@ impl Parser {
             let mut tok = part[0]
             if tok.id != TokenId.Ident && tok.id != TokenId.Self {
                 self.push_err(tok, LogMsg.InvalidSyntax)
-                self.push_suggest(LogMsg.ExpectedIdentifier)
+                self.push_suggestion(LogMsg.ExpectedIdentifier)
                 continue
             }
             selectors[i] = tok
@@ -1086,7 +1086,7 @@ impl Parser {
         let token = tokens[0]
         if token.id != TokenId.Ident {
             self.push_err(token, LogMsg.InvalidSyntax)
-            self.push_suggest(LogMsg.ExpectedIdentifier)
+            self.push_suggestion(LogMsg.ExpectedIdentifier)
             ret
         }
 
@@ -1163,7 +1163,7 @@ impl Parser {
             item.token = t
             if item.token.id != TokenId.Ident {
                 self.push_err(item.token, LogMsg.InvalidSyntax)
-                self.push_suggest(LogMsg.ExpectedIdentifier)
+                self.push_suggestion(LogMsg.ExpectedIdentifier)
             }
             item.ident = item.token.kind
             if i+1 >= tokens.len || tokens[i+1].id == TokenId.Comma {
@@ -1178,7 +1178,7 @@ impl Parser {
             i++
             if t.id != TokenId.Op || t.kind != str(TokenKind.Eq) {
                 self.push_err(t, LogMsg.InvalidSyntax)
-                self.push_suggest(LogMsg.ExpectedEqualsForAssign)
+                self.push_suggestion(LogMsg.ExpectedEqualsForAssign)
                 continue
             }
             if i >= tokens.len || tokens[i].id == TokenId.Comma {
@@ -1201,7 +1201,7 @@ impl Parser {
         }
         if e.token.id != TokenId.Ident {
             self.push_err(e.token, LogMsg.InvalidSyntax)
-            self.push_suggest(LogMsg.ExpectedIdentifier)
+            self.push_suggestion(LogMsg.ExpectedIdentifier)
         }
         e.ident = e.token.kind
         let mut i = 2
@@ -1215,7 +1215,7 @@ impl Parser {
             if i >= tokens.len {
                 self.stop()
                 self.push_err(e.token, LogMsg.BodyNotExist)
-                self.push_suggest(LogMsg.ExpectedBody)
+                self.push_suggestion(LogMsg.ExpectedBody)
                 ret e
             }
         } else {
@@ -1225,7 +1225,7 @@ impl Parser {
         if item_tokens == nil {
             self.stop()
             self.push_err(e.token, LogMsg.BodyNotExist)
-            self.push_suggest(LogMsg.ExpectedBody)
+            self.push_suggestion(LogMsg.ExpectedBody)
             ret e
         } else if i < tokens.len {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
@@ -1258,7 +1258,7 @@ impl Parser {
         f.token = tokens[0]
         if f.token.id != TokenId.Ident {
             self.push_err(f.token, LogMsg.InvalidSyntax)
-            self.push_suggest(LogMsg.ExpectedIdentifier)
+            self.push_suggestion(LogMsg.ExpectedIdentifier)
             ret new(FieldDecl)
         }
         f.ident = f.token.kind
@@ -1308,7 +1308,7 @@ impl Parser {
         }
         if s.token.id != TokenId.Ident {
             self.push_err(s.token, LogMsg.InvalidSyntax)
-            self.push_suggest(LogMsg.ExpectedIdentifier)
+            self.push_suggestion(LogMsg.ExpectedIdentifier)
         }
         i++
         if i >= tokens.len {
@@ -1331,7 +1331,7 @@ impl Parser {
         if body_tokens == nil {
             self.stop()
             self.push_err(s.token, LogMsg.BodyNotExist)
-            self.push_suggest(LogMsg.ExpectedBody)
+            self.push_suggestion(LogMsg.ExpectedBody)
             ret s
         }
         if i < tokens.len {
@@ -1406,7 +1406,7 @@ impl Parser {
         }
         if t.token.id != TokenId.Ident {
             self.push_err(t.token, LogMsg.InvalidSyntax)
-            self.push_suggest(LogMsg.ExpectedIdentifier)
+            self.push_suggestion(LogMsg.ExpectedIdentifier)
         }
         t.ident = t.token.kind
         let mut i = 2
@@ -1414,7 +1414,7 @@ impl Parser {
         if body_tokens == nil {
             self.stop()
             self.push_err(t.token, LogMsg.BodyNotExist)
-            self.push_suggest(LogMsg.ExpectedBody)
+            self.push_suggestion(LogMsg.ExpectedBody)
             ret new(TraitDecl)
         }
         if i < tokens.len {
@@ -1640,7 +1640,7 @@ impl Parser {
         token = tokens[1]
         if token.id != TokenId.Ident {
             self.push_err(token, LogMsg.InvalidSyntax)
-            self.push_suggest(LogMsg.ExpectedIdentifier)
+            self.push_suggestion(LogMsg.ExpectedIdentifier)
             ret new(Impl)
         }
         if tokens.len < 3 {
@@ -1671,7 +1671,7 @@ impl Parser {
         token = tokens[3]
         if token.id != TokenId.Ident {
             self.push_err(token, LogMsg.InvalidSyntax)
-            self.push_suggest(LogMsg.ExpectedIdentifier)
+            self.push_suggestion(LogMsg.ExpectedIdentifier)
             ret new(Impl)
         }
         ipl.dest = token
@@ -1682,7 +1682,7 @@ impl Parser {
         if body_tokens == nil {
             self.stop()
             self.push_err(ipl.base, LogMsg.BodyNotExist)
-            self.push_suggest(LogMsg.ExpectedBody)
+            self.push_suggestion(LogMsg.ExpectedBody)
             ret new(Impl)
         }
         if i < tokens.len {
@@ -1864,7 +1864,7 @@ impl Parser {
 
         if self.ast.decls.len() > 0 {
             self.push_err(node.token, LogMsg.UseDeclAtBody)
-            self.push_suggest(LogMsg.MoveUseDeclToTopOfFile)
+            self.push_suggestion(LogMsg.MoveUseDeclToTopOfFile)
         }
     }
 

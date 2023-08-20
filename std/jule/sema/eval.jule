@@ -288,8 +288,8 @@ impl Eval {
     }
 
     // Push suggestion to last log.
-    fn push_suggest(mut self, fmt: LogMsg, args: ...any) {
-        self.s.push_suggest(fmt, args...)
+    fn push_suggestion(mut self, fmt: LogMsg, args: ...any) {
+        self.s.push_suggestion(fmt, args...)
     }
 
     // Reports whether evaluation in unsafe scope.
@@ -442,7 +442,7 @@ impl Eval {
             let (unsig, err) = parse_uint(lit, base, BIT_SIZE)
             if err != ConvError.Ok {
                 self.push_err(l.token, LogMsg.InvalidNumericRange)
-                self.push_suggest(LogMsg.TryFloatingPoint)
+                self.push_suggestion(LogMsg.TryFloatingPoint)
             }
             d.constant = Const.new_u64(unsig)
             value = unsig
@@ -587,7 +587,7 @@ impl Eval {
     fn eval_enum(mut self, enm: &Enum, error_token: Token): &Data {
         if !self.s.is_accessible_define(enm.public, enm.token) {
             self.push_err(error_token, LogMsg.IdentIsNotAccessible, enm.ident)
-            self.push_suggest(LogMsg.MakePubToAccess)
+            self.push_suggestion(LogMsg.MakePubToAccess)
             ret new(Data)
         }
 
@@ -605,7 +605,7 @@ impl Eval {
     fn eval_struct(mut self, mut s: &StructIns, error_token: Token): &Data {
         if !self.s.is_accessible_define(s.decl.public, s.decl.token) {
             self.push_err(error_token, LogMsg.IdentIsNotAccessible, s.decl.ident)
-            self.push_suggest(LogMsg.MakePubToAccess)
+            self.push_suggestion(LogMsg.MakePubToAccess)
             ret new(Data)
         }
 
@@ -637,7 +637,7 @@ impl Eval {
     fn eval_fn(mut self, mut f: &Fn, error_token: Token): &Data {
         if !self.s.is_accessible_define(f.public, f.token) {
             self.push_err(error_token, LogMsg.IdentIsNotAccessible, f.ident)
-            self.push_suggest(LogMsg.MakePubToAccess)
+            self.push_suggestion(LogMsg.MakePubToAccess)
             ret new(Data)
         }
 
@@ -703,7 +703,7 @@ impl Eval {
     fn eval_var(mut self, mut v: &Var, error_token: Token): &Data {
         if !self.s.is_accessible_define(v.public, v.token) {
             self.push_err(error_token, LogMsg.IdentIsNotAccessible, v.ident)
-            self.push_suggest(LogMsg.MakePubToAccess)
+            self.push_suggestion(LogMsg.MakePubToAccess)
             ret new(Data)
         }
 
@@ -781,7 +781,7 @@ impl Eval {
     fn eval_type_alias(mut self, mut ta: &TypeAlias, error_token: Token): &Data {
         if !self.s.is_accessible_define(ta.public, ta.token) {
             self.push_err(error_token, LogMsg.IdentIsNotAccessible, ta.ident)
-            self.push_suggest(LogMsg.MakePubToAccess)
+            self.push_suggestion(LogMsg.MakePubToAccess)
             ret new(Data)
         }
 
@@ -1726,7 +1726,7 @@ impl Eval {
         | real(d.kind.prim()) && d.kind.prim().is_any():
             if real(t.enm()) {
                 self.push_err(error_token, LogMsg.EnumCastedFromAny)
-                self.push_suggest(LogMsg.CastToEnumTypeInsteadOfEnum)
+                self.push_suggestion(LogMsg.CastToEnumTypeInsteadOfEnum)
             }
 
         | real(t.ptr()):
@@ -2152,7 +2152,7 @@ impl Eval {
         if real(f) {
             if !self.s.is_accessible_define(f.decl.public, f.decl.token) {
                 self.push_err(si.ident, LogMsg.IdentIsNotAccessible, f.decl.ident)
-                self.push_suggest(LogMsg.MakePubToAccess)
+                self.push_suggestion(LogMsg.MakePubToAccess)
             }
 
             let mut model = &StructSubIdentExprModel{

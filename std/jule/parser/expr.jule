@@ -289,8 +289,8 @@ impl ExprBuilder {
     }
 
     // Push suggestion to last log.
-    fn push_suggest(mut self, fmt: LogMsg, args: ...any) {
-        self.p.push_suggest(fmt, args...)
+    fn push_suggestion(mut self, fmt: LogMsg, args: ...any) {
+        self.p.push_suggestion(fmt, args...)
     }
 
     fn build_tuple(mut self, mut parts: [][]Token): &TupleExpr {
@@ -337,13 +337,13 @@ impl ExprBuilder {
             ret new(IdentExpr)
         } else if tokens[1].id != TokenId.Dot {
             self.push_err(tokens[1], LogMsg.InvalidSyntax)
-            self.push_suggest(LogMsg.ExpectedDotForCpp)
+            self.push_suggestion(LogMsg.ExpectedDotForCpp)
             ret new(IdentExpr)
         }
         let mut token = tokens[2]
         if token.id != TokenId.Ident {
             self.push_err(tokens[2], LogMsg.InvalidSyntax)
-            self.push_suggest(LogMsg.ExpectedIdentifier)
+            self.push_suggestion(LogMsg.ExpectedIdentifier)
             ret new(IdentExpr)
         }
         let mut expr = build_ident_expr(token)
@@ -393,12 +393,12 @@ impl ExprBuilder {
             if i%2 == 0 {
                 if token.id != TokenId.Ident {
                     self.push_err(token, LogMsg.InvalidSyntax)
-                    self.push_suggest(LogMsg.ExpectedIdentifier)
+                    self.push_suggestion(LogMsg.ExpectedIdentifier)
                 }
                 ns.ns = append(ns.ns, token)
             } else if token.id != TokenId.DblColon {
                 self.push_err(token, LogMsg.InvalidSyntax)
-                self.push_suggest(LogMsg.ExpectedDblColon)
+                self.push_suggestion(LogMsg.ExpectedDblColon)
             }
         }
         ns.ident = ns.ns[ns.ns.len-1]
@@ -467,7 +467,7 @@ impl ExprBuilder {
         tokens = tokens[1 : tokens.len-1] // Remove parentheses.
         if tokens.len == 0 {
             self.push_err(token, LogMsg.MissingExpr)
-            self.push_suggest(LogMsg.EmptyParentNotValid)
+            self.push_suggestion(LogMsg.EmptyParentNotValid)
             ret nil
         }
         ret self.build(tokens)
@@ -513,13 +513,13 @@ impl ExprBuilder {
             // Expression tokens just parentheses.
             if expr_tokens.len == 2 {
                 self.push_err(expr_tokens[0], LogMsg.MissingExpr)
-                self.push_suggest(LogMsg.GiveExprToCast)
+                self.push_suggestion(LogMsg.GiveExprToCast)
             }
 
             // Type tokens just parentheses.
             if type_tokens.len == 2 {
                 self.push_err(type_tokens[0], LogMsg.MissingType)
-                self.push_suggest(LogMsg.GiveTypeForCast)
+                self.push_suggestion(LogMsg.GiveTypeForCast)
             } else {
                 type_tokens = type_tokens[1:type_tokens.len-1] // Remove parentheses.
                 let mut type_index = 0
@@ -550,7 +550,7 @@ impl ExprBuilder {
     fn push_arg(mut self, mut &args: []&Expr, mut tokens: []Token, err_token: Token) {
         if tokens.len == 0 {
             self.push_err(err_token, LogMsg.InvalidSyntax)
-            self.push_suggest(LogMsg.ExpectedExpr)
+            self.push_suggestion(LogMsg.ExpectedExpr)
             ret
         }
         args = append(args, self.build_from_tokens(tokens))
@@ -675,7 +675,7 @@ impl ExprBuilder {
         let mut f = self.p.build_fn(tokens, false, false)
         if !f.is_anon() {
             self.push_err(f.token, LogMsg.InvalidSyntax)
-            self.push_suggest(LogMsg.ExpectedAnonFn)
+            self.push_suggestion(LogMsg.ExpectedAnonFn)
         }
         ret f
     }
@@ -695,7 +695,7 @@ impl ExprBuilder {
         error_token: Token, mut &parts: [][]Token) {
         if part.len == 0 {
             self.push_err(error_token, LogMsg.InvalidSyntax)
-            self.push_suggest(LogMsg.ExpectedExpr)
+            self.push_suggestion(LogMsg.ExpectedExpr)
             ret
         }
         parts = append(parts, part)
@@ -1023,13 +1023,13 @@ impl ExprBuilder {
 
         if left_tokens.len == 0 {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
-            self.push_suggest(LogMsg.ExpectedLeftOperand)
+            self.push_suggestion(LogMsg.ExpectedLeftOperand)
             ret new(BinopExpr)
         }
 
         if right_tokens.len == 0 {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
-            self.push_suggest(LogMsg.ExpectedRightOperand)
+            self.push_suggestion(LogMsg.ExpectedRightOperand)
             ret new(BinopExpr)
         }
 
