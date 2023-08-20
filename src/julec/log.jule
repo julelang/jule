@@ -5,6 +5,25 @@
 use std::conv::{itoa}
 use std::jule::build::{Log, LogKind}
 
+enum AnsiSeq: str {
+    Reset = "\033[0m",
+    Bold = "\u001b[1m",
+    Red = "\033[31m",
+    BrightMagenta = "\033[95m",
+}
+
+struct AnsiEscape {}
+
+impl AnsiEscape {
+    static fn reset() { out(AnsiSeq.Reset) }
+
+    static fn print(escape: str, text: str) {
+        out(escape)
+        out(text)
+        AnsiEscape.reset()
+    }
+}
+
 struct Logger{}
 
 impl Logger {
@@ -13,14 +32,13 @@ impl Logger {
 
     // Prints error log.
     static fn log_error(&l: Log) {
-        let mut log = ""
-        log += l.path
-        log += ":"
-        log += itoa(l.row)
-        log += ":"
-        log += itoa(l.column)
-        log += " "
-        log += l.text
+        AnsiEscape.print(str(AnsiSeq.Red) + str(AnsiSeq.Bold), l.path)
+        out(":")
+        out(itoa(l.row))
+        out(":")
+        out(itoa(l.column))
+        out(" ")
+        out(l.text)
         if l.line.len != 0 {
             let mut line = l.line.ltrim("\r\n\v\b ")
             let mut offset = l.line.len-line.len+1
@@ -29,15 +47,18 @@ impl Logger {
             if old_len != line.len {
                 offset += (old_len-line.len)*8
             }
-            log += "\n    " + line
-            log += "\n    "
-            log += str_repeat(" ", l.column-offset)
-            log += "^"
+            out("\n    ")
+            out(line)
+            out("\n    ")
+            out(str_repeat(" ", l.column-offset))
+            out("^")
             if l.suggest.len != 0 {
-                log += "\n    suggest: " + l.suggest
+                AnsiEscape.print(str(AnsiSeq.BrightMagenta), "\n    suggest")
+                out(": ")
+                out(l.suggest)
             }
         }
-        outln(log)
+        outln("")
     }
 
     // Log.
