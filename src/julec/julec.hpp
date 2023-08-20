@@ -16,20 +16,20 @@ void __enable_vtp(void);
 void __enable_vtp(void) {
     HANDLE hOut{ GetStdHandle(STD_OUTPUT_HANDLE) };
     if (hOut == INVALID_HANDLE_VALUE)
-        return false;
+        return;
 
     DWORD dwMode{ 0 };
     if (!GetConsoleMode(hOut, &dwMode))
-        return false;
+        return;
 
     dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-    SetConsoleMode(hOut, dwMode)
+    SetConsoleMode(hOut, dwMode);
 }
 #endif
 
 void julec_init(void) {
 #ifdef OS_WINDOWS
-    __enable_vpt();
+    __enable_vtp();
 #endif
 }
 
