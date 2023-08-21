@@ -5,19 +5,13 @@
 use importer::{PlainImporter}
 
 use std::jule::build::{Log, LogKind, logf}
-use std::jule::sema::{
-    Package,
-    ImportInfo,
-    Struct,
-    Var,
-    analyze_package,
-}
+use sema for std::jule::sema
 
 // Intermediate representation of code for compiler.
 pub struct IR {
     pub passes: []str
-    pub main:   &Package
-    pub used:   []&ImportInfo
+    pub main:   &sema::Package
+    pub used:   []&sema::ImportInfo
 }
 
 impl IR {
@@ -38,7 +32,7 @@ impl IR {
             ret new(IR), nil
         }
 
-        let (mut pkg, logs) = analyze_package(files, importer)
+        let (mut pkg, logs) = sema::analyze_package(files, importer)
         if logs.len > 0 {
             ret new(IR), logs
         }
@@ -54,7 +48,7 @@ impl IR {
 }
 
 impl IR {
-    fn append_structs(self, mut p: &Package, mut &buffer: []&Struct) {
+    fn append_structs(self, mut p: &sema::Package, mut &buffer: []&sema::Struct) {
         for (_, mut f) in p.files {
             let mut i = 0
             for i < f.structs.len(); i++ {
@@ -68,8 +62,8 @@ impl IR {
 
     // Returns all structures of main package and used pakcages.
     // Ignores cpp-linked declarations.
-    pub fn get_all_structures(mut self): []&Struct {
-        let mut buffer: []&Struct = nil
+    pub fn get_all_structures(mut self): []&sema::Struct {
+        let mut buffer: []&sema::Struct = nil
 
         self.append_structs(self.main, buffer)
 
@@ -82,7 +76,7 @@ impl IR {
         ret buffer
     }
 
-    fn append_vars(self, mut p: &Package, mut &buffer: []&Var) {
+    fn append_vars(self, mut p: &sema::Package, mut &buffer: []&sema::Var) {
         for (_, mut f) in p.files {
             let mut i = 0
             for i < f.vars.len(); i++ {
@@ -96,8 +90,8 @@ impl IR {
 
     // Returns all variables of main package and used pakcages.
     // Ignores cpp-linked declarations.
-    pub fn get_all_variables(mut self): []&Var {
-        let mut buffer: []&Var = nil
+    pub fn get_all_variables(mut self): []&sema::Var {
+        let mut buffer: []&sema::Var = nil
 
         self.append_vars(self.main, buffer)
 
@@ -111,7 +105,7 @@ impl IR {
     }
 }
 
-fn push_passes(mut p: &Package, mut &passes: []str) {
+fn push_passes(mut p: &sema::Package, mut &passes: []str) {
     for (_, mut f) in p.files {
         let mut i = 0
     push:
@@ -130,7 +124,7 @@ fn push_passes(mut p: &Package, mut &passes: []str) {
     }
 }
 
-fn get_all_unique_passes(mut pkg: &Package, mut uses: []&ImportInfo): []str {
+fn get_all_unique_passes(mut pkg: &sema::Package, mut uses: []&sema::ImportInfo): []str {
     let mut passes: []str = nil
 
     push_passes(pkg, passes)

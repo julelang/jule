@@ -35,7 +35,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // ====================================================
 
-use std::math::bits::{len32, len64, trailing_zeros64, add64, mul64}
+use bits for std::math::bits
 
 // binary to decimal conversion using the Ryū algorithm.
 //
@@ -60,7 +60,7 @@ fn ryu_ftoa_fixed32(mut &d: DecimalSlice, mut mant: u32, exp: int, prec: int) {
     }
     // Renormalize to a 25-bit mantissa.
     let mut e2 = exp
-    let b = len32(mant)
+    let b = bits::len32(mant)
     if b < 25 {
         mant <<= uint(25 - b)
         e2 += int(b) - 25
@@ -131,7 +131,7 @@ fn ryu_ftoa_fixed64(mut &d: DecimalSlice, mut mant: u64, exp: int, prec: int) {
     }
     // Renormalize to a 55-bit mantissa.
     let mut e2 = exp
-    let b = len64(mant)
+    let b = bits::len64(mant)
     if b < 55 {
         mant = mant << uint(55-b)
         e2 += int(b) - 55
@@ -269,7 +269,7 @@ fn ryu_ftoa_shortest(mut &d: DecimalSlice, mut mant: u64, exp: int, &flt: FloatI
     }
     // If input is an exact integer with fewer bits than the mantissa,
     // the previous and next integer are not admissible representations.
-    if exp <= 0 && trailing_zeros64(mant) >= -exp {
+    if exp <= 0 && bits::trailing_zeros64(mant) >= -exp {
         mant >>= uint(-exp)
         ryu_digits(d, mant, mant, mant, true, false)
         ret
@@ -553,7 +553,7 @@ fn mult64bit_pow10(m: u32, mut e2: int, q: int): (resM: u32, resE: int, exact: b
         // Inverse powers of ten must be rounded up.
         pow += 1
     }
-    let (hi, lo) = mul64(u64(m), pow)
+    let (hi, lo) = bits::mul64(u64(m), pow)
     e2 += mul_by_log10_log2(q) - 63 + 57
     ret u32(hi<<7 | lo>>57), e2, lo<<7 == 0
 }
@@ -584,9 +584,9 @@ fn mult128bit_pow10(m: u64, mut e2: int, q: int): (resM: u64, resE: int, exact: 
     e2 += mul_by_log10_log2(q) - 127 + 119
 
     // long multiplication
-    let (l1, l0) = mul64(m, pow[0])
-    let (mut h1, h0) = mul64(m, pow[1])
-    let (mid, carry) = add64(l1, h0, 0)
+    let (l1, l0) = bits::mul64(m, pow[0])
+    let (mut h1, h0) = bits::mul64(m, pow[1])
+    let (mid, carry) = bits::add64(l1, h0, 0)
     h1 += carry
     ret h1<<9 | mid>>55, e2, mid<<9 == 0 && l0 == 0
 }
@@ -612,7 +612,7 @@ fn divmod1e9(x: u64): (u32, u32) {
         ret u32(x / 1e9), u32(x % 1e9)
     }
     // Use the same sequence of operations as the amd64 compiler.
-    let (hi, _) = mul64(x>>1, 0x89705f4136b4a598) // binary digits of 1e-9
+    let (hi, _) = bits::mul64(x>>1, 0x89705f4136b4a598) // binary digits of 1e-9
     let q = hi >> 28
     ret u32(q), u32(x - q*1e9)
 }

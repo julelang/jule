@@ -40,40 +40,7 @@ use std::jule::lex::{
     is_byte,
     is_raw_str,
 }
-use std::jule::types::{
-    SYS_INT,
-    SYS_UINT,
-    MAX_I8,
-    MAX_I16,
-    MAX_I32,
-    MAX_I64,
-    MAX_U8,
-    MAX_U16,
-    MAX_U32,
-    MAX_U64,
-    MAX_F32,
-    MAX_F64,
-    MIN_I8,
-    MIN_I16,
-    MIN_I32,
-    MIN_I64,
-    MIN_F32,
-    MIN_F64,
-    max_of,
-    min_of,
-    is_num,
-    is_int,
-    is_sig_int,
-    is_unsig_int,
-    is_float,
-    int_from_bits,
-    uint_from_bits,
-    float_from_bits,
-    bitsize_of_int,
-    bitsize_of_uint,
-    bitsize_of_float,
-    is_greater,
-}
+use types for std::jule::types
 
 fn find_builtins_import(ident: str, imp: &ImportInfo): any {
     ret find_package_builtin_def(imp.link_path, ident)
@@ -95,7 +62,7 @@ fn find_builtins_sema(ident: str, mut s: &Sema): any {
 
 fn is_ok_for_shifting(mut d: &Data): bool {
     let prim = d.kind.prim()
-    if !real(prim) || !is_int(prim.to_str()) {
+    if !real(prim) || !types::is_int(prim.to_str()) {
         ret false
     }
 
@@ -123,15 +90,15 @@ fn normalize_bitsize(mut d: &Data) {
     match {
     | d.constant.is_f64():
         let x = d.constant.read_f64()
-        kind = float_from_bits(bitsize_of_float(x))
+        kind = types::float_from_bits(types::bitsize_of_float(x))
 
     | d.constant.is_i64():
         let x = d.constant.read_i64()
-        kind = int_from_bits(bitsize_of_int(x))
+        kind = types::int_from_bits(types::bitsize_of_int(x))
 
     | d.constant.is_u64():
         let x = d.constant.read_u64()
-        kind = uint_from_bits(bitsize_of_uint(x))
+        kind = types::uint_from_bits(types::bitsize_of_uint(x))
 
     |:
         ret
@@ -190,15 +157,15 @@ fn kind_by_bitsize(expr: any): str {
     match type expr {
     | f64:
         let x = (f64)(expr)
-        ret float_from_bits(bitsize_of_float(x))
+        ret types::float_from_bits(types::bitsize_of_float(x))
 
     | i64:
         let x = (i64)(expr)
-        ret int_from_bits(bitsize_of_int(x))
+        ret types::int_from_bits(types::bitsize_of_int(x))
 
     | u64:
         let x = (u64)(expr)
-        ret uint_from_bits(bitsize_of_uint(x))
+        ret types::uint_from_bits(types::bitsize_of_uint(x))
 
     |:
         ret ""
@@ -219,7 +186,7 @@ fn check_data_for_integer_indexing(mut d: &Data): (err_fmt: LogMsg) {
     | !real(kind.prim()):
         ret LogMsg.InvalidExpr
 
-    | !is_int(kind.prim().to_str()):
+    | !types::is_int(kind.prim().to_str()):
         ret LogMsg.InvalidExpr
 
     | d.is_const():
@@ -844,7 +811,7 @@ impl Eval {
 
     fn eval_unary_minus(self, mut d: &Data): &Data {
         let t = d.kind.prim()
-        if !real(t) || !is_num(t.to_str()) {
+        if !real(t) || !types::is_num(t.to_str()) {
             ret new(Data)
         }
 
@@ -867,7 +834,7 @@ impl Eval {
 
     fn eval_unary_plus(self, mut d: &Data): &Data {
         let t = d.kind.prim()
-        if !real(t) || !is_num(t.to_str()) {
+        if !real(t) || !types::is_num(t.to_str()) {
             ret new(Data)
         }
 
@@ -890,7 +857,7 @@ impl Eval {
 
     fn eval_unary_caret(self, mut d: &Data): &Data {
         let t = d.kind.prim()
-        if !real(t) || !is_int(t.to_str()) {
+        if !real(t) || !types::is_int(t.to_str()) {
             ret new(Data)
         }
 
@@ -1425,7 +1392,7 @@ impl Eval {
         } else {
             l = &Data{
                 constant: Const.new_i64(0),
-                kind:     &TypeKind{kind: build_prim_type(SYS_INT)},
+                kind:     &TypeKind{kind: build_prim_type(types::SYS_INT)},
             }
             l.model = l.constant
         }
@@ -1548,7 +1515,7 @@ impl Eval {
         }
 
         let prim = d.kind.prim()
-        if !real(d.kind.ptr()) && (!real(prim) || !is_int(prim.to_str())) {
+        if !real(d.kind.ptr()) && (!real(prim) || !types::is_int(prim.to_str())) {
             self.push_err(error_token, LogMsg.TypeNotSupportsCastingTo, d.kind.to_str(), t.to_str())
         }
 
@@ -1636,17 +1603,17 @@ impl Eval {
         if d.is_const() {
             let prim = t.prim()
             match {
-            | is_sig_int(prim.kind):
+            | types::is_sig_int(prim.kind):
                 d.constant.set_i64(d.constant.as_i64())
 
-            | is_unsig_int(prim.kind):
+            | types::is_unsig_int(prim.kind):
                 d.constant.set_u64(d.constant.as_u64())
             }
         }
 
         if real(d.kind.enm()) {
             let e = d.kind.enm()
-            if is_num(e.kind.kind.to_str()) {
+            if types::is_num(e.kind.kind.to_str()) {
                 ret
             }
         }
@@ -1664,7 +1631,7 @@ impl Eval {
         }
 
         let prim = d.kind.prim()
-        if real(prim) && is_num(prim.to_str()) {
+        if real(prim) && types::is_num(prim.to_str()) {
             ret
         }
 
@@ -1675,26 +1642,26 @@ impl Eval {
         if d.is_const() {
             let prim = t.prim()
             match {
-            | is_float(prim.kind):
+            | types::is_float(prim.kind):
                 d.constant.set_f64(d.constant.as_f64())
 
-            | is_sig_int(prim.kind):
+            | types::is_sig_int(prim.kind):
                 d.constant.set_i64(d.constant.as_i64())
 
-            | is_unsig_int(prim.kind):
+            | types::is_unsig_int(prim.kind):
                 d.constant.set_u64(d.constant.as_u64())
             }
         }
 
         if real(d.kind.enm()) {
             let e = d.kind.enm()
-            if is_num(e.kind.kind.to_str()) {
+            if types::is_num(e.kind.kind.to_str()) {
                 ret
             }
         }
 
         let prim = d.kind.prim()
-        if real(prim) && is_num(prim.to_str()) {
+        if real(prim) && types::is_num(prim.to_str()) {
             ret
         }
 
@@ -1710,10 +1677,10 @@ impl Eval {
         | prim.is_str():
             self.cast_str(d, error_token)
 
-        | is_int(prim.to_str()):
+        | types::is_int(prim.to_str()):
             self.cast_int(t, d, error_token)
 
-        | is_num(prim.to_str()):
+        | types::is_num(prim.to_str()):
             self.cast_num(t, d, error_token)
 
         |:
@@ -2221,7 +2188,7 @@ impl Eval {
         | "len":
             ret &Data{
                 mutable: false,
-                kind:    &TypeKind{kind: build_prim_type(SYS_INT)},
+                kind:    &TypeKind{kind: build_prim_type(types::SYS_INT)},
                 model:   &CommonSubIdentExprModel{
                     expr_kind: d.kind,
                     expr:      d.model,
@@ -2232,7 +2199,7 @@ impl Eval {
         | "cap":
             ret &Data{
                 mutable: false,
-                kind:    &TypeKind{kind: build_prim_type(SYS_INT)},
+                kind:    &TypeKind{kind: build_prim_type(types::SYS_INT)},
                 model:   &CommonSubIdentExprModel{
                     expr_kind: d.kind,
                     expr:      d.model,
@@ -2253,7 +2220,7 @@ impl Eval {
             ret &Data{
                 constant: c,
                 mutable:  false,
-                kind:     &TypeKind{kind: build_prim_type(SYS_INT)},
+                kind:     &TypeKind{kind: build_prim_type(types::SYS_INT)},
                 model:    c,
             }
 
@@ -2268,7 +2235,7 @@ impl Eval {
         | "len":
             ret &Data{
                 mutable: false,
-                kind:    &TypeKind{kind: build_prim_type(SYS_INT)},
+                kind:    &TypeKind{kind: build_prim_type(types::SYS_INT)},
                 model: &CommonSubIdentExprModel{
                     expr_kind: d.kind,
                     expr:      d.model,
@@ -2393,7 +2360,7 @@ impl Eval {
         | "len":
             ret &Data{
                 mutable: false,
-                kind:    &TypeKind{kind: build_prim_type(SYS_INT)},
+                kind:    &TypeKind{kind: build_prim_type(types::SYS_INT)},
                 model: &CommonSubIdentExprModel{
                     expr_kind: d.kind,
                     expr:      d.model,
@@ -2641,7 +2608,7 @@ impl Eval {
 
         match ident.kind {
         | "MAX":
-            let mut c = Const.new_i64(i64(max_of(kind)))
+            let mut c = Const.new_i64(i64(types::max(kind)))
             ret &Data{
                 constant: c,
                 model:    c,
@@ -2649,7 +2616,7 @@ impl Eval {
             }
 
         | "MIN":
-            let mut c = Const.new_i64(i64(min_of(kind)))
+            let mut c = Const.new_i64(i64(types::min(kind)))
             ret &Data{
                 constant: c,
                 model:    c,
@@ -2667,7 +2634,7 @@ impl Eval {
 
         match ident.kind {
         | "MAX":
-            let mut c = Const.new_u64(u64(max_of(kind)))
+            let mut c = Const.new_u64(u64(types::max(kind)))
             ret &Data{
                 constant: c,
                 model:    c,
@@ -2682,8 +2649,8 @@ impl Eval {
 
     fn eval_i8_type_static(mut self, ident: Token): &Data {
         const kind = str(PrimKind.I8)
-        const min = MIN_I8
-        const max = MAX_I8
+        const min = types::MIN_I8
+        const max = types::MAX_I8
 
         match ident.kind {
         | "MAX":
@@ -2710,8 +2677,8 @@ impl Eval {
 
     fn eval_i16_type_static(mut self, ident: Token): &Data {
         const kind = str(PrimKind.I16)
-        const min = MIN_I16
-        const max = MAX_I16
+        const min = types::MIN_I16
+        const max = types::MAX_I16
 
         match ident.kind {
         | "MAX":
@@ -2738,8 +2705,8 @@ impl Eval {
 
     fn eval_i32_type_static(mut self, ident: Token): &Data {
         const kind = str(PrimKind.I32)
-        const min = MIN_I32
-        const max = MAX_I32
+        const min = types::MIN_I32
+        const max = types::MAX_I32
 
         match ident.kind {
         | "MAX":
@@ -2766,8 +2733,8 @@ impl Eval {
 
     fn eval_i64_type_static(mut self, ident: Token): &Data {
         const kind = str(PrimKind.I64)
-        const min = MIN_I64
-        const max = MAX_I64
+        const min = types::MIN_I64
+        const max = types::MAX_I64
 
         match ident.kind {
         | "MAX":
@@ -2794,7 +2761,7 @@ impl Eval {
 
     fn eval_u8_type_static(mut self, ident: Token): &Data {
         const kind = str(PrimKind.U8)
-        const max = MAX_U8
+        const max = types::MAX_U8
 
         match ident.kind {
         | "MAX":
@@ -2813,7 +2780,7 @@ impl Eval {
 
     fn eval_u16_type_static(mut self, ident: Token): &Data {
         const kind = str(PrimKind.U16)
-        const max = MAX_U16
+        const max = types::MAX_U16
 
         match ident.kind {
         | "MAX":
@@ -2832,7 +2799,7 @@ impl Eval {
 
     fn eval_u32_type_static(mut self, ident: Token): &Data {
         const kind = str(PrimKind.U32)
-        const max = MAX_U32
+        const max = types::MAX_U32
 
         match ident.kind {
         | "MAX":
@@ -2851,7 +2818,7 @@ impl Eval {
 
     fn eval_u64_type_static(mut self, ident: Token): &Data {
         const kind = str(PrimKind.U64)
-        const max = MAX_U64
+        const max = types::MAX_U64
 
         match ident.kind {
         | "MAX":
@@ -2870,8 +2837,8 @@ impl Eval {
 
     fn eval_f32_type_tatic(mut self, ident: Token): &Data {
         const kind = str(PrimKind.F32)
-        const max = MAX_F32
-        const min = MIN_F32
+        const max = types::MAX_F32
+        const min = types::MIN_F32
 
         match ident.kind {
         | "MAX":
@@ -2898,8 +2865,8 @@ impl Eval {
 
     fn eval_f64_type_static(mut self, ident: Token): &Data {
         const kind = str(PrimKind.F64)
-        const max = MAX_F64
-        const min = MIN_F64
+        const max = types::MAX_F64
+        const min = types::MIN_F64
 
         match ident.kind {
         | "MAX":
@@ -3217,7 +3184,7 @@ impl Eval {
                 !d.lvalue &&
                 !d.is_const() &&
                 real(d.kind.prim()) &&
-                is_num(d.kind.prim().kind) {
+                types::is_num(d.kind.prim().kind) {
                 d.cast_kind = d.kind
             }
 
@@ -3339,7 +3306,7 @@ impl BinopSolver {
 
         | str(TokenKind.Amper)
         | str(TokenKind.Vline):
-            if !real(enm.kind.kind.prim()) || !is_int(enm.kind.kind.prim().to_str()) {
+            if !real(enm.kind.kind.prim()) || !types::is_int(enm.kind.kind.prim().to_str()) {
                 self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, enm.ident)
             }
             ret self.l
@@ -3544,7 +3511,7 @@ impl BinopSolver {
         if self.l.is_const() && self.r.is_const() || !self.l.is_const() && !self.r.is_const() {
             let lk = self.l.kind.to_str()
             let rk = self.r.kind.to_str()
-            if is_greater(rk, lk) {
+            if types::is_greater(rk, lk) {
                 self.l.kind = self.r.kind
             }
             ret
@@ -3560,7 +3527,7 @@ impl BinopSolver {
 
     fn check_mod_data(mut self, mut d: &Data) {
         if !d.is_const() {
-            if !real(d.kind.prim()) || !is_int(d.kind.prim().kind) {
+            if !real(d.kind.prim()) || !types::is_int(d.kind.prim().kind) {
                 self.e.push_err(self.op, LogMsg.ModuloWithNotInt)
             }
             ret
@@ -3586,7 +3553,7 @@ impl BinopSolver {
     fn eval_float(mut self): &Data {
         let lk = self.l.kind.to_str()
         let rk = self.r.kind.to_str()
-        if !is_num(lk) || !is_num(rk) {
+        if !types::is_num(lk) || !types::is_num(rk) {
             self.e.push_err(self.op, LogMsg.IncompatibleTypes, lk, rk)
             ret new(Data)
         }
@@ -3616,7 +3583,7 @@ impl BinopSolver {
             ret self.l
 
         | str(TokenKind.Percent):
-            if !is_int(rk) {
+            if !types::is_int(rk) {
                 self.e.push_err(self.op, LogMsg.IncompatibleTypes, lk, rk)
                 ret new(Data)
             }
@@ -3632,7 +3599,7 @@ impl BinopSolver {
     fn eval_unsig_int(mut self): &Data {
         let lk = self.l.kind.to_str()
         let rk = self.r.kind.to_str()
-        if !is_num(lk) || !is_num(rk) {
+        if !types::is_num(lk) || !types::is_num(rk) {
             self.e.push_err(self.op, LogMsg.IncompatibleTypes, lk, rk)
             ret new(Data)
         }
@@ -3691,7 +3658,7 @@ impl BinopSolver {
     fn eval_sig_int(mut self): &Data {
         let lk = self.l.kind.to_str()
         let rk = self.r.kind.to_str()
-        if !is_num(lk) || !is_num(rk) {
+        if !types::is_num(lk) || !types::is_num(rk) {
             self.e.push_err(self.op, LogMsg.IncompatibleTypes, lk, rk)
             ret new(Data)
         }
@@ -3759,10 +3726,10 @@ impl BinopSolver {
 
         let lk = prim.to_str()
         match {
-        | is_float(lk):     ret self.eval_float()
-        | is_unsig_int(lk): ret self.eval_unsig_int()
-        | is_sig_int(lk):   ret self.eval_sig_int()
-        |:                  ret new(Data)
+        | types::is_float(lk):     ret self.eval_float()
+        | types::is_unsig_int(lk): ret self.eval_unsig_int()
+        | types::is_sig_int(lk):   ret self.eval_sig_int()
+        |:                         ret new(Data)
         }
     }
 

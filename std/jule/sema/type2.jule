@@ -20,19 +20,7 @@ use std::jule::ast::{
 }
 use std::jule::build::{LogMsg}
 use std::jule::lex::{Token, Ident, is_ignore_ident}
-use std::jule::types::{
-    self,
-    bitsize_of,
-    check_bit_float,
-    max_of,
-    min_of,
-    is_int,
-    is_num,
-    is_sig_int,
-    is_unsig_int,
-    is_float,
-    types_are_compatible,
-}
+use types for std::jule::types
 
 fn get_fn_result_types(mut f: &FnIns): []&TypeKind {
     match {
@@ -64,12 +52,12 @@ fn trait_has_reference_receiver(t: &Trait): bool {
 
 fn float_assignable(kind: str, d: &Data): bool {
     let value = fmt_float(d.constant.read_f64(), 'e', -1, 64)
-    ret check_bit_float(value, bitsize_of(kind))
+    ret types::check_bit_float(value, types::bitsize_of(kind))
 }
 
 fn sig_assignable(kind: str, d: &Data): bool {
-    let min = min_of(kind)
-    let max = max_of(kind)
+    let min = types::min(kind)
+    let max = types::max(kind)
 
     match {
     | d.constant.is_f64():
@@ -95,7 +83,7 @@ fn sig_assignable(kind: str, d: &Data): bool {
 }
 
 fn unsig_assignable(kind: str, d: &Data): bool {
-    let max = max_of(kind)
+    let max = types::max(kind)
 
     match {
     | d.constant.is_f64():
@@ -126,9 +114,9 @@ fn unsig_assignable(kind: str, d: &Data): bool {
 
 fn int_assignable(kind: str, d: &Data): bool {
     match {
-    | is_sig_int(kind):   ret sig_assignable(kind, d)
-    | is_unsig_int(kind): ret unsig_assignable(kind, d)
-    |:                    ret false
+    | types::is_sig_int(kind):   ret sig_assignable(kind, d)
+    | types::is_unsig_int(kind): ret unsig_assignable(kind, d)
+    |:                           ret false
     }
 }
 
@@ -398,7 +386,7 @@ impl TypeCompatibilityChecker {
         if dest.is_any() {
             ret !self.ignore_any || src.is_any()
         }
-        ret types_are_compatible(dest.to_str(), src.to_str())
+        ret types::types_are_compatible(dest.to_str(), src.to_str())
     }
 
     fn check_cpp_linked(mut self): (ok: bool) {
@@ -489,19 +477,19 @@ impl AssignTypeChecker {
             !self.d.is_const() ||
             !real(self.dest.prim()) ||
             !real(self.d.kind.prim()) ||
-            !is_num(self.d.kind.prim().kind)) {
+            !types::is_num(self.d.kind.prim().kind)) {
             ret false
         }
 
         let kind = self.dest.prim().kind
         match {
-        | is_float(kind):
+        | types::is_float(kind):
             if !float_assignable(kind, self.d) {
                 self.push_err(LogMsg.OverflowLimits)
                 ret false
             }
 
-        | is_int(kind):
+        | types::is_int(kind):
             if !int_assignable(kind, self.d) {
                 self.push_err(LogMsg.OverflowLimits)
                 ret false
