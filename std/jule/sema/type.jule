@@ -1279,9 +1279,12 @@ impl TypeChecker {
         ret ins
     }
 
-    fn build_by_std_namespace(mut self, mut decl: &NamespaceTypeDecl): Kind {
+    fn build_by_namespace(mut self, mut decl: &NamespaceTypeDecl): Kind {
         let path = build_link_path_by_tokens(decl.idents)
         let mut imp = self.lookup.select_package(fn(imp: &ImportInfo): bool {
+            if decl.idents.len == 1 && imp.alias == path {
+                ret true
+            }
             ret imp.std && imp.link_path == path
         })
 
@@ -1298,16 +1301,6 @@ impl TypeChecker {
         self.lookup = lookup
 
         ret kind
-    }
-
-    fn build_by_namespace(mut self, mut decl: &NamespaceTypeDecl): Kind {
-        let token = decl.idents[0]
-        if token.kind == "std" {
-            ret self.build_by_std_namespace(decl)
-        }
-
-        self.push_err(token, LogMsg.IdentNotExist, token.kind)
-        ret nil
     }
 
     fn build(mut self, mut decl_kind: TypeDeclKind): &TypeKind {
