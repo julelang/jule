@@ -737,7 +737,8 @@ impl Sema {
 
     // Checks type, builds result as kind and collect referred type aliases.
     // Skips already checked types.
-    fn check_type_with_refers(mut &self, mut t: &TypeSymbol, l: Lookup, referencer: &Referencer): (ok: bool) {
+    fn check_type_with_refers(mut &self, mut t: &TypeSymbol,
+        l: Lookup, referencer: &Referencer): (ok: bool) {
         if t.checked() {
             ret true
         }
@@ -758,7 +759,8 @@ impl Sema {
 
     // Builds type with type aliases for generics.
     // Returns nil if error occur or failed.
-    fn build_type_with_generics(mut &self, mut t: &TypeDecl, generics: []&TypeAlias): &TypeKind {
+    fn build_type_with_generics(mut &self, mut t: &TypeDecl,
+        generics: []&TypeAlias): &TypeKind {
         let mut tc = &TypeChecker{
             s:            self,
             lookup:       self,
@@ -774,7 +776,8 @@ impl Sema {
 
     // Evaluates expression with type prefixed Eval and returns result.
     // Checks variable dependencies if exist.
-    fn evalpd(mut &self, mut expr: &Expr, mut l: Lookup, mut p: &TypeKind, owner: &Var): &Data {
+    fn evalpd(mut &self, mut expr: &Expr, mut l: Lookup,
+        mut p: &TypeKind, owner: &Var): &Data {
         let mut e = &Eval{
             s:      self,
             lookup: l,
@@ -801,7 +804,8 @@ impl Sema {
         ret self.evalp(expr, l, new(TypeKind))
     }
 
-    fn check_assign_type(mut &self, mut dest: &TypeKind, mut d: &Data, error_token: Token, deref: bool) {
+    fn check_assign_type(mut &self, mut dest: &TypeKind, mut d: &Data,
+        error_token: Token, deref: bool) {
         let mut atc = &AssignTypeChecker{
             s:           self,
             error_token: error_token,
@@ -836,7 +840,8 @@ impl Sema {
         mut src: &TypeKind, error_token: Token, deref: bool): bool {
         // Tuple to single type, always fails.
         if real(src.tup()) {
-            self.push_err(error_token, LogMsg.IncompatibleTypes, dest.to_str(), src.to_str())
+            self.push_err(
+                error_token, LogMsg.IncompatibleTypes, dest.to_str(), src.to_str())
             ret false
         }
 
@@ -849,7 +854,8 @@ impl Sema {
         }
         let ok = tcc.check()
         if !ok {
-            self.push_err(error_token, LogMsg.IncompatibleTypes, dest.to_str(), src.to_str())
+            self.push_err(
+                error_token, LogMsg.IncompatibleTypes, dest.to_str(), src.to_str())
         }
         ret ok
     }
@@ -860,7 +866,8 @@ impl Sema {
     // Useful:
     //   - For non-generic type parsed string type kinds.
     //   - For checking non-generic types.
-    fn build_non_generic_type_kind(mut &self, mut ast: &TypeDecl, generics: []&GenericDecl): &TypeKind {
+    fn build_non_generic_type_kind(mut &self, mut ast: &TypeDecl,
+        generics: []&GenericDecl): &TypeKind {
         let mut tc = &TypeChecker{
             s:               self,
             lookup:          self,
@@ -1661,6 +1668,16 @@ impl Sema {
         ret ok
     }
 
+    fn check_struct_decl_methods(mut &self, mut strct: &Struct): (ok: bool) {
+        let mut i = 0
+        for i < strct.methods.len(); i++ {
+            if !self.check_fn_decl_types(strct.methods.at(i)) {
+                ret false
+            }
+        }
+        ret true
+    }
+
     fn check_struct_decl(mut &self, mut strct: &Struct) {
         if is_ignore_ident(strct.ident) {
             self.push_err(strct.token, LogMsg.IgnoreIdent)
@@ -1673,6 +1690,7 @@ impl Sema {
         match {
         | !self.check_decl_generics(strct.generics): ret
         | !self.check_struct_fields(strct):          ret
+        | !self.check_struct_decl_methods(strct):    ret
         | !self.check_struct_impls(strct):           ret
         }
     }
