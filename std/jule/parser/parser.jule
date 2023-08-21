@@ -1083,11 +1083,22 @@ impl Parser {
             ret
         }
 
-        let token = tokens[0]
+        let mut token = tokens[0]
         if token.id != TokenId.Ident {
             self.push_err(token, LogMsg.InvalidSyntax)
             self.push_suggestion(LogMsg.ExpectedIdentifier)
             ret
+        }
+
+        if tokens.len > 3 && tokens[1].id == TokenId.Iter {
+            decl.alias = token.kind
+            if tokens[2].id != TokenId.Ident {
+                self.push_err(token, LogMsg.InvalidSyntax)
+                self.push_suggestion(LogMsg.ExpectedIdentifier)
+                ret
+            }
+            tokens = tokens[2:]
+            token = tokens[0]
         }
 
         const STD_LIB_PREFIX = "std"

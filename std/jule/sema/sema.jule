@@ -589,10 +589,6 @@ impl Sema {
     }
 
     fn check_import_selections(mut self, mut imp: &ImportInfo) {
-        // Set file to any package file for accessibility checking.
-        self.set_current_file(self.files[0])
-        defer { drop(self.file) } // Reset file.
-
         for _, ident in imp.selected {
             if ident.kind == str(TokenKind.Self) {
                 continue
@@ -656,11 +652,38 @@ impl Sema {
         }
     }
 
+    fn is_use_alias_duplication(mut self, &imp: &ImportInfo): bool {
+        if imp.alias.len == 0 {
+            ret false
+        }
+
+        let mut i = 0
+        for i < self.file.imports.len(); i++ {
+            let imp2 = self.file.imports.at(i)
+            if &imp2 == &imp {
+                break
+            }
+            if imp2.alias == imp.alias {
+                ret true
+            }
+        }
+        ret false
+    }
+
     fn check_import(mut self, mut imp: &ImportInfo): bool {
-        if imp.duplicate || imp.cpp_linked || imp.package.files.len == 0 {
+        if imp.cpp_linked || imp.package.files.len == 0 {
             ret true
         }
-    
+
+        if self.is_use_alias_duplication(imp) {
+            self.push_err(imp.token, LogMsg.DuplicatedUseAlias, imp.alias)
+            self.push_suggestion(LogMsg.RenameUseAliasAvoidDuplication)
+        }
+
+        if imp.duplicate {
+            ret true
+        }
+
         let mut sema = &Sema{}
         sema.check(imp.package.files)
         if sema.errors.len > 0 {
@@ -674,6 +697,8 @@ impl Sema {
 
     fn check_imports(mut self) {
         for (_, mut file) in self.files {
+            self.set_current_file(file)
+
             let mut i = 0
             for i < file.imports.len(); i++ {
                 let mut imp = file.imports.at(i)
