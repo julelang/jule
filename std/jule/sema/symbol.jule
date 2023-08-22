@@ -35,44 +35,31 @@ use std::jule::build::{
     is_valid_cpp_ext,
 }
 use std::jule::lex::{Token, TokenKind}
-use std::vector::{Vector}
 
 // Stack for symbol references.
 pub struct ReferenceStack {
-    buffer: Vector[any]
+    buffer: []any
 }
 
 impl ReferenceStack {
     // Returns count of references.
     pub fn len(self): int {
-        ret self.buffer.len()
+        ret self.buffer.len
     }
 
     // Returns reference by index.
     pub fn at(mut self, i: int): any {
-        ret self.buffer.at(i)
+        ret self.buffer[i]
     }
 
     // Push new reference to stack.
     pub fn push(mut self, mut ref: any) {
-        self.buffer.push(ref)
-    }
-
-    // Push new reference to front of stack.
-    pub fn push_front(mut self, mut ref: any) {
-        self.buffer.push_front(ref)
-    }
-
-    // Removes reference by index.
-    pub fn remove(mut self, i: int) {
-        self.buffer.remove_range(i, 1)
+        self.buffer = append(self.buffer, ref)
     }
 
     // Reports whether reference is exist.
     pub fn exist[T](self, t: &T): bool {
-        let mut i = 0
-        for i < self.len(); i++ {
-            let ref = unsafe { (&self.buffer).at(i) }
+        for _, ref in self.buffer {
             match type ref {
             | &T:
                 if &(&T)(ref) == &t {
@@ -618,7 +605,7 @@ impl SymbolBuilder {
         }
 
         ok = self.import_package(imp, decl)
-        self.table.imports.push(imp)
+        self.table.imports = append(self.table.imports, imp)
         if ok {
             self.importer.imported(imp)
             ret imp
@@ -627,9 +614,7 @@ impl SymbolBuilder {
     }
 
     fn import_use_decls(mut &self) {
-        let mut i = 0
-        for i < self.ast.use_decls.len(); i++ {
-            let mut decl = self.ast.use_decls.at(i)
+        for (_, mut decl) in self.ast.use_decls {
             self.import_use_decl(decl)
 
             // Break analysis if error occurs.
@@ -643,27 +628,27 @@ impl SymbolBuilder {
         match type decl.data {
         | &TypeAliasDecl:
             let mut ta = build_type_alias((&TypeAliasDecl)(decl.data))
-            self.table.type_aliases.push(ta)
+            self.table.type_aliases = append(self.table.type_aliases, ta)
 
         | &StructDecl:
             let mut srct = build_struct((&StructDecl)(decl.data))
-            self.table.structs.push(srct)
+            self.table.structs = append(self.table.structs, srct)
 
         | &FnDecl:
             let mut f = build_fn((&FnDecl)(decl.data))
-            self.table.funcs.push(f)
+            self.table.funcs = append(self.table.funcs, f)
 
         | &TraitDecl:
             let mut t = build_trait((&TraitDecl)(decl.data))
-            self.table.traits.push(t)
+            self.table.traits = append(self.table.traits, t)
 
         | &VarDecl:
             let mut v = build_var((&VarDecl)(decl.data))
-            self.table.vars.push(v)
+            self.table.vars = append(self.table.vars, v)
 
         | &EnumDecl:
             let mut e = build_enum((&EnumDecl)(decl.data))
-            self.table.enums.push(e)
+            self.table.enums = append(self.table.enums, e)
 
         |:
             self.push_err(decl.token, LogMsg.InvalidSyntax)
@@ -671,19 +656,15 @@ impl SymbolBuilder {
     }
 
     fn append_decls(mut self) {
-        let mut i = 0
-        for i < self.ast.decls.len(); i++ {
-            let mut decl = self.ast.decls.at(i)
+        for (_, mut decl) in self.ast.decls {
             self.append_decl(decl)
         }
     }
 
     fn append_impls(mut self) {
-        self.table.impls = Vector[&Impl].new(self.ast.impls.len())
-        let mut i = 0
-        for i < self.ast.impls.len(); i++ {
-            let mut decl = self.ast.impls.at(i)
-            self.table.impls.push(build_impl(decl))
+        self.table.impls = make([]&Impl, 0, self.ast.impls.len)
+        for (_, mut decl) in self.ast.impls {
+            self.table.impls = append(self.table.impls, build_impl(decl))
         }
     }
 
@@ -697,13 +678,11 @@ impl SymbolBuilder {
             }
         }
         pass.text = pass.text.trim(" \n\r\t\v")
-        self.table.passes.push(pass)
+        self.table.passes = append(self.table.passes, pass)
     }
 
     fn append_top_directives(mut self) {
-        let mut i = 0
-        for i < self.ast.top_directives.len(); i++ {
-            let mut d = self.ast.top_directives.at(i)
+        for (_, mut d) in self.ast.top_directives {
             match d.tag {
             | str(Directive.Pass):
                 self.push_directive_pass(d)

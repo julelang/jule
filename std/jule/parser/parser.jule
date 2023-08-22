@@ -47,11 +47,6 @@ use std::jule::build::{
     is_std_header_path,
     is_top_directive,
 }
-use std::vector::{Vector}
-
-cpp use "parser.hpp"
-
-cpp unsafe fn __jule_parser_vector_as_slice[Vec, T](vec: Vec): []T
 
 fn make_err(row: int, col: int, f: &File, fmt: LogMsg, args: ...any): Log {
     ret Log{
@@ -1873,7 +1868,7 @@ impl Parser {
             ret
         }
 
-        if self.ast.decls.len() > 0 {
+        if self.ast.decls.len > 0 {
             self.push_err(node.token, LogMsg.UseDeclAtBody)
             self.push_suggestion(LogMsg.MoveUseDeclToTopOfFile)
         }
@@ -1925,19 +1920,19 @@ impl Parser {
 
         match {
         | node.is_use_decl():
-            self.ast.use_decls.push((&UseDecl)(node.data))
+            self.ast.use_decls = append(self.ast.use_decls, (&UseDecl)(node.data))
 
         | node.is_decl():
             // Use declarations eliminated.
-            self.ast.decls.push(node)
+            self.ast.decls = append(self.ast.decls, node)
 
         | node.is_comment():
             // Global scope is not appends &CommentGroup.
             let mut c = (&Comment)(node.data)
-            self.ast.comments.push(c)
+            self.ast.comments = append(self.ast.comments, c)
 
         | node.is_impl():
-            self.ast.impls.push((&Impl)(node.data))
+            self.ast.impls = append(self.ast.impls, (&Impl)(node.data))
 
         |:
             self.push_err(node.token, LogMsg.InvalidSyntax)
@@ -1980,7 +1975,7 @@ impl Parser {
         self.remove_range(n-1, t.kind, tokens, ranges)
     }
 
-    fn check_ranges(mut self, tokens: []Token) {
+    fn check_ranges(mut self, &tokens: []Token) {
         let mut ranges: []int = nil
 
         for i, token in tokens {
@@ -2020,8 +2015,7 @@ impl Parser {
             file: f,
         }
 
-        let mut tokens = unsafe { cpp.__jule_parser_vector_as_slice[Vector[Token], Token](f.tokens()) }
-
+        let mut tokens = f.tokens()
         self.check_ranges(tokens)
         if self.errors.len > 0 {
             ret
@@ -2050,7 +2044,7 @@ impl Parser {
             if node.is_comment() {
                 let mut d = self.get_directive((&Comment)(node.data))
                 if real(d) && is_top_directive(d.tag) {
-                    self.ast.top_directives.push(d)
+                    self.ast.top_directives = append(self.ast.top_directives, d)
                 }
             } else {
                 break

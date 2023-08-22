@@ -5,7 +5,6 @@
 use std::jule::ast::{GenericDecl, Directive}
 use std::jule::build
 use std::jule::lex::{Token}
-use std::vector::{Vector}
 
 // Field.
 pub struct Field {
@@ -44,7 +43,7 @@ pub struct Struct {
     pub token:      Token
     pub ident:      str
     pub fields:     []&Field
-    pub methods:    Vector[&Fn]
+    pub methods:    []&Fn
     pub public:     bool
     pub cpp_linked: bool
     pub directives: []&Directive
@@ -67,7 +66,7 @@ impl Struct {
         let mut ins = &StructIns{
             decl:       self,
             fields:     make([]&FieldIns, self.fields.len),
-            methods:    make([]&Fn, self.methods.len()),
+            methods:    make([]&Fn, self.methods.len),
             references: new_reference_stack(),
         }
 
@@ -78,9 +77,7 @@ impl Struct {
             }
         }
 
-        let mut i = 0
-        for i < self.methods.len(); i++ {
-            let mut f = self.methods.at(i)
+        for (i, mut f) in self.methods {
             let mut fins = &Fn{
                 sema: f.sema,
                 token: f.token,
@@ -129,9 +126,7 @@ impl Struct {
     // Returns method by identifier.
     // Returns nil reference if not exist any method in this identifier.
     pub fn find_method(mut self, ident: str, statically: bool): &Fn {
-        let mut i = 0
-        for i < self.methods.len(); i++ {
-            let mut f = self.methods.at(i)
+        for (_, mut f) in self.methods {
             if f.statically == statically && f.ident == ident {
                 ret f
             }

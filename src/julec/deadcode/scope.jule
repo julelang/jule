@@ -9,13 +9,12 @@ use std::jule::sema::{
     RetSt,
     BuiltinPanicCallExprModel,
 }
-use std::vector::{Vector}
 
 // Dead code eliminate optimizer for scopes.
 struct ScopeDeadCode {
     parent: &ScopeDeadCode
     s:      &Scope
-    stmts:  *Vector[St]
+    stmts:  *[]St
     i:      int // Position.
 }
 
@@ -30,10 +29,10 @@ impl ScopeDeadCode {
     }
 
     unsafe fn eliminate_followed(mut self) {
-        self.stmts.remove_range(self.i+1, self.stmts.len()-self.i-1)
+        *self.stmts = (*self.stmts)[:self.i+1]
         let mut parent = self.parent
         for real(parent) {
-            parent.stmts.remove_range(parent.i+1, parent.stmts.len()-parent.i-1)
+            *parent.stmts = (*parent.stmts)[:parent.i+1]
             parent = parent.parent
         }
     }
@@ -65,8 +64,8 @@ impl ScopeDeadCode {
 
     unsafe fn optimize_stmts(mut &self) {
         self.i = 0
-        for self.i < self.stmts.len(); self.i++ {
-            self.optimize_stmt(self.stmts.at(self.i))
+        for self.i < self.stmts.len; self.i++ {
+            self.optimize_stmt((*self.stmts)[self.i])
         }
     }
 }

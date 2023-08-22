@@ -14,7 +14,6 @@ use std::jule::sema::{
     Trait,
     TypeKind,
 }
-use std::vector::{Vector}
 
 // Stores all dead definitions.
 static mut deads: []any = nil
@@ -103,13 +102,6 @@ fn is_dead(mut ref: any): (dead: bool) {
     }
 }
 
-fn remove_from_slice[T](mut &s: []&T, pos: int) {
-    if pos == s.len {
-        ret
-    }
-    s = append(s[:pos], s[pos+1:]...)
-}
-
 // Remove reference from refs by pos.
 fn drop_ref(mut &refs: []any, pos: int) {
     // Remove position, and following references.
@@ -117,8 +109,6 @@ fn drop_ref(mut &refs: []any, pos: int) {
     // References dropped after processed, so following
     // references should be already processed.
     refs = refs[:pos]
-
-    /*remove_from_slice[any](refs, pos)*/
 }
 
 fn is_all_references_are_dead[T](mut references: &ReferenceStack): bool {
@@ -261,17 +251,17 @@ fn is_trait_dead(mut t: &Trait): bool {
 
 // Eliminates dead functions.
 // If functions is alive, eliminates unreachable codes, and etc for scope.
-fn eliminate_dead_functions(mut &funcs: Vector[&Fn]) {
+fn eliminate_dead_functions(mut &funcs: []&Fn) {
     let mut i = 0
-    for i < funcs.len() {
-        let mut f = funcs.at(i)
+    for i < funcs.len {
+        let mut f = funcs[i]
         let mut j = 0
         for j < f.instances.len {
             let mut ins = f.instances[j]
             main_current = ins
             if is_fn_dead(ins) {
                 deads = append(deads, ins)
-                remove_from_slice[FnIns](f.instances, j)
+                f.instances = append(f.instances[:j], f.instances[j+1:]...)
                 continue
             }
             eliminate_dead_code_of_scope(ins.scope)
@@ -280,7 +270,7 @@ fn eliminate_dead_functions(mut &funcs: Vector[&Fn]) {
 
         // Remove function, no instances.
         if f.instances.len == 0 {
-            funcs.remove_range(i, 1)
+            funcs = append(funcs[:i], funcs[i+1:]...)
             continue
         }
         i++
@@ -290,12 +280,12 @@ fn eliminate_dead_functions(mut &funcs: Vector[&Fn]) {
 fn eliminate_dead_globals(mut &pkg: &Package) {
     for (_, mut f) in pkg.files {
         let mut i = 0
-        for i < f.vars.len() {
-            let mut v = f.vars.at(i)
+        for i < f.vars.len {
+            let mut v = f.vars[i]
             main_current = v
             if is_var_dead(v) {
                 deads = append(deads, v)
-                f.vars.remove_range(i, 1)
+                f.vars = append(f.vars[:i], f.vars[i+1:]...)
             } else {
                 i++
             }
@@ -312,36 +302,25 @@ fn eliminate_dead_functions_package(mut &pkg: &Package) {
 fn eliminate_dead_structs(mut &pkg: &Package) {
     for (_, mut f) in pkg.files {
         let mut i = 0
-        for i < f.structs.len() {
-            let mut s = f.structs.at(i)
+        for i < f.structs.len {
+            let mut s = f.structs[i]
             let mut j = 0
             for j < s.instances.len {
                 let mut ins = s.instances[j]
                 main_current = ins
                 if is_struct_dead(ins) {
                     deads = append(deads, ins)
-                    remove_from_slice[StructIns](s.instances, j)
+                    s.instances = append(s.instances[:j], s.instances[j+1:]...)
                     continue
                 }
                 j++
             }
 
             if s.instances.len == 0 {
-                f.structs.remove_range(i, 1)
+                f.structs = append(f.structs[:i], f.structs[i+1:]...)
                 continue
             }
             i++
-
-            /*if is_struct_dead(s) {
-                f.structs.remove_range(i, 1)
-            } else {
-                // Not removes trait-implemented functions.
-                // This is safe.
-                // Because methods marked as not-global and
-                // not-global functions are not removed.
-                eliminate_dead_functions(s.methods)
-                i++
-            }*/
         }
     }
 }
@@ -349,12 +328,12 @@ fn eliminate_dead_structs(mut &pkg: &Package) {
 fn eliminate_dead_traits(mut &pkg: &Package) {
     for (_, mut f) in pkg.files {
         let mut i = 0
-        for i < f.traits.len() {
-            let mut t = f.traits.at(i)
+        for i < f.traits.len {
+            let mut t = f.traits[i]
             main_current = t
             if is_trait_dead(t) {
                 deads = append(deads, t)
-                f.traits.remove_range(i, 1)
+                f.traits = append(f.traits[:i], f.traits[i+1:]...)
             } else {
                 i++
             }
