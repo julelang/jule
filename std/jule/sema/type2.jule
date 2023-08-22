@@ -636,6 +636,18 @@ impl DynamicTypeAnnotation {
         ret self.annotate_kind(ptr.elem)
     }
 
+    unsafe fn annotate_ref(mut self, mut k: &TypeKind): (ok: bool) {
+        let mut rref = (*self.k).ref()
+        if !real(rref) {
+            ret false
+        }
+
+        let mut ref = k.ref()
+        let mut crref = &rref.elem
+        self.k = &crref
+        ret self.annotate_kind(ref.elem)
+    }
+
     unsafe fn annotate_any(mut self, mut k: &TypeKind): (ok: bool) {
         let kind = (*self.k).to_str()
         for i, g in self.f.decl.generics {
@@ -672,6 +684,7 @@ impl DynamicTypeAnnotation {
         | real(k.map()):        ret self.annotate_map(k)
         | real(k.fnc()):        ret self.annotate_fn(k)
         | real(k.ptr()):        ret self.annotate_ptr(k)
+        | real(k.ref()):        ret self.annotate_ref(k)
         |:                      ret false
         }
     }
