@@ -76,12 +76,16 @@ namespace jule {
         }
 
         inline Mask &get(void) {
+#ifndef __JULE_DISABLE__SAFETY
             this->must_ok();
+#endif
             return this->data;
         }
 
         inline Mask &get(void) const {
+#ifndef __JULE_DISABLE__SAFETY
             this->must_ok();
+#endif
             return this->data;
         }
 
@@ -89,17 +93,22 @@ namespace jule {
 
         template<typename T>
         operator T(void) {
+#ifndef __JULE_DISABLE__SAFETY
             this->must_ok();
             if (std::strcmp(this->type_id, typeid(T).name()) != 0)
                 jule::panic(jule::ERROR_INCOMPATIBLE_TYPE);
+#endif
             return *reinterpret_cast<T*>(this->data.alloc);
         }
 
         template<typename T>
         operator jule::Ref<T>(void) {
+#ifndef __JULE_DISABLE__SAFETY
             this->must_ok();
             if (std::strcmp(this->type_id, typeid(jule::Ref<T>).name()) != 0)
                 jule::panic(jule::ERROR_INCOMPATIBLE_TYPE);
+#endif
+
 #ifndef __JULE_DISABLE__REFERENCE_COUNTING
             this->data.add_ref();
 #endif

@@ -150,11 +150,13 @@ namespace jule {
 
         template<typename T>
         operator T(void) const {
+#ifndef __JULE_DISABLE__SAFETY
             if (this->operator==(nullptr))
                 jule::panic(jule::ERROR_INVALID_MEMORY);
 
-            if (!this->type_is<T>())
-                jule::panic(jule::ERROR_INCOMPATIBLE_TYPE);
+        if (!this->type_is<T>())
+            jule::panic(jule::ERROR_INCOMPATIBLE_TYPE);
+#endif
 
             return *static_cast<T*>(this->data);
         }

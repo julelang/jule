@@ -21,15 +21,19 @@ namespace jule {
 
     template<typename T, typename Denominator>
     inline auto div(const T &x, const Denominator &denominator) {
+#ifndef __JULE_DISABLE__SAFETY
         if (denominator == 0)
             jule::panic(jule::ERROR_DIVIDE_BY_ZERO);
+#endif
         return x / denominator;
     }
 
     template<typename T, typename Denominator>
     inline auto mod(const T &x, const Denominator &denominator) {
+#ifndef __JULE_DISABLE__SAFETY
         if (denominator == 0)
             jule::panic(jule::ERROR_DIVIDE_BY_ZERO);
+#endif
         return x % denominator;
     }
 

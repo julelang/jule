@@ -53,8 +53,10 @@ namespace jule {
 
         template<typename ...Arguments>
         auto operator()(Arguments... arguments) {
+#ifndef __JULE_DISABLE__SAFETY
             if (this->buffer == nullptr)
                 jule::panic(jule::ERROR_INVALID_MEMORY);
+#endif
             return this->buffer(arguments...);
         }
 

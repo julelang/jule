@@ -145,17 +145,23 @@ namespace jule {
         { return this->alloc != nullptr; }
 
         inline T *operator->(void) const {
+#ifndef __JULE_DISABLE__SAFETY
             this->must_ok();
+#endif
             return this->alloc;
         }
 
         inline operator T(void) const {
+#ifndef __JULE_DISABLE__SAFETY
             this->must_ok();
+#endif
             return *this->alloc;
         }
 
         inline operator T&(void) {
+#ifndef __JULE_DISABLE__SAFETY
             this->must_ok();
+#endif
             return *this->alloc;
         }
 
@@ -183,7 +189,9 @@ namespace jule {
         }
 
         inline void operator=(const T &val) const {
+#ifndef __JULE_DISABLE__SAFETY
             this->must_ok();
+#endif
             *this->alloc = val;
         }
 

@@ -179,6 +179,7 @@ namespace jule {
 
         inline Slice<Item> slice(const jule::Int &start,
                                  const jule::Int &end) const {
+#ifndef __JULE_DISABLE__SAFETY
             this->check();
 
             if (start < 0 || end < 0 || start > end || end > this->cap()) {
@@ -186,6 +187,7 @@ namespace jule {
                 __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(sstream, start, end);
                 jule::panic(sstream.str().c_str());
             }
+#endif
 
             jule::Slice<Item> slice;
             slice.data = this->data;
@@ -257,12 +259,14 @@ namespace jule {
         { return !this->operator==(nullptr); }
 
         Item &operator[](const jule::Int &index) const {
+#ifndef __JULE_DISABLE__SAFETY
             this->check();
             if (this->empty() || index < 0 || this->len() <= index) {
                 std::stringstream sstream;
                 __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(sstream, index);
                 jule::panic(sstream.str().c_str());
             }
+#endif
             return this->_slice[index];
         }
 

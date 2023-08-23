@@ -2,6 +2,15 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+/*
+
+CONFIGURATION DEFINES
+
+- __JULE_DISABLE__REFERENCE_COUNTING
+- __JULE_DISABLE__SAFETY
+
+*/
+
 #ifndef __JULE_HPP
 #define __JULE_HPP
 
