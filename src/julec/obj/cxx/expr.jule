@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use env::{Opt, is_opt_enabled}
+
 use std::conv::{fmt_int, fmt_uint, fmt_float, itoa}
 use std::jule::build::{Directive, is_64bit}
 use std::jule::constant::{Const}
@@ -274,23 +276,34 @@ fn gen_const_expr_model(m: &Const): str {
     }
 }
 
+fn gen_div_by_zero_binop_expr_model(f: str, mut m: &BinopExprModel): str {
+    if is_opt_enabled(Opt.Math) {
+        match type m.right {
+        | &Const:
+            let mut obj = "("
+            obj += gen_expr(m.left)
+            obj += m.op
+            obj += gen_expr(m.right)
+            obj += ")"
+            ret obj
+        }
+    }
+
+    let mut obj = f + "("
+    obj += gen_expr(m.left)
+    obj += ","
+    obj += gen_expr(m.right)
+    obj += ")"
+    ret obj
+}
+
 fn gen_binop_expr_model(mut m: &BinopExprModel): str {
     match m.op {
     | str(TokenKind.Solidus):
-        let mut obj = "jule::div("
-        obj += gen_expr(m.left)
-        obj += ","
-        obj += gen_expr(m.right)
-        obj += ")"
-        ret obj
+        ret gen_div_by_zero_binop_expr_model("jule::div", m)
 
     | str(TokenKind.Percent):
-        let mut obj = "jule::mod("
-        obj += gen_expr(m.left)
-        obj += ","
-        obj += gen_expr(m.right)
-        obj += ")"
-        ret obj
+        ret gen_div_by_zero_binop_expr_model("jule::mod", m)
 
     |:
         let mut obj = "("
