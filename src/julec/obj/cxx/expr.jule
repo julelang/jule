@@ -276,45 +276,46 @@ fn gen_const_expr_model(m: &Const): str {
     }
 }
 
-fn gen_div_by_zero_binop_expr_model(f: str, mut m: &BinopExprModel): str {
+fn gen_div_by_zero_binop_expr_model(op: str, mut l: ExprModel, mut r: ExprModel): str {
     if is_opt_enabled(Opt.Math) {
-        match type m.right {
+        match type r {
         | &Const:
             let mut obj = "("
-            obj += gen_expr(m.left)
-            obj += m.op
-            obj += gen_expr(m.right)
+            obj += gen_expr(l)
+            obj += op
+            obj += gen_expr(r)
             obj += ")"
             ret obj
         }
     }
 
-    let mut obj = f + "("
-    obj += gen_expr(m.left)
+    let mut obj = ""
+    match op {
+    | str(TokenKind.Solidus): obj += "jule::div("
+    | str(TokenKind.Percent): obj += "jule::mod("
+    }
+    obj += gen_expr(l)
     obj += ","
-    obj += gen_expr(m.right)
+    obj += gen_expr(r)
     obj += ")"
     ret obj
 }
 
 fn gen_binop_expr_model(mut m: &BinopExprModel): str {
     match m.op {
-    | str(TokenKind.Solidus):
-        ret gen_div_by_zero_binop_expr_model("jule::div", m)
-
+    | str(TokenKind.Solidus)
     | str(TokenKind.Percent):
-        ret gen_div_by_zero_binop_expr_model("jule::mod", m)
-
-    |:
-        let mut obj = "("
-        obj += gen_expr_model(m.left)
-        obj += " "
-        obj += m.op
-        obj += " "
-        obj += gen_expr_model(m.right)
-        obj += ")"
-        ret obj
+        ret gen_div_by_zero_binop_expr_model(m.op, m.left, m.right)
     }
+
+    let mut obj = "("
+    obj += gen_expr_model(m.left)
+    obj += " "
+    obj += m.op
+    obj += " "
+    obj += gen_expr_model(m.right)
+    obj += ")"
+    ret obj
 }
 
 fn gen_var_expr_model(mut m: &Var): str {

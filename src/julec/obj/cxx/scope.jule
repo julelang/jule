@@ -4,6 +4,7 @@
 
 use env::{Opt, is_opt_enabled}
 
+use std::jule::constant::{Const}
 use std::jule::lex::{TokenKind, is_ignore_ident, is_anon_ident}
 use std::jule::sema::{
     Data,
@@ -282,7 +283,33 @@ fn gen_postfix(mut p: &Postfix): str {
     ret "(" + gen_expr(p.expr) + ")" + p.op + CPP_ST_TERM
 }
 
+fn gen_div_by_zero_assign(mut a: &Assign): str {
+    let mut obj = gen_expr(a.l)
+    if is_opt_enabled(Opt.Math) {
+        match type a.r {
+        | &Const:
+            obj += " "
+            obj += a.op
+            obj += " "
+            obj += gen_expr(a.r)
+            obj += CPP_ST_TERM
+            ret obj
+        }
+    }
+
+    obj += " = "
+    obj += gen_div_by_zero_binop_expr_model(a.op[:1], a.l, a.r)
+    obj += CPP_ST_TERM
+    ret obj
+}
+
 fn gen_assign(mut a: &Assign): str {
+    match a.op {
+    | str(TokenKind.SolidusEq)
+    | str(TokenKind.PercentEq):
+        ret gen_div_by_zero_assign(a)
+    }
+
     let mut obj = gen_expr(a.l)
     obj += a.op
     if is_opt_enabled(Opt.Append) {
