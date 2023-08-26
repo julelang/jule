@@ -15,7 +15,7 @@
 <!-- Check the boxes below to ensure you have completed the checklist. -->
 
 - [ ] A description of the changes in this PR is mentioned above.
-- [ ] All the new and existing test pass.
+- [ ] All the new and existing tests pass.
 - [ ] The code follows the code style and conventions of the project.
 - [ ] No plagiarized, duplicated, or repetitive code that has been directly copied from another source.
 - [ ] I have read the whole [Contributing guidelines](https://jule.dev/contribute) of the project and its resources/related pages.
