@@ -58,11 +58,6 @@ const CPP_ST_TERM = ";"
 // Current indention count.
 static mut INDENT: u64 = 0
 
-struct OrderedDecls {
-    structs: []&Struct
-    globals: []&Var
-}
-
 // Increase indentation.
 fn add_indent() { INDENT++ }
 
@@ -616,7 +611,7 @@ fn gen_fn_prototypes(mut pkg: &Package): str {
 }
 
 // Generates C++ code of all can-be-prototyped declarations.
-fn gen_prototypes(mut ir: &IR, mut structs: []&Struct): str {
+fn gen_prototypes(mut ir: &IR): str {
     let mut obj = ""
 
     for (_, mut u) in ir.used {
@@ -627,11 +622,11 @@ fn gen_prototypes(mut ir: &IR, mut structs: []&Struct): str {
     obj += gen_trait_prototypes(ir.main)
 
     
-    obj += gen_struct_plain_prototypes(structs)
+    obj += gen_struct_plain_prototypes(ir.ordered.structs)
 
     obj += gen_traits(ir) + "\n"
 
-    obj += gen_struct_prototypes(structs)
+    obj += gen_struct_prototypes(ir.ordered.structs)
 
     for (_, mut u) in ir.used {
         if !u.cpp_linked {
@@ -927,18 +922,11 @@ int main(int argc, char *argv[], char *envp[]) {
 
 // Generates C++ codes from SymbolTables.
 pub fn gen(mut ir: &IR): str {
-    let mut od = &OrderedDecls{}
-    od.structs = ir.get_all_structures()
-    order_structures(od.structs)
-
-    od.globals = ir.get_all_variables()
-    order_variables(od.globals)
-
     let mut obj = ""
     obj += gen_links(ir) + "\n"
-    obj += gen_prototypes(ir, od.structs) + "\n\n"
-    obj += gen_globals(od.globals) + "\n"
-    obj += gen_structs(od.structs)
+    obj += gen_prototypes(ir) + "\n\n"
+    obj += gen_globals(ir.ordered.globals) + "\n"
+    obj += gen_structs(ir.ordered.structs)
     obj += gen_fns(ir) + "\n"
     obj += gen_init_caller(ir) + "\n"
     ret obj

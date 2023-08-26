@@ -9,9 +9,10 @@ use sema for std::jule::sema
 
 // Intermediate representation of code for compiler.
 pub struct IR {
-    pub passes: []str
-    pub main:   &sema::Package
-    pub used:   []&sema::ImportInfo
+    pub passes:  []str
+    pub main:    &sema::Package
+    pub used:    []&sema::ImportInfo
+    pub ordered: OrderedDefines
 }
 
 impl IR {
@@ -98,6 +99,14 @@ impl IR {
         }
 
         ret buffer
+    }
+
+    // Order defines at update ordered field of instance.
+    pub fn order(mut self) {
+        self.ordered.structs = self.get_all_structures()
+        self.ordered.globals = self.get_all_variables()
+        DefineOrderer.order_variables(self.ordered.globals)
+        DefineOrderer.order_structures(self.ordered.structs)
     }
 }
 
