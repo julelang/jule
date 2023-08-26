@@ -10,7 +10,7 @@ It contains the reference compiler, API, and standard library.
 [Website](https://jule.dev) |
 [Manual](https://manual.jule.dev) |
 [Contributing](https://jule.dev/contribute) |
-[Community](https://github.com/julelang/jule/wiki#the-jule-community)
+[Community](https://jule.dev/community)
 
 [![Build](https://github.com/julelang/jule/actions/workflows/build.yml/badge.svg)](https://github.com/julelang/jule/actions/workflows/build.yml)
 [![Tests](https://github.com/julelang/jule/actions/workflows/tests.yml/badge.svg)](https://github.com/julelang/jule/actions/workflows/tests.yml)
