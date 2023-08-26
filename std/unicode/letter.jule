@@ -264,7 +264,7 @@ fn is32(ranges: []Range32, r: u32): bool {
 // Reports whether the rune is in the specified table of ranges.
 pub fn is(range_tab: &RangeTable, r: rune): bool {
     let &r16 = range_tab.r16
-    // Compare as uint32 to correctly handle negative runes.
+    // Compare as u32 to correctly handle negative runes.
     if r16.len > 0 && u32(r) <= u32(r16[r16.len-1].hi) {
         ret is16(r16, u16(r))
     }
@@ -273,4 +273,29 @@ pub fn is(range_tab: &RangeTable, r: rune): bool {
         ret is32(r32, u32(r))
     }
     ret false
+}
+
+fn is_excluding_latin(range_tab: &RangeTable, r: rune): bool {
+    {
+        let &r16 = range_tab.r16
+        // Compare as u32 to correctly handle negative runes.
+        let off = range_tab.latin_offset
+        if r16.len > off && u32(r) <= u32(r16[r16.len-1].hi) {
+            ret is16(r16[off:], u16(r))
+        }
+    }
+    let &r32 = range_tab.r32
+    if r32.len > 0 && r >= rune(r32[0].lo) {
+        ret is32(r32, u32(r))
+    }
+    ret false
+}
+
+// Reports whether the rune is an upper case letter.
+pub fn is_upper(r: rune): bool {
+    // See comment in IsGraphic.
+    if u32(r) <= MAX_LATIN1 {
+        ret _PROPERTIES[u8(r)]&__P_L_MASK == __P_LU
+    }
+    ret is_excluding_latin(UPPER, r)
 }
