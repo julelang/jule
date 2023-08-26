@@ -10,7 +10,8 @@ fn is_struct_ordered(structs: []&Struct, s: &Struct): bool {
         for _, ss in structs {
             if &ss == &s {
                 ret false
-            } else if &ss == &d {
+            }
+            if &ss == &d {
                 break
             }
         }
@@ -23,21 +24,27 @@ fn is_struct_ordered(structs: []&Struct, s: &Struct): bool {
 // Struct's dependencies always comes first itself.
 fn order_structures(mut structs: []&Struct) {
     let n = structs.len
+repeat:
+    let mut order_changed = false
     let mut i = 0
     for i < n; i++ {
         let mut swapped = false
 
         let mut j = 0
         for j < n-i-1; j++ {
-            if structs[j].depends.len > 1 {
+            if !is_struct_ordered(structs, structs[j]) {
                 structs[j], structs[j+1] = structs[j+1], structs[j]
                 swapped = true
+                order_changed = true
             }
         }
 
         if !swapped {
             break
         }
+    }
+    if order_changed {
+        goto repeat
     }
 }
 
@@ -47,7 +54,8 @@ fn is_var_ordered(vars: []&Var, v: &Var): bool {
         for _, vv in vars {
             if &vv == &v {
                 ret false
-            } else if &vv == &d {
+            }
+            if &vv == &d {
                 break
             }
         }
@@ -59,16 +67,27 @@ fn is_var_ordered(vars: []&Var, v: &Var): bool {
 // Orders variables by their dependencies.
 // Variable's dependencies always comes first itself.
 fn order_variables(mut vars: []&Var) {
-    let mut swapped = true
-    for swapped {
-        swapped = false
+    let n = vars.len
+repeat:
+    let mut order_changed = false
+    let mut i = 0
+    for i < n; i++ {
+        let mut swapped = false
 
         let mut j = 0
-        for j < vars.len-1; j++ {
+        for j < n-i-1; j++ {
             if !is_var_ordered(vars, vars[j]) {
                 vars[j], vars[j+1] = vars[j+1], vars[j]
                 swapped = true
+                order_changed = true
             }
         }
+
+        if !swapped {
+            break
+        }
+    }
+    if order_changed {
+        goto repeat
     }
 }
