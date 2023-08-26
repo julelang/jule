@@ -46,3 +46,71 @@ pub const MAX_ASCII = '\u007F'
 
 // Maximum Latin-1 value.
 pub const MAX_LATIN1 = '\u00FF'
+
+// Indices into the delta arrays inside CaseRanges for case mapping.
+pub const UPPER_CASE = 0
+pub const LOWER_CASE = 1
+pub const TITLE_CASE = 2
+pub const MAX_CASE = 3
+
+// If the Delta field of a CaseRange is UpperLower, it means
+// this CaseRange represents a sequence of the form (say)
+// Upper Lower Upper Lower.
+const UPPER_LOWER = MAX_RUNE + 1 // (Cannot be a valid delta.)
+
+type D: [MAX_CASE]rune // to make the CaseRanges text shorter
+
+// CASE_ORBIT is defined in tables.jule as []FoldPair. Right now all the
+// entries fit in uint16, so use uint16. If that changes, compilation
+// will fail (the constants in the composite literal will not fit in u16)
+// and the types here can change to u32.
+struct FoldPair {
+    from: u16
+    to:   u16
+}
+
+// Represents a range of Unicode code points for simple (one
+// code point to one code point) case conversion.
+// The range runs from lo to hi inclusive, with a fixed stride of 1. Deltas
+// are the number to add to the code point to reach the code point for a
+// different case for that character. They may be negative. If zero, it
+// means the character is in the corresponding case. There is a special
+// case representing sequences of alternating corresponding Upper and Lower
+// pairs. It appears with a fixed delta of
+//
+//  {UPPER_LOWER, UPPER_LOWER, UPPER_LOWER}
+//
+// The constant UPPER_LOWER has an otherwise impossible delta value.
+struct CaseRange {
+    lo:    u32
+    hi:    u32
+    delta: D
+}
+
+// Represents of a range of 16-bit Unicode code points. The range runs from lo to hi
+// inclusive and has the specified stride.
+pub struct Range16 {
+    pub lo:     u16
+    pub hi:     u16
+    pub stride: u16
+}
+
+// Represents of a range of Unicode code points and is used when one or
+// more of the values will not fit in 16 bits. The range runs from lo to hi
+// inclusive and has the specified stride. lo and hi must always be >= 1<<16.
+pub struct Range32 {
+    pub lo:     u32
+    pub hi:     u32
+    pub stride: u32
+}
+
+// Defines a set of Unicode code points by listing the ranges of
+// code points within the set. The ranges are listed in two slices
+// to save space: a slice of 16-bit ranges and a slice of 32-bit ranges.
+// The two slices must be in sorted order and non-overlapping.
+// Also, r32 should contain only values >= 0x10000 (1<<16).
+pub struct RangeTable {
+    pub r16:          []Range16
+    pub r32:          []Range32
+    pub latin_offset: int // number of entries in r16 with HI <= MAX_LATIN1
+}
