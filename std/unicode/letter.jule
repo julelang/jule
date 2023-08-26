@@ -58,7 +58,12 @@ pub const MAX_CASE = 3
 // Upper Lower Upper Lower.
 const UPPER_LOWER = MAX_RUNE + 1 // (Cannot be a valid delta.)
 
-type D: [MAX_CASE]rune // to make the CaseRanges text shorter
+// The maximum size table for linear search for non-Latin1 rune.
+// Derived by running 'go test -calibrate'.
+const LINEAR_MAX = 18
+
+// to make the CaseRanges text shorter
+type D: [MAX_CASE]rune
 
 // CASE_ORBIT is defined in tables.jule as []FoldPair. Right now all the
 // entries fit in uint16, so use uint16. If that changes, compilation
@@ -180,4 +185,92 @@ pub fn to_lower(mut r: rune): rune {
         ret r
     }
     ret to(LOWER_CASE, r)
+}
+
+// Reports whether r is in the sorted slice of 16-bit ranges.
+fn is16(ranges: []Range16, r: u16): bool {
+    if ranges.len <= LINEAR_MAX || r <= MAX_LATIN1 {
+        for i in ranges {
+            let range = &ranges[i]
+            unsafe {
+                if r < range.lo {
+                    ret false
+                }
+                if r <= range.hi {
+                    ret range.stride == 1 || (r-range.lo)%range.stride == 0
+                }
+            }
+        }
+        ret false
+    }
+
+    // binary search over ranges
+    let mut lo = 0
+    let mut hi = ranges.len
+    for lo < hi {
+        let m = lo + (hi-lo)/2
+        let range = &ranges[m]
+        unsafe {
+            if range.lo <= r && r <= range.hi {
+                ret range.stride == 1 || (r-range.lo)%range.stride == 0
+            }
+            if r < range.lo {
+                hi = m
+            } else {
+                lo = m + 1
+            }
+        }
+    }
+    ret false
+}
+
+// Reports whether r is in the sorted slice of 32-bit ranges.
+fn is32(ranges: []Range32, r: u32): bool {
+    if ranges.len <= LINEAR_MAX {
+        for i in ranges {
+            let range = &ranges[i]
+            unsafe {
+                if r < range.lo {
+                    ret false
+                }
+                if r <= range.hi {
+                    ret range.stride == 1 || (r-range.lo)%range.stride == 0
+                }
+            }
+        }
+        ret false
+    }
+
+    // binary search over ranges
+    let mut lo = 0
+    let mut hi = ranges.len
+    for lo < hi {
+        let m = lo + (hi-lo)/2
+        let range = &ranges[m]
+        unsafe {
+            if range.lo <= r && r <= range.hi {
+                ret range.stride == 1 || (r-range.lo)%range.stride == 0
+            }
+            if r < range.lo {
+                hi = m
+            } else {
+                lo = m + 1
+            }
+        }
+    }
+    ret false
+}
+
+// Reports whether the rune is in the specified table of ranges.
+pub fn is(range_tab: &RangeTable, r: rune): bool {
+    let &r16 = range_tab.r16
+    // Compare as uint32 to correctly handle negative runes.
+    if r16.len > 0 && u32(r) <= u32(r16[r16.len-1].hi) {
+        ret is16(r16, u16(r))
+    }
+    let &r32 = range_tab.r32
+    if r32.len > 0 && r >= rune(r32[0].lo) {
+        ret is32(r32, u32(r))
+    }
+    ret false
 }
