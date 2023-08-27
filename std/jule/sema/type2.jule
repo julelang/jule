@@ -1098,6 +1098,25 @@ impl RangeChecker {
         }
     }
 
+    // Check range expression validity.
+    // It bypass mutability error if necessary.
+    //
+    //  - d:   data to check.
+    //  - key: data passed to this key.
+    //  - k:   element kind of expression.
+    fn check_range_expr_validity(mut self, mut &d: &Data, &key: &Var, mut &k: &TypeKind) {
+        let mut _mut = key.mutable
+        if _mut && !is_mut(k) {
+            // Bypass mutability error.
+            // Element kind is immutable.
+            // There is no mutation.
+            _mut = false
+        }
+
+        self.sc.s.check_validity_for_init_expr(
+            _mut, key.reference, key.kind.kind, d, self.rang.in_token)
+    }
+
     fn check_slice(mut self) {
         self.set_size_key()
         if !real(self.rang.key_b) || is_ignore_ident(self.rang.key_b.ident) {
@@ -1107,12 +1126,8 @@ impl RangeChecker {
         let mut slc = self.d.kind.slc()
         self.kind.key_b = self.build_var(self.rang.key_b)
         self.kind.key_b.kind = &TypeSymbol{kind: slc.elem}
-        self.sc.s.check_validity_for_init_expr(
-            self.kind.key_b.mutable,
-            self.kind.key_b.reference,
-            self.kind.key_b.kind.kind,
-            self.d,
-            self.rang.in_token)
+
+        self.check_range_expr_validity(self.d, self.kind.key_b, slc.elem)
     }
 
     fn check_array(mut self) {
@@ -1124,12 +1139,8 @@ impl RangeChecker {
         let mut arr = self.d.kind.arr()
         self.kind.key_b = self.build_var(self.rang.key_b)
         self.kind.key_b.kind = &TypeSymbol{kind: arr.elem}
-        self.sc.s.check_validity_for_init_expr(
-            self.kind.key_b.mutable,
-            self.kind.key_b.reference,
-            self.kind.key_b.kind.kind,
-            self.d,
-            self.rang.in_token)
+
+        self.check_range_expr_validity(self.d, self.kind.key_b, arr.elem)
     }
 
     fn check_map_key_a(mut self) {
@@ -1143,12 +1154,8 @@ impl RangeChecker {
 
         let mut d = new(Data, self.d)
         d.kind = m.key
-        self.sc.s.check_validity_for_init_expr(
-            self.kind.key_a.mutable,
-            self.kind.key_a.reference,
-            self.kind.key_a.kind.kind,
-            d,
-            self.rang.in_token)
+
+        self.check_range_expr_validity(d, self.kind.key_a, m.key)
     }
 
     fn check_map_key_b(mut self) {
@@ -1162,12 +1169,8 @@ impl RangeChecker {
 
         let mut d = new(Data, self.d)
         d.kind = m.val
-        self.sc.s.check_validity_for_init_expr(
-            self.kind.key_b.mutable,
-            self.kind.key_b.reference,
-            self.kind.key_b.kind.kind,
-            d,
-            self.rang.in_token)
+
+        self.check_range_expr_validity(d, self.kind.key_b, m.val)
     }
 
     fn check_map(mut self) {
