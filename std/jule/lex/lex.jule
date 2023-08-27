@@ -427,17 +427,21 @@ impl Lex {
         if ln.len == 0 {
             ret ""
         }
-        if ln[0] != '_' && !is_letter(rune(ln[0])) {
+        let (r, mut i) = utf8::decode_rune(ln)
+        if r != '_' && !is_letter(r) {
             ret ""
         }
 
-        for i, r in ln {
+        for i < ln.len {
+            let (r, n) = utf8::decode_rune(ln[i:])
             if r != '_' && !is_decimal(byte(r)) && !is_letter(r) {
+                self.pos += i
                 ret str(ln[:i])
             }
-            self.pos++
+            i += n
         }
 
+        self.pos += ln.len
         ret str(ln)
     }
 
