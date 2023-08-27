@@ -496,20 +496,21 @@ fn gen_slice_expr_model(mut m: &SliceExprModel): str {
 }
 
 fn gen_indexing_expr_model(mut m: &IndexigExprModel): str {
-    let mut obj = gen_expr_model(m.expr)
-    obj += "["
-    obj += gen_expr(m.index)
-    obj += "]"
+    let mut obj = gen_expr_model(m.expr.model)
+    if m.index.is_const() && real(m.expr.kind.arr()) && is_opt_enabled(Opt.Access) {
+        obj += ".__at("
+        obj += gen_expr(m.index.model)
+        obj += ")"
+    } else {
+        obj += "["
+        obj += gen_expr(m.index.model)
+        obj += "]"
+    }
     ret obj
 }
 
 fn gen_anon_fn_expr_model(mut m: &AnonFnExprModel): str {
     let mut obj = gen_fn_kind(m.func)
-    /*if m.global {
-        obj += "([]"
-    } else {
-        obj += "([&]"
-    }*/
     obj += "([=]"
     obj += gen_params_ins(m.func.params)
     obj += " mutable -> "

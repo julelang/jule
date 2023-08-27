@@ -97,6 +97,11 @@ namespace jule {
         jule::Bool operator!=(const jule::Array<Item, N> &src) const
         { return !this->operator==(src); }
 
+        // Returns element by index.
+        // Not includes safety checking.
+        inline Item &__at(const jule::Int &index) const
+        { return this->buffer[index]; }
+
         Item &operator[](const jule::Int &index) const {
 #ifndef __JULE_DISABLE__SAFETY
             if (this->empty() || index < 0 || this->len() <= index) {
@@ -105,18 +110,7 @@ namespace jule {
                 jule::panic(sstream.str().c_str());
             }
 #endif
-            return this->buffer[index];
-        }
-
-        Item &operator[](const jule::Int &index) {
-#ifndef __JULE_DISABLE__SAFETY
-            if (this->empty() || index < 0 || this->len() <= index) {
-                std::stringstream sstream;
-                __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(sstream, index);
-                jule::panic(sstream.str().c_str());
-            }
-#endif
-            return this->buffer[index];
+            return this->__at(index);
         }
 
         friend std::ostream &operator<<(std::ostream &stream,
