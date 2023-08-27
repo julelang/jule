@@ -226,7 +226,7 @@ impl Data {
     pub fn is_nil(self): bool { ret self.kind.is_nil() }
 
     // Reports whether Data is void.
-    pub fn is_void(self): bool { ret self.kind.is_void() }
+    pub fn is_void(self): bool { ret self.kind.void() }
 
     // Reports whether Data is constant expression.
     pub fn is_const(self): bool { ret real(self.constant) }
@@ -1041,7 +1041,7 @@ impl Eval {
             }
         }
 
-        if !is_variadicable(d.kind) {
+        if !d.kind.variadicable() {
             self.push_err(v.token, LogMsg.VariadicWithNonVariadicable, d.kind.to_str())
             ret new(Data)
         }
@@ -1415,7 +1415,7 @@ impl Eval {
 
         // Keep mutability id already mutable.
         // Be mutable, if element is not mutable-type.
-        d.mutable = d.mutable || !is_mut(elem_type)
+        d.mutable = d.mutable || !elem_type.mutable()
     }
 
     fn slicing_slc(self, mut d: &Data) {
@@ -1720,9 +1720,9 @@ impl Eval {
 
         // Keep mutability if data is already mutable.
         // Even if the data is not mutable, set as mutable if the type is not mutable-type.
-        d.mutable = d.mutable || (!is_mut(d.kind) && is_mut(t))
+        d.mutable = d.mutable || (!d.kind.mutable() && t.mutable())
 
-        d.lvalue = is_lvalue(t)
+        d.lvalue = t.lvalue()
         d.decl = false
         if real(t.prim()) && d.is_const() {
             d.model = d.constant
@@ -1998,7 +1998,7 @@ impl Eval {
             }
 
             d.kind = f.result
-            d.lvalue = is_lvalue(f.result)
+            d.lvalue = f.result.lvalue()
         }
 
         d.mutable = true
@@ -3266,7 +3266,7 @@ impl BinopSolver {
     }
 
     fn eval_nil(mut self): &Data {
-        if !is_nil_compatible(self.r.kind) {
+        if !self.r.kind.nil_compatible() {
             self.e.push_err(self.op, LogMsg.IncompatibleTypes, str(TokenKind.Nil), self.r.kind.to_str())
             ret new(Data)
         }
@@ -3733,7 +3733,7 @@ impl BinopSolver {
 
     fn eval(mut self): &Data {
         match {
-        | self.l.kind.is_void():
+        | self.l.kind.void():
             self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, "void")
             ret new(Data)
 
@@ -3952,7 +3952,7 @@ impl BinopSolver {
         self.post_const(d)
 
         if real(d) {
-            d.lvalue = is_lvalue(d.kind)
+            d.lvalue = d.kind.lvalue()
             if !d.is_const() {
                 d.model = &BinopExprModel{
                     left:  l.model,

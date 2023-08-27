@@ -935,7 +935,7 @@ impl Sema {
 
     fn check_validity_for_init_expr(mut &self, left_mut: bool, left_ref: bool,
         left_kind: &TypeKind, mut d: &Data, error_token: Token) {
-        if left_mut && !d.mutable && is_mut(d.kind) {
+        if left_mut && !d.mutable && d.kind.mutable() {
             self.push_err(error_token, LogMsg.AssignNonMutToMut)
         }
         if left_ref {
@@ -1758,11 +1758,11 @@ impl Sema {
         }
 
         for (_, mut f) in st.fields {
-            if !real(f.kind) || !is_mut(f.kind) {
+            if !real(f.kind) || !f.kind.mutable() {
                 continue
             }
 
-            if !supports_cloning(f.kind) {
+            if !f.kind.supports_cloning() {
                 self.push_err(st.decl.token, LogMsg.TypeNotCompatibleForDerive, f.kind.to_str(), str(Derives.Clone))
                 ret false
             }

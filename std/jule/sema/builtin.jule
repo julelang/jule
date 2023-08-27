@@ -642,22 +642,23 @@ fn builtin_caller_clone(mut e: &Eval, mut fc: &FnCallExpr, mut _: &Data): &Data 
     let check_kind = fn(mut k: &TypeKind) {
         match {
         | real(k.slc()):
-            if !supports_cloning(k.slc().elem) {
+            if !k.slc().elem.supports_cloning() {
                 e.push_err(fc.args[0].token, LogMsg.InternalTypeNotSupportsClone, k.to_str())
             }
 
         | real(k.map()):
-            if !supports_cloning(k.map().key) || supports_cloning(k.map().val) {
+            let m = k.map()
+            if !m.key.supports_cloning() || !m.val.supports_cloning() {
                 e.push_err(fc.args[0].token, LogMsg.InternalTypeNotSupportsClone, k.to_str())
             }
 
         | real(k.arr()):
-            if !supports_cloning(k.arr().elem) {
+            if !k.arr().elem.supports_cloning() {
                 e.push_err(fc.args[0].token, LogMsg.InternalTypeNotSupportsClone, k.to_str())
             }
 
         | real(k.ref()):
-            if !supports_cloning(k.ref().elem) {
+            if !k.ref().elem.supports_cloning() {
                 e.push_err(fc.args[0].token, LogMsg.InternalTypeNotSupportsClone, k.to_str())
             }
 
@@ -679,7 +680,7 @@ fn builtin_caller_clone(mut e: &Eval, mut fc: &FnCallExpr, mut _: &Data): &Data 
     | !d.lvalue:
         e.push_err(fc.args[0].token, LogMsg.CloneNonLvalue)
 
-    | !supports_cloning(d.kind):
+    | !d.kind.supports_cloning():
         check_kind(d.kind)
     }
 
