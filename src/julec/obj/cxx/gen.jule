@@ -33,8 +33,8 @@ use std::jule::sema::{
     Trait,
     Param,
     ParamIns,
+    BUILTIN_TRAIT_DISPOSE,
 }
-
 
 cpp use "cxx.hpp"
 
@@ -424,10 +424,20 @@ fn gen_struct_constructor(mut &s: &StructIns): str {
     ret obj
 }
 
-fn gen_struct_destructor(&s: &StructIns): str {
+fn gen_struct_destructor(mut &s: &StructIns): str {
     let mut obj = "~"
     obj += struct_ins_out_ident(s)
-    obj += "(void) { /* heap allocations managed by traits or references */ this->self.ref = nullptr; }"
+    obj += "(void) { "
+
+    // Call destructor if implemented.
+    if s.decl.is_implements(BUILTIN_TRAIT_DISPOSE) {
+        let dispose_method = s.find_method("dispose", false)
+        obj += "this->"
+        obj += fn_out_ident(dispose_method)
+        obj += "(); "
+    }
+
+    obj += "this->self.ref = nullptr; }"
     ret obj
 }
 

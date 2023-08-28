@@ -18,7 +18,7 @@ namespace jule {
     // Error mask for terminations.
     // It's also built-in Error trait.
     struct Error {
-        virtual jule::Str _method_error(void) { return jule::Str(); }
+        inline virtual jule::Str _method_error(void) { return jule::Str(); };
 
         virtual ~Error(void) {}
 

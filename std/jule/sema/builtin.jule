@@ -51,7 +51,7 @@ static mut BUILTIN_TYPE_ALIAS_RUNE: &TypeAlias = &TypeAlias{
     },
 }
 
-static mut BUILTIN_TRAIT_ERROR: &Trait = &Trait{
+pub static mut BUILTIN_TRAIT_ERROR: &Trait = &Trait{
     public: true,
     ident:  "Error",
     methods: [
@@ -68,6 +68,24 @@ static mut BUILTIN_TRAIT_ERROR: &Trait = &Trait{
                     decl: &TypeDecl{kind: &IdentTypeDecl{ident: str(PrimKind.Str)}},
                 }
             }
+        },
+    ],
+}
+
+// Definition of built-in Dispose trait.
+pub static mut BUILTIN_TRAIT_DISPOSE: &Trait = &Trait{
+    public: true,
+    ident:  "Dispose",
+    methods: [
+        &Fn{
+            public: true,
+            ident:  "dispose",
+            params: [
+                &Param{
+                    mutable: true,
+                    ident:   "self",
+                },
+            ],
         },
     ],
 }
@@ -93,6 +111,11 @@ fn init() {
     error_method_ins.result = &TypeKind{kind: build_prim_type(str(PrimKind.Str))}
     error_method_ins.caller = builtin_caller_common
     error_method.append_instance(error_method_ins)
+
+    let mut dispose_method = BUILTIN_TRAIT_DISPOSE.find_method("dispose")
+    let mut dispose_method_ins = dispose_method.instance()
+    dispose_method_ins.caller = builtin_caller_common
+    dispose_method.append_instance(dispose_method_ins)
 }
 
 fn find_builtin_fn(ident: str): &FnIns {
@@ -122,8 +145,9 @@ fn find_builtin_type_alias(ident: str): &TypeAlias {
 
 fn find_builtin_trait(ident: str): &Trait {
     match ident {
-    | "Error": ret BUILTIN_TRAIT_ERROR
-    |:         ret new(Trait)
+    | "Error":   ret BUILTIN_TRAIT_ERROR
+    | "Dispose": ret BUILTIN_TRAIT_DISPOSE
+    |:           ret new(Trait)
     }
 }
 
