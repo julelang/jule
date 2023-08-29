@@ -86,10 +86,6 @@ fn normalize_bitsize(mut d: &Data) {
 
     let mut kind = ""
     match {
-    | d.constant.is_f64():
-        let x = d.constant.read_f64()
-        kind = types::float_from_bits(types::bitsize_of_float(x))
-
     | d.constant.is_i64():
         let x = d.constant.read_i64()
         kind = types::int_from_bits(types::bitsize_of_int(x))
@@ -1197,7 +1193,7 @@ impl Eval {
         let mut arr = d.kind.arr()
         d.kind = arr.elem.clone()
         self.check_integer_indexing_by_data(index, i.token)
-        if index.is_const() && index.constant.as_f64() >= arr.n {
+        if index.is_const() && index.constant.as_f64() >= f64(arr.n) {
             self.push_err(i.token, LogMsg.OverflowLimits)
         }
     }
@@ -1688,6 +1684,26 @@ impl Eval {
         }
     }
 
+    fn cast_constant(mut self, mut &t: &TypeKind, mut &d: &Data) {
+        let prim = t.prim()
+        if !real(prim) || !d.is_const() {
+            ret
+        }
+
+        match {
+        | types::is_sig_int(prim.kind):
+            d.constant.set_i64(d.constant.as_i64())
+
+        | types::is_unsig_int(prim.kind):
+            d.constant.set_u64(d.constant.as_u64())
+
+        | types::is_float(prim.kind):
+            d.constant.set_f64(d.constant.as_f64())
+        }
+
+        d.model = d.constant
+    }
+
     fn eval_cast_by_type_n_data(mut self, mut t: &TypeKind, mut d: &Data, error_token: Token): &Data {
         match {
         | real(d.kind.prim()) && d.kind.prim().is_any():
@@ -1726,9 +1742,7 @@ impl Eval {
 
         d.lvalue = t.lvalue()
         d.decl = false
-        if real(t.prim()) && d.is_const() {
-            d.model = d.constant
-        }
+        self.cast_constant(t, d)
 
         if !real(d.kind.enm()) || d.kind.enm().kind.kind.to_str() != t.to_str() {
             d.cast_kind = t
@@ -3168,11 +3182,13 @@ impl Eval {
             | d.constant.is_i64():
                 if int_assignable(str(PrimKind.Int), d) {
                     d.kind.kind = build_prim_type(str(PrimKind.Int))
+                    d.constant.set_i64(d.constant.as_i64())
                 }
 
             | d.constant.is_u64():
                 if int_assignable(str(PrimKind.Uint), d) {
                     d.kind.kind = build_prim_type(str(PrimKind.Uint))
+                    d.constant.set_u64(d.constant.as_u64())
                 }
             }
         }
@@ -3550,10 +3566,48 @@ impl BinopSolver {
         self.check_mod_data(self.r)
     }
 
+    fn numbers_are_compatibile(self, &lk: str, &rk: str): bool {
+        if self.l.is_const() {
+            ret true
+        }
+
+        if lk == str(types::TypeKind.F32) {
+            if self.r.is_const() {
+                ret true
+            }
+            ret rk == str(types::TypeKind.F32)
+        }
+        if lk == str(types::TypeKind.F64) {
+            if self.r.is_const() {
+                ret true
+            }
+            ret rk == str(types::TypeKind.F64)
+        }
+
+        if self.r.is_const() {
+            if !self.r.constant.is_f64() {
+                ret true
+            }
+
+            // Truncate only literals.
+            // Skip castings.
+            match type self.r.model {
+            | &Const:
+                ret int_assignable(str(types::TypeKind.Int), self.r) ||
+                    int_assignable(str(types::TypeKind.Uint), self.r)
+
+            |:
+                ret false
+            }
+        }
+
+        ret !types::is_float(rk)
+    }
+
     fn eval_float(mut self): &Data {
         let lk = self.l.kind.to_str()
         let rk = self.r.kind.to_str()
-        if !types::is_num(lk) || !types::is_num(rk) {
+        if !self.numbers_are_compatibile(lk, rk) {
             self.e.push_err(self.op, LogMsg.IncompatibleTypes, lk, rk)
             ret new(Data)
         }
@@ -3599,7 +3653,7 @@ impl BinopSolver {
     fn eval_unsig_int(mut self): &Data {
         let lk = self.l.kind.to_str()
         let rk = self.r.kind.to_str()
-        if !types::is_num(lk) || !types::is_num(rk) {
+        if !self.numbers_are_compatibile(lk, rk) {
             self.e.push_err(self.op, LogMsg.IncompatibleTypes, lk, rk)
             ret new(Data)
         }
@@ -3658,7 +3712,7 @@ impl BinopSolver {
     fn eval_sig_int(mut self): &Data {
         let lk = self.l.kind.to_str()
         let rk = self.r.kind.to_str()
-        if !types::is_num(lk) || !types::is_num(rk) {
+        if !self.numbers_are_compatibile(lk, rk) {
             self.e.push_err(self.op, LogMsg.IncompatibleTypes, lk, rk)
             ret new(Data)
         }
@@ -3832,7 +3886,6 @@ impl BinopSolver {
         match self.op.kind {
         | str(TokenKind.Eqs):
             d.constant = Const.new_bool(self.l.constant.eqs(self.r.constant))
-
 
         | str(TokenKind.NotEq):
             d.constant = Const.new_bool(!self.l.constant.eqs(self.r.constant))
