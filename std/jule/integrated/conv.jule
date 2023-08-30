@@ -1,0 +1,25 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use utf16 for std::unicode::utf16
+
+// Returns the UTF-16 encoding of the UTF-8 string
+// s, with a terminating NULL added. If s includes NULL
+// character at any location, ignores followed characters.
+pub fn utf16_from_str(s: str): []u16 {
+    // In the worst case all characters require two u16.
+    // Also account for the terminating NULL character.
+    // See: C Strings and Windows UTF16.
+
+    const NULL_TERMINATION = '\x00'
+    let runes = ([]rune)(s)
+    let mut buff = make([]u16, 0, runes.len)
+    for _, r in runes {
+        if r == NULL_TERMINATION {
+            break
+        }
+        buff = utf16::append_rune(buff, r)
+    }
+    ret utf16::append_rune(buff, NULL_TERMINATION)
+}
