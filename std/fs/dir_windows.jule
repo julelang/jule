@@ -2,15 +2,9 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::fs::path::{join}
+use path for std::fs::path
 use integrated for std::jule::integrated
-use std::sys::{
-    self,
-    u16_ptr_to_str,
-    _wopendir,
-    _wreaddir,
-    _wclosedir
-}
+use sys for std::sys
 
 // Reads the named directory and returs all its directory entries can read.
 // Returns nil if no any directory entry or error occurs.
@@ -20,18 +14,18 @@ use std::sys::{
 //  NotExist InsufficientMemory NotDir
 pub fn read_dir(path: str): (dirents: []&DirEntry, err: FsError) {
     let utf16_path = integrated::utf16_from_str(path)
-    let mut dir = unsafe { _wopendir(&utf16_path[0]) }
+    let mut dir = unsafe { sys::_wopendir(&utf16_path[0]) }
     if dir == nil {
         err = get_last_fs_error()
         ret
     }
     for {
-        let dirent = unsafe { _wreaddir(dir) }
+        let dirent = unsafe { sys::_wreaddir(dir) }
         if dirent == nil {
             break
         }
-        let name = unsafe { u16_ptr_to_str((*u16)(dirent.d_name)) }
-        let (stat, serr) = stat(join(path, name))
+        let name = unsafe { integrated::u16_ptr_to_str((*u16)(dirent.d_name)) }
+        let (stat, serr) = stat(path::join(path, name))
         if serr != FsError.Ok {
             err = serr
             dirents = nil
@@ -42,7 +36,7 @@ pub fn read_dir(path: str): (dirents: []&DirEntry, err: FsError) {
             stat: stat,
         })
     }
-    _ = unsafe { _wclosedir(dir) }
+    _ = unsafe { sys::_wclosedir(dir) }
     ret
 }
 
