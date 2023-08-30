@@ -55,6 +55,54 @@ pub enum MemoryOrder {
     SeqCst = 5,
 }
 
+struct AtomicNumber[T] {
+    n: T
+}
+
+impl AtomicNumber {
+    // Atomically stores new value and returns the previous value.
+    pub fn swap(mut self, new: T, order: MemoryOrder): (old: T) {
+        ret unsafe { cpp.__jule_atomic_swap_explicit[T](&self.n, new, order) }
+    }
+
+    // Executes the compare-and-swap operation.
+    pub fn compare_swap(mut self, old: T, new: T, order: MemoryOrder): (swapped: bool) {
+        ret unsafe {
+            cpp.__jule_atomic_compare_swap_explicit[T](
+                &self.n, &old, new, order, order)
+        }
+    }
+
+    // Atomically adds delta to value and returns the previous value.
+    pub fn add(mut self, delta: T, order: MemoryOrder): (old: T) {
+        ret unsafe { cpp.__jule_atomic_add_explicit[T](&self.n, delta, order) }
+    }
+
+    // Atomically reads and returns value.
+    pub fn load(self, order: MemoryOrder): T {
+        ret unsafe { cpp.__jule_atomic_load_explicit[T](&self.n, order) }
+    }
+
+    // Atomically assigns to value.
+    pub fn store(mut self, val: T, order: MemoryOrder) {
+        unsafe { cpp.__jule_atomic_store_explicit[T](&self.n, val, order) }
+    }
+}
+
+impl AtomicNumber {
+    // Returns new atomic instance for type with initializer value.
+    pub static fn new(n: T): AtomicNumber[T] {
+        ret AtomicNumber[T]{n: n}
+    }
+}
+
+// Type alias for private wrapper structure for int type.
+pub type AtomicInt: AtomicNumber[int]
+// Type aliases for private wrapper structure for uint type.
+pub type AtomicUint: AtomicNumber[uint]
+// Type aliases for private wrapper structure for uintptr type.
+pub type AtomicUintptr: AtomicNumber[uintptr]
+
 // Atomically stores new into addr and returns the previous addr value.
 pub fn swap_i32(mut &addr: i32, new: i32, order: MemoryOrder): (old: i32) {
     ret unsafe { cpp.__jule_atomic_swap_explicit[i32](&addr, new, order) }
