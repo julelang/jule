@@ -2,33 +2,32 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use std::jule::integrated::{Wchar}
 use std::unicode::utf16::{append_rune, decode}
 
 cpp use "<dirent.h>"
-
-cpp type wchar_t: u16
 
 //jule:typedef
 cpp struct _WDIR{}
 
 cpp struct _wdirent {
-    pub d_name: *cpp.wchar_t
+    pub d_name: *Wchar
 }
 
 cpp fn GetStdHandle(stdh: uintptr): *unsafe
 cpp unsafe fn CloseHandle(stdh: *unsafe): bool
-cpp unsafe fn wstat(path: *cpp.wchar_t, mut handle: *cpp.stat): int
-cpp unsafe fn _wopendir(path: *cpp.wchar_t): *cpp._WDIR
+cpp unsafe fn wstat(path: *Wchar, mut handle: *cpp.stat): int
+cpp unsafe fn _wopendir(path: *Wchar): *cpp._WDIR
 cpp unsafe fn _wclosedir(mut dir: *cpp._WDIR): int
 cpp unsafe fn _wreaddir(mut dir: *cpp._WDIR): *cpp._wdirent
-cpp unsafe fn _wopen(path: *cpp.wchar_t, flag: int, mode: int): int
+cpp unsafe fn _wopen(path: *Wchar, flag: int, mode: int): int
 cpp fn GetLastError(): u32
-cpp unsafe fn GetCurrentDirectoryW(bufflen: u32, buff: *cpp.wchar_t): u32
-cpp unsafe fn SetCurrentDirectoryW(path: *cpp.wchar_t): bool
-cpp unsafe fn GetFullPathNameW(path: *cpp.wchar_t, bufflen: u32, buff: *cpp.wchar_t, fname: **cpp.wchar_t): u32
-cpp unsafe fn DeleteFileW(path: *cpp.wchar_t): bool
-cpp unsafe fn CreateDirectoryW(path: *cpp.wchar_t, pass_null_here: *bool): bool
-cpp unsafe fn RemoveDirectoryW(path: *cpp.wchar_t): bool
+cpp unsafe fn GetCurrentDirectoryW(bufflen: u32, buff: *Wchar): u32
+cpp unsafe fn SetCurrentDirectoryW(path: *Wchar): bool
+cpp unsafe fn GetFullPathNameW(path: *Wchar, bufflen: u32, buff: *Wchar, fname: **Wchar): u32
+cpp unsafe fn DeleteFileW(path: *Wchar): bool
+cpp unsafe fn CreateDirectoryW(path: *Wchar, pass_null_here: *bool): bool
+cpp unsafe fn RemoveDirectoryW(path: *Wchar): bool
 
 // C's _WDIR.
 pub type Wdir: cpp._WDIR
@@ -105,12 +104,12 @@ pub unsafe fn close_handle(stdh: handle): bool { ret cpp.CloseHandle(unsafe { (*
 
 // Calls C's wstat function.
 pub unsafe fn wstat(path: *u16, mut stat: *Stat): int {
-    ret cpp.wstat((*cpp.wchar_t)(path), stat)
+    ret cpp.wstat((*Wchar)(path), stat)
 }
 
 // Wrapper for C's _wopen function.
 pub unsafe fn _wopen(path: *u16, flag: int, mode: int): int {
-    ret cpp._wopen((*cpp.wchar_t)(&path[0]), flag, mode)
+    ret cpp._wopen((*Wchar)(&path[0]), flag, mode)
 }
 
 // Returns last Windows error.
@@ -119,32 +118,32 @@ pub fn get_last_error(): u32 { ret cpp.GetLastError() }
 // Reads working directory into buff and returns readed
 // rune count of current process. Returns 0 if fail.
 pub unsafe fn get_current_directory(bufflen: u32, mut buff: *u16): u32 {
-    ret cpp.GetCurrentDirectoryW(bufflen, (*cpp.wchar_t)(buff))
+    ret cpp.GetCurrentDirectoryW(bufflen, (*Wchar)(buff))
 }
 
 // Sets working directory to path.
 // Reports operation is success.
 pub unsafe fn set_current_directory(path: *u16): bool {
-    ret cpp.SetCurrentDirectoryW((*cpp.wchar_t)(path))
+    ret cpp.SetCurrentDirectoryW((*Wchar)(path))
 }
 
 // Delete file.
 pub unsafe fn delete_file(path: *u16): bool {
-    ret cpp.DeleteFileW((*cpp.wchar_t)(path))
+    ret cpp.DeleteFileW((*Wchar)(path))
 }
 
 // Creates directory.
 pub unsafe fn create_directory(path: *u16): bool {
-    ret cpp.CreateDirectoryW((*cpp.wchar_t)(path), nil)
+    ret cpp.CreateDirectoryW((*Wchar)(path), nil)
 }
 
 // Removes empty directory.
 pub unsafe fn remove_directory(path: *u16): bool {
-    ret cpp.RemoveDirectoryW((*cpp.wchar_t)(path))
+    ret cpp.RemoveDirectoryW((*Wchar)(path))
 }
 
 // Calls C's _wopendir function.
-pub unsafe fn _wopendir(path: *u16): *Wdir { ret cpp._wopendir((*cpp.wchar_t)(path)) }
+pub unsafe fn _wopendir(path: *u16): *Wdir { ret cpp._wopendir((*Wchar)(path)) }
 
 // Calls C's _wreaddir function.
 pub unsafe fn _wreaddir(mut dir: *Wdir): *Wdirent { ret cpp._wreaddir(dir) }
@@ -155,8 +154,5 @@ pub unsafe fn _wclosedir(mut dir: *Wdir): int { ret cpp._wclosedir(dir) }
 // Calls Windows's GetFullPathNameW function.
 pub unsafe fn get_full_path_name(path: *u16, bufflen: u32, 
     buff: *u16, fname: **u16): u32 {
-    ret cpp.GetFullPathNameW((*cpp.wchar_t)(path),
-                                bufflen,
-                                (*cpp.wchar_t)(buff),
-                                (**cpp.wchar_t)(fname))
+    ret cpp.GetFullPathNameW((*Wchar)(path), bufflen, (*Wchar)(buff), (**Wchar)(fname))
 }
