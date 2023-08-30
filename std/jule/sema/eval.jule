@@ -545,13 +545,7 @@ impl Eval {
         self.push_reference(s.references)
     }
 
-    fn eval_enum(mut self, enm: &Enum, error_token: Token): &Data {
-        if !self.s.is_accessible_define(enm.public, enm.token) {
-            self.push_err(error_token, LogMsg.IdentIsNotAccessible, enm.ident)
-            self.push_suggestion(LogMsg.MakePubToAccess)
-            ret new(Data)
-        }
-
+    fn __eval_enum(self, enm: &Enum): &Data {
         ret &Data{
             lvalue:   false,
             mutable:  false,
@@ -563,13 +557,17 @@ impl Eval {
         }
     }
 
-    fn eval_struct(mut self, mut s: &StructIns, error_token: Token): &Data {
-        if !self.s.is_accessible_define(s.decl.public, s.decl.token) {
-            self.push_err(error_token, LogMsg.IdentIsNotAccessible, s.decl.ident)
+    fn eval_enum(mut self, enm: &Enum, error_token: Token): &Data {
+        if !self.s.is_accessible_define(enm.public, enm.token) {
+            self.push_err(error_token, LogMsg.IdentIsNotAccessible, enm.ident)
             self.push_suggestion(LogMsg.MakePubToAccess)
             ret new(Data)
         }
 
+        ret self.__eval_enum(enm)
+    }
+
+    fn __eval_struct(self, s: &StructIns): &Data {
         ret &Data{
             lvalue:   false,
             mutable:  false,
@@ -580,6 +578,16 @@ impl Eval {
             },
             model: s,
         }
+    }
+
+    fn eval_struct(mut self, mut s: &StructIns, error_token: Token): &Data {
+        if !self.s.is_accessible_define(s.decl.public, s.decl.token) {
+            self.push_err(error_token, LogMsg.IdentIsNotAccessible, s.decl.ident)
+            self.push_suggestion(LogMsg.MakePubToAccess)
+            ret new(Data)
+        }
+
+        ret self.__eval_struct(s)
     }
 
     fn eval_fn_ins(self, mut f: &FnIns): &Data {
@@ -751,10 +759,10 @@ impl Eval {
         let mut kind = ta.kind.kind.kind
         match type kind {
         | &StructIns:
-            ret self.eval_struct((&StructIns)(kind), error_token)
+            ret self.__eval_struct((&StructIns)(kind))
 
         | &Enum:
-            ret self.eval_enum((&Enum)(kind), error_token)
+            ret self.__eval_enum((&Enum)(kind))
 
         |:
             let mut d = &Data{
