@@ -12,17 +12,9 @@
 
 // Declarations
 
-jule::Str __jule_str_from_byte_ptr(const char *ptr);
-jule::Str __jule_str_from_byte_ptr(const jule::Byte *ptr);
 jule::Int __jule_stat(const char *path, struct stat *_stat);
 
 // Definitions
-jule::Str __jule_str_from_byte_ptr(const char *ptr)
-{ return __jule_str_from_byte_ptr((const jule::Byte*)(ptr)); }
-
-jule::Str __jule_str_from_byte_ptr(const jule::Byte *ptr)
-{ return jule::Str(ptr); }
-
 jule::Int __jule_stat(const char *path, struct stat *_stat)
 { return stat(path, _stat); }
 

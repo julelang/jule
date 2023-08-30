@@ -2,15 +2,9 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::fs::path::{join}
-use std::sys::{
-    byte_ptr_to_str,
-    opendir,
-    readdir,
-    closedir,
-    mkdir,
-    rmdir,
-}
+use path for std::fs::path
+use integrated for std::jule::integrated
+use sys for std::sys
 
 // Reads the named directory and returs all its directory entries can read.
 // Returns nil if no any directory entry or error occurs.
@@ -19,18 +13,18 @@ use std::sys::{
 //  Denied InvalidDescriptor PerProcessLimit SystemWideLimit
 //  NotExist InsufficientMemory NotDir
 pub fn read_dir(path: str): (dirents: []&DirEntry, err: FsError) {
-    let mut dir = unsafe { opendir(&path[0]) }
+    let mut dir = unsafe { sys::opendir(&path[0]) }
     if dir == nil {
         err = get_last_fs_error()
         ret
     }
     for {
-        let dirent = unsafe { readdir(dir) }
+        let dirent = unsafe { sys::readdir(dir) }
         if dirent == nil {
             break
         }
-        let name = unsafe { byte_ptr_to_str((*u8)(dirent.d_name)) }
-        let (stat, serr) = stat(join(path, name))
+        let name = unsafe { integrated::byte_ptr_to_str((*u8)(dirent.d_name)) }
+        let (stat, serr) = stat(path::join(path, name))
         if serr != FsError.Ok {
             err = serr
             dirents = nil
@@ -41,7 +35,7 @@ pub fn read_dir(path: str): (dirents: []&DirEntry, err: FsError) {
             stat: stat,
         })
     }
-    _ = unsafe { closedir(dir) }
+    _ = unsafe { sys::closedir(dir) }
     ret
 }
 
@@ -52,7 +46,7 @@ pub fn create_dir(path: str): FsError {
     // NOTICE
     // Also can has EMLINK error-code.
     // Make sure this situation should documented or not.
-    if (unsafe { mkdir(&path[0], 0700) } == 0) {
+    if (unsafe { sys::mkdir(&path[0], 0700) } == 0) {
         ret FsError.Ok
     }
     ret get_last_fs_error()
@@ -62,7 +56,7 @@ pub fn create_dir(path: str): FsError {
 //
 // Possible errors: Denined NotExist NotEmpty SyncIO IO Loop NotDir
 pub fn remove_dir(path: str): FsError {
-    if (unsafe { rmdir(&path[0]) } == 0) {
+    if (unsafe { sys::rmdir(&path[0]) } == 0) {
         ret FsError.Ok
     }
     ret get_last_fs_error()
