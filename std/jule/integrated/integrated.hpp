@@ -9,6 +9,15 @@
 
 // Declarations
 
+typedef signed char __jule_signed_char;
+typedef unsigned char __jule_unsigned_char;
+typedef unsigned short __jule_unsigned_short;
+typedef unsigned long __jule_unsigned_long;
+typedef long long __jule_long_long;
+typedef unsigned long long __jule_unsigned_long_long;
+typedef long double __jule_long_double;
+typedef bool __jule_bool;
+
 inline jule::Str __jule_str_from_byte_ptr(const char *ptr);
 inline jule::Str __jule_str_from_byte_ptr(const jule::Byte *ptr);
 
