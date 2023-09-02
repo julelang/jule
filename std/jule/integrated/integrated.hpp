@@ -20,6 +20,7 @@ typedef bool __jule_bool;
 
 template<typename T> inline T *__jule_new(void);
 template<typename T> inline T *__jule_new_array(const jule::Int &size);
+template<typename T> inline void __jule_delete(const T *heap);
 inline jule::Str __jule_str_from_byte_ptr(const char *ptr);
 inline jule::Str __jule_str_from_byte_ptr(const jule::Byte *ptr);
 
@@ -31,6 +32,10 @@ inline T *__jule_new(void)
 template<typename T>
 inline T *__jule_new_array(const jule::Int &size)
 { return new T[size]; }
+
+template<typename T>
+inline void __jule_delete(const T *heap)
+{ delete heap; }
 
 inline jule::Str __jule_str_from_byte_ptr(const char *ptr)
 { return __jule_str_from_byte_ptr((const jule::Byte*)(ptr)); }
