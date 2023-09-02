@@ -99,8 +99,8 @@ Please read the <a href="https://manual.jule.dev/unsafe-jule">Unsafe Jule</a> pa
 <br><br>
 
 > **Note** \
-> Jule also has different memory management approaches.\
-> For example, the `std::memory::c` standard library provides C-like memory management.
+> Jule also provides different memory management approaches.\
+> For example, the `std::jule::integrated` standard library provides C-like and CPP-like memory management.
 
 <h2 id="cpp-interoperability">C++ Interoperability</h2>
 Jule is designed to be interoperable with C++.
