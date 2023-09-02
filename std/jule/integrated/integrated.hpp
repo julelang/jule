@@ -19,6 +19,7 @@ typedef long double __jule_long_double;
 typedef bool __jule_bool;
 
 template<typename T> inline T *__jule_new(void);
+template<typename T> inline T *__jule_new_array(const jule::Int &size);
 inline jule::Str __jule_str_from_byte_ptr(const char *ptr);
 inline jule::Str __jule_str_from_byte_ptr(const jule::Byte *ptr);
 
@@ -26,6 +27,10 @@ inline jule::Str __jule_str_from_byte_ptr(const jule::Byte *ptr);
 template<typename T>
 inline T *__jule_new(void)
 { return new T; }
+
+template<typename T>
+inline T *__jule_new_array(const jule::Int &size)
+{ return new T[size]; }
 
 inline jule::Str __jule_str_from_byte_ptr(const char *ptr)
 { return __jule_str_from_byte_ptr((const jule::Byte*)(ptr)); }
