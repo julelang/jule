@@ -18,10 +18,15 @@ typedef unsigned long long __jule_unsigned_long_long;
 typedef long double __jule_long_double;
 typedef bool __jule_bool;
 
+template<typename T> inline T *__jule_new(void);
 inline jule::Str __jule_str_from_byte_ptr(const char *ptr);
 inline jule::Str __jule_str_from_byte_ptr(const jule::Byte *ptr);
 
 // Definitions
+template<typename T>
+inline T *__jule_new(void)
+{ return new T; }
+
 inline jule::Str __jule_str_from_byte_ptr(const char *ptr)
 { return __jule_str_from_byte_ptr((const jule::Byte*)(ptr)); }
 
