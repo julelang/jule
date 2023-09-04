@@ -18,8 +18,8 @@ typedef unsigned long long __jule_unsigned_long_long;
 typedef long double __jule_long_double;
 typedef bool __jule_bool;
 
-template<typename T> inline T *__jule_new(void);
-template<typename T> inline T *__jule_new_array(const jule::Int &size);
+template<typename T> inline jule::Uintptr __jule_new(void);
+template<typename T> inline jule::Uintptr __jule_new_array(const jule::Int &size);
 template<typename T> inline void __jule_delete(const T *heap);
 template<typename T> inline void __jule_delete_array(const T *heap);
 inline jule::Str __jule_str_from_byte_ptr(const char *ptr);
@@ -27,12 +27,12 @@ inline jule::Str __jule_str_from_byte_ptr(const jule::Byte *ptr);
 
 // Definitions
 template<typename T>
-inline T *__jule_new(void)
-{ return new T; }
+inline jule::Uintptr __jule_new(void)
+{ return (jule::Uintptr)new T; }
 
 template<typename T>
-inline T *__jule_new_array(const jule::Int &size)
-{ return new T[size]; }
+inline jule::Uintptr __jule_new_array(const jule::Int &size)
+{ return (jule::Uintptr)new T[size]; }
 
 template<typename T>
 inline void __jule_delete(const T *heap)
