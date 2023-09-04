@@ -8,8 +8,8 @@ cpp unsafe fn realloc(mut ptr: *unsafe, size: uint): *unsafe
 cpp unsafe fn free(mut ptr: *unsafe)
 cpp fn __jule_new[T](): uintptr
 cpp fn __jule_new_array[T](size: int): uintptr
-cpp unsafe fn __jule_delete[T](heap: *T)
-cpp unsafe fn __jule_delete_array[T](heap: *T)
+cpp unsafe fn __jule_delete[T](heap: uintptr)
+cpp unsafe fn __jule_delete_array[T](heap: uintptr)
 
 // Allocates size bytes of memory.
 // Memory does not initialize.
@@ -72,9 +72,25 @@ pub fn new_array_u[T](size: int): uintptr {
 pub fn new_array[T](size: int): *T { ret unsafe { (*T)(new_array_u[T](size)) } }
 
 // Deallocates memory allocation.
+// Equavalent to: delete (T*)heap in C++
+//
+// It can be used also for unsupported
+// types by pointers such as references.
+// So you can delete *&T actually.
+pub unsafe fn delete_u[T](heap: uintptr) { cpp.__jule_delete[T](heap) }
+
+// Deallocates memory allocation.
 // Equavalent to: delete heap in C++
-pub unsafe fn delete[T](heap: *T) { cpp.__jule_delete[T](heap) }
+pub unsafe fn delete[T](heap: *T) { delete_u[T](uintptr(heap)) }
+
+// Deallocates array memory allocation.
+// Equavalent to: delete[] (T*)heap in C++
+//
+// It can be used also for unsupported
+// types by pointers such as references.
+// So you can delete *&T actually.
+pub unsafe fn delete_array_u[T](heap: uintptr) { cpp.__jule_delete_array[T](heap) }
 
 // Deallocates array memory allocation.
 // Equavalent to: delete[] heap in C++
-pub unsafe fn delete_array[T](heap: *T) { cpp.__jule_delete_array[T](heap) }
+pub unsafe fn delete_array[T](heap: *T) { delete_array_u[T](uintptr(heap)) }
