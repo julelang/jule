@@ -52,16 +52,24 @@ pub fn new_u[T](): uintptr { ret cpp.__jule_new[T]() }
 
 // Allocates new memory.
 // Equavalent to: new T in C++
-pub fn new[T](): *T { ret unsafe { (*T)(new[T]()) } }
+pub fn new[T](): *T { ret unsafe { (*T)(new_u[T]()) } }
 
 // Allocates new array memory.
-// Equavalent to: new T[size] in C++
-pub fn new_array[T](size: int): *T {
+// Equavalent to: (uintptr_t)new T[size] in C++
+//
+// It can be used also for unsupported
+// types by pointers such as references.
+// So you can get *&T actually.
+pub fn new_array_u[T](size: int): uintptr {
     if size < 0 {
         panic("std::jule::integrated new_array[T]: size < 0")
     }
-    ret unsafe { (*T)(cpp.__jule_new_array[T](size)) }
+    ret cpp.__jule_new_array[T](size)
 }
+
+// Allocates new array memory.
+// Equavalent to: (uintptr_t)new T[size] in C++
+pub fn new_array[T](size: int): *T { ret unsafe { (*T)(new_array_u[T](size)) } }
 
 // Deallocates memory allocation.
 // Equavalent to: delete heap in C++
