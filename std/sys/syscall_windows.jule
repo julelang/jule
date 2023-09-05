@@ -7,6 +7,9 @@ use std::unicode::utf16::{decode}
 
 cpp use "<dirent.h>"
 
+cpp type DWORD: int
+cpp type HANDLE: *unsafe
+
 //jule:typedef
 cpp struct _WDIR{}
 
@@ -28,6 +31,7 @@ cpp unsafe fn GetFullPathNameW(path: *Wchar, bufflen: u32, buff: *Wchar, fname: 
 cpp unsafe fn DeleteFileW(path: *Wchar): bool
 cpp unsafe fn CreateDirectoryW(path: *Wchar, pass_null_here: *bool): bool
 cpp unsafe fn RemoveDirectoryW(path: *Wchar): bool
+cpp unsafe fn GetConsoleMode(handle: cpp.HANDLE, mut mode: *cpp.DWORD): bool
 
 // C's _WDIR.
 pub type Wdir: cpp._WDIR
@@ -99,4 +103,9 @@ pub unsafe fn _wclosedir(mut dir: *Wdir): int { ret cpp._wclosedir(dir) }
 pub unsafe fn get_full_path_name(path: *u16, bufflen: u32, 
     buff: *u16, fname: **u16): u32 {
     ret cpp.GetFullPathNameW((*Wchar)(path), bufflen, (*Wchar)(buff), (**Wchar)(fname))
+}
+
+// Calls Windows's GetConsoleMode function.
+pub fn get_console_mode(handle: handle, mut &mode: int): bool {
+    ret unsafe { cpp.GetConsoleMode(cpp.HANDLE(handle), (*cpp.DWORD)(&mode)) }
 }
