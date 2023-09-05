@@ -1,0 +1,36 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+//jule:build windows
+
+use sys for std::sys
+
+// When writing with WriteFile or WriteConsole, characters are parsed for VT100
+// and similar control character sequences that control cursor movement,
+// color/font mode, and other operations that can also be performed via the
+// existing Console APIs. For more information, see Console Virtual
+// Terminal Sequences. Ensure ENABLE_PROCESSED_OUTPUT is set when using this flag.
+//
+// See: https://learn.microsoft.com/en-us/windows/console/setconsolemode
+const ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
+
+fn __enable_vtp() {
+    let hOut = sys::get_std_handle(uintptr(sys::STD_OUTPUT_HANDLE))
+    if hOut == sys::INVALID_HANDLE {
+        ret
+    }
+
+    let mut dwMode: int = 0
+    if !sys::get_console_mode(hOut, dwMode) {
+        ret
+    }
+
+    dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING
+    _ = sys::set_console_mode(hOut, dwMode);
+}
+
+fn init() {
+    __enable_vtp()
+    __init_common()
+}
