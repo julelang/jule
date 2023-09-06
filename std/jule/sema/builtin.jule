@@ -28,6 +28,7 @@ static mut BUILTIN_FN_RECOVER: &FnIns = &FnIns{}
 static mut BUILTIN_FN_CLONE: &FnIns = &FnIns{}
 static mut BUILTIN_FN_STD_MEM_SIZE_OF: &FnIns = &FnIns{}
 static mut BUILTIN_FN_STD_MEM_ALIGN_OF: &FnIns = &FnIns{}
+static mut BUILTIN_FN_STD_JULE_INTEGRATED_TO_STR: &FnIns = &FnIns{}
 
 static mut BUILTIN_FN_REAL: &FnIns = &FnIns{
     result: &TypeKind{kind: build_prim_type(str(PrimKind.Bool))},
@@ -106,6 +107,8 @@ fn init() {
     BUILTIN_FN_STD_MEM_SIZE_OF.caller = builtin_caller_std_mem_size_of
     BUILTIN_FN_STD_MEM_ALIGN_OF.caller = builtin_caller_std_mem_align_of
 
+    BUILTIN_FN_STD_JULE_INTEGRATED_TO_STR.caller = builtin_caller_std_jule_integrated_to_str
+
     let mut error_method = BUILTIN_TRAIT_ERROR.find_method("error")
     let mut error_method_ins = error_method.instance()
     error_method_ins.result = &TypeKind{kind: build_prim_type(str(PrimKind.Str))}
@@ -178,10 +181,18 @@ fn find_builtin_def_std_mem(ident: str): any {
     }
 }
 
+fn find_builtin_def_std_jule_integrated(ident: str): any {
+    match ident {
+    | "to_str":  ret BUILTIN_FN_STD_JULE_INTEGRATED_TO_STR
+    |:           ret nil
+    }
+}
+
 fn find_package_builtin_def(link_path: str, ident: str): any {
     match link_path {
-    | "std::mem": ret find_builtin_def_std_mem(ident)
-    |:            ret nil
+    | "std::mem":              ret find_builtin_def_std_mem(ident)
+    | "std::jule::integrated": ret find_builtin_def_std_jule_integrated(ident)
+    |:                         ret nil
     }
 }
 
@@ -761,4 +772,30 @@ fn builtin_caller_std_mem_align_of(mut e: &Eval, mut fc: &FnCallExpr, mut _: &Da
 
     result.model = &AlignofExprModel{expr: d.model}
     ret result
+}
+
+fn builtin_caller_std_jule_integrated_to_str(mut e: &Eval, mut fc: &FnCallExpr, mut _: &Data): &Data {
+    if fc.generics.len > 0 {
+        e.push_err(fc.token, LogMsg.NotHasGenerics)
+    }
+
+    if fc.args.len < 1 {
+        e.push_err(fc.token, LogMsg.MissingExprFor, "expr")
+        ret new(Data)
+    }
+    if fc.args.len > 1 {
+        e.push_err(fc.args[1].token, LogMsg.ArgumentOverflow)
+    }
+
+    let mut d = e.eval_expr_kind(fc.args[0].kind)
+    if !real(d) {
+        ret new(Data)
+    }
+
+    ret &Data{
+        kind:  &TypeKind{kind: build_prim_type(str(PrimKind.Str))},
+        model: &IntegratedToStrExprModel{
+            expr: d.model,
+        },
+    }
 }
