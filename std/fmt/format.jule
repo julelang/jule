@@ -1,0 +1,71 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use integrated for std::jule::integrated
+
+fn find_format_prefix(&bytes: []byte, &start: int): int {
+    let mut i = start
+    for i < bytes.len; i++ {
+        if bytes[i] == '{' {
+            ret i
+        }
+    }
+    ret -1
+}
+
+// It places the passes arguments in the string relative to the corresponding
+// format string. The to_str function provided by the API is used for string
+// conversion. Returns format string if args.len == 0. If the arguments
+// have ended, the remaining part of format string is not processed and
+// is returned as is.
+//
+// Formatting:
+//  Arguments are processed sequentially. That is, when an argument
+//  encounters a format string parameter, it will be processed according
+//  to how many parameters it is. The 5th parameter uses the 5th argument
+//  as the value.
+//
+//  Each format parameter is represented as "{}" in the format string.
+//  These parameters will then be deleted according to the processing
+//  algorithm and replaced with arguments.
+//
+// Examples:
+//  - format("{} {}!", "Hello", "World") = "Hello World!"
+//  - format("{} {}") = "{} {}"
+//  - format("{} is the {}", "PI Number") = "PI Number is the {}"
+pub fn format(fmt: str, args: ...any): str {
+    if args.len == 0 {
+        ret fmt
+    }
+
+    let mut bytes = make([]byte, 0, fmt.len)
+    let fmt_bytes = ([]byte)(fmt)
+
+    let mut j = 0 // Args position.
+    let mut last = 0
+    let mut i = find_format_prefix(fmt_bytes, last)
+    for i != -1; i = find_format_prefix(fmt_bytes, i) {
+        bytes = append(bytes, fmt_bytes[last:i]...)
+        i++
+        if i >= fmt_bytes.len {
+            break
+        }
+
+        // {}
+        if fmt_bytes[i] == '}' {
+            i++
+            bytes = append(bytes, ([]byte)(integrated::to_str(args[j]))...)
+            j++
+            if j >= args.len {
+                bytes = append(bytes, fmt_bytes[i:]...)
+                break
+            }
+        }
+
+        // Set last positioning to latest value of i.
+        last = i
+    }
+
+    ret str(bytes)
+}
