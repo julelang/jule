@@ -26,6 +26,7 @@ template<typename T> inline T __jule_deref_ptr(const jule::Uintptr &heap);
 template<typename T> inline void __jule_assign_ptr(const jule::Uintptr &heap, T val);
 inline jule::Str __jule_str_from_byte_ptr(const char *ptr);
 inline jule::Str __jule_str_from_byte_ptr(const jule::Byte *ptr);
+inline jule::Str __jule_type_id_of_any(const jule::Any &any);
 
 // Definitions
 template<typename T>
@@ -57,5 +58,8 @@ inline jule::Str __jule_str_from_byte_ptr(const char *ptr)
 
 inline jule::Str __jule_str_from_byte_ptr(const jule::Byte *ptr)
 { return jule::Str(ptr); }
+
+inline jule::Str __jule_type_id_of_any(const jule::Any &any)
+{ return jule::Str(any.type->type_id()); }
 
 #endif // ifndef __JULE_STD_JULE_INTEGRATED_HPP
