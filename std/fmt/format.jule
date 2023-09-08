@@ -3,15 +3,43 @@
 // license that can be found in the LICENSE file.
 
 use integrated for std::jule::integrated
+use utf8 for std::unicode::utf8
 
 fn find_format_prefix(&bytes: []byte, &start: int): int {
     let mut i = start
-    for i < bytes.len; i++ {
-        if bytes[i] == '{' {
+    for i < bytes.len {
+        let (r, size) = utf8::decode_rune(bytes[i:])
+        if r == '{' {
             ret i
         }
+        i += size
     }
     ret -1
+}
+
+// Returns range of {...}, included braces.
+// Parameter i is the start point to selected and should
+// points to start brace at beginning.
+// i is points to position of last brace and +1 offset in the end.
+// Returns nil slice if there is no match.
+pub fn get_format_range(mut &i: int, mut &bytes: []byte): []byte {
+    let start = i
+    let mut braces = 0
+    for i < bytes.len {
+        let (r, size) = utf8::decode_rune(bytes[i:])
+        i += size
+        match r {
+        | '{':
+            braces++
+
+        | '}':
+            braces--
+            if braces == 0 {
+                ret bytes[start:i]
+            }
+        }
+    }
+    ret nil
 }
 
 // It places the passes arguments in the string relative to the corresponding
@@ -40,31 +68,35 @@ pub fn format(fmt: str, args: ...any): str {
     }
 
     let mut bytes = make([]byte, 0, fmt.len)
-    let fmt_bytes = ([]byte)(fmt)
+    let mut fmt_bytes = ([]byte)(fmt)
 
     let mut j = 0 // Args position.
     let mut last = 0
     let mut i = find_format_prefix(fmt_bytes, last)
     for i != -1; i = find_format_prefix(fmt_bytes, i) {
         bytes = append(bytes, fmt_bytes[last:i]...)
-        i++
-        if i >= fmt_bytes.len {
-            break
+        let format = get_format_range(i, fmt_bytes)
+        if format == nil {
+            continue
         }
 
         // {}
-        if fmt_bytes[i] == '}' {
-            i++
+        if format.len == 2 {
             bytes = append(bytes, ([]byte)(integrated::to_str(args[j]))...)
             j++
             if j >= args.len {
                 bytes = append(bytes, fmt_bytes[i:]...)
+                last = fmt_bytes.len
                 break
             }
         }
 
         // Set last positioning to latest value of i.
         last = i
+    }
+
+    if last < fmt_bytes.len {
+        bytes = append(bytes, fmt_bytes[last:]...)
     }
 
     ret str(bytes)
