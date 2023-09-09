@@ -42,6 +42,28 @@ pub fn get_format_range(mut &i: int, mut &bytes: []byte): []byte {
     ret nil
 }
 
+fn apply_fmt_by_default(mut &j: int, &args: ...any): []byte {
+    let mut fmt = ([]byte)(integrated::to_str(args[j]))
+    j++
+    ret fmt
+}
+
+// Returns result of formatting.
+// Parameter j is the position of argument list.
+fn apply_fmt(mut &fmt: []byte, mut &j: int, &args: ...any): []byte {
+    // {}
+    if fmt.len == 2 {
+        ret apply_fmt_by_default(j, args...)
+    }
+
+    // {{}} = {}
+    if fmt.len == 4 && fmt == ['{', '{', '}', '}'] {
+        ret ['{', '}']
+    }
+
+    ret fmt
+}
+
 // It places the passes arguments in the string relative to the corresponding
 // format string. The to_str function provided by the API is used for string
 // conversion. Returns format string if args.len == 0. If the arguments
@@ -57,6 +79,9 @@ pub fn get_format_range(mut &i: int, mut &bytes: []byte): []byte {
 //  Each format parameter is represented as "{}" in the format string.
 //  These parameters will then be deleted according to the processing
 //  algorithm and replaced with arguments.
+//
+//  The parameter "{{}}" is formatted as "{}" actually,
+//  And does not increase argument list offset.
 //
 // Examples:
 //  - format("{} {}!", "Hello", "World") = "Hello World!"
@@ -75,20 +100,16 @@ pub fn format(fmt: str, args: ...any): str {
     let mut i = find_format_prefix(fmt_bytes, last)
     for i != -1; i = find_format_prefix(fmt_bytes, i) {
         bytes = append(bytes, fmt_bytes[last:i]...)
-        let format = get_format_range(i, fmt_bytes)
+        let mut format = get_format_range(i, fmt_bytes)
         if format == nil {
             continue
         }
 
-        // {}
-        if format.len == 2 {
-            bytes = append(bytes, ([]byte)(integrated::to_str(args[j]))...)
-            j++
-            if j >= args.len {
-                bytes = append(bytes, fmt_bytes[i:]...)
-                last = fmt_bytes.len
-                break
-            }
+        bytes = append(bytes, apply_fmt(format, j, args...)...)
+        if j >= args.len {
+            bytes = append(bytes, fmt_bytes[i:]...)
+            last = fmt_bytes.len
+            break
         }
 
         // Set last positioning to latest value of i.
