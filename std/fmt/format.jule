@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use conv for std::conv
 use integrated for std::jule::integrated
 use utf8 for std::unicode::utf8
 
@@ -43,9 +44,34 @@ pub fn get_format_range(mut &i: int, mut &bytes: []byte): []byte {
 }
 
 fn apply_fmt_by_default(mut &j: int, &args: ...any): []byte {
-    let mut fmt = ([]byte)(integrated::to_str(args[j]))
+    let arg = args[j]
     j++
-    ret fmt
+    if arg == nil {
+        ret ['n', 'i', 'l']
+    }
+
+    match type arg {
+    | f32: ret ([]byte)(conv::fmt_float(f32(arg), 'g', -1, 32))
+    | f64: ret ([]byte)(conv::fmt_float(f64(arg), 'g', -1, 64))
+    | i8:  ret ([]byte)(conv::fmt_int(i8(arg), 10))
+    | i16: ret ([]byte)(conv::fmt_int(i16(arg), 10))
+    | i32: ret ([]byte)(conv::fmt_int(i32(arg), 10))
+    | i64: ret ([]byte)(conv::fmt_int(i64(arg), 10))
+    | u8:  ret ([]byte)(conv::fmt_uint(u8(arg), 10))
+    | u16: ret ([]byte)(conv::fmt_uint(u16(arg), 10))
+    | u32: ret ([]byte)(conv::fmt_uint(u32(arg), 10))
+    | u64: ret ([]byte)(conv::fmt_uint(u64(arg), 10))
+    | str: ret ([]byte)(str(arg))
+
+    | bool:
+        if bool(arg) {
+            ret ['t', 'r', 'u', 'e']
+        }
+        ret ['f', 'a', 'l', 's', 'e']
+
+    |:
+        ret ([]byte)(integrated::to_str(arg))
+    }
 }
 
 // Returns result of formatting.
