@@ -253,4 +253,4 @@ Regarding security, please refer to the [security policy](https://github.com/jul
 <h2 id="license">License</h2>
 
 The JuleC and standard library are distributed under the terms of the BSD 3-Clause license. <br>
-[See License Details](https://julelang.github.io/website/pages/license.html)
+[See License Details](./LICENSE)
