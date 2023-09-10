@@ -2,21 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::sys::{
-    self,
-    seek,
-    read,
-    write,
-    close,
-    O_RDONLY,
-    O_WRONLY,
-    O_RDWR,
-    O_APPEND,
-    O_CREAT,
-    O_EXCL,
-    O_SYNC,
-    O_TRUNC,
-}
+use integrated for std::jule::integrated
+use sys for std::sys
 
 // Seek whence values.
 pub enum Seek: int {
@@ -29,30 +16,35 @@ pub enum Seek: int {
 // Not all flags may be implemented on a given system.
 // Exactly one of Rdonly, Wronly, or Rdwr must be specified.
 pub enum OFlag: int {
-    Rdonly = O_RDONLY, // Open the file read-only
-    Wronly = O_WRONLY, // Open the file write-only
-    Rdwr = O_RDWR,     // Open the file read-write
-    Append = O_APPEND, // Append data to the file when writing
-    Create = O_CREAT,  // Create a new file if none exists
-    Excl = O_EXCL,     // Used with Sema.Create, file must not exist
-    Sync = O_SYNC,     // Open for synchronous I/O
-    Trunc = O_TRUNC,   // Truncate regular writable file when opened
+    Rdonly = sys::O_RDONLY, // Open the file read-only
+    Wronly = sys::O_WRONLY, // Open the file write-only
+    Rdwr   = sys::O_RDWR,   // Open the file read-write
+    Append = sys::O_APPEND, // Append data to the file when writing
+    Create = sys::O_CREAT,  // Create a new file if none exists
+    Excl   = sys::O_EXCL,   // Used with Sema.Create, file must not exist
+    Sync   = sys::O_SYNC,   // Open for synchronous I/O
+    Trunc  = sys::O_TRUNC,  // Truncate regular writable file when opened
 }
 
 // The file stream handle.
+//
+// It works like a wrapper when it comes to console handle like
+// stdin, stdout or stderr. Read and write functions are supported
+// for console handlers. The rest of the functions are not supported
+// and not checked, it is undefined behavior.
+//
+// There may be system call differences and performance differences
+// for console handlers depending on the operating system.
+// For example, Windows has an overhead for UTF-16 processing.
 pub struct File {
-    handle: int
+    handle: uintptr
 }
 
 impl File {
     // Returns new &File by handle.
-    // If hadle <= 0, returns nil reference.
     pub static fn new(handle: uintptr): &File {
-        if int(handle) <= 0 {
-            ret new(File)
-        }
         ret &File{
-            handle: int(handle),
+            handle: handle,
         }
     }
 }
@@ -66,49 +58,8 @@ impl File {
     // Possible errors:
     //  InvalidDescriptor SyncIO Overflow Seek
     pub fn seek(mut self, offset: i64, origin: Seek): (i64, FsError) {
-        let pos = seek(self.handle, offset, int(origin))
+        let pos = sys::seek(int(self.handle), offset, int(origin))
         ret pos, FsError.Ok
-    }
-
-    // Read bytes to buffer from handle and returns readed byte count.
-    // The number of bytes readed can never exceed the length of the buff.
-    // If the buff is larger than the number of bytes that can be read,
-    // the buffer will not cause an overflow. Offset will be shifted
-    // by the number of bytes read.
-    // Returns 0 if error occurs.
-    //
-    // Possible errors:
-    //  Retry InvalidDescriptor Signal SyncIO IO IsDir Overflow Buffer
-    //  InsufficientMemory Device Seek
-    pub fn read(mut self, mut buff: []byte): (n: int, FsError) {
-        if buff.len == 0 {
-            ret 0, FsError.Ok
-        }
-        n = unsafe { read(self.handle, &buff[0], uint(buff.len)) }
-        if n == -1 {
-            n = 0
-            ret n, get_last_fs_error()
-        }
-        ret n, FsError.Ok
-    }
-
-    // Writes bytes to handle and returns writed byte count.
-    // The number of bytes written can never exceed the length of the buff.
-    // Returns 0 if error occurs.
-    //
-    // Possible errors:
-    //  Retry InvalidDescriptor Big Signal IO NoSpace Pipe Range SyncIO
-    //  Seek Device Buffer
-    pub fn write(mut self, buff: []byte): (n: int, FsError) {
-        if buff.len == 0 {
-            ret 0, FsError.Ok
-        }
-        n = unsafe { write(self.handle, &buff[0], uint(buff.len)) }
-        if n == -1 {
-            n = 0
-            ret n, get_last_fs_error()
-        }
-        ret n, FsError.Ok
     }
 
     // Closes file handle.
@@ -116,7 +67,7 @@ impl File {
     // Possible errors:
     //  InvalidDescriptor Signal IO
     pub fn close(mut self): FsError {
-        if close(self.handle) == -1 {
+        if sys::close(int(self.handle)) == -1 {
             ret get_last_fs_error()
         }
         ret FsError.Ok

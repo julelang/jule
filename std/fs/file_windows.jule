@@ -4,6 +4,87 @@
 
 use integrated for std::jule::integrated
 use sys for std::sys
+use utf8 for std::unicode::utf8
+use utf16 for std::unicode::utf16
+
+impl File {
+    // Writes bytes to handle and returns writed byte count.
+    // The number of bytes written can never exceed the length of the buff.
+    // Returns 0 if error occurs.
+    //
+    // Possible errors:
+    //  Retry InvalidDescriptor Big Signal IO NoSpace Pipe Range SyncIO
+    //  Seek Device Buffer
+    pub fn write(mut self, buff: []byte): (n: int, FsError) {
+        if buff.len == 0 {
+            ret 0, FsError.Ok
+        }
+
+        if is_console_handle(self.handle) {
+            let utf16_buff = integrated::utf16_from_str(str(buff))
+            let ok = unsafe {
+                sys::write_console(self.handle, &utf16_buff[0],
+                    utf16_buff.len, n, nil)
+            }
+            if !ok {
+                ret 0, get_last_fs_error()
+            }
+            ret n, FsError.Ok
+        }
+
+        n = unsafe { sys::write(int(self.handle), &buff[0], uint(buff.len)) }
+        if n == -1 {
+            ret 0, get_last_fs_error()
+        }
+        ret n, FsError.Ok
+    }
+
+    // Read bytes to buffer from handle and returns readed byte count.
+    // The number of bytes readed can never exceed the length of the buff.
+    // If the buff is larger than the number of bytes that can be read,
+    // the buffer will not cause an overflow. Offset will be shifted
+    // by the number of bytes read.
+    // Returns 0 if error occurs.
+    //
+    // Possible errors:
+    //  Retry InvalidDescriptor Signal SyncIO IO IsDir Overflow Buffer
+    //  InsufficientMemory Device Seek
+    pub fn read(mut self, mut buff: []byte): (n: int, FsError) {
+        if buff.len == 0 {
+            ret 0, FsError.Ok
+        }
+
+        if is_console_handle(self.handle) {
+            let mut codepage = make([]u16, buff.len)
+            let ok = unsafe {
+                sys::read_console(self.handle, &codepage[0], buff.len, n, nil)
+            }
+            if !ok {
+                ret 0, get_last_fs_error()
+            }
+
+            let runes = utf16::decode(codepage[:n])
+            n = 0
+            for _, r in runes {
+                let size = utf8::rune_len(r)
+                if n+size > buff.len {
+                    break
+                }
+                _ = utf8::encode_rune(buff[n:], r)
+                n += size
+            }
+
+            ret n, FsError.Ok
+        }
+
+        n = unsafe { sys::read(int(self.handle), &buff[0], uint(buff.len)) }
+        if n == -1 {
+            n = 0
+            ret n, get_last_fs_error()
+        }
+        ret n, FsError.Ok
+    }
+}
 
 // Opens file stream with named file, specified flag
 // (Sema.Rdwr, Sema.Trunc etc.) and perm. If named file does
@@ -35,4 +116,10 @@ pub fn remove_file(path: str): FsError {
         ret FsError.Ok
     }
     ret get_last_fs_error()
+}
+
+fn is_console_handle(handle: uintptr): bool {
+    ret handle == sys::STDIN ||
+        handle == sys::STDOUT ||
+        handle == sys::STDERR
 }
