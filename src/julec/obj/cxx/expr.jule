@@ -463,8 +463,15 @@ fn gen_arg_expr_models(mut models: []ExprModel): str {
     ret obj
 }
 
+fn gen_expr_model_for_call(mut expr: ExprModel): str {
+    match type expr {
+    | &FnIns: ret gen_fn_ins_expr_model((&FnIns)(expr))
+    |:        ret gen_expr_model(expr)
+    }
+}
+
 fn gen_fn_call_expr_model(mut m: &FnCallExprModel): str {
-    let mut obj = gen_expr_model(m.expr)
+    let mut obj = gen_expr_model_for_call(m.expr)
     if !m.func.is_builtin() {
         if m.func.decl.cpp_linked && m.func.generics.len > 0 {
             if !has_directive(m.func.decl.directives, str(Directive.Cdef)) {
@@ -594,6 +601,13 @@ fn gen_array_expr_model(mut m: &ArrayExprModel): str {
     ret obj
 }
 
+// Returns complete expression model of function instance.
+// Usefull for strict type safety.
+fn gen_fn_ins_expr_model_common(mut m: &FnIns): str {
+    ret gen_fn_kind(m) + "(" + gen_fn_ins_expr_model(m) + ")"
+}
+
+// Returns elementary expression model of function instance.
 fn gen_fn_ins_expr_model(mut m: &FnIns): str {
     if real(m.decl) && m.decl.cpp_linked {
         let d = find_directive(m.decl.directives, str(Directive.Namespace))
@@ -813,7 +827,7 @@ fn gen_expr_model(mut m: ExprModel): str {
         ret gen_struct_ins_expr_model((&StructIns)(m))
 
     | &FnIns:
-        ret gen_fn_ins_expr_model((&FnIns)(m))
+        ret gen_fn_ins_expr_model_common((&FnIns)(m))
 
     | &BinopExprModel:
         ret gen_binop_expr_model((&BinopExprModel)(m))
