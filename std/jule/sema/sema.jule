@@ -47,7 +47,7 @@ fn build_ret_vars(mut f: &FnIns): []&Var {
 
     let mut vars: []&Var = nil
     let mut types = get_fn_result_types(f)
-    for i, ident in f.decl.result.idents {
+    for (i, mut ident) in f.decl.result.idents {
         if is_ignore_ident(ident.kind) {
             continue
         }
@@ -723,7 +723,7 @@ impl Sema {
     // Checks type, builds result as kind and collect referred type aliases.
     // Skips already checked types.
     fn check_type_with_refers(mut &self, mut t: &TypeSymbol,
-        l: Lookup, referencer: &Referencer): (ok: bool) {
+        mut l: Lookup, mut referencer: &Referencer): (ok: bool) {
         if t.checked() {
             ret true
         }
@@ -738,14 +738,14 @@ impl Sema {
 
     // Checks type and builds result as kind.
     // Skips already checked types.
-    fn check_type(mut &self, mut t: &TypeSymbol, l: Lookup): (ok: bool) {
+    fn check_type(mut &self, mut t: &TypeSymbol, mut l: Lookup): (ok: bool) {
         ret self.check_type_with_refers(t, l, new(Referencer))
     }
 
     // Builds type with type aliases for generics.
     // Returns nil if error occur or failed.
     fn build_type_with_generics(mut &self, mut t: &TypeDecl,
-        generics: []&TypeAlias): &TypeKind {
+        mut generics: []&TypeAlias): &TypeKind {
         let mut tc = &TypeChecker{
             s:            self,
             lookup:       self,
@@ -762,7 +762,7 @@ impl Sema {
     // Evaluates expression with type prefixed Eval and returns result.
     // Checks variable dependencies if exist.
     fn evalpd(mut &self, mut expr: &Expr, mut l: Lookup,
-        mut p: &TypeKind, owner: &Var): &Data {
+        mut p: &TypeKind, mut owner: &Var): &Data {
         let mut e = &Eval{
             s:      self,
             lookup: l,
@@ -790,7 +790,7 @@ impl Sema {
     }
 
     fn check_assign_type(mut &self, mut dest: &TypeKind, mut d: &Data,
-        error_token: Token, deref: bool) {
+        mut error_token: Token, deref: bool) {
         let mut atc = &AssignTypeChecker{
             s:           self,
             error_token: error_token,
@@ -817,7 +817,7 @@ impl Sema {
     }
 
     fn check_type_compatibility(mut &self, mut dest: &TypeKind,
-        mut src: &TypeKind, error_token: Token, deref: bool): bool {
+        mut src: &TypeKind, mut error_token: Token, deref: bool): bool {
         // Tuple to single type, always fails.
         if real(src.tup()) {
             self.push_err(
@@ -847,7 +847,7 @@ impl Sema {
     //   - For non-generic type parsed string type kinds.
     //   - For checking non-generic types.
     fn build_non_generic_type_kind(mut &self, mut ast: &TypeDecl,
-        generics: []&GenericDecl): &TypeKind {
+        mut generics: []&GenericDecl): &TypeKind {
         let mut tc = &TypeChecker{
             s:               self,
             lookup:          self,
@@ -901,7 +901,7 @@ impl Sema {
 
         let mut generics = make([]&TypeAlias, 0, size)
 
-        for i, g in f.generics {
+        for (i, mut g) in f.generics {
             generics = append(generics, &TypeAlias{
                 ident: f.decl.generics[i].ident,
                 kind: &TypeSymbol{
@@ -943,7 +943,7 @@ impl Sema {
     }
 
     fn check_validity_for_init_expr(mut &self, left_mut: bool, left_ref: bool,
-        left_kind: &TypeKind, mut d: &Data, error_token: Token) {
+        left_kind: &TypeKind, mut d: &Data, mut error_token: Token) {
         if left_mut && !d.mutable && d.kind.mutable() {
             self.push_err(error_token, LogMsg.AssignNonMutToMut)
         }
@@ -981,7 +981,7 @@ impl Sema {
         _ = atc.check_validity()
     }
 
-    fn check_type_alias_decl_kind(mut &self, mut ta: &TypeAlias, l: Lookup): (ok: bool) {
+    fn check_type_alias_decl_kind(mut &self, mut ta: &TypeAlias, mut l: Lookup): (ok: bool) {
         let mut old = self.file
         defer { self.set_current_file(old) }
         let mut file = find_file(self.files, ta.token.file)
@@ -1001,7 +1001,7 @@ impl Sema {
         ret
     }
 
-    fn check_type_alias_decl(mut &self, mut ta: &TypeAlias, l: Lookup) {
+    fn check_type_alias_decl(mut &self, mut ta: &TypeAlias, mut l: Lookup) {
         if is_ignore_ident(ta.ident) {
             self.push_err(ta.token, LogMsg.IgnoreIdent)
         }
@@ -1484,7 +1484,7 @@ impl Sema {
 
     // Checks variable declaration.
     // No checks duplicated identifiers.
-    fn check_var_decl(mut &self, mut decl: &Var, l: Lookup) {
+    fn check_var_decl(mut &self, mut decl: &Var, mut l: Lookup) {
         if is_ignore_ident(decl.ident) {
             self.push_err(decl.token, LogMsg.IgnoreIdent)
         }
@@ -1556,7 +1556,7 @@ impl Sema {
             let mut sf = strct.find_method(tf.ident, tf.statically)
             let tf_k = self.get_trait_check_fn_kind(tf)
             if real(sf) {
-                let sf_k = self.get_trait_check_fn_kind(sf)
+                let mut sf_k = self.get_trait_check_fn_kind(sf)
                 exist = (
                     tf_k.decl.public == sf_k.decl.public &&
                     tf_k.decl.ident == sf_k.decl.ident &&

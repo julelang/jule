@@ -826,7 +826,7 @@ impl FnCallArgChecker {
             if d.variadiced {
                 variadiced = true
                 d.variadiced = false // For ignore assignment checking error.
-                
+
                 p.kind.variadic = true
                 d.kind.variadic = true
                 defer {
@@ -933,14 +933,15 @@ impl StructLitChecker {
         self.e.push_suggestion(fmt, args...)
     }
 
-    fn push_match(mut self, mut f: &FieldIns, mut d: &Data, error_token: Token) {
+    fn push_match(mut self, mut f: &FieldIns, mut d: &Data, mut error_token: Token) {
         self.args = append(self.args, &StructArgExprModel{
             field: f,
             expr:  d.model,
         })
         const REFERENCE = false
+        const MUTABLE = true // Structures literals are always mutable.
         self.e.s.check_validity_for_init_expr(
-            f.decl.mutable, REFERENCE, f.kind, d, error_token)
+            MUTABLE, REFERENCE, f.kind, d, error_token)
         self.e.s.check_assign_type(f.kind, d, error_token, false)
     }
 
@@ -951,7 +952,7 @@ impl StructLitChecker {
             self.push_err(pair.field, LogMsg.IdentNotExist, pair.field.kind)
             ret
         }
-        
+
         if !self.e.s.is_accessible_define(f.decl.public, f.decl.token) {
             self.push_err(pair.field, LogMsg.IdentIsNotAccessible, pair.field.kind)
             self.push_suggestion(LogMsg.MakePubToAccess)
@@ -1042,7 +1043,7 @@ impl StructLitChecker {
                 }
 
                 let mut field = self.s.fields[i]
-                
+
                 let mut prefix = self.e.prefix
                 defer { self.e.prefix = prefix }
                 self.e.prefix = field.kind
