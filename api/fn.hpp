@@ -88,8 +88,7 @@ namespace jule {
 
         friend std::ostream &operator<<(std::ostream &stream,
                                         const Fn<Function> &src) {
-            stream << "<fn>";
-            return stream;
+            return (stream << (void*)src._addr);
         }
     };
 
