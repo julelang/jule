@@ -64,3 +64,32 @@ impl Stream for FileStream {
         ret n, nil
     }
 }
+
+impl FileStream {
+    // Reads line from file handle via &File.read method.
+    // Returns bytes until line delimiter (\n) byte.
+    // Returns zero-length byte slice and nil error when reached EOF.
+    pub fn read_line(mut self): ([]byte, Error) {
+        const LINE_DELIMITER = '\n'
+
+        let mut buff = make([]byte, 0, 1024)
+        let mut part = make([]byte, 1)
+        for {
+            let (n, fserr) = self.buff.read(part)
+            if fserr != FsError.Ok {
+                ret nil, err::new(integrated::to_str(fserr))
+            }
+            if n == 0 {
+                break
+            }
+
+            let b = part[0]
+            buff = append(buff, b)
+
+            if b == LINE_DELIMITER {
+                break
+            }
+        }
+        ret buff, nil
+    }
+}
