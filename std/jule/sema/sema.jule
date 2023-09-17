@@ -241,7 +241,7 @@ fn __has_ret(mut s: &Scope): (ok: bool, falled: bool, breaked: bool) {
             ret false, false, true
 
         | &InfIter:
-            let ok = has_ret((&InfIter)(st).scope)
+            ok = has_ret((&InfIter)(st).scope)
             if ok {
                 ret true, false, false
             }
@@ -250,7 +250,7 @@ fn __has_ret(mut s: &Scope): (ok: bool, falled: bool, breaked: bool) {
             ret true, falled, breaked
 
         | &Scope:
-            let ok = has_ret((&Scope)(st))
+            ok = has_ret((&Scope)(st))
             if ok {
                 ret true, false, false
             }
@@ -262,23 +262,23 @@ fn __has_ret(mut s: &Scope): (ok: bool, falled: bool, breaked: bool) {
             }
 
         | &Recover:
-            let (ok, falled, breaked) = __has_ret((&Recover)(st).scope)
+            let (ok, _falled, _breaked) = __has_ret((&Recover)(st).scope)
             if ok {
-                ret true, falled, breaked
+                ret true, _falled, _breaked
             }
 
         | &Conditional:
-            let (ok, breaking) = conditional_has_ret((&Conditional)(st))
+            ok, breaked = conditional_has_ret((&Conditional)(st))
             if ok {
                 ret true, false, false
             }
 
-            if breaking {
+            if breaked {
                 ret false, false, breaked
             }
 
         | &Match:
-            let ok = match_has_ret((&Match)(st))
+            ok = match_has_ret((&Match)(st))
             if ok {
                 ret true, false, false
             }
@@ -343,7 +343,7 @@ impl Lookup for Sema {
             if !imp_is_lookupable(imp, ident) {
                 continue
             }
-            let mut v = imp.find_var(ident, cpp_linked)
+            v = imp.find_var(ident, cpp_linked)
             if real(v) && self.is_accessible_define(v.public, v.token) {
                 ret v
             }
@@ -370,7 +370,7 @@ impl Lookup for Sema {
             if !imp_is_lookupable(imp, ident) {
                 continue
             }
-            let mut ta = imp.find_type_alias(ident, cpp_linked)
+            ta = imp.find_type_alias(ident, cpp_linked)
             if real(ta) && self.is_accessible_define(ta.public, ta.token) {
                 ret ta
             }
@@ -387,9 +387,9 @@ impl Lookup for Sema {
     //   - Current file's public denifes of imported packages.
     pub fn find_struct(mut self, ident: str, cpp_linked: bool): &Struct {
         // Lookup package files.
-        let mut strct = find_struct_in_package(self.files, ident, cpp_linked)
-        if real(strct) {
-            ret strct
+        let mut s = find_struct_in_package(self.files, ident, cpp_linked)
+        if real(s) {
+            ret s
         }
 
         // Lookup current file's public denifes of imported packages.
@@ -397,9 +397,9 @@ impl Lookup for Sema {
             if !imp_is_lookupable(imp, ident) {
                 continue
             }
-            let mut strct = imp.find_struct(ident, cpp_linked)
-            if real(strct) && self.is_accessible_define(strct.public, strct.token) {
-                ret strct
+            s = imp.find_struct(ident, cpp_linked)
+            if real(s) && self.is_accessible_define(s.public, s.token) {
+                ret s
             }
         }
 
@@ -424,7 +424,7 @@ impl Lookup for Sema {
             if !imp_is_lookupable(imp, ident) {
                 continue
             }
-            let mut f = imp.find_fn(ident, cpp_linked)
+            f = imp.find_fn(ident, cpp_linked)
             if real(f) && self.is_accessible_define(f.public, f.token) {
                 ret f
             }
@@ -451,7 +451,7 @@ impl Lookup for Sema {
             if !imp_is_lookupable(imp, ident) {
                 continue
             }
-            let mut t = imp.find_trait(ident)
+            t = imp.find_trait(ident)
             if real(t) && self.is_accessible_define(t.public, t.token) {
                 ret t
             }
@@ -478,7 +478,7 @@ impl Lookup for Sema {
             if !imp_is_lookupable(imp, ident) {
                 continue
             }
-            let mut e = imp.find_enum(ident)
+            e = imp.find_enum(ident)
             if real(e) && self.is_accessible_define(e.public, e.token) {
                 ret e
             }
@@ -1792,13 +1792,13 @@ impl Sema {
     fn check_file_derives(mut self): (ok: bool) {
         // Check derives.
         for (_, mut st) in self.file.structs {
-            let ok = self.check_struct_derive_clone(st)
+            ok = self.check_struct_derive_clone(st)
             if !ok {
-                ret false
+                break
             }
         }
 
-        ret true
+        ret ok
     }
 
     fn check_package_derives(mut self) {

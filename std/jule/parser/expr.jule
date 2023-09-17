@@ -49,7 +49,7 @@ fn is_fn_call(mut tokens: []Token): []Token {
             ret nil
         }
     }
-    let tok = tokens[tokens.len-1]
+    let mut tok = tokens[tokens.len-1]
     if tok.id != TokenId.Range || tok.kind != str(TokenKind.RParent) {
         ret nil
     }
@@ -58,7 +58,7 @@ fn is_fn_call(mut tokens: []Token): []Token {
     // For this reason, ignore first token.
     let mut i = tokens.len - 1
     for i >= 1; i-- {
-        let tok = tokens[i]
+        tok = tokens[i]
         if tok.id == TokenId.Range {
             match tok.kind {
             | str(TokenKind.RParent): brace_n++
@@ -503,8 +503,8 @@ impl ExprBuilder {
                 ret new(CastExpr)
             }
 
-            let token = expr_tokens[0]
-            if token.id != TokenId.Range || token.kind != str(TokenKind.LParent) {
+            let tok = expr_tokens[0]
+            if tok.id != TokenId.Range || tok.kind != str(TokenKind.LParent) {
                 ret new(CastExpr)
             }
 
@@ -533,12 +533,12 @@ impl ExprBuilder {
 
                 if expr_tokens.len > 2 {
                     // Remove parentheses.
-                    let mut i = 0
-                    _ = range(i, TokenKind.LParent, TokenKind.RParent, expr_tokens)
-                    if i < expr_tokens.len {
+                    let mut j = 0
+                    _ = range(j, TokenKind.LParent, TokenKind.RParent, expr_tokens)
+                    if j < expr_tokens.len {
                         ret new(CastExpr)
                     }
-                    cast.expr = self.build(expr_tokens[:i])
+                    cast.expr = self.build(expr_tokens[:j])
                 }
             }
             ret cast
@@ -755,10 +755,10 @@ impl ExprBuilder {
     }
 
     fn build_struct_lit_expr(mut self, mut tokens: []Token): ExprData {
-        let token = tokens[0]
+        let mut token = tokens[0]
         if token.id == TokenId.Ident {
             if tokens.len > 1 {
-                let token = tokens[1]
+                token = tokens[1]
                 if token.id == TokenId.Colon {
                     ret self.build_field_expr_pair(tokens)
                 }
