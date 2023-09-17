@@ -9,6 +9,7 @@ use std::fs::{File}
 pub struct Scanner {
     mut r: Reader
     mut b: []byte
+    mut e: Error
 }
 
 impl Scanner {
@@ -29,20 +30,26 @@ impl Scanner {
 }
 
 impl Scanner {
-    fn reset(self) { self.b = nil }
+    fn reset(self) {
+        self.b = nil
+        self.e = nil
+    }
 
     // Returns bytes of recent scan.
     // Returned slice is mutable copy of buffer.
     pub fn bytes(self): []byte { ret self.b }
 
+    // Returns error of recent scan.
+    pub fn error(self): Error { ret self.e }
+
     // Returns text from bytes of recent scan.
     pub fn text(self): str { ret str(self.b) }
 
-    // Reads line from handle via read method.
-    // Returns bytes until line delimiter (\n) byte, delimiter not included.
-    // Returns nil error and sets byte buffer to zero-length byte slice when
-    // there is no error and readed byte count is zero, so reached to EOF.
-    pub fn scan(self): Error {
+    // Scans line from handle via read method.
+    // Scans bytes until line delimiter (\n) byte, delimiter not included.
+    // Reports whether readed byte into buffer.
+    // Sets error if any error occurs.
+    pub fn scan(self): bool {
         const LINE_DELIMITER = '\n'
 
         self.reset()
@@ -52,10 +59,11 @@ impl Scanner {
         for {
             let (n, mut err) = self.r.read(part)
             if err != nil {
-                ret err
+                self.e = err
+                ret false
             }
             if n == 0 {
-                ret nil
+                break
             }
 
             let b = part[0]
@@ -68,6 +76,6 @@ impl Scanner {
         }
 
         self.b = buff
-        ret nil
+        ret part[0] != 0
     }
 }
