@@ -16,6 +16,12 @@ namespace jule {
     template<typename T, typename Denominator>
     inline auto mod(const T &x, const Denominator &denominator);
 
+    template<typename T, typename Denominator>
+    inline auto unsafe_div(const T &x, const Denominator &denominator);
+
+    template<typename T, typename Denominator>
+    inline auto unsafe_mod(const T &x, const Denominator &denominator);
+
     template<typename T>
     jule::Ref<T> new_struct(T *ptr);
 
@@ -42,6 +48,14 @@ namespace jule {
 #endif
         return x % denominator;
     }
+
+    template<typename T, typename Denominator>
+    inline auto unsafe_div(const T &x, const Denominator &denominator)
+    { return x / denominator; }
+
+    template<typename T, typename Denominator>
+    inline auto unsafe_mod(const T &x, const Denominator &denominator)
+    { return x % denominator; }
 
     template<typename T>
     jule::Ref<T> new_struct(T *ptr) {

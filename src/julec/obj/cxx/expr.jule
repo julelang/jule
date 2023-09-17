@@ -278,23 +278,22 @@ fn gen_const_expr_model(m: &Const): str {
 }
 
 fn gen_div_by_zero_binop_expr_model(op: str, mut l: ExprModel, mut r: ExprModel): str {
+    let mut op_func = ""
+    match op {
+    | str(TokenKind.Solidus): op_func = "div"
+    | str(TokenKind.Percent): op_func = "mod"
+    }
+
     if is_opt_enabled(Opt.Math) {
         match type r {
         | &Const:
-            let mut obj = "("
-            obj += gen_expr(l)
-            obj += op
-            obj += gen_expr(r)
-            obj += ")"
-            ret obj
+            op_func = "unsafe_" + op_func
         }
     }
 
-    let mut obj = ""
-    match op {
-    | str(TokenKind.Solidus): obj += "jule::div("
-    | str(TokenKind.Percent): obj += "jule::mod("
-    }
+    let mut obj = "jule::"
+    obj += op_func
+    obj += "("
     obj += gen_expr(l)
     obj += ","
     obj += gen_expr(r)
