@@ -4,11 +4,11 @@
 
 // This is the main package of JuleC.
 
-use std::jule::{VERSION}
-use std::jule::build::{DISTOS, DISTARCH}
-use std::env::{ARGS}
-use std::process::{exit}
-use std::runtime::{ARCH, OS}
+use jule for std::jule
+use build for std::jule::build
+use env for std::env
+use process for std::process
+use runtime for std::runtime
 
 const ERROR_EXIT_CODE = 1
 
@@ -43,8 +43,8 @@ fn print_error_message(msg: str) { outln(msg) }
 
 // Command: julec help
 fn help() {
-    if ARGS.len > 2 {
-        print_error_message("invalid command: " + ARGS[2])
+    if env::ARGS.len > 2 {
+        print_error_message("invalid command: " + env::ARGS[2])
         ret
     }
 
@@ -71,18 +71,18 @@ fn help() {
 
 // Command: julec version
 fn version() {
-    if ARGS.len > 2 {
-        print_error_message("invalid command: " + ARGS[2])
+    if env::ARGS.len > 2 {
+        print_error_message("invalid command: " + env::ARGS[2])
         ret
     }
     out("julec version ")
-    outln(VERSION)
+    outln(jule::VERSION)
 }
 
 // Command: julec tool distos
 fn tool_distos() {
     out("supported operating systems:\n ")
-    for _, os in DISTOS {
+    for _, os in build::DISTOS {
         out(os)
         out(" ")
     }
@@ -92,7 +92,7 @@ fn tool_distos() {
 // Command: julec tool distarch
 fn tool_distarch() {
     out("supported architects:\n ")
-    for _, arch in DISTARCH {
+    for _, arch in build::DISTARCH {
         out(arch)
         out(" ")
     }
@@ -101,17 +101,17 @@ fn tool_distarch() {
 
 // Command: julec tool
 fn tool() {
-    if ARGS.len == 2 {
+    if env::ARGS.len == 2 {
         outln(`tool commands:
  distos     Lists all supported operating systems
  distarch   Lists all supported architects`)
         ret
-    } else if ARGS.len > 3 {
-        print_error_message("invalid command: " + ARGS[3])
+    } else if env::ARGS.len > 3 {
+        print_error_message("invalid command: " + env::ARGS[3])
         ret
     }
 
-    let cmd = ARGS[2]
+    let cmd = env::ARGS[2]
     match cmd {
     | "distos":   tool_distos()
     | "distarch": tool_distarch()
@@ -121,15 +121,15 @@ fn tool() {
 
 // Command: julec julenv
 fn julenv() {
-    outln("julec version: " + VERSION)
-    outln("architecture: " + ARCH)
-    outln("operating system: " + OS)
+    outln("julec version: " + jule::VERSION)
+    outln("architecture: " + runtime::ARCH)
+    outln("operating system: " + runtime::OS)
 }
 
 // Try to process compiler commands.
 // Reports whether "ARGS" is command and processed.
 fn process_command(): bool {
-    match ARGS[1] {
+    match env::ARGS[1] {
     | CMD_HELP:    help()
     | CMD_VERSION: version()
     | CMD_TOOL:    tool()
@@ -142,14 +142,14 @@ fn process_command(): bool {
 
 fn exit_err(msg: str) {
     outln(msg)
-    exit(ERROR_EXIT_CODE)
+    process::exit(ERROR_EXIT_CODE)
 }
 
 fn main() {
     // Not started with arguments.
     // Here is "2" but "ARGS" always have one element for store working directory.
-    if ARGS.len < 2 {
-        exit(0)
+    if env::ARGS.len < 2 {
+        ret
     }
 
     if process_command() {

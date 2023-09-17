@@ -14,13 +14,13 @@ Compiler Reference
 
 */
 
-use deadcode::{eliminate_dead_code}
-use env::{Opt, OptLevel, OPTIMIZATIONS, push_opt_level, is_opt_enabled}
-use importer::{PlainImporter, init_flags}
-use obj::{IR}
+use deadcode
+use env::{self, Opt, OptLevel, OPTIMIZATIONS, push_opt_level, is_opt_enabled}
+use importer
+use obj
 use cxx for obj::cxx
 
-use std::env::{ARGS}
+use std::env
 use std::fs::{FsError, OFlag, stat, open, create_dir, remove_file, remove_dir}
 use std::fs::path::{join, dir}
 use integrated for std::jule::integrated
@@ -189,12 +189,12 @@ fn parse_target_option(&args: []str, mut &i: int) {
 
     if os != "native" {
         check_target_os(os)
-        std::jule::build::OS = os
+        env::OS = os
     }
 
     if arch != "native" {
         check_target_arch(arch)
-        std::jule::build::ARCH = arch
+        env::ARCH = arch
     }
 }
 
@@ -338,7 +338,7 @@ fn set() {
     check_compiler()
 
     // Initialize flags for directive eval.
-    init_flags()
+    importer::init_flags()
 }
 
 fn is_cpp_source_file(path: str): bool {
@@ -350,7 +350,7 @@ fn is_cpp_source_file(path: str): bool {
 }
 
 // Generate compile command for backend-compiler.
-fn gen_compile_cmd(source_path: str, &ir: &IR): (str, str) {
+fn gen_compile_cmd(source_path: str, &ir: &obj::IR): (str, str) {
     let compiler = str(COMPILER_PATH)
 
     const ZERO_LEVEL_OPTIMIZATION = "-O0"
@@ -399,15 +399,15 @@ fn get_compile_path(): str {
     ret join(OUT_DIR, OUT_NAME)
 }
 
-fn apply_target_independent_optimizations(mut &ir: &IR) {
+fn apply_target_independent_optimizations(mut &ir: &obj::IR) {
     if is_opt_enabled(Opt.DeadCode) {
-        eliminate_dead_code(ir)
+        deadcode::eliminate(ir)
     }
 }
 
 // Process compile command by "ARGS" global.
 fn compile_command() {
-    let path = parse_options(ARGS)
+    let path = parse_options(std::env::ARGS)
     if path == "" {
         exit_err(logf(LogMsg.MissingCompilePath))
     }
@@ -420,7 +420,7 @@ fn compile_command() {
 
     set()
 
-    let (mut ir, logs) = IR.build(path)
+    let (mut ir, logs) = obj::IR.build(path)
 
     if !real(ir) && logs == nil {
         exit_err(logf(LogMsg.NoFileInEntryPackage, path))
