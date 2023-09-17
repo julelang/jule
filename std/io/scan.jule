@@ -1,0 +1,73 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use std::fs::{File}
+
+// Scanner for files or etc.
+// Scans bytes line-by-line.
+pub struct Scanner {
+    mut r: Reader
+    mut b: []byte
+}
+
+impl Scanner {
+    // New &Scanner from Reader.
+    pub static fn new(mut r: Reader): &Scanner {
+        ret &Scanner{
+            r: r,
+        }
+    }
+
+    // New &Scanner from &File.
+    // Uses &FileStream for Reader trait compatibility.
+    pub static fn newf(mut f: &File): &Scanner {
+        ret &Scanner{
+            r: FileStream.new(f),
+        }
+    }
+}
+
+impl Scanner {
+    fn reset(self) { self.b = nil }
+
+    // Returns bytes of recent scan.
+    // Returned slice is mutable copy of buffer.
+    pub fn bytes(self): []byte { ret self.b }
+
+    // Returns text from bytes of recent scan.
+    pub fn text(self): str { ret str(self.b) }
+
+    // Reads line from handle via read method.
+    // Returns bytes until line delimiter (\n) byte, delimiter not included.
+    // Returns nil error and sets byte buffer to zero-length byte slice when
+    // there is no error and readed byte count is zero, so reached to EOF.
+    pub fn scan(self): Error {
+        const LINE_DELIMITER = '\n'
+
+        self.reset()
+
+        let mut buff = make([]byte, 0, 1024)
+        let mut part = make([]byte, 1)
+        for {
+            let (n, mut err) = self.r.read(part)
+            if err != nil {
+                ret err
+            }
+            if n == 0 {
+                ret nil
+            }
+
+            let b = part[0]
+
+            if b == LINE_DELIMITER {
+                break
+            }
+
+            buff = append(buff, b)
+        }
+
+        self.b = buff
+        ret nil
+    }
+}
