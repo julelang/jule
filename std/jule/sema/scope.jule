@@ -556,13 +556,19 @@ impl ScopeChecker {
     // If founded identifier address equals to self, will be skipped.
     fn is_duplicated_ident(mut self, itself: uintptr, ident: str): bool {
         let v = self.find_var(ident, false)
-        if real(v) && uintptr(&v) != itself && &v.scope == &self.scope {
-            ret true
+        if real(v) && uintptr(&v) != itself {
+            if !real(v.scope) { // Ignore globals.
+                ret false
+            }
+            ret &v.scope == &self.scope || !self.s.is_flag(SemaFlag.Shadowing)
         }
 
         let ta = self.find_type_alias(ident, false)
-        if real(ta) && uintptr(&ta) != itself && &ta.scope == &self.tree {
-            ret true
+        if real(ta) && uintptr(&ta) != itself {
+            if !real(ta.scope) { // Ignore globals.
+                ret false
+            }
+            ret &ta.scope == &self.tree || !self.s.is_flag(SemaFlag.Shadowing)
         }
 
         ret false
@@ -810,10 +816,18 @@ impl ScopeChecker {
         let mut ssc = self.new_child_checker()
 
         if real(kind.key_a) {
+            if !self.s.is_flag(SemaFlag.Shadowing) && self.is_duplicated_ident(0, kind.key_a.ident) {
+                self.s.push_err(kind.key_a.token, LogMsg.DuplicatedIdent, kind.key_a.ident)
+                self.s.push_suggestion(LogMsg.RenameForAvoidDuplication)
+            }
             ssc.table.vars = append(ssc.table.vars, kind.key_a)
         }
 
         if real(kind.key_b) {
+            if !self.s.is_flag(SemaFlag.Shadowing) && self.is_duplicated_ident(0, kind.key_b.ident) {
+                self.s.push_err(kind.key_b.token, LogMsg.DuplicatedIdent, kind.key_b.ident)
+                self.s.push_suggestion(LogMsg.RenameForAvoidDuplication)
+            }
             ssc.table.vars = append(ssc.table.vars, kind.key_b)
         }
 
@@ -1274,7 +1288,7 @@ impl ScopeChecker {
         let mut _case = m.cases[i]
         _case.exprs = make([]ExprModel, c.exprs.len)
 
-        for (i, mut e) in c.exprs {
+        for (j, mut e) in c.exprs {
             if m.type_match {
                 let mut eval = &Eval{
                     s:      self.s,
@@ -1283,7 +1297,7 @@ impl ScopeChecker {
 
                 let mut d = eval.eval(e)
                 if real(d) {
-                    _case.exprs[i] = d.kind
+                    _case.exprs[j] = d.kind
                     if count_match_type(m, d.kind) > 1 {
                         self.s.push_err(e.token, LogMsg.DuplicateMatchType, d.kind.to_str())
                     }
@@ -1302,7 +1316,7 @@ impl ScopeChecker {
                 continue
             }
 
-            _case.exprs[i] = d.model
+            _case.exprs[j] = d.model
 
             let mut checker = AssignTypeChecker{
                 s:           self.s,

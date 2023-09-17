@@ -28,6 +28,7 @@ use std::jule::lex::{is_decimal, is_ident_rune, is_letter, is_space}
 use std::jule::sema::{
     ImportInfo,
     Package,
+    SemaFlag,
     analyze_package,
 }
 use std::jule::build::{
@@ -75,6 +76,8 @@ static mut MODE: Mode = Mode.Compile
 static mut OUT_NAME: str = "ir.cpp"
 static mut OUT: str = ""
 static mut CPP_STD: str = "c++17" // Default C++ standard
+
+static mut SEMA_FLAGS: SemaFlag = SemaFlag.Default
 
 fn system(cmd: str): int {
     ret unsafe { cpp.system((*integrated::Char)(&cmd[0])) }
@@ -246,6 +249,9 @@ fn parse_options(&args: []str): str {
 
         | "--target":
             parse_target_option(args, i)
+
+        | "--shadowing":
+            SEMA_FLAGS |= SemaFlag.Shadowing
 
         | str(Opt.Copy):     OPTIMIZATIONS = append(OPTIMIZATIONS, Opt.Copy)
         | str(Opt.DeadCode): OPTIMIZATIONS = append(OPTIMIZATIONS, Opt.DeadCode)
@@ -420,7 +426,7 @@ fn compile_command() {
 
     set()
 
-    let (mut ir, logs) = obj::IR.build(path)
+    let (mut ir, logs) = obj::IR.build(path, SEMA_FLAGS)
 
     if !real(ir) && logs == nil {
         exit_err(logf(LogMsg.NoFileInEntryPackage, path))

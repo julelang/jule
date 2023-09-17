@@ -303,6 +303,7 @@ struct Sema {
     errors: []Log
     files:  []&SymbolTable // Package files.
     file:   &SymbolTable   // Current package file.
+    flags:  SemaFlag
 }
 
 impl Lookup for Sema {
@@ -489,6 +490,9 @@ impl Lookup for Sema {
 }
 
 impl Sema {
+    // Reports whether flags has given flag.
+    fn is_flag(self, flags: SemaFlag): bool { ret self.flags&flags == flags }
+
     fn set_current_file(mut self, mut f: &SymbolTable) { self.file = f }
 
     fn push_err(mut self, token: Token, fmt: LogMsg, args: ...any) {
@@ -673,7 +677,9 @@ impl Sema {
             ret true
         }
 
-        let mut sema = &Sema{}
+        let mut sema = &Sema{
+            flags: self.flags,
+        }
         sema.check(imp.package.files)
         if sema.errors.len > 0 {
             self.errors = append(self.errors, sema.errors...)

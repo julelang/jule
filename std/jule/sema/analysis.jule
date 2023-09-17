@@ -5,6 +5,12 @@
 use std::jule::ast::{Ast}
 use std::jule::build::{Log}
 
+// Flags for semantic analysis.
+pub enum SemaFlag {
+    Default   = 0,      // Default semantic analysis of Jule.
+    Shadowing = 1 << 0, // Default + enable shadowing.
+}
+
 // Builds symbol table of AST.
 fn build_symbols(mut ast: &Ast, mut importer: Importer, mut owner: &SymbolBuilder): (&SymbolTable, []Log) {
     let mut sb = &SymbolBuilder{
@@ -20,7 +26,7 @@ fn build_symbols(mut ast: &Ast, mut importer: Importer, mut owner: &SymbolBuilde
     ret new(SymbolTable), sb.errors
 }
 
-fn __analyze_package(mut files: []&Ast, mut importer: Importer): (&Package, []Log) {
+fn __analyze_package(mut files: []&Ast, mut importer: Importer, flags: SemaFlag): (&Package, []Log) {
     // Build symbol tables of files.
     let mut tables = make([]&SymbolTable, files.len)
     for (i, mut f) in files {
@@ -31,7 +37,9 @@ fn __analyze_package(mut files: []&Ast, mut importer: Importer): (&Package, []Lo
         tables[i] = table
     }
 
-    let mut sema = &Sema{}
+    let mut sema = &Sema{
+        flags: flags,
+    }
     sema.check(tables)
     if sema.errors.len > 0 {
         ret new(Package), sema.errors
@@ -61,12 +69,12 @@ fn __analyze_package(mut files: []&Ast, mut importer: Importer): (&Package, []Lo
 // Risks:
 //   - You can pass nil to importer, but panics if importer is nil and
 //     semantic analyzer used nil importer.
-pub fn analyze_package(mut files: []&Ast, mut importer: Importer): (&Package, []Log) {
+pub fn analyze_package(mut files: []&Ast, mut importer: Importer, flags: SemaFlag): (&Package, []Log) {
     if files.len == 0 {
         ret new(Package), nil
     }
 
-    let (mut package, mut logs) = __analyze_package(files, importer)
+    let (mut package, mut logs) = __analyze_package(files, importer, flags)
     ret package, logs
 }
 
@@ -87,9 +95,9 @@ pub fn analyze_package(mut files: []&Ast, mut importer: Importer): (&Package, []
 // Risks:
 //   - You can pass nil to importer, but panics if importer is nil and
 //     semantic analyzer used nil importer.
-pub fn analyze_file(mut f: &Ast, mut importer: Importer): (&SymbolTable, []Log) {
+pub fn analyze_file(mut f: &Ast, mut importer: Importer, flags: SemaFlag): (&SymbolTable, []Log) {
     let mut files: []&Ast = [f]
-    let (mut pkg, mut errors) = analyze_package(files, importer)
+    let (mut pkg, mut errors) = analyze_package(files, importer, flags)
     if errors.len > 0 {
         ret new(SymbolTable), errors
     }
