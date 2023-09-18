@@ -26,6 +26,7 @@ use std::jule::ast::{
     StructLit,
     KeyValPair,
     IdentTypeDecl,
+    TernaryExpr,
 }
 use std::jule::build::{LogMsg, logf}
 use std::jule::constant::{Const}
@@ -3152,6 +3153,55 @@ impl Eval {
         ret bs.solve(op)
     }
 
+    fn eval_ternary(mut &self, mut ter: &TernaryExpr): &Data {
+        let mut d = self.eval_expr_kind(ter.condition)
+        if !real(d) {
+            ret new(Data)
+        }
+
+        let prim = d.kind.prim()
+        if !real(prim) || !prim.is_bool() {
+            self.push_err(ter.token, LogMsg.IfRequireBoolExpr)
+            ret new(Data)
+        }
+
+        let mut td = self.eval_expr_kind(ter.true_expr)
+        if !real(td) {
+            ret new(Data)
+        }
+
+        if td.kind.void() {
+            self.push_err(ter.token, LogMsg.VoidUsedForTernary)
+            ret new(Data)
+        }
+
+        let mut fd = self.eval_expr_kind(ter.false_expr)
+        if !real(fd) {
+            ret new(Data)
+        }
+
+        let mut ac = AssignTypeChecker{
+            s:           self.s,
+            dest:        td.kind,
+            d:           fd,
+            error_token: ter.token,
+        }
+        if !ac.check() {
+            self.push_suggestion(LogMsg.UseCompatibleValuesForTernary)
+        }
+
+        let mut r = &Data{}
+        r.kind = td.kind
+        r.lvalue = r.kind.lvalue()
+        r.mutable = r.kind.mutable()
+        r.model = &TernaryExprModel{
+            condition:  d.model,
+            true_expr:  td.model,
+            false_expr: fd.model,
+        }
+        ret r
+    }
+
     fn eval_expr_kind(mut &self, mut kind: ExprData): &Data {
         let mut d = new(Data)
 
@@ -3174,6 +3224,7 @@ impl Eval {
         | &BraceLit:        d = self.eval_brace_lit((&BraceLit)(kind))
         | &FnDecl:          d = self.eval_anon_fn((&FnDecl)(kind))
         | &BinopExpr:       d = self.eval_binop((&BinopExpr)(kind))
+        | &TernaryExpr:     d = self.eval_ternary((&TernaryExpr)(kind))
         |:                  drop(d)
         }
 
