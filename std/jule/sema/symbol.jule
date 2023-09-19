@@ -150,7 +150,7 @@ fn build_field(mut decl: &FieldDecl): &Field {
     }
 }
 
-fn build_fields(mut decls: []&FieldDecl): []&Field {
+fn build_fields(mut &decls: []&FieldDecl): []&Field {
     let mut fields = make([]&Field, decls.len)
     for (i, mut decl) in decls {
         fields[i] = build_field(decl)
@@ -182,7 +182,7 @@ fn build_param(mut decl: &ParamDecl): &Param {
     }
 }
 
-fn build_params(mut decls: []&ParamDecl): []&Param {
+fn build_params(mut &decls: []&ParamDecl): []&Param {
     let mut params = make([]&Param, decls.len)
     for (i, mut decl) in decls {
         params[i] = build_param(decl)
@@ -218,7 +218,7 @@ fn build_fn(mut decl: &FnDecl): &Fn {
     }
 }
 
-fn build_methods(mut decls: []&FnDecl): []&Fn {
+fn build_methods(mut &decls: []&FnDecl): []&Fn {
     let mut methods = make([]&Fn, decls.len)
     for (i, mut decl) in decls {
         methods[i] = build_fn(decl)
@@ -244,7 +244,7 @@ fn build_enum_item(mut decl: &EnumItemDecl): &EnumItem {
     }
 }
 
-fn build_enum_items(mut decls: []&EnumItemDecl): []&EnumItem {
+fn build_enum_items(mut &decls: []&EnumItemDecl): []&EnumItem {
     let mut items = make([]&EnumItem, decls.len)
     for (i, mut decl) in decls {
         items[i] = build_enum_item(decl)
@@ -309,11 +309,11 @@ impl SymbolBuilder {
         ret root
     }
 
-    fn push_err(mut self, token: Token, fmt: LogMsg, args: ...any) {
+    fn push_err(mut self, &token: Token, fmt: LogMsg, args: ...any) {
         self.errors = append(self.errors, compiler_err(token, true, fmt, args...))
     }
 
-    fn push_err_text(mut self, token: Token, fmt: LogMsg, args: ...any) {
+    fn push_err_text(mut self, &token: Token, fmt: LogMsg, args: ...any) {
         self.errors = append(self.errors, compiler_err(token, false, fmt, args...))
     }
 
@@ -322,7 +322,7 @@ impl SymbolBuilder {
         unsafe { push_suggestion(&self.errors[self.errors.len-1], fmt, args...) }
     }
 
-    fn check_cpp_use_decl_path(mut self, decl: &UseDecl): (ok: bool) {
+    fn check_cpp_use_decl_path(mut self, &decl: &UseDecl): (ok: bool) {
         if is_std_header_path(decl.link_path) {
             ret true
         }
@@ -343,7 +343,7 @@ impl SymbolBuilder {
         ret true
     }
 
-    fn build_cpp_header_import(mut self, mut decl: &UseDecl): &ImportInfo {
+    fn build_cpp_header_import(mut self, mut &decl: &UseDecl): &ImportInfo {
         let mut path = decl.link_path
 
         if !is_std_header_path(decl.link_path) {
@@ -370,7 +370,7 @@ impl SymbolBuilder {
         }
     }
 
-    fn build_std_import(mut self, mut decl: &UseDecl): &ImportInfo {
+    fn build_std_import(mut self, mut &decl: &UseDecl): &ImportInfo {
         let mut path = decl.link_path["std::".len:] // Skip "std::" prefix.
         path = path.replace(str(TokenKind.DblColon), str(SEPARATOR), -1)
         path = join(PATH_STDLIB, path)
@@ -405,7 +405,7 @@ impl SymbolBuilder {
         }
     }
 
-    fn build_ident_import(mut &self, mut decl: &UseDecl): &ImportInfo {
+    fn build_ident_import(mut &self, mut &decl: &UseDecl): &ImportInfo {
         let mut path = decl.link_path
         path = path.replace(str(TokenKind.DblColon), str(SEPARATOR), -1)
         path = join(self.get_root().ast.file.dir(), path)
@@ -441,7 +441,7 @@ impl SymbolBuilder {
         }
     }
 
-    fn build_import(mut &self, mut decl: &UseDecl): &ImportInfo {
+    fn build_import(mut &self, mut &decl: &UseDecl): &ImportInfo {
         match {
         | decl.cpp_linked: ret self.build_cpp_header_import(decl)
         | decl.std:        ret self.build_std_import(decl)
@@ -449,7 +449,7 @@ impl SymbolBuilder {
         }
     }
 
-    fn check_duplicate_use_decl(mut self, pkg: &ImportInfo): (ok: bool) {
+    fn check_duplicate_use_decl(mut self, &pkg: &ImportInfo): (ok: bool) {
         // Find package by path to detect cpp header imports.
         let lpkg = self.table.select_package(fn(spkg: &ImportInfo): bool {
             ret pkg.path == spkg.path
@@ -463,7 +463,7 @@ impl SymbolBuilder {
         ret false
     }
 
-    fn impl_import_selections(mut self, mut imp: &ImportInfo, mut decl: &UseDecl) {
+    fn impl_import_selections(mut self, mut &imp: &ImportInfo, mut &decl: &UseDecl) {
         for (_, mut ident) in decl.selected {
             if imp.exist_ident(ident.kind) {
                 self.push_err(ident, LogMsg.DuplicatedUseSelection, ident.kind)
@@ -489,7 +489,7 @@ impl SymbolBuilder {
         ret path.replace(str(SEPARATOR), str(TokenKind.DblColon), -1)
     }
 
-    fn push_cycle_error(mut &self, sb: &SymbolBuilder, path: str, mut &message: str) {
+    fn push_cycle_error(mut &self, &sb: &SymbolBuilder, path: str, mut &message: str) {
         const PADDING = 4
 
         let refers_to = logf(
@@ -499,7 +499,7 @@ impl SymbolBuilder {
         message = str_repeat(" ", PADDING) + refers_to + "\n" + message
     }
 
-    fn push_cross_cycle_error(mut &self, target: &SymbolBuilder, imp: &ImportInfo, error_token: Token) {
+    fn push_cross_cycle_error(mut &self, &target: &SymbolBuilder, &imp: &ImportInfo, &error_token: Token) {
         let mut message = ""
 
         self.push_cycle_error(self, imp.path, message)
@@ -522,7 +522,7 @@ impl SymbolBuilder {
         self.push_err(error_token, LogMsg.PkgIllegalCrossCycle, message)
     }
 
-    fn check_import_cycles(mut &self, imp: &ImportInfo, decl: &UseDecl): bool {
+    fn check_import_cycles(mut &self, imp: &ImportInfo, &decl: &UseDecl): bool {
         if imp.path == self.table.file.dir() {
             self.push_err(decl.token, LogMsg.PkgIllegalCycleRefersItself, self.get_as_link_path(imp.path))
             ret false
@@ -552,7 +552,7 @@ impl SymbolBuilder {
         ret true
     }
 
-    fn import_package(mut &self, mut &imp: &ImportInfo, mut decl: &UseDecl): (ok: bool) {
+    fn import_package(mut &self, mut &imp: &ImportInfo, mut &decl: &UseDecl): (ok: bool) {
         if imp.cpp_linked {
             ret true
         }
@@ -591,7 +591,7 @@ impl SymbolBuilder {
         ret true
     }
 
-    fn import_use_decl(mut &self, mut decl: &UseDecl): &ImportInfo {
+    fn import_use_decl(mut &self, mut &decl: &UseDecl): &ImportInfo {
         let mut imp = self.build_import(decl)
         // Break analysis if error occurs.
         if !real(imp) {
@@ -627,7 +627,7 @@ impl SymbolBuilder {
         }
     }
 
-    fn append_decl(mut self, mut decl: Node) {
+    fn append_decl(mut self, mut &decl: Node) {
         match type decl.data {
         | &TypeAliasDecl:
             let mut ta = build_type_alias((&TypeAliasDecl)(decl.data))
@@ -671,7 +671,7 @@ impl SymbolBuilder {
         }
     }
 
-    fn push_directive_pass(mut self, mut d: &std::jule::ast::Directive) {
+    fn push_directive_pass(mut self, mut &d: &std::jule::ast::Directive) {
         let mut pass = Pass{
             token: d.token,
         }

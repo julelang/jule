@@ -22,7 +22,7 @@ use std::jule::build::{LogMsg}
 use std::jule::lex::{Token, Ident, is_ignore_ident}
 use types for std::jule::types
 
-fn get_fn_result_types(mut f: &FnIns): []&TypeKind {
+fn get_fn_result_types(mut &f: &FnIns): []&TypeKind {
     match {
     | f.decl.is_void() || !real(f.result):
         ret nil
@@ -35,7 +35,7 @@ fn get_fn_result_types(mut f: &FnIns): []&TypeKind {
     }
 }
 
-fn trait_has_reference_receiver(t: &Trait): bool {
+fn trait_has_reference_receiver(&t: &Trait): bool {
     for _, f in t.methods {
         // Skip static functions.
         if f.statically {
@@ -50,12 +50,12 @@ fn trait_has_reference_receiver(t: &Trait): bool {
     ret false
 }
 
-fn float_assignable(kind: str, d: &Data): bool {
+fn float_assignable(kind: str, &d: &Data): bool {
     let value = fmt_float(d.constant.read_f64(), 'e', -1, 64)
     ret types::check_bit_float(value, types::bitsize_of(kind))
 }
 
-fn sig_assignable(kind: str, d: &Data): bool {
+fn sig_assignable(kind: str, &d: &Data): bool {
     let min = types::min(kind)
     let max = types::max(kind)
 
@@ -82,7 +82,7 @@ fn sig_assignable(kind: str, d: &Data): bool {
     ret false
 }
 
-fn unsig_assignable(kind: str, d: &Data): bool {
+fn unsig_assignable(kind: str, &d: &Data): bool {
     let max = types::max(kind)
 
     match {
@@ -112,7 +112,7 @@ fn unsig_assignable(kind: str, d: &Data): bool {
     ret false
 }
 
-fn int_assignable(kind: str, d: &Data): bool {
+fn int_assignable(kind: str, &d: &Data): bool {
     match {
     | types::is_sig_int(kind):   ret sig_assignable(kind, d)
     | types::is_unsig_int(kind): ret unsig_assignable(kind, d)
@@ -535,11 +535,11 @@ struct DynamicTypeAnnotation {
 }
 
 impl DynamicTypeAnnotation {
-    fn push_generic(mut self, mut k: &TypeKind, i: int) {
+    fn push_generic(mut self, mut &k: &TypeKind, i: int) {
         self.f.generics[i] = k
     }
 
-    unsafe fn annotate_prim(mut self, mut k: &TypeKind): (ok: bool) {
+    unsafe fn annotate_prim(mut self, mut &k: &TypeKind): (ok: bool) {
         let kind = (*self.k).to_str()
         for i, g in self.f.decl.generics {
             if kind != g.ident {
@@ -563,7 +563,7 @@ impl DynamicTypeAnnotation {
         ret false
     }
 
-    unsafe fn annotate_slc(mut self, mut k: &TypeKind): (ok: bool) {
+    unsafe fn annotate_slc(mut self, mut &k: &TypeKind): (ok: bool) {
         let mut pslc = (*self.k).slc()
         if !real(pslc) {
             ret false
@@ -575,7 +575,7 @@ impl DynamicTypeAnnotation {
         ret self.annotate_kind(slc.elem)
     }
 
-    unsafe fn check_map_key(mut self, mut k: **TypeKind, mut ck: &TypeKind): (ok: bool) {
+    unsafe fn check_map_key(mut self, mut k: **TypeKind, mut &ck: &TypeKind): (ok: bool) {
         let mut old = self.k
         self.k = k
         ok = self.annotate_kind(ck)
@@ -583,7 +583,7 @@ impl DynamicTypeAnnotation {
         ret ok
     }
 
-    unsafe fn annotate_map(mut self, mut k: &TypeKind): (ok: bool) {
+    unsafe fn annotate_map(mut self, mut &k: &TypeKind): (ok: bool) {
         let mut pmap = (*self.k).map()
         if !real(pmap) {
             ret false
@@ -596,7 +596,7 @@ impl DynamicTypeAnnotation {
         ret self.check_map_key(&key, m.key) && self.check_map_key(&val, m.val)
     }
 
-    unsafe fn annotate_fn(mut self, mut k: &TypeKind): (ok: bool) {
+    unsafe fn annotate_fn(mut self, mut &k: &TypeKind): (ok: bool) {
         let mut pf = (*self.k).fnc()
         if !real(pf) {
             ret false
@@ -628,7 +628,7 @@ impl DynamicTypeAnnotation {
         ret ok
     }
 
-    unsafe fn annotate_ptr(mut self, mut k: &TypeKind): (ok: bool) {
+    unsafe fn annotate_ptr(mut self, mut &k: &TypeKind): (ok: bool) {
         let mut pptr = (*self.k).ptr()
         if !real(pptr) {
             ret false
@@ -640,7 +640,7 @@ impl DynamicTypeAnnotation {
         ret self.annotate_kind(ptr.elem)
     }
 
-    unsafe fn annotate_ref(mut self, mut k: &TypeKind): (ok: bool) {
+    unsafe fn annotate_ref(mut self, mut &k: &TypeKind): (ok: bool) {
         let mut rref = (*self.k).ref()
         if !real(rref) {
             ret false
@@ -652,7 +652,7 @@ impl DynamicTypeAnnotation {
         ret self.annotate_kind(ref.elem)
     }
 
-    unsafe fn annotate_any(mut self, mut k: &TypeKind): (ok: bool) {
+    unsafe fn annotate_any(mut self, mut &k: &TypeKind): (ok: bool) {
         let kind = (*self.k).to_str()
         for i, g in self.f.decl.generics {
             if kind != g.ident {
@@ -676,7 +676,7 @@ impl DynamicTypeAnnotation {
         ret false
     }
 
-    unsafe fn annotate_kind(mut self, mut k: &TypeKind): (ok: bool) {
+    unsafe fn annotate_kind(mut self, mut &k: &TypeKind): (ok: bool) {
         if self.k == nil || *self.k == nil {
             ret
         }
@@ -726,7 +726,7 @@ impl FnCallArgChecker {
         ret self.f.params
     }
 
-    fn check_counts(mut self, params: []&ParamIns): (ok: bool) {
+    fn check_counts(mut self, &params: []&ParamIns): (ok: bool) {
         let mut n = params.len
         if n > 0 && params[0].decl.is_self() {
             n--
@@ -755,7 +755,7 @@ impl FnCallArgChecker {
         ret false
     }
 
-    fn check_arg(mut self, mut p: &ParamIns, mut arg: &Data, mut error_token: Token): (ok: bool) {
+    fn check_arg(mut self, mut &p: &ParamIns, mut &arg: &Data, mut &error_token: Token): (ok: bool) {
         if self.dynamic_annotation {
             let mut dta = DynamicTypeAnnotation{
                 e:           self.e,
@@ -777,7 +777,7 @@ impl FnCallArgChecker {
         ret true
     }
 
-    fn push(mut self, mut p: &ParamIns, mut arg: &Expr): (ok: bool) {
+    fn push(mut self, mut &p: &ParamIns, mut arg: &Expr): (ok: bool) {
         let mut d = new(Data)
         if !self.dynamic_annotation && !p.decl.variadic {
             let mut old = self.e.prefix
@@ -797,7 +797,7 @@ impl FnCallArgChecker {
         ret self.check_arg(p, d, arg.token)
     }
 
-    fn push_variadic(mut self, mut p: &ParamIns, mut i: int): (ok: bool) {
+    fn push_variadic(mut self, mut &p: &ParamIns, mut i: int): (ok: bool) {
         ok = true
         let mut variadiced = false
         let more = i+1 < self.args.len
@@ -863,7 +863,7 @@ impl FnCallArgChecker {
         ret ok
     }
 
-    fn check_args(mut self, mut params: []&ParamIns): (ok: bool) {
+    fn check_args(mut self, mut &params: []&ParamIns): (ok: bool) {
         ok = true
         let mut i = 0
     iter:
@@ -933,7 +933,7 @@ impl StructLitChecker {
         self.e.push_suggestion(fmt, args...)
     }
 
-    fn push_match(mut self, mut f: &FieldIns, mut d: &Data, mut error_token: Token) {
+    fn push_match(mut self, mut &f: &FieldIns, mut &d: &Data, mut &error_token: Token) {
         self.args = append(self.args, &StructArgExprModel{
             field: f,
             expr:  d.model,
@@ -945,7 +945,7 @@ impl StructLitChecker {
         self.e.s.check_assign_type(f.kind, d, error_token, false)
     }
 
-    fn check_pair(mut self, mut pair: &FieldExprPair, mut exprs: []ExprData) {
+    fn check_pair(mut self, mut &pair: &FieldExprPair, mut &exprs: []ExprData) {
         // Check existing.
         let mut f = self.s.find_field(pair.field.kind)
         if !real(f) {
@@ -986,7 +986,7 @@ impl StructLitChecker {
         self.push_match(f, d, pair.field)
     }
 
-    fn ready_exprs(mut self, mut exprs: []ExprData): bool {
+    fn ready_exprs(mut self, mut &exprs: []ExprData): bool {
         let mut ok = true
         for (i, mut expr) in exprs {
             match type expr {
@@ -1012,7 +1012,7 @@ impl StructLitChecker {
         ret ok
     }
 
-    fn check(mut self, mut exprs: []ExprData) {
+    fn check(mut self, mut &exprs: []ExprData) {
         if exprs.len == 0 {
             ret
         }
@@ -1085,7 +1085,7 @@ struct RangeChecker {
 }
 
 impl RangeChecker {
-    fn build_var(self, mut decl: &VarDecl): &Var {
+    fn build_var(self, mut &decl: &VarDecl): &Var {
         let mut v = build_var(decl)
         ret v
     }
@@ -1246,7 +1246,7 @@ impl RetTypeChecker {
         self.types = get_fn_result_types(self.f)
     }
 
-    fn prepare_exprs(mut self, mut e: &Expr) {
+    fn prepare_exprs(mut self, mut &e: &Expr) {
         if !real(e) {
             ret
         }
@@ -1332,7 +1332,7 @@ impl RetTypeChecker {
         }
     }
 
-    fn check(mut self, mut e: &Expr): bool {
+    fn check(mut self, mut &e: &Expr): bool {
         self.prepare_types()
         self.prepare_exprs(e)
         self.ret_vars()

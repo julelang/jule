@@ -32,7 +32,7 @@ fn build_prim_type(mut token: Token): &TypeDecl {
 // Returns colon index and range tokens.
 // Returns nil slice and -1 if not found.
 // Starts search at i.
-fn split_map_range(mut tokens: []Token, mut &i: int): (range_tokens: []Token, colon: int) {
+fn split_map_range(mut &tokens: []Token, mut &i: int): (range_tokens: []Token, colon: int) {
     colon = -1
     let mut range_n = 0
     let start = i
@@ -325,7 +325,8 @@ impl TypeBuilder {
             elem: elem,
         }
 
-        let (_, mut expr_tokens) = range_last(self.tokens[:expr_delta])
+        let mut expr_tokens = self.tokens[:expr_delta]
+        _, expr_tokens = range_last(expr_tokens)
         expr_tokens = expr_tokens[1 : expr_tokens.len-1] // Remove brackets.
         let mut token = expr_tokens[0]
         if expr_tokens.len == 1 && token.id == TokenId.Op && token.kind == str(TokenKind.TripleDot) {
@@ -340,7 +341,7 @@ impl TypeBuilder {
         }
     }
 
-    fn build_map(mut self, colon: int, mut tokens: []Token): &TypeDecl {
+    fn build_map(mut self, colon: int, mut &tokens: []Token): &TypeDecl {
         let mut colon_token = self.tokens[colon]
         if colon == 0 || colon+1 >= tokens.len {
             self.push_err(colon_token, LogMsg.MissingType)

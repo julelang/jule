@@ -556,7 +556,7 @@ impl Ptr {
     pub fn is_unsafe(self): bool { ret !real(self.elem) }
 }
 
-fn can_get_ptr(mut d: &Data): bool {
+fn can_get_ptr(mut &d: &Data): bool {
     if !d.lvalue || d.is_const() {
         ret false
     }
@@ -570,7 +570,7 @@ fn can_get_ptr(mut d: &Data): bool {
     }
 }
 
-fn is_valid_for_ref(mut t: &TypeKind): bool {
+fn is_valid_for_ref(mut &t: &TypeKind): bool {
     let mut s = t.strct()
     if real(s) && real(s.decl) && s.decl.cpp_linked {
         ret false
@@ -578,7 +578,7 @@ fn is_valid_for_ref(mut t: &TypeKind): bool {
     ret !(real(t.enm()) || real(t.ptr()) || real(t.ref()) || real(t.arr()))
 }
 
-fn build_link_path_by_tokens(tokens: []Token): str {
+fn build_link_path_by_tokens(&tokens: []Token): str {
     let mut s = tokens[0].kind
     for _, token in tokens[1:] {
         s += "::"
@@ -593,7 +593,7 @@ fn build_prim_type(kind: str): &Prim {
     }
 }
 
-fn get_struct_from_kind(mut k: &TypeKind): &Struct {
+fn get_struct_from_kind(mut &k: &TypeKind): &Struct {
     match {
     | !real(k):
         ret new(Struct)
@@ -684,7 +684,7 @@ impl TypeChecker {
         self.s.push_err(token, fmt, args...)
     }
 
-    fn build_prim(mut self, decl: &IdentTypeDecl): &Prim {
+    fn build_prim(mut self, &decl: &IdentTypeDecl): &Prim {
         if !is_prim(decl.ident) {
             self.push_err(self.error_token, LogMsg.InvalidType)
             ret new(Prim)
@@ -771,7 +771,7 @@ impl TypeChecker {
     // Appends reference to reference if there is no illegal cycle.
     // Returns true if self.referencer is nil reference.
     // Returns true if refers is nil.
-    fn check_illegal_cycles(mut self, ident: &IdentTypeDecl, mut decl: any): (ok: bool) {
+    fn check_illegal_cycles(mut self, &ident: &IdentTypeDecl, mut decl: any): (ok: bool) {
         if !real(self.referencer) {
             ret true
         }
@@ -816,7 +816,7 @@ impl TypeChecker {
         ret true
     }
 
-    fn from_type_alias(mut self, decl: &IdentTypeDecl, mut ta: &TypeAlias): Kind {
+    fn from_type_alias(mut self, &decl: &IdentTypeDecl, mut &ta: &TypeAlias): Kind {
         if !self.s.is_accessible_define(ta.public, ta.token) {
             self.push_err(decl.token, LogMsg.IdentNotExist, decl.ident)
             ret nil
@@ -849,7 +849,7 @@ impl TypeChecker {
         ret kind
     }
 
-    fn from_enum(mut self, decl: &IdentTypeDecl, mut e: &Enum): &Enum {
+    fn from_enum(mut self, &decl: &IdentTypeDecl, mut &e: &Enum): &Enum {
         if !self.s.is_accessible_define(e.public, e.token) {
             self.push_err(decl.token, LogMsg.IdentNotExist, decl.ident)
             ret new(Enum)
@@ -939,7 +939,7 @@ impl TypeChecker {
         ret true
     }
 
-    fn append_used_struct_reference(mut self, mut s: &Struct) {
+    fn append_used_struct_reference(mut self, mut &s: &Struct) {
         if !real(self.referencer) {
             ret
         }
@@ -953,7 +953,7 @@ impl TypeChecker {
         }
     }
 
-    fn from_struct(mut self, mut decl: &IdentTypeDecl, mut &s: &Struct): &StructIns {
+    fn from_struct(mut self, mut &decl: &IdentTypeDecl, mut &s: &Struct): &StructIns {
         if !self.s.is_accessible_define(s.public, s.token) {
             self.push_err(decl.token, LogMsg.IdentNotExist, decl.ident)
             ret new(StructIns)
@@ -1009,7 +1009,7 @@ impl TypeChecker {
         ret ins
     }
 
-    fn get_def(mut self, mut decl: &IdentTypeDecl): Kind {
+    fn get_def(mut self, mut &decl: &IdentTypeDecl): Kind {
         for _, g in self.ignore_generics {
             if g.ident == decl.ident {
                 ret build_prim_type(g.ident)
@@ -1077,7 +1077,7 @@ impl TypeChecker {
         }
     }
 
-    fn build_ref_from_type(mut self, mut elem: &TypeKind): &Ref {
+    fn build_ref_from_type(mut self, mut &elem: &TypeKind): &Ref {
         // Check special cases.
         match {
         | !real(elem):
@@ -1121,7 +1121,7 @@ impl TypeChecker {
         ret self.build_ref_from_type(elem)
     }
 
-    fn build_ptr_from_type(mut self, mut elem: &TypeKind): &Ptr {
+    fn build_ptr_from_type(mut self, mut &elem: &TypeKind): &Ptr {
         // Check special cases.
         match {
         | !real(elem):
@@ -1268,7 +1268,7 @@ impl TypeChecker {
         ret &Tuple{types: types}
     }
 
-    fn check_fn_types(mut self, mut f: &FnIns): (ok: bool) {
+    fn check_fn_types(mut self, mut &f: &FnIns): (ok: bool) {
         for (_, mut p) in f.params {
             p.kind = self.build(p.decl.kind.decl.kind)
             ok = real(p.kind)
@@ -1327,7 +1327,7 @@ impl TypeChecker {
         ret kind
     }
 
-    fn build(mut self, mut decl_kind: TypeDeclKind): &TypeKind {
+    fn build(mut self, mut &decl_kind: TypeDeclKind): &TypeKind {
         let mut kind: Kind = nil
 
         match type decl_kind {
@@ -1408,7 +1408,7 @@ impl TypeChecker {
         }
     }
 
-    fn check_decl(mut self, mut decl: &TypeDecl): &TypeKind {
+    fn check_decl(mut self, mut &decl: &TypeDecl): &TypeKind {
         // Save current token.
         let mut error_token = self.error_token
 
@@ -1419,7 +1419,7 @@ impl TypeChecker {
         ret kind
     }
 
-    fn check(mut self, mut t: &TypeSymbol) {
+    fn check(mut self, mut &t: &TypeSymbol) {
         if !real(t.decl) {
             ret
         }

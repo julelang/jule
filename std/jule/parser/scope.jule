@@ -62,7 +62,7 @@ fn prev_is_incomplete_binary_expr(&tokens: []Token, &i: int): bool {
 }
 
 // Reports position of the next statement if exist, len(toks) if not.
-fn next_st_pos(tokens: []Token, start: int): (int, bool) {
+fn next_st_pos(&tokens: []Token, start: int): (int, bool) {
     let mut brace_n = 0
     let mut i = start
     for i < tokens.len; i++ {
@@ -147,7 +147,7 @@ struct Stmt {
 }
 
 // Splits all statements.
-fn split_stms(mut tokens: []Token): []&Stmt {
+fn split_stms(mut &tokens: []Token): []&Stmt {
     let mut stms: []&Stmt = nil
     let mut pos = 0
     for pos < tokens.len {
@@ -179,7 +179,7 @@ impl ScopeParser {
         self.p.push_suggestion(fmt, args...)
     }
 
-    fn insert_as_next(mut self, mut tokens: []Token) {
+    fn insert_as_next(mut self, mut &tokens: []Token) {
         self.stms = append(self.stms[:self.pos+1], self.stms[self.pos:]...)
         self.stms[self.pos+1] = &Stmt{tokens: tokens}
     }
@@ -189,7 +189,7 @@ impl ScopeParser {
         ret self.stms[self.pos]
     }
 
-    fn build_scope(mut self, mut tokens: []Token): &ScopeTree {
+    fn build_scope(mut self, mut &tokens: []Token): &ScopeTree {
         let mut s = new_scope()
         s.parent = self.s
         let mut ssp = ScopeParser{
@@ -199,7 +199,7 @@ impl ScopeParser {
         ret s
     }
 
-    fn build_var_st(mut self, mut tokens: []Token): NodeData {
+    fn build_var_st(mut self, mut &tokens: []Token): NodeData {
         let mut v = self.p.build_var(tokens)
         v.scope = self.s
         ret v
@@ -216,7 +216,7 @@ impl ScopeParser {
         ret st
     }
 
-    fn build_while_next_iter(mut self, mut s: &Stmt): NodeData {
+    fn build_while_next_iter(mut self, mut &s: &Stmt): NodeData {
         let mut it = &Iter{
             token: s.tokens[0],
         }
@@ -261,19 +261,19 @@ impl ScopeParser {
         ret it
     }
 
-    fn build_while_iter_kind(mut self, mut tokens: []Token): &WhileKind {
+    fn build_while_iter_kind(mut self, mut &tokens: []Token): &WhileKind {
         ret &WhileKind{
             expr: self.p.build_expr(tokens),
         }
     }
 
-    fn get_range_kind_keys_tokens(mut self, mut toks: []Token): [][]Token {
+    fn get_range_kind_keys_tokens(mut self, mut &toks: []Token): [][]Token {
         let (mut vars, errs) = parts(toks, TokenId.Comma, true)
         self.p.errors = append(self.p.errors, errs...)
         ret vars
     }
 
-    fn build_range_kind_key(mut self, mut tokens: []Token): &VarDecl {
+    fn build_range_kind_key(mut self, mut &tokens: []Token): &VarDecl {
         if tokens.len == 0 {
             ret new(VarDecl)
         }
@@ -298,7 +298,7 @@ impl ScopeParser {
         ret key
     }
 
-    fn build_range_kind_keys(mut self, mut parts: [][]Token): []&VarDecl {
+    fn build_range_kind_keys(mut self, mut &parts: [][]Token): []&VarDecl {
         let mut keys: []&VarDecl = nil
         for (_, mut tokens) in parts {
             keys = append(keys, self.build_range_kind_key(tokens))
@@ -306,7 +306,7 @@ impl ScopeParser {
         ret keys
     }
 
-    fn setup_range_kind_keys_plain(mut self, mut rng: &RangeKind, mut tokens: []Token) {
+    fn setup_range_kind_keys_plain(mut self, mut &rng: &RangeKind, mut &tokens: []Token) {
         let mut key_tokens = self.get_range_kind_keys_tokens(tokens)
         if key_tokens.len == 0 {
             ret
@@ -321,7 +321,7 @@ impl ScopeParser {
         }
     }
 
-    fn setup_range_kind_keys_explicit(mut self, mut rng: &RangeKind, mut tokens: []Token) {
+    fn setup_range_kind_keys_explicit(mut self, mut &rng: &RangeKind, mut &tokens: []Token) {
         let mut i = 0
         let mut rang = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
         if i < tokens.len {
@@ -330,7 +330,7 @@ impl ScopeParser {
         self.setup_range_kind_keys_plain(rng, rang)
     }
 
-    fn setup_range_kind_keys(mut self, mut rng: &RangeKind, mut tokens: []Token) {
+    fn setup_range_kind_keys(mut self, mut &rng: &RangeKind, mut &tokens: []Token) {
         if tokens[0].id == TokenId.Range {
             if tokens[0].kind != str(TokenKind.LParent) {
                 self.push_err(tokens[0], LogMsg.InvalidSyntax)
@@ -342,8 +342,8 @@ impl ScopeParser {
         self.setup_range_kind_keys_plain(rng, tokens)
     }
 
-    fn build_range_iter_kind(mut self, mut var_tokens: []Token,
-        mut expr_tokens: []Token, mut in_token: Token): &RangeKind {
+    fn build_range_iter_kind(mut self, mut &var_tokens: []Token,
+        mut &expr_tokens: []Token, mut &in_token: Token): &RangeKind {
         let mut rng = &RangeKind{
             in_token: in_token,
         }
@@ -358,7 +358,7 @@ impl ScopeParser {
         ret rng
     }
 
-    fn build_common_iter_kind(mut self, mut tokens: []Token, err_tok: Token): IterKind {
+    fn build_common_iter_kind(mut self, mut &tokens: []Token, &err_tok: Token): IterKind {
         let mut brace_n = 0
         for (i, mut tok) in tokens {
             if tok.id == TokenId.Range {
@@ -416,14 +416,14 @@ impl ScopeParser {
         ret it
     }
 
-    fn buid_iter_st(mut self, mut st: &Stmt): NodeData {
+    fn buid_iter_st(mut self, mut &st: &Stmt): NodeData {
         if st.terminated {
             ret self.build_while_next_iter(st)
         }
         ret self.build_common_iter(st.tokens)
     }
 
-    fn build_break_st(mut self, mut tokens: []Token): NodeData {
+    fn build_break_st(mut self, mut &tokens: []Token): NodeData {
         let mut brk = &BreakSt{
             token: tokens[0],
         }
@@ -441,7 +441,7 @@ impl ScopeParser {
         ret brk
     }
 
-    fn build_cont_st(mut self, mut tokens: []Token): NodeData {
+    fn build_cont_st(mut self, mut &tokens: []Token): NodeData {
         let mut cont = &ContSt{
             token: tokens[0],
         }
@@ -491,7 +491,7 @@ impl ScopeParser {
         ret model
     }
 
-    fn build_else(mut self, mut tokens: []Token): &Else {
+    fn build_else(mut self, mut &tokens: []Token): &Else {
         let mut els = &Else{
             token: tokens[0],
         }
@@ -538,11 +538,11 @@ impl ScopeParser {
         ret chain
     }
 
-    fn build_comment_st(self, mut token: Token): NodeData {
+    fn build_comment_st(self, mut &token: Token): NodeData {
         ret build_comment(token)
     }
 
-    fn build_call_st(mut self, mut tokens: []Token): NodeData {
+    fn build_call_st(mut self, mut &tokens: []Token): NodeData {
         let token = tokens[0]
         if is_fn_call(tokens) == nil {
             self.push_err(token, LogMsg.ExprNotFnCall)
@@ -561,7 +561,7 @@ impl ScopeParser {
         ret cc
     }
 
-    fn build_goto_st(mut self, mut tokens: []Token): NodeData {
+    fn build_goto_st(mut self, mut &tokens: []Token): NodeData {
         let mut gt = &GotoSt{
             token: tokens[0],
         }
@@ -581,7 +581,7 @@ impl ScopeParser {
         ret gt
     }
 
-    fn build_fall_st(mut self, mut tokens: []Token): NodeData {
+    fn build_fall_st(mut self, mut &tokens: []Token): NodeData {
         let mut fll = &FallSt{
             token: tokens[0],
         }
@@ -591,7 +591,7 @@ impl ScopeParser {
         ret fll
     }
 
-    fn build_type_alias_st(mut self, mut tokens: []Token): NodeData {
+    fn build_type_alias_st(mut self, mut &tokens: []Token): NodeData {
         let mut tad = self.p.build_type_alias_decl(tokens)
         tad.scope = self.s
         ret tad
@@ -669,7 +669,8 @@ impl ScopeParser {
                 n += i
                 continue
             }
-            let mut scope = self.build_scope(tokens[:n])
+            let mut scope_tokens = tokens[:n]
+            let mut scope = self.build_scope(scope_tokens)
             tokens = tokens[n:]
             ret scope
         }
@@ -796,7 +797,7 @@ impl ScopeParser {
         ret scope
     }
 
-    fn build_label_st(mut self, mut tokens: []Token): &LabelSt {
+    fn build_label_st(mut self, mut &tokens: []Token): &LabelSt {
         let mut lbl = &LabelSt{
             token: tokens[0],
             ident: tokens[0].kind,
@@ -811,7 +812,7 @@ impl ScopeParser {
         ret lbl
     }
 
-    fn build_id_st(mut self, mut tokens: []Token): (NodeData, ok: bool) {
+    fn build_id_st(mut self, mut &tokens: []Token): (NodeData, ok: bool) {
         if tokens.len == 1 {
             ret
         }
@@ -825,7 +826,7 @@ impl ScopeParser {
         ret
     }
 
-    fn build_assign_info(mut self, mut tokens: []Token): &AssignInfo {
+    fn build_assign_info(mut self, mut &tokens: []Token): &AssignInfo {
         let mut info = &AssignInfo{
             ok: true,
         }
@@ -872,7 +873,7 @@ impl ScopeParser {
         ret info
     }
 
-    fn build_assign_l(mut self, mut tokens: []Token): &AssignLeft {
+    fn build_assign_l(mut self, mut &tokens: []Token): &AssignLeft {
         let mut l = &AssignLeft{
             token: tokens[0],
         }
@@ -885,7 +886,7 @@ impl ScopeParser {
         ret l
     }
 
-    fn build_assign_ls(mut self, mut parts: [][]Token): []&AssignLeft {
+    fn build_assign_ls(mut self, mut &parts: [][]Token): []&AssignLeft {
         let mut lefts: []&AssignLeft = nil
         for (_, mut part) in parts {
             let mut l = self.build_assign_l(part)
@@ -895,7 +896,7 @@ impl ScopeParser {
         ret lefts
     }
 
-    fn build_plain_assign(mut self, mut tokens: []Token): (&AssignSt, bool) {
+    fn build_plain_assign(mut self, mut &tokens: []Token): (&AssignSt, bool) {
         let mut info = self.build_assign_info(tokens)
         if !info.ok {
             ret new(AssignSt), false
@@ -942,7 +943,8 @@ impl ScopeParser {
         } else if i+1 < tokens.len {
             assign.setter = tokens[i]
             i++
-            assign.right = self.p.build_expr(tokens[i:])
+            let mut expr_tokens = tokens[i:]
+            assign.right = self.p.build_expr(expr_tokens)
         }
 
         // Lefts
@@ -991,7 +993,7 @@ impl ScopeParser {
         ret assign, true
     }
 
-    fn build_assign_st(mut self, mut tokens: []Token): (st: &AssignSt, ok: bool) {
+    fn build_assign_st(mut self, mut &tokens: []Token): (st: &AssignSt, ok: bool) {
         if !check_assign_tokens(tokens) {
             ret new(AssignSt), false
         }
@@ -1004,7 +1006,7 @@ impl ScopeParser {
         ret
     }
 
-    fn build_st(mut self, mut st: &Stmt): NodeData {
+    fn build_st(mut self, mut &st: &Stmt): NodeData {
         let mut token = st.tokens[0]
         if token.id == TokenId.Ident {
             let (mut s, ok) = self.build_id_st(st.tokens)
@@ -1080,7 +1082,7 @@ impl ScopeParser {
         ret nil
     }
 
-    fn build(mut self, mut tokens: []Token, mut s: &ScopeTree) {
+    fn build(mut self, mut &tokens: []Token, mut &s: &ScopeTree) {
         if !real(s) {
             ret
         }
