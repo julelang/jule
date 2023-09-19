@@ -271,8 +271,10 @@ namespace jule {
         { return std::basic_string<char>(this->begin(), this->end()); }
 
         operator jule::Slice<jule::U8>(void) const {
-            jule::Slice<jule::U8> slice{ jule::Slice<jule::U8>::alloc(this->len()) };
-            std::memcpy(slice._slice, this->begin(), this->_len);
+            jule::Slice<jule::U8> slice;
+            slice.alloc_new(0, this->_len);
+            slice._len = this->_len;
+            std::copy(this->begin(), this->end(), slice._slice);
             return slice;
         }
 
@@ -282,7 +284,7 @@ namespace jule {
             for (jule::Int index{ 0 }; index < this->len(); ) {
                 jule::I32 rune;
                 jule::Int n;
-                std::tie(rune, n) = jule::utf8_decode_rune_str(str+index ,
+                std::tie(rune, n) = jule::utf8_decode_rune_str(str+index,
                                                                this->len()-index);
                 index += n;
                 runes.push(rune);

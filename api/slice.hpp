@@ -163,19 +163,19 @@ namespace jule {
 
         inline constexpr
         Iterator begin(void)
-        { return &this->_slice[0]; }
+        { return this->_slice; }
 
         inline constexpr
         ConstIterator begin(void) const
-        { return &this->_slice[0]; }
+        { return this->_slice; }
 
         inline constexpr
         Iterator end(void)
-        { return &this->_slice[this->_len]; }
+        { return this->_slice+this->_len; }
 
         inline constexpr
         ConstIterator end(void) const
-        { return &this->_slice[this->_len]; }
+        { return this->_slice+this->_len; }
 
         inline Slice<Item> slice(const jule::Int &start,
                                  const jule::Int &end) const {
@@ -223,14 +223,14 @@ namespace jule {
                     this->_slice,
                     this->_slice+this->_len,
                     _new._slice);
-                _new._slice[this->_len] = item;
+                *(_new._slice+this->_len) = item;
 
                 this->dealloc();
                 *this = _new;
                 return;
             }
 
-            this->_slice[this->_len] = item;
+            *(this->_slice+this->_len) = item;
             ++this->_len;
         }
 
@@ -267,7 +267,7 @@ namespace jule {
                 jule::panic(sstream.str().c_str());
             }
 #endif
-            return this->_slice[index];
+            return *(this->_slice+index);
         }
 
         void operator=(const jule::Slice<Item> &src) {
