@@ -13,6 +13,24 @@ use std::jule::lex::{File, Token, TokenKind, is_ignore_ident, is_anon_ident}
 use types for std::jule::types
 use std::vector::{Vector}
 
+fn is_valid_model_for_ref(m: ExprModel): bool {
+    match type m {
+    | &Var:
+        ret true
+
+    | &StructSubIdentExprModel:
+        let model = (&StructSubIdentExprModel)(m)
+        ret is_valid_model_for_ref(model.expr)
+
+    | &TraitSubIdentExprModel:
+        let model = (&TraitSubIdentExprModel)(m)
+        ret is_valid_model_for_ref(model.expr)
+
+    |:
+        ret false
+    }
+}
+
 fn compiler_err(&token: Token, line: bool, fmt: LogMsg, args: ...any): Log {
     let mut log = Log{
         kind:   LogKind.Error,
@@ -224,7 +242,7 @@ fn match_has_ret(mut m: &Match): bool {
     ret has_ret(m.default.scope)
 }
 
-fn __has_ret(mut &s: &Scope): (ok: bool, falled: bool, breaked: bool) {
+fn __has_ret(mut s: &Scope): (ok: bool, falled: bool, breaked: bool) {
     if !real(s) {
         ret false, false, false
     }
@@ -796,7 +814,7 @@ impl Sema {
     }
 
     fn check_assign_type(mut &self, mut &dest: &TypeKind, mut &d: &Data,
-        mut &error_token: Token, deref: bool) {
+        mut error_token: Token, deref: bool) {
         let mut atc = &AssignTypeChecker{
             s:           self,
             error_token: error_token,
@@ -949,37 +967,51 @@ impl Sema {
         ret ok
     }
 
+    fn check_ref_validity_for_init_expr(mut &self, left_mut: bool, &d: &Data, mut &error_token: Token) {
+        match type d.model {
+        | &Var:
+            // Pass.
+
+        | &TraitSubIdentExprModel:
+            let model = (&TraitSubIdentExprModel)(d.model)
+            if !is_valid_model_for_ref(model.expr) {
+                self.push_err(error_token, LogMsg.RefIsDangling, model.ident)
+            }
+
+        | &StructSubIdentExprModel:
+            let model = (&StructSubIdentExprModel)(d.model)
+            if !is_valid_model_for_ref(model.expr) {
+                self.push_err(error_token, LogMsg.RefIsDangling, model.field.decl.ident)
+            }
+
+        | &CommonIdentExprModel
+        | &CommonSubIdentExprModel:
+            self.push_err(error_token, LogMsg.BuiltinUsedForRef)
+
+        | &UnaryExprModel:
+            let unary = (&UnaryExprModel)(d.model)
+            if unary.op == str(TokenKind.Star) {
+                // Pointer dereference, pass
+                break
+            }
+
+            fall
+
+        |:
+            self.push_err(error_token, LogMsg.RefAssignNonVar)
+        }
+        if left_mut && !d.mutable {
+            self.push_err(error_token, LogMsg.MutRefPointsImmut)
+        }
+    }
+
     fn check_validity_for_init_expr(mut &self, left_mut: bool, left_ref: bool,
         &left_kind: &TypeKind, mut &d: &Data, mut &error_token: Token) {
         if left_mut && !d.mutable && d.kind.mutable() {
             self.push_err(error_token, LogMsg.AssignNonMutToMut)
         }
         if left_ref {
-            match type d.model {
-            | &Var
-            | &TraitSubIdentExprModel
-            | &CommonIdentExprModel
-            | &StructSubIdentExprModel:
-                // Pass
-
-            | | &CommonSubIdentExprModel:
-                self.push_err(error_token, LogMsg.BuiltinUsedForRef)
-
-            | &UnaryExprModel:
-                let unary = (&UnaryExprModel)(d.model)
-                if unary.op == str(TokenKind.Star) {
-                    // Pointer dereference, pass
-                    break
-                }
-
-                fall
-
-            |:
-                self.push_err(error_token, LogMsg.RefAssignNonVar)
-            }
-            if left_mut && !d.mutable {
-                self.push_err(error_token, LogMsg.MutRefPointsImmut)
-            }
+            self.check_ref_validity_for_init_expr(left_mut, d, error_token)
         }
 
         let mut atc = &AssignTypeChecker{
