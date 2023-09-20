@@ -621,7 +621,7 @@ impl ScopeParser {
     }
 
     fn build_case_exprs(mut self, mut &tokens: []Token, type_match: bool): []&Expr {
-        let mut exprs: []&Expr = nil
+        let mut exprs = make([]&Expr, 0, 1)
 
         let mut brace_n = 0
         let mut j = 0
@@ -642,7 +642,12 @@ impl ScopeParser {
             }
             match {
             | tok.id == TokenId.Op && tok.kind == str(TokenKind.Vline):
-                self.push_case_expr(tokens[j:i], tok, type_match, exprs)
+                let expr_tokens = tokens[j:i]
+                if expr_tokens.len == 0 {
+                    self.push_err(tok, LogMsg.MissingExpr)
+                } else {
+                    self.push_case_expr(tokens[j:i], tok, type_match, exprs)
+                }
                 j = i + 1
 
             | tok.id == TokenId.Colon:
