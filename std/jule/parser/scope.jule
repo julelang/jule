@@ -698,6 +698,7 @@ impl ScopeParser {
     fn build_cases(mut self, mut tokens: []Token, type_match: bool): ([]&Case, &Else) {
         let mut cases: []&Case = nil
         let mut def: &Else = new(Else)
+        let mut def_not_last = false
         for tokens.len > 0 {
             let mut tok = tokens[0]
             // SKip comments.
@@ -722,9 +723,15 @@ impl ScopeParser {
                     self.push_err(tok, LogMsg.InvalidSyntax)
                 }
             } else {
+                def_not_last = def_not_last || real(def)
                 cases = append(cases, c)
             }
         }
+
+        if def_not_last {
+            self.push_err(def.token, LogMsg.DefaultNotLast)
+        }
+
         ret cases, def
     }
 
