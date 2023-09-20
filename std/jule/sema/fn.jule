@@ -86,15 +86,8 @@ impl Fn {
         }
 
         for _, p in self.params {
-            if p.is_self() {
-                continue
-            }
-
-            let pk = p.kind.kind.to_str()
-            for _, g in self.generics {
-                if pk.find(g.ident) != -1 {
-                    ret true
-                }
+            if parameter_uses_generics(p, self.generics) {
+                ret true
             }
         }
 
@@ -109,14 +102,7 @@ impl Fn {
             ret false
         }
 
-        let rk = self.result.kind.kind.to_str()
-        for _, g in self.generics {
-            if rk.find(g.ident) != -1 {
-                ret true
-            }
-        }
-
-        ret false
+        ret kind_uses_generics(self.result.kind.kind, self.generics)
     }
 
     // Force to new instance.
@@ -384,4 +370,21 @@ impl FnIns {
         }
         ret s
     }
+}
+
+fn kind_uses_generics(k: &TypeKind, &generics: []&GenericDecl): bool {
+    let pk = k.to_str()
+    for _, g in generics {
+        if pk.find(g.ident) != -1 {
+            ret true
+        }
+    }
+    ret false
+}
+
+fn parameter_uses_generics(&p: &Param, &generics: []&GenericDecl): bool {
+    if p.is_self() {
+        ret false
+    }
+    ret kind_uses_generics(p.kind.kind, generics)
 }
