@@ -577,14 +577,13 @@ impl Parser {
         }
     }
 
-    fn build_param_type(mut &self, mut &param: &ParamDecl, mut &tokens: []Token, must_pure: bool) {
+    fn build_param_type(mut &self, mut &param: &ParamDecl, mut &tokens: []Token) {
         let mut i = 0
-        if !must_pure {
-            self.param_type_begin(param, i, tokens)
-            if i >= tokens.len {
-                ret
-            }
+        self.param_type_begin(param, i, tokens)
+        if i >= tokens.len {
+            ret
         }
+
         param.kind, _ = unsafe { self.build_type(tokens, &i, true) }
         if i < tokens.len {
             self.push_err(tokens[i], LogMsg.InvalidSyntax)
@@ -599,7 +598,7 @@ impl Parser {
         param.ident = token.kind
     }
 
-    fn build_param_body(mut &self, mut &param: &ParamDecl, mut i: &int, mut tokens: []Token, must_pure: bool) {
+    fn build_param_body(mut &self, mut &param: &ParamDecl, mut i: &int, mut tokens: []Token) {
         self.param_body_id(param, tokens[i])
         let mut tok = tokens[i]
         // +1 for skip identifier token
@@ -612,15 +611,15 @@ impl Parser {
 
         tok = tokens[i+1]
         if tok.id != TokenId.Colon {
-            self.build_param_type(param, tokens, must_pure)
+            self.build_param_type(param, tokens)
             ret
         }
 
         tokens = tokens[i+2:] // Skip colon
-        self.build_param_type(param, tokens, must_pure)
+        self.build_param_type(param, tokens)
     }
 
-    fn build_param(mut &self, mut tokens: []Token, must_pure: bool): &ParamDecl {
+    fn build_param(mut &self, mut tokens: []Token): &ParamDecl {
         let mut param = &ParamDecl{
             token: tokens[0],
         }
@@ -655,10 +654,10 @@ impl Parser {
         if param.token.id != TokenId.Ident {
             // Just data type
             param.ident = str(Ident.Anon)
-            self.build_param_type(param, tokens, must_pure)
+            self.build_param_type(param, tokens)
         } else {
             let mut i = new(int, 0)
-            self.build_param_body(param, i, tokens, must_pure)
+            self.build_param_body(param, i, tokens)
         }
 
         ret param
@@ -685,7 +684,7 @@ impl Parser {
         }
     }
 
-    fn build_params(mut &self, mut &tokens: []Token, method: bool, must_pure: bool): []&ParamDecl {
+    fn build_params(mut &self, mut &tokens: []Token, method: bool): []&ParamDecl {
         let (mut parts, errs) = parts(tokens, TokenId.Comma, true)
         self.errors = append(self.errors, errs...)
         if parts.len == 0 {
@@ -702,7 +701,7 @@ impl Parser {
         }
 
         for (_, mut part) in parts {
-            let mut param = self.build_param(part, must_pure)
+            let mut param = self.build_param(part)
             if real(param) {
                 params = append(params, param)
             }
@@ -723,17 +722,47 @@ impl Parser {
 
         i-- // For point to parentheses - ( -
         let mut range_tokens = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
-        let mut params = self.build_params(range_tokens, false, true)
 
-        let mut types = make([]&TypeDecl, params.len)
-        for (j, mut param) in params {
-            types[j] = param.kind
-            if param.ident != str(Ident.Anon) {
-                param.token.kind = param.ident
-            } else {
-                param.token.kind = str(Ident.Ignore)
+        let (mut parts, errs) = parts(range_tokens, TokenId.Comma, true)
+        self.errors = append(self.errors, errs...)
+        if parts.len == 0 {
+            ret
+        }
+
+        let mut types = make([]&TypeDecl, 0, parts.len)
+        t.idents = make([]Token, 0, parts.len)
+        for (_, mut part) in parts {
+            let mut token = part[0]
+            let mut offset = 0
+
+            // Check type annotation.
+            if part.len > 1 {
+                token = part[1]
+                if token.id == TokenId.Colon {
+                    offset = 2
+                    if part.len < 3 {
+                        self.push_err(token, LogMsg.MissingType)
+                        continue
+                    }
+                }
             }
-            t.idents = append(t.idents, param.token)
+
+            token = part[0]
+            if offset == 2 {
+                if token.id != TokenId.Ident {
+
+                }
+                t.idents = append(t.idents, token)
+            } else {
+                token.kind = str(Ident.Ignore)
+                t.idents = append(t.idents, token)
+            }
+
+            let (mut t, _) = unsafe { self.build_type(part, &offset, true) }
+            if offset < part.len {
+                self.push_err(part[offset], LogMsg.InvalidSyntax)
+            }
+            types = append(types, t)
         }
 
         if types.len > 1 {
@@ -859,7 +888,7 @@ impl Parser {
 
         let mut params_toks = range(i, TokenKind.LParent, TokenKind.RParent, tokens)
         if params_toks.len > 0 {
-            f.params = self.build_params(params_toks, method, false)
+            f.params = self.build_params(params_toks, method)
         }
 
         f.result, _ = self.build_ret_type(tokens, i)
