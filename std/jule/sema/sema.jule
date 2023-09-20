@@ -950,7 +950,13 @@ impl Sema {
         for (_, mut p) in f.params {
             if !p.decl.is_self() {
                 p.kind = sema.build_type_with_generics(p.decl.kind.decl, generics)
-                ok = real(p.kind) && ok
+                if real(p.kind) {
+                    if p.decl.reference && !is_valid_for_ref(p.kind) {
+                        self.push_err(p.decl.token, LogMsg.RefPointsToInvalidType, p.kind.to_str())
+                    }
+                } else {
+                    ok = false
+                }
             }
         }
 
@@ -1936,6 +1942,10 @@ impl Sema {
             }
 
             self.check_assign_type(v.kind.kind, v.value.data, v.value.expr.token, false)
+        }
+
+        if v.reference && !is_valid_for_ref(v.kind.kind) {
+            self.push_err(v.token, LogMsg.RefPointsToInvalidType, v.kind.kind.to_str())
         }
 
         self.check_validity_for_init_expr(
