@@ -1,0 +1,164 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+cpp use "<time.h>"
+
+cpp type time_t: u64
+cpp unsafe fn time(t: *cpp.time_t): cpp.time_t
+
+const HOUR = 3600
+const DAY  = HOUR * 24
+
+const NSEC_PER_MSEC = 1000000
+const NSEC_PER_SEC  = NSEC_PER_MSEC * MSEC_PER_SEC
+const MSEC_PER_SEC  = 1000
+const DAYS_PER_Y    = 365
+const DAYS_PER_400Y = DAYS_PER_Y*400 + 97
+const DAYS_PER_100Y = DAYS_PER_Y*100 + 24
+const DAYS_PER_4Y   = DAYS_PER_Y*4 + 1
+
+// 2000-03-01 (mod 400 year, immediately after feb29
+const _2000_03_01 = 946684800
+const MOD_APOCH   = (_2000_03_01 + DAY*(31+29))
+
+// Days in month.
+static MDAYS: []int = [31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29]
+
+// Type of unix-time seconds.
+pub type UnixTime: u64
+
+// Type of abstract time data.
+pub type TimeData: uint
+
+// Abstract time.
+pub struct AbsTime {
+    pub day:      TimeData
+    pub week_day: TimeData
+    pub year_day: TimeData
+    pub month:    TimeData
+    pub year:     TimeData
+    pub second:   TimeData
+    pub minute:   TimeData
+    pub hour:     TimeData
+}
+
+// Timestamp.
+// If you are going to use this structure to process data
+// of a time, you can obtain an 'AbsTime' instance by using
+// the `abs()` method to be more efficient. Each function of
+// this structure, such as `day` or `year`, uses an `abs()`
+// call in the background. Back-to-back calls may cause you
+// to make the same calculation over and over again.
+pub struct Time {
+    sec: UnixTime
+}
+
+impl Time {
+    // Returns new time instance from unix-time.
+    pub static fn unix(sec: UnixTime): Time {
+        ret Time{
+            sec: sec,
+        }
+    }
+
+    // Returns time instance of the moment.
+    pub static fn now(): Time {
+        ret Time.unix(unix())
+    }
+}
+
+impl Time {
+    // Returns time as unix-time.
+    pub fn unix(self): UnixTime { ret self.sec }
+
+    // Returns day of month.
+    pub fn day(self): TimeData { ret self.abs().day }
+
+    // Returns month.
+    pub fn month(self): TimeData { ret self.abs().month }
+
+    // Returns year.
+    pub fn year(self): TimeData { ret self.abs().year }
+
+    // Returns second.
+    pub fn second(self): TimeData { ret self.abs().second }
+
+    // Returns minute.
+    pub fn minute(self): TimeData { ret self.abs().minute }
+
+    // Returns hour.
+    pub fn hour(self): TimeData { ret self.abs().hour }
+
+    // Returns time as abstract time.
+    pub fn abs(self): AbsTime {
+        let secs = self.sec - MOD_APOCH
+        let mut days = secs / DAY
+        let mut rem_secs = secs % DAY
+        if rem_secs < 0 {
+            rem_secs += DAY
+            days--
+        }
+
+        let mut qc_cycles = days / DAYS_PER_400Y
+        let mut rem_days = days % DAYS_PER_400Y
+        if rem_days < 0 {
+            rem_days += DAYS_PER_400Y
+            qc_cycles--
+        }
+
+        let mut c_cycles = rem_days / DAYS_PER_100Y
+        if c_cycles == 4 {
+            c_cycles--
+        }
+        rem_days -= c_cycles * DAYS_PER_100Y
+
+        let mut q_cycles = rem_days / DAYS_PER_4Y
+        if q_cycles == 25 {
+            q_cycles--
+        }
+        rem_days -= q_cycles * DAYS_PER_4Y
+
+        let mut rem_years = rem_days / DAYS_PER_Y
+        if rem_years == 4 {
+            rem_years--
+        }
+        rem_days -= rem_years * DAYS_PER_Y
+
+        let leap = if rem_years == 0 && (q_cycles > 0 || c_cycles == 0) { 1 } else { 0 }
+        let mut y_day = rem_days + 31 + 28 + leap
+        if y_day >= DAYS_PER_Y+leap {
+            y_day -= DAYS_PER_Y + leap
+        }
+
+        let mut months = 0
+        for MDAYS[months] <= rem_days; months++ {
+            rem_days -= MDAYS[months]
+        }
+
+        let mut t = AbsTime{}
+        t.year = rem_years + 4*q_cycles + 100*c_cycles + 400*qc_cycles + 100
+        t.month = uint(months + 2)
+        if t.month >= 12 {
+            t.month -= 12
+            t.year++
+        }
+        t.month++
+        t.year += 1900
+        t.day = rem_days + 1
+        t.week_day = (3+days) % 7
+        if t.week_day < 0 {
+            t.week_day += 7
+        }
+        t.year_day = y_day
+        t.hour = rem_secs / HOUR
+        t.minute = rem_secs / 60 % 60
+        t.second = rem_secs % 60
+        ret t
+    }
+}
+
+// Returns current unix time UTC.
+fn unix(): UnixTime {
+    ret UnixTime(unsafe{ cpp.time(nil) })
+}
