@@ -820,8 +820,8 @@ impl Eval {
         if d.is_const() {
             match {
             | d.constant.is_f64(): d.constant.set_f64(-d.constant.read_f64())
-            | d.constant.is_i64(): d.constant.set_f64(-d.constant.as_f64())
-            | d.constant.is_u64(): d.constant.set_f64(-d.constant.as_f64())
+            | d.constant.is_i64(): d.constant.set_i64(-d.constant.read_i64())
+            | d.constant.is_u64(): d.constant.set_u64(-d.constant.read_u64())
             }
             normalize_type(d)
         }
@@ -843,8 +843,8 @@ impl Eval {
         if d.is_const() {
             match {
             | d.constant.is_f64(): d.constant.set_f64(+d.constant.read_f64())
-            | d.constant.is_i64(): d.constant.set_f64(+d.constant.as_f64())
-            | d.constant.is_u64(): d.constant.set_f64(+d.constant.as_f64())
+            | d.constant.is_i64(): d.constant.set_i64(+d.constant.read_i64())
+            | d.constant.is_u64(): d.constant.set_u64(+d.constant.read_u64())
             }
             normalize_type(d)
         }
@@ -2762,7 +2762,7 @@ impl Eval {
 
         match ident.kind {
         | "MAX":
-            let mut c = Const.new_i64(min)
+            let mut c = Const.new_i64(max)
             ret &Data{
                 constant: c,
                 model:    c,
@@ -2770,7 +2770,7 @@ impl Eval {
             }
 
         | "MIN":
-            let mut c = Const.new_i64(max)
+            let mut c = Const.new_i64(min)
             ret &Data{
                 constant: c,
                 model:    c,
@@ -3901,50 +3901,6 @@ impl BinopSolver {
         }
     }
 
-    fn assign_shift(self, mut d: &Data, r: f64) {
-        match {
-        | r <= 6:
-            d.kind.prim().kind = str(PrimKind.I8)
-            d.constant.set_i64(d.constant.as_i64())
-
-        | r <= 7:
-            d.kind.prim().kind = str(PrimKind.U8)
-            d.constant.set_u64(d.constant.as_u64())
-
-        | r <= 14:
-            d.kind.prim().kind = str(PrimKind.I16)
-            d.constant.set_i64(d.constant.as_i64())
-
-        | r <= 15:
-            d.kind.prim().kind = str(PrimKind.U16)
-            d.constant.set_u64(d.constant.as_u64())
-
-        | r <= 30:
-            d.kind.prim().kind = str(PrimKind.I32)
-            d.constant.set_i64(d.constant.as_i64())
-
-        | r <= 31:
-            d.kind.prim().kind = str(PrimKind.U32)
-            d.constant.set_u64(d.constant.as_u64())
-
-        | r <= 62:
-            d.kind.prim().kind = str(PrimKind.I64)
-            d.constant.set_i64(d.constant.as_i64())
-
-        | r <= 63:
-            d.kind.prim().kind = str(PrimKind.U64)
-            d.constant.set_u64(d.constant.as_u64())
-
-        | r <= 127:
-            d.kind.prim().kind = str(PrimKind.F32)
-            d.constant.set_f64(d.constant.as_f64())
-
-        |:
-            d.kind.prim().kind = str(PrimKind.F64)
-            d.constant.set_f64(d.constant.as_f64())
-        }
-    }
-
     fn solve_const(mut self, mut d: &Data) {
         match {
         | !real(d):
@@ -4020,14 +3976,12 @@ impl BinopSolver {
             d.constant = self.l.constant
 
         | str(TokenKind.Lshift):
-            d.constant = self.l.constant
             _ = self.l.constant.lshift(self.r.constant)
-            self.assign_shift(d, self.r.constant.as_f64())
+            d.constant = self.l.constant
 
         | str(TokenKind.Rshift):
-            d.constant = self.l.constant
             _ = self.l.constant.rshift(self.r.constant)
-            self.assign_shift(d, self.r.constant.as_f64())
+            d.constant = self.l.constant
         }
 
         d.model = d.constant
@@ -4035,9 +3989,6 @@ impl BinopSolver {
 
     fn post_const(self, mut d: &Data) {
         if !real(d) {
-            ret
-        }
-        if !d.is_const() {
             ret
         }
 

@@ -135,7 +135,6 @@ impl Const {
     // Set
     //
 
-
     // Sets constant value from 64-bit signed integer.
     pub fn set_i64(mut self, x: i64) { self.data = x }
     // Sets constant value from 64-bit unsigned integer.
@@ -148,15 +147,6 @@ impl Const {
     pub fn set_f64(mut self, x: f64) { self.data = x }
     // Sets constant value to nil.
     pub fn set_nil(mut self) { self.data = nil }
-
-    fn set_by_type(mut self, v: f64, x: Const) {
-        match {
-        | x.is_f64(): self.set_f64(v)
-        | self.is_f64(): self.set_f64(v)
-        | self.is_i64(): self.set_i64(i64(v))
-        | self.is_u64(): self.set_u64(u64(v))
-        }
-    }
 
     //
     // Types
@@ -333,10 +323,22 @@ impl Const {
             }
             self.set_str(self.read_str() + x.read_str())
 
-        | self.is_f64()
-        | self.is_i64()
+        | self.is_f64():
+             self.set_f64(self.read_f64() + x.as_f64())
+
+        | self.is_i64():
+            if x.is_f64() {
+                self.set_f64(self.as_f64() + x.read_f64())
+            } else {
+                self.set_i64(self.read_i64() + x.as_i64())
+            }
+
         | self.is_u64():
-            self.set_by_type(self.as_f64() + x.as_f64(), x)
+            if x.is_f64() {
+                self.set_f64(self.as_f64() + x.read_f64())
+            } else {
+                self.set_u64(self.read_u64() + x.as_u64())
+            }
 
         |:
             ret false
@@ -348,10 +350,22 @@ impl Const {
     // Reports whether operation is success.
     pub fn sub(mut self, x: Const): bool {
         match {
-        | self.is_f64()
-        | self.is_i64()
+        | self.is_f64():
+             self.set_f64(self.read_f64() - x.as_f64())
+
+        | self.is_i64():
+            if x.is_f64() {
+                self.set_f64(self.as_f64() - x.read_f64())
+            } else {
+                self.set_i64(self.read_i64() - x.as_i64())
+            }
+
         | self.is_u64():
-            self.set_by_type(self.as_f64() - x.as_f64(), x)
+            if x.is_f64() {
+                self.set_f64(self.as_f64() - x.read_f64())
+            } else {
+                self.set_u64(self.read_u64() - x.as_u64())
+            }
 
         |:
             ret false
@@ -363,10 +377,22 @@ impl Const {
     // Reports whether operation is success.
     pub fn mul(mut self, x: Const): bool {
         match {
-        | self.is_f64()
-        | self.is_i64()
+        | self.is_f64():
+             self.set_f64(self.read_f64() * x.as_f64())
+
+        | self.is_i64():
+            if x.is_f64() {
+                self.set_f64(self.as_f64() * x.read_f64())
+            } else {
+                self.set_i64(self.read_i64() * x.as_i64())
+            }
+
         | self.is_u64():
-            self.set_by_type(self.as_f64() * x.as_f64(), x)
+            if x.is_f64() {
+                self.set_f64(self.as_f64() * x.read_f64())
+            } else {
+                self.set_u64(self.read_u64() * x.as_u64())
+            }
 
         |:
             ret false
