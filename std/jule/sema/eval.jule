@@ -2085,31 +2085,35 @@ impl Eval {
     }
 
     fn eval_struct_static(mut self, mut s: &StructIns, ident: Token): &Data {
-        const STATIC = true
-        let mut method = s.find_method(ident.kind, STATIC)
-        if !real(method) {
-            self.push_err(ident, LogMsg.ObjHaveNotIdent, ident.kind)
-            ret new(Data)
-        }
-
         let mut d = &Data{
             lvalue:  false,
             decl:    false,
             mutable: false,
         }
 
-
-        let mut ins = method.instance()
-        ins.owner = s
-        self.push_reference_to_fn(ins)
-        d.model = &StructStaticIdentExprModel{
-            structure: s,
-            expr:      d.model,
-            method:    ins,
+        // Method.
+        const STATIC = true
+        let mut method = s.find_method(ident.kind, STATIC)
+        if real(method) {
+            let mut ins = method.instance()
+            ins.owner = s
+            self.push_reference_to_fn(ins)
+            d.model = &StructStaticIdentExprModel{
+                structure: s,
+                expr:      d.model,
+                method:    ins,
+            }
+            d.kind = &TypeKind{kind: ins}
+            ret d
         }
-        d.kind = &TypeKind{kind: ins}
 
-        ret d
+        let mut sttc = s.decl.find_static(ident.kind)
+        if real(sttc) {
+            ret self.eval_var(sttc, ident)
+        }
+
+        self.push_err(ident, LogMsg.ObjHaveNotIdent, ident.kind)
+        ret new(Data)
     }
 
     fn eval_trait_sub_ident(mut self, mut d: &Data, mut trt: &Trait, ident: Token): &Data {

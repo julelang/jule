@@ -1576,94 +1576,52 @@ impl Parser {
         ret f
     }
 
-    fn parse_impl_trait(mut &self, mut &ipl: &Impl, mut tokens: []Token) {
-        let mut stms = split_stms(tokens)
-        for (_, mut st) in stms {
-            tokens = st.tokens
-            let mut token = tokens[0]
-            let mut is_pub = false
-            match token.id {
-            | TokenId.Comment:
-                // Ignore.
-                continue
-
-            | TokenId.Pub:
-                is_pub = true
-                if tokens.len == 1 {
-                    self.push_err(tokens[0], LogMsg.InvalidSyntax)
-                    continue
-                }
-                tokens = tokens[1:]
-                if tokens.len > 0 {
-                    token = tokens[0]
-                }
-            }
-
-            match token.id {
-            | TokenId.Static
-            | TokenId.Fn
-            | TokenId.Unsafe:
-                let mut f = self.get_method(tokens)
-                if real(f) {
-                    f.public = is_pub
-                    self.check_method_receiver(f)
-                    ipl.methods = append(ipl.methods, f)
-                }
-
-            |:
-                self.push_err(token, LogMsg.InvalidSyntax)
-                continue
-            }
-        }
-    }
-
-    fn parse_impl_struct(mut &self, mut &ipl: &Impl, mut tokens: []Token) {
-        let mut stms = split_stms(tokens)
-        for (_, mut st) in stms {
-            tokens = st.tokens
-            let mut token = tokens[0]
-            let mut is_pub = false
-            match token.id {
-            | TokenId.Comment:
-                // Ignore.
-                continue
-
-            | TokenId.Pub:
-                is_pub = true
-                if tokens.len == 1 {
-                    self.push_err(tokens[0], LogMsg.InvalidSyntax)
-                    continue
-                }
-                tokens = tokens[1:]
-                if tokens.len > 0 {
-                    token = tokens[0]
-                }
-            }
-
-            match token.id {
-            | TokenId.Static
-            | TokenId.Fn
-            | TokenId.Unsafe:
-                let mut f = self.get_method(tokens)
-                if real(f) {
-                    f.public = is_pub
-                    self.check_method_receiver(f)
-                    ipl.methods = append(ipl.methods, f)
-                }
-
-            |:
-                self.push_err(token, LogMsg.InvalidSyntax)
-                continue
-            }
-        }
-    }
-
     fn parse_impl_body(mut &self, mut &ipl: &Impl, mut &tokens: []Token) {
-        if ipl.is_trait_impl() {
-            self.parse_impl_trait(ipl, tokens)
-            ret
+        let mut stms = split_stms(tokens)
+        for (_, mut st) in stms {
+            tokens = st.tokens
+            let mut token = tokens[0]
+            let mut is_pub = false
+            match token.id {
+            | TokenId.Comment:
+                // Ignore.
+                continue
+
+            | TokenId.Pub:
+                is_pub = true
+                if tokens.len == 1 {
+                    self.push_err(tokens[0], LogMsg.InvalidSyntax)
+                    continue
+                }
+                tokens = tokens[1:]
+                if tokens.len > 0 {
+                    token = tokens[0]
+                }
+            }
+
+            match token.id {
+            | TokenId.Const:
+                let mut v = self.build_var(tokens)
+                if real(v) {
+                    v.public = is_pub
+                    ipl.statics = append(ipl.statics, v)
+                }
+
+            | TokenId.Static
+            | TokenId.Fn
+            | TokenId.Unsafe:
+                let mut f = self.get_method(tokens)
+                if real(f) {
+                    f.public = is_pub
+                    self.check_method_receiver(f)
+                    ipl.methods = append(ipl.methods, f)
+                }
+
+            |:
+                self.push_err(token, LogMsg.InvalidSyntax)
+                continue
+            }
         }
-        self.parse_impl_struct(ipl, tokens)
     }
 
     fn build_impl(mut &self, mut tokens: []Token): &Impl {

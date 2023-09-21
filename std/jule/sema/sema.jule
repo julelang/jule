@@ -1444,6 +1444,8 @@ impl Sema {
 
     fn impl_to_struct(mut &self, mut &dest: &Struct, mut &ipl: &Impl): (ok: bool) {
         ok = true
+
+        // Methods.
         for (_, mut f) in ipl.methods {
             if real(dest.find_method(f.ident, f.statically)) || real(dest.find_field(f.ident)) {
                 self.push_err(f.token, LogMsg.StructAlreadyHaveIdent, dest.ident, f.ident)
@@ -1465,6 +1467,19 @@ impl Sema {
             f.sema = self
             f.owner = dest
             dest.methods = append(dest.methods, f)
+        }
+
+        for (_, mut v) in ipl.statics {
+            const STATIC = true
+            if real(dest.find_method(v.ident, STATIC)) || real(dest.find_static(v.ident)) {
+                self.push_err(v.token, LogMsg.StructAlreadyHaveIdent, dest.ident, v.ident)
+                ok = false
+                continue
+            }
+
+            self.check_var_decl(v, self)
+            self.check_type_var(v, self)
+            dest.statics = append(dest.statics, v)
         }
         ret
     }
@@ -1497,6 +1512,10 @@ impl Sema {
 
         base.implemented = append(base.implemented, dest)
         dest.implements = append(dest.implements, base)
+
+        if decl.statics.len > 0 {
+            self.push_err(decl.statics[0].token, LogMsg.TraitImplHasStatic)
+        }
 
         match {
         | !self.check_trait_impl_methods(base, decl): ret
