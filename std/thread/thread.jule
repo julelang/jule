@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+cpp use "<chrono>"
 cpp use "thread.hpp"
 
 //jule:namespace std
@@ -18,6 +19,19 @@ cpp struct __jule_thread_handle {
     ref_count: fn(): uint
     drop:      fn()
 }
+
+// Safe mask for std::chrono::nanoseconds type.
+// Used for avoid implicit casting for numeric types.
+cpp type chrono_ns: u64
+
+// Safe mask for std::chrono::nanoseconds type.
+// Used for casting.
+//
+//jule:namespace std::chrono
+cpp fn nanoseconds(x: u64): cpp.chrono_ns
+
+//jule:namespace std::this_thread
+cpp fn sleep_for(x: cpp.chrono_ns)
 
 cpp fn __jule_spawn_thread(routine: fn()): cpp.__jule_thread_handle
 
@@ -45,6 +59,12 @@ impl Thread {
         ret &Thread{
             handle: cpp.__jule_spawn_thread(routine),
         }
+    }
+
+    // Stop execution of caller thread by nanoseconds.
+    // This functions only affects execution of caller thread, not process.
+    pub static fn sleep(ns: u64) {
+        cpp.sleep_for(cpp.nanoseconds(ns))
     }
 }
 
