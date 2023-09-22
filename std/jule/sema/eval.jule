@@ -80,6 +80,18 @@ fn is_instanced_struct(s: &StructIns): bool {
     ret s.decl.generics.len == s.generics.len
 }
 
+fn is_ptr_arithmetic_compatible_int(mut &d: &Data): bool {
+    if d.is_const() {
+        ret int_assignable(str(types::TypeKind.Int), d)
+    }
+    let mut tcc = TypeCompatibilityChecker{
+        dest:        &TypeKind{kind: build_prim_type(str(types::TypeKind.Int))},
+        src:         d.kind,
+        deref:       true,
+    }
+    ret tcc.check()
+}
+
 fn normalize_bitsize(mut d: &Data) {
     if !d.is_const() {
         ret
@@ -3411,11 +3423,6 @@ impl BinopSolver {
     }
 
     fn eval_ptr(mut self): &Data {
-        if !self.check_type_compatibility() {
-            self.e.push_err(self.op, LogMsg.IncompatibleTypes, self.l.kind.to_str(), self.r.kind.to_str())
-            ret new(Data)
-        }
-
         match self.op.kind {
         | str(TokenKind.Eqs)
         | str(TokenKind.NotEq)
@@ -3423,11 +3430,29 @@ impl BinopSolver {
         | str(TokenKind.Gt)
         | str(TokenKind.LessEq)
         | str(TokenKind.GreatEq):
+            if !self.check_type_compatibility() {
+                self.e.push_err(self.op, LogMsg.IncompatibleTypes, self.l.kind.to_str(), self.r.kind.to_str())
+                ret new(Data)
+            }
             ret &Data{
                 kind: &TypeKind{
                     kind: build_prim_type(str(PrimKind.Bool)),
                 },
             }
+
+        | str(TokenKind.Plus)
+        | str(TokenKind.Minus):
+            if !real(self.l.kind.ptr()) {
+                self.l, self.r = self.r, self.l
+            }
+            if self.l.kind.ptr().is_unsafe() {
+                self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, self.l.kind.to_str())
+            }
+            if !is_ptr_arithmetic_compatible_int(self.r) {
+                self.e.push_err(self.op, LogMsg.IncompatibleTypeForPtrArithmetic, self.r.kind.to_str())
+                ret new(Data)
+            }
+            ret self.l
 
         |:
             self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, self.l.kind.to_str())
@@ -3876,7 +3901,7 @@ impl BinopSolver {
         | real(self.l.kind.enm()):
             ret self.eval_enum()
 
-        | real(self.l.kind.ptr()):
+        | real(self.l.kind.ptr()) || real(self.r.kind.ptr()):
             ret self.eval_ptr()
 
         | real(self.l.kind.arr()):

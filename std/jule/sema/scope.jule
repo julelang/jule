@@ -996,20 +996,20 @@ impl ScopeChecker {
 
         if real(d.kind.ptr()) {
             let mut ptr = d.kind.ptr()
-            if !ptr.is_unsafe() && !self.is_unsafe() {
-                self.s.push_err(a.left[0].expr.token, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
+            if ptr.is_unsafe() {
+                self.s.push_err(a.setter, LogMsg.OperatorNotForJuleType, a.setter.kind, d.kind.to_str())
                 ret
             }
-        }
+        } else {
+            let mut check_t = d.kind
+            if real(d.kind.ref()) {
+                check_t = d.kind.ref().elem
+            }
 
-        let mut check_t = d.kind
-        if real(d.kind.ref()) {
-            check_t = d.kind.ref().elem
-        }
-
-        if !real(check_t.prim()) || !types::is_num(check_t.prim().kind) {
-            self.s.push_err(a.setter, LogMsg.OperatorNotForJuleType, a.setter.kind, d.kind.to_str())
-            ret
+            if !real(check_t.prim()) || !types::is_num(check_t.prim().kind) {
+                self.s.push_err(a.setter, LogMsg.OperatorNotForJuleType, a.setter.kind, d.kind.to_str())
+                ret
+            }
         }
 
         self.scope.stmts = append(self.scope.stmts, &Postfix{
@@ -1071,7 +1071,7 @@ impl ScopeChecker {
             op: a.setter.kind,
         })
 
-        if a.setter.kind != str(TokenKind.Eq) && !r.is_const() {
+        if a.setter.kind != str(TokenKind.Eq) {
             a.setter.kind = a.setter.kind[:a.setter.kind.len-1]
 
             let mut solver = BinopSolver{
@@ -1088,6 +1088,7 @@ impl ScopeChecker {
                 ret
             }
             a.setter.kind += str(TokenKind.Eq)
+            ret
         }
 
         let mut checker = AssignTypeChecker{
