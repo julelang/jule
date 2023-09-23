@@ -1,0 +1,79 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// Integer type of random seeds.
+pub type Seed: uint
+
+// This structure implements a type of pseudo random number generator (PRNG).
+// The seed must be given manually for each instance.
+//
+// Seeds:
+//  Seed is a number of seeds used to simulate randomness.
+//  The order and numbers produced vary depending on the seed.
+//  Since PRNGs are inherently deterministic, using a fixed seed
+//  means your program will generate the same numbers every time.
+//
+// If you want to achieve randomness somehow, use a variable seed.
+// A simple solution for seeds that will create the illusion of randomness
+// is to use time. Unix-time seconds could be a simple seed solution.
+//
+// Ranges:
+//  This structure by default provides a function to simulate
+// randomness between two numbers. But a way to do this can be suggested.
+//  Here is basic range formula:
+//    ƒ(x) -> rand.nextn(max - min) + min
+//
+//  With this formula, randomness can be made in the [min, max) range.
+pub struct Rand {
+    seed: Seed
+}
+
+impl Rand {
+    const SeedMask = 1<<31 - 1
+
+    // Returns new PRNG for seed.
+    pub static fn new(seed: Seed): &Rand {
+        let mut rand = &Rand{}
+        rand.set_seed(seed)
+        ret rand
+    }
+}
+
+impl Rand {
+    // Sets seed.
+    fn set_seed(mut self, seed: Seed) {
+        self.seed = seed & Rand.SeedMask
+    }
+
+    // Returns new seed by current seed.
+    fn snext(mut self): Seed {
+        const NEXT_MASK = 0x41C64E6D + 0x3039
+        self.set_seed((self.seed*NEXT_MASK) & Rand.SeedMask)
+        ret self.seed
+    }
+
+    // Returns pseudo random number in [0, uint.MAX) range.
+    pub fn unext(mut self): uint {
+        ret self.snext()
+    }
+
+    // Returns pseudo random number in [0, int.MAX) range.
+    pub fn next(mut self): int {
+        ret int(self.snext())
+    }
+
+    // Returns pseudo random number in [0, n) range.
+    // Panics if n < 0.
+    pub fn nextn(mut self, n: int): int {
+        if n < 0 {
+            panic("Rand.nextn: invalid argument")
+        }
+        ret int(self.snext() % n)
+    }
+
+    // Returns pseudo random number in [0, n) range.
+    pub fn unextn(mut self, n: uint): uint {
+        ret self.snext() % n
+    }
+}
