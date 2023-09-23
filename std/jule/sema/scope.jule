@@ -306,6 +306,13 @@ pub struct Match {
     pub default:    &Case
 }
 
+impl Match {
+    // Reports whether match is type-match for generic type.
+    pub fn is_generic_type_match(self): bool {
+        ret self.type_match && real(self.expr) && self.expr.kind.generic
+    }
+}
+
 // Match-Case case.
 pub struct Case {
     pub owner: &Match
@@ -654,7 +661,7 @@ impl ScopeChecker {
     }
 
     fn check_expr(mut &self, mut expr: &Expr) {
-        let mut d = self.s.eval(expr, self)
+        let mut d = self.s.eval(self).eval_expr(expr)
         if !real(d) {
             ret
         }
@@ -672,7 +679,7 @@ impl ScopeChecker {
     fn check_if(mut &self, mut i: &std::jule::ast::If): &If {
         let mut s = self.check_child(i.scope)
 
-        let mut d = self.s.eval(i.expr, self)
+        let mut d = self.s.eval(self).eval_expr(i.expr)
         if !real(d) {
             ret new(If)
         }
@@ -749,7 +756,7 @@ impl ScopeChecker {
         kind.scope = self.check_iter_scope(uintptr(&kind), it.scope)
 
         if real(wh.expr) {
-            let mut d = self.s.eval(wh.expr, self)
+            let mut d = self.s.eval(self).eval_expr(wh.expr)
             if !real(d) {
                 ret
             }
@@ -791,7 +798,7 @@ impl ScopeChecker {
     fn check_range_iter(mut &self, mut it: &Iter) {
         let mut rang = (&RangeKind)(it.kind)
 
-        let mut d = self.s.eval(rang.expr, self)
+        let mut d = self.s.eval(self).eval_expr(rang.expr)
         if !real(d) {
             ret
         }
@@ -987,7 +994,7 @@ impl ScopeChecker {
         }
 
         let mut expr = a.left[0].expr
-        let mut d = self.s.eval(expr, self)
+        let mut d = self.s.eval(self).eval_expr(expr)
         if !real(d) {
             ret
         }
@@ -1028,21 +1035,21 @@ impl ScopeChecker {
 
     fn check_single_assign(mut &self, mut a: &AssignSt) {
         let mut l = new(Data)
-        let mut r = new(Data)
 
         if !is_ignore_ident(a.left[0].ident) {
             let mut expr = a.left[0].expr
-            l = self.s.eval(expr, self)
+            l = self.s.eval(self).eval_expr(expr)
             if !real(l) {
                 ret
             }
         }
 
-        if real(l) {
-            r = self.s.evalp(a.right, self, l.kind)
+        let mut eval = if real(l) {
+            self.s.evalp(self, l.kind)
         } else {
-            r = self.s.eval(a.right, self)
+            self.s.eval(self)
         }
+        let mut r = eval.eval_expr(a.right)
         if !real(r) {
             ret
         }
@@ -1162,7 +1169,7 @@ impl ScopeChecker {
     }
 
     fn check_ret_multi_assign(mut &self, mut a: &AssignSt) {
-        let mut rd = self.s.eval(a.right, self)
+        let mut rd = self.s.eval(self).eval_expr(a.right)
         if !real(rd) {
             ret
         }
@@ -1191,8 +1198,9 @@ impl ScopeChecker {
             let mut lexpr = a.left[i]
             let mut l = new(Data)
 
-            if !is_ignore_ident(lexpr.ident) && (!a.declarative || !self.is_new_assign_ident(lexpr.ident)) {
-                l = self.s.eval(lexpr.expr, self)
+            if !is_ignore_ident(lexpr.ident) &&
+                (!a.declarative || !self.is_new_assign_ident(lexpr.ident)) {
+                l = self.s.eval(self).eval_expr(lexpr.expr)
                 if !real(l) {
                     continue
                 }
@@ -1239,22 +1247,22 @@ impl ScopeChecker {
         for i in a.left {
             let mut lexpr = a.left[i]
             let mut l = new(Data)
-            let mut r = new(Data)
 
-            if !is_ignore_ident(lexpr.ident) && (!a.declarative || !self.is_new_assign_ident(lexpr.ident)) {
-                l = self.s.eval(lexpr.expr, self)
+            if !is_ignore_ident(lexpr.ident) &&
+                (!a.declarative || !self.is_new_assign_ident(lexpr.ident)) {
+                l = self.s.eval(self).eval_expr(lexpr.expr)
                 if !real(l) {
                     continue
                 }
             }
 
-            if real(l) {
-                let mut expr = &Expr{kind: right[i], token: a.right.token}
-                r = self.s.evalp(expr, self, l.kind)
+            let mut expr = &Expr{kind: right[i], token: a.right.token}
+            let mut eval = if real(l) {
+                self.s.evalp(self, l.kind)
             } else {
-                let mut expr = &Expr{kind: right[i], token: a.right.token}
-                r = self.s.eval(expr, self)
+                self.s.eval(self)
             }
+            let mut r = eval.eval_expr(expr)
             if !real(r) {
                 continue
             }
@@ -1290,6 +1298,7 @@ impl ScopeChecker {
     fn check_case(mut &self, mut m: &Match, i: int, mut c: &std::jule::ast::Case, mut expr: &Data): &Case {
         let mut _case = m.cases[i]
         _case.exprs = make([]ExprModel, c.exprs.len)
+        let mut generic_matched = false
 
         for (j, mut e) in c.exprs {
             if m.type_match {
@@ -1306,15 +1315,19 @@ impl ScopeChecker {
                     }
                 }
 
-                let trt = expr.kind.trt()
-                if real(trt) {
-                    _ = self.s.check_type_compatibility(expr.kind, d.kind, e.token, false)
+                if expr.kind.generic {
+                    generic_matched = generic_matched || expr.kind.equals(d.kind)
+                } else {
+                    let trt = expr.kind.trt()
+                    if real(trt) {
+                        _ = self.s.check_type_compatibility(expr.kind, d.kind, e.token, false)
+                    }
                 }
 
                 continue
             }
 
-            let mut d = self.s.eval(e, self)
+            let mut d = self.s.eval(self).eval_expr(e)
             if !real(d) {
                 continue
             }
@@ -1331,7 +1344,9 @@ impl ScopeChecker {
             checker.check()
         }
 
-        _case.scope = self.check_case_scope(_case, c.scope)
+        if !m.type_match || (expr.kind.generic && generic_matched) {
+            _case.scope = self.check_case_scope(_case, c.scope)
+        }
         ret _case
     }
 
@@ -1366,13 +1381,32 @@ impl ScopeChecker {
         ret def
     }
 
+    fn push_type_match(mut &self, mut tm: &Match) {
+        // Type kind is generic.
+        // Match cases by kind.
+        if tm.expr.kind.generic {
+            for (_, mut c) in tm.cases {
+                if real(c.scope) {
+                    tm.cases = nil
+                    tm.default = c
+                    goto push
+                }
+            }
+            tm.cases = nil
+        }
+
+    push:
+        self.scope.stmts = append(self.scope.stmts, tm)
+    }
+
     fn check_type_match(mut &self, mut m: &std::jule::ast::MatchCase) {
-        let mut d = self.s.eval(m.expr, self)
+        let mut d = self.s.eval(self).eval(m.expr)
         if !real(d) {
             ret
         }
 
-        if !((real(d.kind.prim()) && d.kind.prim().is_any()) || real(d.kind.trt())) {
+        if !d.kind.generic &&
+            !((real(d.kind.prim()) && d.kind.prim().is_any()) || real(d.kind.trt())) {
             self.s.push_err(m.expr.token, LogMsg.TypeCaseHasNotValidExpr)
             ret
         }
@@ -1382,12 +1416,12 @@ impl ScopeChecker {
             expr:       d,
         }
 
-        self.scope.stmts = append(self.scope.stmts, tm)
-
         if real(m.default) {
             tm.default = self.check_default(tm, m.default)
         }
         self.check_cases(m, tm, d)
+
+        self.push_type_match(tm)
     }
 
     fn check_common_match(mut &self, mut m: &std::jule::ast::MatchCase) {
@@ -1399,7 +1433,7 @@ impl ScopeChecker {
             }
             d.model = d.constant
         } else {
-            d = self.s.eval(m.expr, self)
+            d = self.s.eval(self).eval_expr(m.expr)
             if !real(d) {
                 ret
             }

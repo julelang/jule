@@ -316,7 +316,7 @@ fn builtin_caller_new(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data
     d.kind = &TypeKind{kind: &Ref{elem: t.kind.clone()}}
 
     if fc.args.len == 2 { // Initialize expression.
-        let mut init = e.s.evalp(fc.args[1], e.lookup, t.kind)
+        let mut init = e.s.evalp(e.lookup, t.kind).eval_expr(fc.args[1])
         if real(init) {
             t.mutable = true
             _ = check_mut(e.s, t, init, fc.args[1].token)
@@ -458,7 +458,7 @@ fn builtin_caller_make(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
 
     d.kind = t.kind
 
-    let mut len = e.s.evalp(fc.args[1], e.lookup, t.kind)
+    let mut len = e.s.evalp(e.lookup, t.kind).eval_expr(fc.args[1])
     if !real(len) {
         ret d
     }
@@ -466,7 +466,7 @@ fn builtin_caller_make(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
     e.check_integer_indexing_by_data(len, fc.args[1].token)
 
     if fc.args.len == 3 {
-        let mut cap = e.s.evalp(fc.args[2], e.lookup, t.kind)
+        let mut cap = e.s.evalp(e.lookup, t.kind).eval_expr(fc.args[2])
         if !real(cap) {
             ret d
         }

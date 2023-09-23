@@ -34,6 +34,7 @@ pub struct TypeAlias {
     pub public:     bool
     pub cpp_linked: bool
     pub used:       bool
+    pub generic:    bool
     pub token:      Token
     pub ident:      str
     pub kind:       &TypeSymbol
@@ -48,9 +49,10 @@ trait Kind {
 
 // Type's kind's type.
 pub struct TypeKind {
-    pub cpp_ident:  str
-    pub variadic:   bool
-    pub kind:       Kind
+    pub cpp_ident: str
+    pub generic:   bool
+    pub variadic:  bool
+    pub kind:      Kind
 }
 
 impl Kind for TypeKind {
@@ -847,6 +849,7 @@ impl TypeChecker {
         }
 
         let mut kind = ta.kind.kind.clone()
+        kind.generic = ta.generic
 
         if ta.cpp_linked {
             kind.cpp_ident = ta.ident
@@ -1198,7 +1201,7 @@ impl TypeChecker {
         let mut n = 0
 
         if !decl.auto_sized() {
-            let mut size = self.s.eval(decl.size, self.lookup)
+            let mut size = self.s.eval(self.lookup).eval_expr(decl.size)
             if !real(size) {
                 ret new(Arr)
             }

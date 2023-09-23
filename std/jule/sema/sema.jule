@@ -149,11 +149,12 @@ fn build_generic_type_aliases(mut &f: &FnIns): []&TypeAlias {
     for (i, mut g) in f.generics {
         let mut decl = f.decl.generics[i]
         aliases[i] = &TypeAlias{
-            used:  true,
-            scope: f.decl.scope,
-            ident: decl.ident,
-            token: decl.token,
-            kind:  &TypeSymbol{kind: g},
+            used:    true,
+            generic: true,
+            scope:   f.decl.scope,
+            ident:   decl.ident,
+            token:   decl.token,
+            kind:    &TypeSymbol{kind: g},
         }
     }
 
@@ -162,11 +163,12 @@ fn build_generic_type_aliases(mut &f: &FnIns): []&TypeAlias {
         for (i, mut g) in owner.generics {
             let mut decl = owner.decl.generics[i]
             aliases[f.generics.len+i] = &TypeAlias{
-                used:  true,
-                scope: f.decl.scope,
-                ident: decl.ident,
-                token: decl.token,
-                kind:  &TypeSymbol{kind: g},
+                used:    true,
+                generic: true,
+                scope:   f.decl.scope,
+                ident:   decl.ident,
+                token:   decl.token,
+                kind:    &TypeSymbol{kind: g},
             }
         }
     }
@@ -782,10 +784,9 @@ impl Sema {
         ret self.build_type_with_generics(t, nil)
     }
 
-    // Evaluates expression with type prefixed Eval and returns result.
-    // Checks variable dependencies if exist.
-    fn evalpd(mut &self, mut &expr: &Expr, mut l: Lookup,
-        mut p: &TypeKind, mut owner: &Var): &Data {
+    // Returns Eval instance for configuration with
+    // type prefix and checks var dependencies.
+    fn evalpd(mut &self, mut l: Lookup, mut p: &TypeKind, mut owner: &Var): &Eval {
         let mut e = &Eval{
             s:      self,
             lookup: l,
@@ -799,17 +800,17 @@ impl Sema {
 
         e.prefix = p
 
-        ret e.eval_expr(expr)
+        ret e
     }
 
-    // Evaluates expression with type prefixed Eval and returns result.
-    fn evalp(mut &self, mut expr: &Expr, mut l: Lookup, mut p: &TypeKind): &Data {
-        ret self.evalpd(expr, l, p, new(Var))
+    // Returns Eval instance for configuration with type prefix.
+    fn evalp(mut &self, mut l: Lookup, mut p: &TypeKind): &Eval {
+        ret self.evalpd(l, p, new(Var))
     }
 
-    // Evaluates expression with Eval and returns result.
-    fn eval(mut &self, mut &expr: &Expr, mut l: Lookup): &Data {
-        ret self.evalp(expr, l, new(TypeKind))
+    // Returns Eval instance for configuration.
+    fn eval(mut &self, mut l: Lookup): &Eval {
+        ret self.evalp(l, new(TypeKind))
     }
 
     fn check_assign_type(mut &self, dest_is_ref: bool, mut &dest: &TypeKind,
@@ -1110,7 +1111,7 @@ impl Sema {
                 }
                 item.value.data.model = item.value.data.constant
             } else {
-                let mut d = self.eval(item.value.expr, self)
+                let mut d = self.eval(self).eval_expr(item.value.expr)
                 if !real(d) {
                     continue
                 }
@@ -1142,7 +1143,7 @@ impl Sema {
                 }
                 item.value.data.model = item.value.data.constant
             } else {
-                let mut d = self.eval(item.value.expr, self)
+                let mut d = self.eval(self).eval_expr(item.value.expr)
                 if !real(d) {
                     continue
                 }
@@ -1998,13 +1999,12 @@ impl Sema {
             ret
         }
 
-        if real(decl.kind) {
-            decl.value.data = self.evalpd(
-                decl.value.expr, l, decl.kind.kind, decl)
+        let mut eval = if real(decl.kind) {
+            self.evalpd(l, decl.kind.kind, decl)
         } else {
-            decl.value.data = self.evalpd(
-                decl.value.expr, l, new(TypeKind), decl)
+            self.evalpd(l, new(TypeKind), decl)
         }
+        decl.value.data = eval.eval_expr(decl.value.expr)
         if !real(decl.value.data) {
             ret // Skip checks if error ocurrs.
         }

@@ -344,7 +344,7 @@ fn gen_case(mut m: &Match, mut c: &Case): str {
     let end = case_end_label_ident(uintptr(&c))
     let mut obj = ""
 
-    if c.exprs.len > 0 {
+    if c.exprs.len > 0 && !m.is_generic_type_match() {
         obj += "if (!("
         for (i, mut expr) in c.exprs {
             match {
@@ -394,6 +394,9 @@ fn gen_case(mut m: &Match, mut c: &Case): str {
 }
 
 fn gen_match(mut m: &Match): str {
+    if m.cases.len == 0 && !real(m.default) {
+        ret ""
+    }
     let mut obj = "{\n"
 
     add_indent()
@@ -401,7 +404,7 @@ fn gen_match(mut m: &Match): str {
     obj += indent()
 
     // Constant expressions generated as literals in conditions.
-    if !m.expr.is_const() {
+    if !m.is_generic_type_match() && !m.expr.is_const() {
         if m.expr.lvalue && is_opt_enabled(Opt.Copy) {
             obj += "auto &_match_expr{ "
         } else {
