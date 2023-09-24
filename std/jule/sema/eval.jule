@@ -30,7 +30,7 @@ use std::jule::ast::{
 }
 use std::jule::build::{LogMsg, logf}
 use std::jule::constant::{Const}
-use std::jule::constant::lit::{to_str, to_raw_str, to_rune, is_byte_lit}
+use lit for std::jule::constant::lit
 use std::jule::lex::{
     self,
     Token,
@@ -295,9 +295,9 @@ impl Eval {
     fn lit_str(self, lt: &LitExpr): &Data {
         let mut s = lt.value[1 : lt.value.len-1] // Remove quotes.
         if is_raw_str(lt.value) {
-            s = to_raw_str(([]byte)(s))
+            s = lit::to_raw_str(([]byte)(s))
         } else {
-            s = to_str(([]byte)(s))
+            s = lit::to_str(([]byte)(s))
         }
         let mut constant = Const.new_str(s)
 
@@ -332,7 +332,7 @@ impl Eval {
         const RUNE_KIND = str(PrimKind.I32)
 
         let lt = l.value[1 : l.value.len-1] // Remove quotes.
-        let r = to_rune(([]byte)(lt))
+        let r = lit::to_rune(([]byte)(lt))
         let mut data = &Data{
             lvalue:   false,
             mutable:  false,
@@ -340,8 +340,8 @@ impl Eval {
             decl:     false,
         }
 
-        let (_, is_byte) = is_byte_lit(l.value)
-        if is_byte {
+        let is_ascii = lit::is_ascii(r)
+        if is_ascii {
             data.kind = &TypeKind{
                 kind: build_prim_type(BYTE_KIND),
             }
