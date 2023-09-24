@@ -118,3 +118,50 @@ pub fn decode(src: []byte): []byte {
     }
     ret dest
 }
+
+// Encodes source bytes with url base64 table.
+// It is typically used for URLs and file names.
+// Returns encoded base64 bytes if success, nil slice if not.
+pub fn encode_url(src: []byte): []byte {
+    let mut dest = encode(src)
+    if dest == nil {
+        ret nil
+    }
+
+    // Process URL table.
+    let mut i = &dest[0]
+    let end = i + dest.len
+iter:
+    for i < end; i++ {
+        unsafe {
+            match *i {
+            | '+': *i = '-'
+            | '/': *i = '_'
+            | '=':
+                dest = dest[:dest.len-(uintptr(end)-uintptr(i))]
+                break iter
+            }
+        }
+    }
+    ret dest
+}
+
+// Decodes source bytes with url base64 table.
+// It is typically used for URLs and file names.
+// Returns decoded bytes if success, nil slice if not.
+pub fn decode_url(src: []byte): []byte {
+    // Process URL table.
+    let mut dest = clone(src)
+    let mut i = &dest[0]
+    let end = i + dest.len
+    for i < end; i++ {
+        unsafe {
+            match *i {
+            | '-': *i = '+'
+            | '_': *i = '/'
+            // Padding detected by algorithm.
+            }
+        }
+    }
+    ret decode(dest)
+}
