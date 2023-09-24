@@ -85,7 +85,7 @@ fn concat_all_parts(parts: ...str): str {
     ret s
 }
 
-fn get_accessor(mut t: &TypeKind): str {
+fn get_accessor(mut &t: &TypeKind): str {
     if real(t.ref()) || real(t.ptr()) {
         ret "->"
     }
@@ -131,7 +131,7 @@ fn sbtoa(b: byte): str {
     ret "\\" + seq
 }
 
-fn get_str_model(c: &Const): str {
+fn get_str_model(&c: &Const): str {
     let content = c.read_str()
     let bytes = ([]byte)(content)
     let len = fmt_int(i64(bytes.len), 10)
@@ -144,7 +144,7 @@ fn get_str_model(c: &Const): str {
     ret as_jt("str") + `("` + lit + `", ` + len + ")"
 }
 
-fn get_bool_model(c: &Const): str {
+fn get_bool_model(&c: &Const): str {
     if c.read_bool() {
         ret "true"
     }
@@ -153,12 +153,12 @@ fn get_bool_model(c: &Const): str {
 
 fn get_nil_model(): str { ret "nullptr" }
 
-fn gen_float_special_cases(x: f64): str {
+fn gen_float_special_cases(&x: f64): str {
     match {
     | math::is_nan(x):     ret "NAN"
     | math::is_inf(x, 1):  ret "INFINITY"
     | math::is_inf(x, -1): ret "-INFINITY"
-    |:               ret ""
+    |:                     ret ""
     }
 }
 
@@ -179,7 +179,7 @@ fn ftoa(f: f64, bitsize: int): str {
     ret m
 }
 
-fn get_f32_model(c: &Const): str {
+fn get_f32_model(&c: &Const): str {
     let x = c.as_f64()
 
     // Special cases.
@@ -196,7 +196,7 @@ fn get_f32_model(c: &Const): str {
     ret ftoa(x, 32) + "f"
 }
 
-fn get_f64_model(c: &Const): str {
+fn get_f64_model(&c: &Const): str {
     let x = c.as_f64()
 
     // Special cases.
@@ -213,7 +213,7 @@ fn get_f64_model(c: &Const): str {
     ret ftoa(x, 64)
 }
 
-fn get_float_model(mut d: &Data): str {
+fn get_float_model(mut &d: &Data): str {
     match {
     | d.kind.prim().is_f32(): ret get_f32_model(d.constant)
     |:                        ret get_f64_model(d.constant) // 64-bit
@@ -233,7 +233,7 @@ fn i64toa(x: i64): str {
     ret fmt + "L"
 }
 
-fn get_i64_model(c: &Const): str {
+fn get_i64_model(&c: &Const): str {
     ret i64toa(c.read_i64())
 }
 
