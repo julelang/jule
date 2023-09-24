@@ -3211,9 +3211,14 @@ impl Eval {
 
         let mut ac = AssignTypeChecker{
             s:           self.s,
-            dest:        td.kind,
-            d:           fd,
             error_token: ter.token,
+        }
+        if td.is_const() && !fd.is_const() {
+            ac.dest = fd.kind
+            ac.d = td
+        } else {
+            ac.dest = td.kind
+            ac.d = fd
         }
         if !ac.check() {
             self.push_suggestion(LogMsg.UseCompatibleValuesForTernary)
@@ -3227,7 +3232,7 @@ impl Eval {
         }
 
         let mut r = &Data{}
-        r.kind = td.kind
+        r.kind = ac.dest
         r.lvalue = r.kind.lvalue()
         r.mutable = r.kind.mutable()
         r.model = &TernaryExprModel{
