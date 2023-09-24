@@ -194,6 +194,7 @@ fn eliminate_comments(mut &tokens: []Token): []Token {
 fn find_lowest_prec_op(&tokens: []Token): int {
     let mut prec = Precedencer{}
     let mut brace_n = 0
+    let mut skip_to_next_open = false
     for i, token in tokens {
         match {
         | token.id == TokenId.Range:
@@ -202,10 +203,18 @@ fn find_lowest_prec_op(&tokens: []Token): int {
             | str(TokenKind.LParent)
             | str(TokenKind.LBracket):
                 brace_n++
+                skip_to_next_open = false
 
             |:
                 brace_n--
             }
+            continue
+
+        | skip_to_next_open:
+            continue
+
+        | token.id == TokenId.If:
+            skip_to_next_open = true
             continue
 
         | i == 0:
@@ -1021,6 +1030,9 @@ impl ExprBuilder {
 
         let mut token = tokens[0]
         match token.id {
+        | TokenId.If:
+            ret self.build_ternary(tokens)
+
         | TokenId.Op:
             // Handle pointer to primitive type.
             if tokens.len > 1 && token.kind == str(TokenKind.Star) {
@@ -1098,12 +1110,6 @@ impl ExprBuilder {
     }
 
     fn build(mut self, mut &tokens: []Token): ExprData {
-        let mut token = tokens[0]
-        match token.id {
-        | TokenId.If:
-            ret self.build_ternary(tokens)
-        }
-
         let i = find_lowest_prec_op(tokens)
         if i == -1 {
             ret self.build_data(tokens)
