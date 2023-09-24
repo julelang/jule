@@ -1,0 +1,120 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+// Table for standard base64 encoding, as defined in RFC 4648.
+const T64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+// Table for url base64 encoding, as defined in RFC 4648.
+// It is typically used for URLs and file names.
+const UT64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+
+static I64: [123]int = [
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 62, 63, 62, 62, 63, 52, 53, 54, 55,
+    56, 57, 58, 59, 60, 61, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6,
+    7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 0,
+    0, 0, 0, 63, 0, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
+    41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51
+]
+
+// Encodes source bytes with standard base64 table.
+// Returns encoded base64 bytes if success, nil slice if not.
+pub fn encode(src: []byte): []byte {
+    let blen = 4*((src.len + 2) / 3)
+    if blen < src.len {
+        ret nil
+    }
+
+    let mut dest = make([]byte, blen)
+    let mut j = &dest[0]
+
+    let mut i = &src[0]
+    let end = i + src.len
+    for i+3 <= end; i += 3 {
+        unsafe {
+            *j = T64[i[0] >> 2]
+            j++
+            *j = T64[((i[0] & 0x03) << 4) | (i[1] >> 4)]
+            j++
+            *j = T64[((i[1] & 0x0f) << 2) | (i[2] >> 6)]
+            j++
+            *j = T64[i[2] & 0x3f]
+            j++
+        }
+    }
+
+    if i < end {
+        unsafe {
+            *j = T64[i[0] >> 2]
+            j++
+            if i+1 == end {
+                *j = T64[(i[0] & 0x03) << 4]
+                j++
+                *j = '='
+                j++
+            } else {
+                *j = T64[((i[0] & 0x03) << 4) | (i[1] >> 4)]
+                j++
+                *j = T64[(i[1] & 0x0f) << 2]
+                j++
+            }
+            *j = '='
+            j++
+        }
+    }
+
+    ret dest
+}
+
+// Decodes source bytes with standard base64 table.
+// Returns decoded bytes if success, nil slice if not.
+pub fn decode(src: []byte): []byte {
+    if src.len == 0 {
+        ret nil
+    }
+
+    let p = &src[0]
+    let mut j = 0
+    let pad1 = src.len%4 != 0 || unsafe { p[src.len - 1] } == '='
+    let pad2 = pad1 && (src.len%4 > 2 || unsafe { p[src.len - 2] } != '=')
+    let mut l = (src.len - if pad1 { 1 } else { 0 }) / 4<<2
+
+    let mut sz = l/4 * 3
+    if pad1 {
+        sz++
+    }
+    if pad2 {
+        sz++
+    }
+    let mut dest = make([]byte, sz)
+    let mut d = &dest[0]
+
+    let mut i = 0
+    for i < l; i += 4 {
+        unsafe {
+            let n = I64[p[i]]<<18 | I64[p[i + 1]]<<12 | I64[p[i + 2]]<<6 | I64[p[i + 3]]
+            d[j] = byte(n >> 16)
+            j++
+            d[j] = byte(n >> 8 & 0xFF)
+            j++
+            d[j] = byte(n & 0xFF)
+            j++
+        }
+    }
+
+    if pad1 {
+        unsafe {
+            let mut n = I64[p[l]]<<18 | I64[p[l + 1]]<<12
+            d[j] = byte(n >> 16)
+            j++
+            if pad2 {
+                n |= I64[p[l + 2]] << 6
+                d[j] = byte(n >> 8 & 0xFF)
+                j++
+            }
+        }
+    }
+    ret dest
+}
