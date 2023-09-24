@@ -182,7 +182,7 @@ namespace jule {
 #ifndef __JULE_DISABLE__SAFETY
             this->check();
 
-            if (start < 0 || end < 0 || start > end || end > this->cap()) {
+            if (start < 0 || end < 0 || start > end || end > this->_len) {
                 std::stringstream sstream;
                 __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(sstream, start, end);
                 jule::panic(sstream.str().c_str());
