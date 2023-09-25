@@ -36,99 +36,119 @@ use std::jule::sema::{
     BuiltinAppendCallExprModel,
 }
 
-trait RangeSetter {
-    fn setup_vars(self, mut key_a: &Var, mut key_b: &Var): str
-    fn next_steps(self, mut key_a: &Var, mut key_b: &Var, begin: str): str
+trait RangeIterGen {
+    //fn setup_vars(self, mut key_a: &Var, mut key_b: &Var): str
+    //fn next_steps(self, mut key_a: &Var, mut key_b: &Var, begin: str): str
+    fn gen(mut self): str
 }
 
-struct IndexRangeSetter {}
+struct IndexRangeIterGen {
+    it: &RangeIter
+}
 
-impl RangeSetter for IndexRangeSetter {
-    fn setup_vars(self, mut key_a: &Var, mut key_b: &Var): str {
-        let indent = indent()
-
+impl RangeIterGen for IndexRangeIterGen {
+    fn gen(mut self): str {
         let mut obj = ""
-        if real(key_a) {
-            obj += gen_var_init_expr(key_a, "0")
+
+        if real(self.it.key_a) {
+            add_indent()
+            obj += "{\n"
+            obj += indent()
+            obj += gen_var_init_expr(self.it.key_a, "0")
             obj += "\n"
-            obj += indent
+            obj += indent()
         }
 
-        if real(key_b) {
-            obj += gen_var_init_expr(key_b, "*_range_begin")
+        obj += "for (auto "
+        if real(self.it.key_b) {
+            if is_opt_enabled(Opt.Copy) {
+                if !self.it.key_b.mutable || self.it.key_b.kind.kind.mutable() {
+                    obj += "&"
+                }
+            }
+            obj += var_out_ident(self.it.key_b)
+        } else {
+            obj += "&_"
+        }
+        obj += ": "
+        obj += gen_expr(self.it.expr.model)
+        obj += ") {\n"
+
+        add_indent()
+        obj += indent()
+        obj += gen_scope(self.it.scope)
+        obj += "\n"
+        done_indent()
+        obj += indent()
+
+        obj += iter_next_label_ident(uintptr(&self.it))
+        obj += ":;\n"
+
+        if real(self.it.key_a) {
+            obj += indent()
+            obj += var_out_ident(self.it.key_a)
+            obj += "++;"
             obj += "\n"
-            obj += indent
         }
 
-        ret obj
-    }
+        obj += indent()
+        obj += "}\n"
+        obj += indent()
+        obj += iter_end_label_ident(uintptr(&self.it))
+        obj += ":;"
 
-    fn next_steps(self, mut key_a: &Var, mut key_b: &Var, begin: str): str {
-        let indent = indent()
-
-        let mut obj = "++_range_begin;\n"
-        obj += indent
-
-        obj += "if (_range_begin != _range_end) { "
-        if real(key_a) {
-            obj += "++"
-            obj += var_out_ident(key_a)
-            obj += "; "
-        }
-        if real(key_b) {
-            obj += var_out_ident(key_b)
-            obj += " = *_range_begin; "
+        if real(self.it.key_a) {
+            done_indent()
+            obj += "\n"
+            obj += indent()
+            obj += "}"
         }
 
-        obj += "goto "
-        obj += begin
-        obj += "; }\n"
         ret obj
     }
 }
 
-struct MapRangeSetter {}
+struct MapRangeIterGen {
+    it: &RangeIter
+}
 
-impl RangeSetter for MapRangeSetter {
-    fn setup_vars(self, mut key_a: &Var, mut key_b: &Var): str {
-        let indent = indent()
-        let mut obj = ""
+impl RangeIterGen for MapRangeIterGen {
+    fn gen(mut self): str {
+        let mut obj = "for (auto &set: "
+        obj += gen_expr(self.it.expr.model)
+        obj += ") {\n"
 
-        if real(key_a) {
-            obj += gen_var_init_expr(key_a, "_range_begin->first")
+        add_indent()
+        obj += indent()
+
+        if real(self.it.key_a) {
+            obj += gen_var_init_expr(self.it.key_a, "set.first")
             obj += "\n"
-            obj += indent
+            obj += indent()
         }
 
-        if real(key_b) {
-            obj += gen_var_init_expr(key_b, "_range_begin->second")
+        if real(self.it.key_b) {
+            if is_opt_enabled(Opt.Copy) {
+                self.it.key_b.reference = !self.it.key_b.mutable || self.it.key_b.kind.kind.mutable()
+            }
+            obj += gen_var_init_expr(self.it.key_b, "set.second")
             obj += "\n"
-            obj += indent
+            obj += indent()
         }
 
-        ret obj
-    }
+        obj += gen_scope(self.it.scope)
+        obj += "\n"
 
-    fn next_steps(self, mut key_a: &Var, mut key_b: &Var, begin: str): str {
-        let indent = indent()
+        done_indent()
+        obj += indent()
 
-        let mut obj = "++_range_begin;\n"
-        obj += indent
-
-        obj += "if (_range_begin != _range_end) { "
-        if real(key_a) {
-            obj += var_out_ident(key_a)
-            obj += " = _range_begin->first; "
-        }
-        if real(key_b) {
-            obj += var_out_ident(key_b)
-            obj += " = _range_begin->second; "
-        }
-
-        obj += "goto "
-        obj += begin
-        obj += "; }\n"
-
+        obj += iter_next_label_ident(uintptr(&self.it))
+        obj += ":;\n"
+        obj += indent()
+        obj += "}\n"
+        obj += indent()
+        obj += iter_end_label_ident(uintptr(&self.it))
+        obj += ":;"
         ret obj
     }
 }
@@ -158,133 +178,76 @@ fn gen_conditional(mut c: &Conditional): str {
 }
 
 fn gen_inf_iter(mut it: &InfIter): str {
-    let begin = iter_begin_label_ident(uintptr(&it))
-    let end = iter_end_label_ident(uintptr(&it))
-    let next = iter_next_label_ident(uintptr(&it))
+    let mut obj = "for (;;) {\n"
+
+    add_indent() // Indent scope.
+    obj += indent()
+    obj += gen_scope(it.scope)
+    done_indent()
+
     let indent = indent()
 
-    let mut obj = begin
-    obj += ":;\n"
-    obj += indent
-    obj += gen_scope(it.scope)
     obj += "\n"
     obj += indent
-    obj += next
+    obj += iter_next_label_ident(uintptr(&it))
     obj += ":;\n"
     obj += indent
-    obj += "goto "
-    obj += begin
-    obj += ";\n"
+    obj += "}\n"
     obj += indent
-    obj += end + ":;"
-
-    ret obj
-}
-
-fn gen_while_iter(mut it: &WhileIter): str {
-    let begin = iter_begin_label_ident(uintptr(&it))
-    let end = iter_end_label_ident(uintptr(&it))
-    let next = iter_next_label_ident(uintptr(&it))
-    let indent = indent()
-
-    let mut obj = begin
-    obj += ":;\n"
-    obj += indent
-    if it.expr != nil {
-        obj += "if (!("
-        obj += gen_expr(it.expr)
-        obj += ")) { goto "
-        obj += end
-        obj += "; }\n"
-        obj += indent
-    }
-    obj += gen_scope(it.scope)
-    obj += "\n"
-    obj += indent
-    obj += next
-    obj += ":;\n"
-    obj += indent
-    if it.next != nil {
-        obj += gen_st(it.next)
-        obj += "\n"
-        obj += indent
-    }
-    obj += "goto "
-    obj += begin
-    obj += ";\n"
-    obj += indent
-    obj += end
+    obj += iter_end_label_ident(uintptr(&it))
     obj += ":;"
 
     ret obj
 }
 
-fn get_range_setter(mut it: &RangeIter): RangeSetter {
+fn gen_while_iter(mut it: &WhileIter): str {
+    let mut obj = ""
+    if it.expr != nil && it.next == nil {
+        obj += "while ("
+        obj += gen_expr(it.expr)
+        obj += ") {\n"
+    } else {
+        obj += "for (; "
+        if it.expr != nil {
+            obj += gen_expr(it.expr)
+        }
+        obj += "; "
+        if it.next != nil {
+            let st = gen_st(it.next)
+            obj += st[:st.len - 1]
+        }
+        obj += ") {\n"
+    }
+
+    add_indent()
+    obj += indent()
+    obj += gen_scope(it.scope)
+    obj += "\n"
+    done_indent()
+    obj += indent()
+
+    obj += iter_next_label_ident(uintptr(&it))
+    obj += ":;\n"
+    obj += indent()
+    obj += "}\n"
+    obj += indent()
+    obj += iter_end_label_ident(uintptr(&it))
+    obj += ":;"
+    ret obj
+}
+
+fn get_range_generator(mut it: &RangeIter): RangeIterGen {
     match {
-    | real(it.expr.kind.slc()): ret &IndexRangeSetter{}
-    | real(it.expr.kind.arr()): ret &IndexRangeSetter{}
-    | real(it.expr.kind.map()): ret &MapRangeSetter{}
-    |:                          ret &IndexRangeSetter{} // Str
+    | real(it.expr.kind.slc()): ret &IndexRangeIterGen{it: it}
+    | real(it.expr.kind.arr()): ret &IndexRangeIterGen{it: it}
+    | real(it.expr.kind.map()): ret &MapRangeIterGen{it: it}
+    |:                          ret &IndexRangeIterGen{it: it} // Str
     }
 }
 
 fn gen_range_iter(mut it: &RangeIter): str {
-    add_indent()
-
-    let begin = iter_begin_label_ident(uintptr(&it))
-    let end = iter_end_label_ident(uintptr(&it))
-    let next = iter_next_label_ident(uintptr(&it))
-    let mut _indent = indent()
-    let setter = get_range_setter(it)
-
-    let mut obj = "{\n"
-    obj += _indent
-    if it.expr.lvalue && is_opt_enabled(Opt.Copy) {
-        obj += "auto &_range_expr = "
-    } else {
-        obj += "auto _range_expr = "
-    }
-    obj += gen_expr(it.expr.model)
-    obj += ";\n"
-    obj += _indent
-    obj += "if (_range_expr.begin() != _range_expr.end()) {\n"
-
-    add_indent()
-    _indent = indent()
-
-    obj += _indent
-    obj += "auto _range_begin = _range_expr.begin();\n"
-    obj += _indent
-    obj += "const auto _range_end = _range_expr.end();\n"
-    obj += _indent
-    obj += setter.setup_vars(it.key_a, it.key_b)
-    obj += begin
-    obj += ":;\n"
-    obj += _indent
-    obj += gen_scope(it.scope)
-    obj += "\n"
-    obj += _indent
-    obj += next
-    obj += ":;\n"
-    obj += _indent
-    obj += setter.next_steps(it.key_a, it.key_b, begin)
-    obj += _indent
-    obj += end
-    obj += ":;\n"
-
-    done_indent()
-    _indent = indent()
-
-    obj += _indent
-    obj += "}\n"
-
-    done_indent()
-    _indent = indent()
-
-    obj += _indent
-    obj += "}"
-
-    ret obj
+    let generator = get_range_generator(it)
+    ret generator.gen()
 }
 
 fn gen_cont(c: &ContSt): str {
