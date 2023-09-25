@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use std::conv::{itoa}
-use std::jule::ast
+use conv for std::conv
+use ast for std::jule::ast
 use std::jule::build::{Directive}
 use std::jule::sema::{
     Prim,
@@ -31,17 +31,17 @@ fn any_equals[T](&first: &T, &other: any): bool {
 }
 
 // Returns directive by tag.
-fn find_directive(mut &directives: []&std::jule::ast::Directive, tag: str): &std::jule::ast::Directive {
+fn find_directive(mut &directives: []&ast::Directive, tag: str): &ast::Directive {
     for (_, mut dr) in directives {
         if dr.tag == tag {
             ret dr
         }
     }
-    ret new(std::jule::ast::Directive)
+    ret new(ast::Directive)
 }
 
 // Reports wherher tag is exist in directives.
-fn has_directive(&directives: []&std::jule::ast::Directive, tag: str): bool {
+fn has_directive(&directives: []&ast::Directive, tag: str): bool {
     ret real(find_directive(unsafe { *(&directives) }, tag))
 }
 
@@ -54,22 +54,26 @@ fn gen_prim_kind(p: &Prim): str {
 fn gen_tuple_kind(mut t: &Tuple): str {
     let mut obj = "std::tuple<"
     for (_, mut tk) in t.types {
-        obj += gen_type_kind(tk) + ","
+        obj += gen_type_kind(tk)
+        obj += ","
     }
     obj = obj[:obj.len-1] // Remove comma
-    ret obj + ">"
+    obj += ">"
+    ret obj
 }
 
 // Returns C++ code of reference type with element type.
 fn as_ref_kind(elem: str): str {
-    let ref = as_jt("ref")
-    ret ref + "<" + elem + ">"
+    let mut obj = as_jt("ref")
+    obj += "<"
+    obj += elem
+    obj += ">"
+    ret obj
 }
 
 // Generates C++ code of Ref TypeKind.
 fn gen_ref_kind(mut r: &Ref): str {
-    let elem = gen_type_kind(r.elem)
-    ret as_ref_kind(elem)
+    ret as_ref_kind(gen_type_kind(r.elem))
 }
 
 // Generates C++ code of Ptr TypeKind.
@@ -79,8 +83,9 @@ fn gen_ptr_kind(mut p: &Ptr): str {
         ret "void" + CPP_POINTER_MARK
     }
 
-    let elem = gen_type_kind(p.elem)
-    ret elem + CPP_POINTER_MARK
+    let mut elem = gen_type_kind(p.elem)
+    elem += CPP_POINTER_MARK
+    ret elem
 }
 
 // Generates C++ code of Enum TypeKind.
@@ -89,9 +94,11 @@ fn gen_enum_kind(mut e: &Enum): str {
 }
 
 fn as_slice_kind(mut elem: &TypeKind): str {
-    let elem_s = gen_type_kind(elem)
-    let slc = as_jt("slice")
-    ret slc + "<" + elem_s + ">"
+    let mut obj = as_jt("slice")
+    obj += "<"
+    obj += gen_type_kind(elem)
+    obj += ">"
+    ret obj
 }
 
 // Generates C++ code of Slc TypeKind.
@@ -101,15 +108,21 @@ fn gen_slice_kind(mut s: &Slc): str {
 
 // Generates C++ code of Map TypeKind.
 fn gen_map_kind(mut m: &Map): str {
-    let key = gen_type_kind(m.key)
-    let val = gen_type_kind(m.val)
-    let _map = as_jt("map")
-    ret _map + "<" + key + "," + val + ">"
+    let mut obj = as_jt("map")
+    obj += "<"
+    obj += gen_type_kind(m.key)
+    obj += ","
+    obj += gen_type_kind(m.val)
+    obj += ">"
+    ret obj
 }
 
 fn gen_trait_kind_from_ident(ident: str): str {
-    let trt = as_jt("trait")
-    ret trt + "<" + ident + ">"
+    let mut obj = as_jt("trait")
+    obj += "<"
+    obj += ident
+    obj += ">"
+    ret obj
 }
 
 // Generates C++ code of Trait TypeKind.
@@ -136,7 +149,8 @@ fn gen_struct_kind_ins(mut s: &StructIns): str {
         if s.generics.len > 0 {
             ident += "<"
             for (_, mut g) in s.generics {
-                ident += gen_type_kind(g) + ","
+                ident += gen_type_kind(g)
+                ident += ","
             }
             ident = ident[:ident.len-1] // Remove last comma.
             ident += ">"
@@ -152,10 +166,13 @@ fn gen_struct_kind_ins(mut s: &StructIns): str {
 
 // Generates C++ code of Arr TypeKind.
 fn gen_array_kind(mut a: &Arr): str {
-    let arr = as_jt("array")
-    let elem = gen_type_kind(a.elem)
-    let size = itoa(a.n)
-    ret arr + "<" + elem + "," + size + ">"
+    let mut obj = as_jt("array")
+    obj += "<"
+    obj += gen_type_kind(a.elem)
+    obj += ","
+    obj += conv::itoa(a.n)
+    obj += ">"
+    ret obj
 }
 
 fn gen_fn_anon_decl(mut f: &FnIns): str {
@@ -182,9 +199,11 @@ fn gen_fn_anon_decl(mut f: &FnIns): str {
 
 // Generates C++ code of Fn TypeKind.
 fn gen_fn_kind(mut f: &FnIns): str {
-    let fnc = as_jt("fn")
-    let decl = gen_fn_anon_decl(f)
-    ret fnc + "<" + decl + ">"
+    let mut obj = as_jt("fn")
+    obj += "<"
+    obj += gen_fn_anon_decl(f)
+    obj += ">"
+    ret obj
 }
 
 // Generates C++ code of TypeKind.

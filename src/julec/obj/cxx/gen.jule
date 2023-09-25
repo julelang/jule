@@ -43,28 +43,24 @@ const CPP_SELF = "this"
 // C++ statement terminator.
 const CPP_ST_TERM = ";"
 
+const INDENT_KIND = '\t'
+
 // Current indention count.
-static mut INDENT: u64 = 0
+static mut INDENT: []byte = nil
 
 // Increase indentation.
-fn add_indent() { INDENT++ }
+fn add_indent() {
+    INDENT = append(INDENT, INDENT_KIND)
+}
 
 // Decrase indentation.
-fn done_indent() { INDENT-- }
+fn done_indent() {
+    INDENT = INDENT[:INDENT.len - 1]
+}
 
 // Returns indention string by INDENT.
 fn indent(): str {
-    const INDENT_KIND = "\t"
-    if INDENT == 0 {
-        ret ""
-    }
-
-    let mut s = ""
-    let mut i = 0
-    for i < INDENT; i++ {
-        s += INDENT_KIND
-    }
-    ret s
+    ret str(INDENT)
 }
 
 fn is_cpp_header_file(path: str): bool {
@@ -84,7 +80,9 @@ fn gen_links(mut &ir: &IR): str {
             continue
 
         | is_std_header_path(pkg.path):
-            obj += "#include " + pkg.path + "\n"
+            obj += "#include "
+            obj += pkg.path
+            obj += "\n"
         }
     }
 
@@ -94,7 +92,9 @@ fn gen_links(mut &ir: &IR): str {
             continue
 
         | is_cpp_header_file(pkg.path):
-            obj += `#include "` + pkg.path + "\"\n"
+            obj += `#include "`
+            obj += pkg.path
+            obj += "\"\n"
         }
     }
     ret obj
@@ -161,7 +161,8 @@ fn gen_param_ins_prototype(mut &p: &ParamIns): str {
 fn gen_param(mut &p: &Param): str {
     let mut obj = gen_param_prototype(p)
     if p.ident != "" && !is_ignore_ident(p.ident) && !is_anon_ident(p.ident) {
-        obj += " " + param_out_ident(p)
+        obj += " "
+        obj += param_out_ident(p)
     }
     ret obj
 }
@@ -222,7 +223,8 @@ fn gen_params_prototypes(mut &params: []&ParamIns): str {
     let mut obj = "("
     for (_, mut p) in params {
         if !p.decl.is_self() {
-            obj += gen_param_ins_prototype(p) + ","
+            obj += gen_param_ins_prototype(p)
+            obj += ","
         }
     }
 
@@ -264,7 +266,8 @@ fn gen_trait(mut &t: &Trait): str {
 fn gen_traits_tbl(mut &tbl: &SymbolTable): str {
     let mut obj = ""
     for (_, mut t) in tbl.traits {
-        obj += gen_trait(t) + "\n\n"
+        obj += gen_trait(t)
+        obj += "\n\n"
     }
     ret obj
 }
@@ -292,7 +295,10 @@ fn gen_traits(mut &ir: &IR): str {
 
 // Generates C++ declaration code of trait.
 fn gen_trait_prototype(&t: &Trait): str {
-    ret "struct " + trait_out_ident(t) + CPP_ST_TERM
+    let mut obj = "struct "
+    obj += trait_out_ident(t)
+    obj += CPP_ST_TERM
+    ret obj
 }
 
 // Generates C++ declaration code of all traits.
@@ -301,7 +307,8 @@ fn gen_trait_prototypes(mut &p: &Package): str {
     for (_, mut f) in p.files {
         for _, t in f.traits {
             if t.token.id != TokenId.Na {
-                obj += gen_trait_prototype(t) + "\n"
+                obj += gen_trait_prototype(t)
+                obj += "\n"
             }
         }
     }
@@ -325,7 +332,8 @@ fn gen_struct_plain_prototypes(mut &structs: []&Struct): str {
     let mut obj = ""
     for (_, mut s) in structs {
         if !s.cpp_linked && s.token.id != TokenId.Na {
-            obj += gen_struct_plain_prototype(s) + "\n"
+            obj += gen_struct_plain_prototype(s)
+            obj += "\n"
         }
     }
     ret obj
@@ -349,13 +357,15 @@ fn gen_struct_traits(&s: &Struct): str {
 
 // Generates C++ declaration code of field.
 fn gen_field_decl(mut &f: &FieldIns): str {
-    let mut obj = gen_type_kind(f.kind) + " "
+    let mut obj = gen_type_kind(f.kind)
+    obj += " "
     obj += field_out_ident(f.decl)
-    obj += "{" + get_init_expr(f.kind) + "}"
+    obj += "{"
+    obj += get_init_expr(f.kind)
+    obj += "}"
     obj += CPP_ST_TERM
     ret obj
 }
-
 
 fn gen_struct_self_field_type_kind(mut &s: &StructIns): str {
     ret as_ref_kind(gen_struct_kind_ins(s))
@@ -382,7 +392,9 @@ fn gen_struct_constructor(mut &s: &StructIns): str {
     if s.fields.len > 0 {
         for (_, mut f) in s.fields {
             obj += gen_type_kind(f.kind)
-            obj += " __param_" + f.decl.ident + ", "
+            obj += " __param_"
+            obj += f.decl.ident
+            obj += ", "
         }
         obj = obj[:obj.len-2] // Remove last comma.
     } else {
@@ -402,13 +414,16 @@ fn gen_struct_constructor(mut &s: &StructIns): str {
             obj += "this->"
             obj += field_out_ident(f.decl)
             obj += " = "
-            obj += "__param_" + f.decl.ident
+            obj += "__param_"
+            obj += f.decl.ident
             obj += CPP_ST_TERM
         }
     }
 
     done_indent()
-    obj += "\n" + indent() + "}"
+    obj += "\n"
+    obj += indent()
+    obj += "}"
     ret obj
 }
 
@@ -547,7 +562,8 @@ fn gen_struct_ins_prototype(mut &s: &StructIns): str {
 fn gen_struct_prototype(mut &s: &Struct): str {
     let mut obj = ""
     for (_, mut ins) in s.instances {
-        obj += gen_struct_ins_prototype(ins) + "\n\n"
+        obj += gen_struct_ins_prototype(ins)
+        obj += "\n\n"
     }
     ret obj
 }
@@ -557,7 +573,8 @@ fn gen_struct_prototypes(mut &structs: []&Struct): str {
     let mut obj = ""
     for (_, mut s) in structs {
         if !s.cpp_linked && s.token.id != TokenId.Na {
-            obj += gen_struct_prototype(s) + "\n"
+            obj += gen_struct_prototype(s)
+            obj += "\n"
         }
     }
     ret obj
@@ -577,7 +594,8 @@ fn gen_fn_decl_head(mut &f: &FnIns, method: bool): str {
     obj += gen_fn_ins_result(f) + " "
 
     if !method && real(f.decl.owner) {
-        obj += struct_ins_out_ident(f.owner) + str(TokenKind.DblColon)
+        obj += struct_ins_out_ident(f.owner)
+        obj += str(TokenKind.DblColon)
     }
     obj += fn_ins_out_ident(f)
     ret obj
@@ -622,7 +640,8 @@ fn gen_prototypes(mut &ir: &IR): str {
     
     obj += gen_struct_plain_prototypes(ir.ordered.structs)
 
-    obj += gen_traits(ir) + "\n"
+    obj += gen_traits(ir)
+    obj += "\n"
 
     obj += gen_struct_prototypes(ir.ordered.structs)
 
@@ -643,13 +662,15 @@ fn gen_var_init_expr(mut &v: &Var, init: str): str {
         obj += "static "
     }
 
-    obj += gen_type_kind(v.kind.kind) + " "
+    obj += gen_type_kind(v.kind.kind)
+    obj += " "
     if v.reference {
         obj += "&"
     }
     obj += var_out_ident(v)
     if init != "" {
-        obj += " = " + init
+        obj += " = "
+        obj += init
     }
     obj += CPP_ST_TERM
     ret obj
@@ -676,7 +697,8 @@ fn gen_globals(mut &globals: []&Var): str {
 
     for (_, mut v) in globals {
         if v.token.id != TokenId.Na {
-            obj += gen_var(v) + "\n"
+            obj += gen_var(v)
+            obj += "\n"
         }
     }
 
@@ -688,7 +710,8 @@ fn gen_fn(mut &f: &Fn): str {
     let mut obj = ""
     for (_, mut ins) in f.instances {
         obj += gen_fn_decl_head(ins, false)
-        obj += gen_params_ins(ins.params) + " "
+        obj += gen_params_ins(ins.params)
+        obj += " "
         obj += gen_fn_scope(ins)
         obj += "\n\n"
     }
@@ -701,7 +724,8 @@ fn gen_pkg_fns(mut &p: &Package): str {
     for (_, mut f) in p.files {
         for (_, mut f) in f.funcs {
             if !f.cpp_linked && f.token.id != TokenId.Na {
-                obj += gen_fn(f) + "\n\n"
+                obj += gen_fn(f)
+                obj += "\n\n"
             }
         }
     }
@@ -741,7 +765,9 @@ fn gen_struct_ostream(mut &s: &StructIns): str {
         // Skip C++-linked struct kinds.
         let strct = f.kind.strct()
         if real(strct) && real(strct.decl) && strct.decl.cpp_linked {
-            obj += ` cpp.` + field_out_ident(f.decl) + `"`
+            obj += ` cpp.`
+            obj += field_out_ident(f.decl)
+            obj += `"`
         } else {
             obj += `" << _Src.`
             obj += field_out_ident(f.decl)
@@ -807,7 +833,8 @@ fn gen_struct_ins(mut &s: &StructIns): str {
 fn gen_struct(mut &s: &Struct): str {
     let mut obj = ""
     for (_, mut ins) in s.instances {
-        obj += gen_struct_ins(ins) + "\n\n"
+        obj += gen_struct_ins(ins)
+        obj += "\n\n"
     }
     ret obj
 }
@@ -847,7 +874,9 @@ fn push_init(mut &pkg: &Package, mut &obj: str) {
         ret
     }
 
-    obj += "\n" + INDENTION + fn_out_ident(f) + "();"
+    obj += "\n" + INDENTION
+    obj += fn_out_ident(f)
+    obj += "();"
 }
 
 // Generated C++ code of all initializer functions.
@@ -918,11 +947,16 @@ int main(int argc, char *argv[], char *envp[]) {
 // Generates C++ codes from SymbolTables.
 pub fn gen(mut &ir: &IR): str {
     let mut obj = ""
-    obj += gen_links(ir) + "\n"
-    obj += gen_prototypes(ir) + "\n\n"
-    obj += gen_globals(ir.ordered.globals) + "\n"
+    obj += gen_links(ir)
+    obj += "\n"
+    obj += gen_prototypes(ir)
+    obj += "\n\n"
+    obj += gen_globals(ir.ordered.globals)
+    obj += "\n"
     obj += gen_structs(ir.ordered.structs)
-    obj += gen_fns(ir) + "\n"
-    obj += gen_init_caller(ir) + "\n"
+    obj += gen_fns(ir)
+    obj += "\n"
+    obj += gen_init_caller(ir)
+    obj += "\n"
     ret obj
 }

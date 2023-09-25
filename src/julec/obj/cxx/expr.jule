@@ -4,7 +4,7 @@
 
 use env::{Opt, is_opt_enabled}
 
-use std::conv::{fmt_int, fmt_uint, fmt_float, itoa}
+use conv for std::conv
 use std::jule::build::{Directive, is_64bit}
 use std::jule::constant::{Const}
 use std::jule::lex::{TokenKind}
@@ -124,7 +124,7 @@ fn sbtoa(b: byte): str {
         }
     }
 
-    let seq = fmt_uint(u64(b), 8)
+    let seq = conv::fmt_uint(u64(b), 8)
     if seq.len == 2 {
         ret "\\0" + seq
     }
@@ -134,7 +134,7 @@ fn sbtoa(b: byte): str {
 fn get_str_model(&c: &Const): str {
     let content = c.read_str()
     let bytes = ([]byte)(content)
-    let len = fmt_int(i64(bytes.len), 10)
+    let len = conv::fmt_int(i64(bytes.len), 10)
 
     let mut lit = ""
     for _, b in bytes {
@@ -172,7 +172,7 @@ fn ftoa(f: f64, bitsize: int): str {
         }
     }
 
-    let mut m = fmt_float(f, 'f', -1, bitsize)
+    let mut m = conv::fmt_float(f, 'f', -1, bitsize)
     if m.find(".") == -1  {
         m += ".0"
     }
@@ -226,7 +226,7 @@ fn i64toa(x: i64): str {
     | x == MIN_I64: ret "jule::MIN_I64"
     }
 
-    let fmt = fmt_int(x, 10)
+    let fmt = conv::fmt_int(x, 10)
     if is_64bit(ARCH) {
         ret fmt + "LL"
     }
@@ -243,7 +243,7 @@ fn u64toa(x: u64): str {
         ret "jule::MAX_U64"
     }
 
-    let fmt = fmt_uint(x, 10)
+    let fmt = conv::fmt_uint(x, 10)
     if is_64bit(ARCH) {
         ret fmt + "LLU"
     }
@@ -323,7 +323,10 @@ fn gen_var_expr_model(mut m: &Var): str {
     if m.cpp_linked {
         let d = find_directive(m.directives, str(Directive.Namespace))
         if real(d) {
-            ret concat_all_parts(d.args...) + "::" + var_out_ident(m)
+            let mut obj = concat_all_parts(d.args...)
+            obj += "::"
+            obj += var_out_ident(m)
+            ret obj
         }
     }
     ret var_out_ident(m)
@@ -339,13 +342,27 @@ fn gen_struct_ins_expr_model(mut m: &StructIns): str {
 
 fn gen_unary_expr_model(mut m: &UnaryExprModel): str {
     match m.op {
-    | str(TokenKind.Caret): ret "(~(" + gen_expr(m.expr) + "))"
-    |:                      ret "(" + m.op + "(" + gen_expr(m.expr) + "))"
+    | str(TokenKind.Caret):
+        let mut obj = "(~("
+        obj += gen_expr(m.expr)
+        obj += "))"
+        ret obj
+
+    |:
+        let mut obj = "("
+        obj += m.op
+        obj += "("
+        obj += gen_expr(m.expr)
+        obj += "))"
+        ret obj
     }
 }
 
 fn gen_get_ref_ptr_expr_model(mut m: &GetRefPtrExprModel): str {
-    ret "(" + gen_expr(m.expr) + ").alloc"
+    let mut obj = "("
+    obj += gen_expr(m.expr)
+    obj += ").alloc"
+    ret obj
 }
 
 fn gen_cpp_struct_lit_expr_model(mut m: &StructLitExprModel): str {
@@ -360,21 +377,25 @@ fn gen_cpp_struct_lit_expr_model(mut m: &StructLitExprModel): str {
                         obj += "."
                         obj += field_out_ident(f.decl)
                         obj += "="
-                        obj += gen_expr(arg.expr) + ","
+                        obj += gen_expr(arg.expr)
+                        obj += ","
                         continue iter
                     }
                 }
                 continue
             }
 
-            obj += field_out_ident(f.decl) + ": "
+            obj += field_out_ident(f.decl)
+            obj += ": "
             for (_, mut arg) in m.args {
                 if arg.field == f {
-                    obj += gen_expr(arg.expr) + ","
+                    obj += gen_expr(arg.expr)
+                    obj += ","
                     continue iter
                 }
             }
-            obj += get_init_expr(f.kind) + ","
+            obj += get_init_expr(f.kind)
+            obj += ","
         }
         obj = obj[:obj.len-1] // Remove last comma.
     }
@@ -394,11 +415,13 @@ fn gen_struct_lit_expr_model(mut m: &StructLitExprModel): str {
         for (_, mut f) in m.strct.fields {
             for (_, mut arg) in m.args {
                 if arg.field == f {
-                    obj += gen_expr(arg.expr) + ","
+                    obj += gen_expr(arg.expr)
+                    obj += ","
                     continue iter
                 }
             }
-            obj += get_init_expr(f.kind) + ","
+            obj += get_init_expr(f.kind)
+            obj += ","
         }
         obj = obj[:obj.len-1] // Remove last comma.
     }
@@ -457,7 +480,8 @@ fn gen_arg_expr_models(mut models: []ExprModel): str {
 
     let mut obj = ""
     for (_, mut m) in models {
-        obj += gen_expr(m) + ","
+        obj += gen_expr(m)
+        obj += ","
     }
     obj = obj[:obj.len-1] // Remove last comma.
     ret obj
@@ -477,7 +501,8 @@ fn gen_fn_call_expr_model(mut m: &FnCallExprModel): str {
             if !has_directive(m.func.decl.directives, str(Directive.Cdef)) {
                 obj += "<"
                 for (_, mut g) in m.func.generics {
-                    obj += gen_type_kind(g) + ","
+                    obj += gen_type_kind(g)
+                    obj += ","
                 }
                 obj = obj[:obj.len-1] // Remove last comma.
                 obj += ">"
@@ -489,7 +514,8 @@ fn gen_fn_call_expr_model(mut m: &FnCallExprModel): str {
     obj += ")"
 
     if m.is_co {
-        obj = "__JULE_CO(" + obj + ")"
+        obj = "__JULE_CO(" + obj
+        obj += ")"
     }
 
     ret obj
@@ -604,7 +630,11 @@ fn gen_array_expr_model(mut m: &ArrayExprModel): str {
 // Returns complete expression model of function instance.
 // Usefull for strict type safety.
 fn gen_fn_ins_expr_model_common(mut m: &FnIns): str {
-    ret gen_fn_kind(m) + "(" + gen_fn_ins_expr_model(m) + ")"
+    let mut obj = gen_fn_kind(m)
+    obj += "("
+    obj += gen_fn_ins_expr_model(m)
+    obj += ")"
+    ret obj
 }
 
 // Returns elementary expression model of function instance.
@@ -612,7 +642,10 @@ fn gen_fn_ins_expr_model(mut m: &FnIns): str {
     if real(m.decl) && m.decl.cpp_linked {
         let d = find_directive(m.decl.directives, str(Directive.Namespace))
         if real(d) {
-            ret concat_all_parts(d.args...) + "::" + fn_ins_out_ident(m)
+            let mut obj = concat_all_parts(d.args...)
+            obj += "::"
+            obj += fn_ins_out_ident(m)
+            ret obj
         }
     }
     ret fn_ins_out_ident(m)
@@ -621,7 +654,8 @@ fn gen_fn_ins_expr_model(mut m: &FnIns): str {
 fn gen_tuple_expr_model(mut m: &TupleExprModel): str {
     let mut obj = "std::make_tuple("
     for (_, mut d) in m.datas {
-        obj += gen_expr(d.model) + ","
+        obj += gen_expr(d.model)
+        obj += ","
     }
     obj = obj[:obj.len-1] // Remove last comma.
     obj += ")"
@@ -709,7 +743,12 @@ fn gen_builtin_append_call_expr_model_assign_opt(
     mut &m: &BuiltinAppendCallExprModel): str {
     let mut obj = ""
     if !same_dest {
-        obj += dest_expr + " = jule::alloc_for_append(" + gen_expr_model(m.dest) + "," + itoa(s.elems.len) + ")" + CPP_ST_TERM
+        obj += dest_expr
+        obj += " = jule::alloc_for_append("
+        obj += gen_expr_model(m.dest)
+        obj += ","
+        obj += conv::itoa(s.elems.len)
+        obj += ")" + CPP_ST_TERM
     }
     for (_, mut e) in s.elems {
         obj += dest_expr
@@ -747,7 +786,12 @@ fn gen_builtin_append_call_expr_model_assign(mut dest: ExprModel, mut m: &Builti
 }
 
 fn gen_builtin_append_call_expr_model(mut m: &BuiltinAppendCallExprModel): str {
-    ret "jule::append(" + gen_expr_model(m.dest) + "," + gen_expr_model(m.elements) + ")"
+    let mut obj = "jule::append("
+    obj += gen_expr_model(m.dest)
+    obj += ","
+    obj += gen_expr_model(m.elements)
+    obj += ")"
+    ret obj
 }
 
 fn gen_builtin_clone_call_expr_model(mut m: &BuiltinCloneCallExprModel): str {
@@ -785,7 +829,8 @@ fn gen_rune_expr_model(m: &RuneExprModel): str {
 fn gen_builtin_error_trait_sub_ident_expr_model(mut m: &BuiltinErrorTraitSubIdentExprModel): str {
     let mut obj = gen_expr_model(m.expr)
     obj += ".get()."
-    obj += "_method_" + m.ident
+    obj += "_method_"
+    obj += m.ident
     ret obj
 }
 
@@ -803,17 +848,21 @@ fn gen_struct_static_ident_expr_model(mut m: &StructStaticIdentExprModel): str {
 }
 
 fn gen_integrated_to_str_expr_model(mut m: &IntegratedToStrExprModel): str {
-    ret "jule::to_str(" + gen_expr_model(m.expr) + ")"
+    let mut obj = "jule::to_str("
+    obj += gen_expr_model(m.expr)
+    obj += ")"
+    ret obj
 }
 
 fn gen_ternary_expr_model(mut m: &TernaryExprModel): str {
-    ret "((" +
-        gen_expr_model(m.condition) +
-        ") ? (" +
-        gen_expr_model(m.true_expr) +
-        ") : (" +
-        gen_expr_model(m.false_expr) +
-        "))"
+    let mut obj = "(("
+    obj += gen_expr_model(m.condition)
+    obj += ") ? ("
+    obj += gen_expr_model(m.true_expr)
+    obj += ") : ("
+    obj += gen_expr_model(m.false_expr)
+    obj += "))"
+    ret obj
 }
 
 fn gen_expr_model(mut m: ExprModel): str {

@@ -71,13 +71,18 @@ impl RangeSetter for IndexRangeSetter {
 
         obj += "if (_range_begin != _range_end) { "
         if real(key_a) {
-            obj += "++" + var_out_ident(key_a) + "; "
+            obj += "++"
+            obj += var_out_ident(key_a)
+            obj += "; "
         }
         if real(key_b) {
-            obj += var_out_ident(key_b) + " = *_range_begin; "
+            obj += var_out_ident(key_b)
+            obj += " = *_range_begin; "
         }
 
-        obj += "goto " + begin + "; }\n"
+        obj += "goto "
+        obj += begin
+        obj += "; }\n"
         ret obj
     }
 }
@@ -120,7 +125,9 @@ impl RangeSetter for MapRangeSetter {
             obj += " = _range_begin->second; "
         }
 
-        obj += "goto " + begin + "; }\n"
+        obj += "goto "
+        obj += begin
+        obj += "; }\n"
 
         ret obj
     }
@@ -156,14 +163,18 @@ fn gen_inf_iter(mut it: &InfIter): str {
     let next = iter_next_label_ident(uintptr(&it))
     let indent = indent()
 
-    let mut obj = begin + ":;\n"
+    let mut obj = begin
+    obj += ":;\n"
     obj += indent
     obj += gen_scope(it.scope)
     obj += "\n"
     obj += indent
-    obj += next + ":;\n"
+    obj += next
+    obj += ":;\n"
     obj += indent
-    obj += "goto " + begin + ";\n"
+    obj += "goto "
+    obj += begin
+    obj += ";\n"
     obj += indent
     obj += end + ":;"
 
@@ -176,7 +187,8 @@ fn gen_while_iter(mut it: &WhileIter): str {
     let next = iter_next_label_ident(uintptr(&it))
     let indent = indent()
 
-    let mut obj = begin + ":;\n"
+    let mut obj = begin
+    obj += ":;\n"
     obj += indent
     if it.expr != nil {
         obj += "if (!("
@@ -189,16 +201,20 @@ fn gen_while_iter(mut it: &WhileIter): str {
     obj += gen_scope(it.scope)
     obj += "\n"
     obj += indent
-    obj += next + ":;\n"
+    obj += next
+    obj += ":;\n"
     obj += indent
     if it.next != nil {
         obj += gen_st(it.next)
         obj += "\n"
         obj += indent
     }
-    obj += "goto " + begin + ";\n"
+    obj += "goto "
+    obj += begin
+    obj += ";\n"
     obj += indent
-    obj += end + ":;"
+    obj += end
+    obj += ":;"
 
     ret obj
 }
@@ -228,7 +244,8 @@ fn gen_range_iter(mut it: &RangeIter): str {
     } else {
         obj += "auto _range_expr = "
     }
-    obj += gen_expr(it.expr.model) + ";\n"
+    obj += gen_expr(it.expr.model)
+    obj += ";\n"
     obj += _indent
     obj += "if (_range_expr.begin() != _range_expr.end()) {\n"
 
@@ -241,16 +258,19 @@ fn gen_range_iter(mut it: &RangeIter): str {
     obj += "const auto _range_end = _range_expr.end();\n"
     obj += _indent
     obj += setter.setup_vars(it.key_a, it.key_b)
-    obj += begin + ":;\n"
+    obj += begin
+    obj += ":;\n"
     obj += _indent
     obj += gen_scope(it.scope)
     obj += "\n"
     obj += _indent
-    obj += next + ":;\n"
+    obj += next
+    obj += ":;\n"
     obj += _indent
     obj += setter.next_steps(it.key_a, it.key_b, begin)
     obj += _indent
-    obj += end + ":;\n"
+    obj += end
+    obj += ":;\n"
 
     done_indent()
     _indent = indent()
@@ -268,7 +288,10 @@ fn gen_range_iter(mut it: &RangeIter): str {
 }
 
 fn gen_cont(c: &ContSt): str {
-    ret "goto " + iter_next_label_ident(c.it) + CPP_ST_TERM
+    let mut obj = "goto "
+    obj += iter_next_label_ident(c.it)
+    obj += CPP_ST_TERM
+    ret obj
 }
 
 fn gen_label(l: &Label): str {
@@ -276,11 +299,19 @@ fn gen_label(l: &Label): str {
 }
 
 fn gen_goto(gt: &GotoSt): str {
-    ret "goto " + label_ident(gt.ident) + CPP_ST_TERM
+    let mut obj = "goto "
+    obj += label_ident(gt.ident)
+    obj += CPP_ST_TERM
+    ret obj
 }
 
 fn gen_postfix(mut p: &Postfix): str {
-    ret "(" + gen_expr(p.expr) + ")" + p.op + CPP_ST_TERM
+    let mut obj = "("
+    obj += gen_expr(p.expr)
+    obj += ")"
+    obj += p.op
+    obj += CPP_ST_TERM
+    ret obj
 }
 
 fn gen_div_by_zero_assign(mut a: &Assign): str {
@@ -325,9 +356,11 @@ fn gen_multi_assign(mut a: &MultiAssign): str {
 
     for (_, mut l) in a.l {
         if l == nil {
-            obj += CPP_IGNORE + ","
+            obj += CPP_IGNORE
+            obj += ","
         } else {
-            obj += gen_expr(l) + ","
+            obj += gen_expr(l)
+            obj += ","
         }
     }
     obj = obj[:obj.len-1] // Remove last comma.
@@ -365,7 +398,9 @@ fn gen_case(mut m: &Match, mut c: &Case): str {
 
             |:
                 obj += MATCH_EXPR
-                obj += ".type_is<" + gen_expr(expr) + ">()"
+                obj += ".type_is<"
+                obj += gen_expr(expr)
+                obj += ">()"
             }
 
             if i+1 < c.exprs.len {
@@ -373,12 +408,14 @@ fn gen_case(mut m: &Match, mut c: &Case): str {
             }
         }
         obj += ")) { goto "
-        obj += end + "; }\n"
+        obj += end
+        obj += "; }\n"
     }
 
     if c.scope.stmts.len > 0 {
         obj += indent()
-        obj += case_begin_label_ident(uintptr(&c)) + ":;\n"
+        obj += case_begin_label_ident(uintptr(&c))
+        obj += ":;\n"
         obj += indent()
         obj += gen_scope(c.scope)
         obj += "\n"
@@ -389,7 +426,8 @@ fn gen_case(mut m: &Match, mut c: &Case): str {
     obj += match_end_label_ident(uintptr(&m)) + CPP_ST_TERM
     obj += "\n"
     obj += indent()
-    obj += end + ":;"
+    obj += end
+    obj += ":;"
     ret obj
 }
 
@@ -431,7 +469,8 @@ fn gen_match(mut m: &Match): str {
 
     obj += "\n"
     obj += indent()
-    obj += match_end_label_ident(uintptr(&m)) + ":;"
+    obj += match_end_label_ident(uintptr(&m))
+    obj += ":;"
     obj += "\n"
 
     done_indent()
@@ -443,7 +482,10 @@ fn gen_match(mut m: &Match): str {
 }
 
 fn gen_fall_st(f: &FallSt): str {
-    ret "goto " + case_begin_label_ident(f.dest_case) + CPP_ST_TERM
+    let mut obj = "goto "
+    obj += case_begin_label_ident(f.dest_case)
+    obj += CPP_ST_TERM
+    ret obj
 }
 
 fn gen_break_st(b: &BreakSt): str {
@@ -485,7 +527,10 @@ fn gen_ret_vars(mut r: &RetSt): str {
 fn gen_ret_expr_tuple(mut r: &RetSt): str {
     match type r.expr {
     | &FnCallExprModel:
-        ret "return " + gen_expr_model(r.expr) + CPP_ST_TERM
+        let mut obj = "return "
+        obj += gen_expr_model(r.expr)
+        obj += CPP_ST_TERM
+        ret obj
     }
 
     let mut datas = (&TupleExprModel)(r.expr).datas
@@ -494,7 +539,10 @@ fn gen_ret_expr_tuple(mut r: &RetSt): str {
     for (i, mut v) in r.vars {
         if !is_ignore_ident(v.ident) {
             let ident = var_out_ident(v)
-            obj += ident + " = " + gen_expr(datas[i].model) + ";\n"
+            obj += ident
+            obj += " = "
+            obj += gen_expr(datas[i].model)
+            obj += ";\n"
             obj += indent()
         }
     }
@@ -518,7 +566,10 @@ fn gen_ret_expr_tuple(mut r: &RetSt): str {
 
 fn gen_ret_expr(mut r: &RetSt): str {
     if r.vars.len == 0 {
-        ret "return " + gen_expr(r.expr) + CPP_ST_TERM
+        let mut obj = "return "
+        obj += gen_expr(r.expr)
+        obj += CPP_ST_TERM
+        ret obj
     }
 
     if r.vars.len > 1 {
@@ -527,13 +578,21 @@ fn gen_ret_expr(mut r: &RetSt): str {
 
     if !is_ignore_ident(r.vars[0].ident) {
         let ident = var_out_ident(r.vars[0])
-        let mut obj = ident + " = " + gen_expr(r.expr) + ";\n"
+        let mut obj = ident
+        obj += " = "
+        obj += gen_expr(r.expr)
+        obj += ";\n"
         obj += indent()
-        obj += "return " + ident + CPP_ST_TERM
+        obj += "return "
+        obj += ident
+        obj += CPP_ST_TERM
         ret obj
     }
 
-    ret "return " + gen_expr(r.expr) + CPP_ST_TERM
+    let mut obj = "return "
+    obj += gen_expr(r.expr)
+    obj += CPP_ST_TERM
+    ret obj
 }
 
 fn gen_ret_st(mut r: &RetSt): str {
