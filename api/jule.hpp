@@ -20,7 +20,7 @@ CONFIGURATION DEFINES
 #include "atomic.hpp"
 #include "builtin.hpp"
 #include "defer.hpp"
-#include "environment.hpp"
+#include "env.hpp"
 #include "error.hpp"
 #include "fn.hpp"
 #include "map.hpp"

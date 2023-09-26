@@ -42,9 +42,9 @@ fn str_repeat(sub: str, mut n: int): str {
 fn print_error_message(msg: str) { outln(msg) }
 
 // Command: julec help
-fn help() {
-    if env::ARGS.len > 2 {
-        print_error_message("invalid command: " + env::ARGS[2])
+fn help(&args: []str) {
+    if args.len > 2 {
+        print_error_message("invalid command: " + args[2])
         ret
     }
 
@@ -70,9 +70,9 @@ fn help() {
 }
 
 // Command: julec version
-fn version() {
-    if env::ARGS.len > 2 {
-        print_error_message("invalid command: " + env::ARGS[2])
+fn version(&args: []str) {
+    if args.len > 2 {
+        print_error_message("invalid command: " + args[2])
         ret
     }
     out("julec version ")
@@ -100,18 +100,18 @@ fn tool_distarch() {
 }
 
 // Command: julec tool
-fn tool() {
-    if env::ARGS.len == 2 {
+fn tool(&args: []str) {
+    if args.len == 2 {
         outln(`tool commands:
  distos     Lists all supported operating systems
  distarch   Lists all supported architects`)
         ret
-    } else if env::ARGS.len > 3 {
-        print_error_message("invalid command: " + env::ARGS[3])
+    } else if args.len > 3 {
+        print_error_message("invalid command: " + args[3])
         ret
     }
 
-    let cmd = env::ARGS[2]
+    let cmd = args[2]
     match cmd {
     | "distos":   tool_distos()
     | "distarch": tool_distarch()
@@ -128,11 +128,11 @@ fn julenv() {
 
 // Try to process compiler commands.
 // Reports whether "ARGS" is command and processed.
-fn process_command(): bool {
-    match env::ARGS[1] {
-    | CMD_HELP:    help()
-    | CMD_VERSION: version()
-    | CMD_TOOL:    tool()
+fn process_command(&args: []str): bool {
+    match args[1] {
+    | CMD_HELP:    help(args)
+    | CMD_VERSION: version(args)
+    | CMD_TOOL:    tool(args)
     | CMD_JULENV:  julenv()
     |: ret false
     }
@@ -146,15 +146,17 @@ fn exit_err(msg: str) {
 }
 
 fn main() {
+    let args = env::args()
+
     // Not started with arguments.
-    // Here is "2" but "ARGS" always have one element for store working directory.
-    if env::ARGS.len < 2 {
+    // Here is "2" but "args" always have one element for store program name.
+    if args.len < 2 {
         ret
     }
 
-    if process_command() {
+    if process_command(args) {
         ret
     }
 
-    compile_command()
+    compile_command(args)
 }
