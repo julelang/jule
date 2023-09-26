@@ -68,9 +68,11 @@ namespace jule {
                 return jule::Slice<Item>();
 
             const jule::Int n{ end-start };
-            jule::Slice<Item> slice{ jule::Slice<Item>::alloc(n) };
+            jule::Slice<Item> slice;
+            slice.alloc_new(0, n);
+            slice._len = n;
             for (jule::Int counter{ 0 }; counter < n; ++counter)
-                slice[counter] = this->buffer[start+counter];
+                slice._slice[counter] = this->buffer[start+counter];
 
             return slice;
         }
