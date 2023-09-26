@@ -73,7 +73,7 @@ namespace jule {
             return buffer;
         }
 
-        Slice<Item>(void) {}
+        Slice<Item>(void) = default;
         Slice<Item>(const std::nullptr_t) {}
 
         Slice<Item>(const jule::Slice<Item>& src)

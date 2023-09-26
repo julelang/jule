@@ -90,7 +90,7 @@ namespace jule {
 #endif
         }
 
-        Ref<T>(void) {}
+        Ref<T>(void) = default;
 
         Ref<T> (const jule::Ref<T> &ref)
         { this->operator=(ref); }

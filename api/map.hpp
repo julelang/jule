@@ -40,7 +40,7 @@ namespace jule {
     public:
         mutable std::unordered_map<Key, Value, MapKeyHasher> buffer{};
 
-        Map<Key, Value>(void) {}
+        Map<Key, Value>(void) = default;
         Map<Key, Value>(const std::nullptr_t) {}
 
         Map<Key, Value>(const std::initializer_list<std::pair<Key, Value>> &src) {
@@ -49,22 +49,22 @@ namespace jule {
         }
 
         inline constexpr
-        auto begin(void)
+        auto begin(void) noexcept
         { return this->buffer.begin(); }
 
         inline constexpr
-        auto begin(void) const
+        auto begin(void) const noexcept
         { return this->buffer.begin(); }
 
         inline constexpr
-        auto end(void)
+        auto end(void) noexcept
         { return this->buffer.end(); }
 
         inline constexpr
-        auto end(void) const
+        auto end(void) const noexcept
         { return this->buffer.end(); }
 
-        inline void clear(void)
+        inline void clear(void) noexcept
         { this->buffer.clear(); }
 
         jule::Slice<Key> keys(void) const {

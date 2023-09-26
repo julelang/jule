@@ -31,7 +31,8 @@ namespace jule {
         std::function<Function> buffer;
         jule::Uintptr _addr;
 
-        Fn<Function>(void) {}
+        Fn<Function>(void) = default;
+        Fn<Function>(const Fn<Function> &fn) = default;
         Fn<Function>(std::nullptr_t) {}
 
         Fn<Function>(const std::function<Function> &function) {
@@ -46,11 +47,6 @@ namespace jule {
             this->_addr = jule::addr_of_fn(this->buffer);
             if (this->_addr == 0)
                 this->_addr = (jule::Uintptr)(function);
-        }
-
-        Fn<Function>(const Fn<Function> &fn) {
-            this->buffer = fn.buffer;
-            this->_addr = fn._addr;
         }
 
         template<typename ...Arguments>

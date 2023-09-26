@@ -26,32 +26,30 @@ namespace jule {
     public:
         mutable std::array<Item, N> buffer{};
 
-        Array<Item, N>(void) {}
+        Array<Item, N>(void) = default;
+        Array<Item, N>(const jule::Array<Item, N> &src): buffer(src.buffer) {}
 
         Array<Item, N>(const std::initializer_list<Item> &src) {
             std::copy(src.begin(), src.begin()+src.size(), this->buffer.begin());
         }
 
-        Array<Item, N>(const jule::Array<Item, N> &src)
-        { this->buffer = src.buffer; }
-
         typedef Item       *Iterator;
         typedef const Item *ConstIterator;
 
         inline constexpr
-        Iterator begin(void)
+        Iterator begin(void) noexcept
         { return this->buffer.begin(); }
 
         inline constexpr
-        ConstIterator begin(void) const
+        ConstIterator begin(void) const noexcept
         { return this->buffer.begin(); }
 
         inline constexpr
-        Iterator end(void)
+        Iterator end(void) noexcept
         { return this->buffer.end(); }
 
         inline constexpr
-        ConstIterator end(void) const
+        ConstIterator end(void) const noexcept
         { return this->buffer.end(); }
 
         inline jule::Slice<Item> slice(const jule::Int &start,
@@ -84,11 +82,11 @@ namespace jule {
         { return this->slice(0, this->len()); }
 
         inline constexpr
-        jule::Int len(void) const
+        jule::Int len(void) const noexcept
         { return N; }
 
         inline constexpr
-        jule::Bool empty(void) const
+        jule::Bool empty(void) const noexcept
         { return N == 0; }
 
         inline constexpr

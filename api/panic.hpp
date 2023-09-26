@@ -24,13 +24,9 @@ namespace jule {
         std::string message;
 
     public:
-        Exception(void) {}
-
-        Exception(char *message)
-        { this->message = message; }
-
-        Exception(const std::string &message)
-        { this->message = message; }
+        Exception(void) = default;
+        Exception(char *message): message(message) {}
+        Exception(const std::string &message): message(message) {}
 
         char *what(void) noexcept
         { return (char*)this->message.c_str(); }

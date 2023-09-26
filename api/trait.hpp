@@ -26,7 +26,7 @@ namespace jule {
         mutable jule::Ref<Mask> data{};
         const char *type_id { nullptr };
 
-        Trait<Mask>(void) {}
+        Trait<Mask>(void) = default;
         Trait<Mask>(std::nullptr_t) {}
 
         template<typename T>

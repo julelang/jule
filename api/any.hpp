@@ -78,7 +78,7 @@ namespace jule {
         void *data{ nullptr };
         jule::Any::Type *type{ nullptr };
 
-        Any(void) {}
+        Any(void) = default;
 
         template<typename T>
         Any(const T &expr)

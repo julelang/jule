@@ -33,48 +33,16 @@ namespace jule {
     public:
         std::basic_string<jule::U8> buffer{};
 
-        Str(void) {}
-
-        Str(const char *src, const jule::Int &len) {
-            if (!src)
-                return;
-            this->buffer = std::basic_string<jule::U8>(src, src+len);
-        }
-
-        Str(const jule::U8 *src, const jule::Int &len) {
-            if (!src)
-                return;
-            this->buffer = std::basic_string<jule::U8>(src, src+len);
-        }
-
-        Str(const char *src) {
-            if (!src)
-                return;
-            this->buffer = std::basic_string<jule::U8>(src, src+std::strlen(src));
-        }
-
-        Str(const std::initializer_list<jule::U8> &src) {
-            this->buffer = src;
-        }
-
-        Str(const jule::I32 &rune)
-        : Str( jule::utf8_rune_to_bytes(rune) ) {}
-
-        Str(const std::basic_string<jule::U8> &src) {
-            this->buffer = src;
-        }
-
-        Str(const std::string &src) {
-            this->buffer = std::basic_string<jule::U8>(src.begin(), src.end());
-        }
-
-        Str(const jule::Str &src) {
-            this->buffer = src.buffer;
-        }
-
-        Str(const jule::Slice<U8> &src) {
-            this->buffer = std::basic_string<jule::U8>(src.begin(), src.end());
-        }
+        Str(void) = default;
+        Str(const jule::Str &src) = default;
+        Str(const std::initializer_list<jule::U8> &src): buffer(src) {}
+        Str(const jule::I32 &rune): buffer(Str(jule::utf8_rune_to_bytes(rune))) {}
+        Str(const std::basic_string<jule::U8> &src): buffer(src) {}
+        Str(const char *src, const jule::Int &len): buffer(src, src+len) {}
+        Str(const jule::U8 *src, const jule::Int &len): buffer(src, src+len) {}
+        Str(const char *src): buffer(src, src+std::strlen(src)) {}
+        Str(const std::string &src): buffer(src.begin(), src.end()) {}
+        Str(const jule::Slice<U8> &src): buffer(src.begin(), src.end()) {}
 
         Str(const jule::Slice<jule::I32> &src) {
             for (const jule::I32 &r: src) {
