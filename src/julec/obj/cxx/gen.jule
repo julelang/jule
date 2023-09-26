@@ -401,24 +401,24 @@ fn gen_struct_constructor(mut &s: &StructIns): str {
         obj += "void"
     }
 
-    obj += ") {\n"
+    obj += ")"
+    if s.fields.len > 0 {
+        obj += ": "
+        for _, f in s.fields {
+            obj += field_out_ident(f.decl)
+            obj += "("
+            obj += "__param_"
+            obj += f.decl.ident
+            obj += "), "
+        }
+        obj = obj[:obj.len-2] // Remove trailing comma.
+    }
+
+    obj += " {\n"
     add_indent()
     obj += indent()
     obj += gen_struct_self_field_init_st(s)
     obj += "\n"
-
-    if s.fields.len > 0 {
-        for _, f in s.fields {
-            obj += "\n"
-            obj += indent()
-            obj += "this->"
-            obj += field_out_ident(f.decl)
-            obj += " = "
-            obj += "__param_"
-            obj += f.decl.ident
-            obj += CPP_ST_TERM
-        }
-    }
 
     done_indent()
     obj += "\n"
