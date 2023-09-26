@@ -154,17 +154,11 @@ impl Fn {
             ret true, -1
         }
 
-    lookup:
         for j, ains in self.instances {
-            for i, ag in ains.generics {
-                if !ag.equals(ins.generics[i]) {
-                    // Instances are not same.
-                    continue lookup
-                }
+            if ains.same(ins) {
+                // Instances are same.
+                ret false, j
             }
-
-            // Instances are same.
-            ret false, j
         }
 
         self.instances = append(self.instances, ins)
@@ -317,6 +311,21 @@ impl FnIns {
 
     // Reports whether instance is anonymous function.
     pub fn is_anon(self): bool { ret self.anon || real(self.decl) && self.decl.is_anon() }
+
+    // Reports whether instances are same.
+    // Returns true if declarations and generics are same.
+    pub fn same(self, f: &FnIns): bool {
+        if &self.decl != &f.decl || f.generics.len != self.generics.len {
+            ret false
+        }
+
+        for i, g in self.generics {
+            if !g.equals(f.generics[i]) {
+                ret false
+            }
+        }
+        ret true
+    }
 
     // Returns kind string of function instance.
     // Appends identifier to kind of this instance.

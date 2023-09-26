@@ -111,17 +111,10 @@ impl Struct {
             ret self.instances[0]
         }
 
-    lookup:
         for (_, mut ains) in self.instances {
-            for i, ag in ains.generics {
-                if !ag.equals(ins.generics[i]) {
-                    // Instances are not same.
-                    continue lookup
-                }
+            if ains.same(ins) {
+                ret ains
             }
-
-            // Instances are same.
-            ret ains
         }
 
         self.instances = append(self.instances, ins)
@@ -266,6 +259,21 @@ impl Kind for StructIns {
 }
 
 impl StructIns {
+    // Reports whether instances are same.
+    // Returns true if declarations and generics are same.
+    pub fn same(self, s: &StructIns): bool {
+        if &self.decl != &s.decl || s.generics.len != self.generics.len {
+            ret false
+        }
+
+        for i, g in self.generics {
+            if !g.equals(s.generics[i]) {
+                ret false
+            }
+        }
+        ret true
+    }
+
     // Returns method by identifier.
     // Returns nil reference if not exist any method in this identifier.
     pub fn find_method(mut self, ident: str, statically: bool): &Fn {
