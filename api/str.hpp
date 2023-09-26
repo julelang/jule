@@ -25,13 +25,12 @@ namespace jule {
     // Also it is builtin str type constructor.
     template<typename T>
     jule::Str to_str(const T &obj);
-    jule::Str to_str(const jule::Str &s);
-    jule::Str to_str(const char *s);
-    jule::Str to_str(char *s);
+    inline jule::Str to_str(const jule::Str &s);
+    inline jule::Str to_str(const char *s);
+    inline jule::Str to_str(char *s);
 
     class Str {
     public:
-        jule::Int _len{};
         std::basic_string<jule::U8> buffer{};
 
         Str(void) {}
@@ -39,29 +38,22 @@ namespace jule {
         Str(const char *src, const jule::Int &len) {
             if (!src)
                 return;
-            this->_len = len;
-            this->buffer = std::basic_string<jule::U8>(&src[0],
-                                                       &src[this->_len]);
+            this->buffer = std::basic_string<jule::U8>(src, src+len);
         }
 
         Str(const jule::U8 *src, const jule::Int &len) {
             if (!src)
                 return;
-            this->_len = len;
-            this->buffer = std::basic_string<jule::U8>(&src[0],
-                                                       &src[this->_len]);
+            this->buffer = std::basic_string<jule::U8>(src, src+len);
         }
 
         Str(const char *src) {
             if (!src)
                 return;
-            this->_len = std::strlen(src);
-            this->buffer = std::basic_string<jule::U8>(&src[0],
-                                                       &src[this->_len]);
+            this->buffer = std::basic_string<jule::U8>(src, src+std::strlen(src));
         }
 
         Str(const std::initializer_list<jule::U8> &src) {
-            this->_len = src.size();
             this->buffer = src;
         }
 
@@ -69,31 +61,25 @@ namespace jule {
         : Str( jule::utf8_rune_to_bytes(rune) ) {}
 
         Str(const std::basic_string<jule::U8> &src) {
-            this->_len = src.length();
             this->buffer = src;
         }
 
         Str(const std::string &src) {
-            this->_len = src.length();
             this->buffer = std::basic_string<jule::U8>(src.begin(), src.end());
         }
 
         Str(const jule::Str &src) {
-            this->_len = src._len;
             this->buffer = src.buffer;
         }
 
         Str(const jule::Slice<U8> &src) {
-            this->_len = src.len();
             this->buffer = std::basic_string<jule::U8>(src.begin(), src.end());
         }
 
         Str(const jule::Slice<jule::I32> &src) {
             for (const jule::I32 &r: src) {
                 const jule::Slice<jule::U8> bytes{ jule::utf8_rune_to_bytes(r) };
-                this->_len += bytes.len();
-                for (const jule::U8 _byte: bytes)
-                    this->buffer += _byte;
+                this->buffer = std::basic_string<jule::U8>(bytes.begin(), bytes.end());
             }
         }
 
@@ -135,10 +121,10 @@ namespace jule {
         inline jule::Str slice(void) const
         { return this->slice(0, this->len()); }
 
-        inline jule::Int len(void) const
-        { return this->_len; }
+        inline jule::Int len(void) const noexcept
+        { return this->buffer.length(); }
 
-        inline jule::Bool empty(void) const
+        inline jule::Bool empty(void) const noexcept
         { return this->buffer.empty(); }
 
         inline jule::Bool has_prefix(const jule::Str &sub) const {
@@ -272,8 +258,8 @@ namespace jule {
 
         operator jule::Slice<jule::U8>(void) const {
             jule::Slice<jule::U8> slice;
-            slice.alloc_new(0, this->_len);
-            slice._len = this->_len;
+            slice.alloc_new(0, this->len());
+            slice._len = this->len();
             std::copy(this->begin(), this->end(), slice._slice);
             return slice;
         }
@@ -307,7 +293,6 @@ namespace jule {
         { return (*this).buffer[index]; }
 
         inline void operator+=(const jule::Str &str) {
-            this->_len += str.len();
             this->buffer += str.buffer;
         }
 
@@ -335,13 +320,13 @@ namespace jule {
         return jule::Str(stream.str());
     }
 
-    jule::Str to_str(const jule::Str &s)
+    inline jule::Str to_str(const jule::Str &s)
     { return s; }
 
-    jule::Str to_str(const char *s)
+    inline jule::Str to_str(const char *s)
     { return jule::Str(s); }
 
-    jule::Str to_str(char *s)
+    inline jule::Str to_str(char *s)
     { return jule::Str(s); }
 
 } // namespace jule
