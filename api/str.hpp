@@ -79,7 +79,7 @@ namespace jule {
         Str(const jule::Slice<jule::I32> &src) {
             for (const jule::I32 &r: src) {
                 const jule::Slice<jule::U8> bytes{ jule::utf8_rune_to_bytes(r) };
-                this->buffer = std::basic_string<jule::U8>(bytes.begin(), bytes.end());
+                this->buffer += std::basic_string<jule::U8>(bytes.begin(), bytes.end());
             }
         }
 
