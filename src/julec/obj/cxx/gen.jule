@@ -414,33 +414,45 @@ fn gen_struct_constructor(mut &s: &StructIns): str {
         obj = obj[:obj.len-2] // Remove trailing comma.
     }
 
-    obj += " {\n"
-    add_indent()
-    obj += indent()
-    obj += gen_struct_self_field_init_st(s)
-    obj += "\n"
-
-    done_indent()
-    obj += "\n"
-    obj += indent()
+    obj += " {"
+    if s.decl.has_ref_accessible() {
+        obj += "\n"
+        add_indent()
+        obj += indent()
+        obj += gen_struct_self_field_init_st(s)
+        obj += "\n"
+        done_indent()
+        obj += "\n"
+        obj += indent()
+    }
     obj += "}"
     ret obj
 }
 
 fn gen_struct_destructor(mut &s: &StructIns): str {
+    let disposed = s.decl.is_implements(BUILTIN_TRAIT_DISPOSE)
+    let ref_access = s.decl.has_ref_accessible()
+    // Call destructor if implemented.
+    if !ref_access && !disposed {
+        ret ""
+    }
+
     let mut obj = "~"
     obj += struct_ins_out_ident(s)
     obj += "(void) { "
 
-    // Call destructor if implemented.
-    if s.decl.is_implements(BUILTIN_TRAIT_DISPOSE) {
+    if disposed {
         let dispose_method = s.find_method("dispose", false)
         obj += "this->"
         obj += fn_out_ident(dispose_method)
         obj += "(); "
     }
 
-    obj += "this->self.ref = nullptr; }"
+    if ref_access {
+        obj += "this->self.ref = nullptr; "
+    }
+
+    obj += "}"
     ret obj
 }
 
@@ -517,10 +529,14 @@ fn gen_struct_ins_prototype(mut &s: &StructIns): str {
     obj += gen_struct_traits(s.decl)
     obj += " {\n"
 
+    let ref_access = s.decl.has_ref_accessible()
+
     add_indent()
-    obj += indent()
-    obj += gen_struct_self_field(s)
-    obj += "\n\n"
+    if ref_access {
+        obj += indent()
+        obj += gen_struct_self_field(s)
+        obj += "\n\n"
+    }
     if s.fields.len > 0 {
         for (_, mut f) in s.fields {
             obj += indent()
@@ -537,11 +553,16 @@ fn gen_struct_ins_prototype(mut &s: &StructIns): str {
     obj += gen_struct_destructor(s)
     obj += "\n\n"
 
+    // Default constructor.
     obj += indent()
     obj += out_ident
-    obj += "(void) { "
-    obj += gen_struct_self_field_init_st(s)
-    obj += " }\n\n"
+    if ref_access {
+        obj += "(void) { "
+        obj += gen_struct_self_field_init_st(s)
+        obj += " }\n\n"
+    } else {
+       obj += "(void) = default;\n\n"
+    }
 
     for (_, mut f) in s.methods {
         obj += gen_fn_prototype(f, true)
