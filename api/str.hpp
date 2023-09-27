@@ -246,6 +246,11 @@ namespace jule {
             return runes;
         }
 
+        // Returns element by index.
+        // Not includes safety checking.
+        inline jule::U8 &__at(const jule::Int &index) noexcept
+        { return this->buffer[index]; }
+
         jule::U8 &operator[](const jule::Int &index) {
 #ifndef __JULE_DISABLE__SAFETY
             if (this->empty() || index < 0 || this->len() <= index) {
@@ -254,15 +259,14 @@ namespace jule {
                 jule::panic(sstream.str().c_str());
             }
 #endif
-            return this->buffer[index];
+            return this->__at(index);
         }
 
         inline jule::U8 operator[](const jule::Int &index) const
         { return (*this).buffer[index]; }
 
-        inline void operator+=(const jule::Str &str) {
-            this->buffer += str.buffer;
-        }
+        inline void operator+=(const jule::Str &str)
+        { this->buffer += str.buffer; }
 
         inline jule::Str operator+(const jule::Str &str) const
         { return jule::Str(this->buffer + str.buffer); }

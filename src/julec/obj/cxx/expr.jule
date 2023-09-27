@@ -537,9 +537,11 @@ fn gen_indexing_expr_model(mut m: &IndexigExprModel): str {
     let mut obj = gen_expr_model(m.expr.model)
 
     // Try access optimization.
-    if real(m.expr.kind.arr()) && is_opt_enabled(Opt.Access) {
-        // Constants checked by semantic analysis, safe.
-        if m.index.is_const() {
+    if is_opt_enabled(Opt.Access) {
+        let array = real(m.expr.kind.arr())
+
+        // Constants checked by semantic analysis for arrays, safe.
+        if array && m.index.is_const() {
             obj += ".__at("
             obj += gen_expr(m.index.model)
             obj += ")"
@@ -555,6 +557,14 @@ fn gen_indexing_expr_model(mut m: &IndexigExprModel): str {
             match type m.expr.model {
             | &Var:
                 let r = (&Var)(m.expr.model)
+
+                // Skip mutable indexed variables if not array.
+                // Because arrays has fixed-size, no mutation risk.
+                if !array && r.mutable {
+                    break
+                }
+
+                // Iterated variable is indexed variable?
                 if &i.iter_relation.range == &r {
                     obj += ".__at("
                     obj += gen_expr(m.index.model)
@@ -565,6 +575,7 @@ fn gen_indexing_expr_model(mut m: &IndexigExprModel): str {
         }
     }
 
+    // Index access with safety measures.
     obj += "["
     obj += gen_expr(m.index.model)
     obj += "]"
