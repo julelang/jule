@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
+use env::{Opt, is_opt_enabled}
 use obj::{IR}
 
 use conv for std::conv
@@ -461,7 +462,10 @@ fn gen_struct_operators(mut &s: &StructIns): str {
     let mut obj = ""
 
     obj += indent()
-    obj += "inline bool operator==(const "
+    if is_opt_enabled(Opt.Inline) {
+        obj += "inline "
+    }
+    obj += "bool operator==(const "
     obj += out_ident
     obj += " &_Src) const {"
     if s.fields.len > 0 {
@@ -503,7 +507,10 @@ fn gen_struct_operators(mut &s: &StructIns): str {
     }
     obj += "\n\n"
     obj += indent()
-    obj += "inline bool operator!=(const "
+    if is_opt_enabled(Opt.Inline) {
+        obj += "inline "
+    }
+    obj += "bool operator!=(const "
     obj += out_ident
     obj += " &_Src) const { return !this->operator==(_Src); }"
     ret obj
@@ -608,7 +615,7 @@ fn gen_fn_decl_head(mut &f: &FnIns, method: bool): str {
         obj += "static "
     }
 
-    if !f.decl.is_entry_point() {
+    if is_opt_enabled(Opt.Inline) && !f.decl.is_entry_point() {
         obj += "inline "
     }
 
