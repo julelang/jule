@@ -99,7 +99,7 @@ namespace jule {
 
         // Returns element by index.
         // Not includes safety checking.
-        inline Item &__at(const jule::Int &index) const
+        inline Item &__at(const jule::Int &index) const noexcept
         { return this->buffer[index]; }
 
         Item &operator[](const jule::Int &index) const {

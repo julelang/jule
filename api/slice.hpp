@@ -258,6 +258,11 @@ namespace jule {
         jule::Bool operator!=(const std::nullptr_t) const
         { return !this->operator==(nullptr); }
 
+        // Returns element by index.
+        // Not includes safety checking.
+        inline Item &__at(const jule::Int &index) const noexcept
+        { return *(this->_slice+index); }
+
         Item &operator[](const jule::Int &index) const {
 #ifndef __JULE_DISABLE__SAFETY
             this->check();
@@ -267,7 +272,7 @@ namespace jule {
                 jule::panic(sstream.str().c_str());
             }
 #endif
-            return *(this->_slice+index);
+            return this->__at(index);
         }
 
         void operator=(const jule::Slice<Item> &src) {
