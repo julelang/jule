@@ -109,3 +109,20 @@ pub fn read_file(path: str): ([]byte, FsError) {
     }
     ret buff[:n], FsError.Ok
 }
+
+// Writes data to the named file, creating it if necessary.
+// If the file does not exist, creates it with permissions perm (before umask);
+// otherwise truncates it before writing, without changing permissions.
+// Since requires multiple system calls to complete, a failure mid-operation
+// can leave the file in a partially written state.
+pub fn write_file(path: str, data: []byte, perm: int): FsError {
+    let (mut f, mut err) = open(path, OFlag.Wronly|OFlag.Create|OFlag.Trunc, perm)
+    if err != FsError.Ok {
+        ret err
+    }
+    _, err = f.write(data)
+    if err != FsError.Ok {
+        ret err
+    }
+    ret f.close()
+}
