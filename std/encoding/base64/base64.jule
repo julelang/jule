@@ -9,6 +9,9 @@ const T64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 // It is typically used for URLs and file names.
 const UT64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 
+// Standard byte for padding.
+const PADDING_BYTE = '='
+
 static I64: [123]int = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0,
@@ -21,8 +24,20 @@ static I64: [123]int = [
 
 // Encodes source bytes with standard base64 table.
 // Returns encoded base64 bytes if success, nil slice if not.
-pub fn encode(src: []byte): []byte {
-    let blen = 4*((src.len + 2) / 3)
+// Adds padding if pad is true.
+pub fn encode(src: []byte, pad: bool): []byte {
+    let mut blen = 4*((src.len + 2) / 3)
+    if pad {
+        let pad1 = blen%4 != 0
+        let pad2 = pad1 && blen%4 > 2
+        if pad1 {
+            blen--
+        }
+        if pad2 {
+            blen--
+        }
+    }
+
     if blen < src.len {
         ret nil
     }
@@ -52,16 +67,20 @@ pub fn encode(src: []byte): []byte {
             if i+1 == end {
                 *j = T64[(i[0] & 0x03) << 4]
                 j++
-                *j = '='
-                j++
+                if pad {
+                    *j = PADDING_BYTE
+                    j++
+                }
             } else {
                 *j = T64[((i[0] & 0x03) << 4) | (i[1] >> 4)]
                 j++
                 *j = T64[(i[1] & 0x0f) << 2]
                 j++
             }
-            *j = '='
-            j++
+            if pad {
+                *j = PADDING_BYTE
+                j++
+            }
         }
     }
 
@@ -70,6 +89,7 @@ pub fn encode(src: []byte): []byte {
 
 // Decodes source bytes with standard base64 table.
 // Returns decoded bytes if success, nil slice if not.
+// Detects padding by default, no required padding specification.
 pub fn decode(src: []byte): []byte {
     if src.len == 0 {
         ret nil
@@ -77,8 +97,8 @@ pub fn decode(src: []byte): []byte {
 
     let p = &src[0]
     let mut j = 0
-    let pad1 = src.len%4 != 0 || unsafe { p[src.len - 1] } == '='
-    let pad2 = pad1 && (src.len%4 > 2 || unsafe { p[src.len - 2] } != '=')
+    let pad1 = src.len%4 != 0 || unsafe { *(p+src.len-1) } == PADDING_BYTE
+    let pad2 = pad1 && (src.len%4 > 2 || unsafe { *(p+src.len-2) } != PADDING_BYTE)
     let mut l = (src.len - if pad1 { 1 } else { 0 }) / 4<<2
 
     let mut sz = l/4 * 3
@@ -123,7 +143,8 @@ pub fn decode(src: []byte): []byte {
 // It is typically used for URLs and file names.
 // Returns encoded base64 bytes if success, nil slice if not.
 pub fn encode_url(src: []byte): []byte {
-    let mut dest = encode(src)
+    const PADDING = false
+    let mut dest = encode(src, PADDING)
     if dest == nil {
         ret nil
     }
@@ -131,15 +152,11 @@ pub fn encode_url(src: []byte): []byte {
     // Process URL table.
     let mut i = &dest[0]
     let end = i + dest.len
-iter:
     for i < end; i++ {
         unsafe {
             match *i {
             | '+': *i = '-'
             | '/': *i = '_'
-            | '=':
-                dest = dest[:dest.len-(uintptr(end)-uintptr(i))]
-                break iter
             }
         }
     }
