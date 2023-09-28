@@ -28,19 +28,21 @@ static I64: [123]int = [
 pub fn encode(src: []byte, pad: bool): []byte {
     let mut blen = 4*((src.len + 2) / 3)
     if pad {
-        let pad1 = blen%4 != 0
-        let pad2 = pad1 && blen%4 > 2
-        if pad1 {
+        if blen%4 != 0 { // Padding 1
             blen--
-        }
-        if pad2 {
-            blen--
+            if blen%4 > 2 { // Padding 2
+                blen--
+            }
         }
     }
 
     if blen < src.len {
         ret nil
     }
+
+    // Use temporary compile-time stored table to skip boundary-checking cost.
+    let t = T64
+    let tp = &t[0]
 
     let mut dest = make([]byte, blen)
     let mut j = &dest[0]
@@ -49,32 +51,32 @@ pub fn encode(src: []byte, pad: bool): []byte {
     let end = i + src.len
     for i+3 <= end; i += 3 {
         unsafe {
-            *j = T64[i[0] >> 2]
+            *j = tp[i[0] >> 2]
             j++
-            *j = T64[((i[0] & 0x03) << 4) | (i[1] >> 4)]
+            *j = tp[((i[0] & 0x03) << 4) | (i[1] >> 4)]
             j++
-            *j = T64[((i[1] & 0x0f) << 2) | (i[2] >> 6)]
+            *j = tp[((i[1] & 0x0f) << 2) | (i[2] >> 6)]
             j++
-            *j = T64[i[2] & 0x3f]
+            *j = tp[i[2] & 0x3f]
             j++
         }
     }
 
     if i < end {
         unsafe {
-            *j = T64[i[0] >> 2]
+            *j = tp[i[0] >> 2]
             j++
             if i+1 == end {
-                *j = T64[(i[0] & 0x03) << 4]
+                *j = tp[(i[0] & 0x03) << 4]
                 j++
                 if pad {
                     *j = PADDING_BYTE
                     j++
                 }
             } else {
-                *j = T64[((i[0] & 0x03) << 4) | (i[1] >> 4)]
+                *j = tp[((i[0] & 0x03) << 4) | (i[1] >> 4)]
                 j++
-                *j = T64[(i[1] & 0x0f) << 2]
+                *j = tp[(i[1] & 0x0f) << 2]
                 j++
             }
             if pad {
@@ -111,10 +113,13 @@ pub fn decode(src: []byte): []byte {
     let mut dest = make([]byte, sz)
     let mut d = &dest[0]
 
+    // Use pointer for table to skip boundary-checking cost.
+    let ip = &I64[0]
+
     let mut i = 0
     for i < l; i += 4 {
         unsafe {
-            let n = I64[p[i]]<<18 | I64[p[i + 1]]<<12 | I64[p[i + 2]]<<6 | I64[p[i + 3]]
+            let n = ip[p[i]]<<18 | ip[p[i + 1]]<<12 | ip[p[i + 2]]<<6 | ip[p[i + 3]]
             d[j] = byte(n >> 16)
             j++
             d[j] = byte(n >> 8 & 0xFF)
@@ -126,11 +131,11 @@ pub fn decode(src: []byte): []byte {
 
     if pad1 {
         unsafe {
-            let mut n = I64[p[l]]<<18 | I64[p[l + 1]]<<12
+            let mut n = ip[p[l]]<<18 | ip[p[l + 1]]<<12
             d[j] = byte(n >> 16)
             j++
             if pad2 {
-                n |= I64[p[l + 2]] << 6
+                n |= ip[p[l + 2]] << 6
                 d[j] = byte(n >> 8 & 0xFF)
                 j++
             }
