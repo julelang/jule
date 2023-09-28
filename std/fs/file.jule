@@ -96,7 +96,7 @@ pub fn read_file(path: str): ([]byte, FsError) {
         ret make([]byte, 0), FsError.Ok
     }
 
-    let (mut f, err) = open(path, OFlag.Rdonly, 0)
+    let (mut f, err) = open_file(path, OFlag.Rdonly, 0)
     if err != FsError.Ok {
         ret nil, err
     }
@@ -116,7 +116,7 @@ pub fn read_file(path: str): ([]byte, FsError) {
 // Since requires multiple system calls to complete, a failure mid-operation
 // can leave the file in a partially written state.
 pub fn write_file(path: str, data: []byte, perm: int): FsError {
-    let (mut f, mut err) = open(path, OFlag.Wronly|OFlag.Create|OFlag.Trunc, perm)
+    let (mut f, mut err) = open_file(path, OFlag.Wronly|OFlag.Create|OFlag.Trunc, perm)
     if err != FsError.Ok {
         ret err
     }
@@ -125,4 +125,13 @@ pub fn write_file(path: str, data: []byte, perm: int): FsError {
         ret err
     }
     ret f.close()
+}
+
+// Creates or truncates the named file. If the file already exists,
+// it is truncated. If the file does not exist, it is created with mode 0666
+// (before umask). If successful, methods on the returned File can
+// be used for I/O; the associated file descriptor has mode OFlag.Rdwr.
+pub fn create_file(path: str): (&File, FsError) {
+    let (mut f, err) = open_file(path, OFlag.Rdwr|OFlag.Create|OFlag.Trunc, 0666)
+    ret f, err
 }
