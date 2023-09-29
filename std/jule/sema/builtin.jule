@@ -623,7 +623,21 @@ fn builtin_caller_recover(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &
     if fc.generics.len > 0 {
         e.push_err(fc.token, LogMsg.NotHasGenerics)
     }
-    const HANDLER_KIND = "fn(Error)"
+    let HANDLER_KIND = &TypeKind{
+        kind: &FnIns{
+            decl: &Fn{},
+            params: [
+                &ParamIns{
+                    decl: &Param{
+                        ident: "err",
+                    },
+                    kind: &TypeKind{
+                        kind: BUILTIN_TRAIT_ERROR,
+                    },
+                },
+            ],
+        },
+    }
 
     if fc.args.len < 1 {
         e.push_err(fc.token, LogMsg.MissingExprFor, "handler")
@@ -638,14 +652,14 @@ fn builtin_caller_recover(mut &e: &Eval, mut &fc: &FnCallExpr, mut &_: &Data): &
         ret new(Data)
     }
 
-    if !real(t.kind.fnc()) {
+    let f = t.kind.fnc()
+    if !real(f) {
         e.push_err(fc.args[0].token, LogMsg.InvalidExpr)
         ret new(Data)
     }
 
-    let tkind = t.kind.fnc().to_str()
-    if tkind != HANDLER_KIND {
-        e.push_err(fc.args[0].token, LogMsg.IncompatibleTypes, tkind, HANDLER_KIND)
+    if !f.equals(HANDLER_KIND) {
+        e.push_err(fc.args[0].token, LogMsg.IncompatibleTypes, t.kind.to_str(), HANDLER_KIND.to_str())
     }
 
     let mut d = build_void_data()
