@@ -67,6 +67,43 @@ fn find_label_parent(ident: str, mut scope: &ScopeChecker): &ScopeLabel {
     ret label
 }
 
+fn stmt_is_goto_scope(&stmt: any, &sc: &Scope): bool {
+    match type stmt {
+    | &Scope:
+        ret &(&Scope)(stmt) == &sc
+
+    | &InfIter:
+        ret &(&InfIter)(stmt).scope == &sc
+
+    | &RangeIter:
+        ret &(&RangeIter)(stmt).scope == &sc
+
+    | &WhileIter:
+        ret &(&WhileIter)(stmt).scope == &sc
+
+    | &Match:
+        let m = (&Match)(stmt)
+        for _, c in m.cases {
+            if &c.scope == &sc {
+                ret true
+            }
+        }
+        ret real(m.default) && &m.default.scope == &sc
+
+    | &Conditional:
+        let c = (&Conditional)(stmt)
+        for _, elif in c.elifs {
+            if &elif.scope == &sc {
+                ret true
+            }
+        }
+        ret real(c.default) && &c.default.scope == &sc
+
+    |:
+        ret false
+    }
+}
+
 fn count_match_type(m: &Match, t: &TypeKind): int {
     let mut n = 0
     let kind = t.to_str()
@@ -1612,101 +1649,43 @@ impl ScopeChecker {
         }
     }
 
-    fn check_same_scope_goto(mut self, gt: &ScopeGoto, mut label: &ScopeLabel) {
-        if label.pos < gt.pos { // Label at above.
-            ret
+    fn check_goto(mut self, mut &gt: &ScopeGoto, mut label: &ScopeLabel) {
+        let mut gtsc = gt.scope
+        for gtsc.child_index-1 > label.scope.child_index {
+            gtsc = gtsc.parent
         }
 
-        let mut i = label.pos
-        for i > gt.pos; i-- {
-            let stmt = label.scope.scope.stmts[i]
+        let mut n = 0
+
+        if &gtsc.scope == &label.scope.scope {
+            // Scopes are same and label at above, so safe.
+            if gt.pos > label.pos {
+                ret
+            }
+
+            // Limit controlling to goto's position.
+            // Label and goto is in same scope.
+            n = gt.pos
+        }
+
+        let mut i = label.pos - 1
+
+        if n == 0 {
+            for j, stmt in label.scope.scope.stmts {
+                // Break if position reached to goto's scope.
+                if stmt_is_goto_scope(stmt, gtsc.scope) {
+                    n = j
+                    break
+                }
+            }
+        }
+
+        for i >= n; i-- {
+            let mut stmt = label.scope.scope.stmts[i]
             if st_is_def(stmt) {
                 self.s.push_err(gt.gt.token, LogMsg.GotoJumpsDeclarations, gt.gt.label.kind)
-                break
-            }
-        }
-    }
-
-    fn check_label_parents(mut self, gt: &ScopeGoto, mut label: &ScopeLabel): bool {
-        let mut scope = label.scope
-
-    parent_scopes:
-        if real(scope.parent) && &scope.parent != &gt.scope {
-            scope = scope.parent
-            for i, stmt in scope.scope.stmts {
-                match {
-                | i >= label.pos:
-                    ret true
-
-                | st_is_def(stmt):
-                    self.s.push_err(gt.gt.token, LogMsg.GotoJumpsDeclarations, gt.gt.label.kind)
-                    ret false
-                }
-            }
-
-            goto parent_scopes
-        }
-
-        ret true
-    }
-
-    fn check_goto_scope(mut self, mut gt: &ScopeGoto, label: &ScopeLabel) {
-        let mut i = gt.pos
-        for i < gt.scope.scope.stmts.len; i++ {
-            match {
-            | i >= label.pos:
-                ret
-
-            | st_is_def(gt.scope.scope.stmts[i]):
-                self.s.push_err(gt.gt.token, LogMsg.GotoJumpsDeclarations, gt.gt.label.kind)
                 ret
             }
-        }
-    }
-
-    fn check_diff_scope_goto(mut self, mut gt: &ScopeGoto, mut label: &ScopeLabel) {
-        match {
-        | label.scope.child_index > 0 && gt.scope.child_index == 0:
-            if !self.check_label_parents(gt, label) {
-                ret
-            }
-
-        | label.scope.child_index < gt.scope.child_index: // Label at parent blocks.
-            ret
-        }
-
-        let mut scope = label.scope
-        let mut i = label.pos - 1
-        for i >= 0; i-- {
-            let s = scope.scope.stmts[i]
-            match type s {
-            | &Scope:
-                if i <= gt.pos {
-                    ret
-                }
-            }
-
-            if st_is_def(s) {
-                self.s.push_err(gt.gt.token, LogMsg.GotoJumpsDeclarations, gt.gt.label.kind)
-                break
-            }
-        }
-
-        // Parent Scopes
-        if real(scope.parent) && &scope.parent != &gt.scope {
-            _ = self.check_label_parents(gt, label)
-        } else { // goto Scope
-            self.check_goto_scope(gt, label)
-        }
-    }
-
-    fn check_goto(mut self, mut gt: &ScopeGoto, mut label: &ScopeLabel) {
-        match {
-        | &gt.scope == &label.scope:
-            self.check_same_scope_goto(gt, label)
-
-        | label.scope.child_index > 0:
-            self.check_diff_scope_goto(gt, label)
         }
     }
 
