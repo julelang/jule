@@ -4,7 +4,7 @@
 </p>
 <h1>The Jule Programming Language</h1>
 
-This repository is the main source tree of Jule. \
+This repository is the main source tree of the Jule. \
 It contains the reference compiler, API, and standard library.
 
 [Website](https://jule.dev) |
@@ -143,7 +143,7 @@ The Jule source code declares to use `sum.hpp` first and binds the C++ function 
 Then, a call is made from Jule and the result of the function is written to the command line.
 
 <h2 id="future-changes">Future Changes</h2>
-JuleC is in early development and currently, it can only be built from source.
+JuleC is in early development and currently does not have a stable version yet.
 However, despite being in the early development stage, many algorithms (<a href="https://github.com/julelang/jule/tree/master/std">see the standard library</a>) can be successfully implemented.
 However, Jule's compiler is bootstrapped.
 The reference compiler, JuleC, is developed with Pure Jule.
