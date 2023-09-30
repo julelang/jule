@@ -785,21 +785,25 @@ impl FnCallArgChecker {
     }
 
     fn push(mut self, mut &p: &ParamIns, mut arg: &Expr): (ok: bool) {
+        let mut old = self.e.prefix
+        let old_immut = self.e.immutable
         let mut d = new(Data)
+
+        self.e.immutable = !p.decl.mutable
         if !self.dynamic_annotation && !p.decl.variadic {
-            let mut old = self.e.prefix
             self.e.prefix = p.kind
-            d = self.e.eval_expr_kind(arg.kind)
-            self.e.prefix = old
         } else {
-            let mut old = self.e.prefix
             drop(self.e.prefix)
-            d = self.e.eval_expr_kind(arg.kind)
-            self.e.prefix = old
         }
+        d = self.e.eval_expr_kind(arg.kind)
+
+        self.e.prefix = old
+        self.e.immutable = old_immut
+
         if !real(d) {
             ret false
         }
+
         self.arg_models = append(self.arg_models, d.model)
         ret self.check_arg(p, d, arg.token)
     }
@@ -946,9 +950,8 @@ impl StructLitChecker {
             expr:  d.model,
         })
         const REFERENCE = false
-        const MUTABLE = true // Structures literals are always mutable.
         self.e.s.check_validity_for_init_expr(
-            MUTABLE, REFERENCE, f.kind, d, error_token)
+            !self.e.immutable, REFERENCE, f.kind, d, error_token)
         self.e.s.check_assign_type(false, f.kind, d, error_token, false)
     }
 

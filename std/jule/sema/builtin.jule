@@ -316,11 +316,19 @@ fn builtin_caller_new(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data
     d.kind = &TypeKind{kind: &Ref{elem: t.kind.clone()}}
 
     if fc.args.len == 2 { // Initialize expression.
-        let mut init = e.s.evalp(e.lookup, t.kind).eval_expr(fc.args[1])
+        let mut old = e.prefix
+        e.prefix = t.kind
+
+        let mut init = e.eval_expr(fc.args[1])
+
+        e.prefix = old
+
         if real(init) {
-            t.mutable = true
-            _ = check_mut(e.s, t, init, fc.args[1].token)
-            e.s.check_assign_type(false, t.kind, init, fc.args[1].token, false)
+            let mut token = fc.args[1].token
+            const REFERENCE = false
+            e.s.check_validity_for_init_expr(
+                !e.immutable, REFERENCE, t.kind, init, token)
+            e.s.check_assign_type(false, t.kind, init, token, false)
 
             if real(init.kind.ref()) {
                 init.model = &ExplicitDerefExprModel{
