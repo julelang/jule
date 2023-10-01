@@ -16,10 +16,14 @@ public:
     __jule_mutex_handle(void) = default;
 
     __jule_mutex_handle(const __jule_mutex_handle &jmh)
-    { this->_mutex = jmh._mutex;  this->_mutex->unlock(); }
+    { this->_mutex = jmh._mutex; }
 
-    inline void init(void)
-    { this->_mutex = jule::Ref<std::mutex>::make(new std::mutex()); }
+    inline void init(void) {
+        std::mutex *mtx{ new (std::nothrow) std::mutex() };
+        if (mtx == nullptr)
+            jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
+        this->_mutex = jule::Ref<std::mutex>::make(mtx);
+    }
 
     inline std::mutex *mutex(void) noexcept
     { return _mutex.alloc; }
