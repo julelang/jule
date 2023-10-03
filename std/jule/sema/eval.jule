@@ -47,6 +47,18 @@ fn find_builtins_import(ident: str, imp: &ImportInfo): any {
     ret find_package_builtin_def(imp.link_path, ident)
 }
 
+fn make_struct_lit_alloc(mut &d: &Data, mut &lit: &StructLitExprModel) {
+    d.kind = &TypeKind{
+        kind: &Ref{
+            elem: &TypeKind{kind: lit.strct},
+        },
+    }
+
+    d.model = &AllocStructLitExprModel{
+        lit: lit,
+    }
+}
+
 fn find_builtins_sema(ident: str, mut s: &Sema): any {
     for (_, mut imp) in s.file.imports {
         if imp.import_all || imp.exist_ident(ident) {
@@ -942,15 +954,7 @@ impl Eval {
         match type d.model {
         | &StructLitExprModel:
             let mut lit = (&StructLitExprModel)(d.model)
-            d.kind = &TypeKind{
-                kind: &Ref{
-                    elem: &TypeKind{kind: lit.strct},
-                },
-            }
-
-            d.model = &AllocStructLitExprModel{
-                lit: lit,
-            }
+            make_struct_lit_alloc(d, lit)
 
         |:
             match {
@@ -1862,11 +1866,23 @@ impl Eval {
 
         let mut s = t.kind.strct()
         if !real(s) {
+            if real(t.kind.ref()) {
+                s = t.kind.ref().elem.strct()
+                if real(s) {
+                    goto eval
+                }
+            }
             self.push_err(lit.kind.token, LogMsg.InvalidSyntax)
             ret new(Data)
         }
 
-        ret self.eval_struct_lit_explicit(s, lit.exprs, lit.kind.token)
+    eval:
+        let mut d = self.eval_struct_lit_explicit(s, lit.exprs, lit.kind.token)
+        if real(t.kind.ref()) {
+            let mut model = (&StructLitExprModel)(d.model)
+            make_struct_lit_alloc(d, model)
+        }
+        ret d
     }
 
     fn eval_type(mut self, mut t: &TypeDecl): &Data {
