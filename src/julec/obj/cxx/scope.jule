@@ -36,121 +36,146 @@ use std::jule::sema::{
     BuiltinAppendCallExprModel,
 }
 
-trait RangeIterGen {
-    //fn setup_vars(self, mut key_a: &Var, mut key_b: &Var): str
-    //fn next_steps(self, mut key_a: &Var, mut key_b: &Var, begin: str): str
-    fn gen(mut self): str
+fn iter_expr_is_copy_optimizable(&expr: &Data, &v: &Var): bool {
+    ret (!expr.lvalue || !expr.mutable) && !v.mutable || v.kind.kind.mutable()
 }
 
-struct IndexRangeIterGen {
-    it: &RangeIter
-}
+fn gen_range_index_iter(mut &it: &RangeIter): str {
+    let begin = iter_begin_label_ident(uintptr(&it))
+    let next = iter_next_label_ident(uintptr(&it))
 
-impl RangeIterGen for IndexRangeIterGen {
-    fn gen(mut self): str {
-        let mut obj = ""
-
-        if real(self.it.key_a) {
-            add_indent()
-            obj += "{\n"
-            obj += indent()
-            obj += gen_var_init_expr(self.it.key_a, "0")
-            obj += "\n"
-            obj += indent()
-        }
-
-        obj += "for (auto "
-        if real(self.it.key_b) {
-            if is_opt_enabled(Opt.Copy) {
-                if !self.it.key_b.mutable || self.it.key_b.kind.kind.mutable() {
-                    obj += "&"
-                }
-            }
-            obj += var_out_ident(self.it.key_b)
-        } else {
-            obj += "&_"
-        }
-        obj += ": "
-        obj += gen_expr(self.it.expr.model)
-        obj += ") {\n"
-
-        add_indent()
-        obj += indent()
-        obj += gen_scope(self.it.scope)
-        obj += "\n"
-        done_indent()
-        obj += indent()
-
-        obj += iter_next_label_ident(uintptr(&self.it))
-        obj += ":;\n"
-
-        if real(self.it.key_a) {
-            obj += indent()
-            obj += var_out_ident(self.it.key_a)
-            obj += "++;"
-            obj += "\n"
-        }
-
-        obj += indent()
-        obj += "}\n"
-        obj += indent()
-        obj += iter_end_label_ident(uintptr(&self.it))
-        obj += ":;"
-
-        if real(self.it.key_a) {
-            done_indent()
-            obj += "\n"
-            obj += indent()
-            obj += "}"
-        }
-
-        ret obj
+    let mut obj = "{\n"
+    add_indent()
+    obj += indent()
+    obj += "auto "
+    if is_opt_enabled(Opt.Copy) && it.expr.lvalue && !it.expr.mutable {
+        obj += "&"
     }
-}
-
-struct MapRangeIterGen {
-    it: &RangeIter
-}
-
-impl RangeIterGen for MapRangeIterGen {
-    fn gen(mut self): str {
-        let mut obj = "for (auto &set: "
-        obj += gen_expr(self.it.expr.model)
-        obj += ") {\n"
-
-        add_indent()
-        obj += indent()
-
-        if real(self.it.key_a) {
-            obj += gen_var_init_expr(self.it.key_a, "set.first")
-            obj += "\n"
-            obj += indent()
-        }
-
-        if real(self.it.key_b) {
-            if is_opt_enabled(Opt.Copy) {
-                self.it.key_b.reference = !self.it.key_b.mutable || self.it.key_b.kind.kind.mutable()
-            }
-            obj += gen_var_init_expr(self.it.key_b, "set.second")
-            obj += "\n"
-            obj += indent()
-        }
-
-        obj += gen_scope(self.it.scope)
+    obj += "expr = "
+    obj += gen_expr_model(it.expr.model)
+    obj += ";\n"
+    obj += indent()
+    obj += "auto it = expr.begin();\n"
+    obj += indent()
+    if real(it.key_a) {
+        obj += gen_var(it.key_a);
         obj += "\n"
-
-        done_indent()
         obj += indent()
-
-        obj += iter_next_label_ident(uintptr(&self.it))
-        obj += ":;\n"
-        obj += indent()
-        obj += "}\n"
-        obj += indent()
-        obj += iter_end_label_ident(uintptr(&self.it))
-        obj += ":;"
-        ret obj
     }
+    obj += begin
+    obj += ":;\n"
+    obj += indent()
+    obj += "if (it != expr.end()) {\n"
+    add_indent()
+    obj += indent()
+    if real(it.key_b) {
+        if is_opt_enabled(Opt.Copy) {
+            it.key_b.reference = iter_expr_is_copy_optimizable(it.expr, it.key_b)
+        }
+        obj += gen_var_init_expr(it.key_b, "*it")
+        obj += "\n"
+        obj += indent()
+    }
+    obj += gen_scope(it.scope)
+    obj += "\n"
+    obj += indent()
+    obj += next;
+    obj += ":;\n"
+    obj += indent()
+    obj += "++it;\n"
+    obj += indent()
+    if real(it.key_a) {
+        obj += var_out_ident(it.key_a);
+        obj += "++;\n"
+        obj += indent()
+    }
+    obj += "goto "
+    obj += begin
+    obj += ";\n"
+
+    // Close if.
+    done_indent()
+    obj += indent()
+    obj += "}\n"
+
+    obj += indent()
+    obj += iter_end_label_ident(uintptr(&it))
+    obj += ":;\n"
+
+    // Close scope.
+    done_indent()
+    obj += indent()
+    obj += "}"
+
+    ret obj
+}
+
+fn gen_range_hashmap_iter(mut &it: &RangeIter): str {
+    let begin = iter_begin_label_ident(uintptr(&it))
+    let next = iter_next_label_ident(uintptr(&it))
+
+    let mut obj = "{\n"
+    add_indent()
+    obj += indent()
+    obj += "auto "
+    if is_opt_enabled(Opt.Copy) && it.expr.lvalue && !it.expr.mutable {
+        obj += "&"
+    }
+    obj += "expr = "
+    obj += gen_expr_model(it.expr.model)
+    obj += ";\n"
+    obj += indent()
+    obj += "auto it = expr.begin();\n"
+    obj += indent()
+    obj += begin
+    obj += ":;\n"
+    obj += indent()
+    obj += "if (it != expr.end()) {\n"
+    add_indent()
+    obj += indent()
+    if real(it.key_a) {
+        if is_opt_enabled(Opt.Copy) {
+            it.key_a.reference = iter_expr_is_copy_optimizable(it.expr, it.key_a)
+        }
+        obj += gen_var_init_expr(it.key_a, "it->first")
+        obj += "\n"
+        obj += indent()
+    }
+    if real(it.key_b) {
+        if is_opt_enabled(Opt.Copy) {
+            it.key_b.reference = iter_expr_is_copy_optimizable(it.expr, it.key_b)
+        }
+        obj += gen_var_init_expr(it.key_b, "it->second")
+        obj += "\n"
+        obj += indent()
+    }
+    obj += gen_scope(it.scope)
+    obj += "\n"
+    obj += indent()
+    obj += next;
+    obj += ":;\n"
+    obj += indent()
+    obj += "++it;\n"
+    obj += indent()
+    obj += "goto "
+    obj += begin
+    obj += ";\n"
+
+    // Close if.
+    done_indent()
+    obj += indent()
+    obj += "}\n"
+
+    obj += indent()
+    obj += iter_end_label_ident(uintptr(&it))
+    obj += ":;\n"
+
+    // Close scope.
+    done_indent()
+    obj += indent()
+    obj += "}"
+
+    ret obj
 }
 
 fn gen_if(mut i: &If): str {
@@ -236,18 +261,13 @@ fn gen_while_iter(mut it: &WhileIter): str {
     ret obj
 }
 
-fn get_range_generator(mut it: &RangeIter): RangeIterGen {
-    match {
-    | real(it.expr.kind.slc()): ret &IndexRangeIterGen{it: it}
-    | real(it.expr.kind.arr()): ret &IndexRangeIterGen{it: it}
-    | real(it.expr.kind.map()): ret &MapRangeIterGen{it: it}
-    |:                          ret &IndexRangeIterGen{it: it} // Str
-    }
-}
-
 fn gen_range_iter(mut it: &RangeIter): str {
-    let generator = get_range_generator(it)
-    ret generator.gen()
+    match {
+    | real(it.expr.kind.slc()): ret gen_range_index_iter(it)
+    | real(it.expr.kind.arr()): ret gen_range_index_iter(it)
+    | real(it.expr.kind.map()): ret gen_range_hashmap_iter(it)
+    |:                          ret gen_range_index_iter(it) // Str
+    }
 }
 
 fn gen_cont(c: &ContSt): str {
