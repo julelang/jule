@@ -418,6 +418,12 @@ fn gen_match(mut m: &Match): str {
     if m.cases.len == 0 && !real(m.default) {
         ret ""
     }
+
+    let generic_type_match = m.is_generic_type_match()
+    if generic_type_match && (!real(m.default) || m.default.scope.stmts.len == 0) {
+        ret ""
+    }
+
     let mut obj = "{\n"
 
     add_indent()
@@ -425,7 +431,7 @@ fn gen_match(mut m: &Match): str {
     obj += indent()
 
     // Constant expressions generated as literals in conditions.
-    if !m.is_generic_type_match() && !m.expr.is_const() {
+    if !generic_type_match && !m.expr.is_const() {
         if m.expr.lvalue && is_opt_enabled(Opt.Copy) {
             obj += "auto &_match_expr{ "
         } else {
