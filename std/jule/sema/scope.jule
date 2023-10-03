@@ -19,6 +19,7 @@ use std::jule::ast::{
     TupleExpr,
     UnsafeExpr,
     AssignLeft,
+    MatchCase,
 }
 use std::jule::build::{LogMsg}
 use std::jule::constant::{Const}
@@ -1387,7 +1388,7 @@ impl ScopeChecker {
         ret _case
     }
 
-    fn check_cases(mut &self, mut m: &std::jule::ast::MatchCase, mut rm: &Match, mut expr: &Data) {
+    fn check_cases(mut &self, mut &m: &MatchCase, mut rm: &Match, mut expr: &Data) {
         rm.cases = make([]&Case, m.cases.len)
         for i in m.cases {
             let mut _case = &Case{
@@ -1418,16 +1419,43 @@ impl ScopeChecker {
         ret def
     }
 
-    fn push_type_match(mut &self, mut tm: &Match) {
+    fn check_comptime_panic(mut self, &s: &Scope, error_token: Token) {
+        if s.stmts.len != 1 {
+            ret
+        }
+
+        let stmt = s.stmts[0]
+        match type stmt {
+        | &Data:
+            let d = (&Data)(stmt)
+            match type d.model {
+            | &BuiltinPanicCallExprModel:
+                let m = (&BuiltinPanicCallExprModel)(d.model)
+                match type m.expr {
+                | &Const:
+                    let c = (&Const)(m.expr)
+                    if c.is_str() {
+                        self.s.push_err(error_token, LogMsg.ComptimePanic, c.read_str())
+                    }
+                }
+            }
+        }
+    }
+
+    fn push_type_match(mut &self, mut tm: &Match, &m: &MatchCase) {
         // Type kind is generic.
         // Match cases by kind.
         if tm.expr.kind.generic {
-            for (_, mut c) in tm.cases {
+            for (i, mut c) in tm.cases {
                 if real(c.scope) {
                     tm.cases = nil
                     tm.default = c
+                    self.check_comptime_panic(c.scope, m.cases[i].token)
                     goto push
                 }
+            }
+            if real(tm.default) {
+                self.check_comptime_panic(tm.default.scope, m.default.token)
             }
             tm.cases = nil
         }
@@ -1436,7 +1464,7 @@ impl ScopeChecker {
         self.scope.stmts = append(self.scope.stmts, tm)
     }
 
-    fn check_type_match(mut &self, mut m: &std::jule::ast::MatchCase) {
+    fn check_type_match(mut &self, mut &m: &MatchCase) {
         let mut d = self.s.eval(self).eval(m.expr)
         if !real(d) {
             ret
@@ -1458,10 +1486,10 @@ impl ScopeChecker {
         }
         self.check_cases(m, tm, d)
 
-        self.push_type_match(tm)
+        self.push_type_match(tm, m)
     }
 
-    fn check_common_match(mut &self, mut m: &std::jule::ast::MatchCase) {
+    fn check_common_match(mut &self, mut &m: &MatchCase) {
         let mut d = new(Data)
         if !real(m.expr) {
             d = &Data{
@@ -1488,7 +1516,7 @@ impl ScopeChecker {
         self.check_cases(m, mc, d)
     }
 
-    fn check_match(mut &self, mut m: &std::jule::ast::MatchCase) {
+    fn check_match(mut &self, mut m: &MatchCase) {
         if m.type_match {
             self.check_type_match(m)
             ret
@@ -1635,7 +1663,7 @@ impl ScopeChecker {
         | &LabelSt:                     self.check_label((&LabelSt)(node))
         | &std::jule::ast::GotoSt:      self.push_goto((&std::jule::ast::GotoSt)(node))
         | &AssignSt:                    self.check_assign_st((&AssignSt)(node))
-        | &std::jule::ast::MatchCase:   self.check_match((&std::jule::ast::MatchCase)(node))
+        | &MatchCase:                   self.check_match((&MatchCase)(node))
         | &std::jule::ast::FallSt:      self.check_fall((&std::jule::ast::FallSt)(node))
         | &std::jule::ast::BreakSt:     self.check_break((&std::jule::ast::BreakSt)(node))
         | &std::jule::ast::RetSt:       self.check_ret((&std::jule::ast::RetSt)(node))
