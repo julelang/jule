@@ -9,7 +9,7 @@ use obj
 use cxx for obj::cxx
 
 use std::env
-use std::fs::{FsError, OFlag, stat, write_file, create_dir, remove_file, remove_dir}
+use std::fs::{FsError, OFlag, File, Directory, Status}
 use std::fs::path::{join, dir}
 use integrated for std::jule::integrated
 use std::jule::lex::{is_decimal, is_ident_rune, is_letter, is_space}
@@ -259,15 +259,15 @@ fn parse_options(&args: []str): str {
 fn write_output(path: str, content: str) {
     let dir = dir(path)
 
-    let (_, mut err) = stat(dir)
+    let (_, mut err) = Status.of(dir)
     if err != FsError.Ok {
-        err = create_dir(dir)
+        err = Directory.create(dir)
         if err != FsError.Ok {
             exit_err("a problem occurs when code generation")
         }
     }
 
-    err = write_file(path, ([]byte)(content), 0660)
+    err = File.write(path, ([]byte)(content), 0660)
     if err != FsError.Ok {
         exit_err("a problem occurs when code generation")
     }
@@ -275,7 +275,7 @@ fn write_output(path: str, content: str) {
 
 // Remove generated objects for compilation.
 fn clear_objects() {
-    if remove_file(get_compile_path()) != FsError.Ok {
+    if File.remove(get_compile_path()) != FsError.Ok {
         outln("a problem occurs when object cleaning")
         ret
     }
@@ -283,7 +283,7 @@ fn clear_objects() {
     // All created objects are cleaned.
     // So, deletes directory if empty after cleaned all objects,
     // if not, leaves the directory.
-    _ = remove_dir(OUT_DIR)
+    _ = Directory.remove(OUT_DIR)
 }
 
 // Compie generated IR.
@@ -402,7 +402,7 @@ fn compile_command(&args: []str) {
     }
 
     // Check standard library.
-    let (inf, err) = stat(PATH_STDLIB)
+    let (inf, err) = Status.of(PATH_STDLIB)
     if err != FsError.Ok || !inf.is_dir() {
         exit_err(logf(LogMsg.StdlibNotExist))
     }

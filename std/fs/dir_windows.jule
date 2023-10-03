@@ -6,62 +6,64 @@ use path for std::fs::path
 use integrated for std::jule::integrated
 use sys for std::sys
 
-// Reads the named directory and returs all its directory entries can read.
-// Returns nil if no any directory entry or error occurs.
-//
-// Possible errors:
-//  Denied InvalidDescriptor PerProcessLimit SystemWideLimit
-//  NotExist InsufficientMemory NotDir
-pub fn read_dir(path: str): (dirents: []&DirEntry, err: FsError) {
-    let utf16_path = integrated::utf16_from_str(path)
-    let mut dir = unsafe { sys::_wopendir(&utf16_path[0]) }
-    if dir == nil {
-        err = get_last_fs_error()
+impl Directory {
+    // Reads the named directory and returs all its directory entries can read.
+    // Returns nil if no any directory entry or error occurs.
+    //
+    // Possible errors:
+    //  Denied InvalidDescriptor PerProcessLimit SystemWideLimit
+    //  NotExist InsufficientMemory NotDir
+    pub static fn read(path: str): (dirents: []&DirEntry, err: FsError) {
+        let utf16_path = integrated::utf16_from_str(path)
+        let mut dir = unsafe { sys::_wopendir(&utf16_path[0]) }
+        if dir == nil {
+            err = get_last_fs_error()
+            ret
+        }
+        for {
+            let dirent = unsafe { sys::_wreaddir(dir) }
+            if dirent == nil {
+                break
+            }
+            let name = unsafe { integrated::u16_ptr_to_str((*u16)(dirent.d_name)) }
+            let (mut stat, serr) = Status.of(path::join(path, name))
+            if serr != FsError.Ok {
+                err = serr
+                dirents = nil
+                break
+            }
+            dirents = append(dirents, &DirEntry{
+                name: name,
+                stat: stat,
+            })
+        }
+        _ = unsafe { sys::_wclosedir(dir) }
         ret
     }
-    for {
-        let dirent = unsafe { sys::_wreaddir(dir) }
-        if dirent == nil {
-            break
+
+    // Creates directory.
+    //
+    // Possible errors: Denied Exist ReadOnly NoSpace
+    pub static fn create(path: str): FsError {
+        // NOTICE
+        // Also can has EMLINK error-code.
+        // Make sure this situation should documented or not.
+
+        let utf16_path = integrated::utf16_from_str(path)
+        if (unsafe { std::sys::create_directory(&utf16_path[0]) }) {
+            ret FsError.Ok
         }
-        let name = unsafe { integrated::u16_ptr_to_str((*u16)(dirent.d_name)) }
-        let (mut stat, serr) = stat(path::join(path, name))
-        if serr != FsError.Ok {
-            err = serr
-            dirents = nil
-            break
+        ret get_last_fs_error()
+    }
+
+    // Removes empty directory.
+    //
+    // Possible errors: Denined NotExist NotEmpty SyncIO IO Loop NotDir
+    pub static fn remove(path: str): FsError {
+        let utf16_path = integrated::utf16_from_str(path)
+        if (unsafe { std::sys::remove_directory(&utf16_path[0]) }) {
+            ret FsError.Ok
         }
-        dirents = append(dirents, &DirEntry{
-            name: name,
-            stat: stat,
-        })
+        ret get_last_fs_error()
     }
-    _ = unsafe { sys::_wclosedir(dir) }
-    ret
-}
-
-// Creates directory.
-//
-// Possible errors: Denied Exist ReadOnly NoSpace
-pub fn create_dir(path: str): FsError {
-    // NOTICE
-    // Also can has EMLINK error-code.
-    // Make sure this situation should documented or not.
-
-    let utf16_path = integrated::utf16_from_str(path)
-    if (unsafe { std::sys::create_directory(&utf16_path[0]) }) {
-        ret FsError.Ok
-    }
-    ret get_last_fs_error()
-}
-
-// Removes empty directory.
-//
-// Possible errors: Denined NotExist NotEmpty SyncIO IO Loop NotDir
-pub fn remove_dir(path: str): FsError {
-    let utf16_path = integrated::utf16_from_str(path)
-    if (unsafe { std::sys::remove_directory(&utf16_path[0]) }) {
-        ret FsError.Ok
-    }
-    ret get_last_fs_error()
 }

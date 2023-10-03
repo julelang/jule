@@ -47,6 +47,68 @@ impl File {
             handle: handle,
         }
     }
+
+    // Creates or truncates the named file. If the file already exists,
+    // it is truncated. If the file does not exist, it is created with mode 0666
+    // (before umask). If successful, methods on the returned File can
+    // be used for I/O; the associated file descriptor has mode OFlag.Rdwr.
+    pub static fn create(path: str): (&File, FsError) {
+        let (mut f, err) = File.open(path, OFlag.Rdwr|OFlag.Create|OFlag.Trunc, 0666)
+        ret f, err
+    }
+
+    // Reads bytes of file.
+    // First, learns byte-size of file.
+    // Then reads bytes and returns buffer.
+    //
+    // Possible errors:
+    //  Denied Exist Signal SyncIO IO IsDir Loop PerProcessLimit LongPath
+    //  SystemWideLimit NotExist UnableStream NoSpace NotDir Device Overflow
+    //  ReadOnly Retry Busy Device Seek InsufficientMemory Buffer
+    pub static fn read(path: str): ([]byte, FsError) {
+        let (s, mut err) = Status.of(path)
+        if err != FsError.Ok {
+            ret nil, err
+        }
+
+        if !s.is_reg() {
+            ret nil, FsError.IsDir
+        }
+
+        if s.size == 0 {
+            ret make([]byte, 0), FsError.Ok
+        }
+
+        let (mut f, err) = File.open(path, OFlag.Rdonly, 0)
+        if err != FsError.Ok {
+            ret nil, err
+        }
+        defer { f.close() }
+
+        let mut buff = make([]byte, s.size)
+        let (n, err) = f.read(buff)
+        if err != FsError.Ok {
+            ret nil, err
+        }
+        ret buff[:n], FsError.Ok
+    }
+
+    // Writes data to the named file, creating it if necessary.
+    // If the file does not exist, creates it with permissions perm (before umask);
+    // otherwise truncates it before writing, without changing permissions.
+    // Since requires multiple system calls to complete, a failure mid-operation
+    // can leave the file in a partially written state.
+    pub static fn write(path: str, data: []byte, perm: int): FsError {
+        let (mut f, mut err) = File.open(path, OFlag.Wronly|OFlag.Create|OFlag.Trunc, perm)
+        if err != FsError.Ok {
+            ret err
+        }
+        _, err = f.write(data)
+        if err != FsError.Ok {
+            ret err
+        }
+        ret f.close()
+    }
 }
 
 impl File {
@@ -72,66 +134,4 @@ impl File {
         }
         ret FsError.Ok
     }
-}
-
-// Reads bytes of file.
-// First, learns byte-size of file.
-// Then reads bytes and returns buffer.
-//
-// Possible errors:
-//  Denied Exist Signal SyncIO IO IsDir Loop PerProcessLimit LongPath
-//  SystemWideLimit NotExist UnableStream NoSpace NotDir Device Overflow
-//  ReadOnly Retry Busy Device Seek InsufficientMemory Buffer
-pub fn read_file(path: str): ([]byte, FsError) {
-    let (s, mut err) = stat(path)
-    if err != FsError.Ok {
-        ret nil, err
-    }
-
-    if !s.is_reg() {
-        ret nil, FsError.IsDir
-    }
-
-    if s.size == 0 {
-        ret make([]byte, 0), FsError.Ok
-    }
-
-    let (mut f, err) = open_file(path, OFlag.Rdonly, 0)
-    if err != FsError.Ok {
-        ret nil, err
-    }
-    defer { f.close() }
-
-    let mut buff = make([]byte, s.size)
-    let (n, err) = f.read(buff)
-    if err != FsError.Ok {
-        ret nil, err
-    }
-    ret buff[:n], FsError.Ok
-}
-
-// Writes data to the named file, creating it if necessary.
-// If the file does not exist, creates it with permissions perm (before umask);
-// otherwise truncates it before writing, without changing permissions.
-// Since requires multiple system calls to complete, a failure mid-operation
-// can leave the file in a partially written state.
-pub fn write_file(path: str, data: []byte, perm: int): FsError {
-    let (mut f, mut err) = open_file(path, OFlag.Wronly|OFlag.Create|OFlag.Trunc, perm)
-    if err != FsError.Ok {
-        ret err
-    }
-    _, err = f.write(data)
-    if err != FsError.Ok {
-        ret err
-    }
-    ret f.close()
-}
-
-// Creates or truncates the named file. If the file already exists,
-// it is truncated. If the file does not exist, it is created with mode 0666
-// (before umask). If successful, methods on the returned File can
-// be used for I/O; the associated file descriptor has mode OFlag.Rdwr.
-pub fn create_file(path: str): (&File, FsError) {
-    let (mut f, err) = open_file(path, OFlag.Rdwr|OFlag.Create|OFlag.Trunc, 0666)
-    ret f, err
 }

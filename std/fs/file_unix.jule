@@ -5,6 +5,38 @@
 use sys for std::sys
 
 impl File {
+    // Opens file stream with named file, specified flag
+    // (OFlag.Rdwr, OFlag.Trunc etc.) and perm. If named file does
+    // not exist and OFlag.Creat flag is passed, will created with
+    // mode (before umask). If successful, returns File reference with handle
+    // to file stream and the reference can used for I/O operations.
+    // Returns nil reference if error occurs.
+    //
+    // Possible errors:
+    //  Denied Exist Signal SyncIO IO IsDir Loop PerProcessLimit LongPath
+    //  SystemWideLimit NotExist UnableStream NoSpace NotDir Device Overflow
+    //  ReadOnly Retry Busy
+    pub static fn open(path: str, flag: OFlag, mode: int): (&File, FsError) {
+        let handle = unsafe { sys::open(&path[0], int(flag), mode) }
+        if handle == -1 {
+            ret File.new(0), get_last_fs_error()
+        }
+        ret File.new(uintptr(handle)), FsError.Ok
+    }
+
+    // Removes named file.
+    //
+    // Possible errors:
+    //  Denined Busy LongPath NotExist InsufficientMemory NotDir
+    pub static fn remove(path: str): FsError {
+        if (unsafe { sys::unlink(&path[0]) } == 0) {
+            ret FsError.Ok
+        }
+        ret get_last_fs_error()
+    }
+}
+
+impl File {
     // Writes bytes to handle and returns writed byte count.
     // The number of bytes written can never exceed the length of the buff.
     // Returns 0 if error occurs.
@@ -45,34 +77,4 @@ impl File {
         }
         ret n, FsError.Ok
     }
-}
-
-// Opens file stream with named file, specified flag
-// (OFlag.Rdwr, OFlag.Trunc etc.) and perm. If named file does
-// not exist and OFlag.Creat flag is passed, will created with
-// mode (before umask). If successful, returns File reference with handle
-// to file stream and the reference can used for I/O operations.
-// Returns nil reference if error occurs.
-//
-// Possible errors:
-//  Denied Exist Signal SyncIO IO IsDir Loop PerProcessLimit LongPath
-//  SystemWideLimit NotExist UnableStream NoSpace NotDir Device Overflow
-//  ReadOnly Retry Busy
-pub fn open_file(path: str, flag: OFlag, mode: int): (&File, FsError) {
-    let handle = unsafe { sys::open(&path[0], int(flag), mode) }
-    if handle == -1 {
-        ret File.new(0), get_last_fs_error()
-    }
-    ret File.new(uintptr(handle)), FsError.Ok
-}
-
-// Removes named file.
-//
-// Possible errors:
-//  Denined Busy LongPath NotExist InsufficientMemory NotDir
-pub fn remove_file(path: str): FsError {
-    if (unsafe { sys::unlink(&path[0]) } == 0) {
-        ret FsError.Ok
-    }
-    ret get_last_fs_error()
 }
