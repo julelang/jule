@@ -2333,13 +2333,18 @@ impl Eval {
     }
 
     fn eval_map_sub_ident(mut self, mut d: &Data, ident: Token): &Data {
+        let mut map_kind = d.kind.map()
+        if !real(map_kind) {
+            map_kind = d.kind.ref().elem.map()
+        }
+
         match ident.kind {
         | "len":
             ret &Data{
                 mutable: false,
                 kind:    &TypeKind{kind: build_prim_type(types::SYS_INT)},
                 model: &CommonSubIdentExprModel{
-                    expr_kind: d.kind,
+                    expr_kind: &TypeKind{kind: map_kind},
                     expr:      d.model,
                     ident:     "len()",
                 },
@@ -2354,14 +2359,13 @@ impl Eval {
                     },
                 },
                 model: &CommonSubIdentExprModel{
-                    expr_kind: d.kind,
+                    expr_kind: &TypeKind{kind: map_kind},
                     expr:      d.model,
                     ident:     "clear",
                 },
             }
 
         | "keys":
-            let mut m = d.kind.map()
             ret &Data{
                 mutable: d.mutable,
                 kind: &TypeKind{
@@ -2369,20 +2373,19 @@ impl Eval {
                         caller: builtin_caller_common_mut,
                         result: &TypeKind{
                             kind: &Slc{
-                                elem: m.key,
+                                elem: map_kind.key,
                             },
                         },
                     },
                 },
                 model: &CommonSubIdentExprModel{
-                    expr_kind: d.kind,
+                    expr_kind: &TypeKind{kind: map_kind},
                     expr:      d.model,
                     ident:     "keys",
                 },
             }
 
         | "values":
-            let mut m = d.kind.map()
             ret &Data{
                 mutable: d.mutable,
                 kind: &TypeKind{
@@ -2390,20 +2393,19 @@ impl Eval {
                         caller: builtin_caller_common_mut,
                         result: &TypeKind{
                             kind: &Slc{
-                                elem: m.val,
+                                elem: map_kind.val,
                             },
                         },
                     },
                 },
                 model: &CommonSubIdentExprModel{
-                    expr_kind: d.kind,
+                    expr_kind: &TypeKind{kind: map_kind},
                     expr:      d.model,
                     ident:     "values",
                 },
             }
 
         | "has":
-            let mut m = d.kind.map()
             ret &Data{
                 mutable: d.mutable,
                 kind: &TypeKind{
@@ -2414,21 +2416,20 @@ impl Eval {
                                 decl: &Param{
                                     ident: "key",
                                 },
-                                kind: m.key,
+                                kind: map_kind.key,
                             },
                         ],
                         result: &TypeKind{kind: build_prim_type(str(PrimKind.Bool))},
                     },
                 },
                 model: &CommonSubIdentExprModel{
-                    expr_kind: d.kind,
+                    expr_kind: &TypeKind{kind: map_kind},
                     expr:      d.model,
                     ident:     "has",
                 },
             }
 
         | "del":
-            let mut m = d.kind.map()
             ret &Data{
                 mutable: d.mutable,
                 kind: &TypeKind{
@@ -2439,13 +2440,13 @@ impl Eval {
                                 decl: &Param{
                                     ident: "key",
                                 },
-                                kind: m.key,
+                                kind: map_kind.key,
                             },
                         ],
                     },
                 },
                 model: &CommonSubIdentExprModel{
-                    expr_kind: d.kind,
+                    expr_kind: &TypeKind{kind: map_kind},
                     expr:      d.model,
                     ident:     "del",
                 },
