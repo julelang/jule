@@ -722,10 +722,19 @@ impl ScopeChecker {
             ret new(If)
         }
 
-        let prim = d.kind.prim()
+        let mut prim = d.kind.prim()
         if !real(prim) {
-            self.s.push_err(i.expr.token, LogMsg.IfRequireBoolExpr)
-            ret new(If)
+            let mut ref = d.kind.ref()
+            if !real(ref) {
+                self.s.push_err(i.expr.token, LogMsg.IfRequireBoolExpr)
+                ret new(If)
+            }
+
+            prim = ref.elem.prim()
+            if !real(prim) {
+                self.s.push_err(i.expr.token, LogMsg.IfRequireBoolExpr)
+                ret new(If)
+            }
         }
 
         if !prim.is_bool() {
