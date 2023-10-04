@@ -196,7 +196,7 @@ namespace jule {
         }
 
         inline jule::Bool operator==(const T &val) const
-        { return this->__alloc == nullptr ? false : *this->alloc == val; }
+        { return this->alloc == nullptr ? false : *this->alloc == val; }
 
         inline jule::Bool operator!=(const T &val) const
         { return !this->operator==(val); }
