@@ -11,7 +11,7 @@ else
 fi
 
 if [ $? -eq 0 ]; then
-  echo "Compile is successful!"
+  echo "Compilation successful!"
 else
   echo "-----------------------------------------------------------------------"
   echo "An unexpected error occurred while compiling JuleC. Check errors above."
