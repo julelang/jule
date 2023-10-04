@@ -14,7 +14,7 @@ if exist .\main.jule (
 )
 
 if exist ..\..\bin\julec_dev.exe (
-  echo Compile is successful!
+  echo Compilation successful!
 ) else (
   echo -----------------------------------------------------------------------
   echo An unexpected error occurred while compiling JuleC. Check errors above.
