@@ -1,0 +1,308 @@
+// Copyright 2023 The Jule Programming Language.
+// Use of this source code is governed by a BSD 3-Clause
+// license that can be found in the LICENSE file.
+
+use conv for std::conv
+
+const BIT64 = 0b1000000
+
+// Common behaviors of flags.
+pub trait CommonFlag {
+    // Returns name of flag.
+    pub fn name(self): str
+
+    // Returns short name of flag.
+    pub fn short(self): rune
+
+    // Returns description of flag.
+    pub fn what(self): str
+
+    // Resets data to default.
+    pub fn reset(mut self)
+}
+
+struct Flag[T] {
+    _name:    str
+    _short:   rune
+    _default: T
+    _what:    str
+    _data:    &T
+}
+
+impl CommonFlag for Flag {
+    pub fn name(self): str { ret self._name }
+    pub fn what(self): str { ret self._what }
+    pub fn reset(mut self) { self._data = self._default }
+    pub fn short(self): rune { ret self._short }
+}
+
+// Flag for int type.
+type IntFlag: &Flag[int]
+// Flag for uint type.
+type UintFlag: &Flag[uint]
+// Flag for f64 type.
+type FloatFlag: &Flag[f64]
+// Flag for bool type.
+type BoolFlag: &Flag[bool]
+// Flag for str type
+type StrFlag: &Flag[str]
+
+// Flag parser for command-line arguments.
+pub struct FlagSet {
+    _flags:  []CommonFlag
+    _errors: []str
+}
+
+impl FlagSet {
+    // Returns new flagset.
+    pub static fn new(): &FlagSet {
+        ret &FlagSet{
+            _flags: make([]CommonFlag, 0, 20),
+        }
+    }
+}
+
+impl FlagSet {
+    // Returns flag by name, returns nil if not exist.
+    pub fn find_flag(mut self, name: str): CommonFlag {
+        for (_, mut flag) in self._flags {
+            if flag.name() == name {
+                ret flag
+            }
+        }
+        ret nil
+    }
+
+    // Returns flag by short name, returns nil if not exist.
+    pub fn find_flag_short(mut self, name: rune): CommonFlag {
+        for (_, mut flag) in self._flags {
+            if flag.short() == name {
+                ret flag
+            }
+        }
+        ret nil
+    }
+
+    // Returns all flags.
+    pub fn flags(mut self): []CommonFlag {
+        ret self._flags
+    }
+
+    // Parse arguments and process flags.
+    // Returns error text if any error occurs.
+    // Returns non-flag content.
+    //
+    // Sytnax:
+    //   Long names can be used with double dash (--). Short names can be
+    //   used with a single dash (-). When Boolean flags are used, they use
+    //   the opposite of their default values. Floating-point values are the
+    //   same as the `parse_float` function provided by std::conv package.
+    //   Decimal, octal, binary and hexadecimal formats are supported for
+    //   signed and unsigned integer types. String types accept values ​​directly.
+    //
+    //   Octal values are represented by starts with 0o or 0 prefix.
+    //   Hexadecimal values are represented by starts with 0x prefix.
+    //   Binary values are represented by starts with 0b prefix.
+    pub fn parse(mut self, args: []str): (content: []str, error: str) {
+        let mut ap = ArgParser{
+            set:  self,
+            args: unsafe { *(&args) },
+        }
+        ap.parse()
+        ret ap.content, ap.error
+    }
+
+    // Resets all flags to default value.
+    pub fn reset(mut self) {
+        for _, f in self._flags {
+            f.reset()
+        }
+    }
+
+    pub fn add_flag_common[T](mut self, name: str, short: rune, what: str): &Flag[T] {
+        match type T {
+        | int | uint | f64 | bool | str:
+            // Ok
+
+        |:
+            panic("std::flag: FlagSet.add[T]: unsupported typed for flag")
+        }
+
+        if self.find_flag(name) != nil {
+            panic("std::flag: FlagSet.add[T]: flag is already exist in this name: " + name)
+        }
+
+        if self.find_flag_short(short) != nil {
+            panic("std::flag: FlagSet.add[T]: flag is already exist in this short name: " + str(short))
+        }
+
+        let mut flag = &Flag[T]{
+            _name:    name,
+            _short:   short,
+            _what:    what,
+        }
+        self._flags = append(self._flags, flag)
+        ret flag
+    }
+
+    // Adds new flag and returns allocated reference variable.
+    // Panics if name or short name is alreadys exist.
+    // Panics if used unsupported type.
+    //
+    // Supported types are:
+    //  - int
+    //  - uint
+    //  - f64
+    //  - str
+    //  - bool
+    pub fn add[T](mut self, name: str, short: rune, default: T, what: str): &T {
+        let mut flag = self.add_flag_common[T](name, short, default, what)
+        flag._data = new(T, default)
+        ret flag._data
+    }
+
+    // Same with add method but do not allocates new reference, uses existing.
+    pub fn add_var[T](mut self, mut &var: &T, name: str, short: rune, what: str) {
+        let mut flag = self.add_flag_common[T](name, short, what)
+        flag._default = var
+        flag._data = var
+    }
+}
+
+struct ArgParser {
+    set:     FlagSet
+    args:    []str
+    error:   str
+    content: []str
+    i:       int
+}
+
+impl ArgParser {
+    fn parse_integer[T](self, &s: str, parser: fn(s: str, base: int): (T, bool)): (x: T, ok: bool) {
+        match {
+        | s == "":
+            ret 0, false
+
+        | s.has_prefix("0x"): // Hexadecimal
+            x, ok = parser(s[2:], 0b00010000)
+
+        | s.has_prefix("0b"): // Binary
+            x, ok = parser(s[2:], 0b10)
+
+        | s.has_prefix("0o"): // Octal
+            x, ok = parser(s[2:], 0b1000)
+
+        | s[0] == '0': // Octal
+            x, ok = parser(s[1:], 0b1000)
+
+        |: // Decimal
+            x, ok = parser(s, 0b1010)
+        }
+        ret
+    }
+
+    fn get_data(mut self): str {
+        if self.i+1 >= self.args.len {
+            ret ""
+        }
+        self.i++
+        ret self.args[self.i]
+    }
+
+    fn process_flag(mut self, mut &flag: CommonFlag) {
+        match type flag {
+        | BoolFlag:
+            let mut bf = BoolFlag(flag)
+            bf._data = !bf._default
+            ret
+        }
+
+        let data = self.get_data()
+        if data == "" {
+            self.error = "--" + flag.name() + ": expression missing"
+            ret
+        }
+
+        match type flag {
+        | IntFlag:
+            let mut intf = IntFlag(flag)
+            let ((intf._data), ok) = self.parse_integer[int](data, fn(s: str, base: int): (int, bool) {
+                let (x, err) = conv::parse_int(s, base, BIT64)
+                ret x, err == conv::ConvError.Ok
+            })
+            if !ok {
+                self.error = "--" + flag.name() + ": expression must be valid signed integer"
+            }
+
+        | UintFlag:
+            let mut uintf = UintFlag(flag)
+            let ((uintf._data), ok) = self.parse_integer[uint](data, fn(s: str, base: int): (uint, bool) {
+                let (x, err) = conv::parse_uint(s, base, BIT64)
+                ret x, err == conv::ConvError.Ok
+            })
+            if !ok {
+                self.error = "--" + flag.name() + ": expression must be valid unsigned integer"
+            }
+
+        | FloatFlag:
+            let mut ff = FloatFlag(flag)
+            let ((ff._data), err) = conv::parse_float(data, BIT64)
+            if err != conv::ConvError.Ok {
+                self.error = "--" + flag.name() + ": expression must be valid floating-point"
+            }
+
+        | StrFlag:
+            StrFlag(flag)._data = data
+        }
+    }
+
+    fn single_dash(mut self, &arg: str) {
+        let rarg = ([]rune(arg))[1:] // Start at 1 to skip dash.
+        for _, r in rarg {
+            let mut flag = self.set.find_flag_short(r)
+            if flag == nil {
+                self.error = arg + ": flag is not exist: " + str(r)
+                ret
+            }
+
+            self.process_flag(flag)
+        }
+    }
+
+    fn double_dash(mut self, &arg: str) {
+        let mut flag = self.set.find_flag(arg[2:]) // Start at 2 to skip dashes.
+        if flag == nil {
+            self.error = arg + ": flag is not exist"
+            ret
+        }
+
+        self.process_flag(flag)
+    }
+
+    fn try_arg(mut self) {
+        let arg = self.args[self.i]
+        if self.args.len == 0 {
+            ret
+        }
+
+        if arg[0] == '-' {
+            if self.args.len > 1 && arg[1] == '-' {
+                self.double_dash(arg)
+                ret
+            }
+            self.single_dash(arg)
+            ret
+        }
+
+        self.content = append(self.content, arg)
+    }
+
+    fn parse(mut self) {
+        for self.i < self.args.len; self.i++ {
+            self.try_arg()
+            if self.error.len != 0 {
+                break
+            }
+        }
+    }
+}
