@@ -3,12 +3,13 @@
 // license that can be found in the LICENSE file.
 
 use deadcode
-use env::{self, Opt, OptLevel, OPTIMIZATIONS, push_opt_level, is_opt_enabled}
+use env::{self, Opt, OptLevel, push_opt_level}
 use importer
 use obj
 use cxx for obj::cxx
 
 use std::env
+use std::flag::{FlagSet}
 use std::fs::{FsError, OFlag, File, Directory, Status}
 use std::fs::path::{join, dir}
 use integrated for std::jule::integrated
@@ -35,225 +36,26 @@ use std::jule::build::{
 
 cpp unsafe fn system(cmd: *integrated::Char): int
 
-// Officially supported backend-compilers.
-enum Compiler: str {
-    NA = "",
-    GCC = "gcc",
-    Clang = "clang",
-}
-
-// Paths of officially supported backend-compilers.
-enum CompilerPath: str {
-    NA = "",
-    GCC = "g++",
-    Clang = "clang++",
-}
-
-// Compiler mode.
-enum Mode {
-    Compile,
-    Transpile,
-}
+static mut flagset: &FlagSet = FlagSet.new()
 
 // Sets by COMPILER or command-line inputs.
-static mut COMPILER: Compiler = Compiler.NA
-static mut COMPILER_PATH: CompilerPath = CompilerPath.NA
+static mut COMPILER: &str = new(str, "")
+static mut COMPILER_PATH: &str = new(str, "")
 
 static mut OUT_DIR: str = "dist"
-static mut MODE: Mode = Mode.Compile
 static mut OUT_NAME: str = "ir.cpp"
-static mut OUT: str = ""
+static mut OUT: &str = new(str, "")
 static mut CPP_STD: str = "c++17" // Default C++ standard
 
 static mut SEMA_FLAGS: SemaFlag = SemaFlag.Default
 
+static mut SHADOWING: &bool = new(bool, false)
+static mut TRANSPILATION: &bool = new(bool, false)
+static mut OPT: &str = new(str, "L0")
+static mut TARGET: &str = new(str, "native-native")
+
 fn system(cmd: str): int {
     ret unsafe { cpp.system((*integrated::Char)(&cmd[0])) }
-}
-
-fn get_option(&args: []str, mut &i: int): (arg: str, content: str) {
-    for i < args.len; i++ {
-        arg = args[i]
-        let mut j = 0
-        let mut runes = ([]rune)(arg)
-        let mut r = runes[j]
-        if r != '-' {
-            content += arg
-            arg = "" // Forget argument
-            continue
-        }
-        j++
-        if j >= runes.len {
-            exit_err("undefined syntax: " + arg)
-        }
-        r = runes[j]
-        if r == '-' {
-            j++
-            if j >= runes.len {
-                exit_err("undefined syntax: " + arg)
-            }
-            r = runes[j]
-        }
-        if !is_ident_rune(str(r)) {
-            exit_err("undefined syntax: " + arg)
-        }
-        j++
-        for j < runes.len; j++ {
-            r = runes[j]
-            if (
-                !is_space(r) &&
-                !is_letter(r) &&
-                !is_decimal(byte(r)) &&
-                r != '_' &&
-                r != '-'
-            ) {
-                exit_err("undefined syntax: " + str(runes[j:]))
-            }
-        }
-        break
-    }
-    ret
-}
-
-fn get_option_value(&args: []str, mut &i: int): str {
-    i++ // Argument value is the next argument
-    if i < args.len {
-        let arg = args[i]
-        ret arg
-    }
-    ret ""
-}
-
-fn parse_out_option(&args: []str, mut &i: int) {
-    let value = get_option_value(args, i)
-    if value == "" {
-        exit_err("missing option value: -o --out")
-    }
-    OUT = value
-}
-
-fn parse_opt_option(&args: []str, mut &i: int) {
-    let value = get_option_value(args, i)
-    if value == "" {
-        exit_err("missing option value: --opt")
-    }
-
-    match value {
-    | "L0": push_opt_level(OptLevel.L0)
-    | "L1": push_opt_level(OptLevel.L1)
-    |:      exit_err("invalid optimization level: " + value)
-    }
-}
-
-fn check_target_arch(arch: str) {
-    for _, distarch in DISTARCH {
-        if arch == str(distarch) {
-            ret
-        }
-    }
-
-    exit_err("unsupported/undefined architecture: " + arch)
-}
-
-fn check_target_os(os: str) {
-    for _, distos in DISTOS {
-        if os == str(distos) {
-            ret
-        }
-    }
-
-    exit_err("unsupported/undefined operating system: " + os)
-}
-
-fn parse_target_option(&args: []str, mut &i: int) {
-    let value = get_option_value(args, i)
-    if value == "" {
-        exit_err("missing option value: --target")
-    }
-
-    let parts = value.split("-", -1)
-    if parts.len != 2 {
-        exit_err("undefined platform target format: " + value)
-    }
-
-    let (os, arch) = parts[0], parts[1]
-
-    if os != "native" {
-        check_target_os(os)
-        env::OS = os
-    }
-
-    if arch != "native" {
-        check_target_arch(arch)
-        env::ARCH = arch
-    }
-}
-
-fn parse_compiler_option(&args: []str, mut &i: int) {
-    let value = get_option_value(args, i)
-    match value {
-    | "":
-        exit_err("missing option value: --compiler")
-
-    | str(Compiler.Clang):
-        COMPILER = Compiler.Clang
-        COMPILER_PATH = CompilerPath.Clang
-
-    | str(Compiler.GCC):
-        COMPILER = Compiler.GCC
-        COMPILER_PATH = CompilerPath.GCC
-
-    |:
-        exit_err("invalid option value for --compiler: " + value)
-    }
-}
-
-fn parse_options(&args: []str): str {
-    let mut cmd = ""
-
-    // Start at 1 because the index 0 is a path,
-    // not an command-line argument
-    let mut i = 1
-    for i < args.len; i++ {
-        let (arg, content) = get_option(args, i)
-        cmd += content
-        match arg {
-        | "":
-
-        | "-o" | "--out":
-            parse_out_option(args, i)
-
-        | "-t" | "--transpile":
-            MODE = Mode.Transpile
-
-        | "-c" | "--compile":
-            MODE = Mode.Compile
-
-        | "--compiler":
-            parse_compiler_option(args, i)
-
-        | "--opt":
-            parse_opt_option(args, i)
-
-        | "--target":
-            parse_target_option(args, i)
-
-        | "--shadowing":
-            SEMA_FLAGS |= SemaFlag.Shadowing
-
-        | str(Opt.Copy):     OPTIMIZATIONS = append(OPTIMIZATIONS, Opt.Copy)
-        | str(Opt.DeadCode): OPTIMIZATIONS = append(OPTIMIZATIONS, Opt.DeadCode)
-        | str(Opt.Append):   OPTIMIZATIONS = append(OPTIMIZATIONS, Opt.Append)
-        | str(Opt.Math):     OPTIMIZATIONS = append(OPTIMIZATIONS, Opt.Math)
-        | str(Opt.Access):   OPTIMIZATIONS = append(OPTIMIZATIONS, Opt.Access)
-        | str(Opt.Inline):   OPTIMIZATIONS = append(OPTIMIZATIONS, Opt.Inline)
-
-        |:
-            exit_err("undefined option: " + arg)
-        }
-    }
-    cmd = cmd.trim(" \t\r\n\v")
-    ret cmd
 }
 
 fn write_output(path: str, content: str) {
@@ -302,32 +104,9 @@ fn compile_ir(compiler: str, compiler_cmd: str) {
 fn do_spell(obj: str, compiler: str, compiler_cmd: str) {
     let path = get_compile_path()
     write_output(path, obj)
-    match MODE {
-    | Mode.Compile:
+    if !TRANSPILATION {
         compile_ir(compiler, compiler_cmd)
     }
-}
-
-fn check_mode() {
-    if MODE != Mode.Transpile && MODE != Mode.Compile {
-        outln(logf(LogMsg.InvalidValueForKey, MODE, "mode"))
-        exit_err("")
-    }
-}
-
-fn check_compiler() {
-    if COMPILER != Compiler.GCC && COMPILER != Compiler.Clang {
-        outln(logf(LogMsg.InvalidValueForKey, COMPILER, "compiler"))
-        exit_err("")
-    }
-}
-
-fn set() {
-    check_mode()
-    check_compiler()
-
-    // Initialize flags for directive eval.
-    importer::init_flags()
 }
 
 fn is_cpp_source_file(path: str): bool {
@@ -340,7 +119,7 @@ fn is_cpp_source_file(path: str): bool {
 
 // Generate compile command for backend-compiler.
 fn gen_compile_cmd(source_path: str, &ir: &obj::IR): (str, str) {
-    let compiler = str(COMPILER_PATH)
+    let compiler: str = COMPILER_PATH
 
     const ZERO_LEVEL_OPTIMIZATION = "-O0"
     const DISABLE_ALL_WARNINGS_CLANG = "-Wno-everything"
@@ -350,10 +129,10 @@ fn gen_compile_cmd(source_path: str, &ir: &obj::IR): (str, str) {
     let mut cmd = ZERO_LEVEL_OPTIMIZATION + " "
 
     match COMPILER {
-    | Compiler.GCC:
+    | "gcc":
         cmd += DISABLE_ALL_WARNINGS_GCC + " "
 
-    | Compiler.Clang:
+    | "clang":
         cmd += DISABLE_ALL_WARNINGS_CLANG + " "
     }
     cmd += SET_STD + " "
@@ -389,17 +168,103 @@ fn get_compile_path(): str {
 }
 
 fn apply_target_independent_optimizations(mut &ir: &obj::IR) {
-    if is_opt_enabled(Opt.DeadCode) {
+    if env::OPT_DEADCODE {
         deadcode::eliminate(ir)
     }
 }
 
+fn check_compiler_flag() {
+    match COMPILER {
+    | "":
+        exit_err("missing option value: --compiler")
+
+    | "clang":
+        COMPILER_PATH = "clang++"
+
+    | "gcc":
+        COMPILER_PATH = "g++"
+
+    |:
+        exit_err("invalid option value for --compiler: " + COMPILER)
+    }
+}
+
+fn check_target_arch(arch: str) {
+    for _, distarch in DISTARCH {
+        if arch == str(distarch) {
+            ret
+        }
+    }
+
+    exit_err("--target: unsupported/undefined architecture: " + arch)
+}
+
+fn check_target_os(os: str) {
+    for _, distos in DISTOS {
+        if os == str(distos) {
+            ret
+        }
+    }
+
+    exit_err("--target: unsupported/undefined operating system: " + os)
+}
+
+fn check_target_flag() {
+    if TARGET == "" {
+        exit_err("missing option value: --target")
+    }
+
+    let parts = TARGET.split("-", -1)
+    if parts.len != 2 {
+        exit_err("--target: undefined platform target format: " + TARGET)
+    }
+
+    let (os, arch) = parts[0], parts[1]
+
+    if os != "native" {
+        check_target_os(os)
+        env::OS = os
+    }
+
+    if arch != "native" {
+        check_target_arch(arch)
+        env::ARCH = arch
+    }
+}
+
+fn check_opt_flag() {
+    if OPT == "" {
+        exit_err("missing option value: --opt")
+    }
+
+    match OPT {
+    | "L0": // Nothing.
+    | "L1": push_opt_level(OptLevel.L1)
+    |:      exit_err("--opt: invalid optimization level: " + OPT)
+    }
+}
+
+fn check_flags() {
+    check_compiler_flag()
+    check_target_flag()
+    check_opt_flag()
+}
+
 // Process compile command by "ARGS" global.
 fn compile_command(&args: []str) {
-    let path = parse_options(args)
-    if path == "" {
-        exit_err(logf(LogMsg.MissingCompilePath))
+    let (content, error) = flagset.parse(args[1:])
+    if error != "" {
+        exit_err(error)
     }
+
+    check_flags()
+
+    if content.len == 0 {
+        exit_err(logf(LogMsg.MissingCompilePath))
+    } else if content.len > 1 {
+        exit_err("undefined content: " + content[1])
+    }
+    let path = content[0]
 
     // Check standard library.
     let (inf, err) = Status.of(PATH_STDLIB)
@@ -407,7 +272,8 @@ fn compile_command(&args: []str) {
         exit_err(logf(LogMsg.StdlibNotExist))
     }
 
-    set()
+    // Initialize flags for directive eval.
+    importer::init_flags()
 
     let (mut ir, logs) = obj::IR.build(path, SEMA_FLAGS)
 

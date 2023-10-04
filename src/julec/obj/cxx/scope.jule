@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD 3-Clause
 // license that can be found in the LICENSE file.
 
-use env::{Opt, is_opt_enabled}
+use env
 
 use std::jule::constant::{Const}
 use std::jule::lex::{TokenKind, is_ignore_ident, is_anon_ident}
@@ -48,7 +48,7 @@ fn gen_range_index_iter(mut &it: &RangeIter): str {
     add_indent()
     obj += indent()
     obj += "auto "
-    if is_opt_enabled(Opt.Copy) && it.expr.lvalue && !it.expr.mutable {
+    if env::OPT_COPY && it.expr.lvalue && !it.expr.mutable {
         obj += "&"
     }
     obj += "expr = "
@@ -69,7 +69,7 @@ fn gen_range_index_iter(mut &it: &RangeIter): str {
     add_indent()
     obj += indent()
     if real(it.key_b) {
-        if is_opt_enabled(Opt.Copy) {
+        if env::OPT_COPY {
             it.key_b.reference = iter_expr_is_copy_optimizable(it.expr, it.key_b)
         }
         obj += gen_var_init_expr(it.key_b, "*it")
@@ -118,7 +118,7 @@ fn gen_range_hashmap_iter(mut &it: &RangeIter): str {
     add_indent()
     obj += indent()
     obj += "auto "
-    if is_opt_enabled(Opt.Copy) && it.expr.lvalue && !it.expr.mutable {
+    if env::OPT_COPY && it.expr.lvalue && !it.expr.mutable {
         obj += "&"
     }
     obj += "expr = "
@@ -134,7 +134,7 @@ fn gen_range_hashmap_iter(mut &it: &RangeIter): str {
     add_indent()
     obj += indent()
     if real(it.key_a) {
-        if is_opt_enabled(Opt.Copy) {
+        if env::OPT_COPY {
             it.key_a.reference = iter_expr_is_copy_optimizable(it.expr, it.key_a)
         }
         obj += gen_var_init_expr(it.key_a, "it->first")
@@ -142,7 +142,7 @@ fn gen_range_hashmap_iter(mut &it: &RangeIter): str {
         obj += indent()
     }
     if real(it.key_b) {
-        if is_opt_enabled(Opt.Copy) {
+        if env::OPT_COPY {
             it.key_b.reference = iter_expr_is_copy_optimizable(it.expr, it.key_b)
         }
         obj += gen_var_init_expr(it.key_b, "it->second")
@@ -314,7 +314,7 @@ fn gen_assign(mut a: &Assign): str {
 
     let mut obj = gen_expr(a.l)
     obj += a.op
-    if is_opt_enabled(Opt.Append) {
+    if env::OPT_APPEND {
         match type a.r {
         | &BuiltinAppendCallExprModel:
             let mut model = (&BuiltinAppendCallExprModel)(a.r)
@@ -432,7 +432,7 @@ fn gen_match(mut m: &Match): str {
 
     // Constant expressions generated as literals in conditions.
     if !generic_type_match && !m.expr.is_const() {
-        if m.expr.lvalue && is_opt_enabled(Opt.Copy) {
+        if m.expr.lvalue && env::OPT_COPY {
             obj += "auto &_match_expr{ "
         } else {
             obj += "auto _match_expr{ "
