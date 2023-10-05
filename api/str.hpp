@@ -36,7 +36,7 @@ namespace jule {
         Str(void) = default;
         Str(const jule::Str &src) = default;
         Str(const std::initializer_list<jule::U8> &src): buffer(src) {}
-        Str(const jule::I32 &rune): buffer(Str(jule::utf8_rune_to_bytes(rune))) {}
+        Str(const jule::I32 &rune): Str(jule::utf8_rune_to_bytes(rune)) {}
         Str(const std::basic_string<jule::U8> &src): buffer(src) {}
         Str(const char *src, const jule::Int &len): buffer(src, src+len) {}
         Str(const jule::U8 *src, const jule::Int &len): buffer(src, src+len) {}
