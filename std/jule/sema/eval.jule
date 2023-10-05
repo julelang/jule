@@ -1263,10 +1263,23 @@ impl Eval {
         }
     }
 
-    fn indexing_slc(mut self, mut d: &Data,mut index: &Data, i: &IndexingExpr) {
+    fn indexing_slc(mut self, mut d: &Data, mut index: &Data, i: &IndexingExpr) {
         let mut slc = d.kind.slc()
         d.kind = slc.elem.clone()
         self.check_integer_indexing_by_data(index, i.token)
+
+        // Check compile-time bounds.
+        if !index.is_const() {
+            ret
+        }
+        match type d.model {
+        | &SliceExprModel:
+            let m = (&SliceExprModel)(d.model)
+            let indx = index.constant.as_f64()
+            if indx >= f64(m.elems.len) {
+                self.push_err(i.token, LogMsg.OverflowLimits)
+            }
+        }
     }
 
     fn indexing_map(mut self, mut d: &Data, mut index: &Data, mut i: &IndexingExpr) {
