@@ -24,38 +24,39 @@ namespace jule {
     template<typename Item, const jule::Uint N>
     struct Array {
     public:
-        mutable std::array<Item, N> buffer{};
+        mutable Item buffer[N]{};
 
         Array<Item, N>(void) = default;
-        Array<Item, N>(const jule::Array<Item, N> &src): buffer(src.buffer) {}
 
-        Array<Item, N>(const std::initializer_list<Item> &src) {
-            std::copy(src.begin(), src.begin()+src.size(), this->buffer.begin());
-        }
+        Array<Item, N>(const jule::Array<Item, N> &src)
+        { std::copy(src.begin(), src.end(), this->begin()); }
+
+        Array<Item, N>(const std::initializer_list<Item> &src)
+        { std::copy(src.begin(), src.end(), this->begin()); }
 
         typedef Item       *Iterator;
         typedef const Item *ConstIterator;
 
         inline constexpr
         Iterator begin(void) noexcept
-        { return this->buffer.begin(); }
+        { return this->buffer; }
 
         inline constexpr
         ConstIterator begin(void) const noexcept
-        { return this->buffer.begin(); }
+        { return this->buffer; }
 
         inline constexpr
         Iterator end(void) noexcept
-        { return this->buffer.end(); }
+        { return this->begin() + N; }
 
         inline constexpr
         ConstIterator end(void) const noexcept
-        { return this->buffer.end(); }
+        { return this->begin() + N; }
 
         inline jule::Slice<Item> slice(const jule::Int &start,
                                        const jule::Int &end) const {
 #ifndef __JULE_DISABLE__SAFETY
-            if (start < 0 || end < 0 || start > end || end > this->len()) {
+            if (start < 0 || end < 0 || start > end || end > N) {
                 std::stringstream sstream;
                 __JULE_WRITE_ERROR_SLICING_INDEX_OUT_OF_RANGE(
                     sstream, start, end );
@@ -65,21 +66,24 @@ namespace jule {
             if (start == end)
                 return jule::Slice<Item>();
 
-            const jule::Int n{ end-start };
             jule::Slice<Item> slice;
-            slice.alloc_new(0, n);
-            slice._len = n;
-            for (jule::Int counter{ 0 }; counter < n; ++counter)
-                slice._slice[counter] = this->buffer[start+counter];
+            slice.alloc_new(0, end-start);
+            slice._len = slice._cap;
+
+            Item *s_it = slice.begin();
+            jule::Array<Item, N>::ConstIterator a_it = this->begin() + start;
+            jule::Array<Item, N>::ConstIterator a_end = this->begin() + end;
+            while (a_it < a_end)
+                *s_it++ = *a_it++;
 
             return slice;
         }
 
         inline jule::Slice<Item> slice(const jule::Int &start) const
-        { return this->slice(start, this->len()); }
+        { return this->slice(start, N); }
 
         inline jule::Slice<Item> slice(void) const
-        { return this->slice(0, this->len()); }
+        { return this->slice(0, N); }
 
         inline constexpr
         jule::Int len(void) const noexcept
@@ -89,9 +93,20 @@ namespace jule {
         jule::Bool empty(void) const noexcept
         { return N == 0; }
 
-        inline constexpr
-        jule::Bool operator==(const jule::Array<Item, N> &src) const
-        { return this->buffer == src.buffer; }
+        constexpr
+        jule::Bool operator==(const jule::Array<Item, N> &src) const {
+            if (this->begin() == src.begin())
+                return true;
+
+            jule::Array<Item, N>::ConstIterator it = src.begin();
+            for (const Item &a: *this)
+                if (a != *it)
+                    return false;
+                 else
+                    ++it;
+
+            return true;
+        }
 
         inline constexpr
         jule::Bool operator!=(const jule::Array<Item, N> &src) const
@@ -99,12 +114,12 @@ namespace jule {
 
         // Returns element by index.
         // Not includes safety checking.
-        inline Item &__at(const jule::Int &index) const noexcept
+        inline constexpr Item &__at(const jule::Int &index) const noexcept
         { return this->buffer[index]; }
 
         Item &operator[](const jule::Int &index) const {
 #ifndef __JULE_DISABLE__SAFETY
-            if (this->empty() || index < 0 || this->len() <= index) {
+            if (this->empty() || index < 0 || N <= index) {
                 std::stringstream sstream;
                 __JULE_WRITE_ERROR_INDEX_OUT_OF_RANGE(sstream, index);
                 jule::panic(sstream.str().c_str());
@@ -116,9 +131,9 @@ namespace jule {
         friend std::ostream &operator<<(std::ostream &stream,
                                         const jule::Array<Item, N> &src) {
             stream << '[';
-            for (jule::Int index{0}; index < src.len();) {
+            for (jule::Int index{0}; index < N;) {
                 stream << src.buffer[index++];
-                if (index < src.len())
+                if (index < N)
                     stream << " ";
             }
             stream << ']';
