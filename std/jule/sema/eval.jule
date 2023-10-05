@@ -1274,10 +1274,13 @@ impl Eval {
         }
         match type d.model {
         | &SliceExprModel:
-            let m = (&SliceExprModel)(d.model)
+            let mut m = (&SliceExprModel)(d.model)
             let indx = index.constant.as_f64()
             if indx >= f64(m.elems.len) {
                 self.push_err(i.token, LogMsg.OverflowLimits)
+            } else {
+                d.model = m.elems[u64(indx)]
+                d.decl = true // Set model flag.
             }
         }
     }
@@ -1431,9 +1434,16 @@ impl Eval {
             ret new(Data)
         }
 
+        // Set decl to true. It's a kind of flag.
+        // If decl is true after indexing eval, do not touch model.
+        // Setted by indexing eval.
+        d.decl = false
+
         self.to_indexing(d, index, i)
         if d.is_const() {
             d.model = d.constant
+        } else if d.decl {
+            d.decl = false
         } else {
             d.model = &IndexigExprModel{
                 expr:  new(Data, old_d),
