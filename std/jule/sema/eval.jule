@@ -1441,6 +1441,7 @@ impl Eval {
 
         self.to_indexing(d, index, i)
         if d.is_const() {
+            d.decl = false
             d.model = d.constant
         } else if d.decl {
             d.decl = false
@@ -1538,6 +1539,7 @@ impl Eval {
                 ret
             }
             d.constant.set_str(s[left:right])
+            d.decl = true // Set model flag.
         } else {
             drop(d.constant)
         }
@@ -1576,19 +1578,32 @@ impl Eval {
             ret d
         }
 
+        // Set decl to true. It's a kind of flag.
+        // If decl is true after indexing eval, do not touch model.
+        // Setted by indexing eval.
+        d.decl = false
+
         self.check_slicing(d, l, r, s)
         drop(d.cast_kind)
 
-        let mut model = &SlicingExprModel{
-            expr: d.model,
-            left: l.model,
+        if d.is_const() {
+            d.decl = false
+            d.model = d.constant
+        } else if d.decl {
+            d.decl = false
+        } else {
+            let mut model = &SlicingExprModel{
+                expr: d.model,
+                left: l.model,
+            }
+
+            if real(r) {
+                model.right = r.model
+            }
+
+            d.model = model
         }
 
-        if real(r) {
-            model.right = r.model
-        }
-
-        d.model = model
         ret d
     }
 
