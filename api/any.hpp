@@ -79,19 +79,42 @@ namespace jule {
         jule::Any::Type *type{ nullptr };
 
         Any(void) = default;
+        Any(const std::nullptr_t): Any() {}
 
         template<typename T>
         Any(const T &expr)
-        { this->operator=(expr); }
+        { this->__assign<T>(expr); }
 
         Any(const jule::Any &src)
-        { this->operator=(src); }
-
-        Any(const std::nullptr_t)
-        { this->operator=(nullptr); }
+        { this->__get_copy(src); }
 
         ~Any(void)
         { this->dealloc(); }
+
+        // Copy content from source.
+        void __get_copy(const jule::Any &src) {
+            if (src == nullptr)
+                return;
+
+            void *new_heap{ src.type->alloc_new_copy(src.data) };
+            if (!new_heap)
+                jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
+
+            this->data = new_heap;
+            this->type = src.type;
+        }
+
+        // Assign data.
+        template<typename T>
+        void __assign(const T &expr) {
+            T *alloc{ new (std::nothrow) T };
+            if (!alloc)
+                jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
+
+            *alloc = expr;
+            this->data = static_cast<void*>(alloc);
+            this->type = jule::Any::new_type<T>();
+        }
 
         void dealloc(void) {
             if (this->data)
@@ -115,14 +138,7 @@ namespace jule {
         template<typename T>
         void operator=(const T &expr) {
             this->dealloc();
-
-            T *alloc{ new (std::nothrow) T };
-            if (!alloc)
-                jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
-
-            *alloc = expr;
-            this->data = static_cast<void*>(alloc);
-            this->type = jule::Any::new_type<T>();
+            this->__assign<T>(expr);
         }
 
         void operator=(const jule::Any &src) {
@@ -130,19 +146,8 @@ namespace jule {
             if (this->data != nullptr && this->data == src.data)
                 return;
 
-            if (src.operator==(nullptr)) {
-                this->operator=(nullptr);
-                return;
-            }
-
             this->dealloc();
-
-            void *new_heap{ src.type->alloc_new_copy(src.data) };
-            if (!new_heap)
-                jule::panic(jule::ERROR_MEMORY_ALLOCATION_FAILED);
-
-            this->data = new_heap;
-            this->type = src.type;
+            this->__get_copy(src);
         }
 
         inline void operator=(const std::nullptr_t)

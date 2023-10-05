@@ -74,10 +74,10 @@ namespace jule {
         }
 
         Slice<Item>(void) = default;
-        Slice<Item>(const std::nullptr_t) {}
+        Slice<Item>(const std::nullptr_t): Slice<Item>() {}
 
         Slice<Item>(const jule::Slice<Item>& src)
-        { this->operator=(src); }
+        { this->__get_copy(src); }
 
         Slice<Item>(const std::initializer_list<Item> &src) {
             if (src.size() == 0)
@@ -92,6 +92,17 @@ namespace jule {
 
         ~Slice<Item>(void)
         { this->dealloc(); }
+
+        // Copy content from source.
+        void __get_copy(const jule::Slice<Item> &src) {
+            if (src == nullptr)
+                return;
+
+            this->_len = src._len;
+            this->_cap = src._cap;
+            this->data = src.data;
+            this->_slice = src._slice;
+        }
 
         inline void check(void) const {
             if(this->operator==(nullptr))
@@ -286,13 +297,7 @@ namespace jule {
             }
 
             this->dealloc();
-            if (src.operator==(nullptr))
-                return;
-
-            this->_len = src._len;
-            this->_cap = src._cap;
-            this->data = src.data;
-            this->_slice = src._slice;
+            this->__get_copy(src);
         }
 
         void operator=(const std::nullptr_t)

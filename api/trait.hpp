@@ -27,7 +27,7 @@ namespace jule {
         const char *type_id { nullptr };
 
         Trait<Mask>(void) = default;
-        Trait<Mask>(std::nullptr_t) {}
+        Trait<Mask>(std::nullptr_t): Trait<Mask>() {}
 
         template<typename T>
         Trait<Mask>(const T &data) {
@@ -57,10 +57,18 @@ namespace jule {
         }
 
         Trait<Mask>(const jule::Trait<Mask> &src)
-        { this->operator=(src); }
+        { this->__get_copy(src); }
 
         void dealloc(void)
         { this->data.drop(); }
+
+        // Copy content from source.
+        void __get_copy(const jule::Trait<Mask> &src) {
+            if (src == nullptr)
+                return;
+            this->data = src.data;
+            this->type_id = src.type_id;
+        }
 
         inline void must_ok(void) const {
             if (this->operator==(nullptr))
@@ -125,10 +133,7 @@ namespace jule {
                 return;
 
             this->dealloc();
-            if (src == nullptr)
-                return;
-            this->data = src.data;
-            this->type_id = src.type_id;
+            this->__get_copy(src);
         }
 
         inline jule::Bool operator==(const jule::Trait<Mask> &src) const

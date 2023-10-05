@@ -41,7 +41,7 @@ namespace jule {
         mutable std::unordered_map<Key, Value, MapKeyHasher> buffer{};
 
         Map<Key, Value>(void) = default;
-        Map<Key, Value>(const std::nullptr_t) {}
+        Map<Key, Value>(const std::nullptr_t): Map<Key, Value>() {}
 
         Map<Key, Value>(const std::initializer_list<std::pair<Key, Value>> &src) {
             for (const std::pair<Key, Value> &pair: src)

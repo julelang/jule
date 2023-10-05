@@ -33,7 +33,7 @@ namespace jule {
 
         Fn<Function>(void) = default;
         Fn<Function>(const Fn<Function> &fn) = default;
-        Fn<Function>(std::nullptr_t) {}
+        Fn<Function>(std::nullptr_t): Fn<Function>() {}
 
         Fn<Function>(const std::function<Function> &function) {
             this->_addr = jule::addr_of_fn(function);

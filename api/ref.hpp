@@ -92,11 +92,20 @@ namespace jule {
 
         Ref<T>(void) = default;
 
-        Ref<T> (const jule::Ref<T> &ref)
-        { this->operator=(ref); }
+        Ref<T> (const jule::Ref<T> &src)
+        { this->__get_copy(src); }
 
         ~Ref<T>(void)
         { this->drop(); }
+
+        // Copy content from source.
+        void __get_copy(const jule::Ref<T> &src) {
+            if (src.ref)
+                src.add_ref();
+
+            this->ref = src.ref;
+            this->alloc = src.alloc;
+        }
 
         inline jule::Int drop_ref(void) const {
             return __jule_atomic_add_explicit(
@@ -174,18 +183,13 @@ namespace jule {
                 jule::panic(jule::ERROR_INVALID_MEMORY);
         }
 
-        void operator=(const jule::Ref<T> &ref) {
+        void operator=(const jule::Ref<T> &src) {
             // Assignment to itself.
-            if (this->alloc != nullptr && this->alloc == ref.alloc)
+            if (this->alloc != nullptr && this->alloc == src.alloc)
                 return;
 
             this->drop();
-
-            if (ref.ref)
-                ref.add_ref();
-
-            this->ref = ref.ref;
-            this->alloc = ref.alloc;
+            this->__get_copy(src);
         }
 
         inline void operator=(const T &val) const {

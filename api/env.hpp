@@ -39,9 +39,8 @@ namespace jule {
         jule::argv = argv;
     }
 
-    inline void setup_envp(char **envp) {
-        jule::envp = envp;
-    }
+    inline void setup_envp(char **envp)
+    { jule::envp = envp; }
 
     jule::Slice<jule::Str> args(void) {
 #ifdef OS_WINDOWS
