@@ -53,7 +53,6 @@ use std::jule::sema::{
     AlignofExprModel,
     StrConstructorCallExprModel,
     RuneExprModel,
-    ExplicitDerefExprModel,
     StructStaticIdentExprModel,
     IntegratedToStrExprModel,
     TernaryExprModel,
@@ -289,7 +288,7 @@ fn gen_div_by_zero_binop_expr_model(op: str, mut l: ExprModel, mut r: ExprModel)
     | str(TokenKind.Percent): op_func = "mod"
     }
 
-    if env::OPT_MATH {
+    if *env::OPT_MATH {
         match type r {
         | &Const:
             op_func = "unsafe_" + op_func
@@ -541,7 +540,7 @@ fn gen_indexing_expr_model(mut m: &IndexigExprModel): str {
     let mut obj = gen_expr_model(m.expr.model)
 
     // Try access optimization.
-    if env::OPT_ACCESS {
+    if *env::OPT_ACCESS {
         let array = real(m.expr.kind.arr())
 
         // Constants checked by semantic analysis for arrays, safe.
@@ -877,12 +876,6 @@ fn gen_builtin_error_trait_sub_ident_expr_model(mut m: &BuiltinErrorTraitSubIden
     ret obj
 }
 
-fn gen_explicit_deref_expr_model(mut m: &ExplicitDerefExprModel): str {
-    let mut obj = gen_expr_model(m.expr)
-    obj += ".get()"
-    ret obj
-}
-
 fn gen_struct_static_ident_expr_model(mut m: &StructStaticIdentExprModel): str {
     let mut obj = struct_ins_out_ident(m.structure)
     obj += "::"
@@ -1023,9 +1016,6 @@ fn gen_expr_model(mut m: ExprModel): str {
 
     | &BuiltinErrorTraitSubIdentExprModel:
         ret gen_builtin_error_trait_sub_ident_expr_model((&BuiltinErrorTraitSubIdentExprModel)(m))
-
-    | &ExplicitDerefExprModel:
-        ret gen_explicit_deref_expr_model((&ExplicitDerefExprModel)(m))
 
     | &StructStaticIdentExprModel:
         ret gen_struct_static_ident_expr_model((&StructStaticIdentExprModel)(m))

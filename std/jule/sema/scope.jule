@@ -588,7 +588,7 @@ impl ScopeChecker {
     // Returns nil if not exist any label in this identifier.
     // Lookups all labels.
     fn find_label_all(mut self, ident: str): &ScopeLabel {
-        for (_, mut lbl) in self.labels {
+        for (_, mut lbl) in *self.labels {
             if lbl.label.ident == ident {
                 ret lbl
             }
@@ -723,21 +723,7 @@ impl ScopeChecker {
         }
 
         let mut prim = d.kind.prim()
-        if !real(prim) {
-            let mut ref = d.kind.ref()
-            if !real(ref) {
-                self.s.push_err(i.expr.token, LogMsg.IfRequireBoolExpr)
-                ret new(If)
-            }
-
-            prim = ref.elem.prim()
-            if !real(prim) {
-                self.s.push_err(i.expr.token, LogMsg.IfRequireBoolExpr)
-                ret new(If)
-            }
-        }
-
-        if !prim.is_bool() {
+        if !real(prim) || !prim.is_bool() {
             self.s.push_err(i.expr.token, LogMsg.IfRequireBoolExpr)
             ret new(If)
         }
@@ -749,9 +735,8 @@ impl ScopeChecker {
     }
 
     fn check_else(mut &self, mut e: &std::jule::ast::Else): &Else {
-        let mut s = self.check_child(e.scope)
         ret &Else{
-            scope: s,
+            scope: self.check_child(e.scope),
         }
     }
 
@@ -1055,12 +1040,7 @@ impl ScopeChecker {
                 ret
             }
         } else {
-            let mut check_t = d.kind
-            if real(d.kind.ref()) {
-                check_t = d.kind.ref().elem
-            }
-
-            if !real(check_t.prim()) || !types::is_num(check_t.prim().kind) {
+            if !real(d.kind.prim()) || !types::is_num(d.kind.prim().kind) {
                 self.s.push_err(a.setter, LogMsg.OperatorNotForJuleType, a.setter.kind, d.kind.to_str())
                 ret
             }
@@ -1726,7 +1706,7 @@ impl ScopeChecker {
     }
 
     fn check_gotos(mut self) {
-        for (_, mut gt) in self.gotos {
+        for (_, mut gt) in *self.gotos {
             let mut label = self.find_label_all(gt.gt.label.kind)
             if !real(label) {
                 self.s.push_err(gt.gt.token, LogMsg.LabelNotExist, gt.gt.label.kind)
@@ -1739,7 +1719,7 @@ impl ScopeChecker {
     }
 
     fn check_labels(mut self) {
-        for _, l in self.labels {
+        for _, l in *self.labels {
             if !l.used {
                 self.s.push_err(l.token, LogMsg.DeclaredButNotUsed, l.label.ident)
             }

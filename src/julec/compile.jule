@@ -104,7 +104,7 @@ fn compile_ir(compiler: str, compiler_cmd: str) {
 fn do_spell(obj: str, compiler: str, compiler_cmd: str) {
     let path = get_compile_path()
     write_output(path, obj)
-    if !TRANSPILATION {
+    if !*TRANSPILATION {
         compile_ir(compiler, compiler_cmd)
     }
 }
@@ -149,8 +149,8 @@ fn gen_compile_cmd(source_path: str, &ir: &obj::IR): (str, str) {
         }
     }
 
-    if OUT != "" {
-        cmd += "-o " + OUT + " "
+    if *OUT != "" {
+        cmd += "-o " + *OUT + " "
     }
     cmd += source_path
 
@@ -168,7 +168,7 @@ fn get_compile_path(): str {
 }
 
 fn apply_target_independent_optimizations(mut &ir: &obj::IR) {
-    if env::OPT_DEADCODE {
+    if *env::OPT_DEADCODE {
         deadcode::eliminate(ir)
     }
 }
@@ -185,7 +185,7 @@ fn check_compiler_flag() {
         *COMPILER_PATH = "g++"
 
     |:
-        exit_err("invalid option value for --compiler: " + COMPILER)
+        exit_err("invalid option value for --compiler: " + *COMPILER)
     }
 }
 
@@ -210,13 +210,13 @@ fn check_target_os(os: str) {
 }
 
 fn check_target_flag() {
-    if TARGET == "" {
+    if *TARGET == "" {
         exit_err("missing option value: --target")
     }
 
     let parts = TARGET.split("-", -1)
     if parts.len != 2 {
-        exit_err("--target: undefined platform target format: " + TARGET)
+        exit_err("--target: undefined platform target format: " + *TARGET)
     }
 
     let (os, arch) = parts[0], parts[1]
@@ -240,7 +240,7 @@ fn check_opt_flag() {
     match *OPT {
     | "L0": // Nothing.
     | "L1": push_opt_level(OptLevel.L1)
-    |:      exit_err("--opt: invalid optimization level: " + OPT)
+    |:      exit_err("--opt: invalid optimization level: " + *OPT)
     }
 }
 
@@ -249,7 +249,7 @@ fn check_flags() {
     check_target_flag()
     check_opt_flag()
 
-    if SHADOWING {
+    if *SHADOWING {
         SEMA_FLAGS |= SemaFlag.Shadowing
     }
 }

@@ -330,12 +330,6 @@ fn builtin_caller_new(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Data
                 !e.immutable, REFERENCE, t.kind, init, token)
             e.s.check_assign_type(false, t.kind, init, token)
 
-            if real(init.kind.ref()) {
-                init.model = &ExplicitDerefExprModel{
-                    expr: init.model,
-                }
-            }
-
             d.model = &BuiltinNewCallExprModel{
                 kind: t.kind,
                 init: init.model,
@@ -513,12 +507,6 @@ fn builtin_caller_append(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &D
         ret new(Data)
     }
 
-    let mut ref = false
-    if real(t.kind.ref()) {
-        t.kind = t.kind.ref().elem
-        ref = true
-    }
-
     if !real(t.kind.slc()) {
         e.push_err(fc.args[0].token, LogMsg.InvalidExpr)
         ret new(Data)
@@ -549,11 +537,6 @@ fn builtin_caller_append(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &D
     d = builtin_caller_common_plain(e, fc, d)
     if real(d) {
         let mut model = (&FnCallExprModel)(d.model)
-        if ref {
-            model.args[0] = &ExplicitDerefExprModel{
-                expr: t.model,
-            }
-        }
         d.model = &BuiltinAppendCallExprModel{
             dest:     model.args[0],
             elements: model.args[1],
@@ -581,12 +564,6 @@ fn builtin_caller_copy(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
     let mut t = e.eval_expr(fc.args[0])
     if !real(t) {
         ret new(Data)
-    }
-
-    let mut ref = false
-    if real(t.kind.ref()) {
-        t.kind = t.kind.ref().elem
-        ref = false
     }
 
     if !real(t.kind.slc()) {
@@ -619,11 +596,6 @@ fn builtin_caller_copy(mut &e: &Eval, mut &fc: &FnCallExpr, mut &d: &Data): &Dat
     d.model = &CommonIdentExprModel{ident: "copy"}
 
     d = builtin_caller_common_plain(e, fc, d)
-    if real(d) && ref {
-        (&FnCallExprModel)(d.model).args[0] = &ExplicitDerefExprModel{
-            expr: t.model,
-        }
-    }
     ret d
 }
 

@@ -195,16 +195,11 @@ fn check_data_for_integer_indexing(mut &d: &Data): (err_fmt: LogMsg) {
         ret LogMsg.Empty
     }
 
-    let mut kind = d.kind
-    if real(kind.ref()) {
-        kind = kind.ref().elem
-    }
-
     match {
-    | !real(kind.prim()):
+    | !real(d.kind.prim()):
         ret LogMsg.InvalidExpr
 
-    | !types::is_int(kind.prim().to_str()):
+    | !types::is_int(d.kind.prim().to_str()):
         ret LogMsg.InvalidExpr
 
     | d.is_const():
@@ -840,20 +835,10 @@ impl Eval {
     }
 
     fn eval_unary_minus(self, mut &d: &Data) {
-        if real(d.kind.ref()) {
-            let mut ref = d.kind.ref()
-            let prim = ref.elem.prim()
-            if !real(prim) || !types::is_num(prim.to_str()) {
-                drop(d)
-                ret
-            }
-            d.kind = ref.elem
-        } else {
-            let t = d.kind.prim()
-            if !real(t) || !types::is_num(t.to_str()) {
-                drop(d)
-                ret
-            }
+        let t = d.kind.prim()
+        if !real(t) || !types::is_num(t.to_str()) {
+            drop(d)
+            ret
         }
 
         if d.is_const() {
@@ -873,20 +858,10 @@ impl Eval {
     }
 
     fn eval_unary_plus(self, mut &d: &Data) {
-        if real(d.kind.ref()) {
-            let mut ref = d.kind.ref()
-            let prim = ref.elem.prim()
-            if !real(prim) || !types::is_num(prim.to_str()) {
-                drop(d)
-                ret
-            }
-            d.kind = ref.elem
-        } else {
-            let t = d.kind.prim()
-            if !real(t) || !types::is_num(t.to_str()) {
-                drop(d)
-                ret
-            }
+        let t = d.kind.prim()
+        if !real(t) || !types::is_num(t.to_str()) {
+            drop(d)
+            ret
         }
 
         if d.is_const() {
@@ -906,20 +881,10 @@ impl Eval {
     }
 
     fn eval_unary_caret(self, mut &d: &Data) {
-        if real(d.kind.ref()) {
-            let mut ref = d.kind.ref()
-            let prim = ref.elem.prim()
-            if !real(prim) || !types::is_int(prim.to_str()) {
-                drop(d)
-                ret
-            }
-            d.kind = ref.elem
-        } else {
-            let t = d.kind.prim()
-            if !real(t) || !types::is_int(t.to_str()) {
-                drop(d)
-                ret
-            }
+        let t = d.kind.prim()
+        if !real(t) || !types::is_int(t.to_str()) {
+            drop(d)
+            ret
         }
 
         if d.is_const() {
@@ -940,20 +905,10 @@ impl Eval {
     }
 
     fn eval_unary_excl(self, mut &d: &Data) {
-        if real(d.kind.ref()) {
-            let mut ref = d.kind.ref()
-            let prim = ref.elem.prim()
-            if !real(prim) || !prim.is_bool() {
-                drop(d)
-                ret
-            }
-            d.kind = ref.elem
-        } else {
-            let t = d.kind.prim()
-            if !real(t) || !t.is_bool() {
-                drop(d)
-                ret
-            }
+        let t = d.kind.prim()
+        if !real(t) || !t.is_bool() {
+            drop(d)
+            ret
         }
 
         if d.is_const() {
@@ -1107,13 +1062,6 @@ impl Eval {
         let mut d = self.eval_expr_kind(v.expr)
         if !real(d) {
             ret new(Data)
-        }
-
-        if real(d.kind.ref()) {
-            d.kind = d.kind.ref().elem
-            d.model = &ExplicitDerefExprModel{
-                expr: d.model,
-            }
         }
 
         if !d.kind.variadicable() {
@@ -1641,13 +1589,7 @@ impl Eval {
             ret
         }
 
-        let mut s = new(StructIns)
-        if real(t.ref()) {
-            s = t.ref().elem.strct()
-        } else {
-            s = t.strct()
-        }
-
+        let mut s = t.strct()
         self.push_reference_to_struct(s)
 
         if !s.decl.is_implements(tr) {
@@ -1658,7 +1600,7 @@ impl Eval {
     fn cast_ref(mut self, mut t: &TypeKind, mut d: &Data, error_token: Token) {
         let mut ref = t.ref()
         if real(ref.elem.strct()) {
-            self.cast_struct(t, d, error_token)
+            self.cast_struct(ref.elem, d, error_token)
             ret
         }
 
@@ -2388,9 +2330,6 @@ impl Eval {
 
     fn eval_map_sub_ident(mut self, mut d: &Data, ident: Token): &Data {
         let mut map_kind = d.kind.map()
-        if !real(map_kind) {
-            map_kind = d.kind.ref().elem.map()
-        }
 
         match ident.kind {
         | "len":
@@ -3554,6 +3493,27 @@ impl BinopSolver {
         }
     }
 
+    fn eval_ref(mut self): &Data {
+        if !self.check_type_compatibility() {
+            self.e.push_err(self.op, LogMsg.IncompatibleTypes, self.l.kind.to_str(), self.r.kind.to_str())
+            ret new(Data)
+        }
+
+        match self.op.kind {
+        | str(TokenKind.Eqs)
+        | str(TokenKind.NotEq):
+            ret &Data{
+                kind: &TypeKind{
+                    kind: build_prim_type(str(PrimKind.Bool)),
+                },
+            }
+
+        |:
+            self.e.push_err(self.op, LogMsg.OperatorNotForJuleType, self.op.kind, self.l.kind.to_str())
+            ret new(Data)
+        }
+    }
+
     fn eval_ptr(mut self): &Data {
         match self.op.kind {
         | str(TokenKind.Eqs)
@@ -4033,6 +3993,9 @@ impl BinopSolver {
         | real(self.l.kind.enm()):
             ret self.eval_enum()
 
+        | real(self.l.kind.ref()) || real(self.r.kind.ref()):
+            ret self.eval_ref()
+
         | real(self.l.kind.ptr()) || real(self.r.kind.ptr()):
             ret self.eval_ptr()
 
@@ -4160,17 +4123,6 @@ impl BinopSolver {
         normalize_bitsize(d)
     }
 
-    fn prepare_data(self, mut &d: &Data) {
-        if real(d) && real(d.kind.ref()) {
-            d.kind = d.kind.ref().elem
-        }
-    }
-
-    fn prepare_eval(mut self) {
-        self.prepare_data(self.r)
-        self.prepare_data(self.l)
-    }
-
     fn check_data(mut self, mut &d: &Data) {
         let f = d.kind.fnc()
         if real(f) && real(f.decl) && f.decl.is_method() {
@@ -4186,7 +4138,6 @@ impl BinopSolver {
     fn solve_explicit(mut self, mut &l: &Data, mut &r: &Data): &Data {
         self.l, self.r = l, r
 
-        self.prepare_eval()
         self.check_datas()
 
         let mut d = self.eval()

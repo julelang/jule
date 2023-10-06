@@ -432,7 +432,7 @@ impl Parser {
     }
 
     fn build_var_begin(mut self, mut &v: &VarDecl, mut i: &int, &tokens: []Token) {
-        let tok = tokens[i]
+        let tok = tokens[*i]
         match tok.id {
         | TokenId.Static:
             v.statically = true
@@ -440,19 +440,19 @@ impl Parser {
 
         | TokenId.Let:
             // Initialize 1 for skip the let keyword
-            i++
-            if i >= tokens.len {
+            *i++
+            if *i >= tokens.len {
                 self.push_err(tok, LogMsg.InvalidSyntax)
                 ret
             }
-            if tokens[i].id == TokenId.Mut {
+            if tokens[*i].id == TokenId.Mut {
                 v.mutable = true
                 // Skip the mut keyword
-                i++
+                *i++
             }
 
         | TokenId.Const:
-            i++
+            *i++
             v.constant = true
 
         |:
@@ -460,7 +460,7 @@ impl Parser {
             ret
         }
 
-        if i >= tokens.len {
+        if *i >= tokens.len {
             self.push_err(tok, LogMsg.InvalidSyntax)
         }
     }
@@ -468,14 +468,14 @@ impl Parser {
     fn build_var(mut &self, mut tokens: []Token): &VarDecl {
         let mut i = new(int, 0)
         let mut v = &VarDecl{
-            token: tokens[i],
+            token: tokens[*i],
         }
         self.build_var_begin(v, i, tokens)
-        if i >= tokens.len {
+        if *i >= tokens.len {
             ret new(VarDecl)
         }
 
-        tokens = tokens[i:]
+        tokens = tokens[*i:]
         if tokens[0].id == TokenId.Op && tokens[0].kind == str(TokenKind.Amper) {
             v.reference = true
             if tokens.len == 1 {
@@ -600,23 +600,23 @@ impl Parser {
     }
 
     fn build_param_body(mut &self, mut &param: &ParamDecl, mut i: &int, mut tokens: []Token) {
-        self.param_body_id(param, tokens[i])
-        let mut tok = tokens[i]
+        self.param_body_id(param, tokens[*i])
+        let mut tok = tokens[*i]
         // +1 for skip identifier token
-        if i+1 >= tokens.len {
+        if *i+1 >= tokens.len {
             ret
-        } else if tokens.len-i-1 < 2 {
+        } else if tokens.len - *i - 1 < 2 {
             self.push_err(tok, LogMsg.MissingType)
             ret
         }
 
-        tok = tokens[i+1]
+        tok = tokens[*i+1]
         if tok.id != TokenId.Colon {
             self.build_param_type(param, tokens)
             ret
         }
 
-        tokens = tokens[i+2:] // Skip colon
+        tokens = tokens[*i+2:] // Skip colon
         self.build_param_type(param, tokens)
     }
 
@@ -1154,8 +1154,8 @@ impl Parser {
     fn build_enum_item_expr(mut &self, mut i: &int, mut &tokens: []Token): &Expr {
         let mut brace_n = 0
         let expr_start = *i
-        for i < tokens.len; i++ {
-            let t = tokens[i]
+        for *i < tokens.len; *i++ {
+            let t = tokens[*i]
             if t.id == TokenId.Range {
                 match t.kind {
                 | str(TokenKind.LBrace)
@@ -1173,10 +1173,10 @@ impl Parser {
                 continue
             }
 
-            if t.id == TokenId.Comma || i+1 >= tokens.len {
+            if t.id == TokenId.Comma || *i+1 >= tokens.len {
                 let mut expr_tokens: []Token = nil
                 if t.id == TokenId.Comma {
-                    expr_tokens = tokens[expr_start:i]
+                    expr_tokens = tokens[expr_start:*i]
                 } else {
                     expr_tokens = tokens[expr_start:]
                 }
@@ -1189,8 +1189,8 @@ impl Parser {
     fn build_enum_items(mut &self, mut &tokens: []Token): []&EnumItemDecl {
         let mut items = make([]&EnumItemDecl, 0, 1)
         let mut i = new(int, 0)
-        for i < tokens.len; i++ {
-            let mut t = tokens[i]
+        for *i < tokens.len; *i++ {
+            let mut t = tokens[*i]
             if t.id == TokenId.Comment {
                 continue
             }
@@ -1202,22 +1202,22 @@ impl Parser {
                 self.push_suggestion(LogMsg.ExpectedIdentifier)
             }
             item.ident = item.token.kind
-            if i+1 >= tokens.len || tokens[i+1].id == TokenId.Comma {
-                if i+1 < tokens.len {
-                    i++
+            if *i+1 >= tokens.len || tokens[*i+1].id == TokenId.Comma {
+                if *i+1 < tokens.len {
+                    *i++
                 }
                 items = append(items, item)
                 continue
             }
-            i++
-            t = tokens[i]
-            i++
+            *i++
+            t = tokens[*i]
+            *i++
             if t.id != TokenId.Op || t.kind != str(TokenKind.Eq) {
                 self.push_err(t, LogMsg.InvalidSyntax)
                 self.push_suggestion(LogMsg.ExpectedEqualsForAssign)
                 continue
             }
-            if i >= tokens.len || tokens[i].id == TokenId.Comma {
+            if *i >= tokens.len || tokens[*i].id == TokenId.Comma {
                 self.push_err(t, LogMsg.MissingExpr)
                 continue
             }
