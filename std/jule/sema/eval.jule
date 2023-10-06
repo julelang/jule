@@ -757,7 +757,7 @@ impl Eval {
         }
 
         if v.constant && real(v.value.data.constant) {
-            d.constant = new(Const, v.value.data.constant)
+            d.constant = new(Const, *v.value.data.constant)
             d.model = d.constant
         }
 
@@ -1440,7 +1440,7 @@ impl Eval {
             ret self.eval_ident_decl_from_indexing(i)
         }
 
-        let mut old_d: Data = d
+        let mut old_d = *d
 
         let mut index = self.eval_expr_kind(i.index)
         if !real(index) {
@@ -2200,7 +2200,7 @@ impl Eval {
         if !real(item) {
             self.push_err(ident, LogMsg.ObjHaveNotIdent, ident.kind)
         } else {
-            d.constant = new(Const, item.value.data.constant)
+            d.constant = new(Const, *item.value.data.constant)
             d.model = d.constant
         }
 
@@ -4075,73 +4075,77 @@ impl BinopSolver {
 
         match self.op.kind {
         | str(TokenKind.Eqs):
-            d.constant = Const.new_bool(self.l.constant.eqs(self.r.constant))
+            d.constant = Const.new_bool(self.l.constant.eqs(*self.r.constant))
 
         | str(TokenKind.NotEq):
-            d.constant = Const.new_bool(!self.l.constant.eqs(self.r.constant))
+            d.constant = Const.new_bool(!self.l.constant.eqs(*self.r.constant))
 
         | str(TokenKind.DblColon):
-            d.constant = Const.new_bool(self.l.constant.or(self.r.constant))
+            d.constant = Const.new_bool(self.l.constant.or(*self.r.constant))
 
         | str(TokenKind.DblAmper):
-            d.constant = Const.new_bool(self.l.constant.and(self.r.constant))
+            d.constant = Const.new_bool(self.l.constant.and(*self.r.constant))
 
         | str(TokenKind.Gt):
-            d.constant = Const.new_bool(self.l.constant.gt(self.r.constant))
+            d.constant = Const.new_bool(self.l.constant.gt(*self.r.constant))
 
         | str(TokenKind.Lt):
-            d.constant = Const.new_bool(self.l.constant.lt(self.r.constant))
+            d.constant = Const.new_bool(self.l.constant.lt(*self.r.constant))
 
         | str(TokenKind.GreatEq):
-            d.constant = Const.new_bool(self.l.constant.gt(self.r.constant) || self.l.constant.eqs(self.r.constant))
+            d.constant = Const.new_bool(
+                self.l.constant.gt(*self.r.constant) ||
+                self.l.constant.eqs(*self.r.constant))
 
         | str(TokenKind.LessEq):
-            d.constant = Const.new_bool(self.l.constant.lt(self.r.constant) || self.l.constant.eqs(self.r.constant))
+            d.constant = Const.new_bool(
+                self.l.constant.lt(*self.r.constant) ||
+                self.l.constant.eqs(*self.r.constant))
 
         | str(TokenKind.Plus):
-            _ = self.l.constant.add(self.r.constant)
+            _ = self.l.constant.add(*self.r.constant)
             d.constant = self.l.constant
 
         | str(TokenKind.Minus):
-            _ = self.l.constant.sub(self.r.constant)
+            _ = self.l.constant.sub(*self.r.constant)
             d.constant = self.l.constant
 
         | str(TokenKind.Star):
-            _ = self.l.constant.mul(self.r.constant)
+            _ = self.l.constant.mul(*self.r.constant)
             d.constant = self.l.constant
 
         | str(TokenKind.Solidus):
-            let ok = self.l.constant.div(self.r.constant)
+            let ok = self.l.constant.div(*self.r.constant)
             if !ok && self.r.constant.as_f64() == 0 {
                 self.e.push_err(self.op, LogMsg.DivByZero)
             }
             d.constant = self.l.constant
 
         | str(TokenKind.Percent):
-            let ok = self.l.constant.mod(self.r.constant)
+            let ok = self.l.constant.mod(*self.r.constant)
             if !ok && self.r.constant.as_f64() == 0 {
                 self.e.push_err(self.op, LogMsg.DivByZero)
             }
             d.constant = self.l.constant
 
         | str(TokenKind.Vline):
-            _ = self.l.constant.bitwise_or(self.r.constant)
+            _ = self.l.constant.bitwise_or(*self.r.constant)
             d.constant = self.l.constant
 
         | str(TokenKind.Amper):
-            _ = self.l.constant.bitwise_and(self.r.constant)
+            _ = self.l.constant.bitwise_and(*self.r.constant)
             d.constant = self.l.constant
 
         | str(TokenKind.Caret):
-            _ = self.l.constant.xor(self.r.constant)
+            _ = self.l.constant.xor(*self.r.constant)
             d.constant = self.l.constant
 
         | str(TokenKind.Lshift):
-            _ = self.l.constant.lshift(self.r.constant)
+            _ = self.l.constant.lshift(*self.r.constant)
             d.constant = self.l.constant
 
         | str(TokenKind.Rshift):
-            _ = self.l.constant.rshift(self.r.constant)
+            _ = self.l.constant.rshift(*self.r.constant)
             d.constant = self.l.constant
         }
 
