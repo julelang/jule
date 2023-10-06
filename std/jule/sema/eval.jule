@@ -972,18 +972,30 @@ impl Eval {
     }
 
     fn eval_unary_star(mut self, mut &d: &Data, &op: Token) {
-        if !self.is_unsafe() {
-            self.push_err(op, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
-        }
+        match {
+        | real(d.kind.ptr()):
+            if !self.is_unsafe() {
+                self.push_err(op, LogMsg.UnsafeBehaviorAtOutOfUnsafeScope)
+            }
 
-        let mut t = d.kind.ptr()
-        if !real(t) || t.is_unsafe() {
+            let mut t = d.kind.ptr()
+            if t.is_unsafe() {
+                drop(d)
+                ret
+            }
+            d.kind = t.elem
+
+        | real(d.kind.ref()):
+            let mut t = d.kind.ref()
+            d.kind = t.elem
+
+        |:
             drop(d)
             ret
         }
+
         drop(d.constant)
         d.lvalue = true
-        d.kind = t.elem
         d.model = &UnaryExprModel{
             expr: d.model,
             op:   str(TokenKind.Star),
